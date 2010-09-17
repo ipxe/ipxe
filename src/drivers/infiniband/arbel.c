@@ -772,6 +772,7 @@ static int arbel_alloc_qpn ( struct ib_device *ibdev,
 		qp->qpn = ( arbel->special_qpn_base + 2 + port_offset );
 		return 0;
 	case IB_QPT_UD:
+	case IB_QPT_RC:
 		/* Find a free queue pair number */
 		qpn_offset = arbel_bitmask_alloc ( arbel->qp_inuse,
 						   ARBEL_MAX_QPS );
@@ -822,6 +823,7 @@ static uint8_t arbel_qp_st[] = {
 	[IB_QPT_SMI] = ARBEL_ST_MLX,
 	[IB_QPT_GSI] = ARBEL_ST_MLX,
 	[IB_QPT_UD] = ARBEL_ST_UD,
+	[IB_QPT_RC] = ARBEL_ST_RC,
 };
 
 /**
@@ -948,6 +950,18 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	physaddr_t wqe_base_adr;
 	int rc;
 
+	/* Warn about dysfunctional code
+	 *
+	 * Arbel seems to crash the system as soon as the first send
+	 * WQE completes on an RC queue pair.  (NOPs complete
+	 * successfully, so this is a problem specific to the work
+	 * queue rather than the completion queue.)  The cause of this
+	 * problem has remained unknown for over a year.  Patches to
+	 * fix this are welcome.
+	 */
+	if ( qp->type == IB_QPT_RC )
+		DBG ( "*** WARNING: Arbel RC support is non-functional ***\n" );
+
 	/* Calculate queue pair number */
 	if ( ( rc = arbel_alloc_qpn ( ibdev, qp ) ) != 0 )
 		goto err_alloc_qpn;
@@ -1021,7 +1035,11 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 		     ( send_wqe_base_adr >> 6 ) );
 	MLX_FILL_1 ( &qpctx, 35, qpc_eec_data.snd_db_record_index,
 		     arbel_qp->send.doorbell_idx );
-	MLX_FILL_1 ( &qpctx, 38, qpc_eec_data.rsc, 1 );
+	MLX_FILL_4 ( &qpctx, 38,
+		     qpc_eec_data.rre, 1,
+		     qpc_eec_data.rwe, 1,
+		     qpc_eec_data.rae, 1,
+		     qpc_eec_data.rsc, 1 );
 	MLX_FILL_1 ( &qpctx, 41, qpc_eec_data.cqn_rcv, qp->recv.cq->cqn );
 	MLX_FILL_1 ( &qpctx, 42, qpc_eec_data.rcv_wqe_base_adr_l,
 		     ( recv_wqe_base_adr >> 6 ) );
@@ -1084,7 +1102,30 @@ static int arbel_modify_qp ( struct ib_device *ibdev,
 		memset ( &qpctx, 0, sizeof ( qpctx ) );
 		MLX_FILL_2 ( &qpctx, 4,
 			     qpc_eec_data.mtu, ARBEL_MTU_2048,
-			     qpc_eec_data.msg_max, 11 /* 2^11 = 2048 */ );
+			     qpc_eec_data.msg_max, 31 );
+		MLX_FILL_1 ( &qpctx, 7,
+			     qpc_eec_data.remote_qpn_een, qp->av.qpn );
+		MLX_FILL_2 ( &qpctx, 11,
+			     qpc_eec_data.primary_address_path.rnr_retry,
+			     ARBEL_RETRY_MAX,
+			     qpc_eec_data.primary_address_path.rlid,
+			     qp->av.lid );
+		MLX_FILL_2 ( &qpctx, 12,
+			     qpc_eec_data.primary_address_path.ack_timeout,
+			     14 /* 4.096us * 2^(14) = 67ms */,
+			     qpc_eec_data.primary_address_path.max_stat_rate,
+			     arbel_rate ( &qp->av ) );
+		memcpy ( &qpctx.u.dwords[14], &qp->av.gid,
+			 sizeof ( qp->av.gid ) );
+		MLX_FILL_1 ( &qpctx, 30,
+			     qpc_eec_data.retry_count, ARBEL_RETRY_MAX );
+		MLX_FILL_1 ( &qpctx, 39,
+			     qpc_eec_data.next_rcv_psn, qp->recv.psn );
+		MLX_FILL_1 ( &qpctx, 40,
+			     qpc_eec_data.ra_buff_indx,
+			     ( arbel->limits.reserved_rdbs +
+			       ( ( qp->qpn & ~ARBEL_QPN_RANDOM_MASK ) -
+				 arbel->special_qpn_base ) ) );
 		if ( ( rc = arbel_cmd_init2rtr_qpee ( arbel, qp->qpn,
 						      &qpctx ) ) != 0 ) {
 			DBGC ( arbel, "Arbel %p QPN %#lx INIT2RTR_QPEE failed:"
@@ -1097,6 +1138,15 @@ static int arbel_modify_qp ( struct ib_device *ibdev,
 	/* Transition queue to RTS state, if applicable */
 	if ( arbel_qp->state < ARBEL_QP_ST_RTS ) {
 		memset ( &qpctx, 0, sizeof ( qpctx ) );
+		MLX_FILL_1 ( &qpctx, 11,
+			     qpc_eec_data.primary_address_path.rnr_retry,
+			     ARBEL_RETRY_MAX );
+		MLX_FILL_1 ( &qpctx, 12,
+			     qpc_eec_data.primary_address_path.ack_timeout,
+			     14 /* 4.096us * 2^(14) = 67ms */ );
+		MLX_FILL_2 ( &qpctx, 30,
+			     qpc_eec_data.retry_count, ARBEL_RETRY_MAX,
+			     qpc_eec_data.sic, 1 );
 		MLX_FILL_1 ( &qpctx, 32,
 			     qpc_eec_data.next_send_psn, qp->send.psn );
 		if ( ( rc = arbel_cmd_rtr2rts_qpee ( arbel, qp->qpn,
@@ -1288,6 +1338,36 @@ static size_t arbel_fill_mlx_send_wqe ( struct ib_device *ibdev,
 	return ( offsetof ( typeof ( wqe->mlx ), data[2] ) >> 4 );
 }
 
+/**
+ * Construct RC send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @v wqe		Send work queue entry
+ * @v next		Previous work queue entry's "next" field
+ * @ret nds		Work queue entry size
+ */
+static size_t arbel_fill_rc_send_wqe ( struct ib_device *ibdev,
+				       struct ib_queue_pair *qp __unused,
+				       struct ib_address_vector *av __unused,
+				       struct io_buffer *iobuf,
+				       union arbel_send_wqe *wqe ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+
+	/* Construct this work queue entry */
+	MLX_FILL_1 ( &wqe->rc.ctrl, 0, always1, 1 );
+	MLX_FILL_1 ( &wqe->rc.data[0], 0, byte_count, iob_len ( iobuf ) );
+	MLX_FILL_1 ( &wqe->rc.data[0], 1, l_key, arbel->lkey );
+	MLX_FILL_H ( &wqe->rc.data[0], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
+	MLX_FILL_1 ( &wqe->rc.data[0], 3,
+		     local_address_l, virt_to_bus ( iobuf->data ) );
+
+	return ( offsetof ( typeof ( wqe->rc ), data[1] ) >> 4 );
+}
+
 /** Work queue entry constructors */
 static size_t
 ( * arbel_fill_send_wqe[] ) ( struct ib_device *ibdev,
@@ -1298,6 +1378,7 @@ static size_t
 	[IB_QPT_SMI] = arbel_fill_mlx_send_wqe,
 	[IB_QPT_GSI] = arbel_fill_mlx_send_wqe,
 	[IB_QPT_UD] = arbel_fill_ud_send_wqe,
+	[IB_QPT_RC] = arbel_fill_rc_send_wqe,
 };
 
 /**
@@ -1495,6 +1576,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 			    sizeof ( arbel_recv_wq->wqe[0] ) );
 		assert ( wqe_idx < qp->recv.num_wqes );
 	}
+
 	DBGCP ( arbel, "Arbel %p CQN %#lx QPN %#lx %s WQE %#lx completed:\n",
 		arbel, cq->cqn, qp->qpn, ( is_send ? "send" : "recv" ),
 		wqe_idx );
@@ -1541,6 +1623,9 @@ static int arbel_complete ( struct ib_device *ibdev,
 			av->sl = MLX_GET ( &cqe->normal, sl );
 			av->gid_present = MLX_GET ( &cqe->normal, g );
 			memcpy ( &av->gid, &grh->sgid, sizeof ( av->gid ) );
+			break;
+		case IB_QPT_RC:
+			av = &qp->av;
 			break;
 		default:
 			assert ( 0 );
@@ -2297,7 +2382,8 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	log_num_eqs = fls ( arbel->limits.reserved_eqs + ARBEL_MAX_EQS - 1 );
 	log_num_mtts = fls ( arbel->limits.reserved_mtts - 1 );
 	log_num_mpts = fls ( arbel->limits.reserved_mrws + 1 - 1 );
-	log_num_rdbs = fls ( arbel->limits.reserved_rdbs - 1 );
+	log_num_rdbs = fls ( arbel->limits.reserved_rdbs +
+			     ARBEL_RSVD_SPECIAL_QPS + ARBEL_MAX_QPS - 1 );
 	log_num_uars = fls ( arbel->limits.reserved_uars +
 			     1 /* single UAR used */ - 1 );
 	log_num_mcs = ARBEL_LOG_MULTICAST_HASH_SIZE;
@@ -2614,13 +2700,18 @@ static int arbel_setup_mpt ( struct arbel *arbel ) {
 
 	/* Initialise memory protection table */
 	memset ( &mpt, 0, sizeof ( mpt ) );
-	MLX_FILL_4 ( &mpt, 0,
-		     r_w, 1,
-		     pa, 1,
+	MLX_FILL_7 ( &mpt, 0,
+		     a, 1,
+		     rw, 1,
+		     rr, 1,
+		     lw, 1,
 		     lr, 1,
-		     lw, 1 );
+		     pa, 1,
+		     r_w, 1 );
 	MLX_FILL_1 ( &mpt, 2, mem_key, key );
-	MLX_FILL_1 ( &mpt, 3, pd, ARBEL_GLOBAL_PD );
+	MLX_FILL_2 ( &mpt, 3,
+		     pd, ARBEL_GLOBAL_PD,
+		     rae, 1 );
 	MLX_FILL_1 ( &mpt, 6, reg_wnd_len_h, 0xffffffffUL );
 	MLX_FILL_1 ( &mpt, 7, reg_wnd_len_l, 0xffffffffUL );
 	if ( ( rc = arbel_cmd_sw2hw_mpt ( arbel, arbel->limits.reserved_mrws,
@@ -2751,6 +2842,8 @@ static int arbel_probe ( struct pci_device *pci ) {
 	/* Set up memory protection */
 	if ( ( rc = arbel_setup_mpt ( arbel ) ) != 0 )
 		goto err_setup_mpt;
+	for ( i = 0 ; i < ARBEL_NUM_PORTS ; i++ )
+		arbel->ibdev[i]->rdma_key = arbel->lkey;
 
 	/* Set up event queue */
 	if ( ( rc = arbel_create_eq ( arbel ) ) != 0 )
