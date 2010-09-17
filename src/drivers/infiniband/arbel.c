@@ -1968,6 +1968,55 @@ static struct ib_device_operations arbel_ib_operations = {
  */
 
 /**
+ * Map virtual to physical address for firmware usage
+ *
+ * @v arbel		Arbel device
+ * @v map		Mapping function
+ * @v va		Virtual address
+ * @v pa		Physical address
+ * @v len		Length of region
+ * @ret rc		Return status code
+ */
+static int arbel_map_vpm ( struct arbel *arbel,
+			   int ( *map ) ( struct arbel *arbel,
+			     const struct arbelprm_virtual_physical_mapping* ),
+			   uint64_t va, physaddr_t pa, size_t len ) {
+	struct arbelprm_virtual_physical_mapping mapping;
+	int rc;
+
+	assert ( ( va & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( ( pa & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( ( len & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
+
+	/* These mappings tend to generate huge volumes of
+	 * uninteresting debug data, which basically makes it
+	 * impossible to use debugging otherwise.
+	 */
+	DBG_DISABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
+
+	while ( len ) {
+		memset ( &mapping, 0, sizeof ( mapping ) );
+		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
+		MLX_FILL_1 ( &mapping, 1, va_l, ( va >> 12 ) );
+		MLX_FILL_2 ( &mapping, 3,
+			     log2size, 0,
+			     pa_l, ( pa >> 12 ) );
+		if ( ( rc = map ( arbel, &mapping ) ) != 0 ) {
+			DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
+			DBGC ( arbel, "Arbel %p could not map %llx => %lx: "
+			       "%s\n", arbel, va, pa, strerror ( rc ) );
+			return rc;
+		}
+		pa += ARBEL_PAGE_SIZE;
+		va += ARBEL_PAGE_SIZE;
+		len -= ARBEL_PAGE_SIZE;
+	}
+
+	DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
+	return 0;
+}
+
+/**
  * Start firmware running
  *
  * @v arbel		Arbel device
@@ -1976,7 +2025,6 @@ static struct ib_device_operations arbel_ib_operations = {
 static int arbel_start_firmware ( struct arbel *arbel ) {
 	struct arbelprm_query_fw fw;
 	struct arbelprm_access_lam lam;
-	struct arbelprm_virtual_physical_mapping map_fa;
 	unsigned int fw_pages;
 	unsigned int log2_fw_pages;
 	size_t fw_size;
@@ -2010,20 +2058,16 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 
 	/* Allocate firmware pages and map firmware area */
 	fw_size = ( fw_pages * ARBEL_PAGE_SIZE );
-	arbel->firmware_area = umalloc ( fw_size * 2 );
+	arbel->firmware_area = umalloc ( fw_size );
 	if ( ! arbel->firmware_area ) {
 		rc = -ENOMEM;
 		goto err_alloc_fa;
 	}
-	fw_base = ( user_to_phys ( arbel->firmware_area, fw_size ) &
-		    ~( fw_size - 1 ) );
+	fw_base = user_to_phys ( arbel->firmware_area, 0 );
 	DBGC ( arbel, "Arbel %p firmware area at [%08lx,%08lx)\n",
 	       arbel, fw_base, ( fw_base + fw_size ) );
-	memset ( &map_fa, 0, sizeof ( map_fa ) );
-	MLX_FILL_2 ( &map_fa, 3,
-		     log2size, log2_fw_pages,
-		     pa_l, ( fw_base >> 12 ) );
-	if ( ( rc = arbel_cmd_map_fa ( arbel, &map_fa ) ) != 0 ) {
+	if ( ( rc = arbel_map_vpm ( arbel, arbel_cmd_map_fa,
+				    0, fw_base, fw_size ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p could not map firmware: %s\n",
 		       arbel, strerror ( rc ) );
 		goto err_map_fa;
@@ -2168,8 +2212,6 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 			     struct arbelprm_init_hca *init_hca ) {
 	struct arbelprm_scalar_parameter icm_size;
 	struct arbelprm_scalar_parameter icm_aux_size;
-	struct arbelprm_virtual_physical_mapping map_icm_aux;
-	struct arbelprm_virtual_physical_mapping map_icm;
 	union arbelprm_doorbell_record *db_rec;
 	size_t icm_offset = 0;
 	unsigned int log_num_uars, log_num_qps, log_num_srqs, log_num_ees;
@@ -2177,6 +2219,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	unsigned int log_num_eqs, log_num_mcs;
 	size_t db_rec_offset;
 	size_t len;
+	physaddr_t icm_phys;
 	int rc;
 
 	/* Queue pair contexts */
@@ -2379,35 +2422,32 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
+	icm_phys = user_to_phys ( arbel->icm, 0 );
 
 	/* Map ICM auxiliary area */
-	memset ( &map_icm_aux, 0, sizeof ( map_icm_aux ) );
-	MLX_FILL_2 ( &map_icm_aux, 3,
-		     log2size,
-		     fls ( ( arbel->icm_aux_len / ARBEL_PAGE_SIZE ) - 1 ),
-		     pa_l,
-		     ( user_to_phys ( arbel->icm, arbel->icm_len ) >> 12 ) );
-	if ( ( rc = arbel_cmd_map_icm_aux ( arbel, &map_icm_aux ) ) != 0 ) {
+	DBGC ( arbel, "Arbel %p ICM AUX at [%08lx,%08lx)\n",
+	       arbel, icm_phys, ( icm_phys + arbel->icm_aux_len ) );
+	if ( ( rc = arbel_map_vpm ( arbel, arbel_cmd_map_icm_aux,
+				    0, icm_phys, arbel->icm_aux_len ) ) != 0 ){
 		DBGC ( arbel, "Arbel %p could not map AUX ICM: %s\n",
 		       arbel, strerror ( rc ) );
 		goto err_map_icm_aux;
 	}
+	icm_phys += arbel->icm_aux_len;
 
 	/* MAP ICM area */
-	memset ( &map_icm, 0, sizeof ( map_icm ) );
-	MLX_FILL_2 ( &map_icm, 3,
-		     log2size,
-		     fls ( ( arbel->icm_len / ARBEL_PAGE_SIZE ) - 1 ),
-		     pa_l, ( user_to_phys ( arbel->icm, 0 ) >> 12 ) );
-	if ( ( rc = arbel_cmd_map_icm ( arbel, &map_icm ) ) != 0 ) {
+	DBGC ( arbel, "Arbel %p ICM at [%08lx,%08lx)\n",
+	       arbel, icm_phys, ( icm_phys + arbel->icm_len ) );
+	if ( ( rc = arbel_map_vpm ( arbel, arbel_cmd_map_icm,
+				    0, icm_phys, arbel->icm_len ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p could not map ICM: %s\n",
 		       arbel, strerror ( rc ) );
 		goto err_map_icm;
 	}
+	arbel->db_rec = phys_to_virt ( icm_phys + db_rec_offset );
+	icm_phys += arbel->icm_len;
 
 	/* Initialise doorbell records */
-	arbel->db_rec =
-		phys_to_virt ( user_to_phys ( arbel->icm, db_rec_offset ) );
 	memset ( arbel->db_rec, 0, ARBEL_PAGE_SIZE );
 	db_rec = &arbel->db_rec[ARBEL_GROUP_SEPARATOR_DOORBELL];
 	MLX_FILL_1 ( &db_rec->qp, 1, res, ARBEL_UAR_RES_GROUP_SEP );
