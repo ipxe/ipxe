@@ -1981,7 +1981,7 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 	arbel_cmd_enable_lam ( arbel, &lam );
 
 	/* Allocate firmware pages and map firmware area */
-	fw_size = ( fw_pages * 4096 );
+	fw_size = ( fw_pages * ARBEL_PAGE_SIZE );
 	arbel->firmware_area = umalloc ( fw_size * 2 );
 	if ( ! arbel->firmware_area ) {
 		rc = -ENOMEM;
@@ -2092,18 +2092,17 @@ static int arbel_get_limits ( struct arbel *arbel ) {
 }
 
 /**
- * Get ICM usage
+ * Align ICM table
  *
- * @v log_num_entries	Log2 of the number of entries
- * @v entry_size	Entry size
- * @ret usage		Usage size in ICM
+ * @v icm_offset	Current ICM offset
+ * @v len		ICM table length
+ * @ret icm_offset	ICM offset
  */
-static size_t icm_usage ( unsigned int log_num_entries, size_t entry_size ) {
-	size_t usage;
+static size_t icm_align ( size_t icm_offset, size_t len ) {
 
-	usage = ( ( 1 << log_num_entries ) * entry_size );
-	usage = ( ( usage + 4095 ) & ~4095 );
-	return usage;
+	/* Round up to a multiple of the table size */
+	assert ( len == ( 1UL << ( fls ( len ) - 1 ) ) );
+	return ( ( icm_offset + len - 1 ) & ~( len - 1 ) );
 }
 
 /**
@@ -2123,6 +2122,8 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	size_t icm_offset = 0;
 	unsigned int log_num_qps, log_num_srqs, log_num_ees, log_num_cqs;
 	unsigned int log_num_mtts, log_num_mpts, log_num_rdbs, log_num_eqs;
+	unsigned int log_num_mcs;
+	size_t len;
 	int rc;
 
 	icm_offset = ( ( arbel->limits.reserved_uars + 1 ) << 12 );
@@ -2130,108 +2131,143 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	/* Queue pair contexts */
 	log_num_qps = fls ( arbel->limits.reserved_qps +
 			    ARBEL_RSVD_SPECIAL_QPS + ARBEL_MAX_QPS - 1 );
+	len = ( ( 1 << log_num_qps ) * arbel->limits.qpc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 13,
 		     qpc_eec_cqc_eqc_rdb_parameters.qpc_base_addr_l,
 		     ( icm_offset >> 7 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_qp,
 		     log_num_qps );
-	DBGC ( arbel, "Arbel %p ICM QPC base = %zx\n", arbel, icm_offset );
-	icm_offset += icm_usage ( log_num_qps, arbel->limits.qpc_entry_size );
+	DBGC ( arbel, "Arbel %p ICM QPC at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* Extended queue pair contexts */
+	len = ( ( 1 << log_num_qps ) * arbel->limits.eqpc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 25,
 		     qpc_eec_cqc_eqc_rdb_parameters.eqpc_base_addr_l,
 		     icm_offset );
-	DBGC ( arbel, "Arbel %p ICM EQPC base = %zx\n", arbel, icm_offset );
-	//	icm_offset += icm_usage ( log_num_qps, arbel->limits.eqpc_entry_size );
-	icm_offset += icm_usage ( log_num_qps, arbel->limits.qpc_entry_size );	
+	DBGC ( arbel, "Arbel %p ICM EQPC at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* Shared receive queue contexts */
 	log_num_srqs = fls ( arbel->limits.reserved_srqs - 1 );
+	len = ( ( 1 << log_num_srqs ) * arbel->limits.srqc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 19,
 		     qpc_eec_cqc_eqc_rdb_parameters.srqc_base_addr_l,
 		     ( icm_offset >> 5 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_srq,
 		     log_num_srqs );
-	DBGC ( arbel, "Arbel %p ICM SRQC base = %zx\n", arbel, icm_offset );
-	icm_offset += icm_usage ( log_num_srqs, arbel->limits.srqc_entry_size );
+	DBGC ( arbel, "Arbel %p ICM SRQC at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* End-to-end contexts */
 	log_num_ees = fls ( arbel->limits.reserved_ees - 1 );
+	len = ( ( 1 << log_num_ees ) * arbel->limits.eec_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 17,
 		     qpc_eec_cqc_eqc_rdb_parameters.eec_base_addr_l,
 		     ( icm_offset >> 7 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_ee,
 		     log_num_ees );
-	DBGC ( arbel, "Arbel %p ICM EEC base = %zx\n", arbel, icm_offset );
-	icm_offset += icm_usage ( log_num_ees, arbel->limits.eec_entry_size );
+	DBGC ( arbel, "Arbel %p ICM EEC at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* Extended end-to-end contexts */
+	len = ( ( 1 << log_num_ees ) * arbel->limits.eeec_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 29,
 		     qpc_eec_cqc_eqc_rdb_parameters.eeec_base_addr_l,
 		     icm_offset );
-	DBGC ( arbel, "Arbel %p ICM EEEC base = %zx\n", arbel, icm_offset );
-	icm_offset += icm_usage ( log_num_ees, arbel->limits.eeec_entry_size );
+	DBGC ( arbel, "Arbel %p ICM EEEC at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* Completion queue contexts */
 	log_num_cqs = fls ( arbel->limits.reserved_cqs + ARBEL_MAX_CQS - 1 );
+	len = ( ( 1 << log_num_cqs ) * arbel->limits.cqc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 21,
 		     qpc_eec_cqc_eqc_rdb_parameters.cqc_base_addr_l,
 		     ( icm_offset >> 6 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_cq,
 		     log_num_cqs );
-	DBGC ( arbel, "Arbel %p ICM CQC base = %zx\n", arbel, icm_offset );
-	icm_offset += icm_usage ( log_num_cqs, arbel->limits.cqc_entry_size );
+	DBGC ( arbel, "Arbel %p ICM CQC at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* Memory translation table */
 	log_num_mtts = fls ( arbel->limits.reserved_mtts - 1 );
+	len = ( ( 1 << log_num_mtts ) * arbel->limits.mtt_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 65,
 		     tpt_parameters.mtt_base_addr_l, icm_offset );
-	DBGC ( arbel, "Arbel %p ICM MTT base = %zx\n", arbel, icm_offset );
-	icm_offset += icm_usage ( log_num_mtts, arbel->limits.mtt_entry_size );
+	DBGC ( arbel, "Arbel %p ICM MTT at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* Memory protection table */
 	log_num_mpts = fls ( arbel->limits.reserved_mrws + 1 - 1 );
+	len = ( ( 1 << log_num_mpts ) * arbel->limits.mpt_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 61,
 		     tpt_parameters.mpt_base_adr_l, icm_offset );
 	MLX_FILL_1 ( init_hca, 62,
 		     tpt_parameters.log_mpt_sz, log_num_mpts );
-	DBGC ( arbel, "Arbel %p ICM MTT base = %zx\n", arbel, icm_offset );
-	icm_offset += icm_usage ( log_num_mpts, arbel->limits.mpt_entry_size );
+	DBGC ( arbel, "Arbel %p ICM MTT at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
-	/* RDMA something or other */
+	/* Remote read data base table */
 	log_num_rdbs = fls ( arbel->limits.reserved_rdbs - 1 );
+	len = ( ( 1 << log_num_rdbs ) * ARBEL_RDB_ENTRY_SIZE );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 37,
 		     qpc_eec_cqc_eqc_rdb_parameters.rdb_base_addr_l,
 		     icm_offset );
-	DBGC ( arbel, "Arbel %p ICM RDB base = %zx\n", arbel, icm_offset );
-	icm_offset += icm_usage ( log_num_rdbs, 32 );
+	DBGC ( arbel, "Arbel %p ICM RDB at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* Event queue contexts */
-	log_num_eqs =  fls ( arbel->limits.reserved_eqs + ARBEL_MAX_EQS - 1 );
+	log_num_eqs = fls ( arbel->limits.reserved_eqs + ARBEL_MAX_EQS - 1 );
+	len = ( ( 1 << log_num_eqs ) * arbel->limits.eqc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 33,
 		     qpc_eec_cqc_eqc_rdb_parameters.eqc_base_addr_l,
 		     ( icm_offset >> 6 ),
 		     qpc_eec_cqc_eqc_rdb_parameters.log_num_eq,
 		     log_num_eqs );
-	DBGC ( arbel, "Arbel %p ICM EQ base = %zx\n", arbel, icm_offset );
-	icm_offset += ( ( 1 << log_num_eqs ) * arbel->limits.eqc_entry_size );
+	DBGC ( arbel, "Arbel %p ICM EQ at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
 	/* Multicast table */
+	log_num_mcs = ARBEL_LOG_MULTICAST_HASH_SIZE;
+	len = ( ( 1 << log_num_mcs ) * sizeof ( struct arbelprm_mgm_entry ) );
+	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 49,
 		     multicast_parameters.mc_base_addr_l, icm_offset );
 	MLX_FILL_1 ( init_hca, 52,
 		     multicast_parameters.log_mc_table_entry_sz,
 		     fls ( sizeof ( struct arbelprm_mgm_entry ) - 1 ) );
 	MLX_FILL_1 ( init_hca, 53,
-		     multicast_parameters.mc_table_hash_sz, 8 );
+		     multicast_parameters.mc_table_hash_sz,
+		     ( 1 << log_num_mcs ) );
 	MLX_FILL_1 ( init_hca, 54,
-		     multicast_parameters.log_mc_table_sz, 3 );
-	DBGC ( arbel, "Arbel %p ICM MC base = %zx\n", arbel, icm_offset );
-	icm_offset += ( 8 * sizeof ( struct arbelprm_mgm_entry ) );
+		     multicast_parameters.log_mc_table_sz,
+		     log_num_mcs /* Only one entry per hash */ );
+	DBGC ( arbel, "Arbel %p ICM MC at [%zx,%zx)\n",
+	       arbel, icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
 
-	arbel->icm_len = icm_offset;
-	arbel->icm_len = ( ( arbel->icm_len + 4095 ) & ~4095 );
+	/* Round up to a whole number of pages */
+	arbel->icm_len = icm_align ( icm_offset, ARBEL_PAGE_SIZE );
 
 	/* Get ICM auxiliary area size */
 	memset ( &icm_size, 0, sizeof ( icm_size ) );
@@ -2242,7 +2278,8 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 		       arbel, strerror ( rc ) );
 		goto err_set_icm_size;
 	}
-	arbel->icm_aux_len = ( MLX_GET ( &icm_aux_size, value ) * 4096 );
+	arbel->icm_aux_len =
+		( MLX_GET ( &icm_aux_size, value ) * ARBEL_PAGE_SIZE );
 
 	/* Allocate ICM data and auxiliary area */
 	DBGC ( arbel, "Arbel %p requires %zd kB ICM and %zd kB AUX ICM\n",
@@ -2257,7 +2294,8 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	/* Map ICM auxiliary area */
 	memset ( &map_icm_aux, 0, sizeof ( map_icm_aux ) );
 	MLX_FILL_2 ( &map_icm_aux, 3,
-		     log2size, fls ( ( arbel->icm_aux_len / 4096 ) - 1 ),
+		     log2size,
+		     fls ( ( arbel->icm_aux_len / ARBEL_PAGE_SIZE ) - 1 ),
 		     pa_l,
 		     ( user_to_phys ( arbel->icm, arbel->icm_len ) >> 12 ) );
 	if ( ( rc = arbel_cmd_map_icm_aux ( arbel, &map_icm_aux ) ) != 0 ) {
@@ -2269,7 +2307,8 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	/* MAP ICM area */
 	memset ( &map_icm, 0, sizeof ( map_icm ) );
 	MLX_FILL_2 ( &map_icm, 3,
-		     log2size, fls ( ( arbel->icm_len / 4096 ) - 1 ),
+		     log2size,
+		     fls ( ( arbel->icm_len / ARBEL_PAGE_SIZE ) - 1 ),
 		     pa_l, ( user_to_phys ( arbel->icm, 0 ) >> 12 ) );
 	if ( ( rc = arbel_cmd_map_icm ( arbel, &map_icm ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p could not map ICM: %s\n",
@@ -2287,7 +2326,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 
 	return 0;
 
-	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / 4096 ) );
+	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / ARBEL_PAGE_SIZE ) );
  err_map_icm:
 	arbel_cmd_unmap_icm_aux ( arbel );
  err_map_icm_aux:
@@ -2304,7 +2343,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
  * @v arbel		Arbel device
  */
 static void arbel_free_icm ( struct arbel *arbel ) {
-	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / 4096 ) );
+	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / ARBEL_PAGE_SIZE ) );
 	arbel_cmd_unmap_icm_aux ( arbel );
 	ufree ( arbel->icm );
 	arbel->icm = UNULL;
