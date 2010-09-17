@@ -662,7 +662,7 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 		     log_cq_size, fls ( cq->num_cqes - 1 ) );
 	MLX_FILL_1 ( &cqctx, 5, c_eqn, arbel->eq.eqn );
 	MLX_FILL_1 ( &cqctx, 6, pd, ARBEL_GLOBAL_PD );
-	MLX_FILL_1 ( &cqctx, 7, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &cqctx, 7, l_key, arbel->lkey );
 	MLX_FILL_1 ( &cqctx, 12, cqn, cq->cqn );
 	MLX_FILL_1 ( &cqctx, 13,
 		     cq_ci_db_record, arbel_cq->ci_doorbell_idx );
@@ -800,6 +800,24 @@ static void arbel_free_qpn ( struct ib_device *ibdev,
 }
 
 /**
+ * Calculate transmission rate
+ *
+ * @v av		Address vector
+ * @ret arbel_rate	Arbel rate
+ */
+static unsigned int arbel_rate ( struct ib_address_vector *av ) {
+	return ( ( ( av->rate >= IB_RATE_2_5 ) && ( av->rate <= IB_RATE_120 ) )
+		 ? ( av->rate + 5 ) : 0 );
+}
+
+/** Queue pair transport service type map */
+static uint8_t arbel_qp_st[] = {
+	[IB_QPT_SMI] = ARBEL_ST_MLX,
+	[IB_QPT_GSI] = ARBEL_ST_MLX,
+	[IB_QPT_UD] = ARBEL_ST_UD,
+};
+
+/**
  * Dump queue pair context (for debugging only)
  *
  * @v arbel		Arbel device
@@ -832,8 +850,8 @@ arbel_dump_qpctx ( struct arbel *arbel, struct ib_queue_pair *qp ) {
  */
 static int arbel_create_send_wq ( struct arbel_send_work_queue *arbel_send_wq,
 				  unsigned int num_wqes ) {
-	struct arbelprm_ud_send_wqe *wqe;
-	struct arbelprm_ud_send_wqe *next_wqe;
+	union arbel_send_wqe *wqe;
+	union arbel_send_wqe *next_wqe;
 	unsigned int wqe_idx_mask;
 	unsigned int i;
 
@@ -849,8 +867,8 @@ static int arbel_create_send_wq ( struct arbel_send_work_queue *arbel_send_wq,
 	/* Link work queue entries */
 	wqe_idx_mask = ( num_wqes - 1 );
 	for ( i = 0 ; i < num_wqes ; i++ ) {
-		wqe = &arbel_send_wq->wqe[i].ud;
-		next_wqe = &arbel_send_wq->wqe[ ( i + 1 ) & wqe_idx_mask ].ud;
+		wqe = &arbel_send_wq->wqe[i];
+		next_wqe = &arbel_send_wq->wqe[ ( i + 1 ) & wqe_idx_mask ];
 		MLX_FILL_1 ( &wqe->next, 0, nda_31_6,
 			     ( virt_to_bus ( next_wqe ) >> 6 ) );
 		MLX_FILL_1 ( &wqe->next, 1, always1, 1 );
@@ -957,10 +975,8 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_3 ( &qpctx, 2,
 		     qpc_eec_data.de, 1,
-		     qpc_eec_data.pm_state, 0x03 /* Always 0x03 for UD */,
-		     qpc_eec_data.st,
-		     ( ( qp->type == IB_QPT_UD ) ?
-		       ARBEL_ST_UD : ARBEL_ST_MLX ) );
+		     qpc_eec_data.pm_state, ARBEL_PM_STATE_MIGRATED,
+		     qpc_eec_data.st, arbel_qp_st[qp->type] );
 	MLX_FILL_4 ( &qpctx, 4,
 		     qpc_eec_data.log_rq_size, fls ( qp->recv.num_wqes - 1 ),
 		     qpc_eec_data.log_rq_stride,
@@ -973,7 +989,7 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &qpctx, 10, qpc_eec_data.primary_address_path.port_number,
 		     ibdev->port );
 	MLX_FILL_1 ( &qpctx, 27, qpc_eec_data.pd, ARBEL_GLOBAL_PD );
-	MLX_FILL_1 ( &qpctx, 29, qpc_eec_data.wqe_lkey, arbel->reserved_lkey );
+	MLX_FILL_1 ( &qpctx, 29, qpc_eec_data.wqe_lkey, arbel->lkey );
 	MLX_FILL_1 ( &qpctx, 30, qpc_eec_data.ssc, 1 );
 	MLX_FILL_1 ( &qpctx, 33, qpc_eec_data.cqn_snd, qp->send.cq->cqn );
 	MLX_FILL_1 ( &qpctx, 34, qpc_eec_data.snd_wqe_base_adr_l,
@@ -1137,7 +1153,7 @@ static void arbel_ring_doorbell ( struct arbel *arbel,
 				  unsigned int offset ) {
 
 	DBGC2 ( arbel, "Arbel %p ringing doorbell %08x:%08x at %lx\n",
-		arbel, db_reg->dword[0], db_reg->dword[1],
+		arbel, ntohl ( db_reg->dword[0] ), ntohl ( db_reg->dword[1] ),
 		virt_to_phys ( arbel->uar + offset ) );
 
 	barrier();
@@ -1178,8 +1194,7 @@ static size_t arbel_fill_ud_send_wqe ( struct ib_device *ibdev,
 		     ud_address_vector.rlid, av->lid,
 		     ud_address_vector.g, av->gid_present );
 	MLX_FILL_2 ( &wqe->ud.ud, 2,
-		     ud_address_vector.max_stat_rate,
-			 ( ( av->rate >= 3 ) ? 0 : 1 ),
+		     ud_address_vector.max_stat_rate, arbel_rate ( av ),
 		     ud_address_vector.msg, 3 );
 	MLX_FILL_1 ( &wqe->ud.ud, 3, ud_address_vector.sl, av->sl );
 	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
@@ -1187,7 +1202,7 @@ static size_t arbel_fill_ud_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ud.ud, 8, destination_qp, av->qpn );
 	MLX_FILL_1 ( &wqe->ud.ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->ud.data[0], 0, byte_count, iob_len ( iobuf ) );
-	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, arbel->lkey );
 	MLX_FILL_1 ( &wqe->ud.data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1223,19 +1238,18 @@ static size_t arbel_fill_mlx_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_5 ( &wqe->mlx.ctrl, 0,
 		     c, 1 /* generate completion */,
 		     icrc, 0 /* generate ICRC */,
-		     max_statrate, ( ( ( av->rate < 2 ) || ( av->rate > 10 ) )
-				     ? 8 : ( av->rate + 5 ) ),
+		     max_statrate, arbel_rate ( av ),
 		     slr, 0,
 		     v15, ( ( qp->ext_qpn == IB_QPN_SMI ) ? 1 : 0 ) );
 	MLX_FILL_1 ( &wqe->mlx.ctrl, 1, rlid, av->lid );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 0,
 		     byte_count, iob_len ( &headers ) );
-	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, arbel->lkey );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 3,
 		     local_address_l, virt_to_bus ( headers.data ) );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 0,
 		     byte_count, ( iob_len ( iobuf ) + 4 /* ICRC */ ) );
-	MLX_FILL_1 ( &wqe->mlx.data[1], 1, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &wqe->mlx.data[1], 1, l_key, arbel->lkey );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1316,7 +1330,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	/* Ring doorbell register */
 	MLX_FILL_4 ( &db_reg.send, 0,
 		     nopcode, ARBEL_OPCODE_SEND,
-		     f, 1,
+		     f, 0,
 		     wqe_counter, ( wq->next_idx & 0xffff ),
 		     wqe_cnt, 1 );
 	MLX_FILL_2 ( &db_reg.send, 1,
@@ -1361,7 +1375,7 @@ static int arbel_post_recv ( struct ib_device *ibdev,
 
 	/* Construct work queue entry */
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_tailroom ( iobuf ) );
-	MLX_FILL_1 ( &wqe->data[0], 1, l_key, arbel->reserved_lkey );
+	MLX_FILL_1 ( &wqe->data[0], 1, l_key, arbel->lkey );
 	MLX_FILL_1 ( &wqe->data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1396,8 +1410,9 @@ static int arbel_complete ( struct ib_device *ibdev,
 	struct arbel_recv_work_queue *arbel_recv_wq;
 	struct arbelprm_recv_wqe *recv_wqe;
 	struct io_buffer *iobuf;
-	struct ib_address_vector av;
+	struct ib_address_vector recv_av;
 	struct ib_global_route_header *grh;
+	struct ib_address_vector *av;
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
@@ -1414,9 +1429,12 @@ static int arbel_complete ( struct ib_device *ibdev,
 	if ( opcode >= ARBEL_OPCODE_RECV_ERROR ) {
 		/* "s" field is not valid for error opcodes */
 		is_send = ( opcode == ARBEL_OPCODE_SEND_ERROR );
-		DBGC ( arbel, "Arbel %p CQN %#lx syndrome %x vendor %x\n",
-		       arbel, cq->cqn, MLX_GET ( &cqe->error, syndrome ),
+		DBGC ( arbel, "Arbel %p CQN %#lx %s QPN %#lx syndrome %#x "
+		       "vendor %#x\n", arbel, cq->cqn,
+		       ( is_send ? "send" : "recv" ), qpn,
+		       MLX_GET ( &cqe->error, syndrome ),
 		       MLX_GET ( &cqe->error, vendor_code ) );
+		DBGC_HDA ( arbel, virt_to_phys ( cqe ), cqe, sizeof ( *cqe ) );
 		rc = -EIO;
 		/* Don't return immediately; propagate error to completer */
 	}
@@ -1474,18 +1492,28 @@ static int arbel_complete ( struct ib_device *ibdev,
 			     l_key, ARBEL_INVALID_LKEY );
 		assert ( len <= iob_tailroom ( iobuf ) );
 		iob_put ( iobuf, len );
-		assert ( iob_len ( iobuf ) >= sizeof ( *grh ) );
-		grh = iobuf->data;
-		iob_pull ( iobuf, sizeof ( *grh ) );
-		/* Construct address vector */
-		memset ( &av, 0, sizeof ( av ) );
-		av.qpn = MLX_GET ( &cqe->normal, rqpn );
-		av.lid = MLX_GET ( &cqe->normal, rlid );
-		av.sl = MLX_GET ( &cqe->normal, sl );
-		av.gid_present = MLX_GET ( &cqe->normal, g );
-		memcpy ( &av.gid, &grh->sgid, sizeof ( av.gid ) );
+		switch ( qp->type ) {
+		case IB_QPT_SMI:
+		case IB_QPT_GSI:
+		case IB_QPT_UD:
+			assert ( iob_len ( iobuf ) >= sizeof ( *grh ) );
+			grh = iobuf->data;
+			iob_pull ( iobuf, sizeof ( *grh ) );
+			/* Construct address vector */
+			av = &recv_av;
+			memset ( av, 0, sizeof ( *av ) );
+			av->qpn = MLX_GET ( &cqe->normal, rqpn );
+			av->lid = MLX_GET ( &cqe->normal, rlid );
+			av->sl = MLX_GET ( &cqe->normal, sl );
+			av->gid_present = MLX_GET ( &cqe->normal, g );
+			memcpy ( &av->gid, &grh->sgid, sizeof ( av->gid ) );
+			break;
+		default:
+			assert ( 0 );
+			return -EINVAL;
+		}
 		/* Hand off to completion handler */
-		ib_complete_recv ( ibdev, qp, &av, iobuf, rc );
+		ib_complete_recv ( ibdev, qp, av, iobuf, rc );
 	}
 
 	return rc;
@@ -1583,7 +1611,7 @@ static int arbel_create_eq ( struct arbel *arbel ) {
 		     start_address_l, virt_to_phys ( arbel_eq->eqe ) );
 	MLX_FILL_1 ( &eqctx, 3, log_eq_size, fls ( ARBEL_NUM_EQES - 1 ) );
 	MLX_FILL_1 ( &eqctx, 6, pd, ARBEL_GLOBAL_PD );
-	MLX_FILL_1 ( &eqctx, 7, lkey, arbel->reserved_lkey );
+	MLX_FILL_1 ( &eqctx, 7, lkey, arbel->lkey );
 	if ( ( rc = arbel_cmd_sw2hw_eq ( arbel, arbel_eq->eqn,
 					 &eqctx ) ) != 0 ) {
 		DBGC ( arbel, "Arbel %p EQN %#lx SW2HW_EQ failed: %s\n",
@@ -2429,7 +2457,7 @@ static int arbel_setup_mpt ( struct arbel *arbel ) {
 
 	/* Derive key */
 	key = ( arbel->limits.reserved_mrws | ARBEL_MKEY_PREFIX );
-	arbel->reserved_lkey = ( ( key << 8 ) | ( key >> 24 ) );
+	arbel->lkey = ( ( key << 8 ) | ( key >> 24 ) );
 
 	/* Initialise memory protection table */
 	memset ( &mpt, 0, sizeof ( mpt ) );
