@@ -1094,7 +1094,7 @@ int fc_port_open ( struct interface *transport, const struct fc_name *node_wwn,
 	intf_init ( &port->transport, &fc_port_transport_desc, &port->refcnt );
 	fc_link_init ( &port->link, fc_port_examine, &port->refcnt );
 	intf_init ( &port->flogi, &fc_port_flogi_desc, &port->refcnt );
-	list_add ( &port->list, &fc_ports );
+	list_add_tail ( &port->list, &fc_ports );
 	INIT_LIST_HEAD ( &port->xchgs );
 	memcpy ( &port->node_wwn, node_wwn, sizeof ( port->node_wwn ) );
 	memcpy ( &port->port_wwn, port_wwn, sizeof ( port->port_wwn ) );
@@ -1371,7 +1371,7 @@ static struct fc_peer * fc_peer_create ( const struct fc_name *node_wwn ) {
 	ref_init ( &peer->refcnt, NULL );
 	fc_link_init ( &peer->link, fc_peer_examine, &peer->refcnt );
 	intf_init ( &peer->plogi, &fc_peer_plogi_desc, &peer->refcnt );
-	list_add ( &peer->list, &fc_peers );
+	list_add_tail ( &peer->list, &fc_peers );
 	memcpy ( &peer->node_wwn, node_wwn, sizeof ( peer->node_wwn ) );
 	INIT_LIST_HEAD ( &peer->ulps );
 
@@ -1666,7 +1666,7 @@ static struct fc_ulp * fc_ulp_create ( struct fc_peer *peer,
 	fc_link_init ( &ulp->link, fc_ulp_examine, &ulp->refcnt );
 	intf_init ( &ulp->prli, &fc_ulp_prli_desc, &ulp->refcnt );
 	ulp->peer = fc_peer_get ( peer );
-	list_add ( &ulp->list, &peer->ulps );
+	list_add_tail ( &ulp->list, &peer->ulps );
 	ulp->type = type;
 
 	/* Start link state monitor */
