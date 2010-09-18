@@ -2136,11 +2136,25 @@ static int hermon_map_vpm ( struct hermon *hermon,
 			    const struct hermonprm_virtual_physical_mapping* ),
 			    uint64_t va, physaddr_t pa, size_t len ) {
 	struct hermonprm_virtual_physical_mapping mapping;
+	physaddr_t start;
+	physaddr_t low;
+	physaddr_t high;
+	physaddr_t end;
+	size_t size;
 	int rc;
 
+	/* Sanity checks */
 	assert ( ( va & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( pa & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( len & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+
+	/* Calculate starting points */
+	start = pa;
+	end = ( start + len );
+	size = ( 1UL << ( fls ( start ^ end ) - 1 ) );
+	low = high = ( end & ~( size - 1 ) );
+	assert ( start < low );
+	assert ( high <= end );
 
 	/* These mappings tend to generate huge volumes of
 	 * uninteresting debug data, which basically makes it
@@ -2148,23 +2162,41 @@ static int hermon_map_vpm ( struct hermon *hermon,
 	 */
 	DBG_DISABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
 
-	while ( len ) {
+	/* Map blocks in descending order of size */
+	while ( size >= HERMON_PAGE_SIZE ) {
+
+		/* Find the next candidate block */
+		if ( ( low - size ) >= start ) {
+			low -= size;
+			pa = low;
+		} else if ( ( high + size ) <= end ) {
+			pa = high;
+			high += size;
+		} else {
+			size >>= 1;
+			continue;
+		}
+		assert ( ( va & ( size - 1 ) ) == 0 );
+		assert ( ( pa & ( size - 1 ) ) == 0 );
+
+		/* Map this block */
 		memset ( &mapping, 0, sizeof ( mapping ) );
 		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
 		MLX_FILL_1 ( &mapping, 1, va_l, ( va >> 12 ) );
 		MLX_FILL_2 ( &mapping, 3,
-			     log2size, 0,
+			     log2size, ( ( fls ( size ) - 1 ) - 12 ),
 			     pa_l, ( pa >> 12 ) );
 		if ( ( rc = map ( hermon, &mapping ) ) != 0 ) {
 			DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
-			DBGC ( hermon, "Hermon %p could not map %llx => %lx: "
-			       "%s\n", hermon, va, pa, strerror ( rc ) );
+			DBGC ( hermon, "Hermon %p could not map %08llx+%zx to "
+			       "%08lx: %s\n",
+			       hermon, va, size, pa, strerror ( rc ) );
 			return rc;
 		}
-		pa += HERMON_PAGE_SIZE;
-		va += HERMON_PAGE_SIZE;
-		len -= HERMON_PAGE_SIZE;
+		va += size;
 	}
+	assert ( low == start );
+	assert ( high == end );
 
 	DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
 	return 0;
