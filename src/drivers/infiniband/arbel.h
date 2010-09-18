@@ -468,11 +468,12 @@ struct arbel {
 	size_t icm_aux_len;
 	/** ICM area */
 	userptr_t icm;
-
-	/** Event queue */
-	struct arbel_event_queue eq;
+	/** Offset within ICM of doorbell records */
+	size_t db_rec_offset;
 	/** Doorbell records */
 	union arbelprm_doorbell_record *db_rec;
+	/** Event queue */
+	struct arbel_event_queue eq;
 	/** Unrestricted LKey
 	 *
 	 * Used to get unrestricted memory access.

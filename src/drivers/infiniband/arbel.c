@@ -457,10 +457,12 @@ arbel_cmd_enable_lam ( struct arbel *arbel, struct arbelprm_access_lam *lam ) {
 }
 
 static inline int
-arbel_cmd_unmap_icm ( struct arbel *arbel, unsigned int page_count ) {
+arbel_cmd_unmap_icm ( struct arbel *arbel, unsigned int page_count,
+		      const struct arbelprm_scalar_parameter *offset ) {
 	return arbel_cmd ( arbel,
-			   ARBEL_HCR_VOID_CMD ( ARBEL_HCR_UNMAP_ICM ),
-			   0, NULL, page_count, NULL );
+			   ARBEL_HCR_IN_CMD ( ARBEL_HCR_UNMAP_ICM, 0,
+					      sizeof ( *offset ) ),
+			   0, offset, page_count, NULL );
 }
 
 static inline int
@@ -1982,11 +1984,25 @@ static int arbel_map_vpm ( struct arbel *arbel,
 			     const struct arbelprm_virtual_physical_mapping* ),
 			   uint64_t va, physaddr_t pa, size_t len ) {
 	struct arbelprm_virtual_physical_mapping mapping;
+	physaddr_t start;
+	physaddr_t low;
+	physaddr_t high;
+	physaddr_t end;
+	size_t size;
 	int rc;
 
+	/* Sanity checks */
 	assert ( ( va & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( pa & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( len & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
+
+	/* Calculate starting points */
+	start = pa;
+	end = ( start + len );
+	size = ( 1UL << ( fls ( start ^ end ) - 1 ) );
+	low = high = ( end & ~( size - 1 ) );
+	assert ( start < low );
+	assert ( high <= end );
 
 	/* These mappings tend to generate huge volumes of
 	 * uninteresting debug data, which basically makes it
@@ -1994,23 +2010,41 @@ static int arbel_map_vpm ( struct arbel *arbel,
 	 */
 	DBG_DISABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
 
-	while ( len ) {
+	/* Map blocks in descending order of size */
+	while ( size >= ARBEL_PAGE_SIZE ) {
+
+		/* Find the next candidate block */
+		if ( ( low - size ) >= start ) {
+			low -= size;
+			pa = low;
+		} else if ( ( high + size ) <= end ) {
+			pa = high;
+			high += size;
+		} else {
+			size >>= 1;
+			continue;
+		}
+		assert ( ( va & ( size - 1 ) ) == 0 );
+		assert ( ( pa & ( size - 1 ) ) == 0 );
+
+		/* Map this block */
 		memset ( &mapping, 0, sizeof ( mapping ) );
 		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
 		MLX_FILL_1 ( &mapping, 1, va_l, ( va >> 12 ) );
 		MLX_FILL_2 ( &mapping, 3,
-			     log2size, 0,
+			     log2size, ( ( fls ( size ) - 1 ) - 12 ),
 			     pa_l, ( pa >> 12 ) );
 		if ( ( rc = map ( arbel, &mapping ) ) != 0 ) {
 			DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
-			DBGC ( arbel, "Arbel %p could not map %llx => %lx: "
-			       "%s\n", arbel, va, pa, strerror ( rc ) );
+			DBGC ( arbel, "Arbel %p could not map %08llx+%zx to "
+			       "%08lx: %s\n",
+			       arbel, va, size, pa, strerror ( rc ) );
 			return rc;
 		}
-		pa += ARBEL_PAGE_SIZE;
-		va += ARBEL_PAGE_SIZE;
-		len -= ARBEL_PAGE_SIZE;
+		va += size;
 	}
+	assert ( low == start );
+	assert ( high == end );
 
 	DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
 	return 0;
@@ -2026,7 +2060,6 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 	struct arbelprm_query_fw fw;
 	struct arbelprm_access_lam lam;
 	unsigned int fw_pages;
-	unsigned int log2_fw_pages;
 	size_t fw_size;
 	physaddr_t fw_base;
 	uint64_t eq_set_ci_base_addr;
@@ -2042,8 +2075,6 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
 	       MLX_GET ( &fw, fw_rev_subminor ) );
 	fw_pages = MLX_GET ( &fw, fw_pages );
-	log2_fw_pages = fls ( fw_pages - 1 );
-	fw_pages = ( 1 << log2_fw_pages );
 	DBGC ( arbel, "Arbel %p requires %d kB for firmware\n",
 	       arbel, ( fw_pages * 4 ) );
 	eq_set_ci_base_addr =
@@ -2212,19 +2243,31 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 			     struct arbelprm_init_hca *init_hca ) {
 	struct arbelprm_scalar_parameter icm_size;
 	struct arbelprm_scalar_parameter icm_aux_size;
+	struct arbelprm_scalar_parameter unmap_icm;
 	union arbelprm_doorbell_record *db_rec;
 	size_t icm_offset = 0;
 	unsigned int log_num_uars, log_num_qps, log_num_srqs, log_num_ees;
 	unsigned int log_num_cqs, log_num_mtts, log_num_mpts, log_num_rdbs;
 	unsigned int log_num_eqs, log_num_mcs;
-	size_t db_rec_offset;
 	size_t len;
 	physaddr_t icm_phys;
 	int rc;
 
-	/* Queue pair contexts */
+	/* Calculate number of each object type within ICM */
 	log_num_qps = fls ( arbel->limits.reserved_qps +
 			    ARBEL_RSVD_SPECIAL_QPS + ARBEL_MAX_QPS - 1 );
+	log_num_srqs = fls ( arbel->limits.reserved_srqs - 1 );
+	log_num_ees = fls ( arbel->limits.reserved_ees - 1 );
+	log_num_cqs = fls ( arbel->limits.reserved_cqs + ARBEL_MAX_CQS - 1 );
+	log_num_eqs = fls ( arbel->limits.reserved_eqs + ARBEL_MAX_EQS - 1 );
+	log_num_mtts = fls ( arbel->limits.reserved_mtts - 1 );
+	log_num_mpts = fls ( arbel->limits.reserved_mrws + 1 - 1 );
+	log_num_rdbs = fls ( arbel->limits.reserved_rdbs - 1 );
+	log_num_uars = fls ( arbel->limits.reserved_uars +
+			     1 /* single UAR used */ - 1 );
+	log_num_mcs = ARBEL_LOG_MULTICAST_HASH_SIZE;
+
+	/* Queue pair contexts */
 	len = ( ( 1 << log_num_qps ) * arbel->limits.qpc_entry_size );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 13,
@@ -2249,7 +2292,6 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset += len;
 
 	/* Completion queue contexts */
-	log_num_cqs = fls ( arbel->limits.reserved_cqs + ARBEL_MAX_CQS - 1 );
 	len = ( ( 1 << log_num_cqs ) * arbel->limits.cqc_entry_size );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 21,
@@ -2262,24 +2304,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	       icm_offset, ( icm_offset + len ) );
 	icm_offset += len;
 
-	/* User access region contexts */
-	log_num_uars = fls ( arbel->limits.reserved_uars +
-			     1 /* single UAR used */ - 1 );
-	len = ( ( 1 << log_num_uars ) * ARBEL_PAGE_SIZE );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 74, uar_parameters.log_max_uars, log_num_uars );
-	MLX_FILL_1 ( init_hca, 79,
-		     uar_parameters.uar_context_base_addr_l, icm_offset );
-	db_rec_offset = ( icm_offset +
-			  ( arbel->limits.reserved_uars * ARBEL_PAGE_SIZE ) );
-	DBGC ( arbel, "Arbel %p UAR is %d x %#zx at [%zx,%zx), doorbells "
-	       "[%zx,%zx)\n", arbel, ( 1 << log_num_uars ), ARBEL_PAGE_SIZE,
-	       icm_offset, ( icm_offset + len ), db_rec_offset,
-	       ( db_rec_offset + ARBEL_PAGE_SIZE ) );
-	icm_offset += len;
-
 	/* Event queue contexts */
-	log_num_eqs = fls ( arbel->limits.reserved_eqs + ARBEL_MAX_EQS - 1 );
 	len = ( ( 1 << log_num_eqs ) * arbel->limits.eqc_entry_size );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 33,
@@ -2293,7 +2318,6 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset += len;
 
 	/* End-to-end contexts */
-	log_num_ees = fls ( arbel->limits.reserved_ees - 1 );
 	len = ( ( 1 << log_num_ees ) * arbel->limits.eec_entry_size );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 17,
@@ -2307,7 +2331,6 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset += len;
 
 	/* Shared receive queue contexts */
-	log_num_srqs = fls ( arbel->limits.reserved_srqs - 1 );
 	len = ( ( 1 << log_num_srqs ) * arbel->limits.srqc_entry_size );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_2 ( init_hca, 19,
@@ -2321,7 +2344,6 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset += len;
 
 	/* Memory protection table */
-	log_num_mpts = fls ( arbel->limits.reserved_mrws + 1 - 1 );
 	len = ( ( 1 << log_num_mpts ) * arbel->limits.mpt_entry_size );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 61,
@@ -2334,7 +2356,6 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset += len;
 
 	/* Remote read data base table */
-	log_num_rdbs = fls ( arbel->limits.reserved_rdbs - 1 );
 	len = ( ( 1 << log_num_rdbs ) * ARBEL_RDB_ENTRY_SIZE );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 37,
@@ -2357,7 +2378,6 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset += len;
 
 	/* Multicast table */
-	log_num_mcs = ARBEL_LOG_MULTICAST_HASH_SIZE;
 	len = ( ( 1 << log_num_mcs ) * sizeof ( struct arbelprm_mgm_entry ) );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 49,
@@ -2377,7 +2397,6 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	icm_offset += len;
 
 	/* Memory translation table */
-	log_num_mtts = fls ( arbel->limits.reserved_mtts - 1 );
 	len = ( ( 1 << log_num_mtts ) * arbel->limits.mtt_entry_size );
 	icm_offset = icm_align ( icm_offset, len );
 	MLX_FILL_1 ( init_hca, 65,
@@ -2398,8 +2417,30 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	       icm_offset, ( icm_offset + len ) );
 	icm_offset += len;
 
-	/* Round up to a whole number of pages */
-	arbel->icm_len = icm_align ( icm_offset, ARBEL_PAGE_SIZE );
+	/* Record amount of ICM to be allocated */
+	icm_offset = icm_align ( icm_offset, ARBEL_PAGE_SIZE );
+	arbel->icm_len = icm_offset;
+
+	/* User access region contexts
+	 *
+	 * The reserved UAR(s) do not need to be backed by physical
+	 * memory, and our UAR is allocated separately; neither are
+	 * part of the umalloc()ed ICM block, but both contribute to
+	 * the total length of ICM virtual address space.
+	 */
+	len = ( ( 1 << log_num_uars ) * ARBEL_PAGE_SIZE );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 74, uar_parameters.log_max_uars, log_num_uars );
+	MLX_FILL_1 ( init_hca, 79,
+		     uar_parameters.uar_context_base_addr_l, icm_offset );
+	arbel->db_rec_offset =
+		( icm_offset +
+		  ( arbel->limits.reserved_uars * ARBEL_PAGE_SIZE ) );
+	DBGC ( arbel, "Arbel %p UAR is %d x %#zx at [%zx,%zx), doorbells "
+	       "[%zx,%zx)\n", arbel, ( 1 << log_num_uars ), ARBEL_PAGE_SIZE,
+	       icm_offset, ( icm_offset + len ), arbel->db_rec_offset,
+	       ( arbel->db_rec_offset + ARBEL_PAGE_SIZE ) );
+	icm_offset += len;
 
 	/* Get ICM auxiliary area size */
 	memset ( &icm_size, 0, sizeof ( icm_size ) );
@@ -2420,9 +2461,16 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	arbel->icm = umalloc ( arbel->icm_len + arbel->icm_aux_len );
 	if ( ! arbel->icm ) {
 		rc = -ENOMEM;
-		goto err_alloc;
+		goto err_alloc_icm;
 	}
 	icm_phys = user_to_phys ( arbel->icm, 0 );
+
+	/* Allocate doorbell UAR */
+	arbel->db_rec = malloc_dma ( ARBEL_PAGE_SIZE, ARBEL_PAGE_SIZE );
+	if ( ! arbel->db_rec ) {
+		rc = -ENOMEM;
+		goto err_alloc_doorbell;
+	}
 
 	/* Map ICM auxiliary area */
 	DBGC ( arbel, "Arbel %p ICM AUX at [%08lx,%08lx)\n",
@@ -2435,7 +2483,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 	}
 	icm_phys += arbel->icm_aux_len;
 
-	/* MAP ICM area */
+	/* Map ICM area */
 	DBGC ( arbel, "Arbel %p ICM at [%08lx,%08lx)\n",
 	       arbel, icm_phys, ( icm_phys + arbel->icm_len ) );
 	if ( ( rc = arbel_map_vpm ( arbel, arbel_cmd_map_icm,
@@ -2444,8 +2492,20 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 		       arbel, strerror ( rc ) );
 		goto err_map_icm;
 	}
-	arbel->db_rec = phys_to_virt ( icm_phys + db_rec_offset );
 	icm_phys += arbel->icm_len;
+
+	/* Map doorbell UAR */
+	DBGC ( arbel, "Arbel %p UAR at [%08lx,%08lx)\n",
+	       arbel, virt_to_phys ( arbel->db_rec ),
+	       ( virt_to_phys ( arbel->db_rec ) + ARBEL_PAGE_SIZE ) );
+	if ( ( rc = arbel_map_vpm ( arbel, arbel_cmd_map_icm,
+				    arbel->db_rec_offset,
+				    virt_to_phys ( arbel->db_rec ),
+				    ARBEL_PAGE_SIZE ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not map doorbell UAR: %s\n",
+		       arbel, strerror ( rc ) );
+		goto err_map_doorbell;
+	}
 
 	/* Initialise doorbell records */
 	memset ( arbel->db_rec, 0, ARBEL_PAGE_SIZE );
@@ -2454,13 +2514,22 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 
 	return 0;
 
-	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / ARBEL_PAGE_SIZE ) );
+	memset ( &unmap_icm, 0, sizeof ( unmap_icm ) );
+	MLX_FILL_1 ( &unmap_icm, 1, value, arbel->db_rec_offset );
+	arbel_cmd_unmap_icm ( arbel, 1, &unmap_icm );
+ err_map_doorbell:
+	memset ( &unmap_icm, 0, sizeof ( unmap_icm ) );
+	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / ARBEL_PAGE_SIZE ),
+			      &unmap_icm );
  err_map_icm:
 	arbel_cmd_unmap_icm_aux ( arbel );
  err_map_icm_aux:
+	free_dma ( arbel->db_rec, ARBEL_PAGE_SIZE );
+	arbel->db_rec= NULL;
+ err_alloc_doorbell:
 	ufree ( arbel->icm );
 	arbel->icm = UNULL;
- err_alloc:
+ err_alloc_icm:
  err_set_icm_size:
 	return rc;
 }
@@ -2471,8 +2540,17 @@ static int arbel_alloc_icm ( struct arbel *arbel,
  * @v arbel		Arbel device
  */
 static void arbel_free_icm ( struct arbel *arbel ) {
-	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / ARBEL_PAGE_SIZE ) );
+	struct arbelprm_scalar_parameter unmap_icm;
+
+	memset ( &unmap_icm, 0, sizeof ( unmap_icm ) );
+	MLX_FILL_1 ( &unmap_icm, 1, value, arbel->db_rec_offset );
+	arbel_cmd_unmap_icm ( arbel, 1, &unmap_icm );
+	memset ( &unmap_icm, 0, sizeof ( unmap_icm ) );
+	arbel_cmd_unmap_icm ( arbel, ( arbel->icm_len / ARBEL_PAGE_SIZE ),
+			      &unmap_icm );
 	arbel_cmd_unmap_icm_aux ( arbel );
+	free_dma ( arbel->db_rec, ARBEL_PAGE_SIZE );
+	arbel->db_rec = NULL;
 	ufree ( arbel->icm );
 	arbel->icm = UNULL;
 }
