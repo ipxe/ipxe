@@ -186,6 +186,7 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 	memset ( &hcr, 0, sizeof ( hcr ) );
 	in_buffer = &hcr.u.dwords[0];
 	if ( in_len && ( command & HERMON_HCR_IN_MBOX ) ) {
+		memset ( hermon->mailbox_in, 0, HERMON_MBOX_SIZE );
 		in_buffer = hermon->mailbox_in;
 		MLX_FILL_1 ( &hcr, 1, in_param_l, virt_to_bus ( in_buffer ) );
 	}
@@ -289,12 +290,10 @@ hermon_cmd_close_hca ( struct hermon *hermon ) {
 }
 
 static inline int
-hermon_cmd_init_port ( struct hermon *hermon, unsigned int port,
-		       const struct hermonprm_init_port *init_port ) {
+hermon_cmd_init_port ( struct hermon *hermon, unsigned int port ) {
 	return hermon_cmd ( hermon,
-			    HERMON_HCR_IN_CMD ( HERMON_HCR_INIT_PORT,
-						1, sizeof ( *init_port ) ),
-			    0, init_port, port, NULL );
+			    HERMON_HCR_VOID_CMD ( HERMON_HCR_INIT_PORT ),
+			    0, NULL, port, NULL );
 }
 
 static inline int
@@ -302,6 +301,15 @@ hermon_cmd_close_port ( struct hermon *hermon, unsigned int port ) {
 	return hermon_cmd ( hermon,
 			    HERMON_HCR_VOID_CMD ( HERMON_HCR_CLOSE_PORT ),
 			    0, NULL, port, NULL );
+}
+
+static inline int
+hermon_cmd_set_port ( struct hermon *hermon, unsigned int port,
+		      struct hermonprm_set_port *set_port ) {
+	return hermon_cmd ( hermon,
+			    HERMON_HCR_IN_CMD ( HERMON_HCR_SET_PORT,
+						1, sizeof ( *set_port ) ),
+			    0, set_port, port, NULL );
 }
 
 static inline int
@@ -1903,8 +1911,11 @@ static int hermon_sense_port_type ( struct ib_device *ibdev ) {
 	int rc;
 
 	/* If DPDP is not supported, always assume Infiniband */
-	if ( ! hermon->cap.dpdp )
+	if ( ! hermon->cap.dpdp ) {
+		DBGC ( hermon, "Hermon %p does not support DPDP; assuming "
+		       "Infiniband\n", hermon );
 		return HERMON_PORT_TYPE_IB;
+	}
 
 	/* Sense the port type */
 	if ( ( rc = hermon_cmd_sense_port ( hermon, ibdev->port,
@@ -1928,7 +1939,7 @@ static int hermon_sense_port_type ( struct ib_device *ibdev ) {
  */
 static int hermon_open ( struct ib_device *ibdev ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
-	struct hermonprm_init_port init_port;
+	struct hermonprm_set_port set_port;
 	int port_type;
 	int rc;
 
@@ -1941,18 +1952,29 @@ static int hermon_open ( struct ib_device *ibdev ) {
 		return -ENOTCONN;
         }
 
-	/* Init Port */
-	memset ( &init_port, 0, sizeof ( init_port ) );
-	MLX_FILL_2 ( &init_port, 0,
-		     port_width_cap, 3,
-		     vl_cap, 1 );
-	MLX_FILL_2 ( &init_port, 1,
-		     mtu, HERMON_MTU_2048,
+	/* Set port parameters */
+	memset ( &set_port, 0, sizeof ( set_port ) );
+	MLX_FILL_7 ( &set_port, 0,
+		     mmc, 1,
+		     mvc, 1,
+		     mp, 1,
+		     mg, 1,
+		     mtu_cap, IB_MTU_2048,
+		     vl_cap, IB_VL_0,
+		     rcm, 1 );
+	MLX_FILL_2 ( &set_port, 10,
+		     max_pkey, 1,
 		     max_gid, 1 );
-	MLX_FILL_1 ( &init_port, 2, max_pkey, 64 );
-	if ( ( rc = hermon_cmd_init_port ( hermon, ibdev->port,
-					   &init_port ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p port %d could not intialise port: "
+	if ( ( rc = hermon_cmd_set_port ( hermon, ibdev->port,
+					  &set_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not set port: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Initialise port */
+	if ( ( rc = hermon_cmd_init_port ( hermon, ibdev->port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not initialise port: "
 		       "%s\n", hermon, ibdev->port, strerror ( rc ) );
 		return rc;
 	}

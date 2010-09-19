@@ -47,6 +47,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_HCR_CLOSE_HCA		0x0008
 #define HERMON_HCR_INIT_PORT		0x0009
 #define HERMON_HCR_CLOSE_PORT		0x000a
+#define HERMON_HCR_SET_PORT		0x000c
 #define HERMON_HCR_SW2HW_MPT		0x000d
 #define HERMON_HCR_WRITE_MTT		0x0011
 #define HERMON_HCR_MAP_EQ		0x0012
@@ -83,6 +84,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_ST_RC			0x00
 #define HERMON_ST_UD			0x03
 #define HERMON_ST_MLX			0x07
+
+/* Port types */
+#define HERMON_PORT_TYPE_IB		1
 
 /* MTUs */
 #define HERMON_MTU_2048			0x04
@@ -190,13 +194,53 @@ struct hermonprm_port_state_change_event_st {
 	struct hermonprm_port_state_change_st data;
 } __attribute__ (( packed ));
 
-/** Hermon sense port */
 struct hermonprm_sense_port_st {
 	pseudo_bit_t port_type[0x00020];
 /* -------------- */
 	pseudo_bit_t reserved[0x00020];
-};
-#define HERMON_PORT_TYPE_IB		1
+} __attribute__ (( packed ));
+
+struct hermonprm_set_port_st {
+	pseudo_bit_t rqk[0x00001];
+	pseudo_bit_t rcm[0x00001];
+	pseudo_bit_t reserved0[0x00002];
+	pseudo_bit_t vl_cap[0x00004];
+	pseudo_bit_t reserved1[0x00004];
+	pseudo_bit_t mtu_cap[0x00004];
+	pseudo_bit_t g0[0x00001];
+	pseudo_bit_t ng[0x00001];
+	pseudo_bit_t sig[0x00001];
+	pseudo_bit_t mg[0x00001];
+	pseudo_bit_t mp[0x00001];
+	pseudo_bit_t mvc[0x00001];
+	pseudo_bit_t mmc[0x00001];
+	pseudo_bit_t reserved2[0x00009];
+/* -------------- */
+	pseudo_bit_t capability_mask[0x00020];
+/* -------------- */
+	pseudo_bit_t system_image_guid_h[0x00020];
+/* -------------- */
+	pseudo_bit_t system_image_guid_l[0x00020];
+/* -------------- */
+	pseudo_bit_t guid0_h[0x00020];
+/* -------------- */
+	pseudo_bit_t guid0_l[0x00020];
+/* -------------- */
+	pseudo_bit_t node_guid_h[0x00020];
+/* -------------- */
+	pseudo_bit_t node_guid_l[0x00020];
+/* -------------- */
+	pseudo_bit_t egress_sniff_qpn[0x00018];
+	pseudo_bit_t egress_sniff_mode[0x00002];
+	pseudo_bit_t reserved3[0x00006];
+/* -------------- */
+	pseudo_bit_t ingress_sniff_qpn[0x00018];
+	pseudo_bit_t ingress_sniff_mode[0x00002];
+	pseudo_bit_t reserved4[0x00006];
+/* -------------- */
+	pseudo_bit_t max_gid[0x00010];
+	pseudo_bit_t max_pkey[0x00010];
+} __attribute__ (( packed ));
 
 /*
  * Wrapper structures for hardware datatypes
@@ -213,7 +257,6 @@ struct MLX_DECLARE_STRUCT ( hermonprm_event_mask );
 struct MLX_DECLARE_STRUCT ( hermonprm_event_queue_entry );
 struct MLX_DECLARE_STRUCT ( hermonprm_hca_command_register );
 struct MLX_DECLARE_STRUCT ( hermonprm_init_hca );
-struct MLX_DECLARE_STRUCT ( hermonprm_init_port );
 struct MLX_DECLARE_STRUCT ( hermonprm_mad_ifc );
 struct MLX_DECLARE_STRUCT ( hermonprm_mcg_entry );
 struct MLX_DECLARE_STRUCT ( hermonprm_mgm_hash );
@@ -228,6 +271,7 @@ struct MLX_DECLARE_STRUCT ( hermonprm_queue_pair_ee_context_entry );
 struct MLX_DECLARE_STRUCT ( hermonprm_scalar_parameter );
 struct MLX_DECLARE_STRUCT ( hermonprm_sense_port );
 struct MLX_DECLARE_STRUCT ( hermonprm_send_db_register );
+struct MLX_DECLARE_STRUCT ( hermonprm_set_port );
 struct MLX_DECLARE_STRUCT ( hermonprm_ud_address_vector );
 struct MLX_DECLARE_STRUCT ( hermonprm_virtual_physical_mapping );
 struct MLX_DECLARE_STRUCT ( hermonprm_wqe_segment_ctrl_mlx );
@@ -590,7 +634,7 @@ struct hermon {
 #define HERMON_HCR_REG(x)		( HERMON_HCR_BASE + 4 * (x) )
 #define HERMON_HCR_MAX_WAIT_MS		2000
 #define HERMON_MBOX_ALIGN		4096
-#define HERMON_MBOX_SIZE		512
+#define HERMON_MBOX_SIZE		1024
 
 /* HCA command is split into
  *
