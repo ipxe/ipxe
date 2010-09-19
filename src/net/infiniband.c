@@ -894,6 +894,8 @@ struct ib_device * alloc_ibdev ( size_t priv_size ) {
 	if ( ibdev ) {
 		drv_priv = ( ( ( void * ) ibdev ) + sizeof ( *ibdev ) );
 		ib_set_drvdata ( ibdev, drv_priv );
+		INIT_LIST_HEAD ( &ibdev->list );
+		INIT_LIST_HEAD ( &ibdev->open_list );
 		INIT_LIST_HEAD ( &ibdev->cqs );
 		INIT_LIST_HEAD ( &ibdev->qps );
 		ibdev->port_state = IB_PORT_STATE_DOWN;
