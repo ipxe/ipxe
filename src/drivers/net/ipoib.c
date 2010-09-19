@@ -485,6 +485,7 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 	struct ipoib_mac ll_src;
 	struct ipoib_peer *src;
 
+	/* Record errors */
 	if ( rc != 0 ) {
 		netdev_rx_err ( netdev, iobuf, rc );
 		return;
@@ -499,6 +500,12 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 		return;
 	}
 	ipoib_hdr = iobuf->data;
+	if ( ! av ) {
+		DBGC ( ipoib, "IPoIB %p received packet without address "
+		       "vector\n", ipoib );
+		netdev_rx_err ( netdev, iobuf, -ENOTTY );
+		return;
+	}
 
 	/* Parse source address */
 	if ( av->gid_present ) {

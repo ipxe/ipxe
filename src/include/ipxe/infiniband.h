@@ -135,6 +135,7 @@ enum ib_queue_pair_type {
 	IB_QPT_GSI,
 	IB_QPT_UD,
 	IB_QPT_RC,
+	IB_QPT_ETH,
 };
 
 /** An Infiniband Queue Pair */

@@ -483,7 +483,7 @@ void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v av		Address vector
+ * @v av		Address vector, or NULL
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
