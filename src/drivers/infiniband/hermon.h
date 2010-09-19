@@ -94,6 +94,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /* MTUs */
 #define HERMON_MTU_2048			0x04
+#define HERMON_MTU_ETH			0x07
 
 #define HERMON_INVALID_LKEY		0x00000100UL
 
@@ -109,6 +110,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define HERMON_MAP_EQ			( 0UL << 31 )
 #define HERMON_UNMAP_EQ			( 1UL << 31 )
+
+#define HERMON_SET_PORT_GENERAL_PARAM	0x0000
+#define HERMON_SET_PORT_RECEIVE_QP	0x0100
+#define HERMON_SET_PORT_MAC_TABLE	0x0200
+#define HERMON_SET_PORT_VLAN_TABLE	0x0300
+#define HERMON_SET_PORT_PRIORITY_TABLE	0x0400
+#define HERMON_SET_PORT_GID_TABLE	0x0500
 
 #define HERMON_EV_PORT_STATE_CHANGE	0x09
 
@@ -449,6 +457,11 @@ struct hermonprm_rc_send_wqe {
 	struct hermonprm_wqe_segment_data_ptr data[HERMON_MAX_GATHER];
 } __attribute__ (( packed ));
 
+struct hermonprm_eth_send_wqe {
+	struct hermonprm_wqe_segment_ctrl_send ctrl;
+	struct hermonprm_wqe_segment_data_ptr data[HERMON_MAX_GATHER];
+} __attribute__ (( packed ));
+
 #define HERMON_MAX_SCATTER 1
 
 struct hermonprm_recv_wqe {
@@ -584,6 +597,7 @@ union hermon_send_wqe {
 	struct hermonprm_ud_send_wqe ud;
 	struct hermonprm_mlx_send_wqe mlx;
 	struct hermonprm_rc_send_wqe rc;
+	struct hermonprm_eth_send_wqe eth;
 	uint8_t force_align[HERMON_SEND_WQE_ALIGN];
 } __attribute__ (( packed ));
 
@@ -720,6 +734,51 @@ typedef uint32_t hermon_bitmask_t;
 	( ( (max_entries) + ( 8 * sizeof ( hermon_bitmask_t ) ) - 1 ) /	     \
 	  ( 8 * sizeof ( hermon_bitmask_t ) ) )
 
+struct hermon;
+struct hermon_port;
+
+/** A Hermon port type */
+struct hermon_port_type {
+	/** Register port
+	 *
+	 * @v hermon		Hermon device
+	 * @v port		Hermon port
+	 * @ret rc		Return status code
+	 */
+	int ( * register_dev ) ( struct hermon *hermon,
+				 struct hermon_port *port );
+	/** Port state changed
+	 *
+	 * @v hermon		Hermon device
+	 * @v port		Hermon port
+	 * @v link_up		Link is up
+	 */
+	void ( * state_change ) ( struct hermon *hermon,
+				  struct hermon_port *port,
+				  int link_up );
+	/** Unregister port
+	 *
+	 * @v hermon		Hermon device
+	 * @v port		Hermon port
+	 */
+	void ( * unregister_dev ) ( struct hermon *hermon,
+				    struct hermon_port *port );
+};
+
+/** A Hermon port */
+struct hermon_port {
+	/** Infiniband device */
+	struct ib_device *ibdev;
+	/** Network device */
+	struct net_device *netdev;
+	/** Ethernet completion queue */
+	struct ib_completion_queue *eth_cq;
+	/** Ethernet queue pair */
+	struct ib_queue_pair *eth_qp;
+	/** Port type */
+	struct hermon_port_type *type;
+};
+
 /** A Hermon device */
 struct hermon {
 	/** PCI configuration registers */
@@ -763,8 +822,8 @@ struct hermon {
 	/** QPN base */
 	unsigned long qpn_base;
 
-	/** Infiniband devices */
-	struct ib_device *ibdev[HERMON_MAX_PORTS];
+	/** Ports */
+	struct hermon_port port[HERMON_MAX_PORTS];
 };
 
 /** Global protection domain */

@@ -36,6 +36,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/netdevice.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_smc.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/ethernet.h>
 #include "hermon.h"
 
 /**
@@ -304,12 +306,13 @@ hermon_cmd_close_port ( struct hermon *hermon, unsigned int port ) {
 }
 
 static inline int
-hermon_cmd_set_port ( struct hermon *hermon, unsigned int port,
-		      union hermonprm_set_port *set_port ) {
+hermon_cmd_set_port ( struct hermon *hermon, int is_ethernet,
+		      unsigned int port_selector,
+		      const union hermonprm_set_port *set_port ) {
 	return hermon_cmd ( hermon,
 			    HERMON_HCR_IN_CMD ( HERMON_HCR_SET_PORT,
 						1, sizeof ( *set_port ) ),
-			    0, set_port, port, NULL );
+			    is_ethernet, set_port, port_selector, NULL );
 }
 
 static inline int
@@ -492,6 +495,24 @@ hermon_cmd_mgid_hash ( struct hermon *hermon, const union ib_gid *gid,
 }
 
 static inline int
+hermon_cmd_query_port ( struct hermon *hermon, unsigned int port,
+			struct hermonprm_query_port_cap *query_port ) {
+	return hermon_cmd ( hermon,
+			    HERMON_HCR_OUT_CMD ( HERMON_HCR_QUERY_PORT,
+						 1, sizeof ( *query_port ) ),
+			    0, NULL, port, query_port );
+}
+
+static inline int
+hermon_cmd_sense_port ( struct hermon *hermon, unsigned int port,
+			struct hermonprm_sense_port *port_type ) {
+	return hermon_cmd ( hermon,
+                            HERMON_HCR_OUT_CMD ( HERMON_HCR_SENSE_PORT,
+                                                 1, sizeof ( *port_type ) ),
+                            0, NULL, port, port_type );
+}
+
+static inline int
 hermon_cmd_run_fw ( struct hermon *hermon ) {
 	return hermon_cmd ( hermon,
 			    HERMON_HCR_VOID_CMD ( HERMON_HCR_RUN_FW ),
@@ -558,16 +579,6 @@ hermon_cmd_map_fa ( struct hermon *hermon,
 						1, sizeof ( *map ) ),
 			    0, map, 1, NULL );
 }
-
-static inline int
-hermon_cmd_sense_port ( struct hermon *hermon, unsigned int port,
-			struct hermonprm_sense_port *port_type ) {
-	return hermon_cmd ( hermon,
-                            HERMON_HCR_OUT_CMD ( HERMON_HCR_SENSE_PORT,
-                                                 1, sizeof ( *port_type ) ),
-                            0, NULL, port, port_type );
-}
-
 
 /***************************************************************************
  *
@@ -916,6 +927,7 @@ static int hermon_alloc_qpn ( struct ib_device *ibdev,
 		return 0;
 	case IB_QPT_UD:
 	case IB_QPT_RC:
+	case IB_QPT_ETH:
 		/* Find a free queue pair number */
 		qpn_offset = hermon_bitmask_alloc ( hermon->qp_inuse,
 						    HERMON_MAX_QPS, 1 );
@@ -982,6 +994,7 @@ static uint8_t hermon_qp_st[] = {
 	[IB_QPT_GSI] = HERMON_ST_MLX,
 	[IB_QPT_UD] = HERMON_ST_UD,
 	[IB_QPT_RC] = HERMON_ST_RC,
+	[IB_QPT_ETH] = HERMON_ST_MLX,
 };
 
 /**
@@ -1163,7 +1176,9 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 	if ( hermon_qp->state < HERMON_QP_ST_RTR ) {
 		memset ( &qpctx, 0, sizeof ( qpctx ) );
 		MLX_FILL_2 ( &qpctx, 4,
-			     qpc_eec_data.mtu, HERMON_MTU_2048,
+			     qpc_eec_data.mtu,
+			     ( ( qp->type == IB_QPT_ETH ) ?
+			       HERMON_MTU_ETH : HERMON_MTU_2048 ),
 			     qpc_eec_data.msg_max, 31 );
 		MLX_FILL_1 ( &qpctx, 7,
 			     qpc_eec_data.remote_qpn_een, qp->av.qpn );
@@ -1402,6 +1417,38 @@ hermon_fill_rc_send_wqe ( struct ib_device *ibdev,
 	return HERMON_OPCODE_SEND;
 }
 
+/**
+ * Construct Ethernet send work queue entry
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector
+ * @v iobuf		I/O buffer
+ * @v wqe		Send work queue entry
+ * @ret opcode		Control opcode
+ */
+static unsigned int
+hermon_fill_eth_send_wqe ( struct ib_device *ibdev,
+			   struct ib_queue_pair *qp __unused,
+			   struct ib_address_vector *av __unused,
+			   struct io_buffer *iobuf,
+			   union hermon_send_wqe *wqe ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+
+	/* Fill work queue entry */
+	MLX_FILL_1 ( &wqe->eth.ctrl, 1, ds,
+		     ( ( offsetof ( typeof ( wqe->mlx ), data[1] ) / 16 ) ) );
+	MLX_FILL_2 ( &wqe->eth.ctrl, 2,
+		     c, 0x03 /* generate completion */,
+		     s, 1 /* inhibit ICRC */ );
+	MLX_FILL_1 ( &wqe->eth.data[0], 0,
+		     byte_count, iob_len ( iobuf ) );
+	MLX_FILL_1 ( &wqe->eth.data[0], 1, l_key, hermon->lkey );
+	MLX_FILL_1 ( &wqe->eth.data[0], 3,
+		     local_address_l, virt_to_bus ( iobuf->data ) );
+	return HERMON_OPCODE_SEND;
+}
+
 /** Work queue entry constructors */
 static unsigned int
 ( * hermon_fill_send_wqe[] ) ( struct ib_device *ibdev,
@@ -1413,6 +1460,7 @@ static unsigned int
 	[IB_QPT_GSI] = hermon_fill_mlx_send_wqe,
 	[IB_QPT_UD] = hermon_fill_ud_send_wqe,
 	[IB_QPT_RC] = hermon_fill_rc_send_wqe,
+	[IB_QPT_ETH] = hermon_fill_eth_send_wqe,
 };
 
 /**
@@ -1617,6 +1665,9 @@ static int hermon_complete ( struct ib_device *ibdev,
 			break;
 		case IB_QPT_RC:
 			av = &qp->av;
+			break;
+		case IB_QPT_ETH:
+			av = NULL;
 			break;
 		default:
 			assert ( 0 );
@@ -1826,8 +1877,9 @@ static void hermon_event_port_state_change ( struct hermon *hermon,
 		return;
 	}
 
-	/* Update MAD parameters */
-	ib_smc_update ( hermon->ibdev[port], hermon_mad );
+	/* Notify device of port state change */
+	hermon->port[port].type->state_change ( hermon, &hermon->port[port],
+						link_up );
 }
 
 /**
@@ -1899,39 +1951,6 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
  */
 
 /**
- * Sense port type
- *
- * @v ibdev		Infiniband device
- * @ret port_type	Port type, or negative error
- */
-static int hermon_sense_port_type ( struct ib_device *ibdev ) {
-	struct hermon *hermon = ib_get_drvdata ( ibdev );
-	struct hermonprm_sense_port sense_port;
-	int port_type;
-	int rc;
-
-	/* If DPDP is not supported, always assume Infiniband */
-	if ( ! hermon->cap.dpdp ) {
-		DBGC ( hermon, "Hermon %p does not support DPDP; assuming "
-		       "Infiniband\n", hermon );
-		return HERMON_PORT_TYPE_IB;
-	}
-
-	/* Sense the port type */
-	if ( ( rc = hermon_cmd_sense_port ( hermon, ibdev->port,
-					    &sense_port ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p port %d sense failed: %s\n",
-		       hermon, ibdev->port, strerror ( rc ) );
-		return rc;
-	}
-	port_type = MLX_GET ( &sense_port, port_type );
-
-	DBGC ( hermon, "Hermon %p port %d type %d\n",
-	       hermon, ibdev->port, port_type );
-	return port_type;
-}
-
-/**
  * Initialise Infiniband link
  *
  * @v ibdev		Infiniband device
@@ -1940,17 +1959,7 @@ static int hermon_sense_port_type ( struct ib_device *ibdev ) {
 static int hermon_open ( struct ib_device *ibdev ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	union hermonprm_set_port set_port;
-	int port_type;
 	int rc;
-
-	/* Check we are connected to an Infiniband network */
-	if ( ( rc = port_type = hermon_sense_port_type ( ibdev ) ) < 0 )
-		return rc;
-	if ( port_type != HERMON_PORT_TYPE_IB ) {
-		DBGC ( hermon, "Hermon %p port %d not connected to an "
-		       "Infiniband network", hermon, ibdev->port );
-		return -ENOTCONN;
-        }
 
 	/* Set port parameters */
 	memset ( &set_port, 0, sizeof ( set_port ) );
@@ -1965,7 +1974,7 @@ static int hermon_open ( struct ib_device *ibdev ) {
 	MLX_FILL_2 ( &set_port.ib, 10,
 		     max_pkey, 1,
 		     max_gid, 1 );
-	if ( ( rc = hermon_cmd_set_port ( hermon, ibdev->port,
+	if ( ( rc = hermon_cmd_set_port ( hermon, 0, ibdev->port,
 					  &set_port ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not set port: %s\n",
 		       hermon, ibdev->port, strerror ( rc ) );
@@ -2135,6 +2144,530 @@ static struct ib_device_operations hermon_ib_operations = {
 	.set_port_info	= hermon_inform_sma,
 	.set_pkey_table	= hermon_inform_sma,
 };
+
+/**
+ * Register Hermon Infiniband device
+ *
+ * @v hermon		Hermon device
+ * @v port		Hermon port
+ * @ret rc		Return status code
+ */
+static int hermon_register_ibdev ( struct hermon *hermon,
+				   struct hermon_port *port ) {
+	struct ib_device *ibdev = port->ibdev;
+	int rc;
+
+	/* Initialise parameters using SMC */
+	ib_smc_init ( ibdev, hermon_mad );
+
+	/* Register Infiniband device */
+	if ( ( rc = register_ibdev ( ibdev ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not register IB "
+		       "device: %s\n", hermon, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Handle Hermon Infiniband device port state change
+ *
+ * @v hermon		Hermon device
+ * @v port		Hermon port
+ * @v link_up		Link is up
+ */
+static void hermon_state_change_ibdev ( struct hermon *hermon __unused,
+					struct hermon_port *port,
+					int link_up __unused ) {
+	struct ib_device *ibdev = port->ibdev;
+
+	/* Update MAD parameters */
+	ib_smc_update ( ibdev, hermon_mad );
+}
+
+/**
+ * Unregister Hermon Infiniband device
+ *
+ * @v hermon		Hermon device
+ * @v port		Hermon port
+ */
+static void hermon_unregister_ibdev ( struct hermon *hermon __unused,
+				      struct hermon_port *port ) {
+	struct ib_device *ibdev = port->ibdev;
+
+	unregister_ibdev ( ibdev );
+}
+
+/** Hermon Infiniband port type */
+static struct hermon_port_type hermon_port_type_ib = {
+	.register_dev = hermon_register_ibdev,
+	.state_change = hermon_state_change_ibdev,
+	.unregister_dev = hermon_unregister_ibdev,
+};
+
+/***************************************************************************
+ *
+ * Ethernet operation
+ *
+ ***************************************************************************
+ */
+
+/** Number of Hermon Ethernet send work queue entries */
+#define HERMON_ETH_NUM_SEND_WQES 2
+
+/** Number of Hermon Ethernet receive work queue entries */
+#define HERMON_ETH_NUM_RECV_WQES 4
+
+/** Number of Hermon Ethernet completion entries */
+#define HERMON_ETH_NUM_CQES 8
+
+/**
+ * Transmit packet via Hermon Ethernet device
+ *
+ * @v netdev		Network device
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+static int hermon_eth_transmit ( struct net_device *netdev,
+				 struct io_buffer *iobuf ) {
+	struct hermon_port *port = netdev->priv;
+	struct ib_device *ibdev = port->ibdev;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	int rc;
+
+	/* Transmit packet */
+	if ( ( rc = ib_post_send ( ibdev, port->eth_qp, NULL,
+				   iobuf ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not transmit: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Handle Hermon Ethernet device send completion
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v iobuf		I/O buffer
+ * @v rc		Completion status code
+ */
+static void hermon_eth_complete_send ( struct ib_device *ibdev __unused,
+				       struct ib_queue_pair *qp,
+				       struct io_buffer *iobuf, int rc ) {
+	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
+
+	netdev_tx_complete_err ( netdev, iobuf, rc );
+}
+
+/**
+ * Handle Hermon Ethernet device receive completion
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v av		Address vector, or NULL
+ * @v iobuf		I/O buffer
+ * @v rc		Completion status code
+ */
+static void hermon_eth_complete_recv ( struct ib_device *ibdev __unused,
+				       struct ib_queue_pair *qp,
+				       struct ib_address_vector *av __unused,
+				       struct io_buffer *iobuf, int rc ) {
+	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
+
+	/* Hand off to network layer */
+	if ( rc == 0 ) {
+		netdev_rx ( netdev, iobuf );
+	} else {
+		netdev_rx_err ( netdev, iobuf, rc );
+	}
+}
+
+/** Hermon Ethernet device completion operations */
+static struct ib_completion_queue_operations hermon_eth_cq_op = {
+	.complete_send = hermon_eth_complete_send,
+	.complete_recv = hermon_eth_complete_recv,
+};
+
+/**
+ * Poll Hermon Ethernet device
+ *
+ * @v netdev		Network device
+ */
+static void hermon_eth_poll ( struct net_device *netdev ) {
+	struct hermon_port *port = netdev->priv;
+	struct ib_device *ibdev = port->ibdev;
+
+	ib_poll_eq ( ibdev );
+}
+
+/**
+ * Enable/disable interrupts on Hermon Ethernet device
+ *
+ * @v netdev		Network device
+ * @v enable		Interrupts should be enabled
+ */
+static void hermon_eth_irq ( struct net_device *netdev __unused,
+			     int enable __unused ) {
+	/* No implementation */
+}
+
+/**
+ * Open Hermon Ethernet device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int hermon_eth_open ( struct net_device *netdev ) {
+	struct hermon_port *port = netdev->priv;
+	struct ib_device *ibdev = port->ibdev;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	union hermonprm_set_port set_port;
+	int rc;
+
+	/* Allocate completion queue */
+	port->eth_cq = ib_create_cq ( ibdev, HERMON_ETH_NUM_CQES,
+				      &hermon_eth_cq_op );
+	if ( ! port->eth_cq ) {
+		DBGC ( hermon, "Hermon %p port %d could not create completion "
+		       "queue\n", hermon, ibdev->port );
+		rc = -ENOMEM;
+		goto err_create_cq;
+	}
+
+	/* Allocate queue pair */
+	port->eth_qp = ib_create_qp ( ibdev, IB_QPT_ETH,
+				      HERMON_ETH_NUM_SEND_WQES, port->eth_cq,
+				      HERMON_ETH_NUM_RECV_WQES, port->eth_cq );
+	if ( ! port->eth_qp ) {
+		DBGC ( hermon, "Hermon %p port %d could not create queue "
+		       "pair\n", hermon, ibdev->port );
+		rc = -ENOMEM;
+		goto err_create_qp;
+	}
+	ib_qp_set_ownerdata ( port->eth_qp, netdev );
+
+	/* Activate queue pair */
+	if ( ( rc = ib_modify_qp ( ibdev, port->eth_qp ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not modify queue "
+		       "pair: %s\n", hermon, ibdev->port, strerror ( rc ) );
+		goto err_modify_qp;
+	}
+
+	/* Fill receive rings */
+	ib_refill_recv ( ibdev, port->eth_qp );
+
+	/* Set port general parameters */
+	memset ( &set_port, 0, sizeof ( set_port ) );
+	MLX_FILL_3 ( &set_port.general, 0,
+		     v_mtu, 1,
+		     v_pprx, 1,
+		     v_pptx, 1 );
+	MLX_FILL_1 ( &set_port.general, 1,
+		     mtu, ( ETH_FRAME_LEN + 40 /* Used by card */ ) );
+	MLX_FILL_1 ( &set_port.general, 2, pptx, 1 );
+	MLX_FILL_1 ( &set_port.general, 3, pprx, 1 );
+	if ( ( rc = hermon_cmd_set_port ( hermon, 1,
+					  ( HERMON_SET_PORT_GENERAL_PARAM |
+					    ibdev->port ),
+					  &set_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not set port general "
+		       "parameters: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		goto err_set_port_general_params;
+	}
+
+	/* Set port receive QP */
+	memset ( &set_port, 0, sizeof ( set_port ) );
+	MLX_FILL_1 ( &set_port.rqp_calc, 0, base_qpn, port->eth_qp->qpn );
+	MLX_FILL_1 ( &set_port.rqp_calc, 2,
+		     mac_miss_index, 128 /* MAC misses go to promisc QP */ );
+	MLX_FILL_2 ( &set_port.rqp_calc, 3,
+		     vlan_miss_index, 127 /* VLAN misses go to promisc QP */,
+		     no_vlan_index, 126 /* VLAN-free go to promisc QP */ );
+	MLX_FILL_2 ( &set_port.rqp_calc, 5,
+		     promisc_qpn, port->eth_qp->qpn,
+		     en_uc_promisc, 1 );
+	MLX_FILL_2 ( &set_port.rqp_calc, 6,
+		     def_mcast_qpn, port->eth_qp->qpn,
+		     mc_promisc_mode, 2 /* Receive all multicasts */ );
+	if ( ( rc = hermon_cmd_set_port ( hermon, 1,
+					  ( HERMON_SET_PORT_RECEIVE_QP |
+					    ibdev->port ),
+					  &set_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not set port receive "
+		       "QP: %s\n", hermon, ibdev->port, strerror ( rc ) );
+		goto err_set_port_receive_qp;
+	}
+
+	/* Initialise port */
+	if ( ( rc = hermon_cmd_init_port ( hermon, ibdev->port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not initialise port: "
+		       "%s\n", hermon, ibdev->port, strerror ( rc ) );
+		goto err_init_port;
+	}
+
+	return 0;
+
+ err_init_port:
+ err_set_port_receive_qp:
+ err_set_port_general_params:
+ err_modify_qp:
+	ib_destroy_qp ( ibdev, port->eth_qp );
+ err_create_qp:
+	ib_destroy_cq ( ibdev, port->eth_cq );
+ err_create_cq:
+	return rc;
+}
+
+/**
+ * Close Hermon Ethernet device
+ *
+ * @v netdev		Network device
+ */
+static void hermon_eth_close ( struct net_device *netdev ) {
+	struct hermon_port *port = netdev->priv;
+	struct ib_device *ibdev = port->ibdev;
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	int rc;
+
+	/* Close port */
+	if ( ( rc = hermon_cmd_close_port ( hermon, ibdev->port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not close port: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		/* Nothing we can do about this */
+	}
+
+	/* Tear down the queues */
+	ib_destroy_qp ( ibdev, port->eth_qp );
+	ib_destroy_cq ( ibdev, port->eth_cq );
+}
+
+/** Hermon Ethernet network device operations */
+static struct net_device_operations hermon_eth_operations = {
+	.open		= hermon_eth_open,
+	.close		= hermon_eth_close,
+	.transmit	= hermon_eth_transmit,
+	.poll		= hermon_eth_poll,
+	.irq		= hermon_eth_irq,
+};
+
+/**
+ * Register Hermon Ethernet device
+ *
+ * @v hermon		Hermon device
+ * @v port		Hermon port
+ * @ret rc		Return status code
+ */
+static int hermon_register_netdev ( struct hermon *hermon,
+				    struct hermon_port *port ) {
+	struct net_device *netdev = port->netdev;
+	struct ib_device *ibdev = port->ibdev;
+	struct hermonprm_query_port_cap query_port;
+	union {
+		uint8_t bytes[8];
+		uint32_t dwords[2];
+	} mac;
+	int rc;
+
+	/* Retrieve MAC address */
+	if ( ( rc = hermon_cmd_query_port ( hermon, ibdev->port,
+					    &query_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not query port: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+	mac.dwords[0] = htonl ( MLX_GET ( &query_port, mac_47_32 ) );
+	mac.dwords[1] = htonl ( MLX_GET ( &query_port, mac_31_0 ) );
+	memcpy ( netdev->hw_addr,
+		 &mac.bytes[ sizeof ( mac.bytes ) - ETH_ALEN ], ETH_ALEN );
+
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not register network "
+		       "device: %s\n", hermon, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Handle Hermon Ethernet device port state change
+ *
+ * @v hermon		Hermon device
+ * @v port		Hermon port
+ * @v link_up		Link is up
+ */
+static void hermon_state_change_netdev ( struct hermon *hermon __unused,
+					 struct hermon_port *port,
+					 int link_up ) {
+	struct net_device *netdev = port->netdev;
+
+	if ( link_up ) {
+		netdev_link_up ( netdev );
+	} else {
+		netdev_link_down ( netdev );
+	}
+}
+
+/**
+ * Unregister Hermon Ethernet device
+ *
+ * @v hermon		Hermon device
+ * @v port		Hermon port
+ */
+static void hermon_unregister_netdev ( struct hermon *hermon __unused,
+				       struct hermon_port *port ) {
+	struct net_device *netdev = port->netdev;
+
+	unregister_netdev ( netdev );
+}
+
+/** Hermon Ethernet port type */
+static struct hermon_port_type hermon_port_type_eth = {
+	.register_dev = hermon_register_netdev,
+	.state_change = hermon_state_change_netdev,
+	.unregister_dev = hermon_unregister_netdev,
+};
+
+/***************************************************************************
+ *
+ * Port type detection
+ *
+ ***************************************************************************
+ */
+
+/** Timeout for port sensing */
+#define HERMON_SENSE_PORT_TIMEOUT ( TICKS_PER_SEC / 2 )
+
+/**
+ * Name port type
+ *
+ * @v port_type		Port type
+ * @v port_type_name	Port type name
+ */
+static inline const char * hermon_name_port_type ( unsigned int port_type ) {
+	switch ( port_type ) {
+	case HERMON_PORT_TYPE_UNKNOWN:	return "unknown";
+	case HERMON_PORT_TYPE_IB:	return "Infiniband";
+	case HERMON_PORT_TYPE_ETH:	return "Ethernet";
+	default:			return "INVALID";
+	}
+}
+
+/**
+ * Sense port type
+ *
+ * @v hermon		Hermon device
+ * @v port		Hermon port
+ * @ret port_type	Port type, or negative error
+ */
+static int hermon_sense_port_type ( struct hermon *hermon,
+				    struct hermon_port *port ) {
+	struct ib_device *ibdev = port->ibdev;
+	struct hermonprm_sense_port sense_port;
+	int port_type;
+	int rc;
+
+	/* If DPDP is not supported, always assume Infiniband */
+	if ( ! hermon->cap.dpdp ) {
+		port_type = HERMON_PORT_TYPE_IB;
+		DBGC ( hermon, "Hermon %p port %d does not support DPDP; "
+		       "assuming an %s network\n", hermon, ibdev->port,
+		       hermon_name_port_type ( port_type ) );
+		return port_type;
+	}
+
+	/* Sense the port type */
+	if ( ( rc = hermon_cmd_sense_port ( hermon, ibdev->port,
+					    &sense_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d sense failed: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+	port_type = MLX_GET ( &sense_port, port_type );
+
+	DBGC ( hermon, "Hermon %p port %d sensed an %s network\n",
+	       hermon, ibdev->port, hermon_name_port_type ( port_type ) );
+	return port_type;
+}
+
+/**
+ * Set port type
+ *
+ * @v hermon		Hermon device
+ * @v port		Hermon port
+ * @ret rc		Return status code
+ */
+static int hermon_set_port_type ( struct hermon *hermon,
+				  struct hermon_port *port ) {
+	struct ib_device *ibdev = port->ibdev;
+	struct hermonprm_query_port_cap query_port;
+	int ib_supported;
+	int eth_supported;
+	int port_type;
+	unsigned long start;
+	unsigned long elapsed;
+	int rc;
+
+	/* Check to see which types are supported */
+	if ( ( rc = hermon_cmd_query_port ( hermon, ibdev->port,
+					    &query_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not query port: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+	ib_supported = MLX_GET ( &query_port, ib );
+	eth_supported = MLX_GET ( &query_port, eth );
+	DBGC ( hermon, "Hermon %p port %d supports%s%s%s\n",
+	       hermon, ibdev->port, ( ib_supported ? " Infiniband" : "" ),
+	       ( ( ib_supported && eth_supported ) ? " and" : "" ),
+	       ( eth_supported ? " Ethernet" : "" ) );
+
+	/* Sense network, if applicable */
+	if ( ib_supported && eth_supported ) {
+
+		/* Both types are supported; try sensing network */
+		start = currticks();
+		do {
+			/* Try sensing port */
+			port_type = hermon_sense_port_type ( hermon, port );
+			if ( port_type < 0 ) {
+				rc = port_type;
+				return rc;
+			}
+		} while ( ( port_type == HERMON_PORT_TYPE_UNKNOWN ) &&
+			  ( ( elapsed = ( currticks() - start ) ) <
+			    HERMON_SENSE_PORT_TIMEOUT ) );
+
+		/* Set port type based on sensed network, defaulting
+		 * to Infiniband if nothing was sensed.
+		 */
+		switch ( port_type ) {
+		case HERMON_PORT_TYPE_ETH:
+			port->type = &hermon_port_type_eth;
+			break;
+		case HERMON_PORT_TYPE_IB:
+		case HERMON_PORT_TYPE_UNKNOWN:
+			port->type = &hermon_port_type_ib;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+	} else if ( eth_supported ) {
+		port->type = &hermon_port_type_eth;
+	} else {
+		port->type = &hermon_port_type_ib;
+	}
+
+	assert ( port->type != NULL );
+	return 0;
+}
 
 /***************************************************************************
  *
@@ -2789,6 +3322,8 @@ static int hermon_probe ( struct pci_device *pci,
 			  const struct pci_device_id *id __unused ) {
 	struct hermon *hermon;
 	struct ib_device *ibdev;
+	struct net_device *netdev;
+	struct hermon_port *port;
 	struct hermonprm_init_hca init_hca;
 	unsigned int i;
 	int rc;
@@ -2842,11 +3377,24 @@ static int hermon_probe ( struct pci_device *pci,
 			rc = -ENOMEM;
 			goto err_alloc_ibdev;
 		}
-		hermon->ibdev[i] = ibdev;
+		hermon->port[i].ibdev = ibdev;
 		ibdev->op = &hermon_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = ( HERMON_PORT_BASE + i );
 		ib_set_drvdata ( ibdev, hermon );
+	}
+
+	/* Allocate network devices */
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
+		netdev = alloc_etherdev ( 0 );
+		if ( ! netdev ) {
+			rc = -ENOMEM;
+			goto err_alloc_netdev;
+		}
+		hermon->port[i].netdev = netdev;
+		netdev_init ( netdev, &hermon_eth_operations );
+		netdev->dev = &pci->dev;
+		netdev->priv = &hermon->port[i];
 	}
 
 	/* Allocate ICM */
@@ -2868,7 +3416,7 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 )
 		goto err_setup_mpt;
 	for ( i = 0 ; i < hermon->cap.num_ports ; i++ )
-		hermon->ibdev[i]->rdma_key = hermon->lkey;
+		hermon->port[i].ibdev->rdma_key = hermon->lkey;
 
 	/* Set up event queue */
 	if ( ( rc = hermon_create_eq ( hermon ) ) != 0 )
@@ -2878,26 +3426,29 @@ static int hermon_probe ( struct pci_device *pci,
 	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 )
 		goto err_conf_special_qps;
 
-	/* Initialise parameters using SMC */
-	for ( i = 0 ; i < hermon->cap.num_ports ; i++ )
-		ib_smc_init ( hermon->ibdev[i], hermon_mad );
-
-	/* Register Infiniband devices */
+	/* Determine port types */
 	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
-		if ( ( rc = register_ibdev ( hermon->ibdev[i] ) ) != 0 ) {
-			DBGC ( hermon, "Hermon %p port %d could not register "
-			       "IB device: %s\n", hermon,
-			       hermon->ibdev[i]->port, strerror ( rc ) );
-			goto err_register_ibdev;
-		}
+		port = &hermon->port[i];
+		if ( ( rc = hermon_set_port_type ( hermon, port ) ) != 0 )
+			goto err_set_port_type;
+	}
+
+	/* Register devices */
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
+		port = &hermon->port[i];
+		if ( ( rc = port->type->register_dev ( hermon, port ) ) != 0 )
+			goto err_register;
 	}
 
 	return 0;
 
 	i = hermon->cap.num_ports;
- err_register_ibdev:
-	for ( i-- ; ( signed int ) i >= 0 ; i-- )
-		unregister_ibdev ( hermon->ibdev[i] );
+ err_register:
+	for ( i-- ; ( signed int ) i >= 0 ; i-- ) {
+		port = &hermon->port[i];
+		port->type->unregister_dev ( hermon, port );
+	}
+ err_set_port_type:
  err_conf_special_qps:
 	hermon_destroy_eq ( hermon );
  err_create_eq:
@@ -2907,9 +3458,15 @@ static int hermon_probe ( struct pci_device *pci,
 	hermon_free_icm ( hermon );
  err_alloc_icm:
 	i = hermon->cap.num_ports;
+ err_alloc_netdev:
+	for ( i-- ; ( signed int ) i >= 0 ; i-- ) {
+		netdev_nullify ( hermon->port[i].netdev );
+		netdev_put ( hermon->port[i].netdev );
+	}
+	i = hermon->cap.num_ports;
  err_alloc_ibdev:
 	for ( i-- ; ( signed int ) i >= 0 ; i-- )
-		ibdev_put ( hermon->ibdev[i] );
+		ibdev_put ( hermon->port[i].ibdev );
  err_get_cap:
 	hermon_stop_firmware ( hermon );
  err_start_firmware:
@@ -2929,10 +3486,13 @@ static int hermon_probe ( struct pci_device *pci,
  */
 static void hermon_remove ( struct pci_device *pci ) {
 	struct hermon *hermon = pci_get_drvdata ( pci );
+	struct hermon_port *port;
 	int i;
 
-	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- )
-		unregister_ibdev ( hermon->ibdev[i] );
+	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- ) {
+		port = &hermon->port[i];
+		port->type->unregister_dev ( hermon, port );
+	}
 	hermon_destroy_eq ( hermon );
 	hermon_cmd_close_hca ( hermon );
 	hermon_free_icm ( hermon );
@@ -2940,8 +3500,12 @@ static void hermon_remove ( struct pci_device *pci ) {
 	hermon_stop_firmware ( hermon );
 	free_dma ( hermon->mailbox_out, HERMON_MBOX_SIZE );
 	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
+	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- ) {
+		netdev_nullify ( hermon->port[i].netdev );
+		netdev_put ( hermon->port[i].netdev );
+	}
 	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- )
-		ibdev_put ( hermon->ibdev[i] );
+		ibdev_put ( hermon->port[i].ibdev );
 	free ( hermon );
 }
 
@@ -2950,6 +3514,14 @@ static struct pci_device_id hermon_nics[] = {
 	PCI_ROM ( 0x15b3, 0x634a, "mt25418", "MT25418 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x6732, "mt26418", "MT26418 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x673c, "mt26428", "MT26428 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6746, "mt26438", "MT26438 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6778, "mt26488", "MT26488 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6368, "mt25448", "MT25448 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6750, "mt26448", "MT26448 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6372, "mt25458", "MT25458 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x675a, "mt26458", "MT26458 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6764, "mt26468", "MT26468 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x676e, "mt26478", "MT26478 HCA driver", 0 ),
 };
 
 struct pci_driver hermon_driver __pci_driver = {
