@@ -122,6 +122,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define LOGIN_CMD		/* Login command */
 #undef	TIME_CMD		/* Time commands */
 #undef	DIGEST_CMD		/* Image crypto digest commands */
+#undef	LOTEST_CMD		/* Loopback testing commands */
 //#undef	PXE_CMD			/* PXE commands */
 
 /*
