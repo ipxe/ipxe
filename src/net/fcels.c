@@ -119,14 +119,25 @@ static struct fc_els_handler * fc_els_detect ( struct fc_els *els,
  * @ret rc		Return status code
  */
 int fc_els_tx ( struct fc_els *els, const void *data, size_t len ) {
-	struct xfer_metadata meta = {
-		.flags = ( fc_els_is_request ( els ) ?
-			   XFER_FL_OVER : ( XFER_FL_RESPONSE | XFER_FL_OUT ) ),
-	};
+	union {
+		struct sockaddr sa;
+		struct sockaddr_fc fc;
+	} dest;
+	struct xfer_metadata meta;
 	int rc;
 
 	DBGC2 ( els, FCELS_FMT " transmitting:\n", FCELS_ARGS ( els ) );
 	DBGC2_HDA ( els, 0, data, len );
+
+	/* Construct metadata */
+	memset ( &dest, 0, sizeof ( dest ) );
+	dest.fc.sfc_family = AF_FC;
+	memcpy ( &dest.fc.sfc_port_id, &els->peer_port_id,
+		 sizeof ( dest.fc.sfc_port_id ) );
+	memset ( &meta, 0, sizeof ( meta ) );
+	meta.flags = ( fc_els_is_request ( els ) ?
+		       XFER_FL_OVER : ( XFER_FL_RESPONSE | XFER_FL_OUT ) );
+	meta.dest = &dest.sa;
 
 	/* Transmit frame */
 	if ( ( rc = xfer_deliver_raw_meta ( &els->xchg, data, len,
@@ -522,6 +533,14 @@ static int fc_els_flogi_rx ( struct fc_els *els, const void *data,
 		DBGC ( els, FCELS_FMT " could not log in port: %s\n",
 		       FCELS_ARGS ( els ), strerror ( rc ) );
 		return rc;
+	}
+
+	/* Send any responses to the newly-assigned peer port ID, if
+	 * applicable.
+	 */
+	if ( ! has_fabric ) {
+		memcpy ( &els->peer_port_id, &els->port->ptp_link_port_id,
+			 sizeof ( els->peer_port_id ) );
 	}
 
 	return 0;

@@ -54,6 +54,7 @@ socket_semantics_name ( int semantics ) {
  */
 #define AF_INET		1	/**< IPv4 Internet addresses */
 #define AF_INET6	2	/**< IPv6 Internet addresses */
+#define AF_FC		3	/**< Fibre Channel addresses */
 /** @} */
 
 /**

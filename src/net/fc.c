@@ -428,6 +428,7 @@ static struct io_buffer * fc_xchg_alloc_iob ( struct fc_exchange *xchg,
 static int fc_xchg_tx ( struct fc_exchange *xchg, struct io_buffer *iobuf,
 			struct xfer_metadata *meta ) {
 	struct fc_port *port = xchg->port;
+	struct sockaddr_fc *dest = ( ( struct sockaddr_fc * ) meta->dest );
 	struct fc_frame_header *fchdr;
 	unsigned int r_ctl;
 	unsigned int f_ctl_es;
@@ -484,7 +485,9 @@ static int fc_xchg_tx ( struct fc_exchange *xchg, struct io_buffer *iobuf,
 	fchdr = iob_push ( iobuf, sizeof ( *fchdr ) );
 	memset ( fchdr, 0, sizeof ( *fchdr ) );
 	fchdr->r_ctl = r_ctl;
-	memcpy ( &fchdr->d_id, &xchg->peer_port_id, sizeof ( fchdr->d_id ) );
+	memcpy ( &fchdr->d_id,
+		 ( dest ? &dest->sfc_port_id : &xchg->peer_port_id ),
+		 sizeof ( fchdr->d_id ) );
 	memcpy ( &fchdr->s_id, &port->port_id, sizeof ( fchdr->s_id ) );
 	fchdr->type = xchg->type;
 	fchdr->f_ctl_es = f_ctl_es;

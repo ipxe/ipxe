@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tables.h>
 #include <ipxe/interface.h>
 #include <ipxe/retry.h>
+#include <ipxe/socket.h>
 
 /******************************************************************************
  *
@@ -39,6 +40,27 @@ struct fc_port_id {
 
 /** Length of Fibre Channel port identifier next */
 #define FC_PORT_ID_STRLEN 9 /* "xx.xx.xx" */
+
+/**
+ * Fibre Channel socket address
+ */
+struct sockaddr_fc {
+	/** Socket address family (part of struct @c sockaddr)
+	 *
+	 * Always set to @c AF_FC for Fibre Channel addresses
+	 */
+	sa_family_t sfc_family;
+	/** Port ID */
+	struct fc_port_id sfc_port_id;
+	/** Padding
+	 *
+	 * This ensures that a struct @c sockaddr_tcpip is large
+	 * enough to hold a socket address for any TCP/IP address
+	 * family.
+	 */
+	char pad[ sizeof ( struct sockaddr ) - sizeof ( sa_family_t )
+					     - sizeof ( struct fc_port_id ) ];
+} __attribute__ (( may_alias ));
 
 extern struct fc_port_id fc_empty_port_id;
 extern struct fc_port_id fc_f_port_id;
