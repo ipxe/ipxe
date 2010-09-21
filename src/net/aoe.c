@@ -647,7 +647,15 @@ static struct aoe_command * aoecmd_create ( struct aoe_device *aoedev,
 static int aoedev_ata_command ( struct aoe_device *aoedev,
 				struct interface *parent,
 				struct ata_cmd *command ) {
+	struct net_device *netdev = aoedev->netdev;
 	struct aoe_command *aoecmd;
+
+	/* Fail immediately if net device is closed */
+	if ( ! netdev_is_open ( netdev ) ) {
+		DBGC ( aoedev, "AoE %s cannot issue command while net device "
+		       "is closed\n", aoedev_name ( aoedev ) );
+		return -EWOULDBLOCK;
+	}
 
 	/* Create command */
 	aoecmd = aoecmd_create ( aoedev, &aoecmd_ata );
