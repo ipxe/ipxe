@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/netdevice.h>
 #include <ipxe/features.h>
 #include <ipxe/errortab.h>
+#include <ipxe/device.h>
 #include <ipxe/crc32.h>
 #include <ipxe/fc.h>
 #include <ipxe/fcoe.h>
@@ -268,12 +269,24 @@ static void fcoe_close ( struct fcoe_port *fcoe, int rc ) {
 	ref_put ( &fcoe->refcnt );
 }
 
+/**
+ * Identify device underlying FCoE port
+ *
+ * @v fcoe		FCoE port
+ * @ret device		Underlying device
+ */
+static struct device * fcoe_identify_device ( struct fcoe_port *fcoe ) {
+	return fcoe->netdev->dev;
+}
+
 /** FCoE transport interface operations */
 static struct interface_operation fcoe_transport_op[] = {
 	INTF_OP ( xfer_deliver, struct fcoe_port *, fcoe_deliver ),
 	INTF_OP ( xfer_alloc_iob, struct fcoe_port *, fcoe_alloc_iob ),
 	INTF_OP ( xfer_window, struct fcoe_port *, fcoe_window ),
 	INTF_OP ( intf_close, struct fcoe_port *, fcoe_close ),
+	INTF_OP ( identify_device, struct fcoe_port *,
+		  fcoe_identify_device ),
 };
 
 /** FCoE transport interface descriptor */
