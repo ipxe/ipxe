@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uri.h>
 #include <ipxe/open.h>
 #include <ipxe/ata.h>
+#include <ipxe/device.h>
 #include <ipxe/aoe.h>
 
 /** @file
@@ -773,6 +774,16 @@ static void aoedev_config_done ( struct aoe_device *aoedev, int rc ) {
 }
 
 /**
+ * Identify device underlying AoE device
+ *
+ * @v aoedev		AoE device
+ * @ret device		Underlying device
+ */
+static struct device * aoedev_identify_device ( struct aoe_device *aoedev ) {
+	return aoedev->netdev->dev;
+}
+
+/**
  * Describe AoE device in an ACPI table
  *
  * @v aoedev		AoE device
@@ -807,6 +818,8 @@ static struct interface_operation aoedev_ata_op[] = {
 	INTF_OP ( xfer_window, struct aoe_device *, aoedev_window ),
 	INTF_OP ( intf_close, struct aoe_device *, aoedev_close ),
 	INTF_OP ( acpi_describe, struct aoe_device *, aoedev_describe ),
+	INTF_OP ( identify_device, struct aoe_device *,
+		  aoedev_identify_device ),
 };
 
 /** AoE device ATA interface descriptor */
