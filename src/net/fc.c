@@ -907,8 +907,9 @@ int fc_port_login ( struct fc_port *port, struct fc_port_id *port_id,
 			  sizeof ( port->link_node_wwn ) ) != 0 ) ||
 	       ( memcmp ( &port->link_port_wwn, link_port_wwn,
 			  sizeof ( port->link_port_wwn ) ) != 0 ) ||
-	       ( memcmp ( &port->port_id, port_id,
-			  sizeof ( port->port_id ) ) != 0 ) ) ) {
+	       ( has_fabric &&
+		 ( memcmp ( &port->port_id, port_id,
+			    sizeof ( port->port_id ) ) != 0 ) ) ) ) {
 		fc_port_logout ( port, 0 );
 	}
 
