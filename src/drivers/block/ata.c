@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/list.h>
 #include <ipxe/interface.h>
 #include <ipxe/blockdev.h>
+#include <ipxe/edd.h>
 #include <ipxe/ata.h>
 
 /** @file
@@ -602,6 +603,23 @@ static void atadev_close ( struct ata_device *atadev, int rc ) {
 	}
 }
 
+/**
+ * Describe ATA device using EDD
+ *
+ * @v atadev		ATA device
+ * @v type		EDD interface type
+ * @v path		EDD device path
+ * @ret rc		Return status code
+ */
+static int atadev_edd_describe ( struct ata_device *atadev,
+				 struct edd_interface_type *type,
+				 union edd_device_path *path ) {
+
+	type->type = cpu_to_le64 ( EDD_INTF_TYPE_ATA );
+	path->ata.slave = ( ( atadev->device == ATA_DEV_SLAVE ) ? 0x01 : 0x00 );
+	return 0;
+}
+
 /** ATA device block interface operations */
 static struct interface_operation atadev_block_op[] = {
 	INTF_OP ( block_read, struct ata_device *, atadev_read ),
@@ -609,6 +627,7 @@ static struct interface_operation atadev_block_op[] = {
 	INTF_OP ( block_read_capacity, struct ata_device *,
 		  atadev_read_capacity ),
 	INTF_OP ( intf_close, struct ata_device *, atadev_close ),
+	INTF_OP ( edd_describe, struct ata_device *, atadev_edd_describe ),
 };
 
 /** ATA device block interface descriptor */
