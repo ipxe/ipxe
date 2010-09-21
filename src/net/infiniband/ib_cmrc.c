@@ -334,6 +334,17 @@ static size_t ib_cmrc_xfer_window ( struct ib_cmrc_connection *cmrc ) {
 	return ( cmrc->connected ? IB_MAX_PAYLOAD_SIZE : 0 );
 }
 
+/**
+ * Identify device underlying CMRC connection
+ *
+ * @v cmrc		CMRC connection
+ * @ret device		Underlying device
+ */
+static struct device *
+ib_cmrc_identify_device ( struct ib_cmrc_connection *cmrc ) {
+	return cmrc->ibdev->dev;
+}
+
 /** CMRC data transfer interface operations */
 static struct interface_operation ib_cmrc_xfer_operations[] = {
 	INTF_OP ( xfer_deliver, struct ib_cmrc_connection *,
@@ -341,6 +352,8 @@ static struct interface_operation ib_cmrc_xfer_operations[] = {
 	INTF_OP ( xfer_window, struct ib_cmrc_connection *,
 		  ib_cmrc_xfer_window ),
 	INTF_OP ( intf_close, struct ib_cmrc_connection *, ib_cmrc_close ),
+	INTF_OP ( identify_device, struct ib_cmrc_connection *,
+		  ib_cmrc_identify_device ),
 };
 
 /** CMRC data transfer interface descriptor */

@@ -701,7 +701,8 @@ static struct interface_operation srpdev_socket_op[] = {
 
 /** SRP device socket interface descriptor */
 static struct interface_descriptor srpdev_socket_desc =
-	INTF_DESC ( struct srp_device, socket, srpdev_socket_op );
+	INTF_DESC_PASSTHRU ( struct srp_device, socket, srpdev_socket_op,
+			     scsi );
 
 /** SRP device SCSI interface operations */
 static struct interface_operation srpdev_scsi_op[] = {
@@ -713,7 +714,7 @@ static struct interface_operation srpdev_scsi_op[] = {
 
 /** SRP device SCSI interface descriptor */
 static struct interface_descriptor srpdev_scsi_desc =
-	INTF_DESC ( struct srp_device, scsi, srpdev_scsi_op );
+	INTF_DESC_PASSTHRU ( struct srp_device, scsi, srpdev_scsi_op, socket  );
 
 /**
  * Open SRP device
