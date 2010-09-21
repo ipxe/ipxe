@@ -58,6 +58,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_blockdev	       ( ERRFILE_CORE | 0x00120000 )
 #define ERRFILE_acpi		       ( ERRFILE_CORE | 0x00130000 )
 #define ERRFILE_null_sanboot	       ( ERRFILE_CORE | 0x00140000 )
+#define ERRFILE_edd		       ( ERRFILE_CORE | 0x00150000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )

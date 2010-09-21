@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <ipxe/list.h>
+#include <ipxe/edd.h>
 #include <realmode.h>
 
 /**
@@ -36,6 +37,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define INT13_EXTENDED_READ		0x42
 /** Extended write */
 #define INT13_EXTENDED_WRITE		0x43
+/** Verify sectors */
+#define INT13_EXTENDED_VERIFY		0x44
+/** Extended seek */
+#define INT13_EXTENDED_SEEK		0x47
 /** Get extended drive parameters */
 #define INT13_GET_EXTENDED_PARAMETERS	0x48
 /** Get CD-ROM status / terminate emulation */
@@ -68,16 +73,22 @@ FILE_LICENCE ( GPL2_OR_LATER );
 struct int13_disk_address {
 	/** Size of the packet, in bytes */
 	uint8_t bufsize;
-	/** Reserved, must be zero */
-	uint8_t reserved;
+	/** Reserved */
+	uint8_t reserved_a;
 	/** Block count */
-	uint16_t count;
+	uint8_t count;
+	/** Reserved */
+	uint8_t reserved_b;
 	/** Data buffer */
 	struct segoff buffer;
 	/** Starting block number */
 	uint64_t lba;
-	/** Data buffer (EDD-3.0 only) */
+	/** Data buffer (EDD 3.0+ only) */
 	uint64_t buffer_phys;
+	/** Block count (EDD 4.0+ only) */
+	uint32_t long_count;
+	/** Reserved */
+	uint32_t reserved_c;
 } __attribute__ (( packed ));
 
 /** INT 13 disk parameters */
@@ -96,6 +107,10 @@ struct int13_disk_parameters {
 	uint64_t sectors;
 	/** Bytes per sector */
 	uint16_t sector_size;
+	/** Device parameter table extension */
+	struct segoff dpte;
+	/** Device path information */
+	struct edd_device_path_information dpi;
 } __attribute__ (( packed ));
 
 /**
@@ -147,6 +162,8 @@ struct int13_disk_parameters {
 #define INT13_EXTENSION_REMOVABLE	0x02
 /** EDD functions supported */
 #define INT13_EXTENSION_EDD		0x04
+/** 64-bit extensions are present */
+#define INT13_EXTENSION_64BIT		0x08
 
 /** @} */
 
@@ -165,6 +182,12 @@ struct int13_disk_parameters {
 #define INT13_EXTENSION_VER_3_0		0x30
 
 /** @} */ 
+
+/** Maximum number of sectors for which CHS geometry is allowed to be valid
+ *
+ * This number is taken from the EDD specification.
+ */
+#define INT13_MAX_CHS_SECTORS		15482880
 
 /** Bootable CD-ROM specification packet */
 struct int13_cdrom_specification {

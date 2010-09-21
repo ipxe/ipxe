@@ -35,6 +35,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/timer.h>
 #include <ipxe/acpi.h>
 #include <ipxe/sanboot.h>
+#include <ipxe/device.h>
+#include <ipxe/pci.h>
 #include <realmode.h>
 #include <bios.h>
 #include <biosint.h>
@@ -654,8 +656,10 @@ static int int13_extension_check ( struct int13_drive *int13 __unused,
 	if ( ix86->regs.bx == 0x55aa ) {
 		DBGC2 ( int13, "INT13 extensions installation check\n" );
 		ix86->regs.bx = 0xaa55;
-		ix86->regs.cx = INT13_EXTENSION_LINEAR;
-		return INT13_EXTENSION_VER_1_X;
+		ix86->regs.cx = ( INT13_EXTENSION_LINEAR |
+				  INT13_EXTENSION_EDD |
+				  INT13_EXTENSION_64BIT );
+		return INT13_EXTENSION_VER_3_0;
 	} else {
 		return -INT13_STATUS_INVALID;
 	}
@@ -678,25 +682,56 @@ static int int13_extended_rw ( struct int13_drive *int13,
 						    userptr_t buffer,
 						    size_t len ) ) {
 	struct int13_disk_address addr;
+	uint8_t bufsize;
 	uint64_t lba;
 	unsigned long count;
 	userptr_t buffer;
 	int rc;
 
-	/* Read parameters from disk address structure */
-	copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si, sizeof ( addr ));
-	lba = addr.lba;
-	count = addr.count;
-	buffer = real_to_user ( addr.buffer.segment, addr.buffer.offset );
+	/* Get buffer size */
+	get_real ( bufsize, ix86->segs.ds,
+		   ( ix86->regs.si + offsetof ( typeof ( addr ), bufsize ) ) );
+	if ( bufsize < offsetof ( typeof ( addr ), buffer_phys ) ) {
+		DBGC2 ( int13, "<invalid buffer size %#02x\n>\n", bufsize );
+		return -INT13_STATUS_INVALID;
+	}
 
-	DBGC2 ( int13, "LBA %08llx <-> %04x:%04x (count %ld)\n",
-		( ( unsigned long long ) lba ), addr.buffer.segment,
-		addr.buffer.offset, count );
-	
+	/* Read parameters from disk address structure */
+	memset ( &addr, 0, sizeof ( addr ) );
+	copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si, bufsize );
+	lba = addr.lba;
+	DBGC2 ( int13, "LBA %08llx <-> ", ( ( unsigned long long ) lba ) );
+	if ( ( addr.count == 0xff ) ||
+	     ( ( addr.buffer.segment == 0xffff ) &&
+	       ( addr.buffer.offset == 0xffff ) ) ) {
+		buffer = phys_to_user ( addr.buffer_phys );
+		DBGC2 ( int13, "%08llx",
+			( ( unsigned long long ) addr.buffer_phys ) );
+	} else {
+		buffer = real_to_user ( addr.buffer.segment,
+					addr.buffer.offset );
+		DBGC2 ( int13, "%04x:%04x", addr.buffer.segment,
+			addr.buffer.offset );
+	}
+	if ( addr.count <= 0x7f ) {
+		count = addr.count;
+	} else if ( addr.count == 0xff ) {
+		count = addr.long_count;
+	} else {
+		DBGC2 ( int13, " <invalid count %#02x>\n", addr.count );
+		return -INT13_STATUS_INVALID;
+	}
+	DBGC2 ( int13, " (count %ld)\n", count );
+
 	/* Read from / write to block device */
 	if ( ( rc = int13_rw ( int13, lba, count, buffer, block_rw ) ) != 0 ) {
 		DBGC ( int13, "INT13 drive %02x extended I/O failed: %s\n",
 		       int13->drive, strerror ( rc ) );
+		/* Record that no blocks were transferred successfully */
+		addr.count = 0;
+		put_real ( addr.count, ix86->segs.ds,
+			   ( ix86->regs.si +
+			     offsetof ( typeof ( addr ), count ) ) );
 		return -INT13_STATUS_READ_ERROR;
 	}
 
@@ -730,6 +765,117 @@ static int int13_extended_write ( struct int13_drive *int13,
 }
 
 /**
+ * INT 13, 44 - Verify sectors
+ *
+ * @v int13		Emulated drive
+ * @v ds:si		Disk address packet
+ * @ret status		Status code
+ */
+static int int13_extended_verify ( struct int13_drive *int13,
+				   struct i386_all_regs *ix86 ) {
+	struct int13_disk_address addr;
+	uint64_t lba;
+	unsigned long count;
+
+	/* Read parameters from disk address structure */
+	if ( DBG_EXTRA ) {
+		copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si,
+				 sizeof ( addr ));
+		lba = addr.lba;
+		count = addr.count;
+		DBGC2 ( int13, "Verify: LBA %08llx (count %ld)\n",
+			( ( unsigned long long ) lba ), count );
+	}
+
+	/* We have no mechanism for verifying sectors */
+	return -INT13_STATUS_INVALID;
+}
+
+/**
+ * INT 13, 44 - Extended seek
+ *
+ * @v int13		Emulated drive
+ * @v ds:si		Disk address packet
+ * @ret status		Status code
+ */
+int int13_extended_seek ( struct int13_drive *int13,
+			  struct i386_all_regs *ix86 ) {
+	struct int13_disk_address addr;
+	uint64_t lba;
+	unsigned long count;
+
+	/* Read parameters from disk address structure */
+	if ( DBG_EXTRA ) {
+		copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si,
+				 sizeof ( addr ));
+		lba = addr.lba;
+		count = addr.count;
+		DBGC2 ( int13, "Seek: LBA %08llx (count %ld)\n",
+			( ( unsigned long long ) lba ), count );
+	}
+
+	/* Ignore and return success */
+	return 0;
+}
+
+/**
+ * Build device path information
+ *
+ * @v int13		Emulated drive
+ * @v dpi		Device path information
+ * @ret rc		Return status code
+ */
+static int int13_device_path_info ( struct int13_drive *int13,
+				    struct edd_device_path_information *dpi ) {
+	struct device *device;
+	struct device_description *desc;
+	unsigned int i;
+	uint8_t sum = 0;
+	int rc;
+
+	/* Get underlying hardware device */
+	device = identify_device ( &int13->block );
+	if ( ! device ) {
+		DBGC ( int13, "INT13 drive %02x cannot identify hardware "
+		       "device\n", int13->drive );
+		return -ENODEV;
+	}
+
+	/* Fill in bus type and interface path */
+	desc = &device->desc;
+	switch ( desc->bus_type ) {
+	case BUS_TYPE_PCI:
+		dpi->host_bus_type.type = EDD_BUS_TYPE_PCI;
+		dpi->interface_path.pci.bus = PCI_BUS ( desc->location );
+		dpi->interface_path.pci.slot = PCI_SLOT ( desc->location );
+		dpi->interface_path.pci.function = PCI_FUNC ( desc->location );
+		dpi->interface_path.pci.channel = 0xff; /* unused */
+		break;
+	default:
+		DBGC ( int13, "INT13 drive %02x unrecognised bus type %d\n",
+		       int13->drive, desc->bus_type );
+		return -ENOTSUP;
+	}
+
+	/* Get EDD block device description */
+	if ( ( rc = edd_describe ( &int13->block, &dpi->interface_type,
+				   &dpi->device_path ) ) != 0 ) {
+		DBGC ( int13, "INT13 drive %02x cannot identify block device: "
+		       "%s\n", int13->drive, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Fill in common fields and fix checksum */
+	dpi->key = EDD_DEVICE_PATH_INFO_KEY;
+	dpi->len = sizeof ( *dpi );
+	for ( i = 0 ; i < sizeof ( *dpi ) ; i++ )
+		sum += *( ( ( uint8_t * ) dpi ) + i );
+	dpi->checksum -= sum;
+
+	return 0;
+}
+
+/**
  * INT 13, 48 - Get extended parameters
  *
  * @v int13		Emulated drive
@@ -738,21 +884,62 @@ static int int13_extended_write ( struct int13_drive *int13,
  */
 static int int13_get_extended_parameters ( struct int13_drive *int13,
 					   struct i386_all_regs *ix86 ) {
-	struct int13_disk_parameters params = {
-		.bufsize = sizeof ( params ),
-		.flags = INT13_FL_DMA_TRANSPARENT,
-		.cylinders = int13->cylinders,
-		.heads = int13->heads,
-		.sectors_per_track = int13->sectors_per_track,
-		.sectors = int13->capacity.blocks,
-		.sector_size = int13->capacity.blksize,
-	};
-	
-	DBGC2 ( int13, "Get extended drive parameters to %04x:%04x\n",
-		ix86->segs.ds, ix86->regs.si );
+	struct int13_disk_parameters params;
+	struct segoff address;
+	size_t len = sizeof ( params );
+	uint16_t bufsize;
+	int rc;
 
-	copy_to_real ( ix86->segs.ds, ix86->regs.si, &params,
-		       sizeof ( params ) );
+	/* Get buffer size */
+	get_real ( bufsize, ix86->segs.ds,
+		   ( ix86->regs.si + offsetof ( typeof ( params ), bufsize )));
+
+	DBGC2 ( int13, "Get extended drive parameters to %04x:%04x+%02x\n",
+		ix86->segs.ds, ix86->regs.si, bufsize );
+
+	/* Build drive parameters */
+	memset ( &params, 0, sizeof ( params ) );
+	params.flags = INT13_FL_DMA_TRANSPARENT;
+	if ( ( int13->cylinders < 1024 ) &&
+	     ( int13->capacity.blocks <= INT13_MAX_CHS_SECTORS ) ) {
+		params.flags |= INT13_FL_CHS_VALID;
+	}
+	params.cylinders = int13->cylinders;
+	params.heads = int13->heads;
+	params.sectors_per_track = int13->sectors_per_track;
+	params.sectors = int13->capacity.blocks;
+	params.sector_size = int13->capacity.blksize;
+	memset ( &params.dpte, 0xff, sizeof ( params.dpte ) );
+	if ( ( rc = int13_device_path_info ( int13, &params.dpi ) ) != 0 ) {
+		DBGC ( int13, "INT13 drive %02x could not provide device "
+		       "path information: %s\n",
+		       int13->drive, strerror ( rc ) );
+		len = offsetof ( typeof ( params ), dpi );
+	}
+
+	/* Calculate returned "buffer size" (which will be less than
+	 * the length actually copied if device path information is
+	 * present).
+	 */
+	if ( bufsize < offsetof ( typeof ( params ), dpte ) )
+		return -INT13_STATUS_INVALID;
+	if ( bufsize < offsetof ( typeof ( params ), dpi ) ) {
+		params.bufsize = offsetof ( typeof ( params ), dpte );
+	} else {
+		params.bufsize = offsetof ( typeof ( params ), dpi );
+	}
+
+	DBGC ( int13, "INT 13 drive %02x described using extended "
+	       "parameters:\n", int13->drive );
+	address.segment = ix86->segs.ds;
+	address.offset = ix86->regs.si;
+	DBGC_HDA ( int13, address, &params, len );
+
+	/* Return drive parameters */
+	if ( len > bufsize )
+		len = bufsize;
+	copy_to_real ( ix86->segs.ds, ix86->regs.si, &params, len );
+
 	return 0;
 }
 
@@ -813,6 +1000,12 @@ static __asmcall void int13 ( struct i386_all_regs *ix86 ) {
 			break;
 		case INT13_EXTENDED_WRITE:
 			status = int13_extended_write ( int13, ix86 );
+			break;
+		case INT13_EXTENDED_VERIFY:
+			status = int13_extended_verify ( int13, ix86 );
+			break;
+		case INT13_EXTENDED_SEEK:
+			status = int13_extended_seek ( int13, ix86 );
 			break;
 		case INT13_GET_EXTENDED_PARAMETERS:
 			status = int13_get_extended_parameters ( int13, ix86 );

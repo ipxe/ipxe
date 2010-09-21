@@ -21,8 +21,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <ipxe/list.h>
 #include <ipxe/tables.h>
-#include <ipxe/device.h>
 #include <ipxe/init.h>
+#include <ipxe/interface.h>
+#include <ipxe/device.h>
 
 /**
  * @file
@@ -105,3 +106,27 @@ struct startup_fn startup_devices __startup_fn ( STARTUP_NORMAL ) = {
 	.startup = probe_devices,
 	.shutdown = remove_devices,
 };
+
+/**
+ * Identify a device behind an interface
+ *
+ * @v intf		Interface
+ * @ret device		Device, or NULL
+ */
+struct device * identify_device ( struct interface *intf ) {
+	struct interface *dest;
+	identify_device_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, identify_device, &dest );
+	void *object = intf_object ( dest );
+	void *device;
+
+	if ( op ) {
+		device = op ( object );
+	} else {
+		/* Default is to return NULL */
+		device = NULL;
+	}
+
+	intf_put ( dest );
+	return device;
+}

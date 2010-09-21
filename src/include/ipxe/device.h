@@ -13,6 +13,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/list.h>
 #include <ipxe/tables.h>
 
+struct interface;
+
 /** A hardware device description */
 struct device_description {
 	/** Bus type
@@ -109,5 +111,9 @@ struct root_driver {
 
 /** Declare a root device */
 #define __root_device __table_entry ( ROOT_DEVICES, 01 )
+
+extern struct device * identify_device ( struct interface *intf );
+#define identify_device_TYPE( object_type ) \
+	typeof ( struct device * ( object_type ) )
 
 #endif /* _IPXE_DEVICE_H */
