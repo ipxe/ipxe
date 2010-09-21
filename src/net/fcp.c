@@ -36,6 +36,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uri.h>
 #include <ipxe/acpi.h>
 #include <ipxe/scsi.h>
+#include <ipxe/device.h>
+#include <ipxe/edd.h>
 #include <ipxe/fc.h>
 #include <ipxe/fcels.h>
 #include <ipxe/fcp.h>
@@ -152,6 +154,11 @@ struct fcp_device {
 	struct interface scsi;
 	/** List of active commands */
 	struct list_head fcpcmds;
+
+	/** Fibre Channel WWN (for boot firmware table) */
+	struct fc_name wwn;
+	/** SCSI LUN (for boot firmware table) */
+	struct scsi_lun lun;
 };
 
 /** An FCP command */
@@ -840,9 +847,9 @@ static size_t fcpdev_window ( struct fcp_device *fcpdev ) {
  * @v len		Length of ACPI table
  * @ret rc		Return status code
  */
-static int fcpdev_describe ( struct fcp_device *fcpdev,
-			     struct acpi_description_header *acpi,
-			     size_t len ) {
+static int fcpdev_acpi_describe ( struct fcp_device *fcpdev,
+				  struct acpi_description_header *acpi,
+				  size_t len ) {
 
 	DBGC ( fcpdev, "FCP %p cannot yet describe device in an ACPI table\n",
 	       fcpdev );
@@ -851,12 +858,65 @@ static int fcpdev_describe ( struct fcp_device *fcpdev,
 	return 0;
 }
 
+/**
+ * Describe FCP device using EDD
+ *
+ * @v fcpdev		FCP device
+ * @v type		EDD interface type
+ * @v path		EDD device path
+ * @ret rc		Return status code
+ */
+static int fcpdev_edd_describe ( struct fcp_device *fcpdev,
+				 struct edd_interface_type *type,
+				 union edd_device_path *path ) {
+	union {
+		struct fc_name fc;
+		uint64_t u64;
+	} wwn;
+	union {
+		struct scsi_lun scsi;
+		uint64_t u64;
+	} lun;
+
+	type->type = cpu_to_le64 ( EDD_INTF_TYPE_FIBRE );
+	memcpy ( &wwn.fc, &fcpdev->wwn, sizeof ( wwn.fc ) );
+	path->fibre.wwn = be64_to_cpu ( wwn.u64 );
+	memcpy ( &lun.scsi, &fcpdev->lun, sizeof ( lun.scsi ) );
+	path->fibre.lun = be64_to_cpu ( lun.u64 );
+	return 0;
+}
+
+/**
+ * Identify device underlying FCP device
+ *
+ * @v fcpdev		FCP device
+ * @ret device		Underlying device
+ */
+static struct device * fcpdev_identify_device ( struct fcp_device *fcpdev ) {
+
+	/* We know the underlying device only if the link is up;
+	 * otherwise we don't have a port to examine.
+	 */
+	if ( ! fc_link_ok ( &fcpdev->ulp->link ) ) {
+		DBGC ( fcpdev, "FCP %p doesn't know underlying device "
+		       "until link is up\n", fcpdev );
+		return NULL;
+	}
+
+	/* Hand off to port's transport interface */
+	assert ( fcpdev->ulp->peer->port != NULL );
+	return identify_device ( &fcpdev->ulp->peer->port->transport );
+}
+
 /** FCP device SCSI interface operations */
 static struct interface_operation fcpdev_scsi_op[] = {
 	INTF_OP ( scsi_command, struct fcp_device *, fcpdev_scsi_command ),
 	INTF_OP ( xfer_window, struct fcp_device *, fcpdev_window ),
 	INTF_OP ( intf_close, struct fcp_device *, fcpdev_close ),
-	INTF_OP ( acpi_describe, struct fcp_device *, fcpdev_describe ),
+	INTF_OP ( acpi_describe, struct fcp_device *, fcpdev_acpi_describe ),
+	INTF_OP ( edd_describe, struct fcp_device *, fcpdev_edd_describe ),
+	INTF_OP ( identify_device, struct fcp_device *,
+		  fcpdev_identify_device ),
 };
 
 /** FCP device SCSI interface descriptor */
@@ -897,6 +957,10 @@ static int fcpdev_open ( struct interface *parent, struct fc_name *wwn,
 	fc_ulp_increment ( fcpdev->ulp );
 
 	DBGC ( fcpdev, "FCP %p opened for %s\n", fcpdev, fc_ntoa ( wwn ) );
+
+	/* Preserve parameters required for boot firmware table */
+	memcpy ( &fcpdev->wwn, wwn, sizeof ( fcpdev->wwn ) );
+	memcpy ( &fcpdev->lun, lun, sizeof ( fcpdev->lun ) );
 
 	/* Attach SCSI device to parent interface */
 	if ( ( rc = scsi_open ( parent, &fcpdev->scsi, lun ) ) != 0 ) {
