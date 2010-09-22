@@ -242,6 +242,10 @@ struct srp_login_rej {
 /** RDMA channel limit reached for this initiator */
 #define SRP_LOGIN_REJ_REASON_NO_MORE_CHANNELS 0x00010006UL
 
+/** SRP login rejection reason is defined */
+#define SRP_LOGIN_REJ_REASON_DEFINED( reason ) \
+	( ( (reason) & 0xfffffff0UL ) == 0x00010000UL )
+
 /** Indirect data buffer descriptor format supported */
 #define SRP_LOGIN_REJ_FMT_IDBD 0x04
 
