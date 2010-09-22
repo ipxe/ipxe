@@ -1272,7 +1272,7 @@ static void int13_unhook ( unsigned int drive ) {
 	 * to do so reliably.
 	 */
 
-	DBGC ( int13, "INT13 drive %02x unregsitered\n", int13->drive );
+	DBGC ( int13, "INT13 drive %02x unregistered\n", int13->drive );
 
 	/* Unhook INT 13 vector if no more drives */
 	if ( list_empty ( &int13s ) )
