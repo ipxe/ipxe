@@ -249,11 +249,16 @@ struct partition_table_entry {
 
 /** A Master Boot Record */
 struct master_boot_record {
-	uint8_t pad[446];
+	/** Code area */
+	uint8_t code[440];
+	/** Disk signature */
+	uint32_t signature;
+	/** Padding */
+	uint8_t pad[2];
 	/** Partition table */
 	struct partition_table_entry partitions[4];
 	/** 0x55aa MBR signature */
-	uint16_t signature;
+	uint16_t magic;
 } __attribute__ (( packed ));
 
 /** Use natural BIOS drive number */

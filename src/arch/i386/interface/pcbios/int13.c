@@ -368,6 +368,8 @@ static int int13_guess_geometry ( struct int13_drive *int13 ) {
 		       int13->drive, strerror ( rc ) );
 		return rc;
 	}
+	DBGC ( int13, "INT13 drive %02x has signature %08x\n",
+	       int13->drive, mbr.signature );
 
 	/* Scan through partition table and modify guesses for heads
 	 * and sectors_per_track if we find any used partitions.
