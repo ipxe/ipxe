@@ -19,9 +19,10 @@ function cleanup () {
 
 trap cleanup EXIT
 
-imgfile=$1
-if [ -z "$imgfile" ] ; then
-    echo Syntax: $0 /path/to/image/file
+imgfile=$1 ; shift
+command=$1 ; shift
+if [ -z "$imgfile" -o -z "$command" ] ; then
+    echo Syntax: $0 /path/to/image/file command [args..]
     exit 1
 fi
 
@@ -45,4 +46,4 @@ x=$imgfile.cow ; ln -s /dev/mapper/$dmname $x ; cowlink=$x
 
 # Wait until killed
 echo "Created $cowlink"
-while : ; do sleep 2147483647 ; done
+$command "$@" $cowlink
