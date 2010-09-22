@@ -201,7 +201,7 @@ extern char missing_errfile_declaration[] __attribute__ (( deprecated ));
  */
 #define EUNIQ( errno, uniq, ... ) ( {					\
 	euniq_discard ( 0, ##__VA_ARGS__);				\
-	( (errno) | ( (uniq) << 8 ) ); } )
+	( ( int ) ( (errno) | ( (uniq) << 8 ) ) ); } )
 static inline void euniq_discard ( int dummy __unused, ... ) {}
 
 /**
