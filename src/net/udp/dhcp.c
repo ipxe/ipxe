@@ -528,6 +528,8 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 		return;
 	if ( server_id.s_addr != dhcp->server.s_addr )
 		return;
+	if ( ip.s_addr != dhcp->offer.s_addr )
+		return;
 
 	/* Record assigned address */
 	dhcp->local.sin_addr = ip;
