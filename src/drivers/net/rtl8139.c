@@ -342,7 +342,7 @@ static int rtl_open ( struct net_device *netdev ) {
 	outb ( ( CmdRxEnb | CmdTxEnb ), rtl->ioaddr + ChipCmd );
 	outl ( ( ( RX_FIFO_THRESH << 13 ) | ( RX_BUF_LEN_IDX << 11 ) |
 		 ( RX_DMA_BURST << 8 ) | AcceptBroadcast | AcceptMulticast |
-		 AcceptMyPhys ), rtl->ioaddr + RxConfig );
+		 AcceptMyPhys | AcceptAllPhys ), rtl->ioaddr + RxConfig );
 	outl ( 0xffffffffUL, rtl->ioaddr + MAR0 + 0 );
 	outl ( 0xffffffffUL, rtl->ioaddr + MAR0 + 4 );
 	outl ( ( ( TX_DMA_BURST << 8 ) | ( TX_IPG << 24 ) ),
