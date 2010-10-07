@@ -33,6 +33,19 @@ union fcoe_name {
 /** IEEE extended */
 #define FCOE_AUTHORITY_IEEE_EXTENDED 0x2000
 
+/** An FCoE MAC address prefix (FC-MAP) */
+struct fcoe_map {
+	uint8_t bytes[3];
+} __attribute__ (( packed ));
+
+/** An FCoE (fabric-assigned) MAC address */
+struct fcoe_mac {
+	/** MAC address prefix */
+	struct fcoe_map map;
+	/** Port ID */
+	struct fc_port_id port_id;
+} __attribute__ (( packed ));
+
 /** An FCoE header */
 struct fcoe_header {
 	/** FCoE frame version */
