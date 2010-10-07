@@ -71,6 +71,8 @@ extern const char * fc_id_ntoa ( const struct fc_port_id *id );
 extern int fc_id_aton ( const char *id_text, struct fc_port_id *id );
 extern const char * fc_ntoa ( const struct fc_name *wwn );
 extern int fc_aton ( const char *wwn_text, struct fc_name *wwn );
+extern struct sockaddr * fc_fill_sockaddr ( struct sockaddr_fc *sa_fc,
+					    struct fc_port_id *id );
 
 /******************************************************************************
  *

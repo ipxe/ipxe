@@ -146,6 +146,26 @@ int fc_aton ( const char *wwn_text, struct fc_name *wwn ) {
 	}
 }
 
+/**
+ * Fill Fibre Channel socket address
+ *
+ * @v sa_fc		Fibre Channel socket address to fill in
+ * @v id		Fibre Channel port ID
+ * @ret sa		Socket address
+ */
+struct sockaddr * fc_fill_sockaddr ( struct sockaddr_fc *sa_fc,
+				     struct fc_port_id *id ) {
+	union {
+		struct sockaddr sa;
+		struct sockaddr_fc fc;
+	} *u = container_of ( sa_fc, typeof ( *u ), fc );
+
+	memset ( sa_fc, 0, sizeof ( *sa_fc ) );
+	sa_fc->sfc_family = AF_FC;
+	memcpy ( &sa_fc->sfc_port_id, id, sizeof ( sa_fc->sfc_port_id ) );
+	return &u->sa;
+}
+
 /******************************************************************************
  *
  * Fibre Channel link state
@@ -549,6 +569,8 @@ static int fc_xchg_rx ( struct fc_exchange *xchg, struct io_buffer *iobuf,
 	struct fc_port *port = xchg->port;
 	struct fc_frame_header *fchdr = iobuf->data;
 	struct xfer_metadata fc_meta;
+	struct sockaddr_fc src;
+	struct sockaddr_fc dest;
 	int rc;
 
 	/* Record peer exchange ID */
@@ -605,6 +627,8 @@ static int fc_xchg_rx ( struct fc_exchange *xchg, struct io_buffer *iobuf,
 		fc_meta.flags |= XFER_FL_ABS_OFFSET;
 		fc_meta.offset = ntohl ( fchdr->parameter );
 	}
+	fc_meta.src = fc_fill_sockaddr ( &src, &fchdr->s_id );
+	fc_meta.dest = fc_fill_sockaddr ( &dest, &fchdr->d_id );
 
 	/* Reset timeout */
 	start_timer_fixed ( &xchg->timer, FC_TIMEOUT );

@@ -119,25 +119,18 @@ static struct fc_els_handler * fc_els_detect ( struct fc_els *els,
  * @ret rc		Return status code
  */
 int fc_els_tx ( struct fc_els *els, const void *data, size_t len ) {
-	union {
-		struct sockaddr sa;
-		struct sockaddr_fc fc;
-	} dest;
 	struct xfer_metadata meta;
+	struct sockaddr_fc dest;
 	int rc;
 
 	DBGC2 ( els, FCELS_FMT " transmitting:\n", FCELS_ARGS ( els ) );
 	DBGC2_HDA ( els, 0, data, len );
 
 	/* Construct metadata */
-	memset ( &dest, 0, sizeof ( dest ) );
-	dest.fc.sfc_family = AF_FC;
-	memcpy ( &dest.fc.sfc_port_id, &els->peer_port_id,
-		 sizeof ( dest.fc.sfc_port_id ) );
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.flags = ( fc_els_is_request ( els ) ?
 		       XFER_FL_OVER : ( XFER_FL_RESPONSE | XFER_FL_OUT ) );
-	meta.dest = &dest.sa;
+	meta.dest = fc_fill_sockaddr ( &dest, &els->peer_port_id );
 
 	/* Transmit frame */
 	if ( ( rc = xfer_deliver_raw_meta ( &els->xchg, data, len,
