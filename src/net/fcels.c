@@ -153,8 +153,10 @@ int fc_els_tx ( struct fc_els *els, const void *data, size_t len ) {
  */
 static int fc_els_rx ( struct fc_els *els,
 		       struct io_buffer *iobuf,
-		       struct xfer_metadata *meta __unused ) {
+		       struct xfer_metadata *meta ) {
 	struct fc_els_frame_common *frame = iobuf->data;
+	struct sockaddr_fc *src = ( ( struct sockaddr_fc * ) meta->src );
+	struct sockaddr_fc *dest = ( ( struct sockaddr_fc * ) meta->dest );
 	size_t len = iob_len ( iobuf );
 	int ( * rx ) ( struct fc_els *els, const void *data, size_t len );
 	int rc;
@@ -167,6 +169,18 @@ static int fc_els_rx ( struct fc_els *els,
 		rc = -EINVAL;
 		goto done;
 	}
+	if ( ! src ) {
+		DBGC ( els, FCELS_FMT " received frame missing source "
+		       "address:\n", FCELS_ARGS ( els ) );
+		rc = -EINVAL;
+		goto done;
+	}
+	if ( ! dest ) {
+		DBGC ( els, FCELS_FMT " received frame missing destination "
+		       "address:\n", FCELS_ARGS ( els ) );
+		rc = -EINVAL;
+		goto done;
+	}
 
 	/* Check for rejection responses */
 	if ( fc_els_is_request ( els ) &&
@@ -176,6 +190,11 @@ static int fc_els_rx ( struct fc_els *els,
 		rc = -EACCES;
 		goto done;
 	}
+
+	/* Update port IDs */
+	memcpy ( &els->port_id, &dest->sfc_port_id, sizeof ( els->port_id ) );
+	memcpy ( &els->peer_port_id, &src->sfc_port_id,
+		 sizeof ( els->peer_port_id ) );
 
 	/* Determine handler, if necessary */
 	if ( ! els->handler )
@@ -513,8 +532,8 @@ static int fc_els_flogi_rx ( struct fc_els *els, const void *data,
 	DBGC ( els, FCELS_FMT " has port %s\n", FCELS_ARGS ( els ),
 	       fc_ntoa ( &flogi->port_wwn ) );
 	if ( has_fabric ) {
-		DBGC ( els, FCELS_FMT " has fabric with local ID %s\n",
-		       FCELS_ARGS ( els ), fc_id_ntoa ( &els->port_id ) );
+		DBGC ( els, FCELS_FMT " has fabric with", FCELS_ARGS ( els ) );
+		DBGC ( els, " local ID %s\n", fc_id_ntoa ( &els->port_id ) );
 	} else {
 		DBGC ( els, FCELS_FMT " has point-to-point link\n",
 		       FCELS_ARGS ( els ) );
