@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
+ * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  *
@@ -43,6 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 static int rarp_rx ( struct io_buffer *iobuf,
 		     struct net_device *netdev __unused,
+		     const void *ll_dest __unused,
 		     const void *ll_source __unused ) {
 	free_iob ( iobuf );
 	return 0;

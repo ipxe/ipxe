@@ -174,7 +174,8 @@ static int eth_slow_lacp_rx ( struct io_buffer *iobuf,
 
 	/* Send response */
 	eth_slow_lacp_dump ( iobuf, netdev, "TX" );
-	return net_tx ( iobuf, netdev, &eth_slow_protocol, eth_slow_address );
+	return net_tx ( iobuf, netdev, &eth_slow_protocol, eth_slow_address,
+			netdev->ll_addr );
 }
 
 /**
@@ -218,7 +219,7 @@ static int eth_slow_marker_rx ( struct io_buffer *iobuf,
 		marker->marker.tlv.type = ETH_SLOW_TLV_MARKER_RESPONSE;
 		eth_slow_marker_dump ( iobuf, netdev, "TX" );
 		return net_tx ( iobuf, netdev, &eth_slow_protocol,
-				eth_slow_address );
+				eth_slow_address, netdev->ll_addr );
 	} else {
 		/* Discard all other marker packets */
 		free_iob ( iobuf );
@@ -231,11 +232,13 @@ static int eth_slow_marker_rx ( struct io_buffer *iobuf,
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
+ * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  */
 static int eth_slow_rx ( struct io_buffer *iobuf,
 			 struct net_device *netdev,
+			 const void *ll_dest __unused,
 			 const void *ll_source __unused ) {
 	union eth_slow_packet *eth_slow = iobuf->data;
 

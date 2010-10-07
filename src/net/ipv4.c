@@ -355,7 +355,8 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
 	/* Hand off to link layer */
-	if ( ( rc = net_tx ( iobuf, netdev, &ipv4_protocol, ll_dest ) ) != 0 ) {
+	if ( ( rc = net_tx ( iobuf, netdev, &ipv4_protocol, ll_dest,
+			     netdev->ll_addr ) ) != 0 ) {
 		DBG ( "IPv4 could not transmit packet via %s: %s\n",
 		      netdev->name, strerror ( rc ) );
 		return rc;
@@ -373,12 +374,15 @@ static int ipv4_tx ( struct io_buffer *iobuf,
  *
  * @v iobuf	I/O buffer
  * @v netdev	Network device
+ * @v ll_dest	Link-layer destination address
  * @v ll_source	Link-layer destination source
  *
  * This function expects an IP4 network datagram. It processes the headers 
  * and sends it to the transport layer.
  */
-static int ipv4_rx ( struct io_buffer *iobuf, struct net_device *netdev __unused,
+static int ipv4_rx ( struct io_buffer *iobuf,
+		     struct net_device *netdev __unused,
+		     const void *ll_dest __unused,
 		     const void *ll_source __unused ) {
 	struct iphdr *iphdr = iobuf->data;
 	size_t hdrlen;

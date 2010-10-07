@@ -455,7 +455,7 @@ static int wpa_send_eapol ( struct io_buffer *iob, struct wpa_common_ctx *ctx,
 			   pkt->mic );
 
 	return net_tx ( iob, ctx->dev->netdev, &eapol_protocol,
-			ctx->dev->bssid );
+			ctx->dev->bssid, ctx->dev->netdev->ll_addr );
 }
 
 
@@ -757,9 +757,11 @@ static int wpa_handle_1_of_2 ( struct wpa_common_ctx *ctx,
  *
  * @v iob	I/O buffer
  * @v netdev	Network device
+ * @v ll_dest	Link-layer destination address
  * @v ll_source	Source link-layer address
  */
 static int eapol_key_rx ( struct io_buffer *iob, struct net_device *netdev,
+			  const void *ll_dest __unused,
 			  const void *ll_source )
 {
 	struct net80211_device *dev = net80211_get ( netdev );

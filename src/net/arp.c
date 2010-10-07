@@ -155,8 +155,8 @@ int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
 		 dest_net_addr, net_protocol->net_addr_len );
 
 	/* Transmit ARP request */
-	if ( ( rc = net_tx ( iobuf, netdev, &arp_protocol, 
-			     netdev->ll_broadcast ) ) != 0 )
+	if ( ( rc = net_tx ( iobuf, netdev, &arp_protocol,
+			     netdev->ll_broadcast, netdev->ll_addr ) ) != 0 )
 		return rc;
 
 	return -ENOENT;
@@ -195,6 +195,7 @@ static struct arp_net_protocol * arp_find_protocol ( uint16_t net_proto ) {
  * details.
  */
 static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
+		    const void *ll_dest __unused,
 		    const void *ll_source __unused ) {
 	struct arphdr *arphdr = iobuf->data;
 	struct arp_net_protocol *arp_net_protocol;
@@ -261,7 +262,7 @@ static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 
 	/* Send reply */
 	net_tx ( iob_disown ( iobuf ), netdev, &arp_protocol,
-		 arp_target_ha ( arphdr ) );
+		 arp_target_ha ( arphdr ), netdev->ll_addr );
 
  done:
 	free_iob ( iobuf );

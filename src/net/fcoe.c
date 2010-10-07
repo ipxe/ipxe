@@ -129,7 +129,7 @@ static int fcoe_deliver ( struct fcoe_port *fcoe,
 
 	/* Transmit packet */
 	if ( ( rc = net_tx ( iob_disown ( iobuf ), fcoe->netdev, &fcoe_protocol,
-			     fcoe->fcf_ll_addr ) ) != 0 ) {
+			     fcoe->fcf_ll_addr, fcoe->netdev->ll_addr )) != 0){
 		DBGC ( fcoe, "FCoE %s could not transmit: %s\n",
 		       fcoe->netdev->name, strerror ( rc ) );
 		goto done;
@@ -164,12 +164,12 @@ static struct io_buffer * fcoe_alloc_iob ( struct fcoe_port *fcoe __unused,
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
+ * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  */
-static int fcoe_rx ( struct io_buffer *iobuf,
-		     struct net_device *netdev,
-		     const void *ll_source ) {
+static int fcoe_rx ( struct io_buffer *iobuf, struct net_device *netdev,
+		     const void *ll_dest __unused, const void *ll_source ) {
 	struct fcoe_header *fcoehdr;
 	struct fcoe_footer *fcoeftr;
 	struct fcoe_port *fcoe;

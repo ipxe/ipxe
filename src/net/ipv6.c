@@ -242,7 +242,8 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 	}
 
 	/* Transmit packet */
-	return net_tx ( iobuf, netdev, &ipv6_protocol, ll_dest );
+	return net_tx ( iobuf, netdev, &ipv6_protocol, ll_dest,
+			netdev->ll_addr );
 
   err:
 	free_iob ( iobuf );
@@ -285,12 +286,14 @@ static int ipv6_process_nxt_hdr ( struct io_buffer *iobuf, uint8_t nxt_hdr,
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
+ * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
  *
  * This function processes a IPv6 packet
  */
 static int ipv6_rx ( struct io_buffer *iobuf,
 		     __unused struct net_device *netdev,
+		     __unused const void *ll_dest,
 		     __unused const void *ll_source ) {
 
 	struct ip6_header *ip6hdr = iobuf->data;

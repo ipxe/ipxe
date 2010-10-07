@@ -607,6 +607,7 @@ struct net_device * last_opened_netdev ( void ) {
  * @v netdev		Network device
  * @v net_protocol	Network-layer protocol
  * @v ll_dest		Destination link-layer address
+ * @v ll_source		Source link-layer address
  * @ret rc		Return status code
  *
  * Prepends link-layer headers to the I/O buffer and transmits the
@@ -614,7 +615,8 @@ struct net_device * last_opened_netdev ( void ) {
  * ownership of the I/O buffer.
  */
 int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
-	     struct net_protocol *net_protocol, const void *ll_dest ) {
+	     struct net_protocol *net_protocol, const void *ll_dest,
+	     const void *ll_source ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	int rc;
 
@@ -626,7 +628,7 @@ int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	netdev_poll ( netdev );
 
 	/* Add link-layer header */
-	if ( ( rc = ll_protocol->push ( netdev, iobuf, ll_dest, netdev->ll_addr,
+	if ( ( rc = ll_protocol->push ( netdev, iobuf, ll_dest, ll_source,
 					net_protocol->net_proto ) ) != 0 ) {
 		free_iob ( iobuf );
 		return rc;
@@ -642,17 +644,19 @@ int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
  * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v net_proto		Network-layer protocol, in network-byte order
+ * @v ll_dest		Destination link-layer address
  * @v ll_source		Source link-layer address
  * @ret rc		Return status code
  */
 int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
-	     uint16_t net_proto, const void *ll_source ) {
+	     uint16_t net_proto, const void *ll_dest, const void *ll_source ) {
 	struct net_protocol *net_protocol;
 
 	/* Hand off to network-layer protocol, if any */
 	for_each_table_entry ( net_protocol, NET_PROTOCOLS ) {
 		if ( net_protocol->net_proto == net_proto )
-			return net_protocol->rx ( iobuf, netdev, ll_source );
+			return net_protocol->rx ( iobuf, netdev, ll_dest,
+						  ll_source );
 	}
 
 	DBGC ( netdev, "NETDEV %p unknown network protocol %04x\n",
@@ -707,7 +711,8 @@ static void net_step ( struct process *process __unused ) {
 
 			/* Hand packet to network layer */
 			if ( ( rc = net_rx ( iob_disown ( iobuf ), netdev,
-					     net_proto, ll_source ) ) != 0 ) {
+					     net_proto, ll_dest,
+					     ll_source ) ) != 0 ) {
 				/* Record error for diagnosis */
 				netdev_rx_err ( netdev, NULL, rc );
 			}

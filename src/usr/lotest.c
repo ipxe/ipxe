@@ -45,11 +45,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
+ * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  */
 static int lotest_rx ( struct io_buffer *iobuf,
 		       struct net_device *netdev __unused,
+		       const void *ll_dest __unused,
 		       const void *ll_source __unused ) {
 	free_iob ( iobuf );
 	return -ENOTSUP;
@@ -138,8 +140,8 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 
 		/* Transmit packet */
 		if ( ( rc = net_tx ( iob_disown ( iobuf ), sender,
-				     &lotest_protocol,
-				     receiver->ll_addr ) ) != 0 ) {
+				     &lotest_protocol, receiver->ll_addr,
+				     sender->ll_addr ) ) != 0 ) {
 			printf ( "\nFailed to transmit packet: %s",
 				 strerror ( rc ) );
 			goto done;

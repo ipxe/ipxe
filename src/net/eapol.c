@@ -36,13 +36,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * @v iob	I/O buffer
  * @v netdev	Network device
+ * @v ll_dest	Link-layer destination address
  * @v ll_source	Link-layer source address
  *
  * This function takes ownership of the I/O buffer passed to it.
  */
 static int eapol_rx ( struct io_buffer *iob, struct net_device *netdev,
-		      const void *ll_source )
-{
+		      const void *ll_dest, const void *ll_source ) {
 	struct eapol_frame *eapol = iob->data;
 	struct eapol_handler *handler;
 
@@ -54,7 +54,7 @@ static int eapol_rx ( struct io_buffer *iob, struct net_device *netdev,
 	for_each_table_entry ( handler, EAPOL_HANDLERS ) {
 		if ( handler->type == eapol->type ) {
 			iob_pull ( iob, EAPOL_HDR_LEN );
-			return handler->rx ( iob, netdev, ll_source );
+			return handler->rx ( iob, netdev, ll_dest, ll_source );
 		}
 	}
 

@@ -249,13 +249,14 @@ static void aoecmd_close ( struct aoe_command *aoecmd, int rc ) {
  */
 static int aoecmd_tx ( struct aoe_command *aoecmd ) {
 	struct aoe_device *aoedev = aoecmd->aoedev;
+	struct net_device *netdev = aoedev->netdev;
 	struct io_buffer *iobuf;
 	struct aoehdr *aoehdr;
 	size_t cmd_len;
 	int rc;
 
 	/* Sanity check */
-	assert ( aoedev->netdev != NULL );
+	assert ( netdev != NULL );
 
 	/* If we are transmitting anything that requires a response,
          * start the retransmission timer.  Do this before attempting
@@ -281,8 +282,8 @@ static int aoecmd_tx ( struct aoe_command *aoecmd ) {
 	aoecmd->type->cmd ( aoecmd, iobuf->data, iob_len ( iobuf ) );
 
 	/* Send packet */
-	if ( ( rc = net_tx ( iobuf, aoedev->netdev, &aoe_protocol,
-			     aoedev->target ) ) != 0 ) {
+	if ( ( rc = net_tx ( iobuf, netdev, &aoe_protocol, aoedev->target,
+			     netdev->ll_addr ) ) != 0 ) {
 		DBGC ( aoedev, "AoE %s/%08x could not transmit: %s\n",
 		       aoedev_name ( aoedev ), aoecmd->tag,
 		       strerror ( rc ) );
@@ -903,12 +904,14 @@ static int aoedev_open ( struct interface *parent, struct net_device *netdev,
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
+ * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
  * @ret rc		Return status code
  *
  */
 static int aoe_rx ( struct io_buffer *iobuf,
 		    struct net_device *netdev __unused,
+		    const void *ll_dest __unused,
 		    const void *ll_source ) {
 	struct aoehdr *aoehdr = iobuf->data;
 	struct aoe_command *aoecmd;

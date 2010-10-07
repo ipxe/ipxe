@@ -57,12 +57,13 @@ struct net_protocol {
 	 *
 	 * @v iobuf	I/O buffer
 	 * @v netdev	Network device
+	 * @v ll_dest	Link-layer destination address
 	 * @v ll_source	Link-layer source address
 	 *
 	 * This method takes ownership of the I/O buffer.
 	 */
 	int ( * rx ) ( struct io_buffer *iobuf, struct net_device *netdev,
-		       const void *ll_source );
+		       const void *ll_dest, const void *ll_source );
 	/**
 	 * Transcribe network-layer address
 	 *
@@ -534,9 +535,11 @@ extern struct net_device * find_netdev_by_location ( unsigned int bus_type,
 						     unsigned int location );
 extern struct net_device * last_opened_netdev ( void );
 extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
-		    struct net_protocol *net_protocol, const void *ll_dest );
+		    struct net_protocol *net_protocol, const void *ll_dest,
+		    const void *ll_source );
 extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
-		    uint16_t net_proto, const void *ll_source );
+		    uint16_t net_proto, const void *ll_dest,
+		    const void *ll_source );
 
 /**
  * Complete network transmission

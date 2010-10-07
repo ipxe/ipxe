@@ -90,7 +90,8 @@ struct eapol_handler
 	 *
 	 * @v iob	I/O buffer containing packet payload
 	 * @v netdev	Network device from which packet was received
-	 * @v ll_source	Source link-layer address from which packet was received
+	 * @V ll_dest	Destination link-layer address
+	 * @v ll_source	Source link-layer address
 	 * @ret rc	Return status code
 	 *
 	 * The I/O buffer will have the EAPOL header pulled off it, so
@@ -99,7 +100,7 @@ struct eapol_handler
 	 * This function takes ownership of the I/O buffer passed to it.
 	 */
 	int ( * rx ) ( struct io_buffer *iob, struct net_device *netdev,
-		       const void *ll_source );
+		       const void *ll_dest, const void *ll_source );
 };
 
 #define EAPOL_HANDLERS	__table ( struct eapol_handler, "eapol_handlers" )
