@@ -245,6 +245,8 @@ struct dhcp_session {
 
 	/** Retransmission timer */
 	struct retry_timer timer;
+	/** Transmission counter */
+	unsigned int count;
 	/** Start time of the current state (in ticks) */
 	unsigned long start;
 };
@@ -1097,6 +1099,14 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 		       dhcp, strerror ( rc ) );
 		goto done;
 	}
+
+	/* (Ab)use the "secs" field to convey metadata about the DHCP
+	 * session state into packet traces.  Useful for extracting
+	 * debug information from non-debug builds.
+	 */
+	dhcppkt.dhcphdr->secs = htons ( ( ++(dhcp->count) << 2 ) |
+					( dhcp->offer.s_addr ? 0x02 : 0 ) |
+					( dhcp->proxy_offer ? 0x01 : 0 ) );
 
 	/* Fill in packet based on current state */
 	if ( ( rc = dhcp->state->tx ( dhcp, &dhcppkt, &peer ) ) != 0 ) {
