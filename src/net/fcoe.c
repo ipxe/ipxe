@@ -101,6 +101,8 @@ enum fcoe_flags {
 	FCOE_HAVE_FCF = 0x0002,
 	/** We have a FIP-capable FCoE forwarder available to be used */
 	FCOE_HAVE_FIP_FCF = 0x0004,
+	/** FCoE forwarder supports server-provided MAC addresses */
+	FCOE_FCF_ALLOWS_SPMA = 0x0008,
 };
 
 struct net_protocol fcoe_protocol __net_protocol;
@@ -228,8 +230,10 @@ static int fcoe_deliver ( struct fcoe_port *fcoe,
 		memset ( fipmac, 0, sizeof ( *fipmac ) );
 		fipmac->type = FIP_MAC_ADDRESS;
 		fipmac->len = ( sizeof ( *fipmac ) / 4 );
-		memcpy ( fipmac->mac, fcoe->netdev->ll_addr,
-			 sizeof ( fipmac->mac ) );
+		if ( fcoe->flags & FCOE_FCF_ALLOWS_SPMA ) {
+			memcpy ( fipmac->mac, fcoe->netdev->ll_addr,
+				 sizeof ( fipmac->mac ) );
+		}
 
 		/* Create FIP header */
 		fiphdr = iob_push ( iobuf, sizeof ( *fiphdr ) );
@@ -239,7 +243,8 @@ static int fcoe_deliver ( struct fcoe_port *fcoe,
 		fiphdr->subcode = FIP_ELS_REQUEST;
 		fiphdr->len =
 			htons ( ( iob_len ( iobuf ) - sizeof ( *fiphdr ) ) / 4);
-		fiphdr->flags = htons ( FIP_FP | FIP_SP );
+		fiphdr->flags = ( ( fcoe->flags & FCOE_FCF_ALLOWS_SPMA ) ?
+				  htons ( FIP_SP ) : htons ( FIP_FP ) );
 
 		/* Send as FIP packet from netdev's own MAC address */
 		net_protocol = &fip_protocol;
@@ -636,17 +641,23 @@ static int fcoe_fip_rx_advertisement ( struct fcoe_port *fcoe,
 			} else {
 				fcoe->keepalive = ntohl ( fka_adv_p->period );
 			}
+			fcoe->flags &= ~FCOE_FCF_ALLOWS_SPMA;
+			if ( flags & FIP_SP )
+				fcoe->flags |= FCOE_FCF_ALLOWS_SPMA;
 			memcpy ( fcoe->fcf_mac, mac_address->mac,
 				 sizeof ( fcoe->fcf_mac ) );
 			DBGC ( fcoe, "FCoE %s selected FCF %s (priority %d, ",
 			       fcoe->netdev->name, eth_ntoa ( fcoe->fcf_mac ),
 			       fcoe->priority );
 			if ( fcoe->keepalive ) {
-				DBGC ( fcoe, "keepalive %dms)\n",
+				DBGC ( fcoe, "keepalive %dms",
 				       fcoe->keepalive );
 			} else {
-				DBGC ( fcoe, "no keepalive)\n" );
+				DBGC ( fcoe, "no keepalive" );
 			}
+			DBGC ( fcoe, ", %cPMA)\n",
+			       ( ( fcoe->flags & FCOE_FCF_ALLOWS_SPMA ) ?
+				 'S' : 'F' ) );
 		}
 
 	} else if ( fcoe->flags & FCOE_HAVE_FIP_FCF ) {
@@ -704,6 +715,8 @@ static int fcoe_fip_rx_els_response ( struct fcoe_port *fcoe,
 
 	/* Record local MAC address */
 	memcpy ( fcoe->local_mac, mac_address->mac, sizeof ( fcoe->local_mac ));
+	DBGC ( fcoe, "FCoE %s using local MAC %s\n",
+	       fcoe->netdev->name, eth_ntoa ( fcoe->local_mac ) );
 
 	/* Hand off via transport interface */
 	frame = &flogi->fc;
