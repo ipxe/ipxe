@@ -1159,17 +1159,17 @@ struct fc_port * fc_port_find ( const char *name ) {
 /**
  * Find Fibre Channel port by link node name
  *
- * @v link_node_wwn	Link node name
+ * @v link_port_wwn	Link node name
  * @ret port		Fibre Channel port, or NULL
  */
 static struct fc_port *
-fc_port_find_link_wwn ( struct fc_name *link_node_wwn ) {
+fc_port_find_link_wwn ( struct fc_name *link_port_wwn ) {
 	struct fc_port *port;
 
 	list_for_each_entry ( port, &fc_ports, list ) {
 		if ( fc_link_ok ( &port->link ) &&
-		     ( memcmp ( &port->link_node_wwn, link_node_wwn,
-				sizeof ( port->link_node_wwn ) ) == 0 ) ) {
+		     ( memcmp ( &port->link_port_wwn, link_port_wwn,
+				sizeof ( port->link_port_wwn ) ) == 0 ) ) {
 			return port;
 		}
 	}
@@ -1192,7 +1192,7 @@ fc_port_find_link_wwn ( struct fc_name *link_node_wwn ) {
 static void fc_peer_close ( struct fc_peer *peer, int rc ) {
 
 	DBGC ( peer, "FCPEER %s closed: %s\n",
-	       fc_ntoa ( &peer->node_wwn ) , strerror ( rc ) );
+	       fc_ntoa ( &peer->port_wwn ) , strerror ( rc ) );
 
 	/* Sanity check */
 	assert ( list_empty ( &peer->ulps ) );
@@ -1263,7 +1263,7 @@ int fc_peer_login ( struct fc_peer *peer, struct fc_port *port,
 		peer->port = fc_port_get ( port );
 		memcpy ( &peer->port_id, port_id, sizeof ( peer->port_id ) );
 		DBGC ( peer, "FCPEER %s logged in via %s as %s\n",
-		       fc_ntoa ( &peer->node_wwn ), peer->port->name,
+		       fc_ntoa ( &peer->port_wwn ), peer->port->name,
 		       fc_id_ntoa ( &peer->port_id ) );
 
 		/* Add login reference */
@@ -1291,7 +1291,7 @@ void fc_peer_logout ( struct fc_peer *peer, int rc ) {
 	struct fc_ulp *tmp;
 
 	DBGC ( peer, "FCPEER %s logged out: %s\n",
-	       fc_ntoa ( &peer->node_wwn ), strerror ( rc ) );
+	       fc_ntoa ( &peer->port_wwn ), strerror ( rc ) );
 
 	/* Drop login reference, if applicable */
 	if ( fc_link_ok ( &peer->link ) )
@@ -1349,16 +1349,16 @@ static void fc_peer_examine ( struct fc_link_state *link ) {
 		return;
 
 	DBGC ( peer, "FCPEER %s attempting login\n",
-	       fc_ntoa ( &peer->node_wwn ) );
+	       fc_ntoa ( &peer->port_wwn ) );
 
 	/* Sanity check */
 	assert ( peer->port == NULL );
 
 	/* Look for a port with the peer attached via a point-to-point link */
-	port = fc_port_find_link_wwn ( &peer->node_wwn );
+	port = fc_port_find_link_wwn ( &peer->port_wwn );
 	if ( ! port ) {
 		DBGC ( peer, "FCPEER %s could not find a point-to-point "
-		       "link\n", fc_ntoa ( &peer->node_wwn ) );
+		       "link\n", fc_ntoa ( &peer->port_wwn ) );
 		fc_peer_logout ( peer, -ENOENT );
 		return;
 	}
@@ -1368,7 +1368,7 @@ static void fc_peer_examine ( struct fc_link_state *link ) {
 	intf_restart ( &peer->plogi, -ECANCELED );
 	if ( ( rc = fc_els_plogi ( &peer->plogi, port, peer_port_id ) ) != 0 ) {
 		DBGC ( peer, "FCPEER %s could not initiate PLOGI: %s\n",
-		       fc_ntoa ( &peer->node_wwn ), strerror ( rc ) );
+		       fc_ntoa ( &peer->port_wwn ), strerror ( rc ) );
 		fc_peer_logout ( peer, rc );
 		return;
 	}
@@ -1386,10 +1386,10 @@ static struct interface_descriptor fc_peer_plogi_desc =
 /**
  * Create Fibre Channel peer
  *
- * @v node_wwn		Node name
+ * @v port_wwn		Node name
  * @ret peer		Fibre Channel peer, or NULL
  */
-static struct fc_peer * fc_peer_create ( const struct fc_name *node_wwn ) {
+static struct fc_peer * fc_peer_create ( const struct fc_name *port_wwn ) {
 	struct fc_peer *peer;
 
 	/* Allocate and initialise structure */
@@ -1400,34 +1400,34 @@ static struct fc_peer * fc_peer_create ( const struct fc_name *node_wwn ) {
 	fc_link_init ( &peer->link, fc_peer_examine, &peer->refcnt );
 	intf_init ( &peer->plogi, &fc_peer_plogi_desc, &peer->refcnt );
 	list_add_tail ( &peer->list, &fc_peers );
-	memcpy ( &peer->node_wwn, node_wwn, sizeof ( peer->node_wwn ) );
+	memcpy ( &peer->port_wwn, port_wwn, sizeof ( peer->port_wwn ) );
 	INIT_LIST_HEAD ( &peer->ulps );
 
 	/* Start link monitor */
 	fc_link_start ( &peer->link );
 
-	DBGC ( peer, "FCPEER %s created\n", fc_ntoa ( &peer->node_wwn ) );
+	DBGC ( peer, "FCPEER %s created\n", fc_ntoa ( &peer->port_wwn ) );
 	return peer;
 }
 
 /**
  * Get Fibre Channel peer by node name
  *
- * @v node_wwn		Node name
+ * @v port_wwn		Node name
  * @ret peer		Fibre Channel peer, or NULL
  */
-struct fc_peer * fc_peer_get_wwn ( const struct fc_name *node_wwn ) {
+struct fc_peer * fc_peer_get_wwn ( const struct fc_name *port_wwn ) {
 	struct fc_peer *peer;
 
 	/* Look for an existing peer */
 	list_for_each_entry ( peer, &fc_peers, list ) {
-		if ( memcmp ( &peer->node_wwn, node_wwn,
-			      sizeof ( peer->node_wwn ) ) == 0 )
+		if ( memcmp ( &peer->port_wwn, port_wwn,
+			      sizeof ( peer->port_wwn ) ) == 0 )
 			return fc_peer_get ( peer );
 	}
 
 	/* Create a new peer */
-	peer = fc_peer_create ( node_wwn );
+	peer = fc_peer_create ( port_wwn );
 	if ( ! peer )
 		return NULL;
 
@@ -1473,7 +1473,7 @@ struct fc_peer * fc_peer_get_port_id ( struct fc_port *port,
 static void fc_ulp_close ( struct fc_ulp *ulp, int rc ) {
 
 	DBGC ( ulp, "FCULP %s/%02x closed: %s\n",
-	       fc_ntoa ( &ulp->peer->node_wwn ), ulp->type, strerror ( rc ) );
+	       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type, strerror ( rc ) );
 
 	/* Sanity check */
 	assert ( ulp->usage == 0 );
@@ -1555,13 +1555,13 @@ int fc_ulp_login ( struct fc_ulp *ulp, const void *param, size_t param_len,
 		if ( ! ulp->param ) {
 			DBGC ( ulp, "FCULP %s/%02x could not record "
 			       "parameters\n",
-			       fc_ntoa ( &ulp->peer->node_wwn ), ulp->type );
+			       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type );
 			return -ENOMEM;
 		}
 		memcpy ( ulp->param, param, param_len );
 		ulp->param_len = param_len;
 		DBGC ( ulp, "FCULP %s/%02x logged in with parameters:\n",
-		       fc_ntoa ( &ulp->peer->node_wwn ), ulp->type );
+		       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type );
 		DBGC_HDA ( ulp, 0, ulp->param, ulp->param_len );
 
 		/* Add login reference */
@@ -1581,7 +1581,7 @@ int fc_ulp_login ( struct fc_ulp *ulp, const void *param, size_t param_len,
 	if ( ! ( ulp->flags & FC_ULP_ORIGINATED_LOGIN_OK ) ) {
 		DBGC ( ulp, "FCULP %s/%02x sending extra PRLI to work around "
 		       "Linux bug\n",
-		       fc_ntoa ( &ulp->peer->node_wwn ), ulp->type );
+		       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type );
 		fc_link_start ( &ulp->link );
 	}
 
@@ -1597,7 +1597,7 @@ int fc_ulp_login ( struct fc_ulp *ulp, const void *param, size_t param_len,
 void fc_ulp_logout ( struct fc_ulp *ulp, int rc ) {
 
 	DBGC ( ulp, "FCULP %s/%02x logged out: %s\n",
-	       fc_ntoa ( &ulp->peer->node_wwn ), ulp->type, strerror ( rc ) );
+	       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type, strerror ( rc ) );
 
 	/* Drop login reference, if applicable */
 	if ( fc_link_ok ( &ulp->link ) )
@@ -1652,14 +1652,14 @@ static void fc_ulp_examine ( struct fc_link_state *link ) {
 		return;
 
 	DBGC ( ulp, "FCULP %s/%02x attempting login\n",
-	       fc_ntoa ( &ulp->peer->node_wwn ), ulp->type );
+	       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type );
 
 	/* Try to create PRLI ELS */
 	intf_restart ( &ulp->prli, -ECANCELED );
 	if ( ( rc = fc_els_prli ( &ulp->prli, ulp->peer->port,
 				  &ulp->peer->port_id, ulp->type ) ) != 0 ) {
 		DBGC ( ulp, "FCULP %s/%02x could not initiate PRLI: %s\n",
-		       fc_ntoa ( &ulp->peer->node_wwn ), ulp->type,
+		       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type,
 		       strerror ( rc ) );
 		fc_ulp_logout ( ulp, rc );
 		return;
@@ -1701,7 +1701,7 @@ static struct fc_ulp * fc_ulp_create ( struct fc_peer *peer,
 	fc_link_start ( &ulp->link );
 
 	DBGC ( ulp, "FCULP %s/%02x created\n",
-	       fc_ntoa ( &ulp->peer->node_wwn ), ulp->type );
+	       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type );
 	return ulp;
 }
 
@@ -1733,17 +1733,17 @@ static struct fc_ulp * fc_ulp_get_type ( struct fc_peer *peer,
 /**
  * Get Fibre Channel upper-layer protocol by port name and type
  *
- * @v node_wwn		Port name
+ * @v port_wwn		Port name
  * @v type		Type
  * @ret ulp		Fibre Channel upper-layer protocol, or NULL
  */
-struct fc_ulp * fc_ulp_get_wwn_type ( const struct fc_name *node_wwn,
+struct fc_ulp * fc_ulp_get_wwn_type ( const struct fc_name *port_wwn,
 				      unsigned int type ) {
 	struct fc_ulp *ulp;
 	struct fc_peer *peer;
 
 	/* Get peer */
-	peer = fc_peer_get_wwn ( node_wwn );
+	peer = fc_peer_get_wwn ( port_wwn );
 	if ( ! peer )
 		goto err_peer_get_wwn;
 

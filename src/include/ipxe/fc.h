@@ -335,8 +335,8 @@ struct fc_peer {
 	/** List of all peers */
 	struct list_head list;
 
-	/** Node name */
-	struct fc_name node_wwn;
+	/** Port name */
+	struct fc_name port_wwn;
 
 	/** Link state monitor */
 	struct fc_link_state link;
@@ -377,7 +377,7 @@ fc_peer_put ( struct fc_peer *peer ) {
 
 extern struct list_head fc_peers;
 
-extern struct fc_peer * fc_peer_get_wwn ( const struct fc_name *node_wwn );
+extern struct fc_peer * fc_peer_get_wwn ( const struct fc_name *port_wwn );
 extern struct fc_peer *
 fc_peer_get_port_id ( struct fc_port *port,
 		      const struct fc_port_id *peer_port_id );
@@ -448,7 +448,7 @@ fc_ulp_put ( struct fc_ulp *ulp ) {
 	ref_put ( &ulp->refcnt );
 }
 
-extern struct fc_ulp * fc_ulp_get_wwn_type ( const struct fc_name *node_wwn,
+extern struct fc_ulp * fc_ulp_get_wwn_type ( const struct fc_name *port_wwn,
 					     unsigned int type );
 extern struct fc_ulp *
 fc_ulp_get_port_id_type ( struct fc_port *port,

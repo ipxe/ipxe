@@ -38,19 +38,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v port		Fibre Channel port
  */
 void fcportstat ( struct fc_port *port ) {
-	printf ( "%s: %s", port->name, fc_ntoa ( &port->node_wwn ) );
-	printf ( " port %s id %s\n  [Link:", fc_ntoa ( &port->port_wwn ),
+	printf ( "%s: %s id %s", port->name, fc_ntoa ( &port->port_wwn ),
 		 fc_id_ntoa ( &port->port_id ) );
+	printf ( " node %s\n  [Link:", fc_ntoa ( &port->node_wwn ) );
 	if ( fc_link_ok ( &port->link ) ) {
-		printf ( " up, %s", fc_ntoa ( &port->link_node_wwn ) );
-		printf ( " port %s", fc_ntoa ( &port->link_port_wwn ) );
+		printf ( " up, %s", fc_ntoa ( &port->link_port_wwn ) );
 		if ( ( port->flags & FC_PORT_HAS_FABRIC ) ) {
 			printf ( " fabric" );
 		} else {
 			printf ( " id %s",
 				 fc_id_ntoa ( &port->ptp_link_port_id ) );
 		}
-		printf ( "]\n" );
+		printf ( " node %s]\n", fc_ntoa ( &port->link_node_wwn ) );
 	} else {
 		printf ( " down: %s]\n", strerror ( port->link.rc ) );
 	}
@@ -66,7 +65,7 @@ void fcpeerstat ( struct fc_peer *peer ) {
 	uint8_t *param;
 	unsigned int i;
 
-	printf ( "%s:\n  [Link:", fc_ntoa ( &peer->node_wwn ) );
+	printf ( "%s:\n  [Link:", fc_ntoa ( &peer->port_wwn ) );
 	if ( fc_link_ok ( &peer->link ) ) {
 		printf ( " up, port %s id %s]\n", peer->port->name,
 			 fc_id_ntoa ( &peer->port_id ) );

@@ -677,7 +677,7 @@ static int fc_els_plogi_rx ( struct fc_els *els, const void *data,
 	       fc_id_ntoa ( &els->peer_port_id ) );
 
 	/* Get peer */
-	peer = fc_peer_get_wwn ( &plogi->node_wwn );
+	peer = fc_peer_get_wwn ( &plogi->port_wwn );
 	if ( ! peer ) {
 		DBGC ( els, FCELS_FMT " could not create peer\n",
 		       FCELS_ARGS ( els ) );
