@@ -707,7 +707,7 @@ static void iscsi_start_login ( struct iscsi_session *iscsi ) {
 	ISCSI_SET_LENGTHS ( request->lengths, 0, len );
 	request->isid_iana_en = htonl ( ISCSI_ISID_IANA |
 					IANA_EN_FEN_SYSTEMS );
-	/* isid_iana_qual left as zero */
+	request->isid_iana_qual = ( random() & 0xffff );
 	/* tsih left as zero */
 	request->itt = htonl ( iscsi->itt );
 	/* cid left as zero */
