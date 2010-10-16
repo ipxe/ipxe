@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define SCSI_OPCODE_READ_CAPACITY_10	0x25	/**< READ CAPACITY (10) */
 #define SCSI_OPCODE_SERVICE_ACTION_IN	0x9e	/**< SERVICE ACTION IN */
 #define SCSI_SERVICE_ACTION_READ_CAPACITY_16 0x10 /**< READ CAPACITY (16) */
+#define SCSI_OPCODE_TEST_UNIT_READY	0x00	/**< TEST UNIT READY */
 
 /** @} */
 
@@ -192,6 +193,16 @@ struct scsi_capacity_16 {
 	uint8_t reserved[20];
 } __attribute__ (( packed ));
 
+/** A SCSI "TEST UNIT READY" CDB */
+struct scsi_cdb_test_unit_ready {
+	/** Opcode (0x00) */
+	uint8_t opcode;
+	/** Reserved */
+	uint8_t reserved[4];
+	/** Control byte */
+	uint8_t control;
+} __attribute__ (( packed ));
+
 /** A SCSI Command Data Block */
 union scsi_cdb {
 	struct scsi_cdb_read_10 read10;
@@ -200,6 +211,7 @@ union scsi_cdb {
 	struct scsi_cdb_write_16 write16;
 	struct scsi_cdb_read_capacity_10 readcap10;
 	struct scsi_cdb_read_capacity_16 readcap16;
+	struct scsi_cdb_test_unit_ready testready;
 	unsigned char bytes[16];
 };
 

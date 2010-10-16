@@ -24,6 +24,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <ipxe/list.h>
+#include <ipxe/process.h>
+#include <ipxe/xfer.h>
 #include <ipxe/blockdev.h>
 #include <ipxe/scsi.h>
 
@@ -202,9 +204,22 @@ struct scsi_device {
 
 	/** SCSI LUN */
 	struct scsi_lun lun;
+	/** Flags */
+	unsigned int flags;
+
+	/** TEST UNIT READY interface */
+	struct interface ready;
+	/** TEST UNIT READY process */
+	struct process process;
 
 	/** List of commands */
 	struct list_head cmds;
+};
+
+/** SCSI device flags */
+enum scsi_device_flags {
+	/** Unit is ready */
+	SCSIDEV_UNIT_READY = 0x0001,
 };
 
 /** A SCSI command */
@@ -624,6 +639,26 @@ static struct scsi_command_type scsicmd_read_capacity = {
 	.done = scsicmd_read_capacity_done,
 };
 
+/**
+ * Construct SCSI TEST UNIT READY command
+ *
+ * @v scsicmd		SCSI command
+ * @v command		SCSI command IU
+ */
+static void scsicmd_test_unit_ready_cmd ( struct scsi_command *scsicmd __unused,
+					  struct scsi_cmd *command ) {
+	struct scsi_cdb_test_unit_ready *testready = &command->cdb.testready;
+
+	testready->opcode = SCSI_OPCODE_TEST_UNIT_READY;
+}
+
+/** SCSI TEST UNIT READY command type */
+static struct scsi_command_type scsicmd_test_unit_ready = {
+	.name = "TEST UNIT READY",
+	.cmd = scsicmd_test_unit_ready_cmd,
+	.done = scsicmd_close,
+};
+
 /** SCSI command block interface operations */
 static struct interface_operation scsicmd_block_op[] = {
 	INTF_OP ( intf_close, struct scsi_command *, scsicmd_close ),
@@ -752,6 +787,34 @@ static int scsidev_read_capacity ( struct scsi_device *scsidev,
 }
 
 /**
+ * Test to see if SCSI device is ready
+ *
+ * @v scsidev		SCSI device
+ * @v block		Block data interface
+ * @ret rc		Return status code
+ */
+static int scsidev_test_unit_ready ( struct scsi_device *scsidev,
+				     struct interface *block ) {
+	return scsidev_command ( scsidev, block, &scsicmd_test_unit_ready,
+				 0, 0, UNULL, 0 );
+}
+
+/**
+ * Check SCSI device flow-control window
+ *
+ * @v scsidev		SCSI device
+ * @ret len		Length of window
+ */
+static size_t scsidev_window ( struct scsi_device *scsidev ) {
+
+	/* Refuse commands until unit is confirmed ready */
+	if ( ! ( scsidev->flags & SCSIDEV_UNIT_READY ) )
+		return 0;
+
+	return xfer_window ( &scsidev->scsi );
+}
+
+/**
  * Close SCSI device
  *
  * @v scsidev		SCSI device
@@ -761,9 +824,13 @@ static void scsidev_close ( struct scsi_device *scsidev, int rc ) {
 	struct scsi_command *scsicmd;
 	struct scsi_command *tmp;
 
+	/* Stop process */
+	process_del ( &scsidev->process );
+
 	/* Shut down interfaces */
 	intf_shutdown ( &scsidev->block, rc );
 	intf_shutdown ( &scsidev->scsi, rc );
+	intf_shutdown ( &scsidev->ready, rc );
 
 	/* Shut down any remaining commands */
 	list_for_each_entry_safe ( scsicmd, tmp, &scsidev->cmds, list ) {
@@ -775,6 +842,7 @@ static void scsidev_close ( struct scsi_device *scsidev, int rc ) {
 
 /** SCSI device block interface operations */
 static struct interface_operation scsidev_block_op[] = {
+	INTF_OP ( xfer_window, struct scsi_device *, scsidev_window ),
 	INTF_OP ( block_read, struct scsi_device *, scsidev_read ),
 	INTF_OP ( block_write, struct scsi_device *, scsidev_write ),
 	INTF_OP ( block_read_capacity, struct scsi_device *,
@@ -786,6 +854,67 @@ static struct interface_operation scsidev_block_op[] = {
 static struct interface_descriptor scsidev_block_desc =
 	INTF_DESC_PASSTHRU ( struct scsi_device, block,
 			     scsidev_block_op, scsi );
+
+/**
+ * Handle SCSI TEST UNIT READY response
+ *
+ * @v scsidev		SCSI device
+ * @v rc		Reason for close
+ */
+static void scsidev_ready ( struct scsi_device *scsidev, int rc ) {
+
+	/* Shut down interface */
+	intf_shutdown ( &scsidev->ready, rc );
+
+	/* Close device on failure */
+	if ( rc != 0 ) {
+		DBGC ( scsidev, "SCSI %p not ready: %s\n",
+		       scsidev, strerror ( rc ) );
+		scsidev_close ( scsidev, rc );
+		return;
+	}
+
+	/* Mark device as ready */
+	scsidev->flags |= SCSIDEV_UNIT_READY;
+	xfer_window_changed ( &scsidev->block );
+	DBGC ( scsidev, "SCSI %p unit is ready\n", scsidev );
+}
+
+/** SCSI device TEST UNIT READY interface operations */
+static struct interface_operation scsidev_ready_op[] = {
+	INTF_OP ( intf_close, struct scsi_device *, scsidev_ready ),
+};
+
+/** SCSI device TEST UNIT READY interface descriptor */
+static struct interface_descriptor scsidev_ready_desc =
+	INTF_DESC ( struct scsi_device, ready, scsidev_ready_op );
+
+/**
+ * SCSI TEST UNIT READY process
+ *
+ * @v process		Process
+ */
+static void scsidev_step ( struct process *process ) {
+	struct scsi_device *scsidev =
+		container_of ( process, struct scsi_device, process );
+	int rc;
+
+	/* Wait until underlying SCSI device is ready */
+	if ( xfer_window ( &scsidev->scsi ) == 0 )
+		return;
+
+	/* Stop process */
+	process_del ( &scsidev->process );
+
+	DBGC ( scsidev, "SCSI %p waiting for unit to become ready\n",
+	       scsidev );
+
+	/* Issue TEST UNIT READY command */
+	if ( ( rc = scsidev_test_unit_ready ( scsidev, &scsidev->ready )) !=0){
+		scsidev_close ( scsidev, rc );
+		return;
+	}
+}
 
 /** SCSI device SCSI interface operations */
 static struct interface_operation scsidev_scsi_op[] = {
@@ -816,14 +945,14 @@ int scsi_open ( struct interface *block, struct interface *scsi,
 	ref_init ( &scsidev->refcnt, NULL );
 	intf_init ( &scsidev->block, &scsidev_block_desc, &scsidev->refcnt );
 	intf_init ( &scsidev->scsi, &scsidev_scsi_desc, &scsidev->refcnt );
+	intf_init ( &scsidev->ready, &scsidev_ready_desc, &scsidev->refcnt );
+	process_init ( &scsidev->process, scsidev_step, &scsidev->refcnt );
 	INIT_LIST_HEAD ( &scsidev->cmds );
 	memcpy ( &scsidev->lun, lun, sizeof ( scsidev->lun ) );
 	DBGC ( scsidev, "SCSI %p created for LUN " SCSI_LUN_FORMAT "\n",
 	       scsidev, SCSI_LUN_DATA ( scsidev->lun ) );
 
-	/* Attach to SCSI and parent and interfaces, mortalise self,
-	 * and return
-	 */
+	/* Attach to SCSI and parent interfaces, mortalise self, and return */
 	intf_plug_plug ( &scsidev->scsi, scsi );
 	intf_plug_plug ( &scsidev->block, block );
 	ref_put ( &scsidev->refcnt );
