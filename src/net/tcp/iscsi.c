@@ -246,6 +246,9 @@ static int iscsi_open_connection ( struct iscsi_session *iscsi ) {
 	if ( iscsi->target_username )
 		iscsi->status |= ISCSI_STATUS_AUTH_REVERSE_REQUIRED;
 
+	/* Assign new ISID */
+	iscsi->isid_iana_qual = ( random() & 0xffff );
+
 	/* Assign fresh initiator task tag */
 	iscsi_new_itt ( iscsi );
 
@@ -707,7 +710,7 @@ static void iscsi_start_login ( struct iscsi_session *iscsi ) {
 	ISCSI_SET_LENGTHS ( request->lengths, 0, len );
 	request->isid_iana_en = htonl ( ISCSI_ISID_IANA |
 					IANA_EN_FEN_SYSTEMS );
-	request->isid_iana_qual = ( random() & 0xffff );
+	request->isid_iana_qual = htons ( iscsi->isid_iana_qual );
 	/* tsih left as zero */
 	request->itt = htonl ( iscsi->itt );
 	/* cid left as zero */

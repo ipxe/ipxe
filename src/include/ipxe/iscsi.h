@@ -539,6 +539,12 @@ struct iscsi_session {
 	/** CHAP response (used for both initiator and target auth) */
 	struct chap_response chap;
 
+	/** Initiator session ID (IANA format) qualifier
+	 *
+	 * This is part of the ISID.  It is generated randomly
+	 * whenever a new connection is opened.
+	 */
+	uint16_t isid_iana_qual;
 	/** Initiator task tag
 	 *
 	 * This is the tag of the current command.  It is incremented
