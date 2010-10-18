@@ -776,8 +776,11 @@ $(BIN)/%.nodeps : $(BIN)/%.tmp
 
 # Get licensing verdict for the specified target
 #
+define licensable_deps_list
+	$(filter-out config/local/%.h,$(call deps_list,$(1)))
+endef
 define unlicensed_deps_list
-	$(shell grep -L FILE_LICENCE $(call deps_list,$(1)))
+	$(shell grep -L FILE_LICENCE $(call licensable_deps_list,$(1)))
 endef
 define licence_list
 	$(patsubst __licence_%,%,\
