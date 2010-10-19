@@ -187,8 +187,8 @@ struct fcp_command {
 	size_t offset;
 	/** Length of data remaining to be sent within this IU */
 	size_t remaining;
-	/** Command reference */
-	uint8_t ref;
+	/** Exchange ID */
+	uint16_t xchg_id;
 };
 
 /**
@@ -285,8 +285,8 @@ static void fcpcmd_close ( struct fcp_command *fcpcmd, int rc ) {
 	struct fcp_device *fcpdev = fcpcmd->fcpdev;
 
 	if ( rc != 0 ) {
-		DBGC ( fcpdev, "FCP %p ref %02x closed: %s\n",
-		       fcpdev, fcpcmd->ref, strerror ( rc ) );
+		DBGC ( fcpdev, "FCP %p xchg %04x closed: %s\n",
+		       fcpdev, fcpcmd->xchg_id, strerror ( rc ) );
 	}
 
 	/* Stop sending */
@@ -325,16 +325,16 @@ static int fcpcmd_send_cmnd ( struct fcp_command *fcpcmd ) {
 
 	/* Sanity check */
 	if ( command->data_in_len && command->data_out_len ) {
-		DBGC ( fcpdev, "FCP %p ref %02x cannot handle bidirectional "
-		       "command\n", fcpdev, fcpcmd->ref );
+		DBGC ( fcpdev, "FCP %p xchg %04x cannot handle bidirectional "
+		       "command\n", fcpdev, fcpcmd->xchg_id );
 		return -ENOTSUP;
 	}
 
 	/* Allocate I/O buffer */
 	iobuf = xfer_alloc_iob ( &fcpcmd->xchg, sizeof ( *cmnd ) );
 	if ( ! iobuf ) {
-		DBGC ( fcpdev, "FCP %p ref %02x cannot allocate command IU\n",
-		       fcpdev, fcpcmd->ref );
+		DBGC ( fcpdev, "FCP %p xchg %04x cannot allocate command IU\n",
+		       fcpdev, fcpcmd->xchg_id );
 		return -ENOMEM;
 	}
 
@@ -342,7 +342,6 @@ static int fcpcmd_send_cmnd ( struct fcp_command *fcpcmd ) {
 	cmnd = iob_put ( iobuf, sizeof ( *cmnd ) );
 	memset ( cmnd, 0, sizeof ( *cmnd ) );
 	memcpy ( &cmnd->lun, &command->lun, sizeof ( cmnd->lun ) );
-	cmnd->ref = fcpcmd->ref;
 	assert ( ! ( command->data_in_len && command->data_out_len ) );
 	if ( command->data_in_len )
 		cmnd->dirn |= FCP_CMND_RDDATA;
@@ -352,8 +351,8 @@ static int fcpcmd_send_cmnd ( struct fcp_command *fcpcmd ) {
 	cmnd->len = htonl ( command->data_in_len + command->data_out_len );
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.flags = ( XFER_FL_CMD_STAT | XFER_FL_OVER );
-	DBGC2 ( fcpdev, "FCP %p ref %02x CMND " SCSI_CDB_FORMAT " %04x\n",
-		fcpdev, fcpcmd->ref, SCSI_CDB_DATA ( cmnd->cdb ),
+	DBGC2 ( fcpdev, "FCP %p xchg %04x CMND " SCSI_CDB_FORMAT " %04x\n",
+		fcpdev, fcpcmd->xchg_id, SCSI_CDB_DATA ( cmnd->cdb ),
 		ntohl ( cmnd->len ) );
 
 	/* No further data to send within this IU */
@@ -362,8 +361,8 @@ static int fcpcmd_send_cmnd ( struct fcp_command *fcpcmd ) {
 	/* Send command IU frame */
 	if ( ( rc = xfer_deliver ( &fcpcmd->xchg, iob_disown ( iobuf ),
 				   &meta ) ) != 0 ) {
-		DBGC ( fcpdev, "FCP %p ref %02x cannot deliver command IU: "
-		       "%s\n", fcpdev, fcpcmd->ref, strerror ( rc ) );
+		DBGC ( fcpdev, "FCP %p xchg %04x cannot deliver command IU: "
+		       "%s\n", fcpdev, fcpcmd->xchg_id, strerror ( rc ) );
 		return rc;
 	}
 
@@ -389,27 +388,27 @@ static int fcpcmd_recv_rddata ( struct fcp_command *fcpcmd,
 
 	/* Sanity checks */
 	if ( ! ( meta->flags & XFER_FL_ABS_OFFSET ) ) {
-		DBGC ( fcpdev, "FCP %p ref %02x read data missing offset\n",
-		       fcpdev, fcpcmd->ref );
+		DBGC ( fcpdev, "FCP %p xchg %04x read data missing offset\n",
+		       fcpdev, fcpcmd->xchg_id );
 		rc = -ERANGE_READ_DATA_ORDERING;
 		goto done;
 	}
 	if ( offset != fcpcmd->offset ) {
-		DBGC ( fcpdev, "FCP %p ref %02x read data out of order "
+		DBGC ( fcpdev, "FCP %p xchg %04x read data out of order "
 		       "(expected %zd, received %zd)\n",
-		       fcpdev, fcpcmd->ref, fcpcmd->offset, offset );
+		       fcpdev, fcpcmd->xchg_id, fcpcmd->offset, offset );
 		rc = -ERANGE_READ_DATA_ORDERING;
 		goto done;
 	}
 	if ( ( offset + len ) > command->data_in_len ) {
-		DBGC ( fcpdev, "FCP %p ref %02x read data overrun (max %zd, "
-		       "received %zd)\n", fcpdev, fcpcmd->ref,
+		DBGC ( fcpdev, "FCP %p xchg %04x read data overrun (max %zd, "
+		       "received %zd)\n", fcpdev, fcpcmd->xchg_id,
 		       command->data_in_len, ( offset + len ) );
 		rc = -ERANGE_READ_DATA_OVERRUN;
 		goto done;
 	}
-	DBGC2 ( fcpdev, "FCP %p ref %02x RDDATA [%08zx,%08zx)\n",
-		fcpdev, fcpcmd->ref, offset, ( offset + len ) );
+	DBGC2 ( fcpdev, "FCP %p xchg %04x RDDATA [%08zx,%08zx)\n",
+		fcpdev, fcpcmd->xchg_id, offset, ( offset + len ) );
 
 	/* Copy to user buffer */
 	copy_to_user ( command->data_in, offset, iobuf->data, len );
@@ -443,13 +442,13 @@ static int fcpcmd_send_wrdata ( struct fcp_command *fcpcmd ) {
 
 	/* Sanity checks */
 	if ( len == 0 ) {
-		DBGC ( fcpdev, "FCP %p ref %02x write data stuck\n",
-		       fcpdev, fcpcmd->ref );
+		DBGC ( fcpdev, "FCP %p xchg %04x write data stuck\n",
+		       fcpdev, fcpcmd->xchg_id );
 		return -ERANGE_WRITE_DATA_STUCK;
 	}
 	if ( ( fcpcmd->offset + len ) > command->data_out_len ) {
-		DBGC ( fcpdev, "FCP %p ref %02x write data overrun (max %zd, "
-		       "requested %zd)\n", fcpdev, fcpcmd->ref,
+		DBGC ( fcpdev, "FCP %p xchg %04x write data overrun (max %zd, "
+		       "requested %zd)\n", fcpdev, fcpcmd->xchg_id,
 		       command->data_out_len, ( fcpcmd->offset + len ) );
 		return -ERANGE_WRITE_DATA_OVERRUN;
 	}
@@ -457,8 +456,8 @@ static int fcpcmd_send_wrdata ( struct fcp_command *fcpcmd ) {
 	/* Allocate I/O buffer */
 	iobuf = xfer_alloc_iob ( &fcpcmd->xchg, len );
 	if ( ! iobuf ) {
-		DBGC ( fcpdev, "FCP %p ref %02x cannot allocate write data IU "
-		       "for %zd bytes\n", fcpdev, fcpcmd->ref, len );
+		DBGC ( fcpdev, "FCP %p xchg %04x cannot allocate write data "
+		       "IU for %zd bytes\n", fcpdev, fcpcmd->xchg_id, len );
 		return -ENOMEM;
 	}
 
@@ -468,8 +467,8 @@ static int fcpcmd_send_wrdata ( struct fcp_command *fcpcmd ) {
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.flags = ( XFER_FL_RESPONSE | XFER_FL_ABS_OFFSET );
 	meta.offset = fcpcmd->offset;
-	DBGC2 ( fcpdev, "FCP %p ref %02x WRDATA [%08zx,%04zx)\n",
-		fcpdev, fcpcmd->ref, fcpcmd->offset,
+	DBGC2 ( fcpdev, "FCP %p xchg %04x WRDATA [%08zx,%04zx)\n",
+		fcpdev, fcpcmd->xchg_id, fcpcmd->offset,
 		( fcpcmd->offset + iob_len ( iobuf ) ) );
 
 	/* Calculate amount of data remaining to be sent within this IU */
@@ -485,8 +484,8 @@ static int fcpcmd_send_wrdata ( struct fcp_command *fcpcmd ) {
 	/* Send data IU frame */
 	if ( ( rc = xfer_deliver ( &fcpcmd->xchg, iob_disown ( iobuf ),
 				   &meta ) ) != 0 ) {
-		DBGC ( fcpdev, "FCP %p ref %02x cannot deliver write data IU: "
-		       "%s\n", fcpdev, fcpcmd->ref, strerror ( rc ) );
+		DBGC ( fcpdev, "FCP %p xchg %04x cannot deliver write data "
+		       "IU: %s\n", fcpdev, fcpcmd->xchg_id, strerror ( rc ) );
 		return rc;
 	}
 
@@ -510,23 +509,23 @@ static int fcpcmd_recv_xfer_rdy ( struct fcp_command *fcpcmd,
 
 	/* Sanity checks */
 	if ( iob_len ( iobuf ) != sizeof ( *xfer_rdy ) ) {
-		DBGC ( fcpdev, "FCP %p ref %02x received invalid transfer "
-		       "ready IU:\n", fcpdev, fcpcmd->ref );
+		DBGC ( fcpdev, "FCP %p xchg %04x received invalid transfer "
+		       "ready IU:\n", fcpdev, fcpcmd->xchg_id );
 		DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
 		rc = -EINVAL;
 		goto done;
 	}
 	if ( ntohl ( xfer_rdy->offset ) != fcpcmd->offset ) {
 		/* We do not advertise out-of-order delivery */
-		DBGC ( fcpdev, "FCP %p ref %02x cannot support out-of-order "
+		DBGC ( fcpdev, "FCP %p xchg %04x cannot support out-of-order "
 		       "delivery (expected %zd, requested %d)\n",
-		       fcpdev, fcpcmd->ref, fcpcmd->offset,
+		       fcpdev, fcpcmd->xchg_id, fcpcmd->offset,
 		       ntohl ( xfer_rdy->offset ) );
 		rc = -EINVAL;
 		goto done;
 	}
-	DBGC2 ( fcpdev, "FCP %p ref %02x XFER_RDY [%08x,%08x)\n",
-		fcpdev, fcpcmd->ref, ntohl ( xfer_rdy->offset ),
+	DBGC2 ( fcpdev, "FCP %p xchg %04x XFER_RDY [%08x,%08x)\n",
+		fcpdev, fcpcmd->xchg_id, ntohl ( xfer_rdy->offset ),
 		( ntohl ( xfer_rdy->offset ) + ntohl ( xfer_rdy->len ) ) );
 
 	/* Start sending requested data */
@@ -562,28 +561,28 @@ static int fcpcmd_recv_rsp ( struct fcp_command *fcpcmd,
 	     ( iob_len ( iobuf ) < ( sizeof ( *rsp ) +
 				     fcp_rsp_response_data_len ( rsp ) +
 				     fcp_rsp_sense_data_len ( rsp ) ) ) ) {
-		DBGC ( fcpdev, "FCP %p ref %02x received invalid response "
-		       "IU:\n", fcpdev, fcpcmd->ref );
+		DBGC ( fcpdev, "FCP %p xchg %04x received invalid response "
+		       "IU:\n", fcpdev, fcpcmd->xchg_id );
 		DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
 		rc = -EINVAL;
 		goto done;
 	}
-	DBGC2 ( fcpdev, "FCP %p ref %02x RSP stat %02x resid %08x flags %02x"
-		"%s%s%s%s\n", fcpdev, fcpcmd->ref, rsp->status,
+	DBGC2 ( fcpdev, "FCP %p xchg %04x RSP stat %02x resid %08x flags %02x"
+		"%s%s%s%s\n", fcpdev, fcpcmd->xchg_id, rsp->status,
 		ntohl ( rsp->residual ), rsp->flags,
 		( ( rsp->flags & FCP_RSP_RESPONSE_LEN_VALID ) ? " resp" : "" ),
 		( ( rsp->flags & FCP_RSP_SENSE_LEN_VALID ) ? " sense" : "" ),
 		( ( rsp->flags & FCP_RSP_RESIDUAL_OVERRUN ) ? " over" : "" ),
 		( ( rsp->flags & FCP_RSP_RESIDUAL_UNDERRUN ) ? " under" : "" ));
 	if ( fcp_rsp_response_data ( rsp ) ) {
-		DBGC2 ( fcpdev, "FCP %p ref %02x response data:\n",
-			fcpdev, fcpcmd->ref );
+		DBGC2 ( fcpdev, "FCP %p xchg %04x response data:\n",
+			fcpdev, fcpcmd->xchg_id );
 		DBGC2_HDA ( fcpdev, 0, fcp_rsp_response_data ( rsp ),
 			    fcp_rsp_response_data_len ( rsp ) );
 	}
 	if ( fcp_rsp_sense_data ( rsp ) ) {
-		DBGC2 ( fcpdev, "FCP %p ref %02x sense data:\n",
-			fcpdev, fcpcmd->ref );
+		DBGC2 ( fcpdev, "FCP %p xchg %04x sense data:\n",
+			fcpdev, fcpcmd->xchg_id );
 		DBGC2_HDA ( fcpdev, 0, fcp_rsp_sense_data ( rsp ),
 			    fcp_rsp_sense_data_len ( rsp ) );
 	}
@@ -592,8 +591,8 @@ static int fcpcmd_recv_rsp ( struct fcp_command *fcpcmd,
 	if ( ( rsp->status == 0 ) &&
 	     ( fcpcmd->offset != ( command->data_in_len +
 				   command->data_out_len ) ) ) {
-		DBGC ( fcpdev, "FCP %p ref %02x data underrun (expected %zd, "
-		       "got %zd)\n", fcpdev, fcpcmd->ref,
+		DBGC ( fcpdev, "FCP %p xchg %04x data underrun (expected %zd, "
+		       "got %zd)\n", fcpdev, fcpcmd->xchg_id,
 		       ( command->data_in_len + command->data_out_len ),
 		       fcpcmd->offset );
 		rc = -ERANGE_DATA_UNDERRUN;
@@ -642,8 +641,8 @@ static int fcpcmd_recv_unknown ( struct fcp_command *fcpcmd,
 				 struct xfer_metadata *meta __unused ) {
 	struct fcp_device *fcpdev = fcpcmd->fcpdev;
 
-	DBGC ( fcpdev, "FCP %p ref %02x received unknown IU:\n",
-	       fcpdev, fcpcmd->ref );
+	DBGC ( fcpdev, "FCP %p xchg %04x received unknown IU:\n",
+	       fcpdev, fcpcmd->xchg_id );
 	DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
 	free_iob ( iobuf );
 	return -EINVAL;
@@ -738,8 +737,8 @@ static int fcpdev_scsi_command ( struct fcp_device *fcpdev,
 				 struct interface *parent,
 				 struct scsi_cmd *command ) {
 	struct fcp_prli_service_parameters *param = fcpdev->ulp->param;
-	static uint8_t ref = 0;
 	struct fcp_command *fcpcmd;
+	int xchg_id;
 	int rc;
 
 	/* Check link */
@@ -772,16 +771,18 @@ static int fcpdev_scsi_command ( struct fcp_device *fcpdev,
 	fcpcmd->fcpdev = fcpdev_get ( fcpdev );
 	list_add ( &fcpcmd->list, &fcpdev->fcpcmds );
 	memcpy ( &fcpcmd->command, command, sizeof ( fcpcmd->command ) );
-	fcpcmd->ref = ref++; /* Not used for demultiplexing, only for debug */
 
 	/* Create new exchange */
-	if ( ( rc = fc_xchg_originate ( &fcpcmd->xchg, fcpdev->ulp->peer->port,
-					&fcpdev->ulp->peer->port_id,
-					FC_TYPE_FCP ) ) != 0 ) {
-		DBGC ( fcpdev, "FCP %p ref %02x could not create exchange: "
-		       "%s\n", fcpdev, fcpcmd->ref, strerror ( rc ) );
+	if ( ( xchg_id = fc_xchg_originate ( &fcpcmd->xchg,
+					     fcpdev->ulp->peer->port,
+					     &fcpdev->ulp->peer->port_id,
+					     FC_TYPE_FCP ) ) < 0 ) {
+		rc = xchg_id;
+		DBGC ( fcpdev, "FCP %p xchg %04x could not create exchange: "
+		       "%s\n", fcpdev, fcpcmd->xchg_id, strerror ( rc ) );
 		goto err_xchg_originate;
 	}
+	fcpcmd->xchg_id = xchg_id;
 
 	/* Start sending command IU */
 	fcpcmd_start_send ( fcpcmd, fcpcmd_send_cmnd );
@@ -789,7 +790,7 @@ static int fcpdev_scsi_command ( struct fcp_device *fcpdev,
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &fcpcmd->scsi, parent );
 	ref_put ( &fcpcmd->refcnt );
-	return ( FCP_TAG_MAGIC | fcpcmd->ref );
+	return ( FCP_TAG_MAGIC | fcpcmd->xchg_id );
 
  err_xchg_originate:
 	fcpcmd_close ( fcpcmd, rc );

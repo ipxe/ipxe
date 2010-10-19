@@ -703,7 +703,7 @@ static struct fc_exchange * fc_xchg_create ( struct fc_port *port,
  * @v parent		Interface to which to attach
  * @v port		Fibre Channel port
  * @v peer_port_id	Peer port ID
- * @ret rc		Return status code
+ * @ret xchg_id		Exchange ID, or negative error
  */
 int fc_xchg_originate ( struct interface *parent, struct fc_port *port,
 			struct fc_port_id *peer_port_id, unsigned int type ) {
@@ -722,7 +722,7 @@ int fc_xchg_originate ( struct interface *parent, struct fc_port *port,
 
 	/* Attach to parent interface and return */
 	intf_plug_plug ( &xchg->ulp, parent );
-	return 0;
+	return xchg->xchg_id;
 }
 
 /**

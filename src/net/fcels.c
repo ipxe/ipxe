@@ -265,6 +265,7 @@ static struct interface_descriptor fc_els_job_desc =
 static void fc_els_step ( struct process *process ) {
 	struct fc_els *els =
 		container_of ( process, struct fc_els, process );
+	int xchg_id;
 	int rc;
 
 	/* Sanity check */
@@ -274,9 +275,10 @@ static void fc_els_step ( struct process *process ) {
 	process_del ( &els->process );
 
 	/* Create exchange */
-	if ( ( rc = fc_xchg_originate ( &els->xchg, els->port,
-					&els->peer_port_id,
-					FC_TYPE_ELS ) ) != 0 ) {
+	if ( ( xchg_id = fc_xchg_originate ( &els->xchg, els->port,
+					     &els->peer_port_id,
+					     FC_TYPE_ELS ) ) < 0 ) {
+		rc = xchg_id;
 		DBGC ( els, FCELS_FMT " could not create exchange: %s\n",
 		       FCELS_ARGS ( els ), strerror ( rc ) );
 		fc_els_close ( els, rc );
