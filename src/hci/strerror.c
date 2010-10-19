@@ -87,10 +87,13 @@ const char * strerror ( int errno ) {
 
 	/* Construct the error message */
 	if ( errortab ) {
-		snprintf ( errbuf, sizeof ( errbuf ), "%s (%#08x)",
+		snprintf ( errbuf, sizeof ( errbuf ),
+			   "%s (http://ipxe.org/%08x)",
 			   errortab->text, errno );
 	} else {
-		snprintf ( errbuf, sizeof ( errbuf ), "Error %#08x", errno );
+		snprintf ( errbuf, sizeof ( errbuf ),
+			   "Error %#08x (http://ipxe.org/%08x)",
+			   errno, errno );
 	}
 
 	return errbuf;
