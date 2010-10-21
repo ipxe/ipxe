@@ -77,17 +77,21 @@ int boot_next_server_and_filename ( struct in_addr next_server,
 
 	/* Construct URI */
 	uri = parse_uri ( filename );
-	if ( ! uri )
-		return -ENOMEM;
+	if ( ! uri ) {
+		printf ( "Could not parse \"%s\"\n", filename );
+		rc = -ENOMEM;
+		goto err_parse_uri;
+	}
 	filename_is_absolute = uri_is_absolute ( uri );
 	uri_put ( uri );
+
+	/* Construct a tftp:// URI for the filename, if applicable.
+	 * We can't just rely on the current working URI, because the
+	 * relative URI resolution will remove the distinction between
+	 * filenames with and without initial slashes, which is
+	 * significant for TFTP.
+	 */
 	if ( ! filename_is_absolute ) {
-		/* Construct a tftp:// URI for the filename.  We can't
-		 * just rely on the current working URI, because the
-		 * relative URI resolution will remove the distinction
-		 * between filenames with and without initial slashes,
-		 * which is significant for TFTP.
-		 */
 		snprintf ( buf, sizeof ( buf ), "tftp://%s/",
 			   inet_ntoa ( next_server ) );
 		uri_encode ( filename, buf + strlen ( buf ),
@@ -95,18 +99,32 @@ int boot_next_server_and_filename ( struct in_addr next_server,
 		filename = buf;
 	}
 
+	/* Download and boot image */
 	image = alloc_image();
-	if ( ! image )
-		return -ENOMEM;
+	if ( ! image ) {
+		printf ( "Could not allocate image\n" );
+		rc = -ENOMEM;
+		goto err_alloc_image;
+	}
 	if ( ( rc = imgfetch ( image, filename,
 			       register_and_autoload_image ) ) != 0 ) {
-		goto done;
+		printf ( "Could not fetch image: %s\n", strerror ( rc ) );
+		goto err_imgfetch;
 	}
-	if ( ( rc = imgexec ( image ) ) != 0 )
-		goto done;
+	if ( ( rc = imgexec ( image ) ) != 0 ) {
+		printf ( "Could not execute image: %s\n", strerror ( rc ) );
+		goto err_imgexec;
+	}
 
- done:
+	/* Drop image reference */
 	image_put ( image );
+	return 0;
+
+ err_imgexec:
+ err_imgfetch:
+	image_put ( image );
+ err_alloc_image:
+ err_parse_uri:
 	return rc;
 }
 
@@ -229,25 +247,14 @@ static int netboot ( struct net_device *netdev ) {
 	fetch_string_setting ( NULL, &filename_setting, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from filename \"%s\"\n", buf );
-		if ( ( rc = boot_next_server_and_filename ( next_server,
-							    buf ) ) != 0 ) {
-			printf ( "Could not boot from filename \"%s\": %s\n",
-				 buf, strerror ( rc ) );
-			return rc;
-		}
-		return 0;
+		return boot_next_server_and_filename ( next_server, buf );
 	}
 	
 	/* No filename; try the root path */
 	fetch_string_setting ( NULL, &root_path_setting, buf, sizeof ( buf ) );
 	if ( buf[0] ) {
 		printf ( "Booting from root path \"%s\"\n", buf );
-		if ( ( rc = boot_root_path ( buf ) ) != 0 ) {
-			printf ( "Could not boot from root path \"%s\": %s\n",
-				 buf, strerror ( rc ) );
-			return rc;
-		}
-		return 0;
+		return boot_root_path ( buf );
 	}
 
 	printf ( "No filename or root path specified\n" );
