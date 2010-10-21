@@ -136,6 +136,14 @@ struct setting keep_san_setting __setting = {
 	.type = &setting_type_int8,
 };
 
+/** The "skip-san-boot" setting */
+struct setting skip_san_boot_setting __setting = {
+	.name = "skip-san-boot",
+	.description = "Do not boot the SAN drive after connecting",
+	.tag = DHCP_EB_SKIP_SAN_BOOT,
+	.type = &setting_type_int8,
+};
+
 /**
  * Boot using root path
  *
@@ -171,10 +179,15 @@ int boot_root_path ( const char *root_path ) {
 		goto err_describe;
 	}
 
-	printf ( "Booting from SAN device %#02x\n", drive );
-	rc = san_boot ( drive );
-	printf ( "Boot from SAN device %#02x failed: %s\n",
-		 drive, strerror ( rc ) );
+	/* Boot from SAN device */
+	if ( fetch_intz_setting ( NULL, &skip_san_boot_setting) != 0 ) {
+		printf ( "Skipping boot from SAN device %#02x\n", drive );
+	} else {
+		printf ( "Booting from SAN device %#02x\n", drive );
+		rc = san_boot ( drive );
+		printf ( "Boot from SAN device %#02x failed: %s\n",
+			 drive, strerror ( rc ) );
+	}
 
 	/* Leave drive registered, if instructed to do so */
 	if ( fetch_intz_setting ( NULL, &keep_san_setting ) != 0 ) {

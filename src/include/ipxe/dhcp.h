@@ -293,10 +293,18 @@ struct dhcp_client_uuid {
  *
  * If set to a non-zero value, iPXE will not detach any SAN drive
  * after failing to boot from it.  (This option is required in order
- * to perform a Windows Server 2008 installation direct to an iSCSI
- * target.)
+ * to perform an installation direct to an iSCSI target.)
  */
 #define DHCP_EB_KEEP_SAN DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x08 )
+
+/** Skip booting from SAN drive
+ *
+ * If set to a non-zero value, iPXE will skip booting from any SAN
+ * drive.  (This option is sometimes required in conjunction with @c
+ * DHCP_EB_KEEP_SAN in order to perform an installation direct to an
+ * iSCSI target.)
+ */
+#define DHCP_EB_SKIP_SAN_BOOT DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x09 )
 
 /*
  * Tags in the range 0x10-0x7f are reserved for feature markers
