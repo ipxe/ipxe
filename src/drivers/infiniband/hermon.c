@@ -509,9 +509,9 @@ static inline int
 hermon_cmd_sense_port ( struct hermon *hermon, unsigned int port,
 			struct hermonprm_sense_port *port_type ) {
 	return hermon_cmd ( hermon,
-                            HERMON_HCR_OUT_CMD ( HERMON_HCR_SENSE_PORT,
-                                                 1, sizeof ( *port_type ) ),
-                            0, NULL, port, port_type );
+			    HERMON_HCR_OUT_CMD ( HERMON_HCR_SENSE_PORT,
+						 0, sizeof ( *port_type ) ),
+			    0, NULL, port, port_type );
 }
 
 static inline int
