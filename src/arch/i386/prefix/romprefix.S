@@ -489,7 +489,7 @@ get_pmm_image_source:
 	xorw	%ax, %ax
 	movw	%ax, %es
 	movl	build_id, %eax
-	cmpl	%es:build_id(%esi), %eax
+	addr32 cmpl %es:build_id(%esi), %eax
 	je	1f
 	stc
 1:	popw	%es
