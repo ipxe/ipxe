@@ -72,7 +72,8 @@ CFLAGS			+= -Ui386
 ISOLINUX_BIN_LIST	:= \
 	$(ISOLINUX_BIN) \
 	/usr/lib/syslinux/isolinux.bin \
-	/usr/share/syslinux/isolinux.bin
+	/usr/share/syslinux/isolinux.bin \
+	/usr/local/share/syslinux/isolinux.bin
 ISOLINUX_BIN	= $(firstword $(wildcard $(ISOLINUX_BIN_LIST)))
 
 # i386-specific directories containing source files
