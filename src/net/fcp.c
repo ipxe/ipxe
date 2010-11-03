@@ -794,6 +794,7 @@ static int fcpdev_scsi_command ( struct fcp_device *fcpdev,
 
  err_xchg_originate:
 	fcpcmd_close ( fcpcmd, rc );
+	ref_put ( &fcpcmd->refcnt );
  err_zalloc:
  err_target:
  err_link:
@@ -979,6 +980,7 @@ static int fcpdev_open ( struct interface *parent, struct fc_name *wwn,
 
  err_scsi_open:
 	fcpdev_close ( fcpdev, rc );
+	ref_put ( &fcpdev->refcnt );
  err_zalloc:
 	fc_ulp_put ( ulp );
  err_ulp_get:
