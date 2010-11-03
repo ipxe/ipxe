@@ -778,8 +778,8 @@ static int fcpdev_scsi_command ( struct fcp_device *fcpdev,
 					     &fcpdev->ulp->peer->port_id,
 					     FC_TYPE_FCP ) ) < 0 ) {
 		rc = xchg_id;
-		DBGC ( fcpdev, "FCP %p xchg %04x could not create exchange: "
-		       "%s\n", fcpdev, fcpcmd->xchg_id, strerror ( rc ) );
+		DBGC ( fcpdev, "FCP %p could not create exchange: %s\n",
+		       fcpdev, strerror ( rc ) );
 		goto err_xchg_originate;
 	}
 	fcpcmd->xchg_id = xchg_id;
