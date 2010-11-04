@@ -982,8 +982,11 @@ int fc_port_login ( struct fc_port *port, struct fc_port_id *port_id,
 	fc_link_up ( &port->link );
 
 	/* Notify peers of link state change */
-	list_for_each_entry_safe ( peer, tmp, &fc_peers, list )
+	list_for_each_entry_safe ( peer, tmp, &fc_peers, list ) {
+		fc_peer_get ( peer );
 		fc_link_examine ( &peer->link );
+		fc_peer_put ( peer );
+	}
 
 	return 0;
 }
@@ -1008,8 +1011,11 @@ void fc_port_logout ( struct fc_port *port, int rc ) {
 	fc_link_err ( &port->link, rc );
 
 	/* Notify peers of link state change */
-	list_for_each_entry_safe ( peer, tmp, &fc_peers, list )
+	list_for_each_entry_safe ( peer, tmp, &fc_peers, list ) {
+		fc_peer_get ( peer );
 		fc_link_examine ( &peer->link );
+		fc_peer_put ( peer );
+	}
 }
 
 /**
@@ -1274,8 +1280,11 @@ int fc_peer_login ( struct fc_peer *peer, struct fc_port *port,
 	fc_link_up ( &peer->link );
 
 	/* Notify ULPs of link state change */
-	list_for_each_entry_safe ( ulp, tmp, &peer->ulps, list )
+	list_for_each_entry_safe ( ulp, tmp, &peer->ulps, list ) {
+		fc_ulp_get ( ulp );
 		fc_link_examine ( &ulp->link );
+		fc_ulp_put ( ulp );
+	}
 
 	return 0;
 }
@@ -1305,8 +1314,11 @@ void fc_peer_logout ( struct fc_peer *peer, int rc ) {
 	fc_link_err ( &peer->link, rc );
 
 	/* Notify ULPs of link state change */
-	list_for_each_entry_safe ( ulp, tmp, &peer->ulps, list )
+	list_for_each_entry_safe ( ulp, tmp, &peer->ulps, list ) {
+		fc_ulp_get ( ulp );
 		fc_link_examine ( &ulp->link );
+		fc_ulp_put ( ulp );
+	}
 
 	/* Close peer if there are no active users */
 	if ( peer->usage == 0 )
