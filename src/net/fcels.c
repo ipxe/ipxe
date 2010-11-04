@@ -158,7 +158,6 @@ static int fc_els_rx ( struct fc_els *els,
 	struct sockaddr_fc *src = ( ( struct sockaddr_fc * ) meta->src );
 	struct sockaddr_fc *dest = ( ( struct sockaddr_fc * ) meta->dest );
 	size_t len = iob_len ( iobuf );
-	int ( * rx ) ( struct fc_els *els, const void *data, size_t len );
 	int rc;
 
 	/* Sanity check */
@@ -206,25 +205,10 @@ static int fc_els_rx ( struct fc_els *els,
 	DBGC2_HDA ( els, 0, frame, len );
 
 	/* Handle received frame */
-	rx = ( fc_els_is_request ( els ) ?
-	       els->handler->rx_response : els->handler->rx_request );
-	if ( ( rc = rx ( els, frame, len ) ) != 0 ) {
+	if ( ( rc = els->handler->rx ( els, frame, len ) ) != 0 ) {
 		DBGC ( els, FCELS_FMT " could not handle received frame: "
 		       "%s\n", FCELS_ARGS ( els ), strerror ( rc ) );
 		DBGC_HDA ( els, 0, frame, len );
-		goto done;
-	}
-
-	/* Free I/O buffer.  Do this before transmitting response to
-	 * minimise memory consumption.
-	 */
-	free_iob ( iob_disown ( iobuf ) );
-
-	/* Transmit response if applicable */
-	if ( ( ! fc_els_is_request ( els ) ) &&
-	     ( ( rc = els->handler->tx_response ( els ) ) != 0 ) ) {
-		DBGC ( els, FCELS_FMT " could not transmit response: %s\n",
-		       FCELS_ARGS ( els ), strerror ( rc ) );
 		goto done;
 	}
 
@@ -286,7 +270,7 @@ static void fc_els_step ( struct process *process ) {
 	}
 
 	/* Transmit request */
-	if ( ( rc = els->handler->tx_request ( els ) ) != 0 ) {
+	if ( ( rc = els->handler->tx ( els ) ) != 0 ) {
 		DBGC ( els, FCELS_FMT " could not transmit request: %s\n",
 		       FCELS_ARGS ( els ), strerror ( rc ) );
 		fc_els_close ( els, rc );
@@ -394,7 +378,7 @@ struct fc_responder fc_els_responder __fc_responder = {
  * @v els		Fibre Channel ELS transaction
  * @ret rc		Return status code
  */
-static int fc_els_unknown_tx_request ( struct fc_els *els __unused ) {
+static int fc_els_unknown_tx ( struct fc_els *els __unused ) {
 	return -ENOTSUP;
 }
 
@@ -417,34 +401,26 @@ static int fc_els_unknown_tx_response ( struct fc_els *els ) {
 }
 
 /**
- * Receive unknown ELS request
+ * Receive unknown ELS
  *
  * @v els		Fibre Channel ELS transaction
  * @v data		ELS frame
  * @v len		Length of ELS frame
  * @ret rc		Return status code
  */
-static int fc_els_unknown_rx_request ( struct fc_els *els, const void *data,
-				       size_t len ) {
+static int fc_els_unknown_rx ( struct fc_els *els, void *data, size_t len ) {
+	int rc;
 
 	DBGC ( els, FCELS_FMT ":\n", FCELS_ARGS ( els ) );
 	DBGC_HDA ( els, 0, data, len );
-	return 0;
-}
 
-/**
- * Receive unknown ELS response
- *
- * @v els		Fibre Channel ELS transaction
- * @v data		ELS frame
- * @v len		Length of ELS frame
- * @ret rc		Return status code
- */
-static int fc_els_unknown_rx_response ( struct fc_els *els __unused,
-					const void *data __unused,
-					size_t len __unused ) {
-	assert ( 0 );
-	return -EINVAL;
+	/* Transmit response, if applicable */
+	if ( ! fc_els_is_request ( els ) ) {
+		if ( ( rc = fc_els_unknown_tx_response ( els ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -464,10 +440,8 @@ static int fc_els_unknown_detect ( struct fc_els *els __unused,
 /** Unknown ELS handler */
 struct fc_els_handler fc_els_unknown_handler __fc_els_handler = {
 	.name		= "UNKNOWN",
-	.tx_request	= fc_els_unknown_tx_request,
-	.tx_response	= fc_els_unknown_tx_response,
-	.rx_request	= fc_els_unknown_rx_request,
-	.rx_response	= fc_els_unknown_rx_response,
+	.tx		= fc_els_unknown_tx,
+	.rx		= fc_els_unknown_rx,
 	.detect		= fc_els_unknown_detect,
 };
 
@@ -513,9 +487,8 @@ static int fc_els_flogi_tx ( struct fc_els *els ) {
  * @v len		Length of ELS frame
  * @ret rc		Return status code
  */
-static int fc_els_flogi_rx ( struct fc_els *els, const void *data,
-			     size_t len ) {
-	const struct fc_login_frame *flogi = data;
+static int fc_els_flogi_rx ( struct fc_els *els, void *data, size_t len ) {
+	struct fc_login_frame *flogi = data;
 	int has_fabric;
 	int rc;
 
@@ -557,6 +530,12 @@ static int fc_els_flogi_rx ( struct fc_els *els, const void *data,
 			 sizeof ( els->peer_port_id ) );
 	}
 
+	/* Transmit response, if applicable */
+	if ( ! fc_els_is_request ( els ) ) {
+		if ( ( rc = fc_els_flogi_tx ( els ) ) != 0 )
+			return rc;
+	}
+
 	return 0;
 }
 
@@ -582,10 +561,8 @@ static int fc_els_flogi_detect ( struct fc_els *els __unused, const void *data,
 /** FLOGI ELS handler */
 struct fc_els_handler fc_els_flogi_handler __fc_els_handler = {
 	.name		= "FLOGI",
-	.tx_request	= fc_els_flogi_tx,
-	.tx_response	= fc_els_flogi_tx,
-	.rx_request	= fc_els_flogi_rx,
-	.rx_response	= fc_els_flogi_rx,
+	.tx		= fc_els_flogi_tx,
+	.rx		= fc_els_flogi_rx,
 	.detect		= fc_els_flogi_detect,
 };
 
@@ -650,9 +627,8 @@ static int fc_els_plogi_tx ( struct fc_els *els ) {
  * @v len		Length of ELS frame
  * @ret rc		Return status code
  */
-static int fc_els_plogi_rx ( struct fc_els *els, const void *data,
-			     size_t len ) {
-	const struct fc_login_frame *plogi = data;
+static int fc_els_plogi_rx ( struct fc_els *els, void *data, size_t len ) {
+	struct fc_login_frame *plogi = data;
 	struct fc_peer *peer;
 	int rc;
 
@@ -695,11 +671,18 @@ static int fc_els_plogi_rx ( struct fc_els *els, const void *data,
 		goto err_login;
 	}
 
+	/* Transmit response, if applicable */
+	if ( ! fc_els_is_request ( els ) ) {
+		if ( ( rc = fc_els_plogi_tx ( els ) ) != 0 )
+			goto err_plogi_tx;
+	}
+
 	/* Drop temporary reference to peer */
 	fc_peer_put ( peer );
 
 	return 0;
 
+ err_plogi_tx:
  err_login:
 	fc_peer_put ( peer );
  err_peer_get_wwn:
@@ -729,10 +712,8 @@ static int fc_els_plogi_detect ( struct fc_els *els __unused, const void *data,
 /** PLOGI ELS handler */
 struct fc_els_handler fc_els_plogi_handler __fc_els_handler = {
 	.name		= "PLOGI",
-	.tx_request	= fc_els_plogi_tx,
-	.tx_response	= fc_els_plogi_tx,
-	.rx_request	= fc_els_plogi_rx,
-	.rx_response	= fc_els_plogi_rx,
+	.tx		= fc_els_plogi_tx,
+	.rx		= fc_els_plogi_rx,
 	.detect		= fc_els_plogi_detect,
 };
 
@@ -764,7 +745,7 @@ int fc_els_plogi ( struct interface *parent, struct fc_port *port,
  * @v els		Fibre Channel ELS transaction
  * @ret rc		Return status code
  */
-static int fc_els_logo_tx_request ( struct fc_els *els ) {
+static int fc_els_logo_tx ( struct fc_els *els ) {
 	struct fc_logout_request_frame logo;
 
 	/* Construct LOGO */
@@ -802,7 +783,7 @@ static int fc_els_logo_tx_response ( struct fc_els *els ) {
  * @v port_id		Peer port ID
  */
 static void fc_els_logo_logout ( struct fc_els *els,
-				 const struct fc_port_id *peer_port_id ) {
+				 struct fc_port_id *peer_port_id ) {
 	struct fc_peer *peer;
 
 	if ( ( memcmp ( peer_port_id, &fc_f_port_id,
@@ -827,9 +808,10 @@ static void fc_els_logo_logout ( struct fc_els *els,
  * @v len		Length of ELS frame
  * @ret rc		Return status code
  */
-static int fc_els_logo_rx_request ( struct fc_els *els, const void *data,
+static int fc_els_logo_rx_request ( struct fc_els *els, void *data,
 				    size_t len ) {
-	const struct fc_logout_request_frame *logo = data;
+	struct fc_logout_request_frame *logo = data;
+	int rc;
 
 	/* Sanity check */
 	if ( len < sizeof ( *logo ) ) {
@@ -845,6 +827,10 @@ static int fc_els_logo_rx_request ( struct fc_els *els, const void *data,
 	/* Log out individual peer or whole port as applicable */
 	fc_els_logo_logout ( els, &logo->port_id );
 
+	/* Transmit repsonse */
+	if ( ( rc = fc_els_logo_tx_response ( els ) ) != 0 )
+		return rc;
+
 	return 0;
 }
 
@@ -856,14 +842,30 @@ static int fc_els_logo_rx_request ( struct fc_els *els, const void *data,
  * @v len		Length of ELS frame
  * @ret rc		Return status code
  */
-static int fc_els_logo_rx_response ( struct fc_els *els,
-				     const void *data __unused,
+static int fc_els_logo_rx_response ( struct fc_els *els, void *data __unused,
 				     size_t len __unused ) {
 
 	/* Log out individual peer or whole port as applicable */
 	fc_els_logo_logout ( els, &els->port_id );
 
 	return 0;
+}
+
+/**
+ * Receive LOGO
+ *
+ * @v els		Fibre Channel ELS transaction
+ * @v data		ELS frame
+ * @v len		Length of ELS frame
+ * @ret rc		Return status code
+ */
+static int fc_els_logo_rx ( struct fc_els *els, void *data, size_t len ) {
+
+	if ( fc_els_is_request ( els ) ) {
+		return fc_els_logo_rx_response ( els, data, len );
+	} else {
+		return fc_els_logo_rx_request ( els, data, len );
+	}
 }
 
 /**
@@ -888,10 +890,8 @@ static int fc_els_logo_detect ( struct fc_els *els __unused, const void *data,
 /** LOGO ELS handler */
 struct fc_els_handler fc_els_logo_handler __fc_els_handler = {
 	.name		= "LOGO",
-	.tx_request	= fc_els_logo_tx_request,
-	.tx_response	= fc_els_logo_tx_response,
-	.rx_request	= fc_els_logo_rx_request,
-	.rx_response	= fc_els_logo_rx_response,
+	.tx		= fc_els_logo_tx,
+	.rx		= fc_els_logo_rx,
 	.detect		= fc_els_logo_detect,
 };
 
@@ -1000,8 +1000,8 @@ int fc_els_prli_tx ( struct fc_els *els,
  */
 int fc_els_prli_rx ( struct fc_els *els,
 		     struct fc_els_prli_descriptor *descriptor,
-		     const void *data, size_t len ) {
-	const struct {
+		     void *data, size_t len ) {
+	struct {
 		struct fc_prli_frame frame;
 		uint8_t param[descriptor->param_len];
 	} __attribute__ (( packed )) *prli = data;
@@ -1055,11 +1055,18 @@ int fc_els_prli_rx ( struct fc_els *els,
 		}
 	}
 
+	/* Transmit response, if applicable */
+	if ( ! fc_els_is_request ( els ) ) {
+		if ( ( rc = els->handler->tx ( els ) ) != 0 )
+			goto err_tx;
+	}
+
 	/* Drop temporary reference to ULP */
 	fc_ulp_put ( ulp );
 
 	return 0;
 
+ err_tx:
  err_login:
  err_link:
 	fc_ulp_put ( ulp );
@@ -1148,20 +1155,25 @@ static int fc_els_rtv_tx_response ( struct fc_els *els ) {
 }
 
 /**
- * Receive RTV request
+ * Receive RTV
  *
  * @v els		Fibre Channel ELS transaction
  * @v data		ELS frame
  * @v len		Length of ELS frame
  * @ret rc		Return status code
  */
-static int fc_els_rtv_rx_request ( struct fc_els *els,
-				   const void *data __unused,
-				   size_t len __unused ) {
+static int fc_els_rtv_rx ( struct fc_els *els, void *data __unused,
+			   size_t len __unused ) {
+	int rc;
 
 	DBGC ( els, FCELS_FMT "\n", FCELS_ARGS ( els ) );
 
-	/* Nothing to do */
+	/* Transmit response */
+	if ( ! fc_els_is_request ( els ) ) {
+		if ( ( rc = fc_els_rtv_tx_response ( els ) ) != 0 )
+			return rc;
+	}
+
 	return 0;
 }
 
@@ -1187,9 +1199,140 @@ static int fc_els_rtv_detect ( struct fc_els *els __unused, const void *data,
 /** RTV ELS handler */
 struct fc_els_handler fc_els_rtv_handler __fc_els_handler = {
 	.name		= "RTV",
-	.tx_request	= fc_els_unknown_tx_request,
-	.tx_response	= fc_els_rtv_tx_response,
-	.rx_request	= fc_els_rtv_rx_request,
-	.rx_response	= fc_els_unknown_rx_response,
+	.tx		= fc_els_unknown_tx,
+	.rx		= fc_els_rtv_rx,
 	.detect		= fc_els_rtv_detect,
+};
+
+/******************************************************************************
+ *
+ * ECHO
+ *
+ ******************************************************************************
+ */
+
+/** ECHO request data */
+struct fc_echo_request_frame {
+	/** ECHO frame header */
+	struct fc_echo_frame_header echo;
+	/** Magic marker */
+	uint32_t magic;
+} __attribute__ (( packed ));
+
+/** ECHO magic marker */
+#define FC_ECHO_MAGIC 0x69505845
+
+/**
+ * Transmit ECHO
+ *
+ * @v els		Fibre Channel ELS transaction
+ * @ret rc		Return status code
+ */
+static int fc_els_echo_tx ( struct fc_els *els ) {
+	struct fc_echo_request_frame echo;
+
+	/* Construct ECHO */
+	memset ( &echo, 0, sizeof ( echo ) );
+	echo.echo.command = FC_ELS_ECHO;
+	echo.magic = htonl ( FC_ECHO_MAGIC );
+
+	/* Transmit ECHO */
+	return fc_els_tx ( els, &echo, sizeof ( echo ) );
+}
+
+/**
+ * Receive ECHO request
+ *
+ * @v els		Fibre Channel ELS transaction
+ * @v data		ELS frame
+ * @v len		Length of ELS frame
+ * @ret rc		Return status code
+ */
+static int fc_els_echo_rx_request ( struct fc_els *els, void *data,
+				    size_t len ) {
+	struct {
+		struct fc_echo_frame_header echo;
+		char payload[ len - sizeof ( struct fc_echo_frame_header ) ];
+	} *echo = data;
+	int rc;
+
+	DBGC ( els, FCELS_FMT "\n", FCELS_ARGS ( els ) );
+
+	/* Transmit response */
+	echo->echo.command = FC_ELS_LS_ACC;
+	if ( ( rc = fc_els_tx ( els, echo, sizeof ( *echo ) ) ) != 0 )
+		return rc;
+
+	/* Nothing to do */
+	return 0;
+}
+
+/**
+ * Receive ECHO response
+ *
+ * @v els		Fibre Channel ELS transaction
+ * @v data		ELS frame
+ * @v len		Length of ELS frame
+ * @ret rc		Return status code
+ */
+static int fc_els_echo_rx_response ( struct fc_els *els, void *data,
+				     size_t len ) {
+	struct fc_echo_request_frame *echo = data;
+
+	DBGC ( els, FCELS_FMT "\n", FCELS_ARGS ( els ) );
+
+	/* Check response is correct */
+	if ( ( len != sizeof ( *echo ) ) ||
+	     ( echo->magic != htonl ( FC_ECHO_MAGIC ) ) ) {
+		DBGC ( els, FCELS_FMT " received bad echo response\n",
+		       FCELS_ARGS ( els ) );
+		DBGC_HDA ( els, 0, data, len );
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/**
+ * Receive ECHO
+ *
+ * @v els		Fibre Channel ELS transaction
+ * @v data		ELS frame
+ * @v len		Length of ELS frame
+ * @ret rc		Return status code
+ */
+static int fc_els_echo_rx ( struct fc_els *els, void *data, size_t len ) {
+
+	if ( fc_els_is_request ( els ) ) {
+		return fc_els_echo_rx_response ( els, data, len );
+	} else {
+		return fc_els_echo_rx_request ( els, data, len );
+	}
+}
+
+/**
+ * Detect ECHO
+ *
+ * @v els		Fibre Channel ELS transaction
+ * @v data		ELS frame
+ * @v len		Length of ELS frame
+ * @ret rc		Return status code
+ */
+static int fc_els_echo_detect ( struct fc_els *els __unused, const void *data,
+				size_t len __unused ) {
+	const struct fc_echo_frame_header *echo = data;
+
+	/* Check for ECHO */
+	if ( echo->command != FC_ELS_ECHO )
+		return -EINVAL;
+
+	return 0;
+}
+
+/** ECHO ELS handler */
+struct fc_els_handler fc_els_echo_handler __fc_els_handler = {
+	.name		= "ECHO",
+	.tx		= fc_els_echo_tx,
+	.rx		= fc_els_echo_rx,
+	.detect		= fc_els_echo_detect,
 };

@@ -103,7 +103,7 @@ static int fcp_prli_tx ( struct fc_els *els ) {
  * @v len		Length of ELS frame
  * @ret rc		Return status code
  */
-static int fcp_prli_rx ( struct fc_els *els, const void *data, size_t len ) {
+static int fcp_prli_rx ( struct fc_els *els, void *data, size_t len ) {
 	return fc_els_prli_rx ( els, &fcp_prli_descriptor, data, len );
 }
 
@@ -123,10 +123,8 @@ static int fcp_prli_detect ( struct fc_els *els, const void *data,
 /** FCP PRLI ELS handler */
 struct fc_els_handler fcp_prli_handler __fc_els_handler = {
 	.name		= "PRLI-FCP",
-	.tx_request	= fcp_prli_tx,
-	.tx_response	= fcp_prli_tx,
-	.rx_request	= fcp_prli_rx,
-	.rx_response	= fcp_prli_rx,
+	.tx		= fcp_prli_tx,
+	.rx		= fcp_prli_rx,
 	.detect		= fcp_prli_detect,
 };
 

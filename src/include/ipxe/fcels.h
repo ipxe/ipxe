@@ -34,6 +34,7 @@ enum fc_els_command_code {
 	FC_ELS_FLOGI = 0x04,		/**< Fabric Login */
 	FC_ELS_LOGO = 0x05,		/**< Logout */
 	FC_ELS_RTV = 0x0e,		/**< Read Timeout Value */
+	FC_ELS_ECHO = 0x10,		/**< Echo */
 	FC_ELS_PRLI = 0x20,		/**< Process Login */
 	FC_ELS_PRLO = 0x21,		/**< Process Logout */
 };
@@ -310,6 +311,14 @@ struct fc_rtv_response_frame {
 /** Short R_T timeout */
 #define FC_RTV_SHORT_R_T_TOV 0x0008
 
+/** A Fibre Channel ECHO frame */
+struct fc_echo_frame_header {
+	/** ELS command code */
+	uint8_t command;
+	/** Reserved */
+	uint8_t reserved[3];
+} __attribute__ (( packed ));
+
 /** A Fibre Channel extended link services transaction */
 struct fc_els {
 	/** Reference count */
@@ -343,37 +352,21 @@ enum fc_els_flags {
 struct fc_els_handler {
 	/** Name */
 	const char *name;
-	/** Transmit ELS request frame
+	/** Transmit ELS frame
 	 *
 	 * @v els		Fibre Channel ELS transaction
 	 * @ret rc		Return status code
 	 */
-	int ( * tx_request ) ( struct fc_els *els );
-	/** Transmit ELS response frame
-	 *
-	 * @v els		Fibre Channel ELS transaction
-	 * @ret rc		Return status code
-	 */
-	int ( * tx_response ) ( struct fc_els *els );
-	/** Receive ELS request frame
+	int ( * tx ) ( struct fc_els *els );
+	/** Receive ELS frame
 	 *
 	 * @v els		Fibre Channel ELS transaction
 	 * @v data		ELS frame
 	 * @v len		Length of ELS frame
 	 * @ret rc		Return status code
 	 */
-	int ( * rx_request ) ( struct fc_els *els, const void *data,
-			       size_t len );
-	/** Receive ELS response frame
-	 *
-	 * @v els		Fibre Channel ELS transaction
-	 * @v data		ELS frame
-	 * @v len		Length of ELS frame
-	 * @ret rc		Return status code
-	 */
-	int ( * rx_response ) ( struct fc_els *els, const void *data,
-				size_t len );
-	/** Detect ELS request frame
+	int ( * rx ) ( struct fc_els *els, void *data, size_t len );
+	/** Detect ELS frame
 	 *
 	 * @v els		Fibre Channel ELS transaction
 	 * @v data		ELS frame
@@ -444,7 +437,7 @@ extern int fc_els_prli_tx ( struct fc_els *els,
 			    void *param );
 extern int fc_els_prli_rx ( struct fc_els *els,
 			    struct fc_els_prli_descriptor *descriptor,
-			    const void *data, size_t len );
+			    void *data, size_t len );
 extern int fc_els_prli_detect ( struct fc_els *els __unused,
 				struct fc_els_prli_descriptor *descriptor,
 				const void *data, size_t len );
