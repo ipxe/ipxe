@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/fc.h>
 #include <ipxe/fcels.h>
+#include <ipxe/fcns.h>
 
 /** @file
  *
@@ -60,6 +61,9 @@ struct fc_port_id fc_empty_port_id = { .bytes = { 0x00, 0x00, 0x00 } };
 
 /** F_Port contoller port ID */
 struct fc_port_id fc_f_port_id = { .bytes = { 0xff, 0xff, 0xfe } };
+
+/** Generic services port ID */
+struct fc_port_id fc_gs_port_id = { .bytes = { 0xff, 0xff, 0xfc } };
 
 /** Point-to-point low port ID */
 struct fc_port_id fc_ptp_low_port_id = { .bytes = { 0x01, 0x01, 0x01 } };
@@ -464,14 +468,24 @@ static int fc_xchg_tx ( struct fc_exchange *xchg, struct io_buffer *iobuf,
 	}
 
 	/* Calculate routing control */
-	if ( xchg->type == FC_TYPE_ELS ) {
+	switch ( xchg->type ) {
+	case FC_TYPE_ELS:
 		r_ctl = FC_R_CTL_ELS;
 		if ( meta->flags & XFER_FL_RESPONSE ) {
 			r_ctl |= FC_R_CTL_SOL_CTRL;
 		} else {
 			r_ctl |= FC_R_CTL_UNSOL_CTRL;
 		}
-	} else {
+		break;
+	case FC_TYPE_CT:
+		r_ctl = FC_R_CTL_DATA;
+		if ( meta->flags & XFER_FL_RESPONSE ) {
+			r_ctl |= FC_R_CTL_SOL_CTRL;
+		} else {
+			r_ctl |= FC_R_CTL_UNSOL_CTRL;
+		}
+		break;
+	default:
 		r_ctl = FC_R_CTL_DATA;
 		switch ( meta->flags &
 			 ( XFER_FL_CMD_STAT | XFER_FL_RESPONSE ) ) {
@@ -488,6 +502,7 @@ static int fc_xchg_tx ( struct fc_exchange *xchg, struct io_buffer *iobuf,
 			r_ctl |= FC_R_CTL_UNSOL_DATA;
 			break;
 		}
+		break;
 	}
 
 	/* Calculate exchange and sequence control */
@@ -799,6 +814,7 @@ static void fc_port_close ( struct fc_port *port, int rc ) {
 	/* Shut down interfaces */
 	intf_shutdown ( &port->transport, rc );
 	intf_shutdown ( &port->flogi, rc );
+	intf_shutdown ( &port->ns_plogi, rc );
 
 	/* Shut down any remaining exchanges */
 	list_for_each_entry_safe ( xchg, tmp, &port->xchgs, list )
@@ -922,6 +938,7 @@ int fc_port_login ( struct fc_port *port, struct fc_port_id *port_id,
 		    const struct fc_name *link_port_wwn, int has_fabric ) {
 	struct fc_peer *peer;
 	struct fc_peer *tmp;
+	int rc;
 
 	/* Perform implicit logout if logged in and details differ */
 	if ( fc_link_ok ( &port->link ) &&
@@ -978,6 +995,23 @@ int fc_port_login ( struct fc_port *port, struct fc_port_id *port_id,
 		       fc_id_ntoa ( &port->port_id ) );
 	}
 
+	/* Log in to name server, if attached to a fabric */
+	if ( has_fabric && ! ( port->flags & FC_PORT_HAS_NS ) ) {
+
+		DBGC ( port, "FCPORT %s attempting login to name server\n",
+		       port->name );
+
+		intf_restart ( &port->ns_plogi, -ECANCELED );
+		if ( ( rc = fc_els_plogi ( &port->ns_plogi, port,
+					   &fc_gs_port_id ) ) != 0 ) {
+			DBGC ( port, "FCPORT %s could not initiate name "
+			       "server PLOGI: %s\n",
+			       port->name, strerror ( rc ) );
+			fc_port_logout ( port, rc );
+			return rc;
+		}
+	}
+
 	/* Record login */
 	fc_link_up ( &port->link );
 
@@ -1006,6 +1040,7 @@ void fc_port_logout ( struct fc_port *port, int rc ) {
 
 	/* Erase port details */
 	memset ( &port->port_id, 0, sizeof ( port->port_id ) );
+	port->flags = 0;
 
 	/* Record logout */
 	fc_link_err ( &port->link, rc );
@@ -1030,6 +1065,27 @@ static void fc_port_flogi_done ( struct fc_port *port, int rc ) {
 
 	if ( rc != 0 )
 		fc_port_logout ( port, rc );
+}
+
+/**
+ * Handle name server PLOGI completion
+ *
+ * @v port		Fibre Channel port
+ * @v rc		Reason for completion
+ */
+static void fc_port_ns_plogi_done ( struct fc_port *port, int rc ) {
+
+	intf_restart ( &port->ns_plogi, rc );
+
+	if ( rc == 0 ) {
+		port->flags |= FC_PORT_HAS_NS;
+		DBGC ( port, "FCPORT %s logged in to name server\n",
+		       port->name );
+	} else {
+		DBGC ( port, "FCPORT %s could not log in to name server: %s\n",
+		       port->name, strerror ( rc ) );
+		/* Absence of a name server is not a fatal error */
+	}
 }
 
 /**
@@ -1107,6 +1163,15 @@ static struct interface_operation fc_port_flogi_op[] = {
 static struct interface_descriptor fc_port_flogi_desc =
 	INTF_DESC ( struct fc_port, flogi, fc_port_flogi_op );
 
+/** Fibre Channel port name server PLOGI interface operations */
+static struct interface_operation fc_port_ns_plogi_op[] = {
+	INTF_OP ( intf_close, struct fc_port *, fc_port_ns_plogi_done ),
+};
+
+/** Fibre Channel port name server PLOGI interface descriptor */
+static struct interface_descriptor fc_port_ns_plogi_desc =
+	INTF_DESC ( struct fc_port, ns_plogi, fc_port_ns_plogi_op );
+
 /**
  * Create Fibre Channel port
  *
@@ -1128,6 +1193,7 @@ int fc_port_open ( struct interface *transport, const struct fc_name *node_wwn,
 	intf_init ( &port->transport, &fc_port_transport_desc, &port->refcnt );
 	fc_link_init ( &port->link, fc_port_examine, &port->refcnt );
 	intf_init ( &port->flogi, &fc_port_flogi_desc, &port->refcnt );
+	intf_init ( &port->ns_plogi, &fc_port_ns_plogi_desc, &port->refcnt );
 	list_add_tail ( &port->list, &fc_ports );
 	INIT_LIST_HEAD ( &port->xchgs );
 	memcpy ( &port->node_wwn, node_wwn, sizeof ( port->node_wwn ) );
@@ -1158,26 +1224,6 @@ struct fc_port * fc_port_find ( const char *name ) {
 	list_for_each_entry ( port, &fc_ports, list ) {
 		if ( strcmp ( name, port->name ) == 0 )
 			return port;
-	}
-	return NULL;
-}
-
-/**
- * Find Fibre Channel port by link node name
- *
- * @v link_port_wwn	Link node name
- * @ret port		Fibre Channel port, or NULL
- */
-static struct fc_port *
-fc_port_find_link_wwn ( struct fc_name *link_port_wwn ) {
-	struct fc_port *port;
-
-	list_for_each_entry ( port, &fc_ports, list ) {
-		if ( fc_link_ok ( &port->link ) &&
-		     ( memcmp ( &port->link_port_wwn, link_port_wwn,
-				sizeof ( port->link_port_wwn ) ) == 0 ) ) {
-			return port;
-		}
 	}
 	return NULL;
 }
@@ -1340,6 +1386,30 @@ static void fc_peer_plogi_done ( struct fc_peer *peer, int rc ) {
 }
 
 /**
+ * Initiate PLOGI
+ *
+ * @v peer		Fibre Channel peer
+ * @v port		Fibre Channel port
+ * @v peer_port_id	Peer port ID
+ * @ret rc		Return status code
+ */
+static int fc_peer_plogi ( struct fc_peer *peer, struct fc_port *port,
+			   struct fc_port_id *peer_port_id ) {
+	int rc;
+
+	/* Try to create PLOGI ELS */
+	intf_restart ( &peer->plogi, -ECANCELED );
+	if ( ( rc = fc_els_plogi ( &peer->plogi, port, peer_port_id ) ) != 0 ) {
+		DBGC ( peer, "FCPEER %s could not initiate PLOGI: %s\n",
+		       fc_ntoa ( &peer->port_wwn ), strerror ( rc ) );
+		fc_peer_logout ( peer, rc );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Examine Fibre Channel peer link state
  *
  * @ link		Fibre Channel link state monitor
@@ -1347,7 +1417,6 @@ static void fc_peer_plogi_done ( struct fc_peer *peer, int rc ) {
 static void fc_peer_examine ( struct fc_link_state *link ) {
 	struct fc_peer *peer = container_of ( link, struct fc_peer, link );
 	struct fc_port *port;
-	struct fc_port_id *peer_port_id;
 	int rc;
 
 	/* Check to see if underlying port link has gone down */
@@ -1366,23 +1435,36 @@ static void fc_peer_examine ( struct fc_link_state *link ) {
 	/* Sanity check */
 	assert ( peer->port == NULL );
 
-	/* Look for a port with the peer attached via a point-to-point link */
-	port = fc_port_find_link_wwn ( &peer->port_wwn );
-	if ( ! port ) {
-		DBGC ( peer, "FCPEER %s could not find a point-to-point "
-		       "link\n", fc_ntoa ( &peer->port_wwn ) );
-		fc_peer_logout ( peer, -ENOENT );
-		return;
+	/* First, look for a port with the peer attached via a
+	 * point-to-point link.
+	 */
+	list_for_each_entry ( port, &fc_ports, list ) {
+		if ( fc_link_ok ( &port->link ) &&
+		     ( ! ( port->flags & FC_PORT_HAS_FABRIC ) ) &&
+		     ( memcmp ( &peer->port_wwn, &port->link_port_wwn,
+				sizeof ( peer->port_wwn ) ) == 0 ) ) {
+			/* Use this peer port ID, and stop looking */
+			fc_peer_plogi ( peer, port, &port->ptp_link_port_id );
+			return;
+		}
 	}
-	peer_port_id = &port->ptp_link_port_id;
 
-	/* Try to create PLOGI ELS */
-	intf_restart ( &peer->plogi, -ECANCELED );
-	if ( ( rc = fc_els_plogi ( &peer->plogi, port, peer_port_id ) ) != 0 ) {
-		DBGC ( peer, "FCPEER %s could not initiate PLOGI: %s\n",
-		       fc_ntoa ( &peer->port_wwn ), strerror ( rc ) );
-		fc_peer_logout ( peer, rc );
-		return;
+	/* If the peer is not directly attached, try initiating a name
+	 * server lookup on any suitable ports.
+	 */
+	list_for_each_entry ( port, &fc_ports, list ) {
+		if ( fc_link_ok ( &port->link ) &&
+		     ( port->flags & FC_PORT_HAS_FABRIC ) &&
+		     ( port->flags & FC_PORT_HAS_NS ) ) {
+			if ( ( rc = fc_ns_query ( peer, port,
+						  fc_peer_plogi ) ) != 0 ) {
+				DBGC ( peer, "FCPEER %s could not attempt "
+				       "name server lookup on %s: %s\n",
+				       fc_ntoa ( &peer->port_wwn ), port->name,
+				       strerror ( rc ) );
+				/* Non-fatal */
+			}
+		}
 	}
 }
 

@@ -189,6 +189,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_fcels			( ERRFILE_NET | 0x002c0000 )
 #define ERRFILE_fcp			( ERRFILE_NET | 0x002d0000 )
 #define ERRFILE_fcoe			( ERRFILE_NET | 0x002e0000 )
+#define ERRFILE_fcns			( ERRFILE_NET | 0x002f0000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )

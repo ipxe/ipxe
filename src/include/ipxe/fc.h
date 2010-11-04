@@ -64,6 +64,7 @@ struct sockaddr_fc {
 
 extern struct fc_port_id fc_empty_port_id;
 extern struct fc_port_id fc_f_port_id;
+extern struct fc_port_id fc_gs_port_id;
 extern struct fc_port_id fc_ptp_low_port_id;
 extern struct fc_port_id fc_ptp_high_port_id;
 
@@ -190,6 +191,7 @@ enum fc_type {
 	FC_TYPE_BLS = 0x00,		/**< Basic Link Service */
 	FC_TYPE_ELS = 0x01,		/**< Extended Link Service */
 	FC_TYPE_FCP = 0x08,		/**< Fibre Channel Protocol */
+	FC_TYPE_CT  = 0x20,		/**< Common Transport */
 };
 
 /** Fibre Channel Frame Control - Exchange and Sequence */
@@ -277,6 +279,9 @@ struct fc_port {
 	/** Link port ID (for point-to-point links only) */
 	struct fc_port_id ptp_link_port_id;
 
+	/** Name server PLOGI interface */
+	struct interface ns_plogi;
+
 	/** List of active exchanges */
 	struct list_head xchgs;
 };
@@ -285,6 +290,8 @@ struct fc_port {
 enum fc_port_flags {
 	/** Port is attached to a fabric */
 	FC_PORT_HAS_FABRIC = 0x0001,
+	/** Port is logged in to a name server */
+	FC_PORT_HAS_NS = 0x0002,
 };
 
 /**
