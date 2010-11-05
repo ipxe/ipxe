@@ -512,7 +512,7 @@ static int fcpcmd_recv_xfer_rdy ( struct fcp_command *fcpcmd,
 		DBGC ( fcpdev, "FCP %p xchg %04x received invalid transfer "
 		       "ready IU:\n", fcpdev, fcpcmd->xchg_id );
 		DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
-		rc = -EINVAL;
+		rc = -EPROTO;
 		goto done;
 	}
 	if ( ntohl ( xfer_rdy->offset ) != fcpcmd->offset ) {
@@ -521,7 +521,7 @@ static int fcpcmd_recv_xfer_rdy ( struct fcp_command *fcpcmd,
 		       "delivery (expected %zd, requested %d)\n",
 		       fcpdev, fcpcmd->xchg_id, fcpcmd->offset,
 		       ntohl ( xfer_rdy->offset ) );
-		rc = -EINVAL;
+		rc = -EPROTO;
 		goto done;
 	}
 	DBGC2 ( fcpdev, "FCP %p xchg %04x XFER_RDY [%08x,%08x)\n",
@@ -564,7 +564,7 @@ static int fcpcmd_recv_rsp ( struct fcp_command *fcpcmd,
 		DBGC ( fcpdev, "FCP %p xchg %04x received invalid response "
 		       "IU:\n", fcpdev, fcpcmd->xchg_id );
 		DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
-		rc = -EINVAL;
+		rc = -EPROTO;
 		goto done;
 	}
 	DBGC2 ( fcpdev, "FCP %p xchg %04x RSP stat %02x resid %08x flags %02x"
@@ -645,7 +645,7 @@ static int fcpcmd_recv_unknown ( struct fcp_command *fcpcmd,
 	       fcpdev, fcpcmd->xchg_id );
 	DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
 	free_iob ( iobuf );
-	return -EINVAL;
+	return -EPROTO;
 }
 
 /**
