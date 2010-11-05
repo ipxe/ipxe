@@ -1477,6 +1477,18 @@ struct fc_peer * fc_peer_get_port_id ( struct fc_port *port,
  */
 
 /**
+ * Free Fibre Channel upper-layer protocol
+ *
+ * @v refcnt		Reference count
+ */
+static void fc_ulp_free ( struct refcnt *refcnt ) {
+	struct fc_ulp *ulp = container_of ( refcnt, struct fc_ulp, refcnt );
+
+	fc_peer_put ( ulp->peer );
+	free ( ulp );
+}
+
+/**
  * Close Fibre Channel upper-layer protocol
  *
  * @v ulp		Fibre Channel upper-layer protocol
@@ -1499,10 +1511,6 @@ static void fc_ulp_close ( struct fc_ulp *ulp, int rc ) {
 	/* Remove from list of ULPs */
 	list_del ( &ulp->list );
 	INIT_LIST_HEAD ( &ulp->list );
-
-	/* Drop peer reference */
-	fc_peer_put ( ulp->peer );
-	ulp->peer = NULL;
 }
 
 /**
@@ -1525,7 +1533,6 @@ void fc_ulp_increment ( struct fc_ulp *ulp ) {
  * @v ulp		Fibre Channel ulp
  */
 void fc_ulp_decrement ( struct fc_ulp *ulp ) {
-	struct fc_peer *peer = ulp->peer;
 
 	/* Sanity check */
 	assert ( ulp->usage > 0 );
@@ -1535,7 +1542,7 @@ void fc_ulp_decrement ( struct fc_ulp *ulp ) {
 		fc_ulp_logout ( ulp, 0 );
 
 	/* Decrement our peer's usage count */
-	fc_peer_decrement ( peer );
+	fc_peer_decrement ( ulp->peer );
 }
 
 /**
@@ -1702,7 +1709,7 @@ static struct fc_ulp * fc_ulp_create ( struct fc_peer *peer,
 	ulp = zalloc ( sizeof ( *ulp ) );
 	if ( ! ulp )
 		return NULL;
-	ref_init ( &ulp->refcnt, NULL );
+	ref_init ( &ulp->refcnt, fc_ulp_free );
 	fc_link_init ( &ulp->link, fc_ulp_examine, &ulp->refcnt );
 	intf_init ( &ulp->prli, &fc_ulp_prli_desc, &ulp->refcnt );
 	ulp->peer = fc_peer_get ( peer );
