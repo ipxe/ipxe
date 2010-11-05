@@ -846,7 +846,7 @@ static int fc_els_logo_rx_response ( struct fc_els *els, void *data __unused,
 				     size_t len __unused ) {
 
 	/* Log out individual peer or whole port as applicable */
-	fc_els_logo_logout ( els, &els->port_id );
+	fc_els_logo_logout ( els, &els->peer_port_id );
 
 	return 0;
 }
