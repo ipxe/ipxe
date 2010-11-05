@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/io.h>
 #include <ipxe/list.h>
 #include <ipxe/init.h>
+#include <ipxe/refcnt.h>
 #include <ipxe/malloc.h>
 
 /** @file
@@ -35,10 +36,21 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** A free block of memory */
 struct memory_block {
-	/** List of free blocks */
-	struct list_head list;
 	/** Size of this block */
 	size_t size;
+	/** Padding
+	 *
+	 * This padding exists to cover the "count" field of a
+	 * reference counter, in the common case where a reference
+	 * counter is the first element of a dynamically-allocated
+	 * object.  It avoids clobbering the "count" field as soon as
+	 * the memory is freed, and so allows for the possibility of
+	 * detecting reference counting errors.
+	 */
+	char pad[ offsetof ( struct refcnt, count ) +
+		  sizeof ( ( ( struct refcnt * ) NULL )->count ) ];
+	/** List of free blocks */
+	struct list_head list;
 };
 
 #define MIN_MEMBLOCK_SIZE \
