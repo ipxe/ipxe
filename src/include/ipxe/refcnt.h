@@ -9,6 +9,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <stddef.h>
+#include <assert.h>
+
 /**
  * A reference counter
  *
@@ -26,7 +29,7 @@ struct refcnt {
 	 * When this count is decremented below zero, the free()
 	 * method will be called.
 	 */
-	int refcnt;
+	int count;
 	/** Free containing object
 	 *
 	 * This method is called when the reference count is
@@ -75,8 +78,37 @@ ref_init ( struct refcnt *refcnt,
 		.free = free_fn,					\
 	}
 
-extern struct refcnt * ref_get ( struct refcnt *refcnt );
-extern void ref_put ( struct refcnt *refcnt );
+extern void ref_increment ( struct refcnt *refcnt );
+extern void ref_decrement ( struct refcnt *refcnt );
+
+/**
+ * Get additional reference to object
+ *
+ * @v refcnt		Reference counter, or NULL
+ * @ret refcnt		Reference counter
+ *
+ * If @c refcnt is NULL, no action is taken.
+ */
+#define ref_get( refcnt ) ( {						\
+	if ( refcnt )							\
+		assert ( (refcnt)->count >= 0 );			\
+	ref_increment ( refcnt );					\
+	(refcnt); } )
+
+/**
+ * Drop reference to object
+ *
+ * @v refcnt		Reference counter, or NULL
+ * @ret refcnt		Reference counter
+ *
+ * If @c refcnt is NULL, no action is taken.
+ */
+#define ref_put( refcnt ) do {						\
+	if ( refcnt )							\
+		assert ( (refcnt)->count >= 0 );			\
+	ref_decrement ( refcnt );					\
+	} while ( 0 )
+
 extern void ref_no_free ( struct refcnt *refcnt );
 
 #endif /* _IPXE_REFCNT_H */

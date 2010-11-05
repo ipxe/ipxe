@@ -31,18 +31,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Increment reference count
  *
  * @v refcnt		Reference counter, or NULL
- * @ret refcnt		Reference counter
  *
  * If @c refcnt is NULL, no action is taken.
  */
-struct refcnt * ref_get ( struct refcnt *refcnt ) {
+void ref_increment ( struct refcnt *refcnt ) {
 
 	if ( refcnt ) {
-		refcnt->refcnt++;
+		refcnt->count++;
 		DBGC2 ( refcnt, "REFCNT %p incremented to %d\n",
-			refcnt, refcnt->refcnt );
+			refcnt, refcnt->count );
 	}
-	return refcnt;
 }
 
 /**
@@ -55,17 +53,27 @@ struct refcnt * ref_get ( struct refcnt *refcnt ) {
  *
  * If @c refcnt is NULL, no action is taken.
  */
-void ref_put ( struct refcnt *refcnt ) {
+void ref_decrement ( struct refcnt *refcnt ) {
 
 	if ( ! refcnt )
 		return;
 
-	refcnt->refcnt--;
+	refcnt->count--;
 	DBGC2 ( refcnt, "REFCNT %p decremented to %d\n",
-		refcnt, refcnt->refcnt );
+		refcnt, refcnt->count );
 
-	if ( refcnt->refcnt >= 0 )
+	if ( refcnt->count >= 0 )
 		return;
+
+	if ( refcnt->count < -1 ) {
+		DBGC ( refcnt, "REFCNT %p decremented too far (%d)!\n",
+		       refcnt, refcnt->count );
+		/* Avoid multiple calls to free(), which typically
+		 * result in memory corruption that is very hard to
+		 * track down.
+		 */
+		return;
+	}
 
 	if ( refcnt->free ) {
 		DBGC ( refcnt, "REFCNT %p being freed via method %p\n",
