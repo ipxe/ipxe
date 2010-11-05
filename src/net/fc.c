@@ -1236,7 +1236,7 @@ static void fc_peer_decrement ( struct fc_peer *peer ) {
 	assert ( peer->usage > 0 );
 
 	/* Decrement our usage count and log out if we reach zero */
-	if ( peer->usage-- == 0 )
+	if ( --(peer->usage) == 0 )
 		fc_peer_logout ( peer, 0 );
 }
 
@@ -1531,7 +1531,7 @@ void fc_ulp_decrement ( struct fc_ulp *ulp ) {
 	assert ( ulp->usage > 0 );
 
 	/* Decrement our usage count and log out if we reach zero */
-	if ( ulp->usage-- == 0 )
+	if ( --(ulp->usage) == 0 )
 		fc_ulp_logout ( ulp, 0 );
 
 	/* Decrement our peer's usage count */
