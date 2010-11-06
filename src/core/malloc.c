@@ -196,6 +196,7 @@ void * alloc_memblock ( size_t size, size_t align ) {
 void free_memblock ( void *ptr, size_t size ) {
 	struct memory_block *freeing;
 	struct memory_block *block;
+	struct memory_block *tmp;
 	ssize_t gap_before;
 	ssize_t gap_after = -1;
 
@@ -212,7 +213,7 @@ void free_memblock ( void *ptr, size_t size ) {
 	DBG ( "Freeing [%p,%p)\n", freeing, ( ( ( void * ) freeing ) + size ));
 
 	/* Insert/merge into free list */
-	list_for_each_entry ( block, &free_blocks, list ) {
+	list_for_each_entry_safe ( block, tmp, &free_blocks, list ) {
 		/* Calculate gaps before and after the "freeing" block */
 		gap_before = ( ( ( void * ) freeing ) - 
 			       ( ( ( void * ) block ) + block->size ) );
