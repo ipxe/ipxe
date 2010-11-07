@@ -43,11 +43,13 @@ static LIST_HEAD ( run_queue );
  */
 void process_add ( struct process *process ) {
 	if ( ! process_running ( process ) ) {
-		DBGC ( process, "PROCESS %p starting\n", process );
+		DBGC ( process, "PROCESS %p (%p) starting\n",
+		       process, process->step );
 		ref_get ( process->refcnt );
 		list_add_tail ( &process->list, &run_queue );
 	} else {
-		DBGC ( process, "PROCESS %p already started\n", process );
+		DBGC ( process, "PROCESS %p (%p) already started\n",
+		       process, process->step );
 	}
 }
 
@@ -61,12 +63,14 @@ void process_add ( struct process *process ) {
  */
 void process_del ( struct process *process ) {
 	if ( process_running ( process ) ) {
-		DBGC ( process, "PROCESS %p stopping\n", process );
+		DBGC ( process, "PROCESS %p (%p) stopping\n",
+		       process, process->step );
 		list_del ( &process->list );
 		INIT_LIST_HEAD ( &process->list );
 		ref_put ( process->refcnt );
 	} else {
-		DBGC ( process, "PROCESS %p already stopped\n", process );
+		DBGC ( process, "PROCESS %p (%p) already stopped\n",
+		       process, process->step );
 	}
 }
 
@@ -83,9 +87,11 @@ void step ( void ) {
 		list_del ( &process->list );
 		list_add_tail ( &process->list, &run_queue );
 		ref_get ( process->refcnt ); /* Inhibit destruction mid-step */
-		DBGC2 ( process, "PROCESS %p executing\n", process );
+		DBGC2 ( process, "PROCESS %p (%p) executing\n",
+			process, process->step );
 		process->step ( process );
-		DBGC2 ( process, "PROCESS %p finished executing\n", process );
+		DBGC2 ( process, "PROCESS %p (%p) finished executing\n",
+			process, process->step );
 		ref_put ( process->refcnt ); /* Allow destruction */
 		break;
 	}
