@@ -180,14 +180,20 @@ static void timer_expired ( struct retry_timer *timer ) {
  */
 static void retry_step ( struct process *process __unused ) {
 	struct retry_timer *timer;
-	struct retry_timer *tmp;
 	unsigned long now = currticks();
 	unsigned long used;
 
-	list_for_each_entry_safe ( timer, tmp, &timers, list ) {
+	/* Process at most one timer expiry.  We cannot process
+	 * multiple expiries in one pass, because one timer expiring
+	 * may end up triggering another timer's deletion from the
+	 * list.
+	 */
+	list_for_each_entry ( timer, &timers, list ) {
 		used = ( now - timer->start );
-		if ( used >= timer->timeout )
+		if ( used >= timer->timeout ) {
 			timer_expired ( timer );
+			break;
+		}
 	}
 }
 
