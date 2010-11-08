@@ -1014,9 +1014,8 @@ static void tcp_process_rx_queue ( struct tcp_connection *tcp ) {
 	 * queue, since tcp_discard() may remove packets from the RX
 	 * queue while we are processing.
 	 */
-	while ( ! list_empty ( &tcp->rx_queue ) ) {
-		list_for_each_entry ( iobuf, &tcp->rx_queue, list )
-			break;
+	while ( ( iobuf = list_first_entry ( &tcp->rx_queue, struct io_buffer,
+					     list ) ) ) {
 
 		/* Stop processing when we hit the first gap */
 		tcpqhdr = iobuf->data;

@@ -982,12 +982,12 @@ struct ib_device * find_ibdev ( union ib_gid *gid ) {
 struct ib_device * last_opened_ibdev ( void ) {
 	struct ib_device *ibdev;
 
-	list_for_each_entry ( ibdev, &open_ib_devices, open_list ) {
-		assert ( ibdev->open_count != 0 );
-		return ibdev;
-	}
+	ibdev = list_first_entry ( &open_ib_devices, struct ib_device, list );
+	if ( ! ibdev )
+		return NULL;
 
-	return NULL;
+	assert ( ibdev->open_count != 0 );
+	return ibdev;
 }
 
 /* Drag in IPoIB */

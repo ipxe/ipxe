@@ -158,6 +158,19 @@ static inline int list_empty ( const struct list_head *list ) {
 	container_of ( list, type, member ); } )
 
 /**
+ * Get the container of the first entry in a list
+ *
+ * @v list		List head
+ * @v type		Containing type
+ * @v member		Name of list field within containing type
+ * @ret first		First list entry, or NULL
+ */
+#define list_first_entry( list, type, member )		\
+	( list_empty ( (list) ) ?			\
+	  ( type * ) NULL :				\
+	  list_entry ( (list)->next, type, member ) )
+
+/**
  * Iterate over entries in a list
  *
  * @v pos		Iterator

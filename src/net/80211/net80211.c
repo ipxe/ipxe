@@ -668,11 +668,11 @@ struct io_buffer * net80211_mgmt_dequeue ( struct net80211_device *dev,
 			*signal = rxi->signal;
 		free ( rxi );
 
-		list_for_each_entry ( iobuf, &dev->mgmt_queue, list ) {
-			list_del ( &iobuf->list );
-			return iobuf;
-		}
-		assert ( 0 );
+		assert ( ! list_empty ( &dev->mgmt_queue ) );
+		iobuf = list_first_entry ( &dev->mgmt_queue, struct io_buffer,
+					   list );
+		list_del ( &iobuf->list );
+		return iobuf;
 	}
 
 	return NULL;

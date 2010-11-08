@@ -144,12 +144,11 @@ static int fcels_exec ( int argc, char **argv ) {
 		}
 	} else {
 		/* Use first port */
-		if ( list_empty ( &fc_ports ) ) {
+		port = list_first_entry ( &fc_ports, struct fc_port, list );
+		if ( ! port ) {
 			printf ( "No ports\n" );
 			return 1;
 		}
-		list_for_each_entry ( port, &fc_ports, list )
-			break;
 	}
 	assert ( port != NULL );
 

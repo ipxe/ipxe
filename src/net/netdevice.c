@@ -328,11 +328,12 @@ void netdev_poll ( struct net_device *netdev ) {
 struct io_buffer * netdev_rx_dequeue ( struct net_device *netdev ) {
 	struct io_buffer *iobuf;
 
-	list_for_each_entry ( iobuf, &netdev->rx_queue, list ) {
-		list_del ( &iobuf->list );
-		return iobuf;
-	}
-	return NULL;
+	iobuf = list_first_entry ( &netdev->rx_queue, struct io_buffer, list );
+	if ( ! iobuf )
+		return NULL;
+
+	list_del ( &iobuf->list );
+	return iobuf;
 }
 
 /**
@@ -592,12 +593,13 @@ struct net_device * find_netdev_by_location ( unsigned int bus_type,
 struct net_device * last_opened_netdev ( void ) {
 	struct net_device *netdev;
 
-	list_for_each_entry ( netdev, &open_net_devices, open_list ) {
-		assert ( netdev_is_open ( netdev ) );
-		return netdev;
-	}
+	netdev = list_first_entry ( &open_net_devices, struct net_device,
+				    list );
+	if ( ! netdev )
+		return NULL;
 
-	return NULL;
+	assert ( netdev_is_open ( netdev ) );
+	return netdev;
 }
 
 /**

@@ -83,7 +83,8 @@ void process_del ( struct process *process ) {
 void step ( void ) {
 	struct process *process;
 
-	list_for_each_entry ( process, &run_queue, list ) {
+	if ( ( process = list_first_entry ( &run_queue, struct process,
+					    list ) ) ) {
 		list_del ( &process->list );
 		list_add_tail ( &process->list, &run_queue );
 		ref_get ( process->refcnt ); /* Inhibit destruction mid-step */
@@ -93,7 +94,6 @@ void step ( void ) {
 		DBGC2 ( process, "PROCESS %p (%p) finished executing\n",
 			process, process->step );
 		ref_put ( process->refcnt ); /* Allow destruction */
-		break;
 	}
 }
 
