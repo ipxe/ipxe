@@ -594,7 +594,7 @@ struct net_device * last_opened_netdev ( void ) {
 	struct net_device *netdev;
 
 	netdev = list_first_entry ( &open_net_devices, struct net_device,
-				    list );
+				    open_list );
 	if ( ! netdev )
 		return NULL;
 

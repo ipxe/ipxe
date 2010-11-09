@@ -982,7 +982,8 @@ struct ib_device * find_ibdev ( union ib_gid *gid ) {
 struct ib_device * last_opened_ibdev ( void ) {
 	struct ib_device *ibdev;
 
-	ibdev = list_first_entry ( &open_ib_devices, struct ib_device, list );
+	ibdev = list_first_entry ( &open_ib_devices, struct ib_device,
+				   open_list );
 	if ( ! ibdev )
 		return NULL;
 
