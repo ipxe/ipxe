@@ -522,7 +522,7 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 		tsopt->tsopt.tsval = htonl ( currticks() );
 		tsopt->tsopt.tsecr = htonl ( tcp->ts_recent );
 	}
-	if ( ! ( flags & TCP_SYN ) )
+	if ( len != 0 )
 		flags |= TCP_PSH;
 	tcphdr = iob_push ( iobuf, sizeof ( *tcphdr ) );
 	memset ( tcphdr, 0, sizeof ( *tcphdr ) );
