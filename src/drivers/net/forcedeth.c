@@ -990,6 +990,10 @@ forcedeth_poll ( struct net_device *netdev )
 
 	status = readl ( ioaddr + NvRegIrqStatus ) & NVREG_IRQSTAT_MASK;
 
+	/* Return when no interrupts have been triggered */
+	if ( ! status )
+		return;
+
 	/* Clear interrupts */
 	writel ( NVREG_IRQSTAT_MASK, ioaddr + NvRegIrqStatus );
 
@@ -999,10 +1003,6 @@ forcedeth_poll ( struct net_device *netdev )
 	 * to give auto-neg a chance to finish */
 	if ( ( status & NVREG_IRQ_LINK ) || ! ( netdev_link_ok ( netdev ) ) )
 		forcedeth_link_status ( netdev );
-
-	/* Return when no interrupts have been triggered */
-	if ( ! status )
-		return;
 
 	/* Process transmitted packets */
 	nv_process_tx_packets ( netdev );
