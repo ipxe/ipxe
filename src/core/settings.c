@@ -1312,6 +1312,7 @@ static int storef_hex ( struct settings *settings, struct setting *setting,
 		case '\0' :
 			return store_setting ( settings, setting, bytes, len );
 		case ':' :
+		case '-' :
 			ptr++;
 			break;
 		default :
@@ -1327,10 +1328,11 @@ static int storef_hex ( struct settings *settings, struct setting *setting,
  * @v setting		Setting to fetch
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
+ * @v delimiter		Byte delimiter
  * @ret len		Length of formatted value, or negative error
  */
 static int fetchf_hex ( struct settings *settings, struct setting *setting,
-			char *buf, size_t len ) {
+			char *buf, size_t len, const char *delimiter ) {
 	int raw_len;
 	int check_len;
 	int used = 0;
@@ -1353,18 +1355,55 @@ static int fetchf_hex ( struct settings *settings, struct setting *setting,
 			buf[0] = 0; /* Ensure that a terminating NUL exists */
 		for ( i = 0 ; i < raw_len ; i++ ) {
 			used += ssnprintf ( ( buf + used ), ( len - used ),
-					    "%s%02x", ( used ? ":" : "" ),
+					    "%s%02x", ( used ? delimiter : "" ),
 					    raw[i] );
 		}
 		return used;
 	}
 }
 
-/** A hex-string setting */
+/**
+ * Fetch and format value of hex string setting (using colon delimiter)
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int fetchf_hex_colon ( struct settings *settings,
+			      struct setting *setting,
+			      char *buf, size_t len ) {
+	return fetchf_hex ( settings, setting, buf, len, ":" );
+}
+
+/**
+ * Fetch and format value of hex string setting (using hyphen delimiter)
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int fetchf_hex_hyphen ( struct settings *settings,
+			       struct setting *setting,
+			       char *buf, size_t len ) {
+	return fetchf_hex ( settings, setting, buf, len, "-" );
+}
+
+/** A hex-string setting (colon-delimited) */
 struct setting_type setting_type_hex __setting_type = {
 	.name = "hex",
 	.storef = storef_hex,
-	.fetchf = fetchf_hex,
+	.fetchf = fetchf_hex_colon,
+};
+
+/** A hex-string setting (hyphen-delimited) */
+struct setting_type setting_type_hexhyp __setting_type = {
+	.name = "hexhyp",
+	.storef = storef_hex,
+	.fetchf = fetchf_hex_hyphen,
 };
 
 /**
