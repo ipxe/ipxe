@@ -137,6 +137,6 @@ struct bzimage_cmdline {
 #define BZI_STACK_SIZE 0x1000
 
 /** Maximum size of command line */
-#define BZI_CMDLINE_SIZE 0x100
+#define BZI_CMDLINE_SIZE 0x7ff
 
 #endif /* _BZIMAGE_H */
