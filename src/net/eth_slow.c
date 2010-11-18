@@ -111,23 +111,23 @@ static void eth_slow_lacp_dump ( struct io_buffer *iobuf,
 	struct eth_slow_lacp *lacp = &eth_slow->lacp;
 
 	DBGC ( netdev,
-	       "SLOW %p %s LACP actor (%04x,%s,%04x,%02x,%04x) [%s]\n",
-	       netdev, label, ntohs ( lacp->actor.system_priority ),
+	       "SLOW %s %s LACP actor (%04x,%s,%04x,%02x,%04x) [%s]\n",
+	       netdev->name, label, ntohs ( lacp->actor.system_priority ),
 	       eth_ntoa ( lacp->actor.system ),
 	       ntohs ( lacp->actor.key ),
 	       ntohs ( lacp->actor.port_priority ),
 	       ntohs ( lacp->actor.port ),
 	       eth_slow_lacp_state_name ( lacp->actor.state ) );
 	DBGC ( netdev,
-	       "SLOW %p %s LACP partner (%04x,%s,%04x,%02x,%04x) [%s]\n",
-	       netdev, label, ntohs ( lacp->partner.system_priority ),
+	       "SLOW %s %s LACP partner (%04x,%s,%04x,%02x,%04x) [%s]\n",
+	       netdev->name, label, ntohs ( lacp->partner.system_priority ),
 	       eth_ntoa ( lacp->partner.system ),
 	       ntohs ( lacp->partner.key ),
 	       ntohs ( lacp->partner.port_priority ),
 	       ntohs ( lacp->partner.port ),
 	       eth_slow_lacp_state_name ( lacp->partner.state ) );
-	DBGC ( netdev, "SLOW %p %s LACP collector %04x (%d us)\n",
-	       netdev, label, ntohs ( lacp->collector.max_delay ),
+	DBGC ( netdev, "SLOW %s %s LACP collector %04x (%d us)\n",
+	       netdev->name, label, ntohs ( lacp->collector.max_delay ),
 	       ( ntohs ( lacp->collector.max_delay ) * 10 ) );
 	DBGC2_HDA ( netdev, 0, iobuf, iob_len ( iobuf ) );
 }
@@ -191,8 +191,8 @@ static void eth_slow_marker_dump ( struct io_buffer *iobuf,
 	union eth_slow_packet *eth_slow = iobuf->data;
 	struct eth_slow_marker *marker = &eth_slow->marker;
 
-	DBGC ( netdev, "SLOW %p %s marker %s port %04x system %s xact %08x\n",
-	       netdev, label,
+	DBGC ( netdev, "SLOW %s %s marker %s port %04x system %s xact %08x\n",
+	       netdev->name, label,
 	       eth_slow_marker_tlv_name ( marker->marker.tlv.type ),
 	       ntohs ( marker->marker.port ),
 	       eth_ntoa ( marker->marker.system ),
@@ -255,8 +255,8 @@ static int eth_slow_rx ( struct io_buffer *iobuf,
 	case ETH_SLOW_SUBTYPE_MARKER:
 		return eth_slow_marker_rx ( iobuf, netdev );
 	default:
-		DBGC ( netdev, "SLOW %p RX unknown subtype %02x\n",
-		       netdev, eth_slow->header.subtype );
+		DBGC ( netdev, "SLOW %s RX unknown subtype %02x\n",
+		       netdev->name, eth_slow->header.subtype );
 		free_iob ( iobuf );
 		return -EINVAL;
 	}
