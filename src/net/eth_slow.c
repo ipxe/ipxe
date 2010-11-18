@@ -129,7 +129,7 @@ static void eth_slow_lacp_dump ( struct io_buffer *iobuf,
 	DBGC ( netdev, "SLOW %s %s LACP collector %04x (%d us)\n",
 	       netdev->name, label, ntohs ( lacp->collector.max_delay ),
 	       ( ntohs ( lacp->collector.max_delay ) * 10 ) );
-	DBGC2_HDA ( netdev, 0, iobuf, iob_len ( iobuf ) );
+	DBGC2_HDA ( netdev, 0, iobuf->data, iob_len ( iobuf ) );
 }
 
 /**
@@ -197,7 +197,7 @@ static void eth_slow_marker_dump ( struct io_buffer *iobuf,
 	       ntohs ( marker->marker.port ),
 	       eth_ntoa ( marker->marker.system ),
 	       ntohl ( marker->marker.xact ) );
-	DBGC2_HDA ( netdev, 0, iobuf, iob_len ( iobuf ) );
+	DBGC2_HDA ( netdev, 0, iobuf->data, iob_len ( iobuf ) );
 }
 
 /**
