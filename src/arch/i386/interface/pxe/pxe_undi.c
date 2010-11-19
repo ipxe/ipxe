@@ -228,7 +228,6 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
 	char destaddr[MAX_LL_ADDR_LEN];
 	const void *ll_dest;
-	size_t ll_hlen = ll_protocol->ll_header_len;
 	size_t len;
 	unsigned int i;
 	int rc;
@@ -248,7 +247,6 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	case P_RARP:	net_protocol = &rarp_protocol;	break;
 	case P_UNKNOWN:
 		net_protocol = NULL;
-		ll_hlen = 0;
 		break;
 	default:
 		DBG2 ( " %02x invalid protocol\n", undi_transmit->Protocol );
@@ -271,13 +269,13 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	}
 
 	/* Allocate and fill I/O buffer */
-	iobuf = alloc_iob ( ll_hlen + len );
+	iobuf = alloc_iob ( MAX_LL_HEADER_LEN + len );
 	if ( ! iobuf ) {
 		DBG2 ( " could not allocate iobuf\n" );
 		undi_transmit->Status = PXENV_STATUS_OUT_OF_RESOURCES;
 		return PXENV_EXIT_FAILURE;
 	}
-	iob_reserve ( iobuf, ll_hlen );
+	iob_reserve ( iobuf, MAX_LL_HEADER_LEN );
 	copy_from_real ( iob_put ( iobuf, tbd.ImmedLength ), tbd.Xmit.segment,
 			 tbd.Xmit.offset, tbd.ImmedLength );
 	for ( i = 0 ; i < tbd.DataBlkCount ; i++ ) {
