@@ -9,6 +9,7 @@
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/uri.h>
+#include <ipxe/netdevice.h>
 #include <ipxe/udp.h>
 
 /** @file
@@ -197,7 +198,8 @@ static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
 	int rc;
 
 	/* Check we can accommodate the header */
-	if ( ( rc = iob_ensure_headroom ( iobuf, UDP_MAX_HLEN ) ) != 0 ) {
+	if ( ( rc = iob_ensure_headroom ( iobuf,
+					  MAX_LL_NET_HEADER_LEN ) ) != 0 ) {
 		free_iob ( iobuf );
 		return rc;
 	}
@@ -361,13 +363,13 @@ static struct io_buffer * udp_xfer_alloc_iob ( struct udp_connection *udp,
 					       size_t len ) {
 	struct io_buffer *iobuf;
 
-	iobuf = alloc_iob ( UDP_MAX_HLEN + len );
+	iobuf = alloc_iob ( MAX_LL_NET_HEADER_LEN + len );
 	if ( ! iobuf ) {
 		DBGC ( udp, "UDP %p cannot allocate buffer of length %zd\n",
 		       udp, len );
 		return NULL;
 	}
-	iob_reserve ( iobuf, UDP_MAX_HLEN );
+	iob_reserve ( iobuf, MAX_LL_NET_HEADER_LEN );
 	return iobuf;
 }
 
