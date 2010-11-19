@@ -234,6 +234,9 @@ REQUIRE_OBJECT ( pxe_cmd );
 #ifdef LOTEST_CMD
 REQUIRE_OBJECT ( lotest_cmd );
 #endif
+#ifdef VLAN_CMD
+REQUIRE_OBJECT ( vlan_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

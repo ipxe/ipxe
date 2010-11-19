@@ -36,11 +36,12 @@ struct device;
 /** Maximum length of a link-layer header
  *
  * The longest currently-supported link-layer header is for 802.11: a
- * 24-byte frame header plus an 8-byte 802.3 LLC/SNAP header.  (The
- * IPoIB link-layer pseudo-header doesn't actually include link-layer
- * addresses; see ipoib.c for details).
+ * 24-byte frame header plus an 8-byte 802.3 LLC/SNAP header, plus a
+ * possible 4-byte VLAN header.  (The IPoIB link-layer pseudo-header
+ * doesn't actually include link-layer addresses; see ipoib.c for
+ * details.)
  */
-#define MAX_LL_HEADER_LEN 32
+#define MAX_LL_HEADER_LEN 36
 
 /** Maximum length of a network-layer address */
 #define MAX_NET_ADDR_LEN 4
@@ -278,7 +279,7 @@ struct net_device {
 	/** List of open network devices */
 	struct list_head open_list;
 	/** Name of this network device */
-	char name[8];
+	char name[12];
 	/** Underlying hardware device */
 	struct device *dev;
 

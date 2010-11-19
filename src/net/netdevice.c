@@ -405,8 +405,10 @@ int register_netdev ( struct net_device *netdev ) {
 	int rc;
 
 	/* Create device name */
-	snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
-		   ifindex++ );
+	if ( netdev->name[0] == '\0' ) {
+		snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
+			   ifindex++ );
+	}
 
 	/* Set initial link-layer address */
 	netdev->ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
@@ -461,12 +463,12 @@ int netdev_open ( struct net_device *netdev ) {
 
 	DBGC ( netdev, "NETDEV %s opening\n", netdev->name );
 
+	/* Mark as opened */
+	netdev->state |= NETDEV_OPEN;
+
 	/* Open the device */
 	if ( ( rc = netdev->op->open ( netdev ) ) != 0 )
 		return rc;
-
-	/* Mark as opened */
-	netdev->state |= NETDEV_OPEN;
 
 	/* Add to head of open devices list */
 	list_add ( &netdev->open_list, &open_net_devices );
