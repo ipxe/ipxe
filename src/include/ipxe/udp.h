@@ -23,9 +23,6 @@ struct sockaddr;
  * UDP constants
  */
 
-#define UDP_MAX_TXIOB	ETH_MAX_MTU
-#define UDP_MIN_TXIOB	ETH_ZLEN
-
 /**
  * A UDP header
  */
