@@ -258,7 +258,6 @@ struct tcp_options {
 #define TCP_MIN_PORT 1
 
 /* Some IOB constants */
-#define MAX_HDR_LEN	100
 #define MAX_IOB_LEN	1500
 #define MIN_IOB_LEN	MAX_HDR_LEN + 100 /* To account for padding by LL */
 

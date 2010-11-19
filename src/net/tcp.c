@@ -12,6 +12,7 @@
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/uri.h>
+#include <ipxe/netdevice.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/tcp.h>
 
@@ -483,14 +484,14 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 		start_timer ( &tcp->timer );
 
 	/* Allocate I/O buffer */
-	iobuf = alloc_iob ( len + MAX_HDR_LEN );
+	iobuf = alloc_iob ( len + MAX_LL_NET_HEADER_LEN );
 	if ( ! iobuf ) {
 		DBGC ( tcp, "TCP %p could not allocate iobuf for %08x..%08x "
 		       "%08x\n", tcp, tcp->snd_seq, ( tcp->snd_seq + seq_len ),
 		       tcp->rcv_ack );
 		return -ENOMEM;
 	}
-	iob_reserve ( iobuf, MAX_HDR_LEN );
+	iob_reserve ( iobuf, MAX_LL_NET_HEADER_LEN );
 
 	/* Fill data payload from transmit queue */
 	tcp_process_tx_queue ( tcp, len, iobuf, 0 );
@@ -627,14 +628,14 @@ static int tcp_xmit_reset ( struct tcp_connection *tcp,
 	int rc;
 
 	/* Allocate space for dataless TX buffer */
-	iobuf = alloc_iob ( MAX_HDR_LEN );
+	iobuf = alloc_iob ( MAX_LL_NET_HEADER_LEN );
 	if ( ! iobuf ) {
 		DBGC ( tcp, "TCP %p could not allocate iobuf for RST "
 		       "%08x..%08x %08x\n", tcp, ntohl ( in_tcphdr->ack ),
 		       ntohl ( in_tcphdr->ack ), ntohl ( in_tcphdr->seq ) );
 		return -ENOMEM;
 	}
-	iob_reserve ( iobuf, MAX_HDR_LEN );
+	iob_reserve ( iobuf, MAX_LL_NET_HEADER_LEN );
 
 	/* Construct RST response */
 	tcphdr = iob_push ( iobuf, sizeof ( *tcphdr ) );
