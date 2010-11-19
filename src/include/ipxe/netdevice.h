@@ -45,6 +45,16 @@ struct device;
 /** Maximum length of a network-layer address */
 #define MAX_NET_ADDR_LEN 4
 
+/** Maximum length of a network-layer header
+ *
+ * The longest currently-supported network-layer header is for IPv6 at
+ * 40 bytes.
+ */
+#define MAX_NET_HEADER_LEN 40
+
+/** Maximum combined length of a link-layer and network-layer header */
+#define MAX_LL_NET_HEADER_LEN ( MAX_LL_HEADER_LEN + MAX_NET_HEADER_LEN )
+
 /**
  * A network-layer protocol
  *
