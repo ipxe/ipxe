@@ -220,7 +220,7 @@ int boot_root_path ( const char *root_path ) {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-static int netboot ( struct net_device *netdev ) {
+int netboot ( struct net_device *netdev ) {
 	struct setting vendor_class_id_setting
 		= { .tag = DHCP_VENDOR_CLASS_ID };
 	struct setting pxe_discovery_control_setting
