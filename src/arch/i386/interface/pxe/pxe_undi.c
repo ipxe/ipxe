@@ -58,8 +58,10 @@ struct net_device *pxe_netdev = NULL;
  * @v netdev		Network device, or NULL
  */
 void pxe_set_netdev ( struct net_device *netdev ) {
-	if ( pxe_netdev )
+	if ( pxe_netdev ) {
+		netdev_rx_unfreeze ( pxe_netdev );
 		netdev_put ( pxe_netdev );
+	}
 	pxe_netdev = NULL;
 	if ( netdev )
 		pxe_netdev = netdev_get ( netdev );
@@ -76,6 +78,7 @@ static int pxe_netdev_open ( void ) {
 	if ( ( rc = netdev_open ( pxe_netdev ) ) != 0 )
 		return rc;
 
+	netdev_rx_freeze ( pxe_netdev );
 	netdev_irq ( pxe_netdev, 1 );
 	return 0;
 }
@@ -85,6 +88,7 @@ static int pxe_netdev_open ( void ) {
  *
  */
 static void pxe_netdev_close ( void ) {
+	netdev_rx_unfreeze ( pxe_netdev );
 	netdev_irq ( pxe_netdev, 0 );
 	netdev_close ( pxe_netdev );
 	undi_tx_count = 0;
@@ -234,10 +238,11 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 
 	DBG2 ( "PXENV_UNDI_TRANSMIT" );
 
-	/* Forcibly enable interrupts at this point, to work around
-	 * callers that never call PXENV_UNDI_OPEN before attempting
-	 * to use the UNDI API.
+	/* Forcibly enable interrupts and freeze receive queue
+	 * processing at this point, to work around callers that never
+	 * call PXENV_UNDI_OPEN before attempting to use the UNDI API.
 	 */
+	netdev_rx_freeze ( pxe_netdev );
 	netdev_irq ( pxe_netdev, 1 );
 
 	/* Identify network-layer protocol */
@@ -670,7 +675,7 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		/* Call poll().  This should acknowledge the device
 		 * interrupt and queue up any received packet.
 		 */
-		netdev_poll ( pxe_netdev );
+		net_poll();
 
 		/* A 100% accurate determination of "OURS" vs "NOT
 		 * OURS" is difficult to achieve without invasive and
@@ -709,7 +714,7 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		 * PXENV_UNDI_ISR_IN_PROCESS.  Force extra polls to
 		 * cope with these out-of-spec clients.
 		 */
-		netdev_poll ( pxe_netdev );
+		net_poll();
 
 		/* If we have not yet marked a TX as complete, and the
 		 * netdev TX queue is empty, report the TX completion.
