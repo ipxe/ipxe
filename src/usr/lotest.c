@@ -194,7 +194,7 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 			}
 		} else {
 			printf ( "\nReceived spurious packet type %04x\n",
-				 net_proto );
+				 ntohs ( net_proto ) );
 			/* Continue; this allows for the fact that
 			 * there may have been packets outstanding on
 			 * the wire when we started the test.
