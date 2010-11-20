@@ -669,14 +669,12 @@ int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 }
 
 /**
- * Single-step the network stack
- *
- * @v process		Network stack process
+ * Poll the network stack
  *
  * This polls all interfaces for received packets, and processes
  * packets from the RX queue.
  */
-static void net_step ( struct process *process __unused ) {
+void net_poll ( void ) {
 	struct net_device *netdev;
 	struct io_buffer *iobuf;
 	struct ll_protocol *ll_protocol;
@@ -690,6 +688,15 @@ static void net_step ( struct process *process __unused ) {
 
 		/* Poll for new packets */
 		netdev_poll ( netdev );
+
+		/* Leave received packets on the queue if receive
+		 * queue processing is currently frozen.  This will
+		 * happen when the raw packets are to be manually
+		 * dequeued using netdev_rx_dequeue(), rather than
+		 * processed via the usual networking stack.
+		 */
+		if ( netdev_rx_frozen ( netdev ) )
+			continue;
 
 		/* Process at most one received packet.  Give priority
 		 * to getting packets out of the NIC over processing
@@ -721,6 +728,15 @@ static void net_step ( struct process *process __unused ) {
 			}
 		}
 	}
+}
+
+/**
+ * Single-step the network stack
+ *
+ * @v process		Network stack process
+ */
+static void net_step ( struct process *process __unused ) {
+	net_poll();
 }
 
 /** Networking stack process */
