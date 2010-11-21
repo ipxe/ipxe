@@ -124,7 +124,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef	DIGEST_CMD		/* Image crypto digest commands */
 #undef	LOTEST_CMD		/* Loopback testing commands */
 #undef	VLAN_CMD		/* VLAN commands */
-//#undef	PXE_CMD			/* PXE commands */
+#undef	PXE_CMD			/* PXE commands */
 
 /*
  * Error message tables to include
