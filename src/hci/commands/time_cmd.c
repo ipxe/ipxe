@@ -24,24 +24,43 @@
 #include <string.h>
 #include <unistd.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 #include <ipxe/nap.h>
 #include <ipxe/timer.h>
 
-static int time_exec ( int argc, char **argv ) {
-	unsigned long start;
-	int rc, secs;
+/** @file
+ *
+ * Time commands
+ *
+ */
 
-	if ( argc == 1 ||
-	     !strcmp ( argv[1], "--help" ) ||
-	     !strcmp ( argv[1], "-h" ) )
-	{
-		printf ( "Usage:\n"
-			 "  %s <command>\n"
-			 "\n"
-			 "Time a command\n",
-			 argv[0] );
-		return 1;
-	}
+/** "time" options */
+struct time_options {};
+
+/** "time" option list */
+static struct option_descriptor time_opts[] = {};
+
+/** "time" command descriptor */
+static struct command_descriptor time_cmd =
+	COMMAND_DESC ( struct time_options, time_opts, 1, MAX_ARGUMENTS,
+		       "<command>", "Time a command" );
+
+/**
+ * "time" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int time_exec ( int argc, char **argv ) {
+	struct time_options opts;
+	unsigned long start;
+	int secs;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &time_cmd, &opts ) ) != 0 )
+		return rc;
 
 	start = currticks();
 	rc = execv ( argv[1], argv + 1 );
@@ -52,25 +71,39 @@ static int time_exec ( int argc, char **argv ) {
 	return rc;
 }
 
+/** "time" command */
 struct command time_command __command = {
 	.name = "time",
 	.exec = time_exec,
 };
 
-static int sleep_exec ( int argc, char **argv ) {
-	unsigned long start, delay;
+/** "sleep" options */
+struct sleep_options {};
 
-	if ( argc == 1 ||
-	     !strcmp ( argv[1], "--help" ) ||
-	     !strcmp ( argv[1], "-h" ))
-	{
-		printf ( "Usage:\n"
-			 "  %s <seconds>\n"
-			 "\n"
-			 "Sleep for <seconds> seconds\n",
-			 argv[0] );
-		return 1;
-	}
+/** "sleep" option list */
+static struct option_descriptor sleep_opts[] = {};
+
+/** "sleep" command descriptor */
+static struct command_descriptor sleep_cmd =
+	COMMAND_DESC ( struct sleep_options, sleep_opts, 1, 1,
+		       "<seconds>", "Sleep for <seconds> seconds" );
+
+/**
+ * "sleep" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int sleep_exec ( int argc, char **argv ) {
+	struct sleep_options opts;
+	unsigned long start, delay;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &sleep_cmd, &opts ) ) != 0 )
+		return rc;
+
 	start = currticks();
 	delay = strtoul ( argv[1], NULL, 0 ) * ticks_per_sec();
 	while ( ( currticks() - start ) <= delay )
@@ -78,6 +111,7 @@ static int sleep_exec ( int argc, char **argv ) {
 	return 0;
 }
 
+/** "sleep" command */
 struct command sleep_command __command = {
 	.name = "sleep",
 	.exec = sleep_exec,
