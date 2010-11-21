@@ -293,22 +293,24 @@ static void close_all_netdevs ( void ) {
 /**
  * Boot the system
  */
-void autoboot ( void ) {
+int autoboot ( void ) {
 	struct net_device *boot_netdev;
 	struct net_device *netdev;
+	int rc = -ENODEV;
 
 	/* If we have an identifable boot device, try that first */
 	close_all_netdevs();
 	if ( ( boot_netdev = find_boot_netdev() ) )
-		netboot ( boot_netdev );
+		rc = netboot ( boot_netdev );
 
 	/* If that fails, try booting from any of the other devices */
 	for_each_netdev ( netdev ) {
 		if ( netdev == boot_netdev )
 			continue;
 		close_all_netdevs();
-		netboot ( netdev );
+		rc = netboot ( netdev );
 	}
 
 	printf ( "No more network devices\n" );
+	return rc;
 }

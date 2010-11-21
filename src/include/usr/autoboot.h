@@ -15,7 +15,7 @@ struct net_device;
 extern int shutdown_exit_flags;
 
 extern int netboot ( struct net_device *netdev );
-extern void autoboot ( void );
+extern int autoboot ( void );
 extern int boot_next_server_and_filename ( struct in_addr next_server,
 					   const char *filename );
 extern int boot_root_path ( const char *root_path );
