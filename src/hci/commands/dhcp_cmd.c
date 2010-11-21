@@ -30,7 +30,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/netdevice.h>
 #include <ipxe/in.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 #include <usr/dhcpmgmt.h>
+#include <hci/ifmgmt_cmd.h>
 
 /** @file
  *
@@ -38,26 +40,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/**
- * "dhcp" command syntax message
- *
- * @v argv		Argument list
- */
-static void dhcp_syntax ( char **argv ) {
-	printf ( "Usage:\n"
-		 "  %s [<interface>] [<interface>...]\n"
-		 "\n"
-		 "Configure a network interface using DHCP\n",
-		 argv[0] );
-}
+/** "dhcp" command descriptor */
+static struct command_descriptor dhcp_cmd =
+	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
+		       "[<interface>] [<interface>...]",
+		       "Configure network interface(s) using DHCP" );
 
 /**
  * Execute "dhcp" command for a network device
  *
  * @v netdev		Network device
- * @ret rc		Exit code
+ * @ret rc		Return status code
  */
-static int dhcp_exec_netdev ( struct net_device *netdev ) {
+static int dhcp_payload ( struct net_device *netdev ) {
 	int rc;
 
 	if ( ( rc = dhcp ( netdev ) ) != 0 ) {
@@ -67,28 +62,10 @@ static int dhcp_exec_netdev ( struct net_device *netdev ) {
 		/* Close device on failure, to avoid memory exhaustion */
 		netdev_close ( netdev );
 
-		return 1;
+		return rc;
 	}
 
 	return 0;
-}
-
-/**
- * Execute "dhcp" command for a named network device
- *
- * @v netdev_name	Network device name
- * @ret rc		Exit code
- */
-static int dhcp_exec_name ( const char *netdev_name ) {
-	struct net_device *netdev;
-
-	netdev = find_netdev ( netdev_name );
-	if ( ! netdev ) {
-		printf ( "No such interface \"%s\"\n", netdev_name );
-		return 1;
-	}
-
-	return dhcp_exec_netdev ( netdev );
 }
 
 /**
@@ -96,116 +73,54 @@ static int dhcp_exec_name ( const char *netdev_name ) {
  *
  * @v argc		Argument count
  * @v argv		Argument list
- * @ret rc		Exit code
+ * @ret rc		Return status code
  */
 static int dhcp_exec ( int argc, char **argv ) {
-	static struct option longopts[] = {
-		{ "help", 0, NULL, 'h' },
-		{ NULL, 0, NULL, 0 },
-	};
-	const char *netdev_name;
-	struct net_device *netdev;
-	int c;
-	int rc;
-
-	/* Parse options */
-	while ( ( c = getopt_long ( argc, argv, "h", longopts, NULL ) ) >= 0 ){
-		switch ( c ) {
-		case 'h':
-			/* Display help text */
-		default:
-			/* Unrecognised/invalid option */
-			dhcp_syntax ( argv );
-			return 1;
-		}
-	}
-
-	if ( optind != argc ) {
-		/* Treat arguments as a list of interfaces to try */
-		while ( optind != argc ) {
-			netdev_name = argv[optind++];
-			if ( ( rc = dhcp_exec_name ( netdev_name ) ) == 0 )
-				return 0;
-		}
-	} else {
-		/* Try all interfaces */
-		for_each_netdev ( netdev ) {
-			if ( ( rc = dhcp_exec_netdev ( netdev ) ) == 0 )
-				return 0;
-		}
-	}
-
-	return 1;
+	return ifcommon_exec ( argc, argv, &dhcp_cmd, dhcp_payload, 1 );
 }
 
-/**
- * "pxebs" command syntax message
- *
- * @v argv		Argument list
- */
-static void pxebs_syntax ( char **argv ) {
-	printf ( "Usage:\n"
-		 "  %s <interface> <server_type>\n"
-		 "\n"
-		 "Perform PXE Boot Server discovery\n",
-		 argv[0] );
-}
+/** "pxebs" options */
+struct pxebs_options {};
+
+/** "pxebs" option list */
+static struct option_descriptor pxebs_opts[] = {};
+
+/** "pxebs" command descriptor */
+static struct command_descriptor pxebs_cmd =
+	COMMAND_DESC ( struct pxebs_options, pxebs_opts, 2, 2,
+		       "<interface> <server_type>",
+		       "Perform PXE Boot Server discovery" );
 
 /**
  * The "pxebs" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
- * @ret rc		Exit code
+ * @ret rc		Return status code
  */
 static int pxebs_exec ( int argc, char **argv ) {
-	static struct option longopts[] = {
-		{ "help", 0, NULL, 'h' },
-		{ NULL, 0, NULL, 0 },
-	};
-	const char *netdev_txt;
-	const char *pxe_type_txt;
+	struct pxebs_options opts;
 	struct net_device *netdev;
 	unsigned int pxe_type;
-	char *end;
-	int c;
 	int rc;
 
 	/* Parse options */
-	while ( ( c = getopt_long ( argc, argv, "h", longopts, NULL ) ) >= 0 ){
-		switch ( c ) {
-		case 'h':
-			/* Display help text */
-		default:
-			/* Unrecognised/invalid option */
-			pxebs_syntax ( argv );
-			return 1;
-		}
-	}
-	if ( optind != ( argc - 2 ) ) {
-		pxebs_syntax ( argv );
-		return 1;
-	}
-	netdev_txt = argv[optind];
-	pxe_type_txt = argv[ optind + 1 ];
+	if ( ( rc = parse_options ( argc, argv, &pxebs_cmd, &opts ) ) != 0 )
+		return rc;
 
-	/* Parse arguments */
-	netdev = find_netdev ( netdev_txt );
-	if ( ! netdev ) {
-		printf ( "No such interface: %s\n", netdev_txt );
-		return 1;
-	}
-	pxe_type = strtoul ( pxe_type_txt, &end, 0 );
-	if ( *end ) {
-		printf ( "Bad server type: %s\n", pxe_type_txt );
-		return 1;
-	}
+	/* Parse net device name */
+	if ( ( rc = parse_netdev ( argv[optind], &netdev ) ) != 0 )
+		return rc;
+
+	/* Parse boot server type */
+	if ( ( rc = parse_integer ( argv[ optind + 1 ], &pxe_type ) ) != 0 )
+		return rc;
 
 	/* Perform Boot Server Discovery */
 	if ( ( rc = pxebs ( netdev, pxe_type ) ) != 0 ) {
 		printf ( "Could not discover boot server on %s: %s\n",
 			 netdev->name, strerror ( rc ) );
-		return 1;
+		return rc;
 	}
 
 	return 0;
