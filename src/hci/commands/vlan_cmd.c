@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <getopt.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 #include <ipxe/vlan.h>
 
 /** @file
@@ -32,136 +33,102 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-static void vcreate_syntax ( char **argv ) {
-	printf ( "Usage:\n  %s --tag <tag> [--priority <priority] "
-		 "<trunk interface>\n", argv[0] );
-}
-
-static int vcreate_exec ( int argc, char **argv ) {
-	static struct option vcreate_opts[] = {
-		{ "help", 0, NULL, 'h' },
-		{ "tag", required_argument, NULL, 't' },
-		{ "priority", required_argument, NULL, 'p' },
-		{ NULL, 0, NULL, 0 },
-	};
-	const char *trunk_name;
-	const char *tag_text = NULL;
-	const char *priority_text = NULL;
-	struct net_device *trunk;
+/** "vcreate" options */
+struct vcreate_options {
+	/** VLAN tag */
 	unsigned int tag;
+	/** VLAN default priority */
 	unsigned int priority;
-	char *endp;
-	int c;
+};
+
+/** "vcreate" option list */
+static struct option_descriptor vcreate_opts[] = {
+	OPTION_DESC ( "tag", 't', required_argument,
+		      struct vcreate_options, tag, parse_integer ),
+	OPTION_DESC ( "priority", 'p', required_argument,
+		      struct vcreate_options, priority, parse_integer ),
+};
+
+/** "vcreate" command descriptor */
+static struct command_descriptor vcreate_cmd =
+	COMMAND_DESC ( struct vcreate_options, vcreate_opts, 1, 1,
+		       "--tag <tag> [--priority <priority>] "
+		       "<trunk interface>",
+		       "Create a VLAN interface" );
+
+/**
+ * "vcreate" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int vcreate_exec ( int argc, char **argv ) {
+	struct vcreate_options opts;
+	struct net_device *trunk;
 	int rc;
 
-	/* Parse command line */
-	while ( ( c = getopt_long ( argc, argv, "ht:p:", vcreate_opts,
-				    NULL ) ) >= 0 ) {
-		switch ( c ) {
-		case 't':
-			tag_text = optarg;
-			break;
-		case 'p':
-			priority_text = optarg;
-			break;
-		case 'h':
-			/* Display help text */
-		default:
-			/* Unrecognised/invalid option */
-			vcreate_syntax ( argv );
-			return 1;
-		}
-	}
-	if ( optind != ( argc - 1 ) ) {
-		vcreate_syntax ( argv );
-		return 1;
-	}
-	trunk_name = argv[optind];
-	if ( ! tag_text ) {
-		vcreate_syntax ( argv );
-		return 1;
-	}
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &vcreate_cmd, &opts ) ) != 0 )
+		return rc;
 
-	/* Identify network device */
-	trunk = find_netdev ( trunk_name );
-	if ( ! trunk ) {
-		printf ( "%s: no such interface\n", trunk_name );
-		return 1;
-	}
-	tag = strtoul ( tag_text, &endp, 10 );
-	if ( *endp ) {
-		printf ( "%s: invalid tag\n", tag_text );
-		return 1;
-	}
-	if ( priority_text ) {
-		priority = strtoul ( priority_text, &endp, 10 );
-		if ( *endp ) {
-			printf ( "%s: invalid priority\n", priority_text );
-			return 1;
-		}
-	} else {
-		priority = 0;
-	}
+	/* Parse trunk interface */
+	if ( ( rc = parse_netdev ( argv[optind], &trunk ) ) != 0 )
+		return rc;
 
 	/* Create VLAN device */
-	if ( ( rc = vlan_create ( trunk, tag, priority ) ) != 0 ) {
+	if ( ( rc = vlan_create ( trunk, opts.tag, opts.priority ) ) != 0 ) {
 		printf ( "Could not create VLAN device: %s\n",
 			 strerror ( rc ) );
-		return 1;
+		return rc;
 	}
 
 	return 0;
 }
 
-static void vdestroy_syntax ( char **argv ) {
-	printf ( "Usage:\n  %s <interface>\n", argv[0] );
-}
+/** "vdestroy" options */
+struct vdestroy_options {};
 
+/** "vdestroy" option list */
+static struct option_descriptor vdestroy_opts[] = {};
+
+/** "vdestroy" command descriptor */
+static struct command_descriptor vdestroy_cmd =
+	COMMAND_DESC ( struct vdestroy_options, vdestroy_opts, 1, 1,
+		       "<VLAN interface>",
+		       "Destroy a VLAN interface" );
+
+/**
+ * "vdestroy" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int vdestroy_exec ( int argc, char **argv ) {
-	static struct option vdestroy_opts[] = {
-		{ "help", 0, NULL, 'h' },
-		{ NULL, 0, NULL, 0 },
-	};
-	const char *netdev_name;
+	struct vdestroy_options opts;
 	struct net_device *netdev;
-	int c;
 	int rc;
 
-	/* Parse command line */
-	while ( ( c = getopt_long ( argc, argv, "h", vdestroy_opts,
-				    NULL ) ) >= 0 ) {
-		switch ( c ) {
-		case 'h':
-			/* Display help text */
-		default:
-			/* Unrecognised/invalid option */
-			vdestroy_syntax ( argv );
-			return 1;
-		}
-	}
-	if ( optind != ( argc - 1 ) ) {
-		vdestroy_syntax ( argv );
-		return 1;
-	}
-	netdev_name = argv[optind];
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &vdestroy_cmd, &opts ) ) != 0 )
+		return rc;
 
-	/* Identify network device */
-	netdev = find_netdev ( netdev_name );
-	if ( ! netdev ) {
-		printf ( "%s: no such interface\n", netdev_name );
-		return 1;
-	}
+	/* Parse trunk interface */
+	if ( ( rc = parse_netdev ( argv[optind], &netdev ) ) != 0 )
+		return rc;
 
 	/* Destroy VLAN device */
 	if ( ( rc = vlan_destroy ( netdev ) ) != 0 ) {
 		printf ( "Could not destroy VLAN device: %s\n",
 			 strerror ( rc ) );
-		return 1;
+		return rc;
 	}
 
 	return 0;
 }
 
+/** VLAN commands */
 struct command vlan_commands[] __command = {
 	{
 		.name = "vcreate",
