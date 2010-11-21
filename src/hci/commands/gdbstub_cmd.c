@@ -17,8 +17,11 @@
  */
 
 #include <stdio.h>
+#include <errno.h>
+#include <assert.h>
 #include <getopt.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 #include <ipxe/gdbstub.h>
 
 /** @file
@@ -28,71 +31,76 @@
  */
 
 /**
- * "gdbstub" command syntax message
+ * Parse GDB transport name
  *
- * @v argv		Argument list
+ * @v text		Text
+ * @ret trans		GDB transport
+ * @ret rc		Return status code
  */
-static void gdbstub_syntax ( char **argv ) {
-	printf ( "Usage:\n"
-		 "  %s <transport> [<options>...]\n"
-		 "\n"
-		 "Start remote debugging using one of the following transports:\n"
-		 "  serial           use serial port (if compiled in)\n"
-		 "  udp <interface>  use UDP over network interface (if compiled in)\n",
-		 argv[0] );
+static int parse_gdb_transport ( const char *text,
+				 struct gdb_transport **trans ) {
+
+	/* Sanity check */
+	assert ( text != NULL );
+
+	/* Find transport */
+	*trans = find_gdb_transport ( text );
+	if ( ! *trans ) {
+		printf ( "\"%s\": no such transport (is it compiled in?)\n",
+			 text );
+		return -ENOTSUP;
+	}
+
+	return 0;
 }
+
+/** "gdbstub" options */
+struct gdbstub_options {};
+
+/** "gdbstub" option list */
+static struct option_descriptor gdbstub_opts[] = {};
+
+/** "gdbstub" command descriptor */
+static struct command_descriptor gdbstub_cmd =
+	COMMAND_DESC ( struct gdbstub_options, gdbstub_opts, 1, MAX_ARGUMENTS,
+		       "<transport> [<options>...]",
+		       "Start remote debugging using one of the following "
+		       "transports:\n"
+		       "  serial           use serial port (if compiled in)\n"
+		       "  udp <interface>  use UDP over network interface "
+		       "(if compiled in)" );
 
 /**
  * The "gdbstub" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
- * @ret rc		Exit code
+ * @ret rc		Return status code
  */
 static int gdbstub_exec ( int argc, char **argv ) {
-	static struct option longopts[] = {
-		{ "help", 0, NULL, 'h' },
-		{ NULL, 0, NULL, 0 },
-	};
-	const char *trans_name;
+	struct gdbstub_options opts;
 	struct gdb_transport *trans;
-	int c;
+	int rc;
 
 	/* Parse options */
-	while ( ( c = getopt_long ( argc, argv, "h", longopts, NULL ) ) >= 0 ){
-		switch ( c ) {
-		case 'h':
-			/* Display help text */
-		default:
-			/* Unrecognised/invalid option */
-			gdbstub_syntax ( argv );
-			return 1;
-		}
-	}
+	if ( ( rc = parse_options ( argc, argv, &gdbstub_cmd, &opts ) ) != 0 )
+		return rc;
 
-	/* At least one argument */
-	if ( optind == argc ) {
-		gdbstub_syntax ( argv );
-		return 1;
-	}
-
-	trans_name = argv[optind++];
+	/* Parse transport name */
+	if ( ( rc = parse_gdb_transport ( argv[optind++], &trans ) ) != 0 )
+		return rc;
 
 	/* Initialise transport */
-	trans = find_gdb_transport ( trans_name );
-	if ( !trans ) {
-		printf ( "%s: no such transport (is it compiled in?)\n", trans_name );
-		return 1;
-	}
-
 	if ( trans->init ) {
-		if ( trans->init ( argc - optind, &argv[optind] ) != 0 ) {
-			return 1;
+		if ( ( rc = trans->init ( argc - optind,
+					  &argv[optind] ) ) != 0 ) {
+			return rc;
 		}
 	}
 
 	/* Enter GDB stub */
 	gdbstub_start ( trans );
+
 	return 0;
 }
 
