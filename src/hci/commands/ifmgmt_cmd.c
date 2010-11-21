@@ -19,9 +19,11 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
+#include <errno.h>
 #include <getopt.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 #include <usr/ifmgmt.h>
 #include <hci/ifmgmt_cmd.h>
 
@@ -31,136 +33,138 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** Options shared by all if<xxx> commands */
-static struct option ifcommon_longopts[] = {
-	{ "help", 0, NULL, 'h' },
-	{ NULL, 0, NULL, 0 },
-};
-
-/**
- * Print syntax of if<xxx> command
- *
- * @v argv		Command arguments
- * @v verb		Verb describing the action of the command
- */
-static void ifcommon_syntax ( char **argv, const char *verb ) {
-	printf ( "Usage:\n"
-		 "  %s [<interface>] [<interface>...]\n"
-		 "\n"
-		 "%s the specified network interfaces\n",
-		 argv[0], verb );
-}
-
-/**
- * Execute if<xxx> command over all network devices
- *
- * @v payload		Command to execute
- * @ret rc		Exit code
- */
-static int ifcommon_do_all ( int ( * payload ) ( struct net_device * ) ) {
-	struct net_device *netdev;
-	int rc = 0;
-
-	/* Execute payload for each network device */
-	for_each_netdev ( netdev ) {
-		if ( payload ( netdev ) != 0 )
-			rc = 1;
-	}
-	return rc;
-}
-
-/**
- * Execute if<xxx> command over list of network devices
- *
- * @v payload		Command to execute
- * @ret rc		Exit code
- */
-static int ifcommon_do_list ( int ( * payload ) ( struct net_device * ),
-			      char **list, unsigned int count ) {
-	const char *netdev_name;
-	struct net_device *netdev;
-	int rc = 0;
-
-	while ( count-- ) {
-		netdev_name = *(list++);
-		netdev = find_netdev ( netdev_name );
-		if ( ! netdev ) {
-			printf ( "%s: no such interface\n", netdev_name );
-			rc = 1;
-			continue;
-		}
-		if ( payload ( netdev ) != 0 )
-			rc = 1;
-	}
-	return rc;
-}
+/** "if<xxx>" command options */
+struct option_descriptor ifcommon_opts[0];
 
 /**
  * Execute if<xxx> command
  *
  * @v argc		Argument count
  * @v argv		Argument list
+ * @v cmd		Command descriptor
  * @v payload		Command to execute
  * @v verb		Verb describing the action of the command
- * @ret rc		Exit code
+ * @ret rc		Return status code
  */
 int ifcommon_exec ( int argc, char **argv,
+		    struct command_descriptor *cmd,
 		    int ( * payload ) ( struct net_device * ),
-		    const char *verb ) {
-	int c;
+		    int stop_on_first_success ) {
+	struct ifcommon_options opts;
+	struct net_device *netdev;
+	int rc;
 
 	/* Parse options */
-	while ( ( c = getopt_long ( argc, argv, "h", ifcommon_longopts,
-				    NULL ) ) >= 0 ) {
-		switch ( c ) {
-		case 'h':
-			/* Display help text */
-		default:
-			/* Unrecognised/invalid option */
-			ifcommon_syntax ( argv, verb );
-			return 1;
+	if ( ( rc = parse_options ( argc, argv, cmd, &opts ) ) != 0 )
+		return rc;
+
+	if ( optind != argc ) {
+		/* Treat arguments as a list of interfaces to try */
+		while ( optind != argc ) {
+			if ( ( rc = parse_netdev ( argv[optind++],
+						   &netdev ) ) != 0 ) {
+				continue;
+			}
+			if ( ( ( rc = payload ( netdev ) ) == 0 ) &&
+			     stop_on_first_success ) {
+				return 0;
+			}
+		}
+	} else {
+		/* Try all interfaces */
+		rc = -ENODEV;
+		for_each_netdev ( netdev ) {
+			if ( ( ( rc = payload ( netdev ) ) == 0 ) &&
+			     stop_on_first_success ) {
+				return 0;
+			}
 		}
 	}
 
-	if ( optind == argc ) {
-		return ifcommon_do_all ( payload );
-	} else {
-		return ifcommon_do_list ( payload, &argv[optind],
-					  ( argc - optind ) );
-	}
+	return rc;
 }
 
-/* "ifopen" command */
+/** "ifopen" command descriptor */
+static struct command_descriptor ifopen_cmd =
+	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
+		       "[<interface>...]",
+		       "Open network interface(s)" );
 
+/**
+ * "ifopen" payload
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
 static int ifopen_payload ( struct net_device *netdev ) {
 	return ifopen ( netdev );
 }
 
+/**
+ * The "ifopen" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int ifopen_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( argc, argv, ifopen_payload, "Open" );
+	return ifcommon_exec ( argc, argv, &ifopen_cmd, ifopen_payload, 0 );
 }
 
-/* "ifclose" command */
+/** "ifclose" command descriptor */
+static struct command_descriptor ifclose_cmd =
+	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
+		       "[<interface>...]",
+		       "Close network interface(s)" );
 
+/**
+ * "ifclose" payload
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
 static int ifclose_payload ( struct net_device *netdev ) {
 	ifclose ( netdev );
 	return 0;
 }
 
+/**
+ * The "ifclose" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int ifclose_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( argc, argv, ifclose_payload, "Close" );
+	return ifcommon_exec ( argc, argv, &ifclose_cmd, ifclose_payload, 0 );
 }
 
-/* "ifstat" command */
+/** "ifstat" command descriptor */
+static struct command_descriptor ifstat_cmd =
+	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
+		       "[<interface>...]",
+		       "Show network interface(s)" );
 
+/**
+ * "ifstat" payload
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
 static int ifstat_payload ( struct net_device *netdev ) {
 	ifstat ( netdev );
 	return 0;
 }
 
+/**
+ * The "ifstat" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int ifstat_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( argc, argv,
-			       ifstat_payload, "Display status of" );
+	return ifcommon_exec ( argc, argv, &ifstat_cmd, ifstat_payload, 0 );
 }
 
 /** Interface management commands */

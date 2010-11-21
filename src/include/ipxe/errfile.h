@@ -229,6 +229,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_linux_smbios	      ( ERRFILE_OTHER | 0x001a0000 )
 #define ERRFILE_lotest		      ( ERRFILE_OTHER | 0x001b0000 )
 #define ERRFILE_config_cmd	      ( ERRFILE_OTHER | 0x001c0000 )
+#define ERRFILE_ifmgmt_cmd	      ( ERRFILE_OTHER | 0x001d0000 )
 
 /** @} */
 

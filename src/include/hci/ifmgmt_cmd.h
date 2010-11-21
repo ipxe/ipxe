@@ -21,10 +21,17 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <ipxe/parseopt.h>
+
 struct net_device;
 
+struct ifcommon_options {};
+
+extern struct option_descriptor ifcommon_opts[0];
+
 extern int ifcommon_exec (  int argc, char **argv,
+			    struct command_descriptor *cmd,
 			    int ( * payload ) ( struct net_device * ),
-			    const char *verb );
+			    int stop_on_first_success );
 
 #endif /* _IFMGMT_CMD_H */
