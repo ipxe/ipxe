@@ -19,6 +19,8 @@
  * Shao Miller <shao.miller@yrdsb.edu.on.ca>.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
