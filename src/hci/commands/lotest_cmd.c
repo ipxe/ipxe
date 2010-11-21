@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <getopt.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 #include <ipxe/if_ether.h>
 #include <usr/lotest.h>
 
@@ -33,81 +34,63 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-static void lotest_syntax ( char **argv ) {
-	printf ( "Usage:\n  %s <sending interface> <receiving interface>\n",
-		 argv[0] );
-}
+/** "lotest" options */
+struct lotest_options {
+	/** MTU */
+	unsigned int mtu;
+};
 
+/** "lotest" option list */
+static struct option_descriptor lotest_opts[] = {
+	OPTION_DESC ( "mtu", 'm', required_argument,
+		      struct lotest_options, mtu, parse_integer ),
+};
+
+/** "lotest" command descriptor */
+static struct command_descriptor lotest_cmd =
+	COMMAND_DESC ( struct lotest_options, lotest_opts, 2, 2,
+		       "[--mtu <mtu>] <sending_interface> "
+		       "<receiving_interface>", "" );
+
+/**
+ * "lotest" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int lotest_exec ( int argc, char **argv ) {
-	static struct option lotest_opts[] = {
-		{ "help", 0, NULL, 'h' },
-		{ "mtu", required_argument, NULL, 'm' },
-		{ NULL, 0, NULL, 0 },
-	};
-	const char *sender_name;
-	const char *receiver_name;
-	const char *mtu_text = NULL;
+	struct lotest_options opts;
 	struct net_device *sender;
 	struct net_device *receiver;
-	char *endp;
-	size_t mtu;
-	int c;
 	int rc;
 
-	/* Parse command line */
-	while ( ( c = getopt_long ( argc, argv, "hm:", lotest_opts,
-				    NULL ) ) >= 0 ) {
-		switch ( c ) {
-		case 'm':
-			mtu_text = optarg;
-			break;
-		case 'h':
-			/* Display help text */
-		default:
-			/* Unrecognised/invalid option */
-			lotest_syntax ( argv );
-			return 1;
-		}
-	}
-	if ( optind != ( argc - 2 ) ) {
-		lotest_syntax ( argv );
-		return 1;
-	}
-	sender_name = argv[optind];
-	receiver_name = argv[optind + 1];
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &lotest_cmd, &opts ) ) != 0 )
+		return rc;
 
-	/* Identify network devices */
-	sender = find_netdev ( sender_name );
-	if ( ! sender ) {
-		printf ( "%s: no such interface\n", sender_name );
-		return 1;
-	}
-	receiver = find_netdev ( receiver_name );
-	if ( ! receiver ) {
-		printf ( "%s: no such interface\n", receiver_name );
-		return 1;
-	}
+	/* Parse sending interface name */
+	if ( ( rc = parse_netdev ( argv[optind], &sender ) ) != 0 )
+		return rc;
 
-	/* Identify MTU */
-	if ( mtu_text ) {
-		mtu = strtoul ( mtu_text, &endp, 10 );
-		if ( *endp ) {
-			printf ( "%s: invalid MTU\n", mtu_text );
-			return 1;
-		}
-	} else {
-		mtu = ETH_MAX_MTU;
-	}
+	/* Parse receiving interface name */
+	if ( ( rc = parse_netdev ( argv[ optind + 1 ], &receiver ) ) != 0 )
+		return rc;
+
+	/* Use default MTU if none specified */
+	if ( ! opts.mtu )
+		opts.mtu = ETH_MAX_MTU;
 
 	/* Perform loopback test */
-	if ( ( rc = loopback_test ( sender, receiver, mtu ) ) != 0 ) {
+	if ( ( rc = loopback_test ( sender, receiver, opts.mtu ) ) != 0 ) {
 		printf ( "Test failed: %s\n", strerror ( rc ) );
-		return 1;
+		return rc;
 	}
 
 	return 0;
 }
 
+/** Loopback testing commands */
 struct command lotest_command __command = {
 	.name = "lotest",
 	.exec = lotest_exec,
