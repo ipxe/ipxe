@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2010 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -6,42 +24,96 @@
 #include <getopt.h>
 #include <ipxe/settings.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+/** @file
+ *
+ * Non-volatile option commands
+ *
+ */
+
+/** "show" options */
+struct show_options {};
+
+/** "show" option list */
+static struct option_descriptor show_opts[] = {};
+
+/** "show" command descriptor */
+static struct command_descriptor show_cmd =
+	COMMAND_DESC ( struct show_options, show_opts, 1, 1,
+		       "<setting>", "" );
+
+/**
+ * "show" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int show_exec ( int argc, char **argv ) {
+	struct show_options opts;
+	const char *name;
 	char buf[256];
 	int rc;
 
-	if ( argc != 2 ) {
-		printf ( "Syntax: %s <identifier>\n", argv[0] );
-		return 1;
-	}
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &show_cmd, &opts ) ) != 0 )
+		return rc;
 
-	if ( ( rc = fetchf_named_setting ( argv[1], buf,
-					   sizeof ( buf ) ) ) < 0 ){
+	/* Parse setting name */
+	name = argv[optind];
+
+	/* Fetch setting */
+	if ( ( rc = fetchf_named_setting ( name, buf,
+					   sizeof ( buf ) ) ) < 0 ) {
 		printf ( "Could not find \"%s\": %s\n",
-			 argv[1], strerror ( rc ) );
-		return 1;
+			 name, strerror ( rc ) );
+		return rc;
 	}
 
-	printf ( "%s = %s\n", argv[1], buf );
+	/* Print setting value */
+	printf ( "%s = %s\n", name, buf );
+
 	return 0;
 }
 
+/** "set" options */
+struct set_options {};
+
+/** "set" option list */
+static struct option_descriptor set_opts[] = {};
+
+/** "set" command descriptor */
+static struct command_descriptor set_cmd =
+	COMMAND_DESC ( struct set_options, set_opts, 2, MAX_ARGUMENTS,
+		       "<setting> <value>", "" );
+
+/**
+ * "set" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int set_exec ( int argc, char **argv ) {
+	struct set_options opts;
+	const char *name;
 	size_t len;
 	int i;
 	int rc;
 
-	if ( argc < 3 ) {
-		printf ( "Syntax: %s <identifier> <value>\n", argv[0] );
-		return 1;
-	}
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &set_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Parse setting name */
+	name = argv[optind];
 
 	/* Determine total length of command line */
 	len = 1; /* NUL */
-	for ( i = 2 ; i < argc ; i++ )
+	for ( i = optind + 1 ; i < argc ; i++ )
 		len += ( 1 /* possible space */ + strlen ( argv[i] ) );
 
 	{
@@ -50,39 +122,63 @@ static int set_exec ( int argc, char **argv ) {
 
 		/* Assemble command line */
 		buf[0] = '\0';
-		for ( i = 2 ; i < argc ; i++ ) {
+		for ( i = optind + 1 ; i < argc ; i++ ) {
 			ptr += sprintf ( ptr, "%s%s", ( buf[0] ? " " : "" ),
 					 argv[i] );
 		}
 		assert ( ptr < ( buf + len ) );
 
-		if ( ( rc = storef_named_setting ( argv[1], buf ) ) != 0 ) {
+		if ( ( rc = storef_named_setting ( name, buf ) ) != 0 ) {
 			printf ( "Could not set \"%s\"=\"%s\": %s\n",
-				 argv[1], buf, strerror ( rc ) );
-			return 1;
+				 name, buf, strerror ( rc ) );
+			return rc;
 		}
 	}
 
 	return 0;
 }
 
+/** "clear" options */
+struct clear_options {};
+
+/** "clear" option list */
+static struct option_descriptor clear_opts[] = {};
+
+/** "clear" command descriptor */
+static struct command_descriptor clear_cmd =
+	COMMAND_DESC ( struct clear_options, clear_opts, 1, 1,
+		       "<setting>", "" );
+
+/**
+ * "clear" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int clear_exec ( int argc, char **argv ) {
+	struct clear_options opts;
+	const char *name;
 	int rc;
 
-	if ( argc != 2 ) {
-		printf ( "Syntax: %s <identifier>\n", argv[0] );
-		return 1;
-	}
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &clear_cmd, &opts ) ) != 0 )
+		return rc;
 
-	if ( ( rc = delete_named_setting ( argv[1] ) ) != 0 ) {
+	/* Parse setting name */
+	name = argv[optind];
+
+	/* Clear setting */
+	if ( ( rc = delete_named_setting ( name ) ) != 0 ) {
 		printf ( "Could not clear \"%s\": %s\n",
-			 argv[1], strerror ( rc ) );
-		return 1;
+			 name, strerror ( rc ) );
+		return rc;
 	}
 	
 	return 0;
 }
 
+/** Non-volatile option commands */
 struct command nvo_commands[] __command = {
 	{
 		.name = "show",
