@@ -58,12 +58,12 @@ int execv ( const char *command, char * const argv[] ) {
 	/* Count number of arguments */
 	for ( argc = 0 ; argv[argc] ; argc++ ) {}
 
+	/* An empty command is deemed to do nothing, successfully */
+	if ( command == NULL )
+		return 0;
+
 	/* Sanity checks */
-	if ( ! command ) {
-		DBG ( "No command\n" );
-		return -EINVAL;
-	}
-	if ( ! argc ) {
+	if ( argc == 0 ) {
 		DBG ( "%s: empty argument list\n", command );
 		return -EINVAL;
 	}
@@ -156,39 +156,102 @@ static char * expand_command ( const char *command ) {
 }
 
 /**
- * Split command line into argv array
+ * Split command line into tokens
  *
- * @v args		Command line
- * @v argv		Argument array to populate, or NULL
- * @ret argc		Argument count
+ * @v command		Command line
+ * @v tokens		Token list to populate, or NULL
+ * @ret count		Number of tokens
  *
- * Splits the command line into whitespace-delimited arguments.  If @c
- * argv is non-NULL, any whitespace in the command line will be
+ * Splits the command line into whitespace-delimited tokens.  If @c
+ * tokens is non-NULL, any whitespace in the command line will be
  * replaced with NULs.
  */
-static int split_args ( char *args, char * argv[] ) {
-	int argc = 0;
+static int split_command ( char *command, char **tokens ) {
+	int count = 0;
 
 	while ( 1 ) {
 		/* Skip over any whitespace / convert to NUL */
-		while ( isspace ( *args ) ) {
-			if ( argv )
-				*args = '\0';
-			args++;
+		while ( isspace ( *command ) ) {
+			if ( tokens )
+				*command = '\0';
+			command++;
 		}
 		/* Check for end of line */
-		if ( ! *args )
+		if ( ! *command )
 			break;
 		/* We have found the start of the next argument */
-		if ( argv )
-			argv[argc] = args;
-		argc++;
+		if ( tokens )
+			tokens[count] = command;
+		count++;
 		/* Skip to start of next whitespace, if any */
-		while ( *args && ! isspace ( *args ) ) {
-			args++;
+		while ( *command && ! isspace ( *command ) ) {
+			command++;
 		}
 	}
-	return argc;
+	return count;
+}
+
+/**
+ * Terminate command unconditionally
+ *
+ * @v rc		Status of previous command
+ * @ret terminate	Terminate command
+ */
+static int terminate_always ( int rc __unused ) {
+	return 1;
+}
+
+/**
+ * Terminate command only if previous command succeeded
+ *
+ * @v rc		Status of previous command
+ * @ret terminate	Terminate command
+ */
+static int terminate_on_success ( int rc ) {
+	return ( rc == 0 );
+}
+
+/**
+ * Terminate command only if previous command failed
+ *
+ * @v rc		Status of previous command
+ * @ret terminate	Terminate command
+ */
+static int terminate_on_failure ( int rc ) {
+	return ( rc != 0 );
+}
+
+/**
+ * Find command terminator
+ *
+ * @v tokens		Token list
+ * @ret terminator	Terminator type
+ * @ret argc		Argument count
+ */
+static int command_terminator ( char **tokens,
+				int ( **terminator ) ( int rc ) ) {
+	unsigned int i;
+
+	/* Find first terminating token */
+	for ( i = 0 ; tokens[i] ; i++ ) {
+		if ( tokens[i][0] == '#' ) {
+			/* Start of a comment */
+			*terminator = terminate_always;
+			return i;
+		} else if ( strcmp ( tokens[i], "||" ) == 0 ) {
+			/* Short-circuit logical OR */
+			*terminator = terminate_on_success;
+			return i;
+		} else if ( strcmp ( tokens[i], "&&" ) == 0 ) {
+			/* Short-circuit logical AND */
+			*terminator = terminate_on_failure;
+			return i;
+		}
+	}
+
+	/* End of token list */
+	*terminator = terminate_always;
+	return i;
 }
 
 /**
@@ -200,30 +263,46 @@ static int split_args ( char *args, char * argv[] ) {
  * Execute the named command and arguments.
  */
 int system ( const char *command ) {
-	char *args;
+	int ( * terminator ) ( int rc );
+	char *expcmd;
+	char **argv;
 	int argc;
+	int count;
 	int rc = 0;
 
 	/* Perform variable expansion */
-	args = expand_command ( command );
-	if ( ! args )
+	expcmd = expand_command ( command );
+	if ( ! expcmd )
 		return -ENOMEM;
 
-	/* Count arguments */
-	argc = split_args ( args, NULL );
+	/* Count tokens */
+	count = split_command ( expcmd, NULL );
 
-	/* Create argv array and execute command */
-	if ( argc ) {
-		char * argv[argc + 1];
+	/* Create token array */
+	if ( count ) {
+		char * tokens[count + 1];
 		
-		split_args ( args, argv );
-		argv[argc] = NULL;
+		split_command ( expcmd, tokens );
+		tokens[count] = NULL;
 
-		if ( argv[0][0] != '#' )
+		for ( argv = tokens ; ; argv += ( argc + 1 ) ) {
+
+			/* Find command terminator */
+			argc = command_terminator ( argv, &terminator );
+
+			/* Execute command */
+			argv[argc] = NULL;
 			rc = execv ( argv[0], argv );
+
+			/* Handle terminator */
+			if ( terminator ( rc ) )
+				break;
+		}
 	}
 
-	free ( args );
+	/* Free expanded command */
+	free ( expcmd );
+
 	return rc;
 }
 
