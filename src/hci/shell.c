@@ -21,8 +21,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <getopt.h>
 #include <readline/readline.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 #include <ipxe/shell.h>
 
 /** @file
@@ -34,29 +36,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** The shell prompt string */
 static const char shell_prompt[] = "iPXE> ";
 
-/** Flag set in order to exit shell */
-static int exit_flag = 0;
-
-/** "exit" command body */
-static int exit_exec ( int argc, char **argv __unused ) {
-
-	if ( argc == 1 ) {
-		exit_flag = 1;
-	} else {
-		printf ( "Usage: exit\n"
-			 "Exits the command shell\n" );
-	}
-
-	return 0;
-}
-
-/** "exit" command definition */
-struct command exit_command __command = {
-	.name = "exit",
-	.exec = exit_exec,
-};
-
-/** "help" command body */
+/**
+ * "help" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
 static int help_exec ( int argc __unused, char **argv __unused ) {
 	struct command *command;
 	unsigned int hpos = 0;
@@ -78,7 +64,7 @@ static int help_exec ( int argc __unused, char **argv __unused ) {
 	return 0;
 }
 
-/** "help" command definition */
+/** "help" command */
 struct command help_command __command = {
 	.name = "help",
 	.exec = help_exec,
@@ -91,12 +77,11 @@ struct command help_command __command = {
 void shell ( void ) {
 	char *line;
 
-	exit_flag = 0;
-	while ( ! exit_flag ) {
+	do {
 		line = readline ( shell_prompt );
 		if ( line ) {
 			system ( line );
 			free ( line );
 		}
-	}
+	} while ( shell_exit == 0 );
 }

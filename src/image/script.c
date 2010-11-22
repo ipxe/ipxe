@@ -99,23 +99,20 @@ static int process_script ( int ( * process_line ) ( const char *line ),
 }
 
 /**
- * Terminate script processing if line processing failed
+ * Terminate script processing on shell exit or command failure
  *
  * @v rc		Line processing status
  * @ret terminate	Terminate script processing
  */
-static int terminate_on_failure ( int rc ) {
-	return ( rc != 0 );
-}
+static int terminate_on_exit_or_failure ( int rc ) {
 
-/**
- * Terminate script processing if line processing succeeded
- *
- * @v rc		Line processing status
- * @ret terminate	Terminate script processing
- */
-static int terminate_on_success ( int rc ) {
-	return ( rc == 0 );
+	/* Check and consume exit flag */
+	if ( shell_exit ) {
+		shell_exit = 0;
+		return 1;
+	}
+
+	return ( rc != 0 );
 }
 
 /**
@@ -164,7 +161,7 @@ static int script_exec ( struct image *image ) {
 	script = image;
 
 	/* Process script */
-	rc = process_script ( script_exec_line, terminate_on_failure );
+	rc = process_script ( script_exec_line, terminate_on_exit_or_failure );
 
 	/* Restore saved state, re-register image, and return */
 	script_offset = saved_offset;
@@ -253,6 +250,16 @@ static int goto_find_label ( const char *line ) {
 }
 
 /**
+ * Terminate script processing when label is found
+ *
+ * @v rc		Line processing status
+ * @ret terminate	Terminate script processing
+ */
+static int terminate_on_label_found ( int rc ) {
+	return ( rc == 0 );
+}
+
+/**
  * "goto" command
  *
  * @v argc		Argument count
@@ -280,7 +287,7 @@ static int goto_exec ( int argc, char **argv ) {
 	/* Find label */
 	saved_offset = script_offset;
 	if ( ( rc = process_script ( goto_find_label,
-				     terminate_on_success ) ) != 0 ) {
+				     terminate_on_label_found ) ) != 0 ) {
 		script_offset = saved_offset;
 		return rc;
 	}

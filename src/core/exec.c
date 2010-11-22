@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <ipxe/tables.h>
 #include <ipxe/command.h>
+#include <ipxe/parseopt.h>
 #include <ipxe/settings.h>
 
 /** @file
@@ -37,9 +38,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/* Avoid dragging in getopt.o unless a command really uses it */
-int optind;
-int nextchar;
+/** Shell exit flag */
+int shell_exit;
 
 /**
  * Execute command
@@ -270,6 +270,9 @@ int system ( const char *command ) {
 	int count;
 	int rc = 0;
 
+	/* Reset exit flag */
+	shell_exit = 0;
+
 	/* Perform variable expansion */
 	expcmd = expand_command ( command );
 	if ( ! expcmd )
@@ -294,6 +297,10 @@ int system ( const char *command ) {
 			argv[argc] = NULL;
 			rc = execv ( argv[0], argv );
 
+			/* Check exit flag */
+			if ( shell_exit )
+				break;
+
 			/* Handle terminator */
 			if ( terminator ( rc ) )
 				break;
@@ -307,7 +314,7 @@ int system ( const char *command ) {
 }
 
 /**
- * The "echo" command
+ * "echo" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
@@ -328,3 +335,49 @@ struct command echo_command __command = {
 	.name = "echo",
 	.exec = echo_exec,
 };
+
+/** "exit" options */
+struct exit_options {};
+
+/** "exit" option list */
+static struct option_descriptor exit_opts[] = {};
+
+/** "exit" command descriptor */
+static struct command_descriptor exit_cmd =
+	COMMAND_DESC ( struct exit_options, exit_opts, 0, 1,
+		       "[<status>]", "" );
+
+/**
+ * "exit" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int exit_exec ( int argc, char **argv ) {
+	struct exit_options opts;
+	unsigned int exit_code = 0;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &exit_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Parse exit status, if present */
+	if ( optind != argc ) {
+		if ( ( rc = parse_integer ( argv[optind], &exit_code ) ) != 0 )
+			return rc;
+	}
+
+	/* Set exit flag */
+	shell_exit = 1;
+
+	return exit_code;
+}
+
+/** "exit" command */
+struct command exit_command __command = {
+	.name = "exit",
+	.exec = exit_exec,
+};
+
