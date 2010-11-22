@@ -381,3 +381,38 @@ struct command exit_command __command = {
 	.exec = exit_exec,
 };
 
+/** "isset" options */
+struct isset_options {};
+
+/** "isset" option list */
+static struct option_descriptor isset_opts[] = {};
+
+/** "isset" command descriptor */
+static struct command_descriptor isset_cmd =
+	COMMAND_DESC ( struct isset_options, isset_opts, 0, MAX_ARGUMENTS,
+		       "[...]", "" );
+
+/**
+ * "isset" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int isset_exec ( int argc, char **argv ) {
+	struct isset_options opts;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &isset_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Return success iff any arguments exist */
+	return ( ( optind == argc ) ? -ENOENT : 0 );
+}
+
+/** "isset" command */
+struct command isset_command __command = {
+	.name = "isset",
+	.exec = isset_exec,
+};
