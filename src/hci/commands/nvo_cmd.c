@@ -87,7 +87,7 @@ static struct option_descriptor set_opts[] = {};
 
 /** "set" command descriptor */
 static struct command_descriptor set_cmd =
-	COMMAND_DESC ( struct set_options, set_opts, 2, MAX_ARGUMENTS,
+	COMMAND_DESC ( struct set_options, set_opts, 1, MAX_ARGUMENTS,
 		       "<setting> <value>", "" );
 
 /**
