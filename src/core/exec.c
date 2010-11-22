@@ -115,17 +115,21 @@ static char * expand_command ( const char *command ) {
 
 		head = expcmd;
 
-		/* Locate opener */
-		start = strstr ( expcmd, "${" );
-		if ( ! start )
+		/* Locate setting to be expanded */
+		start = NULL;
+		end = NULL;
+		for ( tmp = expcmd ; *tmp ; tmp++ ) {
+			if ( ( tmp[0] == '$' ) && ( tmp[1] == '{' ) )
+				start = tmp;
+			if ( tmp[0] == '}' )
+				end = tmp;
+			if ( start && end )
+				break;
+		}
+		if ( ! ( start && end ) )
 			break;
 		*start = '\0';
 		name = ( start + 2 );
-
-		/* Locate closer */
-		end = strstr ( name, "}" );
-		if ( ! end )
-			break;
 		*end = '\0';
 		tail = ( end + 1 );
 
