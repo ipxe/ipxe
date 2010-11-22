@@ -21,6 +21,7 @@
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/netdevice.h>
+#include <hci/ifmgmt_cmd.h>
 #include <usr/autoboot.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
@@ -31,17 +32,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** "autoboot" options */
-struct autoboot_options {};
-
-/** "autoboot" option list */
-static struct option_descriptor autoboot_opts[] = {};
-
 /** "autoboot" command descriptor */
 static struct command_descriptor autoboot_cmd =
-	COMMAND_DESC ( struct autoboot_options, autoboot_opts, 0, 0,
-		       "",
-		       "Attempt to boot the system" );
+	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
+		       "[<interface>...]", "Attempt to boot the system" );
 
 /**
  * "autoboot" command
@@ -51,57 +45,7 @@ static struct command_descriptor autoboot_cmd =
  * @ret rc		Return status code
  */
 static int autoboot_exec ( int argc, char **argv ) {
-	struct autoboot_options opts;
-	int rc;
-
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &autoboot_cmd, &opts ) ) != 0 )
-		return rc;
-
-	/* Try to boot */
-	if ( ( rc = autoboot() ) != 0 )
-		return rc;
-
-	return 0;
-}
-
-/** "netboot" options */
-struct netboot_options {};
-
-/** "netboot" option list */
-static struct option_descriptor netboot_opts[] = {};
-
-/** "netboot" command descriptor */
-static struct command_descriptor netboot_cmd =
-	COMMAND_DESC ( struct netboot_options, netboot_opts, 1, 1,
-		       "<interface>",
-		       "Attempt to boot the system from <interface>" );
-
-/**
- * "netboot" command
- *
- * @v argc		Argument count
- * @v argv		Argument list
- * @ret rc		Return status code
- */
-static int netboot_exec ( int argc, char **argv ) {
-	struct netboot_options opts;
-	struct net_device *netdev;
-	int rc;
-
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &netboot_cmd, &opts ) ) != 0 )
-		return rc;
-
-	/* Parse interface */
-	if ( ( rc = parse_netdev ( argv[optind], &netdev ) ) != 0 )
-		return rc;
-
-	/* Try to boot */
-	if ( ( rc = netboot ( netdev ) ) != 0 )
-		return rc;
-
-	return 0;
+	return ifcommon_exec ( argc, argv, &autoboot_cmd, netboot, 0 );
 }
 
 /** Booting commands */
@@ -109,9 +53,5 @@ struct command autoboot_commands[] __command = {
 	{
 		.name = "autoboot",
 		.exec = autoboot_exec,
-	},
-	{
-		.name = "netboot",
-		.exec = netboot_exec,
 	},
 };
