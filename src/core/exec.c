@@ -121,12 +121,12 @@ static char * expand_command ( const char *command ) {
 		for ( tmp = expcmd ; *tmp ; tmp++ ) {
 			if ( ( tmp[0] == '$' ) && ( tmp[1] == '{' ) )
 				start = tmp;
-			if ( tmp[0] == '}' )
+			if ( start && ( tmp[0] == '}' ) ) {
 				end = tmp;
-			if ( start && end )
 				break;
+			}
 		}
-		if ( ! ( start && end ) )
+		if ( ! end )
 			break;
 		*start = '\0';
 		name = ( start + 2 );
