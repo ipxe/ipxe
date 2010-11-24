@@ -64,8 +64,9 @@ static unsigned long pci_bar ( struct pci_device *pci, unsigned int reg ) {
 			if ( sizeof ( unsigned long ) > sizeof ( uint32_t ) ) {
 				return ( ( ( uint64_t ) high << 32 ) | low );
 			} else {
-				DBG ( "Unhandled 64-bit BAR %08x%08x\n",
-				      high, low );
+				DBGC ( pci, PCI_FMT " unhandled 64-bit BAR "
+				       "%08x%08x\n",
+				       PCI_ARGS ( pci ), high, low );
 				return PCI_BASE_ADDRESS_MEM_TYPE_64;
 			}
 		}
@@ -148,19 +149,16 @@ void adjust_pci_device ( struct pci_device *pci ) {
 	new_command = ( pci_command | PCI_COMMAND_MASTER |
 			PCI_COMMAND_MEM | PCI_COMMAND_IO );
 	if ( pci_command != new_command ) {
-		DBG ( "PCI BIOS has not enabled device %02x:%02x.%x! "
-		      "Updating PCI command %04x->%04x\n", pci->bus,
-		      PCI_SLOT ( pci->devfn ), PCI_FUNC ( pci->devfn ),
-		      pci_command, new_command );
+		DBGC ( pci, PCI_FMT " device not enabled by BIOS! Updating "
+		       "PCI command %04x->%04x\n",
+		       PCI_ARGS ( pci ), pci_command, new_command );
 		pci_write_config_word ( pci, PCI_COMMAND, new_command );
 	}
 
 	pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
 	if ( pci_latency < 32 ) {
-		DBG ( "PCI device %02x:%02x.%x latency timer is unreasonably "
-		      "low at %d. Setting to 32.\n", pci->bus,
-		      PCI_SLOT ( pci->devfn ), PCI_FUNC ( pci->devfn ),
-		      pci_latency );
+		DBGC ( pci, PCI_FMT " latency timer is unreasonably low at "
+		       "%d. Setting to 32.\n", PCI_ARGS ( pci ), pci_latency );
 		pci_write_config_byte ( pci, PCI_LATENCY_TIMER, 32);
 	}
 }
@@ -180,10 +178,9 @@ static int pci_probe ( struct pci_device *pci ) {
 	unsigned int i;
 	int rc;
 
-	DBG ( "Adding PCI device %02x:%02x.%x (%04x:%04x mem %lx io %lx "
-	      "irq %d)\n", pci->bus, PCI_SLOT ( pci->devfn ),
-	      PCI_FUNC ( pci->devfn ), pci->vendor, pci->device,
-	      pci->membase, pci->ioaddr, pci->irq );
+	DBGC ( pci, PCI_FMT " is %04x:%04x mem %lx io %lx irq %d\n",
+	       PCI_ARGS ( pci ), pci->vendor, pci->device, pci->membase,
+	       pci->ioaddr, pci->irq );
 
 	for_each_table_entry ( driver, PCI_DRIVERS ) {
 		for ( i = 0 ; i < driver->id_count ; i++ ) {
@@ -196,16 +193,18 @@ static int pci_probe ( struct pci_device *pci ) {
 				continue;
 			pci->driver = driver;
 			pci->driver_name = id->name;
-			DBG ( "...using driver %s\n", pci->driver_name );
+			DBGC ( pci, "...using driver %s\n", pci->driver_name );
 			if ( ( rc = driver->probe ( pci, id ) ) != 0 ) {
-				DBG ( "......probe failed\n" );
+				DBGC ( pci, "......probe failed: %s\n",
+				       strerror ( rc ) );
 				continue;
 			}
+			DBGC ( pci, PCI_FMT " added\n", PCI_ARGS ( pci ) );
 			return 0;
 		}
 	}
 
-	DBG ( "...no driver found\n" );
+	DBGC ( pci, "...no driver found\n" );
 	return -ENOTTY;
 }
 
@@ -216,8 +215,7 @@ static int pci_probe ( struct pci_device *pci ) {
  */
 static void pci_remove ( struct pci_device *pci ) {
 	pci->driver->remove ( pci );
-	DBG ( "Removed PCI device %02x:%02x.%x\n", pci->bus,
-	      PCI_SLOT ( pci->devfn ), PCI_FUNC ( pci->devfn ) );
+	DBGC ( pci, PCI_FMT " removed\n", PCI_ARGS ( pci ) );
 }
 
 /**

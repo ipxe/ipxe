@@ -374,6 +374,13 @@ struct pci_driver {
 #define PCI_ROM( _vendor, _device, _name, _description, _data ) \
 	PCI_ID( _vendor, _device, _name, _description, _data )
 
+/** PCI device debug message format */
+#define PCI_FMT "PCI %02x:%02x.%x"
+
+/** PCI device debug message arguments */
+#define PCI_ARGS( pci ) \
+	(pci)->bus, PCI_SLOT ( (pci)->devfn ), PCI_FUNC ( (pci)->devfn )
+
 extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
