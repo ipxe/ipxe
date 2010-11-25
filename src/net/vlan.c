@@ -360,6 +360,9 @@ int vlan_create ( struct net_device *trunk, unsigned int tag,
 	/* Synchronise with trunk device */
 	vlan_sync ( netdev );
 
+	DBGC ( netdev, "VLAN %s created with tag %d and priority %d\n",
+	       netdev->name, vlan->tag, vlan->priority );
+
 	return 0;
 
 	unregister_netdev ( netdev );
@@ -388,6 +391,8 @@ int vlan_destroy ( struct net_device *netdev ) {
 		       netdev->name );
 		return -ENOTTY;
 	}
+
+	DBGC ( netdev, "VLAN %s destroyed\n", netdev->name );
 
 	/* Remove VLAN device */
 	unregister_netdev ( netdev );
