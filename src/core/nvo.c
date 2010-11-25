@@ -197,7 +197,7 @@ static struct settings_operations nvo_settings_operations = {
  *
  * @v nvo		Non-volatile options block
  * @v nvs		Underlying non-volatile storage device
- * @v fragments		List of option-containing fragments
+ * @v fragments		List of option-containing fragments, or NULL
  * @v refcnt		Containing object reference counter, or NULL
  */
 void nvo_init ( struct nvo_block *nvo, struct nvs_device *nvs,
@@ -219,18 +219,32 @@ int register_nvo ( struct nvo_block *nvo, struct settings *parent ) {
 	struct nvo_fragment *fragment = nvo->fragments;
 	int rc;
 
-	/* Calculate total length of all fragments */
-	for ( fragment = nvo->fragments ; fragment->len ; fragment++ )
-		nvo->total_len += fragment->len;
+	/* Calculate total length of all fragments, if applicable */
+	if ( fragment ) {
+		for ( ; fragment->len ; fragment++ )
+			nvo->total_len += fragment->len;
+	} else {
+		nvo->total_len = nvo->nvs->size;
+	}
 
-	/* Allocate memory for options and read in from NVS */
-	nvo->data = malloc ( nvo->total_len );
+	/* Allocate memory for options (and fragment list, if applicable) */
+	nvo->data = zalloc ( nvo->total_len +
+			     ( fragment ? 0 : ( 2 * sizeof ( *fragment ) ) ) );
 	if ( ! nvo->data ) {
 		DBGC ( nvo, "NVO %p could not allocate %zd bytes\n",
 		       nvo, nvo->total_len );
 		rc = -ENOMEM;
 		goto err_malloc;
 	}
+
+	/* Create fragment list, if applicable */
+	if ( ! fragment ) {
+		fragment = ( nvo->data + nvo->total_len );
+		fragment->len = nvo->total_len;
+		nvo->fragments = fragment;
+	}
+
+	/* Read data from NVS */
 	if ( ( rc = nvo_load ( nvo ) ) != 0 )
 		goto err_load;
 
