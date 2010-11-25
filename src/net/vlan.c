@@ -301,6 +301,17 @@ int vlan_create ( struct net_device *trunk, unsigned int tag,
 	struct vlan_device *vlan;
 	int rc;
 
+	/* If VLAN already exists, just update the priority */
+	if ( ( netdev = vlan_find ( trunk, tag ) ) != NULL ) {
+		vlan = netdev->priv;
+		if ( priority != vlan->priority ) {
+			DBGC ( netdev, "VLAN %s priority changed from %d to "
+			       "%d\n", netdev->name, vlan->priority, priority );
+		}
+		vlan->priority = priority;
+		return 0;
+	}
+
 	/* Sanity checks */
 	if ( trunk->ll_protocol->ll_addr_len != ETH_ALEN ) {
 		DBGC ( trunk, "VLAN %s cannot create VLAN for %s device\n",
@@ -318,11 +329,6 @@ int vlan_create ( struct net_device *trunk, unsigned int tag,
 		DBGC ( trunk, "VLAN %s cannot create VLAN with invalid "
 		       "priority %d\n", trunk->name, priority );
 		rc = -EINVAL;
-		goto err_sanity;
-	}
-	if ( ( netdev = vlan_find ( trunk, tag ) ) != NULL ) {
-		DBGC ( netdev, "VLAN %s already exists\n", netdev->name );
-		rc = -EEXIST;
 		goto err_sanity;
 	}
 
