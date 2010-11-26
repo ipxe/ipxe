@@ -59,6 +59,7 @@ struct vlan_header {
  */
 #define VLAN_PRIORITY_IS_VALID( priority ) ( (priority) <= 7 )
 
+extern int vlan_can_be_trunk ( struct net_device *trunk );
 extern int vlan_create ( struct net_device *trunk, unsigned int tag,
 			 unsigned int priority );
 extern int vlan_destroy ( struct net_device *netdev );

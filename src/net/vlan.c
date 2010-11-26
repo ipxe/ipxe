@@ -280,20 +280,35 @@ struct net_protocol vlan_protocol __net_protocol = {
 };
 
 /**
- * Create VLAN device
+ * Check if network device can be used as a VLAN trunk device
  *
  * @v trunk		Trunk network device
- * @v tag		VLAN tag
- * @v priority		Default VLAN priority
- * @ret rc		Return status code
+ * @ret is_ok		Trunk network device is usable
  *
- * The VLAN device will be created as an Ethernet device.  (We cannot
+ * VLAN devices will be created as Ethernet devices.  (We cannot
  * simply clone the link layer of the trunk network device, because
  * this link layer may expect the network device structure to contain
  * some link-layer-private data.)  The trunk network device must
  * therefore have a link layer that is in some sense 'compatible' with
  * Ethernet; specifically, it must have link-layer addresses that are
  * the same length as Ethernet link-layer addresses.
+ *
+ * As an additional check, and primarily to assist with the sanity of
+ * the FCoE code, we refuse to allow nested VLANs.
+ */
+int vlan_can_be_trunk ( struct net_device *trunk ) {
+
+	return ( ( trunk->ll_protocol->ll_addr_len == ETH_ALEN ) &&
+		 ( trunk->op != &vlan_operations ) );
+}
+
+/**
+ * Create VLAN device
+ *
+ * @v trunk		Trunk network device
+ * @v tag		VLAN tag
+ * @v priority		Default VLAN priority
+ * @ret rc		Return status code
  */
 int vlan_create ( struct net_device *trunk, unsigned int tag,
 		  unsigned int priority ) {
@@ -313,9 +328,9 @@ int vlan_create ( struct net_device *trunk, unsigned int tag,
 	}
 
 	/* Sanity checks */
-	if ( trunk->ll_protocol->ll_addr_len != ETH_ALEN ) {
-		DBGC ( trunk, "VLAN %s cannot create VLAN for %s device\n",
-		       trunk->name, trunk->ll_protocol->name );
+	if ( ! vlan_can_be_trunk ( trunk ) ) {
+		DBGC ( trunk, "VLAN %s cannot create VLAN on non-trunk "
+		       "device\n", trunk->name );
 		rc = -ENOTTY;
 		goto err_sanity;
 	}
