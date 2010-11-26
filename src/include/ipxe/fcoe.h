@@ -86,4 +86,7 @@ enum fcoe_eof {
 	FCOE_EOF_A = 0x50,	/**< End of Frame Abort */
 };
 
+/** FCoE VLAN priority */
+#define FCOE_VLAN_PRIORITY 3
+
 #endif /* _IPXE_FCOE_H */
