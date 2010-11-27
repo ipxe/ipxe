@@ -49,7 +49,7 @@ struct vlan_header {
  * @v tag		VLAN tag
  * @ret is_valid	VLAN tag is valid
  */
-#define VLAN_TAG_IS_VALID( tag ) ( ( (tag) >= 1 ) && ( (tag) < 0xfff ) )
+#define VLAN_TAG_IS_VALID( tag ) ( (tag) < 0xfff )
 
 /**
  * Check VLAN priority is valid
