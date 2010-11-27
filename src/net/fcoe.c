@@ -180,6 +180,9 @@ static struct fcoe_port * fcoe_demux ( struct net_device *netdev ) {
  */
 static void fcoe_reset ( struct fcoe_port *fcoe ) {
 
+	/* Detach FC port, if any */
+	intf_restart ( &fcoe->transport, -ECANCELED );
+
 	/* Reset any FIP state */
 	stop_timer ( &fcoe->timer );
 	fcoe->timeouts = 0;
@@ -995,6 +998,7 @@ static int fcoe_fip_rx ( struct io_buffer *iobuf,
 static void fcoe_expired ( struct retry_timer *timer, int over __unused ) {
 	struct fcoe_port *fcoe =
 		container_of ( timer, struct fcoe_port, timer );
+	int rc;
 
 	/* Sanity check */
 	assert ( fcoe->flags & FCOE_HAVE_NETWORK );
@@ -1043,13 +1047,22 @@ static void fcoe_expired ( struct retry_timer *timer, int over __unused ) {
 		 * and we have not yet timed out and given up on
 		 * finding one, then send a FIP solicitation and wait.
 		 */
+		start_timer_fixed ( &fcoe->timer, FCOE_FIP_RETRY_DELAY );
 		if ( ( ! ( fcoe->flags & FCOE_HAVE_FIP_FCF ) ) &&
 		     ( fcoe->timeouts <= FCOE_MAX_FIP_SOLICITATIONS ) ) {
-			start_timer_fixed ( &fcoe->timer,
-					    FCOE_FIP_RETRY_DELAY );
 			fcoe_fip_tx_solicitation ( fcoe );
 			return;
 		}
+
+		/* Attach Fibre Channel port */
+		if ( ( rc = fc_port_open ( &fcoe->transport, &fcoe->node_wwn.fc,
+					   &fcoe->port_wwn.fc ) ) != 0 ) {
+			DBGC ( fcoe, "FCoE %s could not create FC port: %s\n",
+			       fcoe->netdev->name, strerror ( rc ) );
+			/* We will try again on the next timer expiry */
+			return;
+		}
+		stop_timer ( &fcoe->timer );
 
 		/* Either we have found a FIP-capable forwarder, or we
 		 * have timed out and will fall back to pre-FIP mode.
@@ -1125,16 +1138,10 @@ static int fcoe_probe ( struct net_device *netdev ) {
 	       fc_ntoa ( &fcoe->node_wwn.fc ) );
 	DBGC ( fcoe, " port %s\n", fc_ntoa ( &fcoe->port_wwn.fc ) );
 
-	/* Attach Fibre Channel port */
-	if ( ( rc = fc_port_open ( &fcoe->transport, &fcoe->node_wwn.fc,
-				   &fcoe->port_wwn.fc ) ) != 0 )
-		goto err_fc_create;
-
 	/* Transfer reference to port list */
 	list_add ( &fcoe->list, &fcoe_ports );
 	return 0;
 
- err_fc_create:
 	netdev_put ( fcoe->netdev );
  err_zalloc:
  err_non_ethernet:
@@ -1156,8 +1163,12 @@ static void fcoe_notify ( struct net_device *netdev ) {
 		return;
 	}
 
-	/* Reset the FCoE link */
-	fcoe_reset ( fcoe );
+	/* Reset the FCoE link if necessary */
+	if ( ! ( netdev_is_open ( netdev ) &&
+		 netdev_link_ok ( netdev ) &&
+		 ( fcoe->flags & FCOE_HAVE_NETWORK ) ) ) {
+		fcoe_reset ( fcoe );
+	}
 }
 
 /**
