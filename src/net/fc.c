@@ -1178,11 +1178,11 @@ static struct interface_descriptor fc_port_ns_plogi_desc =
  * @v transport		Transport interface
  * @v node		Fibre Channel node name
  * @v port		Fibre Channel port name
+ * @v name		Symbolic port name
  * @ret rc		Return status code
  */
 int fc_port_open ( struct interface *transport, const struct fc_name *node_wwn,
-		   const struct fc_name *port_wwn ) {
-	static unsigned int portindex = 0;
+		   const struct fc_name *port_wwn, const char *name ) {
 	struct fc_port *port;
 
 	/* Allocate and initialise structure */
@@ -1198,9 +1198,7 @@ int fc_port_open ( struct interface *transport, const struct fc_name *node_wwn,
 	INIT_LIST_HEAD ( &port->xchgs );
 	memcpy ( &port->node_wwn, node_wwn, sizeof ( port->node_wwn ) );
 	memcpy ( &port->port_wwn, port_wwn, sizeof ( port->port_wwn ) );
-
-	/* Create device name */
-	snprintf ( port->name, sizeof ( port->name ), "fc%d", portindex++ );
+	snprintf ( port->name, sizeof ( port->name ), "%s", name );
 
 	DBGC ( port, "FCPORT %s opened as %s",
 	       port->name, fc_ntoa ( &port->node_wwn ) );

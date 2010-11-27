@@ -1056,7 +1056,8 @@ static void fcoe_expired ( struct retry_timer *timer, int over __unused ) {
 
 		/* Attach Fibre Channel port */
 		if ( ( rc = fc_port_open ( &fcoe->transport, &fcoe->node_wwn.fc,
-					   &fcoe->port_wwn.fc ) ) != 0 ) {
+					   &fcoe->port_wwn.fc,
+					   fcoe->netdev->name ) ) != 0 ) {
 			DBGC ( fcoe, "FCoE %s could not create FC port: %s\n",
 			       fcoe->netdev->name, strerror ( rc ) );
 			/* We will try again on the next timer expiry */

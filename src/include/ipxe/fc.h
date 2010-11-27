@@ -325,7 +325,8 @@ extern int fc_port_login ( struct fc_port *port, struct fc_port_id *port_id,
 extern void fc_port_logout ( struct fc_port *port, int rc );
 extern int fc_port_open ( struct interface *transport,
 			  const struct fc_name *node_wwn,
-			  const struct fc_name *port_wwn );
+			  const struct fc_name *port_wwn,
+			  const char *name );
 extern struct fc_port * fc_port_find ( const char *name );
 
 /******************************************************************************
