@@ -758,14 +758,12 @@ static int fcoe_fip_rx_advertisement ( struct fcoe_port *fcoe,
 				fcoe->flags |= FCOE_FCF_ALLOWS_SPMA;
 			memcpy ( fcoe->fcf_mac, mac_address->mac,
 				 sizeof ( fcoe->fcf_mac ) );
-			DBGC ( fcoe, "FCoE %s selected FCF %s (priority %d, ",
+			DBGC ( fcoe, "FCoE %s selected FCF %s (pri %d",
 			       fcoe->netdev->name, eth_ntoa ( fcoe->fcf_mac ),
 			       fcoe->priority );
 			if ( fcoe->keepalive ) {
-				DBGC ( fcoe, "keepalive %dms",
+				DBGC ( fcoe, ", FKA ADV %dms",
 				       fcoe->keepalive );
-			} else {
-				DBGC ( fcoe, "no keepalive" );
 			}
 			DBGC ( fcoe, ", %cPMA)\n",
 			       ( ( fcoe->flags & FCOE_FCF_ALLOWS_SPMA ) ?
