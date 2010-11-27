@@ -533,7 +533,9 @@ static int fcoe_fip_parse ( struct fcoe_port *fcoe, struct fip_header *fiphdr,
 		/* Handle descriptors that we understand */
 		if ( ( desc_type > FIP_RESERVED ) &&
 		     ( desc_type < FIP_NUM_DESCRIPTOR_TYPES ) ) {
-			descs->desc[desc_type] = desc;
+			/* Use only the first instance of a descriptor */
+			if ( descs->desc[desc_type] == NULL )
+				descs->desc[desc_type] = desc;
 			continue;
 		}
 
