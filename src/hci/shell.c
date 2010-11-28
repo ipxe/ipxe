@@ -74,14 +74,57 @@ struct command help_command __command = {
  * Start command shell
  *
  */
-void shell ( void ) {
+int shell ( void ) {
 	char *line;
+	int rc = 0;
 
 	do {
 		line = readline ( shell_prompt );
 		if ( line ) {
-			system ( line );
+			rc = system ( line );
 			free ( line );
 		}
 	} while ( shell_exit == 0 );
+	shell_exit = 0;
+
+	return rc;
 }
+
+/** "shell" options */
+struct shell_options {};
+
+/** "shell" option list */
+static struct option_descriptor shell_opts[] = {};
+
+/** "shell" command descriptor */
+static struct command_descriptor shell_cmd =
+	COMMAND_DESC ( struct shell_options, shell_opts, 0, 0,
+		       "", "" );
+
+/**
+ * "shell" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int shell_exec ( int argc, char **argv ) {
+	struct shell_options opts;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &shell_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Start shell */
+	if ( ( rc = shell() ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/** "shell" command */
+struct command shell_command __command = {
+	.name = "shell",
+	.exec = shell_exec,
+};
