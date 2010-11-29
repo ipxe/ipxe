@@ -72,7 +72,7 @@ int parse_integer ( const char *text, unsigned int *value ) {
 	assert ( text != NULL );
 
 	/* Parse integer */
-	*value = strtoul ( text, &endp, 10 );
+	*value = strtoul ( text, &endp, 0 );
 	if ( *endp ) {
 		printf ( "\"%s\": invalid integer value\n", text );
 		return -EINVAL;
