@@ -2369,12 +2369,10 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 		     v_pptx, 1 );
 	MLX_FILL_1 ( &set_port.general, 1,
 		     mtu, ( ETH_FRAME_LEN + 40 /* Used by card */ ) );
-	MLX_FILL_2 ( &set_port.general, 2,
-		     pfctx, ( 1 << FCOE_VLAN_PRIORITY ),
-		     pptx, 1 );
-	MLX_FILL_2 ( &set_port.general, 3,
-		     pfcrx, ( 1 << FCOE_VLAN_PRIORITY ),
-		     pprx, 1 );
+	MLX_FILL_1 ( &set_port.general, 2,
+		     pfctx, ( 1 << FCOE_VLAN_PRIORITY ) );
+	MLX_FILL_1 ( &set_port.general, 3,
+		     pfcrx, ( 1 << FCOE_VLAN_PRIORITY ) );
 	if ( ( rc = hermon_cmd_set_port ( hermon, 1,
 					  ( HERMON_SET_PORT_GENERAL_PARAM |
 					    ibdev->port ),
