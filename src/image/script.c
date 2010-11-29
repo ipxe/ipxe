@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/image.h>
+#include <ipxe/shell.h>
 
 struct image_type script_image_type __image_type ( PROBE_NORMAL );
 
@@ -106,13 +107,8 @@ static int process_script ( int ( * process_line ) ( const char *line ),
  */
 static int terminate_on_exit_or_failure ( int rc ) {
 
-	/* Check and consume exit flag */
-	if ( shell_exit ) {
-		shell_exit = 0;
-		return 1;
-	}
-
-	return ( rc != 0 );
+	return ( shell_stopped ( SHELL_STOP_COMMAND_SEQUENCE ) ||
+		 ( rc != 0 ) );
 }
 
 /**
@@ -291,6 +287,9 @@ static int goto_exec ( int argc, char **argv ) {
 		script_offset = saved_offset;
 		return rc;
 	}
+
+	/* Terminate processing of current command */
+	shell_stop ( SHELL_STOP_COMMAND );
 
 	return 0;
 }

@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/settings.h>
+#include <ipxe/shell.h>
 
 /** @file
  *
@@ -38,15 +39,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** Shell exit flag */
-int shell_exit;
+/** Shell stop state */
+static int stop_state;
 
 /**
  * Execute command
  *
  * @v command		Command name
  * @v argv		Argument list
- * @ret rc		Command exit status
+ * @ret rc		Return status code
  *
  * Execute the named command.  Unlike a traditional POSIX execv(),
  * this function returns the exit status of the command.
@@ -196,32 +197,22 @@ static int split_command ( char *command, char **tokens ) {
 }
 
 /**
- * Terminate command unconditionally
+ * Process next command only if previous command succeeded
  *
  * @v rc		Status of previous command
- * @ret terminate	Terminate command
+ * @ret process		Process next command
  */
-static int terminate_always ( int rc __unused ) {
-	return 1;
-}
-
-/**
- * Terminate command only if previous command succeeded
- *
- * @v rc		Status of previous command
- * @ret terminate	Terminate command
- */
-static int terminate_on_success ( int rc ) {
+static int process_on_success ( int rc ) {
 	return ( rc == 0 );
 }
 
 /**
- * Terminate command only if previous command failed
+ * Process next command only if previous command failed
  *
  * @v rc		Status of previous command
- * @ret terminate	Terminate command
+ * @ret process		Process next command
  */
-static int terminate_on_failure ( int rc ) {
+static int process_on_failure ( int rc ) {
 	return ( rc != 0 );
 }
 
@@ -229,53 +220,78 @@ static int terminate_on_failure ( int rc ) {
  * Find command terminator
  *
  * @v tokens		Token list
- * @ret terminator	Terminator type
+ * @ret process_next	"Should next command be processed?" function
  * @ret argc		Argument count
  */
 static int command_terminator ( char **tokens,
-				int ( **terminator ) ( int rc ) ) {
+				int ( **process_next ) ( int rc ) ) {
 	unsigned int i;
 
 	/* Find first terminating token */
 	for ( i = 0 ; tokens[i] ; i++ ) {
 		if ( tokens[i][0] == '#' ) {
 			/* Start of a comment */
-			*terminator = terminate_always;
-			return i;
+			break;
 		} else if ( strcmp ( tokens[i], "||" ) == 0 ) {
 			/* Short-circuit logical OR */
-			*terminator = terminate_on_success;
+			*process_next = process_on_failure;
 			return i;
 		} else if ( strcmp ( tokens[i], "&&" ) == 0 ) {
 			/* Short-circuit logical AND */
-			*terminator = terminate_on_failure;
+			*process_next = process_on_success;
 			return i;
 		}
 	}
 
 	/* End of token list */
-	*terminator = terminate_always;
+	*process_next = NULL;
 	return i;
+}
+
+/**
+ * Set shell stop state
+ *
+ * @v stop		Shell stop state
+ */
+void shell_stop ( int stop ) {
+	stop_state = stop;
+}
+
+/**
+ * Test and consume shell stop state
+ *
+ * @v stop		Shell stop state to consume
+ * @v stopped		Shell had been stopped
+ */
+int shell_stopped ( int stop ) {
+	int stopped;
+
+	/* Test to see if we need to stop */
+	stopped = ( stop_state >= stop );
+
+	/* Consume stop state */
+	if ( stop_state <= stop )
+		stop_state = 0;
+
+	return stopped;
 }
 
 /**
  * Execute command line
  *
  * @v command		Command line
- * @ret rc		Command exit status
+ * @ret rc		Return status code
  *
  * Execute the named command and arguments.
  */
 int system ( const char *command ) {
-	int ( * terminator ) ( int rc );
+	int ( * process_next ) ( int rc );
 	char *expcmd;
 	char **argv;
 	int argc;
 	int count;
+	int process;
 	int rc = 0;
-
-	/* Reset exit flag */
-	shell_exit = 0;
 
 	/* Perform variable expansion */
 	expcmd = expand_command ( command );
@@ -291,23 +307,31 @@ int system ( const char *command ) {
 		
 		split_command ( expcmd, tokens );
 		tokens[count] = NULL;
+		process = 1;
 
 		for ( argv = tokens ; ; argv += ( argc + 1 ) ) {
 
 			/* Find command terminator */
-			argc = command_terminator ( argv, &terminator );
+			argc = command_terminator ( argv, &process_next );
 
 			/* Execute command */
-			argv[argc] = NULL;
-			rc = execv ( argv[0], argv );
+			if ( process ) {
+				argv[argc] = NULL;
+				rc = execv ( argv[0], argv );
+			}
 
-			/* Check exit flag */
-			if ( shell_exit )
+			/* Stop processing, if applicable */
+			if ( shell_stopped ( SHELL_STOP_COMMAND ) )
 				break;
 
-			/* Handle terminator */
-			if ( terminator ( rc ) )
+			/* Stop processing if we have reached the end
+			 * of the command.
+			 */
+			if ( ! process_next )
 				break;
+
+			/* Determine whether or not to process next command */
+			process = process_next ( rc );
 		}
 	}
 
@@ -322,7 +346,7 @@ int system ( const char *command ) {
  *
  * @v argc		Argument count
  * @v argv		Argument list
- * @ret rc		Exit code
+ * @ret rc		Return status code
  */
 static int echo_exec ( int argc, char **argv ) {
 	int i;
@@ -373,8 +397,8 @@ static int exit_exec ( int argc, char **argv ) {
 			return rc;
 	}
 
-	/* Set exit flag */
-	shell_exit = 1;
+	/* Stop shell processing */
+	shell_stop ( SHELL_STOP_COMMAND_SEQUENCE );
 
 	return exit_code;
 }

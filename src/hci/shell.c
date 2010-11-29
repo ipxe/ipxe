@@ -84,8 +84,7 @@ int shell ( void ) {
 			rc = system ( line );
 			free ( line );
 		}
-	} while ( shell_exit == 0 );
-	shell_exit = 0;
+	} while ( ! shell_stopped ( SHELL_STOP_COMMAND_SEQUENCE ) );
 
 	return rc;
 }
