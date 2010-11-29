@@ -125,10 +125,8 @@ static int script_exec_line ( const char *line ) {
 		return 0;
 
 	/* Execute command */
-	if ( ( rc = system ( line ) ) != 0 ) {
-		printf ( "Aborting on \"%s\"\n", line );
+	if ( ( rc = system ( line ) ) != 0 )
 		return rc;
-	}
 
 	return 0;
 }
