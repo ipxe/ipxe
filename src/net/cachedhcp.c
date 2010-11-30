@@ -58,7 +58,7 @@ void store_cached_dhcpack ( userptr_t data, size_t len ) {
 	dhcphdr = ( ( ( void * ) dhcppkt ) + sizeof ( * dhcppkt ) );
 	copy_from_user ( dhcphdr, data, 0, len );
 	dhcppkt_init ( dhcppkt, dhcphdr, len );
-	DBG_HD ( dhcppkt->options.data, dhcppkt->options.len );
+	DBG_HD ( dhcppkt->options.data, dhcppkt->options.used_len );
 
 	/* Register settings on the last opened network device.
 	 * This will have the effect of registering cached settings
