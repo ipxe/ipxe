@@ -183,8 +183,8 @@ struct myri10ge_private
 	 */
 
 	struct nvs_device	nvs;
-	struct nvo_fragment	nvo_fragment[2];
 	struct nvo_block	nvo;
+	unsigned int		nvo_registered;
 
 	/* Cached PCI capability locations. */
 
@@ -727,28 +727,20 @@ static int myri10ge_nv_init ( struct myri10ge_private *priv )
 	priv->nvs.read		= myri10ge_nvs_read;
 	priv->nvs.write		= myri10ge_nvs_write;
 
-	/* Build the NonVolatile storage fragment list.  We would like
-	   to use the whole last EEPROM block for this, but we must
-	   reduce the block size lest malloc fail in
-	   src/core/nvo.o. */
-
-	priv->nvo_fragment[0].address = nvo_fragment_pos;
-	priv->nvo_fragment[0].len     = 0x200;
-
 	/* Register the NonVolatile Options storage. */
 
 	nvo_init ( &priv->nvo,
 		   &priv->nvs,
-		   priv->nvo_fragment,
+		   nvo_fragment_pos, 0x200,
 		   & myri10ge_netdev (priv) -> refcnt );
 	rc = register_nvo ( &priv->nvo,
 			    netdev_settings ( myri10ge_netdev ( priv ) ) );
 	if ( rc ) {
 		DBG ("register_nvo failed");
-		priv->nvo_fragment[0].len = 0;
 		return rc;
 	}
 
+	priv->nvo_registered = 1;
 	DBG2 ( "NVO supported\n" );
 	return 0;
 }
@@ -758,7 +750,7 @@ myri10ge_nv_fini ( struct myri10ge_private *priv )
 {
 	/* Simply return if nonvolatile access is not supported. */
 
-	if ( 0 == priv->nvo_fragment[0].len )
+	if ( 0 == priv->nvo_registered )
 		return;
 
 	unregister_nvo ( &priv->nvo );

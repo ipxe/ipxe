@@ -43,7 +43,7 @@ static unsigned int nvo_checksum ( struct nvo_block *nvo ) {
 	uint8_t sum = 0;
 	unsigned int i;
 
-	for ( i = 0 ; i < nvo->total_len ; i++ ) {
+	for ( i = 0 ; i < nvo->len ; i++ ) {
 		sum += *(data++);
 	}
 	return sum;
@@ -56,19 +56,14 @@ static unsigned int nvo_checksum ( struct nvo_block *nvo ) {
  * @ret rc		Return status code
  */
 static int nvo_load ( struct nvo_block *nvo ) {
-	void *data = nvo->data;
-	struct nvo_fragment *frag;
 	int rc;
 
-	/* Read data a fragment at a time */
-	for ( frag = nvo->fragments ; frag->len ; frag++ ) {
-		if ( ( rc = nvs_read ( nvo->nvs, frag->address, data,
-				       frag->len ) ) != 0 ) {
-			DBGC ( nvo, "NVO %p could not read %zd bytes at "
-			       "%#04x\n", nvo, frag->len, frag->address );
-			return rc;
-		}
-		data += frag->len;
+	/* Read data */
+	if ( ( rc = nvs_read ( nvo->nvs, nvo->address, nvo->data,
+			       nvo->len ) ) != 0 ) {
+		DBGC ( nvo, "NVO %p could not read %zd bytes at %#04x: %s\n",
+		       nvo, nvo->len, nvo->address, strerror ( rc ) );
+		return rc;
 	}
 
 	DBGC ( nvo, "NVO %p loaded from non-volatile storage\n", nvo );
@@ -82,23 +77,18 @@ static int nvo_load ( struct nvo_block *nvo ) {
  * @ret rc		Return status code
  */
 static int nvo_save ( struct nvo_block *nvo ) {
-	void *data = nvo->data;
-	uint8_t *checksum = data;
-	struct nvo_fragment *frag;
+	uint8_t *checksum = nvo->data;
 	int rc;
 
 	/* Recalculate checksum */
 	*checksum -= nvo_checksum ( nvo );
 
-	/* Write data a fragment at a time */
-	for ( frag = nvo->fragments ; frag->len ; frag++ ) {
-		if ( ( rc = nvs_write ( nvo->nvs, frag->address, data,
-					frag->len ) ) != 0 ) {
-			DBGC ( nvo, "NVO %p could not write %zd bytes at "
-			       "%#04x\n", nvo, frag->len, frag->address );
-			return rc;
-		}
-		data += frag->len;
+	/* Write data */
+	if ( ( rc = nvs_write ( nvo->nvs, nvo->address, nvo->data,
+				nvo->len ) ) != 0 ) {
+		DBGC ( nvo, "NVO %p could not write %zd bytes at %#04x: %s\n",
+		       nvo, nvo->len, nvo->address, strerror ( rc ) );
+		return rc;
 	}
 
 	DBGC ( nvo, "NVO %p saved to non-volatile storage\n", nvo );
@@ -120,7 +110,7 @@ static void nvo_init_dhcpopts ( struct nvo_block *nvo ) {
 
 	/* Steal one byte for the checksum */
 	options_data = ( nvo->data + 1 );
-	options_len = ( nvo->total_len - 1 );
+	options_len = ( nvo->len - 1 );
 
 	/* If checksum fails, or options data starts with a zero,
 	 * assume the whole block is invalid.  This should capture the
@@ -130,7 +120,7 @@ static void nvo_init_dhcpopts ( struct nvo_block *nvo ) {
 		DBGC ( nvo, "NVO %p has checksum %02x and initial byte %02x; "
 		       "assuming empty\n", nvo, nvo_checksum ( nvo ),
 		       options_data[0] );
-		memset ( nvo->data, 0, nvo->total_len );
+		memset ( nvo->data, 0, nvo->len );
 	}
 
 	dhcpopt_init ( &nvo->dhcpopts, options_data, options_len,
@@ -198,13 +188,15 @@ static struct settings_operations nvo_settings_operations = {
  *
  * @v nvo		Non-volatile options block
  * @v nvs		Underlying non-volatile storage device
- * @v fragments		List of option-containing fragments, or NULL
+ * @v address		Address within NVS device
+ * @v len		Length of non-volatile options data
  * @v refcnt		Containing object reference counter, or NULL
  */
 void nvo_init ( struct nvo_block *nvo, struct nvs_device *nvs,
-		struct nvo_fragment *fragments, struct refcnt *refcnt ) {
+		size_t address, size_t len, struct refcnt *refcnt ) {
 	nvo->nvs = nvs;
-	nvo->fragments = fragments;
+	nvo->address = address;
+	nvo->len = len;
 	settings_init ( &nvo->settings, &nvo_settings_operations, refcnt, 0 );
 }
 
@@ -216,32 +208,15 @@ void nvo_init ( struct nvo_block *nvo, struct nvs_device *nvs,
  * @ret rc		Return status code
  */
 int register_nvo ( struct nvo_block *nvo, struct settings *parent ) {
-	struct nvo_fragment *fragment = nvo->fragments;
 	int rc;
 
-	/* Calculate total length of all fragments, if applicable */
-	if ( fragment ) {
-		for ( ; fragment->len ; fragment++ )
-			nvo->total_len += fragment->len;
-	} else {
-		nvo->total_len = nvo->nvs->size;
-	}
-
-	/* Allocate memory for options (and fragment list, if applicable) */
-	nvo->data = zalloc ( nvo->total_len +
-			     ( fragment ? 0 : ( 2 * sizeof ( *fragment ) ) ) );
+	/* Allocate memory for options */
+	nvo->data = zalloc ( nvo->len );
 	if ( ! nvo->data ) {
 		DBGC ( nvo, "NVO %p could not allocate %zd bytes\n",
-		       nvo, nvo->total_len );
+		       nvo, nvo->len );
 		rc = -ENOMEM;
 		goto err_malloc;
-	}
-
-	/* Create fragment list, if applicable */
-	if ( ! fragment ) {
-		fragment = ( nvo->data + nvo->total_len );
-		fragment->len = nvo->total_len;
-		nvo->fragments = fragment;
 	}
 
 	/* Read data from NVS */

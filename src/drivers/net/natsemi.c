@@ -130,15 +130,6 @@ static struct bit_basher_operations natsemi_basher_ops = {
 	.write = natsemi_spi_write_bit,
 };
 
-/* It looks that this portion of EEPROM can be used for 
- * non-volatile stored options. Data sheet does not talk about this region.
- * Currently it is not working. But with some efforts it can.
- */
-static struct nvo_fragment natsemi_nvo_fragments[] = {
-	{ 0x0c, 0x68 },
-	{ 0, 0 }
-};
-
 /*
  * Set up for EEPROM access
  *
@@ -157,8 +148,13 @@ static void natsemi_init_eeprom ( struct natsemi_private *np ) {
 	 */
 	init_at93c46 ( &np->eeprom, 16 );
 	np->eeprom.bus = &np->spibit.bus;
-	np->nvo.nvs = &np->eeprom.nvs;
-	np->nvo.fragments = natsemi_nvo_fragments;
+
+	/* It looks that this portion of EEPROM can be used for
+	 * non-volatile stored options. Data sheet does not talk about
+	 * this region.  Currently it is not working. But with some
+	 * efforts it can.
+	 */
+	nvo_init ( &np->nvo, &np->eeprom.nvs, 0x0c, 0x68, NULL );
 }
 
 /**

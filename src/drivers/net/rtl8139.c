@@ -251,17 +251,6 @@ static struct bit_basher_operations rtl_basher_ops = {
 	.write = rtl_spi_write_bit,
 };
 
-/** Portion of EEPROM available for non-volatile stored options
- *
- * We use offset 0x40 (i.e. address 0x20), length 0x40.  This block is
- * marked as VPD in the rtl8139 datasheets, so we use it only if we
- * detect that the card is not supporting VPD.
- */
-static struct nvo_fragment rtl_nvo_fragments[] = {
-	{ 0x20, 0x40 },
-	{ 0, 0 }
-};
-
 /**
  * Set up for EEPROM access
  *
@@ -288,13 +277,18 @@ static void rtl_init_eeprom ( struct net_device *netdev ) {
 	}
 	rtl->eeprom.bus = &rtl->spibit.bus;
 
-	/* Initialise space for non-volatile options, if available */
+	/* Initialise space for non-volatile options, if available
+	 *
+	 * We use offset 0x40 (i.e. address 0x20), length 0x40.  This
+	 * block is marked as VPD in the rtl8139 datasheets, so we use
+	 * it only if we detect that the card is not supporting VPD.
+	 */
 	vpd = ( inw ( rtl->ioaddr + Config1 ) & VPDEnable );
 	if ( vpd ) {
 		DBGC ( rtl, "rtl8139 %p EEPROM in use for VPD; cannot use "
 		       "for options\n", rtl );
 	} else {
-		nvo_init ( &rtl->nvo, &rtl->eeprom.nvs, rtl_nvo_fragments,
+		nvo_init ( &rtl->nvo, &rtl->eeprom.nvs, 0x20, 0x40,
 			   &netdev->refcnt );
 	}
 }

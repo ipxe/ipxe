@@ -1492,12 +1492,6 @@ fail1:
 	return rc;
 }
 
-/** Portion of EEPROM available for non-volatile options */
-static struct nvo_fragment falcon_nvo_fragments[] = {
-	{ 0x100, 0xf0 },
-	{ 0, 0 }
-};
-
 /*******************************************************************************
  *
  *
@@ -3277,9 +3271,10 @@ falcon_probe_spi ( struct efab_nic *efab )
 	}
 
 	/* If the device has EEPROM attached, then advertise NVO space */
-	if ( has_eeprom )
-		nvo_init ( &efab->nvo, &efab->spi_eeprom.nvs, falcon_nvo_fragments,
+	if ( has_eeprom ) {
+		nvo_init ( &efab->nvo, &efab->spi_eeprom.nvs, 0x100, 0xf0,
 			   &efab->netdev->refcnt );
+	}
 
 	return 0;
 }
