@@ -147,7 +147,6 @@ int dhcppkt_store ( struct dhcp_packet *dhcppkt, unsigned int tag,
 		    const void *data, size_t len ) {
 	struct dhcp_packet_field *field;
 	void *field_data;
-	int rc;
 
 	/* If this is a special field, fill it in */
 	if ( ( field = find_dhcp_packet_field ( tag ) ) != NULL ) {
@@ -163,13 +162,7 @@ int dhcppkt_store ( struct dhcp_packet *dhcppkt, unsigned int tag,
 	}
 
 	/* Otherwise, use the generic options block */
-	rc = dhcpopt_store ( &dhcppkt->options, tag, data, len );
-
-	/* Update our used-length field */
-	dhcppkt->len = ( offsetof ( struct dhcphdr, options ) +
-			 dhcppkt->options.len );
-
-	return rc;
+	return dhcpopt_store ( &dhcppkt->options, tag, data, len );
 }
 
 /**
@@ -273,11 +266,8 @@ void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct dhcphdr *data,
 		    size_t len ) {
 	ref_init ( &dhcppkt->refcnt, NULL );
 	dhcppkt->dhcphdr = data;
-	dhcppkt->max_len = len;
 	dhcpopt_init ( &dhcppkt->options, &dhcppkt->dhcphdr->options,
 		       ( len - offsetof ( struct dhcphdr, options ) ) );
-	dhcppkt->len = ( offsetof ( struct dhcphdr, options ) +
-			 dhcppkt->options.len );
 	settings_init ( &dhcppkt->settings,
 			&dhcppkt_settings_operations, &dhcppkt->refcnt, 0 );
 }

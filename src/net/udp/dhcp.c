@@ -1122,7 +1122,7 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 	}
 
 	/* Transmit the packet */
-	iob_put ( iobuf, dhcppkt.len );
+	iob_put ( iobuf, dhcppkt_len ( &dhcppkt ) );
 	if ( ( rc = xfer_deliver ( &dhcp->xfer, iob_disown ( iobuf ),
 				   &meta ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not transmit UDP packet: %s\n",
