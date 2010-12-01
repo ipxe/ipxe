@@ -362,7 +362,7 @@ int vlan_create ( struct net_device *trunk, unsigned int tag,
 	vlan->priority = priority;
 
 	/* Construct VLAN device name */
-	snprintf ( netdev->name, sizeof ( netdev->name ), "%s.%d",
+	snprintf ( netdev->name, sizeof ( netdev->name ), "%s-%d",
 		   trunk->name, vlan->tag );
 
 	/* Register VLAN device */
