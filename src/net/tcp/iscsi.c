@@ -59,6 +59,22 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_EACCES_INCORRECT_TARGET_PASSWORD )
 #define EINFO_EACCES_INCORRECT_TARGET_PASSWORD \
 	__einfo_uniqify ( EINFO_EACCES, 0x02, "Incorrect target password" )
+#define EINVAL_ROOT_PATH_TOO_SHORT \
+	__einfo_error ( EINFO_EINVAL_ROOT_PATH_TOO_SHORT )
+#define EINFO_EINVAL_ROOT_PATH_TOO_SHORT \
+	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Root path too short" )
+#define EINVAL_BAD_CREDENTIAL_MIX \
+	__einfo_error ( EINFO_EINVAL_BAD_CREDENTIAL_MIX )
+#define EINFO_EINVAL_BAD_CREDENTIAL_MIX \
+	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Bad credential mix" )
+#define EINVAL_NO_ROOT_PATH \
+	__einfo_error ( EINFO_EINVAL_NO_ROOT_PATH )
+#define EINFO_EINVAL_NO_ROOT_PATH \
+	__einfo_uniqify ( EINFO_EINVAL, 0x03, "No root path" )
+#define EINVAL_NO_TARGET_IQN \
+	__einfo_error ( EINFO_EINVAL_NO_TARGET_IQN )
+#define EINFO_EINVAL_NO_TARGET_IQN \
+	__einfo_uniqify ( EINFO_EINVAL, 0x04, "No target IQN" )
 #define ENOTSUP_INITIATOR_STATUS \
 	__einfo_error ( EINFO_ENOTSUP_INITIATOR_STATUS )
 #define EINFO_ENOTSUP_INITIATOR_STATUS \
@@ -1787,7 +1803,7 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 			if ( ! *rp ) {
 				DBGC ( iscsi, "iSCSI %p root path \"%s\" "
 				       "too short\n", iscsi, root_path );
-				return -EINVAL;
+				return -EINVAL_ROOT_PATH_TOO_SHORT;
 			}
 		}
 		*(rp++) = '\0';
@@ -1870,7 +1886,7 @@ static int iscsi_set_auth ( struct iscsi_session *iscsi,
 	       ( initiator_password ? "" : "no " ),
 	       ( target_username ? "" : "no " ),
 	       ( target_password ? "" : "no " ) );
-	return -EINVAL;
+	return -EINVAL_BAD_CREDENTIAL_MIX;
 }
 
 /**
@@ -1886,7 +1902,7 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
 
 	/* Sanity check */
 	if ( ! uri->opaque ) {
-		rc = -EINVAL;
+		rc = -EINVAL_NO_ROOT_PATH;
 		goto err_sanity_uri;
 	}
 
@@ -1924,7 +1940,7 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
 	if ( ! iscsi->target_iqn ) {
 		DBGC ( iscsi, "iSCSI %p no target address supplied in %s\n",
 		       iscsi, uri->opaque );
-		rc = -EINVAL;
+		rc = -EINVAL_NO_TARGET_IQN;
 		goto err_sanity_iqn;
 	}
 
