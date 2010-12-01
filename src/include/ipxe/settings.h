@@ -178,7 +178,7 @@ extern int generic_settings_fetch ( struct settings *settings,
 extern void generic_settings_clear ( struct settings *settings );
 
 extern int register_settings ( struct settings *settings,
-			       struct settings *parent );
+			       struct settings *parent, const char *name );
 extern void unregister_settings ( struct settings *settings );
 
 extern int store_setting ( struct settings *settings, struct setting *setting,
@@ -252,19 +252,16 @@ extern struct setting user_class_setting __setting;
  * @v settings		Settings block
  * @v op		Settings block operations
  * @v refcnt		Containing object reference counter, or NULL
- * @v name		Settings block name
  * @v tag_magic		Tag magic
  */
 static inline void settings_init ( struct settings *settings,
 				   struct settings_operations *op,
 				   struct refcnt *refcnt,
-				   const char *name,
 				   unsigned int tag_magic ) {
 	INIT_LIST_HEAD ( &settings->siblings );
 	INIT_LIST_HEAD ( &settings->children );
 	settings->op = op;
 	settings->refcnt = refcnt;
-	settings->name = name;
 	settings->tag_magic = tag_magic;
 }
 
@@ -273,13 +270,11 @@ static inline void settings_init ( struct settings *settings,
  *
  * @v generics		Generic settings block
  * @v refcnt		Containing object reference counter, or NULL
- * @v name		Settings block name
  */
 static inline void generic_settings_init ( struct generic_settings *generics,
-					   struct refcnt *refcnt,
-					   const char *name ) {
+					   struct refcnt *refcnt ) {
 	settings_init ( &generics->settings, &generic_settings_operations,
-			refcnt, name, 0 );
+			refcnt, 0 );
 	INIT_LIST_HEAD ( &generics->list );
 }
 

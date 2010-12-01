@@ -2061,7 +2061,7 @@ static int phantom_probe ( struct pci_device *pci,
 	assert ( phantom->port < PHN_MAX_NUM_PORTS );
 	settings_init ( &phantom->settings,
 			&phantom_settings_operations,
-			&netdev->refcnt, "clp", PHN_CLP_TAG_MAGIC );
+			&netdev->refcnt, PHN_CLP_TAG_MAGIC );
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
@@ -2111,7 +2111,7 @@ static int phantom_probe ( struct pci_device *pci,
 	/* Register settings blocks */
 	parent_settings = netdev_settings ( netdev );
 	if ( ( rc = register_settings ( &phantom->settings,
-					parent_settings ) ) != 0 ) {
+					parent_settings, "clp" ) ) != 0 ) {
 		DBGC ( phantom, "Phantom %p could not register settings: "
 		       "%s\n", phantom, strerror ( rc ) );
 		goto err_register_settings;

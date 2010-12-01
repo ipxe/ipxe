@@ -204,8 +204,7 @@ void nvo_init ( struct nvo_block *nvo, struct nvs_device *nvs,
 		struct nvo_fragment *fragments, struct refcnt *refcnt ) {
 	nvo->nvs = nvs;
 	nvo->fragments = fragments;
-	settings_init ( &nvo->settings, &nvo_settings_operations, refcnt,
-			"nvo", 0 );
+	settings_init ( &nvo->settings, &nvo_settings_operations, refcnt, 0 );
 }
 
 /**
@@ -250,7 +249,7 @@ int register_nvo ( struct nvo_block *nvo, struct settings *parent ) {
 
 	/* Verify and register options */
 	nvo_init_dhcpopts ( nvo );
-	if ( ( rc = register_settings ( &nvo->settings, parent ) ) != 0 )
+	if ( ( rc = register_settings ( &nvo->settings, parent, "nvo" ) ) != 0 )
 		goto err_register;
 
 	DBGC ( nvo, "NVO %p registered\n", nvo );

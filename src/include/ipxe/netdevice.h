@@ -489,8 +489,7 @@ netdev_settings ( struct net_device *netdev ) {
  */
 static inline __attribute__ (( always_inline )) void
 netdev_settings_init ( struct net_device *netdev ) {
-	generic_settings_init ( &netdev->settings,
-				&netdev->refcnt, netdev->name );
+	generic_settings_init ( &netdev->settings, &netdev->refcnt );
 	netdev->settings.settings.op = &netdev_settings_operations;
 }
 

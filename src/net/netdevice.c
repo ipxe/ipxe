@@ -422,7 +422,7 @@ int register_netdev ( struct net_device *netdev ) {
 
 	/* Register per-netdev configuration settings */
 	if ( ( rc = register_settings ( netdev_settings ( netdev ),
-					NULL ) ) != 0 ) {
+					NULL, netdev->name ) ) != 0 ) {
 		DBGC ( netdev, "NETDEV %s could not register settings: %s\n",
 		       netdev->name, strerror ( rc ) );
 		goto err_register_settings;

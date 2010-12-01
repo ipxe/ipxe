@@ -279,6 +279,5 @@ void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct dhcphdr *data,
 	dhcppkt->len = ( offsetof ( struct dhcphdr, options ) +
 			 dhcppkt->options.len );
 	settings_init ( &dhcppkt->settings,
-			&dhcppkt_settings_operations, &dhcppkt->refcnt,
-			DHCP_SETTINGS_NAME, 0 );
+			&dhcppkt_settings_operations, &dhcppkt->refcnt, 0 );
 }

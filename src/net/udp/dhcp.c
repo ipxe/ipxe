@@ -553,7 +553,8 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 	/* Register settings */
 	parent = netdev_settings ( dhcp->netdev );
 	settings = &dhcppkt->settings;
-	if ( ( rc = register_settings ( settings, parent ) ) != 0 ) {
+	if ( ( rc = register_settings ( settings, parent,
+					DHCP_SETTINGS_NAME ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not register settings: %s\n",
 		       dhcp, strerror ( rc ) );
 		dhcp_finished ( dhcp, rc );
@@ -568,9 +569,8 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 			 * without performing a ProxyDHCPREQUEST
 			 */
 			settings = &dhcp->proxy_offer->settings;
-			settings->name = PROXYDHCP_SETTINGS_NAME;
-			if ( ( rc = register_settings ( settings,
-							NULL ) ) != 0 ) {
+			if ( ( rc = register_settings ( settings, NULL,
+					   PROXYDHCP_SETTINGS_NAME ) ) != 0 ) {
 				DBGC ( dhcp, "DHCP %p could not register "
 				       "proxy settings: %s\n",
 				       dhcp, strerror ( rc ) );
@@ -670,8 +670,8 @@ static void dhcp_proxy_rx ( struct dhcp_session *dhcp,
 		return;
 
 	/* Register settings */
-	settings->name = PROXYDHCP_SETTINGS_NAME;
-	if ( ( rc = register_settings ( settings, NULL ) ) != 0 ) {
+	if ( ( rc = register_settings ( settings, NULL,
+					PROXYDHCP_SETTINGS_NAME ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not register proxy settings: %s\n",
 		       dhcp, strerror ( rc ) );
 		dhcp_finished ( dhcp, rc );
@@ -809,8 +809,8 @@ static void dhcp_pxebs_rx ( struct dhcp_session *dhcp,
 		return;
 
 	/* Register settings */
-	dhcppkt->settings.name = PXEBS_SETTINGS_NAME;
-	if ( ( rc = register_settings ( &dhcppkt->settings, NULL ) ) != 0 ) {
+	if ( ( rc = register_settings ( &dhcppkt->settings, NULL,
+					PXEBS_SETTINGS_NAME ) ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p could not register settings: %s\n",
 		       dhcp, strerror ( rc ) );
 		dhcp_finished ( dhcp, rc );

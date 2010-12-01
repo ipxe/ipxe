@@ -125,7 +125,6 @@ static struct settings_operations smbios_settings_operations = {
 /** SMBIOS settings */
 static struct settings smbios_settings = {
 	.refcnt = NULL,
-	.name = "smbios",
 	.tag_magic = SMBIOS_EMPTY_TAG,
 	.siblings = LIST_HEAD_INIT ( smbios_settings.siblings ),
 	.children = LIST_HEAD_INIT ( smbios_settings.children ),
@@ -136,7 +135,8 @@ static struct settings smbios_settings = {
 static void smbios_init ( void ) {
 	int rc;
 
-	if ( ( rc = register_settings ( &smbios_settings, NULL ) ) != 0 ) {
+	if ( ( rc = register_settings ( &smbios_settings, NULL,
+					"smbios" ) ) != 0 ) {
 		DBG ( "SMBIOS could not register settings: %s\n",
 		      strerror ( rc ) );
 		return;

@@ -66,7 +66,8 @@ void store_cached_dhcpack ( userptr_t data, size_t len ) {
 	 * device, which is usually what we want.
 	 */
 	parent = netdev_settings ( last_opened_netdev() );
-	if ( ( rc = register_settings ( &dhcppkt->settings, parent ) ) != 0 )
+	if ( ( rc = register_settings ( &dhcppkt->settings, parent,
+					DHCP_SETTINGS_NAME ) ) != 0 )
 		DBG ( "DHCP could not register cached settings: %s\n",
 		      strerror ( rc ) );
 
