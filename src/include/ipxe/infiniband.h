@@ -89,6 +89,10 @@ struct ib_address_vector {
 	unsigned int gid_present;
 	/** GID, if present */
 	union ib_gid gid;
+	/** VLAN is present */
+	unsigned int vlan_present;
+	/** VLAN, if present */
+	unsigned int vlan;
 };
 
 /** An Infiniband Work Queue */
