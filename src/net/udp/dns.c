@@ -46,6 +46,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_PROTOCOL, "DNS", DHCP_EB_FEATURE_DNS, 1 );
 
+/* Disambiguate the various error causes */
+#define ENXIO_NO_RECORD __einfo_error ( EINFO_ENXIO_NO_RECORD )
+#define EINFO_ENXIO_NO_RECORD \
+	__einfo_uniqify ( EINFO_ENXIO, 0x01, "DNS name does not exist" )
+#define ENXIO_NO_NAMESERVER __einfo_error ( EINFO_ENXIO_NO_NAMESERVER )
+#define EINFO_ENXIO_NO_NAMESERVER \
+	__einfo_uniqify ( EINFO_ENXIO, 0x02, "No DNS servers available" )
+
 /** The DNS server */
 static struct sockaddr_tcpip nameserver = {
 	.st_port = htons ( DNS_PORT ),
@@ -438,7 +446,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 			goto done;
 		} else {
 			DBGC ( dns, "DNS %p found no CNAME record\n", dns );
-			dns_done ( dns, -ENXIO );
+			dns_done ( dns, -ENXIO_NO_RECORD );
 			rc = 0;
 			goto done;
 		}
@@ -507,7 +515,7 @@ static int dns_resolv ( struct interface *resolv,
 	if ( ! nameserver.st_family ) {
 		DBG ( "DNS not attempting to resolve \"%s\": "
 		      "no DNS servers\n", name );
-		rc = -ENXIO;
+		rc = -ENXIO_NO_NAMESERVER;
 		goto err_no_nameserver;
 	}
 
