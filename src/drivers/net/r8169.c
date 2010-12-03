@@ -1832,7 +1832,7 @@ static void rtl8169_irq_disable ( struct rtl8169_private *tp )
 
 	DBGP ( "rtl8169_irq_disable\n" );
 
-	rtl8169_irq_mask_and_ack ( ioaddr );
+	RTL_W16 ( IntrMask, 0x0000 );
 }
 
 /*** iPXE Core API Routines ***/
