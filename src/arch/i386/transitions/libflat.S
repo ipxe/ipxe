@@ -165,14 +165,23 @@ test_a20_long:
 	pushl	%ecx
 	movl	$TEST_A20_LONG_MAX_RETRIES, %ecx
 1:	pushw	%ax
+	pushw	%ds
+	pushw	%es
 
-	/* Flatten real mode so we can access the test pattern's 1MB offset */
-	call	flatten_real_mode
+	/* Set up segment registers for access across the 1MB boundary */
+	xorw	%ax, %ax
+	movw	%ax, %ds
+	decw	%ax
+	movw	%ax, %es
 
 2:	/* Modify and check test pattern; succeed if we see a difference */
-	incw	%cs:test_a20_data
-	addr32 movw %cs:(test_a20_data + 0x100000 ), %ax
-	cmpw	%cs:test_a20_data, %ax
+	pushfw
+	cli
+	xchgw	%ds:0, %cx
+	movw	%es:0x10, %ax
+	xchgw	%ds:0, %cx
+	popfw
+	cmpw	%ax, %cx
 	clc
 	jnz	99f
 
@@ -182,16 +191,12 @@ test_a20_long:
 	stc
 
 99:	/* Restore registers and return */
+	popw	%es
+	popw	%ds
 	popw	%ax
 	popl	%ecx
 	ret
 	.size	test_a20_long, . - test_a20_long
-
-	.section ".text16.early.data", "aw", @progbits
-	.align	2
-test_a20_data:
-	.word	0xdead
-	.size	test_a20_data, . - test_a20_data
 
 /****************************************************************************
  * enable_a20_bios
@@ -414,6 +419,7 @@ enable_a20_method:
 access_highmem:
 	/* Enable A20 line */
 	call	enable_a20
-	/* CPU will be in flat real mode as a result of this call */
+	/* Set up 4GB limits */
+	call	flatten_real_mode
 	lret
 	.size	access_highmem, . - access_highmem
