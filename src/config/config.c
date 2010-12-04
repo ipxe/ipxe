@@ -237,6 +237,9 @@ REQUIRE_OBJECT ( lotest_cmd );
 #ifdef VLAN_CMD
 REQUIRE_OBJECT ( vlan_cmd );
 #endif
+#ifdef REBOOT_CMD
+REQUIRE_OBJECT ( reboot_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
