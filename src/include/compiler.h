@@ -537,6 +537,19 @@ int __debug_disable;
 /** Declare a function to be always inline */
 #define __always_inline __attribute__ (( always_inline ))
 
+/* Force all inline functions to not be instrumented
+ *
+ * This is required to cope with what seems to be a long-standing gcc
+ * bug, in which -finstrument-functions will cause instances of
+ * inlined functions to be reported as further calls to the
+ * *containing* function.  This makes instrumentation very difficult
+ * to use.
+ *
+ * Work around this problem by adding the no_instrument_function
+ * attribute to all inlined functions.
+ */
+#define inline inline __attribute__ (( no_instrument_function ))
+
 /**
  * Shared data.
  *
