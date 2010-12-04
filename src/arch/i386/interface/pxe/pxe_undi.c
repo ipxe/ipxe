@@ -561,12 +561,12 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 		info->Sub_Class = PCI_SUB_CLASS ( dev->desc.class );
 		info->Prog_Intf = PCI_PROG_INTF ( dev->desc.class );
 		info->BusDevFunc = dev->desc.location;
-		/* Cheat: remaining fields are probably unnecessary,
-		 * and would require adding extra code to pci.c.
+		/* Earlier versions of the PXE specification do not
+		 * have the SubVendor_ID and SubDevice_ID fields.  It
+		 * is possible that some NBPs will not provide space
+		 * for them, and so we must not fill them in.
 		 */
-		undi_get_nic_type->info.pci.SubVendor_ID = 0xffff;
-		undi_get_nic_type->info.pci.SubDevice_ID = 0xffff;
-		DBG ( " PCI %02x:%02x.%x %04x:%04x (%04x:%04x) %02x%02x%02x "
+		DBG ( " PCI %02x:%02x.%x %04x:%04x ('%04x:%04x') %02x%02x%02x "
 		      "rev %02x\n", PCI_BUS ( info->BusDevFunc ),
 		      PCI_SLOT ( info->BusDevFunc ),
 		      PCI_FUNC ( info->BusDevFunc ), info->Vendor_ID,
