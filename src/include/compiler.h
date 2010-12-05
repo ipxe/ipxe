@@ -272,6 +272,8 @@ extern void dbg_autocolourise ( unsigned long id );
 extern void dbg_decolourise ( void );
 extern void dbg_hex_dump_da ( unsigned long dispaddr,
 			      const void *data, unsigned long len );
+extern void dbg_md5_da ( unsigned long dispaddr,
+			 const void *data, unsigned long len );
 extern void dbg_pause ( void );
 extern void dbg_more ( void );
 
@@ -350,6 +352,37 @@ int __debug_disable;
 	} while ( 0 )
 
 /**
+ * Print an MD5 checksum if we are at a certain debug level
+ *
+ * @v level		Debug level
+ * @v dispaddr		Display address
+ * @v data		Data to print
+ * @v len		Length of data
+ */
+#define DBG_MD5A_IF( level, dispaddr, data, len )  do {		\
+		if ( DBG_ ## level ) {				\
+			union {					\
+				unsigned long ul;		\
+				typeof ( dispaddr ) raw;	\
+			} da;					\
+			da.raw = dispaddr;			\
+			dbg_md5_da ( da.ul, data, len );	\
+		}						\
+	} while ( 0 )
+
+/**
+ * Print an MD5 checksum if we are at a certain debug level
+ *
+ * @v level		Debug level
+ * @v data		Data to print
+ * @v len		Length of data
+ */
+#define DBG_MD5_IF( level, data, len ) do {			\
+		const void *_data = data;			\
+		DBG_MD5A_IF ( level, _data, _data, len );	\
+	} while ( 0 )
+
+/**
  * Prompt for key press if we are at a certain debug level
  *
  * @v level		Debug level
@@ -419,6 +452,18 @@ int __debug_disable;
 		DBG_DC_IF ( level );				\
 	} while ( 0 )
 
+#define DBGC_MD5A_IF( level, id, ... ) do {			\
+		DBG_AC_IF ( level, id );			\
+		DBG_MD5A_IF ( level, __VA_ARGS__ );		\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
+#define DBGC_MD5_IF( level, id, ... ) do {			\
+		DBG_AC_IF ( level, id );			\
+		DBG_MD5_IF ( level, __VA_ARGS__ );		\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
 #define DBGC_PAUSE_IF( level, id ) do {				\
 		DBG_AC_IF ( level, id );			\
 		DBG_PAUSE_IF ( level );				\
@@ -436,11 +481,15 @@ int __debug_disable;
 #define DBG( ... )		DBG_IF		( LOG, ##__VA_ARGS__ )
 #define DBG_HDA( ... )		DBG_HDA_IF	( LOG, ##__VA_ARGS__ )
 #define DBG_HD( ... )		DBG_HD_IF	( LOG, ##__VA_ARGS__ )
+#define DBG_MD5A( ... )		DBG_MD5A_IF	( LOG, ##__VA_ARGS__ )
+#define DBG_MD5( ... )		DBG_MD5_IF	( LOG, ##__VA_ARGS__ )
 #define DBG_PAUSE( ... )	DBG_PAUSE_IF	( LOG, ##__VA_ARGS__ )
 #define DBG_MORE( ... )		DBG_MORE_IF	( LOG, ##__VA_ARGS__ )
 #define DBGC( ... )		DBGC_IF		( LOG, ##__VA_ARGS__ )
 #define DBGC_HDA( ... )		DBGC_HDA_IF	( LOG, ##__VA_ARGS__ )
 #define DBGC_HD( ... )		DBGC_HD_IF	( LOG, ##__VA_ARGS__ )
+#define DBGC_MD5A( ... )	DBGC_MD5A_IF	( LOG, ##__VA_ARGS__ )
+#define DBGC_MD5( ... )		DBGC_MD5_IF	( LOG, ##__VA_ARGS__ )
 #define DBGC_PAUSE( ... )	DBGC_PAUSE_IF	( LOG, ##__VA_ARGS__ )
 #define DBGC_MORE( ... )	DBGC_MORE_IF	( LOG, ##__VA_ARGS__ )
 
@@ -449,11 +498,15 @@ int __debug_disable;
 #define DBG2( ... )		DBG_IF		( EXTRA, ##__VA_ARGS__ )
 #define DBG2_HDA( ... )		DBG_HDA_IF	( EXTRA, ##__VA_ARGS__ )
 #define DBG2_HD( ... )		DBG_HD_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBG2_MD5A( ... )	DBG_MD5A_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBG2_MD5( ... )		DBG_MD5_IF	( EXTRA, ##__VA_ARGS__ )
 #define DBG2_PAUSE( ... )	DBG_PAUSE_IF	( EXTRA, ##__VA_ARGS__ )
 #define DBG2_MORE( ... )	DBG_MORE_IF	( EXTRA, ##__VA_ARGS__ )
 #define DBGC2( ... )		DBGC_IF		( EXTRA, ##__VA_ARGS__ )
 #define DBGC2_HDA( ... )	DBGC_HDA_IF	( EXTRA, ##__VA_ARGS__ )
 #define DBGC2_HD( ... )		DBGC_HD_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBGC2_MD5A( ... )	DBGC_MD5A_IF	( EXTRA, ##__VA_ARGS__ )
+#define DBGC2_MD5( ... )	DBGC_MD5_IF	( EXTRA, ##__VA_ARGS__ )
 #define DBGC2_PAUSE( ... )	DBGC_PAUSE_IF	( EXTRA, ##__VA_ARGS__ )
 #define DBGC2_MORE( ... )	DBGC_MORE_IF	( EXTRA, ##__VA_ARGS__ )
 
@@ -462,11 +515,15 @@ int __debug_disable;
 #define DBGP( ... )		DBG_IF		( PROFILE, ##__VA_ARGS__ )
 #define DBGP_HDA( ... )		DBG_HDA_IF	( PROFILE, ##__VA_ARGS__ )
 #define DBGP_HD( ... )		DBG_HD_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGP_MD5A( ... )	DBG_MD5A_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGP_MD5( ... )		DBG_MD5_IF	( PROFILE, ##__VA_ARGS__ )
 #define DBGP_PAUSE( ... )	DBG_PAUSE_IF	( PROFILE, ##__VA_ARGS__ )
 #define DBGP_MORE( ... )	DBG_MORE_IF	( PROFILE, ##__VA_ARGS__ )
 #define DBGCP( ... )		DBGC_IF		( PROFILE, ##__VA_ARGS__ )
 #define DBGCP_HDA( ... )	DBGC_HDA_IF	( PROFILE, ##__VA_ARGS__ )
 #define DBGCP_HD( ... )		DBGC_HD_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGCP_MD5A( ... )	DBGC_MD5A_IF	( PROFILE, ##__VA_ARGS__ )
+#define DBGCP_MD5( ... )	DBGC_MD5_IF	( PROFILE, ##__VA_ARGS__ )
 #define DBGCP_PAUSE( ... )	DBGC_PAUSE_IF	( PROFILE, ##__VA_ARGS__ )
 #define DBGCP_MORE( ... )	DBGC_MORE_IF	( PROFILE, ##__VA_ARGS__ )
 
@@ -475,11 +532,15 @@ int __debug_disable;
 #define DBGIO( ... )		DBG_IF		( IO, ##__VA_ARGS__ )
 #define DBGIO_HDA( ... )	DBG_HDA_IF	( IO, ##__VA_ARGS__ )
 #define DBGIO_HD( ... )		DBG_HD_IF	( IO, ##__VA_ARGS__ )
+#define DBGIO_MD5A( ... )	DBG_MD5A_IF	( IO, ##__VA_ARGS__ )
+#define DBGIO_MD5( ... )	DBG_MD5_IF	( IO, ##__VA_ARGS__ )
 #define DBGIO_PAUSE( ... )	DBG_PAUSE_IF	( IO, ##__VA_ARGS__ )
 #define DBGIO_MORE( ... )	DBG_MORE_IF	( IO, ##__VA_ARGS__ )
 #define DBGCIO( ... )		DBGC_IF		( IO, ##__VA_ARGS__ )
 #define DBGCIO_HDA( ... )	DBGC_HDA_IF	( IO, ##__VA_ARGS__ )
 #define DBGCIO_HD( ... )	DBGC_HD_IF	( IO, ##__VA_ARGS__ )
+#define DBGCIO_MD5A( ... )	DBGC_MD5A_IF	( IO, ##__VA_ARGS__ )
+#define DBGCIO_MD5( ... )	DBGC_MD5_IF	( IO, ##__VA_ARGS__ )
 #define DBGCIO_PAUSE( ... )	DBGC_PAUSE_IF	( IO, ##__VA_ARGS__ )
 #define DBGCIO_MORE( ... )	DBGC_MORE_IF	( IO, ##__VA_ARGS__ )
 
