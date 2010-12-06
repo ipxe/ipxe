@@ -785,7 +785,15 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		undi_isr->Frame.segment = rm_ds;
 		undi_isr->Frame.offset = __from_data16 ( basemem_packet );
 		undi_isr->ProtType = prottype;
-		undi_isr->PktType = XMT_DESTADDR;
+		if ( memcmp ( ll_dest, pxe_netdev->ll_addr,
+			      ll_protocol->ll_addr_len ) == 0 ) {
+			undi_isr->PktType = P_DIRECTED;
+		} else if ( memcmp ( ll_dest, pxe_netdev->ll_broadcast,
+				     ll_protocol->ll_addr_len ) == 0 ) {
+			undi_isr->PktType = P_BROADCAST;
+		} else {
+			undi_isr->PktType = P_MULTICAST;
+		}
 		DBGC2 ( &pxenv_undi_isr, " %04x:%04x+%x(%x) %s hlen %d",
 			undi_isr->Frame.segment, undi_isr->Frame.offset,
 			undi_isr->BufferLength, undi_isr->FrameLength,
