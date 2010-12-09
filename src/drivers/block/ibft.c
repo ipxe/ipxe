@@ -103,13 +103,18 @@ static void ibft_set_ipaddr ( struct ibft_ipaddr *ipaddr, struct in_addr in ) {
  *
  * @v ipaddr		IP address field
  * @v setting		Configuration setting
- * @v tag		DHCP option tag
+ * @v count		Maximum number of IP addresses
  */
 static void ibft_set_ipaddr_setting ( struct ibft_ipaddr *ipaddr,
-				      struct setting *setting ) {
-	struct in_addr in;
-	fetch_ipv4_setting ( NULL, setting, &in );
-	ibft_set_ipaddr ( ipaddr, in );
+				      struct setting *setting,
+				      unsigned int count ) {
+	struct in_addr in[count];
+	unsigned int i;
+
+	fetch_ipv4_array_setting ( NULL, setting, in, count );
+	for ( i = 0 ; i < count ; i++ ) {
+		ibft_set_ipaddr ( &ipaddr[i], in[i] );
+	}
 }
 
 /**
@@ -233,12 +238,15 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 			      IBFT_FL_NIC_FIRMWARE_BOOT_SELECTED );
 
 	/* Extract values from configuration settings */
-	ibft_set_ipaddr_setting ( &nic->ip_address, &ip_setting );
+	ibft_set_ipaddr_setting ( &nic->ip_address, &ip_setting, 1 );
 	DBG ( "iBFT NIC IP = %s\n", ibft_ipaddr ( &nic->ip_address ) );
-	ibft_set_ipaddr_setting ( &nic->gateway, &gateway_setting );
+	ibft_set_ipaddr_setting ( &nic->gateway, &gateway_setting, 1 );
 	DBG ( "iBFT NIC gateway = %s\n", ibft_ipaddr ( &nic->gateway ) );
-	ibft_set_ipaddr_setting ( &nic->dns[0], &dns_setting );
-	DBG ( "iBFT NIC DNS = %s\n", ibft_ipaddr ( &nic->dns[0] ) );
+	ibft_set_ipaddr_setting ( &nic->dns[0], &dns_setting,
+				  ( sizeof ( nic->dns ) /
+				    sizeof ( nic->dns[0] ) ) );
+	DBG ( "iBFT NIC DNS = %s", ibft_ipaddr ( &nic->dns[0] ) );
+	DBG ( ", %s\n", ibft_ipaddr ( &nic->dns[1] ) );
 	if ( ( rc = ibft_set_string_setting ( strings, &nic->hostname,
 					      &hostname_setting ) ) != 0 )
 		return rc;
