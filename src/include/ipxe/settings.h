@@ -193,6 +193,10 @@ extern int fetch_string_setting ( struct settings *settings,
 extern int fetch_string_setting_copy ( struct settings *settings,
 				       struct setting *setting,
 				       char **data );
+extern int fetch_ipv4_array_setting ( struct settings *settings,
+				      struct setting *setting,
+				      struct in_addr *inp,
+				      unsigned int count );
 extern int fetch_ipv4_setting ( struct settings *settings,
 				struct setting *setting, struct in_addr *inp );
 extern int fetch_int_setting ( struct settings *settings,
