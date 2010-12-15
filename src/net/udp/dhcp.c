@@ -867,20 +867,24 @@ static struct dhcp_session_state dhcp_state_pxebs = {
  * Construct DHCP client hardware address field and broadcast flag
  *
  * @v netdev		Network device
- * @v hlen		DHCP hardware address length to fill in
- * @v flags		DHCP flags to fill in
- * @ret chaddr		DHCP client hardware address
+ * @v chaddr		Hardware address buffer
+ * @v flags		Flags to set (or NULL)
+ * @ret hlen		Hardware address length
  */
-void * dhcp_chaddr ( struct net_device *netdev, uint8_t *hlen,
-		     uint16_t *flags ) {
+unsigned int dhcp_chaddr ( struct net_device *netdev, void *chaddr,
+			   uint16_t *flags ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	typeof ( ( ( struct dhcphdr * ) NULL )->chaddr ) chaddr;
+	struct dhcphdr *dhcphdr;
+	int rc;
 
 	/* If the link-layer address cannot fit into the chaddr field
-	 * (as is the case for IPoIB) then try using the hardware
-	 * address instead.  If we do this, set the broadcast flag,
-	 * since chaddr then does not represent a valid link-layer
-	 * address for the return path.
+	 * (as is the case for IPoIB) then try using the Ethernet-
+	 * compatible link-layer address.  If we do this, set the
+	 * broadcast flag, since chaddr then does not represent a
+	 * valid link-layer address for the return path.
+	 *
+	 * If we cannot produce an Ethernet-compatible link-layer
+	 * address, try using the hardware address.
 	 *
 	 * If even the hardware address is too large, use an empty
 	 * chaddr field and set the broadcast flag.
@@ -891,16 +895,19 @@ void * dhcp_chaddr ( struct net_device *netdev, uint8_t *hlen,
 	 * storage, or by eliminating the hardware address completely
 	 * from the DHCP packet, which seems unfriendly to users.
 	 */
-	if ( ( *hlen = ll_protocol->ll_addr_len ) <= sizeof ( chaddr ) ) {
-		return netdev->ll_addr;
+	if ( ll_protocol->ll_addr_len <= sizeof ( dhcphdr->chaddr ) ) {
+		memcpy ( chaddr, netdev->ll_addr, ll_protocol->ll_addr_len );
+		return ll_protocol->ll_addr_len;
 	}
-	*flags = htons ( BOOTP_FL_BROADCAST );
-	if ( ( *hlen = ll_protocol->hw_addr_len ) <= sizeof ( chaddr ) ) {
-		return netdev->hw_addr;
-	} else {
-		*hlen = 0;
-		return NULL;
+	if ( flags )
+		*flags |= htons ( BOOTP_FL_BROADCAST );
+	if ( ( rc = ll_protocol->eth_addr ( netdev->ll_addr, chaddr ) ) == 0 )
+		return ETH_ALEN;
+	if ( ll_protocol->hw_addr_len <= sizeof ( dhcphdr->chaddr ) ) {
+		memcpy ( chaddr, netdev->hw_addr, ll_protocol->hw_addr_len );
+		return ll_protocol->hw_addr_len;
 	}
+	return 0;
 }
 
 /**
@@ -923,7 +930,6 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 			 const void *options, size_t options_len,
 			 void *data, size_t max_len ) {
 	struct dhcphdr *dhcphdr = data;
-	void *chaddr;
 	int rc;
 
 	/* Sanity check */
@@ -936,8 +942,8 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
 	dhcphdr->htype = ntohs ( netdev->ll_protocol->ll_proto );
 	dhcphdr->op = dhcp_op[msgtype];
-	chaddr = dhcp_chaddr ( netdev, &dhcphdr->hlen, &dhcphdr->flags );
-	memcpy ( dhcphdr->chaddr, chaddr, dhcphdr->hlen );
+	dhcphdr->hlen = dhcp_chaddr ( netdev, dhcphdr->chaddr,
+				      &dhcphdr->flags );
 	memcpy ( dhcphdr->options, options, options_len );
 
 	/* Initialise DHCP packet structure */

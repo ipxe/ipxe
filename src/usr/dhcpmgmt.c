@@ -37,9 +37,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 int dhcp ( struct net_device *netdev ) {
-	uint8_t *chaddr;
-	uint8_t hlen;
-	uint16_t flags;
+	struct dhcphdr *dhcphdr;
+	typeof ( dhcphdr->chaddr ) chaddr;
+	unsigned int hlen;
+	unsigned int i;
 	int rc;
 
 	/* Check we can open the interface first */
@@ -51,10 +52,11 @@ int dhcp ( struct net_device *netdev ) {
 		return rc;
 
 	/* Perform DHCP */
-	chaddr = dhcp_chaddr ( netdev, &hlen, &flags );
-	printf ( "DHCP (%s ", netdev->name );
-	while ( hlen-- )
-		printf ( "%02x%c", *(chaddr++), ( hlen ? ':' : ')' ) );
+	printf ( "DHCP (%s", netdev->name );
+	hlen = dhcp_chaddr ( netdev, chaddr, NULL );
+	for ( i = 0 ; i < hlen ; i++ )
+		printf ( "%c%02x", ( i ? ':' : ' ' ), chaddr[i] );
+	printf ( ")" );
 
 	if ( ( rc = start_dhcp ( &monojob, netdev ) ) == 0 ) {
 		rc = monojob_wait ( "" );
