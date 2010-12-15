@@ -166,11 +166,13 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *pxenv_udp_open ) {
 
 	/* Record source IP address */
 	pxe_udp.local.sin_addr.s_addr = pxenv_udp_open->src_ip;
-	DBG ( " %s", inet_ntoa ( pxe_udp.local.sin_addr ) );
+	DBG ( " %s\n", inet_ntoa ( pxe_udp.local.sin_addr ) );
 
 	/* Open promiscuous UDP connection */
 	intf_restart ( &pxe_udp.xfer, 0 );
 	if ( ( rc = udp_open_promisc ( &pxe_udp.xfer ) ) != 0 ) {
+		DBG ( "PXENV_UDP_OPEN could not open promiscuous socket: %s\n",
+		      strerror ( rc ) );
 		pxenv_udp_open->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
@@ -201,7 +203,7 @@ PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *pxenv_udp_open ) {
  *
  */
 PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *pxenv_udp_close ) {
-	DBG ( "PXENV_UDP_CLOSE" );
+	DBG ( "PXENV_UDP_CLOSE\n" );
 
 	/* Close UDP connection */
 	intf_restart ( &pxe_udp.xfer, 0 );
@@ -288,6 +290,7 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	len = pxenv_udp_write->buffer_size;
 	iobuf = xfer_alloc_iob ( &pxe_udp.xfer, len );
 	if ( ! iobuf ) {
+		DBG ( " out of memory\n" );
 		pxenv_udp_write->Status = PXENV_STATUS_OUT_OF_RESOURCES;
 		return PXENV_EXIT_FAILURE;
 	}
@@ -295,7 +298,7 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 				pxenv_udp_write->buffer.offset );
 	copy_from_user ( iob_put ( iobuf, len ), buffer, 0, len );
 
-	DBG ( " %04x:%04x+%x %d->%s:%d", pxenv_udp_write->buffer.segment,
+	DBG ( " %04x:%04x+%x %d->%s:%d\n", pxenv_udp_write->buffer.segment,
 	      pxenv_udp_write->buffer.offset, pxenv_udp_write->buffer_size,
 	      ntohs ( pxenv_udp_write->src_port ),
 	      inet_ntoa ( dest.sin_addr ),
@@ -303,6 +306,8 @@ PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	
 	/* Transmit packet */
 	if ( ( rc = xfer_deliver ( &pxe_udp.xfer, iobuf, &meta ) ) != 0 ) {
+		DBG ( "PXENV_UDP_WRITE could not transmit: %s\n",
+		      strerror ( rc ) );
 		pxenv_udp_write->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
@@ -360,36 +365,36 @@ PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	uint16_t d_port_wanted = pxenv_udp_read->d_port;
 	uint16_t d_port;
 
-	DBG ( "PXENV_UDP_READ" );
-
 	/* Try receiving a packet */
 	pxe_udp.pxenv_udp_read = pxenv_udp_read;
 	step();
 	if ( pxe_udp.pxenv_udp_read ) {
 		/* No packet received */
+		DBG2 ( "PXENV_UDP_READ\n" );
 		pxe_udp.pxenv_udp_read = NULL;
 		goto no_packet;
 	}
 	dest_ip.s_addr = pxenv_udp_read->dest_ip;
 	d_port = pxenv_udp_read->d_port;
+	DBG ( "PXENV_UDP_READ" );
 
 	/* Filter on destination address and/or port */
 	if ( dest_ip_wanted.s_addr &&
 	     ( dest_ip_wanted.s_addr != dest_ip.s_addr ) ) {
 		DBG ( " wrong IP %s", inet_ntoa ( dest_ip ) );
-		DBG ( " (wanted %s)", inet_ntoa ( dest_ip_wanted ) );
+		DBG ( " (wanted %s)\n", inet_ntoa ( dest_ip_wanted ) );
 		goto no_packet;
 	}
 	if ( d_port_wanted && ( d_port_wanted != d_port ) ) {
-		DBG ( " wrong port %d ", htons ( d_port ) );
-		DBG ( " (wanted %d)", htons ( d_port_wanted ) );
+		DBG ( " wrong port %d", htons ( d_port ) );
+		DBG ( " (wanted %d)\n", htons ( d_port_wanted ) );
 		goto no_packet;
 	}
 
 	DBG ( " %04x:%04x+%x %s:", pxenv_udp_read->buffer.segment,
 	      pxenv_udp_read->buffer.offset, pxenv_udp_read->buffer_size,
 	      inet_ntoa ( *( ( struct in_addr * ) &pxenv_udp_read->src_ip ) ));
-	DBG ( "%d<-%s:%d",  ntohs ( pxenv_udp_read->s_port ),
+	DBG ( "%d<-%s:%d\n",  ntohs ( pxenv_udp_read->s_port ),
 	      inet_ntoa ( *( ( struct in_addr * ) &pxenv_udp_read->dest_ip ) ),
 	      ntohs ( pxenv_udp_read->d_port ) );
 
