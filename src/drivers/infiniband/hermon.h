@@ -211,7 +211,7 @@ struct hermonprm_sense_port_st {
 	pseudo_bit_t reserved0[0x00020];
 /* -------------- */
 	pseudo_bit_t port_type[0x00002];
-	pseudo_bit_t reserved1[0x00018];
+	pseudo_bit_t reserved1[0x0001e];
 } __attribute__ (( packed ));
 
 struct hermonprm_set_port_ib_st {
