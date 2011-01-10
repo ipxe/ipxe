@@ -32,6 +32,9 @@ struct pci_vpd_field {
 	uint8_t len;
 } __attribute__ (( packed ));
 
+/** Maximum PCI VPD field length */
+#define PCI_VPD_MAX_LEN 0xff
+
 /** Construct PCI VPD field descriptor
  *
  * @v tag		ISAPnP tag
@@ -172,5 +175,7 @@ extern int pci_vpd_write ( struct pci_vpd *vpd, unsigned int address,
 			   const void *buf, size_t len );
 extern int pci_vpd_find ( struct pci_vpd *vpd, unsigned int field,
 			  unsigned int *address, size_t *len );
+extern int pci_vpd_resize ( struct pci_vpd *vpd, unsigned int field,
+			    size_t len, unsigned int *address );
 
 #endif /* _IPXE_PCIVPD_H */

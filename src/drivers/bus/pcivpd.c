@@ -19,6 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <byteswap.h>
@@ -391,4 +392,164 @@ int pci_vpd_find ( struct pci_vpd *vpd, unsigned int field,
 	DBGC ( vpd, PCI_FMT " VPD field " PCI_VPD_FIELD_FMT " not found\n",
 	       PCI_ARGS ( vpd->pci ), PCI_VPD_FIELD_ARGS ( field ) );
 	return -ENOENT;
+}
+
+/**
+ * Resize VPD field
+ *
+ * @v vpd		PCI VPD
+ * @v field		VPD field descriptor
+ * @v len		New length of field body
+ * @ret address		Address of field body
+ * @ret rc		Return status code
+ */
+int pci_vpd_resize ( struct pci_vpd *vpd, unsigned int field, size_t len,
+		     unsigned int *address ) {
+	struct pci_vpd_field rw_field;
+	struct pci_vpd_field old_field;
+	struct pci_vpd_field new_field;
+	unsigned int rw_address;
+	unsigned int old_address;
+	unsigned int copy_address;
+	unsigned int dst_address;
+	unsigned int dump_address;
+	size_t rw_len;
+	size_t old_len;
+	size_t available_len;
+	size_t copy_len;
+	size_t dump_len;
+	void *copy;
+	int rc;
+
+	/* Sanity checks */
+	assert ( PCI_VPD_TAG ( field ) == PCI_VPD_TAG_RW );
+	assert ( PCI_VPD_KEYWORD ( field ) != 0 );
+	assert ( field != PCI_VPD_FIELD_RW );
+
+	/* Locate 'RW' field */
+	if ( ( rc = pci_vpd_find ( vpd, PCI_VPD_FIELD_RW, &rw_address,
+				   &rw_len ) ) != 0 )
+		goto err_no_rw;
+
+	/* Locate old field, if any */
+	if ( ( rc = pci_vpd_find ( vpd, field, &old_address,
+				   &old_len ) ) == 0 ) {
+
+		/* Field already exists */
+		if ( old_address > rw_address ) {
+			DBGC ( vpd, PCI_FMT " VPD field " PCI_VPD_FIELD_FMT
+			       " at [%04x,%04zx) is after field "
+			       PCI_VPD_FIELD_FMT " at [%04x,%04zx)\n",
+			       PCI_ARGS ( vpd->pci ),
+			       PCI_VPD_FIELD_ARGS ( field ),
+			       old_address, ( old_address + old_len ),
+			       PCI_VPD_FIELD_ARGS ( PCI_VPD_FIELD_RW ),
+			       rw_address, ( rw_address + rw_len ) );
+			rc = -ENXIO;
+			goto err_after_rw;
+		}
+		dst_address = ( old_address - sizeof ( old_field ) );
+		copy_address = ( old_address + old_len );
+		copy_len = ( rw_address - sizeof ( rw_field ) - copy_address );
+
+		/* Calculate available length */
+		available_len = ( rw_len + old_len );
+
+	} else {
+
+		/* Field does not yet exist */
+		dst_address = ( rw_address - sizeof ( rw_field ) );
+		copy_address = dst_address;
+		copy_len = 0;
+
+		/* Calculate available length */
+		available_len = ( ( rw_len > sizeof ( new_field ) ) ?
+				  ( rw_len - sizeof ( new_field ) ) : 0 );
+	}
+
+	/* Dump region before changes */
+	dump_address = dst_address;
+	dump_len = ( rw_address + rw_len - dump_address );
+	DBGC ( vpd, PCI_FMT " VPD before resizing field " PCI_VPD_FIELD_FMT
+	       " to %zd bytes:\n", PCI_ARGS ( vpd->pci ),
+	       PCI_VPD_FIELD_ARGS ( field ), len );
+	pci_vpd_dump ( vpd, dump_address, dump_len );
+
+	/* Check available length */
+	if ( available_len > PCI_VPD_MAX_LEN )
+		available_len = PCI_VPD_MAX_LEN;
+	if ( len > available_len ) {
+		DBGC ( vpd, PCI_FMT " VPD no space for field "
+		       PCI_VPD_FIELD_FMT " (need %02zx, have %02zx)\n",
+		       PCI_ARGS ( vpd->pci ), PCI_VPD_FIELD_ARGS ( field ),
+		       len, available_len );
+		rc = -ENOSPC;
+		goto err_no_space;
+	}
+
+	/* Preserve intermediate fields, if any */
+	copy = malloc ( copy_len );
+	if ( ! copy ) {
+		rc = -ENOMEM;
+		goto err_copy_alloc;
+	}
+	if ( ( rc = pci_vpd_read ( vpd, copy_address, copy, copy_len ) ) != 0 )
+		goto err_copy_read;
+
+	/* Create new field, if applicable */
+	if ( len ) {
+		new_field.keyword = PCI_VPD_KEYWORD ( field );
+		new_field.len = len;
+		if ( ( rc = pci_vpd_write ( vpd, dst_address, &new_field,
+					    sizeof ( new_field ) ) ) != 0 )
+			goto err_new_write;
+		dst_address += sizeof ( new_field );
+		*address = dst_address;
+		DBGC ( vpd, PCI_FMT " VPD field " PCI_VPD_FIELD_FMT " is now "
+		       "at [%04x,%04x)\n", PCI_ARGS ( vpd->pci ),
+		       PCI_VPD_FIELD_ARGS ( field ), dst_address,
+		       ( dst_address + new_field.len ) );
+		dst_address += len;
+	} else {
+		DBGC ( vpd, PCI_FMT " VPD field " PCI_VPD_FIELD_FMT
+		       " no longer exists\n", PCI_ARGS ( vpd->pci ),
+		       PCI_VPD_FIELD_ARGS ( field ) );
+	}
+
+	/* Restore intermediate fields, if any */
+	if ( ( rc = pci_vpd_write ( vpd, dst_address, copy, copy_len ) ) != 0 )
+		goto err_copy_write;
+	dst_address += copy_len;
+
+	/* Create 'RW' field */
+	rw_field.keyword = PCI_VPD_KEYWORD ( PCI_VPD_FIELD_RW );
+	rw_field.len = ( rw_len +
+			 ( rw_address - sizeof ( rw_field ) ) - dst_address );
+	if ( ( rc = pci_vpd_write ( vpd, dst_address, &rw_field,
+				    sizeof ( rw_field ) ) ) != 0 )
+		goto err_rw_write;
+	dst_address += sizeof ( rw_field );
+	DBGC ( vpd, PCI_FMT " VPD field " PCI_VPD_FIELD_FMT " is now "
+	       "at [%04x,%04x)\n", PCI_ARGS ( vpd->pci ),
+	       PCI_VPD_FIELD_ARGS ( PCI_VPD_FIELD_RW ), dst_address,
+	       ( dst_address + rw_field.len ) );
+
+	/* Dump region after changes */
+	DBGC ( vpd, PCI_FMT " VPD after resizing field " PCI_VPD_FIELD_FMT
+	       " to %zd bytes:\n", PCI_ARGS ( vpd->pci ),
+	       PCI_VPD_FIELD_ARGS ( field ), len );
+	pci_vpd_dump ( vpd, dump_address, dump_len );
+
+	rc = 0;
+
+ err_rw_write:
+ err_new_write:
+ err_copy_write:
+ err_copy_read:
+	free ( copy );
+ err_copy_alloc:
+ err_no_space:
+ err_after_rw:
+ err_no_rw:
+	return rc;
 }
