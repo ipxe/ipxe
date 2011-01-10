@@ -133,7 +133,8 @@ static void nvo_init_dhcpopts ( struct nvo_block *nvo ) {
 		memset ( nvo->data, 0, nvo->total_len );
 	}
 
-	dhcpopt_init ( &nvo->dhcpopts, options_data, options_len );
+	dhcpopt_init ( &nvo->dhcpopts, options_data, options_len,
+		       dhcpopt_no_realloc );
 }
 
 /**

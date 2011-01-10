@@ -267,7 +267,8 @@ void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct dhcphdr *data,
 	ref_init ( &dhcppkt->refcnt, NULL );
 	dhcppkt->dhcphdr = data;
 	dhcpopt_init ( &dhcppkt->options, &dhcppkt->dhcphdr->options,
-		       ( len - offsetof ( struct dhcphdr, options ) ) );
+		       ( len - offsetof ( struct dhcphdr, options ) ),
+		       dhcpopt_no_realloc );
 	settings_init ( &dhcppkt->settings,
 			&dhcppkt_settings_operations, &dhcppkt->refcnt, 0 );
 }
