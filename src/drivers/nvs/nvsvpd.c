@@ -19,9 +19,11 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
+#include <errno.h>
 #include <ipxe/nvs.h>
 #include <ipxe/pci.h>
 #include <ipxe/pcivpd.h>
+#include <ipxe/nvo.h>
 #include <ipxe/nvsvpd.h>
 
 /** @file
@@ -31,24 +33,50 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
- * Read from VPD
+ * Read from VPD field
  *
  * @v nvs		NVS device
- * @v address		Starting address
- * @v buf		Data buffer
+ * @v field		VPD field descriptor
+ * @v data		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-static int nvs_vpd_read ( struct nvs_device *nvs, unsigned int address,
+static int nvs_vpd_read ( struct nvs_device *nvs, unsigned int field,
 			  void *data, size_t len ) {
 	struct nvs_vpd_device *nvsvpd =
 		container_of ( nvs, struct nvs_vpd_device, nvs );
+	struct pci_device *pci = nvsvpd->vpd.pci;
+	unsigned int address;
+	size_t max_len;
 	int rc;
 
-	if ( ( rc = pci_vpd_read ( &nvsvpd->vpd, ( nvsvpd->address + address ),
-				   data, len ) ) != 0 ) {
-		DBGC ( nvsvpd->vpd.pci, PCI_FMT " NVS could not read "
-		       "[%04x,%04zx): %s\n", PCI_ARGS ( nvsvpd->vpd.pci ),
+	/* Allow reading non-existent field */
+	if ( len == 0 )
+		return 0;
+
+	/* Locate VPD field */
+	if ( ( rc = pci_vpd_find ( &nvsvpd->vpd, field, &address,
+				   &max_len ) ) != 0 ) {
+		DBGC ( pci, PCI_FMT " NVS VPD could not locate field "
+		       PCI_VPD_FIELD_FMT ": %s\n", PCI_ARGS ( pci ),
+		       PCI_VPD_FIELD_ARGS ( field ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Sanity check */
+	if ( len > max_len ) {
+		DBGC ( pci, PCI_FMT " NVS VPD cannot read %#02zx bytes "
+		       "beyond field " PCI_VPD_FIELD_FMT " at [%04x,%04zx)\n",
+		       PCI_ARGS ( pci ), len, PCI_VPD_FIELD_ARGS ( field ),
+		       address, ( address + max_len ) );
+		return -ENXIO;
+	}
+
+	/* Read from VPD field */
+	if ( ( rc = pci_vpd_read ( &nvsvpd->vpd, address, data, len ) ) != 0 ) {
+		DBGC ( pci, PCI_FMT " NVS VPD could not read field "
+		       PCI_VPD_FIELD_FMT " at [%04x,%04zx): %s\n",
+		       PCI_ARGS ( pci ), PCI_VPD_FIELD_ARGS ( field ),
 		       address, ( address + len ), strerror ( rc ) );
 		return rc;
 	}
@@ -57,25 +85,78 @@ static int nvs_vpd_read ( struct nvs_device *nvs, unsigned int address,
 }
 
 /**
- * Write to VPD
+ * Write to VPD field
  *
  * @v nvs		NVS device
- * @v address		Starting address
- * @v buf		Data buffer
+ * @v field		VPD field descriptor
+ * @v data		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-static int nvs_vpd_write ( struct nvs_device *nvs, unsigned int address,
+static int nvs_vpd_write ( struct nvs_device *nvs, unsigned int field,
 			   const void *data, size_t len ) {
 	struct nvs_vpd_device *nvsvpd =
 		container_of ( nvs, struct nvs_vpd_device, nvs );
+	struct pci_device *pci = nvsvpd->vpd.pci;
+	unsigned int address;
+	size_t max_len;
 	int rc;
 
-	if ( ( rc = pci_vpd_write ( &nvsvpd->vpd, ( nvsvpd->address + address ),
-				    data, len ) ) != 0 ) {
-		DBGC ( nvsvpd->vpd.pci, PCI_FMT " NVS could not write "
-		       "[%04x,%04zx): %s\n", PCI_ARGS ( nvsvpd->vpd.pci ),
+	/* Locate VPD field */
+	if ( ( rc = pci_vpd_find ( &nvsvpd->vpd, field, &address,
+				   &max_len ) ) != 0 ) {
+		DBGC ( pci, PCI_FMT " NVS VPD could not locate field "
+		       PCI_VPD_FIELD_FMT ": %s\n", PCI_ARGS ( pci ),
+		       PCI_VPD_FIELD_ARGS ( field ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Sanity check */
+	if ( len > max_len ) {
+		DBGC ( pci, PCI_FMT " NVS VPD cannot write %#02zx bytes "
+		       "beyond field " PCI_VPD_FIELD_FMT " at [%04x,%04zx)\n",
+		       PCI_ARGS ( pci ), len, PCI_VPD_FIELD_ARGS ( field ),
+		       address, ( address + max_len ) );
+		return -ENXIO;
+	}
+
+	/* Write field */
+	if ( ( rc = pci_vpd_write ( &nvsvpd->vpd, address, data,
+				    len ) ) != 0 ) {
+		DBGC ( pci, PCI_FMT " NVS VPD could not write field "
+		       PCI_VPD_FIELD_FMT " at [%04x,%04zx): %s\n",
+		       PCI_ARGS ( pci ), PCI_VPD_FIELD_ARGS ( field ),
 		       address, ( address + len ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Resize VPD field
+ *
+ * @v nvs		NVS device
+ * @v field		VPD field descriptor
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ * @ret rc		Return status code
+ */
+static int nvs_vpd_resize ( struct nvs_device *nvs, unsigned int field,
+			    size_t len ) {
+	struct nvs_vpd_device *nvsvpd =
+		container_of ( nvs, struct nvs_vpd_device, nvs );
+	struct pci_device *pci = nvsvpd->vpd.pci;
+	unsigned int address;
+	int rc;
+
+	/* Resize field */
+	if ( ( rc = pci_vpd_resize ( &nvsvpd->vpd, field, len,
+				     &address ) ) != 0 ) {
+		DBGC ( pci, PCI_FMT " NVS VPD could not resize field "
+		       PCI_VPD_FIELD_FMT " to %#02zx bytes: %s\n",
+		       PCI_ARGS ( pci ), PCI_VPD_FIELD_ARGS ( field ),
+		       len, strerror ( rc ) );
 		return rc;
 	}
 
@@ -89,9 +170,7 @@ static int nvs_vpd_write ( struct nvs_device *nvs, unsigned int address,
  * @v pci		PCI device
  * @ret rc		Return status code
  */
-int nvs_vpd_init ( struct nvs_vpd_device *nvsvpd, struct pci_device *pci,
-		   unsigned int field ) {
-	size_t len;
+int nvs_vpd_init ( struct nvs_vpd_device *nvsvpd, struct pci_device *pci ) {
 	int rc;
 
 	/* Initialise VPD device */
@@ -101,23 +180,54 @@ int nvs_vpd_init ( struct nvs_vpd_device *nvsvpd, struct pci_device *pci,
 		return rc;
 	}
 
-	/* Locate VPD field */
-	if ( ( rc = pci_vpd_find ( &nvsvpd->vpd, field, &nvsvpd->address,
-				   &len ) ) != 0 ) {
-		DBGC ( pci, PCI_FMT " NVS could not locate VPD field "
-		       PCI_VPD_FIELD_FMT ": %s\n", PCI_ARGS ( pci ),
-		       PCI_VPD_FIELD_ARGS ( field ), strerror ( rc ) );
-		return rc;
-	}
-
 	/* Initialise NVS device */
-	nvsvpd->nvs.size = len;
 	nvsvpd->nvs.read = nvs_vpd_read;
 	nvsvpd->nvs.write = nvs_vpd_write;
 
-	DBGC ( pci, PCI_FMT " NVS using VPD field " PCI_VPD_FIELD_FMT " at "
-	       "[%04x,%04x)\n", PCI_ARGS ( pci ), PCI_VPD_FIELD_ARGS ( field ),
-	       nvsvpd->address, ( nvsvpd->address + nvsvpd->nvs.size ) );
+	return 0;
+}
+
+/**
+ * Resize non-volatile option storage within NVS VPD device
+ *
+ * @v nvo		Non-volatile options block
+ * @v len		New length
+ * @ret rc		Return status code
+ */
+static int nvs_vpd_nvo_resize ( struct nvo_block *nvo, size_t len ) {
+	int rc;
+
+	/* Resize VPD field */
+	if ( ( rc = nvs_vpd_resize ( nvo->nvs, nvo->address, len ) ) != 0 )
+		return rc;
 
 	return 0;
+}
+
+/**
+ * Initialise non-volatile option storage within NVS VPD device
+ *
+ * @v nvsvpd		NVS VPD device
+ * @v field		VPD field descriptor
+ * @v nvo		Non-volatile options block
+ * @v refcnt		Containing object reference counter, or NULL
+ */
+void nvs_vpd_nvo_init ( struct nvs_vpd_device *nvsvpd, unsigned int field,
+			struct nvo_block *nvo, struct refcnt *refcnt ) {
+	struct pci_device *pci = nvsvpd->vpd.pci;
+	unsigned int address;
+	size_t len;
+	int rc;
+
+	/* Locate VPD field, if present */
+	if ( ( rc = pci_vpd_find ( &nvsvpd->vpd, field, &address,
+				   &len ) ) != 0 ) {
+		DBGC ( pci, PCI_FMT " NVS VPD field " PCI_VPD_FIELD_FMT
+		       " not present; assuming empty\n",
+		       PCI_ARGS ( pci ), PCI_VPD_FIELD_ARGS ( field ) );
+		len = 0;
+	}
+
+	/* Initialise non-volatile options block */
+	nvo_init ( nvo, &nvsvpd->nvs, field, len, nvs_vpd_nvo_resize, refcnt );
 }
