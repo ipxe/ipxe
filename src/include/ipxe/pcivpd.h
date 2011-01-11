@@ -134,6 +134,17 @@ struct pci_vpd {
 };
 
 /**
+ * Check for presence of PCI VPD
+ *
+ * @v vpd		PCI VPD
+ * @ret is_present	VPD is present
+ */
+static inline __attribute__ (( always_inline )) int
+pci_vpd_is_present ( struct pci_vpd *vpd ) {
+	return ( vpd->cap != 0 );
+}
+
+/**
  * Check if PCI VPD read cache is valid
  *
  * @v vpd		PCI VPD

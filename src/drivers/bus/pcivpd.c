@@ -73,6 +73,10 @@ static int pci_vpd_read_dword ( struct pci_vpd *vpd, int address,
 	unsigned int retries;
 	uint16_t flag;
 
+	/* Fail if no VPD present */
+	if ( ! cap )
+		return -ENOTTY;
+
 	/* Return cached value, if present */
 	if ( pci_vpd_cache_is_valid ( vpd ) &&
 	     ( vpd->cache.address == address ) ) {
@@ -126,6 +130,10 @@ static int pci_vpd_write_dword ( struct pci_vpd *vpd, int address,
 	unsigned int cap = vpd->cap;
 	unsigned int retries;
 	uint16_t flag;
+
+	/* Fail if no VPD present */
+	if ( ! cap )
+		return -ENOTTY;
 
 	/* Invalidate cache */
 	pci_vpd_invalidate_cache ( vpd );
