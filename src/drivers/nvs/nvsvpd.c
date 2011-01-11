@@ -111,7 +111,6 @@ int nvs_vpd_init ( struct nvs_vpd_device *nvsvpd, struct pci_device *pci,
 	}
 
 	/* Initialise NVS device */
-	nvsvpd->nvs.block_size = 1;
 	nvsvpd->nvs.size = len;
 	nvsvpd->nvs.read = nvs_vpd_read;
 	nvsvpd->nvs.write = nvs_vpd_write;
