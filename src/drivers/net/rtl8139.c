@@ -288,7 +288,7 @@ static void rtl_init_eeprom ( struct net_device *netdev ) {
 		DBGC ( rtl, "rtl8139 %p EEPROM in use for VPD; cannot use "
 		       "for options\n", rtl );
 	} else {
-		nvo_init ( &rtl->nvo, &rtl->eeprom.nvs, 0x20, 0x40,
+		nvo_init ( &rtl->nvo, &rtl->eeprom.nvs, 0x20, 0x40, NULL,
 			   &netdev->refcnt );
 	}
 }

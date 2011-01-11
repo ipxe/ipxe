@@ -154,7 +154,7 @@ static void natsemi_init_eeprom ( struct natsemi_private *np ) {
 	 * this region.  Currently it is not working. But with some
 	 * efforts it can.
 	 */
-	nvo_init ( &np->nvo, &np->eeprom.nvs, 0x0c, 0x68, NULL );
+	nvo_init ( &np->nvo, &np->eeprom.nvs, 0x0c, 0x68, NULL, NULL );
 }
 
 /**

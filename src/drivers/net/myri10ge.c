@@ -732,6 +732,7 @@ static int myri10ge_nv_init ( struct myri10ge_private *priv )
 	nvo_init ( &priv->nvo,
 		   &priv->nvs,
 		   nvo_fragment_pos, 0x200,
+		   NULL,
 		   & myri10ge_netdev (priv) -> refcnt );
 	rc = register_nvo ( &priv->nvo,
 			    netdev_settings ( myri10ge_netdev ( priv ) ) );

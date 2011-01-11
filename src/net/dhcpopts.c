@@ -402,7 +402,7 @@ int dhcpopt_fetch ( struct dhcp_options *options, unsigned int tag,
  * The "used length" field will be updated based on scanning through
  * the block to find the end of the options.
  */
-static void dhcpopt_update_used_len ( struct dhcp_options *options ) {
+void dhcpopt_update_used_len ( struct dhcp_options *options ) {
 	struct dhcp_option *option;
 	int offset = 0;
 	ssize_t remaining = options->alloc_len;

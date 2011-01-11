@@ -3273,7 +3273,7 @@ falcon_probe_spi ( struct efab_nic *efab )
 	/* If the device has EEPROM attached, then advertise NVO space */
 	if ( has_eeprom ) {
 		nvo_init ( &efab->nvo, &efab->spi_eeprom.nvs, 0x100, 0xf0,
-			   &efab->netdev->refcnt );
+			   NULL, &efab->netdev->refcnt );
 	}
 
 	return 0;

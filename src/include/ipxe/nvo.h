@@ -30,12 +30,22 @@ struct nvo_block {
 	size_t len;
 	/** Option-containing data */
 	void *data;
+	/**
+	 * Resize non-volatile stored option block
+	 *
+	 * @v nvo		Non-volatile options block
+	 * @v len		New size
+	 * @ret rc		Return status code
+	 */
+	int ( * resize ) ( struct nvo_block *nvo, size_t len );
 	/** DHCP options block */
 	struct dhcp_options dhcpopts;
 };
 
 extern void nvo_init ( struct nvo_block *nvo, struct nvs_device *nvs,
-		       size_t address, size_t len, struct refcnt *refcnt );
+		       size_t address, size_t len,
+		       int ( * resize ) ( struct nvo_block *nvo, size_t len ),
+		       struct refcnt *refcnt );
 extern int register_nvo ( struct nvo_block *nvo, struct settings *parent );
 extern void unregister_nvo ( struct nvo_block *nvo );
 
