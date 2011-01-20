@@ -440,7 +440,7 @@ struct vxge_hw_device_hw_info {
 #define VXGE_HW_VH_NORMAL_FUNCTION				7
 	u64		function_mode;
 #define VXGE_HW_FUNCTION_MODE_MIN				0
-#define VXGE_HW_FUNCTION_MODE_MAX				10
+#define VXGE_HW_FUNCTION_MODE_MAX				11
 
 #define VXGE_HW_FUNCTION_MODE_SINGLE_FUNCTION			0
 #define VXGE_HW_FUNCTION_MODE_MULTI_FUNCTION			1
@@ -453,6 +453,7 @@ struct vxge_hw_device_hw_info {
 #define VXGE_HW_FUNCTION_MODE_MULTI_FUNCTION_2			8
 #define VXGE_HW_FUNCTION_MODE_MULTI_FUNCTION_4			9
 #define VXGE_HW_FUNCTION_MODE_MRIOV_4				10
+#define VXGE_HW_FUNCTION_MODE_MULTI_FUNCTION_DIRECT_IO		11
 
 	u32		func_id;
 	u64		vpath_mask;
@@ -607,6 +608,7 @@ void vxge_hw_ring_rxd_1b_set(struct vxge_hw_ring_rxd_1 *rxdp,
 }
 
 enum vxge_hw_status vxge_hw_device_hw_info_get(
+	struct pci_device *pdev,
 	void __iomem *bar0,
 	struct vxge_hw_device_hw_info *hw_info);
 
@@ -726,12 +728,6 @@ __vxge_hw_pio_mem_write64(u64 val64, void __iomem *addr,
 	status = __vxge_hw_device_register_poll(addr, mask, max_millis);
 	return status;
 }
-
-struct vxge_hw_toc_reg __iomem *
-__vxge_hw_device_toc_get(void __iomem *bar0);
-
-enum vxge_hw_status
-__vxge_hw_device_reg_addr_get(struct __vxge_hw_device *hldev);
 
 void
 __vxge_hw_device_host_info_get(struct __vxge_hw_device *hldev);

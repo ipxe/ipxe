@@ -17,6 +17,7 @@ FILE_LICENCE(GPL2_ONLY);
 #include <stdlib.h>
 #include <stdio.h>
 #include <ipxe/malloc.h>
+#include <ipxe/pci.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/ethernet.h>
 #include <byteswap.h>
@@ -187,27 +188,46 @@ __vxge_hw_device_vpath_reset_in_prog_check(u64 __iomem *vpath_rst_in_prog)
 }
 
 /*
+ * __vxge_hw_device_get_legacy_reg
+ * This routine gets the legacy register section's memory mapped address
+ * and sets the swapper.
+ */
+static struct vxge_hw_legacy_reg __iomem *
+__vxge_hw_device_get_legacy_reg(struct pci_device *pdev, void __iomem *bar0)
+{
+	enum vxge_hw_status status;
+	struct vxge_hw_legacy_reg __iomem *legacy_reg;
+	/*
+	 * If the length of Bar0 is 16MB, then assume that we are configured
+	 * in MF8P_VP2 mode and then add 8MB to the legacy_reg offsets
+	 */
+	if (pci_bar_size(pdev, PCI_BASE_ADDRESS_0) == 0x1000000)
+		legacy_reg = (struct vxge_hw_legacy_reg __iomem *)
+				(bar0 + 0x800000);
+	else
+		legacy_reg = (struct vxge_hw_legacy_reg __iomem *)bar0;
+
+	status = __vxge_hw_legacy_swapper_set(legacy_reg);
+	if (status != VXGE_HW_OK)
+		return NULL;
+
+	return legacy_reg;
+}
+/*
  * __vxge_hw_device_toc_get
  * This routine sets the swapper and reads the toc pointer and returns the
  * memory mapped address of the toc
  */
 struct vxge_hw_toc_reg __iomem *
-__vxge_hw_device_toc_get(void __iomem *bar0)
+__vxge_hw_device_toc_get(void __iomem *bar0,
+	struct vxge_hw_legacy_reg __iomem *legacy_reg)
 {
 	u64 val64;
 	struct vxge_hw_toc_reg __iomem *toc = NULL;
-	enum vxge_hw_status status;
-
-	struct vxge_hw_legacy_reg __iomem *legacy_reg =
-		(struct vxge_hw_legacy_reg __iomem *)bar0;
-
-	status = __vxge_hw_legacy_swapper_set(legacy_reg);
-	if (status != VXGE_HW_OK)
-		goto exit;
 
 	val64 =	readq(&legacy_reg->toc_first_pointer);
 	toc = (struct vxge_hw_toc_reg __iomem *)(bar0+val64);
-exit:
+
 	return toc;
 }
 
@@ -224,9 +244,15 @@ __vxge_hw_device_reg_addr_get(struct __vxge_hw_device *hldev)
 	u32 i;
 	enum vxge_hw_status status = VXGE_HW_OK;
 
-	hldev->legacy_reg = (struct vxge_hw_legacy_reg __iomem *)hldev->bar0;
+	hldev->legacy_reg = __vxge_hw_device_get_legacy_reg(hldev->pdev,
+					hldev->bar0);
+	if (hldev->legacy_reg  == NULL) {
+		status = VXGE_HW_FAIL;
+		goto exit;
+	}
 
-	hldev->toc_reg = __vxge_hw_device_toc_get(hldev->bar0);
+	hldev->toc_reg = __vxge_hw_device_toc_get(hldev->bar0,
+					hldev->legacy_reg);
 	if (hldev->toc_reg  == NULL) {
 		status = VXGE_HW_FAIL;
 		goto exit;
@@ -234,7 +260,7 @@ __vxge_hw_device_reg_addr_get(struct __vxge_hw_device *hldev)
 
 	val64 = readq(&hldev->toc_reg->toc_common_pointer);
 	hldev->common_reg =
-	(struct vxge_hw_common_reg __iomem *)(hldev->bar0 + val64);
+		(struct vxge_hw_common_reg __iomem *)(hldev->bar0 + val64);
 
 	val64 = readq(&hldev->toc_reg->toc_mrpcim_pointer);
 	hldev->mrpcim_reg =
@@ -355,7 +381,7 @@ void __vxge_hw_device_host_info_get(struct __vxge_hw_device *hldev)
  * each vpath
  */
 enum vxge_hw_status
-vxge_hw_device_hw_info_get(void __iomem *bar0,
+vxge_hw_device_hw_info_get(struct pci_device *pdev, void __iomem *bar0,
 				struct vxge_hw_device_hw_info *hw_info)
 {
 	u32 i;
@@ -365,13 +391,20 @@ vxge_hw_device_hw_info_get(void __iomem *bar0,
 	struct vxge_hw_common_reg __iomem *common_reg;
 	struct vxge_hw_vpath_reg __iomem *vpath_reg;
 	struct vxge_hw_vpmgmt_reg __iomem *vpmgmt_reg;
+	struct vxge_hw_legacy_reg __iomem *legacy_reg;
 	enum vxge_hw_status status;
 
 	vxge_trace();
 
 	memset(hw_info, 0, sizeof(struct vxge_hw_device_hw_info));
 
-	toc = __vxge_hw_device_toc_get(bar0);
+	legacy_reg = __vxge_hw_device_get_legacy_reg(pdev, bar0);
+	if (legacy_reg == NULL) {
+		status = VXGE_HW_ERR_CRITICAL;
+		goto exit;
+	}
+
+	toc = __vxge_hw_device_toc_get(bar0, legacy_reg);
 	if (toc == NULL) {
 		status = VXGE_HW_ERR_CRITICAL;
 		goto exit;

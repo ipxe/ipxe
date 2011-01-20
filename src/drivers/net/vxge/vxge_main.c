@@ -45,6 +45,7 @@ static char *vxge_func_mode_names[] = {
 	"Multi Function 2 - 2 func, 8 vpath per func",
 	"Multi Function 4 - 4 func, 4 vpath per func",
 	"WLPEX/SharedIO 4 - 17 func, 1 vpath per func (PCIe ARI)",
+	"Multi Function 8 - For ESX DirectIO - 8 func, 2 vpath per func",
 };
 
 static inline int is_vxge_card_up(struct vxgedev *vdev)
@@ -533,7 +534,7 @@ vxge_probe(struct pci_device *pdev, const struct pci_device_id *id __unused)
 		goto _exit0;
 	}
 
-	status = vxge_hw_device_hw_info_get(bar0, &hw_info);
+	status = vxge_hw_device_hw_info_get(pdev, bar0, &hw_info);
 	if (status != VXGE_HW_OK) {
 		vxge_debug(VXGE_ERR,
 			"%s: Reading of hardware info failed.\n",

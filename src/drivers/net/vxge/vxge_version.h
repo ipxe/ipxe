@@ -22,9 +22,9 @@ FILE_LICENCE(GPL2_ONLY);
  * Note: Each field must be a nibble size
  */
 #define VXGE_VERSION_MAJOR	3
-#define VXGE_VERSION_MINOR	1
+#define VXGE_VERSION_MINOR	5
 #define VXGE_VERSION_FIX	0
-#define VXGE_VERSION_BUILD	0
+#define VXGE_VERSION_BUILD	1
 
 #define VXGE_FW_VER(major, minor, build) \
 	(((major) << 16) + ((minor) << 8) + (build))
