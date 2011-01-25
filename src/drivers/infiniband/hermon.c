@@ -2320,17 +2320,6 @@ static void hermon_eth_poll ( struct net_device *netdev ) {
 }
 
 /**
- * Enable/disable interrupts on Hermon Ethernet device
- *
- * @v netdev		Network device
- * @v enable		Interrupts should be enabled
- */
-static void hermon_eth_irq ( struct net_device *netdev __unused,
-			     int enable __unused ) {
-	/* No implementation */
-}
-
-/**
  * Open Hermon Ethernet device
  *
  * @v netdev		Network device
@@ -2469,7 +2458,6 @@ static struct net_device_operations hermon_eth_operations = {
 	.close		= hermon_eth_close,
 	.transmit	= hermon_eth_transmit,
 	.poll		= hermon_eth_poll,
-	.irq		= hermon_eth_irq,
 };
 
 /**
