@@ -236,6 +236,9 @@ struct net_device_operations {
 	 *
 	 * @v netdev	Network device
 	 * @v enable	Interrupts should be enabled
+	 *
+	 * This method may be NULL to indicate that interrupts are not
+	 * supported.
 	 */
 	void ( * irq ) ( struct net_device *netdev, int enable );
 };
@@ -513,6 +516,17 @@ netdev_link_ok ( struct net_device *netdev ) {
 static inline __attribute__ (( always_inline )) int
 netdev_is_open ( struct net_device *netdev ) {
 	return ( netdev->state & NETDEV_OPEN );
+}
+
+/**
+ * Check whether or not network device supports interrupts
+ *
+ * @v netdev		Network device
+ * @ret irq_supported	Network device supports interrupts
+ */
+static inline __attribute__ (( always_inline )) int
+netdev_irq_supported ( struct net_device *netdev ) {
+	return ( netdev->op->irq != NULL );
 }
 
 /**

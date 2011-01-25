@@ -542,6 +542,10 @@ void unregister_netdev ( struct net_device *netdev ) {
  */
 void netdev_irq ( struct net_device *netdev, int enable ) {
 
+	/* Do nothing if device does not support interrupts */
+	if ( ! netdev_irq_supported ( netdev ) )
+		return;
+
 	/* Enable or disable device interrupts */
 	netdev->op->irq ( netdev, enable );
 
