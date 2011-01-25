@@ -615,7 +615,9 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 	undi_get_iface_info->ServiceFlags =
 		( SUPPORTED_BROADCAST | SUPPORTED_MULTICAST |
 		  SUPPORTED_SET_STATION_ADDRESS | SUPPORTED_RESET |
-		  SUPPORTED_OPEN_CLOSE | SUPPORTED_IRQ );
+		  SUPPORTED_OPEN_CLOSE );
+	if ( netdev_irq_supported ( pxe_netdev ) )
+		undi_get_iface_info->ServiceFlags |= SUPPORTED_IRQ;
 	memset ( undi_get_iface_info->Reserved, 0,
 		 sizeof(undi_get_iface_info->Reserved) );
 
