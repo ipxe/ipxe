@@ -538,17 +538,6 @@ static void ipoib_poll ( struct net_device *netdev ) {
 }
 
 /**
- * Enable/disable interrupts on IPoIB network device
- *
- * @v netdev		Network device
- * @v enable		Interrupts should be enabled
- */
-static void ipoib_irq ( struct net_device *netdev __unused,
-			int enable __unused ) {
-	/* No implementation */
-}
-
-/**
  * Handle IPv4 broadcast multicast group join completion
  *
  * @v ibdev		Infiniband device
@@ -730,7 +719,6 @@ static struct net_device_operations ipoib_operations = {
 	.close		= ipoib_close,
 	.transmit	= ipoib_transmit,
 	.poll		= ipoib_poll,
-	.irq		= ipoib_irq,
 };
 
 /**
