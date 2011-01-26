@@ -24,6 +24,9 @@ FILE_LICENCE ( GPL2_OR_LATER )
 /* Image compression enabled */
 #define COMPRESS 1
 
+/* Protected mode flag */
+#define CR0_PE 1
+
 /*****************************************************************************
  * Utility function: print character (with LF -> LF,CR translation)
  *
@@ -229,16 +232,186 @@ print_kill_line:
  *   None
  ****************************************************************************
  */
-#if ! COMPRESS
 	.section ".prefix.lib", "awx", @progbits
 	.code16
 copy_bytes:
-	pushl %ecx
+	pushl	%ecx
 	rep addr32 movsb
-	popl %ecx
+	popl	%ecx
 	ret
-	.size copy_bytes, . - copy_bytes
-#endif /* COMPRESS */
+	.size	copy_bytes, . - copy_bytes
+
+/****************************************************************************
+ * zero_bytes
+ *
+ * Zero bytes
+ *
+ * Parameters:
+ *   %ds:esi : source address
+ *   %es:edi : destination address
+ *   %ecx : length
+ * Returns:
+ *   %ds:esi : next source address
+ *   %es:edi : next destination address
+ * Corrupts:
+ *   None
+ ****************************************************************************
+ */
+	.section ".prefix.lib", "awx", @progbits
+	.code16
+zero_bytes:
+	pushl	%ecx
+	pushw	%ax
+	xorw	%ax, %ax
+	rep addr32 stosb
+	popw	%ax
+	popl	%ecx
+	ret
+	.size	zero_bytes, . - zero_bytes
+
+/****************************************************************************
+ * process_bytes
+ *
+ * Call memcpy()-like function
+ *
+ * Parameters:
+ *   %esi : source physical address
+ *   %edi : destination physical address
+ *   %ecx : length
+ *   %bx : memcpy()-like function to call, passing parameters:
+ *	     %ds:esi : source address
+ *	     %es:edi : destination address
+ *	     %ecx : length
+ *         and returning:
+ *	     %ds:esi : next source address
+ *	     %es:edi : next destination address
+ * Returns:
+ *   %esi : next source physical address
+ *   %edi : next destination physical address
+ * Corrupts:
+ *   None
+ ****************************************************************************
+ */
+	.section ".prefix.lib", "awx", @progbits
+	.code16
+process_bytes:
+
+#ifndef KEEP_IT_REAL
+
+	/* Preserve registers */
+	pushfw
+	pushl	%eax
+	pushl	%ebp
+
+	/* Construct GDT on stack (since .prefix may not be writable) */
+	.equ	PM_DS, 0x18	/* Flat data segment */
+	pushl	$0x008f9300
+	pushl	$0x0000ffff
+	.equ	PM_SS, 0x10	/* Stack segment based at %ss:0000 */
+	pushl	$0x008f0930
+	pushw	%ss
+	pushw	$0xffff
+	.equ	PM_CS, 0x08	/* Code segment based at %cs:0000 */
+	pushl	$0x008f09b0
+	pushw	%cs
+	pushw	$0xffff
+	pushl	$0		/* Base and length */
+	pushw	%ss
+	pushw	$0x1f
+	movzwl	%sp, %ebp
+	shll	$4, 0x02(%bp)
+	addl	%ebp, 0x02(%bp)
+	shll	$4, 0x0a(%bp)
+	shll	$4, 0x12(%bp)
+	subw	$8, %sp
+	sgdt	-8(%bp)
+
+	/* Switch to protected mode */
+	pushw	%gs
+	pushw	%fs
+	pushw	%es
+	pushw	%ds
+	pushw	%ss
+	pushw	%cs
+	pushw	$2f
+	cli
+	data32 lgdt (%bp)
+	movl	%cr0, %eax
+	orb	$CR0_PE, %al
+	movl	%eax, %cr0
+	ljmp	$PM_CS, $1f
+1:	movw	$PM_SS, %ax
+	movw	%ax, %ss
+	movw	$PM_DS, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+
+	/* Call memcpy()-like function */
+	call	*%bx
+
+	/* Return to (flat) real mode */
+	movl	%cr0, %eax
+	andb	$0!CR0_PE, %al
+	movl	%eax, %cr0
+	lret
+2:	/* lret will ljmp to here */
+	popw	%ss
+	popw	%ds
+	popw	%es
+	popw	%fs
+	popw	%gs
+
+	/* Restore GDT */
+	data32 lgdt -8(%bp)
+	addw	$( 8 /* saved GDT */ + ( PM_DS + 8 ) /* GDT on stack */ ), %sp
+
+	/* Restore registers and return */
+	popl	%ebp
+	popl	%eax
+	popfw
+	ret
+
+#else /* KEEP_IT_REAL */
+
+	/* Preserve registers */
+	pushl	%eax
+	pushw	%ds
+	pushw	%es
+	
+	/* Convert %esi and %edi to %ds:esi and %es:edi */
+	shrl	$4, %esi
+	movw	%si, %ds
+	xorw	%si, %si
+	shll	$4, %esi
+	shrl	$4, %edi
+	movw	%di, %es
+	xorw	%di, %di
+	shll	$4, %edi
+
+	/* Call memcpy()-like function */
+	call	*%bx
+
+	/* Convert %ds:esi and %es:edi back to physical addresses */
+	xorl	%eax, %eax
+	movw	%ds, %cx
+	shll	$4, %eax
+	addl	%eax, %esi
+	xorl	%eax, %eax
+	movw	%es, %cx
+	shll	$4, %eax
+	addl	%eax, %edi
+
+	/* Restore registers and return */
+	popw	%es
+	popw	%ds
+	popl	%eax
+	ret
+
+#endif /* KEEP_IT_REAL */
+
+	.size	process_bytes, . - process_bytes
 
 /****************************************************************************
  * install_block
@@ -261,35 +434,22 @@ copy_bytes:
 	.code16
 install_block:
 	/* Preserve registers */
-	pushw	%ds
-	pushw	%es
 	pushl	%ecx
-	
-	/* Convert %esi and %edi to %ds:esi and %es:edi */
-	shrl	$4, %esi
-	movw	%si, %ds
-	xorw	%si, %si
-	shll	$4, %esi
-	shrl	$4, %edi
-	movw	%di, %es
-	xorw	%di, %di
-	shll	$4, %edi
+	pushw	%bx
 
+	/* Decompress (or copy) source to destination */
 #if COMPRESS
-	/* Decompress source to destination */
-	call	decompress16
+	movw	$decompress16, %bx
 #else
-	/* Copy source to destination */
-	call	copy_bytes
+	movw	$copy_bytes, %bx
 #endif
+	call	process_bytes
 
 	/* Zero .bss portion */
 	negl	%ecx
 	addl	%edx, %ecx
-	pushw	%ax
-	xorw	%ax, %ax
-	rep addr32 stosb
-	popw	%ax
+	movw	$zero_bytes, %bx
+	call	process_bytes
 
 	/* Round up %esi and %edi to start of next blocks */
 	addl	$0xf, %esi
@@ -297,20 +457,9 @@ install_block:
 	addl	$0xf, %edi
 	andl	$~0xf, %edi
 
-	/* Convert %ds:esi and %es:edi back to physical addresses */
-	xorl	%ecx, %ecx
-	movw	%ds, %cx
-	shll	$4, %ecx
-	addl	%ecx, %esi
-	xorl	%ecx, %ecx
-	movw	%es, %cx
-	shll	$4, %ecx
-	addl	%ecx, %edi
-
 	/* Restore registers and return */
+	popw	%bx
 	popl	%ecx
-	popw	%es
-	popw	%ds
 	ret
 	.size install_block, . - install_block
 
@@ -612,11 +761,10 @@ payload_death_message:
 
 	/* Copy code to new location */
 	pushl	%edi
-	pushw	%ax
-	xorw	%ax, %ax
-	movw	%ax, %es
-	es rep addr32 movsb
-	popw	%ax
+	pushw	%bx
+	movw	$copy_bytes, %bx
+	call	process_bytes
+	popw	%bx
 	popl	%edi
 
 	/* Initialise librm at new location */

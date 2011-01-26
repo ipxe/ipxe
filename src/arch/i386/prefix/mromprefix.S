@@ -151,7 +151,12 @@ find_mem_bar:
 	/* Copy payload to buffer, or set buffer address to BAR address */
 	testl	%esi, %esi
 	jz	1f
-	/* We have a buffer; copy payload to it */
+	/* We have a buffer; copy payload to it.  Since .mrom is
+	 * designed specifically for real hardware, we assume that
+	 * flat real mode is working properly.  (In the unlikely event
+	 * that this code is run inside a hypervisor that doesn't
+	 * properly support flat real mode, it will die horribly.)
+	 */
 	pushl	%esi
 	pushw	%es
 	movl	%esi, %edi
