@@ -649,7 +649,10 @@ install_prealloc:
 	popl	%esi
 
 #ifndef KEEP_IT_REAL
-	/* Access high memory */
+	/* Access high memory by enabling the A20 gate.  (We will
+	 * already have 4GB segment limits as a result of calling
+	 * install_block.)
+	 */
 	pushw	%cs
 	pushw	$1f
 	pushw	%ax
