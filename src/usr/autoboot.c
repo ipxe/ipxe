@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/image.h>
 #include <ipxe/sanboot.h>
 #include <ipxe/uri.h>
+#include <ipxe/open.h>
 #include <ipxe/init.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
@@ -57,30 +58,21 @@ static struct net_device * find_boot_netdev ( void ) {
 }
 
 /**
- * Boot using next-server and filename
+ * Parse next-server and filename into a URI
  *
- * @v filename		Boot filename
- * @ret rc		Return status code
+ * @v next_server	Next-server address
+ * @v filename		Filename
+ * @ret uri		URI, or NULL on failure
  */
-int boot_next_server_and_filename ( struct in_addr next_server,
-				    const char *filename ) {
+static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
+						     const char *filename ) {
 	struct uri *uri;
-	struct image *image;
-	char buf[ 23 /* tftp://xxx.xxx.xxx.xxx/ */ +
-		  ( 3 * strlen(filename) ) /* completely URI-encoded */
-		  + 1 /* NUL */ ];
-	int filename_is_absolute;
-	int rc;
+	struct uri *tmp;
 
-	/* Construct URI */
+	/* Parse filename */
 	uri = parse_uri ( filename );
-	if ( ! uri ) {
-		printf ( "Could not parse \"%s\"\n", filename );
-		rc = -ENOMEM;
-		goto err_parse_uri;
-	}
-	filename_is_absolute = uri_is_absolute ( uri );
-	uri_put ( uri );
+	if ( ! uri )
+		return NULL;
 
 	/* Construct a tftp:// URI for the filename, if applicable.
 	 * We can't just rely on the current working URI, because the
@@ -88,41 +80,17 @@ int boot_next_server_and_filename ( struct in_addr next_server,
 	 * filenames with and without initial slashes, which is
 	 * significant for TFTP.
 	 */
-	if ( ! filename_is_absolute ) {
-		snprintf ( buf, sizeof ( buf ), "tftp://%s/",
-			   inet_ntoa ( next_server ) );
-		uri_encode ( filename, buf + strlen ( buf ),
-			     sizeof ( buf ) - strlen ( buf ), URI_PATH );
-		filename = buf;
+	if ( ! uri_is_absolute ( uri ) ) {
+		tmp = uri;
+		tmp->scheme = "tftp";
+		tmp->host = inet_ntoa ( next_server );
+		uri = uri_dup ( tmp );
+		uri_put ( tmp );
+		if ( ! uri )
+			return NULL;
 	}
 
-	/* Download and boot image */
-	image = alloc_image();
-	if ( ! image ) {
-		printf ( "Could not allocate image\n" );
-		rc = -ENOMEM;
-		goto err_alloc_image;
-	}
-	if ( ( rc = imgfetch ( image, filename,
-			       register_and_autoload_image ) ) != 0 ) {
-		printf ( "Could not fetch image: %s\n", strerror ( rc ) );
-		goto err_imgfetch;
-	}
-	if ( ( rc = imgexec ( image ) ) != 0 ) {
-		printf ( "Could not execute image: %s\n", strerror ( rc ) );
-		goto err_imgexec;
-	}
-
-	/* Drop image reference */
-	image_put ( image );
-	return 0;
-
- err_imgexec:
- err_imgfetch:
-	image_put ( image );
- err_alloc_image:
- err_parse_uri:
-	return rc;
+	return uri;
 }
 
 /** The "keep-san" setting */
@@ -142,71 +110,99 @@ struct setting skip_san_boot_setting __setting = {
 };
 
 /**
- * Boot using root path
+ * Boot from filename and root-path URIs
  *
+ * @v filename		Filename
  * @v root_path		Root path
  * @ret rc		Return status code
  */
-int boot_root_path ( const char *root_path ) {
-	struct uri *uri;
+int uriboot ( struct uri *filename, struct uri *root_path ) {
+	struct image *image;
 	int drive;
 	int rc;
 
-	/* Parse URI */
-	uri = parse_uri ( root_path );
-	if ( ! uri ) {
-		printf ( "Could not parse \"%s\"\n", root_path );
+	/* Allocate image */
+	image = alloc_image();
+	if ( ! image ) {
+		printf ( "Could not allocate image\n" );
 		rc = -ENOMEM;
-		goto err_parse_uri;
+		goto err_alloc_image;
 	}
 
-	/* Hook SAN device */
-	if ( ( drive = san_hook ( uri, 0 ) ) < 0 ) {
-		rc = drive;
-		printf ( "Could not open SAN device: %s\n",
-			 strerror ( rc ) );
-		goto err_open;
-	}
-	printf ( "Registered as SAN device %#02x\n", drive );
+	/* Treat empty URIs as absent */
+	if ( filename && ( ! filename->path ) )
+		filename = NULL;
+	if ( root_path && ( ! uri_is_absolute ( root_path ) ) )
+		root_path = NULL;
 
-	/* Describe SAN device */
-	if ( ( rc = san_describe ( drive ) ) != 0 ) {
+	/* If we have both a filename and a root path, ignore an
+	 * unsupported URI scheme in the root path, since it may
+	 * represent an NFS root.
+	 */
+	if ( filename && root_path &&
+	     ( xfer_uri_opener ( root_path->scheme ) == NULL ) ) {
+		printf ( "Ignoring unsupported root path\n" );
+		root_path = NULL;
+	}
+
+	/* Hook SAN device, if applicable */
+	if ( root_path ) {
+		drive = san_hook ( root_path, 0 );
+		if ( drive < 0 ) {
+			rc = drive;
+			printf ( "Could not open SAN device: %s\n",
+				 strerror ( rc ) );
+			goto err_san_hook;
+		}
+		printf ( "Registered as SAN device %#02x\n", drive );
+	} else {
+		drive = -ENODEV;
+	}
+
+	/* Describe SAN device, if applicable */
+	if ( ( drive >= 0 ) && ( ( rc = san_describe ( drive ) ) != 0 ) ) {
 		printf ( "Could not describe SAN device %#02x: %s\n",
 			 drive, strerror ( rc ) );
-		goto err_describe;
+		goto err_san_describe;
 	}
 
-	/* Boot from SAN device */
-	if ( fetch_intz_setting ( NULL, &skip_san_boot_setting) != 0 ) {
-		printf ( "Skipping boot from SAN device %#02x\n", drive );
+	/* Attempt filename or SAN boot as applicable */
+	if ( filename ) {
+		if ( ( rc = imgdownload ( image, filename,
+					  register_and_autoexec_image ) ) !=0){
+			printf ( "Could not chain image: %s\n",
+				 strerror ( rc ) );
+		}
+	} else if ( root_path ) {
+		if ( fetch_intz_setting ( NULL, &skip_san_boot_setting) == 0 ) {
+			printf ( "Booting from SAN device %#02x\n", drive );
+			rc = san_boot ( drive );
+			printf ( "Boot from SAN device %#02x failed: %s\n",
+				 drive, strerror ( rc ) );
+		} else {
+			printf ( "Skipping boot from SAN device %#02x\n",
+				 drive );
+			rc = 0;
+		}
 	} else {
-		printf ( "Booting from SAN device %#02x\n", drive );
-		rc = san_boot ( drive );
-		printf ( "Boot from SAN device %#02x failed: %s\n",
-			 drive, strerror ( rc ) );
+		printf ( "No filename or root path specified\n" );
+		rc = -ENOENT;
 	}
 
-	/* Leave drive registered, if instructed to do so */
-	if ( fetch_intz_setting ( NULL, &keep_san_setting ) != 0 ) {
-		printf ( "Preserving connection to SAN device %#02x\n",
-			 drive );
-		goto err_keep_san;
+ err_san_describe:
+	/* Unhook SAN device, if applicable */
+	if ( drive >= 0 ) {
+		if ( fetch_intz_setting ( NULL, &keep_san_setting ) == 0 ) {
+			printf ( "Unregistering SAN device %#02x\n", drive );
+			san_unhook ( drive );
+		} else {
+			printf ( "Preserving connection to SAN device %#02x\n",
+				 drive );
+		}
 	}
-
-	/* Unhook SAN deivce */
-	printf ( "Unregistering SAN device %#02x\n", drive );
-	san_unhook ( drive );
-
-	/* Drop URI reference */
-	uri_put ( uri );
-
-	return 0;
-
- err_keep_san:
- err_describe:
- err_open:
-	uri_put ( uri );
- err_parse_uri:
+ err_san_hook:
+	image_put ( image );
+ err_alloc_image:
 	return rc;
 }
 
@@ -227,12 +223,53 @@ static void close_all_netdevs ( void ) {
 }
 
 /**
- * Boot from a network device
+ * Fetch next-server and filename settings into a URI
  *
- * @v netdev		Network device
- * @ret rc		Return status code
+ * @v settings		Settings block
+ * @ret uri		URI, or NULL on failure
  */
-int netboot ( struct net_device *netdev ) {
+struct uri * fetch_next_server_and_filename ( struct settings *settings ) {
+	struct in_addr next_server;
+	char filename[256];
+
+	/* Fetch next-server setting */
+	fetch_ipv4_setting ( settings, &next_server_setting, &next_server );
+	if ( next_server.s_addr )
+		printf ( "Next server: %s\n", inet_ntoa ( next_server ) );
+
+	/* Fetch filename setting */
+	fetch_string_setting ( settings, &filename_setting,
+			       filename, sizeof ( filename ) );
+	if ( filename[0] )
+		printf ( "Filename: %s\n", filename );
+
+	return parse_next_server_and_filename ( next_server, filename );
+}
+
+/**
+ * Fetch root-path setting into a URI
+ *
+ * @v settings		Settings block
+ * @ret uri		URI, or NULL on failure
+ */
+static struct uri * fetch_root_path ( struct settings *settings ) {
+	char root_path[256];
+
+	/* Fetch root-path setting */
+	fetch_string_setting ( settings, &root_path_setting,
+			       root_path, sizeof ( root_path ) );
+	if ( root_path[0] )
+		printf ( "Root path: %s\n", root_path );
+
+	return parse_uri ( root_path );
+}
+
+/**
+ * Check whether or not we have a usable PXE menu
+ *
+ * @ret have_menu	A usable PXE menu is present
+ */
+static int have_pxe_menu ( void ) {
 	struct setting vendor_class_id_setting
 		= { .tag = DHCP_VENDOR_CLASS_ID };
 	struct setting pxe_discovery_control_setting
@@ -240,8 +277,28 @@ int netboot ( struct net_device *netdev ) {
 	struct setting pxe_boot_menu_setting
 		= { .tag = DHCP_PXE_BOOT_MENU };
 	char buf[256];
-	struct in_addr next_server;
 	unsigned int pxe_discovery_control;
+
+	fetch_string_setting ( NULL, &vendor_class_id_setting,
+			       buf, sizeof ( buf ) );
+	pxe_discovery_control =
+		fetch_uintz_setting ( NULL, &pxe_discovery_control_setting );
+
+	return ( ( strcmp ( buf, "PXEClient" ) == 0 ) &&
+		 setting_exists ( NULL, &pxe_boot_menu_setting ) &&
+		 ( ! ( ( pxe_discovery_control & PXEBS_SKIP ) &&
+		       setting_exists ( NULL, &filename_setting ) ) ) );
+}
+
+/**
+ * Boot from a network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+int netboot ( struct net_device *netdev ) {
+	struct uri *filename;
+	struct uri *root_path;
 	int rc;
 
 	/* Close all other network devices */
@@ -249,44 +306,42 @@ int netboot ( struct net_device *netdev ) {
 
 	/* Open device and display device status */
 	if ( ( rc = ifopen ( netdev ) ) != 0 )
-		return rc;
+		goto err_ifopen;
 	ifstat ( netdev );
 
 	/* Configure device via DHCP */
 	if ( ( rc = dhcp ( netdev ) ) != 0 )
-		return rc;
+		goto err_dhcp;
 	route();
 
 	/* Try PXE menu boot, if applicable */
-	fetch_string_setting ( NULL, &vendor_class_id_setting,
-			       buf, sizeof ( buf ) );
-	pxe_discovery_control =
-		fetch_uintz_setting ( NULL, &pxe_discovery_control_setting );
-	if ( ( strcmp ( buf, "PXEClient" ) == 0 ) &&
-	     setting_exists ( NULL, &pxe_boot_menu_setting ) &&
-	     ( ! ( ( pxe_discovery_control & PXEBS_SKIP ) &&
-		   setting_exists ( NULL, &filename_setting ) ) ) ) {
+	if ( have_pxe_menu() ) {
 		printf ( "Booting from PXE menu\n" );
-		return pxe_menu_boot ( netdev );
+		rc = pxe_menu_boot ( netdev );
+		goto err_pxe_menu_boot;
 	}
 
-	/* Try to download and boot whatever we are given as a filename */
-	fetch_ipv4_setting ( NULL, &next_server_setting, &next_server );
-	fetch_string_setting ( NULL, &filename_setting, buf, sizeof ( buf ) );
-	if ( buf[0] ) {
-		printf ( "Booting from filename \"%s\"\n", buf );
-		return boot_next_server_and_filename ( next_server, buf );
-	}
-	
-	/* No filename; try the root path */
-	fetch_string_setting ( NULL, &root_path_setting, buf, sizeof ( buf ) );
-	if ( buf[0] ) {
-		printf ( "Booting from root path \"%s\"\n", buf );
-		return boot_root_path ( buf );
-	}
+	/* Fetch next server, filename and root path */
+	filename = fetch_next_server_and_filename ( NULL );
+	if ( ! filename )
+		goto err_filename;
+	root_path = fetch_root_path ( NULL );
+	if ( ! root_path )
+		goto err_root_path;
 
-	printf ( "No filename or root path specified\n" );
-	return -ENOENT;
+	/* Boot using next server, filename and root path */
+	if ( ( rc = uriboot ( filename, root_path ) ) != 0 )
+		goto err_uriboot;
+
+ err_uriboot:
+	uri_put ( root_path );
+ err_root_path:
+	uri_put ( filename );
+ err_filename:
+ err_pxe_menu_boot:
+ err_dhcp:
+ err_ifopen:
+	return rc;
 }
 
 /**

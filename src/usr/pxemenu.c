@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/keys.h>
 #include <ipxe/timer.h>
 #include <ipxe/process.h>
+#include <ipxe/uri.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/autoboot.h>
 
@@ -346,8 +347,7 @@ int pxe_menu_boot ( struct net_device *netdev ) {
 	struct pxe_menu *menu;
 	unsigned int pxe_type;
 	struct settings *pxebs_settings;
-	struct in_addr next_server;
-	char filename[256];
+	struct uri *uri;
 	int rc;
 
 	/* Parse and allocate boot menu */
@@ -372,12 +372,15 @@ int pxe_menu_boot ( struct net_device *netdev ) {
 	if ( ( rc = pxebs ( netdev, pxe_type ) ) != 0 )
 		return rc;
 
-	/* Attempt boot */
+	/* Fetch next server and filename */
 	pxebs_settings = find_settings ( PXEBS_SETTINGS_NAME );
 	assert ( pxebs_settings );
-	fetch_ipv4_setting ( pxebs_settings, &next_server_setting,
-			     &next_server );
-	fetch_string_setting ( pxebs_settings, &filename_setting,
-			       filename, sizeof ( filename ) );
-	return boot_next_server_and_filename ( next_server, filename );
+	uri = fetch_next_server_and_filename ( pxebs_settings );
+	if ( ! uri )
+		return -ENOMEM;
+
+	/* Attempt boot */
+	rc = uriboot ( uri, NULL );
+	uri_put ( uri );
+	return rc;
 }

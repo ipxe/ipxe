@@ -11,12 +11,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/in.h>
 struct net_device;
+struct uri;
+struct settings;
 
+extern int uriboot ( struct uri *filename, struct uri *root_path );
+extern struct uri *
+fetch_next_server_and_filename ( struct settings *settings );
 extern int netboot ( struct net_device *netdev );
 extern int autoboot ( void );
-extern int boot_next_server_and_filename ( struct in_addr next_server,
-					   const char *filename );
-extern int boot_root_path ( const char *root_path );
 
 extern int pxe_menu_boot ( struct net_device *netdev );
 

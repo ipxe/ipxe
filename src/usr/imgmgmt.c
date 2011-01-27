@@ -36,24 +36,21 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
- * Fetch an image
+ * Download an image
  *
- * @v uri_string	URI as a string (e.g. "http://www.nowhere.com/vmlinuz")
- * @v name		Name for image, or NULL
- * @v register_image	Image registration routine
+ * @v image		Image
+ * @v uri		URI
+ * @v image_register	Action to take upon a successful download
  * @ret rc		Return status code
  */
-int imgfetch ( struct image *image, const char *uri_string,
-	       int ( * image_register ) ( struct image *image ) ) {
-	char uri_string_redacted[ strlen ( uri_string ) + 3 /* "***" */
-				  + 1 /* NUL */ ];
-	struct uri *uri;
+int imgdownload ( struct image *image, struct uri *uri,
+		  int ( * image_register ) ( struct image *image ) ) {
+	size_t len = ( unparse_uri ( NULL, 0, uri, URI_ALL ) + 1 );
+	char uri_string_redacted[len];
 	const char *password;
 	int rc;
 
-	if ( ! ( uri = parse_uri ( uri_string ) ) )
-		return -ENOMEM;
-
+	/* Set image URI */
 	image_set_uri ( image, uri );
 
 	/* Redact password portion of URI, if necessary */
@@ -64,9 +61,35 @@ int imgfetch ( struct image *image, const char *uri_string,
 		      uri, URI_ALL );
 	uri->password = password;
 
+	/* Create downloader */
 	if ( ( rc = create_downloader ( &monojob, image, image_register,
-					LOCATION_URI, uri ) ) == 0 )
-		rc = monojob_wait ( uri_string_redacted );
+					LOCATION_URI, uri ) ) != 0 )
+		return rc;
+
+	/* Wait for download to complete */
+	if ( ( rc = monojob_wait ( uri_string_redacted ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Fetch an image
+ *
+ * @v image		Image
+ * @v uri_string	URI as a string (e.g. "http://www.nowhere.com/vmlinuz")
+ * @v image_register	Action to take upon a successful fetch
+ * @ret rc		Return status code
+ */
+int imgfetch ( struct image *image, const char *uri_string,
+	       int ( * image_register ) ( struct image *image ) ) {
+	struct uri *uri;
+	int rc;
+
+	if ( ! ( uri = parse_uri ( uri_string ) ) )
+		return -ENOMEM;
+
+	rc = imgdownload ( image, uri, image_register );
 
 	uri_put ( uri );
 	return rc;
