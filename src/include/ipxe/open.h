@@ -89,6 +89,7 @@ struct socket_opener {
 /** Register a socket opener */
 #define __socket_opener __table_entry ( SOCKET_OPENERS, 01 )
 
+extern struct uri_opener * xfer_uri_opener ( const char *scheme );
 extern int xfer_open_uri ( struct interface *intf, struct uri *uri );
 extern int xfer_open_uri_string ( struct interface *intf,
 				  const char *uri_string );
