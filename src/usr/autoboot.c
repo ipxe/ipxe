@@ -40,9 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** Shutdown flags for exit */
-int shutdown_exit_flags = 0;
-
 /**
  * Perform PXE menu boot when PXE stack is not available
  */
@@ -193,7 +190,6 @@ int boot_root_path ( const char *root_path ) {
 	if ( fetch_intz_setting ( NULL, &keep_san_setting ) != 0 ) {
 		printf ( "Preserving connection to SAN device %#02x\n",
 			 drive );
-		shutdown_exit_flags |= SHUTDOWN_KEEP_DEVICES;
 		goto err_keep_san;
 	}
 

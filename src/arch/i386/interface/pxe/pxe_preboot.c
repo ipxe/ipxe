@@ -290,7 +290,7 @@ PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
 	pxe_deactivate();
 
 	/* Prepare for unload */
-	shutdown ( SHUTDOWN_BOOT );
+	shutdown_boot();
 
 	/* Check to see if we still have any hooked interrupts */
 	if ( hooked_bios_interrupts != 0 ) {

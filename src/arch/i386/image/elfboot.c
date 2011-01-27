@@ -48,7 +48,7 @@ static int elfboot_exec ( struct image *image ) {
 	/* An ELF image has no callback interface, so we need to shut
 	 * down before invoking it.
 	 */
-	shutdown ( SHUTDOWN_BOOT );
+	shutdown_boot();
 
 	/* Jump to OS with flat physical addressing */
 	DBGC ( image, "ELF %p starting execution at %lx\n", image, entry );

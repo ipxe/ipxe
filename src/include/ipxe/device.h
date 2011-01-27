@@ -112,6 +112,24 @@ struct root_driver {
 /** Declare a root device */
 #define __root_device __table_entry ( ROOT_DEVICES, 01 )
 
+extern int device_keep_count;
+
+/**
+ * Prevent devices from being removed on shutdown
+ *
+ */
+static inline void devices_get ( void ) {
+	device_keep_count++;
+}
+
+/**
+ * Allow devices to be removed on shutdown
+ *
+ */
+static inline void devices_put ( void ) {
+	device_keep_count--;
+}
+
 extern struct device * identify_device ( struct interface *intf );
 #define identify_device_TYPE( object_type ) \
 	typeof ( struct device * ( object_type ) )

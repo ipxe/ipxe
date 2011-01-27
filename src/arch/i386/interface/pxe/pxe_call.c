@@ -448,6 +448,7 @@ void pxe_activate ( struct net_device *netdev ) {
 	if ( ! int_1a_hooked ) {
 		hook_bios_interrupt ( 0x1a, ( unsigned int ) pxe_int_1a,
 				      &pxe_int_1a_vector );
+		devices_get();
 		int_1a_hooked = 1;
 	}
 
@@ -475,6 +476,7 @@ int pxe_deactivate ( void ) {
 			      strerror ( rc ) );
 			return rc;
 		}
+		devices_put();
 		int_1a_hooked = 0;
 	}
 

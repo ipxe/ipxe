@@ -114,13 +114,13 @@ struct root_device undi_root_device __root_device = {
 /**
  * Prepare for exit
  *
- * @v flags		Shutdown flags
+ * @v booting		System is shutting down for OS boot
  */
-static void undionly_shutdown ( int flags ) {
+static void undionly_shutdown ( int booting ) {
 	/* If we are shutting down to boot an OS, clear the "keep PXE
 	 * stack" flag.
 	 */
-	if ( flags & SHUTDOWN_BOOT )
+	if ( booting )
 		preloaded_undi.flags &= ~UNDI_FL_KEEP_ALL;
 }
 

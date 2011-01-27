@@ -114,13 +114,13 @@ struct root_device snp_root_device __root_device = {
 /**
  * Prepare for exit
  *
- * @v flags		Shutdown flags
+ * @v booting		System is shutting down for OS boot
  */
-static void snponly_shutdown ( int flags ) {
+static void snponly_shutdown ( int booting ) {
 	/* If we are shutting down to boot an OS, make sure the SNP does not
 	 * stay active.
 	 */
-	if ( flags & SHUTDOWN_BOOT )
+	if ( booting )
 		snponly_dev.removal_state = EfiSimpleNetworkStopped;
 }
 

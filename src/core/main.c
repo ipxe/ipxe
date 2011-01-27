@@ -85,7 +85,7 @@ __asmcall int main ( void ) {
 			shell();
 	}
 
-	shutdown ( SHUTDOWN_EXIT | shutdown_exit_flags );
+	shutdown_exit();
 
 	return 0;
 }

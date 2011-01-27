@@ -278,7 +278,7 @@ static int multiboot_exec ( struct image *image ) {
 	/* Multiboot images may not return and have no callback
 	 * interface, so shut everything down prior to booting the OS.
 	 */
-	shutdown ( SHUTDOWN_BOOT );
+	shutdown_boot();
 
 	/* Build memory map after unhiding bootloader memory regions as part of
 	 * shutting everything down.

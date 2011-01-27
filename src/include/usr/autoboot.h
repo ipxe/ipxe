@@ -12,8 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/in.h>
 struct net_device;
 
-extern int shutdown_exit_flags;
-
 extern int netboot ( struct net_device *netdev );
 extern int autoboot ( void );
 extern int boot_next_server_and_filename ( struct in_addr next_server,

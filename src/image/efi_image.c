@@ -39,7 +39,7 @@ static EFI_EVENT efi_shutdown_event;
  */
 static EFIAPI void efi_shutdown_hook ( EFI_EVENT event __unused,
 				       void *context __unused ) {
-	shutdown ( SHUTDOWN_BOOT );
+	shutdown_boot();
 }
 
 /**

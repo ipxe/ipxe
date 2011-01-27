@@ -32,16 +32,6 @@ struct init_fn {
 
 /** @} */
 
-/** Shutdown flags */
-enum shutdown_flags {
-	/** Shutdown is in order to exit (return to iPXE's caller) */
-	SHUTDOWN_EXIT = 0x0001,
-	/** Shutdown is in order to boot an OS */
-	SHUTDOWN_BOOT = 0x0002,
-	/** Do not remove devices */
-	SHUTDOWN_KEEP_DEVICES = 0x0004,
-};
-
 /**
  * A startup/shutdown function
  *
@@ -50,7 +40,7 @@ enum shutdown_flags {
  */
 struct startup_fn {
 	void ( * startup ) ( void );
-	void ( * shutdown ) ( int flags );
+	void ( * shutdown ) ( int booting );
 };
 
 /** Startup/shutdown function table */
@@ -76,6 +66,22 @@ struct startup_fn {
 
 extern void initialise ( void );
 extern void startup ( void );
-extern void shutdown ( int flags );
+extern void shutdown ( int booting );
+
+/**
+ * Shut down system for OS boot
+ *
+ */
+static inline void shutdown_boot ( void ) {
+	shutdown ( 1 );
+}
+
+/**
+ * Shut down system for exit back to firmware
+ *
+ */
+static inline void shutdown_exit ( void ) {
+	shutdown ( 0 );
+}
 
 #endif /* _IPXE_INIT_H */

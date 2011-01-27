@@ -35,6 +35,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Registered root devices */
 static LIST_HEAD ( devices );
 
+/** Device removal inhibition counter */
+int device_keep_count = 0;
+
 /**
  * Probe a root device
  *
@@ -87,11 +90,11 @@ static void probe_devices ( void ) {
  * Remove all devices
  *
  */
-static void remove_devices ( int flags ) {
+static void remove_devices ( int booting __unused ) {
 	struct root_device *rootdev;
 	struct root_device *tmp;
 
-	if ( flags & SHUTDOWN_KEEP_DEVICES ) {
+	if ( device_keep_count != 0 ) {
 		DBG ( "Refusing to remove devices on shutdown\n" );
 		return;
 	}

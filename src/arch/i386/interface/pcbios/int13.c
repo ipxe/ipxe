@@ -1209,8 +1209,10 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	       int13->cylinders, int13->heads, int13->sectors_per_track );
 
 	/* Hook INT 13 vector if not already hooked */
-	if ( list_empty ( &int13s ) )
+	if ( list_empty ( &int13s ) ) {
 		int13_hook_vector();
+		devices_get();
+	}
 
 	/* Add to list of emulated drives */
 	list_add ( &int13->list, &int13s );
@@ -1277,8 +1279,10 @@ static void int13_unhook ( unsigned int drive ) {
 	DBGC ( int13, "INT13 drive %02x unregistered\n", int13->drive );
 
 	/* Unhook INT 13 vector if no more drives */
-	if ( list_empty ( &int13s ) )
+	if ( list_empty ( &int13s ) ) {
+		devices_put();
 		int13_unhook_vector();
+	}
 
 	/* Drop list's reference to drive */
 	ref_put ( &int13->refcnt );

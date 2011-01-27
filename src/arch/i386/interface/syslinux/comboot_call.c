@@ -531,7 +531,7 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 			break;
 
 		/* Perform final cleanup */
-		shutdown ( SHUTDOWN_BOOT );
+		shutdown_boot();
 
 		/* Perform sequence of copies */
 		shuffle ( ix86->segs.es, ix86->regs.di, ix86->regs.cx );
@@ -608,7 +608,7 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 			break;
 
 		/* Perform final cleanup */
-		shutdown ( SHUTDOWN_BOOT );
+		shutdown_boot();
 
 		/* Perform sequence of copies */
 		shuffle ( ix86->segs.es, ix86->regs.di, ix86->regs.cx );
