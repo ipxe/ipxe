@@ -230,7 +230,9 @@ static void close_all_netdevs ( void ) {
  */
 struct uri * fetch_next_server_and_filename ( struct settings *settings ) {
 	struct in_addr next_server;
-	char filename[256];
+	char buf[256];
+	char *filename;
+	struct uri *uri;
 
 	/* Fetch next-server setting */
 	fetch_ipv4_setting ( settings, &next_server_setting, &next_server );
@@ -239,11 +241,20 @@ struct uri * fetch_next_server_and_filename ( struct settings *settings ) {
 
 	/* Fetch filename setting */
 	fetch_string_setting ( settings, &filename_setting,
-			       filename, sizeof ( filename ) );
-	if ( filename[0] )
-		printf ( "Filename: %s\n", filename );
+			       buf, sizeof ( buf ) );
+	if ( buf[0] )
+		printf ( "Filename: %s\n", buf );
 
-	return parse_next_server_and_filename ( next_server, filename );
+	/* Expand filename setting */
+	filename = expand_settings ( buf );
+	if ( ! filename )
+		return NULL;
+
+	/* Parse next server and filename */
+	uri = parse_next_server_and_filename ( next_server, filename );
+
+	free ( filename );
+	return uri;
 }
 
 /**
@@ -253,15 +264,26 @@ struct uri * fetch_next_server_and_filename ( struct settings *settings ) {
  * @ret uri		URI, or NULL on failure
  */
 static struct uri * fetch_root_path ( struct settings *settings ) {
-	char root_path[256];
+	char buf[256];
+	char *root_path;
+	struct uri *uri;
 
 	/* Fetch root-path setting */
 	fetch_string_setting ( settings, &root_path_setting,
-			       root_path, sizeof ( root_path ) );
-	if ( root_path[0] )
-		printf ( "Root path: %s\n", root_path );
+			       buf, sizeof ( buf ) );
+	if ( buf[0] )
+		printf ( "Root path: %s\n", buf );
 
-	return parse_uri ( root_path );
+	/* Expand filename setting */
+	root_path = expand_settings ( buf );
+	if ( ! root_path )
+		return NULL;
+
+	/* Parse root path */
+	uri = parse_uri ( root_path );
+
+	free ( root_path );
+	return uri;
 }
 
 /**
