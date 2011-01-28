@@ -87,80 +87,6 @@ int execv ( const char *command, char * const argv[] ) {
 }
 
 /**
- * Expand variables within command line
- *
- * @v command		Command line
- * @ret expcmd		Expanded command line
- *
- * The expanded command line is allocated with malloc() and the caller
- * must eventually free() it.
- */
-static char * expand_command ( const char *command ) {
-	char *expcmd;
-	char *start;
-	char *end;
-	char *head;
-	char *name;
-	char *tail;
-	int setting_len;
-	int new_len;
-	char *tmp;
-
-	/* Obtain temporary modifiable copy of command line */
-	expcmd = strdup ( command );
-	if ( ! expcmd )
-		return NULL;
-
-	/* Expand while expansions remain */
-	while ( 1 ) {
-
-		head = expcmd;
-
-		/* Locate setting to be expanded */
-		start = NULL;
-		end = NULL;
-		for ( tmp = expcmd ; *tmp ; tmp++ ) {
-			if ( ( tmp[0] == '$' ) && ( tmp[1] == '{' ) )
-				start = tmp;
-			if ( start && ( tmp[0] == '}' ) ) {
-				end = tmp;
-				break;
-			}
-		}
-		if ( ! end )
-			break;
-		*start = '\0';
-		name = ( start + 2 );
-		*end = '\0';
-		tail = ( end + 1 );
-
-		/* Determine setting length */
-		setting_len = fetchf_named_setting ( name, NULL, 0 );
-		if ( setting_len < 0 )
-			setting_len = 0; /* Treat error as empty setting */
-
-		/* Read setting into temporary buffer */
-		{
-			char setting_buf[ setting_len + 1 ];
-
-			setting_buf[0] = '\0';
-			fetchf_named_setting ( name, setting_buf,
-					       sizeof ( setting_buf ) );
-
-			/* Construct expanded string and discard old string */
-			tmp = expcmd;
-			new_len = asprintf ( &expcmd, "%s%s%s",
-					     head, setting_buf, tail );
-			free ( tmp );
-			if ( new_len < 0 )
-				return NULL;
-		}
-	}
-
-	return expcmd;
-}
-
-/**
  * Split command line into tokens
  *
  * @v command		Command line
@@ -294,7 +220,7 @@ int system ( const char *command ) {
 	int rc = 0;
 
 	/* Perform variable expansion */
-	expcmd = expand_command ( command );
+	expcmd = expand_settings ( command );
 	if ( ! expcmd )
 		return -ENOMEM;
 

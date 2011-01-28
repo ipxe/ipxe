@@ -1469,6 +1469,87 @@ struct setting_type setting_type_uuid __setting_type = {
 
 /******************************************************************************
  *
+ * Setting expansion
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Expand variables within string
+ *
+ * @v string		String
+ * @ret expstr		Expanded string
+ *
+ * The expanded string is allocated with malloc() and the caller must
+ * eventually free() it.
+ */
+char * expand_settings ( const char *string ) {
+	char *expstr;
+	char *start;
+	char *end;
+	char *head;
+	char *name;
+	char *tail;
+	int setting_len;
+	int new_len;
+	char *tmp;
+
+	/* Obtain temporary modifiable copy of string */
+	expstr = strdup ( string );
+	if ( ! expstr )
+		return NULL;
+
+	/* Expand while expansions remain */
+	while ( 1 ) {
+
+		head = expstr;
+
+		/* Locate setting to be expanded */
+		start = NULL;
+		end = NULL;
+		for ( tmp = expstr ; *tmp ; tmp++ ) {
+			if ( ( tmp[0] == '$' ) && ( tmp[1] == '{' ) )
+				start = tmp;
+			if ( start && ( tmp[0] == '}' ) ) {
+				end = tmp;
+				break;
+			}
+		}
+		if ( ! end )
+			break;
+		*start = '\0';
+		name = ( start + 2 );
+		*end = '\0';
+		tail = ( end + 1 );
+
+		/* Determine setting length */
+		setting_len = fetchf_named_setting ( name, NULL, 0 );
+		if ( setting_len < 0 )
+			setting_len = 0; /* Treat error as empty setting */
+
+		/* Read setting into temporary buffer */
+		{
+			char setting_buf[ setting_len + 1 ];
+
+			setting_buf[0] = '\0';
+			fetchf_named_setting ( name, setting_buf,
+					       sizeof ( setting_buf ) );
+
+			/* Construct expanded string and discard old string */
+			tmp = expstr;
+			new_len = asprintf ( &expstr, "%s%s%s",
+					     head, setting_buf, tail );
+			free ( tmp );
+			if ( new_len < 0 )
+				return NULL;
+		}
+	}
+
+	return expstr;
+}
+
+/******************************************************************************
+ *
  * Settings
  *
  ******************************************************************************
