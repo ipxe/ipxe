@@ -205,7 +205,7 @@ static void a3c90x_reset(struct INF_3C90X *inf_3c90x)
 {
 	DBGP("a3c90x_reset\n");
 	/* Send the reset command to the card */
-	DBG("3c90x: Issuing RESET\n");
+	DBG2("3c90x: Issuing RESET\n");
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdGlobalReset, 0);
 
 	/* global reset command resets station mask, non-B revision cards
@@ -282,14 +282,14 @@ static void a3c90x_process_tx_packets(struct net_device *netdev)
 
 	DBGP("a3c90x_process_tx_packets\n");
 
-	DBG("    tx_cnt: %d\n", p->tx_cnt);
+	DBG2("    tx_cnt: %d\n", p->tx_cnt);
 
 	while (p->tx_tail != p->tx_cur) {
 
 		downlist_ptr = inl(p->IOAddr + regDnListPtr_l);
 
-		DBG("    downlist_ptr: %#08x\n", downlist_ptr);
-		DBG("    tx_tail: %d tx_cur: %d\n", p->tx_tail, p->tx_cur);
+		DBG2("    downlist_ptr: %#08x\n", downlist_ptr);
+		DBG2("    tx_tail: %d tx_cur: %d\n", p->tx_tail, p->tx_cur);
 
 		/* NIC is currently working on this tx desc */
 		if(downlist_ptr == virt_to_bus(p->tx_ring + p->tx_tail))
@@ -297,8 +297,8 @@ static void a3c90x_process_tx_packets(struct net_device *netdev)
 
 		netdev_tx_complete(netdev, p->tx_iobuf[p->tx_tail]);
 
-		DBG("transmitted packet\n");
-		DBG("    size: %zd\n", iob_len(p->tx_iobuf[p->tx_tail]));
+		DBG2("transmitted packet\n");
+		DBG2("    size: %zd\n", iob_len(p->tx_iobuf[p->tx_tail]));
 
 		p->tx_tail = (p->tx_tail + 1) % TX_RING_SIZE;
 		p->tx_cnt--;
@@ -397,7 +397,7 @@ static int a3c90x_transmit(struct net_device *netdev,
 static void a3c90x_prepare_rx_desc(struct INF_3C90X *p, unsigned int index)
 {
 	DBGP("a3c90x_prepare_rx_desc\n");
-	DBG("Populating rx_desc %d\n", index);
+	DBG2("Populating rx_desc %d\n", index);
 
 	/* We have to stall the upload engine, so the NIC won't access the
 	 * rx descriptor while we modify it. There is a way around this
@@ -538,7 +538,7 @@ static void a3c90x_process_rx_packets(struct net_device *netdev)
 			break;
 
 		if (rx_status & upError) {
-			DBG("Corrupted packet received\n");
+			DBG("Corrupted packet received: %#x\n", rx_status);
 			netdev_rx_err(netdev, p->rx_iobuf[p->rx_cur],
 				      -EINVAL);
 		} else {
@@ -548,8 +548,8 @@ static void a3c90x_process_rx_packets(struct net_device *netdev)
 			packet_len = rx_status & 0x1FFF;
 			iob_put(p->rx_iobuf[p->rx_cur], packet_len);
 
-			DBG("received packet\n");
-			DBG("    size: %d\n", packet_len);
+			DBG2("received packet\n");
+			DBG2("    size: %d\n", packet_len);
 
 			netdev_rx(netdev, p->rx_iobuf[p->rx_cur]);
 		}
@@ -588,7 +588,7 @@ static void a3c90x_poll(struct net_device *netdev)
 	if (int_status & INT_TXCOMPLETE)
 		outb(0x00, p->IOAddr + regTxStatus_b);
 
-	DBG("poll: status = %#04x\n", raw_status);
+	DBG2("poll: status = %#04x\n", raw_status);
 
 	a3c90x_process_tx_packets(netdev);
 
@@ -696,40 +696,40 @@ static void a3c90x_hw_start(struct net_device *netdev)
 		mopt &= 0x7F;
 	}
 
-	DBG("Connectors present: ");
+	DBG2("Connectors present: ");
 	c = 0;
 	linktype = 0x0008;
 	if (mopt & 0x01) {
-		DBG("%s100Base-T4", (c++) ? ", " : "");
+		DBG2("%s100Base-T4", (c++) ? ", " : "");
 		linktype = linkMII;
 	}
 	if (mopt & 0x04) {
-		DBG("%s100Base-FX", (c++) ? ", " : "");
+		DBG2("%s100Base-FX", (c++) ? ", " : "");
 		linktype = link100BaseFX;
 	}
 	if (mopt & 0x10) {
-		DBG("%s10Base-2", (c++) ? ", " : "");
+		DBG2("%s10Base-2", (c++) ? ", " : "");
 		linktype = link10Base2;
 	}
 	if (mopt & 0x20) {
-		DBG("%sAUI", (c++) ? ", " : "");
+		DBG2("%sAUI", (c++) ? ", " : "");
 		linktype = linkAUI;
 	}
 	if (mopt & 0x40) {
-		DBG("%sMII", (c++) ? ", " : "");
+		DBG2("%sMII", (c++) ? ", " : "");
 		linktype = linkMII;
 	}
 	if ((mopt & 0xA) == 0xA) {
-		DBG("%s10Base-T / 100Base-TX", (c++) ? ", " : "");
+		DBG2("%s10Base-T / 100Base-TX", (c++) ? ", " : "");
 		linktype = linkAutoneg;
 	} else if ((mopt & 0xA) == 0x2) {
-		DBG("%s100Base-TX", (c++) ? ", " : "");
+		DBG2("%s100Base-TX", (c++) ? ", " : "");
 		linktype = linkAutoneg;
 	} else if ((mopt & 0xA) == 0x8) {
-		DBG("%s10Base-T", (c++) ? ", " : "");
+		DBG2("%s10Base-T", (c++) ? ", " : "");
 		linktype = linkAutoneg;
 	}
-	DBG(".\n");
+	DBG2(".\n");
 
 	/* Determine transceiver type to use, depending on value stored in
 	* eeprom 0x16
@@ -760,7 +760,7 @@ static void a3c90x_hw_start(struct net_device *netdev)
 	cfg &= ~(0xF << 20);
 	cfg |= (linktype << 20);
 
-	DBG("Setting internal cfg register: 0x%08X (linktype: 0x%02X)\n",
+	DBG2("Setting internal cfg register: 0x%08X (linktype: 0x%02X)\n",
 	    cfg, linktype);
 
 	outl(cfg, inf_3c90x->IOAddr + regInternalConfig_3_l);
@@ -911,7 +911,7 @@ static int a3c90x_probe(struct pci_device *pci,
 		break;
 	}
 
-	DBG("[3c90x]: found NIC(0x%04X, 0x%04X), isBrev=%d, is3c556=%d\n",
+	DBG2("[3c90x]: found NIC(0x%04X, 0x%04X), isBrev=%d, is3c556=%d\n",
 	    pci->vendor, pci->device, inf_3c90x->isBrev,
 	    inf_3c90x->is3c556);
 
