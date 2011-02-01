@@ -206,7 +206,14 @@ static void a3c90x_reset(struct INF_3C90X *inf_3c90x)
 	DBGP("a3c90x_reset\n");
 	/* Send the reset command to the card */
 	DBG2("3c90x: Issuing RESET\n");
-	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdGlobalReset, 0);
+
+	/* reset of the receiver on B-revision cards re-negotiates the link
+	 * takes several seconds (a computer eternity), so we don't reset
+	 * it here.
+	 */
+	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr,
+				     cmdGlobalReset,
+				     globalResetMaskNetwork);
 
 	/* global reset command resets station mask, non-B revision cards
 	 * require explicit reset of values
@@ -216,26 +223,14 @@ static void a3c90x_reset(struct INF_3C90X *inf_3c90x)
 	outw(0, inf_3c90x->IOAddr + regStationMask_2_3w + 2);
 	outw(0, inf_3c90x->IOAddr + regStationMask_2_3w + 4);
 
-	/* Issue transmit reset, wait for command completion */
-	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdTxReset, 0);
-
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdTxEnable, 0);
-
-	/*
-	 * reset of the receiver on B-revision cards re-negotiates the link
-	 * takes several seconds (a computer eternity)
-	 */
-	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdRxReset,
-				     inf_3c90x->isBrev ? 0x04 : 0x00);
-
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdRxEnable, 0);
 
-	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr,
-				     cmdSetInterruptEnable, 0);
-	/* enable rxComplete and txComplete */
+	/* enable rxComplete and txComplete indications */
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr,
 				     cmdSetIndicationEnable,
 				     INT_TXCOMPLETE | INT_UPCOMPLETE);
+
 	/* acknowledge any pending status flags */
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr,
 				     cmdAcknowledgeInterrupt, 0x661);

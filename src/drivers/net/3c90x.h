@@ -193,6 +193,12 @@ enum Commands {
 	cmdSetHashFilterBit = 0x19,	/*                                   */
 };
 
+enum GlobalResetParams {
+	globalResetAll = 0,
+	globalResetMaskNetwork = (1<<2),
+	globalResetMaskAll = 0x1ff,
+};
+
 enum FrameStartHeader {
 	fshTxIndicate = 0x8000,
 	fshDnComplete = 0x10000,
