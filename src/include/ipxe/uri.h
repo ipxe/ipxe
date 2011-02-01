@@ -114,6 +114,16 @@ static inline int uri_is_absolute ( struct uri *uri ) {
 }
 
 /**
+ * URI has a path
+ *
+ * @v uri			URI
+ * @ret has_path		URI has a path
+ */
+static inline int uri_has_path ( struct uri *uri ) {
+	return ( uri->path && ( uri->path[0] != '\0' ) );
+}
+
+/**
  * URI has an absolute path
  *
  * @v uri			URI
