@@ -606,7 +606,8 @@ struct hermonprm_multicastparam_st {	/* Little Endian */
     pseudo_bit_t	mc_hash_fn[0x00003];   /* Multicast hash function
                                                  0 - Default hash function
                                                  other - reserved */
-    pseudo_bit_t	reserved5[0x00005];
+    pseudo_bit_t	uc_group_steering[0x00001];
+    pseudo_bit_t	reserved5[0x00004];
 /* -------------- */
     pseudo_bit_t	reserved6[0x00020];
 /* -------------- */
@@ -896,7 +897,7 @@ struct hermonprm_queue_pair_ee_context_entry_st {	/* Little Endian */
     pseudo_bit_t	reserved28[0x00005];
     pseudo_bit_t	rra_max[0x00003];      /* Maximum number of outstanding RDMA-read/Atomic operations allowed on receive queue is 2^RRA_Max. 
                                                  Must be 0 for EE context. */
-    pseudo_bit_t	reserved29[0x00008];
+    pseudo_bit_t	physical_function[0x00008];
 /* -------------- */
     pseudo_bit_t	next_rcv_psn[0x00018]; /* Next (expected) PSN on receive */
     pseudo_bit_t	min_rnr_nak[0x00005];  /* Minimum RNR NAK timer value (TTTTT field encoding according to the IB spec Vol1 9.7.5.2.8). 
@@ -1982,11 +1983,13 @@ struct hermonprm_query_dev_cap_st {	/* Little Endian */
                                                  The reserved resources are numbered from 0 to 2^log2_rsrvd_cqs-1 */
     pseudo_bit_t	reserved7[0x00004];
     pseudo_bit_t	log_max_cq_sz[0x00008];/* Log2 of the Maximum CQEs allowed in a CQ */
-    pseudo_bit_t	reserved8[0x00008];
+    pseudo_bit_t	num_rsvd_eqs[0x00008]; /* The number of EQs reserved for firmware use
+                                                 The reserved resources are numbered from 0 to num_rsvd_eqs-1
+                                                 If 0 - no resources are reserved. */
 /* -------------- */
     pseudo_bit_t	log_max_eq[0x00004];   /* Log2 of the Maximum number of EQs */
     pseudo_bit_t	reserved9[0x00004];
-    pseudo_bit_t	num_rsvd_eqs[0x00004]; /* The number of EQs reserved for firmware use
+    pseudo_bit_t	log2_rsvd_eqs[0x00004]; /* The number of EQs reserved for firmware use
                                                  The reserved resources are numbered from 0 to num_rsvd_eqs-1
                                                  If 0 - no resources are reserved. */
     pseudo_bit_t	reserved10[0x00004];
@@ -2019,20 +2022,8 @@ struct hermonprm_query_dev_cap_st {	/* Little Endian */
     pseudo_bit_t	reserved19[0x0001f];
 /* -------------- */
     pseudo_bit_t	num_ports[0x00004];    /* Number of IB ports. */
-    pseudo_bit_t	max_vl_ib[0x00004];    /* Maximum VLs supported on each port, excluding VL15 */
-    pseudo_bit_t	ib_port_width[0x00004];/* IB Port Width
-                                                 1   - 1x
-                                                 3   - 1x, 4x
-                                                 11 - 1x, 4x or 12x
-                                                 else - Reserved */
-    pseudo_bit_t	ib_mtu[0x00004];       /* Maximum MTU Supported
-                                                 0x0 - Reserved
-                                                 0x1 - 256
-                                                 0x2 - 512
-                                                 0x3 - 1024
-                                                 0x4 - 2048
-                                                 0x5 - 4096
-                                                 0x6-0xF Reserved */
+    pseudo_bit_t	reserved47[0x00004];
+    pseudo_bit_t	pci_pf_num[0x00008];    /* Number of supported physical functions */
     pseudo_bit_t	local_ca_ack_delay[0x00005];/* The Local CA ACK Delay. This is the value recommended to be returned in Query HCA verb.
                                                  The delay value in microseconds is computed using 4.096us * 2^(local_ca_ack_delay). */
     pseudo_bit_t	port_type[0x00004];    /* Hermon New. bit per port. bit0 is first port. value '1' is ehternet. '0' is IB */
@@ -2057,7 +2048,12 @@ struct hermonprm_query_dev_cap_st {	/* Little Endian */
                                                  bit 2 - 1/8 bw
                                                  bit 3 - 1/2 bw; */
 /* -------------- */
-    pseudo_bit_t	reserved26[0x00020];
+    pseudo_bit_t	reserved26[0x00008];
+    pseudo_bit_t	rss_udp[0x00001];
+    pseudo_bit_t	vep_uc_steering[0x00001];
+    pseudo_bit_t	vep_mc_steering[0x00001];
+    pseudo_bit_t	reserved27[0x00015];
+
 /* -------------- */
     pseudo_bit_t	rc[0x00001];           /* RC Transport supported */
     pseudo_bit_t	uc[0x00001];           /* UC Transport Supported */
@@ -2985,7 +2981,9 @@ struct hermonprm_mcg_hdr_st {	/* Little Endian */
     pseudo_bit_t	next_mcg[0x0001a];
 /* -------------- */
     pseudo_bit_t	members_count[0x00018];
-    pseudo_bit_t	reserved1[0x00008];
+    pseudo_bit_t	member_remove[0x00001];
+    pseudo_bit_t	reserved1[0x00005];
+    pseudo_bit_t	protocol[0x00002];
 /* -------------- */
     pseudo_bit_t	reserved2[0x00020];
 /* -------------- */
