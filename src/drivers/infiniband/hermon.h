@@ -724,7 +724,7 @@ struct hermon_event_queue {
  *
  * This is a policy decision.
  */
-#define HERMON_NUM_EQES		4
+#define HERMON_NUM_EQES		8
 
 /** A Hermon resource bitmask */
 typedef uint32_t hermon_bitmask_t;

@@ -1778,7 +1778,9 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 
 	/* Hand queue over to hardware */
 	memset ( &eqctx, 0, sizeof ( eqctx ) );
-	MLX_FILL_1 ( &eqctx, 0, st, 0xa /* "Fired" */ );
+	MLX_FILL_2 ( &eqctx, 0,
+		     st, 0xa /* "Fired" */,
+		     oi, 1 );
 	MLX_FILL_1 ( &eqctx, 2,
 		     page_offset, ( hermon_eq->mtt.page_offset >> 5 ) );
 	MLX_FILL_1 ( &eqctx, 3, log_eq_size, fls ( HERMON_NUM_EQES - 1 ) );
@@ -1831,8 +1833,7 @@ static void hermon_destroy_eq ( struct hermon *hermon ) {
 	int rc;
 
 	/* Unmap events from event queue */
-	memset ( &mask, 0, sizeof ( mask ) );
-	MLX_FILL_1 ( &mask, 1, port_state_change, 1 );
+	memset ( &mask, 0xff, sizeof ( mask ) );
 	if ( ( rc = hermon_cmd_map_eq ( hermon,
 					( HERMON_UNMAP_EQ | hermon_eq->eqn ),
 					&mask ) ) != 0 ) {
@@ -2879,6 +2880,11 @@ static int hermon_get_cap ( struct hermon *hermon ) {
 		( 1 << MLX_GET ( &dev_cap, log2_rsvd_cqs ) );
 	hermon->cap.cqc_entry_size = MLX_GET ( &dev_cap, cqc_entry_sz );
 	hermon->cap.reserved_eqs = MLX_GET ( &dev_cap, num_rsvd_eqs );
+	if ( hermon->cap.reserved_eqs == 0 ) {
+		/* Backward compatibility */
+		hermon->cap.reserved_eqs =
+			( 1 << MLX_GET ( &dev_cap, log2_rsvd_eqs ) );
+	}
 	hermon->cap.eqc_entry_size = MLX_GET ( &dev_cap, eqc_entry_sz );
 	hermon->cap.reserved_mtts =
 		( 1 << MLX_GET ( &dev_cap, log2_rsvd_mtts ) );
