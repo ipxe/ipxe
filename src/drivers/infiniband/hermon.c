@@ -1969,17 +1969,20 @@ static int hermon_open ( struct ib_device *ibdev ) {
 
 	/* Set port parameters */
 	memset ( &set_port, 0, sizeof ( set_port ) );
-	MLX_FILL_7 ( &set_port.ib, 0,
+	MLX_FILL_8 ( &set_port.ib, 0,
 		     mmc, 1,
 		     mvc, 1,
 		     mp, 1,
 		     mg, 1,
 		     mtu_cap, IB_MTU_2048,
 		     vl_cap, IB_VL_0,
-		     rcm, 1 );
+		     rcm, 1,
+		     lss, 1 );
 	MLX_FILL_2 ( &set_port.ib, 10,
 		     max_pkey, 1,
 		     max_gid, 1 );
+	MLX_FILL_1 ( &set_port.ib, 28,
+		     link_speed_supported, 1 );
 	if ( ( rc = hermon_cmd_set_port ( hermon, 0, ibdev->port,
 					  &set_port ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not set port: %s\n",

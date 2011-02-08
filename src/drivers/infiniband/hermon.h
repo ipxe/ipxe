@@ -228,7 +228,10 @@ struct hermonprm_set_port_ib_st {
 	pseudo_bit_t mp[0x00001];
 	pseudo_bit_t mvc[0x00001];
 	pseudo_bit_t mmc[0x00001];
-	pseudo_bit_t reserved2[0x00009];
+	pseudo_bit_t reserved2[0x00004];
+	pseudo_bit_t lws[0x00001];
+	pseudo_bit_t lss[0x00001];
+	pseudo_bit_t reserved3[0x00003];
 /* -------------- */
 	pseudo_bit_t capability_mask[0x00020];
 /* -------------- */
@@ -246,14 +249,53 @@ struct hermonprm_set_port_ib_st {
 /* -------------- */
 	pseudo_bit_t egress_sniff_qpn[0x00018];
 	pseudo_bit_t egress_sniff_mode[0x00002];
-	pseudo_bit_t reserved3[0x00006];
+	pseudo_bit_t reserved4[0x00006];
 /* -------------- */
 	pseudo_bit_t ingress_sniff_qpn[0x00018];
 	pseudo_bit_t ingress_sniff_mode[0x00002];
-	pseudo_bit_t reserved4[0x00006];
+	pseudo_bit_t reserved5[0x00006];
 /* -------------- */
 	pseudo_bit_t max_gid[0x00010];
 	pseudo_bit_t max_pkey[0x00010];
+/* -------------- */
+	pseudo_bit_t reserved6[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved7[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved8[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved9[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved10[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved11[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved12[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved13[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved14[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved15[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved16[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved17[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved18[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved19[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved20[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved21[0x00020];
+/* -------------- */
+	pseudo_bit_t reserved22[0x00020];
+/* -------------- */
+	pseudo_bit_t link_width_supported[0x00004];
+	pseudo_bit_t link_speed_supported[0x00004];
+	pseudo_bit_t reserved23[0x00018];
+/* -------------- */
 } __attribute__ (( packed ));
 
 struct hermonprm_query_port_cap_st {
