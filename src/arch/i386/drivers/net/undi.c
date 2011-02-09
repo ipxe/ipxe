@@ -66,7 +66,6 @@ static int undipci_probe ( struct pci_device *pci,
 			   const struct pci_device_id *id __unused ) {
 	struct undi_device *undi;
 	struct undi_rom *undirom;
-	unsigned int busdevfn = PCI_BUSDEVFN ( pci->bus, pci->devfn );
 	int rc;
 
 	/* Ignore non-network devices */
@@ -80,7 +79,7 @@ static int undipci_probe ( struct pci_device *pci,
 	pci_set_drvdata ( pci, undi );
 
 	/* Find/create our pixie */
-	if ( preloaded_undi.pci_busdevfn == busdevfn ) {
+	if ( preloaded_undi.pci_busdevfn == pci->busdevfn ) {
 		/* Claim preloaded UNDI device */
 		DBGC ( undi, "UNDI %p using preloaded UNDI device\n", undi );
 		memcpy ( undi, &preloaded_undi, sizeof ( *undi ) );
@@ -93,8 +92,10 @@ static int undipci_probe ( struct pci_device *pci,
 		}
 
 		/* Call UNDI ROM loader to create pixie */
-		if ( ( rc = undi_load_pci ( undi, undirom, busdevfn ) ) != 0 )
+		if ( ( rc = undi_load_pci ( undi, undirom,
+					    pci->busdevfn ) ) != 0 ) {
 			goto err_load_pci;
+		}
 	}
 
 	/* Add to device hierarchy */

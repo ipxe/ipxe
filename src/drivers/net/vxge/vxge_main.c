@@ -511,9 +511,8 @@ vxge_probe(struct pci_device *pdev, const struct pci_device_id *id __unused)
 	struct vxge_hw_device_hw_info hw_info;
 	struct vxge_hw_device_version *fw_version;
 
-	vxge_debug(VXGE_INFO, "vxge_probe for device %02X:%02X.%X\n",
-			pdev->bus, PCI_SLOT(pdev->devfn),
-			PCI_FUNC(pdev->devfn));
+	vxge_debug(VXGE_INFO, "vxge_probe for device " PCI_FMT "\n",
+			PCI_ARGS(pdev));
 
 	pci_read_config_byte(pdev, PCI_REVISION_ID, &revision);
 	titan1 = is_titan1(pdev->device, revision);

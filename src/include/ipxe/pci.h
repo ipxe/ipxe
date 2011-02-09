@@ -302,10 +302,8 @@ struct pci_device {
 	uint32_t class;
 	/** Interrupt number */
 	uint8_t irq;
-	/** Bus number */
-	uint8_t bus;
-	/** Device and function number */
-	uint8_t devfn;
+	/** Bus, device, and function (bus:dev.fn) number */
+	uint16_t busdevfn;
 	/** Driver for this device */
 	struct pci_driver *driver;
 	/** Driver-private data
@@ -347,11 +345,11 @@ struct pci_driver {
 /** Declare a PCI driver */
 #define __pci_driver __table_entry ( PCI_DRIVERS, 01 )
 
-#define PCI_DEVFN( slot, func )		( ( (slot) << 3 ) | (func) )
-#define PCI_SLOT( devfn )		( ( (devfn) >> 3 ) & 0x1f )
-#define PCI_FUNC( devfn )		( (devfn) & 0x07 )
-#define PCI_BUS( busdevfn )		( (busdevfn) >> 8 )
-#define PCI_BUSDEVFN( bus, devfn )	( ( (bus) << 8 ) | (devfn) )
+#define PCI_BUS( busdevfn )		( ( (busdevfn) >> 8 ) & 0xff )
+#define PCI_SLOT( busdevfn )		( ( (busdevfn) >> 3 ) & 0x1f )
+#define PCI_FUNC( busdevfn )		( ( (busdevfn) >> 0 ) & 0x07 )
+#define PCI_BUSDEVFN( bus, slot, func )	\
+	( ( (bus) << 8 ) | ( (slot) << 3 ) | ( (func) << 0 ) )
 
 #define PCI_BASE_CLASS( class )		( (class) >> 16 )
 #define PCI_SUB_CLASS( class )		( ( (class) >> 8 ) & 0xff )
@@ -378,8 +376,9 @@ struct pci_driver {
 #define PCI_FMT "PCI %02x:%02x.%x"
 
 /** PCI device debug message arguments */
-#define PCI_ARGS( pci ) \
-	(pci)->bus, PCI_SLOT ( (pci)->devfn ), PCI_FUNC ( (pci)->devfn )
+#define PCI_ARGS( pci )							\
+	PCI_BUS ( (pci)->busdevfn ), PCI_SLOT ( (pci)->busdevfn ),	\
+	PCI_FUNC ( (pci)->busdevfn )
 
 extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,

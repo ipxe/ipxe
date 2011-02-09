@@ -2909,7 +2909,7 @@ static int  tg3_get_device_address(struct tg3 *tp)
 	struct nic *nic = tp->nic;
 	uint32_t hi, lo, mac_offset;
 
-	if (PCI_FUNC(tp->pdev->devfn) == 0)
+	if (PCI_FUNC(tp->pdev->busdevfn) == 0)
 		mac_offset = 0x7c;
 	else
 		mac_offset = 0xcc;

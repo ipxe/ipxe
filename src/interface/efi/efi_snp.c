@@ -794,7 +794,7 @@ efi_snp_netdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
 		( ( unsigned long ) pci_fn ) );
 
 	/* Look up corresponding network device */
-	pci_busdevfn = PCI_BUSDEVFN ( pci_bus, PCI_DEVFN ( pci_dev, pci_fn ) );
+	pci_busdevfn = PCI_BUSDEVFN ( pci_bus, pci_dev, pci_fn );
 	if ( ( netdev = find_netdev_by_location ( BUS_TYPE_PCI,
 						  pci_busdevfn ) ) == NULL ) {
 		DBGCP ( driver, "SNPDRV %p device %p is not a iPXE network "

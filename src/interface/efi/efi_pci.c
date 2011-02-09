@@ -35,8 +35,9 @@ EFI_REQUIRE_PROTOCOL ( EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL, &efipci );
 
 static unsigned long efipci_address ( struct pci_device *pci,
 				      unsigned long location ) {
-	return EFI_PCI_ADDRESS ( pci->bus, PCI_SLOT ( pci->devfn ),
-				 PCI_FUNC ( pci->devfn ),
+	return EFI_PCI_ADDRESS ( PCI_BUS ( pci->busdevfn ),
+				 PCI_SLOT ( pci->busdevfn ),
+				 PCI_FUNC ( pci->busdevfn ),
 				 EFIPCI_OFFSET ( location ) );
 }
 
@@ -47,10 +48,9 @@ int efipci_read ( struct pci_device *pci, unsigned long location,
 	if ( ( efirc = efipci->Pci.Read ( efipci, EFIPCI_WIDTH ( location ),
 					  efipci_address ( pci, location ), 1,
 					  value ) ) != 0 ) {
-		DBG ( "EFIPCI config read from %02x:%02x.%x offset %02lx "
-		      "failed: %s\n", pci->bus, PCI_SLOT ( pci->devfn ),
-		      PCI_FUNC ( pci->devfn ), EFIPCI_OFFSET ( location ),
-		      efi_strerror ( efirc ) );
+		DBG ( "EFIPCI config read from " PCI_FMT " offset %02lx "
+		      "failed: %s\n", PCI_ARGS ( pci ),
+		      EFIPCI_OFFSET ( location ), efi_strerror ( efirc ) );
 		return -EIO;
 	}
 
@@ -64,10 +64,9 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 	if ( ( efirc = efipci->Pci.Write ( efipci, EFIPCI_WIDTH ( location ),
 					   efipci_address ( pci, location ), 1,
 					   &value ) ) != 0 ) {
-		DBG ( "EFIPCI config write to %02x:%02x.%x offset %02lx "
-		      "failed: %s\n", pci->bus, PCI_SLOT ( pci->devfn ),
-		      PCI_FUNC ( pci->devfn ), EFIPCI_OFFSET ( location ),
-		      efi_strerror ( efirc ) );
+		DBG ( "EFIPCI config write to " PCI_FMT " offset %02lx "
+		      "failed: %s\n", PCI_ARGS ( pci ),
+		      EFIPCI_OFFSET ( location ), efi_strerror ( efirc ) );
 		return -EIO;
 	}
 

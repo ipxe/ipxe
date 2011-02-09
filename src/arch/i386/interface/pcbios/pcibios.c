@@ -73,7 +73,7 @@ int pcibios_read ( struct pci_device *pci, uint32_t command, uint32_t *value ){
 			       : "=a" ( status ), "=b" ( discard_b ),
 				 "=c" ( *value ), "=D" ( discard_D )
 			       : "a" ( command >> 16 ), "D" ( command ),
-			         "b" ( PCI_BUSDEVFN ( pci->bus, pci->devfn ) )
+				 "b" ( pci->busdevfn )
 			       : "edx" );
 
 	return ( ( status >> 8 ) & 0xff );
@@ -99,8 +99,7 @@ int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 			       : "=a" ( status ), "=b" ( discard_b ),
 				 "=c" ( discard_c ), "=D" ( discard_D )
 			       : "a" ( command >> 16 ),	"D" ( command ),
-			         "b" ( PCI_BUSDEVFN ( pci->bus, pci->devfn ) ),
-				 "c" ( value )
+			         "b" ( pci->busdevfn ), "c" ( value )
 			       : "edx" );
 	
 	return ( ( status >> 8 ) & 0xff );

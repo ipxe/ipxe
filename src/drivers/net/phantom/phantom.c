@@ -1792,9 +1792,8 @@ static int phantom_map_crb ( struct phantom_nic *phantom,
 
 	bar0_start = pci_bar_start ( pci, PCI_BASE_ADDRESS_0 );
 	bar0_size = pci_bar_size ( pci, PCI_BASE_ADDRESS_0 );
-	DBGC ( phantom, "Phantom %p is PCI %02x:%02x.%x with BAR0 at "
-	       "%08lx+%lx\n", phantom, pci->bus, PCI_SLOT ( pci->devfn ),
-	       PCI_FUNC ( pci->devfn ), bar0_start, bar0_size );
+	DBGC ( phantom, "Phantom %p is " PCI_FMT " with BAR0 at %08lx+%lx\n",
+	       phantom, PCI_ARGS ( pci ), bar0_start, bar0_size );
 
 	if ( ! bar0_start ) {
 		DBGC ( phantom, "Phantom %p BAR not assigned; ignoring\n",
@@ -2057,7 +2056,7 @@ static int phantom_probe ( struct pci_device *pci,
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( phantom, 0, sizeof ( *phantom ) );
-	phantom->port = PCI_FUNC ( pci->devfn );
+	phantom->port = PCI_FUNC ( pci->busdevfn );
 	assert ( phantom->port < PHN_MAX_NUM_PORTS );
 	settings_init ( &phantom->settings,
 			&phantom_settings_operations,
@@ -2074,16 +2073,19 @@ static int phantom_probe ( struct pci_device *pci,
 	 * B2 will have this fixed; remove this hack when B1 is no
 	 * longer in use.
 	 */
-	if ( PCI_FUNC ( pci->devfn ) == 0 ) {
+	if ( PCI_FUNC ( pci->busdevfn ) == 0 ) {
 		unsigned int i;
 		for ( i = 0 ; i < 8 ; i++ ) {
 			uint32_t temp;
-			pci->devfn = PCI_DEVFN ( PCI_SLOT ( pci->devfn ), i );
+			pci->busdevfn =
+				PCI_BUSDEVFN ( PCI_BUS ( pci->busdevfn ),
+					       PCI_SLOT ( pci->busdevfn ), i );
 			pci_read_config_dword ( pci, 0xc8, &temp );
 			pci_read_config_dword ( pci, 0xc8, &temp );
 			pci_write_config_dword ( pci, 0xc8, 0xf1000 );
 		}
-		pci->devfn = PCI_DEVFN ( PCI_SLOT ( pci->devfn ), 0 );
+		pci->busdevfn = PCI_BUSDEVFN ( PCI_BUS ( pci->busdevfn ),
+					       PCI_SLOT ( pci->busdevfn ), 0 );
 	}
 
 	/* Initialise the command PEG */
