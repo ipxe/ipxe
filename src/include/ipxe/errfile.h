@@ -236,6 +236,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_fcmgmt_cmd	      ( ERRFILE_OTHER | 0x001e0000 )
 #define ERRFILE_gdbstub_cmd	      ( ERRFILE_OTHER | 0x001f0000 )
 #define ERRFILE_sanboot_cmd	      ( ERRFILE_OTHER | 0x00200000 )
+#define ERRFILE_bofm		      ( ERRFILE_OTHER | 0x00210000 )
 
 /** @} */
 
