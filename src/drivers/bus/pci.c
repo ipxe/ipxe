@@ -164,23 +164,54 @@ void adjust_pci_device ( struct pci_device *pci ) {
 }
 
 /**
- * Probe a PCI device
+ * Read PCI device configuration
  *
  * @v pci		PCI device
  * @ret rc		Return status code
- *
- * Searches for a driver for the PCI device.  If a driver is found,
- * its probe() routine is called.
  */
-static int pci_probe ( struct pci_device *pci ) {
+int pci_read_config ( struct pci_device *pci ) {
+	uint32_t tmp;
+
+	/* Check for physical device presence */
+	pci_read_config_dword ( pci, PCI_VENDOR_ID, &tmp );
+	if ( ( tmp == 0xffffffff ) || ( tmp == 0 ) )
+		return -ENODEV;
+
+	/* Populate struct pci_device */
+	pci->vendor = ( tmp & 0xffff );
+	pci->device = ( tmp >> 16 );
+	pci_read_config_dword ( pci, PCI_REVISION, &tmp );
+	pci->class = ( tmp >> 8 );
+	pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
+	pci_read_bases ( pci );
+
+	/* Initialise generic device component */
+	snprintf ( pci->dev.name, sizeof ( pci->dev.name ),
+		   "PCI%02x:%02x.%x", PCI_BUS ( pci->busdevfn ),
+		   PCI_SLOT ( pci->busdevfn ), PCI_FUNC ( pci->busdevfn ) );
+	pci->dev.desc.bus_type = BUS_TYPE_PCI;
+	pci->dev.desc.location = pci->busdevfn;
+	pci->dev.desc.vendor = pci->vendor;
+	pci->dev.desc.device = pci->device;
+	pci->dev.desc.class = pci->class;
+	pci->dev.desc.ioaddr = pci->ioaddr;
+	pci->dev.desc.irq = pci->irq;
+	INIT_LIST_HEAD ( &pci->dev.siblings );
+	INIT_LIST_HEAD ( &pci->dev.children );
+
+	return 0;
+}
+
+/**
+ * Find driver for PCI device
+ *
+ * @v pci		PCI device
+ * @ret rc		Return status code
+ */
+int pci_find_driver ( struct pci_device *pci ) {
 	struct pci_driver *driver;
 	struct pci_device_id *id;
 	unsigned int i;
-	int rc;
-
-	DBGC ( pci, PCI_FMT " is %04x:%04x mem %lx io %lx irq %d\n",
-	       PCI_ARGS ( pci ), pci->vendor, pci->device, pci->membase,
-	       pci->ioaddr, pci->irq );
 
 	for_each_table_entry ( driver, PCI_DRIVERS ) {
 		for ( i = 0 ; i < driver->id_count ; i++ ) {
@@ -191,21 +222,37 @@ static int pci_probe ( struct pci_device *pci ) {
 			if ( ( id->device != PCI_ANY_ID ) &&
 			     ( id->device != pci->device ) )
 				continue;
-			pci->driver = driver;
-			pci->id = id;
-			DBGC ( pci, "...using driver %s\n", pci->id->name );
-			if ( ( rc = driver->probe ( pci ) ) != 0 ) {
-				DBGC ( pci, "......probe failed: %s\n",
-				       strerror ( rc ) );
-				continue;
-			}
-			DBGC ( pci, PCI_FMT " added\n", PCI_ARGS ( pci ) );
+			pci_set_driver ( pci, driver, id );
 			return 0;
 		}
 	}
+	return -ENOENT;
+}
 
-	DBGC ( pci, "...no driver found\n" );
-	return -ENOTTY;
+/**
+ * Probe a PCI device
+ *
+ * @v pci		PCI device
+ * @ret rc		Return status code
+ *
+ * Searches for a driver for the PCI device.  If a driver is found,
+ * its probe() routine is called.
+ */
+int pci_probe ( struct pci_device *pci ) {
+	int rc;
+
+	DBGC ( pci, PCI_FMT " (%04x:%04x) has driver \"%s\"\n",
+	       PCI_ARGS ( pci ), pci->vendor, pci->device, pci->id->name );
+	DBGC ( pci, PCI_FMT " has mem %lx io %lx irq %d\n",
+	       PCI_ARGS ( pci ), pci->membase, pci->ioaddr, pci->irq );
+
+	if ( ( rc = pci->driver->probe ( pci ) ) != 0 ) {
+		DBGC ( pci, PCI_FMT " probe failed: %s\n",
+		       PCI_ARGS ( pci ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -213,7 +260,7 @@ static int pci_probe ( struct pci_device *pci ) {
  *
  * @v pci		PCI device
  */
-static void pci_remove ( struct pci_device *pci ) {
+void pci_remove ( struct pci_device *pci ) {
 	pci->driver->remove ( pci );
 	DBGC ( pci, PCI_FMT " removed\n", PCI_ARGS ( pci ) );
 }
@@ -231,7 +278,6 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 	unsigned int num_bus;
 	unsigned int busdevfn;
 	uint8_t hdrtype = 0;
-	uint32_t tmp;
 	int rc;
 
 	num_bus = pci_num_bus();
@@ -246,7 +292,7 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			goto err;
 		}
 		memset ( pci, 0, sizeof ( *pci ) );
-		pci->busdevfn = busdevfn;
+		pci_init ( pci, busdevfn );
 			
 		/* Skip all but the first function on
 		 * non-multifunction cards
@@ -258,37 +304,23 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			continue;
 		}
 
-		/* Check for physical device presence */
-		pci_read_config_dword ( pci, PCI_VENDOR_ID, &tmp );
-		if ( ( tmp == 0xffffffff ) || ( tmp == 0 ) )
+		/* Read device configuration */
+		if ( ( rc = pci_read_config ( pci ) ) != 0 )
 			continue;
-			
-		/* Populate struct pci_device */
-		pci->vendor = ( tmp & 0xffff );
-		pci->device = ( tmp >> 16 );
-		pci_read_config_dword ( pci, PCI_REVISION, &tmp );
-		pci->class = ( tmp >> 8 );
-		pci_read_config_byte ( pci, PCI_INTERRUPT_LINE,
-				       &pci->irq );
-		pci_read_bases ( pci );
-
-		/* Add to device hierarchy */
-		snprintf ( pci->dev.name, sizeof ( pci->dev.name ),
-			   "PCI%02x:%02x.%x", PCI_BUS ( busdevfn ),
-			   PCI_SLOT ( busdevfn ), PCI_FUNC ( busdevfn ) );
-		pci->dev.desc.bus_type = BUS_TYPE_PCI;
-		pci->dev.desc.location = pci->busdevfn;
-		pci->dev.desc.vendor = pci->vendor;
-		pci->dev.desc.device = pci->device;
-		pci->dev.desc.class = pci->class;
-		pci->dev.desc.ioaddr = pci->ioaddr;
-		pci->dev.desc.irq = pci->irq;
-		pci->dev.parent = &rootdev->dev;
-		list_add ( &pci->dev.siblings, &rootdev->dev.children);
-		INIT_LIST_HEAD ( &pci->dev.children );
 
 		/* Look for a driver */
-		if ( pci_probe ( pci ) == 0 ) {
+		if ( ( rc = pci_find_driver ( pci ) ) != 0 ) {
+			DBGC ( pci, PCI_FMT " (%04x:%04x) has no driver\n",
+			       PCI_ARGS ( pci ), pci->vendor, pci->device );
+			continue;
+		}
+
+		/* Add to device hierarchy */
+		pci->dev.parent = &rootdev->dev;
+		list_add ( &pci->dev.siblings, &rootdev->dev.children);
+
+		/* Look for a driver */
+		if ( ( rc = pci_probe ( pci ) ) == 0 ) {
 			/* pcidev registered, we can drop our ref */
 			pci = NULL;
 		} else {

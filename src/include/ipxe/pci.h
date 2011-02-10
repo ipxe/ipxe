@@ -381,8 +381,36 @@ struct pci_driver {
 extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
+extern int pci_read_config ( struct pci_device *pci );
+extern int pci_find_driver ( struct pci_device *pci );
+extern int pci_probe ( struct pci_device *pci );
+extern void pci_remove ( struct pci_device *pci );
 extern int pci_find_capability ( struct pci_device *pci, int capability );
 extern unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg );
+
+/**
+ * Initialise PCI device
+ *
+ * @v pci		PCI device
+ * @v busdevfn		PCI bus:dev.fn address
+ */
+static inline void pci_init ( struct pci_device *pci, unsigned int busdevfn ) {
+	pci->busdevfn = busdevfn;
+}
+
+/**
+ * Set PCI driver
+ *
+ * @v pci		PCI device
+ * @v driver		PCI driver
+ * @v id		PCI device ID
+ */
+static inline void pci_set_driver ( struct pci_device *pci,
+				    struct pci_driver *driver,
+				    struct pci_device_id *id ) {
+	pci->driver = driver;
+	pci->id = id;
+}
 
 /**
  * Set PCI driver-private data
