@@ -337,5 +337,6 @@ extern int bofm_register ( struct bofm_device *bofm );
 extern void bofm_unregister ( struct bofm_device *bofm );
 extern int bofm_find_driver ( struct pci_device *pci );
 extern int bofm ( userptr_t bofmtab, struct pci_device *pci );
+extern void bofm_test ( struct pci_device *pci );
 
 #endif /* _IPXE_BOFM_H */
