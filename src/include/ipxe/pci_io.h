@@ -49,11 +49,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <bits/pci_io.h>
 
 /**
- * Determine maximum PCI bus number within system
+ * Determine number of PCI buses within system
  *
- * @ret max_bus		Maximum bus number
+ * @ret num_bus		Number of buses
  */
-int pci_max_bus ( void );
+int pci_num_bus ( void );
 
 /**
  * Read byte from PCI configuration space

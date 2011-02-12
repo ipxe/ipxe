@@ -38,7 +38,7 @@ void pcidirect_prepare ( struct pci_device *pci, int where ) {
 	       PCIDIRECT_CONFIG_ADDRESS );
 }
 
-PROVIDE_PCIAPI_INLINE ( direct, pci_max_bus );
+PROVIDE_PCIAPI_INLINE ( direct, pci_num_bus );
 PROVIDE_PCIAPI_INLINE ( direct, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( direct, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( direct, pci_read_config_dword );

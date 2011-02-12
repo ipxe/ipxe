@@ -26,14 +26,14 @@ struct pci_device;
 extern void pcidirect_prepare ( struct pci_device *pci, int where );
 
 /**
- * Determine maximum PCI bus number within system
+ * Determine number of PCI buses within system
  *
- * @ret max_bus		Maximum bus number
+ * @ret num_bus		Number of buses
  */
 static inline __always_inline int
-PCIAPI_INLINE ( direct, pci_max_bus ) ( void ) {
+PCIAPI_INLINE ( direct, pci_num_bus ) ( void ) {
 	/* No way to work this out via Type 1 accesses */
-	return 0xff;
+	return 0x100;
 }
 
 /**

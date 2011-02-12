@@ -234,7 +234,7 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 	uint32_t tmp;
 	int rc;
 
-	num_bus = ( pci_max_bus() + 1 );
+	num_bus = pci_num_bus();
 	for ( busdevfn = 0 ; busdevfn < PCI_BUSDEVFN ( num_bus, 0, 0 ) ;
 	      busdevfn++ ) {
 

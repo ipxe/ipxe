@@ -33,14 +33,14 @@ extern int efipci_write ( struct pci_device *pci, unsigned long location,
 			  unsigned long value );
 
 /**
- * Determine maximum PCI bus number within system
+ * Determine number of PCI buses within system
  *
- * @ret max_bus		Maximum bus number
+ * @ret num_bus		Number of buses
  */
 static inline __always_inline int
-PCIAPI_INLINE ( efi, pci_max_bus ) ( void ) {
+PCIAPI_INLINE ( efi, pci_num_bus ) ( void ) {
 	/* No way to work this out via EFI */
-	return 0xff;
+	return 0x100;
 }
 
 /**

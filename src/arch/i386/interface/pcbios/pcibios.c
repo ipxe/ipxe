@@ -29,11 +29,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
- * Determine maximum PCI bus number within system
+ * Determine number of PCI buses within system
  *
- * @ret max_bus		Maximum bus number
+ * @ret num_bus		Number of buses
  */
-static int pcibios_max_bus ( void ) {
+static int pcibios_num_bus ( void ) {
 	int discard_a, discard_D;
 	uint8_t max_bus;
 
@@ -48,7 +48,7 @@ static int pcibios_max_bus ( void ) {
 				 "D" ( 0 )
 			       : "ebx", "edx" );
 
-	return max_bus;
+	return ( max_bus + 1 );
 }
 
 /**
@@ -105,7 +105,7 @@ int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 	return ( ( status >> 8 ) & 0xff );
 }
 
-PROVIDE_PCIAPI ( pcbios, pci_max_bus, pcibios_max_bus );
+PROVIDE_PCIAPI ( pcbios, pci_num_bus, pcibios_num_bus );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_dword );

@@ -73,7 +73,7 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 	return 0;
 }
 
-PROVIDE_PCIAPI_INLINE ( efi, pci_max_bus );
+PROVIDE_PCIAPI_INLINE ( efi, pci_num_bus );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_dword );
