@@ -2038,8 +2038,7 @@ static int phantom_init_rcvpeg ( struct phantom_nic *phantom ) {
  * @v id		PCI ID
  * @ret rc		Return status code
  */
-static int phantom_probe ( struct pci_device *pci,
-			   const struct pci_device_id *id __unused ) {
+static int phantom_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct phantom_nic *phantom;
 	struct settings *parent_settings;

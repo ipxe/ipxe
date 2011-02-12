@@ -638,7 +638,7 @@ static void b44_set_rx_mode(struct net_device *netdev)
  * @v id	Matching entry in ID table
  * @ret rc	Return status code
  */
-static int b44_probe(struct pci_device *pci, const struct pci_device_id *id)
+static int b44_probe(struct pci_device *pci)
 {
 	struct net_device *netdev;
 	struct b44_private *bp;
@@ -694,8 +694,9 @@ static int b44_probe(struct pci_device *pci, const struct pci_device_id *id)
 
 	b44_chip_reset(bp, B44_CHIP_RESET_FULL);
 
-	DBG("b44 %s (%04x:%04x) regs=%p MAC=%s\n", id->name, id->vendor,
-	    id->device, bp->regs, eth_ntoa(netdev->ll_addr));
+	DBG("b44 %s (%04x:%04x) regs=%p MAC=%s\n", pci->id->name,
+	    pci->id->vendor, pci->id->device, bp->regs,
+	    eth_ntoa(netdev->ll_addr));
 
 	return 0;
 }

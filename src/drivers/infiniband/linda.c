@@ -2316,8 +2316,7 @@ static int linda_init_ib_serdes ( struct linda *linda ) {
  * @v id		PCI ID
  * @ret rc		Return status code
  */
-static int linda_probe ( struct pci_device *pci,
-			 const struct pci_device_id *id __unused ) {
+static int linda_probe ( struct pci_device *pci ) {
 	struct ib_device *ibdev;
 	struct linda *linda;
 	struct QIB_7220_Revision revision;

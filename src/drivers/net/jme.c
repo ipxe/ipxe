@@ -1175,7 +1175,7 @@ jme_load_macaddr(struct net_device *netdev)
  * @ret rc	Return status code
  */
 static int
-jme_probe(struct pci_device *pci, const struct pci_device_id *id __unused)
+jme_probe(struct pci_device *pci)
 {
 	struct net_device *netdev;
 	struct jme_adapter *jme;

@@ -83,7 +83,7 @@ FILE_LICENCE ( GPL_ANY );
 static int natsemi_spi_read_bit ( struct bit_basher *, unsigned int );
 static void natsemi_spi_write_bit ( struct bit_basher *,unsigned int, unsigned long ); 
 static void natsemi_init_eeprom ( struct natsemi_private * ); 
-static int natsemi_probe (struct pci_device *pci, const struct pci_device_id *id);
+static int natsemi_probe (struct pci_device *pci);
 static void natsemi_reset (struct net_device *netdev);
 static int natsemi_open (struct net_device *netdev);
 static int natsemi_transmit (struct net_device *netdev, struct io_buffer *iobuf);
@@ -164,8 +164,7 @@ static void natsemi_init_eeprom ( struct natsemi_private *np ) {
  * @v id	PCI ID
  * @ret rc	Return status code
  */
-static int natsemi_probe (struct pci_device *pci,
-		       const struct pci_device_id *id __unused) {
+static int natsemi_probe (struct pci_device *pci) {
 	struct net_device *netdev;
 	struct natsemi_private *np = NULL;
 	uint8_t ll_addr_encoded[MAX_LL_ADDR_LEN];

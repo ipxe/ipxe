@@ -276,8 +276,7 @@ extern void e1000e_init_function_pointers_80003es2lan(struct e1000_hw *hw)
 extern void e1000e_init_function_pointers_ich8lan(struct e1000_hw *hw)
 						__attribute__((weak));
 
-extern int e1000e_probe(struct pci_device *pdev,
-		       const struct pci_device_id *id __unused);
+extern int e1000e_probe(struct pci_device *pdev);
 
 extern void e1000e_remove(struct pci_device *pdev);
 

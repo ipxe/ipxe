@@ -192,9 +192,9 @@ static int pci_probe ( struct pci_device *pci ) {
 			     ( id->device != pci->device ) )
 				continue;
 			pci->driver = driver;
-			pci->driver_name = id->name;
-			DBGC ( pci, "...using driver %s\n", pci->driver_name );
-			if ( ( rc = driver->probe ( pci, id ) ) != 0 ) {
+			pci->id = id;
+			DBGC ( pci, "...using driver %s\n", pci->id->name );
+			if ( ( rc = driver->probe ( pci ) ) != 0 ) {
 				DBGC ( pci, "......probe failed: %s\n",
 				       strerror ( rc ) );
 				continue;

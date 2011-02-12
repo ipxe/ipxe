@@ -675,7 +675,7 @@ static int velocity_probe( struct nic *nic, struct pci_device *pci)
 	struct mac_regs *regs;
 
 	printf("via-velocity.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       pci->driver_name, pci->vendor, pci->device);
+	       pci->id->name, pci->vendor, pci->device);
 
 	/* point to private storage */
 	vptr = &vptx;
@@ -707,10 +707,10 @@ static int velocity_probe( struct nic *nic, struct pci_device *pci)
 	for (i = 0; i < 6; i++)
 		nic->node_addr[i] = readb(&regs->PAR[i]);
 
-	DBG ( "%s: %s at ioaddr %#hX\n", pci->driver_name, eth_ntoa ( nic->node_addr ),
+	DBG ( "%s: %s at ioaddr %#hX\n", pci->id->name, eth_ntoa ( nic->node_addr ),
 	      (unsigned int) BASE );
 
-	velocity_get_options(&vptr->options, 0, pci->driver_name);
+	velocity_get_options(&vptr->options, 0, pci->id->name);
 
 	/* 
 	 *      Mask out the options cannot be set to the chip

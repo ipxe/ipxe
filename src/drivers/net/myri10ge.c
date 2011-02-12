@@ -94,8 +94,7 @@ FILE_LICENCE ( GPL2_ONLY );
 
 /* PCI driver entry points */
 
-static int	myri10ge_pci_probe ( struct pci_device*,
-				     const struct pci_device_id* );
+static int	myri10ge_pci_probe ( struct pci_device* );
 static void	myri10ge_pci_remove ( struct pci_device* );
 
 /* Network device operations */
@@ -771,8 +770,7 @@ myri10ge_nv_fini ( struct myri10ge_private *priv )
  * This function is called very early on, while iPXE is initializing.
  * This is a iPXE PCI Device Driver API function.
  */
-static int myri10ge_pci_probe ( struct pci_device *pci,
-				const struct pci_device_id *id __unused )
+static int myri10ge_pci_probe ( struct pci_device *pci )
 {
 	static struct net_device_operations myri10ge_operations = {
 		.open     = myri10ge_net_open,

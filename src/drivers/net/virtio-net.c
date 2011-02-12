@@ -344,8 +344,7 @@ static struct net_device_operations virtnet_operations = {
  * @v id	PCI ID
  * @ret rc	Return status code
  */
-static int virtnet_probe ( struct pci_device *pci,
-			   const struct pci_device_id *id __unused ) {
+static int virtnet_probe ( struct pci_device *pci ) {
 	unsigned long ioaddr = pci->ioaddr;
 	struct net_device *netdev;
 	struct virtnet_nic *virtnet;

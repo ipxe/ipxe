@@ -458,7 +458,7 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	BASE = pci->ioaddr;
 	printf("dmfe.c: Found %s Vendor=0x%hX Device=0x%hX\n",
-	       pci->driver_name, pci->vendor, pci->device);
+	       pci->id->name, pci->vendor, pci->device);
 
 	/* Read Chip revision */
 	pci_read_config_dword(pci, PCI_REVISION_ID, &dev_rev);
@@ -489,7 +489,8 @@ static int dmfe_probe ( struct nic *nic, struct pci_device *pci ) {
 		nic->node_addr[i] = db->srom[20 + i];
 
 	/* Print out some hardware info */
-	DBG ( "%s: %s at ioaddr %4.4lx\n", pci->driver_name, eth_ntoa ( nic->node_addr ), BASE );
+	DBG ( "%s: %s at ioaddr %4.4lx\n",
+	      pci->id->name, eth_ntoa ( nic->node_addr ), BASE );
 
 	/* Set the card as PCI Bus Master */
 	adjust_pci_device(pci);

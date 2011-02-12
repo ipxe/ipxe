@@ -312,8 +312,8 @@ struct pci_device {
 	 * field.
 	 */
 	void *priv;
-	/** Driver name */
-	const char *driver_name;
+	/** Driver device ID */
+	struct pci_device_id *id;
 };
 
 /** A PCI driver */
@@ -326,11 +326,9 @@ struct pci_driver {
 	 * Probe device
 	 *
 	 * @v pci	PCI device
-	 * @v id	Matching entry in ID table
 	 * @ret rc	Return status code
 	 */
-	int ( * probe ) ( struct pci_device *pci,
-			  const struct pci_device_id *id );
+	int ( * probe ) ( struct pci_device *pci );
 	/**
 	 * Remove device
 	 *

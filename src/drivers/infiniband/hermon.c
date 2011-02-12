@@ -3332,8 +3332,7 @@ static void hermon_reset ( struct hermon *hermon,
  * @v id		PCI ID
  * @ret rc		Return status code
  */
-static int hermon_probe ( struct pci_device *pci,
-			  const struct pci_device_id *id __unused ) {
+static int hermon_probe ( struct pci_device *pci ) {
 	struct hermon *hermon;
 	struct ib_device *ibdev;
 	struct net_device *netdev;

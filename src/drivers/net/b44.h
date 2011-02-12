@@ -453,8 +453,7 @@ static void b44_free_rx_ring ( struct b44_private *bp );
 static void b44_rx_refill ( struct b44_private *bp, u32 pending );
 static void b44_populate_rx_descriptor (struct b44_private *bp, u32 index);
 
-static int b44_probe ( struct pci_device *pci,
-                       const struct pci_device_id *id );
+static int b44_probe ( struct pci_device *pci );
 static void b44_remove ( struct pci_device *pci );
 
 static int b44_open ( struct net_device *netdev );

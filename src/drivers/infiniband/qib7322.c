@@ -2281,8 +2281,7 @@ static void qib7322_reset ( struct qib7322 *qib7322, struct pci_device *pci ) {
  * @v id		PCI ID
  * @ret rc		Return status code
  */
-static int qib7322_probe ( struct pci_device *pci,
-			   const struct pci_device_id *id __unused ) {
+static int qib7322_probe ( struct pci_device *pci ) {
 	struct qib7322 *qib7322;
 	struct QIB_7322_Revision revision;
 	struct ib_device *ibdev;

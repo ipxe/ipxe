@@ -505,8 +505,7 @@ static struct net_device_operations rtl_operations = {
  * @v id	PCI ID
  * @ret rc	Return status code
  */
-static int rtl_probe ( struct pci_device *pci,
-		       const struct pci_device_id *id __unused ) {
+static int rtl_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct rtl8139_nic *rtl;
 	int rc;

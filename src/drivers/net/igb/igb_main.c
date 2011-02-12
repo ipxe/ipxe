@@ -771,8 +771,7 @@ static struct net_device_operations igb_operations;
  *
  * @ret rc	Return status code
  **/
-int igb_probe ( struct pci_device *pdev,
-	      const struct pci_device_id *ent __unused)
+int igb_probe ( struct pci_device *pdev )
 {
 	int i, err;
 	struct net_device *netdev;

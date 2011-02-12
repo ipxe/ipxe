@@ -171,7 +171,7 @@ struct ifec_private {
 /**************************** Function prototypes ****************************/
 
 /* PCI device API prototypes */
-static int  ifec_pci_probe  ( struct pci_device*, const struct pci_device_id*);
+static int  ifec_pci_probe  ( struct pci_device *pci );
 static void ifec_pci_remove ( struct pci_device *pci );
 
 /* Network device API prototypes */

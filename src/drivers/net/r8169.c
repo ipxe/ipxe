@@ -2050,18 +2050,19 @@ static struct net_device_operations rtl8169_operations = {
  * @ret rc	Return status code
  **/
 static int
-rtl8169_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
+rtl8169_probe ( struct pci_device *pdev )
 {
 	int i, rc;
 	struct net_device *netdev;
 	struct rtl8169_private *tp;
 	void *ioaddr;
 
-	const struct rtl_cfg_info *cfg = rtl_cfg_infos + ent->driver_data;
+	const struct rtl_cfg_info *cfg = rtl_cfg_infos + pdev->id->driver_data;
 
 	DBGP ( "rtl8169_probe\n" );
 
-	DBG ( "ent->vendor = %#04x, ent->device = %#04x\n", ent->vendor, ent->device );
+	DBG ( "id->vendor = %#04x, id->device = %#04x\n",
+	      pdev->id->vendor, pdev->id->device );
 
 	DBG ( "cfg->intr_event = %#04x\n", cfg->intr_event );
 

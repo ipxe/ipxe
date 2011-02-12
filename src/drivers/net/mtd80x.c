@@ -617,7 +617,7 @@ static int mtd_probe ( struct nic *nic, struct pci_device *pci ) {
     nic->ioaddr = pci->ioaddr;
     nic->irqno = 0;
 
-    mtdx.nic_name = pci->driver_name;
+    mtdx.nic_name = pci->id->name;
     mtdx.dev_id = pci->device;
     mtdx.ioaddr = nic->ioaddr;
 

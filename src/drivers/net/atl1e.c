@@ -1123,8 +1123,7 @@ static void atl1e_init_netdev(struct net_device *netdev, struct pci_device *pdev
  * The OS initialization, configuring of the adapter private structure,
  * and a hardware reset occur.
  */
-static int atl1e_probe(struct pci_device *pdev,
-		       const struct pci_device_id *ent __unused)
+static int atl1e_probe(struct pci_device *pdev)
 {
 	struct net_device *netdev;
 	struct atl1e_adapter *adapter = NULL;

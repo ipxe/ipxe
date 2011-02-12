@@ -1796,7 +1796,7 @@ err_ioremap:
  * @ret rc	Return status code
  **/
 static int
-forcedeth_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
+forcedeth_probe ( struct pci_device *pdev )
 {
 	struct net_device *netdev;
 	struct forcedeth_private *priv;
@@ -1806,7 +1806,7 @@ forcedeth_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
 	DBGP ( "forcedeth_probe\n" );
 
 	DBG ( "Found %s, vendor = %#04x, device = %#04x\n",
-		pdev->driver_name, ent->vendor, ent->device );
+	      pdev->id->name, pdev->id->vendor, pdev->id->device );
 
 	/* Allocate our private data */
 	netdev = alloc_etherdev ( sizeof ( *priv ) );
@@ -1829,7 +1829,7 @@ forcedeth_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
 	/* We'll need these set up for the rest of the routines */
 	priv->pci_dev = pdev;
 	priv->netdev = netdev;
-	priv->driver_data = ent->driver_data;
+	priv->driver_data = pdev->id->driver_data;
 
 	adjust_pci_device ( pdev );
 

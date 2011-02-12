@@ -2264,8 +2264,7 @@ static struct net_device_operations sky2_operations = {
 	.irq      = sky2_net_irq
 };
 
-static int sky2_probe(struct pci_device *pdev,
-		      const struct pci_device_id *ent __unused)
+static int sky2_probe(struct pci_device *pdev)
 {
 	struct net_device *dev;
 	struct sky2_hw *hw;

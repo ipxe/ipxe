@@ -1005,8 +1005,7 @@ static struct net_device_operations e1000e_operations;
  *
  * @ret rc	Return status code
  **/
-int e1000e_probe ( struct pci_device *pdev,
-	      const struct pci_device_id *ent)
+int e1000e_probe ( struct pci_device *pdev )
 {
 	int i, err;
 	struct net_device *netdev;
@@ -1014,7 +1013,7 @@ int e1000e_probe ( struct pci_device *pdev,
 	unsigned long mmio_start, mmio_len;
 	unsigned long flash_start, flash_len;
 	struct e1000_hw *hw;
-	const struct e1000_info *ei = e1000_info_tbl[ent->driver_data];
+	const struct e1000_info *ei = e1000_info_tbl[pdev->id->driver_data];
 
 	DBGP ( "e1000_probe\n" );
 

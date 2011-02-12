@@ -2333,8 +2333,7 @@ static void skge_show_addr(struct net_device *dev)
 	     dev->name, netdev_addr(dev));
 }
 
-static int skge_probe(struct pci_device *pdev,
-				const struct pci_device_id *ent __unused)
+static int skge_probe(struct pci_device *pdev)
 {
 	struct net_device *dev, *dev1;
 	struct skge_hw *hw;

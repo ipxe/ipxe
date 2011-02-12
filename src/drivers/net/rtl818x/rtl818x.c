@@ -649,8 +649,7 @@ struct net80211_device_operations rtl818x_operations = {
 	.config = rtl818x_config,
 };
 
-static int rtl818x_probe(struct pci_device *pdev,
-			 const struct pci_device_id *id __unused)
+static int rtl818x_probe(struct pci_device *pdev )
 {
 	struct net80211_device *dev;
 	struct rtl818x_priv *priv;

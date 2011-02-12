@@ -2642,8 +2642,7 @@ static int arbel_configure_special_qps ( struct arbel *arbel ) {
  * @v id		PCI ID
  * @ret rc		Return status code
  */
-static int arbel_probe ( struct pci_device *pci,
-			 const struct pci_device_id *id __unused ) {
+static int arbel_probe ( struct pci_device *pci ) {
 	struct arbel *arbel;
 	struct ib_device *ibdev;
 	struct arbelprm_init_hca init_hca;

@@ -495,7 +495,7 @@ vxge_device_unregister(struct __vxge_hw_device *hldev)
  *
  */
 static int
-vxge_probe(struct pci_device *pdev, const struct pci_device_id *id __unused)
+vxge_probe(struct pci_device *pdev)
 {
 	struct __vxge_hw_device  *hldev;
 	enum vxge_hw_status status;

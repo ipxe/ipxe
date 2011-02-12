@@ -121,8 +121,7 @@ s32  e1000_mng_write_dhcp_info(struct e1000_hw * hw,
                                     u8 *buffer, u16 length);
 u32  e1000_translate_register_82542(u32 reg) __attribute__((weak));
 
-extern int e1000_probe(struct pci_device *pdev,
-		       const struct pci_device_id *id __unused);
+extern int e1000_probe(struct pci_device *pdev);
 extern void e1000_remove(struct pci_device *pdev);
 
 #endif

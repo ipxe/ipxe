@@ -1034,7 +1034,7 @@ static struct net_device_operations pcnet32_operations = {
  * @ret rc	Return status code
  **/
 static int
-pcnet32_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
+pcnet32_probe ( struct pci_device *pdev )
 {
 	struct net_device *netdev;
 	struct pcnet32_private *priv;
@@ -1044,7 +1044,7 @@ pcnet32_probe ( struct pci_device *pdev, const struct pci_device_id *ent )
 	DBGP ( "pcnet32_probe\n" );
 
 	DBG ( "Found %s, vendor = %#04x, device = %#04x\n",
-		pdev->driver_name, ent->vendor, ent->device );
+		pdev->id->name, pdev->id->vendor, pdev->id->device );
 
 	/* Allocate our private data */
 	netdev = alloc_etherdev ( sizeof ( *priv ) );

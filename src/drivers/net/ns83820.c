@@ -824,7 +824,7 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 		return 0;
 
 	printf("ns83820.c: Found %s, vendor=0x%hX, device=0x%hX\n",
-	       pci->driver_name, pci->vendor, pci->device);
+	       pci->id->name, pci->vendor, pci->device);
 
 	/* point to private storage */
 	ns = &nsx;
@@ -862,12 +862,12 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 	ns->CFG_cache = readl(ns->base + CFG);
 
 	if ((ns->CFG_cache & CFG_PCI64_DET)) {
-		printf("%s: detected 64 bit PCI data bus.\n", pci->driver_name);
+		printf("%s: detected 64 bit PCI data bus.\n", pci->id->name);
 		/*dev->CFG_cache |= CFG_DATA64_EN; */
 		if (!(ns->CFG_cache & CFG_DATA64_EN))
 			printf
 			    ("%s: EEPROM did not enable 64 bit bus.  Disabled.\n",
-			     pci->driver_name);
+			     pci->id->name);
 	} else
 		ns->CFG_cache &= ~(CFG_DATA64_EN);
 

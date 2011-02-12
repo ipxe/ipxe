@@ -157,8 +157,7 @@ static const struct {
 /*
  * Prototypes - PCI stack related functions
  */
-static int 		ath5k_probe(struct pci_device *pdev,
-				    const struct pci_device_id *id);
+static int 		ath5k_probe(struct pci_device *pdev);
 static void		ath5k_remove(struct pci_device *pdev);
 
 struct pci_driver ath5k_pci_driver __pci_driver = {
@@ -284,8 +283,7 @@ ath5k_chip_name(enum ath5k_srev_type type, u16 val)
 }
 #endif
 
-static int ath5k_probe(struct pci_device *pdev,
-		       const struct pci_device_id *id)
+static int ath5k_probe(struct pci_device *pdev)
 {
 	void *mem;
 	struct ath5k_softc *sc;
@@ -371,7 +369,7 @@ static int ath5k_probe(struct pci_device *pdev,
 	dev->netdev->dev = (struct device *)pdev;
 
 	/* Initialize device */
-	ret = ath5k_hw_attach(sc, id->driver_data, &sc->ah);
+	ret = ath5k_hw_attach(sc, pdev->id->driver_data, &sc->ah);
 	if (ret)
 		goto err_free_hwinfo;
 

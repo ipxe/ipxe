@@ -215,8 +215,7 @@ static void pnic_remove ( struct pci_device *pci ) {
 /**************************************************************************
 PROBE - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int pnic_probe ( struct pci_device *pci,
-			const struct pci_device_id *id __unused ) {
+static int pnic_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct pnic *pnic;
 	uint16_t api_version;

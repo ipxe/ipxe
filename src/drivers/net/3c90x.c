@@ -865,8 +865,7 @@ static struct net_device_operations a3c90x_operations = {
  *
  * @ret rc	Returns 0 on success, negative on failure
  */
-static int a3c90x_probe(struct pci_device *pci,
-			const struct pci_device_id *pci_id __unused)
+static int a3c90x_probe(struct pci_device *pci)
 {
 
 	struct net_device *netdev;

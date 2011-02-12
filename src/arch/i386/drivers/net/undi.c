@@ -62,8 +62,7 @@ static struct undi_rom * undipci_find_rom ( struct pci_device *pci ) {
  * @v id		PCI ID
  * @ret rc		Return status code
  */
-static int undipci_probe ( struct pci_device *pci,
-			   const struct pci_device_id *id __unused ) {
+static int undipci_probe ( struct pci_device *pci ) {
 	struct undi_device *undi;
 	struct undi_rom *undirom;
 	int rc;

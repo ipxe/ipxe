@@ -689,8 +689,7 @@ static struct net_device_operations e1000_operations;
  *
  * @ret rc	Return status code
  **/
-int e1000_probe ( struct pci_device *pdev,
-	      const struct pci_device_id *id __unused )
+int e1000_probe ( struct pci_device *pdev )
 {
 	int i, err;
 	struct net_device *netdev;

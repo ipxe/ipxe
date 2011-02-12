@@ -4129,8 +4129,7 @@ efab_remove ( struct pci_device *pci )
 }
 
 static int
-efab_probe ( struct pci_device *pci,
-	     const struct pci_device_id *id )
+efab_probe ( struct pci_device *pci )
 {
 	struct net_device *netdev;
 	struct efab_nic *efab;
@@ -4190,7 +4189,7 @@ efab_probe ( struct pci_device *pci,
 			goto fail5;
 	}
 
-	EFAB_LOG ( "Found %s EtherFabric %s %s revision %d\n", id->name,
+	EFAB_LOG ( "Found %s EtherFabric %s %s revision %d\n", pci->id->name,
 		   efab->is_asic ? "ASIC" : "FPGA",
 		   efab->phy_10g ? "10G" : "1G",
 		   efab->pci_revision );

@@ -34,7 +34,7 @@ FILE_LICENCE ( GPL2_ONLY );
 
 #include "igb_api.h"
 
-extern int igb_probe ( struct pci_device *pdev, const struct pci_device_id *ent);
+extern int igb_probe ( struct pci_device *pdev );
 extern void igb_remove ( struct pci_device *pdev );
 
 struct igb_adapter;

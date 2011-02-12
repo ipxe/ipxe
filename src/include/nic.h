@@ -85,8 +85,7 @@ void legacy_remove ( void *hwdev,
 
 #define PCI_DRIVER(_name,_ids,_class) 					  \
 	static inline int						  \
-	_name ## _pci_legacy_probe ( struct pci_device *pci,		  \
-				     const struct pci_device_id *id );	  \
+	_name ## _pci_legacy_probe ( struct pci_device *pci );		  \
 	static inline void						  \
 	_name ## _pci_legacy_remove ( struct pci_device *pci );		  \
 	struct pci_driver _name __pci_driver = {			  \
@@ -211,8 +210,7 @@ static inline void * legacy_isa_get_drvdata ( void *hwdev ) {
 		_unsafe_disable ( nic, hwdev );				  \
 	}								  \
 	static inline int						  \
-	_name ## _pci_legacy_probe ( struct pci_device *pci,		  \
-			    const struct pci_device_id *id __unused ) {	  \
+	_name ## _pci_legacy_probe ( struct pci_device *pci ) {		  \
 		return legacy_probe ( pci, legacy_pci_set_drvdata,	  \
 				      &pci->dev, _name ## _probe,	  \
 				      _name ## _disable );		  \

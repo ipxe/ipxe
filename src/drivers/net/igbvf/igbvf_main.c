@@ -779,8 +779,7 @@ void igbvf_get_hw_control ( struct igbvf_adapter *adapter )
  * The OS initialization, configuring of the adapter private structure,
  * and a hardware reset occur.
  **/
-int igbvf_probe ( struct pci_device *pdev,
-		  const struct pci_device_id *ent __unused )
+int igbvf_probe ( struct pci_device *pdev )
 {
 	int err;
 	struct net_device *netdev;
