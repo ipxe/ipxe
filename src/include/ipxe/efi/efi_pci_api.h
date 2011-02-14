@@ -1,5 +1,5 @@
-#ifndef _IPXE_EFI_PCI_H
-#define _IPXE_EFI_PCI_H
+#ifndef _IPXE_EFI_PCI_API_H
+#define _IPXE_EFI_PCI_API_H
 
 /** @file
  *
@@ -39,8 +39,8 @@ extern int efipci_write ( struct pci_device *pci, unsigned long location,
  */
 static inline __always_inline int
 PCIAPI_INLINE ( efi, pci_num_bus ) ( void ) {
-	/* No way to work this out via EFI */
-	return 0x100;
+	/* EFI does not want us to scan the PCI bus ourselves */
+	return 0;
 }
 
 /**
@@ -145,4 +145,4 @@ PCIAPI_INLINE ( efi, pci_write_config_dword ) ( struct pci_device *pci,
 			      value );
 }
 
-#endif /* _IPXE_EFI_PCI_H */
+#endif /* _IPXE_EFI_PCI_API_H */

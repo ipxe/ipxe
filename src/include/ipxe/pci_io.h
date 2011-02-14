@@ -43,7 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	PROVIDE_SINGLE_API_INLINE ( PCIAPI_PREFIX_ ## _subsys, _api_func )
 
 /* Include all architecture-independent I/O API headers */
-#include <ipxe/efi/efi_pci.h>
+#include <ipxe/efi/efi_pci_api.h>
 
 /* Include all architecture-dependent I/O API headers */
 #include <bits/pci_io.h>
