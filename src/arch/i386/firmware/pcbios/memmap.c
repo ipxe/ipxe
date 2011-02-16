@@ -156,6 +156,7 @@ unsigned int extmemsize ( void ) {
  */
 static int meme820 ( struct memory_map *memmap ) {
 	struct memory_region *region = memmap->regions;
+	struct memory_region *prev_region = NULL;
 	uint32_t next = 0;
 	uint32_t smap;
 	size_t size;
@@ -238,8 +239,15 @@ static int meme820 ( struct memory_map *memmap ) {
 
 		region->start = e820buf.start;
 		region->end = e820buf.start + e820buf.len;
-		region++;
-		memmap->count++;
+
+		/* Check for adjacent regions and merge them */
+		if ( prev_region && ( region->start == prev_region->end ) ) {
+			prev_region->end = region->end;
+		} else {
+			prev_region = region;
+			region++;
+			memmap->count++;
+		}
 
 		if ( memmap->count >= ( sizeof ( memmap->regions ) /
 					sizeof ( memmap->regions[0] ) ) ) {
