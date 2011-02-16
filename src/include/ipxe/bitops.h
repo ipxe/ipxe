@@ -66,7 +66,7 @@ typedef unsigned char pseudo_bit_t;
 		uint32_t dwords[ sizeof ( _structure ) / 32 ];		      \
 		uint64_t qwords[ sizeof ( _structure ) / 64 ];		      \
 		_structure *dummy[0];					      \
-	} u
+	} __attribute__ (( packed )) u
 
 /** Get pseudo_bit_t structure type from wrapper structure pointer */
 #define PSEUDO_BIT_STRUCT_TYPE( _ptr )					      \
