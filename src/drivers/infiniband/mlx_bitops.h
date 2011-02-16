@@ -46,8 +46,8 @@ typedef unsigned char pseudo_bit_t;
 		uint8_t bytes[ sizeof ( struct _structure ## _st ) / 8 ];    \
 		uint32_t dwords[ sizeof ( struct _structure ## _st ) / 32 ]; \
 		struct _structure ## _st *dummy[0];			     \
-	    } u;							     \
-	}
+	    } __attribute__ (( packed )) u;				     \
+	} __attribute__ (( packed ))
 
 /** Get pseudo_bit_t structure type from wrapper structure pointer */
 #define MLX_PSEUDO_STRUCT( _ptr )					     \
