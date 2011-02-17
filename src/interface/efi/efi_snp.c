@@ -28,12 +28,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/in.h>
 #include <ipxe/pci.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/Protocol/DriverBinding.h>
-#include <ipxe/efi/Protocol/PciIo.h>
+#include <ipxe/efi/efi_pci.h>
+#include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
-#include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
-#include <config/general.h>
+#include <ipxe/efi/Protocol/DevicePath.h>
 
 /** @file
  *
@@ -43,6 +42,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** An SNP device */
 struct efi_snp_device {
+	/** List of SNP devices */
+	struct list_head list;
 	/** The underlying iPXE network device */
 	struct net_device *netdev;
 	/** EFI device handle */
@@ -81,14 +82,6 @@ struct efi_snp_device {
 static EFI_GUID efi_simple_network_protocol_guid
 	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
 
-/** EFI driver binding protocol GUID */
-static EFI_GUID efi_driver_binding_protocol_guid
-	= EFI_DRIVER_BINDING_PROTOCOL_GUID;
-
-/** EFI component name protocol GUID */
-static EFI_GUID efi_component_name2_protocol_guid
-	= EFI_COMPONENT_NAME2_PROTOCOL_GUID;
-
 /** EFI device path protocol GUID */
 static EFI_GUID efi_device_path_protocol_guid
 	= EFI_DEVICE_PATH_PROTOCOL_GUID;
@@ -107,9 +100,8 @@ static EFI_GUID efi_nii31_protocol_guid = {
 	{ 0xBC, 0x81, 0x76, 0x7F, 0x1F, 0x97, 0x7A, 0x89 }
 };
 
-/** EFI PCI I/O protocol GUID */
-static EFI_GUID efi_pci_io_protocol_guid
-	= EFI_PCI_IO_PROTOCOL_GUID;
+/** List of SNP devices */
+static LIST_HEAD ( efi_snp_devices );
 
 /**
  * Set EFI SNP mode based on iPXE net device parameters
@@ -750,187 +742,57 @@ static EFI_SIMPLE_NETWORK_PROTOCOL efi_snp_device_snp = {
 };
 
 /**
- * Locate net device corresponding to EFI device
+ * Locate SNP device corresponding to network device
  *
- * @v driver		EFI driver
- * @v device		EFI device
- * @ret netdev		Net device, or NULL if not found
+ * @v netdev		Network device
+ * @ret snp		SNP device, or NULL if not found
  */
-static struct net_device *
-efi_snp_netdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_PCI_IO_PROTOCOL *pci;
-		void *interface;
-	} u;
-	UINTN pci_segment, pci_bus, pci_dev, pci_fn;
-	unsigned int pci_busdevfn;
-	struct net_device *netdev = NULL;
-	EFI_STATUS efirc;
-
-	/* See if device is a PCI device */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_pci_io_protocol_guid,
-					  &u.interface,
-					  driver->DriverBindingHandle,
-					  device,
-					  EFI_OPEN_PROTOCOL_BY_DRIVER )) !=0 ){
-		DBGCP ( driver, "SNPDRV %p device %p is not a PCI device\n",
-			driver, device );
-		goto out_no_pci_io;
-	}
-
-	/* Get PCI bus:dev.fn address */
-	if ( ( efirc = u.pci->GetLocation ( u.pci, &pci_segment, &pci_bus,
-					    &pci_dev, &pci_fn ) ) != 0 ) {
-		DBGC ( driver, "SNPDRV %p device %p could not get PCI "
-		       "location: %s\n",
-		       driver, device, efi_strerror ( efirc ) );
-		goto out_no_pci_location;
-	}
-	DBGCP ( driver, "SNPDRV %p device %p is PCI %04lx:%02lx:%02lx.%lx\n",
-		driver, device, ( ( unsigned long ) pci_segment ),
-		( ( unsigned long ) pci_bus ), ( ( unsigned long ) pci_dev ),
-		( ( unsigned long ) pci_fn ) );
-
-	/* Look up corresponding network device */
-	pci_busdevfn = PCI_BUSDEVFN ( pci_bus, pci_dev, pci_fn );
-	if ( ( netdev = find_netdev_by_location ( BUS_TYPE_PCI,
-						  pci_busdevfn ) ) == NULL ) {
-		DBGCP ( driver, "SNPDRV %p device %p is not a iPXE network "
-			"device\n", driver, device );
-		goto out_no_netdev;
-	}
-	DBGC ( driver, "SNPDRV %p device %p is %s\n",
-	       driver, device, netdev->name );
-
- out_no_netdev:
- out_no_pci_location:
-	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
-			    driver->DriverBindingHandle, device );
- out_no_pci_io:
-	return netdev;
-}
-
-/**
- * Locate SNP corresponding to EFI device
- *
- * @v driver		EFI driver
- * @v device		EFI device
- * @ret snp		EFI SNP, or NULL if not found
- */
-static struct efi_snp_device *
-efi_snp_snpdev ( EFI_DRIVER_BINDING_PROTOCOL *driver, EFI_HANDLE device ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_SIMPLE_NETWORK_PROTOCOL *snp;
-		void *interface;
-	} u;
-	struct efi_snp_device *snpdev = NULL;
-	EFI_STATUS efirc;
-
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_simple_network_protocol_guid,
-					  &u.interface,
-					  driver->DriverBindingHandle,
-					  device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL))!=0){
-		DBGC ( driver, "SNPDRV %p device %p could not locate SNP: "
-		       "%s\n", driver, device, efi_strerror ( efirc ) );
-		goto err_no_snp;
-	}
-
-	snpdev =  container_of ( u.snp, struct efi_snp_device, snp );
-	DBGCP ( driver, "SNPDRV %p device %p is SNPDEV %p\n",
-		driver, device, snpdev );
-
-	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
-			    driver->DriverBindingHandle, device );
- err_no_snp:
-	return snpdev;
-}
-
-/**
- * Check to see if driver supports a device
- *
- * @v driver		EFI driver
- * @v device		EFI device
- * @v child		Path to child device, if any
- * @ret efirc		EFI status code
- */
-static EFI_STATUS EFIAPI
-efi_snp_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver,
-			   EFI_HANDLE device,
-			   EFI_DEVICE_PATH_PROTOCOL *child ) {
-	struct net_device *netdev;
-
-	DBGCP ( driver, "SNPDRV %p DRIVER_SUPPORTED %p (%p)\n",
-		driver, device, child );
-
-	netdev = efi_snp_netdev ( driver, device );
-	return ( netdev ? 0 : EFI_UNSUPPORTED );
-}
-
-/**
- * Attach driver to device
- *
- * @v driver		EFI driver
- * @v device		EFI device
- * @v child		Path to child device, if any
- * @ret efirc		EFI status code
- */
-static EFI_STATUS EFIAPI
-efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
-		       EFI_HANDLE device,
-		       EFI_DEVICE_PATH_PROTOCOL *child ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_DEVICE_PATH_PROTOCOL *path;
-	EFI_DEVICE_PATH_PROTOCOL *subpath;
-	MAC_ADDR_DEVICE_PATH *macpath;
+static struct efi_snp_device * efi_snp_demux ( struct net_device *netdev ) {
 	struct efi_snp_device *snpdev;
-	struct net_device *netdev;
-	size_t subpath_len;
+
+	list_for_each_entry ( snpdev, &efi_snp_devices, list ) {
+		if ( snpdev->netdev == netdev )
+			return snpdev;
+	}
+	return NULL;
+}
+
+/**
+ * Create SNP device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int efi_snp_probe ( struct net_device *netdev ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_pci_device *efipci;
+	struct efi_snp_device *snpdev;
+	EFI_DEVICE_PATH_PROTOCOL *path_end;
+	MAC_ADDR_DEVICE_PATH *macpath;
 	size_t path_prefix_len = 0;
 	unsigned int i;
 	EFI_STATUS efirc;
+	int rc;
 
-	DBGCP ( driver, "SNPDRV %p DRIVER_START %p (%p)\n",
-		driver, device, child );
+	/* Find EFI PCI device */
+	efipci = efipci_find ( netdev->dev );
+	if ( ! efipci ) {
+		DBG ( "SNP skipping non-PCI device %s\n", netdev->name );
+		rc = 0;
+		goto err_no_pci;
+	}
 
-	/* Determine device path prefix length */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_device_path_protocol_guid,
-					  ( void * ) &path,
-					  driver->DriverBindingHandle,
-					  device,
-					  EFI_OPEN_PROTOCOL_BY_DRIVER )) !=0 ){
-		DBGCP ( driver, "SNPDRV %p device %p has no device path\n",
-			driver, device );
-		goto err_no_device_path;
-	}
-	subpath = path;
-	while ( subpath->Type != END_DEVICE_PATH_TYPE ) {
-		subpath_len = ( ( subpath->Length[1] << 8 ) |
-				subpath->Length[0] );
-		path_prefix_len += subpath_len;
-		subpath = ( ( ( void * ) subpath ) + subpath_len );
-	}
+	/* Calculate device path prefix length */
+	path_end = efi_devpath_end ( efipci->path );
+	path_prefix_len = ( ( ( void * ) path_end ) -
+			    ( ( void * ) efipci->path ) );
 
 	/* Allocate the SNP device */
 	snpdev = zalloc ( sizeof ( *snpdev ) + path_prefix_len +
 			  sizeof ( *macpath ) );
 	if ( ! snpdev ) {
-		efirc = EFI_OUT_OF_RESOURCES;
+		rc = -ENOMEM;
 		goto err_alloc_snp;
-	}
-
-	/* Identify the net device */
-	netdev = efi_snp_netdev ( driver, device );
-	if ( ! netdev ) {
-		DBGC ( snpdev, "SNPDEV %p cannot find netdev for device %p\n",
-		       snpdev, device );
-		efirc = EFI_UNSUPPORTED;
-		goto err_no_netdev;
 	}
 	snpdev->netdev = netdev_get ( netdev );
 
@@ -939,7 +801,7 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 		DBGC ( snpdev, "SNPDEV %p cannot support link-layer address "
 		       "length %d for %s\n", snpdev,
 		       netdev->ll_protocol->ll_addr_len, netdev->name );
-		efirc = EFI_INVALID_PARAMETER;
+		rc = -ENOTSUP;
 		goto err_ll_addr_len;
 	}
 
@@ -951,6 +813,7 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 					 &snpdev->snp.WaitForPacket ) ) != 0 ){
 		DBGC ( snpdev, "SNPDEV %p could not create event: %s\n",
 		       snpdev, efi_strerror ( efirc ) );
+		rc = EFIRC_TO_RC ( efirc );
 		goto err_create_event;
 	}
 
@@ -973,9 +836,9 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	}
 
 	/* Populate the device path */
-	memcpy ( &snpdev->path, path, path_prefix_len );
+	memcpy ( &snpdev->path, efipci->path, path_prefix_len );
 	macpath = ( ( ( void * ) &snpdev->path ) + path_prefix_len );
-	subpath = ( ( void * ) ( macpath + 1 ) );
+	path_end = ( ( void * ) ( macpath + 1 ) );
 	memset ( macpath, 0, sizeof ( *macpath ) );
 	macpath->Header.Type = MESSAGING_DEVICE_PATH;
 	macpath->Header.SubType = MSG_MAC_ADDR_DP;
@@ -983,10 +846,10 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	memcpy ( &macpath->MacAddress, netdev->ll_addr,
 		 sizeof ( macpath->MacAddress ) );
 	macpath->IfType = ntohs ( netdev->ll_protocol->ll_proto );
-	memset ( subpath, 0, sizeof ( *subpath ) );
-	subpath->Type = END_DEVICE_PATH_TYPE;
-	subpath->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	subpath->Length[0] = sizeof ( *subpath );
+	memset ( path_end, 0, sizeof ( *path_end ) );
+	path_end->Type = END_DEVICE_PATH_TYPE;
+	path_end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	path_end->Length[0] = sizeof ( *path_end );
 
 	/* Install the SNP */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
@@ -998,8 +861,12 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not install protocols: "
 		       "%s\n", snpdev, efi_strerror ( efirc ) );
+		rc = EFIRC_TO_RC ( efirc );
 		goto err_install_protocol_interface;
 	}
+
+	/* Add to list of SNP devices */
+	list_add ( &snpdev->list, &efi_snp_devices );
 
 	DBGC ( snpdev, "SNPDEV %p installed for %s as device %p\n",
 	       snpdev, netdev->name, snpdev->handle );
@@ -1017,44 +884,39 @@ efi_snp_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
  err_create_event:
  err_ll_addr_len:
 	netdev_put ( netdev );
- err_no_netdev:
 	free ( snpdev );
  err_alloc_snp:
-	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
-			    driver->DriverBindingHandle, device );
- err_no_device_path:
-	return efirc;
+ err_no_pci:
+	return rc;
 }
 
 /**
- * Detach driver from device
+ * Handle SNP device or link state change
  *
- * @v driver		EFI driver
- * @v device		EFI device
- * @v num_children	Number of child devices
- * @v children		List of child devices
- * @ret efirc		EFI status code
+ * @v netdev		Network device
  */
-static EFI_STATUS EFIAPI
-efi_snp_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver,
-		      EFI_HANDLE device,
-		      UINTN num_children,
-		      EFI_HANDLE *children ) {
+static void efi_snp_notify ( struct net_device *netdev __unused ) {
+	/* Nothing to do */
+}
+
+/**
+ * Destroy SNP device
+ *
+ * @v netdev		Network device
+ */
+static void efi_snp_remove ( struct net_device *netdev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev;
 
-	DBGCP ( driver, "SNPDRV %p DRIVER_STOP %p (%ld %p)\n",
-		driver, device, ( ( unsigned long ) num_children ), children );
-
 	/* Locate SNP device */
-	snpdev = efi_snp_snpdev ( driver, device );
+	snpdev = efi_snp_demux ( netdev );
 	if ( ! snpdev ) {
-		DBGC ( driver, "SNPDRV %p device %p could not find SNPDEV\n",
-		       driver, device );
-		return EFI_DEVICE_ERROR;
+		DBG ( "SNP skipping non-SNP device %s\n", netdev->name );
+		return;
 	}
 
 	/* Uninstall the SNP */
+	list_del ( &snpdev->list );
 	bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
@@ -1065,87 +927,12 @@ efi_snp_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
 	netdev_put ( snpdev->netdev );
 	free ( snpdev );
-	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
-			    driver->DriverBindingHandle, device );
-	return 0;
 }
 
-/** EFI SNP driver binding */
-static EFI_DRIVER_BINDING_PROTOCOL efi_snp_binding = {
-	efi_snp_driver_supported,
-	efi_snp_driver_start,
-	efi_snp_driver_stop,
-	0x10,
-	NULL,
-	NULL
+/** SNP driver */
+struct net_driver efi_snp_driver __net_driver = {
+	.name = "SNP",
+	.probe = efi_snp_probe,
+	.notify = efi_snp_notify,
+	.remove = efi_snp_remove,
 };
-
-/**
- * Look up driver name
- *
- * @v wtf		Component name protocol
- * @v language		Language to use
- * @v driver_name	Driver name to fill in
- * @ret efirc		EFI status code
- */
-static EFI_STATUS EFIAPI
-efi_snp_get_driver_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
-			  CHAR8 *language __unused, CHAR16 **driver_name ) {
-
-	*driver_name = L"" PRODUCT_SHORT_NAME " Driver";
-	return 0;
-}
-
-/**
- * Look up controller name
- *
- * @v wtf		Component name protocol
- * @v device		Device
- * @v child		Child device, or NULL
- * @v language		Language to use
- * @v driver_name	Device name to fill in
- * @ret efirc		EFI status code
- */
-static EFI_STATUS EFIAPI
-efi_snp_get_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
-			      EFI_HANDLE device __unused,
-			      EFI_HANDLE child __unused,
-			      CHAR8 *language __unused,
-			      CHAR16 **controller_name __unused ) {
-
-	/* Just let EFI use the default Device Path Name */
-	return EFI_UNSUPPORTED;
-}
-
-/** EFI SNP component name protocol */
-static EFI_COMPONENT_NAME2_PROTOCOL efi_snp_name = {
-	efi_snp_get_driver_name,
-	efi_snp_get_controller_name,
-	"en"
-};
-
-/**
- * Install EFI SNP driver
- *
- * @ret rc		Return status code
- */
-int efi_snp_install ( void ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_DRIVER_BINDING_PROTOCOL *driver = &efi_snp_binding;
-	EFI_STATUS efirc;
-
-	driver->ImageHandle = efi_image_handle;
-	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
-			&driver->DriverBindingHandle,
-			&efi_driver_binding_protocol_guid, driver,
-			&efi_component_name2_protocol_guid, &efi_snp_name,
-			NULL ) ) != 0 ) {
-		DBGC ( driver, "SNPDRV %p could not install protocols: "
-		       "%s\n", driver, efi_strerror ( efirc ) );
-		return EFIRC_TO_RC ( efirc );
-	}
-
-	DBGC ( driver, "SNPDRV %p driver binding installed as %p\n",
-	       driver, driver->DriverBindingHandle );
-	return 0;
-}

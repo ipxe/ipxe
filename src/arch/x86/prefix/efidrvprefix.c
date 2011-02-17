@@ -41,6 +41,7 @@ EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
 	initialise();
 	startup();
 
-	/* Install SNP driver and return */
-	return RC_TO_EFIRC ( efi_snp_install () );
+	return 0;
 }
+
+REQUIRE_OBJECT ( efi_snp );
