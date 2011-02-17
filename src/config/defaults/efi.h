@@ -16,6 +16,7 @@
 #define UMALLOC_EFI
 #define SMBIOS_EFI
 #define SANBOOT_NULL
+#define BOFM_EFI
 
 #define	IMAGE_EFI		/* EFI image support */
 #define	IMAGE_SCRIPT		/* iPXE script image support */
