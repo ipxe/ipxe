@@ -802,8 +802,8 @@ static int int13_extended_verify ( struct int13_drive *int13,
  * @v ds:si		Disk address packet
  * @ret status		Status code
  */
-int int13_extended_seek ( struct int13_drive *int13,
-			  struct i386_all_regs *ix86 ) {
+static int int13_extended_seek ( struct int13_drive *int13,
+				 struct i386_all_regs *ix86 ) {
 	struct int13_disk_address addr;
 	uint64_t lba;
 	unsigned long count;
