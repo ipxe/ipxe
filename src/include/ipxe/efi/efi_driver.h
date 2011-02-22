@@ -18,7 +18,7 @@ struct efi_driver {
 	/** Name */
 	const char *name;
 	/** EFI name */
-	CHAR16 *wname;
+	CHAR16 wname[32];
 	/** EFI driver binding protocol */
 	EFI_DRIVER_BINDING_PROTOCOL driver;
 	/** EFI component name protocol */
