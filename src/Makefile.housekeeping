@@ -415,6 +415,19 @@ CFLAGS		+= -finstrument-functions
 CFLAGS		+= -finstrument-functions-exclude-file-list=core/fnrec.c
 endif
 
+# Enable per-item sections and section garbage collection.  Note that
+# some older versions of gcc support -fdata-sections but treat it as
+# implying -fno-common, which would break our build.
+#
+ifeq ($(CCTYPE),gcc)
+DS_TEST		= $(ECHO) 'char x;' | \
+		  $(CC) -fdata-sections -S -x c - -o - 2>/dev/null | \
+		  grep -E '\.comm' > /dev/null
+DS_FLAGS	:= $(shell $(DS_TEST) && $(ECHO) '-fdata-sections')
+CFLAGS		+= -ffunction-sections $(DS_FLAGS)
+endif
+LDFLAGS		+= --gc-sections
+
 # compiler.h is needed for our linking and debugging system
 #
 CFLAGS		+= -include compiler.h

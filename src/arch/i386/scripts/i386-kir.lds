@@ -68,7 +68,8 @@ SECTIONS {
 
     .text16 : AT ( _text16_load_offset + __text16 ) {
 	__text16 = .;
-	*(.text.null_trap)
+	KEEP(*(.text.null_trap))
+	KEEP(*(.text.null_trap.*))
 	*(.text16)
 	*(.text16.*)
 	*(.text)
@@ -97,7 +98,7 @@ SECTIONS {
 	*(.data16.*)
 	*(.data)
 	*(.data.*)
-	*(SORT(.tbl.*))		/* Various tables.  See include/tables.h */
+	KEEP(*(SORT(.tbl.*)))	/* Various tables.  See include/tables.h */
 	_edata16_progbits = .;
     }
     .bss16 : AT ( _data16_load_offset + __bss16 ) {
@@ -129,8 +130,11 @@ SECTIONS {
 
     /DISCARD/ : {
 	*(.comment)
+	*(.comment.*)
 	*(.note)
+	*(.note.*)
 	*(.discard)
+	*(.discard.*)
     }
 
     /*

@@ -51,7 +51,7 @@ SECTIONS {
 		_data = .;
 		*(.data)
 		*(.data.*)
-		*(SORT(.tbl.*))		/* Various tables.  See include/tables.h */
+		KEEP(*(SORT(.tbl.*)))
 		_edata = .;
 	}
 
@@ -77,6 +77,7 @@ SECTIONS {
 	.weak 0x0 : {
 		_weak = .;
 		*(.weak)
+		*(.weak.*)
 		_eweak = .;
 	}
 	_assert = ASSERT ( ( _weak == _eweak ), ".weak is non-zero length" );
@@ -97,5 +98,6 @@ SECTIONS {
 		*(.rel)
 		*(.rel.*)
 		*(.discard)
+		*(.discard.*)
 	}
 }

@@ -49,7 +49,8 @@ SECTIONS {
 
     .text16.early 0x0 : AT ( _text16_early_lma ) {
 	_text16 = .;
-	*(.text16.null)
+	KEEP(*(.text16.null))
+	KEEP(*(.text16.null.*))
 	. += 1;				/* Prevent NULL being valid */
 	*(.text16.early)
 	*(.text16.early.*)
@@ -98,7 +99,8 @@ SECTIONS {
 
     .textdata 0x0 : AT ( _textdata_lma ) {
 	_textdata = .;
-	*(.text.null_trap)
+	KEEP(*(.text.null_trap))
+	KEEP(*(.text.null_trap.*))
 	. += 1;				/* Prevent NULL being valid */
 	*(.text)
 	*(.text.*)
@@ -106,7 +108,7 @@ SECTIONS {
 	*(.rodata.*)
 	*(.data)
 	*(.data.*)
-	*(SORT(.tbl.*))		/* Various tables.  See include/tables.h */
+	KEEP(*(SORT(.tbl.*)))	/* Various tables.  See include/tables.h */
 	_mtextdata = .;
     } .bss.textdata (NOLOAD) : AT ( _end_lma ) {
 	*(.bss)
@@ -126,8 +128,8 @@ SECTIONS {
 
     .zinfo 0x0 : AT ( _zinfo_lma ) {
 	_zinfo = .;
-	*(.zinfo)
-	*(.zinfo.*)
+	KEEP(*(.zinfo))
+	KEEP(*(.zinfo.*))
 	_mzinfo = .;
     } .bss.zinfo (NOLOAD) : AT ( _end_lma ) {
 	_ezinfo = .;
@@ -143,6 +145,7 @@ SECTIONS {
     .weak 0x0 : AT ( _end_lma ) {
 	_weak = .;
 	*(.weak)
+	*(.weak.*)
 	_eweak = .;
     }
     _assert = ASSERT ( ( _weak == _eweak ), ".weak is non-zero length" );
@@ -165,6 +168,7 @@ SECTIONS {
 	*(.einfo)
 	*(.einfo.*)
 	*(.discard)
+	*(.discard.*)
     }
 
     /*
