@@ -2,10 +2,10 @@
 
 	.section ".text"
 	.code32
-	.globl _start
-	.type _start, @function
+	.globl _linux_start
+	.type _linux_start, @function
 
-_start:
+_linux_start:
 	xorl	%ebp, %ebp
 
 	popl	%esi       // save argc

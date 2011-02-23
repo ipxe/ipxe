@@ -10,4 +10,5 @@ REQUEST_OBJECT ( pxeparent_dhcp )
 
 #define PXELOADER_KEEP_UNDI
 #define PXELOADER_KEEP_PXE
+#define _pxe_start _kkpxe_start
 #include "pxeprefix.S"

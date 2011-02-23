@@ -656,9 +656,9 @@ TGT_PCI_DEVICE	= $(PCI_DEVICE_$(TGT_ROM_NAME))
 #		   ROM header (e.g."pci_vendor_id=0x1186 pci_device_id=0x1300")
 #
 TGT_LD_DRIVERS	= $(subst -,_,$(patsubst %,obj_%,$(TGT_DRIVERS)))
-TGT_LD_PREFIX	= obj_$(TGT_PREFIX)prefix
 TGT_LD_IDS	= pci_vendor_id=$(firstword $(TGT_PCI_VENDOR) 0) \
 		  pci_device_id=$(firstword $(TGT_PCI_DEVICE) 0)
+TGT_LD_ENTRY	= _$(TGT_PREFIX)_start
 
 # Calculate linker flags based on link-time options for the current
 # target type (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and derive the
@@ -668,10 +668,10 @@ TGT_LD_IDS	= pci_vendor_id=$(firstword $(TGT_PCI_VENDOR) 0) \
 #		 "-u obj_zpciprefix -u obj_rtl8139 -u obj_prism2_pci
 #		  --defsym pci_vendor=0x1186 --defsym pci_device=0x1300")
 #
-TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_PREFIX) $(TGT_LD_DRIVERS) obj_config,\
+TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_ENTRY) $(TGT_LD_DRIVERS) obj_config,\
 		    -u $(SYM) --defsym check_$(SYM)=$(SYM) ) \
 		  $(patsubst %,--defsym %,$(TGT_LD_IDS)) \
-		  $(TGT_LD_FLAGS_PRE)
+		  -e $(TGT_LD_ENTRY)
 
 # Calculate list of debugging versions of objects to be included in
 # the target.
@@ -698,8 +698,8 @@ $(BIN)/%.info :
 	@$(ECHO) 'PCI device           : $(TGT_PCI_DEVICE)'
 	@$(ECHO)
 	@$(ECHO) 'LD driver symbols    : $(TGT_LD_DRIVERS)'
-	@$(ECHO) 'LD prefix symbols    : $(TGT_LD_PREFIX)'
 	@$(ECHO) 'LD ID symbols        : $(TGT_LD_IDS)'
+	@$(ECHO) 'LD entry point       : $(TGT_LD_ENTRY)'
 	@$(ECHO)
 	@$(ECHO) 'LD target flags      : $(TGT_LD_FLAGS)'
 	@$(ECHO)

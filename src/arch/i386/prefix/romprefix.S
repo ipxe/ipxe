@@ -45,8 +45,8 @@ FILE_LICENCE ( GPL2_OR_LATER )
 	.code16
 	.arch i386
 	.section ".prefix", "ax", @progbits
-	.globl	start
-start:
+	.globl	_rom_start
+_rom_start:
 	
 	.org	0x00
 romheader:

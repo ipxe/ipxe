@@ -13,10 +13,6 @@ LDFLAGS		+= -q -S
 NON_AUTO_MEDIA	+= efi
 NON_AUTO_MEDIA	+= efidrv
 
-# Specify entry point
-#
-TGT_LD_FLAGS_PRE = -e _$(TGT_PREFIX)_start
-
 # Rules for building EFI files
 #
 $(BIN)/%.efi : $(BIN)/%.efi.tmp $(ELF2EFI)

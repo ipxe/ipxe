@@ -2,10 +2,10 @@
 
 	.section ".text"
 	.code64
-	.globl _start
-	.type _start, @function
+	.globl _linux_start
+	.type _linux_start, @function
 
-_start:
+_linux_start:
 	xorq	%rbp, %rbp
 
 	popq	%rdi       // argc -> C arg1

@@ -27,8 +27,8 @@ FILE_LICENCE ( GPL2_ONLY )
 	.text
 	.section ".prefix", "ax", @progbits
 	.code16
-	.globl	start
-start:
+	.globl	_dsk_start
+_dsk_start:
 
 	jmp	$BOOTSEG, $go		/* reload cs:ip to match relocation addr */
 go: 

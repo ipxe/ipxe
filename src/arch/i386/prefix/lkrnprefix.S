@@ -49,8 +49,8 @@ FILE_LICENCE ( GPL_ANY )
 	.arch i386
 	.org	0
 	.section ".prefix", "ax", @progbits
-	.globl	start
-start:
+	.globl	_lkrn_start
+_lkrn_start:
 /* 
 	This is a minimal boot sector.	If anyone tries to execute it (e.g., if
 	a .lilo file is dd'ed to a floppy), print an error message. 

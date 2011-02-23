@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define PCI_BAR_EXPROM			0x30
 
 #define ROMPREFIX_EXCLUDE_PAYLOAD 1
+#define _rom_start _mrom_start
 #include "romprefix.S"
 
 	.text

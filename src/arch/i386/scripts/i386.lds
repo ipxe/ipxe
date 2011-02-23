@@ -5,8 +5,6 @@
  *
  */
 
-ENTRY ( start )
-
 SECTIONS {
 
     /* Each section starts at a virtual address of zero.
