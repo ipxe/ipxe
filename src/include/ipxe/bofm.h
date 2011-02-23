@@ -13,6 +13,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <ipxe/list.h>
 #include <ipxe/pci.h>
+#include <config/sideband.h>
 
 /** 'IBM ' signature
  *
@@ -316,8 +317,16 @@ struct bofm_operations {
 /** BOFM driver table */
 #define BOFM_DRIVERS __table ( struct pci_driver, "bofm_drivers" )
 
-/** Declare a BOFM driver */
+/** Declare a BOFM driver
+ *
+ * In the common case of non-BOFM-enabled builds, allow any BOFM code
+ * to be garbage-collected at link time to save space.
+ */
+#ifdef CONFIG_BOFM
 #define __bofm_driver __table_entry ( BOFM_DRIVERS, 01 )
+#else
+#define __bofm_driver
+#endif
 
 /**
  * Initialise BOFM device
