@@ -75,6 +75,14 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_EINVAL_NO_TARGET_IQN )
 #define EINFO_EINVAL_NO_TARGET_IQN \
 	__einfo_uniqify ( EINFO_EINVAL, 0x04, "No target IQN" )
+#define EIO_TARGET_UNAVAILABLE \
+	__einfo_error ( EINFO_EIO_TARGET_UNAVAILABLE )
+#define EINFO_EIO_TARGET_UNAVAILABLE \
+	__einfo_uniqify ( EINFO_EIO, 0x01, "Target not currently operational" )
+#define EIO_TARGET_NO_RESOURCES \
+	__einfo_error ( EINFO_EIO_TARGET_NO_RESOURCES )
+#define EINFO_EIO_TARGET_NO_RESOURCES \
+	__einfo_uniqify ( EINFO_EIO, 0x02, "Target out of resources" )
 #define ENOTSUP_INITIATOR_STATUS \
 	__einfo_error ( EINFO_ENOTSUP_INITIATOR_STATUS )
 #define EINFO_ENOTSUP_INITIATOR_STATUS \
@@ -87,6 +95,10 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_ENOTSUP_DISCOVERY )
 #define EINFO_ENOTSUP_DISCOVERY \
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x03, "Discovery not supported" )
+#define ENOTSUP_TARGET_STATUS \
+	__einfo_error ( EINFO_ENOTSUP_TARGET_STATUS )
+#define EINFO_ENOTSUP_TARGET_STATUS \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x04, "Unsupported target status" )
 #define EPERM_INITIATOR_AUTHENTICATION \
 	__einfo_error ( EINFO_EPERM_INITIATOR_AUTHENTICATION )
 #define EINFO_EPERM_INITIATOR_AUTHENTICATION \
@@ -1157,7 +1169,14 @@ static int iscsi_status_to_rc ( unsigned int status_class,
 			return -ENOTSUP_INITIATOR_STATUS;
 		}
 	case ISCSI_STATUS_TARGET_ERROR :
-		return -EIO;
+		switch ( status_detail ) {
+		case ISCSI_STATUS_TARGET_ERROR_UNAVAILABLE:
+			return -EIO_TARGET_UNAVAILABLE;
+		case ISCSI_STATUS_TARGET_ERROR_NO_RESOURCES:
+			return -EIO_TARGET_NO_RESOURCES;
+		default:
+			return -ENOTSUP_TARGET_STATUS;
+		}
 	default :
 		return -EINVAL;
 	}
