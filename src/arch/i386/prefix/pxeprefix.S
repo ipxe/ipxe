@@ -24,6 +24,8 @@ FILE_LICENCE ( GPL2_OR_LATER )
  *****************************************************************************
  */
 	.section ".prefix", "ax", @progbits
+	.globl	start
+start:
 	jmp	$0x7c0, $1f
 1:
 	/* Preserve registers for possible return to PXE */

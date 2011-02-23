@@ -5,6 +5,8 @@ FILE_LICENCE ( GPL2_OR_LATER )
 	.section ".prefix", "awx", @progbits
 	.code16
 	.org 0
+	.globl	start
+start:
 
 	movw	$load_image, %bp
 	jmp	find_active_partition

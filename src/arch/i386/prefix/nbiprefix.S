@@ -17,7 +17,7 @@ file_header:
 	.byte	0
 	.byte	0		/* No flags */
 	.word	0x0000, 0x07c0	/* Load header to 0x07c0:0x0000 */
-	.word	entry, 0x07c0	/* Start execution at 0x07c0:entry */
+	.word	start, 0x07c0	/* Start execution at 0x07c0:entry */
 	.size	file_header, . - file_header
 
 /*****************************************************************************
@@ -49,7 +49,8 @@ memlen:	.long	-512
  * NBI entry point
  *****************************************************************************
  */
-entry:
+	.globl	start
+start:
 	/* Install iPXE */
 	call	install
 
@@ -71,7 +72,7 @@ entry:
 	int $0x19
 
 	.previous
-	.size	entry, . - entry
+	.size	start, . - start
 
 nbi_header_end:
 	.org 512
