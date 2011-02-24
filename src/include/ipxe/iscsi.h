@@ -93,6 +93,9 @@ struct iscsi_bhs_common {
 /** iSCSI tag magic marker */
 #define ISCSI_TAG_MAGIC 0x18ae0000
 
+/** iSCSI reserved tag value */
+#define ISCSI_TAG_RESERVED 0xffffffff
+
 /**
  * iSCSI basic header segment common request fields
  *
@@ -456,6 +459,36 @@ struct iscsi_bhs_r2t {
 #define ISCSI_OPCODE_R2T 0x31
 
 /**
+ * iSCSI NOP-In basic header segment
+ *
+ */
+struct iscsi_nop_in {
+	/** Opcode */
+	uint8_t opcode;
+	/** Reserved */
+	uint8_t reserved_a[3];
+	/** Segment lengths */
+	union iscsi_segment_lengths lengths;
+	/** Logical Unit Number */
+	struct scsi_lun lun;
+	/** Initiator Task Tag */
+	uint32_t itt;
+	/** Target Transfer Tag */
+	uint32_t ttt;
+	/** Status sequence number */
+	uint32_t statsn;
+	/** Expected command sequence number */
+	uint32_t expcmdsn;
+	/** Maximum command sequence number */
+	uint32_t maxcmdsn;
+	/** Reserved */
+	uint8_t reserved_b[12];
+};
+
+/** NOP-In opcode */
+#define ISCSI_OPCODE_NOP_IN 0x20
+
+/**
  * An iSCSI basic header segment
  */
 union iscsi_bhs {
@@ -468,6 +501,7 @@ union iscsi_bhs {
 	struct iscsi_bhs_data_in data_in;
 	struct iscsi_bhs_data_out data_out;
 	struct iscsi_bhs_r2t r2t;
+	struct iscsi_nop_in nop_in;
 	unsigned char bytes[ sizeof ( struct iscsi_bhs_common ) ];
 };
 
