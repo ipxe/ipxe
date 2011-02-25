@@ -99,6 +99,10 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_ENOTSUP_TARGET_STATUS )
 #define EINFO_ENOTSUP_TARGET_STATUS \
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x04, "Unsupported target status" )
+#define ENOTSUP_NOP_IN \
+	__einfo_error ( EINFO_ENOTSUP_NOP_IN )
+#define EINFO_ENOTSUP_NOP_IN \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x05, "Unsupported NOP-In received" )
 #define EPERM_INITIATOR_AUTHENTICATION \
 	__einfo_error ( EINFO_EPERM_INITIATOR_AUTHENTICATION )
 #define EINFO_EPERM_INITIATOR_AUTHENTICATION \
@@ -123,10 +127,6 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_EPROTO_INVALID_CHAP_RESPONSE )
 #define EINFO_EPROTO_INVALID_CHAP_RESPONSE \
 	__einfo_uniqify ( EINFO_EPROTO, 0x04, "Invalid CHAP response" )
-#define EPROTO_INVALID_NOP_IN \
-	__einfo_error ( EINFO_EPROTO_INVALID_NOP_IN )
-#define EINFO_EPROTO_INVALID_NOP_IN \
-	__einfo_uniqify ( EINFO_EPROTO, 0x05, "Invalid NOP-In received" )
 
 /** iSCSI initiator name (explicitly specified) */
 static char *iscsi_explicit_initiator_iqn;
@@ -609,29 +609,14 @@ static int iscsi_rx_nop_in ( struct iscsi_session *iscsi,
 
 	DBGC2 ( iscsi, "iSCSI %p received NOP-In\n", iscsi );
 
-	/* RFC 3720 section 10.19 states that "when a target sends a
-	 * NOP-In that is not a response to a Nop-Out received from
-	 * the initiator, the Initiator Task Tag MUST be set to
-	 * 0xffffffff", and section 10.18 states that "upon receipt of
-	 * a NOP-In with the Target Transfer Tag set to a valid value
-	 * (not the reserved 0xffffffff), the initiator MUST respond
-	 * with a NOP-Out".  Since we never send unsolicited NOP-Outs,
-	 * my reading of this is that we can handle all permitted
-	 * NOP-Ins (which must have TTT set to 0xffffffff) by simply
-	 * ignoring them.
-	 *
-	 * There is some ambiguity in the RFC, since there are other
-	 * places that suggest that a target is supposed to be able to
-	 * send an unsolicited NOP-In and expect a NOP-Out response.
-	 * We catch any apparent attempts to use this immediately, so
-	 * that the relevant error gets reported to the iPXE user,
-	 * rather than just having the target drop the connection when
-	 * it times out waiting for the NOP-Out response.
+	/* We don't currently have the ability to respond to NOP-Ins
+	 * sent as ping requests, but we can happily accept NOP-Ins
+	 * sent merely to update CmdSN.
 	 */
 	if ( nop_in->ttt != htonl ( ISCSI_TAG_RESERVED ) ) {
-		DBGC ( iscsi, "iSCSI %p received invalid NOP-In with TTT "
+		DBGC ( iscsi, "iSCSI %p received unsupported NOP-In with TTT "
 		       "%08x\n", iscsi, ntohl ( nop_in->ttt ) );
-		return -EPROTO_INVALID_NOP_IN;
+		return -ENOTSUP_NOP_IN;
 	}
 
 	return 0;
