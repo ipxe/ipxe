@@ -1,6 +1,8 @@
 MEDIA = linux
 
 INCDIRS += arch/x86/include/linux
+SRCDIRS += interface/linux
+SRCDIRS += drivers/linux
 SRCDIRS += arch/x86/core/linux
 
 $(BIN)/%.linux : $(BIN)/%.linux.tmp
