@@ -617,7 +617,7 @@ static int iscsi_rx_nop_in ( struct iscsi_session *iscsi,
 	 * (not the reserved 0xffffffff), the initiator MUST respond
 	 * with a NOP-Out".  Since we never send unsolicited NOP-Outs,
 	 * my reading of this is that we can handle all permitted
-	 * NOP-Ins (which must have ITT set to 0xffffffff) by simply
+	 * NOP-Ins (which must have TTT set to 0xffffffff) by simply
 	 * ignoring them.
 	 *
 	 * There is some ambiguity in the RFC, since there are other
@@ -628,9 +628,9 @@ static int iscsi_rx_nop_in ( struct iscsi_session *iscsi,
 	 * rather than just having the target drop the connection when
 	 * it times out waiting for the NOP-Out response.
 	 */
-	if ( nop_in->itt != htonl ( ISCSI_TAG_RESERVED ) ) {
-		DBGC ( iscsi, "iSCSI %p received invalid NOP-In with ITT "
-		       "%08x\n", iscsi, ntohl ( nop_in->itt ) );
+	if ( nop_in->ttt != htonl ( ISCSI_TAG_RESERVED ) ) {
+		DBGC ( iscsi, "iSCSI %p received invalid NOP-In with TTT "
+		       "%08x\n", iscsi, ntohl ( nop_in->ttt ) );
 		return -EPROTO_INVALID_NOP_IN;
 	}
 
