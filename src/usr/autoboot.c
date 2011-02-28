@@ -41,6 +41,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/* Disambiguate the various error causes */
+#define ENOENT_BOOT __einfo_error ( EINFO_ENOENT_BOOT )
+#define EINFO_ENOENT_BOOT \
+	__einfo_uniqify ( EINFO_ENOENT, 0x01, "Nothing to boot" )
+
 /**
  * Perform PXE menu boot when PXE stack is not available
  */
@@ -185,7 +190,7 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 			rc = 0;
 		}
 	} else {
-		rc = -ENOENT;
+		rc = -ENOENT_BOOT;
 		printf ( "Nothing to boot: %s\n", strerror ( rc ) );
 	}
 
