@@ -185,8 +185,8 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 			rc = 0;
 		}
 	} else {
-		printf ( "No filename or root path specified\n" );
 		rc = -ENOENT;
+		printf ( "Nothing to boot: %s\n", strerror ( rc ) );
 	}
 
  err_san_describe:
