@@ -27,6 +27,33 @@ FILE_LICENCE ( GPL2_OR_LATER )
 /* Protected mode flag */
 #define CR0_PE 1
 
+/* Allow for DBG()-style messages within libprefix */
+#ifdef NDEBUG
+	.macro	progress message
+	.endm
+#else
+	.macro	progress message
+	pushfl
+	pushw	%ds
+	pushw	%si
+	pushw	%di
+	pushw	%cs
+	popw	%ds
+	xorw	%di, %di
+	movw	$progress_\@, %si
+	call	print_message
+	popw	%di
+	popw	%si
+	popw	%ds
+	popfl
+	.section ".prefix.data", "aw", @progbits
+progress_\@:
+	.asciz	"\message"
+	.size	progress_\@, . - progress\@
+	.previous
+	.endm
+#endif
+
 /*****************************************************************************
  * Utility function: print character (with LF -> LF,CR translation)
  *
@@ -583,6 +610,7 @@ hooked_bios_interrupts:
 	.code16
 	.globl install
 install:
+	progress "install:\n"
 	/* Preserve registers */
 	pushl	%esi
 	pushl	%edi
@@ -621,6 +649,7 @@ install:
 	.code16
 	.globl install_prealloc
 install_prealloc:
+	progress "install_prealloc:\n"
 	/* Save registers */
 	pushal
 	pushw	%ds
@@ -636,6 +665,7 @@ install_prealloc:
 	movl	%edi, %ebp
 
 	/* Install .text16.early */
+	progress "  .text16.early\n"
 	pushl	%esi
 	xorl	%esi, %esi
 	movw	%cs, %si
@@ -653,6 +683,7 @@ install_prealloc:
 	 * already have 4GB segment limits as a result of calling
 	 * install_block.)
 	 */
+	progress "  access_highmem\n"
 	pushw	%cs
 	pushw	$1f
 	pushw	%ax
@@ -673,6 +704,7 @@ a20_death_message:
 #endif
 
 	/* Open payload (which may not yet be in memory) */
+	progress "  open_payload\n"
 	pushw	%cs
 	pushw	$1f
 	pushw	%ax
@@ -701,9 +733,11 @@ payload_death_message:
 1:	addl	payload_lma, %esi
 
 	/* Install .text16.late and .data16 */
+	progress "  .text16.late\n"
 	movl	$_text16_late_filesz, %ecx
 	movl	$_text16_late_memsz, %edx
 	call	install_block		/* .text16.late */
+	progress "  .data16\n"
 	movzwl	%bx, %edi
 	shll	$4, %edi
 	movl	$_data16_filesz, %ecx
@@ -738,12 +772,14 @@ payload_death_message:
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
+	progress "  .textdata\n"
 	movl	%ebp, %edi
 	movl	$_textdata_filesz, %ecx
 	movl	$_textdata_memsz, %edx
 	call	install_block
 
 	/* Initialise librm at current location */
+	progress "  init_librm\n"
 	movw	%ax, (init_librm_vector+2)
 	movl	%ebp, %edi
 	lcall	*init_librm_vector
@@ -757,12 +793,14 @@ payload_death_message:
 	 * relocate() will return with %esi, %edi and %ecx set up
 	 * ready for the copy to the new location.
 	 */
+	progress "  relocate\n"
 	movw	%ax, (prot_call_vector+2)
 	pushl	$relocate
 	lcall	*prot_call_vector
 	popl	%edx /* discard */
 
 	/* Copy code to new location */
+	progress "  copy\n"
 	pushl	%edi
 	pushw	%bx
 	movw	$copy_bytes, %bx
@@ -771,11 +809,13 @@ payload_death_message:
 	popl	%edi
 
 	/* Initialise librm at new location */
+	progress "  init_librm\n"
 	lcall	*init_librm_vector
 skip_relocate:
 #endif
 
 	/* Close access to payload */
+	progress "  close_payload\n"
 	movw	%ax, (close_payload_vector+2)
 	lcall	*close_payload_vector
 
