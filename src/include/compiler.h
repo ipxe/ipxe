@@ -204,7 +204,6 @@ REQUEST_EXPANDED ( CONFIG_SYMBOL );
 /** @defgroup dbg Debugging infrastructure
  * @{
  */
-#ifndef ASSEMBLY
 
 /** @def DBG
  *
@@ -254,6 +253,12 @@ REQUEST_EXPANDED ( CONFIG_SYMBOL );
  *
  */
 #define DEBUG_SYMBOL PREFIX_OBJECT ( debug_ )
+
+#if DEBUG_SYMBOL == 0
+#define NDEBUG
+#endif
+
+#ifndef ASSEMBLY
 
 /** printf() for debugging
  *
@@ -543,11 +548,6 @@ int __debug_disable;
 #define DBGCIO_MD5( ... )	DBGC_MD5_IF	( IO, ##__VA_ARGS__ )
 #define DBGCIO_PAUSE( ... )	DBGC_PAUSE_IF	( IO, ##__VA_ARGS__ )
 #define DBGCIO_MORE( ... )	DBGC_MORE_IF	( IO, ##__VA_ARGS__ )
-
-
-#if DEBUG_SYMBOL == 0
-#define NDEBUG
-#endif
 
 #endif /* ASSEMBLY */
 /** @} */

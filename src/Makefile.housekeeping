@@ -470,6 +470,7 @@ RULE_c_to_s	= $(Q)$(COMPILE_c) -S -g0 -c $< -o $@
 PREPROCESS_S	= $(CPP) $(CFLAGS) $(CFLAGS_S) $(OBJ_CFLAGS)
 ASSEMBLE_S	= $(AS) $(ASFLAGS)
 RULE_S		= $(Q)$(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
+RULE_S_to_dbg%.o = $(Q)$(PREPROCESS_S) -Ddebug_$(subst -,_,$(OBJECT))=$* $< | $(ASSEMBLE_S) -o $@
 RULE_S_to_s	= $(Q)$(PREPROCESS_S) $< > $@
 
 DEBUG_TARGETS	+= dbg%.o c s
