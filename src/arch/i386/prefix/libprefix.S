@@ -332,7 +332,7 @@ process_bytes:
 
 	/* Construct GDT on stack (since .prefix may not be writable) */
 	.equ	PM_DS, 0x18	/* Flat data segment */
-	pushl	$0x008f9300
+	pushl	$0x00cf9300
 	pushl	$0x0000ffff
 	.equ	PM_SS, 0x10	/* Stack segment based at %ss:0000 */
 	pushl	$0x008f0930
