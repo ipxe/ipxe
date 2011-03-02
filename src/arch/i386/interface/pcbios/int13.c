@@ -203,6 +203,32 @@ static struct interface_descriptor int13_command_desc =
 	INTF_DESC ( struct int13_command, block, int13_command_op );
 
 /**
+ * Open (or reopen) INT 13 emulated drive underlying block device
+ *
+ * @v int13		Emulated drive
+ * @ret rc		Return status code
+ */
+static int int13_reopen_block ( struct int13_drive *int13 ) {
+	int rc;
+
+	/* Close any existing block device */
+	intf_restart ( &int13->block, -ECONNRESET );
+
+	/* Open block device */
+	if ( ( rc = xfer_open_uri ( &int13->block, int13->uri ) ) != 0 ) {
+		DBGC ( int13, "INT13 drive %02x could not reopen block "
+		       "device: %s\n", int13->drive, strerror ( rc ) );
+		int13->block_rc = rc;
+		return rc;
+	}
+
+	/* Clear block device error status */
+	int13->block_rc = 0;
+
+	return 0;
+}
+
+/**
  * Prepare to issue INT 13 command
  *
  * @v command		INT 13 command
@@ -211,10 +237,16 @@ static struct interface_descriptor int13_command_desc =
  */
 static int int13_command_start ( struct int13_command *command,
 				 struct int13_drive *int13 ) {
+	int rc;
 
 	/* Sanity check */
 	assert ( command->int13 == NULL );
 	assert ( ! timer_running ( &command->timer ) );
+
+	/* Reopen block device if necessary */
+	if ( ( int13->block_rc != 0 ) &&
+	     ( ( rc = int13_reopen_block ( int13 ) ) != 0 ) )
+		return rc;
 
 	/* Initialise command */
 	command->rc = -EINPROGRESS;
@@ -407,36 +439,6 @@ static int int13_guess_geometry ( struct int13_drive *int13 ) {
 }
 
 /**
- * Open (or reopen) INT 13 emulated drive underlying block device
- *
- * @v int13		Emulated drive
- * @ret rc		Return status code
- */
-static int int13_reopen_block ( struct int13_drive *int13 ) {
-	int rc;
-
-	/* Close any existing block device */
-	intf_restart ( &int13->block, -ECONNRESET );
-
-	/* Open block device */
-	if ( ( rc = xfer_open_uri ( &int13->block, int13->uri ) ) != 0 ) {
-		DBGC ( int13, "INT13 drive %02x could not reopen block "
-		       "device: %s\n", int13->drive, strerror ( rc ) );
-		int13->block_rc = rc;
-		return rc;
-	}
-
-	/* Clear block device error status */
-	int13->block_rc = 0;
-
-	/* Read device capacity */
-	if ( ( rc = int13_read_capacity ( int13 ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
-/**
  * Update BIOS drive count
  */
 static void int13_set_num_drives ( void ) {
@@ -483,6 +485,10 @@ static int int13_reset ( struct int13_drive *int13,
 
 	/* Reopen underlying block device */
 	if ( ( rc = int13_reopen_block ( int13 ) ) != 0 )
+		return -INT13_STATUS_RESET_FAILED;
+
+	/* Check that block device is functional */
+	if ( ( rc = int13_read_capacity ( int13 ) ) != 0 )
 		return -INT13_STATUS_RESET_FAILED;
 
 	return 0;
@@ -837,6 +843,11 @@ static int int13_device_path_info ( struct int13_drive *int13,
 	uint8_t sum = 0;
 	int rc;
 
+	/* Reopen block device if necessary */
+	if ( ( int13->block_rc != 0 ) &&
+	     ( ( rc = int13_reopen_block ( int13 ) ) != 0 ) )
+		return rc;
+
 	/* Get underlying hardware device */
 	device = identify_device ( &int13->block );
 	if ( ! device ) {
@@ -1125,10 +1136,6 @@ static void int13_block_close ( struct int13_drive *int13, int rc ) {
 
 	/* Shut down interfaces */
 	intf_restart ( &int13->block, rc );
-
-	/* Further INT 13 calls will fail immediately.  The caller may
-	 * use INT 13,00 to reset the drive.
-	 */
 }
 
 /** INT 13 drive interface operations */
@@ -1199,6 +1206,10 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	/* Open block device interface */
 	if ( ( rc = int13_reopen_block ( int13 ) ) != 0 )
 		goto err_reopen_block;
+
+	/* Read device capacity */
+	if ( ( rc = int13_read_capacity ( int13 ) ) != 0 )
+		return rc;
 
 	/* Give drive a default geometry */
 	if ( ( rc = int13_guess_geometry ( int13 ) ) != 0 )
@@ -1382,6 +1393,11 @@ static int int13_describe ( unsigned int drive ) {
 		DBG ( "INT13 cannot find emulated drive %02x\n", drive );
 		return -ENODEV;
 	}
+
+	/* Reopen block device if necessary */
+	if ( ( int13->block_rc != 0 ) &&
+	     ( ( rc = int13_reopen_block ( int13 ) ) != 0 ) )
+		return rc;
 
 	/* Clear table */
 	memset ( &xbftab, 0, sizeof ( xbftab ) );
