@@ -150,6 +150,13 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 		root_path = NULL;
 	}
 
+	/* Check that we have something to boot */
+	if ( ! ( filename || root_path ) ) {
+		rc = -ENOENT_BOOT;
+		printf ( "Nothing to boot: %s\n", strerror ( rc ) );
+		goto err_no_boot;
+	}
+
 	/* Hook SAN device, if applicable */
 	if ( root_path ) {
 		drive = san_hook ( root_path, 0 );
@@ -171,12 +178,19 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 		goto err_san_describe;
 	}
 
-	/* Attempt filename or SAN boot as applicable */
+	/* Allow a root-path-only boot with skip-san enabled to succeed */
+	rc = 0;
+
+	/* Attempt filename boot if applicable */
 	if ( filename ) {
 		if ( ( rc = imgdownload ( image, filename,
 					  register_and_autoexec_image ) ) !=0){
 			printf ( "\nCould not chain image: %s\n",
 				 strerror ( rc ) );
+			/* Fall through to (possibly) attempt a SAN boot
+			 * as a fallback.  If no SAN boot is attempted,
+			 * our status will become the return status.
+			 */
 		} else {
 			/* Always print an extra newline, because we
 			 * don't know where the NBP may have left the
@@ -184,7 +198,10 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 			 */
 			printf ( "\n" );
 		}
-	} else if ( root_path ) {
+	}
+
+	/* Attempt SAN boot if applicable */
+	if ( root_path ) {
 		if ( fetch_intz_setting ( NULL, &skip_san_boot_setting) == 0 ) {
 			printf ( "Booting from SAN device %#02x\n", drive );
 			rc = san_boot ( drive );
@@ -193,11 +210,10 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 		} else {
 			printf ( "Skipping boot from SAN device %#02x\n",
 				 drive );
-			rc = 0;
+			/* Avoid overwriting a possible failure status
+			 * from a filename boot.
+			 */
 		}
-	} else {
-		rc = -ENOENT_BOOT;
-		printf ( "Nothing to boot: %s\n", strerror ( rc ) );
 	}
 
  err_san_describe:
@@ -212,6 +228,7 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 		}
 	}
  err_san_hook:
+ err_no_boot:
 	image_put ( image );
  err_alloc_image:
 	return rc;
