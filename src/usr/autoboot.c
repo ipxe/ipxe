@@ -175,8 +175,14 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 	if ( filename ) {
 		if ( ( rc = imgdownload ( image, filename,
 					  register_and_autoexec_image ) ) !=0){
-			printf ( "Could not chain image: %s\n",
+			printf ( "\nCould not chain image: %s\n",
 				 strerror ( rc ) );
+		} else {
+			/* Always print an extra newline, because we
+			 * don't know where the NBP may have left the
+			 * cursor.
+			 */
+			printf ( "\n" );
 		}
 	} else if ( root_path ) {
 		if ( fetch_intz_setting ( NULL, &skip_san_boot_setting) == 0 ) {
