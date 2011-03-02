@@ -40,11 +40,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * @v image		Image
  * @v uri		URI
- * @v image_register	Action to take upon a successful download
+ * @v action		Action to take upon a successful download
  * @ret rc		Return status code
  */
 int imgdownload ( struct image *image, struct uri *uri,
-		  int ( * image_register ) ( struct image *image ) ) {
+		  int ( * action ) ( struct image *image ) ) {
 	size_t len = ( unparse_uri ( NULL, 0, uri, URI_ALL ) + 1 );
 	char uri_string_redacted[len];
 	const char *password;
@@ -62,12 +62,16 @@ int imgdownload ( struct image *image, struct uri *uri,
 	uri->password = password;
 
 	/* Create downloader */
-	if ( ( rc = create_downloader ( &monojob, image, image_register,
-					LOCATION_URI, uri ) ) != 0 )
+	if ( ( rc = create_downloader ( &monojob, image, LOCATION_URI,
+					uri ) ) != 0 )
 		return rc;
 
 	/* Wait for download to complete */
 	if ( ( rc = monojob_wait ( uri_string_redacted ) ) != 0 )
+		return rc;
+
+	/* Act upon downloaded image */
+	if ( ( rc = action ( image ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -78,18 +82,18 @@ int imgdownload ( struct image *image, struct uri *uri,
  *
  * @v image		Image
  * @v uri_string	URI as a string (e.g. "http://www.nowhere.com/vmlinuz")
- * @v image_register	Action to take upon a successful fetch
+ * @v action		Action to take upon a successful download
  * @ret rc		Return status code
  */
 int imgfetch ( struct image *image, const char *uri_string,
-	       int ( * image_register ) ( struct image *image ) ) {
+	       int ( * action ) ( struct image *image ) ) {
 	struct uri *uri;
 	int rc;
 
 	if ( ! ( uri = parse_uri ( uri_string ) ) )
 		return -ENOMEM;
 
-	rc = imgdownload ( image, uri, image_register );
+	rc = imgdownload ( image, uri, action );
 
 	uri_put ( uri );
 	return rc;

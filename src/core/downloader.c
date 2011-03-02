@@ -50,8 +50,6 @@ struct downloader {
 	struct image *image;
 	/** Current position within image buffer */
 	size_t pos;
-	/** Image registration routine */
-	int ( * register_image ) ( struct image *image );
 };
 
 /**
@@ -74,10 +72,6 @@ static void downloader_free ( struct refcnt *refcnt ) {
  * @v rc		Reason for termination
  */
 static void downloader_finished ( struct downloader *downloader, int rc ) {
-
-	/* Register image if download was successful */
-	if ( rc == 0 )
-		rc = downloader->register_image ( downloader->image );
 
 	/* Shut down interfaces */
 	intf_shutdown ( &downloader->xfer, rc );
@@ -219,7 +213,6 @@ static struct interface_descriptor downloader_job_desc =
  *
  * @v job		Job control interface
  * @v image		Image to fill with downloaded file
- * @v register_image	Image registration routine
  * @v type		Location type to pass to xfer_open()
  * @v ...		Remaining arguments to pass to xfer_open()
  * @ret rc		Return status code
@@ -229,7 +222,6 @@ static struct interface_descriptor downloader_job_desc =
  * image registration routine @c register_image() will be called.
  */
 int create_downloader ( struct interface *job, struct image *image,
-			int ( * register_image ) ( struct image *image ),
 			int type, ... ) {
 	struct downloader *downloader;
 	va_list args;
@@ -245,7 +237,6 @@ int create_downloader ( struct interface *job, struct image *image,
 	intf_init ( &downloader->xfer, &downloader_xfer_desc,
 		    &downloader->refcnt );
 	downloader->image = image_get ( image );
-	downloader->register_image = register_image;
 	va_start ( args, type );
 
 	/* Instantiate child objects and attach to our interfaces */

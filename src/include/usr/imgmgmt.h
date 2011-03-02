@@ -12,9 +12,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 struct image;
 
 extern int imgdownload ( struct image *image, struct uri *uri,
-			 int ( * image_register ) ( struct image *image ) );
+			 int ( * action ) ( struct image *image ) );
 extern int imgfetch ( struct image *image, const char *uri_string,
-		      int ( * image_register ) ( struct image *image ) );
+		      int ( * action ) ( struct image *image ) );
 extern int imgload ( struct image *image );
 extern int imgexec ( struct image *image );
 extern struct image * imgautoselect ( void );
