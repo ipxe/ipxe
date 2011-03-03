@@ -281,11 +281,12 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
  *
  * @v initiator		Initiator portion of iBFT
  * @v strings		iBFT string block descriptor
+ * @v iscsi		iSCSI session
  * @ret rc		Return status code
  */
 static int ibft_fill_initiator ( struct ibft_initiator *initiator,
-				 struct ibft_strings *strings ) {
-	const char *initiator_iqn = iscsi_initiator_iqn();
+				 struct ibft_strings *strings,
+				 struct iscsi_session *iscsi ) {
 	int rc;
 
 	/* Fill in common header */
@@ -297,7 +298,7 @@ static int ibft_fill_initiator ( struct ibft_initiator *initiator,
 
 	/* Fill in hostname */
 	if ( ( rc = ibft_set_string ( strings, &initiator->initiator_name,
-				      initiator_iqn ) ) != 0 )
+				      iscsi->initiator_iqn ) ) != 0 )
 		return rc;
 	DBG ( "iBFT initiator hostname = %s\n",
 	      ibft_string ( strings, &initiator->initiator_name ) );
@@ -468,8 +469,8 @@ int ibft_describe ( struct iscsi_session *iscsi,
 	/* Fill in NIC, Initiator and Target blocks */
 	if ( ( rc = ibft_fill_nic ( &ibft->nic, &strings, netdev ) ) != 0 )
 		return rc;
-	if ( ( rc = ibft_fill_initiator ( &ibft->initiator,
-					  &strings ) ) != 0 )
+	if ( ( rc = ibft_fill_initiator ( &ibft->initiator, &strings,
+					  iscsi ) ) != 0 )
 		return rc;
 	if ( ( rc = ibft_fill_target ( &ibft->target, &strings,
 				       iscsi ) ) != 0 )

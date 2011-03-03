@@ -543,6 +543,8 @@ struct iscsi_session {
 	/** Transport-layer socket */
 	struct interface socket;
 
+	/** Initiator IQN */
+	char *initiator_iqn;
 	/** Target address */
 	char *target_address;
 	/** Target port */
@@ -694,6 +696,7 @@ struct iscsi_session {
 /** Target authenticated itself correctly */
 #define ISCSI_STATUS_AUTH_REVERSE_OK 0x00040000
 
-extern const char * iscsi_initiator_iqn ( void );
+/** Default initiator IQN prefix */
+#define ISCSI_DEFAULT_IQN_PREFIX "iqn.2010-04.org.ipxe"
 
 #endif /* _IPXE_ISCSI_H */

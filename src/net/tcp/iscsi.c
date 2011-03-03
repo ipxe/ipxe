@@ -75,6 +75,10 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_EINVAL_NO_TARGET_IQN )
 #define EINFO_EINVAL_NO_TARGET_IQN \
 	__einfo_uniqify ( EINFO_EINVAL, 0x04, "No target IQN" )
+#define EINVAL_NO_INITIATOR_IQN \
+	__einfo_error ( EINFO_EINVAL_NO_INITIATOR_IQN )
+#define EINFO_EINVAL_NO_INITIATOR_IQN \
+	__einfo_uniqify ( EINFO_EINVAL, 0x05, "No initiator IQN" )
 #define EIO_TARGET_UNAVAILABLE \
 	__einfo_error ( EINFO_EIO_TARGET_UNAVAILABLE )
 #define EINFO_EIO_TARGET_UNAVAILABLE \
@@ -127,24 +131,6 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_EPROTO_INVALID_CHAP_RESPONSE )
 #define EINFO_EPROTO_INVALID_CHAP_RESPONSE \
 	__einfo_uniqify ( EINFO_EPROTO, 0x04, "Invalid CHAP response" )
-
-/** iSCSI initiator name (explicitly specified) */
-static char *iscsi_explicit_initiator_iqn;
-
-/** Default iSCSI initiator name (constructed from hostname) */
-static char *iscsi_default_initiator_iqn;
-
-/** iSCSI initiator username */
-static char *iscsi_initiator_username;
-
-/** iSCSI initiator password */
-static char *iscsi_initiator_password;
-
-/** iSCSI target username */
-static char *iscsi_target_username;
-
-/** iSCSI target password */
-static char *iscsi_target_password;
 
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
 static void iscsi_start_login ( struct iscsi_session *iscsi );
@@ -200,6 +186,7 @@ static void iscsi_free ( struct refcnt *refcnt ) {
 	struct iscsi_session *iscsi =
 		container_of ( refcnt, struct iscsi_session, refcnt );
 
+	free ( iscsi->initiator_iqn );
 	free ( iscsi->target_address );
 	free ( iscsi->target_iqn );
 	free ( iscsi->initiator_username );
@@ -688,7 +675,7 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 				    "TargetName=%s%c"
 				    "SessionType=Normal%c"
 				    "AuthMethod=%s%c",
-				    iscsi_initiator_iqn(), 0,
+				    iscsi->initiator_iqn, 0,
 				    iscsi->target_iqn, 0, 0,
 				    auth_method, 0 );
 	}
@@ -1832,6 +1819,30 @@ enum iscsi_root_path_component {
 	NUM_RP_COMPONENTS
 };
 
+/** iSCSI initiator IQN setting */
+struct setting initiator_iqn_setting __setting = {
+	.name = "initiator-iqn",
+	.description = "iSCSI initiator name",
+	.tag = DHCP_ISCSI_INITIATOR_IQN,
+	.type = &setting_type_string,
+};
+
+/** iSCSI reverse username setting */
+struct setting reverse_username_setting __setting = {
+	.name = "reverse-username",
+	.description = "Reverse user name",
+	.tag = DHCP_EB_REVERSE_USERNAME,
+	.type = &setting_type_string,
+};
+
+/** iSCSI reverse password setting */
+struct setting reverse_password_setting __setting = {
+	.name = "reverse-password",
+	.description = "Reverse password",
+	.tag = DHCP_EB_REVERSE_PASSWORD,
+	.type = &setting_type_string,
+};
+
 /**
  * Parse iSCSI root path
  *
@@ -1883,64 +1894,117 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 }
 
 /**
- * Set iSCSI authentication details
+ * Fetch iSCSI settings
  *
  * @v iscsi		iSCSI session
- * @v initiator_username Initiator username, if any
- * @v initiator_password Initiator password, if any
- * @v target_username	Target username, if any
- * @v target_password	Target password, if any
  * @ret rc		Return status code
  */
-static int iscsi_set_auth ( struct iscsi_session *iscsi,
-			    const char *initiator_username,
-			    const char *initiator_password,
-			    const char *target_username,
-			    const char *target_password ) {
+static int iscsi_fetch_settings ( struct iscsi_session *iscsi ) {
+	char *hostname;
+	union uuid uuid;
+	int len;
 
-	/* Check for initiator or target credentials */
-	if ( initiator_username || initiator_password ||
-	     target_username || target_password ) {
+	/* Fetch relevant settings.  Don't worry about freeing on
+	 * error, since iscsi_free() will take care of that anyway.
+	 */
+	if ( ( len = fetch_string_setting_copy ( NULL, &username_setting,
+					  &iscsi->initiator_username ) ) < 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not fetch username: %s\n",
+		       iscsi, strerror ( len ) );
+		return len;
+	}
+	if ( ( len = fetch_string_setting_copy ( NULL, &password_setting,
+					  &iscsi->initiator_password ) ) < 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not fetch password: %s\n",
+		       iscsi, strerror ( len ) );
+		return len;
+	}
+	if ( ( len = fetch_string_setting_copy( NULL, &reverse_username_setting,
+					     &iscsi->target_username ) ) < 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not fetch reverse username: %s\n",
+		       iscsi, strerror ( len ) );
+		return len;
+	}
+	if ( ( len = fetch_string_setting_copy( NULL, &reverse_password_setting,
+					     &iscsi->target_password ) ) < 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not fetch reverse password: %s\n",
+		       iscsi, strerror ( len ) );
+		return len;
+	}
 
-		/* We must have at least an initiator username+password */
-		if ( ! ( initiator_username && initiator_password ) )
-			goto invalid_auth;
-
-		/* Store initiator credentials */
-		iscsi->initiator_username = strdup ( initiator_username );
-		if ( ! iscsi->initiator_username )
+	/* Find a suitable initiator name */
+	if ( ( len = fetch_string_setting_copy ( NULL, &initiator_iqn_setting,
+					       &iscsi->initiator_iqn ) ) < 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not fetch initiator IQN: %s\n",
+		       iscsi, strerror ( len ) );
+		return len;
+	}
+	if ( iscsi->initiator_iqn )
+		return 0;
+	if ( ( len = fetch_string_setting_copy ( NULL, &hostname_setting,
+						&hostname ) ) < 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not fetch hostname: %s\n",
+		       iscsi, strerror ( len ) );
+		return len;
+	}
+	if ( hostname ) {
+		len = asprintf ( &iscsi->initiator_iqn,
+				 ISCSI_DEFAULT_IQN_PREFIX ":%s", hostname );
+		free ( hostname );
+		if ( len < 0 ) {
+			DBGC ( iscsi, "iSCSI %p could not allocate initiator "
+			       "IQN\n", iscsi );
 			return -ENOMEM;
-		iscsi->initiator_password = strdup ( initiator_password );
-		if ( ! iscsi->initiator_password )
-			return -ENOMEM;
-
-		/* Check for target credentials */
-		if ( target_username || target_password ) {
-
-			/* We must have target username+password */
-			if ( ! ( target_username && target_password ) )
-				goto invalid_auth;
-
-			/* Store target credentials */
-			iscsi->target_username = strdup ( target_username );
-			if ( ! iscsi->target_username )
-				return -ENOMEM;
-			iscsi->target_password = strdup ( target_password );
-			if ( ! iscsi->target_password )
-				return -ENOMEM;
 		}
+		assert ( iscsi->initiator_iqn );
+		return 0;
+	}
+	if ( ( len = fetch_uuid_setting ( NULL, &uuid_setting, &uuid ) ) < 0 ) {
+		DBGC ( iscsi, "iSCSI %p has no suitable initiator IQN\n",
+		       iscsi );
+		return -EINVAL_NO_INITIATOR_IQN;
+	}
+	if ( ( len = asprintf ( &iscsi->initiator_iqn,
+				ISCSI_DEFAULT_IQN_PREFIX ":%s",
+				uuid_ntoa ( &uuid ) ) ) < 0 ) {
+		DBGC ( iscsi, "iSCSI %p could not allocate initiator IQN\n",
+		       iscsi );
+		return -ENOMEM;
+	}
+	assert ( iscsi->initiator_iqn );
+
+	return 0;
+}
+
+
+/**
+ * Check iSCSI authentication details
+ *
+ * @v iscsi		iSCSI session
+ * @ret rc		Return status code
+ */
+static int iscsi_check_auth ( struct iscsi_session *iscsi ) {
+
+	/* Check for invalid authentication combinations */
+	if ( ( /* Initiator username without password (or vice-versa) */
+		( !! iscsi->initiator_username ) ^
+		( !! iscsi->initiator_password ) ) ||
+	     ( /* Target username without password (or vice-versa) */
+		( !! iscsi->target_username ) ^
+		( !! iscsi->target_password ) ) ||
+	     ( /* Target (reverse) without initiator (forward) */
+		( iscsi->target_username &&
+		  ( ! iscsi->initiator_username ) ) ) ) {
+		DBGC ( iscsi, "iSCSI %p invalid credentials: initiator "
+		       "%sname,%spw, target %sname,%spw\n", iscsi,
+		       ( iscsi->initiator_username ? "" : "no " ),
+		       ( iscsi->initiator_password ? "" : "no " ),
+		       ( iscsi->target_username ? "" : "no " ),
+		       ( iscsi->target_password ? "" : "no " ) );
+		return -EINVAL_BAD_CREDENTIAL_MIX;
 	}
 
 	return 0;
-
- invalid_auth:
-	DBGC ( iscsi, "iSCSI %p invalid credentials: initiator "
-	       "%sname,%spw, target %sname,%spw\n", iscsi,
-	       ( initiator_username ? "" : "no " ),
-	       ( initiator_password ? "" : "no " ),
-	       ( target_username ? "" : "no " ),
-	       ( target_password ? "" : "no " ) );
-	return -EINVAL_BAD_CREDENTIAL_MIX;
 }
 
 /**
@@ -1977,12 +2041,11 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
 	if ( ( rc = iscsi_parse_root_path ( iscsi, uri->opaque ) ) != 0 )
 		goto err_parse_root_path;
 	/* Set fields not specified by root path */
-	if ( ( rc = iscsi_set_auth ( iscsi,
-				     iscsi_initiator_username,
-				     iscsi_initiator_password,
-				     iscsi_target_username,
-				     iscsi_target_password ) ) != 0 )
-		goto err_set_auth;
+	if ( ( rc = iscsi_fetch_settings ( iscsi ) ) != 0 )
+		goto err_fetch_settings;
+	/* Validate authentication */
+	if ( ( rc = iscsi_check_auth ( iscsi ) ) != 0 )
+		goto err_check_auth;
 
 	/* Sanity checks */
 	if ( ! iscsi->target_address ) {
@@ -1997,6 +2060,9 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
 		rc = -EINVAL_NO_TARGET_IQN;
 		goto err_sanity_iqn;
 	}
+	DBGC ( iscsi, "iSCSI %p initiator %s\n",iscsi, iscsi->initiator_iqn );
+	DBGC ( iscsi, "iSCSI %p target %s %s\n",
+	       iscsi, iscsi->target_address, iscsi->target_iqn );
 
 	/* Open socket */
 	if ( ( rc = iscsi_open_connection ( iscsi ) ) != 0 )
@@ -2018,7 +2084,8 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
  err_open_connection:
  err_sanity_iqn:
  err_sanity_address:
- err_set_auth:
+ err_check_auth:
+ err_fetch_settings:
  err_parse_root_path:
 	iscsi_close ( iscsi, rc );
 	ref_put ( &iscsi->refcnt );
@@ -2032,165 +2099,3 @@ struct uri_opener iscsi_uri_opener __uri_opener = {
 	.scheme = "iscsi",
 	.open = iscsi_open,
 };
-
-/****************************************************************************
- *
- * Settings
- *
- */
-
-/** iSCSI initiator IQN setting */
-struct setting initiator_iqn_setting __setting = {
-	.name = "initiator-iqn",
-	.description = "iSCSI initiator name",
-	.tag = DHCP_ISCSI_INITIATOR_IQN,
-	.type = &setting_type_string,
-};
-
-/** iSCSI reverse username setting */
-struct setting reverse_username_setting __setting = {
-	.name = "reverse-username",
-	.description = "Reverse user name",
-	.tag = DHCP_EB_REVERSE_USERNAME,
-	.type = &setting_type_string,
-};
-
-/** iSCSI reverse password setting */
-struct setting reverse_password_setting __setting = {
-	.name = "reverse-password",
-	.description = "Reverse password",
-	.tag = DHCP_EB_REVERSE_PASSWORD,
-	.type = &setting_type_string,
-};
-
-/** An iSCSI string setting */
-struct iscsi_string_setting {
-	/** Setting */
-	struct setting *setting;
-	/** String to update */
-	char **string;
-	/** String prefix */
-	const char *prefix;
-};
-
-/** iSCSI string settings */
-static struct iscsi_string_setting iscsi_string_settings[] = {
-	{
-		.setting = &initiator_iqn_setting,
-		.string = &iscsi_explicit_initiator_iqn,
-		.prefix = "",
-	},
-	{
-		.setting = &username_setting,
-		.string = &iscsi_initiator_username,
-		.prefix = "",
-	},
-	{
-		.setting = &password_setting,
-		.string = &iscsi_initiator_password,
-		.prefix = "",
-	},
-	{
-		.setting = &reverse_username_setting,
-		.string = &iscsi_target_username,
-		.prefix = "",
-	},
-	{
-		.setting = &reverse_password_setting,
-		.string = &iscsi_target_password,
-		.prefix = "",
-	},
-	{
-		.setting = &hostname_setting,
-		.string = &iscsi_default_initiator_iqn,
-		.prefix = "iqn.2000-01.org.etherboot:",
-	},
-};
-
-/**
- * Apply iSCSI setting
- *
- * @v setting		iSCSI string setting
- * @ret rc		Return status code
- */
-static int apply_iscsi_string_setting ( struct iscsi_string_setting *setting ){
-	size_t prefix_len;
-	int setting_len;
-	size_t len;
-	int check_len;
-	char *p;
-
-	/* Free old string */
-	free ( *setting->string );
-	*setting->string = NULL;
-
-	/* Allocate new string */
-	prefix_len = strlen ( setting->prefix );
-	setting_len = fetch_setting_len ( NULL, setting->setting );
-	if ( setting_len < 0 ) {
-		/* Missing settings are not errors; leave strings as NULL */
-		return 0;
-	}
-	len = ( prefix_len + setting_len + 1 );
-	p = *setting->string = malloc ( len );
-	if ( ! p )
-		return -ENOMEM;
-
-	/* Fill new string */
-	strcpy ( p, setting->prefix );
-	check_len = fetch_string_setting ( NULL, setting->setting,
-					   ( p + prefix_len ),
-					   ( len - prefix_len ) );
-	assert ( check_len == setting_len );
-
-	return 0;
-}
-
-/**
- * Apply iSCSI settings
- *
- * @ret rc		Return status code
- */
-static int apply_iscsi_settings ( void ) {
-	struct iscsi_string_setting *setting;
-	unsigned int i;
-	int rc;
-
-	for ( i = 0 ; i < ( sizeof ( iscsi_string_settings ) /
-			    sizeof ( iscsi_string_settings[0] ) ) ; i++ ) {
-		setting = &iscsi_string_settings[i];
-		if ( ( rc = apply_iscsi_string_setting ( setting ) ) != 0 ) {
-			DBG ( "iSCSI could not apply setting %s\n",
-			      setting->setting->name );
-			return rc;
-		}
-	}
-
-	return 0;
-}
-
-/** iSCSI settings applicator */
-struct settings_applicator iscsi_settings_applicator __settings_applicator = {
-	.apply = apply_iscsi_settings,
-};
-
-/****************************************************************************
- *
- * Initiator name
- *
- */
-
-/**
- * Get iSCSI initiator IQN
- *
- * @v iscsi		iSCSI session
- * @ret rc		Return status code
- */
-const char * iscsi_initiator_iqn ( void ) {
-
-	if ( iscsi_explicit_initiator_iqn )
-		return iscsi_explicit_initiator_iqn;
-	if ( iscsi_default_initiator_iqn )
-		return iscsi_default_initiator_iqn;
-	return "iqn.2000-09.org.etherboot:UNKNOWN";
-}
