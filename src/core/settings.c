@@ -625,6 +625,11 @@ int fetch_string_setting ( struct settings *settings, struct setting *setting,
  * The returned length will be the length of the underlying setting
  * data.  The caller is responsible for eventually freeing the
  * allocated buffer.
+ *
+ * To allow the caller to distinguish between a non-existent setting
+ * and an error in allocating memory for the copy, this function will
+ * return success (and a NULL buffer pointer) for a non-existent
+ * setting.
  */
 int fetch_string_setting_copy ( struct settings *settings,
 				struct setting *setting,
@@ -632,16 +637,20 @@ int fetch_string_setting_copy ( struct settings *settings,
 	int len;
 	int check_len = 0;
 
+	/* Avoid returning uninitialised data on error */
 	*data = NULL;
 
+	/* Fetch setting length, and return success if non-existent */
 	len = fetch_setting_len ( settings, setting );
 	if ( len < 0 )
-		return len;
+		return 0;
 
+	/* Allocate string buffer */
 	*data = malloc ( len + 1 );
 	if ( ! *data )
 		return -ENOMEM;
 
+	/* Fetch setting */
 	check_len = fetch_string_setting ( settings, setting, *data,
 					   ( len + 1 ) );
 	assert ( check_len == len );
