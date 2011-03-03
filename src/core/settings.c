@@ -632,6 +632,8 @@ int fetch_string_setting_copy ( struct settings *settings,
 	int len;
 	int check_len = 0;
 
+	*data = NULL;
+
 	len = fetch_setting_len ( settings, setting );
 	if ( len < 0 )
 		return len;
