@@ -612,16 +612,23 @@ static int apply_dns_settings ( void ) {
 		( struct sockaddr_in * ) &nameserver;
 	int len;
 
+	/* Fetch DNS server address */
+	nameserver.st_family = 0;
 	if ( ( len = fetch_ipv4_setting ( NULL, &dns_setting,
 					  &sin_nameserver->sin_addr ) ) >= 0 ){
-		sin_nameserver->sin_family = AF_INET;
+		nameserver.st_family = AF_INET;
 		DBG ( "DNS using nameserver %s\n",
 		      inet_ntoa ( sin_nameserver->sin_addr ) );
 	}
 
 	/* Get local domain DHCP option */
+	free ( localdomain );
 	if ( ( len = fetch_string_setting_copy ( NULL, &domain_setting,
-						 &localdomain ) ) >= 0 )
+						 &localdomain ) ) < 0 ) {
+		DBG ( "DNS could not fetch local domain: %s\n",
+		      strerror ( len ) );
+	}
+	if ( localdomain )
 		DBG ( "DNS local domain %s\n", localdomain );
 
 	return 0;
