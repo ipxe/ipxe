@@ -42,7 +42,7 @@ static struct option_descriptor sanboot_opts[] = {};
 /** "sanboot" command descriptor */
 static struct command_descriptor sanboot_cmd =
 	COMMAND_DESC ( struct sanboot_options, sanboot_opts, 1, 1,
-		       "<root-path>", "Boot from SAN target" );
+		       "<root-path>" );
 
 /**
  * The "sanboot" command

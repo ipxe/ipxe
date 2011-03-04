@@ -84,20 +84,17 @@ static struct option_descriptor imgfetch_opts[] = {
 /** "imgfetch" command descriptor */
 static struct command_descriptor imgfetch_cmd =
 	COMMAND_DESC ( struct imgfetch_options, imgfetch_opts, 1, MAX_ARGUMENTS,
-		       "[--name <name>] <image_url> [<arguments>...]",
-		       "Fetch image" );
+		       "[--name <name>] <uri> [<arguments>...]" );
 
 /** "kernel" command descriptor */
 static struct command_descriptor kernel_cmd =
 	COMMAND_DESC ( struct imgfetch_options, imgfetch_opts, 1, MAX_ARGUMENTS,
-		       "[--name <name>] <image_url> [<arguments>...]",
-		       "Fetch and load image" );
+		       "[--name <name>] <uri> [<arguments>...]" );
 
 /** "chain" command descriptor */
 static struct command_descriptor chain_cmd =
 	COMMAND_DESC ( struct imgfetch_options, imgfetch_opts, 1, MAX_ARGUMENTS,
-		       "[--name <name>] <image_url> [<arguments>...]",
-		       "Fetch and execute image" );
+		       "[--name <name>] <uri> [<arguments>...]" );
 
 /**
  * The "imgfetch" and friends command body
@@ -200,8 +197,7 @@ static struct option_descriptor imgload_opts[] = {};
 
 /** "imgload" command descriptor */
 static struct command_descriptor imgload_cmd =
-	COMMAND_DESC ( struct imgload_options, imgload_opts, 1, 1,
-		       "<image>", "Load image" );
+	COMMAND_DESC ( struct imgload_options, imgload_opts, 1, 1, "<image>" );
 
 /**
  * The "imgload" command
@@ -242,8 +238,7 @@ static struct option_descriptor imgargs_opts[] = {};
 /** "imgargs" command descriptor */
 static struct command_descriptor imgargs_cmd =
 	COMMAND_DESC ( struct imgargs_options, imgargs_opts, 1, MAX_ARGUMENTS,
-		       "<image> [<arguments>...]",
-		       "Set arguments for image" );
+		       "<image> [<arguments>...]" );
 
 /**
  * The "imgargs" command body
@@ -282,7 +277,7 @@ static struct option_descriptor imgexec_opts[] = {};
 /** "imgexec" command descriptor */
 static struct command_descriptor imgexec_cmd =
 	COMMAND_DESC ( struct imgexec_options, imgexec_opts, 0, 1,
-		       "[<image>]", "Execute image" );
+		       "[<image>]" );
 
 /**
  * The "imgexec" command
@@ -330,8 +325,7 @@ static struct option_descriptor imgstat_opts[] = {};
 
 /** "imgstat" command descriptor */
 static struct command_descriptor imgstat_cmd =
-	COMMAND_DESC ( struct imgstat_options, imgstat_opts, 0, 0,
-		       "", "List images" );
+	COMMAND_DESC ( struct imgstat_options, imgstat_opts, 0, 0, "" );
 
 /**
  * The "imgstat" command
@@ -366,7 +360,7 @@ static struct option_descriptor imgfree_opts[] = {};
 /** "imgfree" command descriptor */
 static struct command_descriptor imgfree_cmd =
 	COMMAND_DESC ( struct imgfree_options, imgfree_opts, 0, 1,
-		       "[<image>]", "Free image(s)" );
+		       "[<image>]" );
 
 /**
  * The "imgfree" command

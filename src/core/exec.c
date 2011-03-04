@@ -298,8 +298,7 @@ static struct option_descriptor exit_opts[] = {};
 
 /** "exit" command descriptor */
 static struct command_descriptor exit_cmd =
-	COMMAND_DESC ( struct exit_options, exit_opts, 0, 1,
-		       "[<status>]", "" );
+	COMMAND_DESC ( struct exit_options, exit_opts, 0, 1, "[<status>]" );
 
 /**
  * "exit" command
@@ -344,7 +343,7 @@ static struct option_descriptor isset_opts[] = {};
 /** "isset" command descriptor */
 static struct command_descriptor isset_cmd =
 	COMMAND_DESC ( struct isset_options, isset_opts, 0, MAX_ARGUMENTS,
-		       "[...]", "" );
+		       "[...]" );
 
 /**
  * "isset" command

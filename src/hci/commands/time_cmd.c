@@ -45,7 +45,7 @@ static struct option_descriptor time_opts[] = {};
 /** "time" command descriptor */
 static struct command_descriptor time_cmd =
 	COMMAND_DESC ( struct time_options, time_opts, 1, MAX_ARGUMENTS,
-		       "<command>", "Time a command" );
+		       "<command>" );
 
 /**
  * "time" command
@@ -87,8 +87,7 @@ static struct option_descriptor sleep_opts[] = {};
 
 /** "sleep" command descriptor */
 static struct command_descriptor sleep_cmd =
-	COMMAND_DESC ( struct sleep_options, sleep_opts, 1, 1,
-		       "<seconds>", "Sleep for <seconds> seconds" );
+	COMMAND_DESC ( struct sleep_options, sleep_opts, 1, 1, "<seconds>" );
 
 /**
  * "sleep" command

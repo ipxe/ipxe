@@ -65,12 +65,7 @@ static struct option_descriptor gdbstub_opts[] = {};
 /** "gdbstub" command descriptor */
 static struct command_descriptor gdbstub_cmd =
 	COMMAND_DESC ( struct gdbstub_options, gdbstub_opts, 1, MAX_ARGUMENTS,
-		       "<transport> [<options>...]",
-		       "Start remote debugging using one of the following "
-		       "transports:\n"
-		       "  serial           use serial port (if compiled in)\n"
-		       "  udp <interface>  use UDP over network interface "
-		       "(if compiled in)" );
+		       "<transport> [<options>...]" );
 
 /**
  * The "gdbstub" command

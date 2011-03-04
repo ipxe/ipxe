@@ -44,8 +44,7 @@ static struct option_descriptor digest_opts[] = {};
 /** "digest" command descriptor */
 static struct command_descriptor digest_cmd =
 	COMMAND_DESC ( struct digest_options, digest_opts, 1, MAX_ARGUMENTS,
-		       "<image> [<image>...]",
-		       "Calculate the digest of an image" );
+		       "<image> [<image>...]" );
 
 /**
  * The "digest" command

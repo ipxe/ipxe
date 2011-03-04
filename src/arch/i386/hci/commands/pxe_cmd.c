@@ -33,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** "startpxe" command descriptor */
 static struct command_descriptor startpxe_cmd =
 	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>]", "" );
+		       "[<interface>]" );
 
 /**
  * "startpxe" payload
@@ -68,8 +68,7 @@ static struct option_descriptor stoppxe_opts[] = {};
 
 /** "stoppxe" command descriptor */
 static struct command_descriptor stoppxe_cmd =
-	COMMAND_DESC ( struct stoppxe_options, stoppxe_opts, 0, 0,
-		       "", "" );
+	COMMAND_DESC ( struct stoppxe_options, stoppxe_opts, 0, 0, "" );
 
 /**
  * The "stoppxe" command

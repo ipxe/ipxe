@@ -38,8 +38,7 @@ static struct option_descriptor login_opts[] = {};
 
 /** "login" command descriptor */
 static struct command_descriptor login_cmd =
-	COMMAND_DESC ( struct login_options, login_opts, 0, 0,
-		       "", "Prompt for login credentials" );
+	COMMAND_DESC ( struct login_options, login_opts, 0, 0, "" );
 
 /**
  * "login" command

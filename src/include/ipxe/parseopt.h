@@ -81,12 +81,12 @@ struct command_descriptor {
 	uint8_t min_args;
 	/** Maximum number of non-option arguments */
 	uint8_t max_args;
-	/** Command usage and description
+	/** Command usage
 	 *
 	 * This excludes the literal "Usage:" and the command name,
 	 * which will be prepended automatically.
 	 */
-	const char *usage_description;
+	const char *usage;
 };
 
 /** No maximum number of arguments */
@@ -99,11 +99,9 @@ struct command_descriptor {
  * @v _options		Option descriptor array
  * @v _check_args	Remaining argument checker
  * @v _usage		Command usage
- * @v _description	Command description
  * @ret _command	Command descriptor
  */
-#define COMMAND_DESC( _struct, _options, _min_args, _max_args, _usage,	      \
-		      _description )					      \
+#define COMMAND_DESC( _struct, _options, _min_args, _max_args, _usage )	      \
 	{								      \
 		.options = ( ( ( ( typeof ( _options[0] ) * ) NULL ) ==	      \
 			       ( ( struct option_descriptor * ) NULL ) ) ?    \
@@ -113,7 +111,7 @@ struct command_descriptor {
 		.len = sizeof ( _struct ),				      \
 		.min_args = _min_args,					      \
 		.max_args = _max_args,					      \
-		.usage_description = _usage "\n\n" _description,	      \
+		.usage = _usage,					      \
 	 }
 
 extern int parse_string ( const char *text, const char **value );

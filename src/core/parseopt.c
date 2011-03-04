@@ -132,7 +132,8 @@ int parse_image ( const char *text, struct image **image ) {
  * @v argv		Argument list
  */
 void print_usage ( struct command_descriptor *cmd, char **argv ) {
-	printf ( "Usage:\n\n  %s %s\n", argv[0], cmd->usage_description );
+	printf ( "Usage:\n\n  %s %s\n\nSee http://ipxe.org/cmd/%s for further "
+		 "information\n", argv[0], cmd->usage, argv[0] );
 }
 
 /**

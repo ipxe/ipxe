@@ -36,7 +36,7 @@ static struct option_descriptor reboot_opts[] = {};
 
 /** "reboot" command descriptor */
 static struct command_descriptor reboot_cmd =
-	COMMAND_DESC ( struct reboot_options, reboot_opts, 0, 0, "", "" );
+	COMMAND_DESC ( struct reboot_options, reboot_opts, 0, 0, "" );
 
 /**
  * The "reboot" command

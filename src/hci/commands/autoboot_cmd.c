@@ -35,7 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** "autoboot" command descriptor */
 static struct command_descriptor autoboot_cmd =
 	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]", "Attempt to boot the system" );
+		       "[<interface>...]" );
 
 /**
  * "autoboot" command

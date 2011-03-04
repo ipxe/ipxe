@@ -43,8 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** "dhcp" command descriptor */
 static struct command_descriptor dhcp_cmd =
 	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>] [<interface>...]",
-		       "Configure network interface(s) using DHCP" );
+		       "[<interface>...]" );
 
 /**
  * Execute "dhcp" command for a network device
@@ -88,8 +87,7 @@ static struct option_descriptor pxebs_opts[] = {};
 /** "pxebs" command descriptor */
 static struct command_descriptor pxebs_cmd =
 	COMMAND_DESC ( struct pxebs_options, pxebs_opts, 2, 2,
-		       "<interface> <server_type>",
-		       "Perform PXE Boot Server discovery" );
+		       "<interface> <server type>" );
 
 /**
  * The "pxebs" command

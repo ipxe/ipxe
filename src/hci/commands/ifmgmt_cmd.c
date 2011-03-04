@@ -87,8 +87,7 @@ int ifcommon_exec ( int argc, char **argv,
 /** "ifopen" command descriptor */
 static struct command_descriptor ifopen_cmd =
 	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]",
-		       "Open network interface(s)" );
+		       "[<interface>...]" );
 
 /**
  * "ifopen" payload
@@ -114,8 +113,7 @@ static int ifopen_exec ( int argc, char **argv ) {
 /** "ifclose" command descriptor */
 static struct command_descriptor ifclose_cmd =
 	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]",
-		       "Close network interface(s)" );
+		       "[<interface>...]" );
 
 /**
  * "ifclose" payload
@@ -142,8 +140,7 @@ static int ifclose_exec ( int argc, char **argv ) {
 /** "ifstat" command descriptor */
 static struct command_descriptor ifstat_cmd =
 	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]",
-		       "Show network interface(s)" );
+		       "[<interface>...]" );
 
 /**
  * "ifstat" payload

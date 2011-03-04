@@ -34,8 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** "iwstat" command descriptor */
 static struct command_descriptor iwstat_cmd =
 	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]",
-		       "Show wireless interface(s)" );
+		       "[<interface>...]" );
 
 /**
  * "iwstat" payload
@@ -66,8 +65,7 @@ static int iwstat_exec ( int argc, char **argv ) {
 /** "iwlist" command descriptor */
 static struct command_descriptor iwlist_cmd =
 	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]",
-		       "List wireless networks" );
+		       "[<interface>...]" );
 
 /**
  * "iwlist" payload

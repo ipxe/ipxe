@@ -49,8 +49,8 @@ static struct option_descriptor lotest_opts[] = {
 /** "lotest" command descriptor */
 static struct command_descriptor lotest_cmd =
 	COMMAND_DESC ( struct lotest_options, lotest_opts, 2, 2,
-		       "[--mtu <mtu>] <sending_interface> "
-		       "<receiving_interface>", "" );
+		       "[--mtu <mtu>] <sending interface> "
+		       "<receiving interface>" );
 
 /**
  * "lotest" command

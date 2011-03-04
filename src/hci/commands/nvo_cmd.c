@@ -42,8 +42,7 @@ static struct option_descriptor show_opts[] = {};
 
 /** "show" command descriptor */
 static struct command_descriptor show_cmd =
-	COMMAND_DESC ( struct show_options, show_opts, 1, 1,
-		       "<setting>", "" );
+	COMMAND_DESC ( struct show_options, show_opts, 1, 1, "<setting>" );
 
 /**
  * "show" command
@@ -88,7 +87,7 @@ static struct option_descriptor set_opts[] = {};
 /** "set" command descriptor */
 static struct command_descriptor set_cmd =
 	COMMAND_DESC ( struct set_options, set_opts, 1, MAX_ARGUMENTS,
-		       "<setting> <value>", "" );
+		       "<setting> <value>" );
 
 /**
  * "set" command
@@ -146,8 +145,7 @@ static struct option_descriptor clear_opts[] = {};
 
 /** "clear" command descriptor */
 static struct command_descriptor clear_cmd =
-	COMMAND_DESC ( struct clear_options, clear_opts, 1, 1,
-		       "<setting>", "" );
+	COMMAND_DESC ( struct clear_options, clear_opts, 1, 1, "<setting>" );
 
 /**
  * "clear" command

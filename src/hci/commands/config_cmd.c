@@ -41,9 +41,7 @@ static struct option_descriptor config_opts[] = {};
 
 /** "config" command descriptor */
 static struct command_descriptor config_cmd =
-	COMMAND_DESC ( struct config_options, config_opts, 0, 1,
-		       "[<scope>]",
-		       "Open the option configuration console" );
+	COMMAND_DESC ( struct config_options, config_opts, 0, 1, "[<scope>]" );
 
 /**
  * Parse settings scope name

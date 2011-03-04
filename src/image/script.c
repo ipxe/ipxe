@@ -218,8 +218,7 @@ static struct option_descriptor goto_opts[] = {};
 
 /** "goto" command descriptor */
 static struct command_descriptor goto_cmd =
-	COMMAND_DESC ( struct goto_options, goto_opts, 1, 1,
-		       "<label>", "" );
+	COMMAND_DESC ( struct goto_options, goto_opts, 1, 1, "<label>" );
 
 /**
  * Current "goto" label
