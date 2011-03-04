@@ -193,6 +193,7 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 	if ( in_len && ( command & HERMON_HCR_IN_MBOX ) ) {
 		memset ( hermon->mailbox_in, 0, HERMON_MBOX_SIZE );
 		in_buffer = hermon->mailbox_in;
+		MLX_FILL_H ( &hcr, 0, in_param_h, virt_to_bus ( in_buffer ) );
 		MLX_FILL_1 ( &hcr, 1, in_param_l, virt_to_bus ( in_buffer ) );
 	}
 	memcpy ( in_buffer, in, in_len );
@@ -200,6 +201,8 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 	out_buffer = &hcr.u.dwords[3];
 	if ( out_len && ( command & HERMON_HCR_OUT_MBOX ) ) {
 		out_buffer = hermon->mailbox_out;
+		MLX_FILL_H ( &hcr, 3, out_param_h,
+			     virt_to_bus ( out_buffer ) );
 		MLX_FILL_1 ( &hcr, 4, out_param_l,
 			     virt_to_bus ( out_buffer ) );
 	}
@@ -652,6 +655,7 @@ static int hermon_alloc_mtt ( struct hermon *hermon,
 		memset ( &write_mtt, 0, sizeof ( write_mtt ) );
 		MLX_FILL_1 ( &write_mtt.mtt_base_addr, 1,
 			     value, mtt_base_addr );
+		MLX_FILL_H ( &write_mtt.mtt, 0, ptag_h, addr );
 		MLX_FILL_2 ( &write_mtt.mtt, 1,
 			     p, 1,
 			     ptag_l, ( addr >> 3 ) );
@@ -894,8 +898,12 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 		     usr_page, HERMON_UAR_NON_EQ_PAGE,
 		     log_cq_size, fls ( cq->num_cqes - 1 ) );
 	MLX_FILL_1 ( &cqctx, 5, c_eqn, hermon->eq.eqn );
+	MLX_FILL_H ( &cqctx, 6, mtt_base_addr_h,
+		     hermon_cq->mtt.mtt_base_addr );
 	MLX_FILL_1 ( &cqctx, 7, mtt_base_addr_l,
 		     ( hermon_cq->mtt.mtt_base_addr >> 3 ) );
+	MLX_FILL_H ( &cqctx, 14, db_record_addr_h,
+		     virt_to_phys ( hermon_cq->doorbell ) );
 	MLX_FILL_1 ( &cqctx, 15, db_record_addr_l,
 		     ( virt_to_phys ( hermon_cq->doorbell ) >> 3 ) );
 	if ( ( rc = hermon_cmd_sw2hw_cq ( hermon, cq->cqn, &cqctx ) ) != 0 ) {
@@ -1180,8 +1188,12 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		     qpc_eec_data.page_offset,
 		     ( hermon_qp->mtt.page_offset >> 6 ) );
 	MLX_FILL_1 ( &qpctx, 41, qpc_eec_data.cqn_rcv, qp->recv.cq->cqn );
+	MLX_FILL_H ( &qpctx, 42, qpc_eec_data.db_record_addr_h,
+		     virt_to_phys ( hermon_qp->recv.doorbell ) );
 	MLX_FILL_1 ( &qpctx, 43, qpc_eec_data.db_record_addr_l,
 		     ( virt_to_phys ( hermon_qp->recv.doorbell ) >> 2 ) );
+	MLX_FILL_H ( &qpctx, 52, qpc_eec_data.mtt_base_addr_h,
+		     hermon_qp->mtt.mtt_base_addr );
 	MLX_FILL_1 ( &qpctx, 53, qpc_eec_data.mtt_base_addr_l,
 		     ( hermon_qp->mtt.mtt_base_addr >> 3 ) );
 	if ( ( rc = hermon_cmd_rst2init_qp ( hermon, qp->qpn,
@@ -1403,6 +1415,8 @@ hermon_fill_ud_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ud.ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->ud.data[0], 0, byte_count, iob_len ( iobuf ) );
 	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, hermon->lkey );
+	MLX_FILL_H ( &wqe->ud.data[0], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
 	MLX_FILL_1 ( &wqe->ud.data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 	return HERMON_OPCODE_SEND;
@@ -1446,11 +1460,15 @@ hermon_fill_mlx_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->mlx.data[0], 0,
 		     byte_count, iob_len ( &headers ) );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, hermon->lkey );
+	MLX_FILL_H ( &wqe->mlx.data[0], 2,
+		     local_address_h, virt_to_bus ( headers.data ) );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 3,
 		     local_address_l, virt_to_bus ( headers.data ) );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 0,
 		     byte_count, ( iob_len ( iobuf ) + 4 /* ICRC */ ) );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 1, l_key, hermon->lkey );
+	MLX_FILL_H ( &wqe->mlx.data[1], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 	return HERMON_OPCODE_SEND;
@@ -1479,6 +1497,8 @@ hermon_fill_rc_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->rc.ctrl, 2, c, 0x03 /* generate completion */ );
 	MLX_FILL_1 ( &wqe->rc.data[0], 0, byte_count, iob_len ( iobuf ) );
 	MLX_FILL_1 ( &wqe->rc.data[0], 1, l_key, hermon->lkey );
+	MLX_FILL_H ( &wqe->rc.data[0], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
 	MLX_FILL_1 ( &wqe->rc.data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 	return HERMON_OPCODE_SEND;
@@ -1511,6 +1531,8 @@ hermon_fill_eth_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->eth.data[0], 0,
 		     byte_count, iob_len ( iobuf ) );
 	MLX_FILL_1 ( &wqe->eth.data[0], 1, l_key, hermon->lkey );
+	MLX_FILL_H ( &wqe->eth.data[0], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
 	MLX_FILL_1 ( &wqe->eth.data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 	return HERMON_OPCODE_SEND;
@@ -1623,6 +1645,8 @@ static int hermon_post_recv ( struct ib_device *ibdev,
 	/* Construct work queue entry */
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_tailroom ( iobuf ) );
 	MLX_FILL_1 ( &wqe->data[0], 1, l_key, hermon->lkey );
+	MLX_FILL_H ( &wqe->data[0], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
 	MLX_FILL_1 ( &wqe->data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1849,6 +1873,8 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	MLX_FILL_1 ( &eqctx, 2,
 		     page_offset, ( hermon_eq->mtt.page_offset >> 5 ) );
 	MLX_FILL_1 ( &eqctx, 3, log_eq_size, fls ( HERMON_NUM_EQES - 1 ) );
+	MLX_FILL_H ( &eqctx, 6, mtt_base_addr_h,
+		     hermon_eq->mtt.mtt_base_addr );
 	MLX_FILL_1 ( &eqctx, 7, mtt_base_addr_l,
 		     ( hermon_eq->mtt.mtt_base_addr >> 3 ) );
 	if ( ( rc = hermon_cmd_sw2hw_eq ( hermon, hermon_eq->eqn,
@@ -2812,6 +2838,7 @@ static int hermon_map_vpm ( struct hermon *hermon,
 		memset ( &mapping, 0, sizeof ( mapping ) );
 		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
 		MLX_FILL_1 ( &mapping, 1, va_l, ( va >> 12 ) );
+		MLX_FILL_H ( &mapping, 2, pa_h, pa );
 		MLX_FILL_2 ( &mapping, 3,
 			     log2size, ( ( fls ( size ) - 1 ) - 12 ),
 			     pa_l, ( pa >> 12 ) );

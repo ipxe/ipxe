@@ -232,4 +232,14 @@ typedef unsigned char pseudo_bit_t;
 		__value;						     \
 	} )
 
+/*
+ * Fill high dword of physical address, if necessary
+ *
+ */
+#define MLX_FILL_H( _structure_st, _index, _field, _address ) do {	     \
+	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {		     \
+		MLX_FILL_1 ( _structure_st, _index, _field,		     \
+			     ( ( ( uint64_t ) (_address) ) >> 32 ) );	     \
+	} } while ( 0 )
+
 #endif /* _MLX_BITOPS_H */
