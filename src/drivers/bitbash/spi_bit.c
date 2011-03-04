@@ -162,6 +162,9 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 	uint32_t tmp_address;
 	uint32_t tmp_address_detect;
 
+	/* Deassert chip select to reset specified slave */
+	spi_bit_set_slave_select ( spibit, device->slave, DESELECT_SLAVE );
+
 	/* Set clock line to idle state */
 	write_bit ( &spibit->basher, SPI_BIT_SCLK, 
 		    ( bus->mode & SPI_MODE_CPOL ) );
