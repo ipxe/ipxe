@@ -162,6 +162,7 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	in_buffer = &hcr.u.dwords[0];
 	if ( in_len && ( command & ARBEL_HCR_IN_MBOX ) ) {
 		in_buffer = arbel->mailbox_in;
+		MLX_FILL_H ( &hcr, 0, in_param_h, virt_to_bus ( in_buffer ) );
 		MLX_FILL_1 ( &hcr, 1, in_param_l, virt_to_bus ( in_buffer ) );
 	}
 	memcpy ( in_buffer, in, in_len );
@@ -169,6 +170,8 @@ static int arbel_cmd ( struct arbel *arbel, unsigned long command,
 	out_buffer = &hcr.u.dwords[3];
 	if ( out_len && ( command & ARBEL_HCR_OUT_MBOX ) ) {
 		out_buffer = arbel->mailbox_out;
+		MLX_FILL_H ( &hcr, 3, out_param_h,
+			     virt_to_bus ( out_buffer ) );
 		MLX_FILL_1 ( &hcr, 4, out_param_l,
 			     virt_to_bus ( out_buffer ) );
 	}
@@ -657,6 +660,8 @@ static int arbel_create_cq ( struct ib_device *ibdev,
 	/* Hand queue over to hardware */
 	memset ( &cqctx, 0, sizeof ( cqctx ) );
 	MLX_FILL_1 ( &cqctx, 0, st, 0xa /* "Event fired" */ );
+	MLX_FILL_H ( &cqctx, 1, start_address_h,
+		     virt_to_bus ( arbel_cq->cqe ) );
 	MLX_FILL_1 ( &cqctx, 2, start_address_l,
 		     virt_to_bus ( arbel_cq->cqe ) );
 	MLX_FILL_2 ( &cqctx, 3,
@@ -938,6 +943,9 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	struct arbelprm_qp_ee_state_transitions qpctx;
 	struct arbelprm_qp_db_record *send_db_rec;
 	struct arbelprm_qp_db_record *recv_db_rec;
+	physaddr_t send_wqe_base_adr;
+	physaddr_t recv_wqe_base_adr;
+	physaddr_t wqe_base_adr;
 	int rc;
 
 	/* Calculate queue pair number */
@@ -960,6 +968,20 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	if ( ( rc = arbel_create_recv_wq ( &arbel_qp->recv,
 					   qp->recv.num_wqes ) ) != 0 )
 		goto err_create_recv_wq;
+
+	/* Send and receive work queue entries must be within the same 4GB */
+	send_wqe_base_adr = virt_to_bus ( arbel_qp->send.wqe );
+	recv_wqe_base_adr = virt_to_bus ( arbel_qp->recv.wqe );
+	if ( ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) &&
+	     ( ( ( ( uint64_t ) send_wqe_base_adr ) >> 32 ) !=
+	       ( ( ( uint64_t ) recv_wqe_base_adr ) >> 32 ) ) ) {
+		DBGC ( arbel, "Arbel %p QPN %#lx cannot support send %08lx "
+		       "recv %08lx\n", arbel, qp->qpn,
+		       send_wqe_base_adr, recv_wqe_base_adr );
+		rc = -ENOTSUP;
+		goto err_unsupported_address_split;
+	}
+	wqe_base_adr = send_wqe_base_adr;
 
 	/* Initialise doorbell records */
 	send_db_rec = &arbel->db_rec[arbel_qp->send.doorbell_idx].qp;
@@ -991,17 +1013,18 @@ static int arbel_create_qp ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &qpctx, 10, qpc_eec_data.primary_address_path.port_number,
 		     ibdev->port );
 	MLX_FILL_1 ( &qpctx, 27, qpc_eec_data.pd, ARBEL_GLOBAL_PD );
+	MLX_FILL_H ( &qpctx, 28, qpc_eec_data.wqe_base_adr_h, wqe_base_adr );
 	MLX_FILL_1 ( &qpctx, 29, qpc_eec_data.wqe_lkey, arbel->lkey );
 	MLX_FILL_1 ( &qpctx, 30, qpc_eec_data.ssc, 1 );
 	MLX_FILL_1 ( &qpctx, 33, qpc_eec_data.cqn_snd, qp->send.cq->cqn );
 	MLX_FILL_1 ( &qpctx, 34, qpc_eec_data.snd_wqe_base_adr_l,
-		     ( virt_to_bus ( arbel_qp->send.wqe ) >> 6 ) );
+		     ( send_wqe_base_adr >> 6 ) );
 	MLX_FILL_1 ( &qpctx, 35, qpc_eec_data.snd_db_record_index,
 		     arbel_qp->send.doorbell_idx );
 	MLX_FILL_1 ( &qpctx, 38, qpc_eec_data.rsc, 1 );
 	MLX_FILL_1 ( &qpctx, 41, qpc_eec_data.cqn_rcv, qp->recv.cq->cqn );
 	MLX_FILL_1 ( &qpctx, 42, qpc_eec_data.rcv_wqe_base_adr_l,
-		     ( virt_to_bus ( arbel_qp->recv.wqe ) >> 6 ) );
+		     ( recv_wqe_base_adr >> 6 ) );
 	MLX_FILL_1 ( &qpctx, 43, qpc_eec_data.rcv_db_record_index,
 		     arbel_qp->recv.doorbell_idx );
 	if ( ( rc = arbel_cmd_rst2init_qpee ( arbel, qp->qpn, &qpctx )) != 0 ){
@@ -1030,6 +1053,7 @@ static int arbel_create_qp ( struct ib_device *ibdev,
  err_rst2init_qpee:
 	MLX_FILL_1 ( send_db_rec, 1, res, ARBEL_UAR_RES_NONE );
 	MLX_FILL_1 ( recv_db_rec, 1, res, ARBEL_UAR_RES_NONE );
+ err_unsupported_address_split:
 	free_dma ( arbel_qp->recv.wqe, arbel_qp->recv.wqe_size );
  err_create_recv_wq:
 	free_dma ( arbel_qp->send.wqe, arbel_qp->send.wqe_size );
@@ -1205,6 +1229,8 @@ static size_t arbel_fill_ud_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->ud.ud, 9, q_key, av->qkey );
 	MLX_FILL_1 ( &wqe->ud.data[0], 0, byte_count, iob_len ( iobuf ) );
 	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, arbel->lkey );
+	MLX_FILL_H ( &wqe->ud.data[0], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
 	MLX_FILL_1 ( &wqe->ud.data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1247,11 +1273,15 @@ static size_t arbel_fill_mlx_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->mlx.data[0], 0,
 		     byte_count, iob_len ( &headers ) );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, arbel->lkey );
+	MLX_FILL_H ( &wqe->mlx.data[0], 2,
+		     local_address_h, virt_to_bus ( headers.data ) );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 3,
 		     local_address_l, virt_to_bus ( headers.data ) );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 0,
 		     byte_count, ( iob_len ( iobuf ) + 4 /* ICRC */ ) );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 1, l_key, arbel->lkey );
+	MLX_FILL_H ( &wqe->mlx.data[1], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
 	MLX_FILL_1 ( &wqe->mlx.data[1], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1378,6 +1408,8 @@ static int arbel_post_recv ( struct ib_device *ibdev,
 	/* Construct work queue entry */
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_tailroom ( iobuf ) );
 	MLX_FILL_1 ( &wqe->data[0], 1, l_key, arbel->lkey );
+	MLX_FILL_H ( &wqe->data[0], 2,
+		     local_address_h, virt_to_bus ( iobuf->data ) );
 	MLX_FILL_1 ( &wqe->data[0], 3,
 		     local_address_l, virt_to_bus ( iobuf->data ) );
 
@@ -1609,6 +1641,8 @@ static int arbel_create_eq ( struct arbel *arbel ) {
 	/* Hand queue over to hardware */
 	memset ( &eqctx, 0, sizeof ( eqctx ) );
 	MLX_FILL_1 ( &eqctx, 0, st, 0xa /* "Fired" */ );
+	MLX_FILL_H ( &eqctx, 1,
+		     start_address_h, virt_to_phys ( arbel_eq->eqe ) );
 	MLX_FILL_1 ( &eqctx, 2,
 		     start_address_l, virt_to_phys ( arbel_eq->eqe ) );
 	MLX_FILL_1 ( &eqctx, 3, log_eq_size, fls ( ARBEL_NUM_EQES - 1 ) );
@@ -2031,6 +2065,7 @@ static int arbel_map_vpm ( struct arbel *arbel,
 		memset ( &mapping, 0, sizeof ( mapping ) );
 		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
 		MLX_FILL_1 ( &mapping, 1, va_l, ( va >> 12 ) );
+		MLX_FILL_H ( &mapping, 2, pa_h, pa );
 		MLX_FILL_2 ( &mapping, 3,
 			     log2size, ( ( fls ( size ) - 1 ) - 12 ),
 			     pa_l, ( pa >> 12 ) );
