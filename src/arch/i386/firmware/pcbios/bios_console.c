@@ -188,28 +188,26 @@ static void bios_putchar ( int character ) {
  */
 static const char *ansi_input = "";
 
-/**
- * Lowest BIOS scancode of interest
- *
- * Most of the BIOS key scancodes that we are interested in are in a
- * dense range, so subtracting a constant and treating them as offsets
- * into an array works efficiently.
- */
-#define BIOS_KEY_MIN 0x42
-
-/** Offset into list of interesting BIOS scancodes */
-#define BIOS_KEY(scancode) ( (scancode) - BIOS_KEY_MIN )
+/** A mapping from a BIOS scan code to an ANSI escape sequence */
+#define BIOS_KEY( key, ansi ) key ansi "\0"
 
 /** Mapping from BIOS scan codes to ANSI escape sequences */
-static const char *ansi_sequences[] = {
-	[ BIOS_KEY ( 0x42 ) ] = "[19~",	/* F8 (required for PXE) */
-	[ BIOS_KEY ( 0x47 ) ] = "[H",	/* Home */
-	[ BIOS_KEY ( 0x48 ) ] = "[A",	/* Up arrow */
-	[ BIOS_KEY ( 0x4b ) ] = "[D",	/* Left arrow */
-	[ BIOS_KEY ( 0x4d ) ] = "[C",	/* Right arrow */
-	[ BIOS_KEY ( 0x4f ) ] = "[F",	/* End */
-	[ BIOS_KEY ( 0x50 ) ] = "[B",	/* Down arrow */
-	[ BIOS_KEY ( 0x53 ) ] = "[3~",	/* Delete */
+static const char ansi_sequences[] = {
+	BIOS_KEY ( "\x53", "[3~" )	/* Delete */
+	BIOS_KEY ( "\x48", "[A" )	/* Up arrow */
+	BIOS_KEY ( "\x50", "[B" )	/* Down arrow */
+	BIOS_KEY ( "\x4b", "[D" )	/* Left arrow */
+	BIOS_KEY ( "\x4d", "[C" )	/* Right arrow */
+	BIOS_KEY ( "\x47", "[H" )	/* Home */
+	BIOS_KEY ( "\x4f", "[F" )	/* End */
+	BIOS_KEY ( "\x3f", "[15~" )	/* F5 */
+	BIOS_KEY ( "\x40", "[17~" )	/* F6 */
+	BIOS_KEY ( "\x41", "[18~" )	/* F7 */
+	BIOS_KEY ( "\x42", "[19~" )	/* F8 (required for PXE) */
+	BIOS_KEY ( "\x43", "[20~" )	/* F9 */
+	BIOS_KEY ( "\x44", "[21~" )	/* F10 */
+	BIOS_KEY ( "\x85", "[23~" )	/* F11 */
+	BIOS_KEY ( "\x86", "[24~" )	/* F12 */
 };
 
 /**
@@ -219,11 +217,12 @@ static const char *ansi_sequences[] = {
  * @ret ansi_seq	ANSI escape sequence, if any, otherwise NULL
  */
 static const char * scancode_to_ansi_seq ( unsigned int scancode ) {
-	unsigned int bios_key = BIOS_KEY ( scancode );
-	
-	if ( bios_key < ( sizeof ( ansi_sequences ) /
-			  sizeof ( ansi_sequences[0] ) ) ) {
-		return ansi_sequences[bios_key];
+	const char *seq = ansi_sequences;
+
+	while ( *seq ) {
+		if ( *(seq++) == ( ( char ) scancode ) )
+			return seq;
+		seq += ( strlen ( seq ) + 1 );
 	}
 	DBG ( "Unrecognised BIOS scancode %02x\n", scancode );
 	return NULL;
