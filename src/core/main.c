@@ -88,11 +88,8 @@ __asmcall int main ( void ) {
 		 * booting fails for any reason, offer a second chance
 		 * to enter the shell for diagnostics.
 		 */
-		if ( have_images() ) {
-			for_each_image ( image ) {
-				image_exec ( image );
-				break;
-			}
+		if ( ( image = first_image() ) != NULL ) {
+			image_exec ( image );
 		} else {
 			autoboot();
 		}

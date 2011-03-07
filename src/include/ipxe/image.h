@@ -124,6 +124,15 @@ static inline int have_images ( void ) {
 	return ( ! list_empty ( &images ) );
 }
 
+/**
+ * Retrieve first image
+ *
+ * @ret image		Image, or NULL
+ */
+static inline struct image * first_image ( void ) {
+	return list_first_entry ( &images, struct image, list );
+}
+
 extern struct image * alloc_image ( void );
 extern void image_set_uri ( struct image *image, struct uri *uri );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );
