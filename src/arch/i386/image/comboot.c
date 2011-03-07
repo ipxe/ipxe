@@ -42,8 +42,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "COMBOOT", DHCP_EB_FEATURE_COMBOOT, 1 );
 
-struct image_type comboot_image_type __image_type ( PROBE_NORMAL );
-
 /**
  * COMBOOT PSP, copied to offset 0 of code segment
  */
@@ -131,7 +129,7 @@ static void comboot_init_psp ( struct image * image, userptr_t seg_userptr ) {
  * @v image		COMBOOT image
  * @ret rc		Return status code
  */
-static int comboot_exec ( struct image *image ) {
+static int comboot_exec_loop ( struct image *image ) {
 	userptr_t seg_userptr = real_to_user ( COMBOOT_PSP_SEG, 0 );
 	int state;
 
@@ -194,7 +192,6 @@ static int comboot_exec ( struct image *image ) {
 		       image, comboot_replacement_image );
 		image->replacement = comboot_replacement_image;
 		comboot_replacement_image = NULL;
-		image_autoload ( image->replacement );
 		break;
 
 	case COMBOOT_EXIT_COMMAND:
@@ -278,12 +275,12 @@ static int comboot_prepare_segment ( struct image *image )
 }
 
 /**
- * Load COMBOOT image into memory
+ * Probe COMBOOT image
  *
  * @v image		COMBOOT image
  * @ret rc		Return status code
  */
-static int comboot_load ( struct image *image ) {
+static int comboot_probe ( struct image *image ) {
 	int rc;
 
 	DBGC ( image, "COMBOOT %p: name '%s'\n",
@@ -295,9 +292,17 @@ static int comboot_load ( struct image *image ) {
 		return rc;
 	}
 
-	/* This is a 16-bit COMBOOT image, valid or otherwise */
-	if ( ! image->type )
-		image->type = &comboot_image_type;
+	return 0;
+}
+
+/**
+ * Execute COMBOOT image
+ *
+ * @v image		COMBOOT image
+ * @ret rc		Return status code
+ */
+static int comboot_exec ( struct image *image ) {
+	int rc;
 	
 	/* Sanity check for filesize */
 	if( image->len >= 0xFF00 ) {
@@ -311,12 +316,12 @@ static int comboot_load ( struct image *image ) {
 		return rc;
 	}
 
-	return 0;
+	return comboot_exec_loop ( image );
 }
 
 /** SYSLINUX COMBOOT (16-bit) image type */
 struct image_type comboot_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "COMBOOT",
-	.load = comboot_load,
+	.probe = comboot_probe,
 	.exec = comboot_exec,
 };

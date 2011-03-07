@@ -40,8 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "MBOOT", DHCP_EB_FEATURE_MULTIBOOT, 1 );
 
-struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT );
-
 /**
  * Maximum number of modules we will allow for
  *
@@ -255,57 +253,6 @@ static struct multiboot_module __bss16_array ( mbmodules, [MAX_MODULES] );
 #define mbmodules __use_data16 ( mbmodules )
 
 /**
- * Execute multiboot image
- *
- * @v image		Multiboot image
- * @ret rc		Return status code
- */
-static int multiboot_exec ( struct image *image ) {
-	physaddr_t entry = image->priv.phys;
-
-	/* Populate multiboot information structure */
-	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
-	mbinfo.flags = ( MBI_FLAG_LOADER | MBI_FLAG_MEM | MBI_FLAG_MMAP |
-			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
-	mb_cmdline_offset = 0;
-	mbinfo.cmdline = multiboot_add_cmdline ( image->name, image->cmdline );
-	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
-				( sizeof(mbmodules) / sizeof(mbmodules[0]) ) );
-	mbinfo.mods_addr = virt_to_phys ( mbmodules );
-	mbinfo.mmap_addr = virt_to_phys ( mbmemmap );
-	mbinfo.boot_loader_name = virt_to_phys ( mb_bootloader_name );
-
-	/* Multiboot images may not return and have no callback
-	 * interface, so shut everything down prior to booting the OS.
-	 */
-	shutdown_boot();
-
-	/* Build memory map after unhiding bootloader memory regions as part of
-	 * shutting everything down.
-	 */
-	multiboot_build_memmap ( image, &mbinfo, mbmemmap,
-				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
-
-	/* Jump to OS with flat physical addressing */
-	DBGC ( image, "MULTIBOOT %p starting execution at %lx\n",
-	       image, entry );
-	__asm__ __volatile__ ( PHYS_CODE ( "pushl %%ebp\n\t"
-					   "call *%%edi\n\t"
-					   "popl %%ebp\n\t" )
-			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
-			           "b" ( virt_to_phys ( &mbinfo ) ),
-			           "D" ( entry )
-			       : "ecx", "edx", "esi", "memory" );
-
-	DBGC ( image, "MULTIBOOT %p returned\n", image );
-
-	/* It isn't safe to continue after calling shutdown() */
-	while ( 1 ) {}
-
-	return -ECANCELED;  /* -EIMPOSSIBLE, anyone? */
-}
-
-/**
  * Find multiboot header
  *
  * @v image		Multiboot file
@@ -357,10 +304,12 @@ static int multiboot_find_header ( struct image *image,
  *
  * @v image		Multiboot file
  * @v hdr		Multiboot header descriptor
+ * @ret entry		Entry point
  * @ret rc		Return status code
  */
 static int multiboot_load_raw ( struct image *image,
-				struct multiboot_header_info *hdr ) {
+				struct multiboot_header_info *hdr,
+				physaddr_t *entry ) {
 	size_t offset;
 	size_t filesz;
 	size_t memsz;
@@ -391,8 +340,8 @@ static int multiboot_load_raw ( struct image *image,
 	/* Copy image to segment */
 	memcpy_user ( buffer, 0, image->data, offset, filesz );
 
-	/* Record execution entry point in image private data field */
-	image->priv.phys = hdr->mb.entry_addr;
+	/* Record execution entry point */
+	*entry = hdr->mb.entry_addr;
 
 	return 0;
 }
@@ -401,13 +350,14 @@ static int multiboot_load_raw ( struct image *image,
  * Load ELF multiboot image into memory
  *
  * @v image		Multiboot file
+ * @ret entry		Entry point
  * @ret rc		Return status code
  */
-static int multiboot_load_elf ( struct image *image ) {
+static int multiboot_load_elf ( struct image *image, physaddr_t *entry ) {
 	int rc;
 
 	/* Load ELF image*/
-	if ( ( rc = elf_load ( image ) ) != 0 ) {
+	if ( ( rc = elf_load ( image, entry ) ) != 0 ) {
 		DBGC ( image, "MULTIBOOT %p ELF image failed to load: %s\n",
 		       image, strerror ( rc ) );
 		return rc;
@@ -417,13 +367,14 @@ static int multiboot_load_elf ( struct image *image ) {
 }
 
 /**
- * Load multiboot image into memory
+ * Execute multiboot image
  *
- * @v image		Multiboot file
+ * @v image		Multiboot image
  * @ret rc		Return status code
  */
-static int multiboot_load ( struct image *image ) {
+static int multiboot_exec ( struct image *image ) {
 	struct multiboot_header_info hdr;
+	physaddr_t entry;
 	int rc;
 
 	/* Locate multiboot header, if present */
@@ -432,12 +383,6 @@ static int multiboot_load ( struct image *image ) {
 		       image );
 		return rc;
 	}
-	DBGC ( image, "MULTIBOOT %p found header with flags %08x\n",
-	       image, hdr.mb.flags );
-
-	/* This is a multiboot image, valid or otherwise */
-	if ( ! image->type )
-		image->type = &multiboot_image_type;
 
 	/* Abort if we detect flags that we cannot support */
 	if ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) {
@@ -451,9 +396,70 @@ static int multiboot_load ( struct image *image ) {
 	 * the ELF header if present, and Solaris relies on this
 	 * behaviour.
 	 */
-	if ( ( ( rc = multiboot_load_elf ( image ) ) != 0 ) &&
-	     ( ( rc = multiboot_load_raw ( image, &hdr ) ) != 0 ) )
+	if ( ( ( rc = multiboot_load_elf ( image, &entry ) ) != 0 ) &&
+	     ( ( rc = multiboot_load_raw ( image, &hdr, &entry ) ) != 0 ) )
 		return rc;
+
+	/* Populate multiboot information structure */
+	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
+	mbinfo.flags = ( MBI_FLAG_LOADER | MBI_FLAG_MEM | MBI_FLAG_MMAP |
+			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
+	mb_cmdline_offset = 0;
+	mbinfo.cmdline = multiboot_add_cmdline ( image->name, image->cmdline );
+	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
+				( sizeof(mbmodules) / sizeof(mbmodules[0]) ) );
+	mbinfo.mods_addr = virt_to_phys ( mbmodules );
+	mbinfo.mmap_addr = virt_to_phys ( mbmemmap );
+	mbinfo.boot_loader_name = virt_to_phys ( mb_bootloader_name );
+
+	/* Multiboot images may not return and have no callback
+	 * interface, so shut everything down prior to booting the OS.
+	 */
+	shutdown_boot();
+
+	/* Build memory map after unhiding bootloader memory regions as part of
+	 * shutting everything down.
+	 */
+	multiboot_build_memmap ( image, &mbinfo, mbmemmap,
+				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
+
+	/* Jump to OS with flat physical addressing */
+	DBGC ( image, "MULTIBOOT %p starting execution at %lx\n",
+	       image, entry );
+	__asm__ __volatile__ ( PHYS_CODE ( "pushl %%ebp\n\t"
+					   "call *%%edi\n\t"
+					   "popl %%ebp\n\t" )
+			       : : "a" ( MULTIBOOT_BOOTLOADER_MAGIC ),
+			           "b" ( virt_to_phys ( &mbinfo ) ),
+			           "D" ( entry )
+			       : "ecx", "edx", "esi", "memory" );
+
+	DBGC ( image, "MULTIBOOT %p returned\n", image );
+
+	/* It isn't safe to continue after calling shutdown() */
+	while ( 1 ) {}
+
+	return -ECANCELED;  /* -EIMPOSSIBLE, anyone? */
+}
+
+/**
+ * Probe multiboot image
+ *
+ * @v image		Multiboot file
+ * @ret rc		Return status code
+ */
+static int multiboot_probe ( struct image *image ) {
+	struct multiboot_header_info hdr;
+	int rc;
+
+	/* Locate multiboot header, if present */
+	if ( ( rc = multiboot_find_header ( image, &hdr ) ) != 0 ) {
+		DBGC ( image, "MULTIBOOT %p has no multiboot header\n",
+		       image );
+		return rc;
+	}
+	DBGC ( image, "MULTIBOOT %p found header with flags %08x\n",
+	       image, hdr.mb.flags );
 
 	return 0;
 }
@@ -461,6 +467,6 @@ static int multiboot_load ( struct image *image ) {
 /** Multiboot image type */
 struct image_type multiboot_image_type __image_type ( PROBE_MULTIBOOT ) = {
 	.name = "Multiboot",
-	.load = multiboot_load,
+	.probe = multiboot_probe,
 	.exec = multiboot_exec,
 };

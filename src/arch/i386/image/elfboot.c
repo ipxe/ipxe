@@ -34,8 +34,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "ELF", DHCP_EB_FEATURE_ELF, 1 );
 
-struct image_type elfboot_image_type __image_type ( PROBE_NORMAL );
-
 /**
  * Execute ELF image
  *
@@ -43,7 +41,15 @@ struct image_type elfboot_image_type __image_type ( PROBE_NORMAL );
  * @ret rc		Return status code
  */
 static int elfboot_exec ( struct image *image ) {
-	physaddr_t entry = image->priv.phys;
+	physaddr_t entry;
+	int rc;
+
+	/* Load the image using core ELF support */
+	if ( ( rc = elf_load ( image, &entry ) ) != 0 ) {
+		DBGC ( image, "ELF %p could not load: %s\n",
+		       image, strerror ( rc ) );
+		return rc;
+	}
 
 	/* An ELF image has no callback interface, so we need to shut
 	 * down before invoking it.
@@ -66,12 +72,12 @@ static int elfboot_exec ( struct image *image ) {
 }
 
 /**
- * Load ELF image into memory
+ * Probe ELF image
  *
  * @v image		ELF file
  * @ret rc		Return status code
  */
-static int elfboot_load ( struct image *image ) {
+static int elfboot_probe ( struct image *image ) {
 	Elf32_Ehdr ehdr;
 	static const uint8_t e_ident[] = {
 		[EI_MAG0]	= ELFMAG0,
@@ -82,7 +88,6 @@ static int elfboot_load ( struct image *image ) {
 		[EI_DATA]	= ELFDATA2LSB,
 		[EI_VERSION]	= EV_CURRENT,
 	};
-	int rc;
 
 	/* Read ELF header */
 	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
@@ -91,23 +96,12 @@ static int elfboot_load ( struct image *image ) {
 		return -ENOEXEC;
 	}
 
-	/* This is an ELF image, valid or otherwise */
-	if ( ! image->type )
-		image->type = &elfboot_image_type;
-
-	/* Load the image using core ELF support */
-	if ( ( rc = elf_load ( image ) ) != 0 ) {
-		DBGC ( image, "ELF %p could not load: %s\n",
-		       image, strerror ( rc ) );
-		return rc;
-	}
-
 	return 0;
 }
 
 /** ELF image type */
 struct image_type elfboot_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "ELF",
-	.load = elfboot_load,
+	.probe = elfboot_probe,
 	.exec = elfboot_exec,
 };

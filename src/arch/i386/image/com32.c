@@ -40,8 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/init.h>
 #include <ipxe/io.h>
 
-struct image_type com32_image_type __image_type ( PROBE_NORMAL );
-
 struct idt_register com32_external_idtr = {
 	.limit = COM32_NUM_IDT_ENTRIES * sizeof ( struct idt_descriptor ) - 1,
 	.base = COM32_IDT
@@ -55,7 +53,7 @@ struct idt_register com32_internal_idtr;
  * @v image		COM32 image
  * @ret rc		Return status code
  */
-static int com32_exec ( struct image *image ) {
+static int com32_exec_loop ( struct image *image ) {
 	struct memory_map memmap;
 	unsigned int i;
 	int state;
@@ -137,7 +135,6 @@ static int com32_exec ( struct image *image ) {
 		       image, comboot_replacement_image );
 		image->replacement = comboot_replacement_image;
 		comboot_replacement_image = NULL;
-		image_autoload ( image->replacement );
 		break;
 
 	case COMBOOT_EXIT_COMMAND:
@@ -207,7 +204,7 @@ static int com32_identify ( struct image *image ) {
  * @v image		COM32 image
  * @ret rc		Return status code
  */
-static int comboot_load_image ( struct image *image ) {
+static int com32_load_image ( struct image *image ) {
 	physaddr_t com32_irq_wrapper_phys;
 	struct idt_descriptor *idt;
 	struct ijb_entry *ijb;
@@ -262,7 +259,7 @@ static int comboot_load_image ( struct image *image ) {
  * @v image		COM32 image
  * @ret rc		Return status code
  */
-static int comboot_prepare_bounce_buffer ( struct image * image ) {
+static int com32_prepare_bounce_buffer ( struct image * image ) {
 	unsigned int seg;
 	userptr_t seg_userptr;
 	size_t filesz, memsz;
@@ -286,12 +283,12 @@ static int comboot_prepare_bounce_buffer ( struct image * image ) {
 }
 
 /**
- * Load COM32 image into memory
+ * Probe COM32 image
  *
  * @v image		COM32 image
  * @ret rc		Return status code
  */
-static int com32_load ( struct image *image ) {
+static int com32_probe ( struct image *image ) {
 	int rc;
 
 	DBGC ( image, "COM32 %p: name '%s', cmdline '%s'\n",
@@ -302,26 +299,34 @@ static int com32_load ( struct image *image ) {
 		return rc;
 	}
 
-	/* This is a COM32 image, valid or otherwise */
-	if ( ! image->type )
-		image->type = &com32_image_type;
+	return 0;
+}
+
+/**
+ * Execute COMBOOT image
+ *
+ * @v image		COM32 image
+ * @ret rc		Return status code
+ */
+static int com32_exec ( struct image *image ) {
+	int rc;
 
 	/* Load image */
-	if ( ( rc = comboot_load_image ( image ) ) != 0 ) {
+	if ( ( rc = com32_load_image ( image ) ) != 0 ) {
 		return rc;
 	}
 
 	/* Prepare bounce buffer segment */
-	if ( ( rc = comboot_prepare_bounce_buffer ( image ) ) != 0 ) {
+	if ( ( rc = com32_prepare_bounce_buffer ( image ) ) != 0 ) {
 		return rc;
 	}
 
-	return 0;
+	return com32_exec_loop ( image );
 }
 
 /** SYSLINUX COM32 image type */
 struct image_type com32_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "COM32",
-	.load = com32_load,
+	.probe = com32_probe,
 	.exec = com32_exec,
 };

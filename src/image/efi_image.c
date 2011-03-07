@@ -26,8 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 
-struct image_type efi_image_type __image_type ( PROBE_NORMAL );
-
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
 
@@ -99,12 +97,12 @@ done:
 }
 
 /**
- * Load EFI image into memory
+ * Probe EFI image
  *
  * @v image		EFI file
  * @ret rc		Return status code
  */
-static int efi_image_load ( struct image *image ) {
+static int efi_image_probe ( struct image *image ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE handle;
 	EFI_STATUS efirc;
@@ -119,10 +117,6 @@ static int efi_image_load ( struct image *image ) {
 		return -ENOEXEC;
 	}
 
-	/* This is an EFI image */
-	if ( ! image->type )
-		image->type = &efi_image_type;
-
 	/* Unload the image.  We can't leave it loaded, because we
 	 * have no "unload" operation.
 	 */
@@ -134,6 +128,6 @@ static int efi_image_load ( struct image *image ) {
 /** EFI image type */
 struct image_type efi_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "EFI",
-	.load = efi_image_load,
+	.probe = efi_image_probe,
 	.exec = efi_image_exec,
 };

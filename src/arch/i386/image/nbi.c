@@ -28,8 +28,6 @@
 
 FEATURE ( FEATURE_IMAGE, "NBI", DHCP_EB_FEATURE_NBI, 1 );
 
-struct image_type nbi_image_type __image_type ( PROBE_NORMAL );
-
 /**
  * An NBI image header
  *
@@ -241,57 +239,6 @@ static int nbi_process_segments ( struct image *image,
 }
 
 /**
- * Load an NBI image into memory
- *
- * @v image		NBI image
- * @ret rc		Return status code
- */
-static int nbi_load ( struct image *image ) {
-	struct imgheader imgheader;
-	int rc;
-
-	/* If we don't have enough data give up */
-	if ( image->len < NBI_HEADER_LENGTH ) {
-		DBGC ( image, "NBI %p too short for an NBI image\n", image );
-		return -ENOEXEC;
-	}
-
-	/* Check image header */
-	copy_from_user ( &imgheader, image->data, 0, sizeof ( imgheader ) );
-	if ( imgheader.magic != NBI_MAGIC ) {
-		DBGC ( image, "NBI %p has no NBI signature\n", image );
-		return -ENOEXEC;
-	}
-
-	/* This is an NBI image, valid or otherwise */
-	if ( ! image->type )
-		image->type = &nbi_image_type;
-
-	DBGC ( image, "NBI %p placing header at %hx:%hx\n", image,
-	       imgheader.location.segment, imgheader.location.offset );
-
-	/* NBI files can have overlaps between segments; the bss of
-	 * one segment may overlap the initialised data of another.  I
-	 * assume this is a design flaw, but there are images out
-	 * there that we need to work with.  We therefore do two
-	 * passes: first to initialise the segments, then to copy the
-	 * data.  This avoids zeroing out already-copied data.
-	 */
-	if ( ( rc = nbi_process_segments ( image, &imgheader,
-					   nbi_prepare_segment ) ) != 0 )
-		return rc;
-	if ( ( rc = nbi_process_segments ( image, &imgheader,
-					   nbi_load_segment ) ) != 0 )
-		return rc;
-
-	/* Record header address in image private data field */
-	image->priv.user = real_to_user ( imgheader.location.segment,
-					  imgheader.location.offset );
-
-	return 0;
-}
-
-/**
  * Boot a 16-bit NBI image
  *
  * @v imgheader		Image header information
@@ -396,8 +343,25 @@ static int nbi_exec ( struct image *image ) {
 	int may_return;
 	int rc;
 
-	copy_from_user ( &imgheader, image->priv.user, 0,
-			 sizeof ( imgheader ) );
+	/* Retrieve image header */
+	copy_from_user ( &imgheader, image->data, 0, sizeof ( imgheader ) );
+
+	DBGC ( image, "NBI %p placing header at %hx:%hx\n", image,
+	       imgheader.location.segment, imgheader.location.offset );
+
+	/* NBI files can have overlaps between segments; the bss of
+	 * one segment may overlap the initialised data of another.  I
+	 * assume this is a design flaw, but there are images out
+	 * there that we need to work with.  We therefore do two
+	 * passes: first to initialise the segments, then to copy the
+	 * data.  This avoids zeroing out already-copied data.
+	 */
+	if ( ( rc = nbi_process_segments ( image, &imgheader,
+					   nbi_prepare_segment ) ) != 0 )
+		return rc;
+	if ( ( rc = nbi_process_segments ( image, &imgheader,
+					   nbi_load_segment ) ) != 0 )
+		return rc;
 
 	/* Prepare DHCP option block */
 	if ( ( rc = nbi_prepare_dhcp ( image ) ) != 0 )
@@ -427,9 +391,34 @@ static int nbi_exec ( struct image *image ) {
 	return rc;
 }
 
+/**
+ * Probe NBI image
+ *
+ * @v image		NBI image
+ * @ret rc		Return status code
+ */
+static int nbi_probe ( struct image *image ) {
+	struct imgheader imgheader;
+
+	/* If we don't have enough data give up */
+	if ( image->len < NBI_HEADER_LENGTH ) {
+		DBGC ( image, "NBI %p too short for an NBI image\n", image );
+		return -ENOEXEC;
+	}
+
+	/* Check image header */
+	copy_from_user ( &imgheader, image->data, 0, sizeof ( imgheader ) );
+	if ( imgheader.magic != NBI_MAGIC ) {
+		DBGC ( image, "NBI %p has no NBI signature\n", image );
+		return -ENOEXEC;
+	}
+
+	return 0;
+}
+
 /** NBI image type */
 struct image_type nbi_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "NBI",
-	.load = nbi_load,
+	.probe = nbi_probe,
 	.exec = nbi_exec,
 };

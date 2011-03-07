@@ -100,62 +100,16 @@ int imgfetch ( struct image *image, const char *uri_string,
 }
 
 /**
- * Load an image
- *
- * @v image		Image
- * @ret rc		Return status code
- */
-int imgload ( struct image *image ) {
-	int rc;
-
-	/* Try to load image */
-	if ( ( rc = image_autoload ( image ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
-/**
- * Execute an image
- *
- * @v image		Image
- * @ret rc		Return status code
- */
-int imgexec ( struct image *image ) {
-	return image_exec ( image );
-}
-
-/**
- * Identify the only loaded image
- *
- * @ret image		Image, or NULL if 0 or >1 images are loaded
- */
-struct image * imgautoselect ( void ) {
-	struct image *image;
-	struct image *selected_image = NULL;
-	int flagged_images = 0;
-
-	for_each_image ( image ) {
-		if ( image->flags & IMAGE_LOADED ) {
-			selected_image = image;
-			flagged_images++;
-		}
-	}
-
-	return ( ( flagged_images == 1 ) ? selected_image : NULL );
-}
-
-/**
  * Display status of an image
  *
  * @v image		Executable/loadable image
  */
 void imgstat ( struct image *image ) {
-	printf ( "%s: %zd bytes", image->name, image->len );
+	printf ( "%s : %zd bytes", image->name, image->len );
 	if ( image->type )
 		printf ( " [%s]", image->type->name );
-	if ( image->flags & IMAGE_LOADED )
-		printf ( " [LOADED]" );
+	if ( image->flags & IMAGE_SELECTED )
+		printf ( " [SELECTED]" );
 	if ( image->cmdline )
 		printf ( " \"%s\"", image->cmdline );
 	printf ( "\n" );

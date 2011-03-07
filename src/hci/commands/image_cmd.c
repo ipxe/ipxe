@@ -86,28 +86,18 @@ static struct command_descriptor imgfetch_cmd =
 	COMMAND_DESC ( struct imgfetch_options, imgfetch_opts, 1, MAX_ARGUMENTS,
 		       "[--name <name>] <uri> [<arguments>...]" );
 
-/** "kernel" command descriptor */
-static struct command_descriptor kernel_cmd =
-	COMMAND_DESC ( struct imgfetch_options, imgfetch_opts, 1, MAX_ARGUMENTS,
-		       "[--name <name>] <uri> [<arguments>...]" );
-
-/** "chain" command descriptor */
-static struct command_descriptor chain_cmd =
-	COMMAND_DESC ( struct imgfetch_options, imgfetch_opts, 1, MAX_ARGUMENTS,
-		       "[--name <name>] <uri> [<arguments>...]" );
-
 /**
  * The "imgfetch" and friends command body
  *
  * @v argc		Argument count
  * @v argv		Argument list
  * @v cmd		Command descriptor
- * @v image_register	Image registration action
+ * @v action		Action to take upon a successful download
  * @ret rc		Return status code
  */
 static int imgfetch_core_exec ( int argc, char **argv,
 				struct command_descriptor *cmd,
-				int ( * image_register ) ( struct image * ) ) {
+				int ( * action ) ( struct image *image ) ) {
 	struct imgfetch_options opts;
 	struct image *image;
 	char *uri_string;
@@ -139,7 +129,7 @@ static int imgfetch_core_exec ( int argc, char **argv,
 		return rc;
 
 	/* Fetch the image */
-	if ( ( rc = imgfetch ( image, uri_string, image_register ) ) != 0 ) {
+	if ( ( rc = imgfetch ( image, uri_string, action ) ) != 0 ) {
 		printf ( "Could not fetch %s: %s\n",
 			 uri_string, strerror ( rc ) );
 		image_put ( image );
@@ -172,8 +162,8 @@ static int imgfetch_exec ( int argc, char **argv ) {
  */
 static int kernel_exec ( int argc, char **argv ) {
 
-	return imgfetch_core_exec ( argc, argv, &kernel_cmd,
-				    register_and_autoload_image );
+	return imgfetch_core_exec ( argc, argv, &imgfetch_cmd,
+				    register_and_select_image );
 }
 
 /**
@@ -185,34 +175,35 @@ static int kernel_exec ( int argc, char **argv ) {
  */
 static int chain_exec ( int argc, char **argv) {
 
-	return imgfetch_core_exec ( argc, argv, &chain_cmd,
-				    register_and_autoexec_image );
+	return imgfetch_core_exec ( argc, argv, &imgfetch_cmd,
+				    register_and_boot_image );
 }
 
-/** "imgload" options */
-struct imgload_options {};
+/** "imgselect" options */
+struct imgselect_options {};
 
-/** "imgload" option list */
-static struct option_descriptor imgload_opts[] = {};
+/** "imgselect" option list */
+static struct option_descriptor imgselect_opts[] = {};
 
-/** "imgload" command descriptor */
-static struct command_descriptor imgload_cmd =
-	COMMAND_DESC ( struct imgload_options, imgload_opts, 1, 1, "<image>" );
+/** "imgselect" command descriptor */
+static struct command_descriptor imgselect_cmd =
+	COMMAND_DESC ( struct imgselect_options, imgselect_opts, 1, 1,
+		       "<image>" );
 
 /**
- * The "imgload" command
+ * The "imgselect" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int imgload_exec ( int argc, char **argv ) {
-	struct imgload_options opts;
+static int imgselect_exec ( int argc, char **argv ) {
+	struct imgselect_options opts;
 	struct image *image;
 	int rc;
 
 	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &imgload_cmd, &opts ) ) != 0 )
+	if ( ( rc = parse_options ( argc, argv, &imgselect_cmd, &opts ) ) != 0 )
 		return rc;
 
 	/* Parse image name */
@@ -220,8 +211,8 @@ static int imgload_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Load image */
-	if ( ( rc = imgload ( image ) ) != 0 ) {
-		printf ( "Could not load %s: %s\n",
+	if ( ( rc = imgselect ( image ) ) != 0 ) {
+		printf ( "Could not select %s: %s\n",
 			 image->name, strerror ( rc ) );
 		return rc;
 	}
@@ -302,8 +293,9 @@ static int imgexec_exec ( int argc, char **argv ) {
 	} else {
 		image = imgautoselect();
 		if ( ! image ) {
-			printf ( "No (unique) loaded image\n" );
-			return -ENOTTY;
+			rc = -ENOTTY;
+			printf ( "No image selected: %s\n", strerror ( rc ) );
+			return rc;
 		}
 	}
 
@@ -417,8 +409,12 @@ struct command image_commands[] __command = {
 		.exec = chain_exec,
 	},
 	{
-		.name = "imgload",
-		.exec = imgload_exec,
+		.name = "imgselect",
+		.exec = imgselect_exec,
+	},
+	{
+		.name = "imgload", /* synonym for "imgselect" */
+		.exec = imgselect_exec,
 	},
 	{
 		.name = "imgargs",

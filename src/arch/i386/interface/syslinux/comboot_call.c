@@ -217,7 +217,7 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 		goto out;
 	}
 	if ( ( rc = imgfetch ( kernel, kernel_file,
-			       register_image ) ) != 0 ) {
+			       register_and_select_image ) ) != 0 ) {
 		DBG ( "COMBOOT: could not fetch kernel: %s\n",
 		      strerror ( rc ) );
 		goto out;

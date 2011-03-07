@@ -218,8 +218,7 @@ static struct interface_descriptor downloader_job_desc =
  * @ret rc		Return status code
  *
  * Instantiates a downloader object to download the specified URI into
- * the specified image object.  If the download is successful, the
- * image registration routine @c register_image() will be called.
+ * the specified image object.
  */
 int create_downloader ( struct interface *job, struct image *image,
 			int type, ... ) {

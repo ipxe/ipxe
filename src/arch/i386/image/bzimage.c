@@ -41,8 +41,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "bzImage", DHCP_EB_FEATURE_BZIMAGE, 1 );
 
-struct image_type bzimage_image_type __image_type ( PROBE_NORMAL );
-
 /**
  * bzImage context
  */
@@ -111,8 +109,8 @@ static int bzimage_parse_header ( struct image *image,
 			 sizeof ( bzimg->bzhdr ) );
 
 	/* Calculate size of real-mode portion */
-	bzimg->rm_filesz =
-		( ( bzimg->bzhdr.setup_sects ? bzimg->bzhdr.setup_sects : 4 ) + 1 ) << 9;
+	bzimg->rm_filesz = ( ( ( bzimg->bzhdr.setup_sects ?
+				 bzimg->bzhdr.setup_sects : 4 ) + 1 ) << 9 );
 	if ( bzimg->rm_filesz > image->len ) {
 		DBGC ( image, "bzImage %p too short for %zd byte of setup\n",
 		       image, bzimg->rm_filesz );
@@ -455,11 +453,33 @@ static int bzimage_exec ( struct image *image ) {
 	const char *cmdline = ( image->cmdline ? image->cmdline : "" );
 	int rc;
 
-	/* Read and parse header from loaded kernel */
+	/* Read and parse header from image */
 	if ( ( rc = bzimage_parse_header ( image, &bzimg,
-					   image->priv.user ) ) != 0 )
+					   image->data ) ) != 0 )
 		return rc;
-	assert ( bzimg.rm_kernel == image->priv.user );
+
+	/* Prepare segments */
+	if ( ( rc = prep_segment ( bzimg.rm_kernel, bzimg.rm_filesz,
+				   bzimg.rm_memsz ) ) != 0 ) {
+		DBGC ( image, "bzImage %p could not prepare RM segment: %s\n",
+		       image, strerror ( rc ) );
+		return rc;
+	}
+	if ( ( rc = prep_segment ( bzimg.pm_kernel, bzimg.pm_sz,
+				   bzimg.pm_sz ) ) != 0 ) {
+		DBGC ( image, "bzImage %p could not prepare PM segment: %s\n",
+		       image, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Load segments */
+	memcpy_user ( bzimg.rm_kernel, 0, image->data,
+		      0, bzimg.rm_filesz );
+	memcpy_user ( bzimg.pm_kernel, 0, image->data,
+		      bzimg.rm_filesz, bzimg.pm_sz );
+
+	/* Update and write out header */
+	bzimage_update_header ( image, &bzimg, bzimg.rm_kernel );
 
 	/* Parse command line for bootloader parameters */
 	if ( ( rc = bzimage_parse_cmdline ( image, &bzimg, cmdline ) ) != 0)
@@ -506,12 +526,12 @@ static int bzimage_exec ( struct image *image ) {
 }
 
 /**
- * Load bzImage image into memory
+ * Probe bzImage image
  *
  * @v image		bzImage file
  * @ret rc		Return status code
  */
-int bzimage_load ( struct image *image ) {
+int bzimage_probe ( struct image *image ) {
 	struct bzimage_context bzimg;
 	int rc;
 
@@ -520,42 +540,12 @@ int bzimage_load ( struct image *image ) {
 					   image->data ) ) != 0 )
 		return rc;
 
-	/* This is a bzImage image, valid or otherwise */
-	if ( ! image->type )
-		image->type = &bzimage_image_type;
-
-	/* Prepare segments */
-	if ( ( rc = prep_segment ( bzimg.rm_kernel, bzimg.rm_filesz,
-				   bzimg.rm_memsz ) ) != 0 ) {
-		DBGC ( image, "bzImage %p could not prepare RM segment: %s\n",
-		       image, strerror ( rc ) );
-		return rc;
-	}
-	if ( ( rc = prep_segment ( bzimg.pm_kernel, bzimg.pm_sz,
-				   bzimg.pm_sz ) ) != 0 ) {
-		DBGC ( image, "bzImage %p could not prepare PM segment: %s\n",
-		       image, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Load segments */
-	memcpy_user ( bzimg.rm_kernel, 0, image->data,
-		      0, bzimg.rm_filesz );
-	memcpy_user ( bzimg.pm_kernel, 0, image->data,
-		      bzimg.rm_filesz, bzimg.pm_sz );
-
-	/* Update and write out header */
-	bzimage_update_header ( image, &bzimg, bzimg.rm_kernel );
-
-	/* Record real-mode segment in image private data field */
-	image->priv.user = bzimg.rm_kernel;
-
 	return 0;
 }
 
 /** Linux bzImage image type */
 struct image_type bzimage_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "bzImage",
-	.load = bzimage_load,
+	.probe = bzimage_probe,
 	.exec = bzimage_exec,
 };

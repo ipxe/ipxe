@@ -4,7 +4,7 @@
 /**
  * @file
  *
- * Executable/loadable images
+ * Executable images
  *
  */
 
@@ -18,7 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 struct uri;
 struct image_type;
 
-/** An executable or loadable image */
+/** An executable image */
 struct image {
 	/** Reference count */
 	struct refcnt refcnt;
@@ -42,20 +42,13 @@ struct image {
 
 	/** Image type, if known */
 	struct image_type *type;
-	/** Image type private data */
-	union {
-		physaddr_t phys;
-		userptr_t user;
-		unsigned long ul;
-	} priv;
 
 	/** Replacement image
 	 *
 	 * An image wishing to replace itself with another image (in a
 	 * style similar to a Unix exec() call) should return from its
 	 * exec() method with the replacement image set to point to
-	 * the new image.  The new image must already be in a suitable
-	 * state for execution (i.e. loaded).
+	 * the new image.
 	 *
 	 * If an image unregisters itself as a result of being
 	 * executed, it must make sure that its replacement image (if
@@ -65,41 +58,26 @@ struct image {
 	struct image *replacement;
 };
 
-/** Image is loaded */
-#define IMAGE_LOADED 0x0001
+/** Image is selected for execution */
+#define IMAGE_SELECTED 0x0001
 
-/** An executable or loadable image type */
+/** An executable image type */
 struct image_type {
 	/** Name of this image type */
 	char *name;
-	/**
-	 * Load image into memory
+	/** Probe image
 	 *
-	 * @v image		Executable/loadable image
+	 * @v image		Executable image
 	 * @ret rc		Return status code
 	 *
-	 * Load the image into memory at the correct location as
-	 * determined by the file format.
-	 *
-	 * If the file image is in the correct format, the method must
-	 * update @c image->type to point to its own type (unless @c
-	 * image->type is already set).  This allows the autoloading
-	 * code to disambiguate between "this is not my image format"
-	 * and "there is something wrong with this image".  In
-	 * particular, setting @c image->type and then returning an
-	 * error will cause image_autoload() to abort and return an
-	 * error, rather than continuing to the next image type.
+	 * Return success if the image is of this image type.
 	 */
-	int ( * load ) ( struct image *image );
+	int ( * probe ) ( struct image *image );
 	/**
-	 * Execute loaded image
+	 * Execute image
 	 *
-	 * @v image		Loaded image
+	 * @v image		Executable image
 	 * @ret rc		Return status code
-	 *
-	 * Note that the image may be invalidated by the act of
-	 * execution, i.e. an image is allowed to choose to unregister
-	 * (and so potentially free) itself.
 	 */
 	int ( * exec ) ( struct image *image );
 };
@@ -125,10 +103,10 @@ struct image_type {
  */
 #define PROBE_PXE 03
 
-/** Executable or loadable image type table */
+/** Executable image type table */
 #define IMAGE_TYPES __table ( struct image_type, "image_types" )
 
-/** An executable or loadable image type */
+/** An executable image type */
 #define __image_type( probe_order ) __table_entry ( IMAGE_TYPES, probe_order )
 
 extern struct list_head images;
@@ -147,17 +125,17 @@ static inline int have_images ( void ) {
 }
 
 extern struct image * alloc_image ( void );
-extern int image_set_uri ( struct image *image, struct uri *uri );
+extern void image_set_uri ( struct image *image, struct uri *uri );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
-extern void promote_image ( struct image *image );
 struct image * find_image ( const char *name );
-extern int image_load ( struct image *image );
-extern int image_autoload ( struct image *image );
+extern int image_probe ( struct image *image );
 extern int image_exec ( struct image *image );
-extern int register_and_autoload_image ( struct image *image );
-extern int register_and_autoexec_image ( struct image *image );
+extern int image_select ( struct image *image );
+extern struct image * image_find_selected ( void );
+extern int register_and_select_image ( struct image *image );
+extern int register_and_boot_image ( struct image *image );
 
 /**
  * Increment reference count on an image

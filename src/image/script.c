@@ -36,8 +36,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/image.h>
 #include <ipxe/shell.h>
 
-struct image_type script_image_type __image_type ( PROBE_NORMAL );
-
 /** Currently running script
  *
  * This is a global in order to allow goto_exec() to update the
@@ -165,12 +163,12 @@ static int script_exec ( struct image *image ) {
 }
 
 /**
- * Load script into memory
+ * Probe script image
  *
  * @v image		Script
  * @ret rc		Return status code
  */
-static int script_load ( struct image *image ) {
+static int script_probe ( struct image *image ) {
 	static const char ipxe_magic[] = "#!ipxe";
 	static const char gpxe_magic[] = "#!gpxe";
 	linker_assert ( sizeof ( ipxe_magic ) == sizeof ( gpxe_magic ),
@@ -193,20 +191,13 @@ static int script_load ( struct image *image ) {
 		return -ENOEXEC;
 	}
 
-	/* This is a script */
-	image->type = &script_image_type;
-
-	/* We don't actually load it anywhere; we will pick the lines
-	 * out of the image as we need them.
-	 */
-
 	return 0;
 }
 
 /** Script image type */
 struct image_type script_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "script",
-	.load = script_load,
+	.probe = script_probe,
 	.exec = script_exec,
 };
 

@@ -12,6 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <elf.h>
 
-extern int elf_load ( struct image *image );
+extern int elf_load ( struct image *image, physaddr_t *entry );
 
 #endif /* _IPXE_ELF_H */

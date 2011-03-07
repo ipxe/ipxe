@@ -45,10 +45,11 @@ typedef Elf32_Off	Elf_Off;
  * @v image		ELF file
  * @v phdr		ELF program header
  * @v ehdr		ELF executable header
+ * @ret entry		Entry point, if found
  * @ret rc		Return status code
  */
 static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
-			      Elf_Ehdr *ehdr ) {
+			      Elf_Ehdr *ehdr, physaddr_t *entry ) {
 	physaddr_t dest;
 	userptr_t buffer;
 	unsigned long e_offset;
@@ -96,15 +97,15 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
 
 	/* Set execution address, if it lies within this segment */
 	if ( ( e_offset = ( ehdr->e_entry - dest ) ) < phdr->p_filesz ) {
-		image->priv.phys = ehdr->e_entry;
+		*entry = ehdr->e_entry;
 		DBGC ( image, "ELF %p found physical entry point at %lx\n",
-		       image, image->priv.phys );
+		       image, *entry );
 	} else if ( ( e_offset = ( ehdr->e_entry - phdr->p_vaddr ) )
 		    < phdr->p_filesz ) {
-		if ( ! image->priv.phys ) {
-			image->priv.phys = ( dest + e_offset );
+		if ( ! *entry ) {
+			*entry = ( dest + e_offset );
 			DBGC ( image, "ELF %p found virtual entry point at %lx"
-			       " (virt %lx)\n", image, image->priv.phys,
+			       " (virt %lx)\n", image, *entry,
 			       ( ( unsigned long ) ehdr->e_entry ) );
 		}
 	}
@@ -116,17 +117,15 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
  * Load ELF image into memory
  *
  * @v image		ELF file
+ * @ret entry		Entry point
  * @ret rc		Return status code
  */
-int elf_load ( struct image *image ) {
+int elf_load ( struct image *image, physaddr_t *entry ) {
 	Elf_Ehdr ehdr;
 	Elf_Phdr phdr;
 	Elf_Off phoff;
 	unsigned int phnum;
 	int rc;
-
-	/* Image type must already have been set by caller */
-	assert ( image->type != NULL );
 
 	/* Read ELF header */
 	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
@@ -135,8 +134,8 @@ int elf_load ( struct image *image ) {
 		return -ENOEXEC;
 	}
 
-	/* Invalidate execution address */
-	image->priv.phys = 0;
+	/* Invalidate entry point */
+	*entry = 0;
 
 	/* Read ELF program headers */
 	for ( phoff = ehdr.e_phoff , phnum = ehdr.e_phnum ; phnum ;
@@ -147,12 +146,14 @@ int elf_load ( struct image *image ) {
 			return -ENOEXEC;
 		}
 		copy_from_user ( &phdr, image->data, phoff, sizeof ( phdr ) );
-		if ( ( rc = elf_load_segment ( image, &phdr, &ehdr ) ) != 0 )
+		if ( ( rc = elf_load_segment ( image, &phdr, &ehdr,
+					       entry ) ) != 0 ) {
 			return rc;
+		}
 	}
 
 	/* Check for a valid execution address */
-	if ( ! image->priv.phys ) {
+	if ( ! *entry ) {
 		DBGC ( image, "ELF %p entry point %lx outside image\n",
 		       image, ( ( unsigned long ) ehdr.e_entry ) );
 		return -ENOEXEC;

@@ -35,8 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "PXE", DHCP_EB_FEATURE_PXE, 1 );
 
-struct image_type pxe_image_type __image_type ( PROBE_PXE );
-
 /**
  * Execute PXE image
  *
@@ -44,8 +42,19 @@ struct image_type pxe_image_type __image_type ( PROBE_PXE );
  * @ret rc		Return status code
  */
 static int pxe_exec ( struct image *image ) {
+	userptr_t buffer = real_to_user ( 0, 0x7c00 );
 	struct net_device *netdev;
 	int rc;
+
+	/* Verify and prepare segment */
+	if ( ( rc = prep_segment ( buffer, image->len, image->len ) ) != 0 ) {
+		DBGC ( image, "IMAGE %p could not prepare segment: %s\n",
+		       image, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Copy image to segment */
+	memcpy_user ( buffer, 0, image->data, 0, image->len );
 
 	/* Arbitrarily pick the most recently opened network device */
 	if ( ( netdev = last_opened_netdev() ) == NULL ) {
@@ -67,44 +76,26 @@ static int pxe_exec ( struct image *image ) {
 }
 
 /**
- * Load PXE image into memory
+ * Probe PXE image
  *
  * @v image		PXE file
  * @ret rc		Return status code
  */
-int pxe_load ( struct image *image ) {
-	userptr_t buffer = real_to_user ( 0, 0x7c00 );
-	size_t filesz = image->len;
-	size_t memsz = image->len;
-	int rc;
+int pxe_probe ( struct image *image ) {
 
 	/* Images too large to fit in base memory cannot be PXE
 	 * images.  We include this check to help prevent unrecognised
 	 * images from being marked as PXE images, since PXE images
 	 * have no signature we can check against.
 	 */
-	if ( filesz > ( 0xa0000 - 0x7c00 ) )
+	if ( image->len > ( 0xa0000 - 0x7c00 ) )
 		return -ENOEXEC;
 
 	/* Rejecting zero-length images is also useful, since these
 	 * end up looking to the user like bugs in iPXE.
 	 */
-	if ( ! filesz )
+	if ( ! image->len )
 		return -ENOEXEC;
-
-	/* There are no signature checks for PXE; we will accept anything */
-	if ( ! image->type )
-		image->type = &pxe_image_type;
-
-	/* Verify and prepare segment */
-	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
-		DBGC ( image, "IMAGE %p could not prepare segment: %s\n",
-		       image, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Copy image to segment */
-	memcpy_user ( buffer, 0, image->data, 0, filesz );
 
 	return 0;
 }
@@ -112,6 +103,6 @@ int pxe_load ( struct image *image ) {
 /** PXE image type */
 struct image_type pxe_image_type __image_type ( PROBE_PXE ) = {
 	.name = "PXE",
-	.load = pxe_load,
+	.probe = pxe_probe,
 	.exec = pxe_exec,
 };
