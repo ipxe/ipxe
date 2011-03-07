@@ -23,4 +23,6 @@ struct command {
 
 #define __command __table_entry ( COMMANDS, 01 )
 
+extern char * concat_args ( char **args );
+
 #endif /* _IPXE_COMMAND_H */

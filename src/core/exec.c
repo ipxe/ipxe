@@ -268,19 +268,56 @@ int system ( const char *command ) {
 }
 
 /**
+ * Concatenate arguments
+ *
+ * @v args		Argument list (NULL-terminated)
+ * @ret string		Concatenated arguments
+ *
+ * The returned string is allocated with malloc().  The caller is
+ * responsible for eventually free()ing this string.
+ */
+char * concat_args ( char **args ) {
+	char **arg;
+	size_t len;
+	char *string;
+	char *ptr;
+
+	/* Calculate total string length */
+	len = 1 /* NUL */;
+	for ( arg = args ; *arg ; arg++ )
+		len += ( 1 /* possible space */ + strlen ( *arg ) );
+
+	/* Allocate string */
+	string = zalloc ( len );
+	if ( ! string )
+		return NULL;
+
+	/* Populate string */
+	ptr = string;
+	for ( arg = args ; *arg ; arg++ ) {
+		ptr += sprintf ( ptr, "%s%s",
+				 ( ( ptr == string ) ? "" : " " ), *arg );
+	}
+	assert ( ptr < ( string + len ) );
+
+	return string;
+}
+
+/**
  * "echo" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int echo_exec ( int argc, char **argv ) {
-	int i;
+static int echo_exec ( int argc __unused, char **argv ) {
+	char *text;
 
-	for ( i = 1 ; i < argc ; i++ ) {
-		printf ( "%s%s", ( ( i == 1 ) ? "" : " " ), argv[i] );
-	}
-	printf ( "\n" );
+	text = concat_args ( &argv[1] );
+	if ( ! text )
+		return -ENOMEM;
+	printf ( "%s\n", text );
+	free ( text );
 	return 0;
 }
 

@@ -39,37 +39,24 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Fill in image command line
  *
  * @v image		Image
- * @v nargs		Argument count
  * @v args		Argument list
  * @ret rc		Return status code
  */
-static int imgfill_cmdline ( struct image *image, unsigned int nargs, 
-			     char **args ) {
-	size_t len = 0;
-	unsigned int i;
+static int imgfill_cmdline ( struct image *image, char **args ) {
+	char *cmdline = NULL;
+	int rc;
 
-	/* Clear command line if no arguments given */
-	if ( ! nargs )
-		return image_set_cmdline ( image, NULL );
-
-	/* Determine total length of command line */
-	for ( i = 0 ; i < nargs ; i++ )
-		len += ( strlen ( args[i] ) + 1 /* space or NUL */ );
-
-	{
-		char buf[len];
-		char *ptr = buf;
-
-		/* Assemble command line */
-		buf[0] = '\0';
-		for ( i = 0 ; i < nargs ; i++ ) {
-			ptr += sprintf ( ptr, "%s%s", ( i ? " " : "" ),
-					 args[i] );
-		}
-		assert ( ptr < ( buf + len ) );
-
-		return image_set_cmdline ( image, buf );
+	/* Construct command line (if arguments are present) */
+	if ( *args ) {
+		cmdline = concat_args ( args );
+		if ( ! cmdline )
+			return -ENOMEM;
 	}
+
+	/* Apply command line */
+	rc = image_set_cmdline ( image, cmdline );
+	free ( cmdline );
+	return rc;
 }
 
 /** "imgfetch" options */
@@ -127,8 +114,7 @@ static int imgfetch_core_exec ( int argc, char **argv,
 		return rc;
 
 	/* Fill in command line */
-	if ( ( rc = imgfill_cmdline ( image, ( argc - optind - 1 ),
-				      &argv[ optind + 1 ] ) ) != 0 )
+	if ( ( rc = imgfill_cmdline ( image, &argv[ optind + 1 ] ) ) != 0 )
 		return rc;
 
 	/* Fetch the image */
@@ -255,8 +241,7 @@ static int imgargs_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Fill in command line */
-	if ( ( rc = imgfill_cmdline ( image, ( argc - optind - 1 ),
-				      &argv[ optind + 1 ] ) ) != 0 )
+	if ( ( rc = imgfill_cmdline ( image, &argv[ optind + 1 ] ) ) != 0 )
 		return rc;
 
 	return 0;
