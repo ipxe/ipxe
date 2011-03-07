@@ -119,7 +119,8 @@ static int com32_exec_loop ( struct image *image ) {
 			/* %2 */ "r" ( get_fbms() * 1024 - (COM32_BOUNCE_SEG << 4) ),
 			/* %3 */ "i" ( COM32_BOUNCE_SEG << 4 ),
 			/* %4 */ "r" ( virt_to_phys ( com32_intcall_wrapper ) ),
-			/* %5 */ "r" ( virt_to_phys ( image->cmdline ) ),
+			/* %5 */ "r" ( virt_to_phys ( image->cmdline ?
+						      image->cmdline : "" ) ),
 			/* %6 */ "r" ( COM32_START_PHYS )
 		:
 			"memory" );
@@ -291,8 +292,7 @@ static int com32_prepare_bounce_buffer ( struct image * image ) {
 static int com32_probe ( struct image *image ) {
 	int rc;
 
-	DBGC ( image, "COM32 %p: name '%s', cmdline '%s'\n",
-	       image, image->name, image->cmdline );
+	DBGC ( image, "COM32 %p: name '%s'\n", image, image->name );
 
 	/* Check if this is a COMBOOT image */
 	if ( ( rc = com32_identify ( image ) ) != 0 ) {
