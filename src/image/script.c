@@ -261,8 +261,9 @@ static int goto_exec ( int argc, char **argv ) {
 
 	/* Sanity check */
 	if ( ! script ) {
-		printf ( "Not in a script\n" );
-		return -ENOTTY;
+		rc = -ENOTTY;
+		printf ( "Not in a script: %s\n", strerror ( rc ) );
+		return rc;
 	}
 
 	/* Parse label */
