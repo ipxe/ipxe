@@ -401,7 +401,7 @@ static int main_loop ( struct settings *settings ) {
 		draw_setting ( &widget );
 		color_set ( CPAIR_NORMAL, NULL );
 
-		key = getkey();
+		key = getkey ( 0 );
 		if ( widget.editing ) {
 			key = edit_setting ( &widget, key );
 			switch ( key ) {

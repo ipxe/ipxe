@@ -30,7 +30,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/dhcp.h>
 #include <ipxe/keys.h>
 #include <ipxe/timer.h>
-#include <ipxe/process.h>
 #include <ipxe/uri.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/autoboot.h>
@@ -239,9 +238,7 @@ static int pxe_menu_select ( struct pxe_menu *menu ) {
 		pxe_menu_draw_item ( menu, menu->selection, 1 );
 
 		/* Wait for keyboard input */
-		while ( ! iskey() )
-			step();
-		key = getkey();
+		key = getkey ( 0 );
 
 		/* Unhighlight currently selected item */
 		pxe_menu_draw_item ( menu, menu->selection, 0 );
@@ -304,7 +301,7 @@ static int pxe_menu_prompt_and_select ( struct pxe_menu *menu ) {
 		if ( ! len )
 			len = printf ( " (%d)", menu->timeout );
 		if ( iskey() ) {
-			key = getkey();
+			key = getkey ( 0 );
 			if ( key == KEY_F8 ) {
 				/* Display menu */
 				printf ( "\n" );

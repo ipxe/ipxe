@@ -47,7 +47,7 @@ int shell_banner ( void ) {
 	printf ( "\nPress Ctrl-B for the iPXE command line..." );
 
 	/* Wait for key */
-	key = getchar_timeout ( ( BANNER_TIMEOUT * TICKS_PER_SEC ) / 10 );
+	key = getkey ( ( BANNER_TIMEOUT * TICKS_PER_SEC ) / 10 );
 
 	/* Clear the "Press Ctrl-B" line */
 	printf ( "\r                                         \r" );

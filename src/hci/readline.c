@@ -98,7 +98,7 @@ char * readline ( const char *prompt ) {
 	buf[0] = '\0';
 
 	while ( 1 ) {
-		key = edit_string ( &string, getkey() );
+		key = edit_string ( &string, getkey ( 0 ) );
 		sync_console ( &string );
 		switch ( key ) {
 		case CR:

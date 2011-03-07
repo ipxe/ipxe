@@ -88,7 +88,7 @@ int login_ui ( void ) {
 
 		draw_editbox ( current_box );
 
-		key = getkey();
+		key = getkey ( 0 );
 		switch ( key ) {
 		case KEY_DOWN:
 			current_box = &password_box;
