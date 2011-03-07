@@ -57,14 +57,17 @@ struct interface monojob = INTF_INIT ( monojob_intf_desc );
  * @ret rc		Job final status code
  */
 int monojob_wait ( const char *string ) {
+	struct job_progress progress;
 	int key;
 	int rc;
-	unsigned long last_progress_dot;
+	unsigned long last_progress;
 	unsigned long elapsed;
+	unsigned int percentage;
+	int shown_percentage = 0;
 
-	printf ( "%s.", string );
+	printf ( "%s...", string );
 	monojob_rc = -EINPROGRESS;
-	last_progress_dot = currticks();
+	last_progress = currticks();
 	while ( monojob_rc == -EINPROGRESS ) {
 		step();
 		if ( iskey() ) {
@@ -77,13 +80,27 @@ int monojob_wait ( const char *string ) {
 				break;
 			}
 		}
-		elapsed = ( currticks() - last_progress_dot );
+		elapsed = ( currticks() - last_progress );
 		if ( elapsed >= TICKS_PER_SEC ) {
-			printf ( "." );
-			last_progress_dot = currticks();
+			if ( shown_percentage )
+				printf ( "\b\b\b\b    \b\b\b\b" );
+			job_progress ( &monojob, &progress );
+			if ( progress.total ) {
+				percentage = ( ( 100 * progress.completed ) /
+					       progress.total );
+				printf ( "%3d%%", percentage );
+				shown_percentage = 1;
+			} else {
+				printf ( "." );
+				shown_percentage = 0;
+			}
+			last_progress = currticks();
 		}
 	}
 	rc = monojob_rc;
+
+	if ( shown_percentage )
+		printf ( "\b\b\b\b    \b\b\b\b" );
 
 	if ( rc ) {
 		printf ( " %s\n", strerror ( rc ) );
