@@ -45,13 +45,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 static int imgfill_cmdline ( struct image *image, unsigned int nargs, 
 			     char **args ) {
-	size_t len;
+	size_t len = 0;
 	unsigned int i;
 
+	/* Clear command line if no arguments given */
+	if ( ! nargs )
+		return image_set_cmdline ( image, NULL );
+
 	/* Determine total length of command line */
-	len = 1; /* NUL */
 	for ( i = 0 ; i < nargs ; i++ )
-		len += ( 1 /* possible space */ + strlen ( args[i] ) );
+		len += ( strlen ( args[i] ) + 1 /* space or NUL */ );
 
 	{
 		char buf[len];
