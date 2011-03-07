@@ -95,14 +95,18 @@ void image_set_uri ( struct image *image, struct uri *uri ) {
  * Set image command line
  *
  * @v image		Image
- * @v cmdline		New image command line
+ * @v cmdline		New image command line, or NULL
  * @ret rc		Return status code
  */
 int image_set_cmdline ( struct image *image, const char *cmdline ) {
+
 	free ( image->cmdline );
-	image->cmdline = strdup ( cmdline );
-	if ( ! image->cmdline )
-		return -ENOMEM;
+	image->cmdline = NULL;
+	if ( cmdline ) {
+		image->cmdline = strdup ( cmdline );
+		if ( ! image->cmdline )
+			return -ENOMEM;
+	}
 	return 0;
 }
 
