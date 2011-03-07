@@ -18,14 +18,30 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/init.h>
 #include <ipxe/features.h>
 #include <ipxe/shell.h>
-#include <ipxe/shell_banner.h>
 #include <ipxe/image.h>
+#include <ipxe/keys.h>
+#include <usr/prompt.h>
 #include <usr/autoboot.h>
 #include <config/general.h>
 
 #define NORMAL	"\033[0m"
 #define BOLD	"\033[1m"
 #define CYAN	"\033[36m"
+
+/**
+ * Prompt for shell entry
+ *
+ * @ret	enter_shell		User wants to enter shell
+ */
+static int shell_banner ( void ) {
+
+	/* Skip prompt if timeout is zero */
+	if ( BANNER_TIMEOUT <= 0 )
+		return 0;
+
+	return ( prompt ( "\nPress Ctrl-B for the iPXE command line...",
+			  ( BANNER_TIMEOUT * 100 ), CTRL_B ) == 0 );
+}
 
 /**
  * Main entry point
