@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/parseopt.h>
 #include <ipxe/image.h>
 #include <ipxe/shell.h>
+#include <usr/prompt.h>
 
 /** Currently running script
  *
@@ -287,4 +288,70 @@ static int goto_exec ( int argc, char **argv ) {
 struct command goto_command __command = {
 	.name = "goto",
 	.exec = goto_exec,
+};
+
+/** "prompt" options */
+struct prompt_options {
+	/** Key to wait for */
+	unsigned int key;
+	/** Timeout */
+	unsigned int timeout;
+};
+
+/** "prompt" option list */
+static struct option_descriptor prompt_opts[] = {
+	OPTION_DESC ( "key", 'k', required_argument,
+		      struct prompt_options, key, parse_integer ),
+	OPTION_DESC ( "timeout", 't', required_argument,
+		      struct prompt_options, timeout, parse_integer ),
+};
+
+/** "prompt" command descriptor */
+static struct command_descriptor prompt_cmd =
+	COMMAND_DESC ( struct prompt_options, prompt_opts, 0, MAX_ARGUMENTS,
+		       "[--key <key>] [--timeout <timeout>] [<text>]" );
+
+/**
+ * "prompt" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int prompt_exec ( int argc, char **argv ) {
+	struct prompt_options opts;
+	char *text;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &prompt_cmd, &opts ) ) != 0 )
+		goto err_parse;
+
+	/* Parse prompt text */
+	text = concat_args ( &argv[optind] );
+	if ( ! text ) {
+		rc = -ENOMEM;
+		goto err_concat;
+	}
+
+	/* Display prompt and wait for key */
+	if ( ( rc = prompt ( text, opts.timeout, opts.key ) ) != 0 )
+		goto err_prompt;
+
+	/* Free prompt text */
+	free ( text );
+
+	return 0;
+
+ err_prompt:
+	free ( text );
+ err_concat:
+ err_parse:
+	return rc;
+}
+
+/** "prompt" command */
+struct command prompt_command __command = {
+	.name = "prompt",
+	.exec = prompt_exec,
 };
