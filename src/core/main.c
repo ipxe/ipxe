@@ -78,24 +78,23 @@ __asmcall int main ( void ) {
 		printf ( " %s", feature->name );
 	printf ( "\n" );
 
-	/* Prompt for shell */
-	if ( shell_banner() ) {
-		/* User wants shell; just give them a shell */
-		shell();
+	/* Boot system */
+	if ( ( image = first_image() ) != NULL ) {
+		/* We have an embedded image; execute it */
+		image_exec ( image );
 	} else {
-		/* User doesn't want shell; load and execute the first
-		 * image, or autoboot() if we have no images.  If
-		 * booting fails for any reason, offer a second chance
-		 * to enter the shell for diagnostics.
-		 */
-		if ( ( image = first_image() ) != NULL ) {
-			image_exec ( image );
-		} else {
-			autoboot();
-		}
-
-		if ( shell_banner() )
+		/* Prompt for shell */
+		if ( shell_banner() ) {
+			/* User wants shell; just give them a shell */
 			shell();
+		} else {
+			/* Try booting.  If booting fails, offer the
+			 * user another chance to enter the shell.
+			 */
+			autoboot();
+			if ( shell_banner() )
+				shell();
+		}
 	}
 
 	shutdown_exit();
