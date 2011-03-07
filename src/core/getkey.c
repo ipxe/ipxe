@@ -39,9 +39,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret character	Character read from console
  */
 int getchar_timeout ( unsigned long timeout ) {
-	unsigned long expiry = ( currticks() + timeout );
+	unsigned long start = currticks();
 
-	while ( currticks() < expiry ) {
+	while ( ( currticks() - start ) < timeout ) {
 		step();
 		if ( iskey() )
 			return getchar();
