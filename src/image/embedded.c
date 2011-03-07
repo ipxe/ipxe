@@ -86,6 +86,6 @@ static void embedded_init ( void ) {
 }
 
 /** Embedded image initialisation function */
-struct init_fn embedded_init_fn __init_fn ( INIT_NORMAL ) = {
+struct init_fn embedded_init_fn __init_fn ( INIT_LATE ) = {
 	.initialise = embedded_init,
 };

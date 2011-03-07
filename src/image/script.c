@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/image.h>
 #include <ipxe/shell.h>
 #include <usr/prompt.h>
+#include <ipxe/script.h>
 
 /** Currently running script
  *

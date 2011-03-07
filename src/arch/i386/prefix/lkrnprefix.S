@@ -193,6 +193,9 @@ run_ipxe:
 	movw	%ax, %ss
 	movw	$0x7c00, %sp
 
+	/* Retrieve command-line pointer */
+	movl	%es:cmd_line_ptr, %edx
+
 	/* Install iPXE */
 	call	install
 
@@ -206,6 +209,13 @@ run_ipxe:
 	lret
 	.section ".text16", "awx", @progbits
 1:
+	/* Set up %ds for access to .data16 */
+	movw	%bx, %ds
+
+	/* Store command-line pointer */
+	movl	%edx, cmdline_phys
+
+	/* Run iPXE */
 	pushl	$main
 	pushw	%cs
 	call	prot_call
