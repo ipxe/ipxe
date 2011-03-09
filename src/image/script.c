@@ -148,9 +148,13 @@ static int script_exec ( struct image *image ) {
 	rc = process_script ( image, script_exec_line,
 			      terminate_on_exit_or_failure );
 
-	/* Restore saved state, re-register image, and return */
+	/* Restore saved state */
 	script_offset = saved_offset;
-	register_image ( image );
+
+	/* Re-register image (unless we have been replaced) */
+	if ( ! image->replacement )
+		register_image ( image );
+
 	return rc;
 }
 
