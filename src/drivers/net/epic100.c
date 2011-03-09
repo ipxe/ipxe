@@ -10,7 +10,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/pci.h>
 #include <ipxe/ethernet.h>
 #include "nic.h"
-#include "console.h"
+#include <ipxe/console.h>
 #include "epic100.h"
 
 /* Condensed operations for readability */

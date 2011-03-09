@@ -22,7 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <stdarg.h>
 #include <ipxe/io.h>
-#include <console.h>
+#include <ipxe/console.h>
 
 /**
  * Pause until a key is pressed

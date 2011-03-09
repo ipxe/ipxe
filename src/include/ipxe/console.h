@@ -1,5 +1,5 @@
-#ifndef CONSOLE_H
-#define CONSOLE_H
+#ifndef _IPXE_CONSOLE_H
+#define _IPXE_CONSOLE_H
 
 #include <ipxe/tables.h>
 
@@ -105,4 +105,4 @@ extern int getchar ( void );
 extern int iskey ( void );
 extern int getkey ( unsigned long timeout );
 
-#endif /* CONSOLE_H */
+#endif /* _IPXE_CONSOLE_H */

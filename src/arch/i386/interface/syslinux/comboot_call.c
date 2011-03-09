@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <realmode.h>
 #include <biosint.h>
-#include <console.h>
+#include <ipxe/console.h>
 #include <stdlib.h>
 #include <comboot.h>
 #include <bzimage.h>

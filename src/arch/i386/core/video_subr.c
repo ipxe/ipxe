@@ -8,7 +8,7 @@
 #include "stddef.h"
 #include "string.h"
 #include <ipxe/io.h>
-#include "console.h"
+#include <ipxe/console.h>
 #include <ipxe/init.h>
 #include "vga.h"
 

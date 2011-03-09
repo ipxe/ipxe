@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
 #include <stdio.h>
-#include <console.h>
+#include <ipxe/console.h>
 #include <ipxe/timer.h>
 #include <usr/prompt.h>
 

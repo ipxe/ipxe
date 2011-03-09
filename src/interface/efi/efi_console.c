@@ -22,7 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/ansiesc.h>
-#include <console.h>
+#include <ipxe/console.h>
 
 #define ATTR_BOLD		0x08
 

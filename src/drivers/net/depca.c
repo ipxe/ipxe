@@ -240,7 +240,7 @@ FILE_LICENCE ( GPL_ANY );
 #include "etherboot.h"
 #include "nic.h"
 #include <ipxe/isa.h>
-#include "console.h"
+#include <ipxe/console.h>
 #include <ipxe/ethernet.h>
 
 /*

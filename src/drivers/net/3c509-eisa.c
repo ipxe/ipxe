@@ -6,7 +6,7 @@
 
 #include <ipxe/eisa.h>
 #include <ipxe/isa.h>
-#include "console.h"
+#include <ipxe/console.h>
 #include "3c509.h"
 
 /*

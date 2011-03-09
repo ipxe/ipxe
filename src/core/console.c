@@ -1,5 +1,5 @@
 #include "stddef.h"
-#include "console.h"
+#include <ipxe/console.h>
 #include <ipxe/process.h>
 #include <ipxe/nap.h>
 

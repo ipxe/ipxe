@@ -11,7 +11,7 @@
  */
 
 #include <ipxe/io.h>
-#include "console.h"
+#include <ipxe/console.h>
 
 static char key_map[][128] = {
     {

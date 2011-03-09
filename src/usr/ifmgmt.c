@@ -22,7 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
-#include <console.h>
+#include <ipxe/console.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/device.h>
 #include <ipxe/process.h>

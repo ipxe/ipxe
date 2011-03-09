@@ -20,7 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <assert.h>
 #include <realmode.h>
-#include <console.h>
+#include <ipxe/console.h>
 #include <ipxe/ansiesc.h>
 
 #define ATTR_BOLD		0x08

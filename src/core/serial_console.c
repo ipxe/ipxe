@@ -1,6 +1,6 @@
 #include <ipxe/init.h>
 #include <ipxe/serial.h>
-#include "console.h"
+#include <ipxe/console.h>
 
 /** @file
  *

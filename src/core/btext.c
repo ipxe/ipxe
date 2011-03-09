@@ -9,7 +9,7 @@
  *   move to Etherboot by LYH
  */
 
-#include "console.h"
+#include <ipxe/console.h>
 #include <ipxe/init.h>
 #include <ipxe/pci.h>
 

@@ -92,7 +92,7 @@ FILE_LICENCE ( GPL2_ONLY );
 #include "etherboot.h"
 #include "nic.h"
 #include <ipxe/isa.h>
-#include "console.h"
+#include <ipxe/console.h>
 #include "cs89x0.h"
 
 static unsigned short	eth_nic_base;
