@@ -143,8 +143,6 @@ extern int image_probe ( struct image *image );
 extern int image_exec ( struct image *image );
 extern int image_select ( struct image *image );
 extern struct image * image_find_selected ( void );
-extern int register_and_select_image ( struct image *image );
-extern int register_and_boot_image ( struct image *image );
 
 /**
  * Increment reference count on an image

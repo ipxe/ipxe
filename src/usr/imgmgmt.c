@@ -36,6 +36,45 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
+ * Register and select an image
+ *
+ * @v image		Executable image
+ * @ret rc		Return status code
+ */
+int register_and_select_image ( struct image *image ) {
+	int rc;
+
+	if ( ( rc = register_image ( image ) ) != 0 )
+		return rc;
+
+	if ( ( rc = image_probe ( image ) ) != 0 )
+		return rc;
+
+	if ( ( rc = image_select ( image ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Register and boot an image
+ *
+ * @v image		Image
+ * @ret rc		Return status code
+ */
+int register_and_boot_image ( struct image *image ) {
+	int rc;
+
+	if ( ( rc = register_and_select_image ( image ) ) != 0 )
+		return rc;
+
+	if ( ( rc = image_exec ( image ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
  * Download an image
  *
  * @v image		Image
