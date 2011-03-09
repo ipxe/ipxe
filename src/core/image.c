@@ -130,6 +130,7 @@ int register_image ( struct image *image ) {
 
 	/* Add to image list */
 	image_get ( image );
+	image->flags |= IMAGE_REGISTERED;
 	list_add_tail ( &image->list, &images );
 	DBGC ( image, "IMAGE %s at [%lx,%lx) registered\n",
 	       image->name, user_to_phys ( image->data, 0 ),
@@ -144,8 +145,10 @@ int register_image ( struct image *image ) {
  * @v image		Executable image
  */
 void unregister_image ( struct image *image ) {
+
 	DBGC ( image, "IMAGE %s unregistered\n", image->name );
 	list_del ( &image->list );
+	image->flags &= ~IMAGE_REGISTERED;
 	image_put ( image );
 }
 
@@ -201,12 +204,19 @@ int image_probe ( struct image *image ) {
  *
  * @v image		Executable image
  * @ret rc		Return status code
+ *
+ * The image must already be registered.  Note that executing an image
+ * may cause it to unregister itself.  The caller must therefore
+ * assume that the image pointer becomes invalid.
  */
 int image_exec ( struct image *image ) {
 	struct image *saved_current_image;
 	struct image *replacement;
 	struct uri *old_cwuri;
 	int rc;
+
+	/* Sanity check */
+	assert ( image->flags & IMAGE_REGISTERED );
 
 	/* Check that this image can be executed */
 	if ( ( rc = image_probe ( image ) ) != 0 )
@@ -233,9 +243,13 @@ int image_exec ( struct image *image ) {
 	}
 
 	/* Pick up replacement image before we drop the original
-	 * image's temporary reference.
+	 * image's temporary reference.  The replacement image must
+	 * already be registered, so we don't need to hold a temporary
+	 * reference (which would complicate the tail-recursion).
 	 */
 	replacement = image->replacement;
+	if ( replacement )
+		assert ( replacement->flags & IMAGE_REGISTERED );
 
 	/* Drop temporary reference to the original image */
 	image_put ( image );
@@ -256,6 +270,41 @@ int image_exec ( struct image *image ) {
 	}
 
 	return rc;
+}
+
+/**
+ * Set replacement image
+ *
+ * @v replacement	Replacement image
+ * @ret rc		Return status code
+ *
+ * The replacement image must already be registered, and must remain
+ * registered until the currently-executing image returns.
+ */
+int image_replace ( struct image *replacement ) {
+	struct image *image = current_image;
+	int rc;
+
+	/* Sanity check */
+	assert ( replacement->flags & IMAGE_REGISTERED );
+
+	/* Fail unless there is a currently-executing image */
+	if ( ! image ) {
+		rc = -ENOTTY;
+		DBGC ( replacement, "IMAGE %s cannot replace non-existent "
+		       "image: %s\n", replacement->name, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Clear any existing replacement */
+	image_put ( image->replacement );
+
+	/* Set replacement */
+	image->replacement = image_get ( replacement );
+	DBGC ( image, "IMAGE %s will replace self with IMAGE %s\n",
+	       image->name, replacement->name );
+
+	return 0;
 }
 
 /**

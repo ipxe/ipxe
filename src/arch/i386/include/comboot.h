@@ -161,9 +161,6 @@ extern int comboot_resolv ( const char *name, struct in_addr *address );
 /* setjmp/longjmp context buffer used to return after loading an image */
 extern rmjmp_buf comboot_return;
 
-/* Replacement image when exiting with COMBOOT_EXIT_RUN_KERNEL */
-extern struct image *comboot_replacement_image;
-
 extern void *com32_external_esp;
 
 #define COMBOOT_EXIT 1

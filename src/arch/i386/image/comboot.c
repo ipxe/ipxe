@@ -188,10 +188,9 @@ static int comboot_exec_loop ( struct image *image ) {
 		break;
 
 	case COMBOOT_EXIT_RUN_KERNEL:
-		DBGC ( image, "COMBOOT %p: exited to run kernel %p\n",
-		       image, comboot_replacement_image );
-		image->replacement = comboot_replacement_image;
-		comboot_replacement_image = NULL;
+		assert ( image->replacement );
+		DBGC ( image, "COMBOOT %p: exited to run kernel %s\n",
+		       image, image->replacement->name );
 		break;
 
 	case COMBOOT_EXIT_COMMAND:

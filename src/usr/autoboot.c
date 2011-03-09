@@ -122,17 +122,8 @@ struct setting skip_san_boot_setting __setting = {
  * @ret rc		Return status code
  */
 int uriboot ( struct uri *filename, struct uri *root_path ) {
-	struct image *image;
 	int drive;
 	int rc;
-
-	/* Allocate image */
-	image = alloc_image();
-	if ( ! image ) {
-		printf ( "Could not allocate image\n" );
-		rc = -ENOMEM;
-		goto err_alloc_image;
-	}
 
 	/* Treat empty URIs as absent */
 	if ( filename && ( ! uri_has_path ( filename ) ) )
@@ -183,7 +174,7 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 
 	/* Attempt filename boot if applicable */
 	if ( filename ) {
-		if ( ( rc = imgdownload ( image, filename,
+		if ( ( rc = imgdownload ( filename, NULL, NULL,
 					  register_and_boot_image ) ) != 0 ) {
 			printf ( "\nCould not chain image: %s\n",
 				 strerror ( rc ) );
@@ -229,8 +220,6 @@ int uriboot ( struct uri *filename, struct uri *root_path ) {
 	}
  err_san_hook:
  err_no_boot:
-	image_put ( image );
- err_alloc_image:
 	return rc;
 }
 

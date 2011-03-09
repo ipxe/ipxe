@@ -81,9 +81,6 @@ extern void int22_wrapper ( void );
 /* setjmp/longjmp context buffer used to return after loading an image */
 rmjmp_buf comboot_return;
 
-/* Replacement image when exiting with COMBOOT_EXIT_RUN_KERNEL */
-struct image *comboot_replacement_image;
-
 /* Mode flags set by INT 22h AX=0017h */
 static uint16_t comboot_graphics_mode = 0;
 
@@ -169,8 +166,6 @@ void comboot_force_text_mode ( void ) {
  * Fetch kernel and optional initrd
  */
 static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
-	struct image *kernel = NULL;
-	struct image *initrd = NULL;
 	char *initrd_file;
 	int rc;
 
@@ -188,18 +183,12 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 
 		DBG ( "COMBOOT: fetching initrd '%s'\n", initrd_file );
 
-		/* Allocate and fetch initrd */
-		initrd = alloc_image();
-		if ( ! initrd ) {
-			DBG ( "COMBOOT: could not allocate initrd\n" );
-			rc = -ENOMEM;
-			goto out;
-		}
-		if ( ( rc = imgfetch ( initrd, initrd_file,
-				       register_image ) ) != 0 ) {
+		/* Fetch initrd */
+		if ( ( rc = imgdownload_string ( initrd_file, NULL, NULL,
+						 register_and_put_image ))!=0){
 			DBG ( "COMBOOT: could not fetch initrd: %s\n",
 			      strerror ( rc ) );
-			goto out;
+			return rc;
 		}
 
 		/* Restore space after initrd name, if applicable */
@@ -210,36 +199,14 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 	DBG ( "COMBOOT: fetching kernel '%s'\n", kernel_file );
 
 	/* Allocate and fetch kernel */
-	kernel = alloc_image();
-	if ( ! kernel ) {
-		DBG ( "COMBOOT: could not allocate kernel\n" );
-		rc = -ENOMEM;
-		goto out;
-	}
-	if ( ( rc = imgfetch ( kernel, kernel_file,
-			       register_and_select_image ) ) != 0 ) {
+	if ( ( rc = imgdownload_string ( kernel_file, NULL, cmdline,
+					 register_and_replace_image ) ) != 0 ) {
 		DBG ( "COMBOOT: could not fetch kernel: %s\n",
 		      strerror ( rc ) );
-		goto out;
-	}
-	if ( ( rc = image_set_cmdline ( kernel, cmdline ) ) != 0 ) {
-		DBG ( "COMBOOT: could not set kernel command line: %s\n",
-		      strerror ( rc ) );
-		goto out;
+		return rc;
 	}
 
-	/* Store kernel as replacement image */
-	assert ( comboot_replacement_image == NULL );
-	comboot_replacement_image = image_get ( kernel );
-
- out:
-	/* Drop image references unconditionally; either we want to
-	 * discard them, or they have been registered and we should
-	 * drop out local reference.
-	 */
-	image_put ( kernel );
-	image_put ( initrd );
-	return rc;
+	return 0;
 }
 
 

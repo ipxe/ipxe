@@ -58,8 +58,11 @@ struct image {
 	struct image *replacement;
 };
 
+/** Image is registered */
+#define IMAGE_REGISTERED 0x00001
+
 /** Image is selected for execution */
-#define IMAGE_SELECTED 0x0001
+#define IMAGE_SELECTED 0x0002
 
 /** An executable image type */
 struct image_type {
@@ -142,6 +145,7 @@ extern void unregister_image ( struct image *image );
 struct image * find_image ( const char *name );
 extern int image_probe ( struct image *image );
 extern int image_exec ( struct image *image );
+extern int image_replace ( struct image *replacement );
 extern int image_select ( struct image *image );
 extern struct image * image_find_selected ( void );
 

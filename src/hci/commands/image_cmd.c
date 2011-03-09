@@ -35,30 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/**
- * Fill in image command line
- *
- * @v image		Image
- * @v args		Argument list
- * @ret rc		Return status code
- */
-static int imgfill_cmdline ( struct image *image, char **args ) {
-	char *cmdline = NULL;
-	int rc;
-
-	/* Construct command line (if arguments are present) */
-	if ( *args ) {
-		cmdline = concat_args ( args );
-		if ( ! cmdline )
-			return -ENOMEM;
-	}
-
-	/* Apply command line */
-	rc = image_set_cmdline ( image, cmdline );
-	free ( cmdline );
-	return rc;
-}
-
 /** "imgfetch" options */
 struct imgfetch_options {
 	/** Image name */
@@ -82,51 +58,54 @@ static struct command_descriptor imgfetch_cmd =
  * @v argc		Argument count
  * @v argv		Argument list
  * @v cmd		Command descriptor
+ * @v action_name	Action name (for error messages)
  * @v action		Action to take upon a successful download
  * @ret rc		Return status code
  */
 static int imgfetch_core_exec ( int argc, char **argv,
-				struct command_descriptor *cmd,
+				const char *action_name,
 				int ( * action ) ( struct image *image ) ) {
 	struct imgfetch_options opts;
-	struct image *image;
 	char *uri_string;
+	char *cmdline = NULL;
 	int rc;
 
 	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, cmd, &opts ) ) != 0 )
-		return rc;
+	if ( ( rc = parse_options ( argc, argv, &imgfetch_cmd, &opts ) ) != 0 )
+		goto err_parse_options;
 
 	/* Parse URI string */
 	uri_string = argv[optind];
 	if ( ! opts.name )
 		opts.name = basename ( uri_string );
 
-	/* Allocate image */
-	image = alloc_image();
-	if ( ! image ) {
-		printf ( "%s\n", strerror ( -ENOMEM ) );
-		return -ENOMEM;
+	/* Parse command line */
+	if ( argv[ optind + 1 ] != NULL ) {
+		cmdline = concat_args ( &argv[ optind + 1 ] );
+		if ( ! cmdline ) {
+			rc = -ENOMEM;
+			goto err_cmdline;
+		}
 	}
-
-	/* Fill in image name */
-	if ( ( rc = image_set_name ( image, opts.name ) ) != 0 )
-		return rc;
-
-	/* Fill in command line */
-	if ( ( rc = imgfill_cmdline ( image, &argv[ optind + 1 ] ) ) != 0 )
-		return rc;
 
 	/* Fetch the image */
-	if ( ( rc = imgfetch ( image, uri_string, action ) ) != 0 ) {
-		printf ( "Could not fetch %s: %s\n",
-			 uri_string, strerror ( rc ) );
-		image_put ( image );
-		return rc;
+	if ( ( rc = imgdownload_string ( uri_string, opts.name, cmdline,
+					 action ) ) != 0 ) {
+		printf ( "Could not %s %s: %s\n",
+			 action_name, uri_string, strerror ( rc ) );
+		goto err_imgdownload;
 	}
 
-	image_put ( image );
+	/* Free command line */
+	free ( cmdline );
+
 	return 0;
+
+ err_imgdownload:
+	free ( cmdline );
+ err_cmdline:
+ err_parse_options:
+	return rc;
 }
 
 /**
@@ -138,8 +117,8 @@ static int imgfetch_core_exec ( int argc, char **argv,
  */
 static int imgfetch_exec ( int argc, char **argv ) {
 
-	return imgfetch_core_exec ( argc, argv, &imgfetch_cmd,
-				    register_image );
+	return imgfetch_core_exec ( argc, argv, "fetch",
+				    register_and_put_image );
 }
 
 /**
@@ -151,7 +130,7 @@ static int imgfetch_exec ( int argc, char **argv ) {
  */
 static int kernel_exec ( int argc, char **argv ) {
 
-	return imgfetch_core_exec ( argc, argv, &imgfetch_cmd,
+	return imgfetch_core_exec ( argc, argv, "select",
 				    register_and_select_image );
 }
 
@@ -164,7 +143,7 @@ static int kernel_exec ( int argc, char **argv ) {
  */
 static int chain_exec ( int argc, char **argv) {
 
-	return imgfetch_core_exec ( argc, argv, &imgfetch_cmd,
+	return imgfetch_core_exec ( argc, argv, "boot",
 				    register_and_boot_image );
 }
 
@@ -230,21 +209,41 @@ static struct command_descriptor imgargs_cmd =
 static int imgargs_exec ( int argc, char **argv ) {
 	struct imgargs_options opts;
 	struct image *image;
+	char *cmdline = NULL;
 	int rc;
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &imgargs_cmd, &opts ) ) != 0 )
-		return rc;
+		goto err_parse_options;
 
 	/* Parse image name */
 	if ( ( rc = parse_image ( argv[optind], &image ) ) != 0 )
-		return rc;
+		goto err_parse_image;
 
-	/* Fill in command line */
-	if ( ( rc = imgfill_cmdline ( image, &argv[ optind + 1 ] ) ) != 0 )
-		return rc;
+	/* Parse command line */
+	if ( argv[ optind + 1 ] != NULL ) {
+		cmdline = concat_args ( &argv[ optind + 1 ] );
+		if ( ! cmdline ) {
+			rc = -ENOMEM;
+			goto err_cmdline;
+		}
+	}
+
+	/* Set command line */
+	if ( ( rc = image_set_cmdline ( image, cmdline ) ) != 0 )
+		goto err_set_cmdline;
+
+	/* Free command line */
+	free ( cmdline );
 
 	return 0;
+
+ err_set_cmdline:
+	free ( cmdline );
+ err_cmdline:
+ err_parse_image:
+ err_parse_options:
+	return rc;
 }
 
 /** "imgexec" options */
