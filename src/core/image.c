@@ -128,6 +128,12 @@ int register_image ( struct image *image ) {
 			   imgindex++ );
 	}
 
+	/* Avoid ending up with multiple "selected" images on
+	 * re-registration
+	 */
+	if ( image_find_selected() )
+		image->flags &= ~IMAGE_SELECTED;
+
 	/* Add to image list */
 	image_get ( image );
 	image->flags |= IMAGE_REGISTERED;
