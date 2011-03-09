@@ -110,6 +110,7 @@ struct image_type {
 #define __image_type( probe_order ) __table_entry ( IMAGE_TYPES, probe_order )
 
 extern struct list_head images;
+extern struct image *current_image;
 
 /** Iterate over all registered images */
 #define for_each_image( image ) \

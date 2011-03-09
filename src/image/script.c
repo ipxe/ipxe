@@ -38,13 +38,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <usr/prompt.h>
 #include <ipxe/script.h>
 
-/** Currently running script
- *
- * This is a global in order to allow goto_exec() to update the
- * offset.
- */
-static struct image *script;
-
 /** Offset within current script
  *
  * This is a global in order to allow goto_exec() to update the
@@ -55,11 +48,13 @@ static size_t script_offset;
 /**
  * Process script lines
  *
+ * @v image		Script
  * @v process_line	Line processor
  * @v terminate		Termination check
  * @ret rc		Return status code
  */
-static int process_script ( int ( * process_line ) ( const char *line ),
+static int process_script ( struct image *image,
+			    int ( * process_line ) ( const char *line ),
 			    int ( * terminate ) ( int rc ) ) {
 	off_t eol;
 	size_t len;
@@ -70,17 +65,17 @@ static int process_script ( int ( * process_line ) ( const char *line ),
 	do {
 	
 		/* Find length of next line, excluding any terminating '\n' */
-		eol = memchr_user ( script->data, script_offset, '\n',
-				    ( script->len - script_offset ) );
+		eol = memchr_user ( image->data, script_offset, '\n',
+				    ( image->len - script_offset ) );
 		if ( eol < 0 )
-			eol = script->len;
+			eol = image->len;
 		len = ( eol - script_offset );
 
 		/* Copy line, terminate with NUL, and execute command */
 		{
 			char cmdbuf[ len + 1 ];
 
-			copy_from_user ( cmdbuf, script->data,
+			copy_from_user ( cmdbuf, image->data,
 					 script_offset, len );
 			cmdbuf[len] = '\0';
 			DBG ( "$ %s\n", cmdbuf );
@@ -94,7 +89,7 @@ static int process_script ( int ( * process_line ) ( const char *line ),
 				return rc;
 		}
 
-	} while ( script_offset < script->len );
+	} while ( script_offset < image->len );
 
 	return rc;
 }
@@ -138,7 +133,6 @@ static int script_exec_line ( const char *line ) {
  * @ret rc		Return status code
  */
 static int script_exec ( struct image *image ) {
-	struct image *saved_script;
 	size_t saved_offset;
 	int rc;
 
@@ -148,18 +142,14 @@ static int script_exec ( struct image *image ) {
 	unregister_image ( image );
 
 	/* Preserve state of any currently-running script */
-	saved_script = script;
 	saved_offset = script_offset;
 
-	/* Initialise state for this script */
-	script = image;
-
 	/* Process script */
-	rc = process_script ( script_exec_line, terminate_on_exit_or_failure );
+	rc = process_script ( image, script_exec_line,
+			      terminate_on_exit_or_failure );
 
 	/* Restore saved state, re-register image, and return */
 	script_offset = saved_offset;
-	script = saved_script;
 	register_image ( image );
 	return rc;
 }
@@ -262,7 +252,7 @@ static int goto_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Sanity check */
-	if ( ! script ) {
+	if ( ! current_image ) {
 		rc = -ENOTTY;
 		printf ( "Not in a script: %s\n", strerror ( rc ) );
 		return rc;
@@ -273,7 +263,7 @@ static int goto_exec ( int argc, char **argv ) {
 
 	/* Find label */
 	saved_offset = script_offset;
-	if ( ( rc = process_script ( goto_find_label,
+	if ( ( rc = process_script ( current_image, goto_find_label,
 				     terminate_on_label_found ) ) != 0 ) {
 		script_offset = saved_offset;
 		return rc;

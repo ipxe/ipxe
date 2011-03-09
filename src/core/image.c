@@ -39,6 +39,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** List of registered images */
 struct list_head images = LIST_HEAD_INIT ( images );
 
+/** Currently-executing image */
+struct image *current_image;
+
 /**
  * Free executable image
  *
@@ -200,6 +203,7 @@ int image_probe ( struct image *image ) {
  * @ret rc		Return status code
  */
 int image_exec ( struct image *image ) {
+	struct image *saved_current_image;
 	struct image *replacement;
 	struct uri *old_cwuri;
 	int rc;
@@ -212,11 +216,14 @@ int image_exec ( struct image *image ) {
 	old_cwuri = uri_get ( cwuri );
 	churi ( image->uri );
 
+	/* Preserve record of any currently-running image */
+	saved_current_image = current_image;
+
 	/* Take out a temporary reference to the image.  This allows
 	 * the image to unregister itself if necessary, without
 	 * automatically freeing itself.
 	 */
-	image_get ( image );
+	current_image = image_get ( image );
 
 	/* Try executing the image */
 	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
@@ -232,6 +239,9 @@ int image_exec ( struct image *image ) {
 
 	/* Drop temporary reference to the original image */
 	image_put ( image );
+
+	/* Restore previous currently-running image */
+	current_image = saved_current_image;
 
 	/* Reset current working directory */
 	churi ( old_cwuri );
