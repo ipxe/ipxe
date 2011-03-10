@@ -19,6 +19,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define	CONSOLE_DIRECT_VGA	/* Direct access to VGA card */
 //#define	CONSOLE_BTEXT		/* Who knows what this does? */
 //#define	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
+//#define	CONSOLE_SYSLOG		/* Syslog console */
 
 #include <config/local/console.h>
 
