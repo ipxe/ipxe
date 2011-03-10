@@ -420,7 +420,8 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 	DBG ( "PXENV_UNDI_GET_INFORMATION" );
 
 	undi_get_information->BaseIo = dev->desc.ioaddr;
-	undi_get_information->IntNumber = dev->desc.irq;
+	undi_get_information->IntNumber =
+		( netdev_irq_supported ( pxe_netdev ) ? dev->desc.irq : 0 );
 	/* Cheat: assume all cards can cope with this */
 	undi_get_information->MaxTranUnit = ETH_MAX_MTU;
 	undi_get_information->HwType = ntohs ( ll_protocol->ll_proto );
