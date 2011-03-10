@@ -286,7 +286,7 @@ static int bios_iskey ( void ) {
 					   "popw %w0\n\t"
 					   "cli\n\t" )
 			       : "=r" ( flags ), "=a" ( discard_a )
-			       : "a" ( 0x0100 ) );
+			       : "a" ( 0x1100 ) );
 	return ( ! ( flags & ZF ) );
 }
 
