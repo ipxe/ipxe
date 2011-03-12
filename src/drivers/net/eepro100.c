@@ -808,7 +808,7 @@ static void ifec_rx_process ( struct net_device *netdev )
 		       cur_rx );
 		DBGIO_HD ( (void*)rfd->packet, 0x30 );
 
-		if ( ( status & RFD_STATUS ) != RFD_OK ) {
+		if ( ( status & ( RFD_STATUS & ~RFDShort ) ) != RFD_OK ) {
 			DBG ( "Corrupted packet received. "
 			      "Status = %#08hx\n", status );
 			netdev_rx_err ( netdev, iob, -EINVAL );
