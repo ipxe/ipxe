@@ -320,7 +320,8 @@ pmm_scan:
 	/* We have PMM and so a 1kB stack: preserve whole registers */
 	pushal
 	/* Allocate image source PMM block */
-	movzwl	image_source_len_pgh, %ecx
+	movzwl	image_source_size, %ecx
+	shll	$5, %ecx
 	movl	$PMM_HANDLE_BASE_IMAGE_SOURCE, %ebx
 	movw	$get_pmm_image_source, %bp
 	call	get_pmm
@@ -565,16 +566,16 @@ image_source:
 	.long	0
 	.size	image_source, . - image_source
 
-/* Image source area length (in paragraphs)
+/* Image source size (in 512-byte sectors)
  *
  */
-image_source_len_pgh:
+image_source_size:
 	.word	0
-	.size	image_source_len_pgh, . - image_source_len_pgh
+	.size	image_source_size, . - image_source_size
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
 	.ascii	"ADDW"
-	.long	image_source_len_pgh
-	.long	16
+	.long	image_source_size
+	.long	512
 	.long	0
 	.previous
 
