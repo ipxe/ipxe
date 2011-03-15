@@ -27,6 +27,8 @@ struct efi_pci_device {
 	EFI_PCI_IO_PROTOCOL *pci_io;
 	/** Device path */
 	EFI_DEVICE_PATH_PROTOCOL *path;
+	/** EFI driver */
+	struct efi_driver *efidrv;
 };
 
 extern struct efi_pci_device * efipci_create ( struct efi_driver *efidrv,
@@ -34,6 +36,10 @@ extern struct efi_pci_device * efipci_create ( struct efi_driver *efidrv,
 extern EFI_STATUS efipci_enable ( struct efi_pci_device *efipci );
 extern struct efi_pci_device * efipci_find_efi ( EFI_HANDLE device );
 extern struct efi_pci_device * efipci_find ( struct device *dev );
+extern EFI_STATUS efipci_child_add ( struct efi_pci_device *efipci,
+				     EFI_HANDLE device );
+extern void efipci_child_del ( struct efi_pci_device *efipci,
+			       EFI_HANDLE device );
 extern void efipci_destroy ( struct efi_driver *efidrv,
 			     struct efi_pci_device *efipci );
 

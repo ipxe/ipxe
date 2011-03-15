@@ -139,6 +139,7 @@ struct efi_pci_device * efipci_create ( struct efi_driver *efidrv,
 	if ( ! efipci )
 		goto err_zalloc;
 	efipci->device = device;
+	efipci->efidrv = efidrv;
 
 	/* See if device is a PCI device */
 	if ( ( efirc = bs->OpenProtocol ( device,
@@ -260,6 +261,54 @@ struct efi_pci_device * efipci_find ( struct device *dev ) {
 			return efipci;
 	}
 	return NULL;
+}
+
+/**
+ * Add EFI device as child of EFI PCI device
+ *
+ * @v efipci		EFI PCI device
+ * @v device		EFI child device
+ * @ret efirc		EFI status code
+ */
+EFI_STATUS efipci_child_add ( struct efi_pci_device *efipci,
+			      EFI_HANDLE device ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_driver *efidrv = efipci->efidrv;
+	union {
+		EFI_PCI_IO_PROTOCOL *pci_io;
+		void *interface;
+	} pci_io;
+	EFI_STATUS efirc;
+
+	/* Re-open the PCI_IO_PROTOCOL */
+	if ( ( efirc = bs->OpenProtocol ( efipci->device,
+					  &efi_pci_io_protocol_guid,
+					  &pci_io.interface,
+					  efidrv->driver.DriverBindingHandle,
+					  device,
+					  EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER
+					  ) ) != 0 ) {
+		DBGC ( efipci, "EFIPCI " PCI_FMT " could not add child: %s\n",
+		       PCI_ARGS ( &efipci->pci ), efi_strerror ( efirc ) );
+		return efirc;
+	}
+
+	return 0;
+}
+
+/**
+ * Remove EFI device as child of PCI device
+ *
+ * @v efipci		EFI PCI device
+ * @v device		EFI child device
+ * @ret efirc		EFI status code
+ */
+void efipci_child_del ( struct efi_pci_device *efipci, EFI_HANDLE device ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_driver *efidrv = efipci->efidrv;
+
+	bs->CloseProtocol ( efipci->device, &efi_pci_io_protocol_guid,
+			    efidrv->driver.DriverBindingHandle, device );
 }
 
 /**

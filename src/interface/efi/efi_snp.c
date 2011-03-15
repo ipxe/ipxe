@@ -46,6 +46,8 @@ struct efi_snp_device {
 	struct list_head list;
 	/** The underlying iPXE network device */
 	struct net_device *netdev;
+	/** The underlying EFI PCI device */
+	struct efi_pci_device *efipci;
 	/** EFI device handle */
 	EFI_HANDLE handle;
 	/** The SNP structure itself */
@@ -795,6 +797,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 		goto err_alloc_snp;
 	}
 	snpdev->netdev = netdev_get ( netdev );
+	snpdev->efipci = efipci;
 
 	/* Sanity check */
 	if ( netdev->ll_protocol->ll_addr_len > sizeof ( EFI_MAC_ADDRESS ) ) {
@@ -865,6 +868,15 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 		goto err_install_protocol_interface;
 	}
 
+	/* Add as child of PCI device */
+	if ( ( efirc = efipci_child_add ( efipci, snpdev->handle ) ) != 0 ) {
+		DBGC ( snpdev, "SNPDEV %p could not become child of " PCI_FMT
+		       ": %s\n", snpdev, PCI_ARGS ( &efipci->pci ),
+		       efi_strerror ( efirc ) );
+		rc = EFIRC_TO_RC ( efirc );
+		goto err_efipci_child_add;
+	}
+
 	/* Add to list of SNP devices */
 	list_add ( &snpdev->list, &efi_snp_devices );
 
@@ -872,6 +884,8 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	       snpdev, netdev->name, snpdev->handle );
 	return 0;
 
+	efipci_child_del ( efipci, snpdev->handle );
+ err_efipci_child_add:
 	bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
@@ -916,6 +930,7 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 	}
 
 	/* Uninstall the SNP */
+	efipci_child_del ( snpdev->efipci, snpdev->handle );
 	list_del ( &snpdev->list );
 	bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
