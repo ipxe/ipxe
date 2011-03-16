@@ -918,7 +918,7 @@ static int arbel_create_recv_wq ( struct arbel_recv_work_queue *arbel_recv_wq,
 		next_wqe = &arbel_recv_wq->wqe[( i + 1 ) & wqe_idx_mask].recv;
 		MLX_FILL_1 ( &wqe->next, 0, nda_31_6,
 			     ( virt_to_bus ( next_wqe ) >> 6 ) );
-		MLX_FILL_1 ( &wqe->next, 1, nds, ( sizeof ( *wqe ) / 16 ) );
+		MLX_FILL_1 ( &wqe->next, 1, nds, nds );
 		for ( j = 0 ; ( ( ( void * ) &wqe->data[j] ) <
 				( ( void * ) ( wqe + 1 ) ) ) ; j++ ) {
 			MLX_FILL_1 ( &wqe->data[j], 1,
