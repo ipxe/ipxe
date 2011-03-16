@@ -25,4 +25,4 @@ _linux_start:
 	movl	$__NR_exit, %eax
 	int	$0x80
 
-	.size _start, . - _start
+	.size _linux_start, . - _linux_start

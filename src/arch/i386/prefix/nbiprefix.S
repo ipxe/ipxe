@@ -72,7 +72,7 @@ _nbi_start:
 	int $0x19
 
 	.previous
-	.size	start, . - start
+	.size	_nbi_start, . - _nbi_start
 
 nbi_header_end:
 	.org 512
