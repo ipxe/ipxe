@@ -422,6 +422,7 @@ static void eepro_transmit(
 		tx_available = tx_start - tx_end;
 	else
 		tx_available = XMT_RAM;
+	assert ( length <= tx_available );
 	last = tx_end;
 	end = last + (((length + 3) >> 1) << 1) + XMT_HEADER;
 	if (end >= (XMT_UPPER_LIMIT << 8)) {
