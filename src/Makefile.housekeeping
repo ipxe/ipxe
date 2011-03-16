@@ -1090,7 +1090,7 @@ endif # defined(BIN)
 # Keyboard maps
 #
 
-hci/keymap/keymap_%.c : $(GENKEYMAP)
+hci/keymap/keymap_%.c :
 	$(Q)$(PERL) $(GENKEYMAP) $* > $@
 
 ###############################################################################
