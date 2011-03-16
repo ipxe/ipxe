@@ -13,7 +13,6 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 /** "uk" keyboard mapping */
 struct key_mapping uk_mapping[] __keymap = {
 	{ 0x22, 0x40 },	/* '"' => '@' */
-	{ 0x3c, 0x5c },	/* '<' => '\\' */
 	{ 0x40, 0x22 },	/* '@' => '"' */
 	{ 0x5c, 0x23 },	/* '\\' => '#' */
 	{ 0x7c, 0x7e },	/* '|' => '~' */

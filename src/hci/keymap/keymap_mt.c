@@ -17,5 +17,4 @@ struct key_mapping mt_mapping[] __keymap = {
 	{ 0x40, 0x22 },	/* '@' => '"' */
 	{ 0x5c, 0x23 },	/* '\\' => '#' */
 	{ 0x7c, 0x7e },	/* '|' => '~' */
-	{ 0x7f, 0x08 },	/* 0x7f => Ctrl-H */
 };

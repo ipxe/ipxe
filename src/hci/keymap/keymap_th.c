@@ -12,5 +12,4 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 /** "th" keyboard mapping */
 struct key_mapping th_mapping[] __keymap = {
-	{ 0x7f, 0x08 },	/* 0x7f => Ctrl-H */
 };

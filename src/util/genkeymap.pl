@@ -172,15 +172,26 @@ sub translate_keymaps {
 	  or next;
       my $to_ascii = keysym_to_ascii ( $to->[$keymap]->[$keycode] )
 	  or next;
-      if ( ( $from_ascii != $to_ascii ) && $verbosity > 1 ) {
+      my $new_map = ( ! exists $map->{$from_ascii} );
+      my $update_map =
+	  ( $new_map || ( $keycode < $map->{$from_ascii}->{keycode} ) );
+      if ( ( $verbosity > 1 ) &&
+	   ( ( $from_ascii != $to_ascii ) ||
+	     ( $update_map && ! $new_map ) ) ) {
 	printf STDERR "In keymap %d: %s => %s%s\n", $keymap,
 	       ascii_to_name ( $from_ascii ), ascii_to_name ( $to_ascii ),
-	       ( $map->{$from_ascii} ? " (ignored)" : "" );
+	       ( $update_map ? ( $new_map ? "" : " (override)" )
+			     : " (ignored)" );
       }
-      $map->{$from_ascii} ||= $to_ascii;
+      if ( $update_map ) {
+	$map->{$from_ascii} = {
+	  to_ascii => $to_ascii,
+	  keycode => $keycode,
+	};
+      }
     }
   }
-  return $map;
+  return { map { $_ => $map->{$_}->{to_ascii} } keys %$map };
 }
 
 # Parse command-line options
