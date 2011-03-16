@@ -1113,7 +1113,6 @@ static int sis190_probe(struct pci_device *pdev)
 {
 	struct sis190_private *tp;
 	struct net_device *dev;
-	void *ioaddr;
 	int rc;
 
 	rc = sis190_init_board(pdev, &dev);
@@ -1124,7 +1123,6 @@ static int sis190_probe(struct pci_device *pdev)
 	pci_set_drvdata(pdev, dev);
 
 	tp = netdev_priv(dev);
-	ioaddr = tp->mmio_addr;
 
 	rc = sis190_get_mac_addr(pdev, dev);
 	if (rc < 0)
