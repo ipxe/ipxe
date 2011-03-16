@@ -109,6 +109,10 @@ VERYCLEANUP	+= .toolcheck
 # Check for various tool workarounds
 #
 
+WORKAROUND_CFLAGS :=
+WORKAROUND_ASFLAGS :=
+WORKAROUND_LDFLAGS :=
+
 # Make syntax does not allow use of comma or space in certain places.
 # This ugly workaround is suggested in the manual.
 #
@@ -119,7 +123,7 @@ SPACE	:= $(EMPTY) $(EMPTY)
 # Check for an old version of gas (binutils 2.9.1)
 #
 OLDGAS	:= $(shell $(AS) --version | grep -q '2\.9\.1' && $(ECHO) -DGAS291)
-CFLAGS	+= $(OLDGAS)
+WORKAROUND_CFLAGS += $(OLDGAS)
 oldgas :
 	@$(ECHO) $(oldgas)
 
@@ -131,7 +135,7 @@ ifeq ($(CCTYPE),gcc)
 SP_TEST = $(CC) -fno-stack-protector -x c -c /dev/null \
 		-o /dev/null >/dev/null 2>&1
 SP_FLAGS := $(shell $(SP_TEST) && $(ECHO) '-fno-stack-protector')
-CFLAGS	+= $(SP_FLAGS)
+WORKAROUND_CFLAGS += $(SP_FLAGS)
 endif
 
 # gcc 4.4 generates .eh_frame sections by default, which distort the
@@ -141,7 +145,7 @@ ifeq ($(CCTYPE),gcc)
 CFI_TEST = $(CC) -fno-dwarf2-cfi-asm -x c -c /dev/null \
 		 -o /dev/null >/dev/null 2>&1
 CFI_FLAGS := $(shell $(CFI_TEST) && $(ECHO) '-fno-dwarf2-cfi-asm')
-CFLAGS	+= $(CFI_FLAGS)
+WORKAROUND_CFLAGS += $(CFI_FLAGS)
 endif
 
 # Some versions of gas choke on division operators, treating them as
@@ -150,7 +154,7 @@ endif
 #
 DIVIDE_TEST = $(AS) --divide /dev/null -o /dev/null 2>/dev/null
 DIVIDE_FLAGS := $(shell $(DIVIDE_TEST) && $(ECHO) '--divide')
-ASFLAGS	+= $(DIVIDE_FLAGS)
+WORKAROUND_ASFLAGS += $(DIVIDE_FLAGS)
 
 ###############################################################################
 #
@@ -375,9 +379,9 @@ CFLAGS		+= -diag-disable 1419 # Missing prototypes
 CFLAGS		+= -diag-disable 1599 # Hidden variables
 CFLAGS		+= -Wall -Wmissing-declarations
 endif
-CFLAGS		+= $(EXTRA_CFLAGS)
-ASFLAGS		+= $(EXTRA_ASFLAGS)
-LDFLAGS		+= $(EXTRA_LDFLAGS)
+CFLAGS		+= $(WORKAROUND_CFLAGS) $(EXTRA_CFLAGS)
+ASFLAGS		+= $(WORKAROUND_ASFLAGS) $(EXTRA_ASFLAGS)
+LDFLAGS		+= $(WORKAROUND_LDFLAGS) $(EXTRA_LDFLAGS)
 
 # Inhibit -Werror if NO_WERROR is specified on make command line
 #
