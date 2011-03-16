@@ -34,7 +34,6 @@ static struct uri_test uri_tests[] = {
 
 static int test_parse_unparse ( const char *uri_string ) {
 	char buf[URI_MAX_LEN];
-	size_t len;
 	struct uri *uri = NULL;
 	int rc;
 
@@ -44,7 +43,7 @@ static int test_parse_unparse ( const char *uri_string ) {
 		rc = -ENOMEM;
 		goto done;
 	}
-	len = unparse_uri ( buf, sizeof ( buf ), uri, URI_ALL );
+	unparse_uri ( buf, sizeof ( buf ), uri, URI_ALL );
 
 	/* Compare result */
 	if ( strcmp ( buf, uri_string ) != 0 ) {
@@ -72,7 +71,6 @@ static int test_resolve ( const char *base_uri_string,
 	struct uri *relative_uri = NULL;
 	struct uri *resolved_uri = NULL;
 	char buf[URI_MAX_LEN];
-	size_t len;
 	int rc;
 
 	/* Parse URIs */
@@ -95,7 +93,7 @@ static int test_resolve ( const char *base_uri_string,
 	}
 
 	/* Compare result */
-	len = unparse_uri ( buf, sizeof ( buf ), resolved_uri, URI_ALL );
+	unparse_uri ( buf, sizeof ( buf ), resolved_uri, URI_ALL );
 	if ( strcmp ( buf, resolved_uri_string ) != 0 ) {
 		printf ( "Resolution of \"%s\"+\"%s\" produced \"%s\"\n",
 			 base_uri_string, relative_uri_string, buf );
