@@ -1645,7 +1645,6 @@ static void sky2_status_intr(struct sky2_hw *hw, u16 idx)
 
 	rmb();
 	do {
-		struct sky2_port *sky2;
 		struct sky2_status_le *le  = hw->st_le + hw->st_idx;
 		unsigned port;
 		struct net_device *dev;
@@ -1659,7 +1658,6 @@ static void sky2_status_intr(struct sky2_hw *hw, u16 idx)
 
 		port = le->css & CSS_LINK_BIT;
 		dev = hw->dev[port];
-		sky2 = netdev_priv(dev);
 		length = le16_to_cpu(le->length);
 		status = le32_to_cpu(le->status);
 
@@ -2158,9 +2156,6 @@ static void sky2_set_multicast(struct net_device *dev)
 	unsigned port = sky2->port;
 	u16 reg;
 	u8 filter[8];
-	int rx_pause;
-
-	rx_pause = (sky2->flow_status == FC_RX || sky2->flow_status == FC_BOTH);
 
 	reg = gma_read16(hw, port, GM_RX_CTRL);
 	reg |= GM_RXCR_UCF_ENA;
