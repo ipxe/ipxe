@@ -48,13 +48,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define USE_64BIT_ADDR
 #endif
 
-//#define DDEBUG
-#ifdef DDEBUG
-#define dprintf(x) printf x
-#else
-#define dprintf(x)
-#endif
-
 #define HZ 100
 
 /* Condensed operations for readability. */
@@ -322,7 +315,7 @@ static int lnksts = 0;		/* CFG_LNKSTS bit polarity */
 #define __kick_rx()	writel(CR_RXE, ns->base + CR)
 
 #define kick_rx() do { \
-	dprintf(("kick_rx: maybe kicking\n")); \
+	DBG("kick_rx: maybe kicking\n"); \
 		writel(virt_to_le32desc(&rx_ring[ns->cur_rx]), ns->base + RXDP); \
 		if (ns->next_rx == ns->next_empty) \
 			printf("uh-oh: next_rx == next_empty???\n"); \
@@ -415,8 +408,8 @@ static void phy_intr(struct nic *nic __unused)
 		tbisr = readl(ns->base + TBISR);
 		tanar = readl(ns->base + TANAR);
 		tanlpar = readl(ns->base + TANLPAR);
-		dprintf(("phy_intr: tbisr=%hX, tanar=%hX, tanlpar=%hX\n",
-			 tbisr, tanar, tanlpar));
+		DBG("phy_intr: tbisr=%hX, tanar=%hX, tanlpar=%hX\n",
+		    tbisr, tanar, tanlpar);
 
 		if ((fullduplex = (tanlpar & TANAR_FULL_DUP)
 		     && (tanar & TANAR_FULL_DUP))) {
@@ -511,7 +504,7 @@ static void ns83820_setup_rx(struct nic *nic)
 	writel(0, ns->base + RXDP_HI);
 	writel(virt_to_le32desc(&rx_ring[0]), ns->base + RXDP);
 
-	dprintf(("starting receiver\n"));
+	DBG("starting receiver\n");
 
 	writel(0x0001, ns->base + CCSR);
 	writel(0, ns->base + RFCR);
@@ -544,18 +537,18 @@ static void ns83820_setup_rx(struct nic *nic)
 
 static void ns83820_do_reset(struct nic *nic __unused, u32 which)
 {
-	dprintf(("resetting chip...\n"));
+	DBG("resetting chip...\n");
 	writel(which, ns->base + CR);
 	do {
 
 	} while (readl(ns->base + CR) & which);
-	dprintf(("okay!\n"));
+	DBG("okay!\n");
 }
 
 static void ns83820_reset(struct nic *nic)
 {
 	unsigned i;
-	dprintf(("ns83820_reset\n"));
+	DBG("ns83820_reset\n");
 
 	writel(0, ns->base + PQCR);
 
@@ -612,7 +605,7 @@ static void ns83820_run_bist(struct nic *nic __unused, const char *name,
 	u32 status;
 	int loops = 0;
 
-	dprintf(("start %s\n", name))
+	DBG("start %s\n", name);
 
 	    start = currticks();
 
@@ -637,7 +630,7 @@ static void ns83820_run_bist(struct nic *nic __unused, const char *name,
 		 (unsigned int) fail);
 	else if (timed_out)
 		printf("run_bist %s timed out! (%hX)\n", name, (unsigned int) status);
-	dprintf(("done %s in %d loops\n", name, loops));
+	DBG("done %s in %d loops\n", name, loops);
 }
 
 /*************************************
@@ -697,7 +690,7 @@ static int ns83820_poll(struct nic *nic, int retrieve)
 
 static inline void kick_tx(struct nic *nic __unused)
 {
-	dprintf(("kick_tx\n"));
+	DBG("kick_tx\n");
 	writel(CR_TXE, ns->base + CR);
 }
 
@@ -897,7 +890,7 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 
 	/* setup optical transceiver if we have one */
 	if (ns->CFG_cache & CFG_TBI_EN) {
-		dprintf(("%s: enabling optical transceiver\n", pci->driver_name));
+		DBG("%s: enabling optical transceiver\n", pci->id->name);
 		writel(readl(ns->base + GPIOR) | 0x3e8, ns->base + GPIOR);
 
 		/* setup auto negotiation feature advertisement */
@@ -914,11 +907,11 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 		ns->CFG_cache |= CFG_MODE_1000;
 	}
 	writel(ns->CFG_cache, ns->base + CFG);
-	dprintf(("CFG: %hX\n", ns->CFG_cache));
+	DBG("CFG: %hX\n", ns->CFG_cache);
 
 	/* FIXME: reset_phy is defaulted to 0, should we reset anyway? */
 	if (reset_phy) {
-		dprintf(("%s: resetting phy\n", pci->driver_name));
+		DBG("%s: resetting phy\n", pci->id->name);
 		writel(ns->CFG_cache | CFG_PHY_RST, ns->base + CFG);
 		writel(ns->CFG_cache, ns->base + CFG);
 	}
@@ -983,14 +976,14 @@ static int ns83820_probe ( struct nic *nic, struct pci_device *pci ) {
 	ns83820_getmac(nic, nic->node_addr);
 
 	if (using_dac) {
-		dprintf(("%s: using 64 bit addressing.\n", pci->driver_name));
+		DBG("%s: using 64 bit addressing.\n", pci->id->name);
 	}
 
-	dprintf(("%s: DP83820 %d.%d: %! io=0x%hX\n",
-		 pci->driver_name,
-		 (unsigned) readl(ns->base + SRR) >> 8,
-		 (unsigned) readl(ns->base + SRR) & 0xff,
-		 nic->node_addr, pci->ioaddr));
+	DBG("%s: DP83820 %d.%d: io=%#04lx\n",
+	    pci->id->name,
+	    (unsigned) readl(ns->base + SRR) >> 8,
+	    (unsigned) readl(ns->base + SRR) & 0xff,
+	    pci->ioaddr);
 
 #ifdef PHY_CODE_IS_FINISHED
 	ns83820_probe_phy(dev);
