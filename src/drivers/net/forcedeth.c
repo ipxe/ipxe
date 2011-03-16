@@ -676,7 +676,7 @@ forcedeth_open ( struct net_device *netdev )
 {
 	struct forcedeth_private *priv = netdev_priv ( netdev );
 	void *ioaddr = priv->mmio_addr;
-	int i, ret = 1;
+	int i;
 	int rc;
 	u32 low;
 
@@ -772,7 +772,7 @@ forcedeth_open ( struct net_device *netdev )
 	readl ( ioaddr + NvRegMIIStatus );
 	writel ( NVREG_MIISTAT_MASK_ALL, ioaddr + NvRegMIIStatus );
 	priv->linkspeed = 0;
-	ret = nv_update_linkspeed ( priv );
+	nv_update_linkspeed ( priv );
 	nv_start_rx ( priv );
 	nv_start_tx ( priv );
 
