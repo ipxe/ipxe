@@ -148,6 +148,15 @@ CFI_FLAGS := $(shell $(CFI_TEST) && $(ECHO) '-fno-dwarf2-cfi-asm')
 WORKAROUND_CFLAGS += $(CFI_FLAGS)
 endif
 
+# gcc 4.6 generates spurious warnings if -Waddress is in force.
+# Inhibit this.
+#
+ifeq ($(CCTYPE),gcc)
+WNA_TEST = $(CC) -Wno-address -x c -c /dev/null -o /dev/null >/dev/null 2>&1
+WNA_FLAGS := $(shell $(WNA_TEST) && $(ECHO) '-Wno-address')
+WORKAROUND_CFLAGS += $(WNA_FLAGS)
+endif
+
 # Some versions of gas choke on division operators, treating them as
 # comment markers.  Specifying --divide will work around this problem,
 # but isn't available on older gas versions.
