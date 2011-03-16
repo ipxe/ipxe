@@ -102,6 +102,7 @@ struct igbvf_queue_stats {
  * so a DMA handle can be stored along with the buffer
  */
 struct igbvf_buffer {
+#if 0
 	dma_addr_t dma;
 	dma_addr_t page_dma;
 	struct sk_buff *skb;
@@ -119,9 +120,11 @@ struct igbvf_buffer {
 		};
 	};
 	struct page *page;
+#endif
 };
 
 struct igbvf_ring {
+#if 0
 	struct igbvf_adapter *adapter;  /* backlink */
 	void *desc;			/* pointer to ring memory  */
 	dma_addr_t dma;			/* phys address of ring    */
@@ -136,11 +139,9 @@ struct igbvf_ring {
 
 	/* array of buffer information structs */
 	struct igbvf_buffer *buffer_info;
-#if 0
 	struct napi_struct napi;
 
 	char name[IFNAMSIZ + 5];
-#endif
 	u32 eims_value;
 	u32 itr_val;
 	u16 itr_register;
@@ -149,6 +150,7 @@ struct igbvf_ring {
 	struct sk_buff *rx_skb_top;
 
 	struct igbvf_queue_stats stats;
+#endif
 };
 
 /* board specific private data structure */
