@@ -476,7 +476,6 @@ static int phantom_dmesg ( struct phantom_nic *phantom, unsigned int log,
 			    unsigned int max_lines ) {
 	uint32_t head;
 	uint32_t tail;
-	uint32_t len;
 	uint32_t sig;
 	uint32_t offset;
 	int byte;
@@ -487,7 +486,6 @@ static int phantom_dmesg ( struct phantom_nic *phantom, unsigned int log,
 
 	/* Locate log */
 	head = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_HEAD ( log ) );
-	len = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_LEN ( log ) );
 	tail = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_TAIL ( log ) );
 	sig = phantom_readl ( phantom, UNM_CAM_RAM_DMESG_SIG ( log ) );
 	DBGC ( phantom, "Phantom %p firmware dmesg buffer %d (%08x-%08x)\n",
