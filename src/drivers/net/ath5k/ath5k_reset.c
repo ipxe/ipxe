@@ -698,7 +698,7 @@ static void ath5k_hw_commit_eeprom_settings(struct ath5k_hw *ah,
 int ath5k_hw_reset(struct ath5k_hw *ah,
 	struct net80211_channel *channel, int change_channel)
 {
-	u32 s_seq[10], s_ant, s_led[3], staid1_flags, tsf_up, tsf_lo;
+	u32 s_seq[10], s_ant, s_led[3], staid1_flags;
 	u32 phy_tst1;
 	u8 mode, freq, ee_mode, ant[2];
 	int i, ret;
@@ -706,8 +706,6 @@ int ath5k_hw_reset(struct ath5k_hw *ah,
 	s_ant = 0;
 	ee_mode = 0;
 	staid1_flags = 0;
-	tsf_up = 0;
-	tsf_lo = 0;
 	freq = 0;
 	mode = 0;
 

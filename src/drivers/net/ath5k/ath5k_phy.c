@@ -214,7 +214,6 @@ static void ath5k_hw_request_rfgain_probe(struct ath5k_hw *ah)
 static u32 ath5k_hw_rf_gainf_corr(struct ath5k_hw *ah)
 {
 	u32 mix, step;
-	u32 *rf;
 	const struct ath5k_gain_opt *go;
 	const struct ath5k_gain_opt_step *g_step;
 	const struct ath5k_rf_reg *rf_regs;
@@ -233,7 +232,6 @@ static u32 ath5k_hw_rf_gainf_corr(struct ath5k_hw *ah)
 	if (ah->ah_rf_banks == NULL)
 		return 0;
 
-	rf = ah->ah_rf_banks;
 	ah->ah_gain.g_f_corr = 0;
 
 	/* No VGA (Variable Gain Amplifier) override, skip */
@@ -272,12 +270,9 @@ static int ath5k_hw_rf_check_gainf_readback(struct ath5k_hw *ah)
 {
 	const struct ath5k_rf_reg *rf_regs;
 	u32 step, mix_ovr, level[4];
-	u32 *rf;
 
 	if (ah->ah_rf_banks == NULL)
 		return 0;
-
-	rf = ah->ah_rf_banks;
 
 	if (ah->ah_radio == AR5K_RF5111) {
 

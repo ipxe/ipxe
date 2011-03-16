@@ -55,11 +55,7 @@ int ath5k_hw_set_tx_queueprops(struct ath5k_hw *ah,
 int ath5k_hw_setup_tx_queue(struct ath5k_hw *ah, enum ath5k_tx_queue queue_type,
 		struct ath5k_txq_info *queue_info)
 {
-	unsigned int queue;
 	int ret;
-
-	/* We only use one queue */
-	queue = 0;
 
 	/*
 	 * Setup internal queue structure
