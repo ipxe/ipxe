@@ -554,14 +554,12 @@ static void e1000_close ( struct net_device *netdev )
 	struct e1000_adapter *adapter = netdev_priv ( netdev );
 	struct e1000_hw *hw = &adapter->hw;
 	uint32_t rctl;
-	uint32_t icr;
 
 	DBG ( "e1000_close\n" );
 
-	/* Acknowledge interrupts */
-	icr = E1000_READ_REG ( hw, E1000_ICR );
-
+	/* Disable and acknowledge interrupts */
 	e1000_irq_disable ( adapter );
+	E1000_READ_REG ( hw, E1000_ICR );
 
 	/* disable receives */
 	rctl = E1000_READ_REG ( hw, E1000_RCTL );

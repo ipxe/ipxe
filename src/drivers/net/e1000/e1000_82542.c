@@ -186,7 +186,7 @@ static s32 e1000_reset_hw_82542(struct e1000_hw *hw)
 {
 	struct e1000_bus_info *bus = &hw->bus;
 	s32 ret_val = E1000_SUCCESS;
-	u32 ctrl, icr;
+	u32 ctrl;
 
 	DEBUGFUNC("e1000_reset_hw_82542");
 
@@ -217,7 +217,7 @@ static s32 e1000_reset_hw_82542(struct e1000_hw *hw)
 	msec_delay(2);
 
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
-	icr = E1000_READ_REG(hw, E1000_ICR);
+	E1000_READ_REG(hw, E1000_ICR);
 
 	if (hw->revision_id == E1000_REVISION_2) {
 		if (bus->pci_cmd_word & CMD_MEM_WRT_INVALIDATE)

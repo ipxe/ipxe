@@ -959,7 +959,7 @@ void igb_shutdown_serdes_link_82575(struct e1000_hw *hw)
  **/
 static s32 igb_reset_hw_82575(struct e1000_hw *hw)
 {
-	u32 ctrl, icr;
+	u32 ctrl;
 	s32 ret_val;
 
 	DEBUGFUNC("igb_reset_hw_82575");
@@ -1009,7 +1009,7 @@ static s32 igb_reset_hw_82575(struct e1000_hw *hw)
 
 	/* Clear any pending interrupt events. */
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
-	icr = E1000_READ_REG(hw, E1000_ICR);
+	E1000_READ_REG(hw, E1000_ICR);
 
 	/* Install any alternate MAC address into RAR0 */
 	ret_val = igb_check_alt_mac_addr_generic(hw);

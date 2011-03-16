@@ -919,7 +919,7 @@ out:
  **/
 static s32 e1000e_reset_hw_82571(struct e1000_hw *hw)
 {
-	u32 ctrl, extcnf_ctrl, ctrl_ext, icr;
+	u32 ctrl, extcnf_ctrl, ctrl_ext;
 	s32 ret_val;
 	u16 i = 0;
 
@@ -1004,7 +1004,7 @@ static s32 e1000e_reset_hw_82571(struct e1000_hw *hw)
 
 	/* Clear any pending interrupt events. */
 	ew32(IMC, 0xffffffff);
-	icr = er32(ICR);
+	er32(ICR);
 
 	/* Install any alternate MAC address into RAR0 */
 	ret_val = e1000e_check_alt_mac_addr_generic(hw);

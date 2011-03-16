@@ -666,12 +666,12 @@ static void igbvf_close ( struct net_device *netdev )
 	struct igbvf_adapter *adapter = netdev_priv ( netdev );
         struct e1000_hw *hw = &adapter->hw;
         uint32_t rxdctl;
-        uint32_t icr;
 
         DBG ( "igbvf_close\n" );
-        icr = er32(EICR);
 
+	/* Disable and acknowledge interrupts */
         igbvf_irq_disable ( adapter );
+        er32(EICR);
 
         /* disable receives */
         rxdctl = er32 ( RXDCTL(0) );
