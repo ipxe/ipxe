@@ -1183,11 +1183,10 @@ static int
 sis900_poll(struct nic *nic, int retrieve)
 {
     u32 rx_status = rxd[cur_rx].cmdsts;
-    u32 intr_status;
     int retstat = 0;
 
      /* acknowledge interrupts by reading interrupt status register */
-    intr_status = inl(ioaddr + isr);
+    inl(ioaddr + isr);
 
     if (sis900_debug > 2)
         printf("sis900_poll: cur_rx:%d, status:%X\n", cur_rx, 
