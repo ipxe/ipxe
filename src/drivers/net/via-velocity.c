@@ -1225,8 +1225,6 @@ static int velocity_init_rings(struct velocity_info *vptr)
 #define COMMAND_WAIT        0x80
 static int velocity_open(struct nic *nic, struct pci_device *pci __unused)
 {
-	int ret;
-
 	u8 diff;
 	u32 TxPhyAddr, RxPhyAddr;
 	u32 TxBufPhyAddr, RxBufPhyAddr;
@@ -1278,7 +1276,7 @@ static int velocity_open(struct nic *nic, struct pci_device *pci __unused)
     // turn this on to detect MII coding error
     PCI_BYTE_REG_BITS_ON(MODE3_MIION, PCI_REG_MODE3, pci);
  */
-	ret = velocity_init_rings(vptr);
+	velocity_init_rings(vptr);
 
 	/* Ensure chip is running */
 //FIXME:        pci_set_power_state(vptr->pdev, PCI_D0);
@@ -1608,25 +1606,12 @@ static void set_mii_flow_control(struct velocity_info *vptr)
 static int velocity_set_media_mode(struct velocity_info *vptr,
 				   u32 mii_status)
 {
-	u32 curr_status;
 	struct mac_regs *regs = vptr->mac_regs;
 
 	vptr->mii_status = mii_check_media_mode(vptr->mac_regs);
-	curr_status = vptr->mii_status & (~VELOCITY_LINK_FAIL);
 
 	/* Set mii link status */
 	set_mii_flow_control(vptr);
-
-	/*
-	   Check if new status is consisent with current status
-	   if (((mii_status & curr_status) & VELOCITY_AUTONEG_ENABLE)
-	   || (mii_status==curr_status)) {
-	   vptr->mii_status=mii_check_media_mode(vptr->mac_regs);
-	   vptr->mii_status=check_connection_type(vptr->mac_regs);
-	   printf(MSG_LEVEL_INFO, "Velocity link no change\n");
-	   return 0;
-	   }
-	 */
 
 	if (PHYID_GET_PHY_ID(vptr->phy_id) == PHYID_CICADA_CS8201) {
 		MII_REG_BITS_ON(AUXCR_MDPPS, MII_REG_AUXCR,
