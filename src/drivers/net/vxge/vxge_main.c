@@ -182,13 +182,11 @@ vxge_xmit(struct net_device *dev, struct io_buffer *iobuf)
 	struct vxge_fifo *fifo = NULL;
 	struct vxgedev *vdev = NULL;
 	struct __vxge_hw_fifo *fifoh;
-	struct __vxge_hw_device  *hldev;
 	struct vxge_hw_fifo_txd *txdp;
 
 	vxge_trace();
 
 	vdev = (struct vxgedev *)netdev_priv(dev);
-	hldev = (struct __vxge_hw_device  *)pci_get_drvdata(vdev->pdev);
 
 	if (!is_vxge_card_up(vdev)) {
 		vxge_debug(VXGE_ERR,
@@ -469,11 +467,9 @@ _out0:
 void
 vxge_device_unregister(struct __vxge_hw_device *hldev)
 {
-	struct vxgedev *vdev;
 	struct net_device *ndev;
 
 	ndev = hldev->ndev;
-	vdev = netdev_priv(ndev);
 
 	unregister_netdev(ndev);
 	netdev_nullify(ndev);
@@ -504,7 +500,6 @@ vxge_probe(struct pci_device *pdev)
 	struct vxgedev *vdev;
 	int i;
 	u8 revision, titan1;
-	u32 host_type;
 	u32 function_mode;
 	unsigned long mmio_start, mmio_len;
 	void *bar0;
@@ -562,7 +557,6 @@ vxge_probe(struct pci_device *pdev)
 		"%s:%d  Vpath mask = %llx\n", __func__, __LINE__,
 		(unsigned long long)vpath_mask);
 
-	host_type = hw_info.host_type;
 	fw_version = &hw_info.fw_version;
 	/* fail the driver loading if firmware is incompatible */
 	if ((fw_version->major != VXGE_CERT_FW_VER_MAJOR) ||
