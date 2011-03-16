@@ -21,6 +21,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
 //#define	CONSOLE_SYSLOG		/* Syslog console */
 
+#define	KEYBOARD_MAP	us
+
 #include <config/local/console.h>
 
 #endif /* CONFIG_CONSOLE_H */

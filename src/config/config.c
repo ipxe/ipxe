@@ -281,3 +281,10 @@ REQUIRE_OBJECT ( tap );
 REQUIRE_OBJECT ( efi_bofm );
 #endif /* BOFM_EFI */
 #endif /* CONFIG_BOFM */
+
+/*
+ * Drag in selected keyboard map
+ */
+#define REQUIRE_KEYMAP_OBJECT( _map ) REQUIRE_OBJECT ( keymap_ ## _map )
+#define REQUIRE_KEYMAP( _map ) REQUIRE_KEYMAP_OBJECT ( _map )
+REQUIRE_KEYMAP ( KEYBOARD_MAP );
