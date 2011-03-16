@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <ipxe/console.h>
 #include <ipxe/ansiesc.h>
+#include <ipxe/keymap.h>
 
 #define ATTR_BOLD		0x08
 
@@ -229,6 +230,22 @@ static const char * scancode_to_ansi_seq ( unsigned int scancode ) {
 }
 
 /**
+ * Map a key
+ *
+ * @v character		Character read from console
+ * @ret character	Mapped character
+ */
+static int bios_keymap ( unsigned int character ) {
+	struct key_mapping *mapping;
+
+	for_each_table_entry ( mapping, KEYMAP ) {
+		if ( mapping->from == character )
+			return mapping->to;
+	}
+	return character;
+}
+
+/**
  * Get character from BIOS console
  *
  * @ret character	Character read from console
@@ -251,9 +268,9 @@ static int bios_getchar ( void ) {
 			       : "=a" ( keypress ) : "a" ( 0x1000 ) );
 	character = ( keypress & 0xff );
 
-	/* If it's a normal character, just return it */
+	/* If it's a normal character, just map and return it */
 	if ( character && ( character < 0x80 ) )
-		return character;
+		return bios_keymap ( character );
 
 	/* Otherwise, check for a special key that we know about */
 	if ( ( ansi_seq = scancode_to_ansi_seq ( keypress >> 8 ) ) ) {
