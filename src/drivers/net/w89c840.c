@@ -625,7 +625,7 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
 
 
     u16 sum = 0;
-    int i, j;
+    int i;
     unsigned short value;
 
     if (p->ioaddr == 0)
@@ -666,7 +666,7 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
     adjust_pci_device(p);
 
     /* Ok. Got one. Read the eeprom. */
-    for (j = 0, i = 0; i < 0x40; i++) {
+    for (i = 0; i < 0x40; i++) {
         value = eeprom_read(ioaddr, i);
         eeprom[i] = value;
         sum += value;
