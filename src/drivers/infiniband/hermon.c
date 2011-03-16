@@ -1675,7 +1675,6 @@ static int hermon_complete ( struct ib_device *ibdev,
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq;
 	struct ib_queue_pair *qp;
-	struct hermon_queue_pair *hermon_qp;
 	struct io_buffer *iobuf;
 	struct ib_address_vector recv_av;
 	struct ib_global_route_header *grh;
@@ -1710,7 +1709,6 @@ static int hermon_complete ( struct ib_device *ibdev,
 		return -EIO;
 	}
 	qp = wq->qp;
-	hermon_qp = ib_qp_get_drvdata ( qp );
 
 	/* Identify work queue entry */
 	wqe_idx = MLX_GET ( &cqe->normal, wqe_counter );
