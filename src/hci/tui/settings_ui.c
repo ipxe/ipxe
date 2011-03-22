@@ -66,6 +66,8 @@ struct setting_row {
 struct setting_widget {
 	/** Settings block */
 	struct settings *settings;
+	/** Number of applicable settings */
+	unsigned int num_settings;
         /** Index of the first visible setting, for scrolling. */
 	unsigned int first_visible;
 	/** Configuration setting */
@@ -81,9 +83,6 @@ struct setting_widget {
 	/** Buffer for setting's value */
 	char value[256]; /* enough size for a DHCP string */
 };
-
-/** Number of registered configuration settings */
-#define NUM_SETTINGS table_num_entries ( SETTINGS )
 
 static void load_setting ( struct setting_widget *widget ) __nonnull;
 static int save_setting ( struct setting_widget *widget ) __nonnull;
@@ -143,8 +142,14 @@ static int save_setting ( struct setting_widget *widget ) {
  */
 static void init_widget ( struct setting_widget *widget,
 			  struct settings *settings ) {
+	struct setting *setting;
+
 	memset ( widget, 0, sizeof ( *widget ) );
 	widget->settings = settings;
+	for_each_table_entry ( setting, SETTINGS ) {
+		if ( setting_applies ( settings, setting ) )
+			widget->num_settings++;
+	}
 	widget->first_visible = SETTINGS_LIST_ROWS;
 	reveal ( widget, 0 );
 }
@@ -210,14 +215,18 @@ static int edit_setting ( struct setting_widget *widget, int key ) {
  */
 static void select_setting ( struct setting_widget *widget,
 			     unsigned int index ) {
-	struct setting *all_settings = table_start ( SETTINGS );
 	unsigned int skip = offsetof ( struct setting_widget, setting );
 
 	/* Reset the widget, preserving static state. */
 	memset ( ( char * ) widget + skip, 0, sizeof ( *widget ) - skip );
-	widget->setting = &all_settings[index];
 	widget->row = SETTINGS_LIST_ROW + index - widget->first_visible;
 	widget->col = SETTINGS_LIST_COL;
+	for_each_table_entry ( widget->setting, SETTINGS ) {
+		if ( ! setting_applies ( widget->settings, widget->setting ) )
+			continue;
+		if ( index-- == 0 )
+			break;
+	}
 
 	/* Read current setting value */
 	load_setting ( widget );
@@ -359,13 +368,12 @@ static void reveal ( struct setting_widget *widget, unsigned int n)
 		   widget->first_visible > 0 ? "..." : "   " );
 	mvaddstr ( SETTINGS_LIST_ROW + SETTINGS_LIST_ROWS,
 		   SETTINGS_LIST_COL + 1,
-		   ( widget->first_visible + SETTINGS_LIST_ROWS < NUM_SETTINGS
-		     ? "..."
-		     : "   " ) );
+		   ( ( widget->first_visible + SETTINGS_LIST_ROWS )
+		     < widget->num_settings ? "..." : "   " ) );
 	
 	/* Draw visible settings. */
 	for ( i = 0; i < SETTINGS_LIST_ROWS; i++ ) {
-		if ( widget->first_visible + i < NUM_SETTINGS ) {
+		if ( ( widget->first_visible + i ) < widget->num_settings ) {
 			select_setting ( widget, widget->first_visible + i );
 			draw_setting ( widget );
 		} else {
@@ -424,7 +432,7 @@ static int main_loop ( struct settings *settings ) {
 			next = current;
 			switch ( key ) {
 			case KEY_DOWN:
-				if ( next < ( NUM_SETTINGS - 1 ) )
+				if ( next < ( widget.num_settings - 1 ) )
 					reveal ( &widget, ++next );
 				break;
 			case KEY_UP:
