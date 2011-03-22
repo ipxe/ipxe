@@ -1007,7 +1007,6 @@ parse_setting_name ( const char *name,
 	char *setting_name;
 	char *type_name;
 	struct setting *named_setting;
-	unsigned int tag;
 
 	/* Set defaults */
 	*settings = &settings_root;
@@ -1038,16 +1037,14 @@ parse_setting_name ( const char *name,
 	}
 
 	/* Identify setting */
-	if ( ( named_setting = find_setting ( setting_name ) ) != NULL ) {
+	setting->tag = parse_setting_tag ( *settings, setting_name );
+	setting->name = setting_name;
+	for_each_table_entry ( named_setting, SETTINGS ) {
 		/* Matches a defined named setting; use that setting */
-		memcpy ( setting, named_setting, sizeof ( *setting ) );
-	} else if ( ( tag = parse_setting_tag ( *settings,
-						setting_name ) ) != 0 ) {
-		/* Is a valid numeric tag; use the tag */
-		setting->tag = tag;
-	} else {
-		/* Use the arbitrary name */
-		setting->name = setting_name;
+		if ( setting_cmp ( named_setting, setting ) == 0 ) {
+			memcpy ( setting, named_setting, sizeof ( *setting ) );
+			break;
+		}
 	}
 
 	/* Identify setting type, if specified */
@@ -1076,30 +1073,57 @@ int storef_named_setting ( const char *name, const char *value ) {
 	char tmp_name[ strlen ( name ) + 1 ];
 	int rc;
 
+	/* Parse setting name */
 	if ( ( rc = parse_setting_name ( name, autovivify_child_settings,
 					 &settings, &setting, tmp_name )) != 0)
 		return rc;
-	return storef_setting ( settings, &setting, value );
+
+	/* Store setting */
+	if ( ( rc = storef_setting ( settings, &setting, value ) ) != 0 )
+		return rc;
+
+	return 0;
 }
 
 /**
  * Fetch and format value of named setting
  *
  * @v name		Name of setting
- * @v buf		Buffer to contain formatted value
- * @v len		Length of buffer
+ * @v name_buf		Buffer to contain canonicalised name
+ * @v name_len		Length of canonicalised name buffer
+ * @v value_buf		Buffer to contain formatted value
+ * @v value_len		Length of formatted value buffer
  * @ret len		Length of formatted value, or negative error
  */
-int fetchf_named_setting ( const char *name, char *buf, size_t len ) {
+int fetchf_named_setting ( const char *name,
+			   char *name_buf, size_t name_len,
+			   char *value_buf, size_t value_len ) {
 	struct settings *settings;
 	struct setting setting;
+	struct settings *origin;
+	const char *origin_name;
 	char tmp_name[ strlen ( name ) + 1 ];
 	int rc;
 
+	/* Parse setting name */
 	if ( ( rc = parse_setting_name ( name, find_child_settings,
 					 &settings, &setting, tmp_name )) != 0)
 		return rc;
-	return fetchf_setting ( settings, &setting, buf, len );
+
+	/* Fetch setting */
+	if ( ( rc = fetchf_setting ( settings, &setting, value_buf,
+				     value_len ) ) < 0 )
+		return rc;
+
+	/* Construct setting name */
+	origin = fetch_setting_origin ( settings, &setting );
+	assert ( origin != NULL );
+	origin_name = settings_name ( origin );
+	snprintf ( name_buf, name_len, "%s%s%s:%s",
+		   origin_name, ( origin_name[0] ? "/" : "" ),
+		   setting.name, setting.type->name );
+
+	return 0;
 }
 
 /******************************************************************************
@@ -1597,7 +1621,7 @@ char * expand_settings ( const char *string ) {
 		tail = ( end + 1 );
 
 		/* Determine setting length */
-		setting_len = fetchf_named_setting ( name, NULL, 0 );
+		setting_len = fetchf_named_setting ( name, NULL, 0, NULL, 0 );
 		if ( setting_len < 0 )
 			setting_len = 0; /* Treat error as empty setting */
 
@@ -1606,7 +1630,7 @@ char * expand_settings ( const char *string ) {
 			char setting_buf[ setting_len + 1 ];
 
 			setting_buf[0] = '\0';
-			fetchf_named_setting ( name, setting_buf,
+			fetchf_named_setting ( name, NULL, 0, setting_buf,
 					       sizeof ( setting_buf ) );
 
 			/* Construct expanded string and discard old string */

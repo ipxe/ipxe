@@ -54,7 +54,8 @@ static struct command_descriptor show_cmd =
 static int show_exec ( int argc, char **argv ) {
 	struct show_options opts;
 	const char *name;
-	char buf[256];
+	char name_buf[32];
+	char value_buf[256];
 	int rc;
 
 	/* Parse options */
@@ -65,15 +66,16 @@ static int show_exec ( int argc, char **argv ) {
 	name = argv[optind];
 
 	/* Fetch setting */
-	if ( ( rc = fetchf_named_setting ( name, buf,
-					   sizeof ( buf ) ) ) < 0 ) {
+	if ( ( rc = fetchf_named_setting ( name, name_buf, sizeof ( name_buf ),
+					   value_buf,
+					   sizeof ( value_buf ) ) ) < 0 ) {
 		printf ( "Could not find \"%s\": %s\n",
 			 name, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Print setting value */
-	printf ( "%s = %s\n", name, buf );
+	printf ( "%s = %s\n", name_buf, value_buf );
 
 	return 0;
 }
