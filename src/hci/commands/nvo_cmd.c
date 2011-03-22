@@ -99,42 +99,38 @@ static struct command_descriptor set_cmd =
 static int set_exec ( int argc, char **argv ) {
 	struct set_options opts;
 	const char *name;
-	size_t len;
-	int i;
+	char *value;
 	int rc;
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &set_cmd, &opts ) ) != 0 )
-		return rc;
+		goto err_parse_options;
 
 	/* Parse setting name */
 	name = argv[optind];
 
-	/* Determine total length of command line */
-	len = 1; /* NUL */
-	for ( i = optind + 1 ; i < argc ; i++ )
-		len += ( 1 /* possible space */ + strlen ( argv[i] ) );
-
-	{
-		char buf[len];
-		char *ptr = buf;
-
-		/* Assemble command line */
-		buf[0] = '\0';
-		for ( i = optind + 1 ; i < argc ; i++ ) {
-			ptr += sprintf ( ptr, "%s%s", ( buf[0] ? " " : "" ),
-					 argv[i] );
-		}
-		assert ( ptr < ( buf + len ) );
-
-		if ( ( rc = storef_named_setting ( name, buf ) ) != 0 ) {
-			printf ( "Could not set \"%s\"=\"%s\": %s\n",
-				 name, buf, strerror ( rc ) );
-			return rc;
-		}
+	/* Parse setting value */
+	value = concat_args ( &argv[ optind + 1 ] );
+	if ( ! value ) {
+		rc = -ENOMEM;
+		goto err_concat_args;
 	}
 
+	/* Determine total length of command line */
+	if ( ( rc = storef_named_setting ( name, value ) ) != 0 ) {
+		printf ( "Could not set \"%s\"=\"%s\": %s\n",
+			 name, value, strerror ( rc ) );
+		goto err_store;
+	}
+
+	free ( value );
 	return 0;
+
+ err_store:
+	free ( value );
+ err_concat_args:
+ err_parse_options:
+	return rc;
 }
 
 /** "clear" options */
