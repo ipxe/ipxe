@@ -97,7 +97,8 @@ static void vmsg ( unsigned int row, const char *fmt, va_list args ) __nonnull;
 static void msg ( unsigned int row, const char *fmt, ... ) __nonnull;
 static void valert ( const char *fmt, va_list args ) __nonnull;
 static void alert ( const char *fmt, ... ) __nonnull;
-static void draw_info_row ( struct setting *setting ) __nonnull;
+static void draw_info_row ( struct settings *settings,
+			    struct setting *setting ) __nonnull;
 static int main_loop ( struct settings *settings ) __nonnull;
 
 /**
@@ -313,12 +314,23 @@ static void draw_title_row ( void ) {
 /**
  * Draw information row
  *
+ * @v settings		Settings block
  * @v setting		Current configuration setting
  */
-static void draw_info_row ( struct setting *setting ) {
+static void draw_info_row ( struct settings *settings,
+			    struct setting *setting ) {
+	struct settings *origin;
+	char buf[32];
+
+	/* Determine a suitable setting name */
+	origin = fetch_setting_origin ( settings, setting );
+	if ( ! origin )
+		origin = settings;
+	setting_name ( origin, setting, buf, sizeof ( buf ) );
+
 	clearmsg ( INFO_ROW );
 	attron ( A_BOLD );
-	msg ( INFO_ROW, "%s - %s", setting->name, setting->description );
+	msg ( INFO_ROW, "%s - %s", buf, setting->description );
 	attroff ( A_BOLD );
 }
 
@@ -400,7 +412,7 @@ static int main_loop ( struct settings *settings ) {
 	
 	while ( 1 ) {
 		/* Redraw information and instruction rows */
-		draw_info_row ( widget.setting );
+		draw_info_row ( widget.settings, widget.setting );
 		draw_instruction_row ( widget.editing );
 
 		/* Redraw current setting */

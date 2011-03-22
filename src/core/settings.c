@@ -1061,6 +1061,27 @@ parse_setting_name ( const char *name,
 }
 
 /**
+ * Return full setting name
+ *
+ * @v settings		Settings block, or NULL
+ * @v setting		Setting
+ * @v buf		Buffer
+ * @v len		Length of buffer
+ * @ret len		Length of setting name, or negative error
+ */
+int setting_name ( struct settings *settings, struct setting *setting,
+		   char *buf, size_t len ) {
+	const char *name;
+
+	if ( ! settings )
+		settings = &settings_root;
+
+	name = settings_name ( settings );
+	return snprintf ( buf, len, "%s%s%s:%s", name, ( name[0] ? "/" : "" ),
+			  setting->name, setting->type->name );
+}
+
+/**
  * Parse and store value of named setting
  *
  * @v name		Name of setting
@@ -1101,7 +1122,6 @@ int fetchf_named_setting ( const char *name,
 	struct settings *settings;
 	struct setting setting;
 	struct settings *origin;
-	const char *origin_name;
 	char tmp_name[ strlen ( name ) + 1 ];
 	int rc;
 
@@ -1118,10 +1138,7 @@ int fetchf_named_setting ( const char *name,
 	/* Construct setting name */
 	origin = fetch_setting_origin ( settings, &setting );
 	assert ( origin != NULL );
-	origin_name = settings_name ( origin );
-	snprintf ( name_buf, name_len, "%s%s%s:%s",
-		   origin_name, ( origin_name[0] ? "/" : "" ),
-		   setting.name, setting.type->name );
+	setting_name ( origin, &setting, name_buf, name_len );
 
 	return 0;
 }

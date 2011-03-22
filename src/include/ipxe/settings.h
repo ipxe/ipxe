@@ -251,6 +251,8 @@ extern const char * settings_name ( struct settings *settings );
 extern struct settings * find_settings ( const char *name );
 extern struct setting * find_setting ( const char *name );
 
+extern int setting_name ( struct settings *settings, struct setting *setting,
+			  char *buf, size_t len );
 extern int storef_setting ( struct settings *settings,
 			    struct setting *setting,
 			    const char *value );
