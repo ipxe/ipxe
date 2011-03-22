@@ -80,6 +80,8 @@ struct setting_widget {
 	struct edit_box editbox;
 	/** Editing in progress flag */
 	int editing;
+	/** Setting originates from this block flag */
+	int originates_here;
 	/** Buffer for setting's value */
 	char value[256]; /* enough size for a DHCP string */
 };
@@ -116,7 +118,12 @@ static void load_setting ( struct setting_widget *widget ) {
 	if ( fetchf_setting ( widget->settings, widget->setting,
 			      widget->value, sizeof ( widget->value ) ) < 0 ) {
 		widget->value[0] = '\0';
-	}	
+	}
+
+	/* Check setting's origin */
+	widget->originates_here =
+		( widget->settings ==
+		  fetch_setting_origin ( widget->settings, widget->setting ) );
 
 	/* Initialise edit box */
 	init_editbox ( &widget->editbox, widget->value,
@@ -189,7 +196,10 @@ static void draw_setting ( struct setting_widget *widget ) {
 		     + len );
 
 	/* Print row */
+	if ( widget->originates_here )
+		attron ( A_BOLD );
 	mvprintw ( widget->row, widget->col, "%s", row.start );
+	attroff ( A_BOLD );
 	move ( widget->row, curs_col );
 	if ( widget->editing )
 		draw_editbox ( &widget->editbox );
