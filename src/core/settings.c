@@ -288,22 +288,20 @@ static struct settings * autovivify_child_settings ( struct settings *parent,
 }
 
 /**
- * Return settings block name (for debug only)
+ * Return settings block name
  *
  * @v settings		Settings block
  * @ret name		Settings block name
  */
-static const char * settings_name ( struct settings *settings ) {
-	static char buf[64];
+const char * settings_name ( struct settings *settings ) {
+	static char buf[16];
 	char tmp[ sizeof ( buf ) ];
-	int count;
 
-	for ( count = 0 ; settings ; settings = settings->parent ) {
+	for ( buf[2] = buf[0] = 0 ; settings ; settings = settings->parent ) {
 		memcpy ( tmp, buf, sizeof ( tmp ) );
-		snprintf ( buf, sizeof ( buf ), "%s%c%s", settings->name,
-			   ( count++ ? '.' : '\0' ), tmp );
+		snprintf ( buf, sizeof ( buf ), ".%s%s", settings->name, tmp );
 	}
-	return ( buf + 1 );
+	return ( buf + 2 );
 }
 
 /**

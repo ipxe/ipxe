@@ -245,6 +245,7 @@ extern int fetch_uuid_setting ( struct settings *settings,
 extern void clear_settings ( struct settings *settings );
 extern int setting_cmp ( struct setting *a, struct setting *b );
 
+extern const char * settings_name ( struct settings *settings );
 extern struct settings * find_settings ( const char *name );
 extern struct setting * find_setting ( const char *name );
 
