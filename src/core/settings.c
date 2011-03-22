@@ -552,10 +552,11 @@ int store_setting ( struct settings *settings, struct setting *setting,
 }
 
 /**
- * Fetch value of setting
+ * Fetch value and origin of setting
  *
  * @v settings		Settings block, or NULL to search all blocks
  * @v setting		Setting to fetch
+ * @v origin		Origin of setting to fill in
  * @v data		Buffer to fill with setting data
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
@@ -563,13 +564,17 @@ int store_setting ( struct settings *settings, struct setting *setting,
  * The actual length of the setting will be returned even if
  * the buffer was too small.
  */
-int fetch_setting ( struct settings *settings, struct setting *setting,
-		    void *data, size_t len ) {
+static int fetch_setting_and_origin ( struct settings *settings,
+				      struct setting *setting,
+				      struct settings **origin,
+				      void *data, size_t len ) {
 	struct settings *child;
 	int ret;
 
 	/* Avoid returning uninitialised data on error */
 	memset ( data, 0, len );
+	if ( origin )
+		*origin = NULL;
 
 	/* NULL settings implies starting at the global settings root */
 	if ( ! settings )
@@ -583,17 +588,54 @@ int fetch_setting ( struct settings *settings, struct setting *setting,
 	if ( setting_applies ( settings, setting ) &&
 	     ( ( ret = settings->op->fetch ( settings, setting,
 					     data, len ) ) >= 0 ) ) {
+		if ( origin )
+			*origin = settings;
 		return ret;
 	}
 
 	/* Recurse into each child block in turn */
 	list_for_each_entry ( child, &settings->children, siblings ) {
-		if ( ( ret = fetch_setting ( child, setting,
-					     data, len ) ) >= 0 )
+		if ( ( ret = fetch_setting_and_origin ( child, setting, origin,
+							data, len ) ) >= 0 )
 			return ret;
 	}
 
 	return -ENOENT;
+}
+
+/**
+ * Fetch value of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ *
+ * The actual length of the setting will be returned even if
+ * the buffer was too small.
+ */
+int fetch_setting ( struct settings *settings, struct setting *setting,
+		    void *data, size_t len ) {
+	return fetch_setting_and_origin ( settings, setting, NULL, data, len );
+}
+
+/**
+ * Fetch origin of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @ret origin		Origin of setting, or NULL if not found
+ *
+ * This function can also be used as an existence check for the
+ * setting.
+ */
+struct settings * fetch_setting_origin ( struct settings *settings,
+					 struct setting *setting ) {
+	struct settings *origin;
+
+	fetch_setting_and_origin ( settings, setting, &origin, NULL, 0 );
+	return origin;
 }
 
 /**
