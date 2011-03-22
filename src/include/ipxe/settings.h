@@ -33,7 +33,31 @@ struct setting {
 	 * address, etc.).
 	 */
 	struct setting_type *type;
-	/** DHCP option number, if applicable */
+	/** Setting tag, if applicable
+	 *
+	 * The setting tag is a numerical description of the setting
+	 * (such as a DHCP option number, or an SMBIOS structure and
+	 * field number).
+	 *
+	 * Users can construct tags for settings that are not
+	 * explicitly known to iPXE using the generic syntax for
+	 * numerical settings.  For example, the setting name "60"
+	 * will be interpreted as referring to DHCP option 60 (the
+	 * vendor class identifier).
+	 *
+	 * This creates a potential for namespace collisions, since
+	 * the interpretation of the numerical description will vary
+	 * according to the settings block.  When a user attempts to
+	 * fetch a generic numerical setting, we need to ensure that
+	 * only the intended settings block interprets the numerical
+	 * description.  (For example, we do not want to attempt to
+	 * retrieve the subnet mask from SMBIOS, or the system UUID
+	 * from DHCP.)
+	 *
+	 * This potential problem is resolved by allowing the setting
+	 * tag to include a "magic" value indicating the
+	 * interpretation to be placed upon the numerical description.
+	 */
 	unsigned int tag;
 };
 
@@ -45,6 +69,14 @@ struct setting {
 
 /** Settings block operations */
 struct settings_operations {
+	/** Check applicability of setting
+	 *
+	 * @v settings		Settings block
+	 * @v setting		Setting
+	 * @ret applies		Setting applies within this settings block
+	 */
+	int ( * applies ) ( struct settings *settings,
+			    struct setting *setting );
 	/** Store value of setting
 	 *
 	 * @v settings		Settings block
@@ -84,9 +116,7 @@ struct settings {
 	/** Tag magic
 	 *
 	 * This value will be ORed in to any numerical tags
-	 * constructed by parse_setting_name(), and can be used to
-	 * avoid e.g. attempting to retrieve the subnet mask from
-	 * SMBIOS, or the system UUID from DHCP.
+	 * constructed by parse_setting_name().
 	 */
 	unsigned int tag_magic;
 	/** Parent settings block */
@@ -181,6 +211,8 @@ extern int register_settings ( struct settings *settings,
 			       struct settings *parent, const char *name );
 extern void unregister_settings ( struct settings *settings );
 
+extern int setting_applies ( struct settings *settings,
+			     struct setting *setting );
 extern int store_setting ( struct settings *settings, struct setting *setting,
 			   const void *data, size_t len );
 extern int fetch_setting ( struct settings *settings, struct setting *setting,

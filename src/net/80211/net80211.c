@@ -206,6 +206,7 @@ struct setting net80211_ssid_setting __setting = {
 	.name = "ssid",
 	.description = "802.11 SSID (network name)",
 	.type = &setting_type_string,
+	.tag = NET80211_SETTING_TAG_SSID,
 };
 
 /** Whether to use active scanning
@@ -218,6 +219,7 @@ struct setting net80211_active_setting __setting = {
 	.name = "active-scan",
 	.description = "Use an active scan during 802.11 association",
 	.type = &setting_type_int8,
+	.tag = NET80211_SETTING_TAG_ACTIVE_SCAN,
 };
 
 /** The cryptographic key to use
@@ -230,6 +232,7 @@ struct setting net80211_key_setting __setting = {
 	.name = "key",
 	.description = "Encryption key for protected 802.11 networks",
 	.type = &setting_type_string,
+	.tag = NET80211_SETTING_TAG_KEY,
 };
 
 /** @} */

@@ -185,6 +185,19 @@ static int nvo_save ( struct nvo_block *nvo ) {
 }
 
 /**
+ * Check applicability of NVO setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @ret applies		Setting applies within this settings block
+ */
+static int nvo_applies ( struct settings *settings __unused,
+			 struct setting *setting ) {
+
+	return dhcpopt_applies ( setting->tag );
+}
+
+/**
  * Store value of NVO setting
  *
  * @v settings		Settings block
@@ -236,6 +249,7 @@ static int nvo_fetch ( struct settings *settings, struct setting *setting,
 
 /** NVO settings operations */
 static struct settings_operations nvo_settings_operations = {
+	.applies = nvo_applies,
 	.store = nvo_store,
 	.fetch = nvo_fetch,
 };

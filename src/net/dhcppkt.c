@@ -135,6 +135,19 @@ find_dhcp_packet_field ( unsigned int tag ) {
 }
 
 /**
+ * Check applicability of DHCP setting
+ *
+ * @v dhcppkt		DHCP packet
+ * @v tag		Setting tag number
+ * @ret applies		Setting applies within this settings block
+ */
+static int dhcppkt_applies ( struct dhcp_packet *dhcppkt __unused,
+			     unsigned int tag ) {
+
+	return dhcpopt_applies ( tag );
+}
+
+/**
  * Store value of DHCP packet setting
  *
  * @v dhcppkt		DHCP packet
@@ -205,6 +218,21 @@ int dhcppkt_fetch ( struct dhcp_packet *dhcppkt, unsigned int tag,
  */
 
 /**
+ * Check applicability of DHCP setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @ret applies		Setting applies within this settings block
+ */
+static int dhcppkt_settings_applies ( struct settings *settings,
+				      struct setting *setting ) {
+	struct dhcp_packet *dhcppkt =
+		container_of ( settings, struct dhcp_packet, settings );
+
+	return dhcppkt_applies ( dhcppkt, setting->tag );
+}
+
+/**
  * Store value of DHCP setting
  *
  * @v settings		Settings block
@@ -242,6 +270,7 @@ static int dhcppkt_settings_fetch ( struct settings *settings,
 
 /** DHCP settings operations */
 static struct settings_operations dhcppkt_settings_operations = {
+	.applies = dhcppkt_settings_applies,
 	.store = dhcppkt_settings_store,
 	.fetch = dhcppkt_settings_fetch,
 };

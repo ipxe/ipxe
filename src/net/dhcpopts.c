@@ -348,6 +348,18 @@ static int set_dhcp_option ( struct dhcp_options *options, unsigned int tag,
 }
 
 /**
+ * Check applicability of DHCP option setting
+ *
+ * @v tag		Setting tag number
+ * @ret applies		Setting applies to this option block
+ */
+int dhcpopt_applies ( unsigned int tag ) {
+
+	return ( tag && ( tag <= DHCP_ENCAP_OPT ( DHCP_MAX_OPTION,
+						  DHCP_MAX_OPTION ) ) );
+}
+
+/**
  * Store value of DHCP option setting
  *
  * @v options		DHCP option block

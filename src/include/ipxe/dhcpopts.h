@@ -28,6 +28,7 @@ struct dhcp_options {
 	int ( * realloc ) ( struct dhcp_options *options, size_t len );
 };
 
+extern int dhcpopt_applies ( unsigned int tag );
 extern int dhcpopt_store ( struct dhcp_options *options, unsigned int tag,
 			   const void *data, size_t len );
 extern int dhcpopt_fetch ( struct dhcp_options *options, unsigned int tag,

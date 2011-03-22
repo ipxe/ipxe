@@ -1698,6 +1698,24 @@ phantom_clp_setting ( struct phantom_nic *phantom, struct setting *setting ) {
 }
 
 /**
+ * Check applicability of Phantom CLP setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @ret applies		Setting applies within this settings block
+ */
+static int phantom_setting_applies ( struct settings *settings,
+				     struct setting *setting ) {
+	struct phantom_nic *phantom =
+		container_of ( settings, struct phantom_nic, settings );
+	unsigned int clp_setting;
+
+	/* Find Phantom setting equivalent to iPXE setting */
+	clp_setting = phantom_clp_setting ( phantom, setting );
+	return ( clp_setting != 0 );
+}
+
+/**
  * Store Phantom CLP setting
  *
  * @v settings		Settings block
@@ -1716,8 +1734,7 @@ static int phantom_store_setting ( struct settings *settings,
 
 	/* Find Phantom setting equivalent to iPXE setting */
 	clp_setting = phantom_clp_setting ( phantom, setting );
-	if ( ! clp_setting )
-		return -ENOTSUP;
+	assert ( clp_setting != 0 );
 
 	/* Store setting */
 	if ( ( rc = phantom_clp_store ( phantom, phantom->port,
@@ -1750,8 +1767,7 @@ static int phantom_fetch_setting ( struct settings *settings,
 
 	/* Find Phantom setting equivalent to iPXE setting */
 	clp_setting = phantom_clp_setting ( phantom, setting );
-	if ( ! clp_setting )
-		return -ENOTSUP;
+	assert ( clp_setting != 0 );
 
 	/* Fetch setting */
 	if ( ( read_len = phantom_clp_fetch ( phantom, phantom->port,
@@ -1767,6 +1783,7 @@ static int phantom_fetch_setting ( struct settings *settings,
 
 /** Phantom CLP settings operations */
 static struct settings_operations phantom_settings_operations = {
+	.applies	= phantom_setting_applies,
 	.store		= phantom_store_setting,
 	.fetch		= phantom_fetch_setting,
 };

@@ -493,6 +493,19 @@ void unregister_settings ( struct settings *settings ) {
  */
 
 /**
+ * Check applicability of setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @ret applies		Setting applies within this settings block
+ */
+int setting_applies ( struct settings *settings, struct setting *setting ) {
+
+	return ( settings->op->applies ?
+		 settings->op->applies ( settings, setting ) : 1 );
+}
+
+/**
  * Store value of setting
  *
  * @v settings		Settings block, or NULL
@@ -508,6 +521,10 @@ int store_setting ( struct settings *settings, struct setting *setting,
 	/* NULL settings implies storing into the global settings root */
 	if ( ! settings )
 		settings = &settings_root;
+
+	/* Fail if tag does not apply to this settings block */
+	if ( ! setting_applies ( settings, setting ) )
+		return -ENOTTY;
 
 	/* Sanity check */
 	if ( ! settings->op->store )
@@ -564,10 +581,12 @@ int fetch_setting ( struct settings *settings, struct setting *setting,
 	if ( ! settings->op->fetch )
 		return -ENOTSUP;
 
-	/* Try this block first */
-	if ( ( ret = settings->op->fetch ( settings, setting,
-					   data, len ) ) >= 0 )
+	/* Try this block first, if applicable */
+	if ( setting_applies ( settings, setting ) &&
+	     ( ( ret = settings->op->fetch ( settings, setting,
+					     data, len ) ) >= 0 ) ) {
 		return ret;
+	}
 
 	/* Recurse into each child block in turn */
 	list_for_each_entry ( child, &settings->children, siblings ) {
@@ -886,17 +905,19 @@ struct setting * find_setting ( const char *name ) {
 /**
  * Parse setting name as tag number
  *
+ * @v settings		Settings block
  * @v name		Name
  * @ret tag		Tag number, or 0 if not a valid number
  */
-static unsigned int parse_setting_tag ( const char *name ) {
+static unsigned int parse_setting_tag ( struct settings *settings,
+					const char *name ) {
 	char *tmp = ( ( char * ) name );
 	unsigned int tag = 0;
 
 	while ( 1 ) {
 		tag = ( ( tag << 8 ) | strtoul ( tmp, &tmp, 0 ) );
 		if ( *tmp == 0 )
-			return tag;
+			return ( tag | settings->tag_magic );
 		if ( *tmp != '.' )
 			return 0;
 		tmp++;
@@ -946,6 +967,7 @@ parse_setting_name ( const char *name,
 	char *setting_name;
 	char *type_name;
 	struct setting *named_setting;
+	unsigned int tag;
 
 	/* Set defaults */
 	*settings = &settings_root;
@@ -979,9 +1001,10 @@ parse_setting_name ( const char *name,
 	if ( ( named_setting = find_setting ( setting_name ) ) != NULL ) {
 		/* Matches a defined named setting; use that setting */
 		memcpy ( setting, named_setting, sizeof ( *setting ) );
-	} else if ( ( setting->tag = parse_setting_tag ( setting_name ) ) !=0){
+	} else if ( ( tag = parse_setting_tag ( *settings,
+						setting_name ) ) != 0 ) {
 		/* Is a valid numeric tag; use the tag */
-		setting->tag |= (*settings)->tag_magic;
+		setting->tag = tag;
 	} else {
 		/* Use the arbitrary name */
 		setting->name = setting_name;
