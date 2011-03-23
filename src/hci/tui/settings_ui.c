@@ -40,13 +40,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define CPAIR_SELECT	2
 #define CPAIR_EDIT	3
 #define CPAIR_ALERT	4
+#define CPAIR_URL	5
 
 /* Screen layout */
 #define TITLE_ROW		1
 #define SETTINGS_LIST_ROW	3
 #define SETTINGS_LIST_COL	1
-#define SETTINGS_LIST_ROWS	16
-#define INFO_ROW		20
+#define SETTINGS_LIST_ROWS	15
+#define INFO_ROW		19
 #define ALERT_ROW		22
 #define INSTRUCTION_ROW		22
 #define INSTRUCTION_PAD "     "
@@ -346,6 +347,7 @@ static void draw_info_row ( struct setting_widget *widget ) {
 
 	/* Draw nothing unless this row represents a setting */
 	clearmsg ( INFO_ROW );
+	clearmsg ( INFO_ROW + 1 );
 	if ( ! widget->row.setting )
 		return;
 
@@ -359,6 +361,10 @@ static void draw_info_row ( struct setting_widget *widget ) {
 	attron ( A_BOLD );
 	msg ( INFO_ROW, "%s - %s", buf, widget->row.setting->description );
 	attroff ( A_BOLD );
+	color_set ( CPAIR_URL, NULL );
+	msg ( ( INFO_ROW + 1 ), "http://ipxe.org/cfg/%s",
+	      widget->row.setting->name );
+	color_set ( CPAIR_NORMAL, NULL );
 }
 
 /**
@@ -555,6 +561,7 @@ int settings_ui ( struct settings *settings ) {
 	init_pair ( CPAIR_SELECT, COLOR_WHITE, COLOR_RED );
 	init_pair ( CPAIR_EDIT, COLOR_BLACK, COLOR_CYAN );
 	init_pair ( CPAIR_ALERT, COLOR_WHITE, COLOR_RED );
+	init_pair ( CPAIR_URL, COLOR_CYAN, COLOR_BLUE );
 	color_set ( CPAIR_NORMAL, NULL );
 	erase();
 	
