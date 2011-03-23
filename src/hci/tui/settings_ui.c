@@ -444,6 +444,7 @@ static void init_widget ( struct setting_widget *widget,
 static int main_loop ( struct settings *settings ) {
 	struct setting_widget widget;
 	int redraw = 1;
+	int move;
 	unsigned int next;
 	int key;
 	int rc;
@@ -497,15 +498,15 @@ static int main_loop ( struct settings *settings ) {
 
 			/* Process keypress */
 			key = getkey ( 0 );
-			next = widget.current;
+			move = 0;
 			switch ( key ) {
 			case KEY_DOWN:
 				if ( widget.current < ( widget.num_rows - 1 ) )
-					next++;
+					move = +1;
 				break;
 			case KEY_UP:
 				if ( widget.current > 0 )
-					next--;
+					move = -1;
 				break;
 			case CTRL_D:
 				if ( ! widget.row.setting )
@@ -534,7 +535,8 @@ static int main_loop ( struct settings *settings ) {
 				}
 				break;
 			}
-			if ( next != widget.current ) {
+			if ( move ) {
+				next = ( widget.current + move );
 				draw_setting_row ( &widget );
 				redraw = 1;
 				reveal_setting_row ( &widget, next );
