@@ -253,16 +253,24 @@ static void undinet_poll ( struct net_device *netdev ) {
 	int rc;
 
 	if ( ! undinic->isr_processing ) {
-		/* If interrupts are supported, then do nothing unless
-		 * the ISR has been triggered.
+		/* Allow interrupt to occur.  Do this even if
+		 * interrupts are not known to be supported, since
+		 * some cards erroneously report that they do not
+		 * support interrupts.
 		 */
-		if ( undinic->irq_supported && ( ! undinet_isr_triggered() ) ){
+		if ( ! undinet_isr_triggered() ) {
 			/* Allow interrupt to occur */
 			__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
 							   "nop\n\t"
 							   "nop\n\t"
 							   "cli\n\t" ) : : );
-			return;
+
+			/* If interrupts are known to be supported,
+			 * then do nothing on this poll; wait for the
+			 * interrupt to be triggered.
+			 */
+			if ( undinic->irq_supported )
+				return;
 		}
 
 		/* Start ISR processing */
@@ -361,8 +369,8 @@ static int undinet_open ( struct net_device *netdev ) {
 	struct s_PXENV_UNDI_OPEN undi_open;
 	int rc;
 
-	/* Hook interrupt service routine and enable interrupt if supported */
-	if ( undinic->irq_supported ) {
+	/* Hook interrupt service routine and enable interrupt if applicable */
+	if ( undinic->irq ) {
 		undinet_hook_isr ( undinic->irq );
 		enable_irq ( undinic->irq );
 		send_eoi ( undinic->irq );
@@ -431,8 +439,8 @@ static void undinet_close ( struct net_device *netdev ) {
 	pxeparent_call ( undinet_entry, PXENV_UNDI_CLOSE,
 			 &undi_close, sizeof ( undi_close ) );
 
-	/* Disable interrupt and unhook ISR if supported */
-	if ( undinic->irq_supported ) {
+	/* Disable interrupt and unhook ISR if applicable */
+	if ( undinic->irq ) {
 		disable_irq ( undinic->irq );
 		undinet_unhook_isr ( undinic->irq );
 	}
@@ -532,8 +540,14 @@ int undinet_probe ( struct undi_device *undi ) {
 		goto err_undi_get_information;
 	memcpy ( netdev->hw_addr, undi_info.PermNodeAddress, ETH_ALEN );
 	undinic->irq = undi_info.IntNumber;
-	DBGC ( undinic, "UNDINIC %p has MAC address %s\n",
-	       undinic, eth_ntoa ( netdev->hw_addr ) );
+	if ( undinic->irq > IRQ_MAX ) {
+		DBGC ( undinic, "UNDINIC %p has invalid IRQ %d\n",
+		       undinic, undinic->irq );
+		rc = -EINVAL;
+		goto err_bad_irq;
+	}
+	DBGC ( undinic, "UNDINIC %p has MAC address %s and IRQ %d\n",
+	       undinic, eth_ntoa ( netdev->hw_addr ), undinic->irq );
 
 	/* Get interface information */
 	memset ( &undi_iface, 0, sizeof ( undi_iface ) );
@@ -544,17 +558,10 @@ int undinet_probe ( struct undi_device *undi ) {
 	DBGC ( undinic, "UNDINIC %p has type %s, speed %d, flags %08x\n",
 	       undinic, undi_iface.IfaceType, undi_iface.LinkSpeed,
 	       undi_iface.ServiceFlags );
-	if ( undi_iface.ServiceFlags & SUPPORTED_IRQ ) {
-		if ( undinic->irq > IRQ_MAX ) {
-			DBGC ( undinic, "UNDINIC %p has invalid IRQ %d\n",
-			       undinic, undinic->irq );
-			rc = -EINVAL;
-			goto err_bad_irq;
-		}
+	if ( undi_iface.ServiceFlags & SUPPORTED_IRQ )
 		undinic->irq_supported = 1;
-		DBGC ( undinic, "UNDINIC %p uses IRQ %d\n",
-		       undinic, undinic->irq );
-	}
+	DBGC ( undinic, "UNDINIC %p using %s mode\n", undinic,
+	       ( undinic->irq_supported ? "interrupt" : "polling" ) );
 	if ( strncmp ( ( ( char * ) undi_iface.IfaceType ), "Etherboot",
 		       sizeof ( undi_iface.IfaceType ) ) == 0 ) {
 		DBGC ( undinic, "UNDINIC %p Etherboot 5.4 workaround enabled\n",
@@ -573,8 +580,8 @@ int undinet_probe ( struct undi_device *undi ) {
 	return 0;
 
  err_register:
- err_bad_irq:
  err_undi_get_iface_info:
+ err_bad_irq:
  err_undi_get_information:
  err_undi_initialize:
 	/* Shut down UNDI stack */
