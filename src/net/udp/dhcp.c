@@ -95,7 +95,7 @@ FEATURE_VERSION ( VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH );
 /** DHCP server address setting */
 struct setting dhcp_server_setting __setting ( SETTING_MISC ) = {
 	.name = "dhcp-server",
-	.description = "DHCP server address",
+	.description = "DHCP server",
 	.tag = DHCP_SERVER_IDENTIFIER,
 	.type = &setting_type_ipv4,
 };
@@ -103,7 +103,7 @@ struct setting dhcp_server_setting __setting ( SETTING_MISC ) = {
 /** DHCP user class setting */
 struct setting user_class_setting __setting ( SETTING_HOST_EXTRA ) = {
 	.name = "user-class",
-	.description = "User class identifier",
+	.description = "DHCP user class",
 	.tag = DHCP_USER_CLASS_ID,
 	.type = &setting_type_string,
 };
@@ -111,7 +111,7 @@ struct setting user_class_setting __setting ( SETTING_HOST_EXTRA ) = {
 /** Use cached network settings */
 struct setting use_cached_setting __setting ( SETTING_MISC ) = {
 	.name = "use-cached",
-	.description = "Use cached network settings",
+	.description = "Use cached settings",
 	.tag = DHCP_EB_USE_CACHED,
 	.type = &setting_type_uint8,
 };

@@ -109,7 +109,7 @@ struct setting keep_san_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 /** The "skip-san-boot" setting */
 struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 	.name = "skip-san-boot",
-	.description = "Do not boot the SAN drive after connecting",
+	.description = "Do not boot from SAN device",
 	.tag = DHCP_EB_SKIP_SAN_BOOT,
 	.type = &setting_type_int8,
 };

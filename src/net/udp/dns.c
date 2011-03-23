@@ -597,7 +597,7 @@ struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
 /** Domain name setting */
 struct setting domain_setting __setting ( SETTING_IPv4_EXTRA ) = {
 	.name = "domain",
-	.description = "Local domain",
+	.description = "DNS domain",
 	.tag = DHCP_DOMAIN_NAME,
 	.type = &setting_type_string,
 };

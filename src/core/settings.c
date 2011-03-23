@@ -1714,7 +1714,7 @@ struct setting filename_setting __setting ( SETTING_BOOT ) = {
 /** Root path setting */
 struct setting root_path_setting __setting ( SETTING_SANBOOT ) = {
 	.name = "root-path",
-	.description = "iSCSI root path",
+	.description = "SAN root path",
 	.tag = DHCP_ROOT_PATH,
 	.type = &setting_type_string,
 };
@@ -1738,7 +1738,7 @@ struct setting password_setting __setting ( SETTING_AUTH ) = {
 /** Priority setting */
 struct setting priority_setting __setting ( SETTING_MISC ) = {
 	.name = "priority",
-	.description = "Priority of these settings",
+	.description = "Settings priority",
 	.tag = DHCP_EB_PRIORITY,
 	.type = &setting_type_int8,
 };

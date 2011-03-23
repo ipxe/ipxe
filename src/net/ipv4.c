@@ -556,7 +556,7 @@ struct arp_net_protocol ipv4_arp_protocol __arp_net_protocol = {
 /** IPv4 address setting */
 struct setting ip_setting __setting ( SETTING_IPv4 ) = {
 	.name = "ip",
-	.description = "IPv4 address",
+	.description = "IP address",
 	.tag = DHCP_EB_YIADDR,
 	.type = &setting_type_ipv4,
 };
@@ -564,7 +564,7 @@ struct setting ip_setting __setting ( SETTING_IPv4 ) = {
 /** IPv4 subnet mask setting */
 struct setting netmask_setting __setting ( SETTING_IPv4 ) = {
 	.name = "netmask",
-	.description = "IPv4 subnet mask",
+	.description = "Subnet mask",
 	.tag = DHCP_SUBNET_MASK,
 	.type = &setting_type_ipv4,
 };

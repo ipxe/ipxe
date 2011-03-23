@@ -204,7 +204,7 @@ struct settings_applicator net80211_applicator __settings_applicator = {
  */
 struct setting net80211_ssid_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "ssid",
-	.description = "802.11 SSID (network name)",
+	.description = "Wireless SSID",
 	.type = &setting_type_string,
 	.tag = NET80211_SETTING_TAG_SSID,
 };
@@ -217,7 +217,7 @@ struct setting net80211_ssid_setting __setting ( SETTING_NETDEV_EXTRA ) = {
  */
 struct setting net80211_active_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "active-scan",
-	.description = "Use an active scan during 802.11 association",
+	.description = "Actively scan for wireless networks",
 	.type = &setting_type_int8,
 	.tag = NET80211_SETTING_TAG_ACTIVE_SCAN,
 };
@@ -230,7 +230,7 @@ struct setting net80211_active_setting __setting ( SETTING_NETDEV_EXTRA ) = {
  */
 struct setting net80211_key_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "key",
-	.description = "Encryption key for protected 802.11 networks",
+	.description = "Wireless encryption key",
 	.type = &setting_type_string,
 	.tag = NET80211_SETTING_TAG_KEY,
 };
