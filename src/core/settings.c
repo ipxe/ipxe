@@ -1123,6 +1123,7 @@ int fetchf_named_setting ( const char *name,
 	struct setting setting;
 	struct settings *origin;
 	char tmp_name[ strlen ( name ) + 1 ];
+	int len;
 	int rc;
 
 	/* Parse setting name */
@@ -1131,16 +1132,16 @@ int fetchf_named_setting ( const char *name,
 		return rc;
 
 	/* Fetch setting */
-	if ( ( rc = fetchf_setting ( settings, &setting, value_buf,
+	if ( ( len = fetchf_setting ( settings, &setting, value_buf,
 				     value_len ) ) < 0 )
-		return rc;
+		return len;
 
 	/* Construct setting name */
 	origin = fetch_setting_origin ( settings, &setting );
 	assert ( origin != NULL );
 	setting_name ( origin, &setting, name_buf, name_len );
 
-	return 0;
+	return len;
 }
 
 /******************************************************************************
