@@ -230,6 +230,27 @@ struct generic_settings generic_settings_root = {
 /** Root settings block */
 #define settings_root generic_settings_root.settings
 
+/** Autovivified settings block */
+struct autovivified_settings {
+	/** Reference count */
+	struct refcnt refcnt;
+	/** Generic settings block */
+	struct generic_settings generic;
+};
+
+/**
+ * Free autovivified settings block
+ *
+ * @v refcnt		Reference count
+ */
+static void autovivified_settings_free ( struct refcnt *refcnt ) {
+	struct autovivified_settings *autovivified =
+		container_of ( refcnt, struct autovivified_settings, refcnt );
+
+	generic_settings_clear ( &autovivified->generic.settings );
+	free ( autovivified );
+}
+
 /**
  * Find child named settings block
  *
@@ -264,7 +285,7 @@ static struct settings * find_child_settings ( struct settings *parent,
 static struct settings * autovivify_child_settings ( struct settings *parent,
 						     const char *name ) {
 	struct {
-		struct generic_settings generic;
+		struct autovivified_settings autovivified;
 		char name[ strlen ( name ) + 1 /* NUL */ ];
 	} *new_child;
 	struct settings *settings;
@@ -281,8 +302,11 @@ static struct settings * autovivify_child_settings ( struct settings *parent,
 		return NULL;
 	}
 	memcpy ( new_child->name, name, sizeof ( new_child->name ) );
-	generic_settings_init ( &new_child->generic, NULL );
-	settings = &new_child->generic.settings;
+	ref_init ( &new_child->autovivified.refcnt,
+		   autovivified_settings_free );
+	generic_settings_init ( &new_child->autovivified.generic,
+				&new_child->autovivified.refcnt );
+	settings = &new_child->autovivified.generic.settings;
 	register_settings ( settings, parent, new_child->name );
 	return settings;
 }
