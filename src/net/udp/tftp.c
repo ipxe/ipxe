@@ -1215,7 +1215,7 @@ struct uri_opener mtftp_uri_opener __uri_opener = {
  */
 
 /** TFTP server setting */
-struct setting next_server_setting __setting = {
+struct setting next_server_setting __setting ( SETTING_BOOT ) = {
 	.name = "next-server",
 	.description = "TFTP server",
 	.tag = DHCP_EB_SIADDR,

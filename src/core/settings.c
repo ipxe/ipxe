@@ -1672,7 +1672,7 @@ char * expand_settings ( const char *string ) {
  */
 
 /** Hostname setting */
-struct setting hostname_setting __setting = {
+struct setting hostname_setting __setting ( SETTING_HOST ) = {
 	.name = "hostname",
 	.description = "Host name",
 	.tag = DHCP_HOST_NAME,
@@ -1680,7 +1680,7 @@ struct setting hostname_setting __setting = {
 };
 
 /** Filename setting */
-struct setting filename_setting __setting = {
+struct setting filename_setting __setting ( SETTING_BOOT ) = {
 	.name = "filename",
 	.description = "Boot filename",
 	.tag = DHCP_BOOTFILE_NAME,
@@ -1688,7 +1688,7 @@ struct setting filename_setting __setting = {
 };
 
 /** Root path setting */
-struct setting root_path_setting __setting = {
+struct setting root_path_setting __setting ( SETTING_SANBOOT ) = {
 	.name = "root-path",
 	.description = "iSCSI root path",
 	.tag = DHCP_ROOT_PATH,
@@ -1696,7 +1696,7 @@ struct setting root_path_setting __setting = {
 };
 
 /** Username setting */
-struct setting username_setting __setting = {
+struct setting username_setting __setting ( SETTING_AUTH ) = {
 	.name = "username",
 	.description = "User name",
 	.tag = DHCP_EB_USERNAME,
@@ -1704,7 +1704,7 @@ struct setting username_setting __setting = {
 };
 
 /** Password setting */
-struct setting password_setting __setting = {
+struct setting password_setting __setting ( SETTING_AUTH ) = {
 	.name = "password",
 	.description = "Password",
 	.tag = DHCP_EB_PASSWORD,
@@ -1712,7 +1712,7 @@ struct setting password_setting __setting = {
 };
 
 /** Priority setting */
-struct setting priority_setting __setting = {
+struct setting priority_setting __setting ( SETTING_MISC ) = {
 	.name = "priority",
 	.description = "Priority of these settings",
 	.tag = DHCP_EB_PRIORITY,

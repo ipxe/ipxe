@@ -165,7 +165,7 @@ struct init_fn smbios_init_fn __init_fn ( INIT_NORMAL ) = {
 };
 
 /** UUID setting obtained via SMBIOS */
-struct setting uuid_setting __setting = {
+struct setting uuid_setting __setting ( SETTING_HOST ) = {
 	.name = "uuid",
 	.description = "UUID",
 	.tag = SMBIOS_RAW_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
@@ -174,7 +174,7 @@ struct setting uuid_setting __setting = {
 };
 
 /** Other SMBIOS named settings */
-struct setting smbios_named_settings[] __setting = {
+struct setting smbios_named_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 	{
 		.name = "manufacturer",
 		.description = "Manufacturer",

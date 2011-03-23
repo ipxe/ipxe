@@ -93,7 +93,7 @@ static uint8_t dhcp_request_options_data[] = {
 FEATURE_VERSION ( VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH );
 
 /** DHCP server address setting */
-struct setting dhcp_server_setting __setting = {
+struct setting dhcp_server_setting __setting ( SETTING_MISC ) = {
 	.name = "dhcp-server",
 	.description = "DHCP server address",
 	.tag = DHCP_SERVER_IDENTIFIER,
@@ -101,7 +101,7 @@ struct setting dhcp_server_setting __setting = {
 };
 
 /** DHCP user class setting */
-struct setting user_class_setting __setting = {
+struct setting user_class_setting __setting ( SETTING_HOST_EXTRA ) = {
 	.name = "user-class",
 	.description = "User class identifier",
 	.tag = DHCP_USER_CLASS_ID,
@@ -109,7 +109,7 @@ struct setting user_class_setting __setting = {
 };
 
 /** Use cached network settings */
-struct setting use_cached_setting __setting = {
+struct setting use_cached_setting __setting ( SETTING_MISC ) = {
 	.name = "use-cached",
 	.description = "Use cached network settings",
 	.tag = DHCP_EB_USE_CACHED,

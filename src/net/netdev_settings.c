@@ -34,13 +34,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** Network device named settings */
-struct setting mac_setting __setting = {
+struct setting mac_setting __setting ( SETTING_NETDEV ) = {
 	.name = "mac",
 	.description = "MAC address",
 	.type = &setting_type_hex,
 	.tag = NETDEV_SETTING_TAG_MAC,
 };
-struct setting busid_setting __setting = {
+struct setting busid_setting __setting ( SETTING_NETDEV ) = {
 	.name = "busid",
 	.description = "Bus ID",
 	.type = &setting_type_hex,

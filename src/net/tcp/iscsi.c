@@ -1820,7 +1820,7 @@ enum iscsi_root_path_component {
 };
 
 /** iSCSI initiator IQN setting */
-struct setting initiator_iqn_setting __setting = {
+struct setting initiator_iqn_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 	.name = "initiator-iqn",
 	.description = "iSCSI initiator name",
 	.tag = DHCP_ISCSI_INITIATOR_IQN,
@@ -1828,7 +1828,7 @@ struct setting initiator_iqn_setting __setting = {
 };
 
 /** iSCSI reverse username setting */
-struct setting reverse_username_setting __setting = {
+struct setting reverse_username_setting __setting ( SETTING_AUTH_EXTRA ) = {
 	.name = "reverse-username",
 	.description = "Reverse user name",
 	.tag = DHCP_EB_REVERSE_USERNAME,
@@ -1836,7 +1836,7 @@ struct setting reverse_username_setting __setting = {
 };
 
 /** iSCSI reverse password setting */
-struct setting reverse_password_setting __setting = {
+struct setting reverse_password_setting __setting ( SETTING_AUTH_EXTRA ) = {
 	.name = "reverse-password",
 	.description = "Reverse password",
 	.tag = DHCP_EB_REVERSE_PASSWORD,

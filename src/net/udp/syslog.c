@@ -146,7 +146,7 @@ struct console_driver syslog_console __console_driver = {
  */
 
 /** Syslog server setting */
-struct setting syslog_setting __setting = {
+struct setting syslog_setting __setting ( SETTING_MISC ) = {
 	.name = "syslog",
 	.description = "Syslog server",
 	.tag = DHCP_LOG_SERVERS,

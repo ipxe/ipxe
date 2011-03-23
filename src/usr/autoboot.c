@@ -99,7 +99,7 @@ static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
 }
 
 /** The "keep-san" setting */
-struct setting keep_san_setting __setting = {
+struct setting keep_san_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 	.name = "keep-san",
 	.description = "Preserve SAN connection",
 	.tag = DHCP_EB_KEEP_SAN,
@@ -107,7 +107,7 @@ struct setting keep_san_setting __setting = {
 };
 
 /** The "skip-san-boot" setting */
-struct setting skip_san_boot_setting __setting = {
+struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 	.name = "skip-san-boot",
 	.description = "Do not boot the SAN drive after connecting",
 	.tag = DHCP_EB_SKIP_SAN_BOOT,
