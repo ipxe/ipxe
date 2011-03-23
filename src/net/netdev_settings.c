@@ -81,6 +81,8 @@ static int netdev_store ( struct settings *settings, struct setting *setting,
 		memcpy ( netdev->ll_addr, data, len );
 		return 0;
 	}
+	if ( setting_cmp ( setting, &busid_setting ) == 0 )
+		return -ENOTSUP;
 
 	return generic_settings_store ( settings, setting, data, len );
 }
