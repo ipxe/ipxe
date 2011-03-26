@@ -1060,6 +1060,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	struct tcp_options options;
 	size_t hlen;
 	uint16_t csum;
+	uint32_t start_seq;
 	uint32_t seq;
 	uint32_t ack;
 	uint32_t win;
@@ -1099,7 +1100,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	
 	/* Parse parameters from header and strip header */
 	tcp = tcp_demux ( ntohs ( tcphdr->dest ) );
-	seq = ntohl ( tcphdr->seq );
+	seq = start_seq = ntohl ( tcphdr->seq );
 	ack = ntohl ( tcphdr->ack );
 	win = ntohs ( tcphdr->win );
 	flags = tcphdr->flags;
@@ -1125,10 +1126,6 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		goto discard;
 	}
 
-	/* Update timestamp, if applicable */
-	if ( options.tsopt && tcp_in_window ( tcp->rcv_ack, seq, seq_len ) )
-		tcp->ts_recent = ntohl ( options.tsopt->tsval );
-
 	/* Handle ACK, if present */
 	if ( flags & TCP_ACK ) {
 		if ( ( rc = tcp_rx_ack ( tcp, ack, win ) ) != 0 ) {
@@ -1153,6 +1150,12 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	if ( flags & TCP_RST ) {
 		if ( ( rc = tcp_rx_rst ( tcp, seq ) ) != 0 )
 			goto discard;
+	}
+
+	/* Update timestamp, if applicable */
+	if ( options.tsopt &&
+	     tcp_in_window ( tcp->rcv_ack, start_seq, seq_len ) ) {
+		tcp->ts_recent = ntohl ( options.tsopt->tsval );
 	}
 
 	/* Enqueue received data */
