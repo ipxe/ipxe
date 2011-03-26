@@ -62,6 +62,8 @@ int monojob_wait ( const char *string ) {
 	int rc;
 	unsigned long last_progress;
 	unsigned long elapsed;
+	unsigned long completed;
+	unsigned long total;
 	unsigned int percentage;
 	int shown_percentage = 0;
 
@@ -85,9 +87,11 @@ int monojob_wait ( const char *string ) {
 			if ( shown_percentage )
 				printf ( "\b\b\b\b    \b\b\b\b" );
 			job_progress ( &monojob, &progress );
-			if ( progress.total ) {
-				percentage = ( ( 100 * progress.completed ) /
-					       progress.total );
+			/* Normalise progress figures to avoid overflow */
+			completed = ( progress.completed / 128 );
+			total = ( progress.total / 128 );
+			if ( total ) {
+				percentage = ( ( 100 * completed ) / total );
 				printf ( "%3d%%", percentage );
 				shown_percentage = 1;
 			} else {
