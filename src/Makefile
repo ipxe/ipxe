@@ -101,8 +101,8 @@ INCDIRS		+= include .
 # Default build target: build the most common targets and print out a
 # helpfully suggestive message
 #
-ALL		:= bin/blib.a bin/ipxe.dsk bin/ipxe.iso bin/ipxe.usb \
-		   bin/undionly.kpxe bin/rtl8139.rom
+ALL		:= bin/blib.a bin/ipxe.dsk bin/ipxe.lkrn bin/ipxe.iso \
+		   bin/ipxe.usb bin/undionly.kpxe bin/rtl8139.rom
 all : $(ALL)
 	@$(ECHO) '==========================================================='
 	@$(ECHO)
