@@ -154,7 +154,8 @@ int imgdownload ( struct uri *uri, const char *name, const char *cmdline,
 		return -ENOMEM;
 
 	/* Set image name */
-	image_set_name ( image, name );
+	if ( name )
+		image_set_name ( image, name );
 
 	/* Set image URI */
 	image_set_uri ( image, uri );
