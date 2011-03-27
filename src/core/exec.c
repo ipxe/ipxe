@@ -303,6 +303,23 @@ char * concat_args ( char **args ) {
 	return string;
 }
 
+/** "echo" options */
+struct echo_options {
+	/** Do not print trailing newline */
+	int no_newline;
+};
+
+/** "echo" option list */
+static struct option_descriptor echo_opts[] = {
+	OPTION_DESC ( "n", 'n', no_argument,
+		      struct echo_options, no_newline, parse_flag ),
+};
+
+/** "echo" command descriptor */
+static struct command_descriptor echo_cmd =
+	COMMAND_DESC ( struct echo_options, echo_opts, 0, MAX_ARGUMENTS,
+		       "[-n] [...]" );
+
 /**
  * "echo" command
  *
@@ -310,13 +327,23 @@ char * concat_args ( char **args ) {
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int echo_exec ( int argc __unused, char **argv ) {
+static int echo_exec ( int argc, char **argv ) {
+	struct echo_options opts;
 	char *text;
+	int rc;
 
-	text = concat_args ( &argv[1] );
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &echo_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Parse text */
+	text = concat_args ( &argv[optind] );
 	if ( ! text )
 		return -ENOMEM;
-	printf ( "%s\n", text );
+
+	/* Print text */
+	printf ( "%s%s", text, ( opts.no_newline ? "" : "\n" ) );
+
 	free ( text );
 	return 0;
 }
