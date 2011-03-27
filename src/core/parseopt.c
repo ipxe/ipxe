@@ -126,6 +126,21 @@ int parse_image ( const char *text, struct image **image ) {
 }
 
 /**
+ * Parse flag
+ *
+ * @v text		Text (ignored)
+ * @ret flag		Flag to set
+ * @ret rc		Return status code
+ */
+int parse_flag ( const char *text __unused, int *flag ) {
+
+	/* Set flag */
+	*flag = 1;
+
+	return 0;
+}
+
+/**
  * Print command usage message
  *
  * @v cmd		Command descriptor
