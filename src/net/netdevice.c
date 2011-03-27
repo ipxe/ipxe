@@ -463,12 +463,12 @@ int netdev_open ( struct net_device *netdev ) {
 
 	DBGC ( netdev, "NETDEV %s opening\n", netdev->name );
 
-	/* Mark as opened */
-	netdev->state |= NETDEV_OPEN;
-
 	/* Open the device */
 	if ( ( rc = netdev->op->open ( netdev ) ) != 0 )
 		return rc;
+
+	/* Mark as opened */
+	netdev->state |= NETDEV_OPEN;
 
 	/* Add to head of open devices list */
 	list_add ( &netdev->open_list, &open_net_devices );
