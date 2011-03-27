@@ -22,7 +22,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <libgen.h>
 #include <getopt.h>
 #include <ipxe/image.h>
 #include <ipxe/command.h>
@@ -76,8 +75,6 @@ static int imgfetch_core_exec ( int argc, char **argv,
 
 	/* Parse URI string */
 	uri_string = argv[optind];
-	if ( ! opts.name )
-		opts.name = basename ( uri_string );
 
 	/* Parse command line */
 	if ( argv[ optind + 1 ] != NULL ) {
