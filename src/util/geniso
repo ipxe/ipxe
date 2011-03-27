@@ -30,6 +30,9 @@ then
 	exit 1
 fi
 
+# isohybrid will be used if available
+isohybrid=`which isohybrid 2>/dev/null`
+
 out=$1
 shift
 dir=`mktemp -d bin/iso.dir.XXXXXX`
@@ -63,3 +66,7 @@ do
 done >> $cfg
 $mkisofs -quiet -l -o $out -c boot.cat -b isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table $dir
 rm -fr $dir
+if [ -n "$isohybrid" ]
+then
+    $isohybrid $out >/dev/null
+fi
