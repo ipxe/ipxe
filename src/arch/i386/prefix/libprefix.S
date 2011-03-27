@@ -753,21 +753,25 @@ payload_death_message:
 	lcall	*init_libkir_vector
 #else
 	/* Find a suitable decompression temporary area, if none specified */
+	pushl	%eax
 	testl	%ebp, %ebp
 	jnz	1f
 	/* Use INT 15,88 to find the highest available address via INT
 	 * 15,88.  This limits us to around 64MB, which should avoid
 	 * all of the POST-time memory map failure modes.
 	 */
-	pushl	%eax
 	movb	$0x88, %ah
 	int	$0x15
 	movw	%ax, %bp
 	addl	$0x400, %ebp
 	subl	$_textdata_memsz_kb, %ebp
 	shll	$10, %ebp
-	popl	%eax
-1:
+	/* Sanity check: if we have ended up below 1MB, use 1MB */
+	cmpl	$0x100000, %ebp
+	jae	1f
+	movl	$0x100000, %ebp
+1:	popl	%eax
+
 	/* Install .text and .data to temporary area in high memory,
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
