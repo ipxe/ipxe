@@ -217,6 +217,45 @@ int shell_stopped ( int stop ) {
 }
 
 /**
+ * Expand settings within a token list
+ *
+ * @v argc		Argument count
+ * @v tokens		Token list
+ * @v argv		Argument list to fill in
+ * @ret rc		Return status code
+ */
+static int expand_tokens ( int argc, char **tokens, char **argv ) {
+	int i;
+
+	/* Expand each token in turn */
+	for ( i = 0 ; i < argc ; i++ ) {
+		argv[i] = expand_settings ( tokens[i] );
+		if ( ! argv[i] )
+			goto err_expand_settings;
+	}
+
+	return 0;
+
+ err_expand_settings:
+	assert ( argv[i] == NULL );
+	for ( ; i >= 0 ; i-- )
+		free ( argv[i] );
+	return -ENOMEM;
+}
+
+/**
+ * Free an expanded token list
+ *
+ * @v argv		Argument list
+ */
+static void free_tokens ( char **argv ) {
+
+	/* Free each expanded argument */
+	while ( *argv )
+		free ( *(argv++) );
+}
+
+/**
  * Execute command line
  *
  * @v command		Command line
@@ -225,58 +264,63 @@ int shell_stopped ( int stop ) {
  * Execute the named command and arguments.
  */
 int system ( const char *command ) {
+	int count = split_command ( ( char * ) command, NULL );
+	char *all_tokens[ count + 1 ];
 	int ( * process_next ) ( int rc );
-	char *expcmd;
-	char **argv;
+	char *command_copy;
+	char **tokens;
 	int argc;
-	int count;
 	int process;
 	int rc = 0;
 
-	/* Perform variable expansion */
-	expcmd = expand_settings ( command );
-	if ( ! expcmd )
+	/* Create modifiable copy of command */
+	command_copy = strdup ( command );
+	if ( ! command_copy )
 		return -ENOMEM;
 
-	/* Count tokens */
-	count = split_command ( expcmd, NULL );
+	/* Split command into tokens */
+	split_command ( command_copy, all_tokens );
+	all_tokens[count] = NULL;
 
-	/* Create token array */
-	if ( count ) {
-		char * tokens[count + 1];
-		
-		split_command ( expcmd, tokens );
-		tokens[count] = NULL;
-		process = 1;
+	/* Process individual commands */
+	process = 1;
+	for ( tokens = all_tokens ; ; tokens += ( argc + 1 ) ) {
 
-		for ( argv = tokens ; ; argv += ( argc + 1 ) ) {
+		/* Find command terminator */
+		argc = command_terminator ( tokens, &process_next );
 
-			/* Find command terminator */
-			argc = command_terminator ( argv, &process_next );
+		/* Expand tokens and execute command */
+		if ( process ) {
+			char *argv[ argc + 1 ];
+
+			/* Expand tokens */
+			if ( ( rc = expand_tokens ( argc, tokens, argv ) ) != 0)
+				break;
+			argv[argc] = NULL;
 
 			/* Execute command */
-			if ( process ) {
-				argv[argc] = NULL;
-				rc = execv ( argv[0], argv );
-			}
+			rc = execv ( argv[0], argv );
 
-			/* Stop processing, if applicable */
-			if ( shell_stopped ( SHELL_STOP_COMMAND ) )
-				break;
-
-			/* Stop processing if we have reached the end
-			 * of the command.
-			 */
-			if ( ! process_next )
-				break;
-
-			/* Determine whether or not to process next command */
-			process = process_next ( rc );
+			/* Free tokens */
+			free_tokens ( argv );
 		}
+
+		/* Stop processing, if applicable */
+		if ( shell_stopped ( SHELL_STOP_COMMAND ) )
+			break;
+
+		/* Stop processing if we have reached the end of the
+		 * command.
+		 */
+		if ( ! process_next )
+			break;
+
+		/* Determine whether or not to process next command */
+		process = process_next ( rc );
 	}
 
-	/* Free expanded command */
-	free ( expcmd );
+	/* Free modified copy of command */
+	free ( command_copy );
 
 	return rc;
 }
