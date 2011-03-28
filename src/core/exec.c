@@ -143,6 +143,16 @@ static int process_on_failure ( int rc ) {
 }
 
 /**
+ * Process next command regardless of status from previous command
+ *
+ * @v rc		Status of previous command
+ * @ret process		Process next command
+ */
+static int process_always ( int rc __unused ) {
+	return 1;
+}
+
+/**
  * Find command terminator
  *
  * @v tokens		Token list
@@ -165,6 +175,10 @@ static int command_terminator ( char **tokens,
 		} else if ( strcmp ( tokens[i], "&&" ) == 0 ) {
 			/* Short-circuit logical AND */
 			*process_next = process_on_success;
+			return i;
+		} else if ( strcmp ( tokens[i], ";" ) == 0 ) {
+			/* Process next command unconditionally */
+			*process_next = process_always;
 			return i;
 		}
 	}
