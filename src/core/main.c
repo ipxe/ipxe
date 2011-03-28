@@ -15,6 +15,7 @@ Literature dealing with the network protocols:
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
 #include <ipxe/shell.h>
@@ -27,6 +28,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define NORMAL	"\033[0m"
 #define BOLD	"\033[1m"
 #define CYAN	"\033[36m"
+
+/** The "scriptlet" setting */
+struct setting scriptlet_setting __setting ( SETTING_MISC ) = {
+	.name = "scriptlet",
+	.description = "Boot scriptlet",
+	.tag = DHCP_EB_SCRIPTLET,
+	.type = &setting_type_string,
+};
 
 /**
  * Prompt for shell entry
@@ -51,6 +60,7 @@ static int shell_banner ( void ) {
 __asmcall int main ( void ) {
 	struct feature *feature;
 	struct image *image;
+	char *scriptlet;
 
 	/* Some devices take an unreasonably long time to initialise */
 	printf ( PRODUCT_SHORT_NAME " initialising devices..." );
@@ -82,11 +92,16 @@ __asmcall int main ( void ) {
 	if ( ( image = first_image() ) != NULL ) {
 		/* We have an embedded image; execute it */
 		image_exec ( image );
+	} else if ( shell_banner() ) {
+		/* User wants shell; just give them a shell */
+		shell();
 	} else {
-		/* Prompt for shell */
-		if ( shell_banner() ) {
-			/* User wants shell; just give them a shell */
-			shell();
+		fetch_string_setting_copy ( NULL, &scriptlet_setting,
+					    &scriptlet );
+		if ( scriptlet ) {
+			/* User has defined a scriptlet; execute it */
+			system ( scriptlet );
+			free ( scriptlet );
 		} else {
 			/* Try booting.  If booting fails, offer the
 			 * user another chance to enter the shell.

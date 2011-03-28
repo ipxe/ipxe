@@ -307,9 +307,16 @@ struct dhcp_client_uuid {
 #define DHCP_EB_SKIP_SAN_BOOT DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x09 )
 
 /*
- * Tags in the range 0x10-0x7f are reserved for feature markers
+ * Tags in the range 0x10-0x4f are reserved for feature markers
  *
  */
+
+/** Scriptlet
+ *
+ * If a scriptlet exists, it will be executed in place of the usual
+ * call to autoboot()
+ */
+#define DHCP_EB_SCRIPTLET DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x51 )
 
 /** Skip PXE DHCP protocol extensions such as ProxyDHCP
  *
