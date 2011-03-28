@@ -24,6 +24,7 @@ MEDIA		+= dsk
 MEDIA		+= nbi
 MEDIA		+= hd
 MEDIA		+= raw
+MEDIA		+= exe
 
 # Padding rules
 #
@@ -31,6 +32,7 @@ PAD_rom		= $(PERL) $(PADIMG) --blksize=512 --byte=0xff $@
 PAD_mrom	= $(PAD_rom)
 PAD_dsk		= $(PERL) $(PADIMG) --blksize=512 $@
 PAD_hd		= $(PERL) $(PADIMG) --blksize=32768 $@
+PAD_exe		= $(PERL) $(PADIMG) --blksize=512 $@
 
 # Finalisation rules
 #
