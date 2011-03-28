@@ -4407,7 +4407,7 @@ VALGRIND_PRINTF_BACKTRACE(const char *format, ...)
    Ignored if addr == 0.
 */
 #define VALGRIND_MALLOCLIKE_BLOCK(addr, sizeB, rzB, is_zeroed)    \
-   {unsigned int _qzz_res;                                        \
+   {unsigned int __unused _qzz_res;                               \
     VALGRIND_DO_CLIENT_REQUEST(_qzz_res, 0,                       \
                                VG_USERREQ__MALLOCLIKE_BLOCK,      \
                                addr, sizeB, rzB, is_zeroed, 0);   \
@@ -4417,7 +4417,7 @@ VALGRIND_PRINTF_BACKTRACE(const char *format, ...)
    Ignored if addr == 0.
 */
 #define VALGRIND_FREELIKE_BLOCK(addr, rzB)                        \
-   {unsigned int _qzz_res;                                        \
+   {unsigned int __unused _qzz_res;                               \
     VALGRIND_DO_CLIENT_REQUEST(_qzz_res, 0,                       \
                                VG_USERREQ__FREELIKE_BLOCK,        \
                                addr, rzB, 0, 0, 0);               \
