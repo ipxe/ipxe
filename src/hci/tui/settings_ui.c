@@ -382,7 +382,7 @@ static void draw_instruction_row ( struct setting_widget *widget ) {
 	} else {
 		msg ( INSTRUCTION_ROW,
 		      "%sCtrl-X - exit configuration utility",
-		      ( widget->row.setting ?
+		      ( widget->row.originates_here ?
 			"Ctrl-D - delete setting" INSTRUCTION_PAD : "" ) );
 	}
 }
