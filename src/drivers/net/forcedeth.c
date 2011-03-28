@@ -968,10 +968,9 @@ forcedeth_link_status ( struct net_device *netdev )
 {
 	struct forcedeth_private *priv = netdev_priv ( netdev );
 	void *ioaddr = priv->mmio_addr;
-	u32 mii_status;
 
-	/* Clear the MII link change status */
-	mii_status = readl ( ioaddr + NvRegMIIStatus );
+	/* Clear the MII link change status by reading the MIIStatus register */
+	readl ( ioaddr + NvRegMIIStatus );
 	writel ( NVREG_MIISTAT_LINKCHANGE, ioaddr + NvRegMIIStatus );
 
 	if ( nv_update_linkspeed ( priv ) == 1 )
