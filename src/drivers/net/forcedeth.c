@@ -1098,11 +1098,6 @@ nv_setup_mac_addr ( struct forcedeth_private *priv )
 		dev->hw_addr[3] = ( orig_mac[0] >> 16 ) & 0xff;
 		dev->hw_addr[4] = ( orig_mac[0] >> 8 ) & 0xff;
 		dev->hw_addr[5] = ( orig_mac[0] >> 0 ) & 0xff;
-
-		writel ( txreg | NVREG_TRANSMITPOLL_MAC_ADDR_REV,
-			 ioaddr + NvRegTransmitPoll );
-
-		DBG ( "set workaround bit for reversed mac addr\n" );
 	}
 
 	if ( ! is_valid_ether_addr ( dev->hw_addr ) )
