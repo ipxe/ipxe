@@ -489,7 +489,7 @@ static struct efi_driver efipci_driver =
  * Install EFI PCI driver
  *
  */
-static void efipci_driver_init ( void ) {
+static void efipci_driver_startup ( void ) {
 	struct efi_driver *efidrv = &efipci_driver;
 	EFI_STATUS efirc;
 
@@ -503,7 +503,27 @@ static void efipci_driver_init ( void ) {
 	DBGC ( efidrv, "EFIPCI driver installed\n" );
 }
 
+/**
+ * Shut down EFI PCI driver
+ *
+ * @v booting		System is shutting down for OS boot
+ */
+static void efipci_driver_shutdown ( int booting __unused ) {
+	struct efi_driver *efidrv = &efipci_driver;
+	struct efi_pci_device *efipci;
+	struct efi_pci_device *tmp;
+
+	/* Shut down any remaining devices */
+	list_for_each_entry_safe ( efipci, tmp, &efi_pci_devices, list ) {
+		DBGC ( efipci, "EFIPCI " PCI_FMT " still active at shutdown; "
+		       "forcing close\n", PCI_ARGS ( &efipci->pci ) );
+		pci_remove ( &efipci->pci );
+		efipci_destroy ( efidrv, efipci );
+	}
+}
+
 /** EFI PCI startup function */
 struct startup_fn startup_pci __startup_fn ( STARTUP_NORMAL ) = {
-	.startup = efipci_driver_init,
+	.startup = efipci_driver_startup,
+	.shutdown = efipci_driver_shutdown,
 };

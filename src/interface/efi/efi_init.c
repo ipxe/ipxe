@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/uuid.h>
+#include <ipxe/init.h>
 
 /** Image handle passed to entry point */
 EFI_HANDLE efi_image_handle;
@@ -35,6 +36,21 @@ EFI_SYSTEM_TABLE *efi_systab;
 /** EFI loaded image protocol GUID */
 static EFI_GUID efi_loaded_image_protocol_guid
 	= EFI_LOADED_IMAGE_PROTOCOL_GUID;
+
+/** Event used to signal shutdown */
+static EFI_EVENT efi_shutdown_event;
+
+/**
+ * Shut down in preparation for booting an OS.
+ *
+ * This hook gets called at ExitBootServices time in order to make
+ * sure that everything is properly shut down before the OS takes
+ * over.
+ */
+static EFIAPI void efi_shutdown_hook ( EFI_EVENT event __unused,
+				       void *context __unused ) {
+	shutdown_boot();
+}
 
 /**
  * Look up EFI configuration table
@@ -127,6 +143,19 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			if ( tab->required )
 				return EFI_NOT_AVAILABLE_YET;
 		}
+	}
+
+	/* EFI is perfectly capable of gracefully shutting down any
+	 * loaded devices if it decides to fall back to a legacy boot.
+	 * For no particularly comprehensible reason, it doesn't
+	 * bother doing so when ExitBootServices() is called.
+	 */
+	if ( ( efirc = bs->CreateEvent ( EVT_SIGNAL_EXIT_BOOT_SERVICES,
+					 TPL_CALLBACK, efi_shutdown_hook,
+					 NULL, &efi_shutdown_event ) ) != 0 ) {
+		DBGC ( systab, "EFI could not create ExitBootServices event: "
+		       "%s\n", efi_strerror ( efirc ) );
+		return efirc;
 	}
 
 	return 0;
