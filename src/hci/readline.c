@@ -34,8 +34,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define READLINE_MAX 256
 
-static void sync_console ( struct edit_string *string ) __nonnull;
-
 /**
  * Synchronise console with edited string
  *
@@ -75,6 +73,244 @@ static void sync_console ( struct edit_string *string ) {
 }
 
 /**
+ * Locate history entry
+ *
+ * @v history		History buffer
+ * @v depth		Depth within history buffer
+ * @ret entry		History entry
+ */
+static struct readline_history_entry *
+history_entry ( struct readline_history *history, unsigned int depth ) {
+	unsigned int offset;
+
+	offset = ( ( history->next - depth ) %
+		   ( sizeof ( history->entries ) /
+		     sizeof ( history->entries[0] ) ) );
+	return &history->entries[offset];
+}
+
+/**
+ * Read string from history buffer
+ *
+ * @v history		History buffer
+ * @v depth		Depth within history buffer
+ * @ret string		String
+ */
+static const char * history_fetch ( struct readline_history *history,
+				    unsigned int depth ) {
+	struct readline_history_entry *entry;
+
+	/* Return the temporary copy if it exists, otherwise return
+	 * the persistent copy.
+	 */
+	entry = history_entry ( history, depth );
+	return ( entry->temp ? entry->temp : entry->string );
+}
+
+/**
+ * Write temporary string copy to history buffer
+ *
+ * @v history		History buffer
+ * @v depth		Depth within history buffer
+ * @v string		String
+ */
+static void history_store ( struct readline_history *history,
+			    unsigned int depth, const char *string ) {
+	struct readline_history_entry *entry;
+	char *temp;
+
+	/* Create temporary copy of string */
+	temp = strdup ( string );
+	if ( ! temp ) {
+		/* Just discard the string; there's nothing we can do */
+		DBGC ( history, "READLINE %p could not store string\n",
+		       history );
+		return;
+	}
+
+	/* Store temporary copy */
+	entry = history_entry ( history, depth );
+	free ( entry->temp );
+	entry->temp = temp;
+}
+
+/**
+ * Move to new history depth
+ *
+ * @v history		History buffer
+ * @v offset		Offset by which to change depth
+ * @v old_string	String (possibly modified) at current depth
+ * @ret new_string	String at new depth, or NULL for no movement
+ */
+static const char * history_move ( struct readline_history *history,
+				   int offset, const char *old_string ) {
+	unsigned int new_depth = ( history->depth + offset );
+	const char * new_string = history_fetch ( history, new_depth );
+
+	/* Depth checks */
+	if ( new_depth > READLINE_HISTORY_MAX_DEPTH )
+		return NULL;
+	if ( ! new_string )
+		return NULL;
+
+	/* Store temporary copy of old string at current depth */
+	history_store ( history, history->depth, old_string );
+
+	/* Update depth */
+	history->depth = new_depth;
+
+	/* Return new string */
+	return new_string;
+}
+
+/**
+ * Append new history entry
+ *
+ * @v history		History buffer
+ * @v string		String
+ */
+static void history_append ( struct readline_history *history,
+			     const char *string ) {
+	struct readline_history_entry *entry;
+
+	/* Store new entry */
+	entry = history_entry ( history, 0 );
+	assert ( entry->string == NULL );
+	entry->string = strdup ( string );
+	if ( ! entry->string ) {
+		/* Just discard the string; there's nothing we can do */
+		DBGC ( history, "READLINE %p could not append string\n",
+		       history );
+		return;
+	}
+
+	/* Increment history position */
+	history->next++;
+
+	/* Prepare empty "next" slot */
+	entry = history_entry ( history, 0 );
+	free ( entry->string );
+	entry->string = NULL;
+}
+
+/**
+ * Clean up history after editing
+ *
+ * @v history		History buffer
+ */
+static void history_cleanup ( struct readline_history *history ) {
+	struct readline_history_entry *entry;
+	unsigned int i;
+
+	/* Discard any temporary strings */
+	for ( i = 0 ; i < ( sizeof ( history->entries ) /
+			    sizeof ( history->entries[0] ) ) ; i++ ) {
+		entry = &history->entries[i];
+		free ( entry->temp );
+		entry->temp = NULL;
+	}
+
+	/* Reset depth */
+	history->depth = 0;
+
+	/* Sanity check */
+	entry = history_entry ( history, 0 );
+	assert ( entry->string == NULL );
+}
+
+/**
+ * Free history buffer
+ *
+ * @v history		History buffer
+ */
+void history_free ( struct readline_history *history ) {
+	struct readline_history_entry *entry;
+	unsigned int i;
+
+	/* Discard any temporary strings */
+	for ( i = 0 ; i < ( sizeof ( history->entries ) /
+			    sizeof ( history->entries[0] ) ) ; i++ ) {
+		entry = &history->entries[i];
+		assert ( entry->temp == NULL );
+		free ( entry->string );
+	}
+}
+
+/**
+ * Read line from console (with history)
+ *
+ * @v prompt		Prompt string
+ * @v history		History buffer, or NULL for no history
+ * @ret line		Line read from console (excluding terminating newline)
+ *
+ * The returned line is allocated with malloc(); the caller must
+ * eventually call free() to release the storage.
+ */
+char * readline_history ( const char *prompt,
+			  struct readline_history *history ) {
+	char buf[READLINE_MAX];
+	struct edit_string string;
+	int key;
+	int move_by;
+	const char *new_string;
+	char *line;
+
+	/* Display prompt, if applicable */
+	if ( prompt )
+		printf ( "%s", prompt );
+
+	/* Initialise editable string */
+	memset ( &string, 0, sizeof ( string ) );
+	init_editstring ( &string, buf, sizeof ( buf ) );
+	buf[0] = '\0';
+
+	while ( 1 ) {
+		/* Handle keypress */
+		key = edit_string ( &string, getkey ( 0 ) );
+		sync_console ( &string );
+		move_by = 0;
+		switch ( key ) {
+		case CR:
+		case LF:
+			line = strdup ( buf );
+			if ( ! line )
+				printf ( "\nOut of memory" );
+			goto done;
+		case CTRL_C:
+			line = NULL;
+			goto done;
+		case KEY_UP:
+			move_by = 1;
+			break;
+		case KEY_DOWN:
+			move_by = -1;
+			break;
+		default:
+			/* Do nothing */
+			break;
+		}
+
+		/* Handle history movement, if applicable */
+		if ( move_by && history ) {
+			new_string = history_move ( history, move_by, buf );
+			if ( new_string ) {
+				replace_string ( &string, new_string );
+				sync_console ( &string );
+			}
+		}
+	}
+
+ done:
+	putchar ( '\n' );
+	if ( history ) {
+		if ( line && line[0] )
+			history_append ( history, line );
+		history_cleanup ( history );
+	}
+	return line;
+}
+
+/**
  * Read line from console
  *
  * @v prompt		Prompt string
@@ -84,35 +320,5 @@ static void sync_console ( struct edit_string *string ) {
  * eventually call free() to release the storage.
  */
 char * readline ( const char *prompt ) {
-	char buf[READLINE_MAX];
-	struct edit_string string;
-	int key;
-	char *line;
-
-	if ( prompt )
-		printf ( "%s", prompt );
-
-	memset ( &string, 0, sizeof ( string ) );
-	init_editstring ( &string, buf, sizeof ( buf ) );
-	buf[0] = '\0';
-
-	while ( 1 ) {
-		key = edit_string ( &string, getkey ( 0 ) );
-		sync_console ( &string );
-		switch ( key ) {
-		case CR:
-		case LF:
-			putchar ( '\n' );
-			line = strdup ( buf );
-			if ( ! line )
-				printf ( "Out of memory\n" );
-			return line;
-		case CTRL_C:
-			putchar ( '\n' );
-			return NULL;
-		default:
-			/* Do nothing */
-			break;
-		}
-	}
+	return readline_history ( prompt, NULL );
 }
