@@ -934,15 +934,8 @@ nv_process_rx_packets ( struct net_device *netdev )
 		} else {
 			len = flags & LEN_MASK_V1;
 
-			/* Filter any frames that have as destination address a
-			 * local MAC address but are not meant for this NIC */
-			if ( is_local_ether_addr ( curr_iob->data ) &&
-			     memcmp ( curr_iob->data, netdev->hw_addr, ETH_ALEN ) ) {
-				free_iob ( curr_iob );
-			} else {
-				iob_put ( curr_iob, len );
-				netdev_rx ( netdev, curr_iob );
-			}
+			iob_put ( curr_iob, len );
+			netdev_rx ( netdev, curr_iob );
 		}
 
 		/* Invalidate iobuf */
