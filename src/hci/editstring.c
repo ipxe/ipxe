@@ -118,6 +118,17 @@ static void kill_eol ( struct edit_string *string ) {
 }
 
 /**
+ * Replace editable string
+ *
+ * @v string		Editable string
+ * @v replacement	Replacement string
+ */
+void replace_string ( struct edit_string *string, const char *replacement ) {
+	string->cursor = 0;
+	insert_delete ( string, ~( ( size_t ) 0 ), replacement );
+}
+
+/**
  * Edit editable string
  *
  * @v string		Editable string

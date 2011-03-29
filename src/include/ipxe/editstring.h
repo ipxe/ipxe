@@ -41,6 +41,8 @@ static inline void init_editstring ( struct edit_string *string, char *buf,
 	string->len = len;
 }
 
+extern void replace_string ( struct edit_string *string,
+			     const char *replacement ) __nonnull;
 extern int edit_string ( struct edit_string *string, int key ) __nonnull;
 
 #endif /* _IPXE_EDITSTRING_H */
