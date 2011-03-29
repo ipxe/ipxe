@@ -28,6 +28,19 @@ struct edit_string {
 	unsigned int mod_end;
 };
 
+/**
+ * Initialise editable string
+ *
+ * @v string		Editable string
+ * @v buf		Buffer for string
+ * @v len		Length of buffer
+ */
+static inline void init_editstring ( struct edit_string *string, char *buf,
+				     size_t len ) {
+	string->buf = buf;
+	string->len = len;
+}
+
 extern int edit_string ( struct edit_string *string, int key ) __nonnull;
 
 #endif /* _IPXE_EDITSTRING_H */

@@ -93,8 +93,7 @@ char * readline ( const char *prompt ) {
 		printf ( "%s", prompt );
 
 	memset ( &string, 0, sizeof ( string ) );
-	string.buf = buf;
-	string.len = sizeof ( buf );
+	init_editstring ( &string, buf, sizeof ( buf ) );
 	buf[0] = '\0';
 
 	while ( 1 ) {

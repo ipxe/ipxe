@@ -46,8 +46,7 @@ void init_editbox ( struct edit_box *box, char *buf, size_t len,
 		    WINDOW *win, unsigned int row, unsigned int col,
 		    unsigned int width, unsigned int flags ) {
 	memset ( box, 0, sizeof ( *box ) );
-	box->string.buf = buf;
-	box->string.len = len;
+	init_editstring ( &box->string, buf, len );
 	box->string.cursor = strlen ( buf );
 	box->win = ( win ? win : stdscr );
 	box->row = row;
