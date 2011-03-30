@@ -21,6 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <getopt.h>
 #include <readline/readline.h>
 #include <ipxe/command.h>
@@ -75,16 +76,24 @@ struct command help_command __command = {
  *
  */
 int shell ( void ) {
+	struct readline_history history;
 	char *line;
 	int rc = 0;
 
+	/* Initialise shell history */
+	memset ( &history, 0, sizeof ( history ) );
+
+	/* Read and execute commands */
 	do {
-		line = readline ( shell_prompt );
+		line = readline_history ( shell_prompt, &history );
 		if ( line ) {
 			rc = system ( line );
 			free ( line );
 		}
 	} while ( ! shell_stopped ( SHELL_STOP_COMMAND_SEQUENCE ) );
+
+	/* Discard shell history */
+	history_free ( &history );
 
 	return rc;
 }
