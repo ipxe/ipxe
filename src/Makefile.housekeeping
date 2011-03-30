@@ -631,6 +631,7 @@ EINFOS		:= $(patsubst $(BIN)/%.o,$(BIN)/%.einfo,$(BOBJS))
 $(BIN)/errors : $(EINFOS) $(EINFO)
 	$(QM)$(ECHO) "  [EINFO] $@"
 	$(Q)$(EINFO) $(EINFOS) | sort > $@
+CLEANUP		+= $(BIN)/errors	# Doesn't match the $(BIN)/*.* pattern
 
 # Generate the NIC file from the parsed source files.  The NIC file is
 # only for rom-o-matic.
