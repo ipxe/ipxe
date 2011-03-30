@@ -45,6 +45,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	{ 0x03207ce2, 0xd9c7, 0x11dc,					\
 	  { 0xa9, 0x4d, 0x00, 0x19, 0x7d, 0x89, 0x02, 0x38 } }
 
+#define IBM_BOFM_DRIVER_CONFIGURATION2_PROTOCOL_GUID			\
+	{ 0xe82a9763, 0x0584, 0x4e41,					\
+	  { 0xbb, 0x39, 0xe0, 0xcd, 0xb8, 0xc1, 0xf0, 0xfc } }
+
 typedef struct {
 	UINT8 Id;
 	UINT8 ResultByte;
@@ -114,6 +118,15 @@ struct _IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL {
 	IBM_BOFM_DRIVER_CONFIGURATION_SUPPORT RegisterSupport;
 };
 
+typedef struct _IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2 {
+	UINT32 Signature;
+	UINT32 Reserved1;
+	UINT64 Reserved2;
+	IBM_BOFM_DRIVER_CONFIGURATION_STATUS SetStatus;
+	IBM_BOFM_DRIVER_CONFIGURATION_SUPPORT RegisterSupport;
+	IBM_BOFM_TABLE BofmTable;
+} IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2;
+
 /***************************************************************************
  *
  * EFI BOFM interface
@@ -121,9 +134,13 @@ struct _IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL {
  ***************************************************************************
  */
 
-/** BOFM protocol GUID */
-static EFI_GUID bofm_protocol_guid =
+/** BOFM1 protocol GUID */
+static EFI_GUID bofm1_protocol_guid =
 	IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL_GUID;
+
+/** BOFM2 protocol GUID */
+static EFI_GUID bofm2_protocol_guid =
+	IBM_BOFM_DRIVER_CONFIGURATION2_PROTOCOL_GUID;
 
 /**
  * Check if device is supported
@@ -141,9 +158,9 @@ efi_bofm_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 		container_of ( driver, struct efi_driver, driver );
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
-		IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL *bofm;
+		IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL *bofm1;
 		void *interface;
-	} u;
+	} bofm1;
 	struct efi_pci_device *efipci;
 	EFI_STATUS efirc;
 	int rc;
@@ -166,8 +183,8 @@ efi_bofm_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	}
 
 	/* Locate BOFM protocol */
-	if ( ( efirc = bs->LocateProtocol ( &bofm_protocol_guid, NULL,
-					    &u.interface ) ) != 0 ) {
+	if ( ( efirc = bs->LocateProtocol ( &bofm1_protocol_guid, NULL,
+					    &bofm1.interface ) ) != 0 ) {
 		DBGC ( efidrv, "BOFM " PCI_FMT " cannot find BOFM protocol\n",
 		       PCI_ARGS ( &efipci->pci ) );
 		efirc = EFI_UNSUPPORTED;
@@ -175,10 +192,10 @@ efi_bofm_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	}
 
 	/* Register support for this device */
-	if ( ( efirc = u.bofm->RegisterSupport ( u.bofm, device,
-						 0x04 /* Can change MAC */,
-						 0x00 /* No iSCSI */,
-						 0x01 /* Version */ ) ) != 0 ) {
+	if ( ( efirc = bofm1.bofm1->RegisterSupport ( bofm1.bofm1, device,
+						      0x04 /* Can change MAC */,
+						      0x00 /* No iSCSI */,
+						      0x02 /* Version */ ))!=0){
 		DBGC ( efidrv, "BOFM " PCI_FMT " could not register support: "
 		       "%s\n", PCI_ARGS ( &efipci->pci ),
 		       efi_strerror ( efirc ) );
@@ -216,10 +233,15 @@ static EFI_STATUS EFIAPI efi_bofm_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 		container_of ( driver, struct efi_driver, driver );
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
-		IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL *bofm;
+		IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL *bofm1;
 		void *interface;
-	} u;
+	} bofm1;
+	union {
+		IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2 *bofm2;
+		void *interface;
+	} bofm2;
 	struct efi_pci_device *efipci;
+	userptr_t bofmtab;
 	EFI_STATUS efirc;
 	int bofmrc;
 
@@ -237,21 +259,44 @@ static EFI_STATUS EFIAPI efi_bofm_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 		goto err_enable;
 
 	/* Locate BOFM protocol */
-	if ( ( efirc = bs->LocateProtocol ( &bofm_protocol_guid, NULL,
-					    &u.interface ) ) != 0 ) {
+	if ( ( efirc = bs->LocateProtocol ( &bofm1_protocol_guid, NULL,
+					    &bofm1.interface ) ) != 0 ) {
 		DBGC ( efidrv, "BOFM " PCI_FMT " cannot find BOFM protocol\n",
 		       PCI_ARGS ( &efipci->pci ) );
 		goto err_locate_bofm;
 	}
 
+	/* Locate BOFM2 protocol, if available */
+	if ( ( efirc = bs->LocateProtocol ( &bofm2_protocol_guid, NULL,
+					    &bofm2.interface ) ) != 0 ) {
+		DBGC ( efidrv, "BOFM " PCI_FMT " cannot find BOFM2 protocol\n",
+		       PCI_ARGS ( &efipci->pci ) );
+		/* Not a fatal error; may be a BOFM1-only system */
+		bofm2.bofm2 = NULL;
+	}
+
+	/* Select appropriate BOFM table (v1 or v2) to use */
+	if ( bofm2.bofm2 ) {
+		DBGC ( efidrv, "BOFM " PCI_FMT " using version 2 BOFM table\n",
+		       PCI_ARGS ( &efipci->pci ) );
+		assert ( bofm2.bofm2->RegisterSupport ==
+			 bofm1.bofm1->RegisterSupport );
+		assert ( bofm2.bofm2->SetStatus == bofm1.bofm1->SetStatus );
+		bofmtab = virt_to_user ( &bofm2.bofm2->BofmTable );
+	} else {
+		DBGC ( efidrv, "BOFM " PCI_FMT " using version 1 BOFM table\n",
+		       PCI_ARGS ( &efipci->pci ) );
+		bofmtab = virt_to_user ( &bofm1.bofm1->BofmTable );
+	}
+
 	/* Process BOFM table */
-        bofmrc = bofm ( virt_to_user ( &u.bofm->BofmTable ), &efipci->pci );
+	bofmrc = bofm ( bofmtab, &efipci->pci );
 	DBGC ( efidrv, "BOFM " PCI_FMT " status %08x\n",
 	       PCI_ARGS ( &efipci->pci ), bofmrc );
 
 	/* Return BOFM status */
-	if ( ( efirc = u.bofm->SetStatus ( u.bofm, device, FALSE,
-					   bofmrc ) ) != 0 ) {
+	if ( ( efirc = bofm1.bofm1->SetStatus ( bofm1.bofm1, device, FALSE,
+						bofmrc ) ) != 0 ) {
 		DBGC ( efidrv, "BOFM " PCI_FMT " could not set BOFM status: "
 		       "%s\n", PCI_ARGS ( &efipci->pci ),
 		       efi_strerror ( efirc ) );
