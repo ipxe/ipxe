@@ -927,8 +927,8 @@ BOBJS += $(patsubst payload/%.img,$(BIN)/%.o,$(wildcard payload/*.img))
 
 # The "allXXXs" targets for each suffix
 #
-allall: allroms allpxes allisos alldsks
-allroms : all%s : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).%)
+allall: allroms allmroms allpxes allisos alldsks
+allroms allmroms : all%s : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).%)
 allpxes allisos alldsks : all%s : $(foreach DRIVER,$(DRIVERS),$(BIN)/$(DRIVER).%)
 
 # Alias for ipxe.%
