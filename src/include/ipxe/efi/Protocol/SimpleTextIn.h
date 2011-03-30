@@ -103,8 +103,9 @@ EFI_STATUS
   Reads the next keystroke from the input device. The WaitForKey Event can
   be used to test for existence of a keystroke via WaitForEvent () call.
 
-  @param  This Protocol instance pointer.
-  @param  Key  Driver may perform diagnostics on reset.
+  @param  This  Protocol instance pointer.
+  @param  Key   A pointer to a buffer that is filled in with the keystroke
+                information for the key that was pressed.
 
   @retval EFI_SUCCESS      The keystroke information was returned.
   @retval EFI_NOT_READY    There was no keystroke data available.

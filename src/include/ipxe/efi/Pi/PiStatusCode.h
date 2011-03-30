@@ -1,7 +1,7 @@
 /** @file
   StatusCode related definitions in PI.
 
-Copyright (c) 2009 - 2010, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2009 - 2011, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials are licensed and made available under
 the terms and conditions of the BSD License that accompanies this distribution.
 The full text of the license may be found at
@@ -566,9 +566,9 @@ typedef struct {
 /// IO Bus Class PCI Subclass Progress Code definitions.
 ///
 ///@{
-#define EFI_IOB_PCI_PC_BUS_ENUM   (EFI_SUBCLASS_SPECIFIC | 0x00000000)
-#define EFI_IOB_PCI_PC_RES_ALLOC  (EFI_SUBCLASS_SPECIFIC | 0x00000001)
-#define EFI_IOB_PCI_PC_HPC_INIT   (EFI_SUBCLASS_SPECIFIC | 0x00000002)
+#define EFI_IOB_PCI_BUS_ENUM   (EFI_SUBCLASS_SPECIFIC | 0x00000000)
+#define EFI_IOB_PCI_RES_ALLOC  (EFI_SUBCLASS_SPECIFIC | 0x00000001)
+#define EFI_IOB_PCI_HPC_INIT   (EFI_SUBCLASS_SPECIFIC | 0x00000002)
 ///@}
 
 //
@@ -753,13 +753,14 @@ typedef struct {
 
 ///
 /// Software Class PEI Module Subclass Progress Code definitions.
+/// Note: EFI_SW_PEI_PC_RECOVERY_BEGIN is different from PI 1.2 Specification.
 ///
 ///@{
-#define EFI_SW_PEIM_PC_RECOVERY_BEGIN (EFI_SUBCLASS_SPECIFIC | 0x00000000)
-#define EFI_SW_PEIM_PC_CAPSULE_LOAD   (EFI_SUBCLASS_SPECIFIC | 0x00000001)
-#define EFI_SW_PEIM_PC_CAPSULE_START  (EFI_SUBCLASS_SPECIFIC | 0x00000002)
-#define EFI_SW_PEIM_PC_RECOVERY_USER  (EFI_SUBCLASS_SPECIFIC | 0x00000003)
-#define EFI_SW_PEIM_PC_RECOVERY_AUTO  (EFI_SUBCLASS_SPECIFIC | 0x00000004)
+#define EFI_SW_PEI_PC_RECOVERY_BEGIN  (EFI_SUBCLASS_SPECIFIC | 0x00000000)
+#define EFI_SW_PEI_PC_CAPSULE_LOAD    (EFI_SUBCLASS_SPECIFIC | 0x00000001)
+#define EFI_SW_PEI_PC_CAPSULE_START   (EFI_SUBCLASS_SPECIFIC | 0x00000002)
+#define EFI_SW_PEI_PC_RECOVERY_USER   (EFI_SUBCLASS_SPECIFIC | 0x00000003)
+#define EFI_SW_PEI_PC_RECOVERY_AUTO   (EFI_SUBCLASS_SPECIFIC | 0x00000004)
 #define EFI_SW_PEI_PC_S3_BOOT_SCRIPT  (EFI_SUBCLASS_SPECIFIC | 0x00000005)
 #define EFI_SW_PEI_PC_OS_WAKE         (EFI_SUBCLASS_SPECIFIC | 0x00000006)
 ///@}
@@ -986,10 +987,11 @@ typedef struct {
 
 ///
 /// Software Class PEI Module Subclass Error Code definitions.
+/// Note: EFI_SW_PEI_EC_INVALID_CAPSULE_DESCRIPTOR is different from PI 1.2 Specification.
 ///
 ///@{
-#define EFI_SW_PEIM_EC_NO_RECOVERY_CAPSULE         (EFI_SUBCLASS_SPECIFIC | 0x00000000)
-#define EFI_SW_PEIM_EC_INVALID_CAPSULE_DESCRIPTOR  (EFI_SUBCLASS_SPECIFIC | 0x00000001)
+#define EFI_SW_PEI_EC_NO_RECOVERY_CAPSULE          (EFI_SUBCLASS_SPECIFIC | 0x00000000)
+#define EFI_SW_PEI_EC_INVALID_CAPSULE_DESCRIPTOR   (EFI_SUBCLASS_SPECIFIC | 0x00000001)
 #define EFI_SW_PEI_EC_S3_RESUME_PPI_NOT_FOUND      (EFI_SUBCLASS_SPECIFIC | 0x00000002)
 #define EFI_SW_PEI_EC_S3_BOOT_SCRIPT_ERROR         (EFI_SUBCLASS_SPECIFIC | 0x00000003)
 #define EFI_SW_PEI_EC_S3_OS_WAKE_ERROR             (EFI_SUBCLASS_SPECIFIC | 0x00000004)

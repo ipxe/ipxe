@@ -496,7 +496,7 @@ typedef CHAR8 *VA_LIST;
   @return  A pointer to the beginning of a variable argument list.
 
 **/
-#define VA_START(Marker, Parameter) (Marker = (VA_LIST) & (Parameter) + _INT_SIZE_OF (Parameter))
+#define VA_START(Marker, Parameter) (Marker = (VA_LIST) ((UINTN) & (Parameter) + _INT_SIZE_OF (Parameter)))
 
 /**
   Returns an argument of a specified type from a variable argument list and updates
@@ -575,7 +575,15 @@ typedef UINTN  *BASE_LIST;
   @return  Offset, in bytes, of field.
 
 **/
+#ifdef __GNUC__
+#if __GNUC__ >= 4
+#define OFFSET_OF(TYPE, Field) ((UINTN) __builtin_offsetof(TYPE, Field))
+#endif
+#endif
+
+#ifndef OFFSET_OF
 #define OFFSET_OF(TYPE, Field) ((UINTN) &(((TYPE *)0)->Field))
+#endif
 
 /**
   Macro that returns a pointer to the data structure that contains a specified field of
