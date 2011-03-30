@@ -18,7 +18,7 @@ open DRV, "<$source" or die "Could not open $source: $!\n";
 my $printed_family;
 
 sub rom {
-  ( my $type, my $image, my $desc, my $vendor, my $device ) = @_;
+  ( my $type, my $image, my $desc, my $vendor, my $device, my $dup ) = @_;
   my $ids = $vendor ? "$vendor,$device" : "-";
   unless ( $printed_family ) {
     print "\n";
@@ -34,8 +34,8 @@ sub rom {
   print "ROM_DESCRIPTION_$image = \"$desc\"\n";
   print "PCI_VENDOR_$image = 0x$vendor\n" if $vendor;
   print "PCI_DEVICE_$image = 0x$device\n" if $device;
-  print "ROMS += $image\n";
-  print "ROMS_$driver_name += $image\n";
+  print "ROMS += $image\n" unless $dup;
+  print "ROMS_$driver_name += $image\n" unless $dup;
 }
 
 while ( <DRV> ) {
@@ -49,8 +49,8 @@ while ( <DRV> ) {
          \s*.*\s*		   # Driver data
        \)/x ) {
     ( my $vendor, my $device, my $image, my $desc ) = ( lc $1, lc $2, $3, $4 );
-    rom ( "pci", $image, $desc, $vendor, $device );
     rom ( "pci", lc "${vendor}${device}", $desc, $vendor, $device );
+    rom ( "pci", $image, $desc, $vendor, $device, 1 );
   } elsif ( /^\s*ISA_ROM\s*\(
 	      \s*\"([^\"]*)\"\s*,  # Image
 	      \s*\"([^\"]*)\"\s*   # Description
