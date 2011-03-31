@@ -491,3 +491,38 @@ struct command isset_command __command = {
 	.name = "isset",
 	.exec = isset_exec,
 };
+
+/** "equals" options */
+struct equals_options {};
+
+/** "equals" option list */
+static struct option_descriptor equals_opts[] = {};
+
+/** "equals" command descriptor */
+static struct command_descriptor equals_cmd =
+	COMMAND_DESC ( struct equals_options, equals_opts, 2, 2,
+		       "<value1> <value2>" );
+
+/**
+ * "equals" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int equals_exec ( int argc, char **argv ) {
+	struct equals_options opts;
+	int rc;
+    
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &equals_cmd, &opts ) ) != 0 )
+		return rc;
+    
+    return strcmp ( argv[1], argv[2] );
+}
+
+/** "equals" command */
+struct command equals_command __command = {
+	.name = "equals",
+	.exec = equals_exec,
+};
