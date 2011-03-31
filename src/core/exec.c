@@ -400,7 +400,7 @@ static int echo_exec ( int argc, char **argv ) {
 		return -ENOMEM;
 
 	/* Print text */
-	printf ( "%s%s", text, ( opts.no_newline ? "" : "\n" ) );
+	printf ( "%s%s", text, ( opts.no_newline ? " " : "\n" ) );
 
 	free ( text );
 	return 0;
