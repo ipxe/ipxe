@@ -476,14 +476,20 @@ static struct command_descriptor isset_cmd =
  */
 static int isset_exec ( int argc, char **argv ) {
 	struct isset_options opts;
+	int i;
 	int rc;
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &isset_cmd, &opts ) ) != 0 )
 		return rc;
 
-	/* Return success iff any arguments exist */
-	return ( ( optind == argc ) ? -ENOENT : 0 );
+	/* Return success if any argument is non-empty */
+	for ( i = optind ; i < argc ; i++ ) {
+		if ( argv[i][0] != '\0' )
+			return 0;
+	}
+
+	return -ENOENT;
 }
 
 /** "isset" command */
