@@ -106,6 +106,13 @@ $(warning export LANG=$${LANG%.UTF-8})
 $(error Unsuitable build environment found)
 endif
 
+LD_GOLD_BANNER := $(shell $(LD) -v 2>&1 | grep 'GNU gold')
+ifneq ($(LD_GOLD_BANNER),)
+$(warning GNU gold is unsuitable for building iPXE)
+$(warning Use GNU ld instead)
+$(error Unsuitable build environment found)
+endif
+
 ###############################################################################
 #
 # Check for various tool workarounds
