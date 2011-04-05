@@ -88,21 +88,23 @@ cctype:
 #
 # Check for tools that can cause failed builds
 #
-.toolcheck :
-	@if $(CC) -v 2>&1 | grep -is 'gcc version 2\.96' > /dev/null; then \
-		$(ECHO) 'gcc 2.96 is unsuitable for compiling Etherboot'; \
-		$(ECHO) 'Use gcc 2.95 or gcc 3.x instead'; \
-		exit 1; \
-	fi
-	@if [ `perl -e 'use bytes; print chr(255)' | wc -c` = 2 ]; then \
-		$(ECHO) 'Your Perl version has a Unicode handling bug'; \
-		$(ECHO) 'Execute this command before compiling Etherboot:'; \
-		$(ECHO) 'export LANG=$${LANG%.UTF-8}'; \
-		exit 1; \
-	fi
-	@$(TOUCH) $@
-MAKEDEPS	+= .toolcheck
-VERYCLEANUP	+= .toolcheck
+
+ifeq ($(CCTYPE),gcc)
+GCC_2_96_BANNER := $(shell $(CC) -v 2>&1 | grep -is 'gcc version 2\.96')
+ifneq ($(GCC_2_96_BANNER),)
+$(warning gcc 2.96 is unsuitable for compiling iPXE)
+$(warning Use gcc 2.95 or a newer version instead)
+$(error Unsuitable build environment found)
+endif
+endif
+
+PERL_UNICODE_CHECK := $(shell $(PERL) -e 'use bytes; print chr(255)' | wc -c)
+ifeq ($(PERL_UNICODE_CHECK),2)
+$(warning Your Perl version has a Unicode handling bug)
+$(warning Execute this command before building iPXE:)
+$(warning export LANG=$${LANG%.UTF-8})
+$(error Unsuitable build environment found)
+endif
 
 ###############################################################################
 #
