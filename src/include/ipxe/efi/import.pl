@@ -112,7 +112,8 @@ pod2usage ( 1 ) unless @ARGV == 1;
 my $edktop = shift;
 
 # Identify edk import directories
-my $edkdirs = [ "MdePkg/Include", "IntelFrameworkPkg/Include" ];
+my $edkdirs = [ "MdePkg/Include", "IntelFrameworkPkg/Include",
+		"MdeModulePkg/Include" ];
 foreach my $edkdir ( @$edkdirs ) {
   die "Directory \"$edktop\" does not appear to contain the EFI EDK2 "
       ."(missing \"$edkdir\")\n" unless -d catdir ( $edktop, $edkdir );
