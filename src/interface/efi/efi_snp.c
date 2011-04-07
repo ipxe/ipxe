@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_pci.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
@@ -772,7 +773,6 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	EFI_DEVICE_PATH_PROTOCOL *path_end;
 	MAC_ADDR_DEVICE_PATH *macpath;
 	size_t path_prefix_len = 0;
-	unsigned int i;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -831,12 +831,9 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 		  sizeof ( snpdev->nii.StringId ) );
 
 	/* Populate the device name */
-	for ( i = 0 ; i < sizeof ( netdev->name ) ; i++ ) {
-		/* Damn Unicode names */
-		assert ( i < ( sizeof ( snpdev->name ) /
-			       sizeof ( snpdev->name[0] ) ) );
-		snpdev->name[i] = netdev->name[i];
-	}
+	efi_snprintf ( snpdev->name, ( sizeof ( snpdev->name ) /
+				       sizeof ( snpdev->name[0] ) ),
+		       "%s", netdev->name );
 
 	/* Populate the device path */
 	memcpy ( &snpdev->path, efipci->path, path_prefix_len );

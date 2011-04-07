@@ -23,6 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
+#include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_driver.h>
 #include <config/general.h>
 
@@ -107,8 +108,6 @@ EFI_STATUS efi_driver_install ( struct efi_driver *efidrv ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_DRIVER_BINDING_PROTOCOL *driver = &efidrv->driver;
 	EFI_COMPONENT_NAME2_PROTOCOL *wtf = &efidrv->wtf;
-	char buf[ sizeof ( efidrv->wname ) / sizeof ( efidrv->wname[0] ) ];
-	unsigned int i;
 	EFI_STATUS efirc;
 
 	/* Configure driver binding protocol */
@@ -120,12 +119,10 @@ EFI_STATUS efi_driver_install ( struct efi_driver *efidrv ) {
 	wtf->SupportedLanguages = "en";
 
 	/* Fill in driver name */
-	snprintf ( buf, sizeof ( buf ), PRODUCT_SHORT_NAME " - %s",
-		   efidrv->name );
-	for ( i = 0 ; i < sizeof ( buf ) ; i++ ) {
-		/* Damn Unicode names */
-		efidrv->wname[i] = *( ( ( unsigned char * ) buf ) + i );
-	}
+	efi_snprintf ( efidrv->wname,
+		       ( sizeof ( efidrv->wname ) /
+			 sizeof ( efidrv->wname[0] ) ),
+		       PRODUCT_SHORT_NAME " - %s", efidrv->name );
 
 	/* Install driver */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
