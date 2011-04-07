@@ -3739,7 +3739,6 @@ static void hermon_remove ( struct pci_device *pci ) {
 	hermon_cmd_close_hca ( hermon );
 	hermon_free_icm ( hermon );
 	hermon_stop_firmware ( hermon );
-	hermon_stop_firmware ( hermon );
 	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- ) {
 		netdev_nullify ( hermon->port[i].netdev );
 		netdev_put ( hermon->port[i].netdev );
