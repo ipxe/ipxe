@@ -63,8 +63,8 @@ static int eisa_probe ( struct eisa_device *eisa ) {
 			     ISA_PROD_ID ( eisa->prod_id ) )
 				continue;
 			eisa->driver = driver;
-			eisa->driver_name = id->name;
-			DBG ( "...using driver %s\n", eisa->driver_name );
+			eisa->dev.driver_name = id->name;
+			DBG ( "...using driver %s\n", eisa->dev.driver_name );
 			if ( ( rc = driver->probe ( eisa, id ) ) != 0 ) {
 				DBG ( "......probe failed\n" );
 				continue;

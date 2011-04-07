@@ -50,8 +50,6 @@ struct mca_device {
 	 * this field.
 	 */
 	void *priv;
-	/** Driver name */
-	const char *driver_name;
 };
 
 #define MCA_ID(mca) ( ( (mca)->pos[1] << 8 ) + (mca)->pos[0] )

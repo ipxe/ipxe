@@ -54,8 +54,6 @@ struct eisa_device {
 	 * this field.
 	 */
 	void *priv;
-	/** Driver name */
-	const char *driver_name;
 };
 
 /** An EISA driver */

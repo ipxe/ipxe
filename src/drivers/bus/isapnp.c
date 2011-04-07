@@ -600,8 +600,8 @@ static int isapnp_probe ( struct isapnp_device *isapnp ) {
 			     ISA_PROD_ID ( isapnp->prod_id ) )
 				continue;
 			isapnp->driver = driver;
-			isapnp->driver_name = id->name;
-			DBG ( "...using driver %s\n", isapnp->driver_name );
+			isapnp->dev.driver_name = id->name;
+			DBG ( "...using driver %s\n", isapnp->dev.driver_name );
 			if ( ( rc = driver->probe ( isapnp, id ) ) != 0 ) {
 				DBG ( "......probe failed\n" );
 				continue;

@@ -410,6 +410,7 @@ static inline void pci_set_driver ( struct pci_device *pci,
 				    struct pci_device_id *id ) {
 	pci->driver = driver;
 	pci->id = id;
+	pci->dev.driver_name = id->name;
 }
 
 /**

@@ -114,6 +114,7 @@ static int isabus_probe ( struct root_device *rootdev ) {
 			/* Add to device hierarchy */
 			snprintf ( isa->dev.name, sizeof ( isa->dev.name ),
 				   "ISA%04x", isa->ioaddr );
+			isa->dev.driver_name = driver->name;
 			isa->dev.desc.bus_type = BUS_TYPE_ISA;
 			isa->dev.desc.vendor = driver->vendor_id;
 			isa->dev.desc.device = driver->prod_id;

@@ -44,8 +44,8 @@ static int mca_probe ( struct mca_device *mca ) {
 			if ( id->id != MCA_ID ( mca ) )
 				continue;
 			mca->driver = driver;
-			mca->driver_name = id->name;
-			DBG ( "...using driver %s\n", mca->driver_name );
+			mca->dev.driver_name = id->name;
+			DBG ( "...using driver %s\n", mca->dev.driver_name );
 			if ( ( rc = driver->probe ( mca, id ) ) != 0 ) {
 				DBG ( "......probe failed\n" );
 				continue;

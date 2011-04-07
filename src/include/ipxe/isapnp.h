@@ -198,8 +198,6 @@ struct isapnp_device {
 	 * this field.
 	 */
 	void *priv;
-	/** Driver name */
-	const char *driver_name;
 };
 
 /** An ISAPnP driver */

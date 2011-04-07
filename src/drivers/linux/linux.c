@@ -75,6 +75,7 @@ static int linux_probe(struct root_device *rootdev)
 
 		if (driver->probe(device, request) == 0) {
 			device->driver = driver;
+			device->dev.driver_name = driver->name;
 			/* Driver handled the device so release ownership */
 			device = NULL;
 		} else {
