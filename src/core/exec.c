@@ -490,3 +490,40 @@ struct command isset_command __command = {
 	.name = "isset",
 	.exec = isset_exec,
 };
+
+/** "iseq" options */
+struct iseq_options {};
+
+/** "iseq" option list */
+static struct option_descriptor iseq_opts[] = {};
+
+/** "iseq" command descriptor */
+static struct command_descriptor iseq_cmd =
+	COMMAND_DESC ( struct iseq_options, iseq_opts, 2, 2,
+		       "<value1> <value2>" );
+
+/**
+ * "iseq" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int iseq_exec ( int argc, char **argv ) {
+	struct iseq_options opts;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &iseq_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Return success iff arguments are equal */
+	return ( ( strcmp ( argv[optind], argv[ optind + 1 ] ) == 0 ) ?
+		 0 : -ERANGE );
+}
+
+/** "iseq" command */
+struct command iseq_command __command = {
+	.name = "iseq",
+	.exec = iseq_exec,
+};
