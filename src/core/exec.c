@@ -464,8 +464,7 @@ static struct option_descriptor isset_opts[] = {};
 
 /** "isset" command descriptor */
 static struct command_descriptor isset_cmd =
-	COMMAND_DESC ( struct isset_options, isset_opts, 0, MAX_ARGUMENTS,
-		       "[...]" );
+	COMMAND_DESC ( struct isset_options, isset_opts, 1, 1, "<value>" );
 
 /**
  * "isset" command
@@ -476,20 +475,14 @@ static struct command_descriptor isset_cmd =
  */
 static int isset_exec ( int argc, char **argv ) {
 	struct isset_options opts;
-	int i;
 	int rc;
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &isset_cmd, &opts ) ) != 0 )
 		return rc;
 
-	/* Return success if any argument is non-empty */
-	for ( i = optind ; i < argc ; i++ ) {
-		if ( argv[i][0] != '\0' )
-			return 0;
-	}
-
-	return -ENOENT;
+	/* Return success iff argument is non-empty */
+	return ( argv[optind][0] ? 0 : -ENOENT );
 }
 
 /** "isset" command */
