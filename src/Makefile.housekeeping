@@ -549,7 +549,8 @@ define rules_template
 		    '\n$(TGT)_OBJS += $$(BIN)/$(3).$(TGT)\n' ) ) \
 		 '\n$(BIN)/deps/$(1).d : $$($(3)_DEPS)\n' \
 		 '\nTAGS : $$($(3)_DEPS)\n' > $(BIN)/rules/$(1).r
-	@$(PERL) $(PARSEROM) $(1) >> $(BIN)/rules/$(1).r
+	@$(if $(findstring drivers/,$(1)),\
+	   $(PERL) $(PARSEROM) $(1) >> $(BIN)/rules/$(1).r)
 endef
 
 # Rule to generate the dependency list file
