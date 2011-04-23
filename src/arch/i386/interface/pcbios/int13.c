@@ -1164,8 +1164,8 @@ static void int13_free ( struct refcnt *refcnt ) {
  * Hook INT 13 emulated drive
  *
  * @v uri		URI
- * @v drive		Requested drive number
- * @ret drive		Assigned drive number, or negative error
+ * @v drive		Drive number
+ * @ret rc		Return status code
  *
  * Registers the drive with the INT 13 emulation subsystem, and hooks
  * the INT 13 interrupt vector (if not already hooked).
@@ -1176,12 +1176,9 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	unsigned int natural_drive;
 	int rc;
 
-	/* Calculate drive number */
+	/* Calculate natural drive number */
 	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
 	natural_drive = ( num_drives | 0x80 );
-	if ( drive == INT13_USE_NATURAL_DRIVE )
-		drive = natural_drive;
-	drive |= 0x80;
 
 	/* Check that drive number is not in use */
 	list_for_each_entry ( int13, &int13s, list ) {
@@ -1231,7 +1228,7 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	/* Update BIOS drive count */
 	int13_set_num_drives();
 
-	return int13->drive;
+	return 0;
 
  err_guess_geometry:
  err_reopen_block:
@@ -1428,6 +1425,7 @@ static int int13_describe ( unsigned int drive ) {
 	return 0;
 }
 
+PROVIDE_SANBOOT_INLINE ( pcbios, san_default_drive );
 PROVIDE_SANBOOT ( pcbios, san_hook, int13_hook );
 PROVIDE_SANBOOT ( pcbios, san_unhook, int13_unhook );
 PROVIDE_SANBOOT ( pcbios, san_boot, int13_boot );

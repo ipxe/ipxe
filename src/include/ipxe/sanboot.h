@@ -59,11 +59,18 @@ struct uri;
 #include <bits/sanboot.h>
 
 /**
+ * Get default SAN drive number
+ *
+ * @ret drive		Default drive number
+ */
+unsigned int san_default_drive ( void );
+
+/**
  * Hook SAN device
  *
  * @v uri		URI
- * @v drive		Requested drive number
- * @ret drive		Assigned drive number, or negative error
+ * @v drive		Drive number
+ * @ret rc		Return status code
  */
 int san_hook ( struct uri *uri, unsigned int drive );
 

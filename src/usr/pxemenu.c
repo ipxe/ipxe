@@ -377,7 +377,7 @@ int pxe_menu_boot ( struct net_device *netdev ) {
 		return -ENOMEM;
 
 	/* Attempt boot */
-	rc = uriboot ( uri, NULL );
+	rc = uriboot ( uri, NULL, 0, URIBOOT_NO_SAN );
 	uri_put ( uri );
 	return rc;
 }

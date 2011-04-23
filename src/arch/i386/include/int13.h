@@ -261,7 +261,4 @@ struct master_boot_record {
 	uint16_t magic;
 } __attribute__ (( packed ));
 
-/** Use natural BIOS drive number */
-#define INT13_USE_NATURAL_DRIVE 0xff
-
 #endif /* INT13_H */
