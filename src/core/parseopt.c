@@ -152,16 +152,16 @@ void print_usage ( struct command_descriptor *cmd, char **argv ) {
 }
 
 /**
- * Parse command-line options
+ * Reparse command-line options
  *
  * @v argc		Argument count
  * @v argv		Argument list
  * @v cmd		Command descriptor
- * @v opts		Options
+ * @v opts		Options (already initialised with default values)
  * @ret rc		Return status code
  */
-int parse_options ( int argc, char **argv, struct command_descriptor *cmd,
-		    void *opts ) {
+int reparse_options ( int argc, char **argv, struct command_descriptor *cmd,
+		      void *opts ) {
 	struct option longopts[ cmd->num_options + 1 /* help */ + 1 /* end */ ];
 	char shortopts[ cmd->num_options * 3 /* possible "::" */ + 1 /* "h" */
 			+ 1 /* NUL */ ];
@@ -192,9 +192,6 @@ int parse_options ( int argc, char **argv, struct command_descriptor *cmd,
 	assert ( shortopt_idx <= sizeof ( shortopts ) );
 	DBGC ( cmd,  "Command \"%s\" has options \"%s\", %d-%d args, len %d\n",
 	       argv[0], shortopts, cmd->min_args, cmd->max_args, cmd->len );
-
-	/* Clear options */
-	memset ( opts, 0, cmd->len );
 
 	/* Parse options */
 	while ( ( c = getopt_long ( argc, argv, shortopts, longopts,
@@ -232,4 +229,22 @@ int parse_options ( int argc, char **argv, struct command_descriptor *cmd,
 	}
 
 	return 0;
+}
+
+/**
+ * Parse command-line options
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @v cmd		Command descriptor
+ * @v opts		Options (may be uninitialised)
+ * @ret rc		Return status code
+ */
+int parse_options ( int argc, char **argv, struct command_descriptor *cmd,
+		    void *opts ) {
+
+	/* Clear options */
+	memset ( opts, 0, cmd->len );
+
+	return reparse_options ( argc, argv, cmd, opts );
 }
