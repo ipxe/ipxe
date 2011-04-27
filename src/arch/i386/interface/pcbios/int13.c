@@ -91,6 +91,13 @@ struct int13_drive {
 
 	/** Block device capacity */
 	struct block_device_capacity capacity;
+	/** INT 13 emulated blocksize shift
+	 *
+	 * To allow for emulation of CD-ROM access, this represents
+	 * the left-shift required to translate from INT 13 blocks to
+	 * underlying blocks.
+	 */
+	unsigned int blksize_shift;
 
 	/** Number of cylinders
 	 *
@@ -117,6 +124,9 @@ struct int13_drive {
 	 */
 	unsigned int sectors_per_track;
 
+	/** Address of El Torito boot catalog (if any) */
+	unsigned int boot_catalog;
+
 	/** Underlying device status, if in error */
 	int block_rc;
 	/** Status of last operation */
@@ -141,6 +151,37 @@ static LIST_HEAD ( int13s );
  * number of emulated drives.
  */
 static uint8_t num_drives;
+
+/**
+ * Calculate INT 13 drive sector size
+ *
+ * @v int13		Emulated drive
+ * @ret blksize		Sector size
+ */
+static inline unsigned int int13_blksize ( struct int13_drive *int13 ) {
+	return ( int13->capacity.blksize << int13->blksize_shift );
+}
+
+/**
+ * Calculate INT 13 drive capacity
+ *
+ * @v int13		Emulated drive
+ * @ret blocks		Number of blocks
+ */
+static inline uint64_t int13_capacity ( struct int13_drive *int13 ) {
+	return ( int13->capacity.blocks >> int13->blksize_shift );
+}
+
+/**
+ * Calculate INT 13 drive capacity (limited to 32 bits)
+ *
+ * @v int13		Emulated drive
+ * @ret blocks		Number of blocks
+ */
+static inline uint32_t int13_capacity32 ( struct int13_drive *int13 ) {
+	uint64_t capacity = int13_capacity ( int13 );
+	return ( ( capacity <= 0xffffffffUL ) ? capacity : 0xffffffff );
+}
 
 /** An INT 13 command */
 struct int13_command {
@@ -319,6 +360,10 @@ static int int13_rw ( struct int13_drive *int13, uint64_t lba,
 	size_t frag_len;
 	int rc;
 
+	/* Translate to underlying blocksize */
+	lba <<= int13->blksize_shift;
+	count <<= int13->blksize_shift;
+
 	while ( count ) {
 
 		/* Determine fragment length */
@@ -371,29 +416,110 @@ static int int13_read_capacity ( struct int13_drive *int13 ) {
 }
 
 /**
+ * Parse ISO9660 parameters
+ *
+ * @v int13		Emulated drive
+ * @v scratch		Scratch area for single-sector reads
+ * @ret rc		Return status code
+ *
+ * Reads and parses ISO9660 parameters, if present.
+ */
+static int int13_parse_iso9660 ( struct int13_drive *int13, void *scratch ) {
+	static const struct iso9660_primary_descriptor_fixed primary_check = {
+		.type = ISO9660_TYPE_PRIMARY,
+		.id = ISO9660_ID,
+	};
+	struct iso9660_primary_descriptor *primary = scratch;
+	static const struct eltorito_descriptor_fixed boot_check = {
+		.type = ISO9660_TYPE_BOOT,
+		.id = ISO9660_ID,
+		.version = 1,
+		.system_id = "EL TORITO SPECIFICATION",
+	};
+	struct eltorito_descriptor *boot = scratch;
+	unsigned int blksize;
+	unsigned int blksize_shift;
+	int rc;
+
+	/* Calculate required blocksize shift */
+	blksize = int13_blksize ( int13 );
+	blksize_shift = 0;
+	while ( blksize < ISO9660_BLKSIZE ) {
+		blksize <<= 1;
+		blksize_shift++;
+	}
+	if ( blksize > ISO9660_BLKSIZE ) {
+		/* Do nothing if the blksize is invalid for CD-ROM access */
+		return 0;
+	}
+
+	/* Read primary volume descriptor */
+	if ( ( rc = int13_rw ( int13,
+			       ( ISO9660_PRIMARY_LBA << blksize_shift ), 1,
+			       virt_to_user ( primary ), block_read ) ) != 0 ){
+		DBGC ( int13, "INT13 drive %02x could not read ISO9660 "
+		       "primary volume descriptor: %s\n",
+		       int13->drive, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Do nothing unless this is an ISO image */
+	if ( memcmp ( primary, &primary_check, sizeof ( primary_check ) ) != 0 )
+		return 0;
+	DBGC ( int13, "INT13 drive %02x contains an ISO9660 filesystem; "
+	       "treating as CD-ROM\n", int13->drive );
+
+	/* Read boot record volume descriptor */
+	if ( ( rc = int13_rw ( int13,
+			       ( ELTORITO_LBA << blksize_shift ), 1,
+			       virt_to_user ( boot ), block_read ) ) != 0 ) {
+		DBGC ( int13, "INT13 drive %02x could not read El Torito boot "
+		       "record volume descriptor: %s\n",
+		       int13->drive, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Check for an El Torito boot catalog */
+	if ( memcmp ( boot, &boot_check, sizeof ( boot_check ) ) == 0 ) {
+		int13->boot_catalog = boot->sector;
+		DBGC ( int13, "INT13 drive %02x has an El Torito boot catalog "
+		       "at LBA %08x\n", int13->drive, int13->boot_catalog );
+	} else {
+		DBGC ( int13, "INT13 drive %02x has no El Torito boot "
+		       "catalog\n", int13->drive );
+	}
+
+	/* Configure drive for no-emulation CD-ROM access */
+	int13->blksize_shift += blksize_shift;
+
+	return 0;
+}
+
+/**
  * Guess INT 13 drive geometry
  *
  * @v int13		Emulated drive
+ * @v scratch		Scratch area for single-sector reads
  * @ret rc		Return status code
  *
  * Guesses the drive geometry by inspecting the partition table.
  */
-static int int13_guess_geometry ( struct int13_drive *int13 ) {
-	struct master_boot_record mbr;
+static int int13_guess_geometry ( struct int13_drive *int13, void *scratch ) {
+	struct master_boot_record *mbr = scratch;
 	struct partition_table_entry *partition;
 	unsigned int guessed_heads = 255;
 	unsigned int guessed_sectors_per_track = 63;
-	unsigned long blocks;
-	unsigned long blocks_per_cyl;
+	unsigned int blocks;
+	unsigned int blocks_per_cyl;
 	unsigned int i;
 	int rc;
 
 	/* Don't even try when the blksize is invalid for C/H/S access */
-	if ( int13->capacity.blksize != INT13_BLKSIZE )
+	if ( int13_blksize ( int13 ) != INT13_BLKSIZE )
 		return 0;
 
 	/* Read partition table */
-	if ( ( rc = int13_rw ( int13, 0, 1, virt_to_user ( &mbr ),
+	if ( ( rc = int13_rw ( int13, 0, 1, virt_to_user ( mbr ),
 			       block_read ) ) != 0 ) {
 		DBGC ( int13, "INT13 drive %02x could not read partition "
 		       "table to guess geometry: %s\n",
@@ -401,15 +527,15 @@ static int int13_guess_geometry ( struct int13_drive *int13 ) {
 		return rc;
 	}
 	DBGC2 ( int13, "INT13 drive %02x has MBR:\n", int13->drive );
-	DBGC2_HDA ( int13, 0, &mbr, sizeof ( mbr ) );
+	DBGC2_HDA ( int13, 0, mbr, sizeof ( *mbr ) );
 	DBGC ( int13, "INT13 drive %02x has signature %08x\n",
-	       int13->drive, mbr.signature );
+	       int13->drive, mbr->signature );
 
 	/* Scan through partition table and modify guesses for heads
 	 * and sectors_per_track if we find any used partitions.
 	 */
 	for ( i = 0 ; i < 4 ; i++ ) {
-		partition = &mbr.partitions[i];
+		partition = &mbr->partitions[i];
 		if ( ! partition->type )
 			continue;
 		guessed_heads = ( PART_HEAD ( partition->chs_end ) + 1 );
@@ -426,8 +552,7 @@ static int int13_guess_geometry ( struct int13_drive *int13 ) {
 		int13->sectors_per_track = guessed_sectors_per_track;
 	if ( ! int13->cylinders ) {
 		/* Avoid attempting a 64-bit divide on a 32-bit system */
-		blocks = ( ( int13->capacity.blocks <= ULONG_MAX ) ?
-			   int13->capacity.blocks : ULONG_MAX );
+		blocks = int13_capacity32 ( int13 );
 		blocks_per_cyl = ( int13->heads * int13->sectors_per_track );
 		assert ( blocks_per_cyl != 0 );
 		int13->cylinders = ( blocks / blocks_per_cyl );
@@ -535,10 +660,10 @@ static int int13_rw_sectors ( struct int13_drive *int13,
 	int rc;
 
 	/* Validate blocksize */
-	if ( int13->capacity.blksize != INT13_BLKSIZE ) {
+	if ( int13_blksize ( int13 ) != INT13_BLKSIZE ) {
 		DBGC ( int13, "\nINT 13 drive %02x invalid blocksize (%zd) "
 		       "for non-extended read/write\n",
-		       int13->drive, int13->capacity.blksize );
+		       int13->drive, int13_blksize ( int13 ) );
 		return -INT13_STATUS_INVALID;
 	}
 	
@@ -625,6 +750,14 @@ static int int13_get_parameters ( struct int13_drive *int13,
 
 	DBGC2 ( int13, "Get drive parameters\n" );
 
+	/* Validate blocksize */
+	if ( int13_blksize ( int13 ) != INT13_BLKSIZE ) {
+		DBGC ( int13, "\nINT 13 drive %02x invalid blocksize (%zd) "
+		       "for non-extended parameters\n",
+		       int13->drive, int13_blksize ( int13 ) );
+		return -INT13_STATUS_INVALID;
+	}
+
 	ix86->regs.ch = ( max_cylinder & 0xff );
 	ix86->regs.cl = ( ( ( max_cylinder >> 8 ) << 6 ) | max_sector );
 	ix86->regs.dh = max_head;
@@ -645,8 +778,7 @@ static int int13_get_disk_type ( struct int13_drive *int13,
 	uint32_t blocks;
 
 	DBGC2 ( int13, "Get disk type\n" );
-	blocks = ( ( int13->capacity.blocks <= 0xffffffffUL ) ?
-		   int13->capacity.blocks : 0xffffffffUL );
+	blocks = int13_capacity32 ( int13 );
 	ix86->regs.cx = ( blocks >> 16 );
 	ix86->regs.dx = ( blocks & 0xffff );
 	return INT13_DISK_TYPE_HDD;
@@ -916,14 +1048,14 @@ static int int13_get_extended_parameters ( struct int13_drive *int13,
 	memset ( &params, 0, sizeof ( params ) );
 	params.flags = INT13_FL_DMA_TRANSPARENT;
 	if ( ( int13->cylinders < 1024 ) &&
-	     ( int13->capacity.blocks <= INT13_MAX_CHS_SECTORS ) ) {
+	     ( int13_capacity ( int13 ) <= INT13_MAX_CHS_SECTORS ) ) {
 		params.flags |= INT13_FL_CHS_VALID;
 	}
 	params.cylinders = int13->cylinders;
 	params.heads = int13->heads;
 	params.sectors_per_track = int13->sectors_per_track;
-	params.sectors = int13->capacity.blocks;
-	params.sector_size = int13->capacity.blksize;
+	params.sectors = int13_capacity ( int13 );
+	params.sector_size = int13_blksize ( int13 );
 	memset ( &params.dpte, 0xff, sizeof ( params.dpte ) );
 	if ( ( rc = int13_device_path_info ( int13, &params.dpi ) ) != 0 ) {
 		DBGC ( int13, "INT13 drive %02x could not provide device "
@@ -954,6 +1086,41 @@ static int int13_get_extended_parameters ( struct int13_drive *int13,
 	if ( len > bufsize )
 		len = bufsize;
 	copy_to_real ( ix86->segs.ds, ix86->regs.si, &params, len );
+
+	return 0;
+}
+
+/**
+ * INT 13, 4d - Read CD-ROM boot catalog
+ *
+ * @v int13		Emulated drive
+ * @v ds:si		Command packet
+ * @ret status		Status code
+ */
+static int int13_cdrom_read_boot_catalog ( struct int13_drive *int13,
+					   struct i386_all_regs *ix86 ) {
+	struct int13_cdrom_boot_catalog_command command;
+	int rc;
+
+	/* Fail if we have no boot catalog */
+	if ( ! int13->boot_catalog ) {
+		DBGC ( int13, "INT13 drive %02x has no boot catalog\n",
+		       int13->drive );
+		return -INT13_STATUS_INVALID;
+	}
+
+	/* Read parameters from command packet */
+	copy_from_real ( &command, ix86->segs.ds, ix86->regs.si,
+			 sizeof ( command ) );
+
+	/* Read from boot catalog */
+	if ( ( rc = int13_rw ( int13, ( int13->boot_catalog + command.start ),
+			       command.count, phys_to_user ( command.buffer ),
+			       block_read ) ) != 0 ) {
+		DBGC ( int13, "INT13 drive %02x could not read boot catalog: "
+		       "%s\n", int13->drive, strerror ( rc ) );
+		return -INT13_STATUS_READ_ERROR;
+	}
 
 	return 0;
 }
@@ -1024,6 +1191,9 @@ static __asmcall void int13 ( struct i386_all_regs *ix86 ) {
 			break;
 		case INT13_GET_EXTENDED_PARAMETERS:
 			status = int13_get_extended_parameters ( int13, ix86 );
+			break;
+		case INT13_CDROM_READ_BOOT_CATALOG:
+			status = int13_cdrom_read_boot_catalog ( int13, ix86 );
 			break;
 		default:
 			DBGC2 ( int13, "*** Unrecognised INT13 ***\n" );
@@ -1174,6 +1344,7 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	struct int13_drive *int13;
 	uint8_t num_drives;
 	unsigned int natural_drive;
+	void *scratch;
 	int rc;
 
 	/* Calculate natural drive number */
@@ -1206,10 +1377,19 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 
 	/* Read device capacity */
 	if ( ( rc = int13_read_capacity ( int13 ) ) != 0 )
-		return rc;
+		goto err_read_capacity;
+
+	/* Allocate scratch area */
+	scratch = malloc ( int13_blksize ( int13 ) );
+	if ( ! scratch )
+		goto err_alloc_scratch;
+
+	/* Parse parameters, if present */
+	if ( ( rc = int13_parse_iso9660 ( int13, scratch ) ) != 0 )
+		goto err_parse_iso9660;
 
 	/* Give drive a default geometry */
-	if ( ( rc = int13_guess_geometry ( int13 ) ) != 0 )
+	if ( ( rc = int13_guess_geometry ( int13, scratch ) ) != 0 )
 		goto err_guess_geometry;
 
 	DBGC ( int13, "INT13 drive %02x (naturally %02x) registered with C/H/S "
@@ -1228,9 +1408,14 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	/* Update BIOS drive count */
 	int13_set_num_drives();
 
+	free ( scratch );
 	return 0;
 
  err_guess_geometry:
+ err_parse_iso9660:
+	free ( scratch );
+ err_alloc_scratch:
+ err_read_capacity:
  err_reopen_block:
 	intf_shutdown ( &int13->block, rc );
 	ref_put ( &int13->refcnt );
@@ -1297,6 +1482,150 @@ static void int13_unhook ( unsigned int drive ) {
 }
 
 /**
+ * Load and verify master boot record from INT 13 drive
+ *
+ * @v drive		Drive number
+ * @v address		Boot code address to fill in
+ * @ret rc		Return status code
+ */
+static int int13_load_mbr ( unsigned int drive, struct segoff *address ) {
+	uint8_t status;
+	int discard_b, discard_c, discard_d;
+	uint16_t magic;
+
+	/* Use INT 13, 02 to read the MBR */
+	address->segment = 0;
+	address->offset = 0x7c00;
+	__asm__ __volatile__ ( REAL_CODE ( "pushw %%es\n\t"
+					   "pushl %%ebx\n\t"
+					   "popw %%bx\n\t"
+					   "popw %%es\n\t"
+					   "stc\n\t"
+					   "sti\n\t"
+					   "int $0x13\n\t"
+					   "sti\n\t" /* BIOS bugs */
+					   "jc 1f\n\t"
+					   "xorw %%ax, %%ax\n\t"
+					   "\n1:\n\t"
+					   "popw %%es\n\t" )
+			       : "=a" ( status ), "=b" ( discard_b ),
+				 "=c" ( discard_c ), "=d" ( discard_d )
+			       : "a" ( 0x0201 ), "b" ( *address ),
+				 "c" ( 1 ), "d" ( drive ) );
+	if ( status ) {
+		DBG ( "INT13 drive %02x could not read MBR (status %02x)\n",
+		      drive, status );
+		return -EIO;
+	}
+
+	/* Check magic signature */
+	get_real ( magic, address->segment,
+		   ( address->offset +
+		     offsetof ( struct master_boot_record, magic ) ) );
+	if ( magic != INT13_MBR_MAGIC ) {
+		DBG ( "INT13 drive %02x does not contain a valid MBR\n",
+		      drive );
+		return -ENOEXEC;
+	}
+
+	return 0;
+}
+
+/** El Torito boot catalog command packet */
+static struct int13_cdrom_boot_catalog_command __data16 ( eltorito_cmd ) = {
+	.size = sizeof ( struct int13_cdrom_boot_catalog_command ),
+	.count = 1,
+	.buffer = 0x7c00,
+	.start = 0,
+};
+#define eltorito_cmd __use_data16 ( eltorito_cmd )
+
+/** El Torito disk address packet */
+static struct int13_disk_address __bss16 ( eltorito_address );
+#define eltorito_address __use_data16 ( eltorito_address )
+
+/**
+ * Load and verify El Torito boot record from INT 13 drive
+ *
+ * @v drive		Drive number
+ * @v address		Boot code address to fill in
+ * @ret rc		Return status code
+ */
+static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
+	struct {
+		struct eltorito_validation_entry valid;
+		struct eltorito_boot_entry boot;
+	} __attribute__ (( packed )) catalog;
+	uint8_t status;
+
+	/* Use INT 13, 4d to read the boot catalog */
+	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+					   "sti\n\t"
+					   "int $0x13\n\t"
+					   "sti\n\t" /* BIOS bugs */
+					   "jc 1f\n\t"
+					   "xorw %%ax, %%ax\n\t"
+					   "\n1:\n\t" )
+			       : "=a" ( status )
+			       : "a" ( 0x4d00 ), "d" ( drive ),
+				 "S" ( __from_data16 ( &eltorito_cmd ) ) );
+	if ( status ) {
+		DBG ( "INT13 drive %02x could not read El Torito boot catalog "
+		      "(status %02x)\n", drive, status );
+		return -EIO;
+	}
+	copy_from_user ( &catalog, phys_to_user ( eltorito_cmd.buffer ), 0,
+			 sizeof ( catalog ) );
+
+	/* Sanity checks */
+	if ( catalog.valid.platform_id != ELTORITO_PLATFORM_X86 ) {
+		DBG ( "INT13 drive %02x El Torito specifies unknown platform "
+		      "%02x\n", drive, catalog.valid.platform_id );
+		return -ENOEXEC;
+	}
+	if ( catalog.boot.indicator != ELTORITO_BOOTABLE ) {
+		DBG ( "INT13 drive %02x El Torito is not bootable\n", drive );
+		return -ENOEXEC;
+	}
+	if ( catalog.boot.media_type != ELTORITO_NO_EMULATION ) {
+		DBG ( "INT13 drive %02x El Torito requires emulation "
+		       "type %02x\n", drive, catalog.boot.media_type );
+		return -ENOTSUP;
+	}
+	DBG ( "INT13 drive %02x El Torito boot image at LBA %08x (count %d)\n",
+	      drive, catalog.boot.start, catalog.boot.length );
+	address->segment = ( catalog.boot.load_segment ?
+			     catalog.boot.load_segment : 0x7c0 );
+	address->offset = 0;
+	DBG ( "INT13 drive %02x El Torito boot image loads at %04x:%04x\n",
+	      drive, address->segment, address->offset );
+
+	/* Use INT 13, 42 to read the boot image */
+	eltorito_address.bufsize =
+		offsetof ( typeof ( eltorito_address ), buffer_phys );
+	eltorito_address.count = catalog.boot.length;
+	eltorito_address.buffer = *address;
+	eltorito_address.lba = catalog.boot.start;
+	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+					   "sti\n\t"
+					   "int $0x13\n\t"
+					   "sti\n\t" /* BIOS bugs */
+					   "jc 1f\n\t"
+					   "xorw %%ax, %%ax\n\t"
+					   "\n1:\n\t" )
+			       : "=a" ( status )
+			       : "a" ( 0x4200 ), "d" ( drive ),
+				 "S" ( __from_data16 ( &eltorito_address ) ) );
+	if ( status ) {
+		DBG ( "INT13 drive %02x could not read El Torito boot image "
+		      "(status %02x)\n", drive, status );
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/**
  * Attempt to boot from an INT 13 drive
  *
  * @v drive		Drive number
@@ -1311,38 +1640,13 @@ static void int13_unhook ( unsigned int drive ) {
  */
 static int int13_boot ( unsigned int drive ) {
 	struct memory_map memmap;
-	int status, signature;
-	int discard_c, discard_d;
+	struct segoff address;
 	int rc;
 
-	DBG ( "INT13 drive %02x booting\n", drive );
-
-	/* Use INT 13 to read the boot sector */
-	__asm__ __volatile__ ( REAL_CODE ( "pushw %%es\n\t"
-					   "pushw $0\n\t"
-					   "popw %%es\n\t"
-					   "stc\n\t"
-					   "sti\n\t"
-					   "int $0x13\n\t"
-					   "sti\n\t" /* BIOS bugs */
-					   "jc 1f\n\t"
-					   "xorl %%eax, %%eax\n\t"
-					   "\n1:\n\t"
-					   "movzwl %%es:0x7dfe, %%ebx\n\t"
-					   "popw %%es\n\t" )
-			       : "=a" ( status ), "=b" ( signature ),
-				 "=c" ( discard_c ), "=d" ( discard_d )
-			       : "a" ( 0x0201 ), "b" ( 0x7c00 ),
-				 "c" ( 1 ), "d" ( drive ) );
-	if ( status )
-		return -EIO;
-
-	/* Check signature is correct */
-	if ( signature != be16_to_cpu ( 0x55aa ) ) {
-		DBG ( "INT13 drive %02x invalid disk signature %#04x (should "
-		      "be 0x55aa)\n", drive, cpu_to_be16 ( signature ) );
-		return -ENOEXEC;
-	}
+	/* Look for a usable boot sector */
+	if ( ( ( rc = int13_load_mbr ( drive, &address ) ) != 0 ) &&
+	     ( ( rc = int13_load_eltorito ( drive, &address ) ) != 0 ) )
+		return rc;
 
 	/* Dump out memory map prior to boot, if memmap debugging is
 	 * enabled.  Not required for program flow, but we have so
@@ -1352,7 +1656,8 @@ static int int13_boot ( unsigned int drive ) {
 	get_memmap ( &memmap );
 
 	/* Jump to boot sector */
-	if ( ( rc = call_bootsector ( 0x0, 0x7c00, drive ) ) != 0 ) {
+	if ( ( rc = call_bootsector ( address.segment, address.offset,
+				      drive ) ) != 0 ) {
 		DBG ( "INT13 drive %02x boot returned: %s\n",
 		      drive, strerror ( rc ) );
 		return rc;
