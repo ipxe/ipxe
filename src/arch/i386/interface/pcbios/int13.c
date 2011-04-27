@@ -124,6 +124,8 @@ struct int13_drive {
 	 */
 	unsigned int sectors_per_track;
 
+	/** Drive is a CD-ROM */
+	int is_cdrom;
 	/** Address of El Torito boot catalog (if any) */
 	unsigned int boot_catalog;
 
@@ -468,6 +470,7 @@ static int int13_parse_iso9660 ( struct int13_drive *int13, void *scratch ) {
 		return 0;
 	DBGC ( int13, "INT13 drive %02x contains an ISO9660 filesystem; "
 	       "treating as CD-ROM\n", int13->drive );
+	int13->is_cdrom = 1;
 
 	/* Read boot record volume descriptor */
 	if ( ( rc = int13_rw ( int13,
@@ -1091,6 +1094,41 @@ static int int13_get_extended_parameters ( struct int13_drive *int13,
 }
 
 /**
+ * INT 13, 4b - Get status or terminate CD-ROM emulation
+ *
+ * @v int13		Emulated drive
+ * @v ds:si		Specification packet
+ * @ret status		Status code
+ */
+static int int13_cdrom_status_terminate ( struct int13_drive *int13,
+					  struct i386_all_regs *ix86 ) {
+	struct int13_cdrom_specification specification;
+
+	DBGC2 ( int13, "Get CD-ROM emulation status to %04x:%04x%s\n",
+		ix86->segs.ds, ix86->regs.si,
+		( ix86->regs.al ? "" : " and terminate" ) );
+
+	/* Fail if we are not a CD-ROM */
+	if ( ! int13->is_cdrom ) {
+		DBGC ( int13, "INT13 drive %02x is not a CD-ROM\n",
+		       int13->drive );
+		return -INT13_STATUS_INVALID;
+	}
+
+	/* Build specification packet */
+	memset ( &specification, 0, sizeof ( specification ) );
+	specification.size = sizeof ( specification );
+	specification.drive = int13->drive;
+
+	/* Return specification packet */
+	copy_to_real ( ix86->segs.ds, ix86->regs.si, &specification,
+		       sizeof ( specification ) );
+
+	return 0;
+}
+
+
+/**
  * INT 13, 4d - Read CD-ROM boot catalog
  *
  * @v int13		Emulated drive
@@ -1102,16 +1140,17 @@ static int int13_cdrom_read_boot_catalog ( struct int13_drive *int13,
 	struct int13_cdrom_boot_catalog_command command;
 	int rc;
 
+	/* Read parameters from command packet */
+	copy_from_real ( &command, ix86->segs.ds, ix86->regs.si,
+			 sizeof ( command ) );
+	DBGC2 ( int13, "Read CD-ROM boot catalog to %08x\n", command.buffer );
+
 	/* Fail if we have no boot catalog */
 	if ( ! int13->boot_catalog ) {
 		DBGC ( int13, "INT13 drive %02x has no boot catalog\n",
 		       int13->drive );
 		return -INT13_STATUS_INVALID;
 	}
-
-	/* Read parameters from command packet */
-	copy_from_real ( &command, ix86->segs.ds, ix86->regs.si,
-			 sizeof ( command ) );
 
 	/* Read from boot catalog */
 	if ( ( rc = int13_rw ( int13, ( int13->boot_catalog + command.start ),
@@ -1191,6 +1230,9 @@ static __asmcall void int13 ( struct i386_all_regs *ix86 ) {
 			break;
 		case INT13_GET_EXTENDED_PARAMETERS:
 			status = int13_get_extended_parameters ( int13, ix86 );
+			break;
+		case INT13_CDROM_STATUS_TERMINATE:
+			status = int13_cdrom_status_terminate ( int13, ix86 );
 			break;
 		case INT13_CDROM_READ_BOOT_CATALOG:
 			status = int13_cdrom_read_boot_catalog ( int13, ix86 );
