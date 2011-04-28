@@ -1187,12 +1187,17 @@ static __asmcall void int13 ( struct i386_all_regs *ix86 ) {
 					bios_drive, int13->drive );
 				ix86->regs.dl = int13->drive;
 				return;
+			} else if ( ( ( bios_drive & 0x7f ) == 0x7f ) &&
+				    ( command == INT13_CDROM_STATUS_TERMINATE )
+				    && int13->is_cdrom ) {
+				/* Catch non-drive-specific CD-ROM calls */
+			} else {
+				continue;
 			}
-			continue;
 		}
 		
 		DBGC2 ( int13, "INT13,%02x (%02x): ",
-			ix86->regs.ah, int13->drive );
+			ix86->regs.ah, bios_drive );
 
 		switch ( command ) {
 		case INT13_RESET:
