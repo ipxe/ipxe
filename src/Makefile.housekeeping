@@ -601,21 +601,22 @@ roms :
 # This is needed in order to correctly rebuild embedded.o whenever the
 # list of objects changes.
 #
+EMBED		:= $(EMBEDDED_IMAGE) # Maintain backwards compatibility
 EMBEDDED_LIST	:= $(BIN)/.embedded.list
 ifeq ($(wildcard $(EMBEDDED_LIST)),)
-EMBEDDED_IMAGE_OLD := <invalid>
+EMBED_OLD := <invalid>
 else
-EMBEDDED_IMAGE_OLD := $(shell cat $(EMBEDDED_LIST))
+EMBED_OLD := $(shell cat $(EMBEDDED_LIST))
 endif
-ifneq ($(EMBEDDED_IMAGE_OLD),$(EMBEDDED_IMAGE))
-$(shell $(ECHO) "$(EMBEDDED_IMAGE)" > $(EMBEDDED_LIST))
+ifneq ($(EMBED_OLD),$(EMBED))
+$(shell $(ECHO) "$(EMBED)" > $(EMBEDDED_LIST))
 endif
 
 $(EMBEDDED_LIST) :
 
 VERYCLEANUP	+= $(EMBEDDED_LIST)
 
-EMBEDDED_FILES	:= $(subst $(COMMA), ,$(EMBEDDED_IMAGE))
+EMBEDDED_FILES	:= $(subst $(COMMA), ,$(EMBED))
 EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
 		     EMBED ( $(i), \"$(word $(i), $(EMBEDDED_FILES))\",\
 			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
