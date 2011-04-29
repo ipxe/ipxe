@@ -39,8 +39,8 @@ SECTIONS {
     } .bss.prefix (NOLOAD) : AT ( _end_lma ) {
 	_eprefix = .;
     }
-    _prefix_filesz	= ABSOLUTE ( _mprefix - _prefix );
-    _prefix_memsz	= ABSOLUTE ( _eprefix - _prefix );
+    _prefix_filesz	= ABSOLUTE ( _mprefix ) - ABSOLUTE ( _prefix );
+    _prefix_memsz	= ABSOLUTE ( _eprefix ) - ABSOLUTE ( _prefix );
 
     /*
      * The 16-bit (real-mode) code section
@@ -63,11 +63,11 @@ SECTIONS {
     } .bss.text16 (NOLOAD) : AT ( _end_lma ) {
 	_etext16 = .;
     }
-    _text16_early_filesz = ABSOLUTE ( _etext16_early - _text16 );
-    _text16_early_memsz	= ABSOLUTE ( _etext16_early - _text16 );
-    _text16_late_filesz	= ABSOLUTE ( _mtext16 - _text16_late );
-    _text16_late_memsz	= ABSOLUTE ( _etext16 - _text16_late );
-    _text16_memsz	= ABSOLUTE ( _etext16 - _text16 );
+    _text16_early_filesz = ABSOLUTE ( _etext16_early ) - ABSOLUTE ( _text16 );
+    _text16_early_memsz	= ABSOLUTE ( _etext16_early ) - ABSOLUTE ( _text16 );
+    _text16_late_filesz	= ABSOLUTE ( _mtext16 ) - ABSOLUTE ( _text16_late );
+    _text16_late_memsz	= ABSOLUTE ( _etext16 ) - ABSOLUTE ( _text16_late );
+    _text16_memsz	= ABSOLUTE ( _etext16 ) - ABSOLUTE ( _text16 );
 
     /*
      * The 16-bit (real-mode) data section
@@ -89,8 +89,8 @@ SECTIONS {
 	*(.stack16.*)
 	_edata16 = .;
     }
-    _data16_filesz	= ABSOLUTE ( _mdata16 - _data16 );
-    _data16_memsz	= ABSOLUTE ( _edata16 - _data16 );
+    _data16_filesz	= ABSOLUTE ( _mdata16 ) - ABSOLUTE ( _data16 );
+    _data16_memsz	= ABSOLUTE ( _edata16 ) - ABSOLUTE ( _data16 );
 
     /*
      * The 32-bit sections
@@ -118,8 +118,8 @@ SECTIONS {
 	*(.stack.*)
 	_etextdata = .;
     }
-    _textdata_filesz	= ABSOLUTE ( _mtextdata - _textdata );
-    _textdata_memsz	= ABSOLUTE ( _etextdata - _textdata );
+    _textdata_filesz	= ABSOLUTE ( _mtextdata ) - ABSOLUTE ( _textdata );
+    _textdata_memsz	= ABSOLUTE ( _etextdata ) - ABSOLUTE ( _textdata );
 
     /*
      * Compressor information block
@@ -134,8 +134,8 @@ SECTIONS {
     } .bss.zinfo (NOLOAD) : AT ( _end_lma ) {
 	_ezinfo = .;
     }
-    _zinfo_filesz	= ABSOLUTE ( _mzinfo - _zinfo );
-    _zinfo_memsz	= ABSOLUTE ( _ezinfo - _zinfo );
+    _zinfo_filesz	= ABSOLUTE ( _mzinfo ) - ABSOLUTE ( _zinfo );
+    _zinfo_memsz	= ABSOLUTE ( _ezinfo ) - ABSOLUTE ( _zinfo );
 
     /*
      * Weak symbols that need zero values if not otherwise defined
