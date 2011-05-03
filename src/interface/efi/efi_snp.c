@@ -769,8 +769,8 @@ static EFI_GUID efi_hii_config_access_protocol_guid
 static EFI_HII_DATABASE_PROTOCOL *efihii;
 EFI_REQUIRE_PROTOCOL ( EFI_HII_DATABASE_PROTOCOL, &efihii );
 
-/** Local GUID used for our EFI SNP formset */
-#define EFI_SNP_FORMSET_GUID						\
+/** Local base GUID used for our EFI SNP formset */
+#define EFI_SNP_FORMSET_GUID_BASE					\
 	{ 0xc4f84019, 0x6dfd, 0x4a27,					\
 	  { 0x9b, 0x94, 0xb7, 0x2e, 0x1f, 0xbc, 0xad, 0xca } }
 
@@ -815,7 +815,7 @@ struct efi_snp_formset {
 		.Length = sizeof ( efi_snp_formset ),
 		.Type = EFI_HII_PACKAGE_FORMS,
 	},
-	.FormSet = EFI_IFR_FORM_SET ( EFI_SNP_FORMSET_GUID,
+	.FormSet = EFI_IFR_FORM_SET ( EFI_SNP_FORMSET_GUID_BASE,
 				      EFI_SNP_FORMSET_TITLE,
 				      EFI_SNP_FORMSET_HELP,
 				      typeof ( efi_snp_formset.FormSet ),
@@ -991,6 +991,9 @@ efi_snp_package_list ( struct efi_snp_device *snpdev ) {
 	package_list = zalloc ( sizeof ( *package_list ) );
 	if ( ! package_list )
 		return NULL;
+
+	/* Create a unique GUID for this package list and formset */
+	efi_snp_formset.FormSet.FormSet.Guid.Data1++;
 
 	/* Populate package list */
 	memcpy ( &package_list->header.PackageListGuid,
