@@ -216,8 +216,7 @@ void netdev_tx_complete_err ( struct net_device *netdev,
 	}
 
 	/* Catch data corruption as early as possible */
-	assert ( iobuf->list.next != NULL );
-	assert ( iobuf->list.prev != NULL );
+	list_check_contains ( iobuf, &netdev->tx_queue, list );
 
 	/* Dequeue and free I/O buffer */
 	list_del ( &iobuf->list );
