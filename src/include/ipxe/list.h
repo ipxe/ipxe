@@ -212,4 +212,23 @@ static inline int list_empty ( const struct list_head *list ) {
 	      pos = tmp,						      \
 	      tmp = list_entry ( tmp->member.next, typeof ( *tmp ), member ) )
 
+/**
+ * Check list contains a specified entry
+ *
+ * @v entry		Entry
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ */
+#define list_check_contains( entry, head, member ) do {		\
+	if ( ASSERTING ) {					\
+		typeof ( entry ) tmp;				\
+		int found = 0;					\
+		list_for_each_entry ( tmp, head, member ) {	\
+			if ( tmp == entry )			\
+				found = 1;			\
+		}						\
+		assert ( found );				\
+	}							\
+	} while ( 0 )
+
 #endif /* _IPXE_LIST_H */
