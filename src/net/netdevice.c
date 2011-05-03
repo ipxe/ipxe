@@ -163,8 +163,8 @@ static void netdev_record_stat ( struct net_device_stats *stats, int rc ) {
 int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	int rc;
 
-	DBGC ( netdev, "NETDEV %s transmitting %p (%p+%zx)\n",
-	       netdev->name, iobuf, iobuf->data, iob_len ( iobuf ) );
+	DBGC2 ( netdev, "NETDEV %s transmitting %p (%p+%zx)\n",
+		netdev->name, iobuf, iobuf->data, iob_len ( iobuf ) );
 
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->tx_queue );
@@ -208,8 +208,8 @@ void netdev_tx_complete_err ( struct net_device *netdev,
 	/* Update statistics counter */
 	netdev_record_stat ( &netdev->tx_stats, rc );
 	if ( rc == 0 ) {
-		DBGC ( netdev, "NETDEV %s transmission %p complete\n",
-		       netdev->name, iobuf );
+		DBGC2 ( netdev, "NETDEV %s transmission %p complete\n",
+			netdev->name, iobuf );
 	} else {
 		DBGC ( netdev, "NETDEV %s transmission %p failed: %s\n",
 		       netdev->name, iobuf, strerror ( rc ) );
@@ -265,8 +265,8 @@ static void netdev_tx_flush ( struct net_device *netdev ) {
  */
 void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
-	DBGC ( netdev, "NETDEV %s received %p (%p+%zx)\n",
-	       netdev->name, iobuf, iobuf->data, iob_len ( iobuf ) );
+	DBGC2 ( netdev, "NETDEV %s received %p (%p+%zx)\n",
+		netdev->name, iobuf, iobuf->data, iob_len ( iobuf ) );
 
 	/* Discard packet (for test purposes) if applicable */
 	if ( ( NETDEV_DISCARD_RATE > 0 ) &&
@@ -718,9 +718,9 @@ void net_poll ( void ) {
 		 */
 		if ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
 
-			DBGC ( netdev, "NETDEV %s processing %p (%p+%zx)\n",
-			       netdev->name, iobuf, iobuf->data,
-			       iob_len ( iobuf ) );
+			DBGC2 ( netdev, "NETDEV %s processing %p (%p+%zx)\n",
+				netdev->name, iobuf, iobuf->data,
+				iob_len ( iobuf ) );
 
 			/* Remove link-layer header */
 			ll_protocol = netdev->ll_protocol;
