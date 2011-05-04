@@ -3382,55 +3382,31 @@ static int hermon_bofm_update ( struct bofm_device *bofm, unsigned int mport,
 	union {
 		uint8_t bytes[8];
 		uint32_t dwords[2];
-		uint64_t qword;
 	} buf;
-	uint8_t *mac_copy = &buf.bytes[ sizeof ( buf.bytes ) - ETH_ALEN ];
 	int rc;
 
 	/* Prepare MAC address */
 	memset ( &buf, 0, sizeof ( buf ) );
-	memcpy ( mac_copy, mac, ETH_ALEN );
+	memcpy ( &buf.bytes[ sizeof ( buf.bytes ) - ETH_ALEN ], mac,
+		 ETH_ALEN );
 
-	/* Current BOFM versions are unable to create entries with
-	 * mport>1, which means that only the port 1 MAC address can
-	 * be explicitly specified.  Work around this by using the
-	 * provided MAC address as a base address for all subsequent
-	 * ports.  For example, if BOFM assigns the address
-	 *
-	 *    00:1A:64:76:00:09 for port 1
-	 *
-	 * then we will assign the addresses
-	 *
-	 *    00:1A:64:76:00:09 for port 1
-	 *    00:1A:64:76:00:0a for port 2
-	 *
-	 * Note that hermon->cap.num_ports is not yet defined at this
-	 * point.
-	 */
-	for ( ; mport <= HERMON_MAX_PORTS ; mport++ ) {
-
-		/* Modify static configuration */
-		memset ( &stat_cfg, 0, sizeof ( stat_cfg ) );
-		MLX_FILL_2 ( &stat_cfg, 36,
-			     mac_m, 1,
-			     mac_high, ntohl ( buf.dwords[0] ) );
-		MLX_FILL_1 ( &stat_cfg, 37, mac_low, ntohl ( buf.dwords[1] ) );
-		if ( ( rc = hermon_mod_stat_cfg ( hermon, mport,
+	/* Modify static configuration */
+	memset ( &stat_cfg, 0, sizeof ( stat_cfg ) );
+	MLX_FILL_2 ( &stat_cfg, 36,
+		     mac_m, 1,
+		     mac_high, ntohl ( buf.dwords[0] ) );
+	MLX_FILL_1 ( &stat_cfg, 37, mac_low, ntohl ( buf.dwords[1] ) );
+	if ( ( rc = hermon_mod_stat_cfg ( hermon, mport,
 					  HERMON_MOD_STAT_CFG_SET,
 					  HERMON_MOD_STAT_CFG_OFFSET ( mac_m ),
 					  &stat_cfg ) ) != 0 ) {
-			DBGC ( hermon, "Hermon %p port %d could not modify "
-			       "configuration: %s\n",
-			       hermon, mport, strerror ( rc ) );
-			return rc;
-		}
-
-		DBGC ( hermon, "Hermon %p port %d updated MAC address to %s\n",
-		       hermon, mport, eth_ntoa ( mac_copy ) );
-
-		/* Increment MAC address */
-		buf.qword = cpu_to_be64 ( be64_to_cpu ( buf.qword ) + 1 );
+		DBGC ( hermon, "Hermon %p port %d could not modify "
+		       "configuration: %s\n", hermon, mport, strerror ( rc ) );
+		return rc;
 	}
+
+	DBGC ( hermon, "Hermon %p port %d updated MAC address to %s\n",
+	       hermon, mport, eth_ntoa ( mac ) );
 
 	return 0;
 }
