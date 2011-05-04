@@ -306,11 +306,16 @@ int bofm ( userptr_t bofmtab, struct pci_device *pci ) {
 			      en.slot, ( en.port + 1 ) );
 			continue;
 		}
+		DBG ( "BOFM: slot %d port %d%s is " PCI_FMT " mport %d\n",
+		      en.slot, ( en.port + 1 ),
+		      ( ( en.slot || en.port ) ? "" : "(?)" ),
+		      PCI_BUS ( en.busdevfn ), PCI_SLOT ( en.busdevfn ),
+		      PCI_FUNC ( en.busdevfn ), en.mport );
 		bofm = bofm_find_busdevfn ( en.busdevfn );
 		if ( ! bofm ) {
-			DBG ( "BOFM: " PCI_FMT " ignored\n",
+			DBG ( "BOFM: " PCI_FMT " mport %d ignored\n",
 			      PCI_BUS ( en.busdevfn ), PCI_SLOT ( en.busdevfn ),
-			      PCI_FUNC ( en.busdevfn ) );
+			      PCI_FUNC ( en.busdevfn ), en.mport );
 			continue;
 		}
 		if ( ( rc = bofm_en ( bofm, &en ) ) == 0 ) {
