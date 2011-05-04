@@ -61,6 +61,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static inline void pci_push ( void *ioaddr )
 {
 	/* force out pending posted writes */
+	wmb();
 	readl ( ioaddr );
 }
 
@@ -334,6 +335,7 @@ nv_disable_hw_interrupts ( struct forcedeth_private *priv )
 	void *ioaddr = priv->mmio_addr;
 
 	writel ( 0, ioaddr + NvRegIrqMask );
+	pci_push ( ioaddr );
 }
 
 static void
@@ -764,7 +766,6 @@ forcedeth_open ( struct net_device *netdev )
 		 ioaddr + NvRegPowerState );
 
 	nv_disable_hw_interrupts ( priv );
-	pci_push ( ioaddr );
 	writel ( NVREG_MIISTAT_MASK_ALL, ioaddr + NvRegMIIStatus );
 	writel ( NVREG_IRQSTAT_MASK, ioaddr + NvRegIrqStatus );
 	pci_push ( ioaddr );
@@ -1018,7 +1019,6 @@ static void
 forcedeth_close ( struct net_device *netdev )
 {
 	struct forcedeth_private *priv = netdev_priv ( netdev );
-	void *ioaddr = priv->mmio_addr;
 
 	DBGP ( "forcedeth_close\n" );
 
@@ -1028,7 +1028,6 @@ forcedeth_close ( struct net_device *netdev )
 
 	/* Disable interrupts on the nic or we will lock up */
 	nv_disable_hw_interrupts ( priv );
-	pci_push ( ioaddr );
 
 	nv_free_rxtx_resources ( priv );
 
