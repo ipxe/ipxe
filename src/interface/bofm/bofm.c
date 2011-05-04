@@ -303,7 +303,7 @@ int bofm ( userptr_t bofmtab, struct pci_device *pci ) {
 		DBG2_HDA ( en_offset, &en, sizeof ( en ) );
 		if ( ( en.options & BOFM_EN_MAP_MASK ) != BOFM_EN_MAP_PFA ) {
 			DBG ( "BOFM: slot %d port %d has no PCI mapping\n",
-			      en.slot, en.port );
+			      en.slot, ( en.port + 1 ) );
 			continue;
 		}
 		bofm = bofm_find_busdevfn ( en.busdevfn );
