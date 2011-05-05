@@ -52,7 +52,9 @@ FEATURE ( FEATURE_PROTOCOL, "HTTP", DHCP_EB_FEATURE_HTTP, 1 );
 enum http_rx_state {
 	HTTP_RX_RESPONSE = 0,
 	HTTP_RX_HEADER,
+	HTTP_RX_CHUNK_LEN,
 	HTTP_RX_DATA,
+	HTTP_RX_TRAILER,
 	HTTP_RX_DEAD,
 };
 
@@ -78,6 +80,10 @@ struct http_request {
 	unsigned int response;
 	/** HTTP Content-Length */
 	size_t content_length;
+	/** HTTP is using Transfer-Encoding: chunked */
+	int chunked;
+	/** Current chunk length */
+	size_t chunk_len;
 	/** Received length */
 	size_t rx_len;
 	/** RX state */
@@ -229,6 +235,24 @@ static int http_rx_content_length ( struct http_request *http,
 	return 0;
 }
 
+/**
+ * Handle HTTP Transfer-Encoding header
+ *
+ * @v http		HTTP request
+ * @v value		HTTP header value
+ * @ret rc		Return status code
+ */
+static int http_rx_transfer_encoding ( struct http_request *http,
+				       const char *value ) {
+
+	if ( strcmp ( value, "chunked" ) == 0 ) {
+		/* Mark connection as using chunked transfer encoding */
+		http->chunked = 1;
+	}
+
+	return 0;
+}
+
 /** An HTTP header handler */
 struct http_header_handler {
 	/** Name (e.g. "Content-Length") */
@@ -254,6 +278,10 @@ static struct http_header_handler http_header_handlers[] = {
 		.header = "Content-Length",
 		.rx = http_rx_content_length,
 	},
+	{
+		.header = "Transfer-Encoding",
+		.rx = http_rx_transfer_encoding,
+	},
 	{ NULL, NULL }
 };
 
@@ -270,12 +298,19 @@ static int http_rx_header ( struct http_request *http, char *header ) {
 	char *value;
 	int rc;
 
-	/* An empty header line marks the transition to the data phase */
+	/* An empty header line marks the end of this phase */
 	if ( ! header[0] ) {
-		DBGC ( http, "HTTP %p start of data\n", http );
 		empty_line_buffer ( &http->linebuf );
-		http->rx_state = HTTP_RX_DATA;
-		return 0;
+		if ( http->rx_state == HTTP_RX_HEADER ) {
+			DBGC ( http, "HTTP %p start of data\n", http );
+			http->rx_state = ( http->chunked ?
+					   HTTP_RX_CHUNK_LEN : HTTP_RX_DATA );
+			return 0;
+		} else {
+			DBGC ( http, "HTTP %p end of trailer\n", http );
+			http_done ( http, 0 );
+			return 0;
+		}
 	}
 
 	DBGC ( http, "HTTP %p header \"%s\"\n", http, header );
@@ -300,6 +335,48 @@ static int http_rx_header ( struct http_request *http, char *header ) {
 	return 0;
 }
 
+/**
+ * Handle HTTP chunk length
+ *
+ * @v http		HTTP request
+ * @v length		HTTP chunk length
+ * @ret rc		Return status code
+ */
+static int http_rx_chunk_len ( struct http_request *http, char *length ) {
+	char *endp;
+
+	/* Skip blank lines between chunks */
+	if ( length[0] == '\0' )
+		return 0;
+
+	/* Parse chunk length */
+	http->chunk_len = strtoul ( length, &endp, 16 );
+	if ( *endp != '\0' ) {
+		DBGC ( http, "HTTP %p invalid chunk length \"%s\"\n",
+		       http, length );
+		return -EIO;
+	}
+
+	/* Terminate chunked encoding if applicable */
+	if ( http->chunk_len == 0 ) {
+		DBGC ( http, "HTTP %p end of chunks\n", http );
+		http->chunked = 0;
+		http->rx_state = HTTP_RX_TRAILER;
+		return 0;
+	}
+
+	/* Use seek() to notify recipient of new filesize */
+	DBGC ( http, "HTTP %p start of chunk of length %zd\n",
+	       http, http->chunk_len );
+	xfer_seek ( &http->xfer, ( http->rx_len + http->chunk_len ) );
+	xfer_seek ( &http->xfer, http->rx_len );
+
+	/* Start receiving data */
+	http->rx_state = HTTP_RX_DATA;
+
+	return 0;
+}
+
 /** An HTTP line-based data handler */
 struct http_line_handler {
 	/** Handle line
@@ -315,34 +392,9 @@ struct http_line_handler {
 static struct http_line_handler http_line_handlers[] = {
 	[HTTP_RX_RESPONSE]	= { .rx = http_rx_response },
 	[HTTP_RX_HEADER]	= { .rx = http_rx_header },
+	[HTTP_RX_CHUNK_LEN]	= { .rx = http_rx_chunk_len },
+	[HTTP_RX_TRAILER]	= { .rx = http_rx_header },
 };
-
-/**
- * Handle new data arriving via HTTP connection in the data phase
- *
- * @v http		HTTP request
- * @v iobuf		I/O buffer
- * @ret rc		Return status code
- */
-static int http_rx_data ( struct http_request *http,
-			  struct io_buffer *iobuf ) {
-	int rc;
-
-	/* Update received length */
-	http->rx_len += iob_len ( iobuf );
-
-	/* Hand off data buffer */
-	if ( ( rc = xfer_deliver_iob ( &http->xfer, iobuf ) ) != 0 )
-		return rc;
-
-	/* If we have reached the content-length, stop now */
-	if ( http->content_length &&
-	     ( http->rx_len >= http->content_length ) ) {
-		http_done ( http, 0 );
-	}
-
-	return 0;
-}
 
 /**
  * Handle new data arriving via HTTP connection
@@ -357,34 +409,57 @@ static int http_socket_deliver ( struct http_request *http,
 				 struct xfer_metadata *meta __unused ) {
 	struct http_line_handler *lh;
 	char *line;
-	ssize_t len;
+	size_t data_len;
+	ssize_t line_len;
 	int rc = 0;
 
-	while ( iob_len ( iobuf ) ) {
+	while ( iobuf && iob_len ( iobuf ) ) {
 		switch ( http->rx_state ) {
 		case HTTP_RX_DEAD:
 			/* Do no further processing */
 			goto done;
 		case HTTP_RX_DATA:
-			/* Once we're into the data phase, just fill
-			 * the data buffer
-			 */
-			rc = http_rx_data ( http, iob_disown ( iobuf ) );
-			goto done;
+			/* Pass received data to caller */
+			data_len = iob_len ( iobuf );
+			if ( http->chunk_len && ( http->chunk_len < data_len )){
+				data_len = http->chunk_len;
+				rc = xfer_deliver_raw ( &http->xfer,
+							iobuf->data, data_len );
+				iob_pull ( iobuf, data_len );
+			} else {
+				rc = xfer_deliver_iob ( &http->xfer,
+							iob_disown ( iobuf ) );
+			}
+			if ( rc != 0 )
+				goto done;
+			if ( http->chunk_len ) {
+				http->chunk_len -= data_len;
+				if ( http->chunk_len == 0 )
+					http->rx_state = HTTP_RX_CHUNK_LEN;
+			}
+			http->rx_len += data_len;
+			if ( http->content_length &&
+			     ( http->rx_len >= http->content_length ) ) {
+				http_done ( http, 0 );
+				goto done;
+			}
+			break;
 		case HTTP_RX_RESPONSE:
 		case HTTP_RX_HEADER:
+		case HTTP_RX_CHUNK_LEN:
+		case HTTP_RX_TRAILER:
 			/* In the other phases, buffer and process a
 			 * line at a time
 			 */
-			len = line_buffer ( &http->linebuf, iobuf->data,
-					    iob_len ( iobuf ) );
-			if ( len < 0 ) {
-				rc = len;
+			line_len = line_buffer ( &http->linebuf, iobuf->data,
+						 iob_len ( iobuf ) );
+			if ( line_len < 0 ) {
+				rc = line_len;
 				DBGC ( http, "HTTP %p could not buffer line: "
 				       "%s\n", http, strerror ( rc ) );
 				goto done;
 			}
-			iob_pull ( iobuf, len );
+			iob_pull ( iobuf, line_len );
 			line = buffered_line ( &http->linebuf );
 			if ( line ) {
 				lh = &http_line_handlers[http->rx_state];
@@ -448,7 +523,7 @@ static void http_step ( struct process *process ) {
 
 		/* Send GET request */
 		if ( ( rc = xfer_printf ( &http->socket,
-					  "GET %s%s HTTP/1.0\r\n"
+					  "GET %s%s HTTP/1.1\r\n"
 					  "User-Agent: iPXE/" VERSION "\r\n"
 					  "%s%s%s"
 					  "Host: %s\r\n"
