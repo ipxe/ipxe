@@ -97,6 +97,9 @@ typedef struct {
 typedef struct _IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL
 	IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL;
 
+typedef struct _IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2
+	IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2;
+
 typedef EFI_STATUS ( EFIAPI *IBM_BOFM_DRIVER_CONFIGURATION_SUPPORT ) (
 	IN IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL *This,
 	EFI_HANDLE ControllerHandle,
@@ -112,20 +115,27 @@ typedef EFI_STATUS ( EFIAPI *IBM_BOFM_DRIVER_CONFIGURATION_STATUS ) (
 	UINT8 BOFMReturnCode
 );
 
+typedef EFI_STATUS ( EFIAPI *IBM_BOFM_DRIVER_CONFIGURATION_STATUS2 ) (
+	IN IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2 *This,
+	EFI_HANDLE ControllerHandle,
+	BOOLEAN ResetRequired,
+	UINT8 BOFMReturnCode
+);
+
 struct _IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL {
 	IBM_BOFM_TABLE BofmTable;
 	IBM_BOFM_DRIVER_CONFIGURATION_STATUS SetStatus;
 	IBM_BOFM_DRIVER_CONFIGURATION_SUPPORT RegisterSupport;
 };
 
-typedef struct _IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2 {
+struct _IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2 {
 	UINT32 Signature;
 	UINT32 Reserved1;
 	UINT64 Reserved2;
-	IBM_BOFM_DRIVER_CONFIGURATION_STATUS SetStatus;
+	IBM_BOFM_DRIVER_CONFIGURATION_STATUS2 SetStatus;
 	IBM_BOFM_DRIVER_CONFIGURATION_SUPPORT RegisterSupport;
 	IBM_BOFM_TABLE BofmTable;
-} IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2;
+};
 
 /***************************************************************************
  *
@@ -280,7 +290,6 @@ static EFI_STATUS EFIAPI efi_bofm_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 		       bofmtab2->Parameters.Length );
 		assert ( bofm2.bofm2->RegisterSupport ==
 			 bofm1.bofm1->RegisterSupport );
-		assert ( bofm2.bofm2->SetStatus == bofm1.bofm1->SetStatus );
 	} else {
 		DBGC ( efidrv, "EFIBOFM " PCI_FMT " cannot find BOFM2 "
 		       "protocol\n", PCI_ARGS ( &efipci->pci ) );
@@ -311,12 +320,22 @@ static EFI_STATUS EFIAPI efi_bofm_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	}
 
 	/* Return BOFM status */
-	if ( ( efirc = bofm1.bofm1->SetStatus ( bofm1.bofm1, device, FALSE,
-						bofmrc ) ) != 0 ) {
-		DBGC ( efidrv, "EFIBOFM " PCI_FMT " could not set BOFM status: "
-		       "%s\n", PCI_ARGS ( &efipci->pci ),
-		       efi_strerror ( efirc ) );
-		goto err_set_status;
+	if ( bofmtab2 ) {
+		if ( ( efirc = bofm2.bofm2->SetStatus ( bofm2.bofm2, device,
+							FALSE, bofmrc ) ) != 0){
+			DBGC ( efidrv, "EFIBOFM " PCI_FMT " could not set "
+			       "BOFM2 status: %s\n", PCI_ARGS ( &efipci->pci ),
+			       efi_strerror ( efirc ) );
+			goto err_set_status;
+		}
+	} else {
+		if ( ( efirc = bofm1.bofm1->SetStatus ( bofm1.bofm1, device,
+							FALSE, bofmrc ) ) != 0){
+			DBGC ( efidrv, "EFIBOFM " PCI_FMT " could not set "
+			       "BOFM status: %s\n", PCI_ARGS ( &efipci->pci ),
+			       efi_strerror ( efirc ) );
+			goto err_set_status;
+		}
 	}
 
 	/* Destroy the PCI device anyway; we have no further use for it */
