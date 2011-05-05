@@ -165,7 +165,7 @@ efi_bofm_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	EFI_STATUS efirc;
 	int rc;
 
-	DBGCP ( efidrv, "BOFM DRIVER_SUPPORTED %p (%p)\n", device, child );
+	DBGCP ( efidrv, "EFIBOFM DRIVER_SUPPORTED %p (%p)\n", device, child );
 
 	/* Create corresponding PCI device, if any */
 	efipci = efipci_create ( efidrv, device );
@@ -176,7 +176,7 @@ efi_bofm_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 
 	/* Look for a BOFM driver */
 	if ( ( rc = bofm_find_driver ( &efipci->pci ) ) != 0 ) {
-		DBGC2 ( efidrv, "BOFM " PCI_FMT " has no driver\n",
+		DBGCP ( efidrv, "EFIBOFM " PCI_FMT " has no driver\n",
 			PCI_ARGS ( &efipci->pci ) );
 		efirc = EFI_UNSUPPORTED;
 		goto err_no_driver;
@@ -185,8 +185,8 @@ efi_bofm_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	/* Locate BOFM protocol */
 	if ( ( efirc = bs->LocateProtocol ( &bofm1_protocol_guid, NULL,
 					    &bofm1.interface ) ) != 0 ) {
-		DBGC ( efidrv, "BOFM " PCI_FMT " cannot find BOFM protocol\n",
-		       PCI_ARGS ( &efipci->pci ) );
+		DBGC ( efidrv, "EFIBOFM " PCI_FMT " cannot find BOFM "
+		       "protocol\n", PCI_ARGS ( &efipci->pci ) );
 		efirc = EFI_UNSUPPORTED;
 		goto err_not_bofm;
 	}
@@ -196,13 +196,13 @@ efi_bofm_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 						      0x04 /* Can change MAC */,
 						      0x00 /* No iSCSI */,
 						      0x02 /* Version */ ))!=0){
-		DBGC ( efidrv, "BOFM " PCI_FMT " could not register support: "
-		       "%s\n", PCI_ARGS ( &efipci->pci ),
+		DBGC ( efidrv, "EFIBOFM " PCI_FMT " could not register "
+		       "support: %s\n", PCI_ARGS ( &efipci->pci ),
 		       efi_strerror ( efirc ) );
 		goto err_cannot_register;
 	}
 
-	DBGC ( efidrv, "BOFM " PCI_FMT " is supported by driver \"%s\"\n",
+	DBGC ( efidrv, "EFIBOFM " PCI_FMT " is supported by driver \"%s\"\n",
 	       PCI_ARGS ( &efipci->pci ), efipci->pci.id->name );
 
 	/* Destroy temporary PCI device */
@@ -241,11 +241,12 @@ static EFI_STATUS EFIAPI efi_bofm_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 		void *interface;
 	} bofm2;
 	struct efi_pci_device *efipci;
-	userptr_t bofmtab;
+	IBM_BOFM_TABLE *bofmtab;
+	IBM_BOFM_TABLE *bofmtab2;
 	EFI_STATUS efirc;
 	int bofmrc;
 
-	DBGCP ( efidrv, "BOFM DRIVER_START %p (%p)\n", device, child );
+	DBGCP ( efidrv, "EFIBOFM DRIVER_START %p (%p)\n", device, child );
 
 	/* Create corresponding PCI device */
 	efipci = efipci_create ( efidrv, device );
@@ -261,43 +262,58 @@ static EFI_STATUS EFIAPI efi_bofm_start ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	/* Locate BOFM protocol */
 	if ( ( efirc = bs->LocateProtocol ( &bofm1_protocol_guid, NULL,
 					    &bofm1.interface ) ) != 0 ) {
-		DBGC ( efidrv, "BOFM " PCI_FMT " cannot find BOFM protocol\n",
-		       PCI_ARGS ( &efipci->pci ) );
+		DBGC ( efidrv, "EFIBOFM " PCI_FMT " cannot find BOFM "
+		       "protocol\n", PCI_ARGS ( &efipci->pci ) );
 		goto err_locate_bofm;
 	}
+	bofmtab = &bofm1.bofm1->BofmTable;
+	DBGC ( efidrv, "EFIBOFM " PCI_FMT " found version 1 BOFM table at "
+	       "%p+%04x\n", PCI_ARGS ( &efipci->pci ), bofmtab,
+	       bofmtab->Parameters.Length );
 
 	/* Locate BOFM2 protocol, if available */
 	if ( ( efirc = bs->LocateProtocol ( &bofm2_protocol_guid, NULL,
-					    &bofm2.interface ) ) != 0 ) {
-		DBGC ( efidrv, "BOFM " PCI_FMT " cannot find BOFM2 protocol\n",
-		       PCI_ARGS ( &efipci->pci ) );
-		/* Not a fatal error; may be a BOFM1-only system */
-		bofm2.bofm2 = NULL;
-	}
-
-	/* Select appropriate BOFM table (v1 or v2) to use */
-	if ( bofm2.bofm2 ) {
-		DBGC ( efidrv, "BOFM " PCI_FMT " using version 2 BOFM table\n",
-		       PCI_ARGS ( &efipci->pci ) );
+					    &bofm2.interface ) ) == 0 ) {
+		bofmtab2 = &bofm2.bofm2->BofmTable;
+		DBGC ( efidrv, "EFIBOFM " PCI_FMT " found version 2 BOFM table "
+		       "at %p+%04x\n", PCI_ARGS ( &efipci->pci ), bofmtab2,
+		       bofmtab2->Parameters.Length );
 		assert ( bofm2.bofm2->RegisterSupport ==
 			 bofm1.bofm1->RegisterSupport );
 		assert ( bofm2.bofm2->SetStatus == bofm1.bofm1->SetStatus );
-		bofmtab = virt_to_user ( &bofm2.bofm2->BofmTable );
 	} else {
-		DBGC ( efidrv, "BOFM " PCI_FMT " using version 1 BOFM table\n",
-		       PCI_ARGS ( &efipci->pci ) );
-		bofmtab = virt_to_user ( &bofm1.bofm1->BofmTable );
+		DBGC ( efidrv, "EFIBOFM " PCI_FMT " cannot find BOFM2 "
+		       "protocol\n", PCI_ARGS ( &efipci->pci ) );
+		/* Not a fatal error; may be a BOFM1-only system */
+		bofmtab2 = NULL;
 	}
 
 	/* Process BOFM table */
-	bofmrc = bofm ( bofmtab, &efipci->pci );
-	DBGC ( efidrv, "BOFM " PCI_FMT " status %08x\n",
+	DBGC2 ( efidrv, "EFIBOFM " PCI_FMT " version 1 before processing:\n",
+		PCI_ARGS ( &efipci->pci ) );
+	DBGC2_HD ( efidrv, bofmtab, bofmtab->Parameters.Length );
+	if ( bofmtab2 ) {
+		DBGC2 ( efidrv, "EFIBOFM " PCI_FMT " version 2 before "
+			"processing:\n", PCI_ARGS ( &efipci->pci ) );
+		DBGC2_HD ( efidrv, bofmtab2, bofmtab2->Parameters.Length );
+	}
+	bofmrc = bofm ( virt_to_user ( bofmtab2 ? bofmtab2 : bofmtab ),
+			&efipci->pci );
+	DBGC ( efidrv, "EFIBOFM " PCI_FMT " status %08x\n",
 	       PCI_ARGS ( &efipci->pci ), bofmrc );
+	DBGC2 ( efidrv, "EFIBOFM " PCI_FMT " version 1 after processing:\n",
+		PCI_ARGS ( &efipci->pci ) );
+	DBGC2_HD ( efidrv, bofmtab, bofmtab->Parameters.Length );
+	if ( bofmtab2 ) {
+		DBGC2 ( efidrv, "EFIBOFM " PCI_FMT " version 2 after "
+			"processing:\n", PCI_ARGS ( &efipci->pci ) );
+		DBGC2_HD ( efidrv, bofmtab2, bofmtab2->Parameters.Length );
+	}
 
 	/* Return BOFM status */
 	if ( ( efirc = bofm1.bofm1->SetStatus ( bofm1.bofm1, device, FALSE,
 						bofmrc ) ) != 0 ) {
-		DBGC ( efidrv, "BOFM " PCI_FMT " could not set BOFM status: "
+		DBGC ( efidrv, "EFIBOFM " PCI_FMT " could not set BOFM status: "
 		       "%s\n", PCI_ARGS ( &efipci->pci ),
 		       efi_strerror ( efirc ) );
 		goto err_set_status;
@@ -332,7 +348,7 @@ static EFI_STATUS EFIAPI efi_bofm_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver,
 	struct efi_driver *efidrv =
 		container_of ( driver, struct efi_driver, driver );
 
-	DBGCP ( efidrv, "BOFM DRIVER_STOP %p (%ld %p)\n",
+	DBGCP ( efidrv, "EFIBOFM DRIVER_STOP %p (%ld %p)\n",
 		device, ( ( unsigned long ) num_children ), children );
 
 	return 0;
@@ -353,12 +369,12 @@ static void efi_bofm_driver_init ( void ) {
 
 	/* Install driver */
 	if ( ( efirc = efi_driver_install ( efidrv ) ) != 0 ) {
-		DBGC ( efidrv, "BOFM could not install driver: %s\n",
+		DBGC ( efidrv, "EFIBOFM could not install driver: %s\n",
 		       efi_strerror ( efirc ) );
 		return;
 	}
 
-	DBGC ( efidrv, "BOFM driver installed\n" );
+	DBGC ( efidrv, "EFIBOFM driver installed\n" );
 }
 
 /** EFI BOFM startup function */
