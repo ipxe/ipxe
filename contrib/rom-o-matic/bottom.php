@@ -27,25 +27,25 @@ Resources:
 <ul>
   <li>
     Source code for iPXE images is available at
-    <a href="http://etherboot.org/wiki/download" target="_blank">
-    http://etherboot.org/wiki/download</a>
+    <a href="http://www.ipxe.org/download" target="_blank">
+    http://www.ipxe.org/download</a>
     <br><br>
   </li>
   <li>
     For general information about using iPXE, please visit the
-    <a href="http://www.etherboot.org/" target="_blank">
-    Etherboot Project Home Page</a>
+    <a href="http://www.ipxe.org/" target="_blank">
+    iPXE Project Home Page</a>
     <br><br>
   </li>
   <li>
     For Email-based support for iPXE please join
-    <a href="http://etherboot.org/wiki/mailinglists" target="_blank">
-    Etherboot Project mailing lists.</a>
+    <a href="http://www.ipxe.org/contact" target="_blank">
+    iPXE Project mailing lists.</a>
     <br><br>
   </li>
   <li>
     For real-time online iPXE support via IRC please visit the
-    <a href="irc://irc.freenode.net/%23etherboot"> #etherboot channel
+    <a href="irc://irc.freenode.net/%23ipxe"> #ipxe channel
     of irc.freenode.net</a>.
     <br><br>
   </li>

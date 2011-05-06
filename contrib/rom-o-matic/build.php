@@ -179,7 +179,7 @@ if ( $embedded_script != "" ) {
 
 // Make the requested image.  $status is set to 0 on success
 $make_target = "bin/${nic}.${fmt_extension}";
-$make_cmd = "make -C '$build_dir' '$make_target' $emb_script_cmd $2>&1";
+$make_cmd = "make -C '$build_dir' '$make_target' $emb_script_cmd 2>&1";
 
 exec ( $make_cmd, $maketxt, $status );
 

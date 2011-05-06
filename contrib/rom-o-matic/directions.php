@@ -37,7 +37,7 @@
       <em>PCI VENDOR CODE</em> and <em>PCI DEVICE CODE</em>  <br>
       that match the NIC device for which you are making this image.<br><br>
       Information on how to determine NIC PCI IDs may be found
-      <a href="http://etherboot.org/wiki/romburning"
+      <a href="http://www.ipxe.org/howto/romburning"
       target="_blank">here</a>.
       <br><br>
       PCI VENDOR CODE:  <? echo textbox ( "pci_vendor_code",
