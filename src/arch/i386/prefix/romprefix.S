@@ -13,7 +13,6 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define PNP_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'n' << 16 ) + ( 'P' << 24 ) )
 #define PMM_SIGNATURE ( '$' + ( 'P' << 8 ) + ( 'M' << 16 ) + ( 'M' << 24 ) )
 #define PCI_SIGNATURE ( 'P' + ( 'C' << 8 ) + ( 'I' << 16 ) + ( ' ' << 24 ) )
-#define IBM_SIGNATURE ( ( 'I' << 24 ) + ( 'B' << 16 ) + ( 'M' << 8 ) + ' ' )
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
 #define PMM_ALLOCATE 0x0000
 #define PMM_FIND 0x0001
@@ -173,7 +172,6 @@ undiheader:
 init:
 	/* Preserve registers, clear direction flag, set %ds=%cs */
 	pushaw
-	pushl	%ebx
 	pushw	%ds
 	pushw	%es
 	pushw	%fs
@@ -182,14 +180,15 @@ init:
 	pushw	%cs
 	popw	%ds
 
-	/* Shuffle some registers around.  We need to use %di for the
-	 * print_xxx functions, so shuffle as follows:
+	/* Shuffle some registers around.  We need %di available for
+	 * the print_xxx functions, and in a register that's
+	 * addressable from %es, so shuffle as follows:
 	 *
+	 *    %di (pointer to PnP structure) => %bx
 	 *    %bx (runtime segment address, for PCI 3.0) => %gs
-	 *    %edi (IBM signature) => %ebx
 	 */
 	movw	%bx, %gs
-	movl	%edi, %ebx
+	movw	%di, %bx
 
 	/* Store PCI bus:dev.fn address */
 	movw	%ax, init_pci_busdevfn
@@ -264,16 +263,7 @@ no_pci3:
 	popl	%edx
 	popl	%ebx
 
-	/* Check for IBM BIOS, which uses the PnP entry points but
-	 * doesn't indicate PnP support.
-	 */
-	cmpl	$IBM_SIGNATURE, %ebx
-	jne	no_ibm
-	movw	$init_message_ibm, %si
-	xorw	%di, %di
-	call	print_message
-	jmp	pnp_done
-no_ibm:	/* Check for PnP BIOS.  Although %es:di should point to the
+	/* Check for PnP BIOS.  Although %es:di should point to the
 	 * PnP BIOS signature on entry, some BIOSes fail to do this.
 	 */
 	movw	$( 0xf000 - 1 ), %bx
@@ -426,7 +416,6 @@ no_pmm:
 	popw	%fs
 	popw	%es
 	popw	%ds
-	popl	%ebx
 	popaw
 
 	/* Indicate boot capability to PnP BIOS, if present */
@@ -541,9 +530,6 @@ init_message:
 init_message_pci:
 	.asciz	" PCI"
 	.size	init_message_pci, . - init_message_pci
-init_message_ibm:
-	.asciz	" IBM"
-	.size	init_message_ibm, . - init_message_ibm
 init_message_pnp:
 	.asciz	" PnP"
 	.size	init_message_pnp, . - init_message_pnp
