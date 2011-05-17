@@ -286,6 +286,7 @@ pnp_scan:
 	call	print_message
 	jmp	pnp_done
 no_pnp:	/* Not PnP-compliant - hook INT 19 */
+#ifdef NONPNP_HOOK_INT19
 	movw	$init_message_int19, %si
 	xorw	%di, %di
 	call	print_message
@@ -296,6 +297,7 @@ no_pnp:	/* Not PnP-compliant - hook INT 19 */
 	pushw	%gs /* %gs contains runtime %cs */
 	pushw	$int19_entry
 	popl	%es:( 0x19 * 4 )
+#endif /* NONPNP_HOOK_INT19 */
 pnp_done:
 
 	/* Check for PMM */

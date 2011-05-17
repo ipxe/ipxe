@@ -128,6 +128,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef	REBOOT_CMD		/* Reboot command */
 
 /*
+ * ROM-specific options
+ *
+ */
+#undef	NONPNP_HOOK_INT19	/* Hook INT19 on non-PnP BIOSes */
+
+/*
  * Error message tables to include
  *
  */
