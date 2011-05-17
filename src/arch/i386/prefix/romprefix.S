@@ -104,6 +104,11 @@ pciheader_runtime_length:
 	.long	0
 	.previous
 
+	/* PnP doesn't require any particular alignment, but IBM
+	 * BIOSes will scan on 16-byte boundaries rather than using
+	 * the offset stored at 0x1a
+	 */
+	.align	16
 pnpheader:
 	.ascii	"$PnP"			/* Signature */
 	.byte	0x01			/* Structure revision */
