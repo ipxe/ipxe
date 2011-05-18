@@ -40,6 +40,17 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_ECANCELED_NO_OP \
 	__einfo_uniqify ( EINFO_ECANCELED, 0x01, "Nothing to do" )
 
+/* Disambiguate the various error codes */
+#define EINVAL_INTEGER __einfo_error ( EINFO_EINVAL_INTEGER )
+#define EINFO_EINVAL_INTEGER \
+	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Invalid integer value" )
+#define EINVAL_UNKNOWN_OPTION __einfo_error ( EINFO_EINVAL_UNKNOWN_OPTION )
+#define EINFO_EINVAL_UNKNOWN_OPTION \
+	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Unrecognised option" )
+#define EINVAL_MISSING_ARGUMENT __einfo_error ( EINFO_EINVAL_MISSING_ARGUMENT )
+#define EINFO_EINVAL_MISSING_ARGUMENT \
+	__einfo_uniqify ( EINFO_EINVAL, 0x03, "Missing argument" )
+
 /**
 * Parse string value
  *
@@ -75,7 +86,7 @@ int parse_integer ( const char *text, unsigned int *value ) {
 	*value = strtoul ( text, &endp, 0 );
 	if ( *endp ) {
 		printf ( "\"%s\": invalid integer value\n", text );
-		return -EINVAL;
+		return -EINVAL_INTEGER;
 	}
 
 	return 0;
@@ -202,10 +213,13 @@ int reparse_options ( int argc, char **argv, struct command_descriptor *cmd,
 			print_usage ( cmd, argv );
 			return -ECANCELED_NO_OP;
 		case '?' :
+			/* Print usage message */
+			print_usage ( cmd, argv );
+			return -EINVAL_UNKNOWN_OPTION;
 		case ':' :
 			/* Print usage message */
 			print_usage ( cmd, argv );
-			return -EINVAL;
+			return -EINVAL_MISSING_ARGUMENT;
 		default:
 			/* Search for an option to parse */
 			for ( i = 0 ; i < cmd->num_options ; i++ ) {
