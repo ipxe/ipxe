@@ -56,7 +56,7 @@ do
 	g=${g//[^a-z0-9]}.krn
 	case "$first" in
 	"")
-		echo DEFAULT $g
+		echo DEFAULT $b
 		;;
 	esac
 	first=$g
