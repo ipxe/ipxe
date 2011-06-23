@@ -392,6 +392,25 @@ static size_t tcp_xmit_win ( struct tcp_connection *tcp ) {
 }
 
 /**
+ * Check data-transfer flow control window
+ *
+ * @v tcp		TCP connection
+ * @ret len		Length of window
+ */
+static size_t tcp_xfer_window ( struct tcp_connection *tcp ) {
+
+	/* Not ready if data queue is non-empty.  This imposes a limit
+	 * of only one unACKed packet in the TX queue at any time; we
+	 * do this to conserve memory usage.
+	 */
+	if ( ! list_empty ( &tcp->tx_queue ) )
+		return 0;
+
+	/* Return TCP window length */
+	return tcp_xmit_win ( tcp );
+}
+
+/**
  * Process TCP transmit queue
  *
  * @v tcp		TCP connection
@@ -1084,6 +1103,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	unsigned int flags;
 	size_t len;
 	uint32_t seq_len;
+	size_t old_xfer_window;
 	int rc;
 
 	/* Sanity check packet */
@@ -1145,6 +1165,9 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		goto discard;
 	}
 
+	/* Record old data-transfer window */
+	old_xfer_window = tcp_xfer_window ( tcp );
+
 	/* Handle ACK, if present */
 	if ( flags & TCP_ACK ) {
 		if ( ( rc = tcp_rx_ack ( tcp, ack, win ) ) != 0 ) {
@@ -1190,6 +1213,10 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		stop_timer ( &tcp->wait );
 		start_timer_fixed ( &tcp->wait, ( 2 * TCP_MSL ) );
 	}
+
+	/* Notify application if window has changed */
+	if ( tcp_xfer_window ( tcp ) != old_xfer_window )
+		xfer_window_changed ( &tcp->xfer );
 
 	return 0;
 
@@ -1254,25 +1281,6 @@ static void tcp_xfer_close ( struct tcp_connection *tcp, int rc ) {
 
 	/* Transmit FIN, if possible */
 	tcp_xmit ( tcp );
-}
-
-/**
- * Check flow control window
- *
- * @v tcp		TCP connection
- * @ret len		Length of window
- */
-static size_t tcp_xfer_window ( struct tcp_connection *tcp ) {
-
-	/* Not ready if data queue is non-empty.  This imposes a limit
-	 * of only one unACKed packet in the TX queue at any time; we
-	 * do this to conserve memory usage.
-	 */
-	if ( ! list_empty ( &tcp->tx_queue ) )
-		return 0;
-
-	/* Return TCP window length */
-	return tcp_xmit_win ( tcp );
 }
 
 /**
