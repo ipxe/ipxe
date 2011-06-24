@@ -100,8 +100,12 @@ void step ( void ) {
 		ref_get ( process->refcnt ); /* Inhibit destruction mid-step */
 		desc = process->desc;
 		object = process_object ( process );
-		list_del ( &process->list );
-		list_add_tail ( &process->list, &run_queue );
+		if ( desc->reschedule ) {
+			list_del ( &process->list );
+			list_add_tail ( &process->list, &run_queue );
+		} else {
+			process_del ( process );
+		}
 		DBGC2 ( PROC_COL ( process ), "PROCESS " PROC_FMT
 			" executing\n", PROC_DBG ( process ) );
 		desc->step ( object );

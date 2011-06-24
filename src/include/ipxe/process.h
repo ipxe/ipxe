@@ -39,6 +39,8 @@ struct process_descriptor {
 	 * CPU to another process.
 	 */
 	void ( * step ) ( void *object );
+	/** Automatically reschedule the process */
+	int reschedule;
 };
 
 /**
@@ -78,6 +80,21 @@ struct process_descriptor {
 #define PROC_DESC( object_type, process, _step ) {			      \
 		.offset = process_offset ( object_type, process ),	      \
 		.step = PROC_STEP ( object_type, _step ),		      \
+		.reschedule = 1,					      \
+	}
+
+/**
+ * Define a process descriptor for a process that runs only once
+ *
+ * @v object_type	Containing object data type
+ * @v process		Process name (i.e. field within object data type)
+ * @v step		Process' step() method
+ * @ret desc		Object interface descriptor
+ */
+#define PROC_DESC_ONCE( object_type, process, _step ) {			      \
+		.offset = process_offset ( object_type, process ),	      \
+		.step = PROC_STEP ( object_type, _step ),		      \
+		.reschedule = 0,					      \
 	}
 
 /**
@@ -91,6 +108,7 @@ struct process_descriptor {
 #define PROC_DESC_PURE( _step ) {					      \
 		.offset = 0,						      \
 		.step = PROC_STEP ( struct process, _step ),		      \
+		.reschedule = 1,					      \
 	}
 
 extern void * __attribute__ (( pure ))
