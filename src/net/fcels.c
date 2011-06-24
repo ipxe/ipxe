@@ -253,9 +253,6 @@ static void fc_els_step ( struct fc_els *els ) {
 	/* Sanity check */
 	assert ( fc_els_is_request ( els ) );
 
-	/* Stop process */
-	process_del ( &els->process );
-
 	/* Create exchange */
 	if ( ( xchg_id = fc_xchg_originate ( &els->xchg, els->port,
 					     &els->peer_port_id,
@@ -278,7 +275,7 @@ static void fc_els_step ( struct fc_els *els ) {
 
 /** Fibre Channel ELS process descriptor */
 static struct process_descriptor fc_els_process_desc =
-	PROC_DESC ( struct fc_els, process, fc_els_step );
+	PROC_DESC_ONCE ( struct fc_els, process, fc_els_step );
 
 /**
  * Create ELS transaction
