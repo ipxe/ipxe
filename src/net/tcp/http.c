@@ -483,11 +483,9 @@ static int http_socket_deliver ( struct http_request *http,
 /**
  * HTTP process
  *
- * @v process		Process
+ * @v http		HTTP request
  */
-static void http_step ( struct process *process ) {
-	struct http_request *http =
-		container_of ( process, struct http_request, process );
+static void http_step ( struct http_request *http ) {
 	const char *host = http->uri->host;
 	const char *user = http->uri->user;
 	const char *password =
@@ -561,6 +559,10 @@ static struct interface_descriptor http_xfer_desc =
 	INTF_DESC_PASSTHRU ( struct http_request, xfer,
 			     http_xfer_operations, socket );
 
+/** HTTP process descriptor */
+static struct process_descriptor http_process_desc =
+	PROC_DESC ( struct http_request, process, http_step );
+
 /**
  * Initiate an HTTP connection, with optional filter
  *
@@ -591,7 +593,7 @@ int http_open_filter ( struct interface *xfer, struct uri *uri,
 	intf_init ( &http->xfer, &http_xfer_desc, &http->refcnt );
        	http->uri = uri_get ( uri );
 	intf_init ( &http->socket, &http_socket_desc, &http->refcnt );
-	process_init ( &http->process, http_step, &http->refcnt );
+	process_init ( &http->process, &http_process_desc, &http->refcnt );
 
 	/* Open socket */
 	memset ( &server, 0, sizeof ( server ) );

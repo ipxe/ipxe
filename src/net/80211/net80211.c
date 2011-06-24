@@ -159,7 +159,7 @@ net80211_marshal_request_info ( struct net80211_device *dev,
  * @defgroup net80211_assoc_ll 802.11 association handling functions
  * @{
  */
-static void net80211_step_associate ( struct process *proc );
+static void net80211_step_associate ( struct net80211_device *dev );
 static void net80211_handle_auth ( struct net80211_device *dev,
 				   struct io_buffer *iob );
 static void net80211_handle_assoc_reply ( struct net80211_device *dev,
@@ -729,6 +729,11 @@ int net80211_tx_mgmt ( struct net80211_device *dev, u16 fc, u8 dest[6],
 
 /* ---------- Driver API ---------- */
 
+/** 802.11 association process descriptor */
+static struct process_descriptor net80211_process_desc =
+	PROC_DESC ( struct net80211_device, proc_assoc,
+		    net80211_step_associate );
+
 /**
  * Allocate 802.11 device
  *
@@ -760,7 +765,7 @@ struct net80211_device * net80211_alloc ( size_t priv_size )
 	dev->priv = ( u8 * ) dev + sizeof ( *dev );
 	dev->op = &net80211_null_ops;
 
-	process_init_stopped ( &dev->proc_assoc, net80211_step_associate,
+	process_init_stopped ( &dev->proc_assoc, &net80211_process_desc,
 			       &netdev->refcnt );
 	INIT_LIST_HEAD ( &dev->mgmt_queue );
 	INIT_LIST_HEAD ( &dev->mgmt_info_queue );
@@ -1630,12 +1635,10 @@ void net80211_free_wlanlist ( struct list_head *list )
 /**
  * Step 802.11 association process
  *
- * @v proc	Association process
+ * @v dev	802.11 device
  */
-static void net80211_step_associate ( struct process *proc )
+static void net80211_step_associate ( struct net80211_device *dev )
 {
-	struct net80211_device *dev =
-	    container_of ( proc, struct net80211_device, proc_assoc );
 	int rc = 0;
 	int status = dev->state & NET80211_STATUS_MASK;
 
@@ -1836,7 +1839,7 @@ static void net80211_step_associate ( struct process *proc )
 
 	dev->rctl = rc80211_init ( dev );
 
-	process_del ( proc );
+	process_del ( &dev->proc_assoc );
 
 	DBGC ( dev, "802.11 %p associated with %s (%s)\n", dev,
 	       dev->essid, eth_ntoa ( dev->bssid ) );
@@ -1861,7 +1864,7 @@ static void net80211_step_associate ( struct process *proc )
 	net80211_free_wlan ( dev->associating );
 	dev->associating = NULL;
 
-	process_del ( proc );
+	process_del ( &dev->proc_assoc );
 
 	DBGC ( dev, "802.11 %p association failed (state=%04x): "
 	       "%s\n", dev, dev->state, strerror ( dev->assoc_rc ) );

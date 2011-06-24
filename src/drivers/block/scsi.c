@@ -892,11 +892,9 @@ static struct interface_descriptor scsidev_ready_desc =
 /**
  * SCSI TEST UNIT READY process
  *
- * @v process		Process
+ * @v scsidev		SCSI device
  */
-static void scsidev_step ( struct process *process ) {
-	struct scsi_device *scsidev =
-		container_of ( process, struct scsi_device, process );
+static void scsidev_step ( struct scsi_device *scsidev ) {
 	int rc;
 
 	/* Wait until underlying SCSI device is ready */
@@ -926,6 +924,10 @@ static struct interface_descriptor scsidev_scsi_desc =
 	INTF_DESC_PASSTHRU ( struct scsi_device, scsi,
 			     scsidev_scsi_op, block );
 
+/** SCSI device process descriptor */
+static struct process_descriptor scsidev_process_desc =
+	PROC_DESC ( struct scsi_device, process, scsidev_step );
+
 /**
  * Open SCSI device
  *
@@ -946,7 +948,8 @@ int scsi_open ( struct interface *block, struct interface *scsi,
 	intf_init ( &scsidev->block, &scsidev_block_desc, &scsidev->refcnt );
 	intf_init ( &scsidev->scsi, &scsidev_scsi_desc, &scsidev->refcnt );
 	intf_init ( &scsidev->ready, &scsidev_ready_desc, &scsidev->refcnt );
-	process_init ( &scsidev->process, scsidev_step, &scsidev->refcnt );
+	process_init ( &scsidev->process, &scsidev_process_desc,
+		       &scsidev->refcnt );
 	INIT_LIST_HEAD ( &scsidev->cmds );
 	memcpy ( &scsidev->lun, lun, sizeof ( scsidev->lun ) );
 	DBGC ( scsidev, "SCSI %p created for LUN " SCSI_LUN_FORMAT "\n",

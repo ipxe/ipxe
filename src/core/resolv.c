@@ -86,15 +86,16 @@ struct numeric_resolv {
 	int rc;
 };
 
-static void numeric_step ( struct process *process ) {
-	struct numeric_resolv *numeric =
-		container_of ( process, struct numeric_resolv, process );
+static void numeric_step ( struct numeric_resolv *numeric ) {
 
-	process_del ( process );
+	process_del ( &numeric->process );
 	if ( numeric->rc == 0 )
 		resolv_done ( &numeric->resolv, &numeric->sa );
 	intf_shutdown ( &numeric->resolv, numeric->rc );
 }
+
+static struct process_descriptor numeric_process_desc =
+	PROC_DESC ( struct numeric_resolv, process, numeric_step );
 
 static int numeric_resolv ( struct interface *resolv,
 			    const char *name, struct sockaddr *sa ) {
@@ -107,7 +108,8 @@ static int numeric_resolv ( struct interface *resolv,
 		return -ENOMEM;
 	ref_init ( &numeric->refcnt, NULL );
 	intf_init ( &numeric->resolv, &null_intf_desc, &numeric->refcnt );
-	process_init ( &numeric->process, numeric_step, &numeric->refcnt );
+	process_init ( &numeric->process, &numeric_process_desc,
+		       &numeric->refcnt );
 	memcpy ( &numeric->sa, sa, sizeof ( numeric->sa ) );
 
 	DBGC ( numeric, "NUMERIC %p attempting to resolve \"%s\"\n",

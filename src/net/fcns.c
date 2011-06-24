@@ -153,11 +153,9 @@ static int fc_ns_query_deliver ( struct fc_ns_query *query,
 /**
  * Name server query process
  *
- * @v process		Process
+ * @v query		Name server query
  */
-static void fc_ns_query_step ( struct process *process ) {
-	struct fc_ns_query *query =
-		container_of ( process, struct fc_ns_query, process );
+static void fc_ns_query_step ( struct fc_ns_query *query ) {
 	struct xfer_metadata meta;
 	struct fc_ns_gid_pn_request gid_pn;
 	int xchg_id;
@@ -208,6 +206,10 @@ static struct interface_operation fc_ns_query_xchg_op[] = {
 static struct interface_descriptor fc_ns_query_xchg_desc =
 	INTF_DESC ( struct fc_ns_query, xchg, fc_ns_query_xchg_op );
 
+/** Name server process descriptor */
+static struct process_descriptor fc_ns_query_process_desc =
+	PROC_DESC ( struct fc_ns_query, process, fc_ns_query_step );
+
 /**
  * Issue Fibre Channel name server query
  *
@@ -226,7 +228,8 @@ int fc_ns_query ( struct fc_peer *peer, struct fc_port *port,
 		return -ENOMEM;
 	ref_init ( &query->refcnt, fc_ns_query_free );
 	intf_init ( &query->xchg, &fc_ns_query_xchg_desc, &query->refcnt );
-	process_init ( &query->process, fc_ns_query_step, &query->refcnt );
+	process_init ( &query->process, &fc_ns_query_process_desc,
+		       &query->refcnt );
 	query->peer = fc_peer_get ( peer );
 	query->port = fc_port_get ( port );
 	query->done = done;

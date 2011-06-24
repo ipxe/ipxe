@@ -1427,9 +1427,7 @@ static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
  * 
  * Constructs data to be sent for the current TX state
  */
-static void iscsi_tx_step ( struct process *process ) {
-	struct iscsi_session *iscsi =
-		container_of ( process, struct iscsi_session, process );
+static void iscsi_tx_step ( struct iscsi_session *iscsi ) {
 	struct iscsi_bhs_common *common = &iscsi->tx_bhs.common;
 	int ( * tx ) ( struct iscsi_session *iscsi );
 	enum iscsi_tx_state next_state;
@@ -1487,6 +1485,10 @@ static void iscsi_tx_step ( struct process *process ) {
 		iscsi->tx_state = next_state;
 	}
 }
+
+/** iSCSI TX process descriptor */
+static struct process_descriptor iscsi_process_desc =
+	PROC_DESC ( struct iscsi_session, process, iscsi_tx_step );
 
 /**
  * Receive basic header segment of an iSCSI PDU
@@ -2034,7 +2036,7 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
 	intf_init ( &iscsi->control, &iscsi_control_desc, &iscsi->refcnt );
 	intf_init ( &iscsi->data, &iscsi_data_desc, &iscsi->refcnt );
 	intf_init ( &iscsi->socket, &iscsi_socket_desc, &iscsi->refcnt );
-	process_init_stopped ( &iscsi->process, iscsi_tx_step,
+	process_init_stopped ( &iscsi->process, &iscsi_process_desc,
 			       &iscsi->refcnt );
 
 	/* Parse root path */

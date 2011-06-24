@@ -198,7 +198,4 @@ static void retry_step ( struct process *process __unused ) {
 }
 
 /** Retry timer process */
-struct process retry_process __permanent_process = {
-	.list = LIST_HEAD_INIT ( retry_process.list ),
-	.step = retry_step,
-};
+PERMANENT_PROCESS ( retry_process, retry_step );

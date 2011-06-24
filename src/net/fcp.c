@@ -649,11 +649,9 @@ static int fcpcmd_recv_unknown ( struct fcp_command *fcpcmd,
 /**
  * Transmit FCP frame
  *
- * @v process		FCP command process
+ * @v fcpcmd		FCP command
  */
-static void fcpcmd_step ( struct process *process ) {
-	struct fcp_command *fcpcmd =
-		container_of ( process, struct fcp_command, process );
+static void fcpcmd_step ( struct fcp_command *fcpcmd ) {
 	int rc;
 
 	/* Send the current IU */
@@ -723,6 +721,10 @@ static struct interface_operation fcpcmd_xchg_op[] = {
 static struct interface_descriptor fcpcmd_xchg_desc =
 	INTF_DESC_PASSTHRU ( struct fcp_command, xchg, fcpcmd_xchg_op, scsi );
 
+/** FCP command process descriptor */
+static struct process_descriptor fcpcmd_process_desc =
+	PROC_DESC ( struct fcp_command, process, fcpcmd_step );
+
 /**
  * Issue FCP SCSI command
  *
@@ -765,7 +767,8 @@ static int fcpdev_scsi_command ( struct fcp_device *fcpdev,
 	ref_init ( &fcpcmd->refcnt, fcpcmd_free );
 	intf_init ( &fcpcmd->scsi, &fcpcmd_scsi_desc, &fcpcmd->refcnt );
 	intf_init ( &fcpcmd->xchg, &fcpcmd_xchg_desc, &fcpcmd->refcnt );
-	process_init_stopped ( &fcpcmd->process, fcpcmd_step, &fcpcmd->refcnt );
+	process_init_stopped ( &fcpcmd->process, &fcpcmd_process_desc,
+			       &fcpcmd->refcnt );
 	fcpcmd->fcpdev = fcpdev_get ( fcpdev );
 	list_add ( &fcpcmd->list, &fcpdev->fcpcmds );
 	memcpy ( &fcpcmd->command, command, sizeof ( fcpcmd->command ) );

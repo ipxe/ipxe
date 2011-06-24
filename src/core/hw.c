@@ -26,15 +26,7 @@ static void hw_finished ( struct hw *hw, int rc ) {
 	process_del ( &hw->process );
 }
 
-static struct interface_operation hw_xfer_operations[] = {
-	INTF_OP ( intf_close, struct hw *, hw_finished ),
-};
-
-static struct interface_descriptor hw_xfer_desc =
-	INTF_DESC ( struct hw, xfer, hw_xfer_operations );
-
-static void hw_step ( struct process *process ) {
-	struct hw *hw = container_of ( process, struct hw, process );
+static void hw_step ( struct hw *hw ) {
 	int rc;
 
 	if ( xfer_window ( &hw->xfer ) ) {
@@ -42,6 +34,16 @@ static void hw_step ( struct process *process ) {
 		hw_finished ( hw, rc );
 	}
 }
+
+static struct interface_operation hw_xfer_operations[] = {
+	INTF_OP ( intf_close, struct hw *, hw_finished ),
+};
+
+static struct interface_descriptor hw_xfer_desc =
+	INTF_DESC ( struct hw, xfer, hw_xfer_operations );
+
+static struct process_descriptor hw_process_desc =
+	PROC_DESC ( struct hw, process, hw_step );
 
 static int hw_open ( struct interface *xfer, struct uri *uri __unused ) {
 	struct hw *hw;
@@ -52,7 +54,7 @@ static int hw_open ( struct interface *xfer, struct uri *uri __unused ) {
 		return -ENOMEM;
 	ref_init ( &hw->refcnt, NULL );
 	intf_init ( &hw->xfer, &hw_xfer_desc, &hw->refcnt );
-	process_init ( &hw->process, hw_step, &hw->refcnt );
+	process_init ( &hw->process, &hw_process_desc, &hw->refcnt );
 
 	/* Attach parent interface, mortalise self, and return */
 	intf_plug_plug ( &hw->xfer, xfer );

@@ -1645,11 +1645,9 @@ static struct interface_descriptor tls_cipherstream_desc =
 /**
  * TLS TX state machine
  *
- * @v process		TLS process
+ * @v tls		TLS session
  */
-static void tls_step ( struct process *process ) {
-	struct tls_session *tls =
-		container_of ( process, struct tls_session, process );
+static void tls_step ( struct tls_session *tls ) {
 	int rc;
 
 	/* Wait for cipherstream to become ready */
@@ -1717,6 +1715,10 @@ static void tls_step ( struct process *process ) {
 	tls_close ( tls, rc );
 }
 
+/** TLS TX process descriptor */
+static struct process_descriptor tls_process_desc =
+	PROC_DESC ( struct tls_session, process, tls_step );
+
 /******************************************************************************
  *
  * Instantiator
@@ -1748,7 +1750,7 @@ int add_tls ( struct interface *xfer, struct interface **next ) {
 	digest_init ( &md5_algorithm, tls->handshake_md5_ctx );
 	digest_init ( &sha1_algorithm, tls->handshake_sha1_ctx );
 	tls->tx_state = TLS_TX_CLIENT_HELLO;
-	process_init ( &tls->process, tls_step, &tls->refcnt );
+	process_init ( &tls->process, &tls_process_desc, &tls->refcnt );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &tls->plainstream, xfer );

@@ -92,7 +92,7 @@ struct ib_cmrc_connection {
 /**
  * Shut down CMRC connection gracefully
  *
- * @v process		Process
+ * @v cmrc		Communication-Managed Reliable Connection
  *
  * The Infiniband data structures are not reference-counted or
  * guarded.  It is therefore unsafe to shut them down while we may be
@@ -107,9 +107,7 @@ struct ib_cmrc_connection {
  * connection, ensuring that the structure is not freed before the
  * shutdown process has run.
  */
-static void ib_cmrc_shutdown ( struct process *process ) {
-	struct ib_cmrc_connection *cmrc =
-		container_of ( process, struct ib_cmrc_connection, shutdown );
+static void ib_cmrc_shutdown ( struct ib_cmrc_connection *cmrc ) {
 
 	DBGC ( cmrc, "CMRC %p shutting down\n", cmrc );
 
@@ -363,6 +361,10 @@ static struct interface_operation ib_cmrc_xfer_operations[] = {
 static struct interface_descriptor ib_cmrc_xfer_desc =
 	INTF_DESC ( struct ib_cmrc_connection, xfer, ib_cmrc_xfer_operations );
 
+/** CMRC shutdown process descriptor */
+static struct process_descriptor ib_cmrc_shutdown_desc =
+	PROC_DESC ( struct ib_cmrc_connection, shutdown, ib_cmrc_shutdown );
+
 /**
  * Open CMRC connection
  *
@@ -388,7 +390,7 @@ int ib_cmrc_open ( struct interface *xfer, struct ib_device *ibdev,
 	cmrc->ibdev = ibdev;
 	memcpy ( &cmrc->dgid, dgid, sizeof ( cmrc->dgid ) );
 	memcpy ( &cmrc->service_id, service_id, sizeof ( cmrc->service_id ) );
-	process_init_stopped ( &cmrc->shutdown, ib_cmrc_shutdown,
+	process_init_stopped ( &cmrc->shutdown, &ib_cmrc_shutdown_desc,
 			       &cmrc->refcnt );
 
 	/* Open Infiniband device */

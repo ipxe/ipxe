@@ -866,10 +866,7 @@ static void ib_step ( struct process *process __unused ) {
 }
 
 /** Infiniband event queue process */
-struct process ib_process __permanent_process = {
-	.list = LIST_HEAD_INIT ( ib_process.list ),
-	.step = ib_step,
-};
+PERMANENT_PROCESS ( ib_process, ib_step );
 
 /***************************************************************************
  *
