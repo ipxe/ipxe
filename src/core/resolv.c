@@ -88,14 +88,13 @@ struct numeric_resolv {
 
 static void numeric_step ( struct numeric_resolv *numeric ) {
 
-	process_del ( &numeric->process );
 	if ( numeric->rc == 0 )
 		resolv_done ( &numeric->resolv, &numeric->sa );
 	intf_shutdown ( &numeric->resolv, numeric->rc );
 }
 
 static struct process_descriptor numeric_process_desc =
-	PROC_DESC ( struct numeric_resolv, process, numeric_step );
+	PROC_DESC_ONCE ( struct numeric_resolv, process, numeric_step );
 
 static int numeric_resolv ( struct interface *resolv,
 			    const char *name, struct sockaddr *sa ) {
