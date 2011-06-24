@@ -378,37 +378,15 @@ static void ftp_data_closed ( struct ftp_request *ftp, int rc ) {
 	}
 }
 
-/**
- * Handle data delivery via FTP data channel
- *
- * @v ftp		FTP request
- * @v iobuf		I/O buffer
- * @v meta		Data transfer metadata
- * @ret rc		Return status code
- */
-static int ftp_data_deliver ( struct ftp_request *ftp,
-			      struct io_buffer *iobuf,
-			      struct xfer_metadata *meta __unused ) {
-	int rc;
-
-	if ( ( rc = xfer_deliver_iob ( &ftp->xfer, iobuf ) ) != 0 ) {
-		DBGC ( ftp, "FTP %p failed to deliver data: %s\n",
-		       ftp, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
 /** FTP data channel interface operations */
 static struct interface_operation ftp_data_operations[] = {
-	INTF_OP ( xfer_deliver, struct ftp_request *, ftp_data_deliver ),
 	INTF_OP ( intf_close, struct ftp_request *, ftp_data_closed ),
 };
 
 /** FTP data channel interface descriptor */
 static struct interface_descriptor ftp_data_desc =
-	INTF_DESC ( struct ftp_request, data, ftp_data_operations );
+	INTF_DESC_PASSTHRU ( struct ftp_request, data, ftp_data_operations,
+			     xfer );
 
 /*****************************************************************************
  *
@@ -423,7 +401,8 @@ static struct interface_operation ftp_xfer_operations[] = {
 
 /** FTP data transfer interface descriptor */
 static struct interface_descriptor ftp_xfer_desc =
-	INTF_DESC ( struct ftp_request, xfer, ftp_xfer_operations );
+	INTF_DESC_PASSTHRU ( struct ftp_request, xfer, ftp_xfer_operations,
+			     data );
 
 /*****************************************************************************
  *
