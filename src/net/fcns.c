@@ -161,9 +161,6 @@ static void fc_ns_query_step ( struct fc_ns_query *query ) {
 	int xchg_id;
 	int rc;
 
-	/* Stop process */
-	process_del ( &query->process );
-
 	/* Create exchange */
 	if ( ( xchg_id = fc_xchg_originate ( &query->xchg, query->port,
 					     &fc_gs_port_id,
@@ -208,7 +205,7 @@ static struct interface_descriptor fc_ns_query_xchg_desc =
 
 /** Name server process descriptor */
 static struct process_descriptor fc_ns_query_process_desc =
-	PROC_DESC ( struct fc_ns_query, process, fc_ns_query_step );
+	PROC_DESC_ONCE ( struct fc_ns_query, process, fc_ns_query_step );
 
 /**
  * Issue Fibre Channel name server query
