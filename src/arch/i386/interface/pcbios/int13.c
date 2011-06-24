@@ -1334,6 +1334,20 @@ static void int13_unhook_vector ( void ) {
 }
 
 /**
+ * Check INT13 emulated drive flow control window
+ *
+ * @v int13		Emulated drive
+ */
+static size_t int13_block_window ( struct int13_drive *int13 __unused ) {
+
+	/* We are never ready to receive data via this interface.
+	 * This prevents objects that support both block and stream
+	 * interfaces from attempting to send us stream data.
+	 */
+	return 0;
+}
+
+/**
  * Handle INT 13 emulated drive underlying block device closing
  *
  * @v int13		Emulated drive
@@ -1357,6 +1371,7 @@ static void int13_block_close ( struct int13_drive *int13, int rc ) {
 
 /** INT 13 drive interface operations */
 static struct interface_operation int13_block_op[] = {
+	INTF_OP ( xfer_window, struct int13_drive *, int13_block_window ),
 	INTF_OP ( intf_close, struct int13_drive *, int13_block_close ),
 };
 
