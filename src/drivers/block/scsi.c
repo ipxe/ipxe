@@ -218,8 +218,10 @@ struct scsi_device {
 
 /** SCSI device flags */
 enum scsi_device_flags {
-	/** Unit is ready */
-	SCSIDEV_UNIT_READY = 0x0001,
+	/** TEST UNIT READY has been issued */
+	SCSIDEV_UNIT_TESTED = 0x0001,
+	/** TEST UNIT READY has completed successfully */
+	SCSIDEV_UNIT_READY = 0x0002,
 };
 
 /** A SCSI command */
@@ -897,15 +899,19 @@ static struct interface_descriptor scsidev_ready_desc =
 static void scsidev_step ( struct scsi_device *scsidev ) {
 	int rc;
 
+	/* Do nothing if we have already issued TEST UNIT READY */
+	if ( scsidev->flags & SCSIDEV_UNIT_TESTED )
+		return;
+
 	/* Wait until underlying SCSI device is ready */
 	if ( xfer_window ( &scsidev->scsi ) == 0 )
 		return;
 
-	/* Stop process */
-	process_del ( &scsidev->process );
-
 	DBGC ( scsidev, "SCSI %p waiting for unit to become ready\n",
 	       scsidev );
+
+	/* Mark TEST UNIT READY as sent */
+	scsidev->flags |= SCSIDEV_UNIT_TESTED;
 
 	/* Issue TEST UNIT READY command */
 	if ( ( rc = scsidev_test_unit_ready ( scsidev, &scsidev->ready )) !=0){
@@ -916,6 +922,7 @@ static void scsidev_step ( struct scsi_device *scsidev ) {
 
 /** SCSI device SCSI interface operations */
 static struct interface_operation scsidev_scsi_op[] = {
+	INTF_OP ( xfer_window_changed, struct scsi_device *, scsidev_step ),
 	INTF_OP ( intf_close, struct scsi_device *, scsidev_close ),
 };
 
@@ -926,7 +933,7 @@ static struct interface_descriptor scsidev_scsi_desc =
 
 /** SCSI device process descriptor */
 static struct process_descriptor scsidev_process_desc =
-	PROC_DESC ( struct scsi_device, process, scsidev_step );
+	PROC_DESC_ONCE ( struct scsi_device, process, scsidev_step );
 
 /**
  * Open SCSI device
