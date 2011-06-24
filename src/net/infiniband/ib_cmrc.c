@@ -117,9 +117,6 @@ static void ib_cmrc_shutdown ( struct ib_cmrc_connection *cmrc ) {
 	ib_destroy_cq ( cmrc->ibdev, cmrc->cq );
 	ib_close ( cmrc->ibdev );
 
-	/* Remove process from run queue */
-	process_del ( &cmrc->shutdown );
-
 	/* Drop the remaining reference */
 	ref_put ( &cmrc->refcnt );
 }
@@ -363,7 +360,8 @@ static struct interface_descriptor ib_cmrc_xfer_desc =
 
 /** CMRC shutdown process descriptor */
 static struct process_descriptor ib_cmrc_shutdown_desc =
-	PROC_DESC ( struct ib_cmrc_connection, shutdown, ib_cmrc_shutdown );
+	PROC_DESC_ONCE ( struct ib_cmrc_connection, shutdown,
+			 ib_cmrc_shutdown );
 
 /**
  * Open CMRC connection
