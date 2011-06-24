@@ -357,7 +357,15 @@ struct fc_peer {
 
 	/** List of upper-layer protocols */
 	struct list_head ulps;
-	/** Active usage count */
+	/** Active usage count
+	 *
+	 * A peer (and attached ULPs) may be created in response to
+	 * unsolicited login requests received via the fabric.  We
+	 * track our own active usage count independently of the
+	 * existence of the peer, so that if the peer becomes logged
+	 * out (e.g. due to a link failure) then we know whether or
+	 * not we should attempt to relogin.
+	 */
 	unsigned int usage;
 };
 
@@ -424,14 +432,29 @@ struct fc_ulp {
 	/** Service parameter length */
 	size_t param_len;
 
-	/** Active usage count */
-	unsigned int usage;
+	/** Active users of this upper-layer protocol
+	 *
+	 * As with peers, an upper-layer protocol may be created in
+	 * response to an unsolicited login request received via the
+	 * fabric.  This list records the number of active users of
+	 * the ULP; the number of entries in the list is equivalent to
+	 * the peer usage count.
+	 */
+	struct list_head users;
 };
 
 /** Fibre Channel upper-layer protocol flags */
 enum fc_ulp_flags {
 	/** A login originated by us has succeeded */
 	FC_ULP_ORIGINATED_LOGIN_OK = 0x0001,
+};
+
+/** A Fibre Channel upper-layer protocol user */
+struct fc_ulp_user {
+	/** Fibre Channel upper layer protocol */
+	struct fc_ulp *ulp;
+	/** List of users */
+	struct list_head list;
 };
 
 /**
@@ -462,8 +485,8 @@ extern struct fc_ulp *
 fc_ulp_get_port_id_type ( struct fc_port *port,
 			  const struct fc_port_id *peer_port_id,
 			  unsigned int type );
-extern void fc_ulp_increment ( struct fc_ulp *ulp );
-extern void fc_ulp_decrement ( struct fc_ulp *ulp );
+extern void fc_ulp_attach ( struct fc_ulp *ulp, struct fc_ulp_user *user );
+extern void fc_ulp_detach ( struct fc_ulp_user *user );
 extern int fc_ulp_login ( struct fc_ulp *ulp, const void *param,
 			  size_t param_len, int originated );
 extern void fc_ulp_logout ( struct fc_ulp *ulp, int rc );

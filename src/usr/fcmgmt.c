@@ -74,8 +74,7 @@ void fcpeerstat ( struct fc_peer *peer ) {
 	}
 
 	list_for_each_entry ( ulp, &peer->ulps, list ) {
-		printf ( "  [Type %02x usage %d link:",
-			 ulp->type, ulp->usage );
+		printf ( "  [Type %02x link:", ulp->type );
 		if ( fc_link_ok ( &ulp->link ) ) {
 			printf ( " up, params" );
 			param = ulp->param;

@@ -1580,7 +1580,7 @@ static void fc_ulp_close ( struct fc_ulp *ulp, int rc ) {
 	       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type, strerror ( rc ) );
 
 	/* Sanity check */
-	assert ( ulp->usage == 0 );
+	assert ( list_empty ( &ulp->users ) );
 
 	/* Stop link monitor */
 	fc_link_stop ( &ulp->link );
@@ -1594,35 +1594,50 @@ static void fc_ulp_close ( struct fc_ulp *ulp, int rc ) {
 }
 
 /**
- * Increment Fibre Channel upper-layer protocol active usage count
+ * Attach Fibre Channel upper-layer protocol user
  *
- * @v ulp		Fibre Channel ulp
+ * @v ulp		Fibre Channel upper-layer protocol
+ * @v user		Fibre Channel upper-layer protocol user
  */
-void fc_ulp_increment ( struct fc_ulp *ulp ) {
+void fc_ulp_attach ( struct fc_ulp *ulp, struct fc_ulp_user *user ) {
+
+	/* Sanity check */
+	assert ( user->ulp == NULL );
 
 	/* Increment peer's usage count */
 	fc_peer_increment ( ulp->peer );
 
-	/* Increment our usage count */
-	ulp->usage++;
+	/* Attach user */
+	user->ulp = fc_ulp_get ( ulp );
+	list_add ( &user->list, &ulp->users );
 }
 
 /**
- * Decrement Fibre Channel upper-layer protocol active usage count
+ * Detach Fibre Channel upper-layer protocol user
  *
- * @v ulp		Fibre Channel ulp
+ * @v user		Fibre Channel upper-layer protocol user
  */
-void fc_ulp_decrement ( struct fc_ulp *ulp ) {
+void fc_ulp_detach ( struct fc_ulp_user *user ) {
+	struct fc_ulp *ulp = user->ulp;
 
-	/* Sanity check */
-	assert ( ulp->usage > 0 );
+	/* Do nothing if not attached */
+	if ( ! ulp )
+		return;
 
-	/* Decrement our usage count and log out if we reach zero */
-	if ( --(ulp->usage) == 0 )
+	/* Sanity checks */
+	list_check_contains ( user, &ulp->users, list );
+
+	/* Detach user and log out if no users remain */
+	list_del ( &user->list );
+	if ( list_empty ( &ulp->users ) )
 		fc_ulp_logout ( ulp, 0 );
 
 	/* Decrement our peer's usage count */
 	fc_peer_decrement ( ulp->peer );
+
+	/* Drop reference */
+	user->ulp = NULL;
+	fc_ulp_put ( ulp );
 }
 
 /**
@@ -1712,7 +1727,7 @@ void fc_ulp_logout ( struct fc_ulp *ulp, int rc ) {
 	fc_link_err ( &ulp->link, rc );
 
 	/* Close ULP if there are no clients attached */
-	if ( ulp->usage == 0 )
+	if ( list_empty ( &ulp->users ) )
 		fc_ulp_close ( ulp, rc );
 }
 
@@ -1795,6 +1810,7 @@ static struct fc_ulp * fc_ulp_create ( struct fc_peer *peer,
 	ulp->peer = fc_peer_get ( peer );
 	list_add_tail ( &ulp->list, &peer->ulps );
 	ulp->type = type;
+	INIT_LIST_HEAD ( &ulp->users );
 
 	/* Start link state monitor */
 	fc_link_start ( &ulp->link );
