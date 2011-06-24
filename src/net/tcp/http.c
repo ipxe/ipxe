@@ -48,6 +48,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_PROTOCOL, "HTTP", DHCP_EB_FEATURE_HTTP, 1 );
 
+/** HTTP transmission state */
+enum http_tx_state {
+	HTTP_TX_REQUEST = 0,
+	HTTP_TX_DONE,
+};
+
 /** HTTP receive state */
 enum http_rx_state {
 	HTTP_RX_RESPONSE = 0,
@@ -75,6 +81,8 @@ struct http_request {
 
 	/** TX process */
 	struct process process;
+	/** TX state */
+	enum http_tx_state tx_state;
 
 	/** HTTP response code */
 	unsigned int response;
@@ -498,49 +506,55 @@ static void http_step ( struct http_request *http ) {
 	int rc;
 	int request_len = unparse_uri ( NULL, 0, http->uri,
 					URI_PATH_BIT | URI_QUERY_BIT );
+	char request[ request_len + 1 /* NUL */ ];
 
-	if ( xfer_window ( &http->socket ) ) {
-		char request[request_len + 1];
+	/* Do nothing if we have already transmitted the request */
+	if ( http->tx_state != HTTP_TX_REQUEST )
+		return;
 
-		/* Construct path?query request */
-		unparse_uri ( request, sizeof ( request ), http->uri,
-			      URI_PATH_BIT | URI_QUERY_BIT );
+	/* Do nothing until socket is ready */
+	if ( ! xfer_window ( &http->socket ) )
+		return;
 
-		/* We want to execute only once */
-		process_del ( &http->process );
+	/* Construct path?query request */
+	unparse_uri ( request, sizeof ( request ), http->uri,
+		      URI_PATH_BIT | URI_QUERY_BIT );
 
-		/* Construct authorisation, if applicable */
-		if ( user ) {
-			/* Make "user:password" string from decoded fields */
-			snprintf ( ( ( char * ) user_pw ), sizeof ( user_pw ),
-				   "%s:%s", user, password );
+	/* Construct authorisation, if applicable */
+	if ( user ) {
+		/* Make "user:password" string from decoded fields */
+		snprintf ( ( ( char * ) user_pw ), sizeof ( user_pw ),
+			   "%s:%s", user, password );
 
-			/* Base64-encode the "user:password" string */
-			base64_encode ( user_pw, user_pw_len, user_pw_base64 );
-		}
+		/* Base64-encode the "user:password" string */
+		base64_encode ( user_pw, user_pw_len, user_pw_base64 );
+	}
 
-		/* Send GET request */
-		if ( ( rc = xfer_printf ( &http->socket,
-					  "GET %s%s HTTP/1.1\r\n"
-					  "User-Agent: iPXE/" VERSION "\r\n"
-					  "%s%s%s"
-					  "Host: %s\r\n"
-					  "\r\n",
-					  http->uri->path ? "" : "/",
-					  request,
-					  ( user ?
-					    "Authorization: Basic " : "" ),
-					  ( user ? user_pw_base64 : "" ),
-					  ( user ? "\r\n" : "" ),
-					  host ) ) != 0 ) {
-			http_done ( http, rc );
-		}
+	/* Mark request as transmitted */
+	http->tx_state = HTTP_TX_DONE;
+
+	/* Send GET request */
+	if ( ( rc = xfer_printf ( &http->socket,
+				  "GET %s%s HTTP/1.1\r\n"
+				  "User-Agent: iPXE/" VERSION "\r\n"
+				  "%s%s%s"
+				  "Host: %s\r\n"
+				  "\r\n",
+				  http->uri->path ? "" : "/",
+				  request,
+				  ( user ?
+				    "Authorization: Basic " : "" ),
+				  ( user ? user_pw_base64 : "" ),
+				  ( user ? "\r\n" : "" ),
+				  host ) ) != 0 ) {
+		http_done ( http, rc );
 	}
 }
 
 /** HTTP socket interface operations */
 static struct interface_operation http_socket_operations[] = {
 	INTF_OP ( xfer_deliver, struct http_request *, http_socket_deliver ),
+	INTF_OP ( xfer_window_changed, struct http_request *, http_step ),
 	INTF_OP ( intf_close, struct http_request *, http_done ),
 };
 
@@ -561,7 +575,7 @@ static struct interface_descriptor http_xfer_desc =
 
 /** HTTP process descriptor */
 static struct process_descriptor http_process_desc =
-	PROC_DESC ( struct http_request, process, http_step );
+	PROC_DESC_ONCE ( struct http_request, process, http_step );
 
 /**
  * Initiate an HTTP connection, with optional filter
