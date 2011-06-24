@@ -180,6 +180,9 @@ static void ib_cmrc_changed ( struct ib_device *ibdev __unused,
 		return;
 	}
 
+	/* Notify upper connection of window change */
+	xfer_window_changed ( &cmrc->xfer );
+
 	/* If we are disconnected, close the upper connection */
 	if ( rc_cm != 0 ) {
 		ib_cmrc_close ( cmrc, rc_cm );
