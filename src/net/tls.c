@@ -949,6 +949,10 @@ static int tls_new_finished ( struct tls_session *tls,
 	tls->tx_state = TLS_TX_DATA;
 	( void ) data;
 	( void ) len;
+
+	/* Send notification of a window change */
+	xfer_window_changed ( &tls->plainstream );
+
 	return 0;
 }
 
