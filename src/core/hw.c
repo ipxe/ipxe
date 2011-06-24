@@ -36,6 +36,7 @@ static void hw_step ( struct hw *hw ) {
 }
 
 static struct interface_operation hw_xfer_operations[] = {
+	INTF_OP ( xfer_window_changed, struct hw *, hw_step ),
 	INTF_OP ( intf_close, struct hw *, hw_finished ),
 };
 
@@ -43,7 +44,7 @@ static struct interface_descriptor hw_xfer_desc =
 	INTF_DESC ( struct hw, xfer, hw_xfer_operations );
 
 static struct process_descriptor hw_process_desc =
-	PROC_DESC ( struct hw, process, hw_step );
+	PROC_DESC_ONCE ( struct hw, process, hw_step );
 
 static int hw_open ( struct interface *xfer, struct uri *uri __unused ) {
 	struct hw *hw;
