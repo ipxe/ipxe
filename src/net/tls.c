@@ -582,6 +582,62 @@ static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
 
 /******************************************************************************
  *
+ * TX state machine transitions
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Resume TX state machine
+ *
+ * @v tls		TLS session
+ */
+static void tls_tx_resume ( struct tls_session *tls ) {
+	process_add ( &tls->process );
+}
+
+/**
+ * Enter TX state machine active state
+ *
+ * @v tls		TLS session
+ * @v state		TX state
+ */
+static void tls_tx_start ( struct tls_session *tls, enum tls_tx_state state ) {
+
+	/* Enter specified state */
+	tls->tx_state = state;
+
+	/* Resume state machine */
+	tls_tx_resume ( tls );
+}
+
+/**
+ * Enter TX state machine idle state
+ *
+ * @v tls		TLS session
+ */
+static void tls_tx_none ( struct tls_session *tls ) {
+
+	/* Enter idle state */
+	tls->tx_state = TLS_TX_NONE;
+}
+
+/**
+ * Enter TX state machine data state
+ *
+ * @v tls		TLS session
+ */
+static void tls_tx_data ( struct tls_session *tls ) {
+
+	/* Enter data state */
+	tls->tx_state = TLS_TX_DATA;
+
+	/* Send notification of a window change */
+	xfer_window_changed ( &tls->plainstream );
+}
+
+/******************************************************************************
+ *
  * Record handling
  *
  ******************************************************************************
@@ -929,7 +985,7 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
 	}
 
 	/* Start sending the Client Key Exchange */
-	tls->tx_state = TLS_TX_CLIENT_KEY_EXCHANGE;
+	tls_tx_start ( tls, TLS_TX_CLIENT_KEY_EXCHANGE );
 
 	return 0;
 }
@@ -946,12 +1002,9 @@ static int tls_new_finished ( struct tls_session *tls,
 			      void *data, size_t len ) {
 
 	/* FIXME: Handle this properly */
-	tls->tx_state = TLS_TX_DATA;
+	tls_tx_data ( tls );
 	( void ) data;
 	( void ) len;
-
-	/* Send notification of a window change */
-	xfer_window_changed ( &tls->plainstream );
 
 	return 0;
 }
@@ -1627,6 +1680,7 @@ static int tls_cipherstream_deliver ( struct tls_session *tls,
 static struct interface_operation tls_cipherstream_ops[] = {
 	INTF_OP ( xfer_deliver, struct tls_session *,
 		  tls_cipherstream_deliver ),
+	INTF_OP ( xfer_window_changed, struct tls_session *, tls_tx_resume ),
 	INTF_OP ( intf_close, struct tls_session *, tls_close ),
 };
 
@@ -1647,7 +1701,7 @@ static struct interface_descriptor tls_cipherstream_desc =
  *
  * @v tls		TLS session
  */
-static void tls_step ( struct tls_session *tls ) {
+static void tls_tx_step ( struct tls_session *tls ) {
 	int rc;
 
 	/* Wait for cipherstream to become ready */
@@ -1665,7 +1719,7 @@ static void tls_step ( struct tls_session *tls ) {
 			       tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_state = TLS_TX_NONE;
+		tls_tx_none ( tls );
 		break;
 	case TLS_TX_CLIENT_KEY_EXCHANGE:
 		/* Send Client Key Exchange */
@@ -1674,7 +1728,7 @@ static void tls_step ( struct tls_session *tls ) {
 			       "%s\n", tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_state = TLS_TX_CHANGE_CIPHER;
+		tls_tx_start ( tls, TLS_TX_CHANGE_CIPHER );
 		break;
 	case TLS_TX_CHANGE_CIPHER:
 		/* Send Change Cipher, and then change the cipher in use */
@@ -1691,7 +1745,7 @@ static void tls_step ( struct tls_session *tls ) {
 			goto err;
 		}
 		tls->tx_seq = 0;
-		tls->tx_state = TLS_TX_FINISHED;
+		tls_tx_start ( tls, TLS_TX_FINISHED );
 		break;
 	case TLS_TX_FINISHED:
 		/* Send Finished */
@@ -1700,7 +1754,7 @@ static void tls_step ( struct tls_session *tls ) {
 			       tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_state = TLS_TX_NONE;
+		tls_tx_none ( tls );
 		break;
 	case TLS_TX_DATA:
 		/* Nothing to do */
@@ -1717,7 +1771,7 @@ static void tls_step ( struct tls_session *tls ) {
 
 /** TLS TX process descriptor */
 static struct process_descriptor tls_process_desc =
-	PROC_DESC ( struct tls_session, process, tls_step );
+	PROC_DESC_ONCE ( struct tls_session, process, tls_tx_step );
 
 /******************************************************************************
  *
@@ -1749,8 +1803,8 @@ int add_tls ( struct interface *xfer, struct interface **next ) {
 			      ( sizeof ( tls->pre_master_secret.random ) ) );
 	digest_init ( &md5_algorithm, tls->handshake_md5_ctx );
 	digest_init ( &sha1_algorithm, tls->handshake_sha1_ctx );
-	tls->tx_state = TLS_TX_CLIENT_HELLO;
-	process_init ( &tls->process, &tls_process_desc, &tls->refcnt );
+	process_init_stopped ( &tls->process, &tls_process_desc, &tls->refcnt );
+	tls_tx_start ( tls, TLS_TX_CLIENT_HELLO );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &tls->plainstream, xfer );
