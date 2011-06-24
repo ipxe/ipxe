@@ -455,6 +455,13 @@ struct fc_ulp_user {
 	struct fc_ulp *ulp;
 	/** List of users */
 	struct list_head list;
+	/** Containing object reference count, or NULL */
+	struct refcnt *refcnt;
+	/** Examine link state
+	 *
+	 * @v user		Fibre Channel upper-layer-protocol user
+	 */
+	void ( * examine ) ( struct fc_ulp_user *user );
 };
 
 /**
@@ -477,6 +484,43 @@ fc_ulp_get ( struct fc_ulp *ulp ) {
 static inline __attribute__ (( always_inline )) void
 fc_ulp_put ( struct fc_ulp *ulp ) {
 	ref_put ( &ulp->refcnt );
+}
+
+/**
+ * Get reference to Fibre Channel upper-layer protocol user
+ *
+ * @v user		Fibre Channel upper-layer protocol user
+ * @ret user		Fibre Channel upper-layer protocol user
+ */
+static inline __attribute__ (( always_inline )) struct fc_ulp_user *
+fc_ulp_user_get ( struct fc_ulp_user *user ) {
+	ref_get ( user->refcnt );
+	return user;
+}
+
+/**
+ * Drop reference to Fibre Channel upper-layer protocol user
+ *
+ * @v user		Fibre Channel upper-layer protocol user
+ */
+static inline __attribute__ (( always_inline )) void
+fc_ulp_user_put ( struct fc_ulp_user *user ) {
+	ref_put ( user->refcnt );
+}
+
+/**
+ * Initialise Fibre Channel upper-layer protocol user
+ *
+ * @v user		Fibre Channel upper-layer protocol user
+ * @v examine		Examine link state method
+ * @v refcnt		Containing object reference count, or NULL
+ */
+static inline __attribute__ (( always_inline )) void
+fc_ulp_user_init ( struct fc_ulp_user *user,
+		   void ( * examine ) ( struct fc_ulp_user *user ),
+		   struct refcnt *refcnt ) {
+	user->examine = examine;
+	user->refcnt = refcnt;
 }
 
 extern struct fc_ulp * fc_ulp_get_wwn_type ( const struct fc_name *port_wwn,

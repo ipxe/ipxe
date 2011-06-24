@@ -1651,12 +1651,30 @@ void fc_ulp_detach ( struct fc_ulp_user *user ) {
  */
 int fc_ulp_login ( struct fc_ulp *ulp, const void *param, size_t param_len,
 		   int originated ) {
+	struct fc_ulp_user *user;
+	struct fc_ulp_user *tmp;
 
 	/* Perform implicit logout if logged in and service parameters differ */
 	if ( fc_link_ok ( &ulp->link ) &&
 	     ( ( ulp->param_len != param_len ) ||
 	       ( memcmp ( ulp->param, param, ulp->param_len ) != 0 ) ) ) {
 		fc_ulp_logout ( ulp, 0 );
+	}
+
+	/* Work around a bug in some versions of the Linux Fibre
+	 * Channel stack, which fail to fully initialise image pairs
+	 * established via a PRLI originated by the Linux stack
+	 * itself.
+	 */
+	if ( originated )
+		ulp->flags |= FC_ULP_ORIGINATED_LOGIN_OK;
+	if ( ! ( ulp->flags & FC_ULP_ORIGINATED_LOGIN_OK ) ) {
+		DBGC ( ulp, "FCULP %s/%02x sending extra PRLI to work around "
+		       "Linux bug\n",
+		       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type );
+		fc_link_stop ( &ulp->link );
+		fc_link_start ( &ulp->link );
+		return 0;
 	}
 
 	/* Log in, if applicable */
@@ -1685,18 +1703,11 @@ int fc_ulp_login ( struct fc_ulp *ulp, const void *param, size_t param_len,
 	/* Record login */
 	fc_link_up ( &ulp->link );
 
-	/* Work around a bug in some versions of the Linux Fibre
-	 * Channel stack, which fail to fully initialise image pairs
-	 * established via a PRLI originated by the Linux stack
-	 * itself.
-	 */
-	if ( originated )
-		ulp->flags |= FC_ULP_ORIGINATED_LOGIN_OK;
-	if ( ! ( ulp->flags & FC_ULP_ORIGINATED_LOGIN_OK ) ) {
-		DBGC ( ulp, "FCULP %s/%02x sending extra PRLI to work around "
-		       "Linux bug\n",
-		       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type );
-		fc_link_start ( &ulp->link );
+	/* Notify users of link state change */
+	list_for_each_entry_safe ( user, tmp, &ulp->users, list ) {
+		fc_ulp_user_get ( user );
+		user->examine ( user );
+		fc_ulp_user_put ( user );
 	}
 
 	return 0;
@@ -1709,6 +1720,8 @@ int fc_ulp_login ( struct fc_ulp *ulp, const void *param, size_t param_len,
  * @v rc		Reason for logout
  */
 void fc_ulp_logout ( struct fc_ulp *ulp, int rc ) {
+	struct fc_ulp_user *user;
+	struct fc_ulp_user *tmp;
 
 	DBGC ( ulp, "FCULP %s/%02x logged out: %s\n",
 	       fc_ntoa ( &ulp->peer->port_wwn ), ulp->type, strerror ( rc ) );
@@ -1725,6 +1738,13 @@ void fc_ulp_logout ( struct fc_ulp *ulp, int rc ) {
 
 	/* Record logout */
 	fc_link_err ( &ulp->link, rc );
+
+	/* Notify users of link state change */
+	list_for_each_entry_safe ( user, tmp, &ulp->users, list ) {
+		fc_ulp_user_get ( user );
+		user->examine ( user );
+		fc_ulp_user_put ( user );
+	}
 
 	/* Close ULP if there are no clients attached */
 	if ( list_empty ( &ulp->users ) )

@@ -921,6 +921,26 @@ static struct interface_descriptor fcpdev_scsi_desc =
 	INTF_DESC ( struct fcp_device, scsi, fcpdev_scsi_op );
 
 /**
+ * Examine FCP ULP link state
+ *
+ * @v user		Fibre Channel upper-layer protocol user
+ */
+static void fcpdev_examine ( struct fc_ulp_user *user ) {
+	struct fcp_device *fcpdev =
+		container_of ( user, struct fcp_device, user );
+
+	if ( fc_link_ok ( &fcpdev->user.ulp->link ) ) {
+		DBGC ( fcpdev, "FCP %p link is up\n", fcpdev );
+	} else {
+		DBGC ( fcpdev, "FCP %p link is down: %s\n",
+		       fcpdev, strerror ( fcpdev->user.ulp->link.rc ) );
+	}
+
+	/* Notify SCSI layer of window change */
+	xfer_window_changed ( &fcpdev->scsi );
+}
+
+/**
  * Open FCP device
  *
  * @v parent		Parent interface
@@ -950,9 +970,12 @@ static int fcpdev_open ( struct interface *parent, struct fc_name *wwn,
 	ref_init ( &fcpdev->refcnt, NULL );
 	intf_init ( &fcpdev->scsi, &fcpdev_scsi_desc, &fcpdev->refcnt );
 	INIT_LIST_HEAD ( &fcpdev->fcpcmds );
-	fc_ulp_attach ( ulp, &fcpdev->user );
+	fc_ulp_user_init ( &fcpdev->user, fcpdev_examine, &fcpdev->refcnt );
 
 	DBGC ( fcpdev, "FCP %p opened for %s\n", fcpdev, fc_ntoa ( wwn ) );
+
+	/* Attach to Fibre Channel ULP */
+	fc_ulp_attach ( ulp, &fcpdev->user );
 
 	/* Preserve parameters required for boot firmware table */
 	memcpy ( &fcpdev->wwn, wwn, sizeof ( fcpdev->wwn ) );
