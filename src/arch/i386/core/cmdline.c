@@ -66,7 +66,8 @@ static void cmdline_init ( void ) {
 	struct image *image = &cmdline_image;
 	userptr_t cmdline_user;
 	char *cmdline;
-	char *tmp;
+	char *boot_image;
+	char *boot_image_end;
 	size_t len;
 
 	/* Do nothing if no command line was specified */
@@ -91,9 +92,18 @@ static void cmdline_init ( void ) {
 	/* Check for unwanted cruft in the command line */
 	while ( isspace ( *cmdline ) )
 		cmdline++;
-	if ( ( tmp = strstr ( cmdline, "BOOT_IMAGE=" ) ) != NULL ) {
-		DBGC ( image, "CMDLINE stripping \"%s\"\n", tmp );
-		*tmp = '\0';
+	if ( ( boot_image = strstr ( cmdline, "BOOT_IMAGE=" ) ) != NULL ) {
+		boot_image_end = strchr ( boot_image, ' ' );
+		if ( boot_image_end ) {
+			*boot_image_end = '\0';
+			DBGC ( image, "CMDLINE stripping \"%s\"\n",
+			       boot_image );
+			strcpy ( boot_image, ( boot_image_end + 1 ) );
+		} else {
+			DBGC ( image, "CMDLINE stripping \"%s\"\n",
+			       boot_image );
+			*boot_image = '\0';
+		}
 	}
 	DBGC ( image, "CMDLINE using \"%s\"\n", cmdline );
 
