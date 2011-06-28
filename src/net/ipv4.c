@@ -347,6 +347,8 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 				   ll_dest ) ) != 0 ) {
 		DBG ( "IPv4 has no link-layer address for %s: %s\n",
 		      inet_ntoa ( next_hop ), strerror ( rc ) );
+		/* Record error for diagnosis */
+		netdev_tx_err ( netdev, iob_disown ( iobuf ), rc );
 		goto err;
 	}
 
