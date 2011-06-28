@@ -586,6 +586,8 @@ netdev_rx_frozen ( struct net_device *netdev ) {
 extern void netdev_link_err ( struct net_device *netdev, int rc );
 extern void netdev_link_down ( struct net_device *netdev );
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
+extern void netdev_tx_err ( struct net_device *netdev,
+			    struct io_buffer *iobuf, int rc );
 extern void netdev_tx_complete_err ( struct net_device *netdev,
 				 struct io_buffer *iobuf, int rc );
 extern void netdev_tx_complete_next_err ( struct net_device *netdev, int rc );

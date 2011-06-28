@@ -194,16 +194,17 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 }
 
 /**
- * Complete network transmission
+ * Discard transmitted packet
  *
  * @v netdev		Network device
- * @v iobuf		I/O buffer
+ * @v iobuf		I/O buffer, or NULL
  * @v rc		Packet status code
  *
- * The packet must currently be in the network device's TX queue.
+ * The packet is discarded and a TX error is recorded.  This function
+ * takes ownership of the I/O buffer.
  */
-void netdev_tx_complete_err ( struct net_device *netdev,
-			      struct io_buffer *iobuf, int rc ) {
+void netdev_tx_err ( struct net_device *netdev,
+		     struct io_buffer *iobuf, int rc ) {
 
 	/* Update statistics counter */
 	netdev_record_stat ( &netdev->tx_stats, rc );
@@ -215,12 +216,28 @@ void netdev_tx_complete_err ( struct net_device *netdev,
 		       netdev->name, iobuf, strerror ( rc ) );
 	}
 
+	/* Discard packet */
+	free_iob ( iobuf );
+}
+
+/**
+ * Complete network transmission
+ *
+ * @v netdev		Network device
+ * @v iobuf		I/O buffer
+ * @v rc		Packet status code
+ *
+ * The packet must currently be in the network device's TX queue.
+ */
+void netdev_tx_complete_err ( struct net_device *netdev,
+			      struct io_buffer *iobuf, int rc ) {
+
 	/* Catch data corruption as early as possible */
 	list_check_contains ( iobuf, &netdev->tx_queue, list );
 
 	/* Dequeue and free I/O buffer */
 	list_del ( &iobuf->list );
-	free_iob ( iobuf );
+	netdev_tx_err ( netdev, iobuf, rc );
 }
 
 /**
@@ -644,7 +661,8 @@ int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	/* Add link-layer header */
 	if ( ( rc = ll_protocol->push ( netdev, iobuf, ll_dest, ll_source,
 					net_protocol->net_proto ) ) != 0 ) {
-		free_iob ( iobuf );
+		/* Record error for diagnosis */
+		netdev_tx_err ( netdev, iobuf, rc );
 		return rc;
 	}
 
