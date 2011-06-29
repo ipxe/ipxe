@@ -652,7 +652,7 @@ static void http_step ( struct http_request *http ) {
 
 	/* Determine type of request */
 	partial = ( http->partial_len != 0 );
-	snprintf ( range, sizeof ( range ), "%d-%d", http->partial_start,
+	snprintf ( range, sizeof ( range ), "%zd-%zd", http->partial_start,
 		   ( http->partial_start + http->partial_len - 1 ) );
 
 	/* Mark request as transmitted */
