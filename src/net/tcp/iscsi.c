@@ -1333,8 +1333,7 @@ static void iscsi_tx_resume ( struct iscsi_session *iscsi ) {
 static void iscsi_start_tx ( struct iscsi_session *iscsi ) {
 
 	assert ( iscsi->tx_state == ISCSI_TX_IDLE );
-	assert ( ! process_running ( &iscsi->process ) );
-	
+
 	/* Initialise TX BHS */
 	memset ( &iscsi->tx_bhs, 0, sizeof ( iscsi->tx_bhs ) );
 
@@ -1476,8 +1475,8 @@ static void iscsi_tx_step ( struct iscsi_session *iscsi ) {
 			next_state = ISCSI_TX_IDLE;
 			break;
 		case ISCSI_TX_IDLE:
-			/* Stop processing */
-			iscsi_tx_done ( iscsi );
+			/* Nothing to do; pause processing */
+			iscsi_tx_pause ( iscsi );
 			return;
 		default:
 			assert ( 0 );
@@ -1504,6 +1503,12 @@ static void iscsi_tx_step ( struct iscsi_session *iscsi ) {
 
 		/* Move to next state */
 		iscsi->tx_state = next_state;
+
+		/* If we have moved to the idle state, mark
+		 * transmission as complete
+		 */
+		if ( iscsi->tx_state == ISCSI_TX_IDLE )
+			iscsi_tx_done ( iscsi );
 	}
 }
 
