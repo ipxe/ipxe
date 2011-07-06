@@ -61,11 +61,20 @@ static uint8_t type_sizes[] = {
 #define ALT_FORM 0x02
 
 /**
+ * Use zero padding
+ *
+ * Note that this value is set to 0x10 since that allows the pad
+ * character to be calculated as @c 0x20|(flags&ZPAD)
+ */
+#define ZPAD 0x10
+
+/**
  * Format a hexadecimal number
  *
  * @v end		End of buffer to contain number
  * @v num		Number to format
  * @v width		Minimum field width
+ * @v flags		Format flags
  * @ret ptr		End of buffer
  *
  * Fills a buffer in reverse order with a formatted hexadecimal
@@ -79,18 +88,18 @@ static uint8_t type_sizes[] = {
 static char * format_hex ( char *end, unsigned long long num, int width,
 			   int flags ) {
 	char *ptr = end;
-	int case_mod;
+	int case_mod = ( flags & LCASE );
+	int pad = ( ( flags & ZPAD ) | ' ' );
 
 	/* Generate the number */
-	case_mod = flags & LCASE;
 	do {
 		*(--ptr) = "0123456789ABCDEF"[ num & 0xf ] | case_mod;
 		num >>= 4;
 	} while ( num );
 
-	/* Zero-pad to width */
+	/* Pad to width */
 	while ( ( end - ptr ) < width )
-		*(--ptr) = '0';
+		*(--ptr) = pad;
 
 	/* Add "0x" or "0X" if alternate form specified */
 	if ( flags & ALT_FORM ) {
@@ -107,6 +116,7 @@ static char * format_hex ( char *end, unsigned long long num, int width,
  * @v end		End of buffer to contain number
  * @v num		Number to format
  * @v width		Minimum field width
+ * @v flags		Format flags
  * @ret ptr		End of buffer
  *
  * Fills a buffer in reverse order with a formatted decimal number.
@@ -115,9 +125,12 @@ static char * format_hex ( char *end, unsigned long long num, int width,
  * There must be enough space in the buffer to contain the largest
  * number that this function can format.
  */
-static char * format_decimal ( char *end, signed long num, int width ) {
+static char * format_decimal ( char *end, signed long num, int width,
+			       int flags ) {
 	char *ptr = end;
 	int negative = 0;
+	int zpad = ( flags & ZPAD );
+	int pad = ( zpad | ' ' );
 
 	/* Generate the number */
 	if ( num < 0 ) {
@@ -130,12 +143,16 @@ static char * format_decimal ( char *end, signed long num, int width ) {
 	} while ( num );
 
 	/* Add "-" if necessary */
-	if ( negative )
+	if ( negative && ( ! zpad ) )
 		*(--ptr) = '-';
 
-	/* Space-pad to width */
+	/* Pad to width */
 	while ( ( end - ptr ) < width )
-		*(--ptr) = ' ';
+		*(--ptr) = pad;
+
+	/* Add "-" if necessary */
+	if ( negative && zpad )
+		*ptr = '-';
 
 	return ptr;
 }
@@ -186,7 +203,7 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 			if ( *fmt == '#' ) {
 				flags |= ALT_FORM;
 			} else if ( *fmt == '0' ) {
-				/* We always 0-pad hex and space-pad decimal */
+				flags |= ZPAD;
 			} else {
 				/* End of flag characters */
 				break;
@@ -250,7 +267,7 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 			} else {
 				decimal = va_arg ( args, signed int );
 			}
-			ptr = format_decimal ( ptr, decimal, width );
+			ptr = format_decimal ( ptr, decimal, width, flags );
 		} else {
 			*(--ptr) = *fmt;
 		}
