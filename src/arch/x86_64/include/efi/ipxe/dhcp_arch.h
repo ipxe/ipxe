@@ -30,10 +30,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define DHCP_ARCH_VENDOR_CLASS_ID \
 	DHCP_STRING ( 'P', 'X', 'E', 'C', 'l', 'i', 'e', 'n', 't', ':',      \
-		      'A', 'r', 'c', 'h', ':', '0', '0', '0', '0', '7', ':', \
+		      'A', 'r', 'c', 'h', ':', '0', '0', '0', '0', '9', ':', \
 		      'U', 'N', 'D', 'I', ':', '0', '0', '3', '0', '1', '0' )
 
-#define DHCP_ARCH_CLIENT_ARCHITECTURE DHCP_WORD ( 7 )
+#define DHCP_ARCH_CLIENT_ARCHITECTURE \
+	DHCP_WORD ( DHCP_CLIENT_ARCHITECTURE_X86_64 )
 
 #define DHCP_ARCH_CLIENT_NDI DHCP_OPTION ( 1 /* UNDI */ , 3, 10 /* v3.10 */ )
 

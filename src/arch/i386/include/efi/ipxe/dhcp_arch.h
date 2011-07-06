@@ -33,7 +33,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 		      'A', 'r', 'c', 'h', ':', '0', '0', '0', '0', '6', ':', \
 		      'U', 'N', 'D', 'I', ':', '0', '0', '3', '0', '1', '0' )
 
-#define DHCP_ARCH_CLIENT_ARCHITECTURE DHCP_WORD ( 6 )
+#define DHCP_ARCH_CLIENT_ARCHITECTURE \
+	DHCP_WORD ( DHCP_CLIENT_ARCHITECTURE_IA32 )
 
 #define DHCP_ARCH_CLIENT_NDI DHCP_OPTION ( 1 /* UNDI */ , 3, 10 /* v3.10 */ )
 

@@ -240,6 +240,39 @@ struct dhcp_client_id {
 /** Client system architecture */
 #define DHCP_CLIENT_ARCHITECTURE 93
 
+/** DHCP client architecture */
+struct dhcp_client_architecture {
+	uint16_t arch;
+} __attribute__ (( packed ));
+
+/** DHCP client architecture values
+ *
+ * These are defined by the PXE specification and redefined by
+ * RFC4578.
+ */
+enum dhcp_client_architecture_values {
+	/** Intel x86 PC */
+	DHCP_CLIENT_ARCHITECTURE_X86 = 0x0000,
+	/** NEC/PC98 */
+	DHCP_CLIENT_ARCHITECTURE_PC98 = 0x0001,
+	/** EFI Itanium */
+	DHCP_CLIENT_ARCHITECTURE_IA64 = 0x0002,
+	/** DEC Alpha */
+	DHCP_CLIENT_ARCHITECTURE_ALPHA = 0x0003,
+	/** Arc x86 */
+	DHCP_CLIENT_ARCHITECTURE_ARCX86 = 0x0004,
+	/** Intel Lean Client */
+	DHCP_CLIENT_ARCHITECTURE_LC = 0x0005,
+	/** EFI IA32 */
+	DHCP_CLIENT_ARCHITECTURE_IA32 = 0x0006,
+	/** EFI BC */
+	DHCP_CLIENT_ARCHITECTURE_EFI = 0x0007,
+	/** EFI Xscale */
+	DHCP_CLIENT_ARCHITECTURE_XSCALE = 0x0008,
+	/** EFI x86-64 */
+	DHCP_CLIENT_ARCHITECTURE_X86_64 = 0x0009,
+};
+
 /** Client network device interface */
 #define DHCP_CLIENT_NDI 94
 
