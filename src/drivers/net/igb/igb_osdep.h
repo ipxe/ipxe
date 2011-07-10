@@ -69,11 +69,6 @@ typedef enum {
 #define CMD_MEM_WRT_INVALIDATE PCI_COMMAND_INVALIDATE
 #define ETH_ADDR_LEN           ETH_ALEN
 
-#ifdef __BIG_ENDIAN
-#define E1000_BIG_ENDIAN __BIG_ENDIAN
-#endif
-
-
 #define DEBUGOUT(S) if (0) { printf(S); }
 #define DEBUGOUT1(S, A...) if (0) { printf(S, A); }
 
