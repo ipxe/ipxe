@@ -379,6 +379,42 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 }
 
 /**
+ * Check if network device has any IPv4 address
+ *
+ * @v netdev		Network device
+ * @ret has_any_addr	Network device has any IPv4 address
+ */
+static int ipv4_has_any_addr ( struct net_device *netdev ) {
+	struct ipv4_miniroute *miniroute;
+
+	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
+		if ( miniroute->netdev == netdev )
+			return 1;
+	}
+	return 0;
+}
+
+/**
+ * Check if network device has a specific IPv4 address
+ *
+ * @v netdev		Network device
+ * @v addr		IPv4 address
+ * @ret has_addr	Network device has this IPv4 address
+ */
+static int ipv4_has_addr ( struct net_device *netdev, struct in_addr addr ) {
+	struct ipv4_miniroute *miniroute;
+
+	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
+		if ( ( miniroute->netdev == netdev ) &&
+		     ( miniroute->address.s_addr == addr.s_addr ) ) {
+			/* Found matching address */
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/**
  * Process incoming packets
  *
  * @v iobuf		I/O buffer
@@ -392,10 +428,10 @@ static int ipv4_tx ( struct io_buffer *iobuf,
  * and sends it to the transport layer.
  */
 static int ipv4_rx ( struct io_buffer *iobuf,
-		     struct net_device *netdev __unused,
+		     struct net_device *netdev,
 		     const void *ll_dest __unused,
 		     const void *ll_source __unused,
-		     unsigned int flags __unused ) {
+		     unsigned int flags ) {
 	struct iphdr *iphdr = iobuf->data;
 	size_t hdrlen;
 	size_t len;
@@ -451,6 +487,15 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	      inet_ntoa ( iphdr->src ), ntohs ( iphdr->len ), iphdr->protocol,
 	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
+	/* Discard unicast packets not destined for us */
+	if ( ( ! ( flags & LL_MULTICAST ) ) &&
+	     ipv4_has_any_addr ( netdev ) &&
+	     ( ! ipv4_has_addr ( netdev, iphdr->dest ) ) ) {
+		DBG ( "IPv4 discarding non-local unicast packet for %s\n",
+		      inet_ntoa ( iphdr->dest ) );
+		goto err;
+	}
+
 	/* Truncate packet to correct length, calculate pseudo-header
 	 * checksum and then strip off the IPv4 header.
 	 */
@@ -499,15 +544,10 @@ static int ipv4_rx ( struct io_buffer *iobuf,
  */
 static int ipv4_arp_check ( struct net_device *netdev, const void *net_addr ) {
 	const struct in_addr *address = net_addr;
-	struct ipv4_miniroute *miniroute;
 
-	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
-		if ( ( miniroute->netdev == netdev ) &&
-		     ( miniroute->address.s_addr == address->s_addr ) ) {
-			/* Found matching address */
-			return 0;
-		}
-	}
+	if ( ipv4_has_addr ( netdev, *address ) )
+		return 0;
+
 	return -ENOENT;
 }
 
