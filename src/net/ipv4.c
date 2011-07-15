@@ -110,10 +110,6 @@ static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
 	int local;
 	int has_gw;
 
-	/* Never attempt to route the broadcast address */
-	if ( dest->s_addr == INADDR_BROADCAST )
-		return NULL;
-
 	/* Find first usable route in routing table */
 	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
 		if ( ! netdev_is_open ( miniroute->netdev ) )
@@ -260,15 +256,17 @@ static uint16_t ipv4_pshdr_chksum ( struct io_buffer *iobuf, uint16_t csum ) {
  *
  * @v dest		IPv4 destination address
  * @v src		IPv4 source address
+ * @v netmask		IPv4 subnet mask
  * @v netdev		Network device
  * @v ll_dest		Link-layer destination address buffer
  * @ret rc		Return status code
  */
 static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
-			  struct net_device *netdev, uint8_t *ll_dest ) {
+			  struct in_addr netmask, struct net_device *netdev,
+			  uint8_t *ll_dest ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 
-	if ( dest.s_addr == INADDR_BROADCAST ) {
+	if ( ( ( dest.s_addr ^ INADDR_BROADCAST ) & ~netmask.s_addr ) == 0 ) {
 		/* Broadcast address */
 		memcpy ( ll_dest, netdev->ll_broadcast,
 			 ll_protocol->ll_addr_len );
@@ -306,6 +304,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
 	struct ipv4_miniroute *miniroute;
 	struct in_addr next_hop;
+	struct in_addr netmask = { .s_addr = 0 };
 	uint8_t ll_dest[MAX_LL_ADDR_LEN];
 	int rc;
 
@@ -326,6 +325,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	     ( ! IN_MULTICAST ( ntohl ( next_hop.s_addr ) ) ) &&
 	     ( ( miniroute = ipv4_route ( &next_hop ) ) != NULL ) ) {
 		iphdr->src = miniroute->address;
+		netmask = miniroute->netmask;
 		netdev = miniroute->netdev;
 	}
 	if ( ! netdev ) {
@@ -343,7 +343,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 			       ( ( netdev->rx_stats.good & 0xf ) << 0 ) );
 
 	/* Determine link-layer destination address */
-	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, netdev,
+	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, netmask, netdev,
 				   ll_dest ) ) != 0 ) {
 		DBG ( "IPv4 has no link-layer address for %s: %s\n",
 		      inet_ntoa ( next_hop ), strerror ( rc ) );
