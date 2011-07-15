@@ -662,13 +662,17 @@ static void http_step ( struct http_request *http ) {
 	if ( ( rc = xfer_printf ( &http->socket,
 				  "%s %s%s HTTP/1.1\r\n"
 				  "User-Agent: iPXE/" VERSION "\r\n"
-				  "Host: %s\r\n"
+				  "Host: %s%s%s\r\n"
 				  "%s%s%s%s%s%s%s"
 				  "\r\n",
 				  ( ( http->flags & HTTP_HEAD_ONLY ) ?
 				    "HEAD" : "GET" ),
 				  ( http->uri->path ? "" : "/" ),
 				  request, host,
+				  ( http->uri->port ?
+				    ":" : "" ),
+				  ( http->uri->port ?
+				    http->uri->port : "" ),
 				  ( ( http->flags & HTTP_KEEPALIVE ) ?
 				    "Connection: Keep-Alive\r\n" : "" ),
 				  ( partial ? "Range: bytes=" : "" ),
