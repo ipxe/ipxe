@@ -658,6 +658,7 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	const void *iob_ll_dest;
 	const void *iob_ll_src;
 	uint16_t iob_net_proto;
+	unsigned int iob_flags;
 	int rc;
 	EFI_STATUS efirc;
 
@@ -682,7 +683,8 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 
 	/* Attempt to decode link-layer header */
 	if ( ( rc = ll_protocol->pull ( snpdev->netdev, iobuf, &iob_ll_dest,
-					&iob_ll_src, &iob_net_proto ) ) != 0 ){
+					&iob_ll_src, &iob_net_proto,
+					&iob_flags ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not parse header: %s\n",
 		       snpdev, strerror ( rc ) );
 		efirc = RC_TO_EFIRC ( rc );

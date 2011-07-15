@@ -47,12 +47,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v netdev		Network device
  * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
+ * @v flags		Packet flags
  * @ret rc		Return status code
  */
 static int lotest_rx ( struct io_buffer *iobuf,
 		       struct net_device *netdev __unused,
 		       const void *ll_dest __unused,
-		       const void *ll_source __unused ) {
+		       const void *ll_source __unused,
+		       unsigned int flags __unused ) {
 	free_iob ( iobuf );
 	return -ENOTSUP;
 }
@@ -97,6 +99,7 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 	const void *ll_dest;
 	const void *ll_source;
 	uint16_t net_proto;
+	unsigned int flags;
 	unsigned int i;
 	unsigned int successes;
 	int rc;
@@ -166,7 +169,8 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 		/* Check received packet */
 		if ( ( rc = receiver->ll_protocol->pull ( receiver, iobuf,
 							  &ll_dest, &ll_source,
-							  &net_proto ) ) != 0 ){
+							  &net_proto,
+							  &flags ) ) != 0 ) {
 			printf ( "\nFailed to strip link-layer header: %s",
 				 strerror ( rc ) );
 			goto done;

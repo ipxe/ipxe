@@ -135,7 +135,8 @@ static int net80211_ll_push ( struct net_device *netdev,
 			      const void *ll_source, uint16_t net_proto );
 static int net80211_ll_pull ( struct net_device *netdev,
 			      struct io_buffer *iobuf, const void **ll_dest,
-			      const void **ll_source, uint16_t * net_proto );
+			      const void **ll_source, uint16_t * net_proto,
+			      unsigned int *flags );
 /** @} */
 
 /**
@@ -529,6 +530,7 @@ static int net80211_ll_push ( struct net_device *netdev,
  * @ret ll_dest		Link-layer destination address
  * @ret ll_source	Link-layer source
  * @ret net_proto	Network-layer protocol, in network byte order
+ * @ret flags		Packet flags
  * @ret rc		Return status code
  *
  * This expects and removes both the 802.11 frame header and the 802.2
@@ -537,7 +539,7 @@ static int net80211_ll_push ( struct net_device *netdev,
 static int net80211_ll_pull ( struct net_device *netdev __unused,
 			      struct io_buffer *iobuf,
 			      const void **ll_dest, const void **ll_source,
-			      uint16_t * net_proto )
+			      uint16_t * net_proto, unsigned int *flags )
 {
 	struct ieee80211_frame *hdr = iobuf->data;
 	struct ieee80211_llc_snap_header *lhdr =
@@ -586,6 +588,10 @@ static int net80211_ll_pull ( struct net_device *netdev __unused,
 	*ll_dest = hdr->addr1;
 	*ll_source = hdr->addr3;
 	*net_proto = lhdr->ethertype;
+	*flags = ( ( is_multicast_ether_addr ( hdr->addr1 ) ?
+		     LL_MULTICAST : 0 ) |
+		   ( is_broadcast_ether_addr ( hdr->addr1 ) ?
+		     LL_BROADCAST : 0 ) );
 	return 0;
 }
 

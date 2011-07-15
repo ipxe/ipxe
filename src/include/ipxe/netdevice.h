@@ -66,20 +66,23 @@ struct net_protocol {
 	/**
 	 * Process received packet
 	 *
-	 * @v iobuf	I/O buffer
-	 * @v netdev	Network device
-	 * @v ll_dest	Link-layer destination address
-	 * @v ll_source	Link-layer source address
+	 * @v iobuf		I/O buffer
+	 * @v netdev		Network device
+	 * @v ll_dest		Link-layer destination address
+	 * @v ll_source		Link-layer source address
+	 * @v flags		Packet flags
+	 * @ret rc		Return status code
 	 *
 	 * This method takes ownership of the I/O buffer.
 	 */
 	int ( * rx ) ( struct io_buffer *iobuf, struct net_device *netdev,
-		       const void *ll_dest, const void *ll_source );
+		       const void *ll_dest, const void *ll_source,
+		       unsigned int flags );
 	/**
 	 * Transcribe network-layer address
 	 *
-	 * @v net_addr	Network-layer address
-	 * @ret string	Human-readable transcription of address
+	 * @v net_addr		Network-layer address
+	 * @ret string		Human-readable transcription of address
 	 *
 	 * This method should convert the network-layer address into a
 	 * human-readable format (e.g. dotted quad notation for IPv4).
@@ -96,6 +99,12 @@ struct net_protocol {
 	/** Network-layer address length */
 	uint8_t net_addr_len;
 };
+
+/** Packet is a multicast (including broadcast) packet */
+#define LL_MULTICAST 0x0001
+
+/** Packet is a broadcast packet */
+#define LL_BROADCAST 0x0002
 
 /**
  * A link-layer protocol
@@ -125,11 +134,12 @@ struct ll_protocol {
 	 * @ret ll_dest		Link-layer destination address
 	 * @ret ll_source	Source link-layer address
 	 * @ret net_proto	Network-layer protocol, in network-byte order
+	 * @ret flags		Packet flags
 	 * @ret rc		Return status code
 	 */
 	int ( * pull ) ( struct net_device *netdev, struct io_buffer *iobuf,
 			 const void **ll_dest, const void **ll_source,
-			 uint16_t *net_proto );
+			 uint16_t *net_proto, unsigned int *flags );
 	/**
 	 * Initialise link-layer address
 	 *
@@ -611,7 +621,7 @@ extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    const void *ll_source );
 extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    uint16_t net_proto, const void *ll_dest,
-		    const void *ll_source );
+		    const void *ll_source, unsigned int flags );
 extern void net_poll ( void );
 
 /**

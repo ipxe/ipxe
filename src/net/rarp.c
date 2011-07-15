@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v netdev		Network device
  * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
+ * @v flags		Packet flags
  * @ret rc		Return status code
  *
  * This is a dummy method which simply discards RARP packets.
@@ -45,7 +46,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static int rarp_rx ( struct io_buffer *iobuf,
 		     struct net_device *netdev __unused,
 		     const void *ll_dest __unused,
-		     const void *ll_source __unused ) {
+		     const void *ll_source __unused,
+		     unsigned int flags __unused ) {
 	free_iob ( iobuf );
 	return 0;
 }

@@ -288,13 +288,15 @@ static int ipv6_process_nxt_hdr ( struct io_buffer *iobuf, uint8_t nxt_hdr,
  * @v netdev		Network device
  * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
+ * @v flags		Packet flags
  *
  * This function processes a IPv6 packet
  */
 static int ipv6_rx ( struct io_buffer *iobuf,
 		     __unused struct net_device *netdev,
 		     __unused const void *ll_dest,
-		     __unused const void *ll_source ) {
+		     __unused const void *ll_source,
+		     __unused unsigned int flags ) {
 
 	struct ip6_header *ip6hdr = iobuf->data;
 	union {

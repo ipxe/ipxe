@@ -906,13 +906,14 @@ static int aoedev_open ( struct interface *parent, struct net_device *netdev,
  * @v netdev		Network device
  * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
+ * @v flags		Packet flags
  * @ret rc		Return status code
- *
  */
 static int aoe_rx ( struct io_buffer *iobuf,
 		    struct net_device *netdev __unused,
 		    const void *ll_dest __unused,
-		    const void *ll_source ) {
+		    const void *ll_source,
+		    unsigned int flags __unused ) {
 	struct aoehdr *aoehdr = iobuf->data;
 	struct aoe_command *aoecmd;
 	int rc;

@@ -234,12 +234,14 @@ static int eth_slow_marker_rx ( struct io_buffer *iobuf,
  * @v netdev		Network device
  * @v ll_dest		Link-layer destination address
  * @v ll_source		Link-layer source address
+ * @v flags		Packet flags
  * @ret rc		Return status code
  */
 static int eth_slow_rx ( struct io_buffer *iobuf,
 			 struct net_device *netdev,
 			 const void *ll_dest __unused,
-			 const void *ll_source __unused ) {
+			 const void *ll_source __unused,
+			 unsigned int flags __unused ) {
 	union eth_slow_packet *eth_slow = iobuf->data;
 
 	/* Sanity checks */

@@ -652,6 +652,7 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 	const void *ll_dest;
 	const void *ll_source;
 	uint16_t net_proto;
+	unsigned int flags;
 	size_t ll_hlen;
 	struct net_protocol *net_protocol;
 	unsigned int prottype;
@@ -753,7 +754,8 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		/* Strip link-layer header */
 		ll_protocol = pxe_netdev->ll_protocol;
 		if ( ( rc = ll_protocol->pull ( pxe_netdev, iobuf, &ll_dest,
-						&ll_source, &net_proto )) !=0){
+						&ll_source, &net_proto,
+						&flags ) ) != 0 ) {
 			/* Assume unknown net_proto and no ll_source */
 			net_proto = 0;
 			ll_source = NULL;
@@ -788,14 +790,12 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 		undi_isr->Frame.segment = rm_ds;
 		undi_isr->Frame.offset = __from_data16 ( basemem_packet );
 		undi_isr->ProtType = prottype;
-		if ( memcmp ( ll_dest, pxe_netdev->ll_addr,
-			      ll_protocol->ll_addr_len ) == 0 ) {
-			undi_isr->PktType = P_DIRECTED;
-		} else if ( memcmp ( ll_dest, pxe_netdev->ll_broadcast,
-				     ll_protocol->ll_addr_len ) == 0 ) {
+		if ( flags & LL_BROADCAST ) {
 			undi_isr->PktType = P_BROADCAST;
-		} else {
+		} else if ( flags & LL_MULTICAST ) {
 			undi_isr->PktType = P_MULTICAST;
+		} else {
+			undi_isr->PktType = P_DIRECTED;
 		}
 		DBGC2 ( &pxenv_undi_isr, " %04x:%04x+%x(%x) %s hlen %d",
 			undi_isr->Frame.segment, undi_isr->Frame.offset,

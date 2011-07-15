@@ -71,11 +71,13 @@ static int eth_push ( struct net_device *netdev __unused,
  * @ret ll_dest		Link-layer destination address
  * @ret ll_source	Source link-layer address
  * @ret net_proto	Network-layer protocol, in network-byte order
+ * @ret flags		Packet flags
  * @ret rc		Return status code
  */
 static int eth_pull ( struct net_device *netdev __unused, 
 		      struct io_buffer *iobuf, const void **ll_dest,
-		      const void **ll_source, uint16_t *net_proto ) {
+		      const void **ll_source, uint16_t *net_proto,
+		      unsigned int *flags ) {
 	struct ethhdr *ethhdr = iobuf->data;
 
 	/* Sanity check */
@@ -92,6 +94,10 @@ static int eth_pull ( struct net_device *netdev __unused,
 	*ll_dest = ethhdr->h_dest;
 	*ll_source = ethhdr->h_source;
 	*net_proto = ethhdr->h_protocol;
+	*flags = ( ( is_multicast_ether_addr ( ethhdr->h_dest ) ?
+		     LL_MULTICAST : 0 ) |
+		   ( is_broadcast_ether_addr ( ethhdr->h_dest ) ?
+		     LL_BROADCAST : 0 ) );
 
 	return 0;
 }

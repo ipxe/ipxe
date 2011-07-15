@@ -186,6 +186,7 @@ static struct arp_net_protocol * arp_find_protocol ( uint16_t net_proto ) {
  * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v ll_source		Link-layer source address
+ * @v flags		Packet flags
  * @ret rc		Return status code
  *
  * This handles ARP requests and responses as detailed in RFC826.  The
@@ -196,7 +197,8 @@ static struct arp_net_protocol * arp_find_protocol ( uint16_t net_proto ) {
  */
 static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    const void *ll_dest __unused,
-		    const void *ll_source __unused ) {
+		    const void *ll_source __unused,
+		    unsigned int flags __unused ) {
 	struct arphdr *arphdr = iobuf->data;
 	struct arp_net_protocol *arp_net_protocol;
 	struct net_protocol *net_protocol;

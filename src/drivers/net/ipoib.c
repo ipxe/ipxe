@@ -224,11 +224,13 @@ static int ipoib_push ( struct net_device *netdev __unused,
  * @ret ll_dest		Link-layer destination address
  * @ret ll_source	Source link-layer address
  * @ret net_proto	Network-layer protocol, in network-byte order
+ * @ret flags		Packet flags
  * @ret rc		Return status code
  */
 static int ipoib_pull ( struct net_device *netdev,
 			struct io_buffer *iobuf, const void **ll_dest,
-			const void **ll_source, uint16_t *net_proto ) {
+			const void **ll_source, uint16_t *net_proto,
+			unsigned int *flags ) {
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ipoib_hdr *ipoib_hdr = iobuf->data;
 	struct ipoib_peer *dest;
@@ -255,6 +257,7 @@ static int ipoib_pull ( struct net_device *netdev,
 	*ll_dest = ( dest ? &dest->mac : &ipoib->broadcast );
 	*ll_source = ( source ? &source->mac : &ipoib->broadcast );
 	*net_proto = ipoib_hdr->proto;
+	*flags = ( ( *ll_dest == &ipoib->broadcast ) ? LL_BROADCAST : 0 );
 
 	return 0;
 }
