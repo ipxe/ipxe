@@ -148,6 +148,7 @@ void stop_timer ( struct retry_timer *timer ) {
  * @v timer		Retry timer
  */
 static void timer_expired ( struct retry_timer *timer ) {
+	struct refcnt *refcnt = timer->refcnt;
 	int fail;
 
 	/* Stop timer without performing RTT calculations */
@@ -169,8 +170,9 @@ static void timer_expired ( struct retry_timer *timer ) {
 
 	/* Call expiry callback */
 	timer->expired ( timer, fail );
+	/* If refcnt is NULL, then timer may already have been freed */
 
-	ref_put ( timer->refcnt );
+	ref_put ( refcnt );
 }
 
 /**
