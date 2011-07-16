@@ -31,9 +31,6 @@ struct io_buffer;
 #define IP_TOS		0
 #define IP_TTL		64
 
-#define IP_FRAG_IOB_SIZE	1500
-#define IP_FRAG_TIMEOUT		50
-
 /** An IPv4 packet header */
 struct iphdr {
 	uint8_t  verhdrlen;
@@ -73,20 +70,16 @@ struct ipv4_miniroute {
 	struct in_addr gateway;
 };
 
-/* Fragment reassembly buffer */
-struct frag_buffer {
-	/* Identification number */
-	uint16_t ident;
-	/* Source network address */
-	struct in_addr src;
-	/* Destination network address */
-	struct in_addr dest;
-	/* Reassembled I/O buffer */
-	struct io_buffer *frag_iob;
-	/* Reassembly timer */
-	struct retry_timer frag_timer;
+/* IPv4 fragment reassembly buffer */
+struct ipv4_fragment {
 	/* List of fragment reassembly buffers */
 	struct list_head list;
+	/** Reassembled packet */
+	struct io_buffer *iobuf;
+	/** Current offset */
+	size_t offset;
+	/** Reassembly timer */
+	struct retry_timer timer;
 };
 
 extern struct list_head ipv4_miniroutes;
