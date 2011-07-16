@@ -50,16 +50,16 @@ add_ipv4_miniroute ( struct net_device *netdev, struct in_addr address,
 		     struct in_addr netmask, struct in_addr gateway ) {
 	struct ipv4_miniroute *miniroute;
 
-	DBG ( "IPv4 add %s", inet_ntoa ( address ) );
-	DBG ( "/%s ", inet_ntoa ( netmask ) );
+	DBGC ( netdev, "IPv4 add %s", inet_ntoa ( address ) );
+	DBGC ( netdev, "/%s ", inet_ntoa ( netmask ) );
 	if ( gateway.s_addr )
-		DBG ( "gw %s ", inet_ntoa ( gateway ) );
-	DBG ( "via %s\n", netdev->name );
+		DBGC ( netdev, "gw %s ", inet_ntoa ( gateway ) );
+	DBGC ( netdev, "via %s\n", netdev->name );
 
 	/* Allocate and populate miniroute structure */
 	miniroute = malloc ( sizeof ( *miniroute ) );
 	if ( ! miniroute ) {
-		DBG ( "IPv4 could not add miniroute\n" );
+		DBGC ( netdev, "IPv4 could not add miniroute\n" );
 		return NULL;
 	}
 
@@ -87,12 +87,13 @@ add_ipv4_miniroute ( struct net_device *netdev, struct in_addr address,
  * @v miniroute		Routing table entry
  */
 static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
+	struct net_device *netdev = miniroute->netdev;
 
-	DBG ( "IPv4 del %s", inet_ntoa ( miniroute->address ) );
-	DBG ( "/%s ", inet_ntoa ( miniroute->netmask ) );
+	DBGC ( netdev, "IPv4 del %s", inet_ntoa ( miniroute->address ) );
+	DBGC ( netdev, "/%s ", inet_ntoa ( miniroute->netmask ) );
 	if ( miniroute->gateway.s_addr )
-		DBG ( "gw %s ", inet_ntoa ( miniroute->gateway ) );
-	DBG ( "via %s\n", miniroute->netdev->name );
+		DBGC ( netdev, "gw %s ", inet_ntoa ( miniroute->gateway ) );
+	DBGC ( netdev, "via %s\n", miniroute->netdev->name );
 
 	netdev_put ( miniroute->netdev );
 	list_del ( &miniroute->list );
@@ -143,7 +144,8 @@ static void ipv4_fragment_expired ( struct retry_timer *timer,
 		container_of ( timer, struct ipv4_fragment, timer );
 	struct iphdr *iphdr = frag->iobuf->data;
 
-	DBG ( "IPv4 fragment %04x expired\n", ntohs ( iphdr->ident ) );
+	DBGC ( iphdr->src, "IPv4 fragment %04x expired\n",
+	       ntohs ( iphdr->ident ) );
 	free_iob ( frag->iobuf );
 	list_del ( &frag->list );
 	free ( frag );
@@ -192,8 +194,9 @@ static struct io_buffer * ipv4_reassemble ( struct io_buffer *iobuf ) {
 	/* Drop out-of-order fragments */
 	expected_offset = ( frag ? frag->offset : 0 );
 	if ( offset != expected_offset ) {
-		DBG ( "IPv4 dropping out-of-sequence fragment %04x (%zd+%zd, "
-		      "expected %zd)\n", ntohs ( iphdr->ident ), offset,
+		DBGC ( iphdr->src, "IPv4 dropping out-of-sequence fragment "
+		       "%04x (%zd+%zd, expected %zd)\n",
+		       ntohs ( iphdr->ident ), offset,
 		      ( iob_len ( iobuf ) - hdrlen ), expected_offset );
 		goto drop;
 	}
@@ -217,9 +220,9 @@ static struct io_buffer * ipv4_reassemble ( struct io_buffer *iobuf ) {
 		new_iobuf = alloc_iob ( iob_len ( frag->iobuf ) +
 					iob_len ( iobuf ) );
 		if ( ! new_iobuf ) {
-			DBG ( "IPv4 could not extend reassembly buffer to "
-			      "%zd bytes\n",
-			      ( iob_len ( frag->iobuf ) + iob_len ( iobuf ) ) );
+			DBGC ( iphdr->src, "IPv4 could not extend reassembly "
+			       "buffer to %zd bytes\n",
+			       iob_len ( frag->iobuf ) + iob_len ( iobuf ) );
 			goto drop;
 		}
 		memcpy ( iob_put ( new_iobuf, iob_len ( frag->iobuf ) ),
@@ -356,7 +359,8 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		netdev = miniroute->netdev;
 	}
 	if ( ! netdev ) {
-		DBG ( "IPv4 has no route to %s\n", inet_ntoa ( iphdr->dest ) );
+		DBGC ( sin_dest->sin_addr, "IPv4 has no route to %s\n",
+		       inet_ntoa ( iphdr->dest ) );
 		rc = -ENETUNREACH;
 		goto err;
 	}
@@ -372,8 +376,8 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	/* Determine link-layer destination address */
 	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, netmask, netdev,
 				   ll_dest ) ) != 0 ) {
-		DBG ( "IPv4 has no link-layer address for %s: %s\n",
-		      inet_ntoa ( next_hop ), strerror ( rc ) );
+		DBGC ( sin_dest->sin_addr, "IPv4 has no link-layer address for "
+		       "%s: %s\n", inet_ntoa ( next_hop ), strerror ( rc ) );
 		/* Record error for diagnosis */
 		netdev_tx_err ( netdev, iob_disown ( iobuf ), rc );
 		goto err;
@@ -385,16 +389,17 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	iphdr->chksum = tcpip_chksum ( iphdr, sizeof ( *iphdr ) );
 
 	/* Print IP4 header for debugging */
-	DBG ( "IPv4 TX %s->", inet_ntoa ( iphdr->src ) );
-	DBG ( "%s len %d proto %d id %04x csum %04x\n",
-	      inet_ntoa ( iphdr->dest ), ntohs ( iphdr->len ), iphdr->protocol,
-	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
+	DBGC2 ( sin_dest->sin_addr, "IPv4 TX %s->", inet_ntoa ( iphdr->src ) );
+	DBGC2 ( sin_dest->sin_addr, "%s len %d proto %d id %04x csum %04x\n",
+		inet_ntoa ( iphdr->dest ), ntohs ( iphdr->len ),
+		iphdr->protocol, ntohs ( iphdr->ident ),
+		ntohs ( iphdr->chksum ) );
 
 	/* Hand off to link layer */
 	if ( ( rc = net_tx ( iobuf, netdev, &ipv4_protocol, ll_dest,
 			     netdev->ll_addr ) ) != 0 ) {
-		DBG ( "IPv4 could not transmit packet via %s: %s\n",
-		      netdev->name, strerror ( rc ) );
+		DBGC ( sin_dest->sin_addr, "IPv4 could not transmit packet "
+		       "via %s: %s\n", netdev->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -472,39 +477,40 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 
 	/* Sanity check the IPv4 header */
 	if ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) {
-		DBG ( "IPv4 packet too short at %zd bytes (min %zd bytes)\n",
-		      iob_len ( iobuf ), sizeof ( *iphdr ) );
+		DBGC ( iphdr->src, "IPv4 packet too short at %zd bytes (min "
+		       "%zd bytes)\n", iob_len ( iobuf ), sizeof ( *iphdr ) );
 		goto err;
 	}
 	if ( ( iphdr->verhdrlen & IP_MASK_VER ) != IP_VER ) {
-		DBG ( "IPv4 version %#02x not supported\n", iphdr->verhdrlen );
+		DBGC ( iphdr->src, "IPv4 version %#02x not supported\n",
+		       iphdr->verhdrlen );
 		goto err;
 	}
 	hdrlen = ( ( iphdr->verhdrlen & IP_MASK_HLEN ) * 4 );
 	if ( hdrlen < sizeof ( *iphdr ) ) {
-		DBG ( "IPv4 header too short at %zd bytes (min %zd bytes)\n",
-		      hdrlen, sizeof ( *iphdr ) );
+		DBGC ( iphdr->src, "IPv4 header too short at %zd bytes (min "
+		       "%zd bytes)\n", hdrlen, sizeof ( *iphdr ) );
 		goto err;
 	}
 	if ( hdrlen > iob_len ( iobuf ) ) {
-		DBG ( "IPv4 header too long at %zd bytes "
-		      "(packet is %zd bytes)\n", hdrlen, iob_len ( iobuf ) );
+		DBGC ( iphdr->src, "IPv4 header too long at %zd bytes "
+		       "(packet is %zd bytes)\n", hdrlen, iob_len ( iobuf ) );
 		goto err;
 	}
 	if ( ( csum = tcpip_chksum ( iphdr, hdrlen ) ) != 0 ) {
-		DBG ( "IPv4 checksum incorrect (is %04x including checksum "
-		      "field, should be 0000)\n", csum );
+		DBGC ( iphdr->src, "IPv4 checksum incorrect (is %04x "
+		       "including checksum field, should be 0000)\n", csum );
 		goto err;
 	}
 	len = ntohs ( iphdr->len );
 	if ( len < hdrlen ) {
-		DBG ( "IPv4 length too short at %zd bytes "
-		      "(header is %zd bytes)\n", len, hdrlen );
+		DBGC ( iphdr->src, "IPv4 length too short at %zd bytes "
+		       "(header is %zd bytes)\n", len, hdrlen );
 		goto err;
 	}
 	if ( len > iob_len ( iobuf ) ) {
-		DBG ( "IPv4 length too long at %zd bytes "
-		      "(packet is %zd bytes)\n", len, iob_len ( iobuf ) );
+		DBGC ( iphdr->src, "IPv4 length too long at %zd bytes "
+		       "(packet is %zd bytes)\n", len, iob_len ( iobuf ) );
 		goto err;
 	}
 
@@ -512,17 +518,17 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	iob_unput ( iobuf, ( iob_len ( iobuf ) - len ) );
 
 	/* Print IPv4 header for debugging */
-	DBG ( "IPv4 RX %s<-", inet_ntoa ( iphdr->dest ) );
-	DBG ( "%s len %d proto %d id %04x csum %04x\n",
-	      inet_ntoa ( iphdr->src ), ntohs ( iphdr->len ), iphdr->protocol,
-	      ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
+	DBGC2 ( iphdr->src, "IPv4 RX %s<-", inet_ntoa ( iphdr->dest ) );
+	DBGC2 ( iphdr->src, "%s len %d proto %d id %04x csum %04x\n",
+		inet_ntoa ( iphdr->src ), ntohs ( iphdr->len ), iphdr->protocol,
+		ntohs ( iphdr->ident ), ntohs ( iphdr->chksum ) );
 
 	/* Discard unicast packets not destined for us */
 	if ( ( ! ( flags & LL_MULTICAST ) ) &&
 	     ipv4_has_any_addr ( netdev ) &&
 	     ( ! ipv4_has_addr ( netdev, iphdr->dest ) ) ) {
-		DBG ( "IPv4 discarding non-local unicast packet for %s\n",
-		      inet_ntoa ( iphdr->dest ) );
+		DBGC ( iphdr->src, "IPv4 discarding non-local unicast packet "
+		       "for %s\n", inet_ntoa ( iphdr->dest ) );
 		goto err;
 	}
 
@@ -551,8 +557,8 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	iob_pull ( iobuf, hdrlen );
 	if ( ( rc = tcpip_rx ( iobuf, iphdr->protocol, &src.st,
 			       &dest.st, pshdr_csum ) ) != 0 ) {
-		DBG ( "IPv4 received packet rejected by stack: %s\n",
-		      strerror ( rc ) );
+		DBGC ( src.sin.sin_addr, "IPv4 received packet rejected by "
+		       "stack: %s\n", strerror ( rc ) );
 		return rc;
 	}
 
