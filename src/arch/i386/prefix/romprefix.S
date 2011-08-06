@@ -445,7 +445,7 @@ get_pmm:
 	/* Preserve registers */
 	pushl	%eax
 	pushw	%di
-	movw	$' ', %di
+	movw	$( ' ' ), %di
 get_pmm_find:
 	/* Try to find existing block */
 	pushl	%ebx		/* PMM handle */
@@ -474,7 +474,7 @@ get_pmm_allocate:
 	pushw	%dx
 	pushw	%ax
 	popl	%esi
-	movw	$'+', %di	/* Indicate allocation attempt */
+	movw	$( '+' ), %di	/* Indicate allocation attempt */
 	testl	%esi, %esi
 	jnz	get_pmm_done
 	stc
