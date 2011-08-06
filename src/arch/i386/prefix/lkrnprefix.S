@@ -160,7 +160,7 @@ relocatable_kernel:
 pad2:
 	.byte	0, 0, 0
 cmdline_size:
-	.long	0
+	.long	0x7ff
 hardware_subarch:
 	.long	0
 hardware_subarch_data:
