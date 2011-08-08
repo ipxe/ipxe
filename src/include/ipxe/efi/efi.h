@@ -142,5 +142,7 @@ extern EFI_SYSTEM_TABLE *efi_systab;
 extern const char * efi_strerror ( EFI_STATUS efirc );
 extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
+extern int efi_download_install ( EFI_HANDLE *device_handle );
+extern void efi_download_uninstall ( EFI_HANDLE device_handle );
 
 #endif /* _IPXE_EFI_H */
