@@ -221,11 +221,17 @@ static const char *goto_label;
  * @ret rc		Return status code
  */
 static int goto_find_label ( const char *line ) {
+	size_t len = strlen ( goto_label );
 
 	if ( line[0] != ':' )
 		return -ENOENT;
-	if ( strcmp ( goto_label, &line[1] ) != 0 )
+
+	if ( strncmp ( goto_label, &line[1], len ) != 0 )
 		return -ENOENT;
+
+	if ( line[ 1 + len ] && ! isspace ( line[ 1 + len ] ) )
+		return -ENOENT;
+
 	return 0;
 }
 
