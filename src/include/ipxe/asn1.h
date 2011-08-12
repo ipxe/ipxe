@@ -28,7 +28,19 @@ struct asn1_cursor {
 	size_t len;
 };
 
+/**
+ * Invalidate ASN.1 object cursor
+ *
+ * @v cursor		ASN.1 object cursor
+ */
+static inline __attribute__ (( always_inline )) void
+asn1_invalidate_cursor ( struct asn1_cursor *cursor ) {
+	cursor->len = 0;
+}
+
 extern int asn1_enter ( struct asn1_cursor *cursor, unsigned int type );
+extern int asn1_skip_if_exists ( struct asn1_cursor *cursor,
+				 unsigned int type );
 extern int asn1_skip ( struct asn1_cursor *cursor, unsigned int type );
 
 #endif /* _IPXE_ASN1_H */

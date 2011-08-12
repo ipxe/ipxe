@@ -55,7 +55,7 @@ static int x509_public_key ( const struct asn1_cursor *certificate,
 	memcpy ( &cursor, certificate, sizeof ( cursor ) );
 	rc = ( asn1_enter ( &cursor, ASN1_SEQUENCE ), /* Certificate */
 	       asn1_enter ( &cursor, ASN1_SEQUENCE ), /* tbsCertificate */
-	       asn1_skip ( &cursor, ASN1_EXPLICIT_TAG ), /* version */
+	       asn1_skip_if_exists ( &cursor, ASN1_EXPLICIT_TAG ), /* version */
 	       asn1_skip ( &cursor, ASN1_INTEGER ), /* serialNumber */
 	       asn1_skip ( &cursor, ASN1_SEQUENCE ), /* signature */
 	       asn1_skip ( &cursor, ASN1_SEQUENCE ), /* issuer */

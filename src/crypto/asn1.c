@@ -29,6 +29,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/* Disambiguate the various error causes */
+#define EINVAL_ASN1_EMPTY \
+	__einfo_error ( EINFO_EINVAL_ASN1_EMPTY )
+#define EINFO_EINVAL_ASN1_EMPTY \
+	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Empty or underlength cursor" )
+#define EINVAL_ASN1_LEN_LEN \
+	__einfo_error ( EINFO_EINVAL_ASN1_LEN_LEN )
+#define EINFO_EINVAL_ASN1_LEN_LEN \
+	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Length field overruns cursor" )
+#define EINVAL_ASN1_LEN \
+	__einfo_error ( EINFO_EINVAL_ASN1_LEN )
+#define EINFO_EINVAL_ASN1_LEN \
+	__einfo_uniqify ( EINFO_EINVAL, 0x03, "Field overruns cursor" )
+
 /**
  * Start parsing ASN.1 object
  *
@@ -40,32 +54,23 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * object body (i.e. the first byte following the length byte(s)), and
  * the length of the object body (i.e. the number of bytes until the
  * following object tag, if any) is returned.
- *
- * If any error occurs (i.e. if the object is not of the expected
- * type, or if we overflow beyond the end of the ASN.1 object), then
- * the cursor will be invalidated and a negative value will be
- * returned.
  */
-static int asn1_start ( struct asn1_cursor *cursor,
-			       unsigned int type ) {
+static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 	unsigned int len_len;
 	unsigned int len;
-	int rc;
 
 	/* Sanity check */
 	if ( cursor->len < 2 /* Tag byte and first length byte */ ) {
 		if ( cursor->len )
 			DBGC ( cursor, "ASN1 %p too short\n", cursor );
-		rc = -EINVAL;
-		goto notfound;
+		return -EINVAL_ASN1_EMPTY;
 	}
 
 	/* Check the tag byte */
 	if ( *( ( uint8_t * ) cursor->data ) != type ) {
 		DBGC ( cursor, "ASN1 %p type mismatch (expected %d, got %d)\n",
 		       cursor, type, *( ( uint8_t * ) cursor->data ) );
-		rc = -ENXIO;
-		goto notfound;
+		return -ENXIO;
 	}
 	cursor->data++;
 	cursor->len--;
@@ -82,8 +87,7 @@ static int asn1_start ( struct asn1_cursor *cursor,
 	if ( cursor->len < len_len ) {
 		DBGC ( cursor, "ASN1 %p bad length field length %d (max "
 		       "%zd)\n", cursor, len_len, cursor->len );
-		rc = -EINVAL;
-		goto notfound;
+		return -EINVAL_ASN1_LEN_LEN;
 	}
 
 	/* Extract the length and sanity check */
@@ -96,16 +100,10 @@ static int asn1_start ( struct asn1_cursor *cursor,
 	if ( cursor->len < len ) {
 		DBGC ( cursor, "ASN1 %p bad length %d (max %zd)\n",
 		       cursor, len, cursor->len );
-		rc = -EINVAL;
-		goto notfound;
+		return -EINVAL_ASN1_LEN;
 	}
 
 	return len;
-
- notfound:
-	cursor->data = NULL;
-	cursor->len = 0;
-	return rc;
 }
 
 /**
@@ -123,12 +121,45 @@ int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
 	len = asn1_start ( cursor, type );
-	if ( len < 0 )
+	if ( len < 0 ) {
+		asn1_invalidate_cursor ( cursor );
 		return len;
+	}
 
 	cursor->len = len;
 	DBGC ( cursor, "ASN1 %p entered object type %02x (len %x)\n",
 	       cursor, type, len );
+
+	return 0;
+}
+
+/**
+ * Skip ASN.1 object if present
+ *
+ * @v cursor		ASN.1 object cursor
+ * @v type		Expected type
+ * @ret rc		Return status code
+ *
+ * The object cursor will be updated to point to the next ASN.1
+ * object.  If any error occurs, the object cursor will not be
+ * modified.
+ */
+int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
+	int len;
+
+	len = asn1_start ( cursor, type );
+	if ( len < 0 )
+		return len;
+
+	cursor->data += len;
+	cursor->len -= len;
+	DBGC ( cursor, "ASN1 %p skipped object type %02x (len %x)\n",
+	       cursor, type, len );
+
+	if ( ! cursor->len ) {
+		DBGC ( cursor, "ASN1 %p reached end of object\n", cursor );
+		return -ENOENT;
+	}
 
 	return 0;
 }
@@ -145,21 +176,11 @@ int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
  * invalidated.
  */
 int asn1_skip ( struct asn1_cursor *cursor, unsigned int type ) {
-	int len;
+	int rc;
 
-	len = asn1_start ( cursor, type );
-	if ( len < 0 )
-		return len;
-
-	cursor->data += len;
-	cursor->len -= len;
-	DBGC ( cursor, "ASN1 %p skipped object type %02x (len %x)\n",
-	       cursor, type, len );
-
-	if ( ! cursor->len ) {
-		DBGC ( cursor, "ASN1 %p reached end of object\n", cursor );
-		cursor->data = NULL;
-		return -ENOENT;
+	if ( ( rc = asn1_skip_if_exists ( cursor, type ) ) < 0 ) {
+		asn1_invalidate_cursor ( cursor );
+		return rc;
 	}
 
 	return 0;
