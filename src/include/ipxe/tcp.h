@@ -309,6 +309,16 @@ struct tcp_options {
 #define TCP_MSL ( 2 * 60 * TICKS_PER_SEC )
 
 /**
+ * TCP maximum header length
+ *
+ */
+#define TCP_MAX_HEADER_LEN					\
+	( MAX_LL_NET_HEADER_LEN +				\
+	  sizeof ( struct tcp_header ) +			\
+	  sizeof ( struct tcp_mss_option ) +			\
+	  sizeof ( struct tcp_timestamp_padded_option ) )
+
+/**
  * Compare TCP sequence numbers
  *
  * @v seq1		Sequence number 1
