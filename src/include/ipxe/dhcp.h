@@ -660,15 +660,18 @@ struct dhcphdr {
 /** Setting block name used for BootServerDHCP responses */
 #define PXEBS_SETTINGS_NAME "pxebs"
 
+extern uint32_t dhcp_last_xid;
 extern unsigned int dhcp_chaddr ( struct net_device *netdev, void *chaddr,
 				  uint16_t *flags );
 extern int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 				struct net_device *netdev, uint8_t msgtype,
-				const void *options, size_t options_len,
-				void *data, size_t max_len );
+				uint32_t xid, const void *options,
+				size_t options_len, void *data,
+				size_t max_len );
 extern int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 				 struct net_device *netdev,
-				 unsigned int msgtype, struct in_addr ciaddr,
+				 unsigned int msgtype, uint32_t xid,
+				 struct in_addr ciaddr,
 				 void *data, size_t max_len );
 extern int start_dhcp ( struct interface *job, struct net_device *netdev );
 extern int start_pxebs ( struct interface *job, struct net_device *netdev,
