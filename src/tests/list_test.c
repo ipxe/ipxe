@@ -124,6 +124,8 @@ static int list_check_contents ( struct list_head *list,
  */
 static void list_test_exec ( void ) {
 	struct list_head *list = &test_list;
+	struct list_head target_list;
+	struct list_head *target = &target_list;
 
 	/* Test initialiser and list_empty() */
 	ok ( list_empty ( list ) );
@@ -152,6 +154,176 @@ static void list_test_exec ( void ) {
 	list_del ( &list_tests[8].list ); /* delete all */
 	list_contents_ok ( list, "" );
 	ok ( list_empty ( list ) );
+
+	/* Test list_is_singular() */
+	INIT_LIST_HEAD ( list );
+	ok ( ! list_is_singular ( list ) );
+	list_add ( &list_tests[1].list, list );
+	ok ( list_is_singular ( list ) );
+	list_add ( &list_tests[3].list, list );
+	ok ( ! list_is_singular ( list ) );
+	list_del ( &list_tests[1].list );
+	ok ( list_is_singular ( list ) );
+
+	/* Test list_is_last() */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[6].list, list );
+	ok ( list_is_last ( &list_tests[6].list, list ) );
+	list_add_tail ( &list_tests[4].list, list );
+	ok ( list_is_last ( &list_tests[4].list, list ) );
+	ok ( ! list_is_last ( &list_tests[6].list, list ) );
+
+	/* Test list_cut_position() - empty list */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_cut_position ( target, list, list );
+	list_contents_ok ( list, "" );
+	list_contents_ok ( target, "" );
+
+	/* Test list_cut_position() - singular list, move nothing */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[4].list, list );
+	list_cut_position ( target, list, list );
+	list_contents_ok ( list, "4" );
+	list_contents_ok ( target, "" );
+
+	/* Test list_cut_position() - singular list, move singular entry */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[9].list, list );
+	list_cut_position ( target, list, &list_tests[9].list );
+	list_contents_ok ( list, "" );
+	list_contents_ok ( target, "9" );
+
+	/* Test list_cut_position() - multi-entry list, move nothing */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[3].list, list );
+	list_add_tail ( &list_tests[2].list, list );
+	list_add_tail ( &list_tests[7].list, list );
+	INIT_LIST_HEAD ( target );
+	list_cut_position ( target, list, list );
+	list_contents_ok ( list, "327" );
+	list_contents_ok ( target, "" );
+
+	/* Test list_cut_position() - multi-entry list, move some */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[8].list, list );
+	list_add_tail ( &list_tests[0].list, list );
+	list_add_tail ( &list_tests[9].list, list );
+	list_add_tail ( &list_tests[3].list, list );
+	list_add_tail ( &list_tests[2].list, list );
+	list_cut_position ( target, list, &list_tests[0].list );
+	list_contents_ok ( list, "932" );
+	list_contents_ok ( target, "80" );
+
+	/* Test list_cut_position() - multi-entry list, move everything */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[3].list, list );
+	list_add_tail ( &list_tests[5].list, list );
+	list_add_tail ( &list_tests[4].list, list );
+	list_add_tail ( &list_tests[7].list, list );
+	list_add_tail ( &list_tests[1].list, list );
+	list_cut_position ( target, list, &list_tests[1].list );
+	list_contents_ok ( list, "" );
+	list_contents_ok ( target, "35471" );
+
+	/* Test list_splice() - empty list */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_splice ( list, target );
+	list_contents_ok ( list, "" );
+	list_contents_ok ( target, "" );
+
+	/* Test list_splice() - both lists empty */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_splice ( list, target );
+	list_contents_ok ( target, "" );
+
+	/* Test list_splice() - source list empty */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[1].list, target );
+	list_add_tail ( &list_tests[3].list, target );
+	list_splice ( list, &list_tests[1].list );
+	list_contents_ok ( target, "13" );
+
+	/* Test list_splice() - destination list empty */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[6].list, list );
+	list_add_tail ( &list_tests[5].list, list );
+	list_add_tail ( &list_tests[2].list, list );
+	list_splice ( list, target );
+	list_contents_ok ( target, "652" );
+
+	/* Test list_splice() - both lists non-empty */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[8].list, list );
+	list_add_tail ( &list_tests[4].list, list );
+	list_add_tail ( &list_tests[5].list, list );
+	list_add_tail ( &list_tests[1].list, target );
+	list_add_tail ( &list_tests[9].list, target );
+	list_splice ( list, &list_tests[1].list );
+	list_contents_ok ( target, "18459" );
+
+	/* Test list_splice_tail() - both lists empty */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_splice_tail ( list, target );
+	list_contents_ok ( target, "" );
+
+	/* Test list_splice_tail() - source list empty */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[5].list, target );
+	list_splice_tail ( list, &list_tests[5].list );
+	list_contents_ok ( target, "5" );
+
+	/* Test list_splice_tail() - destination list empty */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[2].list, list );
+	list_add_tail ( &list_tests[1].list, list );
+	list_add_tail ( &list_tests[0].list, list );
+	list_splice_tail ( list, target );
+	list_contents_ok ( target, "210" );
+
+	/* Test list_splice_tail() - both lists non-empty */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[9].list, list );
+	list_add_tail ( &list_tests[5].list, list );
+	list_add_tail ( &list_tests[7].list, list );
+	list_add_tail ( &list_tests[2].list, target );
+	list_add_tail ( &list_tests[4].list, target );
+	list_splice_tail ( list, &list_tests[2].list );
+	list_contents_ok ( target, "95724" );
+
+	/* Test list_splice_init() */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[4].list, list );
+	list_add_tail ( &list_tests[1].list, target );
+	list_splice_init ( list, target );
+	ok ( list_empty ( list ) );
+	list_contents_ok ( list, "" );
+	list_contents_ok ( target, "41" );
+
+	/* Test list_splice_tail_init() */
+	INIT_LIST_HEAD ( list );
+	INIT_LIST_HEAD ( target );
+	list_add_tail ( &list_tests[3].list, list );
+	list_add_tail ( &list_tests[2].list, list );
+	list_add_tail ( &list_tests[5].list, target );
+	list_splice_tail_init ( list, &list_tests[5].list );
+	ok ( list_empty ( list ) );
+	list_contents_ok ( list, "" );
+	list_contents_ok ( target, "325" );
 
 	/* Test list_entry() */
 	INIT_LIST_HEAD ( &list_tests[3].list );  // for list_check()
