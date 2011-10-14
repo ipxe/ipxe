@@ -18,6 +18,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ASSERTING 1
 #endif
 
+extern unsigned int assertion_failures;
+
 /** printf() for assertions
  *
  * This function exists so that the assert() macro can expand to
@@ -43,6 +45,7 @@ assert_printf ( const char *fmt, ... ) asm ( "printf" );
 #define assert( condition ) 						     \
 	do { 								     \
 		if ( ASSERTING && ! (condition) ) { 			     \
+			assertion_failures++;				     \
 			assert_printf ( "assert(%s) failed at %s line %d\n", \
 					#condition, __FILE__, __LINE__ );    \
 		} 							     \
