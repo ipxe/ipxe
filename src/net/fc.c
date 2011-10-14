@@ -1625,7 +1625,7 @@ void fc_ulp_detach ( struct fc_ulp_user *user ) {
 		return;
 
 	/* Sanity checks */
-	list_check_contains ( user, &ulp->users, list );
+	list_check_contains_entry ( user, &ulp->users, list );
 
 	/* Detach user and log out if no users remain */
 	list_del ( &user->list );

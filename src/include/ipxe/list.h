@@ -171,6 +171,18 @@ static inline int list_empty ( const struct list_head *list ) {
 	  list_entry ( (list)->next, type, member ) )
 
 /**
+ * Iterate over a list
+ *
+ * @v pos		Iterator
+ * @v head		List head
+ */
+#define list_for_each( pos, head )					      \
+	for ( list_check ( (head) ),					      \
+	      pos = (head)->next;					      \
+	      pos != (head);						      \
+	      pos = (pos)->next )
+
+/**
  * Iterate over entries in a list
  *
  * @v pos		Iterator
@@ -213,22 +225,46 @@ static inline int list_empty ( const struct list_head *list ) {
 	      tmp = list_entry ( tmp->member.next, typeof ( *tmp ), member ) )
 
 /**
+ * Test if list contains a specified entry
+ *
+ * @v entry		Entry
+ * @v head		List head
+ * @ret present		List contains specified entry
+ */
+static inline int list_contains ( struct list_head *entry,
+				  struct list_head *head ) {
+	struct list_head *tmp;
+
+	list_for_each ( tmp, head ) {
+		if ( tmp == entry )
+			return 1;
+	}
+	return 0;
+}
+#define list_contains( entry, head ) ( {		\
+	list_check ( (head) );				\
+	list_check ( (entry) );				\
+	list_contains ( (entry), (head) ); } )
+
+/**
+ * Test if list contains a specified entry
+ *
+ * @v entry		Entry
+ * @v head		List head
+ * @ret present		List contains specified entry
+ */
+#define list_contains_entry( entry, head, member )	\
+	list_contains ( &(entry)->member, (head) )
+
+/**
  * Check list contains a specified entry
  *
  * @v entry		Entry
  * @v head		List head
  * @v member		Name of list field within iterator's type
  */
-#define list_check_contains( entry, head, member ) do {		\
-	if ( ASSERTING ) {					\
-		typeof ( entry ) tmp;				\
-		int found = 0;					\
-		list_for_each_entry ( tmp, head, member ) {	\
-			if ( tmp == entry )			\
-				found = 1;			\
-		}						\
-		assert ( found );				\
-	}							\
+#define list_check_contains_entry( entry, head, member ) do {		      \
+	assert ( list_contains_entry ( (entry), (head), member ) );	      \
 	} while ( 0 )
 
 #endif /* _IPXE_LIST_H */

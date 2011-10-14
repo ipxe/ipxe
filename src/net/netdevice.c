@@ -233,7 +233,7 @@ void netdev_tx_complete_err ( struct net_device *netdev,
 			      struct io_buffer *iobuf, int rc ) {
 
 	/* Catch data corruption as early as possible */
-	list_check_contains ( iobuf, &netdev->tx_queue, list );
+	list_check_contains_entry ( iobuf, &netdev->tx_queue, list );
 
 	/* Dequeue and free I/O buffer */
 	list_del ( &iobuf->list );
