@@ -137,6 +137,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_virtio_net	     ( ERRFILE_DRIVER | 0x005c0000 )
 #define ERRFILE_tap		     ( ERRFILE_DRIVER | 0x005d0000 )
 #define ERRFILE_igbvf_main	     ( ERRFILE_DRIVER | 0x005e0000 )
+#define ERRFILE_ath9k		     ( ERRFILE_DRIVER | 0x005f0000 )
+#define ERRFILE_ath		     ( ERRFILE_DRIVER | 0x00600000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )

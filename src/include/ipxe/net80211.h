@@ -272,7 +272,7 @@ enum net80211_crypto_alg {
 #define NET80211_MAX_RATES	16
 
 /** The maximum number of channels we allow to be configured simultaneously */
-#define NET80211_MAX_CHANNELS	32
+#define NET80211_MAX_CHANNELS	40
 
 /** Seconds we'll wait to get all fragments of a packet */
 #define NET80211_FRAG_TIMEOUT	2
