@@ -27,7 +27,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <unistd.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
-#include <ipxe/nap.h>
 #include <ipxe/timer.h>
 
 /** @file
@@ -77,43 +76,4 @@ static int time_exec ( int argc, char **argv ) {
 struct command time_command __command = {
 	.name = "time",
 	.exec = time_exec,
-};
-
-/** "sleep" options */
-struct sleep_options {};
-
-/** "sleep" option list */
-static struct option_descriptor sleep_opts[] = {};
-
-/** "sleep" command descriptor */
-static struct command_descriptor sleep_cmd =
-	COMMAND_DESC ( struct sleep_options, sleep_opts, 1, 1, "<seconds>" );
-
-/**
- * "sleep" command
- *
- * @v argc		Argument count
- * @v argv		Argument list
- * @ret rc		Return status code
- */
-static int sleep_exec ( int argc, char **argv ) {
-	struct sleep_options opts;
-	unsigned long start, delay;
-	int rc;
-
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &sleep_cmd, &opts ) ) != 0 )
-		return rc;
-
-	start = currticks();
-	delay = strtoul ( argv[1], NULL, 0 ) * ticks_per_sec();
-	while ( ( currticks() - start ) <= delay )
-		cpu_nap();
-	return 0;
-}
-
-/** "sleep" command */
-struct command sleep_command __command = {
-	.name = "sleep",
-	.exec = sleep_exec,
 };
