@@ -31,6 +31,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/settings.h>
+#include <ipxe/console.h>
+#include <ipxe/keys.h>
+#include <ipxe/process.h>
 #include <ipxe/nap.h>
 #include <ipxe/shell.h>
 
@@ -564,8 +567,12 @@ static int sleep_exec ( int argc, char **argv ) {
 	/* Delay for specified number of seconds */
 	start = currticks();
 	delay = ( seconds * TICKS_PER_SEC );
-	while ( ( currticks() - start ) <= delay )
+	while ( ( currticks() - start ) <= delay ) {
+		step();
+		if ( iskey() && ( getchar() == CTRL_C ) )
+			return -ECANCELED;
 		cpu_nap();
+	}
 
 	return 0;
 }
