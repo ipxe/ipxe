@@ -548,17 +548,25 @@ static struct command_descriptor sleep_cmd =
  */
 static int sleep_exec ( int argc, char **argv ) {
 	struct sleep_options opts;
-	unsigned long start, delay;
+	unsigned int seconds;
+	unsigned long start;
+	unsigned long delay;
 	int rc;
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &sleep_cmd, &opts ) ) != 0 )
 		return rc;
 
+	/* Parse number of seconds */
+	if ( ( rc = parse_integer ( argv[optind], &seconds ) ) != 0 )
+		return rc;
+
+	/* Delay for specified number of seconds */
 	start = currticks();
-	delay = strtoul ( argv[1], NULL, 0 ) * ticks_per_sec();
+	delay = ( seconds * TICKS_PER_SEC );
 	while ( ( currticks() - start ) <= delay )
 		cpu_nap();
+
 	return 0;
 }
 
