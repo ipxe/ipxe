@@ -96,8 +96,11 @@ test_a20_long:
 	.section ".text16.early", "awx", @progbits
 	.code16
 enable_a20_bios:
-	/* Preserve registers */
-	pushw	%ax
+
+	/* Preserve registers.  Be very paranoid, since some BIOSes
+	 * are reported to clobber %ebx
+	 */
+	pushal
 
 	/* Attempt INT 15,2401 */
 	movw	$0x2401, %ax
@@ -108,7 +111,7 @@ enable_a20_bios:
 	call	test_a20_short
 
 99:	/* Restore registers and return */
-	popw	%ax
+	popal
 	ret
 	.size	enable_a20_bios, . - enable_a20_bios
 
