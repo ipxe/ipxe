@@ -11,11 +11,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/image.h>
 
-extern int register_and_put_image ( struct image *image );
-extern int register_and_probe_image ( struct image *image );
-extern int register_and_select_image ( struct image *image );
-extern int register_and_boot_image ( struct image *image );
-extern int register_and_replace_image ( struct image *image );
 extern int imgdownload ( struct uri *uri, const char *name, const char *cmdline,
 			 int ( * action ) ( struct image *image ) );
 extern int imgdownload_string ( const char *uri_string, const char *name,

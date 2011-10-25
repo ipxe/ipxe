@@ -114,8 +114,7 @@ static int imgfetch_core_exec ( int argc, char **argv,
  */
 static int imgfetch_exec ( int argc, char **argv ) {
 
-	return imgfetch_core_exec ( argc, argv, "fetch",
-				    register_and_put_image );
+	return imgfetch_core_exec ( argc, argv, "fetch", NULL );
 }
 
 /**
@@ -127,8 +126,7 @@ static int imgfetch_exec ( int argc, char **argv ) {
  */
 static int kernel_exec ( int argc, char **argv ) {
 
-	return imgfetch_core_exec ( argc, argv, "select",
-				    register_and_select_image );
+	return imgfetch_core_exec ( argc, argv, "select", image_select );
 }
 
 /**
@@ -140,8 +138,7 @@ static int kernel_exec ( int argc, char **argv ) {
  */
 static int chain_exec ( int argc, char **argv) {
 
-	return imgfetch_core_exec ( argc, argv, "boot",
-				    register_and_boot_image );
+	return imgfetch_core_exec ( argc, argv, "boot", image_exec );
 }
 
 /** "imgselect" options */

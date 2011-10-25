@@ -158,7 +158,7 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 	/* Attempt filename boot if applicable */
 	if ( filename ) {
 		if ( ( rc = imgdownload ( filename, NULL, NULL,
-					  register_and_boot_image ) ) != 0 ) {
+					  image_exec ) ) != 0 ) {
 			printf ( "\nCould not chain image: %s\n",
 				 strerror ( rc ) );
 			/* Fall through to (possibly) attempt a SAN boot

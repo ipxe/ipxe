@@ -224,8 +224,8 @@ int image_exec ( struct image *image ) {
 	/* Sanity check */
 	assert ( image->flags & IMAGE_REGISTERED );
 
-	/* Check that this image can be executed */
-	if ( ( rc = image_probe ( image ) ) != 0 )
+	/* Check that this image can be selected for execution */
+	if ( ( rc = image_select ( image ) ) != 0 )
 		return rc;
 
 	/* Switch current working directory to be that of the image itself */
@@ -301,6 +301,10 @@ int image_replace ( struct image *replacement ) {
 		       "image: %s\n", replacement->name, strerror ( rc ) );
 		return rc;
 	}
+
+	/* Check that the replacement image can be executed */
+	if ( ( rc = image_probe ( replacement ) ) != 0 )
+		return rc;
 
 	/* Clear any existing replacement */
 	image_put ( image->replacement );

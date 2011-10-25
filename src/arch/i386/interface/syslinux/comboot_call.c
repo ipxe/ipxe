@@ -185,7 +185,7 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 
 		/* Fetch initrd */
 		if ( ( rc = imgdownload_string ( initrd_file, NULL, NULL,
-						 register_and_put_image ))!=0){
+						 NULL ) ) != 0 ) {
 			DBG ( "COMBOOT: could not fetch initrd: %s\n",
 			      strerror ( rc ) );
 			return rc;
@@ -200,7 +200,7 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 
 	/* Allocate and fetch kernel */
 	if ( ( rc = imgdownload_string ( kernel_file, NULL, cmdline,
-					 register_and_replace_image ) ) != 0 ) {
+					 image_replace ) ) != 0 ) {
 		DBG ( "COMBOOT: could not fetch kernel: %s\n",
 		      strerror ( rc ) );
 		return rc;
