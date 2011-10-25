@@ -97,18 +97,18 @@ init_librm:
 	pushl	%eax
 	pushl	%ebx
 
-	/* Store _virt_offset and set up virtual_cs and virtual_ds segments */
+	/* Store virt_offset and set up virtual_cs and virtual_ds segments */
 	movl	%edi, %eax
 	movw	$virtual_cs, %bx
 	call	set_seg_base
 	movw	$virtual_ds, %bx
 	call	set_seg_base	
-	movl	%edi, _virt_offset
+	movl	%edi, rm_virt_offset
 
 	/* Negate virt_offset */
 	negl	%edi
 		
-	/* Store rm_cs and _text16, set up real_cs segment */
+	/* Store rm_cs and text16, set up real_cs segment */
 	xorl	%eax, %eax
 	movw	%cs, %ax
 	movw	%ax, rm_cs
@@ -116,9 +116,9 @@ init_librm:
 	movw	$real_cs, %bx
 	call	set_seg_base
 	addr32 leal	(%eax, %edi), %ebx
-	movl	%ebx, _text16
+	movl	%ebx, rm_text16
 
-	/* Store rm_ds and _data16, set up real_ds segment */
+	/* Store rm_ds and data16, set up real_ds segment */
 	xorl	%eax, %eax
 	movw	%ds, %ax
 	movw	%ax, %cs:rm_ds
@@ -126,7 +126,7 @@ init_librm:
 	movw	$real_ds, %bx
 	call	set_seg_base
 	addr32 leal	(%eax, %edi), %ebx
-	movl	%ebx, _data16
+	movl	%ebx, rm_data16
 
 	/* Set GDT and IDT base */
 	movl	%eax, gdt_base
@@ -182,12 +182,12 @@ real_to_prot:
 	movw	%cs:rm_ds, %ax
 	movw	%ax, %ds
 
-	/* Add _virt_offset, _text16 and _data16 to stack to be
+	/* Add virt_offset, text16 and data16 to stack to be
 	 * copied, and also copy the return address.
 	 */
-	pushl	_virt_offset
-	pushl	_text16
-	pushl	_data16
+	pushl	rm_virt_offset
+	pushl	rm_text16
+	pushl	rm_data16
 	addw	$16, %cx /* %ecx must be less than 64kB anyway */
 
 	/* Real-mode %ss:%sp => %ebp:%edx and virtual address => %esi */
@@ -197,7 +197,7 @@ real_to_prot:
 	movl	%ebp, %eax
 	shll	$4, %eax
 	addr32 leal (%eax,%edx), %esi
-	subl	_virt_offset, %esi
+	subl	rm_virt_offset, %esi
 
 	/* Switch to protected mode */
 	cli
@@ -557,9 +557,9 @@ pm_esp:	.long _estack
  */
 	/* Internal copies, created by init_librm (which runs in real mode) */
 	.section ".data16", "aw", @progbits
-_virt_offset:	.long 0
-_text16:	.long 0
-_data16:	.long 0
+rm_virt_offset:	.long 0
+rm_text16:	.long 0
+rm_data16:	.long 0
 
 	/* Externally-visible copies, created by real_to_prot */
 	.section ".data", "aw", @progbits
