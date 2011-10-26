@@ -120,12 +120,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define DHCP_CMD		/* DHCP management commands */
 #define SANBOOT_CMD		/* SAN boot commands */
 #define LOGIN_CMD		/* Login command */
-#undef	TIME_CMD		/* Time commands */
-#undef	DIGEST_CMD		/* Image crypto digest commands */
-#undef	LOTEST_CMD		/* Loopback testing commands */
-#undef	VLAN_CMD		/* VLAN commands */
-#undef	PXE_CMD			/* PXE commands */
-#undef	REBOOT_CMD		/* Reboot command */
+//#define TIME_CMD		/* Time commands */
+//#define DIGEST_CMD		/* Image crypto digest commands */
+//#define LOTEST_CMD		/* Loopback testing commands */
+//#define VLAN_CMD		/* VLAN commands */
+//#define PXE_CMD		/* PXE commands */
+//#define REBOOT_CMD		/* Reboot command */
 
 /*
  * ROM-specific options

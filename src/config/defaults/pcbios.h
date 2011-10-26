@@ -34,4 +34,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
 #define	SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
 
+#define	REBOOT_CMD		/* Reboot command */
+
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */
