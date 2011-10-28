@@ -63,6 +63,23 @@ struct errortab netdev_errors[] __errortab = {
 };
 
 /**
+ * Check whether or not network device has a link-layer address
+ *
+ * @v netdev		Network device
+ * @ret has_ll_addr	Network device has a link-layer address
+ */
+static int netdev_has_ll_addr ( struct net_device *netdev ) {
+	uint8_t *ll_addr = netdev->ll_addr;
+	size_t remaining = sizeof ( netdev->ll_addr );
+
+	while ( remaining-- ) {
+		if ( *(ll_addr++) != 0 )
+			return 1;
+	}
+	return 0;
+}
+
+/**
  * Notify drivers of network device or link state change
  *
  * @v netdev		Network device
@@ -432,8 +449,11 @@ int register_netdev ( struct net_device *netdev ) {
 			   ifindex++ );
 	}
 
-	/* Set initial link-layer address */
-	netdev->ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
+	/* Set initial link-layer address, if not already set */
+	if ( ! netdev_has_ll_addr ( netdev ) ) {
+		netdev->ll_protocol->init_addr ( netdev->hw_addr,
+						 netdev->ll_addr );
+	}
 
 	/* Add to device list */
 	netdev_get ( netdev );
