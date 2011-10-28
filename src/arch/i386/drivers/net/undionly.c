@@ -20,9 +20,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <ipxe/device.h>
 #include <ipxe/init.h>
+#include <ipxe/pci.h>
 #include <undi.h>
 #include <undinet.h>
 #include <undipreload.h>
@@ -62,15 +64,21 @@ static int undibus_probe ( struct root_device *rootdev ) {
 	}
 
 	/* Add to device hierarchy */
-	strncpy ( undi->dev.name, "UNDI",
-		  ( sizeof ( undi->dev.name ) - 1 ) );
+	undi->dev.driver_name = "undionly";
 	if ( undi->pci_busdevfn != UNDI_NO_PCI_BUSDEVFN ) {
 		undi->dev.desc.bus_type = BUS_TYPE_PCI;
 		undi->dev.desc.location = undi->pci_busdevfn;
 		undi->dev.desc.vendor = undi->pci_vendor;
 		undi->dev.desc.device = undi->pci_device;
+		snprintf ( undi->dev.name, sizeof ( undi->dev.name ),
+			   "UNDI-PCI%02x:%02x.%x",
+			   PCI_BUS ( undi->pci_busdevfn ),
+			   PCI_SLOT ( undi->pci_busdevfn ),
+			   PCI_FUNC ( undi->pci_busdevfn ) );
 	} else if ( undi->isapnp_csn != UNDI_NO_ISAPNP_CSN ) {
 		undi->dev.desc.bus_type = BUS_TYPE_ISAPNP;
+		snprintf ( undi->dev.name, sizeof ( undi->dev.name ),
+			   "UNDI-ISAPNP" );
 	}
 	undi->dev.parent = &rootdev->dev;
 	list_add ( &undi->dev.siblings, &rootdev->dev.children);
