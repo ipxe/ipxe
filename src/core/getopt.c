@@ -239,6 +239,11 @@ int getopt_long ( int argc, char * const argv[], const char *optstring,
 
 	/* Check for long options */
 	if ( *(opttext++) == '-' ) {
+		/* "--" indicates end of options */
+		if ( *opttext == '\0' ) {
+			optind++;
+			return -1;
+		}
 		for ( longopt = longopts ; longopt->name ; longopt++ ) {
 			if ( ! match_long_option ( argc, argv, opttext,
 						   longopt, &option ) )
