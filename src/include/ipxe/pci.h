@@ -343,6 +343,9 @@ struct pci_driver {
 /** Declare a PCI driver */
 #define __pci_driver __table_entry ( PCI_DRIVERS, 01 )
 
+/** Declare a fallback PCI driver */
+#define __pci_driver_fallback __table_entry ( PCI_DRIVERS, 02 )
+
 #define PCI_BUS( busdevfn )		( ( (busdevfn) >> 8 ) & 0xff )
 #define PCI_SLOT( busdevfn )		( ( (busdevfn) >> 3 ) & 0x1f )
 #define PCI_FUNC( busdevfn )		( ( (busdevfn) >> 0 ) & 0x07 )

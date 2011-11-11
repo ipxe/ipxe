@@ -140,7 +140,7 @@ static struct pci_device_id undipci_nics[] = {
 PCI_ROM ( 0xffff, 0xffff, "undipci", "UNDI (PCI)", 0 ),
 };
 
-struct pci_driver undipci_driver __pci_driver = {
+struct pci_driver undipci_driver __pci_driver_fallback = {
 	.ids = undipci_nics,
 	.id_count = ( sizeof ( undipci_nics ) / sizeof ( undipci_nics[0] ) ),
 	.probe = undipci_probe,
