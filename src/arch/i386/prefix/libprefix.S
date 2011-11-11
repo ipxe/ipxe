@@ -661,8 +661,8 @@ install_prealloc:
 	pushw	%cs
 	popw	%ds
 
-	/* Copy decompression temporary area physical address to %ebp */
-	movl	%edi, %ebp
+	/* Save decompression temporary area physical address */
+	pushl	%edi
 
 	/* Install .text16.early */
 	progress "  .text16.early\n"
@@ -747,6 +747,9 @@ payload_death_message:
 	/* Set up %ds for access to .data16 */
 	movw	%bx, %ds
 
+	/* Restore decompression temporary area physical address */
+	popl	%edi
+
 #ifdef KEEP_IT_REAL
 	/* Initialise libkir */
 	movw	%ax, (init_libkir_vector+2)
@@ -754,7 +757,7 @@ payload_death_message:
 #else
 	/* Find a suitable decompression temporary area, if none specified */
 	pushl	%eax
-	testl	%ebp, %ebp
+	testl	%edi, %edi
 	jnz	1f
 	/* Use INT 15,88 to find the highest available address via INT
 	 * 15,88.  This limits us to around 64MB, which should avoid
@@ -762,14 +765,14 @@ payload_death_message:
 	 */
 	movb	$0x88, %ah
 	int	$0x15
-	movw	%ax, %bp
-	addl	$0x400, %ebp
-	subl	$_textdata_memsz_kb, %ebp
-	shll	$10, %ebp
+	movw	%ax, %di
+	addl	$0x400, %edi
+	subl	$_textdata_memsz_kb, %edi
+	shll	$10, %edi
 	/* Sanity check: if we have ended up below 1MB, use 1MB */
-	cmpl	$0x100000, %ebp
+	cmpl	$0x100000, %edi
 	jae	1f
-	movl	$0x100000, %ebp
+	movl	$0x100000, %edi
 1:	popl	%eax
 
 	/* Install .text and .data to temporary area in high memory,
@@ -777,15 +780,15 @@ payload_death_message:
 	 * properly.
 	 */
 	progress "  .textdata\n"
-	movl	%ebp, %edi
+	pushl	%edi
 	movl	$_textdata_filesz, %ecx
 	movl	$_textdata_memsz, %edx
 	call	install_block
+	popl	%edi
 
 	/* Initialise librm at current location */
 	progress "  init_librm\n"
 	movw	%ax, (init_librm_vector+2)
-	movl	%ebp, %edi
 	lcall	*init_librm_vector
 
 	/* Skip relocation if CF was set on entry */
