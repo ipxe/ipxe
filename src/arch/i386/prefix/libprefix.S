@@ -326,7 +326,6 @@ process_bytes:
 #ifndef KEEP_IT_REAL
 
 	/* Preserve registers */
-	pushfw
 	pushl	%eax
 	pushl	%ebp
 
@@ -397,7 +396,6 @@ process_bytes:
 	/* Restore registers and return */
 	popl	%ebp
 	popl	%eax
-	popfw
 	ret
 
 #else /* KEEP_IT_REAL */
@@ -614,17 +612,19 @@ install:
 	/* Preserve registers */
 	pushl	%esi
 	pushl	%edi
+	pushl	%ebp
 	/* Allocate space for .text16 and .data16 */
 	call	alloc_basemem
 	/* Image source = %cs:0000 */
 	xorl	%esi, %esi
 	/* Image destination = default */
 	xorl	%edi, %edi
-	/* Allow relocation */
-	clc
+	/* Allow arbitrary relocation */
+	xorl	%ebp, %ebp
 	/* Install text and data segments */
 	call	install_prealloc
 	/* Restore registers and return */
+	popl	%ebp
 	popl	%edi
 	popl	%esi
 	ret
@@ -640,7 +640,7 @@ install:
  *   %bx  : .data16 segment address
  *   %esi : Image source physical address (or zero for %cs:0000)
  *   %edi : Decompression temporary area physical address (or zero for default)
- *   CF set : Avoid relocating to top of memory
+ *   %ebp : Maximum end address for relocation (or zero for no maximum)
  * Corrupts:
  *   none
  ****************************************************************************
@@ -655,7 +655,6 @@ install_prealloc:
 	pushw	%ds
 	pushw	%es
 	cld			/* Sanity: clear the direction flag asap */
-	pushfw
 
 	/* Set up %ds for (read-only) access to .prefix */
 	pushw	%cs
@@ -791,11 +790,6 @@ payload_death_message:
 	movw	%ax, (init_librm_vector+2)
 	lcall	*init_librm_vector
 
-	/* Skip relocation if CF was set on entry */
-	popfw
-	pushfw
-	jc	skip_relocate
-
 	/* Call relocate() to determine target address for relocation.
 	 * relocate() will return with %esi, %edi and %ecx set up
 	 * ready for the copy to the new location.
@@ -818,7 +812,6 @@ payload_death_message:
 	/* Initialise librm at new location */
 	progress "  init_librm\n"
 	lcall	*init_librm_vector
-skip_relocate:
 #endif
 
 	/* Close access to payload */
@@ -827,7 +820,6 @@ skip_relocate:
 	lcall	*close_payload_vector
 
 	/* Restore registers */
-	popfw
 	popw	%es
 	popw	%ds
 	popal

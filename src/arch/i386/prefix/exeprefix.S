@@ -113,7 +113,7 @@ _exe_start:
 	call	alloc_basemem
 	xorl	%esi, %esi
 	movl	$EXE_DECOMPRESS_ADDRESS, %edi
-	clc
+	xorl	%ebp, %ebp
 	call	install_prealloc
 
 	/* Set up real-mode stack */

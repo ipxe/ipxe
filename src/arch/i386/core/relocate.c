@@ -42,7 +42,7 @@ extern char _etextdata[];
  */
 __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	struct memory_map memmap;
-	unsigned long start, end, size, padded_size;
+	unsigned long start, end, size, padded_size, max;
 	unsigned long new_start, new_end;
 	unsigned i;
 
@@ -57,6 +57,13 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	      "...need %lx bytes for %d-byte alignment\n",
 	      start, end, padded_size, max_align );
 
+	/* Determine maximum usable address */
+	max = MAX_ADDR;
+	if ( ix86->regs.ebp && ( ix86->regs.ebp < max ) ) {
+		max = ix86->regs.ebp;
+		DBG ( "Limiting relocation to [0,%lx)\n", max );
+	}
+
 	/* Walk through the memory map and find the highest address
 	 * below 4GB that iPXE will fit into.
 	 */
@@ -67,18 +74,18 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 
 		DBG ( "Considering [%llx,%llx)\n", region->start, region->end);
 		
-		/* Truncate block to MAX_ADDR.  This will be less than
-		 * 4GB, which means that we can get away with using
-		 * just 32-bit arithmetic after this stage.
+		/* Truncate block to maximum address.  This will be
+		 * less than 4GB, which means that we can get away
+		 * with using just 32-bit arithmetic after this stage.
 		 */
-		if ( region->start > MAX_ADDR ) {
-			DBG ( "...starts after MAX_ADDR=%lx\n", MAX_ADDR );
+		if ( region->start > max ) {
+			DBG ( "...starts after max=%lx\n", max );
 			continue;
 		}
 		r_start = region->start;
-		if ( region->end > MAX_ADDR ) {
-			DBG ( "...end truncated to MAX_ADDR=%lx\n", MAX_ADDR );
-			r_end = MAX_ADDR;
+		if ( region->end > max ) {
+			DBG ( "...end truncated to max=%lx\n", max );
+			r_end = max;
 		} else {
 			r_end = region->end;
 		}

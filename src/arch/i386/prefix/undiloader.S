@@ -14,6 +14,7 @@ undiloader:
 	/* Save registers */
 	pushl	%esi
 	pushl	%edi
+	pushl	%ebp
 	pushw	%ds
 	pushw	%es
 	pushw	%bx
@@ -30,7 +31,7 @@ undiloader:
 	movw	%es:14(%di), %ax
 	movl	image_source, %esi
 	movl	decompress_to, %edi
-	clc			/* Allow relocation */
+	xorl	%ebp, %ebp		/* Allow relocation */
 	call	install_prealloc
 	popw	%di
 	/* Call UNDI loader C code */
@@ -46,6 +47,7 @@ undiloader:
 	popw	%bx
 	popw	%es
 	popw	%ds
+	popl	%ebp
 	popl	%edi
 	popl	%esi
 	lret

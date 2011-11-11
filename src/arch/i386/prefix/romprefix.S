@@ -414,7 +414,7 @@ no_pmm:
 	 * picked up by the initial shell prompt, and we will drop
 	 * into a shell.
 	 */
-	stc			/* Inhibit relocation */
+	movl	$0xa0000, %ebp	/* Inhibit relocation during POST */
 	pushw	%cs
 	call	exec
 2:
@@ -614,7 +614,7 @@ decompress_to:
  * Called by the PnP BIOS when it wants to boot us.
  */
 bev_entry:
-	clc			/* Allow relocation */
+	xorl	%ebp, %ebp	/* Allow relocation */
 	pushw	%cs
 	call	exec
 	lret
@@ -649,7 +649,7 @@ int19_entry:
 	/* Leave keypress in buffer and start iPXE.  The keypress will
 	 * cause the usual initial Ctrl-B prompt to be skipped.
 	 */
-	clc			/* Allow relocation */
+	xorl	%ebp, %ebp	/* Allow relocation */
 	pushw	%cs
 	call	exec
 1:	/* Try to call original INT 19 vector */
@@ -681,9 +681,6 @@ exec:	/* Set %ds = %cs */
 	pushw	%cs
 	popw	%ds
 
-	/* Preserve state of CF */
-	lahf
-
 	/* Print message as soon as possible */
 	movw	$prodstr, %si
 	xorw	%di, %di
@@ -693,8 +690,8 @@ exec:	/* Set %ds = %cs */
 
 	/* Store magic word on BIOS stack and remember BIOS %ss:sp */
 	pushl	$STACK_MAGIC
-	movw	%ss, %dx
-	movw	%sp, %bp
+	movw	%ss, %cx
+	movw	%sp, %dx
 
 	/* Obtain a reasonably-sized temporary stack */
 	xorw	%bx, %bx
@@ -702,10 +699,7 @@ exec:	/* Set %ds = %cs */
 	movw	$0x7c00, %sp
 
 	/* Install iPXE */
-	sahf
-	pushfw
 	call	alloc_basemem
-	popfw
 	movl	image_source, %esi
 	movl	decompress_to, %edi
 	call	install_prealloc
@@ -728,14 +722,14 @@ exec:	/* Set %ds = %cs */
 	pushl	$main
 	pushw	%cs
 	call	prot_call
-	popl	%ecx /* discard */
+	popl	%eax /* discard */
 
 	/* Uninstall iPXE */
 	call	uninstall
 
 	/* Restore BIOS stack */
-	movw	%dx, %ss
-	movw	%bp, %sp
+	movw	%cx, %ss
+	movw	%dx, %sp
 
 	/* Check magic word on BIOS stack */
 	popl	%eax
