@@ -196,8 +196,15 @@ run_ipxe:
 	/* Retrieve command-line pointer */
 	movl	%es:cmd_line_ptr, %edx
 
+	/* Retrieve initrd pointer and size */
+	movl	%es:ramdisk_image, %ebp
+	movl	%es:ramdisk_size, %ecx
+
 	/* Install iPXE */
-	call	install
+	call	alloc_basemem
+	xorl	%esi, %esi
+	xorl	%edi, %edi
+	call	install_prealloc
 
 	/* Set up real-mode stack */
 	movw	%bx, %ss
@@ -214,6 +221,10 @@ run_ipxe:
 
 	/* Store command-line pointer */
 	movl	%edx, cmdline_phys
+
+	/* Store initrd pointer and size */
+	movl	%ebp, initrd_phys
+	movl	%ecx, initrd_len
 
 	/* Run iPXE */
 	pushl	$main
