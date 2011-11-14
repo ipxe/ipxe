@@ -829,6 +829,8 @@ struct hermon_port {
 
 /** A Hermon device */
 struct hermon {
+	/** PCI device */
+	struct pci_device *pci;
 	/** PCI configuration registers */
 	void *config;
 	/** PCI user Access Region */
@@ -841,11 +843,30 @@ struct hermon {
 	/** Command output mailbox */
 	void *mailbox_out;
 
-	/** Firmware area in external memory */
+	/** Device open request counter */
+	unsigned int open_count;
+
+	/** Firmware size */
+	size_t firmware_len;
+	/** Firmware area in external memory
+	 *
+	 * This is allocated when first needed, and freed only on
+	 * final teardown, in order to avoid memory map changes at
+	 * runtime.
+	 */
 	userptr_t firmware_area;
 	/** ICM map */
 	struct hermon_icm_map icm_map[HERMON_ICM_NUM_REGIONS];
-	/** ICM area */
+	/** ICM size */
+	size_t icm_len;
+	/** ICM AUX size */
+	size_t icm_aux_len;
+	/** ICM area
+	 *
+	 * This is allocated when first needed, and freed only on
+	 * final teardown, in order to avoid memory map changes at
+	 * runtime.
+	 */
 	userptr_t icm;
 
 	/** Event queue */

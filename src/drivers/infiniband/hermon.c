@@ -2136,7 +2136,7 @@ static int hermon_map_vpm ( struct hermon *hermon,
 static int hermon_start_firmware ( struct hermon *hermon ) {
 	struct hermonprm_query_fw fw;
 	unsigned int fw_pages;
-	size_t fw_size;
+	size_t fw_len;
 	physaddr_t fw_base;
 	int rc;
 
@@ -2154,17 +2154,22 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 	       hermon, fw_pages, ( fw_pages * 4 ) );
 
 	/* Allocate firmware pages and map firmware area */
-	fw_size = ( fw_pages * HERMON_PAGE_SIZE );
-	hermon->firmware_area = umalloc ( fw_size );
+	fw_len = ( fw_pages * HERMON_PAGE_SIZE );
 	if ( ! hermon->firmware_area ) {
-		rc = -ENOMEM;
-		goto err_alloc_fa;
+		hermon->firmware_len = fw_len;
+		hermon->firmware_area = umalloc ( hermon->firmware_len );
+		if ( ! hermon->firmware_area ) {
+			rc = -ENOMEM;
+			goto err_alloc_fa;
+		}
+	} else {
+		assert ( hermon->firmware_len == fw_len );
 	}
 	fw_base = user_to_phys ( hermon->firmware_area, 0 );
 	DBGC ( hermon, "Hermon %p firmware area at physical [%08lx,%08lx)\n",
-	       hermon, fw_base, ( fw_base + fw_size ) );
+	       hermon, fw_base, ( fw_base + fw_len ) );
 	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_fa,
-				     0, fw_base, fw_size ) ) != 0 ) {
+				     0, fw_base, fw_len ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p could not map firmware: %s\n",
 		       hermon, strerror ( rc ) );
 		goto err_map_fa;
@@ -2183,8 +2188,6 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
  err_run_fw:
  err_map_fa:
 	hermon_cmd_unmap_fa ( hermon );
-	ufree ( hermon->firmware_area );
-	hermon->firmware_area = UNULL;
  err_alloc_fa:
  err_query_fw:
 	return rc;
@@ -2202,10 +2205,9 @@ static void hermon_stop_firmware ( struct hermon *hermon ) {
 		DBGC ( hermon, "Hermon %p FATAL could not stop firmware: %s\n",
 		       hermon, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
+		hermon->firmware_area = UNULL;
 		return;
 	}
-	ufree ( hermon->firmware_area );
-	hermon->firmware_area = UNULL;
 }
 
 /***************************************************************************
@@ -2285,14 +2287,14 @@ static uint64_t icm_align ( uint64_t icm_offset, size_t len ) {
 }
 
 /**
- * Allocate ICM
+ * Map ICM (allocating if necessary)
  *
  * @v hermon		Hermon device
  * @v init_hca		INIT_HCA structure to fill in
  * @ret rc		Return status code
  */
-static int hermon_alloc_icm ( struct hermon *hermon,
-			      struct hermonprm_init_hca *init_hca ) {
+static int hermon_map_icm ( struct hermon *hermon,
+			    struct hermonprm_init_hca *init_hca ) {
 	struct hermonprm_scalar_parameter icm_size;
 	struct hermonprm_scalar_parameter icm_aux_size;
 	uint64_t icm_offset = 0;
@@ -2519,10 +2521,17 @@ static int hermon_alloc_icm ( struct hermon *hermon,
 	/* Allocate ICM data and auxiliary area */
 	DBGC ( hermon, "Hermon %p requires %zd kB ICM and %zd kB AUX ICM\n",
 	       hermon, ( icm_len / 1024 ), ( icm_aux_len / 1024 ) );
-	hermon->icm = umalloc ( icm_aux_len + icm_len );
 	if ( ! hermon->icm ) {
-		rc = -ENOMEM;
-		goto err_alloc;
+		hermon->icm_len = icm_len;
+		hermon->icm_aux_len = icm_aux_len;
+		hermon->icm = umalloc ( hermon->icm_aux_len + hermon->icm_len );
+		if ( ! hermon->icm ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+	} else {
+		assert ( hermon->icm_len == icm_len );
+		assert ( hermon->icm_aux_len == icm_aux_len );
 	}
 	icm_phys = user_to_phys ( hermon->icm, 0 );
 
@@ -2559,19 +2568,17 @@ static int hermon_alloc_icm ( struct hermon *hermon,
 	assert ( i == 0 ); /* We don't handle partial failure at present */
  err_map_icm_aux:
 	hermon_cmd_unmap_icm_aux ( hermon );
-	ufree ( hermon->icm );
-	hermon->icm = UNULL;
  err_alloc:
  err_set_icm_size:
 	return rc;
 }
 
 /**
- * Free ICM
+ * Unmap ICM
  *
  * @v hermon		Hermon device
  */
-static void hermon_free_icm ( struct hermon *hermon ) {
+static void hermon_unmap_icm ( struct hermon *hermon ) {
 	struct hermonprm_scalar_parameter unmap_icm;
 	int i;
 
@@ -2587,13 +2594,11 @@ static void hermon_free_icm ( struct hermon *hermon ) {
 				       &unmap_icm );
 	}
 	hermon_cmd_unmap_icm_aux ( hermon );
-	ufree ( hermon->icm );
-	hermon->icm = UNULL;
 }
 
 /***************************************************************************
  *
- * Initialisation
+ * Initialisation and teardown
  *
  ***************************************************************************
  */
@@ -2602,19 +2607,22 @@ static void hermon_free_icm ( struct hermon *hermon ) {
  * Reset device
  *
  * @v hermon		Hermon device
- * @v pci		PCI device
  */
-static void hermon_reset ( struct hermon *hermon,
-			   struct pci_device *pci ) {
+static void hermon_reset ( struct hermon *hermon ) {
+	struct pci_device *pci = hermon->pci;
 	struct pci_config_backup backup;
 	static const uint8_t backup_exclude[] =
 		PCI_CONFIG_BACKUP_EXCLUDE ( 0x58, 0x5c );
 
+	/* Perform device reset and preserve PCI configuration */
 	pci_backup ( pci, &backup, backup_exclude );
 	writel ( HERMON_RESET_MAGIC,
 		 ( hermon->config + HERMON_RESET_OFFSET ) );
 	mdelay ( HERMON_RESET_WAIT_TIME_MS );
 	pci_restore ( pci, &backup, backup_exclude );
+
+	/* Reset command interface toggle */
+	hermon->toggle = 0;
 }
 
 /**
@@ -2686,6 +2694,118 @@ static int hermon_configure_special_qps ( struct hermon *hermon ) {
 	return 0;
 }
 
+/**
+ * Start Hermon device
+ *
+ * @v hermon		Hermon device
+ * @v running		Firmware is already running
+ * @ret rc		Return status code
+ */
+static int hermon_start ( struct hermon *hermon, int running ) {
+	struct hermonprm_init_hca init_hca;
+	unsigned int i;
+	int rc;
+
+	/* Start firmware if not already running */
+	if ( ! running ) {
+		if ( ( rc = hermon_start_firmware ( hermon ) ) != 0 )
+			goto err_start_firmware;
+	}
+
+	/* Allocate and map ICM */
+	memset ( &init_hca, 0, sizeof ( init_hca ) );
+	if ( ( rc = hermon_map_icm ( hermon, &init_hca ) ) != 0 )
+		goto err_map_icm;
+
+	/* Initialise HCA */
+	MLX_FILL_1 ( &init_hca, 0, version, 0x02 /* "Must be 0x02" */ );
+	MLX_FILL_1 ( &init_hca, 5, udp, 1 );
+	MLX_FILL_1 ( &init_hca, 74, uar_parameters.log_max_uars, 8 );
+	if ( ( rc = hermon_cmd_init_hca ( hermon, &init_hca ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not initialise HCA: %s\n",
+		       hermon, strerror ( rc ) );
+		goto err_init_hca;
+	}
+
+	/* Set up memory protection */
+	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 )
+		goto err_setup_mpt;
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ )
+		hermon->port[i].ibdev->rdma_key = hermon->lkey;
+
+	/* Set up event queue */
+	if ( ( rc = hermon_create_eq ( hermon ) ) != 0 )
+		goto err_create_eq;
+
+	/* Configure special QPs */
+	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 )
+		goto err_conf_special_qps;
+
+	return 0;
+
+ err_conf_special_qps:
+	hermon_destroy_eq ( hermon );
+ err_create_eq:
+ err_setup_mpt:
+	hermon_cmd_close_hca ( hermon );
+ err_init_hca:
+	hermon_unmap_icm ( hermon );
+ err_map_icm:
+	hermon_stop_firmware ( hermon );
+ err_start_firmware:
+	return rc;
+}
+
+/**
+ * Stop Hermon device
+ *
+ * @v hermon		Hermon device
+ */
+static void hermon_stop ( struct hermon *hermon ) {
+	hermon_destroy_eq ( hermon );
+	hermon_cmd_close_hca ( hermon );
+	hermon_unmap_icm ( hermon );
+	hermon_stop_firmware ( hermon );
+	hermon_reset ( hermon );
+}
+
+/**
+ * Open Hermon device
+ *
+ * @v hermon		Hermon device
+ * @ret rc		Return status code
+ */
+static int hermon_open ( struct hermon *hermon ) {
+	int rc;
+
+	/* Start device if applicable */
+	if ( hermon->open_count == 0 ) {
+		if ( ( rc = hermon_start ( hermon, 0 ) ) != 0 )
+			return rc;
+	}
+
+	/* Increment open counter */
+	hermon->open_count++;
+
+	return 0;
+}
+
+/**
+ * Close Hermon device
+ *
+ * @v hermon		Hermon device
+ */
+static void hermon_close ( struct hermon *hermon ) {
+
+	/* Decrement open counter */
+	assert ( hermon->open_count != 0 );
+	hermon->open_count--;
+
+	/* Stop device if applicable */
+	if ( hermon->open_count == 0 )
+		hermon_stop ( hermon );
+}
+
 /***************************************************************************
  *
  * Infiniband link-layer operations
@@ -2699,10 +2819,14 @@ static int hermon_configure_special_qps ( struct hermon *hermon ) {
  * @v ibdev		Infiniband device
  * @ret rc		Return status code
  */
-static int hermon_open ( struct ib_device *ibdev ) {
+static int hermon_ib_open ( struct ib_device *ibdev ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	union hermonprm_set_port set_port;
 	int rc;
+
+	/* Open hardware */
+	if ( ( rc = hermon_open ( hermon ) ) != 0 )
+		goto err_open;
 
 	/* Set port parameters */
 	memset ( &set_port, 0, sizeof ( set_port ) );
@@ -2724,20 +2848,26 @@ static int hermon_open ( struct ib_device *ibdev ) {
 					  &set_port ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not set port: %s\n",
 		       hermon, ibdev->port, strerror ( rc ) );
-		return rc;
+		goto err_set_port;
 	}
 
 	/* Initialise port */
 	if ( ( rc = hermon_cmd_init_port ( hermon, ibdev->port ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not initialise port: "
 		       "%s\n", hermon, ibdev->port, strerror ( rc ) );
-		return rc;
+		goto err_init_port;
 	}
 
 	/* Update MAD parameters */
 	ib_smc_update ( ibdev, hermon_mad );
 
 	return 0;
+
+ err_init_port:
+ err_set_port:
+	hermon_close ( hermon );
+ err_open:
+	return rc;
 }
 
 /**
@@ -2745,15 +2875,19 @@ static int hermon_open ( struct ib_device *ibdev ) {
  *
  * @v ibdev		Infiniband device
  */
-static void hermon_close ( struct ib_device *ibdev ) {
+static void hermon_ib_close ( struct ib_device *ibdev ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	int rc;
 
+	/* Close port */
 	if ( ( rc = hermon_cmd_close_port ( hermon, ibdev->port ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not close port: %s\n",
 		       hermon, ibdev->port, strerror ( rc ) );
 		/* Nothing we can do about this */
 	}
+
+	/* Close hardware */
+	hermon_close ( hermon );
 }
 
 /**
@@ -2883,8 +3017,8 @@ static struct ib_device_operations hermon_ib_operations = {
 	.post_recv	= hermon_post_recv,
 	.poll_cq	= hermon_poll_cq,
 	.poll_eq	= hermon_poll_eq,
-	.open		= hermon_open,
-	.close		= hermon_close,
+	.open		= hermon_ib_open,
+	.close		= hermon_ib_close,
 	.mcast_attach	= hermon_mcast_attach,
 	.mcast_detach	= hermon_mcast_detach,
 	.set_port_info	= hermon_inform_sma,
@@ -3073,6 +3207,10 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 	union hermonprm_set_port set_port;
 	int rc;
 
+	/* Open hardware */
+	if ( ( rc = hermon_open ( hermon ) ) != 0 )
+		goto err_open;
+
 	/* Allocate completion queue */
 	port->eth_cq = ib_create_cq ( ibdev, HERMON_ETH_NUM_CQES,
 				      &hermon_eth_cq_op );
@@ -3167,6 +3305,8 @@ static int hermon_eth_open ( struct net_device *netdev ) {
  err_create_qp:
 	ib_destroy_cq ( ibdev, port->eth_cq );
  err_create_cq:
+	hermon_close ( hermon );
+ err_open:
 	return rc;
 }
 
@@ -3191,6 +3331,9 @@ static void hermon_eth_close ( struct net_device *netdev ) {
 	/* Tear down the queues */
 	ib_destroy_qp ( ibdev, port->eth_qp );
 	ib_destroy_cq ( ibdev, port->eth_cq );
+
+	/* Close hardware */
+	hermon_close ( hermon );
 }
 
 /** Hermon Ethernet network device operations */
@@ -3562,6 +3705,8 @@ static struct hermon * hermon_alloc ( void ) {
  */
 static void hermon_free ( struct hermon *hermon ) {
 
+	ufree ( hermon->icm );
+	ufree ( hermon->firmware_area );
 	free_dma ( hermon->mailbox_out, HERMON_MBOX_SIZE );
 	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
 	free ( hermon );
@@ -3571,9 +3716,9 @@ static void hermon_free ( struct hermon *hermon ) {
  * Initialise Hermon PCI parameters
  *
  * @v hermon		Hermon device
- * @v pci		PCI device
  */
-static void hermon_pci_init ( struct hermon *hermon, struct pci_device *pci ) {
+static void hermon_pci_init ( struct hermon *hermon ) {
+	struct pci_device *pci = hermon->pci;
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
@@ -3597,7 +3742,6 @@ static int hermon_probe ( struct pci_device *pci ) {
 	struct ib_device *ibdev;
 	struct net_device *netdev;
 	struct hermon_port *port;
-	struct hermonprm_init_hca init_hca;
 	unsigned int i;
 	int rc;
 
@@ -3608,12 +3752,13 @@ static int hermon_probe ( struct pci_device *pci ) {
 		goto err_alloc;
 	}
 	pci_set_drvdata ( pci, hermon );
+	hermon->pci = pci;
 
 	/* Initialise PCI parameters */
-	hermon_pci_init ( hermon, pci );
+	hermon_pci_init ( hermon );
 
 	/* Reset device */
-	hermon_reset ( hermon, pci );
+	hermon_reset ( hermon );
 
 	/* Start firmware */
 	if ( ( rc = hermon_start_firmware ( hermon ) ) != 0 )
@@ -3650,34 +3795,9 @@ static int hermon_probe ( struct pci_device *pci ) {
 		netdev->priv = &hermon->port[i];
 	}
 
-	/* Allocate ICM */
-	memset ( &init_hca, 0, sizeof ( init_hca ) );
-	if ( ( rc = hermon_alloc_icm ( hermon, &init_hca ) ) != 0 )
-		goto err_alloc_icm;
-
-	/* Initialise HCA */
-	MLX_FILL_1 ( &init_hca, 0, version, 0x02 /* "Must be 0x02" */ );
-	MLX_FILL_1 ( &init_hca, 5, udp, 1 );
-	MLX_FILL_1 ( &init_hca, 74, uar_parameters.log_max_uars, 8 );
-	if ( ( rc = hermon_cmd_init_hca ( hermon, &init_hca ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not initialise HCA: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_init_hca;
-	}
-
-	/* Set up memory protection */
-	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 )
-		goto err_setup_mpt;
-	for ( i = 0 ; i < hermon->cap.num_ports ; i++ )
-		hermon->port[i].ibdev->rdma_key = hermon->lkey;
-
-	/* Set up event queue */
-	if ( ( rc = hermon_create_eq ( hermon ) ) != 0 )
-		goto err_create_eq;
-
-	/* Configure special QPs */
-	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 )
-		goto err_conf_special_qps;
+	/* Start device */
+	if ( ( rc = hermon_start ( hermon, 1 ) ) != 0 )
+		goto err_start;
 
 	/* Determine port types */
 	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
@@ -3693,6 +3813,10 @@ static int hermon_probe ( struct pci_device *pci ) {
 			goto err_register;
 	}
 
+	/* Leave device quiescent until opened */
+	if ( hermon->open_count == 0 )
+		hermon_stop ( hermon );
+
 	return 0;
 
 	i = hermon->cap.num_ports;
@@ -3702,14 +3826,8 @@ static int hermon_probe ( struct pci_device *pci ) {
 		port->type->unregister_dev ( hermon, port );
 	}
  err_set_port_type:
- err_conf_special_qps:
-	hermon_destroy_eq ( hermon );
- err_create_eq:
- err_setup_mpt:
-	hermon_cmd_close_hca ( hermon );
- err_init_hca:
-	hermon_free_icm ( hermon );
- err_alloc_icm:
+	hermon_stop ( hermon );
+ err_start:
 	i = hermon->cap.num_ports;
  err_alloc_netdev:
 	for ( i-- ; ( signed int ) i >= 0 ; i-- ) {
@@ -3742,10 +3860,6 @@ static void hermon_remove ( struct pci_device *pci ) {
 		port = &hermon->port[i];
 		port->type->unregister_dev ( hermon, port );
 	}
-	hermon_destroy_eq ( hermon );
-	hermon_cmd_close_hca ( hermon );
-	hermon_free_icm ( hermon );
-	hermon_stop_firmware ( hermon );
 	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- ) {
 		netdev_nullify ( hermon->port[i].netdev );
 		netdev_put ( hermon->port[i].netdev );
@@ -3773,9 +3887,10 @@ static int hermon_bofm_probe ( struct pci_device *pci ) {
 		goto err_alloc;
 	}
 	pci_set_drvdata ( pci, hermon );
+	hermon->pci = pci;
 
 	/* Initialise PCI parameters */
-	hermon_pci_init ( hermon, pci );
+	hermon_pci_init ( hermon );
 
 	/* Initialise BOFM device */
 	bofm_init ( &hermon->bofm, pci, &hermon_bofm_operations );
