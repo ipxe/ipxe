@@ -434,7 +434,7 @@ static void rtl_poll ( struct net_device *netdev ) {
 	}
 
 	/* Handle received packets */
-	while ( ! ( inw ( rtl->ioaddr + ChipCmd ) & RxBufEmpty ) ) {
+	while ( ! ( inb ( rtl->ioaddr + ChipCmd ) & RxBufEmpty ) ) {
 		rx_status = * ( ( uint16_t * )
 				( rtl->rx.ring + rtl->rx.offset ) );
 		rx_len = * ( ( uint16_t * )
