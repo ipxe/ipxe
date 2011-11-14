@@ -31,6 +31,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ARBEL_PCI_UAR_IDX		1
 #define ARBEL_PCI_UAR_SIZE		0x1000
 
+/* Device reset */
+#define ARBEL_RESET_OFFSET		0x0f0010
+#define ARBEL_RESET_MAGIC		0x01000000UL
+#define ARBEL_RESET_WAIT_TIME_MS	1000
+
 /* UAR context table (UCE) resource types */
 #define ARBEL_UAR_RES_NONE		0x00
 #define ARBEL_UAR_RES_CQ_CI		0x01
@@ -458,6 +463,8 @@ typedef uint32_t arbel_bitmask_t;
 
 /** An Arbel device */
 struct arbel {
+	/** PCI device */
+	struct pci_device *pci;
 	/** PCI configuration registers */
 	void *config;
 	/** PCI user Access Region */
@@ -470,13 +477,28 @@ struct arbel {
 	/** Command output mailbox */
 	void *mailbox_out;
 
-	/** Firmware area in external memory */
+	/** Device open request counter */
+	unsigned int open_count;
+
+	/** Firmware size */
+	size_t firmware_len;
+	/** Firmware area in external memory
+	 *
+	 * This is allocated when first needed, and freed only on
+	 * final teardown, in order to avoid memory map changes at
+	 * runtime.
+	 */
 	userptr_t firmware_area;
 	/** ICM size */
 	size_t icm_len;
 	/** ICM AUX size */
 	size_t icm_aux_len;
-	/** ICM area */
+	/** ICM area
+	 *
+	 * This is allocated when first needed, and freed only on
+	 * final teardown, in order to avoid memory map changes at
+	 * runtime.
+	 */
 	userptr_t icm;
 	/** Offset within ICM of doorbell records */
 	size_t db_rec_offset;
