@@ -2040,6 +2040,654 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 
 /***************************************************************************
  *
+ * Firmware control
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Map virtual to physical address for firmware usage
+ *
+ * @v hermon		Hermon device
+ * @v map		Mapping function
+ * @v va		Virtual address
+ * @v pa		Physical address
+ * @v len		Length of region
+ * @ret rc		Return status code
+ */
+static int hermon_map_vpm ( struct hermon *hermon,
+			    int ( *map ) ( struct hermon *hermon,
+			    const struct hermonprm_virtual_physical_mapping* ),
+			    uint64_t va, physaddr_t pa, size_t len ) {
+	struct hermonprm_virtual_physical_mapping mapping;
+	physaddr_t start;
+	physaddr_t low;
+	physaddr_t high;
+	physaddr_t end;
+	size_t size;
+	int rc;
+
+	/* Sanity checks */
+	assert ( ( va & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( ( pa & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( ( len & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+
+	/* Calculate starting points */
+	start = pa;
+	end = ( start + len );
+	size = ( 1UL << ( fls ( start ^ end ) - 1 ) );
+	low = high = ( end & ~( size - 1 ) );
+	assert ( start < low );
+	assert ( high <= end );
+
+	/* These mappings tend to generate huge volumes of
+	 * uninteresting debug data, which basically makes it
+	 * impossible to use debugging otherwise.
+	 */
+	DBG_DISABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
+
+	/* Map blocks in descending order of size */
+	while ( size >= HERMON_PAGE_SIZE ) {
+
+		/* Find the next candidate block */
+		if ( ( low - size ) >= start ) {
+			low -= size;
+			pa = low;
+		} else if ( ( high + size ) <= end ) {
+			pa = high;
+			high += size;
+		} else {
+			size >>= 1;
+			continue;
+		}
+		assert ( ( va & ( size - 1 ) ) == 0 );
+		assert ( ( pa & ( size - 1 ) ) == 0 );
+
+		/* Map this block */
+		memset ( &mapping, 0, sizeof ( mapping ) );
+		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
+		MLX_FILL_1 ( &mapping, 1, va_l, ( va >> 12 ) );
+		MLX_FILL_H ( &mapping, 2, pa_h, pa );
+		MLX_FILL_2 ( &mapping, 3,
+			     log2size, ( ( fls ( size ) - 1 ) - 12 ),
+			     pa_l, ( pa >> 12 ) );
+		if ( ( rc = map ( hermon, &mapping ) ) != 0 ) {
+			DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
+			DBGC ( hermon, "Hermon %p could not map %08llx+%zx to "
+			       "%08lx: %s\n",
+			       hermon, va, size, pa, strerror ( rc ) );
+			return rc;
+		}
+		va += size;
+	}
+	assert ( low == start );
+	assert ( high == end );
+
+	DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
+	return 0;
+}
+
+/**
+ * Start firmware running
+ *
+ * @v hermon		Hermon device
+ * @ret rc		Return status code
+ */
+static int hermon_start_firmware ( struct hermon *hermon ) {
+	struct hermonprm_query_fw fw;
+	unsigned int fw_pages;
+	size_t fw_size;
+	physaddr_t fw_base;
+	int rc;
+
+	/* Get firmware parameters */
+	if ( ( rc = hermon_cmd_query_fw ( hermon, &fw ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not query firmware: %s\n",
+		       hermon, strerror ( rc ) );
+		goto err_query_fw;
+	}
+	DBGC ( hermon, "Hermon %p firmware version %d.%d.%d\n", hermon,
+	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
+	       MLX_GET ( &fw, fw_rev_subminor ) );
+	fw_pages = MLX_GET ( &fw, fw_pages );
+	DBGC ( hermon, "Hermon %p requires %d pages (%d kB) for firmware\n",
+	       hermon, fw_pages, ( fw_pages * 4 ) );
+
+	/* Allocate firmware pages and map firmware area */
+	fw_size = ( fw_pages * HERMON_PAGE_SIZE );
+	hermon->firmware_area = umalloc ( fw_size );
+	if ( ! hermon->firmware_area ) {
+		rc = -ENOMEM;
+		goto err_alloc_fa;
+	}
+	fw_base = user_to_phys ( hermon->firmware_area, 0 );
+	DBGC ( hermon, "Hermon %p firmware area at physical [%08lx,%08lx)\n",
+	       hermon, fw_base, ( fw_base + fw_size ) );
+	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_fa,
+				     0, fw_base, fw_size ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not map firmware: %s\n",
+		       hermon, strerror ( rc ) );
+		goto err_map_fa;
+	}
+
+	/* Start firmware */
+	if ( ( rc = hermon_cmd_run_fw ( hermon ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not run firmware: %s\n",
+		       hermon, strerror ( rc ) );
+		goto err_run_fw;
+	}
+
+	DBGC ( hermon, "Hermon %p firmware started\n", hermon );
+	return 0;
+
+ err_run_fw:
+ err_map_fa:
+	hermon_cmd_unmap_fa ( hermon );
+	ufree ( hermon->firmware_area );
+	hermon->firmware_area = UNULL;
+ err_alloc_fa:
+ err_query_fw:
+	return rc;
+}
+
+/**
+ * Stop firmware running
+ *
+ * @v hermon		Hermon device
+ */
+static void hermon_stop_firmware ( struct hermon *hermon ) {
+	int rc;
+
+	if ( ( rc = hermon_cmd_unmap_fa ( hermon ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p FATAL could not stop firmware: %s\n",
+		       hermon, strerror ( rc ) );
+		/* Leak memory and return; at least we avoid corruption */
+		return;
+	}
+	ufree ( hermon->firmware_area );
+	hermon->firmware_area = UNULL;
+}
+
+/***************************************************************************
+ *
+ * Infinihost Context Memory management
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Get device limits
+ *
+ * @v hermon		Hermon device
+ * @ret rc		Return status code
+ */
+static int hermon_get_cap ( struct hermon *hermon ) {
+	struct hermonprm_query_dev_cap dev_cap;
+	int rc;
+
+	if ( ( rc = hermon_cmd_query_dev_cap ( hermon, &dev_cap ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not get device limits: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	hermon->cap.cmpt_entry_size = MLX_GET ( &dev_cap, c_mpt_entry_sz );
+	hermon->cap.reserved_qps =
+		( 1 << MLX_GET ( &dev_cap, log2_rsvd_qps ) );
+	hermon->cap.qpc_entry_size = MLX_GET ( &dev_cap, qpc_entry_sz );
+	hermon->cap.altc_entry_size = MLX_GET ( &dev_cap, altc_entry_sz );
+	hermon->cap.auxc_entry_size = MLX_GET ( &dev_cap, aux_entry_sz );
+	hermon->cap.reserved_srqs =
+		( 1 << MLX_GET ( &dev_cap, log2_rsvd_srqs ) );
+	hermon->cap.srqc_entry_size = MLX_GET ( &dev_cap, srq_entry_sz );
+	hermon->cap.reserved_cqs =
+		( 1 << MLX_GET ( &dev_cap, log2_rsvd_cqs ) );
+	hermon->cap.cqc_entry_size = MLX_GET ( &dev_cap, cqc_entry_sz );
+	hermon->cap.reserved_eqs = MLX_GET ( &dev_cap, num_rsvd_eqs );
+	if ( hermon->cap.reserved_eqs == 0 ) {
+		/* Backward compatibility */
+		hermon->cap.reserved_eqs =
+			( 1 << MLX_GET ( &dev_cap, log2_rsvd_eqs ) );
+	}
+	hermon->cap.eqc_entry_size = MLX_GET ( &dev_cap, eqc_entry_sz );
+	hermon->cap.reserved_mtts =
+		( 1 << MLX_GET ( &dev_cap, log2_rsvd_mtts ) );
+	hermon->cap.mtt_entry_size = MLX_GET ( &dev_cap, mtt_entry_sz );
+	hermon->cap.reserved_mrws =
+		( 1 << MLX_GET ( &dev_cap, log2_rsvd_mrws ) );
+	hermon->cap.dmpt_entry_size = MLX_GET ( &dev_cap, d_mpt_entry_sz );
+	hermon->cap.reserved_uars = MLX_GET ( &dev_cap, num_rsvd_uars );
+	hermon->cap.num_ports = MLX_GET ( &dev_cap, num_ports );
+	hermon->cap.dpdp = MLX_GET ( &dev_cap, dpdp );
+
+	/* Sanity check */
+	if ( hermon->cap.num_ports > HERMON_MAX_PORTS ) {
+		DBGC ( hermon, "Hermon %p has %d ports (only %d supported)\n",
+		       hermon, hermon->cap.num_ports, HERMON_MAX_PORTS );
+		hermon->cap.num_ports = HERMON_MAX_PORTS;
+	}
+
+	return 0;
+}
+
+/**
+ * Align ICM table
+ *
+ * @v icm_offset	Current ICM offset
+ * @v len		ICM table length
+ * @ret icm_offset	ICM offset
+ */
+static uint64_t icm_align ( uint64_t icm_offset, size_t len ) {
+
+	/* Round up to a multiple of the table size */
+	assert ( len == ( 1UL << ( fls ( len ) - 1 ) ) );
+	return ( ( icm_offset + len - 1 ) & ~( ( ( uint64_t ) len ) - 1 ) );
+}
+
+/**
+ * Allocate ICM
+ *
+ * @v hermon		Hermon device
+ * @v init_hca		INIT_HCA structure to fill in
+ * @ret rc		Return status code
+ */
+static int hermon_alloc_icm ( struct hermon *hermon,
+			      struct hermonprm_init_hca *init_hca ) {
+	struct hermonprm_scalar_parameter icm_size;
+	struct hermonprm_scalar_parameter icm_aux_size;
+	uint64_t icm_offset = 0;
+	unsigned int log_num_qps, log_num_srqs, log_num_cqs, log_num_eqs;
+	unsigned int log_num_mtts, log_num_mpts, log_num_mcs;
+	size_t cmpt_max_len;
+	size_t icm_len, icm_aux_len;
+	size_t len;
+	physaddr_t icm_phys;
+	int i;
+	int rc;
+
+	/*
+	 * Start by carving up the ICM virtual address space
+	 *
+	 */
+
+	/* Calculate number of each object type within ICM */
+	log_num_qps = fls ( hermon->cap.reserved_qps +
+			    HERMON_RSVD_SPECIAL_QPS + HERMON_MAX_QPS - 1 );
+	log_num_srqs = fls ( hermon->cap.reserved_srqs - 1 );
+	log_num_cqs = fls ( hermon->cap.reserved_cqs + HERMON_MAX_CQS - 1 );
+	log_num_eqs = fls ( hermon->cap.reserved_eqs + HERMON_MAX_EQS - 1 );
+	log_num_mtts = fls ( hermon->cap.reserved_mtts + HERMON_MAX_MTTS - 1 );
+	log_num_mpts = fls ( hermon->cap.reserved_mrws + 1 - 1 );
+	log_num_mcs = HERMON_LOG_MULTICAST_HASH_SIZE;
+
+	/* ICM starts with the cMPT tables, which are sparse */
+	cmpt_max_len = ( HERMON_CMPT_MAX_ENTRIES *
+			 ( ( uint64_t ) hermon->cap.cmpt_entry_size ) );
+	len = ( ( ( ( 1 << log_num_qps ) * hermon->cap.cmpt_entry_size ) +
+		  HERMON_PAGE_SIZE - 1 ) & ~( HERMON_PAGE_SIZE - 1 ) );
+	hermon->icm_map[HERMON_ICM_QP_CMPT].offset = icm_offset;
+	hermon->icm_map[HERMON_ICM_QP_CMPT].len = len;
+	icm_offset += cmpt_max_len;
+	len = ( ( ( ( 1 << log_num_srqs ) * hermon->cap.cmpt_entry_size ) +
+		  HERMON_PAGE_SIZE - 1 ) & ~( HERMON_PAGE_SIZE - 1 ) );
+	hermon->icm_map[HERMON_ICM_SRQ_CMPT].offset = icm_offset;
+	hermon->icm_map[HERMON_ICM_SRQ_CMPT].len = len;
+	icm_offset += cmpt_max_len;
+	len = ( ( ( ( 1 << log_num_cqs ) * hermon->cap.cmpt_entry_size ) +
+		  HERMON_PAGE_SIZE - 1 ) & ~( HERMON_PAGE_SIZE - 1 ) );
+	hermon->icm_map[HERMON_ICM_CQ_CMPT].offset = icm_offset;
+	hermon->icm_map[HERMON_ICM_CQ_CMPT].len = len;
+	icm_offset += cmpt_max_len;
+	len = ( ( ( ( 1 << log_num_eqs ) * hermon->cap.cmpt_entry_size ) +
+		  HERMON_PAGE_SIZE - 1 ) & ~( HERMON_PAGE_SIZE - 1 ) );
+	hermon->icm_map[HERMON_ICM_EQ_CMPT].offset = icm_offset;
+	hermon->icm_map[HERMON_ICM_EQ_CMPT].len = len;
+	icm_offset += cmpt_max_len;
+
+	hermon->icm_map[HERMON_ICM_OTHER].offset = icm_offset;
+
+	/* Queue pair contexts */
+	len = ( ( 1 << log_num_qps ) * hermon->cap.qpc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 12,
+		     qpc_eec_cqc_eqc_rdb_parameters.qpc_base_addr_h,
+		     ( icm_offset >> 32 ) );
+	MLX_FILL_2 ( init_hca, 13,
+		     qpc_eec_cqc_eqc_rdb_parameters.qpc_base_addr_l,
+		     ( icm_offset >> 5 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_qp,
+		     log_num_qps );
+	DBGC ( hermon, "Hermon %p ICM QPC is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_qps ), hermon->cap.qpc_entry_size,
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+	/* Extended alternate path contexts */
+	len = ( ( 1 << log_num_qps ) * hermon->cap.altc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 24,
+		     qpc_eec_cqc_eqc_rdb_parameters.altc_base_addr_h,
+		     ( icm_offset >> 32 ) );
+	MLX_FILL_1 ( init_hca, 25,
+		     qpc_eec_cqc_eqc_rdb_parameters.altc_base_addr_l,
+		     icm_offset );
+	DBGC ( hermon, "Hermon %p ICM ALTC is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_qps ), hermon->cap.altc_entry_size,
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+	/* Extended auxiliary contexts */
+	len = ( ( 1 << log_num_qps ) * hermon->cap.auxc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 28,
+		     qpc_eec_cqc_eqc_rdb_parameters.auxc_base_addr_h,
+		     ( icm_offset >> 32 ) );
+	MLX_FILL_1 ( init_hca, 29,
+		     qpc_eec_cqc_eqc_rdb_parameters.auxc_base_addr_l,
+		     icm_offset );
+	DBGC ( hermon, "Hermon %p ICM AUXC is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_qps ), hermon->cap.auxc_entry_size,
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+	/* Shared receive queue contexts */
+	len = ( ( 1 << log_num_srqs ) * hermon->cap.srqc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 18,
+		     qpc_eec_cqc_eqc_rdb_parameters.srqc_base_addr_h,
+		     ( icm_offset >> 32 ) );
+	MLX_FILL_2 ( init_hca, 19,
+		     qpc_eec_cqc_eqc_rdb_parameters.srqc_base_addr_l,
+		     ( icm_offset >> 5 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_srq,
+		     log_num_srqs );
+	DBGC ( hermon, "Hermon %p ICM SRQC is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_srqs ), hermon->cap.srqc_entry_size,
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+	/* Completion queue contexts */
+	len = ( ( 1 << log_num_cqs ) * hermon->cap.cqc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 20,
+		     qpc_eec_cqc_eqc_rdb_parameters.cqc_base_addr_h,
+		     ( icm_offset >> 32 ) );
+	MLX_FILL_2 ( init_hca, 21,
+		     qpc_eec_cqc_eqc_rdb_parameters.cqc_base_addr_l,
+		     ( icm_offset >> 5 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_cq,
+		     log_num_cqs );
+	DBGC ( hermon, "Hermon %p ICM CQC is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_cqs ), hermon->cap.cqc_entry_size,
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+	/* Event queue contexts */
+	len = ( ( 1 << log_num_eqs ) * hermon->cap.eqc_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 32,
+		     qpc_eec_cqc_eqc_rdb_parameters.eqc_base_addr_h,
+		     ( icm_offset >> 32 ) );
+	MLX_FILL_2 ( init_hca, 33,
+		     qpc_eec_cqc_eqc_rdb_parameters.eqc_base_addr_l,
+		     ( icm_offset >> 5 ),
+		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_eq,
+		     log_num_eqs );
+	DBGC ( hermon, "Hermon %p ICM EQC is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_eqs ), hermon->cap.eqc_entry_size,
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+	/* Memory translation table */
+	len = ( ( 1 << log_num_mtts ) * hermon->cap.mtt_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 64,
+		     tpt_parameters.mtt_base_addr_h, ( icm_offset >> 32 ) );
+	MLX_FILL_1 ( init_hca, 65,
+		     tpt_parameters.mtt_base_addr_l, icm_offset );
+	DBGC ( hermon, "Hermon %p ICM MTT is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_mtts ), hermon->cap.mtt_entry_size,
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+	/* Memory protection table */
+	len = ( ( 1 << log_num_mpts ) * hermon->cap.dmpt_entry_size );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 60,
+		     tpt_parameters.dmpt_base_adr_h, ( icm_offset >> 32 ) );
+	MLX_FILL_1 ( init_hca, 61,
+		     tpt_parameters.dmpt_base_adr_l, icm_offset );
+	MLX_FILL_1 ( init_hca, 62,
+		     tpt_parameters.log_dmpt_sz, log_num_mpts );
+	DBGC ( hermon, "Hermon %p ICM DMPT is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_mpts ), hermon->cap.dmpt_entry_size,
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+	/* Multicast table */
+	len = ( ( 1 << log_num_mcs ) * sizeof ( struct hermonprm_mcg_entry ) );
+	icm_offset = icm_align ( icm_offset, len );
+	MLX_FILL_1 ( init_hca, 48,
+		     multicast_parameters.mc_base_addr_h,
+		     ( icm_offset >> 32 ) );
+	MLX_FILL_1 ( init_hca, 49,
+		     multicast_parameters.mc_base_addr_l, icm_offset );
+	MLX_FILL_1 ( init_hca, 52,
+		     multicast_parameters.log_mc_table_entry_sz,
+		     fls ( sizeof ( struct hermonprm_mcg_entry ) - 1 ) );
+	MLX_FILL_1 ( init_hca, 53,
+		     multicast_parameters.log_mc_table_hash_sz, log_num_mcs );
+	MLX_FILL_1 ( init_hca, 54,
+		     multicast_parameters.log_mc_table_sz, log_num_mcs );
+	DBGC ( hermon, "Hermon %p ICM MC is %d x %#zx at [%08llx,%08llx)\n",
+	       hermon, ( 1 << log_num_mcs ),
+	       sizeof ( struct hermonprm_mcg_entry ),
+	       icm_offset, ( icm_offset + len ) );
+	icm_offset += len;
+
+
+	hermon->icm_map[HERMON_ICM_OTHER].len =
+		( icm_offset - hermon->icm_map[HERMON_ICM_OTHER].offset );
+
+	/*
+	 * Allocate and map physical memory for (portions of) ICM
+	 *
+	 * Map is:
+	 *   ICM AUX area (aligned to its own size)
+	 *   cMPT areas
+	 *   Other areas
+	 */
+
+	/* Calculate physical memory required for ICM */
+	icm_len = 0;
+	for ( i = 0 ; i < HERMON_ICM_NUM_REGIONS ; i++ ) {
+		icm_len += hermon->icm_map[i].len;
+	}
+
+	/* Get ICM auxiliary area size */
+	memset ( &icm_size, 0, sizeof ( icm_size ) );
+	MLX_FILL_1 ( &icm_size, 0, value_hi, ( icm_offset >> 32 ) );
+	MLX_FILL_1 ( &icm_size, 1, value, icm_offset );
+	if ( ( rc = hermon_cmd_set_icm_size ( hermon, &icm_size,
+					      &icm_aux_size ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not set ICM size: %s\n",
+		       hermon, strerror ( rc ) );
+		goto err_set_icm_size;
+	}
+	icm_aux_len = ( MLX_GET ( &icm_aux_size, value ) * HERMON_PAGE_SIZE );
+
+	/* Allocate ICM data and auxiliary area */
+	DBGC ( hermon, "Hermon %p requires %zd kB ICM and %zd kB AUX ICM\n",
+	       hermon, ( icm_len / 1024 ), ( icm_aux_len / 1024 ) );
+	hermon->icm = umalloc ( icm_aux_len + icm_len );
+	if ( ! hermon->icm ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	icm_phys = user_to_phys ( hermon->icm, 0 );
+
+	/* Map ICM auxiliary area */
+	DBGC ( hermon, "Hermon %p mapping ICM AUX => %08lx\n",
+	       hermon, icm_phys );
+	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_icm_aux,
+				     0, icm_phys, icm_aux_len ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not map AUX ICM: %s\n",
+		       hermon, strerror ( rc ) );
+		goto err_map_icm_aux;
+	}
+	icm_phys += icm_aux_len;
+
+	/* MAP ICM area */
+	for ( i = 0 ; i < HERMON_ICM_NUM_REGIONS ; i++ ) {
+		DBGC ( hermon, "Hermon %p mapping ICM %llx+%zx => %08lx\n",
+		       hermon, hermon->icm_map[i].offset,
+		       hermon->icm_map[i].len, icm_phys );
+		if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_icm,
+					     hermon->icm_map[i].offset,
+					     icm_phys,
+					     hermon->icm_map[i].len ) ) != 0 ){
+			DBGC ( hermon, "Hermon %p could not map ICM: %s\n",
+			       hermon, strerror ( rc ) );
+			goto err_map_icm;
+		}
+		icm_phys += hermon->icm_map[i].len;
+	}
+
+	return 0;
+
+ err_map_icm:
+	assert ( i == 0 ); /* We don't handle partial failure at present */
+ err_map_icm_aux:
+	hermon_cmd_unmap_icm_aux ( hermon );
+	ufree ( hermon->icm );
+	hermon->icm = UNULL;
+ err_alloc:
+ err_set_icm_size:
+	return rc;
+}
+
+/**
+ * Free ICM
+ *
+ * @v hermon		Hermon device
+ */
+static void hermon_free_icm ( struct hermon *hermon ) {
+	struct hermonprm_scalar_parameter unmap_icm;
+	int i;
+
+	for ( i = ( HERMON_ICM_NUM_REGIONS - 1 ) ; i >= 0 ; i-- ) {
+		memset ( &unmap_icm, 0, sizeof ( unmap_icm ) );
+		MLX_FILL_1 ( &unmap_icm, 0, value_hi,
+			     ( hermon->icm_map[i].offset >> 32 ) );
+		MLX_FILL_1 ( &unmap_icm, 1, value,
+			     hermon->icm_map[i].offset );
+		hermon_cmd_unmap_icm ( hermon,
+				       ( 1 << fls ( ( hermon->icm_map[i].len /
+						      HERMON_PAGE_SIZE ) - 1)),
+				       &unmap_icm );
+	}
+	hermon_cmd_unmap_icm_aux ( hermon );
+	ufree ( hermon->icm );
+	hermon->icm = UNULL;
+}
+
+/***************************************************************************
+ *
+ * Initialisation
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Reset device
+ *
+ * @v hermon		Hermon device
+ * @v pci		PCI device
+ */
+static void hermon_reset ( struct hermon *hermon,
+			   struct pci_device *pci ) {
+	struct pci_config_backup backup;
+	static const uint8_t backup_exclude[] =
+		PCI_CONFIG_BACKUP_EXCLUDE ( 0x58, 0x5c );
+
+	pci_backup ( pci, &backup, backup_exclude );
+	writel ( HERMON_RESET_MAGIC,
+		 ( hermon->config + HERMON_RESET_OFFSET ) );
+	mdelay ( HERMON_RESET_WAIT_TIME_MS );
+	pci_restore ( pci, &backup, backup_exclude );
+}
+
+/**
+ * Set up memory protection table
+ *
+ * @v hermon		Hermon device
+ * @ret rc		Return status code
+ */
+static int hermon_setup_mpt ( struct hermon *hermon ) {
+	struct hermonprm_mpt mpt;
+	uint32_t key;
+	int rc;
+
+	/* Derive key */
+	key = ( hermon->cap.reserved_mrws | HERMON_MKEY_PREFIX );
+	hermon->lkey = ( ( key << 8 ) | ( key >> 24 ) );
+
+	/* Initialise memory protection table */
+	memset ( &mpt, 0, sizeof ( mpt ) );
+	MLX_FILL_7 ( &mpt, 0,
+		     atomic, 1,
+		     rw, 1,
+		     rr, 1,
+		     lw, 1,
+		     lr, 1,
+		     pa, 1,
+		     r_w, 1 );
+	MLX_FILL_1 ( &mpt, 2, mem_key, key );
+	MLX_FILL_1 ( &mpt, 3,
+		     pd, HERMON_GLOBAL_PD );
+	MLX_FILL_1 ( &mpt, 10, len64, 1 );
+	if ( ( rc = hermon_cmd_sw2hw_mpt ( hermon,
+					   hermon->cap.reserved_mrws,
+					   &mpt ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not set up MPT: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Configure special queue pairs
+ *
+ * @v hermon		Hermon device
+ * @ret rc		Return status code
+ */
+static int hermon_configure_special_qps ( struct hermon *hermon ) {
+	int rc;
+
+	/* Special QP block must be aligned on its own size */
+	hermon->special_qpn_base = ( ( hermon->cap.reserved_qps +
+				       HERMON_NUM_SPECIAL_QPS - 1 )
+				     & ~( HERMON_NUM_SPECIAL_QPS - 1 ) );
+	hermon->qpn_base = ( hermon->special_qpn_base +
+			     HERMON_NUM_SPECIAL_QPS );
+	DBGC ( hermon, "Hermon %p special QPs at [%lx,%lx]\n", hermon,
+	       hermon->special_qpn_base, ( hermon->qpn_base - 1 ) );
+
+	/* Issue command to configure special QPs */
+	if ( ( rc = hermon_cmd_conf_special_qp ( hermon, 0x00,
+					  hermon->special_qpn_base ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not configure special QPs: "
+		       "%s\n", hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/***************************************************************************
+ *
  * Infiniband link-layer operations
  *
  ***************************************************************************
@@ -2769,559 +3417,6 @@ static int hermon_set_port_type ( struct hermon *hermon,
 
 /***************************************************************************
  *
- * Firmware control
- *
- ***************************************************************************
- */
-
-/**
- * Map virtual to physical address for firmware usage
- *
- * @v hermon		Hermon device
- * @v map		Mapping function
- * @v va		Virtual address
- * @v pa		Physical address
- * @v len		Length of region
- * @ret rc		Return status code
- */
-static int hermon_map_vpm ( struct hermon *hermon,
-			    int ( *map ) ( struct hermon *hermon,
-			    const struct hermonprm_virtual_physical_mapping* ),
-			    uint64_t va, physaddr_t pa, size_t len ) {
-	struct hermonprm_virtual_physical_mapping mapping;
-	physaddr_t start;
-	physaddr_t low;
-	physaddr_t high;
-	physaddr_t end;
-	size_t size;
-	int rc;
-
-	/* Sanity checks */
-	assert ( ( va & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
-	assert ( ( pa & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
-	assert ( ( len & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
-
-	/* Calculate starting points */
-	start = pa;
-	end = ( start + len );
-	size = ( 1UL << ( fls ( start ^ end ) - 1 ) );
-	low = high = ( end & ~( size - 1 ) );
-	assert ( start < low );
-	assert ( high <= end );
-
-	/* These mappings tend to generate huge volumes of
-	 * uninteresting debug data, which basically makes it
-	 * impossible to use debugging otherwise.
-	 */
-	DBG_DISABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
-
-	/* Map blocks in descending order of size */
-	while ( size >= HERMON_PAGE_SIZE ) {
-
-		/* Find the next candidate block */
-		if ( ( low - size ) >= start ) {
-			low -= size;
-			pa = low;
-		} else if ( ( high + size ) <= end ) {
-			pa = high;
-			high += size;
-		} else {
-			size >>= 1;
-			continue;
-		}
-		assert ( ( va & ( size - 1 ) ) == 0 );
-		assert ( ( pa & ( size - 1 ) ) == 0 );
-
-		/* Map this block */
-		memset ( &mapping, 0, sizeof ( mapping ) );
-		MLX_FILL_1 ( &mapping, 0, va_h, ( va >> 32 ) );
-		MLX_FILL_1 ( &mapping, 1, va_l, ( va >> 12 ) );
-		MLX_FILL_H ( &mapping, 2, pa_h, pa );
-		MLX_FILL_2 ( &mapping, 3,
-			     log2size, ( ( fls ( size ) - 1 ) - 12 ),
-			     pa_l, ( pa >> 12 ) );
-		if ( ( rc = map ( hermon, &mapping ) ) != 0 ) {
-			DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
-			DBGC ( hermon, "Hermon %p could not map %08llx+%zx to "
-			       "%08lx: %s\n",
-			       hermon, va, size, pa, strerror ( rc ) );
-			return rc;
-		}
-		va += size;
-	}
-	assert ( low == start );
-	assert ( high == end );
-
-	DBG_ENABLE ( DBGLVL_LOG | DBGLVL_EXTRA );
-	return 0;
-}
-
-/**
- * Start firmware running
- *
- * @v hermon		Hermon device
- * @ret rc		Return status code
- */
-static int hermon_start_firmware ( struct hermon *hermon ) {
-	struct hermonprm_query_fw fw;
-	unsigned int fw_pages;
-	size_t fw_size;
-	physaddr_t fw_base;
-	int rc;
-
-	/* Get firmware parameters */
-	if ( ( rc = hermon_cmd_query_fw ( hermon, &fw ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not query firmware: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_query_fw;
-	}
-	DBGC ( hermon, "Hermon %p firmware version %d.%d.%d\n", hermon,
-	       MLX_GET ( &fw, fw_rev_major ), MLX_GET ( &fw, fw_rev_minor ),
-	       MLX_GET ( &fw, fw_rev_subminor ) );
-	fw_pages = MLX_GET ( &fw, fw_pages );
-	DBGC ( hermon, "Hermon %p requires %d pages (%d kB) for firmware\n",
-	       hermon, fw_pages, ( fw_pages * 4 ) );
-
-	/* Allocate firmware pages and map firmware area */
-	fw_size = ( fw_pages * HERMON_PAGE_SIZE );
-	hermon->firmware_area = umalloc ( fw_size );
-	if ( ! hermon->firmware_area ) {
-		rc = -ENOMEM;
-		goto err_alloc_fa;
-	}
-	fw_base = user_to_phys ( hermon->firmware_area, 0 );
-	DBGC ( hermon, "Hermon %p firmware area at physical [%08lx,%08lx)\n",
-	       hermon, fw_base, ( fw_base + fw_size ) );
-	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_fa,
-				     0, fw_base, fw_size ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not map firmware: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_map_fa;
-	}
-
-	/* Start firmware */
-	if ( ( rc = hermon_cmd_run_fw ( hermon ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not run firmware: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_run_fw;
-	}
-
-	DBGC ( hermon, "Hermon %p firmware started\n", hermon );
-	return 0;
-
- err_run_fw:
- err_map_fa:
-	hermon_cmd_unmap_fa ( hermon );
-	ufree ( hermon->firmware_area );
-	hermon->firmware_area = UNULL;
- err_alloc_fa:
- err_query_fw:
-	return rc;
-}
-
-/**
- * Stop firmware running
- *
- * @v hermon		Hermon device
- */
-static void hermon_stop_firmware ( struct hermon *hermon ) {
-	int rc;
-
-	if ( ( rc = hermon_cmd_unmap_fa ( hermon ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p FATAL could not stop firmware: %s\n",
-		       hermon, strerror ( rc ) );
-		/* Leak memory and return; at least we avoid corruption */
-		return;
-	}
-	ufree ( hermon->firmware_area );
-	hermon->firmware_area = UNULL;
-}
-
-/***************************************************************************
- *
- * Infinihost Context Memory management
- *
- ***************************************************************************
- */
-
-/**
- * Get device limits
- *
- * @v hermon		Hermon device
- * @ret rc		Return status code
- */
-static int hermon_get_cap ( struct hermon *hermon ) {
-	struct hermonprm_query_dev_cap dev_cap;
-	int rc;
-
-	if ( ( rc = hermon_cmd_query_dev_cap ( hermon, &dev_cap ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not get device limits: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-
-	hermon->cap.cmpt_entry_size = MLX_GET ( &dev_cap, c_mpt_entry_sz );
-	hermon->cap.reserved_qps =
-		( 1 << MLX_GET ( &dev_cap, log2_rsvd_qps ) );
-	hermon->cap.qpc_entry_size = MLX_GET ( &dev_cap, qpc_entry_sz );
-	hermon->cap.altc_entry_size = MLX_GET ( &dev_cap, altc_entry_sz );
-	hermon->cap.auxc_entry_size = MLX_GET ( &dev_cap, aux_entry_sz );
-	hermon->cap.reserved_srqs =
-		( 1 << MLX_GET ( &dev_cap, log2_rsvd_srqs ) );
-	hermon->cap.srqc_entry_size = MLX_GET ( &dev_cap, srq_entry_sz );
-	hermon->cap.reserved_cqs =
-		( 1 << MLX_GET ( &dev_cap, log2_rsvd_cqs ) );
-	hermon->cap.cqc_entry_size = MLX_GET ( &dev_cap, cqc_entry_sz );
-	hermon->cap.reserved_eqs = MLX_GET ( &dev_cap, num_rsvd_eqs );
-	if ( hermon->cap.reserved_eqs == 0 ) {
-		/* Backward compatibility */
-		hermon->cap.reserved_eqs =
-			( 1 << MLX_GET ( &dev_cap, log2_rsvd_eqs ) );
-	}
-	hermon->cap.eqc_entry_size = MLX_GET ( &dev_cap, eqc_entry_sz );
-	hermon->cap.reserved_mtts =
-		( 1 << MLX_GET ( &dev_cap, log2_rsvd_mtts ) );
-	hermon->cap.mtt_entry_size = MLX_GET ( &dev_cap, mtt_entry_sz );
-	hermon->cap.reserved_mrws =
-		( 1 << MLX_GET ( &dev_cap, log2_rsvd_mrws ) );
-	hermon->cap.dmpt_entry_size = MLX_GET ( &dev_cap, d_mpt_entry_sz );
-	hermon->cap.reserved_uars = MLX_GET ( &dev_cap, num_rsvd_uars );
-	hermon->cap.num_ports = MLX_GET ( &dev_cap, num_ports );
-	hermon->cap.dpdp = MLX_GET ( &dev_cap, dpdp );
-
-	/* Sanity check */
-	if ( hermon->cap.num_ports > HERMON_MAX_PORTS ) {
-		DBGC ( hermon, "Hermon %p has %d ports (only %d supported)\n",
-		       hermon, hermon->cap.num_ports, HERMON_MAX_PORTS );
-		hermon->cap.num_ports = HERMON_MAX_PORTS;
-	}
-
-	return 0;
-}
-
-/**
- * Align ICM table
- *
- * @v icm_offset	Current ICM offset
- * @v len		ICM table length
- * @ret icm_offset	ICM offset
- */
-static uint64_t icm_align ( uint64_t icm_offset, size_t len ) {
-
-	/* Round up to a multiple of the table size */
-	assert ( len == ( 1UL << ( fls ( len ) - 1 ) ) );
-	return ( ( icm_offset + len - 1 ) & ~( ( ( uint64_t ) len ) - 1 ) );
-}
-
-/**
- * Allocate ICM
- *
- * @v hermon		Hermon device
- * @v init_hca		INIT_HCA structure to fill in
- * @ret rc		Return status code
- */
-static int hermon_alloc_icm ( struct hermon *hermon,
-			      struct hermonprm_init_hca *init_hca ) {
-	struct hermonprm_scalar_parameter icm_size;
-	struct hermonprm_scalar_parameter icm_aux_size;
-	uint64_t icm_offset = 0;
-	unsigned int log_num_qps, log_num_srqs, log_num_cqs, log_num_eqs;
-	unsigned int log_num_mtts, log_num_mpts, log_num_mcs;
-	size_t cmpt_max_len;
-	size_t icm_len, icm_aux_len;
-	size_t len;
-	physaddr_t icm_phys;
-	int i;
-	int rc;
-
-	/*
-	 * Start by carving up the ICM virtual address space
-	 *
-	 */
-
-	/* Calculate number of each object type within ICM */
-	log_num_qps = fls ( hermon->cap.reserved_qps +
-			    HERMON_RSVD_SPECIAL_QPS + HERMON_MAX_QPS - 1 );
-	log_num_srqs = fls ( hermon->cap.reserved_srqs - 1 );
-	log_num_cqs = fls ( hermon->cap.reserved_cqs + HERMON_MAX_CQS - 1 );
-	log_num_eqs = fls ( hermon->cap.reserved_eqs + HERMON_MAX_EQS - 1 );
-	log_num_mtts = fls ( hermon->cap.reserved_mtts + HERMON_MAX_MTTS - 1 );
-	log_num_mpts = fls ( hermon->cap.reserved_mrws + 1 - 1 );
-	log_num_mcs = HERMON_LOG_MULTICAST_HASH_SIZE;
-
-	/* ICM starts with the cMPT tables, which are sparse */
-	cmpt_max_len = ( HERMON_CMPT_MAX_ENTRIES *
-			 ( ( uint64_t ) hermon->cap.cmpt_entry_size ) );
-	len = ( ( ( ( 1 << log_num_qps ) * hermon->cap.cmpt_entry_size ) +
-		  HERMON_PAGE_SIZE - 1 ) & ~( HERMON_PAGE_SIZE - 1 ) );
-	hermon->icm_map[HERMON_ICM_QP_CMPT].offset = icm_offset;
-	hermon->icm_map[HERMON_ICM_QP_CMPT].len = len;
-	icm_offset += cmpt_max_len;
-	len = ( ( ( ( 1 << log_num_srqs ) * hermon->cap.cmpt_entry_size ) +
-		  HERMON_PAGE_SIZE - 1 ) & ~( HERMON_PAGE_SIZE - 1 ) );
-	hermon->icm_map[HERMON_ICM_SRQ_CMPT].offset = icm_offset;
-	hermon->icm_map[HERMON_ICM_SRQ_CMPT].len = len;
-	icm_offset += cmpt_max_len;
-	len = ( ( ( ( 1 << log_num_cqs ) * hermon->cap.cmpt_entry_size ) +
-		  HERMON_PAGE_SIZE - 1 ) & ~( HERMON_PAGE_SIZE - 1 ) );
-	hermon->icm_map[HERMON_ICM_CQ_CMPT].offset = icm_offset;
-	hermon->icm_map[HERMON_ICM_CQ_CMPT].len = len;
-	icm_offset += cmpt_max_len;
-	len = ( ( ( ( 1 << log_num_eqs ) * hermon->cap.cmpt_entry_size ) +
-		  HERMON_PAGE_SIZE - 1 ) & ~( HERMON_PAGE_SIZE - 1 ) );
-	hermon->icm_map[HERMON_ICM_EQ_CMPT].offset = icm_offset;
-	hermon->icm_map[HERMON_ICM_EQ_CMPT].len = len;
-	icm_offset += cmpt_max_len;
-
-	hermon->icm_map[HERMON_ICM_OTHER].offset = icm_offset;
-
-	/* Queue pair contexts */
-	len = ( ( 1 << log_num_qps ) * hermon->cap.qpc_entry_size );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 12,
-		     qpc_eec_cqc_eqc_rdb_parameters.qpc_base_addr_h,
-		     ( icm_offset >> 32 ) );
-	MLX_FILL_2 ( init_hca, 13,
-		     qpc_eec_cqc_eqc_rdb_parameters.qpc_base_addr_l,
-		     ( icm_offset >> 5 ),
-		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_qp,
-		     log_num_qps );
-	DBGC ( hermon, "Hermon %p ICM QPC is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_qps ), hermon->cap.qpc_entry_size,
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-	/* Extended alternate path contexts */
-	len = ( ( 1 << log_num_qps ) * hermon->cap.altc_entry_size );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 24,
-		     qpc_eec_cqc_eqc_rdb_parameters.altc_base_addr_h,
-		     ( icm_offset >> 32 ) );
-	MLX_FILL_1 ( init_hca, 25,
-		     qpc_eec_cqc_eqc_rdb_parameters.altc_base_addr_l,
-		     icm_offset );
-	DBGC ( hermon, "Hermon %p ICM ALTC is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_qps ), hermon->cap.altc_entry_size,
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-	/* Extended auxiliary contexts */
-	len = ( ( 1 << log_num_qps ) * hermon->cap.auxc_entry_size );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 28,
-		     qpc_eec_cqc_eqc_rdb_parameters.auxc_base_addr_h,
-		     ( icm_offset >> 32 ) );
-	MLX_FILL_1 ( init_hca, 29,
-		     qpc_eec_cqc_eqc_rdb_parameters.auxc_base_addr_l,
-		     icm_offset );
-	DBGC ( hermon, "Hermon %p ICM AUXC is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_qps ), hermon->cap.auxc_entry_size,
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-	/* Shared receive queue contexts */
-	len = ( ( 1 << log_num_srqs ) * hermon->cap.srqc_entry_size );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 18,
-		     qpc_eec_cqc_eqc_rdb_parameters.srqc_base_addr_h,
-		     ( icm_offset >> 32 ) );
-	MLX_FILL_2 ( init_hca, 19,
-		     qpc_eec_cqc_eqc_rdb_parameters.srqc_base_addr_l,
-		     ( icm_offset >> 5 ),
-		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_srq,
-		     log_num_srqs );
-	DBGC ( hermon, "Hermon %p ICM SRQC is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_srqs ), hermon->cap.srqc_entry_size,
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-	/* Completion queue contexts */
-	len = ( ( 1 << log_num_cqs ) * hermon->cap.cqc_entry_size );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 20,
-		     qpc_eec_cqc_eqc_rdb_parameters.cqc_base_addr_h,
-		     ( icm_offset >> 32 ) );
-	MLX_FILL_2 ( init_hca, 21,
-		     qpc_eec_cqc_eqc_rdb_parameters.cqc_base_addr_l,
-		     ( icm_offset >> 5 ),
-		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_cq,
-		     log_num_cqs );
-	DBGC ( hermon, "Hermon %p ICM CQC is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_cqs ), hermon->cap.cqc_entry_size,
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-	/* Event queue contexts */
-	len = ( ( 1 << log_num_eqs ) * hermon->cap.eqc_entry_size );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 32,
-		     qpc_eec_cqc_eqc_rdb_parameters.eqc_base_addr_h,
-		     ( icm_offset >> 32 ) );
-	MLX_FILL_2 ( init_hca, 33,
-		     qpc_eec_cqc_eqc_rdb_parameters.eqc_base_addr_l,
-		     ( icm_offset >> 5 ),
-		     qpc_eec_cqc_eqc_rdb_parameters.log_num_of_eq,
-		     log_num_eqs );
-	DBGC ( hermon, "Hermon %p ICM EQC is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_eqs ), hermon->cap.eqc_entry_size,
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-	/* Memory translation table */
-	len = ( ( 1 << log_num_mtts ) * hermon->cap.mtt_entry_size );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 64,
-		     tpt_parameters.mtt_base_addr_h, ( icm_offset >> 32 ) );
-	MLX_FILL_1 ( init_hca, 65,
-		     tpt_parameters.mtt_base_addr_l, icm_offset );
-	DBGC ( hermon, "Hermon %p ICM MTT is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_mtts ), hermon->cap.mtt_entry_size,
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-	/* Memory protection table */
-	len = ( ( 1 << log_num_mpts ) * hermon->cap.dmpt_entry_size );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 60,
-		     tpt_parameters.dmpt_base_adr_h, ( icm_offset >> 32 ) );
-	MLX_FILL_1 ( init_hca, 61,
-		     tpt_parameters.dmpt_base_adr_l, icm_offset );
-	MLX_FILL_1 ( init_hca, 62,
-		     tpt_parameters.log_dmpt_sz, log_num_mpts );
-	DBGC ( hermon, "Hermon %p ICM DMPT is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_mpts ), hermon->cap.dmpt_entry_size,
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-	/* Multicast table */
-	len = ( ( 1 << log_num_mcs ) * sizeof ( struct hermonprm_mcg_entry ) );
-	icm_offset = icm_align ( icm_offset, len );
-	MLX_FILL_1 ( init_hca, 48,
-		     multicast_parameters.mc_base_addr_h,
-		     ( icm_offset >> 32 ) );
-	MLX_FILL_1 ( init_hca, 49,
-		     multicast_parameters.mc_base_addr_l, icm_offset );
-	MLX_FILL_1 ( init_hca, 52,
-		     multicast_parameters.log_mc_table_entry_sz,
-		     fls ( sizeof ( struct hermonprm_mcg_entry ) - 1 ) );
-	MLX_FILL_1 ( init_hca, 53,
-		     multicast_parameters.log_mc_table_hash_sz, log_num_mcs );
-	MLX_FILL_1 ( init_hca, 54,
-		     multicast_parameters.log_mc_table_sz, log_num_mcs );
-	DBGC ( hermon, "Hermon %p ICM MC is %d x %#zx at [%08llx,%08llx)\n",
-	       hermon, ( 1 << log_num_mcs ),
-	       sizeof ( struct hermonprm_mcg_entry ),
-	       icm_offset, ( icm_offset + len ) );
-	icm_offset += len;
-
-
-	hermon->icm_map[HERMON_ICM_OTHER].len =
-		( icm_offset - hermon->icm_map[HERMON_ICM_OTHER].offset );
-
-	/*
-	 * Allocate and map physical memory for (portions of) ICM
-	 *
-	 * Map is:
-	 *   ICM AUX area (aligned to its own size)
-	 *   cMPT areas
-	 *   Other areas
-	 */
-
-	/* Calculate physical memory required for ICM */
-	icm_len = 0;
-	for ( i = 0 ; i < HERMON_ICM_NUM_REGIONS ; i++ ) {
-		icm_len += hermon->icm_map[i].len;
-	}
-
-	/* Get ICM auxiliary area size */
-	memset ( &icm_size, 0, sizeof ( icm_size ) );
-	MLX_FILL_1 ( &icm_size, 0, value_hi, ( icm_offset >> 32 ) );
-	MLX_FILL_1 ( &icm_size, 1, value, icm_offset );
-	if ( ( rc = hermon_cmd_set_icm_size ( hermon, &icm_size,
-					      &icm_aux_size ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not set ICM size: %s\n",
-		       hermon, strerror ( rc ) );
-		goto err_set_icm_size;
-	}
-	icm_aux_len = ( MLX_GET ( &icm_aux_size, value ) * HERMON_PAGE_SIZE );
-
-	/* Allocate ICM data and auxiliary area */
-	DBGC ( hermon, "Hermon %p requires %zd kB ICM and %zd kB AUX ICM\n",
-	       hermon, ( icm_len / 1024 ), ( icm_aux_len / 1024 ) );
-	hermon->icm = umalloc ( icm_aux_len + icm_len );
-	if ( ! hermon->icm ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-	icm_phys = user_to_phys ( hermon->icm, 0 );
-
-	/* Map ICM auxiliary area */
-	DBGC ( hermon, "Hermon %p mapping ICM AUX => %08lx\n",
-	       hermon, icm_phys );
-	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_icm_aux,
-				     0, icm_phys, icm_aux_len ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not map AUX ICM: %s\n",
-		       hermon, strerror ( rc ) );		
-		goto err_map_icm_aux;
-	}
-	icm_phys += icm_aux_len;
-
-	/* MAP ICM area */
-	for ( i = 0 ; i < HERMON_ICM_NUM_REGIONS ; i++ ) {
-		DBGC ( hermon, "Hermon %p mapping ICM %llx+%zx => %08lx\n",
-		       hermon, hermon->icm_map[i].offset,
-		       hermon->icm_map[i].len, icm_phys );
-		if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_icm,
-					     hermon->icm_map[i].offset,
-					     icm_phys,
-					     hermon->icm_map[i].len ) ) != 0 ){
-			DBGC ( hermon, "Hermon %p could not map ICM: %s\n",
-			       hermon, strerror ( rc ) );
-			goto err_map_icm;
-		}
-		icm_phys += hermon->icm_map[i].len;
-	}
-
-	return 0;
-
- err_map_icm:
-	assert ( i == 0 ); /* We don't handle partial failure at present */
- err_map_icm_aux:
-	hermon_cmd_unmap_icm_aux ( hermon );
-	ufree ( hermon->icm );
-	hermon->icm = UNULL;
- err_alloc:
- err_set_icm_size:
-	return rc;
-}
-
-/**
- * Free ICM
- *
- * @v hermon		Hermon device
- */
-static void hermon_free_icm ( struct hermon *hermon ) {
-	struct hermonprm_scalar_parameter unmap_icm;
-	int i;
-
-	for ( i = ( HERMON_ICM_NUM_REGIONS - 1 ) ; i >= 0 ; i-- ) {
-		memset ( &unmap_icm, 0, sizeof ( unmap_icm ) );
-		MLX_FILL_1 ( &unmap_icm, 0, value_hi,
-			     ( hermon->icm_map[i].offset >> 32 ) );
-		MLX_FILL_1 ( &unmap_icm, 1, value,
-			     hermon->icm_map[i].offset );
-		hermon_cmd_unmap_icm ( hermon,
-				       ( 1 << fls ( ( hermon->icm_map[i].len /
-						      HERMON_PAGE_SIZE ) - 1)),
-				       &unmap_icm );
-	}
-	hermon_cmd_unmap_icm_aux ( hermon );
-	ufree ( hermon->icm );
-	hermon->icm = UNULL;
-}
-
-/***************************************************************************
- *
  * BOFM interface
  *
  ***************************************************************************
@@ -3423,94 +3518,6 @@ static struct bofm_operations hermon_bofm_operations = {
  *
  ***************************************************************************
  */
-
-/**
- * Set up memory protection table
- *
- * @v hermon		Hermon device
- * @ret rc		Return status code
- */
-static int hermon_setup_mpt ( struct hermon *hermon ) {
-	struct hermonprm_mpt mpt;
-	uint32_t key;
-	int rc;
-
-	/* Derive key */
-	key = ( hermon->cap.reserved_mrws | HERMON_MKEY_PREFIX );
-	hermon->lkey = ( ( key << 8 ) | ( key >> 24 ) );
-
-	/* Initialise memory protection table */
-	memset ( &mpt, 0, sizeof ( mpt ) );
-	MLX_FILL_7 ( &mpt, 0,
-		     atomic, 1,
-		     rw, 1,
-		     rr, 1,
-		     lw, 1,
-		     lr, 1,
-		     pa, 1,
-		     r_w, 1 );
-	MLX_FILL_1 ( &mpt, 2, mem_key, key );
-	MLX_FILL_1 ( &mpt, 3,
-		     pd, HERMON_GLOBAL_PD );
-	MLX_FILL_1 ( &mpt, 10, len64, 1 );
-	if ( ( rc = hermon_cmd_sw2hw_mpt ( hermon,
-					   hermon->cap.reserved_mrws,
-					   &mpt ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not set up MPT: %s\n",
-		       hermon, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Configure special queue pairs
- *
- * @v hermon		Hermon device
- * @ret rc		Return status code
- */
-static int hermon_configure_special_qps ( struct hermon *hermon ) {
-	int rc;
-
-	/* Special QP block must be aligned on its own size */
-	hermon->special_qpn_base = ( ( hermon->cap.reserved_qps +
-				       HERMON_NUM_SPECIAL_QPS - 1 )
-				     & ~( HERMON_NUM_SPECIAL_QPS - 1 ) );
-	hermon->qpn_base = ( hermon->special_qpn_base +
-			     HERMON_NUM_SPECIAL_QPS );
-	DBGC ( hermon, "Hermon %p special QPs at [%lx,%lx]\n", hermon,
-	       hermon->special_qpn_base, ( hermon->qpn_base - 1 ) );
-
-	/* Issue command to configure special QPs */
-	if ( ( rc = hermon_cmd_conf_special_qp ( hermon, 0x00,
-					  hermon->special_qpn_base ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not configure special QPs: "
-		       "%s\n", hermon, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Reset device
- *
- * @v hermon		Hermon device
- * @v pci		PCI device
- */
-static void hermon_reset ( struct hermon *hermon,
-			   struct pci_device *pci ) {
-	struct pci_config_backup backup;
-	static const uint8_t backup_exclude[] =
-		PCI_CONFIG_BACKUP_EXCLUDE ( 0x58, 0x5c );
-
-	pci_backup ( pci, &backup, backup_exclude );
-	writel ( HERMON_RESET_MAGIC,
-		 ( hermon->config + HERMON_RESET_OFFSET ) );
-	mdelay ( HERMON_RESET_WAIT_TIME_MS );
-	pci_restore ( pci, &backup, backup_exclude );
-}
 
 /**
  * Allocate Hermon device
