@@ -861,7 +861,7 @@ void ib_poll_eq ( struct ib_device *ibdev ) {
 static void ib_step ( struct process *process __unused ) {
 	struct ib_device *ibdev;
 
-	for_each_ibdev ( ibdev )
+	list_for_each_entry ( ibdev, &open_ib_devices, open_list )
 		ib_poll_eq ( ibdev );
 }
 
