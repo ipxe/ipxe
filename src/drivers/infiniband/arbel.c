@@ -1894,195 +1894,6 @@ static void arbel_poll_eq ( struct ib_device *ibdev ) {
 
 /***************************************************************************
  *
- * Infiniband link-layer operations
- *
- ***************************************************************************
- */
-
-/**
- * Initialise Infiniband link
- *
- * @v ibdev		Infiniband device
- * @ret rc		Return status code
- */
-static int arbel_open ( struct ib_device *ibdev ) {
-	struct arbel *arbel = ib_get_drvdata ( ibdev );
-	struct arbelprm_init_ib init_ib;
-	int rc;
-
-	memset ( &init_ib, 0, sizeof ( init_ib ) );
-	MLX_FILL_3 ( &init_ib, 0,
-		     mtu_cap, ARBEL_MTU_2048,
-		     port_width_cap, 3,
-		     vl_cap, 1 );
-	MLX_FILL_1 ( &init_ib, 1, max_gid, 1 );
-	MLX_FILL_1 ( &init_ib, 2, max_pkey, 64 );
-	if ( ( rc = arbel_cmd_init_ib ( arbel, ibdev->port,
-					&init_ib ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p port %d could not intialise IB: %s\n",
-		       arbel, ibdev->port, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Update MAD parameters */
-	ib_smc_update ( ibdev, arbel_mad );
-
-	return 0;
-}
-
-/**
- * Close Infiniband link
- *
- * @v ibdev		Infiniband device
- */
-static void arbel_close ( struct ib_device *ibdev ) {
-	struct arbel *arbel = ib_get_drvdata ( ibdev );
-	int rc;
-
-	if ( ( rc = arbel_cmd_close_ib ( arbel, ibdev->port ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p port %d could not close IB: %s\n",
-		       arbel, ibdev->port, strerror ( rc ) );
-		/* Nothing we can do about this */
-	}
-}
-
-/**
- * Inform embedded subnet management agent of a received MAD
- *
- * @v ibdev		Infiniband device
- * @v mad		MAD
- * @ret rc		Return status code
- */
-static int arbel_inform_sma ( struct ib_device *ibdev, union ib_mad *mad ) {
-	int rc;
-
-	/* Send the MAD to the embedded SMA */
-	if ( ( rc = arbel_mad ( ibdev, mad ) ) != 0 )
-		return rc;
-
-	/* Update parameters held in software */
-	ib_smc_update ( ibdev, arbel_mad );
-
-	return 0;
-}
-
-/***************************************************************************
- *
- * Multicast group operations
- *
- ***************************************************************************
- */
-
-/**
- * Attach to multicast group
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v gid		Multicast GID
- * @ret rc		Return status code
- */
-static int arbel_mcast_attach ( struct ib_device *ibdev,
-				struct ib_queue_pair *qp,
-				union ib_gid *gid ) {
-	struct arbel *arbel = ib_get_drvdata ( ibdev );
-	struct arbelprm_mgm_hash hash;
-	struct arbelprm_mgm_entry mgm;
-	unsigned int index;
-	int rc;
-
-	/* Generate hash table index */
-	if ( ( rc = arbel_cmd_mgid_hash ( arbel, gid, &hash ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not hash GID: %s\n",
-		       arbel, strerror ( rc ) );
-		return rc;
-	}
-	index = MLX_GET ( &hash, hash );
-
-	/* Check for existing hash table entry */
-	if ( ( rc = arbel_cmd_read_mgm ( arbel, index, &mgm ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not read MGM %#x: %s\n",
-		       arbel, index, strerror ( rc ) );
-		return rc;
-	}
-	if ( MLX_GET ( &mgm, mgmqp_0.qi ) != 0 ) {
-		/* FIXME: this implementation allows only a single QP
-		 * per multicast group, and doesn't handle hash
-		 * collisions.  Sufficient for IPoIB but may need to
-		 * be extended in future.
-		 */
-		DBGC ( arbel, "Arbel %p MGID index %#x already in use\n",
-		       arbel, index );
-		return -EBUSY;
-	}
-
-	/* Update hash table entry */
-	MLX_FILL_2 ( &mgm, 8,
-		     mgmqp_0.qpn_i, qp->qpn,
-		     mgmqp_0.qi, 1 );
-	memcpy ( &mgm.u.dwords[4], gid, sizeof ( *gid ) );
-	if ( ( rc = arbel_cmd_write_mgm ( arbel, index, &mgm ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not write MGM %#x: %s\n",
-		       arbel, index, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Detach from multicast group
- *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
- * @v gid		Multicast GID
- */
-static void arbel_mcast_detach ( struct ib_device *ibdev,
-				 struct ib_queue_pair *qp __unused,
-				 union ib_gid *gid ) {
-	struct arbel *arbel = ib_get_drvdata ( ibdev );
-	struct arbelprm_mgm_hash hash;
-	struct arbelprm_mgm_entry mgm;
-	unsigned int index;
-	int rc;
-
-	/* Generate hash table index */
-	if ( ( rc = arbel_cmd_mgid_hash ( arbel, gid, &hash ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not hash GID: %s\n",
-		       arbel, strerror ( rc ) );
-		return;
-	}
-	index = MLX_GET ( &hash, hash );
-
-	/* Clear hash table entry */
-	memset ( &mgm, 0, sizeof ( mgm ) );
-	if ( ( rc = arbel_cmd_write_mgm ( arbel, index, &mgm ) ) != 0 ) {
-		DBGC ( arbel, "Arbel %p could not write MGM %#x: %s\n",
-		       arbel, index, strerror ( rc ) );
-		return;
-	}
-}
-
-/** Arbel Infiniband operations */
-static struct ib_device_operations arbel_ib_operations = {
-	.create_cq	= arbel_create_cq,
-	.destroy_cq	= arbel_destroy_cq,
-	.create_qp	= arbel_create_qp,
-	.modify_qp	= arbel_modify_qp,
-	.destroy_qp	= arbel_destroy_qp,
-	.post_send	= arbel_post_send,
-	.post_recv	= arbel_post_recv,
-	.poll_cq	= arbel_poll_cq,
-	.poll_eq	= arbel_poll_eq,
-	.open		= arbel_open,
-	.close		= arbel_close,
-	.mcast_attach	= arbel_mcast_attach,
-	.mcast_detach	= arbel_mcast_detach,
-	.set_port_info	= arbel_inform_sma,
-	.set_pkey_table	= arbel_inform_sma,
-};
-
-/***************************************************************************
- *
  * Firmware control
  *
  ***************************************************************************
@@ -2678,7 +2489,7 @@ static void arbel_free_icm ( struct arbel *arbel ) {
 
 /***************************************************************************
  *
- * PCI interface
+ * Initialisation
  *
  ***************************************************************************
  */
@@ -2760,6 +2571,202 @@ static int arbel_configure_special_qps ( struct arbel *arbel ) {
 
 	return 0;
 }
+
+/***************************************************************************
+ *
+ * Infiniband link-layer operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Initialise Infiniband link
+ *
+ * @v ibdev		Infiniband device
+ * @ret rc		Return status code
+ */
+static int arbel_open ( struct ib_device *ibdev ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbelprm_init_ib init_ib;
+	int rc;
+
+	memset ( &init_ib, 0, sizeof ( init_ib ) );
+	MLX_FILL_3 ( &init_ib, 0,
+		     mtu_cap, ARBEL_MTU_2048,
+		     port_width_cap, 3,
+		     vl_cap, 1 );
+	MLX_FILL_1 ( &init_ib, 1, max_gid, 1 );
+	MLX_FILL_1 ( &init_ib, 2, max_pkey, 64 );
+	if ( ( rc = arbel_cmd_init_ib ( arbel, ibdev->port,
+					&init_ib ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p port %d could not intialise IB: %s\n",
+		       arbel, ibdev->port, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Update MAD parameters */
+	ib_smc_update ( ibdev, arbel_mad );
+
+	return 0;
+}
+
+/**
+ * Close Infiniband link
+ *
+ * @v ibdev		Infiniband device
+ */
+static void arbel_close ( struct ib_device *ibdev ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	int rc;
+
+	if ( ( rc = arbel_cmd_close_ib ( arbel, ibdev->port ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p port %d could not close IB: %s\n",
+		       arbel, ibdev->port, strerror ( rc ) );
+		/* Nothing we can do about this */
+	}
+}
+
+/**
+ * Inform embedded subnet management agent of a received MAD
+ *
+ * @v ibdev		Infiniband device
+ * @v mad		MAD
+ * @ret rc		Return status code
+ */
+static int arbel_inform_sma ( struct ib_device *ibdev, union ib_mad *mad ) {
+	int rc;
+
+	/* Send the MAD to the embedded SMA */
+	if ( ( rc = arbel_mad ( ibdev, mad ) ) != 0 )
+		return rc;
+
+	/* Update parameters held in software */
+	ib_smc_update ( ibdev, arbel_mad );
+
+	return 0;
+}
+
+/***************************************************************************
+ *
+ * Multicast group operations
+ *
+ ***************************************************************************
+ */
+
+/**
+ * Attach to multicast group
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v gid		Multicast GID
+ * @ret rc		Return status code
+ */
+static int arbel_mcast_attach ( struct ib_device *ibdev,
+				struct ib_queue_pair *qp,
+				union ib_gid *gid ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbelprm_mgm_hash hash;
+	struct arbelprm_mgm_entry mgm;
+	unsigned int index;
+	int rc;
+
+	/* Generate hash table index */
+	if ( ( rc = arbel_cmd_mgid_hash ( arbel, gid, &hash ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not hash GID: %s\n",
+		       arbel, strerror ( rc ) );
+		return rc;
+	}
+	index = MLX_GET ( &hash, hash );
+
+	/* Check for existing hash table entry */
+	if ( ( rc = arbel_cmd_read_mgm ( arbel, index, &mgm ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not read MGM %#x: %s\n",
+		       arbel, index, strerror ( rc ) );
+		return rc;
+	}
+	if ( MLX_GET ( &mgm, mgmqp_0.qi ) != 0 ) {
+		/* FIXME: this implementation allows only a single QP
+		 * per multicast group, and doesn't handle hash
+		 * collisions.  Sufficient for IPoIB but may need to
+		 * be extended in future.
+		 */
+		DBGC ( arbel, "Arbel %p MGID index %#x already in use\n",
+		       arbel, index );
+		return -EBUSY;
+	}
+
+	/* Update hash table entry */
+	MLX_FILL_2 ( &mgm, 8,
+		     mgmqp_0.qpn_i, qp->qpn,
+		     mgmqp_0.qi, 1 );
+	memcpy ( &mgm.u.dwords[4], gid, sizeof ( *gid ) );
+	if ( ( rc = arbel_cmd_write_mgm ( arbel, index, &mgm ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not write MGM %#x: %s\n",
+		       arbel, index, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Detach from multicast group
+ *
+ * @v ibdev		Infiniband device
+ * @v qp		Queue pair
+ * @v gid		Multicast GID
+ */
+static void arbel_mcast_detach ( struct ib_device *ibdev,
+				 struct ib_queue_pair *qp __unused,
+				 union ib_gid *gid ) {
+	struct arbel *arbel = ib_get_drvdata ( ibdev );
+	struct arbelprm_mgm_hash hash;
+	struct arbelprm_mgm_entry mgm;
+	unsigned int index;
+	int rc;
+
+	/* Generate hash table index */
+	if ( ( rc = arbel_cmd_mgid_hash ( arbel, gid, &hash ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not hash GID: %s\n",
+		       arbel, strerror ( rc ) );
+		return;
+	}
+	index = MLX_GET ( &hash, hash );
+
+	/* Clear hash table entry */
+	memset ( &mgm, 0, sizeof ( mgm ) );
+	if ( ( rc = arbel_cmd_write_mgm ( arbel, index, &mgm ) ) != 0 ) {
+		DBGC ( arbel, "Arbel %p could not write MGM %#x: %s\n",
+		       arbel, index, strerror ( rc ) );
+		return;
+	}
+}
+
+/** Arbel Infiniband operations */
+static struct ib_device_operations arbel_ib_operations = {
+	.create_cq	= arbel_create_cq,
+	.destroy_cq	= arbel_destroy_cq,
+	.create_qp	= arbel_create_qp,
+	.modify_qp	= arbel_modify_qp,
+	.destroy_qp	= arbel_destroy_qp,
+	.post_send	= arbel_post_send,
+	.post_recv	= arbel_post_recv,
+	.poll_cq	= arbel_poll_cq,
+	.poll_eq	= arbel_poll_eq,
+	.open		= arbel_open,
+	.close		= arbel_close,
+	.mcast_attach	= arbel_mcast_attach,
+	.mcast_detach	= arbel_mcast_detach,
+	.set_port_info	= arbel_inform_sma,
+	.set_pkey_table	= arbel_inform_sma,
+};
+
+/***************************************************************************
+ *
+ * PCI interface
+ *
+ ***************************************************************************
+ */
 
 /**
  * Probe PCI device
