@@ -104,7 +104,8 @@ static void pxe_dump_mcast_list ( struct s_PXENV_UNDI_MCAST_ADDRESS *mcast ) {
 	unsigned int i;
 
 	for ( i = 0 ; i < mcast->MCastAddrCount ; i++ ) {
-		DBG ( " %s", ll_protocol->ntoa ( mcast->McastAddr[i] ) );
+		DBGC ( &pxe_netdev, " %s",
+		       ll_protocol->ntoa ( mcast->McastAddr[i] ) );
 	}
 }
 
@@ -113,7 +114,7 @@ static void pxe_dump_mcast_list ( struct s_PXENV_UNDI_MCAST_ADDRESS *mcast ) {
  * Status: working
  */
 PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
-	DBG ( "PXENV_UNDI_STARTUP\n" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_STARTUP\n" );
 
 	undi_startup->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -124,7 +125,7 @@ PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
  * Status: working
  */
 PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
-	DBG ( "PXENV_UNDI_CLEANUP\n" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_CLEANUP\n" );
 
 	pxe_netdev_close();
 
@@ -138,8 +139,8 @@ PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
  */
 PXENV_EXIT_t pxenv_undi_initialize ( struct s_PXENV_UNDI_INITIALIZE
 				     *undi_initialize ) {
-	DBG ( "PXENV_UNDI_INITIALIZE protocolini %08x\n",
-	      undi_initialize->ProtocolIni );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_INITIALIZE protocolini %08x\n",
+	       undi_initialize->ProtocolIni );
 
 	undi_initialize->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -153,14 +154,14 @@ PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
 					*undi_reset_adapter ) {
 	int rc;
 
-	DBG ( "PXENV_UNDI_RESET_ADAPTER" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_RESET_ADAPTER" );
 	pxe_dump_mcast_list ( &undi_reset_adapter->R_Mcast_Buf );
-	DBG ( "\n" );
+	DBGC ( &pxe_netdev, "\n" );
 
 	pxe_netdev_close();
 	if ( ( rc = pxe_netdev_open() ) != 0 ) {
-		DBG ( "PXENV_UNDI_RESET_ADAPTER could not reopen %s: %s\n",
-		      pxe_netdev->name, strerror ( rc ) );
+		DBGC ( &pxe_netdev, "PXENV_UNDI_RESET_ADAPTER could not "
+		       "reopen %s: %s\n", pxe_netdev->name, strerror ( rc ) );
 		undi_reset_adapter->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
@@ -175,7 +176,7 @@ PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
  */
 PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
 				   *undi_shutdown ) {
-	DBG ( "PXENV_UNDI_SHUTDOWN\n" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_SHUTDOWN\n" );
 
 	pxe_netdev_close();
 
@@ -190,14 +191,14 @@ PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
 PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
 	int rc;
 
-	DBG ( "PXENV_UNDI_OPEN flag %04x filter %04x",
-	      undi_open->OpenFlag, undi_open->PktFilter );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_OPEN flag %04x filter %04x",
+	       undi_open->OpenFlag, undi_open->PktFilter );
 	pxe_dump_mcast_list ( &undi_open->R_Mcast_Buf );
-	DBG ( "\n" );
+	DBGC ( &pxe_netdev, "\n" );
 
 	if ( ( rc = pxe_netdev_open() ) != 0 ) {
-		DBG ( "PXENV_UNDI_OPEN could not open %s: %s\n",
-		      pxe_netdev->name, strerror ( rc ) );
+		DBGC ( &pxe_netdev, "PXENV_UNDI_OPEN could not open %s: %s\n",
+		       pxe_netdev->name, strerror ( rc ) );
 		undi_open->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
@@ -211,7 +212,7 @@ PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
  * Status: working
  */
 PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close ) {
-	DBG ( "PXENV_UNDI_CLOSE\n" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_CLOSE\n" );
 
 	pxe_netdev_close();
 
@@ -236,7 +237,7 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	unsigned int i;
 	int rc;
 
-	DBG2 ( "PXENV_UNDI_TRANSMIT" );
+	DBGC2 ( &pxe_netdev, "PXENV_UNDI_TRANSMIT" );
 
 	/* Forcibly enable interrupts and freeze receive queue
 	 * processing at this point, to work around callers that never
@@ -254,29 +255,32 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 		net_protocol = NULL;
 		break;
 	default:
-		DBG2 ( " %02x invalid protocol\n", undi_transmit->Protocol );
+		DBGC2 ( &pxe_netdev, " %02x invalid protocol\n",
+			undi_transmit->Protocol );
 		undi_transmit->Status = PXENV_STATUS_UNDI_INVALID_PARAMETER;
 		return PXENV_EXIT_FAILURE;
 	}
-	DBG2 ( " %s", ( net_protocol ? net_protocol->name : "RAW" ) );
+	DBGC2 ( &pxe_netdev, " %s",
+		( net_protocol ? net_protocol->name : "RAW" ) );
 
 	/* Calculate total packet length */
 	copy_from_real ( &tbd, undi_transmit->TBD.segment,
 			 undi_transmit->TBD.offset, sizeof ( tbd ) );
 	len = tbd.ImmedLength;
-	DBG2 ( " %04x:%04x+%x", tbd.Xmit.segment, tbd.Xmit.offset,
-	       tbd.ImmedLength );
+	DBGC2 ( &pxe_netdev, " %04x:%04x+%x", tbd.Xmit.segment, tbd.Xmit.offset,
+		tbd.ImmedLength );
 	for ( i = 0 ; i < tbd.DataBlkCount ; i++ ) {
 		datablk = &tbd.DataBlock[i];
 		len += datablk->TDDataLen;
-		DBG2 ( " %04x:%04x+%x", datablk->TDDataPtr.segment,
-		       datablk->TDDataPtr.offset, datablk->TDDataLen );
+		DBGC2 ( &pxe_netdev, " %04x:%04x+%x",
+			datablk->TDDataPtr.segment, datablk->TDDataPtr.offset,
+			datablk->TDDataLen );
 	}
 
 	/* Allocate and fill I/O buffer */
 	iobuf = alloc_iob ( MAX_LL_HEADER_LEN + len );
 	if ( ! iobuf ) {
-		DBG2 ( " could not allocate iobuf\n" );
+		DBGC2 ( &pxe_netdev, " could not allocate iobuf\n" );
 		undi_transmit->Status = PXENV_STATUS_OUT_OF_RESOURCES;
 		return PXENV_EXIT_FAILURE;
 	}
@@ -301,18 +305,19 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 					 undi_transmit->DestAddr.offset,
 					 ll_protocol->ll_addr_len );
 			ll_dest = destaddr;
-			DBG2 ( " DEST %s", ll_protocol->ntoa ( ll_dest ) );
+			DBGC2 ( &pxe_netdev, " DEST %s",
+				ll_protocol->ntoa ( ll_dest ) );
 		} else {
 			ll_dest = pxe_netdev->ll_broadcast;
-			DBG2 ( " BCAST" );
+			DBGC2 ( &pxe_netdev, " BCAST" );
 		}
 
 		/* Add link-layer header */
 		if ( ( rc = ll_protocol->push ( pxe_netdev, iobuf, ll_dest,
 						pxe_netdev->ll_addr,
 						net_protocol->net_proto ))!=0){
-			DBG2 ( " could not add link-layer header: %s\n",
-			       strerror ( rc ) );
+			DBGC2 ( &pxe_netdev, " could not add link-layer "
+				"header: %s\n", strerror ( rc ) );
 			free_iob ( iobuf );
 			undi_transmit->Status = PXENV_STATUS ( rc );
 			return PXENV_EXIT_FAILURE;
@@ -326,10 +331,10 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	undi_tx_count++;
 
 	/* Transmit packet */
-	DBG2 ( "\n" );
+	DBGC2 ( &pxe_netdev, "\n" );
 	if ( ( rc = netdev_tx ( pxe_netdev, iobuf ) ) != 0 ) {
-		DBG2 ( "PXENV_UNDI_TRANSMIT could not transmit: %s\n",
-		       strerror ( rc ) );
+		DBGC2 ( &pxe_netdev, "PXENV_UNDI_TRANSMIT could not transmit: "
+			"%s\n", strerror ( rc ) );
 		undi_tx_count--;
 		undi_transmit->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
@@ -346,9 +351,9 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 PXENV_EXIT_t
 pxenv_undi_set_mcast_address ( struct s_PXENV_UNDI_SET_MCAST_ADDRESS
 			       *undi_set_mcast_address ) {
-	DBG ( "PXENV_UNDI_SET_MCAST_ADDRESS" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_SET_MCAST_ADDRESS" );
 	pxe_dump_mcast_list ( &undi_set_mcast_address->R_Mcast_Buf );
-	DBG ( "\n" );
+	DBGC ( &pxe_netdev, "\n" );
 
 	undi_set_mcast_address->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -363,14 +368,14 @@ pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 				 *undi_set_station_address ) {
 	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
 
-	DBG ( "PXENV_UNDI_SET_STATION_ADDRESS %s",
-	      ll_protocol->ntoa ( undi_set_station_address->StationAddress ) );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_SET_STATION_ADDRESS %s",
+	       ll_protocol->ntoa ( undi_set_station_address->StationAddress ) );
 
 	/* If adapter is open, the change will have no effect; return
 	 * an error
 	 */
 	if ( netdev_is_open ( pxe_netdev ) ) {
-		DBG ( " failed: netdev is open\n" );
+		DBGC ( &pxe_netdev, " failed: netdev is open\n" );
 		undi_set_station_address->Status =
 			PXENV_STATUS_UNDI_INVALID_STATE;
 		return PXENV_EXIT_FAILURE;
@@ -381,7 +386,7 @@ pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 		 &undi_set_station_address->StationAddress,
 		 ll_protocol->ll_addr_len );
 
-	DBG ( "\n" );
+	DBGC ( &pxe_netdev, "\n" );
 	undi_set_station_address->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -395,8 +400,8 @@ PXENV_EXIT_t
 pxenv_undi_set_packet_filter ( struct s_PXENV_UNDI_SET_PACKET_FILTER
 			       *undi_set_packet_filter ) {
 
-	DBG ( "PXENV_UNDI_SET_PACKET_FILTER %02x\n",
-	      undi_set_packet_filter->filter );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_SET_PACKET_FILTER %02x\n",
+	       undi_set_packet_filter->filter );
 
 	/* Pretend that we succeeded, otherwise the 3Com DOS UNDI
 	 * driver refuses to load.  (We ignore the filter value in the
@@ -417,7 +422,7 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 	struct ll_protocol *ll_protocol = pxe_netdev->ll_protocol;
 	size_t ll_addr_len = ll_protocol->ll_addr_len;
 
-	DBG ( "PXENV_UNDI_GET_INFORMATION" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_INFORMATION" );
 
 	undi_get_information->BaseIo = dev->desc.ioaddr;
 	undi_get_information->IntNumber =
@@ -441,10 +446,10 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 	undi_get_information->RxBufCt = 1;
 	undi_get_information->TxBufCt = 1;
 
-	DBG ( " io %04x irq %d mtu %d %s %s\n",
-	      undi_get_information->BaseIo, undi_get_information->IntNumber,
-	      undi_get_information->MaxTranUnit, ll_protocol->name,
-	      ll_protocol->ntoa ( &undi_get_information->CurrentNodeAddress ));
+	DBGC ( &pxe_netdev, " io %04x irq %d mtu %d %s %s\n",
+	       undi_get_information->BaseIo, undi_get_information->IntNumber,
+	       undi_get_information->MaxTranUnit, ll_protocol->name,
+	       ll_protocol->ntoa ( &undi_get_information->CurrentNodeAddress ));
 	undi_get_information->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -455,18 +460,18 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
  */
 PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
 					 *undi_get_statistics ) {
-	DBG ( "PXENV_UNDI_GET_STATISTICS" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_STATISTICS" );
 
 	undi_get_statistics->XmtGoodFrames = pxe_netdev->tx_stats.good;
 	undi_get_statistics->RcvGoodFrames = pxe_netdev->rx_stats.good;
 	undi_get_statistics->RcvCRCErrors = pxe_netdev->rx_stats.bad;
 	undi_get_statistics->RcvResourceErrors = pxe_netdev->rx_stats.bad;
 
-	DBG ( " txok %d rxok %d rxcrc %d rxrsrc %d\n",
-	      undi_get_statistics->XmtGoodFrames,
-	      undi_get_statistics->RcvGoodFrames,
-	      undi_get_statistics->RcvCRCErrors,
-	      undi_get_statistics->RcvResourceErrors );
+	DBGC ( &pxe_netdev, " txok %d rxok %d rxcrc %d rxrsrc %d\n",
+	       undi_get_statistics->XmtGoodFrames,
+	       undi_get_statistics->RcvGoodFrames,
+	       undi_get_statistics->RcvCRCErrors,
+	       undi_get_statistics->RcvResourceErrors );
 	undi_get_statistics->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -477,7 +482,7 @@ PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
  */
 PXENV_EXIT_t pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
 					   *undi_clear_statistics ) {
-	DBG ( "PXENV_UNDI_CLEAR_STATISTICS\n" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_CLEAR_STATISTICS\n" );
 
 	memset ( &pxe_netdev->tx_stats, 0, sizeof ( pxe_netdev->tx_stats ) );
 	memset ( &pxe_netdev->rx_stats, 0, sizeof ( pxe_netdev->rx_stats ) );
@@ -493,7 +498,7 @@ PXENV_EXIT_t pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
  */
 PXENV_EXIT_t pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
 					 *undi_initiate_diags ) {
-	DBG ( "PXENV_UNDI_INITIATE_DIAGS failed: unsupported\n" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_INITIATE_DIAGS failed: unsupported\n" );
 
 	undi_initiate_diags->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
@@ -506,7 +511,8 @@ PXENV_EXIT_t pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
  */
 PXENV_EXIT_t pxenv_undi_force_interrupt ( struct s_PXENV_UNDI_FORCE_INTERRUPT
 					  *undi_force_interrupt ) {
-	DBG ( "PXENV_UNDI_FORCE_INTERRUPT failed: unsupported\n" );
+	DBGC ( &pxe_netdev,
+	       "PXENV_UNDI_FORCE_INTERRUPT failed: unsupported\n" );
 
 	undi_force_interrupt->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
@@ -523,16 +529,17 @@ pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
 	struct in_addr ip = { .s_addr = undi_get_mcast_address->InetAddr };
 	int rc;
 
-	DBG ( "PXENV_UNDI_GET_MCAST_ADDRESS %s", inet_ntoa ( ip ) );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_MCAST_ADDRESS %s",
+	       inet_ntoa ( ip ) );
 
 	if ( ( rc = ll_protocol->mc_hash ( AF_INET, &ip,
 				      undi_get_mcast_address->MediaAddr ))!=0){
-		DBG ( " failed: %s\n", strerror ( rc ) );
+		DBGC ( &pxe_netdev, " failed: %s\n", strerror ( rc ) );
 		undi_get_mcast_address->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
-	DBG ( "=>%s\n",
-	      ll_protocol->ntoa ( undi_get_mcast_address->MediaAddr ) );
+	DBGC ( &pxe_netdev, "=>%s\n",
+	       ll_protocol->ntoa ( undi_get_mcast_address->MediaAddr ) );
 
 	undi_get_mcast_address->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -546,7 +553,7 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 				       *undi_get_nic_type ) {
 	struct device *dev = pxe_netdev->dev;
 
-	DBG ( "PXENV_UNDI_GET_NIC_TYPE" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_NIC_TYPE" );
 
 	memset ( &undi_get_nic_type->info, 0,
 		 sizeof ( undi_get_nic_type->info ) );
@@ -567,13 +574,14 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 		 * is possible that some NBPs will not provide space
 		 * for them, and so we must not fill them in.
 		 */
-		DBG ( " PCI %02x:%02x.%x %04x:%04x ('%04x:%04x') %02x%02x%02x "
-		      "rev %02x\n", PCI_BUS ( info->BusDevFunc ),
-		      PCI_SLOT ( info->BusDevFunc ),
-		      PCI_FUNC ( info->BusDevFunc ), info->Vendor_ID,
-		      info->Dev_ID, info->SubVendor_ID, info->SubDevice_ID,
-		      info->Base_Class, info->Sub_Class, info->Prog_Intf,
-		      info->Rev );
+		DBGC ( &pxe_netdev, " PCI %02x:%02x.%x %04x:%04x "
+		       "('%04x:%04x') %02x%02x%02x rev %02x\n",
+		       PCI_BUS ( info->BusDevFunc ),
+		       PCI_SLOT ( info->BusDevFunc ),
+		       PCI_FUNC ( info->BusDevFunc ), info->Vendor_ID,
+		       info->Dev_ID, info->SubVendor_ID, info->SubDevice_ID,
+		       info->Base_Class, info->Sub_Class, info->Prog_Intf,
+		       info->Rev );
 		break; }
 	case BUS_TYPE_ISAPNP: {
 		struct pnp_nic_info *info = &undi_get_nic_type->info.pnp;
@@ -585,12 +593,12 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 		/* Cheat: remaining fields are probably unnecessary,
 		 * and would require adding extra code to isapnp.c.
 		 */
-		DBG ( " ISAPnP CSN %04x %08x %02x%02x%02x\n",
-		      info->CardSelNum, info->EISA_Dev_ID,
-		      info->Base_Class, info->Sub_Class, info->Prog_Intf );
+		DBGC ( &pxe_netdev, " ISAPnP CSN %04x %08x %02x%02x%02x\n",
+		       info->CardSelNum, info->EISA_Dev_ID,
+		       info->Base_Class, info->Sub_Class, info->Prog_Intf );
 		break; }
 	default:
-		DBG ( " failed: unknown bus type\n" );
+		DBGC ( &pxe_netdev, " failed: unknown bus type\n" );
 		undi_get_nic_type->Status = PXENV_STATUS_FAILURE;
 		return PXENV_EXIT_FAILURE;
 	}
@@ -605,7 +613,7 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
  */
 PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 					 *undi_get_iface_info ) {
-	DBG ( "PXENV_UNDI_GET_IFACE_INFO" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_IFACE_INFO" );
 
 	/* Just hand back some info, doesn't really matter what it is.
 	 * Most PXE stacks seem to take this approach.
@@ -622,9 +630,9 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 	memset ( undi_get_iface_info->Reserved, 0,
 		 sizeof(undi_get_iface_info->Reserved) );
 
-	DBG ( " %s %dbps flags %08x\n", undi_get_iface_info->IfaceType,
-	      undi_get_iface_info->LinkSpeed,
-	      undi_get_iface_info->ServiceFlags );
+	DBGC ( &pxe_netdev, " %s %dbps flags %08x\n",
+	       undi_get_iface_info->IfaceType, undi_get_iface_info->LinkSpeed,
+	       undi_get_iface_info->ServiceFlags );
 	undi_get_iface_info->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
@@ -635,7 +643,7 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
  */
 PXENV_EXIT_t pxenv_undi_get_state ( struct s_PXENV_UNDI_GET_STATE
 				    *undi_get_state ) {
-	DBG ( "PXENV_UNDI_GET_STATE failed: unsupported\n" );
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_STATE failed: unsupported\n" );
 
 	undi_get_state->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
@@ -658,8 +666,8 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 	unsigned int prottype;
 	int rc;
 
-	/* Use coloured debug, since UNDI ISR messages are likely to
-	 * be interspersed amongst other UNDI messages.
+	/* Use a different debug colour, since UNDI ISR messages are
+	 * likely to be interspersed amongst other UNDI messages.
 	 */
 	DBGC2 ( &pxenv_undi_isr, "PXENV_UNDI_ISR" );
 
