@@ -89,6 +89,26 @@ static struct pxe_dhcp_packet_creator pxe_dhcp_packet_creators[] = {
 	[CACHED_INFO_BINL] = { create_fakepxebsack },
 };
 
+/**
+ * Name PXENV_GET_CACHED_INFO packet type
+ *
+ * @v packet_type	Packet type
+ * @ret name		Name of packet type
+ */
+static inline __attribute__ (( always_inline )) const char *
+pxenv_get_cached_info_name ( int packet_type ) {
+	switch ( packet_type ) {
+	case PXENV_PACKET_TYPE_DHCP_DISCOVER:
+		return "DHCPDISCOVER";
+	case PXENV_PACKET_TYPE_DHCP_ACK:
+		return "DHCPACK";
+	case PXENV_PACKET_TYPE_CACHED_REPLY:
+		return "BINL";
+	default:
+		return "<INVALID>";
+	}
+}
+
 /* The case in which the caller doesn't supply a buffer is really
  * awkward to support given that we have multiple sources of options,
  * and that we don't actually store the DHCP packets.  (We may not
@@ -111,7 +131,7 @@ static union pxe_cached_info __bss16_array ( cached_info, [NUM_CACHED_INFOS] );
  *
  */
 PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
-	DBG ( "PXENV_UNLOAD_STACK" );
+	DBGC ( &pxe_netdev, "PXENV_UNLOAD_STACK\n" );
 
 	unload_stack->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -130,15 +150,16 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	userptr_t buffer;
 	int rc;
 
-	DBG ( "PXENV_GET_CACHED_INFO %d", get_cached_info->PacketType );
-
-	DBG ( " to %04x:%04x+%x", get_cached_info->Buffer.segment,
-	      get_cached_info->Buffer.offset, get_cached_info->BufferSize );
+	DBGC ( &pxe_netdev, "PXENV_GET_CACHED_INFO %s to %04x:%04x+%x",
+	       pxenv_get_cached_info_name ( get_cached_info->PacketType ),
+	       get_cached_info->Buffer.segment,
+	       get_cached_info->Buffer.offset, get_cached_info->BufferSize );
 
 	/* Sanity check */
         idx = ( get_cached_info->PacketType - 1 );
 	if ( idx >= NUM_CACHED_INFOS ) {
-		DBG ( " bad PacketType" );
+		DBGC ( &pxe_netdev, " bad PacketType %d\n",
+		       get_cached_info->PacketType );
 		goto err;
 	}
 	info = &cached_info[idx];
@@ -149,7 +170,8 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 		creator = &pxe_dhcp_packet_creators[idx];
 		if ( ( rc = creator->create ( pxe_netdev, info,
 					      sizeof ( *info ) ) ) != 0 ) {
-			DBG ( " failed to build packet" );
+			DBGC ( &pxe_netdev, " failed to build packet: %s\n",
+			       strerror ( rc ) );
 			goto err;
 		}
 	}
@@ -184,23 +206,24 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 		get_cached_info->Buffer.segment = rm_ds;
 		get_cached_info->Buffer.offset = __from_data16 ( info );
 		get_cached_info->BufferSize = sizeof ( *info );
-		DBG ( " returning %04x:%04x+%04x['%x']",
-		      get_cached_info->Buffer.segment,
-		      get_cached_info->Buffer.offset,
-		      get_cached_info->BufferSize,
-		      get_cached_info->BufferLimit );
+		DBGC ( &pxe_netdev, " using %04x:%04x+%04x['%x']",
+		       get_cached_info->Buffer.segment,
+		       get_cached_info->Buffer.offset,
+		       get_cached_info->BufferSize,
+		       get_cached_info->BufferLimit );
 	} else {
 		/* Copy packet to client buffer */
 		if ( len > sizeof ( *info ) )
 			len = sizeof ( *info );
 		if ( len < sizeof ( *info ) )
-			DBG ( " buffer may be too short" );
+			DBGC ( &pxe_netdev, " buffer may be too short" );
 		buffer = real_to_user ( get_cached_info->Buffer.segment,
 					get_cached_info->Buffer.offset );
 		copy_to_user ( buffer, 0, info, len );
 		get_cached_info->BufferSize = len;
 	}
 
+	DBGC ( &pxe_netdev, "\n" );
 	get_cached_info->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 
@@ -217,7 +240,7 @@ PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
 				  *restart_tftp ) {
 	PXENV_EXIT_t tftp_exit;
 
-	DBG ( "PXENV_RESTART_TFTP " );
+	DBGC ( &pxe_netdev, "PXENV_RESTART_TFTP\n" );
 
 	/* Words cannot describe the complete mismatch between the PXE
 	 * specification and any possible version of reality...
@@ -241,8 +264,8 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
 	unsigned int location;
 	struct net_device *netdev;
 
-	DBG ( "PXENV_START_UNDI %04x:%04x:%04x",
-	      start_undi->AX, start_undi->BX, start_undi->DX );
+	DBGC ( &pxe_netdev, "PXENV_START_UNDI %04x:%04x:%04x\n",
+	       start_undi->AX, start_undi->BX, start_undi->DX );
 
 	/* Determine bus type and location.  Use a heuristic to decide
 	 * whether we are PCI or ISAPnP
@@ -266,11 +289,13 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
 	/* Look for a matching net device */
 	netdev = find_netdev_by_location ( bus_type, location );
 	if ( ! netdev ) {
-		DBG ( " no net device found" );
+		DBGC ( &pxe_netdev, "PXENV_START_UNDI could not find matching "
+		       "net device\n" );
 		start_undi->Status = PXENV_STATUS_UNDI_CANNOT_INITIALIZE_NIC;
 		return PXENV_EXIT_FAILURE;
 	}
-	DBG ( " using netdev %s", netdev->name );
+	DBGC ( &pxe_netdev, "PXENV_START_UNDI found net device %s\n",
+	       netdev->name );
 
 	/* Activate PXE */
 	pxe_activate ( netdev );
@@ -284,7 +309,7 @@ PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi ) {
  * Status: working
  */
 PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
-	DBG ( "PXENV_STOP_UNDI" );
+	DBGC ( &pxe_netdev, "PXENV_STOP_UNDI\n" );
 
 	/* Deactivate PXE */
 	pxe_deactivate();
@@ -294,8 +319,8 @@ PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
 
 	/* Check to see if we still have any hooked interrupts */
 	if ( hooked_bios_interrupts != 0 ) {
-		DBG ( "PXENV_STOP_UNDI failed: %d interrupts still hooked\n",
-		      hooked_bios_interrupts );
+		DBGC ( &pxe_netdev, "PXENV_STOP_UNDI failed: %d interrupts "
+		       "still hooked\n", hooked_bios_interrupts );
 		stop_undi->Status = PXENV_STATUS_KEEP_UNDI;
 		return PXENV_EXIT_FAILURE;
 	}
@@ -309,7 +334,7 @@ PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi ) {
  * Status: won't implement (requires major structural changes)
  */
 PXENV_EXIT_t pxenv_start_base ( struct s_PXENV_START_BASE *start_base ) {
-	DBG ( "PXENV_START_BASE" );
+	DBGC ( &pxe_netdev, "PXENV_START_BASE\n" );
 
 	start_base->Status = PXENV_STATUS_UNSUPPORTED;
 	return PXENV_EXIT_FAILURE;
@@ -320,7 +345,7 @@ PXENV_EXIT_t pxenv_start_base ( struct s_PXENV_START_BASE *start_base ) {
  * Status: working
  */
 PXENV_EXIT_t pxenv_stop_base ( struct s_PXENV_STOP_BASE *stop_base ) {
-	DBG ( "PXENV_STOP_BASE" );
+	DBGC ( &pxe_netdev, "PXENV_STOP_BASE\n" );
 
 	/* The only time we will be called is when the NBP is trying
 	 * to shut down the PXE stack.  There's nothing we need to do
