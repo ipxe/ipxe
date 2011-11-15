@@ -120,7 +120,10 @@ struct ipoib_peer {
 static struct ipoib_peer ipoib_peer_cache[IPOIB_NUM_CACHED_PEERS];
 
 /** Oldest IPoIB peer cache entry index */
-static unsigned int ipoib_peer_cache_idx = 1;
+static unsigned int ipoib_peer_cache_idx = 0;
+
+/** IPoIB peer cache entry validity flag */
+#define IPOIB_PEER_KEY_VALID 0x80
 
 /**
  * Look up cached peer by key
@@ -132,16 +135,17 @@ static struct ipoib_peer * ipoib_lookup_peer_by_key ( unsigned int key ) {
 	struct ipoib_peer *peer;
 	unsigned int i;
 
+	if ( ! key )
+		return NULL;
+
 	for ( i = 0 ; i < IPOIB_NUM_CACHED_PEERS ; i++ ) {
 		peer = &ipoib_peer_cache[i];
 		if ( peer->key == key )
 			return peer;
 	}
 
-	if ( key != 0 ) {
-		DBG ( "IPoIB warning: peer cache lost track of key %x while "
-		      "still in use\n", key );
-	}
+	DBG ( "IPoIB warning: peer cache lost track of key %x while still in "
+	      "use\n", key );
 	return NULL;
 }
 
@@ -153,7 +157,7 @@ static struct ipoib_peer * ipoib_lookup_peer_by_key ( unsigned int key ) {
  */
 static struct ipoib_peer * ipoib_cache_peer ( const struct ipoib_mac *mac ) {
 	struct ipoib_peer *peer;
-	unsigned int key;
+	uint8_t key;
 	unsigned int i;
 
 	/* Look for existing cache entry */
@@ -164,7 +168,7 @@ static struct ipoib_peer * ipoib_cache_peer ( const struct ipoib_mac *mac ) {
 	}
 
 	/* No entry found: create a new one */
-	key = ipoib_peer_cache_idx++;
+	key = ( ipoib_peer_cache_idx++ | IPOIB_PEER_KEY_VALID );
 	peer = &ipoib_peer_cache[ key % IPOIB_NUM_CACHED_PEERS ];
 	if ( peer->key )
 		DBG ( "IPoIB peer %x evicted from cache\n", peer->key );
@@ -257,7 +261,8 @@ static int ipoib_pull ( struct net_device *netdev,
 	*ll_dest = ( dest ? &dest->mac : &ipoib->broadcast );
 	*ll_source = ( source ? &source->mac : &ipoib->broadcast );
 	*net_proto = ipoib_hdr->proto;
-	*flags = ( ( *ll_dest == &ipoib->broadcast ) ? LL_BROADCAST : 0 );
+	*flags = ( ( *ll_dest == &ipoib->broadcast ) ?
+		   ( LL_MULTICAST | LL_BROADCAST ) : 0 );
 
 	return 0;
 }
