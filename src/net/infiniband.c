@@ -680,6 +680,7 @@ void ib_close ( struct ib_device *ibdev ) {
 		ib_destroy_sma ( ibdev, ibdev->smi );
 		ib_destroy_mi ( ibdev, ibdev->smi );
 		ibdev->op->close ( ibdev );
+		ibdev->port_state = IB_PORT_STATE_DOWN;
 	}
 }
 
