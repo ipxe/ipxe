@@ -610,6 +610,13 @@ int ib_open ( struct ib_device *ibdev ) {
 		return 0;
 	}
 
+	/* Open device */
+	if ( ( rc = ibdev->op->open ( ibdev ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %p could not open: %s\n",
+		       ibdev, strerror ( rc ) );
+		goto err_open;
+	}
+
 	/* Create subnet management interface */
 	ibdev->smi = ib_create_mi ( ibdev, IB_QPT_SMI );
 	if ( ! ibdev->smi ) {
@@ -633,13 +640,6 @@ int ib_open ( struct ib_device *ibdev ) {
 		goto err_create_gsi;
 	}
 
-	/* Open device */
-	if ( ( rc = ibdev->op->open ( ibdev ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not open: %s\n",
-		       ibdev, strerror ( rc ) );
-		goto err_open;
-	}
-
 	/* Add to head of open devices list */
 	list_add ( &ibdev->open_list, &open_ib_devices );
 
@@ -649,14 +649,14 @@ int ib_open ( struct ib_device *ibdev ) {
 	assert ( ibdev->open_count == 1 );
 	return 0;
 
-	ibdev->op->close ( ibdev );
- err_open:
 	ib_destroy_mi ( ibdev, ibdev->gsi );
  err_create_gsi:
 	ib_destroy_sma ( ibdev, ibdev->smi );
  err_create_sma:
 	ib_destroy_mi ( ibdev, ibdev->smi );
  err_create_smi:
+	ibdev->op->close ( ibdev );
+ err_open:
 	assert ( ibdev->open_count == 1 );
 	ibdev->open_count = 0;
 	return rc;
