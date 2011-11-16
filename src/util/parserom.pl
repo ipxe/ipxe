@@ -28,6 +28,7 @@ sub rom {
     $printed_family = 1;
   }
   print "\n";
+  return if ( $vendor && ( ( $vendor eq "ffff" ) || ( $device eq "ffff" ) ) );
   print "# NIC\t$image\t$ids\t$desc\n";
   print "DRIVER_$image = $driver_name\n";
   print "ROM_TYPE_$image = $type\n";
@@ -49,7 +50,6 @@ while ( <DRV> ) {
          \s*.*\s*		   # Driver data
        \)/x ) {
     ( my $vendor, my $device, my $image, my $desc ) = ( lc $1, lc $2, $3, $4 );
-    next if ( $vendor eq "ffff" ) || ( $device eq "ffff" );
     rom ( "pci", lc "${vendor}${device}", $desc, $vendor, $device );
     rom ( "pci", $image, $desc, $vendor, $device, 1 );
   } elsif ( /^\s*ISA_ROM\s*\(
