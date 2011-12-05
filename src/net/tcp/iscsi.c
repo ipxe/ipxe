@@ -131,6 +131,14 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_EPROTO_INVALID_CHAP_RESPONSE )
 #define EINFO_EPROTO_INVALID_CHAP_RESPONSE \
 	__einfo_uniqify ( EINFO_EPROTO, 0x04, "Invalid CHAP response" )
+#define EPROTO_INVALID_KEY_VALUE_PAIR \
+	__einfo_error ( EINFO_EPROTO_INVALID_KEY_VALUE_PAIR )
+#define EINFO_EPROTO_INVALID_KEY_VALUE_PAIR \
+	__einfo_uniqify ( EINFO_EPROTO, 0x05, "Invalid key/value pair" )
+#define EPROTO_VALUE_REJECTED \
+	__einfo_error ( EINFO_EPROTO_VALUE_REJECTED )
+#define EINFO_EPROTO_VALUE_REJECTED					\
+	__einfo_uniqify ( EINFO_EPROTO, 0x06, "Parameter rejected" )
 
 static void iscsi_start_tx ( struct iscsi_session *iscsi );
 static void iscsi_start_login ( struct iscsi_session *iscsi );
@@ -1083,8 +1091,8 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 struct iscsi_string_type {
 	/** String key
 	 *
-	 * This is the portion up to and including the "=" sign,
-	 * e.g. "InitiatorName=", "CHAP_A=", etc.
+	 * This is the portion preceding the "=" sign,
+	 * e.g. "InitiatorName", "CHAP_A", etc.
 	 */
 	const char *key;
 	/** Handle iSCSI string value
@@ -1098,13 +1106,13 @@ struct iscsi_string_type {
 
 /** iSCSI text strings that we want to handle */
 static struct iscsi_string_type iscsi_string_types[] = {
-	{ "TargetAddress=", iscsi_handle_targetaddress_value },
-	{ "AuthMethod=", iscsi_handle_authmethod_value },
-	{ "CHAP_A=", iscsi_handle_chap_a_value },
-	{ "CHAP_I=", iscsi_handle_chap_i_value },
-	{ "CHAP_C=", iscsi_handle_chap_c_value },
-	{ "CHAP_N=", iscsi_handle_chap_n_value },
-	{ "CHAP_R=", iscsi_handle_chap_r_value },
+	{ "TargetAddress", iscsi_handle_targetaddress_value },
+	{ "AuthMethod", iscsi_handle_authmethod_value },
+	{ "CHAP_A", iscsi_handle_chap_a_value },
+	{ "CHAP_I", iscsi_handle_chap_i_value },
+	{ "CHAP_C", iscsi_handle_chap_c_value },
+	{ "CHAP_N", iscsi_handle_chap_n_value },
+	{ "CHAP_R", iscsi_handle_chap_r_value },
 	{ NULL, NULL }
 };
 
@@ -1118,16 +1126,35 @@ static struct iscsi_string_type iscsi_string_types[] = {
 static int iscsi_handle_string ( struct iscsi_session *iscsi,
 				 const char *string ) {
 	struct iscsi_string_type *type;
+	const char *separator;
+	const char *value;
 	size_t key_len;
 	int rc;
 
+	/* Find separator */
+	separator = strchr ( string, '=' );
+	if ( ! separator ) {
+		DBGC ( iscsi, "iSCSI %p malformed string %s\n",
+		       iscsi, string );
+		return -EPROTO_INVALID_KEY_VALUE_PAIR;
+	}
+	key_len = ( separator - string );
+	value = ( separator + 1 );
+
+	/* Check for rejections.  Since we send only non-rejectable
+	 * values, any rejection is a fatal protocol error.
+	 */
+	if ( strcmp ( value, "Reject" ) == 0 ) {
+		DBGC ( iscsi, "iSCSI %p rejection: %s\n", iscsi, string );
+		return -EPROTO_VALUE_REJECTED;
+	}
+
+	/* Handle key/value pair */
 	for ( type = iscsi_string_types ; type->key ; type++ ) {
-		key_len = strlen ( type->key );
 		if ( strncmp ( string, type->key, key_len ) != 0 )
 			continue;
 		DBGC ( iscsi, "iSCSI %p handling %s\n", iscsi, string );
-		if ( ( rc = type->handle ( iscsi,
-					   ( string + key_len ) ) ) != 0 ) {
+		if ( ( rc = type->handle ( iscsi, value ) ) != 0 ) {
 			DBGC ( iscsi, "iSCSI %p could not handle %s: %s\n",
 			       iscsi, string, strerror ( rc ) );
 			return rc;
