@@ -611,7 +611,7 @@ static int e1000_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 	tx_curr_desc->buffer_addr =
 		virt_to_bus ( iobuf->data );
 	tx_curr_desc->lower.data =
-		E1000_TXD_CMD_RPS  | E1000_TXD_CMD_EOP |
+		E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP |
 		E1000_TXD_CMD_IFCS | iob_len ( iobuf );
 	tx_curr_desc->upper.data = 0;
 
