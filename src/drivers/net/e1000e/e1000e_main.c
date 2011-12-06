@@ -791,7 +791,7 @@ static void e1000e_configure_rx ( struct e1000_adapter *adapter )
 
 	/* Enable Receives */
 	rctl |=	 E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SZ_2048 |
-		 E1000_RCTL_MPE;
+		 E1000_RCTL_MPE | E1000_RCTL_SECRC;
 	E1000_WRITE_REG ( hw, E1000_RCTL, rctl );
 	e1e_flush();
 
