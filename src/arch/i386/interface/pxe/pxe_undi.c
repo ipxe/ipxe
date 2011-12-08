@@ -306,8 +306,6 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 	unsigned int i;
 	int rc;
 
-	DBGC2 ( &pxe_netdev, "PXENV_UNDI_TRANSMIT" );
-
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
 		DBGC ( &pxe_netdev, "PXENV_UNDI_TRANSMIT called with no "
@@ -315,6 +313,8 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
 		undi_transmit->Status = PXENV_STATUS_UNDI_INVALID_STATE;
 		return PXENV_EXIT_FAILURE;
 	}
+
+	DBGC2 ( &pxe_netdev, "PXENV_UNDI_TRANSMIT" );
 
 	/* Forcibly enable interrupts and freeze receive queue
 	 * processing at this point, to work around callers that never
@@ -527,8 +527,6 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 	struct device *dev;
 	struct ll_protocol *ll_protocol;
 
-	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_INFORMATION" );
-
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
 		DBGC ( &pxe_netdev, "PXENV_UNDI_GET_INFORMATION called with no "
@@ -536,6 +534,8 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
 		undi_get_information->Status = PXENV_STATUS_UNDI_INVALID_STATE;
 		return PXENV_EXIT_FAILURE;
 	}
+
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_INFORMATION" );
 
 	/* Fill in information */
 	dev = pxe_netdev->dev;
@@ -576,7 +576,6 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
  */
 PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
 					 *undi_get_statistics ) {
-	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_STATISTICS" );
 
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
@@ -585,6 +584,8 @@ PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
 		undi_get_statistics->Status = PXENV_STATUS_UNDI_INVALID_STATE;
 		return PXENV_EXIT_FAILURE;
 	}
+
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_STATISTICS" );
 
 	/* Report statistics */
 	undi_get_statistics->XmtGoodFrames = pxe_netdev->tx_stats.good;
@@ -679,9 +680,6 @@ pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
 	struct in_addr ip = { .s_addr = undi_get_mcast_address->InetAddr };
 	int rc;
 
-	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_MCAST_ADDRESS %s",
-	       inet_ntoa ( ip ) );
-
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
 		DBGC ( &pxe_netdev, "PXENV_UNDI_GET_MCAST_ADDRESS called with "
@@ -690,6 +688,9 @@ pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
 			PXENV_STATUS_UNDI_INVALID_STATE;
 		return PXENV_EXIT_FAILURE;
 	}
+
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_MCAST_ADDRESS %s",
+	       inet_ntoa ( ip ) );
 
 	/* Hash address using the network device's link-layer protocol */
 	ll_protocol = pxe_netdev->ll_protocol;
@@ -714,8 +715,6 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 				       *undi_get_nic_type ) {
 	struct device *dev;
 
-	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_NIC_TYPE" );
-
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
 		DBGC ( &pxe_netdev, "PXENV_UNDI_GET_NIC_TYPE called with "
@@ -723,6 +722,8 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
 		undi_get_nic_type->Status = PXENV_STATUS_UNDI_INVALID_STATE;
 		return PXENV_EXIT_FAILURE;
 	}
+
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_NIC_TYPE" );
 
 	/* Fill in information */
 	memset ( &undi_get_nic_type->info, 0,
@@ -783,7 +784,6 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
  */
 PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 					 *undi_get_iface_info ) {
-	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_IFACE_INFO" );
 
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
@@ -792,6 +792,8 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 		undi_get_iface_info->Status = PXENV_STATUS_UNDI_INVALID_STATE;
 		return PXENV_EXIT_FAILURE;
 	}
+
+	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_IFACE_INFO" );
 
 	/* Just hand back some info, doesn't really matter what it is.
 	 * Most PXE stacks seem to take this approach.
@@ -855,15 +857,16 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 	/* Use a different debug colour, since UNDI ISR messages are
 	 * likely to be interspersed amongst other UNDI messages.
 	 */
-	DBGC2 ( &pxenv_undi_isr, "PXENV_UNDI_ISR" );
 
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
-		DBGC ( &pxe_netdev, "PXENV_UNDI_ISR called with "
+		DBGC ( &pxenv_undi_isr, "PXENV_UNDI_ISR called with "
 		       "no network device\n" );
 		undi_isr->Status = PXENV_STATUS_UNDI_INVALID_STATE;
 		return PXENV_EXIT_FAILURE;
 	}
+
+	DBGC2 ( &pxenv_undi_isr, "PXENV_UNDI_ISR" );
 
 	/* Just in case some idiot actually looks at these fields when
 	 * we weren't meant to fill them in...
