@@ -156,6 +156,14 @@ PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 	       get_cached_info->Buffer.offset, get_cached_info->BufferSize );
 
 	/* Sanity check */
+	if ( ! pxe_netdev ) {
+		DBGC ( &pxe_netdev, "PXENV_GET_CACHED_INFO called with no "
+		       "network device\n" );
+		get_cached_info->Status = PXENV_STATUS_UNDI_INVALID_STATE;
+		return PXENV_EXIT_FAILURE;
+	}
+
+	/* Sanity check */
         idx = ( get_cached_info->PacketType - 1 );
 	if ( idx >= NUM_CACHED_INFOS ) {
 		DBGC ( &pxe_netdev, " bad PacketType %d\n",
