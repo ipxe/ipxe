@@ -19,6 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
+#include <unistd.h>
 #include <pxe.h>
 #include <realmode.h>
 #include <pic8259.h>
@@ -33,7 +34,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <undi.h>
 #include <undinet.h>
 #include <pxeparent.h>
-
 
 /** @file
  *
@@ -62,6 +62,12 @@ struct undi_nic {
 #define UNDI_HACK_EB54		0x0001
 
 /** @} */
+
+/** Maximum number of times to retry PXENV_UNDI_INITIALIZE */
+#define UNDI_INITIALIZE_RETRY_MAX 10
+
+/** Delay between retries of PXENV_UNDI_INITIALIZE */
+#define UNDI_INITIALIZE_RETRY_DELAY_MS 200
 
 static void undinet_close ( struct net_device *netdev );
 
@@ -482,12 +488,13 @@ int undinet_probe ( struct undi_device *undi ) {
 	struct undi_nic *undinic;
 	struct s_PXENV_START_UNDI start_undi;
 	struct s_PXENV_UNDI_STARTUP undi_startup;
-	struct s_PXENV_UNDI_INITIALIZE undi_initialize;
+	struct s_PXENV_UNDI_INITIALIZE undi_init;
 	struct s_PXENV_UNDI_GET_INFORMATION undi_info;
 	struct s_PXENV_UNDI_GET_IFACE_INFO undi_iface;
 	struct s_PXENV_UNDI_SHUTDOWN undi_shutdown;
 	struct s_PXENV_UNDI_CLEANUP undi_cleanup;
 	struct s_PXENV_STOP_UNDI stop_undi;
+	unsigned int retry;
 	int rc;
 
 	/* Allocate net device */
@@ -524,12 +531,27 @@ int undinet_probe ( struct undi_device *undi ) {
 					     &undi_startup,
 					     sizeof ( undi_startup ) ) ) != 0 )
 			goto err_undi_startup;
-		memset ( &undi_initialize, 0, sizeof ( undi_initialize ) );
-		if ( ( rc = pxeparent_call ( undinet_entry,
-					     PXENV_UNDI_INITIALIZE,
-					     &undi_initialize,
-					     sizeof ( undi_initialize ))) != 0 )
-			goto err_undi_initialize;
+		/* On some PXE stacks, PXENV_UNDI_INITIALIZE may fail
+		 * due to a transient condition (e.g. media test
+		 * failing because the link has only just come out of
+		 * reset).  We may therefore need to retry this call
+		 * several times.
+		 */
+		for ( retry = 0 ; ; ) {
+			memset ( &undi_init, 0, sizeof ( undi_init ) );
+			if ( ( rc = pxeparent_call ( undinet_entry,
+						     PXENV_UNDI_INITIALIZE,
+						     &undi_init,
+						     sizeof ( undi_init ))) ==0)
+				break;
+			if ( ++retry > UNDI_INITIALIZE_RETRY_MAX )
+				goto err_undi_initialize;
+			DBGC ( undinic, "UNDINIC %p retrying "
+			       "PXENV_UNDI_INITIALIZE (retry %d)\n",
+			       undinic, retry );
+			/* Delay to allow link to settle if necessary */
+			mdelay ( UNDI_INITIALIZE_RETRY_DELAY_MS );
+		}
 	}
 	undi->flags |= UNDI_FL_INITIALIZED;
 
