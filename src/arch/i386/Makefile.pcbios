@@ -19,6 +19,7 @@ MEDIA		+= mrom
 MEDIA		+= pxe
 MEDIA		+= kpxe
 MEDIA		+= kkpxe
+MEDIA		+= kkkpxe
 MEDIA		+= lkrn
 MEDIA		+= dsk
 MEDIA		+= nbi

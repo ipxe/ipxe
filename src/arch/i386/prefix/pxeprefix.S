@@ -721,11 +721,7 @@ run_ipxe:
 	.section ".text16", "ax", @progbits
 1:
 	/* Update the exit hook */
-	movw	%cs,pxe_exit_hook+2
-	push	%ax
-	mov	$2f,%ax
-	mov	%ax,pxe_exit_hook
-	pop	%ax
+	movw	%cs, ( pxe_exit_hook + 2 )
 
 	/* Run main program */
 	pushl	$main
@@ -743,7 +739,14 @@ run_ipxe:
 	/* Jump to hook if applicable */
 	ljmpw	*pxe_exit_hook
 
-2:	/* Check PXE stack magic */
+	.section ".data16", "aw", @progbits
+	.globl	pxe_exit_hook
+pxe_exit_hook:
+	.word	exit_ipxe, 0
+	.previous
+
+exit_ipxe:
+	/* Check PXE stack magic */
 	popl	%eax
 	cmpl	$STACK_MAGIC, %eax
 	jne	1f

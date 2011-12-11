@@ -16,8 +16,6 @@
 
 /*
  * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
- * Portions (C) 2010 Shao Miller <shao.miller@yrdsb.edu.on.ca>.
- *              [PXE exit hook logic]
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -234,9 +232,6 @@ static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
 	return PXENV_EXIT_SUCCESS;
 }
 
-segoff_t __data16 ( pxe_exit_hook ) = { 0, 0 };
-#define pxe_exit_hook __use_data16 ( pxe_exit_hook )
-
 /**
  * FILE API CHECK
  *
@@ -253,57 +248,40 @@ segoff_t __data16 ( pxe_exit_hook ) = { 0, 0 };
  */
 static PXENV_EXIT_t
 pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_check ) {
+	struct pxe_api_call *call;
+	unsigned int mask = 0;
+	unsigned int offset;
+
 	DBG ( "PXENV_FILE_API_CHECK" );
 
+	/* Check for magic value */
 	if ( file_api_check->Magic != 0x91d447b2 ) {
 		file_api_check->Status = PXENV_STATUS_BAD_FUNC;
 		return PXENV_EXIT_FAILURE;
-	} else if ( file_api_check->Size <
-		    sizeof(struct s_PXENV_FILE_API_CHECK) ) {
+	}
+
+	/* Check for required parameter size */
+	if ( file_api_check->Size < sizeof ( *file_api_check ) ) {
 		file_api_check->Status = PXENV_STATUS_OUT_OF_RESOURCES;
 		return PXENV_EXIT_FAILURE;
-	} else {
-		file_api_check->Status   = PXENV_STATUS_SUCCESS;
-		file_api_check->Size     = sizeof(struct s_PXENV_FILE_API_CHECK);
-		file_api_check->Magic    = 0xe9c17b20;
-		file_api_check->Provider = 0x45585067; /* "iPXE" */
-		file_api_check->APIMask  = 0x0000007f; /* Functions e0-e6 */
-		/* Check to see if we have a PXE exit hook */
-		if ( pxe_exit_hook.segment | pxe_exit_hook.offset )
-			/* Function e7, also */
-			file_api_check->APIMask |= 0x00000080;
-		file_api_check->Flags    = 0;	       /* None defined */
-		return PXENV_EXIT_SUCCESS;
-	}
-}
-
-/**
- * FILE EXIT HOOK
- *
- * @v file_exit_hook			Pointer to a struct
- *					s_PXENV_FILE_EXIT_HOOK
- * @v s_PXENV_FILE_EXIT_HOOK::Hook	SEG16:OFF16 to jump to
- * @ret #PXENV_EXIT_SUCCESS		Successfully set hook
- * @ret #PXENV_EXIT_FAILURE		We're not an NBP build
- * @ret s_PXENV_FILE_EXIT_HOOK::Status	PXE status code
- *
- */
-static PXENV_EXIT_t
-pxenv_file_exit_hook ( struct s_PXENV_FILE_EXIT_HOOK *file_exit_hook ) {
-	DBG ( "PXENV_FILE_EXIT_HOOK" );
-
-	/* Check to see if we have a PXE exit hook */
-	if ( pxe_exit_hook.segment | pxe_exit_hook.offset ) {
-		/* We'll jump to the specified SEG16:OFF16 during exit */
-		pxe_exit_hook.segment = file_exit_hook->Hook.segment;
-		pxe_exit_hook.offset = file_exit_hook->Hook.offset;
-		file_exit_hook->Status = PXENV_STATUS_SUCCESS;
-		return PXENV_EXIT_SUCCESS;
 	}
 
-	DBG ( " not NBP" );
-	file_exit_hook->Status = PXENV_STATUS_UNSUPPORTED;
-	return PXENV_EXIT_FAILURE;
+	/* Determine supported calls */
+	for_each_table_entry ( call, PXE_API_CALLS ) {
+		offset = ( call->opcode - PXENV_FILE_MIN );
+		if ( offset <= ( PXENV_FILE_MAX - PXENV_FILE_MIN ) )
+			mask |= ( 1 << offset );
+	}
+
+	/* Fill in parameters */
+	file_api_check->Size = sizeof ( *file_api_check );
+	file_api_check->Magic = 0xe9c17b20;
+	file_api_check->Provider = 0x45585067; /* "iPXE" */
+	file_api_check->APIMask = mask;
+	file_api_check->Flags = 0; /* None defined */
+
+	file_api_check->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }
 
 /** PXE file API */
@@ -322,6 +300,4 @@ struct pxe_api_call pxe_file_api[] __pxe_api_call = {
 		       struct s_PXENV_FILE_EXEC ),
 	PXE_API_CALL ( PXENV_FILE_API_CHECK, pxenv_file_api_check,
 		       struct s_PXENV_FILE_API_CHECK ),
-	PXE_API_CALL ( PXENV_FILE_EXIT_HOOK, pxenv_file_exit_hook,
-		       struct s_PXENV_FILE_EXIT_HOOK ),
 };

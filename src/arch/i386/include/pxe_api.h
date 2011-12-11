@@ -1511,6 +1511,12 @@ typedef struct s_PXENV_UNDI_ISR PXENV_UNDI_ISR_t;
  * @{
  */
 
+/** Minimum possible opcode used within PXE FILE API */
+#define PXENV_FILE_MIN 0x00e0
+
+/** Minimum possible opcode used within PXE FILE API */
+#define PXENV_FILE_MAX 0x00ef
+
 /** @defgroup pxenv_file_open PXENV_FILE_OPEN
  *
  * FILE OPEN
