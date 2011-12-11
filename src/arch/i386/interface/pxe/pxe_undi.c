@@ -121,7 +121,8 @@ static void pxe_dump_mcast_list ( struct s_PXENV_UNDI_MCAST_ADDRESS *mcast ) {
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
+static PXENV_EXIT_t
+pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
 	DBGC ( &pxe_netdev, "PXENV_UNDI_STARTUP\n" );
 
 	/* Sanity check */
@@ -140,7 +141,8 @@ PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP *undi_startup ) {
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
+static PXENV_EXIT_t
+pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
 	DBGC ( &pxe_netdev, "PXENV_UNDI_CLEANUP\n" );
 
 	/* Sanity check */
@@ -162,8 +164,8 @@ PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP *undi_cleanup ) {
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_initialize ( struct s_PXENV_UNDI_INITIALIZE
-				     *undi_initialize ) {
+static PXENV_EXIT_t
+pxenv_undi_initialize ( struct s_PXENV_UNDI_INITIALIZE *undi_initialize ) {
 	DBGC ( &pxe_netdev, "PXENV_UNDI_INITIALIZE protocolini %08x\n",
 	       undi_initialize->ProtocolIni );
 
@@ -183,8 +185,8 @@ PXENV_EXIT_t pxenv_undi_initialize ( struct s_PXENV_UNDI_INITIALIZE
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
-					*undi_reset_adapter ) {
+static PXENV_EXIT_t
+pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET *undi_reset_adapter ) {
 	int rc;
 
 	DBGC ( &pxe_netdev, "PXENV_UNDI_RESET_ADAPTER" );
@@ -216,8 +218,8 @@ PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
-				   *undi_shutdown ) {
+static PXENV_EXIT_t
+pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN *undi_shutdown ) {
 	DBGC ( &pxe_netdev, "PXENV_UNDI_SHUTDOWN\n" );
 
 	/* Sanity check */
@@ -239,7 +241,7 @@ PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
+static PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
 	int rc;
 
 	DBGC ( &pxe_netdev, "PXENV_UNDI_OPEN flag %04x filter %04x",
@@ -271,7 +273,7 @@ PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open ) {
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close ) {
+static PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close ) {
 	DBGC ( &pxe_netdev, "PXENV_UNDI_CLOSE\n" );
 
 	/* Sanity check */
@@ -293,8 +295,8 @@ PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close ) {
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
-				   *undi_transmit ) {
+static PXENV_EXIT_t
+pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT *undi_transmit ) {
 	struct s_PXENV_UNDI_TBD tbd;
 	struct DataBlk *datablk;
 	struct io_buffer *iobuf;
@@ -426,7 +428,7 @@ PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
  *
  * Status: working (for NICs that support receive-all-multicast)
  */
-PXENV_EXIT_t
+static PXENV_EXIT_t
 pxenv_undi_set_mcast_address ( struct s_PXENV_UNDI_SET_MCAST_ADDRESS
 			       *undi_set_mcast_address ) {
 	DBGC ( &pxe_netdev, "PXENV_UNDI_SET_MCAST_ADDRESS" );
@@ -450,7 +452,7 @@ pxenv_undi_set_mcast_address ( struct s_PXENV_UNDI_SET_MCAST_ADDRESS
  *
  * Status: working
  */
-PXENV_EXIT_t 
+static PXENV_EXIT_t
 pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
 				 *undi_set_station_address ) {
 	struct ll_protocol *ll_protocol;
@@ -493,7 +495,7 @@ pxenv_undi_set_station_address ( struct s_PXENV_UNDI_SET_STATION_ADDRESS
  * Status: won't implement (would require driver API changes for no
  * real benefit)
  */
-PXENV_EXIT_t
+static PXENV_EXIT_t
 pxenv_undi_set_packet_filter ( struct s_PXENV_UNDI_SET_PACKET_FILTER
 			       *undi_set_packet_filter ) {
 
@@ -522,8 +524,9 @@ pxenv_undi_set_packet_filter ( struct s_PXENV_UNDI_SET_PACKET_FILTER
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
-					  *undi_get_information ) {
+static PXENV_EXIT_t
+pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
+			     *undi_get_information ) {
 	struct device *dev;
 	struct ll_protocol *ll_protocol;
 
@@ -574,8 +577,9 @@ PXENV_EXIT_t pxenv_undi_get_information ( struct s_PXENV_UNDI_GET_INFORMATION
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
-					 *undi_get_statistics ) {
+static PXENV_EXIT_t
+pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
+			    *undi_get_statistics ) {
 
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
@@ -606,8 +610,9 @@ PXENV_EXIT_t pxenv_undi_get_statistics ( struct s_PXENV_UNDI_GET_STATISTICS
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
-					   *undi_clear_statistics ) {
+static PXENV_EXIT_t
+pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
+			      *undi_clear_statistics ) {
 	DBGC ( &pxe_netdev, "PXENV_UNDI_CLEAR_STATISTICS\n" );
 
 	/* Sanity check */
@@ -631,8 +636,9 @@ PXENV_EXIT_t pxenv_undi_clear_statistics ( struct s_PXENV_UNDI_CLEAR_STATISTICS
  * Status: won't implement (would require driver API changes for no
  * real benefit)
  */
-PXENV_EXIT_t pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
-					 *undi_initiate_diags ) {
+static PXENV_EXIT_t
+pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
+			    *undi_initiate_diags ) {
 	DBGC ( &pxe_netdev, "PXENV_UNDI_INITIATE_DIAGS failed: unsupported\n" );
 
 	/* Sanity check */
@@ -652,8 +658,9 @@ PXENV_EXIT_t pxenv_undi_initiate_diags ( struct s_PXENV_UNDI_INITIATE_DIAGS
  * Status: won't implement (would require driver API changes for no
  * perceptible benefit)
  */
-PXENV_EXIT_t pxenv_undi_force_interrupt ( struct s_PXENV_UNDI_FORCE_INTERRUPT
-					  *undi_force_interrupt ) {
+static PXENV_EXIT_t
+pxenv_undi_force_interrupt ( struct s_PXENV_UNDI_FORCE_INTERRUPT
+			     *undi_force_interrupt ) {
 	DBGC ( &pxe_netdev,
 	       "PXENV_UNDI_FORCE_INTERRUPT failed: unsupported\n" );
 
@@ -673,7 +680,7 @@ PXENV_EXIT_t pxenv_undi_force_interrupt ( struct s_PXENV_UNDI_FORCE_INTERRUPT
  *
  * Status: working
  */
-PXENV_EXIT_t
+static PXENV_EXIT_t
 pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
 			       *undi_get_mcast_address ) {
 	struct ll_protocol *ll_protocol;
@@ -711,8 +718,8 @@ pxenv_undi_get_mcast_address ( struct s_PXENV_UNDI_GET_MCAST_ADDRESS
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
-				       *undi_get_nic_type ) {
+static PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
+					      *undi_get_nic_type ) {
 	struct device *dev;
 
 	/* Sanity check */
@@ -782,8 +789,9 @@ PXENV_EXIT_t pxenv_undi_get_nic_type ( struct s_PXENV_UNDI_GET_NIC_TYPE
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
-					 *undi_get_iface_info ) {
+static PXENV_EXIT_t
+pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
+			    *undi_get_iface_info ) {
 
 	/* Sanity check */
 	if ( ! pxe_netdev ) {
@@ -819,29 +827,14 @@ PXENV_EXIT_t pxenv_undi_get_iface_info ( struct s_PXENV_UNDI_GET_IFACE_INFO
 
 /* PXENV_UNDI_GET_STATE
  *
- * Status: impossible
+ * Status: impossible due to opcode collision
  */
-PXENV_EXIT_t pxenv_undi_get_state ( struct s_PXENV_UNDI_GET_STATE
-				    *undi_get_state ) {
-	DBGC ( &pxe_netdev, "PXENV_UNDI_GET_STATE failed: unsupported\n" );
-
-	/* Sanity check */
-	if ( ! pxe_netdev ) {
-		DBGC ( &pxe_netdev, "PXENV_UNDI_GET_STATE called with "
-		       "no network device\n" );
-		undi_get_state->Status = PXENV_STATUS_UNDI_INVALID_STATE;
-		return PXENV_EXIT_FAILURE;
-	}
-
-	undi_get_state->Status = PXENV_STATUS_UNSUPPORTED;
-	return PXENV_EXIT_FAILURE;
-};
 
 /* PXENV_UNDI_ISR
  *
  * Status: working
  */
-PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
+static PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 	struct io_buffer *iobuf;
 	size_t len;
 	struct ll_protocol *ll_protocol;
@@ -1025,3 +1018,51 @@ PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr ) {
 	undi_isr->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 }
+
+/** PXE UNDI API */
+struct pxe_api_call pxe_undi_api[] __pxe_api_call = {
+	PXE_API_CALL ( PXENV_UNDI_STARTUP, pxenv_undi_startup,
+		       struct s_PXENV_UNDI_STARTUP ),
+	PXE_API_CALL ( PXENV_UNDI_CLEANUP, pxenv_undi_cleanup,
+		       struct s_PXENV_UNDI_CLEANUP ),
+	PXE_API_CALL ( PXENV_UNDI_INITIALIZE, pxenv_undi_initialize,
+		       struct s_PXENV_UNDI_INITIALIZE ),
+	PXE_API_CALL ( PXENV_UNDI_RESET_ADAPTER, pxenv_undi_reset_adapter,
+		       struct s_PXENV_UNDI_RESET ),
+	PXE_API_CALL ( PXENV_UNDI_SHUTDOWN, pxenv_undi_shutdown,
+		       struct s_PXENV_UNDI_SHUTDOWN ),
+	PXE_API_CALL ( PXENV_UNDI_OPEN, pxenv_undi_open,
+		       struct s_PXENV_UNDI_OPEN ),
+	PXE_API_CALL ( PXENV_UNDI_CLOSE, pxenv_undi_close,
+		       struct s_PXENV_UNDI_CLOSE ),
+	PXE_API_CALL ( PXENV_UNDI_TRANSMIT, pxenv_undi_transmit,
+		       struct s_PXENV_UNDI_TRANSMIT ),
+	PXE_API_CALL ( PXENV_UNDI_SET_MCAST_ADDRESS,
+		       pxenv_undi_set_mcast_address,
+		       struct s_PXENV_UNDI_SET_MCAST_ADDRESS ),
+	PXE_API_CALL ( PXENV_UNDI_SET_STATION_ADDRESS,
+		       pxenv_undi_set_station_address,
+		       struct s_PXENV_UNDI_SET_STATION_ADDRESS ),
+	PXE_API_CALL ( PXENV_UNDI_SET_PACKET_FILTER,
+		       pxenv_undi_set_packet_filter,
+		       struct s_PXENV_UNDI_SET_PACKET_FILTER ),
+	PXE_API_CALL ( PXENV_UNDI_GET_INFORMATION, pxenv_undi_get_information,
+		       struct s_PXENV_UNDI_GET_INFORMATION ),
+	PXE_API_CALL ( PXENV_UNDI_GET_STATISTICS, pxenv_undi_get_statistics,
+		       struct s_PXENV_UNDI_GET_STATISTICS ),
+	PXE_API_CALL ( PXENV_UNDI_CLEAR_STATISTICS, pxenv_undi_clear_statistics,
+		       struct s_PXENV_UNDI_CLEAR_STATISTICS ),
+	PXE_API_CALL ( PXENV_UNDI_INITIATE_DIAGS, pxenv_undi_initiate_diags,
+		       struct s_PXENV_UNDI_INITIATE_DIAGS ),
+	PXE_API_CALL ( PXENV_UNDI_FORCE_INTERRUPT, pxenv_undi_force_interrupt,
+		       struct s_PXENV_UNDI_FORCE_INTERRUPT ),
+	PXE_API_CALL ( PXENV_UNDI_GET_MCAST_ADDRESS,
+		       pxenv_undi_get_mcast_address,
+		       struct s_PXENV_UNDI_GET_MCAST_ADDRESS ),
+	PXE_API_CALL ( PXENV_UNDI_GET_NIC_TYPE, pxenv_undi_get_nic_type,
+		       struct s_PXENV_UNDI_GET_NIC_TYPE ),
+	PXE_API_CALL ( PXENV_UNDI_GET_IFACE_INFO, pxenv_undi_get_iface_info,
+		       struct s_PXENV_UNDI_GET_IFACE_INFO ),
+	PXE_API_CALL ( PXENV_UNDI_ISR, pxenv_undi_isr,
+		       struct s_PXENV_UNDI_ISR ),
+};

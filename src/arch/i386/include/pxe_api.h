@@ -252,9 +252,6 @@ struct s_PXENV_UNLOAD_STACK {
 
 typedef struct s_PXENV_UNLOAD_STACK PXENV_UNLOAD_STACK_t;
 
-extern PXENV_EXIT_t pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK
-					 *unload_stack );
-
 /** @} */ /* pxenv_unload_stack */
 
 /** @defgroup pxenv_get_cached_info PXENV_GET_CACHED_INFO
@@ -403,9 +400,6 @@ struct bootph {
 
 typedef struct bootph BOOTPLAYER_t;
 
-extern PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
-					    *get_cached_info );
-
 /** @} */ /* pxenv_get_cached_info */
 
 /** @defgroup pxenv_restart_tftp PXENV_RESTART_TFTP
@@ -422,9 +416,6 @@ extern PXENV_EXIT_t pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO
 struct s_PXENV_TFTP_READ_FILE;
 
 typedef struct s_PXENV_RESTART_TFTP PXENV_RESTART_TFTP_t;
-
-extern PXENV_EXIT_t pxenv_restart_tftp ( struct s_PXENV_TFTP_READ_FILE
-					 *restart_tftp );
 
 /** @} */ /* pxenv_restart_tftp */
 
@@ -496,8 +487,6 @@ struct s_PXENV_START_UNDI {
 
 typedef struct s_PXENV_START_UNDI PXENV_START_UNDI_t;
 
-extern PXENV_EXIT_t pxenv_start_undi ( struct s_PXENV_START_UNDI *start_undi );
-
 /** @} */ /* pxenv_start_undi */
 
 /** @defgroup pxenv_stop_undi PXENV_STOP_UNDI
@@ -516,8 +505,6 @@ struct s_PXENV_STOP_UNDI {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_STOP_UNDI PXENV_STOP_UNDI_t;
-
-extern PXENV_EXIT_t pxenv_stop_undi ( struct s_PXENV_STOP_UNDI *stop_undi );
 
 /** @} */ /* pxenv_stop_undi */
 
@@ -538,8 +525,6 @@ struct s_PXENV_START_BASE {
 
 typedef struct s_PXENV_START_BASE PXENV_START_BASE_t;
 
-extern PXENV_EXIT_t pxenv_start_base ( struct s_PXENV_START_BASE *start_base );
-
 /** @} */ /* pxenv_start_base */
 
 /** @defgroup pxenv_stop_base PXENV_STOP_BASE
@@ -558,8 +543,6 @@ struct s_PXENV_STOP_BASE {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_STOP_BASE PXENV_STOP_BASE_t;
-
-extern PXENV_EXIT_t pxenv_stop_base ( struct s_PXENV_STOP_BASE *stop_base );
 
 /** @} */ /* pxenv_stop_base */
 
@@ -600,8 +583,6 @@ struct s_PXENV_TFTP_OPEN {
 
 typedef struct s_PXENV_TFTP_OPEN PXENV_TFTP_OPEN_t;
 
-extern PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open );
-
 /** @} */ /* pxenv_tftp_open */
 
 /** @defgroup pxenv_tftp_close PXENV_TFTP_CLOSE
@@ -620,8 +601,6 @@ struct s_PXENV_TFTP_CLOSE {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_TFTP_CLOSE PXENV_TFTP_CLOSE_t;
-
-extern PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close );
 
 /** @} */ /* pxenv_tftp_close */
 
@@ -644,8 +623,6 @@ struct s_PXENV_TFTP_READ {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_TFTP_READ PXENV_TFTP_READ_t;
-
-extern PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read );
 
 /** @} */ /* pxenv_tftp_read */
 
@@ -690,9 +667,6 @@ struct s_PXENV_TFTP_READ_FILE {
 
 typedef struct s_PXENV_TFTP_READ_FILE PXENV_TFTP_READ_FILE_t;
 
-extern PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
-					   *tftp_read_file );
-
 /** @} */ /* pxenv_tftp_read_file */
 
 /** @defgroup pxenv_tftp_get_fsize PXENV_TFTP_GET_FSIZE
@@ -715,9 +689,6 @@ struct s_PXENV_TFTP_GET_FSIZE {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_TFTP_GET_FSIZE PXENV_TFTP_GET_FSIZE_t;
-
-extern PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
-					   *get_fsize );
 
 /** @} */ /* pxenv_tftp_get_fsize */
 
@@ -748,8 +719,6 @@ struct s_PXENV_UDP_OPEN {
 
 typedef struct s_PXENV_UDP_OPEN PXENV_UDP_OPEN_t;
 
-extern PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *udp_open );
-
 /** @} */ /* pxenv_udp_open */
 
 /** @defgroup pxenv_udp_close PXENV_UDP_CLOSE
@@ -768,8 +737,6 @@ struct s_PXENV_UDP_CLOSE {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UDP_CLOSE PXENV_UDP_CLOSE_t;
-
-extern PXENV_EXIT_t pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *udp_close );
 
 /** @} */ /* pxenv_udp_close */
 
@@ -796,8 +763,6 @@ struct s_PXENV_UDP_WRITE {
 
 typedef struct s_PXENV_UDP_WRITE PXENV_UDP_WRITE_t;
 
-extern PXENV_EXIT_t pxenv_udp_write ( struct s_PXENV_UDP_WRITE *udp_write );
-
 /** @} */ /* pxenv_udp_write */
 
 /** @defgroup pxenv_udp_read PXENV_UDP_READ
@@ -822,8 +787,6 @@ struct s_PXENV_UDP_READ {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UDP_READ PXENV_UDP_READ_t;
-
-extern PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *udp_read );
 
 /** @} */ /* pxenv_udp_read */
 
@@ -860,9 +823,6 @@ struct s_PXENV_UNDI_STARTUP {
 
 typedef struct s_PXENV_UNDI_STARTUP PXENV_UNDI_STARTUP_t;
 
-extern PXENV_EXIT_t pxenv_undi_startup ( struct s_PXENV_UNDI_STARTUP
-					 *undi_startup );
-
 /** @} */ /* pxenv_undi_startup */
 
 /** @defgroup pxenv_undi_cleanup PXENV_UNDI_CLEANUP
@@ -881,9 +841,6 @@ struct s_PXENV_UNDI_CLEANUP {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_CLEANUP PXENV_UNDI_CLEANUP_t;
-
-extern PXENV_EXIT_t pxenv_undi_cleanup ( struct s_PXENV_UNDI_CLEANUP
-					 *undi_cleanup );
 
 /** @} */ /* pxenv_undi_cleanup */
 
@@ -912,9 +869,6 @@ struct s_PXENV_UNDI_INITIALIZE {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_INITIALIZE PXENV_UNDI_INITIALIZE_t;
-
-extern PXENV_EXIT_t pxenv_undi_initialize ( struct s_PXENV_UNDI_INITIALIZE
-					    *undi_initialize );
 
 /** @} */ /* pxenv_undi_initialize */
 
@@ -950,9 +904,6 @@ struct s_PXENV_UNDI_RESET {
 
 typedef struct s_PXENV_UNDI_RESET PXENV_UNDI_RESET_t;
 
-extern PXENV_EXIT_t pxenv_undi_reset_adapter ( struct s_PXENV_UNDI_RESET
-					       *undi_reset_adapter );
-
 /** @} */ /* pxenv_undi_reset_adapter */
 
 /** @defgroup pxenv_undi_shutdown PXENV_UNDI_SHUTDOWN
@@ -971,9 +922,6 @@ struct s_PXENV_UNDI_SHUTDOWN {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_SHUTDOWN PXENV_UNDI_SHUTDOWN_t;
-
-extern PXENV_EXIT_t pxenv_undi_shutdown ( struct s_PXENV_UNDI_SHUTDOWN
-					  *undi_shutdown );
 
 /** @} */ /* pxenv_undi_shutdown */
 
@@ -1024,8 +972,6 @@ struct s_PXENV_UNDI_OPEN {
 
 typedef struct s_PXENV_UNDI_OPEN PXENV_UNDI_OPEN_t;
 
-extern PXENV_EXIT_t pxenv_undi_open ( struct s_PXENV_UNDI_OPEN *undi_open );
-
 /** @} */ /* pxenv_undi_open */
 
 /** @defgroup pxenv_undi_close PXENV_UNDI_CLOSE
@@ -1044,8 +990,6 @@ struct s_PXENV_UNDI_CLOSE {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_CLOSE PXENV_UNDI_CLOSE_t;
-
-extern PXENV_EXIT_t pxenv_undi_close ( struct s_PXENV_UNDI_CLOSE *undi_close );
 
 /** @} */ /* pxenv_undi_close */
 
@@ -1122,9 +1066,6 @@ struct s_PXENV_UNDI_TRANSMIT {
 
 typedef struct s_PXENV_UNDI_TRANSMIT PXENV_UNDI_TRANSMIT_t;
 
-extern PXENV_EXIT_t pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT
-					  *undi_transmit );
-
 /** @} */ /* pxenv_undi_transmit */
 
 /** @defgroup pxenv_undi_set_mcast_address PXENV_UNDI_SET_MCAST_ADDRESS
@@ -1146,9 +1087,6 @@ struct s_PXENV_UNDI_SET_MCAST_ADDRESS {
 
 typedef struct s_PXENV_UNDI_SET_MCAST_ADDRESS PXENV_UNDI_SET_MCAST_ADDRESS_t;
 
-extern PXENV_EXIT_t pxenv_undi_set_mcast_address (
-	       struct s_PXENV_UNDI_SET_MCAST_ADDRESS *undi_set_mcast_address );
-
 /** @} */ /* pxenv_undi_set_mcast_address */
 
 /** @defgroup pxenv_undi_set_station_address PXENV_UNDI_SET_STATION_ADDRESS
@@ -1168,9 +1106,6 @@ struct s_PXENV_UNDI_SET_STATION_ADDRESS {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_SET_STATION_ADDRESS PXENV_UNDI_SET_STATION_ADDRESS_t;
-
-extern PXENV_EXIT_t pxenv_undi_set_station_address (
-	   struct s_PXENV_UNDI_SET_STATION_ADDRESS *undi_set_station_address );
 
 /** @} */ /* pxenv_undi_set_station_address */
 
@@ -1201,9 +1136,6 @@ struct s_PXENV_UNDI_SET_PACKET_FILTER {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_SET_PACKET_FILTER PXENV_UNDI_SET_PACKET_FILTER_t;
-
-extern PXENV_EXIT_t pxenv_undi_set_packet_filter (
-	       struct s_PXENV_UNDI_SET_PACKET_FILTER *undi_set_packet_filter );
 
 /** @} */ /* pxenv_undi_set_packet_filter */
 
@@ -1248,9 +1180,6 @@ struct s_PXENV_UNDI_GET_INFORMATION {
 
 typedef struct s_PXENV_UNDI_GET_INFORMATION PXENV_UNDI_GET_INFORMATION_t;
 
-extern PXENV_EXIT_t pxenv_undi_get_information (
-		   struct s_PXENV_UNDI_GET_INFORMATION *undi_get_information );
-
 /** @} */ /* pxenv_undi_get_information */
 
 /** @defgroup pxenv_undi_get_statistics PXENV_UNDI_GET_STATISTICS
@@ -1274,9 +1203,6 @@ struct s_PXENV_UNDI_GET_STATISTICS {
 
 typedef struct s_PXENV_UNDI_GET_STATISTICS PXENV_UNDI_GET_STATISTICS_t;
 
-extern PXENV_EXIT_t pxenv_undi_get_statistics (
-		     struct s_PXENV_UNDI_GET_STATISTICS *undi_get_statistics );
-
 /** @} */ /* pxenv_undi_get_statistics */
 
 /** @defgroup pxenv_undi_clear_statistics PXENV_UNDI_CLEAR_STATISTICS
@@ -1295,9 +1221,6 @@ struct s_PXENV_UNDI_CLEAR_STATISTICS {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_CLEAR_STATISTICS PXENV_UNDI_CLEAR_STATISTICS_t;
-
-extern PXENV_EXIT_t pxenv_undi_clear_statistics (
-		 struct s_PXENV_UNDI_CLEAR_STATISTICS *undi_clear_statistics );
 
 /** @} */ /* pxenv_undi_clear_statistics */
 
@@ -1318,9 +1241,6 @@ struct s_PXENV_UNDI_INITIATE_DIAGS {
 
 typedef struct s_PXENV_UNDI_INITIATE_DIAGS PXENV_UNDI_INITIATE_DIAGS_t;
 
-extern PXENV_EXIT_t pxenv_undi_initiate_diags (
-		     struct s_PXENV_UNDI_INITIATE_DIAGS *undi_initiate_diags );
-
 /** @} */ /* pxenv_undi_initiate_diags */
 
 /** @defgroup pxenv_undi_force_interrupt PXENV_UNDI_FORCE_INTERRUPT
@@ -1339,9 +1259,6 @@ struct s_PXENV_UNDI_FORCE_INTERRUPT {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_FORCE_INTERRUPT PXENV_UNDI_FORCE_INTERRUPT_t;
-
-extern PXENV_EXIT_t pxenv_undi_force_interrupt (
-		   struct s_PXENV_UNDI_FORCE_INTERRUPT *undi_force_interrupt );
 
 /** @} */ /* pxenv_undi_force_interrupt */
 
@@ -1363,9 +1280,6 @@ struct s_PXENV_UNDI_GET_MCAST_ADDRESS {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_GET_MCAST_ADDRESS PXENV_UNDI_GET_MCAST_ADDRESS_t;
-
-extern PXENV_EXIT_t pxenv_undi_get_mcast_address (
-	       struct s_PXENV_UNDI_GET_MCAST_ADDRESS *undi_get_mcast_address );
 
 /** @} */ /* pxenv_undi_get_mcast_address */
 
@@ -1427,9 +1341,6 @@ struct s_PXENV_UNDI_GET_NIC_TYPE {
 
 typedef struct s_PXENV_UNDI_GET_NIC_TYPE PXENV_UNDI_GET_NIC_TYPE_t;
 
-extern PXENV_EXIT_t pxenv_undi_get_nic_type ( 
-			 struct s_PXENV_UNDI_GET_NIC_TYPE *undi_get_nic_type );
-
 /** @} */ /* pxenv_undi_get_nic_type */
 
 /** @defgroup pxenv_undi_get_iface_info PXENV_UNDI_GET_IFACE_INFO
@@ -1488,9 +1399,6 @@ struct s_PXENV_UNDI_GET_IFACE_INFO {
 
 typedef struct s_PXENV_UNDI_GET_IFACE_INFO PXENV_UNDI_GET_IFACE_INFO_t;
 
-extern PXENV_EXIT_t pxenv_undi_get_iface_info (
-		     struct s_PXENV_UNDI_GET_IFACE_INFO *undi_get_iface_info );
-
 /** @} */ /* pxenv_undi_get_iface_info */
 
 /** @defgroup pxenv_undi_get_state PXENV_UNDI_GET_STATE
@@ -1523,9 +1431,6 @@ struct s_PXENV_UNDI_GET_STATE {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_UNDI_GET_STATE PXENV_UNDI_GET_STATE_t;
-
-extern PXENV_EXIT_t pxenv_undi_get_state ( struct s_PXENV_UNDI_GET_STATE
-					   *undi_get_state );
 
 /** @} */ /* pxenv_undi_get_state */
 
@@ -1595,8 +1500,6 @@ struct s_PXENV_UNDI_ISR {
 
 typedef struct s_PXENV_UNDI_ISR PXENV_UNDI_ISR_t;
 
-extern PXENV_EXIT_t pxenv_undi_isr ( struct s_PXENV_UNDI_ISR *undi_isr );
-
 /** @} */ /* pxenv_undi_isr */
 
 /** @} */ /* pxe_undi_api */
@@ -1628,8 +1531,6 @@ struct s_PXENV_FILE_OPEN {
 
 typedef struct s_PXENV_FILE_OPEN PXENV_FILE_OPEN_t;
 
-extern PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open );
-
 /** @} */ /* pxenv_file_open */
 
 /** @defgroup pxenv_file_close PXENV_FILE_CLOSE
@@ -1649,9 +1550,6 @@ struct s_PXENV_FILE_CLOSE {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_CLOSE PXENV_FILE_CLOSE_t;
-
-extern PXENV_EXIT_t pxenv_file_close ( struct s_PXENV_FILE_CLOSE
-				       *file_close );
 
 /** @} */ /* pxenv_file_close */
 
@@ -1677,9 +1575,6 @@ struct s_PXENV_FILE_SELECT {
 
 typedef struct s_PXENV_FILE_SELECT PXENV_FILE_SELECT_t;
 
-extern PXENV_EXIT_t pxenv_file_select ( struct s_PXENV_FILE_SELECT
-					*file_select );
-
 /** @} */ /* pxenv_file_select */
 
 /** @defgroup pxenv_file_read PXENV_FILE_READ
@@ -1702,8 +1597,6 @@ struct s_PXENV_FILE_READ {
 
 typedef struct s_PXENV_FILE_READ PXENV_FILE_READ_t;
 
-extern PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read );
-
 /** @} */ /* pxenv_file_read */
 
 /** @defgroup pxenv_get_file_size PXENV_GET_FILE_SIZE
@@ -1725,9 +1618,6 @@ struct s_PXENV_GET_FILE_SIZE {
 
 typedef struct s_PXENV_GET_FILE_SIZE PXENV_GET_FILE_SIZE_t;
 
-extern PXENV_EXIT_t pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE
-					  *get_file_size );
-
 /** @} */ /* pxenv_get_file_size */
 
 /** @defgroup pxenv_file_exec PXENV_FILE_EXEC
@@ -1747,8 +1637,6 @@ struct s_PXENV_FILE_EXEC {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_EXEC PXENV_FILE_EXEC_t;
-
-extern PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec );
 
 /** @} */ /* pxenv_file_exec */
 
@@ -1774,8 +1662,6 @@ struct s_PXENV_FILE_API_CHECK {
 
 typedef struct s_PXENV_FILE_API_CHECK PXENV_FILE_API_CHECK_t;
 
-extern PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_check );
-
 /** @} */ /* pxenv_file_api_check */
 
 /** @defgroup pxenv_file_exit_hook PXENV_FILE_EXIT_HOOK
@@ -1795,8 +1681,6 @@ struct s_PXENV_FILE_EXIT_HOOK {
 } __attribute__ (( packed ));
 
 typedef struct s_PXENV_FILE_EXIT_HOOK PXENV_FILE_EXIT_HOOK_t;
-
-extern PXENV_EXIT_t pxenv_file_exit_hook ( struct s_PXENV_FILE_EXIT_HOOK *file_exit_hook );
 
 /** @} */ /* pxenv_file_exit_hook */
 
@@ -1846,8 +1730,6 @@ struct s_UNDI_LOADER {
 } __attribute__ (( packed ));
 
 typedef struct s_UNDI_LOADER UNDI_LOADER_t;
-
-extern PXENV_EXIT_t undi_loader ( struct s_UNDI_LOADER *undi_loader );
 
 /** @} */ /* pxe_loader_api */
 

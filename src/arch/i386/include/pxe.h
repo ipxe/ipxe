@@ -6,8 +6,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include "pxe_types.h"
 #include "pxe_api.h"
 #include <ipxe/device.h>
+#include <ipxe/tables.h>
 
-/* Parameter block for pxenv_unknown() */
+/** PXE API invalid function code */
+#define PXENV_UNKNOWN 0xffff
+
+/** Parameter block for pxenv_unknown() */
 struct s_PXENV_UNKNOWN {
 	PXENV_STATUS_t Status;			/**< PXE status code */
 } __attribute__ (( packed ));
@@ -71,6 +75,45 @@ union u_PXENV_ANY {
 };
 
 typedef union u_PXENV_ANY PXENV_ANY_t;
+
+/** A PXE API call */
+struct pxe_api_call {
+	/** Entry point
+	 *
+	 * @v params		PXE API call parameters
+	 * @ret exit		PXE API call exit code
+	 */
+	PXENV_EXIT_t ( * entry ) ( union u_PXENV_ANY *params );
+	/** Length of parameters */
+	uint16_t params_len;
+	/** Opcode */
+	uint16_t opcode;
+};
+
+/** PXE API call table */
+#define PXE_API_CALLS __table ( struct pxe_api_call, "pxe_api_calls" )
+
+/** Declare a PXE API call */
+#define __pxe_api_call __table_entry ( PXE_API_CALLS, 01 )
+
+/**
+ * Define a PXE API call
+ *
+ * @v _opcode		Opcode
+ * @v _entry		Entry point
+ * @v _params_type	Type of parameter structure
+ * @ret call		PXE API call
+ */
+#define PXE_API_CALL( _opcode, _entry, _params_type ) {			      \
+	.entry = ( ( ( ( PXENV_EXIT_t ( * ) ( _params_type *params ) ) NULL ) \
+		    == ( ( typeof ( _entry ) * ) NULL ) )		      \
+		   ? ( ( PXENV_EXIT_t ( * )				      \
+			 ( union u_PXENV_ANY *params ) ) _entry )	      \
+		   : ( ( PXENV_EXIT_t ( * )				      \
+			 ( union u_PXENV_ANY *params ) ) _entry ) ),	      \
+	.params_len = sizeof ( _params_type ),				      \
+	.opcode = _opcode,						      \
+	}
 
 /** An UNDI expansion ROM header */
 struct undi_rom_header {
@@ -144,9 +187,11 @@ struct pcir_header {
 #define PCIR_SIGNATURE \
 	( ( 'P' << 0 ) + ( 'C' << 8 ) + ( 'I' << 16 ) + ( 'R' << 24 ) )
 
-
 extern struct net_device *pxe_netdev;
 
 extern void pxe_set_netdev ( struct net_device *netdev );
+extern PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
+					   *tftp_read_file );
+extern PXENV_EXIT_t undi_loader ( struct s_UNDI_LOADER *undi_loader );
 
 #endif /* PXE_H */

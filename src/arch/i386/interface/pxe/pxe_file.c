@@ -49,7 +49,7 @@ FEATURE ( FEATURE_MISC, "PXEXT", DHCP_EB_FEATURE_PXE_EXT, 2 );
  * @ret s_PXENV_FILE_OPEN::FileHandle	Handle of opened file
  *
  */
-PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open ) {
+static PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open ) {
 	userptr_t filename;
 	size_t filename_len;
 	int fd;
@@ -91,7 +91,7 @@ PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open ) {
  * @ret s_PXENV_FILE_CLOSE::Status	PXE status code
  *
  */
-PXENV_EXIT_t pxenv_file_close ( struct s_PXENV_FILE_CLOSE *file_close ) {
+static PXENV_EXIT_t pxenv_file_close ( struct s_PXENV_FILE_CLOSE *file_close ) {
 
 	DBG ( "PXENV_FILE_CLOSE %d", file_close->FileHandle );
 
@@ -111,7 +111,8 @@ PXENV_EXIT_t pxenv_file_close ( struct s_PXENV_FILE_CLOSE *file_close ) {
  * @ret s_PXENV_FILE_SELECT::Ready	Indication of readiness
  *
  */
-PXENV_EXIT_t pxenv_file_select ( struct s_PXENV_FILE_SELECT *file_select ) {
+static PXENV_EXIT_t
+pxenv_file_select ( struct s_PXENV_FILE_SELECT *file_select ) {
 	fd_set fdset;
 	int ready;
 
@@ -143,7 +144,7 @@ PXENV_EXIT_t pxenv_file_select ( struct s_PXENV_FILE_SELECT *file_select ) {
  * @ret s_PXENV_FILE_READ::BufferSize	Length of data read
  *
  */
-PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read ) {
+static PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read ) {
 	userptr_t buffer;
 	ssize_t len;
 
@@ -176,8 +177,8 @@ PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read ) {
  * @ret s_PXENV_GET_FILE_SIZE::Status	PXE status code
  * @ret s_PXENV_GET_FILE_SIZE::FileSize	Size of file
  */
-PXENV_EXIT_t pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE
-				   *get_file_size ) {
+static PXENV_EXIT_t
+pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE *get_file_size ) {
 	ssize_t filesize;
 
 	DBG ( "PXENV_GET_FILE_SIZE %d", get_file_size->FileHandle );
@@ -205,7 +206,7 @@ PXENV_EXIT_t pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE
  * @ret s_PXENV_FILE_EXEC::Status	PXE status code
  *
  */
-PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
+static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
 	userptr_t command;
 	size_t command_len;
 	int rc;
@@ -250,7 +251,8 @@ segoff_t __data16 ( pxe_exit_hook ) = { 0, 0 };
  * @ret s_PXENV_FILE_API_CHECK::Flags	Reserved
  *
  */
-PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_check ) {
+static PXENV_EXIT_t
+pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_check ) {
 	DBG ( "PXENV_FILE_API_CHECK" );
 
 	if ( file_api_check->Magic != 0x91d447b2 ) {
@@ -286,8 +288,8 @@ PXENV_EXIT_t pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_chec
  * @ret s_PXENV_FILE_EXIT_HOOK::Status	PXE status code
  *
  */
-PXENV_EXIT_t pxenv_file_exit_hook ( struct s_PXENV_FILE_EXIT_HOOK
-					*file_exit_hook ) {
+static PXENV_EXIT_t
+pxenv_file_exit_hook ( struct s_PXENV_FILE_EXIT_HOOK *file_exit_hook ) {
 	DBG ( "PXENV_FILE_EXIT_HOOK" );
 
 	/* Check to see if we have a PXE exit hook */
@@ -304,3 +306,22 @@ PXENV_EXIT_t pxenv_file_exit_hook ( struct s_PXENV_FILE_EXIT_HOOK
 	return PXENV_EXIT_FAILURE;
 }
 
+/** PXE file API */
+struct pxe_api_call pxe_file_api[] __pxe_api_call = {
+	PXE_API_CALL ( PXENV_FILE_OPEN, pxenv_file_open,
+		       struct s_PXENV_FILE_OPEN ),
+	PXE_API_CALL ( PXENV_FILE_CLOSE, pxenv_file_close,
+		       struct s_PXENV_FILE_CLOSE ),
+	PXE_API_CALL ( PXENV_FILE_SELECT, pxenv_file_select,
+		       struct s_PXENV_FILE_SELECT ),
+	PXE_API_CALL ( PXENV_FILE_READ, pxenv_file_read,
+		       struct s_PXENV_FILE_READ ),
+	PXE_API_CALL ( PXENV_GET_FILE_SIZE, pxenv_get_file_size,
+		       struct s_PXENV_GET_FILE_SIZE ),
+	PXE_API_CALL ( PXENV_FILE_EXEC, pxenv_file_exec,
+		       struct s_PXENV_FILE_EXEC ),
+	PXE_API_CALL ( PXENV_FILE_API_CHECK, pxenv_file_api_check,
+		       struct s_PXENV_FILE_API_CHECK ),
+	PXE_API_CALL ( PXENV_FILE_EXIT_HOOK, pxenv_file_exit_hook,
+		       struct s_PXENV_FILE_EXIT_HOOK ),
+};

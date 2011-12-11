@@ -233,7 +233,7 @@ static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
  * view of the PXE API, it is conceptually impossible to issue any
  * other PXE API call "if an MTFTP connection is active".
  */
-PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
+static PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 	int rc;
 
 	DBG ( "PXENV_TFTP_OPEN" );
@@ -285,7 +285,7 @@ PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
  * call this function with a 32-bit stack segment.  (See the relevant
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
  */
-PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
+static PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
 	DBG ( "PXENV_TFTP_CLOSE" );
 
 	pxe_tftp_close ( &pxe_tftp, 0 );
@@ -354,7 +354,7 @@ PXENV_EXIT_t pxenv_tftp_close ( struct s_PXENV_TFTP_CLOSE *tftp_close ) {
  * call this function with a 32-bit stack segment.  (See the relevant
  * @ref pxe_x86_pmode16 "implementation note" for more details.)
  */
-PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
+static PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
 	int rc;
 
 	DBG ( "PXENV_TFTP_READ to %04x:%04x",
@@ -531,8 +531,8 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
  * a file from a TFTP server listening on the standard TFTP port.
  * "Consistency" is not a word in Intel's vocabulary.
  */
-PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
-				    *tftp_get_fsize ) {
+static PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
+					   *tftp_get_fsize ) {
 	int rc;
 
 	DBG ( "PXENV_TFTP_GET_FSIZE" );
@@ -562,3 +562,17 @@ PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 	tftp_get_fsize->Status = PXENV_STATUS ( rc );
 	return ( rc ? PXENV_EXIT_FAILURE : PXENV_EXIT_SUCCESS );
 }
+
+/** PXE TFTP API */
+struct pxe_api_call pxe_tftp_api[] __pxe_api_call = {
+	PXE_API_CALL ( PXENV_TFTP_OPEN, pxenv_tftp_open,
+		       struct s_PXENV_TFTP_OPEN ),
+	PXE_API_CALL ( PXENV_TFTP_CLOSE, pxenv_tftp_close,
+		       struct s_PXENV_TFTP_CLOSE ),
+	PXE_API_CALL ( PXENV_TFTP_READ, pxenv_tftp_read,
+		       struct s_PXENV_TFTP_READ ),
+	PXE_API_CALL ( PXENV_TFTP_READ_FILE, pxenv_tftp_read_file,
+		       struct s_PXENV_TFTP_READ_FILE ),
+	PXE_API_CALL ( PXENV_TFTP_GET_FSIZE, pxenv_tftp_get_fsize,
+		       struct s_PXENV_TFTP_GET_FSIZE ),
+};

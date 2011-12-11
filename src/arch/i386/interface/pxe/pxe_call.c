@@ -41,73 +41,6 @@ extern void pxe_int_1a ( void );
 /** INT 1A hooked flag */
 static int int_1a_hooked = 0;
 
-/** A function pointer to hold any PXE API call
- *
- * Used by pxe_api_call() to avoid large swathes of duplicated code.
- */
-union pxenv_call {
-	PXENV_EXIT_t ( * any ) ( union u_PXENV_ANY * );
-	PXENV_EXIT_t ( * unknown ) ( struct s_PXENV_UNKNOWN * );
-	PXENV_EXIT_t ( * unload_stack ) ( struct s_PXENV_UNLOAD_STACK * );
-	PXENV_EXIT_t ( * get_cached_info )
-			( struct s_PXENV_GET_CACHED_INFO * );
-	PXENV_EXIT_t ( * restart_tftp ) ( struct s_PXENV_TFTP_READ_FILE * );
-	PXENV_EXIT_t ( * start_undi ) ( struct s_PXENV_START_UNDI * );
-	PXENV_EXIT_t ( * stop_undi ) ( struct s_PXENV_STOP_UNDI * );
-	PXENV_EXIT_t ( * start_base ) ( struct s_PXENV_START_BASE * );
-	PXENV_EXIT_t ( * stop_base ) ( struct s_PXENV_STOP_BASE * );
-	PXENV_EXIT_t ( * tftp_open ) ( struct s_PXENV_TFTP_OPEN * );
-	PXENV_EXIT_t ( * tftp_close ) ( struct s_PXENV_TFTP_CLOSE * );
-	PXENV_EXIT_t ( * tftp_read ) ( struct s_PXENV_TFTP_READ * );
-	PXENV_EXIT_t ( * tftp_read_file ) ( struct s_PXENV_TFTP_READ_FILE * );
-	PXENV_EXIT_t ( * tftp_get_fsize ) ( struct s_PXENV_TFTP_GET_FSIZE * );
-	PXENV_EXIT_t ( * udp_open ) ( struct s_PXENV_UDP_OPEN * );
-	PXENV_EXIT_t ( * udp_close ) ( struct s_PXENV_UDP_CLOSE * );
-	PXENV_EXIT_t ( * udp_write ) ( struct s_PXENV_UDP_WRITE * );
-	PXENV_EXIT_t ( * udp_read ) ( struct s_PXENV_UDP_READ * );
-	PXENV_EXIT_t ( * undi_startup ) ( struct s_PXENV_UNDI_STARTUP * );
-	PXENV_EXIT_t ( * undi_cleanup ) ( struct s_PXENV_UNDI_CLEANUP * );
-	PXENV_EXIT_t ( * undi_initialize )
-			( struct s_PXENV_UNDI_INITIALIZE * );
-	PXENV_EXIT_t ( * undi_reset_adapter ) ( struct s_PXENV_UNDI_RESET * );
-	PXENV_EXIT_t ( * undi_shutdown ) ( struct s_PXENV_UNDI_SHUTDOWN * );
-	PXENV_EXIT_t ( * undi_open ) ( struct s_PXENV_UNDI_OPEN * );
-	PXENV_EXIT_t ( * undi_close ) ( struct s_PXENV_UNDI_CLOSE * );
-	PXENV_EXIT_t ( * undi_transmit ) ( struct s_PXENV_UNDI_TRANSMIT * );
-	PXENV_EXIT_t ( * undi_set_mcast_address )
-			( struct s_PXENV_UNDI_SET_MCAST_ADDRESS * );
-	PXENV_EXIT_t ( * undi_set_station_address )
-			( struct s_PXENV_UNDI_SET_STATION_ADDRESS * );
-	PXENV_EXIT_t ( * undi_set_packet_filter )
-			( struct s_PXENV_UNDI_SET_PACKET_FILTER * );
-	PXENV_EXIT_t ( * undi_get_information )
-			( struct s_PXENV_UNDI_GET_INFORMATION * );
-	PXENV_EXIT_t ( * undi_get_statistics )
-			( struct s_PXENV_UNDI_GET_STATISTICS * );
-	PXENV_EXIT_t ( * undi_clear_statistics )
-			( struct s_PXENV_UNDI_CLEAR_STATISTICS * );
-	PXENV_EXIT_t ( * undi_initiate_diags )
-			( struct s_PXENV_UNDI_INITIATE_DIAGS * );
-	PXENV_EXIT_t ( * undi_force_interrupt )
-			( struct s_PXENV_UNDI_FORCE_INTERRUPT * );
-	PXENV_EXIT_t ( * undi_get_mcast_address )
-			( struct s_PXENV_UNDI_GET_MCAST_ADDRESS * );
-	PXENV_EXIT_t ( * undi_get_nic_type )
-			( struct s_PXENV_UNDI_GET_NIC_TYPE * );
-	PXENV_EXIT_t ( * undi_get_iface_info )
-			( struct s_PXENV_UNDI_GET_IFACE_INFO * );
-	PXENV_EXIT_t ( * undi_get_state ) ( struct s_PXENV_UNDI_GET_STATE * );
-	PXENV_EXIT_t ( * undi_isr ) ( struct s_PXENV_UNDI_ISR * );
-	PXENV_EXIT_t ( * file_open ) ( struct s_PXENV_FILE_OPEN * );
-	PXENV_EXIT_t ( * file_close ) ( struct s_PXENV_FILE_CLOSE * );
-	PXENV_EXIT_t ( * file_select ) ( struct s_PXENV_FILE_SELECT * );
-	PXENV_EXIT_t ( * file_read ) ( struct s_PXENV_FILE_READ * );
-	PXENV_EXIT_t ( * get_file_size ) ( struct s_PXENV_GET_FILE_SIZE * );
-	PXENV_EXIT_t ( * file_exec ) ( struct s_PXENV_FILE_EXEC * );
-	PXENV_EXIT_t ( * file_api_check ) ( struct s_PXENV_FILE_API_CHECK * );
-	PXENV_EXIT_t ( * file_exit_hook ) ( struct s_PXENV_FILE_EXIT_HOOK * );
-};
-
 /**
  * Handle an unknown PXE API call
  *
@@ -120,6 +53,26 @@ static PXENV_EXIT_t pxenv_unknown ( struct s_PXENV_UNKNOWN *pxenv_unknown ) {
 	return PXENV_EXIT_FAILURE;
 }
 
+/** Unknown PXE API call list */
+struct pxe_api_call pxenv_unknown_api __pxe_api_call =
+	PXE_API_CALL ( PXENV_UNKNOWN, pxenv_unknown, struct s_PXENV_UNKNOWN );
+
+/**
+ * Locate PXE API call
+ *
+ * @v opcode		Opcode
+ * @ret call		PXE API call, or NULL
+ */
+static struct pxe_api_call * find_pxe_api_call ( uint16_t opcode ) {
+	struct pxe_api_call *call;
+
+	for_each_table_entry ( call, PXE_API_CALLS ) {
+		if ( call->opcode == opcode )
+			return call;
+	}
+	return NULL;
+}
+
 /**
  * Dispatch PXE API call
  *
@@ -128,220 +81,30 @@ static PXENV_EXIT_t pxenv_unknown ( struct s_PXENV_UNKNOWN *pxenv_unknown ) {
  * @ret ax		PXE exit code
  */
 __asmcall void pxe_api_call ( struct i386_all_regs *ix86 ) {
-	int opcode = ix86->regs.bx;
-	userptr_t parameters = real_to_user ( ix86->segs.es, ix86->regs.di );
-	size_t param_len;
-	union u_PXENV_ANY pxenv_any;
-	union pxenv_call pxenv_call;
+	uint16_t opcode = ix86->regs.bx;
+	userptr_t uparams = real_to_user ( ix86->segs.es, ix86->regs.di );
+	struct pxe_api_call *call;
+	union u_PXENV_ANY params;
 	PXENV_EXIT_t ret;
 
-	switch ( opcode ) {
-	case PXENV_UNLOAD_STACK:
-		pxenv_call.unload_stack = pxenv_unload_stack;
-		param_len = sizeof ( pxenv_any.unload_stack );
-		break;
-	case PXENV_GET_CACHED_INFO:
-		pxenv_call.get_cached_info = pxenv_get_cached_info;
-		param_len = sizeof ( pxenv_any.get_cached_info );
-		break;
-	case PXENV_RESTART_TFTP:
-		pxenv_call.restart_tftp = pxenv_restart_tftp;
-		param_len = sizeof ( pxenv_any.restart_tftp );
-		break;
-	case PXENV_START_UNDI:
-		pxenv_call.start_undi = pxenv_start_undi;
-		param_len = sizeof ( pxenv_any.start_undi );
-		break;
-	case PXENV_STOP_UNDI:
-		pxenv_call.stop_undi = pxenv_stop_undi;
-		param_len = sizeof ( pxenv_any.stop_undi );
-		break;
-	case PXENV_START_BASE:
-		pxenv_call.start_base = pxenv_start_base;
-		param_len = sizeof ( pxenv_any.start_base );
-		break;
-	case PXENV_STOP_BASE:
-		pxenv_call.stop_base = pxenv_stop_base;
-		param_len = sizeof ( pxenv_any.stop_base );
-		break;
-	case PXENV_TFTP_OPEN:
-		pxenv_call.tftp_open = pxenv_tftp_open;
-		param_len = sizeof ( pxenv_any.tftp_open );
-		break;
-	case PXENV_TFTP_CLOSE:
-		pxenv_call.tftp_close = pxenv_tftp_close;
-		param_len = sizeof ( pxenv_any.tftp_close );
-		break;
-	case PXENV_TFTP_READ:
-		pxenv_call.tftp_read = pxenv_tftp_read;
-		param_len = sizeof ( pxenv_any.tftp_read );
-		break;
-	case PXENV_TFTP_READ_FILE:
-		pxenv_call.tftp_read_file = pxenv_tftp_read_file;
-		param_len = sizeof ( pxenv_any.tftp_read_file );
-		break;
-	case PXENV_TFTP_GET_FSIZE:
-		pxenv_call.tftp_get_fsize = pxenv_tftp_get_fsize;
-		param_len = sizeof ( pxenv_any.tftp_get_fsize );
-		break;
-	case PXENV_UDP_OPEN:
-		pxenv_call.udp_open = pxenv_udp_open;
-		param_len = sizeof ( pxenv_any.udp_open );
-		break;
-	case PXENV_UDP_CLOSE:
-		pxenv_call.udp_close = pxenv_udp_close;
-		param_len = sizeof ( pxenv_any.udp_close );
-		break;
-	case PXENV_UDP_WRITE:
-		pxenv_call.udp_write = pxenv_udp_write;
-		param_len = sizeof ( pxenv_any.udp_write );
-		break;
-	case PXENV_UDP_READ:
-		pxenv_call.udp_read = pxenv_udp_read;
-		param_len = sizeof ( pxenv_any.udp_read );
-		break;
-	case PXENV_UNDI_STARTUP:
-		pxenv_call.undi_startup = pxenv_undi_startup;
-		param_len = sizeof ( pxenv_any.undi_startup );
-		break;
-	case PXENV_UNDI_CLEANUP:
-		pxenv_call.undi_cleanup = pxenv_undi_cleanup;
-		param_len = sizeof ( pxenv_any.undi_cleanup );
-		break;
-	case PXENV_UNDI_INITIALIZE:
-		pxenv_call.undi_initialize = pxenv_undi_initialize;
-		param_len = sizeof ( pxenv_any.undi_initialize );
-		break;
-	case PXENV_UNDI_RESET_ADAPTER:
-		pxenv_call.undi_reset_adapter = pxenv_undi_reset_adapter;
-		param_len = sizeof ( pxenv_any.undi_reset_adapter );
-		break;
-	case PXENV_UNDI_SHUTDOWN:
-		pxenv_call.undi_shutdown = pxenv_undi_shutdown;
-		param_len = sizeof ( pxenv_any.undi_shutdown );
-		break;
-	case PXENV_UNDI_OPEN:
-		pxenv_call.undi_open = pxenv_undi_open;
-		param_len = sizeof ( pxenv_any.undi_open );
-		break;
-	case PXENV_UNDI_CLOSE:
-		pxenv_call.undi_close = pxenv_undi_close;
-		param_len = sizeof ( pxenv_any.undi_close );
-		break;
-	case PXENV_UNDI_TRANSMIT:
-		pxenv_call.undi_transmit = pxenv_undi_transmit;
-		param_len = sizeof ( pxenv_any.undi_transmit );
-		break;
-	case PXENV_UNDI_SET_MCAST_ADDRESS:
-		pxenv_call.undi_set_mcast_address =
-			pxenv_undi_set_mcast_address;
-		param_len = sizeof ( pxenv_any.undi_set_mcast_address );
-		break;
-	case PXENV_UNDI_SET_STATION_ADDRESS:
-		pxenv_call.undi_set_station_address =
-			pxenv_undi_set_station_address;
-		param_len = sizeof ( pxenv_any.undi_set_station_address );
-		break;
-	case PXENV_UNDI_SET_PACKET_FILTER:
-		pxenv_call.undi_set_packet_filter =
-			pxenv_undi_set_packet_filter;
-		param_len = sizeof ( pxenv_any.undi_set_packet_filter );
-		break;
-	case PXENV_UNDI_GET_INFORMATION:
-		pxenv_call.undi_get_information = pxenv_undi_get_information;
-		param_len = sizeof ( pxenv_any.undi_get_information );
-		break;
-	case PXENV_UNDI_GET_STATISTICS:
-		pxenv_call.undi_get_statistics = pxenv_undi_get_statistics;
-		param_len = sizeof ( pxenv_any.undi_get_statistics );
-		break;
-	case PXENV_UNDI_CLEAR_STATISTICS:
-		pxenv_call.undi_clear_statistics = pxenv_undi_clear_statistics;
-		param_len = sizeof ( pxenv_any.undi_clear_statistics );
-		break;
-	case PXENV_UNDI_INITIATE_DIAGS:
-		pxenv_call.undi_initiate_diags = pxenv_undi_initiate_diags;
-		param_len = sizeof ( pxenv_any.undi_initiate_diags );
-		break;
-	case PXENV_UNDI_FORCE_INTERRUPT:
-		pxenv_call.undi_force_interrupt = pxenv_undi_force_interrupt;
-		param_len = sizeof ( pxenv_any.undi_force_interrupt );
-		break;
-	case PXENV_UNDI_GET_MCAST_ADDRESS:
-		pxenv_call.undi_get_mcast_address =
-			pxenv_undi_get_mcast_address;
-		param_len = sizeof ( pxenv_any.undi_get_mcast_address );
-		break;
-	case PXENV_UNDI_GET_NIC_TYPE:
-		pxenv_call.undi_get_nic_type = pxenv_undi_get_nic_type;
-		param_len = sizeof ( pxenv_any.undi_get_nic_type );
-		break;
-	case PXENV_UNDI_GET_IFACE_INFO:
-		pxenv_call.undi_get_iface_info = pxenv_undi_get_iface_info;
-		param_len = sizeof ( pxenv_any.undi_get_iface_info );
-		break;
-	case PXENV_UNDI_ISR:
-		pxenv_call.undi_isr = pxenv_undi_isr;
-		param_len = sizeof ( pxenv_any.undi_isr );
-		break;
-	case PXENV_FILE_OPEN:
-		pxenv_call.file_open = pxenv_file_open;
-		param_len = sizeof ( pxenv_any.file_open );
-		break;
-	case PXENV_FILE_CLOSE:
-		pxenv_call.file_close = pxenv_file_close;
-		param_len = sizeof ( pxenv_any.file_close );
-		break;
-	case PXENV_FILE_SELECT:
-		pxenv_call.file_select = pxenv_file_select;
-		param_len = sizeof ( pxenv_any.file_select );
-		break;
-	case PXENV_FILE_READ:
-		pxenv_call.file_read = pxenv_file_read;
-		param_len = sizeof ( pxenv_any.file_read );
-		break;
-	case PXENV_GET_FILE_SIZE:
-		pxenv_call.get_file_size = pxenv_get_file_size;
-		param_len = sizeof ( pxenv_any.get_file_size );
-		break;
-	case PXENV_FILE_EXEC:
-		pxenv_call.file_exec = pxenv_file_exec;
-		param_len = sizeof ( pxenv_any.file_exec );
-		break;
-	case PXENV_FILE_API_CHECK:
-		pxenv_call.file_api_check = pxenv_file_api_check;
-		param_len = sizeof ( pxenv_any.file_api_check );
-		break;
-	case PXENV_FILE_EXIT_HOOK:
-		pxenv_call.file_exit_hook = pxenv_file_exit_hook;
-		param_len = sizeof ( pxenv_any.file_exit_hook );
-		break;
-	default:
-		DBG ( "PXENV_UNKNOWN_%hx", opcode );
-		pxenv_call.unknown = pxenv_unknown;
-		param_len = sizeof ( pxenv_any.unknown );
-		break;
+	/* Locate API call */
+	call = find_pxe_api_call ( opcode );
+	if ( ! call ) {
+		DBGC ( &pxe_netdev, "PXENV_UNKNOWN_%04x\n", opcode );
+		call = &pxenv_unknown_api;
 	}
 
 	/* Copy parameter block from caller */
-	copy_from_user ( &pxenv_any, parameters, 0, param_len );
+	copy_from_user ( &params, uparams, 0, call->params_len );
 
 	/* Set default status in case child routine fails to do so */
-	pxenv_any.Status = PXENV_STATUS_FAILURE;
+	params.Status = PXENV_STATUS_FAILURE;
 
 	/* Hand off to relevant API routine */
-	DBG ( "[" );
-	ret = pxenv_call.any ( &pxenv_any );
-	if ( pxenv_any.Status != PXENV_STATUS_SUCCESS ) {
-		DBG ( " %02x", pxenv_any.Status );
-	}
-	if ( ret != PXENV_EXIT_SUCCESS ) {
-		DBG ( ret == PXENV_EXIT_FAILURE ? " err" : " ??" );
-	}
-	DBG ( "]" );
-	
+	ret = call->entry ( &params );
+
 	/* Copy modified parameter block back to caller and return */
-	copy_to_user ( parameters, 0, &pxenv_any, param_len );
+	copy_to_user ( uparams, 0, &params, call->params_len );
 	ix86->regs.ax = ret;
 }
 
@@ -351,8 +114,7 @@ __asmcall void pxe_api_call ( struct i386_all_regs *ix86 ) {
  * @v ix86		Registers for PXE call
  * @ret present		Zero (PXE stack present)
  */
-int pxe_api_call_weak ( struct i386_all_regs *ix86 )
-{
+int pxe_api_call_weak ( struct i386_all_regs *ix86 ) {
 	pxe_api_call ( ix86 );
 	return 0;
 }
@@ -519,3 +281,9 @@ int pxe_start_nbp ( void ) {
 
 	return rc;
 }
+
+REQUIRE_OBJECT ( pxe_preboot );
+REQUIRE_OBJECT ( pxe_undi );
+REQUIRE_OBJECT ( pxe_udp );
+REQUIRE_OBJECT ( pxe_tftp );
+REQUIRE_OBJECT ( pxe_file );
