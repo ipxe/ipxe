@@ -222,18 +222,24 @@ static char * dns_qualify_name ( const char *string ) {
  * DNS names consist of "<length>element" pairs.
  */
 static char * dns_make_name ( const char *string, char *buf ) {
-	char *length_byte = buf++;
+	char *length_byte;
 	char c;
 
-	while ( ( c = *(string++) ) ) {
-		if ( c == '.' ) {
-			*length_byte = buf - length_byte - 1;
-			length_byte = buf;
+	length_byte = buf++;
+	*length_byte = 0;
+	do {
+		c = *(string++);
+		if ( ( c == '.' ) || ( c == '\0' ) ) {
+			if ( *length_byte ) {
+				length_byte = buf++;
+				*length_byte = 0;
+			}
+		} else {
+			*(buf++) = c;
+			(*length_byte)++;
 		}
-		*(buf++) = c;
-	}
-	*length_byte = buf - length_byte - 1;
-	*(buf++) = '\0';
+	} while ( c );
+
 	return buf;
 }
 
