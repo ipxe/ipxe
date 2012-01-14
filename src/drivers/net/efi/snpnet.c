@@ -57,28 +57,25 @@ static int snpnet_transmit ( struct net_device *netdev,
 	struct snpnet_device *snpnetdev = netdev->priv;
 	EFI_SIMPLE_NETWORK_PROTOCOL *snp = snpnetdev->snp;
 	EFI_STATUS efirc;
+	void *txbuf=NULL;
 	size_t len = iob_len ( iobuf );
 
 	efirc = snp->Transmit ( snp, 0, len, iobuf->data, NULL, NULL, NULL );
-	return EFIRC_TO_RC ( efirc );
-}
-
-/**
- * Find a I/O buffer on the list of outstanding Tx buffers and complete it.
- *
- * @v snpnetdev		SNP network device
- * @v txbuf		Buffer address
- */
-static void snpnet_complete ( struct net_device *netdev, void *txbuf ) {
-	struct io_buffer *tmp;
-	struct io_buffer *iobuf;
-
-	list_for_each_entry_safe ( iobuf, tmp, &netdev->tx_queue, list ) {
-		if ( iobuf->data == txbuf ) {
-			netdev_tx_complete ( netdev, iobuf );
+	if (efirc) {
+		return EFIRC_TO_RC ( efirc );
+	}
+	/* since GetStatus is so inconsistent, don't try more than one outstanding transmit at a time */
+	while ( txbuf == NULL ) {
+		efirc = snp->GetStatus ( snp, NULL, &txbuf );
+		if ( efirc ) {
+			DBGC ( snp, "SNP %p could not get status %s\n", snp,
+			       efi_strerror ( efirc ) );
 			break;
 		}
+
 	}
+	netdev_tx_complete ( netdev, iobuf );
+	return 0;
 }
 
 /**
@@ -92,22 +89,6 @@ static void snpnet_poll ( struct net_device *netdev ) {
 	EFI_STATUS efirc;
 	struct io_buffer *iobuf = NULL;
 	UINTN len;
-	void *txbuf;
-
-	/* Process Tx completions */
-	while ( 1 ) {
-		efirc = snp->GetStatus ( snp, NULL, &txbuf );
-		if ( efirc ) {
-			DBGC ( snp, "SNP %p could not get status %s\n", snp,
-			       efi_strerror ( efirc ) );
-			break;
-		}
-
-		if ( txbuf == NULL )
-			break;
-
-		snpnet_complete ( netdev, txbuf );
-	}
 
 	/* Process received packets */
 	while ( 1 ) {
