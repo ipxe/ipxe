@@ -188,17 +188,52 @@ setup_code:
 	We're now at the beginning of the kernel proper.
  */
 run_ipxe:
-	/* Set up stack just below 0x7c00 */
+	/* Set up stack just below 0x7c00 and clear direction flag */
 	xorw	%ax, %ax
 	movw	%ax, %ss
 	movw	$0x7c00, %sp
+	cld
 
 	/* Retrieve command-line pointer */
-	movl	%es:cmd_line_ptr, %edx
+	movl	%ds:cmd_line_ptr, %edx
+	testl	%edx, %edx
+	jz	no_cmd_line
+
+	/* Set up %es:%di to point to command line */
+	movl	%edx, %edi
+	andl	$0xf, %edi
+	rorl	$4, %edx
+	movw	%dx, %es
+
+	/* Find length of command line */
+	pushw	%di
+	movw	$0xffff, %cx
+	repnz scasb
+	notw	%cx
+	popw	%si
+
+	/* Make space for command line on stack */
+	movw	%sp, %di
+	subw	%cx, %di
+	andw	$~0xf, %di
+	movw	%di, %sp
+
+	/* Copy command line to stack */
+	pushw	%ds
+	pushw	%es
+	popw	%ds
+	pushw	%ss
+	popw	%es
+	rep movsb
+	popw	%ds
+
+	/* Store new command-line pointer */
+	movzwl	%sp, %edx
+no_cmd_line:
 
 	/* Retrieve initrd pointer and size */
-	movl	%es:ramdisk_image, %ebp
-	movl	%es:ramdisk_size, %ecx
+	movl	%ds:ramdisk_image, %ebp
+	movl	%ds:ramdisk_size, %ecx
 
 	/* Install iPXE */
 	call	alloc_basemem

@@ -132,7 +132,8 @@ static int cmdline_init ( void ) {
 	}
 	cmdline = cmdline_copy;
 	copy_from_user ( cmdline, cmdline_user, 0, len );
-	DBGC ( colour, "RUNTIME found command line \"%s\"\n", cmdline );
+	DBGC ( colour, "RUNTIME found command line \"%s\" at %08x\n",
+	       cmdline, cmdline_phys );
 
 	/* Strip unwanted cruft from the command line */
 	cmdline_strip ( cmdline, "BOOT_IMAGE=" );
