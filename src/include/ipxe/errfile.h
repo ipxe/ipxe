@@ -242,6 +242,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_bofm		      ( ERRFILE_OTHER | 0x00210000 )
 #define ERRFILE_prompt		      ( ERRFILE_OTHER | 0x00220000 )
 #define ERRFILE_nvo_cmd		      ( ERRFILE_OTHER | 0x00230000 )
+#define ERRFILE_hmac_drbg	      ( ERRFILE_OTHER | 0x00240000 )
 
 /** @} */
 
