@@ -141,3 +141,4 @@ struct init_fn test_init_fn __init_fn ( INIT_NORMAL ) = {
 /* Drag in all applicable self-tests */
 REQUIRE_OBJECT ( list_test );
 REQUIRE_OBJECT ( sha1_test );
+REQUIRE_OBJECT ( hmac_drbg_test );
