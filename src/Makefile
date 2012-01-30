@@ -73,6 +73,7 @@ SRCDIRS		+= drivers/net/ath/ath5k
 SRCDIRS		+= drivers/net/ath/ath9k
 SRCDIRS		+= drivers/net/vxge
 SRCDIRS		+= drivers/net/efi
+SRCDIRS		+= drivers/net/tg3
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
