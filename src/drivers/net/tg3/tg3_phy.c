@@ -1124,12 +1124,9 @@ static u8 tg3_resolve_flowctrl_1000X(u16 lcladv, u16 rmtadv)
 static void tg3_setup_flow_control(struct tg3 *tp, u32 lcladv, u32 rmtadv)
 {	DBGP("%s\n", __func__);
 
-	u8 autoneg;
 	u8 flowctrl = 0;
 	u32 old_rx_mode = tp->rx_mode;
 	u32 old_tx_mode = tp->tx_mode;
-
-	autoneg = tp->link_config.autoneg;
 
 	if (tg3_flag(tp, PAUSE_AUTONEG)) {
 		if (tp->phy_flags & TG3_PHYFLG_ANY_SERDES)

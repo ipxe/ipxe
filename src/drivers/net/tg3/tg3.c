@@ -533,7 +533,7 @@ static int tg3_test_dma(struct tg3 *tp)
 {	DBGP("%s\n", __func__);
 
 	dma_addr_t buf_dma;
-	u32 *buf, saved_dma_rwctrl;
+	u32 *buf;
 	int ret = 0;
 
 	buf = malloc_dma(TEST_BUFFER_SIZE, TG3_DMA_ALIGNMENT);
@@ -624,7 +624,6 @@ static int tg3_test_dma(struct tg3 *tp)
 	/* It is best to perform DMA test with maximum write burst size
 	 * to expose the 5700/5701 write DMA bug.
 	 */
-	saved_dma_rwctrl = tp->dma_rwctrl;
 	tp->dma_rwctrl &= ~DMA_RWCTRL_WRITE_BNDRY_MASK;
 	tw32(TG3PCI_DMA_RW_CTRL, tp->dma_rwctrl);
 

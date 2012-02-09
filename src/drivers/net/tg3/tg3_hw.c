@@ -1778,7 +1778,7 @@ static void tg3_rings_reset(struct tg3 *tp)
 {	DBGP("%s\n", __func__);
 
 	int i;
-	u32 stblk, txrcb, rxrcb, limit;
+	u32 txrcb, rxrcb, limit;
 
 	/* Disable all transmit rings but the first. */
 	if (!tg3_flag(tp, 5705_PLUS))
@@ -1854,8 +1854,6 @@ static void tg3_rings_reset(struct tg3 *tp)
 				BDINFO_FLAGS_MAXLEN_SHIFT, 0);
 		rxrcb += TG3_BDINFO_SIZE;
 	}
-
-	stblk = HOSTCC_STATBLCK_RING1;
 }
 
 static void tg3_setup_rxbd_thresholds(struct tg3 *tp)
@@ -2569,14 +2567,9 @@ void tg3_set_txd(struct tg3 *tp, int entry,
 u32 tg3_calc_dma_bndry(struct tg3 *tp, u32 val)
 {	DBGP("%s\n", __func__);
 
-	int cacheline_size;
 	u8 byte;
 
 	pci_read_config_byte(tp->pdev, PCI_CACHE_LINE_SIZE, &byte);
-	if (byte == 0)
-		cacheline_size = 1024;
-	else
-		cacheline_size = (int) byte * 4;
 
 	/* On 5703 and later chips, the boundary bits have no
 	 * effect.
