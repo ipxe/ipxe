@@ -135,6 +135,9 @@ static int cmdline_init ( void ) {
 	DBGC ( colour, "RUNTIME found command line \"%s\" at %08x\n",
 	       cmdline, cmdline_phys );
 
+	/* Mark command line as consumed */
+	cmdline_phys = 0;
+
 	/* Strip unwanted cruft from the command line */
 	cmdline_strip ( cmdline, "BOOT_IMAGE=" );
 	cmdline_strip ( cmdline, "initrd=" );
@@ -205,6 +208,9 @@ static int initrd_init ( void ) {
 	memcpy_user ( image->data, 0, phys_to_user ( initrd_phys ), 0,
 		      initrd_len );
 
+	/* Mark initrd as consumed */
+	initrd_phys = 0;
+
 	/* Register image */
 	if ( ( rc = register_image ( image ) ) != 0 ) {
 		DBGC ( colour, "RUNTIME could not register initrd: %s\n",
@@ -245,6 +251,6 @@ static void runtime_init ( void ) {
 }
 
 /** Command line and initrd initialisation function */
-struct init_fn runtime_init_fn __init_fn ( INIT_NORMAL ) = {
-	.initialise = runtime_init,
+struct startup_fn runtime_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.startup = runtime_init,
 };
