@@ -49,7 +49,7 @@ FILE_LICENCE ( GPL2_OR_LATER )
 	.section ".prefix.data", "aw", @progbits
 progress_\@:
 	.asciz	"\message"
-	.size	progress_\@, . - progress\@
+	.size	progress_\@, . - progress_\@
 	.previous
 	.endm
 #endif
