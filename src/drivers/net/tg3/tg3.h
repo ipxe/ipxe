@@ -3380,7 +3380,6 @@ void tg3_set_txd(struct tg3 *tp, int entry, dma_addr_t mapping, int len, u32 fla
 void tg3_set_power_state_0(struct tg3 *tp);
 int tg3_alloc_consistent(struct tg3 *tp);
 int tg3_init_hw(struct tg3 *tp, int reset_phy);
-u32 tg3_calc_dma_bndry(struct tg3 *tp, u32 val);
 void tg3_poll_link(struct tg3 *tp);
 void tg3_wait_for_event_ack(struct tg3 *tp);
 void __tg3_set_mac_addr(struct tg3 *tp, int skip_mac_1);

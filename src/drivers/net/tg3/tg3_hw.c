@@ -2564,28 +2564,6 @@ void tg3_set_txd(struct tg3 *tp, int entry,
 	txd->vlan_tag = 0;
 }
 
-u32 tg3_calc_dma_bndry(struct tg3 *tp, u32 val)
-{	DBGP("%s\n", __func__);
-
-	u8 byte;
-
-	pci_read_config_byte(tp->pdev, PCI_CACHE_LINE_SIZE, &byte);
-
-	/* On 5703 and later chips, the boundary bits have no
-	 * effect.
-	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
-	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701 &&
-	    !tg3_flag(tp, PCI_EXPRESS))
-		goto out;
-
-	if (tg3_flag(tp, 57765_PLUS))
-		val = DMA_RWCTRL_DIS_CACHE_ALIGNMENT;
-
-out:
-	return val;
-}
-
 int tg3_do_test_dma(struct tg3 *tp, u32 __unused *buf, dma_addr_t buf_dma, int size, int to_device)
 {	DBGP("%s\n", __func__);
 

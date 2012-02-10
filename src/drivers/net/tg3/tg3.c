@@ -544,13 +544,13 @@ static int tg3_test_dma(struct tg3 *tp)
 	buf_dma = virt_to_bus(buf);
 	DBGC2(tp->dev, "dma test buffer, virt: %p phys: %#08x\n", buf, buf_dma);
 
-	tp->dma_rwctrl = ((0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
-			  (0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT));
-
-	tp->dma_rwctrl = tg3_calc_dma_bndry(tp, tp->dma_rwctrl);
-
-	if (tg3_flag(tp, 57765_PLUS))
+	if (tg3_flag(tp, 57765_PLUS)) {
+		tp->dma_rwctrl = DMA_RWCTRL_DIS_CACHE_ALIGNMENT;
 		goto out;
+	}
+
+	tp->dma_rwctrl = ((0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
+	                 (0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT));
 
 	if (tg3_flag(tp, PCI_EXPRESS)) {
 		/* DMA read watermark not used on PCIE */
