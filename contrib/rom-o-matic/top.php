@@ -1,6 +1,6 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 
-<?
+<?php
 
 /**
  * Copyright (C) 2009 Marty Connor <mdc@etherboot.org>.
@@ -25,17 +25,17 @@
 
 <html>
 <head>
-  <link rev="made" href="mailto:<? echo "${webmaster_email}" ?>">
+  <link rev="made" href="mailto:<?php echo "${webmaster_email}" ?>">
   <meta name="keywords" content="rom, etherboot, ipxe, open source, rom-o-matic.net">
-  <title><? echo $header_title ?></title>
-  <meta name="description" content="<? echo $description ?>">
+  <title><?php echo $header_title ?></title>
+  <meta name="description" content="<?php echo $description ?>">
 </head>
 <h1>
-<? echo "$html_title" ?>&nbsp;
+<?php echo "$html_title" ?>&nbsp;
 </h1>
 <hr>
 <h2>
-<? echo "$html_tagline" ?>
+<?php echo "$html_tagline" ?>
 </h2>
 </form>
 <hr>

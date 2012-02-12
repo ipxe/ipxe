@@ -1,4 +1,4 @@
-<?
+<?php
 
 /**
  * Copyright (C) 2009 Marty Connor <mdc@etherboot.org>.
@@ -53,7 +53,7 @@ Resources:
 <hr>
   <font size="-1">
     <br>
-    Please email <a href="mailto:<? echo "${webmaster_email}" ?>"><? echo "${webmaster_email}"?></a>
+    Please email <a href="mailto:<?php echo "${webmaster_email}" ?>"><?php echo "${webmaster_email}"?></a>
     with questions or comments about this website.
   </font>
   <br><br>
