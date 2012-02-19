@@ -18,7 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define UMALLOC_MEMTOP
 #define SMBIOS_PCBIOS
 #define SANBOOT_PCBIOS
-#define ENTROPY_NULL
+#define ENTROPY_RTC
 
 #define	IMAGE_ELF		/* ELF image support */
 #define	IMAGE_MULTIBOOT		/* MultiBoot image support */

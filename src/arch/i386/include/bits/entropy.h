@@ -9,4 +9,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <ipxe/rtc_entropy.h>
+
 #endif /* _BITS_ENTROPY_H */
