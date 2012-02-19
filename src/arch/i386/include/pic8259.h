@@ -9,6 +9,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #ifndef PIC8259_H
 #define PIC8259_H
 
+#include <ipxe/io.h>
+
 /* For segoff_t */
 #include "realmode.h"
 
