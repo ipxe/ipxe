@@ -14,6 +14,7 @@
 #define NAP_LINUX
 #define SMBIOS_LINUX
 #define SANBOOT_NULL
+#define ENTROPY_NULL
 
 #define DRIVERS_LINUX
 

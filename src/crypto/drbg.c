@@ -63,7 +63,7 @@ int drbg_instantiate ( struct drbg_state *state, const void *personal,
 	unsigned int entropy_bits = ( ( 3 * DRBG_SECURITY_STRENGTH + 1 ) / 2 );
 	size_t min_len = DRBG_MIN_ENTROPY_LEN_BYTES;
 	size_t max_len = DRBG_MAX_ENTROPY_LEN_BYTES;
-	uint8_t data[ entropy_bufsize ( entropy_bits, min_len, max_len ) ];
+	uint8_t data[max_len];
 	int len;
 	int rc;
 
@@ -175,7 +175,7 @@ int drbg_reseed ( struct drbg_state *state, const void *additional,
 	unsigned int entropy_bits = DRBG_SECURITY_STRENGTH;
 	size_t min_len = DRBG_MIN_ENTROPY_LEN_BYTES;
 	size_t max_len = DRBG_MAX_ENTROPY_LEN_BYTES;
-	uint8_t data[ entropy_bufsize ( entropy_bits, min_len, max_len ) ];
+	uint8_t data[max_len];
 	int len;
 	int rc;
 

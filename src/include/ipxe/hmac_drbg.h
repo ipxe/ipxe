@@ -59,9 +59,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * according to ANS X9.82 Part 3-2007 Section 10.2.1 Table 2 (NIST SP
  * 800-90 Section 10.1 Table 2).
  *
- * We choose to allow up to 2^32-1 bytes (i.e. 2^35-8 bits).
+ * We choose to allow up to 32 bytes.
  */
-#define HMAC_DRBG_MAX_ENTROPY_LEN_BYTES 0xffffffffUL
+#define HMAC_DRBG_MAX_ENTROPY_LEN_BYTES 32
 
 /** Maximum personalisation string length
  *
