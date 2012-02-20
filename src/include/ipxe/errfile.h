@@ -244,6 +244,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_nvo_cmd		      ( ERRFILE_OTHER | 0x00230000 )
 #define ERRFILE_hmac_drbg	      ( ERRFILE_OTHER | 0x00240000 )
 #define ERRFILE_drbg		      ( ERRFILE_OTHER | 0x00250000 )
+#define ERRFILE_entropy		      ( ERRFILE_OTHER | 0x00260000 )
 
 /** @} */
 
