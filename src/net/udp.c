@@ -386,10 +386,9 @@ static int udp_xfer_deliver ( struct udp_connection *udp,
 			      struct xfer_metadata *meta ) {
 
 	/* Transmit data, if possible */
-	udp_tx ( udp, iobuf, ( ( struct sockaddr_tcpip * ) meta->src ),
-		 ( ( struct sockaddr_tcpip * ) meta->dest ), meta->netdev );
-
-	return 0;
+	return udp_tx ( udp, iobuf, ( ( struct sockaddr_tcpip * ) meta->src ),
+			( ( struct sockaddr_tcpip * ) meta->dest ),
+			meta->netdev );
 }
 
 /** UDP data transfer interface operations */
