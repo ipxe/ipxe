@@ -39,6 +39,8 @@ struct drbg_state {
 	struct hmac_drbg_state internal;
 	/** Reseed required flag */
 	int reseed_required;
+	/** State is valid */
+	int valid;
 };
 
 /**

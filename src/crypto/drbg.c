@@ -151,6 +151,7 @@ int drbg_instantiate ( struct drbg_state *state, const void *personal,
 	 * in-situ.)
 	 */
 	state->reseed_required = 0;
+	state->valid = 1;
 
 	/* 12.  Return SUCCESS and state_handle. */
 	return 0;
@@ -187,9 +188,13 @@ int drbg_reseed ( struct drbg_state *state, const void *additional,
 	 *     If state_handle indicates an invalid or empty internal
 	 *     state, return an ERROR_FLAG.
 	 *
-	 * (Nothing to do since the memory holding the internal state
-	 * was passed in by the caller.)
+	 * (Almost nothing to do since the memory holding the internal
+	 * state was passed in by the caller.)
 	 */
+	if ( ! state->valid ) {
+		DBGC ( state, "DRBG %p not valid\n", state );
+		return -EINVAL;
+	}
 
 	/* 2.  If prediction_resistance_request is set, and
 	 *     prediction_resistance_flag is not set, then return an
@@ -273,9 +278,13 @@ int drbg_generate ( struct drbg_state *state, const void *additional,
 	 *     for the instantiation.  If state_handle indicates an
 	 *     invalid or empty internal state, then return an ERROR_FLAG.
 	 *
-	 * (Nothing to do since the memory holding the internal state
-	 * was passed in by the caller.)
+	 * (Almost nothing to do since the memory holding the internal
+	 * state was passed in by the caller.)
 	 */
+	if ( ! state->valid ) {
+		DBGC ( state, "DRBG %p not valid\n", state );
+		return -EINVAL;
+	}
 
 	/* 2.  If requested_number_of_bits >
 	 *     max_number_of_bits_per_request, then return an
