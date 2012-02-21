@@ -18,6 +18,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <string.h>
 #include <ipxe/net80211.h>
 #include <ipxe/crypto.h>
 #include <ipxe/hmac.h>
