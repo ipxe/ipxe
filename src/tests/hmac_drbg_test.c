@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef NDEBUG
 
 #include <assert.h>
+#include <string.h>
 #include <ipxe/hmac_drbg.h>
 #include <ipxe/test.h>
 

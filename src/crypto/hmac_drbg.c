@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/crypto.h>
 #include <ipxe/hmac.h>

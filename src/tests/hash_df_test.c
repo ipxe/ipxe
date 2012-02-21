@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef NDEBUG
 
 #include <assert.h>
+#include <string.h>
 #include <ipxe/hash_df.h>
 #include <ipxe/test.h>
 
