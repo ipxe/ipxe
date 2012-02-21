@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/open.h>
 #include <ipxe/asn1.h>
 #include <ipxe/x509.h>
+#include <ipxe/rbg.h>
 #include <ipxe/tls.h>
 
 static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
@@ -121,12 +122,25 @@ static void tls_close ( struct tls_session *tls, int rc ) {
 /**
  * Generate random data
  *
+ * @v tls		TLS session
  * @v data		Buffer to fill
  * @v len		Length of buffer
+ * @ret rc		Return status code
  */
-static void tls_generate_random ( void *data, size_t len ) {
-	/* FIXME: Some real random data source would be nice... */
-	memset ( data, 0x01, len );
+static int tls_generate_random ( struct tls_session *tls,
+				 void *data, size_t len ) {
+	int rc;
+
+	/* Generate random bits with no additional input and without
+	 * prediction resistance
+	 */
+	if ( ( rc = rbg_generate ( NULL, 0, 0, data, len ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not generate random data: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -1782,11 +1796,14 @@ static struct process_descriptor tls_process_desc =
 
 int add_tls ( struct interface *xfer, struct interface **next ) {
 	struct tls_session *tls;
+	int rc;
 
 	/* Allocate and initialise TLS structure */
 	tls = malloc ( sizeof ( *tls ) );
-	if ( ! tls )
-		return -ENOMEM;
+	if ( ! tls ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 	memset ( tls, 0, sizeof ( *tls ) );
 	ref_init ( &tls->refcnt, free_tls );
 	intf_init ( &tls->plainstream, &tls_plainstream_desc, &tls->refcnt );
@@ -1796,11 +1813,15 @@ int add_tls ( struct interface *xfer, struct interface **next ) {
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
 	tls->client_random.gmt_unix_time = 0;
-	tls_generate_random ( &tls->client_random.random,
-			      ( sizeof ( tls->client_random.random ) ) );
+	if ( ( rc = tls_generate_random ( tls, &tls->client_random.random,
+			  ( sizeof ( tls->client_random.random ) ) ) ) != 0 ) {
+		goto err_random;
+	}
 	tls->pre_master_secret.version = htons ( TLS_VERSION_TLS_1_0 );
-	tls_generate_random ( &tls->pre_master_secret.random,
-			      ( sizeof ( tls->pre_master_secret.random ) ) );
+	if ( ( rc = tls_generate_random ( tls, &tls->pre_master_secret.random,
+		      ( sizeof ( tls->pre_master_secret.random ) ) ) ) != 0 ) {
+		goto err_random;
+	}
 	digest_init ( &md5_algorithm, tls->handshake_md5_ctx );
 	digest_init ( &sha1_algorithm, tls->handshake_sha1_ctx );
 	process_init_stopped ( &tls->process, &tls_process_desc, &tls->refcnt );
@@ -1811,4 +1832,9 @@ int add_tls ( struct interface *xfer, struct interface **next ) {
 	*next = &tls->cipherstream;
 	ref_put ( &tls->refcnt );
 	return 0;
+
+ err_random:
+	ref_put ( &tls->refcnt );
+ err_alloc:
+	return rc;
 }
