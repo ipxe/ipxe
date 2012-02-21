@@ -130,9 +130,16 @@ void RNG_terminate(void);
 void get_random(int num_rand_bytes, uint8_t *rand_data);
 //void get_random_NZ(int num_rand_bytes, uint8_t *rand_data);
 
-#include <string.h>
+#include <ipxe/random_nz.h>
 static inline void get_random_NZ(int num_rand_bytes, uint8_t *rand_data) {
-	memset ( rand_data, 0x01, num_rand_bytes );
+	/* AXTLS does not check for failures when generating random
+	 * data.  Rely on the fact that get_random_nz() does not
+	 * request prediction resistance (and so cannot introduce new
+	 * failures) and therefore any potential failure must already
+	 * have been encountered by e.g. tls_generate_random(), which
+	 * does check for failures.
+	 */
+	get_random_nz ( rand_data, num_rand_bytes );
 }
 
 /**************************************************************************
