@@ -200,6 +200,7 @@ static int http_response_to_rc ( unsigned int response ) {
 	case 206:
 	case 301:
 	case 302:
+	case 303:
 		return 0;
 	case 404:
 		return -ENOENT;
