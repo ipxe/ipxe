@@ -137,9 +137,3 @@ static void test_init ( void ) {
 struct init_fn test_init_fn __init_fn ( INIT_NORMAL ) = {
 	.initialise = test_init,
 };
-
-/* Drag in all applicable self-tests */
-REQUIRE_OBJECT ( list_test );
-REQUIRE_OBJECT ( sha1_test );
-REQUIRE_OBJECT ( hmac_drbg_test );
-REQUIRE_OBJECT ( hash_df_test );
