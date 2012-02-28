@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/dhcp.h>
 #include <ipxe/settings.h>
 #include <ipxe/console.h>
-#include <ipxe/ansiesc.h>
+#include <ipxe/lineconsole.h>
 #include <ipxe/syslog.h>
 
 /** The syslog server */
@@ -61,21 +61,14 @@ static struct interface syslogger = INTF_INIT ( syslogger_desc );
 /** Syslog line buffer */
 static char syslog_buffer[SYSLOG_BUFSIZE];
 
-/** Index into syslog line buffer */
-static unsigned int syslog_idx;
+/** Syslog line console */
+static struct line_console syslog_line = {
+	.buffer = syslog_buffer,
+	.len = sizeof ( syslog_buffer ),
+};
 
 /** Syslog recursion marker */
 static int syslog_entered;
-
-/** Syslog ANSI escape sequence handlers */
-static struct ansiesc_handler syslog_ansiesc_handlers[] = {
-	{ 0, NULL }
-};
-
-/** Syslog ANSI escape sequence context */
-static struct ansiesc_context syslog_ansiesc_ctx = {
-	.handlers = syslog_ansiesc_handlers,
-};
 
 /**
  * Print a character to syslog console
@@ -89,30 +82,9 @@ static void syslog_putchar ( int character ) {
 	if ( syslog_entered )
 		return;
 
-	/* Strip ANSI escape sequences */
-	character = ansiesc_process ( &syslog_ansiesc_ctx, character );
-	if ( character < 0 )
+	/* Fill line buffer */
+	if ( line_putchar ( &syslog_line, character ) == 0 )
 		return;
-
-	/* Ignore carriage return */
-	if ( character == '\r' )
-		return;
-
-	/* Treat newline as a terminator */
-	if ( character == '\n' )
-		character = 0;
-
-	/* Add character to buffer */
-	syslog_buffer[syslog_idx++] = character;
-
-	/* Do nothing more unless we reach end-of-line (or end-of-buffer) */
-	if ( ( character != 0 ) &&
-	     ( syslog_idx < ( sizeof ( syslog_buffer ) - 1 /* NUL */ ) ) ) {
-		return;
-	}
-
-	/* Reset to start of buffer */
-	syslog_idx = 0;
 
 	/* Guard against re-entry */
 	syslog_entered = 1;
