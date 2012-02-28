@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define	CONSOLE_BTEXT		/* Who knows what this does? */
 //#define	CONSOLE_PC_KBD		/* Direct access to PC keyboard */
 //#define	CONSOLE_SYSLOG		/* Syslog console */
+//#define	CONSOLE_VMWARE		/* VMware logfile console */
 
 #define	KEYBOARD_MAP	us
 
