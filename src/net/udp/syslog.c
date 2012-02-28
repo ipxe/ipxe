@@ -37,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** The syslog server */
 static struct sockaddr_tcpip logserver = {
+	.st_family = AF_INET,
 	.st_port = htons ( SYSLOG_PORT ),
 };
 
@@ -83,10 +84,6 @@ static struct ansiesc_context syslog_ansiesc_ctx = {
  */
 static void syslog_putchar ( int character ) {
 	int rc;
-
-	/* Do nothing if we have no log server */
-	if ( ! logserver.st_family )
-		return;
 
 	/* Ignore if we are already mid-logging */
 	if ( syslog_entered )
@@ -136,6 +133,7 @@ static void syslog_putchar ( int character ) {
 /** Syslog console driver */
 struct console_driver syslog_console __console_driver = {
 	.putchar = syslog_putchar,
+	.disabled = 1,
 };
 
 /******************************************************************************
@@ -166,11 +164,11 @@ static int apply_syslog_settings ( void ) {
 	int rc;
 
 	/* Fetch log server */
+	syslog_console.disabled = 1;
 	old_addr.s_addr = sin_logserver->sin_addr.s_addr;
-	logserver.st_family = 0;
 	if ( ( len = fetch_ipv4_setting ( NULL, &syslog_setting,
 					  &sin_logserver->sin_addr ) ) >= 0 ) {
-		sin_logserver->sin_family = AF_INET;
+		syslog_console.disabled = 0;
 	}
 
 	/* Do nothing unless log server has changed */
@@ -181,7 +179,7 @@ static int apply_syslog_settings ( void ) {
 	intf_restart ( &syslogger, 0 );
 
 	/* Do nothing unless we have a log server */
-	if ( ! logserver.st_family ) {
+	if ( syslog_console.disabled ) {
 		DBG ( "SYSLOG has no log server\n" );
 		return 0;
 	}
