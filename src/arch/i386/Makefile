@@ -85,6 +85,7 @@ SRCDIRS		+= arch/i386/interface/pcbios
 SRCDIRS		+= arch/i386/interface/pxe
 SRCDIRS		+= arch/i386/interface/pxeparent
 SRCDIRS 	+= arch/i386/interface/syslinux
+SRCDIRS		+= arch/i386/interface/vmware
 SRCDIRS		+= arch/i386/hci/commands
 
 # The various xxx_loader.c files are #included into core/loader.c and
