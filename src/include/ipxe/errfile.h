@@ -161,7 +161,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_nullnet			( ERRFILE_NET | 0x00090000 )
 #define ERRFILE_tcp			( ERRFILE_NET | 0x000a0000 )
 #define ERRFILE_ftp			( ERRFILE_NET | 0x000b0000 )
-#define ERRFILE_http			( ERRFILE_NET | 0x000c0000 )
+#define ERRFILE_httpcore		( ERRFILE_NET | 0x000c0000 )
 #define ERRFILE_iscsi			( ERRFILE_NET | 0x000d0000 )
 #define ERRFILE_tcpip			( ERRFILE_NET | 0x000e0000 )
 #define ERRFILE_udp			( ERRFILE_NET | 0x000f0000 )
