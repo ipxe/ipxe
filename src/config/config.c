@@ -280,13 +280,16 @@ REQUIRE_OBJECT ( tap );
 #endif
 
 /*
- * Drag in relevant BOFM entry points
+ * Drag in relevant sideband entry points
  */
 #ifdef CONFIG_BOFM
 #ifdef BOFM_EFI
 REQUIRE_OBJECT ( efi_bofm );
 #endif /* BOFM_EFI */
 #endif /* CONFIG_BOFM */
+#ifdef VMWARE_SETTINGS
+REQUIRE_OBJECT ( guestinfo );
+#endif /* VMWARE_SETTINGS */
 
 /*
  * Drag in selected keyboard map
