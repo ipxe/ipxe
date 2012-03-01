@@ -292,6 +292,7 @@ int guestrpc_command ( int channel, const char *command, char *reply,
 			if ( status_len ) {
 				*(status_bytes++) = ( data & 0xff );
 				status_len--;
+				len--;
 			} else if ( reply_len ) {
 				*(reply_bytes++) = ( data & 0xff );
 				reply_len--;
