@@ -515,8 +515,6 @@ enum iscsi_tx_state {
 	ISCSI_TX_AHS,
 	/** Sending the data segment */
 	ISCSI_TX_DATA,
-	/** Sending the data segment padding */
-	ISCSI_TX_DATA_PADDING,
 };
 
 /** State of an iSCSI RX engine */
