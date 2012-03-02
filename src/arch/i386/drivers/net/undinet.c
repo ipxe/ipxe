@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <unistd.h>
+#include <byteswap.h>
 #include <pxe.h>
 #include <realmode.h>
 #include <pic8259.h>
@@ -166,6 +167,10 @@ static int undinet_isr_triggered ( void ) {
 static struct s_PXENV_UNDI_TBD __data16 ( undinet_tbd );
 #define undinet_tbd __use_data16 ( undinet_tbd )
 
+/** UNDI transmit destination address */
+static uint8_t __data16_array ( undinet_destaddr, [ETH_ALEN] );
+#define undinet_destaddr __use_data16 ( undinet_destaddr )
+
 /**
  * Transmit packet
  *
@@ -175,8 +180,14 @@ static struct s_PXENV_UNDI_TBD __data16 ( undinet_tbd );
  */
 static int undinet_transmit ( struct net_device *netdev,
 			      struct io_buffer *iobuf ) {
+	struct undi_nic *undinic = netdev->priv;
 	struct s_PXENV_UNDI_TRANSMIT undi_transmit;
-	size_t len = iob_len ( iobuf );
+	const void *ll_dest;
+	const void *ll_source;
+	uint16_t net_proto;
+	unsigned int flags;
+	uint8_t protocol;
+	size_t len;
 	int rc;
 
 	/* Technically, we ought to make sure that the previous
@@ -189,15 +200,49 @@ static int undinet_transmit ( struct net_device *netdev,
 	 * transmit the next packet.
 	 */
 
+	/* Some PXE stacks are unable to cope with P_UNKNOWN, and will
+	 * always try to prepend a link-layer header.  Work around
+	 * these stacks by stripping the existing link-layer header
+	 * and allowing the PXE stack to (re)construct the link-layer
+	 * header itself.
+	 */
+	if ( ( rc = eth_pull ( netdev, iobuf, &ll_dest, &ll_source,
+			       &net_proto, &flags ) ) != 0 ) {
+		DBGC ( undinic, "UNDINIC %p could not strip Ethernet header: "
+		       "%s\n", undinic, strerror ( rc ) );
+		return rc;
+	}
+	memcpy ( undinet_destaddr, ll_dest, sizeof ( undinet_destaddr ) );
+	switch ( net_proto ) {
+	case htons ( ETH_P_IP ) :
+		protocol = P_IP;
+		break;
+	case htons ( ETH_P_ARP ) :
+		protocol = P_ARP;
+		break;
+	case htons ( ETH_P_RARP ) :
+		protocol = P_RARP;
+		break;
+	default:
+		/* Unknown protocol; restore the original link-layer header */
+		iob_push ( iobuf, sizeof ( struct ethhdr ) );
+		protocol = P_UNKNOWN;
+		break;
+	}
+
 	/* Copy packet to UNDI I/O buffer */
+	len = iob_len ( iobuf );
 	if ( len > sizeof ( basemem_packet ) )
 		len = sizeof ( basemem_packet );
 	memcpy ( &basemem_packet, iobuf->data, len );
 
 	/* Create PXENV_UNDI_TRANSMIT data structure */
 	memset ( &undi_transmit, 0, sizeof ( undi_transmit ) );
+	undi_transmit.Protocol = protocol;
+	undi_transmit.XmitFlag = ( ( flags & LL_BROADCAST ) ?
+				   XMT_BROADCAST : XMT_DESTADDR );
 	undi_transmit.DestAddr.segment = rm_ds;
-	undi_transmit.DestAddr.offset = __from_data16 ( &undinet_tbd );
+	undi_transmit.DestAddr.offset = __from_data16 ( &undinet_destaddr );
 	undi_transmit.TBD.segment = rm_ds;
 	undi_transmit.TBD.offset = __from_data16 ( &undinet_tbd );
 

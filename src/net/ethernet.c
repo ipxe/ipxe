@@ -50,9 +50,9 @@ static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
  * @v net_proto		Network-layer protocol, in network-byte order
  * @ret rc		Return status code
  */
-static int eth_push ( struct net_device *netdev __unused,
-		      struct io_buffer *iobuf, const void *ll_dest,
-		      const void *ll_source, uint16_t net_proto ) {
+int eth_push ( struct net_device *netdev __unused, struct io_buffer *iobuf,
+	       const void *ll_dest, const void *ll_source,
+	       uint16_t net_proto ) {
 	struct ethhdr *ethhdr = iob_push ( iobuf, sizeof ( *ethhdr ) );
 
 	/* Build Ethernet header */
@@ -74,10 +74,9 @@ static int eth_push ( struct net_device *netdev __unused,
  * @ret flags		Packet flags
  * @ret rc		Return status code
  */
-static int eth_pull ( struct net_device *netdev __unused, 
-		      struct io_buffer *iobuf, const void **ll_dest,
-		      const void **ll_source, uint16_t *net_proto,
-		      unsigned int *flags ) {
+int eth_pull ( struct net_device *netdev __unused, struct io_buffer *iobuf,
+	       const void **ll_dest, const void **ll_source,
+	       uint16_t *net_proto, unsigned int *flags ) {
 	struct ethhdr *ethhdr = iobuf->data;
 
 	/* Sanity check */
