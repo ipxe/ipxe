@@ -282,35 +282,6 @@ static uint16_t ipv4_pshdr_chksum ( struct io_buffer *iobuf, uint16_t csum ) {
 }
 
 /**
- * Determine link-layer address
- *
- * @v dest		IPv4 destination address
- * @v src		IPv4 source address
- * @v netmask		IPv4 subnet mask
- * @v netdev		Network device
- * @v ll_dest		Link-layer destination address buffer
- * @ret rc		Return status code
- */
-static int ipv4_ll_addr ( struct in_addr dest, struct in_addr src,
-			  struct in_addr netmask, struct net_device *netdev,
-			  uint8_t *ll_dest ) {
-	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-
-	if ( ( ( dest.s_addr ^ INADDR_BROADCAST ) & ~netmask.s_addr ) == 0 ) {
-		/* Broadcast address */
-		memcpy ( ll_dest, netdev->ll_broadcast,
-			 ll_protocol->ll_addr_len );
-		return 0;
-	} else if ( IN_MULTICAST ( ntohl ( dest.s_addr ) ) ) {
-		return ll_protocol->mc_hash ( AF_INET, &dest, ll_dest );
-	} else {
-		/* Unicast address: resolve via ARP */
-		return arp_resolve ( netdev, &ipv4_protocol, &dest,
-				     &src, ll_dest );
-	}
-}
-
-/**
  * Transmit IP packet
  *
  * @v iobuf		I/O buffer
@@ -335,7 +306,8 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	struct ipv4_miniroute *miniroute;
 	struct in_addr next_hop;
 	struct in_addr netmask = { .s_addr = 0 };
-	uint8_t ll_dest[MAX_LL_ADDR_LEN];
+	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
+	const void *ll_dest;
 	int rc;
 
 	/* Fill up the IP header, except source address */
@@ -373,16 +345,6 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 			       ( ( netdev->rx_stats.bad & 0xf ) << 4 ) |
 			       ( ( netdev->rx_stats.good & 0xf ) << 0 ) );
 
-	/* Determine link-layer destination address */
-	if ( ( rc = ipv4_ll_addr ( next_hop, iphdr->src, netmask, netdev,
-				   ll_dest ) ) != 0 ) {
-		DBGC ( sin_dest->sin_addr, "IPv4 has no link-layer address for "
-		       "%s: %s\n", inet_ntoa ( next_hop ), strerror ( rc ) );
-		/* Record error for diagnosis */
-		netdev_tx_err ( netdev, iob_disown ( iobuf ), rc );
-		goto err;
-	}
-
 	/* Fix up checksums */
 	if ( trans_csum )
 		*trans_csum = ipv4_pshdr_chksum ( iobuf, *trans_csum );
@@ -395,12 +357,42 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		iphdr->protocol, ntohs ( iphdr->ident ),
 		ntohs ( iphdr->chksum ) );
 
-	/* Hand off to link layer */
-	if ( ( rc = net_tx ( iobuf, netdev, &ipv4_protocol, ll_dest,
-			     netdev->ll_addr ) ) != 0 ) {
-		DBGC ( sin_dest->sin_addr, "IPv4 could not transmit packet "
-		       "via %s: %s\n", netdev->name, strerror ( rc ) );
-		return rc;
+	/* Calculate link-layer destination address, if possible */
+	if ( ( ( next_hop.s_addr ^ INADDR_BROADCAST ) & ~netmask.s_addr ) == 0){
+		/* Broadcast address */
+		ll_dest = netdev->ll_broadcast;
+	} else if ( IN_MULTICAST ( ntohl ( next_hop.s_addr ) ) ) {
+		/* Multicast address */
+		if ( ( rc = netdev->ll_protocol->mc_hash ( AF_INET, &next_hop,
+							   ll_dest_buf ) ) !=0){
+			DBGC ( sin_dest->sin_addr, "IPv4 could not hash "
+			       "multicast %s: %s\n",
+			       inet_ntoa ( next_hop ), strerror ( rc ) );
+			return rc;
+		}
+		ll_dest = ll_dest_buf;
+	} else {
+		/* Unicast address */
+		ll_dest = NULL;
+	}
+
+	/* Hand off to link layer (via ARP if applicable) */
+	if ( ll_dest ) {
+		if ( ( rc = net_tx ( iobuf, netdev, &ipv4_protocol, ll_dest,
+				     netdev->ll_addr ) ) != 0 ) {
+			DBGC ( sin_dest->sin_addr, "IPv4 could not transmit "
+			       "packet via %s: %s\n",
+			       netdev->name, strerror ( rc ) );
+			return rc;
+		}
+	} else {
+		if ( ( rc = arp_tx ( iobuf, netdev, &ipv4_protocol, &next_hop,
+				     &iphdr->src, netdev->ll_addr ) ) != 0 ) {
+			DBGC ( sin_dest->sin_addr, "IPv4 could not transmit "
+			       "packet via %s: %s\n",
+			       netdev->name, strerror ( rc ) );
+			return rc;
+		}
 	}
 
 	return 0;

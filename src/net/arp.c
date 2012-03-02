@@ -19,6 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
@@ -26,6 +27,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/if_arp.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/list.h>
+#include <ipxe/retry.h>
+#include <ipxe/timer.h>
+#include <ipxe/malloc.h>
 #include <ipxe/arp.h>
 
 /** @file
@@ -38,104 +43,263 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** ARP minimum timeout */
+#define ARP_MIN_TIMEOUT ( TICKS_PER_SEC / 8 )
+
+/** ARP maximum timeout */
+#define ARP_MAX_TIMEOUT ( TICKS_PER_SEC * 3 )
+
 /** An ARP cache entry */
 struct arp_entry {
+	/** List of ARP cache entries */
+	struct list_head list;
+	/** Network device */
+	struct net_device *netdev;
 	/** Network-layer protocol */
 	struct net_protocol *net_protocol;
-	/** Link-layer protocol */
-	struct ll_protocol *ll_protocol;
-	/** Network-layer address */
-	uint8_t net_addr[MAX_NET_ADDR_LEN];
-	/** Link-layer address */
-	uint8_t ll_addr[MAX_LL_ADDR_LEN];
+	/** Network-layer destination address */
+	uint8_t net_dest[MAX_NET_ADDR_LEN];
+	/** Network-layer source address */
+	uint8_t net_source[MAX_NET_ADDR_LEN];
+	/** Link-layer destination address */
+	uint8_t ll_dest[MAX_LL_ADDR_LEN];
+	/** Retransmission timer */
+	struct retry_timer timer;
+	/** Pending I/O buffers */
+	struct list_head tx_queue;
 };
 
-/** Number of entries in the ARP cache
- *
- * This is a global cache, covering all network interfaces,
- * network-layer protocols and link-layer protocols.
- */
-#define NUM_ARP_ENTRIES 4
-
 /** The ARP cache */
-static struct arp_entry arp_table[NUM_ARP_ENTRIES];
-#define arp_table_end &arp_table[NUM_ARP_ENTRIES]
-
-static unsigned int next_new_arp_entry = 0;
+static LIST_HEAD ( arp_entries );
 
 struct net_protocol arp_protocol __net_protocol;
+
+static void arp_expired ( struct retry_timer *timer, int over );
+
+/**
+ * Create ARP cache entry
+ *
+ * @v netdev		Network device
+ * @v net_protocol	Network-layer protocol
+ * @v net_dest		Destination network-layer address
+ * @v net_source	Source network-layer address
+ * @ret arp		ARP cache entry, or NULL if allocation failed
+ */
+static struct arp_entry * arp_create ( struct net_device *netdev,
+				       struct net_protocol *net_protocol,
+				       const void *net_dest,
+				       const void *net_source ) {
+	struct arp_entry *arp;
+
+	/* Allocate entry and add to cache */
+	arp = zalloc ( sizeof ( *arp ) );
+	if ( ! arp )
+		return NULL;
+
+	/* Initialise entry and add to cache */
+	arp->netdev = netdev_get ( netdev );
+	arp->net_protocol = net_protocol;
+	memcpy ( arp->net_dest, net_dest,
+		 net_protocol->net_addr_len );
+	memcpy ( arp->net_source, net_source,
+		 net_protocol->net_addr_len );
+	timer_init ( &arp->timer, arp_expired, NULL );
+	arp->timer.min_timeout = ARP_MIN_TIMEOUT;
+	arp->timer.max_timeout = ARP_MAX_TIMEOUT;
+	INIT_LIST_HEAD ( &arp->tx_queue );
+	list_add ( &arp->list, &arp_entries );
+
+	/* Start timer running to trigger initial transmission */
+	start_timer_nodelay ( &arp->timer );
+
+	DBGC ( arp, "ARP %p %s %s %s created\n", arp, netdev->name,
+	       net_protocol->name, net_protocol->ntoa ( net_dest ) );
+	return arp;
+}
 
 /**
  * Find entry in the ARP cache
  *
- * @v ll_protocol	Link-layer protocol
+ * @v netdev		Network device
  * @v net_protocol	Network-layer protocol
- * @v net_addr		Network-layer address
+ * @v net_dest		Destination network-layer address
  * @ret arp		ARP cache entry, or NULL if not found
- *
  */
-static struct arp_entry *
-arp_find_entry ( struct ll_protocol *ll_protocol,
-		 struct net_protocol *net_protocol,
-		 const void *net_addr ) {
+static struct arp_entry * arp_find ( struct net_device *netdev,
+				     struct net_protocol *net_protocol,
+				     const void *net_dest ) {
 	struct arp_entry *arp;
 
-	for ( arp = arp_table ; arp < arp_table_end ; arp++ ) {
-		if ( ( arp->ll_protocol == ll_protocol ) &&
+	list_for_each_entry ( arp, &arp_entries, list ) {
+		if ( ( arp->netdev == netdev ) &&
 		     ( arp->net_protocol == net_protocol ) &&
-		     ( memcmp ( arp->net_addr, net_addr,
-				net_protocol->net_addr_len ) == 0 ) )
+		     ( memcmp ( arp->net_dest, net_dest,
+				net_protocol->net_addr_len ) == 0 ) ) {
+
+			/* Move to start of cache */
+			list_del ( &arp->list );
+			list_add ( &arp->list, &arp_entries );
+
 			return arp;
+		}
 	}
 	return NULL;
 }
 
 /**
- * Look up media-specific link-layer address in the ARP cache
+ * Destroy ARP cache entry
  *
+ * @v arp		ARP cache entry
+ * @v rc		Reason for destruction
+ */
+static void arp_destroy ( struct arp_entry *arp, int rc ) {
+	struct net_device *netdev = arp->netdev;
+	struct net_protocol *net_protocol = arp->net_protocol;
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
+
+	/* Stop timer */
+	stop_timer ( &arp->timer );
+
+	/* Discard any outstanding I/O buffers */
+	list_for_each_entry_safe ( iobuf, tmp, &arp->tx_queue, list ) {
+		DBGC2 ( arp, "ARP %p %s %s %s discarding deferred packet: "
+			"%s\n", arp, netdev->name, net_protocol->name,
+			net_protocol->ntoa ( arp->net_dest ), strerror ( rc ) );
+		list_del ( &iobuf->list );
+		netdev_tx_err ( arp->netdev, iobuf, rc );
+	}
+
+	DBGC ( arp, "ARP %p %s %s %s destroyed: %s\n", arp, netdev->name,
+	       net_protocol->name, net_protocol->ntoa ( arp->net_dest ),
+	       strerror ( rc ) );
+
+	/* Drop reference to network device, remove from cache and free */
+	netdev_put ( arp->netdev );
+	list_del ( &arp->list );
+	free ( arp );
+}
+
+/**
+ * Test if ARP cache entry has a valid link-layer address
+ *
+ * @v arp		ARP cache entry
+ * @ret resolved	ARP cache entry is resolved
+ */
+static inline int arp_resolved ( struct arp_entry *arp ) {
+	return ( ! timer_running ( &arp->timer ) );
+}
+
+/**
+ * Transmit packet, determining link-layer address via ARP
+ *
+ * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v net_protocol	Network-layer protocol
- * @v dest_net_addr	Destination network-layer address
- * @v source_net_addr	Source network-layer address
- * @ret dest_ll_addr	Destination link layer address
+ * @v net_dest		Destination network-layer address
+ * @v net_source	Source network-layer address
+ * @v ll_source		Source link-layer address
  * @ret rc		Return status code
- *
- * This function will use the ARP cache to look up the link-layer
- * address for the link-layer protocol associated with the network
- * device and the given network-layer protocol and addresses.  If
- * found, the destination link-layer address will be filled in in @c
- * dest_ll_addr.
- *
- * If no address is found in the ARP cache, an ARP request will be
- * transmitted on the specified network device and -ENOENT will be
- * returned.
  */
-int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
-		  const void *dest_net_addr, const void *source_net_addr,
-		  void *dest_ll_addr ) {
+int arp_tx ( struct io_buffer *iobuf, struct net_device *netdev,
+	     struct net_protocol *net_protocol, const void *net_dest,
+	     const void *net_source, const void *ll_source ) {
+	struct arp_entry *arp;
+
+	/* Find or create ARP cache entry */
+	arp = arp_find ( netdev, net_protocol, net_dest );
+	if ( ! arp ) {
+		arp = arp_create ( netdev, net_protocol, net_dest,
+				   net_source );
+		if ( ! arp )
+			return -ENOMEM;
+	}
+
+	/* If a link-layer address is available then transmit
+	 * immediately, otherwise queue for later transmission.
+	 */
+	if ( arp_resolved ( arp ) ) {
+		return net_tx ( iobuf, netdev, net_protocol, arp->ll_dest,
+				ll_source );
+	} else {
+		DBGC2 ( arp, "ARP %p %s %s %s deferring packet\n",
+			arp, netdev->name, net_protocol->name,
+			net_protocol->ntoa ( net_dest ) );
+		list_add_tail ( &iobuf->list, &arp->tx_queue );
+		return -EAGAIN;
+	}
+}
+
+/**
+ * Update ARP cache entry
+ *
+ * @v arp		ARP cache entry
+ * @v ll_dest		Destination link-layer address
+ */
+static void arp_update ( struct arp_entry *arp, const void *ll_dest ) {
+	struct net_device *netdev = arp->netdev;
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	const struct arp_entry *arp;
+	struct net_protocol *net_protocol = arp->net_protocol;
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
+	int rc;
+
+	DBGC ( arp, "ARP %p %s %s %s updated => %s\n", arp, netdev->name,
+	       net_protocol->name, net_protocol->ntoa ( arp->net_dest ),
+	       ll_protocol->ntoa ( ll_dest ) );
+
+	/* Fill in link-layer address */
+	memcpy ( arp->ll_dest, ll_dest, ll_protocol->ll_addr_len );
+
+	/* Stop retransmission timer */
+	stop_timer ( &arp->timer );
+
+	/* Transmit any packets in queue */
+	list_for_each_entry_safe ( iobuf, tmp, &arp->tx_queue, list ) {
+		DBGC2 ( arp, "ARP %p %s %s %s transmitting deferred packet\n",
+			arp, netdev->name, net_protocol->name,
+			net_protocol->ntoa ( arp->net_dest ) );
+		list_del ( &iobuf->list );
+		if ( ( rc = net_tx ( iobuf, netdev, net_protocol, ll_dest,
+				     netdev->ll_addr ) ) != 0 ) {
+			DBGC ( arp, "ARP %p could not transmit deferred "
+			       "packet: %s\n", arp, strerror ( rc ) );
+			/* Ignore error and continue */
+		}
+	}
+}
+
+/**
+ * Handle ARP timer expiry
+ *
+ * @v timer		Retry timer
+ * @v fail		Failure indicator
+ */
+static void arp_expired ( struct retry_timer *timer, int fail ) {
+	struct arp_entry *arp = container_of ( timer, struct arp_entry, timer );
+	struct net_device *netdev = arp->netdev;
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
+	struct net_protocol *net_protocol = arp->net_protocol;
 	struct io_buffer *iobuf;
 	struct arphdr *arphdr;
 	int rc;
 
-	/* Look for existing entry in ARP table */
-	arp = arp_find_entry ( ll_protocol, net_protocol, dest_net_addr );
-	if ( arp ) {
-		DBG ( "ARP cache hit: %s %s => %s %s\n",
-		      net_protocol->name, net_protocol->ntoa ( arp->net_addr ),
-		      ll_protocol->name, ll_protocol->ntoa ( arp->ll_addr ) );
-		memcpy ( dest_ll_addr, arp->ll_addr, ll_protocol->ll_addr_len);
-		return 0;
+	/* If we have failed, destroy the cache entry */
+	if ( fail ) {
+		arp_destroy ( arp, -ETIMEDOUT );
+		return;
 	}
-	DBG ( "ARP cache miss: %s %s\n", net_protocol->name,
-	      net_protocol->ntoa ( dest_net_addr ) );
+
+	/* Restart the timer */
+	start_timer ( &arp->timer );
 
 	/* Allocate ARP packet */
 	iobuf = alloc_iob ( MAX_LL_HEADER_LEN + sizeof ( *arphdr ) +
-			  2 * ( MAX_LL_ADDR_LEN + MAX_NET_ADDR_LEN ) );
-	if ( ! iobuf )
-		return -ENOMEM;
+			    ( 2 * ( MAX_LL_ADDR_LEN + MAX_NET_ADDR_LEN ) ) );
+	if ( ! iobuf ) {
+		/* Leave timer running and try again later */
+		return;
+	}
 	iob_reserve ( iobuf, MAX_LL_HEADER_LEN );
 
 	/* Build up ARP request */
@@ -148,18 +312,19 @@ int arp_resolve ( struct net_device *netdev, struct net_protocol *net_protocol,
 	memcpy ( iob_put ( iobuf, ll_protocol->ll_addr_len ),
 		 netdev->ll_addr, ll_protocol->ll_addr_len );
 	memcpy ( iob_put ( iobuf, net_protocol->net_addr_len ),
-		 source_net_addr, net_protocol->net_addr_len );
+		 arp->net_source, net_protocol->net_addr_len );
 	memset ( iob_put ( iobuf, ll_protocol->ll_addr_len ),
 		 0, ll_protocol->ll_addr_len );
 	memcpy ( iob_put ( iobuf, net_protocol->net_addr_len ),
-		 dest_net_addr, net_protocol->net_addr_len );
+		 arp->net_dest, net_protocol->net_addr_len );
 
 	/* Transmit ARP request */
 	if ( ( rc = net_tx ( iobuf, netdev, &arp_protocol,
-			     netdev->ll_broadcast, netdev->ll_addr ) ) != 0 )
-		return rc;
-
-	return -ENOENT;
+			     netdev->ll_broadcast, netdev->ll_addr ) ) != 0 ) {
+		DBGC ( arp, "ARP %p could not transmit request: %s\n",
+		       arp, strerror ( rc ) );
+		return;
+	}
 }
 
 /**
@@ -188,12 +353,6 @@ static struct arp_net_protocol * arp_find_protocol ( uint16_t net_proto ) {
  * @v ll_source		Link-layer source address
  * @v flags		Packet flags
  * @ret rc		Return status code
- *
- * This handles ARP requests and responses as detailed in RFC826.  The
- * method detailed within the RFC is pretty optimised, handling
- * requests and responses with basically a single code path and
- * avoiding the need for extraneous ARP requests; read the RFC for
- * details.
  */
 static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    const void *ll_dest __unused,
@@ -204,71 +363,68 @@ static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	struct net_protocol *net_protocol;
 	struct ll_protocol *ll_protocol;
 	struct arp_entry *arp;
-	int merge = 0;
+	int rc;
 
 	/* Identify network-layer and link-layer protocols */
 	arp_net_protocol = arp_find_protocol ( arphdr->ar_pro );
-	if ( ! arp_net_protocol )
+	if ( ! arp_net_protocol ) {
+		rc = -EPROTONOSUPPORT;
 		goto done;
+	}
 	net_protocol = arp_net_protocol->net_protocol;
 	ll_protocol = netdev->ll_protocol;
 
 	/* Sanity checks */
 	if ( ( arphdr->ar_hrd != ll_protocol->ll_proto ) ||
 	     ( arphdr->ar_hln != ll_protocol->ll_addr_len ) ||
-	     ( arphdr->ar_pln != net_protocol->net_addr_len ) )
+	     ( arphdr->ar_pln != net_protocol->net_addr_len ) ) {
+		rc = -EINVAL;
 		goto done;
-
-	/* See if we have an entry for this sender, and update it if so */
-	arp = arp_find_entry ( ll_protocol, net_protocol,
-			       arp_sender_pa ( arphdr ) );
-	if ( arp ) {
-		memcpy ( arp->ll_addr, arp_sender_ha ( arphdr ),
-			 arphdr->ar_hln );
-		merge = 1;
-		DBG ( "ARP cache update: %s %s => %s %s\n",
-		      net_protocol->name, net_protocol->ntoa ( arp->net_addr ),
-		      ll_protocol->name, ll_protocol->ntoa ( arp->ll_addr ) );
 	}
 
-	/* See if we own the target protocol address */
-	if ( arp_net_protocol->check ( netdev, arp_target_pa ( arphdr ) ) != 0)
-		goto done;
-	
-	/* Create new ARP table entry if necessary */
-	if ( ! merge ) {
-		arp = &arp_table[next_new_arp_entry++ % NUM_ARP_ENTRIES];
-		arp->ll_protocol = ll_protocol;
-		arp->net_protocol = net_protocol;
-		memcpy ( arp->ll_addr, arp_sender_ha ( arphdr ),
-			 arphdr->ar_hln );
-		memcpy ( arp->net_addr, arp_sender_pa ( arphdr ),
-			 arphdr->ar_pln);
-		DBG ( "ARP cache add: %s %s => %s %s\n",
-		      net_protocol->name, net_protocol->ntoa ( arp->net_addr ),
-		      ll_protocol->name, ll_protocol->ntoa ( arp->ll_addr ) );
+	/* See if we have an entry for this sender, and update it if so */
+	arp = arp_find ( netdev, net_protocol, arp_sender_pa ( arphdr ) );
+	if ( arp ) {
+		arp_update ( arp, arp_sender_ha ( arphdr ) );
 	}
 
 	/* If it's not a request, there's nothing more to do */
-	if ( arphdr->ar_op != htons ( ARPOP_REQUEST ) )
+	if ( arphdr->ar_op != htons ( ARPOP_REQUEST ) ) {
+		rc = 0;
 		goto done;
+	}
+
+	/* See if we own the target protocol address */
+	if ( arp_net_protocol->check ( netdev, arp_target_pa ( arphdr ) ) != 0){
+		rc = 0;
+		goto done;
+	}
 
 	/* Change request to a reply */
-	DBG ( "ARP reply: %s %s => %s %s\n", net_protocol->name,
-	      net_protocol->ntoa ( arp_target_pa ( arphdr ) ),
-	      ll_protocol->name, ll_protocol->ntoa ( netdev->ll_addr ) );
+	DBGC ( netdev, "ARP reply %s %s %s => %s %s\n",
+	       netdev->name, net_protocol->name,
+	       net_protocol->ntoa ( arp_target_pa ( arphdr ) ),
+	       ll_protocol->name, ll_protocol->ntoa ( netdev->ll_addr ) );
 	arphdr->ar_op = htons ( ARPOP_REPLY );
 	memswap ( arp_sender_ha ( arphdr ), arp_target_ha ( arphdr ),
 		 arphdr->ar_hln + arphdr->ar_pln );
 	memcpy ( arp_sender_ha ( arphdr ), netdev->ll_addr, arphdr->ar_hln );
 
 	/* Send reply */
-	net_tx ( iob_disown ( iobuf ), netdev, &arp_protocol,
-		 arp_target_ha ( arphdr ), netdev->ll_addr );
+	if ( ( rc = net_tx ( iob_disown ( iobuf ), netdev, &arp_protocol,
+			     arp_target_ha ( arphdr ),
+			     netdev->ll_addr ) ) != 0 ) {
+		DBGC ( netdev, "ARP could not transmit reply via %s: %s\n",
+		       netdev->name, strerror ( rc ) );
+		goto done;
+	}
+
+	/* Success */
+	rc = 0;
 
  done:
 	free_iob ( iobuf );
-	return 0;
+	return rc;
 }
 
 /**
@@ -289,4 +445,60 @@ struct net_protocol arp_protocol __net_protocol = {
 	.net_proto = htons ( ETH_P_ARP ),
 	.rx = arp_rx,
 	.ntoa = arp_ntoa,
+};
+
+/**
+ * Update ARP cache on network device creation
+ *
+ * @v netdev		Network device
+ */
+static int arp_probe ( struct net_device *netdev __unused ) {
+	/* Nothing to do */
+	return 0;
+}
+
+/**
+ * Update ARP cache on network device state change or removal
+ *
+ * @v netdev		Network device
+ */
+static void arp_flush ( struct net_device *netdev ) {
+	struct arp_entry *arp;
+	struct arp_entry *tmp;
+
+	/* Remove all ARP cache entries when a network device is closed */
+	if ( ! netdev_is_open ( netdev ) ) {
+		list_for_each_entry_safe ( arp, tmp, &arp_entries, list )
+			arp_destroy ( arp, -ENODEV );
+	}
+}
+
+/** ARP driver (for net device notifications) */
+struct net_driver arp_net_driver __net_driver = {
+	.name = "ARP",
+	.probe = arp_probe,
+	.notify = arp_flush,
+	.remove = arp_flush,
+};
+
+/**
+ * Discard some cached ARP entries
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int arp_discard ( void ) {
+	struct arp_entry *arp;
+
+	/* Drop oldest cache entry, if any */
+	list_for_each_entry_reverse ( arp, &arp_entries, list ) {
+		arp_destroy ( arp, -ENOBUFS );
+		return 1;
+	}
+
+	return 0;
+}
+
+/** ARP cache discarder */
+struct cache_discarder arp_cache_discarder __cache_discarder = {
+	.discard = arp_discard,
 };

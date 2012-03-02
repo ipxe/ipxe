@@ -35,10 +35,8 @@ struct arp_net_protocol {
 
 extern struct net_protocol arp_protocol __net_protocol;
 
-extern int arp_resolve ( struct net_device *netdev,
-			 struct net_protocol *net_protocol,
-			 const void *dest_net_addr,
-			 const void *source_net_addr,
-			 void *dest_ll_addr );
+extern int arp_tx ( struct io_buffer *iobuf, struct net_device *netdev,
+		    struct net_protocol *net_protocol, const void *net_dest,
+		    const void *net_source, const void *ll_source );
 
 #endif /* _IPXE_ARP_H */
