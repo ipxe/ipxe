@@ -138,6 +138,8 @@ struct tls_session {
 	/** Ciphertext stream */
 	struct interface cipherstream;
 
+	/** Protocol version */
+	uint16_t version;
 	/** Current TX cipher specification */
 	struct tls_cipherspec tx_cipherspec;
 	/** Next TX cipher specification */

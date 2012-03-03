@@ -697,7 +697,7 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 	hello.type_length = ( cpu_to_le32 ( TLS_CLIENT_HELLO ) |
 			      htonl ( sizeof ( hello ) -
 				      sizeof ( hello.type_length ) ) );
-	hello.version = htons ( TLS_VERSION_TLS_1_0 );
+	hello.version = htons ( tls->version );
 	memcpy ( &hello.random, &tls->client_random, sizeof ( hello.random ) );
 	hello.cipher_suite_len = htons ( sizeof ( hello.cipher_suites ) );
 	hello.cipher_suites[0] = htons ( TLS_RSA_WITH_AES_128_CBC_SHA );
@@ -877,6 +877,7 @@ static int tls_new_server_hello ( struct tls_session *tls,
 		char next[0];
 	} __attribute__ (( packed )) *hello_b = ( void * ) &hello_a->next;
 	void *end = hello_b->next;
+	uint16_t version;
 	int rc;
 
 	/* Sanity check */
@@ -886,13 +887,22 @@ static int tls_new_server_hello ( struct tls_session *tls,
 		return -EINVAL;
 	}
 
-	/* Check protocol version */
-	if ( ntohs ( hello_a->version ) < TLS_VERSION_TLS_1_0 ) {
+	/* Check and store protocol version */
+	version = ntohs ( hello_a->version );
+	if ( version < TLS_VERSION_TLS_1_0 ) {
 		DBGC ( tls, "TLS %p does not support protocol version %d.%d\n",
-		       tls, ( ntohs ( hello_a->version ) >> 8 ),
-		       ( ntohs ( hello_a->version ) & 0xff ) );
+		       tls, ( version >> 8 ), ( version & 0xff ) );
 		return -ENOTSUP;
 	}
+	if ( version > tls->version ) {
+		DBGC ( tls, "TLS %p server attempted to illegally upgrade to "
+		       "protocol version %d.%d\n",
+		       tls, ( version >> 8 ), ( version & 0xff ) );
+		return -EPROTO;
+	}
+	tls->version = version;
+	DBGC ( tls, "TLS %p using protocol version %d.%d\n",
+	       tls, ( version >> 8 ), ( version & 0xff ) );
 
 	/* Copy out server random bytes */
 	memcpy ( &tls->server_random, &hello_a->random,
@@ -1208,8 +1218,8 @@ static void * tls_assemble_block ( struct tls_session *tls,
 				   const void *data, size_t len,
 				   void *digest, size_t *plaintext_len ) {
 	size_t blocksize = tls->tx_cipherspec.cipher->blocksize;
-	size_t iv_len = blocksize;
 	size_t mac_len = tls->tx_cipherspec.digest->digestsize;
+	size_t iv_len;
 	size_t padding_len;
 	void *plaintext;
 	void *iv;
@@ -1217,8 +1227,8 @@ static void * tls_assemble_block ( struct tls_session *tls,
 	void *mac;
 	void *padding;
 
-	/* FIXME: TLSv1.1 has an explicit IV */
-	iv_len = 0;
+	/* TLSv1.1 and later use an explicit IV */
+	iv_len = ( ( tls->version >= TLS_VERSION_TLS_1_1 ) ? blocksize : 0 );
 
 	/* Calculate block-ciphered struct length */
 	padding_len = ( ( blocksize - 1 ) & -( iv_len + len + mac_len + 1 ) );
@@ -1234,7 +1244,7 @@ static void * tls_assemble_block ( struct tls_session *tls,
 	padding = ( mac + mac_len );
 
 	/* Fill in block-ciphered struct */
-	memset ( iv, 0, iv_len );
+	tls_generate_random ( tls, iv, iv_len );
 	memcpy ( content, data, len );
 	memcpy ( mac, digest, mac_len );
 	memset ( padding, padding_len, ( padding_len + 1 ) );
@@ -1266,7 +1276,7 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 
 	/* Construct header */
 	plaintext_tlshdr.type = type;
-	plaintext_tlshdr.version = htons ( TLS_VERSION_TLS_1_0 );
+	plaintext_tlshdr.version = htons ( tls->version );
 	plaintext_tlshdr.length = htons ( len );
 
 	/* Calculate MAC */
@@ -1304,7 +1314,7 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 	/* Assemble ciphertext */
 	tlshdr = iob_put ( ciphertext, sizeof ( *tlshdr ) );
 	tlshdr->type = type;
-	tlshdr->version = htons ( TLS_VERSION_TLS_1_0 );
+	tlshdr->version = htons ( tls->version );
 	tlshdr->length = htons ( plaintext_len );
 	memcpy ( cipherspec->cipher_next_ctx, cipherspec->cipher_ctx,
 		 cipherspec->cipher->ctxsize );
@@ -1399,17 +1409,18 @@ static int tls_split_block ( struct tls_session *tls,
 	size_t padding_len;
 	unsigned int i;
 
-	/* Decompose block-ciphered data */
+	/* Sanity check */
 	if ( plaintext_len < 1 ) {
 		DBGC ( tls, "TLS %p received underlength record\n", tls );
 		DBGC_HD ( tls, plaintext, plaintext_len );
 		return -EINVAL;
 	}
-	iv_len = tls->rx_cipherspec.cipher->blocksize;
 
-	/* FIXME: TLSv1.1 uses an explicit IV */
-	iv_len = 0;
+	/* TLSv1.1 and later use an explicit IV */
+	iv_len = ( ( tls->version >= TLS_VERSION_TLS_1_1 ) ?
+		   tls->rx_cipherspec.cipher->blocksize : 0 );
 
+	/* Decompose block-ciphered data */
 	mac_len = tls->rx_cipherspec.digest->digestsize;
 	padding_len = *( ( uint8_t * ) ( plaintext + plaintext_len - 1 ) );
 	if ( plaintext_len < ( iv_len + mac_len + padding_len + 1 ) ) {
@@ -1808,6 +1819,7 @@ int add_tls ( struct interface *xfer, struct interface **next ) {
 	ref_init ( &tls->refcnt, free_tls );
 	intf_init ( &tls->plainstream, &tls_plainstream_desc, &tls->refcnt );
 	intf_init ( &tls->cipherstream, &tls_cipherstream_desc, &tls->refcnt );
+	tls->version = TLS_VERSION_TLS_1_1;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
@@ -1817,7 +1829,7 @@ int add_tls ( struct interface *xfer, struct interface **next ) {
 			  ( sizeof ( tls->client_random.random ) ) ) ) != 0 ) {
 		goto err_random;
 	}
-	tls->pre_master_secret.version = htons ( TLS_VERSION_TLS_1_0 );
+	tls->pre_master_secret.version = htons ( tls->version );
 	if ( ( rc = tls_generate_random ( tls, &tls->pre_master_secret.random,
 		      ( sizeof ( tls->pre_master_secret.random ) ) ) ) != 0 ) {
 		goto err_random;
