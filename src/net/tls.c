@@ -997,10 +997,31 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
  */
 static int tls_new_finished ( struct tls_session *tls,
 			      void *data, size_t len ) {
+	struct {
+		uint8_t verify_data[12];
+		char next[0];
+	} __attribute__ (( packed )) *finished = data;
+	void *end = finished->next;
+	uint8_t digest[MD5_DIGEST_SIZE + SHA1_DIGEST_SIZE];
+	uint8_t verify_data[ sizeof ( finished->verify_data ) ];
 
-	/* FIXME: Handle this properly */
-	( void ) data;
-	( void ) len;
+	/* Sanity check */
+	if ( end != ( data + len ) ) {
+		DBGC ( tls, "TLS %p received overlength Finished\n", tls );
+		DBGC_HD ( tls, data, len );
+		return -EINVAL;
+	}
+
+	/* Verify data */
+	tls_verify_handshake ( tls, digest );
+	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
+			verify_data, sizeof ( verify_data ), "server finished",
+			digest, sizeof ( digest ) );
+	if ( memcmp ( verify_data, finished->verify_data,
+		      sizeof ( verify_data ) ) != 0 ) {
+		DBGC ( tls, "TLS %p verification failed\n", tls );
+		return -EPERM;
+	}
 
 	/* Mark session as ready to transmit plaintext data */
 	tls->tx_ready = 1;
