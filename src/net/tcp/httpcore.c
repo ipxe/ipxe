@@ -838,6 +838,7 @@ static struct process_descriptor http_process_desc =
 int http_open_filter ( struct interface *xfer, struct uri *uri,
 		       unsigned int default_port,
 		       int ( * filter ) ( struct interface *xfer,
+					  const char *name,
 					  struct interface **next ) ) {
 	struct http_request *http;
 	struct sockaddr_tcpip server;
@@ -865,7 +866,7 @@ int http_open_filter ( struct interface *xfer, struct uri *uri,
 	server.st_port = htons ( uri_port ( http->uri, default_port ) );
 	socket = &http->socket;
 	if ( filter ) {
-		if ( ( rc = filter ( socket, &socket ) ) != 0 )
+		if ( ( rc = filter ( socket, uri->host, &socket ) ) != 0 )
 			goto err;
 	}
 	if ( ( rc = xfer_open_named_socket ( socket, SOCK_STREAM,

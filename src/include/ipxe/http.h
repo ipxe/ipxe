@@ -18,6 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 extern int http_open_filter ( struct interface *xfer, struct uri *uri,
 			      unsigned int default_port,
 			      int ( * filter ) ( struct interface *,
+						 const char *,
 						 struct interface ** ) );
 
 #endif /* _IPXE_HTTP_H */

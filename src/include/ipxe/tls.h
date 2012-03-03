@@ -74,6 +74,10 @@ struct tls_header {
 #define TLS_RSA_WITH_AES_128_CBC_SHA 0x002f
 #define TLS_RSA_WITH_AES_256_CBC_SHA 0x0035
 
+/* TLS extension types */
+#define TLS_SERVER_NAME 0
+#define TLS_SERVER_NAME_HOST_NAME 0
+
 /** TLS RX state machine state */
 enum tls_rx_state {
 	TLS_RX_HEADER = 0,
@@ -133,6 +137,8 @@ struct tls_session {
 	/** Reference counter */
 	struct refcnt refcnt;
 
+	/** Server name */
+	const char *name;
 	/** Plaintext stream */
 	struct interface plainstream;
 	/** Ciphertext stream */
@@ -183,7 +189,7 @@ struct tls_session {
 	void *rx_data;
 };
 
-extern int add_tls ( struct interface *xfer,
+extern int add_tls ( struct interface *xfer, const char *name,
 		     struct interface **next );
 
 #endif /* _IPXE_TLS_H */
