@@ -87,9 +87,10 @@ enum tls_rx_state {
 /** TLS TX pending flags */
 enum tls_tx_pending {
 	TLS_TX_CLIENT_HELLO = 0x0001,
-	TLS_TX_CLIENT_KEY_EXCHANGE = 0x0002,
-	TLS_TX_CHANGE_CIPHER = 0x0004,
-	TLS_TX_FINISHED = 0x0008,
+	TLS_TX_CERTIFICATE = 0x0002,
+	TLS_TX_CLIENT_KEY_EXCHANGE = 0x0004,
+	TLS_TX_CHANGE_CIPHER = 0x0008,
+	TLS_TX_FINISHED = 0x0010,
 };
 
 /** A TLS cipher specification */

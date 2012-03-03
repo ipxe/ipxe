@@ -685,6 +685,27 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 }
 
 /**
+ * Transmit Certificate record
+ *
+ * @v tls		TLS session
+ * @ret rc		Return status code
+ */
+static int tls_send_certificate ( struct tls_session *tls ) {
+	struct {
+		uint32_t type_length;
+		uint8_t length[3];
+	} __attribute__ (( packed )) certificate;
+
+	memset ( &certificate, 0, sizeof ( certificate ) );
+	certificate.type_length = ( cpu_to_le32 ( TLS_CERTIFICATE ) |
+				    htonl ( sizeof ( certificate ) -
+					    sizeof ( certificate.type_length)));
+
+	return tls_send_handshake ( tls, &certificate, sizeof ( certificate ) );
+}
+
+
+/**
  * Transmit Client Key Exchange record
  *
  * @v tls		TLS session
@@ -956,6 +977,30 @@ static int tls_new_certificate ( struct tls_session *tls,
 }
 
 /**
+ * Receive new Certificate Request handshake record
+ *
+ * @v tls		TLS session
+ * @v data		Plaintext handshake record
+ * @v len		Length of plaintext handshake record
+ * @ret rc		Return status code
+ */
+static int tls_new_certificate_request ( struct tls_session *tls,
+					 void *data __unused,
+					 size_t len __unused ) {
+
+	/* We can only send an empty certificate (as mandated by
+	 * TLSv1.2), so there is no point in parsing the Certificate
+	 * Request.
+	 */
+
+	/* Schedule Certificate transmission */
+	tls->tx_pending |= TLS_TX_CERTIFICATE;
+	tls_tx_resume ( tls );
+
+	return 0;
+}
+
+/**
  * Receive new Server Hello Done handshake record
  *
  * @v tls		TLS session
@@ -1069,6 +1114,10 @@ static int tls_new_handshake ( struct tls_session *tls,
 			break;
 		case TLS_CERTIFICATE:
 			rc = tls_new_certificate ( tls, payload, payload_len );
+			break;
+		case TLS_CERTIFICATE_REQUEST:
+			rc = tls_new_certificate_request ( tls, payload,
+							   payload_len );
 			break;
 		case TLS_SERVER_HELLO_DONE:
 			rc = tls_new_server_hello_done ( tls, payload,
@@ -1741,6 +1790,14 @@ static void tls_tx_step ( struct tls_session *tls ) {
 			goto err;
 		}
 		tls->tx_pending &= ~TLS_TX_CLIENT_HELLO;
+	} else if ( tls->tx_pending & TLS_TX_CERTIFICATE ) {
+		/* Send Certificate */
+		if ( ( rc = tls_send_certificate ( tls ) ) != 0 ) {
+			DBGC ( tls, "TLS %p cold not send Certificate: %s\n",
+			       tls, strerror ( rc ) );
+			goto err;
+		}
+		tls->tx_pending &= ~TLS_TX_CERTIFICATE;
 	} else if ( tls->tx_pending & TLS_TX_CLIENT_KEY_EXCHANGE ) {
 		/* Send Client Key Exchange */
 		if ( ( rc = tls_send_client_key_exchange ( tls ) ) != 0 ) {
