@@ -84,14 +84,12 @@ enum tls_rx_state {
 	TLS_RX_DATA,
 };
 
-/** TLS TX state machine state */
-enum tls_tx_state {
-	TLS_TX_NONE = 0,
-	TLS_TX_CLIENT_HELLO,
-	TLS_TX_CLIENT_KEY_EXCHANGE,
-	TLS_TX_CHANGE_CIPHER,
-	TLS_TX_FINISHED,
-	TLS_TX_DATA
+/** TLS TX pending flags */
+enum tls_tx_pending {
+	TLS_TX_CLIENT_HELLO = 0x0001,
+	TLS_TX_CLIENT_KEY_EXCHANGE = 0x0002,
+	TLS_TX_CHANGE_CIPHER = 0x0004,
+	TLS_TX_FINISHED = 0x0008,
 };
 
 /** A TLS cipher specification */
@@ -172,10 +170,12 @@ struct tls_session {
 
 	/** TX sequence number */
 	uint64_t tx_seq;
-	/** TX state */
-	enum tls_tx_state tx_state;
+	/** TX pending transmissions */
+	unsigned int tx_pending;
 	/** TX process */
 	struct process process;
+	/** TX ready for plaintext data */
+	int tx_ready;
 
 	/** RX sequence number */
 	uint64_t rx_seq;

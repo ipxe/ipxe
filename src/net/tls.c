@@ -596,7 +596,7 @@ static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
 
 /******************************************************************************
  *
- * TX state machine transitions
+ * Record handling
  *
  ******************************************************************************
  */
@@ -609,53 +609,6 @@ static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
 static void tls_tx_resume ( struct tls_session *tls ) {
 	process_add ( &tls->process );
 }
-
-/**
- * Enter TX state machine active state
- *
- * @v tls		TLS session
- * @v state		TX state
- */
-static void tls_tx_start ( struct tls_session *tls, enum tls_tx_state state ) {
-
-	/* Enter specified state */
-	tls->tx_state = state;
-
-	/* Resume state machine */
-	tls_tx_resume ( tls );
-}
-
-/**
- * Enter TX state machine idle state
- *
- * @v tls		TLS session
- */
-static void tls_tx_none ( struct tls_session *tls ) {
-
-	/* Enter idle state */
-	tls->tx_state = TLS_TX_NONE;
-}
-
-/**
- * Enter TX state machine data state
- *
- * @v tls		TLS session
- */
-static void tls_tx_data ( struct tls_session *tls ) {
-
-	/* Enter data state */
-	tls->tx_state = TLS_TX_DATA;
-
-	/* Send notification of a window change */
-	xfer_window_changed ( &tls->plainstream );
-}
-
-/******************************************************************************
- *
- * Record handling
- *
- ******************************************************************************
- */
 
 /**
  * Transmit Handshake record
@@ -1025,15 +978,11 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
 		return -EINVAL;
 	}
 
-	/* Check that we are ready to send the Client Key Exchange */
-	if ( tls->tx_state != TLS_TX_NONE ) {
-		DBGC ( tls, "TLS %p received Server Hello Done while in "
-		       "TX state %d\n", tls, tls->tx_state );
-		return -EIO;
-	}
-
-	/* Start sending the Client Key Exchange */
-	tls_tx_start ( tls, TLS_TX_CLIENT_KEY_EXCHANGE );
+	/* Schedule Client Key Exchange, Change Cipher, and Finished */
+	tls->tx_pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
+			     TLS_TX_CHANGE_CIPHER |
+			     TLS_TX_FINISHED );
+	tls_tx_resume ( tls );
 
 	return 0;
 }
@@ -1050,9 +999,14 @@ static int tls_new_finished ( struct tls_session *tls,
 			      void *data, size_t len ) {
 
 	/* FIXME: Handle this properly */
-	tls_tx_data ( tls );
 	( void ) data;
 	( void ) len;
+
+	/* Mark session as ready to transmit plaintext data */
+	tls->tx_ready = 1;
+
+	/* Send notification of a window change */
+	xfer_window_changed ( &tls->plainstream );
 
 	return 0;
 }
@@ -1561,7 +1515,7 @@ static int tls_new_ciphertext ( struct tls_session *tls,
 static size_t tls_plainstream_window ( struct tls_session *tls ) {
 
 	/* Block window unless we are ready to accept data */
-	if ( tls->tx_state != TLS_TX_DATA )
+	if ( ! tls->tx_ready )
 		return 0;
 
 	return xfer_window ( &tls->cipherstream );
@@ -1581,7 +1535,7 @@ static int tls_plainstream_deliver ( struct tls_session *tls,
 	int rc;
 	
 	/* Refuse unless we are ready to accept data */
-	if ( tls->tx_state != TLS_TX_DATA ) {
+	if ( ! tls->tx_ready ) {
 		rc = -ENOTCONN;
 		goto done;
 	}
@@ -1757,29 +1711,24 @@ static void tls_tx_step ( struct tls_session *tls ) {
 	if ( ! xfer_window ( &tls->cipherstream ) )
 		return;
 
-	switch ( tls->tx_state ) {
-	case TLS_TX_NONE:
-		/* Nothing to do */
-		break;
-	case TLS_TX_CLIENT_HELLO:
+	/* Send first pending transmission */
+	if ( tls->tx_pending & TLS_TX_CLIENT_HELLO ) {
 		/* Send Client Hello */
 		if ( ( rc = tls_send_client_hello ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Client Hello: %s\n",
 			       tls, strerror ( rc ) );
 			goto err;
 		}
-		tls_tx_none ( tls );
-		break;
-	case TLS_TX_CLIENT_KEY_EXCHANGE:
+		tls->tx_pending &= ~TLS_TX_CLIENT_HELLO;
+	} else if ( tls->tx_pending & TLS_TX_CLIENT_KEY_EXCHANGE ) {
 		/* Send Client Key Exchange */
 		if ( ( rc = tls_send_client_key_exchange ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could send Client Key Exchange: "
 			       "%s\n", tls, strerror ( rc ) );
 			goto err;
 		}
-		tls_tx_start ( tls, TLS_TX_CHANGE_CIPHER );
-		break;
-	case TLS_TX_CHANGE_CIPHER:
+		tls->tx_pending &= ~TLS_TX_CLIENT_KEY_EXCHANGE;
+	} else if ( tls->tx_pending & TLS_TX_CHANGE_CIPHER ) {
 		/* Send Change Cipher, and then change the cipher in use */
 		if ( ( rc = tls_send_change_cipher ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Change Cipher: "
@@ -1794,23 +1743,20 @@ static void tls_tx_step ( struct tls_session *tls ) {
 			goto err;
 		}
 		tls->tx_seq = 0;
-		tls_tx_start ( tls, TLS_TX_FINISHED );
-		break;
-	case TLS_TX_FINISHED:
+		tls->tx_pending &= ~TLS_TX_CHANGE_CIPHER;
+	} else if ( tls->tx_pending & TLS_TX_FINISHED ) {
 		/* Send Finished */
 		if ( ( rc = tls_send_finished ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Finished: %s\n",
 			       tls, strerror ( rc ) );
 			goto err;
 		}
-		tls_tx_none ( tls );
-		break;
-	case TLS_TX_DATA:
-		/* Nothing to do */
-		break;
-	default:
-		assert ( 0 );
+		tls->tx_pending &= ~TLS_TX_FINISHED;
 	}
+
+	/* Reschedule process if pending transmissions remain */
+	if ( tls->tx_pending )
+		tls_tx_resume ( tls );
 
 	return;
 
@@ -1862,8 +1808,8 @@ int add_tls ( struct interface *xfer, const char *name,
 	}
 	digest_init ( &md5_algorithm, tls->handshake_md5_ctx );
 	digest_init ( &sha1_algorithm, tls->handshake_sha1_ctx );
-	process_init_stopped ( &tls->process, &tls_process_desc, &tls->refcnt );
-	tls_tx_start ( tls, TLS_TX_CLIENT_HELLO );
+	tls->tx_pending = TLS_TX_CLIENT_HELLO;
+	process_init ( &tls->process, &tls_process_desc, &tls->refcnt );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &tls->plainstream, xfer );
