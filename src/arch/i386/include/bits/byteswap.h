@@ -19,7 +19,7 @@ __bswap_variable_16 ( uint16_t x ) {
 
 static inline __attribute__ (( always_inline )) void
 __bswap_16s ( uint16_t *x ) {
-	__asm__ ( "rorw $8, %0" : "=g" ( *x ) : "0" ( *x ) );
+	__asm__ ( "rorw $8, %0" : "+m" ( *x ) );
 }
 
 static inline __attribute__ (( always_inline, const )) uint32_t
@@ -63,9 +63,8 @@ __bswap_64s ( uint64_t *x ) {
 		  "xchgl %2,%1\n\t"
 		  "bswapl %2\n\t"
 		  "movl %2,%0\n\t"
-		  : "=g" ( dwords->low ), "=g" ( dwords->high ),
-		    "=r" ( discard )
-		  : "0" ( dwords->low ), "1" ( dwords->high ) );
+		  : "+m" ( dwords->low ), "+m" ( dwords->high ),
+		    "=r" ( discard ) );
 }
 
 #endif /* _BITS_BYTESWAP_H */
