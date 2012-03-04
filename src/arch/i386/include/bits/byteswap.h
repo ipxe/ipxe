@@ -1,43 +1,67 @@
-#ifndef ETHERBOOT_BITS_BYTESWAP_H
-#define ETHERBOOT_BITS_BYTESWAP_H
+#ifndef _BITS_BYTESWAP_H
+#define _BITS_BYTESWAP_H
+
+/** @file
+ *
+ * Byte-order swapping functions
+ *
+ */
+
+#include <stdint.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-static inline __attribute__ ((always_inline, const)) uint16_t
-__bswap_variable_16(uint16_t x)
-{
-	__asm__("xchgb %b0,%h0\n\t"
-		: "=q" (x)
-		: "0" (x));
+static inline __attribute__ (( always_inline, const )) uint16_t
+__bswap_variable_16 ( uint16_t x ) {
+	__asm__ ( "xchgb %b0,%h0" : "=q" ( x ) : "0" ( x ) );
 	return x;
 }
 
-static inline __attribute__ ((always_inline, const)) uint32_t
-__bswap_variable_32(uint32_t x)
-{
-	__asm__("xchgb %b0,%h0\n\t"
-		"rorl $16,%0\n\t"
-		"xchgb %b0,%h0"
-		: "=q" (x)
-		: "0" (x));
+static inline __attribute__ (( always_inline )) void
+__bswap_16s ( uint16_t *x ) {
+	__asm__ ( "rorw $8, %0" : "=g" ( *x ) : "0" ( *x ) );
+}
+
+static inline __attribute__ (( always_inline, const )) uint32_t
+__bswap_variable_32 ( uint32_t x ) {
+	__asm__ ( "bswapl %0" : "=r" ( x ) : "0" ( x ) );
 	return x;
 }
 
-static inline __attribute__ ((always_inline, const)) uint64_t
-__bswap_variable_64(uint64_t x)
-{
-	union {
-		uint64_t qword;
-		uint32_t dword[2]; 
-	} u;
-
-	u.qword = x;
-	u.dword[0] = __bswap_variable_32(u.dword[0]);
-	u.dword[1] = __bswap_variable_32(u.dword[1]);
-	__asm__("xchgl %0,%1"
-		: "=r" ( u.dword[0] ), "=r" ( u.dword[1] )
-		: "0" ( u.dword[0] ), "1" ( u.dword[1] ) );
-	return u.qword;
+static inline __attribute__ (( always_inline )) void
+__bswap_32s ( uint32_t *x ) {
+	__asm__ ( "bswapl %0" : "=r" ( *x ) : "0" ( *x ) );
 }
 
-#endif /* ETHERBOOT_BITS_BYTESWAP_H */
+static inline __attribute__ (( always_inline, const )) uint64_t
+__bswap_variable_64 ( uint64_t x ) {
+	uint32_t in_high = ( x >> 32 );
+	uint32_t in_low = ( x & 0xffffffffUL );
+	uint32_t out_high;
+	uint32_t out_low;
+
+	__asm__ ( "bswapl %0\n\t"
+		  "bswapl %1\n\t"
+		  "xchgl %0,%1\n\t"
+		  : "=r" ( out_high ), "=r" ( out_low )
+		  : "0" ( in_high ), "1" ( in_low ) );
+
+	return ( ( ( ( uint64_t ) out_high ) << 32 ) |
+		 ( ( uint64_t ) out_low ) );
+}
+
+static inline __attribute__ (( always_inline )) void
+__bswap_64s ( uint64_t *x ) {
+	uint32_t __attribute__ (( may_alias )) *dwords = ( ( void * ) x );
+	uint32_t discard;
+
+	__asm__ ( "movl %0,%2\n\t"
+		  "bswapl %2\n\t"
+		  "xchgl %2,%1\n\t"
+		  "bswapl %2\n\t"
+		  "movl %2,%0\n\t"
+		  : "=g" ( dwords[0] ), "=g" ( dwords[1] ), "=r" ( discard )
+		  : "0" ( dwords[0] ), "1" ( dwords[1] ) );
+}
+
+#endif /* _BITS_BYTESWAP_H */
