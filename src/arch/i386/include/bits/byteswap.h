@@ -52,7 +52,10 @@ __bswap_variable_64 ( uint64_t x ) {
 
 static inline __attribute__ (( always_inline )) void
 __bswap_64s ( uint64_t *x ) {
-	uint32_t __attribute__ (( may_alias )) *dwords = ( ( void * ) x );
+	struct {
+		uint32_t low;
+		uint32_t high;
+	} __attribute__ (( may_alias )) *dwords = ( ( void * ) x );
 	uint32_t discard;
 
 	__asm__ ( "movl %0,%2\n\t"
@@ -60,8 +63,9 @@ __bswap_64s ( uint64_t *x ) {
 		  "xchgl %2,%1\n\t"
 		  "bswapl %2\n\t"
 		  "movl %2,%0\n\t"
-		  : "=g" ( dwords[0] ), "=g" ( dwords[1] ), "=r" ( discard )
-		  : "0" ( dwords[0] ), "1" ( dwords[1] ) );
+		  : "=g" ( dwords->low ), "=g" ( dwords->high ),
+		    "=r" ( discard )
+		  : "0" ( dwords->low ), "1" ( dwords->high ) );
 }
 
 #endif /* _BITS_BYTESWAP_H */
