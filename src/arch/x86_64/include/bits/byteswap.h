@@ -19,7 +19,7 @@ __bswap_variable_16 ( uint16_t x ) {
 
 static inline __attribute__ (( always_inline )) void
 __bswap_16s ( uint16_t *x ) {
-	__asm__ ( "rorw $8, %0" : "=g" ( *x ) : "0" ( *x ) );
+	__asm__ ( "rorw $8, %0" : "+m" ( *x ) );
 }
 
 static inline __attribute__ (( always_inline, const )) uint32_t
