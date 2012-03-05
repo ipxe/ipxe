@@ -346,9 +346,9 @@ static void tls_generate_master_secret ( struct tls_session *tls ) {
 static int tls_generate_keys ( struct tls_session *tls ) {
 	struct tls_cipherspec *tx_cipherspec = &tls->tx_cipherspec_pending;
 	struct tls_cipherspec *rx_cipherspec = &tls->rx_cipherspec_pending;
-	size_t hash_size = tx_cipherspec->digest->digestsize;
-	size_t key_size = tx_cipherspec->key_len;
-	size_t iv_size = tx_cipherspec->cipher->blocksize;
+	size_t hash_size = tx_cipherspec->suite->digest->digestsize;
+	size_t key_size = tx_cipherspec->suite->key_len;
+	size_t iv_size = tx_cipherspec->suite->cipher->blocksize;
 	size_t total = ( 2 * ( hash_size + key_size + iv_size ) );
 	uint8_t key_block[total];
 	uint8_t *key;
@@ -376,7 +376,7 @@ static int tls_generate_keys ( struct tls_session *tls ) {
 	key += hash_size;
 
 	/* TX key */
-	if ( ( rc = cipher_setkey ( tx_cipherspec->cipher,
+	if ( ( rc = cipher_setkey ( tx_cipherspec->suite->cipher,
 				    tx_cipherspec->cipher_ctx,
 				    key, key_size ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not set TX key: %s\n",
@@ -388,7 +388,7 @@ static int tls_generate_keys ( struct tls_session *tls ) {
 	key += key_size;
 
 	/* RX key */
-	if ( ( rc = cipher_setkey ( rx_cipherspec->cipher,
+	if ( ( rc = cipher_setkey ( rx_cipherspec->suite->cipher,
 				    rx_cipherspec->cipher_ctx,
 				    key, key_size ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not set TX key: %s\n",
@@ -400,13 +400,15 @@ static int tls_generate_keys ( struct tls_session *tls ) {
 	key += key_size;
 
 	/* TX initialisation vector */
-	cipher_setiv ( tx_cipherspec->cipher, tx_cipherspec->cipher_ctx, key );
+	cipher_setiv ( tx_cipherspec->suite->cipher,
+		       tx_cipherspec->cipher_ctx, key );
 	DBGC ( tls, "TLS %p TX IV:\n", tls );
 	DBGC_HD ( tls, key, iv_size );
 	key += iv_size;
 
 	/* RX initialisation vector */
-	cipher_setiv ( rx_cipherspec->cipher, rx_cipherspec->cipher_ctx, key );
+	cipher_setiv ( rx_cipherspec->suite->cipher,
+		       rx_cipherspec->cipher_ctx, key );
 	DBGC ( tls, "TLS %p RX IV:\n", tls );
 	DBGC_HD ( tls, key, iv_size );
 	key += iv_size;
@@ -423,6 +425,70 @@ static int tls_generate_keys ( struct tls_session *tls ) {
  ******************************************************************************
  */
 
+/** Null cipher suite */
+struct tls_cipher_suite tls_cipher_suite_null = {
+	.pubkey = &pubkey_null,
+	.cipher = &cipher_null,
+	.digest = &digest_null,
+};
+
+/** Supported cipher suites, in order of preference */
+struct tls_cipher_suite tls_cipher_suites[] = {
+	{
+		.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 ),
+		.key_len = ( 256 / 8 ),
+		.pubkey = &pubkey_null, /* FIXME */
+		.cipher = &aes_cbc_algorithm,
+		.digest = &sha256_algorithm,
+	},
+	{
+		.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 ),
+		.key_len = ( 128 / 8 ),
+		.pubkey = &pubkey_null, /* FIXME */
+		.cipher = &aes_cbc_algorithm,
+		.digest = &sha256_algorithm,
+	},
+	{
+		.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA ),
+		.key_len = ( 256 / 8 ),
+		.pubkey = &pubkey_null, /* FIXME */
+		.cipher = &aes_cbc_algorithm,
+		.digest = &sha1_algorithm,
+	},
+	{
+		.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA ),
+		.key_len = ( 128 / 8 ),
+		.pubkey = &pubkey_null, /* FIXME */
+		.cipher = &aes_cbc_algorithm,
+		.digest = &sha1_algorithm,
+	},
+};
+
+/** Number of supported cipher suites */
+#define TLS_NUM_CIPHER_SUITES \
+	( sizeof ( tls_cipher_suites ) / sizeof ( tls_cipher_suites[0] ) )
+
+/**
+ * Identify cipher suite
+ *
+ * @v cipher_suite	Cipher suite specification
+ * @ret suite		Cipher suite, or NULL
+ */
+static struct tls_cipher_suite *
+tls_find_cipher_suite ( unsigned int cipher_suite ) {
+	struct tls_cipher_suite *suite;
+	unsigned int i;
+
+	/* Identify cipher suite */
+	for ( i = 0 ; i < TLS_NUM_CIPHER_SUITES ; i++ ) {
+		suite = &tls_cipher_suites[i];
+		if ( suite->code == cipher_suite )
+			return suite;
+	}
+
+	return NULL;
+}
+
 /**
  * Clear cipher suite
  *
@@ -432,9 +498,7 @@ static void tls_clear_cipher ( struct tls_session *tls __unused,
 			       struct tls_cipherspec *cipherspec ) {
 	free ( cipherspec->dynamic );
 	memset ( cipherspec, 0, sizeof ( cipherspec ) );
-	cipherspec->pubkey = &pubkey_null;
-	cipherspec->cipher = &cipher_null;
-	cipherspec->digest = &digest_null;
+	cipherspec->suite = &tls_cipher_suite_null;
 }
 
 /**
@@ -442,18 +506,15 @@ static void tls_clear_cipher ( struct tls_session *tls __unused,
  *
  * @v tls		TLS session
  * @v cipherspec	TLS cipher specification
- * @v pubkey		Public-key encryption elgorithm
- * @v cipher		Bulk encryption cipher algorithm
- * @v digest		MAC digest algorithm
- * @v key_len		Key length
+ * @v suite		Cipher suite
  * @ret rc		Return status code
  */
 static int tls_set_cipher ( struct tls_session *tls,
 			    struct tls_cipherspec *cipherspec,
-			    struct pubkey_algorithm *pubkey,
-			    struct cipher_algorithm *cipher,
-			    struct digest_algorithm *digest,
-			    size_t key_len ) {
+			    struct tls_cipher_suite *suite ) {
+	struct pubkey_algorithm *pubkey = suite->pubkey;
+	struct cipher_algorithm *cipher = suite->cipher;
+	struct digest_algorithm *digest = suite->digest;
 	size_t total;
 	void *dynamic;
 
@@ -479,10 +540,7 @@ static int tls_set_cipher ( struct tls_session *tls,
 	assert ( ( cipherspec->dynamic + total ) == dynamic );
 
 	/* Store parameters */
-	cipherspec->pubkey = pubkey;
-	cipherspec->cipher = cipher;
-	cipherspec->digest = digest;
-	cipherspec->key_len = key_len;
+	cipherspec->suite = suite;
 
 	return 0;
 }
@@ -496,49 +554,28 @@ static int tls_set_cipher ( struct tls_session *tls,
  */
 static int tls_select_cipher ( struct tls_session *tls,
 			       unsigned int cipher_suite ) {
-	struct pubkey_algorithm *pubkey = &pubkey_null;
-	struct cipher_algorithm *cipher = &cipher_null;
-	struct digest_algorithm *digest = &digest_null;
-	unsigned int key_len = 0;
+	struct tls_cipher_suite *suite;
 	int rc;
 
-	switch ( cipher_suite ) {
-	case htons ( TLS_RSA_WITH_AES_128_CBC_SHA ):
-		key_len = ( 128 / 8 );
-		cipher = &aes_cbc_algorithm;
-		digest = &sha1_algorithm;
-		break;
-	case htons ( TLS_RSA_WITH_AES_256_CBC_SHA ):
-		key_len = ( 256 / 8 );
-		cipher = &aes_cbc_algorithm;
-		digest = &sha1_algorithm;
-		break;
-	case htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 ):
-		key_len = ( 128 / 8 );
-		cipher = &aes_cbc_algorithm;
-		digest = &sha256_algorithm;
-		break;
-	case htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 ):
-		key_len = ( 256 / 8 );
-		cipher = &aes_cbc_algorithm;
-		digest = &sha256_algorithm;
-		break;
-	default:
+	/* Identify cipher suite */
+	suite = tls_find_cipher_suite ( cipher_suite );
+	if ( ! suite ) {
 		DBGC ( tls, "TLS %p does not support cipher %04x\n",
 		       tls, ntohs ( cipher_suite ) );
 		return -ENOTSUP;
 	}
 
 	/* Set ciphers */
-	if ( ( rc = tls_set_cipher ( tls, &tls->tx_cipherspec_pending, pubkey,
-				     cipher, digest, key_len ) ) != 0 )
+	if ( ( rc = tls_set_cipher ( tls, &tls->tx_cipherspec_pending,
+				     suite ) ) != 0 )
 		return rc;
-	if ( ( rc = tls_set_cipher ( tls, &tls->rx_cipherspec_pending, pubkey,
-				     cipher, digest, key_len ) ) != 0 )
+	if ( ( rc = tls_set_cipher ( tls, &tls->rx_cipherspec_pending,
+				     suite ) ) != 0 )
 		return rc;
 
-	DBGC ( tls, "TLS %p selected %s-%s-%d-%s\n", tls,
-	       pubkey->name, cipher->name, ( key_len * 8 ), digest->name );
+	DBGC ( tls, "TLS %p selected %s-%s-%d-%s\n", tls, suite->pubkey->name,
+	       suite->cipher->name, ( suite->key_len * 8 ),
+	       suite->digest->name );
 
 	return 0;
 }
@@ -556,10 +593,7 @@ static int tls_change_cipher ( struct tls_session *tls,
 			       struct tls_cipherspec *active ) {
 
 	/* Sanity check */
-	if ( /* FIXME (when pubkey is not hard-coded to RSA):
-	      * ( pending->pubkey == &pubkey_null ) || */
-	     ( pending->cipher == &cipher_null ) ||
-	     ( pending->digest == &digest_null ) ) {
+	if ( pending->suite == &tls_cipher_suite_null ) {
 		DBGC ( tls, "TLS %p refusing to use null cipher\n", tls );
 		return -ENOTSUP;
 	}
@@ -687,7 +721,7 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 		uint8_t random[32];
 		uint8_t session_id_len;
 		uint16_t cipher_suite_len;
-		uint16_t cipher_suites[4];
+		uint16_t cipher_suites[TLS_NUM_CIPHER_SUITES];
 		uint8_t compression_methods_len;
 		uint8_t compression_methods[1];
 		uint16_t extensions_len;
@@ -704,6 +738,7 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 			} __attribute__ (( packed )) server_name;
 		} __attribute__ (( packed )) extensions;
 	} __attribute__ (( packed )) hello;
+	unsigned int i;
 
 	memset ( &hello, 0, sizeof ( hello ) );
 	hello.type_length = ( cpu_to_le32 ( TLS_CLIENT_HELLO ) |
@@ -712,10 +747,8 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 	hello.version = htons ( tls->version );
 	memcpy ( &hello.random, &tls->client_random, sizeof ( hello.random ) );
 	hello.cipher_suite_len = htons ( sizeof ( hello.cipher_suites ) );
-	hello.cipher_suites[0] = htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 );
-	hello.cipher_suites[1] = htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 );
-	hello.cipher_suites[2] = htons ( TLS_RSA_WITH_AES_256_CBC_SHA );
-	hello.cipher_suites[3] = htons ( TLS_RSA_WITH_AES_128_CBC_SHA );
+	for ( i = 0 ; i < TLS_NUM_CIPHER_SUITES ; i++ )
+		hello.cipher_suites[i] = tls_cipher_suites[i].code;
 	hello.compression_methods_len = sizeof ( hello.compression_methods );
 	hello.extensions_len = htons ( sizeof ( hello.extensions ) );
 	hello.extensions.server_name_type = htons ( TLS_SERVER_NAME );
@@ -1252,7 +1285,7 @@ static void tls_hmac ( struct tls_session *tls __unused,
 		       struct tls_cipherspec *cipherspec,
 		       uint64_t seq, struct tls_header *tlshdr,
 		       const void *data, size_t len, void *hmac ) {
-	struct digest_algorithm *digest = cipherspec->digest;
+	struct digest_algorithm *digest = cipherspec->suite->digest;
 	uint8_t digest_ctx[digest->ctxsize];
 
 	hmac_init ( digest, digest_ctx, cipherspec->mac_secret,
@@ -1278,7 +1311,7 @@ static void tls_hmac ( struct tls_session *tls __unused,
 static void * __malloc tls_assemble_stream ( struct tls_session *tls,
 				    const void *data, size_t len,
 				    void *digest, size_t *plaintext_len ) {
-	size_t mac_len = tls->tx_cipherspec.digest->digestsize;
+	size_t mac_len = tls->tx_cipherspec.suite->digest->digestsize;
 	void *plaintext;
 	void *content;
 	void *mac;
@@ -1313,8 +1346,8 @@ static void * __malloc tls_assemble_stream ( struct tls_session *tls,
 static void * tls_assemble_block ( struct tls_session *tls,
 				   const void *data, size_t len,
 				   void *digest, size_t *plaintext_len ) {
-	size_t blocksize = tls->tx_cipherspec.cipher->blocksize;
-	size_t mac_len = tls->tx_cipherspec.digest->digestsize;
+	size_t blocksize = tls->tx_cipherspec.suite->cipher->blocksize;
+	size_t mac_len = tls->tx_cipherspec.suite->digest->digestsize;
 	size_t iv_len;
 	size_t padding_len;
 	void *plaintext;
@@ -1362,11 +1395,12 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 	struct tls_header plaintext_tlshdr;
 	struct tls_header *tlshdr;
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec;
+	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
 	void *plaintext = NULL;
 	size_t plaintext_len;
 	struct io_buffer *ciphertext = NULL;
 	size_t ciphertext_len;
-	size_t mac_len = cipherspec->digest->digestsize;
+	size_t mac_len = cipherspec->suite->digest->digestsize;
 	uint8_t mac[mac_len];
 	int rc;
 
@@ -1380,7 +1414,7 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 		   data, len, mac );
 
 	/* Allocate and assemble plaintext struct */
-	if ( is_stream_cipher ( cipherspec->cipher ) ) {
+	if ( is_stream_cipher ( cipher ) ) {
 		plaintext = tls_assemble_stream ( tls, data, len, mac,
 						  &plaintext_len );
 	} else {
@@ -1413,10 +1447,9 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 	tlshdr->version = htons ( tls->version );
 	tlshdr->length = htons ( plaintext_len );
 	memcpy ( cipherspec->cipher_next_ctx, cipherspec->cipher_ctx,
-		 cipherspec->cipher->ctxsize );
-	cipher_encrypt ( cipherspec->cipher, cipherspec->cipher_next_ctx,
-			 plaintext, iob_put ( ciphertext, plaintext_len ),
-			 plaintext_len );
+		 cipher->ctxsize );
+	cipher_encrypt ( cipher, cipherspec->cipher_next_ctx, plaintext,
+			 iob_put ( ciphertext, plaintext_len ), plaintext_len );
 
 	/* Free plaintext as soon as possible to conserve memory */
 	free ( plaintext );
@@ -1433,8 +1466,7 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 	/* Update TX state machine to next record */
 	tls->tx_seq += 1;
 	memcpy ( tls->tx_cipherspec.cipher_ctx,
-		 tls->tx_cipherspec.cipher_next_ctx,
-		 tls->tx_cipherspec.cipher->ctxsize );
+		 tls->tx_cipherspec.cipher_next_ctx, cipher->ctxsize );
 
  done:
 	free ( plaintext );
@@ -1462,7 +1494,7 @@ static int tls_split_stream ( struct tls_session *tls,
 	size_t mac_len;
 
 	/* Decompose stream-ciphered data */
-	mac_len = tls->rx_cipherspec.digest->digestsize;
+	mac_len = tls->rx_cipherspec.suite->digest->digestsize;
 	if ( plaintext_len < mac_len ) {
 		DBGC ( tls, "TLS %p received underlength record\n", tls );
 		DBGC_HD ( tls, plaintext, plaintext_len );
@@ -1514,10 +1546,10 @@ static int tls_split_block ( struct tls_session *tls,
 
 	/* TLSv1.1 and later use an explicit IV */
 	iv_len = ( ( tls->version >= TLS_VERSION_TLS_1_1 ) ?
-		   tls->rx_cipherspec.cipher->blocksize : 0 );
+		   tls->rx_cipherspec.suite->cipher->blocksize : 0 );
 
 	/* Decompose block-ciphered data */
-	mac_len = tls->rx_cipherspec.digest->digestsize;
+	mac_len = tls->rx_cipherspec.suite->digest->digestsize;
 	padding_len = *( ( uint8_t * ) ( plaintext + plaintext_len - 1 ) );
 	if ( plaintext_len < ( iv_len + mac_len + padding_len + 1 ) ) {
 		DBGC ( tls, "TLS %p received underlength record\n", tls );
@@ -1559,12 +1591,13 @@ static int tls_new_ciphertext ( struct tls_session *tls,
 				struct tls_header *tlshdr, void *ciphertext ) {
 	struct tls_header plaintext_tlshdr;
 	struct tls_cipherspec *cipherspec = &tls->rx_cipherspec;
+	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
 	size_t record_len = ntohs ( tlshdr->length );
 	void *plaintext = NULL;
 	void *data;
 	size_t len;
 	void *mac;
-	size_t mac_len = cipherspec->digest->digestsize;
+	size_t mac_len = cipherspec->suite->digest->digestsize;
 	uint8_t verify_mac[mac_len];
 	int rc;
 
@@ -1578,11 +1611,11 @@ static int tls_new_ciphertext ( struct tls_session *tls,
 	}
 
 	/* Decrypt the record */
-	cipher_decrypt ( cipherspec->cipher, cipherspec->cipher_ctx,
+	cipher_decrypt ( cipher, cipherspec->cipher_ctx,
 			 ciphertext, plaintext, record_len );
 
 	/* Split record into content and MAC */
-	if ( is_stream_cipher ( cipherspec->cipher ) ) {
+	if ( is_stream_cipher ( cipher ) ) {
 		if ( ( rc = tls_split_stream ( tls, plaintext, record_len,
 					       &data, &len, &mac ) ) != 0 )
 			goto done;

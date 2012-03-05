@@ -99,8 +99,8 @@ enum tls_tx_pending {
 	TLS_TX_FINISHED = 0x0010,
 };
 
-/** A TLS cipher specification */
-struct tls_cipherspec {
+/** A TLS cipher suite */
+struct tls_cipher_suite {
 	/** Public-key encryption algorithm */
 	struct pubkey_algorithm *pubkey;
 	/** Bulk encryption cipher algorithm */
@@ -108,7 +108,15 @@ struct tls_cipherspec {
 	/** MAC digest algorithm */
 	struct digest_algorithm *digest;
 	/** Key length */
-	size_t key_len;
+	uint16_t key_len;
+	/** Numeric code (in network-endian order) */
+	uint16_t code;
+};
+
+/** A TLS cipher specification */
+struct tls_cipherspec {
+	/** Cipher suite */
+	struct tls_cipher_suite *suite;
 	/** Dynamically-allocated storage */
 	void *dynamic;
 	/** Public key encryption context */
