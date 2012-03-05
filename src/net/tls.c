@@ -513,6 +513,16 @@ static int tls_select_cipher ( struct tls_session *tls,
 		cipher = &aes_cbc_algorithm;
 		digest = &sha1_algorithm;
 		break;
+	case htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 ):
+		key_len = ( 128 / 8 );
+		cipher = &aes_cbc_algorithm;
+		digest = &sha256_algorithm;
+		break;
+	case htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 ):
+		key_len = ( 256 / 8 );
+		cipher = &aes_cbc_algorithm;
+		digest = &sha256_algorithm;
+		break;
 	default:
 		DBGC ( tls, "TLS %p does not support cipher %04x\n",
 		       tls, ntohs ( cipher_suite ) );
@@ -677,7 +687,7 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 		uint8_t random[32];
 		uint8_t session_id_len;
 		uint16_t cipher_suite_len;
-		uint16_t cipher_suites[2];
+		uint16_t cipher_suites[4];
 		uint8_t compression_methods_len;
 		uint8_t compression_methods[1];
 		uint16_t extensions_len;
@@ -702,8 +712,10 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 	hello.version = htons ( tls->version );
 	memcpy ( &hello.random, &tls->client_random, sizeof ( hello.random ) );
 	hello.cipher_suite_len = htons ( sizeof ( hello.cipher_suites ) );
-	hello.cipher_suites[0] = htons ( TLS_RSA_WITH_AES_128_CBC_SHA );
-	hello.cipher_suites[1] = htons ( TLS_RSA_WITH_AES_256_CBC_SHA );
+	hello.cipher_suites[0] = htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 );
+	hello.cipher_suites[1] = htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 );
+	hello.cipher_suites[2] = htons ( TLS_RSA_WITH_AES_256_CBC_SHA );
+	hello.cipher_suites[3] = htons ( TLS_RSA_WITH_AES_128_CBC_SHA );
 	hello.compression_methods_len = sizeof ( hello.compression_methods );
 	hello.extensions_len = htons ( sizeof ( hello.extensions ) );
 	hello.extensions.server_name_type = htons ( TLS_SERVER_NAME );

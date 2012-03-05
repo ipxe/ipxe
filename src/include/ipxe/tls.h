@@ -77,6 +77,8 @@ struct tls_header {
 #define TLS_RSA_WITH_NULL_SHA 0x0002
 #define TLS_RSA_WITH_AES_128_CBC_SHA 0x002f
 #define TLS_RSA_WITH_AES_256_CBC_SHA 0x0035
+#define TLS_RSA_WITH_AES_128_CBC_SHA256 0x003c
+#define TLS_RSA_WITH_AES_256_CBC_SHA256 0x003d
 
 /* TLS extension types */
 #define TLS_SERVER_NAME 0
