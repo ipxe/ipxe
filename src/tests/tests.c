@@ -28,5 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 REQUIRE_OBJECT ( list_test );
 REQUIRE_OBJECT ( byteswap_test );
 REQUIRE_OBJECT ( sha1_test );
+REQUIRE_OBJECT ( sha256_test );
 REQUIRE_OBJECT ( hmac_drbg_test );
 REQUIRE_OBJECT ( hash_df_test );
