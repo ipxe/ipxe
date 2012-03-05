@@ -14,7 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <ipxe/api.h>
 #include <ipxe/hash_df.h>
-#include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
 #include <config/entropy.h>
 
 /**
@@ -100,14 +100,14 @@ int get_noise ( noise_sample_t *noise );
 extern int get_entropy_input_tmp ( unsigned int num_samples,
 				   uint8_t *tmp, size_t tmp_len );
 
-/** Use SHA-1 as the underlying hash algorithm for Hash_df
+/** Use SHA-256 as the underlying hash algorithm for Hash_df
  *
- * Hash_df using SHA-1 is an Approved algorithm in ANS X9.82.
+ * Hash_df using SHA-256 is an Approved algorithm in ANS X9.82.
  */
-#define entropy_hash_df_algorithm sha1_algorithm
+#define entropy_hash_df_algorithm sha256_algorithm
 
 /** Underlying hash algorithm output length (in bytes) */
-#define ENTROPY_HASH_DF_OUTLEN_BYTES SHA1_DIGEST_SIZE
+#define ENTROPY_HASH_DF_OUTLEN_BYTES SHA256_DIGEST_SIZE
 
 /**
  * Obtain entropy input
@@ -165,6 +165,13 @@ get_entropy_input ( unsigned int min_entropy_bits, void *data, size_t min_len,
 	 */
 	linker_assert ( __builtin_constant_p ( num_samples ),
 			num_samples_not_constant );
+
+	/* (Unnumbered).  The output length of the hash function shall
+	 * meet or exceed the security strength indicated by the
+	 * min_entropy parameter.
+	 */
+	linker_assert ( ( ( 8 * ENTROPY_HASH_DF_OUTLEN_BYTES ) >=
+			  min_entropy_bits ), hash_df_algorithm_too_weak );
 
 	/* 1.  If ( min_length > max_length ), then return ( FAILURE, Null ) */
 	linker_assert ( ( min_len <= max_len ), min_len_greater_than_max_len );
