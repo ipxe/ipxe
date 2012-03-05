@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/hmac.h>
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
 #include <ipxe/aes.h>
 #include <ipxe/rsa.h>
 #include <ipxe/iobuf.h>
@@ -247,32 +248,40 @@ static void tls_prf ( struct tls_session *tls, void *secret, size_t secret_len,
 	size_t subsecret_len;
 	void *md5_secret;
 	void *sha1_secret;
-	uint8_t out_md5[out_len];
-	uint8_t out_sha1[out_len];
+	uint8_t buf[out_len];
 	unsigned int i;
 
 	va_start ( seeds, out_len );
 
-	/* Split secret into two, with an overlap of up to one byte */
-	subsecret_len = ( ( secret_len + 1 ) / 2 );
-	md5_secret = secret;
-	sha1_secret = ( secret + secret_len - subsecret_len );
+	if ( tls->version >= TLS_VERSION_TLS_1_2 ) {
+		/* Use P_SHA256 for TLSv1.2 and later */
+		tls_p_hash_va ( tls, &sha256_algorithm, secret, secret_len,
+				out, out_len, seeds );
+	} else {
+		/* Use combination of P_MD5 and P_SHA-1 for TLSv1.1
+		 * and earlier
+		 */
 
-	/* Calculate MD5 portion */
-	va_copy ( tmp, seeds );
-	tls_p_hash_va ( tls, &md5_algorithm, md5_secret, subsecret_len,
-			out_md5, out_len, seeds );
-	va_end ( tmp );
+		/* Split secret into two, with an overlap of up to one byte */
+		subsecret_len = ( ( secret_len + 1 ) / 2 );
+		md5_secret = secret;
+		sha1_secret = ( secret + secret_len - subsecret_len );
 
-	/* Calculate SHA1 portion */
-	va_copy ( tmp, seeds );
-	tls_p_hash_va ( tls, &sha1_algorithm, sha1_secret, subsecret_len,
-			out_sha1, out_len, seeds );
-	va_end ( tmp );
+		/* Calculate MD5 portion */
+		va_copy ( tmp, seeds );
+		tls_p_hash_va ( tls, &md5_algorithm, md5_secret,
+				subsecret_len, out, out_len, seeds );
+		va_end ( tmp );
 
-	/* XOR the two portions together into the final output buffer */
-	for ( i = 0 ; i < out_len ; i++ ) {
-		*( ( uint8_t * ) out + i ) = ( out_md5[i] ^ out_sha1[i] );
+		/* Calculate SHA1 portion */
+		va_copy ( tmp, seeds );
+		tls_p_hash_va ( tls, &sha1_algorithm, sha1_secret,
+				subsecret_len, buf, out_len, seeds );
+		va_end ( tmp );
+
+		/* XOR the two portions together into the final output buffer */
+		for ( i = 0 ; i < out_len ; i++ )
+			*( ( uint8_t * ) out + i ) ^= buf[i];
 	}
 
 	va_end ( seeds );
@@ -569,6 +578,24 @@ static void tls_add_handshake ( struct tls_session *tls,
 
 	digest_update ( &md5_algorithm, tls->handshake_md5_ctx, data, len );
 	digest_update ( &sha1_algorithm, tls->handshake_sha1_ctx, data, len );
+	digest_update ( &sha256_algorithm, tls->handshake_sha256_ctx,
+			data, len );
+}
+
+/**
+ * Size of handshake output buffer
+ *
+ * @v tls		TLS session
+ */
+static size_t tls_verify_handshake_len ( struct tls_session *tls ) {
+
+	if ( tls->version >= TLS_VERSION_TLS_1_2 ) {
+		/* Use SHA-256 for TLSv1.2 and later */
+		return SHA256_DIGEST_SIZE;
+	} else {
+		/* Use MD5+SHA1 for TLSv1.1 and earlier */
+		return ( MD5_DIGEST_SIZE + SHA1_DIGEST_SIZE );
+	}
 }
 
 /**
@@ -577,21 +604,30 @@ static void tls_add_handshake ( struct tls_session *tls,
  * @v tls		TLS session
  * @v out		Output buffer
  *
- * Calculates the MD5+SHA1 digest over all handshake messages seen so
- * far.
+ * Calculates the MD5+SHA1 or SHA256 digest over all handshake
+ * messages seen so far.
  */
 static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
-	struct digest_algorithm *md5 = &md5_algorithm;
-	struct digest_algorithm *sha1 = &sha1_algorithm;
-	uint8_t md5_ctx[md5->ctxsize];
-	uint8_t sha1_ctx[sha1->ctxsize];
-	void *md5_digest = out;
-	void *sha1_digest = ( out + md5->digestsize );
+	union {
+		uint8_t md5[MD5_CTX_SIZE];
+		uint8_t sha1[SHA1_CTX_SIZE];
+		uint8_t sha256[SHA256_CTX_SIZE];
+	} ctx;
 
-	memcpy ( md5_ctx, tls->handshake_md5_ctx, sizeof ( md5_ctx ) );
-	memcpy ( sha1_ctx, tls->handshake_sha1_ctx, sizeof ( sha1_ctx ) );
-	digest_final ( md5, md5_ctx, md5_digest );
-	digest_final ( sha1, sha1_ctx, sha1_digest );
+	if ( tls->version >= TLS_VERSION_TLS_1_2 ) {
+		/* Use SHA-256 for TLSv1.2 and later */
+		memcpy ( ctx.sha256, tls->handshake_sha256_ctx,
+			 sizeof ( ctx.sha256 ) );
+		digest_final ( &sha256_algorithm, ctx.sha256, out );
+	} else {
+		/* Use MD5+SHA1 for TLSv1.1 and earlier */
+		memcpy ( ctx.md5, tls->handshake_md5_ctx, sizeof ( ctx.md5 ) );
+		digest_final ( &md5_algorithm, ctx.md5, out );
+		memcpy ( ctx.sha1, tls->handshake_sha1_ctx,
+			 sizeof ( ctx.sha1 ) );
+		digest_final ( &sha1_algorithm, ctx.sha1,
+			       ( out + MD5_DIGEST_SIZE ) );
+	}
 }
 
 /******************************************************************************
@@ -770,7 +806,7 @@ static int tls_send_finished ( struct tls_session *tls ) {
 		uint32_t type_length;
 		uint8_t verify_data[12];
 	} __attribute__ (( packed )) finished;
-	uint8_t digest[MD5_DIGEST_SIZE + SHA1_DIGEST_SIZE];
+	uint8_t digest[ tls_verify_handshake_len ( tls ) ];
 
 	memset ( &finished, 0, sizeof ( finished ) );
 	finished.type_length = ( cpu_to_le32 ( TLS_FINISHED ) |
@@ -1047,7 +1083,7 @@ static int tls_new_finished ( struct tls_session *tls,
 		char next[0];
 	} __attribute__ (( packed )) *finished = data;
 	void *end = finished->next;
-	uint8_t digest[MD5_DIGEST_SIZE + SHA1_DIGEST_SIZE];
+	uint8_t digest[ tls_verify_handshake_len ( tls ) ];
 	uint8_t verify_data[ sizeof ( finished->verify_data ) ];
 
 	/* Sanity check */
@@ -1869,7 +1905,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->name = name;
 	intf_init ( &tls->plainstream, &tls_plainstream_desc, &tls->refcnt );
 	intf_init ( &tls->cipherstream, &tls_cipherstream_desc, &tls->refcnt );
-	tls->version = TLS_VERSION_TLS_1_1;
+	tls->version = TLS_VERSION_TLS_1_2;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
@@ -1886,6 +1922,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	}
 	digest_init ( &md5_algorithm, tls->handshake_md5_ctx );
 	digest_init ( &sha1_algorithm, tls->handshake_sha1_ctx );
+	digest_init ( &sha256_algorithm, tls->handshake_sha256_ctx );
 	tls->tx_pending = TLS_TX_CLIENT_HELLO;
 	process_init ( &tls->process, &tls_process_desc, &tls->refcnt );
 

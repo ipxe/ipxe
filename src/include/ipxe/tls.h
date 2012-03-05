@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
 #include <ipxe/x509.h>
 
 /** A TLS header */
@@ -39,6 +40,9 @@ struct tls_header {
 
 /** TLS version 1.1 */
 #define TLS_VERSION_TLS_1_1 0x0302
+
+/** TLS version 1.2 */
+#define TLS_VERSION_TLS_1_2 0x0303
 
 /** Change cipher content type */
 #define TLS_TYPE_CHANGE_CIPHER 20
@@ -165,6 +169,8 @@ struct tls_session {
 	uint8_t handshake_md5_ctx[MD5_CTX_SIZE];
 	/** SHA1 context for handshake verification */
 	uint8_t handshake_sha1_ctx[SHA1_CTX_SIZE];
+	/** SHA256 context for handshake verification */
+	uint8_t handshake_sha256_ctx[SHA256_CTX_SIZE];
 
 	/** Hack: server RSA public key */
 	struct x509_rsa_public_key rsa;
