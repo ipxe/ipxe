@@ -454,7 +454,8 @@ int get_entropy_input_tmp ( unsigned int num_samples, uint8_t *tmp,
 		/* 5.4.  tmp = tmp XOR
 		 *             df ( ( nonce || entropy_bitstring ), n )
 		 */
-		hash_df ( &data, sizeof ( data ), df_buf, sizeof ( df_buf ) );
+		hash_df ( &entropy_hash_df_algorithm, &data, sizeof ( data ),
+			  df_buf, sizeof ( df_buf ) );
 		for ( i = 0 ; i < tmp_len ; i++ )
 			tmp[i] ^= df_buf[i];
 

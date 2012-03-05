@@ -45,6 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Distribute entropy throughout a buffer
  *
+ * @v hash		Underlying hash algorithm
  * @v input		Input data
  * @v input_len		Length of input data, in bytes
  * @v output		Output buffer
@@ -63,10 +64,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * There is no way for the Hash_df function to fail.  The returned
  * status SUCCESS is implicit.
  */
-void hash_df ( const void *input, size_t input_len, void *output,
-	      size_t output_len ) {
-	uint8_t context[HASH_DF_CTX_SIZE];
-	uint8_t digest[HASH_DF_OUTLEN_BYTES];
+void hash_df ( struct digest_algorithm *hash, const void *input,
+	       size_t input_len, void *output, size_t output_len ) {
+	uint8_t context[hash->ctxsize];
+	uint8_t digest[hash->digestsize];
 	size_t frag_len;
 	struct {
 		uint8_t pad[3];
@@ -106,12 +107,12 @@ void hash_df ( const void *input, size_t input_len, void *output,
 		 *                            || input_string )
 		 */
 		prefix.no_of_bits_to_return = htonl ( output_len * 8 );
-		digest_init ( &hash_df_algorithm, context );
-		digest_update ( &hash_df_algorithm, context, &prefix.counter,
+		digest_init ( hash, context );
+		digest_update ( hash, context, &prefix.counter,
 				( sizeof ( prefix ) -
 				  offsetof ( typeof ( prefix ), counter ) ) );
-		digest_update ( &hash_df_algorithm, context, input, input_len );
-		digest_final ( &hash_df_algorithm, context, digest );
+		digest_update ( hash, context, input, input_len );
+		digest_final ( hash, context, digest );
 
 		/* 4.2  counter = counter + 1 */
 		prefix.counter++;

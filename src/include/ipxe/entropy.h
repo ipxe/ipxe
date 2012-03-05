@@ -14,6 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <ipxe/api.h>
 #include <ipxe/hash_df.h>
+#include <ipxe/sha1.h>
 #include <config/entropy.h>
 
 /**
@@ -98,6 +99,15 @@ int get_noise ( noise_sample_t *noise );
 
 extern int get_entropy_input_tmp ( unsigned int num_samples,
 				   uint8_t *tmp, size_t tmp_len );
+
+/** Use SHA-1 as the underlying hash algorithm for Hash_df
+ *
+ * Hash_df using SHA-1 is an Approved algorithm in ANS X9.82.
+ */
+#define entropy_hash_df_algorithm sha1_algorithm
+
+/** Underlying hash algorithm output length (in bytes) */
+#define ENTROPY_HASH_DF_OUTLEN_BYTES SHA1_DIGEST_SIZE
 
 /**
  * Obtain entropy input
@@ -192,7 +202,8 @@ get_entropy_input ( unsigned int min_entropy_bits, void *data, size_t min_len,
 		return min_len;
 	} else if ( tmp_len > max_len ) {
 		linker_assert ( ( tmp == tmp_buf ), data_inplace );
-		hash_df ( tmp, tmp_len, data, max_len );
+		hash_df ( &entropy_hash_df_algorithm, tmp, tmp_len,
+			  data, max_len );
 		return max_len;
 	} else {
 		/* (Data is already in-place.) */
