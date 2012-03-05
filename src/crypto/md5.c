@@ -1,233 +1,295 @@
-/* 
- * Cryptographic API.
+/*
+ * Copyright (C) 2012 Michael Brown <mbrown@fensystems.co.uk>.
  *
- * MD5 Message Digest Algorithm (RFC1321).
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
  *
- * Derived from cryptoapi implementation, originally based on the
- * public domain implementation written by Colin Plumb in 1993.
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
  *
- * Reduced object size by around 50% compared to the original Linux
- * version for use in Etherboot by Michael Brown.
- *
- * Copyright (c) Cryptoapi developers.
- * Copyright (c) 2002 James Morris <jmorris@intercode.com.au>
- * Copyright (c) 2006 Michael Brown <mbrown@fensystems.co.uk>
- * 
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option) 
- * any later version.
- *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+/** @file
+ *
+ * MD5 algorithm
+ *
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <byteswap.h>
+#include <assert.h>
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
 
+/**
+ * Rotate dword left
+ *
+ * @v dword		Dword
+ * @v rotate		Amount of rotation
+ */
+static inline __attribute__ (( always_inline )) uint32_t
+rol32 ( uint32_t dword, unsigned int rotate ) {
+	return ( ( dword << rotate ) | ( dword >> ( 32 - rotate ) ) );
+}
+
+/** MD5 variables */
+struct md5_variables {
+	/* This layout matches that of struct md5_digest_data,
+	 * allowing for efficient endianness-conversion,
+	 */
+	uint32_t a;
+	uint32_t b;
+	uint32_t c;
+	uint32_t d;
+	uint32_t w[16];
+} __attribute__ (( packed ));
+
+/** MD5 constants */
+static const uint32_t k[64] = {
+	0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a,
+	0xa8304613, 0xfd469501, 0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
+	0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821, 0xf61e2562, 0xc040b340,
+	0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+	0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8,
+	0x676f02d9, 0x8d2a4c8a, 0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
+	0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70, 0x289b7ec6, 0xeaa127fa,
+	0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+	0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92,
+	0xffeff47d, 0x85845dd1, 0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
+	0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
+};
+
+/** MD5 shift amounts */
+static const uint8_t r[64] = {
+	7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+	5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
+	4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+	6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+};
+
+/**
+ * f(b,c,d) for steps 0 to 15
+ *
+ * @v v		MD5 variables
+ * @ret f	f(b,c,d)
+ */
+static uint32_t md5_f_0_15 ( struct md5_variables *v ) {
+	return ( v->d ^ ( v->b & ( v->c ^ v->d ) ) );
+}
+
+/**
+ * f(b,c,d) for steps 16 to 31
+ *
+ * @v v		MD5 variables
+ * @ret f	f(b,c,d)
+ */
+static uint32_t md5_f_16_31 ( struct md5_variables *v ) {
+	return ( v->c ^ ( v->d & ( v->b ^ v->c ) ) );
+}
+
+/**
+ * f(b,c,d) for steps 32 to 47
+ *
+ * @v v		MD5 variables
+ * @ret f	f(b,c,d)
+ */
+static uint32_t md5_f_32_47 ( struct md5_variables *v ) {
+	return ( v->b ^ v->c ^ v->d );
+}
+
+/**
+ * f(b,c,d) for steps 48 to 63
+ *
+ * @v v		MD5 variables
+ * @ret f	f(b,c,d)
+ */
+static uint32_t md5_f_48_63 ( struct md5_variables *v ) {
+	return ( v->c ^ ( v->b | (~v->d) ) );
+}
+
+/** An MD5 step function */
 struct md5_step {
-	u32 ( * f ) ( u32 b, u32 c, u32 d );
-	u8 coefficient;
-	u8 constant;
+	/**
+	 * Calculate f(b,c,d)
+	 *
+	 * @v v		MD5 variables
+	 * @ret f	f(b,c,d)
+	 */
+	uint32_t ( * f ) ( struct md5_variables *v );
+	/** Coefficient of i in g=ni+m */
+	uint8_t coefficient;
+	/** Constant term in g=ni+m */
+	uint8_t constant;
 };
 
-static u32 f1(u32 b, u32 c, u32 d)
-{
-	return ( d ^ ( b & ( c ^ d ) ) );
-}
-
-static u32 f2(u32 b, u32 c, u32 d)
-{
-	return ( c ^ ( d & ( b ^ c ) ) );
-}
-
-static u32 f3(u32 b, u32 c, u32 d)
-{
-	return ( b ^ c ^ d );
-}
-
-static u32 f4(u32 b, u32 c, u32 d)
-{
-	return ( c ^ ( b | ~d ) );
-}
-
+/** MD5 steps */
 static struct md5_step md5_steps[4] = {
-	{
-		.f = f1,
-		.coefficient = 1,
-		.constant = 0,
-	},
-	{
-		.f = f2,
-		.coefficient = 5,
-		.constant = 1,
-	},
-	{
-		.f = f3,
-		.coefficient = 3,
-		.constant = 5,
-	},
-	{
-		.f = f4,
-		.coefficient = 7,
-		.constant = 0,
-	}
+	/** 0 to 15 */
+	{ .f = md5_f_0_15,	.coefficient = 1,	.constant = 0 },
+	/** 16 to 31 */
+	{ .f = md5_f_16_31,	.coefficient = 5,	.constant = 1 },
+	/** 32 to 47 */
+	{ .f = md5_f_32_47,	.coefficient = 3,	.constant = 5 },
+	/** 48 to 63 */
+	{ .f = md5_f_48_63,	.coefficient = 7,	.constant = 0 },
 };
 
-static const u8 r[64] = {
-	7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
-	5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
-	4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
-	6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21
-};
+/**
+ * Initialise MD5 algorithm
+ *
+ * @v ctx		MD5 context
+ */
+static void md5_init ( void *ctx ) {
+	struct md5_context *context = ctx;
 
-static const u32 k[64] = {
-	0xd76aa478UL, 0xe8c7b756UL, 0x242070dbUL, 0xc1bdceeeUL,
-	0xf57c0fafUL, 0x4787c62aUL, 0xa8304613UL, 0xfd469501UL,
-	0x698098d8UL, 0x8b44f7afUL, 0xffff5bb1UL, 0x895cd7beUL,
-	0x6b901122UL, 0xfd987193UL, 0xa679438eUL, 0x49b40821UL,
-	0xf61e2562UL, 0xc040b340UL, 0x265e5a51UL, 0xe9b6c7aaUL,
-	0xd62f105dUL, 0x02441453UL, 0xd8a1e681UL, 0xe7d3fbc8UL,
-	0x21e1cde6UL, 0xc33707d6UL, 0xf4d50d87UL, 0x455a14edUL,
-	0xa9e3e905UL, 0xfcefa3f8UL, 0x676f02d9UL, 0x8d2a4c8aUL,
-	0xfffa3942UL, 0x8771f681UL, 0x6d9d6122UL, 0xfde5380cUL,
-	0xa4beea44UL, 0x4bdecfa9UL, 0xf6bb4b60UL, 0xbebfbc70UL,
-	0x289b7ec6UL, 0xeaa127faUL, 0xd4ef3085UL, 0x04881d05UL,
-	0xd9d4d039UL, 0xe6db99e5UL, 0x1fa27cf8UL, 0xc4ac5665UL,
-	0xf4292244UL, 0x432aff97UL, 0xab9423a7UL, 0xfc93a039UL,
-	0x655b59c3UL, 0x8f0ccc92UL, 0xffeff47dUL, 0x85845dd1UL,
-	0x6fa87e4fUL, 0xfe2ce6e0UL, 0xa3014314UL, 0x4e0811a1UL,
-	0xf7537e82UL, 0xbd3af235UL, 0x2ad7d2bbUL, 0xeb86d391UL,
-};
+	context->ddd.dd.digest.h[0] = cpu_to_le32 ( 0x67452301 );
+	context->ddd.dd.digest.h[1] = cpu_to_le32 ( 0xefcdab89 );
+	context->ddd.dd.digest.h[2] = cpu_to_le32 ( 0x98badcfe );
+	context->ddd.dd.digest.h[3] = cpu_to_le32 ( 0x10325476 );
+	context->len = 0;
+}
 
-static void md5_transform(u32 *hash, const u32 *in)
-{
-	u32 a, b, c, d, f, g, temp;
-	int i;
+/**
+ * Calculate MD5 digest of accumulated data
+ *
+ * @v context		MD5 context
+ */
+static void md5_digest ( struct md5_context *context ) {
+        union {
+		union md5_digest_data_dwords ddd;
+		struct md5_variables v;
+	} u;
+	uint32_t *a = &u.v.a;
+	uint32_t *b = &u.v.b;
+	uint32_t *c = &u.v.c;
+	uint32_t *d = &u.v.d;
+	uint32_t *w = u.v.w;
+	uint32_t f;
+	uint32_t g;
+	uint32_t temp;
 	struct md5_step *step;
+	unsigned int i;
 
-	a = hash[0];
-	b = hash[1];
-	c = hash[2];
-	d = hash[3];
+	/* Sanity checks */
+	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
+	linker_assert ( &u.ddd.dd.digest.h[0] == a, md5_bad_layout );
+	linker_assert ( &u.ddd.dd.digest.h[1] == b, md5_bad_layout );
+	linker_assert ( &u.ddd.dd.digest.h[2] == c, md5_bad_layout );
+	linker_assert ( &u.ddd.dd.digest.h[3] == d, md5_bad_layout );
+	linker_assert ( &u.ddd.dd.data.dword[0] == w, md5_bad_layout );
 
+	DBGC ( context, "MD5 digesting:\n" );
+	DBGC_HDA ( context, 0, &context->ddd.dd.digest,
+		   sizeof ( context->ddd.dd.digest ) );
+	DBGC_HDA ( context, context->len, &context->ddd.dd.data,
+		   sizeof ( context->ddd.dd.data ) );
+
+	/* Convert h[0..3] to host-endian, and initialise a, b, c, d,
+	 * and w[0..15]
+	 */
+	for ( i = 0 ; i < ( sizeof ( u.ddd.dword ) /
+			    sizeof ( u.ddd.dword[0] ) ) ; i++ ) {
+		le32_to_cpus ( &context->ddd.dword[i] );
+		u.ddd.dword[i] = context->ddd.dword[i];
+	}
+
+	/* Main loop */
 	for ( i = 0 ; i < 64 ; i++ ) {
-		step = &md5_steps[i >> 4];
-		f = step->f ( b, c, d );
-		g = ( ( i * step->coefficient + step->constant ) & 0xf );
-		temp = d;
-		d = c;
-		c = b;
-		a += ( f + k[i] + in[g] );
-		a = ( ( a << r[i] ) | ( a >> ( 32-r[i] ) ) );
-		b += a;
-		a = temp;
+		step = &md5_steps[ i / 16 ];
+		f = step->f ( &u.v );
+		g = ( ( ( step->coefficient * i ) + step->constant ) % 16 );
+		temp = *d;
+		*d = *c;
+		*c = *b;
+		*b = ( *b + rol32 ( ( *a + f + k[i] + w[g] ), r[i] ) );
+		*a = temp;
+		DBGC2 ( context, "%2d : %08x %08x %08x %08x\n",
+			i, *a, *b, *c, *d );
 	}
 
-	hash[0] += a;
-	hash[1] += b;
-	hash[2] += c;
-	hash[3] += d;
+	/* Add chunk to hash and convert back to big-endian */
+	for ( i = 0 ; i < 4 ; i++ ) {
+		context->ddd.dd.digest.h[i] =
+			cpu_to_le32 ( context->ddd.dd.digest.h[i] +
+				      u.ddd.dd.digest.h[i] );
+	}
+
+	DBGC ( context, "MD5 digested:\n" );
+	DBGC_HDA ( context, 0, &context->ddd.dd.digest,
+		   sizeof ( context->ddd.dd.digest ) );
 }
 
-/* XXX: this stuff can be optimized */
-static inline void le32_to_cpu_array(u32 *buf, unsigned int words)
-{
-	while (words--) {
-		le32_to_cpus(buf);
-		buf++;
+/**
+ * Accumulate data with MD5 algorithm
+ *
+ * @v ctx		MD5 context
+ * @v data		Data
+ * @v len		Length of data
+ */
+static void md5_update ( void *ctx, const void *data, size_t len ) {
+	struct md5_context *context = ctx;
+	const uint8_t *byte = data;
+	size_t offset;
+
+	/* Accumulate data a byte at a time, performing the digest
+	 * whenever we fill the data buffer
+	 */
+	while ( len-- ) {
+		offset = ( context->len % sizeof ( context->ddd.dd.data ) );
+		context->ddd.dd.data.byte[offset] = *(byte++);
+		context->len++;
+		if ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 )
+			md5_digest ( context );
 	}
 }
 
-static inline void cpu_to_le32_array(u32 *buf, unsigned int words)
-{
-	while (words--) {
-		cpu_to_le32s(buf);
-		buf++;
-	}
+/**
+ * Generate MD5 digest
+ *
+ * @v ctx		MD5 context
+ * @v out		Output buffer
+ */
+static void md5_final ( void *ctx, void *out ) {
+	struct md5_context *context = ctx;
+	uint64_t len_bits;
+	uint8_t pad;
+
+	/* Record length before pre-processing */
+	len_bits = cpu_to_le64 ( ( ( uint64_t ) context->len ) * 8 );
+
+	/* Pad with a single "1" bit followed by as many "0" bits as required */
+	pad = 0x80;
+	do {
+		md5_update ( ctx, &pad, sizeof ( pad ) );
+		pad = 0x00;
+	} while ( ( context->len % sizeof ( context->ddd.dd.data ) ) !=
+		  offsetof ( typeof ( context->ddd.dd.data ), final.len ) );
+
+	/* Append length (in bits) */
+	md5_update ( ctx, &len_bits, sizeof ( len_bits ) );
+	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
+
+	/* Copy out final digest */
+	memcpy ( out, &context->ddd.dd.digest,
+		 sizeof ( context->ddd.dd.digest ) );
 }
 
-static inline void md5_transform_helper(struct md5_ctx *ctx)
-{
-	le32_to_cpu_array(ctx->block, sizeof(ctx->block) / sizeof(u32));
-	md5_transform(ctx->hash, ctx->block);
-}
-
-static void md5_init(void *context)
-{
-	struct md5_ctx *mctx = context;
-
-	mctx->hash[0] = 0x67452301;
-	mctx->hash[1] = 0xefcdab89;
-	mctx->hash[2] = 0x98badcfe;
-	mctx->hash[3] = 0x10325476;
-	mctx->byte_count = 0;
-}
-
-static void md5_update(void *context, const void *data, size_t len)
-{
-	struct md5_ctx *mctx = context;
-	const u32 avail = sizeof(mctx->block) - (mctx->byte_count & 0x3f);
-
-	mctx->byte_count += len;
-
-	if (avail > len) {
-		memcpy((char *)mctx->block + (sizeof(mctx->block) - avail),
-		       data, len);
-		return;
-	}
-
-	memcpy((char *)mctx->block + (sizeof(mctx->block) - avail),
-	       data, avail);
-
-	md5_transform_helper(mctx);
-	data += avail;
-	len -= avail;
-
-	while (len >= sizeof(mctx->block)) {
-		memcpy(mctx->block, data, sizeof(mctx->block));
-		md5_transform_helper(mctx);
-		data += sizeof(mctx->block);
-		len -= sizeof(mctx->block);
-	}
-
-	memcpy(mctx->block, data, len);
-}
-
-static void md5_final(void *context, void *out)
-{
-	struct md5_ctx *mctx = context;
-	const unsigned int offset = mctx->byte_count & 0x3f;
-	char *p = (char *)mctx->block + offset;
-	int padding = 56 - (offset + 1);
-
-	*p++ = 0x80;
-	if (padding < 0) {
-		memset(p, 0x00, padding + sizeof (u64));
-		md5_transform_helper(mctx);
-		p = (char *)mctx->block;
-		padding = 56;
-	}
-
-	memset(p, 0, padding);
-	mctx->block[14] = mctx->byte_count << 3;
-	mctx->block[15] = mctx->byte_count >> 29;
-	le32_to_cpu_array(mctx->block, (sizeof(mctx->block) -
-	                  sizeof(u64)) / sizeof(u32));
-	md5_transform(mctx->hash, mctx->block);
-	cpu_to_le32_array(mctx->hash, sizeof(mctx->hash) / sizeof(u32));
-	memcpy(out, mctx->hash, sizeof(mctx->hash));
-	memset(mctx, 0, sizeof(*mctx));
-}
-
+/** MD5 algorithm */
 struct digest_algorithm md5_algorithm = {
 	.name		= "md5",
-	.ctxsize	= MD5_CTX_SIZE,
-	.blocksize	= ( MD5_BLOCK_WORDS * 4 ),
-	.digestsize	= MD5_DIGEST_SIZE,
+	.ctxsize	= sizeof ( struct md5_context ),
+	.blocksize	= sizeof ( union md5_block ),
+	.digestsize	= sizeof ( struct md5_digest ),
 	.init		= md5_init,
 	.update		= md5_update,
 	.final		= md5_final,
