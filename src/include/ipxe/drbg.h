@@ -10,16 +10,29 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <ipxe/sha1.h>
 #include <ipxe/hmac_drbg.h>
 
-/** Maximum security strength */
-#define DRBG_MAX_SECURITY_STRENGTH HMAC_DRBG_MAX_SECURITY_STRENGTH
+/** Choose HMAC_DRBG using SHA-1
+ *
+ * HMAC_DRBG using SHA-1 is an Approved algorithm in ANS X9.82.
+ */
+#define HMAC_DRBG_ALGORITHM HMAC_DRBG_SHA1
 
-/** Security strength */
-#define DRBG_SECURITY_STRENGTH HMAC_DRBG_SECURITY_STRENGTH
+/** Maximum security strength */
+#define DRBG_MAX_SECURITY_STRENGTH \
+	HMAC_DRBG_MAX_SECURITY_STRENGTH ( HMAC_DRBG_ALGORITHM )
+
+/** Security strength
+ *
+ * We choose to operate at the maximum security strength supported by
+ * the algorithm.
+ */
+#define DRBG_SECURITY_STRENGTH DRBG_MAX_SECURITY_STRENGTH
 
 /** Minimum entropy input length */
-#define DRBG_MIN_ENTROPY_LEN_BYTES HMAC_DRBG_MIN_ENTROPY_LEN_BYTES
+#define DRBG_MIN_ENTROPY_LEN_BYTES \
+	HMAC_DRBG_MIN_ENTROPY_LEN_BYTES ( DRBG_SECURITY_STRENGTH )
 
 /** Maximum entropy input length */
 #define DRBG_MAX_ENTROPY_LEN_BYTES HMAC_DRBG_MAX_ENTROPY_LEN_BYTES
@@ -60,7 +73,8 @@ static inline void drbg_instantiate_algorithm ( struct drbg_state *state,
 						size_t entropy_len,
 						const void *personal,
 						size_t personal_len ) {
-	hmac_drbg_instantiate ( &state->internal, entropy, entropy_len,
+	hmac_drbg_instantiate ( HMAC_DRBG_HASH ( HMAC_DRBG_ALGORITHM ),
+				&state->internal, entropy, entropy_len,
 				personal, personal_len );
 }
 
@@ -81,7 +95,8 @@ static inline void drbg_reseed_algorithm ( struct drbg_state *state,
 					   size_t entropy_len,
 					   const void *additional,
 					   size_t additional_len ) {
-	hmac_drbg_reseed ( &state->internal, entropy, entropy_len,
+	hmac_drbg_reseed ( HMAC_DRBG_HASH ( HMAC_DRBG_ALGORITHM ),
+			   &state->internal, entropy, entropy_len,
 			   additional, additional_len );
 }
 
@@ -104,7 +119,8 @@ static inline int drbg_generate_algorithm ( struct drbg_state *state,
 					    const void *additional,
 					    size_t additional_len,
 					    void *data, size_t len ) {
-	return hmac_drbg_generate ( &state->internal, additional,
+	return hmac_drbg_generate ( HMAC_DRBG_HASH ( HMAC_DRBG_ALGORITHM ),
+				    &state->internal, additional,
 				    additional_len, data, len );
 }
 
