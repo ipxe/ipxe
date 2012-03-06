@@ -10,14 +10,14 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
-#include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
 #include <ipxe/hmac_drbg.h>
 
-/** Choose HMAC_DRBG using SHA-1
+/** Choose HMAC_DRBG using SHA-256
  *
- * HMAC_DRBG using SHA-1 is an Approved algorithm in ANS X9.82.
+ * HMAC_DRBG using SHA-256 is an Approved algorithm in ANS X9.82.
  */
-#define HMAC_DRBG_ALGORITHM HMAC_DRBG_SHA1
+#define HMAC_DRBG_ALGORITHM HMAC_DRBG_SHA256
 
 /** Maximum security strength */
 #define DRBG_MAX_SECURITY_STRENGTH \
@@ -25,10 +25,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** Security strength
  *
- * We choose to operate at the maximum security strength supported by
- * the algorithm.
+ * We choose to operate at a strength of 128 bits.
  */
-#define DRBG_SECURITY_STRENGTH DRBG_MAX_SECURITY_STRENGTH
+#define DRBG_SECURITY_STRENGTH 128
 
 /** Minimum entropy input length */
 #define DRBG_MIN_ENTROPY_LEN_BYTES \
