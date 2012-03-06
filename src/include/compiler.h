@@ -339,6 +339,7 @@ int __debug_disable;
 				unsigned long ul;		\
 				typeof ( dispaddr ) raw;	\
 			} da;					\
+			da.ul = 0;				\
 			da.raw = dispaddr;			\
 			dbg_hex_dump_da ( da.ul, data, len );	\
 		}						\
@@ -370,6 +371,7 @@ int __debug_disable;
 				unsigned long ul;		\
 				typeof ( dispaddr ) raw;	\
 			} da;					\
+			da.ul = 0;				\
 			da.raw = dispaddr;			\
 			dbg_md5_da ( da.ul, data, len );	\
 		}						\
@@ -421,6 +423,7 @@ int __debug_disable;
 				unsigned long ul;		\
 				typeof ( id ) raw;		\
 			} dbg_stream;				\
+			dbg_stream.ul = 0;			\
 			dbg_stream.raw = id;			\
 			dbg_autocolourise ( dbg_stream.ul );	\
 		}						\
