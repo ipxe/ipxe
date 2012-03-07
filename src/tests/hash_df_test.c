@@ -71,7 +71,7 @@ struct hash_df_test {
 #define HASH_DF_TEST( name, hash_algorithm, input_array, expected_array ) \
 	static const uint8_t name ## _input [] = input_array;		  \
 	static const uint8_t name ## _expected [] = expected_array;	  \
-	static const struct hash_df_test name = {			  \
+	static struct hash_df_test name = {				  \
 		.hash = &(hash_algorithm),				  \
 		.input = name ## _input,				  \
 		.input_len = sizeof ( name ## _input ),			  \

@@ -86,7 +86,7 @@ struct aes_cbc_test {
 	static const uint8_t name ## _iv [] = iv_array;			\
 	static const uint8_t name ## _plaintext [] = plaintext_array;	\
 	static const uint8_t name ## _ciphertext [] = ciphertext_array;	\
-	static const struct aes_cbc_test name = {			\
+	static struct aes_cbc_test name = {				\
 		.key = name ## _key,					\
 		.key_len = sizeof ( name ## _key ),			\
 		.iv = name ## _iv,					\

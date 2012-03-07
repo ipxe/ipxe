@@ -87,7 +87,7 @@ struct hmac_drbg_test_instantiate {
 				    key, value )			\
 	static const uint8_t name ## _key [] = key;			\
 	static const uint8_t name ## _value [] = value;			\
-	static const struct hmac_drbg_test_instantiate name = {		\
+	static struct hmac_drbg_test_instantiate name = {		\
 		.hash = HMAC_DRBG_HASH ( hmac_drbg ),			\
 		.out_len = HMAC_DRBG_OUTLEN_BYTES ( hmac_drbg ),	\
 		.entropy = entropy_array,				\
@@ -169,7 +169,7 @@ struct hmac_drbg_test_reseed {
 			       additional_array, key, value )		\
 	static const uint8_t name ## _key [] = key;			\
 	static const uint8_t name ## _value [] = value;			\
-	static const struct hmac_drbg_test_reseed name = {		\
+	static struct hmac_drbg_test_reseed name = {			\
 		.hash = HMAC_DRBG_HASH ( hmac_drbg ),			\
 		.out_len = HMAC_DRBG_OUTLEN_BYTES ( hmac_drbg ),	\
 		.entropy = entropy_array,				\
@@ -240,7 +240,7 @@ struct hmac_drbg_test_generate {
 	static const uint8_t name ## _key [] = key;			\
 	static const uint8_t name ## _value [] = value;			\
 	static const uint8_t name ## _data [] = data;			\
-	static const struct hmac_drbg_test_generate name = {		\
+	static struct hmac_drbg_test_generate name = {			\
 		.hash = HMAC_DRBG_HASH ( hmac_drbg ),			\
 		.out_len = HMAC_DRBG_OUTLEN_BYTES ( hmac_drbg ),	\
 		.additional = additional_array,				\
@@ -300,7 +300,7 @@ struct hmac_drbg_test_generate_fail {
  */
 #define HMAC_DRBG_TEST_GENERATE_FAIL( name, hmac_drbg,			\
 				      additional_array, len )		\
-	static const struct hmac_drbg_test_generate_fail name = {	\
+	static struct hmac_drbg_test_generate_fail name = {		\
 		.hash = HMAC_DRBG_HASH ( hmac_drbg ),			\
 		.additional = additional_array,				\
 		.additional_len = sizeof ( additional_array ),		\
