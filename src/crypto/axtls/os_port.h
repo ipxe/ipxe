@@ -1,61 +1,54 @@
+#ifndef AXTLS_OS_PORT_H
+#define AXTLS_OS_PORT_H
+
 /**
  * @file os_port.h
  *
  * Trick the axtls code into building within our build environment.
  */
 
-#ifndef HEADER_OS_PORT_H
-#define HEADER_OS_PORT_H
-
 #include <stdint.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <time.h>
-#include <sys/time.h>
 #include <byteswap.h>
 
-#define STDCALL
-#define EXP_FUNC
-#define TTY_FLUSH()
+/** All imported axTLS files are licensed using the three-clause BSD licence */
+FILE_LICENCE ( BSD3 );
 
 /** We can't actually abort, since we are effectively a kernel... */
 #define abort() assert ( 0 )
 
-/** crypto_misc.c has a bad #ifdef */
-static inline void close ( int fd __unused ) {
-	/* Do nothing */
+/** rsa.c uses alloca() */
+#define alloca( size ) __builtin_alloca ( size )
+
+#include <ipxe/random_nz.h>
+static inline void get_random_NZ ( int num_rand_bytes, uint8_t *rand_data ) {
+	/* AXTLS does not check for failures when generating random
+	 * data.  Rely on the fact that get_random_nz() does not
+	 * request prediction resistance (and so cannot introduce new
+	 * failures) and therefore any potential failure must already
+	 * have been encountered by e.g. tls_generate_random(), which
+	 * does check for failures.
+	 */
+	get_random_nz ( rand_data, num_rand_bytes );
 }
 
-typedef void FILE;
+/* Expose AES_encrypt() and AES_decrypt() in aes.o */
+#define aes 1
+#if OBJECT
 
-static inline FILE * fopen ( const char *filename __unused,
-			     const char *mode __unused ) {
-	return NULL;
+/* AES_CTX is not defined at this point, so omit prototypes */
+
+static void AES_encrypt();
+static void AES_decrypt();
+
+void axtls_aes_encrypt ( void *ctx, uint32_t *data ) {
+	AES_encrypt ( ctx, data );
 }
 
-static inline int fseek ( FILE *stream __unused, long offset __unused,
-			  int whence __unused ) {
-	return -1;
+void axtls_aes_decrypt ( void *ctx, uint32_t *data ) {
+	AES_decrypt ( ctx, data );
 }
 
-static inline long ftell ( FILE *stream __unused ) {
-	return -1;
-}
-
-static inline size_t fread ( void *ptr __unused, size_t size __unused,
-			     size_t nmemb __unused, FILE *stream __unused ) {
-	return -1;
-}
-
-static inline int fclose ( FILE *stream __unused ) {
-	return -1;
-}
-
-#define CONFIG_SSL_CERT_VERIFICATION 1
-#define CONFIG_SSL_MAX_CERTS 1
-#define CONFIG_X509_MAX_CA_CERTS 1
-#define CONFIG_SSL_EXPIRY_TIME 24
-#define CONFIG_SSL_ENABLE_CLIENT 1
-#define CONFIG_BIGINT_CLASSICAL 1
+#endif
+#undef aes
 
 #endif 

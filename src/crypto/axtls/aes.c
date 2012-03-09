@@ -1,22 +1,32 @@
 /*
- *  Copyright(C) 2006 Cameron Rich
+ * Copyright (c) 2007, Cameron Rich
  *
- *  This library is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU Lesser General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ * All rights reserved.
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU Lesser General Public License for more details.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- *  You should have received a copy of the GNU Lesser General Public License
- *  along with this library; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * * Redistributions of source code must retain the above copyright notice,
+ *   this list of conditions and the following disclaimer.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ * * Neither the name of the axTLS project nor the names of its contributors
+ *   may be used to endorse or promote products derived from this software
+ *   without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-FILE_LICENCE ( GPL2_OR_LATER );
 
 /**
  * AES implementation - this is a small code version. There are much faster
@@ -25,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <string.h>
+#include "os_port.h"
 #include "crypto.h"
 
 /* all commented out in skeleton mode */
@@ -63,10 +74,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 			(f8)^=rot3(f2), \
 			(f8)^=rot2(f4), \
 			(f8)^rot1(f9))
-
-/* some macros to do endian independent byte extraction */
-#define n2l(c,l) l=ntohl(*c); c++
-#define l2n(l,c) *c++=htonl(l)
 
 /*
  * AES S-box
@@ -154,11 +161,15 @@ static const unsigned char Rcon[30]=
 	0xb3,0x7d,0xfa,0xef,0xc5,0x91,
 };
 
+/* ----- static functions ----- */
+static void AES_encrypt(const AES_CTX *ctx, uint32_t *data);
+static void AES_decrypt(const AES_CTX *ctx, uint32_t *data);
+
 /* Perform doubling in Galois Field GF(2^8) using the irreducible polynomial
    x^8+x^4+x^3+x+1 */
 static unsigned char AES_xtime(uint32_t x)
 {
-	return x = (x&0x80) ? (x<<1)^0x1b : x<<1;
+	return (x&0x80) ? (x<<1)^0x1b : x<<1;
 }
 
 /**
@@ -247,7 +258,7 @@ void AES_convert_key(AES_CTX *ctx)
     k = ctx->ks;
     k += 4;
 
-    for (i=ctx->rounds*4; i>4; i--)
+    for (i= ctx->rounds*4; i > 4; i--)
     {
         w= *k;
         w = inv_mix_col(w,t1,t2,t3,t4);
@@ -255,52 +266,43 @@ void AES_convert_key(AES_CTX *ctx)
     }
 }
 
-#if 0
 /**
  * Encrypt a byte sequence (with a block size 16) using the AES cipher.
  */
 void AES_cbc_encrypt(AES_CTX *ctx, const uint8_t *msg, uint8_t *out, int length)
 {
-    uint32_t tin0, tin1, tin2, tin3;
-    uint32_t tout0, tout1, tout2, tout3;
-    uint32_t tin[4];
-    uint32_t *iv = (uint32_t *)ctx->iv;
-    uint32_t *msg_32 = (uint32_t *)msg;
-    uint32_t *out_32 = (uint32_t *)out;
+    int i;
+    uint32_t tin[4], tout[4], iv[4];
 
-    n2l(iv, tout0);
-    n2l(iv, tout1);
-    n2l(iv, tout2);
-    n2l(iv, tout3);
-    iv -= 4;
+    memcpy(iv, ctx->iv, AES_IV_SIZE);
+    for (i = 0; i < 4; i++)
+        tout[i] = ntohl(iv[i]);
 
-    for (length -= 16; length >= 0; length -= 16)
+    for (length -= AES_BLOCKSIZE; length >= 0; length -= AES_BLOCKSIZE)
     {
-        n2l(msg_32, tin0);
-        n2l(msg_32, tin1);
-        n2l(msg_32, tin2);
-        n2l(msg_32, tin3);
-        tin[0] = tin0^tout0;
-        tin[1] = tin1^tout1;
-        tin[2] = tin2^tout2;
-        tin[3] = tin3^tout3;
+        uint32_t msg_32[4];
+        uint32_t out_32[4];
+        memcpy(msg_32, msg, AES_BLOCKSIZE);
+        msg += AES_BLOCKSIZE;
+
+        for (i = 0; i < 4; i++)
+            tin[i] = ntohl(msg_32[i])^tout[i];
 
         AES_encrypt(ctx, tin);
 
-        tout0 = tin[0]; 
-        l2n(tout0, out_32);
-        tout1 = tin[1]; 
-        l2n(tout1, out_32);
-        tout2 = tin[2]; 
-        l2n(tout2, out_32);
-        tout3 = tin[3]; 
-        l2n(tout3, out_32);
+        for (i = 0; i < 4; i++)
+        {
+            tout[i] = tin[i];
+            out_32[i] = htonl(tout[i]);
+        }
+
+        memcpy(out, out_32, AES_BLOCKSIZE);
+        out += AES_BLOCKSIZE;
     }
 
-    l2n(tout0, iv);
-    l2n(tout1, iv);
-    l2n(tout2, iv);
-    l2n(tout3, iv);
+    for (i = 0; i < 4; i++)
+        iv[i] = htonl(tout[i]);
+    memcpy(ctx->iv, iv, AES_IV_SIZE);
 }
 
 /**
@@ -308,61 +310,48 @@ void AES_cbc_encrypt(AES_CTX *ctx, const uint8_t *msg, uint8_t *out, int length)
  */
 void AES_cbc_decrypt(AES_CTX *ctx, const uint8_t *msg, uint8_t *out, int length)
 {
-    uint32_t tin0, tin1, tin2, tin3;
-    uint32_t xor0,xor1,xor2,xor3;
-    uint32_t tout0,tout1,tout2,tout3;
-    uint32_t data[4];
-    uint32_t *iv = (uint32_t *)ctx->iv;
-    uint32_t *msg_32 = (uint32_t *)msg;
-    uint32_t *out_32 = (uint32_t *)out;
+    int i;
+    uint32_t tin[4], xor[4], tout[4], data[4], iv[4];
 
-    n2l(iv ,xor0);
-    n2l(iv, xor1);
-    n2l(iv, xor2);
-    n2l(iv, xor3);
-    iv -= 4;
+    memcpy(iv, ctx->iv, AES_IV_SIZE);
+    for (i = 0; i < 4; i++)
+        xor[i] = ntohl(iv[i]);
 
-    for (length-=16; length >= 0; length -= 16)
+    for (length -= 16; length >= 0; length -= 16)
     {
-        n2l(msg_32, tin0);
-        n2l(msg_32, tin1);
-        n2l(msg_32, tin2);
-        n2l(msg_32, tin3);
+        uint32_t msg_32[4];
+        uint32_t out_32[4];
+        memcpy(msg_32, msg, AES_BLOCKSIZE);
+        msg += AES_BLOCKSIZE;
 
-        data[0] = tin0;
-        data[1] = tin1;
-        data[2] = tin2;
-        data[3] = tin3;
+        for (i = 0; i < 4; i++)
+        {
+            tin[i] = ntohl(msg_32[i]);
+            data[i] = tin[i];
+        }
 
         AES_decrypt(ctx, data);
 
-        tout0 = data[0]^xor0;
-        tout1 = data[1]^xor1;
-        tout2 = data[2]^xor2;
-        tout3 = data[3]^xor3;
+        for (i = 0; i < 4; i++)
+        {
+            tout[i] = data[i]^xor[i];
+            xor[i] = tin[i];
+            out_32[i] = htonl(tout[i]);
+        }
 
-        xor0 = tin0;
-        xor1 = tin1;
-        xor2 = tin2;
-        xor3 = tin3;
-
-        l2n(tout0, out_32);
-        l2n(tout1, out_32);
-        l2n(tout2, out_32);
-        l2n(tout3, out_32);
+        memcpy(out, out_32, AES_BLOCKSIZE);
+        out += AES_BLOCKSIZE;
     }
 
-    l2n(xor0, iv);
-    l2n(xor1, iv);
-    l2n(xor2, iv);
-    l2n(xor3, iv);
+    for (i = 0; i < 4; i++)
+        iv[i] = htonl(xor[i]);
+    memcpy(ctx->iv, iv, AES_IV_SIZE);
 }
-#endif
 
 /**
  * Encrypt a single block (16 bytes) of data
  */
-void AES_encrypt(const AES_CTX *ctx, uint32_t *data)
+static void AES_encrypt(const AES_CTX *ctx, uint32_t *data)
 {
     /* To make this code smaller, generate the sbox entries on the fly.
      * This will have a really heavy effect upon performance.
@@ -375,9 +364,7 @@ void AES_encrypt(const AES_CTX *ctx, uint32_t *data)
 
     /* Pre-round key addition */
     for (row = 0; row < 4; row++)
-    {
         data[row] ^= *(k++);
-    }
 
     /* Encrypt one block. */
     for (curr_rnd = 0; curr_rnd < rounds; curr_rnd++)
@@ -395,12 +382,10 @@ void AES_encrypt(const AES_CTX *ctx, uint32_t *data)
             {
                 tmp1 = a0 ^ a1 ^ a2 ^ a3;
                 old_a0 = a0;
-
                 a0 ^= tmp1 ^ AES_xtime(a0 ^ a1);
                 a1 ^= tmp1 ^ AES_xtime(a1 ^ a2);
                 a2 ^= tmp1 ^ AES_xtime(a2 ^ a3);
                 a3 ^= tmp1 ^ AES_xtime(a3 ^ old_a0);
-
             }
 
             tmp[row] = ((a0 << 24) | (a1 << 16) | (a2 << 8) | a3);
@@ -409,32 +394,28 @@ void AES_encrypt(const AES_CTX *ctx, uint32_t *data)
         /* KeyAddition - note that it is vital that this loop is separate from
            the MixColumn operation, which must be atomic...*/ 
         for (row = 0; row < 4; row++)
-        {
             data[row] = tmp[row] ^ *(k++);
-        }
     }
 }
 
 /**
  * Decrypt a single block (16 bytes) of data
  */
-void AES_decrypt(const AES_CTX *ctx, uint32_t *data)
+static void AES_decrypt(const AES_CTX *ctx, uint32_t *data)
 { 
     uint32_t tmp[4];
     uint32_t xt0,xt1,xt2,xt3,xt4,xt5,xt6;
     uint32_t a0, a1, a2, a3, row;
     int curr_rnd;
     int rounds = ctx->rounds;
-    uint32_t *k = (uint32_t*)ctx->ks + ((rounds+1)*4);
+    const uint32_t *k = ctx->ks + ((rounds+1)*4);
 
     /* pre-round key addition */
     for (row=4; row > 0;row--)
-    {
         data[row-1] ^= *(--k);
-    }
 
     /* Decrypt one block */
-    for (curr_rnd=0; curr_rnd < rounds; curr_rnd++)
+    for (curr_rnd = 0; curr_rnd < rounds; curr_rnd++)
     {
         /* Perform ByteSub and ShiftRow operations together */
         for (row = 4; row > 0; row--)
@@ -469,9 +450,7 @@ void AES_decrypt(const AES_CTX *ctx, uint32_t *data)
         }
 
         for (row = 4; row > 0; row--)
-        {
             data[row-1] = tmp[row-1] ^ *(--k);
-        }
     }
 }
 

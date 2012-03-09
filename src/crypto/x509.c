@@ -155,6 +155,11 @@ int x509_rsa_public_key ( const struct asn1_cursor *certificate,
 		DBG_HDA ( 0, certificate->data, certificate->len );
 		return -ENOTSUP;
 	}
+	if ( modulus.len && ( ! *( ( uint8_t * ) modulus.data ) ) ) {
+		/* Skip positive sign byte */
+		modulus.data++;
+		modulus.len--;
+	}
 	memcpy ( &exponent, &pubkey, sizeof ( exponent ) );
 	rc = ( asn1_skip ( &exponent, ASN1_INTEGER ), /* modulus */
 	       asn1_enter ( &exponent, ASN1_INTEGER ) /* publicExponent */ );
@@ -162,6 +167,11 @@ int x509_rsa_public_key ( const struct asn1_cursor *certificate,
 		DBG ( "Cannot locate publicExponent in:\n" );
 		DBG_HDA ( 0, certificate->data, certificate->len );
 		return -ENOTSUP;
+	}
+	if ( exponent.len && ( ! *( ( uint8_t * ) exponent.data ) ) ) {
+		/* Skip positive sign byte */
+		exponent.data++;
+		exponent.len--;
 	}
 
 	/* Allocate space and copy out modulus and exponent */

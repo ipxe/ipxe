@@ -794,7 +794,7 @@ static int tls_send_certificate ( struct tls_session *tls ) {
  */
 static int tls_send_client_key_exchange ( struct tls_session *tls ) {
 	/* FIXME: Hack alert */
-	RSA_CTX *rsa_ctx;
+	RSA_CTX *rsa_ctx = NULL;
 	RSA_pub_key_new ( &rsa_ctx, tls->rsa.modulus, tls->rsa.modulus_len,
 			  tls->rsa.exponent, tls->rsa.exponent_len );
 	struct {

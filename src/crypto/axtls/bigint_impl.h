@@ -1,19 +1,31 @@
 /*
- *  Copyright(C) 2006 Cameron Rich
+ * Copyright (c) 2007, Cameron Rich
  *
- *  This library is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU Lesser General Public License as published by
- *  the Free Software Foundation; either version 2.1 of the License, or
- *  (at your option) any later version.
+ * All rights reserved.
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU Lesser General Public License for more details.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- *  You should have received a copy of the GNU Lesser General Public License
- *  along with this library; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * * Redistributions of source code must retain the above copyright notice,
+ *   this list of conditions and the following disclaimer.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ * * Neither the name of the axTLS project nor the names of its contributors
+ *   may be used to endorse or promote products derived from this software
+ *   without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef BIGINT_IMPL_HEADER
@@ -30,20 +42,39 @@
 #endif
 
 /* Architecture specific functions for big ints */
+#if defined(CONFIG_INTEGER_8BIT)
+#define COMP_RADIX          256U       /**< Max component + 1 */
+#define COMP_MAX            0xFFFFU/**< (Max dbl comp -1) */
+#define COMP_BIT_SIZE       8   /**< Number of bits in a component. */
+#define COMP_BYTE_SIZE      1   /**< Number of bytes in a component. */
+#define COMP_NUM_NIBBLES    2   /**< Used For diagnostics only. */
+typedef uint8_t comp;	        /**< A single precision component. */
+typedef uint16_t long_comp;     /**< A double precision component. */
+typedef int16_t slong_comp;     /**< A signed double precision component. */
+#elif defined(CONFIG_INTEGER_16BIT)
+#define COMP_RADIX          65536U       /**< Max component + 1 */
+#define COMP_MAX            0xFFFFFFFFU/**< (Max dbl comp -1) */
+#define COMP_BIT_SIZE       16  /**< Number of bits in a component. */
+#define COMP_BYTE_SIZE      2   /**< Number of bytes in a component. */
+#define COMP_NUM_NIBBLES    4   /**< Used For diagnostics only. */
+typedef uint16_t comp;	        /**< A single precision component. */
+typedef uint32_t long_comp;     /**< A double precision component. */
+typedef int32_t slong_comp;     /**< A signed double precision component. */
+#else /* regular 32 bit */
 #ifdef WIN32
 #define COMP_RADIX          4294967296i64         
-#define COMP_BIG_MSB        0x8000000000000000i64 
+#define COMP_MAX            0xFFFFFFFFFFFFFFFFui64
 #else
 #define COMP_RADIX          4294967296ULL         /**< Max component + 1 */
-#define COMP_BIG_MSB        0x8000000000000000ULL /**< (Max dbl comp + 1)/ 2 */
+#define COMP_MAX            0xFFFFFFFFFFFFFFFFULL/**< (Max dbl comp -1) */
 #endif
 #define COMP_BIT_SIZE       32  /**< Number of bits in a component. */
 #define COMP_BYTE_SIZE      4   /**< Number of bytes in a component. */
 #define COMP_NUM_NIBBLES    8   /**< Used For diagnostics only. */
-
 typedef uint32_t comp;	        /**< A single precision component. */
 typedef uint64_t long_comp;     /**< A double precision component. */
 typedef int64_t slong_comp;     /**< A signed double precision component. */
+#endif
 
 /**
  * @struct  _bigint
@@ -96,10 +127,5 @@ typedef struct /**< A big integer "session" context. */
 #endif
 
 #define PERMANENT           0x7FFF55AA  /**< A magic number for permanents. */
-
-#define V1      v->comps[v->size-1]                 /**< v1 for division */
-#define V2      v->comps[v->size-2]                 /**< v2 for division */
-#define U(j)    tmp_u->comps[tmp_u->size-j-1]       /**< uj for division */
-#define Q(j)    quotient->comps[quotient->size-j-1] /**< qj for division */
 
 #endif

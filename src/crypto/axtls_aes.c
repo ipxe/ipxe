@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 #include <byteswap.h>
 #include <ipxe/crypto.h>
 #include <ipxe/cbc.h>
@@ -119,7 +120,7 @@ static void aes_encrypt ( void *ctx, const void *src, void *dst,
 	assert ( len == AES_BLOCKSIZE );
 	if ( aes_ctx->decrypting )
 		assert ( 0 );
-	aes_call_axtls ( &aes_ctx->axtls_ctx, src, dst, AES_encrypt );
+	aes_call_axtls ( &aes_ctx->axtls_ctx, src, dst, axtls_aes_encrypt );
 }
 
 /**
@@ -139,7 +140,7 @@ static void aes_decrypt ( void *ctx, const void *src, void *dst,
 		AES_convert_key ( &aes_ctx->axtls_ctx );
 		aes_ctx->decrypting = 1;
 	}
-	aes_call_axtls ( &aes_ctx->axtls_ctx, src, dst, AES_decrypt );
+	aes_call_axtls ( &aes_ctx->axtls_ctx, src, dst, axtls_aes_decrypt );
 }
 
 /** Basic AES algorithm */
