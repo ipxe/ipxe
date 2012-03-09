@@ -193,6 +193,7 @@ static int initrd_init ( void ) {
 	if ( ! image ) {
 		DBGC ( colour, "RUNTIME could not allocate image for "
 		       "initrd\n" );
+		rc = -ENOMEM;
 		goto err_alloc_image;
 	}
 	image_set_name ( image, "<INITRD>" );
@@ -202,6 +203,7 @@ static int initrd_init ( void ) {
 	if ( ! image->data ) {
 		DBGC ( colour, "RUNTIME could not allocate %zd bytes for "
 		       "initrd\n", initrd_len );
+		rc = -ENOMEM;
 		goto err_umalloc;
 	}
 	image->len = initrd_len;
