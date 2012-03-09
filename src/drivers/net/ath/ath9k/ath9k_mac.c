@@ -638,7 +638,7 @@ void ath9k_hw_enable_interrupts(struct ath_hw *ah)
 		REG_READ(ah, AR_IMR), REG_READ(ah, AR_IER));
 }
 
-void ath9k_hw_set_interrupts(struct ath_hw *ah, enum ath9k_int ints)
+void ath9k_hw_set_interrupts(struct ath_hw *ah, unsigned int ints)
 {
 	enum ath9k_int omask = ah->imask;
 	u32 mask, mask2;

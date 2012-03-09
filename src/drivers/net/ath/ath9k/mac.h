@@ -668,7 +668,6 @@ enum ath9k_key_type {
 
 struct ath_hw;
 struct ath9k_channel;
-enum ath9k_int;
 
 u32 ath9k_hw_gettxbuf(struct ath_hw *ah, u32 q);
 void ath9k_hw_puttxbuf(struct ath_hw *ah, u32 q, u32 txdp);
@@ -699,7 +698,7 @@ int ath9k_hw_stopdmarecv(struct ath_hw *ah, int *reset);
 
 /* Interrupt Handling */
 int ath9k_hw_intrpend(struct ath_hw *ah);
-void ath9k_hw_set_interrupts(struct ath_hw *ah, enum ath9k_int ints);
+void ath9k_hw_set_interrupts(struct ath_hw *ah, unsigned int ints);
 void ath9k_hw_enable_interrupts(struct ath_hw *ah);
 void ath9k_hw_disable_interrupts(struct ath_hw *ah);
 
