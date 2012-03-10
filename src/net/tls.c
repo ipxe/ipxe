@@ -65,7 +65,7 @@ static void tls_clear_cipher ( struct tls_session *tls,
  * TLS uses 24-bit integers in several places, which are awkward to
  * parse in C.
  */
-static unsigned long tls_uint24 ( uint8_t field24[3] ) {
+static unsigned long tls_uint24 ( const uint8_t field24[3] ) {
 	return ( ( field24[0] << 16 ) + ( field24[1] << 8 ) + field24[2] );
 }
 
@@ -874,7 +874,7 @@ static int tls_send_finished ( struct tls_session *tls ) {
  * @ret rc		Return status code
  */
 static int tls_new_change_cipher ( struct tls_session *tls,
-				   void *data, size_t len ) {
+				   const void *data, size_t len ) {
 	int rc;
 
 	if ( ( len != 1 ) || ( *( ( uint8_t * ) data ) != 1 ) ) {
@@ -902,13 +902,14 @@ static int tls_new_change_cipher ( struct tls_session *tls,
  * @v len		Length of plaintext record
  * @ret rc		Return status code
  */
-static int tls_new_alert ( struct tls_session *tls, void *data, size_t len ) {
-	struct {
+static int tls_new_alert ( struct tls_session *tls, const void *data,
+			   size_t len ) {
+	const struct {
 		uint8_t level;
 		uint8_t description;
 		char next[0];
 	} __attribute__ (( packed )) *alert = data;
-	void *end = alert->next;
+	const void *end = alert->next;
 
 	/* Sanity check */
 	if ( end != ( data + len ) ) {
@@ -942,20 +943,20 @@ static int tls_new_alert ( struct tls_session *tls, void *data, size_t len ) {
  * @ret rc		Return status code
  */
 static int tls_new_server_hello ( struct tls_session *tls,
-				  void *data, size_t len ) {
-	struct {
+				  const void *data, size_t len ) {
+	const struct {
 		uint16_t version;
 		uint8_t random[32];
 		uint8_t session_id_len;
 		char next[0];
 	} __attribute__ (( packed )) *hello_a = data;
-	struct {
+	const struct {
 		uint8_t session_id[hello_a->session_id_len];
 		uint16_t cipher_suite;
 		uint8_t compression_method;
 		char next[0];
 	} __attribute__ (( packed )) *hello_b = ( void * ) &hello_a->next;
-	void *end = hello_b->next;
+	const void *end = hello_b->next;
 	uint16_t version;
 	int rc;
 
@@ -1008,18 +1009,18 @@ static int tls_new_server_hello ( struct tls_session *tls,
  * @ret rc		Return status code
  */
 static int tls_new_certificate ( struct tls_session *tls,
-				 void *data, size_t len ) {
-	struct {
+				 const void *data, size_t len ) {
+	const struct {
 		uint8_t length[3];
 		uint8_t certificates[0];
 	} __attribute__ (( packed )) *certificate = data;
-	struct {
+	const struct {
 		uint8_t length[3];
 		uint8_t certificate[0];
 	} __attribute__ (( packed )) *element =
 		  ( ( void * ) certificate->certificates );
 	size_t elements_len = tls_uint24 ( certificate->length );
-	void *end = ( certificate->certificates + elements_len );
+	const void *end = ( certificate->certificates + elements_len );
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -1066,7 +1067,7 @@ static int tls_new_certificate ( struct tls_session *tls,
  * @ret rc		Return status code
  */
 static int tls_new_certificate_request ( struct tls_session *tls,
-					 void *data __unused,
+					 const void *data __unused,
 					 size_t len __unused ) {
 
 	/* We can only send an empty certificate (as mandated by
@@ -1090,11 +1091,11 @@ static int tls_new_certificate_request ( struct tls_session *tls,
  * @ret rc		Return status code
  */
 static int tls_new_server_hello_done ( struct tls_session *tls,
-				       void *data, size_t len ) {
-	struct {
+				       const void *data, size_t len ) {
+	const struct {
 		char next[0];
 	} __attribute__ (( packed )) *hello_done = data;
-	void *end = hello_done->next;
+	const void *end = hello_done->next;
 
 	/* Sanity check */
 	if ( end != ( data + len ) ) {
@@ -1122,12 +1123,12 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
  * @ret rc		Return status code
  */
 static int tls_new_finished ( struct tls_session *tls,
-			      void *data, size_t len ) {
-	struct {
+			      const void *data, size_t len ) {
+	const struct {
 		uint8_t verify_data[12];
 		char next[0];
 	} __attribute__ (( packed )) *finished = data;
-	void *end = finished->next;
+	const void *end = finished->next;
 	uint8_t digest[ tls_verify_handshake_len ( tls ) ];
 	uint8_t verify_data[ sizeof ( finished->verify_data ) ];
 
@@ -1167,12 +1168,12 @@ static int tls_new_finished ( struct tls_session *tls,
  * @ret rc		Return status code
  */
 static int tls_new_handshake ( struct tls_session *tls,
-			       void *data, size_t len ) {
-	void *end = ( data + len );
+			       const void *data, size_t len ) {
+	const void *end = ( data + len );
 	int rc;
 
 	while ( data != end ) {
-		struct {
+		const struct {
 			uint8_t type;
 			uint8_t length[3];
 			uint8_t payload[0];
@@ -1242,8 +1243,8 @@ static int tls_new_handshake ( struct tls_session *tls,
  * @v len		Length of plaintext record
  * @ret rc		Return status code
  */
-static int tls_new_record ( struct tls_session *tls,
-			    unsigned int type, void *data, size_t len ) {
+static int tls_new_record ( struct tls_session *tls, unsigned int type,
+			    const void *data, size_t len ) {
 
 	switch ( type ) {
 	case TLS_TYPE_CHANGE_CIPHER:
@@ -1588,7 +1589,8 @@ static int tls_split_block ( struct tls_session *tls,
  * @ret rc		Return status code
  */
 static int tls_new_ciphertext ( struct tls_session *tls,
-				struct tls_header *tlshdr, void *ciphertext ) {
+				struct tls_header *tlshdr,
+				const void *ciphertext ) {
 	struct tls_header plaintext_tlshdr;
 	struct tls_cipherspec *cipherspec = &tls->rx_cipherspec;
 	struct cipher_algorithm *cipher = cipherspec->suite->cipher;

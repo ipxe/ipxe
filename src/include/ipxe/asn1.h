@@ -23,7 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 struct asn1_cursor {
 	/** Start of data */
-	void *data;
+	const void *data;
 	/** Length of data */
 	size_t len;
 };
