@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/asn1.h>
 
@@ -44,10 +45,22 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_uniqify ( EINFO_EINVAL, 0x03, "Field overruns cursor" )
 
 /**
+ * Invalidate ASN.1 object cursor
+ *
+ * @v cursor		ASN.1 object cursor
+ */
+void asn1_invalidate_cursor ( struct asn1_cursor *cursor ) {
+	static uint8_t asn1_invalid_object[] = { ASN1_END, 0 };
+
+	cursor->data = asn1_invalid_object;
+	cursor->len = 0;
+}
+
+/**
  * Start parsing ASN.1 object
  *
  * @v cursor		ASN.1 object cursor
- * @v type		Expected type
+ * @v type		Expected type, or ASN1_ANY
  * @ret len		Length of object body, or negative error
  *
  * The object cursor will be updated to point to the start of the
@@ -67,7 +80,7 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 	}
 
 	/* Check the tag byte */
-	if ( *( ( uint8_t * ) cursor->data ) != type ) {
+	if ( ( type != ASN1_ANY ) && ( type != asn1_type ( cursor ) ) ) {
 		DBGC ( cursor, "ASN1 %p type mismatch (expected %d, got %d)\n",
 		       cursor, type, *( ( uint8_t * ) cursor->data ) );
 		return -ENXIO;
@@ -110,7 +123,7 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
  * Enter ASN.1 object
  *
  * @v cursor		ASN.1 object cursor
- * @v type		Expected type
+ * @v type		Expected type, or ASN1_ANY
  * @ret rc		Return status code
  *
  * The object cursor will be updated to point to the body of the
@@ -137,7 +150,7 @@ int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
  * Skip ASN.1 object if present
  *
  * @v cursor		ASN.1 object cursor
- * @v type		Expected type
+ * @v type		Expected type, or ASN1_ANY
  * @ret rc		Return status code
  *
  * The object cursor will be updated to point to the next ASN.1
@@ -168,7 +181,7 @@ int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
  * Skip ASN.1 object
  *
  * @v cursor		ASN.1 object cursor
- * @v type		Expected type
+ * @v type		Expected type, or ASN1_ANY
  * @ret rc		Return status code
  *
  * The object cursor will be updated to point to the next ASN.1
@@ -184,4 +197,43 @@ int asn1_skip ( struct asn1_cursor *cursor, unsigned int type ) {
 	}
 
 	return 0;
+}
+
+/**
+ * Enter ASN.1 object of any type
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret rc		Return status code
+ */
+int asn1_enter_any ( struct asn1_cursor *cursor ) {
+	return asn1_enter ( cursor, ASN1_ANY );
+}
+
+/**
+ * Skip ASN.1 object of any type
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret rc		Return status code
+ */
+int asn1_skip_any ( struct asn1_cursor *cursor ) {
+	return asn1_skip ( cursor, ASN1_ANY );
+}
+
+/**
+ * Compare two ASN.1 objects
+ *
+ * @v cursor1		ASN.1 object cursor
+ * @v cursor2		ASN.1 object cursor
+ * @ret difference	Difference as returned by memcmp()
+ *
+ * Note that invalid and empty cursors will compare as equal with each
+ * other.
+ */
+int asn1_compare ( const struct asn1_cursor *cursor1,
+		   const struct asn1_cursor *cursor2 ) {
+	int difference;
+
+	difference = ( cursor2->len - cursor1->len );
+	return ( difference ? difference :
+		 memcmp ( cursor1->data, cursor2->data, cursor1->len ) );
 }
