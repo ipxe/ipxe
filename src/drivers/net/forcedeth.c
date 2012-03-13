@@ -740,8 +740,7 @@ forcedeth_open ( struct net_device *netdev )
 		 ioaddr + NvRegReceiverStatus );
 
 	/* Set up slot time */
-	get_random_bytes ( &low, sizeof(low) );
-	low &= NVREG_SLOTTIME_MASK;
+	low = ( random() & NVREG_SLOTTIME_MASK );
 	writel ( low | NVREG_SLOTTIME_DEFAULT, ioaddr + NvRegSlotTime );
 
 	writel ( NVREG_TX_DEFERRAL_DEFAULT , ioaddr + NvRegTxDeferral );
