@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/hmac.h>
 #include <ipxe/list.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/rbg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -515,7 +516,8 @@ static int wpa_handle_1_of_4 ( struct wpa_common_ctx *ctx,
 	ctx->state = WPA_WORKING;
 	memcpy ( ctx->Anonce, pkt->nonce, sizeof ( ctx->Anonce ) );
 	if ( ! ctx->have_Snonce ) {
-		get_random_bytes ( ctx->Snonce, sizeof ( ctx->Snonce ) );
+		rbg_generate ( NULL, 0, 0, ctx->Snonce,
+			       sizeof ( ctx->Snonce ) );
 		ctx->have_Snonce = 1;
 	}
 
