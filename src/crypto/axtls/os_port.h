@@ -35,10 +35,10 @@ static inline void get_random_NZ ( int num_rand_bytes, uint8_t *rand_data ) {
 #define aes 1
 #if OBJECT
 
-/* AES_CTX is not defined at this point, so omit prototypes */
+struct aes_key_st;
 
-static void AES_encrypt();
-static void AES_decrypt();
+static void AES_encrypt ( const struct aes_key_st *ctx, uint32_t *data );
+static void AES_decrypt ( const struct aes_key_st *ctx, uint32_t *data );
 
 void axtls_aes_encrypt ( void *ctx, uint32_t *data ) {
 	AES_encrypt ( ctx, data );
