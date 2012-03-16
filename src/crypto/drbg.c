@@ -128,8 +128,8 @@ int drbg_instantiate ( struct drbg_state *state, const void *personal,
 		       state, strerror ( rc ) );
 		return rc;
 	}
-	assert ( len >= min_len );
-	assert ( len <= sizeof ( data ) );
+	assert ( len >= ( int ) min_len );
+	assert ( len <= ( int ) sizeof ( data ) );
 
 	/* 9.  initial_working_state = Instantiate_algorithm (
 	 *     entropy_input, nonce, personalization_string ).
