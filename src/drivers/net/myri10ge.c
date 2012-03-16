@@ -304,10 +304,10 @@ static int myri10ge_command ( struct myri10ge_private *priv,
 	command->response_addr.high = 0;
 	command->response_addr.low
 		= htonl ( virt_to_bus ( &priv->dma->command_response ) );
-	for ( i=0; i<36; i+=4 )
-		* ( uint32 * ) &command->pad[i] = 0;
+	for ( i=0; i<9; i++ )
+		command->pad[i] = 0;
 	wmb();
-	* ( uint32 * ) &command->pad[36] = 0;
+	command->pad[9] = 0;
 
 	/* Wait up to 2 seconds for a response. */
 

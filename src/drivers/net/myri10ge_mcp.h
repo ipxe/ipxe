@@ -80,7 +80,7 @@ struct mcp_cmd {
   /* 16 */
   struct mcp_dma_addr response_addr;
   /* 24 */
-  uint8_t pad[40];
+  uint32_t pad[10];
 };
 typedef struct mcp_cmd mcp_cmd_t;
 
