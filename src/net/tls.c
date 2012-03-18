@@ -43,6 +43,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/rbg.h>
 #include <ipxe/tls.h>
 
+/* Disambiguate the various error causes */
+#define EACCES_UNTRUSTED \
+	__einfo_error ( EINFO_EACCES_UNTRUSTED )
+#define EINFO_EACCES_UNTRUSTED \
+	__einfo_uniqify ( EINFO_EACCES, 0x01, "Untrusted certificate chain" )
+#define EACCES_WRONG_NAME \
+	__einfo_error ( EINFO_EACCES_WRONG_NAME )
+#define EINFO_EACCES_WRONG_NAME \
+	__einfo_uniqify ( EINFO_EACCES, 0x02, "Incorrect server name" )
+
 static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 				const void *data, size_t len );
 static void tls_clear_cipher ( struct tls_session *tls,
@@ -1003,6 +1013,63 @@ static int tls_new_server_hello ( struct tls_session *tls,
 	return 0;
 }
 
+/** TLS certificate chain context */
+struct tls_certificate_context {
+	/** TLS session */
+	struct tls_session *tls;
+	/** Current certificate */
+	const void *current;
+	/** End of certificates */
+	const void *end;
+};
+
+/**
+ * Parse next certificate in TLS certificate list
+ *
+ * @v cert		X.509 certificate to fill in
+ * @v ctx		Context
+ * @ret rc		Return status code
+ */
+static int tls_parse_next ( struct x509_certificate *cert, void *ctx ) {
+	struct tls_certificate_context *context = ctx;
+	struct tls_session *tls = context->tls;
+	const struct {
+		uint8_t length[3];
+		uint8_t certificate[0];
+	} __attribute__ (( packed )) *current = context->current;
+	const void *data;
+	const void *next;
+	size_t len;
+	int rc;
+
+	/* Return error at end of chain */
+	if ( context->current >= context->end ) {
+		DBGC ( tls, "TLS %p reached end of certificate chain\n", tls );
+		return -EACCES_UNTRUSTED;
+	}
+
+	/* Extract current certificate and update context */
+	data = current->certificate;
+	len = tls_uint24 ( current->length );
+	next = ( data + len );
+	if ( next > context->end ) {
+		DBGC ( tls, "TLS %p overlength certificate\n", tls );
+		DBGC_HDA ( tls, 0, context->current,
+			   ( context->end - context->current ) );
+		return -EINVAL;
+	}
+	context->current = next;
+
+	/* Parse current certificate */
+	if ( ( rc = x509_parse ( cert, data, len ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not parse certificate: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
 /**
  * Receive new Certificate handshake record
  *
@@ -1017,19 +1084,14 @@ static int tls_new_certificate ( struct tls_session *tls,
 		uint8_t length[3];
 		uint8_t certificates[0];
 	} __attribute__ (( packed )) *certificate = data;
-	const struct {
-		uint8_t length[3];
-		uint8_t certificate[0];
-	} __attribute__ (( packed )) *element =
-		  ( ( void * ) certificate->certificates );
 	size_t elements_len = tls_uint24 ( certificate->length );
 	const void *end = ( certificate->certificates + elements_len );
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
+	struct tls_certificate_context context;
 	struct x509_certificate cert;
+	struct x509_name *name = &cert.subject.name;
 	struct x509_public_key *key = &cert.subject.public_key;
-	const void *cert_data;
-	size_t cert_len;
 	int rc;
 
 	/* Sanity check */
@@ -1040,38 +1102,33 @@ static int tls_new_certificate ( struct tls_session *tls,
 		return -EINVAL;
 	}
 
-	/* Traverse certificate chain */
-	do {
-		cert_data = element->certificate;
-		cert_len = tls_uint24 ( element->length );
-		if ( ( cert_data + cert_len ) > end ) {
-			DBGC ( tls, "TLS %p received corrupt Server "
-			       "Certificate\n", tls );
-			DBGC_HD ( tls, data, len );
-			return -EINVAL;
-		}
+	/* Parse first certificate and validate certificate chain */
+	context.tls = tls;
+	context.current = certificate->certificates;
+	context.end = end;
+	if ( ( rc = x509_validate_chain ( tls_parse_next, &context,
+					  NULL, &cert ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not validate certificate chain: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
 
-		// HACK
+	/* Verify server name */
+	if ( ( name->len != strlen ( tls->name ) ) ||
+	     ( memcmp ( name->data, tls->name, name->len ) != 0 ) ) {
+		DBGC ( tls, "TLS %p server name incorrect\n", tls );
+		return -EACCES_WRONG_NAME;
+	}
 
-		/* Parse certificate */
-		if ( ( rc = x509_parse ( &cert, cert_data, cert_len ) ) != 0 ) {
-			DBGC ( tls, "TLS %p cannot parse certificate: %s\n",
-			       tls, strerror ( rc ) );
-			return rc;
-		}
+	/* Initialise public key algorithm */
+	if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
+				  key->raw.data, key->raw.len ) ) != 0 ) {
+		DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
 
-		/* Initialise public key algorithm */
-		if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
-					  key->raw.data, key->raw.len ) ) != 0){
-			DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
-			       tls, strerror ( rc ) );
-			return rc;
-		}
-
-		return 0;
-	} while ( element != end );
-
-	return -EINVAL;
+	return 0;
 }
 
 /**
