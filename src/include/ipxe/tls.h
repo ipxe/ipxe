@@ -182,9 +182,6 @@ struct tls_session {
 	/** SHA256 context for handshake verification */
 	uint8_t handshake_sha256_ctx[SHA256_CTX_SIZE];
 
-	/** Hack: server RSA public key */
-	struct x509_rsa_public_key rsa;
-
 	/** TX sequence number */
 	uint64_t tx_seq;
 	/** TX pending transmissions */

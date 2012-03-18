@@ -39,7 +39,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
-#include <ipxe/asn1.h>
 #include <ipxe/x509.h>
 #include <ipxe/rbg.h>
 #include <ipxe/tls.h>
@@ -90,7 +89,6 @@ static void free_tls ( struct refcnt *refcnt ) {
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
-	x509_free_rsa_public_key ( &tls->rsa );
 	free ( tls->rx_data );
 
 	/* Free TLS structure itself */
@@ -437,28 +435,28 @@ struct tls_cipher_suite tls_cipher_suites[] = {
 	{
 		.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 ),
 		.key_len = ( 256 / 8 ),
-		.pubkey = &pubkey_null, /* FIXME */
+		.pubkey = &rsa_algorithm,
 		.cipher = &aes_cbc_algorithm,
 		.digest = &sha256_algorithm,
 	},
 	{
 		.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 ),
 		.key_len = ( 128 / 8 ),
-		.pubkey = &pubkey_null, /* FIXME */
+		.pubkey = &rsa_algorithm,
 		.cipher = &aes_cbc_algorithm,
 		.digest = &sha256_algorithm,
 	},
 	{
 		.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA ),
 		.key_len = ( 256 / 8 ),
-		.pubkey = &pubkey_null, /* FIXME */
+		.pubkey = &rsa_algorithm,
 		.cipher = &aes_cbc_algorithm,
 		.digest = &sha1_algorithm,
 	},
 	{
 		.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA ),
 		.key_len = ( 128 / 8 ),
-		.pubkey = &pubkey_null, /* FIXME */
+		.pubkey = &rsa_algorithm,
 		.cipher = &aes_cbc_algorithm,
 		.digest = &sha1_algorithm,
 	},
@@ -496,6 +494,11 @@ tls_find_cipher_suite ( unsigned int cipher_suite ) {
  */
 static void tls_clear_cipher ( struct tls_session *tls __unused,
 			       struct tls_cipherspec *cipherspec ) {
+
+	if ( cipherspec->suite ) {
+		pubkey_final ( cipherspec->suite->pubkey,
+			       cipherspec->pubkey_ctx );
+	}
 	free ( cipherspec->dynamic );
 	memset ( cipherspec, 0, sizeof ( cipherspec ) );
 	cipherspec->suite = &tls_cipher_suite_null;
@@ -523,13 +526,12 @@ static int tls_set_cipher ( struct tls_session *tls,
 	
 	/* Allocate dynamic storage */
 	total = ( pubkey->ctxsize + 2 * cipher->ctxsize + digest->digestsize );
-	dynamic = malloc ( total );
+	dynamic = zalloc ( total );
 	if ( ! dynamic ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for crypto "
 		       "context\n", tls, total );
 		return -ENOMEM;
 	}
-	memset ( dynamic, 0, total );
 
 	/* Assign storage */
 	cipherspec->dynamic = dynamic;
@@ -793,37 +795,38 @@ static int tls_send_certificate ( struct tls_session *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_client_key_exchange ( struct tls_session *tls ) {
-	/* FIXME: Hack alert */
-	RSA_CTX *rsa_ctx = NULL;
-	RSA_pub_key_new ( &rsa_ctx, tls->rsa.modulus, tls->rsa.modulus_len,
-			  tls->rsa.exponent, tls->rsa.exponent_len );
+	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
+	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
+	size_t max_len = pubkey_max_len ( pubkey, cipherspec->pubkey_ctx );
 	struct {
 		uint32_t type_length;
 		uint16_t encrypted_pre_master_secret_len;
-		uint8_t encrypted_pre_master_secret[rsa_ctx->num_octets];
+		uint8_t encrypted_pre_master_secret[max_len];
 	} __attribute__ (( packed )) key_xchg;
+	size_t unused;
+	int len;
+	int rc;
 
+	/* Encrypt pre-master secret using server's public key */
 	memset ( &key_xchg, 0, sizeof ( key_xchg ) );
-	key_xchg.type_length = ( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
-				 htonl ( sizeof ( key_xchg ) -
-					 sizeof ( key_xchg.type_length ) ) );
-	key_xchg.encrypted_pre_master_secret_len
-		= htons ( sizeof ( key_xchg.encrypted_pre_master_secret ) );
-
-	/* FIXME: Hack alert */
-	DBGC ( tls, "RSA encrypting plaintext, modulus, exponent:\n" );
-	DBGC_HD ( tls, &tls->pre_master_secret,
-		  sizeof ( tls->pre_master_secret ) );
-	DBGC_HD ( tls, tls->rsa.modulus, tls->rsa.modulus_len );
-	DBGC_HD ( tls, tls->rsa.exponent, tls->rsa.exponent_len );
-	RSA_encrypt ( rsa_ctx, ( const uint8_t * ) &tls->pre_master_secret,
-		      sizeof ( tls->pre_master_secret ),
-		      key_xchg.encrypted_pre_master_secret, 0 );
-	DBGC ( tls, "RSA encrypt done.  Ciphertext:\n" );
-	DBGC_HD ( tls, &key_xchg.encrypted_pre_master_secret,
-		  sizeof ( key_xchg.encrypted_pre_master_secret ) );
-	RSA_free ( rsa_ctx );
-
+	len = pubkey_encrypt ( pubkey, cipherspec->pubkey_ctx,
+			       &tls->pre_master_secret,
+			       sizeof ( tls->pre_master_secret ),
+			       key_xchg.encrypted_pre_master_secret );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( tls, "TLS %p could not encrypt pre-master secret: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+	unused = ( max_len - len );
+	key_xchg.type_length =
+		( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
+		  htonl ( sizeof ( key_xchg ) -
+			  sizeof ( key_xchg.type_length ) - unused ) );
+	key_xchg.encrypted_pre_master_secret_len =
+		htons ( sizeof ( key_xchg.encrypted_pre_master_secret ) -
+			unused );
 
 	return tls_send_handshake ( tls, &key_xchg, sizeof ( key_xchg ) );
 }
@@ -1021,7 +1024,10 @@ static int tls_new_certificate ( struct tls_session *tls,
 		  ( ( void * ) certificate->certificates );
 	size_t elements_len = tls_uint24 ( certificate->length );
 	const void *end = ( certificate->certificates + elements_len );
+	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
+	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	struct asn1_cursor cursor;
+	struct x509_rsa_public_key key;
 	int rc;
 
 	/* Sanity check */
@@ -1044,12 +1050,20 @@ static int tls_new_certificate ( struct tls_session *tls,
 		}
 
 		// HACK
-		if ( ( rc = x509_rsa_public_key ( &cursor,
-						  &tls->rsa ) ) != 0 ) {
-			DBGC ( tls, "TLS %p cannot determine RSA public key: "
-			       "%s\n", tls, strerror ( rc ) );
+		if ( ( rc = x509_rsa_public_key ( &cursor, &key ) ) != 0 ) {
+			DBGC ( tls, "TLS %p cannot parse public key: %s\n",
+			       tls, strerror ( rc ) );
 			return rc;
 		}
+
+		/* Initialise public key algorithm */
+		if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
+					  key.raw.data, key.raw.len ) ) != 0){
+			DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
+			       tls, strerror ( rc ) );
+			return rc;
+		}
+
 		return 0;
 
 		element = ( cursor.data + cursor.len );

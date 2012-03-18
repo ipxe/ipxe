@@ -33,161 +33,33 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * documented in RFC2313.
  */
 
-/** Object Identifier for "rsaEncryption" (1.2.840.113549.1.1.1) */
-static const uint8_t oid_rsa_encryption[] = { 0x2a, 0x86, 0x48, 0x86, 0xf7,
-					      0x0d, 0x01, 0x01, 0x01 };
-
 /**
- * Identify X.509 certificate public key
+ * Identify X.509 certificate RSA public key
  *
  * @v certificate	Certificate
- * @v algorithm		Public key algorithm to fill in
- * @v pubkey		Public key value to fill in
+ * @v rsa		RSA public key to fill in
  * @ret rc		Return status code
  */
-static int x509_public_key ( const struct asn1_cursor *certificate,
-			     struct asn1_cursor *algorithm,
-			     struct asn1_cursor *pubkey ) {
-	struct asn1_cursor cursor;
+int x509_rsa_public_key ( const struct asn1_cursor *certificate,
+			  struct x509_rsa_public_key *key ) {
+	struct asn1_cursor *cursor = &key->raw;
 	int rc;
 
 	/* Locate subjectPublicKeyInfo */
-	memcpy ( &cursor, certificate, sizeof ( cursor ) );
-	rc = ( asn1_enter ( &cursor, ASN1_SEQUENCE ), /* Certificate */
-	       asn1_enter ( &cursor, ASN1_SEQUENCE ), /* tbsCertificate */
-	       asn1_skip_if_exists ( &cursor, ASN1_EXPLICIT_TAG(0) ),/*version*/
-	       asn1_skip ( &cursor, ASN1_INTEGER ), /* serialNumber */
-	       asn1_skip ( &cursor, ASN1_SEQUENCE ), /* signature */
-	       asn1_skip ( &cursor, ASN1_SEQUENCE ), /* issuer */
-	       asn1_skip ( &cursor, ASN1_SEQUENCE ), /* validity */
-	       asn1_skip ( &cursor, ASN1_SEQUENCE ), /* name */
-	       asn1_enter ( &cursor, ASN1_SEQUENCE )/* subjectPublicKeyInfo*/);
+	memcpy ( cursor, certificate, sizeof ( *cursor ) );
+	rc = ( asn1_enter ( cursor, ASN1_SEQUENCE ), /* Certificate */
+	       asn1_enter ( cursor, ASN1_SEQUENCE ), /* tbsCertificate */
+	       asn1_skip_if_exists ( cursor, ASN1_EXPLICIT_TAG(0) ),/*version*/
+	       asn1_skip ( cursor, ASN1_INTEGER ), /* serialNumber */
+	       asn1_skip ( cursor, ASN1_SEQUENCE ), /* signature */
+	       asn1_skip ( cursor, ASN1_SEQUENCE ), /* issuer */
+	       asn1_skip ( cursor, ASN1_SEQUENCE ), /* validity */
+	       asn1_skip ( cursor, ASN1_SEQUENCE ) /* name */ );
 	if ( rc != 0 ) {
 		DBG ( "Cannot locate subjectPublicKeyInfo in:\n" );
 		DBG_HDA ( 0, certificate->data, certificate->len );
 		return rc;
 	}
-
-	/* Locate algorithm */
-	memcpy ( algorithm, &cursor, sizeof ( *algorithm ) );
-	rc = ( asn1_enter ( algorithm, ASN1_SEQUENCE ) /* algorithm */ );
-	if ( rc != 0 ) {
-		DBG ( "Cannot locate algorithm in:\n" );
-		DBG_HDA ( 0, certificate->data, certificate->len );
-		return rc;
-	}
-
-	/* Locate subjectPublicKey */
-	memcpy ( pubkey, &cursor, sizeof ( *pubkey ) );
-	rc = ( asn1_skip ( pubkey, ASN1_SEQUENCE ), /* algorithm */
-	       asn1_enter ( pubkey, ASN1_BIT_STRING ) /* subjectPublicKey*/ );
-	if ( rc != 0 ) {
-		DBG ( "Cannot locate subjectPublicKey in:\n" );
-		DBG_HDA ( 0, certificate->data, certificate->len );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Identify X.509 certificate RSA modulus and public exponent
- *
- * @v certificate	Certificate
- * @v rsa		RSA public key to fill in
- * @ret rc		Return status code
- *
- * The caller is responsible for eventually calling
- * x509_free_rsa_public_key() to free the storage allocated to hold
- * the RSA modulus and exponent.
- */
-int x509_rsa_public_key ( const struct asn1_cursor *certificate,
-			  struct x509_rsa_public_key *rsa_pubkey ) {
-	struct asn1_cursor algorithm;
-	struct asn1_cursor pubkey;
-	struct asn1_cursor modulus;
-	struct asn1_cursor exponent;
-	int rc;
-
-	/* First, extract the public key algorithm and key data */
-	if ( ( rc = x509_public_key ( certificate, &algorithm,
-				      &pubkey ) ) != 0 )
-		return rc;
-
-	/* Check that algorithm is RSA */
-	rc = ( asn1_enter ( &algorithm, ASN1_OID ) /* algorithm */ );
-	if ( rc != 0 ) {
-		DBG ( "Cannot locate algorithm:\n" );
-		DBG_HDA ( 0, certificate->data, certificate->len );
-	return rc;
-	}
-	if ( ( algorithm.len != sizeof ( oid_rsa_encryption ) ) ||
-	     ( memcmp ( algorithm.data, &oid_rsa_encryption,
-			sizeof ( oid_rsa_encryption ) ) != 0 ) ) {
-		DBG ( "algorithm is not rsaEncryption in:\n" );
-		DBG_HDA ( 0, certificate->data, certificate->len );
-		return -ENOTSUP;
-	}
-
-	/* Check that public key is a byte string, i.e. that the
-	 * "unused bits" byte contains zero.
-	 */
-	if ( ( pubkey.len < 1 ) ||
-	     ( ( *( uint8_t * ) pubkey.data ) != 0 ) ) {
-		DBG ( "subjectPublicKey is not a byte string in:\n" );
-		DBG_HDA ( 0, certificate->data, certificate->len );
-		return -ENOTSUP;
-	}
-	pubkey.data++;
-	pubkey.len--;
-
-	/* Pick out the modulus and exponent */
-	rc = ( asn1_enter ( &pubkey, ASN1_SEQUENCE ) /* RSAPublicKey */ );
-	if ( rc != 0 ) {
-		DBG ( "Cannot locate RSAPublicKey in:\n" );
-		DBG_HDA ( 0, certificate->data, certificate->len );
-		return -ENOTSUP;
-	}
-	memcpy ( &modulus, &pubkey, sizeof ( modulus ) );
-	rc = ( asn1_enter ( &modulus, ASN1_INTEGER ) /* modulus */ );
-	if ( rc != 0 ) {
-		DBG ( "Cannot locate modulus in:\n" );
-		DBG_HDA ( 0, certificate->data, certificate->len );
-		return -ENOTSUP;
-	}
-	if ( modulus.len && ( ! *( ( uint8_t * ) modulus.data ) ) ) {
-		/* Skip positive sign byte */
-		modulus.data++;
-		modulus.len--;
-	}
-	memcpy ( &exponent, &pubkey, sizeof ( exponent ) );
-	rc = ( asn1_skip ( &exponent, ASN1_INTEGER ), /* modulus */
-	       asn1_enter ( &exponent, ASN1_INTEGER ) /* publicExponent */ );
-	if ( rc != 0 ) {
-		DBG ( "Cannot locate publicExponent in:\n" );
-		DBG_HDA ( 0, certificate->data, certificate->len );
-		return -ENOTSUP;
-	}
-	if ( exponent.len && ( ! *( ( uint8_t * ) exponent.data ) ) ) {
-		/* Skip positive sign byte */
-		exponent.data++;
-		exponent.len--;
-	}
-
-	/* Allocate space and copy out modulus and exponent */
-	rsa_pubkey->modulus = malloc ( modulus.len + exponent.len );
-	if ( ! rsa_pubkey->modulus )
-		return -ENOMEM;
-	rsa_pubkey->exponent = ( rsa_pubkey->modulus + modulus.len );
-	memcpy ( rsa_pubkey->modulus, modulus.data, modulus.len );
-	rsa_pubkey->modulus_len = modulus.len;
-	memcpy ( rsa_pubkey->exponent, exponent.data, exponent.len );
-	rsa_pubkey->exponent_len = exponent.len;
-
-	DBG2 ( "RSA modulus:\n" );
-	DBG2_HDA ( 0, rsa_pubkey->modulus, rsa_pubkey->modulus_len );
-	DBG2 ( "RSA exponent:\n" );
-	DBG2_HDA ( 0, rsa_pubkey->exponent, rsa_pubkey->exponent_len );
 
 	return 0;
 }
