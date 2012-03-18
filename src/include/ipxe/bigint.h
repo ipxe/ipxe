@@ -197,15 +197,29 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v multiplier	Big integer to be multiplied
  * @v modulus		Big integer modulus
  * @v result		Big integer to hold result
+ * @v tmp		Temporary working space
  */
 #define bigint_mod_multiply( multiplicand, multiplier, modulus,		\
-			     result ) do {				\
+			     result, tmp ) do {				\
 	unsigned int size = bigint_size (multiplicand);			\
 	bigint_mod_multiply_raw ( (multiplicand)->element,		\
 				  (multiplier)->element,		\
 				  (modulus)->element,			\
-				  (result)->element, size );		\
+				  (result)->element, size, tmp );	\
 	} while ( 0 )
+
+/**
+ * Calculate temporary working space required for moduluar multiplication
+ *
+ * @v modulus		Big integer modulus
+ * @ret len		Length of temporary working space
+ */
+#define bigint_mod_multiply_tmp_len( modulus ) ( {			\
+	unsigned int size = bigint_size (modulus);			\
+	sizeof ( struct {						\
+		bigint_t ( size * 2 ) temp_result;			\
+		bigint_t ( size * 2 ) temp_modulus;			\
+	} ); } )
 
 /**
  * Perform modular exponentiation of big integers
@@ -214,14 +228,33 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v modulus		Big integer modulus
  * @v exponent		Big integer exponent
  * @v result		Big integer to hold result
+ * @v tmp		Temporary working space
  */
-#define bigint_mod_exp( base, modulus, exponent, result ) do {		\
+#define bigint_mod_exp( base, modulus, exponent, result, tmp ) do {	\
 	unsigned int size = bigint_size (base);				\
 	unsigned int exponent_size = bigint_size (exponent);		\
 	bigint_mod_exp_raw ( (base)->element, (modulus)->element,	\
-			  (exponent)->element, (result)->element,	\
-			  size, exponent_size );			\
+			     (exponent)->element, (result)->element,	\
+			     size, exponent_size, tmp );		\
 	} while ( 0 )
+
+/**
+ * Calculate temporary working space required for moduluar exponentiation
+ *
+ * @v modulus		Big integer modulus
+ * @v exponent		Big integer exponent
+ * @ret len		Length of temporary working space
+ */
+#define bigint_mod_exp_tmp_len( modulus, exponent ) ( {			\
+	unsigned int size = bigint_size (modulus);			\
+	unsigned int exponent_size = bigint_size (exponent);		\
+	size_t mod_multiply_len =					\
+		bigint_mod_multiply_tmp_len (modulus);			\
+	sizeof ( struct {						\
+		bigint_t ( size ) temp_base;				\
+		bigint_t ( exponent_size ) temp_exponent;		\
+		uint8_t mod_multiply[mod_multiply_len];			\
+	} ); } )
 
 #include <bits/bigint.h>
 
@@ -257,12 +290,12 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 			       const bigint_element_t *multiplier0,
 			       const bigint_element_t *modulus0,
 			       bigint_element_t *result0,
-			       unsigned int size );
+			       unsigned int size, void *tmp );
 void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			  const bigint_element_t *modulus0,
 			  const bigint_element_t *exponent0,
 			  bigint_element_t *result0,
-			  unsigned int size,
-			  unsigned int exponent_size );
+			  unsigned int size, unsigned int exponent_size,
+			  void *tmp );
 
 #endif /* _IPXE_BIGINT_H */

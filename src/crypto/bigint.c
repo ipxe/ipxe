@@ -35,12 +35,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v multiplier0	Element 0 of big integer to be multiplied
  * @v modulus0		Element 0 of big integer modulus
  * @v result0		Element 0 of big integer to hold result
+ * @v size		Number of elements in base, modulus, and result
+ * @v tmp		Temporary working space
  */
 void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 			       const bigint_element_t *multiplier0,
 			       const bigint_element_t *modulus0,
 			       bigint_element_t *result0,
-			       unsigned int size ) {
+			       unsigned int size, void *tmp ) {
 	const bigint_t ( size ) __attribute__ (( may_alias )) *multiplicand =
 		( ( const void * ) multiplicand0 );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *multiplier =
@@ -49,30 +51,35 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 		( ( const void * ) modulus0 );
 	bigint_t ( size ) __attribute__ (( may_alias )) *result =
 		( ( void * ) result0 );
-	bigint_t ( size * 2 ) temp_result;
-	bigint_t ( size * 2 ) temp_modulus;
+	struct {
+		bigint_t ( size * 2 ) result;
+		bigint_t ( size * 2 ) modulus;
+	} *temp = tmp;
 	int rotation;
 	int i;
 
+	/* Sanity check */
+	assert ( sizeof ( *temp ) == bigint_mod_multiply_tmp_len ( modulus ) );
+
 	/* Perform multiplication */
-	bigint_multiply ( multiplicand, multiplier, &temp_result );
+	bigint_multiply ( multiplicand, multiplier, &temp->result );
 
 	/* Rescale modulus to match result */
-	bigint_grow ( modulus, &temp_modulus );
-	rotation = ( bigint_max_set_bit ( &temp_result ) -
-		     bigint_max_set_bit ( &temp_modulus ) );
+	bigint_grow ( modulus, &temp->modulus );
+	rotation = ( bigint_max_set_bit ( &temp->result ) -
+		     bigint_max_set_bit ( &temp->modulus ) );
 	for ( i = 0 ; i < rotation ; i++ )
-		bigint_rol ( &temp_modulus );
+		bigint_rol ( &temp->modulus );
 
 	/* Subtract multiples of modulus */
 	for ( i = 0 ; i <= rotation ; i++ ) {
-		if ( bigint_is_geq ( &temp_result, &temp_modulus ) )
-			bigint_subtract ( &temp_modulus, &temp_result );
-		bigint_ror ( &temp_modulus );
+		if ( bigint_is_geq ( &temp->result, &temp->modulus ) )
+			bigint_subtract ( &temp->modulus, &temp->result );
+		bigint_ror ( &temp->modulus );
 	}
 
 	/* Resize result */
-	bigint_shrink ( &temp_result, result );
+	bigint_shrink ( &temp->result, result );
 
 	/* Sanity check */
 	assert ( bigint_is_geq ( modulus, result ) );
@@ -87,13 +94,14 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
  * @v result0		Element 0 of big integer to hold result
  * @v size		Number of elements in base, modulus, and result
  * @v exponent_size	Number of elements in exponent
+ * @v tmp		Temporary working space
  */
 void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			  const bigint_element_t *modulus0,
 			  const bigint_element_t *exponent0,
 			  bigint_element_t *result0,
-			  unsigned int size,
-			  unsigned int exponent_size ) {
+			  unsigned int size, unsigned int exponent_size,
+			  void *tmp ) {
 	const bigint_t ( size ) __attribute__ (( may_alias )) *base =
 		( ( const void * ) base0 );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *modulus =
@@ -102,21 +110,25 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 		*exponent = ( ( const void * ) exponent0 );
 	bigint_t ( size ) __attribute__ (( may_alias )) *result =
 		( ( void * ) result0 );
-	bigint_t ( size ) temp_base;
-	bigint_t ( exponent_size ) temp_exponent;
+	size_t mod_multiply_len = bigint_mod_multiply_tmp_len ( modulus );
+	struct {
+		bigint_t ( size ) base;
+		bigint_t ( exponent_size ) exponent;
+		uint8_t mod_multiply[mod_multiply_len];
+	} *temp = tmp;
 	static const uint8_t start[1] = { 0x01 };
 
-	memcpy ( &temp_base, base, sizeof ( temp_base ) );
-	memcpy ( &temp_exponent, exponent, sizeof ( temp_exponent ) );
+	memcpy ( &temp->base, base, sizeof ( temp->base ) );
+	memcpy ( &temp->exponent, exponent, sizeof ( temp->exponent ) );
 	bigint_init ( result, start, sizeof ( start ) );
 
-	while ( ! bigint_is_zero ( &temp_exponent ) ) {
-		if ( bigint_bit_is_set ( &temp_exponent, 0 ) ) {
-			bigint_mod_multiply ( result, &temp_base,
-					      modulus, result );
+	while ( ! bigint_is_zero ( &temp->exponent ) ) {
+		if ( bigint_bit_is_set ( &temp->exponent, 0 ) ) {
+			bigint_mod_multiply ( result, &temp->base, modulus,
+					      result, temp->mod_multiply );
 		}
-		bigint_ror ( &temp_exponent );
-		bigint_mod_multiply ( &temp_base, &temp_base, modulus,
-				      &temp_base );
+		bigint_ror ( &temp->exponent );
+		bigint_mod_multiply ( &temp->base, &temp->base, modulus,
+				      &temp->base, temp->mod_multiply );
 	}
 }

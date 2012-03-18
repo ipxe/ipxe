@@ -123,11 +123,15 @@ static int rsa_alloc ( struct rsa_context *context, size_t modulus_len,
 		       size_t exponent_len ) {
 	unsigned int size = bigint_required_size ( modulus_len );
 	unsigned int exponent_size = bigint_required_size ( exponent_len );
+	bigint_t ( size ) *modulus;
+	bigint_t ( exponent_size ) *exponent;
+	size_t tmp_len = bigint_mod_exp_tmp_len ( modulus, exponent );
 	struct {
 		bigint_t ( size ) modulus;
 		bigint_t ( exponent_size ) exponent;
 		bigint_t ( size ) input;
 		bigint_t ( size ) output;
+		uint8_t tmp[tmp_len];
 	} __attribute__ (( packed )) *dynamic;
 
 	/* Free any existing dynamic storage */
@@ -147,6 +151,7 @@ static int rsa_alloc ( struct rsa_context *context, size_t modulus_len,
 	context->exponent_size = exponent_size;
 	context->input0 = &dynamic->input.element[0];
 	context->output0 = &dynamic->output.element[0];
+	context->tmp = &dynamic->tmp;
 
 	return 0;
 }
@@ -309,7 +314,7 @@ static void rsa_cipher ( struct rsa_context *context,
 	bigint_init ( input, in, context->max_len );
 
 	/* Perform modular exponentiation */
-	bigint_mod_exp ( input, modulus, exponent, output );
+	bigint_mod_exp ( input, modulus, exponent, output, context->tmp );
 
 	/* Copy out result */
 	bigint_done ( output, out, context->max_len );

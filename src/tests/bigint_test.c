@@ -162,7 +162,8 @@ void bigint_mod_multiply_sample ( const bigint_element_t *multiplicand0,
 				  const bigint_element_t *multiplier0,
 				  const bigint_element_t *modulus0,
 				  bigint_element_t *result0,
-				  unsigned int size ) {
+				  unsigned int size,
+				  void *tmp ) {
 	const bigint_t ( size ) *multiplicand __attribute__ (( may_alias ))
 		= ( ( const void * ) multiplicand0 );
 	const bigint_t ( size ) *multiplier __attribute__ (( may_alias ))
@@ -172,14 +173,15 @@ void bigint_mod_multiply_sample ( const bigint_element_t *multiplicand0,
 	bigint_t ( size ) *result __attribute__ (( may_alias ))
 		= ( ( void * ) result0 );
 
-	bigint_mod_multiply ( multiplicand, multiplier, modulus, result );
+	bigint_mod_multiply ( multiplicand, multiplier, modulus, result, tmp );
 }
 
 void bigint_mod_exp_sample ( const bigint_element_t *base0,
 			     const bigint_element_t *modulus0,
 			     const bigint_element_t *exponent0,
 			     bigint_element_t *result0,
-			     unsigned int size, unsigned int exponent_size ) {
+			     unsigned int size, unsigned int exponent_size,
+			     void *tmp ) {
 	const bigint_t ( size ) *base __attribute__ (( may_alias ))
 		= ( ( const void * ) base0 );
 	const bigint_t ( size ) *modulus __attribute__ (( may_alias ))
@@ -189,7 +191,7 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	bigint_t ( size ) *result __attribute__ (( may_alias ))
 		= ( ( void * ) result0 );
 
-	bigint_mod_exp ( base, modulus, exponent, result );
+	bigint_mod_exp ( base, modulus, exponent, result, tmp );
 }
 
 /**
@@ -471,6 +473,8 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	bigint_t ( size ) multiplier_temp;				\
 	bigint_t ( size ) modulus_temp;					\
 	bigint_t ( size ) result_temp;					\
+	size_t tmp_len = bigint_mod_multiply_tmp_len ( &modulus_temp ); \
+	uint8_t tmp[tmp_len];						\
 	{} /* Fix emacs alignment */					\
 									\
 	assert ( bigint_size ( &multiplier_temp ) ==			\
@@ -490,7 +494,7 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	DBG_HDA ( 0, &multiplier_temp, sizeof ( multiplier_temp ) );	\
 	DBG_HDA ( 0, &modulus_temp, sizeof ( modulus_temp ) );		\
 	bigint_mod_multiply ( &multiplicand_temp, &multiplier_temp,	\
-			      &modulus_temp, &result_temp );		\
+			      &modulus_temp, &result_temp, tmp );	\
 	DBG_HDA ( 0, &result_temp, sizeof ( result_temp ) );		\
 	bigint_done ( &result_temp, result_raw, sizeof ( result_raw ) );\
 									\
@@ -520,6 +524,9 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	bigint_t ( size ) modulus_temp;					\
 	bigint_t ( exponent_size ) exponent_temp;			\
 	bigint_t ( size ) result_temp;					\
+	size_t tmp_len = bigint_mod_exp_tmp_len ( &modulus_temp,	\
+						  &exponent_temp );	\
+	uint8_t tmp[tmp_len];						\
 	{} /* Fix emacs alignment */					\
 									\
 	assert ( bigint_size ( &modulus_temp ) ==			\
@@ -536,7 +543,7 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	DBG_HDA ( 0, &modulus_temp, sizeof ( modulus_temp ) );		\
 	DBG_HDA ( 0, &exponent_temp, sizeof ( exponent_temp ) );	\
 	bigint_mod_exp ( &base_temp, &modulus_temp, &exponent_temp,	\
-			 &result_temp );				\
+			 &result_temp, tmp );				\
 	DBG_HDA ( 0, &result_temp, sizeof ( result_temp ) );		\
 	bigint_done ( &result_temp, result_raw, sizeof ( result_raw ) );\
 									\

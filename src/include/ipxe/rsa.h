@@ -129,6 +129,8 @@ struct rsa_context {
 	bigint_element_t *input0;
 	/** Output buffer */
 	bigint_element_t *output0;
+	/** Temporary working space for modular exponentiation */
+	void *tmp;
 };
 
 extern struct pubkey_algorithm rsa_algorithm;
