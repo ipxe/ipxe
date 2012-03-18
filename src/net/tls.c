@@ -1026,8 +1026,10 @@ static int tls_new_certificate ( struct tls_session *tls,
 	const void *end = ( certificate->certificates + elements_len );
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
-	struct asn1_cursor cursor;
-	struct x509_rsa_public_key key;
+	struct x509_certificate cert;
+	struct x509_public_key *key = &cert.subject.public_key;
+	const void *cert_data;
+	size_t cert_len;
 	int rc;
 
 	/* Sanity check */
@@ -1040,9 +1042,9 @@ static int tls_new_certificate ( struct tls_session *tls,
 
 	/* Traverse certificate chain */
 	do {
-		cursor.data = element->certificate;
-		cursor.len = tls_uint24 ( element->length );
-		if ( ( cursor.data + cursor.len ) > end ) {
+		cert_data = element->certificate;
+		cert_len = tls_uint24 ( element->length );
+		if ( ( cert_data + cert_len ) > end ) {
 			DBGC ( tls, "TLS %p received corrupt Server "
 			       "Certificate\n", tls );
 			DBGC_HD ( tls, data, len );
@@ -1050,23 +1052,23 @@ static int tls_new_certificate ( struct tls_session *tls,
 		}
 
 		// HACK
-		if ( ( rc = x509_rsa_public_key ( &cursor, &key ) ) != 0 ) {
-			DBGC ( tls, "TLS %p cannot parse public key: %s\n",
+
+		/* Parse certificate */
+		if ( ( rc = x509_parse ( &cert, cert_data, cert_len ) ) != 0 ) {
+			DBGC ( tls, "TLS %p cannot parse certificate: %s\n",
 			       tls, strerror ( rc ) );
 			return rc;
 		}
 
 		/* Initialise public key algorithm */
 		if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
-					  key.raw.data, key.raw.len ) ) != 0){
+					  key->raw.data, key->raw.len ) ) != 0){
 			DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
 			       tls, strerror ( rc ) );
 			return rc;
 		}
 
 		return 0;
-
-		element = ( cursor.data + cursor.len );
 	} while ( element != end );
 
 	return -EINVAL;
