@@ -34,3 +34,4 @@ REQUIRE_OBJECT ( aes_cbc_test );
 REQUIRE_OBJECT ( hmac_drbg_test );
 REQUIRE_OBJECT ( hash_df_test );
 REQUIRE_OBJECT ( bigint_test );
+REQUIRE_OBJECT ( rsa_test );
