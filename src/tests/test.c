@@ -29,9 +29,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
 #include <stdio.h>
+#include <errno.h>
 #include <assert.h>
 #include <ipxe/test.h>
 #include <ipxe/init.h>
+#include <ipxe/image.h>
 
 /** Current self-test set */
 static struct self_test *current_tests;
@@ -100,8 +102,9 @@ static void run_tests ( struct self_test *tests ) {
 /**
  * Run all self-tests
  *
+ * @ret rc		Return status code
  */
-static void test_init ( void ) {
+static int run_all_tests ( void ) {
 	struct self_test *tests;
 	unsigned int failures = 0;
 	unsigned int assertions = 0;
@@ -125,15 +128,50 @@ static void test_init ( void ) {
 			printf ( " with %d assertion failures", assertions );
 		}
 		printf ( "\n" );
+		return -EINPROGRESS;
 	} else {
 		printf ( "OK: all %d tests passed\n", total );
+		return 0;
 	}
+}
 
-	/* Lock system */
-	while ( 1 ) {}
+static int test_image_probe ( struct image *image __unused ) {
+	return -ENOTTY;
+}
+
+static int test_image_exec ( struct image *image __unused ) {
+	return run_all_tests();
+}
+
+static struct image_type test_image_type = {
+	.name = "self-tests",
+	.probe = test_image_probe,
+	.exec = test_image_exec,
+};
+
+static void test_image_free ( struct refcnt *refcnt __unused ) {
+	/* Do nothing */
+}
+
+static struct image test_image = {
+	.refcnt = REF_INIT ( test_image_free ),
+	.name = "<TESTS>",
+	.type = &test_image_type,
+};
+
+static void test_init ( void ) {
+	int rc;
+
+	/* Register self-tests image */
+	if ( ( rc = register_image ( &test_image ) ) != 0 ) {
+		DBG ( "Could not register self-test image: %s\n",
+		      strerror ( rc ) );
+		/* No way to report failure */
+		return;
+	}
 }
 
 /** Self-test initialisation function */
-struct init_fn test_init_fn __init_fn ( INIT_NORMAL ) = {
+struct init_fn test_init_fn __init_fn ( INIT_EARLY ) = {
 	.initialise = test_init,
 };
