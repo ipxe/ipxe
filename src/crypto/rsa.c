@@ -236,12 +236,13 @@ static int rsa_init ( void *ctx, const void *key, size_t key_len ) {
 
 		/* Check and skip unused-bits byte of bit string */
 		bit_string = cursor.data;
-		if ( cursor.len < 1 ) {
+		if ( ( cursor.len < sizeof ( *bit_string ) ) ||
+		     ( bit_string->unused != 0 ) ) {
 			rc = -EINVAL;
 			goto err_parse;
 		}
-		cursor.data++;
-		cursor.len--;
+		cursor.data = &bit_string->data;
+		cursor.len -= offsetof ( typeof ( *bit_string ), data );
 
 		/* Enter RSAPublicKey */
 		asn1_enter ( &cursor, ASN1_SEQUENCE );
