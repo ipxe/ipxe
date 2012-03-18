@@ -19,9 +19,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ENTROPY_PREFIX_null __null_
 #endif
 
-static inline __always_inline void
+static inline __always_inline int
 ENTROPY_INLINE ( null, entropy_enable ) ( void ) {
 	/* Do nothing */
+	return 0;
 }
 
 static inline __always_inline void

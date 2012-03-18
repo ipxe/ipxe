@@ -61,8 +61,9 @@ typedef uint8_t entropy_sample_t;
 /**
  * Enable entropy gathering
  *
+ * @ret rc		Return status code
  */
-void entropy_enable ( void );
+int entropy_enable ( void );
 
 /**
  * Disable entropy gathering

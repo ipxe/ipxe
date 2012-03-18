@@ -165,12 +165,15 @@ static void rtc_disable_int ( void ) {
 /**
  * Enable entropy gathering
  *
+ * @ret rc		Return status code
  */
-static void rtc_entropy_enable ( void ) {
+static int rtc_entropy_enable ( void ) {
 
 	rtc_hook_isr();
 	enable_irq ( RTC_IRQ );
 	rtc_enable_int();
+
+	return 0;
 }
 
 /**

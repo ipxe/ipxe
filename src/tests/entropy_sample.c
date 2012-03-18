@@ -48,7 +48,8 @@ static void entropy_sample_test_exec ( void ) {
 	for ( i = 0 ; i < ( SAMPLE_COUNT / SAMPLE_BLOCKSIZE ) ; i++ ) {
 
 		/* Collect one block of samples */
-		entropy_enable();
+		rc = entropy_enable();
+		ok ( rc == 0 );
 		for ( j = 0 ; j < SAMPLE_BLOCKSIZE ; j++ ) {
 			rc = get_noise ( &samples[j] );
 			ok ( rc == 0 );

@@ -422,7 +422,8 @@ int get_entropy_input_tmp ( unsigned int num_samples, uint8_t *tmp,
 	int rc;
 
 	/* Enable entropy gathering */
-	entropy_enable();
+	if ( ( rc = entropy_enable() ) != 0 )
+		return rc;
 
 	/* Perform mandatory startup tests, if not yet performed */
 	for ( ; startup_tested < startup_test_count() ; startup_tested++ ) {
