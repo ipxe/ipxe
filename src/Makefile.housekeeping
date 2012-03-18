@@ -637,6 +637,34 @@ $(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
 
 CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
 
+# List of trusted root certificates
+#
+TRUSTED_LIST	:= $(BIN)/.trusted.list
+ifeq ($(wildcard $(TRUSTED_LIST)),)
+TRUST_OLD := <invalid>
+else
+TRUST_OLD := $(shell cat $(TRUSTED_LIST))
+endif
+ifneq ($(TRUST_OLD),$(TRUST))
+$(shell $(ECHO) "$(TRUST)" > $(TRUSTED_LIST))
+endif
+
+$(TRUSTED_LIST) :
+
+VERYCLEANUP	+= $(TRUSTED_LIST)
+
+# Trusted root certificate fingerprints
+#
+TRUSTED_CERTS	:= $(subst $(COMMA), ,$(TRUST))
+TRUSTED_FPS	:= $(foreach CERT,$(TRUSTED_CERTS),\
+		     0x$(subst :,$(COMMA) 0x,$(lastword $(subst =, ,\
+			 $(shell $(OPENSSL) x509 -in $(CERT) -noout -sha256 \
+				 -fingerprint))))$(COMMA))
+
+$(BIN)/rootcert.o : $(TRUSTED_FILES) $(TRUSTED_LIST)
+
+CFLAGS_rootcert = $(if $(TRUSTED_FPS),-DTRUSTED="$(TRUSTED_FPS)")
+
 # Generate error usage information
 #
 $(BIN)/%.einfo : $(BIN)/%.o
