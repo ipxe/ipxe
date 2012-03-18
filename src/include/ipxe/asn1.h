@@ -20,6 +20,9 @@ struct asn1_cursor {
 /** ASN.1 end */
 #define ASN1_END 0x00
 
+/** ASN.1 boolean */
+#define ASN1_BOOLEAN 0x01
+
 /** ASN.1 integer */
 #define ASN1_INTEGER 0x02
 
@@ -48,7 +51,7 @@ struct asn1_cursor {
 #define ASN1_SET 0x31
 
 /** ASN.1 explicit tag */
-#define ASN1_EXPLICIT_TAG 0xa0
+#define ASN1_EXPLICIT_TAG( number) ( 0xa0 | (number) )
 
 /** ASN.1 "any tag" magic value */
 #define ASN1_ANY -1U
@@ -79,21 +82,26 @@ struct asn1_cursor {
 /** ASN.1 OID for iso(1) member-body(2) */
 #define ASN1_OID_ISO_MEMBERBODY ASN1_OID_INITIAL ( 1, 2 )
 
+/** ASN.1 OID for iso(1) identified-organization(3) */
+#define ASN1_OID_IDENTIFIED_ORGANIZATION ASN1_OID_INITIAL ( 1, 3 )
+
 /** ASN.1 OID for joint-iso-itu-t(2) ds(5) */
 #define ASN1_OID_DIRECTORY_SERVICES ASN1_OID_INITIAL ( 2, 5 )
 
-/** ASN.1 OID for joint-iso-itu-t(2) ds(5) attributeType(4) */
-#define ASN1_OID_ATTRIBUTE_TYPE \
-	ASN1_OID_DIRECTORY_SERVICES, ASN1_OID_SINGLE ( 4 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) ds(5) attributeType(4) commonName(3) */
-#define ASN1_OID_COMMON_NAME ASN1_OID_ATTRIBUTE_TYPE, ASN1_OID_SINGLE ( 3 )
+/** ASN.1 OID for joint-iso-itu-t(2) country(16) */
+#define ASN1_OID_COUNTRY ASN1_OID_INITIAL ( 2, 16 )
 
 /** Define an ASN.1 cursor containing an OID */
 #define ASN1_OID_CURSOR( oid_value ) {			\
 		.data = oid_value,			\
 		.len = sizeof ( oid_value ),		\
 	}
+
+/** An ASN.1 boolean */
+struct asn1_boolean {
+	/** Value */
+	uint8_t value;
+} __attribute__ (( packed ));
 
 /** An ASN.1 bit string */
 struct asn1_bit_string {
@@ -119,8 +127,12 @@ extern int asn1_enter ( struct asn1_cursor *cursor, unsigned int type );
 extern int asn1_skip_if_exists ( struct asn1_cursor *cursor,
 				 unsigned int type );
 extern int asn1_skip ( struct asn1_cursor *cursor, unsigned int type );
+extern int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type );
 extern int asn1_enter_any ( struct asn1_cursor *cursor );
 extern int asn1_skip_any ( struct asn1_cursor *cursor );
+extern int asn1_shrink_any ( struct asn1_cursor *cursor );
+extern int asn1_boolean ( const struct asn1_cursor *cursor );
+extern int asn1_integer ( const struct asn1_cursor *cursor, int *value );
 extern int asn1_compare ( const struct asn1_cursor *cursor1,
 			  const struct asn1_cursor *cursor2 );
 

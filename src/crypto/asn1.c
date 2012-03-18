@@ -43,6 +43,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EINVAL_ASN1_LEN )
 #define EINFO_EINVAL_ASN1_LEN \
 	__einfo_uniqify ( EINFO_EINVAL, 0x03, "Field overruns cursor" )
+#define EINVAL_ASN1_BOOLEAN \
+	__einfo_error ( EINFO_EINVAL_ASN1_BOOLEAN )
+#define EINFO_EINVAL_ASN1_BOOLEAN \
+	__einfo_uniqify ( EINFO_EINVAL, 0x04, "Invalid boolean" )
+#define EINVAL_ASN1_INTEGER \
+	__einfo_error ( EINFO_EINVAL_ASN1_INTEGER )
+#define EINFO_EINVAL_ASN1_INTEGER \
+	__einfo_uniqify ( EINFO_EINVAL, 0x04, "Invalid integer" )
 
 /**
  * Invalidate ASN.1 object cursor
@@ -191,10 +199,36 @@ int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
 int asn1_skip ( struct asn1_cursor *cursor, unsigned int type ) {
 	int rc;
 
-	if ( ( rc = asn1_skip_if_exists ( cursor, type ) ) < 0 ) {
+	if ( ( rc = asn1_skip_if_exists ( cursor, type ) ) != 0 ) {
 		asn1_invalidate_cursor ( cursor );
 		return rc;
 	}
+
+	return 0;
+}
+
+/**
+ * Shrink ASN.1 cursor to fit object
+ *
+ * @v cursor		ASN.1 object cursor
+ * @v type		Expected type, or ASN1_ANY
+ * @ret rc		Return status code
+ *
+ * The object cursor will be shrunk to contain only the current ASN.1
+ * object.  If any error occurs, the object cursor will be
+ * invalidated.
+ */
+int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type ) {
+	struct asn1_cursor next;
+	int rc;
+
+	/* Skip to next object */
+	memcpy ( &next, cursor, sizeof ( next ) );
+	if ( ( rc = asn1_skip ( &next, type ) ) != 0 )
+		return rc;
+
+	/* Shrink original cursor to contain only its first object */
+	cursor->len = ( next.data - cursor->data );
 
 	return 0;
 }
@@ -217,6 +251,76 @@ int asn1_enter_any ( struct asn1_cursor *cursor ) {
  */
 int asn1_skip_any ( struct asn1_cursor *cursor ) {
 	return asn1_skip ( cursor, ASN1_ANY );
+}
+
+/**
+ * Shrink ASN.1 object of any type
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret rc		Return status code
+ */
+int asn1_shrink_any ( struct asn1_cursor *cursor ) {
+	return asn1_shrink ( cursor, ASN1_ANY );
+}
+
+/**
+ * Parse value of ASN.1 boolean
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret value		Value, or negative error
+ */
+int asn1_boolean ( const struct asn1_cursor *cursor ) {
+	struct asn1_cursor contents;
+	const struct asn1_boolean *boolean;
+
+	/* Enter boolean */
+	memcpy ( &contents, cursor, sizeof ( contents ) );
+	asn1_enter ( &contents, ASN1_BOOLEAN );
+	if ( contents.len != sizeof ( *boolean ) )
+		return -EINVAL_ASN1_BOOLEAN;
+
+	/* Extract value */
+	boolean = contents.data;
+	return boolean->value;
+}
+
+/**
+ * Parse value of ASN.1 integer
+ *
+ * @v cursor		ASN.1 object cursor
+ * @v value		Value to fill in
+ * @ret rc		Return status code
+ */
+int asn1_integer ( const struct asn1_cursor *cursor, int *value ) {
+	struct asn1_cursor contents;
+	uint8_t high_byte;
+	int rc;
+
+	/* Enter integer */
+	memcpy ( &contents, cursor, sizeof ( contents ) );
+	if ( ( rc = asn1_enter ( &contents, ASN1_INTEGER ) ) != 0 )
+		return rc;
+	if ( contents.len < 1 )
+		return -EINVAL_ASN1_INTEGER;
+
+	/* Initialise value according to sign byte */
+	*value = *( ( int8_t * ) contents.data );
+	contents.data++;
+	contents.len--;
+
+	/* Process value */
+	while ( contents.len ) {
+		high_byte = ( (*value) >> ( 8 * ( sizeof ( *value ) - 1 ) ) );
+		if ( ( high_byte != 0x00 ) && ( high_byte != 0xff ) ) {
+			DBGC ( cursor, "ASN1 %p integer overflow\n", cursor );
+			return -EINVAL_ASN1_INTEGER;
+		}
+		*value = ( ( *value << 8 ) | *( ( uint8_t * ) contents.data ) );
+		contents.data++;
+		contents.len--;
+	}
+
+	return 0;
 }
 
 /**
