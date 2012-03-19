@@ -22,52 +22,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * RTC-based entropy source
  *
- * The CMOS/RTC registers are documented (with varying degrees of
- * accuracy and consistency) at
- *
- *    http://www.nondot.org/sabre/os/files/MiscHW/RealtimeClockFAQ.txt
- *    http://wiki.osdev.org/RTC
- *    http://wiki.osdev.org/CMOS
  */
 
 #include <stdint.h>
 #include <string.h>
 #include <biosint.h>
 #include <pic8259.h>
+#include <rtc.h>
 #include <ipxe/entropy.h>
-
-/** RTC IRQ */
-#define RTC_IRQ 8
-
-/** RTC interrupt vector */
-#define RTC_INT IRQ_INT ( RTC_IRQ )
-
-/** CMOS/RTC address (and NMI) register */
-#define CMOS_ADDRESS 0x70
-
-/** NMI disable bit */
-#define CMOS_DISABLE_NMI 0x80
-
-/** CMOS/RTC data register */
-#define CMOS_DATA 0x71
-
-/** RTC status register A */
-#define RTC_STATUS_A 0x0a
-
-/** RTC status register B */
-#define RTC_STATUS_B 0x0b
-
-/** RTC Periodic Interrupt Enabled bit */
-#define RTC_STATUS_B_PIE 0x40
-
-/** RTC status register C */
-#define RTC_STATUS_C 0x0c
-
-/** RTC status register D */
-#define RTC_STATUS_D 0x0d
-
-/** CMOS default address */
-#define CMOS_DEFAULT_ADDRESS RTC_STATUS_D
 
 /** RTC "interrupt triggered" flag */
 static uint8_t __text16 ( rtc_flag );

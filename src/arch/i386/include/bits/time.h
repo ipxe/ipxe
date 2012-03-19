@@ -9,4 +9,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <ipxe/rtc_time.h>
+
 #endif /* _BITS_TIME_H */
