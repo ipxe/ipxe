@@ -85,6 +85,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EACCES_KEY_USAGE )
 #define EINFO_EACCES_KEY_USAGE \
 	__einfo_uniqify ( EINFO_EACCES, 0x03, "Incorrect key usage" )
+#define EACCES_EXPIRED \
+	__einfo_error ( EINFO_EACCES_EXPIRED )
+#define EINFO_EACCES_EXPIRED \
+	__einfo_uniqify ( EINFO_EACCES, 0x04, "Expired (or not yet valid)" )
 
 /** "commonName" object identifier */
 static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
@@ -1036,14 +1040,14 @@ static int x509_check_signature ( struct x509_certificate *cert,
 }
 
 /**
- * Validate X.509 certificate against signing certificate
+ * Validate X.509 certificate against issuer certificate
  *
  * @v cert		X.509 certificate
  * @v issuer		X.509 issuer certificate
  * @ret rc		Return status code
  */
-int x509_validate ( struct x509_certificate *cert,
-		    struct x509_certificate *issuer ) {
+int x509_validate_issuer ( struct x509_certificate *cert,
+			   struct x509_certificate *issuer ) {
 	struct x509_public_key *public_key = &issuer->subject.public_key;
 	int rc;
 
@@ -1140,18 +1144,44 @@ int x509_validate_root ( struct x509_certificate *cert,
 }
 
 /**
+ * Validate X.509 certificate validity period
+ *
+ * @v cert		X.509 certificate
+ * @v time		Time at which to validate certificate
+ * @ret rc		Return status code
+ */
+int x509_validate_time ( struct x509_certificate *cert, time_t time ) {
+	struct x509_validity *validity = &cert->validity;
+
+	/* Check validity period */
+	if ( time < validity->not_before.time ) {
+		DBGC ( cert, "X509 %p is not yet valid (at time %lld)\n",
+		       cert, time );
+		return -EACCES_EXPIRED;
+	}
+	if ( time > validity->not_after.time ) {
+		DBGC ( cert, "X509 %p has expired (at time %lld)\n",
+		       cert, time );
+		return -EACCES_EXPIRED;
+	}
+
+	DBGC ( cert, "X509 %p is valid (at time %lld)\n", cert, time );
+	return 0;
+}
+
+/**
  * Validate X.509 certificate chain
  *
  * @v parse_next	Parse next X.509 certificate in chain
  * @v context		Context for parse_next()
+ * @v time		Time at which to validate certificates
  * @v root		Root certificate store, or NULL to use default
  * @v first		Initial X.509 certificate to fill in, or NULL
  * @ret rc		Return status code
  */
 int x509_validate_chain ( int ( * parse_next ) ( struct x509_certificate *cert,
 						 void *context ),
-			  void *context,
-			  struct x509_root *root,
+			  void *context, time_t time, struct x509_root *root,
 			  struct x509_certificate *first ) {
 	struct x509_certificate temp[2];
 	struct x509_certificate *current = &temp[0];
@@ -1177,6 +1207,10 @@ int x509_validate_chain ( int ( * parse_next ) ( struct x509_certificate *cert,
 	/* Process chain */
 	while ( 1 ) {
 
+		/* Check that certificate is valid at specified time */
+		if ( ( rc = x509_validate_time ( current, time ) ) != 0 )
+			return rc;
+
 		/* Succeed if we have reached a root certificate */
 		if ( x509_validate_root ( current, root ) == 0 )
 			return 0;
@@ -1188,8 +1222,8 @@ int x509_validate_chain ( int ( * parse_next ) ( struct x509_certificate *cert,
 			return rc;
 		}
 
-		/* Validate current certificate */
-		if ( ( rc = x509_validate ( current, next ) ) != 0 )
+		/* Validate current certificate against next certificate */
+		if ( ( rc = x509_validate_issuer ( current, next ) ) != 0 )
 			return rc;
 
 		/* Move to next certificate in chain */

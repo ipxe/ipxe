@@ -204,17 +204,19 @@ struct x509_root {
 
 extern int x509_parse ( struct x509_certificate *cert,
 			const void *data, size_t len );
-extern int x509_validate ( struct x509_certificate *cert,
-			   struct x509_certificate *issuer );
+extern int x509_validate_issuer ( struct x509_certificate *cert,
+				  struct x509_certificate *issuer );
 extern void x509_fingerprint ( struct x509_certificate *cert,
 			       struct digest_algorithm *digest,
 			       void *fingerprint );
 extern int x509_validate_root ( struct x509_certificate *cert,
 				struct x509_root *root );
+extern int x509_validate_time ( struct x509_certificate *cert, time_t time );
 extern int x509_validate_chain ( int ( * parse_next )
 				 ( struct x509_certificate *cert,
 				   void *context ),
-				 void *context, struct x509_root *root,
+				 void *context, time_t time,
+				 struct x509_root *root,
 				 struct x509_certificate *first );
 
 #endif /* _IPXE_X509_H */

@@ -1093,6 +1093,7 @@ static int tls_new_certificate ( struct tls_session *tls,
 	struct x509_certificate cert;
 	struct x509_name *name = &cert.subject.name;
 	struct x509_public_key *key = &cert.subject.public_key;
+	time_t now;
 	int rc;
 
 	/* Sanity check */
@@ -1107,8 +1108,9 @@ static int tls_new_certificate ( struct tls_session *tls,
 	context.tls = tls;
 	context.current = certificate->certificates;
 	context.end = end;
+	now = time ( NULL );
 	if ( ( rc = x509_validate_chain ( tls_parse_next, &context,
-					  NULL, &cert ) ) != 0 ) {
+					  now, NULL, &cert ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not validate certificate chain: %s\n",
 		       tls, strerror ( rc ) );
 		return rc;
