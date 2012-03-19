@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/asn1.h>
@@ -331,6 +332,7 @@ static int x509_parse_time ( struct x509_certificate *cert,
 		} __attribute__ (( packed )) named;
 		uint8_t raw[7];
 	} pairs;
+	struct tm tm;
 	const uint8_t *data;
 	size_t remaining;
 	unsigned int tens;
@@ -395,12 +397,16 @@ static int x509_parse_time ( struct x509_certificate *cert,
 	}
 
 	/* Fill in time */
-	time->year = ( ( pairs.named.century * 100 ) + pairs.named.year );
-	time->month = pairs.named.month;
-	time->day = pairs.named.day;
-	time->hour = pairs.named.hour;
-	time->minute = pairs.named.minute;
-	time->second = pairs.named.second;
+	tm.tm_year = ( ( ( pairs.named.century - 19 ) * 100 ) +
+		       pairs.named.year );
+	tm.tm_mon = ( pairs.named.month - 1 );
+	tm.tm_mday = pairs.named.day;
+	tm.tm_hour = pairs.named.hour;
+	tm.tm_min = pairs.named.minute;
+	tm.tm_sec = pairs.named.second;
+
+	/* Convert to seconds since the Epoch */
+	time->time = mktime ( &tm );
 
 	return 0;
 }
@@ -492,17 +498,13 @@ static int x509_parse_validity ( struct x509_certificate *cert,
 	/* Parse notBefore */
 	if ( ( rc = x509_parse_time ( cert, not_before, &cursor ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p valid from %04d-%02d-%02d %02d:%02d:%02d\n",
-	       cert, not_before->year, not_before->month, not_before->day,
-	       not_before->hour, not_before->minute, not_before->second );
+	DBGC ( cert, "X509 %p valid from time %lld\n", cert, not_before->time );
 	asn1_skip_any ( &cursor );
 
 	/* Parse notAfter */
 	if ( ( rc = x509_parse_time ( cert, not_after, &cursor ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p valid until %04d-%02d-%02d %02d:%02d:%02d\n",
-	       cert, not_after->year, not_after->month, not_after->day,
-	       not_after->hour, not_after->minute, not_after->second );
+	DBGC ( cert, "X509 %p valid until time %lld\n", cert, not_after->time );
 
 	return 0;
 }

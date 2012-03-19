@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stddef.h>
+#include <time.h>
 #include <ipxe/asn1.h>
 
 /** ASN.1 OID for joint-iso-itu-t(2) ds(5) attributeType(4) */
@@ -70,18 +71,8 @@ struct x509_issuer {
 
 /** An X.509 time */
 struct x509_time {
-	/** Year */
-	uint16_t year;
-	/** Month */
-	uint8_t month;
-	/** Day */
-	uint8_t day;
-	/** Hour */
-	uint8_t hour;
-	/** Minute */
-	uint8_t minute;
-	/** Second */
-	uint8_t second;
+	/** Seconds since the Epoch */
+	time_t time;
 };
 
 /** An X.509 certificate validity period */
