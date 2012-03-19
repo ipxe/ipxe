@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Drag in all applicable self-tests */
 REQUIRE_OBJECT ( list_test );
 REQUIRE_OBJECT ( byteswap_test );
+REQUIRE_OBJECT ( time_test );
 REQUIRE_OBJECT ( md5_test );
 REQUIRE_OBJECT ( sha1_test );
 REQUIRE_OBJECT ( sha256_test );
