@@ -7,6 +7,7 @@
  */
 
 #include <sys/time.h>
+#include <ipxe/time.h>
 
 /** Broken-down time */
 struct tm {
@@ -29,6 +30,21 @@ struct tm {
 	/** Daylight savings flag */
 	int tm_isdst;
 };
+
+/**
+ * Get current time in seconds since the Epoch
+ *
+ * @v t			Time to fill in, or NULL
+ * @ret time		Current time
+ */
+static inline time_t time ( time_t *t ) {
+	time_t now;
+
+	now = time_now();
+	if ( t )
+		*t = now;
+	return now;
+}
 
 extern time_t mktime ( struct tm *tm );
 

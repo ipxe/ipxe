@@ -19,6 +19,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define SMBIOS_PCBIOS
 #define SANBOOT_PCBIOS
 #define ENTROPY_RTC
+#define TIME_NULL
 
 #define	IMAGE_ELF		/* ELF image support */
 #define	IMAGE_MULTIBOOT		/* MultiBoot image support */

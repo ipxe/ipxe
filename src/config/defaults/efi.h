@@ -18,6 +18,7 @@
 #define SANBOOT_NULL
 #define BOFM_EFI
 #define ENTROPY_NULL
+#define TIME_NULL
 
 #define	IMAGE_EFI		/* EFI image support */
 #define	IMAGE_SCRIPT		/* iPXE script image support */
