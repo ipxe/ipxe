@@ -183,7 +183,7 @@ bigint_is_geq_raw ( const uint32_t *value0, const uint32_t *reference0,
 			       "loope 1b\n\t"
 			       "setae %b0\n\t"
 			       "cld\n\t"
-			       : "=r" ( result ), "=&S" ( discard_S ),
+			       : "=q" ( result ), "=&S" ( discard_S ),
 				 "=&D" ( discard_D ), "=&c" ( discard_c )
 			       : "0" ( 0 ), "1" ( &value->element[ size - 1 ] ),
 				 "2" ( &reference->element[ size - 1 ] ),
