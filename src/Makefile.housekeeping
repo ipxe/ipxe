@@ -629,12 +629,6 @@ EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
 
 $(BIN)/embedded.o : $(EMBEDDED_FILES) $(EMBEDDED_LIST)
 
-# This file uses .incbin inline assembly to include a binary file.
-# Unfortunately ccache does not detect this dependency and caches builds even
-# when the binary file has changed.
-#
-$(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
-
 CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
 
 # List of trusted root certificates
@@ -664,6 +658,80 @@ TRUSTED_FPS	:= $(foreach CERT,$(TRUSTED_CERTS),\
 $(BIN)/rootcert.o : $(TRUSTED_FILES) $(TRUSTED_LIST)
 
 CFLAGS_rootcert = $(if $(TRUSTED_FPS),-DTRUSTED="$(TRUSTED_FPS)")
+
+# (Single-element) list of client certificates
+#
+CERT_LIST := $(BIN)/.certificate.list
+ifeq ($(wildcard $(CERT_LIST)),)
+CERT_OLD := <invalid>
+else
+CERT_OLD := $(shell cat $(CERT_LIST))
+endif
+ifneq ($(CERT_OLD),$(CERT))
+$(shell $(ECHO) "$(CERT)" > $(CERT_LIST))
+endif
+
+$(CERT_LIST) :
+
+VERYCLEANUP += $(CERT_LIST)
+
+# Embedded client certificate
+#
+CERT_INC := $(BIN)/.certificate.der
+
+ifdef CERT
+$(CERT_INC) : $(CERT) $(CERT_LIST)
+	$(Q)$(OPENSSL) x509 -in $< -outform DER -out $@
+
+$(BIN)/clientcert.o : $(CERT_INC)
+endif
+
+CLEANUP += $(CERT_INC)
+
+$(BIN)/clientcert.o : $(CERT_LIST)
+
+CFLAGS_clientcert += $(if $(CERT),-DCERTIFICATE="\"$(CERT_INC)\"")
+
+# (Single-element) list of client private keys
+#
+KEY_LIST := $(BIN)/.private_key.list
+ifeq ($(wildcard $(KEY_LIST)),)
+KEY_OLD := <invalid>
+else
+KEY_OLD := $(shell cat $(KEY_LIST))
+endif
+ifneq ($(KEY_OLD),$(KEY))
+$(shell $(ECHO) "$(KEY)" > $(KEY_LIST))
+endif
+
+$(KEY_LIST) :
+
+VERYCLEANUP += $(KEY_LIST)
+
+# Embedded client private key
+#
+KEY_INC := $(BIN)/.private_key.der
+
+ifdef KEY
+$(KEY_INC) : $(KEY) $(KEY_LIST)
+	$(Q)$(OPENSSL) rsa -in $< -outform DER -out $@
+
+$(BIN)/clientcert.o : $(KEY_INC)
+endif
+
+CLEANUP += $(KEY_INC)
+
+$(BIN)/clientcert.o : $(KEY_LIST)
+
+CFLAGS_clientcert += $(if $(KEY),-DPRIVATE_KEY="\"$(KEY_INC)\"")
+
+# These files use .incbin inline assembly to include a binary file.
+# Unfortunately ccache does not detect this dependency and caches
+# builds even when the binary file has changed.
+#
+$(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
+
+$(BIN)/clientcert.o : override CC := env CCACHE_DISABLE=1 $(CC)
 
 # Generate error usage information
 #
