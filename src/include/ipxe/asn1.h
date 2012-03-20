@@ -152,6 +152,12 @@ struct asn1_cursor {
 	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
 	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 3 )
 
+/** ASN.1 OID for pkcs-signedData (1.2.840.113549.1.7.2) */
+#define ASN1_OID_SIGNEDDATA					\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
+	ASN1_OID_SINGLE ( 7 ), ASN1_OID_SINGLE ( 2 )
+
 /** Define an ASN.1 cursor containing an OID */
 #define ASN1_OID_CURSOR( oid_value ) {				\
 		.data = oid_value,				\
