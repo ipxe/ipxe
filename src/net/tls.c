@@ -81,6 +81,64 @@ static unsigned long tls_uint24 ( const uint8_t field24[3] ) {
 
 /******************************************************************************
  *
+ * Hybrid MD5+SHA1 hash as used by TLSv1.1 and earlier
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Initialise MD5+SHA1 algorithm
+ *
+ * @v ctx		MD5+SHA1 context
+ */
+static void md5_sha1_init ( void *ctx ) {
+	struct md5_sha1_context *context = ctx;
+
+	digest_init ( &md5_algorithm, context->md5 );
+	digest_init ( &sha1_algorithm, context->sha1 );
+}
+
+/**
+ * Accumulate data with MD5+SHA1 algorithm
+ *
+ * @v ctx		MD5+SHA1 context
+ * @v data		Data
+ * @v len		Length of data
+ */
+static void md5_sha1_update ( void *ctx, const void *data, size_t len ) {
+	struct md5_sha1_context *context = ctx;
+
+	digest_update ( &md5_algorithm, context->md5, data, len );
+	digest_update ( &sha1_algorithm, context->sha1, data, len );
+}
+
+/**
+ * Generate MD5+SHA1 digest
+ *
+ * @v ctx		MD5+SHA1 context
+ * @v out		Output buffer
+ */
+static void md5_sha1_final ( void *ctx, void *out ) {
+	struct md5_sha1_context *context = ctx;
+	struct md5_sha1_digest *digest = out;
+
+	digest_final ( &md5_algorithm, context->md5, digest->md5 );
+	digest_final ( &sha1_algorithm, context->sha1, digest->sha1 );
+}
+
+/** Hybrid MD5+SHA1 digest algorithm */
+static struct digest_algorithm md5_sha1_algorithm = {
+	.name		= "md5+sha1",
+	.ctxsize	= sizeof ( struct md5_sha1_context ),
+	.blocksize	= 0, /* Not applicable */
+	.digestsize	= sizeof ( struct md5_sha1_digest ),
+	.init		= md5_sha1_init,
+	.update		= md5_sha1_update,
+	.final		= md5_sha1_final,
+};
+
+/******************************************************************************
+ *
  * Cleanup functions
  *
  ******************************************************************************
@@ -633,8 +691,8 @@ static int tls_change_cipher ( struct tls_session *tls,
 static void tls_add_handshake ( struct tls_session *tls,
 				const void *data, size_t len ) {
 
-	digest_update ( &md5_algorithm, tls->handshake_md5_ctx, data, len );
-	digest_update ( &sha1_algorithm, tls->handshake_sha1_ctx, data, len );
+	digest_update ( &md5_sha1_algorithm, tls->handshake_md5_sha1_ctx,
+			data, len );
 	digest_update ( &sha256_algorithm, tls->handshake_sha256_ctx,
 			data, len );
 }
@@ -651,7 +709,7 @@ static size_t tls_verify_handshake_len ( struct tls_session *tls ) {
 		return SHA256_DIGEST_SIZE;
 	} else {
 		/* Use MD5+SHA1 for TLSv1.1 and earlier */
-		return ( MD5_DIGEST_SIZE + SHA1_DIGEST_SIZE );
+		return MD5_SHA1_DIGEST_SIZE;
 	}
 }
 
@@ -666,8 +724,7 @@ static size_t tls_verify_handshake_len ( struct tls_session *tls ) {
  */
 static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
 	union {
-		uint8_t md5[MD5_CTX_SIZE];
-		uint8_t sha1[SHA1_CTX_SIZE];
+		uint8_t md5_sha1[MD5_SHA1_CTX_SIZE];
 		uint8_t sha256[SHA256_CTX_SIZE];
 	} ctx;
 
@@ -678,12 +735,9 @@ static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
 		digest_final ( &sha256_algorithm, ctx.sha256, out );
 	} else {
 		/* Use MD5+SHA1 for TLSv1.1 and earlier */
-		memcpy ( ctx.md5, tls->handshake_md5_ctx, sizeof ( ctx.md5 ) );
-		digest_final ( &md5_algorithm, ctx.md5, out );
-		memcpy ( ctx.sha1, tls->handshake_sha1_ctx,
-			 sizeof ( ctx.sha1 ) );
-		digest_final ( &sha1_algorithm, ctx.sha1,
-			       ( out + MD5_DIGEST_SIZE ) );
+		memcpy ( ctx.md5_sha1, tls->handshake_md5_sha1_ctx,
+			 sizeof ( ctx.md5_sha1 ) );
+		digest_final ( &md5_sha1_algorithm, ctx.md5_sha1, out );
 	}
 }
 
@@ -2043,8 +2097,7 @@ int add_tls ( struct interface *xfer, const char *name,
 		      ( sizeof ( tls->pre_master_secret.random ) ) ) ) != 0 ) {
 		goto err_random;
 	}
-	digest_init ( &md5_algorithm, tls->handshake_md5_ctx );
-	digest_init ( &sha1_algorithm, tls->handshake_sha1_ctx );
+	digest_init ( &md5_sha1_algorithm, tls->handshake_md5_sha1_ctx );
 	digest_init ( &sha256_algorithm, tls->handshake_sha256_ctx );
 	tls->tx_pending = TLS_TX_CLIENT_HELLO;
 	process_init ( &tls->process, &tls_process_desc, &tls->refcnt );

@@ -145,6 +145,28 @@ struct tls_client_random {
 	uint8_t random[28];
 } __attribute__ (( packed ));
 
+/** An MD5+SHA1 context */
+struct md5_sha1_context {
+	/** MD5 context */
+	uint8_t md5[MD5_CTX_SIZE];
+	/** SHA-1 context */
+	uint8_t sha1[SHA1_CTX_SIZE];
+} __attribute__ (( packed ));
+
+/** MD5+SHA1 context size */
+#define MD5_SHA1_CTX_SIZE sizeof ( struct md5_sha1_context )
+
+/** An MD5+SHA1 digest */
+struct md5_sha1_digest {
+	/** MD5 digest */
+	uint8_t md5[MD5_DIGEST_SIZE];
+	/** SHA-1 digest */
+	uint8_t sha1[SHA1_DIGEST_SIZE];
+} __attribute__ (( packed ));
+
+/** MD5+SHA1 digest size */
+#define MD5_SHA1_DIGEST_SIZE sizeof ( struct md5_sha1_digest )
+
 /** A TLS session */
 struct tls_session {
 	/** Reference counter */
@@ -175,10 +197,8 @@ struct tls_session {
 	uint8_t server_random[32];
 	/** Client random bytes */
 	struct tls_client_random client_random;
-	/** MD5 context for handshake verification */
-	uint8_t handshake_md5_ctx[MD5_CTX_SIZE];
-	/** SHA1 context for handshake verification */
-	uint8_t handshake_sha1_ctx[SHA1_CTX_SIZE];
+	/** MD5+SHA1 context for handshake verification */
+	uint8_t handshake_md5_sha1_ctx[MD5_SHA1_CTX_SIZE];
 	/** SHA256 context for handshake verification */
 	uint8_t handshake_sha256_ctx[SHA256_CTX_SIZE];
 
