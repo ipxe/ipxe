@@ -201,6 +201,10 @@ struct tls_session {
 	uint8_t handshake_md5_sha1_ctx[MD5_SHA1_CTX_SIZE];
 	/** SHA256 context for handshake verification */
 	uint8_t handshake_sha256_ctx[SHA256_CTX_SIZE];
+	/** Digest algorithm used for handshake verification */
+	struct digest_algorithm *handshake_digest;
+	/** Digest algorithm context used for handshake verification */
+	uint8_t *handshake_ctx;
 
 	/** TX sequence number */
 	uint64_t tx_seq;
