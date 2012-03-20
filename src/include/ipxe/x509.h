@@ -14,22 +14,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <time.h>
 #include <ipxe/asn1.h>
 
-/** ASN.1 OID for joint-iso-itu-t(2) ds(5) attributeType(4) */
-#define ASN1_OID_ATTRIBUTE_TYPE \
-	ASN1_OID_DIRECTORY_SERVICES, ASN1_OID_SINGLE ( 4 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) ds(5) attributeType(4) commonName(3) */
-#define ASN1_OID_COMMON_NAME ASN1_OID_ATTRIBUTE_TYPE, ASN1_OID_SINGLE ( 3 )
-
-/** ASN.1 OID for id-ce */
-#define ASN1_OID_CE ASN1_OID_DIRECTORY_SERVICES, ASN1_OID_SINGLE ( 29 )
-
-/** ASN.1 OID for id-ce-keyUsage */
-#define ASN1_OID_KEYUSAGE ASN1_OID_CE, ASN1_OID_SINGLE ( 15 )
-
-/** ASN.1 OID for id-ce-basicConstraints */
-#define ASN1_OID_BASICCONSTRAINTS ASN1_OID_CE, ASN1_OID_SINGLE ( 19 )
-
 /** An X.509 algorithm */
 struct x509_algorithm {
 	/** Name */
