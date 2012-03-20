@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/crypto.h>
 #include <ipxe/bigint.h>
 #include <ipxe/asn1.h>
+#include <ipxe/tables.h>
 
 /** ASN.1 OID for iso(1) member-body(2) us(840) */
 #define ASN1_OID_ISO_US ASN1_OID_ISO_MEMBERBODY, ASN1_OID_DOUBLE ( 840 )
@@ -110,6 +111,23 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	  digest_size ),						\
 	RSA_DIGESTALGORITHM ( __VA_ARGS__ ),				\
 	RSA_DIGEST_PREFIX ( digest_size )
+
+/** An RSA digestInfo prefix */
+struct rsa_digestinfo_prefix {
+	/** Digest algorithm */
+	struct digest_algorithm *digest;
+	/** Prefix */
+	const void *data;
+	/** Length of prefix */
+	size_t len;
+};
+
+/** RSA digestInfo prefix table */
+#define RSA_DIGESTINFO_PREFIXES \
+	__table ( struct rsa_digestinfo_prefix, "rsa_digestinfo_prefixes" )
+
+/** Declare an RSA digestInfo prefix */
+#define __rsa_digestinfo_prefix __table_entry ( RSA_DIGESTINFO_PREFIXES, 01 )
 
 /** An RSA context */
 struct rsa_context {

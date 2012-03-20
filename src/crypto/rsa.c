@@ -39,45 +39,37 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * RSA is documented in RFC 3447.
  */
 
-/** An RSA digestInfo prefix */
-struct rsa_digestinfo_prefix {
-	/** Digest algorithm */
-	struct digest_algorithm *digest;
-	/** Prefix */
-	const void *data;
-	/** Length of prefix */
-	size_t len;
-};
-
-/** "id-md5" object identifier */
-static const uint8_t rsa_md5_prefix[] =
+/** MD5 digestInfo prefix */
+static const uint8_t rsa_md5_prefix_data[] =
 	{ RSA_DIGESTINFO_PREFIX ( MD5_DIGEST_SIZE, ASN1_OID_MD5 ) };
 
-/** "id-sha1" object identifier */
-static const uint8_t rsa_sha1_prefix[] =
+/** SHA-1 digestInfo prefix */
+static const uint8_t rsa_sha1_prefix_data[] =
 	{ RSA_DIGESTINFO_PREFIX ( SHA1_DIGEST_SIZE, ASN1_OID_SHA1 ) };
 
-/** "id-sha256" object identifier */
-static const uint8_t rsa_sha256_prefix[] =
+/** SHA-256 digestInfo prefix */
+static const uint8_t rsa_sha256_prefix_data[] =
 	{ RSA_DIGESTINFO_PREFIX ( SHA256_DIGEST_SIZE, ASN1_OID_SHA256 ) };
 
-/** RSA digestInfo prefixes */
-static struct rsa_digestinfo_prefix rsa_digestinfo_prefixes[] = {
-	{
-		.digest = &md5_algorithm,
-		.data = rsa_md5_prefix,
-		.len = sizeof ( rsa_md5_prefix ),
-	},
-	{
-		.digest = &sha1_algorithm,
-		.data = rsa_sha1_prefix,
-		.len = sizeof ( rsa_sha1_prefix ),
-	},
-	{
-		.digest = &sha256_algorithm,
-		.data = rsa_sha256_prefix,
-		.len = sizeof ( rsa_sha256_prefix ),
-	},
+/** MD5 digestInfo prefix */
+struct rsa_digestinfo_prefix rsa_md5_prefix __rsa_digestinfo_prefix = {
+	.digest = &md5_algorithm,
+	.data = rsa_md5_prefix_data,
+	.len = sizeof ( rsa_md5_prefix_data ),
+};
+
+/** SHA-1 digestInfo prefix */
+struct rsa_digestinfo_prefix rsa_sha1_prefix __rsa_digestinfo_prefix = {
+	.digest = &sha1_algorithm,
+	.data = rsa_sha1_prefix_data,
+	.len = sizeof ( rsa_sha1_prefix_data ),
+};
+
+/** SHA-256 digestInfo prefix */
+struct rsa_digestinfo_prefix rsa_sha256_prefix __rsa_digestinfo_prefix = {
+	.digest = &sha256_algorithm,
+	.data = rsa_sha256_prefix_data,
+	.len = sizeof ( rsa_sha256_prefix_data ),
 };
 
 /**
@@ -89,11 +81,8 @@ static struct rsa_digestinfo_prefix rsa_digestinfo_prefixes[] = {
 static struct rsa_digestinfo_prefix *
 rsa_find_prefix ( struct digest_algorithm *digest ) {
 	struct rsa_digestinfo_prefix *prefix;
-	unsigned int i;
 
-	for ( i = 0 ; i < ( sizeof ( rsa_digestinfo_prefixes ) /
-			    sizeof ( rsa_digestinfo_prefixes[0] ) ) ; i++ ) {
-		prefix = &rsa_digestinfo_prefixes[i];
+	for_each_table_entry ( prefix, RSA_DIGESTINFO_PREFIXES ) {
 		if ( prefix->digest == digest )
 			return prefix;
 	}
