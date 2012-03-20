@@ -80,6 +80,14 @@ struct tls_header {
 #define TLS_RSA_WITH_AES_128_CBC_SHA256 0x003c
 #define TLS_RSA_WITH_AES_256_CBC_SHA256 0x003d
 
+/* TLS hash algorithm identifiers */
+#define TLS_MD5_ALGORITHM 1
+#define TLS_SHA1_ALGORITHM 2
+#define TLS_SHA256_ALGORITHM 4
+
+/* TLS signature algorithm identifiers */
+#define TLS_RSA_ALGORITHM 1
+
 /* TLS extension types */
 #define TLS_SERVER_NAME 0
 #define TLS_SERVER_NAME_HOST_NAME 0
@@ -95,8 +103,9 @@ enum tls_tx_pending {
 	TLS_TX_CLIENT_HELLO = 0x0001,
 	TLS_TX_CERTIFICATE = 0x0002,
 	TLS_TX_CLIENT_KEY_EXCHANGE = 0x0004,
-	TLS_TX_CHANGE_CIPHER = 0x0008,
-	TLS_TX_FINISHED = 0x0010,
+	TLS_TX_CERTIFICATE_VERIFY = 0x0008,
+	TLS_TX_CHANGE_CIPHER = 0x0010,
+	TLS_TX_FINISHED = 0x0020,
 };
 
 /** A TLS cipher suite */
@@ -127,6 +136,24 @@ struct tls_cipherspec {
 	void *cipher_next_ctx;
 	/** MAC secret */
 	void *mac_secret;
+};
+
+/** A TLS signature and hash algorithm identifier */
+struct tls_signature_hash_id {
+	/** Hash algorithm */
+	uint8_t hash;
+	/** Signature algorithm */
+	uint8_t signature;
+} __attribute__ (( packed ));
+
+/** A TLS signature algorithm */
+struct tls_signature_hash_algorithm {
+	/** Digest algorithm */
+	struct digest_algorithm *digest;
+	/** Public-key algorithm */
+	struct pubkey_algorithm *pubkey;
+	/** Numeric code */
+	struct tls_signature_hash_id code;
 };
 
 /** TLS pre-master secret */
@@ -205,6 +232,8 @@ struct tls_session {
 	struct digest_algorithm *handshake_digest;
 	/** Digest algorithm context used for handshake verification */
 	uint8_t *handshake_ctx;
+	/** Public-key algorithm used for Certificate Verify (if sent) */
+	struct pubkey_algorithm *verify_pubkey;
 
 	/** TX sequence number */
 	uint64_t tx_seq;

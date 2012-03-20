@@ -41,6 +41,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/x509.h>
+#include <ipxe/clientcert.h>
 #include <ipxe/rbg.h>
 #include <ipxe/tls.h>
 
@@ -75,8 +76,25 @@ static void tls_clear_cipher ( struct tls_session *tls,
  * TLS uses 24-bit integers in several places, which are awkward to
  * parse in C.
  */
-static unsigned long tls_uint24 ( const uint8_t field24[3] ) {
-	return ( ( field24[0] << 16 ) + ( field24[1] << 8 ) + field24[2] );
+static inline __attribute__ (( always_inline )) unsigned long
+tls_uint24 ( const uint8_t field24[3] ) {
+	const uint32_t *field32 __attribute__ (( may_alias )) =
+		( ( const void * ) field24 );
+	return ( be32_to_cpu ( *field32 ) >> 8 );
+}
+
+/**
+ * Set 24-bit field value
+ *
+ * @v field24		24-bit field
+ * @v value		Field value
+ *
+ * The field must be pre-zeroed.
+ */
+static void tls_set_uint24 ( uint8_t field24[3], unsigned long value ) {
+	uint32_t *field32 __attribute__ (( may_alias )) =
+		( ( void * ) field24 );
+	*field32 |= cpu_to_be32 ( value << 8 );
 }
 
 /******************************************************************************
@@ -135,6 +153,13 @@ static struct digest_algorithm md5_sha1_algorithm = {
 	.init		= md5_sha1_init,
 	.update		= md5_sha1_update,
 	.final		= md5_sha1_final,
+};
+
+/** RSA digestInfo prefix for MD5+SHA1 algorithm */
+struct rsa_digestinfo_prefix rsa_md5_sha1_prefix __rsa_digestinfo_prefix = {
+	.digest = &md5_sha1_algorithm,
+	.data = NULL, /* MD5+SHA1 signatures have no digestInfo */
+	.len = 0,
 };
 
 /******************************************************************************
@@ -676,6 +701,59 @@ static int tls_change_cipher ( struct tls_session *tls,
 
 /******************************************************************************
  *
+ * Signature and hash algorithms
+ *
+ ******************************************************************************
+ */
+
+/** Supported signature and hash algorithms
+ *
+ * Note that the default (TLSv1.1 and earlier) algorithm using
+ * MD5+SHA1 is never explicitly specified.
+ */
+struct tls_signature_hash_algorithm tls_signature_hash_algorithms[] = {
+	{
+		.code = {
+			.signature = TLS_RSA_ALGORITHM,
+			.hash = TLS_SHA256_ALGORITHM,
+		},
+		.pubkey = &rsa_algorithm,
+		.digest = &sha256_algorithm,
+	},
+};
+
+/** Number of supported signature and hash algorithms */
+#define TLS_NUM_SIG_HASH_ALGORITHMS			\
+	( sizeof ( tls_signature_hash_algorithms ) /	\
+	  sizeof ( tls_signature_hash_algorithms[0] ) )
+
+/**
+ * Find TLS signature and hash algorithm
+ *
+ * @v pubkey		Public-key algorithm
+ * @v digest		Digest algorithm
+ * @ret sig_hash	Signature and hash algorithm, or NULL
+ */
+static struct tls_signature_hash_algorithm *
+tls_signature_hash_algorithm ( struct pubkey_algorithm *pubkey,
+			       struct digest_algorithm *digest ) {
+	struct tls_signature_hash_algorithm *sig_hash;
+	unsigned int i;
+
+	/* Identify signature and hash algorithm */
+	for ( i = 0 ; i < TLS_NUM_SIG_HASH_ALGORITHMS ; i++ ) {
+		sig_hash = &tls_signature_hash_algorithms[i];
+		if ( ( sig_hash->pubkey == pubkey ) &&
+		     ( sig_hash->digest == digest ) ) {
+			return sig_hash;
+		}
+	}
+
+	return NULL;
+}
+
+/******************************************************************************
+ *
  * Handshake verification
  *
  ******************************************************************************
@@ -812,19 +890,68 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_certificate ( struct tls_session *tls ) {
+	int num_certificates = ( have_client_certificate() ? 1 : 0 );
 	struct {
 		uint32_t type_length;
 		uint8_t length[3];
-	} __attribute__ (( packed )) certificate;
+		struct {
+			uint8_t length[3];
+			uint8_t data[ client_certificate.len ];
+		} __attribute__ (( packed )) certificates[num_certificates];
+	} __attribute__ (( packed )) *certificate;
+	struct x509_certificate cert;
+	int rc;
 
-	memset ( &certificate, 0, sizeof ( certificate ) );
-	certificate.type_length = ( cpu_to_le32 ( TLS_CERTIFICATE ) |
-				    htonl ( sizeof ( certificate ) -
-					    sizeof ( certificate.type_length)));
+	/* If we have a certificate to send, determine the applicable
+	 * public-key algorithm and schedule transmission of
+	 * CertificateVerify.
+	 */
+	if ( num_certificates ) {
 
-	return tls_send_handshake ( tls, &certificate, sizeof ( certificate ) );
+		/* Parse certificate to determine public-key algorithm */
+		if ( ( rc = x509_parse ( &cert, client_certificate.data,
+					 client_certificate.len ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not parse client "
+			       "certificate: %s\n", tls, strerror ( rc ) );
+			return rc;
+		}
+		tls->verify_pubkey = cert.signature_algorithm->pubkey;
+
+		/* Schedule CertificateVerify transmission */
+		tls->tx_pending |= TLS_TX_CERTIFICATE_VERIFY;
+		tls_tx_resume ( tls );
+	}
+
+	/* Allocate storage for Certificate record (which may be too
+	 * large for the stack).
+	 */
+	certificate = zalloc ( sizeof ( *certificate ) );
+	if ( ! certificate )
+		return -ENOMEM;
+
+	/* Populate record */
+	certificate->type_length =
+		( cpu_to_le32 ( TLS_CERTIFICATE ) |
+		  htonl ( sizeof ( *certificate ) -
+			  sizeof ( certificate->type_length ) ) );
+	tls_set_uint24 ( certificate->length,
+			 sizeof ( certificate->certificates ) );
+	if ( num_certificates ) {
+		tls_set_uint24 ( certificate->certificates[0].length,
+				 sizeof ( certificate->certificates[0].data ) );
+		memcpy ( certificate->certificates[0].data,
+			 client_certificate.data,
+			 sizeof ( certificate->certificates[0].data ) );
+	}
+
+	/* Transmit record */
+	rc = tls_send_handshake ( tls, certificate, sizeof ( *certificate ) );
+
+	/* Free record */
+	free ( certificate );
+
+	return rc;
 }
-
 
 /**
  * Transmit Client Key Exchange record
@@ -866,7 +993,97 @@ static int tls_send_client_key_exchange ( struct tls_session *tls ) {
 		htons ( sizeof ( key_xchg.encrypted_pre_master_secret ) -
 			unused );
 
-	return tls_send_handshake ( tls, &key_xchg, sizeof ( key_xchg ) );
+	return tls_send_handshake ( tls, &key_xchg,
+				    ( sizeof ( key_xchg ) - unused ) );
+}
+
+/**
+ * Transmit Certificate Verify record
+ *
+ * @v tls		TLS session
+ * @ret rc		Return status code
+ */
+static int tls_send_certificate_verify ( struct tls_session *tls ) {
+	struct digest_algorithm *digest = tls->handshake_digest;
+	struct pubkey_algorithm *pubkey = tls->verify_pubkey;
+	uint8_t digest_out[ digest->digestsize ];
+	uint8_t ctx[ pubkey->ctxsize ];
+	struct tls_signature_hash_algorithm *sig_hash = NULL;
+	int rc;
+
+	/* Generate digest to be signed */
+	tls_verify_handshake ( tls, digest_out );
+
+	/* Initialise public-key algorithm */
+	if ( ( rc = pubkey_init ( pubkey, ctx, client_private_key.data,
+				  client_private_key.len ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not initialise %s client private "
+		       "key: %s\n", tls, pubkey->name, strerror ( rc ) );
+		goto err_pubkey_init;
+	}
+
+	/* TLSv1.2 and later use explicit algorithm identifiers */
+	if ( tls->version >= TLS_VERSION_TLS_1_2 ) {
+		sig_hash = tls_signature_hash_algorithm ( pubkey, digest );
+		if ( ! sig_hash ) {
+			DBGC ( tls, "TLS %p could not identify (%s,%s) "
+			       "signature and hash algorithm\n", tls,
+			       pubkey->name, digest->name );
+			rc = -ENOTSUP;
+			goto err_sig_hash;
+		}
+	}
+
+	/* Generate and transmit record */
+	{
+		size_t max_len = pubkey_max_len ( pubkey, ctx );
+		int use_sig_hash = ( ( sig_hash == NULL ) ? 0 : 1 );
+		struct {
+			uint32_t type_length;
+			struct tls_signature_hash_id sig_hash[use_sig_hash];
+			uint16_t signature_len;
+			uint8_t signature[max_len];
+		} __attribute__ (( packed )) certificate_verify;
+		size_t unused;
+		int len;
+
+		/* Sign digest */
+		len = pubkey_sign ( pubkey, ctx, digest, digest_out,
+				    certificate_verify.signature );
+		if ( len < 0 ) {
+			rc = len;
+			DBGC ( tls, "TLS %p could not sign %s digest using %s "
+			       "client private key: %s\n", tls, digest->name,
+			       pubkey->name, strerror ( rc ) );
+			goto err_pubkey_sign;
+		}
+		unused = ( max_len - len );
+
+		/* Construct Certificate Verify record */
+		certificate_verify.type_length =
+			( cpu_to_le32 ( TLS_CERTIFICATE_VERIFY ) |
+			  htonl ( sizeof ( certificate_verify ) -
+				  sizeof ( certificate_verify.type_length ) -
+				  unused ) );
+		if ( use_sig_hash ) {
+			memcpy ( &certificate_verify.sig_hash[0],
+				 &sig_hash->code,
+				 sizeof ( certificate_verify.sig_hash[0] ) );
+		}
+		certificate_verify.signature_len =
+			htons ( sizeof ( certificate_verify.signature ) -
+				unused );
+
+		/* Transmit record */
+		rc = tls_send_handshake ( tls, &certificate_verify,
+				   ( sizeof ( certificate_verify ) - unused ) );
+	}
+
+ err_pubkey_sign:
+ err_sig_hash:
+	pubkey_final ( pubkey, ctx );
+ err_pubkey_init:
+	return rc;
 }
 
 /**
@@ -1182,9 +1399,8 @@ static int tls_new_certificate_request ( struct tls_session *tls,
 					 const void *data __unused,
 					 size_t len __unused ) {
 
-	/* We can only send an empty certificate (as mandated by
-	 * TLSv1.2), so there is no point in parsing the Certificate
-	 * Request.
+	/* We can only send a single certificate, so there is no point
+	 * in parsing the Certificate Request.
 	 */
 
 	/* Schedule Certificate transmission */
@@ -2002,6 +2218,14 @@ static void tls_tx_step ( struct tls_session *tls ) {
 			goto err;
 		}
 		tls->tx_pending &= ~TLS_TX_CLIENT_KEY_EXCHANGE;
+	} else if ( tls->tx_pending & TLS_TX_CERTIFICATE_VERIFY ) {
+		/* Send Certificate Verify */
+		if ( ( rc = tls_send_certificate_verify ( tls ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not send Certificate "
+			       "Verify: %s\n", tls, strerror ( rc ) );
+			goto err;
+		}
+		tls->tx_pending &= ~TLS_TX_CERTIFICATE_VERIFY;
 	} else if ( tls->tx_pending & TLS_TX_CHANGE_CIPHER ) {
 		/* Send Change Cipher, and then change the cipher in use */
 		if ( ( rc = tls_send_change_cipher ( tls ) ) != 0 ) {
