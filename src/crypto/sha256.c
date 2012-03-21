@@ -28,19 +28,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <assert.h>
+#include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
 #include <ipxe/sha256.h>
-
-/**
- * Rotate dword right
- *
- * @v dword		Dword
- * @v rotate		Amount of rotation
- */
-static inline __attribute__ (( always_inline )) uint32_t
-ror32 ( uint32_t dword, unsigned int rotate ) {
-	return ( ( dword >> rotate ) | ( dword << ( 32 - rotate ) ) );
-}
 
 /** SHA-256 variables */
 struct sha256_variables {

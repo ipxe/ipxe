@@ -28,19 +28,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <byteswap.h>
 #include <assert.h>
+#include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
-
-/**
- * Rotate dword left
- *
- * @v dword		Dword
- * @v rotate		Amount of rotation
- */
-static inline __attribute__ (( always_inline )) uint32_t
-rol32 ( uint32_t dword, unsigned int rotate ) {
-	return ( ( dword << rotate ) | ( dword >> ( 32 - rotate ) ) );
-}
 
 /** MD5 variables */
 struct md5_variables {
