@@ -683,11 +683,91 @@ static int x509_parse_key_usage ( struct x509_certificate *cert,
 	return 0;
 }
 
+/** "id-kp-codeSigning" object identifier */
+static uint8_t oid_code_signing[] = { ASN1_OID_CODESIGNING };
+
+/** Supported key purposes */
+static struct x509_key_purpose x509_key_purposes[] = {
+	{
+		.name = "codeSigning",
+		.bits = X509_CODE_SIGNING,
+		.oid = ASN1_OID_CURSOR ( oid_code_signing ),
+	},
+};
+
+/**
+ * Parse X.509 certificate key purpose identifier
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int x509_parse_key_purpose ( struct x509_certificate *cert,
+				    const struct asn1_cursor *raw ) {
+	struct x509_extended_key_usage *ext_usage = &cert->extensions.ext_usage;
+	struct x509_key_purpose *purpose;
+	struct asn1_cursor cursor;
+	unsigned int i;
+	int rc;
+
+	/* Enter keyPurposeId */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	if ( ( rc = asn1_enter ( &cursor, ASN1_OID ) ) != 0 ) {
+		DBGC ( cert, "X509 %p invalid keyPurposeId:\n", cert );
+		DBGC_HDA ( cert, 0, raw->data, raw->len );
+		return rc;
+	}
+
+	/* Identify key purpose */
+	for ( i = 0 ; i < ( sizeof ( x509_key_purposes ) /
+			    sizeof ( x509_key_purposes[0] ) ) ; i++ ) {
+		purpose = &x509_key_purposes[i];
+		if ( asn1_compare ( &cursor, &purpose->oid ) == 0 ) {
+			DBGC ( cert, "X509 %p has key purpose %s\n",
+			       cert, purpose->name );
+			ext_usage->bits |= purpose->bits;
+			return 0;
+		}
+	}
+
+	/* Ignore unrecognised key purposes */
+	return 0;
+}
+
+/**
+ * Parse X.509 certificate extended key usage
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int x509_parse_extended_key_usage ( struct x509_certificate *cert,
+					   const struct asn1_cursor *raw ) {
+	struct asn1_cursor cursor;
+	int rc;
+
+	/* Enter extKeyUsage */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	asn1_enter ( &cursor, ASN1_SEQUENCE );
+
+	/* Parse each extension in turn */
+	while ( cursor.len ) {
+		if ( ( rc = x509_parse_key_purpose ( cert, &cursor ) ) != 0 )
+			return rc;
+		asn1_skip_any ( &cursor );
+	}
+
+	return 0;
+}
+
 /** "id-ce-basicConstraints" object identifier */
 static uint8_t oid_ce_basic_constraints[] = { ASN1_OID_BASICCONSTRAINTS };
 
 /** "id-ce-keyUsage" object identifier */
 static uint8_t oid_ce_key_usage[] = { ASN1_OID_KEYUSAGE };
+
+/** "id-ce-extKeyUsage" object identifier */
+static uint8_t oid_ce_ext_key_usage[] = { ASN1_OID_EXTKEYUSAGE };
 
 /** Supported certificate extensions */
 static struct x509_extension x509_extensions[] = {
@@ -700,6 +780,11 @@ static struct x509_extension x509_extensions[] = {
 		.name = "keyUsage",
 		.oid = ASN1_OID_CURSOR ( oid_ce_key_usage ),
 		.parse = x509_parse_key_usage,
+	},
+	{
+		.name = "extKeyUsage",
+		.oid = ASN1_OID_CURSOR ( oid_ce_ext_key_usage ),
+		.parse = x509_parse_extended_key_usage,
 	},
 };
 

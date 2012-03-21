@@ -140,6 +140,18 @@ struct asn1_cursor {
 	ASN1_OID_INITIAL ( 2, 5 ), ASN1_OID_SINGLE ( 29 ),	\
 	ASN1_OID_SINGLE ( 19 )
 
+/** ASN.1 OID for id-ce-extKeyUsage (2.5.29.37) */
+#define ASN1_OID_EXTKEYUSAGE					\
+	ASN1_OID_INITIAL ( 2, 5 ), ASN1_OID_SINGLE ( 29 ),	\
+	ASN1_OID_SINGLE ( 37 )
+
+/** ASN.1 OID for id-kp-codeSigning (1.3.6.1.5.5.7.3.3) */
+#define ASN1_OID_CODESIGNING					\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 6 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 5 ),		\
+	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 3 )
+
 /** Define an ASN.1 cursor containing an OID */
 #define ASN1_OID_CURSOR( oid_value ) {				\
 		.data = oid_value,				\

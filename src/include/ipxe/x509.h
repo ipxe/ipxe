@@ -113,12 +113,29 @@ enum x509_key_usage_bits {
 	X509_DECIPHER_ONLY = 0x8000,
 };
 
+/** An X.509 certificate extended key usage */
+struct x509_extended_key_usage {
+	/** Usage bits */
+	unsigned int bits;
+};
+
+/** X.509 certificate extended key usage bits
+ *
+ * Extended key usages are identified by OID; these bits are purely an
+ * internal definition.
+ */
+enum x509_extended_key_usage_bits {
+	X509_CODE_SIGNING = 0x0001,
+};
+
 /** An X.509 certificate extensions set */
 struct x509_extensions {
 	/** Basic constraints */
 	struct x509_basic_constraints basic;
 	/** Key usage */
 	struct x509_key_usage usage;
+	/** Extended key usage */
+	struct x509_extended_key_usage ext_usage;
 };
 
 /** An X.509 certificate */
@@ -159,6 +176,16 @@ struct x509_extension {
 	 */
 	int ( * parse ) ( struct x509_certificate *cert,
 			  const struct asn1_cursor *raw );
+};
+
+/** An X.509 key purpose */
+struct x509_key_purpose {
+	/** Name */
+	const char *name;
+	/** Object identifier */
+	struct asn1_cursor oid;
+	/** Extended key usage bits */
+	unsigned int bits;
 };
 
 /** An X.509 root certificate store */
