@@ -37,3 +37,4 @@ REQUIRE_OBJECT ( hash_df_test );
 REQUIRE_OBJECT ( bigint_test );
 REQUIRE_OBJECT ( rsa_test );
 REQUIRE_OBJECT ( x509_test );
+REQUIRE_OBJECT ( cms_test );
