@@ -79,113 +79,68 @@ struct asn1_cursor {
 #define ASN1_OID_TRIPLE( value ) \
 	( 0x80 | ( ( (value) >> 14 ) & 0x7f ) ), ASN1_OID_DOUBLE ( (value) )
 
-/** ASN.1 OID for iso(1) member-body(2) */
-#define ASN1_OID_ISO_MEMBERBODY ASN1_OID_INITIAL ( 1, 2 )
+/** ASN.1 OID for rsaEncryption (1.2.840.113549.1.1.1) */
+#define ASN1_OID_RSAENCRYPTION					\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 1 )
 
-/** ASN.1 OID for iso(1) identified-organization(3) */
-#define ASN1_OID_IDENTIFIED_ORGANIZATION ASN1_OID_INITIAL ( 1, 3 )
+/** ASN.1 OID for md5WithRSAEncryption (1.2.840.113549.1.1.4) */
+#define ASN1_OID_MD5WITHRSAENCRYPTION				\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 4 )
 
-/** ASN.1 OID for joint-iso-itu-t(2) ds(5) */
-#define ASN1_OID_DIRECTORY_SERVICES ASN1_OID_INITIAL ( 2, 5 )
+/** ASN.1 OID for sha1WithRSAEncryption (1.2.840.113549.1.1.5) */
+#define ASN1_OID_SHA1WITHRSAENCRYPTION				\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 5 )
 
-/** ASN.1 OID for joint-iso-itu-t(2) country(16) */
-#define ASN1_OID_COUNTRY ASN1_OID_INITIAL ( 2, 16 )
+/** ASN.1 OID for sha256WithRSAEncryption (1.2.840.113549.1.1.11) */
+#define ASN1_OID_SHA256WITHRSAENCRYPTION			\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 11 )
 
-/** ASN.1 OID for iso(1) member-body(2) us(840) */
-#define ASN1_OID_ISO_US ASN1_OID_ISO_MEMBERBODY, ASN1_OID_DOUBLE ( 840 )
+/** ASN.1 OID for id-md5 (1.2.840.113549.2.5) */
+#define ASN1_OID_MD5						\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 2 ),	\
+	ASN1_OID_SINGLE ( 5 )
 
-/** ASN.1 OID for iso(1) member-body(2) us(840) rsadsi(113549) */
-#define ASN1_OID_RSADSI ASN1_OID_ISO_US, ASN1_OID_TRIPLE ( 113549 )
+/** ASN.1 OID for id-sha1 (1.3.14.3.2.26) */
+#define ASN1_OID_SHA1						\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 14 ),	\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 2 ),		\
+	ASN1_OID_SINGLE ( 26 )
 
-/** ASN.1 OID for iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) */
-#define ASN1_OID_PKCS ASN1_OID_RSADSI, ASN1_OID_SINGLE ( 1 )
+/** ASN.1 OID for id-sha256 (2.16.840.1.101.3.4.2.1) */
+#define ASN1_OID_SHA256						\
+	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 101 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
+	ASN1_OID_SINGLE ( 2 ), ASN1_OID_SINGLE ( 1 )
 
-/** ASN.1 OID for iso(1) member-body(2) us(840) rsadsi(113549)
- * digestAlgorithm(2)
- */
-#define ASN1_OID_DIGESTALGORITHM ASN1_OID_RSADSI, ASN1_OID_SINGLE ( 2 )
+/** ASN.1 OID for commonName (2.5.4.3) */
+#define ASN1_OID_COMMON_NAME					\
+	ASN1_OID_INITIAL ( 2, 5 ), ASN1_OID_SINGLE ( 4 ),	\
+	ASN1_OID_SINGLE ( 3 )
 
-/** ASN.1 OID for iso(1) identified-organization(3) oiw(14) */
-#define ASN1_OID_OIW ASN1_OID_IDENTIFIED_ORGANIZATION, ASN1_OID_SINGLE ( 14 )
+/** ASN.1 OID for id-ce-keyUsage (2.5.29.15) */
+#define ASN1_OID_KEYUSAGE					\
+	ASN1_OID_INITIAL ( 2, 5 ), ASN1_OID_SINGLE ( 29 ),	\
+	ASN1_OID_SINGLE ( 15 )
 
-/** ASN.1 OID for iso(1) identified-organization(3) oiw(14) secsig(3) */
-#define ASN1_OID_SECSIG ASN1_OID_OIW, ASN1_OID_SINGLE ( 3 )
-
-/** ASN1. OID for iso(1) identified-organization(3) oiw(14) secsig(3)
- * algorithms(2)
- */
-#define ASN1_OID_SECSIG_ALGORITHMS ASN1_OID_SECSIG, ASN1_OID_SINGLE ( 2 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) country(16) us(840) */
-#define ASN1_OID_COUNTRY_US ASN1_OID_COUNTRY, ASN1_OID_DOUBLE ( 840 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) country(16) us(840) organization(1) */
-#define ASN1_OID_US_ORGANIZATION ASN1_OID_COUNTRY_US, ASN1_OID_SINGLE ( 1 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) country(16) us(840)
- * organization(1) gov(101)
- */
-#define ASN1_OID_US_GOV ASN1_OID_US_ORGANIZATION, ASN1_OID_SINGLE ( 101 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) country(16) us(840)
- * organization(1) gov(101) csor(3)
- */
-#define ASN1_OID_CSOR ASN1_OID_US_GOV, ASN1_OID_SINGLE ( 3 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) country(16) us(840)
- * organization(1) gov(101) csor(3) nistalgorithm(4)
- */
-#define ASN1_OID_NISTALGORITHM ASN1_OID_CSOR, ASN1_OID_SINGLE ( 4 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) country(16) us(840)
- * organization(1) gov(101) csor(3) nistalgorithm(4) hashalgs(2)
- */
-#define ASN1_OID_HASHALGS ASN1_OID_NISTALGORITHM, ASN1_OID_SINGLE ( 2 )
-
-/** ASN.1 OID for pkcs-1 */
-#define ASN1_OID_PKCS_1 ASN1_OID_PKCS, ASN1_OID_SINGLE ( 1 )
-
-/** ASN.1 OID for rsaEncryption */
-#define ASN1_OID_RSAENCRYPTION ASN1_OID_PKCS_1, ASN1_OID_SINGLE ( 1 )
-
-/** ASN.1 OID for md5WithRSAEncryption */
-#define ASN1_OID_MD5WITHRSAENCRYPTION ASN1_OID_PKCS_1, ASN1_OID_SINGLE ( 4 )
-
-/** ASN.1 OID for sha1WithRSAEncryption */
-#define ASN1_OID_SHA1WITHRSAENCRYPTION ASN1_OID_PKCS_1, ASN1_OID_SINGLE ( 5 )
-
-/** ASN.1 OID for sha256WithRSAEncryption */
-#define ASN1_OID_SHA256WITHRSAENCRYPTION ASN1_OID_PKCS_1, ASN1_OID_SINGLE ( 11 )
-
-/** ASN.1 OID for id-md5 */
-#define ASN1_OID_MD5 ASN1_OID_DIGESTALGORITHM, ASN1_OID_SINGLE ( 5 )
-
-/** ASN.1 OID for id-sha1 */
-#define ASN1_OID_SHA1 ASN1_OID_SECSIG_ALGORITHMS, ASN1_OID_SINGLE ( 26 )
-
-/** ASN.1 OID for id-sha256 */
-#define ASN1_OID_SHA256 ASN1_OID_HASHALGS, ASN1_OID_SINGLE ( 1 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) ds(5) attributeType(4) */
-#define ASN1_OID_ATTRIBUTE_TYPE \
-	ASN1_OID_DIRECTORY_SERVICES, ASN1_OID_SINGLE ( 4 )
-
-/** ASN.1 OID for joint-iso-itu-t(2) ds(5) attributeType(4) commonName(3) */
-#define ASN1_OID_COMMON_NAME ASN1_OID_ATTRIBUTE_TYPE, ASN1_OID_SINGLE ( 3 )
-
-/** ASN.1 OID for id-ce */
-#define ASN1_OID_CE ASN1_OID_DIRECTORY_SERVICES, ASN1_OID_SINGLE ( 29 )
-
-/** ASN.1 OID for id-ce-keyUsage */
-#define ASN1_OID_KEYUSAGE ASN1_OID_CE, ASN1_OID_SINGLE ( 15 )
-
-/** ASN.1 OID for id-ce-basicConstraints */
-#define ASN1_OID_BASICCONSTRAINTS ASN1_OID_CE, ASN1_OID_SINGLE ( 19 )
+/** ASN.1 OID for id-ce-basicConstraints (2.5.29.19) */
+#define ASN1_OID_BASICCONSTRAINTS				\
+	ASN1_OID_INITIAL ( 2, 5 ), ASN1_OID_SINGLE ( 29 ),	\
+	ASN1_OID_SINGLE ( 19 )
 
 /** Define an ASN.1 cursor containing an OID */
-#define ASN1_OID_CURSOR( oid_value ) {			\
-		.data = oid_value,			\
-		.len = sizeof ( oid_value ),		\
+#define ASN1_OID_CURSOR( oid_value ) {				\
+		.data = oid_value,				\
+		.len = sizeof ( oid_value ),			\
 	}
 
 /** An ASN.1 boolean */
