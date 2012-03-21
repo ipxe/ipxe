@@ -39,6 +39,53 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * RSA is documented in RFC 3447.
  */
 
+/** "rsaEncryption" object identifier */
+static uint8_t oid_rsa_encryption[] = { ASN1_OID_RSAENCRYPTION };
+
+/** "md5WithRSAEncryption" object identifier */
+static uint8_t oid_md5_with_rsa_encryption[] =
+	{ ASN1_OID_MD5WITHRSAENCRYPTION };
+
+/** "sha1WithRSAEncryption" object identifier */
+static uint8_t oid_sha1_with_rsa_encryption[] =
+	{ ASN1_OID_SHA1WITHRSAENCRYPTION };
+
+/** "sha256WithRSAEncryption" object identifier */
+static uint8_t oid_sha256_with_rsa_encryption[] =
+	{ ASN1_OID_SHA256WITHRSAENCRYPTION };
+
+/** "rsaEncryption" OID-identified algorithm */
+struct asn1_algorithm rsa_encryption_algorithm __asn1_algorithm = {
+	.name = "rsaEncryption",
+	.pubkey = &rsa_algorithm,
+	.digest = NULL,
+	.oid = ASN1_OID_CURSOR ( oid_rsa_encryption ),
+};
+
+/** "md5WithRSAEncryption" OID-identified algorithm */
+struct asn1_algorithm md5_with_rsa_encryption_algorithm __asn1_algorithm = {
+	.name = "md5WithRSAEncryption",
+	.pubkey = &rsa_algorithm,
+	.digest = &md5_algorithm,
+	.oid = ASN1_OID_CURSOR ( oid_md5_with_rsa_encryption ),
+};
+
+/** "sha1WithRSAEncryption" OID-identified algorithm */
+struct asn1_algorithm sha1_with_rsa_encryption_algorithm __asn1_algorithm = {
+	.name = "sha1WithRSAEncryption",
+	.pubkey = &rsa_algorithm,
+	.digest = &sha1_algorithm,
+	.oid = ASN1_OID_CURSOR ( oid_sha1_with_rsa_encryption ),
+};
+
+/** "sha256WithRSAEncryption" OID-identified algorithm */
+struct asn1_algorithm sha256_with_rsa_encryption_algorithm __asn1_algorithm = {
+	.name = "sha256WithRSAEncryption",
+	.pubkey = &rsa_algorithm,
+	.digest = &sha256_algorithm,
+	.oid = ASN1_OID_CURSOR ( oid_sha256_with_rsa_encryption ),
+};
+
 /** MD5 digestInfo prefix */
 static const uint8_t rsa_md5_prefix_data[] =
 	{ RSA_DIGESTINFO_PREFIX ( MD5_DIGEST_SIZE, ASN1_OID_MD5 ) };

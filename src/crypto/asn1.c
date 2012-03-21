@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
+#include <ipxe/tables.h>
 #include <ipxe/asn1.h>
 
 /** @file
@@ -340,4 +341,57 @@ int asn1_compare ( const struct asn1_cursor *cursor1,
 	difference = ( cursor2->len - cursor1->len );
 	return ( difference ? difference :
 		 memcmp ( cursor1->data, cursor2->data, cursor1->len ) );
+}
+
+/**
+ * Identify ASN.1 algorithm by OID
+ *
+ * @v cursor		ASN.1 object cursor
+
+ * @ret algorithm	Algorithm, or NULL
+ */
+static struct asn1_algorithm *
+asn1_find_algorithm ( const struct asn1_cursor *cursor ) {
+	struct asn1_algorithm *algorithm;
+
+	for_each_table_entry ( algorithm, ASN1_ALGORITHMS ) {
+		if ( asn1_compare ( &algorithm->oid, cursor ) == 0 )
+			return algorithm;
+	}
+
+	return NULL;
+}
+
+/**
+ * Parse ASN.1 OID-identified algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret algorithm	Algorithm, or NULL
+ */
+struct asn1_algorithm * asn1_algorithm ( const struct asn1_cursor *cursor ) {
+	struct asn1_cursor contents;
+	struct asn1_algorithm *algorithm;
+	int rc;
+
+	/* Enter signatureAlgorithm */
+	memcpy ( &contents, cursor, sizeof ( contents ) );
+	asn1_enter ( &contents, ASN1_SEQUENCE );
+
+	/* Enter algorithm */
+	if ( ( rc = asn1_enter ( &contents, ASN1_OID ) ) != 0 ) {
+		DBGC ( cursor, "ASN1 %p cannot locate algorithm OID:\n",
+		       cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return NULL;
+	}
+
+	/* Identify algorithm */
+	algorithm = asn1_find_algorithm ( &contents );
+	if ( ! algorithm ) {
+		DBGC ( cursor, "ASN1 %p unrecognised algorithm:\n", cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return NULL;
+	}
+
+	return algorithm;
 }

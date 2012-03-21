@@ -14,29 +14,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <time.h>
 #include <ipxe/asn1.h>
 
-/** An X.509 algorithm */
-struct x509_algorithm {
-	/** Name */
-	const char *name;
-	/** Object identifier */
-	struct asn1_cursor oid;
-	/** Public-key algorithm */
-	struct pubkey_algorithm *pubkey;
-	/** Digest algorithm (if applicable) */
-	struct digest_algorithm *digest;
-};
-
-/**
- * Test if X.509 algorithm is a signature algorithm
- *
- * @v algorithm		Algorithm
- * @ret is_signature	Algorithm is a signature algorithm
- */
-static inline __attribute__ (( always_inline )) int
-x509_is_signature_algorithm ( struct x509_algorithm *algorithm ) {
-	return ( algorithm->digest != NULL );
-}
-
 /** An X.509 bit string */
 struct x509_bit_string {
 	/** Data */
@@ -80,7 +57,7 @@ struct x509_public_key {
 	/** Raw public key */
 	struct asn1_cursor raw;
 	/** Public key algorithm */
-	struct x509_algorithm *algorithm;
+	struct asn1_algorithm *algorithm;
 };
 
 /** An X.509 certificate subject */
@@ -96,7 +73,7 @@ struct x509_subject {
 /** An X.509 certificate signature */
 struct x509_signature {
 	/** Signature algorithm */
-	struct x509_algorithm *algorithm;
+	struct asn1_algorithm *algorithm;
 	/** Signature value */
 	struct x509_bit_string value;
 };
@@ -147,7 +124,7 @@ struct x509_certificate {
 	/** Raw tbsCertificate */
 	struct asn1_cursor tbs;
 	/** Signature algorithm */
-	struct x509_algorithm *signature_algorithm;
+	struct asn1_algorithm *signature_algorithm;
 	/** Issuer */
 	struct x509_issuer issuer;
 	/** Validity */

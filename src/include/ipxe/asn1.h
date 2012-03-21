@@ -9,6 +9,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <stdint.h>
+#include <ipxe/tables.h>
+
 /** An ASN.1 object cursor */
 struct asn1_cursor {
 	/** Start of data */
@@ -143,6 +146,24 @@ struct asn1_cursor {
 		.len = sizeof ( oid_value ),			\
 	}
 
+/** An ASN.1 OID-identified algorithm */
+struct asn1_algorithm {
+	/** Name */
+	const char *name;
+	/** Object identifier */
+	struct asn1_cursor oid;
+	/** Public-key algorithm (if applicable) */
+	struct pubkey_algorithm *pubkey;
+	/** Digest algorithm (if applicable) */
+	struct digest_algorithm *digest;
+};
+
+/** ASN.1 OID-identified algorithms */
+#define ASN1_ALGORITHMS __table ( struct asn1_algorithm, "asn1_algorithms" )
+
+/** Declare an ASN.1 OID-identified algorithm */
+#define __asn1_algorithm __table_entry ( ASN1_ALGORITHMS, 01 )
+
 /** An ASN.1 boolean */
 struct asn1_boolean {
 	/** Value */
@@ -181,5 +202,7 @@ extern int asn1_boolean ( const struct asn1_cursor *cursor );
 extern int asn1_integer ( const struct asn1_cursor *cursor, int *value );
 extern int asn1_compare ( const struct asn1_cursor *cursor1,
 			  const struct asn1_cursor *cursor2 );
+extern struct asn1_algorithm *
+asn1_algorithm ( const struct asn1_cursor *cursor );
 
 #endif /* _IPXE_ASN1_H */

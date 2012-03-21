@@ -49,10 +49,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_ENOTSUP_EXTENSION )
 #define EINFO_ENOTSUP_EXTENSION \
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x02, "Unsupported extension" )
-#define EINVAL_NON_SIGNATURE \
-	__einfo_error ( EINFO_EINVAL_NON_SIGNATURE )
-#define EINFO_EINVAL_NON_SIGNATURE \
-	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Not a signature algorithm" )
+#define EINVAL_ALGORITHM \
+	__einfo_error ( EINFO_EINVAL_ALGORITHM )
+#define EINFO_EINVAL_ALGORITHM \
+	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Invalid algorithm type" )
 #define EINVAL_BIT_STRING \
 	__einfo_error ( EINFO_EINVAL_BIT_STRING )
 #define EINFO_EINVAL_BIT_STRING \
@@ -101,70 +101,6 @@ static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
 static struct asn1_cursor oid_common_name_cursor =
 	ASN1_OID_CURSOR ( oid_common_name );
 
-/** "rsaEncryption" object identifier */
-static uint8_t oid_rsa_encryption[] = { ASN1_OID_RSAENCRYPTION };
-
-/** "md5WithRSAEncryption" object identifier */
-static uint8_t oid_md5_with_rsa_encryption[] =
-	{ ASN1_OID_MD5WITHRSAENCRYPTION };
-
-/** "sha1WithRSAEncryption" object identifier */
-static uint8_t oid_sha1_with_rsa_encryption[] =
-	{ ASN1_OID_SHA1WITHRSAENCRYPTION };
-
-/** "sha256WithRSAEncryption" object identifier */
-static uint8_t oid_sha256_with_rsa_encryption[] =
-	{ ASN1_OID_SHA256WITHRSAENCRYPTION };
-
-/** Supported algorithms */
-static struct x509_algorithm x509_algorithms[] = {
-	{
-		.name = "rsaEncryption",
-		.pubkey = &rsa_algorithm,
-		.digest = NULL,
-		.oid = ASN1_OID_CURSOR ( oid_rsa_encryption ),
-	},
-	{
-		.name = "md5WithRSAEncryption",
-		.pubkey = &rsa_algorithm,
-		.digest = &md5_algorithm,
-		.oid = ASN1_OID_CURSOR ( oid_md5_with_rsa_encryption ),
-	},
-	{
-		.name = "sha1WithRSAEncryption",
-		.pubkey = &rsa_algorithm,
-		.digest = &sha1_algorithm,
-		.oid = ASN1_OID_CURSOR ( oid_sha1_with_rsa_encryption ),
-	},
-	{
-		.name = "sha256WithRSAEncryption",
-		.pubkey = &rsa_algorithm,
-		.digest = &sha256_algorithm,
-		.oid = ASN1_OID_CURSOR ( oid_sha256_with_rsa_encryption ),
-	},
-};
-
-/**
- * Identify X.509 algorithm by OID
- *
- * @v oid		OID
- * @ret algorithm	Algorithm, or NULL
- */
-static struct x509_algorithm *
-x509_find_algorithm ( const struct asn1_cursor *oid ) {
-	struct x509_algorithm *algorithm;
-	unsigned int i;
-
-	for ( i = 0 ; i < ( sizeof ( x509_algorithms ) /
-			    sizeof ( x509_algorithms[0] ) ) ; i++ ) {
-		algorithm = &x509_algorithms[i];
-		if ( asn1_compare ( &algorithm->oid, oid ) == 0 )
-			return algorithm;
-	}
-
-	return NULL;
-}
-
 /**
  * Parse X.509 certificate algorithm
  *
@@ -173,29 +109,24 @@ x509_find_algorithm ( const struct asn1_cursor *oid ) {
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int x509_parse_algorithm ( struct x509_certificate *cert,
-				  struct x509_algorithm **algorithm,
+int x509_parse_pubkey_algorithm ( struct x509_certificate *cert,
+				  struct asn1_algorithm **algorithm,
 				  const struct asn1_cursor *raw ) {
-	struct asn1_cursor cursor;
-	int rc;
 
-	/* Enter signatureAlgorithm */
-	memcpy ( &cursor, raw, sizeof ( cursor ) );
-	asn1_enter ( &cursor, ASN1_SEQUENCE );
-
-	/* Enter algorithm */
-	if ( ( rc = asn1_enter ( &cursor, ASN1_OID ) ) != 0 ) {
-		DBGC ( cert, "X509 %p cannot locate algorithm:\n", cert );
+	/* Parse algorithm */
+	*algorithm = asn1_algorithm ( raw );
+	if ( ! (*algorithm) ) {
+		DBGC ( cert, "X509 %p unrecognised algorithm:\n", cert );
 		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return rc;
+		return -ENOTSUP_ALGORITHM;
 	}
 
-	/* Identify algorithm */
-	*algorithm = x509_find_algorithm ( &cursor );
-	if ( ! *algorithm ) {
-		DBGC ( cert, "X509 %p unsupported algorithm:\n", cert );
-		DBGC_HDA ( cert, 0, cursor.data, cursor.len );
-		return -ENOTSUP_ALGORITHM;
+	/* Check algorithm has a public key */
+	if ( ! (*algorithm)->pubkey ) {
+		DBGC ( cert, "X509 %p algorithm %s is not a public-key "
+		       "algorithm:\n", cert, (*algorithm)->name );
+		DBGC_HDA ( cert, 0, raw->data, raw->len );
+		return -EINVAL_ALGORITHM;
 	}
 
 	return 0;
@@ -210,20 +141,21 @@ static int x509_parse_algorithm ( struct x509_certificate *cert,
  * @ret rc		Return status code
  */
 static int x509_parse_signature_algorithm ( struct x509_certificate *cert,
-					    struct x509_algorithm **algorithm,
+					    struct asn1_algorithm **algorithm,
 					    const struct asn1_cursor *raw ) {
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = x509_parse_algorithm ( cert, algorithm, raw ) ) != 0 )
+	if ( ( rc = x509_parse_pubkey_algorithm ( cert, algorithm,
+						  raw ) ) != 0 )
 		return rc;
 
 	/* Check algorithm is a signature algorithm */
-	if ( ! x509_is_signature_algorithm ( *algorithm ) ) {
+	if ( ! (*algorithm)->digest ) {
 		DBGC ( cert, "X509 %p algorithm %s is not a signature "
 		       "algorithm:\n", cert, (*algorithm)->name );
 		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -EINVAL_NON_SIGNATURE;
+		return -EINVAL_ALGORITHM;
 	}
 
 	return 0;
@@ -600,7 +532,7 @@ static int x509_parse_subject ( struct x509_certificate *cert,
 static int x509_parse_public_key ( struct x509_certificate *cert,
 				   const struct asn1_cursor *raw ) {
 	struct x509_public_key *public_key = &cert->subject.public_key;
-	struct x509_algorithm **algorithm = &public_key->algorithm;
+	struct asn1_algorithm **algorithm = &public_key->algorithm;
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -613,7 +545,8 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Parse algorithm */
-	if ( ( rc = x509_parse_algorithm ( cert, algorithm, &cursor ) ) != 0 )
+	if ( ( rc = x509_parse_pubkey_algorithm ( cert, algorithm,
+						  &cursor ) ) != 0 )
 		return rc;
 	DBGC ( cert, "X509 %p public key algorithm is %s\n",
 	       cert, (*algorithm)->name );
@@ -866,7 +799,7 @@ static int x509_parse_extensions ( struct x509_certificate *cert,
  */
 static int x509_parse_tbscertificate ( struct x509_certificate *cert,
 				       const struct asn1_cursor *raw ) {
-	struct x509_algorithm **algorithm = &cert->signature_algorithm;
+	struct asn1_algorithm **algorithm = &cert->signature_algorithm;
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -933,7 +866,7 @@ static int x509_parse_tbscertificate ( struct x509_certificate *cert,
  */
 int x509_parse ( struct x509_certificate *cert, const void *data, size_t len ) {
 	struct x509_signature *signature = &cert->signature;
-	struct x509_algorithm **signature_algorithm = &signature->algorithm;
+	struct asn1_algorithm **signature_algorithm = &signature->algorithm;
 	struct x509_bit_string *signature_value = &signature->value;
 	struct asn1_cursor cursor;
 	int rc;
@@ -991,7 +924,7 @@ int x509_parse ( struct x509_certificate *cert, const void *data, size_t len ) {
 static int x509_check_signature ( struct x509_certificate *cert,
 				  struct x509_public_key *public_key ) {
 	struct x509_signature *signature = &cert->signature;
-	struct x509_algorithm *algorithm = signature->algorithm;
+	struct asn1_algorithm *algorithm = signature->algorithm;
 	struct digest_algorithm *digest = algorithm->digest;
 	struct pubkey_algorithm *pubkey = algorithm->pubkey;
 	uint8_t digest_ctx[ digest->ctxsize ];
