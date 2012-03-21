@@ -24,6 +24,12 @@ struct x509_bit_string {
 	unsigned int unused;
 };
 
+/** An X.509 serial number */
+struct x509_serial {
+	/** Raw serial number */
+	struct asn1_cursor raw;
+};
+
 /** An X.509 issuer */
 struct x509_issuer {
 	/** Raw issuer */
@@ -121,6 +127,8 @@ struct x509_certificate {
 	struct asn1_cursor raw;
 	/** Version */
 	unsigned int version;
+	/** Serial number */
+	struct x509_serial serial;
 	/** Raw tbsCertificate */
 	struct asn1_cursor tbs;
 	/** Signature algorithm */

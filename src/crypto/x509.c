@@ -392,6 +392,31 @@ static int x509_parse_version ( struct x509_certificate *cert,
 }
 
 /**
+ * Parse X.509 certificate serial number
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int x509_parse_serial ( struct x509_certificate *cert,
+			       const struct asn1_cursor *raw ) {
+	struct x509_serial *serial = &cert->serial;
+	int rc;
+
+	/* Record raw serial number */
+	memcpy ( &serial->raw, raw, sizeof ( serial->raw ) );
+	if ( ( rc = asn1_shrink ( &serial->raw, ASN1_INTEGER ) ) != 0 ) {
+		DBGC ( cert, "X509 %p cannot shrink serialNumber: %s\n",
+		       cert, strerror ( rc ) );
+		return rc;
+	}
+	DBGC ( cert, "X509 %p issuer is:\n", cert );
+	DBGC_HDA ( cert, 0, serial->raw.data, serial->raw.len );
+
+	return 0;
+}
+
+/**
  * Parse X.509 certificate issuer
  *
  * @v cert		X.509 certificate
@@ -818,8 +843,10 @@ static int x509_parse_tbscertificate ( struct x509_certificate *cert,
 		asn1_skip_any ( &cursor );
 	}
 
-	/* Skip serialNumber */
-	asn1_skip ( &cursor, ASN1_INTEGER );
+	/* Parse serialNumber */
+	if ( ( rc = x509_parse_serial ( cert, &cursor ) ) != 0 )
+		return rc;
+	asn1_skip_any ( &cursor );
 
 	/* Parse signature */
 	if ( ( rc = x509_parse_signature_algorithm ( cert, algorithm,
