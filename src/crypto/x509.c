@@ -89,6 +89,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EACCES_EXPIRED )
 #define EINFO_EACCES_EXPIRED \
 	__einfo_uniqify ( EINFO_EACCES, 0x04, "Expired (or not yet valid)" )
+#define EACCES_PATH_LEN \
+	__einfo_error ( EINFO_EACCES_PATH_LEN )
+#define EINFO_EACCES_PATH_LEN \
+	__einfo_uniqify ( EINFO_EACCES, 0x05, "Maximum path length exceeded" )
 
 /** "commonName" object identifier */
 static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
@@ -1187,6 +1191,7 @@ int x509_validate_chain ( int ( * parse_next ) ( struct x509_certificate *cert,
 	struct x509_certificate *current = &temp[0];
 	struct x509_certificate *next = &temp[1];
 	struct x509_certificate *swap;
+	unsigned int path_len = 0;
 	int rc;
 
 	/* Use default root certificate store if none specified */
@@ -1225,6 +1230,15 @@ int x509_validate_chain ( int ( * parse_next ) ( struct x509_certificate *cert,
 		/* Validate current certificate against next certificate */
 		if ( ( rc = x509_validate_issuer ( current, next ) ) != 0 )
 			return rc;
+
+		/* Validate path length constraint */
+		if ( path_len > next->extensions.basic.path_len ) {
+			DBGC ( context, "X509 chain %p path length %d exceeds "
+			       "maximum %d\n", context, path_len,
+			       next->extensions.basic.path_len );
+			return -EACCES_PATH_LEN;
+		}
+		path_len++;
 
 		/* Move to next certificate in chain */
 		swap = current;
