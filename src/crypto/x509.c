@@ -1143,8 +1143,10 @@ int x509_validate_time ( struct x509_certificate *cert, time_t time ) {
  * @v first		Initial X.509 certificate to fill in, or NULL
  * @ret rc		Return status code
  */
-int x509_validate_chain ( int ( * parse_next ) ( struct x509_certificate *cert,
-						 void *context ),
+int x509_validate_chain ( int ( * parse_next )
+			  ( struct x509_certificate *cert,
+			    const struct x509_certificate *previous,
+			    void *context ),
 			  void *context, time_t time, struct x509_root *root,
 			  struct x509_certificate *first ) {
 	struct x509_certificate temp[2];
@@ -1159,7 +1161,7 @@ int x509_validate_chain ( int ( * parse_next ) ( struct x509_certificate *cert,
 		root = &root_certificates;
 
 	/* Get first certificate in chain */
-	if ( ( rc = parse_next ( current, context ) ) != 0 ) {
+	if ( ( rc = parse_next ( current, NULL, context ) ) != 0 ) {
 		DBGC ( context, "X509 chain %p could not get first "
 		       "certificate: %s\n", context, strerror ( rc ) );
 		return rc;
@@ -1181,7 +1183,7 @@ int x509_validate_chain ( int ( * parse_next ) ( struct x509_certificate *cert,
 			return 0;
 
 		/* Get next certificate in chain */
-		if ( ( rc = parse_next ( next, context ) ) != 0 ) {
+		if ( ( rc = parse_next ( next, current, context ) ) != 0 ) {
 			DBGC ( context, "X509 chain %p could not get next "
 			       "certificate: %s\n", context, strerror ( rc ) );
 			return rc;

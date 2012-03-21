@@ -695,10 +695,14 @@ struct x509_test_chain_context {
  * Parse next certificate in chain
  *
  * @v cert		X.509 certificate to parse
+ * @v previous		Previous X.509 certificate, or NULL
  * @v ctx		Chain context
  * @ret rc		Return status code
  */
-static int x509_test_parse_next ( struct x509_certificate *cert, void *ctx ) {
+static int
+x509_test_parse_next ( struct x509_certificate *cert,
+		       const struct x509_certificate *previous __unused,
+		       void *ctx ) {
 	struct x509_test_chain_context *context = ctx;
 	struct x509_test_certificate *test_cert;
 

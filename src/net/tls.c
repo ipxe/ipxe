@@ -1281,10 +1281,13 @@ struct tls_certificate_context {
  * Parse next certificate in TLS certificate list
  *
  * @v cert		X.509 certificate to fill in
+ * @v previous		Previous X.509 certificate, or NULL
  * @v ctx		Context
  * @ret rc		Return status code
  */
-static int tls_parse_next ( struct x509_certificate *cert, void *ctx ) {
+static int tls_parse_next ( struct x509_certificate *cert,
+			    const struct x509_certificate *previous __unused,
+			    void *ctx ) {
 	struct tls_certificate_context *context = ctx;
 	struct tls_session *tls = context->tls;
 	const struct {

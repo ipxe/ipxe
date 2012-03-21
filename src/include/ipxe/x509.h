@@ -183,6 +183,7 @@ extern int x509_validate_root ( struct x509_certificate *cert,
 extern int x509_validate_time ( struct x509_certificate *cert, time_t time );
 extern int x509_validate_chain ( int ( * parse_next )
 				 ( struct x509_certificate *cert,
+				   const struct x509_certificate *previous,
 				   void *context ),
 				 void *context, time_t time,
 				 struct x509_root *root,
