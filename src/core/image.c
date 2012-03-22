@@ -36,11 +36,27 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/* Disambiguate the various error causes */
+#define EACCES_UNTRUSTED \
+	__einfo_error ( EINFO_EACCES_UNTRUSTED )
+#define EINFO_EACCES_UNTRUSTED \
+	__einfo_uniqify ( EINFO_EACCES, 0x01, "Untrusted image" )
+#define EACCES_PERMANENT \
+	__einfo_error ( EINFO_EACCES_PERMANENT )
+#define EINFO_EACCES_PERMANENT \
+	__einfo_uniqify ( EINFO_EACCES, 0x02, "Trust requirement is permanent" )
+
 /** List of registered images */
 struct list_head images = LIST_HEAD_INIT ( images );
 
 /** Currently-executing image */
 struct image *current_image;
+
+/** Current image trust requirement */
+static int require_trusted_images = 0;
+
+/** Prevent changes to image trust requirement */
+static int require_trusted_images_permanent = 0;
 
 /**
  * Free executable image
@@ -228,6 +244,12 @@ int image_exec ( struct image *image ) {
 	if ( ( rc = image_select ( image ) ) != 0 )
 		return rc;
 
+	/* Check that image is trusted (if applicable) */
+	if ( require_trusted_images && ! ( image->flags & IMAGE_TRUSTED ) ) {
+		DBGC ( image, "IMAGE %s is not trusted\n", image->name );
+		return -EACCES_UNTRUSTED;
+	}
+
 	/* Switch current working directory to be that of the image itself */
 	old_cwuri = uri_get ( cwuri );
 	churi ( image->uri );
@@ -354,4 +376,28 @@ struct image * image_find_selected ( void ) {
 			return image;
 	}
 	return NULL;
+}
+
+/**
+ * Change image trust requirement
+ *
+ * @v require_trusted	Require trusted images
+ * @v permanent		Make trust requirement permanent
+ * @ret rc		Return status code
+ */
+int image_set_trust ( int require_trusted, int permanent ) {
+
+	/* Update trust requirement, if permitted to do so */
+	if ( ! require_trusted_images_permanent ) {
+		require_trusted_images = require_trusted;
+		require_trusted_images_permanent = permanent;
+	}
+
+	/* Fail if we attempted to change the trust requirement but
+	 * were not permitted to do so.
+	 */
+	if ( require_trusted_images != require_trusted )
+		return -EACCES_PERMANENT;
+
+	return 0;
 }

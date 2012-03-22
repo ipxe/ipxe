@@ -64,6 +64,9 @@ struct image {
 /** Image is selected for execution */
 #define IMAGE_SELECTED 0x0002
 
+/** Image is trusted */
+#define IMAGE_TRUSTED 0x0004
+
 /** An executable image type */
 struct image_type {
 	/** Name of this image type */
@@ -148,6 +151,7 @@ extern int image_exec ( struct image *image );
 extern int image_replace ( struct image *replacement );
 extern int image_select ( struct image *image );
 extern struct image * image_find_selected ( void );
+extern int image_set_trust ( int require_trusted, int permanent );
 
 /**
  * Increment reference count on an image
@@ -179,6 +183,24 @@ static inline void image_put ( struct image *image ) {
 static inline int image_set_name ( struct image *image, const char *name ) {
 	strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
 	return 0;
+}
+
+/**
+ * Set image as trusted
+ *
+ * @v image		Image
+ */
+static inline void image_trust ( struct image *image ) {
+	image->flags |= IMAGE_TRUSTED;
+}
+
+/**
+ * Set image as untrusted
+ *
+ * @v image		Image
+ */
+static inline void image_untrust ( struct image *image ) {
+	image->flags &= ~IMAGE_TRUSTED;
 }
 
 #endif /* _IPXE_IMAGE_H */

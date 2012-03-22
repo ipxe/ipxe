@@ -140,6 +140,8 @@ void imgstat ( struct image *image ) {
 	printf ( "%s : %zd bytes", image->name, image->len );
 	if ( image->type )
 		printf ( " [%s]", image->type->name );
+	if ( image->flags & IMAGE_TRUSTED )
+		printf ( " [TRUSTED]" );
 	if ( image->flags & IMAGE_SELECTED )
 		printf ( " [SELECTED]" );
 	if ( image->cmdline )
