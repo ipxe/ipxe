@@ -163,6 +163,14 @@ static void bios_putchar ( int character ) {
 					   /* Skip non-printable characters */
 					   "cmpb $0x20, %%al\n\t"
 					   "jb 1f\n\t"
+					   /* Read attribute */
+					   "movb %%al, %%cl\n\t"
+					   "movb $0x08, %%ah\n\t"
+					   "int $0x10\n\t"
+					   "xchgb %%al, %%cl\n\t"
+					   /* Skip if attribute matches */
+					   "cmpb %%ah, %%bl\n\t"
+					   "je 1f\n\t"
 					   /* Set attribute */
 					   "movw $0x0001, %%cx\n\t"
 					   "movb $0x09, %%ah\n\t"
