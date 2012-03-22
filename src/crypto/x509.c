@@ -902,6 +902,7 @@ int x509_parse ( struct x509_certificate *cert, const void *data, size_t len ) {
 	memset ( cert, 0, sizeof ( *cert ) );
 	cert->raw.data = data;
 	cert->raw.len = len;
+	asn1_shrink_any ( &cert->raw );
 
 	/* Enter certificate */
 	memcpy ( &cursor, &cert->raw, sizeof ( cursor ) );
