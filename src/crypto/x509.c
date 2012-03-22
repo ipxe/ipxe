@@ -93,6 +93,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EACCES_PATH_LEN )
 #define EINFO_EACCES_PATH_LEN \
 	__einfo_uniqify ( EINFO_EACCES, 0x05, "Maximum path length exceeded" )
+#define EACCES_UNTRUSTED \
+	__einfo_error ( EINFO_EACCES_UNTRUSTED )
+#define EINFO_EACCES_UNTRUSTED \
+	__einfo_uniqify ( EINFO_EACCES, 0x06, "Untrusted root certificate" )
 
 /** "commonName" object identifier */
 static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
@@ -1179,9 +1183,17 @@ int x509_validate_chain ( int ( * parse_next )
 		if ( ( rc = x509_validate_time ( current, time ) ) != 0 )
 			return rc;
 
-		/* Succeed if we have reached a root certificate */
+		/* Succeed if we have reached a trusted root certificate */
 		if ( x509_validate_root ( current, root ) == 0 )
 			return 0;
+
+		/* Fail if we have reached an untrusted root certificate */
+		if ( asn1_compare ( &current->issuer.raw,
+				    &current->subject.raw ) == 0 ) {
+			DBGC ( context, "X509 chain %p reached untrusted root "
+			       "certificate\n", context );
+			return -EACCES_UNTRUSTED;
+		}
 
 		/* Get next certificate in chain */
 		if ( ( rc = parse_next ( next, current, context ) ) != 0 ) {

@@ -46,10 +46,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tls.h>
 
 /* Disambiguate the various error causes */
-#define EACCES_UNTRUSTED \
-	__einfo_error ( EINFO_EACCES_UNTRUSTED )
-#define EINFO_EACCES_UNTRUSTED \
-	__einfo_uniqify ( EINFO_EACCES, 0x01, "Untrusted certificate chain" )
+#define EACCES_INCOMPLETE \
+	__einfo_error ( EINFO_EACCES_INCOMPLETE )
+#define EINFO_EACCES_INCOMPLETE \
+	__einfo_uniqify ( EINFO_EACCES, 0x01, "Incomplete certificate chain" )
 #define EACCES_WRONG_NAME \
 	__einfo_error ( EINFO_EACCES_WRONG_NAME )
 #define EINFO_EACCES_WRONG_NAME \
@@ -1302,7 +1302,7 @@ static int tls_parse_next ( struct x509_certificate *cert,
 	/* Return error at end of chain */
 	if ( context->current >= context->end ) {
 		DBGC ( tls, "TLS %p reached end of certificate chain\n", tls );
-		return -EACCES_UNTRUSTED;
+		return -EACCES_INCOMPLETE;
 	}
 
 	/* Extract current certificate and update context */
