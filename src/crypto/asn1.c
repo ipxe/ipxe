@@ -220,16 +220,21 @@ int asn1_skip ( struct asn1_cursor *cursor, unsigned int type ) {
  * invalidated.
  */
 int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type ) {
-	struct asn1_cursor next;
-	int rc;
+	struct asn1_cursor temp;
+	const void *end;
+	int len;
 
-	/* Skip to next object */
-	memcpy ( &next, cursor, sizeof ( next ) );
-	if ( ( rc = asn1_skip ( &next, type ) ) != 0 )
-		return rc;
+	/* Find end of object */
+	memcpy ( &temp, cursor, sizeof ( temp ) );
+	len = asn1_start ( &temp, type );
+	if ( len < 0 ) {
+		asn1_invalidate_cursor ( cursor );
+		return len;
+	}
+	end = ( temp.data + len );
 
 	/* Shrink original cursor to contain only its first object */
-	cursor->len = ( next.data - cursor->data );
+	cursor->len = ( end - cursor->data );
 
 	return 0;
 }
