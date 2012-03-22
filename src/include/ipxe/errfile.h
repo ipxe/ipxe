@@ -250,6 +250,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_linux_entropy	      ( ERRFILE_OTHER | 0x00280000 )
 #define ERRFILE_x509_test	      ( ERRFILE_OTHER | 0x00290000 )
 #define ERRFILE_cms		      ( ERRFILE_OTHER | 0x002a0000 )
+#define ERRFILE_imgtrust	      ( ERRFILE_OTHER | 0x002b0000 )
 
 /** @} */
 
