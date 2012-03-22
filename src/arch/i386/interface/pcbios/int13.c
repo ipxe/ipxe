@@ -160,7 +160,7 @@ static uint8_t num_drives;
  * @v int13		Emulated drive
  * @ret blksize		Sector size
  */
-static inline unsigned int int13_blksize ( struct int13_drive *int13 ) {
+static inline size_t int13_blksize ( struct int13_drive *int13 ) {
 	return ( int13->capacity.blksize << int13->blksize_shift );
 }
 

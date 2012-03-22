@@ -201,7 +201,7 @@ static int initrd_init ( void ) {
 	/* Allocate and copy initrd content */
 	image->data = umalloc ( initrd_len );
 	if ( ! image->data ) {
-		DBGC ( colour, "RUNTIME could not allocate %zd bytes for "
+		DBGC ( colour, "RUNTIME could not allocate %d bytes for "
 		       "initrd\n", initrd_len );
 		rc = -ENOMEM;
 		goto err_umalloc;
