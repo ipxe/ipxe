@@ -115,28 +115,6 @@ int parse_netdev ( const char *text, struct net_device **netdev ) {
 }
 
 /**
- * Parse image name
- *
- * @v text		Text
- * @ret image		Image
- * @ret rc		Return status code
- */
-int parse_image ( const char *text, struct image **image ) {
-
-	/* Sanity check */
-	assert ( text != NULL );
-
-	/* Find network device */
-	*image = find_image ( text );
-	if ( ! *image ) {
-		printf ( "\"%s\": no such image\n", text );
-		return -ENOENT;
-	}
-
-	return 0;
-}
-
-/**
  * Parse flag
  *
  * @v text		Text (ignored)

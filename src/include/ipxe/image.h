@@ -29,7 +29,7 @@ struct image {
 	/** URI of image */
 	struct uri *uri;
 	/** Name */
-	char name[16];
+	char *name;
 	/** Flags */
 	unsigned int flags;
 
@@ -122,6 +122,10 @@ extern struct image *current_image;
 #define for_each_image( image ) \
 	list_for_each_entry ( (image), &images, list )
 
+/** Iterate over all registered images, safe against deletion */
+#define for_each_image_safe( image, tmp ) \
+	list_for_each_entry_safe ( (image), (tmp), &images, list )
+
 /**
  * Test for existence of images
  *
@@ -140,8 +144,8 @@ static inline struct image * first_image ( void ) {
 	return list_first_entry ( &images, struct image, list );
 }
 
-extern struct image * alloc_image ( void );
-extern void image_set_uri ( struct image *image, struct uri *uri );
+extern struct image * alloc_image ( struct uri *uri );
+extern int image_set_name ( struct image *image, const char *name );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
@@ -174,15 +178,12 @@ static inline void image_put ( struct image *image ) {
 }
 
 /**
- * Set image name
+ * Clear image command line
  *
  * @v image		Image
- * @v name		New image name
- * @ret rc		Return status code
  */
-static inline int image_set_name ( struct image *image, const char *name ) {
-	strncpy ( image->name, name, ( sizeof ( image->name ) - 1 ) );
-	return 0;
+static inline void image_clear_cmdline ( struct image *image ) {
+	image_set_cmdline ( image, NULL );
 }
 
 /**

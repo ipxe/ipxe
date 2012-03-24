@@ -189,14 +189,18 @@ static int initrd_init ( void ) {
 	       initrd_phys, ( initrd_phys + initrd_len ) );
 
 	/* Allocate image */
-	image = alloc_image();
+	image = alloc_image ( NULL );
 	if ( ! image ) {
 		DBGC ( colour, "RUNTIME could not allocate image for "
 		       "initrd\n" );
 		rc = -ENOMEM;
 		goto err_alloc_image;
 	}
-	image_set_name ( image, "<INITRD>" );
+	if ( ( rc = image_set_name ( image, "<INITRD>" ) ) != 0 ) {
+		DBGC ( colour, "RUNTIME could not set image name: %s\n",
+		       strerror ( rc ) );
+		goto err_set_name;
+	}
 
 	/* Allocate and copy initrd content */
 	image->data = umalloc ( initrd_len );
@@ -227,6 +231,7 @@ static int initrd_init ( void ) {
 
  err_register_image:
  err_umalloc:
+ err_set_name:
 	image_put ( image );
  err_alloc_image:
 	return rc;

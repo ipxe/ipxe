@@ -166,6 +166,8 @@ void comboot_force_text_mode ( void ) {
  * Fetch kernel and optional initrd
  */
 static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
+	struct image *kernel;
+	struct image *initrd;
 	char *initrd_file;
 	int rc;
 
@@ -184,8 +186,7 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 		DBG ( "COMBOOT: fetching initrd '%s'\n", initrd_file );
 
 		/* Fetch initrd */
-		if ( ( rc = imgdownload_string ( initrd_file, NULL, NULL,
-						 NULL ) ) != 0 ) {
+		if ( ( rc = imgdownload_string ( initrd_file, &initrd ) ) != 0){
 			DBG ( "COMBOOT: could not fetch initrd: %s\n",
 			      strerror ( rc ) );
 			return rc;
@@ -198,10 +199,16 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 
 	DBG ( "COMBOOT: fetching kernel '%s'\n", kernel_file );
 
-	/* Allocate and fetch kernel */
-	if ( ( rc = imgdownload_string ( kernel_file, NULL, cmdline,
-					 image_replace ) ) != 0 ) {
+	/* Fetch kernel */
+	if ( ( rc = imgdownload_string ( kernel_file, &kernel ) ) != 0 ) {
 		DBG ( "COMBOOT: could not fetch kernel: %s\n",
+		      strerror ( rc ) );
+		return rc;
+	}
+
+	/* Replace comboot image with kernel */
+	if ( ( rc = image_replace ( kernel ) ) != 0 ) {
+		DBG ( "COMBOOT: could not replace with kernel: %s\n",
 		      strerror ( rc ) );
 		return rc;
 	}

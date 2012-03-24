@@ -131,6 +131,7 @@ struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
  */
 int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 	      unsigned int flags ) {
+	struct image *image;
 	int rc;
 
 	/* Hook SAN device, if applicable */
@@ -157,9 +158,10 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 
 	/* Attempt filename boot if applicable */
 	if ( filename ) {
-		if ( ( rc = imgdownload ( filename, NULL, NULL,
-					  image_exec ) ) != 0 ) {
-			printf ( "\nCould not chain image: %s\n",
+		if ( ( rc = imgdownload ( filename, &image ) ) != 0 )
+			goto err_download;
+		if ( ( rc = image_exec ( image ) ) != 0 ) {
+			printf ( "Could not boot image: %s\n",
 				 strerror ( rc ) );
 			/* Fall through to (possibly) attempt a SAN boot
 			 * as a fallback.  If no SAN boot is attempted,
@@ -190,6 +192,7 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 		}
 	}
 
+ err_download:
  err_san_describe:
 	/* Unhook SAN device, if applicable */
 	if ( ( drive >= 0 ) && ! ( flags & URIBOOT_NO_SAN_UNHOOK ) ) {

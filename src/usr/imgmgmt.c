@@ -36,38 +36,24 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
- * Download an image
+ * Download a new image
  *
  * @v uri		URI
- * @v name		Image name, or NULL to use default
- * @v cmdline		Command line, or NULL for no command line
- * @v action		Action to take upon a successful download, or NULL
+ * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload ( struct uri *uri, const char *name, const char *cmdline,
-		  int ( * action ) ( struct image *image ) ) {
-	struct image *image;
+int imgdownload ( struct uri *uri, struct image **image ) {
 	size_t len = ( unparse_uri ( NULL, 0, uri, URI_ALL ) + 1 );
 	char uri_string_redacted[len];
 	const char *password;
 	int rc;
 
 	/* Allocate image */
-	image = alloc_image();
-	if ( ! image ) {
+	*image = alloc_image ( uri );
+	if ( ! *image ) {
 		rc = -ENOMEM;
 		goto err_alloc_image;
 	}
-
-	/* Set image name */
-	if ( name )
-		image_set_name ( image, name );
-
-	/* Set image URI */
-	image_set_uri ( image, uri );
-
-	/* Set image command line */
-	image_set_cmdline ( image, cmdline );
 
 	/* Redact password portion of URI, if necessary */
 	password = uri->password;
@@ -78,8 +64,9 @@ int imgdownload ( struct uri *uri, const char *name, const char *cmdline,
 	uri->password = password;
 
 	/* Create downloader */
-	if ( ( rc = create_downloader ( &monojob, image, LOCATION_URI,
+	if ( ( rc = create_downloader ( &monojob, *image, LOCATION_URI,
 					uri ) ) != 0 ) {
+		printf ( "Could not start download: %s\n", strerror ( rc ) );
 		goto err_create_downloader;
 	}
 
@@ -88,47 +75,62 @@ int imgdownload ( struct uri *uri, const char *name, const char *cmdline,
 		goto err_monojob_wait;
 
 	/* Register image */
-	if ( ( rc = register_image ( image ) ) != 0 )
+	if ( ( rc = register_image ( *image ) ) != 0 ) {
+		printf ( "Could not register image: %s\n", strerror ( rc ) );
 		goto err_register_image;
+	}
 
 	/* Drop local reference to image.  Image is guaranteed to
 	 * remain in scope since it is registered.
 	 */
-	image_put ( image );
+	image_put ( *image );
 
-	/* Carry out specified post-download action, if applicable */
-	return ( action ? action ( image ) : 0 );
+	return 0;
 
  err_register_image:
  err_monojob_wait:
  err_create_downloader:
-	image_put ( image );
+	image_put ( *image );
  err_alloc_image:
 	return rc;
 }
 
 /**
- * Download an image
+ * Download a new image
  *
- * @v uri_string	URI as a string (e.g. "http://www.nowhere.com/vmlinuz")
- * @v name		Image name, or NULL to use default
- * @v cmdline		Command line, or NULL for no command line
- * @v action		Action to take upon a successful download
+ * @v uri_string	URI string
+ * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload_string ( const char *uri_string, const char *name,
-			 const char *cmdline,
-			 int ( * action ) ( struct image *image ) ) {
+int imgdownload_string ( const char *uri_string, struct image **image ) {
 	struct uri *uri;
 	int rc;
 
 	if ( ! ( uri = parse_uri ( uri_string ) ) )
 		return -ENOMEM;
 
-	rc = imgdownload ( uri, name, cmdline, action );
+	rc = imgdownload ( uri, image );
 
 	uri_put ( uri );
 	return rc;
+}
+
+/**
+ * Acquire an image
+ *
+ * @v name_uri		Name or URI string
+ * @v image		Image to fill in
+ * @ret rc		Return status code
+ */
+int imgacquire ( const char *name_uri, struct image **image ) {
+
+	/* If we already have an image with the specified name, use it */
+	*image = find_image ( name_uri );
+	if ( *image )
+		return 0;
+
+	/* Otherwise, download a new image */
+	return imgdownload_string ( name_uri, image );
 }
 
 /**
@@ -147,13 +149,4 @@ void imgstat ( struct image *image ) {
 	if ( image->cmdline )
 		printf ( " \"%s\"", image->cmdline );
 	printf ( "\n" );
-}
-
-/**
- * Free an image
- *
- * @v image		Executable/loadable image
- */
-void imgfree ( struct image *image ) {
-	unregister_image ( image );
 }

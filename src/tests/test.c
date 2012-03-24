@@ -149,12 +149,8 @@ static struct image_type test_image_type = {
 	.exec = test_image_exec,
 };
 
-static void test_image_free ( struct refcnt *refcnt __unused ) {
-	/* Do nothing */
-}
-
 static struct image test_image = {
-	.refcnt = REF_INIT ( test_image_free ),
+	.refcnt = REF_INIT ( ref_no_free ),
 	.name = "<TESTS>",
 	.type = &test_image_type,
 };

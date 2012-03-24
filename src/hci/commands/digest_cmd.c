@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
+#include <usr/imgmgmt.h>
 
 /** @file
  *
@@ -74,8 +75,8 @@ static int digest_exec ( int argc, char **argv,
 
 	for ( i = optind ; i < argc ; i++ ) {
 
-		/* find image */
-		if ( ( rc = parse_image ( argv[i], &image ) ) != 0 )
+		/* Acquire image */
+		if ( ( rc = imgacquire ( argv[i], &image ) ) != 0 )
 			continue;
 		offset = 0;
 		len = image->len;

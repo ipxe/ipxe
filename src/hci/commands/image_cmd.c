@@ -34,123 +34,158 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** "imgfetch" options */
-struct imgfetch_options {
+/** "img{single}" options */
+struct imgsingle_options {
 	/** Image name */
 	const char *name;
 };
 
-/** "imgfetch" option list */
-static struct option_descriptor imgfetch_opts[] = {
+/** "img{single}" option list */
+static struct option_descriptor imgsingle_opts[] = {
 	OPTION_DESC ( "name", 'n', required_argument,
-		      struct imgfetch_options, name, parse_string ),
+		      struct imgsingle_options, name, parse_string ),
 };
 
-/** "imgfetch" command descriptor */
-static struct command_descriptor imgfetch_cmd =
-	COMMAND_DESC ( struct imgfetch_options, imgfetch_opts, 1, MAX_ARGUMENTS,
-		       "[--name <name>] <uri> [<arguments>...]" );
+/** "img{single}" command descriptor */
+static struct command_descriptor imgsingle_cmd =
+	COMMAND_DESC ( struct imgsingle_options, imgsingle_opts,
+		       1, MAX_ARGUMENTS,
+		       "[--name <name>] <uri|image> [<arguments>...]" );
+
+/** An "img{single}" family command descriptor */
+struct imgsingle_descriptor {
+	/** Command descriptor */
+	struct command_descriptor *cmd;
+	/** Function to use to acquire the image */
+	int ( * acquire ) ( const char *name, struct image **image );
+	/** Pre-action to take upon image, or NULL */
+	void ( * preaction ) ( struct image *image );
+	/** Action to take upon image, or NULL */
+	int ( * action ) ( struct image *image );
+	/** Verb to describe action */
+	const char *verb;
+};
 
 /**
- * The "imgfetch" and friends command body
+ * The "img{single}" family of commands
  *
  * @v argc		Argument count
  * @v argv		Argument list
- * @v cmd		Command descriptor
+ * @v desc		"img{single}" command descriptor
  * @v action_name	Action name (for error messages)
- * @v action		Action to take upon a successful download
+ * @v action		Action to take upon image
  * @ret rc		Return status code
  */
-static int imgfetch_core_exec ( int argc, char **argv,
-				const char *action_name,
-				int ( * action ) ( struct image *image ) ) {
-	struct imgfetch_options opts;
-	char *uri_string;
+static int imgsingle_exec ( int argc, char **argv,
+			    struct imgsingle_descriptor *desc ) {
+	struct imgsingle_options opts;
+	char *name_uri = NULL;
 	char *cmdline = NULL;
+	struct image *image;
 	int rc;
 
 	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &imgfetch_cmd, &opts ) ) != 0 )
+	if ( ( rc = parse_options ( argc, argv, desc->cmd, &opts ) ) != 0 )
 		goto err_parse_options;
 
-	/* Parse URI string */
-	uri_string = argv[optind];
-
-	/* Parse command line */
-	if ( argv[ optind + 1 ] != NULL ) {
-		cmdline = concat_args ( &argv[ optind + 1 ] );
-		if ( ! cmdline ) {
-			rc = -ENOMEM;
-			goto err_cmdline;
+	/* Parse name/URI string and command line, if present */
+	if ( optind < argc ) {
+		name_uri = argv[optind];
+		if ( argv[ optind + 1 ] != NULL ) {
+			cmdline = concat_args ( &argv[ optind + 1 ] );
+			if ( ! cmdline ) {
+				rc = -ENOMEM;
+				goto err_parse_cmdline;
+			}
 		}
 	}
 
-	/* Fetch the image */
-	if ( ( rc = imgdownload_string ( uri_string, opts.name, cmdline,
-					 action ) ) != 0 ) {
-		printf ( "Could not %s %s: %s\n",
-			 action_name, uri_string, strerror ( rc ) );
-		goto err_imgdownload;
+	/* Acquire the image */
+	if ( name_uri ) {
+		if ( ( rc = desc->acquire ( name_uri, &image ) ) != 0 )
+			goto err_acquire;
+	} else {
+		image = image_find_selected();
+		if ( ! image ) {
+			printf ( "No image selected\n" );
+			goto err_acquire;
+		}
 	}
 
-	/* Free command line */
-	free ( cmdline );
+	/* Carry out command pre-action, if applicable */
+	if ( desc->preaction )
+		desc->preaction ( image );
 
-	return 0;
+	/* Set the image name, if applicable */
+	if ( opts.name ) {
+		if ( ( rc = image_set_name ( image, opts.name ) ) != 0 ) {
+			printf ( "Could not name image: %s\n",
+				 strerror ( rc ) );
+			goto err_set_name;
+		}
+	}
 
- err_imgdownload:
+	/* Set the command-line arguments, if applicable */
+	if ( cmdline ) {
+		if ( ( rc = image_set_cmdline ( image, cmdline ) ) != 0 ) {
+			printf ( "Could not set arguments: %s\n",
+				 strerror ( rc ) );
+			goto err_set_cmdline;
+		}
+	}
+
+	/* Carry out command action, if applicable */
+	if ( desc->action ) {
+		if ( ( rc = desc->action ( image ) ) != 0 ) {
+			printf ( "Could not %s: %s\n",
+				 desc->verb, strerror ( rc ) );
+			goto err_action;
+		}
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_action:
+ err_set_cmdline:
+ err_set_name:
+ err_acquire:
 	free ( cmdline );
- err_cmdline:
+ err_parse_cmdline:
  err_parse_options:
 	return rc;
 }
 
+/** "imgfetch" command descriptor */
+static struct command_descriptor imgfetch_cmd =
+	COMMAND_DESC ( struct imgsingle_options, imgsingle_opts,
+		       1, MAX_ARGUMENTS,
+		       "[--name <name>] <uri> [<arguments>...]" );
+
+/** "imgfetch" family command descriptor */
+struct imgsingle_descriptor imgfetch_desc = {
+	.cmd = &imgfetch_cmd,
+	.acquire = imgdownload_string,
+};
+
 /**
- * The "imgfetch"/"module" command
+ * The "imgfetch" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
  * @ret rc		Return status code
  */
 static int imgfetch_exec ( int argc, char **argv ) {
-
-	return imgfetch_core_exec ( argc, argv, "fetch", NULL );
+	return imgsingle_exec ( argc, argv, &imgfetch_desc );
 }
 
-/**
- * The "kernel" command
- *
- * @v argc		Argument count
- * @v argv		Argument list
- * @ret rc		Return status code
- */
-static int kernel_exec ( int argc, char **argv ) {
-
-	return imgfetch_core_exec ( argc, argv, "select", image_select );
-}
-
-/**
- * The "chain" command
- *
- * @v argc		Argument count
- * @v argv		Argument list
- * @ret rc		Return status code
- */
-static int chain_exec ( int argc, char **argv) {
-
-	return imgfetch_core_exec ( argc, argv, "boot", image_exec );
-}
-
-/** "imgselect" options */
-struct imgselect_options {};
-
-/** "imgselect" option list */
-static struct option_descriptor imgselect_opts[] = {};
-
-/** "imgselect" command descriptor */
-static struct command_descriptor imgselect_cmd =
-	COMMAND_DESC ( struct imgselect_options, imgselect_opts, 1, 1,
-		       "<image>" );
+/** "imgselect" family command descriptor */
+struct imgsingle_descriptor imgselect_desc = {
+	.cmd = &imgsingle_cmd,
+	.acquire = imgacquire,
+	.action = image_select,
+	.verb = "select",
+};
 
 /**
  * The "imgselect" command
@@ -160,38 +195,40 @@ static struct command_descriptor imgselect_cmd =
  * @ret rc		Return status code
  */
 static int imgselect_exec ( int argc, char **argv ) {
-	struct imgselect_options opts;
-	struct image *image;
-	int rc;
-
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &imgselect_cmd, &opts ) ) != 0 )
-		return rc;
-
-	/* Parse image name */
-	if ( ( rc = parse_image ( argv[optind], &image ) ) != 0 )
-		return rc;
-
-	/* Load image */
-	if ( ( rc = imgselect ( image ) ) != 0 ) {
-		printf ( "Could not select %s: %s\n",
-			 image->name, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
+	return imgsingle_exec ( argc, argv, &imgselect_desc );
 }
 
-/** "imgargs" options */
-struct imgargs_options {};
+/** "imgexec" command descriptor */
+static struct command_descriptor imgexec_cmd =
+	COMMAND_DESC ( struct imgsingle_options, imgsingle_opts,
+		       0, MAX_ARGUMENTS,
+		       "[--name <name>] [<uri|image> [<arguments>...]]" );
 
-/** "imgargs" option list */
-static struct option_descriptor imgargs_opts[] = {};
+/** "imgexec" family command descriptor */
+struct imgsingle_descriptor imgexec_desc = {
+	.cmd = &imgexec_cmd,
+	.acquire = imgacquire,
+	.action = image_exec,
+	.verb = "boot",
+};
 
-/** "imgargs" command descriptor */
-static struct command_descriptor imgargs_cmd =
-	COMMAND_DESC ( struct imgargs_options, imgargs_opts, 1, MAX_ARGUMENTS,
-		       "<image> [<arguments>...]" );
+/**
+ * The "imgexec" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int imgexec_exec ( int argc, char **argv) {
+	return imgsingle_exec ( argc, argv, &imgexec_desc );
+}
+
+/** "imgargs" family command descriptor */
+struct imgsingle_descriptor imgargs_desc = {
+	.cmd = &imgsingle_cmd,
+	.acquire = imgacquire,
+	.preaction = image_clear_cmdline,
+};
 
 /**
  * The "imgargs" command body
@@ -201,104 +238,59 @@ static struct command_descriptor imgargs_cmd =
  * @ret rc		Return status code
  */
 static int imgargs_exec ( int argc, char **argv ) {
-	struct imgargs_options opts;
-	struct image *image;
-	char *cmdline = NULL;
-	int rc;
-
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &imgargs_cmd, &opts ) ) != 0 )
-		goto err_parse_options;
-
-	/* Parse image name */
-	if ( ( rc = parse_image ( argv[optind], &image ) ) != 0 )
-		goto err_parse_image;
-
-	/* Parse command line */
-	if ( argv[ optind + 1 ] != NULL ) {
-		cmdline = concat_args ( &argv[ optind + 1 ] );
-		if ( ! cmdline ) {
-			rc = -ENOMEM;
-			goto err_cmdline;
-		}
-	}
-
-	/* Set command line */
-	if ( ( rc = image_set_cmdline ( image, cmdline ) ) != 0 )
-		goto err_set_cmdline;
-
-	/* Free command line */
-	free ( cmdline );
-
-	return 0;
-
- err_set_cmdline:
-	free ( cmdline );
- err_cmdline:
- err_parse_image:
- err_parse_options:
-	return rc;
+	return imgsingle_exec ( argc, argv, &imgargs_desc );
 }
 
-/** "imgexec" options */
-struct imgexec_options {};
+/** "img{multi}" options */
+struct imgmulti_options {};
 
-/** "imgexec" option list */
-static struct option_descriptor imgexec_opts[] = {};
+/** "img{multi}" option list */
+static struct option_descriptor imgmulti_opts[] = {};
 
-/** "imgexec" command descriptor */
-static struct command_descriptor imgexec_cmd =
-	COMMAND_DESC ( struct imgexec_options, imgexec_opts, 0, 1,
-		       "[<image>]" );
+/** "img{multi}" command descriptor */
+static struct command_descriptor imgmulti_cmd =
+	COMMAND_DESC ( struct imgmulti_options, imgmulti_opts, 0, MAX_ARGUMENTS,
+		       "[<image>...]" );
 
 /**
- * The "imgexec" command
+ * The "img{multi}" family of commands
  *
  * @v argc		Argument count
  * @v argv		Argument list
+ * @v payload		Function to execute on each image
  * @ret rc		Return status code
  */
-static int imgexec_exec ( int argc, char **argv ) {
-	struct imgexec_options opts;
+static int imgmulti_exec ( int argc, char **argv,
+			   void ( * payload ) ( struct image *image ) ) {
+	struct imgmulti_options opts;
 	struct image *image;
+	struct image *tmp;
+	int i;
 	int rc;
 
 	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &imgexec_cmd, &opts ) ) != 0 )
+	if ( ( rc = parse_options ( argc, argv, &imgmulti_cmd, &opts ) ) != 0 )
 		return rc;
 
-	/* Parse image name */
-	if ( optind < argc ) {
-		if ( ( rc = parse_image ( argv[optind], &image ) ) != 0 )
-			return rc;
-	} else {
-		image = imgautoselect();
-		if ( ! image ) {
-			rc = -ENOTTY;
-			printf ( "No image selected: %s\n", strerror ( rc ) );
-			return rc;
-		}
+	/* If no images are explicitly specified, process all images */
+	if ( optind == argc ) {
+		for_each_image_safe ( image, tmp )
+			payload ( image );
+		return 0;
 	}
 
-	/* Execute image */
-	if ( ( rc = imgexec ( image ) ) != 0 ) {
-		printf ( "Could not execute %s: %s\n",
-			 image->name, strerror ( rc ) );
-		return rc;
+	/* Otherwise, process specified images */
+	for ( i = optind ; i < argc ; i++ ) {
+		image = find_image ( argv[i] );
+		if ( ! image ) {
+			printf ( "\"%s\": no such image\n", argv[i] );
+			return -ENOENT;
+		}
+		payload ( image );
 	}
 
 	return 0;
 }
-
-/** "imgstat" options */
-struct imgstat_options {};
-
-/** "imgstat" option list */
-static struct option_descriptor imgstat_opts[] = {};
-
-/** "imgstat" command descriptor */
-static struct command_descriptor imgstat_cmd =
-	COMMAND_DESC ( struct imgstat_options, imgstat_opts, 0, 0, "" );
 
 /**
  * The "imgstat" command
@@ -308,32 +300,8 @@ static struct command_descriptor imgstat_cmd =
  * @ret rc		Return status code
  */
 static int imgstat_exec ( int argc, char **argv ) {
-	struct imgstat_options opts;
-	struct image *image;
-	int rc;
-
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &imgstat_cmd, &opts ) ) != 0 )
-		return rc;
-
-	/* Show status of all images */
-	for_each_image ( image ) {
-		imgstat ( image );
-	}
-
-	return 0;
+	return imgmulti_exec ( argc, argv, imgstat );
 }
-
-/** "imgfree" options */
-struct imgfree_options {};
-
-/** "imgfree" option list */
-static struct option_descriptor imgfree_opts[] = {};
-
-/** "imgfree" command descriptor */
-static struct command_descriptor imgfree_cmd =
-	COMMAND_DESC ( struct imgfree_options, imgfree_opts, 0, 1,
-		       "[<image>]" );
 
 /**
  * The "imgfree" command
@@ -343,28 +311,7 @@ static struct command_descriptor imgfree_cmd =
  * @ret rc		Return status code
  */
 static int imgfree_exec ( int argc, char **argv ) {
-	struct imgfree_options opts;
-	struct image *image;
-	struct image *tmp;
-	int rc;
-
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &imgfree_cmd, &opts ) ) != 0 )
-		return rc;
-
-	if ( optind < argc ) {
-		/* Free specified image */
-		if ( ( rc = parse_image ( argv[optind], &image ) ) != 0 )
-			return rc;
-		imgfree ( image );
-	} else {
-		/* Free all images */
-		list_for_each_entry_safe ( image, tmp, &images, list ) {
-			imgfree ( image );
-		}
-	}
-
-	return 0;
+	return imgmulti_exec ( argc, argv, unregister_image );
 }
 
 /** Image management commands */
@@ -383,19 +330,19 @@ struct command image_commands[] __command = {
 	},
 	{
 		.name = "kernel",
-		.exec = kernel_exec,
+		.exec = imgselect_exec, /* synonym for "imgselect" */
 	},
 	{
 		.name = "chain",
-		.exec = chain_exec,
+		.exec = imgexec_exec, /* synonym for "imgexec" */
 	},
 	{
 		.name = "imgselect",
 		.exec = imgselect_exec,
 	},
 	{
-		.name = "imgload", /* synonym for "imgselect" */
-		.exec = imgselect_exec,
+		.name = "imgload",
+		.exec = imgselect_exec, /* synonym for "imgselect" */
 	},
 	{
 		.name = "imgargs",
