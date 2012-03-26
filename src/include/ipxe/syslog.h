@@ -9,6 +9,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <syslog.h>
+
 /** Syslog server port */
 #define SYSLOG_PORT 514
 
@@ -28,7 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * This is a policy decision
  */
-#define SYSLOG_SEVERITY 6 /* informational */
+#define SYSLOG_SEVERITY LOG_INFO
 
 /** Syslog priority */
 #define SYSLOG_PRIORITY( facility, severity ) ( 8 * (facility) + (severity) )

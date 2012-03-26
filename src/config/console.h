@@ -23,6 +23,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define	KEYBOARD_MAP	us
 
+#define	LOG_LEVEL	LOG_NONE
+
 #include <config/local/console.h>
 
 #endif /* CONFIG_CONSOLE_H */
