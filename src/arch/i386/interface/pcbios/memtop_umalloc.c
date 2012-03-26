@@ -208,7 +208,8 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 
 	/* Collect any free blocks and update hidden memory region */
 	ecollect_free();
-	hide_umalloc ( user_to_phys ( bottom, 0 ),
+	hide_umalloc ( user_to_phys ( bottom, ( ( bottom == top ) ?
+						0 : -sizeof ( extmem ) ) ),
 		       user_to_phys ( top, 0 ) );
 
 	return ( new_size ? new : UNOWHERE );
