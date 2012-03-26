@@ -183,6 +183,8 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 
  done:
 	free_iob ( iobuf );
+	if ( rc != 0 )
+		downloader_finished ( downloader, rc );
 	return rc;
 }
 
