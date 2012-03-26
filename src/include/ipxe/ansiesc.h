@@ -113,6 +113,13 @@ struct ansiesc_context {
 /** Select graphic rendition */
 #define ANSIESC_SGR 'm'
 
+/** Explicit log message priority
+ *
+ * This is an iPXE private sequence identifier.  (The range 'p' to '~'
+ * is reserved for private sequences.)
+ */
+#define ANSIESC_LOG_PRIORITY 'p'
+
 /** @} */
 
 extern int ansiesc_process ( struct ansiesc_context *ctx, int c );

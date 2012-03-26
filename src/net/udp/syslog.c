@@ -68,8 +68,27 @@ static struct interface syslogger = INTF_INIT ( syslogger_desc );
 /** Syslog line buffer */
 static char syslog_buffer[SYSLOG_BUFSIZE];
 
+/** Syslog severity */
+static unsigned int syslog_severity = SYSLOG_DEFAULT_SEVERITY;
+
+/**
+ * Handle ANSI set syslog priority (private sequence)
+ *
+ * @v count		Parameter count
+ * @v params		List of graphic rendition aspects
+ */
+static void syslog_handle_priority ( unsigned int count __unused,
+				     int params[] ) {
+	if ( params[0] >= 0 ) {
+		syslog_severity = params[0];
+	} else {
+		syslog_severity = SYSLOG_DEFAULT_SEVERITY;
+	}
+}
+
 /** Syslog ANSI escape sequence handlers */
 static struct ansiesc_handler syslog_handlers[] = {
+	{ ANSIESC_LOG_PRIORITY, syslog_handle_priority },
 	{ 0, NULL }
 };
 
@@ -106,8 +125,8 @@ static void syslog_putchar ( int character ) {
 
 	/* Send log message */
 	if ( ( rc = xfer_printf ( &syslogger, "<%d>ipxe: %s",
-				  SYSLOG_PRIORITY ( SYSLOG_FACILITY,
-						    SYSLOG_SEVERITY ),
+				  SYSLOG_PRIORITY ( SYSLOG_DEFAULT_FACILITY,
+						    syslog_severity ),
 				  syslog_buffer ) ) != 0 ) {
 		DBG ( "SYSLOG could not send log message: %s\n",
 		      strerror ( rc ) );

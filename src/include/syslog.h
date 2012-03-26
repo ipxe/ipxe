@@ -10,6 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdarg.h>
+#include <ipxe/ansiesc.h>
 #include <config/console.h>
 
 /**
@@ -55,6 +56,16 @@ extern void log_vprintf ( const char *fmt, va_list args );
 extern void __attribute__ (( format ( printf, 1, 2 ) ))
 log_printf ( const char *fmt, ... );
 
+/** ANSI private escape sequence to set syslog priority
+ *
+ * @v priority		Priority
+ */
+#define SYSLOG_SET_PRIORITY( priority ) \
+	"\033[" #priority "p"
+
+/** ANSI private escape sequence to clear syslog priority */
+#define SYSLOG_CLEAR_PRIORITY "\033[p"
+
 /**
  * Write message to system log
  *
@@ -62,10 +73,11 @@ log_printf ( const char *fmt, ... );
  * @v fmt		Format string
  * @v ...		Arguments
  */
-#define vsyslog( priority, fmt, args ) do {		\
-	if ( (priority) <= LOG_LEVEL ) {		\
-		log_vprintf ( fmt, (args) );		\
-	}						\
+#define vsyslog( priority, fmt, args ) do {				\
+	if ( (priority) <= LOG_LEVEL ) {				\
+		log_vprintf ( SYSLOG_SET_PRIORITY ( priority ) fmt	\
+			      SYSLOG_CLEAR_PRIORITY, (args) );		\
+	}								\
 	} while ( 0 )
 
 /**
@@ -75,10 +87,11 @@ log_printf ( const char *fmt, ... );
  * @v fmt		Format string
  * @v ...		Arguments
  */
-#define syslog( priority, fmt, ... ) do {		\
-	if ( (priority) <= LOG_LEVEL ) {		\
-		log_printf ( fmt, ##__VA_ARGS__ );	\
-	}						\
+#define syslog( priority, fmt, ... ) do {				\
+	if ( (priority) <= LOG_LEVEL ) {				\
+		log_printf ( SYSLOG_SET_PRIORITY ( priority ) fmt	\
+			     SYSLOG_CLEAR_PRIORITY, ##__VA_ARGS__ );	\
+	}								\
 	} while ( 0 )
 
 #endif /* _SYSLOG_H */
