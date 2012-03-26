@@ -12,12 +12,24 @@ static void ansiscr_putc(struct _curses_screen *scr, chtype c) __nonnull;
 unsigned short _COLS = 80;
 unsigned short _LINES = 24;
 
+static unsigned int saved_usage;
+
 static void ansiscr_reset ( struct _curses_screen *scr ) {
 	/* Reset terminal attributes and clear screen */
 	scr->attrs = 0;
 	scr->curs_x = 0;
 	scr->curs_y = 0;
 	printf ( "\033[0m" );
+}
+
+static void ansiscr_init ( struct _curses_screen *scr ) {
+	saved_usage = console_set_usage ( CONSOLE_USAGE_TUI );
+	ansiscr_reset ( scr );
+}
+
+static void ansiscr_exit ( struct _curses_screen *scr ) {
+	ansiscr_reset ( scr );
+	console_set_usage ( saved_usage );
 }
 
 static void ansiscr_movetoyx ( struct _curses_screen *scr,
@@ -65,8 +77,8 @@ static bool ansiscr_peek ( struct _curses_screen *scr __unused ) {
 }
 
 SCREEN _ansi_screen = {
-	.init		= ansiscr_reset,
-	.exit		= ansiscr_reset,
+	.init		= ansiscr_init,
+	.exit		= ansiscr_exit,
 	.movetoyx	= ansiscr_movetoyx,
 	.putc		= ansiscr_putc,
 	.getc		= ansiscr_getc,

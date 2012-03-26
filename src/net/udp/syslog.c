@@ -39,7 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_SYSLOG ) && CONSOLE_EXPLICIT ( CONSOLE_SYSLOG ) )
 #undef CONSOLE_SYSLOG
-#define CONSOLE_SYSLOG CONSOLE_USAGE_ALL
+#define CONSOLE_SYSLOG ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_TUI )
 #endif
 
 /** The syslog server */

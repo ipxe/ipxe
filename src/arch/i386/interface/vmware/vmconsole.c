@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_VMWARE ) && CONSOLE_EXPLICIT ( CONSOLE_VMWARE ) )
 #undef CONSOLE_VMWARE
-#define CONSOLE_VMWARE CONSOLE_USAGE_ALL
+#define CONSOLE_VMWARE ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_TUI )
 #endif
 
 /** VMware logfile console GuestRPC channel */

@@ -117,8 +117,12 @@ struct console_driver {
 /** Debug messages */
 #define CONSOLE_USAGE_DEBUG 0x0002
 
+/** Text-based user interface */
+#define CONSOLE_USAGE_TUI 0x0004
+
 /** All console usages */
-#define CONSOLE_USAGE_ALL ( CONSOLE_USAGE_STDOUT | CONSOLE_USAGE_DEBUG )
+#define CONSOLE_USAGE_ALL \
+	( CONSOLE_USAGE_STDOUT | CONSOLE_USAGE_DEBUG | CONSOLE_USAGE_TUI )
 
 /** @} */
 
