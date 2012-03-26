@@ -17,7 +17,7 @@
 #if ! ( defined ( CONSOLE_DIRECT_VGA ) && \
 	CONSOLE_EXPLICIT ( CONSOLE_DIRECT_VGA ) )
 #undef CONSOLE_DIRECT_VGA
-#define CONSOLE_DIRECT_VGA CONSOLE_USAGE_ALL
+#define CONSOLE_DIRECT_VGA ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )
 #endif
 
 struct console_driver vga_console __console_driver;

@@ -52,7 +52,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_PCBIOS ) && CONSOLE_EXPLICIT ( CONSOLE_PCBIOS ) )
 #undef CONSOLE_PCBIOS
-#define CONSOLE_PCBIOS CONSOLE_USAGE_ALL
+#define CONSOLE_PCBIOS ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )
 #endif
 
 /** Current character attribute */

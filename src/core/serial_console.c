@@ -12,7 +12,7 @@
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_SERIAL ) && CONSOLE_EXPLICIT ( CONSOLE_SERIAL ) )
 #undef CONSOLE_SERIAL
-#define CONSOLE_SERIAL CONSOLE_USAGE_ALL
+#define CONSOLE_SERIAL ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )
 #endif
 
 struct console_driver serial_console __console_driver;

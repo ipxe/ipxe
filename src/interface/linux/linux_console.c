@@ -38,7 +38,7 @@ FILE_LICENCE(GPL2_OR_LATER);
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_LINUX ) && CONSOLE_EXPLICIT ( CONSOLE_LINUX ) )
 #undef CONSOLE_LINUX
-#define CONSOLE_LINUX CONSOLE_USAGE_ALL
+#define CONSOLE_LINUX ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )
 #endif
 
 static void linux_console_putchar(int c)
