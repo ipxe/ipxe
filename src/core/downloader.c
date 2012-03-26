@@ -21,6 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <syslog.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
@@ -72,6 +73,15 @@ static void downloader_free ( struct refcnt *refcnt ) {
  * @v rc		Reason for termination
  */
 static void downloader_finished ( struct downloader *downloader, int rc ) {
+
+	/* Log download status */
+	if ( rc == 0 ) {
+		syslog ( LOG_NOTICE, "Downloaded \"%s\"\n",
+			 downloader->image->name );
+	} else {
+		syslog ( LOG_ERR, "Download of \"%s\" failed: %s\n",
+			 downloader->image->name, strerror ( rc ) );
+	}
 
 	/* Shut down interfaces */
 	intf_shutdown ( &downloader->xfer, rc );
