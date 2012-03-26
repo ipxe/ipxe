@@ -68,10 +68,18 @@ static struct interface syslogger = INTF_INIT ( syslogger_desc );
 /** Syslog line buffer */
 static char syslog_buffer[SYSLOG_BUFSIZE];
 
+/** Syslog ANSI escape sequence handlers */
+static struct ansiesc_handler syslog_handlers[] = {
+	{ 0, NULL }
+};
+
 /** Syslog line console */
 static struct line_console syslog_line = {
 	.buffer = syslog_buffer,
 	.len = sizeof ( syslog_buffer ),
+	.ctx = {
+		.handlers = syslog_handlers,
+	},
 };
 
 /** Syslog recursion marker */

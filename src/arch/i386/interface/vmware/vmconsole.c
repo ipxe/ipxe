@@ -51,10 +51,18 @@ static struct {
 	.prefix = "log ",
 };
 
+/** VMware logfile console ANSI escape sequence handlers */
+static struct ansiesc_handler vmconsole_handlers[] = {
+	{ 0, NULL }
+};
+
 /** VMware logfile line console */
 static struct line_console vmconsole_line = {
 	.buffer = vmconsole_buffer.message,
 	.len = sizeof ( vmconsole_buffer.message ),
+	.ctx = {
+		.handlers = vmconsole_handlers,
+	},
 };
 
 /** VMware logfile console recursion marker */

@@ -29,16 +29,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/ansiesc.h>
 #include <ipxe/lineconsole.h>
 
-/** Line-based console ANSI escape sequence handlers */
-static struct ansiesc_handler line_ansiesc_handlers[] = {
-	{ 0, NULL }
-};
-
-/** Line-based console ANSI escape sequence context */
-static struct ansiesc_context line_ansiesc_ctx = {
-	.handlers = line_ansiesc_handlers,
-};
-
 /**
  * Print a character to a line-based console
  *
@@ -48,7 +38,7 @@ static struct ansiesc_context line_ansiesc_ctx = {
 size_t line_putchar ( struct line_console *line, int character ) {
 
 	/* Strip ANSI escape sequences */
-	character = ansiesc_process ( &line_ansiesc_ctx, character );
+	character = ansiesc_process ( &line->ctx, character );
 	if ( character < 0 )
 		return 0;
 

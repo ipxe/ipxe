@@ -10,6 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <ipxe/ansiesc.h>
 
 /** A line-based console */
 struct line_console {
@@ -26,6 +27,8 @@ struct line_console {
 	 * a potential terminating NUL.
 	 */
 	size_t len;
+	/** ANSI escape sequence context */
+	struct ansiesc_context ctx;
 };
 
 extern size_t line_putchar ( struct line_console *line, int character );
