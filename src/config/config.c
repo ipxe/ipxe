@@ -71,9 +71,6 @@ REQUIRE_OBJECT ( serial_console );
 #ifdef CONSOLE_DIRECT_VGA
 REQUIRE_OBJECT ( video_subr );
 #endif
-#ifdef CONSOLE_BTEXT
-REQUIRE_OBJECT ( btext );
-#endif
 #ifdef CONSOLE_PC_KBD
 REQUIRE_OBJECT ( pc_kbd );
 #endif
