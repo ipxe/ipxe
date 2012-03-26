@@ -111,7 +111,7 @@ static int downloader_ensure_size ( struct downloader *downloader,
 	if ( ! new_buffer ) {
 		DBGC ( downloader, "Downloader %p could not extend buffer to "
 		       "%zd bytes\n", downloader, len );
-		return -ENOBUFS;
+		return -ENOSPC;
 	}
 	downloader->image->data = new_buffer;
 	downloader->image->len = len;
