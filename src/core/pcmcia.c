@@ -34,7 +34,6 @@ FILE_LICENCE ( GPL2_ONLY );
 #define CODE_STATUS "alpha"
 #define	CODE_VERSION "0.1.3"
 #include <pcmcia-opts.h>
-#include <ipxe/console.h>
 #include <ipxe/init.h>
 
 int	sockets; /* AHTODO: Phase this out! */

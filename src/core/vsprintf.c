@@ -21,7 +21,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <ipxe/console.h>
 #include <errno.h>
 #include <ipxe/vsprintf.h>
 

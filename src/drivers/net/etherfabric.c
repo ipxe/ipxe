@@ -20,11 +20,11 @@ FILE_LICENCE ( GPL_ANY );
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
-#include <ipxe/console.h>
 #include <ipxe/io.h>
 #include <ipxe/pci.h>
 #include <ipxe/malloc.h>

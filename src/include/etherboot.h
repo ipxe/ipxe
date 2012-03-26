@@ -14,7 +14,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <unistd.h>
 #include <strings.h>
-#include <ipxe/console.h>
 #include <ipxe/timer.h>
 #include <ipxe/if_arp.h>
 #include <ipxe/if_ether.h>

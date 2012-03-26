@@ -1,6 +1,7 @@
 #ifndef _IPXE_CONSOLE_H
 #define _IPXE_CONSOLE_H
 
+#include <stdio.h>
 #include <ipxe/tables.h>
 
 /** @file
@@ -100,8 +101,6 @@ struct console_driver {
 
 /* Function prototypes */
 
-extern void putchar ( int character );
-extern int getchar ( void );
 extern int iskey ( void );
 extern int getkey ( unsigned long timeout );
 

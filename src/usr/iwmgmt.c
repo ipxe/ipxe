@@ -19,7 +19,6 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
-#include <ipxe/console.h>
 #include <string.h>
 #include <errno.h>
 #include <ipxe/net80211.h>

@@ -1,4 +1,3 @@
-#include <ipxe/console.h>
 #include <curses.h>
 #include "mucurses.h"
 
