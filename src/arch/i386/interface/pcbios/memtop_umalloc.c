@@ -52,6 +52,9 @@ static userptr_t top = UNULL;
 /** Bottom of heap (current lowest allocated block) */
 static userptr_t bottom = UNULL;
 
+/** Remaining space on heap */
+static size_t heap_size;
+
 /**
  * Initialise external heap
  *
@@ -59,12 +62,12 @@ static userptr_t bottom = UNULL;
  */
 static int init_eheap ( void ) {
 	struct memory_map memmap;
-	unsigned long heap_size = 0;
 	unsigned int i;
 
 	DBG ( "Allocating external heap\n" );
 
 	get_memmap ( &memmap );
+	heap_size = 0;
 	for ( i = 0 ; i < memmap.count ; i++ ) {
 		struct memory_region *region = &memmap.regions[i];
 		unsigned long r_start, r_end;
@@ -99,8 +102,8 @@ static int init_eheap ( void ) {
 		return -ENOMEM;
 	}
 
-	DBG ( "External heap grows downwards from %lx\n",
-	      user_to_phys ( top, 0 ) );
+	DBG ( "External heap grows downwards from %lx (size %zx)\n",
+	      user_to_phys ( top, 0 ), heap_size );
 	return 0;
 }
 
@@ -110,6 +113,7 @@ static int init_eheap ( void ) {
  */
 static void ecollect_free ( void ) {
 	struct external_memory extmem;
+	size_t len;
 
 	/* Walk the free list and collect empty blocks */
 	while ( bottom != top ) {
@@ -119,8 +123,9 @@ static void ecollect_free ( void ) {
 			break;
 		DBG ( "EXTMEM freeing [%lx,%lx)\n", user_to_phys ( bottom, 0 ),
 		      user_to_phys ( bottom, extmem.size ) );
-		bottom = userptr_add ( bottom,
-				       ( extmem.size + sizeof ( extmem ) ) );
+		len = ( extmem.size + sizeof ( extmem ) );
+		bottom = userptr_add ( bottom, len );
+		heap_size += len;
 	}
 }
 
@@ -153,7 +158,12 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 				 sizeof ( extmem ) );
 	} else {
 		/* Create a zero-length block */
+		if ( heap_size < sizeof ( extmem ) ) {
+			DBG ( "EXTMEM out of space\n" );
+			return UNULL;
+		}
 		ptr = bottom = userptr_add ( bottom, -sizeof ( extmem ) );
+		heap_size -= sizeof ( extmem );
 		DBG ( "EXTMEM allocating [%lx,%lx)\n",
 		      user_to_phys ( ptr, 0 ), user_to_phys ( ptr, 0 ) );
 		extmem.size = 0;
@@ -163,6 +173,10 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 	/* Expand/shrink block if possible */
 	if ( ptr == bottom ) {
 		/* Update block */
+		if ( new_size > ( heap_size - extmem.size ) ) {
+			DBG ( "EXTMEM out of space\n" );
+			return UNULL;
+		}
 		new = userptr_add ( ptr, - ( new_size - extmem.size ) );
 		align = ( user_to_phys ( new, 0 ) & ( EM_ALIGN - 1 ) );
 		new_size += align;
@@ -174,8 +188,9 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 		      user_to_phys ( new, new_size ));
 		memmove_user ( new, 0, ptr, 0, ( ( extmem.size < new_size ) ?
 						 extmem.size : new_size ) );
-		extmem.size = new_size;
 		bottom = new;
+		heap_size -= ( new_size - extmem.size );
+		extmem.size = new_size;
 	} else {
 		/* Cannot expand; can only pretend to shrink */
 		if ( new_size > extmem.size ) {
@@ -193,7 +208,7 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 
 	/* Collect any free blocks and update hidden memory region */
 	ecollect_free();
-	hide_umalloc ( user_to_phys ( bottom, -sizeof ( extmem ) ),
+	hide_umalloc ( user_to_phys ( bottom, 0 ),
 		       user_to_phys ( top, 0 ) );
 
 	return ( new_size ? new : UNOWHERE );
