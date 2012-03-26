@@ -11,6 +11,14 @@
 #include <ipxe/console.h>
 #include <ipxe/init.h>
 #include "vga.h"
+#include <config/console.h>
+
+/* Set default console usage if applicable */
+#if ! ( defined ( CONSOLE_DIRECT_VGA ) && \
+	CONSOLE_EXPLICIT ( CONSOLE_DIRECT_VGA ) )
+#undef CONSOLE_DIRECT_VGA
+#define CONSOLE_DIRECT_VGA CONSOLE_USAGE_ALL
+#endif
 
 struct console_driver vga_console __console_driver;
 
@@ -97,6 +105,7 @@ static void vga_putc(int byte)
 struct console_driver vga_console __console_driver = {
 	.putchar = vga_putc,
 	.disabled = 1,
+	.usage = CONSOLE_DIRECT_VGA,
 };
 
 struct init_fn video_init_fn __init_fn ( INIT_EARLY ) = {

@@ -23,6 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/console.h>
 #include <ipxe/ansiesc.h>
 #include <ipxe/keymap.h>
+#include <config/console.h>
 
 #define ATTR_BOLD		0x08
 
@@ -47,6 +48,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ATTR_BCOL_WHITE		0x70
 
 #define ATTR_DEFAULT		ATTR_FCOL_WHITE
+
+/* Set default console usage if applicable */
+#if ! ( defined ( CONSOLE_PCBIOS ) && CONSOLE_EXPLICIT ( CONSOLE_PCBIOS ) )
+#undef CONSOLE_PCBIOS
+#define CONSOLE_PCBIOS CONSOLE_USAGE_ALL
+#endif
 
 /** Current character attribute */
 static unsigned int bios_attr = ATTR_DEFAULT;
@@ -319,4 +326,5 @@ struct console_driver bios_console __console_driver = {
 	.putchar = bios_putchar,
 	.getchar = bios_getchar,
 	.iskey = bios_iskey,
+	.usage = CONSOLE_PCBIOS,
 };

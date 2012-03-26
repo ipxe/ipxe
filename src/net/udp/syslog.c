@@ -34,6 +34,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/console.h>
 #include <ipxe/lineconsole.h>
 #include <ipxe/syslog.h>
+#include <config/console.h>
+
+/* Set default console usage if applicable */
+#if ! ( defined ( CONSOLE_SYSLOG ) && CONSOLE_EXPLICIT ( CONSOLE_SYSLOG ) )
+#undef CONSOLE_SYSLOG
+#define CONSOLE_SYSLOG CONSOLE_USAGE_ALL
+#endif
 
 /** The syslog server */
 static struct sockaddr_tcpip logserver = {
@@ -106,6 +113,7 @@ static void syslog_putchar ( int character ) {
 struct console_driver syslog_console __console_driver = {
 	.putchar = syslog_putchar,
 	.disabled = 1,
+	.usage = CONSOLE_SYSLOG,
 };
 
 /******************************************************************************

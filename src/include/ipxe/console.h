@@ -75,6 +75,13 @@ struct console_driver {
 	 *
 	 */
 	int ( *iskey ) ( void );
+
+	/** Console usage bitmask
+	 *
+	 * This is the bitwise OR of zero or more @c CONSOLE_USAGE_XXX
+	 * values.
+	 */
+	int usage;
 };
 
 /** Console driver table */
@@ -99,7 +106,49 @@ struct console_driver {
  */
 #define __console_driver __table_entry ( CONSOLES, 01 )
 
-/* Function prototypes */
+/**
+ * @defgroup consoleusage Console usages
+ * @{
+ */
+
+/** Standard output */
+#define CONSOLE_USAGE_STDOUT 0x0001
+
+/** Debug messages */
+#define CONSOLE_USAGE_DEBUG 0x0002
+
+/** All console usages */
+#define CONSOLE_USAGE_ALL ( CONSOLE_USAGE_STDOUT | CONSOLE_USAGE_DEBUG )
+
+/** @} */
+
+/**
+ * Test to see if console has an explicit usage
+ *
+ * @v console		Console definition (e.g. CONSOLE_PCBIOS)
+ * @ret explicit	Console has an explicit usage
+ *
+ * This relies upon the trick that the expression ( 2 * N + 1 ) will
+ * be valid even if N is defined to be empty, since it will then
+ * evaluate to give ( 2 * + 1 ) == ( 2 * +1 ) == 2.
+ */
+#define CONSOLE_EXPLICIT( console ) ( ( 2 * console + 1 ) != 2 )
+
+extern int console_usage;
+
+/**
+ * Set console usage
+ *
+ * @v usage		New console usage
+ * @ret old_usage	Previous console usage
+ */
+static inline __attribute__ (( always_inline )) int
+console_set_usage ( int usage ) {
+	int old_usage = console_usage;
+
+	console_usage = usage;
+	return old_usage;
+}
 
 extern int iskey ( void );
 extern int getkey ( unsigned long timeout );

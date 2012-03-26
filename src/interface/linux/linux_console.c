@@ -33,6 +33,14 @@ FILE_LICENCE(GPL2_OR_LATER);
 #include <linux/termios.h>
 #include <asm/errno.h>
 
+#include <config/console.h>
+
+/* Set default console usage if applicable */
+#if ! ( defined ( CONSOLE_LINUX ) && CONSOLE_EXPLICIT ( CONSOLE_LINUX ) )
+#undef CONSOLE_LINUX
+#define CONSOLE_LINUX CONSOLE_USAGE_ALL
+#endif
+
 static void linux_console_putchar(int c)
 {
 	/* write to stdout */
@@ -79,6 +87,7 @@ struct console_driver linux_console __console_driver = {
 	.putchar = linux_console_putchar,
 	.getchar = linux_console_getchar,
 	.iskey = linux_console_iskey,
+	.usage = CONSOLE_LINUX,
 };
 
 static int linux_tcgetattr(int fd, struct termios *termios_p)

@@ -29,9 +29,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/lineconsole.h>
 #include <ipxe/init.h>
 #include <ipxe/guestrpc.h>
+#include <config/console.h>
 
 /** VMware logfile console buffer size */
 #define VMCONSOLE_BUFSIZE 128
+
+/* Set default console usage if applicable */
+#if ! ( defined ( CONSOLE_VMWARE ) && CONSOLE_EXPLICIT ( CONSOLE_VMWARE ) )
+#undef CONSOLE_VMWARE
+#define CONSOLE_VMWARE CONSOLE_USAGE_ALL
+#endif
 
 /** VMware logfile console GuestRPC channel */
 static int vmconsole_channel;
@@ -87,6 +94,7 @@ static void vmconsole_putchar ( int character ) {
 struct console_driver vmconsole __console_driver = {
 	.putchar = vmconsole_putchar,
 	.disabled = 1,
+	.usage = CONSOLE_VMWARE,
 };
 
 /**

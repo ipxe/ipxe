@@ -7,6 +7,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+/** Current console usage */
+int console_usage = CONSOLE_USAGE_STDOUT;
+
 /**
  * Write a single character to each console device.
  *
@@ -26,7 +29,9 @@ void putchar ( int character ) {
 		putchar ( '\r' );
 
 	for_each_table_entry ( console, CONSOLES ) {
-		if ( ( ! console->disabled ) && console->putchar )
+		if ( ( ! console->disabled ) &&
+		     ( console_usage & console->usage ) &&
+		     console->putchar )
 			console->putchar ( character );
 	}
 }

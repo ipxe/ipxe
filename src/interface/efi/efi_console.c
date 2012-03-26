@@ -23,6 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/ansiesc.h>
 #include <ipxe/console.h>
+#include <config/console.h>
 
 #define ATTR_BOLD		0x08
 
@@ -47,6 +48,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ATTR_BCOL_WHITE		0x70
 
 #define ATTR_DEFAULT		ATTR_FCOL_WHITE
+
+/* Set default console usage if applicable */
+#if ! ( defined ( CONSOLE_EFI ) && CONSOLE_EXPLICIT ( CONSOLE_EFI ) )
+#undef CONSOLE_EFI
+#define CONSOLE_EFI CONSOLE_USAGE_ALL
+#endif
 
 /** Current character attribute */
 static unsigned int efi_attr = ATTR_DEFAULT;
@@ -273,4 +280,5 @@ struct console_driver efi_console __console_driver = {
 	.putchar = efi_putchar,
 	.getchar = efi_getchar,
 	.iskey = efi_iskey,
+	.usage = CONSOLE_EFI,
 };
