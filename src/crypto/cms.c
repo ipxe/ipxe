@@ -52,6 +52,27 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EACCES_WRONG_NAME )
 #define EINFO_EACCES_WRONG_NAME \
 	__einfo_uniqify ( EINFO_EACCES, 0x04, "Incorrect certificate name" )
+#define EINVAL_DIGEST \
+	__einfo_error ( EINFO_EINVAL_DIGEST )
+#define EINFO_EINVAL_DIGEST \
+	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Not a digest algorithm" )
+#define EINVAL_PUBKEY \
+	__einfo_error ( EINFO_EINVAL_PUBKEY )
+#define EINFO_EINVAL_PUBKEY \
+	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Not a public-key algorithm" )
+#define ENOTSUP_SIGNEDDATA \
+	__einfo_error ( EINFO_ENOTSUP_SIGNEDDATA )
+#define EINFO_ENOTSUP_SIGNEDDATA \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Not a digital signature" )
+#define ENOTSUP_DIGEST \
+	__einfo_error ( EINFO_ENOTSUP_DIGEST )
+#define EINFO_ENOTSUP_DIGEST \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x02, "Unsupported digest algorithm" )
+#define ENOTSUP_PUBKEY \
+	__einfo_error ( EINFO_ENOTSUP_PUBKEY )
+#define EINFO_ENOTSUP_PUBKEY					\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x03,			\
+			  "Unsupported public-key algorithm" )
 
 /** "pkcs7-signedData" object identifier */
 static uint8_t oid_signeddata[] = { ASN1_OID_SIGNEDDATA };
@@ -79,7 +100,7 @@ static int cms_parse_content_type ( struct cms_signature *sig,
 	if ( asn1_compare ( &cursor, &oid_signeddata_cursor ) != 0 ) {
 		DBGC ( sig, "CMS %p does not contain signedData:\n", sig );
 		DBGC_HDA ( sig, 0, raw->data, raw->len );
-		return -ENOTSUP;
+		return -ENOTSUP_SIGNEDDATA;
 	}
 
 	DBGC ( sig, "CMS %p contains signedData\n", sig );
@@ -149,14 +170,14 @@ static int cms_parse_digest_algorithm ( struct cms_signature *sig,
 		DBGC ( sig, "CMS %p/%p could not identify digest algorithm:\n",
 		       sig, info );
 		DBGC_HDA ( sig, 0, raw->data, raw->len );
-		return -ENOTSUP;
+		return -ENOTSUP_DIGEST;
 	}
 
 	/* Check algorithm is a digest algorithm */
 	if ( ! algorithm->digest ) {
 		DBGC ( sig, "CMS %p/%p algorithm %s is not a digest "
 		       "algorithm\n", sig, info, algorithm->name );
-		return -EINVAL;
+		return -EINVAL_DIGEST;
 	}
 
 	/* Record digest algorithm */
@@ -186,14 +207,14 @@ static int cms_parse_signature_algorithm ( struct cms_signature *sig,
 		DBGC ( sig, "CMS %p/%p could not identify public-key "
 		       "algorithm:\n", sig, info );
 		DBGC_HDA ( sig, 0, raw->data, raw->len );
-		return -ENOTSUP;
+		return -ENOTSUP_PUBKEY;
 	}
 
 	/* Check algorithm is a signature algorithm */
 	if ( ! algorithm->pubkey ) {
 		DBGC ( sig, "CMS %p/%p algorithm %s is not a public-key "
 		       "algorithm\n", sig, info, algorithm->name );
-		return -EINVAL;
+		return -EINVAL_PUBKEY;
 	}
 
 	/* Record signature algorithm */
