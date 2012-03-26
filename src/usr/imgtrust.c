@@ -21,6 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <errno.h>
 #include <time.h>
+#include <syslog.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/cms.h>
@@ -72,10 +73,18 @@ int imgverify ( struct image *image, struct image *signature,
 
 	/* Mark image as trusted */
 	image_trust ( image );
+	syslog ( LOG_NOTICE, "Image \"%s\" signature OK\n", image->name );
+
+	/* Free internal copy of signature */
+	free ( data );
+
+	return 0;
 
  err_verify:
  err_parse:
 	free ( data );
  err_alloc:
+	syslog ( LOG_ERR, "Image \"%s\" signature bad: %s\n",
+		 image->name, strerror ( rc ) );
 	return rc;
 }
