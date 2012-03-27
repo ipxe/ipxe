@@ -124,8 +124,10 @@ sub keysym_to_ascii {
   return unless $keysym;
 
   # Sanity check
-  die "Unexpected keysym ".sprintf ( "0x%04x\n", $keysym )."\n"
-      if $keysym & 0xf000;
+  if ( $keysym & 0xf000 ) {
+    warn "Unexpected keysym ".sprintf ( "0x%04x", $keysym )."\n";
+    return;
+  }
 
   # Extract type and value
   my $type = ( $keysym >> 8 );
