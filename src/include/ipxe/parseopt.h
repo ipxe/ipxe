@@ -117,6 +117,7 @@ extern int parse_string ( const char *text, const char **value );
 extern int parse_integer ( const char *text, unsigned int *value );
 extern int parse_netdev ( const char *text, struct net_device **netdev );
 extern int parse_flag ( const char *text __unused, int *flag );
+extern int parse_key ( const char *text, unsigned int *key );
 extern void print_usage ( struct command_descriptor *cmd, char **argv );
 extern int reparse_options ( int argc, char **argv,
 			     struct command_descriptor *cmd, void *opts );
