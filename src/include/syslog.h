@@ -51,6 +51,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Do not log any messages */
 #define LOG_NONE -1
 
+/** Log all messages */
+#define LOG_ALL LOG_DEBUG
+
 extern void log_vprintf ( const char *fmt, va_list args );
 
 extern void __attribute__ (( format ( printf, 1, 2 ) ))
