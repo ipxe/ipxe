@@ -47,6 +47,38 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/acpi.h>
 #include <ipxe/http.h>
 
+/* Disambiguate the various error causes */
+#define EACCES_401 __einfo_error ( EINFO_EACCES_401 )
+#define EINFO_EACCES_401 \
+	__einfo_uniqify ( EINFO_EACCES, 0x01, "HTTP 401 Unauthorized" )
+#define EIO_OTHER __einfo_error ( EINFO_EIO_OTHER )
+#define EINFO_EIO_OTHER \
+	__einfo_uniqify ( EINFO_EIO, 0x01, "Unrecognised HTTP response code" )
+#define EIO_CONTENT_LENGTH __einfo_error ( EINFO_EIO_CONTENT_LENGTH )
+#define EINFO_EIO_CONTENT_LENGTH \
+	__einfo_uniqify ( EINFO_EIO, 0x02, "Content length mismatch" )
+#define EINVAL_RESPONSE __einfo_error ( EINFO_EINVAL_RESPONSE )
+#define EINFO_EINVAL_RESPONSE \
+	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Invalid content length" )
+#define EINVAL_HEADER __einfo_error ( EINFO_EINVAL_HEADER )
+#define EINFO_EINVAL_HEADER \
+	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Invalid header" )
+#define EINVAL_CONTENT_LENGTH __einfo_error ( EINFO_EINVAL_CONTENT_LENGTH )
+#define EINFO_EINVAL_CONTENT_LENGTH \
+	__einfo_uniqify ( EINFO_EINVAL, 0x03, "Invalid content length" )
+#define EINVAL_CHUNK_LENGTH __einfo_error ( EINFO_EINVAL_CHUNK_LENGTH )
+#define EINFO_EINVAL_CHUNK_LENGTH \
+	__einfo_uniqify ( EINFO_EINVAL, 0x04, "Invalid chunk length" )
+#define ENOENT_404 __einfo_error ( EINFO_ENOENT_404 )
+#define EINFO_ENOENT_404 \
+	__einfo_uniqify ( EINFO_ENOENT, 0x01, "HTTP 404 Not Found" )
+#define EPERM_403 __einfo_error ( EINFO_EPERM_403 )
+#define EINFO_EPERM_403 \
+	__einfo_uniqify ( EINFO_EPERM, 0x01, "HTTP 403 Forbidden" )
+#define EPROTO_UNSOLICITED __einfo_error ( EINFO_EPROTO_UNSOLICITED )
+#define EINFO_EPROTO_UNSOLICITED \
+	__einfo_uniqify ( EINFO_EPROTO, 0x01, "Unsolicited data" )
+
 /** Block size used for HTTP block device request */
 #define HTTP_BLKSIZE 512
 
@@ -146,7 +178,7 @@ static void http_close ( struct http_request *http, int rc ) {
 		DBGC ( http, "HTTP %p incorrect length %zd, should be %zd\n",
 		       http, http->rx_len, ( http->rx_len + http->remaining ) );
 		if ( rc == 0 )
-			rc = -EIO;
+			rc = -EIO_CONTENT_LENGTH;
 	}
 
 	/* Remove process */
@@ -169,7 +201,7 @@ static void http_done ( struct http_request *http ) {
 	 * isn't correct, force an error
 	 */
 	if ( http->remaining != 0 ) {
-		http_close ( http, -EIO );
+		http_close ( http, -EIO_CONTENT_LENGTH );
 		return;
 	}
 
@@ -203,13 +235,13 @@ static int http_response_to_rc ( unsigned int response ) {
 	case 303:
 		return 0;
 	case 404:
-		return -ENOENT;
+		return -ENOENT_404;
 	case 403:
-		return -EPERM;
+		return -EPERM_403;
 	case 401:
-		return -EACCES;
+		return -EACCES_401;
 	default:
-		return -EIO;
+		return -EIO_OTHER;
 	}
 }
 
@@ -229,12 +261,12 @@ static int http_rx_response ( struct http_request *http, char *response ) {
 
 	/* Check response starts with "HTTP/" */
 	if ( strncmp ( response, "HTTP/", 5 ) != 0 )
-		return -EIO;
+		return -EINVAL_RESPONSE;
 
 	/* Locate and check response code */
 	spc = strchr ( response, ' ' );
 	if ( ! spc )
-		return -EIO;
+		return -EINVAL_RESPONSE;
 	code = strtoul ( spc, NULL, 10 );
 	if ( ( rc = http_response_to_rc ( code ) ) != 0 )
 		return rc;
@@ -284,7 +316,7 @@ static int http_rx_content_length ( struct http_request *http,
 	if ( *endp != '\0' ) {
 		DBGC ( http, "HTTP %p invalid Content-Length \"%s\"\n",
 		       http, value );
-		return -EIO;
+		return -EINVAL_CONTENT_LENGTH;
 	}
 
 	/* If we already have an expected content length, and this
@@ -293,7 +325,7 @@ static int http_rx_content_length ( struct http_request *http,
 	if ( http->remaining && ( http->remaining != content_len ) ) {
 		DBGC ( http, "HTTP %p incorrect Content-Length %zd (expected "
 		       "%zd)\n", http, content_len, http->remaining );
-		return -EIO;
+		return -EIO_CONTENT_LENGTH;
 	}
 	if ( ! ( http->flags & HTTP_HEAD_ONLY ) )
 		http->remaining = content_len;
@@ -397,7 +429,7 @@ static int http_rx_header ( struct http_request *http, char *header ) {
 	separator = strstr ( header, ": " );
 	if ( ! separator ) {
 		DBGC ( http, "HTTP %p malformed header\n", http );
-		return -EIO;
+		return -EINVAL_HEADER;
 	}
 	*separator = '\0';
 	value = ( separator + 2 );
@@ -432,7 +464,7 @@ static int http_rx_chunk_len ( struct http_request *http, char *length ) {
 	if ( *endp != '\0' ) {
 		DBGC ( http, "HTTP %p invalid chunk length \"%s\"\n",
 		       http, length );
-		return -EIO;
+		return -EINVAL_CHUNK_LENGTH;
 	}
 
 	/* Terminate chunked encoding if applicable */
@@ -500,7 +532,7 @@ static int http_socket_deliver ( struct http_request *http,
 			       http, iob_len ( iobuf ),
 			       ( ( http->rx_state == HTTP_RX_IDLE ) ?
 				 "idle" : "dead" ) );
-			rc = -EPROTO;
+			rc = -EPROTO_UNSOLICITED;
 			goto done;
 		case HTTP_RX_DEAD:
 			/* Do no further processing */
