@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <libgen.h>
+#include <syslog.h>
 #include <ipxe/list.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/uri.h>
@@ -286,11 +287,23 @@ int image_exec ( struct image *image ) {
 	 */
 	current_image = image_get ( image );
 
+	/* Record boot attempt */
+	syslog ( LOG_NOTICE, "Executing \"%s\"\n", image->name );
+
 	/* Try executing the image */
 	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
 		DBGC ( image, "IMAGE %s could not execute: %s\n",
 		       image->name, strerror ( rc ) );
 		/* Do not return yet; we still have clean-up to do */
+	}
+
+	/* Record result of boot attempt */
+	if ( rc == 0 ) {
+		syslog ( LOG_NOTICE, "Execution of \"%s\" completed\n",
+			 image->name );
+	} else {
+		syslog ( LOG_ERR, "Execution of \"%s\" failed: %s\n",
+			 image->name, strerror ( rc ) );
 	}
 
 	/* Pick up replacement image before we drop the original
