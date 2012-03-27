@@ -39,6 +39,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * RSA is documented in RFC 3447.
  */
 
+/* Disambiguate the various error causes */
+#define EACCES_VERIFY \
+	__einfo_error ( EINFO_EACCES_VERIFY )
+#define EINFO_EACCES_VERIFY \
+	__einfo_uniqify ( EINFO_EACCES, 0x01, "RSA signature incorrect" )
+
 /** "rsaEncryption" object identifier */
 static uint8_t oid_rsa_encryption[] = { ASN1_OID_RSAENCRYPTION };
 
@@ -610,7 +616,7 @@ static int rsa_verify ( void *ctx, struct digest_algorithm *digest,
 	if ( memcmp ( actual, expected, context->max_len ) != 0 ) {
 		DBGC ( context, "RSA %p signature verification failed\n",
 		       context );
-		return -EACCES;
+		return -EACCES_VERIFY;
 	}
 
 	DBGC ( context, "RSA %p signature verified successfully\n", context );
