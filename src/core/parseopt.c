@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <getopt.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/menu.h>
 #include <ipxe/parseopt.h>
 
 /** @file
@@ -108,6 +109,29 @@ int parse_netdev ( const char *text, struct net_device **netdev ) {
 	if ( ! *netdev ) {
 		printf ( "\"%s\": no such network device\n", text );
 		return -ENODEV;
+	}
+
+	return 0;
+}
+
+/**
+ * Parse menu name
+ *
+ * @v text		Text
+ * @ret menu		Menu
+ * @ret rc		Return status code
+ */
+int parse_menu ( const char *text, struct menu **menu ) {
+
+	/* Find menu */
+	*menu = find_menu ( text );
+	if ( ! *menu ) {
+		if ( text ) {
+			printf ( "\"%s\": no such menu\n", text );
+		} else {
+			printf ( "No default menu\n" );
+		}
+		return -ENOENT;
 	}
 
 	return 0;

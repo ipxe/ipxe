@@ -52,6 +52,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define DHCP_EB_FEATURE_EFI		0x24 /**< EFI format */
 #define DHCP_EB_FEATURE_FCOE		0x25 /**< FCoE protocol */
 #define DHCP_EB_FEATURE_VLAN		0x26 /**< VLAN support */
+#define DHCP_EB_FEATURE_MENU		0x27 /**< Menu support */
 
 /** @} */
 

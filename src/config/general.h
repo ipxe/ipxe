@@ -119,6 +119,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define IMAGE_CMD		/* Image management commands */
 #define DHCP_CMD		/* DHCP management commands */
 #define SANBOOT_CMD		/* SAN boot commands */
+#define MENU_CMD		/* Menu commands */
 #define LOGIN_CMD		/* Login command */
 //#define TIME_CMD		/* Time commands */
 //#define DIGEST_CMD		/* Image crypto digest commands */
