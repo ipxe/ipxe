@@ -216,6 +216,8 @@ static const char ansi_sequences[] = {
 	BIOS_KEY ( "\x4d", "[C" )	/* Right arrow */
 	BIOS_KEY ( "\x47", "[H" )	/* Home */
 	BIOS_KEY ( "\x4f", "[F" )	/* End */
+	BIOS_KEY ( "\x49", "[5~" )	/* Page up */
+	BIOS_KEY ( "\x51", "[6~" )	/* Page down */
 	BIOS_KEY ( "\x3f", "[15~" )	/* F5 */
 	BIOS_KEY ( "\x40", "[17~" )	/* F6 */
 	BIOS_KEY ( "\x41", "[18~" )	/* F7 */
