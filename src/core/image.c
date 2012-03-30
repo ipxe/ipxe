@@ -67,13 +67,13 @@ static int require_trusted_images_permanent = 0;
 static void free_image ( struct refcnt *refcnt ) {
 	struct image *image = container_of ( refcnt, struct image, refcnt );
 
+	DBGC ( image, "IMAGE %s freed\n", image->name );
 	free ( image->name );
 	free ( image->cmdline );
 	uri_put ( image->uri );
 	ufree ( image->data );
 	image_put ( image->replacement );
 	free ( image );
-	DBGC ( image, "IMAGE %s freed\n", image->name );
 }
 
 /**
@@ -327,8 +327,8 @@ int image_exec ( struct image *image ) {
 
 	/* Tail-recurse into replacement image, if one exists */
 	if ( replacement ) {
-		DBGC ( image, "IMAGE %s replacing self with IMAGE %s\n",
-		       image->name, replacement->name );
+		DBGC ( image, "IMAGE <freed> replacing self with IMAGE %s\n",
+		       replacement->name );
 		if ( ( rc = image_exec ( replacement ) ) != 0 )
 			return rc;
 	}
