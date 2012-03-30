@@ -71,6 +71,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Block size for non-extended INT 13 calls */
 #define INT13_BLKSIZE 512
 
+/** @defgroup int13fddtype INT 13 floppy disk drive types
+ * @{
+ */
+
+/** 360K */
+#define INT13_FDD_TYPE_360K		0x01
+/** 1.2M */
+#define INT13_FDD_TYPE_1M2		0x02
+/** 720K */
+#define INT13_FDD_TYPE_720K		0x03
+/** 1.44M */
+#define INT13_FDD_TYPE_1M44		0x04
+
 /** An INT 13 disk address packet */
 struct int13_disk_address {
 	/** Size of the packet, in bytes */
@@ -393,5 +406,44 @@ enum eltorito_media_type {
 	/** No emulation */
 	ELTORITO_NO_EMULATION = 0,
 };
+
+/** A floppy disk geometry */
+struct int13_fdd_geometry {
+	/** Number of tracks */
+	uint8_t tracks;
+	/** Number of heads and sectors per track */
+	uint8_t heads_spt;
+};
+
+/** Define a floppy disk geometry */
+#define INT13_FDD_GEOMETRY( cylinders, heads, sectors )			\
+	{								\
+		.tracks = (cylinders),					\
+		.heads_spt = ( ( (heads) << 6 ) | (sectors) ),		\
+	}
+
+/** Get floppy disk number of cylinders */
+#define INT13_FDD_CYLINDERS( geometry ) ( (geometry)->tracks )
+
+/** Get floppy disk number of heads */
+#define INT13_FDD_HEADS( geometry ) ( (geometry)->heads_spt >> 6 )
+
+/** Get floppy disk number of sectors per track */
+#define INT13_FDD_SECTORS( geometry ) ( (geometry)->heads_spt & 0x3f )
+
+/** A floppy drive parameter table */
+struct int13_fdd_parameters {
+	uint8_t step_rate__head_unload;
+	uint8_t head_load__ndma;
+	uint8_t motor_off_delay;
+	uint8_t bytes_per_sector;
+	uint8_t sectors_per_track;
+	uint8_t gap_length;
+	uint8_t data_length;
+	uint8_t format_gap_length;
+	uint8_t format_filler;
+	uint8_t head_settle_time;
+	uint8_t motor_start_time;
+} __attribute__ (( packed ));
 
 #endif /* INT13_H */

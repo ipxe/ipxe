@@ -75,9 +75,9 @@ struct int13_drive {
 	/** Underlying block device interface */
 	struct interface block;
 
-	/** BIOS in-use drive number (0x80-0xff) */
+	/** BIOS in-use drive number (0x00-0xff) */
 	unsigned int drive;
-	/** BIOS natural drive number (0x80-0xff)
+	/** BIOS natural drive number (0x00-0xff)
 	 *
 	 * This is the drive number that would have been assigned by
 	 * 'naturally' appending the drive to the end of the BIOS
@@ -142,17 +142,44 @@ static struct segoff __text16 ( int13_vector );
 /** Assembly wrapper */
 extern void int13_wrapper ( void );
 
+/** Dummy floppy disk parameter table */
+static struct int13_fdd_parameters __data16 ( int13_fdd_params ) = {
+	/* 512 bytes per sector */
+	.bytes_per_sector = 0x02,
+	/* Highest sectors per track that we ever return */
+	.sectors_per_track = 48,
+};
+#define int13_fdd_params __use_data16 ( int13_fdd_params )
+
 /** List of registered emulated drives */
 static LIST_HEAD ( int13s );
 
 /**
- * Number of BIOS drives
+ * Equipment word
  *
- * Note that this is the number of drives in the system as a whole
- * (i.e. a mirror of the counter at 40:75), rather than a count of the
- * number of emulated drives.
+ * This is a cached copy of the BIOS Data Area equipment word at
+ * 40:10.
  */
-static uint8_t num_drives;
+static uint16_t equipment_word;
+
+/**
+ * Number of BIOS floppy disk drives
+ *
+ * This is derived from the equipment word.  It is held in .text16 to
+ * allow for easy access by the INT 13,08 wrapper.
+ */
+static uint8_t __text16 ( num_fdds );
+#define num_fdds __use_text16 ( num_fdds )
+
+/**
+ * Number of BIOS hard disk drives
+ *
+ * This is a cached copy of the BIOS Data Area number of hard disk
+ * drives at 40:75.  It is held in .text16 to allow for easy access by
+ * the INT 13,08 wrapper.
+ */
+static uint8_t __text16 ( num_drives );
+#define num_drives __use_text16 ( num_drives )
 
 /**
  * Calculate INT 13 drive sector size
@@ -183,6 +210,16 @@ static inline uint64_t int13_capacity ( struct int13_drive *int13 ) {
 static inline uint32_t int13_capacity32 ( struct int13_drive *int13 ) {
 	uint64_t capacity = int13_capacity ( int13 );
 	return ( ( capacity <= 0xffffffffUL ) ? capacity : 0xffffffff );
+}
+
+/**
+ * Test if INT 13 drive is a floppy disk drive
+ *
+ * @v int13		Emulated drive
+ * @ret is_fdd		Emulated drive is a floppy disk
+ */
+static inline int int13_is_fdd ( struct int13_drive *int13 ) {
+	return ( ! ( int13->drive & 0x80 ) );
 }
 
 /** An INT 13 command */
@@ -499,33 +536,33 @@ static int int13_parse_iso9660 ( struct int13_drive *int13, void *scratch ) {
 }
 
 /**
- * Guess INT 13 drive geometry
+ * Guess INT 13 hard disk drive geometry
  *
  * @v int13		Emulated drive
  * @v scratch		Scratch area for single-sector reads
+ * @ret heads		Guessed number of heads
+ * @ret sectors		Guessed number of sectors per track
  * @ret rc		Return status code
  *
  * Guesses the drive geometry by inspecting the partition table.
  */
-static int int13_guess_geometry ( struct int13_drive *int13, void *scratch ) {
+static int int13_guess_geometry_hdd ( struct int13_drive *int13, void *scratch,
+				      unsigned int *heads,
+				      unsigned int *sectors ) {
 	struct master_boot_record *mbr = scratch;
 	struct partition_table_entry *partition;
-	unsigned int guessed_heads = 255;
-	unsigned int guessed_sectors_per_track = 63;
-	unsigned int blocks;
-	unsigned int blocks_per_cyl;
 	unsigned int i;
 	int rc;
 
-	/* Don't even try when the blksize is invalid for C/H/S access */
-	if ( int13_blksize ( int13 ) != INT13_BLKSIZE )
-		return 0;
+	/* Default guess is xx/255/63 */
+	*heads = 255;
+	*sectors = 63;
 
 	/* Read partition table */
 	if ( ( rc = int13_rw ( int13, 0, 1, virt_to_user ( mbr ),
 			       block_read ) ) != 0 ) {
-		DBGC ( int13, "INT13 drive %02x could not read partition "
-		       "table to guess geometry: %s\n",
+		DBGC ( int13, "INT13 drive %02x could not read "
+		       "partition table to guess geometry: %s\n",
 		       int13->drive, strerror ( rc ) );
 		return rc;
 	}
@@ -534,25 +571,126 @@ static int int13_guess_geometry ( struct int13_drive *int13, void *scratch ) {
 	DBGC ( int13, "INT13 drive %02x has signature %08x\n",
 	       int13->drive, mbr->signature );
 
-	/* Scan through partition table and modify guesses for heads
-	 * and sectors_per_track if we find any used partitions.
+	/* Scan through partition table and modify guesses for
+	 * heads and sectors_per_track if we find any used
+	 * partitions.
 	 */
 	for ( i = 0 ; i < 4 ; i++ ) {
 		partition = &mbr->partitions[i];
 		if ( ! partition->type )
 			continue;
-		guessed_heads = ( PART_HEAD ( partition->chs_end ) + 1 );
-		guessed_sectors_per_track = PART_SECTOR ( partition->chs_end );
+		*heads = ( PART_HEAD ( partition->chs_end ) + 1 );
+		*sectors = PART_SECTOR ( partition->chs_end );
 		DBGC ( int13, "INT13 drive %02x guessing C/H/S xx/%d/%d based "
-		       "on partition %d\n", int13->drive, guessed_heads,
-		       guessed_sectors_per_track, ( i + 1 ) );
+		       "on partition %d\n",
+		       int13->drive, *heads, *sectors, ( i + 1 ) );
+	}
+
+	return 0;
+}
+
+/** Recognised floppy disk geometries */
+static const struct int13_fdd_geometry int13_fdd_geometries[] = {
+	INT13_FDD_GEOMETRY ( 40, 1, 8 ),
+	INT13_FDD_GEOMETRY ( 40, 1, 9 ),
+	INT13_FDD_GEOMETRY ( 40, 2, 8 ),
+	INT13_FDD_GEOMETRY ( 40, 1, 9 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 8 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 9 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 15 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 18 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 20 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 21 ),
+	INT13_FDD_GEOMETRY ( 82, 2, 21 ),
+	INT13_FDD_GEOMETRY ( 83, 2, 21 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 22 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 23 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 24 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 36 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 39 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 40 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 44 ),
+	INT13_FDD_GEOMETRY ( 80, 2, 48 ),
+};
+
+/**
+ * Guess INT 13 floppy disk drive geometry
+ *
+ * @v int13		Emulated drive
+ * @ret heads		Guessed number of heads
+ * @ret sectors		Guessed number of sectors per track
+ * @ret rc		Return status code
+ *
+ * Guesses the drive geometry by inspecting the disk size.
+ */
+static int int13_guess_geometry_fdd ( struct int13_drive *int13,
+				      unsigned int *heads,
+				      unsigned int *sectors ) {
+	unsigned int blocks = int13_blksize ( int13 );
+	const struct int13_fdd_geometry *geometry;
+	unsigned int cylinders;
+	unsigned int i;
+
+	/* Look for a match against a known geometry */
+	for ( i = 0 ; i < ( sizeof ( int13_fdd_geometries ) /
+			    sizeof ( int13_fdd_geometries[0] ) ) ; i++ ) {
+		geometry = &int13_fdd_geometries[i];
+		cylinders = INT13_FDD_CYLINDERS ( geometry );
+		*heads = INT13_FDD_HEADS ( geometry );
+		*sectors = INT13_FDD_SECTORS ( geometry );
+		if ( ( cylinders * (*heads) * (*sectors) ) == blocks ) {
+			DBGC ( int13, "INT13 drive %02x guessing C/H/S "
+			       "%d/%d/%d based on size %dK\n", int13->drive,
+			       cylinders, *heads, *sectors, ( blocks / 2 ) );
+			return 0;
+		}
+	}
+
+	/* Otherwise, assume a partial disk image in the most common
+	 * format (1440K, 80/2/18).
+	 */
+	*heads = 2;
+	*sectors = 18;
+	DBGC ( int13, "INT13 drive %02x guessing C/H/S xx/%d/%d based on size "
+	       "%dK\n", int13->drive, *heads, *sectors, ( blocks / 2 ) );
+	return 0;
+}
+
+/**
+ * Guess INT 13 drive geometry
+ *
+ * @v int13		Emulated drive
+ * @v scratch		Scratch area for single-sector reads
+ * @ret rc		Return status code
+ */
+static int int13_guess_geometry ( struct int13_drive *int13, void *scratch ) {
+	unsigned int guessed_heads;
+	unsigned int guessed_sectors;
+	unsigned int blocks;
+	unsigned int blocks_per_cyl;
+	int rc;
+
+	/* Don't even try when the blksize is invalid for C/H/S access */
+	if ( int13_blksize ( int13 ) != INT13_BLKSIZE )
+		return 0;
+
+	/* Guess geometry according to drive type */
+	if ( int13_is_fdd ( int13 ) ) {
+		if ( ( rc = int13_guess_geometry_fdd ( int13, &guessed_heads,
+						       &guessed_sectors )) != 0)
+			return rc;
+	} else {
+		if ( ( rc = int13_guess_geometry_hdd ( int13, scratch,
+						       &guessed_heads,
+						       &guessed_sectors )) != 0)
+			return rc;
 	}
 
 	/* Apply guesses if no geometry already specified */
 	if ( ! int13->heads )
 		int13->heads = guessed_heads;
 	if ( ! int13->sectors_per_track )
-		int13->sectors_per_track = guessed_sectors_per_track;
+		int13->sectors_per_track = guessed_sectors;
 	if ( ! int13->cylinders ) {
 		/* Avoid attempting a 64-bit divide on a 32-bit system */
 		blocks = int13_capacity32 ( int13 );
@@ -569,19 +707,40 @@ static int int13_guess_geometry ( struct int13_drive *int13, void *scratch ) {
 /**
  * Update BIOS drive count
  */
-static void int13_set_num_drives ( void ) {
+static void int13_sync_num_drives ( void ) {
 	struct int13_drive *int13;
+	uint8_t *counter;
+	uint8_t max_drive;
+	uint8_t required;
 
-	/* Get current drive count */
+	/* Get current drive counts */
+	get_real ( equipment_word, BDA_SEG, BDA_EQUIPMENT_WORD );
 	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
+	num_fdds = ( ( equipment_word & 0x0001 ) ?
+		     ( ( ( equipment_word >> 6 ) & 0x3 ) + 1 ) : 0 );
 
 	/* Ensure count is large enough to cover all of our emulated drives */
 	list_for_each_entry ( int13, &int13s, list ) {
-		if ( num_drives <= ( int13->drive & 0x7f ) )
-			num_drives = ( ( int13->drive & 0x7f ) + 1 );
+		counter = ( int13_is_fdd ( int13 ) ? &num_fdds : &num_drives );
+		max_drive = int13->drive;
+		if ( max_drive < int13->natural_drive )
+			max_drive = int13->natural_drive;
+		required = ( ( max_drive & 0x7f ) + 1 );
+		if ( *counter < required ) {
+			*counter = required;
+			DBGC ( int13, "INT13 drive %02x added to drive count: "
+			       "%d HDDs, %d FDDs\n",
+			       int13->drive, num_drives, num_fdds );
+		}
 	}
 
 	/* Update current drive count */
+	equipment_word &= ~( ( 0x3 << 6 ) | 0x0001 );
+	if ( num_fdds ) {
+		equipment_word |= ( 0x0001 |
+				    ( ( ( num_fdds - 1 ) & 0x3 ) << 6 ) );
+	}
+	put_real ( equipment_word, BDA_SEG, BDA_EQUIPMENT_WORD );
 	put_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
 }
 
@@ -589,13 +748,14 @@ static void int13_set_num_drives ( void ) {
  * Check number of drives
  */
 static void int13_check_num_drives ( void ) {
+	uint16_t check_equipment_word;
 	uint8_t check_num_drives;
 
+	get_real ( check_equipment_word, BDA_SEG, BDA_EQUIPMENT_WORD );
 	get_real ( check_num_drives, BDA_SEG, BDA_NUM_DRIVES );
-	if ( check_num_drives != num_drives ) {
-		int13_set_num_drives();
-		DBG ( "INT13 fixing up number of drives from %d to %d\n",
-		      check_num_drives, num_drives );
+	if ( ( check_equipment_word != equipment_word ) ||
+	     ( check_num_drives != num_drives ) ) {
+		int13_sync_num_drives();
 	}
 }
 
@@ -669,14 +829,19 @@ static int int13_rw_sectors ( struct int13_drive *int13,
 		       int13->drive, int13_blksize ( int13 ) );
 		return -INT13_STATUS_INVALID;
 	}
-	
+
 	/* Calculate parameters */
 	cylinder = ( ( ( ix86->regs.cl & 0xc0 ) << 2 ) | ix86->regs.ch );
-	assert ( cylinder < int13->cylinders );
 	head = ix86->regs.dh;
-	assert ( head < int13->heads );
 	sector = ( ix86->regs.cl & 0x3f );
-	assert ( ( sector >= 1 ) && ( sector <= int13->sectors_per_track ) );
+	if ( ( cylinder >= int13->cylinders ) ||
+	     ( head >= int13->heads ) ||
+	     ( sector < 1 ) || ( sector > int13->sectors_per_track ) ) {
+		DBGC ( int13, "C/H/S %d/%d/%d out of range for geometry "
+		       "%d/%d/%d\n", cylinder, head, sector, int13->cylinders,
+		       int13->heads, int13->sectors_per_track );
+		return -INT13_STATUS_INVALID;
+	}
 	lba = ( ( ( ( cylinder * int13->heads ) + head )
 		  * int13->sectors_per_track ) + sector - 1 );
 	count = ix86->regs.al;
@@ -761,10 +926,19 @@ static int int13_get_parameters ( struct int13_drive *int13,
 		return -INT13_STATUS_INVALID;
 	}
 
+	/* Common parameters */
 	ix86->regs.ch = ( max_cylinder & 0xff );
 	ix86->regs.cl = ( ( ( max_cylinder >> 8 ) << 6 ) | max_sector );
 	ix86->regs.dh = max_head;
-	get_real ( ix86->regs.dl, BDA_SEG, BDA_NUM_DRIVES );
+	ix86->regs.dl = ( int13_is_fdd ( int13 ) ? num_fdds : num_drives );
+
+	/* Floppy-specific parameters */
+	if ( int13_is_fdd ( int13 ) ) {
+		ix86->regs.bl = INT13_FDD_TYPE_1M44;
+		ix86->segs.es = rm_ds;
+		ix86->regs.di = __from_data16 ( &int13_fdd_params );
+	}
+
 	return 0;
 }
 
@@ -781,10 +955,15 @@ static int int13_get_disk_type ( struct int13_drive *int13,
 	uint32_t blocks;
 
 	DBGC2 ( int13, "Get disk type\n" );
-	blocks = int13_capacity32 ( int13 );
-	ix86->regs.cx = ( blocks >> 16 );
-	ix86->regs.dx = ( blocks & 0xffff );
-	return INT13_DISK_TYPE_HDD;
+
+	if ( int13_is_fdd ( int13 ) ) {
+		return INT13_DISK_TYPE_FDD;
+	} else {
+		blocks = int13_capacity32 ( int13 );
+		ix86->regs.cx = ( blocks >> 16 );
+		ix86->regs.dx = ( blocks & 0xffff );
+		return INT13_DISK_TYPE_HDD;
+	}
 }
 
 /**
@@ -832,6 +1011,13 @@ static int int13_extended_rw ( struct int13_drive *int13,
 	unsigned long count;
 	userptr_t buffer;
 	int rc;
+
+	/* Extended reads are not allowed on floppy drives.
+	 * ELTORITO.SYS seems to assume that we are really a CD-ROM if
+	 * we support extended reads for a floppy drive.
+	 */
+	if ( int13_is_fdd ( int13 ) )
+		return -INT13_STATUS_INVALID;
 
 	/* Get buffer size */
 	get_real ( bufsize, ix86->segs.ds,
@@ -1300,26 +1486,29 @@ static void int13_hook_vector ( void ) {
 			     "popw 6(%%bp)\n\t"
 			     /* Fix up %dl:
 			      *
-			      * INT 13,15 : do nothing
+			      * INT 13,15 : do nothing if hard disk
 			      * INT 13,08 : load with number of drives
 			      * all others: restore original value
 			      */
 			     "cmpb $0x15, -1(%%bp)\n\t"
-			     "je 2f\n\t"
+			     "jne 2f\n\t"
+			     "testb $0x80, -4(%%bp)\n\t"
+			     "jnz 3f\n\t"
+			     "\n2:\n\t"
 			     "movb -4(%%bp), %%dl\n\t"
 			     "cmpb $0x08, -1(%%bp)\n\t"
-			     "jne 2f\n\t"
-			     "pushw %%ds\n\t"
-			     "pushw %1\n\t"
-			     "popw %%ds\n\t"
-			     "movb %c2, %%dl\n\t"
-			     "popw %%ds\n\t"
+			     "jne 3f\n\t"
+			     "testb $0x80, %%dl\n\t"
+			     "movb %%cs:%c1, %%dl\n\t"
+			     "jnz 3f\n\t"
+			     "movb %%cs:%c2, %%dl\n\t"
 			     /* Return */
-			     "\n2:\n\t"
+			     "\n3:\n\t"
 			     "movw %%bp, %%sp\n\t"
 			     "popw %%bp\n\t"
 			     "iret\n\t" )
-	       : : "i" ( int13 ), "i" ( BDA_SEG ), "i" ( BDA_NUM_DRIVES ) );
+	       : : "i" ( int13 ), "i" ( __from_text16 ( &num_drives ) ),
+		   "i" ( __from_text16 ( &num_fdds ) ) );
 
 	hook_bios_interrupt ( 0x13, ( unsigned int ) int13_wrapper,
 			      &int13_vector );
@@ -1404,14 +1593,13 @@ static void int13_free ( struct refcnt *refcnt ) {
  */
 static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	struct int13_drive *int13;
-	uint8_t num_drives;
 	unsigned int natural_drive;
 	void *scratch;
 	int rc;
 
 	/* Calculate natural drive number */
-	get_real ( num_drives, BDA_SEG, BDA_NUM_DRIVES );
-	natural_drive = ( num_drives | 0x80 );
+	int13_sync_num_drives();
+	natural_drive = ( ( drive & 0x80 ) ? ( num_drives | 0x80 ) : num_fdds );
 
 	/* Check that drive number is not in use */
 	list_for_each_entry ( int13, &int13s, list ) {
@@ -1468,7 +1656,7 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	list_add ( &int13->list, &int13s );
 
 	/* Update BIOS drive count */
-	int13_set_num_drives();
+	int13_sync_num_drives();
 
 	free ( scratch );
 	return 0;
