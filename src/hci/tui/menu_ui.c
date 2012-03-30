@@ -315,9 +315,9 @@ int show_menu ( struct menu *menu, unsigned int timeout_ms,
 	ui.timeout = ( ( timeout_ms * TICKS_PER_SEC ) / 1000 );
 	list_for_each_entry ( item, &menu->items, list ) {
 		if ( item->label ) {
-			labelled_count++;
-			if ( ! ui.selected )
+			if ( ! labelled_count )
 				ui.selected = ui.count;
+			labelled_count++;
 			if ( item->is_default )
 				ui.selected = ui.count;
 		}
