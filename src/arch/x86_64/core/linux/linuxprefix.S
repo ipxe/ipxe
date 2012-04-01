@@ -22,4 +22,4 @@ _linux_start:
 	movq	$__NR_exit, %rax
 	syscall
 
-	.size _start, . - _start
+	.size _linux_start, . - _linux_start
