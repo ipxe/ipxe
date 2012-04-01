@@ -125,9 +125,6 @@ REQUIRE_OBJECT ( https );
 #ifdef DOWNLOAD_PROTO_FTP
 REQUIRE_OBJECT ( ftp );
 #endif
-#ifdef DOWNLOAD_PROTO_TFTM
-REQUIRE_OBJECT ( tftm );
-#endif
 #ifdef DOWNLOAD_PROTO_SLAM
 REQUIRE_OBJECT ( slam );
 #endif
