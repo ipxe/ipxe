@@ -48,7 +48,7 @@ int aes_wrap ( const void *kek, const void *src, void *dest, int nblk )
 	cipher_setkey ( &aes_algorithm, aes_ctx, kek, 16 );
 
 	/* Set up */
-	memset ( A, 0xA6, sizeof ( A ) );
+	memset ( A, 0xA6, 8 );
 	memmove ( dest + 8, src, nblk * 8 );
 
 	/* Wrap */
