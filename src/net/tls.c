@@ -594,7 +594,7 @@ static void tls_clear_cipher ( struct tls_session *tls __unused,
 			       cipherspec->pubkey_ctx );
 	}
 	free ( cipherspec->dynamic );
-	memset ( cipherspec, 0, sizeof ( cipherspec ) );
+	memset ( cipherspec, 0, sizeof ( *cipherspec ) );
 	cipherspec->suite = &tls_cipher_suite_null;
 }
 
