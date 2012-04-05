@@ -54,6 +54,7 @@ FILE_LICENCE ( GPL2_ONLY );
 struct e1000_hw;
 
 #define E1000_DEV_ID_82576_VF                 0x10CA
+#define E1000_DEV_ID_I350_VF                  0x1520
 
 #define E1000_VF_INIT_TIMEOUT 200 /* Number of retries to clear RSTI */
 

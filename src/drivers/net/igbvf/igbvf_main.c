@@ -942,7 +942,8 @@ void igbvf_remove ( struct pci_device *pdev )
 }
 
 static struct pci_device_id igbvf_pci_tbl[] = {
-	PCI_ROM(0x8086, 0x10CA, "igbvf", "E1000_DEV_ID_82576_VF", 0)
+	PCI_ROM(0x8086, 0x10CA, "igbvf", "E1000_DEV_ID_82576_VF", 0),
+	PCI_ROM(0x8086, 0x1520, "i350vf", "E1000_DEV_ID_I350_VF", 0),
 };
 
 
