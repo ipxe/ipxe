@@ -143,6 +143,7 @@ enum e1000_boards {
 	board_ich9lan,
 	board_ich10lan,
 	board_pchlan,
+	board_pch2lan,
 	board_82583,
 };
 
@@ -300,6 +301,7 @@ extern void e1000e_set_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw,
 extern void e1000e_igp3_phy_powerdown_workaround_ich8lan(struct e1000_hw *hw);
 extern void e1000e_gig_downshift_workaround_ich8lan(struct e1000_hw *hw);
 extern void e1000e_disable_gig_wol_ich8lan(struct e1000_hw *hw);
+extern s32 e1000_lv_jumbo_workaround_ich8lan(struct e1000_hw *hw, bool enable);
 
 extern s32 e1000e_check_for_copper_link(struct e1000_hw *hw);
 extern s32 e1000e_check_for_fiber_link(struct e1000_hw *hw);

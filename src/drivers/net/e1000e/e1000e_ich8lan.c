@@ -206,7 +206,7 @@ static s32 e1000e_init_phy_params_pchlan(struct e1000_hw *hw)
 	e1000e_get_phy_id(hw);
 	phy->type = e1000e_get_phy_type_from_id(phy->id);
 
-	if (phy->type == e1000_phy_82577) {
+	if (phy->type == e1000_phy_82577 || phy->type == e1000_phy_82579) {
 		phy->ops.check_polarity = e1000e_check_polarity_82577;
 #if 0
 		phy->ops.force_speed_duplex =
@@ -449,6 +449,7 @@ static s32 e1000e_init_mac_params_ich8lan(struct e1000_hw *hw)
 		mac->ops.led_off = e1000e_led_off_ich8lan;
 		break;
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		/* ID LED init */
 		mac->ops.id_led_init = e1000e_id_led_init_pchlan;
 		/* setup LED */
@@ -466,6 +467,14 @@ static s32 e1000e_init_mac_params_ich8lan(struct e1000_hw *hw)
 	/* Enable PCS Lock-loss workaround for ICH8 */
 	if (mac->type == e1000_ich8lan)
 		e1000e_set_kmrn_lock_loss_workaround_ich8lan(hw, true);
+
+	/* Disable PHY configuration by hardware, config by software */
+	if (mac->type == e1000_pch2lan) {
+		u32 extcnf_ctrl = er32(EXTCNF_CTRL);
+
+		extcnf_ctrl |= E1000_EXTCNF_CTRL_GATE_PHY_CFG;
+		ew32(EXTCNF_CTRL, extcnf_ctrl);
+	}
 
 
 	return E1000_SUCCESS;
@@ -577,6 +586,7 @@ void e1000e_init_function_pointers_ich8lan(struct e1000_hw *hw)
 		hw->phy.ops.init_params = e1000e_init_phy_params_ich8lan;
 		break;
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		hw->phy.ops.init_params = e1000e_init_phy_params_pchlan;
 		break;
 	default:
@@ -765,7 +775,8 @@ static s32 e1000e_sw_lcd_config_ich8lan(struct e1000_hw *hw)
 		/* Check if SW needs to configure the PHY */
 		if ((hw->device_id == E1000_DEV_ID_ICH8_IGP_M_AMT) ||
 		    (hw->device_id == E1000_DEV_ID_ICH8_IGP_M) ||
-		    (hw->mac.type == e1000_pchlan))
+		    (hw->mac.type == e1000_pchlan) ||
+		    (hw->mac.type == e1000_pch2lan))
 			sw_cfg_mask = E1000_FEXTNVM_SW_CONFIG_ICH8M;
 		else
 			sw_cfg_mask = E1000_FEXTNVM_SW_CONFIG;
@@ -777,13 +788,15 @@ static s32 e1000e_sw_lcd_config_ich8lan(struct e1000_hw *hw)
 		/* Wait for basic configuration completes before proceeding */
 		e1000e_lan_init_done_ich8lan(hw);
 
-		/*
-		 * Make sure HW does not configure LCD from PHY
-		 * extended configuration before SW configuration
-		 */
-		data = er32(EXTCNF_CTRL);
-		if (data & E1000_EXTCNF_CTRL_LCD_WRITE_ENABLE)
-			goto out;
+		if (hw->mac.type != e1000_pch2lan) {
+			/*
+			 * Make sure HW does not configure LCD from PHY
+			 * extended configuration before SW configuration
+			 */
+			data = er32(EXTCNF_CTRL);
+			if (data & E1000_EXTCNF_CTRL_LCD_WRITE_ENABLE)
+				goto out;
+		}
 
 		cnf_size = er32(EXTCNF_SIZE);
 		cnf_size &= E1000_EXTCNF_SIZE_EXT_PCIE_LENGTH_MASK;
@@ -795,7 +808,8 @@ static s32 e1000e_sw_lcd_config_ich8lan(struct e1000_hw *hw)
 		cnf_base_addr >>= E1000_EXTCNF_CTRL_EXT_CNF_POINTER_SHIFT;
 
 		if (!(data & E1000_EXTCNF_CTRL_OEM_WRITE_ENABLE) &&
-		    (hw->mac.type == e1000_pchlan)) {
+		    (hw->mac.type == e1000_pchlan ||
+		     hw->mac.type == e1000_pch2lan)) {
 			/*
 			 * HW configures the SMBus address and LEDs when the
 			 * OEM and LCD Write Enable bits are set in the NVM.
@@ -1006,16 +1020,18 @@ s32 e1000e_oem_bits_config_ich8lan(struct e1000_hw *hw, bool d0_state)
 	u32 mac_reg;
 	u16 oem_reg;
 
-	if (hw->mac.type != e1000_pchlan)
+	if (hw->mac.type != e1000_pchlan && hw->mac.type != e1000_pch2lan)
 		return ret_val;
 
 	ret_val = hw->phy.ops.acquire(hw);
 	if (ret_val)
 		return ret_val;
 
-	mac_reg = er32(EXTCNF_CTRL);
-	if (mac_reg & E1000_EXTCNF_CTRL_OEM_WRITE_ENABLE)
-		goto out;
+	if (hw->mac.type != e1000_pch2lan) {
+		mac_reg = er32(EXTCNF_CTRL);
+		if (mac_reg & E1000_EXTCNF_CTRL_OEM_WRITE_ENABLE)
+			goto out;
+	}
 
 	mac_reg = er32(FEXTNVM);
 	if (!(mac_reg & E1000_FEXTNVM_SW_CONFIG_ICH8M))
@@ -2573,7 +2589,7 @@ static s32 e1000e_reset_hw_ich8lan(struct e1000_hw *hw)
 		}
 	}
 	/* Dummy read to clear the phy wakeup bit after lcd reset */
-	if (hw->mac.type == e1000_pchlan)
+	if (hw->mac.type == e1000_pchlan || hw->mac.type == e1000_pch2lan)
 		e1e_rphy(hw, BM_WUC, &reg);
 
 	ret_val = e1000e_sw_lcd_config_ich8lan(hw);
@@ -2791,6 +2807,7 @@ static s32 e1000e_setup_link_ich8lan(struct e1000_hw *hw)
 
 	ew32(FCTTV, hw->fc.pause_time);
 	if ((hw->phy.type == e1000_phy_82578) ||
+	    (hw->phy.type == e1000_phy_82579) ||
 	    (hw->phy.type == e1000_phy_82577)) {
 		ret_val = e1e_wphy(hw,
 		                             PHY_REG(BM_PORT_CTRL_PAGE, 27),
@@ -2859,6 +2876,7 @@ static s32 e1000e_setup_copper_link_ich8lan(struct e1000_hw *hw)
 			goto out;
 		break;
 	case e1000_phy_82577:
+	case e1000_phy_82579:
 		ret_val = e1000e_copper_link_setup_82577(hw);
 		if (ret_val)
 			goto out;
@@ -3388,6 +3406,7 @@ static void e1000e_clear_hw_cntrs_ich8lan(struct e1000_hw *hw __unused)
 
 	/* Clear PHY statistics registers */
 	if ((hw->phy.type == e1000_phy_82578) ||
+	    (hw->phy.type == e1000_phy_82579) ||
 	    (hw->phy.type == e1000_phy_82577)) {
 		e1e_rphy(hw, HV_SCC_UPPER, &phy_data);
 		e1e_rphy(hw, HV_SCC_LOWER, &phy_data);
@@ -3434,6 +3453,8 @@ static struct pci_device_id e1000e_ich8lan_nics[] = {
      PCI_ROM(0x8086, 0x10EB, "E1000_DEV_ID_PCH_M_HV_LC", "E1000_DEV_ID_PCH_M_HV_LC", board_pchlan),
      PCI_ROM(0x8086, 0x10EF, "E1000_DEV_ID_PCH_D_HV_DM", "E1000_DEV_ID_PCH_D_HV_DM", board_pchlan),
      PCI_ROM(0x8086, 0x10F0, "E1000_DEV_ID_PCH_D_HV_DC", "E1000_DEV_ID_PCH_D_HV_DC", board_pchlan),
+     PCI_ROM(0x8086, 0x1502, "E1000_DEV_ID_PCH2_LV_LM", "E1000_DEV_ID_PCH2_LV_LM", board_pch2lan),
+     PCI_ROM(0x8086, 0x1503, "E1000_DEV_ID_PCH2_LV_V", "E1000_DEV_ID_PCH2_LV_V", board_pch2lan),
 };
 
 struct pci_driver e1000e_ich8lan_driver __pci_driver = {

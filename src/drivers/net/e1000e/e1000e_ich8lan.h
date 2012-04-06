@@ -146,6 +146,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HV_SMB_ADDR_PEC_EN     0x0200
 #define HV_SMB_ADDR_VALID      0x0080
 
+/* PHY Power Management Control */
+#define HV_PM_CTRL             PHY_REG(770, 17)
+
 /* Strapping Option Register - RO */
 #define E1000_STRAP                     0x0000C
 #define E1000_STRAP_SMBUS_ADDRESS_MASK  0x00FE0000
