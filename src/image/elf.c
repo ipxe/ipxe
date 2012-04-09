@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 typedef Elf32_Ehdr	Elf_Ehdr;
 typedef Elf32_Phdr	Elf_Phdr;
 typedef Elf32_Off	Elf_Off;
+#define ELFCLASS	ELFCLASS32
 
 /**
  * Load ELF segment into memory
@@ -121,6 +122,13 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
  * @ret rc		Return status code
  */
 int elf_load ( struct image *image, physaddr_t *entry ) {
+	static const uint8_t e_ident[] = {
+		[EI_MAG0]	= ELFMAG0,
+		[EI_MAG1]	= ELFMAG1,
+		[EI_MAG2]	= ELFMAG2,
+		[EI_MAG3]	= ELFMAG3,
+		[EI_CLASS]	= ELFCLASS,
+	};
 	Elf_Ehdr ehdr;
 	Elf_Phdr phdr;
 	Elf_Off phoff;
@@ -129,7 +137,8 @@ int elf_load ( struct image *image, physaddr_t *entry ) {
 
 	/* Read ELF header */
 	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
-	if ( memcmp ( &ehdr.e_ident[EI_MAG0], ELFMAG, SELFMAG ) != 0 ) {
+	if ( memcmp ( &ehdr.e_ident[EI_MAG0], e_ident,
+		      sizeof ( e_ident ) ) != 0 ) {
 		DBGC ( image, "ELF %p has invalid signature\n", image );
 		return -ENOEXEC;
 	}
