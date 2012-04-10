@@ -77,6 +77,9 @@ REQUIRE_OBJECT ( pc_kbd );
 #ifdef CONSOLE_SYSLOG
 REQUIRE_OBJECT ( syslog );
 #endif
+#ifdef CONSOLE_SYSLOGS
+REQUIRE_OBJECT ( syslogs );
+#endif
 #ifdef CONSOLE_EFI
 REQUIRE_OBJECT ( efi_console );
 #endif

@@ -352,6 +352,9 @@ struct dhcp_client_uuid {
  */
 #define DHCP_EB_SCRIPTLET DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x51 )
 
+/** Encrypted syslog server */
+#define DHCP_EB_SYSLOGS_SERVER DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x55 )
+
 /** Skip PXE DHCP protocol extensions such as ProxyDHCP
  *
  * If set to a non-zero value, iPXE will not wait for ProxyDHCP offers
