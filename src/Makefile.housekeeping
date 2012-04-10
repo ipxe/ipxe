@@ -381,6 +381,7 @@ CFLAGS		+= -g
 ifeq ($(CCTYPE),gcc)
 CFLAGS		+= -ffreestanding
 CFLAGS		+= -Wall -W -Wformat-nonliteral
+HOST_CFLAGS	+= -Wall -W -Wformat-nonliteral
 endif
 ifeq ($(CCTYPE),icc)
 CFLAGS		+= -fno-builtin
@@ -411,12 +412,14 @@ endif
 CFLAGS		+= $(WORKAROUND_CFLAGS) $(EXTRA_CFLAGS)
 ASFLAGS		+= $(WORKAROUND_ASFLAGS) $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(WORKAROUND_LDFLAGS) $(EXTRA_LDFLAGS)
+HOST_CFLAGS	+= -O2 -g
 
 # Inhibit -Werror if NO_WERROR is specified on make command line
 #
 ifneq ($(NO_WERROR),1)
 CFLAGS		+= -Werror
 ASFLAGS		+= --fatal-warnings
+HOST_CFLAGS	+= -Werror
 endif
 
 # Function trace recorder state in the last build.  This is needed
@@ -1057,13 +1060,13 @@ endif # defined(BIN)
 #
 $(NRV2B) : util/nrv2b.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -O2 -DENCODE -DDECODE -DMAIN -DVERBOSE -DNDEBUG \
-		       -DBITSIZE=32 -DENDIAN=0 -o $@ $<
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -DENCODE -DDECODE -DMAIN -DVERBOSE \
+		       -DNDEBUG -DBITSIZE=32 -DENDIAN=0 -o $@ $<
 CLEANUP	+= $(NRV2B)
 
 $(ZBIN) : util/zbin.c util/nrv2b.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -O2 -o $@ $<
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
 CLEANUP += $(ZBIN)
 
 ###############################################################################
@@ -1071,23 +1074,25 @@ CLEANUP += $(ZBIN)
 # The EFI image converter
 #
 ELF2EFI_CFLAGS	:= -I$(BINUTILS_DIR)/include -I$(BFD_DIR)/include \
-		   -I$(ZLIB_DIR)/include -idirafter include \
-		   -L$(BINUTILS_DIR)/lib -L$(BFD_DIR)/lib -L$(ZLIB_DIR)/lib \
+		   -I$(ZLIB_DIR)/include -idirafter include
+ELF2EFI_LDFLAGS	:= -L$(BINUTILS_DIR)/lib -L$(BFD_DIR)/lib -L$(ZLIB_DIR)/lib \
 		   -lbfd -ldl -liberty -lz -Wl,--no-warn-search-mismatch
 
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $< $(ELF2EFI_CFLAGS) -DEFI_TARGET_IA32 -O2 -o $@
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET_IA32 $< \
+		$(ELF2EFI_LDFLAGS) -o $@
 CLEANUP += $(ELF2EFI32)
 
 $(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $< $(ELF2EFI_CFLAGS) -DEFI_TARGET_X64 -O2 -o $@
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET_X64 $< \
+		$(ELF2EFI_LDFLAGS) -o $@
 CLEANUP += $(ELF2EFI64)
 
 $(EFIROM) : util/efirom.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -idirafter include -O2 -o $@ $<
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -o $@ $<
 CLEANUP += $(EFIROM)
 
 ###############################################################################
@@ -1096,7 +1101,7 @@ CLEANUP += $(EFIROM)
 #
 $(ICCFIX) : util/iccfix.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -idirafter include -O2 -o $@ $<
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -o $@ $<
 CLEANUP += $(ICCFIX)
 
 ###############################################################################
@@ -1105,7 +1110,7 @@ CLEANUP += $(ICCFIX)
 #
 $(EINFO) : util/einfo.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) -idirafter include -O2 -o $@ $<
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -o $@ $<
 CLEANUP += $(EINFO)
 
 ###############################################################################

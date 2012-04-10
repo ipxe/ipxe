@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -49,7 +50,7 @@ static int ICCFIX ( void *elf ) {
 		     ( align >= ICC_ALIGN_HACK_FACTOR ) ) {
 			new_align = ( align / ICC_ALIGN_HACK_FACTOR );
 			shdr->sh_addralign = new_align;
-			dprintf ( "Section \"%s\": alignment %d->%d\n",
+			dprintf ( "Section \"%s\": alignment %ld->%ld\n",
 				  name, align, new_align );
 		}
 	}

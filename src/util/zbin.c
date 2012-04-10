@@ -218,7 +218,8 @@ static int process_zinfo_pack ( struct input_file *input,
 	return 0;
 }
 
-static int process_zinfo_payl ( struct input_file *input,
+static int process_zinfo_payl ( struct input_file *input
+					__attribute__ (( unused )),
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
 	struct zinfo_payload *payload = &zinfo->payload;
@@ -229,9 +230,11 @@ static int process_zinfo_payl ( struct input_file *input,
 	if ( DEBUG ) {
 		fprintf ( stderr, "PAYL at %#zx\n", output->hdr_len );
 	}
+	return 0;
 }
 
-static int process_zinfo_add ( struct input_file *input,
+static int process_zinfo_add ( struct input_file *input
+					__attribute__ (( unused )),
 			       struct output_file *output,
 			       size_t len,
 			       struct zinfo_add *add,

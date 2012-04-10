@@ -7,6 +7,7 @@ CLEANUP		:=
 CFLAGS		:=
 ASFLAGS		:=
 LDFLAGS		:=
+HOST_CFLAGS	:=
 MAKEDEPS	:= Makefile
 
 ###############################################################################

@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -49,7 +50,8 @@ struct einfo {
  * @v infile		Filename
  * @v opts		Command-line options
  */
-static void einfo ( const char *infile, struct options *opts ) {
+static void einfo ( const char *infile,
+		    struct options *opts __attribute__ (( unused )) ) {
 	int fd;
 	struct stat stat;
 	size_t len;
@@ -85,9 +87,9 @@ static void einfo ( const char *infile, struct options *opts ) {
 		for ( einfo = start ; ( ( void * ) einfo ) < ( start + len ) ;
 		      einfo = ( ( ( void * ) einfo ) + einfo->size ) ) {
 			printf ( "%08x\t%s\t%d\t%s\n", einfo->error,
-				 ( ( ( void * ) einfo ) + einfo->file ),
+				 ( ( ( char * ) einfo ) + einfo->file ),
 				 einfo->line,
-				 ( ( ( void * ) einfo ) + einfo->desc ) );
+				 ( ( ( char * ) einfo ) + einfo->desc ) );
 		}
 
 	}
@@ -115,8 +117,7 @@ static void print_help ( const char *program_name ) {
  * @v opts		Options structure to populate
  */
 static int parse_options ( const int argc, char **argv,
-			   struct options *opts ) {
-	char *end;
+			   struct options *opts __attribute__ (( unused )) ) {
 	int c;
 
 	while (1) {
@@ -147,7 +148,7 @@ static int parse_options ( const int argc, char **argv,
 int main ( int argc, char **argv ) {
 	struct options opts = {
 	};
-	unsigned int infile_index;
+	int infile_index;
 	const char *infile;
 
 	/* Parse command-line arguments */

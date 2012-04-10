@@ -57,18 +57,6 @@ static void * xmalloc ( size_t len ) {
 }
 
 /**
- * Get file size
- *
- * @v file		File
- * @v len		File size
- */
-static size_t file_size ( FILE *file ) {
-	ssize_t len;
-
-	return len;
-}
-
-/**
  * Read information from PE headers
  *
  * @v pe		PE file
@@ -239,15 +227,15 @@ static int parse_options ( const int argc, char **argv,
 }
 
 int main ( int argc, char **argv ) {
-	struct options opts = {
-	};
-	unsigned int infile_index;
+	struct options opts;
+	int infile_index;
 	const char *infile_name;
 	const char *outfile_name;
 	FILE *infile;
 	FILE *outfile;
 
 	/* Parse command-line arguments */
+	memset ( &opts, 0, sizeof ( opts ) );
 	infile_index = parse_options ( argc, argv, &opts );
 	if ( argc != ( infile_index + 2 ) ) {
 		print_help ( argv[0] );

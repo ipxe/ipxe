@@ -77,7 +77,7 @@ static __inline__ void Error(char *message)
 
 /* These will be a complete waste of time on a lo-endian */
 /* system, but it only gets done once so WTF. */
-static unsigned long i86ul_to_host(unsigned long ul)
+static unsigned long __attribute__ (( unused )) i86ul_to_host(unsigned long ul)
 {
 	unsigned long res = 0;
 	int i;
@@ -375,7 +375,6 @@ static
 int swd_init(struct ucl_swd *s, const uint8_t *dict, unsigned int dict_len)
 {
 	unsigned int i = 0;
-	int c = 0;
 
 	if (s->n == 0)
 		s->n = N;
@@ -439,7 +438,7 @@ static
 void swd_exit(struct ucl_swd *s)
 {
 	/* unused s */
-
+	( void ) s;
 }
 
 #define swd_pos2off(s,pos) \
