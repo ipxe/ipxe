@@ -1499,16 +1499,15 @@ static void int13_hook_vector ( void ) {
 			     "cmpb $0x08, -1(%%bp)\n\t"
 			     "jne 3f\n\t"
 			     "testb $0x80, %%dl\n\t"
-			     "movb %%cs:%c1, %%dl\n\t"
+			     "movb %%cs:num_drives, %%dl\n\t"
 			     "jnz 3f\n\t"
-			     "movb %%cs:%c2, %%dl\n\t"
+			     "movb %%cs:num_fdds, %%dl\n\t"
 			     /* Return */
 			     "\n3:\n\t"
 			     "movw %%bp, %%sp\n\t"
 			     "popw %%bp\n\t"
 			     "iret\n\t" )
-	       : : "i" ( int13 ), "i" ( __from_text16 ( &num_drives ) ),
-		   "i" ( __from_text16 ( &num_fdds ) ) );
+	       : : "i" ( int13 ) );
 
 	hook_bios_interrupt ( 0x13, ( unsigned int ) int13_wrapper,
 			      &int13_vector );
