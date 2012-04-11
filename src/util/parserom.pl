@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 #
 # Parse PCI_ROM and ISA_ROM entries from a source file on stdin and
 # output the relevant Makefile variable definitions to stdout
