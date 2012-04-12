@@ -94,10 +94,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 //#define	IMAGE_NBI		/* NBI image support */
 //#define	IMAGE_ELF		/* ELF image support */
-//#define	IMAGE_FREEBSD		/* FreeBSD kernel image support */
 //#define	IMAGE_MULTIBOOT		/* MultiBoot image support */
-//#define	IMAGE_AOUT		/* a.out image support */
-//#define	IMAGE_WINCE		/* WinCE image support */
 //#define	IMAGE_PXE		/* PXE image support */
 //#define	IMAGE_SCRIPT		/* iPXE script image support */
 //#define	IMAGE_BZIMAGE		/* Linux bzImage image support */

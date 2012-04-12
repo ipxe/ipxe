@@ -155,17 +155,8 @@ REQUIRE_OBJECT ( nbi );
 #ifdef IMAGE_ELF
 REQUIRE_OBJECT ( elfboot );
 #endif
-#ifdef IMAGE_FREEBSD
-REQUIRE_OBJECT ( freebsd );
-#endif
 #ifdef IMAGE_MULTIBOOT
 REQUIRE_OBJECT ( multiboot );
-#endif
-#ifdef IMAGE_AOUT
-REQUIRE_OBJECT ( aout );
-#endif
-#ifdef IMAGE_WINCE
-REQUIRE_OBJECT ( wince );
 #endif
 #ifdef IMAGE_PXE
 REQUIRE_OBJECT ( pxe_image );

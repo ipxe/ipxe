@@ -88,13 +88,6 @@ SRCDIRS 	+= arch/i386/interface/syslinux
 SRCDIRS		+= arch/i386/interface/vmware
 SRCDIRS		+= arch/i386/hci/commands
 
-# The various xxx_loader.c files are #included into core/loader.c and
-# should not be compiled directly.
-#
-NON_AUTO_SRCS	+= arch/i386/core/aout_loader.c
-NON_AUTO_SRCS	+= arch/i386/core/freebsd_loader.c
-NON_AUTO_SRCS	+= arch/i386/core/wince_loader.c
-
 # Include common x86 Makefile
 #
 MAKEDEPS	+= arch/x86/Makefile
