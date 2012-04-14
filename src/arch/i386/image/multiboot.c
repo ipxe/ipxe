@@ -37,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/elf.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
+#include <ipxe/uri.h>
 
 FEATURE ( FEATURE_IMAGE, "MBOOT", DHCP_EB_FEATURE_MULTIBOOT, 1 );
 
@@ -139,26 +140,35 @@ static void multiboot_build_memmap ( struct image *image,
 /**
  * Add command line in base memory
  *
- * @v imgname		Image name
- * @v cmdline		Command line
+ * @v image		Image
  * @ret physaddr	Physical address of command line
  */
-physaddr_t multiboot_add_cmdline ( const char *imgname, const char *cmdline ) {
-	char *mb_cmdline;
+physaddr_t multiboot_add_cmdline ( struct image *image ) {
+	char *mb_cmdline = ( mb_cmdlines + mb_cmdline_offset );
+	size_t remaining = ( sizeof ( mb_cmdlines ) - mb_cmdline_offset );
+	char *buf = mb_cmdline;
+	size_t len;
 
-	if ( ! cmdline )
-		cmdline = "";
+	/* Copy image URI to base memory buffer as start of command line */
+	len = ( unparse_uri ( buf, remaining, image->uri,
+			      URI_ALL ) + 1 /* NUL */ );
+	if ( len > remaining )
+		len = remaining;
+	mb_cmdline_offset += len;
+	buf += len;
+	remaining -= len;
 
-	/* Copy command line to base memory buffer */
-	mb_cmdline = ( mb_cmdlines + mb_cmdline_offset );
-	mb_cmdline_offset +=
-		( snprintf ( mb_cmdline,
-			     ( sizeof ( mb_cmdlines ) - mb_cmdline_offset ),
-			     "%s %s", imgname, cmdline ) + 1 );
-
-	/* Truncate to terminating NUL in buffer if necessary */
-	if ( mb_cmdline_offset > sizeof ( mb_cmdlines ) )
-		mb_cmdline_offset = ( sizeof ( mb_cmdlines ) - 1 );
+	/* Copy command line to base memory buffer, if present */
+	if ( image->cmdline ) {
+		mb_cmdline_offset--; /* Strip NUL */
+		buf--;
+		remaining++;
+		len = ( snprintf ( buf, remaining, " %s",
+				   image->cmdline ) + 1 /* NUL */ );
+		if ( len > remaining )
+			len = remaining;
+		mb_cmdline_offset += len;
+	}
 
 	return virt_to_phys ( mb_cmdline );
 }
@@ -209,8 +219,7 @@ multiboot_build_module_list ( struct image *image,
 			  ( ( count - insert ) * sizeof ( *module ) ) );
 		module->mod_start = start;
 		module->mod_end = end;
-		module->string = multiboot_add_cmdline ( module_image->name,
-						       module_image->cmdline );
+		module->string = multiboot_add_cmdline ( module_image );
 		module->reserved = 0;
 		
 		/* We promise to page-align modules */
@@ -405,7 +414,7 @@ static int multiboot_exec ( struct image *image ) {
 	mbinfo.flags = ( MBI_FLAG_LOADER | MBI_FLAG_MEM | MBI_FLAG_MMAP |
 			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
 	mb_cmdline_offset = 0;
-	mbinfo.cmdline = multiboot_add_cmdline ( image->name, image->cmdline );
+	mbinfo.cmdline = multiboot_add_cmdline ( image );
 	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
 				( sizeof(mbmodules) / sizeof(mbmodules[0]) ) );
 	mbinfo.mods_addr = virt_to_phys ( mbmodules );
