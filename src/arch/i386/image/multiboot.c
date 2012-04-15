@@ -143,7 +143,7 @@ static void multiboot_build_memmap ( struct image *image,
  * @v image		Image
  * @ret physaddr	Physical address of command line
  */
-physaddr_t multiboot_add_cmdline ( struct image *image ) {
+static physaddr_t multiboot_add_cmdline ( struct image *image ) {
 	char *mb_cmdline = ( mb_cmdlines + mb_cmdline_offset );
 	size_t remaining = ( sizeof ( mb_cmdlines ) - mb_cmdline_offset );
 	char *buf = mb_cmdline;
@@ -174,28 +174,26 @@ physaddr_t multiboot_add_cmdline ( struct image *image ) {
 }
 
 /**
- * Build multiboot module list
+ * Add multiboot modules
  *
  * @v image		Multiboot image
- * @v modules		Module list to fill, or NULL
- * @ret count		Number of modules
+ * @v start		Start address for modules
+ * @v mbinfo		Multiboot information structure
+ * @v modules		Multiboot module list
+ * @ret rc		Return status code
  */
-static unsigned int
-multiboot_build_module_list ( struct image *image,
-			      struct multiboot_module *modules,
-			      unsigned int limit ) {
+static int multiboot_add_modules ( struct image *image, physaddr_t start,
+				   struct multiboot_info *mbinfo,
+				   struct multiboot_module *modules,
+				   unsigned int limit ) {
 	struct image *module_image;
 	struct multiboot_module *module;
-	unsigned int count = 0;
-	unsigned int insert;
-	physaddr_t start;
-	physaddr_t end;
-	unsigned int i;
+	int rc;
 
 	/* Add each image as a multiboot module */
 	for_each_image ( module_image ) {
 
-		if ( count >= limit ) {
+		if ( mbinfo->mods_count >= limit ) {
 			DBGC ( image, "MULTIBOOT %p limit of %d modules "
 			       "reached\n", image, limit );
 			break;
@@ -205,37 +203,36 @@ multiboot_build_module_list ( struct image *image,
 		if ( module_image == image )
 			continue;
 
-		/* At least some OSes expect the multiboot modules to
-		 * be in ascending order, so we have to support it.
-		 */
-		start = user_to_phys ( module_image->data, 0 );
-		end = user_to_phys ( module_image->data, module_image->len );
-		for ( insert = 0 ; insert < count ; insert++ ) {
-			if ( start < modules[insert].mod_start )
-				break;
+		/* Page-align the module */
+		start = ( ( start + 0xfff ) & ~0xfff );
+
+		/* Prepare segment */
+		if ( ( rc = prep_segment ( phys_to_user ( start ),
+					   module_image->len,
+					   module_image->len ) ) != 0 ) {
+			DBGC ( image, "MULTIBOOT %p could not prepare module "
+			       "%s: %s\n", image, module_image->name,
+			       strerror ( rc ) );
+			return rc;
 		}
-		module = &modules[insert];
-		memmove ( ( module + 1 ), module,
-			  ( ( count - insert ) * sizeof ( *module ) ) );
+
+		/* Copy module */
+		memcpy_user ( phys_to_user ( start ), 0,
+			      module_image->data, 0, module_image->len );
+
+		/* Add module to list */
+		module = &modules[mbinfo->mods_count++];
 		module->mod_start = start;
-		module->mod_end = end;
+		module->mod_end = ( start + module_image->len );
 		module->string = multiboot_add_cmdline ( module_image );
 		module->reserved = 0;
-		
-		/* We promise to page-align modules */
-		assert ( ( module->mod_start & 0xfff ) == 0 );
-
-		count++;
+		DBGC ( image, "MULTIBOOT %p module %s is [%x,%x)\n",
+		       image, module_image->name, module->mod_start,
+		       module->mod_end );
+		start += module_image->len;
 	}
 
-	/* Dump module configuration */
-	for ( i = 0 ; i < count ; i++ ) {
-		DBGC ( image, "MULTIBOOT %p module %d is [%x,%x)\n",
-		       image, i, modules[i].mod_start,
-		       modules[i].mod_end );
-	}
-
-	return count;
+	return 0;
 }
 
 /**
@@ -314,11 +311,12 @@ static int multiboot_find_header ( struct image *image,
  * @v image		Multiboot file
  * @v hdr		Multiboot header descriptor
  * @ret entry		Entry point
+ * @ret max		Maximum used address
  * @ret rc		Return status code
  */
 static int multiboot_load_raw ( struct image *image,
 				struct multiboot_header_info *hdr,
-				physaddr_t *entry ) {
+				physaddr_t *entry, physaddr_t *max ) {
 	size_t offset;
 	size_t filesz;
 	size_t memsz;
@@ -349,8 +347,9 @@ static int multiboot_load_raw ( struct image *image,
 	/* Copy image to segment */
 	memcpy_user ( buffer, 0, image->data, offset, filesz );
 
-	/* Record execution entry point */
+	/* Record execution entry point and maximum used address */
 	*entry = hdr->mb.entry_addr;
+	*max = ( hdr->mb.load_addr + memsz );
 
 	return 0;
 }
@@ -360,13 +359,15 @@ static int multiboot_load_raw ( struct image *image,
  *
  * @v image		Multiboot file
  * @ret entry		Entry point
+ * @ret max		Maximum used address
  * @ret rc		Return status code
  */
-static int multiboot_load_elf ( struct image *image, physaddr_t *entry ) {
+static int multiboot_load_elf ( struct image *image, physaddr_t *entry,
+				physaddr_t *max ) {
 	int rc;
 
 	/* Load ELF image*/
-	if ( ( rc = elf_load ( image, entry ) ) != 0 ) {
+	if ( ( rc = elf_load ( image, entry, max ) ) != 0 ) {
 		DBGC ( image, "MULTIBOOT %p ELF image failed to load: %s\n",
 		       image, strerror ( rc ) );
 		return rc;
@@ -384,6 +385,7 @@ static int multiboot_load_elf ( struct image *image, physaddr_t *entry ) {
 static int multiboot_exec ( struct image *image ) {
 	struct multiboot_header_info hdr;
 	physaddr_t entry;
+	physaddr_t max;
 	int rc;
 
 	/* Locate multiboot header, if present */
@@ -405,8 +407,8 @@ static int multiboot_exec ( struct image *image ) {
 	 * the ELF header if present, and Solaris relies on this
 	 * behaviour.
 	 */
-	if ( ( ( rc = multiboot_load_elf ( image, &entry ) ) != 0 ) &&
-	     ( ( rc = multiboot_load_raw ( image, &hdr, &entry ) ) != 0 ) )
+	if ( ( ( rc = multiboot_load_elf ( image, &entry, &max ) ) != 0 ) &&
+	     ( ( rc = multiboot_load_raw ( image, &hdr, &entry, &max ) ) != 0 ))
 		return rc;
 
 	/* Populate multiboot information structure */
@@ -415,11 +417,13 @@ static int multiboot_exec ( struct image *image ) {
 			 MBI_FLAG_CMDLINE | MBI_FLAG_MODS );
 	mb_cmdline_offset = 0;
 	mbinfo.cmdline = multiboot_add_cmdline ( image );
-	mbinfo.mods_count = multiboot_build_module_list ( image, mbmodules,
-				( sizeof(mbmodules) / sizeof(mbmodules[0]) ) );
 	mbinfo.mods_addr = virt_to_phys ( mbmodules );
 	mbinfo.mmap_addr = virt_to_phys ( mbmemmap );
 	mbinfo.boot_loader_name = virt_to_phys ( mb_bootloader_name );
+	if ( ( rc = multiboot_add_modules ( image, max, &mbinfo, mbmodules,
+					    ( sizeof ( mbmodules ) /
+					      sizeof ( mbmodules[0] ) ) ) ) !=0)
+		return rc;
 
 	/* Multiboot images may not return and have no callback
 	 * interface, so shut everything down prior to booting the OS.

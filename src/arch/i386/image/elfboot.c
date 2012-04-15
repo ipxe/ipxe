@@ -42,10 +42,11 @@ FEATURE ( FEATURE_IMAGE, "ELF", DHCP_EB_FEATURE_ELF, 1 );
  */
 static int elfboot_exec ( struct image *image ) {
 	physaddr_t entry;
+	physaddr_t max;
 	int rc;
 
 	/* Load the image using core ELF support */
-	if ( ( rc = elf_load ( image, &entry ) ) != 0 ) {
+	if ( ( rc = elf_load ( image, &entry, &max ) ) != 0 ) {
 		DBGC ( image, "ELF %p could not load: %s\n",
 		       image, strerror ( rc ) );
 		return rc;

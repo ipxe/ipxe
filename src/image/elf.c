@@ -47,11 +47,14 @@ typedef Elf32_Off	Elf_Off;
  * @v phdr		ELF program header
  * @v ehdr		ELF executable header
  * @ret entry		Entry point, if found
+ * @ret max		Maximum used address
  * @ret rc		Return status code
  */
 static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
-			      Elf_Ehdr *ehdr, physaddr_t *entry ) {
+			      Elf_Ehdr *ehdr, physaddr_t *entry,
+			      physaddr_t *max ) {
 	physaddr_t dest;
+	physaddr_t end;
 	userptr_t buffer;
 	unsigned long e_offset;
 	int rc;
@@ -79,6 +82,7 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
 		return -ENOEXEC;
 	}
 	buffer = phys_to_user ( dest );
+	end = ( dest + phdr->p_memsz );
 
 	DBGC ( image, "ELF %p loading segment [%x,%x) to [%x,%x,%x)\n", image,
 	       phdr->p_offset, ( phdr->p_offset + phdr->p_filesz ),
@@ -92,6 +96,10 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
 		       image, strerror ( rc ) );
 		return rc;
 	}
+
+	/* Update maximum used address, if applicable */
+	if ( end > *max )
+		*max = end;
 
 	/* Copy image to segment */
 	memcpy_user ( buffer, 0, image->data, phdr->p_offset, phdr->p_filesz );
@@ -119,9 +127,10 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
  *
  * @v image		ELF file
  * @ret entry		Entry point
+ * @ret max		Maximum used address
  * @ret rc		Return status code
  */
-int elf_load ( struct image *image, physaddr_t *entry ) {
+int elf_load ( struct image *image, physaddr_t *entry, physaddr_t *max ) {
 	static const uint8_t e_ident[] = {
 		[EI_MAG0]	= ELFMAG0,
 		[EI_MAG1]	= ELFMAG1,
@@ -143,6 +152,9 @@ int elf_load ( struct image *image, physaddr_t *entry ) {
 		return -ENOEXEC;
 	}
 
+	/* Initialise maximum used address */
+	*max = 0;
+
 	/* Invalidate entry point */
 	*entry = 0;
 
@@ -156,7 +168,7 @@ int elf_load ( struct image *image, physaddr_t *entry ) {
 		}
 		copy_from_user ( &phdr, image->data, phoff, sizeof ( phdr ) );
 		if ( ( rc = elf_load_segment ( image, &phdr, &ehdr,
-					       entry ) ) != 0 ) {
+					       entry, max ) ) != 0 ) {
 			return rc;
 		}
 	}
