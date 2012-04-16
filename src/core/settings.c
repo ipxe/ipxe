@@ -777,6 +777,41 @@ int fetch_ipv4_setting ( struct settings *settings, struct setting *setting,
 }
 
 /**
+ * Extract numeric value of setting
+ *
+ * @v raw		Raw setting data
+ * @v len		Length of raw setting data
+ * @ret signed_value	Value, when interpreted as a signed integer
+ * @ret unsigned_value	Value, when interpreted as an unsigned integer
+ * @ret len		Length of setting, or negative error
+ */
+static int numeric_setting_value ( const void *raw, size_t len,
+				   signed long *signed_value,
+				   unsigned long *unsigned_value ) {
+	const uint8_t *unsigned_bytes = raw;
+	const int8_t *signed_bytes = raw;
+	int is_negative;
+	unsigned int i;
+	uint8_t byte;
+
+	/* Range check */
+	if ( len > sizeof ( long ) )
+		return -ERANGE;
+
+	/* Convert to host-ordered longs */
+	is_negative = ( len && ( signed_bytes[0] < 0 ) );
+	*signed_value = ( is_negative ? -1L : 0 );
+	*unsigned_value = 0;
+	for ( i = 0 ; i < len ; i++ ) {
+		byte = unsigned_bytes[i];
+		*signed_value = ( ( *signed_value << 8 ) | byte );
+		*unsigned_value = ( ( *unsigned_value << 8 ) | byte );
+	}
+
+	return len;
+}
+
+/**
  * Fetch value of signed integer setting
  *
  * @v settings		Settings block, or NULL to search all blocks
@@ -786,30 +821,20 @@ int fetch_ipv4_setting ( struct settings *settings, struct setting *setting,
  */
 int fetch_int_setting ( struct settings *settings, struct setting *setting,
 			long *value ) {
-	union {
-		uint8_t u8[ sizeof ( long ) ];
-		int8_t s8[ sizeof ( long ) ];
-	} buf;
+	unsigned long dummy;
+	long tmp;
 	int len;
-	int i;
 
 	/* Avoid returning uninitialised data on error */
 	*value = 0;
 
 	/* Fetch raw (network-ordered, variable-length) setting */
-	len = fetch_setting ( settings, setting, &buf, sizeof ( buf ) );
+	len = fetch_setting ( settings, setting, &tmp, sizeof ( tmp ) );
 	if ( len < 0 )
 		return len;
-	if ( len > ( int ) sizeof ( buf ) )
-		return -ERANGE;
 
-	/* Convert to host-ordered signed long */
-	*value = ( ( buf.s8[0] >= 0 ) ? 0 : -1L );
-	for ( i = 0 ; i < len ; i++ ) {
-		*value = ( ( *value << 8 ) | buf.u8[i] );
-	}
-
-	return len;
+	/* Extract numeric value */
+	return numeric_setting_value ( &tmp, len, value, &dummy );
 }
 
 /**
@@ -822,22 +847,20 @@ int fetch_int_setting ( struct settings *settings, struct setting *setting,
  */
 int fetch_uint_setting ( struct settings *settings, struct setting *setting,
 			 unsigned long *value ) {
-	long svalue;
+	signed long dummy;
+	long tmp;
 	int len;
 
 	/* Avoid returning uninitialised data on error */
 	*value = 0;
 
-	/* Fetch as a signed long */
-	len = fetch_int_setting ( settings, setting, &svalue );
+	/* Fetch raw (network-ordered, variable-length) setting */
+	len = fetch_setting ( settings, setting, &tmp, sizeof ( tmp ) );
 	if ( len < 0 )
 		return len;
 
-	/* Mask off sign-extended bits */
-	assert ( len <= ( int ) sizeof ( long ) );
-	*value = ( svalue & ( -1UL >> ( 8 * ( sizeof ( long ) - len ) ) ) );
-
-	return len;
+	/* Extract numeric value */
+	return numeric_setting_value ( &tmp, len, &dummy, value );
 }
 
 /**
@@ -929,26 +952,82 @@ int setting_cmp ( struct setting *a, struct setting *b ) {
  */
 
 /**
- * Store value of typed setting
+ * Fetch and format value of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v type		Settings type
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+int fetchf_setting ( struct settings *settings, struct setting *setting,
+		     char *buf, size_t len ) {
+	int raw_len;
+	int check_len;
+	int rc;
+
+	/* Fetch raw value */
+	raw_len = fetch_setting_len ( settings, setting );
+	if ( raw_len < 0 ) {
+		rc = raw_len;
+		return rc;
+	} else {
+		uint8_t raw[raw_len];
+
+		/* Fetch raw value */
+		check_len = fetch_setting ( settings, setting, raw,
+					    sizeof ( raw ) );
+		if ( check_len < 0 )
+			return check_len;
+		assert ( check_len == raw_len );
+
+		/* Format value */
+		return setting->type->format ( raw, sizeof ( raw ), buf, len );
+	}
+}
+
+/**
+ * Store formatted value of setting
  *
  * @v settings		Settings block
  * @v setting		Setting to store
- * @v type		Settings type
  * @v value		Formatted setting data, or NULL
  * @ret rc		Return status code
  */
 int storef_setting ( struct settings *settings, struct setting *setting,
 		     const char *value ) {
+	int raw_len;
+	int check_len;
+	int rc;
 
-	/* NULL value implies deletion.  Avoid imposing the burden of
-	 * checking for NULL values on each typed setting's storef()
-	 * method.
-	 */
+	/* NULL value implies deletion */
 	if ( ! value )
 		return delete_setting ( settings, setting );
-		
-	return setting->type->storef ( settings, setting, value );
+
+	/* Parse formatted value */
+	raw_len = setting->type->parse ( value, NULL, 0 );
+	if ( raw_len < 0 ) {
+		rc = raw_len;
+		return rc;
+	} else {
+		uint8_t raw[raw_len];
+
+		/* Parse formatted value */
+		check_len = setting->type->parse ( value, raw, sizeof ( raw ) );
+		assert ( check_len == raw_len );
+
+		/* Store raw value */
+		return store_setting ( settings, setting, raw, sizeof ( raw ) );
+	}
 }
+
+/******************************************************************************
+ *
+ * Named settings
+ *
+ ******************************************************************************
+ */
 
 /**
  * Find named setting
@@ -1176,302 +1255,334 @@ int fetchf_named_setting ( const char *name,
  */
 
 /**
- * Parse and store value of string setting
+ * Parse string setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
- * @ret rc		Return status code
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_string ( struct settings *settings, struct setting *setting,
-			   const char *value ) {
-	return store_setting ( settings, setting, value, strlen ( value ) );
+static int parse_string_setting ( const char *value, void *buf, size_t len ) {
+	size_t raw_len = strlen ( value ); /* Exclude terminating NUL */
+
+	/* Copy string to buffer */
+	if ( len > raw_len )
+		len = raw_len;
+	memcpy ( buf, value, len );
+
+	return raw_len;
 }
 
 /**
- * Fetch and format value of string setting
+ * Format string setting value
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_string ( struct settings *settings, struct setting *setting,
-			   char *buf, size_t len ) {
-	return fetch_string_setting ( settings, setting, buf, len );
+static int format_string_setting ( const void *raw, size_t raw_len, char *buf,
+				   size_t len ) {
+
+	/* Copy string to buffer, and terminate */
+	memset ( buf, 0, len );
+	if ( len > raw_len )
+		len = raw_len;
+	memcpy ( buf, raw, len );
+
+	return raw_len;
 }
 
 /** A string setting type */
 struct setting_type setting_type_string __setting_type = {
 	.name = "string",
-	.storef = storef_string,
-	.fetchf = fetchf_string,
+	.parse = parse_string_setting,
+	.format = format_string_setting,
 };
 
 /**
- * Parse and store value of URI-encoded string setting
+ * Parse URI-encoded string setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
- * @ret rc		Return status code
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_uristring ( struct settings *settings,
-			      struct setting *setting,
-			      const char *value ) {
-	char buf[ strlen ( value ) + 1 ]; /* Decoding never expands string */
-	size_t len;
+static int parse_uristring_setting ( const char *value, void *buf,
+				     size_t len ) {
+	char tmp[ len + 1 /* NUL */ ];
+	size_t raw_len;
 
-	len = uri_decode ( value, buf, sizeof ( buf ) );
-	return store_setting ( settings, setting, buf, len );
+	/* Decode to temporary buffer (including NUL) */
+	raw_len = uri_decode ( value, tmp, sizeof ( tmp ) );
+
+	/* Copy to output buffer (excluding NUL) */
+	if ( len > raw_len )
+		len = raw_len;
+	memcpy ( buf, tmp, len );
+
+	return raw_len;
 }
 
 /**
- * Fetch and format value of URI-encoded string setting
+ * Format URI-encoded string setting value
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_uristring ( struct settings *settings,
-			      struct setting *setting,
-			      char *buf, size_t len ) {
-	ssize_t raw_len;
+static int format_uristring_setting ( const void *raw, size_t raw_len,
+				      char *buf, size_t len ) {
+	char tmp[ raw_len + 1 /* NUL */ ];
 
-	/* We need to always retrieve the full raw string to know the
-	 * length of the encoded string.
-	 */
-	raw_len = fetch_setting ( settings, setting, NULL, 0 );
-	if ( raw_len < 0 )
-		return raw_len;
+	/* Copy to temporary buffer and terminate */
+	memcpy ( tmp, raw, raw_len );
+	tmp[raw_len] = '\0';
 
-	{
-		char raw_buf[ raw_len + 1 ];
-       
-		fetch_string_setting ( settings, setting, raw_buf,
-				       sizeof ( raw_buf ) );
-		return uri_encode ( raw_buf, buf, len, URI_FRAGMENT );
-	}
+	/* Encode directly into output buffer */
+	return uri_encode ( tmp, buf, len, URI_FRAGMENT );
 }
 
 /** A URI-encoded string setting type */
 struct setting_type setting_type_uristring __setting_type = {
 	.name = "uristring",
-	.storef = storef_uristring,
-	.fetchf = fetchf_uristring,
+	.parse = parse_uristring_setting,
+	.format = format_uristring_setting,
 };
 
 /**
- * Parse and store value of IPv4 address setting
+ * Parse IPv4 address setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
- * @ret rc		Return status code
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_ipv4 ( struct settings *settings, struct setting *setting,
-			 const char *value ) {
+static int parse_ipv4_setting ( const char *value, void *buf, size_t len ) {
 	struct in_addr ipv4;
 
+	/* Parse IPv4 address */
 	if ( inet_aton ( value, &ipv4 ) == 0 )
 		return -EINVAL;
-	return store_setting ( settings, setting, &ipv4, sizeof ( ipv4 ) );
+
+	/* Copy to buffer */
+	if ( len > sizeof ( ipv4 ) )
+		len = sizeof ( ipv4 );
+	memcpy ( buf, &ipv4, len );
+
+	return ( sizeof ( ipv4 ) );
 }
 
 /**
- * Fetch and format value of IPv4 address setting
+ * Format IPv4 address setting value
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_ipv4 ( struct settings *settings, struct setting *setting,
-			 char *buf, size_t len ) {
-	struct in_addr ipv4;
-	int raw_len;
+static int format_ipv4_setting ( const void *raw, size_t raw_len, char *buf,
+				 size_t len ) {
+	const struct in_addr *ipv4 = raw;
 
-	if ( ( raw_len = fetch_ipv4_setting ( settings, setting, &ipv4 ) ) < 0)
-		return raw_len;
-	return snprintf ( buf, len, "%s", inet_ntoa ( ipv4 ) );
+	if ( raw_len < sizeof ( *ipv4 ) )
+		return -EINVAL;
+	return snprintf ( buf, len, "%s", inet_ntoa ( *ipv4 ) );
 }
 
 /** An IPv4 address setting type */
 struct setting_type setting_type_ipv4 __setting_type = {
 	.name = "ipv4",
-	.storef = storef_ipv4,
-	.fetchf = fetchf_ipv4,
+	.parse = parse_ipv4_setting,
+	.format = format_ipv4_setting,
 };
 
 /**
- * Parse and store value of integer setting
+ * Parse integer setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
  * @v size		Integer size, in bytes
- * @ret rc		Return status code
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_int ( struct settings *settings, struct setting *setting,
-			const char *value, unsigned int size ) {
+static int parse_int_setting ( const char *value, void *buf, size_t len,
+			       unsigned int size ) {
 	union {
 		uint32_t num;
 		uint8_t bytes[4];
 	} u;
 	char *endp;
 
+	/* Parse value */
 	u.num = htonl ( strtoul ( value, &endp, 0 ) );
 	if ( *endp )
 		return -EINVAL;
-	return store_setting ( settings, setting, 
-			       &u.bytes[ sizeof ( u ) - size ], size );
+
+	/* Copy to buffer */
+	if ( len > size )
+		len = size;
+	memcpy ( buf, &u.bytes[ sizeof ( u ) - size ], len );
+
+	return size;
 }
 
 /**
- * Parse and store value of 8-bit integer setting
+ * Parse 8-bit integer setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
  * @v size		Integer size, in bytes
- * @ret rc		Return status code
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_int8 ( struct settings *settings, struct setting *setting,
-			 const char *value ) {
-	return storef_int ( settings, setting, value, 1 );
+static int parse_int8_setting ( const char *value, void *buf, size_t len ) {
+	return parse_int_setting ( value, buf, len, sizeof ( uint8_t ) );
 }
 
 /**
- * Parse and store value of 16-bit integer setting
+ * Parse 16-bit integer setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
  * @v size		Integer size, in bytes
- * @ret rc		Return status code
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_int16 ( struct settings *settings, struct setting *setting,
-			  const char *value ) {
-	return storef_int ( settings, setting, value, 2 );
+static int parse_int16_setting ( const char *value, void *buf, size_t len ) {
+	return parse_int_setting ( value, buf, len, sizeof ( uint16_t ) );
 }
 
 /**
- * Parse and store value of 32-bit integer setting
+ * Parse 32-bit integer setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
  * @v size		Integer size, in bytes
- * @ret rc		Return status code
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_int32 ( struct settings *settings, struct setting *setting,
-			  const char *value ) {
-	return storef_int ( settings, setting, value, 4 );
+static int parse_int32_setting ( const char *value, void *buf, size_t len ) {
+	return parse_int_setting ( value, buf, len, sizeof ( uint32_t ) );
 }
 
 /**
- * Fetch and format value of signed integer setting
+ * Format signed integer setting value
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_int ( struct settings *settings, struct setting *setting,
-			char *buf, size_t len ) {
-	long value;
-	int rc;
+static int format_int_setting ( const void *raw, size_t raw_len, char *buf,
+				size_t len ) {
+	signed long value;
+	unsigned long dummy;
+	int check_len;
 
-	if ( ( rc = fetch_int_setting ( settings, setting, &value ) ) < 0 )
-		return rc;
+	/* Extract numeric value */
+	check_len = numeric_setting_value ( raw, raw_len, &value, &dummy );
+	if ( check_len < 0 )
+		return check_len;
+	assert ( check_len == ( int ) raw_len );
+
+	/* Format value */
 	return snprintf ( buf, len, "%ld", value );
 }
 
 /**
- * Fetch and format value of unsigned integer setting
+ * Format unsigned integer setting value
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_uint ( struct settings *settings, struct setting *setting,
-			 char *buf, size_t len ) {
+static int format_uint_setting ( const void *raw, size_t raw_len, char *buf,
+				 size_t len ) {
+	signed long dummy;
 	unsigned long value;
-	int rc;
+	int check_len;
 
-	if ( ( rc = fetch_uint_setting ( settings, setting, &value ) ) < 0 )
-		return rc;
+	/* Extract numeric value */
+	check_len = numeric_setting_value ( raw, raw_len, &dummy, &value );
+	if ( check_len < 0 )
+		return check_len;
+	assert ( check_len == ( int ) raw_len );
+
+	/* Format value */
 	return snprintf ( buf, len, "%#lx", value );
 }
 
 /** A signed 8-bit integer setting type */
 struct setting_type setting_type_int8 __setting_type = {
 	.name = "int8",
-	.storef = storef_int8,
-	.fetchf = fetchf_int,
+	.parse = parse_int8_setting,
+	.format = format_int_setting,
 };
 
 /** A signed 16-bit integer setting type */
 struct setting_type setting_type_int16 __setting_type = {
 	.name = "int16",
-	.storef = storef_int16,
-	.fetchf = fetchf_int,
+	.parse = parse_int16_setting,
+	.format = format_int_setting,
 };
 
 /** A signed 32-bit integer setting type */
 struct setting_type setting_type_int32 __setting_type = {
 	.name = "int32",
-	.storef = storef_int32,
-	.fetchf = fetchf_int,
+	.parse = parse_int32_setting,
+	.format = format_int_setting,
 };
 
 /** An unsigned 8-bit integer setting type */
 struct setting_type setting_type_uint8 __setting_type = {
 	.name = "uint8",
-	.storef = storef_int8,
-	.fetchf = fetchf_uint,
+	.parse = parse_int8_setting,
+	.format = format_uint_setting,
 };
 
 /** An unsigned 16-bit integer setting type */
 struct setting_type setting_type_uint16 __setting_type = {
 	.name = "uint16",
-	.storef = storef_int16,
-	.fetchf = fetchf_uint,
+	.parse = parse_int16_setting,
+	.format = format_uint_setting,
 };
 
 /** An unsigned 32-bit integer setting type */
 struct setting_type setting_type_uint32 __setting_type = {
 	.name = "uint32",
-	.storef = storef_int32,
-	.fetchf = fetchf_uint,
+	.parse = parse_int32_setting,
+	.format = format_uint_setting,
 };
 
 /**
- * Parse and store value of hex string setting
+ * Parse hex string setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
- * @ret rc		Return status code
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_hex ( struct settings *settings, struct setting *setting,
-			const char *value ) {
+static int parse_hex_setting ( const char *value, void *buf, size_t len ) {
 	char *ptr = ( char * ) value;
-	uint8_t bytes[ strlen ( value ) ]; /* cannot exceed strlen(value) */
-	unsigned int len = 0;
+	uint8_t *bytes = buf;
+	unsigned int count = 0;
+	uint8_t byte;
 
 	while ( 1 ) {
-		bytes[len++] = strtoul ( ptr, &ptr, 16 );
+		byte = strtoul ( ptr, &ptr, 16 );
+		if ( count++ < len )
+			*bytes++ = byte;
 		switch ( *ptr ) {
 		case '\0' :
-			return store_setting ( settings, setting, bytes, len );
+			return count;
 		case ':' :
 		case '-' :
 			ptr++;
@@ -1483,128 +1594,112 @@ static int storef_hex ( struct settings *settings, struct setting *setting,
 }
 
 /**
- * Fetch and format value of hex string setting
+ * Format hex string setting value
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @v delimiter		Byte delimiter
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_hex ( struct settings *settings, struct setting *setting,
-			char *buf, size_t len, const char *delimiter ) {
-	int raw_len;
-	int check_len;
+static int format_hex_setting ( const void *raw, size_t raw_len, char *buf,
+				size_t len, const char *delimiter ) {
+	const uint8_t *bytes = raw;
 	int used = 0;
-	int i;
+	unsigned int i;
 
-	raw_len = fetch_setting_len ( settings, setting );
-	if ( raw_len < 0 )
-		return raw_len;
-
-	{
-		uint8_t raw[raw_len];
-
-		check_len = fetch_setting ( settings, setting, raw,
-					    sizeof ( raw ) );
-		if ( check_len < 0 )
-			return check_len;
-		assert ( check_len == raw_len );
-		
-		if ( len )
-			buf[0] = 0; /* Ensure that a terminating NUL exists */
-		for ( i = 0 ; i < raw_len ; i++ ) {
-			used += ssnprintf ( ( buf + used ), ( len - used ),
-					    "%s%02x", ( used ? delimiter : "" ),
-					    raw[i] );
-		}
-		return used;
+	if ( len )
+		buf[0] = 0; /* Ensure that a terminating NUL exists */
+	for ( i = 0 ; i < raw_len ; i++ ) {
+		used += ssnprintf ( ( buf + used ), ( len - used ),
+				    "%s%02x", ( used ? delimiter : "" ),
+				    bytes[i] );
 	}
+	return used;
 }
 
 /**
- * Fetch and format value of hex string setting (using colon delimiter)
+ * Format hex string setting value (using colon delimiter)
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_hex_colon ( struct settings *settings,
-			      struct setting *setting,
-			      char *buf, size_t len ) {
-	return fetchf_hex ( settings, setting, buf, len, ":" );
+static int format_hex_colon_setting ( const void *raw, size_t raw_len,
+				      char *buf, size_t len ) {
+	return format_hex_setting ( raw, raw_len, buf, len, ":" );
 }
 
 /**
- * Fetch and format value of hex string setting (using hyphen delimiter)
+ * Format hex string setting value (using hyphen delimiter)
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_hex_hyphen ( struct settings *settings,
-			       struct setting *setting,
-			       char *buf, size_t len ) {
-	return fetchf_hex ( settings, setting, buf, len, "-" );
+static int format_hex_hyphen_setting ( const void *raw, size_t raw_len,
+				       char *buf, size_t len ) {
+	return format_hex_setting ( raw, raw_len, buf, len, "-" );
 }
 
 /** A hex-string setting (colon-delimited) */
 struct setting_type setting_type_hex __setting_type = {
 	.name = "hex",
-	.storef = storef_hex,
-	.fetchf = fetchf_hex_colon,
+	.parse = parse_hex_setting,
+	.format = format_hex_colon_setting,
 };
 
 /** A hex-string setting (hyphen-delimited) */
 struct setting_type setting_type_hexhyp __setting_type = {
 	.name = "hexhyp",
-	.storef = storef_hex,
-	.fetchf = fetchf_hex_hyphen,
+	.parse = parse_hex_setting,
+	.format = format_hex_hyphen_setting,
 };
 
 /**
- * Parse and store value of UUID setting
+ * Parse UUID setting value
  *
- * @v settings		Settings block
- * @v setting		Setting to store
- * @v value		Formatted setting data
- * @ret rc		Return status code
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
  */
-static int storef_uuid ( struct settings *settings __unused,
-			 struct setting *setting __unused,
-			 const char *value __unused ) {
+static int parse_uuid_setting ( const char *value __unused,
+				void *buf __unused, size_t len __unused ) {
 	return -ENOTSUP;
 }
 
 /**
- * Fetch and format value of UUID setting
+ * Format UUID setting value
  *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
  * @v buf		Buffer to contain formatted value
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int fetchf_uuid ( struct settings *settings, struct setting *setting,
-			 char *buf, size_t len ) {
-	union uuid uuid;
-	int raw_len;
+static int format_uuid_setting ( const void *raw, size_t raw_len, char *buf,
+				 size_t len ) {
+	const union uuid *uuid = raw;
 
-	if ( ( raw_len = fetch_uuid_setting ( settings, setting, &uuid ) ) < 0)
-		return raw_len;
-	return snprintf ( buf, len, "%s", uuid_ntoa ( &uuid ) );
+	/* Range check */
+	if ( raw_len != sizeof ( *uuid ) )
+		return -ERANGE;
+
+	/* Format value */
+	return snprintf ( buf, len, "%s", uuid_ntoa ( uuid ) );
 }
 
 /** UUID setting type */
 struct setting_type setting_type_uuid __setting_type = {
 	.name = "uuid",
-	.storef = storef_uuid,
-	.fetchf = fetchf_uuid,
+	.parse = parse_uuid_setting,
+	.format = format_uuid_setting,
 };
 
 /******************************************************************************

@@ -161,25 +161,24 @@ struct setting_type {
 	 * This is the name exposed to the user (e.g. "string").
 	 */
 	const char *name;
-	/** Parse and set value of setting
+	/** Parse formatted setting value
 	 *
-	 * @v settings		Settings block
-	 * @v setting		Setting to store
-	 * @v value		Formatted setting data
-	 * @ret rc		Return status code
+	 * @v value		Formatted setting value
+	 * @v buf		Buffer to contain raw value
+	 * @v len		Length of buffer
+	 * @ret len		Length of raw value, or negative error
 	 */
-	int ( * storef ) ( struct settings *settings, struct setting *setting,
-			   const char *value );
-	/** Fetch and format value of setting
+	int ( * parse ) ( const char *value, void *buf, size_t len );
+	/** Format setting value
 	 *
-	 * @v settings		Settings block
-	 * @v setting		Setting to fetch
+	 * @v raw		Raw setting value
+	 * @v raw_len		Length of raw setting value
 	 * @v buf		Buffer to contain formatted value
 	 * @v len		Length of buffer
 	 * @ret len		Length of formatted value, or negative error
 	 */
-	int ( * fetchf ) ( struct settings *settings, struct setting *setting,
-			   char *buf, size_t len );
+	int ( * format ) ( const void *raw, size_t raw_len, char *buf,
+			   size_t len );
 };
 
 /** Configuration setting type table */
@@ -273,6 +272,8 @@ extern struct setting * find_setting ( const char *name );
 
 extern int setting_name ( struct settings *settings, struct setting *setting,
 			  char *buf, size_t len );
+extern int fetchf_setting ( struct settings *settings, struct setting *setting,
+			    char *buf, size_t len );
 extern int storef_setting ( struct settings *settings,
 			    struct setting *setting,
 			    const char *value );
@@ -352,22 +353,6 @@ static inline void generic_settings_init ( struct generic_settings *generics,
 static inline int delete_setting ( struct settings *settings,
 				   struct setting *setting ) {
 	return store_setting ( settings, setting, NULL, 0 );
-}
-
-/**
- * Fetch and format value of setting
- *
- * @v settings		Settings block, or NULL to search all blocks
- * @v setting		Setting to fetch
- * @v type		Settings type
- * @v buf		Buffer to contain formatted value
- * @v len		Length of buffer
- * @ret len		Length of formatted value, or negative error
- */
-static inline int fetchf_setting ( struct settings *settings,
-				   struct setting *setting,
-				   char *buf, size_t len ) {
-	return setting->type->fetchf ( settings, setting, buf, len );
 }
 
 /**

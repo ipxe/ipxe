@@ -35,7 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v uuid		UUID
  * @ret string		UUID in canonical form
  */
-char * uuid_ntoa ( union uuid *uuid ) {
+char * uuid_ntoa ( const union uuid *uuid ) {
 	static char buf[37]; /* "00000000-0000-0000-0000-000000000000" */
 
 	sprintf ( buf, "%08x-%04x-%04x-%04x-%02x%02x%02x%02x%02x%02x",

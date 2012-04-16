@@ -28,6 +28,6 @@ union uuid {
 	uint8_t raw[16];
 };
 
-extern char * uuid_ntoa ( union uuid *uuid );
+extern char * uuid_ntoa ( const union uuid *uuid );
 
 #endif /* _IPXE_UUID_H */
