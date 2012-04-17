@@ -5,7 +5,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <assert.h>
-#include <ctype.h>
 
 /*****************************************************************************
  *
@@ -17,9 +16,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static inline int strtoul_base ( const char **pp, int base )
 {
 	const char *p = *pp;
-
-	while ( isspace ( *p ) )
-		p++;
 
 	if ( base == 0 ) {
 		base = 10;

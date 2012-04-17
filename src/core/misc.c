@@ -35,7 +35,16 @@ int inet_aton ( const char *cp, struct in_addr *inp ) {
 
 unsigned long strtoul ( const char *p, char **endp, int base ) {
 	unsigned long ret = 0;
+	int negative = 0;
 	unsigned int charval;
+
+	while ( isspace ( *p ) )
+		p++;
+
+	if ( *p == '-' ) {
+		negative = 1;
+		p++;
+	}
 
 	base = strtoul_base ( &p, base );
 
@@ -46,6 +55,9 @@ unsigned long strtoul ( const char *p, char **endp, int base ) {
 		ret = ( ( ret * base ) + charval );
 		p++;
 	}
+
+	if ( negative )
+		ret = -ret;
 
 	if ( endp )
 		*endp = ( char * ) p;

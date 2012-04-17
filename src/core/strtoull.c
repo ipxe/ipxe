@@ -29,7 +29,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 unsigned long long strtoull ( const char *p, char **endp, int base ) {
 	unsigned long long ret = 0;
+	int negative = 0;
 	unsigned int charval;
+
+	while ( isspace ( *p ) )
+		p++;
+
+	if ( *p == '-' ) {
+		negative = 1;
+		p++;
+	}
 
 	base = strtoul_base ( &p, base );
 
@@ -40,6 +49,9 @@ unsigned long long strtoull ( const char *p, char **endp, int base ) {
 		ret = ( ( ret * base ) + charval );
 		p++;
 	}
+
+	if ( negative )
+		ret = -ret;
 
 	if ( endp )
 		*endp = ( char * ) p;
