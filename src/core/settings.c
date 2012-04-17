@@ -1798,6 +1798,14 @@ struct setting hostname_setting __setting ( SETTING_HOST ) = {
 	.type = &setting_type_string,
 };
 
+/** TFTP server setting */
+struct setting next_server_setting __setting ( SETTING_BOOT ) = {
+	.name = "next-server",
+	.description = "TFTP server",
+	.tag = DHCP_EB_SIADDR,
+	.type = &setting_type_ipv4,
+};
+
 /** Filename setting */
 struct setting filename_setting __setting ( SETTING_BOOT ) = {
 	.name = "filename",
