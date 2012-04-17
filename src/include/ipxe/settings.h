@@ -283,6 +283,7 @@ extern int fetchf_named_setting ( const char *name, char *name_buf,
 extern char * expand_settings ( const char *string );
 
 extern struct setting_type setting_type_string __setting_type;
+extern struct setting_type setting_type_uristring __setting_type;
 extern struct setting_type setting_type_ipv4 __setting_type;
 extern struct setting_type setting_type_int8 __setting_type;
 extern struct setting_type setting_type_int16 __setting_type;
@@ -291,6 +292,7 @@ extern struct setting_type setting_type_uint8 __setting_type;
 extern struct setting_type setting_type_uint16 __setting_type;
 extern struct setting_type setting_type_uint32 __setting_type;
 extern struct setting_type setting_type_hex __setting_type;
+extern struct setting_type setting_type_hexhyp __setting_type;
 extern struct setting_type setting_type_uuid __setting_type;
 
 extern struct setting ip_setting __setting ( SETTING_IPv4 );
