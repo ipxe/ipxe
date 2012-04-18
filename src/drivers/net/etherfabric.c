@@ -93,7 +93,6 @@ static int falcon_mdio_read ( struct efab_nic *efab, int device, int location );
 #define LPA_EF_10000FULL		0x00040000
 #define LPA_EF_10000HALF		0x00080000
 
-#define LPA_100			(LPA_100FULL | LPA_100HALF | LPA_100BASE4)
 #define LPA_EF_1000		( LPA_EF_1000FULL | LPA_EF_1000HALF )
 #define LPA_EF_10000               ( LPA_EF_10000FULL | LPA_EF_10000HALF )
 #define LPA_EF_DUPLEX		( LPA_10FULL | LPA_100FULL | LPA_EF_1000FULL | \
