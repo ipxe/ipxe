@@ -18,9 +18,13 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <stdlib.h>
 #include <ipxe/crypto.h>
 #include <ipxe/sha256.h>
 #include <ipxe/x509.h>
+#include <ipxe/settings.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/init.h>
 #include <ipxe/rootcert.h>
 
 /** @file
@@ -28,6 +32,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Root certificate store
  *
  */
+
+/** Length of a root certificate fingerprint */
+#define FINGERPRINT_LEN SHA256_DIGEST_SIZE
 
 /* Use iPXE root CA if no trusted certificates are explicitly specified */
 #ifndef TRUSTED
@@ -42,9 +49,65 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Root certificate fingerprints */
 static const uint8_t fingerprints[] = { TRUSTED };
 
+/** Root certificate fingerprint setting */
+struct setting trust_setting __setting ( SETTING_CRYPTO ) = {
+	.name = "trust",
+	.description = "Trusted root certificate fingerprint",
+	.tag = DHCP_EB_TRUST,
+	.type = &setting_type_hex,
+};
+
 /** Root certificates */
 struct x509_root root_certificates = {
 	.digest = &sha256_algorithm,
-	.count = ( sizeof ( fingerprints ) / SHA256_DIGEST_SIZE ),
+	.count = ( sizeof ( fingerprints ) / FINGERPRINT_LEN ),
 	.fingerprints = fingerprints,
+};
+
+/**
+ * Initialise root certificate
+ *
+ * We allow the list of trusted root certificate fingerprints to be
+ * overridden using the "trust" setting, but only at the point of iPXE
+ * initialisation.  This prevents untrusted sources of settings
+ * (e.g. DHCP) from subverting the chain of trust, while allowing
+ * trustworthy sources (e.g. VMware GuestInfo or non-volatile stored
+ * options) to change the trusted root certificate without requiring a
+ * rebuild.
+ */
+static void rootcert_init ( void ) {
+	void *external;
+	int len;
+	int rc;
+
+	/* Fetch copy of "trust" setting, if it exists.  This memory
+	 * will never be freed.
+	 */
+	len = fetch_setting_copy ( NULL, &trust_setting, &external );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( &root_certificates, "ROOTCERT cannot fetch trusted "
+		       "root certificate fingerprints: %s\n", strerror ( rc ) );
+		/* No way to prevent startup; fail safe by trusting no
+		 * certificates.
+		 */
+		root_certificates.count = 0;
+		return;
+	}
+
+	/* Use certificates from "trust" setting, if present */
+	if ( external ) {
+		root_certificates.fingerprints = external;
+		root_certificates.count = ( len / FINGERPRINT_LEN );
+	}
+
+	DBGC ( &root_certificates, "ROOTCERT using %d %s certificate(s):\n",
+	       root_certificates.count, ( external ? "external" : "built-in" ));
+	DBGC_HDA ( &root_certificates, 0, root_certificates.fingerprints,
+		   ( root_certificates.count * FINGERPRINT_LEN ) );
+}
+
+/** Root certificate initialiser */
+struct init_fn rootcert_init_fn __init_fn ( INIT_LATE ) = {
+	.initialise = rootcert_init,
 };

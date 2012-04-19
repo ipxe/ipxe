@@ -83,7 +83,8 @@ struct setting {
 #define SETTING_HOST_EXTRA	10 /**< Host identity additional settings */
 #define SETTING_AUTH		11 /**< Authentication settings */
 #define SETTING_AUTH_EXTRA	12 /**< Authentication additional settings */
-#define SETTING_MISC		13 /**< Miscellaneous settings */
+#define SETTING_CRYPTO		13 /**< Cryptography settings */
+#define SETTING_MISC		14 /**< Miscellaneous settings */
 
 /** @} */
 
