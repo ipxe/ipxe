@@ -677,6 +677,46 @@ int fetch_setting_len ( struct settings *settings, struct setting *setting ) {
 }
 
 /**
+ * Fetch copy of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v data		Buffer to allocate and fill with setting data
+ * @ret len		Length of setting, or negative error
+ *
+ * The caller is responsible for eventually freeing the allocated
+ * buffer.
+ *
+ * To allow the caller to distinguish between a non-existent setting
+ * and an error in allocating memory for the copy, this function will
+ * return success (and a NULL buffer pointer) for a non-existent
+ * setting.
+ */
+int fetch_setting_copy ( struct settings *settings, struct setting *setting,
+			 void **data ) {
+	int len;
+	int check_len = 0;
+
+	/* Avoid returning uninitialised data on error */
+	*data = NULL;
+
+	/* Fetch setting length, and return success if non-existent */
+	len = fetch_setting_len ( settings, setting );
+	if ( len < 0 )
+		return 0;
+
+	/* Allocate buffer */
+	*data = malloc ( len );
+	if ( ! *data )
+		return -ENOMEM;
+
+	/* Fetch setting */
+	check_len = fetch_setting ( settings, setting, *data, len );
+	assert ( check_len == len );
+	return len;
+}
+
+/**
  * Fetch value of string setting
  *
  * @v settings		Settings block, or NULL to search all blocks
