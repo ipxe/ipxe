@@ -1282,8 +1282,21 @@ static int efi_snp_probe ( struct net_device *netdev ) {
  *
  * @v netdev		Network device
  */
-static void efi_snp_notify ( struct net_device *netdev __unused ) {
-	/* Nothing to do */
+static void efi_snp_notify ( struct net_device *netdev ) {
+	struct efi_snp_device *snpdev;
+
+	/* Locate SNP device */
+	snpdev = efi_snp_demux ( netdev );
+	if ( ! snpdev ) {
+		DBG ( "SNP skipping non-SNP device %s\n", netdev->name );
+		return;
+	}
+
+	/* Update link state */
+	snpdev->mode.MediaPresent =
+		( netdev_link_ok ( netdev ) ? TRUE : FALSE );
+	DBGC ( snpdev, "SNPDEV %p link is %s\n", snpdev,
+	       ( snpdev->mode.MediaPresent ? "up" : "down" ) );
 }
 
 /**
