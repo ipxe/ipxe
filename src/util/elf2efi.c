@@ -405,6 +405,10 @@ static struct pe_section * process_section ( bfd *bfd,
 			  EFI_IMAGE_SCN_MEM_WRITE );
 		applicable_start = &data_mid;
 		applicable_end = &data_end;
+	} else {
+		eprintf ( "Unrecognised characteristics %#lx for section %s\n",
+			  flags, section->name );
+		exit ( 1 );
 	}
 
 	/* Copy in section contents */
