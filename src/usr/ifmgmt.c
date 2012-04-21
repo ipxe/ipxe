@@ -113,6 +113,9 @@ int iflinkwait ( struct net_device *netdev, unsigned int max_wait_ms ) {
 	int key;
 	int rc;
 
+	/* Allow link state to be updated */
+	netdev_poll ( netdev );
+
 	if ( netdev_link_ok ( netdev ) )
 		return 0;
 
