@@ -426,6 +426,9 @@ static int realtek_open ( struct net_device *netdev ) {
 	/* Enable transmitter and receiver */
 	writeb ( ( RTL_CR_TE | RTL_CR_RE ), rtl->regs + RTL_CR );
 
+	/* Update link state */
+	realtek_check_link ( netdev );
+
 	return 0;
 
 	realtek_destroy_ring ( rtl, &rtl->rx );
