@@ -144,6 +144,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_mii		     ( ERRFILE_DRIVER | 0x00620000 )
 #define ERRFILE_realtek		     ( ERRFILE_DRIVER | 0x00630000 )
 #define ERRFILE_skeleton	     ( ERRFILE_DRIVER | 0x00640000 )
+#define ERRFILE_intel		     ( ERRFILE_DRIVER | 0x00650000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
