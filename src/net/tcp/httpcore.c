@@ -643,14 +643,16 @@ static void http_step ( struct http_request *http ) {
 	size_t user_pw_len = ( user ? ( strlen ( user ) + 1 /* ":" */ +
 					strlen ( password ) ) : 0 );
 	size_t user_pw_base64_len = base64_encoded_len ( user_pw_len );
-	uint8_t user_pw[ user_pw_len + 1 /* NUL */ ];
-	char user_pw_base64[ user_pw_base64_len + 1 /* NUL */ ];
-	int rc;
 	int request_len = unparse_uri ( NULL, 0, http->uri,
 					URI_PATH_BIT | URI_QUERY_BIT );
-	char request[ request_len + 1 /* NUL */ ];
-	char range[48]; /* Enough for two 64-bit integers in decimal */
+	struct {
+		uint8_t user_pw[ user_pw_len + 1 /* NUL */ ];
+		char user_pw_base64[ user_pw_base64_len + 1 /* NUL */ ];
+		char request[ request_len + 1 /* NUL */ ];
+		char range[48]; /* Enough for two 64-bit integers in decimal */
+	} *dynamic;
 	int partial;
+	int rc;
 
 	/* Do nothing if we have already transmitted the request */
 	if ( ! ( http->flags & HTTP_TX_PENDING ) )
@@ -660,18 +662,27 @@ static void http_step ( struct http_request *http ) {
 	if ( ! xfer_window ( &http->socket ) )
 		return;
 
+	/* Allocate dynamic storage */
+	dynamic = malloc ( sizeof ( *dynamic ) );
+	if ( ! malloc ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
 	/* Construct path?query request */
-	unparse_uri ( request, sizeof ( request ), http->uri,
+	unparse_uri ( dynamic->request, sizeof ( dynamic->request ), http->uri,
 		      URI_PATH_BIT | URI_QUERY_BIT );
 
 	/* Construct authorisation, if applicable */
 	if ( user ) {
 		/* Make "user:password" string from decoded fields */
-		snprintf ( ( ( char * ) user_pw ), sizeof ( user_pw ),
-			   "%s:%s", user, password );
+		snprintf ( ( ( char * ) dynamic->user_pw ),
+			   sizeof ( dynamic->user_pw ), "%s:%s",
+			   user, password );
 
 		/* Base64-encode the "user:password" string */
-		base64_encode ( user_pw, user_pw_len, user_pw_base64 );
+		base64_encode ( dynamic->user_pw, user_pw_len,
+				dynamic->user_pw_base64 );
 	}
 
 	/* Force a HEAD request if we have nowhere to send any received data */
@@ -682,7 +693,8 @@ static void http_step ( struct http_request *http ) {
 
 	/* Determine type of request */
 	partial = ( http->partial_len != 0 );
-	snprintf ( range, sizeof ( range ), "%zd-%zd", http->partial_start,
+	snprintf ( dynamic->range, sizeof ( dynamic->range ),
+		   "%zd-%zd", http->partial_start,
 		   ( http->partial_start + http->partial_len - 1 ) );
 
 	/* Mark request as transmitted */
@@ -698,7 +710,7 @@ static void http_step ( struct http_request *http ) {
 				  ( ( http->flags & HTTP_HEAD_ONLY ) ?
 				    "HEAD" : "GET" ),
 				  ( http->uri->path ? "" : "/" ),
-				  request, host,
+				  dynamic->request, host,
 				  ( http->uri->port ?
 				    ":" : "" ),
 				  ( http->uri->port ?
@@ -706,14 +718,20 @@ static void http_step ( struct http_request *http ) {
 				  ( ( http->flags & HTTP_KEEPALIVE ) ?
 				    "Connection: Keep-Alive\r\n" : "" ),
 				  ( partial ? "Range: bytes=" : "" ),
-				  ( partial ? range : "" ),
+				  ( partial ? dynamic->range : "" ),
 				  ( partial ? "\r\n" : "" ),
 				  ( user ?
 				    "Authorization: Basic " : "" ),
-				  ( user ? user_pw_base64 : "" ),
+				  ( user ? dynamic->user_pw_base64 : "" ),
 				  ( user ? "\r\n" : "" ) ) ) != 0 ) {
-		http_close ( http, rc );
+		goto err_xfer;
 	}
+
+ err_xfer:
+	free ( dynamic );
+ err_alloc:
+	if ( rc != 0 )
+		http_close ( http, rc );
 }
 
 /**
