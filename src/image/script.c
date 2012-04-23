@@ -58,6 +58,7 @@ static int process_script ( struct image *image,
 			    int ( * terminate ) ( int rc ) ) {
 	off_t eol;
 	size_t len;
+	char *line;
 	int rc;
 
 	script_offset = 0;
@@ -71,23 +72,23 @@ static int process_script ( struct image *image,
 			eol = image->len;
 		len = ( eol - script_offset );
 
-		/* Copy line, terminate with NUL, and execute command */
-		{
-			char cmdbuf[ len + 1 ];
+		/* Allocate buffer for line */
+		line = zalloc ( len + 1 /* NUL */ );
+		if ( ! line )
+			return -ENOMEM;
 
-			copy_from_user ( cmdbuf, image->data,
-					 script_offset, len );
-			cmdbuf[len] = '\0';
-			DBG ( "$ %s\n", cmdbuf );
+		/* Copy line */
+		copy_from_user ( line, image->data, script_offset, len );
+		DBG ( "$ %s\n", line );
 
-			/* Move to next line */
-			script_offset += ( len + 1 );
+		/* Move to next line */
+		script_offset += ( len + 1 );
 
-			/* Process line */
-			rc = process_line ( cmdbuf );
-			if ( terminate ( rc ) )
-				return rc;
-		}
+		/* Process and free line */
+		rc = process_line ( line );
+		free ( line );
+		if ( terminate ( rc ) )
+			return rc;
 
 	} while ( script_offset < image->len );
 
