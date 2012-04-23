@@ -19,6 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <ipxe/iobuf.h>
@@ -297,17 +298,28 @@ int xfer_deliver_raw ( struct interface *intf, const void *data, size_t len ) {
  */
 int xfer_vprintf ( struct interface *intf, const char *format,
 		   va_list args ) {
-	size_t len;
 	va_list args_tmp;
+	char *buf;
+	int len;
+	int rc;
 
+	/* Create temporary string */
 	va_copy ( args_tmp, args );
-	len = vsnprintf ( NULL, 0, format, args );
-	{
-		char buf[len + 1];
-		vsnprintf ( buf, sizeof ( buf ), format, args_tmp );
-		va_end ( args_tmp );
-		return xfer_deliver_raw ( intf, buf, len );
+	len = vasprintf ( &buf, format, args );
+	if ( len < 0 ) {
+		rc = len;
+		goto err_asprintf;
 	}
+	va_end ( args_tmp );
+
+	/* Transmit string */
+	if ( ( rc = xfer_deliver_raw ( intf, buf, len ) ) != 0 )
+		goto err_deliver;
+
+ err_deliver:
+	free ( buf );
+ err_asprintf:
+	return rc;
 }
 
 /**
