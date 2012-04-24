@@ -1,604 +1,927 @@
-/* 
-   natsemi.c - iPXE driver for the NatSemi DP8381x series.
- 
-   Based on:
-
-   natsemi.c: An Etherboot driver for the NatSemi DP8381x series.
-
-   Copyright (C) 2001 Entity Cyber, Inc.
-   
-   This development of this Etherboot driver was funded by 
-   
-      Sicom Systems: http://www.sicompos.com/
-   
-   Author: Marty Connor <mdc@etherboot.org>
-   Adapted from a Linux driver which was written by Donald Becker
-   
-   This software may be used and distributed according to the terms
-   of the GNU Public License (GPL), incorporated herein by reference.
-   
-   Original Copyright Notice:
-   
-   Written/copyright 1999-2001 by Donald Becker.
-   
-   This software may be used and distributed according to the terms of
-   the GNU General Public License (GPL), incorporated herein by reference.
-   Drivers based on or derived from this code fall under the GPL and must
-   retain the authorship, copyright and license notice.  This file is not
-   a complete program and may only be used when the entire operating
-   system is licensed under the GPL.  License for under other terms may be
-   available.  Contact the original author for details.
-   
-   The original author may be reached as becker@scyld.com, or at
-   Scyld Computing Corporation
-   410 Severn Ave., Suite 210
-   Annapolis MD 21403
-   
-   Support information and updates available at
-   http://www.scyld.com/network/netsemi.html
-   
-   References:
-   
-   http://www.scyld.com/expert/100mbps.html
-   http://www.scyld.com/expert/NWay.html
-   Datasheet is available from:
-   http://www.national.com/pf/DP/DP83815.html
-
-*/
-
-FILE_LICENCE ( GPL_ANY );
-
-/* Revision History */
-
 /*
-  02 Jul 2007  Udayan Kumar	 1.2 ported the driver from etherboot to iPXE API.
-				     Fully rewritten,adapting the old driver.
-		      	      	     Added a circular buffer for transmit and receive.
-		                     transmit routine will not wait for transmission to finish.
-			             poll routine deals with it.
-  13 Dec 2003  Tim Legge         1.1 Enabled Multicast Support
-  29 May 2001  Marty Connor	 1.0 Initial Release. Tested with Netgear FA311 and FA312 boards
-*/
+ * Copyright (C) 2012 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
+ */
+
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
-#include <ipxe/io.h>
+#include <unistd.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <unistd.h>
-#include <ipxe/pci.h>
-#include <ipxe/if_ether.h>
-#include <ipxe/ethernet.h>
-#include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/iobuf.h>
+#include <ipxe/malloc.h>
+#include <ipxe/pci.h>
+#include <ipxe/nvs.h>
+#include <ipxe/bitbash.h>
 #include <ipxe/spi_bit.h>
 #include <ipxe/threewire.h>
-#include <ipxe/nvo.h>
 #include "natsemi.h"
 
-/*  Function Prototypes: */
- 
-static int natsemi_spi_read_bit ( struct bit_basher *, unsigned int );
-static void natsemi_spi_write_bit ( struct bit_basher *,unsigned int, unsigned long ); 
-static void natsemi_init_eeprom ( struct natsemi_private * ); 
-static int natsemi_probe (struct pci_device *pci);
-static void natsemi_reset (struct net_device *netdev);
-static int natsemi_open (struct net_device *netdev);
-static int natsemi_transmit (struct net_device *netdev, struct io_buffer *iobuf);
-static void natsemi_poll (struct net_device *netdev);
-static void natsemi_close (struct net_device *netdev);
-static void natsemi_irq (struct net_device *netdev, int enable);
-static void natsemi_remove (struct pci_device *pci);
+/** @file
+ *
+ * National Semiconductor "MacPhyter" network card driver
+ *
+ * Based on the following datasheets:
+ *
+ *    http://www.ti.com/lit/ds/symlink/dp83820.pdf
+ *    http://www.datasheets.org.uk/indexdl/Datasheet-03/DSA0041338.pdf
+ *
+ */
 
-/** natsemi net device operations */
-static struct net_device_operations natsemi_operations = {
-        .open           = natsemi_open,
-        .close          = natsemi_close,
-        .transmit       = natsemi_transmit,
-        .poll           = natsemi_poll,
-	.irq		= natsemi_irq,
+/******************************************************************************
+ *
+ * EEPROM interface
+ *
+ ******************************************************************************
+ */
+
+/** Pin mapping for SPI bit-bashing interface */
+static const uint8_t natsemi_eeprom_bits[] = {
+	[SPI_BIT_SCLK]	= NATSEMI_MEAR_EECLK,
+	[SPI_BIT_MOSI]	= NATSEMI_MEAR_EEDI,
+	[SPI_BIT_MISO]	= NATSEMI_MEAR_EEDO,
+	[SPI_BIT_SS(0)]	= NATSEMI_MEAR_EESEL,
 };
 
+/**
+ * Read input bit
+ *
+ * @v basher		Bit-bashing interface
+ * @v bit_id		Bit number
+ * @ret zero		Input is a logic 0
+ * @ret non-zero	Input is a logic 1
+ */
 static int natsemi_spi_read_bit ( struct bit_basher *basher,
-			      unsigned int bit_id ) {
-	struct natsemi_private *np = container_of ( basher, struct natsemi_private,
-						 spibit.basher );
-	uint8_t mask = natsemi_ee_bits[bit_id];
-	uint8_t eereg;
+				  unsigned int bit_id ) {
+	struct natsemi_nic *natsemi = container_of ( basher, struct natsemi_nic,
+						     spibit.basher );
+	uint32_t mask = natsemi_eeprom_bits[bit_id];
+	uint32_t reg;
 
-	eereg = inb ( np->ioaddr + EE_REG );
-	return ( eereg & mask );
+	DBG_DISABLE ( DBGLVL_IO );
+	reg = readl ( natsemi->regs + NATSEMI_MEAR );
+	DBG_ENABLE ( DBGLVL_IO );
+	return ( reg & mask );
 }
 
+/**
+ * Set/clear output bit
+ *
+ * @v basher		Bit-bashing interface
+ * @v bit_id		Bit number
+ * @v data		Value to write
+ */
 static void natsemi_spi_write_bit ( struct bit_basher *basher,
-				unsigned int bit_id, unsigned long data ) {
-	struct natsemi_private *np = container_of ( basher, struct natsemi_private,
-						 spibit.basher );
-	uint8_t mask = natsemi_ee_bits[bit_id];
-	uint8_t eereg;
+				    unsigned int bit_id, unsigned long data ) {
+	struct natsemi_nic *natsemi = container_of ( basher, struct natsemi_nic,
+						     spibit.basher );
+	uint32_t mask = natsemi_eeprom_bits[bit_id];
+	uint32_t reg;
 
-	eereg = inb ( np->ioaddr + EE_REG );
-	eereg &= ~mask;
-	eereg |= ( data & mask );
-	outb ( eereg, np->ioaddr + EE_REG );
+	DBG_DISABLE ( DBGLVL_IO );
+	reg = readl ( natsemi->regs + NATSEMI_MEAR );
+	reg &= ~mask;
+	reg |= ( data & mask );
+	writel ( reg, natsemi->regs + NATSEMI_MEAR );
+	DBG_ENABLE ( DBGLVL_IO );
 }
 
+/** SPI bit-bashing interface */
 static struct bit_basher_operations natsemi_basher_ops = {
 	.read = natsemi_spi_read_bit,
 	.write = natsemi_spi_write_bit,
 };
 
-/*
- * Set up for EEPROM access
+/**
+ * Initialise EEPROM
  *
- * @v NAT		NATSEMI NIC
+ * @v natsemi		National Semiconductor device
  */
-static void natsemi_init_eeprom ( struct natsemi_private *np ) {
+static void natsemi_init_eeprom ( struct natsemi_nic *natsemi ) {
 
-	/* Initialise three-wire bus 
-	 */
-	np->spibit.basher.op = &natsemi_basher_ops;
-	np->spibit.bus.mode = SPI_MODE_THREEWIRE;
-	np->spibit.endianness = SPI_BIT_LITTLE_ENDIAN;
-	init_spi_bit_basher ( &np->spibit );
+	/* Initialise SPI bit-bashing interface */
+	natsemi->spibit.basher.op = &natsemi_basher_ops;
+	natsemi->spibit.bus.mode = SPI_MODE_THREEWIRE;
+	natsemi->spibit.endianness =
+		( ( natsemi->flags & NATSEMI_EEPROM_LITTLE_ENDIAN ) ?
+		  SPI_BIT_LITTLE_ENDIAN : SPI_BIT_BIG_ENDIAN );
+	init_spi_bit_basher ( &natsemi->spibit );
 
-	/*natsemi DP 83815 only supports at93c46
-	 */
-	init_at93c46 ( &np->eeprom, 16 );
-	np->eeprom.bus = &np->spibit.bus;
-
-	/* It looks that this portion of EEPROM can be used for
-	 * non-volatile stored options. Data sheet does not talk about
-	 * this region.  Currently it is not working. But with some
-	 * efforts it can.
-	 */
-	nvo_init ( &np->nvo, &np->eeprom.nvs, 0x0c, 0x68, NULL, NULL );
+	/* Initialise EEPROM device */
+	init_at93c06 ( &natsemi->eeprom, 16 );
+	natsemi->eeprom.bus = &natsemi->spibit.bus;
 }
+
+/**
+ * Get hardware address from sane EEPROM data
+ *
+ * @v natsemi		National Semiconductor device
+ * @v eeprom		EEPROM data
+ * @v hw_addr		Hardware address to fill in
+ */
+static void natsemi_hwaddr_sane ( struct natsemi_nic *natsemi,
+				  const uint16_t *eeprom, uint16_t *hw_addr ) {
+	int i;
+
+	/* Copy MAC address from EEPROM data */
+	for ( i = ( ( ETH_ALEN / 2 ) - 1 ) ; i >= 0 ; i-- )
+		*(hw_addr++) = eeprom[ NATSEMI_EEPROM_MAC_SANE + i ];
+
+	DBGC ( natsemi, "NATSEMI %p has sane EEPROM layout\n", natsemi );
+}
+
+/**
+ * Get hardware address from insane EEPROM data
+ *
+ * @v natsemi		National Semiconductor device
+ * @v eeprom		EEPROM data
+ * @v hw_addr		Hardware address to fill in
+ */
+static void natsemi_hwaddr_insane ( struct natsemi_nic *natsemi,
+				    const uint16_t *eeprom,
+				    uint16_t *hw_addr ) {
+	unsigned int i;
+	unsigned int offset;
+	uint16_t word;
+
+	/* Copy MAC address from EEPROM data */
+	for ( i = 0 ; i < ( ETH_ALEN / 2 ) ; i++ ) {
+		offset = ( NATSEMI_EEPROM_MAC_INSANE + i );
+		word = ( ( le16_to_cpu ( eeprom[ offset ] ) >> 15 ) |
+			 ( le16_to_cpu ( eeprom[ offset + 1 ] << 1 ) ) );
+		hw_addr[i] = cpu_to_le16 ( word );
+	}
+
+	DBGC ( natsemi, "NATSEMI %p has insane EEPROM layout\n", natsemi );
+}
+
+/**
+ * Get hardware address from EEPROM
+ *
+ * @v natsemi		National Semiconductor device
+ * @v hw_addr		Hardware address to fill in
+ * @ret rc		Return status code
+ */
+static int natsemi_hwaddr ( struct natsemi_nic *natsemi, void *hw_addr ) {
+	uint16_t buf[NATSEMI_EEPROM_SIZE];
+	void ( * extract ) ( struct natsemi_nic *natsemi,
+			     const uint16_t *eeprom, uint16_t *hw_addr );
+	int rc;
+
+	/* Read EEPROM contents */
+	if ( ( rc = nvs_read ( &natsemi->eeprom.nvs, 0, buf,
+			       sizeof ( buf ) ) ) != 0 ) {
+		DBGC ( natsemi, "NATSEMI %p could not read EEPROM: %s\n",
+		       natsemi, strerror ( rc ) );
+		return rc;
+	}
+	DBGC2 ( natsemi, "NATSEMI %p EEPROM contents:\n", natsemi );
+	DBGC2_HDA ( natsemi, 0, buf, sizeof ( buf ) );
+
+	/* Extract MAC address from EEPROM contents */
+	extract = ( ( natsemi->flags & NATSEMI_EEPROM_INSANE ) ?
+		    natsemi_hwaddr_insane : natsemi_hwaddr_sane );
+	extract ( natsemi, buf, hw_addr );
+
+	return 0;
+}
+
+/******************************************************************************
+ *
+ * Device reset
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Reset controller chip
+ *
+ * @v natsemi		National Semiconductor device
+ * @ret rc		Return status code
+ */
+static int natsemi_soft_reset ( struct natsemi_nic *natsemi ) {
+	unsigned int i;
+
+	/* Initiate reset */
+	writel ( NATSEMI_CR_RST, natsemi->regs + NATSEMI_CR );
+
+	/* Wait for reset to complete */
+	for ( i = 0 ; i < NATSEMI_RESET_MAX_WAIT_MS ; i++ ) {
+
+		/* If reset is not complete, delay 1ms and retry */
+		if ( readl ( natsemi->regs + NATSEMI_CR ) & NATSEMI_CR_RST ) {
+			mdelay ( 1 );
+			continue;
+		}
+
+		return 0;
+	}
+
+	DBGC ( natsemi, "NATSEMI %p timed out waiting for reset\n", natsemi );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Reload configuration from EEPROM
+ *
+ * @v natsemi		National Semiconductor device
+ * @ret rc		Return status code
+ */
+static int natsemi_reload_config ( struct natsemi_nic *natsemi ) {
+	unsigned int i;
+
+	/* Initiate reload */
+	writel ( NATSEMI_PTSCR_EELOAD_EN, natsemi->regs + NATSEMI_PTSCR );
+
+	/* Wait for reload to complete */
+	for ( i = 0 ; i < NATSEMI_EELOAD_MAX_WAIT_MS ; i++ ) {
+
+		/* If reload is not complete, delay 1ms and retry */
+		if ( readl ( natsemi->regs + NATSEMI_PTSCR ) &
+		     NATSEMI_PTSCR_EELOAD_EN ) {
+			mdelay ( 1 );
+			continue;
+		}
+
+		return 0;
+	}
+
+	DBGC ( natsemi, "NATSEMI %p timed out waiting for configuration "
+	       "reload\n", natsemi );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Reset hardware
+ *
+ * @v natsemi		National Semiconductor device
+ * @ret rc		Return status code
+ */
+static int natsemi_reset ( struct natsemi_nic *natsemi ) {
+	uint32_t cfg;
+	int rc;
+
+	/* Perform soft reset */
+	if ( ( rc = natsemi_soft_reset ( natsemi ) ) != 0 )
+		return rc;
+
+	/* Reload configuration from EEPROM */
+	if ( ( rc = natsemi_reload_config ( natsemi ) ) != 0 )
+		return rc;
+
+	/* Configure 64-bit operation, if applicable */
+	cfg = readl ( natsemi->regs + NATSEMI_CFG );
+	if ( natsemi->flags & NATSEMI_64BIT ) {
+		cfg |= ( NATSEMI_CFG_M64ADDR | NATSEMI_CFG_EXTSTS_EN );
+		if ( ! ( cfg & NATSEMI_CFG_PCI64_DET ) )
+			cfg &= ~NATSEMI_CFG_DATA64_EN;
+	}
+	writel ( cfg, natsemi->regs + NATSEMI_CFG );
+
+	/* Invalidate link status cache to force an update */
+	natsemi->cfg = ~cfg;
+
+	DBGC ( natsemi, "NATSEMI %p using configuration %08x\n",
+	       natsemi, cfg );
+	return 0;
+}
+
+/******************************************************************************
+ *
+ * Link state
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Check link state
+ *
+ * @v netdev		Network device
+ */
+static void natsemi_check_link ( struct net_device *netdev ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+	uint32_t cfg;
+
+	/* Read link status */
+	cfg = readl ( natsemi->regs + NATSEMI_CFG );
+
+	/* Do nothing unless link status has changed */
+	if ( cfg == natsemi->cfg )
+		return;
+
+	/* Set gigabit mode (if applicable) */
+	if ( natsemi->flags & NATSEMI_1000 ) {
+		cfg &= ~NATSEMI_CFG_MODE_1000;
+		if ( ! ( cfg & NATSEMI_CFG_SPDSTS1 ) )
+			cfg |= NATSEMI_CFG_MODE_1000;
+		writel ( cfg, natsemi->regs + NATSEMI_CFG );
+	}
+
+	/* Update link status */
+	natsemi->cfg = cfg;
+	DBGC ( natsemi, "NATSEMI %p link status is %08x\n", natsemi, cfg );
+
+	/* Update network device */
+	if ( cfg & NATSEMI_CFG_LNKSTS ) {
+		netdev_link_up ( netdev );
+	} else {
+		netdev_link_down ( netdev );
+	}
+}
+
+/******************************************************************************
+ *
+ * Network device interface
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Set perfect match filter address
+ *
+ * @v natsemi		National Semiconductor device
+ * @v mac		MAC address
+ */
+static void natsemi_pmatch ( struct natsemi_nic *natsemi, const void *mac ) {
+	const uint16_t *pmatch = mac;
+	uint32_t rfcr;
+	unsigned int rfaddr;
+	unsigned int i;
+
+	for ( i = 0 ; i < ETH_ALEN ; i += sizeof ( *pmatch ) ) {
+
+		/* Select receive filter register address */
+		rfaddr = ( NATSEMI_RFADDR_PMATCH_BASE + i );
+		rfcr = readl ( natsemi->regs + NATSEMI_RFCR );
+		rfcr &= ~NATSEMI_RFCR_RFADDR_MASK;
+		rfcr |= NATSEMI_RFCR_RFADDR ( rfaddr );
+		writel ( rfcr, natsemi->regs + NATSEMI_RFCR );
+
+		/* Write receive filter data */
+		writel ( ( le16_to_cpu ( *(pmatch++) ) | NATSEMI_RFDR_BMASK ),
+			 natsemi->regs + NATSEMI_RFDR );
+	}
+}
+
+/**
+ * Create descriptor ring
+ *
+ * @v natsemi		National Semiconductor device
+ * @v ring		Descriptor ring
+ * @ret rc		Return status code
+ */
+static int natsemi_create_ring ( struct natsemi_nic *natsemi,
+				 struct natsemi_ring *ring ) {
+	size_t len = ( ring->count * sizeof ( ring->desc[0] ) );
+	union natsemi_descriptor *desc;
+	union natsemi_descriptor *linked_desc;
+	physaddr_t address;
+	physaddr_t link;
+	size_t offset;
+	unsigned int i;
+	int rc;
+
+	/* Calculate descriptor offset */
+	offset = ( ( natsemi->flags & NATSEMI_64BIT ) ? 0 :
+		   offsetof ( typeof ( desc[i].d32pad ), d32 ) );
+
+	/* Allocate descriptor ring.  Align ring on its own size to
+	 * ensure that it can't possibly cross the boundary of 32-bit
+	 * address space.
+	 */
+	ring->desc = malloc_dma ( len, len );
+	if ( ! ring->desc ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	address = ( virt_to_bus ( ring->desc ) + offset );
+
+	/* Check address is usable by card */
+	if ( ! natsemi_address_ok ( natsemi, address ) ) {
+		DBGC ( natsemi, "NATSEMI %p cannot support 64-bit ring "
+		       "address\n", natsemi );
+		rc = -ENOTSUP;
+		goto err_64bit;
+	}
+
+	/* Initialise descriptor ring */
+	memset ( ring->desc, 0, len );
+	for ( i = 0 ; i < ring->count ; i++ ) {
+		linked_desc = &ring->desc [ ( i + 1 ) % ring->count ];
+		link = ( virt_to_bus ( linked_desc ) + offset );
+		if ( natsemi->flags & NATSEMI_64BIT ) {
+			ring->desc[i].d64.link = cpu_to_le64 ( link );
+		} else {
+			ring->desc[i].d32pad.d32.link = cpu_to_le32 ( link );
+		}
+	}
+
+	/* Program ring address */
+	writel ( ( address & 0xffffffffUL ), natsemi->regs + ring->reg );
+	if ( natsemi->flags & NATSEMI_64BIT ) {
+		if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {
+			writel ( ( ( ( uint64_t ) address ) >> 32 ),
+				 natsemi->regs + ring->reg + 4 );
+		} else {
+			writel ( 0, natsemi->regs + ring->reg + 4 );
+		}
+	}
+
+	DBGC ( natsemi, "NATSEMI %p ring %02x is at [%08llx,%08llx)\n",
+	       natsemi, ring->reg,
+	       ( ( unsigned long long ) virt_to_bus ( ring->desc ) ),
+	       ( ( unsigned long long ) virt_to_bus ( ring->desc ) + len ) );
+
+	return 0;
+
+ err_64bit:
+	free_dma ( ring->desc, len );
+	ring->desc = NULL;
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Destroy descriptor ring
+ *
+ * @v natsemi		National Semiconductor device
+ * @v ring		Descriptor ring
+ */
+static void natsemi_destroy_ring ( struct natsemi_nic *natsemi,
+				   struct natsemi_ring *ring ) {
+	size_t len = ( ring->count * sizeof ( ring->desc[0] ) );
+
+	/* Clear ring address */
+	writel ( 0, natsemi->regs + ring->reg );
+	if ( natsemi->flags & NATSEMI_64BIT )
+		writel ( 0, natsemi->regs + ring->reg + 4 );
+
+	/* Free descriptor ring */
+	free_dma ( ring->desc, len );
+	ring->desc = NULL;
+	ring->prod = 0;
+	ring->cons = 0;
+}
+
+/**
+ * Refill receive descriptor ring
+ *
+ * @v netdev		Network device
+ */
+static void natsemi_refill_rx ( struct net_device *netdev ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+	union natsemi_descriptor *rx;
+	struct io_buffer *iobuf;
+	unsigned int rx_idx;
+	physaddr_t address;
+
+	while ( ( natsemi->rx.prod - natsemi->rx.cons ) < NATSEMI_NUM_RX_DESC ){
+
+		/* Allocate I/O buffer */
+		iobuf = alloc_iob ( NATSEMI_RX_MAX_LEN );
+		if ( ! iobuf ) {
+			/* Wait for next refill */
+			return;
+		}
+
+		/* Check address is usable by card */
+		address = virt_to_bus ( iobuf->data );
+		if ( ! natsemi_address_ok ( natsemi, address ) ) {
+			DBGC ( natsemi, "NATSEMI %p cannot support 64-bit RX "
+			       "buffer address\n", natsemi );
+			netdev_rx_err ( netdev, iobuf, -ENOTSUP );
+			return;
+		}
+
+		/* Get next receive descriptor */
+		rx_idx = ( natsemi->rx.prod++ % NATSEMI_NUM_RX_DESC );
+		rx = &natsemi->rx.desc[rx_idx];
+
+		/* Populate receive descriptor */
+		if ( natsemi->flags & NATSEMI_64BIT ) {
+			rx->d64.bufptr = cpu_to_le64 ( address );
+		} else {
+			rx->d32pad.d32.bufptr = cpu_to_le32 ( address );
+		}
+		wmb();
+		rx->common.cmdsts = cpu_to_le32 ( NATSEMI_DESC_INTR |
+						  NATSEMI_RX_MAX_LEN );
+		wmb();
+
+		/* Record I/O buffer */
+		assert ( natsemi->rx_iobuf[rx_idx] == NULL );
+		natsemi->rx_iobuf[rx_idx] = iobuf;
+
+		/* Notify card that there are descriptors available */
+		writel ( NATSEMI_CR_RXE, natsemi->regs + NATSEMI_CR );
+
+		DBGC2 ( natsemi, "NATSEMI %p RX %d is [%llx,%llx)\n", natsemi,
+			rx_idx, ( ( unsigned long long ) address ),
+			( ( unsigned long long ) address + NATSEMI_RX_MAX_LEN));
+	}
+}
+
+/**
+ * Open network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int natsemi_open ( struct net_device *netdev ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+	int rc;
+
+	/* Set MAC address */
+	natsemi_pmatch ( natsemi, netdev->ll_addr );
+
+	/* Create transmit descriptor ring */
+	if ( ( rc = natsemi_create_ring ( natsemi, &natsemi->tx ) ) != 0 )
+		goto err_create_tx;
+
+	/* Set transmit configuration */
+	writel ( ( NATSEMI_TXCFG_CSI | NATSEMI_TXCFG_HBI | NATSEMI_TXCFG_ATP |
+		   NATSEMI_TXCFG_ECRETRY | NATSEMI_TXCFG_MXDMA_DEFAULT |
+		   NATSEMI_TXCFG_FLTH_DEFAULT | NATSEMI_TXCFG_DRTH_DEFAULT ),
+		 ( natsemi->regs + ( ( natsemi->flags & NATSEMI_64BIT ) ?
+				     NATSEMI_TXCFG_64 : NATSEMI_TXCFG_32 ) ) );
+
+	/* Create receive descriptor ring */
+	if ( ( rc = natsemi_create_ring ( natsemi, &natsemi->rx ) ) != 0 )
+		goto err_create_rx;
+
+	/* Set receive configuration */
+	writel ( ( NATSEMI_RXCFG_ARP | NATSEMI_RXCFG_ATX | NATSEMI_RXCFG_ALP |
+		   NATSEMI_RXCFG_MXDMA_DEFAULT | NATSEMI_RXCFG_DRTH_DEFAULT ),
+		 ( natsemi->regs + ( ( natsemi->flags & NATSEMI_64BIT ) ?
+				     NATSEMI_RXCFG_64 : NATSEMI_RXCFG_32 ) ) );
+
+	/* Set receive filter configuration */
+	writel ( ( NATSEMI_RFCR_RFEN | NATSEMI_RFCR_AAB | NATSEMI_RFCR_AAM |
+		   NATSEMI_RFCR_AAU ), natsemi->regs + NATSEMI_RFCR );
+
+	/* Fill receive ring */
+	natsemi_refill_rx ( netdev );
+
+	/* Unmask transmit and receive interrupts.  (Interrupts will
+	 * not be generated unless enabled via the IER.)
+	 */
+	writel ( ( NATSEMI_IRQ_TXDESC | NATSEMI_IRQ_RXDESC ),
+		 natsemi->regs + NATSEMI_IMR );
+
+	/* Update link state */
+	natsemi_check_link ( netdev );
+
+	return 0;
+
+	natsemi_destroy_ring ( natsemi, &natsemi->rx );
+ err_create_rx:
+	natsemi_destroy_ring ( natsemi, &natsemi->tx );
+ err_create_tx:
+	return rc;
+}
+
+/**
+ * Close network device
+ *
+ * @v netdev		Network device
+ */
+static void natsemi_close ( struct net_device *netdev ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+	unsigned int i;
+
+	/* Mask transmit and receive interrupts */
+	writel ( 0, natsemi->regs + NATSEMI_IMR );
+
+	/* Reset and disable transmitter and receiver */
+	writel ( ( NATSEMI_CR_RXR | NATSEMI_CR_TXR ),
+		 natsemi->regs + NATSEMI_CR );
+
+	/* Discard any unused receive buffers */
+	for ( i = 0 ; i < NATSEMI_NUM_RX_DESC ; i++ ) {
+		if ( natsemi->rx_iobuf[i] )
+			free_iob ( natsemi->rx_iobuf[i] );
+		natsemi->rx_iobuf[i] = NULL;
+	}
+
+	/* Destroy receive descriptor ring */
+	natsemi_destroy_ring ( natsemi, &natsemi->rx );
+
+	/* Destroy transmit descriptor ring */
+	natsemi_destroy_ring ( natsemi, &natsemi->tx );
+}
+
+/**
+ * Transmit packet
+ *
+ * @v netdev		Network device
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+static int natsemi_transmit ( struct net_device *netdev,
+			       struct io_buffer *iobuf ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+	union natsemi_descriptor *tx;
+	unsigned int tx_idx;
+	physaddr_t address;
+
+	/* Check address is usable by card */
+	address = virt_to_bus ( iobuf->data );
+	if ( ! natsemi_address_ok ( natsemi, address ) ) {
+		DBGC ( natsemi, "NATSEMI %p cannot support 64-bit TX buffer "
+		       "address\n", natsemi );
+		return -ENOTSUP;
+	}
+
+	/* Get next transmit descriptor */
+	if ( ( natsemi->tx.prod - natsemi->tx.cons ) >= NATSEMI_NUM_TX_DESC ) {
+		DBGC ( natsemi, "NATSEMI %p out of transmit descriptors\n",
+		       natsemi );
+		return -ENOBUFS;
+	}
+	tx_idx = ( natsemi->tx.prod++ % NATSEMI_NUM_TX_DESC );
+	tx = &natsemi->tx.desc[tx_idx];
+
+	/* Populate transmit descriptor */
+	if ( natsemi->flags & NATSEMI_64BIT ) {
+		tx->d64.bufptr = cpu_to_le64 ( address );
+	} else {
+		tx->d32pad.d32.bufptr = cpu_to_le32 ( address );
+	}
+	wmb();
+	tx->common.cmdsts = cpu_to_le32 ( NATSEMI_DESC_OWN | NATSEMI_DESC_INTR |
+					  iob_len ( iobuf ) );
+	wmb();
+
+	/* Notify card that there are packets ready to transmit */
+	writel ( NATSEMI_CR_TXE, natsemi->regs + NATSEMI_CR );
+
+	DBGC2 ( natsemi, "NATSEMI %p TX %d is [%llx,%llx)\n", natsemi, tx_idx,
+		( ( unsigned long long ) address ),
+		( ( unsigned long long ) address + iob_len ( iobuf ) ) );
+
+	return 0;
+}
+
+/**
+ * Poll for completed packets
+ *
+ * @v netdev		Network device
+ */
+static void natsemi_poll_tx ( struct net_device *netdev ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+	union natsemi_descriptor *tx;
+	unsigned int tx_idx;
+
+	/* Check for completed packets */
+	while ( natsemi->tx.cons != natsemi->tx.prod ) {
+
+		/* Get next transmit descriptor */
+		tx_idx = ( natsemi->tx.cons % NATSEMI_NUM_TX_DESC );
+		tx = &natsemi->tx.desc[tx_idx];
+
+		/* Stop if descriptor is still in use */
+		if ( tx->common.cmdsts & cpu_to_le32 ( NATSEMI_DESC_OWN ) )
+			return;
+
+		/* Complete TX descriptor */
+		if ( tx->common.cmdsts & cpu_to_le32 ( NATSEMI_DESC_OK ) ) {
+			DBGC2 ( natsemi, "NATSEMI %p TX %d complete\n",
+				natsemi, tx_idx );
+			netdev_tx_complete_next ( netdev );
+		} else {
+			DBGC ( natsemi, "NATSEMI %p TX %d completion error "
+			       "(%08x)\n", natsemi, tx_idx,
+			       le32_to_cpu ( tx->common.cmdsts ) );
+			netdev_tx_complete_next_err ( netdev, -EIO );
+		}
+		natsemi->tx.cons++;
+	}
+}
+
+/**
+ * Poll for received packets
+ *
+ * @v netdev		Network device
+ */
+static void natsemi_poll_rx ( struct net_device *netdev ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+	union natsemi_descriptor *rx;
+	struct io_buffer *iobuf;
+	unsigned int rx_idx;
+	size_t len;
+
+	/* Check for received packets */
+	while ( natsemi->rx.cons != natsemi->rx.prod ) {
+
+		/* Get next receive descriptor */
+		rx_idx = ( natsemi->rx.cons % NATSEMI_NUM_RX_DESC );
+		rx = &natsemi->rx.desc[rx_idx];
+
+		/* Stop if descriptor is still in use */
+		if ( ! ( rx->common.cmdsts & NATSEMI_DESC_OWN ) )
+			return;
+
+		/* Populate I/O buffer */
+		iobuf = natsemi->rx_iobuf[rx_idx];
+		natsemi->rx_iobuf[rx_idx] = NULL;
+		len = ( le32_to_cpu ( rx->common.cmdsts ) &
+			NATSEMI_DESC_SIZE_MASK );
+		iob_put ( iobuf, len - 4 /* strip CRC */ );
+
+		/* Hand off to network stack */
+		if ( rx->common.cmdsts & cpu_to_le32 ( NATSEMI_DESC_OK ) ) {
+			DBGC2 ( natsemi, "NATSEMI %p RX %d complete (length "
+				"%zd)\n", natsemi, rx_idx, len );
+			netdev_rx ( netdev, iobuf );
+		} else {
+			DBGC ( natsemi, "NATSEMI %p RX %d error (length %zd, "
+			       "status %08x)\n", natsemi, rx_idx, len,
+			       le32_to_cpu ( rx->common.cmdsts ) );
+			netdev_rx_err ( netdev, iobuf, -EIO );
+		}
+		natsemi->rx.cons++;
+	}
+}
+
+/**
+ * Poll for completed and received packets
+ *
+ * @v netdev		Network device
+ */
+static void natsemi_poll ( struct net_device *netdev ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+	uint32_t isr;
+
+	/* Poll for link state.  The PHY interrupt seems not to
+	 * function as expected, and polling for the link state is
+	 * only a single register read.
+	 */
+	natsemi_check_link ( netdev );
+
+	/* Check for and acknowledge interrupts */
+	isr = readl ( natsemi->regs + NATSEMI_ISR );
+	if ( ! isr )
+		return;
+
+	/* Poll for TX completions, if applicable */
+	if ( isr & NATSEMI_IRQ_TXDESC )
+		natsemi_poll_tx ( netdev );
+
+	/* Poll for RX completionsm, if applicable */
+	if ( isr & NATSEMI_IRQ_RXDESC )
+		natsemi_poll_rx ( netdev );
+
+	/* Refill RX ring */
+	natsemi_refill_rx ( netdev );
+}
+
+/**
+ * Enable or disable interrupts
+ *
+ * @v netdev		Network device
+ * @v enable		Interrupts should be enabled
+ */
+static void natsemi_irq ( struct net_device *netdev, int enable ) {
+	struct natsemi_nic *natsemi = netdev->priv;
+
+	/* Enable or disable interrupts */
+	writel ( ( enable ? NATSEMI_IER_IE : 0 ), natsemi->regs + NATSEMI_IER );
+}
+
+/** National Semiconductor network device operations */
+static struct net_device_operations natsemi_operations = {
+	.open		= natsemi_open,
+	.close		= natsemi_close,
+	.transmit	= natsemi_transmit,
+	.poll		= natsemi_poll,
+	.irq		= natsemi_irq,
+};
+
+/******************************************************************************
+ *
+ * PCI interface
+ *
+ ******************************************************************************
+ */
 
 /**
  * Probe PCI device
  *
- * @v pci	PCI device
- * @v id	PCI ID
- * @ret rc	Return status code
+ * @v pci		PCI device
+ * @ret rc		Return status code
  */
-static int natsemi_probe (struct pci_device *pci) {
+static int natsemi_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
-	struct natsemi_private *np = NULL;
-	uint8_t ll_addr_encoded[MAX_LL_ADDR_LEN];
-	uint8_t last=0,last1=0;
-	uint8_t prev_bytes[2];
-	int i;
+	struct natsemi_nic *natsemi;
 	int rc;
 
-	/* Allocate net device 
-	 */
-	netdev = alloc_etherdev (sizeof (*np));
-	if (! netdev) 
-		return -ENOMEM;
-
-	netdev_init (netdev, &natsemi_operations);
-	np = netdev->priv;
-	pci_set_drvdata (pci, netdev);
-	netdev->dev = &pci->dev;
-	memset (np, 0, sizeof (*np));
-	np->ioaddr = pci->ioaddr;
-
-	adjust_pci_device (pci);
-
-	natsemi_reset (netdev);
-	natsemi_init_eeprom ( np );
-	nvs_read ( &np->eeprom.nvs, EE_MAC-1, prev_bytes, 1 );
-	nvs_read ( &np->eeprom.nvs, EE_MAC, ll_addr_encoded, ETH_ALEN );
-
-	/* decoding the MAC address read from NVS 
-	 * and save it in netdev->ll_addr
-         */
-	last = prev_bytes[1] >> 7;
-	for ( i = 0 ; i < ETH_ALEN ; i++ ) {
-		last1 = ll_addr_encoded[i] >> 7;
-		netdev->hw_addr[i] = ll_addr_encoded[i] << 1 | last;
-		last = last1;
+	/* Allocate and initialise net device */
+	netdev = alloc_etherdev ( sizeof ( *natsemi ) );
+	if ( ! netdev ) {
+		rc = -ENOMEM;
+		goto err_alloc;
 	}
+	netdev_init ( netdev, &natsemi_operations );
+	natsemi = netdev->priv;
+	pci_set_drvdata ( pci, netdev );
+	netdev->dev = &pci->dev;
+	memset ( natsemi, 0, sizeof ( *natsemi ) );
+	natsemi->flags = pci->id->driver_data;
+	natsemi_init_ring ( &natsemi->tx, NATSEMI_NUM_TX_DESC, NATSEMI_TXDP );
+	natsemi_init_ring ( &natsemi->rx, NATSEMI_NUM_RX_DESC, NATSEMI_RXDP );
 
-	if ((rc = register_netdev (netdev)) != 0)
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+
+	/* Map registers */
+	natsemi->regs = ioremap ( pci->membase, NATSEMI_BAR_SIZE );
+
+	/* Reset the NIC */
+	if ( ( rc = natsemi_reset ( natsemi ) ) != 0 )
+		goto err_reset;
+
+	/* Initialise EEPROM */
+	natsemi_init_eeprom ( natsemi );
+
+	/* Read initial MAC address */
+	if ( ( rc = natsemi_hwaddr ( natsemi, netdev->hw_addr ) ) != 0 )
+		goto err_hwaddr;
+
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
 
-	/* Mark as link up; we don't yet handle link state */
-	netdev_link_up ( netdev );
+	/* Set initial link state */
+	natsemi_check_link ( netdev );
 
 	return 0;
 
-err_register_netdev:
-
-	natsemi_reset (netdev);
-	netdev_put (netdev);
+	unregister_netdev ( netdev );
+ err_register_netdev:
+ err_hwaddr:
+	natsemi_reset ( natsemi );
+ err_reset:
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
+ err_alloc:
 	return rc;
 }
 
 /**
  * Remove PCI device
  *
- * @v pci	PCI device
+ * @v pci		PCI device
  */
-static void natsemi_remove (struct pci_device *pci) {
-	struct net_device *netdev = pci_get_drvdata (pci);
- 
-	unregister_netdev (netdev);
-	natsemi_reset (netdev);
+static void natsemi_remove ( struct pci_device *pci ) {
+	struct net_device *netdev = pci_get_drvdata ( pci );
+	struct natsemi_nic *natsemi = netdev->priv;
+
+	/* Unregister network device */
+	unregister_netdev ( netdev );
+
+	/* Reset card */
+	natsemi_reset ( natsemi );
+
+	/* Free network device */
 	netdev_nullify ( netdev );
-	netdev_put (netdev);
+	netdev_put ( netdev );
 }
 
-/**
- * Reset NIC
- *
- * @v		NATSEMI NIC
- *
- * Issues a hardware reset and waits for the reset to complete.
- */
-static void natsemi_reset (struct net_device *netdev) 
-{
-	struct natsemi_private *np = netdev->priv;
-	int i;
-        u32 cfg;
-        u32 wcsr;
-        u32 rfcr;
-        u16 pmatch[3];
-        u16 sopass[3];
+/** Flags for DP83815 */
+#define DP83815_FLAGS ( NATSEMI_EEPROM_LITTLE_ENDIAN | NATSEMI_EEPROM_INSANE )
 
-	natsemi_irq (netdev, 0);
+/** Flags for DP83820 */
+#define DP83820_FLAGS ( NATSEMI_64BIT | NATSEMI_1000 )
 
-        /*
-         * Resetting the chip causes some registers to be lost.
-         * Natsemi suggests NOT reloading the EEPROM while live, so instead
-         * we save the state that would have been loaded from EEPROM
-         * on a normal power-up (see the spec EEPROM map).
-         */
-
-        /* CFG */
-        cfg = inl (np->ioaddr + ChipConfig) & CFG_RESET_SAVE;
-
-        /* WCSR */
-        wcsr = inl (np->ioaddr + WOLCmd) & WCSR_RESET_SAVE;
-
-        /* RFCR */
-        rfcr = inl (np->ioaddr + RxFilterAddr) & RFCR_RESET_SAVE;
-
-        /* PMATCH */
-        for (i = 0; i < 3; i++) {
-		outl(i*2, np->ioaddr + RxFilterAddr);
-		pmatch[i] = inw(np->ioaddr + RxFilterData);
-        }
-
-        /* SOPAS */
-        for (i = 0; i < 3; i++) {
-	  	outl(0xa+(i*2), np->ioaddr + RxFilterAddr);
-		sopass[i] = inw(np->ioaddr + RxFilterData);
-        }
-
-        /* now whack the chip */
-        outl(ChipReset, np->ioaddr + ChipCmd);
-        for (i=0; i<NATSEMI_HW_TIMEOUT; i++) {
-		if (! (inl (np->ioaddr + ChipCmd) & ChipReset))
-		       break;
-		udelay(5);
-        }
-        if (i == NATSEMI_HW_TIMEOUT) {
-	  	DBG ("natsemi_reset: reset did not complete in %d usec.\n", i*5);
-        }
-
-        /* restore CFG */
-        cfg |= inl(np->ioaddr + ChipConfig) & ~CFG_RESET_SAVE;
-	cfg &= ~(CfgExtPhy | CfgPhyDis);
-        outl (cfg, np->ioaddr + ChipConfig);
-
-        /* restore WCSR */
-        wcsr |= inl (np->ioaddr + WOLCmd) & ~WCSR_RESET_SAVE;
-        outl (wcsr, np->ioaddr + WOLCmd);
-
-        /* read RFCR */
-        rfcr |= inl (np->ioaddr + RxFilterAddr) & ~RFCR_RESET_SAVE;
-
-        /* restore PMATCH */
-        for (i = 0; i < 3; i++) {
-	  	outl (i*2, np->ioaddr + RxFilterAddr);
-		outw (pmatch[i], np->ioaddr + RxFilterData);
-        }
-        for (i = 0; i < 3; i++) {
-		outl (0xa+(i*2), np->ioaddr + RxFilterAddr);
-		outw (sopass[i], np->ioaddr + RxFilterData);
-        }
-        /* restore RFCR */
-        outl (rfcr, np->ioaddr + RxFilterAddr);
-}
-
-/**
- * Open NIC
- *
- * @v netdev		Net device
- * @ret rc		Return status code
- */
-static int natsemi_open (struct net_device *netdev)
-{
-	struct natsemi_private *np = netdev->priv;
-	uint32_t tx_config, rx_config;
-	int i;
-	
-	/* Disable PME:
-         * The PME bit is initialized from the EEPROM contents.
-         * PCI cards probably have PME disabled, but motherboard
-         * implementations may have PME set to enable WakeOnLan. 
-         * With PME set the chip will scan incoming packets but
-         * nothing will be written to memory. 
-         */
-        outl (inl (np->ioaddr + ClkRun) & ~0x100, np->ioaddr + ClkRun);
-
-	/* Set MAC address in NIC
-	 */
-	for (i = 0 ; i < ETH_ALEN ; i+=2) {
-		outl (i, np->ioaddr + RxFilterAddr);
-		outw (netdev->ll_addr[i] + (netdev->ll_addr[i + 1] << 8),
-		       np->ioaddr + RxFilterData);
-	}
-
-	/* Setup Tx Ring 
-	 */
-	np->tx_cur = 0;
-	np->tx_dirty = 0;
-	for (i = 0 ; i < TX_RING_SIZE ; i++) {
-		np->tx[i].link   = virt_to_bus ((i + 1 < TX_RING_SIZE) ? &np->tx[i + 1] : &np->tx[0]);
-		np->tx[i].cmdsts = 0;
-		np->tx[i].bufptr = 0;
-	}
-	outl (virt_to_bus (&np->tx[0]),np->ioaddr + TxRingPtr);
-
-	DBG ("Natsemi Tx descriptor loaded with: %#08x\n",
-	     inl (np->ioaddr + TxRingPtr));
-
-	/* Setup RX ring
-	 */
-	np->rx_cur = 0;
-	for (i = 0 ; i < NUM_RX_DESC ; i++) {
-		np->iobuf[i] = alloc_iob (RX_BUF_SIZE);
-		if (! np->iobuf[i])
-			goto memory_alloc_err;
-		np->rx[i].link   = virt_to_bus ((i + 1 < NUM_RX_DESC) 
-						? &np->rx[i + 1] : &np->rx[0]);
-		np->rx[i].cmdsts = RX_BUF_SIZE;
-		np->rx[i].bufptr = virt_to_bus (np->iobuf[i]->data);
-		DBG (" Address of iobuf [%d] = %p and iobuf->data = %p \n", i, 
-		      &np->iobuf[i],  &np->iobuf[i]->data);
-	}
-	outl (virt_to_bus (&np->rx[0]), np->ioaddr + RxRingPtr);
-
-	DBG ("Natsemi Rx descriptor loaded with: %#08x\n",
-	      inl (np->ioaddr + RxRingPtr));		
-
-	/* Setup RX Filter 
-	 */
-	outl (RxFilterEnable | AcceptBroadcast | AcceptAllMulticast | AcceptMyPhys,
-	      np->ioaddr + RxFilterAddr);
-
-	/* Initialize other registers. 
-	 * Configure the PCI bus bursts and FIFO thresholds. 
-	 * Configure for standard, in-spec Ethernet. 
-	 */
-	if (inl (np->ioaddr + ChipConfig) & 0x20000000) {	/* Full duplex */
-		DBG ("Full duplex\n");
-		tx_config = 0xD0801002 |  0xC0000000;
-		rx_config = 0x10000020 |  0x10000000;
-	} else {
-		DBG ("Half duplex\n");
-		tx_config = 0x10801002 & ~0xC0000000;
-		rx_config = 0x00000020 & ~0x10000000;
-	}
-	outl (tx_config, np->ioaddr + TxConfig);
-	outl (rx_config, np->ioaddr + RxConfig);
-
-	DBG ("Tx config register = %#08x Rx config register = %#08x\n", 
-               inl (np->ioaddr + TxConfig),
-	       inl (np->ioaddr + RxConfig));
-
-	/*Set the Interrupt Mask register
-	 */
-	outl((RxOk|RxErr|TxOk|TxErr),np->ioaddr + IntrMask);
-	/*start the receiver 
-	 */
-        outl (RxOn, np->ioaddr + ChipCmd);
-	
-	return 0;
-		       
-memory_alloc_err:
-
-	/* Frees any allocated buffers when memory
-	 * for all buffers requested is not available
-	 */
-	i = 0;
-	while (np->rx[i].cmdsts == RX_BUF_SIZE) {
-		free_iob (np->iobuf[i]);
-		i++;
-	}
-	return -ENOMEM;	
-}
-
-/**
- * Close NIC
- *
- * @v netdev		Net device
- */
-static void natsemi_close (struct net_device *netdev) 
-{
-	struct natsemi_private *np = netdev->priv;
-	int i;
-
-	natsemi_reset (netdev);
-
-	for (i = 0; i < NUM_RX_DESC ; i++) {
-		free_iob (np->iobuf[i]);
-	}
-}
-
-/** 
- * Transmit packet
- *
- * @v netdev	Network device
- * @v iobuf	I/O buffer
- * @ret rc	Return status code
- */
-static int natsemi_transmit (struct net_device *netdev, struct io_buffer *iobuf)
-{
-	struct natsemi_private *np = netdev->priv;
-
-	if (np->tx[np->tx_cur].cmdsts != 0) {
-		DBG ("TX overflow\n");
-		return -ENOBUFS;
-	}
-
-	/* Used by netdev_tx_complete ()
-	 */
-	np->tx_iobuf[np->tx_cur] = iobuf;
-
-	/* Pad and align packet has not been used because its not required 
-	 * by the hardware.
-	 * 	iob_pad (iobuf, ETH_ZLEN); 
-	 * can be used to achieve it, if required
-	 */
-
-	/* Add the packet to TX ring
-	 */
-	np->tx[np->tx_cur].bufptr = virt_to_bus (iobuf->data);
-	np->tx[np->tx_cur].cmdsts = iob_len (iobuf) | OWN;
-
-	DBG ("TX id %d at %#08lx + %#08zx\n", np->tx_cur,
-	     virt_to_bus (&iobuf->data), iob_len (iobuf));
-
-	/* increment the circular buffer pointer to the next buffer location
-	 */
-	np->tx_cur = (np->tx_cur + 1) % TX_RING_SIZE;
-
-	/*start the transmitter 
-	 */
-        outl (TxOn, np->ioaddr + ChipCmd);
-
-	return 0;
-}
-
-/** 
- * Poll for received packets
- *
- * @v netdev	Network device
- */
-static void natsemi_poll (struct net_device *netdev)
-{
-	struct natsemi_private *np = netdev->priv;
-	unsigned int tx_status;
-	unsigned int rx_status;
-	unsigned int intr_status;
-	unsigned int rx_len;
-	struct io_buffer *rx_iob;
-	int i;
-	
-	/* read the interrupt register
-	 */
-	intr_status = inl (np->ioaddr + IntrStatus);
-
-	if (!intr_status)
-		goto end;
-
-        DBG ("natsemi_poll: intr_status = %#08x\n", intr_status);
-
-	/* Check status of transmitted packets
-	 */
-	i = np->tx_dirty;
-	while (i != np->tx_cur) {
-	  	tx_status = np->tx[np->tx_dirty].cmdsts;
-
-		DBG ("tx_dirty = %d tx_cur=%d tx_status=%#08x\n",
-		     np->tx_dirty, np->tx_cur, tx_status);
-		
-		if (tx_status & OWN) 
-			break;
-
-		if (! (tx_status & DescPktOK)) {
-			netdev_tx_complete_err (netdev,np->tx_iobuf[np->tx_dirty],-EINVAL);
-			DBG ("Error transmitting packet, tx_status: %#08x\n",
-			     tx_status);
-		} else {
-			netdev_tx_complete (netdev, np->tx_iobuf[np->tx_dirty]);
-			DBG ("Success transmitting packet\n");
-		}
-
-		np->tx[np->tx_dirty].cmdsts = 0;
-		np->tx_dirty = (np->tx_dirty + 1) % TX_RING_SIZE;
-		i = (i + 1) % TX_RING_SIZE;
-	}
-	
-	/* Process received packets 
-	 */
-	rx_status = (unsigned int) np->rx[np->rx_cur].cmdsts; 
-	while ((rx_status & OWN)) {
-		rx_len = (rx_status & DSIZE) - CRC_SIZE;
-
-                DBG ("Received packet, rx_curr = %d, rx_status = %#08x, rx_len = %d\n",
-                     np->rx_cur, rx_status, rx_len);
-                
-		if ((rx_status & (DescMore | DescPktOK | RxTooLong)) != DescPktOK) {
-			netdev_rx_err (netdev, NULL, -EINVAL);
-
-			DBG ("natsemi_poll: Corrupted packet received!"
-			     " Status = %#08x\n",
-			      np->rx[np->rx_cur].cmdsts);
-
-		} else 	{
-
-
-			/* If unable allocate space for this packet,
-			 *  try again next poll
-			 */
-			rx_iob = alloc_iob (rx_len);
-			if (! rx_iob) 
-				goto end;
-			memcpy (iob_put (rx_iob, rx_len), 
-				np->iobuf[np->rx_cur]->data, rx_len);
-			/* Add this packet to the receive queue. 
-			 */
-			netdev_rx (netdev, rx_iob);
-		}
-		np->rx[np->rx_cur].cmdsts = RX_BUF_SIZE;
-		np->rx_cur = (np->rx_cur + 1) % NUM_RX_DESC;
-		rx_status = np->rx[np->rx_cur].cmdsts; 
-	}
-end:
-	/* re-enable the potentially idle receive state machine 
-	 */
-	outl (RxOn, np->ioaddr + ChipCmd);	
-}				
-
-/**
- * Enable/disable interrupts
- *
- * @v netdev    Network device
- * @v enable    Non-zero for enable, zero for disable
- */
-static void natsemi_irq (struct net_device *netdev, int enable)
-{
-        struct natsemi_private *np = netdev->priv;
-
-	outl ((enable ? (RxOk | RxErr | TxOk|TxErr) : 0),
-	      np->ioaddr + IntrMask); 
-	outl ((enable ? 1 : 0), np->ioaddr + IntrEnable);
-}
-
+/** National Semiconductor PCI device IDs */
 static struct pci_device_id natsemi_nics[] = {
-	PCI_ROM(0x100b, 0x0020, "dp83815", "DP83815", 0),
+	PCI_ROM ( 0x100b, 0x0020, "dp83815", "DP83815", DP83815_FLAGS ),
+	PCI_ROM ( 0x100b, 0x0022, "dp83820", "DP83820", DP83820_FLAGS ),
 };
 
+/** National Semiconductor PCI driver */
 struct pci_driver natsemi_driver __pci_driver = {
 	.ids = natsemi_nics,
-	.id_count = (sizeof (natsemi_nics) / sizeof (natsemi_nics[0])),
+	.id_count = ( sizeof ( natsemi_nics ) / sizeof ( natsemi_nics[0] ) ),
 	.probe = natsemi_probe,
 	.remove = natsemi_remove,
 };
