@@ -358,6 +358,12 @@ struct dhcp_client_uuid {
 /** Trusted root certficate fingerprints */
 #define DHCP_EB_TRUST DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x5a )
 
+/** Client certficate */
+#define DHCP_EB_CERT DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x5b )
+
+/** Client private key */
+#define DHCP_EB_KEY DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x5c )
+
 /** Skip PXE DHCP protocol extensions such as ProxyDHCP
  *
  * If set to a non-zero value, iPXE will not wait for ProxyDHCP offers
