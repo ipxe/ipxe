@@ -36,6 +36,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Length of a root certificate fingerprint */
 #define FINGERPRINT_LEN SHA256_DIGEST_SIZE
 
+/* Allow trusted certificates to be overridden if not explicitly specified */
+#ifdef TRUSTED
+#define ALLOW_TRUST_OVERRIDE 0
+#else
+#define ALLOW_TRUST_OVERRIDE 1
+#endif
+
 /* Use iPXE root CA if no trusted certificates are explicitly specified */
 #ifndef TRUSTED
 #define TRUSTED								\
@@ -50,9 +57,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static const uint8_t fingerprints[] = { TRUSTED };
 
 /** Root certificate fingerprint setting */
-struct setting trust_setting __setting ( SETTING_CRYPTO ) = {
+static struct setting trust_setting __setting ( SETTING_CRYPTO ) = {
 	.name = "trust",
-	.description = "Trusted root certificate fingerprint",
+	.description = "Trusted root certificate fingerprints",
 	.tag = DHCP_EB_TRUST,
 	.type = &setting_type_hex,
 };
@@ -67,38 +74,50 @@ struct x509_root root_certificates = {
 /**
  * Initialise root certificate
  *
- * We allow the list of trusted root certificate fingerprints to be
- * overridden using the "trust" setting, but only at the point of iPXE
+ * The list of trusted root certificates can be specified at build
+ * time using the TRUST= build parameter.  If no certificates are
+ * specified, then the default iPXE root CA certificate is trusted.
+ *
+ * If no certificates were explicitly specified, then we allow the
+ * list of trusted root certificate fingerprints to be overridden
+ * using the "trust" setting, but only at the point of iPXE
  * initialisation.  This prevents untrusted sources of settings
  * (e.g. DHCP) from subverting the chain of trust, while allowing
  * trustworthy sources (e.g. VMware GuestInfo or non-volatile stored
- * options) to change the trusted root certificate without requiring a
- * rebuild.
+ * options) to specify the trusted root certificate without requiring
+ * a rebuild.
  */
 static void rootcert_init ( void ) {
-	void *external;
+	void *external = NULL;
 	int len;
 	int rc;
 
-	/* Fetch copy of "trust" setting, if it exists.  This memory
-	 * will never be freed.
+	/* Allow trusted root certificates to be overridden only if
+	 * not explicitly specified at build time.
 	 */
-	len = fetch_setting_copy ( NULL, &trust_setting, &external );
-	if ( len < 0 ) {
-		rc = len;
-		DBGC ( &root_certificates, "ROOTCERT cannot fetch trusted "
-		       "root certificate fingerprints: %s\n", strerror ( rc ) );
-		/* No way to prevent startup; fail safe by trusting no
-		 * certificates.
-		 */
-		root_certificates.count = 0;
-		return;
-	}
+	if ( ALLOW_TRUST_OVERRIDE ) {
 
-	/* Use certificates from "trust" setting, if present */
-	if ( external ) {
-		root_certificates.fingerprints = external;
-		root_certificates.count = ( len / FINGERPRINT_LEN );
+		/* Fetch copy of "trust" setting, if it exists.  This
+		 * memory will never be freed.
+		 */
+		len = fetch_setting_copy ( NULL, &trust_setting, &external );
+		if ( len < 0 ) {
+			rc = len;
+			DBGC ( &root_certificates, "ROOTCERT cannot fetch "
+			       "trusted root certificate fingerprints: %s\n",
+			       strerror ( rc ) );
+			/* No way to prevent startup; fail safe by
+			 * trusting no certificates.
+			 */
+			root_certificates.count = 0;
+			return;
+		}
+
+		/* Use certificates from "trust" setting, if present */
+		if ( external ) {
+			root_certificates.fingerprints = external;
+			root_certificates.count = ( len / FINGERPRINT_LEN );
+		}
 	}
 
 	DBGC ( &root_certificates, "ROOTCERT using %d %s certificate(s):\n",

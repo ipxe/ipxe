@@ -47,6 +47,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #warning "Attempting to embed private key with no corresponding certificate"
 #endif
 
+/* Allow client certificates to be overridden if not explicitly specified */
+#ifdef CERTIFICATE
+#define ALLOW_CERT_OVERRIDE 0
+#else
+#define ALLOW_CERT_OVERRIDE 1
+#endif
+
 /* Raw client certificate data */
 extern char client_certificate_data[];
 extern char client_certificate_len[];
@@ -72,13 +79,19 @@ __asm__ ( ".section \".rodata\", \"a\", @progbits\n\t"
 	  ".previous\n\t" );
 
 /** Client certificate */
-struct client_certificate client_certificate;
+struct client_certificate client_certificate = {
+	.data = client_certificate_data,
+	.len = ( ( size_t ) client_certificate_len ),
+};
 
 /** Client private key */
-struct client_private_key client_private_key;
+struct client_private_key client_private_key = {
+	.data = client_private_key_data,
+	.len = ( ( size_t ) client_private_key_len ),
+};
 
 /** Client certificate setting */
-struct setting cert_setting __setting ( SETTING_CRYPTO ) = {
+static struct setting cert_setting __setting ( SETTING_CRYPTO ) = {
 	.name = "cert",
 	.description = "Client certificate",
 	.tag = DHCP_EB_CERT,
@@ -86,7 +99,7 @@ struct setting cert_setting __setting ( SETTING_CRYPTO ) = {
 };
 
 /** Client private key setting */
-struct setting key_setting __setting ( SETTING_CRYPTO ) = {
+static struct setting key_setting __setting ( SETTING_CRYPTO ) = {
 	.name = "key",
 	.description = "Client private key",
 	.tag = DHCP_EB_KEY,
@@ -99,45 +112,51 @@ struct setting key_setting __setting ( SETTING_CRYPTO ) = {
  * @ret rc		Return status code
  */
 static int clientcert_apply_settings ( void ) {
-	static void *cert;
-	static void *key;
+	static void *cert = NULL;
+	static void *key = NULL;
 	int len;
 	int rc;
 
-	/* Restore default client certificate */
-	client_certificate.data = client_certificate_data;
-	client_certificate.len = ( ( size_t ) client_certificate_len );
+	/* Allow client certificate to be overridden only if
+	 * not explicitly specified at build time.
+	 */
+	if ( ALLOW_CERT_OVERRIDE ) {
 
-	/* Fetch new client certificate, if any */
-	free ( cert );
-	len = fetch_setting_copy ( NULL, &cert_setting, &cert );
-	if ( len < 0 ) {
-		rc = len;
-		DBGC ( &client_certificate, "CLIENTCERT cannot fetch client "
-		       "certificate: %s\n", strerror ( rc ) );
-		return rc;
-	}
-	if ( cert ) {
-		client_certificate.data = cert;
-		client_certificate.len = len;
-	}
+		/* Restore default client certificate */
+		client_certificate.data = client_certificate_data;
+		client_certificate.len = ( ( size_t ) client_certificate_len );
 
-	/* Restore default client private key */
-	client_private_key.data = client_private_key_data;
-	client_private_key.len = ( ( size_t ) client_private_key_len );
+		/* Fetch new client certificate, if any */
+		free ( cert );
+		len = fetch_setting_copy ( NULL, &cert_setting, &cert );
+		if ( len < 0 ) {
+			rc = len;
+			DBGC ( &client_certificate, "CLIENTCERT cannot fetch "
+			       "client certificate: %s\n", strerror ( rc ) );
+			return rc;
+		}
+		if ( cert ) {
+			client_certificate.data = cert;
+			client_certificate.len = len;
+		}
 
-	/* Fetch new client private key, if any */
-	free ( key );
-	len = fetch_setting_copy ( NULL, &key_setting, &key );
-	if ( len < 0 ) {
-		rc = len;
-		DBGC ( &client_certificate, "CLIENTCERT cannot fetch client "
-		       "private key: %s\n", strerror ( rc ) );
-		return rc;
-	}
-	if ( key ) {
-		client_private_key.data = key;
-		client_private_key.len = len;
+		/* Restore default client private key */
+		client_private_key.data = client_private_key_data;
+		client_private_key.len = ( ( size_t ) client_private_key_len );
+
+		/* Fetch new client private key, if any */
+		free ( key );
+		len = fetch_setting_copy ( NULL, &key_setting, &key );
+		if ( len < 0 ) {
+			rc = len;
+			DBGC ( &client_certificate, "CLIENTCERT cannot fetch "
+			       "client private key: %s\n", strerror ( rc ) );
+			return rc;
+		}
+		if ( key ) {
+			client_private_key.data = key;
+			client_private_key.len = len;
+		}
 	}
 
 	/* Debug */
