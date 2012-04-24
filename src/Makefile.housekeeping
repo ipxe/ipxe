@@ -517,6 +517,136 @@ RULE_S_to_s	= $(Q)$(PREPROCESS_S) $< > $@
 
 DEBUG_TARGETS	+= dbg%.o c s
 
+# List of embedded images included in the last build of embedded.o.
+# This is needed in order to correctly rebuild embedded.o whenever the
+# list of objects changes.
+#
+EMBED		:= $(EMBEDDED_IMAGE) # Maintain backwards compatibility
+EMBEDDED_LIST	:= $(BIN)/.embedded.list
+ifeq ($(wildcard $(EMBEDDED_LIST)),)
+EMBED_OLD := <invalid>
+else
+EMBED_OLD := $(shell cat $(EMBEDDED_LIST))
+endif
+ifneq ($(EMBED_OLD),$(EMBED))
+$(shell $(ECHO) "$(EMBED)" > $(EMBEDDED_LIST))
+endif
+
+$(EMBEDDED_LIST) :
+
+VERYCLEANUP	+= $(EMBEDDED_LIST)
+
+EMBEDDED_FILES	:= $(subst $(COMMA), ,$(EMBED))
+EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
+		     EMBED ( $(i), \"$(word $(i), $(EMBEDDED_FILES))\",\
+			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
+
+embedded_DEPS += $(EMBEDDED_FILES) $(EMBEDDED_LIST)
+
+CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
+
+# List of trusted root certificates
+#
+TRUSTED_LIST	:= $(BIN)/.trusted.list
+ifeq ($(wildcard $(TRUSTED_LIST)),)
+TRUST_OLD := <invalid>
+else
+TRUST_OLD := $(shell cat $(TRUSTED_LIST))
+endif
+ifneq ($(TRUST_OLD),$(TRUST))
+$(shell $(ECHO) "$(TRUST)" > $(TRUSTED_LIST))
+endif
+
+$(TRUSTED_LIST) :
+
+VERYCLEANUP	+= $(TRUSTED_LIST)
+
+# Trusted root certificate fingerprints
+#
+TRUSTED_CERTS	:= $(subst $(COMMA), ,$(TRUST))
+TRUSTED_FPS	:= $(foreach CERT,$(TRUSTED_CERTS),\
+		     0x$(subst :,$(COMMA) 0x,$(lastword $(subst =, ,\
+			 $(shell $(OPENSSL) x509 -in $(CERT) -noout -sha256 \
+				 -fingerprint))))$(COMMA))
+
+rootcert_DEPS += $(TRUSTED_FILES) $(TRUSTED_LIST)
+
+CFLAGS_rootcert = $(if $(TRUSTED_FPS),-DTRUSTED="$(TRUSTED_FPS)")
+
+# (Single-element) list of client certificates
+#
+CERT_LIST := $(BIN)/.certificate.list
+ifeq ($(wildcard $(CERT_LIST)),)
+CERT_OLD := <invalid>
+else
+CERT_OLD := $(shell cat $(CERT_LIST))
+endif
+ifneq ($(CERT_OLD),$(CERT))
+$(shell $(ECHO) "$(CERT)" > $(CERT_LIST))
+endif
+
+$(CERT_LIST) :
+
+VERYCLEANUP += $(CERT_LIST)
+
+# Embedded client certificate
+#
+CERT_INC := $(BIN)/.certificate.der
+
+ifdef CERT
+$(CERT_INC) : $(CERT) $(CERT_LIST)
+	$(Q)$(OPENSSL) x509 -in $< -outform DER -out $@
+
+clientcert_DEPS += $(CERT_INC)
+endif
+
+CLEANUP += $(CERT_INC)
+
+clientcert_DEPS += $(CERT_LIST)
+
+CFLAGS_clientcert += $(if $(CERT),-DCERTIFICATE="\"$(CERT_INC)\"")
+
+# (Single-element) list of client private keys
+#
+KEY_LIST := $(BIN)/.private_key.list
+ifeq ($(wildcard $(KEY_LIST)),)
+KEY_OLD := <invalid>
+else
+KEY_OLD := $(shell cat $(KEY_LIST))
+endif
+ifneq ($(KEY_OLD),$(KEY))
+$(shell $(ECHO) "$(KEY)" > $(KEY_LIST))
+endif
+
+$(KEY_LIST) :
+
+VERYCLEANUP += $(KEY_LIST)
+
+# Embedded client private key
+#
+KEY_INC := $(BIN)/.private_key.der
+
+ifdef KEY
+$(KEY_INC) : $(KEY) $(KEY_LIST)
+	$(Q)$(OPENSSL) rsa -in $< -outform DER -out $@
+
+clientcert_DEPS += $(KEY_INC)
+endif
+
+CLEANUP += $(KEY_INC)
+
+clientcert_DEPS += $(KEY_LIST)
+
+CFLAGS_clientcert += $(if $(KEY),-DPRIVATE_KEY="\"$(KEY_INC)\"")
+
+# These files use .incbin inline assembly to include a binary file.
+# Unfortunately ccache does not detect this dependency and caches
+# builds even when the binary file has changed.
+#
+$(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
+
+$(BIN)/clientcert.o : override CC := env CCACHE_DISABLE=1 $(CC)
+
 # We automatically generate rules for any file mentioned in AUTO_SRCS
 # using the following set of templates.  It would be cleaner to use
 # $(eval ...), but this function exists only in GNU make >= 3.80.
@@ -532,7 +662,7 @@ define deps_template
 	@$(MKDIR) -p $(BIN)/deps/$(dir $(1))
 	@$(CPP) $(CFLAGS) $(CFLAGS_$(2)) $(CFLAGS_$(3)) -DOBJECT=$(3) \
 		-Wno-error -M $(1) -MG -MP | \
-		sed 's/\.o\s*:/_DEPS =/' > $(BIN)/deps/$(1).d
+		sed 's/\.o\s*:/_DEPS +=/' > $(BIN)/deps/$(1).d
 endef
 
 # rules_template : generate rules for a given source file
@@ -605,136 +735,6 @@ drivers :
 .PHONY : drivers
 roms :
 	@$(ECHO) $(ROMS)
-
-# List of embedded images included in the last build of embedded.o.
-# This is needed in order to correctly rebuild embedded.o whenever the
-# list of objects changes.
-#
-EMBED		:= $(EMBEDDED_IMAGE) # Maintain backwards compatibility
-EMBEDDED_LIST	:= $(BIN)/.embedded.list
-ifeq ($(wildcard $(EMBEDDED_LIST)),)
-EMBED_OLD := <invalid>
-else
-EMBED_OLD := $(shell cat $(EMBEDDED_LIST))
-endif
-ifneq ($(EMBED_OLD),$(EMBED))
-$(shell $(ECHO) "$(EMBED)" > $(EMBEDDED_LIST))
-endif
-
-$(EMBEDDED_LIST) :
-
-VERYCLEANUP	+= $(EMBEDDED_LIST)
-
-EMBEDDED_FILES	:= $(subst $(COMMA), ,$(EMBED))
-EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
-		     EMBED ( $(i), \"$(word $(i), $(EMBEDDED_FILES))\",\
-			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
-
-$(BIN)/embedded.o : $(EMBEDDED_FILES) $(EMBEDDED_LIST)
-
-CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
-
-# List of trusted root certificates
-#
-TRUSTED_LIST	:= $(BIN)/.trusted.list
-ifeq ($(wildcard $(TRUSTED_LIST)),)
-TRUST_OLD := <invalid>
-else
-TRUST_OLD := $(shell cat $(TRUSTED_LIST))
-endif
-ifneq ($(TRUST_OLD),$(TRUST))
-$(shell $(ECHO) "$(TRUST)" > $(TRUSTED_LIST))
-endif
-
-$(TRUSTED_LIST) :
-
-VERYCLEANUP	+= $(TRUSTED_LIST)
-
-# Trusted root certificate fingerprints
-#
-TRUSTED_CERTS	:= $(subst $(COMMA), ,$(TRUST))
-TRUSTED_FPS	:= $(foreach CERT,$(TRUSTED_CERTS),\
-		     0x$(subst :,$(COMMA) 0x,$(lastword $(subst =, ,\
-			 $(shell $(OPENSSL) x509 -in $(CERT) -noout -sha256 \
-				 -fingerprint))))$(COMMA))
-
-$(BIN)/rootcert.o : $(TRUSTED_FILES) $(TRUSTED_LIST)
-
-CFLAGS_rootcert = $(if $(TRUSTED_FPS),-DTRUSTED="$(TRUSTED_FPS)")
-
-# (Single-element) list of client certificates
-#
-CERT_LIST := $(BIN)/.certificate.list
-ifeq ($(wildcard $(CERT_LIST)),)
-CERT_OLD := <invalid>
-else
-CERT_OLD := $(shell cat $(CERT_LIST))
-endif
-ifneq ($(CERT_OLD),$(CERT))
-$(shell $(ECHO) "$(CERT)" > $(CERT_LIST))
-endif
-
-$(CERT_LIST) :
-
-VERYCLEANUP += $(CERT_LIST)
-
-# Embedded client certificate
-#
-CERT_INC := $(BIN)/.certificate.der
-
-ifdef CERT
-$(CERT_INC) : $(CERT) $(CERT_LIST)
-	$(Q)$(OPENSSL) x509 -in $< -outform DER -out $@
-
-$(BIN)/clientcert.o : $(CERT_INC)
-endif
-
-CLEANUP += $(CERT_INC)
-
-$(BIN)/clientcert.o : $(CERT_LIST)
-
-CFLAGS_clientcert += $(if $(CERT),-DCERTIFICATE="\"$(CERT_INC)\"")
-
-# (Single-element) list of client private keys
-#
-KEY_LIST := $(BIN)/.private_key.list
-ifeq ($(wildcard $(KEY_LIST)),)
-KEY_OLD := <invalid>
-else
-KEY_OLD := $(shell cat $(KEY_LIST))
-endif
-ifneq ($(KEY_OLD),$(KEY))
-$(shell $(ECHO) "$(KEY)" > $(KEY_LIST))
-endif
-
-$(KEY_LIST) :
-
-VERYCLEANUP += $(KEY_LIST)
-
-# Embedded client private key
-#
-KEY_INC := $(BIN)/.private_key.der
-
-ifdef KEY
-$(KEY_INC) : $(KEY) $(KEY_LIST)
-	$(Q)$(OPENSSL) rsa -in $< -outform DER -out $@
-
-$(BIN)/clientcert.o : $(KEY_INC)
-endif
-
-CLEANUP += $(KEY_INC)
-
-$(BIN)/clientcert.o : $(KEY_LIST)
-
-CFLAGS_clientcert += $(if $(KEY),-DPRIVATE_KEY="\"$(KEY_INC)\"")
-
-# These files use .incbin inline assembly to include a binary file.
-# Unfortunately ccache does not detect this dependency and caches
-# builds even when the binary file has changed.
-#
-$(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
-
-$(BIN)/clientcert.o : override CC := env CCACHE_DISABLE=1 $(CC)
 
 # Generate error usage information
 #
