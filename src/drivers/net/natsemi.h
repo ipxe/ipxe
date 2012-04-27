@@ -319,8 +319,8 @@ natsemi_address_ok ( struct natsemi_nic *natsemi, physaddr_t address ) {
 	if ( natsemi->flags & NATSEMI_64BIT )
 		return 1;
 
-	/* A 32-bit card can access all address below 4GB */
-	if ( ( address & 0xffffffffUL ) == 0 )
+	/* A 32-bit card can access all addresses below 4GB */
+	if ( ( address & ~0xffffffffULL ) == 0 )
 		return 1;
 
 	return 0;
