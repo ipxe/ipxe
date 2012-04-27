@@ -664,7 +664,7 @@ static void http_step ( struct http_request *http ) {
 
 	/* Allocate dynamic storage */
 	dynamic = malloc ( sizeof ( *dynamic ) );
-	if ( ! malloc ) {
+	if ( ! dynamic ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
