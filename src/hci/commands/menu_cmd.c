@@ -194,6 +194,8 @@ struct choose_options {
 	const char *menu;
 	/** Timeout */
 	unsigned int timeout;
+	/** Default selection */
+	const char *select;
 	/** Keep menu */
 	int keep;
 };
@@ -202,6 +204,8 @@ struct choose_options {
 static struct option_descriptor choose_opts[] = {
 	OPTION_DESC ( "menu", 'm', required_argument,
 		      struct choose_options, menu, parse_string ),
+	OPTION_DESC ( "default", 'd', required_argument,
+		      struct choose_options, select, parse_string ),
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct choose_options, timeout, parse_integer ),
 	OPTION_DESC ( "keep", 'k', no_argument,
@@ -211,8 +215,8 @@ static struct option_descriptor choose_opts[] = {
 /** "choose" command descriptor */
 static struct command_descriptor choose_cmd =
 	COMMAND_DESC ( struct choose_options, choose_opts, 1, 1,
-		       "[--menu <menu>] [--timeout <timeout>] [--keep] "
-		       "<setting>" );
+		       "[--menu <menu>] [--default <label>] "
+		       "[--timeout <timeout>] [--keep] <setting>" );
 
 /**
  * The "choose" command
@@ -240,7 +244,7 @@ static int choose_exec ( int argc, char **argv ) {
 		goto err_parse_menu;
 
 	/* Show menu */
-	if ( ( rc = show_menu ( menu, opts.timeout, &item ) ) != 0 )
+	if ( ( rc = show_menu ( menu, opts.timeout, opts.select, &item ) ) != 0)
 		goto err_show_menu;
 
 	/* Store setting */

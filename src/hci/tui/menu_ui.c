@@ -303,7 +303,7 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
  * @ret rc		Return status code
  */
 int show_menu ( struct menu *menu, unsigned int timeout_ms,
-		struct menu_item **selected ) {
+		const char *select, struct menu_item **selected ) {
 	struct menu_item *item;
 	struct menu_ui ui;
 	int labelled_count = 0;
@@ -318,8 +318,13 @@ int show_menu ( struct menu *menu, unsigned int timeout_ms,
 			if ( ! labelled_count )
 				ui.selected = ui.count;
 			labelled_count++;
-			if ( item->is_default )
-				ui.selected = ui.count;
+			if ( select ) {
+				if ( strcmp ( select, item->label ) == 0 )
+					ui.selected = ui.count;
+			} else {
+				if ( item->is_default )
+					ui.selected = ui.count;
+			}
 		}
 		ui.count++;
 	}
