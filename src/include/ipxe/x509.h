@@ -50,9 +50,9 @@ struct x509_validity {
 	struct x509_time not_after;
 };
 
-/** An X.509 name */
-struct x509_name {
-	/** Name (not NUL-terminated) */
+/** An X.509 string */
+struct x509_string {
+	/** String (not NUL-terminated) */
 	const void *data;
 	/** Length of name */
 	size_t len;
@@ -71,7 +71,7 @@ struct x509_subject {
 	/** Raw subject */
 	struct asn1_cursor raw;
 	/** Common name */
-	struct x509_name name;
+	struct x509_string name;
 	/** Public key information */
 	struct x509_public_key public_key;
 };
@@ -128,6 +128,18 @@ enum x509_extended_key_usage_bits {
 	X509_CODE_SIGNING = 0x0001,
 };
 
+/** X.509 certificate OCSP responder */
+struct x509_ocsp_responder {
+	/** URI */
+	struct x509_string uri;
+};
+
+/** X.509 certificate authority information access */
+struct x509_authority_info_access {
+	/** OCSP responder */
+	struct x509_ocsp_responder ocsp;
+};
+
 /** An X.509 certificate extensions set */
 struct x509_extensions {
 	/** Basic constraints */
@@ -136,6 +148,8 @@ struct x509_extensions {
 	struct x509_key_usage usage;
 	/** Extended key usage */
 	struct x509_extended_key_usage ext_usage;
+	/** Authority information access */
+	struct x509_authority_info_access auth_info;
 };
 
 /** An X.509 certificate */
@@ -186,6 +200,22 @@ struct x509_key_purpose {
 	struct asn1_cursor oid;
 	/** Extended key usage bits */
 	unsigned int bits;
+};
+
+/** An X.509 access method */
+struct x509_access_method {
+	/** Name */
+	const char *name;
+	/** Object identifier */
+	struct asn1_cursor oid;
+	/** Parse access method
+	 *
+	 * @v cert		X.509 certificate
+	 * @v raw		ASN.1 cursor
+	 * @ret rc		Return status code
+	 */
+	int ( * parse ) ( struct x509_certificate *cert,
+			  const struct asn1_cursor *raw );
 };
 
 /** An X.509 root certificate store */

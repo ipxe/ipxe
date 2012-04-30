@@ -1347,7 +1347,7 @@ static int tls_new_certificate ( struct tls_session *tls,
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	struct tls_certificate_context context;
 	struct x509_certificate cert;
-	struct x509_name *name = &cert.subject.name;
+	struct x509_string *name = &cert.subject.name;
 	struct x509_public_key *key = &cert.subject.public_key;
 	time_t now;
 	int rc;

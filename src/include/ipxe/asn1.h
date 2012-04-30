@@ -53,6 +53,9 @@ struct asn1_cursor {
 /** ASN.1 set */
 #define ASN1_SET 0x31
 
+/** ASN.1 implicit tag */
+#define ASN1_IMPLICIT_TAG( number) ( 0x80 | (number) )
+
 /** ASN.1 explicit tag */
 #define ASN1_EXPLICIT_TAG( number) ( 0xa0 | (number) )
 
@@ -157,6 +160,20 @@ struct asn1_cursor {
 	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
 	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
 	ASN1_OID_SINGLE ( 7 ), ASN1_OID_SINGLE ( 2 )
+
+/** ASN.1 OID for id-pe-authorityInfoAccess (1.3.6.1.5.5.7.1.1) */
+#define ASN1_OID_AUTHORITYINFOACCESS				\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 6 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 5 ),		\
+	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 1 )
+
+/** ASN.1 OID for id-ad-ocsp (1.3.6.1.5.5.7.48.1) */
+#define ASN1_OID_OCSP						\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 6 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 5 ),		\
+	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
+	ASN1_OID_SINGLE ( 48 ), ASN1_OID_SINGLE ( 1 )
 
 /** Define an ASN.1 cursor containing an OID */
 #define ASN1_OID_CURSOR( oid_value ) {				\

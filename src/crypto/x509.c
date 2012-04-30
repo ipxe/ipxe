@@ -487,7 +487,7 @@ static int x509_parse_validity ( struct x509_certificate *cert,
  * @ret rc		Return status code
  */
 static int x509_parse_common_name ( struct x509_certificate *cert,
-				    struct x509_name *name,
+				    struct x509_string *name,
 				    const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
 	struct asn1_cursor oid_cursor;
@@ -533,7 +533,7 @@ static int x509_parse_common_name ( struct x509_certificate *cert,
 static int x509_parse_subject ( struct x509_certificate *cert,
 				const struct asn1_cursor *raw ) {
 	struct x509_subject *subject = &cert->subject;
-	struct x509_name *name = &subject->name;
+	struct x509_string *name = &subject->name;
 	int rc;
 
 	/* Record raw subject */
@@ -750,7 +750,7 @@ static int x509_parse_extended_key_usage ( struct x509_certificate *cert,
 	memcpy ( &cursor, raw, sizeof ( cursor ) );
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
-	/* Parse each extension in turn */
+	/* Parse each extended key usage in turn */
 	while ( cursor.len ) {
 		if ( ( rc = x509_parse_key_purpose ( cert, &cursor ) ) != 0 )
 			return rc;
@@ -760,14 +760,145 @@ static int x509_parse_extended_key_usage ( struct x509_certificate *cert,
 	return 0;
 }
 
+/**
+ * Parse X.509 certificate OCSP access method
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int x509_parse_ocsp ( struct x509_certificate *cert,
+			     const struct asn1_cursor *raw ) {
+	struct x509_ocsp_responder *ocsp = &cert->extensions.auth_info.ocsp;
+	struct asn1_cursor cursor;
+	int rc;
+
+	/* Enter accessLocation */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	if ( ( rc = asn1_enter ( &cursor, ASN1_IMPLICIT_TAG ( 6 ) ) ) != 0 ) {
+		DBGC ( cert, "X509 %p OCSP does not contain "
+		       "uniformResourceIdentifier:\n", cert );
+		DBGC_HDA ( cert, 0, raw->data, raw->len );
+		return rc;
+	}
+
+	/* Record URI */
+	ocsp->uri.data = cursor.data;
+	ocsp->uri.len = cursor.len;
+	DBGC ( cert, "X509 %p OCSP URI is:\n", cert );
+	DBGC_HDA ( cert, 0, ocsp->uri.data, ocsp->uri.len );
+
+	return 0;
+}
+
+/** "id-ad-ocsp" object identifier */
+static uint8_t oid_ad_ocsp[] = { ASN1_OID_OCSP };
+
+/** Supported access methods */
+static struct x509_access_method x509_access_methods[] = {
+	{
+		.name = "OCSP",
+		.oid = ASN1_OID_CURSOR ( oid_ad_ocsp ),
+		.parse = x509_parse_ocsp,
+	},
+};
+
+/**
+ * Identify X.509 access method by OID
+ *
+ * @v oid		OID
+ * @ret method		Access method, or NULL
+ */
+static struct x509_access_method *
+x509_find_access_method ( const struct asn1_cursor *oid ) {
+	struct x509_access_method *method;
+	unsigned int i;
+
+	for ( i = 0 ; i < ( sizeof ( x509_access_methods ) /
+			    sizeof ( x509_access_methods[0] ) ) ; i++ ) {
+		method = &x509_access_methods[i];
+		if ( asn1_compare ( &method->oid, oid ) == 0 )
+			return method;
+	}
+
+	return NULL;
+}
+
+/**
+ * Parse X.509 certificate access description
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int x509_parse_access_description ( struct x509_certificate *cert,
+					   const struct asn1_cursor *raw ) {
+	struct asn1_cursor cursor;
+	struct asn1_cursor subcursor;
+	struct x509_access_method *method;
+	int rc;
+
+	/* Enter keyPurposeId */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	asn1_enter ( &cursor, ASN1_SEQUENCE );
+
+	/* Try to identify access method */
+	memcpy ( &subcursor, &cursor, sizeof ( subcursor ) );
+	asn1_enter ( &subcursor, ASN1_OID );
+	method = x509_find_access_method ( &subcursor );
+	asn1_skip_any ( &cursor );
+	DBGC ( cert, "X509 %p found access method %s\n",
+	       cert, ( method ? method->name : "<unknown>" ) );
+
+	/* Parse access location, if applicable */
+	if ( method && ( ( rc = method->parse ( cert, &cursor ) ) != 0 ) )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Parse X.509 certificate authority information access
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int x509_parse_authority_info_access ( struct x509_certificate *cert,
+					      const struct asn1_cursor *raw ) {
+	struct asn1_cursor cursor;
+	int rc;
+
+	/* Enter authorityInfoAccess */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	asn1_enter ( &cursor, ASN1_SEQUENCE );
+
+	/* Parse each access description in turn */
+	while ( cursor.len ) {
+		if ( ( rc = x509_parse_access_description ( cert,
+							    &cursor ) ) != 0 )
+			return rc;
+		asn1_skip_any ( &cursor );
+	}
+
+	return 0;
+}
+
 /** "id-ce-basicConstraints" object identifier */
-static uint8_t oid_ce_basic_constraints[] = { ASN1_OID_BASICCONSTRAINTS };
+static uint8_t oid_ce_basic_constraints[] =
+	{ ASN1_OID_BASICCONSTRAINTS };
 
 /** "id-ce-keyUsage" object identifier */
-static uint8_t oid_ce_key_usage[] = { ASN1_OID_KEYUSAGE };
+static uint8_t oid_ce_key_usage[] =
+	{ ASN1_OID_KEYUSAGE };
 
 /** "id-ce-extKeyUsage" object identifier */
-static uint8_t oid_ce_ext_key_usage[] = { ASN1_OID_EXTKEYUSAGE };
+static uint8_t oid_ce_ext_key_usage[] =
+	{ ASN1_OID_EXTKEYUSAGE };
+
+/** "id-pe-authorityInfoAccess" object identifier */
+static uint8_t oid_pe_authority_info_access[] =
+	{ ASN1_OID_AUTHORITYINFOACCESS };
 
 /** Supported certificate extensions */
 static struct x509_extension x509_extensions[] = {
@@ -785,6 +916,11 @@ static struct x509_extension x509_extensions[] = {
 		.name = "extKeyUsage",
 		.oid = ASN1_OID_CURSOR ( oid_ce_ext_key_usage ),
 		.parse = x509_parse_extended_key_usage,
+	},
+	{
+		.name = "authorityInfoAccess",
+		.oid = ASN1_OID_CURSOR ( oid_pe_authority_info_access ),
+		.parse = x509_parse_authority_info_access,
 	},
 };
 
