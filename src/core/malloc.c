@@ -145,6 +145,18 @@ static unsigned int discard_cache ( void ) {
 }
 
 /**
+ * Discard all cached data
+ *
+ */
+static void discard_all_cache ( void ) {
+	unsigned int discarded;
+
+	do {
+		discarded = discard_cache();
+	} while ( discarded );
+}
+
+/**
  * Allocate a memory block
  *
  * @v size		Requested size
@@ -456,6 +468,19 @@ static void init_heap ( void ) {
 /** Memory allocator initialisation function */
 struct init_fn heap_init_fn __init_fn ( INIT_EARLY ) = {
 	.initialise = init_heap,
+};
+
+/**
+ * Discard all cached data on shutdown
+ *
+ */
+static void shutdown_cache ( int booting __unused ) {
+	discard_all_cache();
+}
+
+/** Memory allocator shutdown function */
+struct startup_fn heap_startup_fn __startup_fn ( STARTUP_EARLY ) = {
+	.shutdown = shutdown_cache,
 };
 
 #if 0
