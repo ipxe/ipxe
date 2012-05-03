@@ -267,7 +267,8 @@ static void settings_test_exec ( void ) {
 			  0x7a, 0x7c, 0xfe, 0x4f, 0xca, 0x4a, 0x57 ),
 		    "1a6a749d-0eda-461a-a87a-7cfe4fca4a57" );
 
-	/* Unregister test settings block */
+	/* Clear and unregister test settings block */
+	clear_settings ( &test_settings );
 	unregister_settings ( &test_settings );
 }
 
