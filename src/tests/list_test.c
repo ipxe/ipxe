@@ -425,7 +425,7 @@ static void list_test_exec ( void ) {
 	pos = &list_tests[7];
 	list_iterate_entry_ok ( list_for_each_entry_continue, "293",
 				pos, list, list );
-	pos = list_entry ( list, struct list_test, list );
+	ok ( pos == list_entry ( list, struct list_test, list ) );
 	list_iterate_entry_ok ( list_for_each_entry_continue, "47293",
 				pos, list, list );
 	pos = &list_tests[3];
@@ -434,7 +434,7 @@ static void list_test_exec ( void ) {
 	pos = &list_tests[2];
 	list_iterate_entry_ok ( list_for_each_entry_continue_reverse, "74",
 				pos, list, list );
-	pos = list_entry ( list, struct list_test, list );
+	ok ( pos == list_entry ( list, struct list_test, list ) );
 	list_iterate_entry_ok ( list_for_each_entry_continue_reverse, "39274",
 				pos, list, list );
 	pos = &list_tests[4];
