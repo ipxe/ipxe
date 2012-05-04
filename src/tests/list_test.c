@@ -119,6 +119,41 @@ static int list_check_contents ( struct list_head *list,
 	} while ( 0 )
 
 /**
+ * Report list iteration test result
+ *
+ * @v macro		Iterator macro
+ * @v expected		Expected contents
+ * @v pos		Iterator
+ * @v ...		Arguments to iterator macro
+ */
+#define list_iterate_ok( macro, expected, pos, ... ) do {	\
+	const char *check = expected;				\
+	macro ( pos, __VA_ARGS__ ) {				\
+		struct list_test *entry =			\
+			list_entry ( pos, struct list_test,	\
+				     list );			\
+		ok ( entry->label == *(check++) );		\
+	}							\
+	ok ( *check == '\0' );					\
+	} while ( 0 )
+
+/**
+ * Report list entry iteration test result
+ *
+ * @v macro		Iterator macro
+ * @v expected		Expected contents
+ * @v pos		Iterator
+ * @v ...		Arguments to iterator macro
+ */
+#define list_iterate_entry_ok( macro, expected, pos, ... ) do {	\
+	const char *check = expected;				\
+	macro ( pos, __VA_ARGS__ ) {				\
+		ok ( (pos)->label == *(check++) );		\
+	}							\
+	ok ( *check == '\0' );					\
+	} while ( 0 )
+
+/**
  * Perform list self-test
  *
  */
@@ -126,6 +161,9 @@ static void list_test_exec ( void ) {
 	struct list_head *list = &test_list;
 	struct list_head target_list;
 	struct list_head *target = &target_list;
+	struct list_head *raw_pos;
+	struct list_test *pos;
+	struct list_test *tmp;
 
 	/* Test initialiser and list_empty() */
 	ok ( list_empty ( list ) );
@@ -346,19 +384,18 @@ static void list_test_exec ( void ) {
 	list_add_tail ( &list_tests[6].list, list );
 	list_add_tail ( &list_tests[7].list, list );
 	list_add_tail ( &list_tests[3].list, list );
-	{
-		char *expected = "673";
-		struct list_head *pos;
-		struct list_test *entry;
-		list_for_each ( pos, list ) {
-			entry = list_entry ( pos, struct list_test, list );
-			ok ( entry->label == *(expected++) );
-		}
-	}
+	list_iterate_ok ( list_for_each, "673", raw_pos, list );
 
-	/* list_for_each_entry() and list_for_each_entry_reverse() are
-	 * already tested as part of list_contents_ok()
-	 */
+	/* Test list_for_each_entry() and list_for_each_entry_reverse() */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[3].list, list );
+	list_add_tail ( &list_tests[2].list, list );
+	list_add_tail ( &list_tests[6].list, list );
+	list_add_tail ( &list_tests[9].list, list );
+	list_iterate_entry_ok ( list_for_each_entry, "3269",
+				pos, list, list );
+	list_iterate_entry_ok ( list_for_each_entry_reverse, "9623",
+				pos, list, list );
 
 	/* Test list_for_each_entry_safe() */
 	INIT_LIST_HEAD ( list );
@@ -367,8 +404,6 @@ static void list_test_exec ( void ) {
 	list_add_tail ( &list_tests[1].list, list );
 	{
 		char *expected = "241";
-		struct list_test *pos;
-		struct list_test *tmp;
 		list_for_each_entry_safe ( pos, tmp, list, list ) {
 			list_contents_ok ( list, expected );
 			list_del ( &pos->list );
@@ -377,6 +412,34 @@ static void list_test_exec ( void ) {
 		}
 	}
 	ok ( list_empty ( list ) );
+
+	/* Test list_for_each_entry_continue() and
+	 * list_for_each_entry_continue_reverse()
+	 */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[4].list, list );
+	list_add_tail ( &list_tests[7].list, list );
+	list_add_tail ( &list_tests[2].list, list );
+	list_add_tail ( &list_tests[9].list, list );
+	list_add_tail ( &list_tests[3].list, list );
+	pos = &list_tests[7];
+	list_iterate_entry_ok ( list_for_each_entry_continue, "293",
+				pos, list, list );
+	pos = list_entry ( list, struct list_test, list );
+	list_iterate_entry_ok ( list_for_each_entry_continue, "47293",
+				pos, list, list );
+	pos = &list_tests[3];
+	list_iterate_entry_ok ( list_for_each_entry_continue, "",
+				pos, list, list );
+	pos = &list_tests[2];
+	list_iterate_entry_ok ( list_for_each_entry_continue_reverse, "74",
+				pos, list, list );
+	pos = list_entry ( list, struct list_test, list );
+	list_iterate_entry_ok ( list_for_each_entry_continue_reverse, "39274",
+				pos, list, list );
+	pos = &list_tests[4];
+	list_iterate_entry_ok ( list_for_each_entry_continue_reverse, "",
+				pos, list, list );
 
 	/* Test list_contains() and list_contains_entry() */
 	INIT_LIST_HEAD ( list );

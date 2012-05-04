@@ -379,6 +379,32 @@ static inline void list_splice_tail_init ( struct list_head *list,
 	      tmp = list_entry ( tmp->member.next, typeof ( *tmp ), member ) )
 
 /**
+ * Iterate over entries in a list, starting after current position
+ *
+ * @v pos		Iterator
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ */
+#define list_for_each_entry_continue( pos, head, member )		      \
+	for ( list_check ( (head) ),					      \
+	      pos = list_entry ( pos->member.next, typeof ( *pos ), member ); \
+	      &pos->member != (head);					      \
+	      pos = list_entry ( pos->member.next, typeof ( *pos ), member ) )
+
+/**
+ * Iterate over entries in a list in reverse, starting after current position
+ *
+ * @v pos		Iterator
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ */
+#define list_for_each_entry_continue_reverse( pos, head, member )	      \
+	for ( list_check ( (head) ),					      \
+	      pos = list_entry ( pos->member.prev, typeof ( *pos ), member ); \
+	      &pos->member != (head);					      \
+	      pos = list_entry ( pos->member.prev, typeof ( *pos ), member ) )
+
+/**
  * Test if list contains a specified entry
  *
  * @v entry		Entry
