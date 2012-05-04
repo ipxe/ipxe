@@ -105,11 +105,36 @@ static char heap[HEAP_SIZE] __attribute__ (( aligned ( __alignof__(void *) )));
 static inline void valgrind_make_blocks_defined ( void ) {
 	struct memory_block *block;
 
-	if ( RUNNING_ON_VALGRIND > 0 ) {
-		VALGRIND_MAKE_MEM_DEFINED ( &free_blocks,
-					    sizeof ( free_blocks ) );
-		list_for_each_entry ( block, &free_blocks, list )
-			VALGRIND_MAKE_MEM_DEFINED ( block, sizeof ( *block ) );
+	if ( RUNNING_ON_VALGRIND <= 0 )
+		return;
+
+	/* Traverse free block list, marking each block structure as
+	 * defined.  Some contortions are necessary to avoid errors
+	 * from list_check().
+	 */
+
+	/* Mark block list itself as defined */
+	VALGRIND_MAKE_MEM_DEFINED ( &free_blocks, sizeof ( free_blocks ) );
+
+	/* Mark areas accessed by list_check() as defined */
+	VALGRIND_MAKE_MEM_DEFINED ( &free_blocks.prev->next,
+				    sizeof ( free_blocks.prev->next ) );
+	VALGRIND_MAKE_MEM_DEFINED ( free_blocks.next,
+				    sizeof ( *free_blocks.next ) );
+	VALGRIND_MAKE_MEM_DEFINED ( &free_blocks.next->next->prev,
+				    sizeof ( free_blocks.next->next->prev ) );
+
+	/* Mark each block in list as defined */
+	list_for_each_entry ( block, &free_blocks, list ) {
+
+		/* Mark block as defined */
+		VALGRIND_MAKE_MEM_DEFINED ( block, sizeof ( *block ) );
+
+		/* Mark areas accessed by list_check() as defined */
+		VALGRIND_MAKE_MEM_DEFINED ( block->list.next,
+					    sizeof ( *block->list.next ) );
+		VALGRIND_MAKE_MEM_DEFINED ( &block->list.next->next->prev,
+				      sizeof ( block->list.next->next->prev ) );
 	}
 }
 
@@ -119,14 +144,45 @@ static inline void valgrind_make_blocks_defined ( void ) {
  */
 static inline void valgrind_make_blocks_noaccess ( void ) {
 	struct memory_block *block;
-	struct memory_block *tmp;
+	struct memory_block *prev = NULL;
 
-	if ( RUNNING_ON_VALGRIND > 0 ) {
-		list_for_each_entry_safe ( block, tmp, &free_blocks, list )
-			VALGRIND_MAKE_MEM_NOACCESS ( block, sizeof ( *block ) );
-		VALGRIND_MAKE_MEM_NOACCESS ( &free_blocks,
-					     sizeof ( free_blocks ) );
+	if ( RUNNING_ON_VALGRIND <= 0 )
+		return;
+
+	/* Traverse free block list, marking each block structure as
+	 * inaccessible.  Some contortions are necessary to avoid
+	 * errors from list_check().
+	 */
+
+	/* Mark each block in list as inaccessible */
+	list_for_each_entry ( block, &free_blocks, list ) {
+
+		/* Mark previous block (if any) as inaccessible. (Current
+		 * block will be accessed by list_check().)
+		 */
+		if ( prev )
+			VALGRIND_MAKE_MEM_NOACCESS ( prev, sizeof ( *prev ) );
+		prev = block;
+
+		/* At the end of the list, list_check() will end up
+		 * accessing the first list item.  Temporarily mark
+		 * this area as defined.
+		 */
+		VALGRIND_MAKE_MEM_DEFINED ( &free_blocks.next->prev,
+					    sizeof ( free_blocks.next->prev ) );
 	}
+	/* Mark last block (if any) as inaccessible */
+	if ( prev )
+		VALGRIND_MAKE_MEM_NOACCESS ( prev, sizeof ( *prev ) );
+
+	/* Mark as inaccessible the area that was temporarily marked
+	 * as defined to avoid errors from list_check().
+	 */
+	VALGRIND_MAKE_MEM_NOACCESS ( &free_blocks.next->prev,
+				     sizeof ( free_blocks.next->prev ) );
+
+	/* Mark block list itself as inaccessible */
+	VALGRIND_MAKE_MEM_NOACCESS ( &free_blocks, sizeof ( free_blocks ) );
 }
 
 /**
