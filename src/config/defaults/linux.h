@@ -15,7 +15,7 @@
 #define SMBIOS_LINUX
 #define SANBOOT_NULL
 #define ENTROPY_LINUX
-#define TIME_NULL
+#define TIME_LINUX
 
 #define DRIVERS_LINUX
 

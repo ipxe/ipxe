@@ -37,7 +37,6 @@ FILE_LICENCE(GPL2_OR_LATER);
 #include <linux/types.h>
 #include <linux/posix_types.h>
 typedef __kernel_pid_t pid_t;
-typedef __kernel_time_t time_t;
 typedef __kernel_suseconds_t suseconds_t;
 typedef __kernel_loff_t loff_t;
 #include <linux/time.h>
