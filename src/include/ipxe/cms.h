@@ -13,37 +13,62 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/asn1.h>
 #include <ipxe/crypto.h>
 #include <ipxe/x509.h>
+#include <ipxe/refcnt.h>
 #include <ipxe/uaccess.h>
 
 /** CMS signer information */
 struct cms_signer_info {
-	/** Issuer name */
-	struct asn1_cursor issuer;
-	/** Serial number */
-	struct asn1_cursor serial;
+	/** List of signer information blocks */
+	struct list_head list;
+
+	/** Certificate chain */
+	struct x509_chain *chain;
+
 	/** Digest algorithm */
 	struct digest_algorithm *digest;
 	/** Public-key algorithm */
 	struct pubkey_algorithm *pubkey;
+
 	/** Signature */
-	const void *signature;
+	void *signature;
 	/** Length of signature */
 	size_t signature_len;
 };
 
 /** A CMS signature */
 struct cms_signature {
-	/** Raw certificate list */
-	struct asn1_cursor certificates;
-	/** Signer information
-	 *
-	 * We currently use only the first signer information block.
-	 */
-	struct cms_signer_info info;
+	/** Reference count */
+	struct refcnt refcnt;
+	/** List of all certificates */
+	struct x509_chain *certificates;
+	/** List of signer information blocks */
+	struct list_head info;
 };
 
-extern int cms_parse ( struct cms_signature *sig, const void *data,
-		       size_t len );
+/**
+ * Get reference to CMS signature
+ *
+ * @v sig		CMS signature
+ * @ret sig		CMS signature
+ */
+static inline __attribute__ (( always_inline )) struct cms_signature *
+cms_get ( struct cms_signature *sig ) {
+	ref_get ( &sig->refcnt );
+	return sig;
+}
+
+/**
+ * Drop reference to CMS signature
+ *
+ * @v sig		CMS signature
+ */
+static inline __attribute__ (( always_inline )) void
+cms_put ( struct cms_signature *sig ) {
+	ref_put ( &sig->refcnt );
+}
+
+extern int cms_signature ( const void *data, size_t len,
+			   struct cms_signature **sig );
 extern int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
 			const char *name, time_t time, struct x509_root *root );
 

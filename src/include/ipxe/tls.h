@@ -235,6 +235,9 @@ struct tls_session {
 	/** Public-key algorithm used for Certificate Verify (if sent) */
 	struct pubkey_algorithm *verify_pubkey;
 
+	/** Server certificate chain */
+	struct x509_chain *chain;
+
 	/** TX sequence number */
 	uint64_t tx_seq;
 	/** TX pending transmissions */

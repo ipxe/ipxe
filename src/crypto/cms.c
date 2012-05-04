@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <ipxe/asn1.h>
 #include <ipxe/x509.h>
+#include <ipxe/malloc.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/cms.h>
 
@@ -44,14 +45,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EACCES_NON_CODE_SIGNING )
 #define EINFO_EACCES_NON_CODE_SIGNING \
 	__einfo_uniqify ( EINFO_EACCES, 0x02, "Not a code-signing certificate" )
-#define EACCES_INCOMPLETE \
-	__einfo_error ( EINFO_EACCES_INCOMPLETE )
-#define EINFO_EACCES_INCOMPLETE \
-	__einfo_uniqify ( EINFO_EACCES, 0x03, "Incomplete certificate chain" )
 #define EACCES_WRONG_NAME \
 	__einfo_error ( EINFO_EACCES_WRONG_NAME )
 #define EINFO_EACCES_WRONG_NAME \
 	__einfo_uniqify ( EINFO_EACCES, 0x04, "Incorrect certificate name" )
+#define EACCES_NO_SIGNATURES \
+	__einfo_error ( EINFO_EACCES_NO_SIGNATURES )
+#define EINFO_EACCES_NO_SIGNATURES \
+	__einfo_uniqify ( EINFO_EACCES, 0x05, "No signatures present" )
 #define EINVAL_DIGEST \
 	__einfo_error ( EINFO_EINVAL_DIGEST )
 #define EINFO_EINVAL_DIGEST \
@@ -108,6 +109,113 @@ static int cms_parse_content_type ( struct cms_signature *sig,
 }
 
 /**
+ * Parse CMS signature certificate list
+ *
+ * @v sig		CMS signature
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int cms_parse_certificates ( struct cms_signature *sig,
+				    const struct asn1_cursor *raw ) {
+	struct asn1_cursor cursor;
+	struct x509_certificate *cert;
+	int rc;
+
+	/* Enter certificates */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	asn1_enter ( &cursor, ASN1_EXPLICIT_TAG ( 0 ) );
+
+	/* Add each certificate */
+	while ( cursor.len ) {
+
+		/* Parse certificate */
+		if ( ( rc = x509_certificate ( cursor.data, cursor.len,
+					       &cert ) ) != 0 ) {
+			DBGC ( sig, "CMS %p could not parse certificate: %s\n",
+			       sig, strerror ( rc) );
+			DBGC_HDA ( sig, 0, cursor.data, cursor.len );
+			goto err_parse;
+		}
+		DBGC ( sig, "CMS %p found certificate %s\n",
+		       sig, cert->subject.name );
+
+		/* Add certificate to list */
+		if ( ( rc = x509_append ( sig->certificates, cert ) ) != 0 ) {
+			DBGC ( sig, "CMS %p could not append certificate: %s\n",
+			       sig, strerror ( rc ) );
+			goto err_append;
+		}
+
+		/* Drop reference to certificate */
+		x509_put ( cert );
+		cert = NULL;
+
+		/* Move to next certificate */
+		asn1_skip_any ( &cursor );
+	}
+
+	return 0;
+
+ err_append:
+	x509_put ( cert );
+ err_parse:
+	return rc;
+}
+
+/**
+ * Identify CMS signature certificate by issuer and serial number
+ *
+ * @v sig		CMS signature
+ * @v issuer		Issuer
+ * @v serial		Serial number
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+static struct x509_certificate *
+cms_find_issuer_serial ( struct cms_signature *sig,
+			 const struct asn1_cursor *issuer,
+			 const struct asn1_cursor *serial ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Scan through certificate list */
+	list_for_each_entry ( link, &sig->certificates->links, list ) {
+
+		/* Check issuer and serial number */
+		cert = link->cert;
+		if ( ( asn1_compare ( issuer, &cert->issuer.raw ) == 0 ) &&
+		     ( asn1_compare ( serial, &cert->serial.raw ) == 0 ) )
+			return cert;
+	}
+
+	return NULL;
+}
+
+/**
+ * Identify CMS signature certificate by subject
+ *
+ * @v sig		CMS signature
+ * @v subject		Subject
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+static struct x509_certificate *
+cms_find_subject ( struct cms_signature *sig,
+		   const struct asn1_cursor *subject ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Scan through certificate list */
+	list_for_each_entry ( link, &sig->certificates->links, list ) {
+
+		/* Check subject */
+		cert = link->cert;
+		if ( asn1_compare ( subject, &cert->subject.raw ) == 0 )
+			return cert;
+	}
+
+	return NULL;
+}
+
+/**
  * Parse CMS signature signer identifier
  *
  * @v sig		CMS signature
@@ -119,34 +227,63 @@ static int cms_parse_signer_identifier ( struct cms_signature *sig,
 					 struct cms_signer_info *info,
 					 const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
+	struct asn1_cursor serial;
+	struct asn1_cursor issuer;
+	struct x509_certificate *cert;
+	struct x509_certificate *previous;
 	int rc;
 
 	/* Enter issuerAndSerialNumber */
 	memcpy ( &cursor, raw, sizeof ( cursor ) );
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
-	/* Record issuer */
-	memcpy ( &info->issuer, &cursor, sizeof ( info->issuer ) );
-	if ( ( rc = asn1_shrink ( &info->issuer, ASN1_SEQUENCE ) ) != 0 ) {
+	/* Identify issuer */
+	memcpy ( &issuer, &cursor, sizeof ( issuer ) );
+	if ( ( rc = asn1_shrink ( &issuer, ASN1_SEQUENCE ) ) != 0 ) {
 		DBGC ( sig, "CMS %p/%p could not locate issuer: %s\n",
 		       sig, info, strerror ( rc ) );
 		DBGC_HDA ( sig, 0, raw->data, raw->len );
 		return rc;
 	}
 	DBGC ( sig, "CMS %p/%p issuer is:\n", sig, info );
-	DBGC_HDA ( sig, 0, info->issuer.data, info->issuer.len );
+	DBGC_HDA ( sig, 0, issuer.data, issuer.len );
 	asn1_skip_any ( &cursor );
 
-	/* Record serialNumber */
-	memcpy ( &info->serial, &cursor, sizeof ( info->serial ) );
-	if ( ( rc = asn1_shrink ( &info->serial, ASN1_INTEGER ) ) != 0 ) {
+	/* Identify serialNumber */
+	memcpy ( &serial, &cursor, sizeof ( serial ) );
+	if ( ( rc = asn1_shrink ( &serial, ASN1_INTEGER ) ) != 0 ) {
 		DBGC ( sig, "CMS %p/%p could not locate serialNumber: %s\n",
 		       sig, info, strerror ( rc ) );
 		DBGC_HDA ( sig, 0, raw->data, raw->len );
 		return rc;
 	}
 	DBGC ( sig, "CMS %p/%p serial number is:\n", sig, info );
-	DBGC_HDA ( sig, 0, info->serial.data, info->serial.len );
+	DBGC_HDA ( sig, 0, serial.data, serial.len );
+
+	/* Identify certificate */
+	cert = cms_find_issuer_serial ( sig, &issuer, &serial );
+	if ( ! cert ) {
+		DBGC ( sig, "CMS %p/%p could not identify signer's "
+		       "certificate\n", sig, info );
+		return -ENOENT;
+	}
+
+	/* Create certificate chain */
+	do {
+		/* Add certificate to chain */
+		if ( ( rc = x509_append ( info->chain, cert ) ) != 0 ) {
+			DBGC ( sig, "CMS %p/%p could not append certificate: "
+			       "%s\n", sig, info, strerror ( rc ) );
+			return rc;
+		}
+		DBGC ( sig, "CMS %p/%p added certificate %s\n",
+		       sig, info, cert->subject.name );
+
+		/* Locate next certificate in chain, if any */
+		previous = cert;
+		cert = cms_find_subject ( sig, &cert->issuer.raw );
+
+	} while ( ( cert != NULL ) && ( cert != previous ) );
 
 	return 0;
 }
@@ -249,8 +386,11 @@ static int cms_parse_signature_value ( struct cms_signature *sig,
 	}
 
 	/* Record signature */
-	info->signature = cursor.data;
 	info->signature_len = cursor.len;
+	info->signature = malloc ( info->signature_len );
+	if ( ! info->signature )
+		return -ENOMEM;
+	memcpy ( info->signature, cursor.data, info->signature_len );
 	DBGC ( sig, "CMS %p/%p signature value is:\n", sig, info );
 	DBGC_HDA ( sig, 0, info->signature, info->signature_len );
 
@@ -307,23 +447,21 @@ static int cms_parse_signer_info ( struct cms_signature *sig,
  * Parse CMS signature from ASN.1 data
  *
  * @v sig		CMS signature
- * @v data		Raw signature data
- * @v len		Length of raw data
+ * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-int cms_parse ( struct cms_signature *sig, const void *data, size_t len ) {
+static int cms_parse ( struct cms_signature *sig,
+		       const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
+	struct cms_signer_info *info;
 	int rc;
 
-	/* Initialise signature */
-	memset ( sig, 0, sizeof ( *sig ) );
-	cursor.data = data;
-	cursor.len = len;
-
 	/* Enter contentInfo */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Parse contentType */
+
 	if ( ( rc = cms_parse_content_type ( sig, &cursor ) ) != 0 )
 		return rc;
 	asn1_skip_any ( &cursor );
@@ -343,14 +481,9 @@ int cms_parse ( struct cms_signature *sig, const void *data, size_t len ) {
 	/* Skip encapContentInfo */
 	asn1_skip ( &cursor, ASN1_SEQUENCE );
 
-	/* Record certificates */
-	memcpy ( &sig->certificates, &cursor, sizeof ( sig->certificates ) );
-	if ( ( rc = asn1_enter ( &sig->certificates,
-				 ASN1_EXPLICIT_TAG ( 0 ) ) ) != 0 ) {
-		DBGC ( sig, "CMS %p could not locate certificates:\n", sig );
-		DBGC_HDA ( sig, 0, data, len );
+	/* Parse certificates */
+	if ( ( rc = cms_parse_certificates ( sig, &cursor ) ) != 0 )
 		return rc;
-	}
 	asn1_skip_any ( &cursor );
 
 	/* Skip crls, if present */
@@ -359,77 +492,100 @@ int cms_parse ( struct cms_signature *sig, const void *data, size_t len ) {
 	/* Enter signerInfos */
 	asn1_enter ( &cursor, ASN1_SET );
 
-	/* Parse first signerInfo */
-	if ( ( rc = cms_parse_signer_info ( sig, &sig->info, &cursor ) ) != 0 )
-		return rc;
+	/* Add each signerInfo.  Errors are handled by ensuring that
+	 * cms_put() will always be able to free any allocated memory.
+	 */
+	while ( cursor.len ) {
+
+		/* Allocate signer information block */
+		info = zalloc ( sizeof ( *info ) );
+		if ( ! info )
+			return -ENOMEM;
+		list_add ( &info->list, &sig->info );
+
+		/* Allocate certificate chain */
+		info->chain = x509_alloc_chain();
+		if ( ! info->chain )
+			return -ENOMEM;
+
+		/* Parse signerInfo */
+		if ( ( rc = cms_parse_signer_info ( sig, info,
+						    &cursor ) ) != 0 )
+			return rc;
+		asn1_skip_any ( &cursor );
+	}
 
 	return 0;
 }
 
-/** CMS certificate chain context */
-struct cms_chain_context {
-	/** Signature */
-	struct cms_signature *sig;
-	/** Signer information */
+/**
+ * Free CMS signature
+ *
+ * @v refcnt		Reference count
+ */
+static void cms_free ( struct refcnt *refcnt ) {
+	struct cms_signature *sig =
+		container_of ( refcnt, struct cms_signature, refcnt );
 	struct cms_signer_info *info;
-};
+	struct cms_signer_info *tmp;
+
+	list_for_each_entry_safe ( info, tmp, &sig->info, list ) {
+		list_del ( &info->list );
+		x509_chain_put ( info->chain );
+		free ( info->signature );
+		free ( info );
+	}
+	x509_chain_put ( sig->certificates );
+	free ( sig );
+}
 
 /**
- * Parse next certificate in chain
+ * Create CMS signature
  *
- * @v cert		X.509 certificate to parse
- * @v previous		Previous X.509 certificate, or NULL
- * @v ctx		Chain context
+ * @v data		Raw signature data
+ * @v len		Length of raw data
+ * @ret sig		CMS signature
  * @ret rc		Return status code
+ *
+ * On success, the caller holds a reference to the CMS signature, and
+ * is responsible for ultimately calling cms_put().
  */
-static int cms_parse_next ( struct x509_certificate *cert,
-			    const struct x509_certificate *previous,
-			    void *ctx ) {
-	struct cms_chain_context *context = ctx;
-	struct cms_signature *sig = context->sig;
-	struct cms_signer_info *info = context->info;
+int cms_signature ( const void *data, size_t len, struct cms_signature **sig ) {
 	struct asn1_cursor cursor;
 	int rc;
 
-	/* Search for relevant certificate */
-	memcpy ( &cursor, &sig->certificates, sizeof ( cursor ) );
-	while ( cursor.len ) {
+	/* Allocate and initialise signature */
+	*sig = zalloc ( sizeof ( **sig ) );
+	if ( ! *sig ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	ref_init ( &(*sig)->refcnt, cms_free );
+	INIT_LIST_HEAD ( &(*sig)->info );
 
-		/* Parse certificate */
-		if ( ( rc = x509_parse ( cert, cursor.data,
-					 cursor.len ) ) != 0 ) {
-			DBGC ( sig, "CMS %p/%p could not parse certificate:\n",
-			       sig, info );
-			DBGC_HDA ( sig, 0, cursor.data, cursor.len );
-			return rc;
-		}
-
-		if ( previous == NULL ) {
-			/* First certificate: check issuer and serial
-			 * number against signer info
-			 */
-			if ( ( asn1_compare ( &info->issuer,
-					      &cert->issuer.raw ) == 0 ) &&
-			     ( asn1_compare ( &info->serial,
-					      &cert->serial.raw ) == 0 ) ) {
-				return 0;
-			}
-		} else {
-			/* Subsequent certificates: check subject
-			 * against previous certificate's issuer.
-			 */
-			if ( asn1_compare ( &previous->issuer.raw,
-					    &cert->subject.raw ) == 0 ) {
-				return 0;
-			}
-		}
-
-		/* Move to next certificate */
-		asn1_skip_any ( &cursor );
+	/* Allocate certificate list */
+	(*sig)->certificates = x509_alloc_chain();
+	if ( ! (*sig)->certificates ) {
+		rc = -ENOMEM;
+		goto err_alloc_chain;
 	}
 
-	DBGC ( sig, "CMS %p/%p reached end of certificate chain\n", sig, info );
-	return -EACCES_INCOMPLETE;
+	/* Initialise cursor */
+	cursor.data = data;
+	cursor.len = len;
+	asn1_shrink_any ( &cursor );
+
+	/* Parse signature */
+	if ( ( rc = cms_parse ( *sig, &cursor ) ) != 0 )
+		goto err_parse;
+
+	return 0;
+
+ err_parse:
+ err_alloc_chain:
+	cms_put ( *sig );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -525,7 +681,6 @@ static int cms_verify_digest ( struct cms_signature *sig,
  * @v info		Signer information
  * @v data		Signed data
  * @v len		Length of signed data
- * @v name		Required common name, or NULL to allow any name
  * @v time		Time at which to validate certificates
  * @v root		Root certificate store, or NULL to use default
  * @ret rc		Return status code
@@ -533,48 +688,37 @@ static int cms_verify_digest ( struct cms_signature *sig,
 static int cms_verify_signer_info ( struct cms_signature *sig,
 				    struct cms_signer_info *info,
 				    userptr_t data, size_t len,
-				    const char *name, time_t time,
-				    struct x509_root *root ) {
-	struct cms_chain_context context;
-	struct x509_certificate cert;
+				    time_t time, struct x509_root *root ) {
+	struct x509_certificate *cert;
 	int rc;
 
 	/* Validate certificate chain */
-	context.sig = sig;
-	context.info = info;
-	if ( ( rc = x509_validate_chain ( cms_parse_next, &context, time, root,
-					  &cert ) ) != 0 ) {
+	if ( ( rc = x509_validate_chain ( info->chain, time, root ) ) != 0 ) {
 		DBGC ( sig, "CMS %p/%p could not validate chain: %s\n",
 		       sig, info, strerror ( rc ) );
 		return rc;
 	}
 
+	/* Extract code-signing certificate */
+	cert = x509_first ( info->chain );
+	assert ( cert != NULL );
+
 	/* Check that certificate can create digital signatures */
-	if ( ! ( cert.extensions.usage.bits & X509_DIGITAL_SIGNATURE ) ) {
+	if ( ! ( cert->extensions.usage.bits & X509_DIGITAL_SIGNATURE ) ) {
 		DBGC ( sig, "CMS %p/%p certificate cannot create signatures\n",
 		       sig, info );
 		return -EACCES_NON_SIGNING;
 	}
 
 	/* Check that certificate can sign code */
-	if ( ! ( cert.extensions.ext_usage.bits & X509_CODE_SIGNING ) ) {
+	if ( ! ( cert->extensions.ext_usage.bits & X509_CODE_SIGNING ) ) {
 		DBGC ( sig, "CMS %p/%p certificate is not code-signing\n",
 		       sig, info );
 		return -EACCES_NON_CODE_SIGNING;
 	}
 
-	/* Check certificate name, if applicable */
-	if ( ( name != NULL ) &&
-	     ( ( cert.subject.name.len != strlen ( name ) ) ||
-	       ( memcmp ( cert.subject.name.data, name,
-			  cert.subject.name.len ) != 0 ) ) ) {
-		DBGC ( sig, "CMS %p/%p certificate name incorrect\n",
-		       sig, info );
-		return -EACCES_WRONG_NAME;
-	}
-
 	/* Verify digest */
-	if ( ( rc = cms_verify_digest ( sig, info, &cert, data, len ) ) != 0 )
+	if ( ( rc = cms_verify_digest ( sig, info, cert, data, len ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -586,19 +730,40 @@ static int cms_verify_signer_info ( struct cms_signature *sig,
  * @v sig		CMS signature
  * @v data		Signed data
  * @v len		Length of signed data
- * @v name		Required common name, or NULL to allow any name
+ * @v name		Required common name, or NULL to check all signatures
  * @v time		Time at which to validate certificates
  * @v root		Root certificate store, or NULL to use default
  * @ret rc		Return status code
  */
 int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
 		 const char *name, time_t time, struct x509_root *root ) {
+	struct cms_signer_info *info;
+	struct x509_certificate *cert;
+	int count = 0;
 	int rc;
 
-	/* Verify using first signerInfo */
-	if ( ( rc = cms_verify_signer_info ( sig, &sig->info, data, len,
-					     name, time, root ) ) != 0 )
-		return rc;
+	/* Verify using all signerInfos */
+	list_for_each_entry ( info, &sig->info, list ) {
+		cert = x509_first ( info->chain );
+		if ( name && ( strcmp ( name, cert->subject.name ) != 0 ) )
+			continue;
+		if ( ( rc = cms_verify_signer_info ( sig, info, data, len,
+						     time, root ) ) != 0 )
+			return rc;
+		count++;
+	}
+
+	/* Check that we have verified at least one signature */
+	if ( count == 0 ) {
+		if ( name ) {
+			DBGC ( sig, "CMS %p had no signatures matching name "
+			       "%s\n", sig, name );
+			return -EACCES_WRONG_NAME;
+		} else {
+			DBGC ( sig, "CMS %p had no signatures\n", sig );
+			return -EACCES_NO_SIGNATURES;
+		}
+	}
 
 	return 0;
 }

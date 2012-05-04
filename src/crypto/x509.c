@@ -18,11 +18,14 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
 #include <errno.h>
 #include <assert.h>
+#include <ipxe/list.h>
+#include <ipxe/malloc.h>
 #include <ipxe/asn1.h>
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
@@ -97,6 +100,58 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EACCES_UNTRUSTED )
 #define EINFO_EACCES_UNTRUSTED \
 	__einfo_uniqify ( EINFO_EACCES, 0x06, "Untrusted root certificate" )
+#define EACCES_OUT_OF_ORDER \
+	__einfo_error ( EINFO_EACCES_OUT_OF_ORDER )
+#define EINFO_EACCES_OUT_OF_ORDER \
+	__einfo_uniqify ( EINFO_EACCES, 0x07, "Validation out of order" )
+#define EACCES_EMPTY \
+	__einfo_error ( EINFO_EACCES_EMPTY )
+#define EINFO_EACCES_EMPTY \
+	__einfo_uniqify ( EINFO_EACCES, 0x08, "Empty certificate chain" )
+
+/** Certificate cache */
+static LIST_HEAD ( x509_cache );
+
+/**
+ * Free X.509 certificate
+ *
+ * @v refcnt		Reference count
+ */
+static void x509_free ( struct refcnt *refcnt ) {
+	struct x509_certificate *cert =
+		container_of ( refcnt, struct x509_certificate, refcnt );
+
+	DBGC ( cert, "X509 %p freed\n", cert );
+	free ( cert->subject.name );
+	free ( cert->extensions.auth_info.ocsp.uri );
+	free ( cert );
+}
+
+/**
+ * Discard a cached certificate
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int x509_discard ( void ) {
+	struct x509_certificate *cert;
+
+	/* Discard the least recently used certificate for which the
+	 * only reference is held by the cache itself.
+	 */
+	list_for_each_entry_reverse ( cert, &x509_cache, list ) {
+		if ( cert->refcnt.count == 0 ) {
+			list_del ( &cert->list );
+			x509_put ( cert );
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/** X.509 cache discarder */
+struct cache_discarder x509_cache_discarder __cache_discarder = {
+	.discard = x509_discard,
+};
 
 /** "commonName" object identifier */
 static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
@@ -113,9 +168,9 @@ static struct asn1_cursor oid_common_name_cursor =
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-int x509_parse_pubkey_algorithm ( struct x509_certificate *cert,
-				  struct asn1_algorithm **algorithm,
-				  const struct asn1_cursor *raw ) {
+static int x509_parse_pubkey_algorithm ( struct x509_certificate *cert,
+					 struct asn1_algorithm **algorithm,
+					 const struct asn1_cursor *raw ) {
 
 	/* Parse algorithm */
 	*algorithm = asn1_algorithm ( raw );
@@ -486,8 +541,7 @@ static int x509_parse_validity ( struct x509_certificate *cert,
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int x509_parse_common_name ( struct x509_certificate *cert,
-				    struct x509_string *name,
+static int x509_parse_common_name ( struct x509_certificate *cert, char **name,
 				    const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
 	struct asn1_cursor oid_cursor;
@@ -500,6 +554,8 @@ static int x509_parse_common_name ( struct x509_certificate *cert,
 
 	/* Scan through name list */
 	for ( ; cursor.len ; asn1_skip_any ( &cursor ) ) {
+
+		/* Check for "commonName" OID */
 		memcpy ( &oid_cursor, &cursor, sizeof ( oid_cursor ) );
 		asn1_enter ( &oid_cursor, ASN1_SET );
 		asn1_enter ( &oid_cursor, ASN1_SEQUENCE );
@@ -513,8 +569,12 @@ static int x509_parse_common_name ( struct x509_certificate *cert,
 			DBGC_HDA ( cert, 0, raw->data, raw->len );
 			return rc;
 		}
-		name->data = name_cursor.data;
-		name->len = name_cursor.len;
+
+		/* Allocate name */
+		*name = zalloc ( name_cursor.len + 1 /* NUL */ );
+		if ( ! *name )
+			return -ENOMEM;
+		memcpy ( *name, name_cursor.data, name_cursor.len );
 		return 0;
 	}
 
@@ -533,7 +593,7 @@ static int x509_parse_common_name ( struct x509_certificate *cert,
 static int x509_parse_subject ( struct x509_certificate *cert,
 				const struct asn1_cursor *raw ) {
 	struct x509_subject *subject = &cert->subject;
-	struct x509_string *name = &subject->name;
+	char **name = &subject->name;
 	int rc;
 
 	/* Record raw subject */
@@ -545,8 +605,7 @@ static int x509_parse_subject ( struct x509_certificate *cert,
 	/* Parse common name */
 	if ( ( rc = x509_parse_common_name ( cert, name, raw ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p common name is:\n", cert );
-	DBGC_HDA ( cert, 0, name->data, name->len );
+	DBGC ( cert, "X509 %p common name is \"%s\":\n", cert, *name );
 
 	return 0;
 }
@@ -625,7 +684,7 @@ static int x509_parse_basic_constraints ( struct x509_certificate *cert,
 		return 0;
 
 	/* Parse "pathLenConstraint", if present and applicable */
-	basic->path_len = -1U; /* Default is unlimited */
+	basic->path_len = X509_PATH_LEN_UNLIMITED;
 	if ( asn1_type ( &cursor ) == ASN1_INTEGER ) {
 		if ( ( rc = asn1_integer ( &cursor, &path_len ) ) != 0 ) {
 			DBGC ( cert, "X509 %p cannot parse pathLenConstraint: "
@@ -783,10 +842,11 @@ static int x509_parse_ocsp ( struct x509_certificate *cert,
 	}
 
 	/* Record URI */
-	ocsp->uri.data = cursor.data;
-	ocsp->uri.len = cursor.len;
-	DBGC ( cert, "X509 %p OCSP URI is:\n", cert );
-	DBGC_HDA ( cert, 0, ocsp->uri.data, ocsp->uri.len );
+	ocsp->uri = zalloc ( cursor.len + 1 /* NUL */ );
+	if ( ! ocsp->uri )
+		return -ENOMEM;
+	memcpy ( ocsp->uri, cursor.data, cursor.len );
+	DBGC ( cert, "X509 %p OCSP URI is %s:\n", cert, ocsp->uri );
 
 	return 0;
 }
@@ -1112,25 +1172,22 @@ static int x509_parse_tbscertificate ( struct x509_certificate *cert,
  * Parse X.509 certificate from ASN.1 data
  *
  * @v cert		X.509 certificate
- * @v data		Raw certificate data
- * @v len		Length of raw data
+ * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-int x509_parse ( struct x509_certificate *cert, const void *data, size_t len ) {
+static int x509_parse ( struct x509_certificate *cert,
+			const struct asn1_cursor *raw ) {
 	struct x509_signature *signature = &cert->signature;
 	struct asn1_algorithm **signature_algorithm = &signature->algorithm;
 	struct x509_bit_string *signature_value = &signature->value;
 	struct asn1_cursor cursor;
 	int rc;
 
-	/* Initialise certificate */
-	memset ( cert, 0, sizeof ( *cert ) );
-	cert->raw.data = data;
-	cert->raw.len = len;
-	asn1_shrink_any ( &cert->raw );
+	/* Record raw certificate */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	memcpy ( &cert->raw, &cursor, sizeof ( cert->raw ) );
 
 	/* Enter certificate */
-	memcpy ( &cursor, &cert->raw, sizeof ( cursor ) );
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Parse tbsCertificate */
@@ -1168,7 +1225,72 @@ int x509_parse ( struct x509_certificate *cert, const void *data, size_t len ) {
 }
 
 /**
- * Verify X.509 certificate signature
+ * Create X.509 certificate
+ *
+ * @v data		Raw certificate data
+ * @v len		Length of raw data
+ * @ret cert		X.509 certificate
+ * @ret rc		Return status code
+ *
+ * On success, the caller holds a reference to the X.509 certificate,
+ * and is responsible for ultimately calling x509_put().
+ */
+int x509_certificate ( const void *data, size_t len,
+		       struct x509_certificate **cert ) {
+	struct asn1_cursor cursor;
+	void *raw;
+	int rc;
+
+	/* Initialise cursor */
+	cursor.data = data;
+	cursor.len = len;
+	asn1_shrink_any ( &cursor );
+
+	/* Search for certificate within cache */
+	list_for_each_entry ( (*cert), &x509_cache, list ) {
+		if ( asn1_compare ( &cursor, &(*cert)->raw ) == 0 ) {
+
+			DBGC ( *cert, "X509 %p \"%s\" cache hit\n",
+			       *cert, (*cert)->subject.name );
+
+			/* Mark as most recently used */
+			list_del ( &(*cert)->list );
+			list_add ( &(*cert)->list, &x509_cache );
+
+			/* Add caller's reference */
+			x509_get ( *cert );
+
+			return 0;
+		}
+	}
+
+	/* Allocate and initialise certificate */
+	*cert = zalloc ( sizeof ( **cert ) + cursor.len );
+	if ( ! *cert )
+		return -ENOMEM;
+	ref_init ( &(*cert)->refcnt, x509_free );
+	INIT_LIST_HEAD ( &(*cert)->list );
+	raw = ( *cert + 1 );
+
+	/* Copy raw data */
+	memcpy ( raw, cursor.data, cursor.len );
+	cursor.data = raw;
+
+	/* Parse certificate */
+	if ( ( rc = x509_parse ( *cert, &cursor ) ) != 0 ) {
+		x509_put ( *cert );
+		return rc;
+	}
+
+	/* Add certificate to cache */
+	x509_get ( *cert );
+	list_add ( &(*cert)->list, &x509_cache );
+
+	return 0;
+}
+
+/**
+ * Check X.509 certificate signature
  *
  * @v cert		X.509 certificate
  * @v public_key	X.509 public key
@@ -1192,14 +1314,15 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	digest_init ( digest, digest_ctx );
 	digest_update ( digest, digest_ctx, cert->tbs.data, cert->tbs.len );
 	digest_final ( digest, digest_ctx, digest_out );
-	DBGC ( cert, "X509 %p digest:\n", cert );
+	DBGC ( cert, "X509 %p \"%s\" digest:\n", cert, cert->subject.name );
 	DBGC_HDA ( cert, 0, digest_out, sizeof ( digest_out ) );
 
 	/* Check that signature public key algorithm matches signer */
 	if ( public_key->algorithm->pubkey != pubkey ) {
-		DBGC ( cert, "X509 %p signature algorithm %s does not match "
-		       "signer's algorithm %s\n",
-		       cert, algorithm->name, public_key->algorithm->name );
+		DBGC ( cert, "X509 %p \"%s\" signature algorithm %s does not "
+		       "match signer's algorithm %s\n",
+		       cert, cert->subject.name, algorithm->name,
+		       public_key->algorithm->name );
 		rc = -EINVAL_ALGORITHM_MISMATCH;
 		goto err_mismatch;
 	}
@@ -1207,15 +1330,15 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	/* Verify signature using signer's public key */
 	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx, public_key->raw.data,
 				  public_key->raw.len ) ) != 0 ) {
-		DBGC ( cert, "X509 %p cannot initialise public key: %s\n",
-		       cert, strerror ( rc ) );
+		DBGC ( cert, "X509 %p \"%s\" cannot initialise public key: "
+		       "%s\n", cert, cert->subject.name, strerror ( rc ) );
 		goto err_pubkey_init;
 	}
 	if ( ( rc = pubkey_verify ( pubkey, pubkey_ctx, digest, digest_out,
 				    signature->value.data,
 				    signature->value.len ) ) != 0 ) {
-		DBGC ( cert, "X509 %p signature verification failed: %s\n",
-		       cert, strerror ( rc ) );
+		DBGC ( cert, "X509 %p \"%s\" signature verification failed: "
+		       "%s\n", cert, cert->subject.name, strerror ( rc ) );
 		goto err_pubkey_verify;
 	}
 
@@ -1230,14 +1353,14 @@ static int x509_check_signature ( struct x509_certificate *cert,
 }
 
 /**
- * Validate X.509 certificate against issuer certificate
+ * Check X.509 certificate against issuer certificate
  *
  * @v cert		X.509 certificate
  * @v issuer		X.509 issuer certificate
  * @ret rc		Return status code
  */
-int x509_validate_issuer ( struct x509_certificate *cert,
-			   struct x509_certificate *issuer ) {
+int x509_check_issuer ( struct x509_certificate *cert,
+			struct x509_certificate *issuer ) {
 	struct x509_public_key *public_key = &issuer->subject.public_key;
 	int rc;
 
@@ -1254,8 +1377,9 @@ int x509_validate_issuer ( struct x509_certificate *cert,
 	 * for some enjoyable ranting on this subject.
 	 */
 	if ( asn1_compare ( &cert->issuer.raw, &issuer->subject.raw ) != 0 ) {
-		DBGC ( cert, "X509 %p issuer does not match X509 %p subject\n",
-		       cert, issuer );
+		DBGC ( cert, "X509 %p \"%s\" issuer does not match X509 %p "
+		       "\"%s\" subject\n", cert, cert->subject.name,
+		       issuer, issuer->subject.name );
 		DBGC_HDA ( cert, 0, cert->issuer.raw.data,
 			   cert->issuer.raw.len );
 		DBGC_HDA ( issuer, 0, issuer->subject.raw.data,
@@ -1265,14 +1389,16 @@ int x509_validate_issuer ( struct x509_certificate *cert,
 
 	/* Check that issuer is allowed to sign certificates */
 	if ( ! issuer->extensions.basic.ca ) {
-		DBGC ( issuer, "X509 %p cannot sign X509 %p: not a CA "
-		       "certificate\n", issuer, cert );
+		DBGC ( issuer, "X509 %p \"%s\" cannot sign X509 %p \"%s\": "
+		       "not a CA certificate\n", issuer, issuer->subject.name,
+		       cert, cert->subject.name );
 		return -EACCES_NOT_CA;
 	}
 	if ( issuer->extensions.usage.present &&
 	     ( ! ( issuer->extensions.usage.bits & X509_KEY_CERT_SIGN ) ) ) {
-		DBGC ( issuer, "X509 %p cannot sign X509 %p: no keyCertSign "
-		       "usage\n", issuer, cert );
+		DBGC ( issuer, "X509 %p \"%s\" cannot sign X509 %p \"%s\": "
+		       "no keyCertSign usage\n", issuer, issuer->subject.name,
+		       cert, cert->subject.name );
 		return -EACCES_KEY_USAGE;
 	}
 
@@ -1280,8 +1406,6 @@ int x509_validate_issuer ( struct x509_certificate *cert,
 	if ( ( rc = x509_check_signature ( cert, public_key ) ) != 0 )
 		return rc;
 
-	DBGC ( cert, "X509 %p successfully validated using X509 %p\n",
-	       cert, issuer );
 	return 0;
 }
 
@@ -1293,7 +1417,8 @@ int x509_validate_issuer ( struct x509_certificate *cert,
  * @v fingerprint	Fingerprint buffer
  */
 void x509_fingerprint ( struct x509_certificate *cert,
-			struct digest_algorithm *digest, void *fingerprint ) {
+			struct digest_algorithm *digest,
+			void *fingerprint ) {
 	uint8_t ctx[ digest->ctxsize ];
 
 	/* Calculate fingerprint */
@@ -1303,14 +1428,13 @@ void x509_fingerprint ( struct x509_certificate *cert,
 }
 
 /**
- * Validate X.509 root certificate
+ * Check X.509 root certificate
  *
  * @v cert		X.509 certificate
  * @v root		X.509 root certificate store
  * @ret rc		Return status code
  */
-int x509_validate_root ( struct x509_certificate *cert,
-			 struct x509_root *root ) {
+int x509_check_root ( struct x509_certificate *cert, struct x509_root *root ) {
 	struct digest_algorithm *digest = root->digest;
 	uint8_t fingerprint[ digest->digestsize ];
 	const uint8_t *root_fingerprint = root->fingerprints;
@@ -1323,122 +1447,244 @@ int x509_validate_root ( struct x509_certificate *cert,
 	for ( i = 0 ; i < root->count ; i++ ) {
 		if ( memcmp ( fingerprint, root_fingerprint,
 			      sizeof ( fingerprint ) ) == 0 ) {
-			DBGC ( cert, "X509 %p is a root certificate\n", cert );
+			DBGC ( cert, "X509 %p \"%s\" is a root certificate\n",
+			       cert, cert->subject.name );
 			return 0;
 		}
 		root_fingerprint += sizeof ( fingerprint );
 	}
 
-	DBGC ( cert, "X509 %p is not a root certificate\n", cert );
+	DBGC ( cert, "X509 %p \"%s\" is not a root certificate\n",
+	       cert, cert->subject.name );
 	return -ENOENT;
 }
 
 /**
- * Validate X.509 certificate validity period
+ * Check X.509 certificate validity period
  *
  * @v cert		X.509 certificate
- * @v time		Time at which to validate certificate
+ * @v time		Time at which to check certificate
  * @ret rc		Return status code
  */
-int x509_validate_time ( struct x509_certificate *cert, time_t time ) {
+int x509_check_time ( struct x509_certificate *cert, time_t time ) {
 	struct x509_validity *validity = &cert->validity;
 
 	/* Check validity period */
 	if ( time < validity->not_before.time ) {
-		DBGC ( cert, "X509 %p is not yet valid (at time %lld)\n",
-		       cert, time );
+		DBGC ( cert, "X509 %p \"%s\" is not yet valid (at time %lld)\n",
+		       cert, cert->subject.name, time );
 		return -EACCES_EXPIRED;
 	}
 	if ( time > validity->not_after.time ) {
-		DBGC ( cert, "X509 %p has expired (at time %lld)\n",
-		       cert, time );
+		DBGC ( cert, "X509 %p \"%s\" has expired (at time %lld)\n",
+		       cert, cert->subject.name, time );
 		return -EACCES_EXPIRED;
 	}
 
-	DBGC ( cert, "X509 %p is valid (at time %lld)\n", cert, time );
+	DBGC ( cert, "X509 %p \"%s\" is valid (at time %lld)\n",
+	       cert, cert->subject.name, time );
 	return 0;
 }
 
 /**
- * Validate X.509 certificate chain
+ * Validate X.509 certificate
  *
- * @v parse_next	Parse next X.509 certificate in chain
- * @v context		Context for parse_next()
- * @v time		Time at which to validate certificates
+ * @v cert		X.509 certificate
+ * @v issuer		Issuing X.509 certificate (or NULL)
+ * @v time		Time at which to validate certificate
  * @v root		Root certificate store, or NULL to use default
- * @v first		Initial X.509 certificate to fill in, or NULL
  * @ret rc		Return status code
+ *
+ * The issuing certificate must have already been validated.
+ *
+ * Validation results are cached: if a certificate has already been
+ * successfully validated then @c issuer, @c time, and @c root will be
+ * ignored.
  */
-int x509_validate_chain ( int ( * parse_next )
-			  ( struct x509_certificate *cert,
-			    const struct x509_certificate *previous,
-			    void *context ),
-			  void *context, time_t time, struct x509_root *root,
-			  struct x509_certificate *first ) {
-	struct x509_certificate temp[2];
-	struct x509_certificate *current = &temp[0];
-	struct x509_certificate *next = &temp[1];
-	struct x509_certificate *swap;
-	unsigned int path_len = 0;
+static int x509_validate ( struct x509_certificate *cert,
+			   struct x509_certificate *issuer,
+			   time_t time, struct x509_root *root ) {
+	unsigned int max_path_remaining;
 	int rc;
 
 	/* Use default root certificate store if none specified */
 	if ( ! root )
 		root = &root_certificates;
 
-	/* Get first certificate in chain */
-	if ( ( rc = parse_next ( current, NULL, context ) ) != 0 ) {
-		DBGC ( context, "X509 chain %p could not get first "
-		       "certificate: %s\n", context, strerror ( rc ) );
+	/* Return success if certificate has already been validated */
+	if ( cert->valid )
+		return 0;
+
+	/* Fail if certificate is invalid at specified time */
+	if ( ( rc = x509_check_time ( cert, time ) ) != 0 )
 		return rc;
+
+	/* Succeed if certificate is a trusted root certificate */
+	if ( x509_check_root ( cert, root ) == 0 ) {
+		cert->valid = 1;
+		cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
+		return 0;
 	}
 
-	/* Record first certificate, if applicable */
-	if ( first )
-		memcpy ( first, current, sizeof ( *first ) );
-
-	/* Process chain */
-	while ( 1 ) {
-
-		/* Check that certificate is valid at specified time */
-		if ( ( rc = x509_validate_time ( current, time ) ) != 0 )
-			return rc;
-
-		/* Succeed if we have reached a trusted root certificate */
-		if ( x509_validate_root ( current, root ) == 0 )
-			return 0;
-
-		/* Fail if we have reached an untrusted root certificate */
-		if ( asn1_compare ( &current->issuer.raw,
-				    &current->subject.raw ) == 0 ) {
-			DBGC ( context, "X509 chain %p reached untrusted root "
-			       "certificate\n", context );
-			return -EACCES_UNTRUSTED;
-		}
-
-		/* Get next certificate in chain */
-		if ( ( rc = parse_next ( next, current, context ) ) != 0 ) {
-			DBGC ( context, "X509 chain %p could not get next "
-			       "certificate: %s\n", context, strerror ( rc ) );
-			return rc;
-		}
-
-		/* Validate current certificate against next certificate */
-		if ( ( rc = x509_validate_issuer ( current, next ) ) != 0 )
-			return rc;
-
-		/* Validate path length constraint */
-		if ( path_len > next->extensions.basic.path_len ) {
-			DBGC ( context, "X509 chain %p path length %d exceeds "
-			       "maximum %d\n", context, path_len,
-			       next->extensions.basic.path_len );
-			return -EACCES_PATH_LEN;
-		}
-		path_len++;
-
-		/* Move to next certificate in chain */
-		swap = current;
-		current = next;
-		next = swap;
+	/* Fail unless we have an issuer */
+	if ( ! issuer ) {
+		DBGC ( cert, "X509 %p \"%s\" has no issuer\n",
+		       cert, cert->subject.name );
+		return -EACCES_UNTRUSTED;
 	}
+
+	/* Fail unless issuer has already been validated */
+	if ( ! issuer->valid ) {
+		DBGC ( cert, "X509 %p \"%s\" issuer %p \"%s\" has not yet "
+		       "been validated\n", cert, cert->subject.name,
+		       issuer, issuer->subject.name );
+		return -EACCES_OUT_OF_ORDER;
+	}
+
+	/* Fail if issuing certificate cannot validate this certificate */
+	if ( ( rc = x509_check_issuer ( cert, issuer ) ) != 0 )
+		return rc;
+
+	/* Fail if path length constraint is violated */
+	if ( issuer->path_remaining == 0 ) {
+		DBGC ( cert, "X509 %p \"%s\" issuer %p \"%s\" path length "
+		       "exceeded\n", cert, cert->subject.name,
+		       issuer, issuer->subject.name );
+		return -EACCES_PATH_LEN;
+	}
+
+	/* Calculate effective path length */
+	cert->path_remaining = ( issuer->path_remaining - 1 );
+	max_path_remaining = ( cert->extensions.basic.path_len + 1 );
+	if ( cert->path_remaining > max_path_remaining )
+		cert->path_remaining = max_path_remaining;
+
+	/* Mark certificate as valid */
+	cert->valid = 1;
+
+	DBGC ( cert, "X509 %p \"%s\" successfully validated using issuer %p "
+	       "\"%s\"\n", cert, cert->subject.name,
+	       issuer, issuer->subject.name );
+	return 0;
+}
+
+/**
+ * Free X.509 certificate chain
+ *
+ * @v refcnt		Reference count
+ */
+static void x509_free_chain ( struct refcnt *refcnt ) {
+	struct x509_chain *chain =
+		container_of ( refcnt, struct x509_chain, refcnt );
+	struct x509_link *link;
+	struct x509_link *tmp;
+
+	DBGC ( chain, "X509 chain %p freed\n", chain );
+
+	/* Free each link in the chain */
+	list_for_each_entry_safe ( link, tmp, &chain->links, list ) {
+		x509_put ( link->cert );
+		list_del ( &link->list );
+		free ( link );
+	}
+
+	/* Free chain */
+	free ( chain );
+}
+
+/**
+ * Allocate X.509 certificate chain
+ *
+ * @ret chain		X.509 certificate chain, or NULL
+ */
+struct x509_chain * x509_alloc_chain ( void ) {
+	struct x509_chain *chain;
+
+	/* Allocate chain */
+	chain = zalloc ( sizeof ( *chain ) );
+	if ( ! chain )
+		return NULL;
+
+	/* Initialise chain */
+	ref_init ( &chain->refcnt, x509_free_chain );
+	INIT_LIST_HEAD ( &chain->links );
+
+	DBGC ( chain, "X509 chain %p allocated\n", chain );
+	return chain;
+}
+
+/**
+ * Append X.509 certificate to X.509 certificate chain
+ *
+ * @v chain		X.509 certificate chain
+ * @v cert		X.509 certificate
+ * @ret rc		Return status code
+ */
+int x509_append ( struct x509_chain *chain, struct x509_certificate *cert ) {
+	struct x509_link *link;
+
+	/* Allocate link */
+	link = zalloc ( sizeof ( *link ) );
+	if ( ! link )
+		return -ENOMEM;
+
+	/* Add link to chain */
+	link->cert = x509_get ( cert );
+	list_add_tail ( &link->list, &chain->links );
+	DBGC ( chain, "X509 chain %p added X509 %p \"%s\"\n",
+	       chain, cert, cert->subject.name );
+
+	return 0;
+}
+
+/**
+ * Validate X.509 certificate chain
+ *
+ * @v chain		X.509 certificate chain
+ * @v time		Time at which to validate certificates
+ * @v root		Root certificate store, or NULL to use default
+ * @ret rc		Return status code
+ */
+int x509_validate_chain ( struct x509_chain *chain, time_t time,
+			  struct x509_root *root ) {
+	struct x509_certificate *issuer = NULL;
+	struct x509_link *link;
+	int rc;
+
+	/* Sanity check */
+	if ( list_empty ( &chain->links ) ) {
+		DBGC ( chain, "X509 chain %p is empty\n", chain );
+		return -EACCES_EMPTY;
+	}
+
+	/* Find first certificate that can be validated as a
+	 * standalone (i.e.  is already valid, or can be validated as
+	 * a trusted root certificate).
+	 */
+	list_for_each_entry ( link, &chain->links, list ) {
+
+		/* Try validating this certificate as a standalone */
+		if ( ( rc = x509_validate ( link->cert, NULL, time,
+					    root ) ) != 0 )
+			continue;
+
+		/* Work back up to start of chain, performing pairwise
+		 * validation.
+		 */
+		issuer = link->cert;
+		list_for_each_entry_continue_reverse ( link, &chain->links,
+						       list ) {
+
+			/* Validate this certificate against its issuer */
+			if ( ( rc = x509_validate ( link->cert, issuer, time,
+						    root ) ) != 0 )
+				return rc;
+			issuer = link->cert;
+		}
+
+		return 0;
+	}
+
+	DBGC ( chain, "X509 chain %p found no valid certificates\n", chain );
+	return -EACCES_UNTRUSTED;
 }

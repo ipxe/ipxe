@@ -45,7 +45,7 @@ int imgverify ( struct image *image, struct image *signature,
 		const char *name ) {
 	size_t len;
 	void *data;
-	struct cms_signature sig;
+	struct cms_signature *sig;
 	time_t now;
 	int rc;
 
@@ -62,25 +62,31 @@ int imgverify ( struct image *image, struct image *signature,
 	copy_from_user ( data, signature->data, 0, len );
 
 	/* Parse signature */
-	if ( ( rc = cms_parse ( &sig, data, len ) ) != 0 )
+	if ( ( rc = cms_signature ( data, len, &sig ) ) != 0 )
 		goto err_parse;
+
+	/* Free internal copy of signature */
+	free ( data );
+	data = NULL;
 
 	/* Use signature to verify image */
 	now = time ( NULL );
-	if ( ( rc = cms_verify ( &sig, image->data, image->len,
+	if ( ( rc = cms_verify ( sig, image->data, image->len,
 				 name, now, NULL ) ) != 0 )
 		goto err_verify;
+
+	/* Drop reference to signature */
+	cms_put ( sig );
+	sig = NULL;
 
 	/* Mark image as trusted */
 	image_trust ( image );
 	syslog ( LOG_NOTICE, "Image \"%s\" signature OK\n", image->name );
 
-	/* Free internal copy of signature */
-	free ( data );
-
 	return 0;
 
  err_verify:
+	cms_put ( sig );
  err_parse:
 	free ( data );
  err_alloc:

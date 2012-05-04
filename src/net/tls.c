@@ -46,10 +46,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tls.h>
 
 /* Disambiguate the various error causes */
-#define EACCES_INCOMPLETE \
-	__einfo_error ( EINFO_EACCES_INCOMPLETE )
-#define EINFO_EACCES_INCOMPLETE \
-	__einfo_uniqify ( EINFO_EACCES, 0x01, "Incomplete certificate chain" )
 #define EACCES_WRONG_NAME \
 	__einfo_error ( EINFO_EACCES_WRONG_NAME )
 #define EINFO_EACCES_WRONG_NAME \
@@ -184,6 +180,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
 	free ( tls->rx_data );
+	x509_chain_put ( tls->chain );
 
 	/* Free TLS structure itself */
 	free ( tls );	
@@ -899,7 +896,7 @@ static int tls_send_certificate ( struct tls_session *tls ) {
 			uint8_t data[ client_certificate.len ];
 		} __attribute__ (( packed )) certificates[num_certificates];
 	} __attribute__ (( packed )) *certificate;
-	struct x509_certificate cert;
+	struct x509_certificate *cert;
 	int rc;
 
 	/* If we have a certificate to send, determine the applicable
@@ -909,13 +906,16 @@ static int tls_send_certificate ( struct tls_session *tls ) {
 	if ( num_certificates ) {
 
 		/* Parse certificate to determine public-key algorithm */
-		if ( ( rc = x509_parse ( &cert, client_certificate.data,
-					 client_certificate.len ) ) != 0 ) {
+		if ( ( rc = x509_certificate ( client_certificate.data,
+					       client_certificate.len,
+					       &cert ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not parse client "
 			       "certificate: %s\n", tls, strerror ( rc ) );
 			return rc;
 		}
-		tls->verify_pubkey = cert.signature_algorithm->pubkey;
+		tls->verify_pubkey = cert->signature_algorithm->pubkey;
+		x509_put ( cert );
+		cert = NULL;
 
 		/* Schedule CertificateVerify transmission */
 		tls->tx_pending |= TLS_TX_CERTIFICATE_VERIFY;
@@ -1267,64 +1267,88 @@ static int tls_new_server_hello ( struct tls_session *tls,
 	return 0;
 }
 
-/** TLS certificate chain context */
-struct tls_certificate_context {
-	/** TLS session */
-	struct tls_session *tls;
-	/** Current certificate */
-	const void *current;
-	/** End of certificates */
-	const void *end;
-};
-
 /**
- * Parse next certificate in TLS certificate list
+ * Parse certificate chain
  *
- * @v cert		X.509 certificate to fill in
- * @v previous		Previous X.509 certificate, or NULL
- * @v ctx		Context
+ * @v tls		TLS session
+ * @v data		Certificate chain
+ * @v len		Length of certificate chain
  * @ret rc		Return status code
  */
-static int tls_parse_next ( struct x509_certificate *cert,
-			    const struct x509_certificate *previous __unused,
-			    void *ctx ) {
-	struct tls_certificate_context *context = ctx;
-	struct tls_session *tls = context->tls;
+static int tls_parse_chain ( struct tls_session *tls,
+			     const void *data, size_t len ) {
+	const void *end = ( data + len );
 	const struct {
 		uint8_t length[3];
-		uint8_t certificate[0];
-	} __attribute__ (( packed )) *current = context->current;
-	const void *data;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *certificate;
+	size_t certificate_len;
+	struct x509_certificate *cert;
 	const void *next;
-	size_t len;
 	int rc;
 
-	/* Return error at end of chain */
-	if ( context->current >= context->end ) {
-		DBGC ( tls, "TLS %p reached end of certificate chain\n", tls );
-		return -EACCES_INCOMPLETE;
+	/* Free any existing certificate chain */
+	x509_chain_put ( tls->chain );
+	tls->chain = NULL;
+
+	/* Create certificate chain */
+	tls->chain = x509_alloc_chain();
+	if ( ! tls->chain ) {
+		rc = -ENOMEM;
+		goto err_alloc_chain;
 	}
 
-	/* Extract current certificate and update context */
-	data = current->certificate;
-	len = tls_uint24 ( current->length );
-	next = ( data + len );
-	if ( next > context->end ) {
-		DBGC ( tls, "TLS %p overlength certificate\n", tls );
-		DBGC_HDA ( tls, 0, context->current,
-			   ( context->end - context->current ) );
-		return -EINVAL;
-	}
-	context->current = next;
+	/* Add certificates to chain */
+	while ( data < end ) {
 
-	/* Parse current certificate */
-	if ( ( rc = x509_parse ( cert, data, len ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not parse certificate: %s\n",
-		       tls, strerror ( rc ) );
-		return rc;
+		/* Extract raw certificate data */
+		certificate = data;
+		certificate_len = tls_uint24 ( certificate->length );
+		next = ( certificate->data + certificate_len );
+		if ( next > end ) {
+			DBGC ( tls, "TLS %p overlength certificate:\n", tls );
+			DBGC_HDA ( tls, 0, data, ( end - data ) );
+			rc = -EINVAL;
+			goto err_overlength;
+		}
+
+		/* Parse certificate */
+		if ( ( rc = x509_certificate ( certificate->data,
+					       certificate_len,
+					       &cert ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not parse certificate: %s\n",
+			       tls, strerror ( rc ) );
+			DBGC_HDA ( tls, 0, data, ( end - data ) );
+			goto err_parse;
+		}
+		DBGC ( tls, "TLS %p found certificate %s\n",
+		       tls, cert->subject.name );
+
+		/* Append certificate to chain */
+		if ( ( rc = x509_append ( tls->chain, cert ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not append certificate: %s\n",
+			       tls, strerror ( rc ) );
+			goto err_append;
+		}
+
+		/* Drop reference to certificate */
+		x509_put ( cert );
+		cert = NULL;
+
+		/* Move to next certificate in list */
+		data = next;
 	}
 
 	return 0;
+
+ err_append:
+	x509_put ( cert );
+ err_parse:
+ err_overlength:
+	x509_chain_put ( tls->chain );
+	tls->chain = NULL;
+ err_alloc_chain:
+	return rc;
 }
 
 /**
@@ -1341,14 +1365,11 @@ static int tls_new_certificate ( struct tls_session *tls,
 		uint8_t length[3];
 		uint8_t certificates[0];
 	} __attribute__ (( packed )) *certificate = data;
-	size_t elements_len = tls_uint24 ( certificate->length );
-	const void *end = ( certificate->certificates + elements_len );
+	size_t certificates_len = tls_uint24 ( certificate->length );
+	const void *end = ( certificate->certificates + certificates_len );
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
-	struct tls_certificate_context context;
-	struct x509_certificate cert;
-	struct x509_string *name = &cert.subject.name;
-	struct x509_public_key *key = &cert.subject.public_key;
+	struct x509_certificate *cert;
 	time_t now;
 	int rc;
 
@@ -1360,28 +1381,34 @@ static int tls_new_certificate ( struct tls_session *tls,
 		return -EINVAL;
 	}
 
-	/* Parse first certificate and validate certificate chain */
-	context.tls = tls;
-	context.current = certificate->certificates;
-	context.end = end;
+	/* Parse certificate chain */
+	if ( ( rc = tls_parse_chain ( tls, certificate->certificates,
+				      certificates_len ) ) != 0 )
+		return rc;
+
+	/* Validate certificate chain */
 	now = time ( NULL );
-	if ( ( rc = x509_validate_chain ( tls_parse_next, &context,
-					  now, NULL, &cert ) ) != 0 ) {
+	if ( ( rc = x509_validate_chain ( tls->chain, now, NULL ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not validate certificate chain: %s\n",
 		       tls, strerror ( rc ) );
 		return rc;
 	}
 
+	/* Extract first certificate */
+	cert = x509_first ( tls->chain );
+	assert ( cert != NULL );
+
 	/* Verify server name */
-	if ( ( name->len != strlen ( tls->name ) ) ||
-	     ( memcmp ( name->data, tls->name, name->len ) != 0 ) ) {
-		DBGC ( tls, "TLS %p server name incorrect\n", tls );
+	if ( strcmp ( tls->name, cert->subject.name ) != 0 ) {
+		DBGC ( tls, "TLS %p server name incorrect (expected %s, got "
+		       "%s)\n", tls, tls->name, cert->subject.name );
 		return -EACCES_WRONG_NAME;
 	}
 
 	/* Initialise public key algorithm */
 	if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
-				  key->raw.data, key->raw.len ) ) != 0 ) {
+				  cert->subject.public_key.raw.data,
+				  cert->subject.public_key.raw.len ) ) != 0 ) {
 		DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
 		       tls, strerror ( rc ) );
 		return rc;

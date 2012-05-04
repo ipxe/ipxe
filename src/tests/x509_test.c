@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/x509.h>
+#include <ipxe/asn1.h>
 #include <ipxe/sha256.h>
 #include <ipxe/test.h>
 
@@ -45,6 +46,9 @@ struct x509_test_certificate {
 	size_t len;
 	/** Fingerprint */
 	const void *fingerprint;
+
+	/** Parsed certificate */
+	struct x509_certificate *cert;
 };
 
 /** An X.509 test certificate chain */
@@ -53,6 +57,9 @@ struct x509_test_chain {
 	struct x509_test_certificate **certs;
 	/** Number of certificates */
 	unsigned int count;
+
+	/** Parsed certificate chain */
+	struct x509_chain *chain;
 };
 
 /** Define inline certificate data */
@@ -683,172 +690,147 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
 /** Time at which CA test certificates are invalid */
 static time_t test_ca_expired = 2205014905ULL; /* Wed Nov 16 00:08:25 2039 */
 
-/** An X.509 test certificate chain context */
-struct x509_test_chain_context {
-	/** Test certificate chain */
-	struct x509_test_chain *chain;
-	/** Index within chain */
-	unsigned int index;
-};
-
-/**
- * Parse next certificate in chain
- *
- * @v cert		X.509 certificate to parse
- * @v previous		Previous X.509 certificate, or NULL
- * @v ctx		Chain context
- * @ret rc		Return status code
- */
-static int
-x509_test_parse_next ( struct x509_certificate *cert,
-		       const struct x509_certificate *previous __unused,
-		       void *ctx ) {
-	struct x509_test_chain_context *context = ctx;
-	struct x509_test_certificate *test_cert;
-
-	/* Return error at end of chain */
-	if ( context->index >= context->chain->count )
-		return -ENOENT;
-
-	/* Get next test certificate */
-	test_cert = context->chain->certs[ context->index++ ];
-
-	/* Parse certificate */
-	return x509_parse ( cert, test_cert->data, test_cert->len );
-}
-
 /**
  * Report certificate parsing test result
  *
- * @v cert		Test certificate
+ * @v crt		Test certificate
  */
-#define x509_parse_ok( cert ) do {					\
-	struct x509_certificate temp;					\
-	ok ( x509_parse ( &temp, (cert)->data, (cert)->len ) == 0 );	\
+#define x509_certificate_ok( crt ) do {					\
+	ok ( x509_certificate ( (crt)->data, (crt)->len,		\
+				&(crt)->cert ) == 0 );			\
+	} while ( 0 )
+
+/**
+ * Report cached certificate parsing test result
+ *
+ * @v crt		Test certificate
+ */
+#define x509_cached_ok( crt ) do {					\
+	struct x509_certificate *temp;					\
+	ok ( x509_certificate ( (crt)->data, (crt)->len,		\
+				&temp ) == 0 );				\
+	ok ( temp == (crt)->cert );					\
+	x509_put ( temp );						\
 	} while ( 0 )
 
 /**
  * Report certificate fingerprint test result
  *
- * @v cert		Test certificate
+ * @v crt		Test certificate
  */
-#define x509_fingerprint_ok( cert ) do {				\
-	struct x509_certificate temp;					\
+#define x509_fingerprint_ok( crt ) do {					\
 	uint8_t fingerprint[ x509_test_algorithm.digestsize ];		\
-	ok ( x509_parse ( &temp, (cert)->data, (cert)->len ) == 0 );	\
-	x509_fingerprint ( &temp, &x509_test_algorithm, fingerprint );	\
-	ok ( memcmp ( fingerprint, (cert)->fingerprint,			\
+	x509_fingerprint ( (crt)->cert, &x509_test_algorithm,		\
+			   fingerprint );				\
+	ok ( memcmp ( fingerprint, (crt)->fingerprint,			\
 		      sizeof ( fingerprint ) ) == 0 );			\
 	} while ( 0 )
 
 /**
  * Report certificate issuer validation test result
  *
- * @v cert		Test certificate
+ * @v crt		Test certificate
  * @v issuer		Test issuer
  */
-#define x509_validate_issuer_ok( cert, issuer ) do {			\
-	struct x509_certificate cert_temp;				\
-	struct x509_certificate issuer_temp;				\
-	ok ( x509_parse ( &cert_temp, (cert)->data,			\
-			  (cert)->len ) == 0 );				\
-	ok ( x509_parse ( &issuer_temp, (issuer)->data,			\
-			  (issuer)->len ) == 0 );			\
-	ok ( x509_validate_issuer ( &cert_temp, &issuer_temp ) == 0 );	\
+#define x509_check_issuer_ok( crt, issuer ) do {			\
+	ok ( x509_check_issuer ( (crt)->cert, (issuer)->cert ) == 0 );	\
 	} while ( 0 )
 
 /**
  * Report certificate issuer validation failure test result
  *
- * @v cert		Test certificate
+ * @v crt		Test certificate
  * @v issuer		Test issuer
  */
-#define x509_validate_issuer_fail_ok( cert, issuer ) do {		\
-	struct x509_certificate cert_temp;				\
-	struct x509_certificate issuer_temp;				\
-	ok ( x509_parse ( &cert_temp, (cert)->data,			\
-			  (cert)->len ) == 0 );				\
-	ok ( x509_parse ( &issuer_temp, (issuer)->data,			\
-			  (issuer)->len ) == 0 );			\
-	ok ( x509_validate_issuer ( &cert_temp, &issuer_temp ) != 0 );	\
+#define x509_check_issuer_fail_ok( crt, issuer ) do {			\
+	ok ( x509_check_issuer ( (crt)->cert, (issuer)->cert ) != 0 );	\
 	} while ( 0 )
 
 /**
  * Report certificate root validation test result
  *
- * @v cert		Test certificate
+ * @v crt		Test certificate
  * @v root		Test root certificate store
  */
-#define x509_validate_root_ok( cert, root ) do {			\
-	struct x509_certificate temp;					\
-	ok ( x509_parse ( &temp, (cert)->data, (cert)->len ) == 0 );	\
-	ok ( x509_validate_root ( &temp, root ) == 0 );			\
+#define x509_check_root_ok( crt, root ) do {				\
+	ok ( x509_check_root ( (crt)->cert, root ) == 0 );		\
 	} while ( 0 )
 
 /**
  * Report certificate root validation failure test result
  *
- * @v cert		Test certificate
+ * @v crt		Test certificate
  * @v root		Test root certificate store
  */
-#define x509_validate_root_fail_ok( cert, root ) do {			\
-	struct x509_certificate temp;					\
-	ok ( x509_parse ( &temp, (cert)->data, (cert)->len ) == 0 );	\
-	ok ( x509_validate_root ( &temp, root ) != 0 );			\
+#define x509_check_root_fail_ok( crt, root ) do {			\
+	ok ( x509_check_root ( (crt)->cert, root ) != 0 );		\
 	} while ( 0 )
 
 /**
  * Report certificate time validation test result
  *
- * @v cert		Test certificate
+ * @v crt		Test certificate
  * @v time		Test time
  */
-#define x509_validate_time_ok( cert, time ) do {			\
-	struct x509_certificate temp;					\
-	ok ( x509_parse ( &temp, (cert)->data, (cert)->len ) == 0 );	\
-	ok ( x509_validate_time ( &temp, time ) == 0 );			\
+#define x509_check_time_ok( crt, time ) do {				\
+	ok ( x509_check_time ( (crt)->cert, time ) == 0 );		\
 	} while ( 0 )
 
 /**
  * Report certificate time validation failure test result
  *
- * @v cert		Test certificate
+ * @v crt		Test certificate
  * @v time		Test time
  */
-#define x509_validate_time_fail_ok( cert, time ) do {			\
-	struct x509_certificate temp;					\
-	ok ( x509_parse ( &temp, (cert)->data, (cert)->len ) == 0 );	\
-	ok ( x509_validate_time ( &temp, time ) != 0 );			\
+#define x509_check_time_fail_ok( crt, time ) do {			\
+	ok ( x509_check_time ( (crt)->cert, time ) != 0 );		\
+	} while ( 0 )
+
+/**
+ * Report certificate chain parsing test result
+ *
+ * @v chn		Test certificate chain
+ */
+#define x509_chain_ok( chn ) do {					\
+	unsigned int i;							\
+	struct x509_certificate *first;					\
+	(chn)->chain = x509_alloc_chain();				\
+	ok ( (chn)->chain != NULL );					\
+	for ( i = 0 ; i < (chn)->count ; i++ ) {			\
+		ok ( x509_append ( (chn)->chain,			\
+				   (chn)->certs[i]->cert ) == 0 );	\
+	}								\
+	first = x509_first ( (chn)->chain );				\
+	ok ( first != NULL );						\
+	ok ( first->raw.len == (chn)->certs[0]->len );			\
+	ok ( memcmp ( first->raw.data, (chn)->certs[0]->data,		\
+		      first->raw.len ) == 0 );				\
 	} while ( 0 )
 
 /**
  * Report certificate chain validation test result
  *
- * @v chain		Test certificate chain
+ * @v chn		Test certificate chain
  * @v time		Test certificate validation time
  * @v root		Test root certificate store
  */
-#define x509_validate_chain_ok( chain, time, root ) do {		\
-	struct x509_test_chain_context context = { (chain), 0 };	\
-	struct x509_certificate temp;					\
-	ok ( x509_validate_chain ( x509_test_parse_next, &context,	\
-				   (time), (root), &temp ) == 0 );	\
-	ok ( temp.raw.data == (chain)->certs[0]->data );		\
-	ok ( temp.raw.len == (chain)->certs[0]->len );			\
+#define x509_validate_chain_ok( chn, time, root ) do {			\
+	x509_invalidate_chain ( (chn)->chain );				\
+	ok ( x509_validate_chain ( (chn)->chain, (time),		\
+				   (root) ) == 0 );			\
 	} while ( 0 )
 
 /**
  * Report certificate chain validation failure test result
  *
- * @v chain		Test certificate chain
+ * @v chn		Test certificate chain
  * @v time		Test certificate validation time
  * @v root		Test root certificate store
  */
-#define x509_validate_chain_fail_ok( chain, time, root ) do {		\
-	struct x509_test_chain_context context = { (chain), 0 };	\
-	struct x509_certificate temp;					\
-	ok ( x509_validate_chain ( x509_test_parse_next, &context,	\
-				   (time), (root), &temp ) != 0 );	\
+#define x509_validate_chain_fail_ok( chn, time, root ) do {		\
+	x509_invalidate_chain ( (chn)->chain );				\
+	ok ( x509_validate_chain ( (chn)->chain, (time),		\
+				   (root) ) != 0 );			\
 	} while ( 0 )
 
 /**
@@ -856,6 +838,24 @@ x509_test_parse_next ( struct x509_certificate *cert,
  *
  */
 static void x509_test_exec ( void ) {
+
+	/* Parse all certificates */
+	x509_certificate_ok ( &root_crt );
+	x509_certificate_ok ( &intermediate_crt );
+	x509_certificate_ok ( &leaf_crt );
+	x509_certificate_ok ( &useless_crt );
+	x509_certificate_ok ( &server_crt );
+	x509_certificate_ok ( &not_ca_crt );
+	x509_certificate_ok ( &bad_path_len_crt );
+
+	/* Check cache functionality */
+	x509_cached_ok ( &root_crt );
+	x509_cached_ok ( &intermediate_crt );
+	x509_cached_ok ( &leaf_crt );
+	x509_cached_ok ( &useless_crt );
+	x509_cached_ok ( &server_crt );
+	x509_cached_ok ( &not_ca_crt );
+	x509_cached_ok ( &bad_path_len_crt );
 
 	/* Check all certificate fingerprints */
 	x509_fingerprint_ok ( &root_crt );
@@ -867,26 +867,34 @@ static void x509_test_exec ( void ) {
 	x509_fingerprint_ok ( &bad_path_len_crt );
 
 	/* Check pairwise issuing */
-	x509_validate_issuer_ok ( &intermediate_crt, &root_crt );
-	x509_validate_issuer_ok ( &leaf_crt, &intermediate_crt );
-	x509_validate_issuer_ok ( &useless_crt, &leaf_crt );
-	x509_validate_issuer_ok ( &server_crt, &leaf_crt );
-	x509_validate_issuer_fail_ok ( &not_ca_crt, &server_crt );
-	x509_validate_issuer_ok ( &bad_path_len_crt, &useless_crt );
+	x509_check_issuer_ok ( &intermediate_crt, &root_crt );
+	x509_check_issuer_ok ( &leaf_crt, &intermediate_crt );
+	x509_check_issuer_ok ( &useless_crt, &leaf_crt );
+	x509_check_issuer_ok ( &server_crt, &leaf_crt );
+	x509_check_issuer_fail_ok ( &not_ca_crt, &server_crt );
+	x509_check_issuer_ok ( &bad_path_len_crt, &useless_crt );
 
 	/* Check root certificate stores */
-	x509_validate_root_ok ( &root_crt, &test_root );
-	x509_validate_root_fail_ok ( &intermediate_crt, &test_root );
-	x509_validate_root_ok ( &intermediate_crt, &intermediate_root );
-	x509_validate_root_fail_ok ( &root_crt, &intermediate_root );
-	x509_validate_root_fail_ok ( &root_crt, &dummy_root );
+	x509_check_root_ok ( &root_crt, &test_root );
+	x509_check_root_fail_ok ( &intermediate_crt, &test_root );
+	x509_check_root_ok ( &intermediate_crt, &intermediate_root );
+	x509_check_root_fail_ok ( &root_crt, &intermediate_root );
+	x509_check_root_fail_ok ( &root_crt, &dummy_root );
 
 	/* Check certificate validity periods */
-	x509_validate_time_ok ( &server_crt, test_time );
-	x509_validate_time_fail_ok ( &server_crt, test_expired );
-	x509_validate_time_ok ( &root_crt, test_time );
-	x509_validate_time_ok ( &root_crt, test_expired );
-	x509_validate_time_fail_ok ( &root_crt, test_ca_expired );
+	x509_check_time_ok ( &server_crt, test_time );
+	x509_check_time_fail_ok ( &server_crt, test_expired );
+	x509_check_time_ok ( &root_crt, test_time );
+	x509_check_time_ok ( &root_crt, test_expired );
+	x509_check_time_fail_ok ( &root_crt, test_ca_expired );
+
+	/* Parse all certificate chains */
+	x509_chain_ok ( &server_chain );
+	x509_chain_ok ( &broken_server_chain );
+	x509_chain_ok ( &incomplete_server_chain );
+	x509_chain_ok ( &not_ca_chain );
+	x509_chain_ok ( &useless_chain );
+	x509_chain_ok ( &bad_path_len_chain );
 
 	/* Check certificate chains */
 	x509_validate_chain_ok ( &server_chain, test_time, &test_root );
@@ -908,6 +916,23 @@ static void x509_test_exec ( void ) {
 	x509_validate_chain_ok ( &useless_chain, test_expired, &test_root );
 	x509_validate_chain_fail_ok ( &useless_chain, test_ca_expired,
 				      &test_root );
+
+	/* Drop chain references */
+	x509_chain_put ( bad_path_len_chain.chain );
+	x509_chain_put ( useless_chain.chain );
+	x509_chain_put ( not_ca_chain.chain );
+	x509_chain_put ( incomplete_server_chain.chain );
+	x509_chain_put ( broken_server_chain.chain );
+	x509_chain_put ( server_chain.chain );
+
+	/* Drop certificate references */
+	x509_put ( bad_path_len_crt.cert );
+	x509_put ( not_ca_crt.cert );
+	x509_put ( server_crt.cert );
+	x509_put ( useless_crt.cert );
+	x509_put ( leaf_crt.cert );
+	x509_put ( intermediate_crt.cert );
+	x509_put ( root_crt.cert );
 }
 
 /** X.509 self-test */

@@ -52,6 +52,9 @@ struct cms_test_signature {
 	const void *data;
 	/** Length of data */
 	size_t len;
+
+	/** Parsed signature */
+	struct cms_signature *sig;
 };
 
 /** Define inline data */
@@ -1331,42 +1334,40 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
 /**
  * Report signature parsing test result
  *
- * @v sig		Test signature
+ * @v sgn		Test signature
  */
-#define cms_parse_ok( sig ) do {					\
-	struct cms_signature temp;					\
-	ok ( cms_parse ( &temp, (sig)->data, (sig)->len ) == 0 );	\
+#define cms_signature_ok( sgn ) do {					\
+	ok ( cms_signature ( (sgn)->data, (sgn)->len,			\
+			     &(sgn)->sig ) == 0 );			\
 	} while ( 0 )
 
 /**
  * Report signature verification test result
  *
- * @v sig		Test signature
+ * @v sgn		Test signature
  * @v code		Test signed code
  * @v name		Test verification name
  * @v time		Test verification time
  * @v root		Test root certificate store
  */
-#define cms_verify_ok( sig, code, name, time, root ) do {		\
-	struct cms_signature temp;					\
-	ok ( cms_parse ( &temp, (sig)->data, (sig)->len ) == 0 );	\
-	ok ( cms_verify ( &temp, virt_to_user ( (code)->data ),		\
+#define cms_verify_ok( sgn, code, name, time, root ) do {		\
+	x509_invalidate_chain ( (sgn)->sig->certificates );		\
+	ok ( cms_verify ( (sgn)->sig, virt_to_user ( (code)->data ),	\
 			  (code)->len, name, time, root ) == 0 );	\
 	} while ( 0 )
 
 /**
  * Report signature verification failure test result
  *
- * @v sig		Test signature
+ * @v sgn		Test signature
  * @v code		Test signed code
  * @v name		Test verification name
  * @v time		Test verification time
  * @v root		Test root certificate store
  */
-#define cms_verify_fail_ok( sig, code, name, time, root ) do {		\
-	struct cms_signature temp;					\
-	ok ( cms_parse ( &temp, (sig)->data, (sig)->len ) == 0 );	\
-	ok ( cms_verify ( &temp, virt_to_user ( (code)->data ),		\
+#define cms_verify_fail_ok( sgn, code, name, time, root ) do {		\
+	x509_invalidate_chain ( (sgn)->sig->certificates );		\
+	ok ( cms_verify ( (sgn)->sig, virt_to_user ( (code)->data ),	\
 			  (code)->len, name, time, root ) != 0 );	\
 	} while ( 0 )
 
@@ -1377,10 +1378,10 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
 static void cms_test_exec ( void ) {
 
 	/* Check that all signatures can be parsed */
-	cms_parse_ok ( &codesigned_sig );
-	cms_parse_ok ( &brokenchain_sig );
-	cms_parse_ok ( &genericsigned_sig );
-	cms_parse_ok ( &nonsigned_sig );
+	cms_signature_ok ( &codesigned_sig );
+	cms_signature_ok ( &brokenchain_sig );
+	cms_signature_ok ( &genericsigned_sig );
+	cms_signature_ok ( &nonsigned_sig );
 
 	/* Check good signature */
 	cms_verify_ok ( &codesigned_sig, &test_code,
@@ -1415,6 +1416,12 @@ static void cms_test_exec ( void ) {
 	/* Check expired signature */
 	cms_verify_fail_ok ( &codesigned_sig, &test_code,
 			     NULL, test_expired, &test_root );
+
+	/* Drop signature references */
+	cms_put ( nonsigned_sig.sig );
+	cms_put ( genericsigned_sig.sig );
+	cms_put ( brokenchain_sig.sig );
+	cms_put ( codesigned_sig.sig );
 }
 
 /** CMS self-test */
