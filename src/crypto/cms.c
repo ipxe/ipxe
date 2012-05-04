@@ -509,9 +509,10 @@ static int cms_verify_digest ( struct cms_signature *sig,
 				    info->signature_len ) ) != 0 ) {
 		DBGC ( sig, "CMS %p/%p signature verification failed: %s\n",
 		       sig, info, strerror ( rc ) );
-		return rc;
+		goto err_verify;
 	}
 
+ err_verify:
 	pubkey_final ( pubkey, ctx );
  err_init:
 	return rc;
