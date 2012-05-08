@@ -1679,6 +1679,72 @@ int x509_append_raw ( struct x509_chain *chain, const void *data,
 }
 
 /**
+ * Identify X.509 certificate by subject
+ *
+ * @v certs		X.509 certificate list
+ * @v subject		Subject
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+static struct x509_certificate *
+x509_find_subject ( struct x509_chain *certs,
+		    const struct asn1_cursor *subject ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Scan through certificate list */
+	list_for_each_entry ( link, &certs->links, list ) {
+
+		/* Check subject */
+		cert = link->cert;
+		if ( asn1_compare ( subject, &cert->subject.raw ) == 0 )
+			return cert;
+	}
+
+	return NULL;
+}
+
+/**
+ * Append X.509 certificates to X.509 certificate chain
+ *
+ * @v chain		X.509 certificate chain
+ * @v certs		X.509 certificate list
+ * @ret rc		Return status code
+ *
+ * Certificates will be automatically appended to the chain based upon
+ * the subject and issuer names.
+ */
+int x509_auto_append ( struct x509_chain *chain, struct x509_chain *certs ) {
+	struct x509_certificate *cert;
+	struct x509_certificate *previous;
+	int rc;
+
+	/* Get current certificate */
+	cert = x509_last ( chain );
+	if ( ! cert ) {
+		DBGC ( chain, "X509 chain %p has no certificates\n", chain );
+		return -EINVAL;
+	}
+
+	/* Append certificates, in order */
+	while ( 1 ) {
+
+		/* Find issuing certificate */
+		previous = cert;
+		cert = x509_find_subject ( certs, &cert->issuer.raw );
+		if ( ! cert )
+			break;
+		if ( cert == previous )
+			break;
+
+		/* Append certificate to chain */
+		if ( ( rc = x509_append ( chain, cert ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Validate X.509 certificate chain
  *
  * @v chain		X.509 certificate chain

@@ -335,6 +335,8 @@ extern int x509_append ( struct x509_chain *chain,
 			 struct x509_certificate *cert );
 extern int x509_append_raw ( struct x509_chain *chain, const void *data,
 			     size_t len );
+extern int x509_auto_append ( struct x509_chain *chain,
+			      struct x509_chain *certs );
 extern int x509_validate_chain ( struct x509_chain *chain, time_t time,
 				 struct x509_root *root );
 

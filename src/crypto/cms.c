@@ -176,31 +176,6 @@ cms_find_issuer_serial ( struct cms_signature *sig,
 }
 
 /**
- * Identify CMS signature certificate by subject
- *
- * @v sig		CMS signature
- * @v subject		Subject
- * @ret cert		X.509 certificate, or NULL if not found
- */
-static struct x509_certificate *
-cms_find_subject ( struct cms_signature *sig,
-		   const struct asn1_cursor *subject ) {
-	struct x509_link *link;
-	struct x509_certificate *cert;
-
-	/* Scan through certificate list */
-	list_for_each_entry ( link, &sig->certificates->links, list ) {
-
-		/* Check subject */
-		cert = link->cert;
-		if ( asn1_compare ( subject, &cert->subject.raw ) == 0 )
-			return cert;
-	}
-
-	return NULL;
-}
-
-/**
  * Parse CMS signature signer identifier
  *
  * @v sig		CMS signature
@@ -215,7 +190,6 @@ static int cms_parse_signer_identifier ( struct cms_signature *sig,
 	struct asn1_cursor serial;
 	struct asn1_cursor issuer;
 	struct x509_certificate *cert;
-	struct x509_certificate *previous;
 	int rc;
 
 	/* Enter issuerAndSerialNumber */
@@ -253,22 +227,20 @@ static int cms_parse_signer_identifier ( struct cms_signature *sig,
 		return -ENOENT;
 	}
 
-	/* Create certificate chain */
-	do {
-		/* Add certificate to chain */
-		if ( ( rc = x509_append ( info->chain, cert ) ) != 0 ) {
-			DBGC ( sig, "CMS %p/%p could not append certificate: "
-			       "%s\n", sig, info, strerror ( rc ) );
-			return rc;
-		}
-		DBGC ( sig, "CMS %p/%p added certificate %s\n",
-		       sig, info, cert->subject.name );
+	/* Append certificate to chain */
+	if ( ( rc = x509_append ( info->chain, cert ) ) != 0 ) {
+		DBGC ( sig, "CMS %p/%p could not append certificate: %s\n",
+		       sig, info, strerror ( rc ) );
+		return rc;
+	}
 
-		/* Locate next certificate in chain, if any */
-		previous = cert;
-		cert = cms_find_subject ( sig, &cert->issuer.raw );
-
-	} while ( ( cert != NULL ) && ( cert != previous ) );
+	/* Append remaining certificates to chain */
+	if ( ( rc = x509_auto_append ( info->chain,
+				       sig->certificates ) ) != 0 ) {
+		DBGC ( sig, "CMS %p/%p could not append certificates: %s\n",
+		       sig, info, strerror ( rc ) );
+		return rc;
+	}
 
 	return 0;
 }
