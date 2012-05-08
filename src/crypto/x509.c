@@ -570,7 +570,7 @@ static int x509_parse_common_name ( struct x509_certificate *cert, char **name,
 			return rc;
 		}
 
-		/* Allocate name */
+		/* Allocate and copy name */
 		*name = zalloc ( name_cursor.len + 1 /* NUL */ );
 		if ( ! *name )
 			return -ENOMEM;
@@ -578,9 +578,9 @@ static int x509_parse_common_name ( struct x509_certificate *cert, char **name,
 		return 0;
 	}
 
+	/* Certificates may not have a commonName */
 	DBGC ( cert, "X509 %p no commonName found:\n", cert );
-	DBGC_HDA ( cert, 0, raw->data, raw->len );
-	return -ENOENT;
+	return 0;
 }
 
 /**

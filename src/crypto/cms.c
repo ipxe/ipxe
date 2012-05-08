@@ -745,7 +745,8 @@ int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
 	/* Verify using all signerInfos */
 	list_for_each_entry ( info, &sig->info, list ) {
 		cert = x509_first ( info->chain );
-		if ( name && ( strcmp ( name, cert->subject.name ) != 0 ) )
+		if ( name && ( ( cert->subject.name == NULL ) ||
+			       ( strcmp ( cert->subject.name, name ) != 0 ) ) )
 			continue;
 		if ( ( rc = cms_verify_signer_info ( sig, info, data, len,
 						     time, root ) ) != 0 )

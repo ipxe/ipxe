@@ -1399,7 +1399,8 @@ static int tls_new_certificate ( struct tls_session *tls,
 	assert ( cert != NULL );
 
 	/* Verify server name */
-	if ( strcmp ( tls->name, cert->subject.name ) != 0 ) {
+	if ( ( cert->subject.name == NULL ) ||
+	     ( strcmp ( cert->subject.name, tls->name ) != 0 ) ) {
 		DBGC ( tls, "TLS %p server name incorrect (expected %s, got "
 		       "%s)\n", tls, tls->name, cert->subject.name );
 		return -EACCES_WRONG_NAME;
