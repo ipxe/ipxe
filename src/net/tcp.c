@@ -1143,7 +1143,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	flags = tcphdr->flags;
 	tcp_rx_opts ( tcp, ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) ),
 		      ( hlen - sizeof ( *tcphdr ) ), &options );
-	if ( options.tsopt )
+	if ( tcp && options.tsopt )
 		tcp->ts_val = ntohl ( options.tsopt->tsval );
 	iob_pull ( iobuf, hlen );
 	len = iob_len ( iobuf );
