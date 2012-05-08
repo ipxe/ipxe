@@ -258,6 +258,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_imgtrust	      ( ERRFILE_OTHER | 0x002b0000 )
 #define ERRFILE_menu_ui		      ( ERRFILE_OTHER | 0x002c0000 )
 #define ERRFILE_menu_cmd	      ( ERRFILE_OTHER | 0x002d0000 )
+#define ERRFILE_validator	      ( ERRFILE_OTHER | 0x002e0000 )
 
 /** @} */
 
