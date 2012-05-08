@@ -96,9 +96,11 @@ struct image * alloc_image ( struct uri *uri ) {
 	ref_init ( &image->refcnt, free_image );
 	if ( uri ) {
 		image->uri = uri_get ( uri );
-		name = basename ( ( char * ) uri->path );
-		if ( ( rc = image_set_name ( image, name ) ) != 0 )
-			goto err_set_name;
+		if ( uri->path ) {
+			name = basename ( ( char * ) uri->path );
+			if ( ( rc = image_set_name ( image, name ) ) != 0 )
+				goto err_set_name;
+		}
 	}
 
 	return image;
