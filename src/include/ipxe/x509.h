@@ -261,6 +261,20 @@ x509_first ( struct x509_chain *chain ) {
 	return ( link ? link->cert : NULL );
 }
 
+/**
+ * Get last certificate in X.509 certificate chain
+ *
+ * @v chain		X.509 certificate chain
+ * @ret cert		X.509 certificate, or NULL
+ */
+static inline __attribute__ (( always_inline )) struct x509_certificate *
+x509_last ( struct x509_chain *chain ) {
+	struct x509_link *link;
+
+	link = list_last_entry ( &chain->links, struct x509_link, list );
+	return ( link ? link->cert : NULL );
+}
+
 /** An X.509 extension */
 struct x509_extension {
 	/** Name */
@@ -319,6 +333,8 @@ extern int x509_certificate ( const void *data, size_t len,
 extern struct x509_chain * x509_alloc_chain ( void );
 extern int x509_append ( struct x509_chain *chain,
 			 struct x509_certificate *cert );
+extern int x509_append_raw ( struct x509_chain *chain, const void *data,
+			     size_t len );
 extern int x509_validate_chain ( struct x509_chain *chain, time_t time,
 				 struct x509_root *root );
 

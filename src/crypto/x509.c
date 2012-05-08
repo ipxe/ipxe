@@ -1647,6 +1647,38 @@ int x509_append ( struct x509_chain *chain, struct x509_certificate *cert ) {
 }
 
 /**
+ * Append X.509 certificate to X.509 certificate chain
+ *
+ * @v chain		X.509 certificate chain
+ * @v data		Raw certificate data
+ * @v len		Length of raw data
+ * @ret rc		Return status code
+ */
+int x509_append_raw ( struct x509_chain *chain, const void *data,
+		      size_t len ) {
+	struct x509_certificate *cert;
+	int rc;
+
+	/* Parse certificate */
+	if ( ( rc = x509_certificate ( data, len, &cert ) ) != 0 )
+		goto err_parse;
+
+	/* Append certificate to chain */
+	if ( ( rc = x509_append ( chain, cert ) ) != 0 )
+		goto err_append;
+
+	/* Drop reference to certificate */
+	x509_put ( cert );
+
+	return 0;
+
+ err_append:
+	x509_put ( cert );
+ err_parse:
+	return rc;
+}
+
+/**
  * Validate X.509 certificate chain
  *
  * @v chain		X.509 certificate chain

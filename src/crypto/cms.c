@@ -128,38 +128,23 @@ static int cms_parse_certificates ( struct cms_signature *sig,
 	/* Add each certificate */
 	while ( cursor.len ) {
 
-		/* Parse certificate */
-		if ( ( rc = x509_certificate ( cursor.data, cursor.len,
-					       &cert ) ) != 0 ) {
-			DBGC ( sig, "CMS %p could not parse certificate: %s\n",
+		/* Add certificate to chain */
+		if ( ( rc = x509_append_raw ( sig->certificates, cursor.data,
+					      cursor.len ) ) != 0 ) {
+			DBGC ( sig, "CMS %p could not append certificate: %s\n",
 			       sig, strerror ( rc) );
 			DBGC_HDA ( sig, 0, cursor.data, cursor.len );
-			goto err_parse;
+			return rc;
 		}
+		cert = x509_last ( sig->certificates );
 		DBGC ( sig, "CMS %p found certificate %s\n",
 		       sig, cert->subject.name );
-
-		/* Add certificate to list */
-		if ( ( rc = x509_append ( sig->certificates, cert ) ) != 0 ) {
-			DBGC ( sig, "CMS %p could not append certificate: %s\n",
-			       sig, strerror ( rc ) );
-			goto err_append;
-		}
-
-		/* Drop reference to certificate */
-		x509_put ( cert );
-		cert = NULL;
 
 		/* Move to next certificate */
 		asn1_skip_any ( &cursor );
 	}
 
 	return 0;
-
- err_append:
-	x509_put ( cert );
- err_parse:
-	return rc;
 }
 
 /**

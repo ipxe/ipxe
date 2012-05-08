@@ -1312,28 +1312,17 @@ static int tls_parse_chain ( struct tls_session *tls,
 			goto err_overlength;
 		}
 
-		/* Parse certificate */
-		if ( ( rc = x509_certificate ( certificate->data,
-					       certificate_len,
-					       &cert ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not parse certificate: %s\n",
+		/* Add certificate to chain */
+		if ( ( rc = x509_append_raw ( tls->chain, certificate->data,
+					      certificate_len ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not append certificate: %s\n",
 			       tls, strerror ( rc ) );
 			DBGC_HDA ( tls, 0, data, ( end - data ) );
 			goto err_parse;
 		}
+		cert = x509_last ( tls->chain );
 		DBGC ( tls, "TLS %p found certificate %s\n",
 		       tls, cert->subject.name );
-
-		/* Append certificate to chain */
-		if ( ( rc = x509_append ( tls->chain, cert ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not append certificate: %s\n",
-			       tls, strerror ( rc ) );
-			goto err_append;
-		}
-
-		/* Drop reference to certificate */
-		x509_put ( cert );
-		cert = NULL;
 
 		/* Move to next certificate in list */
 		data = next;
@@ -1341,8 +1330,6 @@ static int tls_parse_chain ( struct tls_session *tls,
 
 	return 0;
 
- err_append:
-	x509_put ( cert );
  err_parse:
  err_overlength:
 	x509_chain_put ( tls->chain );
