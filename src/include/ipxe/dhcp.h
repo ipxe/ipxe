@@ -364,6 +364,9 @@ struct dhcp_client_uuid {
 /** Client private key */
 #define DHCP_EB_KEY DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x5c )
 
+/** Cross-signed certificate source */
+#define DHCP_EB_CROSS_CERT DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x5d )
+
 /** Skip PXE DHCP protocol extensions such as ProxyDHCP
  *
  * If set to a non-zero value, iPXE will not wait for ProxyDHCP offers
