@@ -61,6 +61,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_edd		       ( ERRFILE_CORE | 0x00150000 )
 #define ERRFILE_parseopt	       ( ERRFILE_CORE | 0x00160000 )
 #define ERRFILE_test		       ( ERRFILE_CORE | 0x00170000 )
+#define ERRFILE_xferbuf		       ( ERRFILE_CORE | 0x00180000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
