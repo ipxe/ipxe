@@ -368,16 +368,28 @@ static void list_test_exec ( void ) {
 	ok ( list_entry ( &list_tests[3].list, struct list_test, list )
 	     == &list_tests[3] );
 
-	/* Test list_first_entry() */
+	/* Test list_first_entry() and list_last_entry() */
 	INIT_LIST_HEAD ( list );
 	list_add_tail ( &list_tests[9].list, list );
 	list_add_tail ( &list_tests[5].list, list );
 	list_add_tail ( &list_tests[6].list, list );
 	ok ( list_first_entry ( list, struct list_test, list )
 	     == &list_tests[9] );
+	ok ( list_last_entry ( list, struct list_test, list )
+	     == &list_tests[6] );
 	list_del ( &list_tests[9].list );
 	ok ( list_first_entry ( list, struct list_test, list )
 	     == &list_tests[5] );
+	ok ( list_last_entry ( list, struct list_test, list )
+	     == &list_tests[6] );
+	list_del ( &list_tests[6].list );
+	ok ( list_first_entry ( list, struct list_test, list )
+	     == &list_tests[5] );
+	ok ( list_last_entry ( list, struct list_test, list )
+	     == &list_tests[5] );
+	list_del ( &list_tests[5].list );
+	ok ( list_first_entry ( list, struct list_test, list ) == NULL );
+	ok ( list_last_entry ( list, struct list_test, list ) == NULL );
 
 	/* Test list_for_each() */
 	INIT_LIST_HEAD ( list );

@@ -325,6 +325,19 @@ static inline void list_splice_tail_init ( struct list_head *list,
 	  list_entry ( (list)->next, type, member ) )
 
 /**
+ * Get the container of the last entry in a list
+ *
+ * @v list		List head
+ * @v type		Containing type
+ * @v member		Name of list field within containing type
+ * @ret first		First list entry, or NULL
+ */
+#define list_last_entry( list, type, member )		\
+	( list_empty ( (list) ) ?			\
+	  ( type * ) NULL :				\
+	  list_entry ( (list)->prev, type, member ) )
+
+/**
  * Iterate over a list
  *
  * @v pos		Iterator
