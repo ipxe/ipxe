@@ -575,6 +575,15 @@ static int x509_parse_common_name ( struct x509_certificate *cert, char **name,
 		if ( ! *name )
 			return -ENOMEM;
 		memcpy ( *name, name_cursor.data, name_cursor.len );
+
+		/* Check that name contains no NULs */
+		if ( strlen ( *name ) != name_cursor.len ) {
+			DBGC ( cert, "X509 %p contains malicious commonName:\n",
+			       cert );
+			DBGC_HDA ( cert, 0, raw->data, raw->len );
+			return rc;
+		}
+
 		return 0;
 	}
 
