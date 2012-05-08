@@ -43,6 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/x509.h>
 #include <ipxe/clientcert.h>
 #include <ipxe/rbg.h>
+#include <ipxe/validator.h>
 #include <ipxe/tls.h>
 
 /* Disambiguate the various error causes */
@@ -91,6 +92,16 @@ static void tls_set_uint24 ( uint8_t field24[3], unsigned long value ) {
 	uint32_t *field32 __attribute__ (( may_alias )) =
 		( ( void * ) field24 );
 	*field32 |= cpu_to_be32 ( value << 8 );
+}
+
+/**
+ * Determine if TLS session is ready for application data
+ *
+ * @v tls		TLS session
+ * @ret is_ready	TLS session is ready
+ */
+static int tls_ready ( struct tls_session *tls ) {
+	return ( tls->client_finished && tls->server_finished );
 }
 
 /******************************************************************************
@@ -196,10 +207,11 @@ static void tls_close ( struct tls_session *tls, int rc ) {
 
 	/* Remove process */
 	process_del ( &tls->process );
-	
-	/* Close ciphertext and plaintext streams */
+
+	/* Close all interfaces */
 	intf_shutdown ( &tls->cipherstream, rc );
 	intf_shutdown ( &tls->plainstream, rc );
+	intf_shutdown ( &tls->validator, rc );
 }
 
 /******************************************************************************
@@ -1111,7 +1123,9 @@ static int tls_send_finished ( struct tls_session *tls ) {
 		uint8_t verify_data[12];
 	} __attribute__ (( packed )) finished;
 	uint8_t digest_out[ digest->digestsize ];
+	int rc;
 
+	/* Construct record */
 	memset ( &finished, 0, sizeof ( finished ) );
 	finished.type_length = ( cpu_to_le32 ( TLS_FINISHED ) |
 				 htonl ( sizeof ( finished ) -
@@ -1121,7 +1135,15 @@ static int tls_send_finished ( struct tls_session *tls ) {
 			finished.verify_data, sizeof ( finished.verify_data ),
 			"client finished", digest_out, sizeof ( digest_out ) );
 
-	return tls_send_handshake ( tls, &finished, sizeof ( finished ) );
+	/* Transmit record */
+	if ( ( rc = tls_send_handshake ( tls, &finished,
+					 sizeof ( finished ) ) ) != 0 )
+		return rc;
+
+	/* Mark client as finished */
+	tls->client_finished = 1;
+
+	return 0;
 }
 
 /**
@@ -1354,10 +1376,6 @@ static int tls_new_certificate ( struct tls_session *tls,
 	} __attribute__ (( packed )) *certificate = data;
 	size_t certificates_len = tls_uint24 ( certificate->length );
 	const void *end = ( certificate->certificates + certificates_len );
-	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
-	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
-	struct x509_certificate *cert;
-	time_t now;
 	int rc;
 
 	/* Sanity check */
@@ -1372,35 +1390,6 @@ static int tls_new_certificate ( struct tls_session *tls,
 	if ( ( rc = tls_parse_chain ( tls, certificate->certificates,
 				      certificates_len ) ) != 0 )
 		return rc;
-
-	/* Validate certificate chain */
-	now = time ( NULL );
-	if ( ( rc = x509_validate_chain ( tls->chain, now, NULL ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not validate certificate chain: %s\n",
-		       tls, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Extract first certificate */
-	cert = x509_first ( tls->chain );
-	assert ( cert != NULL );
-
-	/* Verify server name */
-	if ( ( cert->subject.name == NULL ) ||
-	     ( strcmp ( cert->subject.name, tls->name ) != 0 ) ) {
-		DBGC ( tls, "TLS %p server name incorrect (expected %s, got "
-		       "%s)\n", tls, tls->name, cert->subject.name );
-		return -EACCES_WRONG_NAME;
-	}
-
-	/* Initialise public key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
-				  cert->subject.public_key.raw.data,
-				  cert->subject.public_key.raw.len ) ) != 0 ) {
-		DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
-		       tls, strerror ( rc ) );
-		return rc;
-	}
 
 	return 0;
 }
@@ -1442,6 +1431,7 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
 		char next[0];
 	} __attribute__ (( packed )) *hello_done = data;
 	const void *end = hello_done->next;
+	int rc;
 
 	/* Sanity check */
 	if ( end != ( data + len ) ) {
@@ -1451,11 +1441,12 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
 		return -EINVAL;
 	}
 
-	/* Schedule Client Key Exchange, Change Cipher, and Finished */
-	tls->tx_pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
-			     TLS_TX_CHANGE_CIPHER |
-			     TLS_TX_FINISHED );
-	tls_tx_resume ( tls );
+	/* Begin certificate validation */
+	if ( ( rc = create_validator ( &tls->validator, tls->chain ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not start certificate validation: "
+		       "%s\n", tls, strerror ( rc ) );
+		return rc;
+	}
 
 	return 0;
 }
@@ -1497,8 +1488,8 @@ static int tls_new_finished ( struct tls_session *tls,
 		return -EPERM;
 	}
 
-	/* Mark session as ready to transmit plaintext data */
-	tls->tx_ready = 1;
+	/* Mark server as finished */
+	tls->server_finished = 1;
 
 	/* Send notification of a window change */
 	xfer_window_changed ( &tls->plainstream );
@@ -1601,6 +1592,8 @@ static int tls_new_record ( struct tls_session *tls, unsigned int type,
 	case TLS_TYPE_HANDSHAKE:
 		return tls_new_handshake ( tls, data, len );
 	case TLS_TYPE_DATA:
+		if ( ! tls_ready ( tls ) )
+			return -ENOTCONN;
 		return xfer_deliver_raw ( &tls->plainstream, data, len );
 	default:
 		/* RFC4346 says that we should just ignore unknown
@@ -2015,7 +2008,7 @@ static int tls_new_ciphertext ( struct tls_session *tls,
 static size_t tls_plainstream_window ( struct tls_session *tls ) {
 
 	/* Block window unless we are ready to accept data */
-	if ( ! tls->tx_ready )
+	if ( ! tls_ready ( tls ) )
 		return 0;
 
 	return xfer_window ( &tls->cipherstream );
@@ -2035,7 +2028,7 @@ static int tls_plainstream_deliver ( struct tls_session *tls,
 	int rc;
 	
 	/* Refuse unless we are ready to accept data */
-	if ( ! tls->tx_ready ) {
+	if ( ! tls_ready ( tls ) ) {
 		rc = -ENOTCONN;
 		goto done;
 	}
@@ -2194,6 +2187,79 @@ static struct interface_descriptor tls_cipherstream_desc =
 
 /******************************************************************************
  *
+ * Certificate validator
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Handle certificate validation completion
+ *
+ * @v tls		TLS session
+ * @v rc		Reason for completion
+ */
+static void tls_validator_done ( struct tls_session *tls, int rc ) {
+	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
+	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
+	struct x509_certificate *cert;
+
+	/* Close validator interface */
+	intf_restart ( &tls->validator, rc );
+
+	/* Check for validation failure */
+	if ( rc != 0 ) {
+		DBGC ( tls, "TLS %p certificate validation failed: %s\n",
+		       tls, strerror ( rc ) );
+		goto err;
+	}
+	DBGC ( tls, "TLS %p certificate validation succeeded\n", tls );
+
+	/* Extract first certificate */
+	cert = x509_first ( tls->chain );
+	assert ( cert != NULL );
+
+	/* Verify server name */
+	if ( ( cert->subject.name == NULL ) ||
+	     ( strcmp ( cert->subject.name, tls->name ) != 0 ) ) {
+		DBGC ( tls, "TLS %p server name incorrect (expected %s, got "
+		       "%s)\n", tls, tls->name, cert->subject.name );
+		rc = -EACCES_WRONG_NAME;
+		goto err;
+	}
+
+	/* Initialise public key algorithm */
+	if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
+				  cert->subject.public_key.raw.data,
+				  cert->subject.public_key.raw.len ) ) != 0 ) {
+		DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
+		       tls, strerror ( rc ) );
+		goto err;
+	}
+
+	/* Schedule Client Key Exchange, Change Cipher, and Finished */
+	tls->tx_pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
+			     TLS_TX_CHANGE_CIPHER |
+			     TLS_TX_FINISHED );
+	tls_tx_resume ( tls );
+
+	return;
+
+ err:
+	tls_close ( tls, rc );
+	return;
+}
+
+/** TLS certificate validator interface operations */
+static struct interface_operation tls_validator_ops[] = {
+	INTF_OP ( intf_close, struct tls_session *, tls_validator_done ),
+};
+
+/** TLS certificate validator interface descriptor */
+static struct interface_descriptor tls_validator_desc =
+	INTF_DESC ( struct tls_session, validator, tls_validator_ops );
+
+/******************************************************************************
+ *
  * Controlling process
  *
  ******************************************************************************
@@ -2307,6 +2373,8 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->name = name;
 	intf_init ( &tls->plainstream, &tls_plainstream_desc, &tls->refcnt );
 	intf_init ( &tls->cipherstream, &tls_cipherstream_desc, &tls->refcnt );
+	intf_init ( &tls->validator, &tls_validator_desc, &tls->refcnt );
+	process_init ( &tls->process, &tls_process_desc, &tls->refcnt );
 	tls->version = TLS_VERSION_TLS_1_2;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
@@ -2327,7 +2395,6 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->handshake_digest = &sha256_algorithm;
 	tls->handshake_ctx = tls->handshake_sha256_ctx;
 	tls->tx_pending = TLS_TX_CLIENT_HELLO;
-	process_init ( &tls->process, &tls_process_desc, &tls->refcnt );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &tls->plainstream, xfer );

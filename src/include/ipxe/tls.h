@@ -237,6 +237,13 @@ struct tls_session {
 
 	/** Server certificate chain */
 	struct x509_chain *chain;
+	/** Certificate validator */
+	struct interface validator;
+
+	/** Client has finished security negotiation */
+	unsigned int client_finished;
+	/** Server has finished security negotiation */
+	unsigned int server_finished;
 
 	/** TX sequence number */
 	uint64_t tx_seq;
@@ -244,8 +251,6 @@ struct tls_session {
 	unsigned int tx_pending;
 	/** TX process */
 	struct process process;
-	/** TX ready for plaintext data */
-	int tx_ready;
 
 	/** RX sequence number */
 	uint64_t rx_seq;
