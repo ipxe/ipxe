@@ -121,7 +121,7 @@ static void x509_free ( struct refcnt *refcnt ) {
 	struct x509_certificate *cert =
 		container_of ( refcnt, struct x509_certificate, refcnt );
 
-	DBGC ( cert, "X509 %p freed\n", cert );
+	DBGC2 ( cert, "X509 %p freed\n", cert );
 	free ( cert->subject.name );
 	free ( cert->extensions.auth_info.ocsp.uri );
 	free ( cert );
@@ -444,8 +444,8 @@ static int x509_parse_version ( struct x509_certificate *cert,
 
 	/* Record version */
 	cert->version = version;
-	DBGC ( cert, "X509 %p is a version %d certificate\n",
-	       cert, ( cert->version + 1 ) );
+	DBGC2 ( cert, "X509 %p is a version %d certificate\n",
+		cert, ( cert->version + 1 ) );
 
 	return 0;
 }
@@ -469,8 +469,8 @@ static int x509_parse_serial ( struct x509_certificate *cert,
 		       cert, strerror ( rc ) );
 		return rc;
 	}
-	DBGC ( cert, "X509 %p issuer is:\n", cert );
-	DBGC_HDA ( cert, 0, serial->raw.data, serial->raw.len );
+	DBGC2 ( cert, "X509 %p issuer is:\n", cert );
+	DBGC2_HDA ( cert, 0, serial->raw.data, serial->raw.len );
 
 	return 0;
 }
@@ -494,8 +494,8 @@ static int x509_parse_issuer ( struct x509_certificate *cert,
 		       cert, strerror ( rc ) );
 		return rc;
 	}
-	DBGC ( cert, "X509 %p issuer is:\n", cert );
-	DBGC_HDA ( cert, 0, issuer->raw.data, issuer->raw.len );
+	DBGC2 ( cert, "X509 %p issuer is:\n", cert );
+	DBGC2_HDA ( cert, 0, issuer->raw.data, issuer->raw.len );
 
 	return 0;
 }
@@ -522,13 +522,15 @@ static int x509_parse_validity ( struct x509_certificate *cert,
 	/* Parse notBefore */
 	if ( ( rc = x509_parse_time ( cert, not_before, &cursor ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p valid from time %lld\n", cert, not_before->time );
+	DBGC2 ( cert, "X509 %p valid from time %lld\n",
+		cert, not_before->time );
 	asn1_skip_any ( &cursor );
 
 	/* Parse notAfter */
 	if ( ( rc = x509_parse_time ( cert, not_after, &cursor ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p valid until time %lld\n", cert, not_after->time );
+	DBGC2 ( cert, "X509 %p valid until time %lld\n",
+		cert, not_after->time );
 
 	return 0;
 }
@@ -588,7 +590,7 @@ static int x509_parse_common_name ( struct x509_certificate *cert, char **name,
 	}
 
 	/* Certificates may not have a commonName */
-	DBGC ( cert, "X509 %p no commonName found:\n", cert );
+	DBGC2 ( cert, "X509 %p no commonName found:\n", cert );
 	return 0;
 }
 
@@ -608,13 +610,13 @@ static int x509_parse_subject ( struct x509_certificate *cert,
 	/* Record raw subject */
 	memcpy ( &subject->raw, raw, sizeof ( subject->raw ) );
 	asn1_shrink_any ( &subject->raw );
-	DBGC ( cert, "X509 %p subject is:\n", cert );
-	DBGC_HDA ( cert, 0, subject->raw.data, subject->raw.len );
+	DBGC2 ( cert, "X509 %p subject is:\n", cert );
+	DBGC2_HDA ( cert, 0, subject->raw.data, subject->raw.len );
 
 	/* Parse common name */
 	if ( ( rc = x509_parse_common_name ( cert, name, raw ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p common name is \"%s\":\n", cert, *name );
+	DBGC2 ( cert, "X509 %p common name is \"%s\":\n", cert, *name );
 
 	return 0;
 }
@@ -645,10 +647,10 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 	if ( ( rc = x509_parse_pubkey_algorithm ( cert, algorithm,
 						  &cursor ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p public key algorithm is %s\n",
-	       cert, (*algorithm)->name );
-	DBGC ( cert, "X509 %p public key is:\n", cert );
-	DBGC_HDA ( cert, 0, public_key->raw.data, public_key->raw.len );
+	DBGC2 ( cert, "X509 %p public key algorithm is %s\n",
+		cert, (*algorithm)->name );
+	DBGC2 ( cert, "X509 %p public key is:\n", cert );
+	DBGC2_HDA ( cert, 0, public_key->raw.data, public_key->raw.len );
 
 	return 0;
 }
@@ -685,8 +687,8 @@ static int x509_parse_basic_constraints ( struct x509_certificate *cert,
 		asn1_skip_any ( &cursor );
 	}
 	basic->ca = ca;
-	DBGC ( cert, "X509 %p is %sa CA certificate\n",
-	       cert, ( basic->ca ? "" : "not " ) );
+	DBGC2 ( cert, "X509 %p is %sa CA certificate\n",
+		cert, ( basic->ca ? "" : "not " ) );
 
 	/* Ignore everything else unless "cA" is true */
 	if ( ! ca )
@@ -708,8 +710,8 @@ static int x509_parse_basic_constraints ( struct x509_certificate *cert,
 			return -EINVAL;
 		}
 		basic->path_len = path_len;
-		DBGC ( cert, "X509 %p path length constraint is %u\n",
-		       cert, basic->path_len );
+		DBGC2 ( cert, "X509 %p path length constraint is %u\n",
+			cert, basic->path_len );
 	}
 
 	return 0;
@@ -746,7 +748,7 @@ static int x509_parse_key_usage ( struct x509_certificate *cert,
 	for ( i = 0 ; i < len ; i++ ) {
 		usage->bits |= ( *(bytes++) << ( 8 * i ) );
 	}
-	DBGC ( cert, "X509 %p key usage is %08x\n", cert, usage->bits );
+	DBGC2 ( cert, "X509 %p key usage is %08x\n", cert, usage->bits );
 
 	return 0;
 }
@@ -791,8 +793,8 @@ static int x509_parse_key_purpose ( struct x509_certificate *cert,
 			    sizeof ( x509_key_purposes[0] ) ) ; i++ ) {
 		purpose = &x509_key_purposes[i];
 		if ( asn1_compare ( &cursor, &purpose->oid ) == 0 ) {
-			DBGC ( cert, "X509 %p has key purpose %s\n",
-			       cert, purpose->name );
+			DBGC2 ( cert, "X509 %p has key purpose %s\n",
+				cert, purpose->name );
 			ext_usage->bits |= purpose->bits;
 			return 0;
 		}
@@ -855,7 +857,7 @@ static int x509_parse_ocsp ( struct x509_certificate *cert,
 	if ( ! ocsp->uri )
 		return -ENOMEM;
 	memcpy ( ocsp->uri, cursor.data, cursor.len );
-	DBGC ( cert, "X509 %p OCSP URI is %s:\n", cert, ocsp->uri );
+	DBGC2 ( cert, "X509 %p OCSP URI is %s:\n", cert, ocsp->uri );
 
 	return 0;
 }
@@ -916,8 +918,8 @@ static int x509_parse_access_description ( struct x509_certificate *cert,
 	asn1_enter ( &subcursor, ASN1_OID );
 	method = x509_find_access_method ( &subcursor );
 	asn1_skip_any ( &cursor );
-	DBGC ( cert, "X509 %p found access method %s\n",
-	       cert, ( method ? method->name : "<unknown>" ) );
+	DBGC2 ( cert, "X509 %p found access method %s\n",
+		cert, ( method ? method->name : "<unknown>" ) );
 
 	/* Parse access location, if applicable */
 	if ( method && ( ( rc = method->parse ( cert, &cursor ) ) != 0 ) )
@@ -1038,8 +1040,8 @@ static int x509_parse_extension ( struct x509_certificate *cert,
 	asn1_enter ( &subcursor, ASN1_OID );
 	extension = x509_find_extension ( &subcursor );
 	asn1_skip_any ( &cursor );
-	DBGC ( cert, "X509 %p found extension %s\n",
-	       cert, ( extension ? extension->name : "<unknown>" ) );
+	DBGC2 ( cert, "X509 %p found extension %s\n",
+		cert, ( extension ? extension->name : "<unknown>" ) );
 
 	/* Identify criticality */
 	if ( asn1_type ( &cursor ) == ASN1_BOOLEAN ) {
@@ -1146,8 +1148,8 @@ static int x509_parse_tbscertificate ( struct x509_certificate *cert,
 	if ( ( rc = x509_parse_signature_algorithm ( cert, algorithm,
 						     &cursor ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p tbsCertificate signature algorithm is %s\n",
-	       cert, (*algorithm)->name );
+	DBGC2 ( cert, "X509 %p tbsCertificate signature algorithm is %s\n",
+		cert, (*algorithm)->name );
 	asn1_skip_any ( &cursor );
 
 	/* Parse issuer */
@@ -1208,16 +1210,16 @@ static int x509_parse ( struct x509_certificate *cert,
 	if ( ( rc = x509_parse_signature_algorithm ( cert, signature_algorithm,
 						     &cursor ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p signatureAlgorithm is %s\n",
-	       cert, (*signature_algorithm)->name );
+	DBGC2 ( cert, "X509 %p signatureAlgorithm is %s\n",
+		cert, (*signature_algorithm)->name );
 	asn1_skip_any ( &cursor );
 
 	/* Parse signatureValue */
 	if ( ( rc = x509_parse_integral_bit_string ( cert, signature_value,
 						     &cursor ) ) != 0 )
 		return rc;
-	DBGC ( cert, "X509 %p signatureValue is:\n", cert );
-	DBGC_HDA ( cert, 0, signature_value->data, signature_value->len );
+	DBGC2 ( cert, "X509 %p signatureValue is:\n", cert );
+	DBGC2_HDA ( cert, 0, signature_value->data, signature_value->len );
 
 	/* Check that algorithm in tbsCertificate matches algorithm in
 	 * signature
@@ -1259,8 +1261,8 @@ int x509_certificate ( const void *data, size_t len,
 	list_for_each_entry ( (*cert), &x509_cache, list ) {
 		if ( asn1_compare ( &cursor, &(*cert)->raw ) == 0 ) {
 
-			DBGC ( *cert, "X509 %p \"%s\" cache hit\n",
-			       *cert, (*cert)->subject.name );
+			DBGC2 ( *cert, "X509 %p \"%s\" cache hit\n",
+				*cert, (*cert)->subject.name );
 
 			/* Mark as most recently used */
 			list_del ( &(*cert)->list );
@@ -1323,8 +1325,8 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	digest_init ( digest, digest_ctx );
 	digest_update ( digest, digest_ctx, cert->tbs.data, cert->tbs.len );
 	digest_final ( digest, digest_ctx, digest_out );
-	DBGC ( cert, "X509 %p \"%s\" digest:\n", cert, cert->subject.name );
-	DBGC_HDA ( cert, 0, digest_out, sizeof ( digest_out ) );
+	DBGC2 ( cert, "X509 %p \"%s\" digest:\n", cert, cert->subject.name );
+	DBGC2_HDA ( cert, 0, digest_out, sizeof ( digest_out ) );
 
 	/* Check that signature public key algorithm matches signer */
 	if ( public_key->algorithm->pubkey != pubkey ) {
@@ -1463,8 +1465,8 @@ int x509_check_root ( struct x509_certificate *cert, struct x509_root *root ) {
 		root_fingerprint += sizeof ( fingerprint );
 	}
 
-	DBGC ( cert, "X509 %p \"%s\" is not a root certificate\n",
-	       cert, cert->subject.name );
+	DBGC2 ( cert, "X509 %p \"%s\" is not a root certificate\n",
+		cert, cert->subject.name );
 	return -ENOENT;
 }
 
@@ -1490,8 +1492,8 @@ int x509_check_time ( struct x509_certificate *cert, time_t time ) {
 		return -EACCES_EXPIRED;
 	}
 
-	DBGC ( cert, "X509 %p \"%s\" is valid (at time %lld)\n",
-	       cert, cert->subject.name, time );
+	DBGC2 ( cert, "X509 %p \"%s\" is valid (at time %lld)\n",
+		cert, cert->subject.name, time );
 	return 0;
 }
 
@@ -1537,8 +1539,8 @@ static int x509_validate ( struct x509_certificate *cert,
 
 	/* Fail unless we have an issuer */
 	if ( ! issuer ) {
-		DBGC ( cert, "X509 %p \"%s\" has no issuer\n",
-		       cert, cert->subject.name );
+		DBGC2 ( cert, "X509 %p \"%s\" has no issuer\n",
+			cert, cert->subject.name );
 		return -EACCES_UNTRUSTED;
 	}
 
@@ -1588,7 +1590,7 @@ static void x509_free_chain ( struct refcnt *refcnt ) {
 	struct x509_link *link;
 	struct x509_link *tmp;
 
-	DBGC ( chain, "X509 chain %p freed\n", chain );
+	DBGC2 ( chain, "X509 chain %p freed\n", chain );
 
 	/* Free each link in the chain */
 	list_for_each_entry_safe ( link, tmp, &chain->links, list ) {
@@ -1618,7 +1620,7 @@ struct x509_chain * x509_alloc_chain ( void ) {
 	ref_init ( &chain->refcnt, x509_free_chain );
 	INIT_LIST_HEAD ( &chain->links );
 
-	DBGC ( chain, "X509 chain %p allocated\n", chain );
+	DBGC2 ( chain, "X509 chain %p allocated\n", chain );
 	return chain;
 }
 

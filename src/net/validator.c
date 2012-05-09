@@ -68,7 +68,7 @@ static void validator_free ( struct refcnt *refcnt ) {
 	struct validator *validator =
 		container_of ( refcnt, struct validator, refcnt );
 
-	DBGC ( validator, "VALIDATOR %p freed\n", validator );
+	DBGC2 ( validator, "VALIDATOR %p freed\n", validator );
 	x509_chain_put ( validator->chain );
 	xferbuf_done ( &validator->buffer );
 	free ( validator );
@@ -294,7 +294,7 @@ static void validator_xfer_close ( struct validator *validator, int rc ) {
 		       validator, strerror ( rc ) );
 		goto err_download;
 	}
-	DBGC ( validator, "VALIDATOR %p download complete\n", validator );
+	DBGC2 ( validator, "VALIDATOR %p download complete\n", validator );
 
 	/* Append downloaded certificates */
 	if ( ( rc = validator_append ( validator, validator->buffer.data,
@@ -439,8 +439,8 @@ int create_validator ( struct interface *job, struct x509_chain *chain ) {
 	/* Attach parent interface, mortalise self, and return */
 	intf_plug_plug ( &validator->job, job );
 	ref_put ( &validator->refcnt );
-	DBGC ( validator, "VALIDATOR %p validating X509 chain %p\n",
-	       validator, validator->chain );
+	DBGC2 ( validator, "VALIDATOR %p validating X509 chain %p\n",
+		validator, validator->chain );
 	return 0;
 
 	validator_finished ( validator, rc );
