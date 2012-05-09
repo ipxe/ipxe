@@ -151,8 +151,8 @@ static int validator_start_download ( struct validator *validator,
 	crosscert = ( crosscert_copy ? crosscert_copy : crosscert_default );
 
 	/* Allocate URI string */
-	uri_string_len = ( strlen ( crosscert ) + 14 /* "/%08x.der?" */ +
-			   base64_encoded_len ( issuer->len ) + 1 /* NUL */ );
+	uri_string_len = ( strlen ( crosscert ) + 22 /* "/%08x.der?subject=" */
+			   + base64_encoded_len ( issuer->len ) + 1 /* NUL */ );
 	uri_string = zalloc ( uri_string_len );
 	if ( ! uri_string ) {
 		rc = -ENOMEM;
@@ -163,7 +163,7 @@ static int validator_start_download ( struct validator *validator,
 	crc = crc32_le ( 0xffffffffUL, issuer->data, issuer->len );
 
 	/* Generate URI string */
-	len = snprintf ( uri_string, uri_string_len, "%s/%08x.der?",
+	len = snprintf ( uri_string, uri_string_len, "%s/%08x.der?subject=",
 			 crosscert, crc );
 	base64_encode ( issuer->data, issuer->len, ( uri_string + len ) );
 	DBGC ( validator, "VALIDATOR %p downloading cross-signed certificate "
