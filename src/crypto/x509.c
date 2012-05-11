@@ -632,6 +632,7 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 				   const struct asn1_cursor *raw ) {
 	struct x509_public_key *public_key = &cert->subject.public_key;
 	struct asn1_algorithm **algorithm = &public_key->algorithm;
+	struct x509_bit_string *raw_bits = &public_key->raw_bits;
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -639,6 +640,8 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 	memcpy ( &cursor, raw, sizeof ( cursor ) );
 	asn1_shrink_any ( &cursor );
 	memcpy ( &public_key->raw, &cursor, sizeof ( public_key->raw ) );
+	DBGC2 ( cert, "X509 %p public key is:\n", cert );
+	DBGC2_HDA ( cert, 0, public_key->raw.data, public_key->raw.len );
 
 	/* Enter subjectPublicKeyInfo */
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
@@ -649,8 +652,11 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 		return rc;
 	DBGC2 ( cert, "X509 %p public key algorithm is %s\n",
 		cert, (*algorithm)->name );
-	DBGC2 ( cert, "X509 %p public key is:\n", cert );
-	DBGC2_HDA ( cert, 0, public_key->raw.data, public_key->raw.len );
+	asn1_skip_any ( &cursor );
+
+	/* Parse bit string */
+	if ( ( rc = x509_parse_bit_string ( cert, raw_bits, &cursor ) ) != 0 )
+		return rc;
 
 	return 0;
 }

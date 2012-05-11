@@ -54,10 +54,12 @@ struct x509_validity {
 
 /** An X.509 certificate public key */
 struct x509_public_key {
-	/** Raw public key */
+	/** Raw public key information */
 	struct asn1_cursor raw;
 	/** Public key algorithm */
 	struct asn1_algorithm *algorithm;
+	/** Raw public key bit string */
+	struct x509_bit_string raw_bits;
 };
 
 /** An X.509 certificate subject */
