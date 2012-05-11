@@ -21,6 +21,34 @@ struct asn1_cursor {
 	size_t len;
 };
 
+/** An ASN.1 object builder */
+struct asn1_builder {
+	/** Data
+	 *
+	 * This is always dynamically allocated.  If @c data is NULL
+	 * while @len is non-zero, this indicates that a memory
+	 * allocation error has occurred during the building process.
+	 */
+	void *data;
+	/** Length of data */
+	size_t len;
+};
+
+/** Maximum (viable) length of ASN.1 length
+ *
+ * While in theory unlimited, this length is sufficient to contain a
+ * size_t.
+ */
+#define ASN1_MAX_LEN_LEN ( 1 + sizeof ( size_t ) )
+
+/** An ASN.1 header */
+struct asn1_builder_header {
+	/** Type */
+	uint8_t type;
+	/** Length (encoded) */
+	uint8_t length[ASN1_MAX_LEN_LEN];
+} __attribute__ (( packed ));
+
 /** ASN.1 end */
 #define ASN1_END 0x00
 
@@ -255,5 +283,10 @@ extern int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 				      struct asn1_algorithm **algorithm );
 extern int asn1_generalized_time ( const struct asn1_cursor *cursor,
 				   time_t *time );
+extern int asn1_prepend_raw ( struct asn1_builder *builder, const void *data,
+			      size_t len );
+extern int asn1_prepend ( struct asn1_builder *builder, unsigned int type,
+			  const void *data, size_t len );
+extern int asn1_wrap ( struct asn1_builder *builder, unsigned int type );
 
 #endif /* _IPXE_ASN1_H */

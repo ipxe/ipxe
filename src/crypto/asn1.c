@@ -20,6 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -696,6 +697,144 @@ int asn1_generalized_time ( const struct asn1_cursor *cursor, time_t *time ) {
 
 	/* Convert to seconds since the Epoch */
 	*time = mktime ( &tm );
+
+	return 0;
+}
+
+/**
+ * Construct ASN.1 header
+ *
+ * @v header		ASN.1 builder header
+ * @v type		Type
+ * @v len		Content length
+ * @ret header_len	Header length
+ */
+static size_t asn1_header ( struct asn1_builder_header *header,
+			    unsigned int type, size_t len ) {
+	unsigned int header_len = 2;
+	unsigned int len_len = 0;
+	size_t temp;
+
+	/* Construct header */
+	header->type = type;
+	if ( len < 0x80 ) {
+		header->length[0] = len;
+	} else {
+		for ( temp = len ; temp ; temp >>= 8 )
+			len_len++;
+		header->length[0] = ( 0x80 | len_len );
+		header_len += len_len;
+		for ( temp = len ; temp ; temp >>= 8 )
+			header->length[len_len--] = ( temp & 0xff );
+	}
+
+	return header_len;
+}
+
+/**
+ * Grow ASN.1 builder
+ *
+ * @v builder		ASN.1 builder
+ * @v extra		Extra space to prepend
+ * @ret rc		Return status code
+ */
+static int asn1_grow ( struct asn1_builder *builder, size_t extra ) {
+	size_t new_len;
+	void *new;
+
+	/* As with the ASN1 parsing functions, make errors permanent */
+	if ( builder->len && ! builder->data )
+		return -ENOMEM;
+
+	/* Reallocate data buffer */
+	new_len = ( builder->len + extra );
+	new = realloc ( builder->data, new_len );
+	if ( ! new ) {
+		free ( builder->data );
+		builder->data = NULL;
+		return -ENOMEM;
+	}
+	builder->data = new;
+
+	/* Move existing data to end of buffer */
+	memmove ( ( builder->data + extra ), builder->data, builder->len );
+	builder->len = new_len;
+
+	return 0;
+}
+
+/**
+ * Prepend raw data to ASN.1 builder
+ *
+ * @v builder		ASN.1 builder
+ * @v data		Data to prepend
+ * @v len		Length of data to prepend
+ * @ret rc		Return status code
+ */
+int asn1_prepend_raw ( struct asn1_builder *builder, const void *data,
+		       size_t len ) {
+	int rc;
+
+	/* Grow buffer */
+	if ( ( rc = asn1_grow ( builder, len ) ) != 0 )
+		return rc;
+
+	/* Populate data buffer */
+	memcpy ( builder->data, data, len );
+
+	return 0;
+}
+
+/**
+ * Prepend data to ASN.1 builder
+ *
+ * @v builder		ASN.1 builder
+ * @v type		Type
+ * @v data		Data to prepend
+ * @v len		Length of data to prepend
+ * @ret rc		Return status code
+ */
+int asn1_prepend ( struct asn1_builder *builder, unsigned int type,
+		   const void *data, size_t len ) {
+	struct asn1_builder_header header;
+	size_t header_len;
+	int rc;
+
+	/* Construct header */
+	header_len = asn1_header ( &header, type, len );
+
+	/* Grow buffer */
+	if ( ( rc = asn1_grow ( builder, header_len + len ) ) != 0 )
+		return rc;
+
+	/* Populate data buffer */
+	memcpy ( builder->data, &header, header_len );
+	memcpy ( ( builder->data + header_len ), data, len );
+
+	return 0;
+}
+
+/**
+ * Wrap ASN.1 builder
+ *
+ * @v builder		ASN.1 builder
+ * @v type		Type
+ * @ret rc		Return status code
+ */
+int asn1_wrap ( struct asn1_builder *builder, unsigned int type ) {
+	struct asn1_builder_header header;
+	size_t header_len;
+	int rc;
+
+	/* Construct header */
+	header_len = asn1_header ( &header, type, builder->len );
+
+	/* Grow buffer */
+	if ( ( rc = asn1_grow ( builder, header_len ) ) != 0 )
+		return rc;
+
+	/* Populate data buffer */
+	memcpy ( builder->data, &header, header_len );
 
 	return 0;
 }
