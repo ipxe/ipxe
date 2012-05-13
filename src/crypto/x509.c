@@ -155,66 +155,6 @@ static struct asn1_cursor oid_common_name_cursor =
 	ASN1_OID_CURSOR ( oid_common_name );
 
 /**
- * Parse X.509 certificate algorithm
- *
- * @v cert		X.509 certificate
- * @v algorithm		Algorithm to fill in
- * @v raw		ASN.1 cursor
- * @ret rc		Return status code
- */
-static int x509_parse_pubkey_algorithm ( struct x509_certificate *cert,
-					 struct asn1_algorithm **algorithm,
-					 const struct asn1_cursor *raw ) {
-
-	/* Parse algorithm */
-	*algorithm = asn1_algorithm ( raw );
-	if ( ! (*algorithm) ) {
-		DBGC ( cert, "X509 %p unrecognised algorithm:\n", cert );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -ENOTSUP_ALGORITHM;
-	}
-
-	/* Check algorithm has a public key */
-	if ( ! (*algorithm)->pubkey ) {
-		DBGC ( cert, "X509 %p algorithm %s is not a public-key "
-		       "algorithm:\n", cert, (*algorithm)->name );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -EINVAL_ALGORITHM;
-	}
-
-	return 0;
-}
-
-/**
- * Parse X.509 certificate signature algorithm
- *
- * @v cert		X.509 certificate
- * @v algorithm		Algorithm to fill in
- * @v raw		ASN.1 cursor
- * @ret rc		Return status code
- */
-static int x509_parse_signature_algorithm ( struct x509_certificate *cert,
-					    struct asn1_algorithm **algorithm,
-					    const struct asn1_cursor *raw ) {
-	int rc;
-
-	/* Parse algorithm */
-	if ( ( rc = x509_parse_pubkey_algorithm ( cert, algorithm,
-						  raw ) ) != 0 )
-		return rc;
-
-	/* Check algorithm is a signature algorithm */
-	if ( ! (*algorithm)->digest ) {
-		DBGC ( cert, "X509 %p algorithm %s is not a signature "
-		       "algorithm:\n", cert, (*algorithm)->name );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -EINVAL_ALGORITHM;
-	}
-
-	return 0;
-}
-
-/**
  * Parse X.509 certificate bit string
  *
  * @v cert		X.509 certificate
@@ -541,9 +481,11 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Parse algorithm */
-	if ( ( rc = x509_parse_pubkey_algorithm ( cert, algorithm,
-						  &cursor ) ) != 0 )
+	if ( ( rc = asn1_pubkey_algorithm ( &cursor, algorithm ) ) != 0 ) {
+		DBGC ( cert, "X509 %p could not parse public key algorithm: "
+		       "%s\n", cert, strerror ( rc ) );
 		return rc;
+	}
 	DBGC2 ( cert, "X509 %p public key algorithm is %s\n",
 		cert, (*algorithm)->name );
 	asn1_skip_any ( &cursor );
@@ -1045,9 +987,11 @@ static int x509_parse_tbscertificate ( struct x509_certificate *cert,
 	asn1_skip_any ( &cursor );
 
 	/* Parse signature */
-	if ( ( rc = x509_parse_signature_algorithm ( cert, algorithm,
-						     &cursor ) ) != 0 )
+	if ( ( rc = asn1_signature_algorithm ( &cursor, algorithm ) ) != 0 ) {
+		DBGC ( cert, "X509 %p could not parse signature algorithm: "
+		       "%s\n", cert, strerror ( rc ) );
 		return rc;
+	}
 	DBGC2 ( cert, "X509 %p tbsCertificate signature algorithm is %s\n",
 		cert, (*algorithm)->name );
 	asn1_skip_any ( &cursor );
@@ -1107,9 +1051,12 @@ static int x509_parse ( struct x509_certificate *cert,
 	asn1_skip_any ( &cursor );
 
 	/* Parse signatureAlgorithm */
-	if ( ( rc = x509_parse_signature_algorithm ( cert, signature_algorithm,
-						     &cursor ) ) != 0 )
+	if ( ( rc = asn1_signature_algorithm ( &cursor,
+					       signature_algorithm ) ) != 0 ) {
+		DBGC ( cert, "X509 %p could not parse signature algorithm: "
+		       "%s\n", cert, strerror ( rc ) );
 		return rc;
+	}
 	DBGC2 ( cert, "X509 %p signatureAlgorithm is %s\n",
 		cert, (*signature_algorithm)->name );
 	asn1_skip_any ( &cursor );

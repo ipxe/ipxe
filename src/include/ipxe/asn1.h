@@ -238,8 +238,14 @@ extern int asn1_boolean ( const struct asn1_cursor *cursor );
 extern int asn1_integer ( const struct asn1_cursor *cursor, int *value );
 extern int asn1_compare ( const struct asn1_cursor *cursor1,
 			  const struct asn1_cursor *cursor2 );
-extern struct asn1_algorithm *
-asn1_algorithm ( const struct asn1_cursor *cursor );
+extern int asn1_algorithm ( const struct asn1_cursor *cursor,
+			    struct asn1_algorithm **algorithm );
+extern int asn1_pubkey_algorithm ( const struct asn1_cursor *cursor,
+				   struct asn1_algorithm **algorithm );
+extern int asn1_digest_algorithm ( const struct asn1_cursor *cursor,
+				   struct asn1_algorithm **algorithm );
+extern int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
+				      struct asn1_algorithm **algorithm );
 extern int asn1_generalized_time ( const struct asn1_cursor *cursor,
 				   time_t *time );
 

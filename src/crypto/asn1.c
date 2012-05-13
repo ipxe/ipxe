@@ -58,6 +58,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EINVAL_ASN1_TIME )
 #define EINFO_EINVAL_ASN1_TIME \
 	__einfo_uniqify ( EINFO_EINVAL, 0x05, "Invalid time" )
+#define EINVAL_ASN1_ALGORITHM \
+	__einfo_error ( EINFO_EINVAL_ASN1_ALGORITHM )
+#define EINFO_EINVAL_ASN1_ALGORITHM \
+	__einfo_uniqify ( EINFO_EINVAL, 0x06, "Invalid algorithm" )
+#define ENOTSUP_ALGORITHM \
+	__einfo_error ( EINFO_ENOTSUP_ALGORITHM )
+#define EINFO_ENOTSUP_ALGORITHM \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Unsupported algorithm" )
+#define ENOTTY_ALGORITHM \
+	__einfo_error ( EINFO_ENOTTY_ALGORITHM )
+#define EINFO_ENOTTY_ALGORITHM \
+	__einfo_uniqify ( EINFO_ENOTTY, 0x01, "Inappropriate algorithm" )
 
 /**
  * Invalidate ASN.1 object cursor
@@ -377,11 +389,12 @@ asn1_find_algorithm ( const struct asn1_cursor *cursor ) {
  * Parse ASN.1 OID-identified algorithm
  *
  * @v cursor		ASN.1 object cursor
- * @ret algorithm	Algorithm, or NULL
+ * @ret algorithm	Algorithm
+ * @ret rc		Return status code
  */
-struct asn1_algorithm * asn1_algorithm ( const struct asn1_cursor *cursor ) {
+int asn1_algorithm ( const struct asn1_cursor *cursor,
+		     struct asn1_algorithm **algorithm ) {
 	struct asn1_cursor contents;
-	struct asn1_algorithm *algorithm;
 	int rc;
 
 	/* Enter signatureAlgorithm */
@@ -393,18 +406,104 @@ struct asn1_algorithm * asn1_algorithm ( const struct asn1_cursor *cursor ) {
 		DBGC ( cursor, "ASN1 %p cannot locate algorithm OID:\n",
 		       cursor );
 		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
-		return NULL;
+		return -EINVAL_ASN1_ALGORITHM;
 	}
 
 	/* Identify algorithm */
-	algorithm = asn1_find_algorithm ( &contents );
-	if ( ! algorithm ) {
+	*algorithm = asn1_find_algorithm ( &contents );
+	if ( ! *algorithm ) {
 		DBGC ( cursor, "ASN1 %p unrecognised algorithm:\n", cursor );
 		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
-		return NULL;
+		return -ENOTSUP_ALGORITHM;
 	}
 
-	return algorithm;
+	return 0;
+}
+
+/**
+ * Parse ASN.1 OID-identified public-key algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret algorithm	Algorithm
+ * @ret rc		Return status code
+ */
+int asn1_pubkey_algorithm ( const struct asn1_cursor *cursor,
+			    struct asn1_algorithm **algorithm ) {
+	int rc;
+
+	/* Parse algorithm */
+	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+		return rc;
+
+	/* Check algorithm has a public key */
+	if ( ! (*algorithm)->pubkey ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s is not a public-key "
+		       "algorithm:\n", cursor, (*algorithm)->name );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	return 0;
+}
+
+/**
+ * Parse ASN.1 OID-identified digest algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret algorithm	Algorithm
+ * @ret rc		Return status code
+ */
+int asn1_digest_algorithm ( const struct asn1_cursor *cursor,
+			    struct asn1_algorithm **algorithm ) {
+	int rc;
+
+	/* Parse algorithm */
+	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+		return rc;
+
+	/* Check algorithm has a digest */
+	if ( ! (*algorithm)->digest ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s is not a digest "
+		       "algorithm:\n", cursor, (*algorithm)->name );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	return 0;
+}
+
+/**
+ * Parse ASN.1 OID-identified signature algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret algorithm	Algorithm
+ * @ret rc		Return status code
+ */
+int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
+			       struct asn1_algorithm **algorithm ) {
+	int rc;
+
+	/* Parse algorithm */
+	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+		return rc;
+
+	/* Check algorithm has a public key */
+	if ( ! (*algorithm)->pubkey ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s is not a signature "
+		       "algorithm:\n", cursor, (*algorithm)->name );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	/* Check algorithm has a digest */
+	if ( ! (*algorithm)->digest ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s is not a signature "
+		       "algorithm:\n", cursor, (*algorithm)->name );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	return 0;
 }
 
 /**
