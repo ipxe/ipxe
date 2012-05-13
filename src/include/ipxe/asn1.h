@@ -10,6 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <time.h>
 #include <ipxe/tables.h>
 
 /** An ASN.1 object cursor */
@@ -239,5 +240,7 @@ extern int asn1_compare ( const struct asn1_cursor *cursor1,
 			  const struct asn1_cursor *cursor2 );
 extern struct asn1_algorithm *
 asn1_algorithm ( const struct asn1_cursor *cursor );
+extern int asn1_generalized_time ( const struct asn1_cursor *cursor,
+				   time_t *time );
 
 #endif /* _IPXE_ASN1_H */

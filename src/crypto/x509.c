@@ -20,8 +20,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <time.h>
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/list.h>
@@ -60,10 +58,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EINVAL_BIT_STRING )
 #define EINFO_EINVAL_BIT_STRING \
 	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Invalid bit string" )
-#define EINVAL_TIME \
-	__einfo_error ( EINFO_EINVAL_TIME )
-#define EINFO_EINVAL_TIME \
-	__einfo_uniqify ( EINFO_EINVAL, 0x03, "Invalid time" )
 #define EINVAL_ALGORITHM_MISMATCH \
 	__einfo_error ( EINFO_EINVAL_ALGORITHM_MISMATCH )
 #define EINFO_EINVAL_ALGORITHM_MISMATCH \
@@ -301,114 +295,6 @@ static int x509_parse_integral_bit_string ( struct x509_certificate *cert,
 	return 0;
 }
 
-/**
- * Parse X.509 certificate time
- *
- * @v cert		X.509 certificate
- * @v time		Time to fill in
- * @v raw		ASN.1 cursor
- * @ret rc		Return status code
- *
- * RFC 5280 section 4.1.2.5 places several restrictions on the allowed
- * formats for UTCTime and GeneralizedTime, and mandates the
- * interpretation of centuryless year values.
- */
-static int x509_parse_time ( struct x509_certificate *cert,
-			     struct x509_time *time,
-			     const struct asn1_cursor *raw ) {
-	struct asn1_cursor cursor;
-	unsigned int have_century;
-	unsigned int type;
-	union {
-		struct {
-			uint8_t century;
-			uint8_t year;
-			uint8_t month;
-			uint8_t day;
-			uint8_t hour;
-			uint8_t minute;
-			uint8_t second;
-		} __attribute__ (( packed )) named;
-		uint8_t raw[7];
-	} pairs;
-	struct tm tm;
-	const uint8_t *data;
-	size_t remaining;
-	unsigned int tens;
-	unsigned int units;
-	unsigned int i;
-	int rc;
-
-	/* Determine time format utcTime/generalizedTime */
-	memcpy ( &cursor, raw, sizeof ( cursor ) );
-	type = asn1_type ( &cursor );
-	switch ( type ) {
-	case ASN1_UTC_TIME:
-		have_century = 0;
-		break;
-	case ASN1_GENERALIZED_TIME:
-		have_century = 1;
-		break;
-	default:
-		DBGC ( cert, "X509 %p invalid time type %02x\n", cert, type );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -EINVAL_TIME;
-	}
-
-	/* Enter utcTime/generalizedTime */
-	if ( ( rc = asn1_enter ( &cursor, type ) ) != 0 ) {
-		DBGC ( cert, "X509 %p cannot locate %s time:\n", cert,
-		       ( ( type == ASN1_UTC_TIME ) ? "UTC" : "generalized" ) );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return rc;
-	}
-
-	/* Parse digit string a pair at a time */
-	data = cursor.data;
-	remaining = cursor.len;
-	for ( i = ( have_century ? 0 : 1 ) ; i < sizeof ( pairs.raw ) ; i++ ) {
-		if ( remaining < 2 ) {
-			DBGC ( cert, "X509 %p invalid time:\n", cert );
-			DBGC_HDA ( cert, 0, raw->data, raw->len );
-			return -EINVAL_TIME;
-		}
-		tens = data[0];
-		units = data[1];
-		if ( ! ( isdigit ( tens ) && isdigit ( units ) ) ) {
-			DBGC ( cert, "X509 %p invalid time:\n", cert );
-			DBGC_HDA ( cert, 0, raw->data, raw->len );
-			return -EINVAL_TIME;
-		}
-		pairs.raw[i] = ( ( 10 * ( tens - '0' ) ) + ( units - '0' ) );
-		data += 2;
-		remaining -= 2;
-	}
-
-	/* Determine century if applicable */
-	if ( ! have_century )
-		pairs.named.century = ( ( pairs.named.year >= 50 ) ? 19 : 20 );
-
-	/* Check for trailing "Z" */
-	if ( ( remaining != 1 ) || ( data[0] != 'Z' ) ) {
-		DBGC ( cert, "X509 %p invalid time:\n", cert );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -EINVAL_TIME;
-	}
-
-	/* Fill in time */
-	tm.tm_year = ( ( ( pairs.named.century - 19 ) * 100 ) +
-		       pairs.named.year );
-	tm.tm_mon = ( pairs.named.month - 1 );
-	tm.tm_mday = pairs.named.day;
-	tm.tm_hour = pairs.named.hour;
-	tm.tm_min = pairs.named.minute;
-	tm.tm_sec = pairs.named.second;
-
-	/* Convert to seconds since the Epoch */
-	time->time = mktime ( &tm );
-
-	return 0;
-}
 
 /**
  * Parse X.509 certificate version
@@ -520,15 +406,23 @@ static int x509_parse_validity ( struct x509_certificate *cert,
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Parse notBefore */
-	if ( ( rc = x509_parse_time ( cert, not_before, &cursor ) ) != 0 )
+	if ( ( rc = asn1_generalized_time ( &cursor,
+					    &not_before->time ) ) != 0 ) {
+		DBGC ( cert, "X509 %p cannot parse notBefore: %s\n",
+		       cert, strerror ( rc ) );
 		return rc;
+	}
 	DBGC2 ( cert, "X509 %p valid from time %lld\n",
 		cert, not_before->time );
 	asn1_skip_any ( &cursor );
 
 	/* Parse notAfter */
-	if ( ( rc = x509_parse_time ( cert, not_after, &cursor ) ) != 0 )
+	if ( ( rc = asn1_generalized_time ( &cursor,
+					    &not_after->time ) ) != 0 ) {
+		DBGC ( cert, "X509 %p cannot parse notAfter: %s\n",
+		       cert, strerror ( rc ) );
 		return rc;
+	}
 	DBGC2 ( cert, "X509 %p valid until time %lld\n",
 		cert, not_after->time );
 

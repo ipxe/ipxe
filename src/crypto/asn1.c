@@ -21,7 +21,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
+#include <time.h>
 #include <ipxe/tables.h>
 #include <ipxe/asn1.h>
 
@@ -52,6 +54,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EINVAL_ASN1_INTEGER )
 #define EINFO_EINVAL_ASN1_INTEGER \
 	__einfo_uniqify ( EINFO_EINVAL, 0x04, "Invalid integer" )
+#define EINVAL_ASN1_TIME \
+	__einfo_error ( EINFO_EINVAL_ASN1_TIME )
+#define EINFO_EINVAL_ASN1_TIME \
+	__einfo_uniqify ( EINFO_EINVAL, 0x05, "Invalid time" )
 
 /**
  * Invalidate ASN.1 object cursor
@@ -399,4 +405,111 @@ struct asn1_algorithm * asn1_algorithm ( const struct asn1_cursor *cursor ) {
 	}
 
 	return algorithm;
+}
+
+/**
+ * Parse ASN.1 GeneralizedTime
+ *
+ * @v cursor		ASN.1 cursor
+ * @v time		Time to fill in
+ * @ret rc		Return status code
+ *
+ * RFC 5280 section 4.1.2.5 places several restrictions on the allowed
+ * formats for UTCTime and GeneralizedTime, and mandates the
+ * interpretation of centuryless year values.
+ */
+int asn1_generalized_time ( const struct asn1_cursor *cursor, time_t *time ) {
+	struct asn1_cursor contents;
+	unsigned int have_century;
+	unsigned int type;
+	union {
+		struct {
+			uint8_t century;
+			uint8_t year;
+			uint8_t month;
+			uint8_t day;
+			uint8_t hour;
+			uint8_t minute;
+			uint8_t second;
+		} __attribute__ (( packed )) named;
+		uint8_t raw[7];
+	} pairs;
+	struct tm tm;
+	const uint8_t *data;
+	size_t remaining;
+	unsigned int tens;
+	unsigned int units;
+	unsigned int i;
+	int rc;
+
+	/* Determine time format utcTime/generalizedTime */
+	memcpy ( &contents, cursor, sizeof ( contents ) );
+	type = asn1_type ( &contents );
+	switch ( type ) {
+	case ASN1_UTC_TIME:
+		have_century = 0;
+		break;
+	case ASN1_GENERALIZED_TIME:
+		have_century = 1;
+		break;
+	default:
+		DBGC ( cursor, "ASN1 %p invalid time type %02x\n",
+		       cursor, type );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -EINVAL_ASN1_TIME;
+	}
+
+	/* Enter utcTime/generalizedTime */
+	if ( ( rc = asn1_enter ( &contents, type ) ) != 0 ) {
+		DBGC ( cursor, "ASN1 %p cannot locate %s time:\n", cursor,
+		       ( ( type == ASN1_UTC_TIME ) ? "UTC" : "generalized" ) );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return rc;
+	}
+
+	/* Parse digit string a pair at a time */
+	data = contents.data;
+	remaining = contents.len;
+	for ( i = ( have_century ? 0 : 1 ) ; i < sizeof ( pairs.raw ) ; i++ ) {
+		if ( remaining < 2 ) {
+			DBGC ( cursor, "ASN1 %p invalid time:\n", cursor );
+			DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+			return -EINVAL_ASN1_TIME;
+		}
+		tens = data[0];
+		units = data[1];
+		if ( ! ( isdigit ( tens ) && isdigit ( units ) ) ) {
+			DBGC ( cursor, "ASN1 %p invalid time:\n", cursor );
+			DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+			return -EINVAL_ASN1_TIME;
+		}
+		pairs.raw[i] = ( ( 10 * ( tens - '0' ) ) + ( units - '0' ) );
+		data += 2;
+		remaining -= 2;
+	}
+
+	/* Determine century if applicable */
+	if ( ! have_century )
+		pairs.named.century = ( ( pairs.named.year >= 50 ) ? 19 : 20 );
+
+	/* Check for trailing "Z" */
+	if ( ( remaining != 1 ) || ( data[0] != 'Z' ) ) {
+		DBGC ( cursor, "ASN1 %p invalid time:\n", cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -EINVAL_ASN1_TIME;
+	}
+
+	/* Fill in time */
+	tm.tm_year = ( ( ( pairs.named.century - 19 ) * 100 ) +
+		       pairs.named.year );
+	tm.tm_mon = ( pairs.named.month - 1 );
+	tm.tm_mday = pairs.named.day;
+	tm.tm_hour = pairs.named.hour;
+	tm.tm_min = pairs.named.minute;
+	tm.tm_sec = pairs.named.second;
+
+	/* Convert to seconds since the Epoch */
+	*time = mktime ( &tm );
+
+	return 0;
 }
