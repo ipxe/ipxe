@@ -1290,9 +1290,9 @@ int x509_check_time ( struct x509_certificate *cert, time_t time ) {
  * successfully validated then @c issuer, @c time, and @c root will be
  * ignored.
  */
-static int x509_validate ( struct x509_certificate *cert,
-			   struct x509_certificate *issuer,
-			   time_t time, struct x509_root *root ) {
+int x509_validate ( struct x509_certificate *cert,
+		    struct x509_certificate *issuer,
+		    time_t time, struct x509_root *root ) {
 	unsigned int max_path_remaining;
 	int rc;
 

@@ -70,6 +70,9 @@ struct asn1_builder_header {
 /** ASN.1 object identifier */
 #define ASN1_OID 0x06
 
+/** ASN.1 enumeration */
+#define ASN1_ENUMERATED 0x0a
+
 /** ASN.1 UTC time */
 #define ASN1_UTC_TIME 0x17
 
@@ -203,6 +206,14 @@ struct asn1_builder_header {
 	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 5 ),		\
 	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
 	ASN1_OID_SINGLE ( 48 ), ASN1_OID_SINGLE ( 1 )
+
+/** ASN.1 OID for id-pkix-ocsp-basic ( 1.3.6.1.5.5.7.48.1.1) */
+#define ASN1_OID_OCSP_BASIC					\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 6 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 5 ),		\
+	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
+	ASN1_OID_SINGLE ( 48 ), ASN1_OID_SINGLE ( 1 ),		\
+	ASN1_OID_SINGLE ( 1 )
 
 /** ASN.1 OID for id-kp-OCSPSigning (1.3.6.1.5.5.7.3.9) */
 #define ASN1_OID_OCSPSIGNING					\
