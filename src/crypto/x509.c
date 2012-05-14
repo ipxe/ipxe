@@ -54,10 +54,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EINVAL_ALGORITHM )
 #define EINFO_EINVAL_ALGORITHM \
 	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Invalid algorithm type" )
-#define EINVAL_BIT_STRING \
-	__einfo_error ( EINFO_EINVAL_BIT_STRING )
-#define EINFO_EINVAL_BIT_STRING \
-	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Invalid bit string" )
 #define EINVAL_ALGORITHM_MISMATCH \
 	__einfo_error ( EINFO_EINVAL_ALGORITHM_MISMATCH )
 #define EINFO_EINVAL_ALGORITHM_MISMATCH \
@@ -153,88 +149,6 @@ static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
 /** "commonName" object identifier cursor */
 static struct asn1_cursor oid_common_name_cursor =
 	ASN1_OID_CURSOR ( oid_common_name );
-
-/**
- * Parse X.509 certificate bit string
- *
- * @v cert		X.509 certificate
- * @v bits		Bit string to fill in
- * @v raw		ASN.1 cursor
- * @ret rc		Return status code
- */
-static int x509_parse_bit_string ( struct x509_certificate *cert,
-				   struct x509_bit_string *bits,
-				   const struct asn1_cursor *raw ) {
-	struct asn1_cursor cursor;
-	const struct asn1_bit_string *bit_string;
-	size_t len;
-	unsigned int unused;
-	uint8_t unused_mask;
-	const uint8_t *last;
-	int rc;
-
-	/* Enter bit string */
-	memcpy ( &cursor, raw, sizeof ( cursor ) );
-	if ( ( rc = asn1_enter ( &cursor, ASN1_BIT_STRING ) ) != 0 ) {
-		DBGC ( cert, "X509 %p cannot locate bit string:\n", cert );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return rc;
-	}
-
-	/* Validity checks */
-	if ( cursor.len < sizeof ( *bit_string ) ) {
-		DBGC ( cert, "X509 %p invalid bit string:\n", cert );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -EINVAL_BIT_STRING;
-	}
-	bit_string = cursor.data;
-	len = ( cursor.len - offsetof ( typeof ( *bit_string ), data ) );
-	unused = bit_string->unused;
-	unused_mask = ( 0xff >> ( 8 - unused ) );
-	last = ( bit_string->data + len - 1 );
-	if ( ( unused >= 8 ) ||
-	     ( ( unused > 0 ) && ( len == 0 ) ) ||
-	     ( ( *last & unused_mask ) != 0 ) ) {
-		DBGC ( cert, "X509 %p invalid bit string:\n", cert );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -EINVAL_BIT_STRING;
-	}
-
-	/* Populate bit string */
-	bits->data = &bit_string->data;
-	bits->len = len;
-	bits->unused = unused;
-
-	return 0;
-}
-
-/**
- * Parse X.509 certificate bit string that must be an integral number of bytes
- *
- * @v cert		X.509 certificate
- * @v bits		Bit string to fill in
- * @v raw		ASN.1 cursor
- * @ret rc		Return status code
- */
-static int x509_parse_integral_bit_string ( struct x509_certificate *cert,
-					    struct x509_bit_string *bits,
-					    const struct asn1_cursor *raw ) {
-	int rc;
-
-	/* Parse bit string */
-	if ( ( rc = x509_parse_bit_string ( cert, bits, raw ) ) != 0 )
-		return rc;
-
-	/* Check that there are no unused bits at end of string */
-	if ( bits->unused ) {
-		DBGC ( cert, "X509 %p invalid integral bit string:\n", cert );
-		DBGC_HDA ( cert, 0, raw->data, raw->len );
-		return -EINVAL_BIT_STRING;
-	}
-
-	return 0;
-}
-
 
 /**
  * Parse X.509 certificate version
@@ -466,7 +380,7 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 				   const struct asn1_cursor *raw ) {
 	struct x509_public_key *public_key = &cert->subject.public_key;
 	struct asn1_algorithm **algorithm = &public_key->algorithm;
-	struct x509_bit_string *raw_bits = &public_key->raw_bits;
+	struct asn1_bit_string *raw_bits = &public_key->raw_bits;
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -491,8 +405,11 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 	asn1_skip_any ( &cursor );
 
 	/* Parse bit string */
-	if ( ( rc = x509_parse_bit_string ( cert, raw_bits, &cursor ) ) != 0 )
+	if ( ( rc = asn1_bit_string ( &cursor, raw_bits ) ) != 0 ) {
+		DBGC ( cert, "X509 %p could not parse public key bits: %s\n",
+		       cert, strerror ( rc ) );
 		return rc;
+	}
 
 	return 0;
 }
@@ -569,7 +486,7 @@ static int x509_parse_basic_constraints ( struct x509_certificate *cert,
 static int x509_parse_key_usage ( struct x509_certificate *cert,
 				  const struct asn1_cursor *raw ) {
 	struct x509_key_usage *usage = &cert->extensions.usage;
-	struct x509_bit_string bit_string;
+	struct asn1_bit_string bit_string;
 	const uint8_t *bytes;
 	size_t len;
 	unsigned int i;
@@ -579,8 +496,11 @@ static int x509_parse_key_usage ( struct x509_certificate *cert,
 	usage->present = 1;
 
 	/* Parse bit string */
-	if ( ( rc = x509_parse_bit_string ( cert, &bit_string, raw ) ) != 0 )
+	if ( ( rc = asn1_bit_string ( raw, &bit_string ) ) != 0 ) {
+		DBGC ( cert, "X509 %p could not parse key usage: %s\n",
+		       cert, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Parse key usage bits */
 	bytes = bit_string.data;
@@ -1034,7 +954,7 @@ static int x509_parse ( struct x509_certificate *cert,
 			const struct asn1_cursor *raw ) {
 	struct x509_signature *signature = &cert->signature;
 	struct asn1_algorithm **signature_algorithm = &signature->algorithm;
-	struct x509_bit_string *signature_value = &signature->value;
+	struct asn1_bit_string *signature_value = &signature->value;
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -1062,9 +982,12 @@ static int x509_parse ( struct x509_certificate *cert,
 	asn1_skip_any ( &cursor );
 
 	/* Parse signatureValue */
-	if ( ( rc = x509_parse_integral_bit_string ( cert, signature_value,
-						     &cursor ) ) != 0 )
+	if ( ( rc = asn1_integral_bit_string ( &cursor,
+					       signature_value ) ) != 0 ) {
+		DBGC ( cert, "X509 %p could not parse signature value: %s\n",
+		       cert, strerror ( rc ) );
 		return rc;
+	}
 	DBGC2 ( cert, "X509 %p signatureValue is:\n", cert );
 	DBGC2_HDA ( cert, 0, signature_value->data, signature_value->len );
 

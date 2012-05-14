@@ -200,18 +200,14 @@ struct asn1_algorithm {
 /** Declare an ASN.1 OID-identified algorithm */
 #define __asn1_algorithm __table_entry ( ASN1_ALGORITHMS, 01 )
 
-/** An ASN.1 boolean */
-struct asn1_boolean {
-	/** Value */
-	uint8_t value;
-} __attribute__ (( packed ));
-
 /** An ASN.1 bit string */
 struct asn1_bit_string {
-	/** Number of unused bits */
-	uint8_t unused;
 	/** Data */
-	uint8_t data[0];
+	const void *data;
+	/** Length */
+	size_t len;
+	/** Unused bits at end of data */
+	unsigned int unused;
 } __attribute__ (( packed ));
 
 /**
@@ -236,6 +232,10 @@ extern int asn1_skip_any ( struct asn1_cursor *cursor );
 extern int asn1_shrink_any ( struct asn1_cursor *cursor );
 extern int asn1_boolean ( const struct asn1_cursor *cursor );
 extern int asn1_integer ( const struct asn1_cursor *cursor, int *value );
+extern int asn1_bit_string ( const struct asn1_cursor *cursor,
+			     struct asn1_bit_string *bits );
+extern int asn1_integral_bit_string ( const struct asn1_cursor *cursor,
+				      struct asn1_bit_string *bits );
 extern int asn1_compare ( const struct asn1_cursor *cursor1,
 			  const struct asn1_cursor *cursor2 );
 extern int asn1_algorithm ( const struct asn1_cursor *cursor,

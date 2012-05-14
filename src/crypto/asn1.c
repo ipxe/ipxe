@@ -62,6 +62,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EINVAL_ASN1_ALGORITHM )
 #define EINFO_EINVAL_ASN1_ALGORITHM \
 	__einfo_uniqify ( EINFO_EINVAL, 0x06, "Invalid algorithm" )
+#define EINVAL_BIT_STRING \
+	__einfo_error ( EINFO_EINVAL_BIT_STRING )
+#define EINFO_EINVAL_BIT_STRING \
+	__einfo_uniqify ( EINFO_EINVAL, 0x07, "Invalid bit string" )
 #define ENOTSUP_ALGORITHM \
 	__einfo_error ( EINFO_ENOTSUP_ALGORITHM )
 #define EINFO_ENOTSUP_ALGORITHM \
@@ -295,7 +299,9 @@ int asn1_shrink_any ( struct asn1_cursor *cursor ) {
  */
 int asn1_boolean ( const struct asn1_cursor *cursor ) {
 	struct asn1_cursor contents;
-	const struct asn1_boolean *boolean;
+	const struct {
+		uint8_t value;
+	} __attribute__ (( packed )) *boolean;
 
 	/* Enter boolean */
 	memcpy ( &contents, cursor, sizeof ( contents ) );
@@ -342,6 +348,87 @@ int asn1_integer ( const struct asn1_cursor *cursor, int *value ) {
 		*value = ( ( *value << 8 ) | *( ( uint8_t * ) contents.data ) );
 		contents.data++;
 		contents.len--;
+	}
+
+	return 0;
+}
+
+/**
+ * Parse ASN.1 bit string
+ *
+ * @v cursor		ASN.1 cursor
+ * @v bits		Bit string to fill in
+ * @ret rc		Return status code
+ */
+int asn1_bit_string ( const struct asn1_cursor *cursor,
+		      struct asn1_bit_string *bits ) {
+	struct asn1_cursor contents;
+	const struct {
+		uint8_t unused;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *bit_string;
+	size_t len;
+	unsigned int unused;
+	uint8_t unused_mask;
+	const uint8_t *last;
+	int rc;
+
+	/* Enter bit string */
+	memcpy ( &contents, cursor, sizeof ( contents ) );
+	if ( ( rc = asn1_enter ( &contents, ASN1_BIT_STRING ) ) != 0 ) {
+		DBGC ( cursor, "ASN1 %p cannot locate bit string:\n", cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return rc;
+	}
+
+	/* Validity checks */
+	if ( contents.len < sizeof ( *bit_string ) ) {
+		DBGC ( cursor, "ASN1 %p invalid bit string:\n", cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -EINVAL_BIT_STRING;
+	}
+	bit_string = contents.data;
+	len = ( contents.len - offsetof ( typeof ( *bit_string ), data ) );
+	unused = bit_string->unused;
+	unused_mask = ( 0xff >> ( 8 - unused ) );
+	last = ( bit_string->data + len - 1 );
+	if ( ( unused >= 8 ) ||
+	     ( ( unused > 0 ) && ( len == 0 ) ) ||
+	     ( ( *last & unused_mask ) != 0 ) ) {
+		DBGC ( cursor, "ASN1 %p invalid bit string:\n", cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -EINVAL_BIT_STRING;
+	}
+
+	/* Populate bit string */
+	bits->data = &bit_string->data;
+	bits->len = len;
+	bits->unused = unused;
+
+	return 0;
+}
+
+/**
+ * Parse ASN.1 bit string that must be an integral number of bytes
+ *
+ * @v cursor		ASN.1 cursor
+ * @v bits		Bit string to fill in
+ * @ret rc		Return status code
+ */
+int asn1_integral_bit_string ( const struct asn1_cursor *cursor,
+			       struct asn1_bit_string *bits ) {
+	int rc;
+
+	/* Parse bit string */
+	if ( ( rc = asn1_bit_string ( cursor, bits ) ) != 0 )
+		return rc;
+
+	/* Check that there are no unused bits at end of string */
+	if ( bits->unused ) {
+		DBGC ( cursor, "ASN1 %p invalid integral bit string:\n",
+		       cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -EINVAL_BIT_STRING;
 	}
 
 	return 0;

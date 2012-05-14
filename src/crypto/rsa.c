@@ -241,7 +241,7 @@ static int rsa_parse_integer ( struct rsa_context *context,
  */
 static int rsa_init ( void *ctx, const void *key, size_t key_len ) {
 	struct rsa_context *context = ctx;
-	const struct asn1_bit_string *bit_string;
+	struct asn1_bit_string bits;
 	struct asn1_cursor modulus;
 	struct asn1_cursor exponent;
 	struct asn1_cursor cursor;
@@ -274,17 +274,10 @@ static int rsa_init ( void *ctx, const void *key, size_t key_len ) {
 		asn1_skip ( &cursor, ASN1_SEQUENCE );
 
 		/* Enter subjectPublicKey */
-		asn1_enter ( &cursor, ASN1_BIT_STRING );
-
-		/* Check and skip unused-bits byte of bit string */
-		bit_string = cursor.data;
-		if ( ( cursor.len < sizeof ( *bit_string ) ) ||
-		     ( bit_string->unused != 0 ) ) {
-			rc = -EINVAL;
+		if ( ( rc = asn1_integral_bit_string ( &cursor, &bits ) ) != 0 )
 			goto err_parse;
-		}
-		cursor.data = &bit_string->data;
-		cursor.len -= offsetof ( typeof ( *bit_string ), data );
+		cursor.data = bits.data;
+		cursor.len = bits.len;
 
 		/* Enter RSAPublicKey */
 		asn1_enter ( &cursor, ASN1_SEQUENCE );

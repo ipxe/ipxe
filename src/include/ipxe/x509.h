@@ -16,16 +16,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/refcnt.h>
 #include <ipxe/list.h>
 
-/** An X.509 bit string */
-struct x509_bit_string {
-	/** Data */
-	const void *data;
-	/** Length */
-	size_t len;
-	/** Unused bits at end of data */
-	unsigned int unused;
-};
-
 /** An X.509 serial number */
 struct x509_serial {
 	/** Raw serial number */
@@ -59,7 +49,7 @@ struct x509_public_key {
 	/** Public key algorithm */
 	struct asn1_algorithm *algorithm;
 	/** Raw public key bit string */
-	struct x509_bit_string raw_bits;
+	struct asn1_bit_string raw_bits;
 };
 
 /** An X.509 certificate subject */
@@ -77,7 +67,7 @@ struct x509_signature {
 	/** Signature algorithm */
 	struct asn1_algorithm *algorithm;
 	/** Signature value */
-	struct x509_bit_string value;
+	struct asn1_bit_string value;
 };
 
 /** An X.509 certificate basic constraints set */
