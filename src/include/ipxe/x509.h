@@ -119,6 +119,7 @@ struct x509_extended_key_usage {
  */
 enum x509_extended_key_usage_bits {
 	X509_CODE_SIGNING = 0x0001,
+	X509_OCSP_SIGNING = 0x0002,
 };
 
 /** X.509 certificate OCSP responder */

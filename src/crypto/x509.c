@@ -518,12 +518,20 @@ static int x509_parse_key_usage ( struct x509_certificate *cert,
 /** "id-kp-codeSigning" object identifier */
 static uint8_t oid_code_signing[] = { ASN1_OID_CODESIGNING };
 
+/** "id-kp-OCSPSigning" object identifier */
+static uint8_t oid_ocsp_signing[] = { ASN1_OID_OCSPSIGNING };
+
 /** Supported key purposes */
 static struct x509_key_purpose x509_key_purposes[] = {
 	{
 		.name = "codeSigning",
 		.bits = X509_CODE_SIGNING,
 		.oid = ASN1_OID_CURSOR ( oid_code_signing ),
+	},
+	{
+		.name = "ocspSigning",
+		.bits = X509_OCSP_SIGNING,
+		.oid = ASN1_OID_CURSOR ( oid_ocsp_signing ),
 	},
 };
 

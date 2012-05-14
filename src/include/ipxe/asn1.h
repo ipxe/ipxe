@@ -176,6 +176,13 @@ struct asn1_cursor {
 	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
 	ASN1_OID_SINGLE ( 48 ), ASN1_OID_SINGLE ( 1 )
 
+/** ASN.1 OID for id-kp-OCSPSigning (1.3.6.1.5.5.7.3.9) */
+#define ASN1_OID_OCSPSIGNING					\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 6 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 5 ),		\
+	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 9 )
+
 /** Define an ASN.1 cursor containing an OID */
 #define ASN1_OID_CURSOR( oid_value ) {				\
 		.data = oid_value,				\
