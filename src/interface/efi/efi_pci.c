@@ -216,17 +216,19 @@ struct efi_pci_device * efipci_create ( struct efi_driver *efidrv,
  */
 EFI_STATUS efipci_enable ( struct efi_pci_device *efipci ) {
 	EFI_PCI_IO_PROTOCOL *pci_io = efipci->pci_io;
-	EFI_STATUS efirc;
 
-	/* Enable device */
-	if ( ( efirc = pci_io->Attributes ( pci_io,
-					    EfiPciIoAttributeOperationSet,
-					    EFI_PCI_DEVICE_ENABLE,
-					    NULL ) ) != 0 ) {
-		DBGC ( efipci, "EFIPCI " PCI_FMT " could not be enabled: %s\n",
-		       PCI_ARGS ( &efipci->pci ), efi_strerror ( efirc ) );
-		return efirc;
-	}
+	/* Try to enable I/O cycles, memory cycles, and bus mastering.
+	 * Some platforms will 'helpfully' report errors if these bits
+	 * can't be enabled (for example, if the card doesn't actually
+	 * support I/O cycles).  Work around any such platforms by
+	 * enabling bits individually and simply ignoring any errors.
+	 */
+	pci_io->Attributes ( pci_io, EfiPciIoAttributeOperationEnable,
+			     EFI_PCI_IO_ATTRIBUTE_IO, NULL );
+	pci_io->Attributes ( pci_io, EfiPciIoAttributeOperationEnable,
+			     EFI_PCI_IO_ATTRIBUTE_MEMORY, NULL );
+	pci_io->Attributes ( pci_io, EfiPciIoAttributeOperationEnable,
+			     EFI_PCI_IO_ATTRIBUTE_BUS_MASTER, NULL );
 
 	return 0;
 }
