@@ -337,7 +337,8 @@ static void iscsi_scsi_done ( struct iscsi_session *iscsi, int rc,
 	iscsi->command = NULL;
 
 	/* Send SCSI response, if any */
-	scsi_response ( &iscsi->data, rsp );
+	if ( rsp )
+		scsi_response ( &iscsi->data, rsp );
 
 	/* Close SCSI command, if this is still the same command.  (It
 	 * is possible that the command interface has already been
