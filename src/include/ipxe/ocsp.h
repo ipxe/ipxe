@@ -70,6 +70,8 @@ struct ocsp_check {
 	struct x509_certificate *cert;
 	/** Issuing certificate */
 	struct x509_certificate *issuer;
+	/** URI string */
+	char *uri_string;
 	/** Request */
 	struct ocsp_request request;
 	/** Response */

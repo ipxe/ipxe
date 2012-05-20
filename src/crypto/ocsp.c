@@ -21,11 +21,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <ipxe/asn1.h>
 #include <ipxe/x509.h>
 #include <ipxe/sha1.h>
+#include <ipxe/base64.h>
+#include <ipxe/uri.h>
 #include <ipxe/ocsp.h>
 
 /** @file
@@ -110,6 +113,7 @@ static void ocsp_free ( struct refcnt *refcnt ) {
 
 	x509_put ( ocsp->cert );
 	x509_put ( ocsp->issuer );
+	free ( ocsp->uri_string );
 	free ( ocsp->request.builder.data );
 	free ( ocsp->response.data );
 	x509_put ( ocsp->response.signer );
@@ -181,6 +185,71 @@ static int ocsp_request ( struct ocsp_check *ocsp ) {
 }
 
 /**
+ * Build OCSP URI string
+ *
+ * @v ocsp		OCSP check
+ * @ret rc		Return status code
+ */
+static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
+	char *base_uri_string;
+	char *base64_request;
+	size_t base64_request_len;
+	size_t uri_string_len;
+	size_t prefix_len;
+	int rc;
+
+	/* Sanity check */
+	base_uri_string = ocsp->cert->extensions.auth_info.ocsp.uri;
+	if ( ! base_uri_string ) {
+		DBGC ( ocsp, "OCSP %p \"%s\" has no OCSP URI\n",
+		       ocsp, ocsp->cert->subject.name );
+		rc = -ENOTTY;
+		goto err_no_uri;
+	}
+
+	/* Base64-encode the request */
+	base64_request_len = ( base64_encoded_len ( ocsp->request.builder.len )
+			       + 1 /* NUL */ );
+	base64_request = malloc ( base64_request_len );
+	if ( ! base64_request ) {
+		rc = -ENOMEM;
+		goto err_alloc_base64;
+	}
+	base64_encode ( ocsp->request.builder.data, ocsp->request.builder.len,
+			base64_request );
+
+	/* Allocate URI string */
+	uri_string_len = ( strlen ( base_uri_string ) + 1 /* "/" */ +
+			   uri_encode ( base64_request, NULL, 0, URI_FRAGMENT )
+			   + 1 /* NUL */ );
+	ocsp->uri_string = malloc ( uri_string_len );
+	if ( ! ocsp->uri_string ) {
+		rc = -ENOMEM;
+		goto err_alloc_uri;
+	}
+
+	/* Construct URI string */
+	prefix_len = snprintf ( ocsp->uri_string, uri_string_len,
+				"%s/", base_uri_string );
+	uri_encode ( base64_request, ( ocsp->uri_string + prefix_len ),
+		     ( uri_string_len - prefix_len ), URI_FRAGMENT );
+	DBGC2 ( ocsp, "OCSP %p \"%s\" URI is %s\n",
+		ocsp, ocsp->cert->subject.name, ocsp->uri_string );
+
+	/* Free base64-encoded request */
+	free ( base64_request );
+	base64_request = NULL;
+
+	return 0;
+
+ err_alloc_uri:
+	free ( base64_request );
+ err_alloc_base64:
+ err_no_uri:
+	return rc;
+}
+
+/**
  * Create OCSP check
  *
  * @v cert		Certificate to check
@@ -212,8 +281,13 @@ int ocsp_check ( struct x509_certificate *cert,
 	if ( ( rc = ocsp_request ( *ocsp ) ) != 0 )
 		goto err_request;
 
+	/* Build URI string */
+	if ( ( rc = ocsp_uri_string ( *ocsp ) ) != 0 )
+		goto err_uri_string;
+
 	return 0;
 
+ err_uri_string:
  err_request:
 	ocsp_put ( *ocsp );
  err_alloc:
