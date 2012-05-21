@@ -217,6 +217,7 @@ int ocsp_check ( struct x509_certificate *cert,
  err_request:
 	ocsp_put ( *ocsp );
  err_alloc:
+	*ocsp = NULL;
 	return rc;
 }
 
