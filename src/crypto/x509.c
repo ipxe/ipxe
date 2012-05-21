@@ -98,6 +98,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EACCES_EMPTY )
 #define EINFO_EACCES_EMPTY \
 	__einfo_uniqify ( EINFO_EACCES, 0x08, "Empty certificate chain" )
+#define EACCES_OCSP_REQUIRED \
+	__einfo_error ( EINFO_EACCES_OCSP_REQUIRED )
+#define EINFO_EACCES_OCSP_REQUIRED \
+	__einfo_uniqify ( EINFO_EACCES, 0x09, "OCSP check required" )
 
 /** Certificate cache */
 static LIST_HEAD ( x509_cache );
@@ -1341,6 +1345,14 @@ int x509_validate ( struct x509_certificate *cert,
 		       "exceeded\n", cert, cert->subject.name,
 		       issuer, issuer->subject.name );
 		return -EACCES_PATH_LEN;
+	}
+
+	/* Fail if OCSP is required */
+	if ( cert->extensions.auth_info.ocsp.uri &&
+	     ( ! cert->extensions.auth_info.ocsp.good ) ) {
+		DBGC ( cert, "X509 %p \"%s\" requires an OCSP check\n",
+		       cert, cert->subject.name );
+		return -EACCES_OCSP_REQUIRED;
 	}
 
 	/* Calculate effective path length */
