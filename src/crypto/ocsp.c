@@ -720,12 +720,12 @@ int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 	/* Check OCSP response is valid at the specified time
 	 * (allowing for some margin of error).
 	 */
-	if ( response->this_update > ( time - OCSP_ERROR_MARGIN_TIME ) ) {
+	if ( response->this_update > ( time + OCSP_ERROR_MARGIN_TIME ) ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" response is not yet valid (at "
 		       "time %lld)\n", ocsp, ocsp->cert->subject.name, time );
 		return -EACCES_STALE;
 	}
-	if ( response->next_update < ( time + OCSP_ERROR_MARGIN_TIME ) ) {
+	if ( response->next_update < ( time - OCSP_ERROR_MARGIN_TIME ) ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" response is stale (at time "
 		       "%lld)\n", ocsp, ocsp->cert->subject.name, time );
 		return -EACCES_STALE;
