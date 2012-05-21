@@ -655,10 +655,16 @@ int asn1_generalized_time ( const struct asn1_cursor *cursor, time_t *time ) {
 	}
 
 	/* Parse digit string a pair at a time */
+	memset ( &pairs, 0, sizeof ( pairs ) );
 	data = contents.data;
 	remaining = contents.len;
 	for ( i = ( have_century ? 0 : 1 ) ; i < sizeof ( pairs.raw ) ; i++ ) {
 		if ( remaining < 2 ) {
+			/* Some certificates violate the X.509 RFC by
+			 * omitting the "seconds" value.
+			 */
+			if ( i == ( sizeof ( pairs.raw ) - 1 ) )
+				break;
 			DBGC ( cursor, "ASN1 %p invalid time:\n", cursor );
 			DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
 			return -EINVAL_ASN1_TIME;
