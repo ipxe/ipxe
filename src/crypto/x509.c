@@ -1068,6 +1068,7 @@ int x509_certificate ( const void *data, size_t len,
 	/* Parse certificate */
 	if ( ( rc = x509_parse ( *cert, &cursor ) ) != 0 ) {
 		x509_put ( *cert );
+		*cert = NULL;
 		return rc;
 	}
 
