@@ -95,6 +95,10 @@ enum http_flags {
 	HTTP_CLIENT_KEEPALIVE = 0x0004,
 	/** Server will keep connection alive */
 	HTTP_SERVER_KEEPALIVE = 0x0008,
+	/** Discard the current request and try again */
+	HTTP_TRY_AGAIN = 0x0010,
+	/** Provide Basic authentication details */
+	HTTP_BASIC_AUTH = 0x0020,
 };
 
 /** HTTP receive state */
@@ -257,10 +261,11 @@ static void http_done ( struct http_request *http ) {
 	assert ( http->chunk_remaining == 0 );
 
 	/* Close partial transfer interface */
-	intf_restart ( &http->partial, 0 );
+	if ( ! ( http->flags & HTTP_TRY_AGAIN ) )
+		intf_restart ( &http->partial, 0 );
 
 	/* Close everything unless we want to keep the connection alive */
-	if ( ! ( http->flags & HTTP_CLIENT_KEEPALIVE ) ) {
+	if ( ! ( http->flags & ( HTTP_CLIENT_KEEPALIVE | HTTP_TRY_AGAIN ) ) ) {
 		http_close ( http, 0 );
 		return;
 	}
@@ -277,6 +282,14 @@ static void http_done ( struct http_request *http ) {
 		}
 	}
 	http->flags &= ~HTTP_SERVER_KEEPALIVE;
+
+	/* Retry the request if applicable */
+	if ( http->flags & HTTP_TRY_AGAIN ) {
+		http->flags &= ~HTTP_TRY_AGAIN;
+		http->flags |= HTTP_TX_PENDING;
+		http->rx_state = HTTP_RX_RESPONSE;
+		process_add ( &http->process );
+	}
 }
 
 /**
@@ -338,7 +351,7 @@ static int http_rx_response ( struct http_request *http, char *response ) {
  * @v value		HTTP header value
  * @ret rc		Return status code
  */
-static int http_rx_location ( struct http_request *http, const char *value ) {
+static int http_rx_location ( struct http_request *http, char *value ) {
 	int rc;
 
 	/* Redirect to new location */
@@ -360,8 +373,7 @@ static int http_rx_location ( struct http_request *http, const char *value ) {
  * @v value		HTTP header value
  * @ret rc		Return status code
  */
-static int http_rx_content_length ( struct http_request *http,
-				    const char *value ) {
+static int http_rx_content_length ( struct http_request *http, char *value ) {
 	struct block_device_capacity capacity;
 	size_t content_len;
 	char *endp;
@@ -385,6 +397,10 @@ static int http_rx_content_length ( struct http_request *http,
 	if ( ! ( http->flags & HTTP_HEAD_ONLY ) )
 		http->remaining = content_len;
 
+	/* Do nothing more if we are retrying the request */
+	if ( http->flags & HTTP_TRY_AGAIN )
+		return 0;
+
 	/* Use seek() to notify recipient of filesize */
 	xfer_seek ( &http->xfer, http->remaining );
 	xfer_seek ( &http->xfer, 0 );
@@ -406,8 +422,7 @@ static int http_rx_content_length ( struct http_request *http,
  * @v value		HTTP header value
  * @ret rc		Return status code
  */
-static int http_rx_transfer_encoding ( struct http_request *http,
-				       const char *value ) {
+static int http_rx_transfer_encoding ( struct http_request *http, char *value ){
 
 	if ( strcasecmp ( value, "chunked" ) == 0 ) {
 		/* Mark connection as using chunked transfer encoding */
@@ -424,13 +439,95 @@ static int http_rx_transfer_encoding ( struct http_request *http,
  * @v value		HTTP header value
  * @ret rc		Return status code
  */
-static int http_rx_connection ( struct http_request *http, const char *value ) {
+static int http_rx_connection ( struct http_request *http, char *value ) {
 
 	if ( strcasecmp ( value, "keep-alive" ) == 0 ) {
 		/* Mark connection as being kept alive by the server */
 		http->flags |= HTTP_SERVER_KEEPALIVE;
 	}
 
+	return 0;
+}
+
+/**
+ * Handle WWW-Authenticate Basic header
+ *
+ * @v http		HTTP request
+ * @v params		Parameters
+ * @ret rc		Return status code
+ */
+static int http_rx_basic_auth ( struct http_request *http, char *params ) {
+
+	DBGC ( http, "HTTP %p Basic authentication required (%s)\n",
+	       http, params );
+
+	/* If we received a 401 Unauthorized response, then retry
+	 * using Basic authentication
+	 */
+	if ( ( http->code == 401 ) &&
+	     ( ! ( http->flags & HTTP_BASIC_AUTH ) ) &&
+	     ( http->uri->user != NULL ) ) {
+		http->flags |= ( HTTP_TRY_AGAIN | HTTP_BASIC_AUTH );
+	}
+
+	return 0;
+}
+
+/** An HTTP WWW-Authenticate header handler */
+struct http_auth_header_handler {
+	/** Scheme (e.g. "Basic") */
+	const char *scheme;
+	/** Handle received parameters
+	 *
+	 * @v http	HTTP request
+	 * @v params	Parameters
+	 * @ret rc	Return status code
+	 */
+	int ( * rx ) ( struct http_request *http, char *params );
+};
+
+/** List of HTTP WWW-Authenticate header handlers */
+static struct http_auth_header_handler http_auth_header_handlers[] = {
+	{
+		.scheme = "Basic",
+		.rx = http_rx_basic_auth,
+	},
+	{ NULL, NULL },
+};
+
+/**
+ * Handle HTTP WWW-Authenticate header
+ *
+ * @v http		HTTP request
+ * @v value		HTTP header value
+ * @ret rc		Return status code
+ */
+static int http_rx_www_authenticate ( struct http_request *http, char *value ) {
+	struct http_auth_header_handler *handler;
+	char *separator;
+	char *scheme;
+	char *params;
+	int rc;
+
+	/* Extract scheme */
+	separator = strchr ( value, ' ' );
+	if ( ! separator ) {
+		DBGC ( http, "HTTP %p malformed WWW-Authenticate header\n",
+		       http );
+		return -EINVAL_HEADER;
+	}
+	*separator = '\0';
+	scheme = value;
+	params = ( separator + 1 );
+
+	/* Hand off to header handler, if one exists */
+	for ( handler = http_auth_header_handlers; handler->scheme; handler++ ){
+		if ( strcasecmp ( scheme, handler->scheme ) == 0 ) {
+			if ( ( rc = handler->rx ( http, params ) ) != 0 )
+				return rc;
+			break;
+		}
+	}
 	return 0;
 }
 
@@ -446,7 +543,7 @@ struct http_header_handler {
 	 *
 	 * If an error is returned, the download will be aborted.
 	 */
-	int ( * rx ) ( struct http_request *http, const char *value );
+	int ( * rx ) ( struct http_request *http, char *value );
 };
 
 /** List of HTTP header handlers */
@@ -466,6 +563,10 @@ static struct http_header_handler http_header_handlers[] = {
 	{
 		.header = "Connection",
 		.rx = http_rx_connection,
+	},
+	{
+		.header = "WWW-Authenticate",
+		.rx = http_rx_www_authenticate,
 	},
 	{ NULL, NULL }
 };
@@ -488,8 +589,10 @@ static int http_rx_header ( struct http_request *http, char *header ) {
 		empty_line_buffer ( &http->linebuf );
 
 		/* Handle response code */
-		if ( ( rc = http_response_to_rc ( http->code ) ) != 0 )
-			return rc;
+		if ( ! ( http->flags & HTTP_TRY_AGAIN ) ) {
+			if ( ( rc = http_response_to_rc ( http->code ) ) != 0 )
+				return rc;
+		}
 
 		/* Move to next state */
 		if ( ( http->rx_state == HTTP_RX_HEADER ) &&
@@ -497,6 +600,10 @@ static int http_rx_header ( struct http_request *http, char *header ) {
 			DBGC ( http, "HTTP %p start of data\n", http );
 			http->rx_state = ( http->chunked ?
 					   HTTP_RX_CHUNK_LEN : HTTP_RX_DATA );
+			if ( ( http->partial_len != 0 ) &&
+			     ( ! ( http->flags & HTTP_TRY_AGAIN ) ) ) {
+				http->remaining = http->partial_len;
+			}
 			return 0;
 		} else {
 			DBGC ( http, "HTTP %p end of trailer\n", http );
@@ -560,8 +667,11 @@ static int http_rx_chunk_len ( struct http_request *http, char *length ) {
 	/* Use seek() to notify recipient of new filesize */
 	DBGC ( http, "HTTP %p start of chunk of length %zd\n",
 	       http, http->chunk_remaining );
-	xfer_seek ( &http->xfer, ( http->rx_len + http->chunk_remaining ) );
-	xfer_seek ( &http->xfer, http->rx_len );
+	if ( ! ( http->flags & HTTP_TRY_AGAIN ) ) {
+		xfer_seek ( &http->xfer,
+			    ( http->rx_len + http->chunk_remaining ) );
+		xfer_seek ( &http->xfer, http->rx_len );
+	}
 
 	/* Start receiving data */
 	http->rx_state = HTTP_RX_DATA;
@@ -630,7 +740,10 @@ static int http_socket_deliver ( struct http_request *http,
 			     ( http->remaining < data_len ) ) {
 				data_len = http->remaining;
 			}
-			if ( http->rx_buffer != UNULL ) {
+			if ( http->flags & HTTP_TRY_AGAIN ) {
+				/* Discard all received data */
+				iob_pull ( iobuf, data_len );
+			} else if ( http->rx_buffer != UNULL ) {
 				/* Copy to partial transfer buffer */
 				copy_to_user ( http->rx_buffer, http->rx_len,
 					       iobuf->data, data_len );
@@ -830,7 +943,7 @@ static void http_step ( struct http_request *http ) {
 	}
 
 	/* Construct authorisation, if applicable */
-	if ( http->uri->user ) {
+	if ( http->flags & HTTP_BASIC_AUTH ) {
 		auth = http_basic_auth ( http );
 		if ( ! auth ) {
 			rc = -ENOMEM;
@@ -907,7 +1020,6 @@ static int http_partial_read ( struct http_request *http,
 	http->rx_buffer = buffer;
 	http->partial_start = offset;
 	http->partial_len = len;
-	http->remaining = len;
 
 	/* Schedule request */
 	http->rx_state = HTTP_RX_RESPONSE;
