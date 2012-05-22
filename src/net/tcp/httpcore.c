@@ -43,6 +43,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/process.h>
 #include <ipxe/linebuf.h>
 #include <ipxe/base64.h>
+#include <ipxe/base16.h>
+#include <ipxe/md5.h>
 #include <ipxe/blockdev.h>
 #include <ipxe/acpi.h>
 #include <ipxe/http.h>
@@ -99,6 +101,8 @@ enum http_flags {
 	HTTP_TRY_AGAIN = 0x0010,
 	/** Provide Basic authentication details */
 	HTTP_BASIC_AUTH = 0x0020,
+	/** Provide Digest authentication details */
+	HTTP_DIGEST_AUTH = 0x0040,
 };
 
 /** HTTP receive state */
@@ -161,6 +165,13 @@ struct http_request {
 	struct line_buffer linebuf;
 	/** Receive data buffer (if applicable) */
 	userptr_t rx_buffer;
+
+	/** Authentication realm (if any) */
+	char *auth_realm;
+	/** Authentication nonce (if any) */
+	char *auth_nonce;
+	/** Authentication opaque string (if any) */
+	char *auth_opaque;
 };
 
 /**
@@ -174,6 +185,9 @@ static void http_free ( struct refcnt *refcnt ) {
 
 	uri_put ( http->uri );
 	empty_line_buffer ( &http->linebuf );
+	free ( http->auth_realm );
+	free ( http->auth_nonce );
+	free ( http->auth_opaque );
 	free ( http );
 };
 
@@ -473,6 +487,81 @@ static int http_rx_basic_auth ( struct http_request *http, char *params ) {
 	return 0;
 }
 
+/**
+ * Parse Digest authentication parameter
+ *
+ * @v params		Parameters
+ * @v name		Parameter name (including trailing "=\"")
+ * @ret value		Parameter value, or NULL
+ */
+static char * http_digest_param ( char *params, const char *name ) {
+	char *key;
+	char *value;
+	char *terminator;
+
+	/* Locate parameter */
+	key = strstr ( params, name );
+	if ( ! key )
+		return NULL;
+
+	/* Extract value */
+	value = ( key + strlen ( name ) );
+	terminator = strchr ( value, '"' );
+	if ( ! terminator )
+		return NULL;
+	return strndup ( value, ( terminator - value ) );
+}
+
+/**
+ * Handle WWW-Authenticate Digest header
+ *
+ * @v http		HTTP request
+ * @v params		Parameters
+ * @ret rc		Return status code
+ */
+static int http_rx_digest_auth ( struct http_request *http, char *params ) {
+
+	DBGC ( http, "HTTP %p Digest authentication required (%s)\n",
+	       http, params );
+
+	/* If we received a 401 Unauthorized response, then retry
+	 * using Digest authentication
+	 */
+	if ( ( http->code == 401 ) &&
+	     ( ! ( http->flags & HTTP_DIGEST_AUTH ) ) &&
+	     ( http->uri->user != NULL ) ) {
+
+		/* Extract realm */
+		free ( http->auth_realm );
+		http->auth_realm = http_digest_param ( params, "realm=\"" );
+		if ( ! http->auth_realm ) {
+			DBGC ( http, "HTTP %p Digest prompt missing realm\n",
+			       http );
+			return -EINVAL_HEADER;
+		}
+
+		/* Extract nonce */
+		free ( http->auth_nonce );
+		http->auth_nonce = http_digest_param ( params, "nonce=\"" );
+		if ( ! http->auth_nonce ) {
+			DBGC ( http, "HTTP %p Digest prompt missing nonce\n",
+			       http );
+			return -EINVAL_HEADER;
+		}
+
+		/* Extract opaque */
+		free ( http->auth_opaque );
+		http->auth_opaque = http_digest_param ( params, "opaque=\"" );
+		if ( ! http->auth_opaque ) {
+			/* Not an error; "opaque" is optional */
+		}
+
+		http->flags |= ( HTTP_TRY_AGAIN | HTTP_DIGEST_AUTH );
+	}
+
+	return 0;
+}
+
 /** An HTTP WWW-Authenticate header handler */
 struct http_auth_header_handler {
 	/** Scheme (e.g. "Basic") */
@@ -491,6 +580,10 @@ static struct http_auth_header_handler http_auth_header_handlers[] = {
 	{
 		.scheme = "Basic",
 		.rx = http_rx_basic_auth,
+	},
+	{
+		.scheme = "Digest",
+		.rx = http_rx_digest_auth,
 	},
 	{ NULL, NULL },
 };
@@ -883,6 +976,80 @@ static char * http_basic_auth ( struct http_request *http ) {
 }
 
 /**
+ * Generate HTTP Digest authorisation string
+ *
+ * @v http		HTTP request
+ * @v method		HTTP method (e.g. "GET")
+ * @v uri		HTTP request URI (e.g. "/index.html")
+ * @ret auth		Authorisation string, or NULL on error
+ *
+ * The authorisation string is dynamically allocated, and must be
+ * freed by the caller.
+ */
+static char * http_digest_auth ( struct http_request *http,
+				 const char *method, const char *uri ) {
+	const char *user = http->uri->user;
+	const char *password =
+		( http->uri->password ? http->uri->password : "" );
+	const char *realm = http->auth_realm;
+	const char *nonce = http->auth_nonce;
+	const char *opaque = http->auth_opaque;
+	static const char colon = ':';
+	uint8_t ctx[MD5_CTX_SIZE];
+	uint8_t digest[MD5_DIGEST_SIZE];
+	char ha1[ base16_encoded_len ( sizeof ( digest ) ) + 1 /* NUL */ ];
+	char ha2[ base16_encoded_len ( sizeof ( digest ) ) + 1 /* NUL */ ];
+	char response[ base16_encoded_len ( sizeof ( digest ) ) + 1 /* NUL */ ];
+	char *auth;
+	int len;
+
+	/* Sanity checks */
+	assert ( user != NULL );
+	assert ( realm != NULL );
+	assert ( nonce != NULL );
+
+	/* Generate HA1 */
+	digest_init ( &md5_algorithm, ctx );
+	digest_update ( &md5_algorithm, ctx, user, strlen ( user ) );
+	digest_update ( &md5_algorithm, ctx, &colon, sizeof ( colon ) );
+	digest_update ( &md5_algorithm, ctx, realm, strlen ( realm ) );
+	digest_update ( &md5_algorithm, ctx, &colon, sizeof ( colon ) );
+	digest_update ( &md5_algorithm, ctx, password, strlen ( password ) );
+	digest_final ( &md5_algorithm, ctx, digest );
+	base16_encode ( digest, sizeof ( digest ), ha1 );
+
+	/* Generate HA2 */
+	digest_init ( &md5_algorithm, ctx );
+	digest_update ( &md5_algorithm, ctx, method, strlen ( method ) );
+	digest_update ( &md5_algorithm, ctx, &colon, sizeof ( colon ) );
+	digest_update ( &md5_algorithm, ctx, uri, strlen ( uri ) );
+	digest_final ( &md5_algorithm, ctx, digest );
+	base16_encode ( digest, sizeof ( digest ), ha2 );
+
+	/* Generate response */
+	digest_init ( &md5_algorithm, ctx );
+	digest_update ( &md5_algorithm, ctx, ha1, strlen ( ha1 ) );
+	digest_update ( &md5_algorithm, ctx, &colon, sizeof ( colon ) );
+	digest_update ( &md5_algorithm, ctx, nonce, strlen ( nonce ) );
+	digest_update ( &md5_algorithm, ctx, &colon, sizeof ( colon ) );
+	digest_update ( &md5_algorithm, ctx, ha2, strlen ( ha2 ) );
+	digest_final ( &md5_algorithm, ctx, digest );
+	base16_encode ( digest, sizeof ( digest ), response );
+
+	/* Generate the authorisation string */
+	len = asprintf ( &auth, "Authorization: Digest username=\"%s\", "
+			 "realm=\"%s\", nonce=\"%s\", uri=\"%s\", "
+			 "%s%s%sresponse=\"%s\"\r\n", user, realm, nonce, uri,
+			 ( opaque ? "opaque=\"" : "" ),
+			 ( opaque ? opaque : "" ),
+			 ( opaque ? "\", " : "" ), response );
+	if ( len < 0 )
+		return NULL;
+
+	return auth;
+}
+
+/**
  * HTTP process
  *
  * @v http		HTTP request
@@ -945,6 +1112,12 @@ static void http_step ( struct http_request *http ) {
 	/* Construct authorisation, if applicable */
 	if ( http->flags & HTTP_BASIC_AUTH ) {
 		auth = http_basic_auth ( http );
+		if ( ! auth ) {
+			rc = -ENOMEM;
+			goto err_auth;
+		}
+	} else if ( http->flags & HTTP_DIGEST_AUTH ) {
+		auth = http_digest_auth ( http, method, uri );
 		if ( ! auth ) {
 			rc = -ENOMEM;
 			goto err_auth;
