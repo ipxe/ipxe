@@ -731,27 +731,56 @@ static void http_socket_close ( struct http_request *http, int rc ) {
 }
 
 /**
+ * Generate HTTP Basic authorisation string
+ *
+ * @v http		HTTP request
+ * @ret auth		Authorisation string, or NULL on error
+ *
+ * The authorisation string is dynamically allocated, and must be
+ * freed by the caller.
+ */
+static char * http_basic_auth ( struct http_request *http ) {
+	const char *user = http->uri->user;
+	const char *password =
+		( http->uri->password ? http->uri->password : "" );
+	size_t user_pw_len =
+		( strlen ( user ) + 1 /* ":" */ + strlen ( password ) );
+	char user_pw[ user_pw_len + 1 /* NUL */ ];
+	size_t user_pw_base64_len = base64_encoded_len ( user_pw_len );
+	char user_pw_base64[ user_pw_base64_len + 1 /* NUL */ ];
+	char *auth;
+	int len;
+
+	/* Sanity check */
+	assert ( user != NULL );
+
+	/* Make "user:password" string from decoded fields */
+	snprintf ( user_pw, sizeof ( user_pw ), "%s:%s", user, password );
+
+	/* Base64-encode the "user:password" string */
+	base64_encode ( ( void * ) user_pw, user_pw_len, user_pw_base64 );
+
+	/* Generate the authorisation string */
+	len = asprintf ( &auth, "Authorization: Basic %s\r\n",
+			 user_pw_base64 );
+	if ( len < 0 )
+		return NULL;
+
+	return auth;
+}
+
+/**
  * HTTP process
  *
  * @v http		HTTP request
  */
 static void http_step ( struct http_request *http ) {
-	const char *host = http->uri->host;
-	const char *user = http->uri->user;
-	const char *password =
-		( http->uri->password ? http->uri->password : "" );
-	size_t user_pw_len = ( user ? ( strlen ( user ) + 1 /* ":" */ +
-					strlen ( password ) ) : 0 );
-	size_t user_pw_base64_len = base64_encoded_len ( user_pw_len );
-	int request_len = unparse_uri ( NULL, 0, http->uri,
-					URI_PATH_BIT | URI_QUERY_BIT );
-	struct {
-		uint8_t user_pw[ user_pw_len + 1 /* NUL */ ];
-		char user_pw_base64[ user_pw_base64_len + 1 /* NUL */ ];
-		char request[ request_len + 1 /* NUL */ ];
-		char range[48]; /* Enough for two 64-bit integers in decimal */
-	} *dynamic;
-	int partial;
+	size_t uri_len;
+	char *method;
+	char *uri;
+	char *range;
+	char *auth;
+	int len;
 	int rc;
 
 	/* Do nothing if we have already transmitted the request */
@@ -762,74 +791,84 @@ static void http_step ( struct http_request *http ) {
 	if ( ! xfer_window ( &http->socket ) )
 		return;
 
-	/* Allocate dynamic storage */
-	dynamic = malloc ( sizeof ( *dynamic ) );
-	if ( ! dynamic ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-
-	/* Construct path?query request */
-	unparse_uri ( dynamic->request, sizeof ( dynamic->request ), http->uri,
-		      URI_PATH_BIT | URI_QUERY_BIT );
-
-	/* Construct authorisation, if applicable */
-	if ( user ) {
-		/* Make "user:password" string from decoded fields */
-		snprintf ( ( ( char * ) dynamic->user_pw ),
-			   sizeof ( dynamic->user_pw ), "%s:%s",
-			   user, password );
-
-		/* Base64-encode the "user:password" string */
-		base64_encode ( dynamic->user_pw, user_pw_len,
-				dynamic->user_pw_base64 );
-	}
-
 	/* Force a HEAD request if we have nowhere to send any received data */
 	if ( ( xfer_window ( &http->xfer ) == 0 ) &&
 	     ( http->rx_buffer == UNULL ) ) {
 		http->flags |= ( HTTP_HEAD_ONLY | HTTP_CLIENT_KEEPALIVE );
 	}
 
-	/* Determine type of request */
-	partial = ( http->partial_len != 0 );
-	snprintf ( dynamic->range, sizeof ( dynamic->range ),
-		   "%zd-%zd", http->partial_start,
-		   ( http->partial_start + http->partial_len - 1 ) );
+	/* Determine method */
+	method = ( ( http->flags & HTTP_HEAD_ONLY ) ? "HEAD" : "GET" );
+
+	/* Construct path?query request */
+	uri_len = ( unparse_uri ( NULL, 0, http->uri,
+				  URI_PATH_BIT | URI_QUERY_BIT )
+		    + 1 /* possible "/" */ + 1 /* NUL */ );
+	uri = malloc ( uri_len );
+	if ( ! uri ) {
+		rc = -ENOMEM;
+		goto err_uri;
+	}
+	unparse_uri ( uri, uri_len, http->uri, URI_PATH_BIT | URI_QUERY_BIT );
+	if ( ! uri[0] ) {
+		uri[0] = '/';
+		uri[1] = '\0';
+	}
+
+	/* Calculate range request parameters if applicable */
+	if ( http->partial_len ) {
+		len = asprintf ( &range, "Range: bytes=%zd-%zd\r\n",
+				 http->partial_start,
+				 ( http->partial_start + http->partial_len
+				   - 1 ) );
+		if ( len < 0 ) {
+			rc = len;
+			goto err_range;
+		}
+	} else {
+		range = NULL;
+	}
+
+	/* Construct authorisation, if applicable */
+	if ( http->uri->user ) {
+		auth = http_basic_auth ( http );
+		if ( ! auth ) {
+			rc = -ENOMEM;
+			goto err_auth;
+		}
+	} else {
+		auth = NULL;
+	}
 
 	/* Mark request as transmitted */
 	http->flags &= ~HTTP_TX_PENDING;
 
-	/* Send GET request */
+	/* Send request */
 	if ( ( rc = xfer_printf ( &http->socket,
-				  "%s %s%s HTTP/1.1\r\n"
+				  "%s %s HTTP/1.1\r\n"
 				  "User-Agent: iPXE/" VERSION "\r\n"
 				  "Host: %s%s%s\r\n"
-				  "%s%s%s%s%s%s%s"
+				  "%s%s%s"
 				  "\r\n",
-				  ( ( http->flags & HTTP_HEAD_ONLY ) ?
-				    "HEAD" : "GET" ),
-				  ( http->uri->path ? "" : "/" ),
-				  dynamic->request, host,
+				  method, uri, http->uri->host,
 				  ( http->uri->port ?
 				    ":" : "" ),
 				  ( http->uri->port ?
 				    http->uri->port : "" ),
 				  ( ( http->flags & HTTP_CLIENT_KEEPALIVE ) ?
 				    "Connection: keep-alive\r\n" : "" ),
-				  ( partial ? "Range: bytes=" : "" ),
-				  ( partial ? dynamic->range : "" ),
-				  ( partial ? "\r\n" : "" ),
-				  ( user ?
-				    "Authorization: Basic " : "" ),
-				  ( user ? dynamic->user_pw_base64 : "" ),
-				  ( user ? "\r\n" : "" ) ) ) != 0 ) {
+				  ( range ? range : "" ),
+				  ( auth ? auth : "" ) ) ) != 0 ) {
 		goto err_xfer;
 	}
 
  err_xfer:
-	free ( dynamic );
- err_alloc:
+	free ( auth );
+ err_auth:
+	free ( range );
+ err_range:
+	free ( uri );
+ err_uri:
 	if ( rc != 0 )
 		http_close ( http, rc );
 }
