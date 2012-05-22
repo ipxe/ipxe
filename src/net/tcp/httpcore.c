@@ -143,6 +143,8 @@ struct http_request {
 
 	/** RX state */
 	enum http_rx_state rx_state;
+	/** Response code */
+	unsigned int code;
 	/** Received length */
 	size_t rx_len;
 	/** Length remaining (or 0 if unknown) */
@@ -311,8 +313,6 @@ static int http_response_to_rc ( unsigned int response ) {
  */
 static int http_rx_response ( struct http_request *http, char *response ) {
 	char *spc;
-	unsigned int code;
-	int rc;
 
 	DBGC ( http, "HTTP %p response \"%s\"\n", http, response );
 
@@ -320,13 +320,11 @@ static int http_rx_response ( struct http_request *http, char *response ) {
 	if ( strncmp ( response, "HTTP/", 5 ) != 0 )
 		return -EINVAL_RESPONSE;
 
-	/* Locate and check response code */
+	/* Locate and store response code */
 	spc = strchr ( response, ' ' );
 	if ( ! spc )
 		return -EINVAL_RESPONSE;
-	code = strtoul ( spc, NULL, 10 );
-	if ( ( rc = http_response_to_rc ( code ) ) != 0 )
-		return rc;
+	http->code = strtoul ( spc, NULL, 10 );
 
 	/* Move to received headers */
 	http->rx_state = HTTP_RX_HEADER;
@@ -488,6 +486,12 @@ static int http_rx_header ( struct http_request *http, char *header ) {
 	/* An empty header line marks the end of this phase */
 	if ( ! header[0] ) {
 		empty_line_buffer ( &http->linebuf );
+
+		/* Handle response code */
+		if ( ( rc = http_response_to_rc ( http->code ) ) != 0 )
+			return rc;
+
+		/* Move to next state */
 		if ( ( http->rx_state == HTTP_RX_HEADER ) &&
 		     ( ! ( http->flags & HTTP_HEAD_ONLY ) ) ) {
 			DBGC ( http, "HTTP %p start of data\n", http );
