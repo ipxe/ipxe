@@ -99,8 +99,8 @@ static struct setting cert_setting __setting ( SETTING_CRYPTO ) = {
 };
 
 /** Client private key setting */
-static struct setting key_setting __setting ( SETTING_CRYPTO ) = {
-	.name = "key",
+static struct setting privkey_setting __setting ( SETTING_CRYPTO ) = {
+	.name = "privkey",
 	.description = "Client private key",
 	.tag = DHCP_EB_KEY,
 	.type = &setting_type_hex,
@@ -146,7 +146,7 @@ static int clientcert_apply_settings ( void ) {
 
 		/* Fetch new client private key, if any */
 		free ( key );
-		len = fetch_setting_copy ( NULL, &key_setting, &key );
+		len = fetch_setting_copy ( NULL, &privkey_setting, &key );
 		if ( len < 0 ) {
 			rc = len;
 			DBGC ( &client_certificate, "CLIENTCERT cannot fetch "
