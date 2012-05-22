@@ -57,6 +57,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EIO_CONTENT_LENGTH __einfo_error ( EINFO_EIO_CONTENT_LENGTH )
 #define EINFO_EIO_CONTENT_LENGTH \
 	__einfo_uniqify ( EINFO_EIO, 0x02, "Content length mismatch" )
+#define EIO_CHUNK __einfo_error ( EINFO_EIO_CHUNK )
+#define EINFO_EIO_CHUNK \
+	__einfo_uniqify ( EINFO_EIO, 0x03, "Terminated mid-chunk" )
 #define EINVAL_RESPONSE __einfo_error ( EINFO_EINVAL_RESPONSE )
 #define EINFO_EINVAL_RESPONSE \
 	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Invalid content length" )
@@ -88,8 +91,10 @@ enum http_flags {
 	HTTP_TX_PENDING = 0x0001,
 	/** Fetch header only */
 	HTTP_HEAD_ONLY = 0x0002,
-	/** Keep connection alive */
-	HTTP_KEEPALIVE = 0x0004,
+	/** Client would like to keep connection alive */
+	HTTP_CLIENT_KEEPALIVE = 0x0004,
+	/** Server will keep connection alive */
+	HTTP_SERVER_KEEPALIVE = 0x0008,
 };
 
 /** HTTP receive state */
@@ -117,6 +122,12 @@ struct http_request {
 
 	/** URI being fetched */
 	struct uri *uri;
+	/** Default port */
+	unsigned int default_port;
+	/** Filter (if any) */
+	int ( * filter ) ( struct interface *xfer,
+			   const char *name,
+			   struct interface **next );
 	/** Transport layer interface */
 	struct interface socket;
 
@@ -171,15 +182,8 @@ static void http_close ( struct http_request *http, int rc ) {
 	/* Prevent further processing of any current packet */
 	http->rx_state = HTTP_RX_DEAD;
 
-	/* If we had a Content-Length, and the received content length
-	 * isn't correct, flag an error
-	 */
-	if ( http->remaining != 0 ) {
-		DBGC ( http, "HTTP %p incorrect length %zd, should be %zd\n",
-		       http, http->rx_len, ( http->rx_len + http->remaining ) );
-		if ( rc == 0 )
-			rc = -EIO_CONTENT_LENGTH;
-	}
+	/* Prevent reconnection */
+	http->flags &= ~HTTP_CLIENT_KEEPALIVE;
 
 	/* Remove process */
 	process_del ( &http->process );
@@ -191,16 +195,54 @@ static void http_close ( struct http_request *http, int rc ) {
 }
 
 /**
+ * Open HTTP socket
+ *
+ * @v http		HTTP request
+ * @ret rc		Return status code
+ */
+static int http_socket_open ( struct http_request *http ) {
+	struct uri *uri = http->uri;
+	struct sockaddr_tcpip server;
+	struct interface *socket;
+	int rc;
+
+	/* Open socket */
+	memset ( &server, 0, sizeof ( server ) );
+	server.st_port = htons ( uri_port ( uri, http->default_port ) );
+	socket = &http->socket;
+	if ( http->filter ) {
+		if ( ( rc = http->filter ( socket, uri->host, &socket ) ) != 0 )
+			return rc;
+	}
+	if ( ( rc = xfer_open_named_socket ( socket, SOCK_STREAM,
+					     ( struct sockaddr * ) &server,
+					     uri->host, NULL ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
  * Mark HTTP request as completed successfully
  *
  * @v http		HTTP request
  */
 static void http_done ( struct http_request *http ) {
+	int rc;
+
+	/* If we are in the middle of a chunked transfer, force an error */
+	if ( http->chunked ) {
+		DBGC ( http, "HTTP %p terminated mid-chunk\n", http );
+		http_close ( http, -EIO_CHUNK );
+		return;
+	}
 
 	/* If we had a Content-Length, and the received content length
 	 * isn't correct, force an error
 	 */
 	if ( http->remaining != 0 ) {
+		DBGC ( http, "HTTP %p incorrect length %zd, should be %zd\n",
+		       http, http->rx_len, ( http->rx_len + http->remaining ) );
 		http_close ( http, -EIO_CONTENT_LENGTH );
 		return;
 	}
@@ -215,9 +257,24 @@ static void http_done ( struct http_request *http ) {
 	/* Close partial transfer interface */
 	intf_restart ( &http->partial, 0 );
 
-	/* Close everything unless we are keeping the connection alive */
-	if ( ! ( http->flags & HTTP_KEEPALIVE ) )
+	/* Close everything unless we want to keep the connection alive */
+	if ( ! ( http->flags & HTTP_CLIENT_KEEPALIVE ) ) {
 		http_close ( http, 0 );
+		return;
+	}
+
+	/* If the server is not intending to keep the connection
+	 * alive, then reopen the socket.
+	 */
+	if ( ! ( http->flags & HTTP_SERVER_KEEPALIVE ) ) {
+		DBGC ( http, "HTTP %p reopening connection\n", http );
+		intf_restart ( &http->socket, 0 );
+		if ( ( rc = http_socket_open ( http ) ) != 0 ) {
+			http_close ( http, rc );
+			return;
+		}
+	}
+	http->flags &= ~HTTP_SERVER_KEEPALIVE;
 }
 
 /**
@@ -354,9 +411,26 @@ static int http_rx_content_length ( struct http_request *http,
 static int http_rx_transfer_encoding ( struct http_request *http,
 				       const char *value ) {
 
-	if ( strcmp ( value, "chunked" ) == 0 ) {
+	if ( strcasecmp ( value, "chunked" ) == 0 ) {
 		/* Mark connection as using chunked transfer encoding */
 		http->chunked = 1;
+	}
+
+	return 0;
+}
+
+/**
+ * Handle HTTP Connection header
+ *
+ * @v http		HTTP request
+ * @v value		HTTP header value
+ * @ret rc		Return status code
+ */
+static int http_rx_connection ( struct http_request *http, const char *value ) {
+
+	if ( strcasecmp ( value, "keep-alive" ) == 0 ) {
+		/* Mark connection as being kept alive by the server */
+		http->flags |= HTTP_SERVER_KEEPALIVE;
 	}
 
 	return 0;
@@ -390,6 +464,10 @@ static struct http_header_handler http_header_handlers[] = {
 	{
 		.header = "Transfer-Encoding",
 		.rx = http_rx_transfer_encoding,
+	},
+	{
+		.header = "Connection",
+		.rx = http_rx_connection,
 	},
 	{ NULL, NULL }
 };
@@ -631,6 +709,24 @@ static size_t http_socket_window ( struct http_request *http __unused ) {
 }
 
 /**
+ * Close HTTP socket
+ *
+ * @v http		HTTP request
+ * @v rc		Reason for close
+ */
+static void http_socket_close ( struct http_request *http, int rc ) {
+
+	/* If we have an error, terminate */
+	if ( rc != 0 ) {
+		http_close ( http, rc );
+		return;
+	}
+
+	/* Mark HTTP request as complete */
+	http_done ( http );
+}
+
+/**
  * HTTP process
  *
  * @v http		HTTP request
@@ -688,7 +784,7 @@ static void http_step ( struct http_request *http ) {
 	/* Force a HEAD request if we have nowhere to send any received data */
 	if ( ( xfer_window ( &http->xfer ) == 0 ) &&
 	     ( http->rx_buffer == UNULL ) ) {
-		http->flags |= ( HTTP_HEAD_ONLY | HTTP_KEEPALIVE );
+		http->flags |= ( HTTP_HEAD_ONLY | HTTP_CLIENT_KEEPALIVE );
 	}
 
 	/* Determine type of request */
@@ -715,8 +811,8 @@ static void http_step ( struct http_request *http ) {
 				    ":" : "" ),
 				  ( http->uri->port ?
 				    http->uri->port : "" ),
-				  ( ( http->flags & HTTP_KEEPALIVE ) ?
-				    "Connection: Keep-Alive\r\n" : "" ),
+				  ( ( http->flags & HTTP_CLIENT_KEEPALIVE ) ?
+				    "Connection: keep-alive\r\n" : "" ),
 				  ( partial ? "Range: bytes=" : "" ),
 				  ( partial ? dynamic->range : "" ),
 				  ( partial ? "\r\n" : "" ),
@@ -772,7 +868,7 @@ static int http_partial_read ( struct http_request *http,
 
 	/* Schedule request */
 	http->rx_state = HTTP_RX_RESPONSE;
-	http->flags = ( HTTP_TX_PENDING | HTTP_KEEPALIVE );
+	http->flags = ( HTTP_TX_PENDING | HTTP_CLIENT_KEEPALIVE );
 	if ( ! len )
 		http->flags |= HTTP_HEAD_ONLY;
 	process_add ( &http->process );
@@ -840,7 +936,7 @@ static struct interface_operation http_socket_operations[] = {
 	INTF_OP ( xfer_window, struct http_request *, http_socket_window ),
 	INTF_OP ( xfer_deliver, struct http_request *, http_socket_deliver ),
 	INTF_OP ( xfer_window_changed, struct http_request *, http_step ),
-	INTF_OP ( intf_close, struct http_request *, http_close ),
+	INTF_OP ( intf_close, struct http_request *, http_socket_close ),
 };
 
 /** HTTP socket interface descriptor */
@@ -891,8 +987,6 @@ int http_open_filter ( struct interface *xfer, struct uri *uri,
 					  const char *name,
 					  struct interface **next ) ) {
 	struct http_request *http;
-	struct sockaddr_tcpip server;
-	struct interface *socket;
 	int rc;
 
 	/* Sanity checks */
@@ -907,21 +1001,14 @@ int http_open_filter ( struct interface *xfer, struct uri *uri,
 	intf_init ( &http->xfer, &http_xfer_desc, &http->refcnt );
 	intf_init ( &http->partial, &http_partial_desc, &http->refcnt );
 	http->uri = uri_get ( uri );
+	http->default_port = default_port;
+	http->filter = filter;
 	intf_init ( &http->socket, &http_socket_desc, &http->refcnt );
 	process_init ( &http->process, &http_process_desc, &http->refcnt );
 	http->flags = HTTP_TX_PENDING;
 
 	/* Open socket */
-	memset ( &server, 0, sizeof ( server ) );
-	server.st_port = htons ( uri_port ( http->uri, default_port ) );
-	socket = &http->socket;
-	if ( filter ) {
-		if ( ( rc = filter ( socket, uri->host, &socket ) ) != 0 )
-			goto err;
-	}
-	if ( ( rc = xfer_open_named_socket ( socket, SOCK_STREAM,
-					     ( struct sockaddr * ) &server,
-					     uri->host, NULL ) ) != 0 )
+	if ( ( rc = http_socket_open ( http ) ) != 0 )
 		goto err;
 
 	/* Attach to parent interface, mortalise self, and return */
