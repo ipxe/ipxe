@@ -455,7 +455,6 @@ static struct interface_descriptor validator_xfer_desc =
  */
 static void validator_step ( struct validator *validator ) {
 	struct x509_link *link;
-	struct x509_link *previous;
 	struct x509_certificate *cert;
 	struct x509_certificate *issuer = NULL;
 	struct x509_certificate *last;
@@ -479,7 +478,6 @@ static void validator_step ( struct validator *validator ) {
 	list_for_each_entry ( link, &validator->chain->links, list ) {
 		cert = issuer;
 		issuer = link->cert;
-		previous = link;
 		if ( ! cert )
 			continue;
 		if ( ! issuer->valid )
