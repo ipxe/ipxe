@@ -376,7 +376,7 @@ epic100_poll(struct nic *nic, int retrieve)
 {
     int entry;
     int retcode;
-    int status;
+    unsigned long status;
     entry = cur_rx % RX_RING_SIZE;
 
     if ((rx_ring[entry].status & cpu_to_le32(RRING_OWN)) == RRING_OWN)
@@ -401,7 +401,7 @@ epic100_poll(struct nic *nic, int retrieve)
 	retcode = 0;
     } else {
 	/* Omit the four octet CRC from the length. */
-	nic->packetlen = le32_to_cpu((rx_ring[entry].buflength))- 4;
+	nic->packetlen = (status >> 16) - 4;
 	memcpy(nic->packet, &rx_packet[entry * PKT_BUF_SZ], nic->packetlen);
 	retcode = 1;
     }
