@@ -2334,7 +2334,7 @@ static int sky2_probe(struct pci_device *pdev)
 			sky2_show_addr(dev1);
 	}
 
-	pci_set_drvdata(pdev, dev);
+	pci_set_drvdata(pdev, hw);
 
 	return 0;
 
