@@ -238,6 +238,9 @@ REQUIRE_OBJECT ( vlan_cmd );
 #ifdef REBOOT_CMD
 REQUIRE_OBJECT ( reboot_cmd );
 #endif
+#ifdef CPUID_CMD
+REQUIRE_OBJECT ( cpuid_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

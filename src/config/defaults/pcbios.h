@@ -36,5 +36,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
 
 #define	REBOOT_CMD		/* Reboot command */
+#define	CPUID_CMD		/* x86 CPU feature detection command */
 
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */

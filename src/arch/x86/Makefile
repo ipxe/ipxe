@@ -7,6 +7,7 @@ INCDIRS		+= arch/x86/include
 SRCDIRS		+= arch/x86/core
 SRCDIRS		+= arch/x86/interface/efi
 SRCDIRS		+= arch/x86/prefix
+SRCDIRS		+= arch/x86/hci/commands
 
 # breaks building some of the linux-related objects
 CFLAGS		+= -Ulinux
