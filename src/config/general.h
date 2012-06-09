@@ -117,6 +117,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define SANBOOT_CMD		/* SAN boot commands */
 #define MENU_CMD		/* Menu commands */
 #define LOGIN_CMD		/* Login command */
+#define SYNC_CMD		/* Sync command */
 //#define TIME_CMD		/* Time commands */
 //#define DIGEST_CMD		/* Image crypto digest commands */
 //#define LOTEST_CMD		/* Loopback testing commands */

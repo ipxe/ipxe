@@ -241,6 +241,9 @@ REQUIRE_OBJECT ( reboot_cmd );
 #ifdef CPUID_CMD
 REQUIRE_OBJECT ( cpuid_cmd );
 #endif
+#ifdef SYNC_CMD
+REQUIRE_OBJECT ( sync_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
