@@ -10,6 +10,7 @@
 #include <ipxe/init.h>
 #include <ipxe/retry.h>
 #include <ipxe/refcnt.h>
+#include <ipxe/pending.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/uri.h>
@@ -95,6 +96,11 @@ struct tcp_connection {
 	struct retry_timer timer;
 	/** Shutdown (TIME_WAIT) timer */
 	struct retry_timer wait;
+
+	/** Pending operations for SYN and FIN */
+	struct pending_operation pending_flags;
+	/** Pending operations for transmit queue */
+	struct pending_operation pending_data;
 };
 
 /** TCP flags */
@@ -291,6 +297,9 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	/* Start timer to initiate SYN */
 	start_timer_nodelay ( &tcp->timer );
 
+	/* Add a pending operation for the SYN */
+	pending_get ( &tcp->pending_flags );
+
 	/* Attach parent interface, transfer reference to connection
 	 * list and return
 	 */
@@ -340,7 +349,13 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 		list_for_each_entry_safe ( iobuf, tmp, &tcp->tx_queue, list ) {
 			list_del ( &iobuf->list );
 			free_iob ( iobuf );
+			pending_put ( &tcp->pending_data );
 		}
+		assert ( ! is_pending ( &tcp->pending_data ) );
+
+		/* Remove pending operations for SYN and FIN, if applicable */
+		pending_put ( &tcp->pending_flags );
+		pending_put ( &tcp->pending_flags );
 
 		/* Remove from list and drop reference */
 		stop_timer ( &tcp->timer );
@@ -359,9 +374,14 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 		tcp_rx_ack ( tcp, ( tcp->snd_seq + 1 ), 0 );
 
 	/* If we have no data remaining to send, start sending FIN */
-	if ( list_empty ( &tcp->tx_queue ) ) {
+	if ( list_empty ( &tcp->tx_queue ) &&
+	     ! ( tcp->tcp_state & TCP_STATE_SENT ( TCP_FIN ) ) ) {
+
 		tcp->tcp_state |= TCP_STATE_SENT ( TCP_FIN );
 		tcp_dump_state ( tcp );
+
+		/* Add a pending operation for the FIN */
+		pending_get ( &tcp->pending_flags );
 	}
 }
 
@@ -446,6 +466,7 @@ static size_t tcp_process_tx_queue ( struct tcp_connection *tcp, size_t max_len,
 			if ( ! iob_len ( iobuf ) ) {
 				list_del ( &iobuf->list );
 				free_iob ( iobuf );
+				pending_put ( &tcp->pending_data );
 			}
 		}
 		len += frag_len;
@@ -869,8 +890,10 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 	len = ack_len;
 	acked_flags = ( TCP_FLAGS_SENDING ( tcp->tcp_state ) &
 			( TCP_SYN | TCP_FIN ) );
-	if ( acked_flags )
+	if ( acked_flags ) {
 		len--;
+		pending_put ( &tcp->pending_flags );
+	}
 
 	/* Update SEQ and sent counters, and window size */
 	tcp->snd_seq = ack;
@@ -885,8 +908,12 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 		tcp->tcp_state |= TCP_STATE_ACKED ( acked_flags );
 
 	/* Start sending FIN if we've had all possible data ACKed */
-	if ( list_empty ( &tcp->tx_queue ) && ( tcp->flags & TCP_XFER_CLOSED ) )
+	if ( list_empty ( &tcp->tx_queue ) &&
+	     ( tcp->flags & TCP_XFER_CLOSED ) &&
+	     ! ( tcp->tcp_state & TCP_STATE_SENT ( TCP_FIN ) ) ) {
 		tcp->tcp_state |= TCP_STATE_SENT ( TCP_FIN );
+		pending_get ( &tcp->pending_flags );
+	}
 
 	return 0;
 }
@@ -1319,6 +1346,9 @@ static int tcp_xfer_deliver ( struct tcp_connection *tcp,
 
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &tcp->tx_queue );
+
+	/* Each enqueued packet is a pending operation */
+	pending_get ( &tcp->pending_data );
 
 	/* Transmit data, if possible */
 	tcp_xmit ( tcp );
