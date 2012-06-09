@@ -18,6 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/sha1.h>
 #include <ipxe/sha256.h>
 #include <ipxe/x509.h>
+#include <ipxe/pending.h>
 
 /** A TLS header */
 struct tls_header {
@@ -240,10 +241,10 @@ struct tls_session {
 	/** Certificate validator */
 	struct interface validator;
 
-	/** Client has finished security negotiation */
-	unsigned int client_finished;
-	/** Server has finished security negotiation */
-	unsigned int server_finished;
+	/** Client security negotiation pending operation */
+	struct pending_operation client_negotiation;
+	/** Server security negotiation pending operation */
+	struct pending_operation server_negotiation;
 
 	/** TX sequence number */
 	uint64_t tx_seq;

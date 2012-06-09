@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <time.h>
 #include <errno.h>
 #include <byteswap.h>
+#include <ipxe/pending.h>
 #include <ipxe/hmac.h>
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
@@ -101,7 +102,8 @@ static void tls_set_uint24 ( uint8_t field24[3], unsigned long value ) {
  * @ret is_ready	TLS session is ready
  */
 static int tls_ready ( struct tls_session *tls ) {
-	return ( tls->client_finished && tls->server_finished );
+	return ( ( ! is_pending ( &tls->client_negotiation ) ) &&
+		 ( ! is_pending ( &tls->server_negotiation ) ) );
 }
 
 /******************************************************************************
@@ -204,6 +206,10 @@ static void free_tls ( struct refcnt *refcnt ) {
  * @v rc		Status code
  */
 static void tls_close ( struct tls_session *tls, int rc ) {
+
+	/* Remove pending operations, if applicable */
+	pending_put ( &tls->client_negotiation );
+	pending_put ( &tls->server_negotiation );
 
 	/* Remove process */
 	process_del ( &tls->process );
@@ -1141,7 +1147,7 @@ static int tls_send_finished ( struct tls_session *tls ) {
 		return rc;
 
 	/* Mark client as finished */
-	tls->client_finished = 1;
+	pending_put ( &tls->client_negotiation );
 
 	return 0;
 }
@@ -1489,7 +1495,7 @@ static int tls_new_finished ( struct tls_session *tls,
 	}
 
 	/* Mark server as finished */
-	tls->server_finished = 1;
+	pending_put ( &tls->server_negotiation );
 
 	/* Send notification of a window change */
 	xfer_window_changed ( &tls->plainstream );
@@ -2395,6 +2401,10 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->handshake_digest = &sha256_algorithm;
 	tls->handshake_ctx = tls->handshake_sha256_ctx;
 	tls->tx_pending = TLS_TX_CLIENT_HELLO;
+
+	/* Add pending operations for server and client Finished messages */
+	pending_get ( &tls->client_negotiation );
+	pending_get ( &tls->server_negotiation );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &tls->plainstream, xfer );
