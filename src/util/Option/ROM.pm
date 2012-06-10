@@ -169,9 +169,11 @@ use Exporter 'import';
 
 use constant ROM_SIGNATURE => 0xaa55;
 use constant PCI_SIGNATURE => 'PCIR';
+use constant PCI_LAST_IMAGE => 0x80;
 use constant PNP_SIGNATURE => '$PnP';
 
-our @EXPORT_OK = qw ( ROM_SIGNATURE PCI_SIGNATURE PNP_SIGNATURE );
+our @EXPORT_OK = qw ( ROM_SIGNATURE PCI_SIGNATURE PCI_LAST_IMAGE
+		      PNP_SIGNATURE );
 our %EXPORT_TAGS = ( all => [ @EXPORT_OK ] );
 
 use constant JMP_SHORT => 0xeb;
@@ -241,6 +243,53 @@ sub new {
 
 =pod
 
+=item C<< set ( $data ) >>
+
+Set option ROM contents.
+
+=cut
+
+sub set {
+  my $hash = shift;
+  my $self = tied(%$hash);
+  my $data = shift;
+
+  # Store data
+  $self->{data} = \$data;
+
+  # Split out any data belonging to the next image
+  delete $self->{next_image};
+  my $length = ( $hash->{length} * 512 );
+  my $pci_header = $hash->pci_header();
+  if ( ( $length < length $data ) &&
+       ( defined $pci_header ) &&
+       ( ! ( $pci_header->{last_image} & PCI_LAST_IMAGE ) ) ) {
+    my $remainder = substr ( $data, $length );
+    $data = substr ( $data, 0, $length );
+    $self->{next_image} = new Option::ROM;
+    $self->{next_image}->set ( $remainder );
+  }
+}
+
+=pod
+
+=item C<< get () >>
+
+Get option ROM contents.
+
+=cut
+
+sub get {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  my $data = ${$self->{data}};
+  $data .= $self->{next_image}->get() if $self->{next_image};
+  return $data;
+}
+
+=pod
+
 =item C<< load ( $filename ) >>
 
 Load option ROM contents from the file C<$filename>.
@@ -256,8 +305,8 @@ sub load {
 
   open my $fh, "<$filename"
       or croak "Cannot open $filename for reading: $!";
-  read $fh, my $data, ( 128 * 1024 ); # 128kB is theoretical max size
-  $self->{data} = \$data;
+  read $fh, my $data, -s $fh;
+  $hash->set ( $data );
   close $fh;
 }
 
@@ -279,7 +328,8 @@ sub save {
 
   open my $fh, ">$filename"
       or croak "Cannot open $filename for writing: $!";
-  print $fh ${$self->{data}};
+  my $data = $hash->get();
+  print $fh $data;
   close $fh;
 }
 
@@ -335,6 +385,22 @@ sub pnp_header {
   return undef unless $offset != 0;
 
   return Option::ROM::PnP->new ( $self->{data}, $offset );
+}
+
+=pod
+
+=item C<< next_image () >>
+
+Return a C<Option::ROM> object representing the next image within the
+ROM, if present.
+
+=cut
+
+sub next_image {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  return $self->{next_image};
 }
 
 =pod

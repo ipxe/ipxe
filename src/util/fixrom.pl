@@ -28,7 +28,11 @@ my @romfiles = @ARGV;
 foreach my $romfile ( @romfiles ) {
   my $rom = new Option::ROM;
   $rom->load ( $romfile );
-  $rom->pnp_header->fix_checksum() if $rom->pnp_header;
-  $rom->fix_checksum();
+  my $image = $rom;
+  while ( $image ) {
+    $image->pnp_header->fix_checksum() if $image->pnp_header;
+    $image->fix_checksum();
+    $image = $image->next_image();
+  }
   $rom->save ( $romfile );
 }
