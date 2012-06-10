@@ -154,6 +154,18 @@ find_mem_bar:
 	movw	$PCI_BAR_EXPROM, %di
 	call	pci_write_config_dword
 
+	/* Locate our ROM image */
+1:	addr32 es cmpw $0xaa55, (%eax)
+	stc
+	jne	99f
+	addr32 es cmpl $_build_id, build_id(%eax)
+	je	2f
+	addr32 es movzbl 2(%eax), %ecx
+	shll	$9, %ecx
+	addl	%ecx, %eax
+	jmp	1b
+2:
+
 	/* Copy payload to buffer, or set buffer address to BAR address */
 	testl	%esi, %esi
 	jz	1f
