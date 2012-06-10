@@ -237,15 +237,15 @@ static int process_zinfo_add ( struct input_file *input
 					__attribute__ (( unused )),
 			       struct output_file *output,
 			       size_t len,
-			       struct zinfo_add *add,
+			       struct zinfo_add *add, size_t offset,
 			       size_t datasize ) {
-	size_t offset = add->offset;
 	void *target;
 	signed long addend;
 	unsigned long size;
 	signed long val;
 	unsigned long mask;
 
+	offset += add->offset;
 	if ( ( offset + datasize ) > output->len ) {
 		fprintf ( stderr, "Add at %#zx outside output buffer\n",
 			  offset );
@@ -319,42 +319,90 @@ static int process_zinfo_addb ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
 	return process_zinfo_add ( input, output, output->len,
-				   &zinfo->add, 1 );
+				   &zinfo->add, 0, 1 );
 }
 
 static int process_zinfo_addw ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
 	return process_zinfo_add ( input, output, output->len,
-				   &zinfo->add, 2 );
+				   &zinfo->add, 0, 2 );
 }
 
 static int process_zinfo_addl ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
 	return process_zinfo_add ( input, output, output->len,
-				   &zinfo->add, 4 );
+				   &zinfo->add, 0, 4 );
 }
 
 static int process_zinfo_adhb ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
 	return process_zinfo_add ( input, output, output->hdr_len,
-				   &zinfo->add, 1 );
+				   &zinfo->add, 0, 1 );
 }
 
 static int process_zinfo_adhw ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
 	return process_zinfo_add ( input, output, output->hdr_len,
-				   &zinfo->add, 2 );
+				   &zinfo->add, 0, 2 );
 }
 
 static int process_zinfo_adhl ( struct input_file *input,
 				struct output_file *output,
 				union zinfo_record *zinfo ) {
 	return process_zinfo_add ( input, output, output->hdr_len,
-				   &zinfo->add, 4 );
+				   &zinfo->add, 0, 4 );
+}
+
+static int process_zinfo_adpb ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output,
+				   ( output->len - output->hdr_len ),
+				   &zinfo->add, 0, 1 );
+}
+
+static int process_zinfo_adpw ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output,
+				   ( output->len - output->hdr_len ),
+				   &zinfo->add, 0, 2 );
+}
+
+static int process_zinfo_adpl ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output,
+				   ( output->len - output->hdr_len ),
+				   &zinfo->add, 0, 4 );
+}
+
+static int process_zinfo_appb ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output,
+				   ( output->len - output->hdr_len ),
+				   &zinfo->add, output->hdr_len, 1 );
+}
+
+static int process_zinfo_appw ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output,
+				   ( output->len - output->hdr_len ),
+				   &zinfo->add, output->hdr_len, 2 );
+}
+
+static int process_zinfo_appl ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	return process_zinfo_add ( input, output,
+				   ( output->len - output->hdr_len ),
+				   &zinfo->add, output->hdr_len, 4 );
 }
 
 struct zinfo_processor {
@@ -374,6 +422,12 @@ static struct zinfo_processor zinfo_processors[] = {
 	{ "ADHB", process_zinfo_adhb },
 	{ "ADHW", process_zinfo_adhw },
 	{ "ADHL", process_zinfo_adhl },
+	{ "ADPB", process_zinfo_adpb },
+	{ "ADPW", process_zinfo_adpw },
+	{ "ADPL", process_zinfo_adpl },
+	{ "APPB", process_zinfo_appb },
+	{ "APPW", process_zinfo_appw },
+	{ "APPL", process_zinfo_appl },
 };
 
 static int process_zinfo ( struct input_file *input,

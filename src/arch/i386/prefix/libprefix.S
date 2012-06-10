@@ -663,18 +663,22 @@ install_prealloc:
 	/* Save decompression temporary area physical address */
 	pushl	%edi
 
-	/* Install .text16.early */
+	/* Install .text16.early and calculate %ecx as offset to next block */
 	progress "  .text16.early\n"
 	pushl	%esi
 	xorl	%esi, %esi
 	movw	%cs, %si
 	shll	$4, %esi
+	pushl	%esi			/* Save original %cs:0000 */
 	addl	$_text16_early_lma, %esi
 	movzwl	%ax, %edi
 	shll	$4, %edi
 	movl	$_text16_early_filesz, %ecx
 	movl	$_text16_early_memsz, %edx
 	call	install_block		/* .text16.early */
+	popl	%ecx			/* Calculate offset to next block */
+	subl	%esi, %ecx
+	negl	%ecx
 	popl	%esi
 
 #ifndef KEEP_IT_REAL
@@ -729,7 +733,7 @@ payload_death_message:
 	jnz	1f
 	movw	%cs, %si
 	shll	$4, %esi
-1:	addl	payload_lma, %esi
+1:	addl	%ecx, %esi
 
 	/* Install .text16.late and .data16 */
 	progress "  .text16.late\n"
@@ -850,17 +854,6 @@ close_payload_vector:
 	.word 0
 	.size close_payload_vector, . - close_payload_vector
 
-	/* Payload address */
-	.section ".prefix.lib", "awx", @progbits
-payload_lma:
-	.long 0
-	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"ADHL"
-	.long	payload_lma
-	.long	1
-	.long	0
-	.previous
-
 	/* Dummy routines to open and close payload */
 	.section ".text16.early.data", "aw", @progbits
 	.weak	open_payload
@@ -914,6 +907,10 @@ uninstall:
 	.ascii	"PAYL"
 	.long	0
 	.long	0
+	.long	_payload_align
+	.ascii	"COPY"
+	.long	_pprefix_lma
+	.long	_pprefix_filesz
 	.long	_max_align
 	.ascii	PACK_OR_COPY
 	.long	_text16_late_lma
@@ -927,3 +924,6 @@ uninstall:
 	.long	_textdata_lma
 	.long	_textdata_filesz
 	.long	_max_align
+
+	.weak	_payload_align
+	.equ	_payload_align, 1

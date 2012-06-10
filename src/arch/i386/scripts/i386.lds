@@ -1,4 +1,4 @@
-/* -*- sh -*- */
+/* -*- ld-script -*- */
 
 /*
  * Linker script for i386 images
@@ -122,6 +122,23 @@ SECTIONS {
     _textdata_memsz	= ABSOLUTE ( _etextdata ) - ABSOLUTE ( _textdata );
 
     /*
+     * Payload prefix
+     *
+     * If present, this will be placed between .text16.early and .text16.late.
+     *
+     */
+    .pprefix 0x0 : AT ( _pprefix_lma ) {
+	_pprefix = .;
+	KEEP(*(.pprefix))
+	KEEP(*(.pprefix.*))
+	_mpprefix = .;
+    } .bss.pprefix (NOLOAD) : AT ( _end_lma ) {
+	_epprefix = .;
+    }
+    _pprefix_filesz	= ABSOLUTE ( _mpprefix ) - ABSOLUTE ( _pprefix );
+    _pprefix_memsz	= ABSOLUTE ( _epprefix ) - ABSOLUTE ( _pprefix );
+
+    /*
      * Compressor information block
      *
      */
@@ -188,7 +205,13 @@ SECTIONS {
     .			+= _text16_early_filesz;
 
     .			= ALIGN ( _max_align );
+    .			= ALIGN ( _payload_align );
+    _pprefix_lma	= .;
+    .			+= _pprefix_filesz;
+
+    .			= ALIGN ( _max_align );
     _payload_lma	= .;
+    _pprefix_skip	= ABSOLUTE ( _payload_lma ) - ABSOLUTE ( _pprefix_lma );
     _text16_late_lma	= .;
     .			+= _text16_late_filesz;
 

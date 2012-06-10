@@ -41,6 +41,14 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define	ZINFO_TYPE_ADxW "ADDW"
 #endif
 
+/* Allow ROM to be marked as containing multiple images
+ */
+#if ROMPREFIX_MORE_IMAGES
+#define INDICATOR 0x00
+#else
+#define INDICATOR 0x80
+#endif
+
 	.text
 	.code16
 	.arch i386
@@ -85,7 +93,7 @@ pciheader_image_length:
 	.word	0			/* Image length */
 	.word	0x0001			/* Revision level */
 	.byte	0x00			/* Code type */
-	.byte	0x80			/* Last image indicator */
+	.byte	INDICATOR		/* Last image indicator */
 pciheader_runtime_length:
 	.word	0			/* Maximum run-time image length */
 	.word	0x0000			/* Configuration utility code header */
@@ -98,7 +106,7 @@ pciheader_runtime_length:
 	.long	pciheader_image_length
 	.long	512
 	.long	0
-	.ascii	ZINFO_TYPE_ADxW
+	.ascii	"ADHW"
 	.long	pciheader_runtime_length
 	.long	512
 	.long	0
@@ -327,7 +335,8 @@ pmm_scan:
 	/* We have PMM and so a 1kB stack: preserve whole registers */
 	pushal
 	/* Allocate image source PMM block */
-	movzwl	image_source_size, %ecx
+	movzbl	romheader_size, %ecx
+	addw	extra_size, %cx
 	shll	$5, %ecx
 	movl	$PMM_HANDLE_BASE_IMAGE_SOURCE, %ebx
 	movw	$get_pmm_image_source, %bp
@@ -341,11 +350,11 @@ pmm_scan:
 	movl	%esi, %edi
 	xorl	%esi, %esi
 	movzbl	romheader_size, %ecx
-	shll	$9, %ecx
-	addr32 rep movsb	/* PMM presence implies flat real mode */
+	shll	$7, %ecx
+	addr32 rep movsl	/* PMM presence implies flat real mode */
 	popw	%es
 	/* Shrink ROM */
-	movb	shrunk_rom_size, %al
+	movw	pciheader_runtime_length, %ax
 	movb	%al, romheader_size
 1:	/* Allocate decompression PMM block.  Round up the size to the
 	 * nearest 128kB and use the size within the PMM handle; this
@@ -573,31 +582,12 @@ image_source:
 	.long	0
 	.size	image_source, . - image_source
 
-/* Image source size (in 512-byte sectors)
+/* Additional image source size (in 512-byte sectors)
  *
  */
-image_source_size:
+extra_size:
 	.word	0
-	.size	image_source_size, . - image_source_size
-	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"ADDW"
-	.long	image_source_size
-	.long	512
-	.long	0
-	.previous
-
-/* Shrunk ROM size (in 512-byte sectors)
- *
- */
-shrunk_rom_size:
-	.byte	0
-	.size	shrunk_rom_size, . - shrunk_rom_size
-	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"ADHB"
-	.long	shrunk_rom_size
-	.long	512
-	.long	0
-	.previous
+	.size	extra_size, . - extra_size
 
 /* Temporary decompression area
  *

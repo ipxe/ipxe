@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define PCI_BAR_EXPROM			0x30
 
 #define ROMPREFIX_EXCLUDE_PAYLOAD 1
+#define ROMPREFIX_MORE_IMAGES 1
 #define _rom_start _mrom_start
 #include "romprefix.S"
 
@@ -46,8 +47,10 @@ FILE_LICENCE ( GPL2_OR_LATER )
  * Parameters:
  *   %ds:0000 : Prefix
  *   %esi : Buffer for copy of image source (or zero if no buffer available)
+ *   %ecx : Expected offset within buffer of first payload block
  * Returns:
  *   %esi : Valid image source address (buffered or unbuffered)
+ *   %ecx : Actual offset within buffer of first payload block
  *   CF set on error
  */
 	.section ".text16.early", "awx", @progbits
@@ -56,23 +59,25 @@ open_payload:
 	/* Preserve registers */
 	pushl	%eax
 	pushw	%bx
-	pushl	%ecx
 	pushl	%edx
 	pushl	%edi
 	pushw	%bp
+	pushw	%es
 	pushw	%ds
 
-	/* Retrieve bus:dev.fn and image source length from .prefix */
+	/* Retrieve bus:dev.fn from .prefix */
 	movw	init_pci_busdevfn, %bx
-	movl	image_source_len_dword, %ecx
 
 	/* Set up %ds for access to .text16.early */
 	pushw	%cs
 	popw	%ds
 
-	/* Store bus:dev.fn and image source length to .text16.early */
+	/* Set up %es for access to flat address space */
+	xorw	%ax, %ax
+	movw	%ax, %es
+
+	/* Store bus:dev.fn to .text16.early */
 	movw	%bx, payload_pci_busdevfn
-	movl	%ecx, rom_bar_copy_len_dword
 
 	/* Get expansion ROM BAR current value */
 	movw	$PCI_BAR_EXPROM, %di
@@ -159,27 +164,32 @@ find_mem_bar:
 	 * properly support flat real mode, it will die horribly.)
 	 */
 	pushl	%esi
-	pushw	%es
 	movl	%esi, %edi
 	movl	%eax, %esi
-	movl	rom_bar_copy_len_dword, %ecx
-	xorw	%ax, %ax
-	movw	%ax, %es
+	addr32 es movzbl 2(%esi), %ecx
+	shll	$7, %ecx
+	addr32 es movzbl 2(%esi,%ecx,4), %edx
+	shll	$7, %edx
+	addl	%edx, %ecx
 	addr32 es rep movsl
-	popw	%es
 	popl	%esi
 	jmp	2f
 1:	/* We have no buffer; set %esi to the BAR address */
 	movl	%eax, %esi
 2:
 
+	/* Locate first payload block (after the dummy ROM header) */
+	addr32 es movzbl 2(%esi), %ecx
+	shll	$9, %ecx
+	addl	$_pprefix_skip, %ecx
+
 	clc
 	/* Restore registers and return */
 99:	popw	%ds
+	popw	%es
 	popw	%bp
 	popl	%edi
 	popl	%edx
-	popl	%ecx
 	popw	%bx
 	popl	%eax
 	lret
@@ -199,11 +209,6 @@ rom_bar_orig_value:
 rom_bar_size:
 	.long	0
 	.size	rom_bar_size, . - rom_bar_size
-
-	.section ".text16.early.data", "aw", @progbits
-rom_bar_copy_len_dword:
-	.long	0
-	.size	rom_bar_copy_len_dword, . - rom_bar_copy_len_dword
 
 	.section ".text16.early.data", "aw", @progbits
 stolen_bar_register:
@@ -419,16 +424,68 @@ pci_set_mem_access:
 	ret
 	.size	pci_set_mem_access, . - pci_set_mem_access
 
-/* Image source area length (in dwords)
+/* Payload prefix
+ *
+ * We include a dummy ROM header to cover the "hidden" portion of the
+ * overall ROM image.
+ */
+	.globl	_payload_align
+	.equ	_payload_align, 512
+	.section ".pprefix", "ax", @progbits
+	.org	0x00
+mromheader:
+	.word	0xaa55			/* BIOS extension signature */
+mromheader_size: .byte 0		/* Size in 512-byte blocks */
+	.org	0x18
+	.word	mpciheader
+	.org	0x1a
+	.word	0
+	.size	mromheader, . - mromheader
+
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+	.ascii	"APPB"
+	.long	mromheader_size
+	.long	512
+	.long	0
+	.previous
+
+mpciheader:
+	.ascii	"PCIR"			/* Signature */
+	.word	pci_vendor_id		/* Vendor identification */
+	.word	pci_device_id		/* Device identification */
+	.word	0x0000			/* Device list pointer */
+	.word	mpciheader_len		/* PCI data structure length */
+	.byte	0x03			/* PCI data structure revision */
+	.byte	0x02, 0x00, 0x00	/* Class code */
+mpciheader_image_length:
+	.word	0			/* Image length */
+	.word	0x0001			/* Revision level */
+	.byte	0xff			/* Code type */
+	.byte	0x80			/* Last image indicator */
+mpciheader_runtime_length:
+	.word	0			/* Maximum run-time image length */
+	.word	0x0000			/* Configuration utility code header */
+	.word	0x0000			/* DMTF CLP entry point */
+	.equ	mpciheader_len, . - mpciheader
+	.size	mpciheader, . - mpciheader
+
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+	.ascii	"APPW"
+	.long	mpciheader_image_length
+	.long	512
+	.long	0
+	.ascii	"APPW"
+	.long	mpciheader_runtime_length
+	.long	512
+	.long	0
+	.previous
+
+/* Fix up additional image source size
  *
  */
-	.section ".prefix", "ax", @progbits
-image_source_len_dword:
-	.long	0
-	.size	image_source_len_dword, . - image_source_len_dword
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"ADDL"
-	.long	image_source_len_dword
-	.long	4
+	.ascii	"ADPW"
+	.long	extra_size
+	.long	512
 	.long	0
 	.previous
