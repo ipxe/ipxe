@@ -87,12 +87,15 @@ foreach my $rom ( @roms ) {
   # Fix checksum for this ROM segment
   $rom->fix_checksum();
 
+  # Add this ROM to base ROM
+  my $data = substr ( $baserom->get(), 0, $baserom->length() );
+  $data .= $rom->get();
+  $data .= $baserom->next_image()->get() if $baserom->next_image();
+  $baserom->set ( $data );
+
   $offset += $rom->length;
 }
 
 $baserom->pnp_header->fix_checksum() if $baserom->pnp_header;
 $baserom->fix_checksum();
 $baserom->save ( "-" );
-foreach my $rom ( @roms ) {
-  $rom->save ( "-" );
-}
