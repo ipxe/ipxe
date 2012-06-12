@@ -42,6 +42,9 @@ struct cpuid_options {
 
 /** "cpuid" option list */
 static struct option_descriptor cpuid_opts[] = {
+	OPTION_DESC ( "ext", 'e', no_argument,
+		      struct cpuid_options, amd, parse_flag ),
+	/* "--amd" retained for backwards compatibility */
 	OPTION_DESC ( "amd", 'a', no_argument,
 		      struct cpuid_options, amd, parse_flag ),
 	OPTION_DESC ( "ecx", 'c', no_argument,
@@ -51,7 +54,7 @@ static struct option_descriptor cpuid_opts[] = {
 /** "cpuid" command descriptor */
 static struct command_descriptor cpuid_cmd =
 	COMMAND_DESC ( struct cpuid_options, cpuid_opts, 1, 1,
-		       "[--amd] [--ecx] <bit>" );
+		       "[--ext] [--ecx] <bit>" );
 
 /**
  * The "cpuid" command
