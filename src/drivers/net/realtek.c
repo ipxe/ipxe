@@ -478,7 +478,7 @@ static void realtek_refill_rx ( struct realtek_nic *rtl ) {
 		/* Populate receive descriptor */
 		address = virt_to_bus ( iobuf->data );
 		rx->address = cpu_to_le64 ( address );
-		rx->length = RTL_RX_MAX_LEN;
+		rx->length = cpu_to_le16 ( RTL_RX_MAX_LEN );
 		wmb();
 		rx->flags = ( cpu_to_le16 ( RTL_DESC_OWN ) |
 			      ( is_last ? cpu_to_le16 ( RTL_DESC_EOR ) : 0 ) );
