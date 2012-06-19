@@ -342,7 +342,7 @@ pmm_scan:
 	movw	$get_pmm_image_source, %bp
 	call	get_pmm
 	movl	%esi, image_source
-	jc	1f
+	jz	1f
 	/* Copy ROM to image source PMM block */
 	pushw	%es
 	xorw	%ax, %ax
@@ -448,7 +448,7 @@ no_pmm:
  *  %es:0000 : PMM structure
  * Returns:
  *  %ebx : PMM handle
- *  %esi : allocated block address, or zero (with CF set) if allocation failed
+ *  %esi : allocated block address, or zero (with ZF set) if allocation failed
  */
 get_pmm:
 	/* Preserve registers */
@@ -464,7 +464,10 @@ get_pmm_find:
 	pushw	%dx
 	pushw	%ax
 	popl	%esi
-	testl	%esi, %esi
+	/* Treat 0xffffffff (not supported) as 0x00000000 (not found) */
+	incl	%esi
+	jz	get_pmm_allocate
+	decl	%esi
 	jz	get_pmm_allocate
 	/* Block found - check acceptability */
 	call	*%bp
@@ -484,19 +487,20 @@ get_pmm_allocate:
 	pushw	%ax
 	popl	%esi
 	movw	$( '+' ), %di	/* Indicate allocation attempt */
-	testl	%esi, %esi
-	jnz	get_pmm_done
-	stc
 get_pmm_done:
 	/* Print block address */
-	pushfw
 	movw	%di, %ax
 	xorw	%di, %di
 	call	print_character
 	movl	%esi, %eax
 	call	print_hex_dword
-	popfw
-	/* Restore registers and return */
+	/* Treat 0xffffffff (not supported) as 0x00000000 (allocation
+	 * failed), and set ZF to indicate a zero result.
+	 */
+	incl	%esi
+	jz	1f
+	decl	%esi
+1:	/* Restore registers and return */
 	popw	%di
 	popl	%eax
 	ret
