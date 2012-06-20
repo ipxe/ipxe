@@ -42,6 +42,14 @@ struct x509_validity {
 	struct x509_time not_after;
 };
 
+/** Margin of error allowed in X.509 response times
+ *
+ * We allow a generous margin of error: 12 hours to allow for the
+ * local time zone being non-GMT, plus 30 minutes to allow for general
+ * clock drift.
+ */
+#define X509_ERROR_MARGIN_TIME ( ( 12 * 60 + 30 ) * 60 )
+
 /** An X.509 certificate public key */
 struct x509_public_key {
 	/** Raw public key information */
