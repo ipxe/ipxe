@@ -1838,6 +1838,14 @@ struct setting hostname_setting __setting ( SETTING_HOST ) = {
 	.type = &setting_type_string,
 };
 
+/** Domain name setting */
+struct setting domain_setting __setting ( SETTING_IPv4_EXTRA ) = {
+	.name = "domain",
+	.description = "DNS domain",
+	.tag = DHCP_DOMAIN_NAME,
+	.type = &setting_type_string,
+};
+
 /** TFTP server setting */
 struct setting next_server_setting __setting ( SETTING_BOOT ) = {
 	.name = "next-server",

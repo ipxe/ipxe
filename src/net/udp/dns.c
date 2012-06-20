@@ -600,14 +600,6 @@ struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
 	.type = &setting_type_ipv4,
 };
 
-/** Domain name setting */
-struct setting domain_setting __setting ( SETTING_IPv4_EXTRA ) = {
-	.name = "domain",
-	.description = "DNS domain",
-	.tag = DHCP_DOMAIN_NAME,
-	.type = &setting_type_string,
-};
-
 /**
  * Apply DNS settings
  *
