@@ -35,4 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Syslog priority */
 #define SYSLOG_PRIORITY( facility, severity ) ( 8 * (facility) + (severity) )
 
+extern int syslog_send ( struct interface *xfer, unsigned int severity,
+			 const char *message, const char *terminator );
+
 #endif /* _IPXE_SYSLOG_H */
