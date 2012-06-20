@@ -86,4 +86,6 @@ extern struct list_head ipv4_miniroutes;
 
 extern struct net_protocol ipv4_protocol __net_protocol;
 
+extern int ipv4_has_any_addr ( struct net_device *netdev );
+
 #endif /* _IPXE_IP_H */

@@ -941,6 +941,13 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 				      &dhcphdr->flags );
 	memcpy ( dhcphdr->options, options, options_len );
 
+	/* If the network device already has an IPv4 address then
+	 * unicast responses from the DHCP server may be rejected, so
+	 * request broadcast responses.
+	 */
+	if ( ipv4_has_any_addr ( netdev ) )
+		dhcphdr->flags |= htons ( BOOTP_FL_BROADCAST );
+
 	/* Initialise DHCP packet structure */
 	memset ( dhcppkt, 0, sizeof ( *dhcppkt ) );
 	dhcppkt_init ( dhcppkt, data, max_len );
