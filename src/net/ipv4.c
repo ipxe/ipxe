@@ -408,7 +408,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
  * @v netdev		Network device
  * @ret has_any_addr	Network device has any IPv4 address
  */
-static int ipv4_has_any_addr ( struct net_device *netdev ) {
+int ipv4_has_any_addr ( struct net_device *netdev ) {
 	struct ipv4_miniroute *miniroute;
 
 	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {

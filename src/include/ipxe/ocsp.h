@@ -28,14 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define OCSP_STATUS_SIG_REQUIRED	0x05
 #define OCSP_STATUS_UNAUTHORIZED	0x06
 
-/** Margin of error allowed in OCSP response times
- *
- * We allow a generous margin of error: 12 hours to allow for the
- * local time zone being non-GMT, plus 30 minutes to allow for general
- * clock drift.
- */
-#define OCSP_ERROR_MARGIN_TIME ( ( 12 * 60 + 30 ) * 60 )
-
 /** An OCSP request */
 struct ocsp_request {
 	/** Request builder */

@@ -314,6 +314,7 @@ extern struct setting gateway6_setting __setting ( SETTING_IPv6 ); /* IPv6 gatew
 extern struct setting dns_setting __setting ( SETTING_IPv4_EXTRA );
 extern struct setting dns6_setting __setting ( SETTING_IPv6_EXTRA );
 extern struct setting hostname_setting __setting ( SETTING_HOST );
+extern struct setting domain_setting __setting ( SETTING_IPv4_EXTRA );
 extern struct setting filename_setting __setting ( SETTING_BOOT );
 extern struct setting root_path_setting __setting ( SETTING_SANBOOT );
 extern struct setting username_setting __setting ( SETTING_AUTH );

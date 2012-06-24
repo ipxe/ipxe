@@ -162,10 +162,8 @@ static void syslogs_putchar ( int character ) {
 	syslogs_entered = 1;
 
 	/* Send log message */
-	if ( ( rc = xfer_printf ( &syslogs, "<%d>ipxe: %s\n",
-				  SYSLOG_PRIORITY ( SYSLOG_DEFAULT_FACILITY,
-						    syslogs_severity ),
-				  syslogs_buffer ) ) != 0 ) {
+	if ( ( rc = syslog_send ( &syslogs, syslogs_severity,
+				  syslogs_buffer, "\n" ) ) != 0 ) {
 		DBG ( "SYSLOGS could not send log message: %s\n",
 		      strerror ( rc ) );
 	}
