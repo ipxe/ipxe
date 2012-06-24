@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 struct settings;
 struct in_addr;
+struct in6_addr;
 union uuid;
 
 /** A setting */
@@ -75,16 +76,18 @@ struct setting {
 #define SETTING_NETDEV_EXTRA	02 /**< Network device additional settings */
 #define SETTING_IPv4		03 /**< IPv4 settings */
 #define SETTING_IPv4_EXTRA	04 /**< IPv4 additional settings */
-#define SETTING_BOOT		05 /**< Generic boot settings */
-#define SETTING_BOOT_EXTRA	06 /**< Generic boot additional settings */
-#define SETTING_SANBOOT		07 /**< SAN boot settings */
-#define SETTING_SANBOOT_EXTRA	08 /**< SAN boot additional settings */
-#define SETTING_HOST		09 /**< Host identity settings */
-#define SETTING_HOST_EXTRA	10 /**< Host identity additional settings */
-#define SETTING_AUTH		11 /**< Authentication settings */
-#define SETTING_AUTH_EXTRA	12 /**< Authentication additional settings */
-#define SETTING_CRYPTO		13 /**< Cryptography settings */
-#define SETTING_MISC		14 /**< Miscellaneous settings */
+#define SETTING_IPv6		05 /**< IPv6 settings */
+#define SETTING_IPv6_EXTRA	06 /**< IPv6 additional settings */
+#define SETTING_BOOT		07 /**< Generic boot settings */
+#define SETTING_BOOT_EXTRA	08 /**< Generic boot additional settings */
+#define SETTING_SANBOOT		09 /**< SAN boot settings */
+#define SETTING_SANBOOT_EXTRA	10 /**< SAN boot additional settings */
+#define SETTING_HOST		11 /**< Host identity settings */
+#define SETTING_HOST_EXTRA	12 /**< Host identity additional settings */
+#define SETTING_AUTH		13 /**< Authentication settings */
+#define SETTING_AUTH_EXTRA	14 /**< Authentication additional settings */
+#define SETTING_CRYPTO		15 /**< Cryptography settings */
+#define SETTING_MISC		16 /**< Miscellaneous settings */
 
 /** @} */
 
@@ -255,6 +258,8 @@ extern int fetch_ipv4_array_setting ( struct settings *settings,
 				      unsigned int count );
 extern int fetch_ipv4_setting ( struct settings *settings,
 				struct setting *setting, struct in_addr *inp );
+extern int fetch_ipv6_setting ( struct settings *settings,
+				struct setting *setting, struct in6_addr *inp );
 extern int fetch_int_setting ( struct settings *settings,
 			       struct setting *setting, long *value );
 extern int fetch_uint_setting ( struct settings *settings,
@@ -289,6 +294,7 @@ extern char * expand_settings ( const char *string );
 extern struct setting_type setting_type_string __setting_type;
 extern struct setting_type setting_type_uristring __setting_type;
 extern struct setting_type setting_type_ipv4 __setting_type;
+extern struct setting_type setting_type_ipv6 __setting_type;
 extern struct setting_type setting_type_int8 __setting_type;
 extern struct setting_type setting_type_int16 __setting_type;
 extern struct setting_type setting_type_int32 __setting_type;
@@ -300,9 +306,13 @@ extern struct setting_type setting_type_hexhyp __setting_type;
 extern struct setting_type setting_type_uuid __setting_type;
 
 extern struct setting ip_setting __setting ( SETTING_IPv4 );
+extern struct setting ip6_setting __setting ( SETTING_IPv6 ); /* Pre-defined IPv6 address */
 extern struct setting netmask_setting __setting ( SETTING_IPv4 );
+extern struct setting prefix_setting __setting ( SETTING_IPv6 ); /* IPv6 address prefix */
 extern struct setting gateway_setting __setting ( SETTING_IPv4 );
+extern struct setting gateway6_setting __setting ( SETTING_IPv6 ); /* IPv6 gateway */
 extern struct setting dns_setting __setting ( SETTING_IPv4_EXTRA );
+extern struct setting dns6_setting __setting ( SETTING_IPv6_EXTRA );
 extern struct setting hostname_setting __setting ( SETTING_HOST );
 extern struct setting filename_setting __setting ( SETTING_BOOT );
 extern struct setting root_path_setting __setting ( SETTING_SANBOOT );

@@ -10,6 +10,7 @@
 #include <ipxe/icmp6.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/ethernet.h>
 
 /**
  * Send neighbour solicitation packet
@@ -29,37 +30,116 @@ int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src __unuse
 	} st_dest;
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct neighbour_solicit *nsolicit;
-	struct io_buffer *iobuf = alloc_iob ( sizeof ( *nsolicit ) + MIN_IOB_LEN );
+	struct ll_option *llopt;
+	struct io_buffer *iobuf = alloc_iob ( sizeof ( struct ll_option ) + 
+					      sizeof ( *nsolicit ) + MIN_IOB_LEN );
 	iob_reserve ( iobuf, MAX_HDR_LEN );
 	nsolicit = iob_put ( iobuf, sizeof ( *nsolicit ) );
+	llopt = iob_put ( iobuf, sizeof ( *llopt ) );
 
 	/* Fill up the headers */
 	memset ( nsolicit, 0, sizeof ( *nsolicit ) );
 	nsolicit->type = ICMP6_NSOLICIT;
 	nsolicit->code = 0;
 	nsolicit->target = *dest;
-	nsolicit->opt_type = 1;
-	nsolicit->opt_len = ( 2 + ll_protocol->ll_addr_len ) / 8;
-	memcpy ( nsolicit->opt_ll_addr, netdev->ll_addr,
-				netdev->ll_protocol->ll_addr_len );
+	
+	/* Fill in the link-layer address. FIXME: ll_option assumes 6 bytes. */
+	llopt->type = 1;
+	llopt->length = ( 2 + ll_protocol->ll_addr_len ) / 8;
+	memcpy ( llopt->address, netdev->ll_addr, netdev->ll_protocol->ll_addr_len );
+	
 	/* Partial checksum */
 	nsolicit->csum = 0;
-	nsolicit->csum = tcpip_chksum ( nsolicit, sizeof ( *nsolicit ) );
+	nsolicit->csum = tcpip_chksum ( nsolicit, sizeof ( *nsolicit ) + sizeof ( *llopt ) );
 
-	/* Solicited multicast address */
+	/* Solicited multicast address - FF02::1 (all stations on local network) */
+	memset(&st_dest.sin6, 0, sizeof(st_dest.sin6));
 	st_dest.sin6.sin_family = AF_INET6;
 	st_dest.sin6.sin6_addr.in6_u.u6_addr8[0] = 0xff;
-	st_dest.sin6.sin6_addr.in6_u.u6_addr8[2] = 0x02;
-	st_dest.sin6.sin6_addr.in6_u.u6_addr16[1] = 0x0000;
-	st_dest.sin6.sin6_addr.in6_u.u6_addr32[1] = 0x00000000;
-	st_dest.sin6.sin6_addr.in6_u.u6_addr16[4] = 0x0000;
-	st_dest.sin6.sin6_addr.in6_u.u6_addr16[5] = 0x0001;
-	st_dest.sin6.sin6_addr.in6_u.u6_addr32[3] = dest->in6_u.u6_addr32[3];
-	st_dest.sin6.sin6_addr.in6_u.u6_addr8[13] = 0xff;
-	
+	st_dest.sin6.sin6_addr.in6_u.u6_addr8[1] = 0x2;
+	st_dest.sin6.sin6_addr.in6_u.u6_addr8[15] = 0x1;
+
 	/* Send packet over IP6 */
-	return tcpip_tx ( iobuf, &icmp6_protocol, NULL, &st_dest.st,
-			  NULL, &nsolicit->csum );
+	return ipv6_tx ( iobuf, &icmp6_protocol, NULL, &st_dest.st,
+			 netdev, &nsolicit->csum );
+}
+
+/**
+ * Send neighbour advertisement packet
+ *
+ * @v netdev	Network device
+ * @v src	Source address
+ * @v dest	Destination address
+ *
+ * This function prepares a neighbour advertisement packet and sends it to the
+ * network layer.
+ */
+int icmp6_send_advert ( struct net_device *netdev, struct in6_addr *src,
+			struct in6_addr *dest ) {
+	union {
+		struct sockaddr_in6 sin6;
+		struct sockaddr_tcpip st;
+	} st_dest;
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
+	struct neighbour_advert *nadvert;
+	struct ll_option *llopt;
+	struct io_buffer *iobuf = alloc_iob ( sizeof ( struct ll_option ) + 
+					      sizeof ( *nadvert ) + MIN_IOB_LEN );
+	iob_reserve ( iobuf, MAX_HDR_LEN );
+	nadvert = iob_put ( iobuf, sizeof ( *nadvert ) );
+	llopt = iob_put ( iobuf, sizeof ( *llopt ) );
+
+	/* Fill up the headers */
+	memset ( nadvert, 0, sizeof ( *nadvert ) );
+	nadvert->type = ICMP6_NADVERT;
+	nadvert->code = 0;
+	nadvert->target = *src;
+	nadvert->flags = ICMP6_FLAGS_SOLICITED | ICMP6_FLAGS_OVERRIDE;
+	
+	/* Fill in the link-layer address. FIXME: ll_option assumes 6 bytes. */
+	llopt->type = 2;
+	llopt->length = ( 2 + ll_protocol->ll_addr_len ) / 8;
+	memcpy ( llopt->address, netdev->ll_addr, netdev->ll_protocol->ll_addr_len );
+
+	/* Partial checksum */
+	nadvert->csum = 0;
+	nadvert->csum = tcpip_chksum ( nadvert, sizeof ( *nadvert ) + sizeof ( *llopt ) );
+
+	/* Target network address. */
+	st_dest.sin6.sin_family = AF_INET6;
+	st_dest.sin6.sin6_addr = *dest;
+
+	/* Send packet over IP6 */
+	return ipv6_tx ( iobuf, &icmp6_protocol, NULL, &st_dest.st,
+			 NULL, &nadvert->csum );
+}
+
+/**
+ * Process ICMP6 Echo Request
+ *
+ * @v iobuf I/O buffer containing the original ICMPv6 packet.
+ * @v st_src Address of the source station.
+ * @v st_dest Address of the destination station.
+ */
+int icmp6_handle_echo ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
+			struct sockaddr_tcpip *st_dest ) {
+	struct icmp6_header *icmp6hdr = iobuf->data;
+	size_t len = iob_len ( iobuf );
+	int rc;
+
+	/* Change type to response and recalculate checksum */
+	icmp6hdr->type = ICMP6_ECHO_RESPONSE;
+	icmp6hdr->csum = 0;
+	icmp6hdr->csum = tcpip_chksum ( icmp6hdr, len );
+
+	/* Transmit the response */
+	if ( ( rc = ipv6_tx ( iob_disown ( iobuf ), &icmp6_protocol, st_dest,
+			      st_src, NULL, &icmp6hdr->csum ) ) != 0 ) {
+		DBG ( "ICMP could not transmit ping response: %s\n",
+		      strerror ( rc ) );
+	}
+
+	return rc;
 }
 
 /**
@@ -69,9 +149,14 @@ int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src __unuse
  * @v st_src	Source address
  * @v st_dest	Destination address
  */
-static int icmp6_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
-		      struct sockaddr_tcpip *st_dest, __unused uint16_t pshdr_csum ) {
+int icmp6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
+		      struct sockaddr_tcpip *st_src,
+		      struct sockaddr_tcpip *st_dest,
+		      uint16_t pshdr_csum ) {
 	struct icmp6_header *icmp6hdr = iobuf->data;
+	size_t len = iob_len ( iobuf );
+	unsigned int csum;
+	int rc;
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < sizeof ( *icmp6hdr ) ) {
@@ -80,14 +165,39 @@ static int icmp6_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 		return -EINVAL;
 	}
 
-	/* TODO: Verify checksum */
+	/* Verify checksum */
+	csum = tcpip_continue_chksum ( pshdr_csum, icmp6hdr, len );
+	if ( csum != 0 ) {
+		DBG ( "ICMPv6 checksum incorrect (is %04x, should be 0000)\n",
+		      csum );
+		DBG_HD ( icmp6hdr, len );
+		rc = -EINVAL;
+		goto done;
+	}
+
+	DBG ( "ICMPv6: packet with type %d and code %x\n", icmp6hdr->type, icmp6hdr->code);
 
 	/* Process the ICMP header */
 	switch ( icmp6hdr->type ) {
+	case ICMP6_ROUTER_ADVERT:
+		rc = ndp_process_radvert ( iobuf, netdev, st_src, st_dest );
+		break;
+	case ICMP6_NSOLICIT:
+		rc = ndp_process_nsolicit ( iobuf, netdev, st_src, st_dest );
+		break;
 	case ICMP6_NADVERT:
-		return ndp_process_advert ( iobuf, st_src, st_dest );
+		rc = ndp_process_nadvert ( iobuf, st_src, st_dest );
+		break;
+	case ICMP6_ECHO_REQUEST:
+		rc = icmp6_handle_echo ( iobuf, st_src, st_dest );
+		break;
+	default:
+		rc = -ENOSYS;
 	}
-	return -ENOSYS;
+
+ done:
+	free_iob ( iobuf );
+	return rc;
 }
 
 #if 0
@@ -124,3 +234,4 @@ struct tcpip_protocol icmp6_protocol __tcpip_protocol = {
 	.rx = icmp6_rx,
 	.tcpip_proto = IP_ICMP6, // 58
 };
+

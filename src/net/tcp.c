@@ -1118,6 +1118,7 @@ static void tcp_process_rx_queue ( struct tcp_connection *tcp ) {
  * @ret rc		Return status code
   */
 static int tcp_rx ( struct io_buffer *iobuf,
+		    __unused struct net_device *netdev,
 		    struct sockaddr_tcpip *st_src,
 		    struct sockaddr_tcpip *st_dest __unused,
 		    uint16_t pshdr_csum ) {
@@ -1374,10 +1375,16 @@ static struct interface_descriptor tcp_xfer_desc =
  ***************************************************************************
  */
 
-/** TCP socket opener */
+/** TCP socket openers */
 struct socket_opener tcp_socket_opener __socket_opener = {
 	.semantics	= TCP_SOCK_STREAM,
 	.family		= AF_INET,
+	.open		= tcp_open,
+};
+
+struct socket_opener tcp_socket_opener_v6 __socket_opener = {
+	.semantics	= TCP_SOCK_STREAM,
+	.family		= AF_INET6,
 	.open		= tcp_open,
 };
 

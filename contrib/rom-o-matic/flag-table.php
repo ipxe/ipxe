@@ -116,7 +116,6 @@ $flag_table = array (
 	"HDR_NETWORK_PROTOCOL_OPTIONS"
 	=> array (
 	   "flag" => "HDR_NETWORK_PROTOCOL_OPTIONS",
-	   "hide_from_user" => "yes",  // Hide even the header
 	   "type" => "header",
 	   "label" => "Network Protocol Options"
 		),
@@ -127,6 +126,14 @@ $flag_table = array (
 	   "type" => "on/off",
 	   "value" => "on",
 	   "hide_from_user" => "yes",
+	   "cfgsec" => "general"
+	   ),
+
+	"NET_PROTO_IPV6"
+	=> array (
+	   "flag" => "NET_PROTO_IPV6",
+	   "type" => "on/off",
+	   "value" => "off",
 	   "cfgsec" => "general"
 	   ),
 
@@ -456,6 +463,22 @@ $flag_table = array (
 	"DIGEST_CMD"
 	=> array (
 	   "flag" => "DIGEST_CMD",
+	   "type" => "on/off",
+	   "value" => "off",
+	   "cfgsec" => "general"
+		),
+
+	"PXE_CMD"
+	=> array (
+	   "flag" => "PXE_CMD",
+	   "type" => "on/off",
+	   "value" => "on",
+	   "cfgsec" => "general"
+		),
+
+	"IPV6_CMD"
+	=> array (
+	   "flag" => "IPV6_CMD",
 	   "type" => "on/off",
 	   "value" => "off",
 	   "cfgsec" => "general"

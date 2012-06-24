@@ -42,7 +42,8 @@ struct tcpip_protocol icmp_protocol __tcpip_protocol;
  * @v pshdr_csum	Pseudo-header checksum
  * @ret rc		Return status code
  */
-static int icmp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
+static int icmp_rx ( struct io_buffer *iobuf, __unused struct net_device *netdev,
+		     struct sockaddr_tcpip *st_src,
 		     struct sockaddr_tcpip *st_dest,
 		     uint16_t pshdr_csum __unused ) {
 	struct icmp_header *icmp = iobuf->data;
