@@ -98,6 +98,10 @@ REQUIRE_OBJECT ( vmconsole );
 REQUIRE_OBJECT ( ipv4 );
 #endif
 
+#ifdef NET_PROTO_IPV6
+REQUIRE_OBJECT ( ipv6 );
+#endif
+
 /*
  * Drag in all requested PXE support
  *
