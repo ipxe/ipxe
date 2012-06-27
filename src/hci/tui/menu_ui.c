@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/timer.h>
 #include <ipxe/console.h>
 #include <ipxe/menu.h>
+#include <config/colour.h>
 
 /* Colour pairs */
 #define CPAIR_NORMAL	1
@@ -339,9 +340,9 @@ int show_menu ( struct menu *menu, unsigned int timeout_ms,
 	/* Initialise screen */
 	initscr();
 	start_color();
-	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLUE );
-	init_pair ( CPAIR_SELECT, COLOR_WHITE, COLOR_RED );
-	init_pair ( CPAIR_SEPARATOR, COLOR_CYAN, COLOR_BLUE );
+	init_pair ( CPAIR_NORMAL, COLOR_NORMAL_FG, COLOR_NORMAL_BG );
+	init_pair ( CPAIR_SELECT, COLOR_SELECT_FG, COLOR_SELECT_BG );
+	init_pair ( CPAIR_SEPARATOR, COLOR_SEPARATOR_FG, COLOR_SEPARATOR_BG );
 	color_set ( CPAIR_NORMAL, NULL );
 	erase();
 
