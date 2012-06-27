@@ -35,8 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /* Colour pairs */
 #define CPAIR_NORMAL		1
-#define CPAIR_LABEL		2
-#define CPAIR_EDITBOX		3
+#define CPAIR_EDIT		2
 
 /* Screen layout */
 #define USERNAME_LABEL_ROW	8
@@ -65,9 +64,8 @@ int login_ui ( void ) {
 	/* Initialise UI */
 	initscr();
 	start_color();
-	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLACK );
-	init_pair ( CPAIR_LABEL, COLOR_WHITE, COLOR_BLACK );
-	init_pair ( CPAIR_EDITBOX, COLOR_WHITE, COLOR_BLUE );
+	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLUE );
+	init_pair ( CPAIR_EDIT, COLOR_BLACK, COLOR_CYAN );
 	init_editbox ( &username_box, username, sizeof ( username ), NULL,
 		       USERNAME_ROW, EDITBOX_COL, EDITBOX_WIDTH, 0 );
 	init_editbox ( &password_box, password, sizeof ( password ), NULL,
@@ -75,11 +73,13 @@ int login_ui ( void ) {
 		       EDITBOX_STARS );
 
 	/* Draw initial UI */
+	color_set ( CPAIR_NORMAL, NULL );
 	erase();
-	color_set ( CPAIR_LABEL, NULL );
+	attron ( A_BOLD );
 	mvprintw ( USERNAME_LABEL_ROW, LABEL_COL, "Username:" );
 	mvprintw ( PASSWORD_LABEL_ROW, LABEL_COL, "Password:" );
-	color_set ( CPAIR_EDITBOX, NULL );
+	attroff ( A_BOLD );
+	color_set ( CPAIR_EDIT, NULL );
 	draw_editbox ( &username_box );
 	draw_editbox ( &password_box );
 
