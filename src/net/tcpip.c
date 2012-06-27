@@ -97,8 +97,8 @@ int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip_protocol,
  * or both.  Deciding which to swap is left as an exercise for the
  * interested reader.
  */
-uint16_t tcpip_continue_chksum ( uint16_t partial, const void *data,
-				 size_t len ) {
+uint16_t generic_tcpip_continue_chksum ( uint16_t partial,
+					 const void *data, size_t len ) {
 	unsigned int cksum = ( ( ~partial ) & 0xffff );
 	unsigned int value;
 	unsigned int i;
