@@ -869,6 +869,11 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 					uint8_t name[ strlen ( tls->name ) ];
 				} __attribute__ (( packed )) list[1];
 			} __attribute__ (( packed )) server_name;
+			uint16_t max_fragment_length_type;
+			uint16_t max_fragment_length_len;
+			struct {
+				uint8_t max;
+			} __attribute__ (( packed )) max_fragment_length;
 		} __attribute__ (( packed )) extensions;
 	} __attribute__ (( packed )) hello;
 	unsigned int i;
@@ -894,6 +899,12 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 		= htons ( sizeof ( hello.extensions.server_name.list[0].name ));
 	memcpy ( hello.extensions.server_name.list[0].name, tls->name,
 		 sizeof ( hello.extensions.server_name.list[0].name ) );
+	hello.extensions.max_fragment_length_type
+		= htons ( TLS_MAX_FRAGMENT_LENGTH );
+	hello.extensions.max_fragment_length_len
+		= htons ( sizeof ( hello.extensions.max_fragment_length ) );
+	hello.extensions.max_fragment_length.max
+		= TLS_MAX_FRAGMENT_LENGTH_2048;
 
 	return tls_send_handshake ( tls, &hello, sizeof ( hello ) );
 }

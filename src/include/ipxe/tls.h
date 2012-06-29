@@ -89,9 +89,16 @@ struct tls_header {
 /* TLS signature algorithm identifiers */
 #define TLS_RSA_ALGORITHM 1
 
-/* TLS extension types */
+/* TLS server name extension */
 #define TLS_SERVER_NAME 0
 #define TLS_SERVER_NAME_HOST_NAME 0
+
+/* TLS maximum fragment length extension */
+#define TLS_MAX_FRAGMENT_LENGTH 1
+#define TLS_MAX_FRAGMENT_LENGTH_512 1
+#define TLS_MAX_FRAGMENT_LENGTH_1024 2
+#define TLS_MAX_FRAGMENT_LENGTH_2048 3
+#define TLS_MAX_FRAGMENT_LENGTH_4096 4
 
 /** TLS RX state machine state */
 enum tls_rx_state {
