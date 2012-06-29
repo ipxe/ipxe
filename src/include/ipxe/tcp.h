@@ -54,6 +54,31 @@ struct tcp_mss_option {
 /** Code for the TCP MSS option */
 #define TCP_OPTION_MSS 2
 
+/** TCP window scale option */
+struct tcp_window_scale_option {
+	uint8_t kind;
+	uint8_t length;
+	uint8_t scale;
+} __attribute__ (( packed ));
+
+/** Padded TCP window scale option (used for sending) */
+struct tcp_window_scale_padded_option {
+	uint8_t nop;
+	struct tcp_window_scale_option wsopt;
+} __attribute (( packed ));
+
+/** Code for the TCP window scale option */
+#define TCP_OPTION_WS 3
+
+/** Advertised TCP window scale
+ *
+ * Using a scale factor of 2**9 provides for a maximum window of 32MB,
+ * which is sufficient to allow Gigabit-speed transfers with a 200ms
+ * RTT.  The minimum advertised window is 512 bytes, which is still
+ * less than a single packet.
+ */
+#define TCP_RX_WINDOW_SCALE 9
+
 /** TCP timestamp option */
 struct tcp_timestamp_option {
 	uint8_t kind;
@@ -75,7 +100,9 @@ struct tcp_timestamp_padded_option {
 struct tcp_options {
 	/** MSS option, if present */
 	const struct tcp_mss_option *mssopt;
-	/** Timestampe option, if present */
+	/** Window scale option, if present */
+	const struct tcp_window_scale_option *wsopt;
+	/** Timestamp option, if present */
 	const struct tcp_timestamp_option *tsopt;
 };
 
@@ -316,6 +343,7 @@ struct tcp_options {
 	( MAX_LL_NET_HEADER_LEN +				\
 	  sizeof ( struct tcp_header ) +			\
 	  sizeof ( struct tcp_mss_option ) +			\
+	  sizeof ( struct tcp_window_scale_padded_option ) +	\
 	  sizeof ( struct tcp_timestamp_padded_option ) )
 
 /**

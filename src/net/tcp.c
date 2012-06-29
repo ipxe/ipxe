@@ -87,6 +87,16 @@ struct tcp_connection {
 	 * Equivalent to TS.Recent in RFC 1323 terminology.
 	 */
 	uint32_t ts_recent;
+	/** Send window scale
+	 *
+	 * Equivalent to Snd.Wind.Scale in RFC 1323 terminology
+	 */
+	uint8_t snd_win_scale;
+	/** Receive window scale
+	 *
+	 * Equivalent to Rcv.Wind.Scale in RFC 1323 terminology
+	 */
+	uint8_t rcv_win_scale;
 
 	/** Transmit queue */
 	struct list_head tx_queue;
@@ -490,6 +500,7 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 	struct io_buffer *iobuf;
 	struct tcp_header *tcphdr;
 	struct tcp_mss_option *mssopt;
+	struct tcp_window_scale_padded_option *wsopt;
 	struct tcp_timestamp_padded_option *tsopt;
 	void *payload;
 	unsigned int flags;
@@ -497,6 +508,7 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 	uint32_t seq_len;
 	uint32_t app_win;
 	uint32_t max_rcv_win;
+	uint32_t max_representable_win;
 	int rc;
 
 	/* If retransmission timer is already running, do nothing */
@@ -551,6 +563,9 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 	app_win = xfer_window ( &tcp->xfer );
 	if ( max_rcv_win > app_win )
 		max_rcv_win = app_win;
+	max_representable_win = ( 0xffff << tcp->rcv_win_scale );
+	if ( max_rcv_win > max_representable_win )
+		max_rcv_win = max_representable_win;
 	max_rcv_win &= ~0x03; /* Keep everything dword-aligned */
 	if ( tcp->rcv_win < max_rcv_win )
 		tcp->rcv_win = max_rcv_win;
@@ -562,6 +577,11 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 		mssopt->kind = TCP_OPTION_MSS;
 		mssopt->length = sizeof ( *mssopt );
 		mssopt->mss = htons ( TCP_MSS );
+		wsopt = iob_push ( iobuf, sizeof ( *wsopt ) );
+		wsopt->nop = TCP_OPTION_NOP;
+		wsopt->wsopt.kind = TCP_OPTION_WS;
+		wsopt->wsopt.length = sizeof ( wsopt->wsopt );
+		wsopt->wsopt.scale = TCP_RX_WINDOW_SCALE;
 	}
 	if ( ( flags & TCP_SYN ) || ( tcp->flags & TCP_TS_ENABLED ) ) {
 		tsopt = iob_push ( iobuf, sizeof ( *tsopt ) );
@@ -581,7 +601,7 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 	tcphdr->ack = htonl ( tcp->rcv_ack );
 	tcphdr->hlen = ( ( payload - iobuf->data ) << 2 );
 	tcphdr->flags = flags;
-	tcphdr->win = htons ( tcp->rcv_win );
+	tcphdr->win = htons ( tcp->rcv_win >> tcp->rcv_win_scale );
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
@@ -769,6 +789,9 @@ static void tcp_rx_opts ( struct tcp_connection *tcp, const void *data,
 		case TCP_OPTION_MSS:
 			options->mssopt = data;
 			break;
+		case TCP_OPTION_WS:
+			options->wsopt = data;
+			break;
 		case TCP_OPTION_TS:
 			options->tsopt = data;
 			break;
@@ -825,6 +848,10 @@ static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq,
 		tcp->rcv_ack = seq;
 		if ( options->tsopt )
 			tcp->flags |= TCP_TS_ENABLED;
+		if ( options->wsopt ) {
+			tcp->snd_win_scale = options->wsopt->scale;
+			tcp->rcv_win_scale = TCP_RX_WINDOW_SCALE;
+		}
 	}
 
 	/* Ignore duplicate SYN */
@@ -1168,7 +1195,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	tcp = tcp_demux ( ntohs ( tcphdr->dest ) );
 	seq = ntohl ( tcphdr->seq );
 	ack = ntohl ( tcphdr->ack );
-	win = ntohs ( tcphdr->win );
+	win = ( ntohs ( tcphdr->win ) << tcp->snd_win_scale );
 	flags = tcphdr->flags;
 	tcp_rx_opts ( tcp, ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) ),
 		      ( hlen - sizeof ( *tcphdr ) ), &options );
