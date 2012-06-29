@@ -19,6 +19,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <strings.h>
 #include <errno.h>
 #include <ipxe/malloc.h>
 #include <ipxe/iobuf.h>
@@ -40,18 +41,24 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 struct io_buffer * alloc_iob ( size_t len ) {
 	struct io_buffer *iobuf = NULL;
+	size_t align;
 	void *data;
 
 	/* Pad to minimum length */
 	if ( len < IOB_ZLEN )
 		len = IOB_ZLEN;
 
-	/* Align buffer length */
-	len = ( len + __alignof__( *iobuf ) - 1 ) &
-		~( __alignof__( *iobuf ) - 1 );
-	
+	/* Align buffer length to ensure that struct io_buffer is aligned */
+	len = ( len + __alignof__ ( *iobuf ) - 1 ) &
+		~( __alignof__ ( *iobuf ) - 1 );
+
+	/* Align buffer on its own size to avoid potential problems
+	 * with boundary-crossing DMA.
+	 */
+	align = ( 1 << fls ( len - 1 ) );
+
 	/* Allocate memory for buffer plus descriptor */
-	data = malloc_dma ( len + sizeof ( *iobuf ), IOB_ALIGN );
+	data = malloc_dma ( len + sizeof ( *iobuf ), align );
 	if ( ! data )
 		return NULL;
 
@@ -60,6 +67,7 @@ struct io_buffer * alloc_iob ( size_t len ) {
 	iobuf->end = iobuf;
 	return iobuf;
 }
+
 
 /**
  * Free I/O buffer
