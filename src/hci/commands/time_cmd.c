@@ -56,7 +56,8 @@ static struct command_descriptor time_cmd =
 static int time_exec ( int argc, char **argv ) {
 	struct time_options opts;
 	unsigned long start;
-	int secs;
+	unsigned long elapsed;
+	int decisecs;
 	int rc;
 
 	/* Parse options */
@@ -65,9 +66,11 @@ static int time_exec ( int argc, char **argv ) {
 
 	start = currticks();
 	rc = execv ( argv[1], argv + 1 );
-	secs = (currticks() - start) / ticks_per_sec();
+	elapsed = ( currticks() - start );
+	decisecs = ( 10 * elapsed / ticks_per_sec() );
 
-	printf ( "%s: %ds\n", argv[0], secs );
+	printf ( "%s: %d.%ds\n", argv[0],
+		 ( decisecs / 10 ), ( decisecs % 10 ) );
 
 	return rc;
 }

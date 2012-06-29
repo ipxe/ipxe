@@ -43,21 +43,15 @@ void * __memcpy ( void *dest, const void *src, size_t len ) {
 	 * moves.  Using movsl rather than movsb speeds these up by
 	 * around 32%.
 	 */
-	if ( len >> 2 ) {
-		__asm__ __volatile__ ( "rep movsl"
-				       : "=&D" ( edi ), "=&S" ( esi ),
-				         "=&c" ( discard_ecx )
-				       : "0" ( edi ), "1" ( esi ),
-				         "2" ( len >> 2 )
-				       : "memory" );
-	}
-	if ( len & 0x02 ) {
-		__asm__ __volatile__ ( "movsw" : "=&D" ( edi ), "=&S" ( esi )
-				       : "0" ( edi ), "1" ( esi ) : "memory" );
-	}
-	if ( len & 0x01 ) {
-		__asm__ __volatile__ ( "movsb" : "=&D" ( edi ), "=&S" ( esi )
-				       : "0" ( edi ), "1" ( esi ) : "memory" );
-	}
+	__asm__ __volatile__ ( "rep movsl"
+			       : "=&D" ( edi ), "=&S" ( esi ),
+				 "=&c" ( discard_ecx )
+			       : "0" ( edi ), "1" ( esi ), "2" ( len >> 2 )
+			       : "memory" );
+	__asm__ __volatile__ ( "rep movsb"
+			       : "=&D" ( edi ), "=&S" ( esi ),
+				 "=&c" ( discard_ecx )
+			       : "0" ( edi ), "1" ( esi ), "2" ( len & 3 )
+			       : "memory" );
 	return dest;
 }

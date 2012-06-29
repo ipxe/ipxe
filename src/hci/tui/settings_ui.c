@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/editbox.h>
 #include <ipxe/keys.h>
 #include <ipxe/settings_ui.h>
+#include <config/colour.h>
 
 /** @file
  *
@@ -557,11 +558,11 @@ int settings_ui ( struct settings *settings ) {
 
 	initscr();
 	start_color();
-	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLUE );
-	init_pair ( CPAIR_SELECT, COLOR_WHITE, COLOR_RED );
-	init_pair ( CPAIR_EDIT, COLOR_BLACK, COLOR_CYAN );
-	init_pair ( CPAIR_ALERT, COLOR_WHITE, COLOR_RED );
-	init_pair ( CPAIR_URL, COLOR_CYAN, COLOR_BLUE );
+	init_pair ( CPAIR_NORMAL, COLOR_NORMAL_FG, COLOR_NORMAL_BG );
+	init_pair ( CPAIR_SELECT, COLOR_SELECT_FG, COLOR_SELECT_BG );
+	init_pair ( CPAIR_EDIT, COLOR_EDIT_FG, COLOR_EDIT_BG );
+	init_pair ( CPAIR_ALERT, COLOR_ALERT_FG, COLOR_ALERT_BG );
+	init_pair ( CPAIR_URL, COLOR_URL_FG, COLOR_URL_BG );
 	color_set ( CPAIR_NORMAL, NULL );
 	erase();
 	

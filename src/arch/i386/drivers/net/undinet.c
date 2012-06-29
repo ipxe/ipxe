@@ -70,6 +70,9 @@ struct undi_nic {
 /** Delay between retries of PXENV_UNDI_INITIALIZE */
 #define UNDI_INITIALIZE_RETRY_DELAY_MS 200
 
+/** Alignment of received frame payload */
+#define UNDI_RX_ALIGN 16
+
 static void undinet_close ( struct net_device *netdev );
 
 /** Address of UNDI entry point */
@@ -299,6 +302,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 	struct s_PXENV_UNDI_ISR undi_isr;
 	struct io_buffer *iobuf = NULL;
 	size_t len;
+	size_t reserve_len;
 	size_t frag_len;
 	size_t max_frag_len;
 	int rc;
@@ -346,6 +350,8 @@ static void undinet_poll ( struct net_device *netdev ) {
 			/* Packet fragment received */
 			len = undi_isr.FrameLength;
 			frag_len = undi_isr.BufferLength;
+			reserve_len = ( -undi_isr.FrameHeaderLength &
+					( UNDI_RX_ALIGN - 1 ) );
 			if ( ( len == 0 ) || ( len < frag_len ) ) {
 				/* Don't laugh.  VMWare does it. */
 				DBGC ( undinic, "UNDINIC %p reported insane "
@@ -354,15 +360,17 @@ static void undinet_poll ( struct net_device *netdev ) {
 				netdev_rx_err ( netdev, NULL, -EINVAL );
 				break;
 			}
-			if ( ! iobuf )
-				iobuf = alloc_iob ( len );
 			if ( ! iobuf ) {
-				DBGC ( undinic, "UNDINIC %p could not "
-				       "allocate %zd bytes for RX buffer\n",
-				       undinic, len );
-				/* Fragment will be dropped */
-				netdev_rx_err ( netdev, NULL, -ENOMEM );
-				goto done;
+				iobuf = alloc_iob ( reserve_len + len );
+				if ( ! iobuf ) {
+					DBGC ( undinic, "UNDINIC %p could not "
+					       "allocate %zd bytes for RX "
+					       "buffer\n", undinic, len );
+					/* Fragment will be dropped */
+					netdev_rx_err ( netdev, NULL, -ENOMEM );
+					goto done;
+				}
+				iob_reserve ( iobuf, reserve_len );
 			}
 			max_frag_len = iob_tailroom ( iobuf );
 			if ( frag_len > max_frag_len ) {

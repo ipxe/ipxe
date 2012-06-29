@@ -60,7 +60,9 @@ int monojob_wait ( const char *string ) {
 	struct job_progress progress;
 	int key;
 	int rc;
+	unsigned long last_keycheck;
 	unsigned long last_progress;
+	unsigned long now;
 	unsigned long elapsed;
 	unsigned long completed;
 	unsigned long total;
@@ -70,20 +72,32 @@ int monojob_wait ( const char *string ) {
 	if ( string )
 		printf ( "%s...", string );
 	monojob_rc = -EINPROGRESS;
-	last_progress = currticks();
+	last_keycheck = last_progress = currticks();
 	while ( monojob_rc == -EINPROGRESS ) {
+
+		/* Allow job to progress */
 		step();
-		if ( iskey() ) {
-			key = getchar();
-			switch ( key ) {
-			case CTRL_C:
-				monojob_close ( &monojob, -ECANCELED );
-				break;
-			default:
-				break;
+		now = currticks();
+
+		/* Check for keypresses.  This can be time-consuming,
+		 * so check only once per clock tick.
+		 */
+		if ( now != last_keycheck ) {
+			if ( iskey() ) {
+				key = getchar();
+				switch ( key ) {
+				case CTRL_C:
+					monojob_close ( &monojob, -ECANCELED );
+					break;
+				default:
+					break;
+				}
 			}
+			last_keycheck = now;
 		}
-		elapsed = ( currticks() - last_progress );
+
+		/* Display progress, if applicable */
+		elapsed = ( now - last_progress );
 		if ( string && ( elapsed >= TICKS_PER_SEC ) ) {
 			if ( shown_percentage )
 				printf ( "\b\b\b\b    \b\b\b\b" );
@@ -99,7 +113,7 @@ int monojob_wait ( const char *string ) {
 				printf ( "." );
 				shown_percentage = 0;
 			}
-			last_progress = currticks();
+			last_progress = now;
 		}
 	}
 	rc = monojob_rc;
