@@ -1155,6 +1155,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	uint16_t csum;
 	uint32_t seq;
 	uint32_t ack;
+	uint16_t raw_win;
 	uint32_t win;
 	unsigned int flags;
 	size_t len;
@@ -1195,7 +1196,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	tcp = tcp_demux ( ntohs ( tcphdr->dest ) );
 	seq = ntohl ( tcphdr->seq );
 	ack = ntohl ( tcphdr->ack );
-	win = ( ntohs ( tcphdr->win ) << tcp->snd_win_scale );
+	raw_win = ntohs ( tcphdr->win );
 	flags = tcphdr->flags;
 	tcp_rx_opts ( tcp, ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) ),
 		      ( hlen - sizeof ( *tcphdr ) ), &options );
@@ -1226,6 +1227,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 
 	/* Handle ACK, if present */
 	if ( flags & TCP_ACK ) {
+		win = ( raw_win << tcp->snd_win_scale );
 		if ( ( rc = tcp_rx_ack ( tcp, ack, win ) ) != 0 ) {
 			tcp_xmit_reset ( tcp, st_src, tcphdr );
 			goto discard;
