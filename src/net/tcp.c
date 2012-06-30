@@ -714,7 +714,7 @@ static int tcp_xmit_reset ( struct tcp_connection *tcp,
 	tcphdr->ack = in_tcphdr->seq;
 	tcphdr->hlen = ( ( sizeof ( *tcphdr ) / 4 ) << 4 );
 	tcphdr->flags = ( TCP_RST | TCP_ACK );
-	tcphdr->win = htons ( TCP_MAX_WINDOW_SIZE );
+	tcphdr->win = htons ( 0 );
 	tcphdr->csum = tcpip_chksum ( iobuf->data, iob_len ( iobuf ) );
 
 	/* Dump header */
