@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/retry.h>
 #include <ipxe/timer.h>
 #include <ipxe/malloc.h>
+#include <ipxe/refcnt.h>
 #include <ipxe/arp.h>
 
 /** @file
@@ -51,6 +52,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** An ARP cache entry */
 struct arp_entry {
+	/** Reference count */
+	struct refcnt refcnt;
 	/** List of ARP cache entries */
 	struct list_head list;
 	/** Network device */
@@ -77,6 +80,25 @@ struct net_protocol arp_protocol __net_protocol;
 static void arp_expired ( struct retry_timer *timer, int over );
 
 /**
+ * Free ARP cache entry
+ *
+ * @v refcnt		Reference count
+ */
+static void arp_free ( struct refcnt *refcnt ) {
+	struct arp_entry *arp =
+		container_of ( refcnt, struct arp_entry, refcnt );
+
+	/* Sanity check */
+	assert ( list_empty ( &arp->tx_queue ) );
+
+	/* Drop reference to network device */
+	netdev_put ( arp->netdev );
+
+	/* Free entry */
+	free ( arp );
+}
+
+/**
  * Create ARP cache entry
  *
  * @v netdev		Network device
@@ -91,26 +113,27 @@ static struct arp_entry * arp_create ( struct net_device *netdev,
 				       const void *net_source ) {
 	struct arp_entry *arp;
 
-	/* Allocate entry and add to cache */
+	/* Allocate and initialise entry */
 	arp = zalloc ( sizeof ( *arp ) );
 	if ( ! arp )
 		return NULL;
-
-	/* Initialise entry and add to cache */
+	ref_init ( &arp->refcnt, arp_free );
 	arp->netdev = netdev_get ( netdev );
 	arp->net_protocol = net_protocol;
 	memcpy ( arp->net_dest, net_dest,
 		 net_protocol->net_addr_len );
 	memcpy ( arp->net_source, net_source,
 		 net_protocol->net_addr_len );
-	timer_init ( &arp->timer, arp_expired, NULL );
+	timer_init ( &arp->timer, arp_expired, &arp->refcnt );
 	arp->timer.min_timeout = ARP_MIN_TIMEOUT;
 	arp->timer.max_timeout = ARP_MAX_TIMEOUT;
 	INIT_LIST_HEAD ( &arp->tx_queue );
-	list_add ( &arp->list, &arp_entries );
 
 	/* Start timer running to trigger initial transmission */
 	start_timer_nodelay ( &arp->timer );
+
+	/* Transfer ownership to cache */
+	list_add ( &arp->list, &arp_entries );
 
 	DBGC ( arp, "ARP %p %s %s %s created\n", arp, netdev->name,
 	       net_protocol->name, net_protocol->ntoa ( net_dest ) );
@@ -174,10 +197,9 @@ static void arp_destroy ( struct arp_entry *arp, int rc ) {
 	       net_protocol->name, net_protocol->ntoa ( arp->net_dest ),
 	       strerror ( rc ) );
 
-	/* Drop reference to network device, remove from cache and free */
-	netdev_put ( arp->netdev );
+	/* Remove from cache and drop reference */
 	list_del ( &arp->list );
-	free ( arp );
+	ref_put ( &arp->refcnt );
 }
 
 /**
@@ -241,7 +263,6 @@ static void arp_update ( struct arp_entry *arp, const void *ll_dest ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct net_protocol *net_protocol = arp->net_protocol;
 	struct io_buffer *iobuf;
-	struct io_buffer *tmp;
 	int rc;
 
 	DBGC ( arp, "ARP %p %s %s %s updated => %s\n", arp, netdev->name,
@@ -254,8 +275,13 @@ static void arp_update ( struct arp_entry *arp, const void *ll_dest ) {
 	/* Stop retransmission timer */
 	stop_timer ( &arp->timer );
 
-	/* Transmit any packets in queue */
-	list_for_each_entry_safe ( iobuf, tmp, &arp->tx_queue, list ) {
+	/* Transmit any packets in queue.  Take out a temporary
+	 * reference on the entry to prevent it from going out of
+	 * scope during the call to net_tx().
+	 */
+	ref_get ( &arp->refcnt );
+	while ( ( iobuf = list_first_entry ( &arp->tx_queue, struct io_buffer,
+					     list ) ) != NULL ) {
 		DBGC2 ( arp, "ARP %p %s %s %s transmitting deferred packet\n",
 			arp, netdev->name, net_protocol->name,
 			net_protocol->ntoa ( arp->net_dest ) );
@@ -267,6 +293,7 @@ static void arp_update ( struct arp_entry *arp, const void *ll_dest ) {
 			/* Ignore error and continue */
 		}
 	}
+	ref_put ( &arp->refcnt );
 }
 
 /**
