@@ -750,13 +750,8 @@ void net_poll ( void ) {
 		if ( netdev_rx_frozen ( netdev ) )
 			continue;
 
-		/* Process at most one received packet.  Give priority
-		 * to getting packets out of the NIC over processing
-		 * the received packets, because we advertise a window
-		 * that assumes that we can receive packets from the
-		 * NIC faster than they arrive.
-		 */
-		if ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
+		/* Process all received packets */
+		while ( ( iobuf = netdev_rx_dequeue ( netdev ) ) ) {
 
 			DBGC2 ( netdev, "NETDEV %s processing %p (%p+%zx)\n",
 				netdev->name, iobuf, iobuf->data,
