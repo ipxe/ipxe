@@ -209,7 +209,7 @@ struct ucl_compress
 
 #define SWD_HSIZE	16384
 #define SWD_MAX_CHAIN	2048
-#define SWD_BEST_OFF    1
+#undef SWD_BEST_OFF
 
 #define HEAD3(b,p) \
     (((0x9f5f*(((((uint32_t)b[p]<<5)^b[p+1])<<5)^b[p+2]))>>5) & (SWD_HSIZE-1))
