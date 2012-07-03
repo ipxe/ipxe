@@ -307,6 +307,7 @@ int show_menu ( struct menu *menu, unsigned int timeout_ms,
 		const char *select, struct menu_item **selected ) {
 	struct menu_item *item;
 	struct menu_ui ui;
+	char buf[ MENU_COLS + 1 /* NUL */ ];
 	int labelled_count = 0;
 	int rc;
 
@@ -348,8 +349,8 @@ int show_menu ( struct menu *menu, unsigned int timeout_ms,
 
 	/* Draw initial content */
 	attron ( A_BOLD );
-	mvprintw ( TITLE_ROW, ( ( COLS - strlen ( ui.menu->title ) ) / 2 ),
-		   "%s", ui.menu->title );
+	snprintf ( buf, sizeof ( buf ), "%s", ui.menu->title );
+	mvprintw ( TITLE_ROW, ( ( COLS - strlen ( buf ) ) / 2 ), "%s", buf );
 	attroff ( A_BOLD );
 	draw_menu_items ( &ui );
 	draw_menu_item ( &ui, ui.selected );
