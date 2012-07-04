@@ -358,7 +358,7 @@ char * concat_args ( char **args ) {
 	ptr = string;
 	for ( arg = args ; *arg ; arg++ ) {
 		ptr += sprintf ( ptr, "%s%s",
-				 ( ( ptr == string ) ? "" : " " ), *arg );
+				 ( ( arg == args ) ? "" : " " ), *arg );
 	}
 	assert ( ptr < ( string + len ) );
 
