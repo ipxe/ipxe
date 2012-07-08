@@ -97,6 +97,8 @@ struct tcp_connection {
 	 * Equivalent to Rcv.Wind.Scale in RFC 1323 terminology
 	 */
 	uint8_t rcv_win_scale;
+	/** Maximum receive window */
+	uint32_t max_rcv_win;
 
 	/** Transmit queue */
 	struct list_head tx_queue;
@@ -295,6 +297,7 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
 	tcp_dump_state ( tcp );
 	tcp->snd_seq = random();
+	tcp->max_rcv_win = TCP_MAX_WINDOW_SIZE;
 	INIT_LIST_HEAD ( &tcp->tx_queue );
 	INIT_LIST_HEAD ( &tcp->rx_queue );
 	memcpy ( &tcp->peer, st_peer, sizeof ( tcp->peer ) );
@@ -557,9 +560,7 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 	tcp_process_tx_queue ( tcp, len, iobuf, 0 );
 
 	/* Expand receive window if possible */
-	max_rcv_win = ( ( freemem * 3 ) / 4 );
-	if ( max_rcv_win > TCP_MAX_WINDOW_SIZE )
-		max_rcv_win = TCP_MAX_WINDOW_SIZE;
+	max_rcv_win = tcp->max_rcv_win;
 	app_win = xfer_window ( &tcp->xfer );
 	if ( max_rcv_win > app_win )
 		max_rcv_win = app_win;
@@ -1299,13 +1300,29 @@ struct tcpip_protocol tcp_protocol __tcpip_protocol = {
 static unsigned int tcp_discard ( void ) {
 	struct tcp_connection *tcp;
 	struct io_buffer *iobuf;
+	struct tcp_rx_queued_header *tcpqhdr;
+	uint32_t max_win;
 	unsigned int discarded = 0;
 
 	/* Try to drop one queued RX packet from each connection */
 	list_for_each_entry ( tcp, &tcp_conns, list ) {
 		list_for_each_entry_reverse ( iobuf, &tcp->rx_queue, list ) {
+
+			/* Limit window to prevent future discards */
+			tcpqhdr = iobuf->data;
+			max_win = ( tcpqhdr->seq - tcp->rcv_ack );
+			if ( max_win < tcp->max_rcv_win ) {
+				DBGC ( tcp, "TCP %p reducing maximum window "
+				       "from %d to %d\n",
+				       tcp, tcp->max_rcv_win, max_win );
+				tcp->max_rcv_win = max_win;
+			}
+
+			/* Remove packet from queue */
 			list_del ( &iobuf->list );
 			free_iob ( iobuf );
+
+			/* Report discard */
 			discarded++;
 			break;
 		}
