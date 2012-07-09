@@ -192,12 +192,14 @@ static inline void valgrind_make_blocks_noaccess ( void ) {
  */
 static unsigned int discard_cache ( void ) {
 	struct cache_discarder *discarder;
-	unsigned int discarded = 0;
+	unsigned int discarded;
 
 	for_each_table_entry ( discarder, CACHE_DISCARDERS ) {
-		discarded += discarder->discard();
+		discarded = discarder->discard();
+		if ( discarded )
+			return discarded;
 	}
-	return discarded;
+	return 0;
 }
 
 /**
