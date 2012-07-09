@@ -143,7 +143,7 @@ static unsigned int x509_discard ( void ) {
 }
 
 /** X.509 cache discarder */
-struct cache_discarder x509_cache_discarder __cache_discarder = {
+struct cache_discarder x509_discarder __cache_discarder ( CACHE_NORMAL ) = {
 	.discard = x509_discard,
 };
 

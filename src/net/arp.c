@@ -525,7 +525,12 @@ static unsigned int arp_discard ( void ) {
 	return 0;
 }
 
-/** ARP cache discarder */
-struct cache_discarder arp_cache_discarder __cache_discarder = {
+/** ARP cache discarder
+ *
+ * ARP cache entries are deemed to have a high replacement cost, since
+ * flushing an active ARP cache entry midway through a TCP transfer
+ * will cause substantial disruption.
+ */
+struct cache_discarder arp_discarder __cache_discarder ( CACHE_EXPENSIVE ) = {
 	.discard = arp_discard,
 };

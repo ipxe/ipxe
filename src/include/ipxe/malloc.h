@@ -76,6 +76,17 @@ struct cache_discarder {
 #define CACHE_DISCARDERS __table ( struct cache_discarder, "cache_discarders" )
 
 /** Declare a cache discarder */
-#define __cache_discarder __table_entry ( CACHE_DISCARDERS, 01 )
+#define __cache_discarder( cost ) __table_entry ( CACHE_DISCARDERS, cost )
+
+/** @defgroup cache_cost Cache discarder costs
+ *
+ * @{
+ */
+
+#define CACHE_CHEAP	01	/**< Items with a low replacement cost */
+#define CACHE_NORMAL	02	/**< Items with a normal replacement cost */
+#define CACHE_EXPENSIVE	03	/**< Items with a high replacement cost */
+
+/** @} */
 
 #endif /* _IPXE_MALLOC_H */

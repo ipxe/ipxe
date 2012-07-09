@@ -1315,7 +1315,7 @@ static unsigned int tcp_discard ( void ) {
 }
 
 /** TCP cache discarder */
-struct cache_discarder tcp_cache_discarder __cache_discarder = {
+struct cache_discarder tcp_discarder __cache_discarder ( CACHE_NORMAL ) = {
 	.discard = tcp_discard,
 };
 
