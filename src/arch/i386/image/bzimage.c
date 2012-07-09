@@ -214,7 +214,8 @@ static void bzimage_update_header ( struct image *image,
 	} else {
 		bzimg->cmdline_magic.magic = BZI_CMDLINE_MAGIC;
 		bzimg->cmdline_magic.offset = bzimg->rm_cmdline;
-		bzimg->bzhdr.setup_move_size = bzimg->rm_memsz;
+		if ( bzimg->version >= 0x0200 )
+			bzimg->bzhdr.setup_move_size = bzimg->rm_memsz;
 	}
 
 	/* Set video mode */
