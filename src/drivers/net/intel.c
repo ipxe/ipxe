@@ -491,9 +491,6 @@ static int intel_open ( struct net_device *netdev ) {
 	if ( ( rc = intel_create_ring ( intel, &intel->rx ) ) != 0 )
 		goto err_create_rx;
 
-	/* Fill receive ring */
-	intel_refill_rx ( intel );
-
 	/* Program MAC address */
 	memset ( &mac, 0, sizeof ( mac ) );
 	memcpy ( mac.raw, netdev->ll_addr, sizeof ( mac.raw ) );
@@ -514,6 +511,9 @@ static int intel_open ( struct net_device *netdev ) {
 	rctl |= ( INTEL_RCTL_EN | INTEL_RCTL_UPE | INTEL_RCTL_MPE |
 		  INTEL_RCTL_BAM | INTEL_RCTL_BSIZE_2048 | INTEL_RCTL_SECRC );
 	writel ( rctl, intel->regs + INTEL_RCTL );
+
+	/* Fill receive ring */
+	intel_refill_rx ( intel );
 
 	/* Update link state */
 	intel_check_link ( netdev );
