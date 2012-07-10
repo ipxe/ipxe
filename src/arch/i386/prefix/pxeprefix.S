@@ -19,6 +19,8 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define EB_MAGIC_1 ( 'E' + ( 't' << 8 ) + ( 'h' << 16 ) + ( 'e' << 24 ) )
 #define EB_MAGIC_2 ( 'r' + ( 'b' << 8 ) + ( 'o' << 16 ) + ( 'o' << 24 ) )
 
+#define PREFIX_STACK_SIZE 2048
+
 /*****************************************************************************
  * Entry point:	set operating context, print welcome message
  *****************************************************************************
@@ -46,10 +48,11 @@ _pxe_start:
 	movw	%ax, %ds
 	movw	$0x40, %ax		/* BIOS data segment access */
 	movw	%ax, %fs
-	/* Set up stack just below 0x7c00 */
-	xorw	%ax, %ax
+	/* Set up temporary stack immediately after the iPXE image */
+	movw	%cs, %ax
+	addw	image_size_pgh, %ax
 	movw	%ax, %ss
-	movl	$0x7c00, %esp
+	movl	$PREFIX_STACK_SIZE, %esp
 	/* Clear direction flag, for the sake of sanity */
 	cld
 	/* Print welcome message */
@@ -58,6 +61,18 @@ _pxe_start:
 	call	print_message
 	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"PXE->EB:"
+	.previous
+
+	/* Image size (for stack placement calculation) */
+	.section ".prefix.data", "aw", @progbits
+image_size_pgh:
+	.word	0
+	.previous
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+	.ascii	"ADDW"
+	.long	image_size_pgh
+	.long	16
+	.long	0
 	.previous
 
 /*****************************************************************************
