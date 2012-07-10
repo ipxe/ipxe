@@ -363,6 +363,7 @@ static void intel_check_link ( struct net_device *netdev ) {
 static int intel_create_ring ( struct intel_nic *intel,
 			       struct intel_ring *ring ) {
 	physaddr_t address;
+	uint32_t dctl;
 
 	/* Allocate descriptor ring.  Align ring on its own size to
 	 * prevent any possible page-crossing errors due to hardware
@@ -392,6 +393,11 @@ static int intel_create_ring ( struct intel_nic *intel,
 	/* Reset head and tail pointers */
 	writel ( 0, ( intel->regs + ring->reg + INTEL_xDH ) );
 	writel ( 0, ( intel->regs + ring->reg + INTEL_xDT ) );
+
+	/* Enable ring */
+	dctl = readl ( intel->regs + ring->reg + INTEL_xDCTL );
+	dctl |= INTEL_xDCTL_ENABLE;
+	writel ( dctl, intel->regs + ring->reg + INTEL_xDCTL );
 
 	DBGC ( intel, "INTEL %p ring %05x is at [%08llx,%08llx)\n",
 	       intel, ring->reg, ( ( unsigned long long ) address ),

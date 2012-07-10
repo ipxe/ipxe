@@ -170,6 +170,10 @@ enum intel_descriptor_status {
 /** Receive/Transmit Descriptor Tail (offset) */
 #define INTEL_xDT 0x18
 
+/** Receive/Transmit Descriptor Control (offset) */
+#define INTEL_xDCTL 0x28
+#define INTEL_xDCTL_ENABLE	0x02000000UL	/**< Queue enable */
+
 /** Receive Descriptor Head */
 #define INTEL_RDH ( INTEL_RD + INTEL_xDH )
 
