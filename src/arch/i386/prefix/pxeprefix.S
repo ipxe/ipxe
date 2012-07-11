@@ -5,6 +5,7 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define PXENV_UNDI_GET_IFACE_INFO	0x0013
 #define	PXENV_STOP_UNDI			0x0015
 #define PXENV_UNLOAD_STACK		0x0070
+#define PXENV_FILE_CMDLINE		0x00e8
 
 #define PXE_HACK_EB54			0x0001
 
@@ -381,6 +382,37 @@ get_iface_type:
 99:	movb	$0x0a, %al
 	call	print_character
 
+
+/*****************************************************************************
+ * Check for a command line
+ *****************************************************************************
+ */
+get_cmdline:
+	/* Issue PXENV_FILE_CMDLINE */
+	xorl	%esi, %esi
+	movw	%ss, %si
+	movw	%si, ( pxe_parameter_structure + 0x06 )
+	movw	$PREFIX_STACK_SIZE, ( pxe_parameter_structure + 0x04 )
+	movw	$0xffff, ( pxe_parameter_structure + 0x02 )
+	movw	$PXENV_FILE_CMDLINE, %bx
+	call	pxe_call
+	jnc	1f
+	call	print_pxe_error
+	jmp	99f
+1:	/* Check for non-NULL command line */
+	movw	( pxe_parameter_structure + 0x02 ), %ax
+	testw	%ax, %ax
+	jz	99f
+	/* Record command line */
+	shll	$4, %esi
+	addl	$PREFIX_STACK_SIZE, %esi
+	movl	%esi, pxe_cmdline
+99:
+	.section ".prefix.data", "aw", @progbits
+pxe_cmdline:
+	.long	0
+	.previous
+
 /*****************************************************************************
  * Leave NIC in a safe state
  *****************************************************************************
@@ -728,6 +760,9 @@ run_ipxe:
 	movw	pxe_ss,	%di
 	movl	pxe_esp, %ebp
 
+	/* Retrieve PXE command line, if any */
+	movl	pxe_cmdline, %esi
+
 	/* Jump to .text16 segment with %ds pointing to .data16 */
 	movw	%bx, %ds
 	pushw	%ax
@@ -737,6 +772,9 @@ run_ipxe:
 1:
 	/* Update the exit hook */
 	movw	%cs, ( pxe_exit_hook + 2 )
+
+	/* Store command-line pointer */
+	movl	%esi, cmdline_phys
 
 	/* Run main program */
 	pushl	$main
