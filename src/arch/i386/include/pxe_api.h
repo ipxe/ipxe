@@ -1690,6 +1690,27 @@ typedef struct s_PXENV_FILE_EXIT_HOOK PXENV_FILE_EXIT_HOOK_t;
 
 /** @} */ /* pxenv_file_exit_hook */
 
+/** @defgroup pxenv_file_cmdline PXENV_FILE_CMDLINE
+ *
+ * FILE CMDLINE
+ *
+ * @{
+ */
+
+/** PXE API function code for pxenv_file_cmdline() */
+#define PXENV_FILE_CMDLINE			0x00e8
+
+/** Parameter block for pxenv_file_cmdline() */
+struct s_PXENV_FILE_CMDLINE {
+	PXENV_STATUS_t Status;		/**< PXE status code */
+	UINT16_t BufferSize;		/**< Data buffer size */
+	SEGOFF16_t Buffer;		/**< Data buffer */
+} __attribute__ (( packed ));
+
+typedef struct s_PXENV_FILE_CMDLINE PXENV_FILE_CMDLINE_t;
+
+/** @} */ /* pxe_file_cmdline */
+
 /** @} */ /* pxe_file_api */
 
 /** @defgroup pxe_loader_api PXE Loader API

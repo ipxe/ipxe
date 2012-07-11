@@ -233,6 +233,42 @@ static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
 }
 
 /**
+ * FILE CMDLINE
+ *
+ * @v file_cmdline			Pointer to a struct s_PXENV_FILE_CMDLINE
+ * @v s_PXENV_FILE_CMDLINE::Buffer	Buffer to contain command line
+ * @v s_PXENV_FILE_CMDLINE::BufferSize	Size of buffer
+ * @ret #PXENV_EXIT_SUCCESS		Command was executed successfully
+ * @ret #PXENV_EXIT_FAILURE		Command was not executed successfully
+ * @ret s_PXENV_FILE_EXEC::Status	PXE status code
+ * @ret s_PXENV_FILE_EXEC::BufferSize	Length of command line (including NUL)
+ *
+ */
+static PXENV_EXIT_t
+pxenv_file_cmdline ( struct s_PXENV_FILE_CMDLINE *file_cmdline ) {
+	userptr_t buffer;
+	size_t max_len;
+	size_t len;
+
+	DBG ( "PXENV_FILE_CMDLINE to %04x:%04x+%04x \"%s\"\n",
+	      file_cmdline->Buffer.segment, file_cmdline->Buffer.offset,
+	      file_cmdline->BufferSize, pxe_cmdline );
+
+	buffer = real_to_user ( file_cmdline->Buffer.segment,
+				file_cmdline->Buffer.offset );
+	len = file_cmdline->BufferSize;
+	max_len = ( pxe_cmdline ?
+		    ( strlen ( pxe_cmdline ) + 1 /* NUL */ ) : 0 );
+	if ( len > max_len )
+		len = max_len;
+	copy_to_user ( buffer, 0, pxe_cmdline, len );
+	file_cmdline->BufferSize = max_len;
+
+	file_cmdline->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
+}
+
+/**
  * FILE API CHECK
  *
  * @v file_exec				Pointer to a struct s_PXENV_FILE_API_CHECK
@@ -298,6 +334,8 @@ struct pxe_api_call pxe_file_api[] __pxe_api_call = {
 		       struct s_PXENV_GET_FILE_SIZE ),
 	PXE_API_CALL ( PXENV_FILE_EXEC, pxenv_file_exec,
 		       struct s_PXENV_FILE_EXEC ),
+	PXE_API_CALL ( PXENV_FILE_CMDLINE, pxenv_file_cmdline,
+		       struct s_PXENV_FILE_CMDLINE ),
 	PXE_API_CALL ( PXENV_FILE_API_CHECK, pxenv_file_api_check,
 		       struct s_PXENV_FILE_API_CHECK ),
 };

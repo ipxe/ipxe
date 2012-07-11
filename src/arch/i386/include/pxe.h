@@ -188,6 +188,7 @@ struct pcir_header {
 	( ( 'P' << 0 ) + ( 'C' << 8 ) + ( 'I' << 16 ) + ( 'R' << 24 ) )
 
 extern struct net_device *pxe_netdev;
+extern const char *pxe_cmdline;
 
 extern void pxe_set_netdev ( struct net_device *netdev );
 extern PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE

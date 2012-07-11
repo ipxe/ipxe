@@ -35,6 +35,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "PXE", DHCP_EB_FEATURE_PXE, 1 );
 
+/** PXE command line */
+const char *pxe_cmdline;
+
 /**
  * Execute PXE image
  *
@@ -66,8 +69,14 @@ static int pxe_exec ( struct image *image ) {
 	/* Activate PXE */
 	pxe_activate ( netdev );
 
+	/* Set PXE command line */
+	pxe_cmdline = image->cmdline;
+
 	/* Start PXE NBP */
 	rc = pxe_start_nbp();
+
+	/* Clear PXE command line */
+	pxe_cmdline = NULL;
 
 	/* Deactivate PXE */
 	pxe_deactivate();
