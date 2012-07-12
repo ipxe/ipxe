@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/dhcp.h>
 #include <ipxe/uuid.h>
 #include <ipxe/uri.h>
+#include <ipxe/init.h>
 #include <ipxe/settings.h>
 
 /** @file
@@ -1892,4 +1893,123 @@ struct setting priority_setting __setting ( SETTING_MISC ) = {
 	.description = "Settings priority",
 	.tag = DHCP_EB_PRIORITY,
 	.type = &setting_type_int8,
+};
+
+/******************************************************************************
+ *
+ * Built-in settings block
+ *
+ ******************************************************************************
+ */
+
+/** Built-in setting tag magic */
+#define BUILTIN_SETTING_TAG_MAGIC 0xb1
+
+/**
+ * Construct built-in setting tag
+ *
+ * @v id		Unique identifier
+ * @ret tag		Setting tag
+ */
+#define BUILTIN_SETTING_TAG( id ) ( ( BUILTIN_SETTING_TAG_MAGIC << 24 ) | (id) )
+
+/** "errno" setting tag */
+#define BUILTIN_SETTING_TAG_ERRNO BUILTIN_SETTING_TAG ( 0x01 )
+
+/** Error number setting */
+struct setting errno_setting __setting ( SETTING_MISC ) = {
+	.name = "errno",
+	.description = "Last error",
+	.tag = BUILTIN_SETTING_TAG_ERRNO,
+	.type = &setting_type_uint32,
+};
+
+/**
+ * Fetch error number setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+static int errno_fetch ( struct settings *settings __unused,
+			 struct setting *setting __unused,
+			 void *data, size_t len ) {
+	uint32_t content;
+
+	/* Return current error */
+	content = htonl ( errno );
+	if ( len > sizeof ( content ) )
+		len = sizeof ( content );
+	memcpy ( data, &content, len );
+	return sizeof ( content );
+}
+
+/**
+ * Fetch built-in setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+static int builtin_fetch ( struct settings *settings __unused,
+			   struct setting *setting,
+			   void *data, size_t len ) {
+
+	if ( setting_cmp ( setting, &errno_setting ) == 0 ) {
+		return errno_fetch ( settings, setting, data, len );
+	} else {
+		return -ENOENT;
+	}
+}
+
+/**
+ * Check applicability of built-in setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @ret applies		Setting applies within this settings block
+ */
+static int builtin_applies ( struct settings *settings __unused,
+			     struct setting *setting ) {
+	unsigned int tag_magic;
+
+	/* Check tag magic */
+	tag_magic = ( setting->tag >> 24 );
+	return ( tag_magic == BUILTIN_SETTING_TAG_MAGIC );
+}
+
+/** Built-in settings operations */
+static struct settings_operations builtin_settings_operations = {
+	.applies = builtin_applies,
+	.fetch = builtin_fetch,
+};
+
+/** Built-in settings */
+static struct settings builtin_settings = {
+	.refcnt = NULL,
+	.tag_magic = BUILTIN_SETTING_TAG ( 0 ),
+	.siblings = LIST_HEAD_INIT ( builtin_settings.siblings ),
+	.children = LIST_HEAD_INIT ( builtin_settings.children ),
+	.op = &builtin_settings_operations,
+};
+
+/** Initialise built-in settings */
+static void builtin_init ( void ) {
+	int rc;
+
+	if ( ( rc = register_settings ( &builtin_settings, NULL,
+					"builtin" ) ) != 0 ) {
+		DBG ( "Could not register built-in settings: %s\n",
+		      strerror ( rc ) );
+		return;
+	}
+}
+
+/** Built-in settings initialiser */
+struct init_fn builtin_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = builtin_init,
 };
