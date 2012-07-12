@@ -65,6 +65,7 @@ static int pxe_exec ( struct image *image ) {
 		       image );
 		return -ENODEV;
 	}
+	netdev_get ( netdev );
 
 	/* Activate PXE */
 	pxe_activate ( netdev );
@@ -80,6 +81,12 @@ static int pxe_exec ( struct image *image ) {
 
 	/* Deactivate PXE */
 	pxe_deactivate();
+
+	/* Try to reopen network device.  Ignore errors, since the NBP
+	 * may have called PXENV_STOP_UNDI.
+	 */
+	netdev_open ( netdev );
+	netdev_put ( netdev );
 
 	return rc;
 }
