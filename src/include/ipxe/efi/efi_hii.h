@@ -137,4 +137,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	},								   \
 	}
 
+/** GUID indicating formset compliance for IBM Unified Configuration Manager */
+#define EFI_HII_IBM_UCM_COMPLIANT_FORMSET_GUID				   \
+	{ 0x5c8e9746, 0xa5f7, 0x4593,					   \
+	  { 0xaf, 0x1f, 0x66, 0xa8, 0x2a, 0xa1, 0x9c, 0xb1 } }
+
 #endif /* _IPXE_EFI_HII_H */

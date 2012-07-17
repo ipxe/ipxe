@@ -805,7 +805,7 @@ enum efi_snp_hii_string_id {
 /** EFI SNP formset */
 struct efi_snp_formset {
 	EFI_HII_PACKAGE_HEADER Header;
-	EFI_IFR_FORM_SET_TYPE(1) FormSet;
+	EFI_IFR_FORM_SET_TYPE(2) FormSet;
 	EFI_IFR_GUID_CLASS Class;
 	EFI_IFR_GUID_SUBCLASS SubClass;
 	EFI_IFR_FORM Form;
@@ -824,7 +824,8 @@ struct efi_snp_formset {
 				      EFI_SNP_FORMSET_TITLE,
 				      EFI_SNP_FORMSET_HELP,
 				      typeof ( efi_snp_formset.FormSet ),
-				      EFI_HII_PLATFORM_SETUP_FORMSET_GUID ),
+				      EFI_HII_PLATFORM_SETUP_FORMSET_GUID,
+				      EFI_HII_IBM_UCM_COMPLIANT_FORMSET_GUID ),
 	.Class = EFI_IFR_GUID_CLASS ( EFI_NETWORK_DEVICE_CLASS ),
 	.SubClass = EFI_IFR_GUID_SUBCLASS ( 0x03 ),
 	.Form = EFI_IFR_FORM ( EFI_SNP_FORM, EFI_SNP_FORMSET_TITLE ),
