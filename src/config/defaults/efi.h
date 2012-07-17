@@ -8,7 +8,7 @@
  */
 
 #define UACCESS_EFI
-#define IOAPI_EFI
+#define IOAPI_X86
 #define PCIAPI_EFI
 #define CONSOLE_EFI
 #define TIMER_EFI
