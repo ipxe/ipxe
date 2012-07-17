@@ -78,23 +78,20 @@ static inline void bflush(const struct b44_private *bp, u32 reg, u32 timeout)
 
 
 /**
- * Return non-zero if the installed RAM is within
- * the limit given and zero if it is outside.
- * Hopefully will be removed soon.
+ * Check if card can access address
+ *
+ * @v address		Virtual address
+ * @v address_ok	Card can access address
  */
-int phys_ram_within_limit(u64 limit)
-{
-	struct memory_map memmap;
-	struct memory_region *highest = NULL;
-	get_memmap(&memmap);
+static inline __attribute__ (( always_inline )) int
+b44_address_ok ( void *address ) {
 
-	if (memmap.count == 0)
-		return 0;
-	highest = &memmap.regions[memmap.count - 1];
+	/* Card can address anything with a 30-bit address */
+	if ( ( virt_to_bus ( address ) & ~B44_30BIT_DMA_MASK ) == 0 )
+		return 1;
 
-	return (highest->end < limit);
+	return 0;
 }
-
 
 /**
  * Ring cells waiting to be processed are between 'tx_cur' and 'pending'
@@ -404,6 +401,7 @@ static void b44_populate_rx_descriptor(struct b44_private *bp, u32 idx)
  */
 static void b44_rx_refill(struct b44_private *bp, u32 pending)
 {
+	struct io_buffer *iobuf;
 	u32 i;
 
 	// skip pending
@@ -411,11 +409,17 @@ static void b44_rx_refill(struct b44_private *bp, u32 pending)
 		if (bp->rx_iobuf[i] != NULL)
 			continue;
 
-		bp->rx_iobuf[i] = alloc_iob(RX_PKT_BUF_SZ);
-		if (!bp->rx_iobuf[i]) {
+		iobuf = alloc_iob(RX_PKT_BUF_SZ);
+		if (!iobuf) {
 			DBG("Refill rx ring failed!!\n");
 			break;
 		}
+		if (!b44_address_ok(iobuf->data)) {
+			DBG("Refill rx ring bad address!!\n");
+			free_iob(iobuf);
+			break;
+		}
+		bp->rx_iobuf[i] = iobuf;
 
 		b44_populate_rx_descriptor(bp, i);
 	}
@@ -444,6 +448,10 @@ static int b44_init_rx_ring(struct b44_private *bp)
 	bp->rx = malloc_dma(B44_RX_RING_LEN_BYTES, B44_DMA_ALIGNMENT);
 	if (!bp->rx)
 		return -ENOMEM;
+	if (!b44_address_ok(bp->rx)) {
+		free_dma(bp->rx, B44_RX_RING_LEN_BYTES);
+		return -ENOTSUP;
+	}
 
 	memset(bp->rx_iobuf, 0, sizeof(bp->rx_iobuf));
 
@@ -472,6 +480,10 @@ static int b44_init_tx_ring(struct b44_private *bp)
 	bp->tx = malloc_dma(B44_TX_RING_LEN_BYTES, B44_DMA_ALIGNMENT);
 	if (!bp->tx)
 		return -ENOMEM;
+	if (!b44_address_ok(bp->tx)) {
+		free_dma(bp->tx, B44_TX_RING_LEN_BYTES);
+		return -ENOTSUP;
+	}
 
 	memset(bp->tx, 0, B44_TX_RING_LEN_BYTES);
 	memset(bp->tx_iobuf, 0, sizeof(bp->tx_iobuf));
@@ -644,17 +656,6 @@ static int b44_probe(struct pci_device *pci)
 	struct b44_private *bp;
 	int rc;
 
-	/*
-	 * Bail out if more than 1GB of physical RAM is installed.
-	 * This limitation will be removed later when dma mapping
-	 * is merged into mainline.
-	 */
-	if (!phys_ram_within_limit(B44_30BIT_DMA_MASK)) {
-		DBG("Sorry, this version of the driver does not\n"
-		    "support systems with more than 1GB of RAM.\n");
-		return -ENOMEM;
-	}
-
 	/* Set up netdev */
 	netdev = alloc_etherdev(sizeof(*bp));
 	if (!netdev)
@@ -792,6 +793,10 @@ static int b44_transmit(struct net_device *netdev, struct io_buffer *iobuf)
 		DBG("tx overflow\n");
 		return -ENOBUFS;
 	}
+
+	/* Check for addressability */
+	if (!b44_address_ok(iobuf->data))
+		return -ENOTSUP;
 
 	/* Will call netdev_tx_complete() on the iobuf later */
 	bp->tx_iobuf[cur] = iobuf;
