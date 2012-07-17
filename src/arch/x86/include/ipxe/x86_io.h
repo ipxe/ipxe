@@ -5,14 +5,14 @@
  *
  * iPXE I/O API for x86
  *
- * i386 uses direct pointer dereferences for accesses to memory-mapped
+ * x86 uses direct pointer dereferences for accesses to memory-mapped
  * I/O space, and the inX/outX instructions for accesses to
  * port-mapped I/O space.
  *
- * 64-bit atomic accesses (readq() and writeq()) use MMX instructions,
- * and will crash original Pentium and earlier CPUs.  Fortunately, no
- * hardware that requires atomic 64-bit accesses will physically fit
- * into a machine with such an old CPU anyway.
+ * 64-bit atomic accesses (readq() and writeq()) use MMX instructions
+ * under i386, and will crash original Pentium and earlier CPUs.
+ * Fortunately, no hardware that requires atomic 64-bit accesses will
+ * physically fit into a machine with such an old CPU anyway.
  */
 
 FILE_LICENCE ( GPL2_OR_LATER );
@@ -59,7 +59,7 @@ IOAPI_INLINE ( x86, io_to_bus ) ( volatile const void *io_addr ) {
 }
 
 /*
- * MMIO reads and writes up to 32 bits
+ * MMIO reads and writes up to native word size
  *
  */
 
@@ -71,6 +71,9 @@ IOAPI_INLINE ( x86, _api_func ) ( volatile _type *io_addr ) {		      \
 X86_READX ( readb, uint8_t );
 X86_READX ( readw, uint16_t );
 X86_READX ( readl, uint32_t );
+#ifdef __x86_64__
+X86_READX ( readq, uint64_t );
+#endif
 
 #define X86_WRITEX( _api_func, _type )					      \
 static inline __always_inline void					      \
@@ -81,6 +84,9 @@ IOAPI_INLINE ( x86, _api_func ) ( _type data,				      \
 X86_WRITEX ( writeb, uint8_t );
 X86_WRITEX ( writew, uint16_t );
 X86_WRITEX ( writel, uint32_t );
+#ifdef __x86_64__
+X86_WRITEX ( writeq, uint64_t );
+#endif
 
 /*
  * PIO reads and writes up to 32 bits

@@ -3,7 +3,7 @@
 
 /** @file
  *
- * i386-specific I/O API implementations
+ * x86-specific I/O API implementations
  *
  */
 
