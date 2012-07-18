@@ -396,10 +396,8 @@ get_cmdline:
 	movw	$0xffff, ( pxe_parameter_structure + 0x02 )
 	movw	$PXENV_FILE_CMDLINE, %bx
 	call	pxe_call
-	jnc	1f
-	call	print_pxe_error
-	jmp	99f
-1:	/* Check for non-NULL command line */
+	jc	99f  /* Suppress errors; this is an iPXE extension API call */
+	/* Check for non-NULL command line */
 	movw	( pxe_parameter_structure + 0x02 ), %ax
 	testw	%ax, %ax
 	jz	99f
