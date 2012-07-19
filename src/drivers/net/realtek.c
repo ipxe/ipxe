@@ -987,6 +987,7 @@ static int realtek_probe ( struct pci_device *pci ) {
  err_nvs_read:
 	realtek_reset ( rtl );
  err_reset:
+	iounmap ( rtl->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
@@ -1013,6 +1014,7 @@ static void realtek_remove ( struct pci_device *pci ) {
 	realtek_reset ( rtl );
 
 	/* Free network device */
+	iounmap ( rtl->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
