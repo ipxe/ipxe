@@ -26,5 +26,6 @@ FILE_LICENCE ( GPL2_ONLY );
 #define __WCHAR_TYPE__ long int
 #endif
 typedef __WCHAR_TYPE__ wchar_t;
+typedef __WINT_TYPE__ wint_t;
 
 #endif /* STDDEF_H */

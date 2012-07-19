@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdarg.h>
 #include <stdio.h>
 #include <errno.h>
+#include <wchar.h>
 #include <ipxe/vsprintf.h>
 
 /** @file */
@@ -185,6 +186,7 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 	char *ptr;
 	char tmp_buf[32]; /* 32 is enough for all numerical formats.
 			   * Insane width fields could overflow this buffer. */
+	wchar_t *wptr;
 
 	/* Initialise context */
 	ctx->len = 0;
@@ -234,11 +236,26 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 		/* Process conversion specifier */
 		ptr = tmp_buf + sizeof ( tmp_buf ) - 1;
 		*ptr = '\0';
+		wptr = NULL;
 		if ( *fmt == 'c' ) {
-			cputchar ( ctx, va_arg ( args, unsigned int ) );
+			if ( length < &type_sizes[LONG_LEN] ) {
+				cputchar ( ctx, va_arg ( args, unsigned int ) );
+			} else {
+				wchar_t wc;
+				size_t len;
+
+				wc = va_arg ( args, wint_t );
+				len = wcrtomb ( tmp_buf, wc, NULL );
+				tmp_buf[len] = '\0';
+				ptr = tmp_buf;
+			}
 		} else if ( *fmt == 's' ) {
-			ptr = va_arg ( args, char * );
-			if ( ! ptr )
+			if ( length < &type_sizes[LONG_LEN] ) {
+				ptr = va_arg ( args, char * );
+			} else {
+				wptr = va_arg ( args, wchar_t * );
+			}
+			if ( ( ptr == NULL ) && ( wptr == NULL ) )
 				ptr = "<NULL>";
 		} else if ( *fmt == 'p' ) {
 			intptr_t ptrval;
@@ -271,8 +288,17 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 			*(--ptr) = *fmt;
 		}
 		/* Write out conversion result */
-		for ( ; *ptr ; ptr++ ) {
-			cputchar ( ctx, *ptr );
+		if ( wptr == NULL ) {
+			for ( ; *ptr ; ptr++ ) {
+				cputchar ( ctx, *ptr );
+			}
+		} else {
+			for ( ; *wptr ; wptr++ ) {
+				size_t len = wcrtomb ( tmp_buf, *wptr, NULL );
+				for ( ptr = tmp_buf ; len-- ; ptr++ ) {
+					cputchar ( ctx, *ptr );
+				}
+			}
 		}
 	}
 
