@@ -880,6 +880,7 @@ static int natsemi_probe ( struct pci_device *pci ) {
  err_hwaddr:
 	natsemi_reset ( natsemi );
  err_reset:
+	iounmap ( natsemi->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
@@ -902,6 +903,7 @@ static void natsemi_remove ( struct pci_device *pci ) {
 	natsemi_reset ( natsemi );
 
 	/* Free network device */
+	iounmap ( natsemi->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
