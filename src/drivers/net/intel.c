@@ -799,6 +799,7 @@ static int intel_probe ( struct pci_device *pci ) {
  err_fetch_mac:
 	intel_reset ( intel );
  err_reset:
+	iounmap ( intel->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
@@ -821,6 +822,7 @@ static void intel_remove ( struct pci_device *pci ) {
 	intel_reset ( intel );
 
 	/* Free network device */
+	iounmap ( intel->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
