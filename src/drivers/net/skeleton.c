@@ -268,6 +268,7 @@ static int skeleton_probe ( struct pci_device *pci ) {
  err_mii_reset:
 	skeleton_reset ( skel );
  err_reset:
+	iounmap ( skel->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
@@ -290,6 +291,7 @@ static void skeleton_remove ( struct pci_device *pci ) {
 	skeleton_reset ( skel );
 
 	/* Free network device */
+	iounmap ( skel->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
