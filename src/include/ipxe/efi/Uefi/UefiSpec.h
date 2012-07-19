@@ -5,7 +5,7 @@
   If a code construct is defined in the UEFI 2.3 specification it must be included
   by this include file.
 
-Copyright (c) 2006 - 2011, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2012, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials are licensed and made available under
 the terms and conditions of the BSD License that accompanies this distribution.
 The full text of the license may be found at
@@ -25,6 +25,7 @@ FILE_LICENCE ( BSD3 );
 
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/Protocol/SimpleTextIn.h>
+#include <ipxe/efi/Protocol/SimpleTextInEx.h>
 #include <ipxe/efi/Protocol/SimpleTextOut.h>
 
 ///
@@ -128,6 +129,7 @@ typedef struct {
   @retval EFI_INVALID_PARAMETER 1) Type is not AllocateAnyPages or
                                 AllocateMaxAddress or AllocateAddress.
                                 2) MemoryType is in the range
+                                3) Memory is NULL.
                                 EfiMaxMemoryType..0x7FFFFFFF.
   @retval EFI_OUT_OF_RESOURCES  The pages could not be allocated.
   @retval EFI_NOT_FOUND         The requested pages could not be found.
@@ -206,7 +208,7 @@ EFI_STATUS
 
   @retval EFI_SUCCESS           The requested number of bytes was allocated.
   @retval EFI_OUT_OF_RESOURCES  The pool requested could not be allocated.
-  @retval EFI_INVALID_PARAMETER PoolType was invalid.
+  @retval EFI_INVALID_PARAMETER PoolType was invalid or Buffer is NULL.
 
 **/
 typedef
@@ -277,7 +279,7 @@ EFI_STATUS
                                 2) No drivers were connected to ControllerHandle, but
                                 RemainingDevicePath is not NULL, and it is an End Device
                                 Path Node.
-  @retval EFI_INVALID_PARAMETER ControllerHandle is not a valid EFI_HANDLE.
+  @retval EFI_INVALID_PARAMETER ControllerHandle is NULL.
   @retval EFI_NOT_FOUND         1) There are no EFI_DRIVER_BINDING_PROTOCOL instances
                                 present in the system.
                                 2) No drivers were connected to ControllerHandle.
@@ -307,7 +309,7 @@ EFI_STATUS
                                 2) On entry, no drivers are managing ControllerHandle.
                                 3) DriverImageHandle is not NULL, and on entry
                                    DriverImageHandle is not managing ControllerHandle.
-  @retval EFI_INVALID_PARAMETER 1) ControllerHandle is not a valid EFI_HANDLE.
+  @retval EFI_INVALID_PARAMETER 1) ControllerHandle is NULL.
                                 2) DriverImageHandle is not NULL, and it is not a valid EFI_HANDLE.
                                 3) ChildHandle is not NULL, and it is not a valid EFI_HANDLE.
                                 4) DriverImageHandle does not support the EFI_DRIVER_BINDING_PROTOCOL.
@@ -1168,7 +1170,7 @@ EFI_STATUS
   @retval EFI_ACCESS_DENIED     The protocol interface could not be reinstalled,
                                 because OldInterface is still being used by a
                                 driver that will not release it.
-  @retval EFI_INVALID_PARAMETER Handle is not a valid EFI_HANDLE.
+  @retval EFI_INVALID_PARAMETER Handle is NULL.
   @retval EFI_INVALID_PARAMETER Protocol is NULL.
 
 **/
@@ -1194,7 +1196,7 @@ EFI_STATUS
   @retval EFI_NOT_FOUND         The interface was not found.
   @retval EFI_ACCESS_DENIED     The interface was not removed because the interface
                                 is still being used by a driver.
-  @retval EFI_INVALID_PARAMETER Handle is not a valid EFI_HANDLE.
+  @retval EFI_INVALID_PARAMETER Handle is NULL.
   @retval EFI_INVALID_PARAMETER Protocol is NULL.
 
 **/
@@ -1234,7 +1236,7 @@ EFI_STATUS
 
   @retval EFI_SUCCESS           The interface information for the specified protocol was returned.
   @retval EFI_UNSUPPORTED       The device does not support the specified protocol.
-  @retval EFI_INVALID_PARAMETER Handle is not a valid EFI_HANDLE.
+  @retval EFI_INVALID_PARAMETER Handle is NULL.
   @retval EFI_INVALID_PARAMETER Protocol is NULL.
   @retval EFI_INVALID_PARAMETER Interface is NULL.
 
@@ -1305,8 +1307,8 @@ EFI_STATUS
                                 that required the protocol interface.
 
   @retval EFI_SUCCESS           The protocol instance was closed.
-  @retval EFI_INVALID_PARAMETER 1) Handle is not a valid EFI_HANDLE.
-                                2) AgentHandle is not a valid EFI_HANDLE.
+  @retval EFI_INVALID_PARAMETER 1) Handle is NULL.
+                                2) AgentHandle is NULL.
                                 3) ControllerHandle is not NULL and ControllerHandle is not a valid EFI_HANDLE.
                                 4) Protocol is NULL.
   @retval EFI_NOT_FOUND         1) Handle does not support the protocol specified by Protocol.
@@ -1493,7 +1495,7 @@ EFI_STATUS
 
   @retval EFI_SUCCESS           The (Guid, Table) pair was added, updated, or removed.
   @retval EFI_NOT_FOUND         An attempt was made to delete a nonexistent entry.
-  @retval EFI_INVALID_PARAMETER Guid is not valid.
+  @retval EFI_INVALID_PARAMETER Guid is NULL.
   @retval EFI_OUT_OF_RESOURCES  There is not enough memory available to complete the operation.
 
 **/
@@ -1725,16 +1727,17 @@ EFI_STATUS
 // EFI Runtime Services Table
 //
 #define EFI_SYSTEM_TABLE_SIGNATURE      SIGNATURE_64 ('I','B','I',' ','S','Y','S','T')
+#define EFI_2_31_SYSTEM_TABLE_REVISION  ((2 << 16) | (31))
 #define EFI_2_30_SYSTEM_TABLE_REVISION  ((2 << 16) | (30))
 #define EFI_2_20_SYSTEM_TABLE_REVISION  ((2 << 16) | (20))
 #define EFI_2_10_SYSTEM_TABLE_REVISION  ((2 << 16) | (10))
 #define EFI_2_00_SYSTEM_TABLE_REVISION  ((2 << 16) | (00))
 #define EFI_1_10_SYSTEM_TABLE_REVISION  ((1 << 16) | (10))
 #define EFI_1_02_SYSTEM_TABLE_REVISION  ((1 << 16) | (02))
-#define EFI_SYSTEM_TABLE_REVISION       EFI_2_30_SYSTEM_TABLE_REVISION
+#define EFI_SYSTEM_TABLE_REVISION       EFI_2_31_SYSTEM_TABLE_REVISION
 
 #define EFI_RUNTIME_SERVICES_SIGNATURE  SIGNATURE_64 ('R','U','N','T','S','E','R','V')
-#define EFI_RUNTIME_SERVICES_REVISION   EFI_2_30_SYSTEM_TABLE_REVISION
+#define EFI_RUNTIME_SERVICES_REVISION   EFI_2_31_SYSTEM_TABLE_REVISION
 
 ///
 /// EFI Runtime Services Table.
@@ -1786,7 +1789,7 @@ typedef struct {
 
 
 #define EFI_BOOT_SERVICES_SIGNATURE   SIGNATURE_64 ('B','O','O','T','S','E','R','V')
-#define EFI_BOOT_SERVICES_REVISION    EFI_2_30_SYSTEM_TABLE_REVISION
+#define EFI_BOOT_SERVICES_REVISION    EFI_2_31_SYSTEM_TABLE_REVISION
 
 ///
 /// EFI Boot Services Table.

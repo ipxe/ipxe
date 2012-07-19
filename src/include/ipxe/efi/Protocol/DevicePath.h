@@ -5,7 +5,7 @@
   from a software point of view. The path must persist from boot to boot, so
   it can not contain things like PCI bus numbers that change from boot to boot.
 
-Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2011, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials are licensed and made available under
 the terms and conditions of the BSD License that accompanies this distribution.
 The full text of the license may be found at
@@ -349,6 +349,26 @@ typedef struct {
 } FIBRECHANNEL_DEVICE_PATH;
 
 ///
+/// Fibre Channel Ex SubType.
+///
+#define MSG_FIBRECHANNELEX_DP     0x15
+typedef struct {
+  EFI_DEVICE_PATH_PROTOCOL        Header;
+  ///
+  /// Reserved for the future.
+  ///
+  UINT32                          Reserved;
+  ///
+  /// 8 byte array containing Fibre Channel End Device Port Name.
+  ///
+  UINT8                           WWN[8];
+  ///
+  /// 8 byte array containing Fibre Channel Logical Unit Number.
+  ///
+  UINT8                           Lun[8];
+} FIBRECHANNELEX_DEVICE_PATH;
+
+///
 /// 1394 Device Path SubType
 ///
 #define MSG_1394_DP               0x04
@@ -543,6 +563,14 @@ typedef struct {
   /// 0x01 - The Source IP Address is statically bound.
   ///
   BOOLEAN                         StaticIpAddress;
+  ///
+  /// The gateway IP address
+  ///
+  EFI_IPv4_ADDRESS                GatewayIpAddress;
+  ///
+  /// The subnet mask
+  ///
+  EFI_IPv4_ADDRESS                SubnetMask;
 } IPv4_DEVICE_PATH;
 
 ///
@@ -572,10 +600,21 @@ typedef struct {
   ///
   UINT16                          Protocol;
   ///
-  /// 0x00 - The Source IP Address was assigned though DHCP.
-  /// 0x01 - The Source IP Address is statically bound.
+  /// 0x00 - The Local IP Address was manually configured.
+  /// 0x01 - The Local IP Address is assigned through IPv6
+  /// stateless auto-configuration.
+  /// 0x02 - The Local IP Address is assigned through IPv6
+  /// stateful configuration.
   ///
-  BOOLEAN                         StaticIpAddress;
+  UINT8                           IpAddressOrigin;
+  ///
+  /// The prefix length
+  ///
+  UINT8                           PrefixLength;
+  ///
+  /// The gateway IP address
+  ///
+  EFI_IPv6_ADDRESS                GatewayIpAddress;
 } IPv6_DEVICE_PATH;
 
 ///
@@ -692,9 +731,9 @@ typedef struct {
 #define UART_FLOW_CONTROL_HARDWARE         0x00000001
 #define UART_FLOW_CONTROL_XON_XOFF         0x00000010
 
-#define DEVICE_PATH_MESSAGING_SAS                 EFI_SAS_DEVICE_PATH_GUID
+#define DEVICE_PATH_MESSAGING_SAS          EFI_SAS_DEVICE_PATH_GUID
 ///
-/// Serial Attached SCSI (SAS) devices.
+/// Serial Attached SCSI (SAS) Device Path.
 ///
 typedef struct {
   EFI_DEVICE_PATH_PROTOCOL        Header;
@@ -723,6 +762,30 @@ typedef struct {
   ///
   UINT16                          RelativeTargetPort;
 } SAS_DEVICE_PATH;
+
+///
+/// Serial Attached SCSI (SAS) Ex Device Path SubType
+///
+#define MSG_SASEX_DP              0x16
+typedef struct {
+  EFI_DEVICE_PATH_PROTOCOL        Header;
+  ///
+  /// 8-byte array of the SAS Address for Serial Attached SCSI Target Port.
+  ///
+  UINT8                           SasAddress[8];
+  ///
+  /// 8-byte array of the SAS Logical Unit Number.
+  ///
+  UINT8                           Lun[8];
+  ///
+  /// More Information about the device and its interconnect.
+  ///
+  UINT16                          DeviceTopology;
+  ///
+  /// Relative Target Port (RTP).
+  ///
+  UINT16                          RelativeTargetPort;
+} SASEX_DEVICE_PATH;
 
 ///
 /// iSCSI Device Path SubType
@@ -897,7 +960,7 @@ typedef struct {
 } MEDIA_PROTOCOL_DEVICE_PATH;
 
 ///
-/// PIWG Firmware Volume Device Path SubType.
+/// PIWG Firmware File SubType.
 ///
 #define MEDIA_PIWG_FW_FILE_DP     0x06
 
@@ -967,7 +1030,7 @@ typedef struct {
   ///
   UINT16                          StatusFlag;
   ///
-  /// ASCIIZ string that describes the boot device to a user.
+  /// Null-terminated ASCII string that describes the boot device to a user.
   ///
   CHAR8                           String[1];
 } BBS_BBS_DEVICE_PATH;
@@ -989,78 +1052,100 @@ typedef struct {
 /// Union of all possible Device Paths and pointers to Device Paths.
 ///
 typedef union {
-  EFI_DEVICE_PATH_PROTOCOL             DevPath;
-  PCI_DEVICE_PATH                      Pci;
-  PCCARD_DEVICE_PATH                   PcCard;
-  MEMMAP_DEVICE_PATH                   MemMap;
-  VENDOR_DEVICE_PATH                   Vendor;
+  EFI_DEVICE_PATH_PROTOCOL                   DevPath;
+  PCI_DEVICE_PATH                            Pci;
+  PCCARD_DEVICE_PATH                         PcCard;
+  MEMMAP_DEVICE_PATH                         MemMap;
+  VENDOR_DEVICE_PATH                         Vendor;
 
-  CONTROLLER_DEVICE_PATH               Controller;
-  ACPI_HID_DEVICE_PATH                 Acpi;
+  CONTROLLER_DEVICE_PATH                     Controller;
+  ACPI_HID_DEVICE_PATH                       Acpi;
+  ACPI_EXTENDED_HID_DEVICE_PATH              ExtendedAcpi;
+  ACPI_ADR_DEVICE_PATH                       AcpiAdr;
 
-  ATAPI_DEVICE_PATH                    Atapi;
-  SCSI_DEVICE_PATH                     Scsi;
-  ISCSI_DEVICE_PATH                    Iscsi;
-  FIBRECHANNEL_DEVICE_PATH             FibreChannel;
+  ATAPI_DEVICE_PATH                          Atapi;
+  SCSI_DEVICE_PATH                           Scsi;
+  ISCSI_DEVICE_PATH                          Iscsi;
+  FIBRECHANNEL_DEVICE_PATH                   FibreChannel;
+  FIBRECHANNELEX_DEVICE_PATH                 FibreChannelEx;
 
-  F1394_DEVICE_PATH                    F1394;
-  USB_DEVICE_PATH                      Usb;
-  SATA_DEVICE_PATH                     Sata;
-  USB_CLASS_DEVICE_PATH                UsbClass;
-  I2O_DEVICE_PATH                      I2O;
-  MAC_ADDR_DEVICE_PATH                 MacAddr;
-  IPv4_DEVICE_PATH                     Ipv4;
-  IPv6_DEVICE_PATH                     Ipv6;
-  INFINIBAND_DEVICE_PATH               InfiniBand;
-  UART_DEVICE_PATH                     Uart;
+  F1394_DEVICE_PATH                          F1394;
+  USB_DEVICE_PATH                            Usb;
+  SATA_DEVICE_PATH                           Sata;
+  USB_CLASS_DEVICE_PATH                      UsbClass;
+  USB_WWID_DEVICE_PATH                       UsbWwid;
+  DEVICE_LOGICAL_UNIT_DEVICE_PATH            LogicUnit;
+  I2O_DEVICE_PATH                            I2O;
+  MAC_ADDR_DEVICE_PATH                       MacAddr;
+  IPv4_DEVICE_PATH                           Ipv4;
+  IPv6_DEVICE_PATH                           Ipv6;
+  VLAN_DEVICE_PATH                           Vlan;
+  INFINIBAND_DEVICE_PATH                     InfiniBand;
+  UART_DEVICE_PATH                           Uart;
+  UART_FLOW_CONTROL_DEVICE_PATH              UartFlowControl;
+  SAS_DEVICE_PATH                            Sas;
+  SASEX_DEVICE_PATH                          SasEx;
+  HARDDRIVE_DEVICE_PATH                      HardDrive;
+  CDROM_DEVICE_PATH                          CD;
 
-  HARDDRIVE_DEVICE_PATH                HardDrive;
-  CDROM_DEVICE_PATH                    CD;
+  FILEPATH_DEVICE_PATH                       FilePath;
+  MEDIA_PROTOCOL_DEVICE_PATH                 MediaProtocol;
 
-  FILEPATH_DEVICE_PATH                 FilePath;
-  MEDIA_PROTOCOL_DEVICE_PATH           MediaProtocol;
-  MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH Offset;
+  MEDIA_FW_VOL_DEVICE_PATH                   FirmwareVolume;
+  MEDIA_FW_VOL_FILEPATH_DEVICE_PATH          FirmwareFile;
+  MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH    Offset;
 
-  BBS_BBS_DEVICE_PATH                  Bbs;
+  BBS_BBS_DEVICE_PATH                        Bbs;
 } EFI_DEV_PATH;
 
 
 
 typedef union {
-  EFI_DEVICE_PATH_PROTOCOL             *DevPath;
-  PCI_DEVICE_PATH                      *Pci;
-  PCCARD_DEVICE_PATH                   *PcCard;
-  MEMMAP_DEVICE_PATH                   *MemMap;
-  VENDOR_DEVICE_PATH                   *Vendor;
+  EFI_DEVICE_PATH_PROTOCOL                   *DevPath;
+  PCI_DEVICE_PATH                            *Pci;
+  PCCARD_DEVICE_PATH                         *PcCard;
+  MEMMAP_DEVICE_PATH                         *MemMap;
+  VENDOR_DEVICE_PATH                         *Vendor;
 
-  CONTROLLER_DEVICE_PATH               *Controller;
-  ACPI_HID_DEVICE_PATH                 *Acpi;
-  ACPI_EXTENDED_HID_DEVICE_PATH        *ExtendedAcpi;
+  CONTROLLER_DEVICE_PATH                     *Controller;
+  ACPI_HID_DEVICE_PATH                       *Acpi;
+  ACPI_EXTENDED_HID_DEVICE_PATH              *ExtendedAcpi;
+  ACPI_ADR_DEVICE_PATH                       *AcpiAdr;
 
-  ATAPI_DEVICE_PATH                    *Atapi;
-  SCSI_DEVICE_PATH                     *Scsi;
-  FIBRECHANNEL_DEVICE_PATH             *FibreChannel;
+  ATAPI_DEVICE_PATH                          *Atapi;
+  SCSI_DEVICE_PATH                           *Scsi;
+  ISCSI_DEVICE_PATH                          *Iscsi;
+  FIBRECHANNEL_DEVICE_PATH                   *FibreChannel;
+  FIBRECHANNELEX_DEVICE_PATH                 *FibreChannelEx;
 
-  F1394_DEVICE_PATH                    *F1394;
-  USB_DEVICE_PATH                      *Usb;
-  SATA_DEVICE_PATH                     *Sata;
-  USB_CLASS_DEVICE_PATH                *UsbClass;
-  I2O_DEVICE_PATH                      *I2O;
-  MAC_ADDR_DEVICE_PATH                 *MacAddr;
-  IPv4_DEVICE_PATH                     *Ipv4;
-  IPv6_DEVICE_PATH                     *Ipv6;
-  INFINIBAND_DEVICE_PATH               *InfiniBand;
-  UART_DEVICE_PATH                     *Uart;
+  F1394_DEVICE_PATH                          *F1394;
+  USB_DEVICE_PATH                            *Usb;
+  SATA_DEVICE_PATH                           *Sata;
+  USB_CLASS_DEVICE_PATH                      *UsbClass;
+  USB_WWID_DEVICE_PATH                       *UsbWwid;
+  DEVICE_LOGICAL_UNIT_DEVICE_PATH            *LogicUnit;
+  I2O_DEVICE_PATH                            *I2O;
+  MAC_ADDR_DEVICE_PATH                       *MacAddr;
+  IPv4_DEVICE_PATH                           *Ipv4;
+  IPv6_DEVICE_PATH                           *Ipv6;
+  VLAN_DEVICE_PATH                           *Vlan;
+  INFINIBAND_DEVICE_PATH                     *InfiniBand;
+  UART_DEVICE_PATH                           *Uart;
+  UART_FLOW_CONTROL_DEVICE_PATH              *UartFlowControl;
+  SAS_DEVICE_PATH                            *Sas;
+  SASEX_DEVICE_PATH                          *SasEx;
+  HARDDRIVE_DEVICE_PATH                      *HardDrive;
+  CDROM_DEVICE_PATH                          *CD;
 
-  HARDDRIVE_DEVICE_PATH                *HardDrive;
-  CDROM_DEVICE_PATH                    *CD;
+  FILEPATH_DEVICE_PATH                       *FilePath;
+  MEDIA_PROTOCOL_DEVICE_PATH                 *MediaProtocol;
 
-  FILEPATH_DEVICE_PATH                 *FilePath;
-  MEDIA_PROTOCOL_DEVICE_PATH           *MediaProtocol;
-  MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH *Offset;
+  MEDIA_FW_VOL_DEVICE_PATH                   *FirmwareVolume;
+  MEDIA_FW_VOL_FILEPATH_DEVICE_PATH          *FirmwareFile;
+  MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH    *Offset;
 
-  BBS_BBS_DEVICE_PATH                  *Bbs;
-  UINT8                                *Raw;
+  BBS_BBS_DEVICE_PATH                        *Bbs;
+  UINT8                                      *Raw;
 } EFI_DEV_PATH_PTR;
 
 #pragma pack()

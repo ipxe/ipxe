@@ -11,7 +11,7 @@
   WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
   @par Revision Reference:
-  PI Version 1.2B
+  PI Version 1.2C
 
 **/
 
@@ -75,7 +75,7 @@ typedef UINT32  EFI_FVB_ATTRIBUTES_2;
 #define EFI_FVB2_ALIGNMENT_64K      0x00100000
 #define EFI_FVB2_ALIGNMENT_128K     0x00110000
 #define EFI_FVB2_ALIGNMENT_256K     0x00120000
-#define EFI_FVB2_ALIGNMNET_512K     0x00130000
+#define EFI_FVB2_ALIGNMENT_512K     0x00130000
 #define EFI_FVB2_ALIGNMENT_1M       0x00140000
 #define EFI_FVB2_ALIGNMENT_2M       0x00150000
 #define EFI_FVB2_ALIGNMENT_4M       0x00160000
@@ -207,13 +207,15 @@ typedef struct {
   ///
   /// An array of GUIDs, each GUID representing an OEM file type.
   ///
-  EFI_GUID  Types[1];
+  /// EFI_GUID  Types[1];
+  ///
 } EFI_FIRMWARE_VOLUME_EXT_ENTRY_OEM_TYPE;
 
 #define EFI_FV_EXT_TYPE_GUID_TYPE 0x0002
 
 ///
-/// This extension header provides a mapping between a GUID and an OEM file type.
+/// This extension header EFI_FIRMWARE_VOLUME_EXT_ENTRY_GUID_TYPE provides a vendor specific
+/// GUID FormatType type which includes a length and a successive series of data bytes.
 ///
 typedef struct {
   ///
@@ -227,7 +229,8 @@ typedef struct {
   ///
   /// An arry of bytes of length Length.
   ///
-  UINT8                             Data[1];
+  /// UINT8                             Data[1];
+  ///
 } EFI_FIRMWARE_VOLUME_EXT_ENTRY_GUID_TYPE;
 
 #endif

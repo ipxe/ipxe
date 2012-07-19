@@ -3,7 +3,7 @@
   IFR is primarily consumed by the EFI presentation engine, and produced by EFI
   internal application and drivers as well as all add-in card option-ROM drivers
 
-Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2012, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials are licensed and made available under
 the terms and conditions of the BSD License that accompanies this distribution.
 The full text of the license may be found at
@@ -660,6 +660,13 @@ typedef struct {
   UINT8  Day;
 } EFI_HII_DATE;
 
+typedef struct {
+  EFI_QUESTION_ID QuestionId;
+  EFI_FORM_ID     FormId;
+  EFI_GUID        FormSetGuid;
+  EFI_STRING_ID   DevicePath;
+} EFI_HII_REF;
+
 typedef union {
   UINT8           u8;
   UINT16          u16;
@@ -669,7 +676,8 @@ typedef union {
   EFI_HII_TIME    time;
   EFI_HII_DATE    date;
   EFI_STRING_ID   string; ///< EFI_IFR_TYPE_STRING, EFI_IFR_TYPE_ACTION
-  // UINT8 buffer[];      ///< EFI_IFR_TYPE_ORDERED_LIST
+  EFI_HII_REF     ref;    ///< EFI_IFR_TYPE_REF
+  // UINT8 buffer[];      ///< EFI_IFR_TYPE_BUFFER
 } EFI_IFR_TYPE_VALUE;
 
 //
@@ -694,7 +702,7 @@ typedef union {
 #define EFI_IFR_INCONSISTENT_IF_OP     0x11
 #define EFI_IFR_EQ_ID_VAL_OP           0x12
 #define EFI_IFR_EQ_ID_ID_OP            0x13
-#define EFI_IFR_EQ_ID_LIST_OP          0x14
+#define EFI_IFR_EQ_ID_VAL_LIST_OP      0x14
 #define EFI_IFR_AND_OP                 0x15
 #define EFI_IFR_OR_OP                  0x16
 #define EFI_IFR_NOT_OP                 0x17
@@ -771,6 +779,8 @@ typedef union {
 #define EFI_IFR_CATENATE_OP            0x5E
 #define EFI_IFR_GUID_OP                0x5F
 #define EFI_IFR_SECURITY_OP            0x60
+#define EFI_IFR_MODAL_TAG_OP           0x61
+#define EFI_IFR_REFRESH_ID_OP          0x62
 
 //
 // Definitions of IFR Standard Headers
@@ -843,6 +853,8 @@ typedef struct _EFI_IFR_VARSTORE_EFI {
   EFI_VARSTORE_ID          VarStoreId;
   EFI_GUID                 Guid;
   UINT32                   Attributes;
+  UINT16                   Size;
+  UINT8                    Name[1];
 } EFI_IFR_VARSTORE_EFI;
 
 typedef struct _EFI_IFR_VARSTORE_NAME_VALUE {
@@ -874,6 +886,10 @@ typedef struct _EFI_IFR_IMAGE {
   EFI_IFR_OP_HEADER        Header;
   EFI_IMAGE_ID             Id;
 } EFI_IFR_IMAGE;
+
+typedef struct _EFI_IFR_MODAL {
+  EFI_IFR_OP_HEADER        Header;
+} EFI_IFR_MODAL;
 
 typedef struct _EFI_IFR_LOCKED {
   EFI_IFR_OP_HEADER        Header;
@@ -947,6 +963,11 @@ typedef struct _EFI_IFR_REF4 {
   EFI_GUID                 FormSetId;
   EFI_STRING_ID            DevicePath;
 } EFI_IFR_REF4;
+
+typedef struct _EFI_IFR_REF5 {
+  EFI_IFR_OP_HEADER Header;
+  EFI_IFR_QUESTION_HEADER Question;
+} EFI_IFR_REF5;
 
 typedef struct _EFI_IFR_RESET_BUTTON {
   EFI_IFR_OP_HEADER        Header;
@@ -1134,6 +1155,7 @@ typedef struct _EFI_IFR_ONE_OF_OPTION {
 #define EFI_IFR_TYPE_UNDEFINED         0x09
 #define EFI_IFR_TYPE_ACTION            0x0A
 #define EFI_IFR_TYPE_BUFFER            0x0B
+#define EFI_IFR_TYPE_REF               0x0C
 
 #define EFI_IFR_OPTION_DEFAULT         0x10
 #define EFI_IFR_OPTION_DEFAULT_MFG     0x20
@@ -1143,6 +1165,11 @@ typedef struct _EFI_IFR_GUID {
   EFI_GUID                 Guid;
   //Optional Data Follows
 } EFI_IFR_GUID;
+
+typedef struct _EFI_IFR_REFRESH_ID {
+  EFI_IFR_OP_HEADER Header;
+  EFI_GUID          RefreshEventGroupId;
+} EFI_IFR_REFRESH_ID;
 
 typedef struct _EFI_IFR_DUP {
   EFI_IFR_OP_HEADER        Header;

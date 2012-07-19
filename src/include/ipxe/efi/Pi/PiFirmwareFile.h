@@ -1,7 +1,7 @@
 /** @file
   The firmware file related definitions in PI.
 
-Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2011, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials are licensed and made available under
 the terms and conditions of the BSD License that accompanies this distribution.
 The full text of the license may be found at
@@ -36,8 +36,7 @@ typedef union {
     ///
     /// If the FFS_ATTRIB_CHECKSUM (see definition below) bit of the Attributes
     /// field is set to one, the IntegrityCheck.Checksum.File field is an 8-bit
-    /// checksum of the entire file The State field and the file tail are assumed to be zero
-    /// and the checksum is calculated such that the entire file sums to zero.
+    /// checksum of the file data.
     /// If the FFS_ATTRIB_CHECKSUM bit of the Attributes field is cleared to zero,
     /// the IntegrityCheck.Checksum.File field must be initialized with a value of
     /// 0xAA. The IntegrityCheck.Checksum.File field is valid any time the
@@ -176,8 +175,17 @@ typedef struct {
   /// If FFS_ATTRIB_LARGE_FILE is set in Attributes, then ExtendedSize exists and Size must be set to zero.
   /// If FFS_ATTRIB_LARGE_FILE is not set then EFI_FFS_FILE_HEADER is used.
   ///
-  EFI_FFS_FILE_STATE        ExtendedSize;
+  UINT32                    ExtendedSize;
 } EFI_FFS_FILE_HEADER2;
+
+#define IS_FFS_FILE2(FfsFileHeaderPtr) \
+    (((((EFI_FFS_FILE_HEADER *) (UINTN) FfsFileHeaderPtr)->Attributes) & FFS_ATTRIB_LARGE_FILE) == FFS_ATTRIB_LARGE_FILE)
+
+#define FFS_FILE_SIZE(FfsFileHeaderPtr) \
+    ((UINT32) (*((UINT32 *) ((EFI_FFS_FILE_HEADER *) (UINTN) FfsFileHeaderPtr)->Size) & 0x00ffffff))
+
+#define FFS_FILE2_SIZE(FfsFileHeaderPtr) \
+    (((EFI_FFS_FILE_HEADER2 *) (UINTN) FfsFileHeaderPtr)->ExtendedSize)
 
 typedef UINT8 EFI_SECTION_TYPE;
 
@@ -473,8 +481,14 @@ typedef struct {
   CHAR16                        VersionString[1];
 } EFI_VERSION_SECTION2;
 
+#define IS_SECTION2(SectionHeaderPtr) \
+    ((UINT32) (*((UINT32 *) ((EFI_COMMON_SECTION_HEADER *) (UINTN) SectionHeaderPtr)->Size) & 0x00ffffff) == 0x00ffffff)
+
 #define SECTION_SIZE(SectionHeaderPtr) \
-    ((UINT32) (*((UINT32 *) ((EFI_COMMON_SECTION_HEADER *) SectionHeaderPtr)->Size) & 0x00ffffff))
+    ((UINT32) (*((UINT32 *) ((EFI_COMMON_SECTION_HEADER *) (UINTN) SectionHeaderPtr)->Size) & 0x00ffffff))
+
+#define SECTION2_SIZE(SectionHeaderPtr) \
+    (((EFI_COMMON_SECTION_HEADER2 *) (UINTN) SectionHeaderPtr)->ExtendedSize)
 
 #pragma pack()
 

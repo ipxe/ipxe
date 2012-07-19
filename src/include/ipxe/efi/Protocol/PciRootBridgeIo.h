@@ -5,7 +5,7 @@
   and PCI Configuration cycles on a PCI Root Bridge. It also provides services to perform
   defferent types of bus mastering DMA.
 
-  Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2006 - 2011, Intel Corporation. All rights reserved.<BR>
   This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
   which accompanies this distribution.  The full text of the license may be found at
@@ -20,6 +20,8 @@
 #define __PCI_ROOT_BRIDGE_IO_H__
 
 FILE_LICENCE ( BSD3 );
+
+#include <ipxe/efi/Library/BaseLib.h>
 
 #define EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID \
   { \
@@ -108,7 +110,11 @@ typedef enum {
 #define EFI_PCI_ATTRIBUTE_INVALID_FOR_ALLOCATE_BUFFER (~EFI_PCI_ATTRIBUTE_VALID_FOR_ALLOCATE_BUFFER)
 
 #define EFI_PCI_ADDRESS(bus, dev, func, reg) \
-    ((UINT64) ((((UINTN) bus) << 24) + (((UINTN) dev) << 16) + (((UINTN) func) << 8) + ((UINTN) reg)))
+  (UINT64) ( \
+  (((UINTN) bus) << 24) | \
+  (((UINTN) dev) << 16) | \
+  (((UINTN) func) << 8) | \
+  (((UINTN) (reg)) < 256 ? ((UINTN) (reg)) : (UINT64) (LShiftU64 ((UINT64) (reg), 32))))
 
 typedef struct {
   UINT8   Register;
