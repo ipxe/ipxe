@@ -1,3 +1,6 @@
+#ifndef _IPXE_DOWNLOAD_H
+#define _IPXE_DOWNLOAD_H
+
 /*
  * Copyright (C) 2010 VMware, Inc.  All Rights Reserved.
  *
@@ -15,9 +18,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-
-#ifndef IPXE_DOWNLOAD_H
-#define IPXE_DOWNLOAD_H
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
@@ -151,4 +151,4 @@ struct _IPXE_DOWNLOAD_PROTOCOL {
     0x3eaeaebd, 0xdecf, 0x493b, { 0x9b, 0xd1, 0xcd, 0xb2, 0xde, 0xca, 0xe7, 0x19 } \
   }
 
-#endif
+#endif /* _IPXE_DOWNLOAD_H */
