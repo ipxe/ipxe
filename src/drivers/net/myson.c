@@ -626,6 +626,7 @@ static int myson_probe ( struct pci_device *pci ) {
  err_register_netdev:
 	myson_reset ( myson );
  err_reset:
+	iounmap ( myson->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
@@ -648,6 +649,7 @@ static void myson_remove ( struct pci_device *pci ) {
 	myson_reset ( myson );
 
 	/* Free network device */
+	iounmap ( myson->regs );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
