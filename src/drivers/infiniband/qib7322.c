@@ -2062,6 +2062,9 @@ static int qib7322_ahb_read ( struct qib7322 *qib7322, unsigned int location,
 	struct QIB_7322_ahb_transaction_reg xact;
 	int rc;
 
+	/* Avoid returning uninitialised data on error */
+	*data = 0;
+
 	/* Initiate transaction */
 	memset ( &xact, 0, sizeof ( xact ) );
 	BIT_FILL_2 ( &xact,
