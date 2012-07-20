@@ -165,13 +165,17 @@ VERSION_PATCH	= 0
 EXTRAVERSION	= +
 MM_VERSION	= $(VERSION_MAJOR).$(VERSION_MINOR)
 VERSION		= $(MM_VERSION).$(VERSION_PATCH)$(EXTRAVERSION)
+GITVERSION := $(shell git describe --always --abbrev=1 --match "" 2>/dev/null)
+ifneq ($(GITVERSION),)
+VERSION		+= ($(GITVERSION))
+endif
 CFLAGS		+= -DVERSION_MAJOR=$(VERSION_MAJOR) \
 		   -DVERSION_MINOR=$(VERSION_MINOR) \
 		   -DVERSION_PATCH=$(VERSION_PATCH) \
-		   -DVERSION=\"$(VERSION)\"
+		   -DVERSION="\"$(VERSION)\""
 IDENT		= '$(@F) $(VERSION) (GPL) ipxe.org'
 version :
-	@$(ECHO) $(VERSION)
+	@$(ECHO) "$(VERSION)"
 
 ###############################################################################
 #
