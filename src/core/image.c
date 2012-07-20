@@ -327,6 +327,14 @@ int image_exec ( struct image *image ) {
 	if ( image->flags & IMAGE_AUTO_UNREGISTER )
 		unregister_image ( image );
 
+	/* Debug message for tail-recursion.  Placed here because the
+	 * image_put() may end up freeing the image.
+	 */
+	if ( replacement ) {
+		DBGC ( image, "IMAGE %s replacing self with IMAGE %s\n",
+		       image->name, replacement->name );
+	}
+
 	/* Drop temporary reference to the original image */
 	image_put ( image );
 
@@ -338,12 +346,8 @@ int image_exec ( struct image *image ) {
 	uri_put ( old_cwuri );
 
 	/* Tail-recurse into replacement image, if one exists */
-	if ( replacement ) {
-		DBGC ( image, "IMAGE <freed> replacing self with IMAGE %s\n",
-		       replacement->name );
-		if ( ( rc = image_exec ( replacement ) ) != 0 )
-			return rc;
-	}
+	if ( replacement )
+		return image_exec ( replacement );
 
 	return rc;
 }
