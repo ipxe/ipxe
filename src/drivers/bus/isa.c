@@ -46,9 +46,9 @@ static isa_probe_addr_t isa_extra_probe_addrs[] = {
 #endif
 
 #define ISA_IOADDR( driver, ioidx )					  \
-	( ( (ioidx) < 0 ) ?						  \
-	  isa_extra_probe_addrs[ (ioidx) + ISA_EXTRA_PROBE_ADDR_COUNT ] : \
-	  (driver)->probe_addrs[(ioidx)] )
+	( ( (ioidx) >= 0 ) ?						  \
+	  (driver)->probe_addrs[(ioidx)] :				  \
+	  *( isa_extra_probe_addrs + (ioidx) + ISA_EXTRA_PROBE_ADDR_COUNT ) )
 
 static void isabus_remove ( struct root_device *rootdev );
 
