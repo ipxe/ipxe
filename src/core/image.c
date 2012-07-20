@@ -194,6 +194,10 @@ int register_image ( struct image *image ) {
  */
 void unregister_image ( struct image *image ) {
 
+	/* Do nothing unless image is registered */
+	if ( ! ( image->flags & IMAGE_REGISTERED ) )
+		return;
+
 	DBGC ( image, "IMAGE %s unregistered\n", image->name );
 	list_del ( &image->list );
 	image->flags &= ~IMAGE_REGISTERED;
@@ -259,22 +263,12 @@ int image_probe ( struct image *image ) {
  */
 int image_exec ( struct image *image ) {
 	struct image *saved_current_image;
-	struct image *replacement;
+	struct image *replacement = NULL;
 	struct uri *old_cwuri;
 	int rc;
 
 	/* Sanity check */
 	assert ( image->flags & IMAGE_REGISTERED );
-
-	/* Check that this image can be selected for execution */
-	if ( ( rc = image_select ( image ) ) != 0 )
-		return rc;
-
-	/* Check that image is trusted (if applicable) */
-	if ( require_trusted_images && ! ( image->flags & IMAGE_TRUSTED ) ) {
-		DBGC ( image, "IMAGE %s is not trusted\n", image->name );
-		return -EACCES_UNTRUSTED;
-	}
 
 	/* Switch current working directory to be that of the image itself */
 	old_cwuri = uri_get ( cwuri );
@@ -288,6 +282,17 @@ int image_exec ( struct image *image ) {
 	 * automatically freeing itself.
 	 */
 	current_image = image_get ( image );
+
+	/* Check that this image can be selected for execution */
+	if ( ( rc = image_select ( image ) ) != 0 )
+		goto err;
+
+	/* Check that image is trusted (if applicable) */
+	if ( require_trusted_images && ! ( image->flags & IMAGE_TRUSTED ) ) {
+		DBGC ( image, "IMAGE %s is not trusted\n", image->name );
+		rc = -EACCES_UNTRUSTED;
+		goto err;
+	}
 
 	/* Record boot attempt */
 	syslog ( LOG_NOTICE, "Executing \"%s\"\n", image->name );
@@ -316,6 +321,11 @@ int image_exec ( struct image *image ) {
 	replacement = image->replacement;
 	if ( replacement )
 		assert ( replacement->flags & IMAGE_REGISTERED );
+
+ err:
+	/* Unregister image if applicable */
+	if ( image->flags & IMAGE_AUTO_UNREGISTER )
+		unregister_image ( image );
 
 	/* Drop temporary reference to the original image */
 	image_put ( image );

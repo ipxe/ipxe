@@ -67,6 +67,9 @@ struct image {
 /** Image is trusted */
 #define IMAGE_TRUSTED 0x0004
 
+/** Image will be automatically unregistered after execution */
+#define IMAGE_AUTO_UNREGISTER 0x0008
+
 /** An executable image type */
 struct image_type {
 	/** Name of this image type */
