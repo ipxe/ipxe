@@ -123,7 +123,7 @@ uint16_t x86_tcpip_continue_chksum ( uint16_t partial,
 		  "\nx86_tcpip_loop_end:\n\t"
 		  "loop x86_tcpip_loop_start\n\t"
 		  ".equ x86_tcpip_loop_step_size, "
-		  "  ( ( x86_tcpip_loop_end - x86_tcpip_loop_start ) / 16 )\n\t"
+		  "  ( ( x86_tcpip_loop_end - x86_tcpip_loop_start ) >> 4 )\n\t"
 
 		  /* Checksum remaining whole words */
 		  "mov %13, %3\n\t"
