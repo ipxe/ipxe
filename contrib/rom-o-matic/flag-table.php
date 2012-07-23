@@ -109,6 +109,16 @@ $flag_table = array (
            "cfgsec" => "console"
            ),
 
+	"LOG_LEVEL"
+	=> array (
+	   "flag" => "LOG_LEVEL",
+	   "type" => "choice",
+	   "options" => array("LOG_NONE","LOG_EMERG","LOG_ALERT","LOG_CRIT","LOG_ERR",
+	      "LOG_WARNING","LOG_NOTICE","LOG_INFO","LOG_DEBUG","LOG_ALL"),
+	   "value" => "LOG_NONE",
+	   "cfgsec" => "console"
+	   ),
+
 	// End Console Options
 
 	// Begin Network Protocol Options:
