@@ -54,6 +54,8 @@ CFLAGS		+= -m32
 ASFLAGS		+= --32
 ifeq ($(HOST_OS),FreeBSD)
 LDFLAGS		+= -m elf_i386_fbsd
+else ifeq ($(HOST_OS),OpenBSD)
+LDFLAGS		+= -m elf_i386_obsd
 else
 LDFLAGS		+= -m elf_i386
 endif
