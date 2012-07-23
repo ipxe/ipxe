@@ -91,7 +91,7 @@ static int guestinfo_fetch_type ( struct settings *settings,
 	/* Allocate temporary block to hold GuestInfo value */
 	info = zalloc ( info_len + 1 /* NUL */ );
 	if ( ! info ) {
-		DBGC ( settings, "GuestInfo %p could not allocate %zd bytes\n",
+		DBGC ( settings, "GuestInfo %p could not allocate %d bytes\n",
 		       settings, info_len );
 		ret = -ENOMEM;
 		goto err_alloc;
