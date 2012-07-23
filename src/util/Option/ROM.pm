@@ -172,9 +172,10 @@ use constant ROM_SIGNATURE => 0xaa55;
 use constant PCI_SIGNATURE => 'PCIR';
 use constant PCI_LAST_IMAGE => 0x80;
 use constant PNP_SIGNATURE => '$PnP';
+use constant IPXE_SIGNATURE => 'iPXE';
 
 our @EXPORT_OK = qw ( ROM_SIGNATURE PCI_SIGNATURE PCI_LAST_IMAGE
-		      PNP_SIGNATURE );
+		      PNP_SIGNATURE IPXE_SIGNATURE );
 our %EXPORT_TAGS = ( all => [ @EXPORT_OK ] );
 
 use constant JMP_SHORT => 0xeb;
@@ -232,6 +233,7 @@ sub new {
       init =>		{ offset => 0x03, length => 0x03,
 			  pack => \&pack_init, unpack => \&unpack_init },
       checksum =>	{ offset => 0x06, length => 0x01, pack => "C" },
+      ipxe_header =>	{ offset => 0x10, length => 0x02, pack => "S" },
       bofm_header =>	{ offset => 0x14, length => 0x02, pack => "S" },
       undi_header =>	{ offset => 0x16, length => 0x02, pack => "S" },
       pci_header =>	{ offset => 0x18, length => 0x02, pack => "S" },
@@ -386,6 +388,25 @@ sub pnp_header {
   return undef unless $offset != 0;
 
   return Option::ROM::PnP->new ( $self->{data}, $offset );
+}
+
+=pod
+
+=item C<< ipxe_header () >>
+
+Return a C<Option::ROM::iPXE> object representing the ROM's iPXE
+header, if present.
+
+=cut
+
+sub ipxe_header {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  my $offset = $hash->{ipxe_header};
+  return undef unless $offset != 0;
+
+  return Option::ROM::iPXE->new ( $self->{data}, $offset );
 }
 
 =pod
@@ -564,6 +585,60 @@ sub product {
 
   my $raw = substr ( ${$self->{data}}, $product );
   return unpack ( "Z*", $raw );
+}
+
+##############################################################################
+#
+# Option::ROM::iPXE
+#
+##############################################################################
+
+package Option::ROM::iPXE;
+
+use strict;
+use warnings;
+use Carp;
+use bytes;
+
+sub new {
+  my $class = shift;
+  my $data = shift;
+  my $offset = shift;
+
+  my $hash = {};
+  tie %$hash, "Option::ROM::Fields", {
+    data => $data,
+    offset => $offset,
+    length => 0x06,
+    fields => {
+      signature =>	{ offset => 0x00, length => 0x04, pack => "a4" },
+      struct_length =>	{ offset => 0x04, length => 0x01, pack => "C" },
+      checksum =>	{ offset => 0x05, length => 0x01, pack => "C" },
+      shrunk_length =>	{ offset => 0x06, length => 0x01, pack => "C" },
+      build_id =>	{ offset => 0x08, length => 0x04, pack => "L" },
+    },
+  };
+  bless $hash, $class;
+
+  # Retrieve true length of structure
+  my $self = tied ( %$hash );
+  $self->{length} = $hash->{struct_length};
+
+  return $hash;
+}
+
+sub checksum {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  return $self->checksum();
+}
+
+sub fix_checksum {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  $hash->{checksum} = ( ( $hash->{checksum} - $hash->checksum() ) & 0xff );
 }
 
 1;

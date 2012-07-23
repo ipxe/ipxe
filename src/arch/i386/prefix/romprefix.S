@@ -63,6 +63,8 @@ romheader_size:	.byte 0			/* Size in 512-byte blocks */
 	jmp	init			/* Initialisation vector */
 checksum:
 	.byte	0
+	.org	0x10
+	.word	ipxeheader
 	.org	0x16
 	.word	undiheader
 	.org	0x18
@@ -77,9 +79,6 @@ checksum:
 	.long	512
 	.long	0
 	.previous
-
-build_id:
-	.long	_build_id		/* Randomly-generated build ID */
 
 pciheader:
 	.ascii	"PCIR"			/* Signature */
@@ -106,7 +105,7 @@ pciheader_runtime_length:
 	.long	pciheader_image_length
 	.long	512
 	.long	0
-	.ascii	"ADHW"
+	.ascii	ZINFO_TYPE_ADxW
 	.long	pciheader_runtime_length
 	.long	512
 	.long	0
@@ -174,6 +173,25 @@ undiheader:
 	.ascii	"PCIR"			/* Bus type */
 	.equ undiheader_len, . - undiheader
 	.size undiheader, . - undiheader
+
+ipxeheader:
+	.ascii	"iPXE"			/* Signature */
+	.byte	ipxeheader_len		/* Length of structure */
+	.byte	0			/* Checksum */
+shrunk_rom_size:
+	.byte	0			/* Shrunk size (in 512-byte blocks) */
+	.byte	0			/* Reserved */
+build_id:
+	.long	_build_id		/* Randomly-generated build ID */
+	.equ ipxeheader_len, . - ipxeheader
+	.size ipxeheader, . - ipxeheader
+
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+	.ascii	"ADHB"
+	.long	shrunk_rom_size
+	.long	512
+	.long	0
+	.previous
 
 /* Initialisation (called once during POST)
  *
@@ -354,7 +372,7 @@ pmm_scan:
 	addr32 rep movsl	/* PMM presence implies flat real mode */
 	popw	%es
 	/* Shrink ROM */
-	movw	pciheader_runtime_length, %ax
+	movb	shrunk_rom_size, %al
 	movb	%al, romheader_size
 1:	/* Allocate decompression PMM block.  Round up the size to the
 	 * nearest 128kB and use the size within the PMM handle; this

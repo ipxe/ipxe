@@ -85,4 +85,15 @@ do {
     printf "\n";
   }
 
+  my $ipxe = $rom->ipxe_header();
+  if ( $ipxe ) {
+    printf "iPXE header:\n\n";
+    printf "  %-16s 0x%02x (%s0x%02x)\n", "Checksum:", $ipxe->{checksum},
+	   ( ( $ipxe->checksum == 0 ) ? "" : "INCORRECT: " ), $ipxe->checksum;
+    printf "  %-16s 0x%02x (%d)\n", "Shrunk length:",
+	   $ipxe->{shrunk_length}, ( $ipxe->{shrunk_length} * 512 );
+    printf "  %-16s 0x%08x\n", "Build ID:", $ipxe->{build_id};
+    printf "\n";
+  }
+
 } while ( $rom = $rom->next_image );
