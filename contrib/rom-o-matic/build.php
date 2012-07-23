@@ -179,7 +179,12 @@ if ( $embedded_script != "" ) {
 
 // Make the requested image.  $status is set to 0 on success
 $make_target = "bin/${nic}.${fmt_extension}";
-$make_cmd = "make -C '$build_dir' '$make_target' $emb_script_cmd 2>&1";
+$gitversion = exec('git describe --always --abbrev=1 --match "" 2>/dev/null');
+if ($gitversion) {
+	$gitversion = "GITVERSION=$gitversion";
+}
+
+$make_cmd = "make -C '$build_dir' '$make_target' $gitversion $emb_script_cmd 2>&1";
 
 exec ( $make_cmd, $maketxt, $status );
 
@@ -239,7 +244,7 @@ if ( $status == 0 ) {
             // Delete build directory as soon as it is not needed
             rm_build_dir ();
 
-            $output_filename = "ipxe-${version}-${nic}.${fmt_extension}";
+            $output_filename = preg_replace('/[^a-z0-9\+\.\-]/i', '', "ipxe-${version}-${nic}.${fmt_extension}");
 
             // Try to force IE to handle downloading right.
             Header ( "Cache-control: private");
