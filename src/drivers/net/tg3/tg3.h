@@ -3277,8 +3277,7 @@ struct tg3 {
 #define TG3_TX_RING_SIZE		512
 #define TG3_DEF_TX_RING_PENDING		(TG3_TX_RING_SIZE - 1)
 
-/* FIXME: look up alignment requirement in datasheet, page align for now */
-#define	TG3_DMA_ALIGNMENT	4096
+#define	TG3_DMA_ALIGNMENT	16
 
 #define TG3_RX_STD_DMA_SZ		(1536 + 64 + 2)
 
