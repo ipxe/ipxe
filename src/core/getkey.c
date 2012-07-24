@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/process.h>
 #include <ipxe/keys.h>
 #include <ipxe/timer.h>
+#include <ipxe/nap.h>
 
 /** @file
  *
@@ -46,6 +47,7 @@ static int getchar_timeout ( unsigned long timeout ) {
 		step();
 		if ( iskey() )
 			return getchar();
+		cpu_nap();
 	}
 
 	return -1;
