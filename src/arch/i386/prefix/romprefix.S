@@ -352,9 +352,13 @@ pmm_scan:
 	call	print_message
 	/* We have PMM and so a 1kB stack: preserve whole registers */
 	pushal
-	/* Allocate image source PMM block */
+	/* Allocate image source PMM block.  Round up the size to the
+	 * nearest 4kB (8 512-byte sectors) to work around AMI BIOS bugs.
+	 */
 	movzbl	romheader_size, %ecx
 	addw	extra_size, %cx
+	addw	$0x0007, %cx	/* Round up to multiple of 8 512-byte sectors */
+	andw	$0xfff8, %cx
 	shll	$5, %ecx
 	movl	$PMM_HANDLE_BASE_IMAGE_SOURCE, %ebx
 	movw	$get_pmm_image_source, %bp
