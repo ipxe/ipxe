@@ -323,6 +323,32 @@ static int bzimage_set_cmdline ( struct image *image,
 }
 
 /**
+ * Parse standalone image command line for cpio parameters
+ *
+ * @v image		bzImage file
+ * @v cpio		CPIO header
+ * @v cmdline		Command line
+ */
+static void bzimage_parse_cpio_cmdline ( struct image *image,
+					 struct cpio_header *cpio,
+					 const char *cmdline ) {
+	char *arg;
+	char *end;
+	unsigned int mode;
+
+	/* Look for "mode=" */
+	if ( ( arg = strstr ( cmdline, "mode=" ) ) ) {
+		arg += 5;
+		mode = strtoul ( arg, &end, 8 /* Octal for file mode */ );
+		if ( *end && ( *end != ' ' ) ) {
+			DBGC ( image, "bzImage %p strange \"mode=\""
+			       "terminator '%c'\n", image, *end );
+		}
+		cpio_set_field ( cpio->c_mode, ( 0100000 | mode ) );
+	}
+}
+
+/**
  * Load initrd
  *
  * @v image		bzImage image
@@ -334,8 +360,10 @@ static size_t bzimage_load_initrd ( struct image *image,
 				    struct image *initrd,
 				    userptr_t address ) {
 	char *filename = initrd->cmdline;
+	char *cmdline;
 	struct cpio_header cpio;
         size_t offset = 0;
+	size_t name_len;
 
 	/* Do not include kernel image itself as an initrd */
 	if ( initrd == image )
@@ -343,24 +371,30 @@ static size_t bzimage_load_initrd ( struct image *image,
 
 	/* Create cpio header before non-prebuilt images */
 	if ( filename && filename[0] ) {
-		size_t name_len = ( strlen ( filename ) + 1 );
-
 		DBGC ( image, "bzImage %p inserting initrd %p as %s\n",
 		       image, initrd, filename );
+		cmdline = strchr ( filename, ' ' );
+		name_len = ( ( cmdline ? ( ( size_t ) ( cmdline - filename ) )
+			       : strlen ( filename ) ) + 1 /* NUL */ );
 		memset ( &cpio, '0', sizeof ( cpio ) );
 		memcpy ( cpio.c_magic, CPIO_MAGIC, sizeof ( cpio.c_magic ) );
 		cpio_set_field ( cpio.c_mode, 0100644 );
 		cpio_set_field ( cpio.c_nlink, 1 );
 		cpio_set_field ( cpio.c_filesize, initrd->len );
 		cpio_set_field ( cpio.c_namesize, name_len );
+		if ( cmdline ) {
+			bzimage_parse_cpio_cmdline ( image, &cpio,
+						     ( cmdline + 1 /* ' ' */ ));
+		}
 		if ( address ) {
 			copy_to_user ( address, offset, &cpio,
 				       sizeof ( cpio ) );
 		}
 		offset += sizeof ( cpio );
 		if ( address ) {
+			memset_user ( address, offset, 0, name_len );
 			copy_to_user ( address, offset, filename,
-				       name_len );
+				       ( name_len - 1 /* NUL (or space) */ ) );
 		}
 		offset += name_len;
 		offset = ( ( offset + 0x03 ) & ~0x03 );
