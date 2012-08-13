@@ -229,7 +229,7 @@ static int comboot_identify ( struct image *image ) {
 
 	++ext;
 
-	if ( strcasecmp( ext, "com" ) && strcasecmp( ext, "cbt" ) ) {
+	if ( strcasecmp( ext, "cbt" ) ) {
 		DBGC ( image, "COMBOOT %p: unrecognized extension %s\n",
 		       image, ext );
 		return -ENOEXEC;
