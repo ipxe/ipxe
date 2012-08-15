@@ -180,6 +180,7 @@ our %EXPORT_TAGS = ( all => [ @EXPORT_OK ] );
 
 use constant JMP_SHORT => 0xeb;
 use constant JMP_NEAR => 0xe9;
+use constant CALL_NEAR => 0xe8;
 
 sub pack_init {
   my $dest = shift;
@@ -201,6 +202,9 @@ sub unpack_init {
     my $offset = unpack ( "xC", $instr );
     return ( $offset + 5 );
   } elsif ( $jump == JMP_NEAR ) {
+    my $offset = unpack ( "xS", $instr );
+    return ( $offset + 6 );
+  } elsif ( $jump == CALL_NEAR ) {
     my $offset = unpack ( "xS", $instr );
     return ( $offset + 6 );
   } elsif ( $jump == 0 ) {
