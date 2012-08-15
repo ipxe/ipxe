@@ -396,6 +396,25 @@ sub pnp_header {
 
 =pod
 
+=item C<< undi_header () >>
+
+Return a C<Option::ROM::UNDI> object representing the ROM's UNDI header,
+if present.
+
+=cut
+
+sub undi_header {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  my $offset = $hash->{undi_header};
+  return undef unless $offset != 0;
+
+  return Option::ROM::UNDI->new ( $self->{data}, $offset );
+}
+
+=pod
+
 =item C<< ipxe_header () >>
 
 Return a C<Option::ROM::iPXE> object representing the ROM's iPXE
@@ -589,6 +608,67 @@ sub product {
 
   my $raw = substr ( ${$self->{data}}, $product );
   return unpack ( "Z*", $raw );
+}
+
+##############################################################################
+#
+# Option::ROM::UNDI
+#
+##############################################################################
+
+package Option::ROM::UNDI;
+
+use strict;
+use warnings;
+use Carp;
+use bytes;
+
+sub new {
+  my $class = shift;
+  my $data = shift;
+  my $offset = shift;
+
+  my $hash = {};
+  tie %$hash, "Option::ROM::Fields", {
+    data => $data,
+    offset => $offset,
+    length => 0x16,
+    fields => {
+      signature =>	{ offset => 0x00, length => 0x04, pack => "a4" },
+      struct_length =>	{ offset => 0x04, length => 0x01, pack => "C" },
+      checksum =>	{ offset => 0x05, length => 0x01, pack => "C" },
+      struct_revision =>{ offset => 0x06, length => 0x01, pack => "C" },
+      version_revision =>{ offset => 0x07, length => 0x01, pack => "C" },
+      version_minor =>	{ offset => 0x08, length => 0x01, pack => "C" },
+      version_major =>	{ offset => 0x09, length => 0x01, pack => "C" },
+      loader_entry =>	{ offset => 0x0a, length => 0x02, pack => "S" },
+      stack_size =>	{ offset => 0x0c, length => 0x02, pack => "S" },
+      data_size =>	{ offset => 0x0e, length => 0x02, pack => "S" },
+      code_size =>	{ offset => 0x10, length => 0x02, pack => "S" },
+      bus_type =>	{ offset => 0x12, length => 0x04, pack => "a4" },
+    },
+  };
+  bless $hash, $class;
+
+  # Retrieve true length of structure
+  my $self = tied ( %$hash );
+  $self->{length} = $hash->{struct_length};
+
+  return $hash;
+}
+
+sub checksum {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  return $self->checksum();
+}
+
+sub fix_checksum {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  $hash->{checksum} = ( ( $hash->{checksum} - $hash->checksum() ) & 0xff );
 }
 
 ##############################################################################

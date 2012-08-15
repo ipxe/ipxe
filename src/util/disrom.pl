@@ -85,6 +85,22 @@ do {
     printf "\n";
   }
 
+  my $undi = $rom->undi_header();
+  if ( $undi ) {
+    printf "UNDI header:\n\n";
+    printf "  %-16s %s\n", "Signature:", $undi->{signature};
+    printf "  %-16s 0x%02x (%s0x%02x)\n", "Checksum:", $undi->{checksum},
+	   ( ( $undi->checksum == 0 ) ? "" : "INCORRECT: " ), $undi->checksum;
+    printf "  %-16s %d.%d.%d\n", "UNDI version:", $undi->{version_major},
+	   $undi->{version_minor}, $undi->{version_revision};
+    printf "  %-16s 0x%04x\n", "Loader entry:", $undi->{loader_entry};
+    printf "  %-16s 0x%04x\n", "Stack size:", $undi->{stack_size};
+    printf "  %-16s 0x%04x\n", "Data size:", $undi->{data_size};
+    printf "  %-16s 0x%04x\n", "Code size:", $undi->{code_size};
+    printf "  %-16s %s\n", "Bus type:", $undi->{bus_type};
+    printf "\n";
+  }
+
   my $ipxe = $rom->ipxe_header();
   if ( $ipxe ) {
     printf "iPXE header:\n\n";
