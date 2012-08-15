@@ -32,6 +32,7 @@ foreach my $romfile ( @romfiles ) {
   my $image = $rom;
   while ( $image ) {
     $image->pnp_header->fix_checksum() if $image->pnp_header;
+    $image->undi_header->fix_checksum() if $image->undi_header;
     $image->ipxe_header->fix_checksum() if $image->ipxe_header;
     $image->fix_checksum();
     $image = $image->next_image();
