@@ -260,8 +260,8 @@ static void http_done ( struct http_request *http ) {
 	 * force an error.
 	 */
 	if ( ( http->rx_state < HTTP_RX_DATA ) || ( http->chunked != 0 ) ) {
-		DBGC ( http, "HTTP %p connection closed unexpectedly\n",
-		       http );
+		DBGC ( http, "HTTP %p connection closed unexpectedly in state "
+		       "%d\n", http, http->rx_state );
 		http_close ( http, -ECONNRESET );
 		return;
 	}
@@ -362,8 +362,9 @@ static int http_rx_response ( struct http_request *http, char *response ) {
 		return -EINVAL_RESPONSE;
 	http->code = strtoul ( spc, NULL, 10 );
 
-	/* Move to received headers */
-	http->rx_state = HTTP_RX_HEADER;
+	/* Move to receive headers */
+	http->rx_state = ( ( http->flags & HTTP_HEAD_ONLY ) ?
+			   HTTP_RX_TRAILER : HTTP_RX_HEADER );
 	return 0;
 }
 
@@ -697,8 +698,7 @@ static int http_rx_header ( struct http_request *http, char *header ) {
 		}
 
 		/* Move to next state */
-		if ( ( http->rx_state == HTTP_RX_HEADER ) &&
-		     ( ! ( http->flags & HTTP_HEAD_ONLY ) ) ) {
+		if ( http->rx_state == HTTP_RX_HEADER ) {
 			DBGC ( http, "HTTP %p start of data\n", http );
 			http->rx_state = ( http->chunked ?
 					   HTTP_RX_CHUNK_LEN : HTTP_RX_DATA );
