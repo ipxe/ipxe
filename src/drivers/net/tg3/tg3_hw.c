@@ -434,6 +434,7 @@ int tg3_get_invariants(struct tg3 *tp)
 		else if (tp->pdev->device == TG3PCI_DEVICE_TIGON3_57781 ||
 			 tp->pdev->device == TG3PCI_DEVICE_TIGON3_57785 ||
 			 tp->pdev->device == TG3PCI_DEVICE_TIGON3_57761 ||
+			 tp->pdev->device == TG3PCI_DEVICE_TIGON3_57762 ||
 			 tp->pdev->device == TG3PCI_DEVICE_TIGON3_57765 ||
 			 tp->pdev->device == TG3PCI_DEVICE_TIGON3_57791 ||
 			 tp->pdev->device == TG3PCI_DEVICE_TIGON3_57795)
@@ -2127,15 +2128,20 @@ static int tg3_reset_hw(struct tg3 *tp, int reset_phy)
 
 	val = TG3_RX_STD_MAX_SIZE_5700 << BDINFO_FLAGS_MAXLEN_SHIFT;
 
+	if (tg3_flag(tp, 57765_PLUS))
+		val |= (RX_STD_MAX_SIZE << 2);
+
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_MAXLEN_FLAGS, val);
 
-	tpr->rx_std_prod_idx = TG3_DEF_RX_RING_PENDING;
+	tpr->rx_std_prod_idx = 0;
 
 	/* std prod index is updated by tg3_refill_prod_ring() */
 	tw32_rx_mbox(TG3_RX_STD_PROD_IDX_REG, 0);
 	tw32_rx_mbox(TG3_RX_JMB_PROD_IDX_REG, 0);
 
 	tg3_rings_reset(tp);
+
+	__tg3_set_mac_addr(tp,0);
 
 #define	TG3_MAX_MTU	1522
 	/* MTU + ethernet header + FCS + optional VLAN tag */

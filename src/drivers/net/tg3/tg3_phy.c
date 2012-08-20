@@ -1008,12 +1008,11 @@ skip_phy_reset:
 void tg3_poll_link(struct tg3 *tp)
 {	DBGP("%s\n", __func__);
 
-	u32 mac_stat;
-
-	mac_stat = tr32(MAC_STATUS);
-
-	if (mac_stat & MAC_STATUS_LNKSTATE_CHANGED)
+	if (tp->hw_status->status & SD_STATUS_LINK_CHG) {
+		DBGC(tp->dev,"link_changed\n");
+		tp->hw_status->status &= ~SD_STATUS_LINK_CHG;
 		tg3_setup_phy(tp, 0);
+	}
 }
 
 static void tg3_aux_stat_to_speed_duplex(struct tg3 *tp, u32 val, u16 *speed, u8 *duplex)
@@ -1506,9 +1505,8 @@ relink:
 	tw32_f(MAC_MODE, tp->mac_mode);
 	udelay(40);
 
-	/* We always use the link change register */
-	/* NOTE: this freezes for mdc? */
-	tw32_f(MAC_EVENT, 0);
+	/* Enabled attention when the link has changed state. */
+	tw32_f(MAC_EVENT, MAC_EVENT_LNKSTATE_CHANGED);
 	udelay(40);
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 &&
