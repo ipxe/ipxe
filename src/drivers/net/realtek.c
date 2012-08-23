@@ -500,6 +500,7 @@ static void realtek_refill_rx ( struct realtek_nic *rtl ) {
  */
 static int realtek_open ( struct net_device *netdev ) {
 	struct realtek_nic *rtl = netdev->priv;
+	uint32_t tcr;
 	uint32_t rcr;
 	int rc;
 
@@ -523,6 +524,12 @@ static int realtek_open ( struct net_device *netdev ) {
 	 * this happens before writing to RCR.
 	 */
 	writeb ( ( RTL_CR_TE | RTL_CR_RE ), rtl->regs + RTL_CR );
+
+	/* Configure transmitter */
+	tcr = readl ( rtl->regs + RTL_TCR );
+	tcr &= ~RTL_TCR_MXDMA_MASK;
+	tcr |= RTL_TCR_MXDMA_DEFAULT;
+	writel ( tcr, rtl->regs + RTL_TCR );
 
 	/* Configure receiver */
 	rcr = readl ( rtl->regs + RTL_RCR );

@@ -132,6 +132,12 @@ enum realtek_legacy_status {
 /** Interrupt Status Register (word) */
 #define RTL_ISR 0x3e
 
+/** Transmit (Tx) Configuration Register (dword) */
+#define RTL_TCR 0x40
+#define RTL_TCR_MXDMA(x)	( (x) << 8 ) /**< Max DMA burst size */
+#define RTL_TCR_MXDMA_MASK	RTL_TCR_MXDMA ( 0x7 )
+#define RTL_TCR_MXDMA_DEFAULT	RTL_TCR_MXDMA ( 0x7 /* Unlimited */ )
+
 /** Receive (Rx) Configuration Register (dword) */
 #define RTL_RCR 0x44
 #define RTL_RCR_RXFTH(x)	( (x) << 13 ) /**< Receive FIFO threshold */
