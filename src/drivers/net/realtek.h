@@ -134,9 +134,15 @@ enum realtek_legacy_status {
 
 /** Receive (Rx) Configuration Register (dword) */
 #define RTL_RCR 0x44
+#define RTL_RCR_RXFTH(x)	( (x) << 13 ) /**< Receive FIFO threshold */
+#define RTL_RCR_RXFTH_MASK	RTL_RCR_RXFTH ( 0x7 )
+#define RTL_RCR_RXFTH_DEFAULT	RTL_RCR_RXFTH ( 0x7 /* Whole packet */ )
 #define RTL_RCR_RBLEN(x)	( (x) << 11 ) /**< Receive buffer length */
 #define RTL_RCR_RBLEN_MASK	RTL_RCR_RBLEN ( 0x3 )
 #define RTL_RCR_RBLEN_DEFAULT	RTL_RCR_RBLEN ( 0 /* 8kB */ )
+#define RTL_RCR_MXDMA(x)	( (x) << 8 ) /**< Max DMA burst size */
+#define RTL_RCR_MXDMA_MASK	RTL_RCR_MXDMA ( 0x7 )
+#define RTL_RCR_MXDMA_DEFAULT	RTL_RCR_MXDMA ( 0x7 /* Unlimited */ )
 #define RTL_RCR_WRAP		0x00000080UL /**< Overrun receive buffer */
 #define RTL_RCR_9356SEL		0x00000040UL /**< EEPROM is a 93C56 */
 #define RTL_RCR_AB		0x00000008UL /**< Accept broadcast packets */
