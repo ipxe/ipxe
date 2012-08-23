@@ -81,6 +81,7 @@ mii_write ( struct mii_interface *mii, unsigned int reg, unsigned int data ) {
 /** Maximum time to wait for a reset, in milliseconds */
 #define MII_RESET_MAX_WAIT_MS 500
 
+extern int mii_restart ( struct mii_interface *mii );
 extern int mii_reset ( struct mii_interface *mii );
 
 #endif /* _IPXE_MII_H */

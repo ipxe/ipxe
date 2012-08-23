@@ -31,6 +31,37 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
+ * Restart autonegotiation
+ *
+ * @v mii		MII interface
+ * @ret rc		Return status code
+ */
+int mii_restart ( struct mii_interface *mii ) {
+	int bmcr;
+	int rc;
+
+	/* Read BMCR */
+	bmcr = mii_read ( mii, MII_BMCR );
+	if ( bmcr < 0 ) {
+		rc = bmcr;
+		DBGC ( mii, "MII %p could not read BMCR: %s\n",
+		       mii, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Enable and restart autonegotiation */
+	bmcr |= ( BMCR_ANENABLE | BMCR_ANRESTART );
+	if ( ( rc = mii_write ( mii, MII_BMCR, bmcr ) ) != 0 ) {
+		DBGC ( mii, "MII %p could not write BMCR: %s\n",
+		       mii, strerror ( rc ) );
+		return rc;
+	}
+
+	DBGC ( mii, "MII %p restarted autonegotiation\n", mii );
+	return 0;
+}
+
+/**
  * Reset MII interface
  *
  * @v mii		MII interface
@@ -70,11 +101,8 @@ int mii_reset ( struct mii_interface *mii ) {
 		/* Force autonegotation on again, in case it was
 		 * cleared by the reset.
 		 */
-		if ( ( rc = mii_write ( mii, MII_BMCR, BMCR_ANENABLE ) ) != 0 ){
-			DBGC ( mii, "MII %p could not write BMCR: %s\n",
-			       mii, strerror ( rc ) );
+		if ( ( rc = mii_restart ( mii ) ) != 0 )
 			return rc;
-		}
 
 		DBGC ( mii, "MII %p reset after %dms\n", mii, i );
 		return 0;
