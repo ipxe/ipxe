@@ -409,11 +409,9 @@ static int realtek_create_ring ( struct realtek_nic *rtl,
 
 	/* Program ring address */
 	address = virt_to_bus ( ring->desc );
+	writel ( ( ( ( uint64_t ) address ) >> 32 ),
+		 rtl->regs + ring->reg + 4 );
 	writel ( ( address & 0xffffffffUL ), rtl->regs + ring->reg );
-	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {
-		writel ( ( ( ( uint64_t ) address ) >> 32 ),
-			 rtl->regs + ring->reg + 4 );
-	}
 	DBGC ( rtl, "REALTEK %p ring %02x is at [%08llx,%08llx)\n",
 	       rtl, ring->reg, ( ( unsigned long long ) address ),
 	       ( ( unsigned long long ) address + ring->len ) );
