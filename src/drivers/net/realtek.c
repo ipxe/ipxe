@@ -879,8 +879,9 @@ static void realtek_detect ( struct realtek_nic *rtl ) {
 	 * Try to enable C+ mode and PCI Dual Address Cycle (for
 	 * 64-bit systems), if supported.
 	 */
-	cpcr = ( RTL_CPCR_DAC | RTL_CPCR_MULRW | RTL_CPCR_CPRX |
-		 RTL_CPCR_CPTX );
+	cpcr = readw ( rtl->regs + RTL_CPCR );
+	cpcr |= ( RTL_CPCR_DAC | RTL_CPCR_MULRW | RTL_CPCR_CPRX |
+		  RTL_CPCR_CPTX );
 	writew ( cpcr, rtl->regs + RTL_CPCR );
 	check_cpcr = readw ( rtl->regs + RTL_CPCR );
 
@@ -890,7 +891,7 @@ static void realtek_detect ( struct realtek_nic *rtl ) {
 		rtl->have_phy_regs = 1;
 		rtl->tppoll = RTL_TPPOLL_8169;
 	} else {
-		if ( check_cpcr == cpcr ) {
+		if ( ( check_cpcr == cpcr ) && ( cpcr != 0xffff ) ) {
 			DBGC ( rtl, "REALTEK %p appears to be an RTL8139C+\n",
 			       rtl );
 			rtl->tppoll = RTL_TPPOLL_8139CP;
