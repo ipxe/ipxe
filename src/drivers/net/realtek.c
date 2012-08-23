@@ -272,6 +272,75 @@ static int realtek_reset ( struct realtek_nic *rtl ) {
 	return -ETIMEDOUT;
 }
 
+/**
+ * Configure PHY for Gigabit operation
+ *
+ * @v rtl		Realtek device
+ * @ret rc		Return status code
+ */
+static int realtek_phy_speed ( struct realtek_nic *rtl ) {
+	int ctrl1000;
+	int rc;
+
+	/* Read CTRL1000 register */
+	ctrl1000 = mii_read ( &rtl->mii, MII_CTRL1000 );
+	if ( ctrl1000 < 0 ) {
+		rc = ctrl1000;
+		DBGC ( rtl, "REALTEK %p could not read CTRL1000: %s\n",
+		       rtl, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Advertise 1000Mbps speeds */
+	ctrl1000 |= ( ADVERTISE_1000FULL | ADVERTISE_1000HALF );
+	if ( ( rc = mii_write ( &rtl->mii, MII_CTRL1000, ctrl1000 ) ) != 0 ) {
+		DBGC ( rtl, "REALTEK %p could not write CTRL1000: %s\n",
+		       rtl, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Reset PHY
+ *
+ * @v rtl		Realtek device
+ * @ret rc		Return status code
+ */
+static int realtek_phy_reset ( struct realtek_nic *rtl ) {
+	int rc;
+
+	/* Do nothing if we have no separate PHY register access */
+	if ( ! rtl->have_phy_regs )
+		return 0;
+
+	/* Perform MII reset */
+	if ( ( rc = mii_reset ( &rtl->mii ) ) != 0 ) {
+		DBGC ( rtl, "REALTEK %p could not reset MII: %s\n",
+		       rtl, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Some cards (e.g. RTL8169SC) do not advertise Gigabit by
+	 * default.  Try to enable advertisement of Gigabit speeds.
+	 */
+	if ( ( rc = realtek_phy_speed ( rtl ) ) != 0 ) {
+		/* Ignore failures, since the register may not be
+		 * present on non-Gigabit PHYs (e.g. RTL8101).
+		 */
+	}
+
+	/* Restart autonegotiation */
+	if ( ( rc = mii_restart ( &rtl->mii ) ) != 0 ) {
+		DBGC ( rtl, "REALTEK %p could not restart MII: %s\n",
+		       rtl, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
 /******************************************************************************
  *
  * Link state
@@ -970,12 +1039,8 @@ static int realtek_probe ( struct pci_device *pci ) {
 
 	/* Initialise and reset MII interface */
 	mii_init ( &rtl->mii, &realtek_mii_operations );
-	if ( rtl->have_phy_regs &&
-	     ( ( rc = mii_reset ( &rtl->mii ) ) != 0 ) ) {
-		DBGC ( rtl, "REALTEK %p could not reset MII: %s\n",
-		       rtl, strerror ( rc ) );
-		goto err_mii_reset;
-	}
+	if ( ( rc = realtek_phy_reset ( rtl ) ) != 0 )
+		goto err_phy_reset;
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
@@ -996,7 +1061,7 @@ static int realtek_probe ( struct pci_device *pci ) {
  err_register_nvo:
 	unregister_netdev ( netdev );
  err_register_netdev:
- err_mii_reset:
+ err_phy_reset:
  err_nvs_read:
 	realtek_reset ( rtl );
  err_reset:
