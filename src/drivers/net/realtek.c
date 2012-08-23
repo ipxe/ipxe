@@ -878,10 +878,15 @@ static void realtek_detect ( struct realtek_nic *rtl ) {
 	/* The C+ Command register is present only on 8169 and 8139C+.
 	 * Try to enable C+ mode and PCI Dual Address Cycle (for
 	 * 64-bit systems), if supported.
+	 *
+	 * Note that enabling DAC seems to cause bizarre behaviour
+	 * (lockups, garbage data on the wire) on some systems, even
+	 * if only 32-bit addresses are used.
 	 */
 	cpcr = readw ( rtl->regs + RTL_CPCR );
-	cpcr |= ( RTL_CPCR_DAC | RTL_CPCR_MULRW | RTL_CPCR_CPRX |
-		  RTL_CPCR_CPTX );
+	cpcr |= ( RTL_CPCR_MULRW | RTL_CPCR_CPRX | RTL_CPCR_CPTX );
+	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) )
+		cpcr |= RTL_CPCR_DAC;
 	writew ( cpcr, rtl->regs + RTL_CPCR );
 	check_cpcr = readw ( rtl->regs + RTL_CPCR );
 
