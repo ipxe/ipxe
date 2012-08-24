@@ -163,6 +163,9 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 	uint32_t tmp_address;
 	uint32_t tmp_address_detect;
 
+	/* Open bit-bashing interface */
+	open_bit ( &spibit->basher );
+
 	/* Deassert chip select to reset specified slave */
 	spi_bit_set_slave_select ( spibit, device->slave, DESELECT_SLAVE );
 
@@ -213,6 +216,9 @@ static int spi_bit_rw ( struct spi_bus *bus, struct spi_device *device,
 
 	/* Deassert chip select on specified slave */
 	spi_bit_set_slave_select ( spibit, device->slave, DESELECT_SLAVE );
+
+	/* Close bit-bashing interface */
+	close_bit ( &spibit->basher );
 
 	return 0;
 }
