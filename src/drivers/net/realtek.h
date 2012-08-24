@@ -158,8 +158,9 @@ enum realtek_legacy_status {
 
 /** 93C46 (93C56) Command Register (byte) */
 #define RTL_9346CR 0x50
-#define RTL_9346CR_EEM1		0x80	/**< Mode select bit 1 */
-#define RTL_9346CR_EEM0		0x40	/**< Mode select bit 0 */
+#define RTL_9346CR_EEM(x)	( (x) << 6 ) /**< Mode select */
+#define RTL_9346CR_EEM_EEPROM	RTL_9346CR_EEM ( 0x2 ) /**< EEPROM mode */
+#define RTL_9346CR_EEM_NORMAL	RTL_9346CR_EEM ( 0x0 ) /**< Normal mode */
 #define RTL_9346CR_EECS		0x08	/**< Chip select */
 #define RTL_9346CR_EESK		0x04	/**< Clock */
 #define RTL_9346CR_EEDI		0x02	/**< Data in */

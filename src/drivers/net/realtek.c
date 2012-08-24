@@ -60,8 +60,34 @@ static const uint8_t realtek_eeprom_bits[] = {
 	[SPI_BIT_SCLK]	= RTL_9346CR_EESK,
 	[SPI_BIT_MOSI]	= RTL_9346CR_EEDI,
 	[SPI_BIT_MISO]	= RTL_9346CR_EEDO,
-	[SPI_BIT_SS(0)]	= ( RTL_9346CR_EECS | RTL_9346CR_EEM1 ),
+	[SPI_BIT_SS(0)]	= RTL_9346CR_EECS,
 };
+
+/**
+ * Open bit-bashing interface
+ *
+ * @v basher		Bit-bashing interface
+ */
+static void realtek_spi_open_bit ( struct bit_basher *basher ) {
+	struct realtek_nic *rtl = container_of ( basher, struct realtek_nic,
+						 spibit.basher );
+
+	/* Enable EEPROM access */
+	writeb ( RTL_9346CR_EEM_EEPROM, rtl->regs + RTL_9346CR );
+}
+
+/**
+ * Close bit-bashing interface
+ *
+ * @v basher		Bit-bashing interface
+ */
+static void realtek_spi_close_bit ( struct bit_basher *basher ) {
+	struct realtek_nic *rtl = container_of ( basher, struct realtek_nic,
+						 spibit.basher );
+
+	/* Disable EEPROM access */
+	writeb ( RTL_9346CR_EEM_NORMAL, rtl->regs + RTL_9346CR );
+}
 
 /**
  * Read input bit
@@ -108,6 +134,8 @@ static void realtek_spi_write_bit ( struct bit_basher *basher,
 
 /** SPI bit-bashing interface */
 static struct bit_basher_operations realtek_basher_ops = {
+	.open = realtek_spi_open_bit,
+	.close = realtek_spi_close_bit,
 	.read = realtek_spi_read_bit,
 	.write = realtek_spi_write_bit,
 };
