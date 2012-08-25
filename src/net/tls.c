@@ -49,10 +49,118 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tls.h>
 
 /* Disambiguate the various error causes */
-#define EACCES_WRONG_NAME \
-	__einfo_error ( EINFO_EACCES_WRONG_NAME )
-#define EINFO_EACCES_WRONG_NAME \
-	__einfo_uniqify ( EINFO_EACCES, 0x02, "Incorrect server name" )
+#define EACCES_WRONG_NAME __einfo_error ( EINFO_EACCES_WRONG_NAME )
+#define EINFO_EACCES_WRONG_NAME						\
+	__einfo_uniqify ( EINFO_EACCES, 0x02,				\
+			  "Incorrect server name" )
+#define EINVAL_CHANGE_CIPHER __einfo_error ( EINFO_EINVAL_CHANGE_CIPHER )
+#define EINFO_EINVAL_CHANGE_CIPHER					\
+	__einfo_uniqify ( EINFO_EINVAL, 0x01,				\
+			  "Invalid Change Cipher record" )
+#define EINVAL_ALERT __einfo_error ( EINFO_EINVAL_ALERT )
+#define EINFO_EINVAL_ALERT						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x02,				\
+			  "Invalid Alert record" )
+#define EINVAL_HELLO __einfo_error ( EINFO_EINVAL_HELLO )
+#define EINFO_EINVAL_HELLO						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x03,				\
+			  "Invalid Server Hello record" )
+#define EINVAL_CERTIFICATE __einfo_error ( EINFO_EINVAL_CERTIFICATE )
+#define EINFO_EINVAL_CERTIFICATE					\
+	__einfo_uniqify ( EINFO_EINVAL, 0x04,				\
+			  "Invalid Certificate" )
+#define EINVAL_CERTIFICATES __einfo_error ( EINFO_EINVAL_CERTIFICATES )
+#define EINFO_EINVAL_CERTIFICATES					\
+	__einfo_uniqify ( EINFO_EINVAL, 0x05,				\
+			  "Invalid Server Certificate record" )
+#define EINVAL_HELLO_DONE __einfo_error ( EINFO_EINVAL_HELLO_DONE )
+#define EINFO_EINVAL_HELLO_DONE						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x06,				\
+			  "Invalid Server Hello Done record" )
+#define EINVAL_FINISHED __einfo_error ( EINFO_EINVAL_FINISHED )
+#define EINFO_EINVAL_FINISHED						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x07,				\
+			  "Invalid Server Finished record" )
+#define EINVAL_HANDSHAKE __einfo_error ( EINFO_EINVAL_HANDSHAKE )
+#define EINFO_EINVAL_HANDSHAKE						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x08,				\
+			  "Invalid Handshake record" )
+#define EINVAL_STREAM __einfo_error ( EINFO_EINVAL_STREAM )
+#define EINFO_EINVAL_STREAM						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x09,				\
+			  "Invalid stream-ciphered record" )
+#define EINVAL_BLOCK __einfo_error ( EINFO_EINVAL_BLOCK )
+#define EINFO_EINVAL_BLOCK						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x0a,				\
+			  "Invalid block-ciphered record" )
+#define EINVAL_PADDING __einfo_error ( EINFO_EINVAL_PADDING )
+#define EINFO_EINVAL_PADDING						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x0b,				\
+			  "Invalid block padding" )
+#define EINVAL_RX_STATE __einfo_error ( EINFO_EINVAL_RX_STATE )
+#define EINFO_EINVAL_RX_STATE						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x0c,				\
+			  "Invalid receive state" )
+#define EIO_ALERT __einfo_error ( EINFO_EIO_ALERT )
+#define EINFO_EIO_ALERT							\
+	__einfo_uniqify ( EINFO_EINVAL, 0x01,				\
+			  "Unknown alert level" )
+#define ENOMEM_CONTEXT __einfo_error ( EINFO_ENOMEM_CONTEXT )
+#define EINFO_ENOMEM_CONTEXT						\
+	__einfo_uniqify ( EINFO_ENOMEM, 0x01,				\
+			  "Not enough space for crypto context" )
+#define ENOMEM_CERTIFICATE __einfo_error ( EINFO_ENOMEM_CERTIFICATE )
+#define EINFO_ENOMEM_CERTIFICATE					\
+	__einfo_uniqify ( EINFO_ENOMEM, 0x02,				\
+			  "Not enough space for certificate" )
+#define ENOMEM_CHAIN __einfo_error ( EINFO_ENOMEM_CHAIN )
+#define EINFO_ENOMEM_CHAIN						\
+	__einfo_uniqify ( EINFO_ENOMEM, 0x03,				\
+			  "Not enough space for certificate chain" )
+#define ENOMEM_TX_PLAINTEXT __einfo_error ( EINFO_ENOMEM_TX_PLAINTEXT )
+#define EINFO_ENOMEM_TX_PLAINTEXT					\
+	__einfo_uniqify ( EINFO_ENOMEM, 0x04,				\
+			  "Not enough space for transmitted plaintext" )
+#define ENOMEM_TX_CIPHERTEXT __einfo_error ( EINFO_ENOMEM_TX_CIPHERTEXT )
+#define EINFO_ENOMEM_TX_CIPHERTEXT					\
+	__einfo_uniqify ( EINFO_ENOMEM, 0x05,				\
+			  "Not enough space for transmitted ciphertext" )
+#define ENOMEM_RX_PLAINTEXT __einfo_error ( EINFO_ENOMEM_RX_PLAINTEXT )
+#define EINFO_ENOMEM_RX_PLAINTEXT					\
+	__einfo_uniqify ( EINFO_ENOMEM, 0x06,				\
+			  "Not enough space for received plaintext" )
+#define ENOMEM_RX_DATA __einfo_error ( EINFO_ENOMEM_RX_DATA )
+#define EINFO_ENOMEM_RX_DATA						\
+	__einfo_uniqify ( EINFO_ENOMEM, 0x07,				\
+			  "Not enough space for received data" )
+#define ENOTSUP_CIPHER __einfo_error ( EINFO_ENOTSUP_CIPHER )
+#define EINFO_ENOTSUP_CIPHER						\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x01,				\
+			  "Unsupported cipher" )
+#define ENOTSUP_NULL __einfo_error ( EINFO_ENOTSUP_NULL )
+#define EINFO_ENOTSUP_NULL						\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x02,				\
+			  "Refusing to use null cipher" )
+#define ENOTSUP_SIG_HASH __einfo_error ( EINFO_ENOTSUP_SIG_HASH )
+#define EINFO_ENOTSUP_SIG_HASH						\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x03,				\
+			  "Unsupported signature and hash algorithm" )
+#define ENOTSUP_VERSION __einfo_error ( EINFO_ENOTSUP_VERSION )
+#define EINFO_ENOTSUP_VERSION						\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x04,				\
+			  "Unsupported protocol version" )
+#define EPERM_ALERT __einfo_error ( EINFO_EPERM_ALERT )
+#define EINFO_EPERM_ALERT						\
+	__einfo_uniqify ( EINFO_EPERM, 0x01,				\
+			  "Received fatal alert" )
+#define EPERM_VERIFY __einfo_error ( EINFO_EPERM_VERIFY )
+#define EINFO_EPERM_VERIFY						\
+	__einfo_uniqify ( EINFO_EPERM, 0x02,				\
+			  "Handshake verification failed" )
+#define EPROTO_VERSION __einfo_error ( EINFO_EPROTO_VERSION )
+#define EINFO_EPROTO_VERSION						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x01,				\
+			  "Illegal protocol version upgrade" )
 
 static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 				const void *data, size_t len );
@@ -640,7 +748,7 @@ static int tls_set_cipher ( struct tls_session *tls,
 	if ( ! dynamic ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for crypto "
 		       "context\n", tls, total );
-		return -ENOMEM;
+		return -ENOMEM_CONTEXT;
 	}
 
 	/* Assign storage */
@@ -674,7 +782,7 @@ static int tls_select_cipher ( struct tls_session *tls,
 	if ( ! suite ) {
 		DBGC ( tls, "TLS %p does not support cipher %04x\n",
 		       tls, ntohs ( cipher_suite ) );
-		return -ENOTSUP;
+		return -ENOTSUP_CIPHER;
 	}
 
 	/* Set ciphers */
@@ -707,7 +815,7 @@ static int tls_change_cipher ( struct tls_session *tls,
 	/* Sanity check */
 	if ( pending->suite == &tls_cipher_suite_null ) {
 		DBGC ( tls, "TLS %p refusing to use null cipher\n", tls );
-		return -ENOTSUP;
+		return -ENOTSUP_NULL;
 	}
 
 	tls_clear_cipher ( tls, active );
@@ -957,7 +1065,7 @@ static int tls_send_certificate ( struct tls_session *tls ) {
 	 */
 	certificate = zalloc ( sizeof ( *certificate ) );
 	if ( ! certificate )
-		return -ENOMEM;
+		return -ENOMEM_CERTIFICATE;
 
 	/* Populate record */
 	certificate->type_length =
@@ -1059,7 +1167,7 @@ static int tls_send_certificate_verify ( struct tls_session *tls ) {
 			DBGC ( tls, "TLS %p could not identify (%s,%s) "
 			       "signature and hash algorithm\n", tls,
 			       pubkey->name, digest->name );
-			rc = -ENOTSUP;
+			rc = -ENOTSUP_SIG_HASH;
 			goto err_sig_hash;
 		}
 	}
@@ -1179,7 +1287,7 @@ static int tls_new_change_cipher ( struct tls_session *tls,
 	if ( ( len != 1 ) || ( *( ( uint8_t * ) data ) != 1 ) ) {
 		DBGC ( tls, "TLS %p received invalid Change Cipher\n", tls );
 		DBGC_HD ( tls, data, len );
-		return -EINVAL;
+		return -EINVAL_CHANGE_CIPHER;
 	}
 
 	if ( ( rc = tls_change_cipher ( tls, &tls->rx_cipherspec_pending,
@@ -1214,7 +1322,7 @@ static int tls_new_alert ( struct tls_session *tls, const void *data,
 	if ( end != ( data + len ) ) {
 		DBGC ( tls, "TLS %p received overlength Alert\n", tls );
 		DBGC_HD ( tls, data, len );
-		return -EINVAL;
+		return -EINVAL_ALERT;
 	}
 
 	switch ( alert->level ) {
@@ -1225,11 +1333,11 @@ static int tls_new_alert ( struct tls_session *tls, const void *data,
 	case TLS_ALERT_FATAL:
 		DBGC ( tls, "TLS %p received fatal alert %d\n",
 		       tls, alert->description );
-		return -EPERM;
+		return -EPERM_ALERT;
 	default:
 		DBGC ( tls, "TLS %p received unknown alert level %d"
 		       "(alert %d)\n", tls, alert->level, alert->description );
-		return -EIO;
+		return -EIO_ALERT;
 	}
 }
 
@@ -1263,7 +1371,7 @@ static int tls_new_server_hello ( struct tls_session *tls,
 	if ( end > ( data + len ) ) {
 		DBGC ( tls, "TLS %p received underlength Server Hello\n", tls );
 		DBGC_HD ( tls, data, len );
-		return -EINVAL;
+		return -EINVAL_HELLO;
 	}
 
 	/* Check and store protocol version */
@@ -1271,13 +1379,13 @@ static int tls_new_server_hello ( struct tls_session *tls,
 	if ( version < TLS_VERSION_TLS_1_0 ) {
 		DBGC ( tls, "TLS %p does not support protocol version %d.%d\n",
 		       tls, ( version >> 8 ), ( version & 0xff ) );
-		return -ENOTSUP;
+		return -ENOTSUP_VERSION;
 	}
 	if ( version > tls->version ) {
 		DBGC ( tls, "TLS %p server attempted to illegally upgrade to "
 		       "protocol version %d.%d\n",
 		       tls, ( version >> 8 ), ( version & 0xff ) );
-		return -EPROTO;
+		return -EPROTO_VERSION;
 	}
 	tls->version = version;
 	DBGC ( tls, "TLS %p using protocol version %d.%d\n",
@@ -1334,7 +1442,7 @@ static int tls_parse_chain ( struct tls_session *tls,
 	/* Create certificate chain */
 	tls->chain = x509_alloc_chain();
 	if ( ! tls->chain ) {
-		rc = -ENOMEM;
+		rc = -ENOMEM_CHAIN;
 		goto err_alloc_chain;
 	}
 
@@ -1348,7 +1456,7 @@ static int tls_parse_chain ( struct tls_session *tls,
 		if ( next > end ) {
 			DBGC ( tls, "TLS %p overlength certificate:\n", tls );
 			DBGC_HDA ( tls, 0, data, ( end - data ) );
-			rc = -EINVAL;
+			rc = -EINVAL_CERTIFICATE;
 			goto err_overlength;
 		}
 
@@ -1401,7 +1509,7 @@ static int tls_new_certificate ( struct tls_session *tls,
 		DBGC ( tls, "TLS %p received overlength Server Certificate\n",
 		       tls );
 		DBGC_HD ( tls, data, len );
-		return -EINVAL;
+		return -EINVAL_CERTIFICATES;
 	}
 
 	/* Parse certificate chain */
@@ -1456,7 +1564,7 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
 		DBGC ( tls, "TLS %p received overlength Server Hello Done\n",
 		       tls );
 		DBGC_HD ( tls, data, len );
-		return -EINVAL;
+		return -EINVAL_HELLO_DONE;
 	}
 
 	/* Begin certificate validation */
@@ -1492,7 +1600,7 @@ static int tls_new_finished ( struct tls_session *tls,
 	if ( end != ( data + len ) ) {
 		DBGC ( tls, "TLS %p received overlength Finished\n", tls );
 		DBGC_HD ( tls, data, len );
-		return -EINVAL;
+		return -EINVAL_FINISHED;
 	}
 
 	/* Verify data */
@@ -1503,7 +1611,7 @@ static int tls_new_finished ( struct tls_session *tls,
 	if ( memcmp ( verify_data, finished->verify_data,
 		      sizeof ( verify_data ) ) != 0 ) {
 		DBGC ( tls, "TLS %p verification failed\n", tls );
-		return -EPERM;
+		return -EPERM_VERIFY;
 	}
 
 	/* Mark server as finished */
@@ -1543,7 +1651,7 @@ static int tls_new_handshake ( struct tls_session *tls,
 			DBGC ( tls, "TLS %p received overlength Handshake\n",
 			       tls );
 			DBGC_HD ( tls, data, len );
-			return -EINVAL;
+			return -EINVAL_HANDSHAKE;
 		}
 
 		switch ( handshake->type ) {
@@ -1783,7 +1891,7 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 	if ( ! plaintext ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
 		       "plaintext\n", tls, plaintext_len );
-		rc = -ENOMEM;
+		rc = -ENOMEM_TX_PLAINTEXT;
 		goto done;
 	}
 
@@ -1796,7 +1904,7 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 	if ( ! ciphertext ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
 		       "ciphertext\n", tls, ciphertext_len );
-		rc = -ENOMEM;
+		rc = -ENOMEM_TX_CIPHERTEXT;
 		goto done;
 	}
 
@@ -1857,7 +1965,7 @@ static int tls_split_stream ( struct tls_session *tls,
 	if ( plaintext_len < mac_len ) {
 		DBGC ( tls, "TLS %p received underlength record\n", tls );
 		DBGC_HD ( tls, plaintext, plaintext_len );
-		return -EINVAL;
+		return -EINVAL_STREAM;
 	}
 	content_len = ( plaintext_len - mac_len );
 	content = plaintext;
@@ -1900,7 +2008,7 @@ static int tls_split_block ( struct tls_session *tls,
 	if ( plaintext_len < 1 ) {
 		DBGC ( tls, "TLS %p received underlength record\n", tls );
 		DBGC_HD ( tls, plaintext, plaintext_len );
-		return -EINVAL;
+		return -EINVAL_BLOCK;
 	}
 
 	/* TLSv1.1 and later use an explicit IV */
@@ -1913,7 +2021,7 @@ static int tls_split_block ( struct tls_session *tls,
 	if ( plaintext_len < ( iv_len + mac_len + padding_len + 1 ) ) {
 		DBGC ( tls, "TLS %p received underlength record\n", tls );
 		DBGC_HD ( tls, plaintext, plaintext_len );
-		return -EINVAL;
+		return -EINVAL_BLOCK;
 	}
 	content_len = ( plaintext_len - iv_len - mac_len - padding_len - 1 );
 	iv = plaintext;
@@ -1926,7 +2034,7 @@ static int tls_split_block ( struct tls_session *tls,
 		if ( *( ( uint8_t * ) ( padding + i ) ) != padding_len ) {
 			DBGC ( tls, "TLS %p received bad padding\n", tls );
 			DBGC_HD ( tls, plaintext, plaintext_len );
-			return -EINVAL;
+			return -EINVAL_PADDING;
 		}
 	}
 
@@ -1966,7 +2074,7 @@ static int tls_new_ciphertext ( struct tls_session *tls,
 	if ( ! plaintext ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
 		       "decryption buffer\n", tls, record_len );
-		rc = -ENOMEM;
+		rc = -ENOMEM_RX_PLAINTEXT;
 		goto done;
 	}
 
@@ -2094,7 +2202,7 @@ static int tls_newdata_process_header ( struct tls_session *tls ) {
 	if ( ! tls->rx_data ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes "
 		       "for receive buffer\n", tls, data_len );
-		return -ENOMEM;
+		return -ENOMEM_RX_DATA;
 	}
 
 	/* Move to data state */
@@ -2162,7 +2270,7 @@ static int tls_cipherstream_deliver ( struct tls_session *tls,
 			break;
 		default:
 			assert ( 0 );
-			rc = -EINVAL;
+			rc = -EINVAL_RX_STATE;
 			goto done;
 		}
 
