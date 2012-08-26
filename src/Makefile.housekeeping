@@ -663,7 +663,7 @@ $(BIN)/clientcert.o : override CC := env CCACHE_DISABLE=1 $(CC)
 define deps_template
 	@$(ECHO) "  [DEPS] $(1)"
 	@$(MKDIR) -p $(BIN)/deps/$(dir $(1))
-	@$(CPP) $(CFLAGS) $(CFLAGS_$(2)) $(CFLAGS_$(3)) -DOBJECT=$(3) \
+	$(Q)$(CPP) $(CFLAGS) $(CFLAGS_$(2)) $(CFLAGS_$(3)) -DOBJECT=$(3) \
 		-Wno-error -M $(1) -MG -MP | \
 		sed 's/\.o\s*:/_DEPS +=/' > $(BIN)/deps/$(1).d
 endef
