@@ -590,7 +590,8 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 
 	/* Allocate buffer */
 	ll_headroom = ( MAX_LL_HEADER_LEN - ll_header_len );
-	iobuf = alloc_iob ( ll_headroom + len );
+	iobuf = alloc_iob ( ll_headroom +
+			    ( ( len > IOB_ZLEN ) ? len : IOB_ZLEN ) );
 	if ( ! iobuf ) {
 		DBGC ( snpdev, "SNPDEV %p TX could not allocate %ld-byte "
 		       "buffer\n", snpdev, ( ( unsigned long ) len ) );

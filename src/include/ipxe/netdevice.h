@@ -188,7 +188,16 @@ struct ll_protocol {
 	uint8_t ll_addr_len;
 	/** Link-layer header length */
 	uint8_t ll_header_len;
+	/** Flags */
+	unsigned int flags;
 };
+
+/** Local link-layer address functions only as a name
+ *
+ * This flag indicates that the local link-layer address cannot
+ * directly be used as a destination address by a remote node.
+ */
+#define LL_NAME_ONLY 0x0001
 
 /** Network device operations */
 struct net_device_operations {

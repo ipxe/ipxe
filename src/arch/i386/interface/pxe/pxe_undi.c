@@ -358,7 +358,8 @@ pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT *undi_transmit ) {
 	}
 
 	/* Allocate and fill I/O buffer */
-	iobuf = alloc_iob ( MAX_LL_HEADER_LEN + len );
+	iobuf = alloc_iob ( MAX_LL_HEADER_LEN +
+			    ( ( len > IOB_ZLEN ) ? len : IOB_ZLEN ) );
 	if ( ! iobuf ) {
 		DBGC2 ( &pxe_netdev, " could not allocate iobuf\n" );
 		undi_transmit->Status = PXENV_STATUS_OUT_OF_RESOURCES;

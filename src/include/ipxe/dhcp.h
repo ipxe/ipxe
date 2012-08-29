@@ -651,8 +651,6 @@ struct dhcphdr {
 #define PXEBS_SETTINGS_NAME "pxebs"
 
 extern uint32_t dhcp_last_xid;
-extern unsigned int dhcp_chaddr ( struct net_device *netdev, void *chaddr,
-				  uint16_t *flags );
 extern int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 				struct net_device *netdev, uint8_t msgtype,
 				uint32_t xid, const void *options,

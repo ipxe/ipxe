@@ -938,9 +938,17 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 	dhcphdr->magic = htonl ( DHCP_MAGIC_COOKIE );
 	dhcphdr->htype = ntohs ( netdev->ll_protocol->ll_proto );
 	dhcphdr->op = dhcp_op[msgtype];
-	dhcphdr->hlen = dhcp_chaddr ( netdev, dhcphdr->chaddr,
-				      &dhcphdr->flags );
+	dhcphdr->hlen = netdev->ll_protocol->ll_addr_len;
+	memcpy ( dhcphdr->chaddr, netdev->ll_addr,
+		 netdev->ll_protocol->ll_addr_len );
 	memcpy ( dhcphdr->options, options, options_len );
+
+	/* If the local link-layer address functions only as a name
+	 * (i.e. cannot be used as a destination address), then
+	 * request broadcast responses.
+	 */
+	if ( netdev->ll_protocol->flags & LL_NAME_ONLY )
+		dhcphdr->flags |= htons ( BOOTP_FL_BROADCAST );
 
 	/* If the network device already has an IPv4 address then
 	 * unicast responses from the DHCP server may be rejected, so
