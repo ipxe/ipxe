@@ -534,6 +534,11 @@ static struct ib_completion_queue_operations ipoib_cq_op = {
 	.complete_recv = ipoib_complete_recv,
 };
 
+/** IPoIB queue pair operations */
+static struct ib_queue_pair_operations ipoib_qp_op = {
+	.alloc_iob = alloc_iob,
+};
+
 /**
  * Poll IPoIB network device
  *
@@ -667,9 +672,9 @@ static int ipoib_open ( struct net_device *netdev ) {
 	}
 
 	/* Allocate queue pair */
-	ipoib->qp = ib_create_qp ( ibdev, IB_QPT_UD,
-				   IPOIB_NUM_SEND_WQES, ipoib->cq,
-				   IPOIB_NUM_RECV_WQES, ipoib->cq );
+	ipoib->qp = ib_create_qp ( ibdev, IB_QPT_UD, IPOIB_NUM_SEND_WQES,
+				   ipoib->cq, IPOIB_NUM_RECV_WQES, ipoib->cq,
+				   &ipoib_qp_op );
 	if ( ! ipoib->qp ) {
 		DBGC ( ipoib, "IPoIB %p could not allocate queue pair\n",
 		       ipoib );

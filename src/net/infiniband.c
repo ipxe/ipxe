@@ -168,6 +168,7 @@ void ib_poll_cq ( struct ib_device *ibdev,
  * @v send_cq		Send completion queue
  * @v num_recv_wqes	Number of receive work queue entries
  * @v recv_cq		Receive completion queue
+ * @v op		Queue pair operations
  * @ret qp		Queue pair
  *
  * The queue pair will be left in the INIT state; you must call
@@ -178,7 +179,8 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 				      unsigned int num_send_wqes,
 				      struct ib_completion_queue *send_cq,
 				      unsigned int num_recv_wqes,
-				      struct ib_completion_queue *recv_cq ) {
+				      struct ib_completion_queue *recv_cq,
+				      struct ib_queue_pair_operations *op ) {
 	struct ib_queue_pair *qp;
 	size_t total_size;
 	int rc;
@@ -210,6 +212,7 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	qp->recv.iobufs = ( ( ( void * ) qp ) + sizeof ( *qp ) +
 			    ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ));
 	INIT_LIST_HEAD ( &qp->mgids );
+	qp->op = op;
 
 	/* Perform device-specific initialisation and get QPN */
 	if ( ( rc = ibdev->op->create_qp ( ibdev, qp ) ) != 0 ) {
@@ -514,7 +517,7 @@ void ib_refill_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	while ( qp->recv.fill < qp->recv.num_wqes ) {
 
 		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( IB_MAX_PAYLOAD_SIZE );
+		iobuf = qp->op->alloc_iob ( IB_MAX_PAYLOAD_SIZE );
 		if ( ! iobuf ) {
 			/* Non-fatal; we will refill on next attempt */
 			return;

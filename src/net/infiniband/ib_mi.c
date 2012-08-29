@@ -164,6 +164,11 @@ static struct ib_completion_queue_operations ib_mi_completion_ops = {
 	.complete_recv = ib_mi_complete_recv,
 };
 
+/** Management interface queue pair operations */
+static struct ib_queue_pair_operations ib_mi_queue_pair_ops = {
+	.alloc_iob = alloc_iob,
+};
+
 /**
  * Transmit MAD
  *
@@ -353,7 +358,8 @@ struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
 
 	/* Create queue pair */
 	mi->qp = ib_create_qp ( ibdev, type, IB_MI_NUM_SEND_WQES, mi->cq,
-				IB_MI_NUM_RECV_WQES, mi->cq );
+				IB_MI_NUM_RECV_WQES, mi->cq,
+				&ib_mi_queue_pair_ops );
 	if ( ! mi->qp ) {
 		DBGC ( mi, "MI %p could not allocate queue pair\n", mi );
 		goto err_create_qp;

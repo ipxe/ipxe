@@ -142,6 +142,16 @@ enum ib_queue_pair_type {
 	IB_QPT_ETH,
 };
 
+/** Infiniband queue pair operations */
+struct ib_queue_pair_operations {
+	/** Allocate receive I/O buffer
+	 *
+	 * @v len		Maximum receive length
+	 * @ret iobuf		I/O buffer (or NULL if out of memory)
+	 */
+	struct io_buffer * ( * alloc_iob ) ( size_t len );
+};
+
 /** An Infiniband Queue Pair */
 struct ib_queue_pair {
 	/** Containing Infiniband device */
@@ -169,6 +179,8 @@ struct ib_queue_pair {
 	struct list_head mgids;
 	/** Address vector */
 	struct ib_address_vector av;
+	/** Queue pair operations */
+	struct ib_queue_pair_operations *op;
 	/** Driver private data */
 	void *drv_priv;
 	/** Queue owner private data */
@@ -478,8 +490,8 @@ extern void ib_poll_cq ( struct ib_device *ibdev,
 extern struct ib_queue_pair *
 ib_create_qp ( struct ib_device *ibdev, enum ib_queue_pair_type type,
 	       unsigned int num_send_wqes, struct ib_completion_queue *send_cq,
-	       unsigned int num_recv_wqes,
-	       struct ib_completion_queue *recv_cq );
+	       unsigned int num_recv_wqes, struct ib_completion_queue *recv_cq,
+	       struct ib_queue_pair_operations *op );
 extern int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp );
 extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );

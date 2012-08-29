@@ -257,6 +257,11 @@ static struct ib_completion_queue_operations ib_cmrc_completion_ops = {
 	.complete_recv = ib_cmrc_complete_recv,
 };
 
+/** Infiniband CMRC queue pair operations */
+static struct ib_queue_pair_operations ib_cmrc_queue_pair_ops = {
+	.alloc_iob = alloc_iob,
+};
+
 /**
  * Send data via CMRC
  *
@@ -410,7 +415,8 @@ int ib_cmrc_open ( struct interface *xfer, struct ib_device *ibdev,
 
 	/* Create queue pair */
 	cmrc->qp = ib_create_qp ( ibdev, IB_QPT_RC, IB_CMRC_NUM_SEND_WQES,
-				  cmrc->cq, IB_CMRC_NUM_RECV_WQES, cmrc->cq );
+				  cmrc->cq, IB_CMRC_NUM_RECV_WQES, cmrc->cq,
+				  &ib_cmrc_queue_pair_ops );
 	if ( ! cmrc->qp ) {
 		DBGC ( cmrc, "CMRC %p could not create queue pair\n", cmrc );
 		rc = -ENOMEM;
