@@ -247,6 +247,9 @@ REQUIRE_OBJECT ( cpuid_cmd );
 #ifdef SYNC_CMD
 REQUIRE_OBJECT ( sync_cmd );
 #endif
+#ifdef NSLOOKUP_CMD
+REQUIRE_OBJECT ( nslookup_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
