@@ -32,31 +32,25 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
- * Allocate I/O buffer
+ * Allocate I/O buffer with specified alignment and offset
  *
  * @v len	Required length of buffer
+ * @v align	Physical alignment
+ * @v offset	Offset from physical alignment
  * @ret iobuf	I/O buffer, or NULL if none available
  *
- * The I/O buffer will be physically aligned to a multiple of
- * @c IOBUF_SIZE.
+ * @c align will be rounded up to the nearest power of two.
  */
-struct io_buffer * alloc_iob ( size_t len ) {
+struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
 	struct io_buffer *iobuf;
-	size_t align;
 	void *data;
-
-	/* Pad to minimum length */
-	if ( len < IOB_ZLEN )
-		len = IOB_ZLEN;
 
 	/* Align buffer length to ensure that struct io_buffer is aligned */
 	len = ( len + __alignof__ ( *iobuf ) - 1 ) &
 		~( __alignof__ ( *iobuf ) - 1 );
 
-	/* Align buffer on its own size to avoid potential problems
-	 * with boundary-crossing DMA.
-	 */
-	align = ( 1 << fls ( len - 1 ) );
+	/* Round up alignment to the nearest power of two */
+	align = ( 1 << fls ( align - 1 ) );
 
 	/* Allocate buffer plus descriptor as a single unit, unless
 	 * doing so will push the total size over the alignment
@@ -65,7 +59,8 @@ struct io_buffer * alloc_iob ( size_t len ) {
 	if ( ( len + sizeof ( *iobuf ) ) <= align ) {
 
 		/* Allocate memory for buffer plus descriptor */
-		data = malloc_dma ( len + sizeof ( *iobuf ), align );
+		data = malloc_dma_offset ( len + sizeof ( *iobuf ), align,
+					   offset );
 		if ( ! data )
 			return NULL;
 		iobuf = ( data + len );
@@ -73,7 +68,7 @@ struct io_buffer * alloc_iob ( size_t len ) {
 	} else {
 
 		/* Allocate memory for buffer */
-		data = malloc_dma ( len, align );
+		data = malloc_dma_offset ( len, align, offset );
 		if ( ! data )
 			return NULL;
 
@@ -92,6 +87,26 @@ struct io_buffer * alloc_iob ( size_t len ) {
 	return iobuf;
 }
 
+/**
+ * Allocate I/O buffer
+ *
+ * @v len	Required length of buffer
+ * @ret iobuf	I/O buffer, or NULL if none available
+ *
+ * The I/O buffer will be physically aligned on its own size (rounded
+ * up to the nearest power of two).
+ */
+struct io_buffer * alloc_iob ( size_t len ) {
+
+	/* Pad to minimum length */
+	if ( len < IOB_ZLEN )
+		len = IOB_ZLEN;
+
+	/* Align buffer on its own size to avoid potential problems
+	 * with boundary-crossing DMA.
+	 */
+	return alloc_iob_raw ( len, len, 0 );
+}
 
 /**
  * Free I/O buffer

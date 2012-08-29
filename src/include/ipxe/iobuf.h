@@ -210,6 +210,8 @@ static inline void iob_populate ( struct io_buffer *iobuf,
 	(iobuf) = NULL;					\
 	__iobuf; } )
 
+extern struct io_buffer * __malloc alloc_iob_raw ( size_t len, size_t align,
+						   size_t offset );
 extern struct io_buffer * __malloc alloc_iob ( size_t len );
 extern void free_iob ( struct io_buffer *iobuf );
 extern void iob_pad ( struct io_buffer *iobuf, size_t min_len );
