@@ -39,7 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** Ethernet broadcast MAC address */
-static uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 /**
  * Add Ethernet link-layer header
