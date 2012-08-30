@@ -1250,14 +1250,14 @@ static const union ib_gid arbel_no_gid = {
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v av		Address vector
+ * @v dest		Destination address vector
  * @v iobuf		I/O buffer
  * @v wqe		Send work queue entry
  * @ret nds		Work queue entry size
  */
 static size_t arbel_fill_ud_send_wqe ( struct ib_device *ibdev,
 				       struct ib_queue_pair *qp __unused,
-				       struct ib_address_vector *av,
+				       struct ib_address_vector *dest,
 				       struct io_buffer *iobuf,
 				       union arbel_send_wqe *wqe ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
@@ -1269,16 +1269,16 @@ static size_t arbel_fill_ud_send_wqe ( struct ib_device *ibdev,
 		     ud_address_vector.pd, ARBEL_GLOBAL_PD,
 		     ud_address_vector.port_number, ibdev->port );
 	MLX_FILL_2 ( &wqe->ud.ud, 1,
-		     ud_address_vector.rlid, av->lid,
-		     ud_address_vector.g, av->gid_present );
+		     ud_address_vector.rlid, dest->lid,
+		     ud_address_vector.g, dest->gid_present );
 	MLX_FILL_2 ( &wqe->ud.ud, 2,
-		     ud_address_vector.max_stat_rate, arbel_rate ( av ),
+		     ud_address_vector.max_stat_rate, arbel_rate ( dest ),
 		     ud_address_vector.msg, 3 );
-	MLX_FILL_1 ( &wqe->ud.ud, 3, ud_address_vector.sl, av->sl );
-	gid = ( av->gid_present ? &av->gid : &arbel_no_gid );
+	MLX_FILL_1 ( &wqe->ud.ud, 3, ud_address_vector.sl, dest->sl );
+	gid = ( dest->gid_present ? &dest->gid : &arbel_no_gid );
 	memcpy ( &wqe->ud.ud.u.dwords[4], gid, sizeof ( *gid ) );
-	MLX_FILL_1 ( &wqe->ud.ud, 8, destination_qp, av->qpn );
-	MLX_FILL_1 ( &wqe->ud.ud, 9, q_key, av->qkey );
+	MLX_FILL_1 ( &wqe->ud.ud, 8, destination_qp, dest->qpn );
+	MLX_FILL_1 ( &wqe->ud.ud, 9, q_key, dest->qkey );
 	MLX_FILL_1 ( &wqe->ud.data[0], 0, byte_count, iob_len ( iobuf ) );
 	MLX_FILL_1 ( &wqe->ud.data[0], 1, l_key, arbel->lkey );
 	MLX_FILL_H ( &wqe->ud.data[0], 2,
@@ -1294,15 +1294,14 @@ static size_t arbel_fill_ud_send_wqe ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v av		Address vector
+ * @v dest		Destination address vector
  * @v iobuf		I/O buffer
  * @v wqe		Send work queue entry
- * @v next		Previous work queue entry's "next" field
  * @ret nds		Work queue entry size
  */
 static size_t arbel_fill_mlx_send_wqe ( struct ib_device *ibdev,
 					struct ib_queue_pair *qp,
-					struct ib_address_vector *av,
+					struct ib_address_vector *dest,
 					struct io_buffer *iobuf,
 					union arbel_send_wqe *wqe ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
@@ -1312,16 +1311,16 @@ static size_t arbel_fill_mlx_send_wqe ( struct ib_device *ibdev,
 	iob_populate ( &headers, &wqe->mlx.headers, 0,
 		       sizeof ( wqe->mlx.headers ) );
 	iob_reserve ( &headers, sizeof ( wqe->mlx.headers ) );
-	ib_push ( ibdev, &headers, qp, iob_len ( iobuf ), av );
+	ib_push ( ibdev, &headers, qp, iob_len ( iobuf ), dest );
 
 	/* Construct this work queue entry */
 	MLX_FILL_5 ( &wqe->mlx.ctrl, 0,
 		     c, 1 /* generate completion */,
 		     icrc, 0 /* generate ICRC */,
-		     max_statrate, arbel_rate ( av ),
+		     max_statrate, arbel_rate ( dest ),
 		     slr, 0,
 		     v15, ( ( qp->ext_qpn == IB_QPN_SMI ) ? 1 : 0 ) );
-	MLX_FILL_1 ( &wqe->mlx.ctrl, 1, rlid, av->lid );
+	MLX_FILL_1 ( &wqe->mlx.ctrl, 1, rlid, dest->lid );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 0,
 		     byte_count, iob_len ( &headers ) );
 	MLX_FILL_1 ( &wqe->mlx.data[0], 1, l_key, arbel->lkey );
@@ -1345,15 +1344,14 @@ static size_t arbel_fill_mlx_send_wqe ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v av		Address vector
+ * @v dest		Destination address vector
  * @v iobuf		I/O buffer
  * @v wqe		Send work queue entry
- * @v next		Previous work queue entry's "next" field
  * @ret nds		Work queue entry size
  */
 static size_t arbel_fill_rc_send_wqe ( struct ib_device *ibdev,
 				       struct ib_queue_pair *qp __unused,
-				       struct ib_address_vector *av __unused,
+				       struct ib_address_vector *dest __unused,
 				       struct io_buffer *iobuf,
 				       union arbel_send_wqe *wqe ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
@@ -1374,7 +1372,7 @@ static size_t arbel_fill_rc_send_wqe ( struct ib_device *ibdev,
 static size_t
 ( * arbel_fill_send_wqe[] ) ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp,
-			      struct ib_address_vector *av,
+			      struct ib_address_vector *dest,
 			      struct io_buffer *iobuf,
 			      union arbel_send_wqe *wqe ) = {
 	[IB_QPT_SMI] = arbel_fill_mlx_send_wqe,
@@ -1388,13 +1386,13 @@ static size_t
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v av		Address vector
+ * @v dest		Destination address vector
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
 static int arbel_post_send ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp,
-			     struct ib_address_vector *av,
+			     struct ib_address_vector *dest,
 			     struct io_buffer *iobuf ) {
 	struct arbel *arbel = ib_get_drvdata ( ibdev );
 	struct arbel_queue_pair *arbel_qp = ib_qp_get_drvdata ( qp );
@@ -1424,7 +1422,7 @@ static int arbel_post_send ( struct ib_device *ibdev,
 	assert ( qp->type < ( sizeof ( arbel_fill_send_wqe ) /
 			      sizeof ( arbel_fill_send_wqe[0] ) ) );
 	assert ( arbel_fill_send_wqe[qp->type] != NULL );
-	nds = arbel_fill_send_wqe[qp->type] ( ibdev, qp, av, iobuf, wqe );
+	nds = arbel_fill_send_wqe[qp->type] ( ibdev, qp, dest, iobuf, wqe );
 	DBGCP ( arbel, "Arbel %p QPN %#lx posting send WQE %#lx:\n",
 		arbel, qp->qpn, ( wq->next_idx & wqe_idx_mask ) );
 	DBGCP_HDA ( arbel, virt_to_phys ( wqe ), wqe, sizeof ( *wqe ) );
@@ -1527,9 +1525,9 @@ static int arbel_complete ( struct ib_device *ibdev,
 	struct arbel_recv_work_queue *arbel_recv_wq;
 	struct arbelprm_recv_wqe *recv_wqe;
 	struct io_buffer *iobuf;
-	struct ib_address_vector recv_av;
+	struct ib_address_vector recv_source;
 	struct ib_global_route_header *grh;
-	struct ib_address_vector *av;
+	struct ib_address_vector *source;
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
@@ -1618,23 +1616,24 @@ static int arbel_complete ( struct ib_device *ibdev,
 			grh = iobuf->data;
 			iob_pull ( iobuf, sizeof ( *grh ) );
 			/* Construct address vector */
-			av = &recv_av;
-			memset ( av, 0, sizeof ( *av ) );
-			av->qpn = MLX_GET ( &cqe->normal, rqpn );
-			av->lid = MLX_GET ( &cqe->normal, rlid );
-			av->sl = MLX_GET ( &cqe->normal, sl );
-			av->gid_present = MLX_GET ( &cqe->normal, g );
-			memcpy ( &av->gid, &grh->sgid, sizeof ( av->gid ) );
+			source = &recv_source;
+			memset ( source, 0, sizeof ( *source ) );
+			source->qpn = MLX_GET ( &cqe->normal, rqpn );
+			source->lid = MLX_GET ( &cqe->normal, rlid );
+			source->sl = MLX_GET ( &cqe->normal, sl );
+			source->gid_present = MLX_GET ( &cqe->normal, g );
+			memcpy ( &source->gid, &grh->sgid,
+				 sizeof ( source->gid ) );
 			break;
 		case IB_QPT_RC:
-			av = &qp->av;
+			source = &qp->av;
 			break;
 		default:
 			assert ( 0 );
 			return -EINVAL;
 		}
 		/* Hand off to completion handler */
-		ib_complete_recv ( ibdev, qp, av, iobuf, rc );
+		ib_complete_recv ( ibdev, qp, source, iobuf, rc );
 	}
 
 	return rc;

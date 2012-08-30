@@ -42,11 +42,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v iobuf		I/O buffer to contain headers
  * @v qp		Queue pair
  * @v payload_len	Payload length
- * @v av		Address vector
+ * @v dest		Destination address vector
+ * @ret rc		Return status code
  */
 int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	      struct ib_queue_pair *qp, size_t payload_len,
-	      const struct ib_address_vector *av ) {
+	      const struct ib_address_vector *dest ) {
 	struct ib_local_route_header *lrh;
 	struct ib_global_route_header *grh;
 	struct ib_base_transport_header *bth;
@@ -59,7 +60,8 @@ int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	unsigned int lnh;
 
 	DBGC2 ( ibdev, "IBDEV %p TX %04x:%08lx => %04x:%08lx (key %08lx)\n",
-		ibdev, ibdev->lid, qp->ext_qpn, av->lid, av->qpn, av->qkey );
+		ibdev, ibdev->lid, qp->ext_qpn, dest->lid, dest->qpn,
+		dest->qkey );
 
 	/* Calculate packet length */
 	pad_len = ( (-payload_len) & 0x3 );
@@ -71,7 +73,7 @@ int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	deth = iob_push ( iobuf, sizeof ( *deth ) );
 	bth = iob_push ( iobuf, sizeof ( *bth ) );
 	grh_len = ( payload_len + iob_len ( iobuf ) - orig_iob_len );
-	grh = ( av->gid_present ?
+	grh = ( dest->gid_present ?
 		iob_push ( iobuf, sizeof ( *grh ) ) : NULL );
 	lrh = iob_push ( iobuf, sizeof ( *lrh ) );
 	lrh_len = ( payload_len + iob_len ( iobuf ) - orig_iob_len );
@@ -80,8 +82,8 @@ int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	vl = ( ( qp->ext_qpn == IB_QPN_SMI ) ? IB_VL_SMP : IB_VL_DEFAULT );
 	lrh->vl__lver = ( vl << 4 );
 	lnh = ( grh ? IB_LNH_GRH : IB_LNH_BTH );
-	lrh->sl__lnh = ( ( av->sl << 4 ) | lnh );
-	lrh->dlid = htons ( av->lid );
+	lrh->sl__lnh = ( ( dest->sl << 4 ) | lnh );
+	lrh->dlid = htons ( dest->lid );
 	lrh->length = htons ( lrh_len >> 2 );
 	lrh->slid = htons ( ibdev->lid );
 
@@ -93,18 +95,18 @@ int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		grh->nxthdr = IB_GRH_NXTHDR_IBA;
 		grh->hoplmt = 0;
 		memcpy ( &grh->sgid, &ibdev->gid, sizeof ( grh->sgid ) );
-		memcpy ( &grh->dgid, &av->gid, sizeof ( grh->dgid ) );
+		memcpy ( &grh->dgid, &dest->gid, sizeof ( grh->dgid ) );
 	}
 
 	/* Construct BTH */
 	bth->opcode = BTH_OPCODE_UD_SEND;
 	bth->se__m__padcnt__tver = ( pad_len << 4 );
 	bth->pkey = htons ( ibdev->pkey );
-	bth->dest_qp = htonl ( av->qpn );
+	bth->dest_qp = htonl ( dest->qpn );
 	bth->ack__psn = htonl ( ( qp->send.psn++ ) & 0xffffffUL );
 
 	/* Construct DETH */
-	deth->qkey = htonl ( av->qkey );
+	deth->qkey = htonl ( dest->qkey );
 	deth->src_qp = htonl ( qp->ext_qpn );
 
 	DBGCP_HDA ( ibdev, 0, iobuf->data,
@@ -120,11 +122,12 @@ int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
  * @v iobuf		I/O buffer containing headers
  * @v qp		Queue pair to fill in, or NULL
  * @v payload_len	Payload length to fill in, or NULL
- * @v av		Address vector to fill in
+ * @v source		Source address vector to fill in
+ * @ret rc		Return status code
  */
 int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	      struct ib_queue_pair **qp, size_t *payload_len,
-	      struct ib_address_vector *av ) {
+	      struct ib_address_vector *source ) {
 	struct ib_local_route_header *lrh;
 	struct ib_global_route_header *grh;
 	struct ib_base_transport_header *bth;
@@ -140,7 +143,7 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		*qp = NULL;
 	if ( payload_len )
 		*payload_len = 0;
-	memset ( av, 0, sizeof ( *av ) );
+	memset ( source, 0, sizeof ( *source ) );
 
 	/* Extract LRH */
 	if ( iob_len ( iobuf ) < sizeof ( *lrh ) ) {
@@ -150,8 +153,8 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	}
 	lrh = iobuf->data;
 	iob_pull ( iobuf, sizeof ( *lrh ) );
-	av->lid = ntohs ( lrh->slid );
-	av->sl = ( lrh->sl__lnh >> 4 );
+	source->lid = ntohs ( lrh->slid );
+	source->sl = ( lrh->sl__lnh >> 4 );
 	lnh = ( lrh->sl__lnh & 0x3 );
 	lid = ntohs ( lrh->dlid );
 
@@ -171,8 +174,8 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		}
 		grh = iobuf->data;
 		iob_pull ( iobuf, sizeof ( *grh ) );
-		av->gid_present = 1;
-		memcpy ( &av->gid, &grh->sgid, sizeof ( av->gid ) );
+		source->gid_present = 1;
+		memcpy ( &source->gid, &grh->sgid, sizeof ( source->gid ) );
 	} else {
 		grh = NULL;
 	}
@@ -200,8 +203,8 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	}
 	deth = iobuf->data;
 	iob_pull ( iobuf, sizeof ( *deth ) );
-	av->qpn = ntohl ( deth->src_qp );
-	av->qkey = ntohl ( deth->qkey );
+	source->qpn = ntohl ( deth->src_qp );
+	source->qkey = ntohl ( deth->qkey );
 
 	/* Calculate payload length, if applicable */
 	if ( payload_len ) {
@@ -233,7 +236,7 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	DBGC2 ( ibdev, "IBDEV %p RX %04x:%08lx <= %04x:%08lx (key %08x)\n",
 		ibdev, lid, ( IB_LID_MULTICAST( lid ) ?
 			      ( qp ? (*qp)->ext_qpn : -1UL ) : qpn ),
-		av->lid, av->qpn, ntohl ( deth->qkey ) );
+		source->lid, source->qpn, ntohl ( deth->qkey ) );
 	DBGCP_HDA ( ibdev, 0,
 		    ( iobuf->data - ( orig_iob_len - iob_len ( iobuf ) ) ),
 		    ( orig_iob_len - iob_len ( iobuf ) ) );

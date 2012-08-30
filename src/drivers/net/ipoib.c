@@ -423,8 +423,8 @@ static int ipoib_transmit ( struct net_device *netdev,
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ib_device *ibdev = ipoib->ibdev;
 	struct ipoib_hdr *ipoib_hdr;
-	struct ipoib_peer *dest;
-	struct ib_address_vector av;
+	struct ipoib_peer *peer;
+	struct ib_address_vector dest;
 	int rc;
 
 	/* Sanity check */
@@ -441,22 +441,22 @@ static int ipoib_transmit ( struct net_device *netdev,
 		return -ENETUNREACH;
 
 	/* Identify destination address */
-	dest = ipoib_lookup_peer_by_key ( ipoib_hdr->u.peer.dest );
-	if ( ! dest )
+	peer = ipoib_lookup_peer_by_key ( ipoib_hdr->u.peer.dest );
+	if ( ! peer )
 		return -ENXIO;
 	ipoib_hdr->u.reserved = 0;
 
 	/* Construct address vector */
-	memset ( &av, 0, sizeof ( av ) );
-	av.qpn = ( ntohl ( dest->mac.flags__qpn ) & IB_QPN_MASK );
-	av.gid_present = 1;
-	memcpy ( &av.gid, &dest->mac.gid, sizeof ( av.gid ) );
-	if ( ( rc = ib_resolve_path ( ibdev, &av ) ) != 0 ) {
+	memset ( &dest, 0, sizeof ( dest ) );
+	dest.qpn = ( ntohl ( peer->mac.flags__qpn ) & IB_QPN_MASK );
+	dest.gid_present = 1;
+	memcpy ( &dest.gid, &peer->mac.gid, sizeof ( dest.gid ) );
+	if ( ( rc = ib_resolve_path ( ibdev, &dest ) ) != 0 ) {
 		/* Path not resolved yet */
 		return rc;
 	}
 
-	return ib_post_send ( ibdev, ipoib->qp, &av, iobuf );
+	return ib_post_send ( ibdev, ipoib->qp, &dest, iobuf );
 }
 
 /**
@@ -480,13 +480,13 @@ static void ipoib_complete_send ( struct ib_device *ibdev __unused,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v av		Address vector, or NULL
+ * @v source		Source address vector, or NULL
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
 static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 				  struct ib_queue_pair *qp,
-				  struct ib_address_vector *av,
+				  struct ib_address_vector *source,
 				  struct io_buffer *iobuf, int rc ) {
 	struct ipoib_device *ipoib = ib_qp_get_ownerdata ( qp );
 	struct net_device *netdev = ipoib->netdev;
@@ -509,7 +509,7 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 		return;
 	}
 	ipoib_hdr = iobuf->data;
-	if ( ! av ) {
+	if ( ! source ) {
 		DBGC ( ipoib, "IPoIB %p received packet without address "
 		       "vector\n", ipoib );
 		netdev_rx_err ( netdev, iobuf, -ENOTTY );
@@ -517,9 +517,9 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 	}
 
 	/* Parse source address */
-	if ( av->gid_present ) {
-		ll_src.flags__qpn = htonl ( av->qpn );
-		memcpy ( &ll_src.gid, &av->gid, sizeof ( ll_src.gid ) );
+	if ( source->gid_present ) {
+		ll_src.flags__qpn = htonl ( source->qpn );
+		memcpy ( &ll_src.gid, &source->gid, sizeof ( ll_src.gid ) );
 		src = ipoib_cache_peer ( &ll_src );
 		ipoib_hdr->u.peer.src = src->key;
 	}

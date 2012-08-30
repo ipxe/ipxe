@@ -205,13 +205,13 @@ struct ib_completion_queue_operations {
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
-	 * @v av		Address vector, or NULL
+	 * @v source		Source address vector, or NULL
 	 * @v iobuf		I/O buffer
 	 * @v rc		Completion status code
 	 */
 	void ( * complete_recv ) ( struct ib_device *ibdev,
 				   struct ib_queue_pair *qp,
-				   struct ib_address_vector *av,
+				   struct ib_address_vector *source,
 				   struct io_buffer *iobuf, int rc );
 };
 
@@ -289,7 +289,7 @@ struct ib_device_operations {
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
-	 * @v av		Address vector
+	 * @v dest		Destination address vector
 	 * @v iobuf		I/O buffer
 	 * @ret rc		Return status code
 	 *
@@ -300,7 +300,7 @@ struct ib_device_operations {
 	 */
 	int ( * post_send ) ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp,
-			      struct ib_address_vector *av,
+			      struct ib_address_vector *dest,
 			      struct io_buffer *iobuf );
 	/** Post receive work queue entry
 	 *
@@ -502,7 +502,7 @@ extern struct ib_queue_pair * ib_find_qp_mgid ( struct ib_device *ibdev,
 extern struct ib_work_queue * ib_find_wq ( struct ib_completion_queue *cq,
 					   unsigned long qpn, int is_send );
 extern int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
-			  struct ib_address_vector *av,
+			  struct ib_address_vector *dest,
 			  struct io_buffer *iobuf );
 extern int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			  struct io_buffer *iobuf );
@@ -511,7 +511,7 @@ extern void ib_complete_send ( struct ib_device *ibdev,
 			       struct io_buffer *iobuf, int rc );
 extern void ib_complete_recv ( struct ib_device *ibdev,
 			       struct ib_queue_pair *qp,
-			       struct ib_address_vector *av,
+			       struct ib_address_vector *source,
 			       struct io_buffer *iobuf, int rc );
 extern void ib_refill_recv ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp );

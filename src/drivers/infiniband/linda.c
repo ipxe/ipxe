@@ -936,13 +936,13 @@ static void linda_destroy_qp ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v av		Address vector
+ * @v dest		Destination address vector
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
 static int linda_post_send ( struct ib_device *ibdev,
 			     struct ib_queue_pair *qp,
-			     struct ib_address_vector *av,
+			     struct ib_address_vector *dest,
 			     struct io_buffer *iobuf ) {
 	struct linda *linda = ib_get_drvdata ( ibdev );
 	struct ib_work_queue *wq = &qp->send;
@@ -969,7 +969,7 @@ static int linda_post_send ( struct ib_device *ibdev,
 	/* Construct headers */
 	iob_populate ( &headers, header_buf, 0, sizeof ( header_buf ) );
 	iob_reserve ( &headers, sizeof ( header_buf ) );
-	ib_push ( ibdev, &headers, qp, iob_len ( iobuf ), av );
+	ib_push ( ibdev, &headers, qp, iob_len ( iobuf ), dest );
 
 	/* Calculate packet length */
 	len = ( ( sizeof ( sendpbc ) + iob_len ( &headers ) +
@@ -1170,7 +1170,7 @@ static void linda_complete_recv ( struct ib_device *ibdev,
 	struct io_buffer headers;
 	struct io_buffer *iobuf;
 	struct ib_queue_pair *intended_qp;
-	struct ib_address_vector av;
+	struct ib_address_vector source;
 	unsigned int rcvtype;
 	unsigned int pktlen;
 	unsigned int egrindex;
@@ -1238,7 +1238,7 @@ static void linda_complete_recv ( struct ib_device *ibdev,
 	qp0 = ( qp->qpn == 0 );
 	intended_qp = NULL;
 	if ( ( rc = ib_pull ( ibdev, &headers, ( qp0 ? &intended_qp : NULL ),
-			      &payload_len, &av ) ) != 0 ) {
+			      &payload_len, &source ) ) != 0 ) {
 		DBGC ( linda, "Linda %p could not parse headers: %s\n",
 		       linda, strerror ( rc ) );
 		err = 1;
@@ -1295,10 +1295,12 @@ static void linda_complete_recv ( struct ib_device *ibdev,
 				qp->recv.fill--;
 				intended_qp->recv.fill++;
 			}
-			ib_complete_recv ( ibdev, intended_qp, &av, iobuf, rc);
+			ib_complete_recv ( ibdev, intended_qp, &source,
+					   iobuf, rc);
 		} else {
 			/* Completing on a skipped-over eager buffer */
-			ib_complete_recv ( ibdev, qp, &av, iobuf, -ECANCELED );
+			ib_complete_recv ( ibdev, qp, &source, iobuf,
+					   -ECANCELED );
 		}
 
 		/* Clear eager buffer */

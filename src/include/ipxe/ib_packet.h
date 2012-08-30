@@ -152,9 +152,9 @@ union ib_headers {
 
 extern int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		     struct ib_queue_pair *qp, size_t payload_len,
-		     const struct ib_address_vector *av );
+		     const struct ib_address_vector *dest );
 extern int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		     struct ib_queue_pair **qp, size_t *payload_len,
-		     struct ib_address_vector *av );
+		     struct ib_address_vector *source );
 
 #endif /* _IPXE_IB_PACKET_H */
