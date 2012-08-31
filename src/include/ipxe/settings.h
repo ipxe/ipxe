@@ -280,7 +280,12 @@ extern int fetchf_setting ( struct settings *settings, struct setting *setting,
 extern int storef_setting ( struct settings *settings,
 			    struct setting *setting,
 			    const char *value );
-extern int storef_named_setting ( const char *name, const char *value );
+extern int store_named_setting ( const char *name,
+				 struct setting_type *default_type,
+				 const void *data, size_t len );
+extern int storef_named_setting ( const char *name,
+				  struct setting_type *default_type,
+				  const char *value );
 extern int fetchf_named_setting ( const char *name, char *name_buf,
 				  size_t name_len, char *value_buf,
 				  size_t value_len );
@@ -366,7 +371,7 @@ static inline int delete_setting ( struct settings *settings,
  * @ret rc		Return status code
  */
 static inline int delete_named_setting ( const char *name ) {
-	return storef_named_setting ( name, NULL );
+	return store_named_setting ( name, NULL, NULL, 0 );
 }
 
 /**

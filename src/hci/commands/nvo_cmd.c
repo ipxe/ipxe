@@ -127,7 +127,8 @@ static int set_core_exec ( int argc, char **argv,
 		goto err_get_value;
 
 	/* Determine total length of command line */
-	if ( ( rc = storef_named_setting ( name, value ) ) != 0 ) {
+	if ( ( rc = storef_named_setting ( name, &setting_type_string,
+					   value ) ) != 0 ) {
 		printf ( "Could not %s \"%s\": %s\n",
 			 argv[0], name, strerror ( rc ) );
 		goto err_store;

@@ -180,6 +180,11 @@ int generic_settings_fetch ( struct settings *settings,
 	if ( len > generic->data_len )
 		len = generic->data_len;
 	memcpy ( data, generic_setting_data ( generic ), len );
+
+	/* Set setting type, if not yet specified */
+	if ( ! setting->type )
+		setting->type = generic->setting.type;
+
 	return generic->data_len;
 }
 
@@ -614,8 +619,12 @@ static int fetch_setting_and_origin ( struct settings *settings,
 	if ( setting_applies ( settings, setting ) &&
 	     ( ( ret = settings->op->fetch ( settings, setting,
 					     data, len ) ) >= 0 ) ) {
+		/* Record origin, if applicable */
 		if ( origin )
 			*origin = settings;
+		/* Default to string setting type, if not yet specified */
+		if ( ! setting->type )
+			setting->type = &setting_type_string;
 		return ret;
 	}
 
@@ -1132,6 +1141,7 @@ static struct setting_type * find_setting_type ( const char *name ) {
  * @v get_child		Function to find or create child settings block
  * @v settings		Settings block to fill in
  * @v setting		Setting to fill in
+ * @v default_type	Default type to use, if none specified
  * @v tmp_name		Buffer for copy of setting name
  * @ret rc		Return status code
  *
@@ -1147,6 +1157,7 @@ parse_setting_name ( const char *name,
 		     struct settings * ( * get_child ) ( struct settings *,
 							 const char * ),
 		     struct settings **settings, struct setting *setting,
+		     struct setting_type *default_type,
 		     char *tmp_name ) {
 	char *settings_name;
 	char *setting_name;
@@ -1157,7 +1168,7 @@ parse_setting_name ( const char *name,
 	*settings = &settings_root;
 	memset ( setting, 0, sizeof ( *setting ) );
 	setting->name = "";
-	setting->type = &setting_type_string;
+	setting->type = default_type;
 
 	/* Split name into "[settings_name/]setting_name[:type_name]" */
 	strcpy ( tmp_name, name );
@@ -1227,13 +1238,16 @@ int setting_name ( struct settings *settings, struct setting *setting,
 }
 
 /**
- * Parse and store value of named setting
+ * Store value of named setting
  *
  * @v name		Name of setting
- * @v value		Formatted setting data, or NULL
+ * @v default_type	Default type to use, if none specified
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
  * @ret rc		Return status code
  */
-int storef_named_setting ( const char *name, const char *value ) {
+int store_named_setting ( const char *name, struct setting_type *default_type,
+			  const void *data, size_t len ) {
 	struct settings *settings;
 	struct setting setting;
 	char tmp_name[ strlen ( name ) + 1 ];
@@ -1241,7 +1255,36 @@ int storef_named_setting ( const char *name, const char *value ) {
 
 	/* Parse setting name */
 	if ( ( rc = parse_setting_name ( name, autovivify_child_settings,
-					 &settings, &setting, tmp_name )) != 0)
+					 &settings, &setting, default_type,
+					 tmp_name ) ) != 0 )
+		return rc;
+
+	/* Store setting */
+	if ( ( rc = store_setting ( settings, &setting, data, len ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Parse and store value of named setting
+ *
+ * @v name		Name of setting
+ * @v default_type	Default type to use, if none specified
+ * @v value		Formatted setting data, or NULL
+ * @ret rc		Return status code
+ */
+int storef_named_setting ( const char *name, struct setting_type *default_type,
+			   const char *value ) {
+	struct settings *settings;
+	struct setting setting;
+	char tmp_name[ strlen ( name ) + 1 ];
+	int rc;
+
+	/* Parse setting name */
+	if ( ( rc = parse_setting_name ( name, autovivify_child_settings,
+					 &settings, &setting, default_type,
+					 tmp_name ) ) != 0 )
 		return rc;
 
 	/* Store setting */
@@ -1272,8 +1315,8 @@ int fetchf_named_setting ( const char *name,
 	int rc;
 
 	/* Parse setting name */
-	if ( ( rc = parse_setting_name ( name, find_child_settings,
-					 &settings, &setting, tmp_name )) != 0)
+	if ( ( rc = parse_setting_name ( name, find_child_settings, &settings,
+					 &setting, NULL, tmp_name ) ) != 0 )
 		return rc;
 
 	/* Fetch setting */

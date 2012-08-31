@@ -249,7 +249,8 @@ static int choose_exec ( int argc, char **argv ) {
 		goto err_show_menu;
 
 	/* Store setting */
-	if ( ( rc = storef_named_setting ( setting, item->label ) ) != 0 ) {
+	if ( ( rc = storef_named_setting ( setting, &setting_type_string,
+					   item->label ) ) != 0 ) {
 		printf ( "Could not store \"%s\": %s\n",
 			 setting, strerror ( rc ) );
 		goto err_store;
