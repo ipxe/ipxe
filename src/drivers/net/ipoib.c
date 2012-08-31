@@ -480,12 +480,14 @@ static void ipoib_complete_send ( struct ib_device *ibdev __unused,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
+ * @v dest		Destination address vector, or NULL
  * @v source		Source address vector, or NULL
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
 static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 				  struct ib_queue_pair *qp,
+				  struct ib_address_vector *dest __unused,
 				  struct ib_address_vector *source,
 				  struct io_buffer *iobuf, int rc ) {
 	struct ipoib_device *ipoib = ib_qp_get_ownerdata ( qp );

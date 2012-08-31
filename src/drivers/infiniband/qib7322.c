@@ -1413,6 +1413,7 @@ static void qib7322_complete_recv ( struct ib_device *ibdev,
 	struct io_buffer headers;
 	struct io_buffer *iobuf;
 	struct ib_queue_pair *intended_qp;
+	struct ib_address_vector dest;
 	struct ib_address_vector source;
 	unsigned int rcvtype;
 	unsigned int pktlen;
@@ -1474,7 +1475,7 @@ static void qib7322_complete_recv ( struct ib_device *ibdev,
 	qp0 = ( qp->qpn == 0 );
 	intended_qp = NULL;
 	if ( ( rc = ib_pull ( ibdev, &headers, ( qp0 ? &intended_qp : NULL ),
-			      &payload_len, &source ) ) != 0 ) {
+			      &payload_len, &dest, &source ) ) != 0 ) {
 		DBGC ( qib7322, "QIB7322 %p could not parse headers: %s\n",
 		       qib7322, strerror ( rc ) );
 		err = 1;
@@ -1531,11 +1532,11 @@ static void qib7322_complete_recv ( struct ib_device *ibdev,
 				qp->recv.fill--;
 				intended_qp->recv.fill++;
 			}
-			ib_complete_recv ( ibdev, intended_qp, &source,
+			ib_complete_recv ( ibdev, intended_qp, &dest, &source,
 					   iobuf, rc);
 		} else {
 			/* Completing on a skipped-over eager buffer */
-			ib_complete_recv ( ibdev, qp, &source, iobuf,
+			ib_complete_recv ( ibdev, qp, &dest, &source, iobuf,
 					   -ECANCELED );
 		}
 

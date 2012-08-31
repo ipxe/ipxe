@@ -220,12 +220,14 @@ static void ib_cmrc_complete_send ( struct ib_device *ibdev __unused,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
+ * @v dest		Destination address vector, or NULL
  * @v source		Source address vector, or NULL
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
 static void ib_cmrc_complete_recv ( struct ib_device *ibdev __unused,
 				    struct ib_queue_pair *qp,
+				    struct ib_address_vector *dest __unused,
 				    struct ib_address_vector *source __unused,
 				    struct io_buffer *iobuf, int rc ) {
 	struct ib_cmrc_connection *cmrc = ib_qp_get_ownerdata ( qp );

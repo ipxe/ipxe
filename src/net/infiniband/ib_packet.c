@@ -122,11 +122,13 @@ int ib_push ( struct ib_device *ibdev, struct io_buffer *iobuf,
  * @v iobuf		I/O buffer containing headers
  * @v qp		Queue pair to fill in, or NULL
  * @v payload_len	Payload length to fill in, or NULL
+ * @v dest		Destination address vector to fill in
  * @v source		Source address vector to fill in
  * @ret rc		Return status code
  */
 int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	      struct ib_queue_pair **qp, size_t *payload_len,
+	      struct ib_address_vector *dest,
 	      struct ib_address_vector *source ) {
 	struct ib_local_route_header *lrh;
 	struct ib_global_route_header *grh;
@@ -135,14 +137,13 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	size_t orig_iob_len = iob_len ( iobuf );
 	unsigned int lnh;
 	size_t pad_len;
-	unsigned long qpn;
-	unsigned int lid;
 
 	/* Clear return values */
 	if ( qp )
 		*qp = NULL;
 	if ( payload_len )
 		*payload_len = 0;
+	memset ( dest, 0, sizeof ( *dest ) );
 	memset ( source, 0, sizeof ( *source ) );
 
 	/* Extract LRH */
@@ -153,10 +154,11 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	}
 	lrh = iobuf->data;
 	iob_pull ( iobuf, sizeof ( *lrh ) );
+	dest->lid = ntohs ( lrh->dlid );
+	dest->sl = ( lrh->sl__lnh >> 4 );
 	source->lid = ntohs ( lrh->slid );
 	source->sl = ( lrh->sl__lnh >> 4 );
 	lnh = ( lrh->sl__lnh & 0x3 );
-	lid = ntohs ( lrh->dlid );
 
 	/* Reject unsupported packets */
 	if ( ! ( ( lnh == IB_LNH_BTH ) || ( lnh == IB_LNH_GRH ) ) ) {
@@ -174,6 +176,8 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		}
 		grh = iobuf->data;
 		iob_pull ( iobuf, sizeof ( *grh ) );
+		dest->gid_present = 1;
+		memcpy ( &dest->gid, &grh->dgid, sizeof ( dest->gid ) );
 		source->gid_present = 1;
 		memcpy ( &source->gid, &grh->sgid, sizeof ( source->gid ) );
 	} else {
@@ -193,7 +197,7 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		       ibdev, bth->opcode );
 		return -ENOTSUP;
 	}
-	qpn = ntohl ( bth->dest_qp );
+	dest->qpn = ntohl ( bth->dest_qp );
 
 	/* Extract DETH */
 	if ( iob_len ( iobuf ) < sizeof ( *deth ) ) {
@@ -216,7 +220,7 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 
 	/* Determine destination QP, if applicable */
 	if ( qp ) {
-		if ( IB_LID_MULTICAST ( lid ) && grh ) {
+		if ( IB_LID_MULTICAST ( dest->lid ) && grh ) {
 			if ( ! ( *qp = ib_find_qp_mgid ( ibdev, &grh->dgid ))){
 				DBGC ( ibdev, "IBDEV %p RX for unknown MGID "
 				       IB_GID_FMT "\n",
@@ -224,9 +228,9 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 				return -ENODEV;
 			}
 		} else {
-			if ( ! ( *qp = ib_find_qp_qpn ( ibdev, qpn ) ) ) {
+			if ( ! ( *qp = ib_find_qp_qpn ( ibdev, dest->qpn ) ) ) {
 				DBGC ( ibdev, "IBDEV %p RX for nonexistent "
-				       "QPN %lx\n", ibdev, qpn );
+				       "QPN %lx\n", ibdev, dest->qpn );
 				return -ENODEV;
 			}
 		}
@@ -234,8 +238,8 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 	}
 
 	DBGC2 ( ibdev, "IBDEV %p RX %04x:%08lx <= %04x:%08lx (key %08x)\n",
-		ibdev, lid, ( IB_LID_MULTICAST( lid ) ?
-			      ( qp ? (*qp)->ext_qpn : -1UL ) : qpn ),
+		ibdev, dest->lid, ( IB_LID_MULTICAST ( dest->lid ) ?
+			      ( qp ? (*qp)->ext_qpn : -1UL ) : dest->qpn ),
 		source->lid, source->qpn, ntohl ( deth->qkey ) );
 	DBGCP_HDA ( ibdev, 0,
 		    ( iobuf->data - ( orig_iob_len - iob_len ( iobuf ) ) ),

@@ -112,12 +112,14 @@ static int ib_mi_handle ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
- * @v source		Address vector
+ * @v dest		Destination address vector
+ * @v source		Source address vector
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
 static void ib_mi_complete_recv ( struct ib_device *ibdev,
 				  struct ib_queue_pair *qp,
+				  struct ib_address_vector *dest __unused,
 				  struct ib_address_vector *source,
 				  struct io_buffer *iobuf, int rc ) {
 	struct ib_mad_interface *mi = ib_qp_get_ownerdata ( qp );

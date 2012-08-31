@@ -1677,6 +1677,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 	struct ib_work_queue *wq;
 	struct ib_queue_pair *qp;
 	struct io_buffer *iobuf;
+	struct ib_address_vector recv_dest;
 	struct ib_address_vector recv_source;
 	struct ib_global_route_header *grh;
 	struct ib_address_vector *source;
@@ -1737,6 +1738,8 @@ static int hermon_complete ( struct ib_device *ibdev,
 		len = MLX_GET ( &cqe->normal, byte_cnt );
 		assert ( len <= iob_tailroom ( iobuf ) );
 		iob_put ( iobuf, len );
+		memset ( &recv_dest, 0, sizeof ( recv_dest ) );
+		recv_dest.qpn = qpn;
 		memset ( &recv_source, 0, sizeof ( recv_source ) );
 		switch ( qp->type ) {
 		case IB_QPT_SMI:
@@ -1750,7 +1753,10 @@ static int hermon_complete ( struct ib_device *ibdev,
 			source->qpn = MLX_GET ( &cqe->normal, srq_rqpn );
 			source->lid = MLX_GET ( &cqe->normal, slid_smac47_32 );
 			source->sl = MLX_GET ( &cqe->normal, sl );
-			source->gid_present = MLX_GET ( &cqe->normal, g );
+			recv_dest.gid_present = source->gid_present =
+				MLX_GET ( &cqe->normal, g );
+			memcpy ( &recv_dest.gid, &grh->dgid,
+				 sizeof ( recv_dest.gid ) );
 			memcpy ( &source->gid, &grh->sgid,
 				 sizeof ( source->gid ) );
 			break;
@@ -1768,7 +1774,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 			return -EINVAL;
 		}
 		/* Hand off to completion handler */
-		ib_complete_recv ( ibdev, qp, source, iobuf, rc );
+		ib_complete_recv ( ibdev, qp, &recv_dest, source, iobuf, rc );
 	}
 
 	return rc;
@@ -3155,12 +3161,14 @@ static void hermon_eth_complete_send ( struct ib_device *ibdev __unused,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
+ * @v dest		Destination address vector, or NULL
  * @v source		Source address vector, or NULL
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
 static void hermon_eth_complete_recv ( struct ib_device *ibdev __unused,
 				       struct ib_queue_pair *qp,
+				       struct ib_address_vector *dest __unused,
 				       struct ib_address_vector *source,
 				       struct io_buffer *iobuf, int rc ) {
 	struct net_device *netdev = ib_qp_get_ownerdata ( qp );

@@ -304,7 +304,7 @@ void ib_destroy_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	}
 	for ( i = 0 ; i < qp->recv.num_wqes ; i++ ) {
 		if ( ( iobuf = qp->recv.iobufs[i] ) != NULL ) {
-			ib_complete_recv ( ibdev, qp, NULL, iobuf,
+			ib_complete_recv ( ibdev, qp, NULL, NULL, iobuf,
 					   -ECANCELED );
 		}
 	}
@@ -486,16 +486,19 @@ void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  *
  * @v ibdev		Infiniband device
  * @v qp		Queue pair
+ * @v dest		Destination address vector, or NULL
  * @v source		Source address vector, or NULL
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
 void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
+			struct ib_address_vector *dest,
 			struct ib_address_vector *source,
 			struct io_buffer *iobuf, int rc ) {
 
 	if ( qp->recv.cq->op->complete_recv ) {
-		qp->recv.cq->op->complete_recv ( ibdev, qp, source, iobuf, rc );
+		qp->recv.cq->op->complete_recv ( ibdev, qp, dest, source,
+						 iobuf, rc );
 	} else {
 		free_iob ( iobuf );
 	}

@@ -205,12 +205,14 @@ struct ib_completion_queue_operations {
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
+	 * @v dest		Destination address vector, or NULL
 	 * @v source		Source address vector, or NULL
 	 * @v iobuf		I/O buffer
 	 * @v rc		Completion status code
 	 */
 	void ( * complete_recv ) ( struct ib_device *ibdev,
 				   struct ib_queue_pair *qp,
+				   struct ib_address_vector *dest,
 				   struct ib_address_vector *source,
 				   struct io_buffer *iobuf, int rc );
 };
@@ -511,6 +513,7 @@ extern void ib_complete_send ( struct ib_device *ibdev,
 			       struct io_buffer *iobuf, int rc );
 extern void ib_complete_recv ( struct ib_device *ibdev,
 			       struct ib_queue_pair *qp,
+			       struct ib_address_vector *dest,
 			       struct ib_address_vector *source,
 			       struct io_buffer *iobuf, int rc );
 extern void ib_refill_recv ( struct ib_device *ibdev,

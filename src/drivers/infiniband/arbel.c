@@ -1525,6 +1525,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 	struct arbel_recv_work_queue *arbel_recv_wq;
 	struct arbelprm_recv_wqe *recv_wqe;
 	struct io_buffer *iobuf;
+	struct ib_address_vector recv_dest;
 	struct ib_address_vector recv_source;
 	struct ib_global_route_header *grh;
 	struct ib_address_vector *source;
@@ -1608,6 +1609,8 @@ static int arbel_complete ( struct ib_device *ibdev,
 			     l_key, ARBEL_INVALID_LKEY );
 		assert ( len <= iob_tailroom ( iobuf ) );
 		iob_put ( iobuf, len );
+		memset ( &recv_dest, 0, sizeof ( recv_dest ) );
+		recv_dest.qpn = qpn;
 		switch ( qp->type ) {
 		case IB_QPT_SMI:
 		case IB_QPT_GSI:
@@ -1621,7 +1624,10 @@ static int arbel_complete ( struct ib_device *ibdev,
 			source->qpn = MLX_GET ( &cqe->normal, rqpn );
 			source->lid = MLX_GET ( &cqe->normal, rlid );
 			source->sl = MLX_GET ( &cqe->normal, sl );
-			source->gid_present = MLX_GET ( &cqe->normal, g );
+			recv_dest.gid_present = source->gid_present =
+				MLX_GET ( &cqe->normal, g );
+			memcpy ( &recv_dest.gid, &grh->dgid,
+				 sizeof ( recv_dest.gid ) );
 			memcpy ( &source->gid, &grh->sgid,
 				 sizeof ( source->gid ) );
 			break;
@@ -1633,7 +1639,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 			return -EINVAL;
 		}
 		/* Hand off to completion handler */
-		ib_complete_recv ( ibdev, qp, source, iobuf, rc );
+		ib_complete_recv ( ibdev, qp, &recv_dest, source, iobuf, rc );
 	}
 
 	return rc;
