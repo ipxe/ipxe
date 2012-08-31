@@ -85,6 +85,7 @@ extern void start_timer ( struct retry_timer *timer );
 extern void start_timer_fixed ( struct retry_timer *timer,
 				unsigned long timeout );
 extern void stop_timer ( struct retry_timer *timer );
+extern void retry_poll ( void );
 
 /**
  * Start timer with no delay
