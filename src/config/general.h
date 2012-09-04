@@ -100,6 +100,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define	IMAGE_BZIMAGE		/* Linux bzImage image support */
 //#define	IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
 //#define	IMAGE_EFI		/* EFI image support */
+//#define	IMAGE_SDI		/* SDI image support */
 
 /*
  * Command-line commands to include

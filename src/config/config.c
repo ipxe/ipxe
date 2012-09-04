@@ -181,6 +181,9 @@ REQUIRE_OBJECT ( comboot_resolv );
 #ifdef IMAGE_EFI
 REQUIRE_OBJECT ( efi_image );
 #endif
+#ifdef IMAGE_SDI
+REQUIRE_OBJECT ( sdi );
+#endif
 
 /*
  * Drag in all requested commands
