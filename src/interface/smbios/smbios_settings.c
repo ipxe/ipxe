@@ -120,14 +120,21 @@ static int smbios_fetch ( struct settings *settings __unused,
 
 		if ( tag_len == 0 ) {
 			/* String */
-			return read_smbios_string ( &structure,
-						    buf[tag_offset],
-						    data, len );
+			if ( ( rc = read_smbios_string ( &structure,
+							 buf[tag_offset],
+							 data, len ) ) < 0 ) {
+				return rc;
+			}
+			if ( ! setting->type )
+				setting->type = &setting_type_string;
+			return rc;
 		} else {
 			/* Raw data */
 			if ( len > tag_len )
 				len = tag_len;
 			memcpy ( data, &buf[tag_offset], len );
+			if ( ! setting->type )
+				setting->type = &setting_type_hex;
 			return tag_len;
 		}
 	}
