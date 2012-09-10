@@ -89,6 +89,9 @@ REQUIRE_OBJECT ( linux_console );
 #ifdef CONSOLE_VMWARE
 REQUIRE_OBJECT ( vmconsole );
 #endif
+#ifdef CONSOLE_DEBUGCON
+REQUIRE_OBJECT ( debugcon );
+#endif
 
 /*
  * Drag in all requested network protocols
