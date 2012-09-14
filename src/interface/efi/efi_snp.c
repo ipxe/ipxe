@@ -536,7 +536,7 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		container_of ( snp, struct efi_snp_device, snp );
 	struct ll_protocol *ll_protocol = snpdev->netdev->ll_protocol;
 	struct io_buffer *iobuf;
-	size_t ll_headroom;
+	size_t payload_len;
 	int rc;
 	EFI_STATUS efirc;
 
@@ -589,21 +589,22 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	}
 
 	/* Allocate buffer */
-	ll_headroom = ( MAX_LL_HEADER_LEN - ll_header_len );
-	iobuf = alloc_iob ( ll_headroom +
-			    ( ( len > IOB_ZLEN ) ? len : IOB_ZLEN ) );
+	payload_len = ( len - ll_protocol->ll_header_len );
+	iobuf = alloc_iob ( MAX_LL_HEADER_LEN + ( ( payload_len > IOB_ZLEN ) ?
+						  payload_len : IOB_ZLEN ) );
 	if ( ! iobuf ) {
 		DBGC ( snpdev, "SNPDEV %p TX could not allocate %ld-byte "
 		       "buffer\n", snpdev, ( ( unsigned long ) len ) );
 		efirc = EFI_DEVICE_ERROR;
 		goto err_alloc_iob;
 	}
-	iob_reserve ( iobuf, ll_headroom );
+	iob_reserve ( iobuf, ( MAX_LL_HEADER_LEN -
+			       ll_protocol->ll_header_len ) );
 	memcpy ( iob_put ( iobuf, len ), data, len );
 
 	/* Create link-layer header, if specified */
 	if ( ll_header_len ) {
-		iob_pull ( iobuf, ll_header_len );
+		iob_pull ( iobuf, ll_protocol->ll_header_len );
 		if ( ( rc = ll_protocol->push ( snpdev->netdev,
 						iobuf, ll_dest, ll_src,
 						htons ( *net_proto ) )) != 0 ){
