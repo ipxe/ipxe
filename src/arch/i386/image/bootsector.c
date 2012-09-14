@@ -80,9 +80,22 @@ int call_bootsector ( unsigned int segment, unsigned int offset,
 					   "movw %%ss, %%ax\n\t"
 					   "movw %%ax, %%cs:saved_ss\n\t"
 					   "movw %%sp, %%cs:saved_sp\n\t"
-					   /* Jump to boot sector */
+					   /* Prepare jump to boot sector */
 					   "pushw %%bx\n\t"
 					   "pushw %%di\n\t"
+					   /* Clear all registers */
+					   "xorl %%eax, %%eax\n\t"
+					   "xorl %%ebx, %%ebx\n\t"
+					   "xorl %%ecx, %%ecx\n\t"
+					   "xorl %%edx, %%edx\n\t"
+					   "xorl %%esi, %%esi\n\t"
+					   "xorl %%edi, %%edi\n\t"
+					   "xorl %%ebp, %%ebp\n\t"
+					   "movw %%ax, %%ds\n\t"
+					   "movw %%ax, %%es\n\t"
+					   "movw %%ax, %%fs\n\t"
+					   "movw %%ax, %%gs\n\t"
+					   /* Jump to boot sector */
 					   "sti\n\t"
 					   "lret\n\t"
 					   /* Preserved variables */
