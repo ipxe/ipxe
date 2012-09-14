@@ -627,7 +627,7 @@ static const struct int13_fdd_geometry int13_fdd_geometries[] = {
 static int int13_guess_geometry_fdd ( struct int13_drive *int13,
 				      unsigned int *heads,
 				      unsigned int *sectors ) {
-	unsigned int blocks = int13_blksize ( int13 );
+	unsigned int blocks = int13_capacity ( int13 );
 	const struct int13_fdd_geometry *geometry;
 	unsigned int cylinders;
 	unsigned int i;
