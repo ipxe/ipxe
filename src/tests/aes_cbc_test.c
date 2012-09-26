@@ -169,9 +169,21 @@ AES_CBC_TEST ( test_256,
  *
  */
 static void aes_cbc_test_exec ( void ) {
+	struct cipher_algorithm *cipher = &aes_cbc_algorithm;
 
+	/* Correctness tests */
 	aes_cbc_ok ( &test_128 );
 	aes_cbc_ok ( &test_256 );
+
+	/* Speed tests */
+	DBG ( "AES128 encryption required %ld cycles per byte\n",
+	      cbc_cost_encrypt ( cipher, test_128.key_len ) );
+	DBG ( "AES128 decryption required %ld cycles per byte\n",
+	      cbc_cost_decrypt ( cipher, test_128.key_len ) );
+	DBG ( "AES256 encryption required %ld cycles per byte\n",
+	      cbc_cost_encrypt ( cipher, test_256.key_len ) );
+	DBG ( "AES256 decryption required %ld cycles per byte\n",
+	      cbc_cost_decrypt ( cipher, test_256.key_len ) );
 }
 
 /** AES-in-CBC-mode self-test */

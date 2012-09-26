@@ -15,6 +15,10 @@ extern int cbc_test_decrypt ( struct cipher_algorithm *cipher, const void *key,
 			      size_t key_len, const void *iv,
 			      const void *ciphertext,
 			      const void *expected_plaintext, size_t len );
+extern unsigned long cbc_cost_encrypt ( struct cipher_algorithm *cipher,
+					size_t key_len );
+extern unsigned long cbc_cost_decrypt ( struct cipher_algorithm *cipher,
+					size_t key_len );
 
 /**
  * Report CBC encryption test result
