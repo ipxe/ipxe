@@ -19,6 +19,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/sha256.h>
 #include <ipxe/x509.h>
 #include <ipxe/pending.h>
+#include <ipxe/iobuf.h>
 
 /** A TLS header */
 struct tls_header {
@@ -264,13 +265,34 @@ struct tls_session {
 	uint64_t rx_seq;
 	/** RX state */
 	enum tls_rx_state rx_state;
-	/** Offset within current RX state */
-	size_t rx_rcvd;
 	/** Current received record header */
 	struct tls_header rx_header;
-	/** Current received raw data buffer */
-	void *rx_data;
+	/** Current received record header (static I/O buffer) */
+	struct io_buffer rx_header_iobuf;
+	/** List of received data buffers */
+	struct list_head rx_data;
 };
+
+/** RX I/O buffer size
+ *
+ * The maximum fragment length extension is optional, and many common
+ * implementations (including OpenSSL) do not support it.  We must
+ * therefore be prepared to receive records of up to 16kB in length.
+ * The chance of an allocation of this size failing is non-negligible,
+ * so we must split received data into smaller allocations.
+ */
+#define TLS_RX_BUFSIZE 4096
+
+/** Minimum RX I/O buffer size
+ *
+ * To simplify manipulations, we ensure that no RX I/O buffer is
+ * smaller than this size.  This allows us to assume that the MAC and
+ * padding are entirely contained within the final I/O buffer.
+ */
+#define TLS_RX_MIN_BUFSIZE 512
+
+/** RX I/O buffer alignment */
+#define TLS_RX_ALIGN 16
 
 extern int add_tls ( struct interface *xfer, const char *name,
 		     struct interface **next );
