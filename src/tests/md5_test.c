@@ -70,9 +70,11 @@ static struct digest_test_fragments md5_test_fragments[] = {
 static void md5_test_exec ( void ) {
 	struct digest_algorithm *digest = &md5_algorithm;
 	struct md5_test_vector *test;
+	unsigned long cost;
 	unsigned int i;
 	unsigned int j;
 
+	/* Correctness test */
 	for ( i = 0 ; i < ( sizeof ( md5_test_vectors ) /
 			    sizeof ( md5_test_vectors[0] ) ) ; i++ ) {
 		test = &md5_test_vectors[i];
@@ -85,6 +87,10 @@ static void md5_test_exec ( void ) {
 				    test->data, test->len, test->digest );
 		}
 	}
+
+	/* Speed test */
+	cost = digest_cost ( digest );
+	DBG ( "MD5 required %ld cycles per byte\n", cost );
 }
 
 /** MD5 self-test */

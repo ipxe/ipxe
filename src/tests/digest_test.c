@@ -25,8 +25,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <ipxe/crypto.h>
+#include <ipxe/profile.h>
 #include "digest_test.h"
 
 /**
@@ -67,4 +69,37 @@ int digest_test ( struct digest_algorithm *digest,
 
 	/* Compare against expected output */
 	return ( memcmp ( expected, out, sizeof ( out ) ) == 0 );
+}
+
+/**
+ * Calculate digest algorithm cost
+ *
+ * @v digest		Digest algorithm
+ * @ret cost		Cost (in cycles per byte)
+ */
+unsigned long digest_cost ( struct digest_algorithm *digest ) {
+	static uint8_t random[8192]; /* Too large for stack */
+	uint8_t ctx[digest->ctxsize];
+	uint8_t out[digest->digestsize];
+	union profiler profiler;
+	unsigned long long elapsed;
+	unsigned long cost;
+	unsigned int i;
+
+	/* Fill buffer with pseudo-random data */
+	srand ( 0x1234568 );
+	for ( i = 0 ; i < sizeof ( random ) ; i++ )
+		random[i] = rand();
+
+	/* Time digest calculation */
+	profile ( &profiler );
+	digest_init ( digest, ctx );
+	digest_update ( digest, ctx, random, sizeof ( random ) );
+	digest_final ( digest, ctx, out );
+	elapsed = profile ( &profiler );
+
+	/* Round to nearest whole number of cycles per byte */
+	cost = ( ( elapsed + ( sizeof ( random ) / 2 ) ) / sizeof ( random ) );
+
+	return cost;
 }

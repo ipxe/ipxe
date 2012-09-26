@@ -19,6 +19,7 @@ struct digest_test_fragments {
 extern int digest_test ( struct digest_algorithm *digest,
 			 struct digest_test_fragments *fragments,
 			 void *data, size_t len, void *expected );
+extern unsigned long digest_cost ( struct digest_algorithm *digest );
 
 /**
  * Report digest test result

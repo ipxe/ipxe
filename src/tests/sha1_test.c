@@ -75,9 +75,11 @@ static struct digest_test_fragments sha1_test_fragments[] = {
 static void sha1_test_exec ( void ) {
 	struct digest_algorithm *digest = &sha1_algorithm;
 	struct sha1_test_vector *test;
+	unsigned long cost;
 	unsigned int i;
 	unsigned int j;
 
+	/* Correctness test */
 	for ( i = 0 ; i < ( sizeof ( sha1_test_vectors ) /
 			    sizeof ( sha1_test_vectors[0] ) ) ; i++ ) {
 		test = &sha1_test_vectors[i];
@@ -90,6 +92,10 @@ static void sha1_test_exec ( void ) {
 				    test->data, test->len, test->digest );
 		}
 	}
+
+	/* Speed test */
+	cost = digest_cost ( digest );
+	DBG ( "SHA1 required %ld cycles per byte\n", cost );
 }
 
 /** SHA-1 self-test */

@@ -78,9 +78,11 @@ static struct digest_test_fragments sha256_test_fragments[] = {
 static void sha256_test_exec ( void ) {
 	struct digest_algorithm *digest = &sha256_algorithm;
 	struct sha256_test_vector *test;
+	unsigned long cost;
 	unsigned int i;
 	unsigned int j;
 
+	/* Correctness test */
 	for ( i = 0 ; i < ( sizeof ( sha256_test_vectors ) /
 			    sizeof ( sha256_test_vectors[0] ) ) ; i++ ) {
 		test = &sha256_test_vectors[i];
@@ -93,6 +95,10 @@ static void sha256_test_exec ( void ) {
 				    test->data, test->len, test->digest );
 		}
 	}
+
+	/* Speed test */
+	cost = digest_cost ( digest );
+	DBG ( "SHA256 required %ld cycles per byte\n", cost );
 }
 
 /** SHA-256 self-test */
