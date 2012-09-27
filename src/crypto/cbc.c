@@ -88,13 +88,15 @@ void cbc_encrypt ( void *ctx, const void *src, void *dst, size_t len,
 void cbc_decrypt ( void *ctx, const void *src, void *dst, size_t len,
 		   struct cipher_algorithm *raw_cipher, void *cbc_ctx ) {
 	size_t blocksize = raw_cipher->blocksize;
+	uint8_t next_cbc_ctx[blocksize];
 
 	assert ( ( len % blocksize ) == 0 );
 
 	while ( len ) {
+		memcpy ( next_cbc_ctx, src, blocksize );
 		cipher_decrypt ( raw_cipher, ctx, src, dst, blocksize );
 		cbc_xor ( cbc_ctx, dst, blocksize );
-		memcpy ( cbc_ctx, src, blocksize );
+		memcpy ( cbc_ctx, next_cbc_ctx, blocksize );
 		dst += blocksize;
 		src += blocksize;
 		len -= blocksize;
