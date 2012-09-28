@@ -1773,8 +1773,7 @@ static int tls_new_record ( struct tls_session *tls, unsigned int type,
 	}
 
 	/* Handle record and free I/O buffer */
-	if ( handler )
-		rc = handler ( tls, iobuf->data, iob_len ( iobuf ) );
+	rc = ( handler ? handler ( tls, iobuf->data, iob_len ( iobuf ) ) : 0 );
 	free_iob ( iobuf );
 	return rc;
 }
