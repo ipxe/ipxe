@@ -1749,6 +1749,7 @@ static int tls_new_record ( struct tls_session *tls, unsigned int type,
 	list_del ( &iobuf->list );
 	if ( ! list_empty ( rx_data ) ) {
 		DBGC ( tls, "TLS %p overlength non-data record\n", tls );
+		free_iob ( iobuf );
 		return -EINVAL_NON_DATA;
 	}
 
