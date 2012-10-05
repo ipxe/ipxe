@@ -18,9 +18,12 @@
 struct console_driver serial_console __console_driver;
 
 static void serial_console_init ( void ) {
-	/* Serial driver initialization should already be done,
-	 * time to enable the serial console. */
-	serial_console.disabled = 0;
+	/*
+	 * Check if serial driver initialization is done.
+	 * If so, it's time to enable the serial console.
+	 */
+	if ( serial_initialized )
+		serial_console.disabled = 0;
 }
 
 struct console_driver serial_console __console_driver = {

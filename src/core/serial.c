@@ -93,6 +93,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define uart_writeb(val,addr) outb((val),(addr))
 #endif
 
+/* Boolean for the state of serial driver initialization */
+int serial_initialized = 0;
+
 /*
  * void serial_putc(int ch);
  *	Write character `ch' to port UART_BASE.
@@ -207,7 +210,6 @@ static void serial_init ( void ) {
 	/* Set clear to send, so flow control works... */
 	uart_writeb((1<<1), UART_BASE + UART_MCR);
 
-
 	/* Flush the input buffer. */
 	do {
 		/* rx buffer reg
@@ -217,6 +219,9 @@ static void serial_init ( void ) {
 		/* line status reg */
 		status = uart_readb(UART_BASE + UART_LSR);
 	} while(status & UART_LSR_DR);
+
+	/* Note that serial support has been initialized */
+	serial_initialized = 1;
  out:
 	return;
 }
