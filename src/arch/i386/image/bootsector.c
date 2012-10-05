@@ -87,7 +87,7 @@ int call_bootsector ( unsigned int segment, unsigned int offset,
 					   "xorl %%eax, %%eax\n\t"
 					   "xorl %%ebx, %%ebx\n\t"
 					   "xorl %%ecx, %%ecx\n\t"
-					   "xorl %%edx, %%edx\n\t"
+					   /* %edx contains drive number */
 					   "xorl %%esi, %%esi\n\t"
 					   "xorl %%edi, %%edi\n\t"
 					   "xorl %%ebp, %%ebp\n\t"
