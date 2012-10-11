@@ -19,9 +19,39 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+/**
+ * @file
+ *
+ * EFI SNP HII protocol
+ *
+ * The HII protocols are some of the less-well designed parts of the
+ * entire EFI specification.  This is a significant accomplishment.
+ *
+ * The face-slappingly ludicrous query string syntax seems to be
+ * motivated by the desire to allow a caller to query multiple drivers
+ * simultaneously via the single-instance HII_CONFIG_ROUTING_PROTOCOL,
+ * which is supposed to pass relevant subsets of the query string to
+ * the relevant drivers.
+ *
+ * Nobody uses the HII_CONFIG_ROUTING_PROTOCOL.  Not even the EFI
+ * setup browser uses the HII_CONFIG_ROUTING_PROTOCOL.  To the best of
+ * my knowledge, there has only ever been one implementation of the
+ * HII_CONFIG_ROUTING_PROTOCOL (as part of EDK2), and it just doesn't
+ * work.  It's so badly broken that I can't even figure out what the
+ * code is _trying_ to do.
+ *
+ * Fundamentally, the problem seems to be that Javascript programmers
+ * should not be allowed to design APIs for C code.
+ */
+
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <wchar.h>
 #include <errno.h>
+#include <ipxe/settings.h>
+#include <ipxe/nvo.h>
 #include <ipxe/device.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/efi/efi.h>
@@ -34,250 +64,452 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static EFI_GUID efi_hii_config_access_protocol_guid
 	= EFI_HII_CONFIG_ACCESS_PROTOCOL_GUID;
 
+/** EFI platform setup formset GUID */
+static EFI_GUID efi_hii_platform_setup_formset_guid
+	= EFI_HII_PLATFORM_SETUP_FORMSET_GUID;
+
+/** EFI IBM UCM compliant formset GUID */
+static EFI_GUID efi_hii_ibm_ucm_compliant_formset_guid
+	= EFI_HII_IBM_UCM_COMPLIANT_FORMSET_GUID;
+
 /** EFI HII database protocol */
 static EFI_HII_DATABASE_PROTOCOL *efihii;
 EFI_REQUIRE_PROTOCOL ( EFI_HII_DATABASE_PROTOCOL, &efihii );
 
-/** Local base GUID used for our EFI SNP formset */
-#define EFI_SNP_FORMSET_GUID_BASE					\
-	{ 0xc4f84019, 0x6dfd, 0x4a27,					\
-	  { 0x9b, 0x94, 0xb7, 0x2e, 0x1f, 0xbc, 0xad, 0xca } }
+/**
+ * Identify settings to be exposed via HII
+ *
+ * @v snpdev		SNP device
+ * @ret settings	Settings, or NULL
+ */
+static struct settings * efi_snp_hii_settings ( struct efi_snp_device *snpdev ){
 
-/** Form identifiers used for our EFI SNP HII */
-enum efi_snp_hii_form_id {
-	EFI_SNP_FORM = 0x0001,		/**< The only form */
-};
-
-/** String identifiers used for our EFI SNP HII */
-enum efi_snp_hii_string_id {
-	/* Language name */
-	EFI_SNP_LANGUAGE_NAME = 0x0001,
-	/* Formset */
-	EFI_SNP_FORMSET_TITLE, EFI_SNP_FORMSET_HELP,
-	/* Product name */
-	EFI_SNP_PRODUCT_PROMPT, EFI_SNP_PRODUCT_HELP, EFI_SNP_PRODUCT_TEXT,
-	/* Version */
-	EFI_SNP_VERSION_PROMPT, EFI_SNP_VERSION_HELP, EFI_SNP_VERSION_TEXT,
-	/* Driver */
-	EFI_SNP_DRIVER_PROMPT, EFI_SNP_DRIVER_HELP, EFI_SNP_DRIVER_TEXT,
-	/* Device */
-	EFI_SNP_DEVICE_PROMPT, EFI_SNP_DEVICE_HELP, EFI_SNP_DEVICE_TEXT,
-	/* End of list */
-	EFI_SNP_MAX_STRING_ID
-};
-
-/** EFI SNP formset */
-struct efi_snp_formset {
-	EFI_HII_PACKAGE_HEADER Header;
-	EFI_IFR_FORM_SET_TYPE(2) FormSet;
-	EFI_IFR_GUID_CLASS Class;
-	EFI_IFR_GUID_SUBCLASS SubClass;
-	EFI_IFR_FORM Form;
-	EFI_IFR_TEXT ProductText;
-	EFI_IFR_TEXT VersionText;
-	EFI_IFR_TEXT DriverText;
-	EFI_IFR_TEXT DeviceText;
-	EFI_IFR_END EndForm;
-	EFI_IFR_END EndFormSet;
-} __attribute__ (( packed )) efi_snp_formset = {
-	.Header = {
-		.Length = sizeof ( efi_snp_formset ),
-		.Type = EFI_HII_PACKAGE_FORMS,
-	},
-	.FormSet = EFI_IFR_FORM_SET ( EFI_SNP_FORMSET_GUID_BASE,
-				      EFI_SNP_FORMSET_TITLE,
-				      EFI_SNP_FORMSET_HELP,
-				      typeof ( efi_snp_formset.FormSet ),
-				      EFI_HII_PLATFORM_SETUP_FORMSET_GUID,
-				      EFI_HII_IBM_UCM_COMPLIANT_FORMSET_GUID ),
-	.Class = EFI_IFR_GUID_CLASS ( EFI_NETWORK_DEVICE_CLASS ),
-	.SubClass = EFI_IFR_GUID_SUBCLASS ( 0x03 ),
-	.Form = EFI_IFR_FORM ( EFI_SNP_FORM, EFI_SNP_FORMSET_TITLE ),
-	.ProductText = EFI_IFR_TEXT ( EFI_SNP_PRODUCT_PROMPT,
-				      EFI_SNP_PRODUCT_HELP,
-				      EFI_SNP_PRODUCT_TEXT ),
-	.VersionText = EFI_IFR_TEXT ( EFI_SNP_VERSION_PROMPT,
-				      EFI_SNP_VERSION_HELP,
-				      EFI_SNP_VERSION_TEXT ),
-	.DriverText = EFI_IFR_TEXT ( EFI_SNP_DRIVER_PROMPT,
-				     EFI_SNP_DRIVER_HELP,
-				     EFI_SNP_DRIVER_TEXT ),
-	.DeviceText = EFI_IFR_TEXT ( EFI_SNP_DEVICE_PROMPT,
-				     EFI_SNP_DEVICE_HELP,
-				     EFI_SNP_DEVICE_TEXT ),
-	.EndForm = EFI_IFR_END(),
-	.EndFormSet = EFI_IFR_END(),
-};
+	return find_child_settings ( netdev_settings ( snpdev->netdev ),
+				     NVO_SETTINGS_NAME );
+}
 
 /**
- * Generate EFI SNP string
+ * Check whether or not setting is applicable
  *
- * @v wbuf		Buffer
- * @v swlen		Size of buffer (in wide characters)
  * @v snpdev		SNP device
- * @ret wlen		Length of string (in wide characters)
+ * @v setting		Setting
+ * @ret applies		Setting applies
  */
-static int efi_snp_string ( wchar_t *wbuf, ssize_t swlen,
-			    enum efi_snp_hii_string_id id,
-			    struct efi_snp_device *snpdev ) {
-	struct net_device *netdev = snpdev->netdev;
-	struct device *dev = netdev->dev;
+static int efi_snp_hii_setting_applies ( struct efi_snp_device *snpdev,
+					 struct setting *setting ) {
 
-	switch ( id ) {
-	case EFI_SNP_LANGUAGE_NAME:
-		return efi_ssnprintf ( wbuf, swlen, "English" );
-	case EFI_SNP_FORMSET_TITLE:
-		return efi_ssnprintf ( wbuf, swlen, "%s (%s)",
-				       ( PRODUCT_NAME[0] ?
-					 PRODUCT_NAME : PRODUCT_SHORT_NAME ),
-				       netdev_addr ( netdev ) );
-	case EFI_SNP_FORMSET_HELP:
-		return efi_ssnprintf ( wbuf, swlen,
-				       "Configure " PRODUCT_SHORT_NAME );
-	case EFI_SNP_PRODUCT_PROMPT:
-		return efi_ssnprintf ( wbuf, swlen, "Name" );
-	case EFI_SNP_PRODUCT_HELP:
-		return efi_ssnprintf ( wbuf, swlen, "Firmware product name" );
-	case EFI_SNP_PRODUCT_TEXT:
-		return efi_ssnprintf ( wbuf, swlen, "%s",
-				       ( PRODUCT_NAME[0] ?
-					 PRODUCT_NAME : PRODUCT_SHORT_NAME ) );
-	case EFI_SNP_VERSION_PROMPT:
-		return efi_ssnprintf ( wbuf, swlen, "Version" );
-	case EFI_SNP_VERSION_HELP:
-		return efi_ssnprintf ( wbuf, swlen, "Firmware version" );
-	case EFI_SNP_VERSION_TEXT:
-		return efi_ssnprintf ( wbuf, swlen, VERSION );
-	case EFI_SNP_DRIVER_PROMPT:
-		return efi_ssnprintf ( wbuf, swlen, "Driver" );
-	case EFI_SNP_DRIVER_HELP:
-		return efi_ssnprintf ( wbuf, swlen, "Firmware driver" );
-	case EFI_SNP_DRIVER_TEXT:
-		return efi_ssnprintf ( wbuf, swlen, "%s", dev->driver_name );
-	case EFI_SNP_DEVICE_PROMPT:
-		return efi_ssnprintf ( wbuf, swlen, "Device" );
-	case EFI_SNP_DEVICE_HELP:
-		return efi_ssnprintf ( wbuf, swlen, "Hardware device" );
-	case EFI_SNP_DEVICE_TEXT:
-		return efi_ssnprintf ( wbuf, swlen, "%s", dev->name );
-	default:
-		assert ( 0 );
-		return 0;
+	return nvo_applies ( efi_snp_hii_settings ( snpdev ), setting );
+}
+
+/**
+ * Generate a random GUID
+ *
+ * @v guid		GUID to fill in
+ */
+static void efi_snp_hii_random_guid ( EFI_GUID *guid ) {
+	uint8_t *byte = ( ( uint8_t * ) guid );
+	unsigned int i;
+
+	for ( i = 0 ; i < sizeof ( *guid ) ; i++ )
+		*(byte++) = random();
+}
+
+/**
+ * Generate EFI SNP questions
+ *
+ * @v snpdev		SNP device
+ * @v ifr		IFR builder
+ * @v varstore_id	Variable store identifier
+ */
+static void efi_snp_hii_questions ( struct efi_snp_device *snpdev,
+				    struct efi_ifr_builder *ifr,
+				    unsigned int varstore_id ) {
+	struct setting *setting;
+	unsigned int name_id;
+	unsigned int prompt_id;
+	unsigned int help_id;
+	unsigned int question_id;
+
+	/* Add all applicable settings */
+	for_each_table_entry ( setting, SETTINGS ) {
+		if ( ! efi_snp_hii_setting_applies ( snpdev, setting ) )
+			continue;
+		name_id = efi_ifr_string ( ifr, "%s", setting->name );
+		prompt_id = efi_ifr_string ( ifr, "%s", setting->description );
+		help_id = efi_ifr_string ( ifr, "http://ipxe.org/cfg/%s",
+					   setting->name );
+		question_id = setting->tag;
+		efi_ifr_string_op ( ifr, prompt_id, help_id,
+				    question_id, varstore_id, name_id,
+				    0, 0x00, 0xff, 0 );
 	}
 }
 
 /**
- * Generate EFI SNP string package
- *
- * @v strings		String package header buffer
- * @v max_len		Buffer length
- * @v snpdev		SNP device
- * @ret len		Length of string package
- */
-static int efi_snp_strings ( EFI_HII_STRING_PACKAGE_HDR *strings,
-			     size_t max_len, struct efi_snp_device *snpdev ) {
-	static const char language[] = "en-us";
-	void *buf = strings;
-	ssize_t remaining = max_len;
-	size_t hdrsize;
-	EFI_HII_SIBT_STRING_UCS2_BLOCK *string;
-	ssize_t wremaining;
-	size_t string_wlen;
-	unsigned int id;
-	EFI_HII_STRING_BLOCK *end;
-	size_t len;
-
-	/* Calculate header size */
-	hdrsize = ( offsetof ( typeof ( *strings ), Language ) +
-		    sizeof ( language ) );
-	buf += hdrsize;
-	remaining -= hdrsize;
-
-	/* Fill in strings */
-	for ( id = 1 ; id < EFI_SNP_MAX_STRING_ID ; id++ ) {
-		string = buf;
-		if ( remaining >= ( ( ssize_t ) sizeof ( string->Header ) ) )
-			string->Header.BlockType = EFI_HII_SIBT_STRING_UCS2;
-		buf += offsetof ( typeof ( *string ), StringText );
-		remaining -= offsetof ( typeof ( *string ), StringText );
-		wremaining = ( remaining /
-			       ( ( ssize_t ) sizeof ( string->StringText[0] )));
-		assert ( ! ( ( remaining <= 0 ) && ( wremaining > 0 ) ) );
-		string_wlen = efi_snp_string ( string->StringText, wremaining,
-					       id, snpdev );
-		buf += ( ( string_wlen + 1 /* wNUL */ ) *
-			 sizeof ( string->StringText[0] ) );
-		remaining -= ( ( string_wlen + 1 /* wNUL */ ) *
-			       sizeof ( string->StringText[0] ) );
-	}
-
-	/* Fill in end marker */
-	end = buf;
-	if ( remaining >= ( ( ssize_t ) sizeof ( *end ) ) )
-		end->BlockType = EFI_HII_SIBT_END;
-	buf += sizeof ( *end );
-	remaining -= sizeof ( *end );
-
-	/* Calculate overall length */
-	len = ( max_len - remaining );
-
-	/* Fill in string package header */
-	if ( strings ) {
-		memset ( strings, 0, sizeof ( *strings ) );
-		strings->Header.Length = len;
-		strings->Header.Type = EFI_HII_PACKAGE_STRINGS;
-		strings->HdrSize = hdrsize;
-		strings->StringInfoOffset = hdrsize;
-		strings->LanguageName = EFI_SNP_LANGUAGE_NAME;
-		memcpy ( strings->Language, language, sizeof ( language ) );
-	}
-
-	return len;
-}
-
-/**
- * Generate EFI SNP package list
+ * Build HII package list for SNP device
  *
  * @v snpdev		SNP device
- * @ret package_list	Package list, or NULL on error
- *
- * The package list is allocated using malloc(), and must eventually
- * be freed by the caller.
+ * @ret package		Package list, or NULL on error
  */
 static EFI_HII_PACKAGE_LIST_HEADER *
-efi_snp_package_list ( struct efi_snp_device *snpdev ) {
-	size_t strings_len = efi_snp_strings ( NULL, 0, snpdev );
-	struct {
-		EFI_HII_PACKAGE_LIST_HEADER header;
-		struct efi_snp_formset formset;
-		union {
-			EFI_HII_STRING_PACKAGE_HDR strings;
-			uint8_t pad[strings_len];
-		} __attribute__ (( packed )) strings;
-		EFI_HII_PACKAGE_HEADER end;
-	} __attribute__ (( packed )) *package_list;
+efi_snp_hii_package_list ( struct efi_snp_device *snpdev ) {
+	struct net_device *netdev = snpdev->netdev;
+	struct device *dev = netdev->dev;
+	struct efi_ifr_builder ifr;
+	EFI_HII_PACKAGE_LIST_HEADER *package;
+	const char *product_name;
+	EFI_GUID package_guid;
+	EFI_GUID formset_guid;
+	EFI_GUID varstore_guid;
+	unsigned int title_id;
+	unsigned int varstore_id;
 
-	/* Allocate package list */
-	package_list = zalloc ( sizeof ( *package_list ) );
-	if ( ! package_list )
+	/* Initialise IFR builder */
+	efi_ifr_init ( &ifr );
+
+	/* Determine product name */
+	product_name = ( PRODUCT_NAME[0] ? PRODUCT_NAME : PRODUCT_SHORT_NAME );
+
+	/* Generate GUIDs */
+	efi_snp_hii_random_guid ( &package_guid );
+	efi_snp_hii_random_guid ( &formset_guid );
+	efi_snp_hii_random_guid ( &varstore_guid );
+
+	/* Generate title string (used more than once) */
+	title_id = efi_ifr_string ( &ifr, "%s (%s)", product_name,
+				    netdev_addr ( netdev ) );
+
+	/* Generate opcodes */
+	efi_ifr_form_set_op ( &ifr, &formset_guid, title_id,
+			      efi_ifr_string ( &ifr,
+					       "Configure " PRODUCT_SHORT_NAME),
+			      &efi_hii_platform_setup_formset_guid,
+			      &efi_hii_ibm_ucm_compliant_formset_guid, NULL );
+	efi_ifr_guid_class_op ( &ifr, EFI_NETWORK_DEVICE_CLASS );
+	efi_ifr_guid_subclass_op ( &ifr, 0x03 );
+	varstore_id = efi_ifr_varstore_name_value_op ( &ifr, &varstore_guid );
+	efi_ifr_form_op ( &ifr, title_id );
+	efi_ifr_text_op ( &ifr,
+			  efi_ifr_string ( &ifr, "Name" ),
+			  efi_ifr_string ( &ifr, "Firmware product name" ),
+			  efi_ifr_string ( &ifr, "%s", product_name ) );
+	efi_ifr_text_op ( &ifr,
+			  efi_ifr_string ( &ifr, "Version" ),
+			  efi_ifr_string ( &ifr, "Firmware version" ),
+			  efi_ifr_string ( &ifr, VERSION ) );
+	efi_ifr_text_op ( &ifr,
+			  efi_ifr_string ( &ifr, "Driver" ),
+			  efi_ifr_string ( &ifr, "Firmware driver" ),
+			  efi_ifr_string ( &ifr, "%s", dev->driver_name ) );
+	efi_ifr_text_op ( &ifr,
+			  efi_ifr_string ( &ifr, "Device" ),
+			  efi_ifr_string ( &ifr, "Hardware device" ),
+			  efi_ifr_string ( &ifr, "%s", dev->name ) );
+	efi_snp_hii_questions ( snpdev, &ifr, varstore_id );
+	efi_ifr_end_op ( &ifr );
+	efi_ifr_end_op ( &ifr );
+
+	/* Build package */
+	package = efi_ifr_package ( &ifr, &package_guid, "en-us",
+				    efi_ifr_string ( &ifr, "English" ) );
+	if ( ! package ) {
+		DBGC ( snpdev, "SNPDEV %p could not build IFR package\n",
+		       snpdev );
+		efi_ifr_free ( &ifr );
 		return NULL;
+	}
 
-	/* Create a unique GUID for this package list and formset */
-	efi_snp_formset.FormSet.FormSet.Guid.Data1++;
+	/* Free temporary storage */
+	efi_ifr_free ( &ifr );
+	return package;
+}
 
-	/* Populate package list */
-	memcpy ( &package_list->header.PackageListGuid,
-		 &efi_snp_formset.FormSet.FormSet.Guid,
-		 sizeof ( package_list->header.PackageListGuid ) );
-	package_list->header.PackageLength = sizeof ( *package_list );
-	memcpy ( &package_list->formset, &efi_snp_formset,
-		 sizeof ( package_list->formset ) );
-	efi_snp_strings ( &package_list->strings.strings,
-			  sizeof ( package_list->strings ), snpdev );
-	package_list->end.Length = sizeof ( package_list->end );
-	package_list->end.Type = EFI_HII_PACKAGE_END;
+/**
+ * Append response to result string
+ *
+ * @v snpdev		SNP device
+ * @v key		Key
+ * @v value		Value
+ * @v results		Result string
+ * @ret rc		Return status code
+ *
+ * The result string is allocated dynamically using
+ * BootServices::AllocatePool(), and the caller is responsible for
+ * eventually calling BootServices::FreePool().
+ */
+static int efi_snp_hii_append ( struct efi_snp_device *snpdev __unused,
+				const char *key, const char *value,
+				wchar_t **results ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	size_t len;
+	void *new;
 
-	return &package_list->header;
+	/* Allocate new string */
+	len = ( ( *results ? ( wcslen ( *results ) + 1 /* "&" */ ) : 0 ) +
+		strlen ( key ) + 1 /* "=" */ + strlen ( value ) + 1 /* NUL */ );
+	bs->AllocatePool ( EfiBootServicesData, ( len * sizeof ( wchar_t ) ),
+			   &new );
+	if ( ! new )
+		return -ENOMEM;
+
+	/* Populate string */
+	efi_snprintf ( new, len, "%ls%s%s=%s", ( *results ? *results : L"" ),
+		       ( *results ? L"&" : L"" ), key, value );
+	bs->FreePool ( *results );
+	*results = new;
+
+	return 0;
+}
+
+/**
+ * Fetch HII setting
+ *
+ * @v snpdev		SNP device
+ * @v key		Key
+ * @v value		Value
+ * @v results		Result string
+ * @v have_setting	Flag indicating detection of a setting
+ * @ret rc		Return status code
+ */
+static int efi_snp_hii_fetch ( struct efi_snp_device *snpdev,
+			       const char *key, const char *value,
+			       wchar_t **results, int *have_setting ) {
+	struct settings *settings = efi_snp_hii_settings ( snpdev );
+	struct setting *setting;
+	int len;
+	char *buf;
+	char *encoded;
+	int i;
+	int rc;
+
+	/* Handle ConfigHdr components */
+	if ( ( strcasecmp ( key, "GUID" ) == 0 ) ||
+	     ( strcasecmp ( key, "NAME" ) == 0 ) ||
+	     ( strcasecmp ( key, "PATH" ) == 0 ) ) {
+		return efi_snp_hii_append ( snpdev, key, value, results );
+	}
+	if ( have_setting )
+		*have_setting = 1;
+
+	/* Do nothing more unless we have a settings block */
+	if ( ! settings ) {
+		rc = -ENOTSUP;
+		goto err_no_settings;
+	}
+
+	/* Identify setting */
+	setting = find_setting ( key );
+	if ( ! setting ) {
+		DBGC ( snpdev, "SNPDEV %p no such setting \"%s\"\n",
+		       snpdev, key );
+		rc = -ENODEV;
+		goto err_find_setting;
+	}
+
+	/* Encode value */
+	if ( setting_exists ( settings, setting ) ) {
+
+		/* Calculate formatted length */
+		len = fetchf_setting ( settings, setting, NULL, 0 );
+		if ( len < 0 ) {
+			rc = len;
+			DBGC ( snpdev, "SNPDEV %p could not fetch %s: %s\n",
+			       snpdev, setting->name, strerror ( rc ) );
+			goto err_fetchf_len;
+		}
+
+		/* Allocate buffer for formatted value and HII-encoded value */
+		buf = zalloc ( len + 1 /* NUL */ + ( len * 4 ) + 1 /* NUL */ );
+		if ( ! buf ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+		encoded = ( buf + len + 1 /* NUL */ );
+
+		/* Format value */
+		fetchf_setting ( settings, setting, buf, ( len + 1 /* NUL */ ));
+		for ( i = 0 ; i < len ; i++ ) {
+			sprintf ( ( encoded + ( 4 * i ) ), "%04x",
+				  *( ( uint8_t * ) buf + i ) );
+		}
+
+	} else {
+
+		/* Non-existent or inapplicable setting */
+		buf = NULL;
+		encoded = "";
+	}
+
+	/* Append results */
+	if ( ( rc = efi_snp_hii_append ( snpdev, key, encoded,
+					 results ) ) != 0 ) {
+		goto err_append;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_append:
+	free ( buf );
+ err_alloc:
+ err_fetchf_len:
+ err_find_setting:
+ err_no_settings:
+	return rc;
+}
+
+/**
+ * Fetch HII setting
+ *
+ * @v snpdev		SNP device
+ * @v key		Key
+ * @v value		Value
+ * @v results		Result string (unused)
+ * @v have_setting	Flag indicating detection of a setting (unused)
+ * @ret rc		Return status code
+ */
+static int efi_snp_hii_store ( struct efi_snp_device *snpdev,
+			       const char *key, const char *value,
+			       wchar_t **results __unused,
+			       int *have_setting __unused ) {
+	struct settings *settings = efi_snp_hii_settings ( snpdev );
+	struct setting *setting;
+	char *buf;
+	char tmp[5];
+	char *endp;
+	int len;
+	int i;
+	int rc;
+
+	/* Handle ConfigHdr components */
+	if ( ( strcasecmp ( key, "GUID" ) == 0 ) ||
+	     ( strcasecmp ( key, "NAME" ) == 0 ) ||
+	     ( strcasecmp ( key, "PATH" ) == 0 ) ) {
+		/* Nothing to do */
+		return 0;
+	}
+
+	/* Do nothing more unless we have a settings block */
+	if ( ! settings ) {
+		rc = -ENOTSUP;
+		goto err_no_settings;
+	}
+
+	/* Identify setting */
+	setting = find_setting ( key );
+	if ( ! setting ) {
+		DBGC ( snpdev, "SNPDEV %p no such setting \"%s\"\n",
+		       snpdev, key );
+		rc = -ENODEV;
+		goto err_find_setting;
+	}
+
+	/* Allocate buffer */
+	len = ( strlen ( value ) / 4 );
+	buf = zalloc ( len + 1 /* NUL */ );
+	if ( ! buf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Decode value */
+	tmp[4] = '\0';
+	for ( i = 0 ; i < len ; i++ ) {
+		memcpy ( tmp, ( value + ( i * 4 ) ), 4 );
+		buf[i] = strtoul ( tmp, &endp, 16 );
+		if ( endp != &tmp[4] ) {
+			DBGC ( snpdev, "SNPDEV %p invalid character %s\n",
+			       snpdev, tmp );
+			rc = -EINVAL;
+			goto err_inval;
+		}
+	}
+
+	/* Store value */
+	if ( ( rc = storef_setting ( settings, setting, buf ) ) != 0 ) {
+		DBGC ( snpdev, "SNPDEV %p could not store \"%s\" into %s: %s\n",
+		       snpdev, buf, setting->name, strerror ( rc ) );
+		goto err_storef;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_storef:
+ err_inval:
+	free ( buf );
+ err_alloc:
+ err_find_setting:
+ err_no_settings:
+	return rc;
+}
+
+/**
+ * Process portion of HII configuration string
+ *
+ * @v snpdev		SNP device
+ * @v string		HII configuration string
+ * @v progress		Progress through HII configuration string
+ * @v results		Results string
+ * @v have_setting	Flag indicating detection of a setting (unused)
+ * @v process		Function used to process key=value pairs
+ * @ret rc		Return status code
+ */
+static int efi_snp_hii_process ( struct efi_snp_device *snpdev,
+				 wchar_t *string, wchar_t **progress,
+				 wchar_t **results, int *have_setting,
+				 int ( * process ) ( struct efi_snp_device *,
+						     const char *key,
+						     const char *value,
+						     wchar_t **results,
+						     int *have_setting ) ) {
+	wchar_t *wkey = string;
+	wchar_t *wend = string;
+	wchar_t *wvalue = NULL;
+	size_t key_len;
+	size_t value_len;
+	void *temp;
+	char *key;
+	char *value;
+	int rc;
+
+	/* Locate key, value (if any), and end */
+	while ( *wend ) {
+		if ( *wend == L'&' )
+			break;
+		if ( *(wend++) == L'=' )
+			wvalue = wend;
+	}
+
+	/* Allocate memory for key and value */
+	key_len = ( ( wvalue ? ( wvalue - 1 ) : wend ) - wkey );
+	value_len = ( wvalue ? ( wend - wvalue ) : 0 );
+	temp = zalloc ( key_len + 1 /* NUL */ + value_len + 1 /* NUL */ );
+	if ( ! temp )
+		return -ENOMEM;
+	key = temp;
+	value = ( temp + key_len + 1 /* NUL */ );
+
+	/* Copy key and value */
+	while ( key_len-- )
+		key[key_len] = wkey[key_len];
+	while ( value_len-- )
+		value[value_len] = wvalue[value_len];
+
+	/* Process key and value */
+	if ( ( rc = process ( snpdev, key, value, results,
+			      have_setting ) ) != 0 ) {
+		goto err;
+	}
+
+	/* Update progress marker */
+	*progress = wend;
+
+ err:
+	/* Free temporary storage */
+	free ( temp );
+
+	return rc;
 }
 
 /**
@@ -292,14 +524,47 @@ efi_snp_package_list ( struct efi_snp_device *snpdev ) {
 static EFI_STATUS EFIAPI
 efi_snp_hii_extract_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
 			     EFI_STRING request, EFI_STRING *progress,
-			     EFI_STRING *results __unused ) {
+			     EFI_STRING *results ) {
 	struct efi_snp_device *snpdev =
 		container_of ( hii, struct efi_snp_device, hii );
+	int have_setting = 0;
+	wchar_t *pos;
+	int rc;
 
-	DBGC ( snpdev, "SNPDEV %p ExtractConfig \"%ls\"\n", snpdev, request );
+	DBGC ( snpdev, "SNPDEV %p ExtractConfig request \"%ls\"\n",
+	       snpdev, request );
 
-	*progress = request;
-	return EFI_INVALID_PARAMETER;
+	/* Initialise results */
+	*results = NULL;
+
+	/* Process all request fragments */
+	for ( pos = *progress = request ; *progress && **progress ;
+	      pos = *progress + 1 ) {
+		if ( ( rc = efi_snp_hii_process ( snpdev, pos, progress,
+						  results, &have_setting,
+						  efi_snp_hii_fetch ) ) != 0 ) {
+			return RC_TO_EFIRC ( rc );
+		}
+	}
+
+	/* If we have no explicit request, return all settings */
+	if ( ! have_setting ) {
+		struct setting *setting;
+
+		for_each_table_entry ( setting, SETTINGS ) {
+			if ( ! efi_snp_hii_setting_applies ( snpdev, setting ) )
+				continue;
+			if ( ( rc = efi_snp_hii_fetch ( snpdev, setting->name,
+							NULL, results,
+							NULL ) ) != 0 ) {
+				return rc;
+			}
+		}
+	}
+
+	DBGC ( snpdev, "SNPDEV %p ExtractConfig results \"%ls\"\n",
+	       snpdev, *results );
+	return 0;
 }
 
 /**
@@ -315,11 +580,22 @@ efi_snp_hii_route_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
 			   EFI_STRING config, EFI_STRING *progress ) {
 	struct efi_snp_device *snpdev =
 		container_of ( hii, struct efi_snp_device, hii );
+	wchar_t *pos;
+	int rc;
 
 	DBGC ( snpdev, "SNPDEV %p RouteConfig \"%ls\"\n", snpdev, config );
 
-	*progress = config;
-	return EFI_INVALID_PARAMETER;
+	/* Process all request fragments */
+	for ( pos = *progress = config ; *progress && **progress ;
+	      pos = *progress + 1 ) {
+		if ( ( rc = efi_snp_hii_process ( snpdev, pos, progress,
+						  NULL, NULL,
+						  efi_snp_hii_store ) ) != 0 ) {
+			return RC_TO_EFIRC ( rc );
+		}
+	}
+
+	return 0;
 }
 
 /**
@@ -368,7 +644,7 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 	memcpy ( &snpdev->hii, &efi_snp_device_hii, sizeof ( snpdev->hii ) );
 
 	/* Create HII package list */
-	snpdev->package_list = efi_snp_package_list ( snpdev );
+	snpdev->package_list = efi_snp_hii_package_list ( snpdev );
 	if ( ! snpdev->package_list ) {
 		DBGC ( snpdev, "SNPDEV %p could not create HII package list\n",
 		       snpdev );

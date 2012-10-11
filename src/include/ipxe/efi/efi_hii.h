@@ -8,138 +8,89 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <string.h>
 #include <ipxe/efi/Uefi/UefiInternalFormRepresentation.h>
 #include <ipxe/efi/Guid/MdeModuleHii.h>
-
-/**
- * Define an EFI IFR form set type
- *
- * @v num_class_guids	Number of class GUIDs
- * @ret type		Form set type
- */
-#define EFI_IFR_FORM_SET_TYPE( num_class_guids )			   \
-	struct {							   \
-		EFI_IFR_FORM_SET FormSet;				   \
-		EFI_GUID ClassGuid[num_class_guids];			   \
-	} __attribute__ (( packed ))
-
-/**
- * Define an EFI IFR form set
- *
- * @v guid		GUID
- * @v title		Title string
- * @v help		Help string
- * @v type		Form set type (as returned by EFI_IFR_FORM_SET_TYPE())
- * @ret ifr		Form set
- *
- * This definition opens a new scope, which must be closed by an
- * EFI_IFR_END().
- */
-#define EFI_IFR_FORM_SET( guid, title, help, type, ... ) {		   \
-	.FormSet = {							   \
-		.Header = {						   \
-			.OpCode = EFI_IFR_FORM_SET_OP,			   \
-			.Length = sizeof ( type ),			   \
-			.Scope = 1,					   \
-		},							   \
-		.Guid = guid,						   \
-		.FormSetTitle = title,					   \
-		.Help = help,						   \
-		.Flags = ( sizeof ( ( ( type * ) NULL )->ClassGuid ) /	   \
-			   sizeof ( ( ( type * ) NULL )->ClassGuid[0] ) ), \
-	},								   \
-	.ClassGuid = {							   \
-		__VA_ARGS__						   \
-	},								   \
-	}
-
-/**
- * Define an EFI IFR GUID class
- *
- * @v class		Class
- * @ret ifr		GUID class
- */
-#define EFI_IFR_GUID_CLASS( class ) {					   \
-	.Header = {							   \
-		.OpCode = EFI_IFR_GUID_OP,				   \
-		.Length = sizeof ( EFI_IFR_GUID_CLASS ),		   \
-	},								   \
-	.Guid = EFI_IFR_TIANO_GUID,					   \
-	.ExtendOpCode = EFI_IFR_EXTEND_OP_CLASS,			   \
-	.Class = class,							   \
-	}
-
-/**
- * Define an EFI IFR GUID subclass
- *
- * @v subclass		Subclass
- * @ret ifr		GUID subclass
- */
-#define EFI_IFR_GUID_SUBCLASS( subclass ) {				   \
-	.Header = {							   \
-		.OpCode = EFI_IFR_GUID_OP,				   \
-		.Length = sizeof ( EFI_IFR_GUID_SUBCLASS ),		   \
-	},								   \
-	.Guid = EFI_IFR_TIANO_GUID,					   \
-	.ExtendOpCode = EFI_IFR_EXTEND_OP_SUBCLASS,			   \
-	.SubClass = subclass,						   \
-	}
-
-/**
- * Define an EFI IFR form
- *
- * @v formid		Form ID
- * @v title		Title string
- * @ret ifr		Form
- *
- * This definition opens a new scope, which must be closed by an
- * EFI_IFR_END().
- */
-#define EFI_IFR_FORM( formid, title ) {					   \
-	.Header = {							   \
-		.OpCode = EFI_IFR_FORM_OP,				   \
-		.Length = sizeof ( EFI_IFR_FORM ),			   \
-		.Scope = 1,						   \
-	},								   \
-	.FormId = formid,						   \
-	.FormTitle = title,						   \
-	}
-
-/**
- * Define an EFI IFR text widget
- *
- * @v prompt		Prompt string
- * @v help		Help string
- * @v text		Text string
- * @ret ifr		Text widget
- */
-#define EFI_IFR_TEXT( prompt, help, text ) {				   \
-	.Header = {							   \
-		.OpCode = EFI_IFR_TEXT_OP,				   \
-		.Length = sizeof ( EFI_IFR_TEXT ),			   \
-	},								   \
-	.Statement = {							   \
-		.Prompt = prompt,					   \
-		.Help = help,						   \
-	},								   \
-	.TextTwo = text,						   \
-	}
-
-/**
- * Define an EFI IFR end marker
- *
- * @ret ifr		End marker
- */
-#define EFI_IFR_END() {							   \
-	.Header = {							   \
-		.OpCode = EFI_IFR_END_OP,				   \
-		.Length = sizeof ( EFI_IFR_END ),			   \
-	},								   \
-	}
 
 /** GUID indicating formset compliance for IBM Unified Configuration Manager */
 #define EFI_HII_IBM_UCM_COMPLIANT_FORMSET_GUID				   \
 	{ 0x5c8e9746, 0xa5f7, 0x4593,					   \
 	  { 0xaf, 0x1f, 0x66, 0xa8, 0x2a, 0xa1, 0x9c, 0xb1 } }
+
+/** An EFI IFR builder */
+struct efi_ifr_builder {
+	/** IFR opcodes */
+	EFI_IFR_OP_HEADER *ops;
+	/** Length of IFR opcodes */
+	size_t ops_len;
+	/** Strings */
+	EFI_HII_STRING_BLOCK *strings;
+	/** Length of strings */
+	size_t strings_len;
+	/** Current string identifier */
+	unsigned int string_id;
+	/** Current variable store identifier */
+	unsigned int varstore_id;
+	/** Current form identifier */
+	unsigned int form_id;
+	/** An allocation has failed */
+	int failed;
+};
+
+/**
+ * Initialise IFR builder
+ *
+ * @v ifr		IFR builder
+ *
+ * The caller must eventually call efi_ifr_free() to free the dynamic
+ * storage associated with the IFR builder.
+ */
+static inline void efi_ifr_init ( struct efi_ifr_builder *ifr ) {
+	memset ( ifr, 0, sizeof ( *ifr ) );
+}
+
+extern unsigned int efi_ifr_string ( struct efi_ifr_builder *ifr,
+				     const char *fmt, ... );
+extern void efi_ifr_end_op ( struct efi_ifr_builder *ifr );
+extern void efi_ifr_false_op ( struct efi_ifr_builder *ifr );
+extern unsigned int efi_ifr_form_op ( struct efi_ifr_builder *ifr,
+				      unsigned int title_id );
+extern void efi_ifr_form_set_op ( struct efi_ifr_builder *ifr,
+				  const EFI_GUID *guid,
+				  unsigned int title_id, unsigned int help_id,
+				  ... );
+void efi_ifr_get_op ( struct efi_ifr_builder *ifr, unsigned int varstore_id,
+		      unsigned int varstore_info, unsigned int varstore_type );
+extern void efi_ifr_guid_class_op ( struct efi_ifr_builder *ifr,
+				    unsigned int class );
+extern void efi_ifr_guid_subclass_op ( struct efi_ifr_builder *ifr,
+				       unsigned int subclass );
+extern void efi_ifr_numeric_op ( struct efi_ifr_builder *ifr,
+				 unsigned int prompt_id,
+				 unsigned int help_id, unsigned int question_id,
+				 unsigned int varstore_id,
+				 unsigned int varstore_info,
+				 unsigned int vflags, unsigned long min_value,
+				 unsigned long max_value, unsigned int step,
+				 unsigned int flags );
+extern void efi_ifr_string_op ( struct efi_ifr_builder *ifr,
+				unsigned int prompt_id, unsigned int help_id,
+				unsigned int question_id,
+				unsigned int varstore_id,
+				unsigned int varstore_info, unsigned int vflags,
+				unsigned int min_size, unsigned int max_size,
+				unsigned int flags );
+extern void efi_ifr_suppress_if_op ( struct efi_ifr_builder *ifr );
+extern void efi_ifr_text_op ( struct efi_ifr_builder *ifr,
+			      unsigned int prompt_id, unsigned int help_id,
+			      unsigned int text_id );
+extern void efi_ifr_true_op ( struct efi_ifr_builder *ifr );
+extern unsigned int
+efi_ifr_varstore_name_value_op ( struct efi_ifr_builder *ifr,
+				 const EFI_GUID *guid );
+extern void efi_ifr_free ( struct efi_ifr_builder *ifr );
+extern EFI_HII_PACKAGE_LIST_HEADER *
+efi_ifr_package ( struct efi_ifr_builder *ifr, const EFI_GUID *guid,
+		  const char *language, unsigned int language_id );
 
 #endif /* _IPXE_EFI_HII_H */
