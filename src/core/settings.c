@@ -1052,8 +1052,8 @@ int storef_setting ( struct settings *settings, struct setting *setting,
 	int check_len;
 	int rc;
 
-	/* NULL value implies deletion */
-	if ( ! value )
+	/* NULL value or empty string implies deletion */
+	if ( ( ! value ) || ( ! value[0] ) )
 		return delete_setting ( settings, setting );
 
 	/* Parse formatted value */
