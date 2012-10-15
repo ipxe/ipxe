@@ -42,6 +42,9 @@ struct nvo_block {
 	struct dhcp_options dhcpopts;
 };
 
+/** Name of non-volatile options settings block */
+#define NVO_SETTINGS_NAME "nvo"
+
 extern void nvo_init ( struct nvo_block *nvo, struct nvs_device *nvs,
 		       size_t address, size_t len,
 		       int ( * resize ) ( struct nvo_block *nvo, size_t len ),
