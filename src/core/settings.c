@@ -265,8 +265,8 @@ static void autovivified_settings_free ( struct refcnt *refcnt ) {
  * @v name		Name within this parent
  * @ret settings	Settings block, or NULL
  */
-static struct settings * find_child_settings ( struct settings *parent,
-					       const char *name ) {
+struct settings * find_child_settings ( struct settings *parent,
+					const char *name ) {
 	struct settings *settings;
 
 	/* Treat empty name as meaning "this block" */
