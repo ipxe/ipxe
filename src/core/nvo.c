@@ -192,8 +192,8 @@ static int nvo_save ( struct nvo_block *nvo ) {
  * @v setting		Setting
  * @ret applies		Setting applies within this settings block
  */
-static int nvo_applies ( struct settings *settings __unused,
-			 struct setting *setting ) {
+int nvo_applies ( struct settings *settings __unused,
+		  struct setting *setting ) {
 
 	return dhcpopt_applies ( setting->tag );
 }
