@@ -42,6 +42,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/fcoe.h>
 #include <ipxe/vlan.h>
 #include <ipxe/bofm.h>
+#include <ipxe/nvsvpd.h>
+#include <ipxe/nvo.h>
 #include "hermon.h"
 
 /**
@@ -3383,7 +3385,7 @@ static int hermon_register_netdev ( struct hermon *hermon,
 					    &query_port ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not query port: %s\n",
 		       hermon, ibdev->port, strerror ( rc ) );
-		return rc;
+		goto err_query_port;
 	}
 	mac.dwords[0] = htonl ( MLX_GET ( &query_port, mac_47_32 ) );
 	mac.dwords[1] = htonl ( MLX_GET ( &query_port, mac_31_0 ) );
@@ -3394,10 +3396,26 @@ static int hermon_register_netdev ( struct hermon *hermon,
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not register network "
 		       "device: %s\n", hermon, ibdev->port, strerror ( rc ) );
-		return rc;
+		goto err_register_netdev;
+	}
+
+	/* Register non-volatile options */
+	if ( ( rc = register_nvo ( &port->nvo,
+				   netdev_settings ( netdev ) ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not register non-"
+		       "volatile options: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		goto err_register_nvo;
 	}
 
 	return 0;
+
+	unregister_nvo ( &port->nvo );
+ err_register_nvo:
+	unregister_netdev ( netdev );
+ err_register_netdev:
+ err_query_port:
+	return rc;
 }
 
 /**
@@ -3429,6 +3447,7 @@ static void hermon_unregister_netdev ( struct hermon *hermon __unused,
 				       struct hermon_port *port ) {
 	struct net_device *netdev = port->netdev;
 
+	unregister_nvo ( &port->nvo );
 	unregister_netdev ( netdev );
 }
 
@@ -3820,6 +3839,15 @@ static int hermon_probe ( struct pci_device *pci ) {
 		port = &hermon->port[i];
 		if ( ( rc = hermon_set_port_type ( hermon, port ) ) != 0 )
 			goto err_set_port_type;
+	}
+
+	/* Initialise non-volatile storage */
+	nvs_vpd_init ( &hermon->nvsvpd, pci );
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
+		port = &hermon->port[i];
+		nvs_vpd_nvo_init ( &hermon->nvsvpd,
+				   HERMON_VPD_FIELD ( port->ibdev->port ),
+				   &port->nvo, NULL );
 	}
 
 	/* Register devices */
