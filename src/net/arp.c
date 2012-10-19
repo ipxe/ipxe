@@ -180,13 +180,16 @@ static void arp_destroy ( struct arp_entry *arp, int rc ) {
 	struct net_device *netdev = arp->netdev;
 	struct net_protocol *net_protocol = arp->net_protocol;
 	struct io_buffer *iobuf;
-	struct io_buffer *tmp;
+
+	/* Take ownership from cache */
+	list_del ( &arp->list );
 
 	/* Stop timer */
 	stop_timer ( &arp->timer );
 
 	/* Discard any outstanding I/O buffers */
-	list_for_each_entry_safe ( iobuf, tmp, &arp->tx_queue, list ) {
+	while ( ( iobuf = list_first_entry ( &arp->tx_queue, struct io_buffer,
+					     list ) ) != NULL ) {
 		DBGC2 ( arp, "ARP %p %s %s %s discarding deferred packet: "
 			"%s\n", arp, netdev->name, net_protocol->name,
 			net_protocol->ntoa ( arp->net_dest ), strerror ( rc ) );
@@ -198,8 +201,7 @@ static void arp_destroy ( struct arp_entry *arp, int rc ) {
 	       net_protocol->name, net_protocol->ntoa ( arp->net_dest ),
 	       strerror ( rc ) );
 
-	/* Remove from cache and drop reference */
-	list_del ( &arp->list );
+	/* Drop remaining reference */
 	ref_put ( &arp->refcnt );
 }
 
@@ -518,12 +520,13 @@ static unsigned int arp_discard ( void ) {
 	struct arp_entry *arp;
 
 	/* Drop oldest cache entry, if any */
-	list_for_each_entry_reverse ( arp, &arp_entries, list ) {
+	arp = list_last_entry ( &arp_entries, struct arp_entry, list );
+	if ( arp ) {
 		arp_destroy ( arp, -ENOBUFS );
 		return 1;
+	} else {
+		return 0;
 	}
-
-	return 0;
 }
 
 /** ARP cache discarder
