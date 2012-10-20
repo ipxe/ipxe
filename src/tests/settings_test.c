@@ -240,8 +240,6 @@ static void settings_test_exec ( void ) {
 
 	/* "hex" setting type */
 	storef_ok ( &test_settings, &test_hex_setting,
-		    "", RAW ( 0x00 ) );
-	storef_ok ( &test_settings, &test_hex_setting,
 		    ":", RAW ( 0x00, 0x00 ) );
 	storef_ok ( &test_settings, &test_hex_setting,
 		    "1:2:", RAW ( 0x01, 0x02, 0x00 ) );
