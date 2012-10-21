@@ -48,7 +48,9 @@ static int shell_banner ( void ) {
 	if ( BANNER_TIMEOUT <= 0 )
 		return 0;
 
-	return ( prompt ( "\nPress Ctrl-B for the iPXE command line...",
+	/* Prompt user */
+	printf ( "\n" );
+	return ( prompt ( "Press Ctrl-B for the iPXE command line...",
 			  ( BANNER_TIMEOUT * 100 ), CTRL_B ) == 0 );
 }
 
