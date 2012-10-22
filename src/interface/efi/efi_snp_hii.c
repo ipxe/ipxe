@@ -557,7 +557,7 @@ efi_snp_hii_extract_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
 			if ( ( rc = efi_snp_hii_fetch ( snpdev, setting->name,
 							NULL, results,
 							NULL ) ) != 0 ) {
-				return rc;
+				return RC_TO_EFIRC ( rc );
 			}
 		}
 	}
