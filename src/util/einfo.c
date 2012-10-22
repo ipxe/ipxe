@@ -93,10 +93,11 @@ static void einfo ( const char *infile,
 				 ( ( ( char * ) einfo ) + einfo->desc ) );
 		}
 
+		/* Unmap file */
+		munmap ( start, len );
 	}
 
-	/* Unmap and close file */
-	munmap ( start, len );
+	/* Close file */
 	close ( fd );
 }
 
