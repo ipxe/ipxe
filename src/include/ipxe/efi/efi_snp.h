@@ -12,6 +12,7 @@
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
+#include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/Protocol/HiiConfigAccess.h>
 #include <ipxe/efi/Protocol/HiiDatabase.h>
@@ -46,6 +47,8 @@ struct efi_snp_device {
 	unsigned int rx_count_events;
 	/** The network interface identifier */
 	EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL nii;
+	/** Component name protocol */
+	EFI_COMPONENT_NAME2_PROTOCOL name2;
 	/** HII configuration access protocol */
 	EFI_HII_CONFIG_ACCESS_PROTOCOL hii;
 	/** HII package list */
@@ -54,6 +57,10 @@ struct efi_snp_device {
 	EFI_HII_HANDLE hii_handle;
 	/** Device name */
 	wchar_t name[ sizeof ( ( ( struct net_device * ) NULL )->name ) ];
+	/** Driver name */
+	wchar_t driver_name[16];
+	/** Controller name */
+	wchar_t controller_name[32];
 	/** The device path
 	 *
 	 * This field is variable in size and must appear at the end

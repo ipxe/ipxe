@@ -56,6 +56,10 @@ static EFI_GUID efi_nii31_protocol_guid = {
 	{ 0xBC, 0x81, 0x76, 0x7F, 0x1F, 0x97, 0x7A, 0x89 }
 };
 
+/** EFI component name protocol */
+static EFI_GUID efi_component_name2_protocol_guid
+	= EFI_COMPONENT_NAME2_PROTOCOL_GUID;
+
 /** List of SNP devices */
 static LIST_HEAD ( efi_snp_devices );
 
@@ -703,6 +707,54 @@ static EFI_SIMPLE_NETWORK_PROTOCOL efi_snp_device_snp = {
 
 /******************************************************************************
  *
+ * Component name protocol
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Look up driver name
+ *
+ * @v name2		Component name protocol
+ * @v language		Language to use
+ * @v driver_name	Driver name to fill in
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_snp_get_driver_name ( EFI_COMPONENT_NAME2_PROTOCOL *name2,
+			  CHAR8 *language __unused, CHAR16 **driver_name ) {
+	struct efi_snp_device *snpdev =
+		container_of ( name2, struct efi_snp_device, name2 );
+
+	*driver_name = snpdev->driver_name;
+	return 0;
+}
+
+/**
+ * Look up controller name
+ *
+ * @v name2     		Component name protocol
+ * @v device		Device
+ * @v child		Child device, or NULL
+ * @v language		Language to use
+ * @v driver_name	Device name to fill in
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_snp_get_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *name2,
+			      EFI_HANDLE device __unused,
+			      EFI_HANDLE child __unused,
+			      CHAR8 *language __unused,
+			      CHAR16 **controller_name ) {
+	struct efi_snp_device *snpdev =
+		container_of ( name2, struct efi_snp_device, name2 );
+
+	*controller_name = snpdev->controller_name;
+	return 0;
+}
+
+/******************************************************************************
+ *
  * iPXE network driver
  *
  ******************************************************************************
@@ -794,6 +846,19 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	strncpy ( snpdev->nii.StringId, "iPXE",
 		  sizeof ( snpdev->nii.StringId ) );
 
+	/* Populate the component name structure */
+	efi_snprintf ( snpdev->driver_name,
+		       ( sizeof ( snpdev->driver_name ) /
+			 sizeof ( snpdev->driver_name[0] ) ), "%s",
+		       netdev->dev->driver_name );
+	efi_snprintf ( snpdev->controller_name,
+		       ( sizeof ( snpdev->controller_name ) /
+			 sizeof ( snpdev->controller_name[0] ) ), "%s (%s)",
+		       netdev->name, netdev_addr ( netdev ) );
+	snpdev->name2.GetDriverName = efi_snp_get_driver_name;
+	snpdev->name2.GetControllerName = efi_snp_get_controller_name;
+	snpdev->name2.SupportedLanguages = "en";
+
 	/* Populate the device name */
 	efi_snprintf ( snpdev->name, ( sizeof ( snpdev->name ) /
 				       sizeof ( snpdev->name[0] ) ),
@@ -822,6 +887,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_device_path_protocol_guid, &snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
+			&efi_component_name2_protocol_guid, &snpdev->name2,
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not install protocols: "
 		       "%s\n", snpdev, efi_strerror ( efirc ) );
@@ -862,6 +928,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_device_path_protocol_guid, &snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
+			&efi_component_name2_protocol_guid, &snpdev->name2,
 			NULL );
  err_install_protocol_interface:
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
@@ -922,6 +989,7 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 			&efi_device_path_protocol_guid, &snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
+			&efi_component_name2_protocol_guid, &snpdev->name2,
 			NULL );
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
 	netdev_put ( snpdev->netdev );
