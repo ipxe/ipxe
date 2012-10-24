@@ -672,13 +672,6 @@ int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	int rc;
 
-	/* Force a poll on the netdevice to (potentially) clear any
-	 * backed-up TX completions.  This is needed on some network
-	 * devices to avoid excessive losses due to small TX ring
-	 * sizes.
-	 */
-	netdev_poll ( netdev );
-
 	/* Add link-layer header */
 	if ( ( rc = ll_protocol->push ( netdev, iobuf, ll_dest, ll_source,
 					net_protocol->net_proto ) ) != 0 ) {
