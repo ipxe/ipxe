@@ -699,9 +699,13 @@ static void intel_poll ( struct net_device *netdev ) {
 	if ( icr & INTEL_IRQ_TXDW )
 		intel_poll_tx ( netdev );
 
-	/* Poll for RX completionsm, if applicable */
+	/* Poll for RX completions, if applicable */
 	if ( icr & INTEL_IRQ_RXT0 )
 		intel_poll_rx ( netdev );
+
+	/* Report receive overruns */
+	if ( icr & INTEL_IRQ_RXO )
+		netdev_rx_err ( netdev, NULL, -ENOBUFS );
 
 	/* Check link state, if applicable */
 	if ( icr & INTEL_IRQ_LSC )
