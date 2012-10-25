@@ -241,13 +241,14 @@ void history_free ( struct readline_history *history ) {
  * Read line from console (with history)
  *
  * @v prompt		Prompt string
+ * @v prefill		Prefill string, or NULL for no prefill
  * @v history		History buffer, or NULL for no history
  * @ret line		Line read from console (excluding terminating newline)
  *
  * The returned line is allocated with malloc(); the caller must
  * eventually call free() to release the storage.
  */
-char * readline_history ( const char *prompt,
+char * readline_history ( const char *prompt, const char *prefill,
 			  struct readline_history *history ) {
 	char buf[READLINE_MAX];
 	struct edit_string string;
@@ -264,6 +265,12 @@ char * readline_history ( const char *prompt,
 	memset ( &string, 0, sizeof ( string ) );
 	init_editstring ( &string, buf, sizeof ( buf ) );
 	buf[0] = '\0';
+
+	/* Prefill string, if applicable */
+	if ( prefill ) {
+		replace_string ( &string, prefill );
+		sync_console ( &string );
+	}
 
 	while ( 1 ) {
 		/* Handle keypress */
@@ -321,5 +328,5 @@ char * readline_history ( const char *prompt,
  * eventually call free() to release the storage.
  */
 char * readline ( const char *prompt ) {
-	return readline_history ( prompt, NULL );
+	return readline_history ( prompt, NULL, NULL );
 }
