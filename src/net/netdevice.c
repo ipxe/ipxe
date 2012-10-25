@@ -486,6 +486,7 @@ int register_netdev ( struct net_device *netdev ) {
  err_probe:
 	for_each_table_entry_continue_reverse ( driver, NET_DRIVERS )
 		driver->remove ( netdev );
+	clear_settings ( netdev_settings ( netdev ) );
 	unregister_settings ( netdev_settings ( netdev ) );
  err_register_settings:
 	return rc;
@@ -570,6 +571,7 @@ void unregister_netdev ( struct net_device *netdev ) {
 		driver->remove ( netdev );
 
 	/* Unregister per-netdev configuration settings */
+	clear_settings ( netdev_settings ( netdev ) );
 	unregister_settings ( netdev_settings ( netdev ) );
 
 	/* Remove from device list */
