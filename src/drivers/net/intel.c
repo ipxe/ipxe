@@ -700,7 +700,7 @@ static void intel_poll ( struct net_device *netdev ) {
 		intel_poll_tx ( netdev );
 
 	/* Poll for RX completions, if applicable */
-	if ( icr & INTEL_IRQ_RXT0 )
+	if ( icr & ( INTEL_IRQ_RXT0 | INTEL_IRQ_RXO ) )
 		intel_poll_rx ( netdev );
 
 	/* Report receive overruns */
