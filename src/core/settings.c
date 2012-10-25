@@ -1332,6 +1332,45 @@ int fetchf_named_setting ( const char *name,
 	return len;
 }
 
+/**
+ * Fetch and format copy of value of named setting
+ *
+ * @v name		Name of setting
+ * @v data		Buffer to allocate and fill with formatted value
+ * @ret len		Length of formatted value, or negative error
+ *
+ * The caller is responsible for eventually freeing the allocated
+ * buffer.
+ *
+ * To allow the caller to distinguish between a non-existent setting
+ * and an error in allocating memory for the copy, this function will
+ * return success (and a NULL buffer pointer) for a non-existent
+ * setting.
+ */
+int fetchf_named_setting_copy ( const char *name, char **data ) {
+	int len;
+	int check_len;
+
+	/* Avoid returning uninitialised data on error */
+	*data = NULL;
+
+	/* Fetch formatted value length, and return success if non-existent */
+	len = fetchf_named_setting ( name, NULL, 0, NULL, 0 );
+	if ( len < 0 )
+		return 0;
+
+	/* Allocate buffer */
+	*data = malloc ( len + 1 /* NUL */ );
+	if ( ! *data )
+		return -ENOMEM;
+
+	/* Fetch formatted value */
+	check_len = fetchf_named_setting ( name, NULL, 0, *data,
+					   ( len + 1 /* NUL */ ) );
+	assert ( check_len == len );
+	return len;
+}
+
 /******************************************************************************
  *
  * Setting types

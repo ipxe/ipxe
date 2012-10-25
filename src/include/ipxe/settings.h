@@ -291,6 +291,7 @@ extern int storef_named_setting ( const char *name,
 extern int fetchf_named_setting ( const char *name, char *name_buf,
 				  size_t name_len, char *value_buf,
 				  size_t value_len );
+extern int fetchf_named_setting_copy ( const char *name, char **data );
 extern char * expand_settings ( const char *string );
 
 extern struct setting_type setting_type_string __setting_type;
