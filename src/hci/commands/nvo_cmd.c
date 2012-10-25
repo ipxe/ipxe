@@ -213,15 +213,19 @@ static int read_value ( const char *name, char **args __unused, char **value ) {
 
 	/* Read existing value */
 	if ( ( rc = fetchf_named_setting_copy ( name, &existing ) ) < 0 )
-		return rc;
+		goto err_existing;
 
 	/* Read new value */
-	*value = readline_history ( NULL, existing, NULL );
+	if ( ( rc = readline_history ( NULL, existing, NULL, value ) ) != 0 )
+		goto err_new;
 
-	/* Free existing value */
+	/* Success */
+	rc = 0;
+
+ err_new:
 	free ( existing );
-
-	return 0;
+ err_existing:
+	return rc;
 }
 
 /**
