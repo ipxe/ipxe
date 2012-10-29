@@ -55,7 +55,7 @@ struct ring_desc_ex {
 #define DESC_VER_3	3
 
 #define RX_RING_SIZE		16
-#define TX_RING_SIZE		16
+#define TX_RING_SIZE		32
 #define RXTX_RING_SIZE		( ( RX_RING_SIZE ) + ( TX_RING_SIZE ) )
 #define RX_RING_MIN		128
 #define TX_RING_MIN		64
