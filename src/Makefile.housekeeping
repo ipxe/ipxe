@@ -162,9 +162,12 @@ endif
 # output of "size".  Inhibit this.
 #
 ifeq ($(CCTYPE),gcc)
-CFI_TEST = $(CC) -fno-dwarf2-cfi-asm -x c -c /dev/null \
+CFI_TEST = $(CC) -fno-dwarf2-cfi-asm -fno-exceptions -fno-unwind-tables \
+		 -fno-asynchronous-unwind-tables -x c -c /dev/null \
 		 -o /dev/null >/dev/null 2>&1
-CFI_FLAGS := $(shell $(CFI_TEST) && $(ECHO) '-fno-dwarf2-cfi-asm')
+CFI_FLAGS := $(shell $(CFI_TEST) && \
+	       $(ECHO) '-fno-dwarf2-cfi-asm -fno-exceptions ' \
+		       '-fno-unwind-tables -fno-asynchronous-unwind-tables')
 WORKAROUND_CFLAGS += $(CFI_FLAGS)
 endif
 
