@@ -42,9 +42,9 @@ struct list_head {
  *
  * @v list		List head
  */
-#define INIT_LIST_HEAD( list ) do {			\
-	(list)->next = (list);				\
-	(list)->prev = (list);				\
+#define INIT_LIST_HEAD( list ) do {				\
+	(list)->next = (list);					\
+	(list)->prev = (list);					\
 	} while ( 0 )
 
 /**
@@ -52,29 +52,13 @@ struct list_head {
  *
  * @v list		List entry or head
  */
-#define list_check( list ) ( {				\
-	assert ( (list) != NULL );			\
-	assert ( (list)->prev != NULL );		\
-	assert ( (list)->next != NULL );		\
-	assert ( (list)->next->prev == (list) );	\
-	assert ( (list)->prev->next == (list) );	\
+#define list_check( list ) ( {					\
+	assert ( (list) != NULL );				\
+	assert ( (list)->prev != NULL );			\
+	assert ( (list)->next != NULL );			\
+	assert ( (list)->next->prev == (list) );		\
+	assert ( (list)->prev->next == (list) );		\
 	} )
-
-/**
- * Insert a list entry between two known consecutive entries
- *
- * @v new		New list entry
- * @v prev		Previous list entry
- * @v next		Next list entry
- */
-static inline void __list_add ( struct list_head *new,
-				struct list_head *prev,
-				struct list_head *next ) {
-	next->prev = new;
-	new->next = next;
-	new->prev = prev;
-	prev->next = new;
-}
 
 /**
  * Add a new entry to the head of a list
@@ -82,13 +66,21 @@ static inline void __list_add ( struct list_head *new,
  * @v new		New entry to be added
  * @v head		List head, or entry after which to add the new entry
  */
-static inline void list_add ( struct list_head *new, struct list_head *head ) {
-	__list_add ( new, head, head->next );
-}
-#define list_add( new, head ) do {			\
-	list_check ( (head) );				\
-	list_add ( (new), (head) );			\
+#define list_add( new, head ) do {				\
+	list_check ( (head) );					\
+	extern_list_add ( (new), (head) );			\
 	} while ( 0 )
+static inline void inline_list_add ( struct list_head *new,
+				     struct list_head *head ) {
+	struct list_head *prev = head;
+	struct list_head *next = head->next;
+	next->prev = (new);
+	(new)->next = next;
+	(new)->prev = prev;
+	prev->next = (new);
+}
+extern void extern_list_add ( struct list_head *new,
+			      struct list_head *head );
 
 /**
  * Add a new entry to the tail of a list
@@ -96,26 +88,21 @@ static inline void list_add ( struct list_head *new, struct list_head *head ) {
  * @v new		New entry to be added
  * @v head		List head, or entry before which to add the new entry
  */
-static inline void list_add_tail ( struct list_head *new,
-				   struct list_head *head ) {
-	__list_add ( new, head->prev, head );
-}
-#define list_add_tail( new, head ) do {			\
-	list_check ( (head) );				\
-	list_add_tail ( (new), (head) );		\
+#define list_add_tail( new, head ) do {				\
+	list_check ( (head) );					\
+	extern_list_add_tail ( (new), (head) );			\
 	} while ( 0 )
-
-/**
- * Delete a list entry between two known consecutive entries
- *
- * @v prev		Previous list entry
- * @v next		Next list entry
- */
-static inline void __list_del ( struct list_head *prev,
-				struct list_head *next ) {
-	next->prev = prev;
-	prev->next = next;
+static inline void inline_list_add_tail ( struct list_head *new,
+					  struct list_head *head ) {
+	struct list_head *prev = head->prev;
+	struct list_head *next = head;
+	next->prev = (new);
+	(new)->next = next;
+	(new)->prev = prev;
+	prev->next = (new);
 }
+extern void extern_list_add_tail ( struct list_head *new,
+				   struct list_head *head );
 
 /**
  * Delete an entry from a list
@@ -125,37 +112,43 @@ static inline void __list_del ( struct list_head *prev,
  * Note that list_empty() on entry does not return true after this;
  * the entry is in an undefined state.
  */
-static inline void list_del ( struct list_head *list ) {
-	__list_del ( list->prev, list->next );
-}
-#define list_del( list ) do {				\
-	list_check ( (list) );				\
-	list_del ( (list) );				\
+#define list_del( list ) do {					\
+	list_check ( (list) );					\
+	inline_list_del ( (list) );				\
 	} while ( 0 )
+static inline void inline_list_del ( struct list_head *list ) {
+	struct list_head *next = (list)->next;
+	struct list_head *prev = (list)->prev;
+	next->prev = prev;
+	prev->next = next;
+}
+extern void extern_list_del ( struct list_head *list );
 
 /**
  * Test whether a list is empty
  *
  * @v list		List head
  */
-static inline int list_empty ( const struct list_head *list ) {
+#define list_empty( list ) ( {					\
+	list_check ( (list) );					\
+	inline_list_empty ( (list) ); } )
+static inline int inline_list_empty ( const struct list_head *list ) {
 	return ( list->next == list );
 }
-#define list_empty( list ) ( {				\
-	list_check ( (list) );				\
-	list_empty ( (list) ); } )
+extern int extern_list_empty ( const struct list_head *list );
 
 /**
  * Test whether a list has just one entry
  *
  * @v list		List to test
  */
-static inline int list_is_singular ( const struct list_head *list ) {
+#define list_is_singular( list ) ( {				\
+	list_check ( (list) );					\
+	inline_list_is_singular ( (list) ); } )
+static inline int inline_list_is_singular ( const struct list_head *list ) {
 	return ( ( ! list_empty ( list ) ) && ( list->next == list->prev ) );
 }
-#define list_is_singular( list ) ( {			\
-	list_check ( (list) );				\
-	list_is_singular ( (list) ); } )
+extern int extern_list_is_singular ( const struct list_head *list );
 
 /**
  * Test whether an entry is the last entry in list
@@ -163,14 +156,16 @@ static inline int list_is_singular ( const struct list_head *list ) {
  * @v list		List entry to test
  * @v head		List head
  */
-static inline int list_is_last ( const struct list_head *list,
-				 const struct list_head *head ) {
+#define list_is_last( list, head ) ( {				\
+	list_check ( (list) );					\
+	list_check ( (head) );					\
+	inline_list_is_last ( (list), (head) ); } )
+static inline int inline_list_is_last ( const struct list_head *list,
+					const struct list_head *head ) {
 	return ( list->next == head );
 }
-#define list_is_last( list, head ) ( {			\
-	list_check ( (list) );				\
-	list_check ( (head) );				\
-	list_is_last ( (list), (head) ); } )
+extern int extern_list_is_last ( const struct list_head *list,
+				 const struct list_head *head );
 
 /**
  * Cut a list into two
@@ -183,9 +178,16 @@ static inline int list_is_last ( const struct list_head *list,
  * @c new, which should be an empty list.  @c entry may be equal to @c
  * list, in which case no entries are moved.
  */
-static inline void list_cut_position ( struct list_head *new,
-				       struct list_head *list,
-				       struct list_head *entry ) {
+#define list_cut_position( new, list, entry ) do {		\
+	list_check ( (new) );					\
+	assert ( list_empty ( (new) ) );			\
+	list_check ( (list) );					\
+	list_check ( (entry) );					\
+	extern_list_cut_position ( (new), (list), (entry) );	\
+	} while ( 0 )
+static inline void inline_list_cut_position ( struct list_head *new,
+					      struct list_head *list,
+					      struct list_head *entry ) {
 	struct list_head *first = entry->next;
 
 	if ( list != entry ) {
@@ -197,13 +199,9 @@ static inline void list_cut_position ( struct list_head *new,
 		list->next->prev = list;
 	}
 }
-#define list_cut_position( new, list, entry ) do {	\
-	list_check ( (new) );				\
-	assert ( list_empty ( (new) ) );		\
-	list_check ( (list) );				\
-	list_check ( (entry) );				\
-	list_cut_position ( (new), (list), (entry) );	\
-	} while ( 0 )
+extern void extern_list_cut_position ( struct list_head *new,
+				       struct list_head *list,
+				       struct list_head *entry );
 
 /**
  * Move all entries from one list into another list
@@ -215,8 +213,13 @@ static inline void list_cut_position ( struct list_head *new,
  * list is left in an undefined state; use @c list_splice_init() if
  * you want @c list to become an empty list.
  */
-static inline void list_splice ( const struct list_head *list,
-				 struct list_head *entry ) {
+#define list_splice( list, entry ) do {				\
+	list_check ( (list) );					\
+	list_check ( (entry) );					\
+	extern_list_splice ( (list), (entry) );			\
+	} while ( 0 )
+static inline void inline_list_splice ( const struct list_head *list,
+					struct list_head *entry ) {
 	struct list_head *first = list->next;
 	struct list_head *last = list->prev;
 
@@ -227,11 +230,8 @@ static inline void list_splice ( const struct list_head *list,
 		first->prev->next = first;
 	}
 }
-#define list_splice( list, entry ) do {			\
-	list_check ( (list) );				\
-	list_check ( (entry) );				\
-	list_splice ( (list), (entry) );		\
-	} while ( 0 )
+extern void extern_list_splice ( const struct list_head *list,
+				 struct list_head *entry );
 
 /**
  * Move all entries from one list into another list
@@ -243,8 +243,13 @@ static inline void list_splice ( const struct list_head *list,
  * list is left in an undefined state; use @c list_splice_tail_init() if
  * you want @c list to become an empty list.
  */
-static inline void list_splice_tail ( const struct list_head *list,
-				      struct list_head *entry ) {
+#define list_splice_tail( list, entry ) do {			\
+	list_check ( (list) );					\
+	list_check ( (entry) );					\
+	extern_list_splice_tail ( (list), (entry) );		\
+	} while ( 0 )
+static inline void inline_list_splice_tail ( const struct list_head *list,
+					     struct list_head *entry ) {
 	struct list_head *first = list->next;
 	struct list_head *last = list->prev;
 
@@ -255,11 +260,8 @@ static inline void list_splice_tail ( const struct list_head *list,
 		last->next->prev = last;
 	}
 }
-#define list_splice_tail( list, entry ) do {		\
-	list_check ( (list) );				\
-	list_check ( (entry) );				\
-	list_splice_tail ( (list), (entry) );		\
-	} while ( 0 )
+extern void extern_list_splice_tail ( const struct list_head *list,
+				      struct list_head *entry );
 
 /**
  * Move all entries from one list into another list and reinitialise empty list
@@ -269,16 +271,18 @@ static inline void list_splice_tail ( const struct list_head *list,
  *
  * All entries from @c list are inserted after @c entry.
  */
-static inline void list_splice_init ( struct list_head *list,
-				      struct list_head *entry ) {
+#define list_splice_init( list, entry ) do {			\
+	list_check ( (list) );					\
+	list_check ( (entry) );					\
+	extern_list_splice_init ( (list), (entry) );		\
+	} while ( 0 )
+static inline void inline_list_splice_init ( struct list_head *list,
+					     struct list_head *entry ) {
 	list_splice ( list, entry );
 	INIT_LIST_HEAD ( list );
 }
-#define list_splice_init( list, entry ) do {			\
-	list_check ( (list) );				\
-	list_check ( (entry) );				\
-	list_splice_init ( (list), (entry) );		\
-	} while ( 0 )
+extern void extern_list_splice_init ( struct list_head *list,
+				      struct list_head *entry );
 
 /**
  * Move all entries from one list into another list and reinitialise empty list
@@ -288,16 +292,19 @@ static inline void list_splice_init ( struct list_head *list,
  *
  * All entries from @c list are inserted before @c entry.
  */
-static inline void list_splice_tail_init ( struct list_head *list,
-					   struct list_head *entry ) {
+#define list_splice_tail_init( list, entry ) do {		\
+	list_check ( (list) );					\
+	list_check ( (entry) );					\
+	extern_list_splice_tail_init ( (list), (entry) );	\
+	} while ( 0 )
+
+static inline void inline_list_splice_tail_init ( struct list_head *list,
+						  struct list_head *entry ) {
 	list_splice_tail ( list, entry );
 	INIT_LIST_HEAD ( list );
 }
-#define list_splice_tail_init( list, entry ) do {	\
-	list_check ( (list) );				\
-	list_check ( (entry) );				\
-	list_splice_tail_init ( (list), (entry) );	\
-	} while ( 0 )
+extern void extern_list_splice_tail_init ( struct list_head *list,
+					   struct list_head *entry );
 
 /**
  * Get the container of a list entry
@@ -307,8 +314,8 @@ static inline void list_splice_tail_init ( struct list_head *list,
  * @v member		Name of list field within containing type
  * @ret container	Containing object
  */
-#define list_entry( list, type, member ) ( {		\
-	list_check ( (list) );				\
+#define list_entry( list, type, member ) ( {			\
+	list_check ( (list) );					\
 	container_of ( list, type, member ); } )
 
 /**
@@ -319,9 +326,9 @@ static inline void list_splice_tail_init ( struct list_head *list,
  * @v member		Name of list field within containing type
  * @ret first		First list entry, or NULL
  */
-#define list_first_entry( list, type, member )		\
-	( list_empty ( (list) ) ?			\
-	  ( type * ) NULL :				\
+#define list_first_entry( list, type, member )			\
+	( list_empty ( (list) ) ?				\
+	  ( type * ) NULL :					\
 	  list_entry ( (list)->next, type, member ) )
 
 /**
@@ -332,9 +339,9 @@ static inline void list_splice_tail_init ( struct list_head *list,
  * @v member		Name of list field within containing type
  * @ret first		First list entry, or NULL
  */
-#define list_last_entry( list, type, member )		\
-	( list_empty ( (list) ) ?			\
-	  ( type * ) NULL :				\
+#define list_last_entry( list, type, member )			\
+	( list_empty ( (list) ) ?				\
+	  ( type * ) NULL :					\
 	  list_entry ( (list)->prev, type, member ) )
 
 /**
@@ -424,8 +431,12 @@ static inline void list_splice_tail_init ( struct list_head *list,
  * @v head		List head
  * @ret present		List contains specified entry
  */
-static inline int list_contains ( struct list_head *entry,
-				  struct list_head *head ) {
+#define list_contains( entry, head ) ( {			\
+	list_check ( (head) );					\
+	list_check ( (entry) );					\
+	extern_list_contains ( (entry), (head) ); } )
+static inline int inline_list_contains ( struct list_head *entry,
+					 struct list_head *head ) {
 	struct list_head *tmp;
 
 	list_for_each ( tmp, head ) {
@@ -434,10 +445,8 @@ static inline int list_contains ( struct list_head *entry,
 	}
 	return 0;
 }
-#define list_contains( entry, head ) ( {		\
-	list_check ( (head) );				\
-	list_check ( (entry) );				\
-	list_contains ( (entry), (head) ); } )
+extern int extern_list_contains ( struct list_head *entry,
+				  struct list_head *head );
 
 /**
  * Test if list contains a specified entry
@@ -446,7 +455,7 @@ static inline int list_contains ( struct list_head *entry,
  * @v head		List head
  * @ret present		List contains specified entry
  */
-#define list_contains_entry( entry, head, member )	\
+#define list_contains_entry( entry, head, member )		\
 	list_contains ( &(entry)->member, (head) )
 
 /**
