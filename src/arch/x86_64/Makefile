@@ -26,6 +26,18 @@ CFLAGS		+= -fshort-wchar
 #
 CFLAGS			+= -Ui386
 
+# Add -maccumulate-outgoing-args if required by this version of gcc
+#
+ifeq ($(CCTYPE),gcc)
+MS_ABI_TEST_CODE := extern void __attribute__ (( ms_abi )) ms_abi(); \
+		    void sysv_abi ( void ) { ms_abi(); }
+MS_ABI_TEST = $(ECHO) '$(MS_ABI_TEST_CODE)' | \
+	      $(CC) -m64 -mno-accumulate-outgoing-args -x c -c - -o /dev/null \
+		    >/dev/null 2>&1
+MS_ABI_FLAGS := $(shell $(MS_ABI_TEST) || $(ECHO) '-maccumulate-outgoing-args')
+WORKAROUND_CFLAGS += $(MS_ABI_FLAGS)
+endif
+
 # x86_64-specific directories containing source files
 #
 SRCDIRS		+= arch/x86_64/prefix
