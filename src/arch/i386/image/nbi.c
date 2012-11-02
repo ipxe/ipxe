@@ -10,6 +10,7 @@
 #include <ipxe/fakedhcp.h>
 #include <ipxe/image.h>
 #include <ipxe/features.h>
+#include <ipxe/version.h>
 
 /** @file
  *
@@ -92,12 +93,6 @@ struct segheader {
 struct ebinfo {
 	uint8_t  major, minor;  /* Version */
 	uint16_t flags;         /* Bit flags */
-};
-
-/** Info passed to NBI image */
-static struct ebinfo loaderinfo = {
-	VERSION_MAJOR, VERSION_MINOR,
-	0
 };
 
 /**
@@ -281,6 +276,10 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
  * @ret rc		Return status code, if image returns
  */
 static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
+	struct ebinfo loaderinfo = {
+		product_major_version, product_minor_version,
+		0
+	};
 	int discard_D, discard_S, discard_b;
 	int rc;
 

@@ -39,6 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/init.h>
 #include <ipxe/features.h>
 #include <ipxe/uri.h>
+#include <ipxe/version.h>
 
 FEATURE ( FEATURE_IMAGE, "MBOOT", DHCP_EB_FEATURE_MULTIBOOT, 1 );
 
@@ -247,7 +248,7 @@ static struct multiboot_info __bss16 ( mbinfo );
 #define mbinfo __use_data16 ( mbinfo )
 
 /** The multiboot bootloader name */
-static char __data16_array ( mb_bootloader_name, [] ) = "iPXE " VERSION;
+static char __bss16_array ( mb_bootloader_name, [32] );
 #define mb_bootloader_name __use_data16 ( mb_bootloader_name )
 
 /** The multiboot memory map */
@@ -420,6 +421,8 @@ static int multiboot_exec ( struct image *image ) {
 	mbinfo.cmdline = multiboot_add_cmdline ( image );
 	mbinfo.mods_addr = virt_to_phys ( mbmodules );
 	mbinfo.mmap_addr = virt_to_phys ( mbmemmap );
+	snprintf ( mb_bootloader_name, sizeof ( mb_bootloader_name ),
+		   "iPXE %s", product_version );
 	mbinfo.boot_loader_name = virt_to_phys ( mb_bootloader_name );
 	if ( ( rc = multiboot_add_modules ( image, max, &mbinfo, mbmodules,
 					    ( sizeof ( mbmodules ) /

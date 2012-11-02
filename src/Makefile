@@ -169,11 +169,6 @@ GITVERSION := $(shell git describe --always --abbrev=1 --match "" 2>/dev/null)
 ifneq ($(GITVERSION),)
 VERSION		+= ($(GITVERSION))
 endif
-CFLAGS		+= -DVERSION_MAJOR=$(VERSION_MAJOR) \
-		   -DVERSION_MINOR=$(VERSION_MINOR) \
-		   -DVERSION_PATCH=$(VERSION_PATCH) \
-		   -DVERSION="\"$(VERSION)\""
-IDENT		= '$(@F) $(VERSION) (GPL) ipxe.org'
 version :
 	@$(ECHO) "$(VERSION)"
 

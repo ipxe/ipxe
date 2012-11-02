@@ -653,6 +653,13 @@ $(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
 
 $(BIN)/clientcert.o : override CC := env CCACHE_DISABLE=1 $(CC)
 
+# Version number
+#
+CFLAGS_version += -DVERSION_MAJOR=$(VERSION_MAJOR) \
+		  -DVERSION_MINOR=$(VERSION_MINOR) \
+		  -DVERSION_PATCH=$(VERSION_PATCH) \
+		  -DVERSION="\"$(VERSION)\""
+
 # We automatically generate rules for any file mentioned in AUTO_SRCS
 # using the following set of templates.  It would be cleaner to use
 # $(eval ...), but this function exists only in GNU make >= 3.80.

@@ -91,9 +91,6 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_END
 };
 
-/** Version number feature */
-FEATURE_VERSION ( VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH );
-
 /** DHCP server address setting */
 struct setting dhcp_server_setting __setting ( SETTING_MISC ) = {
 	.name = "dhcp-server",

@@ -48,6 +48,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/md5.h>
 #include <ipxe/blockdev.h>
 #include <ipxe/acpi.h>
+#include <ipxe/version.h>
 #include <ipxe/http.h>
 
 /* Disambiguate the various error causes */
@@ -1141,11 +1142,11 @@ static void http_step ( struct http_request *http ) {
 	/* Send request */
 	if ( ( rc = xfer_printf ( &http->socket,
 				  "%s %s HTTP/1.1\r\n"
-				  "User-Agent: iPXE/" VERSION "\r\n"
+				  "User-Agent: iPXE/%s\r\n"
 				  "Host: %s%s%s\r\n"
 				  "%s%s%s"
 				  "\r\n",
-				  method, uri, http->uri->host,
+				  method, uri, product_version, http->uri->host,
 				  ( http->uri->port ?
 				    ":" : "" ),
 				  ( http->uri->port ?

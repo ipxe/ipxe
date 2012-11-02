@@ -54,6 +54,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/nvo.h>
 #include <ipxe/device.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/version.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_hii.h>
 #include <ipxe/efi/efi_snp.h>
@@ -196,7 +197,7 @@ efi_snp_hii_package_list ( struct efi_snp_device *snpdev ) {
 	efi_ifr_text_op ( &ifr,
 			  efi_ifr_string ( &ifr, "Version" ),
 			  efi_ifr_string ( &ifr, "Firmware version" ),
-			  efi_ifr_string ( &ifr, VERSION ) );
+			  efi_ifr_string ( &ifr, "%s", product_version ) );
 	efi_ifr_text_op ( &ifr,
 			  efi_ifr_string ( &ifr, "Driver" ),
 			  efi_ifr_string ( &ifr, "Firmware driver" ),
