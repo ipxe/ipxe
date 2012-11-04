@@ -192,17 +192,24 @@ memmove ( void *dest, const void *src, size_t len ) {
 }
 
 #define __HAVE_ARCH_MEMSET
-static inline void * memset(void *s, int c,size_t count)
-{
-int d0, d1;
-__asm__ __volatile__(
-	"cld\n\t"
-	"rep\n\t"
-	"stosb"
-	: "=&c" (d0), "=&D" (d1)
-	:"a" (c),"1" (s),"0" (count)
-	:"memory");
-return s;
+
+/**
+ * Fill memory region
+ *
+ * @v dest		Destination address
+ * @v fill		Fill pattern
+ * @v len		Length
+ * @ret dest		Destination address
+ */
+static inline void * memset ( void *dest, int fill, size_t len ) {
+	void *discard_D;
+	size_t discard_c;
+
+	__asm__ __volatile__ ( "rep stosb"
+			       : "=&D" ( discard_D ), "=&c" ( discard_c )
+			       : "0" ( dest ), "1" ( len ), "a" ( fill )
+			       : "memory" );
+	return dest;
 }
 
 #define __HAVE_ARCH_MEMSWAP
