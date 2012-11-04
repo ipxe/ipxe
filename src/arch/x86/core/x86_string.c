@@ -35,7 +35,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v len		Length
  * @ret dest		Destination address
  */
-void * __memcpy ( void *dest, const void *src, size_t len ) {
+void * __attribute__ (( noinline )) __memcpy ( void *dest, const void *src,
+					       size_t len ) {
 	void *edi = dest;
 	const void *esi = src;
 	int discard_ecx;
@@ -55,4 +56,51 @@ void * __memcpy ( void *dest, const void *src, size_t len ) {
 			       : "0" ( edi ), "1" ( esi ), "2" ( len & 3 )
 			       : "memory" );
 	return dest;
+}
+
+/**
+ * Copy memory area backwards
+ *
+ * @v dest		Destination address
+ * @v src		Source address
+ * @v len		Length
+ * @ret dest		Destination address
+ */
+void * __attribute__ (( noinline )) __memcpy_reverse ( void *dest,
+						       const void *src,
+						       size_t len ) {
+	void *edi = ( dest + len - 1 );
+	const void *esi = ( src + len - 1 );
+	int discard_ecx;
+
+	/* Assume memmove() is not performance-critical, and perform a
+	 * bytewise copy for simplicity.
+	 */
+	__asm__ __volatile__ ( "std\n\t"
+			       "rep movsb\n\t"
+			       "cld\n\t"
+			       : "=&D" ( edi ), "=&S" ( esi ),
+				 "=&c" ( discard_ecx )
+			       : "0" ( edi ), "1" ( esi ),
+				 "2" ( len )
+			       : "memory" );
+	return dest;
+}
+
+
+/**
+ * Copy (possibly overlapping) memory area
+ *
+ * @v dest		Destination address
+ * @v src		Source address
+ * @v len		Length
+ * @ret dest		Destination address
+ */
+void * __memmove ( void *dest, const void *src, size_t len ) {
+
+	if ( dest <= src ) {
+		return __memcpy ( dest, src, len );
+	} else {
+		return __memcpy_reverse ( dest, src, len );
+	}
 }

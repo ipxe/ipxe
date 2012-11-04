@@ -26,6 +26,7 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 #define __HAVE_ARCH_MEMCPY
 
 extern void * __memcpy ( void *dest, const void *src, size_t len );
+extern void * __memcpy_reverse ( void *dest, const void *src, size_t len );
 
 static inline __attribute__ (( always_inline )) void *
 __constant_memcpy ( void *dest, const void *src, size_t len ) {
@@ -144,29 +145,30 @@ __constant_memcpy ( void *dest, const void *src, size_t len ) {
 	  __memcpy ( (dest), (src), (len) ) )
 
 #define __HAVE_ARCH_MEMMOVE
-static inline void * memmove(void * dest,const void * src, size_t n)
-{
-int d0, d1, d2;
-if (dest<src)
-__asm__ __volatile__(
-	"cld\n\t"
-	"rep\n\t"
-	"movsb"
-	: "=&c" (d0), "=&S" (d1), "=&D" (d2)
-	:"0" (n),"1" (src),"2" (dest)
-	: "memory");
-else
-__asm__ __volatile__(
-	"std\n\t"
-	"rep\n\t"
-	"movsb\n\t"
-	"cld"
-	: "=&c" (d0), "=&S" (d1), "=&D" (d2)
-	:"0" (n),
-	 "1" (n-1+(const char *)src),
-	 "2" (n-1+(char *)dest)
-	:"memory");
-return dest;
+
+extern void * __memmove ( void *dest, const void *src, size_t len );
+
+/**
+ * Copy (possibly overlapping) memory area
+ *
+ * @v dest		Destination address
+ * @v src		Source address
+ * @v len		Length
+ * @ret dest		Destination address
+ */
+static inline __attribute__ (( always_inline )) void *
+memmove ( void *dest, const void *src, size_t len ) {
+	ssize_t offset = ( dest - src );
+
+	if ( __builtin_constant_p ( offset ) ) {
+		if ( offset <= 0 ) {
+			return memcpy ( dest, src, len );
+		} else {
+			return __memcpy_reverse ( dest, src, len );
+		}
+	} else {
+		return __memmove ( dest, src, len );
+	}
 }
 
 #define __HAVE_ARCH_MEMSET
