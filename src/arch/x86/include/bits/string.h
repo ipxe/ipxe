@@ -230,27 +230,8 @@ return dest;
 }
 
 #define __HAVE_ARCH_STRNCMP
-static inline int strncmp(const char * cs,const char * ct,size_t count)
-{
-register int __res;
-int d0, d1, d2;
-__asm__ __volatile__(
-	"1:\tdecl %3\n\t"
-	"js 2f\n\t"
-	"lodsb\n\t"
-	"scasb\n\t"
-	"jne 3f\n\t"
-	"testb %%al,%%al\n\t"
-	"jne 1b\n"
-	"2:\txorl %%eax,%%eax\n\t"
-	"jmp 4f\n"
-	"3:\tsbbl %%eax,%%eax\n\t"
-	"orb $1,%%al\n"
-	"4:"
-		     :"=a" (__res), "=&S" (d0), "=&D" (d1), "=&c" (d2)
-		     :"1" (cs),"2" (ct),"3" (count));
-return __res;
-}
+
+extern int strncmp ( const char *str1, const char *str2, size_t len );
 
 #define __HAVE_ARCH_STRLEN
 static inline size_t strlen(const char * s)

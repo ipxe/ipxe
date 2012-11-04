@@ -104,3 +104,41 @@ void * __memmove ( void *dest, const void *src, size_t len ) {
 		return __memcpy_reverse ( dest, src, len );
 	}
 }
+
+/**
+ * Compare strings (up to a specified length)
+ *
+ * @v str1		First string
+ * @v str2		Second string
+ * @v len		Maximum length
+ * @ret diff		Difference
+ */
+int strncmp ( const char *str1, const char *str2, size_t len ) {
+	const void *discard_S;
+	const void *discard_D;
+	size_t discard_c;
+	int diff;
+
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "dec %2\n\t"
+			       "js 2f\n\t"
+			       "lodsb\n\t"
+			       "scasb\n\t"
+			       "jne 3f\n\t"
+			       "testb %b3, %b3\n\t"
+			       "jnz 1b\n\t"
+			       /* Equal */
+			       "\n2:\n\t"
+			       "xor %3, %3\n\t"
+			       "jmp 4f\n\t"
+			       /* Not equal; CF indicates difference */
+			       "\n3:\n\t"
+			       "sbb %3, %3\n\t"
+			       "orb $1, %b3\n\t"
+			       "\n4:\n\t"
+			       : "=&S" ( discard_S ), "=&D" ( discard_D ),
+				 "=&c" ( discard_c ), "=&a" ( diff )
+			       : "0" ( str1 ), "1" ( str2 ), "2" ( len ) );
+
+	return diff;
+}
