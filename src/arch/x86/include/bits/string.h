@@ -27,18 +27,6 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 extern void * __memcpy ( void *dest, const void *src, size_t len );
 
-#if 0
-static inline __attribute__ (( always_inline )) void *
-__memcpy ( void *dest, const void *src, size_t len ) {
-	int d0, d1, d2;
-	__asm__ __volatile__ ( "rep ; movsb"
-			       : "=&c" ( d0 ), "=&S" ( d1 ), "=&D" ( d2 )
-			       : "0" ( len ), "1" ( src ), "2" ( dest )
-			       : "memory" );
-	return dest; 
-}
-#endif
-
 static inline __attribute__ (( always_inline )) void *
 __constant_memcpy ( void *dest, const void *src, size_t len ) {
 	union {
