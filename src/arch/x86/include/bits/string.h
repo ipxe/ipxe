@@ -28,6 +28,14 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 extern void * __memcpy ( void *dest, const void *src, size_t len );
 extern void * __memcpy_reverse ( void *dest, const void *src, size_t len );
 
+/**
+ * Copy memory area (where length is a compile-time constant)
+ *
+ * @v dest		Destination address
+ * @v src		Source address
+ * @v len		Length
+ * @ret dest		Destination address
+ */
 static inline __attribute__ (( always_inline )) void *
 __constant_memcpy ( void *dest, const void *src, size_t len ) {
 	union {
@@ -139,10 +147,22 @@ __constant_memcpy ( void *dest, const void *src, size_t len ) {
 	return dest;
 }
 
-#define memcpy( dest, src, len )			\
-	( __builtin_constant_p ( (len) ) ?		\
-	  __constant_memcpy ( (dest), (src), (len) ) :	\
-	  __memcpy ( (dest), (src), (len) ) )
+/**
+ * Copy memory area
+ *
+ * @v dest		Destination address
+ * @v src		Source address
+ * @v len		Length
+ * @ret dest		Destination address
+ */
+static inline __attribute__ (( always_inline )) void *
+memcpy ( void *dest, const void *src, size_t len ) {
+	if ( __builtin_constant_p ( len ) ) {
+		return __constant_memcpy ( dest, src, len );
+	} else {
+		return __memcpy ( dest, src, len );
+	}
+}
 
 #define __HAVE_ARCH_MEMMOVE
 

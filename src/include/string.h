@@ -37,6 +37,7 @@ char * __pure strpbrk(const char * cs,const char * ct) __nonnull;
 char * strtok(char * s,const char * ct) __nonnull;
 char * strsep(char **s, const char *ct) __nonnull;
 void * memset(void * s,int c,size_t count) __nonnull;
+void * memcpy ( void *dest, const void *src, size_t len ) __nonnull;
 void * memmove(void * dest,const void *src,size_t count) __nonnull;
 int __pure memcmp(const void * cs,const void * ct,
 				    size_t count) __nonnull;
