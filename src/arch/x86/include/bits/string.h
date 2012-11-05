@@ -1,27 +1,32 @@
-#ifndef ETHERBOOT_BITS_STRING_H
-#define ETHERBOOT_BITS_STRING_H
-/*
- * Taken from Linux /usr/include/asm/string.h
- * All except memcpy, memmove, memset and memcmp removed.
- *
- * Non-standard memswap() function added because it saves quite a bit
- * of code (mbrown@fensystems.co.uk).
- */
+#ifndef X86_BITS_STRING_H
+#define X86_BITS_STRING_H
 
 /*
- * This string-include defines all string functions as inline
- * functions. Use gcc. It also assumes ds=es=data space, this should be
- * normal. Most of the string-functions are rather heavily hand-optimized,
- * see especially strtok,strstr,str[c]spn. They should work, but are not
- * very easy to understand. Everything is done entirely within the register
- * set, making the functions fast and clean. String instructions have been
- * used through-out, making for "slightly" unclear code :-)
+ * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
  *
- *		NO Copyright (C) 1991, 1992 Linus Torvalds,
- *		consider these trivial functions to be PD.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
  */
 
-FILE_LICENCE ( PUBLIC_DOMAIN );
+FILE_LICENCE ( GPL2_OR_LATER );
+
+/** @file
+ *
+ * Optimised string operations
+ *
+ */
 
 #define __HAVE_ARCH_MEMCPY
 
@@ -224,4 +229,4 @@ extern int strncmp ( const char *str1, const char *str2, size_t len );
 
 extern size_t strlen ( const char *string );
 
-#endif /* ETHERBOOT_BITS_STRING_H */
+#endif /* X86_BITS_STRING_H */
