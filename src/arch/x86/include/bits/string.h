@@ -213,21 +213,8 @@ static inline void * memset ( void *dest, int fill, size_t len ) {
 }
 
 #define __HAVE_ARCH_MEMSWAP
-static inline void * memswap(void *dest, void *src, size_t n)
-{
-long d0, d1, d2, d3;
-__asm__ __volatile__(
-	"\n1:\t"
-	"movb (%2),%%al\n\t"
-	"xchgb (%1),%%al\n\t"
-	"inc %1\n\t"
-	"stosb\n\t"
-	"loop 1b"
-	: "=&c" (d0), "=&S" (d1), "=&D" (d2), "=&a" (d3)
-	: "0" (n), "1" (src), "2" (dest)
-	: "memory" );
-return dest;
-}
+
+extern void * memswap ( void *dest, void *src, size_t len );
 
 #define __HAVE_ARCH_STRNCMP
 

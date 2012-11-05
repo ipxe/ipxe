@@ -106,6 +106,34 @@ void * __memmove ( void *dest, const void *src, size_t len ) {
 }
 
 /**
+ * Swap memory areas
+ *
+ * @v dest		Destination address
+ * @v src		Source address
+ * @v len		Length
+ * @ret dest		Destination address
+ */
+void * memswap ( void *dest, void *src, size_t len ) {
+	size_t discard_c;
+	int discard;
+
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "dec %2\n\t"
+			       "js 2f\n\t"
+			       "movb (%0,%2), %b3\n\t"
+			       "xchgb (%1,%2), %b3\n\t"
+			       "movb %b3, (%0,%2)\n\t"
+			       "jmp 1b\n\t"
+			       "2:\n\t"
+			       : "=r" ( src ), "=r" ( dest ),
+				 "=&c" ( discard_c ), "=&q" ( discard )
+			       : "0" ( src ), "1" ( dest ), "2" ( len )
+			       : "memory" );
+
+	return dest;
+}
+
+/**
  * Calculate length of string
  *
  * @v string		String
