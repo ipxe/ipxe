@@ -234,17 +234,7 @@ return dest;
 extern int strncmp ( const char *str1, const char *str2, size_t len );
 
 #define __HAVE_ARCH_STRLEN
-static inline size_t strlen(const char * s)
-{
-int d0;
-register int __res;
-__asm__ __volatile__(
-	"repne\n\t"
-	"scasb\n\t"
-	"notl %0\n\t"
-	"decl %0"
-	:"=c" (__res), "=&D" (d0) :"1" (s),"a" (0), "0" (0xffffffff));
-return __res;
-}
+
+extern size_t strlen ( const char *string );
 
 #endif /* ETHERBOOT_BITS_STRING_H */

@@ -106,6 +106,24 @@ void * __memmove ( void *dest, const void *src, size_t len ) {
 }
 
 /**
+ * Calculate length of string
+ *
+ * @v string		String
+ * @ret len		Length (excluding NUL)
+ */
+size_t strlen ( const char *string ) {
+	const char *discard_D;
+	size_t len_plus_one;
+
+	__asm__ __volatile__ ( "repne scasb\n\t"
+			       "not %1\n\t"
+			       : "=&D" ( discard_D ), "=&c" ( len_plus_one )
+			       : "0" ( string ), "1" ( -1UL ), "a" ( 0 ) );
+
+	return ( len_plus_one - 1 );
+}
+
+/**
  * Compare strings (up to a specified length)
  *
  * @v str1		First string
