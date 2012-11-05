@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uaccess.h>
 #include <ipxe/hidemem.h>
 #include <ipxe/io.h>
+#include <ipxe/memblock.h>
 #include <ipxe/umalloc.h>
 
 /** Alignment of external allocated memory */
@@ -59,53 +60,14 @@ static size_t heap_size;
 /**
  * Initialise external heap
  *
- * @ret rc		Return status code
  */
-static int init_eheap ( void ) {
-	struct memory_map memmap;
-	unsigned int i;
+static void init_eheap ( void ) {
+	userptr_t base;
 
-	DBG ( "Allocating external heap\n" );
-
-	get_memmap ( &memmap );
-	heap_size = 0;
-	for ( i = 0 ; i < memmap.count ; i++ ) {
-		struct memory_region *region = &memmap.regions[i];
-		unsigned long r_start, r_end;
-		unsigned long r_size;
-
-		DBG ( "Considering [%llx,%llx)\n", region->start, region->end);
-
-		/* Truncate block to 4GB */
-		if ( region->start > UINT_MAX ) {
-			DBG ( "...starts after 4GB\n" );
-			continue;
-		}
-		r_start = region->start;
-		if ( region->end > UINT_MAX ) {
-			DBG ( "...end truncated to 4GB\n" );
-			r_end = 0; /* =4GB, given the wraparound */
-		} else {
-			r_end = region->end;
-		}
-
-		/* Use largest block */
-		r_size = ( r_end - r_start );
-		if ( r_size > heap_size ) {
-			DBG ( "...new best block found\n" );
-			top = bottom = phys_to_user ( r_end );
-			heap_size = r_size;
-		}
-	}
-
-	if ( ! heap_size ) {
-		DBG ( "No external heap available\n" );
-		return -ENOMEM;
-	}
-
+	heap_size = largest_memblock ( &base );
+	bottom = top = userptr_add ( base, heap_size );
 	DBG ( "External heap grows downwards from %lx (size %zx)\n",
 	      user_to_phys ( top, 0 ), heap_size );
-	return 0;
 }
 
 /**
@@ -144,13 +106,10 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 	struct external_memory extmem;
 	userptr_t new = ptr;
 	size_t align;
-	int rc;
 
-	/* Initialise external memory allocator if necessary */
-	if ( bottom == top ) {
-		if ( ( rc = init_eheap() ) != 0 )
-			return UNULL;
-	}
+	/* (Re)initialise external memory allocator if necessary */
+	if ( bottom == top )
+		init_eheap();
 
 	/* Get block properties into extmem */
 	if ( ptr && ( ptr != UNOWHERE ) ) {
