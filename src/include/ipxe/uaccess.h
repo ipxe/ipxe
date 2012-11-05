@@ -83,6 +83,18 @@ trivial_userptr_add ( userptr_t userptr, off_t offset ) {
 }
 
 /**
+ * Subtract user pointers
+ *
+ * @v userptr		User pointer
+ * @v subtrahend	User pointer to be subtracted
+ * @ret offset		Offset
+ */
+static inline __always_inline off_t
+trivial_userptr_sub ( userptr_t userptr, userptr_t subtrahend ) {
+	return ( userptr - subtrahend );
+}
+
+/**
  * Copy data between user buffers
  *
  * @v dest		Destination
@@ -238,6 +250,15 @@ void * user_to_virt ( userptr_t userptr, off_t offset );
  * @ret userptr		New pointer value
  */
 userptr_t userptr_add ( userptr_t userptr, off_t offset );
+
+/**
+ * Subtract user pointers
+ *
+ * @v userptr		User pointer
+ * @v subtrahend	User pointer to be subtracted
+ * @ret offset		Offset
+ */
+off_t userptr_sub ( userptr_t userptr, userptr_t subtrahend );
 
 /**
  * Convert virtual address to a physical address
