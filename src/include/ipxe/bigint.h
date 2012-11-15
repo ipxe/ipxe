@@ -8,6 +8,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#define BIGINT_FAST_SHIFT
+#define BIGINT_MONTGOMERY
+
 /**
  * Define a big-integer type
  *

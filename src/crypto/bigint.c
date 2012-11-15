@@ -274,6 +274,8 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 	assert ( bigint_is_geq ( modulus, result ) );
 }
 
+#ifndef BIGINT_MONTGOMERY
+
 /**
  * Perform classic modular exponentiation of big integers
  *
@@ -339,7 +341,7 @@ void bigint_mod_exp_classic_raw ( const bigint_element_t *base0,
         }
 }
 
-#ifdef BIGINT_MONTGOMERY
+#else
 
 #define MONTGOMERY_CONTEXT(size) struct { \
 	unsigned int power;             \
@@ -589,7 +591,7 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			  unsigned int size, unsigned int exponent_size,
 			  void *tmp ) {
 #ifdef BIGINT_MONTGOMERY
-	bigint_mod_exp_montgomery_raw ( base0, modulus0, exponent0, result0, size, exponent_size );
+	bigint_mod_exp_montgomery_raw ( base0, modulus0, exponent0, result0, size, exponent_size, tmp );
 #else
 	bigint_mod_exp_classic_raw ( base0, modulus0, exponent0, result0, size, exponent_size, tmp );
 #endif
