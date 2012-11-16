@@ -528,7 +528,7 @@ void bigint_mod_exp_montgomery_raw ( const bigint_element_t *base0,
 		return;
 	}
 
-	context = malloc( sizeof ( *context ) );
+	context = calloc( 1, sizeof ( *context ) );
 	if ( NULL == context ) {
 		return;
 	}
