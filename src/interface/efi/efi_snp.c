@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
+#include <config/general.h>
 
 /** EFI simple network protocol GUID */
 static EFI_GUID efi_simple_network_protocol_guid
@@ -849,11 +850,12 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	/* Populate the component name structure */
 	efi_snprintf ( snpdev->driver_name,
 		       ( sizeof ( snpdev->driver_name ) /
-			 sizeof ( snpdev->driver_name[0] ) ), "%s",
-		       netdev->dev->driver_name );
+			 sizeof ( snpdev->driver_name[0] ) ),
+		       PRODUCT_SHORT_NAME " %s", netdev->dev->driver_name );
 	efi_snprintf ( snpdev->controller_name,
 		       ( sizeof ( snpdev->controller_name ) /
-			 sizeof ( snpdev->controller_name[0] ) ), "%s (%s)",
+			 sizeof ( snpdev->controller_name[0] ) ),
+		       PRODUCT_SHORT_NAME " %s (%s)",
 		       netdev->name, netdev_addr ( netdev ) );
 	snpdev->name2.GetDriverName = efi_snp_get_driver_name;
 	snpdev->name2.GetControllerName = efi_snp_get_controller_name;
