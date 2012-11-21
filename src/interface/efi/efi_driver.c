@@ -90,12 +90,29 @@ efi_driver_get_driver_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf,
  */
 static EFI_STATUS EFIAPI
 efi_driver_get_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
-				 EFI_HANDLE device __unused,
-				 EFI_HANDLE child __unused,
-				 CHAR8 *language __unused,
-				 CHAR16 **controller_name __unused ) {
+				 EFI_HANDLE device, EFI_HANDLE child,
+				 CHAR8 *language, CHAR16 **controller_name ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_COMPONENT_NAME2_PROTOCOL *name2;
+		void *interface;
+	} name2;
+	EFI_STATUS efirc;
 
-	/* Just let EFI use the default Device Path Name */
+	/* Delegate to the EFI_COMPONENT_NAME2_PROTOCOL instance
+	 * installed on child handle, if present.
+	 */
+	if ( ( child != NULL ) &&
+	     ( ( efirc = bs->OpenProtocol (
+			  child, &efi_component_name2_protocol_guid,
+			  &name2.interface, NULL, NULL,
+			  EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) == 0 ) ) {
+		return name2.name2->GetControllerName ( name2.name2, device,
+							child, language,
+							controller_name );
+	}
+
+	/* Otherwise, let EFI use the default Device Path Name */
 	return EFI_UNSUPPORTED;
 }
 
