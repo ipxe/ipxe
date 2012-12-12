@@ -20,11 +20,15 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
+#include <stdlib.h>
+#include <byteswap.h>
 #include <ipxe/list.h>
 #include <ipxe/tables.h>
 #include <ipxe/init.h>
 #include <ipxe/interface.h>
 #include <ipxe/device.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/timer.h>
 
 /**
  * @file
@@ -78,6 +82,9 @@ static void rootdev_remove ( struct root_device *rootdev ) {
 static void probe_devices ( void ) {
 	struct root_device *rootdev;
 	int rc;
+	struct net_device *netdev;
+	unsigned int seed;
+	unsigned int ll_addr;
 
 	for_each_table_entry ( rootdev, ROOT_DEVICES ) {
 		list_add ( &rootdev->dev.siblings, &devices );
@@ -85,6 +92,20 @@ static void probe_devices ( void ) {
 		if ( ( rc = rootdev_probe ( rootdev ) ) != 0 )
 			list_del ( &rootdev->dev.siblings );
 	}
+
+	/* Seed the pseudo-random number generator. Combine the current
+	 * timer ticks and the least significant bits of the hardware
+	 * address(es) to get a high degree of randomness for the seed.
+	 */
+	seed = (unsigned int)currticks();
+	for_each_netdev ( netdev ) {
+		memcpy ( &ll_addr, ( netdev->ll_addr + netdev->ll_protocol->ll_addr_len
+				 - sizeof ( ll_addr ) ), sizeof ( ll_addr ) );
+		ll_addr = ntohl ( ll_addr );
+		seed <<= 1;
+		seed ^= ll_addr;
+	}
+	srand ( seed );
 }
 
 /**
