@@ -127,7 +127,7 @@ static void t595_reset(struct nic *nic)
 		S_TX_COMPLETE | S_TX_AVAIL, BASE + VX_COMMAND);
 
 /*
- * Attempt to get rid of any stray interrupts that occured during
+ * Attempt to get rid of any stray interrupts that occurred during
  * configuration.  On the i386 this isn't possible because one may
  * already be queued.  However, a single stray interrupt is
  * unimportant.

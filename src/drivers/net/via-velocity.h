@@ -878,7 +878,7 @@ enum {
  *	Bits in the EECSR register
  */
 
-#define EECSR_EMBP          0x40	/* eeprom embeded programming */
+#define EECSR_EMBP          0x40	/* eeprom embedded programming */
 #define EECSR_RELOAD        0x20	/* eeprom content reload */
 #define EECSR_DPM           0x10	/* eeprom direct programming */
 #define EECSR_ECS           0x08	/* eeprom CS pin */

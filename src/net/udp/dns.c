@@ -428,7 +428,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 	}
 	
 	/* Determine what to do next based on the type of query we
-	 * issued and the reponse we received
+	 * issued and the response we received
 	 */
 	switch ( qtype ) {
 

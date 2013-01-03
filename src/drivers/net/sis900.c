@@ -328,7 +328,7 @@ static int sis635_get_mac_addr(struct pci_device * pci_dev __unused, struct nic 
  *
  * Side effects:
  *            leaves the ioaddress of the sis900 chip in the variable ioaddr.
- *            leaves the sis900 initialized, and ready to recieve packets.
+ *            leaves the sis900 initialized, and ready to receive packets.
  *
  * Returns:   struct nic *:          pointer to NIC data structure
  */
@@ -394,7 +394,7 @@ static int sis900_probe ( struct nic *nic, struct pci_device *pci ) {
 
         mii_status = sis900_mdio_read(phy_addr, MII_STATUS);
         if (mii_status == 0xffff || mii_status == 0x0000)
-            /* the mii is not accessable, try next one */
+            /* the mii is not accessible, try next one */
             continue;
                 
         phy_id0 = sis900_mdio_read(phy_addr, MII_PHY_ID0);
@@ -508,7 +508,7 @@ static u16 sis900_read_eeprom(int location)
 /* 
    Read and write the MII management registers using software-generated
    serial MDIO protocol. Note that the command bits and data bits are
-   send out seperately 
+   sent out separately
 */
 
 static void sis900_mdio_idle(long mdio_addr)
@@ -1171,8 +1171,8 @@ sis900_transmit(struct nic  *nic,
  *
  * Arguments: struct nic *nic:          NIC data structure
  *
- * Returns:   1 if a packet was recieved.
- *            0 if no pacet was recieved.
+ * Returns:   1 if a packet was received.
+ *            0 if no packet was received.
  *
  * Side effects:
  *            Returns (copies) the packet to the array nic->packet.

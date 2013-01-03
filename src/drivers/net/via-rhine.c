@@ -288,7 +288,7 @@ static const char *version = "rhine.c v1.0.2 2004-10-29\n";
  */
 
 #define EECSR_EEPR		0x80	/* eeprom programed status, 73h means programed */
-#define EECSR_EMBP		0x40	/* eeprom embeded programming */
+#define EECSR_EMBP		0x40	/* eeprom embedded programming */
 #define EECSR_AUTOLD		0x20	/* eeprom content reload */
 #define EECSR_DPM		0x10	/* eeprom direct programming */
 #define EECSR_CS		0x08	/* eeprom CS pin */
@@ -322,7 +322,7 @@ static const char *version = "rhine.c v1.0.2 2004-10-29\n";
  * Bits in the CFGA register
  */
 
-#define CFGA_EELOAD		0x80	/* enable eeprom embeded and direct programming */
+#define CFGA_EELOAD		0x80	/* enable eeprom embedded and direct programming */
 #define CFGA_JUMPER		0x40
 #define CFGA_MTGPIO		0x08
 #define CFGA_T10EN		0x02
@@ -693,7 +693,7 @@ static void MIIDelay (void);
 static void rhine_init_ring (struct nic *dev);
 static void rhine_disable (struct nic *nic);
 static void rhine_reset (struct nic *nic);
-static int rhine_poll (struct nic *nic, int retreive);
+static int rhine_poll (struct nic *nic, int retrieve);
 static void rhine_transmit (struct nic *nic, const char *d, unsigned int t,
 			    unsigned int s, const char *p);
 static void reload_eeprom(int ioaddr);
@@ -1286,7 +1286,7 @@ rhine_reset (struct nic *nic)
 #define IOSYNC  do { inb(nic->ioaddr + StationAddr); } while (0)
 
 static int
-rhine_poll (struct nic *nic, int retreive)
+rhine_poll (struct nic *nic, int retrieve)
 {
     struct rhine_private *tp = (struct rhine_private *) nic->priv_data;
     int rxstatus, good = 0;;
@@ -1295,7 +1295,7 @@ rhine_poll (struct nic *nic, int retreive)
     {
         unsigned int intr_status;
         /* There is a packet ready */
-        if(!retreive)
+        if(!retrieve)
             return 1;
 
         intr_status = inw(nic->ioaddr + IntrStatus);

@@ -202,7 +202,7 @@ static struct tlan_private {
 	unsigned short vendor_id;	/* PCI Vendor code */
 	unsigned short dev_id;	/* PCI Device code */
 	const char *nic_name;
-	unsigned int cur_rx, dirty_rx;	/* Producer/consumer ring indicies */
+	unsigned int cur_rx, dirty_rx;	/* Producer/consumer ring indices */
 	unsigned rx_buf_sz;	/* Based on mtu + Slack */
 	struct TLanList *txList;
 	u32 txHead;
@@ -1085,11 +1085,11 @@ These routines are based on the information in Chap. 2 of the
 *				for this device.
 *		phy		The address of the PHY to be queried.
 *		reg		The register whose contents are to be
-*				retreived.
+*				retrieved.
 *		val		A pointer to a variable to store the
 *				retrieved value.
 *
-*	This function uses the TLAN's MII bus to retreive the contents
+*	This function uses the TLAN's MII bus to retrieve the contents
 *	of a given register on a PHY.  It sends the appropriate info
 *	and then reads the 16-bit register value from the MII bus via
 *	the TLAN SIO register.

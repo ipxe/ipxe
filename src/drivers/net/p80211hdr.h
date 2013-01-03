@@ -258,7 +258,7 @@ typedef union p80211_hdr
 /*================================================================*/
 /* Function Declarations */
 
-/* Frame and header lenght macros */
+/* Frame and header length macros */
 
 #define WLAN_CTL_FRAMELEN(fstype) (\
 	(fstype) == WLAN_FSTYPE_BLOCKACKREQ	? 24 : \

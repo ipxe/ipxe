@@ -656,7 +656,7 @@ static int
 corkscrew_found_device(int ioaddr, int irq,
 		       int product_index, int options, struct nic *nic)
 {
-	/* Direct copy from Becker 3c515.c with unecessary parts removed */
+	/* Direct copy from Becker 3c515.c with unnecessary parts removed */
 	vp->product_name = "3c515";
 	vp->options = options;
 	if (options >= 0) {

@@ -250,7 +250,7 @@ epic100_open(void)
 
     outl(tmp, txcon);
 
-    /* Give adress of RX and TX ring to the chip */
+    /* Give address of RX and TX ring to the chip */
     outl(virt_to_le32desc(&rx_ring), prcdar);
     outl(virt_to_le32desc(&tx_ring), ptcdar);
 
@@ -365,7 +365,7 @@ epic100_transmit(struct nic *nic, const char *destaddr, unsigned int type,
  * Arguments: none
  *
  * returns:   1 if a packet was received.
- *            0 if no pacet was received.
+ *            0 if no packet was received.
  * side effects:
  *            returns the packet in the array nic->packet.
  *            returns the length of the packet in nic->packetlen.
