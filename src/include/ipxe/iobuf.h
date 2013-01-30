@@ -216,5 +216,6 @@ extern struct io_buffer * __malloc alloc_iob ( size_t len );
 extern void free_iob ( struct io_buffer *iobuf );
 extern void iob_pad ( struct io_buffer *iobuf, size_t min_len );
 extern int iob_ensure_headroom ( struct io_buffer *iobuf, size_t len );
+extern struct io_buffer * iob_concatenate ( struct list_head *list );
 
 #endif /* _IPXE_IOBUF_H */

@@ -105,10 +105,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_EINVAL_MAC						\
 	__einfo_uniqify ( EINFO_EINVAL, 0x0d,				\
 			  "Invalid MAC" )
-#define EINVAL_NON_DATA __einfo_error ( EINFO_EINVAL_NON_DATA )
-#define EINFO_EINVAL_NON_DATA						\
-	__einfo_uniqify ( EINFO_EINVAL, 0x0e,				\
-			  "Overlength non-data record" )
 #define EIO_ALERT __einfo_error ( EINFO_EIO_ALERT )
 #define EINFO_EIO_ALERT							\
 	__einfo_uniqify ( EINFO_EINVAL, 0x01,				\
@@ -137,6 +133,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_ENOMEM_RX_DATA						\
 	__einfo_uniqify ( EINFO_ENOMEM, 0x07,				\
 			  "Not enough space for received data" )
+#define ENOMEM_RX_CONCAT __einfo_error ( EINFO_ENOMEM_RX_CONCAT )
+#define EINFO_ENOMEM_RX_CONCAT						\
+	__einfo_uniqify ( EINFO_ENOMEM, 0x08,				\
+			  "Not enough space to concatenate received data" )
 #define ENOTSUP_CIPHER __einfo_error ( EINFO_ENOTSUP_CIPHER )
 #define EINFO_ENOTSUP_CIPHER						\
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x01,				\
@@ -1743,14 +1743,12 @@ static int tls_new_record ( struct tls_session *tls, unsigned int type,
 		return 0;
 	}
 
-	/* For all other records, fail unless we have exactly one I/O buffer */
-	iobuf = list_first_entry ( rx_data, struct io_buffer, list );
-	assert ( iobuf != NULL );
-	list_del ( &iobuf->list );
-	if ( ! list_empty ( rx_data ) ) {
-		DBGC ( tls, "TLS %p overlength non-data record\n", tls );
-		free_iob ( iobuf );
-		return -EINVAL_NON_DATA;
+	/* For all other records, merge into a single I/O buffer */
+	iobuf = iob_concatenate ( rx_data );
+	if ( ! iobuf ) {
+		DBGC ( tls, "TLS %p could not concatenate non-data record "
+		       "type %d\n", tls, type );
+		return -ENOMEM_RX_CONCAT;
 	}
 
 	/* Determine handler */
