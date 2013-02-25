@@ -614,8 +614,11 @@ static void write_pe_file ( struct pe_header *pe_header,
 	struct pe_section *section;
 	unsigned long fpos = 0;
 
+	/* Align length of headers */
+	fpos = pe_header->nt.OptionalHeader.SizeOfHeaders =
+		efi_file_align ( pe_header->nt.OptionalHeader.SizeOfHeaders );
+
 	/* Assign raw data pointers */
-	fpos = efi_file_align ( pe_header->nt.OptionalHeader.SizeOfHeaders );
 	for ( section = pe_sections ; section ; section = section->next ) {
 		if ( section->hdr.SizeOfRawData ) {
 			section->hdr.PointerToRawData = fpos;
