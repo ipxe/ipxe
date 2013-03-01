@@ -283,6 +283,23 @@ struct net_protocol vlan_protocol __net_protocol = {
 };
 
 /**
+ * Get the VLAN tag
+ *
+ * @v netdev		Network device
+ * @ret tag		VLAN tag, or 0 if device is not a VLAN device
+ */
+unsigned int vlan_tag ( struct net_device *netdev ) {
+	struct vlan_device *vlan;
+
+	if ( netdev->op == &vlan_operations ) {
+		vlan = netdev->priv;
+		return vlan->tag;
+	} else {
+		return 0;
+	}
+}
+
+/**
  * Check if network device can be used as a VLAN trunk device
  *
  * @v trunk		Trunk network device

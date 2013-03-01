@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/init.h>
 #include <ipxe/device.h>
 #include <ipxe/errortab.h>
+#include <ipxe/vlan.h>
 #include <ipxe/netdevice.h>
 
 /** @file
@@ -781,6 +782,16 @@ void net_poll ( void ) {
  */
 static void net_step ( struct process *process __unused ) {
 	net_poll();
+}
+
+/**
+ * Get the VLAN tag (when VLAN support is not present)
+ *
+ * @v netdev		Network device
+ * @ret tag		0, indicating that device is not a VLAN device
+ */
+__weak unsigned int vlan_tag ( struct net_device *netdev __unused ) {
+	return 0;
 }
 
 /** Networking stack process */
