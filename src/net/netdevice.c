@@ -794,5 +794,17 @@ __weak unsigned int vlan_tag ( struct net_device *netdev __unused ) {
 	return 0;
 }
 
+/**
+ * Identify VLAN device (when VLAN support is not present)
+ *
+ * @v trunk		Trunk network device
+ * @v tag		VLAN tag
+ * @ret netdev		VLAN device, if any
+ */
+__weak struct net_device * vlan_find ( struct net_device *trunk __unused,
+				       unsigned int tag __unused ) {
+	return NULL;
+}
+
 /** Networking stack process */
 PERMANENT_PROCESS ( net_process, net_step );
