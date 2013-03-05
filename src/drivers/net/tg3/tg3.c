@@ -919,7 +919,7 @@ static struct pci_device_id tg3_nics[] = {
 	PCI_ROM(0x14e4, 0x1691, "14e4-1691", "14e4-1691", 0),
 	PCI_ROM(0x14e4, 0x1655, "14e4-1655", "14e4-1655", 0),
 	PCI_ROM(0x14e4, 0x1656, "14e4-1656", "14e4-1656", 0),
-	PCI_ROM(0x14e4, 0x16b1, "14e4-16b1", "14e4-16b1", 0),
+	PCI_ROM(0x14e4, 0x16b1, "bcm57781",  "BCM57781",  0),
 	PCI_ROM(0x14e4, 0x16b5, "bcm57785",  "BCM57785",  0),
 	PCI_ROM(0x14e4, 0x16b0, "14e4-16b0", "14e4-16b0", 0),
 	PCI_ROM(0x14e4, 0x16b4, "14e4-16b4", "14e4-16b4", 0),
