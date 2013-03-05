@@ -1,4 +1,3 @@
-
 FILE_LICENCE ( GPL2_ONLY );
 
 #include <mii.h>
@@ -921,7 +920,7 @@ static struct pci_device_id tg3_nics[] = {
 	PCI_ROM(0x14e4, 0x1655, "14e4-1655", "14e4-1655", 0),
 	PCI_ROM(0x14e4, 0x1656, "14e4-1656", "14e4-1656", 0),
 	PCI_ROM(0x14e4, 0x16b1, "14e4-16b1", "14e4-16b1", 0),
-	PCI_ROM(0x14e4, 0x16b5, "14e4-16b5", "14e4-16b5", 0),
+	PCI_ROM(0x14e4, 0x16b5, "bcm57785",  "BCM57785",  0),
 	PCI_ROM(0x14e4, 0x16b0, "14e4-16b0", "14e4-16b0", 0),
 	PCI_ROM(0x14e4, 0x16b4, "14e4-16b4", "14e4-16b4", 0),
 	PCI_ROM(0x14e4, 0x16b2, "14e4-16b2", "14e4-16b2", 0),
