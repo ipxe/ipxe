@@ -247,7 +247,8 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 				i = 0;
 				list_for_each_entry ( item, &ui->menu->items,
 						      list ) {
-					if ( item->shortcut == key ) {
+					if ( item->shortcut &&
+					     ( item->shortcut == key ) ) {
 						ui->selected = i;
 						chosen = 1;
 						break;
