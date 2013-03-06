@@ -288,24 +288,6 @@ static int tftp_presize ( struct tftp_request *tftp, size_t filesize ) {
 }
 
 /**
- * TFTP requested blocksize
- *
- * This is treated as a global configuration parameter.
- */
-static unsigned int tftp_request_blksize = TFTP_MAX_BLKSIZE;
-
-/**
- * Set TFTP request blocksize
- *
- * @v blksize		Requested block size
- */
-void tftp_set_request_blksize ( unsigned int blksize ) {
-	if ( blksize < TFTP_DEFAULT_BLKSIZE )
-		blksize = TFTP_DEFAULT_BLKSIZE;
-	tftp_request_blksize = blksize;
-}
-
-/**
  * MTFTP multicast receive address
  *
  * This is treated as a global configuration parameter.
@@ -345,6 +327,7 @@ static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	const char *path;
 	size_t len;
 	struct io_buffer *iobuf;
+	size_t blksize;
 
 	/* Strip initial '/' if present.  If we were opened via the
 	 * URI interface, then there will be an initial '/', since a
@@ -370,6 +353,11 @@ static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	if ( ! iobuf )
 		return -ENOMEM;
 
+	/* Determine block size */
+	blksize = xfer_window ( &tftp->xfer );
+	if ( blksize > TFTP_MAX_BLKSIZE )
+		blksize = TFTP_MAX_BLKSIZE;
+
 	/* Build request */
 	rrq = iob_put ( iobuf, sizeof ( *rrq ) );
 	rrq->opcode = htons ( TFTP_RRQ );
@@ -378,8 +366,8 @@ static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	if ( tftp->flags & TFTP_FL_RRQ_SIZES ) {
 		iob_put ( iobuf, snprintf ( iobuf->tail,
 					    iob_tailroom ( iobuf ),
-					    "blksize%c%d%ctsize%c0", 0,
-					    tftp_request_blksize, 0, 0 ) + 1 );
+					    "blksize%c%zd%ctsize%c0",
+					    0, blksize, 0, 0 ) + 1 );
 	}
 	if ( tftp->flags & TFTP_FL_RRQ_MULTICAST ) {
 		iob_put ( iobuf, snprintf ( iobuf->tail,

@@ -72,6 +72,17 @@ static void pxe_tftp_close ( struct pxe_tftp_connection *pxe_tftp, int rc ) {
 }
 
 /**
+ * Check flow control window
+ *
+ * @v pxe_tftp		PXE TFTP connection
+ * @ret len		Length of window
+ */
+static size_t pxe_tftp_xfer_window ( struct pxe_tftp_connection *pxe_tftp ) {
+
+	return pxe_tftp->blksize;
+}
+
+/**
  * Receive new data
  *
  * @v pxe_tftp		PXE TFTP connection
@@ -128,6 +139,8 @@ static int pxe_tftp_xfer_deliver ( struct pxe_tftp_connection *pxe_tftp,
 static struct interface_operation pxe_tftp_xfer_ops[] = {
 	INTF_OP ( xfer_deliver, struct pxe_tftp_connection *,
 		  pxe_tftp_xfer_deliver ),
+	INTF_OP ( xfer_window, struct pxe_tftp_connection *,
+		  pxe_tftp_xfer_window ),
 	INTF_OP ( intf_close, struct pxe_tftp_connection *, pxe_tftp_close ),
 };
 
@@ -167,19 +180,19 @@ static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
 	/* Reset PXE TFTP connection structure */
 	memset ( &pxe_tftp, 0, sizeof ( pxe_tftp ) );
 	intf_init ( &pxe_tftp.xfer, &pxe_tftp_xfer_desc, NULL );
+	if ( blksize < TFTP_DEFAULT_BLKSIZE )
+		blksize = TFTP_DEFAULT_BLKSIZE;
+	pxe_tftp.blksize = blksize;
 	pxe_tftp.rc = -EINPROGRESS;
 
 	/* Construct URI string */
 	address.s_addr = ipaddress;
 	if ( ! port )
 		port = htons ( TFTP_PORT );
-	if ( blksize < TFTP_DEFAULT_BLKSIZE )
-		blksize = TFTP_DEFAULT_BLKSIZE;
-	snprintf ( uri_string, sizeof ( uri_string ),
-		   "tftp%s://%s:%d%s%s?blksize=%zd",
-		   sizeonly ? "size" : "",
-		   inet_ntoa ( address ), ntohs ( port ),
-		   ( ( filename[0] == '/' ) ? "" : "/" ), filename, blksize );
+	snprintf ( uri_string, sizeof ( uri_string ), "tftp%s://%s:%d%s%s",
+		   sizeonly ? "size" : "", inet_ntoa ( address ),
+		   ntohs ( port ), ( ( filename[0] == '/' ) ? "" : "/" ),
+		   filename );
 	DBG ( " %s", uri_string );
 
 	/* Open PXE TFTP connection */
