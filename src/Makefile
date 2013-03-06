@@ -148,6 +148,23 @@ everything :
 
 ###############################################################################
 #
+# Build target to build all of the VMWare supports (m)roms.
+#
+vmware : bin/8086100f.mrom bin/808610d3.mrom bin/10222000.rom bin/15ad07b0.rom
+	@$(ECHO) '==========================================================='
+	@$(ECHO) 
+	@$(ECHO) ' For More Information, See: http://ipxe.org/howto/vmware'
+	@$(ECHO) 
+	@$(ECHO) ' Available (m)roms:'
+	@$(ECHO) '  bin/8086100f.mrom -- Intel e1000'
+	@$(ECHO) '  bin/808610d3.mrom -- Intel e1000e'
+	@$(ECHO) '  bin/10222000.rom  -- Vlance/PCNet32'
+	@$(ECHO) '  bin/15ad07b0.rom  -- VMXNet3'
+	@$(ECHO)
+	@$(ECHO) '==========================================================='
+
+###############################################################################
+#
 # Build targets that do nothing but might be tried by users
 #
 configure :
