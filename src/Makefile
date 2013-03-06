@@ -68,6 +68,7 @@ SRCDIRS		+= drivers/net/e1000
 SRCDIRS		+= drivers/net/e1000e
 SRCDIRS		+= drivers/net/igb
 SRCDIRS		+= drivers/net/igbvf
+SRCDIRS		+= drivers/net/ixgbevf
 SRCDIRS		+= drivers/net/phantom
 SRCDIRS		+= drivers/net/rtl818x
 SRCDIRS		+= drivers/net/ath
