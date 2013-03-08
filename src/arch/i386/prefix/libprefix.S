@@ -545,8 +545,7 @@ alloc_basemem:
  * Free space allocated with alloc_basemem.
  *
  * Parameters:
- *   %ax : .text16 segment address
- *   %bx : .data16 segment address
+ *   none (.text16 segment address is implicit in %cs)
  * Returns:
  *   %ax : 0 if successfully freed
  * Corrupts:
@@ -559,14 +558,14 @@ alloc_basemem:
 free_basemem:
 	/* Preserve registers */
 	pushw	%fs
+	pushw	%ax
 
 	/* Check FBMS counter */
-	pushw	%ax
+	movw	%cs, %ax
 	shrw	$6, %ax
 	pushw	$0x40
 	popw	%fs
 	cmpw	%ax, %fs:0x13
-	popw	%ax
 	jne	1f
 
 	/* Check hooked interrupt count */
@@ -574,6 +573,7 @@ free_basemem:
 	jne	1f
 
 	/* OK to free memory */
+	movw	%cs, %ax
 	addw	$_text16_memsz_pgh, %ax
 	addw	$_data16_memsz_pgh, %ax
 	shrw	$6, %ax
@@ -581,6 +581,7 @@ free_basemem:
 	xorw	%ax, %ax
 
 1:	/* Restore registers and return */
+	popw	%ax
 	popw	%fs
 	ret
 	.size free_basemem, . - free_basemem
@@ -872,8 +873,7 @@ close_payload:
  * Uninstall all text and data segments.
  *
  * Parameters:
- *   %ax  : .text16 segment address
- *   %bx  : .data16 segment address
+ *   none (.text16 segment address is implicit in %cs)
  * Returns:
  *   none
  * Corrupts:
