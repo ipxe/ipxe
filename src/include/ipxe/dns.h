@@ -19,6 +19,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define DNS_TYPE_A		1
 #define DNS_TYPE_CNAME		5
+#define DNS_TYPE_AAAA		28
 #define DNS_TYPE_ANY		255
 
 #define DNS_CLASS_IN		1
@@ -78,6 +79,11 @@ struct dns_rr_info_a {
 	struct in_addr in_addr;
 } __attribute__ (( packed ));
 
+struct dns_rr_info_aaaa {
+	struct dns_rr_info_common common;
+	struct in6_addr in6_addr;
+} __attribute__ (( packed ));
+
 struct dns_rr_info_cname {
 	struct dns_rr_info_common common;
 	char cname[0];
@@ -86,6 +92,7 @@ struct dns_rr_info_cname {
 union dns_rr_info {
 	struct dns_rr_info_common common;
 	struct dns_rr_info_a a;
+	struct dns_rr_info_aaaa aaaa;
 	struct dns_rr_info_cname cname;
 };
 

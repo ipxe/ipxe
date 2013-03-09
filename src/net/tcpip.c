@@ -31,7 +31,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * address family and the network-layer addresses, but leave the ports
  * and the rest of the structures as zero).
  */
-int tcpip_rx ( struct io_buffer *iobuf, uint8_t tcpip_proto, 
+int tcpip_rx ( struct io_buffer *iobuf, struct net_device *netdev,
+	       uint8_t tcpip_proto,
 	       struct sockaddr_tcpip *st_src,
 	       struct sockaddr_tcpip *st_dest,
 	       uint16_t pshdr_csum ) {
@@ -41,7 +42,7 @@ int tcpip_rx ( struct io_buffer *iobuf, uint8_t tcpip_proto,
 	for_each_table_entry ( tcpip, TCPIP_PROTOCOLS ) {
 		if ( tcpip->tcpip_proto == tcpip_proto ) {
 			DBG ( "TCP/IP received %s packet\n", tcpip->name );
-			return tcpip->rx ( iobuf, st_src, st_dest, pshdr_csum );
+			return tcpip->rx ( iobuf, netdev, st_src, st_dest, pshdr_csum );
 		}
 	}
 

@@ -269,7 +269,8 @@ static struct udp_connection * udp_demux ( struct sockaddr_tcpip *local ) {
  * @v pshdr_csum	Pseudo-header checksum
  * @ret rc		Return status code
  */
-static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
+static int udp_rx ( struct io_buffer *iobuf, __unused struct net_device *netdev,
+		    struct sockaddr_tcpip *st_src,
 		    struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum ) {
 	struct udp_header *udphdr = iobuf->data;
 	struct udp_connection *udp;
@@ -413,6 +414,13 @@ static struct interface_descriptor udp_xfer_desc =
 struct socket_opener udp_socket_opener __socket_opener = {
 	.semantics	= UDP_SOCK_DGRAM,
 	.family		= AF_INET,
+	.open		= udp_open,
+};
+
+/** UDP over IPv6 socket opener */
+struct socket_opener udp_socket_opener_v6 __socket_opener = {
+	.semantics	= UDP_SOCK_DGRAM,
+	.family		= AF_INET6,
 	.open		= udp_open,
 };
 

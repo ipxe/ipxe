@@ -93,12 +93,7 @@ struct sockaddr_in6 {
 extern int inet_aton ( const char *cp, struct in_addr *inp );
 extern char * inet_ntoa ( struct in_addr in );
 
-/* Adding the following for IP6 support
- *
-
 extern int inet6_aton ( const char *cp, struct in6_addr *inp );
-extern char * inet6_ntoa ( struct in_addr in );
-
- */
+extern char * inet6_ntoa ( struct in6_addr in );
 
 #endif	/* _IPXE_IN_H */

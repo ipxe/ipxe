@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ip.h>
+#include <ipxe/ip6.h>
 #include <usr/route.h>
 
 /** @file
@@ -32,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 void route ( void ) {
 	struct ipv4_miniroute *miniroute;
+	struct ipv6_miniroute *miniroute6;
 
 	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
 		printf ( "%s: %s/", miniroute->netdev->name,
@@ -40,6 +42,17 @@ void route ( void ) {
 		if ( miniroute->gateway.s_addr )
 			printf ( " gw %s", inet_ntoa ( miniroute->gateway ) );
 		if ( ! netdev_is_open ( miniroute->netdev ) )
+			printf ( " (inaccessible)" );
+		printf ( "\n" );
+	}
+
+	list_for_each_entry ( miniroute6, &ipv6_miniroutes, list ) {
+		printf ( "%s: %s/", miniroute6->netdev->name,
+			 inet6_ntoa ( miniroute6->address ) );
+		printf ( "%d", miniroute6->prefix_len );
+		if ( miniroute6->gateway.s6_addr )
+			printf ( " gw %s", inet6_ntoa ( miniroute6->gateway ) );
+		if ( ! netdev_is_open ( miniroute6->netdev ) )
 			printf ( " (inaccessible)" );
 		printf ( "\n" );
 	}

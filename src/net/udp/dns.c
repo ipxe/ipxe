@@ -346,6 +346,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 	const struct dns_header *reply = iobuf->data;
 	union dns_rr_info *rr_info;
 	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
 	unsigned int qtype = dns->qinfo->qtype;
 	int rc;
 
@@ -419,6 +420,19 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 				goto done;
 			}
 			break;
+		
+		case htons ( DNS_TYPE_AAAA ):
+
+			/* Found the target AAAA record */
+			DBGC ( dns, "DNS %p found address %s\n",
+			       dns, inet6_ntoa ( rr_info->aaaa.in6_addr ) );
+			sin6 = ( struct sockaddr_in6 * ) &dns->sa;
+			sin6->sin_family = AF_INET6;
+			sin6->sin6_addr = rr_info->aaaa.in6_addr;
+
+			/* Mark operation as complete */
+			dns_done ( dns, 0 );
+			return 0;
 
 		default:
 			DBGC ( dns, "DNS %p got unknown record type %d\n",
@@ -434,9 +448,19 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 
 	case htons ( DNS_TYPE_A ):
 		/* We asked for an A record and got nothing;
+		 * try the AAAA record.
+		 */
+		DBGC ( dns, "DNS %p found no A record; trying AAAA\n", dns );
+		dns->qinfo->qtype = htons ( DNS_TYPE_AAAA );
+		dns_send_packet ( dns );
+		rc = 0;
+		goto done;
+
+	case htons ( DNS_TYPE_AAAA ):
+		/* We asked for an AAAA record and got nothing;
 		 * try the CNAME.
 		 */
-		DBGC ( dns, "DNS %p found no A record; trying CNAME\n", dns );
+		DBGC ( dns, "DNS %p found no AAAA record; trying CNAME\n", dns );
 		dns->qinfo->qtype = htons ( DNS_TYPE_CNAME );
 		dns_send_packet ( dns );
 		rc = 0;
@@ -444,10 +468,10 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 
 	case htons ( DNS_TYPE_CNAME ):
 		/* We asked for a CNAME record.  If we got a response
-		 * (i.e. if the next A query is already set up), then
+		 * (i.e. if the next AAAA query is already set up), then
 		 * issue it, otherwise abort.
 		 */
-		if ( dns->qinfo->qtype == htons ( DNS_TYPE_A ) ) {
+		if ( dns->qinfo->qtype == htons ( DNS_TYPE_AAAA ) ) {
 			dns_send_packet ( dns );
 			rc = 0;
 			goto done;
@@ -601,6 +625,14 @@ struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
 	.type = &setting_type_ipv4,
 };
 
+/** IPv6 DNS server setting */
+struct setting dns6_setting __setting ( SETTING_IPv6_EXTRA ) = {
+	.name = "dns6",
+	.description = "IPv6 DNS server",
+	.tag = 0,
+	.type = &setting_type_ipv6,
+};
+
 /**
  * Apply DNS settings
  *
@@ -609,11 +641,19 @@ struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
 static int apply_dns_settings ( void ) {
 	struct sockaddr_in *sin_nameserver =
 		( struct sockaddr_in * ) &nameserver;
+	struct sockaddr_in6 *sin6_nameserver =
+		( struct sockaddr_in6 * ) &nameserver;
 	int len;
 
 	/* Fetch DNS server address */
 	nameserver.st_family = 0;
-	if ( ( len = fetch_ipv4_setting ( NULL, &dns_setting,
+	/* Favor IPv6 nameservers if they are available. */
+	if ( ( len = fetch_ipv6_setting ( NULL, &dns6_setting,
+					  &sin6_nameserver->sin6_addr ) ) >= 0 ){
+		sin6_nameserver->sin_family = AF_INET6;
+		DBG ( "DNS using IPv6 nameserver %s\n",
+		      inet6_ntoa ( sin6_nameserver->sin6_addr ) );
+	} else if ( ( len = fetch_ipv4_setting ( NULL, &dns_setting,
 					  &sin_nameserver->sin_addr ) ) >= 0 ){
 		nameserver.st_family = AF_INET;
 		DBG ( "DNS using nameserver %s\n",

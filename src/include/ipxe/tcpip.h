@@ -62,8 +62,11 @@ struct tcpip_protocol {
          *
          * This method takes ownership of the I/O buffer.
          */
-        int ( * rx ) ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
-		       struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
+        int ( * rx ) ( struct io_buffer *iobuf,
+		       struct net_device *netdev,
+		       struct sockaddr_tcpip *st_src,
+		       struct sockaddr_tcpip *st_dest,
+		       uint16_t pshdr_csum );
         /** 
 	 * Transport-layer protocol number
 	 *
@@ -114,7 +117,8 @@ struct tcpip_net_protocol {
 /** Declare a TCP/IP network-layer protocol */
 #define __tcpip_net_protocol __table_entry ( TCPIP_NET_PROTOCOLS, 01 )
 
-extern int tcpip_rx ( struct io_buffer *iobuf, uint8_t tcpip_proto,
+extern int tcpip_rx ( struct io_buffer *iobuf, struct net_device *netdev,
+		      uint8_t tcpip_proto,
 		      struct sockaddr_tcpip *st_src,
 		      struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
 extern int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip,
