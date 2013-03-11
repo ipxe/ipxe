@@ -445,7 +445,7 @@ no_pmm:
 	 * picked up by the initial shell prompt, and we will drop
 	 * into a shell.
 	 */
-	movl	$0xa0000, %ebp	/* Inhibit relocation during POST */
+	xorl	%ebp, %ebp	/* Inhibit use of INT 15,e820 and INT 15,e801 */
 	pushw	%cs
 	call	exec
 2:
@@ -630,7 +630,7 @@ decompress_to:
  * Called by the PnP BIOS when it wants to boot us.
  */
 bev_entry:
-	xorl	%ebp, %ebp	/* Allow relocation */
+	orl	$0xffffffff, %ebp	/* Allow arbitrary relocation */
 	pushw	%cs
 	call	exec
 	lret
@@ -665,7 +665,7 @@ int19_entry:
 	/* Leave keypress in buffer and start iPXE.  The keypress will
 	 * cause the usual initial Ctrl-B prompt to be skipped.
 	 */
-	xorl	%ebp, %ebp	/* Allow relocation */
+	orl	$0xffffffff, %ebp	/* Allow arbitrary relocation */
 	pushw	%cs
 	call	exec
 1:	/* Try to call original INT 19 vector */
