@@ -30,11 +30,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uri.h>
 #include <ipxe/open.h>
 #include <ipxe/init.h>
+#include <ipxe/keys.h>
+#include <ipxe/version.h>
+#include <ipxe/shell.h>
+#include <ipxe/features.h>
+#include <ipxe/image.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/imgmgmt.h>
+#include <usr/prompt.h>
 #include <usr/autoboot.h>
+#include <config/general.h>
 
 /** @file
  *
@@ -46,6 +53,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ENOENT_BOOT __einfo_error ( EINFO_ENOENT_BOOT )
 #define EINFO_ENOENT_BOOT \
 	__einfo_uniqify ( EINFO_ENOENT, 0x01, "Nothing to boot" )
+
+#define NORMAL	"\033[0m"
+#define BOLD	"\033[1m"
+#define CYAN	"\033[36m"
+
+/** The "scriptlet" setting */
+struct setting scriptlet_setting __setting ( SETTING_MISC ) = {
+	.name = "scriptlet",
+	.description = "Boot scriptlet",
+	.tag = DHCP_EB_SCRIPTLET,
+	.type = &setting_type_string,
+};
 
 /**
  * Perform PXE menu boot when PXE stack is not available
@@ -422,4 +441,80 @@ int autoboot ( void ) {
 
 	printf ( "No more network devices\n" );
 	return rc;
+}
+
+/**
+ * Prompt for shell entry
+ *
+ * @ret	enter_shell	User wants to enter shell
+ */
+static int shell_banner ( void ) {
+
+	/* Skip prompt if timeout is zero */
+	if ( BANNER_TIMEOUT <= 0 )
+		return 0;
+
+	/* Prompt user */
+	printf ( "\n" );
+	return ( prompt ( "Press Ctrl-B for the iPXE command line...",
+			  ( BANNER_TIMEOUT * 100 ), CTRL_B ) == 0 );
+}
+
+/**
+ * Main iPXE flow of execution
+ *
+ * @v netdev		Network device, or NULL
+ */
+void ipxe ( struct net_device *netdev ) {
+	struct feature *feature;
+	struct image *image;
+	char *scriptlet;
+
+	/*
+	 * Print welcome banner
+	 *
+	 *
+	 * If you wish to brand this build of iPXE, please do so by
+	 * defining the string PRODUCT_NAME in config/general.h.
+	 *
+	 * While nothing in the GPL prevents you from removing all
+	 * references to iPXE or http://ipxe.org, we prefer you not to
+	 * do so.
+	 *
+	 */
+	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD "iPXE %s"
+		 NORMAL " -- Open Source Network Boot Firmware -- "
+		 CYAN "http://ipxe.org" NORMAL "\n"
+		 "Features:", product_version );
+	for_each_table_entry ( feature, FEATURES )
+		printf ( " %s", feature->name );
+	printf ( "\n" );
+
+	/* Boot system */
+	if ( ( image = first_image() ) != NULL ) {
+		/* We have an embedded image; execute it */
+		image_exec ( image );
+	} else if ( shell_banner() ) {
+		/* User wants shell; just give them a shell */
+		shell();
+	} else {
+		fetch_string_setting_copy ( NULL, &scriptlet_setting,
+					    &scriptlet );
+		if ( scriptlet ) {
+			/* User has defined a scriptlet; execute it */
+			system ( scriptlet );
+			free ( scriptlet );
+		} else {
+			/* Try booting.  If booting fails, offer the
+			 * user another chance to enter the shell.
+			 */
+			if ( netdev ) {
+				netboot ( netdev );
+			} else {
+				autoboot();
+			}
+			if ( shell_banner() )
+				shell();
+		}
+	}
 }
