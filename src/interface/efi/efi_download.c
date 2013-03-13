@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/ipxe_download.h>
+#include <ipxe/efi/efi_download.h>
 
 /** iPXE download protocol GUID */
 static EFI_GUID ipxe_download_protocol_guid
@@ -187,47 +187,39 @@ static IPXE_DOWNLOAD_PROTOCOL ipxe_download_protocol_interface = {
 };
 
 /**
- * Create a new device handle with a iPXE download protocol attached to it.
+ * Install iPXE download protocol
  *
- * @v device_handle	Newly created device handle (output)
+ * @v handle		EFI handle
  * @ret rc		Return status code
  */
-int efi_download_install ( EFI_HANDLE *device_handle ) {
+int efi_download_install ( EFI_HANDLE *handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_STATUS efirc;
-	EFI_HANDLE handle = NULL;
-	if (efi_loaded_image->DeviceHandle) { /* TODO: ensure handle is the NIC (maybe efi_image has a better way to indicate the handle doing SNP?) */
-		handle = efi_loaded_image->DeviceHandle;
-	}
 
-	DBG ( "Installing ipxe protocol interface (%p)... ",
-	      &ipxe_download_protocol_interface );
 	efirc = bs->InstallMultipleProtocolInterfaces (
-			&handle,
+			handle,
 			&ipxe_download_protocol_guid,
 			&ipxe_download_protocol_interface,
 			NULL );
 	if ( efirc ) {
-		DBG ( "failed (%s)\n", efi_strerror ( efirc ) );
+		DBG ( "Could not install download protocol: %s\n",
+		      efi_strerror ( efirc ) );
 		return EFIRC_TO_RC ( efirc );
 	}
 
-	DBG ( "success (%p)\n", handle );
-	*device_handle = handle;
 	return 0;
 }
 
 /**
- * Remove the iPXE download protocol from the given handle, and if nothing
- * else is attached, destroy the handle.
+ * Uninstall iPXE download protocol
  *
- * @v device_handle	EFI device handle to remove from
+ * @v handle		EFI handle
  */
-void efi_download_uninstall ( EFI_HANDLE device_handle ) {
+void efi_download_uninstall ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
 	bs->UninstallMultipleProtocolInterfaces (
-			device_handle,
-			ipxe_download_protocol_guid,
-			ipxe_download_protocol_interface );
+			handle,
+			&ipxe_download_protocol_guid,
+			&ipxe_download_protocol_interface, NULL );
 }
