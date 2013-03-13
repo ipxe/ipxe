@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
 #include <config/general.h>
+#include <usr/autoboot.h>
 
 /** EFI simple network protocol GUID */
 static EFI_GUID efi_simple_network_protocol_guid
@@ -57,9 +58,13 @@ static EFI_GUID efi_nii31_protocol_guid = {
 	{ 0xBC, 0x81, 0x76, 0x7F, 0x1F, 0x97, 0x7A, 0x89 }
 };
 
-/** EFI component name protocol */
+/** EFI component name protocol GUID */
 static EFI_GUID efi_component_name2_protocol_guid
 	= EFI_COMPONENT_NAME2_PROTOCOL_GUID;
+
+/** EFI load file protocol GUID */
+static EFI_GUID efi_load_file_protocol_guid
+	= EFI_LOAD_FILE_PROTOCOL_GUID;
 
 /** List of SNP devices */
 static LIST_HEAD ( efi_snp_devices );
@@ -756,6 +761,49 @@ efi_snp_get_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *name2,
 
 /******************************************************************************
  *
+ * Load file protocol
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Load file
+ *
+ * @v loadfile		Load file protocol
+ * @v path		File path
+ * @v booting		Loading as part of a boot attempt
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_snp_load_file ( EFI_LOAD_FILE_PROTOCOL *load_file,
+		    EFI_DEVICE_PATH_PROTOCOL *path __unused,
+		    BOOLEAN booting, UINTN *len __unused,
+		    VOID *data __unused ) {
+	struct efi_snp_device *snpdev =
+		container_of ( load_file, struct efi_snp_device, load_file );
+	struct net_device *netdev = snpdev->netdev;
+
+	/* Fail unless this is a boot attempt */
+	if ( ! booting ) {
+		DBGC ( snpdev, "SNPDEV %p cannot load non-boot file\n",
+		       snpdev );
+		return EFI_UNSUPPORTED;
+	}
+
+	/* Boot from network device */
+	ipxe ( netdev );
+
+	/* Assume boot process was aborted */
+	return EFI_ABORTED;
+}
+
+/** Load file protocol */
+static EFI_LOAD_FILE_PROTOCOL efi_snp_load_file_protocol = {
+	.LoadFile	= efi_snp_load_file,
+};
+
+/******************************************************************************
+ *
  * iPXE network driver
  *
  ******************************************************************************
@@ -861,6 +909,10 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	snpdev->name2.GetControllerName = efi_snp_get_controller_name;
 	snpdev->name2.SupportedLanguages = "en";
 
+	/* Populate the load file protocol structure */
+	memcpy ( &snpdev->load_file, &efi_snp_load_file_protocol,
+		 sizeof ( snpdev->load_file ) );
+
 	/* Populate the device name */
 	efi_snprintf ( snpdev->name, ( sizeof ( snpdev->name ) /
 				       sizeof ( snpdev->name[0] ) ),
@@ -890,6 +942,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
+			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not install protocols: "
 		       "%s\n", snpdev, efi_strerror ( efirc ) );
@@ -931,6 +984,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
+			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL );
  err_install_protocol_interface:
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
@@ -992,6 +1046,7 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
+			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL );
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
 	netdev_put ( snpdev->netdev );

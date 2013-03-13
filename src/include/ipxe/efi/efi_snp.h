@@ -16,6 +16,7 @@
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/Protocol/HiiConfigAccess.h>
 #include <ipxe/efi/Protocol/HiiDatabase.h>
+#include <ipxe/efi/Protocol/LoadFile.h>
 
 /** An SNP device */
 struct efi_snp_device {
@@ -49,6 +50,8 @@ struct efi_snp_device {
 	EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL nii;
 	/** Component name protocol */
 	EFI_COMPONENT_NAME2_PROTOCOL name2;
+	/** Load file protocol handle */
+	EFI_LOAD_FILE_PROTOCOL load_file;
 	/** HII configuration access protocol */
 	EFI_HII_CONFIG_ACCESS_PROTOCOL hii;
 	/** HII package list */
