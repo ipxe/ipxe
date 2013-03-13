@@ -1005,3 +1005,18 @@ struct net_driver efi_snp_driver __net_driver = {
 	.notify = efi_snp_notify,
 	.remove = efi_snp_remove,
 };
+
+/**
+ * Get most recently opened SNP device
+ *
+ * @ret snpdev		Most recently opened SNP device, or NULL
+ */
+struct efi_snp_device * last_opened_snpdev ( void ) {
+	struct net_device *netdev;
+
+	netdev = last_opened_netdev();
+	if ( ! netdev )
+		return NULL;
+
+	return efi_snp_demux ( netdev );
+}
