@@ -283,7 +283,9 @@ EFI_STATUS
   @retval EFI_NOT_FOUND         1) There are no EFI_DRIVER_BINDING_PROTOCOL instances
                                 present in the system.
                                 2) No drivers were connected to ControllerHandle.
-
+  @retval EFI_SECURITY_VIOLATION
+                                The user has no permission to start UEFI device drivers on the device path
+                                associated with the ControllerHandle or specified by the RemainingDevicePath.
 **/
 typedef
 EFI_STATUS
@@ -850,8 +852,9 @@ EFI_STATUS
   @param  ExitData              The pointer to a pointer to a data buffer that includes a Null-terminated
                                 string, optionally followed by additional binary data.
 
-  @retval EFI_INVALID_PARAMETER ImageHandle is either an invalid image handle or the image
-                                has already been initialized with StartImage.
+  @retval EFI_INVALID_PARAMETER  ImageHandle is either an invalid image handle or the image
+                                 has already been initialized with StartImage.
+  @retval EFI_SECURITY_VIOLATION The current platform policy specifies that the image should not be started.
   @return Exit code from image
 
 **/
@@ -1138,8 +1141,8 @@ EFI_STATUS
 /**
   Installs one or more protocol interfaces into the boot services environment.
 
-  @param  Handle                The handle to install the new protocol interfaces on, or NULL if a new
-                                handle is to be allocated.
+  @param  Handle                The pointer to a handle to install the new protocol interfaces on,
+                                or a pointer to NULL if a new handle is to be allocated.
   @param  ...                   A variable argument list containing pairs of protocol GUIDs and protocol
                                 interfaces.
 
@@ -1722,6 +1725,10 @@ EFI_STATUS
   OUT UINT64            *MaximumVariableSize
   );
 
+//
+// Firmware should stop at a firmware user interface on next boot
+//
+#define EFI_OS_INDICATIONS_BOOT_TO_FW_UI    0x0000000000000001
 
 //
 // EFI Runtime Services Table
@@ -2006,50 +2013,46 @@ EFI_STATUS
 ///
 /// EFI Boot Key Data
 ///
-typedef union {
-  struct {
-    ///
-    /// Indicates the revision of the EFI_KEY_OPTION structure. This revision level should be 0.
-    ///
-    UINT32  Revision        : 8;
-    ///
-    /// Either the left or right Shift keys must be pressed (1) or must not be pressed (0).
-    ///
-    UINT32  ShiftPressed    : 1;
-    ///
-    /// Either the left or right Control keys must be pressed (1) or must not be pressed (0).
-    ///
-    UINT32  ControlPressed  : 1;
-    ///
-    /// Either the left or right Alt keys must be pressed (1) or must not be pressed (0).
-    ///
-    UINT32  AltPressed      : 1;
-    ///
-    /// Either the left or right Logo keys must be pressed (1) or must not be pressed (0).
-    ///
-    UINT32  LogoPressed     : 1;
-    ///
-    /// The Menu key must be pressed (1) or must not be pressed (0).
-    ///
-    UINT32  MenuPressed     : 1;
-    ///
-    /// The SysReq key must be pressed (1) or must not be pressed (0).
-    ///
-    UINT32  SysReqPressed    : 1;
-    UINT32  Reserved        : 16;
-    ///
-    /// Specifies the actual number of entries in EFI_KEY_OPTION.Keys, from 0-3. If
-    /// zero, then only the shift state is considered. If more than one, then the boot option will
-    /// only be launched if all of the specified keys are pressed with the same shift state.
-    ///
-    UINT32  InputKeyCount   : 2;
-  } Options;
-  UINT32  PackedValue;
-} EFI_BOOT_KEY_DATA;
+typedef UINT32 EFI_BOOT_KEY_DATA;
+///
+/// Indicates the revision of the EFI_KEY_OPTION structure. This revision level should be 0.
+///
+#define EFI_KEY_OPTION_REVISION_MASK        0x000000FF
+///
+/// Either the left or right Shift keys must be pressed (1) or must not be pressed (0).
+///
+#define EFI_KEY_OPTION_SHIFT_PRESSED_MASK   BIT8
+///
+/// Either the left or right Control keys must be pressed (1) or must not be pressed (0).
+///
+#define EFI_KEY_OPTION_CONTROL_PRESSED_MASK BIT9
+///
+/// Either the left or right Alt keys must be pressed (1) or must not be pressed (0).
+///
+#define EFI_KEY_OPTION_ALT_PRESSED_MASK     BIT10
+///
+/// Either the left or right Logo keys must be pressed (1) or must not be pressed (0).
+///
+#define EFI_KEY_OPTION_LOGO_PRESSED_MASK    BIT11
+///
+/// The Menu key must be pressed (1) or must not be pressed (0).
+///
+#define EFI_KEY_OPTION_MENU_PRESSED_MASK    BIT12
+///
+/// The SysReq key must be pressed (1) or must not be pressed (0).
+///
+#define EFI_KEY_OPTION_SYS_REQ_PRESSED_MASK BIT13
+///
+/// Specifies the actual number of entries in EFI_KEY_OPTION.Keys, from 0-3. If
+/// zero, then only the shift state is considered. If more than one, then the boot option will
+/// only be launched if all of the specified keys are pressed with the same shift state.
+///
+#define EFI_KEY_OPTION_INPUT_KEY_COUNT_MASK (BIT30 | BIT31)
 
 ///
 /// EFI Key Option.
 ///
+#pragma pack(1)
 typedef struct {
   ///
   /// Specifies options about how the key will be processed.
@@ -2073,6 +2076,7 @@ typedef struct {
   ///
   //EFI_INPUT_KEY      Keys[];
 } EFI_KEY_OPTION;
+#pragma pack()
 
 //
 // EFI File location to boot from on removable media devices
