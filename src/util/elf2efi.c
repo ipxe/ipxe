@@ -18,6 +18,8 @@
  */
 
 #define _GNU_SOURCE
+#define PACKAGE "elf2efi"
+#define PACKAGE_VERSION "1"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
