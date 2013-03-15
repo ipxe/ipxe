@@ -140,6 +140,40 @@ extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 extern EFI_SYSTEM_TABLE *efi_systab;
 
 extern const char * efi_strerror ( EFI_STATUS efirc );
+
+extern void dbg_efi_protocols ( EFI_HANDLE handle );
+extern void dbg_efi_devpath ( EFI_DEVICE_PATH_PROTOCOL *path );
+
+#define DBG_EFI_PROTOCOLS_IF( level, handle ) do {		\
+		if ( DBG_ ## level ) {				\
+			dbg_efi_protocols ( handle );		\
+		}						\
+	} while ( 0 )
+
+#define DBG_EFI_DEVPATH_IF( level, path ) do {			\
+		if ( DBG_ ## level ) {				\
+			dbg_efi_devpath ( path );		\
+		}						\
+	} while ( 0 )
+
+#define DBGC_EFI_PROTOCOLS_IF( level, id, ... ) do {		\
+		DBG_AC_IF ( level, id );			\
+		DBG_EFI_PROTOCOLS_IF ( level, __VA_ARGS__ );	\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
+#define DBGC_EFI_DEVPATH_IF( level, id, ... ) do {		\
+		DBG_AC_IF ( level, id );			\
+		DBG_EFI_DEVPATH_IF ( level, __VA_ARGS__ );	\
+		DBG_DC_IF ( level );				\
+	} while ( 0 )
+
+#define DBGC_EFI_PROTOCOLS( ... )				\
+	DBGC_EFI_PROTOCOLS_IF( LOG, ##__VA_ARGS__ )
+
+#define DBGC_EFI_DEVPATH( ... )					\
+	DBGC_EFI_DEVPATH_IF( LOG, ##__VA_ARGS__ )
+
 extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
 
