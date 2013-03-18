@@ -38,6 +38,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/sanboot.h>
 #include <ipxe/device.h>
 #include <ipxe/pci.h>
+#include <ipxe/iso9660.h>
+#include <ipxe/eltorito.h>
 #include <realmode.h>
 #include <bios.h>
 #include <biosint.h>
