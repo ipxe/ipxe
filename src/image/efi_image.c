@@ -48,8 +48,8 @@ static EFI_GUID efi_loaded_image_protocol_guid =
  *
  * The caller must eventually free() the device path.
  */
-static EFI_DEVICE_PATH_PROTOCOL * efi_image_path ( struct image *image,
-						   EFI_DEVICE_PATH *parent ) {
+static EFI_DEVICE_PATH_PROTOCOL *
+efi_image_path ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
 	EFI_DEVICE_PATH_PROTOCOL *path;
 	FILEPATH_DEVICE_PATH *filepath;
 	EFI_DEVICE_PATH_PROTOCOL *end;
@@ -204,7 +204,7 @@ static int efi_image_exec ( struct image *image ) {
 		( ( wcslen ( cmdline ) + 1 /* NUL */ ) * sizeof ( wchar_t ) );
 
 	/* Start the image */
-	if ( ( efirc = bs->StartImage ( handle, 0, NULL ) ) != 0 ) {
+	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %p returned with status %s\n",
 		       image, efi_strerror ( efirc ) );
 		rc = EFIRC_TO_RC ( efirc );
