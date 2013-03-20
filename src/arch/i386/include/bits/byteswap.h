@@ -53,8 +53,8 @@ __bswap_variable_64 ( uint64_t x ) {
 static inline __attribute__ (( always_inline )) void
 __bswap_64s ( uint64_t *x ) {
 	struct {
-		uint32_t low;
-		uint32_t high;
+		uint32_t __attribute__ (( may_alias )) low;
+		uint32_t __attribute__ (( may_alias )) high;
 	} __attribute__ (( may_alias )) *dwords = ( ( void * ) x );
 	uint32_t discard;
 
