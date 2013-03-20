@@ -148,7 +148,18 @@ struct smbios {
 	size_t len;
 	/** Number of SMBIOS structures */
 	unsigned int count;
+	/** SMBIOS version */
+	uint16_t version;
 };
+
+/**
+ * Calculate SMBIOS version
+ *
+ * @v major		Major version
+ * @v minor		Minor version
+ * @ret version		SMBIOS version
+ */
+#define SMBIOS_VERSION( major, minor ) ( ( (major) << 8 ) | (minor) )
 
 extern int find_smbios ( struct smbios *smbios );
 extern int find_smbios_structure ( unsigned int type,
@@ -158,5 +169,6 @@ extern int read_smbios_structure ( struct smbios_structure *structure,
 extern int read_smbios_string ( struct smbios_structure *structure,
 				unsigned int index,
 				void *data, size_t len );
+extern int smbios_version ( void );
 
 #endif /* _IPXE_SMBIOS_H */

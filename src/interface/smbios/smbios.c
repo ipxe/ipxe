@@ -179,3 +179,20 @@ int read_smbios_string ( struct smbios_structure *structure,
 	DBG ( "SMBIOS string index %d not found\n", index );
 	return -ENOENT;
 }
+
+/**
+ * Get SMBIOS version
+ *
+ * @ret version		Version, or negative error
+ */
+int smbios_version ( void ) {
+	int rc;
+
+	/* Find SMBIOS */
+	if ( ( smbios.address == UNULL ) &&
+	     ( ( rc = find_smbios ( &smbios ) ) != 0 ) )
+		return rc;
+	assert ( smbios.address != UNULL );
+
+	return smbios.version;
+}
