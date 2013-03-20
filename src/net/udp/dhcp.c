@@ -1049,9 +1049,7 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
 	if ( ( len = fetch_uuid_setting ( NULL, &uuid_setting,
 					  &client_uuid.uuid ) ) >= 0 ) {
-		__bswap_32s ( &client_uuid.uuid.canonical.a );
-		__bswap_16s ( &client_uuid.uuid.canonical.b );
-		__bswap_16s ( &client_uuid.uuid.canonical.c );
+		uuid_mangle ( &client_uuid.uuid );
 		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_UUID,
 					    &client_uuid,
 					    sizeof ( client_uuid ) ) ) != 0 ) {

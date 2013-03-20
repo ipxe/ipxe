@@ -22,7 +22,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
-#include <byteswap.h>
 #include <ipxe/settings.h>
 #include <ipxe/init.h>
 #include <ipxe/uuid.h>
@@ -148,9 +147,7 @@ static int smbios_fetch ( struct settings *settings __unused,
 		     ( smbios_version() >= SMBIOS_VERSION ( 2, 6 ) ) ) {
 			DBG ( "SMBIOS detected mangled UUID\n" );
 			memcpy ( &uuid, &buf[tag_offset], sizeof ( uuid ) );
-			__bswap_32s ( &uuid.canonical.a );
-			__bswap_16s ( &uuid.canonical.b );
-			__bswap_16s ( &uuid.canonical.c );
+			uuid_mangle ( &uuid );
 			raw = &uuid;
 		}
 
