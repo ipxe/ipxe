@@ -27,6 +27,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <stdio.h>
+#include <string.h>
+#include <ipxe/uuid.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
@@ -35,6 +37,24 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Device path to text protocol */
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
 EFI_REQUIRE_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
+
+/**
+ * Convert GUID to a printable string
+ *
+ * @v guid		GUID
+ * @ret string		Printable string
+ */
+const char * efi_guid_ntoa ( EFI_GUID *guid ) {
+	union {
+		union uuid uuid;
+		EFI_GUID guid;
+	} u;
+
+	/* Convert GUID to standard endianness */
+	memcpy ( &u.guid, guid, sizeof ( u.guid ) );
+	uuid_mangle ( &u.uuid );
+	return uuid_ntoa ( &u.uuid );
+}
 
 /**
  * Print list of protocol handlers attached to a handle
@@ -57,9 +77,8 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 	}
 
 	/* Dump list of protocols */
-	for ( i = 0 ; i < count ; i++ ) {
-		printf ( "%s\n", uuid_ntoa ( ( union uuid * ) protocols[i] ) );
-	}
+	for ( i = 0 ; i < count ; i++ )
+		printf ( "%s\n", efi_guid_ntoa ( protocols[i] ) );
 
 	/* Free list */
 	bs->FreePool ( protocols );

@@ -121,13 +121,14 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 
 	/* Look up used protocols */
 	for_each_table_entry ( prot, EFI_PROTOCOLS ) {
-		if ( ( efirc = bs->LocateProtocol ( &prot->u.guid, NULL,
+		if ( ( efirc = bs->LocateProtocol ( &prot->guid, NULL,
 						    prot->protocol ) ) == 0 ) {
 			DBGC ( systab, "EFI protocol %s is at %p\n",
-			       uuid_ntoa ( &prot->u.uuid ), *(prot->protocol));
+			       efi_guid_ntoa ( &prot->guid ),
+			       *(prot->protocol) );
 		} else {
 			DBGC ( systab, "EFI does not provide protocol %s\n",
-			       uuid_ntoa ( &prot->u.uuid ) );
+			       efi_guid_ntoa ( &prot->guid ) );
 			/* All protocols are required */
 			return efirc;
 		}
@@ -135,12 +136,12 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 
 	/* Look up used configuration tables */
 	for_each_table_entry ( tab, EFI_CONFIG_TABLES ) {
-		if ( ( *(tab->table) = efi_find_table ( &tab->u.guid ) ) ) {
+		if ( ( *(tab->table) = efi_find_table ( &tab->guid ) ) ) {
 			DBGC ( systab, "EFI configuration table %s is at %p\n",
-			       uuid_ntoa ( &tab->u.uuid ), *(tab->table) );
+			       efi_guid_ntoa ( &tab->guid ), *(tab->table) );
 		} else {
 			DBGC ( systab, "EFI does not provide configuration "
-			       "table %s\n", uuid_ntoa ( &tab->u.uuid ) );
+			       "table %s\n", efi_guid_ntoa ( &tab->guid ) );
 			if ( tab->required )
 				return EFI_NOT_AVAILABLE_YET;
 		}

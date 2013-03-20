@@ -414,8 +414,7 @@ static EFI_STATUS EFIAPI efi_file_get_info ( EFI_FILE_PROTOCOL *this,
 	} else {
 
 		DBGC ( file, "EFIFILE %s cannot get information of type %s\n",
-		       efi_file_name ( file ),
-		       uuid_ntoa ( ( union uuid * ) type ) );
+		       efi_file_name ( file ), efi_guid_ntoa ( type ) );
 		return EFI_UNSUPPORTED;
 	}
 }
@@ -435,7 +434,7 @@ efi_file_set_info ( EFI_FILE_PROTOCOL *this, EFI_GUID *type,
 	struct efi_file *file = container_of ( this, struct efi_file, file );
 
 	DBGC ( file, "EFIFILE %s cannot set information of type %s\n",
-	       efi_file_name ( file ), uuid_ntoa ( ( union uuid * ) type ) );
+	       efi_file_name ( file ), efi_guid_ntoa ( type ) );
 	return EFI_WRITE_PROTECTED;
 }
 
