@@ -1041,10 +1041,17 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 		return rc;
 	}
 
-	/* Add client UUID, if we have one.  Required for PXE. */
+	/* Add client UUID, if we have one.  Required for PXE.  The
+	 * PXE spec does not specify a byte ordering for UUIDs, but
+	 * RFC4578 suggests that it follows the EFI spec, in which the
+	 * first three fields are little-endian.
+	 */
 	client_uuid.type = DHCP_CLIENT_UUID_TYPE;
 	if ( ( len = fetch_uuid_setting ( NULL, &uuid_setting,
 					  &client_uuid.uuid ) ) >= 0 ) {
+		__bswap_32s ( &client_uuid.uuid.canonical.a );
+		__bswap_16s ( &client_uuid.uuid.canonical.b );
+		__bswap_16s ( &client_uuid.uuid.canonical.c );
 		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_CLIENT_UUID,
 					    &client_uuid,
 					    sizeof ( client_uuid ) ) ) != 0 ) {
