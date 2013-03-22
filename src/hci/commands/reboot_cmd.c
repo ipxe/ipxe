@@ -17,6 +17,7 @@
  * 02110-1301, USA.
  */
 
+#include <getopt.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/reboot.h>
@@ -30,14 +31,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** "reboot" options */
-struct reboot_options {};
+struct reboot_options {
+	/** Perform a warm reboot */
+	int warm;
+};
 
 /** "reboot" option list */
-static struct option_descriptor reboot_opts[] = {};
+static struct option_descriptor reboot_opts[] = {
+	OPTION_DESC ( "warm", 'w', no_argument,
+		      struct reboot_options, warm, parse_flag ),
+};
 
 /** "reboot" command descriptor */
 static struct command_descriptor reboot_cmd =
-	COMMAND_DESC ( struct reboot_options, reboot_opts, 0, 0, "" );
+	COMMAND_DESC ( struct reboot_options, reboot_opts, 0, 0, "[--warm]" );
 
 /**
  * The "reboot" command
@@ -55,7 +62,7 @@ static int reboot_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Reboot system */
-	reboot();
+	reboot ( opts.warm );
 
 	return 0;
 }

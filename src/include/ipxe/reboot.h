@@ -51,7 +51,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Reboot system
  *
+ * @v warm		Perform a warm reboot
  */
-void reboot ( void );
+void reboot ( int warm );
 
 #endif /* _IPXE_REBOOT_H */

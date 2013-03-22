@@ -27,12 +27,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/reboot.h>
 #include <realmode.h>
+#include <bios.h>
 
 /**
  * Reboot system
  *
+ * @v warm		Perform a warm reboot
  */
-static void bios_reboot ( void ) {
+static void bios_reboot ( int warm ) {
+	uint16_t flag;
+
+	/* Configure BIOS for cold/warm reboot */
+	flag = ( warm ? BDA_REBOOT_WARM : 0 );
+	put_real ( flag, BDA_SEG, BDA_REBOOT );
 
 	/* Jump to system reset vector */
 	__asm__ __volatile__ ( REAL_CODE ( "ljmp $0xf000, $0xfff0" ) : : );

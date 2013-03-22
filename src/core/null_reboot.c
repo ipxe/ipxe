@@ -32,8 +32,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Reboot system
  *
+ * @v warm		Perform a warm reboot
  */
-static void null_reboot ( void ) {
+static void null_reboot ( int warm __unused ) {
 
 	printf ( "Cannot reboot; not implemented\n" );
 	while ( 1 ) {}

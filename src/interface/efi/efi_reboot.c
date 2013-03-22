@@ -32,12 +32,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Reboot system
  *
+ * @v warm		Perform a warm reboot
  */
-static void efi_reboot ( void ) {
+static void efi_reboot ( int warm ) {
 	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
 
 	/* Use runtime services to reset system */
-	rs->ResetSystem ( EfiResetCold, 0, 0, NULL );
+	rs->ResetSystem ( ( warm ? EfiResetWarm : EfiResetCold ), 0, 0, NULL );
 }
 
 PROVIDE_REBOOT ( efi, reboot, efi_reboot );
