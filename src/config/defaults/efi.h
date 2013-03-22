@@ -25,5 +25,6 @@
 #define	IMAGE_SCRIPT		/* iPXE script image support */
 
 #define	REBOOT_CMD		/* Reboot command */
+#define	CPUID_CMD		/* x86 CPU feature detection command */
 
 #endif /* CONFIG_DEFAULTS_EFI_H */
