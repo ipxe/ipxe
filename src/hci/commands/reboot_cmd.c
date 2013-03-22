@@ -17,9 +17,9 @@
  * 02110-1301, USA.
  */
 
-#include <realmode.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
+#include <ipxe/reboot.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
@@ -55,7 +55,7 @@ static int reboot_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Reboot system */
-	__asm__ __volatile__ ( REAL_CODE ( "ljmp $0xf000, $0xfff0" ) : : );
+	reboot();
 
 	return 0;
 }

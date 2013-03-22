@@ -19,8 +19,11 @@
 #define BOFM_EFI
 #define ENTROPY_NULL
 #define TIME_NULL
+#define REBOOT_EFI
 
 #define	IMAGE_EFI		/* EFI image support */
 #define	IMAGE_SCRIPT		/* iPXE script image support */
+
+#define	REBOOT_CMD		/* Reboot command */
 
 #endif /* CONFIG_DEFAULTS_EFI_H */

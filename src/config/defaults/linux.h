@@ -16,6 +16,7 @@
 #define SANBOOT_NULL
 #define ENTROPY_LINUX
 #define TIME_LINUX
+#define REBOOT_NULL
 
 #define DRIVERS_LINUX
 
