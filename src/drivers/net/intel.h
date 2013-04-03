@@ -175,18 +175,6 @@ enum intel_descriptor_status {
 #define INTEL_xDCTL 0x28
 #define INTEL_xDCTL_ENABLE	0x02000000UL	/**< Queue enable */
 
-/** Receive Descriptor Head */
-#define INTEL_RDH ( INTEL_RD + INTEL_xDH )
-
-/** Receive Descriptor Tail */
-#define INTEL_RDT ( INTEL_RD + INTEL_xDT )
-
-/** Transmit Descriptor Head */
-#define INTEL_TDH ( INTEL_TD + INTEL_xDH )
-
-/** Transmit Descriptor Tail */
-#define INTEL_TDT ( INTEL_TD + INTEL_xDT )
-
 /** Receive Address Low */
 #define INTEL_RAL0 0x05400UL
 

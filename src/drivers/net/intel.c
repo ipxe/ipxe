@@ -248,10 +248,10 @@ static int intel_fetch_mac ( struct intel_nic *intel, uint8_t *hw_addr ) {
 static void __attribute__ (( unused )) intel_diag ( struct intel_nic *intel ) {
 
 	DBGC ( intel, "INTEL %p TDH=%04x TDT=%04x RDH=%04x RDT=%04x\n", intel,
-	       readl ( intel->regs + INTEL_TDH ),
-	       readl ( intel->regs + INTEL_TDT ),
-	       readl ( intel->regs + INTEL_RDH ),
-	       readl ( intel->regs + INTEL_RDT ) );
+	       readl ( intel->regs + intel->tx.reg + INTEL_xDH ),
+	       readl ( intel->regs + intel->tx.reg + INTEL_xDT ),
+	       readl ( intel->regs + intel->rx.reg + INTEL_xDH ),
+	       readl ( intel->regs + intel->rx.reg + INTEL_xDT ) );
 }
 
 /******************************************************************************
@@ -468,7 +468,7 @@ static void intel_refill_rx ( struct intel_nic *intel ) {
 		intel->rx_iobuf[rx_idx] = iobuf;
 
 		/* Push descriptor to card */
-		writel ( rx_tail, intel->regs + INTEL_RDT );
+		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
 
 		DBGC2 ( intel, "INTEL %p RX %d is [%llx,%llx)\n", intel, rx_idx,
 			( ( unsigned long long ) address ),
@@ -599,7 +599,7 @@ static int intel_transmit ( struct net_device *netdev,
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */
-	writel ( tx_tail, intel->regs + INTEL_TDT );
+	writel ( tx_tail, intel->regs + intel->tx.reg + INTEL_xDT );
 
 	DBGC2 ( intel, "INTEL %p TX %d is [%llx,%llx)\n", intel, tx_idx,
 		( ( unsigned long long ) address ),
