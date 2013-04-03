@@ -360,8 +360,7 @@ static void intel_check_link ( struct net_device *netdev ) {
  * @v ring		Descriptor ring
  * @ret rc		Return status code
  */
-static int intel_create_ring ( struct intel_nic *intel,
-			       struct intel_ring *ring ) {
+int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	physaddr_t address;
 	uint32_t dctl;
 
@@ -412,8 +411,7 @@ static int intel_create_ring ( struct intel_nic *intel,
  * @v intel		Intel device
  * @v ring		Descriptor ring
  */
-static void intel_destroy_ring ( struct intel_nic *intel,
-				 struct intel_ring *ring ) {
+void intel_destroy_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 
 	/* Clear ring length */
 	writel ( 0, ( intel->regs + ring->reg + INTEL_xDLEN ) );
@@ -434,7 +432,7 @@ static void intel_destroy_ring ( struct intel_nic *intel,
  *
  * @v intel		Intel device
  */
-static void intel_refill_rx ( struct intel_nic *intel ) {
+void intel_refill_rx ( struct intel_nic *intel ) {
 	struct intel_descriptor *rx;
 	struct io_buffer *iobuf;
 	unsigned int rx_idx;
@@ -473,6 +471,21 @@ static void intel_refill_rx ( struct intel_nic *intel ) {
 		DBGC2 ( intel, "INTEL %p RX %d is [%llx,%llx)\n", intel, rx_idx,
 			( ( unsigned long long ) address ),
 			( ( unsigned long long ) address + INTEL_RX_MAX_LEN ) );
+	}
+}
+
+/**
+ * Discard unused receive I/O buffers
+ *
+ * @v intel		Intel device
+ */
+void intel_empty_rx ( struct intel_nic *intel ) {
+	unsigned int i;
+
+	for ( i = 0 ; i < INTEL_NUM_RX_DESC ; i++ ) {
+		if ( intel->rx_iobuf[i] )
+			free_iob ( intel->rx_iobuf[i] );
+		intel->rx_iobuf[i] = NULL;
 	}
 }
 
@@ -540,7 +553,6 @@ static int intel_open ( struct net_device *netdev ) {
  */
 static void intel_close ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
-	unsigned int i;
 
 	/* Disable receiver */
 	writel ( 0, intel->regs + INTEL_RCTL );
@@ -552,11 +564,7 @@ static void intel_close ( struct net_device *netdev ) {
 	intel_destroy_ring ( intel, &intel->rx );
 
 	/* Discard any unused receive buffers */
-	for ( i = 0 ; i < INTEL_NUM_RX_DESC ; i++ ) {
-		if ( intel->rx_iobuf[i] )
-			free_iob ( intel->rx_iobuf[i] );
-		intel->rx_iobuf[i] = NULL;
-	}
+	intel_empty_rx ( intel );
 
 	/* Destroy transmit descriptor ring */
 	intel_destroy_ring ( intel, &intel->tx );
@@ -572,8 +580,7 @@ static void intel_close ( struct net_device *netdev ) {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int intel_transmit ( struct net_device *netdev,
-			       struct io_buffer *iobuf ) {
+int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct intel_nic *intel = netdev->priv;
 	struct intel_descriptor *tx;
 	unsigned int tx_idx;
@@ -613,7 +620,7 @@ static int intel_transmit ( struct net_device *netdev,
  *
  * @v netdev		Network device
  */
-static void intel_poll_tx ( struct net_device *netdev ) {
+void intel_poll_tx ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
 	struct intel_descriptor *tx;
 	unsigned int tx_idx;
@@ -642,7 +649,7 @@ static void intel_poll_tx ( struct net_device *netdev ) {
  *
  * @v netdev		Network device
  */
-static void intel_poll_rx ( struct net_device *netdev ) {
+void intel_poll_rx ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
 	struct intel_descriptor *rx;
 	struct io_buffer *iobuf;

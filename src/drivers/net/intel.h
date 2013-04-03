@@ -242,4 +242,15 @@ struct intel_nic {
 	struct io_buffer *rx_iobuf[INTEL_NUM_RX_DESC];
 };
 
+extern int intel_create_ring ( struct intel_nic *intel,
+			       struct intel_ring *ring );
+extern void intel_destroy_ring ( struct intel_nic *intel,
+				 struct intel_ring *ring );
+extern void intel_refill_rx ( struct intel_nic *intel );
+extern void intel_empty_rx ( struct intel_nic *intel );
+extern int intel_transmit ( struct net_device *netdev,
+			    struct io_buffer *iobuf );
+extern void intel_poll_tx ( struct net_device *netdev );
+extern void intel_poll_rx ( struct net_device *netdev );
+
 #endif /* _INTEL_H */
