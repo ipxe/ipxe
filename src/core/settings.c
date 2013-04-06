@@ -1985,6 +1985,19 @@ struct setting priority_setting __setting ( SETTING_MISC ) = {
  ******************************************************************************
  */
 
+/** A built-in setting operation */
+struct builtin_setting_operation {
+	/** Setting */
+	struct setting *setting;
+	/** Fetch setting value
+	 *
+	 * @v data		Buffer to fill with setting data
+	 * @v len		Length of buffer
+	 * @ret len		Length of setting data, or negative error
+	 */
+	int ( * fetch ) ( void *data, size_t len );
+};
+
 /** Built-in setting tag magic */
 #define BUILTIN_SETTING_TAG_MAGIC 0xb1
 
@@ -2010,15 +2023,11 @@ struct setting errno_setting __setting ( SETTING_MISC ) = {
 /**
  * Fetch error number setting
  *
- * @v settings		Settings block
- * @v setting		Setting to fetch
- * @v data		Setting data, or NULL to clear setting
- * @v len		Length of setting data
- * @ret rc		Return status code
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
  */
-static int errno_fetch ( struct settings *settings __unused,
-			 struct setting *setting __unused,
-			 void *data, size_t len ) {
+static int errno_fetch ( void *data, size_t len ) {
 	uint32_t content;
 
 	/* Return current error */
@@ -2029,24 +2038,85 @@ static int errno_fetch ( struct settings *settings __unused,
 	return sizeof ( content );
 }
 
+/** "buildarch" setting tag */
+#define BUILTIN_SETTING_TAG_BUILDARCH BUILTIN_SETTING_TAG ( 0x02 )
+
+/** Build architecture setting */
+struct setting buildarch_setting __setting ( SETTING_MISC ) = {
+	.name = "buildarch",
+	.description = "Build architecture",
+	.tag = BUILTIN_SETTING_TAG_BUILDARCH,
+	.type = &setting_type_string,
+};
+
+/**
+ * Fetch build architecture setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int buildarch_fetch ( void *data, size_t len ) {
+	static const char buildarch[] = _S2 ( ARCH );
+
+	strncpy ( data, buildarch, len );
+	return ( sizeof ( buildarch ) - 1 /* NUL */ );
+}
+
+/** "platform" setting tag */
+#define BUILTIN_SETTING_TAG_PLATFORM BUILTIN_SETTING_TAG ( 0x03 )
+
+/** Platform setting */
+struct setting platform_setting __setting ( SETTING_MISC ) = {
+	.name = "platform",
+	.description = "Platform",
+	.tag = BUILTIN_SETTING_TAG_PLATFORM,
+	.type = &setting_type_string,
+};
+
+/**
+ * Fetch platform setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int platform_fetch ( void *data, size_t len ) {
+	static const char platform[] = _S2 ( PLATFORM );
+
+	strncpy ( data, platform, len );
+	return ( sizeof ( platform ) - 1 /* NUL */ );
+}
+
+/** List of built-in setting operations */
+static struct builtin_setting_operation builtin_setting_operations[] = {
+	{ &errno_setting, errno_fetch },
+	{ &buildarch_setting, buildarch_fetch },
+	{ &platform_setting, platform_fetch },
+};
+
 /**
  * Fetch built-in setting
  *
  * @v settings		Settings block
  * @v setting		Setting to fetch
- * @v data		Setting data, or NULL to clear setting
- * @v len		Length of setting data
- * @ret rc		Return status code
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
  */
 static int builtin_fetch ( struct settings *settings __unused,
 			   struct setting *setting,
 			   void *data, size_t len ) {
+	struct builtin_setting_operation *builtin;
+	unsigned int i;
 
-	if ( setting_cmp ( setting, &errno_setting ) == 0 ) {
-		return errno_fetch ( settings, setting, data, len );
-	} else {
-		return -ENOENT;
+	for ( i = 0 ; i < ( sizeof ( builtin_setting_operations ) /
+			    sizeof ( builtin_setting_operations[0] ) ) ; i++ ) {
+		builtin = &builtin_setting_operations[i];
+		if ( setting_cmp ( setting, builtin->setting ) == 0 )
+			return builtin->fetch ( data, len );
 	}
+	return -ENOENT;
 }
 
 /**
