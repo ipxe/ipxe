@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
+#include <errno.h>
 #include <ipxe/efi/efi.h>
 
 /**
@@ -38,5 +39,5 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 		return efirc;
 
 	/* Call to main() */
-	return RC_TO_EFIRC ( main () );
+	return EFIRC ( main () );
 }

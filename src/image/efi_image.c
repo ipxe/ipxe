@@ -176,9 +176,9 @@ static int efi_image_exec ( struct image *image ) {
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
+		rc = -EEFI ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
-		       image, efi_strerror ( efirc ) );
-		rc = -ENOEXEC;
+		       image, strerror ( rc ) );
 		goto err_load_image;
 	}
 
@@ -188,7 +188,7 @@ static int efi_image_exec ( struct image *image ) {
 				   NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL );
 	if ( efirc ) {
 		/* Should never happen */
-		rc = EFIRC_TO_RC ( efirc );
+		rc = -EEFI ( efirc );
 		goto err_open_protocol;
 	}
 
@@ -205,9 +205,9 @@ static int efi_image_exec ( struct image *image ) {
 
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( image, "EFIIMAGE %p returned with status %s\n",
-		       image, efi_strerror ( efirc ) );
-		rc = EFIRC_TO_RC ( efirc );
+		       image, strerror ( rc ) );
 		goto err_start_image;
 	}
 
@@ -220,8 +220,9 @@ static int efi_image_exec ( struct image *image ) {
 	 * have no "unload" operation.
 	 */
 	if ( ( efirc = bs->UnloadImage ( handle ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not unload: %s\n",
-		       image, efi_strerror ( efirc ) );
+		       image, strerror ( rc ) );
 	}
  err_load_image:
 	free ( cmdline );
@@ -246,15 +247,17 @@ static int efi_image_probe ( struct image *image ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE handle;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Attempt loading image */
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, NULL,
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
+		rc = -EEFI ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
-		       image, efi_strerror ( efirc ) );
-		return -ENOEXEC;
+		       image, strerror ( rc ) );
+		return rc;
 	}
 
 	/* Unload the image.  We can't leave it loaded, because we

@@ -19,6 +19,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <string.h>
+#include <errno.h>
 #include <assert.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/efi/efi.h>
@@ -49,6 +51,7 @@ static userptr_t efi_urealloc ( userptr_t old_ptr, size_t new_size ) {
 	userptr_t new_ptr = UNOWHERE;
 	size_t old_size;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Allocate new memory if necessary.  If allocation fails,
 	 * return without touching the old block.
@@ -59,8 +62,9 @@ static userptr_t efi_urealloc ( userptr_t old_ptr, size_t new_size ) {
 						   EfiBootServicesData,
 						   new_pages,
 						   &phys_addr ) ) != 0 ) {
+			rc = -EEFI ( efirc );
 			DBG ( "EFI could not allocate %d pages: %s\n",
-			      new_pages, efi_strerror ( efirc ) );
+			      new_pages, strerror ( rc ) );
 			return UNULL;
 		}
 		assert ( phys_addr != 0 );
@@ -84,8 +88,9 @@ static userptr_t efi_urealloc ( userptr_t old_ptr, size_t new_size ) {
 		old_pages = ( EFI_SIZE_TO_PAGES ( old_size ) + 1 );
 		phys_addr = user_to_phys ( old_ptr, -EFI_PAGE_SIZE );
 		if ( ( efirc = bs->FreePages ( phys_addr, old_pages ) ) != 0 ){
+			rc = -EEFI ( efirc );
 			DBG ( "EFI could not free %d pages at %llx: %s\n",
-			      old_pages, phys_addr, efi_strerror ( efirc ) );
+			      old_pages, phys_addr, strerror ( rc ) );
 			/* Not fatal; we have leaked memory but successfully
 			 * allocated (if asked to do so).
 			 */

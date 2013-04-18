@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include <ipxe/uuid.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
@@ -67,12 +68,14 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 	UINTN count;
 	unsigned int i;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Retrieve list of protocols */
 	if ( ( efirc = bs->ProtocolsPerHandle ( handle, &protocols,
 						&count ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		printf ( "EFI could not retrieve protocols for %p: %s\n",
-			 handle, efi_strerror ( efirc ) );
+			 handle, strerror ( rc ) );
 		return;
 	}
 

@@ -108,29 +108,27 @@ struct efi_config_table {
 		.required = (_required),				     \
 	}
 
-/** Convert a iPXE status code to an EFI status code
+/**
+ * Convert an iPXE status code to an EFI status code
  *
- * FIXME: actually perform some kind of conversion.  iPXE error codes
- * will be detected as EFI error codes; both have the top bit set, and
- * the success return code is zero for both.  Anything that just
- * reports a numerical error will be OK, anything attempting to
- * interpret the value or to display a text equivalent will be
- * screwed.
+ * @v rc		iPXE status code
+ * @ret efirc		EFI status code
  */
-#define RC_TO_EFIRC( rc ) (rc)
+#define EFIRC( rc ) ERRNO_TO_PLATFORM ( -(rc) )
 
-/** Convert an EFI status code to a iPXE status code
+/**
+ * Convert an EFI status code to an iPXE status code
  *
- * FIXME: as above
+ * @v efirc		EFI status code
+ * @ret rc		iPXE status code (before negation)
  */
-#define EFIRC_TO_RC( efirc ) (efirc)
+#define EEFI( efirc ) EPLATFORM ( EINFO_EPLATFORM, efirc )
 
 extern EFI_HANDLE efi_image_handle;
 extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 extern EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
 extern EFI_SYSTEM_TABLE *efi_systab;
 
-extern const char * efi_strerror ( EFI_STATUS efirc );
 extern const char * efi_guid_ntoa ( EFI_GUID *guid );
 
 extern void dbg_efi_protocols ( EFI_HANDLE handle );

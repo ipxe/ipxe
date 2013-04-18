@@ -266,6 +266,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_nslookup	      ( ERRFILE_OTHER | 0x00300000 )
 #define ERRFILE_efi_snp_hii	      ( ERRFILE_OTHER | 0x00310000 )
 #define ERRFILE_readline	      ( ERRFILE_OTHER | 0x00320000 )
+#define ERRFILE_efi_bofm	      ( ERRFILE_OTHER | 0x00330000 )
+#define ERRFILE_efi_console	      ( ERRFILE_OTHER | 0x00340000 )
+#define ERRFILE_efi_debug	      ( ERRFILE_OTHER | 0x00350000 )
+#define ERRFILE_efi_download	      ( ERRFILE_OTHER | 0x00360000 )
+#define ERRFILE_efi_driver	      ( ERRFILE_OTHER | 0x00370000 )
+#define ERRFILE_efi_file	      ( ERRFILE_OTHER | 0x00380000 )
+#define ERRFILE_efi_init	      ( ERRFILE_OTHER | 0x00390000 )
+#define ERRFILE_efi_timer	      ( ERRFILE_OTHER | 0x003a0000 )
+#define ERRFILE_efi_umalloc	      ( ERRFILE_OTHER | 0x003b0000 )
 
 /** @} */
 

@@ -38,11 +38,11 @@ struct efi_pci_device {
 
 extern struct efi_pci_device * efipci_create ( struct efi_driver *efidrv,
 					       EFI_HANDLE device );
-extern EFI_STATUS efipci_enable ( struct efi_pci_device *efipci );
+extern int efipci_enable ( struct efi_pci_device *efipci );
 extern struct efi_pci_device * efipci_find_efi ( EFI_HANDLE device );
 extern struct efi_pci_device * efipci_find ( struct device *dev );
-extern EFI_STATUS efipci_child_add ( struct efi_pci_device *efipci,
-				     EFI_HANDLE device );
+extern int efipci_child_add ( struct efi_pci_device *efipci,
+			      EFI_HANDLE device );
 extern void efipci_child_del ( struct efi_pci_device *efipci,
 			       EFI_HANDLE device );
 extern void efipci_destroy ( struct efi_driver *efidrv,

@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
+#include <errno.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
@@ -94,6 +95,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	void *loaded_image;
 	void *loaded_image_path;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Store image handle and system table pointer for future use */
 	efi_image_handle = image_handle;
@@ -149,8 +151,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 				&efi_loaded_image_protocol_guid,
 				&loaded_image, image_handle, NULL,
 				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( systab, "EFI could not get loaded image protocol: %s",
-		       efi_strerror ( efirc ) );
+		       strerror ( rc ) );
 		return efirc;
 	}
 	efi_loaded_image = loaded_image;
@@ -162,8 +165,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 				&efi_loaded_image_device_path_protocol_guid,
 				&loaded_image_path, image_handle, NULL,
 				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( systab, "EFI could not get loaded image device path "
-		       "protocol: %s", efi_strerror ( efirc ) );
+		       "protocol: %s", strerror ( rc ) );
 		return efirc;
 	}
 	efi_loaded_image_path = loaded_image_path;
@@ -179,8 +183,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	if ( ( efirc = bs->CreateEvent ( EVT_SIGNAL_EXIT_BOOT_SERVICES,
 					 TPL_CALLBACK, efi_shutdown_hook,
 					 NULL, &efi_shutdown_event ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( systab, "EFI could not create ExitBootServices event: "
-		       "%s\n", efi_strerror ( efirc ) );
+		       "%s\n", strerror ( rc ) );
 		return efirc;
 	}
 

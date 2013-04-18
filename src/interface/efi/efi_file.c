@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include <wchar.h>
 #include <ipxe/image.h>
 #include <ipxe/efi/efi.h>
@@ -549,6 +550,7 @@ static EFI_BLOCK_IO_PROTOCOL efi_block_io_protocol = {
 int efi_file_install ( EFI_HANDLE *handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Install the simple file system protocol and the block I/O
 	 * protocol.  We don't have a block device, but large parts of
@@ -563,9 +565,10 @@ int efi_file_install ( EFI_HANDLE *handle ) {
 			&efi_block_io_protocol,
 			&efi_simple_file_system_protocol_guid,
 			&efi_simple_file_system_protocol, NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( handle, "Could not install simple file system protocol: "
-		       "%s\n", efi_strerror ( efirc ) );
-		return EFIRC_TO_RC ( efirc );
+		       "%s\n", strerror ( rc ) );
+		return rc;
 	}
 
 	return 0;

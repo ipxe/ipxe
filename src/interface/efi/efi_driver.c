@@ -21,6 +21,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
+#include <errno.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
@@ -122,11 +124,12 @@ efi_driver_get_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
  * @v efidrv		EFI driver
  * @ret efirc		EFI status code
  */
-EFI_STATUS efi_driver_install ( struct efi_driver *efidrv ) {
+int efi_driver_install ( struct efi_driver *efidrv ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_DRIVER_BINDING_PROTOCOL *driver = &efidrv->driver;
 	EFI_COMPONENT_NAME2_PROTOCOL *wtf = &efidrv->wtf;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Configure driver binding protocol */
 	driver->ImageHandle = efi_image_handle;
@@ -148,9 +151,10 @@ EFI_STATUS efi_driver_install ( struct efi_driver *efidrv ) {
 			&efi_driver_binding_protocol_guid, driver,
 			&efi_component_name2_protocol_guid, wtf,
 			NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( efidrv, "EFIDRV %s could not install protocol: %s\n",
-		       efidrv->name, efi_strerror ( efirc ) );
-		return efirc;
+		       efidrv->name, strerror ( rc ) );
+		return rc;
 	}
 
 	DBGC ( efidrv, "EFIDRV %s installed\n", efidrv->name );
