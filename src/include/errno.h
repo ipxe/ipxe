@@ -187,8 +187,8 @@ extern char missing_errfile_declaration[] __attribute__ (( deprecated ));
 /**
  * Disambiguate a base error based on non-constant information
  *
- * @v error_base	Base error
- * @v uniq		Error disambiguator
+ * @v einfo_base	Base error information
+ * @v uniq		Error disambiguator (0x00-0x1f)
  * @v ...		List of expected possible disambiguated errors
  * @ret error		Error
  *
@@ -200,9 +200,10 @@ extern char missing_errfile_declaration[] __attribute__ (( deprecated ));
  * EUNIQ() should not be used for constant error disambiguators; use
  * __einfo_uniqify() instead.
  */
-#define EUNIQ( errno, uniq, ... ) ( {					\
-	euniq_discard ( 0, ##__VA_ARGS__);				\
-	( ( int ) ( (errno) | ( (uniq) << 8 ) ) ); } )
+#define EUNIQ( einfo_base, uniq, ... ) ( {				\
+	euniq_discard ( 0, ##__VA_ARGS__ );				\
+	( ( int ) ( __einfo_error ( einfo_base ) |			\
+		    ( (uniq) << 8 ) ) ); } )
 static inline void euniq_discard ( int dummy __unused, ... ) {}
 
 /**
