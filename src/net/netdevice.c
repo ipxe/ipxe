@@ -442,7 +442,9 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
  */
 int register_netdev ( struct net_device *netdev ) {
 	static unsigned int ifindex = 0;
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct net_driver *driver;
+	uint32_t seed;
 	int rc;
 
 	/* Create device name */
@@ -453,9 +455,16 @@ int register_netdev ( struct net_device *netdev ) {
 
 	/* Set initial link-layer address, if not already set */
 	if ( ! netdev_has_ll_addr ( netdev ) ) {
-		netdev->ll_protocol->init_addr ( netdev->hw_addr,
-						 netdev->ll_addr );
+		ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
 	}
+
+	/* Use least significant bits of the link-layer address to
+	 * improve the randomness of the (non-cryptographic) random
+	 * number generator.
+	 */
+	memcpy ( &seed, ( netdev->ll_addr + ll_protocol->ll_addr_len
+			  - sizeof ( seed ) ), sizeof ( seed ) );
+	srand ( rand() ^ seed );
 
 	/* Add to device list */
 	netdev_get ( netdev );
