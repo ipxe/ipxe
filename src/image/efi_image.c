@@ -35,6 +35,22 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 
+/* Disambiguate the various error causes */
+#define EINFO_EEFI_LOAD							\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x01,			\
+			  "Could not load image" )
+#define EINFO_EEFI_LOAD_PROHIBITED					\
+	__einfo_platformify ( EINFO_EEFI_LOAD, EFI_SECURITY_VIOLATION,	\
+			      "Image prohibited by security policy" )
+#define EEFI_LOAD_PROHIBITED						\
+	__einfo_error ( EINFO_EEFI_LOAD_PROHIBITED )
+#define EEFI_LOAD( efirc ) EPLATFORM ( EINFO_EEFI_LOAD, efirc,		\
+				       EEFI_LOAD_PROHIBITED )
+#define EINFO_EEFI_START						\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x02,			\
+			  "Could not start image" )
+#define EEFI_START( efirc ) EPLATFORM ( EINFO_EEFI_START, efirc )
+
 /** EFI loaded image protocol GUID */
 static EFI_GUID efi_loaded_image_protocol_guid =
 	EFI_LOADED_IMAGE_PROTOCOL_GUID;
@@ -176,7 +192,7 @@ static int efi_image_exec ( struct image *image ) {
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
-		rc = -EEFI ( efirc );
+		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
 		       image, strerror ( rc ) );
 		goto err_load_image;
@@ -205,7 +221,7 @@ static int efi_image_exec ( struct image *image ) {
 
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+		rc = -EEFI_START ( efirc );
 		DBGC ( image, "EFIIMAGE %p returned with status %s\n",
 		       image, strerror ( rc ) );
 		goto err_start_image;
@@ -254,7 +270,7 @@ static int efi_image_probe ( struct image *image ) {
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
-		rc = -EEFI ( efirc );
+		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
 		       image, strerror ( rc ) );
 		return rc;
