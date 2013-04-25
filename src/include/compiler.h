@@ -64,6 +64,7 @@
 	.comm	_sym, 0
 #else /* ASSEMBLY */
 #define PROVIDE_SYMBOL( _sym )				\
+	extern char _sym[];				\
 	char _sym[0]
 #endif /* ASSEMBLY */
 
