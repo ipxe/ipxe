@@ -174,7 +174,7 @@ process_running ( struct process *process ) {
  *
  */
 #define PERMANENT_PROCESS( name, step )					      \
-struct process_descriptor name ## _desc = PROC_DESC_PURE ( step );	      \
+static struct process_descriptor name ## _desc = PROC_DESC_PURE ( step );     \
 struct process name __permanent_process = {				      \
 	.list = LIST_HEAD_INIT ( name.list ),				      \
 	.desc = & name ## _desc,					      \
