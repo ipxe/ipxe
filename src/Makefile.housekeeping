@@ -475,7 +475,7 @@ LDFLAGS		+= --gc-sections
 
 # compiler.h is needed for our linking and debugging system
 #
-CFLAGS		+= -include compiler.h
+CFLAGS		+= -include include/compiler.h
 
 # CFLAGS for specific object types
 #
