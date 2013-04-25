@@ -202,6 +202,15 @@ endif
 
 ###############################################################################
 #
+# Checker
+#
+ifeq ($(C),1)
+export REAL_CC := $(CC)
+CC := cgcc
+endif
+
+###############################################################################
+#
 # Set BIN according to whatever was specified on the command line as
 # the build target.
 #
