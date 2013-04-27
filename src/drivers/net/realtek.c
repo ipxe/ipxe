@@ -1060,7 +1060,8 @@ static int realtek_probe ( struct pci_device *pci ) {
 	 * hopefully have been programmed by the platform firmware.
 	 */
 	if ( ! is_valid_ether_addr ( netdev->hw_addr ) ) {
-		DBGC ( rtl, "REALTEK %p seems to have no EEPROM\n", rtl );
+		DBGC ( rtl, "REALTEK %p seems to have no EEPROM (MAC %s)\n",
+		       rtl, eth_ntoa ( netdev->hw_addr ) );
 		for ( i = 0 ; i < ETH_ALEN ; i++ )
 			netdev->hw_addr[i] = readb ( rtl->regs + RTL_IDR0 + i );
 	}
