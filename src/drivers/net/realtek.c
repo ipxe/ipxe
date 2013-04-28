@@ -144,9 +144,12 @@ static struct bit_basher_operations realtek_basher_ops = {
  * Initialise EEPROM
  *
  * @v netdev		Network device
+ * @ret rc		Return status code
  */
-static void realtek_init_eeprom ( struct net_device *netdev ) {
+static int realtek_init_eeprom ( struct net_device *netdev ) {
 	struct realtek_nic *rtl = netdev->priv;
+	uint16_t id;
+	int rc;
 
 	/* Initialise SPI bit-bashing interface */
 	rtl->spibit.basher.op = &realtek_basher_ops;
@@ -163,6 +166,22 @@ static void realtek_init_eeprom ( struct net_device *netdev ) {
 	}
 	rtl->eeprom.bus = &rtl->spibit.bus;
 
+	/* Check for EEPROM presence.  Some onboard NICs will have no
+	 * EEPROM connected, with the BIOS being responsible for
+	 * programming the initial register values.
+	 */
+	if ( ( rc = nvs_read ( &rtl->eeprom.nvs, RTL_EEPROM_ID,
+			       &id, sizeof ( id ) ) ) != 0 ) {
+		DBGC ( rtl, "REALTEK %p could not read EEPROM ID: %s\n",
+		       rtl, strerror ( rc ) );
+		return rc;
+	}
+	if ( id != cpu_to_le16 ( RTL_EEPROM_ID_MAGIC ) ) {
+		DBGC ( rtl, "REALTEK %p EEPROM ID incorrect (%#04x); assuming "
+		       "no EEPROM\n", rtl, le16_to_cpu ( id ) );
+		return -ENODEV;
+	}
+
 	/* Initialise space for non-volatile options, if available
 	 *
 	 * We use offset 0x40 (i.e. address 0x20), length 0x40.  This
@@ -176,6 +195,8 @@ static void realtek_init_eeprom ( struct net_device *netdev ) {
 		nvo_init ( &rtl->nvo, &rtl->eeprom.nvs, RTL_EEPROM_VPD,
 			   RTL_EEPROM_VPD_LEN, NULL, &netdev->refcnt );
 	}
+
+	return 0;
 }
 
 /******************************************************************************
@@ -1045,23 +1066,22 @@ static int realtek_probe ( struct pci_device *pci ) {
 	realtek_detect ( rtl );
 
 	/* Initialise EEPROM */
-	realtek_init_eeprom ( netdev );
+	if ( ( rc = realtek_init_eeprom ( netdev ) ) == 0 ) {
 
-	/* Read MAC address from EEPROM */
-	if ( ( rc = nvs_read ( &rtl->eeprom.nvs, RTL_EEPROM_MAC,
-			       netdev->hw_addr, ETH_ALEN ) ) != 0 ) {
-		DBGC ( rtl, "REALTEK %p could not read MAC address: %s\n",
-		       rtl, strerror ( rc ) );
-		goto err_nvs_read;
-	}
+		/* Read MAC address from EEPROM */
+		if ( ( rc = nvs_read ( &rtl->eeprom.nvs, RTL_EEPROM_MAC,
+				       netdev->hw_addr, ETH_ALEN ) ) != 0 ) {
+			DBGC ( rtl, "REALTEK %p could not read MAC address: "
+			       "%s\n", rtl, strerror ( rc ) );
+			goto err_nvs_read;
+		}
 
-	/* The EEPROM may not be present for onboard NICs.  Fall back
-	 * to reading the current ID register value, which will
-	 * hopefully have been programmed by the platform firmware.
-	 */
-	if ( ! is_valid_ether_addr ( netdev->hw_addr ) ) {
-		DBGC ( rtl, "REALTEK %p seems to have no EEPROM (MAC %s)\n",
-		       rtl, eth_ntoa ( netdev->hw_addr ) );
+	} else {
+
+		/* EEPROM not present.  Fall back to reading the
+		 * current ID register value, which will hopefully
+		 * have been programmed by the platform firmware.
+		 */
 		for ( i = 0 ; i < ETH_ALEN ; i++ )
 			netdev->hw_addr[i] = readb ( rtl->regs + RTL_IDR0 + i );
 	}

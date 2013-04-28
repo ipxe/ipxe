@@ -166,6 +166,12 @@ enum realtek_legacy_status {
 #define RTL_9346CR_EEDI		0x02	/**< Data in */
 #define RTL_9346CR_EEDO		0x01	/**< Data out */
 
+/** Word offset of ID code word within EEPROM */
+#define RTL_EEPROM_ID ( 0x00 / 2 )
+
+/** EEPROM code word magic value */
+#define RTL_EEPROM_ID_MAGIC 0x8129
+
 /** Word offset of MAC address within EEPROM */
 #define RTL_EEPROM_MAC ( 0x0e / 2 )
 
