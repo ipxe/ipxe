@@ -1230,7 +1230,7 @@ static int velocity_open(struct nic *nic, struct pci_device *pci __unused)
 	u32 TxPhyAddr, RxPhyAddr;
 	u32 TxBufPhyAddr, RxBufPhyAddr;
 	vptr->TxDescArrays = tx_ring;
-	if (vptr->TxDescArrays == 0)
+	if (vptr->TxDescArrays == NULL)
 		printf("Allot Error");
 
 	/* Tx Descriptor needs 64 bytes alignment; */

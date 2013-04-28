@@ -399,7 +399,7 @@ vxsetlink(void)
 
     i = vx_connector;       /* default in EEPROM */
     reason = "default";
-    warning = 0;
+    warning = NULL;
 
     if ((vx_connectors & conn_tab[vx_connector].bit) == 0) {
         warning = "strange connector type in EEPROM.";
@@ -407,7 +407,7 @@ vxsetlink(void)
         i = CONNECTOR_UTP;
     }
 
-        if (warning != 0) {
+        if (warning) {
             printf("warning: %s\n", warning);
         }
         printf("selected %s. (%s)\n", conn_tab[i].name, reason);

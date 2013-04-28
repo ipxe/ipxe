@@ -389,7 +389,7 @@ static void t515_reset(struct nic *nic)
 		outb(PKT_BUF_SZ >> 8, nic->ioaddr + TxFreeThreshold);	/* Room for a packet. */
 		/* Clear the Tx ring. */
 		for (i = 0; i < TX_RING_SIZE; i++)
-			vp->tx_skbuff[i] = 0;
+			vp->tx_skbuff[i] = NULL;
 		outl(0, nic->ioaddr + DownListPtr);
 	}
 	/* Set receiver mode: presumably accept b-case and phys addr only. */

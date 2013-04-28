@@ -130,9 +130,7 @@ typedef struct hfa384x
 } hfa384x_t;
 
 /* The global instance of the hardware (i.e. where we store iobase and membase, in the absence of anywhere better to put them */
-static hfa384x_t hw_global = {
-  0, 0, 0, 0, 0, 0, 0, {0,0,0,0,0,0}
-};
+static hfa384x_t hw_global;
 
 /*
  * 802.11 headers in addition to those in hfa384x_tx_frame_t (LLC and SNAP)

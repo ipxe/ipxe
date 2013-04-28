@@ -111,7 +111,7 @@ static struct mii_chip_info {
 //  {"NS 83851 PHY",0x2000, 0x5C20, MIX },
     {"RTL 8201 10/100Mbps Phyceiver"   , 0x0000, 0x8200,rtl8201_read_mode},
     {"VIA 6103 10/100Mbps Phyceiver", 0x0101, 0x8f20,vt6103_read_mode},
-    {0,0,0,0}
+    {NULL,0,0,NULL}
 };
 
 static struct mii_phy {

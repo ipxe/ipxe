@@ -3798,7 +3798,8 @@ falcon_clear_interrupts ( struct efab_nic *efab )
 	}
 	else {
 		/* write to the INT_ACK register */
-		falcon_writel ( efab, 0, FCN_INT_ACK_KER_REG_A1 );
+		EFAB_ZERO_DWORD ( reg );
+		falcon_writel ( efab, &reg, FCN_INT_ACK_KER_REG_A1 );
 		mb();
 		falcon_readl ( efab, &reg,
 			       WORK_AROUND_BROKEN_PCI_READS_REG_KER_A1 );

@@ -205,7 +205,7 @@ static char * dns_qualify_name ( const char *string ) {
 	char *fqdn;
 
 	/* Leave unchanged if already fully-qualified or no local domain */
-	if ( ( ! localdomain ) || ( strchr ( string, '.' ) != 0 ) )
+	if ( ( ! localdomain ) || ( strchr ( string, '.' ) != NULL ) )
 		return strdup ( string );
 
 	/* Append local domain to name */

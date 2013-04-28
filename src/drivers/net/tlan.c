@@ -94,7 +94,7 @@ static void TLan_MiiWriteReg(struct nic *nic __unused, u16, u16, u16);
 
 static const char *media[] = {
 	"10BaseT-HD ", "10BaseT-FD ", "100baseTx-HD ",
-	"100baseTx-FD", "100baseT4", 0
+	"100baseTx-FD", "100baseT4", NULL
 };
 
 /* This much match tlan_pci_tbl[]!  */
@@ -164,7 +164,7 @@ static const struct pci_id_info tlan_pci_tbl[] = {
 	{"Compaq NetFlex-3/E", 0,	/* EISA card */
 	 {0, 0, 0, 0, 0, 0},
 	 TLAN_ADAPTER_ACTIVITY_LED, 0x83},
-	{0, 0,
+	{NULL, 0,
 	 {0, 0, 0, 0, 0, 0},
 	 0, 0},
 };

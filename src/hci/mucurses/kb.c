@@ -88,7 +88,7 @@ int wgetnstr ( WINDOW *win, char *str, int n ) {
 	int c;
 
 	if ( n == 0 ) {
-		str = '\0';
+		*str = '\0';
 		return OK;
 	}
 
