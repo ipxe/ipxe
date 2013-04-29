@@ -73,6 +73,7 @@ my $xrefs = {};
 while ( <> ) {
   chomp;
   ( my $errno, my $filename, my $line, my $description ) = split ( /\t/ );
+  $errno = substr ( $errno, 0, 6 ) unless $errno =~ /^7f/;
   $errors->{$errno} = $description;
   $xrefs->{$errno} ||= {};
   $xrefs->{$errno}->{$filename} ||= {};
