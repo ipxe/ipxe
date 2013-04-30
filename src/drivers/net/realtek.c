@@ -861,6 +861,9 @@ static void realtek_legacy_poll_rx ( struct net_device *netdev ) {
 		rtl->rx_offset = ( ( rtl->rx_offset + 3 ) & ~3 );
 		rtl->rx_offset = ( rtl->rx_offset % RTL_RXBUF_LEN );
 		writew ( ( rtl->rx_offset - 16 ), rtl->regs + RTL_CAPR );
+
+		/* Give chip time to react before rechecking RTL_CR */
+		readw ( rtl->regs + RTL_CAPR );
 	}
 }
 
