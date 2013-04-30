@@ -98,6 +98,7 @@ find_mem_bar:
 	cmpw	$PCI_BAR_5, %di
 	jle	1f
 	stc
+	movl	$0xbabababa, %esi	/* Report "No suitable BAR" */
 	jmp	99f
 1:	movw	$4, %bp
 
@@ -157,15 +158,17 @@ find_mem_bar:
 
 	/* Locate our ROM image */
 1:	addr32 es cmpw $0xaa55, (%eax)
-	stc
-	jne	99f
-	addr32 es cmpl $_build_id, build_id(%eax)
 	je	2f
+	stc
+	movl	%eax, %esi		/* Report failure address */
+	jmp	99f
+2:	addr32 es cmpl $_build_id, build_id(%eax)
+	je	3f
 	addr32 es movzbl 2(%eax), %ecx
 	shll	$9, %ecx
 	addl	%ecx, %eax
 	jmp	1b
-2:
+3:
 
 	/* Copy payload to buffer, or set buffer address to BAR address */
 	testl	%esi, %esi
