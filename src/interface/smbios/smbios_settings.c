@@ -81,18 +81,21 @@ static int smbios_fetch ( struct settings *settings __unused,
 			  struct setting *setting,
 			  void *data, size_t len ) {
 	struct smbios_structure structure;
+	unsigned int tag_instance;
 	unsigned int tag_type;
 	unsigned int tag_offset;
 	unsigned int tag_len;
 	int rc;
 
-	/* Split tag into type, offset and length */
+	/* Split tag into instance, type, offset and length */
+	tag_instance = ( ( setting->tag >> 24 ) & 0xff );
 	tag_type = ( ( setting->tag >> 16 ) & 0xff );
 	tag_offset = ( ( setting->tag >> 8 ) & 0xff );
 	tag_len = ( setting->tag & 0xff );
 
 	/* Find SMBIOS structure */
-	if ( ( rc = find_smbios_structure ( tag_type, &structure ) ) != 0 )
+	if ( ( rc = find_smbios_structure ( tag_type, tag_instance,
+					    &structure ) ) != 0 )
 		return rc;
 
 	{

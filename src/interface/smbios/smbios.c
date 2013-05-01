@@ -59,10 +59,11 @@ static size_t find_strings_terminator ( size_t offset ) {
  * Find specific structure type within SMBIOS
  *
  * @v type		Structure type to search for
+ * @v instance		Instance of this type of structure
  * @v structure		SMBIOS structure descriptor to fill in
  * @ret rc		Return status code
  */
-int find_smbios_structure ( unsigned int type,
+int find_smbios_structure ( unsigned int type, unsigned int instance,
 			    struct smbios_structure *structure ) {
 	unsigned int count = 0;
 	size_t offset = 0;
@@ -105,7 +106,8 @@ int find_smbios_structure ( unsigned int type,
 		      structure->header.len, structure->strings_len );
 
 		/* If this is the structure we want, return */
-		if ( structure->header.type == type ) {
+		if ( ( structure->header.type == type ) &&
+		     ( instance-- == 0 ) ) {
 			structure->offset = offset;
 			return 0;
 		}

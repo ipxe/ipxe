@@ -162,7 +162,7 @@ struct smbios {
 #define SMBIOS_VERSION( major, minor ) ( ( (major) << 8 ) | (minor) )
 
 extern int find_smbios ( struct smbios *smbios );
-extern int find_smbios_structure ( unsigned int type,
+extern int find_smbios_structure ( unsigned int type, unsigned int instance,
 				   struct smbios_structure *structure );
 extern int read_smbios_structure ( struct smbios_structure *structure,
 				   void *data, size_t len );
