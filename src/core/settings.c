@@ -984,7 +984,7 @@ void clear_settings ( struct settings *settings ) {
 int setting_cmp ( struct setting *a, struct setting *b ) {
 
 	/* If the settings have tags, compare them */
-	if ( a->tag && ( a->tag == b->tag ) )
+	if ( a->tag && ( a->tag == b->tag ) && ( a->scope == b->scope ) )
 		return 0;
 
 	/* Otherwise, if the settings have names, compare them */
@@ -1099,19 +1099,17 @@ struct setting * find_setting ( const char *name ) {
 /**
  * Parse setting name as tag number
  *
- * @v settings		Settings block
  * @v name		Name
  * @ret tag		Tag number, or 0 if not a valid number
  */
-static unsigned int parse_setting_tag ( struct settings *settings,
-					const char *name ) {
+static unsigned int parse_setting_tag ( const char *name ) {
 	char *tmp = ( ( char * ) name );
 	unsigned int tag = 0;
 
 	while ( 1 ) {
 		tag = ( ( tag << 8 ) | strtoul ( tmp, &tmp, 0 ) );
 		if ( *tmp == 0 )
-			return ( tag | settings->tag_magic );
+			return tag;
 		if ( *tmp != '.' )
 			return 0;
 		tmp++;
@@ -1193,7 +1191,8 @@ parse_setting_name ( const char *name,
 	}
 
 	/* Identify setting */
-	setting->tag = parse_setting_tag ( *settings, setting_name );
+	setting->tag = parse_setting_tag ( setting_name );
+	setting->scope = (*settings)->default_scope;
 	setting->name = setting_name;
 	for_each_table_entry ( named_setting, SETTINGS ) {
 		/* Matches a defined named setting; use that setting */
@@ -1998,26 +1997,15 @@ struct builtin_setting_operation {
 	int ( * fetch ) ( void *data, size_t len );
 };
 
-/** Built-in setting tag magic */
-#define BUILTIN_SETTING_TAG_MAGIC 0xb1
-
-/**
- * Construct built-in setting tag
- *
- * @v id		Unique identifier
- * @ret tag		Setting tag
- */
-#define BUILTIN_SETTING_TAG( id ) ( ( BUILTIN_SETTING_TAG_MAGIC << 24 ) | (id) )
-
-/** "errno" setting tag */
-#define BUILTIN_SETTING_TAG_ERRNO BUILTIN_SETTING_TAG ( 0x01 )
+/** Built-in setting scope */
+static struct settings_scope builtin_scope;
 
 /** Error number setting */
 struct setting errno_setting __setting ( SETTING_MISC ) = {
 	.name = "errno",
 	.description = "Last error",
-	.tag = BUILTIN_SETTING_TAG_ERRNO,
 	.type = &setting_type_uint32,
+	.scope = &builtin_scope,
 };
 
 /**
@@ -2038,15 +2026,12 @@ static int errno_fetch ( void *data, size_t len ) {
 	return sizeof ( content );
 }
 
-/** "buildarch" setting tag */
-#define BUILTIN_SETTING_TAG_BUILDARCH BUILTIN_SETTING_TAG ( 0x02 )
-
 /** Build architecture setting */
 struct setting buildarch_setting __setting ( SETTING_MISC ) = {
 	.name = "buildarch",
 	.description = "Build architecture",
-	.tag = BUILTIN_SETTING_TAG_BUILDARCH,
 	.type = &setting_type_string,
+	.scope = &builtin_scope,
 };
 
 /**
@@ -2063,15 +2048,12 @@ static int buildarch_fetch ( void *data, size_t len ) {
 	return ( sizeof ( buildarch ) - 1 /* NUL */ );
 }
 
-/** "platform" setting tag */
-#define BUILTIN_SETTING_TAG_PLATFORM BUILTIN_SETTING_TAG ( 0x03 )
-
 /** Platform setting */
 struct setting platform_setting __setting ( SETTING_MISC ) = {
 	.name = "platform",
 	.description = "Platform",
-	.tag = BUILTIN_SETTING_TAG_PLATFORM,
 	.type = &setting_type_string,
+	.scope = &builtin_scope,
 };
 
 /**
@@ -2128,11 +2110,8 @@ static int builtin_fetch ( struct settings *settings __unused,
  */
 static int builtin_applies ( struct settings *settings __unused,
 			     struct setting *setting ) {
-	unsigned int tag_magic;
 
-	/* Check tag magic */
-	tag_magic = ( setting->tag >> 24 );
-	return ( tag_magic == BUILTIN_SETTING_TAG_MAGIC );
+	return ( setting->scope == &builtin_scope );
 }
 
 /** Built-in settings operations */
@@ -2144,7 +2123,6 @@ static struct settings_operations builtin_settings_operations = {
 /** Built-in settings */
 static struct settings builtin_settings = {
 	.refcnt = NULL,
-	.tag_magic = BUILTIN_SETTING_TAG ( 0 ),
 	.siblings = LIST_HEAD_INIT ( builtin_settings.siblings ),
 	.children = LIST_HEAD_INIT ( builtin_settings.children ),
 	.op = &builtin_settings_operations,

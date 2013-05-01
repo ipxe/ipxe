@@ -230,7 +230,8 @@ static int dhcppkt_settings_applies ( struct settings *settings,
 	struct dhcp_packet *dhcppkt =
 		container_of ( settings, struct dhcp_packet, settings );
 
-	return dhcppkt_applies ( dhcppkt, setting->tag );
+	return ( ( setting->scope == NULL ) &&
+		 dhcppkt_applies ( dhcppkt, setting->tag ) );
 }
 
 /**
@@ -299,6 +300,6 @@ void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct dhcphdr *data,
 	dhcpopt_init ( &dhcppkt->options, &dhcppkt->dhcphdr->options,
 		       ( len - offsetof ( struct dhcphdr, options ) ),
 		       dhcpopt_no_realloc );
-	settings_init ( &dhcppkt->settings,
-			&dhcppkt_settings_operations, &dhcppkt->refcnt, 0 );
+	settings_init ( &dhcppkt->settings, &dhcppkt_settings_operations,
+			&dhcppkt->refcnt, NULL );
 }

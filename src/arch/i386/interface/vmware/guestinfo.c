@@ -224,7 +224,7 @@ static int guestinfo_net_probe ( struct net_device *netdev ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	settings_init ( settings, &guestinfo_settings_operations, NULL, 0 );
+	settings_init ( settings, &guestinfo_settings_operations, NULL, NULL );
 
 	/* Register settings */
 	if ( ( rc = register_settings ( settings, netdev_settings ( netdev ),

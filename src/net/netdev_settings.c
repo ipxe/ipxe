@@ -39,28 +39,12 @@ struct setting mac_setting __setting ( SETTING_NETDEV ) = {
 	.name = "mac",
 	.description = "MAC address",
 	.type = &setting_type_hex,
-	.tag = NETDEV_SETTING_TAG_MAC,
 };
 struct setting busid_setting __setting ( SETTING_NETDEV ) = {
 	.name = "busid",
 	.description = "Bus ID",
 	.type = &setting_type_hex,
-	.tag = NETDEV_SETTING_TAG_BUS_ID,
 };
-
-/**
- * Check applicability of network device setting
- *
- * @v settings		Settings block
- * @v setting		Setting
- * @ret applies		Setting applies within this settings block
- */
-static int netdev_applies ( struct settings *settings __unused,
-			    struct setting *setting ) {
-
-	return ( IS_NETDEV_SETTING_TAG ( setting->tag ) ||
-		 dhcpopt_applies ( setting->tag ) );
-}
 
 /**
  * Store value of network device setting
@@ -134,7 +118,6 @@ static void netdev_clear ( struct settings *settings ) {
 
 /** Network device configuration settings operations */
 struct settings_operations netdev_settings_operations = {
-	.applies = netdev_applies,
 	.store = netdev_store,
 	.fetch = netdev_fetch,
 	.clear = netdev_clear,

@@ -38,27 +38,14 @@ struct setting {
 	 * The setting tag is a numerical description of the setting
 	 * (such as a DHCP option number, or an SMBIOS structure and
 	 * field number).
-	 *
-	 * Users can construct tags for settings that are not
-	 * explicitly known to iPXE using the generic syntax for
-	 * numerical settings.  For example, the setting name "60"
-	 * will be interpreted as referring to DHCP option 60 (the
-	 * vendor class identifier).
-	 *
-	 * This creates a potential for namespace collisions, since
-	 * the interpretation of the numerical description will vary
-	 * according to the settings block.  When a user attempts to
-	 * fetch a generic numerical setting, we need to ensure that
-	 * only the intended settings block interprets the numerical
-	 * description.  (For example, we do not want to attempt to
-	 * retrieve the subnet mask from SMBIOS, or the system UUID
-	 * from DHCP.)
-	 *
-	 * This potential problem is resolved by allowing the setting
-	 * tag to include a "magic" value indicating the
-	 * interpretation to be placed upon the numerical description.
 	 */
 	unsigned int tag;
+	/** Setting scope (or NULL)
+	 *
+	 * For historic reasons, a NULL scope with a non-zero tag
+	 * indicates a DHCPv4 option setting.
+	 */
+	struct settings_scope *scope;
 };
 
 /** Configuration setting table */
@@ -134,12 +121,6 @@ struct settings {
 	struct refcnt *refcnt;
 	/** Name */
 	const char *name;
-	/** Tag magic
-	 *
-	 * This value will be ORed in to any numerical tags
-	 * constructed by parse_setting_name().
-	 */
-	unsigned int tag_magic;
 	/** Parent settings block */
 	struct settings *parent;
 	/** Sibling settings blocks */
@@ -148,7 +129,43 @@ struct settings {
 	struct list_head children;
 	/** Settings block operations */
 	struct settings_operations *op;
+	/** Default scope for numerical settings constructed for this block */
+	struct settings_scope *default_scope;
 };
+
+/**
+ * A setting scope
+ *
+ * Users can construct tags for settings that are not explicitly known
+ * to iPXE using the generic syntax for numerical settings.  For
+ * example, the setting name "60" will be interpreted as referring to
+ * DHCP option 60 (the vendor class identifier).
+ *
+ * This creates a potential for namespace collisions, since the
+ * interpretation of the numerical description will vary according to
+ * the settings block.  When a user attempts to fetch a generic
+ * numerical setting, we need to ensure that only the intended
+ * settings blocks interpret this numerical description.  (For
+ * example, we do not want to attempt to retrieve the subnet mask from
+ * SMBIOS, or the system UUID from DHCP.)
+ *
+ * This potential problem is resolved by including a user-invisible
+ * "scope" within the definition of each setting.  Settings blocks may
+ * use this to determine whether or not the setting is applicable.
+ * Any settings constructed from a numerical description
+ * (e.g. "smbios/1.4.0") will be assigned the default scope of the
+ * settings block specified in the description (e.g. "smbios"); this
+ * provides behaviour matching the user's expectations in most
+ * circumstances.
+ */
+struct settings_scope {
+	/** Dummy field
+	 *
+	 * This is included only to ensure that pointers to different
+	 * scopes always compare differently.
+	 */
+	uint8_t dummy;
+} __attribute__ (( packed ));
 
 /**
  * A setting type
@@ -329,17 +346,17 @@ extern struct setting busid_setting __setting ( SETTING_NETDEV );
  * @v settings		Settings block
  * @v op		Settings block operations
  * @v refcnt		Containing object reference counter, or NULL
- * @v tag_magic		Tag magic
+ * @v default_scope	Default scope
  */
 static inline void settings_init ( struct settings *settings,
 				   struct settings_operations *op,
 				   struct refcnt *refcnt,
-				   unsigned int tag_magic ) {
+				   struct settings_scope *default_scope ) {
 	INIT_LIST_HEAD ( &settings->siblings );
 	INIT_LIST_HEAD ( &settings->children );
 	settings->op = op;
 	settings->refcnt = refcnt;
-	settings->tag_magic = tag_magic;
+	settings->default_scope = default_scope;
 }
 
 /**
@@ -351,7 +368,7 @@ static inline void settings_init ( struct settings *settings,
 static inline void generic_settings_init ( struct generic_settings *generics,
 					   struct refcnt *refcnt ) {
 	settings_init ( &generics->settings, &generic_settings_operations,
-			refcnt, 0 );
+			refcnt, NULL );
 	INIT_LIST_HEAD ( &generics->list );
 }
 
