@@ -99,16 +99,22 @@ static int smbios_fetch ( struct settings *settings __unused,
 		uint8_t buf[structure.header.len];
 		const void *raw;
 		union uuid uuid;
+		unsigned int index;
 
 		/* Read SMBIOS structure */
 		if ( ( rc = read_smbios_structure ( &structure, buf,
 						    sizeof ( buf ) ) ) != 0 )
 			return rc;
 
-		/* A tag length of zero indicates a string */
-		if ( tag_len == 0 ) {
-			if ( ( rc = read_smbios_string ( &structure,
-							 buf[tag_offset],
+		/* A <length> of zero indicates that the byte at
+		 * <offset> contains a string index.  An <offset> of
+		 * zero indicates that the <length> contains a literal
+		 * string index.
+		 */
+		if ( ( tag_len == 0 ) || ( tag_offset == 0 ) ) {
+			index = ( ( tag_offset == 0 ) ?
+				  tag_len : buf[tag_offset] );
+			if ( ( rc = read_smbios_string ( &structure, index,
 							 data, len ) ) < 0 ) {
 				return rc;
 			}
