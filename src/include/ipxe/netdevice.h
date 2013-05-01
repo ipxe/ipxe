@@ -346,6 +346,8 @@ struct net_device {
 	size_t max_pkt_len;
 	/** TX packet queue */
 	struct list_head tx_queue;
+	/** Deferred TX packet queue */
+	struct list_head tx_deferred;
 	/** RX packet queue */
 	struct list_head rx_queue;
 	/** TX statistics */
@@ -605,6 +607,8 @@ netdev_rx_frozen ( struct net_device *netdev ) {
 extern void netdev_link_err ( struct net_device *netdev, int rc );
 extern void netdev_link_down ( struct net_device *netdev );
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
+extern void netdev_tx_defer ( struct net_device *netdev,
+			      struct io_buffer *iobuf );
 extern void netdev_tx_err ( struct net_device *netdev,
 			    struct io_buffer *iobuf, int rc );
 extern void netdev_tx_complete_err ( struct net_device *netdev,
