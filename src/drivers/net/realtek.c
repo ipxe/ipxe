@@ -74,6 +74,7 @@ static void realtek_spi_open_bit ( struct bit_basher *basher ) {
 
 	/* Enable EEPROM access */
 	writeb ( RTL_9346CR_EEM_EEPROM, rtl->regs + RTL_9346CR );
+	readb ( rtl->regs + RTL_9346CR ); /* Ensure write reaches chip */
 }
 
 /**
@@ -87,6 +88,7 @@ static void realtek_spi_close_bit ( struct bit_basher *basher ) {
 
 	/* Disable EEPROM access */
 	writeb ( RTL_9346CR_EEM_NORMAL, rtl->regs + RTL_9346CR );
+	readb ( rtl->regs + RTL_9346CR ); /* Ensure write reaches chip */
 }
 
 /**
@@ -129,6 +131,7 @@ static void realtek_spi_write_bit ( struct bit_basher *basher,
 	reg &= ~mask;
 	reg |= ( data & mask );
 	writeb ( reg, rtl->regs + RTL_9346CR );
+	readb ( rtl->regs + RTL_9346CR ); /* Ensure write reaches chip */
 	DBG_ENABLE ( DBGLVL_IO );
 }
 
