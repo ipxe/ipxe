@@ -724,8 +724,8 @@ static int realtek_transmit ( struct net_device *netdev,
 
 	/* Get next transmit descriptor */
 	if ( ( rtl->tx.prod - rtl->tx.cons ) >= RTL_NUM_TX_DESC ) {
-		DBGC ( rtl, "REALTEK %p out of transmit descriptors\n", rtl );
-		return -ENOBUFS;
+		netdev_tx_defer ( netdev, iobuf );
+		return 0;
 	}
 	tx_idx = ( rtl->tx.prod++ % RTL_NUM_TX_DESC );
 
@@ -809,8 +809,8 @@ static void realtek_poll_tx ( struct net_device *netdev ) {
 		DBGC2 ( rtl, "REALTEK %p TX %d complete\n", rtl, tx_idx );
 
 		/* Complete TX descriptor */
-		netdev_tx_complete_next ( netdev );
 		rtl->tx.cons++;
+		netdev_tx_complete_next ( netdev );
 	}
 }
 
