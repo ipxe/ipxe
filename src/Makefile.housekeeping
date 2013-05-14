@@ -115,6 +115,18 @@ endif
 
 ###############################################################################
 #
+# Check if $(eval ...) is available to use
+#
+
+HAVE_EVAL :=
+ifndef NO_EVAL
+$(eval HAVE_EVAL := yes)
+endif
+eval :
+	@$(ECHO) $(HAVE_EVAL)
+
+###############################################################################
+#
 # Check for various tool workarounds
 #
 
@@ -128,6 +140,11 @@ WORKAROUND_LDFLAGS :=
 COMMA	:= ,
 EMPTY	:=
 SPACE	:= $(EMPTY) $(EMPTY)
+HASH	:= \#
+define NEWLINE
+
+
+endef
 
 # Check for an old version of gas (binutils 2.9.1)
 #
@@ -675,83 +692,118 @@ $(BIN)/version.o : ../.git/index
 endif
 
 # We automatically generate rules for any file mentioned in AUTO_SRCS
-# using the following set of templates.  It would be cleaner to use
-# $(eval ...), but this function exists only in GNU make >= 3.80.
+# using the following set of templates.  We use $(eval ...) if
+# available, otherwise we generate separate Makefile fragments and
+# include them.
 
 # deps_template : generate dependency list for a given source file
+#
+# $(1) is the full path to the source file (e.g. "drivers/net/rtl8139.c")
+#
+define deps_template_file
+$(call deps_template_parts,$(1),$(subst .,,$(suffix $(1))),$(basename $(notdir $(1))))
+endef
 #
 # $(1) is the full path to the source file (e.g. "drivers/net/rtl8139.c")
 # $(2) is the source type (e.g. "c")
 # $(3) is the source base name (e.g. "rtl8139")
 #
-define deps_template
+define deps_template_parts
 	@$(ECHO) "  [DEPS] $(1)"
 	@$(MKDIR) -p $(BIN)/deps/$(dir $(1))
 	$(Q)$(CPP) $(CFLAGS) $(CFLAGS_$(2)) $(CFLAGS_$(3)) -DOBJECT=$(3) \
 		-Wno-error -M $(1) -MG -MP | \
 		sed 's/\.o\s*:/_DEPS +=/' > $(BIN)/deps/$(1).d
+	$(Q)$(if $(findstring drivers/,$(1)),\
+	   $(PERL) $(PARSEROM) $(1) >> $(BIN)/deps/$(1).d)
 endef
 
 # rules_template : generate rules for a given source file
 #
 # $(1) is the full path to the source file (e.g. "drivers/net/rtl8139.c")
+#
+define rules_template
+$(call rules_template_parts,$(1),$(subst .,,$(suffix $(1))),$(basename $(notdir $(1))))
+endef
+#
+# $(1) is the full path to the source file (e.g. "drivers/net/rtl8139.c")
 # $(2) is the source type (e.g. "c")
 # $(3) is the source base name (e.g. "rtl8139")
 #
-define rules_template
+define rules_template_parts
+$$(BIN)/$(3).o : $(1) $$(MAKEDEPS) $$(POST_O_DEPS) $$($(3)_DEPS)
+	$$(QM)$(ECHO) "  [BUILD] $$@"
+	$$(RULE_$(2))
+BOBJS += $$(BIN)/$(3).o
+$(foreach TGT,$(DEBUG_TARGETS),$(if $(RULE_$(2)_to_$(TGT)),$(NEWLINE)$(call rules_template_target,$(1),$(2),$(3),$(TGT))))
+$$(BIN)/deps/$(1).d : $$($(3)_DEPS)
+TAGS : $$($(3)_DEPS)
+endef
+#
+# $(1) is the full path to the source file (e.g. "drivers/net/rtl8139.c")
+# $(2) is the source type (e.g. "c")
+# $(3) is the source base name (e.g. "rtl8139")
+# $(4) is the destination type (e.g. "dbg%.o")
+#
+define rules_template_target
+$$(BIN)/$(3).$(4) : $(1) $$(MAKEDEPS) $$(POST_O_DEPS) $$($(3)_DEPS)
+	$$(QM)$(ECHO) "  [BUILD] $$@"
+	$$(RULE_$(2)_to_$(4))
+$(TGT)_OBJS += $$(BIN)/$(3).$(4)
+endef
+#
+# $(1) is the full path to the source file (e.g. "drivers/net/rtl8139.c")
+#
+define rules_template_file
 	@$(ECHO) "  [RULES] $(1)"
 	@$(MKDIR) -p $(BIN)/rules/$(dir $(1))
-	@$(ECHO_E) '\n$$(BIN)/$(3).o :' \
-		 '$(1) $$(MAKEDEPS) $$(POST_O_DEPS) $$($(3)_DEPS)' \
-		 '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"' \
-		 '\n\t$$(RULE_$(2))\n' \
-		 '\nBOBJS += $$(BIN)/$(3).o\n' \
-		 $(foreach TGT,$(DEBUG_TARGETS), \
-		    $(if $(RULE_$(2)_to_$(TGT)), \
-		    '\n$$(BIN)/$(3).$(TGT) :' \
-		    '$(1) $$(MAKEDEPS) $$(POST_O_DEPS) $$($(3)_DEPS)' \
-		    '\n\t$$(QM)$(ECHO) "  [BUILD] $$@"' \
-		    '\n\t$$(RULE_$(2)_to_$(TGT))\n' \
-		    '\n$(TGT)_OBJS += $$(BIN)/$(3).$(TGT)\n' ) ) \
-		 '\n$(BIN)/deps/$(1).d : $$($(3)_DEPS)\n' \
-		 '\nTAGS : $$($(3)_DEPS)\n' > $(BIN)/rules/$(1).r
-	@$(if $(findstring drivers/,$(1)),\
-	   $(PERL) $(PARSEROM) $(1) >> $(BIN)/rules/$(1).r)
+	@$(ECHO_E) '$(subst $(NEWLINE),\n,$(call rules_template,$(1)))' \
+		 > $(BIN)/rules/$(1).r
 endef
 
-# Rule to generate the dependency list file
+# Generate the dependency files
 #
-$(BIN)/deps/%.d : % $(MAKEDEPS)
-	$(call deps_template,$<,$(subst .,,$(suffix $<)),$(basename $(notdir $<)))
+$(BIN)/deps/%.d : % $(MAKEDEPS) $(PARSEROM)
+	$(call deps_template_file,$<)
 
-# Calculate and include the list of dependency list files
+# Calculate list of dependency files
 #
 AUTO_DEPS	= $(patsubst %,$(BIN)/deps/%.d,$(AUTO_SRCS))
+autodeps :
+	@$(ECHO) $(AUTO_DEPS)
+VERYCLEANUP	+= $(BIN)/deps
+
+# Include dependency files
+#
 ifdef NEED_DEPS
 ifneq ($(AUTO_DEPS),)
 -include $(AUTO_DEPS)
 endif
 endif
-autodeps :
-	@$(ECHO) $(AUTO_DEPS)
-VERYCLEANUP	+= $(BIN)/deps
 
-# Rule to generate the rules file
+# Generate the rules files
 #
-$(BIN)/rules/%.r : % $(MAKEDEPS) $(PARSEROM)
-	$(call rules_template,$<,$(subst .,,$(suffix $<)),$(basename $(notdir $<)))
+$(BIN)/rules/%.r : % $(MAKEDEPS)
+	$(call rules_template_file,$<)
 
-# Calculate and include the list of rules files
+# Calculate list of rules files
 #
 AUTO_RULES	= $(patsubst %,$(BIN)/rules/%.r,$(AUTO_SRCS))
-ifdef NEED_DEPS
-ifneq ($(AUTO_RULES),)
--include $(AUTO_RULES)
-endif
-endif
 autorules :
 	@$(ECHO) $(AUTO_RULES)
 VERYCLEANUP	+= $(BIN)/rules
+
+# Evaluate rules (or include rules files)
+#
+ifdef NEED_DEPS
+ifneq ($(AUTO_RULES),)
+ifneq ($(HAVE_EVAL),)
+$(foreach SRC,$(AUTO_SRCS),$(eval $(call rules_template,$(SRC))))
+else
+-include $(AUTO_RULES)
+endif
+endif
+endif
 
 # The following variables are created by the rules files
 #
@@ -1028,34 +1080,47 @@ AUTO_MEDIA	= $(filter-out $(NON_AUTO_MEDIA),$(MEDIA))
 automedia :
 	@$(ECHO) $(AUTO_MEDIA)
 
-# media_template : create Makefile rules for specified media
+# media_template : create media rules
 #
 # $(1) is the media name (e.g. "rom")
 #
 define media_template
+$$(BIN)/%.$(1) : $$(BIN)/%.$(1).zbin
+	$$(QM)echo "  [FINISH] $$@"
+	$$(Q)$$(CP) $$< $$@
+	$$(Q)$$(if $$(PAD_$(1)),$$(PAD_$(1)) $$@)
+	$$(Q)$$(if $$(FINALISE_$(1)),$$(FINALISE_$(1)) $$@)
+endef
+#
+# $(1) is the media name (e.g. "rom")
+#
+define media_template_file
 	@$(ECHO) "  [MEDIARULES] $(1)"
 	@$(MKDIR) -p $(BIN)/rules/$(dir $(1))
-	@$(ECHO_E) '$$(BIN)/%.$(1) : $$(BIN)/%.$(1).zbin' \
-		  '\n\t$$(QM)$(ECHO) "  [FINISH] $$@"' \
-		  '\n\t$$(Q)$$(CP) $$< $$@' \
-		  '\n\t$$(Q)$$(PAD_$(1))' \
-		  '\n\t$$(Q)$$(FINALISE_$(1))' \
+	@$(ECHO_E) '$(subst $(NEWLINE),\n,$(call media_template,$(1)))' \
 		> $(BIN)/rules/$(1).media.r
 endef
 
-# Rule to generate the Makefile rules to be included
+# Generate media rules files
 #
 $(BIN)/rules/%.media.r : $(MAKEDEPS)
-	$(call media_template,$*)
+	$(call media_template_file,$*)
 
-# Calculate and include the list of Makefile rules files
+# Calculate list of media rules files
 #
 MEDIA_RULES		= $(patsubst %,$(BIN)/rules/%.media.r,$(AUTO_MEDIA))
 mediarules :
 	@$(ECHO) $(MEDIA_RULES)
+
+# Evaluate media rules (or include media rules files)
+#
 ifdef NEED_DEPS
 ifneq ($(MEDIA_RULES),)
+ifneq ($(HAVE_EVAL),)
+$(foreach MEDIUM,$(AUTO_MEDIA),$(eval $(call media_template,$(MEDIUM))))
+else
 -include $(MEDIA_RULES)
+endif
 endif
 endif
 
