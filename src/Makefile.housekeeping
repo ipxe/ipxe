@@ -1085,6 +1085,16 @@ automedia :
 # $(1) is the media name (e.g. "rom")
 #
 define media_template
+$(if $(filter $(1),$(AUTO_MEDIA)),$(call auto_media_template,$(1)))
+$$(BIN)/all$(1)s : $$(foreach DRIVER,$$(DRIVERS),$$(BIN)/$$(DRIVER).$(1))
+$$(BIN)/allall : $$(BIN)/all$(1)s
+all$(1)s : $$(BIN)/all$(1)s
+allall : $$(BIN)/allall
+endef
+#
+# $(1) is the media name (e.g. "rom")
+#
+define auto_media_template
 $$(BIN)/%.$(1) : $$(BIN)/%.$(1).zbin
 	$$(QM)echo "  [FINISH] $$@"
 	$$(Q)$$(CP) $$< $$@
@@ -1108,7 +1118,7 @@ $(BIN)/rules/%.media.r : $(MAKEDEPS)
 
 # Calculate list of media rules files
 #
-MEDIA_RULES		= $(patsubst %,$(BIN)/rules/%.media.r,$(AUTO_MEDIA))
+MEDIA_RULES		= $(patsubst %,$(BIN)/rules/%.media.r,$(MEDIA))
 mediarules :
 	@$(ECHO) $(MEDIA_RULES)
 
@@ -1117,7 +1127,7 @@ mediarules :
 ifdef NEED_DEPS
 ifneq ($(MEDIA_RULES),)
 ifneq ($(HAVE_EVAL),)
-$(foreach MEDIUM,$(AUTO_MEDIA),$(eval $(call media_template,$(MEDIUM))))
+$(foreach MEDIUM,$(MEDIA),$(eval $(call media_template,$(MEDIUM))))
 else
 -include $(MEDIA_RULES)
 endif
@@ -1132,12 +1142,6 @@ $(BIN)/%.o : payload/%.img
 		--defsym obj_$*=0
 
 BOBJS += $(patsubst payload/%.img,$(BIN)/%.o,$(wildcard payload/*.img))
-
-# The "allXXXs" targets for each suffix
-#
-allall: allroms allmroms allpxes allisos alldsks
-allroms allmroms : all%s : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).%)
-allpxes allisos alldsks : all%s : $(foreach DRIVER,$(DRIVERS),$(BIN)/$(DRIVER).%)
 
 # Alias for ipxe.%
 #

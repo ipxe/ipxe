@@ -40,6 +40,13 @@ PAD_exe		= $(PERL) $(PADIMG) --blksize=512
 FINALISE_rom	= $(PERL) $(FIXROM)
 FINALISE_mrom	= $(FINALISE_rom)
 
+# Add per-ROM targets for "allroms"
+#
+$(BIN)/allroms : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).rom)
+$(BIN)/allmroms : $(foreach ROM,$(ROMS),$(BIN)/$(ROM).mrom)
+allroms : $(BIN)/allroms
+allmroms : $(BIN)/allmroms
+
 # rule to make a non-emulation ISO boot image
 NON_AUTO_MEDIA	+= iso
 %iso:	%lkrn util/geniso
