@@ -23,8 +23,8 @@ undiloader:
 	popw	%ds
 	/* UNDI loader parameter structure address into %es:%di */
 	movw	%sp, %bx
-	movw	%ss:18(%bx), %di
-	movw	%ss:20(%bx), %es
+	movw	%ss:22(%bx), %di
+	movw	%ss:24(%bx), %es
 	/* Install to specified real-mode addresses */
 	pushw	%di
 	movw	%es:12(%di), %bx
