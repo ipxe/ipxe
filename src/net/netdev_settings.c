@@ -61,10 +61,18 @@ struct setting chip_setting __setting ( SETTING_NETDEV ) = {
  */
 static int netdev_store_mac ( struct net_device *netdev,
 			      const void *data, size_t len ) {
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 
-	if ( len != netdev->ll_protocol->ll_addr_len )
-		return -EINVAL;
-	memcpy ( netdev->ll_addr, data, len );
+	/* Record new MAC address */
+	if ( data ) {
+		if ( len != netdev->ll_protocol->ll_addr_len )
+			return -EINVAL;
+		memcpy ( netdev->ll_addr, data, len );
+	} else {
+		/* Reset MAC address if clearing setting */
+		ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
+	}
+
 	return 0;
 }
 
