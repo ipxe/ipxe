@@ -549,7 +549,11 @@ static int realtek_create_ring ( struct realtek_nic *rtl,
 static void realtek_destroy_ring ( struct realtek_nic *rtl,
 				   struct realtek_ring *ring ) {
 
-	/* Do nothing in legacy mode */
+	/* Reset producer and consumer counters */
+	ring->prod = 0;
+	ring->cons = 0;
+
+	/* Do nothing more if in legacy mode */
 	if ( rtl->legacy )
 		return;
 
@@ -560,8 +564,6 @@ static void realtek_destroy_ring ( struct realtek_nic *rtl,
 	/* Free descriptor ring */
 	free_dma ( ring->desc, ring->len );
 	ring->desc = NULL;
-	ring->prod = 0;
-	ring->cons = 0;
 }
 
 /**
