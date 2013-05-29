@@ -58,6 +58,21 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_EACCES_STALE						\
 	__einfo_uniqify ( EINFO_EACCES, 0x04,				\
 			  "Stale (or premature) OCSP repsonse" )
+#define EACCES_NO_RESPONDER						\
+	__einfo_error ( EINFO_EACCES_NO_RESPONDER )
+#define EINFO_EACCES_NO_RESPONDER					\
+	__einfo_uniqify ( EINFO_EACCES, 0x05,				\
+			  "Missing OCSP responder certificate" )
+#define ENOTSUP_RESPONSE_TYPE						\
+	__einfo_error ( EINFO_ENOTSUP_RESPONSE_TYPE )
+#define EINFO_ENOTSUP_RESPONSE_TYPE					\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x01,				\
+			  "Unsupported OCSP response type" )
+#define ENOTSUP_RESPONDER_ID						\
+	__einfo_error ( EINFO_ENOTSUP_RESPONDER_ID )
+#define EINFO_ENOTSUP_RESPONDER_ID					\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x02,				\
+			  "Unsupported OCSP responder ID" )
 #define EPROTO_MALFORMED_REQUEST					\
 	__einfo_error ( EINFO_EPROTO_MALFORMED_REQUEST )
 #define EINFO_EPROTO_MALFORMED_REQUEST					\
@@ -355,10 +370,92 @@ static int ocsp_parse_response_type ( struct ocsp_check *ocsp,
 		DBGC ( ocsp, "OCSP %p \"%s\" response type not supported:\n",
 		       ocsp, ocsp->cert->subject.name );
 		DBGC_HDA ( ocsp, 0, cursor.data, cursor.len );
-		return -ENOTSUP;
+		return -ENOTSUP_RESPONSE_TYPE;
 	}
 
 	return 0;
+}
+
+/**
+ * Compare responder's certificate name
+ *
+ * @v ocsp		OCSP check
+ * @v cert		Certificate
+ * @ret difference	Difference as returned by memcmp()
+ */
+static int ocsp_compare_responder_name ( struct ocsp_check *ocsp,
+					 struct x509_certificate *cert ) {
+	struct ocsp_responder *responder = &ocsp->response.responder;
+
+	/* Compare responder ID with certificate's subject */
+	return asn1_compare ( &responder->id, &cert->subject.raw );
+}
+
+/**
+ * Compare responder's certificate public key hash
+ *
+ * @v ocsp		OCSP check
+ * @v cert		Certificate
+ * @ret difference	Difference as returned by memcmp()
+ */
+static int ocsp_compare_responder_key_hash ( struct ocsp_check *ocsp,
+					     struct x509_certificate *cert ) {
+	struct ocsp_responder *responder = &ocsp->response.responder;
+	uint8_t ctx[SHA1_CTX_SIZE];
+	uint8_t digest[SHA1_DIGEST_SIZE];
+	int difference;
+
+	/* Sanity check */
+	difference = ( sizeof ( digest ) - responder->id.len );
+	if ( difference )
+		return difference;
+
+	/* Generate SHA1 hash of certificate's public key */
+	digest_init ( &sha1_algorithm, ctx );
+	digest_update ( &sha1_algorithm, ctx,
+			cert->subject.public_key.raw_bits.data,
+			cert->subject.public_key.raw_bits.len );
+	digest_final ( &sha1_algorithm, ctx, digest );
+
+	/* Compare responder ID with SHA1 hash of certificate's public key */
+	return memcmp ( digest, responder->id.data, sizeof ( digest ) );
+}
+
+/**
+ * Parse OCSP responder ID
+ *
+ * @v ocsp		OCSP check
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int ocsp_parse_responder_id ( struct ocsp_check *ocsp,
+				     const struct asn1_cursor *raw ) {
+	struct ocsp_responder *responder = &ocsp->response.responder;
+	struct asn1_cursor *responder_id = &responder->id;
+	unsigned int type;
+
+	/* Enter responder ID */
+	memcpy ( responder_id, raw, sizeof ( *responder_id ) );
+	type = asn1_type ( responder_id );
+	asn1_enter_any ( responder_id );
+
+	/* Identify responder ID type */
+	switch ( type ) {
+	case ASN1_EXPLICIT_TAG ( 1 ) :
+		DBGC2 ( ocsp, "OCSP %p \"%s\" responder identified by name\n",
+			ocsp, ocsp->cert->subject.name );
+		responder->compare = ocsp_compare_responder_name;
+		return 0;
+	case ASN1_EXPLICIT_TAG ( 2 ) :
+		DBGC2 ( ocsp, "OCSP %p \"%s\" responder identified by key "
+			"hash\n", ocsp, ocsp->cert->subject.name );
+		responder->compare = ocsp_compare_responder_key_hash;
+		return 0;
+	default:
+		DBGC ( ocsp, "OCSP %p \"%s\" unsupported responder ID type "
+		       "%d\n", ocsp, ocsp->cert->subject.name, type );
+		return -ENOTSUP_RESPONDER_ID;
+	}
 }
 
 /**
@@ -484,7 +581,9 @@ static int ocsp_parse_tbs_response_data ( struct ocsp_check *ocsp,
 	/* Skip version, if present */
 	asn1_skip_if_exists ( &cursor, ASN1_EXPLICIT_TAG ( 0 ) );
 
-	/* Skip responderID */
+	/* Parse responderID */
+	if ( ( rc = ocsp_parse_responder_id ( ocsp, &cursor ) ) != 0 )
+		return rc;
 	asn1_skip_any ( &cursor );
 
 	/* Skip producedAt */
@@ -508,6 +607,7 @@ static int ocsp_parse_certs ( struct ocsp_check *ocsp,
 			      const struct asn1_cursor *raw ) {
 	struct ocsp_response *response = &ocsp->response;
 	struct asn1_cursor cursor;
+	struct x509_certificate *cert;
 	int rc;
 
 	/* Enter certs */
@@ -519,20 +619,39 @@ static int ocsp_parse_certs ( struct ocsp_check *ocsp,
 	 * multiple certificates, but the protocol requires that the
 	 * OCSP signing certificate must either be the issuer itself,
 	 * or must be directly issued by the issuer (see RFC2560
-	 * section 4.2.2.2 "Authorized Responders").
+	 * section 4.2.2.2 "Authorized Responders").  We therefore
+	 * need to identify only the single certificate matching the
+	 * Responder ID.
 	 */
-	if ( ( cursor.len != 0 ) &&
-	     ( ( rc = x509_certificate ( cursor.data, cursor.len,
-					 &response->signer ) ) != 0 ) ) {
-		DBGC ( ocsp, "OCSP %p \"%s\" could not parse certificate: "
-		       "%s\n", ocsp, ocsp->cert->subject.name, strerror ( rc ));
-		DBGC_HDA ( ocsp, 0, cursor.data, cursor.len );
-		return rc;
-	}
-	DBGC2 ( ocsp, "OCSP %p \"%s\" response is signed by \"%s\"\n", ocsp,
-		ocsp->cert->subject.name, response->signer->subject.name );
+	while ( cursor.len ) {
 
-	return 0;
+		/* Parse certificate */
+		if ( ( rc = x509_certificate ( cursor.data, cursor.len,
+					       &cert ) ) != 0 ) {
+			DBGC ( ocsp, "OCSP %p \"%s\" could not parse "
+			       "certificate: %s\n", ocsp,
+			       ocsp->cert->subject.name, strerror ( rc ) );
+			DBGC_HDA ( ocsp, 0, cursor.data, cursor.len );
+			return rc;
+		}
+
+		/* Use if this certificate matches the responder ID */
+		if ( response->responder.compare ( ocsp, cert ) == 0 ) {
+			response->signer = cert;
+			DBGC2 ( ocsp, "OCSP %p \"%s\" response is signed by "
+				"\"%s\"\n", ocsp, ocsp->cert->subject.name,
+				response->signer->subject.name );
+			return 0;
+		}
+
+		/* Otherwise, discard this certificate */
+		x509_put ( cert );
+		asn1_skip_any ( &cursor );
+	}
+
+	DBGC ( ocsp, "OCSP %p \"%s\" missing responder certificate\n",
+	       ocsp, ocsp->cert->subject.name );
+	return -EACCES_NO_RESPONDER;
 }
 
 /**

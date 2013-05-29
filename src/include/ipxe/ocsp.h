@@ -28,6 +28,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define OCSP_STATUS_SIG_REQUIRED	0x05
 #define OCSP_STATUS_UNAUTHORIZED	0x06
 
+struct ocsp_check;
+
 /** An OCSP request */
 struct ocsp_request {
 	/** Request builder */
@@ -36,12 +38,29 @@ struct ocsp_request {
 	struct asn1_cursor cert_id;
 };
 
+/** An OCSP responder */
+struct ocsp_responder {
+	/**
+	 * Check if certificate is the responder's certificate
+	 *
+	 * @v ocsp		OCSP check
+	 * @v cert		Certificate
+	 * @ret difference	Difference as returned by memcmp()
+	 */
+	int ( * compare ) ( struct ocsp_check *ocsp,
+			    struct x509_certificate *cert );
+	/** Responder ID */
+	struct asn1_cursor id;
+};
+
 /** An OCSP response */
 struct ocsp_response {
 	/** Raw response */
 	void *data;
 	/** Raw tbsResponseData */
 	struct asn1_cursor tbs;
+	/** Responder */
+	struct ocsp_responder responder;
 	/** Time at which status is known to be correct */
 	time_t this_update;
 	/** Time at which newer status information will be available */
