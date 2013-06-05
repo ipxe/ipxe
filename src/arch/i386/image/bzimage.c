@@ -386,6 +386,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 		offset = ( ( sizeof ( cpio ) + name_len + 0x03 ) & ~0x03 );
 	} else {
 		offset = 0;
+		name_len = 0;
 	}
 
 	/* Copy in initrd image body (and cpio header if applicable) */
