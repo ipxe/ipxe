@@ -271,12 +271,14 @@ int pxe_start_nbp ( void ) {
 		DBG ( "Restarting NBP (%x)\n", jmp );
 
 	/* Far call to PXE NBP */
-	__asm__ __volatile__ ( REAL_CODE ( "movw %%cx, %%es\n\t"
+	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
+					   "movw %%cx, %%es\n\t"
 					   "pushw %%es\n\t"
 					   "pushw %%di\n\t"
 					   "sti\n\t"
 					   "lcall $0, $0x7c00\n\t"
-					   "addw $4, %%sp\n\t" )
+					   "popl %%ebp\n\t" /* discard */
+					   "popl %%ebp\n\t" /* gcc bug */ )
 			       : "=a" ( status ), "=b" ( discard_b ),
 				 "=c" ( discard_c ), "=d" ( discard_d ),
 				 "=D" ( discard_D )
@@ -284,7 +286,7 @@ int pxe_start_nbp ( void ) {
 			         "c" ( rm_cs ),
 			         "d" ( virt_to_phys ( &pxenv ) ),
 				 "D" ( __from_text16 ( &ppxe ) )
-			       : "esi", "ebp", "memory" );
+			       : "esi", "memory" );
 	if ( status )
 		return -EPXENBP ( status );
 
