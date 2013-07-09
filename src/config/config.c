@@ -298,6 +298,9 @@ REQUIRE_OBJECT ( efi_bofm );
 /*
  * Drag in relevant settings sources
  */
+#ifdef PCI_SETTINGS
+REQUIRE_OBJECT ( pci_settings );
+#endif
 #ifdef VMWARE_SETTINGS
 REQUIRE_OBJECT ( guestinfo );
 #endif
