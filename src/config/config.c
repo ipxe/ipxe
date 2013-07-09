@@ -10,6 +10,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <config/general.h>
 #include <config/console.h>
 #include <config/sideband.h>
+#include <config/settings.h>
 
 /** @file
  *
@@ -293,9 +294,13 @@ REQUIRE_OBJECT ( tap );
 REQUIRE_OBJECT ( efi_bofm );
 #endif /* BOFM_EFI */
 #endif /* CONFIG_BOFM */
+
+/*
+ * Drag in relevant settings sources
+ */
 #ifdef VMWARE_SETTINGS
 REQUIRE_OBJECT ( guestinfo );
-#endif /* VMWARE_SETTINGS */
+#endif
 
 /*
  * Drag in selected keyboard map
