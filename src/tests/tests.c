@@ -31,6 +31,7 @@ REQUIRE_OBJECT ( string_test );
 REQUIRE_OBJECT ( list_test );
 REQUIRE_OBJECT ( byteswap_test );
 REQUIRE_OBJECT ( base64_test );
+REQUIRE_OBJECT ( base16_test );
 REQUIRE_OBJECT ( settings_test );
 REQUIRE_OBJECT ( time_test );
 REQUIRE_OBJECT ( tcpip_test );
