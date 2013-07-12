@@ -1218,7 +1218,6 @@ static int tcp_rx ( struct io_buffer *iobuf,
 
 	/* If no connection was found, send RST */
 	if ( ! tcp ) {
-		tcp_xmit_reset ( tcp, st_src, tcphdr );
 		rc = -ENOTCONN;
 		goto discard;
 	}
