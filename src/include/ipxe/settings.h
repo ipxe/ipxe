@@ -322,6 +322,7 @@ extern struct setting_type setting_type_uint16 __setting_type;
 extern struct setting_type setting_type_uint32 __setting_type;
 extern struct setting_type setting_type_hex __setting_type;
 extern struct setting_type setting_type_hexhyp __setting_type;
+extern struct setting_type setting_type_hexraw __setting_type;
 extern struct setting_type setting_type_uuid __setting_type;
 
 extern struct setting ip_setting __setting ( SETTING_IPv4 );

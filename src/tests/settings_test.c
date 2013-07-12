@@ -170,6 +170,12 @@ static struct setting test_hexhyp_setting = {
 	.type = &setting_type_hexhyp,
 };
 
+/** Test raw hex string setting type */
+static struct setting test_hexraw_setting = {
+	.name = "test_hexraw",
+	.type = &setting_type_hexraw,
+};
+
 /** Test UUID setting type */
 static struct setting test_uuid_setting = {
 	.name = "test_uuid",
@@ -261,6 +267,14 @@ static void settings_test_exec ( void ) {
 		    RAW ( 0x9f, 0xe5, 0x6d, 0xfb, 0x24, 0x3a, 0x4c, 0xbb, 0xa9,
 			  0x09, 0x6c, 0x66, 0x13, 0xc1, 0xa8, 0xec, 0x27 ),
 		    "9f-e5-6d-fb-24-3a-4c-bb-a9-09-6c-66-13-c1-a8-ec-27" );
+
+	/* "hexraw" setting type */
+	storef_ok ( &test_settings, &test_hexraw_setting,
+		    "012345abcdef", RAW ( 0x01, 0x23, 0x45, 0xab, 0xcd, 0xef ));
+	fetchf_ok ( &test_settings, &test_hexraw_setting,
+		    RAW ( 0x9e, 0x4b, 0x6e, 0xef, 0x36, 0xb6, 0x46, 0xfe, 0x8f,
+			  0x17, 0x06, 0x39, 0x6b, 0xf4, 0x48, 0x4e ),
+		    "9e4b6eef36b646fe8f1706396bf4484e" );
 
 	/* "uuid" setting type (no store capability) */
 	fetchf_ok ( &test_settings, &test_uuid_setting,

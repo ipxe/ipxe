@@ -1767,6 +1767,34 @@ static int format_hex_hyphen_setting ( const void *raw, size_t raw_len,
 	return format_hex_setting ( raw, raw_len, buf, len, "-" );
 }
 
+/**
+ * Parse hex string setting value (using no delimiter)
+ *
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @v size		Integer size, in bytes
+ * @ret len		Length of raw value, or negative error
+ */
+static int parse_hex_raw_setting ( const char *value, void *buf,
+				   size_t len ) {
+	return hex_decode ( value, 0, buf, len );
+}
+
+/**
+ * Format hex string setting value (using no delimiter)
+ *
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int format_hex_raw_setting ( const void *raw, size_t raw_len,
+				    char *buf, size_t len ) {
+	return format_hex_setting ( raw, raw_len, buf, len, "" );
+}
+
 /** A hex-string setting (colon-delimited) */
 struct setting_type setting_type_hex __setting_type = {
 	.name = "hex",
@@ -1779,6 +1807,13 @@ struct setting_type setting_type_hexhyp __setting_type = {
 	.name = "hexhyp",
 	.parse = parse_hex_hyphen_setting,
 	.format = format_hex_hyphen_setting,
+};
+
+/** A hex-string setting (non-delimited) */
+struct setting_type setting_type_hexraw __setting_type = {
+	.name = "hexraw",
+	.parse = parse_hex_raw_setting,
+	.format = format_hex_raw_setting,
 };
 
 /**
