@@ -51,9 +51,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	ok ( storef_setting ( settings, setting, formatted ) == 0 );	\
 	len = fetch_setting ( settings, setting, actual,		\
 			      sizeof ( actual ) );			\
-	DBGC ( settings, "Stored %s \"%s\", got:\n",			\
-	       (setting)->type->name, formatted );			\
-	DBGC_HDA ( settings, 0, actual, len );				\
+	if ( len >= 0 ) {						\
+		DBGC ( settings, "Stored %s \"%s\", got:\n",		\
+		       (setting)->type->name, formatted );		\
+		DBGC_HDA ( settings, 0, actual, len );			\
+	} else {							\
+		DBGC ( settings, "Stored %s \"%s\", got error %s\n",	\
+		       (setting)->type->name, formatted,		\
+		       strerror ( len ) );				\
+	}								\
 	ok ( len == ( int ) sizeof ( actual ) );			\
 	ok ( memcmp ( actual, expected, sizeof ( actual ) ) == 0 );	\
 	} while ( 0 )
@@ -239,10 +245,6 @@ static void settings_test_exec ( void ) {
 		    RAW ( 0xf2, 0x37, 0xb2, 0x18 ), "0xf237b218" );
 
 	/* "hex" setting type */
-	storef_ok ( &test_settings, &test_hex_setting,
-		    ":", RAW ( 0x00, 0x00 ) );
-	storef_ok ( &test_settings, &test_hex_setting,
-		    "1:2:", RAW ( 0x01, 0x02, 0x00 ) );
 	storef_ok ( &test_settings, &test_hex_setting,
 		    "08:12:f5:22:90:1b:4b:47:a8:30:cb:4d:67:4c:d6:76",
 		    RAW ( 0x08, 0x12, 0xf5, 0x22, 0x90, 0x1b, 0x4b, 0x47, 0xa8,

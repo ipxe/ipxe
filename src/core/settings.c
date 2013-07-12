@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/dhcp.h>
 #include <ipxe/uuid.h>
 #include <ipxe/uri.h>
+#include <ipxe/base16.h>
 #include <ipxe/init.h>
 #include <ipxe/settings.h>
 
@@ -1686,37 +1687,6 @@ struct setting_type setting_type_uint32 __setting_type = {
 };
 
 /**
- * Parse hex string setting value
- *
- * @v value		Formatted setting value
- * @v buf		Buffer to contain raw value
- * @v len		Length of buffer
- * @ret len		Length of raw value, or negative error
- */
-static int parse_hex_setting ( const char *value, void *buf, size_t len ) {
-	char *ptr = ( char * ) value;
-	uint8_t *bytes = buf;
-	unsigned int count = 0;
-	uint8_t byte;
-
-	while ( 1 ) {
-		byte = strtoul ( ptr, &ptr, 16 );
-		if ( count++ < len )
-			*bytes++ = byte;
-		switch ( *ptr ) {
-		case '\0' :
-			return count;
-		case ':' :
-		case '-' :
-			ptr++;
-			break;
-		default :
-			return -EINVAL;
-		}
-	}
-}
-
-/**
  * Format hex string setting value
  *
  * @v raw		Raw setting value
@@ -1743,6 +1713,19 @@ static int format_hex_setting ( const void *raw, size_t raw_len, char *buf,
 }
 
 /**
+ * Parse hex string setting value (using colon delimiter)
+ *
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @v size		Integer size, in bytes
+ * @ret len		Length of raw value, or negative error
+ */
+static int parse_hex_setting ( const char *value, void *buf, size_t len ) {
+	return hex_decode ( value, ':', buf, len );
+}
+
+/**
  * Format hex string setting value (using colon delimiter)
  *
  * @v raw		Raw setting value
@@ -1754,6 +1737,20 @@ static int format_hex_setting ( const void *raw, size_t raw_len, char *buf,
 static int format_hex_colon_setting ( const void *raw, size_t raw_len,
 				      char *buf, size_t len ) {
 	return format_hex_setting ( raw, raw_len, buf, len, ":" );
+}
+
+/**
+ * Parse hex string setting value (using hyphen delimiter)
+ *
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @v size		Integer size, in bytes
+ * @ret len		Length of raw value, or negative error
+ */
+static int parse_hex_hyphen_setting ( const char *value, void *buf,
+				      size_t len ) {
+	return hex_decode ( value, '-', buf, len );
 }
 
 /**
@@ -1780,7 +1777,7 @@ struct setting_type setting_type_hex __setting_type = {
 /** A hex-string setting (hyphen-delimited) */
 struct setting_type setting_type_hexhyp __setting_type = {
 	.name = "hexhyp",
-	.parse = parse_hex_setting,
+	.parse = parse_hex_hyphen_setting,
 	.format = format_hex_hyphen_setting,
 };
 
