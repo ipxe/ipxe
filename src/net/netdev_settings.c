@@ -40,6 +40,16 @@ struct setting mac_setting __setting ( SETTING_NETDEV ) = {
 	.description = "MAC address",
 	.type = &setting_type_hex,
 };
+struct setting bustype_setting __setting ( SETTING_NETDEV ) = {
+	.name = "bustype",
+	.description = "Bus type",
+	.type = &setting_type_string,
+};
+struct setting busloc_setting __setting ( SETTING_NETDEV ) = {
+	.name = "busloc",
+	.description = "Bus location",
+	.type = &setting_type_uint32,
+};
 struct setting busid_setting __setting ( SETTING_NETDEV ) = {
 	.name = "busid",
 	.description = "Bus ID",
@@ -91,6 +101,54 @@ static int netdev_fetch_mac ( struct net_device *netdev, void *data,
 		len = netdev->ll_protocol->ll_addr_len;
 	memcpy ( data, netdev->ll_addr, len );
 	return netdev->ll_protocol->ll_addr_len;
+}
+
+/**
+ * Fetch bus type setting
+ *
+ * @v netdev		Network device
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int netdev_fetch_bustype ( struct net_device *netdev, void *data,
+				  size_t len ) {
+	static const char *bustypes[] = {
+		[BUS_TYPE_PCI] = "PCI",
+		[BUS_TYPE_ISAPNP] = "ISAPNP",
+		[BUS_TYPE_EISA] = "EISA",
+		[BUS_TYPE_MCA] = "MCA",
+		[BUS_TYPE_ISA] = "ISA",
+	};
+	struct device_description *desc = &netdev->dev->desc;
+	const char *bustype;
+
+	assert ( desc->bus_type < ( sizeof ( bustypes ) /
+				    sizeof ( bustypes[0] ) ) );
+	bustype = bustypes[desc->bus_type];
+	assert ( bustypes != NULL );
+	strncpy ( data, bustype, len );
+	return strlen ( bustype );
+}
+
+/**
+ * Fetch bus location setting
+ *
+ * @v netdev		Network device
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int netdev_fetch_busloc ( struct net_device *netdev, void *data,
+				 size_t len ) {
+	struct device_description *desc = &netdev->dev->desc;
+	uint32_t busloc;
+
+	busloc = cpu_to_be32 ( desc->location );
+	if ( len > sizeof ( busloc ) )
+		len = sizeof ( busloc );
+	memcpy ( data, &busloc, len );
+	return sizeof ( busloc );
 }
 
 /**
@@ -157,6 +215,8 @@ struct netdev_setting_operation {
 /** Network device settings */
 static struct netdev_setting_operation netdev_setting_operations[] = {
 	{ &mac_setting, netdev_store_mac, netdev_fetch_mac },
+	{ &bustype_setting, NULL, netdev_fetch_bustype },
+	{ &busloc_setting, NULL, netdev_fetch_busloc },
 	{ &busid_setting, NULL, netdev_fetch_busid },
 	{ &chip_setting, NULL, netdev_fetch_chip },
 };
