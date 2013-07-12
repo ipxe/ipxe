@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uuid.h>
 #include <ipxe/uri.h>
 #include <ipxe/base16.h>
+#include <ipxe/pci.h>
 #include <ipxe/init.h>
 #include <ipxe/settings.h>
 
@@ -1855,6 +1856,52 @@ struct setting_type setting_type_uuid __setting_type = {
 	.name = "uuid",
 	.parse = parse_uuid_setting,
 	.format = format_uuid_setting,
+};
+
+/**
+ * Parse PCI bus:dev.fn setting value
+ *
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
+ */
+static int parse_busdevfn_setting ( const char *value __unused,
+				    void *buf __unused, size_t len __unused ) {
+	return -ENOTSUP;
+}
+
+/**
+ * Format PCI bus:dev.fn setting value
+ *
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int format_busdevfn_setting ( const void *raw, size_t raw_len, char *buf,
+				     size_t len ) {
+	signed long dummy;
+	unsigned long busdevfn;
+	int check_len;
+
+	/* Extract numeric value */
+	check_len = numeric_setting_value ( raw, raw_len, &dummy, &busdevfn );
+	if ( check_len < 0 )
+		return check_len;
+	assert ( check_len == ( int ) raw_len );
+
+	/* Format value */
+	return snprintf ( buf, len, "%02lx:%02lx.%lx", PCI_BUS ( busdevfn ),
+			  PCI_SLOT ( busdevfn ), PCI_FUNC ( busdevfn ) );
+}
+
+/** PCI bus:dev.fn setting type */
+struct setting_type setting_type_busdevfn __setting_type = {
+	.name = "busdevfn",
+	.parse = parse_busdevfn_setting,
+	.format = format_busdevfn_setting,
 };
 
 /******************************************************************************

@@ -182,6 +182,12 @@ static struct setting test_uuid_setting = {
 	.type = &setting_type_uuid,
 };
 
+/** Test PCI bus:dev.fn setting type */
+static struct setting test_busdevfn_setting = {
+	.name = "test_busdevfn",
+	.type = &setting_type_busdevfn,
+};
+
 /**
  * Perform settings self-tests
  *
@@ -281,6 +287,10 @@ static void settings_test_exec ( void ) {
 		    RAW ( 0x1a, 0x6a, 0x74, 0x9d, 0x0e, 0xda, 0x46, 0x1a,0xa8,
 			  0x7a, 0x7c, 0xfe, 0x4f, 0xca, 0x4a, 0x57 ),
 		    "1a6a749d-0eda-461a-a87a-7cfe4fca4a57" );
+
+	/* "busdevfn" setting type (no store capability) */
+	fetchf_ok ( &test_settings, &test_busdevfn_setting,
+		    RAW ( 0x03, 0x45 ), "03:08.5" );
 
 	/* Clear and unregister test settings block */
 	clear_settings ( &test_settings );
