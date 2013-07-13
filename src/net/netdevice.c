@@ -670,6 +670,11 @@ void netdev_irq ( struct net_device *netdev, int enable ) {
 struct net_device * find_netdev ( const char *name ) {
 	struct net_device *netdev;
 
+	/* Allow "netX" shortcut */
+	if ( strcmp ( name, "netX" ) == 0 )
+		return last_opened_netdev();
+
+	/* Identify network device by name */
 	list_for_each_entry ( netdev, &net_devices, list ) {
 		if ( strcmp ( netdev->name, name ) == 0 )
 			return netdev;
