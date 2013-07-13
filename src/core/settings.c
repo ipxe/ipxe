@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/pci.h>
 #include <ipxe/init.h>
 #include <ipxe/settings.h>
+#include <ipxe/version.h>
 
 /** @file
  *
@@ -2176,11 +2177,32 @@ static int platform_fetch ( void *data, size_t len ) {
 	return ( sizeof ( platform ) - 1 /* NUL */ );
 }
 
+/** Version setting */
+struct setting version_setting __setting ( SETTING_MISC ) = {
+	.name = "version",
+	.description = "Version",
+	.type = &setting_type_string,
+	.scope = &builtin_scope,
+};
+
+/**
+ * Fetch version setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int version_fetch ( void *data, size_t len ) {
+	strncpy ( data, product_version, len );
+	return ( strlen ( product_version ) );
+}
+
 /** List of built-in setting operations */
 static struct builtin_setting_operation builtin_setting_operations[] = {
 	{ &errno_setting, errno_fetch },
 	{ &buildarch_setting, buildarch_fetch },
 	{ &platform_setting, platform_fetch },
+	{ &version_setting, version_fetch },
 };
 
 /**
