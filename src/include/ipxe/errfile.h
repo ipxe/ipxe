@@ -113,7 +113,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_sundance	     ( ERRFILE_DRIVER | 0x00410000 )
 #define ERRFILE_tlan		     ( ERRFILE_DRIVER | 0x00420000 )
 #define ERRFILE_tulip		     ( ERRFILE_DRIVER | 0x00430000 )
-#define ERRFILE_via_rhine	     ( ERRFILE_DRIVER | 0x00440000 )
+#define ERRFILE_rhine		     ( ERRFILE_DRIVER | 0x00440000 )
 #define ERRFILE_via_velocity	     ( ERRFILE_DRIVER | 0x00450000 )
 #define ERRFILE_w89c840		     ( ERRFILE_DRIVER | 0x00460000 )
 #define ERRFILE_ipoib		     ( ERRFILE_DRIVER | 0x00470000 )
