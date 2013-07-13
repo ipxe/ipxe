@@ -126,6 +126,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define VLAN_CMD		/* VLAN commands */
 //#define PXE_CMD		/* PXE commands */
 //#define REBOOT_CMD		/* Reboot command */
+//#define POWEROFF_CMD		/* Power off command */
 //#define IMAGE_TRUST_CMD	/* Image trust management commands */
 
 /*

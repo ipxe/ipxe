@@ -242,6 +242,9 @@ REQUIRE_OBJECT ( lotest_cmd );
 #ifdef VLAN_CMD
 REQUIRE_OBJECT ( vlan_cmd );
 #endif
+#ifdef POWEROFF_CMD
+REQUIRE_OBJECT ( poweroff_cmd );
+#endif
 #ifdef REBOOT_CMD
 REQUIRE_OBJECT ( reboot_cmd );
 #endif

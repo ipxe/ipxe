@@ -55,4 +55,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 void reboot ( int warm );
 
+/**
+ * Power off system
+ *
+ * @ret rc		Return status code
+ *
+ * This function may fail, since not all systems support being powered
+ * off by software.
+ */
+int poweroff ( void );
+
 #endif /* _IPXE_REBOOT_H */

@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <stdio.h>
+#include <errno.h>
 #include <ipxe/reboot.h>
 
 /**
@@ -40,4 +41,15 @@ static void null_reboot ( int warm __unused ) {
 	while ( 1 ) {}
 }
 
+/**
+ * Power off system
+ *
+ * @ret rc		Return status code
+ */
+static int null_poweroff ( void ) {
+
+	return -ENOTSUP;
+}
+
 PROVIDE_REBOOT ( null, reboot, null_reboot );
+PROVIDE_REBOOT ( null, poweroff, null_poweroff );

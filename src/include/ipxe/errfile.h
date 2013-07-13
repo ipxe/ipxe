@@ -63,6 +63,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_test		       ( ERRFILE_CORE | 0x00170000 )
 #define ERRFILE_xferbuf		       ( ERRFILE_CORE | 0x00180000 )
 #define ERRFILE_pending		       ( ERRFILE_CORE | 0x00190000 )
+#define ERRFILE_null_reboot	       ( ERRFILE_CORE | 0x001a0000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
@@ -277,6 +278,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_efi_umalloc	      ( ERRFILE_OTHER | 0x003b0000 )
 #define ERRFILE_linux_pci	      ( ERRFILE_OTHER | 0x003c0000 )
 #define ERRFILE_pci_settings	      ( ERRFILE_OTHER | 0x003d0000 )
+#define ERRFILE_efi_reboot	      ( ERRFILE_OTHER | 0x003e0000 )
 
 /** @} */
 
