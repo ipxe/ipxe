@@ -441,7 +441,7 @@ static void reveal_setting_row ( struct setting_widget *widget,
 static void init_widget ( struct setting_widget *widget,
 			  struct settings *settings ) {
 
-	widget->settings = settings;
+	widget->settings = settings_target ( settings );
 	widget->num_rows = select_setting_row ( widget, 0 );
 	widget->first_visible = SETTINGS_LIST_ROWS;
 	draw_title_row ( widget );

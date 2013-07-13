@@ -271,6 +271,9 @@ struct settings * find_child_settings ( struct settings *parent,
 					const char *name ) {
 	struct settings *settings;
 
+	/* Find target parent settings block */
+	parent = settings_target ( parent );
+
 	/* Treat empty name as meaning "this block" */
 	if ( ! *name )
 		return parent;
@@ -278,7 +281,7 @@ struct settings * find_child_settings ( struct settings *parent,
 	/* Look for child with matching name */
 	list_for_each_entry ( settings, &parent->children, siblings ) {
 		if ( strcmp ( settings->name, name ) == 0 )
-			return settings;
+			return settings_target ( settings );
 	}
 
 	return NULL;
@@ -298,6 +301,9 @@ static struct settings * autovivify_child_settings ( struct settings *parent,
 		char name[ strlen ( name ) + 1 /* NUL */ ];
 	} *new_child;
 	struct settings *settings;
+
+	/* Find target parent settings block */
+	parent = settings_target ( parent );
 
 	/* Return existing settings, if existent */
 	if ( ( settings = find_child_settings ( parent, name ) ) != NULL )
@@ -330,6 +336,10 @@ const char * settings_name ( struct settings *settings ) {
 	static char buf[16];
 	char tmp[ sizeof ( buf ) ];
 
+	/* Find target settings block */
+	settings = settings_target ( settings );
+
+	/* Construct name */
 	for ( buf[2] = buf[0] = 0 ; settings ; settings = settings->parent ) {
 		memcpy ( tmp, buf, sizeof ( tmp ) );
 		snprintf ( buf, sizeof ( buf ), ".%s%s", settings->name, tmp );
@@ -359,20 +369,11 @@ parse_settings_name ( const char *name,
 
 	/* Parse each name component in turn */
 	while ( remainder ) {
-		struct net_device *netdev;
-
 		subname = remainder;
 		remainder = strchr ( subname, '.' );
 		if ( remainder )
 			*(remainder++) = '\0';
-
-		/* Special case "netX" root settings block */
-		if ( ( subname == name_copy ) && ! strcmp ( subname, "netX" ) &&
-		     ( ( netdev = last_opened_netdev() ) != NULL ) )
-			settings = get_child ( settings, netdev->name );
-		else
-			settings = get_child ( settings, subname );
-
+		settings = get_child ( settings, subname );
 		if ( ! settings )
 			break;
 	}
@@ -460,10 +461,11 @@ int register_settings ( struct settings *settings, struct settings *parent,
 			const char *name ) {
 	struct settings *old_settings;
 
-	/* NULL parent => add to settings root */
+	/* Sanity check */
 	assert ( settings != NULL );
-	if ( parent == NULL )
-		parent = &settings_root;
+
+	/* Find target parent settings block */
+	parent = settings_target ( parent );
 
 	/* Apply settings block name */
 	settings->name = name;
@@ -524,6 +526,26 @@ void unregister_settings ( struct settings *settings ) {
  */
 
 /**
+ * Redirect to target settings block
+ *
+ * @v settings		Settings block, or NULL
+ * @ret settings	Underlying settings block
+ */
+struct settings * settings_target ( struct settings *settings ) {
+
+	/* NULL settings implies the global settings root */
+	if ( ! settings )
+		settings = &settings_root;
+
+	/* Redirect to underlying settings block, if applicable */
+	if ( settings->op->redirect )
+		return settings->op->redirect ( settings );
+
+	/* Otherwise, return this settings block */
+	return settings;
+}
+
+/**
  * Check applicability of setting
  *
  * @v settings		Settings block
@@ -532,6 +554,10 @@ void unregister_settings ( struct settings *settings ) {
  */
 int setting_applies ( struct settings *settings, struct setting *setting ) {
 
+	/* Find target settings block */
+	settings = settings_target ( settings );
+
+	/* Check applicability of setting */
 	return ( settings->op->applies ?
 		 settings->op->applies ( settings, setting ) : 1 );
 }
@@ -549,9 +575,8 @@ int store_setting ( struct settings *settings, struct setting *setting,
 		    const void *data, size_t len ) {
 	int rc;
 
-	/* NULL settings implies storing into the global settings root */
-	if ( ! settings )
-		settings = &settings_root;
+	/* Find target settings block */
+	settings = settings_target ( settings );
 
 	/* Fail if tag does not apply to this settings block */
 	if ( ! setting_applies ( settings, setting ) )
@@ -609,9 +634,8 @@ static int fetch_setting_and_origin ( struct settings *settings,
 	if ( origin )
 		*origin = NULL;
 
-	/* NULL settings implies starting at the global settings root */
-	if ( ! settings )
-		settings = &settings_root;
+	/* Find target settings block */
+	settings = settings_target ( settings );
 
 	/* Sanity check */
 	if ( ! settings->op->fetch )
@@ -971,6 +995,11 @@ int fetch_uuid_setting ( struct settings *settings, struct setting *setting,
  * @v settings		Settings block
  */
 void clear_settings ( struct settings *settings ) {
+
+	/* Find target settings block */
+	settings = settings_target ( settings );
+
+	/* Clear settings, if applicable */
 	if ( settings->op->clear )
 		settings->op->clear ( settings );
 }
@@ -1230,9 +1259,7 @@ int setting_name ( struct settings *settings, struct setting *setting,
 		   char *buf, size_t len ) {
 	const char *name;
 
-	if ( ! settings )
-		settings = &settings_root;
-
+	settings = settings_target ( settings );
 	name = settings_name ( settings );
 	return snprintf ( buf, len, "%s%s%s:%s", name, ( name[0] ? "/" : "" ),
 			  setting->name, setting->type->name );

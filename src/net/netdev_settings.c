@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/settings.h>
 #include <ipxe/device.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/init.h>
 
 /** @file
  *
@@ -294,4 +295,52 @@ struct settings_operations netdev_settings_operations = {
 	.store = netdev_store,
 	.fetch = netdev_fetch,
 	.clear = netdev_clear,
+};
+
+/**
+ * Redirect "netX" settings block
+ *
+ * @v settings		Settings block
+ * @ret settings	Underlying settings block
+ */
+static struct settings * netdev_redirect ( struct settings *settings ) {
+	struct net_device *netdev;
+
+	/* Redirect to most recently opened network device */
+	netdev = last_opened_netdev();
+	if ( netdev ) {
+		return netdev_settings ( netdev );
+	} else {
+		return settings;
+	}
+}
+
+/** "netX" settings operations */
+static struct settings_operations netdev_redirect_settings_operations = {
+	.redirect = netdev_redirect,
+};
+
+/** "netX" settings */
+static struct settings netdev_redirect_settings = {
+	.refcnt = NULL,
+	.siblings = LIST_HEAD_INIT ( netdev_redirect_settings.siblings ),
+	.children = LIST_HEAD_INIT ( netdev_redirect_settings.children ),
+	.op = &netdev_redirect_settings_operations,
+};
+
+/** Initialise "netX" settings */
+static void netdev_redirect_settings_init ( void ) {
+	int rc;
+
+	if ( ( rc = register_settings ( &netdev_redirect_settings, NULL,
+					"netX" ) ) != 0 ) {
+		DBG ( "Could not register netX settings: %s\n",
+		      strerror ( rc ) );
+		return;
+	}
+}
+
+/** "netX" settings initialiser */
+struct init_fn netdev_redirect_settings_init_fn __init_fn ( INIT_LATE ) = {
+	.initialise = netdev_redirect_settings_init,
 };
