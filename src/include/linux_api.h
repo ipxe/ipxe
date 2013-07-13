@@ -47,11 +47,13 @@ typedef __kernel_loff_t loff_t;
 typedef unsigned long nfds_t;
 typedef uint32_t useconds_t;
 #define MAP_FAILED ( ( void * ) -1 )
+#define SEEK_SET 0
 
 extern long linux_syscall ( int number, ... );
 
 extern int linux_open ( const char *pathname, int flags );
 extern int linux_close ( int fd );
+extern off_t linux_lseek ( int fd, off_t offset, int whence );
 extern __kernel_ssize_t linux_read ( int fd, void *buf, __kernel_size_t count );
 extern __kernel_ssize_t linux_write ( int fd, const void *buf,
 				      __kernel_size_t count );

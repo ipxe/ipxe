@@ -275,6 +275,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_efi_init	      ( ERRFILE_OTHER | 0x00390000 )
 #define ERRFILE_efi_timer	      ( ERRFILE_OTHER | 0x003a0000 )
 #define ERRFILE_efi_umalloc	      ( ERRFILE_OTHER | 0x003b0000 )
+#define ERRFILE_linux_pci	      ( ERRFILE_OTHER | 0x003c0000 )
 
 /** @} */
 

@@ -17,6 +17,7 @@
 #define ENTROPY_LINUX
 #define TIME_LINUX
 #define REBOOT_NULL
+#define PCIAPI_LINUX
 
 #define DRIVERS_LINUX
 
