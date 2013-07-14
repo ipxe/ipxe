@@ -20,6 +20,8 @@
 #ifndef ANI_H
 #define ANI_H
 
+FILE_LICENCE ( BSD2 );
+
 #define HAL_PROCESS_ANI           0x00000001
 
 #define DO_ANI(ah) (((ah)->proc_phyerr & HAL_PROCESS_ANI) && ah->curchan)
