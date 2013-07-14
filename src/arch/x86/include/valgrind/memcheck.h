@@ -60,6 +60,8 @@
 #ifndef __MEMCHECK_H
 #define __MEMCHECK_H
 
+FILE_LICENCE ( BSD3 );
+
 
 /* This file is for inclusion into client (your!) code.
 
