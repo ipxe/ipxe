@@ -51,9 +51,13 @@ void base16_encode ( const uint8_t *raw, size_t len, char *encoded ) {
 	char *encoded_bytes = encoded;
 	size_t remaining = len;
 
+	/* Encode each byte */
 	for ( ; remaining-- ; encoded_bytes += 2 ) {
 		sprintf ( encoded_bytes, "%02x", *(raw_bytes++) );
 	}
+
+	/* Ensure terminating NUL exists even if length was zero */
+	*encoded_bytes = '\0';
 
 	DBG ( "Base16-encoded to \"%s\":\n", encoded );
 	DBG_HDA ( 0, raw, len );
