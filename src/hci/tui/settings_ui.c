@@ -528,6 +528,22 @@ static int main_loop ( struct settings *settings ) {
 			case KEY_END:
 				move = +widget.num_rows;
 				break;
+			case KEY_PPAGE:
+				move = -SETTINGS_LIST_ROWS;
+				if ( (int)widget.current + move < 0 )
+					move = -widget.current;
+				break;
+			case KEY_NPAGE:
+				move = SETTINGS_LIST_ROWS;
+				if ( widget.current + move > widget.num_rows )
+					move = widget.num_rows - widget.current - 1;
+				break;
+			case KEY_HOME:
+				move = -widget.current;
+				break;
+			case KEY_END:
+				move = ( widget.num_rows - widget.current ) - 1;
+				break;
 			case CTRL_D:
 				if ( ! widget.row.setting )
 					break;
