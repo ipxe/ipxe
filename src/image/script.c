@@ -57,9 +57,11 @@ static size_t script_offset;
 static int process_script ( struct image *image,
 			    int ( * process_line ) ( const char *line ),
 			    int ( * terminate ) ( int rc ) ) {
+	size_t len = 0;
+	char *line = NULL;
 	off_t eol;
-	size_t len;
-	char *line;
+	size_t frag_len;
+	char *tmp;
 	int rc;
 
 	script_offset = 0;
@@ -71,28 +73,54 @@ static int process_script ( struct image *image,
 				    ( image->len - script_offset ) );
 		if ( eol < 0 )
 			eol = image->len;
-		len = ( eol - script_offset );
+		frag_len = ( eol - script_offset );
 
 		/* Allocate buffer for line */
-		line = zalloc ( len + 1 /* NUL */ );
-		if ( ! line )
-			return -ENOMEM;
+		tmp = realloc ( line, ( len + frag_len + 1 /* NUL */ ) );
+		if ( ! tmp ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+		line = tmp;
 
 		/* Copy line */
-		copy_from_user ( line, image->data, script_offset, len );
+		copy_from_user ( ( line + len ), image->data, script_offset,
+				 frag_len );
+		len += frag_len;
+
+		/* Move to next line in script */
+		script_offset += ( frag_len + 1 );
+
+		/* Strip trailing CR, if present */
+		if ( line[ len - 1 ] == '\r' )
+			len--;
+
+		/* Handle backslash continuations */
+		if ( line[ len - 1 ] == '\\' ) {
+			len--;
+			rc = -EINVAL;
+			continue;
+		}
+
+		/* Terminate line */
+		line[len] = '\0';
 		DBG ( "$ %s\n", line );
 
-		/* Move to next line */
-		script_offset += ( len + 1 );
-
-		/* Process and free line */
+		/* Process line */
 		rc = process_line ( line );
-		free ( line );
 		if ( terminate ( rc ) )
-			return rc;
+			goto err_process;
+
+		/* Free line */
+		free ( line );
+		line = NULL;
+		len = 0;
 
 	} while ( script_offset < image->len );
 
+ err_process:
+ err_alloc:
+	free ( line );
 	return rc;
 }
 
