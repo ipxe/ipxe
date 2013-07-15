@@ -1,6 +1,8 @@
 #ifndef ETHERBOOT_BIG_BSWAP_H
 #define ETHERBOOT_BIG_BSWAP_H
 
+#define htonll(x)	(x)
+#define ntohll(x)	(x)
 #define ntohl(x) 	(x)
 #define htonl(x) 	(x)
 #define ntohs(x) 	(x)

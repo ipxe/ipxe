@@ -54,6 +54,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define DHCP_EB_FEATURE_VLAN		0x26 /**< VLAN support */
 #define DHCP_EB_FEATURE_MENU		0x27 /**< Menu support */
 #define DHCP_EB_FEATURE_SDI		0x28 /**< SDI image support */
+#define DHCP_EB_FEATURE_NFS		0x29 /**< NFS protocol */
 
 /** @} */
 

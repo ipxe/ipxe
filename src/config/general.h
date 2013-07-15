@@ -59,6 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef	DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
 #undef	DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */
 #undef	DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
+#undef	DOWNLOAD_PROTO_NFS	/* Network File System Protocol */
 
 /*
  * SAN boot protocols
