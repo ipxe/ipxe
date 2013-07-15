@@ -92,11 +92,11 @@ static int process_script ( struct image *image,
 		script_offset += ( frag_len + 1 );
 
 		/* Strip trailing CR, if present */
-		if ( line[ len - 1 ] == '\r' )
+		if ( len && ( line[ len - 1 ] == '\r' ) )
 			len--;
 
 		/* Handle backslash continuations */
-		if ( line[ len - 1 ] == '\\' ) {
+		if ( len && ( line[ len - 1 ] == '\\' ) ) {
 			len--;
 			rc = -EINVAL;
 			continue;
