@@ -226,7 +226,8 @@ enum realtek_legacy_status {
 #define RTL_NUM_RX_DESC 4
 
 /** Receive buffer length */
-#define RTL_RX_MAX_LEN ( ETH_FRAME_LEN + 4 /* VLAN */ + 4 /* CRC */ )
+#define RTL_RX_MAX_LEN \
+	( ETH_FRAME_LEN + 4 /* VLAN */ + 4 /* CRC */ + 4 /* extra space */ )
 
 /** A Realtek descriptor ring */
 struct realtek_ring {
