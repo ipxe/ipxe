@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #define CONSOLE_LINUX
 #define TIMER_LINUX
 #define UACCESS_LINUX

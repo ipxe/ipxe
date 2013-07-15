@@ -17,6 +17,8 @@
 #ifndef ATH9K_HW_OPS_H
 #define ATH9K_HW_OPS_H
 
+FILE_LICENCE ( BSD2 );
+
 #include "hw.h"
 
 /* Hardware core and driver accessible callbacks */
