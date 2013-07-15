@@ -108,7 +108,7 @@ INCDIRS		+= include .
 # helpfully suggestive message
 #
 ALL		:= bin/blib.a bin/ipxe.dsk bin/ipxe.lkrn bin/ipxe.iso \
-		   bin/ipxe.usb bin/undionly.kpxe bin/rtl8139.rom
+		   bin/ipxe.usb bin/ipxe.pxe bin/undionly.kpxe bin/rtl8139.rom
 all : $(ALL)
 	@$(ECHO) '==========================================================='
 	@$(ECHO)
