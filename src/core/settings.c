@@ -1046,28 +1046,32 @@ int setting_cmp ( struct setting *a, struct setting *b ) {
  */
 int fetchf_setting ( struct settings *settings, struct setting *setting,
 		     char *buf, size_t len ) {
+	void *raw;
 	int raw_len;
-	int check_len;
-	int rc;
+	int ret;
 
 	/* Fetch raw value */
-	raw_len = fetch_setting_len ( settings, setting );
+	raw_len = fetch_setting_copy ( settings, setting, &raw );
 	if ( raw_len < 0 ) {
-		rc = raw_len;
-		return rc;
-	} else {
-		uint8_t raw[raw_len];
-
-		/* Fetch raw value */
-		check_len = fetch_setting ( settings, setting, raw,
-					    sizeof ( raw ) );
-		if ( check_len < 0 )
-			return check_len;
-		assert ( check_len == raw_len );
-
-		/* Format value */
-		return setting->type->format ( raw, sizeof ( raw ), buf, len );
+		ret = raw_len;
+		goto err_fetch_copy;
 	}
+
+	/* Return error if setting does not exist */
+	if ( ! raw ) {
+		ret = -ENOENT;
+		goto err_exists;
+	}
+
+	/* Format setting */
+	if ( ( ret = setting->type->format ( raw, raw_len, buf, len ) ) < 0 )
+		goto err_format;
+
+ err_format:
+	free ( raw );
+ err_exists:
+ err_fetch_copy:
+	return ret;
 }
 
 /**
@@ -1080,6 +1084,7 @@ int fetchf_setting ( struct settings *settings, struct setting *setting,
  */
 int storef_setting ( struct settings *settings, struct setting *setting,
 		     const char *value ) {
+	void *raw;
 	int raw_len;
 	int check_len;
 	int rc;
@@ -1088,21 +1093,33 @@ int storef_setting ( struct settings *settings, struct setting *setting,
 	if ( ( ! value ) || ( ! value[0] ) )
 		return delete_setting ( settings, setting );
 
-	/* Parse formatted value */
+	/* Get raw value length */
 	raw_len = setting->type->parse ( value, NULL, 0 );
 	if ( raw_len < 0 ) {
 		rc = raw_len;
-		return rc;
-	} else {
-		uint8_t raw[raw_len];
-
-		/* Parse formatted value */
-		check_len = setting->type->parse ( value, raw, sizeof ( raw ) );
-		assert ( check_len == raw_len );
-
-		/* Store raw value */
-		return store_setting ( settings, setting, raw, sizeof ( raw ) );
+		goto err_parse_len;
 	}
+
+	/* Allocate buffer for raw value */
+	raw = malloc ( raw_len );
+	if ( ! raw ) {
+		rc = -ENOMEM;
+		goto err_alloc_raw;
+	}
+
+	/* Parse formatted value */
+	check_len = setting->type->parse ( value, raw, raw_len );
+	assert ( check_len == raw_len );
+
+	/* Store raw value */
+	if ( ( rc = store_setting ( settings, setting, raw, raw_len ) ) != 0 )
+		goto err_store;
+
+ err_store:
+	free ( raw );
+ err_alloc_raw:
+ err_parse_len:
+	return rc;
 }
 
 /******************************************************************************
