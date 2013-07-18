@@ -58,7 +58,7 @@ static int guestinfo_fetch_type ( struct settings *settings,
 		      strlen ( parent_name ) + 1 /* "." */ +
 		      strlen ( setting->name ) + 1 /* "." */ +
 		      ( type ? strlen ( type->name ) : 0 ) + 1 /* NUL */ ];
-	struct setting *named_setting;
+	struct setting *predefined;
 	char *info;
 	int info_len;
 	int check_len;
@@ -82,9 +82,8 @@ static int guestinfo_fetch_type ( struct settings *settings,
 
 	/* Determine default type if necessary */
 	if ( ! type ) {
-		named_setting = find_setting ( setting->name );
-		type = ( named_setting ?
-			 named_setting->type : &setting_type_string );
+		predefined = find_setting ( setting->name );
+		type = ( predefined ? predefined->type : &setting_type_string );
 	}
 	assert ( type != NULL );
 

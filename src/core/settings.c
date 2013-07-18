@@ -262,7 +262,7 @@ static void autovivified_settings_free ( struct refcnt *refcnt ) {
 }
 
 /**
- * Find child named settings block
+ * Find child settings block
  *
  * @v parent		Parent settings block
  * @v name		Name within this parent
@@ -289,7 +289,7 @@ struct settings * find_child_settings ( struct settings *parent,
 }
 
 /**
- * Find or create child named settings block
+ * Find or create child settings block
  *
  * @v parent		Parent settings block
  * @v name		Name within this parent
@@ -383,7 +383,7 @@ parse_settings_name ( const char *name,
 }
 
 /**
- * Find named settings block
+ * Find settings block
  *
  * @v name		Name
  * @ret settings	Settings block, or NULL
@@ -1113,10 +1113,10 @@ int storef_setting ( struct settings *settings, struct setting *setting,
  */
 
 /**
- * Find named setting
+ * Find predefined setting
  *
  * @v name		Name
- * @ret setting		Named setting, or NULL
+ * @ret setting		Setting, or NULL
  */
 struct setting * find_setting ( const char *name ) {
 	struct setting *setting;
@@ -1192,7 +1192,7 @@ parse_setting_name ( const char *name,
 	char *settings_name;
 	char *setting_name;
 	char *type_name;
-	struct setting *named_setting;
+	struct setting *predefined;
 
 	/* Set defaults */
 	*settings = &settings_root;
@@ -1226,10 +1226,10 @@ parse_setting_name ( const char *name,
 	setting->tag = parse_setting_tag ( setting_name );
 	setting->scope = (*settings)->default_scope;
 	setting->name = setting_name;
-	for_each_table_entry ( named_setting, SETTINGS ) {
-		/* Matches a defined named setting; use that setting */
-		if ( setting_cmp ( named_setting, setting ) == 0 ) {
-			memcpy ( setting, named_setting, sizeof ( *setting ) );
+	for_each_table_entry ( predefined, SETTINGS ) {
+		/* Matches a predefined setting; use that setting */
+		if ( setting_cmp ( predefined, setting ) == 0 ) {
+			memcpy ( setting, predefined, sizeof ( *setting ) );
 			break;
 		}
 	}

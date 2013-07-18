@@ -35,7 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** Network device named settings */
+/** Network device predefined settings */
 struct setting mac_setting __setting ( SETTING_NETDEV ) = {
 	.name = "mac",
 	.description = "MAC address",

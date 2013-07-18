@@ -197,8 +197,8 @@ struct setting uuid_setting __setting ( SETTING_HOST ) = {
 	.scope = &smbios_settings_scope,
 };
 
-/** Other SMBIOS named settings */
-struct setting smbios_named_settings[] __setting ( SETTING_HOST_EXTRA ) = {
+/** Other SMBIOS predefined settings */
+struct setting smbios_predefined_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 	{
 		.name = "manufacturer",
 		.description = "Manufacturer",
