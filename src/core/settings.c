@@ -726,7 +726,7 @@ int fetch_setting_len ( struct settings *settings, struct setting *setting ) {
 int fetch_setting_copy ( struct settings *settings, struct setting *setting,
 			 void **data ) {
 	int len;
-	int check_len = 0;
+	int check_len;
 
 	/* Avoid returning uninitialised data on error */
 	*data = NULL;
@@ -1028,7 +1028,7 @@ int setting_cmp ( struct setting *a, struct setting *b ) {
  */
 
 /**
- * Fetch and format value of setting
+ * Fetch formatted value of setting
  *
  * @v settings		Settings block, or NULL to search all blocks
  * @v setting		Setting to fetch
@@ -1062,6 +1062,43 @@ int fetchf_setting ( struct settings *settings, struct setting *setting,
 	free ( raw );
  err_fetch_copy:
 	return ret;
+}
+
+/**
+ * Fetch copy of formatted value of setting
+ *
+ * @v settings		Settings block, or NULL to search all blocks
+ * @v setting		Setting to fetch
+ * @v type		Settings type
+ * @v value		Buffer to allocate and fill with formatted value
+ * @ret len		Length of formatted value, or negative error
+ *
+ * The caller is responsible for eventually freeing the allocated
+ * buffer.
+ */
+int fetchf_setting_copy ( struct settings *settings, struct setting *setting,
+			  char **value ) {
+	int len;
+	int check_len;
+
+	/* Avoid returning uninitialised data on error */
+	*value = NULL;
+
+	/* Check existence, and fetch formatted value length */
+	len = fetchf_setting ( settings, setting, NULL, 0 );
+	if ( len < 0 )
+		return len;
+
+	/* Allocate buffer */
+	*value = zalloc ( len + 1 /* NUL */ );
+	if ( ! *value )
+		return -ENOMEM;
+
+	/* Fetch formatted value */
+	check_len = fetchf_setting ( settings, setting, *value,
+				     ( len + 1 /* NUL */ ) );
+	assert ( check_len == len );
+	return len;
 }
 
 /**

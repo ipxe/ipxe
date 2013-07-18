@@ -310,6 +310,8 @@ extern int setting_name ( struct settings *settings, struct setting *setting,
 			  char *buf, size_t len );
 extern int fetchf_setting ( struct settings *settings, struct setting *setting,
 			    char *buf, size_t len );
+extern int fetchf_setting_copy ( struct settings *settings,
+				 struct setting *setting, char **value );
 extern int storef_setting ( struct settings *settings,
 			    struct setting *setting,
 			    const char *value );
