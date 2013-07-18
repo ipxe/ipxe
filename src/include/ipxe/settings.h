@@ -315,9 +315,6 @@ extern int fetchf_setting_copy ( struct settings *settings,
 extern int storef_setting ( struct settings *settings,
 			    struct setting *setting,
 			    const char *value );
-extern int store_named_setting ( const char *name,
-				 struct setting_type *default_type,
-				 const void *data, size_t len );
 extern int storef_named_setting ( const char *name,
 				  struct setting_type *default_type,
 				  const char *value );
@@ -400,16 +397,6 @@ static inline void generic_settings_init ( struct generic_settings *generics,
 static inline int delete_setting ( struct settings *settings,
 				   struct setting *setting ) {
 	return store_setting ( settings, setting, NULL, 0 );
-}
-
-/**
- * Delete named setting
- *
- * @v name		Name of setting
- * @ret rc		Return status code
- */
-static inline int delete_named_setting ( const char *name ) {
-	return store_named_setting ( name, NULL, NULL, 0 );
 }
 
 /**

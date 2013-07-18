@@ -1317,41 +1317,6 @@ int setting_name ( struct settings *settings, struct setting *setting,
 }
 
 /**
- * Store value of named setting
- *
- * @v name		Name of setting
- * @v default_type	Default type to use, if none specified
- * @v data		Setting data, or NULL to clear setting
- * @v len		Length of setting data
- * @ret rc		Return status code
- */
-int store_named_setting ( const char *name, struct setting_type *default_type,
-			  const void *data, size_t len ) {
-	struct settings *settings;
-	struct setting setting;
-	char tmp_name[ strlen ( name ) + 1 ];
-	int rc;
-
-	/* Create modifiable copy of setting name */
-	strcpy ( tmp_name, name );
-
-	/* Parse setting name */
-	if ( ( rc = parse_setting_name ( tmp_name, autovivify_child_settings,
-					 &settings, &setting ) ) != 0 )
-		return rc;
-
-	/* Apply default type if necessary */
-	if ( ! setting.type )
-		setting.type = default_type;
-
-	/* Store setting */
-	if ( ( rc = store_setting ( settings, &setting, data, len ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
-/**
  * Parse and store value of named setting
  *
  * @v name		Name of setting
