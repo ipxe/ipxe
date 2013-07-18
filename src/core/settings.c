@@ -2014,15 +2014,18 @@ struct setting_type setting_type_busdevfn __setting_type = {
  * eventually free() it.
  */
 char * expand_settings ( const char *string ) {
+	struct settings *settings;
+	struct setting setting;
 	char *expstr;
 	char *start;
 	char *end;
 	char *head;
 	char *name;
 	char *tail;
-	int setting_len;
-	int new_len;
+	char *value;
 	char *tmp;
+	int new_len;
+	int rc;
 
 	/* Obtain temporary modifiable copy of string */
 	expstr = strdup ( string );
@@ -2052,27 +2055,27 @@ char * expand_settings ( const char *string ) {
 		*end = '\0';
 		tail = ( end + 1 );
 
-		/* Determine setting length */
-		setting_len = fetchf_named_setting ( name, NULL, 0, NULL, 0 );
-		if ( setting_len < 0 )
-			setting_len = 0; /* Treat error as empty setting */
-
-		/* Read setting into temporary buffer */
-		{
-			char setting_buf[ setting_len + 1 ];
-
-			setting_buf[0] = '\0';
-			fetchf_named_setting ( name, NULL, 0, setting_buf,
-					       sizeof ( setting_buf ) );
-
-			/* Construct expanded string and discard old string */
-			tmp = expstr;
-			new_len = asprintf ( &expstr, "%s%s%s",
-					     head, setting_buf, tail );
-			free ( tmp );
-			if ( new_len < 0 )
-				return NULL;
+		/* Expand setting */
+		if ( ( rc = parse_setting_name ( name, find_child_settings,
+						 &settings,
+						 &setting ) ) != 0 ) {
+			/* Treat invalid setting names as empty */
+			value = NULL;
+		} else {
+			/* Fetch and format setting value.  Ignore
+			 * errors; treat non-existent settings as empty.
+			 */
+			fetchf_setting_copy ( settings, &setting, &value );
 		}
+
+		/* Construct expanded string and discard old string */
+		tmp = expstr;
+		new_len = asprintf ( &expstr, "%s%s%s",
+				     head, ( value ? value : "" ), tail );
+		free ( value );
+		free ( tmp );
+		if ( new_len < 0 )
+			return NULL;
 	}
 
 	return expstr;
