@@ -196,6 +196,61 @@ int parse_settings ( char *text, struct settings **value ) {
 }
 
 /**
+ * Parse setting name
+ *
+ * @v text		Text
+ * @v setting		Named setting to fill in
+ * @v get_child		Function to find or create child settings block
+ * @ret rc		Return status code
+ *
+ * Note that this function modifies the original @c text.
+ */
+int parse_setting ( char *text, struct named_setting *setting,
+		    get_child_settings_t get_child ) {
+	int rc;
+
+	/* Sanity check */
+	assert ( text != NULL );
+
+	/* Parse setting name */
+	if ( ( rc = parse_setting_name ( text, get_child, &setting->settings,
+					 &setting->setting ) ) != 0 ) {
+		printf ( "\"%s\": invalid setting\n", text );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Parse existing setting name
+ *
+ * @v text		Text
+ * @v setting		Named setting to fill in
+ * @ret rc		Return status code
+ *
+ * Note that this function modifies the original @c text.
+ */
+int parse_existing_setting ( char *text, struct named_setting *setting ) {
+
+	return parse_setting ( text, setting, find_child_settings );
+}
+
+/**
+ * Parse and autovivify setting name
+ *
+ * @v text		Text
+ * @v setting		Named setting to fill in
+ * @ret rc		Return status code
+ *
+ * Note that this function modifies the original @c text.
+ */
+int parse_autovivified_setting ( char *text, struct named_setting *setting ) {
+
+	return parse_setting ( text, setting, autovivify_child_settings );
+}
+
+/**
  * Print command usage message
  *
  * @v cmd		Command descriptor

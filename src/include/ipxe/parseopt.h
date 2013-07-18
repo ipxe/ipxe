@@ -11,10 +11,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stddef.h>
+#include <ipxe/settings.h>
 
 struct net_device;
 struct menu;
-struct settings;
 
 /** A command-line option descriptor */
 struct option_descriptor {
@@ -115,6 +115,14 @@ struct command_descriptor {
 		.usage = _usage,					      \
 	 }
 
+/** A parsed named setting */
+struct named_setting {
+	/** Settings block */
+	struct settings *settings;
+	/** Setting */
+	struct setting setting;
+};
+
 extern int parse_string ( char *text, char **value );
 extern int parse_integer ( char *text, unsigned int *value );
 extern int parse_netdev ( char *text, struct net_device **netdev );
@@ -122,6 +130,12 @@ extern int parse_menu ( char *text, struct menu **menu );
 extern int parse_flag ( char *text __unused, int *flag );
 extern int parse_key ( char *text, unsigned int *key );
 extern int parse_settings ( char *text, struct settings **settings );
+extern int parse_setting ( char *text, struct named_setting *setting,
+			   get_child_settings_t get_child );
+extern int parse_existing_setting ( char *text, struct named_setting *setting );
+extern int parse_autovivified_setting ( char *text,
+					struct named_setting *setting );
+extern void print_usage ( struct command_descriptor *cmd, char **argv );
 extern int reparse_options ( int argc, char **argv,
 			     struct command_descriptor *cmd, void *opts );
 extern int parse_options ( int argc, char **argv,
