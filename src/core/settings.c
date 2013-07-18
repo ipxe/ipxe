@@ -295,8 +295,8 @@ struct settings * find_child_settings ( struct settings *parent,
  * @v name		Name within this parent
  * @ret settings	Settings block, or NULL
  */
-static struct settings * autovivify_child_settings ( struct settings *parent,
-						     const char *name ) {
+struct settings * autovivify_child_settings ( struct settings *parent,
+					      const char *name ) {
 	struct {
 		struct autovivified_settings autovivified;
 		char name[ strlen ( name ) + 1 /* NUL */ ];
@@ -356,9 +356,7 @@ const char * settings_name ( struct settings *settings ) {
  * @ret settings	Settings block, or NULL
  */
 static struct settings *
-parse_settings_name ( const char *name,
-		      struct settings * ( * get_child ) ( struct settings *,
-							  const char * ) ) {
+parse_settings_name ( const char *name, get_child_settings_t get_child ) {
 	struct settings *settings = &settings_root;
 	char name_copy[ strlen ( name ) + 1 ];
 	char *subname;
@@ -1205,12 +1203,8 @@ static struct setting_type * find_setting_type ( const char *name ) {
  * Note that on success, this function will have modified the original
  * setting @c name.
  */
-static int
-parse_setting_name ( char *name,
-		     struct settings * ( * get_child )
-			     ( struct settings *settings,
-			       const char *name ),
-		     struct settings **settings, struct setting *setting ) {
+int parse_setting_name ( char *name, get_child_settings_t get_child,
+			 struct settings **settings, struct setting *setting ) {
 	char *settings_name;
 	char *setting_name;
 	char *type_name;

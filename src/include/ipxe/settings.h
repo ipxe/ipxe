@@ -241,6 +241,9 @@ struct generic_settings {
 	struct list_head list;
 };
 
+/** A child settings block locator function */
+typedef struct settings * ( *get_child_settings_t ) ( struct settings *settings,
+						      const char *name );
 extern struct settings_operations generic_settings_operations;
 extern int generic_settings_store ( struct settings *settings,
 				    struct setting *setting,
@@ -295,10 +298,14 @@ extern int setting_cmp ( struct setting *a, struct setting *b );
 
 extern struct settings * find_child_settings ( struct settings *parent,
 					       const char *name );
+extern struct settings * autovivify_child_settings ( struct settings *parent,
+						     const char *name );
 extern const char * settings_name ( struct settings *settings );
 extern struct settings * find_settings ( const char *name );
 extern struct setting * find_setting ( const char *name );
-
+extern int parse_setting_name ( char *name, get_child_settings_t get_child,
+				struct settings **settings,
+				struct setting *setting );
 extern int setting_name ( struct settings *settings, struct setting *setting,
 			  char *buf, size_t len );
 extern int fetchf_setting ( struct settings *settings, struct setting *setting,
