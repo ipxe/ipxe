@@ -160,12 +160,12 @@ static int nfs_connect ( struct interface *intf, uint16_t port,
 		return -EINVAL;
 
 	memset ( &peer, 0, sizeof ( peer ) );
-	memset ( &peer, 0, sizeof ( local ) );
+	memset ( &local, 0, sizeof ( local ) );
 	peer.st_port = htons ( port );
 
 	/* Use a local port < 1024 to avoid using the 'insecure' option in
 	 * /etc/exports file. */
-	local.st_port = htons ( 1 + ( rand() % 1023 ) );
+	local.st_flags = TCPIP_BIND_PRIVILEGED;
 
 	return xfer_open_named_socket ( intf, SOCK_STREAM,
 	                                ( struct sockaddr * ) &peer, hostname,
