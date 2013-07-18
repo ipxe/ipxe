@@ -1189,27 +1189,27 @@ static struct setting_type * find_setting_type ( const char *name ) {
  * @v settings		Settings block to fill in
  * @v setting		Setting to fill in
  * @v default_type	Default type to use, if none specified
- * @v tmp_name		Buffer for copy of setting name
  * @ret rc		Return status code
  *
  * Interprets a name of the form
  * "[settings_name/]tag_name[:type_name]" and fills in the appropriate
  * fields.
  *
- * The @c tmp_name buffer must be large enough to hold a copy of the
- * setting name.
+ * Note that on success, this function will have modified the original
+ * setting @c name.
  */
 static int
-parse_setting_name ( const char *name,
-		     struct settings * ( * get_child ) ( struct settings *,
-							 const char * ),
+parse_setting_name ( char *name,
+		     struct settings * ( * get_child )
+			     ( struct settings *settings,
+			       const char *name ),
 		     struct settings **settings, struct setting *setting,
-		     struct setting_type *default_type,
-		     char *tmp_name ) {
+		     struct setting_type *default_type ) {
 	char *settings_name;
 	char *setting_name;
 	char *type_name;
 	struct setting *predefined;
+	int rc;
 
 	/* Set defaults */
 	*settings = &settings_root;
@@ -1218,12 +1218,11 @@ parse_setting_name ( const char *name,
 	setting->type = default_type;
 
 	/* Split name into "[settings_name/]setting_name[:type_name]" */
-	strcpy ( tmp_name, name );
-	if ( ( setting_name = strchr ( tmp_name, '/' ) ) != NULL ) {
+	if ( ( setting_name = strchr ( name, '/' ) ) != NULL ) {
 		*(setting_name++) = 0;
-		settings_name = tmp_name;
+		settings_name = name;
 	} else {
-		setting_name = tmp_name;
+		setting_name = name;
 		settings_name = NULL;
 	}
 	if ( ( type_name = strchr ( setting_name, ':' ) ) != NULL )
@@ -1235,7 +1234,8 @@ parse_setting_name ( const char *name,
 		if ( *settings == NULL ) {
 			DBG ( "Unrecognised settings block \"%s\" in \"%s\"\n",
 			      settings_name, name );
-			return -ENODEV;
+			rc = -ENODEV;
+			goto err;
 		}
 	}
 
@@ -1257,11 +1257,20 @@ parse_setting_name ( const char *name,
 		if ( setting->type == NULL ) {
 			DBG ( "Invalid setting type \"%s\" in \"%s\"\n",
 			      type_name, name );
-			return -ENOTSUP;
+			rc = -ENOTSUP;
+			goto err;
 		}
 	}
 
 	return 0;
+
+ err:
+	/* Restore original name */
+	if ( settings_name )
+		*( setting_name - 1 ) = '/';
+	if ( type_name )
+		*( type_name - 1 ) = ':';
+	return rc;
 }
 
 /**
@@ -1299,10 +1308,13 @@ int store_named_setting ( const char *name, struct setting_type *default_type,
 	char tmp_name[ strlen ( name ) + 1 ];
 	int rc;
 
+	/* Create modifiable copy of setting name */
+	strcpy ( tmp_name, name );
+
 	/* Parse setting name */
-	if ( ( rc = parse_setting_name ( name, autovivify_child_settings,
-					 &settings, &setting, default_type,
-					 tmp_name ) ) != 0 )
+	if ( ( rc = parse_setting_name ( tmp_name, autovivify_child_settings,
+					 &settings, &setting,
+					 default_type ) ) != 0 )
 		return rc;
 
 	/* Store setting */
@@ -1327,10 +1339,13 @@ int storef_named_setting ( const char *name, struct setting_type *default_type,
 	char tmp_name[ strlen ( name ) + 1 ];
 	int rc;
 
+	/* Create modifiable copy of setting name */
+	strcpy ( tmp_name, name );
+
 	/* Parse setting name */
-	if ( ( rc = parse_setting_name ( name, autovivify_child_settings,
-					 &settings, &setting, default_type,
-					 tmp_name ) ) != 0 )
+	if ( ( rc = parse_setting_name ( tmp_name, autovivify_child_settings,
+					 &settings, &setting,
+					 default_type ) ) != 0 )
 		return rc;
 
 	/* Store setting */
@@ -1360,9 +1375,12 @@ int fetchf_named_setting ( const char *name,
 	int len;
 	int rc;
 
+	/* Create modifiable copy of setting name */
+	strcpy ( tmp_name, name );
+
 	/* Parse setting name */
-	if ( ( rc = parse_setting_name ( name, find_child_settings, &settings,
-					 &setting, NULL, tmp_name ) ) != 0 )
+	if ( ( rc = parse_setting_name ( tmp_name, find_child_settings,
+					 &settings, &setting, NULL ) ) != 0 )
 		return rc;
 
 	/* Fetch setting */
