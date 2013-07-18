@@ -228,9 +228,9 @@ static struct command_descriptor choose_cmd =
  */
 static int choose_exec ( int argc, char **argv ) {
 	struct choose_options opts;
+	struct named_setting setting;
 	struct menu *menu;
 	struct menu_item *item;
-	const char *setting;
 	int rc;
 
 	/* Parse options */
@@ -238,7 +238,9 @@ static int choose_exec ( int argc, char **argv ) {
 		goto err_parse_options;
 
 	/* Parse setting name */
-	setting = argv[optind];
+	if ( ( rc = parse_autovivified_setting ( argv[optind],
+						 &setting ) ) != 0 )
+		goto err_parse_setting;
 
 	/* Identify menu */
 	if ( ( rc = parse_menu ( opts.menu, &menu ) ) != 0 )
@@ -248,11 +250,15 @@ static int choose_exec ( int argc, char **argv ) {
 	if ( ( rc = show_menu ( menu, opts.timeout, opts.select, &item ) ) != 0)
 		goto err_show_menu;
 
+	/* Apply default type if necessary */
+	if ( ! setting.setting.type )
+		setting.setting.type = &setting_type_string;
+
 	/* Store setting */
-	if ( ( rc = storef_named_setting ( setting, &setting_type_string,
-					   item->label ) ) != 0 ) {
+	if ( ( rc = storef_setting ( setting.settings, &setting.setting,
+				     item->label ) ) != 0 ) {
 		printf ( "Could not store \"%s\": %s\n",
-			 setting, strerror ( rc ) );
+			 setting.setting.name, strerror ( rc ) );
 		goto err_store;
 	}
 
@@ -265,6 +271,7 @@ static int choose_exec ( int argc, char **argv ) {
 	if ( ! opts.keep )
 		destroy_menu ( menu );
  err_parse_menu:
+ err_parse_setting:
  err_parse_options:
 	return rc;
 }
