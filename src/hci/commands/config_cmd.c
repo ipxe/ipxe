@@ -45,28 +45,6 @@ static struct command_descriptor config_cmd =
 	COMMAND_DESC ( struct config_options, config_opts, 0, 1, "[<scope>]" );
 
 /**
- * Parse settings scope name
- *
- * @v text		Text
- * @ret value		Integer value
- * @ret rc		Return status code
- */
-static int parse_settings ( const char *text, struct settings **value ) {
-
-	/* Sanity check */
-	assert ( text != NULL );
-
-	/* Parse scope name */
-	*value = find_settings ( text );
-	if ( ! *value ) {
-		printf ( "\"%s\": no such scope\n", text );
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/**
  * "config" command
  *
  * @v argc		Argument count

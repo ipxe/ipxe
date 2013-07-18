@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <getopt.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/menu.h>
+#include <ipxe/settings.h>
 #include <ipxe/parseopt.h>
 
 /** @file
@@ -170,6 +171,28 @@ int parse_key ( char *text, unsigned int *key ) {
 
 	/* Otherwise, interpret as an integer */
 	return parse_integer ( text, key );
+}
+
+/**
+ * Parse settings block name
+ *
+ * @v text		Text
+ * @ret value		Integer value
+ * @ret rc		Return status code
+ */
+int parse_settings ( char *text, struct settings **value ) {
+
+	/* Sanity check */
+	assert ( text != NULL );
+
+	/* Parse scope name */
+	*value = find_settings ( text );
+	if ( ! *value ) {
+		printf ( "\"%s\": no such scope\n", text );
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 /**
