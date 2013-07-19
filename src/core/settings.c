@@ -722,11 +722,6 @@ int fetch_setting_len ( struct settings *settings, struct setting *setting ) {
  *
  * The caller is responsible for eventually freeing the allocated
  * buffer.
- *
- * To allow the caller to distinguish between a non-existent setting
- * and an error in allocating memory for the copy, this function will
- * return success (and a NULL buffer pointer) for a non-existent
- * setting.
  */
 int fetch_setting_copy ( struct settings *settings, struct setting *setting,
 			 void **data ) {
@@ -736,10 +731,10 @@ int fetch_setting_copy ( struct settings *settings, struct setting *setting,
 	/* Avoid returning uninitialised data on error */
 	*data = NULL;
 
-	/* Fetch setting length, and return success if non-existent */
+	/* Check existence, and fetch setting length */
 	len = fetch_setting_len ( settings, setting );
 	if ( len < 0 )
-		return 0;
+		return len;
 
 	/* Allocate buffer */
 	*data = malloc ( len );
@@ -1055,12 +1050,6 @@ int fetchf_setting ( struct settings *settings, struct setting *setting,
 		goto err_fetch_copy;
 	}
 
-	/* Return error if setting does not exist */
-	if ( ! raw ) {
-		ret = -ENOENT;
-		goto err_exists;
-	}
-
 	/* Sanity check */
 	assert ( setting->type != NULL );
 	assert ( setting->type->format != NULL );
@@ -1071,7 +1060,6 @@ int fetchf_setting ( struct settings *settings, struct setting *setting,
 
  err_format:
 	free ( raw );
- err_exists:
  err_fetch_copy:
 	return ret;
 }
