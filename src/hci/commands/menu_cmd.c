@@ -41,7 +41,7 @@ FEATURE ( FEATURE_MISC, "Menu", DHCP_EB_FEATURE_MENU, 1 );
 /** "menu" options */
 struct menu_options {
 	/** Name */
-	const char *name;
+	char *name;
 	/** Delete */
 	int delete;
 };
@@ -107,7 +107,7 @@ static int menu_exec ( int argc, char **argv ) {
 /** "item" options */
 struct item_options {
 	/** Menu name */
-	const char *menu;
+	char *menu;
 	/** Shortcut key */
 	unsigned int key;
 	/** Use as default */
@@ -192,11 +192,11 @@ static int item_exec ( int argc, char **argv ) {
 /** "choose" options */
 struct choose_options {
 	/** Menu name */
-	const char *menu;
+	char *menu;
 	/** Timeout */
 	unsigned int timeout;
 	/** Default selection */
-	const char *select;
+	char *select;
 	/** Keep menu */
 	int keep;
 };

@@ -59,7 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret value		String value
  * @ret rc		Return status code
  */
-int parse_string ( const char *text, const char **value ) {
+int parse_string ( char *text, char **value ) {
 
 	/* Sanity check */
 	assert ( text != NULL );
@@ -77,7 +77,7 @@ int parse_string ( const char *text, const char **value ) {
  * @ret value		Integer value
  * @ret rc		Return status code
  */
-int parse_integer ( const char *text, unsigned int *value ) {
+int parse_integer ( char *text, unsigned int *value ) {
 	char *endp;
 
 	/* Sanity check */
@@ -100,7 +100,7 @@ int parse_integer ( const char *text, unsigned int *value ) {
  * @ret netdev		Network device
  * @ret rc		Return status code
  */
-int parse_netdev ( const char *text, struct net_device **netdev ) {
+int parse_netdev ( char *text, struct net_device **netdev ) {
 
 	/* Sanity check */
 	assert ( text != NULL );
@@ -122,7 +122,7 @@ int parse_netdev ( const char *text, struct net_device **netdev ) {
  * @ret menu		Menu
  * @ret rc		Return status code
  */
-int parse_menu ( const char *text, struct menu **menu ) {
+int parse_menu ( char *text, struct menu **menu ) {
 
 	/* Find menu */
 	*menu = find_menu ( text );
@@ -145,7 +145,7 @@ int parse_menu ( const char *text, struct menu **menu ) {
  * @ret flag		Flag to set
  * @ret rc		Return status code
  */
-int parse_flag ( const char *text __unused, int *flag ) {
+int parse_flag ( char *text __unused, int *flag ) {
 
 	/* Set flag */
 	*flag = 1;
@@ -160,7 +160,7 @@ int parse_flag ( const char *text __unused, int *flag ) {
  * @ret key		Key
  * @ret rc		Return status code
  */
-int parse_key ( const char *text, unsigned int *key ) {
+int parse_key ( char *text, unsigned int *key ) {
 
 	/* Interpret single characters as being a literal key character */
 	if ( text[0] && ! text[1] ) {
@@ -198,7 +198,7 @@ int reparse_options ( int argc, char **argv, struct command_descriptor *cmd,
 	char shortopts[ cmd->num_options * 3 /* possible "::" */ + 1 /* "h" */
 			+ 1 /* NUL */ ];
 	unsigned int shortopt_idx = 0;
-	int ( * parse ) ( const char *text, void *value );
+	int ( * parse ) ( char *text, void *value );
 	void *value;
 	unsigned int i;
 	unsigned int j;
