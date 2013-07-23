@@ -55,19 +55,27 @@ static size_t script_offset;
  * @ret rc		Return status code
  */
 static int process_script ( struct image *image,
-			    int ( * process_line ) ( const char *line ),
+			    int ( * process_line ) ( struct image *image,
+						     size_t offset,
+						     const char *label,
+						     const char *command ),
 			    int ( * terminate ) ( int rc ) ) {
 	size_t len = 0;
 	char *line = NULL;
+	size_t line_offset;
+	char *label;
+	char *command;
 	off_t eol;
 	size_t frag_len;
 	char *tmp;
 	int rc;
 
+	/* Initialise script and line offsets */
 	script_offset = 0;
+	line_offset = 0;
 
 	do {
-	
+
 		/* Find length of next line, excluding any terminating '\n' */
 		eol = memchr_user ( image->data, script_offset, '\n',
 				    ( image->len - script_offset ) );
@@ -104,10 +112,23 @@ static int process_script ( struct image *image,
 
 		/* Terminate line */
 		line[len] = '\0';
-		DBG ( "$ %s\n", line );
+
+		/* Split line into (optional) label and command */
+		command = line;
+		while ( isspace ( *command ) )
+			command++;
+		if ( *command == ':' ) {
+			label = ++command;
+			while ( *command && ! isspace ( *command ) )
+				command++;
+			if ( *command )
+				*(command++) = '\0';
+		} else {
+			label = NULL;
+		}
 
 		/* Process line */
-		rc = process_line ( line );
+		rc = process_line ( image, line_offset, label, command );
 		if ( terminate ( rc ) )
 			goto err_process;
 
@@ -115,6 +136,9 @@ static int process_script ( struct image *image,
 		free ( line );
 		line = NULL;
 		len = 0;
+
+		/* Update line offset */
+		line_offset = script_offset;
 
 	} while ( script_offset < image->len );
 
@@ -137,40 +161,23 @@ static int terminate_on_exit_or_failure ( int rc ) {
 }
 
 /**
- * Find label within script line
- *
- * @v line		Line of script
- * @ret label		Start of label name, or NULL if not found
- */
-static const char * find_label ( const char *line ) {
-
-	/* Skip any leading whitespace */
-	while ( isspace ( *line ) )
-		line++;
-
-	/* If first non-whitespace character is a ':', then we have a label */
-	if ( *line == ':' ) {
-		return ( line + 1 );
-	} else {
-		return NULL;
-	}
-}
-
-/**
  * Execute script line
  *
- * @v line		Line of script
+ * @v image		Script
+ * @v offset		Offset within script
+ * @v label		Label, or NULL
+ * @v command		Command
  * @ret rc		Return status code
  */
-static int script_exec_line ( const char *line ) {
+static int script_exec_line ( struct image *image, size_t offset,
+			      const char *label __unused,
+			      const char *command ) {
 	int rc;
 
-	/* Skip label lines */
-	if ( find_label ( line ) != NULL )
-		return 0;
+	DBGC ( image, "[%04zx] $ %s\n", offset, command );
 
 	/* Execute command */
-	if ( ( rc = system ( line ) ) != 0 )
+	if ( ( rc = system ( command ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -224,7 +231,7 @@ static int script_probe ( struct image *image ) {
 
 	/* Sanity check */
 	if ( image->len < sizeof ( test ) ) {
-		DBG ( "Too short to be a script\n" );
+		DBGC ( image, "Too short to be a script\n" );
 		return -ENOEXEC;
 	}
 
@@ -233,7 +240,7 @@ static int script_probe ( struct image *image ) {
 	if ( ! ( ( ( memcmp ( test, ipxe_magic, sizeof ( test ) - 1 ) == 0 ) ||
 		   ( memcmp ( test, gpxe_magic, sizeof ( test ) - 1 ) == 0 )) &&
 		 isspace ( test[ sizeof ( test ) - 1 ] ) ) ) {
-		DBG ( "Invalid magic signature\n" );
+		DBGC ( image, "Invalid magic signature\n" );
 		return -ENOEXEC;
 	}
 
@@ -267,25 +274,26 @@ static const char *goto_label;
 /**
  * Check for presence of label
  *
- * @v line		Script line
+ * @v image		Script
+ * @v offset		Offset within script
+ * @v label		Label
+ * @v command		Command
  * @ret rc		Return status code
  */
-static int goto_find_label ( const char *line ) {
-	size_t len = strlen ( goto_label );
-	const char *label;
+static int goto_find_label ( struct image *image, size_t offset,
+			     const char *label, const char *command __unused ) {
 
-	/* Find label */
-	label = find_label ( line );
+	/* Check label exists */
 	if ( ! label )
 		return -ENOENT;
 
-	/* Check if label matches */
-	if ( strncmp ( goto_label, label, len ) != 0 )
+	/* Check label matches */
+	if ( strcmp ( goto_label, label ) != 0 )
 		return -ENOENT;
 
-	/* Check label is terminated by a NUL or whitespace */
-	if ( label[len] && ! isspace ( label[len] ) )
-		return -ENOENT;
+	/* Update script offset */
+	script_offset = offset;
+	DBGC ( image, "[%04zx] Gone to :%s\n", offset, label );
 
 	return 0;
 }
@@ -331,6 +339,8 @@ static int goto_exec ( int argc, char **argv ) {
 	if ( ( rc = process_script ( current_image, goto_find_label,
 				     terminate_on_label_found ) ) != 0 ) {
 		script_offset = saved_offset;
+		DBGC ( current_image, "[%04zx] No such label :%s\n",
+		       script_offset, goto_label );
 		return rc;
 	}
 
