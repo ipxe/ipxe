@@ -137,6 +137,26 @@ static int terminate_on_exit_or_failure ( int rc ) {
 }
 
 /**
+ * Find label within script line
+ *
+ * @v line		Line of script
+ * @ret label		Start of label name, or NULL if not found
+ */
+static const char * find_label ( const char *line ) {
+
+	/* Skip any leading whitespace */
+	while ( isspace ( *line ) )
+		line++;
+
+	/* If first non-whitespace character is a ':', then we have a label */
+	if ( *line == ':' ) {
+		return ( line + 1 );
+	} else {
+		return NULL;
+	}
+}
+
+/**
  * Execute script line
  *
  * @v line		Line of script
@@ -146,7 +166,7 @@ static int script_exec_line ( const char *line ) {
 	int rc;
 
 	/* Skip label lines */
-	if ( line[0] == ':' )
+	if ( find_label ( line ) != NULL )
 		return 0;
 
 	/* Execute command */
@@ -252,14 +272,19 @@ static const char *goto_label;
  */
 static int goto_find_label ( const char *line ) {
 	size_t len = strlen ( goto_label );
+	const char *label;
 
-	if ( line[0] != ':' )
+	/* Find label */
+	label = find_label ( line );
+	if ( ! label )
 		return -ENOENT;
 
-	if ( strncmp ( goto_label, &line[1], len ) != 0 )
+	/* Check if label matches */
+	if ( strncmp ( goto_label, label, len ) != 0 )
 		return -ENOENT;
 
-	if ( line[ 1 + len ] && ! isspace ( line[ 1 + len ] ) )
+	/* Check label is terminated by a NUL or whitespace */
+	if ( label[len] && ! isspace ( label[len] ) )
 		return -ENOENT;
 
 	return 0;
