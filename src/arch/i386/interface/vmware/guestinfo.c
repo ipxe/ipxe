@@ -114,7 +114,7 @@ static int guestinfo_fetch_type ( struct settings *settings,
 		settings, &command[9] /* Skip "info-get " */, info );
 
 	/* Parse GuestInfo value according to type */
-	ret = type->parse ( info, data, len );
+	ret = setting_parse ( type, info, data, len );
 	if ( ret < 0 ) {
 		DBGC ( settings, "GuestInfo %p could not parse \"%s\" as %s: "
 		       "%s\n", settings, info, type->name, strerror ( ret ) );

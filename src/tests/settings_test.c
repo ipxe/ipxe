@@ -82,10 +82,61 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	len = fetchf_setting ( settings, setting, actual,		\
 			       sizeof ( actual ) );			\
 	DBGC ( settings, "Fetched %s \"%s\" from:\n",			\
-	       (setting)->type->name, formatted );			\
+	       (setting)->type->name, actual );				\
 	DBGC_HDA ( settings, 0, raw, sizeof ( raw ) );			\
 	ok ( len == ( int ) ( sizeof ( actual ) - 1 ) );		\
 	ok ( strcmp ( actual, formatted ) == 0 );			\
+	} while ( 0 )
+
+/**
+ * Report a numeric-store test result
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @v numeric		Numeric value
+ * @v raw_array		Expected raw value
+ */
+#define storen_ok( settings, setting, numeric, raw_array ) do {		\
+	const uint8_t expected[] = raw_array;				\
+	uint8_t actual[ sizeof ( expected ) ];				\
+	int len;							\
+									\
+	ok ( storen_setting ( settings, setting, numeric ) == 0 );	\
+	len = fetch_setting ( settings, setting, actual,		\
+			      sizeof ( actual ) );			\
+	if ( len >= 0 ) {						\
+		DBGC ( settings, "Stored %s %#lx, got:\n",		\
+		       (setting)->type->name,				\
+		       ( unsigned long ) numeric );			\
+		DBGC_HDA ( settings, 0, actual, len );			\
+	} else {							\
+		DBGC ( settings, "Stored %s %#lx, got error %s\n",	\
+		       (setting)->type->name,				\
+		       ( unsigned long ) numeric, strerror ( len ) );	\
+	}								\
+	ok ( len == ( int ) sizeof ( actual ) );			\
+	ok ( memcmp ( actual, expected, sizeof ( actual ) ) == 0 );	\
+	} while ( 0 )
+
+/**
+ * Report a numeric-fetch test result
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @v raw_array		Raw array
+ * @v numeric		Expected numeric value
+ */
+#define fetchn_ok( settings, setting, raw_array, numeric ) do {		\
+	const uint8_t raw[] = raw_array;				\
+	unsigned long actual;						\
+									\
+	ok ( store_setting ( settings, setting, raw,			\
+			     sizeof ( raw ) ) == 0 );			\
+	ok ( fetchn_setting ( settings, setting, &actual ) == 0 );	\
+	DBGC ( settings, "Fetched %s %#lx from:\n",			\
+	       (setting)->type->name, actual );				\
+	DBGC_HDA ( settings, 0, raw, sizeof ( raw ) );			\
+	ok ( actual == ( unsigned long ) numeric );			\
 	} while ( 0 )
 
 /** Test generic settings block */
@@ -216,7 +267,7 @@ static void settings_test_exec ( void ) {
 	fetchf_ok ( &test_settings, &test_ipv4_setting,
 		    RAW ( 212, 13, 204, 60 ), "212.13.204.60" );
 
-	/* Integer setting types */
+	/* Integer setting types (as formatted strings) */
 	storef_ok ( &test_settings, &test_int8_setting,
 		    "54", RAW ( 54 ) );
 	storef_ok ( &test_settings, &test_int8_setting,
@@ -255,6 +306,42 @@ static void settings_test_exec ( void ) {
 		    "0xb598d21", RAW ( 0x0b, 0x59, 0x8d, 0x21 ) );
 	fetchf_ok ( &test_settings, &test_uint32_setting,
 		    RAW ( 0xf2, 0x37, 0xb2, 0x18 ), "0xf237b218" );
+
+	/* Integer setting types (as numeric values) */
+	storen_ok ( &test_settings, &test_int8_setting,
+		    72, RAW ( 72 ) );
+	storen_ok ( &test_settings, &test_int8_setting,
+		    0xabcd, RAW ( 0xcd ) );
+	fetchn_ok ( &test_settings, &test_int8_setting,
+		    RAW ( 0xfe ), -2 );
+	storen_ok ( &test_settings, &test_uint8_setting,
+		    84, RAW ( 84 ) );
+	fetchn_ok ( &test_settings, &test_uint8_setting,
+		    RAW ( 0xfe ), 0xfe );
+	storen_ok ( &test_settings, &test_int16_setting,
+		    0x87bd, RAW ( 0x87, 0xbd ) );
+	fetchn_ok ( &test_settings, &test_int16_setting,
+		    RAW ( 0x3d, 0x14 ), 0x3d14 );
+	fetchn_ok ( &test_settings, &test_int16_setting,
+		    RAW ( 0x80 ), -128 );
+	storen_ok ( &test_settings, &test_uint16_setting,
+		    1, RAW ( 0x00, 0x01 ) );
+	fetchn_ok ( &test_settings, &test_uint16_setting,
+		    RAW ( 0xbd, 0x87 ), 0xbd87 );
+	fetchn_ok ( &test_settings, &test_uint16_setting,
+		    RAW ( 0x80 ), 0x0080 );
+	storen_ok ( &test_settings, &test_int32_setting,
+		    0x0812bfd2, RAW ( 0x08, 0x12, 0xbf, 0xd2 ) );
+	fetchn_ok ( &test_settings, &test_int32_setting,
+		    RAW ( 0x43, 0x87, 0x91, 0xb4 ), 0x438791b4 );
+	fetchn_ok ( &test_settings, &test_int32_setting,
+		    RAW ( 0xff, 0xff, 0xfe ), -2 );
+	storen_ok ( &test_settings, &test_uint32_setting,
+		    0xb5927ab8, RAW ( 0xb5, 0x92, 0x7a, 0xb8 ) );
+	fetchn_ok ( &test_settings, &test_uint32_setting,
+		    RAW ( 0x98, 0xab, 0x41, 0x81 ), 0x98ab4181 );
+	fetchn_ok ( &test_settings, &test_uint32_setting,
+		    RAW ( 0xff, 0xff, 0xfe ), 0x00fffffe );
 
 	/* "hex" setting type */
 	storef_ok ( &test_settings, &test_hex_setting,

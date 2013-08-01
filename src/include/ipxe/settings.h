@@ -185,24 +185,47 @@ struct setting_type {
 	 * This is the name exposed to the user (e.g. "string").
 	 */
 	const char *name;
-	/** Parse formatted setting value
+	/** Parse formatted string to setting value
 	 *
+	 * @v type		Setting type
 	 * @v value		Formatted setting value
 	 * @v buf		Buffer to contain raw value
 	 * @v len		Length of buffer
 	 * @ret len		Length of raw value, or negative error
 	 */
-	int ( * parse ) ( const char *value, void *buf, size_t len );
-	/** Format setting value
+	int ( * parse ) ( struct setting_type *type, const char *value,
+			  void *buf, size_t len );
+	/** Format setting value as a string
 	 *
+	 * @v type		Setting type
 	 * @v raw		Raw setting value
 	 * @v raw_len		Length of raw setting value
 	 * @v buf		Buffer to contain formatted value
 	 * @v len		Length of buffer
 	 * @ret len		Length of formatted value, or negative error
 	 */
-	int ( * format ) ( const void *raw, size_t raw_len, char *buf,
-			   size_t len );
+	int ( * format ) ( struct setting_type *type, const void *raw,
+			   size_t raw_len, char *buf, size_t len );
+	/** Convert number to setting value
+	 *
+	 * @v type		Setting type
+	 * @v value		Numeric value
+	 * @v buf		Buffer to contain raw value
+	 * @v len		Length of buffer
+	 * @ret len		Length of raw value, or negative error
+	 */
+	int ( * denumerate ) ( struct setting_type *type, unsigned long value,
+			       void *buf, size_t len );
+	/** Convert setting value to number
+	 *
+	 * @v type		Setting type
+	 * @v raw		Raw setting value
+	 * @v raw_len		Length of raw setting value
+	 * @v value		Numeric value to fill in
+	 * @ret rc		Return status code
+	 */
+	int ( * numerate ) ( struct setting_type *type, const void *raw,
+			     size_t raw_len, unsigned long *value );
 };
 
 /** Configuration setting type table */
@@ -308,6 +331,14 @@ extern int parse_setting_name ( char *name, get_child_settings_t get_child,
 				struct setting *setting );
 extern int setting_name ( struct settings *settings, struct setting *setting,
 			  char *buf, size_t len );
+extern int setting_format ( struct setting_type *type, const void *raw,
+			    size_t raw_len, char *buf, size_t len );
+extern int setting_parse ( struct setting_type *type, const char *value,
+			   void *buf, size_t len );
+extern int setting_numerate ( struct setting_type *type, const void *raw,
+			      size_t raw_len, unsigned long *value );
+extern int setting_denumerate ( struct setting_type *type, unsigned long value,
+				void *buf, size_t len );
 extern int fetchf_setting ( struct settings *settings, struct setting *setting,
 			    char *buf, size_t len );
 extern int fetchf_setting_copy ( struct settings *settings,
@@ -315,6 +346,10 @@ extern int fetchf_setting_copy ( struct settings *settings,
 extern int storef_setting ( struct settings *settings,
 			    struct setting *setting,
 			    const char *value );
+extern int fetchn_setting ( struct settings *settings, struct setting *setting,
+			    unsigned long *value );
+extern int storen_setting ( struct settings *settings, struct setting *setting,
+			    unsigned long value );
 extern char * expand_settings ( const char *string );
 
 extern struct setting_type setting_type_string __setting_type;
