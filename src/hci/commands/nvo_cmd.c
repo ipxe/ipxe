@@ -23,6 +23,7 @@
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
+#include <byteswap.h>
 #include <ipxe/settings.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
@@ -255,6 +256,73 @@ static int read_exec ( int argc, char **argv ) {
 	return set_core_exec ( argc, argv, &clear_read_cmd, read_value );
 }
 
+/** "inc" options */
+struct inc_options {};
+
+/** "inc" option list */
+static struct option_descriptor inc_opts[] = {};
+
+/** "inc" command descriptor */
+static struct command_descriptor inc_cmd =
+	COMMAND_DESC ( struct inc_options, inc_opts, 1, 2,
+		       "<setting> [<increment>]" );
+
+/**
+ * "inc" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int inc_exec ( int argc, char **argv ) {
+	struct inc_options opts;
+	struct named_setting setting;
+	unsigned int increment = 1;
+	unsigned long value;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &inc_cmd, &opts ) ) != 0 )
+		goto err_parse_options;
+
+	/* Parse setting name */
+	if ( ( rc = parse_existing_setting ( argv[optind], &setting ) ) != 0 )
+		goto err_parse_setting;
+
+	/* Parse increment (if present) */
+	if ( ( ( optind + 1 ) < argc ) &&
+	     ( ( rc = parse_integer ( argv[ optind + 1 ], &increment ) ) != 0))
+		goto err_parse_increment;
+
+	/* Fetch existing setting value, if any, allowing for the fact
+	 * that numeric settings are big-endian and variable-length.
+	 */
+	if ( ( rc = fetchn_setting ( setting.settings, &setting.setting,
+				     &value ) ) != 0 ) {
+		/* Treat as a non-existent :int32 setting with a zero value */
+		value = 0;
+		if ( ! setting.setting.type )
+			setting.setting.type = &setting_type_int32;
+	}
+
+	/* Increment value */
+	value += increment;
+
+	/* Store updated setting value */
+	if ( ( rc = storen_setting ( setting.settings, &setting.setting,
+				     value ) ) != 0 ) {
+		printf ( "Could not store \"%s\": %s\n",
+			 setting.setting.name, strerror ( rc ) );
+		goto err_store;
+	}
+
+ err_store:
+ err_parse_increment:
+ err_parse_setting:
+ err_parse_options:
+	return rc;
+}
+
 /** Non-volatile option commands */
 struct command nvo_commands[] __command = {
 	{
@@ -272,5 +340,9 @@ struct command nvo_commands[] __command = {
 	{
 		.name = "read",
 		.exec = read_exec,
+	},
+	{
+		.name = "inc",
+		.exec = inc_exec,
 	},
 };
