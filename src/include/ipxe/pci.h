@@ -351,6 +351,7 @@ struct pci_driver {
 #define PCI_FUNC( busdevfn )		( ( (busdevfn) >> 0 ) & 0x07 )
 #define PCI_BUSDEVFN( bus, slot, func )	\
 	( ( (bus) << 8 ) | ( (slot) << 3 ) | ( (func) << 0 ) )
+#define PCI_FIRST_FUNC( busdevfn )	( (busdevfn) & ~0x07 )
 
 #define PCI_BASE_CLASS( class )		( (class) >> 16 )
 #define PCI_SUB_CLASS( class )		( ( (class) >> 8 ) & 0xff )
@@ -385,6 +386,7 @@ extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
 extern int pci_read_config ( struct pci_device *pci );
+extern int pci_find_next ( struct pci_device *pci, unsigned int busdevfn );
 extern int pci_find_driver ( struct pci_device *pci );
 extern int pci_probe ( struct pci_device *pci );
 extern void pci_remove ( struct pci_device *pci );
