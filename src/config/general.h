@@ -129,6 +129,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define REBOOT_CMD		/* Reboot command */
 //#define POWEROFF_CMD		/* Power off command */
 //#define IMAGE_TRUST_CMD	/* Image trust management commands */
+//#define PCI_CMD		/* PCI commands */
 
 /*
  * ROM-specific options
