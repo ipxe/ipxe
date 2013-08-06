@@ -82,9 +82,9 @@ struct sockaddr_in6 {
 	 *
 	 * Always set to @c AF_INET6 for IPv6 addresses
 	 */
-	sa_family_t sin_family;
+	sa_family_t sin6_family;
 	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
-	uint16_t 	sin_port;
+	uint16_t sin6_port;
         uint32_t        sin6_flowinfo;  /* Flow number */
         struct in6_addr sin6_addr;      /* 128-bit destination address */
         uint32_t        sin6_scope_id;  /* Scope ID */
