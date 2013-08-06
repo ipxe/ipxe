@@ -220,9 +220,9 @@ static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
 	udphdr->chksum = tcpip_chksum ( udphdr, len );
 
 	/* Dump debugging information */
-	DBGC ( udp, "UDP %p TX %d->%d len %d\n", udp,
-	       ntohs ( udphdr->src ), ntohs ( udphdr->dest ),
-	       ntohs ( udphdr->len ) );
+	DBGC2 ( udp, "UDP %p TX %d->%d len %d\n", udp,
+		ntohs ( udphdr->src ), ntohs ( udphdr->dest ),
+		ntohs ( udphdr->len ) );
 
 	/* Send it to the next layer for processing */
 	if ( ( rc = tcpip_tx ( iobuf, &udp_protocol, src, dest, netdev,
@@ -317,8 +317,8 @@ static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 	iob_pull ( iobuf, sizeof ( *udphdr ) );
 
 	/* Dump debugging information */
-	DBGC ( udp, "UDP %p RX %d<-%d len %zd\n", udp,
-	       ntohs ( udphdr->dest ), ntohs ( udphdr->src ), ulen );
+	DBGC2 ( udp, "UDP %p RX %d<-%d len %zd\n", udp,
+		ntohs ( udphdr->dest ), ntohs ( udphdr->src ), ulen );
 
 	/* Ignore if no matching connection found */
 	if ( ! udp ) {
