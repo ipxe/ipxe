@@ -33,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  * @ret is_supported	CPUID instruction is supported
  */
-static int cpuid_is_supported ( void ) {
+int cpuid_is_supported ( void ) {
 	unsigned long original;
 	unsigned long inverted;
 
@@ -50,24 +50,6 @@ static int cpuid_is_supported ( void ) {
 		  : "=&r" ( original ), "=&r" ( inverted )
 		  : "ir" ( CPUID_FLAG ) );
 	return ( ( original ^ inverted ) & CPUID_FLAG );
-}
-
-/**
- * Issue CPUID instruction
- *
- * @v operation		CPUID operation
- * @v eax		Output via %eax
- * @v ebx		Output via %ebx
- * @v ecx		Output via %ecx
- * @v edx		Output via %edx
- */
-static inline __attribute__ (( always_inline )) void
-cpuid ( uint32_t operation, uint32_t *eax, uint32_t *ebx, uint32_t *ecx,
-	uint32_t *edx ) {
-
-	__asm__ ( "cpuid"
-		  : "=a" ( *eax ), "=b" ( *ebx ), "=c" ( *ecx ), "=d" ( *edx )
-		  : "0" ( operation ) );
 }
 
 /**

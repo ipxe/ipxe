@@ -10,6 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #define	PCI_SETTINGS	/* PCI device settings */
+//#define	CPUID_SETTINGS	/* CPUID settings */
 //#define	VMWARE_SETTINGS	/* VMware GuestInfo settings */
 
 #include <config/local/settings.h>
