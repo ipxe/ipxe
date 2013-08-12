@@ -862,18 +862,18 @@ static int numeric_setting_value ( int is_signed, const void *raw, size_t len,
 	const int8_t *signed_bytes = raw;
 	int is_negative;
 	unsigned int i;
+	uint8_t pad;
 	uint8_t byte;
-
-	/* Range check */
-	if ( len > sizeof ( long ) )
-		return -ERANGE;
 
 	/* Convert to host-ordered longs */
 	is_negative = ( len && ( signed_bytes[0] < 0 ) );
 	*value = ( ( is_signed && is_negative ) ? -1L : 0 );
+	pad = *value;
 	for ( i = 0 ; i < len ; i++ ) {
 		byte = unsigned_bytes[i];
 		*value = ( ( *value << 8 ) | byte );
+		if ( ( ( i + sizeof ( *value ) ) < len ) && ( byte != pad ) )
+			return -ERANGE;
 	}
 
 	return len;

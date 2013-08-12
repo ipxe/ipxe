@@ -342,6 +342,12 @@ static void settings_test_exec ( void ) {
 		    RAW ( 0x98, 0xab, 0x41, 0x81 ), 0x98ab4181 );
 	fetchn_ok ( &test_settings, &test_uint32_setting,
 		    RAW ( 0xff, 0xff, 0xfe ), 0x00fffffe );
+	fetchn_ok ( &test_settings, &test_uint32_setting,
+		    RAW ( 0, 0, 0, 0x12, 0x34, 0x56, 0x78 ), 0x12345678 );
+	fetchn_ok ( &test_settings, &test_int32_setting,
+		    RAW ( 0, 0, 0, 0x12, 0x34, 0x56, 0x78 ), 0x12345678 );
+	fetchn_ok ( &test_settings, &test_int32_setting,
+		    RAW ( 0xff, 0xff, 0x87, 0x65, 0x43, 0x21 ), -0x789abcdf );
 
 	/* "hex" setting type */
 	storef_ok ( &test_settings, &test_hex_setting,
