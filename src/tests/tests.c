@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Drag in all applicable self-tests */
 REQUIRE_OBJECT ( memcpy_test );
 REQUIRE_OBJECT ( string_test );
+REQUIRE_OBJECT ( vsprintf_test );
 REQUIRE_OBJECT ( list_test );
 REQUIRE_OBJECT ( byteswap_test );
 REQUIRE_OBJECT ( base64_test );
