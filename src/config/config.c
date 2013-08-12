@@ -316,6 +316,9 @@ REQUIRE_OBJECT ( guestinfo );
 #ifdef CPUID_SETTINGS
 REQUIRE_OBJECT ( cpuid_settings );
 #endif
+#ifdef MEMMAP_SETTINGS
+REQUIRE_OBJECT ( memmap_settings );
+#endif
 
 /*
  * Drag in selected keyboard map
