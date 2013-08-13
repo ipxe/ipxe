@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/netdevice.h>
 #include <ipxe/menu.h>
 #include <ipxe/settings.h>
+#include <ipxe/params.h>
 #include <ipxe/parseopt.h>
 
 /** @file
@@ -248,6 +249,29 @@ int parse_existing_setting ( char *text, struct named_setting *setting ) {
 int parse_autovivified_setting ( char *text, struct named_setting *setting ) {
 
 	return parse_setting ( text, setting, autovivify_child_settings );
+}
+
+/**
+ * Parse form parameter list name
+ *
+ * @v text		Text
+ * @ret params		Parameter list
+ * @ret rc		Return status code
+ */
+int parse_parameters ( char *text, struct parameters **params ) {
+
+	/* Find parameter list */
+	*params = find_parameters ( text );
+	if ( ! *params ) {
+		if ( text ) {
+			printf ( "\"%s\": no such parameter list\n", text );
+		} else {
+			printf ( "No default parameter list\n" );
+		}
+		return -ENOENT;
+	}
+
+	return 0;
 }
 
 /**

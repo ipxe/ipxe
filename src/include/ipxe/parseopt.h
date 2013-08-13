@@ -15,6 +15,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 struct net_device;
 struct menu;
+struct parameters;
 
 /** A command-line option descriptor */
 struct option_descriptor {
@@ -135,6 +136,7 @@ extern int parse_setting ( char *text, struct named_setting *setting,
 extern int parse_existing_setting ( char *text, struct named_setting *setting );
 extern int parse_autovivified_setting ( char *text,
 					struct named_setting *setting );
+extern int parse_parameters ( char *text, struct parameters **params );
 extern void print_usage ( struct command_descriptor *cmd, char **argv );
 extern int reparse_options ( int argc, char **argv,
 			     struct command_descriptor *cmd, void *opts );
