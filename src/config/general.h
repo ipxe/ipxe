@@ -130,6 +130,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define POWEROFF_CMD		/* Power off command */
 //#define IMAGE_TRUST_CMD	/* Image trust management commands */
 //#define PCI_CMD		/* PCI commands */
+//#define PARAM_CMD		/* Form parameter commands */
 
 /*
  * ROM-specific options

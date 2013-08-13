@@ -286,6 +286,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_pci_settings	      ( ERRFILE_OTHER | 0x003d0000 )
 #define ERRFILE_efi_reboot	      ( ERRFILE_OTHER | 0x003e0000 )
 #define ERRFILE_memmap_settings	      ( ERRFILE_OTHER | 0x003f0000 )
+#define ERRFILE_param_cmd	      ( ERRFILE_OTHER | 0x00400000 )
 
 /** @} */
 
