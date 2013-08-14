@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <libgen.h>
 #include <ctype.h>
 #include <ipxe/vsprintf.h>
+#include <ipxe/params.h>
 #include <ipxe/uri.h>
 
 /**
@@ -59,6 +60,21 @@ static void dump_uri ( struct uri *uri ) {
 		DBG ( " query \"%s\"", uri->query );
 	if ( uri->fragment )
 		DBG ( " fragment \"%s\"", uri->fragment );
+	if ( uri->params )
+		DBG ( " params \"%s\"", uri->params->name );
+}
+
+/**
+ * Free URI
+ *
+ * @v refcnt		Reference count
+ */
+static void free_uri ( struct refcnt *refcnt ) {
+	struct uri *uri = container_of ( refcnt, struct uri, refcnt );
+
+	if ( uri->params )
+		destroy_parameters ( uri->params );
+	free ( uri );
 }
 
 /**
@@ -85,12 +101,25 @@ struct uri * parse_uri ( const char *uri_string ) {
 	uri = zalloc ( sizeof ( *uri ) + raw_len );
 	if ( ! uri )
 		return NULL;
+	ref_init ( &uri->refcnt, free_uri );
 	raw = ( ( ( char * ) uri ) + sizeof ( *uri ) );
 
 	/* Copy in the raw string */
 	memcpy ( raw, uri_string, raw_len );
 
-	/* Start by chopping off the fragment, if it exists */
+	/* Identify the parameter list, if present */
+	if ( ( tmp = strstr ( raw, "##params" ) ) ) {
+		*tmp = '\0';
+		tmp += 8 /* "##params" */;
+		uri->params = find_parameters ( *tmp ? ( tmp + 1 ) : NULL );
+		if ( uri->params ) {
+			claim_parameters ( uri->params );
+		} else {
+			/* Ignore non-existent submission blocks */
+		}
+	}
+
+	/* Chop off the fragment, if it exists */
 	if ( ( tmp = strchr ( raw, '#' ) ) ) {
 		*(tmp++) = '\0';
 		uri->fragment = tmp;

@@ -13,6 +13,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <ipxe/refcnt.h>
 
+struct parameters;
+
 /** A Uniform Resource Identifier
  *
  * Terminology for this data structure is as per uri(7), except that
@@ -65,6 +67,8 @@ struct uri {
 	const char *query;
 	/** Fragment */
 	const char *fragment;
+	/** Form parameters */
+	struct parameters *params;
 } __attribute__ (( packed ));
 
 /** A field in a URI
