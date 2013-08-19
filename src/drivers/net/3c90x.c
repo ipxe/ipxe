@@ -813,9 +813,13 @@ static int a3c90x_open(struct net_device *netdev)
 		goto error;
 	}
 
+	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdStallCtl, upStall);
+
 	/* send rx_ring address to NIC */
 	outl(virt_to_bus(inf_3c90x->rx_ring),
 	     inf_3c90x->IOAddr + regUpListPtr_l);
+
+	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdStallCtl, upUnStall);
 
 	/* enable packet transmission and reception */
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdTxEnable, 0);
