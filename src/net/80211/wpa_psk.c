@@ -54,6 +54,18 @@ static int wpa_psk_start ( struct net80211_device *dev )
 	int len;
 	struct wpa_common_ctx *ctx = dev->handshaker->priv;
 
+	/* try PMK first */
+	len = fetch_setting ( netdev_settings ( dev->netdev ),
+			      &net80211_pmk_setting, 
+			      pmk, WPA_PMK_LEN );
+
+	DBGC ( ctx, "WPA-PSK %p: load PMK setting returned %d:\n", ctx, len );
+	DBGC_HD ( ctx, pmk, WPA_PMK_LEN );
+
+	if ( WPA_PMK_LEN == len ) {
+		return wpa_start ( dev, ctx, pmk, WPA_PMK_LEN );
+	}
+
 	len = fetch_string_setting ( netdev_settings ( dev->netdev ),
 				     &net80211_key_setting, passphrase,
 				     64 + 1 );

@@ -237,6 +237,19 @@ struct setting net80211_key_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.tag = NET80211_SETTING_TAG_KEY,
 };
 
+/** Pairwise master key (PMK), PMK = PBKDF2_SHA1(key, ssid, 4096)
+ *
+ * Windows XP stores PMK instead of a key. We need to support auth data from
+ * from Windows XP, so we had to introduce PMK here. PMK data will have higher 
+ * priority than key.
+ */
+struct setting net80211_pmk_setting __setting ( SETTING_NETDEV_EXTRA ) = {
+	.name = "pmk",
+	.description = "Pairwise master key for WPA/WPA2",
+	.type = &setting_type_hex,
+	.tag = NET80211_SETTING_TAG_PMK,
+};
+
 /** @} */
 
 

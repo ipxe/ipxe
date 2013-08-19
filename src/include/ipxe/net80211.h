@@ -1095,6 +1095,9 @@ struct net80211_wlan
 /** 802.11 encryption key setting */
 extern struct setting net80211_key_setting __setting ( SETTING_NETDEV_EXTRA );
 
+/** Pairwise master key setting */
+extern struct setting net80211_pmk_setting __setting ( SETTING_NETDEV_EXTRA );
+
 
 /**
  * @defgroup net80211_probe 802.11 network location API
@@ -1203,5 +1206,8 @@ static inline u16 net80211_cts_duration ( struct net80211_device *dev,
 
 /** Wireless key setting tag */
 #define NET80211_SETTING_TAG_KEY NET80211_SETTING_TAG ( 0x03 )
+
+/** WPA Pairwise master key setting tag */
+#define NET80211_SETTING_TAG_PMK NET80211_SETTING_TAG ( 0x04 )
 
 #endif
