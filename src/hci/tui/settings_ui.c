@@ -441,7 +441,7 @@ static void reveal_setting_row ( struct setting_widget *widget,
 static void init_widget ( struct setting_widget *widget,
 			  struct settings *settings ) {
 
-	widget->settings = settings;
+	widget->settings = settings_target ( settings );
 	widget->num_rows = select_setting_row ( widget, 0 );
 	widget->first_visible = SETTINGS_LIST_ROWS;
 	draw_title_row ( widget );
@@ -508,13 +508,25 @@ static int main_loop ( struct settings *settings ) {
 			key = getkey ( 0 );
 			move = 0;
 			switch ( key ) {
-			case KEY_DOWN:
-				if ( widget.current < ( widget.num_rows - 1 ) )
-					move = +1;
-				break;
 			case KEY_UP:
-				if ( widget.current > 0 )
-					move = -1;
+				move = -1;
+				break;
+			case KEY_DOWN:
+				move = +1;
+				break;
+			case KEY_PPAGE:
+				move = ( widget.first_visible -
+					 widget.current - 1 );
+				break;
+			case KEY_NPAGE:
+				move = ( widget.first_visible - widget.current
+					 + SETTINGS_LIST_ROWS );
+				break;
+			case KEY_HOME:
+				move = -widget.num_rows;
+				break;
+			case KEY_END:
+				move = +widget.num_rows;
 				break;
 			case CTRL_D:
 				if ( ! widget.row.setting )
@@ -545,10 +557,16 @@ static int main_loop ( struct settings *settings ) {
 			}
 			if ( move ) {
 				next = ( widget.current + move );
-				draw_setting_row ( &widget );
-				redraw = 1;
-				reveal_setting_row ( &widget, next );
-				select_setting_row ( &widget, next );
+				if ( ( int ) next < 0 )
+					next = 0;
+				if ( next >= widget.num_rows )
+					next = ( widget.num_rows - 1 );
+				if ( next != widget.current ) {
+					draw_setting_row ( &widget );
+					redraw = 1;
+					reveal_setting_row ( &widget, next );
+					select_setting_row ( &widget, next );
+				}
 			}
 		}
 	}

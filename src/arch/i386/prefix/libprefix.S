@@ -545,8 +545,7 @@ alloc_basemem:
  * Free space allocated with alloc_basemem.
  *
  * Parameters:
- *   %ax : .text16 segment address
- *   %bx : .data16 segment address
+ *   none (.text16 segment address is implicit in %cs)
  * Returns:
  *   %ax : 0 if successfully freed
  * Corrupts:
@@ -559,14 +558,14 @@ alloc_basemem:
 free_basemem:
 	/* Preserve registers */
 	pushw	%fs
+	pushw	%ax
 
 	/* Check FBMS counter */
-	pushw	%ax
+	movw	%cs, %ax
 	shrw	$6, %ax
 	pushw	$0x40
 	popw	%fs
 	cmpw	%ax, %fs:0x13
-	popw	%ax
 	jne	1f
 
 	/* Check hooked interrupt count */
@@ -574,6 +573,7 @@ free_basemem:
 	jne	1f
 
 	/* OK to free memory */
+	movw	%cs, %ax
 	addw	$_text16_memsz_pgh, %ax
 	addw	$_data16_memsz_pgh, %ax
 	shrw	$6, %ax
@@ -581,6 +581,7 @@ free_basemem:
 	xorw	%ax, %ax
 
 1:	/* Restore registers and return */
+	popw	%ax
 	popw	%fs
 	ret
 	.size free_basemem, . - free_basemem
@@ -621,7 +622,7 @@ install:
 	/* Image destination = default */
 	xorl	%edi, %edi
 	/* Allow arbitrary relocation */
-	xorl	%ebp, %ebp
+	orl	$0xffffffff, %ebp
 	/* Install text and data segments */
 	call	install_prealloc
 	/* Restore registers and return */
@@ -641,7 +642,9 @@ install:
  *   %bx  : .data16 segment address
  *   %esi : Image source physical address (or zero for %cs:0000)
  *   %edi : Decompression temporary area physical address (or zero for default)
- *   %ebp : Maximum end address for relocation (or zero for no maximum)
+ *   %ebp : Maximum end address for relocation
+ *          - 0xffffffff for no maximum
+ *          - 0x00000000 to inhibit use of INT 15,e820 and INT 15,e801
  * Corrupts:
  *   none
  ****************************************************************************
@@ -795,6 +798,13 @@ payload_death_message:
 	movw	%ax, (init_librm_vector+2)
 	lcall	*init_librm_vector
 
+	/* Inhibit INT 15,e820 and INT 15,e801 if applicable */
+	testl	%ebp, %ebp
+	jnz	1f
+	incb	memmap_post
+	decl	%ebp
+1:
+
 	/* Call relocate() to determine target address for relocation.
 	 * relocate() will return with %esi, %edi and %ecx set up
 	 * ready for the copy to the new location.
@@ -872,8 +882,7 @@ close_payload:
  * Uninstall all text and data segments.
  *
  * Parameters:
- *   %ax  : .text16 segment address
- *   %bx  : .data16 segment address
+ *   none (.text16 segment address is implicit in %cs)
  * Returns:
  *   none
  * Corrupts:

@@ -51,13 +51,59 @@ void base16_encode ( const uint8_t *raw, size_t len, char *encoded ) {
 	char *encoded_bytes = encoded;
 	size_t remaining = len;
 
+	/* Encode each byte */
 	for ( ; remaining-- ; encoded_bytes += 2 ) {
 		sprintf ( encoded_bytes, "%02x", *(raw_bytes++) );
 	}
 
+	/* Ensure terminating NUL exists even if length was zero */
+	*encoded_bytes = '\0';
+
 	DBG ( "Base16-encoded to \"%s\":\n", encoded );
 	DBG_HDA ( 0, raw, len );
 	assert ( strlen ( encoded ) == base16_encoded_len ( len ) );
+}
+
+/**
+ * Decode hexadecimal string
+ *
+ * @v encoded		Encoded string
+ * @v separator		Byte separator character, or 0 for no separator
+ * @v data		Buffer
+ * @v len		Length of buffer
+ * @ret len		Length of data, or negative error
+ */
+int hex_decode ( const char *encoded, char separator, void *data, size_t len ) {
+	uint8_t *out = data;
+	unsigned int count = 0;
+	unsigned int sixteens;
+	unsigned int units;
+
+	while ( *encoded ) {
+
+		/* Check separator, if applicable */
+		if ( count && separator && ( ( *(encoded++) != separator ) ) )
+			return -EINVAL;
+
+		/* Extract digits.  Note that either digit may be NUL,
+		 * which would be interpreted as an invalid value by
+		 * strtoul_charval(); there is therefore no need for an
+		 * explicit end-of-string check.
+		 */
+		sixteens = strtoul_charval ( *(encoded++) );
+		if ( sixteens >= 16 )
+			return -EINVAL;
+		units = strtoul_charval ( *(encoded++) );
+		if ( units >= 16 )
+			return -EINVAL;
+
+		/* Store result */
+		if ( count < len )
+			out[count] = ( ( sixteens << 4 ) | units );
+		count++;
+
+	}
+	return count;
 }
 
 /**
@@ -75,33 +121,15 @@ void base16_encode ( const uint8_t *raw, size_t len, char *encoded ) {
  * to provide a buffer of the correct size.
  */
 int base16_decode ( const char *encoded, uint8_t *raw ) {
-	const char *encoded_bytes = encoded;
-	uint8_t *raw_bytes = raw;
-	char buf[3];
-	char *endp;
-	size_t len;
+	int len;
 
-	while ( encoded_bytes[0] ) {
-		if ( ! encoded_bytes[1] ) {
-			DBG ( "Base16-encoded string \"%s\" has invalid "
-			      "length\n", encoded );
-			return -EINVAL;
-		}
-		memcpy ( buf, encoded_bytes, 2 );
-		buf[2] = '\0';
-		*(raw_bytes++) = strtoul ( buf, &endp, 16 );
-		if ( *endp != '\0' ) {
-			DBG ( "Base16-encoded string \"%s\" has invalid "
-			      "byte \"%s\"\n", encoded, buf );
-			return -EINVAL;
-		}
-		encoded_bytes += 2;
-	}
-	len = ( raw_bytes - raw );
+	len = hex_decode ( encoded, 0, raw, -1UL );
+	if ( len < 0 )
+		return len;
 
 	DBG ( "Base16-decoded \"%s\" to:\n", encoded );
 	DBG_HDA ( 0, raw, len );
 	assert ( len <= base16_decoded_max_len ( encoded ) );
 
-	return ( len );
+	return len;
 }

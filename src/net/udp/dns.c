@@ -205,7 +205,7 @@ static char * dns_qualify_name ( const char *string ) {
 	char *fqdn;
 
 	/* Leave unchanged if already fully-qualified or no local domain */
-	if ( ( ! localdomain ) || ( strchr ( string, '.' ) != 0 ) )
+	if ( ( ! localdomain ) || ( strchr ( string, '.' ) != NULL ) )
 		return strdup ( string );
 
 	/* Append local domain to name */
@@ -428,7 +428,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 	}
 	
 	/* Determine what to do next based on the type of query we
-	 * issued and the reponse we received
+	 * issued and the response we received
 	 */
 	switch ( qtype ) {
 

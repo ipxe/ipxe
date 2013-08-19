@@ -6,6 +6,8 @@
  * Date and time
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
 
 /** Seconds since the Epoch

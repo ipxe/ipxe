@@ -17,6 +17,8 @@
 #ifndef PHY_H
 #define PHY_H
 
+FILE_LICENCE ( BSD2 );
+
 #define CHANSEL_DIV		15
 #define CHANSEL_2G(_freq)	(((_freq) * 0x10000) / CHANSEL_DIV)
 #define CHANSEL_5G(_freq)	(((_freq) * 0x8000) / CHANSEL_DIV)

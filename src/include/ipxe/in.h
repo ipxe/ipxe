@@ -59,19 +59,22 @@ struct sockaddr_in {
 	 * Always set to @c AF_INET for IPv4 addresses
 	 */
 	sa_family_t sin_family;
+	/** Flags (part of struct @c sockaddr_tcpip) */
+	uint16_t sin_flags;
 	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
 	uint16_t sin_port;
 	/** IPv4 address */
 	struct in_addr sin_addr;
 	/** Padding
 	 *
-	 * This ensures that a struct @c sockaddr_tcpip is large
-	 * enough to hold a socket address for any TCP/IP address
-	 * family.
+	 * This ensures that a struct @c sockaddr_in is large enough
+	 * to hold a socket address for any TCP/IP address family.
 	 */
-	char pad[ sizeof ( struct sockaddr ) - sizeof ( sa_family_t )
-					     - sizeof ( uint16_t )
-					     - sizeof ( struct in_addr ) ];
+	char pad[ sizeof ( struct sockaddr ) -
+		  ( sizeof ( sa_family_t ) /* sin_family */ +
+		    sizeof ( uint16_t ) /* sin_flags */ +
+		    sizeof ( uint16_t ) /* sin_port */ +
+		    sizeof ( struct in_addr ) /* sin_addr */ ) ];
 } __attribute__ (( may_alias ));
 
 /**
@@ -82,12 +85,27 @@ struct sockaddr_in6 {
 	 *
 	 * Always set to @c AF_INET6 for IPv6 addresses
 	 */
-	sa_family_t sin_family;
+	sa_family_t sin6_family;
+	/** Flags (part of struct @c sockaddr_tcpip) */
+	uint16_t sin6_flags;
 	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
-	uint16_t 	sin_port;
+	uint16_t sin6_port;
         uint32_t        sin6_flowinfo;  /* Flow number */
         struct in6_addr sin6_addr;      /* 128-bit destination address */
         uint32_t        sin6_scope_id;  /* Scope ID */
+	/** Padding
+	 *
+	 * This ensures that a struct @c sockaddr_in6 is large
+	 * enough to hold a socket address for any TCP/IP address
+	 * family.
+	 */
+	char pad[ sizeof ( struct sockaddr ) -
+		  ( sizeof ( sa_family_t ) /* sin6_family */ +
+		    sizeof ( uint16_t ) /* sin6_flags */ +
+		    sizeof ( uint16_t ) /* sin6_port */ +
+		    sizeof ( uint32_t ) /* sin6_flowinfo */ +
+		    sizeof ( struct in6_addr ) /* sin6_addr */ +
+		    sizeof ( uint32_t ) /* sin6_scope_id */ ) ];
 } __attribute__ (( may_alias ));
 
 extern int inet_aton ( const char *cp, struct in_addr *inp );

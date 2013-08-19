@@ -56,9 +56,6 @@ typedef enum {
     true = 1
 } boolean_t;
 
-#define TRUE  1
-#define FALSE 0
-
 #define usec_delay(x) udelay(x)
 #define msec_delay(x) mdelay(x)
 #define msec_delay_irq(x) mdelay(x)

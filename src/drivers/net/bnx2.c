@@ -2617,9 +2617,6 @@ bnx2_probe(struct nic *nic, struct pci_device *pdev)
 	struct bnx2 *bp = &bnx2;
 	int i, rc;
 
-	if (pdev == 0)
-		return 0;
-
 	memset(bp, 0, sizeof(*bp));
 
 	rc = bnx2_init_board(pdev, nic);

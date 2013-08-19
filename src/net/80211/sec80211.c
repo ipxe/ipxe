@@ -45,8 +45,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ENOTSUP_CCMP __einfo_error ( EINFO_ENOTSUP_CCMP )
 #define EINFO_ENOTSUP_CCMP __einfo_uniqify ( EINFO_ENOTSUP, \
 	( 0x10 | NET80211_CRYPT_CCMP ), "CCMP not supported" )
-#define ENOTSUP_CRYPT( crypt )		     \
-	EUNIQ ( ENOTSUP, ( 0x10 | (crypt) ), \
+#define ENOTSUP_CRYPT( crypt )			   \
+	EUNIQ ( EINFO_ENOTSUP, ( 0x10 | (crypt) ), \
 		ENOTSUP_WEP, ENOTSUP_TKIP, ENOTSUP_CCMP )
 
 /** Mapping from net80211 crypto/secprot types to RSN OUI descriptors */

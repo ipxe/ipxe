@@ -20,6 +20,8 @@
 #ifndef ATH_REGISTERS_H
 #define ATH_REGISTERS_H
 
+FILE_LICENCE ( BSD2 );
+
 #define AR_MIBC			0x0040
 #define AR_MIBC_COW		0x00000001
 #define AR_MIBC_FMC		0x00000002

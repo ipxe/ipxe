@@ -53,7 +53,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	PROVIDE_SINGLE_API_INLINE ( IOAPI_PREFIX_ ## _subsys, _api_func )
 
 /* Include all architecture-independent I/O API headers */
-#include <ipxe/efi/efi_io.h>
 
 /* Include all architecture-dependent I/O API headers */
 #include <bits/io.h>

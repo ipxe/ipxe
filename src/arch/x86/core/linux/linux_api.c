@@ -37,6 +37,10 @@ int linux_close ( int fd ) {
 	return linux_syscall ( __NR_close, fd );
 }
 
+off_t linux_lseek ( int fd, off_t offset, int whence ) {
+	return linux_syscall ( __NR_lseek, fd, offset, whence );
+}
+
 __kernel_ssize_t linux_read ( int fd, void *buf, __kernel_size_t count ) {
 	return linux_syscall ( __NR_read, fd, buf, count );
 }

@@ -360,7 +360,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 	char *filename = initrd->cmdline;
 	char *cmdline;
 	struct cpio_header cpio;
-        size_t offset = 0;
+	size_t offset;
 	size_t name_len;
 	size_t pad_len;
 
@@ -368,7 +368,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 	if ( initrd == image )
 		return 0;
 
-	/* Create cpio header before non-prebuilt images */
+	/* Create cpio header for non-prebuilt images */
 	if ( filename && filename[0] ) {
 		cmdline = strchr ( filename, ' ' );
 		name_len = ( ( cmdline ? ( ( size_t ) ( cmdline - filename ) )
@@ -383,24 +383,21 @@ static size_t bzimage_load_initrd ( struct image *image,
 			bzimage_parse_cpio_cmdline ( image, &cpio,
 						     ( cmdline + 1 /* ' ' */ ));
 		}
-		if ( address ) {
-			copy_to_user ( address, offset, &cpio,
-				       sizeof ( cpio ) );
-		}
-		offset += sizeof ( cpio );
-		if ( address ) {
-			memset_user ( address, offset, 0, name_len );
-			copy_to_user ( address, offset, filename,
-				       ( name_len - 1 /* NUL (or space) */ ) );
-		}
-		offset += name_len;
-		offset = ( ( offset + 0x03 ) & ~0x03 );
+		offset = ( ( sizeof ( cpio ) + name_len + 0x03 ) & ~0x03 );
+	} else {
+		offset = 0;
+		name_len = 0;
 	}
 
-	/* Copy in initrd image body */
-	if ( address )
-		memmove_user ( address, offset, initrd->data, 0, initrd->len );
+	/* Copy in initrd image body (and cpio header if applicable) */
 	if ( address ) {
+		memmove_user ( address, offset, initrd->data, 0, initrd->len );
+		if ( offset ) {
+			memset_user ( address, 0, 0, offset );
+			copy_to_user ( address, 0, &cpio, sizeof ( cpio ) );
+			copy_to_user ( address, sizeof ( cpio ), filename,
+				       ( name_len - 1 /* NUL (or space) */ ) );
+		}
 		DBGC ( image, "bzImage %p initrd %p [%#08lx,%#08lx,%#08lx)"
 		       "%s%s\n", image, initrd, user_to_phys ( address, 0 ),
 		       user_to_phys ( address, offset ),

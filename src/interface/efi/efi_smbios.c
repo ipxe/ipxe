@@ -55,6 +55,8 @@ static int efi_find_smbios ( struct smbios *smbios ) {
 	smbios->address = phys_to_user ( smbios_entry->smbios_address );
 	smbios->len = smbios_entry->smbios_len;
 	smbios->count = smbios_entry->smbios_count;
+	smbios->version =
+		SMBIOS_VERSION ( smbios_entry->major, smbios_entry->minor );
 	DBG ( "Found SMBIOS v%d.%d entry point at %p (%x+%zx)\n",
 	      smbios_entry->major, smbios_entry->minor, smbios_entry,
 	      smbios_entry->smbios_address, smbios->len );

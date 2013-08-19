@@ -998,7 +998,7 @@ forcedeth_poll ( struct net_device *netdev )
 
 	DBG ( "forcedeth_poll: status = %#04x\n", status );
 
-	/* Link change interrupt occured. Call always if link is down,
+	/* Link change interrupt occurred. Call always if link is down,
 	 * to give auto-neg a chance to finish */
 	if ( ( status & NVREG_IRQ_LINK ) || ! ( netdev_link_ok ( netdev ) ) )
 		forcedeth_link_status ( netdev );

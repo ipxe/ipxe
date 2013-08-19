@@ -20,6 +20,8 @@
 #ifndef REGD_H
 #define REGD_H
 
+FILE_LICENCE ( BSD2 );
+
 #include "ath.h"
 
 enum ctl_group {

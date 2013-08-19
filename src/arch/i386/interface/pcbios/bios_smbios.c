@@ -77,6 +77,8 @@ static int bios_find_smbios ( struct smbios *smbios ) {
 		smbios->address = phys_to_user ( u.entry.smbios_address );
 		smbios->len = u.entry.smbios_len;
 		smbios->count = u.entry.smbios_count;
+		smbios->version =
+			SMBIOS_VERSION ( u.entry.major, u.entry.minor );
 		return 0;
 	}
 

@@ -51,9 +51,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	ok ( storef_setting ( settings, setting, formatted ) == 0 );	\
 	len = fetch_setting ( settings, setting, actual,		\
 			      sizeof ( actual ) );			\
-	DBGC ( settings, "Stored %s \"%s\", got:\n",			\
-	       (setting)->type->name, formatted );			\
-	DBGC_HDA ( settings, 0, actual, len );				\
+	if ( len >= 0 ) {						\
+		DBGC ( settings, "Stored %s \"%s\", got:\n",		\
+		       (setting)->type->name, formatted );		\
+		DBGC_HDA ( settings, 0, actual, len );			\
+	} else {							\
+		DBGC ( settings, "Stored %s \"%s\", got error %s\n",	\
+		       (setting)->type->name, formatted,		\
+		       strerror ( len ) );				\
+	}								\
 	ok ( len == ( int ) sizeof ( actual ) );			\
 	ok ( memcmp ( actual, expected, sizeof ( actual ) ) == 0 );	\
 	} while ( 0 )
@@ -76,10 +82,61 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	len = fetchf_setting ( settings, setting, actual,		\
 			       sizeof ( actual ) );			\
 	DBGC ( settings, "Fetched %s \"%s\" from:\n",			\
-	       (setting)->type->name, formatted );			\
+	       (setting)->type->name, actual );				\
 	DBGC_HDA ( settings, 0, raw, sizeof ( raw ) );			\
 	ok ( len == ( int ) ( sizeof ( actual ) - 1 ) );		\
 	ok ( strcmp ( actual, formatted ) == 0 );			\
+	} while ( 0 )
+
+/**
+ * Report a numeric-store test result
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @v numeric		Numeric value
+ * @v raw_array		Expected raw value
+ */
+#define storen_ok( settings, setting, numeric, raw_array ) do {		\
+	const uint8_t expected[] = raw_array;				\
+	uint8_t actual[ sizeof ( expected ) ];				\
+	int len;							\
+									\
+	ok ( storen_setting ( settings, setting, numeric ) == 0 );	\
+	len = fetch_setting ( settings, setting, actual,		\
+			      sizeof ( actual ) );			\
+	if ( len >= 0 ) {						\
+		DBGC ( settings, "Stored %s %#lx, got:\n",		\
+		       (setting)->type->name,				\
+		       ( unsigned long ) numeric );			\
+		DBGC_HDA ( settings, 0, actual, len );			\
+	} else {							\
+		DBGC ( settings, "Stored %s %#lx, got error %s\n",	\
+		       (setting)->type->name,				\
+		       ( unsigned long ) numeric, strerror ( len ) );	\
+	}								\
+	ok ( len == ( int ) sizeof ( actual ) );			\
+	ok ( memcmp ( actual, expected, sizeof ( actual ) ) == 0 );	\
+	} while ( 0 )
+
+/**
+ * Report a numeric-fetch test result
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @v raw_array		Raw array
+ * @v numeric		Expected numeric value
+ */
+#define fetchn_ok( settings, setting, raw_array, numeric ) do {		\
+	const uint8_t raw[] = raw_array;				\
+	unsigned long actual;						\
+									\
+	ok ( store_setting ( settings, setting, raw,			\
+			     sizeof ( raw ) ) == 0 );			\
+	ok ( fetchn_setting ( settings, setting, &actual ) == 0 );	\
+	DBGC ( settings, "Fetched %s %#lx from:\n",			\
+	       (setting)->type->name, actual );				\
+	DBGC_HDA ( settings, 0, raw, sizeof ( raw ) );			\
+	ok ( actual == ( unsigned long ) numeric );			\
 	} while ( 0 )
 
 /** Test generic settings block */
@@ -164,10 +221,22 @@ static struct setting test_hexhyp_setting = {
 	.type = &setting_type_hexhyp,
 };
 
+/** Test raw hex string setting type */
+static struct setting test_hexraw_setting = {
+	.name = "test_hexraw",
+	.type = &setting_type_hexraw,
+};
+
 /** Test UUID setting type */
 static struct setting test_uuid_setting = {
 	.name = "test_uuid",
 	.type = &setting_type_uuid,
+};
+
+/** Test PCI bus:dev.fn setting type */
+static struct setting test_busdevfn_setting = {
+	.name = "test_busdevfn",
+	.type = &setting_type_busdevfn,
 };
 
 /**
@@ -198,7 +267,7 @@ static void settings_test_exec ( void ) {
 	fetchf_ok ( &test_settings, &test_ipv4_setting,
 		    RAW ( 212, 13, 204, 60 ), "212.13.204.60" );
 
-	/* Integer setting types */
+	/* Integer setting types (as formatted strings) */
 	storef_ok ( &test_settings, &test_int8_setting,
 		    "54", RAW ( 54 ) );
 	storef_ok ( &test_settings, &test_int8_setting,
@@ -238,11 +307,49 @@ static void settings_test_exec ( void ) {
 	fetchf_ok ( &test_settings, &test_uint32_setting,
 		    RAW ( 0xf2, 0x37, 0xb2, 0x18 ), "0xf237b218" );
 
+	/* Integer setting types (as numeric values) */
+	storen_ok ( &test_settings, &test_int8_setting,
+		    72, RAW ( 72 ) );
+	storen_ok ( &test_settings, &test_int8_setting,
+		    0xabcd, RAW ( 0xcd ) );
+	fetchn_ok ( &test_settings, &test_int8_setting,
+		    RAW ( 0xfe ), -2 );
+	storen_ok ( &test_settings, &test_uint8_setting,
+		    84, RAW ( 84 ) );
+	fetchn_ok ( &test_settings, &test_uint8_setting,
+		    RAW ( 0xfe ), 0xfe );
+	storen_ok ( &test_settings, &test_int16_setting,
+		    0x87bd, RAW ( 0x87, 0xbd ) );
+	fetchn_ok ( &test_settings, &test_int16_setting,
+		    RAW ( 0x3d, 0x14 ), 0x3d14 );
+	fetchn_ok ( &test_settings, &test_int16_setting,
+		    RAW ( 0x80 ), -128 );
+	storen_ok ( &test_settings, &test_uint16_setting,
+		    1, RAW ( 0x00, 0x01 ) );
+	fetchn_ok ( &test_settings, &test_uint16_setting,
+		    RAW ( 0xbd, 0x87 ), 0xbd87 );
+	fetchn_ok ( &test_settings, &test_uint16_setting,
+		    RAW ( 0x80 ), 0x0080 );
+	storen_ok ( &test_settings, &test_int32_setting,
+		    0x0812bfd2, RAW ( 0x08, 0x12, 0xbf, 0xd2 ) );
+	fetchn_ok ( &test_settings, &test_int32_setting,
+		    RAW ( 0x43, 0x87, 0x91, 0xb4 ), 0x438791b4 );
+	fetchn_ok ( &test_settings, &test_int32_setting,
+		    RAW ( 0xff, 0xff, 0xfe ), -2 );
+	storen_ok ( &test_settings, &test_uint32_setting,
+		    0xb5927ab8, RAW ( 0xb5, 0x92, 0x7a, 0xb8 ) );
+	fetchn_ok ( &test_settings, &test_uint32_setting,
+		    RAW ( 0x98, 0xab, 0x41, 0x81 ), 0x98ab4181 );
+	fetchn_ok ( &test_settings, &test_uint32_setting,
+		    RAW ( 0xff, 0xff, 0xfe ), 0x00fffffe );
+	fetchn_ok ( &test_settings, &test_uint32_setting,
+		    RAW ( 0, 0, 0, 0x12, 0x34, 0x56, 0x78 ), 0x12345678 );
+	fetchn_ok ( &test_settings, &test_int32_setting,
+		    RAW ( 0, 0, 0, 0x12, 0x34, 0x56, 0x78 ), 0x12345678 );
+	fetchn_ok ( &test_settings, &test_int32_setting,
+		    RAW ( 0xff, 0xff, 0x87, 0x65, 0x43, 0x21 ), -0x789abcdf );
+
 	/* "hex" setting type */
-	storef_ok ( &test_settings, &test_hex_setting,
-		    ":", RAW ( 0x00, 0x00 ) );
-	storef_ok ( &test_settings, &test_hex_setting,
-		    "1:2:", RAW ( 0x01, 0x02, 0x00 ) );
 	storef_ok ( &test_settings, &test_hex_setting,
 		    "08:12:f5:22:90:1b:4b:47:a8:30:cb:4d:67:4c:d6:76",
 		    RAW ( 0x08, 0x12, 0xf5, 0x22, 0x90, 0x1b, 0x4b, 0x47, 0xa8,
@@ -260,11 +367,23 @@ static void settings_test_exec ( void ) {
 			  0x09, 0x6c, 0x66, 0x13, 0xc1, 0xa8, 0xec, 0x27 ),
 		    "9f-e5-6d-fb-24-3a-4c-bb-a9-09-6c-66-13-c1-a8-ec-27" );
 
+	/* "hexraw" setting type */
+	storef_ok ( &test_settings, &test_hexraw_setting,
+		    "012345abcdef", RAW ( 0x01, 0x23, 0x45, 0xab, 0xcd, 0xef ));
+	fetchf_ok ( &test_settings, &test_hexraw_setting,
+		    RAW ( 0x9e, 0x4b, 0x6e, 0xef, 0x36, 0xb6, 0x46, 0xfe, 0x8f,
+			  0x17, 0x06, 0x39, 0x6b, 0xf4, 0x48, 0x4e ),
+		    "9e4b6eef36b646fe8f1706396bf4484e" );
+
 	/* "uuid" setting type (no store capability) */
 	fetchf_ok ( &test_settings, &test_uuid_setting,
 		    RAW ( 0x1a, 0x6a, 0x74, 0x9d, 0x0e, 0xda, 0x46, 0x1a,0xa8,
 			  0x7a, 0x7c, 0xfe, 0x4f, 0xca, 0x4a, 0x57 ),
 		    "1a6a749d-0eda-461a-a87a-7cfe4fca4a57" );
+
+	/* "busdevfn" setting type (no store capability) */
+	fetchf_ok ( &test_settings, &test_busdevfn_setting,
+		    RAW ( 0x03, 0x45 ), "03:08.5" );
 
 	/* Clear and unregister test settings block */
 	clear_settings ( &test_settings );

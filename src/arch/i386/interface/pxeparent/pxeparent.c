@@ -31,6 +31,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/* Disambiguate the various error causes */
+#define EINFO_EPXECALL							\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x01,			\
+			  "External PXE API error" )
+#define EPXECALL( status ) EPLATFORM ( EINFO_EPXECALL, status )
+
 /**
  * Name PXE API call
  *
@@ -151,16 +157,8 @@ int pxeparent_call ( SEGOFF16_t entry, unsigned int function,
 	/* Determine return status code based on PXENV_EXIT and
 	 * PXENV_STATUS
 	 */
-	if ( exit == PXENV_EXIT_SUCCESS ) {
-		rc = 0;
-	} else {
-		rc = -pxeparent_params.Status;
-		/* Paranoia; don't return success for the combination
-		 * of PXENV_EXIT_FAILURE but PXENV_STATUS_SUCCESS
-		 */
-		if ( rc == 0 )
-			rc = -EIO;
-	}
+	rc = ( ( exit == PXENV_EXIT_SUCCESS ) ?
+	       0 : -EPXECALL ( pxeparent_params.Status ) );
 
 	/* If anything goes wrong, print as much debug information as
 	 * it's possible to give.

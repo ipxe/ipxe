@@ -20,6 +20,8 @@
 #ifndef AR9003_EEPROM_H
 #define AR9003_EEPROM_H
 
+FILE_LICENCE ( BSD2 );
+
 #define AR9300_EEP_VER               0xD000
 #define AR9300_EEP_VER_MINOR_MASK    0xFFF
 #define AR9300_EEP_MINOR_VER_1       0x1

@@ -84,7 +84,7 @@ static int imgtrust_exec ( int argc, char **argv ) {
 /** "imgverify" options */
 struct imgverify_options {
 	/** Required signer common name */
-	const char *signer;
+	char *signer;
 	/** Keep signature after verification */
 	int keep;
 };

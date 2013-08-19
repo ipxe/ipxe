@@ -44,6 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /* Include all architecture-independent I/O API headers */
 #include <ipxe/efi/efi_pci_api.h>
+#include <ipxe/linux/linux_pci.h>
 
 /* Include all architecture-dependent I/O API headers */
 #include <bits/pci_io.h>

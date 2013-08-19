@@ -127,7 +127,7 @@ static void t595_reset(struct nic *nic)
 		S_TX_COMPLETE | S_TX_AVAIL, BASE + VX_COMMAND);
 
 /*
- * Attempt to get rid of any stray interrupts that occured during
+ * Attempt to get rid of any stray interrupts that occurred during
  * configuration.  On the i386 this isn't possible because one may
  * already be queued.  However, a single stray interrupt is
  * unimportant.
@@ -399,7 +399,7 @@ vxsetlink(void)
 
     i = vx_connector;       /* default in EEPROM */
     reason = "default";
-    warning = 0;
+    warning = NULL;
 
     if ((vx_connectors & conn_tab[vx_connector].bit) == 0) {
         warning = "strange connector type in EEPROM.";
@@ -407,7 +407,7 @@ vxsetlink(void)
         i = CONNECTOR_UTP;
     }
 
-        if (warning != 0) {
+        if (warning) {
             printf("warning: %s\n", warning);
         }
         printf("selected %s. (%s)\n", conn_tab[i].name, reason);

@@ -1011,7 +1011,7 @@ static void fcoe_expired ( struct retry_timer *timer, int over __unused ) {
 	/* Increment the timeout counter */
 	fcoe->timeouts++;
 
-	if ( vlan_can_be_trunk ( fcoe->netdev ) &
+	if ( vlan_can_be_trunk ( fcoe->netdev ) &&
 	     ! ( fcoe->flags & FCOE_VLAN_TIMED_OUT ) ) {
 
 		/* If we have already found a VLAN, send infrequent

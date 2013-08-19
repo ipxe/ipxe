@@ -98,6 +98,8 @@ SECTIONS {
 	*(.data)
 	*(.data.*)
 	KEEP(*(SORT(.tbl.*)))	/* Various tables.  See include/tables.h */
+	KEEP(*(.provided))
+	KEEP(*(.provided.*))
 	_edata16_progbits = .;
     }
     .bss16 : AT ( _data16_load_offset + __bss16 ) {

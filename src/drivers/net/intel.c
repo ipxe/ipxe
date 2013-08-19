@@ -247,11 +247,16 @@ static int intel_fetch_mac ( struct intel_nic *intel, uint8_t *hw_addr ) {
  */
 static void __attribute__ (( unused )) intel_diag ( struct intel_nic *intel ) {
 
-	DBGC ( intel, "INTEL %p TDH=%04x TDT=%04x RDH=%04x RDT=%04x\n", intel,
-	       readl ( intel->regs + INTEL_TDH ),
-	       readl ( intel->regs + INTEL_TDT ),
-	       readl ( intel->regs + INTEL_RDH ),
-	       readl ( intel->regs + INTEL_RDT ) );
+	DBGC ( intel, "INTEL %p TX %04x(%02x)/%04x(%02x) "
+	       "RX %04x(%02x)/%04x(%02x)\n", intel,
+	       ( intel->tx.cons & 0xffff ),
+	       readl ( intel->regs + intel->tx.reg + INTEL_xDH ),
+	       ( intel->tx.prod & 0xffff ),
+	       readl ( intel->regs + intel->tx.reg + INTEL_xDT ),
+	       ( intel->rx.cons & 0xffff ),
+	       readl ( intel->regs + intel->rx.reg + INTEL_xDH ),
+	       ( intel->rx.prod & 0xffff ),
+	       readl ( intel->regs + intel->rx.reg + INTEL_xDT ) );
 }
 
 /******************************************************************************
@@ -360,8 +365,7 @@ static void intel_check_link ( struct net_device *netdev ) {
  * @v ring		Descriptor ring
  * @ret rc		Return status code
  */
-static int intel_create_ring ( struct intel_nic *intel,
-			       struct intel_ring *ring ) {
+int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	physaddr_t address;
 	uint32_t dctl;
 
@@ -412,8 +416,7 @@ static int intel_create_ring ( struct intel_nic *intel,
  * @v intel		Intel device
  * @v ring		Descriptor ring
  */
-static void intel_destroy_ring ( struct intel_nic *intel,
-				 struct intel_ring *ring ) {
+void intel_destroy_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 
 	/* Clear ring length */
 	writel ( 0, ( intel->regs + ring->reg + INTEL_xDLEN ) );
@@ -434,7 +437,7 @@ static void intel_destroy_ring ( struct intel_nic *intel,
  *
  * @v intel		Intel device
  */
-static void intel_refill_rx ( struct intel_nic *intel ) {
+void intel_refill_rx ( struct intel_nic *intel ) {
 	struct intel_descriptor *rx;
 	struct io_buffer *iobuf;
 	unsigned int rx_idx;
@@ -468,11 +471,26 @@ static void intel_refill_rx ( struct intel_nic *intel ) {
 		intel->rx_iobuf[rx_idx] = iobuf;
 
 		/* Push descriptor to card */
-		writel ( rx_tail, intel->regs + INTEL_RDT );
+		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
 
 		DBGC2 ( intel, "INTEL %p RX %d is [%llx,%llx)\n", intel, rx_idx,
 			( ( unsigned long long ) address ),
 			( ( unsigned long long ) address + INTEL_RX_MAX_LEN ) );
+	}
+}
+
+/**
+ * Discard unused receive I/O buffers
+ *
+ * @v intel		Intel device
+ */
+void intel_empty_rx ( struct intel_nic *intel ) {
+	unsigned int i;
+
+	for ( i = 0 ; i < INTEL_NUM_RX_DESC ; i++ ) {
+		if ( intel->rx_iobuf[i] )
+			free_iob ( intel->rx_iobuf[i] );
+		intel->rx_iobuf[i] = NULL;
 	}
 }
 
@@ -540,7 +558,6 @@ static int intel_open ( struct net_device *netdev ) {
  */
 static void intel_close ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
-	unsigned int i;
 
 	/* Disable receiver */
 	writel ( 0, intel->regs + INTEL_RCTL );
@@ -552,11 +569,7 @@ static void intel_close ( struct net_device *netdev ) {
 	intel_destroy_ring ( intel, &intel->rx );
 
 	/* Discard any unused receive buffers */
-	for ( i = 0 ; i < INTEL_NUM_RX_DESC ; i++ ) {
-		if ( intel->rx_iobuf[i] )
-			free_iob ( intel->rx_iobuf[i] );
-		intel->rx_iobuf[i] = NULL;
-	}
+	intel_empty_rx ( intel );
 
 	/* Destroy transmit descriptor ring */
 	intel_destroy_ring ( intel, &intel->tx );
@@ -572,8 +585,7 @@ static void intel_close ( struct net_device *netdev ) {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int intel_transmit ( struct net_device *netdev,
-			       struct io_buffer *iobuf ) {
+int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct intel_nic *intel = netdev->priv;
 	struct intel_descriptor *tx;
 	unsigned int tx_idx;
@@ -599,7 +611,7 @@ static int intel_transmit ( struct net_device *netdev,
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */
-	writel ( tx_tail, intel->regs + INTEL_TDT );
+	writel ( tx_tail, intel->regs + intel->tx.reg + INTEL_xDT );
 
 	DBGC2 ( intel, "INTEL %p TX %d is [%llx,%llx)\n", intel, tx_idx,
 		( ( unsigned long long ) address ),
@@ -613,7 +625,7 @@ static int intel_transmit ( struct net_device *netdev,
  *
  * @v netdev		Network device
  */
-static void intel_poll_tx ( struct net_device *netdev ) {
+void intel_poll_tx ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
 	struct intel_descriptor *tx;
 	unsigned int tx_idx;
@@ -642,7 +654,7 @@ static void intel_poll_tx ( struct net_device *netdev ) {
  *
  * @v netdev		Network device
  */
-static void intel_poll_rx ( struct net_device *netdev ) {
+void intel_poll_rx ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
 	struct intel_descriptor *rx;
 	struct io_buffer *iobuf;
@@ -945,6 +957,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1525, "82567v-4", "82567V-4", 0 ),
 	PCI_ROM ( 0x8086, 0x1526, "82576-5", "82576", 0 ),
 	PCI_ROM ( 0x8086, 0x1527, "82580-f2", "82580 Fiber", 0 ),
+	PCI_ROM ( 0x8086, 0x1533, "i210", "I210", 0 ),
 	PCI_ROM ( 0x8086, 0x294c, "82566dc-2", "82566DC-2", 0 ),
 	PCI_ROM ( 0x8086, 0x2e6e, "cemedia", "CE Media Processor", 0 ),
 };

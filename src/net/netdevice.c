@@ -31,8 +31,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tables.h>
 #include <ipxe/process.h>
 #include <ipxe/init.h>
+#include <ipxe/malloc.h>
 #include <ipxe/device.h>
 #include <ipxe/errortab.h>
+#include <ipxe/vlan.h>
 #include <ipxe/netdevice.h>
 
 /** @file
@@ -212,6 +214,43 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 }
 
 /**
+ * Defer transmitted packet
+ *
+ * @v netdev		Network device
+ * @v iobuf		I/O buffer
+ *
+ * Drivers may call netdev_tx_defer() if there is insufficient space
+ * in the transmit descriptor ring.  Any packets deferred in this way
+ * will be automatically retransmitted as soon as space becomes
+ * available (i.e. as soon as the driver calls netdev_tx_complete()).
+ *
+ * The packet must currently be in the network device's TX queue.
+ *
+ * Drivers utilising netdev_tx_defer() must ensure that space in the
+ * transmit descriptor ring is freed up @b before calling
+ * netdev_tx_complete().  For example, if the ring is modelled using a
+ * producer counter and a consumer counter, then the consumer counter
+ * must be incremented before the call to netdev_tx_complete().
+ * Failure to do this will cause the retransmitted packet to be
+ * immediately redeferred (which will result in out-of-order
+ * transmissions and other nastiness).
+ */
+void netdev_tx_defer ( struct net_device *netdev, struct io_buffer *iobuf ) {
+
+	/* Catch data corruption as early as possible */
+	list_check_contains_entry ( iobuf, &netdev->tx_queue, list );
+
+	/* Remove from transmit queue */
+	list_del ( &iobuf->list );
+
+	/* Add to deferred transmit queue */
+	list_add_tail ( &iobuf->list, &netdev->tx_deferred );
+
+	/* Record "out of space" statistic */
+	netdev_tx_err ( netdev, NULL, -ENOBUFS );
+}
+
+/**
  * Discard transmitted packet
  *
  * @v netdev		Network device
@@ -256,6 +295,13 @@ void netdev_tx_complete_err ( struct net_device *netdev,
 	/* Dequeue and free I/O buffer */
 	list_del ( &iobuf->list );
 	netdev_tx_err ( netdev, iobuf, rc );
+
+	/* Transmit first pending packet, if any */
+	if ( ( iobuf = list_first_entry ( &netdev->tx_deferred,
+					  struct io_buffer, list ) ) != NULL ) {
+		list_del ( &iobuf->list );
+		netdev_tx ( netdev, iobuf );
+	}
 }
 
 /**
@@ -269,9 +315,9 @@ void netdev_tx_complete_err ( struct net_device *netdev,
 void netdev_tx_complete_next_err ( struct net_device *netdev, int rc ) {
 	struct io_buffer *iobuf;
 
-	list_for_each_entry ( iobuf, &netdev->tx_queue, list ) {
+	if ( ( iobuf = list_first_entry ( &netdev->tx_queue, struct io_buffer,
+					  list ) ) != NULL ) {
 		netdev_tx_complete_err ( netdev, iobuf, rc );
-		return;
 	}
 }
 
@@ -282,10 +328,15 @@ void netdev_tx_complete_next_err ( struct net_device *netdev, int rc ) {
  */
 static void netdev_tx_flush ( struct net_device *netdev ) {
 
-	/* Discard any packets in the TX queue */
+	/* Discard any packets in the TX queue.  This will also cause
+	 * any packets in the deferred TX queue to be discarded
+	 * automatically.
+	 */
 	while ( ! list_empty ( &netdev->tx_queue ) ) {
 		netdev_tx_complete_next_err ( netdev, -ECANCELED );
 	}
+	assert ( list_empty ( &netdev->tx_queue ) );
+	assert ( list_empty ( &netdev->tx_deferred ) );
 }
 
 /**
@@ -423,6 +474,7 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 		ref_init ( &netdev->refcnt, free_netdev );
 		netdev->link_rc = -EUNKNOWN_LINK_STATUS;
 		INIT_LIST_HEAD ( &netdev->tx_queue );
+		INIT_LIST_HEAD ( &netdev->tx_deferred );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
 		netdev_settings_init ( netdev );
 		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
@@ -441,7 +493,9 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
  */
 int register_netdev ( struct net_device *netdev ) {
 	static unsigned int ifindex = 0;
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct net_driver *driver;
+	uint32_t seed;
 	int rc;
 
 	/* Create device name */
@@ -452,9 +506,16 @@ int register_netdev ( struct net_device *netdev ) {
 
 	/* Set initial link-layer address, if not already set */
 	if ( ! netdev_has_ll_addr ( netdev ) ) {
-		netdev->ll_protocol->init_addr ( netdev->hw_addr,
-						 netdev->ll_addr );
+		ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
 	}
+
+	/* Use least significant bits of the link-layer address to
+	 * improve the randomness of the (non-cryptographic) random
+	 * number generator.
+	 */
+	memcpy ( &seed, ( netdev->ll_addr + ll_protocol->ll_addr_len
+			  - sizeof ( seed ) ), sizeof ( seed ) );
+	srand ( rand() ^ seed );
 
 	/* Add to device list */
 	netdev_get ( netdev );
@@ -609,6 +670,11 @@ void netdev_irq ( struct net_device *netdev, int enable ) {
 struct net_device * find_netdev ( const char *name ) {
 	struct net_device *netdev;
 
+	/* Allow "netX" shortcut */
+	if ( strcmp ( name, "netX" ) == 0 )
+		return last_opened_netdev();
+
+	/* Identify network device by name */
 	list_for_each_entry ( netdev, &net_devices, list ) {
 		if ( strcmp ( netdev->name, name ) == 0 )
 			return netdev;
@@ -783,5 +849,60 @@ static void net_step ( struct process *process __unused ) {
 	net_poll();
 }
 
+/**
+ * Get the VLAN tag (when VLAN support is not present)
+ *
+ * @v netdev		Network device
+ * @ret tag		0, indicating that device is not a VLAN device
+ */
+__weak unsigned int vlan_tag ( struct net_device *netdev __unused ) {
+	return 0;
+}
+
+/**
+ * Identify VLAN device (when VLAN support is not present)
+ *
+ * @v trunk		Trunk network device
+ * @v tag		VLAN tag
+ * @ret netdev		VLAN device, if any
+ */
+__weak struct net_device * vlan_find ( struct net_device *trunk __unused,
+				       unsigned int tag __unused ) {
+	return NULL;
+}
+
 /** Networking stack process */
 PERMANENT_PROCESS ( net_process, net_step );
+
+/**
+ * Discard some cached network device data
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int net_discard ( void ) {
+	struct net_device *netdev;
+	struct io_buffer *iobuf;
+	unsigned int discarded = 0;
+
+	/* Try to drop one deferred TX packet from each network device */
+	for_each_netdev ( netdev ) {
+		if ( ( iobuf = list_first_entry ( &netdev->tx_deferred,
+						  struct io_buffer,
+						  list ) ) != NULL ) {
+
+			/* Discard first deferred packet */
+			list_del ( &iobuf->list );
+			free ( iobuf );
+
+			/* Report discard */
+			discarded++;
+		}
+	}
+
+	return discarded;
+}
+
+/** Network device cache discarder */
+struct cache_discarder net_discarder __cache_discarder ( CACHE_NORMAL ) = {
+	.discard = net_discard,
+};

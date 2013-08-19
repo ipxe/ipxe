@@ -59,6 +59,7 @@ sub try_import_file {
       open my $outfh, ">$outfile" or die "Could not open $outfile: $!\n";
       my @dependencies = ();
       my $licence;
+      my $maybe_guard;
       my $guard;
       while ( <$infh> ) {
 	# Strip CR and trailing whitespace
@@ -77,10 +78,16 @@ sub try_import_file {
 	# Write out line
 	print $outfh "$_\n";
 	# Apply FILE_LICENCE() immediately after include guard
-	if ( /^\#define\s+_?_\S+_H_?_$/ ) {
-	  die "Duplicate header guard detected in $infile\n" if $guard;
-	  $guard = 1;
-	  print $outfh "\nFILE_LICENCE ( $licence );\n" if $licence;
+	if ( defined $maybe_guard ) {
+	  if ( /^\#define\s+_?_${maybe_guard}_?_$/ ) {
+	    die "Duplicate header guard detected in $infile\n" if $guard;
+	    $guard = $maybe_guard;
+	    print $outfh "\nFILE_LICENCE ( $licence );\n" if $licence;
+	  }
+	  undef $maybe_guard;
+	}
+	if ( /^#ifndef\s+_?_(\S+)_?_/ ) {
+	  $maybe_guard = $1;
 	}
       }
       close $outfh;

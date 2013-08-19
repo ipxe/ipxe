@@ -332,10 +332,10 @@ static int ipv6_rx ( struct io_buffer *iobuf,
 
 	/* Construct socket address */
 	memset ( &src, 0, sizeof ( src ) );
-	src.sin6.sin_family = AF_INET6;
+	src.sin6.sin6_family = AF_INET6;
 	src.sin6.sin6_addr = ip6hdr->src;
 	memset ( &dest, 0, sizeof ( dest ) );
-	dest.sin6.sin_family = AF_INET6;
+	dest.sin6.sin6_family = AF_INET6;
 	dest.sin6.sin6_addr = ip6hdr->dest;
 
 	/* Strip header */

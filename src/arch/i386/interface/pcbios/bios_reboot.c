@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2010 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -19,28 +19,30 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <stdio.h>
-#include <ipxe/efi/efi.h>
-
 /** @file
  *
- * iPXE error message formatting for EFI
+ * Standard PC-BIOS reboot mechanism
  *
  */
+
+#include <ipxe/reboot.h>
+#include <realmode.h>
+#include <bios.h>
 
 /**
- * Format EFI status code
+ * Reboot system
  *
- * @v efirc		EFI status code
- * @v efi_strerror	EFI status code string
+ * @v warm		Perform a warm reboot
  */
-const char * efi_strerror ( EFI_STATUS efirc ) {
-	static char errbuf[32];
+static void bios_reboot ( int warm ) {
+	uint16_t flag;
 
-	if ( ! efirc )
-		return "No error";
+	/* Configure BIOS for cold/warm reboot */
+	flag = ( warm ? BDA_REBOOT_WARM : 0 );
+	put_real ( flag, BDA_SEG, BDA_REBOOT );
 
-	snprintf ( errbuf, sizeof ( errbuf ), "Error %lld",
-		   ( unsigned long long ) ( efirc ^ MAX_BIT ) );
-	return errbuf;
+	/* Jump to system reset vector */
+	__asm__ __volatile__ ( REAL_CODE ( "ljmp $0xf000, $0xfff0" ) : : );
 }
+
+PROVIDE_REBOOT ( pcbios, reboot, bios_reboot );

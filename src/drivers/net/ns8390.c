@@ -895,7 +895,7 @@ static int eth_probe (struct dev *dev, unsigned short *probe_addrs __unused)
 #endif
 			0 };
 		/* if no addresses supplied, fall back on defaults */
-		if (probe_addrs == 0 || probe_addrs[0] == 0)
+		if (probe_addrs == NULL || probe_addrs[0] == 0)
 			probe_addrs = base;
 		eth_bmem = 0;		/* No shared memory */
 		for (idx = 0; (eth_nic_base = probe_addrs[idx]) != 0; ++idx) {

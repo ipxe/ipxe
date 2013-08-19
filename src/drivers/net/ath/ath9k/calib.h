@@ -20,6 +20,8 @@
 #ifndef CALIB_H
 #define CALIB_H
 
+FILE_LICENCE ( BSD2 );
+
 #include "hw.h"
 
 #define AR_PHY_CCA_FILTERWINDOW_LENGTH_INIT     3

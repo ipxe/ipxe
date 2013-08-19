@@ -114,7 +114,7 @@ _exe_start:
 	call	alloc_basemem
 	xorl	%esi, %esi
 	movl	$EXE_DECOMPRESS_ADDRESS, %edi
-	xorl	%ebp, %ebp
+	orl	$0xffffffff, %ebp	/* Allow arbitrary relocation */
 	call	install_prealloc
 
 	/* Set up real-mode stack */

@@ -58,7 +58,7 @@ FILE_LICENCE ( GPL2_ONLY );
   Fri Nov 22 23:00:00 1996  Markus Gutschke  <gutschk@math.uni-muenster.de>
 
   * read the manuals for the CS89x0 chipsets and took note of all the
-    changes that will be neccessary in order to adapt Russel Nelson's code
+    changes that will be necessary in order to adapt Russel Nelson's code
     to the requirements of a BOOT-Prom
 
   * 6

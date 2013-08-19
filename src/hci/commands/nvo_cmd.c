@@ -23,6 +23,7 @@
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
+#include <byteswap.h>
 #include <ipxe/settings.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
@@ -55,31 +56,44 @@ static struct command_descriptor show_cmd =
  */
 static int show_exec ( int argc, char **argv ) {
 	struct show_options opts;
-	const char *name;
+	struct named_setting setting;
+	struct settings *origin;
 	char name_buf[32];
-	char value_buf[256];
+	char *value;
 	int rc;
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &show_cmd, &opts ) ) != 0 )
-		return rc;
+		goto err_parse_options;
 
 	/* Parse setting name */
-	name = argv[optind];
+	if ( ( rc = parse_existing_setting ( argv[optind], &setting ) ) != 0 )
+		goto err_parse_setting;
 
-	/* Fetch setting */
-	if ( ( rc = fetchf_named_setting ( name, name_buf, sizeof ( name_buf ),
-					   value_buf,
-					   sizeof ( value_buf ) ) ) < 0 ) {
+	/* Fetch formatted setting value */
+	if ( ( rc = fetchf_setting_copy ( setting.settings, &setting.setting,
+					  &value ) ) < 0 ) {
 		printf ( "Could not find \"%s\": %s\n",
-			 name, strerror ( rc ) );
-		return rc;
+			 setting.setting.name, strerror ( rc ) );
+		goto err_fetchf;
 	}
 
-	/* Print setting value */
-	printf ( "%s = %s\n", name_buf, value_buf );
+	/* Fetch origin and format fully-qualified name */
+	origin = fetch_setting_origin ( setting.settings, &setting.setting );
+	assert ( origin != NULL );
+	setting_name ( origin, &setting.setting, name_buf, sizeof ( name_buf ));
 
-	return 0;
+	/* Print setting value */
+	printf ( "%s = %s\n", name_buf, value );
+
+	/* Success */
+	rc = 0;
+
+	free ( value );
+ err_fetchf:
+ err_parse_setting:
+ err_parse_options:
+	return rc;
 }
 
 /** "set", "clear", and "read" options */
@@ -109,10 +123,10 @@ static struct command_descriptor clear_read_cmd =
  */
 static int set_core_exec ( int argc, char **argv,
 			   struct command_descriptor *cmd,
-			   int ( * get_value ) ( const char *name,
+			   int ( * get_value ) ( struct named_setting *setting,
 						 char **args, char **value ) ) {
 	struct set_core_options opts;
-	const char *name;
+	struct named_setting setting;
 	char *value;
 	int rc;
 
@@ -121,26 +135,30 @@ static int set_core_exec ( int argc, char **argv,
 		goto err_parse_options;
 
 	/* Parse setting name */
-	name = argv[optind];
+	if ( ( rc = parse_autovivified_setting ( argv[optind],
+						 &setting ) ) != 0 )
+		goto err_parse_setting;
 
 	/* Parse setting value */
-	if ( ( rc = get_value ( name, &argv[ optind + 1 ], &value ) ) != 0 )
+	if ( ( rc = get_value ( &setting, &argv[ optind + 1 ], &value ) ) != 0 )
 		goto err_get_value;
 
-	/* Determine total length of command line */
-	if ( ( rc = storef_named_setting ( name, &setting_type_string,
-					   value ) ) != 0 ) {
-		printf ( "Could not %s \"%s\": %s\n",
-			 argv[0], name, strerror ( rc ) );
+	/* Apply default type if necessary */
+	if ( ! setting.setting.type )
+		setting.setting.type = &setting_type_string;
+
+	/* Store setting */
+	if ( ( rc = storef_setting ( setting.settings, &setting.setting,
+				     value ) ) != 0 ) {
+		printf ( "Could not store \"%s\": %s\n",
+			 setting.setting.name, strerror ( rc ) );
 		goto err_store;
 	}
-
-	free ( value );
-	return 0;
 
  err_store:
 	free ( value );
  err_get_value:
+ err_parse_setting:
  err_parse_options:
 	return rc;
 }
@@ -148,12 +166,13 @@ static int set_core_exec ( int argc, char **argv,
 /**
  * Get setting value for "set" command
  *
- * @v name		Setting name
+ * @v setting		Named setting
  * @v args		Remaining arguments
  * @ret value		Setting value
  * @ret rc		Return status code
  */
-static int set_value ( const char *name __unused, char **args, char **value ) {
+static int set_value ( struct named_setting *setting __unused,
+		       char **args, char **value ) {
 
 	*value = concat_args ( args );
 	if ( ! *value )
@@ -176,13 +195,13 @@ static int set_exec ( int argc, char **argv ) {
 /**
  * Get setting value for "clear" command
  *
- * @v name		Setting name
+ * @v setting		Named setting
  * @v args		Remaining arguments
  * @ret value		Setting value
  * @ret rc		Return status code
  */
-static int clear_value ( const char *name __unused, char **args __unused,
-			 char **value ) {
+static int clear_value ( struct named_setting *setting __unused,
+			 char **args __unused, char **value ) {
 
 	*value = NULL;
 	return 0;
@@ -202,29 +221,27 @@ static int clear_exec ( int argc, char **argv ) {
 /**
  * Get setting value for "read" command
  *
- * @v name		Setting name
+ * @v setting		Named setting
  * @v args		Remaining arguments
  * @ret value		Setting value
  * @ret rc		Return status code
  */
-static int read_value ( const char *name, char **args __unused, char **value ) {
+static int read_value ( struct named_setting *setting, char **args __unused,
+			char **value ) {
 	char *existing;
 	int rc;
 
-	/* Read existing value */
-	if ( ( rc = fetchf_named_setting_copy ( name, &existing ) ) < 0 )
-		goto err_existing;
+	/* Read existing value, treating errors as equivalent to an
+	 * empty initial setting.
+	 */
+	fetchf_setting_copy ( setting->settings, &setting->setting, &existing );
 
 	/* Read new value */
 	if ( ( rc = readline_history ( NULL, existing, NULL, value ) ) != 0 )
-		goto err_new;
+		goto err_readline;
 
-	/* Success */
-	rc = 0;
-
- err_new:
+ err_readline:
 	free ( existing );
- err_existing:
 	return rc;
 }
 
@@ -237,6 +254,73 @@ static int read_value ( const char *name, char **args __unused, char **value ) {
  */
 static int read_exec ( int argc, char **argv ) {
 	return set_core_exec ( argc, argv, &clear_read_cmd, read_value );
+}
+
+/** "inc" options */
+struct inc_options {};
+
+/** "inc" option list */
+static struct option_descriptor inc_opts[] = {};
+
+/** "inc" command descriptor */
+static struct command_descriptor inc_cmd =
+	COMMAND_DESC ( struct inc_options, inc_opts, 1, 2,
+		       "<setting> [<increment>]" );
+
+/**
+ * "inc" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int inc_exec ( int argc, char **argv ) {
+	struct inc_options opts;
+	struct named_setting setting;
+	unsigned int increment = 1;
+	unsigned long value;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &inc_cmd, &opts ) ) != 0 )
+		goto err_parse_options;
+
+	/* Parse setting name */
+	if ( ( rc = parse_existing_setting ( argv[optind], &setting ) ) != 0 )
+		goto err_parse_setting;
+
+	/* Parse increment (if present) */
+	if ( ( ( optind + 1 ) < argc ) &&
+	     ( ( rc = parse_integer ( argv[ optind + 1 ], &increment ) ) != 0))
+		goto err_parse_increment;
+
+	/* Fetch existing setting value, if any, allowing for the fact
+	 * that numeric settings are big-endian and variable-length.
+	 */
+	if ( ( rc = fetchn_setting ( setting.settings, &setting.setting,
+				     &value ) ) != 0 ) {
+		/* Treat as a non-existent :int32 setting with a zero value */
+		value = 0;
+		if ( ! setting.setting.type )
+			setting.setting.type = &setting_type_int32;
+	}
+
+	/* Increment value */
+	value += increment;
+
+	/* Store updated setting value */
+	if ( ( rc = storen_setting ( setting.settings, &setting.setting,
+				     value ) ) != 0 ) {
+		printf ( "Could not store \"%s\": %s\n",
+			 setting.setting.name, strerror ( rc ) );
+		goto err_store;
+	}
+
+ err_store:
+ err_parse_increment:
+ err_parse_setting:
+ err_parse_options:
+	return rc;
 }
 
 /** Non-volatile option commands */
@@ -256,5 +340,9 @@ struct command nvo_commands[] __command = {
 	{
 		.name = "read",
 		.exec = read_exec,
+	},
+	{
+		.name = "inc",
+		.exec = inc_exec,
 	},
 };

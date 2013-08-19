@@ -166,6 +166,12 @@ enum realtek_legacy_status {
 #define RTL_9346CR_EEDI		0x02	/**< Data in */
 #define RTL_9346CR_EEDO		0x01	/**< Data out */
 
+/** Word offset of ID code word within EEPROM */
+#define RTL_EEPROM_ID ( 0x00 / 2 )
+
+/** EEPROM code word magic value */
+#define RTL_EEPROM_ID_MAGIC 0x8129
+
 /** Word offset of MAC address within EEPROM */
 #define RTL_EEPROM_MAC ( 0x0e / 2 )
 
@@ -220,7 +226,8 @@ enum realtek_legacy_status {
 #define RTL_NUM_RX_DESC 4
 
 /** Receive buffer length */
-#define RTL_RX_MAX_LEN ( ETH_FRAME_LEN + 4 /* VLAN */ + 4 /* CRC */ )
+#define RTL_RX_MAX_LEN \
+	( ETH_FRAME_LEN + 4 /* VLAN */ + 4 /* CRC */ + 4 /* extra space */ )
 
 /** A Realtek descriptor ring */
 struct realtek_ring {

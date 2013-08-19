@@ -77,7 +77,7 @@ FILE_LICENCE ( BSD3 );
 /**************************************************************************
  *
  * These define the EEPROM data structure.  They are used in the probe
- * function to verify the existance of the adapter after having sent
+ * function to verify the existence of the adapter after having sent
  * the ID_Sequence.
  *
  * There are others but only the ones we use are defined here.

@@ -1566,7 +1566,7 @@ falcon_gmii_wait ( struct efab_nic *efab )
 	efab_dword_t md_stat;
 	int count;
 
-	/* wait upto 10ms */
+	/* wait up to 10ms */
 	for (count = 0; count < 1000; count++) {
 		falcon_readl ( efab, &md_stat, FCN_MD_STAT_REG_KER );
 		if ( EFAB_DWORD_FIELD ( md_stat, FCN_MD_BSY ) == 0 ) {
@@ -2195,7 +2195,7 @@ falcon_reset_xaui ( struct efab_nic *efab )
 	falcon_xmac_writel ( efab, &reg, FCN_XX_PWR_RST_REG_MAC );
 
 	/* Give some time for the link to establish */
-	for (count = 0; count < 1000; count++) { /* wait upto 10ms */
+	for (count = 0; count < 1000; count++) { /* wait up to 10ms */
 		falcon_xmac_readl ( efab, &reg, FCN_XX_PWR_RST_REG_MAC );
 		if ( EFAB_DWORD_FIELD ( reg, FCN_XX_RST_XX_EN ) == 0 ) {
 			falcon_setup_xaui ( efab );
@@ -3395,7 +3395,7 @@ falcon_init_sram ( struct efab_nic *efab )
 		falcon_read ( efab, &reg, FCN_SRM_CFG_REG_KER );
 		if ( !EFAB_OWORD_FIELD ( reg, FCN_SRAM_OOB_BT_INIT_EN ) )
 			return 0;
-	} while (++count < 20);	/* wait upto 0.4 sec */
+	} while (++count < 20);	/* wait up to 0.4 sec */
 
 	EFAB_ERR ( "timed out waiting for SRAM reset\n");
 	return -ETIMEDOUT;
@@ -3426,7 +3426,7 @@ falcon_setup_nic ( struct efab_nic *efab )
 	falcon_write ( efab, &reg, FCN_RX_DC_CFG_REG_KER );
 	
 	/* Set number of RSS CPUs
-	 * bug7244: Increase filter depth to reduce RX_RESET likelyhood
+	 * bug7244: Increase filter depth to reduce RX_RESET likelihood
 	 */
 	EFAB_POPULATE_OWORD_5 ( reg,
 				FCN_NUM_KER, 0,
@@ -3798,7 +3798,8 @@ falcon_clear_interrupts ( struct efab_nic *efab )
 	}
 	else {
 		/* write to the INT_ACK register */
-		falcon_writel ( efab, 0, FCN_INT_ACK_KER_REG_A1 );
+		EFAB_ZERO_DWORD ( reg );
+		falcon_writel ( efab, &reg, FCN_INT_ACK_KER_REG_A1 );
 		mb();
 		falcon_readl ( efab, &reg,
 			       WORK_AROUND_BROKEN_PCI_READS_REG_KER_A1 );

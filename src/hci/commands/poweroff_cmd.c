@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2013 Marin Hannache <ipxe@mareo.fr>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -17,51 +17,56 @@
  * 02110-1301, USA.
  */
 
-#include <realmode.h>
+#include <stdio.h>
+#include <string.h>
+#include <getopt.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
+#include <ipxe/reboot.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
 /** @file
  *
- * Reboot command
+ * Power off command
  *
  */
 
-/** "reboot" options */
-struct reboot_options {};
+/** "poweroff" options */
+struct poweroff_options {};
 
-/** "reboot" option list */
-static struct option_descriptor reboot_opts[] = {};
+/** "poweroff" option list */
+static struct option_descriptor poweroff_opts[] = {};
 
-/** "reboot" command descriptor */
-static struct command_descriptor reboot_cmd =
-	COMMAND_DESC ( struct reboot_options, reboot_opts, 0, 0, "" );
+/** "poweroff" command descriptor */
+static struct command_descriptor poweroff_cmd =
+	COMMAND_DESC ( struct poweroff_options, poweroff_opts, 0, 0, "" );
 
 /**
- * The "reboot" command
+ * The "poweroff" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int reboot_exec ( int argc, char **argv ) {
-	struct reboot_options opts;
+static int poweroff_exec ( int argc, char **argv ) {
+	struct poweroff_options opts;
 	int rc;
 
 	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &reboot_cmd, &opts ) ) != 0 )
+	if ( ( rc = parse_options ( argc, argv, &poweroff_cmd, &opts ) ) != 0 )
 		return rc;
 
-	/* Reboot system */
-	__asm__ __volatile__ ( REAL_CODE ( "ljmp $0xf000, $0xfff0" ) : : );
+	/* Power off system */
+	rc = poweroff();
+	if ( rc != 0 )
+		printf ( "Could not power off: %s\n", strerror ( rc ) );
 
-	return 0;
+	return rc;
 }
 
-/** "reboot" command */
-struct command reboot_command __command = {
-	.name = "reboot",
-	.exec = reboot_exec,
+/** "poweroff" command */
+struct command poweroff_command __command = {
+	.name = "poweroff",
+	.exec = poweroff_exec,
 };

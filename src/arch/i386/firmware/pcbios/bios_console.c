@@ -97,7 +97,7 @@ static void bios_handle_ed ( unsigned int count __unused,
 					   "int $0x10\n\t"
 					   "cli\n\t" )
 			       : : "a" ( 0x0600 ), "b" ( bios_attr << 8 ),
-			           "c" ( 0 ), "d" ( 0xffff ) );
+			           "c" ( 0 ), "d" ( 0xfefe ) );
 }
 
 /**

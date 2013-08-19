@@ -21,7 +21,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
 #include <stdlib.h>
+#include <wchar.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_snp.h>
+#include <ipxe/efi/efi_download.h>
+#include <ipxe/efi/efi_file.h>
+#include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_strings.h>
 #include <ipxe/image.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -29,84 +35,96 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 
+/* Disambiguate the various error causes */
+#define EINFO_EEFI_LOAD							\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x01,			\
+			  "Could not load image" )
+#define EINFO_EEFI_LOAD_PROHIBITED					\
+	__einfo_platformify ( EINFO_EEFI_LOAD, EFI_SECURITY_VIOLATION,	\
+			      "Image prohibited by security policy" )
+#define EEFI_LOAD_PROHIBITED						\
+	__einfo_error ( EINFO_EEFI_LOAD_PROHIBITED )
+#define EEFI_LOAD( efirc ) EPLATFORM ( EINFO_EEFI_LOAD, efirc,		\
+				       EEFI_LOAD_PROHIBITED )
+#define EINFO_EEFI_START						\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x02,			\
+			  "Could not start image" )
+#define EEFI_START( efirc ) EPLATFORM ( EINFO_EEFI_START, efirc )
+
 /** EFI loaded image protocol GUID */
 static EFI_GUID efi_loaded_image_protocol_guid =
 	EFI_LOADED_IMAGE_PROTOCOL_GUID;
 
 /**
- * Create a Unicode command line for the image
+ * Create device path for image
+ *
+ * @v image		EFI image
+ * @v parent		Parent device path
+ * @ret path		Device path, or NULL on failure
+ *
+ * The caller must eventually free() the device path.
+ */
+static EFI_DEVICE_PATH_PROTOCOL *
+efi_image_path ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	FILEPATH_DEVICE_PATH *filepath;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	size_t name_len;
+	size_t prefix_len;
+	size_t filepath_len;
+	size_t len;
+
+	/* Calculate device path lengths */
+	end = efi_devpath_end ( parent );
+	prefix_len = ( ( void * ) end - ( void * ) parent );
+	name_len = strlen ( image->name );
+	filepath_len = ( SIZE_OF_FILEPATH_DEVICE_PATH +
+			 ( name_len + 1 /* NUL */ ) * sizeof ( wchar_t ) );
+	len = ( prefix_len + filepath_len + sizeof ( *end ) );
+
+	/* Allocate device path */
+	path = zalloc ( len );
+	if ( ! path )
+		return NULL;
+
+	/* Construct device path */
+	memcpy ( path, parent, prefix_len );
+	filepath = ( ( ( void * ) path ) + prefix_len );
+	filepath->Header.Type = MEDIA_DEVICE_PATH;
+	filepath->Header.SubType = MEDIA_FILEPATH_DP;
+	filepath->Header.Length[0] = ( filepath_len & 0xff );
+	filepath->Header.Length[1] = ( filepath_len >> 8 );
+	efi_snprintf ( filepath->PathName, ( name_len + 1 /* NUL */ ),
+		       "%s", image->name );
+	end = ( ( ( void * ) filepath ) + filepath_len );
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+
+	return path;
+}
+
+/**
+ * Create command line for image
  *
  * @v image             EFI image
- * @v devpath_out       Device path to pass to image (output)
- * @v cmdline_out       Unicode command line (output)
- * @v cmdline_len_out   Length of command line in bytes (output)
- * @ret rc              Return status code
+ * @ret cmdline		Command line, or NULL on failure
  */
-static int efi_image_make_cmdline ( struct image *image,
-				    EFI_DEVICE_PATH **devpath_out,
-				    VOID **cmdline_out,
-				    UINT32 *cmdline_len_out ) {
-	char *uri;
-	size_t uri_len;
-	FILEPATH_DEVICE_PATH *devpath;
-	EFI_DEVICE_PATH *endpath;
-	size_t devpath_len;
-	CHAR16 *cmdline;
-	UINT32 cmdline_len;
-	size_t args_len = 0;
-	UINT32 i;
+static wchar_t * efi_image_cmdline ( struct image *image ) {
+	wchar_t *cmdline;
+	size_t len;
 
-	/* Get the URI string of the image */
-	uri_len = unparse_uri ( NULL, 0, image->uri, URI_ALL ) + 1;
-
-	/* Compute final command line length */
-	if ( image->cmdline ) {
-		args_len = strlen ( image->cmdline ) + 1;
-	}
-	cmdline_len = args_len + uri_len;
-
-	/* Allocate space for the uri, final command line and device path */
-	cmdline = malloc ( cmdline_len * sizeof ( CHAR16 ) + uri_len
-			   + SIZE_OF_FILEPATH_DEVICE_PATH
-			   + uri_len * sizeof ( CHAR16 )
-			   + sizeof ( EFI_DEVICE_PATH ) );
+	len = ( strlen ( image->name ) +
+		( image->cmdline ?
+		  ( 1 /* " " */ + strlen ( image->cmdline ) ) : 0 ) );
+	cmdline = zalloc ( ( len + 1 /* NUL */ ) * sizeof ( wchar_t ) );
 	if ( ! cmdline )
-		return -ENOMEM;
-	uri = (char *) ( cmdline + cmdline_len );
-	devpath = (FILEPATH_DEVICE_PATH *) ( uri + uri_len );
-	endpath = (EFI_DEVICE_PATH *) ( (char *) devpath
-					+ SIZE_OF_FILEPATH_DEVICE_PATH
-					+ uri_len * sizeof ( CHAR16 ) );
-
-	/* Build the iPXE device path */
-	devpath->Header.Type = MEDIA_DEVICE_PATH;
-	devpath->Header.SubType = MEDIA_FILEPATH_DP;
-	devpath_len = SIZE_OF_FILEPATH_DEVICE_PATH
-			+ uri_len * sizeof ( CHAR16 );
-	devpath->Header.Length[0] = devpath_len & 0xFF;
-	devpath->Header.Length[1] = devpath_len >> 8;
-	endpath->Type = END_DEVICE_PATH_TYPE;
-	endpath->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	endpath->Length[0] = 4;
-	endpath->Length[1] = 0;
-	unparse_uri ( uri, uri_len, image->uri, URI_ALL );
-
-	/* Convert to Unicode */
-	for ( i = 0 ; i < uri_len ; i++ ) {
-		cmdline[i] = uri[i];
-		devpath->PathName[i] = uri[i];
-	}
-	if ( image->cmdline ) {
-		cmdline[uri_len - 1] = ' ';
-	}
-	for ( i = 0 ; i < args_len ; i++ ) {
-		cmdline[i + uri_len] = image->cmdline[i];
-	}
-
-	*devpath_out = &devpath->Header;
-	*cmdline_out = cmdline;
-	*cmdline_len_out = cmdline_len * sizeof ( CHAR16 );
-	return 0;
+		return NULL;
+	efi_snprintf ( cmdline, ( len + 1 /* NUL */ ), "%s%s%s",
+		       image->name,
+		       ( image->cmdline ? " " : "" ),
+		       ( image->cmdline ? image->cmdline : "" ) );
+	return cmdline;
 }
 
 /**
@@ -117,25 +135,66 @@ static int efi_image_make_cmdline ( struct image *image,
  */
 static int efi_image_exec ( struct image *image ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_snp_device *snpdev;
+	EFI_DEVICE_PATH_PROTOCOL *path;
 	union {
 		EFI_LOADED_IMAGE_PROTOCOL *image;
 		void *interface;
 	} loaded;
 	EFI_HANDLE handle;
-	EFI_HANDLE device_handle = NULL;
-	UINTN exit_data_size;
-	CHAR16 *exit_data;
+	wchar_t *cmdline;
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Find an appropriate device handle to use */
+	snpdev = last_opened_snpdev();
+	if ( ! snpdev ) {
+		DBGC ( image, "EFIIMAGE %p could not identify SNP device\n",
+		       image );
+		rc = -ENODEV;
+		goto err_no_snpdev;
+	}
+
+	/* Install file I/O protocols */
+	if ( ( rc = efi_file_install ( &snpdev->handle ) ) != 0 ) {
+		DBGC ( image, "EFIIMAGE %p could not install file protocol: "
+		       "%s\n", image, strerror ( rc ) );
+		goto err_file_install;
+	}
+
+	/* Install iPXE download protocol */
+	if ( ( rc = efi_download_install ( &snpdev->handle ) ) != 0 ) {
+		DBGC ( image, "EFIIMAGE %p could not install iPXE download "
+		       "protocol: %s\n", image, strerror ( rc ) );
+		goto err_download_install;
+	}
+
+	/* Create device path for image */
+	path = efi_image_path ( image, &snpdev->path );
+	if ( ! path ) {
+		DBGC ( image, "EFIIMAGE %p could not create device path\n",
+		       image );
+		rc = -ENOMEM;
+		goto err_image_path;
+	}
+
+	/* Create command line for image */
+	cmdline = efi_image_cmdline ( image );
+	if ( ! cmdline ) {
+		DBGC ( image, "EFIIMAGE %p could not create command line\n",
+		       image );
+		rc = -ENOMEM;
+		goto err_cmdline;
+	}
+
 	/* Attempt loading image */
-	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, NULL,
+	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, path,
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
+		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
-		       image, efi_strerror ( efirc ) );
-		rc = -ENOEXEC;
+		       image, strerror ( rc ) );
 		goto err_load_image;
 	}
 
@@ -145,29 +204,26 @@ static int efi_image_exec ( struct image *image ) {
 				   NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL );
 	if ( efirc ) {
 		/* Should never happen */
-		rc = EFIRC_TO_RC ( efirc );
+		rc = -EEFI ( efirc );
 		goto err_open_protocol;
 	}
 
-	/* Pass an iPXE download protocol to the image */
-	if ( ( rc = efi_download_install ( &device_handle ) ) != 0 ) {
-		DBGC ( image, "EFIIMAGE %p could not install iPXE download "
-		       "protocol: %s\n", image, strerror ( rc ) );
-		goto err_download_install;
-	}
-	loaded.image->DeviceHandle = device_handle;
-	loaded.image->ParentHandle = efi_loaded_image;
-	if ( ( rc = efi_image_make_cmdline ( image, &loaded.image->FilePath,
-				       &loaded.image->LoadOptions,
-				       &loaded.image->LoadOptionsSize ) ) != 0 )
-		goto err_make_cmdline;
+	/* Sanity checks */
+	assert ( loaded.image->ParentHandle == efi_image_handle );
+	assert ( loaded.image->DeviceHandle == snpdev->handle );
+	assert ( loaded.image->LoadOptionsSize == 0 );
+	assert ( loaded.image->LoadOptions == NULL );
+
+	/* Set command line */
+	loaded.image->LoadOptions = cmdline;
+	loaded.image->LoadOptionsSize =
+		( ( wcslen ( cmdline ) + 1 /* NUL */ ) * sizeof ( wchar_t ) );
 
 	/* Start the image */
-	if ( ( efirc = bs->StartImage ( handle, &exit_data_size,
-					&exit_data ) ) != 0 ) {
+	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
+		rc = -EEFI_START ( efirc );
 		DBGC ( image, "EFIIMAGE %p returned with status %s\n",
-		       image, efi_strerror ( efirc ) );
-		rc = EFIRC_TO_RC ( efirc );
+		       image, strerror ( rc ) );
 		goto err_start_image;
 	}
 
@@ -175,17 +231,25 @@ static int efi_image_exec ( struct image *image ) {
 	rc = 0;
 
  err_start_image:
-	free ( loaded.image->LoadOptions );
- err_make_cmdline:
-	efi_download_uninstall ( device_handle );
- err_download_install:
  err_open_protocol:
 	/* Unload the image.  We can't leave it loaded, because we
 	 * have no "unload" operation.
 	 */
-	bs->UnloadImage ( handle );
+	if ( ( efirc = bs->UnloadImage ( handle ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( image, "EFIIMAGE %p could not unload: %s\n",
+		       image, strerror ( rc ) );
+	}
  err_load_image:
-
+	free ( cmdline );
+ err_cmdline:
+	free ( path );
+ err_image_path:
+	efi_download_uninstall ( snpdev->handle );
+ err_download_install:
+	efi_file_uninstall ( snpdev->handle );
+ err_file_install:
+ err_no_snpdev:
 	return rc;
 }
 
@@ -199,15 +263,17 @@ static int efi_image_probe ( struct image *image ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE handle;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Attempt loading image */
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, NULL,
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
+		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
-		       image, efi_strerror ( efirc ) );
-		return -ENOEXEC;
+		       image, strerror ( rc ) );
+		return rc;
 	}
 
 	/* Unload the image.  We can't leave it loaded, because we

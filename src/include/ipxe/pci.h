@@ -172,7 +172,7 @@ FILE_LICENCE ( GPL2_ONLY );
 #define  PCI_PM_CAP_PME_CLOCK	0x0008	/* PME clock required */
 #define  PCI_PM_CAP_RESERVED    0x0010  /* Reserved field */
 #define  PCI_PM_CAP_DSI		0x0020	/* Device specific initialization */
-#define  PCI_PM_CAP_AUX_POWER	0x01C0	/* Auxilliary power support mask */
+#define  PCI_PM_CAP_AUX_POWER	0x01C0	/* Auxiliary power support mask */
 #define  PCI_PM_CAP_D1		0x0200	/* D1 power state support */
 #define  PCI_PM_CAP_D2		0x0400	/* D2 power state support */
 #define  PCI_PM_CAP_PME		0x0800	/* PME pin supported */
@@ -351,6 +351,7 @@ struct pci_driver {
 #define PCI_FUNC( busdevfn )		( ( (busdevfn) >> 0 ) & 0x07 )
 #define PCI_BUSDEVFN( bus, slot, func )	\
 	( ( (bus) << 8 ) | ( (slot) << 3 ) | ( (func) << 0 ) )
+#define PCI_FIRST_FUNC( busdevfn )	( (busdevfn) & ~0x07 )
 
 #define PCI_BASE_CLASS( class )		( (class) >> 16 )
 #define PCI_SUB_CLASS( class )		( ( (class) >> 8 ) & 0xff )
@@ -385,6 +386,7 @@ extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
 extern int pci_read_config ( struct pci_device *pci );
+extern int pci_find_next ( struct pci_device *pci, unsigned int busdevfn );
 extern int pci_find_driver ( struct pci_device *pci );
 extern int pci_probe ( struct pci_device *pci );
 extern void pci_remove ( struct pci_device *pci );

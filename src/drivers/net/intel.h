@@ -175,18 +175,6 @@ enum intel_descriptor_status {
 #define INTEL_xDCTL 0x28
 #define INTEL_xDCTL_ENABLE	0x02000000UL	/**< Queue enable */
 
-/** Receive Descriptor Head */
-#define INTEL_RDH ( INTEL_RD + INTEL_xDH )
-
-/** Receive Descriptor Tail */
-#define INTEL_RDT ( INTEL_RD + INTEL_xDT )
-
-/** Transmit Descriptor Head */
-#define INTEL_TDH ( INTEL_TD + INTEL_xDH )
-
-/** Transmit Descriptor Tail */
-#define INTEL_TDT ( INTEL_TD + INTEL_xDT )
-
 /** Receive Address Low */
 #define INTEL_RAL0 0x05400UL
 
@@ -253,5 +241,16 @@ struct intel_nic {
 	/** Receive I/O buffers */
 	struct io_buffer *rx_iobuf[INTEL_NUM_RX_DESC];
 };
+
+extern int intel_create_ring ( struct intel_nic *intel,
+			       struct intel_ring *ring );
+extern void intel_destroy_ring ( struct intel_nic *intel,
+				 struct intel_ring *ring );
+extern void intel_refill_rx ( struct intel_nic *intel );
+extern void intel_empty_rx ( struct intel_nic *intel );
+extern int intel_transmit ( struct net_device *netdev,
+			    struct io_buffer *iobuf );
+extern void intel_poll_tx ( struct net_device *netdev );
+extern void intel_poll_rx ( struct net_device *netdev );
 
 #endif /* _INTEL_H */

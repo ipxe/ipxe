@@ -20,6 +20,8 @@
 #ifndef MAC_H
 #define MAC_H
 
+FILE_LICENCE ( BSD2 );
+
 #include <unistd.h>
 
 #define RXSTATUS_RATE(ah, ads) (AR_SREV_5416_20_OR_LATER(ah) ?		\

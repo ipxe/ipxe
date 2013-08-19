@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <getopt.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/menu.h>
+#include <ipxe/settings.h>
 #include <ipxe/parseopt.h>
 
 /** @file
@@ -59,7 +60,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret value		String value
  * @ret rc		Return status code
  */
-int parse_string ( const char *text, const char **value ) {
+int parse_string ( char *text, char **value ) {
 
 	/* Sanity check */
 	assert ( text != NULL );
@@ -77,7 +78,7 @@ int parse_string ( const char *text, const char **value ) {
  * @ret value		Integer value
  * @ret rc		Return status code
  */
-int parse_integer ( const char *text, unsigned int *value ) {
+int parse_integer ( char *text, unsigned int *value ) {
 	char *endp;
 
 	/* Sanity check */
@@ -100,7 +101,7 @@ int parse_integer ( const char *text, unsigned int *value ) {
  * @ret netdev		Network device
  * @ret rc		Return status code
  */
-int parse_netdev ( const char *text, struct net_device **netdev ) {
+int parse_netdev ( char *text, struct net_device **netdev ) {
 
 	/* Sanity check */
 	assert ( text != NULL );
@@ -122,7 +123,7 @@ int parse_netdev ( const char *text, struct net_device **netdev ) {
  * @ret menu		Menu
  * @ret rc		Return status code
  */
-int parse_menu ( const char *text, struct menu **menu ) {
+int parse_menu ( char *text, struct menu **menu ) {
 
 	/* Find menu */
 	*menu = find_menu ( text );
@@ -145,7 +146,7 @@ int parse_menu ( const char *text, struct menu **menu ) {
  * @ret flag		Flag to set
  * @ret rc		Return status code
  */
-int parse_flag ( const char *text __unused, int *flag ) {
+int parse_flag ( char *text __unused, int *flag ) {
 
 	/* Set flag */
 	*flag = 1;
@@ -160,7 +161,7 @@ int parse_flag ( const char *text __unused, int *flag ) {
  * @ret key		Key
  * @ret rc		Return status code
  */
-int parse_key ( const char *text, unsigned int *key ) {
+int parse_key ( char *text, unsigned int *key ) {
 
 	/* Interpret single characters as being a literal key character */
 	if ( text[0] && ! text[1] ) {
@@ -170,6 +171,83 @@ int parse_key ( const char *text, unsigned int *key ) {
 
 	/* Otherwise, interpret as an integer */
 	return parse_integer ( text, key );
+}
+
+/**
+ * Parse settings block name
+ *
+ * @v text		Text
+ * @ret value		Integer value
+ * @ret rc		Return status code
+ */
+int parse_settings ( char *text, struct settings **value ) {
+
+	/* Sanity check */
+	assert ( text != NULL );
+
+	/* Parse scope name */
+	*value = find_settings ( text );
+	if ( ! *value ) {
+		printf ( "\"%s\": no such scope\n", text );
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * Parse setting name
+ *
+ * @v text		Text
+ * @v setting		Named setting to fill in
+ * @v get_child		Function to find or create child settings block
+ * @ret rc		Return status code
+ *
+ * Note that this function modifies the original @c text.
+ */
+int parse_setting ( char *text, struct named_setting *setting,
+		    get_child_settings_t get_child ) {
+	int rc;
+
+	/* Sanity check */
+	assert ( text != NULL );
+
+	/* Parse setting name */
+	if ( ( rc = parse_setting_name ( text, get_child, &setting->settings,
+					 &setting->setting ) ) != 0 ) {
+		printf ( "\"%s\": invalid setting\n", text );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Parse existing setting name
+ *
+ * @v text		Text
+ * @v setting		Named setting to fill in
+ * @ret rc		Return status code
+ *
+ * Note that this function modifies the original @c text.
+ */
+int parse_existing_setting ( char *text, struct named_setting *setting ) {
+
+	return parse_setting ( text, setting, find_child_settings );
+}
+
+/**
+ * Parse and autovivify setting name
+ *
+ * @v text		Text
+ * @v setting		Named setting to fill in
+ * @ret rc		Return status code
+ *
+ * Note that this function modifies the original @c text.
+ */
+int parse_autovivified_setting ( char *text, struct named_setting *setting ) {
+
+	return parse_setting ( text, setting, autovivify_child_settings );
 }
 
 /**
@@ -198,7 +276,7 @@ int reparse_options ( int argc, char **argv, struct command_descriptor *cmd,
 	char shortopts[ cmd->num_options * 3 /* possible "::" */ + 1 /* "h" */
 			+ 1 /* NUL */ ];
 	unsigned int shortopt_idx = 0;
-	int ( * parse ) ( const char *text, void *value );
+	int ( * parse ) ( char *text, void *value );
 	void *value;
 	unsigned int i;
 	unsigned int j;

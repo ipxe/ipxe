@@ -17,6 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+FILE_LICENCE ( BSD2 );
+
 #include "../ath.h"
 
 #include "hw.h"

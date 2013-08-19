@@ -58,7 +58,7 @@ static int guestinfo_fetch_type ( struct settings *settings,
 		      strlen ( parent_name ) + 1 /* "." */ +
 		      strlen ( setting->name ) + 1 /* "." */ +
 		      ( type ? strlen ( type->name ) : 0 ) + 1 /* NUL */ ];
-	struct setting *named_setting;
+	struct setting *predefined;
 	char *info;
 	int info_len;
 	int check_len;
@@ -82,9 +82,8 @@ static int guestinfo_fetch_type ( struct settings *settings,
 
 	/* Determine default type if necessary */
 	if ( ! type ) {
-		named_setting = find_setting ( setting->name );
-		type = ( named_setting ?
-			 named_setting->type : &setting_type_string );
+		predefined = find_setting ( setting->name );
+		type = ( predefined ? predefined->type : &setting_type_string );
 	}
 	assert ( type != NULL );
 
@@ -115,7 +114,7 @@ static int guestinfo_fetch_type ( struct settings *settings,
 		settings, &command[9] /* Skip "info-get " */, info );
 
 	/* Parse GuestInfo value according to type */
-	ret = type->parse ( info, data, len );
+	ret = setting_parse ( type, info, data, len );
 	if ( ret < 0 ) {
 		DBGC ( settings, "GuestInfo %p could not parse \"%s\" as %s: "
 		       "%s\n", settings, info, type->name, strerror ( ret ) );
@@ -224,7 +223,7 @@ static int guestinfo_net_probe ( struct net_device *netdev ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	settings_init ( settings, &guestinfo_settings_operations, NULL, 0 );
+	settings_init ( settings, &guestinfo_settings_operations, NULL, NULL );
 
 	/* Register settings */
 	if ( ( rc = register_settings ( settings, netdev_settings ( netdev ),

@@ -910,7 +910,7 @@ static void ifec_refill_rx_ring ( struct net_device *netdev )
  * Initial allocation & initialization of the rx ring.
  *
  * @v netdev  		Device of rx ring.
- * @ret rc    		Non-zero if error occured
+ * @ret rc    		Non-zero if error occurred
  */
 static int ifec_rx_setup ( struct net_device *netdev )
 {

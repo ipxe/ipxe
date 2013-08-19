@@ -228,7 +228,7 @@ static const struct pci_id_info pci_id_tbl[] = {
       TULIP_IOTYPE, TULIP_SIZE, COMET },
     { "SG Thomson STE10/100A", { 0x2774104a, 0xffffffff, 0, 0, 0, 0 },
       TULIP_IOTYPE, 256, COMET },	/*Ramesh Chander*/
-    { 0, { 0, 0, 0, 0, 0, 0 }, 0, 0, 0 },
+    { NULL, { 0, 0, 0, 0, 0, 0 }, 0, 0, 0 },
 };
 
 enum tbl_flag {
@@ -264,7 +264,7 @@ static struct tulip_chip_table {
     { "Xircom tulip work-alike", HAS_MII | HAS_MEDIA_TABLE | ALWAYS_CHECK_MII 
       | HAS_PWRDWN | HAS_NWAY },
     { "SGThomson STE10/100A", HAS_MII | MC_HASH_ONLY },	/*Ramesh Chander*/   
-    { 0, 0 },
+    { NULL, 0 },
 };
 
 /* A full-duplex map for media types. */
@@ -475,7 +475,7 @@ static struct fixups {
                                     0x1B03, 0x006D, /* 100baseTx, CSR12 0x1B */
                                     0x1B05, 0x006D, /* 100baseTx-FD CSR12 0x1B */
     }},
-    {0, 0, 0, 0, {}}};
+    {NULL, 0, 0, 0, {}}};
 
 static const char * block_name[] = {"21140 non-MII", "21140 MII PHY",
                                     "21142 Serial PHY", "21142 MII PHY", "21143 SYM PHY", "21143 reset method"};
@@ -720,7 +720,7 @@ static void parse_eeprom(struct nic *nic)
 
     whereami("parse_eeprom\n");
 
-    tp->mtable = 0;
+    tp->mtable = NULL;
     /* Detect an old-style (SA only) EEPROM layout:
        memcmp(ee_data, ee_data+16, 8). */
     for (i = 0; i < 8; i ++)

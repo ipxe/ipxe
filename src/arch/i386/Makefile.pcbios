@@ -29,16 +29,21 @@ MEDIA		+= exe
 
 # Padding rules
 #
-PAD_rom		= $(PERL) $(PADIMG) --blksize=512 --byte=0xff $@
+PAD_rom		= $(PERL) $(PADIMG) --blksize=512 --byte=0xff
 PAD_mrom	= $(PAD_rom)
-PAD_dsk		= $(PERL) $(PADIMG) --blksize=512 $@
-PAD_hd		= $(PERL) $(PADIMG) --blksize=32768 $@
-PAD_exe		= $(PERL) $(PADIMG) --blksize=512 $@
+PAD_dsk		= $(PERL) $(PADIMG) --blksize=512
+PAD_hd		= $(PERL) $(PADIMG) --blksize=32768
+PAD_exe		= $(PERL) $(PADIMG) --blksize=512
 
 # Finalisation rules
 #
-FINALISE_rom	= $(PERL) $(FIXROM) $@
+FINALISE_rom	= $(PERL) $(FIXROM)
 FINALISE_mrom	= $(FINALISE_rom)
+
+# Use $(ROMS) rather than $(DRIVERS) for "allroms" and "allmroms"
+#
+LIST_NAME_rom := ROMS
+LIST_NAME_mrom := ROMS
 
 # rule to make a non-emulation ISO boot image
 NON_AUTO_MEDIA	+= iso
