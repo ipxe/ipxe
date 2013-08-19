@@ -822,6 +822,10 @@ static int a3c90x_open(struct net_device *netdev)
 
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdStallCtl, upUnStall);
 
+	/* set maximum allowed receive packet length */
+	a3c90x_internal_SetWindow(inf_3c90x, winTxRxOptions3);
+	outl(RX_BUF_SIZE, inf_3c90x->IOAddr + regMaxPktSize_3_w);
+
 	/* enable packet transmission and reception */
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdTxEnable, 0);
 	a3c90x_internal_IssueCommand(inf_3c90x->IOAddr, cmdRxEnable, 0);
