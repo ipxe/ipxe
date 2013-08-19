@@ -49,6 +49,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/blockdev.h>
 #include <ipxe/acpi.h>
 #include <ipxe/version.h>
+#include <ipxe/params.h>
 #include <ipxe/http.h>
 
 /* Disambiguate the various error causes */
@@ -1060,16 +1061,100 @@ static char * http_digest_auth ( struct http_request *http,
 }
 
 /**
+ * Generate HTTP POST parameter list
+ *
+ * @v http		HTTP request
+ * @v buf		Buffer to contain HTTP POST parameters
+ * @v len		Length of buffer
+ * @ret len		Length of parameter list (excluding terminating NUL)
+ */
+static size_t http_post_params ( struct http_request *http,
+				 char *buf, size_t len ) {
+	struct parameter *param;
+	ssize_t remaining = len;
+	size_t frag_len;
+
+	/* Add each parameter in the form "key=value", joined with "&" */
+	len = 0;
+	for_each_param ( param, http->uri->params ) {
+
+		/* Add the "&", if applicable */
+		if ( len ) {
+			if ( remaining > 0 )
+				*buf = '&';
+			buf++;
+			len++;
+			remaining--;
+		}
+
+		/* URI-encode the key */
+		frag_len = uri_encode ( param->key, buf, remaining, 0 );
+		buf += frag_len;
+		len += frag_len;
+		remaining -= frag_len;
+
+		/* Add the "=" */
+		if ( remaining > 0 )
+			*buf = '=';
+		buf++;
+		len++;
+		remaining--;
+
+		/* URI-encode the value */
+		frag_len = uri_encode ( param->value, buf, remaining, 0 );
+		buf += frag_len;
+		len += frag_len;
+		remaining -= frag_len;
+	}
+
+	/* Ensure string is NUL-terminated even if no parameters are present */
+	if ( remaining > 0 )
+		*buf = '\0';
+
+	return len;
+}
+
+/**
+ * Generate HTTP POST body
+ *
+ * @v http		HTTP request
+ * @ret post		I/O buffer containing POST body, or NULL on error
+ */
+static struct io_buffer * http_post ( struct http_request *http ) {
+	struct io_buffer *post;
+	size_t len;
+	size_t check_len;
+
+	/* Calculate length of parameter list */
+	len = http_post_params ( http, NULL, 0 );
+
+	/* Allocate parameter list */
+	post = alloc_iob ( len + 1 /* NUL */ );
+	if ( ! post )
+		return NULL;
+
+	/* Fill parameter list */
+	check_len = http_post_params ( http, iob_put ( post, len ),
+				       ( len + 1 /* NUL */ ) );
+	assert ( len == check_len );
+	DBGC ( http, "HTTP %p POST %s\n", http, ( ( char * ) post->data ) );
+
+	return post;
+}
+
+/**
  * HTTP process
  *
  * @v http		HTTP request
  */
 static void http_step ( struct http_request *http ) {
+	struct io_buffer *post;
 	size_t uri_len;
 	char *method;
 	char *uri;
 	char *range;
 	char *auth;
+	char *content;
 	int len;
 	int rc;
 
@@ -1088,7 +1173,8 @@ static void http_step ( struct http_request *http ) {
 	}
 
 	/* Determine method */
-	method = ( ( http->flags & HTTP_HEAD_ONLY ) ? "HEAD" : "GET" );
+	method = ( ( http->flags & HTTP_HEAD_ONLY ) ? "HEAD" :
+		   ( http->uri->params ? "POST" : "GET" ) );
 
 	/* Construct path?query request */
 	uri_len = ( unparse_uri ( NULL, 0, http->uri,
@@ -1136,6 +1222,25 @@ static void http_step ( struct http_request *http ) {
 		auth = NULL;
 	}
 
+	/* Construct POST content, if applicable */
+	if ( http->uri->params ) {
+		post = http_post ( http );
+		if ( ! post ) {
+			rc = -ENOMEM;
+			goto err_post;
+		}
+		len = asprintf ( &content, "Content-Type: "
+				 "application/x-www-form-urlencoded\r\n"
+				 "Content-Length: %zd\r\n", iob_len ( post ) );
+		if ( len < 0 ) {
+			rc = len;
+			goto err_content;
+		}
+	} else {
+		post = NULL;
+		content = NULL;
+	}
+
 	/* Mark request as transmitted */
 	http->flags &= ~HTTP_TX_PENDING;
 
@@ -1144,7 +1249,7 @@ static void http_step ( struct http_request *http ) {
 				  "%s %s HTTP/1.1\r\n"
 				  "User-Agent: iPXE/%s\r\n"
 				  "Host: %s%s%s\r\n"
-				  "%s%s%s"
+				  "%s%s%s%s"
 				  "\r\n",
 				  method, uri, product_version, http->uri->host,
 				  ( http->uri->port ?
@@ -1154,11 +1259,24 @@ static void http_step ( struct http_request *http ) {
 				  ( ( http->flags & HTTP_CLIENT_KEEPALIVE ) ?
 				    "Connection: keep-alive\r\n" : "" ),
 				  ( range ? range : "" ),
-				  ( auth ? auth : "" ) ) ) != 0 ) {
+				  ( auth ? auth : "" ),
+				  ( content ? content : "" ) ) ) != 0 ) {
 		goto err_xfer;
 	}
 
+	/* Send POST content, if applicable */
+	if ( post ) {
+		if ( ( rc = xfer_deliver_iob ( &http->socket,
+					       iob_disown ( post ) ) ) != 0 )
+			goto err_xfer_post;
+	}
+
+ err_xfer_post:
  err_xfer:
+	free ( content );
+ err_content:
+	free ( post );
+ err_post:
 	free ( auth );
  err_auth:
 	free ( range );
