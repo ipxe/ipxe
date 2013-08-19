@@ -531,6 +531,53 @@ static struct net_device_operations undinet_operations = {
 	.irq   		= undinet_irq,
 };
 
+/** A device with broken support for generating interrupts */
+struct undinet_irq_broken {
+	/** PCI vendor ID */
+	uint16_t pci_vendor;
+	/** PCI device ID */
+	uint16_t pci_device;
+};
+
+/**
+ * List of devices with broken support for generating interrupts
+ *
+ * Some PXE stacks are known to claim that IRQs are supported, but
+ * then never generate interrupts.  No satisfactory solution has been
+ * found to this problem; the workaround is to add the PCI vendor and
+ * device IDs to this list.  This is something of a hack, since it
+ * will generate false positives for identical devices with a working
+ * PXE stack (e.g. those that have been reflashed with iPXE), but it's
+ * an improvement on the current situation.
+ */
+static const struct undinet_irq_broken undinet_irq_broken_list[] = {
+	/* HP XX70x laptops */
+	{ .pci_vendor = 0x8086, .pci_device = 0x1502 },
+	{ .pci_vendor = 0x8086, .pci_device = 0x1503 },
+};
+
+/**
+ * Check for devices with broken support for generating interrupts
+ *
+ * @v undi		UNDI device
+ * @ret irq_is_broken	Interrupt support is broken; no interrupts are generated
+ */
+static int undinet_irq_is_broken ( struct undi_device *undi ) {
+	const struct undinet_irq_broken *broken;
+	unsigned int i;
+
+	for ( i = 0 ; i < ( sizeof ( undinet_irq_broken_list ) /
+			    sizeof ( undinet_irq_broken_list[0] ) ) ; i++ ) {
+		broken = &undinet_irq_broken_list[i];
+		if ( ( undi->dev.desc.bus_type == BUS_TYPE_PCI ) &&
+		     ( undi->dev.desc.vendor == broken->pci_vendor ) &&
+		     ( undi->dev.desc.device == broken->pci_device ) ) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 /**
  * Probe UNDI device
  *
@@ -646,6 +693,11 @@ int undinet_probe ( struct undi_device *undi ) {
 		DBGC ( undinic, "UNDINIC %p Etherboot 5.4 workaround enabled\n",
 		       undinic );
 		undinic->hacks |= UNDI_HACK_EB54;
+	}
+	if ( undinet_irq_is_broken ( undi ) ) {
+		DBGC ( undinic, "UNDINIC %p forcing polling mode due to "
+		       "broken interrupts\n", undinic );
+		undinic->irq_supported = 0;
 	}
 
 	/* Register network device */

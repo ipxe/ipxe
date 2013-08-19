@@ -17,6 +17,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __BASE_LIB__
 #define __BASE_LIB__
 
+FILE_LICENCE ( BSD3 );
+
 //
 // Definitions for architecture-specific types
 //
@@ -1291,7 +1293,7 @@ InitializeListHead (
   If Entry is NULL, then ASSERT().
   If ListHead was not initialized with INTIALIZE_LIST_HEAD_VARIABLE() or
   InitializeListHead(), then ASSERT().
-  If PcdMaximumLinkedListLenth is not zero, and prior to insertion the number
+  If PcdMaximumLinkedListLength is not zero, and prior to insertion the number
   of nodes in ListHead, including the ListHead node, is greater than or
   equal to PcdMaximumLinkedListLength, then ASSERT().
 
@@ -1321,7 +1323,7 @@ InsertHeadList (
   If Entry is NULL, then ASSERT().
   If ListHead was not initialized with INTIALIZE_LIST_HEAD_VARIABLE() or
   InitializeListHead(), then ASSERT().
-  If PcdMaximumLinkedListLenth is not zero, and prior to insertion the number
+  If PcdMaximumLinkedListLength is not zero, and prior to insertion the number
   of nodes in ListHead, including the ListHead node, is greater than or
   equal to PcdMaximumLinkedListLength, then ASSERT().
 
@@ -1350,7 +1352,7 @@ InsertTailList (
   If List is NULL, then ASSERT().
   If List was not initialized with INTIALIZE_LIST_HEAD_VARIABLE() or
   InitializeListHead(), then ASSERT().
-  If PcdMaximumLinkedListLenth is not zero, and the number of nodes
+  If PcdMaximumLinkedListLength is not zero, and the number of nodes
   in List, including the List node, is greater than or equal to
   PcdMaximumLinkedListLength, then ASSERT().
 
@@ -1378,8 +1380,8 @@ GetFirstNode (
   If Node is NULL, then ASSERT().
   If List was not initialized with INTIALIZE_LIST_HEAD_VARIABLE() or
   InitializeListHead(), then ASSERT().
-  If PcdMaximumLinkedListLenth is not zero, and List contains more than
-  PcdMaximumLinkedListLenth nodes, then ASSERT().
+  If PcdMaximumLinkedListLength is not zero, and List contains more than
+  PcdMaximumLinkedListLength nodes, then ASSERT().
   If PcdVerifyNodeInList is TRUE and Node is not a node in List, then ASSERT().
 
   @param  List  A pointer to the head node of a doubly linked list.
@@ -1407,8 +1409,8 @@ GetNextNode (
   If Node is NULL, then ASSERT().
   If List was not initialized with INTIALIZE_LIST_HEAD_VARIABLE() or
   InitializeListHead(), then ASSERT().
-  If PcdMaximumLinkedListLenth is not zero, and List contains more than
-  PcdMaximumLinkedListLenth nodes, then ASSERT().
+  If PcdMaximumLinkedListLength is not zero, and List contains more than
+  PcdMaximumLinkedListLength nodes, then ASSERT().
   If PcdVerifyNodeInList is TRUE and Node is not a node in List, then ASSERT().
 
   @param  List  A pointer to the head node of a doubly linked list.
@@ -1434,7 +1436,7 @@ GetPreviousNode (
   If ListHead is NULL, then ASSERT().
   If ListHead was not initialized with INTIALIZE_LIST_HEAD_VARIABLE() or
   InitializeListHead(), then ASSERT().
-  If PcdMaximumLinkedListLenth is not zero, and the number of nodes
+  If PcdMaximumLinkedListLength is not zero, and the number of nodes
   in List, including the List node, is greater than or equal to
   PcdMaximumLinkedListLength, then ASSERT().
 
@@ -1464,7 +1466,7 @@ IsListEmpty (
   If Node is NULL, then ASSERT().
   If List was not initialized with INTIALIZE_LIST_HEAD_VARIABLE() or InitializeListHead(),
   then ASSERT().
-  If PcdMaximumLinkedListLenth is not zero, and the number of nodes
+  If PcdMaximumLinkedListLength is not zero, and the number of nodes
   in List, including the List node, is greater than or equal to
   PcdMaximumLinkedListLength, then ASSERT().
   If PcdVerifyNodeInList is TRUE and Node is not a node in List the and Node is not equal
@@ -1496,7 +1498,7 @@ IsNull (
   If Node is NULL, then ASSERT().
   If List was not initialized with INTIALIZE_LIST_HEAD_VARIABLE() or
   InitializeListHead(), then ASSERT().
-  If PcdMaximumLinkedListLenth is not zero, and the number of nodes
+  If PcdMaximumLinkedListLength is not zero, and the number of nodes
   in List, including the List node, is greater than or equal to
   PcdMaximumLinkedListLength, then ASSERT().
   If PcdVerifyNodeInList is TRUE and Node is not a node in List, then ASSERT().
@@ -2343,6 +2345,7 @@ BitFieldRead8 (
   If StartBit is greater than 7, then ASSERT().
   If EndBit is greater than 7, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If Value is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2376,6 +2379,7 @@ BitFieldWrite8 (
   If StartBit is greater than 7, then ASSERT().
   If EndBit is greater than 7, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2409,6 +2413,7 @@ BitFieldOr8 (
   If StartBit is greater than 7, then ASSERT().
   If EndBit is greater than 7, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2443,6 +2448,8 @@ BitFieldAnd8 (
   If StartBit is greater than 7, then ASSERT().
   If EndBit is greater than 7, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2505,6 +2512,7 @@ BitFieldRead16 (
   If StartBit is greater than 15, then ASSERT().
   If EndBit is greater than 15, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If Value is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2538,6 +2546,7 @@ BitFieldWrite16 (
   If StartBit is greater than 15, then ASSERT().
   If EndBit is greater than 15, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2571,6 +2580,7 @@ BitFieldOr16 (
   If StartBit is greater than 15, then ASSERT().
   If EndBit is greater than 15, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2605,6 +2615,8 @@ BitFieldAnd16 (
   If StartBit is greater than 15, then ASSERT().
   If EndBit is greater than 15, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2667,6 +2679,7 @@ BitFieldRead32 (
   If StartBit is greater than 31, then ASSERT().
   If EndBit is greater than 31, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If Value is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2700,6 +2713,7 @@ BitFieldWrite32 (
   If StartBit is greater than 31, then ASSERT().
   If EndBit is greater than 31, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2733,6 +2747,7 @@ BitFieldOr32 (
   If StartBit is greater than 31, then ASSERT().
   If EndBit is greater than 31, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2767,6 +2782,8 @@ BitFieldAnd32 (
   If StartBit is greater than 31, then ASSERT().
   If EndBit is greater than 31, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2829,6 +2846,7 @@ BitFieldRead64 (
   If StartBit is greater than 63, then ASSERT().
   If EndBit is greater than 63, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If Value is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2862,6 +2880,7 @@ BitFieldWrite64 (
   If StartBit is greater than 63, then ASSERT().
   If EndBit is greater than 63, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2895,6 +2914,7 @@ BitFieldOr64 (
   If StartBit is greater than 63, then ASSERT().
   If EndBit is greater than 63, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -2929,6 +2949,8 @@ BitFieldAnd64 (
   If StartBit is greater than 63, then ASSERT().
   If EndBit is greater than 63, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Operand   Operand on which to perform the bitfield operation.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -5380,6 +5402,7 @@ AsmMsrBitFieldRead32 (
   If StartBit is greater than 31, then ASSERT().
   If EndBit is greater than 31, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If Value is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Index     The 32-bit MSR index to write.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -5416,6 +5439,7 @@ AsmMsrBitFieldWrite32 (
   If StartBit is greater than 31, then ASSERT().
   If EndBit is greater than 31, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Index     The 32-bit MSR index to write.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -5452,6 +5476,7 @@ AsmMsrBitFieldOr32 (
   If StartBit is greater than 31, then ASSERT().
   If EndBit is greater than 31, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Index     The 32-bit MSR index to write.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -5490,6 +5515,8 @@ AsmMsrBitFieldAnd32 (
   If StartBit is greater than 31, then ASSERT().
   If EndBit is greater than 31, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Index     The 32-bit MSR index to write.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -5684,6 +5711,7 @@ AsmMsrBitFieldRead64 (
   If StartBit is greater than 63, then ASSERT().
   If EndBit is greater than 63, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If Value is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Index     The 32-bit MSR index to write.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -5720,6 +5748,7 @@ AsmMsrBitFieldWrite64 (
   If StartBit is greater than 63, then ASSERT().
   If EndBit is greater than 63, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Index     The 32-bit MSR index to write.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -5756,6 +5785,7 @@ AsmMsrBitFieldOr64 (
   If StartBit is greater than 63, then ASSERT().
   If EndBit is greater than 63, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Index     The 32-bit MSR index to write.
   @param  StartBit  The ordinal of the least significant bit in the bit field.
@@ -5793,6 +5823,8 @@ AsmMsrBitFieldAnd64 (
   If StartBit is greater than 63, then ASSERT().
   If EndBit is greater than 63, then ASSERT().
   If EndBit is less than StartBit, then ASSERT().
+  If AndData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
+  If OrData is larger than the bitmask value range specified by StartBit and EndBit, then ASSERT().
 
   @param  Index     The 32-bit MSR index to write.
   @param  StartBit  The ordinal of the least significant bit in the bit field.

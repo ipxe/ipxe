@@ -1552,11 +1552,8 @@ int x509_validate_chain ( struct x509_chain *chain, time_t time,
 	struct x509_link *link;
 	int rc;
 
-	/* Sanity check */
-	if ( list_empty ( &chain->links ) ) {
-		DBGC ( chain, "X509 chain %p is empty\n", chain );
-		return -EACCES_EMPTY;
-	}
+	/* Error to be used if chain contains no certifictes */
+	rc = -EACCES_EMPTY;
 
 	/* Find first certificate that can be validated as a
 	 * standalone (i.e.  is already valid, or can be validated as
@@ -1586,6 +1583,7 @@ int x509_validate_chain ( struct x509_chain *chain, time_t time,
 		return 0;
 	}
 
-	DBGC ( chain, "X509 chain %p found no valid certificates\n", chain );
-	return -EACCES_UNTRUSTED;
+	DBGC ( chain, "X509 chain %p found no valid certificates: %s\n",
+	       chain, strerror ( rc ) );
+	return rc;
 }

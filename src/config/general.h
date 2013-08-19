@@ -59,6 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef	DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
 #undef	DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */
 #undef	DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
+#undef	DOWNLOAD_PROTO_NFS	/* Network File System Protocol */
 
 /*
  * SAN boot protocols
@@ -126,7 +127,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define VLAN_CMD		/* VLAN commands */
 //#define PXE_CMD		/* PXE commands */
 //#define REBOOT_CMD		/* Reboot command */
+//#define POWEROFF_CMD		/* Power off command */
 //#define IMAGE_TRUST_CMD	/* Image trust management commands */
+//#define PCI_CMD		/* PCI commands */
 
 /*
  * ROM-specific options

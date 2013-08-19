@@ -20,8 +20,10 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
+#include <errno.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
+#include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/uuid.h>
 #include <ipxe/init.h>
 
@@ -31,12 +33,19 @@ EFI_HANDLE efi_image_handle;
 /** Loaded image protocol for this image */
 EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 
+/** Loaded image protocol device path for this image */
+EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
+
 /** System table passed to entry point */
 EFI_SYSTEM_TABLE *efi_systab;
 
 /** EFI loaded image protocol GUID */
 static EFI_GUID efi_loaded_image_protocol_guid
 	= EFI_LOADED_IMAGE_PROTOCOL_GUID;
+
+/** EFI loaded image device path protocol GUID */
+static EFI_GUID efi_loaded_image_device_path_protocol_guid
+	= EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID;
 
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
@@ -83,8 +92,10 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	EFI_BOOT_SERVICES *bs;
 	struct efi_protocol *prot;
 	struct efi_config_table *tab;
-	EFI_STATUS efirc;
 	void *loaded_image;
+	void *loaded_image_path;
+	EFI_STATUS efirc;
+	int rc;
 
 	/* Store image handle and system table pointer for future use */
 	efi_image_handle = image_handle;
@@ -105,29 +116,18 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 		return EFI_NOT_AVAILABLE_YET;
 	}
 	DBGC ( systab, "EFI handle %p systab %p\n", image_handle, systab );
-
 	bs = systab->BootServices;
-	efirc = bs->OpenProtocol ( image_handle,
-				   &efi_loaded_image_protocol_guid,
-				   &loaded_image, image_handle, NULL,
-				   EFI_OPEN_PROTOCOL_GET_PROTOCOL );
-	if ( efirc ) {
-	   DBGC ( systab, "Could not get loaded image protocol" );
-	   return efirc;
-	}
-
-	efi_loaded_image = loaded_image;
-	DBG ( "Image base address = %p\n", efi_loaded_image->ImageBase );
 
 	/* Look up used protocols */
 	for_each_table_entry ( prot, EFI_PROTOCOLS ) {
-		if ( ( efirc = bs->LocateProtocol ( &prot->u.guid, NULL,
+		if ( ( efirc = bs->LocateProtocol ( &prot->guid, NULL,
 						    prot->protocol ) ) == 0 ) {
 			DBGC ( systab, "EFI protocol %s is at %p\n",
-			       uuid_ntoa ( &prot->u.uuid ), *(prot->protocol));
+			       efi_guid_ntoa ( &prot->guid ),
+			       *(prot->protocol) );
 		} else {
 			DBGC ( systab, "EFI does not provide protocol %s\n",
-			       uuid_ntoa ( &prot->u.uuid ) );
+			       efi_guid_ntoa ( &prot->guid ) );
 			/* All protocols are required */
 			return efirc;
 		}
@@ -135,16 +135,45 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 
 	/* Look up used configuration tables */
 	for_each_table_entry ( tab, EFI_CONFIG_TABLES ) {
-		if ( ( *(tab->table) = efi_find_table ( &tab->u.guid ) ) ) {
+		if ( ( *(tab->table) = efi_find_table ( &tab->guid ) ) ) {
 			DBGC ( systab, "EFI configuration table %s is at %p\n",
-			       uuid_ntoa ( &tab->u.uuid ), *(tab->table) );
+			       efi_guid_ntoa ( &tab->guid ), *(tab->table) );
 		} else {
 			DBGC ( systab, "EFI does not provide configuration "
-			       "table %s\n", uuid_ntoa ( &tab->u.uuid ) );
+			       "table %s\n", efi_guid_ntoa ( &tab->guid ) );
 			if ( tab->required )
 				return EFI_NOT_AVAILABLE_YET;
 		}
 	}
+
+	/* Get loaded image protocol */
+	if ( ( efirc = bs->OpenProtocol ( image_handle,
+				&efi_loaded_image_protocol_guid,
+				&loaded_image, image_handle, NULL,
+				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( systab, "EFI could not get loaded image protocol: %s",
+		       strerror ( rc ) );
+		return efirc;
+	}
+	efi_loaded_image = loaded_image;
+	DBGC ( systab, "EFI image base address %p\n",
+	       efi_loaded_image->ImageBase );
+
+	/* Get loaded image device path protocol */
+	if ( ( efirc = bs->OpenProtocol ( image_handle,
+				&efi_loaded_image_device_path_protocol_guid,
+				&loaded_image_path, image_handle, NULL,
+				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( systab, "EFI could not get loaded image device path "
+		       "protocol: %s", strerror ( rc ) );
+		return efirc;
+	}
+	efi_loaded_image_path = loaded_image_path;
+	DBGC ( systab, "EFI image device path " );
+	DBGC_EFI_DEVPATH ( systab, efi_loaded_image_path );
+	DBGC ( systab, "\n" );
 
 	/* EFI is perfectly capable of gracefully shutting down any
 	 * loaded devices if it decides to fall back to a legacy boot.
@@ -154,8 +183,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	if ( ( efirc = bs->CreateEvent ( EVT_SIGNAL_EXIT_BOOT_SERVICES,
 					 TPL_CALLBACK, efi_shutdown_hook,
 					 NULL, &efi_shutdown_event ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( systab, "EFI could not create ExitBootServices event: "
-		       "%s\n", efi_strerror ( efirc ) );
+		       "%s\n", strerror ( rc ) );
 		return efirc;
 	}
 

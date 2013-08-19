@@ -19,6 +19,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <string.h>
+#include <errno.h>
 #include <limits.h>
 #include <assert.h>
 #include <unistd.h>
@@ -54,10 +56,12 @@ EFI_REQUIRE_PROTOCOL ( EFI_CPU_ARCH_PROTOCOL, &cpu_arch );
 static void efi_udelay ( unsigned long usecs ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_STATUS efirc;
+	int rc;
 
 	if ( ( efirc = bs->Stall ( usecs ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBG ( "EFI could not delay for %ldus: %s\n",
-		      usecs, efi_strerror ( efirc ) );
+		      usecs, strerror ( rc ) );
 		/* Probably screwed */
 	}
 }
@@ -70,12 +74,13 @@ static void efi_udelay ( unsigned long usecs ) {
 static unsigned long efi_currticks ( void ) {
 	UINT64 time;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Read CPU timer 0 (TSC) */
 	if ( ( efirc = cpu_arch->GetTimerValue ( cpu_arch, 0, &time,
 						 NULL ) ) != 0 ) {
-		DBG ( "EFI could not read CPU timer: %s\n",
-		      efi_strerror ( efirc ) );
+		rc = -EEFI ( efirc );
+		DBG ( "EFI could not read CPU timer: %s\n", strerror ( rc ) );
 		/* Probably screwed */
 		return -1UL;
 	}

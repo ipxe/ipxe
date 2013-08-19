@@ -38,27 +38,14 @@ struct setting {
 	 * The setting tag is a numerical description of the setting
 	 * (such as a DHCP option number, or an SMBIOS structure and
 	 * field number).
-	 *
-	 * Users can construct tags for settings that are not
-	 * explicitly known to iPXE using the generic syntax for
-	 * numerical settings.  For example, the setting name "60"
-	 * will be interpreted as referring to DHCP option 60 (the
-	 * vendor class identifier).
-	 *
-	 * This creates a potential for namespace collisions, since
-	 * the interpretation of the numerical description will vary
-	 * according to the settings block.  When a user attempts to
-	 * fetch a generic numerical setting, we need to ensure that
-	 * only the intended settings block interprets the numerical
-	 * description.  (For example, we do not want to attempt to
-	 * retrieve the subnet mask from SMBIOS, or the system UUID
-	 * from DHCP.)
-	 *
-	 * This potential problem is resolved by allowing the setting
-	 * tag to include a "magic" value indicating the
-	 * interpretation to be placed upon the numerical description.
 	 */
 	unsigned int tag;
+	/** Setting scope (or NULL)
+	 *
+	 * For historic reasons, a NULL scope with a non-zero tag
+	 * indicates a DHCPv4 option setting.
+	 */
+	struct settings_scope *scope;
 };
 
 /** Configuration setting table */
@@ -90,6 +77,12 @@ struct setting {
 
 /** Settings block operations */
 struct settings_operations {
+	/** Redirect to underlying settings block (if applicable)
+	 *
+	 * @v settings		Settings block
+	 * @ret settings	Underlying settings block
+	 */
+	struct settings * ( * redirect ) ( struct settings *settings );
 	/** Check applicability of setting
 	 *
 	 * @v settings		Settings block
@@ -134,12 +127,6 @@ struct settings {
 	struct refcnt *refcnt;
 	/** Name */
 	const char *name;
-	/** Tag magic
-	 *
-	 * This value will be ORed in to any numerical tags
-	 * constructed by parse_setting_name().
-	 */
-	unsigned int tag_magic;
 	/** Parent settings block */
 	struct settings *parent;
 	/** Sibling settings blocks */
@@ -148,7 +135,43 @@ struct settings {
 	struct list_head children;
 	/** Settings block operations */
 	struct settings_operations *op;
+	/** Default scope for numerical settings constructed for this block */
+	struct settings_scope *default_scope;
 };
+
+/**
+ * A setting scope
+ *
+ * Users can construct tags for settings that are not explicitly known
+ * to iPXE using the generic syntax for numerical settings.  For
+ * example, the setting name "60" will be interpreted as referring to
+ * DHCP option 60 (the vendor class identifier).
+ *
+ * This creates a potential for namespace collisions, since the
+ * interpretation of the numerical description will vary according to
+ * the settings block.  When a user attempts to fetch a generic
+ * numerical setting, we need to ensure that only the intended
+ * settings blocks interpret this numerical description.  (For
+ * example, we do not want to attempt to retrieve the subnet mask from
+ * SMBIOS, or the system UUID from DHCP.)
+ *
+ * This potential problem is resolved by including a user-invisible
+ * "scope" within the definition of each setting.  Settings blocks may
+ * use this to determine whether or not the setting is applicable.
+ * Any settings constructed from a numerical description
+ * (e.g. "smbios/1.4.0") will be assigned the default scope of the
+ * settings block specified in the description (e.g. "smbios"); this
+ * provides behaviour matching the user's expectations in most
+ * circumstances.
+ */
+struct settings_scope {
+	/** Dummy field
+	 *
+	 * This is included only to ensure that pointers to different
+	 * scopes always compare differently.
+	 */
+	uint8_t dummy;
+} __attribute__ (( packed ));
 
 /**
  * A setting type
@@ -162,24 +185,47 @@ struct setting_type {
 	 * This is the name exposed to the user (e.g. "string").
 	 */
 	const char *name;
-	/** Parse formatted setting value
+	/** Parse formatted string to setting value
 	 *
+	 * @v type		Setting type
 	 * @v value		Formatted setting value
 	 * @v buf		Buffer to contain raw value
 	 * @v len		Length of buffer
 	 * @ret len		Length of raw value, or negative error
 	 */
-	int ( * parse ) ( const char *value, void *buf, size_t len );
-	/** Format setting value
+	int ( * parse ) ( struct setting_type *type, const char *value,
+			  void *buf, size_t len );
+	/** Format setting value as a string
 	 *
+	 * @v type		Setting type
 	 * @v raw		Raw setting value
 	 * @v raw_len		Length of raw setting value
 	 * @v buf		Buffer to contain formatted value
 	 * @v len		Length of buffer
 	 * @ret len		Length of formatted value, or negative error
 	 */
-	int ( * format ) ( const void *raw, size_t raw_len, char *buf,
-			   size_t len );
+	int ( * format ) ( struct setting_type *type, const void *raw,
+			   size_t raw_len, char *buf, size_t len );
+	/** Convert number to setting value
+	 *
+	 * @v type		Setting type
+	 * @v value		Numeric value
+	 * @v buf		Buffer to contain raw value
+	 * @v len		Length of buffer
+	 * @ret len		Length of raw value, or negative error
+	 */
+	int ( * denumerate ) ( struct setting_type *type, unsigned long value,
+			       void *buf, size_t len );
+	/** Convert setting value to number
+	 *
+	 * @v type		Setting type
+	 * @v raw		Raw setting value
+	 * @v raw_len		Length of raw setting value
+	 * @v value		Numeric value to fill in
+	 * @ret rc		Return status code
+	 */
+	int ( * numerate ) ( struct setting_type *type, const void *raw,
+			     size_t raw_len, unsigned long *value );
 };
 
 /** Configuration setting type table */
@@ -218,6 +264,9 @@ struct generic_settings {
 	struct list_head list;
 };
 
+/** A child settings block locator function */
+typedef struct settings * ( *get_child_settings_t ) ( struct settings *settings,
+						      const char *name );
 extern struct settings_operations generic_settings_operations;
 extern int generic_settings_store ( struct settings *settings,
 				    struct setting *setting,
@@ -231,6 +280,7 @@ extern int register_settings ( struct settings *settings,
 			       struct settings *parent, const char *name );
 extern void unregister_settings ( struct settings *settings );
 
+extern struct settings * settings_target ( struct settings *settings );
 extern int setting_applies ( struct settings *settings,
 			     struct setting *setting );
 extern int store_setting ( struct settings *settings, struct setting *setting,
@@ -271,27 +321,35 @@ extern int setting_cmp ( struct setting *a, struct setting *b );
 
 extern struct settings * find_child_settings ( struct settings *parent,
 					       const char *name );
+extern struct settings * autovivify_child_settings ( struct settings *parent,
+						     const char *name );
 extern const char * settings_name ( struct settings *settings );
 extern struct settings * find_settings ( const char *name );
 extern struct setting * find_setting ( const char *name );
-
+extern int parse_setting_name ( char *name, get_child_settings_t get_child,
+				struct settings **settings,
+				struct setting *setting );
 extern int setting_name ( struct settings *settings, struct setting *setting,
 			  char *buf, size_t len );
+extern int setting_format ( struct setting_type *type, const void *raw,
+			    size_t raw_len, char *buf, size_t len );
+extern int setting_parse ( struct setting_type *type, const char *value,
+			   void *buf, size_t len );
+extern int setting_numerate ( struct setting_type *type, const void *raw,
+			      size_t raw_len, unsigned long *value );
+extern int setting_denumerate ( struct setting_type *type, unsigned long value,
+				void *buf, size_t len );
 extern int fetchf_setting ( struct settings *settings, struct setting *setting,
 			    char *buf, size_t len );
+extern int fetchf_setting_copy ( struct settings *settings,
+				 struct setting *setting, char **value );
 extern int storef_setting ( struct settings *settings,
 			    struct setting *setting,
 			    const char *value );
-extern int store_named_setting ( const char *name,
-				 struct setting_type *default_type,
-				 const void *data, size_t len );
-extern int storef_named_setting ( const char *name,
-				  struct setting_type *default_type,
-				  const char *value );
-extern int fetchf_named_setting ( const char *name, char *name_buf,
-				  size_t name_len, char *value_buf,
-				  size_t value_len );
-extern int fetchf_named_setting_copy ( const char *name, char **data );
+extern int fetchn_setting ( struct settings *settings, struct setting *setting,
+			    unsigned long *value );
+extern int storen_setting ( struct settings *settings, struct setting *setting,
+			    unsigned long value );
 extern char * expand_settings ( const char *string );
 
 extern struct setting_type setting_type_string __setting_type;
@@ -305,7 +363,9 @@ extern struct setting_type setting_type_uint16 __setting_type;
 extern struct setting_type setting_type_uint32 __setting_type;
 extern struct setting_type setting_type_hex __setting_type;
 extern struct setting_type setting_type_hexhyp __setting_type;
+extern struct setting_type setting_type_hexraw __setting_type;
 extern struct setting_type setting_type_uuid __setting_type;
+extern struct setting_type setting_type_busdevfn __setting_type;
 
 extern struct setting ip_setting __setting ( SETTING_IPv4 );
 extern struct setting netmask_setting __setting ( SETTING_IPv4 );
@@ -329,17 +389,17 @@ extern struct setting busid_setting __setting ( SETTING_NETDEV );
  * @v settings		Settings block
  * @v op		Settings block operations
  * @v refcnt		Containing object reference counter, or NULL
- * @v tag_magic		Tag magic
+ * @v default_scope	Default scope
  */
 static inline void settings_init ( struct settings *settings,
 				   struct settings_operations *op,
 				   struct refcnt *refcnt,
-				   unsigned int tag_magic ) {
+				   struct settings_scope *default_scope ) {
 	INIT_LIST_HEAD ( &settings->siblings );
 	INIT_LIST_HEAD ( &settings->children );
 	settings->op = op;
 	settings->refcnt = refcnt;
-	settings->tag_magic = tag_magic;
+	settings->default_scope = default_scope;
 }
 
 /**
@@ -351,7 +411,7 @@ static inline void settings_init ( struct settings *settings,
 static inline void generic_settings_init ( struct generic_settings *generics,
 					   struct refcnt *refcnt ) {
 	settings_init ( &generics->settings, &generic_settings_operations,
-			refcnt, 0 );
+			refcnt, NULL );
 	INIT_LIST_HEAD ( &generics->list );
 }
 
@@ -365,16 +425,6 @@ static inline void generic_settings_init ( struct generic_settings *generics,
 static inline int delete_setting ( struct settings *settings,
 				   struct setting *setting ) {
 	return store_setting ( settings, setting, NULL, 0 );
-}
-
-/**
- * Delete named setting
- *
- * @v name		Name of setting
- * @ret rc		Return status code
- */
-static inline int delete_named_setting ( const char *name ) {
-	return store_named_setting ( name, NULL, NULL, 0 );
 }
 
 /**

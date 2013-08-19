@@ -33,8 +33,10 @@ extern char _etextdata[];
 /**
  * Relocate iPXE
  *
- * @v ix86		x86 register dump from prefix
- * @ret ix86		x86 registers to return to prefix
+ * @v ebp		Maximum address to use for relocation
+ * @ret esi		Current physical address
+ * @ret edi		New physical address
+ * @ret ecx		Length to copy
  *
  * This finds a suitable location for iPXE near the top of 32-bit
  * address space, and returns the physical address of the new location
@@ -59,7 +61,7 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 
 	/* Determine maximum usable address */
 	max = MAX_ADDR;
-	if ( ix86->regs.ebp && ( ix86->regs.ebp < max ) ) {
+	if ( ix86->regs.ebp < max ) {
 		max = ix86->regs.ebp;
 		DBG ( "Limiting relocation to [0,%lx)\n", max );
 	}

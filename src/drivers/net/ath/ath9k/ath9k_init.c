@@ -17,6 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+FILE_LICENCE ( BSD2 );
+
 #include <ipxe/malloc.h>
 #include <ipxe/pci_io.h>
 #include <ipxe/pci.h>

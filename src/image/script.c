@@ -55,44 +55,96 @@ static size_t script_offset;
  * @ret rc		Return status code
  */
 static int process_script ( struct image *image,
-			    int ( * process_line ) ( const char *line ),
+			    int ( * process_line ) ( struct image *image,
+						     size_t offset,
+						     const char *label,
+						     const char *command ),
 			    int ( * terminate ) ( int rc ) ) {
+	size_t len = 0;
+	char *line = NULL;
+	size_t line_offset;
+	char *label;
+	char *command;
 	off_t eol;
-	size_t len;
-	char *line;
+	size_t frag_len;
+	char *tmp;
 	int rc;
 
+	/* Initialise script and line offsets */
 	script_offset = 0;
+	line_offset = 0;
 
 	do {
-	
+
 		/* Find length of next line, excluding any terminating '\n' */
 		eol = memchr_user ( image->data, script_offset, '\n',
 				    ( image->len - script_offset ) );
 		if ( eol < 0 )
 			eol = image->len;
-		len = ( eol - script_offset );
+		frag_len = ( eol - script_offset );
 
 		/* Allocate buffer for line */
-		line = zalloc ( len + 1 /* NUL */ );
-		if ( ! line )
-			return -ENOMEM;
+		tmp = realloc ( line, ( len + frag_len + 1 /* NUL */ ) );
+		if ( ! tmp ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+		line = tmp;
 
 		/* Copy line */
-		copy_from_user ( line, image->data, script_offset, len );
-		DBG ( "$ %s\n", line );
+		copy_from_user ( ( line + len ), image->data, script_offset,
+				 frag_len );
+		len += frag_len;
 
-		/* Move to next line */
-		script_offset += ( len + 1 );
+		/* Move to next line in script */
+		script_offset += ( frag_len + 1 );
 
-		/* Process and free line */
-		rc = process_line ( line );
-		free ( line );
+		/* Strip trailing CR, if present */
+		if ( len && ( line[ len - 1 ] == '\r' ) )
+			len--;
+
+		/* Handle backslash continuations */
+		if ( len && ( line[ len - 1 ] == '\\' ) ) {
+			len--;
+			rc = -EINVAL;
+			continue;
+		}
+
+		/* Terminate line */
+		line[len] = '\0';
+
+		/* Split line into (optional) label and command */
+		command = line;
+		while ( isspace ( *command ) )
+			command++;
+		if ( *command == ':' ) {
+			label = ++command;
+			while ( *command && ! isspace ( *command ) )
+				command++;
+			if ( *command )
+				*(command++) = '\0';
+		} else {
+			label = NULL;
+		}
+
+		/* Process line */
+		rc = process_line ( image, line_offset, label, command );
 		if ( terminate ( rc ) )
-			return rc;
+			goto err_process;
+
+		/* Free line */
+		free ( line );
+		line = NULL;
+		len = 0;
+
+		/* Update line offset */
+		line_offset = script_offset;
 
 	} while ( script_offset < image->len );
 
+ err_process:
+ err_alloc:
+	free ( line );
 	return rc;
 }
 
@@ -111,18 +163,21 @@ static int terminate_on_exit_or_failure ( int rc ) {
 /**
  * Execute script line
  *
- * @v line		Line of script
+ * @v image		Script
+ * @v offset		Offset within script
+ * @v label		Label, or NULL
+ * @v command		Command
  * @ret rc		Return status code
  */
-static int script_exec_line ( const char *line ) {
+static int script_exec_line ( struct image *image, size_t offset,
+			      const char *label __unused,
+			      const char *command ) {
 	int rc;
 
-	/* Skip label lines */
-	if ( line[0] == ':' )
-		return 0;
+	DBGC ( image, "[%04zx] $ %s\n", offset, command );
 
 	/* Execute command */
-	if ( ( rc = system ( line ) ) != 0 )
+	if ( ( rc = system ( command ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -176,7 +231,7 @@ static int script_probe ( struct image *image ) {
 
 	/* Sanity check */
 	if ( image->len < sizeof ( test ) ) {
-		DBG ( "Too short to be a script\n" );
+		DBGC ( image, "Too short to be a script\n" );
 		return -ENOEXEC;
 	}
 
@@ -185,7 +240,7 @@ static int script_probe ( struct image *image ) {
 	if ( ! ( ( ( memcmp ( test, ipxe_magic, sizeof ( test ) - 1 ) == 0 ) ||
 		   ( memcmp ( test, gpxe_magic, sizeof ( test ) - 1 ) == 0 )) &&
 		 isspace ( test[ sizeof ( test ) - 1 ] ) ) ) {
-		DBG ( "Invalid magic signature\n" );
+		DBGC ( image, "Invalid magic signature\n" );
 		return -ENOEXEC;
 	}
 
@@ -219,20 +274,26 @@ static const char *goto_label;
 /**
  * Check for presence of label
  *
- * @v line		Script line
+ * @v image		Script
+ * @v offset		Offset within script
+ * @v label		Label
+ * @v command		Command
  * @ret rc		Return status code
  */
-static int goto_find_label ( const char *line ) {
-	size_t len = strlen ( goto_label );
+static int goto_find_label ( struct image *image, size_t offset,
+			     const char *label, const char *command __unused ) {
 
-	if ( line[0] != ':' )
+	/* Check label exists */
+	if ( ! label )
 		return -ENOENT;
 
-	if ( strncmp ( goto_label, &line[1], len ) != 0 )
+	/* Check label matches */
+	if ( strcmp ( goto_label, label ) != 0 )
 		return -ENOENT;
 
-	if ( line[ 1 + len ] && ! isspace ( line[ 1 + len ] ) )
-		return -ENOENT;
+	/* Update script offset */
+	script_offset = offset;
+	DBGC ( image, "[%04zx] Gone to :%s\n", offset, label );
 
 	return 0;
 }
@@ -278,6 +339,8 @@ static int goto_exec ( int argc, char **argv ) {
 	if ( ( rc = process_script ( current_image, goto_find_label,
 				     terminate_on_label_found ) ) != 0 ) {
 		script_offset = saved_offset;
+		DBGC ( current_image, "[%04zx] No such label :%s\n",
+		       script_offset, goto_label );
 		return rc;
 	}
 

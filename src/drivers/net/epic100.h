@@ -64,7 +64,7 @@ enum epic100_registers {
 #define INTR_RX_STATUS_OK	(0x00008000)	/* rx status valid. NI */
 #define INTR_PCI_TGT_ABT	(0x00004000)	/* PCI Target abort */
 #define INTR_PCI_MASTER_ABT	(0x00002000)	/* PCI Master abort */
-#define INTR_PCI_PARITY_ERR	(0x00001000)	/* PCI adress parity error */
+#define INTR_PCI_PARITY_ERR	(0x00001000)	/* PCI address parity error */
 #define INTR_PCI_DATA_ERR	(0x00000800)	/* PCI data parity error */
 #define INTR_RX_THR_CROSSED	(0x00000400)	/* rx copy threshold crossed */
 #define INTR_CNTFULL		(0x00000200)	/* Counter overflow */

@@ -49,6 +49,7 @@ ICCFIX		:= ./util/iccfix
 EINFO		:= ./util/einfo
 GENKEYMAP	:= ./util/genkeymap.pl
 DOXYGEN		:= doxygen
+LCAB		:= lcab
 BINUTILS_DIR	:= /usr
 BFD_DIR		:= $(BINUTILS_DIR)
 ZLIB_DIR	:= /usr
@@ -60,7 +61,7 @@ ZLIB_DIR	:= /usr
 SRCDIRS		:=
 SRCDIRS		+= libgcc
 SRCDIRS		+= core
-SRCDIRS		+= net net/tcp net/udp net/infiniband net/80211
+SRCDIRS		+= net net/oncrpc net/tcp net/udp net/infiniband net/80211
 SRCDIRS		+= image
 SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
@@ -107,7 +108,7 @@ INCDIRS		+= include .
 # helpfully suggestive message
 #
 ALL		:= bin/blib.a bin/ipxe.dsk bin/ipxe.lkrn bin/ipxe.iso \
-		   bin/ipxe.usb bin/undionly.kpxe bin/rtl8139.rom
+		   bin/ipxe.usb bin/ipxe.pxe bin/undionly.kpxe bin/rtl8139.rom
 all : $(ALL)
 	@$(ECHO) '==========================================================='
 	@$(ECHO)
@@ -143,7 +144,25 @@ everything :
 		bin-i386-efi/ipxe.efirom \
 		bin-x86_64-efi/ipxe.efi bin-x86_64-efi/ipxe.efidrv \
 		bin-x86_64-efi/ipxe.efirom \
-		bin-i386-linux/tap.linux bin-x86_64-linux/tap.linux
+		bin-i386-linux/tap.linux bin-x86_64-linux/tap.linux \
+		bin-i386-linux/tests.linux bin-x86_64-linux/tests.linux
+
+###############################################################################
+#
+# VMware build target: all ROMs used with VMware
+#
+vmware : bin/8086100f.mrom bin/808610d3.mrom bin/10222000.rom bin/15ad07b0.rom
+	@$(ECHO) '==========================================================='
+	@$(ECHO) 
+	@$(ECHO) 'Available ROMs:'
+	@$(ECHO) '    bin/8086100f.mrom -- intel/e1000'
+	@$(ECHO) '    bin/808610d3.mrom -- intel/e1000e'
+	@$(ECHO) '    bin/10222000.rom  -- vlance/pcnet32'
+	@$(ECHO) '    bin/15ad07b0.rom  -- vmxnet3'
+	@$(ECHO) 
+	@$(ECHO) 'For more information, see http://ipxe.org/howto/vmware'
+	@$(ECHO)
+	@$(ECHO) '==========================================================='
 
 ###############################################################################
 #

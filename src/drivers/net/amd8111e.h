@@ -574,7 +574,7 @@ typedef enum {
 #define CSTATE  1 
 #define SSTATE  2 
 
-/* amd8111e decriptor flag definitions */
+/* amd8111e descriptor flag definitions */
 typedef enum {
 
 	OWN_BIT		=	(1 << 15),

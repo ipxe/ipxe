@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #define CONSOLE_LINUX
 #define TIMER_LINUX
 #define UACCESS_LINUX
@@ -16,6 +18,8 @@
 #define SANBOOT_NULL
 #define ENTROPY_LINUX
 #define TIME_LINUX
+#define REBOOT_NULL
+#define PCIAPI_LINUX
 
 #define DRIVERS_LINUX
 

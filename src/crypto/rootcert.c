@@ -91,7 +91,6 @@ struct x509_root root_certificates = {
 static void rootcert_init ( void ) {
 	void *external = NULL;
 	int len;
-	int rc;
 
 	/* Allow trusted root certificates to be overridden only if
 	 * not explicitly specified at build time.
@@ -101,21 +100,8 @@ static void rootcert_init ( void ) {
 		/* Fetch copy of "trust" setting, if it exists.  This
 		 * memory will never be freed.
 		 */
-		len = fetch_setting_copy ( NULL, &trust_setting, &external );
-		if ( len < 0 ) {
-			rc = len;
-			DBGC ( &root_certificates, "ROOTCERT cannot fetch "
-			       "trusted root certificate fingerprints: %s\n",
-			       strerror ( rc ) );
-			/* No way to prevent startup; fail safe by
-			 * trusting no certificates.
-			 */
-			root_certificates.count = 0;
-			return;
-		}
-
-		/* Use certificates from "trust" setting, if present */
-		if ( external ) {
+		if ( ( len = fetch_setting_copy ( NULL, &trust_setting,
+						  &external ) ) >= 0 ) {
 			root_certificates.fingerprints = external;
 			root_certificates.count = ( len / FINGERPRINT_LEN );
 		}

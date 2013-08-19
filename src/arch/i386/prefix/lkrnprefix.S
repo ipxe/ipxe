@@ -231,9 +231,12 @@ run_ipxe:
 	movzwl	%sp, %edx
 no_cmd_line:
 
-	/* Retrieve initrd pointer and size */
-	movl	%ds:ramdisk_image, %ebp
-	movl	%ds:ramdisk_size, %ecx
+	/* Calculate maximum relocation address */
+	movl	ramdisk_image, %ebp
+	testl	%ebp, %ebp
+	jnz	1f
+	orl	$0xffffffff, %ebp /* Allow arbitrary relocation if no initrd */
+1:
 
 	/* Install iPXE */
 	call	alloc_basemem
@@ -251,6 +254,10 @@ no_cmd_line:
 	lret
 	.section ".text16", "awx", @progbits
 1:
+	/* Retrieve initrd pointer and size */
+	movl	ramdisk_image, %ebp
+	movl	ramdisk_size, %ecx
+
 	/* Set up %ds for access to .data16 */
 	movw	%bx, %ds
 

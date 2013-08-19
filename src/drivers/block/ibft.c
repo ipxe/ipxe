@@ -37,6 +37,7 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/in.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/vlan.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/iscsi.h>
 #include <ipxe/ibft.h>
@@ -264,6 +265,8 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	DBG ( "iBFT NIC subnet = /%d\n", nic->subnet_mask_prefix );
 
 	/* Extract values from net-device configuration */
+	nic->vlan = cpu_to_le16 ( vlan_tag ( netdev ) );
+	DBG ( "iBFT NIC VLAN = %02x\n", le16_to_cpu ( nic->vlan ) );
 	if ( ( rc = ll_protocol->eth_addr ( netdev->ll_addr,
 					    nic->mac_address ) ) != 0 ) {
 		DBG ( "Could not determine iBFT MAC: %s\n", strerror ( rc ) );

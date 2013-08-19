@@ -158,3 +158,45 @@ int iob_ensure_headroom ( struct io_buffer *iobuf, size_t len ) {
 	return -ENOBUFS;
 }
 
+/**
+ * Concatenate I/O buffers into a single buffer
+ *
+ * @v list	List of I/O buffers
+ * @ret iobuf	Concatenated I/O buffer, or NULL on allocation failure
+ *
+ * After a successful concatenation, the list will be empty.
+ */
+struct io_buffer * iob_concatenate ( struct list_head *list ) {
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
+	struct io_buffer *concatenated;
+	size_t len = 0;
+
+	/* If the list contains only a single entry, avoid an
+	 * unnecessary additional allocation.
+	 */
+	if ( list_is_singular ( list ) ) {
+		iobuf = list_first_entry ( list, struct io_buffer, list );
+		INIT_LIST_HEAD ( list );
+		return iobuf;
+	}
+
+	/* Calculate total length */
+	list_for_each_entry ( iobuf, list, list )
+		len += iob_len ( iobuf );
+
+	/* Allocate new I/O buffer */
+	concatenated = alloc_iob_raw ( len, __alignof__ ( *iobuf ), 0 );
+	if ( ! concatenated )
+		return NULL;
+
+	/* Move data to new I/O buffer */
+	list_for_each_entry_safe ( iobuf, tmp, list, list ) {
+		list_del ( &iobuf->list );
+		memcpy ( iob_put ( concatenated, iob_len ( iobuf ) ),
+			 iobuf->data, iob_len ( iobuf ) );
+		free_iob ( iobuf );
+	}
+
+	return concatenated;
+}

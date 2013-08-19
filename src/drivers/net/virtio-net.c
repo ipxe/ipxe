@@ -69,7 +69,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Linux source.
  */
 
-/* Virtqueue indicies */
+/* Virtqueue indices */
 enum {
 	RX_INDEX = 0,
 	TX_INDEX,

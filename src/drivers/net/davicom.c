@@ -213,11 +213,11 @@ static int phy_read(int location)
  phy_write_1bit(io_dcr9, PHY_DATA_1);
  phy_write_1bit(io_dcr9, PHY_DATA_0);
 
- /* Send Phy addres */
+ /* Send Phy address */
  for (i=0x10; i>0; i=i>>1)
      phy_write_1bit(io_dcr9, phy_addr&i ? PHY_DATA_1: PHY_DATA_0);
    
- /* Send register addres */
+ /* Send register address */
  for (i=0x10; i>0; i=i>>1)
      phy_write_1bit(io_dcr9, location&i ? PHY_DATA_1: PHY_DATA_0);
 
@@ -257,11 +257,11 @@ static void phy_write(int location, u16 phy_data)
  phy_write_1bit(io_dcr9, PHY_DATA_0);
  phy_write_1bit(io_dcr9, PHY_DATA_1);
 
- /* Send Phy addres */
+ /* Send Phy address */
  for (i=0x10; i>0; i=i>>1)
    phy_write_1bit(io_dcr9, phy_addr&i ? PHY_DATA_1: PHY_DATA_0);
 
- /* Send register addres */
+ /* Send register address */
  for (i=0x10; i>0; i=i>>1)
    phy_write_1bit(io_dcr9, location&i ? PHY_DATA_1: PHY_DATA_0);
 

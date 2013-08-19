@@ -171,7 +171,19 @@ void adjust_pci_device ( struct pci_device *pci ) {
  * @ret rc		Return status code
  */
 int pci_read_config ( struct pci_device *pci ) {
+	uint16_t busdevfn;
+	uint8_t hdrtype;
 	uint32_t tmp;
+
+	/* Ignore all but the first function on non-multifunction devices */
+	if ( PCI_FUNC ( pci->busdevfn ) != 0 ) {
+		busdevfn = pci->busdevfn;
+		pci->busdevfn = PCI_FIRST_FUNC ( pci->busdevfn );
+		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdrtype );
+		pci->busdevfn = busdevfn;
+		if ( ! ( hdrtype & 0x80 ) )
+			return -ENODEV;
+	}
 
 	/* Check for physical device presence */
 	pci_read_config_dword ( pci, PCI_VENDOR_ID, &tmp );
@@ -201,6 +213,32 @@ int pci_read_config ( struct pci_device *pci ) {
 	INIT_LIST_HEAD ( &pci->dev.children );
 
 	return 0;
+}
+
+/**
+ * Find next device on PCI bus
+ *
+ * @v pci		PCI device to fill in
+ * @v busdevfn		Starting bus:dev.fn address
+ * @ret busdevfn	Bus:dev.fn address of next PCI device, or negative error
+ */
+int pci_find_next ( struct pci_device *pci, unsigned int busdevfn ) {
+	static unsigned int end;
+	int rc;
+
+	/* Determine number of PCI buses */
+	if ( ! end )
+		end = PCI_BUSDEVFN ( pci_num_bus(), 0, 0 );
+
+	/* Find next PCI device, if any */
+	for ( ; busdevfn < end ; busdevfn++ ) {
+		memset ( pci, 0, sizeof ( *pci ) );
+		pci_init ( pci, busdevfn );
+		if ( ( rc = pci_read_config ( pci ) ) == 0 )
+			return busdevfn;
+	}
+
+	return -ENODEV;
 }
 
 /**
@@ -276,14 +314,10 @@ void pci_remove ( struct pci_device *pci ) {
  */
 static int pcibus_probe ( struct root_device *rootdev ) {
 	struct pci_device *pci = NULL;
-	unsigned int num_bus;
-	unsigned int busdevfn;
-	uint8_t hdrtype = 0;
+	int busdevfn = 0;
 	int rc;
 
-	num_bus = pci_num_bus();
-	for ( busdevfn = 0 ; busdevfn < PCI_BUSDEVFN ( num_bus, 0, 0 ) ;
-	      busdevfn++ ) {
+	for ( busdevfn = 0 ; 1 ; busdevfn++ ) {
 
 		/* Allocate struct pci_device */
 		if ( ! pci )
@@ -292,22 +326,11 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			rc = -ENOMEM;
 			goto err;
 		}
-		memset ( pci, 0, sizeof ( *pci ) );
-		pci_init ( pci, busdevfn );
-			
-		/* Skip all but the first function on
-		 * non-multifunction cards
-		 */
-		if ( PCI_FUNC ( busdevfn ) == 0 ) {
-			pci_read_config_byte ( pci, PCI_HEADER_TYPE,
-					       &hdrtype );
-		} else if ( ! ( hdrtype & 0x80 ) ) {
-			continue;
-		}
 
-		/* Read device configuration */
-		if ( ( rc = pci_read_config ( pci ) ) != 0 )
-			continue;
+		/* Find next PCI device, if any */
+		busdevfn = pci_find_next ( pci, busdevfn );
+		if ( busdevfn < 0 )
+			break;
 
 		/* Look for a driver */
 		if ( ( rc = pci_find_driver ( pci ) ) != 0 ) {

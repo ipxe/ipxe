@@ -30,6 +30,9 @@ struct x86_features {
 /** CPUID support flag */
 #define CPUID_FLAG 0x00200000UL
 
+/** CPUID extended function */
+#define CPUID_EXTENDED 0x80000000UL
+
 /** Get vendor ID and largest standard function */
 #define CPUID_VENDOR_ID 0x00000000UL
 
@@ -48,6 +51,28 @@ struct x86_features {
 /** Get extended features */
 #define CPUID_AMD_FEATURES 0x80000001UL
 
+/** Get CPU model */
+#define CPUID_MODEL 0x80000002UL
+
+/**
+ * Issue CPUID instruction
+ *
+ * @v operation		CPUID operation
+ * @v eax		Output via %eax
+ * @v ebx		Output via %ebx
+ * @v ecx		Output via %ecx
+ * @v edx		Output via %edx
+ */
+static inline __attribute__ (( always_inline )) void
+cpuid ( uint32_t operation, uint32_t *eax, uint32_t *ebx, uint32_t *ecx,
+	uint32_t *edx ) {
+
+	__asm__ ( "cpuid"
+		  : "=a" ( *eax ), "=b" ( *ebx ), "=c" ( *ecx ), "=d" ( *edx )
+		  : "0" ( operation ) );
+}
+
+extern int cpuid_is_supported ( void );
 extern void x86_features ( struct x86_features *features );
 
 #endif /* _IPXE_CPUID_H */

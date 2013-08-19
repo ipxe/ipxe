@@ -247,12 +247,17 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 				i = 0;
 				list_for_each_entry ( item, &ui->menu->items,
 						      list ) {
-					if ( item->shortcut == key ) {
-						ui->selected = i;
-						chosen = 1;
-						break;
+					if ( ! ( item->shortcut &&
+						 ( item->shortcut == key ) ) ) {
+						i++;
+						continue;
 					}
-					i++;
+					ui->selected = i;
+					if ( item->label ) {
+						chosen = 1;
+					} else {
+						move = +1;
+					}
 				}
 				break;
 			}
@@ -283,12 +288,10 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 			draw_menu_item ( ui, ui->selected );
 		}
 
-		/* Refuse to choose unlabelled items (i.e. separators) */
-		item = menu_item ( ui->menu, ui->selected );
-		if ( ! item->label )
-			chosen = 0;
-
 		/* Record selection */
+		item = menu_item ( ui->menu, ui->selected );
+		assert ( item != NULL );
+		assert ( item->label != NULL );
 		*selected = item;
 
 	} while ( ( rc == 0 ) && ! chosen );

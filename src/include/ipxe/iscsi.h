@@ -36,7 +36,7 @@ union iscsi_segment_lengths {
 		 */
 		uint8_t data_len[3];
 	} bytes;
-	/** Ths data length (measured in bytes), in network byte
+	/** The data length (measured in bytes), in network byte
 	 * order, with ahs_len as the first byte.
 	 */
 	uint32_t ahs_and_data_len;

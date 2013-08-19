@@ -31,6 +31,7 @@ extern struct uri *
 fetch_next_server_and_filename ( struct settings *settings );
 extern int netboot ( struct net_device *netdev );
 extern int autoboot ( void );
+extern void ipxe ( struct net_device *netdev );
 
 extern int pxe_menu_boot ( struct net_device *netdev );
 

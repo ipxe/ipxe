@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #define UACCESS_EFI
 #define IOAPI_X86
 #define PCIAPI_EFI
@@ -19,8 +21,12 @@
 #define BOFM_EFI
 #define ENTROPY_NULL
 #define TIME_NULL
+#define REBOOT_EFI
 
 #define	IMAGE_EFI		/* EFI image support */
 #define	IMAGE_SCRIPT		/* iPXE script image support */
+
+#define	REBOOT_CMD		/* Reboot command */
+#define	CPUID_CMD		/* x86 CPU feature detection command */
 
 #endif /* CONFIG_DEFAULTS_EFI_H */

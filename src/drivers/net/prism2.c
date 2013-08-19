@@ -69,10 +69,10 @@ static const char hardcoded_ssid[] = "";
 #define __cpu_to_le16(x) (x)
 #define __cpu_to_le32(x) (x)
 
-#define hfa384x2host_16(n)	(__le16_to_cpu((UINT16)(n)))
-#define hfa384x2host_32(n)	(__le32_to_cpu((UINT32)(n)))
-#define host2hfa384x_16(n)	(__cpu_to_le16((UINT16)(n)))
-#define host2hfa384x_32(n)	(__cpu_to_le32((UINT32)(n)))
+#define hfa384x2host_16(n)	(__le16_to_cpu((uint16_t)(n)))
+#define hfa384x2host_32(n)	(__le32_to_cpu((uint32_t)(n)))
+#define host2hfa384x_16(n)	(__cpu_to_le16((uint16_t)(n)))
+#define host2hfa384x_32(n)	(__cpu_to_le32((uint32_t)(n)))
 
 /*
  * PLX9052 PCI register offsets
@@ -119,20 +119,18 @@ static const char hardcoded_ssid[] = "";
 
 typedef struct hfa384x
 {
-  UINT32 iobase;
+  uint32_t iobase;
   void *membase;
-  UINT16 lastcmd;
-  UINT16 status;         /* in host order */
-  UINT16 resp0;          /* in host order */
-  UINT16 resp1;          /* in host order */
-  UINT16 resp2;          /* in host order */
-  UINT8  bssid[WLAN_BSSID_LEN];
+  uint16_t lastcmd;
+  uint16_t status;         /* in host order */
+  uint16_t resp0;          /* in host order */
+  uint16_t resp1;          /* in host order */
+  uint16_t resp2;          /* in host order */
+  uint8_t  bssid[WLAN_BSSID_LEN];
 } hfa384x_t;
 
 /* The global instance of the hardware (i.e. where we store iobase and membase, in the absence of anywhere better to put them */
-static hfa384x_t hw_global = {
-  0, 0, 0, 0, 0, 0, 0, {0,0,0,0,0,0}
-};
+static hfa384x_t hw_global;
 
 /*
  * 802.11 headers in addition to those in hfa384x_tx_frame_t (LLC and SNAP)
@@ -141,9 +139,9 @@ static hfa384x_t hw_global = {
 
 typedef struct wlan_llc
 {
-  UINT8   dsap;
-  UINT8   ssap;
-  UINT8   ctl;
+  uint8_t   dsap;
+  uint8_t   ssap;
+  uint8_t   ctl;
 }  wlan_llc_t;
 
 static const wlan_llc_t wlan_llc_snap = { 0xaa, 0xaa, 0x03 }; /* LLC header indicating SNAP (?) */
@@ -151,8 +149,8 @@ static const wlan_llc_t wlan_llc_snap = { 0xaa, 0xaa, 0x03 }; /* LLC header indi
 #define WLAN_IEEE_OUI_LEN 3
 typedef struct wlan_snap
 {
-  UINT8   oui[WLAN_IEEE_OUI_LEN];
-  UINT16  type;
+  uint8_t   oui[WLAN_IEEE_OUI_LEN];
+  uint16_t  type;
 } wlan_snap_t;
 
 typedef struct wlan_80211hdr
@@ -168,11 +166,11 @@ typedef struct wlan_80211hdr
 /*
  * Hardware-level hfa384x functions
  * These are based on the ones in hfa384x.h (which are ifdef'd out since __KERNEL__ is not defined).
- * Basically, these functions are the result of hand-evaluating all the ifdefs and defines in the hfa384x.h versions. 
+ * Basically, these functions are the result of hand-evaluating all the ifdefs and defines in the hfa384x.h versions.
  */
 
 /* Retrieve the value of one of the MAC registers. */
-static inline UINT16 hfa384x_getreg( hfa384x_t *hw, UINT reg )
+static inline uint16_t hfa384x_getreg( hfa384x_t *hw, unsigned int reg )
 {
 #if (WLAN_HOSTIF == WLAN_PLX)
   return inw ( hw->iobase + reg );
@@ -182,7 +180,7 @@ static inline UINT16 hfa384x_getreg( hfa384x_t *hw, UINT reg )
 }
 
 /* Set the value of one of the MAC registers. */
-static inline void hfa384x_setreg( hfa384x_t *hw, UINT16 val, UINT reg )
+static inline void hfa384x_setreg( hfa384x_t *hw, uint16_t val, unsigned int reg )
 {
 #if (WLAN_HOSTIF == WLAN_PLX)
   outw ( val, hw->iobase + reg );
@@ -192,15 +190,15 @@ static inline void hfa384x_setreg( hfa384x_t *hw, UINT16 val, UINT reg )
   return;
 }
 
-/* 
+/*
  * Noswap versions
  * Etherboot is i386 only, so swap and noswap are the same...
  */
-static inline UINT16 hfa384x_getreg_noswap( hfa384x_t *hw, UINT reg )
+static inline uint16_t hfa384x_getreg_noswap( hfa384x_t *hw, unsigned int reg )
 {
   return hfa384x_getreg ( hw, reg );
 }
-static inline void hfa384x_setreg_noswap( hfa384x_t *hw, UINT16 val, UINT reg )
+static inline void hfa384x_setreg_noswap( hfa384x_t *hw, uint16_t val, unsigned int reg )
 {
   hfa384x_setreg ( hw, val, reg );
 }
@@ -227,12 +225,12 @@ static inline void hfa384x_setreg_noswap( hfa384x_t *hw, UINT16 val, UINT reg )
  *       >0              command indicated error, Status and Resp0-2 are
  *                       in hw structure.
  */
-static int hfa384x_docmd_wait( hfa384x_t *hw, UINT16 cmd, UINT16 parm0, UINT16 parm1, UINT16 parm2)
+static int hfa384x_docmd_wait( hfa384x_t *hw, uint16_t cmd, uint16_t parm0, uint16_t parm1, uint16_t parm2)
 {
-  UINT16 reg = 0;
-  UINT16 counter = 0;
-  
-  /* wait for the busy bit to clear */	
+  uint16_t reg = 0;
+  uint16_t counter = 0;
+
+  /* wait for the busy bit to clear */
   counter = 0;
   reg = hfa384x_getreg(hw, HFA384x_CMD);
   while ( HFA384x_CMD_ISBUSY(reg) && (counter < 10) ) {
@@ -251,7 +249,7 @@ static int hfa384x_docmd_wait( hfa384x_t *hw, UINT16 cmd, UINT16 parm0, UINT16 p
   hfa384x_setreg(hw, parm2, HFA384x_PARAM2);
   hw->lastcmd = cmd;
   hfa384x_setreg(hw, cmd, HFA384x_CMD);
-  
+
   /* Now wait for completion */
   counter = 0;
   reg = hfa384x_getreg(hw, HFA384x_EVSTAT);
@@ -286,14 +284,14 @@ static int hfa384x_docmd_wait( hfa384x_t *hw, UINT16 cmd, UINT16 parm0, UINT16 p
  *	hw		device structure
  *	id		FID or RID, destined for the select register (host order)
  *	offset		An _even_ offset into the buffer for the given FID/RID.
- * Returns: 
+ * Returns:
  *	0		success
  */
-static int hfa384x_prepare_bap(hfa384x_t *hw, UINT16 id, UINT16 offset)
+static int hfa384x_prepare_bap(hfa384x_t *hw, uint16_t id, uint16_t offset)
 {
   int result = 0;
-  UINT16 reg;
-  UINT16 i;
+  uint16_t reg;
+  uint16_t i;
 
   /* Validate offset, buf, and len */
   if ( (offset > HFA384x_BAP_OFFSET_MAX) || (offset % 2) ) {
@@ -304,7 +302,7 @@ static int hfa384x_prepare_bap(hfa384x_t *hw, UINT16 id, UINT16 offset)
     udelay(10);
     hfa384x_setreg(hw, offset, HFA384x_OFFSET0);
     /* Wait for offset[busy] to clear (see BAP_TIMEOUT) */
-    i = 0; 
+    i = 0;
     do {
       reg = hfa384x_getreg(hw, HFA384x_OFFSET0);
       if ( i > 0 ) udelay(2);
@@ -330,28 +328,28 @@ static int hfa384x_prepare_bap(hfa384x_t *hw, UINT16 id, UINT16 offset)
  *	offset		An _even_ offset into the buffer for the given FID/RID.
  *	buf		ptr to array of bytes
  *	len		length of data to transfer in bytes
- * Returns: 
+ * Returns:
  *	0		success
  */
-static int hfa384x_copy_from_bap(hfa384x_t *hw, UINT16 id, UINT16 offset,
-			  void *buf, UINT len)
+static int hfa384x_copy_from_bap(hfa384x_t *hw, uint16_t id, uint16_t offset,
+			  void *buf, unsigned int len)
 {
   int result = 0;
-  UINT8	*d = (UINT8*)buf;
-  UINT16 i;
-  UINT16 reg = 0;
-  
+  uint8_t	*d = (uint8_t*)buf;
+  uint16_t i;
+  uint16_t reg = 0;
+
   /* Prepare BAP */
   result = hfa384x_prepare_bap ( hw, id, offset );
   if ( result == 0 ) {
     /* Read even(len) buf contents from data reg */
     for ( i = 0; i < (len & 0xfffe); i+=2 ) {
-      *(UINT16*)(&(d[i])) = hfa384x_getreg_noswap(hw, HFA384x_DATA0);
+      *(uint16_t*)(&(d[i])) = hfa384x_getreg_noswap(hw, HFA384x_DATA0);
     }
     /* If len odd, handle last byte */
     if ( len % 2 ){
       reg = hfa384x_getreg_noswap(hw, HFA384x_DATA0);
-      d[len-1] = ((UINT8*)(&reg))[0];
+      d[len-1] = ((uint8_t*)(&reg))[0];
     }
   }
   if (result) {
@@ -369,30 +367,30 @@ static int hfa384x_copy_from_bap(hfa384x_t *hw, UINT16 id, UINT16 offset,
  *	offset		An _even_ offset into the buffer for the given FID/RID.
  *	buf		ptr to array of bytes
  *	len		length of data to transfer in bytes
- * Returns: 
+ * Returns:
  *	0		success
  */
-static int hfa384x_copy_to_bap(hfa384x_t *hw, UINT16 id, UINT16 offset,
-			void *buf, UINT len)
+static int hfa384x_copy_to_bap(hfa384x_t *hw, uint16_t id, uint16_t offset,
+			void *buf, unsigned int len)
 {
   int result = 0;
-  UINT8	*d = (UINT8*)buf;
-  UINT16 i;
-  UINT16 savereg;
+  uint8_t	*d = (uint8_t*)buf;
+  uint16_t i;
+  uint16_t savereg;
 
   /* Prepare BAP */
   result = hfa384x_prepare_bap ( hw, id, offset );
   if ( result == 0 ) {
     /* Write even(len) buf contents to data reg */
     for ( i = 0; i < (len & 0xfffe); i+=2 ) {
-      hfa384x_setreg_noswap(hw, *(UINT16*)(&(d[i])), HFA384x_DATA0);
+      hfa384x_setreg_noswap(hw, *(uint16_t*)(&(d[i])), HFA384x_DATA0);
     }
     /* If len odd, handle last byte */
     if ( len % 2 ){
       savereg = hfa384x_getreg_noswap(hw, HFA384x_DATA0);
       result = hfa384x_prepare_bap ( hw, id, offset + (len & 0xfffe) );
       if ( result == 0 ) {
-	((UINT8*)(&savereg))[0] = d[len-1];
+	((uint8_t*)(&savereg))[0] = d[len-1];
 	hfa384x_setreg_noswap(hw, savereg, HFA384x_DATA0);
       }
     }
@@ -412,10 +410,10 @@ static int hfa384x_copy_to_bap(hfa384x_t *hw, UINT16 id, UINT16 offset,
  *			configuration record. (host order)
  *	rid		RID of the record to read/write. (host order)
  *
- * Returns: 
+ * Returns:
  *	0		success
  */
-static inline int hfa384x_cmd_access(hfa384x_t *hw, UINT16 write, UINT16 rid)
+static inline int hfa384x_cmd_access(hfa384x_t *hw, uint16_t write, uint16_t rid)
 {
   return hfa384x_docmd_wait(hw, HFA384x_CMD_CMDCODE_SET(HFA384x_CMDCODE_ACCESS) | HFA384x_CMD_WRITE_SET(write), rid, 0, 0);
 }
@@ -427,14 +425,14 @@ static inline int hfa384x_cmd_access(hfa384x_t *hw, UINT16 write, UINT16 rid)
  *	hw		device structure
  *	rid		config/info record id (host order)
  *	buf		host side record buffer.  Upon return it will
- *			contain the body portion of the record (minus the 
+ *			contain the body portion of the record (minus the
  *			RID and len).
  *	len		buffer length (in bytes, should match record length)
  *
- * Returns: 
+ * Returns:
  *	0		success
  */
-static int hfa384x_drvr_getconfig(hfa384x_t *hw, UINT16 rid, void *buf, UINT16 len)
+static int hfa384x_drvr_getconfig(hfa384x_t *hw, uint16_t rid, void *buf, uint16_t len)
 {
   int result = 0;
   hfa384x_rec_t	rec;
@@ -469,27 +467,27 @@ static int hfa384x_drvr_getconfig(hfa384x_t *hw, UINT16 rid, void *buf, UINT16 l
  *	rid		config/info record id (in host order)
  *	val		ptr to 16/32 bit buffer to receive value (in host order)
  *
- * Returns: 
+ * Returns:
  *	0		success
  */
 #if 0 /* Not actually used anywhere */
-static int hfa384x_drvr_getconfig16(hfa384x_t *hw, UINT16 rid, void *val)
+static int hfa384x_drvr_getconfig16(hfa384x_t *hw, uint16_t rid, void *val)
 {
   int result = 0;
-  result = hfa384x_drvr_getconfig(hw, rid, val, sizeof(UINT16));
+  result = hfa384x_drvr_getconfig(hw, rid, val, sizeof(uint16_t));
   if ( result == 0 ) {
-    *((UINT16*)val) = hfa384x2host_16(*((UINT16*)val));
+    *((uint16_t*)val) = hfa384x2host_16(*((uint16_t*)val));
   }
   return result;
 }
 #endif
 #if 0 /* Not actually used anywhere */
-static int hfa384x_drvr_getconfig32(hfa384x_t *hw, UINT16 rid, void *val)
+static int hfa384x_drvr_getconfig32(hfa384x_t *hw, uint16_t rid, void *val)
 {
   int result = 0;
-  result = hfa384x_drvr_getconfig(hw, rid, val, sizeof(UINT32));
+  result = hfa384x_drvr_getconfig(hw, rid, val, sizeof(uint32_t));
   if ( result == 0 ) {
-    *((UINT32*)val) = hfa384x2host_32(*((UINT32*)val));
+    *((uint32_t*)val) = hfa384x2host_32(*((uint32_t*)val));
   }
   return result;
 }
@@ -504,10 +502,10 @@ static int hfa384x_drvr_getconfig32(hfa384x_t *hw, UINT16 rid, void *val)
  *	buf		host side record buffer
  *	len		buffer length (in bytes)
  *
- * Returns: 
+ * Returns:
  *	0		success
  */
-static int hfa384x_drvr_setconfig(hfa384x_t *hw, UINT16 rid, void *buf, UINT16 len)
+static int hfa384x_drvr_setconfig(hfa384x_t *hw, uint16_t rid, void *buf, uint16_t len)
 {
   int result = 0;
   hfa384x_rec_t	rec;
@@ -541,21 +539,21 @@ static int hfa384x_drvr_setconfig(hfa384x_t *hw, UINT16 rid, void *buf, UINT16 l
  *	rid		config/info record id (in host order)
  *	val		16/32 bit value to store (in host order)
  *
- * Returns: 
+ * Returns:
  *	0		success
  */
-static int hfa384x_drvr_setconfig16(hfa384x_t *hw, UINT16 rid, UINT16 *val)
+static int hfa384x_drvr_setconfig16(hfa384x_t *hw, uint16_t rid, uint16_t *val)
 {
-  UINT16 value;
+  uint16_t value;
   value = host2hfa384x_16(*val);
-  return hfa384x_drvr_setconfig(hw, rid, &value, sizeof(UINT16));
+  return hfa384x_drvr_setconfig(hw, rid, &value, sizeof(uint16_t));
 }
 #if 0 /* Not actually used anywhere */
-static int hfa384x_drvr_setconfig32(hfa384x_t *hw, UINT16 rid, UINT32 *val)
+static int hfa384x_drvr_setconfig32(hfa384x_t *hw, uint16_t rid, uint32_t *val)
 {
-  UINT32 value;
+  uint32_t value;
   value = host2hfa384x_32(*val);
-  return hfa384x_drvr_setconfig(hw, rid, &value, sizeof(UINT32));
+  return hfa384x_drvr_setconfig(hw, rid, &value, sizeof(uint32_t));
 }
 #endif
 
@@ -573,14 +571,14 @@ static int hfa384x_drvr_setconfig32(hfa384x_t *hw, UINT16 rid, UINT32 *val)
  *      descr           Descriptive text string of what is being waited for
  *                      (will be printed out if a timeout happens)
  *
- * Returns: 
- *      value of EVSTAT register, or 0 on failure 
+ * Returns:
+ *      value of EVSTAT register, or 0 on failure
  */
-static int hfa384x_wait_for_event(hfa384x_t *hw, UINT16 event_mask, UINT16 event_ack, int wait, int timeout, const char *descr)
+static int hfa384x_wait_for_event(hfa384x_t *hw, uint16_t event_mask, uint16_t event_ack, int wait, int timeout, const char *descr)
 {
-  UINT16 reg;
+  uint16_t reg;
   int count = 0;
-  
+
   do {
     reg = hfa384x_getreg(hw, HFA384x_EVSTAT);
     if ( count > 0 ) udelay(wait);
@@ -600,12 +598,12 @@ POLL - Wait for a frame
 ***************************************************************************/
 static int prism2_poll(struct nic *nic, int retrieve)
 {
-  UINT16 reg;
-  UINT16 rxfid;
-  UINT16 result;
+  uint16_t reg;
+  uint16_t rxfid;
+  uint16_t result;
   hfa384x_rx_frame_t rxdesc;
   hfa384x_t *hw = &hw_global;
-  
+
   /* Check for received packet */
   reg = hfa384x_getreg(hw, HFA384x_EVSTAT);
   if ( ! HFA384x_EVSTAT_ISRX(reg) ) {
@@ -617,7 +615,7 @@ static int prism2_poll(struct nic *nic, int retrieve)
 
   /* Acknowledge RX event */
   hfa384x_setreg(hw, HFA384x_EVACK_RX_SET(1), HFA384x_EVACK);
-  /* Get RX FID */  
+  /* Get RX FID */
   rxfid = hfa384x_getreg(hw, HFA384x_RXFID);
   /* Get the descriptor (including headers) */
   result = hfa384x_copy_from_bap(hw, rxfid, 0, &rxdesc, sizeof(rxdesc));
@@ -660,8 +658,8 @@ static void prism2_transmit(
   hfa384x_t *hw = &hw_global;
   hfa384x_tx_frame_t txdesc;
   wlan_80211hdr_t p80211hdr = { wlan_llc_snap, {{0,0,0},0} };
-  UINT16 fid;
-  UINT16 status;
+  uint16_t fid;
+  uint16_t status;
   int result;
 
   // Request FID allocation
@@ -675,7 +673,7 @@ static void prism2_transmit(
 
   /* Build Tx frame structure */
   memset(&txdesc, 0, sizeof(txdesc));
-  txdesc.tx_control = host2hfa384x_16( HFA384x_TX_MACPORT_SET(0) | HFA384x_TX_STRUCTYPE_SET(1) | 
+  txdesc.tx_control = host2hfa384x_16( HFA384x_TX_MACPORT_SET(0) | HFA384x_TX_STRUCTYPE_SET(1) |
 				       HFA384x_TX_TXEX_SET(1) | HFA384x_TX_TXOK_SET(1) );
   txdesc.frame_control =  host2ieee16( WLAN_SET_FC_FTYPE(WLAN_FTYPE_DATA) |
 				       WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_DATAONLY) |
@@ -687,13 +685,13 @@ static void prism2_transmit(
   /* Set up SNAP header */
   /* Let OUI default to RFC1042 (0x000000) */
   p80211hdr.snap.type = htons(t);
-  
+
   /* Copy txdesc, p80211hdr and payload parts to FID */
   result = hfa384x_copy_to_bap(hw, fid, 0, &txdesc, sizeof(txdesc));
   if ( result ) return; /* fail */
   result = hfa384x_copy_to_bap( hw, fid, sizeof(txdesc), &p80211hdr, sizeof(p80211hdr) );
   if ( result ) return; /* fail */
-  result = hfa384x_copy_to_bap( hw, fid, sizeof(txdesc) + sizeof(p80211hdr), (UINT8*)p, s );
+  result = hfa384x_copy_to_bap( hw, fid, sizeof(txdesc) + sizeof(p80211hdr), (uint8_t*)p, s );
   if ( result ) return; /* fail */
 
   /* Issue Tx command */
@@ -702,7 +700,7 @@ static void prism2_transmit(
     printf("hfa384x: Transmit failed with result %#hx.\n", result);
     return;
   }
-  
+
   /* Wait for transmit completion (or exception) */
   result = hfa384x_wait_for_event(hw, HFA384x_EVSTAT_TXEXC | HFA384x_EVSTAT_TX, HFA384x_EVACK_INFO,
 				  200, 500, "Tx to complete\n" );
@@ -760,8 +758,8 @@ You should omit the last argument struct pci_device * for a non-PCI NIC
 ***************************************************************************/
 static int prism2_probe ( struct nic *nic, hfa384x_t *hw ) {
   int result;
-  UINT16 tmp16 = 0;
-  UINT16 infofid;
+  uint16_t tmp16 = 0;
+  uint16_t infofid;
   hfa384x_InfFrame_t inf;
   char ssid[HFA384x_RID_CNFDESIREDSSID_LEN];
   int info_count = 0;
@@ -820,17 +818,17 @@ static int prism2_probe ( struct nic *nic, hfa384x_t *hw ) {
     } else {
       printf ( "Attempting to autojoin to SSID %s (attempt %d)...", &ssid[2], info_count );
     }
-    
+
     if ( !hfa384x_wait_for_event(hw, HFA384x_EVSTAT_INFO, 0, 1000, 2000, "Info event" ) ) return 0;
     printf("done\n");
     infofid = hfa384x_getreg(hw, HFA384x_INFOFID);
     /* Retrieve the length */
-    result = hfa384x_copy_from_bap( hw, infofid, 0, &inf.framelen, sizeof(UINT16));
+    result = hfa384x_copy_from_bap( hw, infofid, 0, &inf.framelen, sizeof(uint16_t));
     if ( result ) return 0; /* fail */
     inf.framelen = hfa384x2host_16(inf.framelen);
     /* Retrieve the rest */
-    result = hfa384x_copy_from_bap( hw, infofid, sizeof(UINT16),
-				    &(inf.infotype), inf.framelen * sizeof(UINT16));
+    result = hfa384x_copy_from_bap( hw, infofid, sizeof(uint16_t),
+				    &(inf.infotype), inf.framelen * sizeof(uint16_t));
     if ( result ) return 0; /* fail */
     if ( inf.infotype != HFA384x_IT_LINKSTATUS ) {
       /* Not a Link Status info frame: die */
@@ -843,13 +841,13 @@ static int prism2_probe ( struct nic *nic, hfa384x_t *hw ) {
       printf ( "Link not connected (status %#hx)\n", inf.info.linkstatus.linkstatus );
     }
   } while ( inf.info.linkstatus.linkstatus != HFA384x_LINK_CONNECTED );
-    
+
   /* Retrieve BSSID and print Connected message */
   result = hfa384x_drvr_getconfig(hw, HFA384x_RID_CURRENTBSSID, hw->bssid, WLAN_BSSID_LEN);
 
   DBG ( "Link connected (BSSID %s - ", eth_ntoa ( hw->bssid ) );
   DBG ( " MAC address %s)\n", eth_ntoa (nic->node_addr ) );
-  
+
   /* point to NIC specific routines */
   nic->nic_op	= &prism2_operations;
   return 1;

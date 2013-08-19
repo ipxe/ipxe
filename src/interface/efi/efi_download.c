@@ -20,12 +20,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <ipxe/open.h>
 #include <ipxe/process.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/ipxe_download.h>
+#include <ipxe/efi/efi_download.h>
 
 /** iPXE download protocol GUID */
 static EFI_GUID ipxe_download_protocol_guid
@@ -59,7 +60,7 @@ struct efi_download_file {
  */
 static void efi_download_close ( struct efi_download_file *file, int rc ) {
 
-	file->finish_callback ( file->context, RC_TO_EFIRC ( rc ) );
+	file->finish_callback ( file->context, EFIRC ( rc ) );
 
 	intf_shutdown ( &file->xfer, rc );
 }
@@ -77,6 +78,7 @@ static int efi_download_deliver_iob ( struct efi_download_file *file,
 				      struct xfer_metadata *meta ) {
 	EFI_STATUS efirc;
 	size_t len = iob_len ( iobuf );
+	int rc;
 
 	/* Calculate new buffer position */
 	if ( meta->flags & XFER_FL_ABS_OFFSET )
@@ -84,14 +86,21 @@ static int efi_download_deliver_iob ( struct efi_download_file *file,
 	file->pos += meta->offset;
 
 	/* Call out to the data handler */
-	efirc = file->data_callback ( file->context, iobuf->data,
-				      len, file->pos );
+	if ( ( efirc = file->data_callback ( file->context, iobuf->data,
+					     len, file->pos ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		goto err_callback;
+	}
 
 	/* Update current buffer position */
 	file->pos += len;
 
+	/* Success */
+	rc = 0;
+
+ err_callback:
 	free_iob ( iobuf );
-	return EFIRC_TO_RC ( efirc );
+	return rc;
 }
 
 /** Data transfer interface operations */
@@ -135,7 +144,7 @@ efi_download_start ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
 	rc = xfer_open ( &file->xfer, LOCATION_URI_STRING, Url );
 	if ( rc ) {
 		free ( file );
-		return RC_TO_EFIRC ( rc );
+		return EFIRC ( rc );
 	}
 
 	file->pos = 0;
@@ -162,7 +171,7 @@ efi_download_abort ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
 		     EFI_STATUS Status ) {
 	struct efi_download_file *file = File;
 
-	efi_download_close ( file, EFIRC_TO_RC ( Status ) );
+	efi_download_close ( file, -EEFI ( Status ) );
 	return EFI_SUCCESS;
 }
 
@@ -187,47 +196,41 @@ static IPXE_DOWNLOAD_PROTOCOL ipxe_download_protocol_interface = {
 };
 
 /**
- * Create a new device handle with a iPXE download protocol attached to it.
+ * Install iPXE download protocol
  *
- * @v device_handle	Newly created device handle (output)
+ * @v handle		EFI handle
  * @ret rc		Return status code
  */
-int efi_download_install ( EFI_HANDLE *device_handle ) {
+int efi_download_install ( EFI_HANDLE *handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_STATUS efirc;
-	EFI_HANDLE handle = NULL;
-	if (efi_loaded_image->DeviceHandle) { /* TODO: ensure handle is the NIC (maybe efi_image has a better way to indicate the handle doing SNP?) */
-		handle = efi_loaded_image->DeviceHandle;
-	}
+	int rc;
 
-	DBG ( "Installing ipxe protocol interface (%p)... ",
-	      &ipxe_download_protocol_interface );
 	efirc = bs->InstallMultipleProtocolInterfaces (
-			&handle,
+			handle,
 			&ipxe_download_protocol_guid,
 			&ipxe_download_protocol_interface,
 			NULL );
 	if ( efirc ) {
-		DBG ( "failed (%s)\n", efi_strerror ( efirc ) );
-		return EFIRC_TO_RC ( efirc );
+		rc = -EEFI ( efirc );
+		DBG ( "Could not install download protocol: %s\n",
+		      strerror ( rc ) );
+		return rc;
 	}
 
-	DBG ( "success (%p)\n", handle );
-	*device_handle = handle;
 	return 0;
 }
 
 /**
- * Remove the iPXE download protocol from the given handle, and if nothing
- * else is attached, destroy the handle.
+ * Uninstall iPXE download protocol
  *
- * @v device_handle	EFI device handle to remove from
+ * @v handle		EFI handle
  */
-void efi_download_uninstall ( EFI_HANDLE device_handle ) {
+void efi_download_uninstall ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
 	bs->UninstallMultipleProtocolInterfaces (
-			device_handle,
-			ipxe_download_protocol_guid,
-			ipxe_download_protocol_interface );
+			handle,
+			&ipxe_download_protocol_guid,
+			&ipxe_download_protocol_interface, NULL );
 }

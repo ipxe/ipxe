@@ -16,6 +16,8 @@
 #ifndef AR9002_PHY_H
 #define AR9002_PHY_H
 
+FILE_LICENCE ( BSD2 );
+
 #define AR_PHY_TEST             0x9800
 #define PHY_AGC_CLR             0x10000000
 #define RFSILENT_BB             0x00002000

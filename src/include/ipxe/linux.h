@@ -30,6 +30,14 @@ FILE_LICENCE(GPL2_OR_LATER);
 #include <ipxe/device.h>
 #include <ipxe/settings.h>
 
+/**
+ * Convert a Linux error number to an iPXE status code
+ *
+ * @v errno		Linux error number
+ * @ret rc		iPXE status code (before negation)
+ */
+#define ELINUX( errno ) EPLATFORM ( EINFO_EPLATFORM, errno )
+
 /** A linux device */
 struct linux_device {
 	/** Generic device */

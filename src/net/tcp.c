@@ -157,6 +157,7 @@ static LIST_HEAD ( tcp_conns );
 static struct interface_descriptor tcp_xfer_desc;
 static void tcp_expired ( struct retry_timer *timer, int over );
 static void tcp_wait_expired ( struct retry_timer *timer, int over );
+static struct tcp_connection * tcp_demux ( unsigned int local_port );
 static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 			uint32_t win );
 
@@ -226,46 +227,14 @@ tcp_dump_flags ( struct tcp_connection *tcp, unsigned int flags ) {
  */
 
 /**
- * Bind TCP connection to local port
+ * Check if local TCP port is available
  *
- * @v tcp		TCP connection
  * @v port		Local port number
- * @ret rc		Return status code
- *
- * If the port is 0, the connection is assigned an available port
- * between 1024 and 65535.
+ * @ret port		Local port number, or negative error
  */
-static int tcp_bind ( struct tcp_connection *tcp, unsigned int port ) {
-	struct tcp_connection *existing;
-	uint16_t try_port;
-	unsigned int i;
+static int tcp_port_available ( int port ) {
 
-	/* If no port is specified, find an available port */
-	if ( ! port ) {
-		try_port = random();
-		for ( i = 0 ; i < 65536 ; i++ ) {
-			try_port++;
-			if ( try_port < 1024 )
-				continue;
-			if ( tcp_bind ( tcp, try_port ) == 0 )
-				return 0;
-		}
-		DBGC ( tcp, "TCP %p could not bind: no free ports\n", tcp );
-		return -EADDRINUSE;
-	}
-
-	/* Attempt bind to local port */
-	list_for_each_entry ( existing, &tcp_conns, list ) {
-		if ( existing->local_port == port ) {
-			DBGC ( tcp, "TCP %p could not bind: port %d in use\n",
-			       tcp, port );
-			return -EADDRINUSE;
-		}
-	}
-	tcp->local_port = port;
-
-	DBGC ( tcp, "TCP %p bound to port %d\n", tcp, port );
-	return 0;
+	return ( tcp_demux ( port ) ? -EADDRINUSE : port );
 }
 
 /**
@@ -281,7 +250,7 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	struct sockaddr_tcpip *st_peer = ( struct sockaddr_tcpip * ) peer;
 	struct sockaddr_tcpip *st_local = ( struct sockaddr_tcpip * ) local;
 	struct tcp_connection *tcp;
-	unsigned int bind_port;
+	int port;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -303,9 +272,15 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	memcpy ( &tcp->peer, st_peer, sizeof ( tcp->peer ) );
 
 	/* Bind to local port */
-	bind_port = ( st_local ? ntohs ( st_local->st_port ) : 0 );
-	if ( ( rc = tcp_bind ( tcp, bind_port ) ) != 0 )
+	port = tcpip_bind ( st_local, tcp_port_available );
+	if ( port < 0 ) {
+		rc = port;
+		DBGC ( tcp, "TCP %p could not bind: %s\n",
+		       tcp, strerror ( rc ) );
 		goto err;
+	}
+	tcp->local_port = port;
+	DBGC ( tcp, "TCP %p bound to port %d\n", tcp, tcp->local_port );
 
 	/* Start timer to initiate SYN */
 	start_timer_nodelay ( &tcp->timer );
@@ -1216,9 +1191,8 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	tcp_dump_flags ( tcp, tcphdr->flags );
 	DBGC2 ( tcp, "\n" );
 
-	/* If no connection was found, send RST */
+	/* If no connection was found, silently drop packet */
 	if ( ! tcp ) {
-		tcp_xmit_reset ( tcp, st_src, tcphdr );
 		rc = -ENOTCONN;
 		goto discard;
 	}

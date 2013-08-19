@@ -261,15 +261,15 @@ static void dmfe_reset(struct nic *nic)
 		db->cr0_data = 0;
 		db->dm910x_chk_mode = 1;	/* Enter the check mode */
 	}
-	/* Initilize DM910X board */
+	/* Initialize DM910X board */
 	dmfe_init_dm910x(nic);
 
 	return;
 }
 
-/*	Initilize DM910X board
+/*	Initialize DM910X board
  *	Reset DM910X board
- *	Initilize TX/Rx descriptor chain structure
+ *	Initialize TX/Rx descriptor chain structure
  *	Send the set-up frame
  *	Enable Tx/Rx machine
  */
@@ -307,7 +307,7 @@ static void dmfe_init_dm910x(struct nic *nic)
 	if (!(db->media_mode & DMFE_AUTO))
 		db->op_mode = db->media_mode;	/* Force Mode */
 
-	/* Initiliaze Transmit/Receive decriptor and CR3/4 */
+	/* Initiliaze Transmit/Receive descriptor and CR3/4 */
 	dmfe_descriptor_init(nic, ioaddr);
 
 	/* tx descriptor start pointer */
@@ -572,7 +572,7 @@ static void update_cr6(u32 cr6_data, unsigned long ioaddr)
 
 /*
  *	Send a setup frame for DM9132
- *	This setup frame initilize DM910X addres filter mode
+ *	This setup frame initialize DM910X address filter mode
 */
 
 static void dm9132_id_table(struct nic *nic __unused)
@@ -623,7 +623,7 @@ static void dm9132_id_table(struct nic *nic __unused)
 
 /*
  *	Send a setup frame for DM9102/DM9102A
- *	This setup frame initilize DM910X addres filter mode
+ *	This setup frame initialize DM910X address filter mode
  */
 
 static void send_filter_frame(struct nic *nic)
@@ -903,13 +903,13 @@ static void phy_write(unsigned long iobase, u8 phy_addr, u8 offset,
 		phy_write_1bit(ioaddr, PHY_DATA_0);
 		phy_write_1bit(ioaddr, PHY_DATA_1);
 
-		/* Send Phy addres */
+		/* Send Phy address */
 		for (i = 0x10; i > 0; i = i >> 1)
 			phy_write_1bit(ioaddr,
 				       phy_addr & i ? PHY_DATA_1 :
 				       PHY_DATA_0);
 
-		/* Send register addres */
+		/* Send register address */
 		for (i = 0x10; i > 0; i = i >> 1)
 			phy_write_1bit(ioaddr,
 				       offset & i ? PHY_DATA_1 :
@@ -959,13 +959,13 @@ static u16 phy_read(unsigned long iobase, u8 phy_addr, u8 offset,
 		phy_write_1bit(ioaddr, PHY_DATA_1);
 		phy_write_1bit(ioaddr, PHY_DATA_0);
 
-		/* Send Phy addres */
+		/* Send Phy address */
 		for (i = 0x10; i > 0; i = i >> 1)
 			phy_write_1bit(ioaddr,
 				       phy_addr & i ? PHY_DATA_1 :
 				       PHY_DATA_0);
 
-		/* Send register addres */
+		/* Send register address */
 		for (i = 0x10; i > 0; i = i >> 1)
 			phy_write_1bit(ioaddr,
 				       offset & i ? PHY_DATA_1 :

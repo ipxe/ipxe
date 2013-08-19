@@ -4,6 +4,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "pxe_types.h"
+#include "pxe_error.h"
 #include "pxe_api.h"
 #include <ipxe/device.h>
 #include <ipxe/tables.h>

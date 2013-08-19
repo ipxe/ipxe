@@ -23,7 +23,10 @@ FILE_LICENCE ( GPL2_ONLY );
 
 /* __WCHAR_TYPE__ is defined by gcc and will change if -fshort-wchar is used */
 #ifndef __WCHAR_TYPE__
-#define __WCHAR_TYPE__ long int
+#define __WCHAR_TYPE__ uint16_t
+#endif
+#ifndef __WINT_TYPE__
+#define __WINT_TYPE__ int
 #endif
 typedef __WCHAR_TYPE__ wchar_t;
 typedef __WINT_TYPE__ wint_t;

@@ -13,9 +13,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** Minimum alignment for initrds
  *
- * Chosen to maximise memcpy() speeds
+ * Some versions of Linux complain about initrds that are not
+ * page-aligned.
  */
-#define INITRD_ALIGN 4
+#define INITRD_ALIGN 4096
 
 /** Minimum free space required to reshuffle initrds
  *

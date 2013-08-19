@@ -346,6 +346,8 @@ struct net_device {
 	size_t max_pkt_len;
 	/** TX packet queue */
 	struct list_head tx_queue;
+	/** Deferred TX packet queue */
+	struct list_head tx_deferred;
 	/** RX packet queue */
 	struct list_head rx_queue;
 	/** TX statistics */
@@ -408,38 +410,6 @@ struct net_driver {
 
 /** Declare a network driver */
 #define __net_driver __table_entry ( NET_DRIVERS, 01 )
-
-/** Network device setting tag magic
- *
- * All DHCP option settings are deemed to be valid as network device
- * settings.  There are also some extra non-DHCP settings (such as
- * "mac"), which are marked as being valid network device settings by
- * using a magic tag value.
- */
-#define NETDEV_SETTING_TAG_MAGIC 0xeb
-
-/**
- * Construct network device setting tag
- *
- * @v id		Unique identifier
- * @ret tag		Setting tag
- */
-#define NETDEV_SETTING_TAG( id ) ( ( NETDEV_SETTING_TAG_MAGIC << 24 ) | (id) )
-
-/**
- * Check if tag is a network device setting tag
- *
- * @v tag		Setting tag
- * @ret is_ours		Tag is a network device setting tag
- */
-#define IS_NETDEV_SETTING_TAG( tag ) \
-	( ( (tag) >> 24 ) == NETDEV_SETTING_TAG_MAGIC )
-
-/** MAC address setting tag */
-#define NETDEV_SETTING_TAG_MAC NETDEV_SETTING_TAG ( 0x01 )
-
-/** Bus ID setting tag */
-#define NETDEV_SETTING_TAG_BUS_ID NETDEV_SETTING_TAG ( 0x02 )
 
 extern struct list_head net_devices;
 extern struct net_device_operations null_netdev_operations;
@@ -605,6 +575,8 @@ netdev_rx_frozen ( struct net_device *netdev ) {
 extern void netdev_link_err ( struct net_device *netdev, int rc );
 extern void netdev_link_down ( struct net_device *netdev );
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
+extern void netdev_tx_defer ( struct net_device *netdev,
+			      struct io_buffer *iobuf );
 extern void netdev_tx_err ( struct net_device *netdev,
 			    struct io_buffer *iobuf, int rc );
 extern void netdev_tx_complete_err ( struct net_device *netdev,

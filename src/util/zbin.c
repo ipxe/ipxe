@@ -143,7 +143,7 @@ static int alloc_output_file ( size_t max_len, struct output_file *output ) {
 			  max_len );
 		return -1;
 	}
-	memset ( output->buf, 0xff, sizeof ( output->buf ) );
+	memset ( output->buf, 0xff, max_len );
 	return 0;
 }
 

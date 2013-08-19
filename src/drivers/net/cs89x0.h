@@ -471,9 +471,6 @@ FILE_LICENCE ( GPL2_ONLY );
 #define PNP_CNF_DMA 0x74
 #define PNP_CNF_MEM 0x48
 
-#define BIT0 1
-#define BIT15 0x8000
-
 /*
  * Local variables:
  *  c-basic-offset: 8

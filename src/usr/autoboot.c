@@ -30,11 +30,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uri.h>
 #include <ipxe/open.h>
 #include <ipxe/init.h>
+#include <ipxe/keys.h>
+#include <ipxe/version.h>
+#include <ipxe/shell.h>
+#include <ipxe/features.h>
+#include <ipxe/image.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/imgmgmt.h>
+#include <usr/prompt.h>
 #include <usr/autoboot.h>
+#include <config/general.h>
 
 /** @file
  *
@@ -46,6 +53,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ENOENT_BOOT __einfo_error ( EINFO_ENOENT_BOOT )
 #define EINFO_ENOENT_BOOT \
 	__einfo_uniqify ( EINFO_ENOENT, 0x01, "Nothing to boot" )
+
+#define NORMAL	"\033[0m"
+#define BOLD	"\033[1m"
+#define CYAN	"\033[36m"
+
+/** The "scriptlet" setting */
+struct setting scriptlet_setting __setting ( SETTING_MISC ) = {
+	.name = "scriptlet",
+	.description = "Boot scriptlet",
+	.tag = DHCP_EB_SCRIPTLET,
+	.type = &setting_type_string,
+};
 
 /**
  * Perform PXE menu boot when PXE stack is not available
@@ -232,31 +251,42 @@ static void close_all_netdevs ( void ) {
  * @ret uri		URI, or NULL on failure
  */
 struct uri * fetch_next_server_and_filename ( struct settings *settings ) {
-	struct in_addr next_server;
-	char buf[256];
+	struct in_addr next_server = { 0 };
+	char *raw_filename = NULL;
+	struct uri *uri = NULL;
 	char *filename;
-	struct uri *uri;
 
-	/* Fetch next-server setting */
-	fetch_ipv4_setting ( settings, &next_server_setting, &next_server );
-	if ( next_server.s_addr )
-		printf ( "Next server: %s\n", inet_ntoa ( next_server ) );
+	/* Determine settings block containing the filename, if any */
+	settings = fetch_setting_origin ( settings, &filename_setting );
 
-	/* Fetch filename setting */
-	fetch_string_setting ( settings, &filename_setting,
-			       buf, sizeof ( buf ) );
-	if ( buf[0] )
-		printf ( "Filename: %s\n", buf );
+	/* If we have a filename, fetch it along with next-server */
+	if ( settings ) {
+		fetch_ipv4_setting ( settings, &next_server_setting,
+				     &next_server );
+		if ( fetch_string_setting_copy ( settings, &filename_setting,
+						 &raw_filename ) < 0 )
+			goto err_fetch;
+	}
 
 	/* Expand filename setting */
-	filename = expand_settings ( buf );
+	filename = expand_settings ( raw_filename ? raw_filename : "" );
 	if ( ! filename )
-		return NULL;
+		goto err_expand;
 
 	/* Parse next server and filename */
+	if ( next_server.s_addr )
+		printf ( "Next server: %s\n", inet_ntoa ( next_server ) );
+	if ( filename[0] )
+		printf ( "Filename: %s\n", filename );
 	uri = parse_next_server_and_filename ( next_server, filename );
+	if ( ! uri )
+		goto err_parse;
 
+ err_parse:
 	free ( filename );
+ err_expand:
+	free ( raw_filename );
+ err_fetch:
 	return uri;
 }
 
@@ -422,4 +452,80 @@ int autoboot ( void ) {
 
 	printf ( "No more network devices\n" );
 	return rc;
+}
+
+/**
+ * Prompt for shell entry
+ *
+ * @ret	enter_shell	User wants to enter shell
+ */
+static int shell_banner ( void ) {
+
+	/* Skip prompt if timeout is zero */
+	if ( BANNER_TIMEOUT <= 0 )
+		return 0;
+
+	/* Prompt user */
+	printf ( "\n" );
+	return ( prompt ( "Press Ctrl-B for the iPXE command line...",
+			  ( BANNER_TIMEOUT * 100 ), CTRL_B ) == 0 );
+}
+
+/**
+ * Main iPXE flow of execution
+ *
+ * @v netdev		Network device, or NULL
+ */
+void ipxe ( struct net_device *netdev ) {
+	struct feature *feature;
+	struct image *image;
+	char *scriptlet;
+
+	/*
+	 * Print welcome banner
+	 *
+	 *
+	 * If you wish to brand this build of iPXE, please do so by
+	 * defining the string PRODUCT_NAME in config/general.h.
+	 *
+	 * While nothing in the GPL prevents you from removing all
+	 * references to iPXE or http://ipxe.org, we prefer you not to
+	 * do so.
+	 *
+	 */
+	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD "iPXE %s"
+		 NORMAL " -- Open Source Network Boot Firmware -- "
+		 CYAN "http://ipxe.org" NORMAL "\n"
+		 "Features:", product_version );
+	for_each_table_entry ( feature, FEATURES )
+		printf ( " %s", feature->name );
+	printf ( "\n" );
+
+	/* Boot system */
+	if ( ( image = first_image() ) != NULL ) {
+		/* We have an embedded image; execute it */
+		image_exec ( image );
+	} else if ( shell_banner() ) {
+		/* User wants shell; just give them a shell */
+		shell();
+	} else {
+		fetch_string_setting_copy ( NULL, &scriptlet_setting,
+					    &scriptlet );
+		if ( scriptlet ) {
+			/* User has defined a scriptlet; execute it */
+			system ( scriptlet );
+			free ( scriptlet );
+		} else {
+			/* Try booting.  If booting fails, offer the
+			 * user another chance to enter the shell.
+			 */
+			if ( netdev ) {
+				netboot ( netdev );
+			} else {
+				autoboot();
+			}
+			if ( shell_banner() )
+				shell();
+		}
+	}
 }

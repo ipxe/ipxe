@@ -1,6 +1,8 @@
 #ifndef _IPXE_EFI_PROCESSOR_BIND_H
 #define _IPXE_EFI_PROCESSOR_BIND_H
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /*
  * EFI header files rely on having the CPU architecture directory
  * present in the search path in order to pick up ProcessorBind.h.  We

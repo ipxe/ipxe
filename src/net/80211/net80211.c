@@ -208,7 +208,6 @@ struct setting net80211_ssid_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "ssid",
 	.description = "Wireless SSID",
 	.type = &setting_type_string,
-	.tag = NET80211_SETTING_TAG_SSID,
 };
 
 /** Whether to use active scanning
@@ -221,7 +220,6 @@ struct setting net80211_active_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "active-scan",
 	.description = "Actively scan for wireless networks",
 	.type = &setting_type_int8,
-	.tag = NET80211_SETTING_TAG_ACTIVE_SCAN,
 };
 
 /** The cryptographic key to use
@@ -234,7 +232,6 @@ struct setting net80211_key_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "key",
 	.description = "Wireless encryption key",
 	.type = &setting_type_string,
-	.tag = NET80211_SETTING_TAG_KEY,
 };
 
 /** Pairwise master key (PMK), PMK = PBKDF2_SHA1(key, ssid, 4096)
@@ -247,7 +244,6 @@ struct setting net80211_pmk_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "pmk",
 	.description = "Pairwise master key for WPA/WPA2",
 	.type = &setting_type_hex,
-	.tag = NET80211_SETTING_TAG_PMK,
 };
 
 /** @} */

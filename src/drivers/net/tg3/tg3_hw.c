@@ -322,7 +322,7 @@ static void tg3_get_eeprom_hw_cfg(struct tg3 *tp)
 		}
 
 		if ((nic_cfg & NIC_SRAM_DATA_CFG_APE_ENABLE) &&
-		    tg3_flag(tp, 5750_PLUS))
+		    tg3_flag(tp, ENABLE_ASF))
 			tg3_flag_set(tp, ENABLE_APE);
 
 		if (cfg2 & (1 << 17))
@@ -466,6 +466,7 @@ int tg3_get_invariants(struct tg3 *tp)
 		tg3_flag_set(tp, 5717_PLUS);
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_57765 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_57766 ||
 	    tg3_flag(tp, 5717_PLUS))
 		tg3_flag_set(tp, 57765_PLUS);
 
@@ -1463,6 +1464,13 @@ static int tg3_chip_reset(struct tg3 *tp)
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5720) {
 		val = tr32(TG3_CPMU_CLCK_ORIDE);
 		tw32(TG3_CPMU_CLCK_ORIDE, val & ~CPMU_CLCK_ORIDE_MAC_ORIDE_EN);
+	}
+
+	if (tg3_flag(tp, CPMU_PRESENT)) {
+		tw32(TG3_CPMU_D0_CLCK_POLICY, 0);
+		val = tr32(TG3_CPMU_CLCK_ORIDE_EN);
+		tw32(TG3_CPMU_CLCK_ORIDE_EN,
+		     val | CPMU_CLCK_ORIDE_MAC_CLCK_ORIDE_EN);
 	}
 
 	return 0;

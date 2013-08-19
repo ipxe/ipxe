@@ -39,7 +39,7 @@
 *
 * --------------------------------------------------------------------
 *
-* Portions of the development of this software were funded by 
+* Portions of the development of this software were funded by
 * Intersil Corporation as part of PRISM(R) chipset product development.
 *
 * --------------------------------------------------------------------
@@ -109,7 +109,7 @@ FILE_LICENCE ( GPL2_ONLY );
 /* Lets try to figure out what we've got.  Kernel mode or User mode? */
 #if defined(__KERNEL__)
 	#define WLAN_OS				WLAN_LINUX_KERNEL
-#else 
+#else
 	#define WLAN_OS				WLAN_LINUX_USER
 #endif
 
@@ -179,8 +179,8 @@ FILE_LICENCE ( GPL2_ONLY );
           Linux/PPC on PowerMacs (PCI)
 	  Arm/Intel Xscale (PCI)
 
-   This may also affect PLX boards and other BE &| PPC platforms; 
-   as new ones are discovered, add them below. 
+   This may also affect PLX boards and other BE &| PPC platforms;
+   as new ones are discovered, add them below.
 */
 
 #if (WLAN_HOSTIF == WLAN_PCI)
@@ -225,28 +225,6 @@ FILE_LICENCE ( GPL2_ONLY );
 #define BIT29	0x20000000
 #define BIT30	0x40000000
 #define BIT31	0x80000000
-
-typedef unsigned char   UINT8;
-typedef unsigned short  UINT16;
-typedef unsigned long   UINT32;
-
-typedef signed char     INT8;
-typedef signed short    INT16;
-typedef signed long     INT32;
-
-typedef unsigned int    UINT;
-typedef signed int      INT;
-
-typedef unsigned long long	UINT64;
-typedef signed long long	INT64;
-
-#define UINT8_MAX	(0xffUL)
-#define UINT16_MAX	(0xffffUL)
-#define UINT32_MAX	(0xffffffffUL)
-
-#define INT8_MAX	(0x7fL)
-#define INT16_MAX	(0x7fffL)
-#define INT32_MAX	(0x7fffffffL)
 
 /*=============================================================*/
 /*------ Compiler Portability Macros --------------------------*/
@@ -298,7 +276,7 @@ typedef signed long long	INT64;
 			int __i__; \
 			printk(KERN_DEBUG x ":"); \
 			for( __i__=0; __i__ < (n); __i__++) \
-				printk( " %02x", ((UINT8*)(p))[__i__]); \
+				printk( " %02x", ((uint8_t*)(p))[__i__]); \
 			printk("\n"); }
 
 		#define DBFENTER { if ( WLAN_DBVAR >= 4 ){ WLAN_LOG_DEBUG0(3,"Enter\n"); } }
@@ -312,11 +290,11 @@ typedef signed long long	INT64;
 		#define WLAN_LOG_DEBUG5(l,x,n1,n2,n3,n4,n5) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x , __FUNCTION__ , (n1), (n2), (n3), (n4), (n5));
 		#define WLAN_LOG_DEBUG6(l,x,n1,n2,n3,n4,n5,n6) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x , __FUNCTION__ , (n1), (n2), (n3), (n4), (n5), (n6));
 	#else
-		#define WLAN_ASSERT(c) 
+		#define WLAN_ASSERT(c)
 		#define WLAN_HEX_DUMP( l, s, p, n)
 
-		#define DBFENTER 
-		#define DBFEXIT 
+		#define DBFENTER
+		#define DBFEXIT
 
 		#define WLAN_LOG_DEBUG0(l, s)
 		#define WLAN_LOG_DEBUG1(l, s,n)
@@ -344,11 +322,11 @@ typedef signed long long	INT64;
 	#define WLAN_LOG_NOTICE3(s,n1,n2,n3)
 	#define WLAN_LOG_NOTICE4(s,n1,n2,n3,n4)
 
-		#define WLAN_ASSERT(c) 
+		#define WLAN_ASSERT(c)
 		#define WLAN_HEX_DUMP( l, s, p, n)
 
-		#define DBFENTER 
-		#define DBFEXIT 
+		#define DBFENTER
+		#define DBFEXIT
 
 		#define WLAN_LOG_INFO0(s)
 		#define WLAN_LOG_INFO1(s,n)
@@ -378,7 +356,7 @@ typedef signed long long	INT64;
 
 #ifdef CONFIG_SMP
 #define __SMP__			1
-#endif	
+#endif
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))

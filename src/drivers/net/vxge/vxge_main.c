@@ -252,7 +252,7 @@ static void vxge_poll(struct net_device *ndev)
 /*
  * vxge_irq - enable or Disable interrupts
  *
- * @netdev   netdevice sturcture reference
+ * @netdev   netdevice structure reference
  * @action   requested interrupt action
  */
 static void vxge_irq(struct net_device *netdev __unused, int action)

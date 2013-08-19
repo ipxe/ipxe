@@ -450,6 +450,18 @@ struct dhcp_netdev_desc {
  */
 #define DHCP_EB_REVERSE_PASSWORD DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xc1 )
 
+/** User ID
+ *
+ * This will be used as the user id for AUTH_SYS based authentication in NFS.
+ */
+#define DHCP_EB_UID DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xc2 )
+
+/** Group ID
+ *
+ * This will be used as the group id for AUTH_SYS based authentication in NFS.
+ */
+#define DHCP_EB_GID DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xc3 )
+
 /** iPXE version number */
 #define DHCP_EB_VERSION DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xeb )
 

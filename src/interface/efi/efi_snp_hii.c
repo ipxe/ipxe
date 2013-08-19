@@ -544,7 +544,7 @@ efi_snp_hii_extract_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
 		if ( ( rc = efi_snp_hii_process ( snpdev, pos, progress,
 						  results, &have_setting,
 						  efi_snp_hii_fetch ) ) != 0 ) {
-			return RC_TO_EFIRC ( rc );
+			return EFIRC ( rc );
 		}
 	}
 
@@ -558,7 +558,7 @@ efi_snp_hii_extract_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
 			if ( ( rc = efi_snp_hii_fetch ( snpdev, setting->name,
 							NULL, results,
 							NULL ) ) != 0 ) {
-				return RC_TO_EFIRC ( rc );
+				return EFIRC ( rc );
 			}
 		}
 	}
@@ -592,7 +592,7 @@ efi_snp_hii_route_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
 		if ( ( rc = efi_snp_hii_process ( snpdev, pos, progress,
 						  NULL, NULL,
 						  efi_snp_hii_store ) ) != 0 ) {
-			return RC_TO_EFIRC ( rc );
+			return EFIRC ( rc );
 		}
 	}
 
@@ -657,9 +657,9 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 	if ( ( efirc = efihii->NewPackageList ( efihii, snpdev->package_list,
 						snpdev->handle,
 						&snpdev->hii_handle ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( snpdev, "SNPDEV %p could not add HII packages: %s\n",
-		       snpdev, efi_strerror ( efirc ) );
-		rc = EFIRC_TO_RC ( efirc );
+		       snpdev, strerror ( rc ) );
 		goto err_new_package_list;
 	}
 
@@ -668,9 +668,9 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 			 &snpdev->handle,
 			 &efi_hii_config_access_protocol_guid, &snpdev->hii,
 			 NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( snpdev, "SNPDEV %p could not install HII protocol: %s\n",
-		       snpdev, efi_strerror ( efirc ) );
-		rc = EFIRC_TO_RC ( efirc );
+		       snpdev, strerror ( rc ) );
 		goto err_install_protocol;
 	}
 

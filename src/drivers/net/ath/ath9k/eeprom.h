@@ -20,6 +20,8 @@
 #ifndef EEPROM_H
 #define EEPROM_H
 
+FILE_LICENCE ( BSD2 );
+
 #define AR_EEPROM_MODAL_SPURS   5
 
 #include "../ath.h"

@@ -1454,11 +1454,8 @@ static struct net_device_operations phantom_operations = {
  *
  */
 
-/** Phantom CLP settings tag magic */
-#define PHN_CLP_TAG_MAGIC 0xc19c1900UL
-
-/** Phantom CLP settings tag magic mask */
-#define PHN_CLP_TAG_MAGIC_MASK 0xffffff00UL
+/** Phantom CLP settings scope */
+static struct settings_scope phantom_settings_scope;
 
 /** Phantom CLP data
  *
@@ -1689,8 +1686,8 @@ phantom_clp_setting ( struct phantom_nic *phantom, struct setting *setting ) {
 	}
 
 	/* Allow for use of numbered settings */
-	if ( ( setting->tag & PHN_CLP_TAG_MAGIC_MASK ) == PHN_CLP_TAG_MAGIC )
-		return ( setting->tag & ~PHN_CLP_TAG_MAGIC_MASK );
+	if ( setting->scope == &phantom_settings_scope )
+		return setting->tag;
 
 	DBGC2 ( phantom, "Phantom %p has no \"%s\" setting\n",
 		phantom, setting->name );
@@ -2075,7 +2072,7 @@ static int phantom_probe ( struct pci_device *pci ) {
 	assert ( phantom->port < PHN_MAX_NUM_PORTS );
 	settings_init ( &phantom->settings,
 			&phantom_settings_operations,
-			&netdev->refcnt, PHN_CLP_TAG_MAGIC );
+			&netdev->refcnt, &phantom_settings_scope );
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );

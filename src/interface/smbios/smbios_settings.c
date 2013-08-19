@@ -27,15 +27,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uuid.h>
 #include <ipxe/smbios.h>
 
-/** SMBIOS settings tag magic number */
-#define SMBIOS_TAG_MAGIC 0x5B /* "SmBios" */
-
-/**
- * Construct SMBIOS empty tag
- *
- * @ret tag		SMBIOS setting tag
- */
-#define SMBIOS_EMPTY_TAG ( SMBIOS_TAG_MAGIC << 24 )
+/** SMBIOS settings scope */
+static struct settings_scope smbios_settings_scope;
 
 /**
  * Construct SMBIOS raw-data tag
@@ -46,8 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret tag		SMBIOS setting tag
  */
 #define SMBIOS_RAW_TAG( _type, _structure, _field )		\
-	( ( SMBIOS_TAG_MAGIC << 24 ) |				\
-	  ( (_type) << 16 ) |					\
+	( ( (_type) << 16 ) |					\
 	  ( offsetof ( _structure, _field ) << 8 ) |		\
 	  ( sizeof ( ( ( _structure * ) 0 )->_field ) ) )
 
@@ -60,8 +52,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret tag		SMBIOS setting tag
  */
 #define SMBIOS_STRING_TAG( _type, _structure, _field )		\
-	( ( SMBIOS_TAG_MAGIC << 24 ) |				\
-	  ( (_type) << 16 ) |					\
+	( ( (_type) << 16 ) |					\
 	  ( offsetof ( _structure, _field ) << 8 ) )
 
 /**
@@ -73,11 +64,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 static int smbios_applies ( struct settings *settings __unused,
 			    struct setting *setting ) {
-	unsigned int tag_magic;
 
-	/* Check tag magic */
-	tag_magic = ( setting->tag >> 24 );
-	return ( tag_magic == SMBIOS_TAG_MAGIC );
+	return ( setting->scope == &smbios_settings_scope );
 }
 
 /**
@@ -93,50 +81,77 @@ static int smbios_fetch ( struct settings *settings __unused,
 			  struct setting *setting,
 			  void *data, size_t len ) {
 	struct smbios_structure structure;
-	unsigned int tag_magic;
+	unsigned int tag_instance;
 	unsigned int tag_type;
 	unsigned int tag_offset;
 	unsigned int tag_len;
 	int rc;
 
-	/* Split tag into type, offset and length */
-	tag_magic = ( setting->tag >> 24 );
+	/* Split tag into instance, type, offset and length */
+	tag_instance = ( ( setting->tag >> 24 ) & 0xff );
 	tag_type = ( ( setting->tag >> 16 ) & 0xff );
 	tag_offset = ( ( setting->tag >> 8 ) & 0xff );
 	tag_len = ( setting->tag & 0xff );
-	assert ( tag_magic == SMBIOS_TAG_MAGIC );
 
 	/* Find SMBIOS structure */
-	if ( ( rc = find_smbios_structure ( tag_type, &structure ) ) != 0 )
+	if ( ( rc = find_smbios_structure ( tag_type, tag_instance,
+					    &structure ) ) != 0 )
 		return rc;
 
 	{
 		uint8_t buf[structure.header.len];
+		const void *raw;
+		union uuid uuid;
+		unsigned int index;
 
 		/* Read SMBIOS structure */
 		if ( ( rc = read_smbios_structure ( &structure, buf,
 						    sizeof ( buf ) ) ) != 0 )
 			return rc;
 
-		if ( tag_len == 0 ) {
-			/* String */
-			if ( ( rc = read_smbios_string ( &structure,
-							 buf[tag_offset],
+		/* A <length> of zero indicates that the byte at
+		 * <offset> contains a string index.  An <offset> of
+		 * zero indicates that the <length> contains a literal
+		 * string index.
+		 */
+		if ( ( tag_len == 0 ) || ( tag_offset == 0 ) ) {
+			index = ( ( tag_offset == 0 ) ?
+				  tag_len : buf[tag_offset] );
+			if ( ( rc = read_smbios_string ( &structure, index,
 							 data, len ) ) < 0 ) {
 				return rc;
 			}
 			if ( ! setting->type )
 				setting->type = &setting_type_string;
 			return rc;
-		} else {
-			/* Raw data */
-			if ( len > tag_len )
-				len = tag_len;
-			memcpy ( data, &buf[tag_offset], len );
-			if ( ! setting->type )
-				setting->type = &setting_type_hex;
-			return tag_len;
 		}
+
+		/* Mangle UUIDs if necessary.  iPXE treats UUIDs as
+		 * being in network byte order (big-endian).  SMBIOS
+		 * specification version 2.6 states that UUIDs are
+		 * stored with little-endian values in the first three
+		 * fields; earlier versions did not specify an
+		 * endianness.  dmidecode assumes that the byte order
+		 * is little-endian if and only if the SMBIOS version
+		 * is 2.6 or higher; we match this behaviour.
+		 */
+		raw = &buf[tag_offset];
+		if ( ( setting->type == &setting_type_uuid ) &&
+		     ( tag_len == sizeof ( uuid ) ) &&
+		     ( smbios_version() >= SMBIOS_VERSION ( 2, 6 ) ) ) {
+			DBG ( "SMBIOS detected mangled UUID\n" );
+			memcpy ( &uuid, &buf[tag_offset], sizeof ( uuid ) );
+			uuid_mangle ( &uuid );
+			raw = &uuid;
+		}
+
+		/* Return data */
+		if ( len > tag_len )
+			len = tag_len;
+		memcpy ( data, raw, len );
+		if ( ! setting->type )
+			setting->type = &setting_type_hex;
+		return tag_len;
 	}
 }
 
@@ -149,10 +164,10 @@ static struct settings_operations smbios_settings_operations = {
 /** SMBIOS settings */
 static struct settings smbios_settings = {
 	.refcnt = NULL,
-	.tag_magic = SMBIOS_EMPTY_TAG,
 	.siblings = LIST_HEAD_INIT ( smbios_settings.siblings ),
 	.children = LIST_HEAD_INIT ( smbios_settings.children ),
 	.op = &smbios_settings_operations,
+	.default_scope = &smbios_settings_scope,
 };
 
 /** Initialise SMBIOS settings */
@@ -179,10 +194,11 @@ struct setting uuid_setting __setting ( SETTING_HOST ) = {
 	.tag = SMBIOS_RAW_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
 				struct smbios_system_information, uuid ),
 	.type = &setting_type_uuid,
+	.scope = &smbios_settings_scope,
 };
 
-/** Other SMBIOS named settings */
-struct setting smbios_named_settings[] __setting ( SETTING_HOST_EXTRA ) = {
+/** Other SMBIOS predefined settings */
+struct setting smbios_predefined_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 	{
 		.name = "manufacturer",
 		.description = "Manufacturer",
@@ -190,6 +206,7 @@ struct setting smbios_named_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 					   struct smbios_system_information,
 					   manufacturer ),
 		.type = &setting_type_string,
+		.scope = &smbios_settings_scope,
 	},
 	{
 		.name = "product",
@@ -198,6 +215,7 @@ struct setting smbios_named_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 					   struct smbios_system_information,
 					   product ),
 		.type = &setting_type_string,
+		.scope = &smbios_settings_scope,
 	},
 	{
 		.name = "serial",
@@ -206,6 +224,7 @@ struct setting smbios_named_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 					   struct smbios_system_information,
 					   serial ),
 		.type = &setting_type_string,
+		.scope = &smbios_settings_scope,
 	},
 	{
 		.name = "asset",
@@ -214,5 +233,6 @@ struct setting smbios_named_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 					   struct smbios_enclosure_information,
 					   asset_tag ),
 		.type = &setting_type_string,
+		.scope = &smbios_settings_scope,
 	},
 };

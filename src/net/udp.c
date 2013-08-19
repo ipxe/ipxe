@@ -48,45 +48,19 @@ static struct interface_descriptor udp_xfer_desc;
 struct tcpip_protocol udp_protocol __tcpip_protocol;
 
 /**
- * Bind UDP connection to local port
+ * Check if local UDP port is available
  *
- * @v udp		UDP connection
- * @ret rc		Return status code
- *
- * Opens the UDP connection and binds to the specified local port.  If
- * no local port is specified, the first available port will be used.
+ * @v port		Local port number
+ * @ret port		Local port number, or negative error
  */
-static int udp_bind ( struct udp_connection *udp ) {
-	struct udp_connection *existing;
-	static uint16_t try_port = 1023;
+static int udp_port_available ( int port ) {
+	struct udp_connection *udp;
 
-	/* If no port specified, find the first available port */
-	if ( ! udp->local.st_port ) {
-		while ( try_port ) {
-			try_port++;
-			if ( try_port < 1024 )
-				continue;
-			udp->local.st_port = htons ( try_port );
-			if ( udp_bind ( udp ) == 0 )
-				return 0;
-		}
-		return -EADDRINUSE;
-	}
-
-	/* Attempt bind to local port */
-	list_for_each_entry ( existing, &udp_conns, list ) {
-		if ( existing->local.st_port == udp->local.st_port ) {
-			DBGC ( udp, "UDP %p could not bind: port %d in use\n",
-			       udp, ntohs ( udp->local.st_port ) );
+	list_for_each_entry ( udp, &udp_conns, list ) {
+		if ( udp->local.st_port == htons ( port ) )
 			return -EADDRINUSE;
-		}
 	}
-
-	/* Add to UDP connection list */
-	DBGC ( udp, "UDP %p bound to port %d\n",
-	       udp, ntohs ( udp->local.st_port ) );
-
-	return 0;
+	return port;
 }
 
 /**
@@ -104,6 +78,7 @@ static int udp_open_common ( struct interface *xfer,
 	struct sockaddr_tcpip *st_peer = ( struct sockaddr_tcpip * ) peer;
 	struct sockaddr_tcpip *st_local = ( struct sockaddr_tcpip * ) local;
 	struct udp_connection *udp;
+	int port;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -120,8 +95,16 @@ static int udp_open_common ( struct interface *xfer,
 
 	/* Bind to local port */
 	if ( ! promisc ) {
-		if ( ( rc = udp_bind ( udp ) ) != 0 )
+		port = tcpip_bind ( st_local, udp_port_available );
+		if ( port < 0 ) {
+			rc = port;
+			DBGC ( udp, "UDP %p could not bind: %s\n",
+			       udp, strerror ( rc ) );
 			goto err;
+		}
+		udp->local.st_port = htons ( port );
+		DBGC ( udp, "UDP %p bound to port %d\n",
+		       udp, ntohs ( udp->local.st_port ) );
 	}
 
 	/* Attach parent interface, transfer reference to connection
@@ -220,9 +203,9 @@ static int udp_tx ( struct udp_connection *udp, struct io_buffer *iobuf,
 	udphdr->chksum = tcpip_chksum ( udphdr, len );
 
 	/* Dump debugging information */
-	DBGC ( udp, "UDP %p TX %d->%d len %d\n", udp,
-	       ntohs ( udphdr->src ), ntohs ( udphdr->dest ),
-	       ntohs ( udphdr->len ) );
+	DBGC2 ( udp, "UDP %p TX %d->%d len %d\n", udp,
+		ntohs ( udphdr->src ), ntohs ( udphdr->dest ),
+		ntohs ( udphdr->len ) );
 
 	/* Send it to the next layer for processing */
 	if ( ( rc = tcpip_tx ( iobuf, &udp_protocol, src, dest, netdev,
@@ -317,8 +300,8 @@ static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
 	iob_pull ( iobuf, sizeof ( *udphdr ) );
 
 	/* Dump debugging information */
-	DBGC ( udp, "UDP %p RX %d<-%d len %zd\n", udp,
-	       ntohs ( udphdr->dest ), ntohs ( udphdr->src ), ulen );
+	DBGC2 ( udp, "UDP %p RX %d<-%d len %zd\n", udp,
+		ntohs ( udphdr->dest ), ntohs ( udphdr->src ), ulen );
 
 	/* Ignore if no matching connection found */
 	if ( ! udp ) {

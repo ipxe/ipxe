@@ -20,6 +20,8 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
+#include <string.h>
+#include <errno.h>
 #include <assert.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/ansiesc.h>
@@ -227,6 +229,7 @@ static int efi_getchar ( void ) {
 	const char *ansi_seq;
 	EFI_INPUT_KEY key;
 	EFI_STATUS efirc;
+	int rc;
 
 	/* If we are mid-sequence, pass out the next byte */
 	if ( *ansi_input )
@@ -234,8 +237,8 @@ static int efi_getchar ( void ) {
 
 	/* Read key from real EFI console */
 	if ( ( efirc = conin->ReadKeyStroke ( conin, &key ) ) != 0 ) {
-		DBG ( "EFI could not read keystroke: %s\n",
-		      efi_strerror ( efirc ) );
+		rc = -EEFI ( efirc );
+		DBG ( "EFI could not read keystroke: %s\n", strerror ( rc ) );
 		return 0;
 	}
 	DBG2 ( "EFI read key stroke with unicode %04x scancode %04x\n",

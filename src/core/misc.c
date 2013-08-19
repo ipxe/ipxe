@@ -33,6 +33,19 @@ int inet_aton ( const char *cp, struct in_addr *inp ) {
 	return 0;
 }
 
+unsigned int strtoul_charval ( unsigned int charval ) {
+
+	if ( charval >= 'a' ) {
+		charval = ( charval - 'a' + 10 );
+	} else if ( charval >= 'A' ) {
+		charval = ( charval - 'A' + 10 );
+	} else if ( charval <= '9' ) {
+		charval = ( charval - '0' );
+	}
+
+	return charval;
+}
+
 unsigned long strtoul ( const char *p, char **endp, int base ) {
 	unsigned long ret = 0;
 	int negative = 0;

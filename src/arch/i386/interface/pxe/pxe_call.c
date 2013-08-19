@@ -32,6 +32,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * PXE API entry point
  */
 
+/* Disambiguate the various error causes */
+#define EINFO_EPXENBP							\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x01,			\
+			  "External PXE NBP error" )
+#define EPXENBP( status ) EPLATFORM ( EINFO_EPXENBP, status )
+
 /** Vector for chaining INT 1A */
 extern struct segoff __text16 ( pxe_int_1a_vector );
 #define pxe_int_1a_vector __use_text16 ( pxe_int_1a_vector )
@@ -257,7 +263,7 @@ rmjmp_buf pxe_restart_nbp;
 int pxe_start_nbp ( void ) {
 	int jmp;
 	int discard_b, discard_c, discard_d, discard_D;
-	uint16_t rc;
+	uint16_t status;
 
 	/* Allow restarting NBP via PXENV_RESTART_TFTP */
 	jmp = rmsetjmp ( pxe_restart_nbp );
@@ -265,22 +271,26 @@ int pxe_start_nbp ( void ) {
 		DBG ( "Restarting NBP (%x)\n", jmp );
 
 	/* Far call to PXE NBP */
-	__asm__ __volatile__ ( REAL_CODE ( "movw %%cx, %%es\n\t"
+	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
+					   "movw %%cx, %%es\n\t"
 					   "pushw %%es\n\t"
 					   "pushw %%di\n\t"
 					   "sti\n\t"
 					   "lcall $0, $0x7c00\n\t"
-					   "addw $4, %%sp\n\t" )
-			       : "=a" ( rc ), "=b" ( discard_b ),
+					   "popl %%ebp\n\t" /* discard */
+					   "popl %%ebp\n\t" /* gcc bug */ )
+			       : "=a" ( status ), "=b" ( discard_b ),
 				 "=c" ( discard_c ), "=d" ( discard_d ),
 				 "=D" ( discard_D )
 			       : "a" ( 0 ), "b" ( __from_text16 ( &pxenv ) ),
 			         "c" ( rm_cs ),
 			         "d" ( virt_to_phys ( &pxenv ) ),
 				 "D" ( __from_text16 ( &ppxe ) )
-			       : "esi", "ebp", "memory" );
+			       : "esi", "memory" );
+	if ( status )
+		return -EPXENBP ( status );
 
-	return rc;
+	return 0;
 }
 
 REQUIRE_OBJECT ( pxe_preboot );

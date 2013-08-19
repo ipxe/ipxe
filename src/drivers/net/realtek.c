@@ -74,6 +74,7 @@ static void realtek_spi_open_bit ( struct bit_basher *basher ) {
 
 	/* Enable EEPROM access */
 	writeb ( RTL_9346CR_EEM_EEPROM, rtl->regs + RTL_9346CR );
+	readb ( rtl->regs + RTL_9346CR ); /* Ensure write reaches chip */
 }
 
 /**
@@ -87,6 +88,7 @@ static void realtek_spi_close_bit ( struct bit_basher *basher ) {
 
 	/* Disable EEPROM access */
 	writeb ( RTL_9346CR_EEM_NORMAL, rtl->regs + RTL_9346CR );
+	readb ( rtl->regs + RTL_9346CR ); /* Ensure write reaches chip */
 }
 
 /**
@@ -129,6 +131,7 @@ static void realtek_spi_write_bit ( struct bit_basher *basher,
 	reg &= ~mask;
 	reg |= ( data & mask );
 	writeb ( reg, rtl->regs + RTL_9346CR );
+	readb ( rtl->regs + RTL_9346CR ); /* Ensure write reaches chip */
 	DBG_ENABLE ( DBGLVL_IO );
 }
 
@@ -144,9 +147,12 @@ static struct bit_basher_operations realtek_basher_ops = {
  * Initialise EEPROM
  *
  * @v netdev		Network device
+ * @ret rc		Return status code
  */
-static void realtek_init_eeprom ( struct net_device *netdev ) {
+static int realtek_init_eeprom ( struct net_device *netdev ) {
 	struct realtek_nic *rtl = netdev->priv;
+	uint16_t id;
+	int rc;
 
 	/* Initialise SPI bit-bashing interface */
 	rtl->spibit.basher.op = &realtek_basher_ops;
@@ -163,6 +169,22 @@ static void realtek_init_eeprom ( struct net_device *netdev ) {
 	}
 	rtl->eeprom.bus = &rtl->spibit.bus;
 
+	/* Check for EEPROM presence.  Some onboard NICs will have no
+	 * EEPROM connected, with the BIOS being responsible for
+	 * programming the initial register values.
+	 */
+	if ( ( rc = nvs_read ( &rtl->eeprom.nvs, RTL_EEPROM_ID,
+			       &id, sizeof ( id ) ) ) != 0 ) {
+		DBGC ( rtl, "REALTEK %p could not read EEPROM ID: %s\n",
+		       rtl, strerror ( rc ) );
+		return rc;
+	}
+	if ( id != cpu_to_le16 ( RTL_EEPROM_ID_MAGIC ) ) {
+		DBGC ( rtl, "REALTEK %p EEPROM ID incorrect (%#04x); assuming "
+		       "no EEPROM\n", rtl, le16_to_cpu ( id ) );
+		return -ENODEV;
+	}
+
 	/* Initialise space for non-volatile options, if available
 	 *
 	 * We use offset 0x40 (i.e. address 0x20), length 0x40.  This
@@ -176,6 +198,8 @@ static void realtek_init_eeprom ( struct net_device *netdev ) {
 		nvo_init ( &rtl->nvo, &rtl->eeprom.nvs, RTL_EEPROM_VPD,
 			   RTL_EEPROM_VPD_LEN, NULL, &netdev->refcnt );
 	}
+
+	return 0;
 }
 
 /******************************************************************************
@@ -525,7 +549,11 @@ static int realtek_create_ring ( struct realtek_nic *rtl,
 static void realtek_destroy_ring ( struct realtek_nic *rtl,
 				   struct realtek_ring *ring ) {
 
-	/* Do nothing in legacy mode */
+	/* Reset producer and consumer counters */
+	ring->prod = 0;
+	ring->cons = 0;
+
+	/* Do nothing more if in legacy mode */
 	if ( rtl->legacy )
 		return;
 
@@ -536,8 +564,6 @@ static void realtek_destroy_ring ( struct realtek_nic *rtl,
 	/* Free descriptor ring */
 	free_dma ( ring->desc, ring->len );
 	ring->desc = NULL;
-	ring->prod = 0;
-	ring->cons = 0;
 }
 
 /**
@@ -700,8 +726,8 @@ static int realtek_transmit ( struct net_device *netdev,
 
 	/* Get next transmit descriptor */
 	if ( ( rtl->tx.prod - rtl->tx.cons ) >= RTL_NUM_TX_DESC ) {
-		DBGC ( rtl, "REALTEK %p out of transmit descriptors\n", rtl );
-		return -ENOBUFS;
+		netdev_tx_defer ( netdev, iobuf );
+		return 0;
 	}
 	tx_idx = ( rtl->tx.prod++ % RTL_NUM_TX_DESC );
 
@@ -785,8 +811,8 @@ static void realtek_poll_tx ( struct net_device *netdev ) {
 		DBGC2 ( rtl, "REALTEK %p TX %d complete\n", rtl, tx_idx );
 
 		/* Complete TX descriptor */
-		netdev_tx_complete_next ( netdev );
 		rtl->tx.cons++;
+		netdev_tx_complete_next ( netdev );
 	}
 }
 
@@ -840,6 +866,9 @@ static void realtek_legacy_poll_rx ( struct net_device *netdev ) {
 		rtl->rx_offset = ( ( rtl->rx_offset + 3 ) & ~3 );
 		rtl->rx_offset = ( rtl->rx_offset % RTL_RXBUF_LEN );
 		writew ( ( rtl->rx_offset - 16 ), rtl->regs + RTL_CAPR );
+
+		/* Give chip time to react before rechecking RTL_CR */
+		readw ( rtl->regs + RTL_CAPR );
 	}
 }
 
@@ -878,13 +907,15 @@ static void realtek_poll_rx ( struct net_device *netdev ) {
 		len = ( le16_to_cpu ( rx->length ) & RTL_DESC_SIZE_MASK );
 		iob_put ( iobuf, ( len - 4 /* strip CRC */ ) );
 
-		DBGC2 ( rtl, "REALTEK %p RX %d complete (length %zd)\n",
-			rtl, rx_idx, len );
-
 		/* Hand off to network stack */
 		if ( rx->flags & cpu_to_le16 ( RTL_DESC_RES ) ) {
+			DBGC ( rtl, "REALTEK %p RX %d error (length %zd, "
+			       "flags %04x)\n", rtl, rx_idx, len,
+			       le16_to_cpu ( rx->flags ) );
 			netdev_rx_err ( netdev, iobuf, -EIO );
 		} else {
+			DBGC2 ( rtl, "REALTEK %p RX %d complete (length "
+				"%zd)\n", rtl, rx_idx, len );
 			netdev_rx ( netdev, iobuf );
 		}
 		rtl->rx.cons++;
@@ -1045,22 +1076,22 @@ static int realtek_probe ( struct pci_device *pci ) {
 	realtek_detect ( rtl );
 
 	/* Initialise EEPROM */
-	realtek_init_eeprom ( netdev );
+	if ( ( rc = realtek_init_eeprom ( netdev ) ) == 0 ) {
 
-	/* Read MAC address from EEPROM */
-	if ( ( rc = nvs_read ( &rtl->eeprom.nvs, RTL_EEPROM_MAC,
-			       netdev->hw_addr, ETH_ALEN ) ) != 0 ) {
-		DBGC ( rtl, "REALTEK %p could not read MAC address: %s\n",
-		       rtl, strerror ( rc ) );
-		goto err_nvs_read;
-	}
+		/* Read MAC address from EEPROM */
+		if ( ( rc = nvs_read ( &rtl->eeprom.nvs, RTL_EEPROM_MAC,
+				       netdev->hw_addr, ETH_ALEN ) ) != 0 ) {
+			DBGC ( rtl, "REALTEK %p could not read MAC address: "
+			       "%s\n", rtl, strerror ( rc ) );
+			goto err_nvs_read;
+		}
 
-	/* The EEPROM may not be present for onboard NICs.  Fall back
-	 * to reading the current ID register value, which will
-	 * hopefully have been programmed by the platform firmware.
-	 */
-	if ( ! is_valid_ether_addr ( netdev->hw_addr ) ) {
-		DBGC ( rtl, "REALTEK %p seems to have no EEPROM\n", rtl );
+	} else {
+
+		/* EEPROM not present.  Fall back to reading the
+		 * current ID register value, which will hopefully
+		 * have been programmed by the platform firmware.
+		 */
 		for ( i = 0 ; i < ETH_ALEN ; i++ )
 			netdev->hw_addr[i] = readb ( rtl->regs + RTL_IDR0 + i );
 	}

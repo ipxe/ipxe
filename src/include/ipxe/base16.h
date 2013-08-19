@@ -33,6 +33,8 @@ static inline size_t base16_decoded_max_len ( const char *encoded ) {
 }
 
 extern void base16_encode ( const uint8_t *raw, size_t len, char *encoded );
+extern int hex_decode ( const char *string, char separator, void *data,
+			size_t len );
 extern int base16_decode ( const char *encoded, uint8_t *raw );
 
 #endif /* _IPXE_BASE16_H */

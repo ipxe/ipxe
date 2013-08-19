@@ -47,7 +47,7 @@ int icmp6_send_solicit ( struct net_device *netdev, struct in6_addr *src __unuse
 	nsolicit->csum = tcpip_chksum ( nsolicit, sizeof ( *nsolicit ) );
 
 	/* Solicited multicast address */
-	st_dest.sin6.sin_family = AF_INET6;
+	st_dest.sin6.sin6_family = AF_INET6;
 	st_dest.sin6.sin6_addr.in6_u.u6_addr8[0] = 0xff;
 	st_dest.sin6.sin6_addr.in6_u.u6_addr8[2] = 0x02;
 	st_dest.sin6.sin6_addr.in6_u.u6_addr16[1] = 0x0000;

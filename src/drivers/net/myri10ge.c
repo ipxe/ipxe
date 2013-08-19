@@ -719,7 +719,7 @@ static int myri10ge_nv_init ( struct myri10ge_private *priv )
 		return 0;
 	}
 
-	/* Initilize NonVolatile Storage state. */
+	/* Initialize NonVolatile Storage state. */
 
 	priv->nvs.word_len_log2 = 0;
 	priv->nvs.size		= hdr.eeprom_len;

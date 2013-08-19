@@ -38,6 +38,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/* Disambiguate the various error causes */
+#define EINFO_EUNDILOAD							\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x01,			\
+			  "UNDI loader error" )
+#define EUNDILOAD( status ) EPLATFORM ( EINFO_EUNDILOAD, status )
+
 /** Parameter block for calling UNDI loader */
 static struct s_UNDI_LOADER __bss16 ( undi_loader );
 #define undi_loader __use_data16 ( undi_loader )
@@ -109,9 +115,7 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 		/* Clear entry point */
 		memset ( &undi_loader_entry, 0, sizeof ( undi_loader_entry ) );
 
-		rc = -undi_loader.Status;
-		if ( rc == 0 ) /* Paranoia */
-			rc = -EIO;
+		rc = -EUNDILOAD ( undi_loader.Status );
 		DBGC ( undi, "UNDI %p loader failed: %s\n",
 		       undi, strerror ( rc ) );
 		return rc;

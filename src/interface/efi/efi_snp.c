@@ -33,6 +33,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
+#include <config/general.h>
+#include <usr/autoboot.h>
 
 /** EFI simple network protocol GUID */
 static EFI_GUID efi_simple_network_protocol_guid
@@ -56,9 +58,13 @@ static EFI_GUID efi_nii31_protocol_guid = {
 	{ 0xBC, 0x81, 0x76, 0x7F, 0x1F, 0x97, 0x7A, 0x89 }
 };
 
-/** EFI component name protocol */
+/** EFI component name protocol GUID */
 static EFI_GUID efi_component_name2_protocol_guid
 	= EFI_COMPONENT_NAME2_PROTOCOL_GUID;
+
+/** EFI load file protocol GUID */
+static EFI_GUID efi_load_file_protocol_guid
+	= EFI_LOAD_FILE_PROTOCOL_GUID;
 
 /** List of SNP devices */
 static LIST_HEAD ( efi_snp_devices );
@@ -171,7 +177,7 @@ efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	if ( ( rc = netdev_open ( snpdev->netdev ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not open %s: %s\n",
 		       snpdev, snpdev->netdev->name, strerror ( rc ) );
-		return RC_TO_EFIRC ( rc );
+		return EFIRC ( rc );
 	}
 
 	snpdev->mode.State = EfiSimpleNetworkInitialized;
@@ -200,7 +206,7 @@ efi_snp_reset ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN ext_verify ) {
 	if ( ( rc = netdev_open ( snpdev->netdev ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not reopen %s: %s\n",
 		       snpdev, snpdev->netdev->name, strerror ( rc ) );
-		return RC_TO_EFIRC ( rc );
+		return EFIRC ( rc );
 	}
 
 	snpdev->mode.State = EfiSimpleNetworkInitialized;
@@ -360,7 +366,7 @@ efi_snp_mcast_ip_to_mac ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN ipv6,
 					   ip, mac ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not hash %s: %s\n",
 		       snpdev, ip_str, strerror ( rc ) );
-		return RC_TO_EFIRC ( rc );
+		return EFIRC ( rc );
 	}
 
 	return 0;
@@ -484,7 +490,6 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	struct io_buffer *iobuf;
 	size_t payload_len;
 	int rc;
-	EFI_STATUS efirc;
 
 	DBGC2 ( snpdev, "SNPDEV %p TRANSMIT %p+%lx", snpdev, data,
 		( ( unsigned long ) len ) );
@@ -509,25 +514,25 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 			DBGC ( snpdev, "SNPDEV %p TX invalid header length "
 			       "%ld\n", snpdev,
 			       ( ( unsigned long ) ll_header_len ) );
-			efirc = EFI_INVALID_PARAMETER;
+			rc = -EINVAL;
 			goto err_sanity;
 		}
 		if ( len < ll_header_len ) {
 			DBGC ( snpdev, "SNPDEV %p invalid packet length %ld\n",
 			       snpdev, ( ( unsigned long ) len ) );
-			efirc = EFI_BUFFER_TOO_SMALL;
+			rc = -EINVAL;
 			goto err_sanity;
 		}
 		if ( ! ll_dest ) {
 			DBGC ( snpdev, "SNPDEV %p TX missing destination "
 			       "address\n", snpdev );
-			efirc = EFI_INVALID_PARAMETER;
+			rc = -EINVAL;
 			goto err_sanity;
 		}
 		if ( ! net_proto ) {
 			DBGC ( snpdev, "SNPDEV %p TX missing network "
 			       "protocol\n", snpdev );
-			efirc = EFI_INVALID_PARAMETER;
+			rc = -EINVAL;
 			goto err_sanity;
 		}
 		if ( ! ll_src )
@@ -541,7 +546,7 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	if ( ! iobuf ) {
 		DBGC ( snpdev, "SNPDEV %p TX could not allocate %ld-byte "
 		       "buffer\n", snpdev, ( ( unsigned long ) len ) );
-		efirc = EFI_DEVICE_ERROR;
+		rc = -ENOMEM;
 		goto err_alloc_iob;
 	}
 	iob_reserve ( iobuf, ( MAX_LL_HEADER_LEN -
@@ -556,7 +561,6 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 						htons ( *net_proto ) )) != 0 ){
 			DBGC ( snpdev, "SNPDEV %p TX could not construct "
 			       "header: %s\n", snpdev, strerror ( rc ) );
-			efirc = RC_TO_EFIRC ( rc );
 			goto err_ll_push;
 		}
 	}
@@ -565,7 +569,6 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	if ( ( rc = netdev_tx ( snpdev->netdev, iob_disown ( iobuf ) ) ) != 0){
 		DBGC ( snpdev, "SNPDEV %p TX could not transmit: %s\n",
 		       snpdev, strerror ( rc ) );
-		efirc = RC_TO_EFIRC ( rc );
 		goto err_tx;
 	}
 
@@ -580,7 +583,7 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	free_iob ( iobuf );
  err_alloc_iob:
  err_sanity:
-	return efirc;
+	return EFIRC ( rc );
 }
 
 /**
@@ -609,7 +612,6 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	uint16_t iob_net_proto;
 	unsigned int iob_flags;
 	int rc;
-	EFI_STATUS efirc;
 
 	DBGC2 ( snpdev, "SNPDEV %p RECEIVE %p(+%lx)", snpdev, data,
 		( ( unsigned long ) *len ) );
@@ -621,7 +623,7 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	iobuf = netdev_rx_dequeue ( snpdev->netdev );
 	if ( ! iobuf ) {
 		DBGC2 ( snpdev, "\n" );
-		efirc = EFI_NOT_READY;
+		rc = -EAGAIN;
 		goto out_no_packet;
 	}
 	DBGC2 ( snpdev, "+%zx\n", iob_len ( iobuf ) );
@@ -636,7 +638,6 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 					&iob_flags ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not parse header: %s\n",
 		       snpdev, strerror ( rc ) );
-		efirc = RC_TO_EFIRC ( rc );
 		goto out_bad_ll_header;
 	}
 
@@ -650,12 +651,12 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	if ( net_proto )
 		*net_proto = ntohs ( iob_net_proto );
 
-	efirc = 0;
+	rc = 0;
 
  out_bad_ll_header:
 	free_iob ( iobuf );
 out_no_packet:
-	return efirc;
+	return EFIRC ( rc );
 }
 
 /**
@@ -755,6 +756,49 @@ efi_snp_get_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *name2,
 
 /******************************************************************************
  *
+ * Load file protocol
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Load file
+ *
+ * @v loadfile		Load file protocol
+ * @v path		File path
+ * @v booting		Loading as part of a boot attempt
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_snp_load_file ( EFI_LOAD_FILE_PROTOCOL *load_file,
+		    EFI_DEVICE_PATH_PROTOCOL *path __unused,
+		    BOOLEAN booting, UINTN *len __unused,
+		    VOID *data __unused ) {
+	struct efi_snp_device *snpdev =
+		container_of ( load_file, struct efi_snp_device, load_file );
+	struct net_device *netdev = snpdev->netdev;
+
+	/* Fail unless this is a boot attempt */
+	if ( ! booting ) {
+		DBGC ( snpdev, "SNPDEV %p cannot load non-boot file\n",
+		       snpdev );
+		return EFI_UNSUPPORTED;
+	}
+
+	/* Boot from network device */
+	ipxe ( netdev );
+
+	/* Assume boot process was aborted */
+	return EFI_ABORTED;
+}
+
+/** Load file protocol */
+static EFI_LOAD_FILE_PROTOCOL efi_snp_load_file_protocol = {
+	.LoadFile	= efi_snp_load_file,
+};
+
+/******************************************************************************
+ *
  * iPXE network driver
  *
  ******************************************************************************
@@ -830,9 +874,9 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	if ( ( efirc = bs->CreateEvent ( EVT_NOTIFY_WAIT, TPL_NOTIFY,
 					 efi_snp_wait_for_packet, snpdev,
 					 &snpdev->snp.WaitForPacket ) ) != 0 ){
+		rc = -EEFI ( efirc );
 		DBGC ( snpdev, "SNPDEV %p could not create event: %s\n",
-		       snpdev, efi_strerror ( efirc ) );
-		rc = EFIRC_TO_RC ( efirc );
+		       snpdev, strerror ( rc ) );
 		goto err_create_event;
 	}
 
@@ -849,15 +893,20 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	/* Populate the component name structure */
 	efi_snprintf ( snpdev->driver_name,
 		       ( sizeof ( snpdev->driver_name ) /
-			 sizeof ( snpdev->driver_name[0] ) ), "%s",
-		       netdev->dev->driver_name );
+			 sizeof ( snpdev->driver_name[0] ) ),
+		       PRODUCT_SHORT_NAME " %s", netdev->dev->driver_name );
 	efi_snprintf ( snpdev->controller_name,
 		       ( sizeof ( snpdev->controller_name ) /
-			 sizeof ( snpdev->controller_name[0] ) ), "%s (%s)",
+			 sizeof ( snpdev->controller_name[0] ) ),
+		       PRODUCT_SHORT_NAME " %s (%s)",
 		       netdev->name, netdev_addr ( netdev ) );
 	snpdev->name2.GetDriverName = efi_snp_get_driver_name;
 	snpdev->name2.GetControllerName = efi_snp_get_controller_name;
 	snpdev->name2.SupportedLanguages = "en";
+
+	/* Populate the load file protocol structure */
+	memcpy ( &snpdev->load_file, &efi_snp_load_file_protocol,
+		 sizeof ( snpdev->load_file ) );
 
 	/* Populate the device name */
 	efi_snprintf ( snpdev->name, ( sizeof ( snpdev->name ) /
@@ -888,19 +937,19 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
+			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
 		DBGC ( snpdev, "SNPDEV %p could not install protocols: "
-		       "%s\n", snpdev, efi_strerror ( efirc ) );
-		rc = EFIRC_TO_RC ( efirc );
+		       "%s\n", snpdev, strerror ( rc ) );
 		goto err_install_protocol_interface;
 	}
 
 	/* Add as child of PCI device */
-	if ( ( efirc = efipci_child_add ( efipci, snpdev->handle ) ) != 0 ) {
+	if ( ( rc = efipci_child_add ( efipci, snpdev->handle ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not become child of " PCI_FMT
 		       ": %s\n", snpdev, PCI_ARGS ( &efipci->pci ),
-		       efi_strerror ( efirc ) );
-		rc = EFIRC_TO_RC ( efirc );
+		       strerror ( rc ) );
 		goto err_efipci_child_add;
 	}
 
@@ -929,6 +978,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
+			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL );
  err_install_protocol_interface:
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
@@ -990,6 +1040,7 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
+			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL );
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
 	netdev_put ( snpdev->netdev );
@@ -1003,3 +1054,18 @@ struct net_driver efi_snp_driver __net_driver = {
 	.notify = efi_snp_notify,
 	.remove = efi_snp_remove,
 };
+
+/**
+ * Get most recently opened SNP device
+ *
+ * @ret snpdev		Most recently opened SNP device, or NULL
+ */
+struct efi_snp_device * last_opened_snpdev ( void ) {
+	struct net_device *netdev;
+
+	netdev = last_opened_netdev();
+	if ( ! netdev )
+		return NULL;
+
+	return efi_snp_demux ( netdev );
+}

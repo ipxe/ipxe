@@ -80,6 +80,4 @@ union tftp_any {
 	struct tftp_oack	oack;
 };
 
-extern void tftp_set_request_blksize ( unsigned int blksize );
-
 #endif /* _IPXE_TFTP_H */

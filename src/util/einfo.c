@@ -38,10 +38,15 @@ struct options {
 
 /** Error usage information */
 struct einfo {
+	/** Size of error information record */
 	uint32_t size;
+	/** Error number */
 	uint32_t error;
+	/** Offset to error description (NUL-terminated) */
 	uint32_t desc;
+	/** Offset to file name (NUL-terminated) */
 	uint32_t file;
+	/** Line number */
 	uint32_t line;
 } __attribute__ (( packed ));
 
