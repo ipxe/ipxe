@@ -202,6 +202,7 @@ enum GlobalResetParams {
 enum FrameStartHeader {
 	fshTxIndicate = 0x8000,
 	fshDnComplete = 0x10000,
+	fshRndupDefeat = 0x10000000,
 };
 
 enum UpDownDesc {

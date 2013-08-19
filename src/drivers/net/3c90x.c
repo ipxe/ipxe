@@ -346,11 +346,12 @@ static int a3c90x_transmit(struct net_device *netdev,
 	tx_cur_desc->DnNextPtr = 0;
 
 	/* FrameStartHeader differs in 90x and >= 90xB
-	 * It contains length in 90x and a round up boundary and packet ID for
-	 * 90xB and 90xC. We can leave this to 0 for 90xB and 90xC.
+	 * It contains the packet length in 90x and a round up boundary and
+	 * packet ID for 90xB and 90xC. Disable packet length round-up on the
+	 * later revisions.
 	 */
 	tx_cur_desc->FrameStartHeader =
-	    fshTxIndicate | (inf_3c90x->isBrev ? 0x00 : len);
+	    fshTxIndicate | (inf_3c90x->isBrev ? fshRndupDefeat : len);
 
 	tx_cur_desc->DataAddr = virt_to_bus(iob->data);
 	tx_cur_desc->DataLength = len | downLastFrag;
