@@ -1,76 +1,162 @@
-#include <errno.h>
+/*
+ * Copyright (C) 2013 Michael Brown <mbrown@fensystems.co.uk>.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
+ */
+
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <assert.h>
 #include <byteswap.h>
-#include <ipxe/in.h>
-#include <ipxe/ip6.h>
-#include <ipxe/ndp.h>
-#include <ipxe/list.h>
-#include <ipxe/icmp6.h>
-#include <ipxe/tcpip.h>
-#include <ipxe/socket.h>
 #include <ipxe/iobuf.h>
-#include <ipxe/netdevice.h>
+#include <ipxe/tcpip.h>
 #include <ipxe/if_ether.h>
+#include <ipxe/crc32.h>
+#include <ipxe/fragment.h>
+#include <ipxe/ndp.h>
+#include <ipxe/ipv6.h>
 
-/* Unspecified IP6 address */
-static struct in6_addr ip6_none = {
-        .in6_u.u6_addr32 = { 0,0,0,0 }
-};
+/** @file
+ *
+ * IPv6 protocol
+ *
+ */
 
-/** An IPv6 routing table entry */
-struct ipv6_miniroute {
-	/* List of miniroutes */
-	struct list_head list;
-
-	/* Network device */
-	struct net_device *netdev;
-
-	/* Destination prefix */
-	struct in6_addr prefix;
-	/* Prefix length */
-	int prefix_len;
-	/* IPv6 address of interface */
-	struct in6_addr address;
-	/* Gateway address */
-	struct in6_addr gateway;
-};
+/* Disambiguate the various error causes */
+#define EINVAL_LEN __einfo_error ( EINFO_EINVAL_LEN )
+#define EINFO_EINVAL_LEN \
+	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Invalid length" )
+#define ENOTSUP_VER __einfo_error ( EINFO_ENOTSUP_VER )
+#define EINFO_ENOTSUP_VER \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Unsupported version" )
+#define ENOTSUP_HDR __einfo_error ( EINFO_ENOTSUP_HDR )
+#define EINFO_ENOTSUP_HDR \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x02, "Unsupported header type" )
+#define ENOTSUP_OPT __einfo_error ( EINFO_ENOTSUP_OPT )
+#define EINFO_ENOTSUP_OPT \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x03, "Unsupported option" )
 
 /** List of IPv6 miniroutes */
-static LIST_HEAD ( miniroutes );
+struct list_head ipv6_miniroutes = LIST_HEAD_INIT ( ipv6_miniroutes );
+
+/**
+ * Determine debugging colour for IPv6 debug messages
+ *
+ * @v in		IPv6 address
+ * @ret col		Debugging colour (for DBGC())
+ */
+static uint32_t ipv6col ( struct in6_addr *in ) {
+	return crc32_le ( 0, in, sizeof ( *in ) );
+}
+
+/**
+ * Check if network device has a specific IPv6 address
+ *
+ * @v netdev		Network device
+ * @v addr		IPv6 address
+ * @ret has_addr	Network device has this IPv6 address
+ */
+int ipv6_has_addr ( struct net_device *netdev, struct in6_addr *addr ) {
+	struct ipv6_miniroute *miniroute;
+
+	list_for_each_entry ( miniroute, &ipv6_miniroutes, list ) {
+		if ( ( miniroute->netdev == netdev ) &&
+		     ( memcmp ( &miniroute->address, addr,
+				sizeof ( miniroute->address ) ) == 0 ) ) {
+			/* Found matching address */
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/**
+ * Check if IPv6 address is within a routing table entry's local network
+ *
+ * @v miniroute		Routing table entry
+ * @v address		IPv6 address
+ * @ret is_local	Address is within this entry's local network
+ */
+static int ipv6_is_local ( struct ipv6_miniroute *miniroute,
+			   struct in6_addr *address ) {
+	unsigned int i;
+
+	for ( i = 0 ; i < ( sizeof ( address->s6_addr32 ) /
+			    sizeof ( address->s6_addr32[0] ) ) ; i++ ) {
+		if ( (( address->s6_addr32[i] ^ miniroute->address.s6_addr32[i])
+		      & miniroute->prefix_mask.s6_addr32[i] ) != 0 )
+			return 0;
+	}
+	return 1;
+}
 
 /**
  * Add IPv6 minirouting table entry
  *
  * @v netdev		Network device
- * @v prefix		Destination prefix
- * @v address		Address of the interface
- * @v gateway		Gateway address (or ::0 for no gateway)
- * @ret miniroute	Routing table entry, or NULL
+ * @v address		IPv6 address
+ * @v prefix_len	Prefix length
+ * @v router		Router address (or NULL)
+ * @ret miniroute	Routing table entry, or NULL on failure
  */
-static struct ipv6_miniroute * __malloc 
-add_ipv6_miniroute ( struct net_device *netdev, struct in6_addr prefix,
-		     int prefix_len, struct in6_addr address,
-		     struct in6_addr gateway ) {
+static struct ipv6_miniroute * __malloc
+add_ipv6_miniroute ( struct net_device *netdev, struct in6_addr *address,
+		     unsigned int prefix_len, struct in6_addr *router ) {
 	struct ipv6_miniroute *miniroute;
-	
-	miniroute = malloc ( sizeof ( *miniroute ) );
-	if ( miniroute ) {
-		/* Record routing information */
-		miniroute->netdev = netdev_get ( netdev );
-		miniroute->prefix = prefix;
-		miniroute->prefix_len = prefix_len;
-		miniroute->address = address;
-		miniroute->gateway = gateway;
-		
-		/* Add miniroute to list of miniroutes */
-		if ( !IP6_EQUAL ( gateway, ip6_none ) ) {
-			list_add_tail ( &miniroute->list, &miniroutes );
-		} else {
-			list_add ( &miniroute->list, &miniroutes );
-		}
+	uint8_t *prefix_mask;
+
+	DBGC ( netdev, "IPv6 add %s/%d ", inet6_ntoa ( address ), prefix_len );
+	if ( router )
+		DBGC ( netdev, "router %s ", inet6_ntoa ( router ) );
+	DBGC ( netdev, "via %s\n", netdev->name );
+
+	/* Allocate and populate miniroute structure */
+	miniroute = zalloc ( sizeof ( *miniroute ) );
+	if ( ! miniroute )
+		return NULL;
+
+	/* Record routing information */
+	miniroute->netdev = netdev_get ( netdev );
+	memcpy ( &miniroute->address, address, sizeof ( miniroute->address ) );
+	miniroute->prefix_len = prefix_len;
+	assert ( prefix_len <= ( 8 * sizeof ( miniroute->prefix_mask ) ) );
+	for ( prefix_mask = miniroute->prefix_mask.s6_addr ; prefix_len >= 8 ;
+	      prefix_mask++, prefix_len -= 8 ) {
+		*prefix_mask = 0xff;
+	}
+	if ( prefix_len )
+		*prefix_mask <<= ( 8 - prefix_len );
+	if ( router ) {
+		miniroute->has_router = 1;
+		memcpy ( &miniroute->router, router,
+			 sizeof ( miniroute->router ) );
+	}
+
+	/* Add to end of list if we have a gateway, otherwise to start
+	 * of list.
+	 */
+	if ( router ) {
+		list_add_tail ( &miniroute->list, &ipv6_miniroutes );
+	} else {
+		list_add ( &miniroute->list, &ipv6_miniroutes );
 	}
 
 	return miniroute;
@@ -82,290 +168,516 @@ add_ipv6_miniroute ( struct net_device *netdev, struct in6_addr prefix,
  * @v miniroute		Routing table entry
  */
 static void del_ipv6_miniroute ( struct ipv6_miniroute *miniroute ) {
+	struct net_device *netdev = miniroute->netdev;
+
+	DBGC ( netdev, "IPv6 del %s/%d ", inet6_ntoa ( &miniroute->address ),
+	       miniroute->prefix_len );
+	if ( miniroute->has_router )
+		DBGC ( netdev, "router %s ", inet6_ntoa ( &miniroute->router ));
+	DBGC ( netdev, "via %s\n", netdev->name );
+
 	netdev_put ( miniroute->netdev );
 	list_del ( &miniroute->list );
 	free ( miniroute );
 }
 
 /**
- * Add IPv6 interface
+ * Perform IPv6 routing
  *
- * @v netdev	Network device
- * @v prefix	Destination prefix
- * @v address	Address of the interface
- * @v gateway	Gateway address (or ::0 for no gateway)
+ * @v scope_id		Destination address scope ID (for link-local addresses)
+ * @v dest		Final destination address
+ * @ret dest		Next hop destination address
+ * @ret miniroute	Routing table entry to use, or NULL if no route
  */
-int add_ipv6_address ( struct net_device *netdev, struct in6_addr prefix,
-		       int prefix_len, struct in6_addr address,
-		       struct in6_addr gateway ) {
+static struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
+					   struct in6_addr **dest ) {
 	struct ipv6_miniroute *miniroute;
+	int local;
 
-	/* Clear any existing address for this net device */
-	del_ipv6_address ( netdev );
+	/* Find first usable route in routing table */
+	list_for_each_entry ( miniroute, &ipv6_miniroutes, list ) {
 
-	/* Add new miniroute */
-	miniroute = add_ipv6_miniroute ( netdev, prefix, prefix_len, address,
-					 gateway );
-	if ( ! miniroute )
-		return -ENOMEM;
+		/* Skip closed network devices */
+		if ( ! netdev_is_open ( miniroute->netdev ) )
+			continue;
 
+		/* For link-local addresses, skip devices that are not
+		 * the specified network device.
+		 */
+		if ( IN6_IS_ADDR_LINKLOCAL ( *dest ) &&
+		     ( miniroute->netdev->index != scope_id ) )
+			continue;
+
+		/* Skip non-gateway devices for which the prefix does
+		 * not match.
+		 */
+		local = ipv6_is_local ( miniroute, *dest );
+		if ( ! ( local || miniroute->has_router ) )
+			continue;
+
+		/* Update next hop if applicable */
+		if ( ! local )
+			*dest = &miniroute->router;
+
+		return miniroute;
+	}
+
+	return NULL;
+}
+
+/**
+ * Check that received options can be safely ignored
+ *
+ * @v iphdr		IPv6 header
+ * @v options		Options extension header
+ * @v len		Maximum length of header
+ * @ret rc		Return status code
+ */
+static int ipv6_check_options ( struct ipv6_header *iphdr,
+				struct ipv6_options_header *options,
+				size_t len ) {
+	struct ipv6_option *option = options->options;
+	struct ipv6_option *end = ( ( ( void * ) options ) + len );
+
+	while ( option < end ) {
+		if ( ! IPV6_CAN_IGNORE_OPT ( option->type ) ) {
+			DBGC ( ipv6col ( &iphdr->src ), "IPv6 unrecognised "
+			       "option type %#02x:\n", option->type );
+			DBGC_HDA ( ipv6col ( &iphdr->src ), 0,
+				   options, len );
+			return -ENOTSUP_OPT;
+		}
+		if ( option->type == IPV6_OPT_PAD1 ) {
+			option = ( ( ( void * ) option ) + 1 );
+		} else {
+			option = ( ( ( void * ) option ) + option->len );
+		}
+	}
 	return 0;
 }
 
 /**
- * Remove IPv6 interface
+ * Check if fragment matches fragment reassembly buffer
  *
- * @v netdev	Network device
+ * @v fragment		Fragment reassembly buffer
+ * @v iobuf		I/O buffer
+ * @v hdrlen		Length of non-fragmentable potion of I/O buffer
+ * @ret is_fragment	Fragment matches this reassembly buffer
  */
-void del_ipv6_address ( struct net_device *netdev ) {
-	struct ipv6_miniroute *miniroute;
+static int ipv6_is_fragment ( struct fragment *fragment,
+			      struct io_buffer *iobuf, size_t hdrlen ) {
+	struct ipv6_header *frag_iphdr = fragment->iobuf->data;
+	struct ipv6_fragment_header *frag_fhdr =
+		( fragment->iobuf->data + fragment->hdrlen -
+		  sizeof ( *frag_fhdr ) );
+	struct ipv6_header *iphdr = iobuf->data;
+	struct ipv6_fragment_header *fhdr =
+		( iobuf->data + hdrlen - sizeof ( *fhdr ) );
 
-	list_for_each_entry ( miniroute, &miniroutes, list ) {
-		if ( miniroute->netdev == netdev ) {
-			del_ipv6_miniroute ( miniroute );
-			break;
-		}
-	}
+	return ( ( memcmp ( &iphdr->src, &frag_iphdr->src,
+			    sizeof ( iphdr->src ) ) == 0 ) &&
+		 ( fhdr->ident == frag_fhdr->ident ) );
 }
 
 /**
- * Calculate TCPIP checksum
+ * Get fragment offset
  *
- * @v iobuf	I/O buffer
- * @v tcpip	TCP/IP protocol
- *
- * This function constructs the pseudo header and completes the checksum in the
- * upper layer header.
+ * @v iobuf		I/O buffer
+ * @v hdrlen		Length of non-fragmentable potion of I/O buffer
+ * @ret offset		Offset
  */
-static uint16_t ipv6_tx_csum ( struct io_buffer *iobuf, uint16_t csum ) {
-	struct ip6_header *ip6hdr = iobuf->data;
+static size_t ipv6_fragment_offset ( struct io_buffer *iobuf, size_t hdrlen ) {
+	struct ipv6_fragment_header *fhdr =
+		( iobuf->data + hdrlen - sizeof ( *fhdr ) );
+
+	return ( ntohs ( fhdr->offset_more ) & IPV6_MASK_OFFSET );
+}
+
+/**
+ * Check if more fragments exist
+ *
+ * @v iobuf		I/O buffer
+ * @v hdrlen		Length of non-fragmentable potion of I/O buffer
+ * @ret more_frags	More fragments exist
+ */
+static int ipv6_more_fragments ( struct io_buffer *iobuf, size_t hdrlen ) {
+	struct ipv6_fragment_header *fhdr =
+		( iobuf->data + hdrlen - sizeof ( *fhdr ) );
+
+	return ( fhdr->offset_more & htons ( IPV6_MASK_MOREFRAGS ) );
+}
+
+/** Fragment reassembler */
+static struct fragment_reassembler ipv6_reassembler = {
+	.list = LIST_HEAD_INIT ( ipv6_reassembler.list ),
+	.is_fragment = ipv6_is_fragment,
+	.fragment_offset = ipv6_fragment_offset,
+	.more_fragments = ipv6_more_fragments,
+};
+
+/**
+ * Calculate IPv6 pseudo-header checksum
+ *
+ * @v iphdr		IPv6 header
+ * @v len		Payload length
+ * @v next_header	Next header type
+ * @v csum		Existing checksum
+ * @ret csum		Updated checksum
+ */
+static uint16_t ipv6_pshdr_chksum ( struct ipv6_header *iphdr, size_t len,
+				    int next_header, uint16_t csum ) {
 	struct ipv6_pseudo_header pshdr;
 
-	/* Calculate pseudo header */
-	memset ( &pshdr, 0, sizeof ( pshdr ) );
-	pshdr.src = ip6hdr->src;
-	pshdr.dest = ip6hdr->dest;
-	pshdr.len = htons ( iob_len ( iobuf ) - sizeof ( *ip6hdr ) );
-	pshdr.nxt_hdr = ip6hdr->nxt_hdr;
+	/* Build pseudo-header */
+	memcpy ( &pshdr.src, &iphdr->src, sizeof ( pshdr.src ) );
+	memcpy ( &pshdr.dest, &iphdr->dest, sizeof ( pshdr.dest ) );
+	pshdr.len = htonl ( len );
+	memset ( pshdr.zero, 0, sizeof ( pshdr.zero ) );
+	pshdr.next_header = next_header;
 
-	/* Update checksum value */
+	/* Update the checksum value */
 	return tcpip_continue_chksum ( csum, &pshdr, sizeof ( pshdr ) );
 }
 
 /**
- * Dump IP6 header for debugging
+ * Transmit IPv6 packet
  *
- * ip6hdr	IPv6 header
- */
-void ipv6_dump ( struct ip6_header *ip6hdr ) {
-	DBG ( "IP6 %p src %s dest %s nxt_hdr %d len %d\n", ip6hdr,
-	      inet6_ntoa ( ip6hdr->src ), inet6_ntoa ( ip6hdr->dest ),
-	      ip6hdr->nxt_hdr, ntohs ( ip6hdr->payload_len ) );
-}
-
-/**
- * Transmit IP6 packet
+ * @v iobuf		I/O buffer
+ * @v tcpip		Transport-layer protocol
+ * @v st_src		Source network-layer address
+ * @v st_dest		Destination network-layer address
+ * @v netdev		Network device to use if no route found, or NULL
+ * @v trans_csum	Transport-layer checksum to complete, or NULL
+ * @ret rc		Status
  *
- * iobuf		I/O buffer
- * tcpip	TCP/IP protocol
- * st_dest	Destination socket address
- *
- * This function prepends the IPv6 headers to the payload an transmits it.
+ * This function expects a transport-layer segment and prepends the
+ * IPv6 header
  */
 static int ipv6_tx ( struct io_buffer *iobuf,
-		     struct tcpip_protocol *tcpip,
-		     struct sockaddr_tcpip *st_src __unused,
+		     struct tcpip_protocol *tcpip_protocol,
+		     struct sockaddr_tcpip *st_src,
 		     struct sockaddr_tcpip *st_dest,
 		     struct net_device *netdev,
 		     uint16_t *trans_csum ) {
-	struct sockaddr_in6 *dest = ( struct sockaddr_in6* ) st_dest;
-	struct in6_addr next_hop;
+	struct sockaddr_in6 *sin6_src = ( ( struct sockaddr_in6 * ) st_src );
+	struct sockaddr_in6 *sin6_dest = ( ( struct sockaddr_in6 * ) st_dest );
 	struct ipv6_miniroute *miniroute;
+	struct ipv6_header *iphdr;
+	struct in6_addr *next_hop;
 	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
-	const uint8_t *ll_dest = ll_dest_buf;
+	const void *ll_dest;
+	size_t len;
 	int rc;
 
-	/* Construct the IPv6 packet */
-	struct ip6_header *ip6hdr = iob_push ( iobuf, sizeof ( *ip6hdr ) );
-	memset ( ip6hdr, 0, sizeof ( *ip6hdr) );
-	ip6hdr->ver_traffic_class_flow_label = htonl ( 0x60000000 );//IP6_VERSION;
-	ip6hdr->payload_len = htons ( iob_len ( iobuf ) - sizeof ( *ip6hdr ) );
-	ip6hdr->nxt_hdr = tcpip->tcpip_proto;
-	ip6hdr->hop_limit = IP6_HOP_LIMIT; // 255
+	/* Fill up the IPv6 header, except source address */
+	len = iob_len ( iobuf );
+	iphdr = iob_push ( iobuf, sizeof ( *iphdr ) );
+	memset ( iphdr, 0, sizeof ( *iphdr ) );
+	iphdr->ver_tc_label = htonl ( IPV6_VER );
+	iphdr->len = htons ( len );
+	iphdr->next_header = tcpip_protocol->tcpip_proto;
+	iphdr->hop_limit = IPV6_HOP_LIMIT;
+	memcpy ( &iphdr->dest, &sin6_dest->sin6_addr, sizeof ( iphdr->dest ) );
 
-	/* Determine the next hop address and interface
-	 *
-	 * TODO: Implement the routing table.
-	 */
-	next_hop = dest->sin6_addr;
-	list_for_each_entry ( miniroute, &miniroutes, list ) {
-		if ( ( memcmp ( &ip6hdr->dest, &miniroute->prefix,
-					miniroute->prefix_len ) == 0 ) ||
-		     ( IP6_EQUAL ( miniroute->gateway, ip6_none ) ) ) {
-			netdev = miniroute->netdev;
-			ip6hdr->src = miniroute->address;
-			if ( ! ( IS_UNSPECIFIED ( miniroute->gateway ) ) ) {
-				next_hop = miniroute->gateway;
-			}
-			break;
-		}
+	/* Use routing table to identify next hop and transmitting netdev */
+	next_hop = &iphdr->dest;
+	if ( sin6_src ) {
+		memcpy ( &iphdr->src, &sin6_src->sin6_addr,
+			 sizeof ( iphdr->src ) );
 	}
-	/* No network interface identified */
-	if ( !netdev ) {
-		DBG ( "No route to host %s\n", inet6_ntoa ( ip6hdr->dest ) );
+	if ( ( ! IN6_IS_ADDR_MULTICAST ( next_hop ) ) &&
+	     ( ( miniroute = ipv6_route ( ntohl ( sin6_dest->sin6_scope_id ),
+					  &next_hop ) ) != NULL ) ) {
+		memcpy ( &iphdr->src, &miniroute->address,
+			 sizeof ( iphdr->src ) );
+		netdev = miniroute->netdev;
+	}
+	if ( ! netdev ) {
+		DBGC ( ipv6col ( &iphdr->dest ), "IPv6 has no route to %s\n",
+		       inet6_ntoa ( &iphdr->dest ) );
 		rc = -ENETUNREACH;
 		goto err;
 	}
 
-	/* Complete the transport layer checksum */
-	if ( trans_csum )
-		*trans_csum = ipv6_tx_csum ( iobuf, *trans_csum );
+	/* Fix up checksums */
+	if ( trans_csum ) {
+		*trans_csum = ipv6_pshdr_chksum ( iphdr, len,
+						  tcpip_protocol->tcpip_proto,
+						  *trans_csum );
+	}
 
-	/* Print IPv6 header */
-	ipv6_dump ( ip6hdr );
-	
-	/* Resolve link layer address */
-	if ( next_hop.in6_u.u6_addr8[0] == 0xff ) {
-		ll_dest_buf[0] = 0x33;
-		ll_dest_buf[1] = 0x33;
-		ll_dest_buf[2] = next_hop.in6_u.u6_addr8[12];
-		ll_dest_buf[3] = next_hop.in6_u.u6_addr8[13];
-		ll_dest_buf[4] = next_hop.in6_u.u6_addr8[14];
-		ll_dest_buf[5] = next_hop.in6_u.u6_addr8[15];
-	} else {
-		/* Unicast address needs to be resolved by NDP */
-		if ( ( rc = ndp_resolve ( netdev, &next_hop, &ip6hdr->src,
-					  ll_dest_buf ) ) != 0 ) {
-			DBG ( "No entry for %s\n", inet6_ntoa ( next_hop ) );
+	/* Print IPv6 header for debugging */
+	DBGC2 ( ipv6col ( &iphdr->dest ), "IPv6 TX %s->",
+		inet6_ntoa ( &iphdr->src ) );
+	DBGC2 ( ipv6col ( &iphdr->dest ), "%s len %zd next %d\n",
+		inet6_ntoa ( &iphdr->dest ), len, iphdr->next_header );
+
+	/* Calculate link-layer destination address, if possible */
+	if ( IN6_IS_ADDR_MULTICAST ( next_hop ) ) {
+		/* Multicast address */
+		if ( ( rc = netdev->ll_protocol->mc_hash ( AF_INET6, next_hop,
+							   ll_dest_buf ) ) !=0){
+			DBGC ( ipv6col ( &iphdr->dest ), "IPv6 could not hash "
+			       "multicast %s: %s\n", inet6_ntoa ( next_hop ),
+			       strerror ( rc ) );
 			goto err;
+		}
+		ll_dest = ll_dest_buf;
+	} else {
+		/* Unicast address */
+		ll_dest = NULL;
+	}
+
+	/* Hand off to link layer (via NDP if applicable) */
+	if ( ll_dest ) {
+		if ( ( rc = net_tx ( iobuf, netdev, &ipv6_protocol, ll_dest,
+				     netdev->ll_addr ) ) != 0 ) {
+			DBGC ( ipv6col ( &iphdr->dest ), "IPv6 could not "
+			       "transmit packet via %s: %s\n",
+			       netdev->name, strerror ( rc ) );
+			return rc;
+		}
+	} else {
+		if ( ( rc = ndp_tx ( iobuf, netdev, next_hop, &iphdr->src,
+				     netdev->ll_addr ) ) != 0 ) {
+			DBGC ( ipv6col ( &iphdr->dest ), "IPv6 could not "
+			       "transmit packet via %s: %s\n",
+			       netdev->name, strerror ( rc ) );
+			return rc;
 		}
 	}
 
-	/* Transmit packet */
-	return net_tx ( iobuf, netdev, &ipv6_protocol, ll_dest,
-			netdev->ll_addr );
+	return 0;
 
-  err:
+ err:
 	free_iob ( iobuf );
 	return rc;
 }
 
 /**
- * Process next IP6 header
- *
- * @v iobuf	I/O buffer
- * @v nxt_hdr	Next header number
- * @v src	Source socket address
- * @v dest	Destination socket address
- *
- * Refer http://www.iana.org/assignments/ipv6-parameters for the numbers
- */
-static int ipv6_process_nxt_hdr ( struct io_buffer *iobuf,
-				  struct net_device *netdev, uint8_t nxt_hdr,
-		struct sockaddr_tcpip *src, struct sockaddr_tcpip *dest ) {
-	switch ( nxt_hdr ) {
-	case IP6_HOPBYHOP: 
-	case IP6_ROUTING: 
-	case IP6_FRAGMENT: 
-	case IP6_AUTHENTICATION: 
-	case IP6_DEST_OPTS: 
-	case IP6_ESP: 
-		DBG ( "Function not implemented for header %d\n", nxt_hdr );
-		return -ENOSYS;
-	case IP6_ICMP6: 
-		break;
-	case IP6_NO_HEADER: 
-		DBG ( "No next header\n" );
-		return 0;
-	}
-	/* Next header is not a IPv6 extension header */
-	return tcpip_rx ( iobuf, netdev, nxt_hdr, src, dest, 0 /* fixme */ );
-}
-
-/**
- * Process incoming IP6 packets
+ * Process incoming IPv6 packets
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v ll_dest		Link-layer destination address
- * @v ll_source		Link-layer source address
+ * @v ll_source		Link-layer destination source
  * @v flags		Packet flags
+ * @ret rc		Return status code
  *
- * This function processes a IPv6 packet
+ * This function expects an IPv6 network datagram. It processes the
+ * headers and sends it to the transport layer.
  */
-static int ipv6_rx ( struct io_buffer *iobuf,
-		     __unused struct net_device *netdev,
-		     __unused const void *ll_dest,
-		     __unused const void *ll_source,
-		     __unused unsigned int flags ) {
-
-	struct ip6_header *ip6hdr = iobuf->data;
+static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
+		     const void *ll_dest __unused,
+		     const void *ll_source __unused,
+		     unsigned int flags __unused ) {
+	struct ipv6_header *iphdr = iobuf->data;
+	union ipv6_extension_header *ext;
 	union {
 		struct sockaddr_in6 sin6;
 		struct sockaddr_tcpip st;
 	} src, dest;
+	uint16_t pshdr_csum;
+	size_t len;
+	size_t hdrlen;
+	size_t extlen;
+	int this_header;
+	int next_header;
+	int rc;
 
-	/* Sanity check */
-	if ( iob_len ( iobuf ) < sizeof ( *ip6hdr ) ) {
-		DBG ( "Packet too short (%zd bytes)\n", iob_len ( iobuf ) );
-		goto drop;
+	/* Sanity check the IPv6 header */
+	if ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) {
+		DBGC ( ipv6col ( &iphdr->src ), "IPv6 packet too short at %zd "
+		       "bytes (min %zd bytes)\n", iob_len ( iobuf ),
+		       sizeof ( *iphdr ) );
+		rc = -EINVAL_LEN;
+		goto err;
+	}
+	if ( ( iphdr->ver_tc_label & htonl ( IPV6_MASK_VER ) ) !=
+	     htonl ( IPV6_VER ) ) {
+		DBGC ( ipv6col ( &iphdr->src ), "IPv6 version %#08x not "
+		       "supported\n", ntohl ( iphdr->ver_tc_label ) );
+		rc = -ENOTSUP_VER;
+		goto err;
 	}
 
-	/* TODO: Verify checksum */
+	/* Truncate packet to specified length */
+	len = ntohs ( iphdr->len );
+	if ( len > iob_len ( iobuf ) ) {
+		DBGC ( ipv6col ( &iphdr->src ), "IPv6 length too long at %zd "
+		       "bytes (packet is %zd bytes)\n", len, iob_len ( iobuf ));
+		rc = -EINVAL_LEN;
+		goto err;
+	}
+	iob_unput ( iobuf, ( iob_len ( iobuf ) - len - sizeof ( *iphdr ) ) );
+	hdrlen = sizeof ( *iphdr );
 
-	/* Print IP6 header for debugging */
-	ipv6_dump ( ip6hdr );
+	/* Print IPv6 header for debugging */
+	DBGC2 ( ipv6col ( &iphdr->src ), "IPv6 RX %s<-",
+		inet6_ntoa ( &iphdr->dest ) );
+	DBGC2 ( ipv6col ( &iphdr->src ), "%s len %zd next %d\n",
+		inet6_ntoa ( &iphdr->src ), len, iphdr->next_header );
 
-	/* Check header version */
-	if ( ( ip6hdr->ver_traffic_class_flow_label & 0xf0000000 ) != 0x60000000 ) {
-		DBG ( "Invalid protocol version\n" );
-		goto drop;
+	/* Discard unicast packets not destined for us */
+	if ( ( ! ( flags & LL_MULTICAST ) ) &&
+	     ( ! ipv6_has_addr ( netdev, &iphdr->dest ) ) ) {
+		DBGC ( ipv6col ( &iphdr->src ), "IPv6 discarding non-local "
+		       "unicast packet for %s\n", inet6_ntoa ( &iphdr->dest ) );
+		rc = -EPIPE;
+		goto err;
 	}
 
-	/* Check the payload length */
-	if ( ntohs ( ip6hdr->payload_len ) > iob_len ( iobuf ) ) {
-		DBG ( "Inconsistent packet length (%d bytes)\n",
-			ip6hdr->payload_len );
-		goto drop;
+	/* Process any extension headers */
+	next_header = iphdr->next_header;
+	while ( 1 ) {
+
+		/* Extract extension header */
+		this_header = next_header;
+		ext = ( iobuf->data + hdrlen );
+		extlen = sizeof ( ext->pad );
+		if ( iob_len ( iobuf ) < ( hdrlen + extlen ) ) {
+			DBGC ( ipv6col ( &iphdr->src ), "IPv6 too short for "
+			       "extension header type %d at %zd bytes (min "
+			       "%zd bytes)\n", this_header,
+			       ( iob_len ( iobuf ) - hdrlen ), extlen );
+			rc = -EINVAL_LEN;
+			goto err;
+		}
+
+		/* Determine size of extension header (if applicable) */
+		if ( ( this_header == IPV6_HOPBYHOP ) ||
+		     ( this_header == IPV6_DESTINATION ) ||
+		     ( this_header == IPV6_ROUTING ) ) {
+			/* Length field is present */
+			extlen += ext->common.len;
+		} else if ( this_header == IPV6_FRAGMENT ) {
+			/* Length field is reserved and ignored (RFC2460) */
+		} else {
+			/* Not an extension header; assume rest is payload */
+			break;
+		}
+		if ( iob_len ( iobuf ) < ( hdrlen + extlen ) ) {
+			DBGC ( ipv6col ( &iphdr->src ), "IPv6 too short for "
+			       "extension header type %d at %zd bytes (min "
+			       "%zd bytes)\n", this_header,
+			       ( iob_len ( iobuf ) - hdrlen ), extlen );
+			rc = -EINVAL_LEN;
+			goto err;
+		}
+		hdrlen += extlen;
+		next_header = ext->common.next_header;
+		DBGC2 ( ipv6col ( &iphdr->src ), "IPv6 RX %s<-",
+			inet6_ntoa ( &iphdr->dest ) );
+		DBGC2 ( ipv6col ( &iphdr->src ), "%s ext type %d len %zd next "
+			"%d\n", inet6_ntoa ( &iphdr->src ), this_header,
+			extlen, next_header );
+
+		/* Process this extension header */
+		if ( ( this_header == IPV6_HOPBYHOP ) ||
+		     ( this_header == IPV6_DESTINATION ) ) {
+
+			/* Check that all options can be ignored */
+			if ( ( rc = ipv6_check_options ( iphdr, &ext->options,
+							 extlen ) ) != 0 )
+				goto err;
+
+		} else if ( this_header == IPV6_FRAGMENT ) {
+
+			/* Reassemble fragments */
+			iobuf = fragment_reassemble ( &ipv6_reassembler, iobuf,
+						      &hdrlen );
+			if ( ! iobuf )
+				return 0;
+			iphdr = iobuf->data;
+		}
 	}
 
-	/* Ignore the traffic class and flow control values */
-
-	/* Construct socket address */
+	/* Construct socket address, calculate pseudo-header checksum,
+	 * and hand off to transport layer
+	 */
 	memset ( &src, 0, sizeof ( src ) );
 	src.sin6.sin6_family = AF_INET6;
-	src.sin6.sin6_addr = ip6hdr->src;
+	memcpy ( &src.sin6.sin6_addr, &iphdr->src,
+		 sizeof ( src.sin6.sin6_addr ) );
+	src.sin6.sin6_scope_id = htonl ( netdev->index );
 	memset ( &dest, 0, sizeof ( dest ) );
 	dest.sin6.sin6_family = AF_INET6;
-	dest.sin6.sin6_addr = ip6hdr->dest;
+	memcpy ( &dest.sin6.sin6_addr, &iphdr->dest,
+		 sizeof ( dest.sin6.sin6_addr ) );
+	dest.sin6.sin6_scope_id = htonl ( netdev->index );
+	iob_pull ( iobuf, hdrlen );
+	pshdr_csum = ipv6_pshdr_chksum ( iphdr, iob_len ( iobuf ),
+					 next_header, TCPIP_EMPTY_CSUM );
+	if ( ( rc = tcpip_rx ( iobuf, netdev, next_header, &src.st, &dest.st,
+			       pshdr_csum ) ) != 0 ) {
+		DBGC ( ipv6col ( &src.sin6.sin6_addr ), "IPv6 received packet "
+				"rejected by stack: %s\n", strerror ( rc ) );
+		return rc;
+	}
 
-	/* Strip header */
-	iob_unput ( iobuf, iob_len ( iobuf ) - ntohs ( ip6hdr->payload_len ) -
-							sizeof ( *ip6hdr ) );
-	iob_pull ( iobuf, sizeof ( *ip6hdr ) );
+	return 0;
 
-	/* Send it to the transport layer */
-	return ipv6_process_nxt_hdr ( iobuf, netdev, ip6hdr->nxt_hdr, &src.st, &dest.st );
-
-  drop:
-	DBG ( "Packet dropped\n" );
+ err:
 	free_iob ( iobuf );
-	return -1;
+	return rc;
 }
 
 /**
- * Print a IP6 address as xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx
+ * Convert IPv6 address to standard notation
+ *
+ * @v in	IPv6 address
+ * @ret string	IPv6 address in standard notation
+ *
+ * RFC5952 defines the canonical format for IPv6 textual representation.
  */
-char * inet6_ntoa ( struct in6_addr in6 ) {
-	static char buf[40];
-	uint16_t *bytes = ( uint16_t* ) &in6;
-	sprintf ( buf, "%x:%x:%x:%x:%x:%x:%x:%x", bytes[0], bytes[1], bytes[2],
-			bytes[3], bytes[4], bytes[5], bytes[6], bytes[7] );
-	return buf;
+char * inet6_ntoa ( const struct in6_addr *in ) {
+	static char buf[41]; /* ":xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx" */
+	char *out = buf;
+	char *longest_start = NULL;
+	char *start = NULL;
+	int longest_len = 1;
+	int len = 0;
+	char *dest;
+	unsigned int i;
+	uint16_t value;
+
+	/* Format address, keeping track of longest run of zeros */
+	for ( i = 0 ; i < ( sizeof ( in->s6_addr16 ) /
+			    sizeof ( in->s6_addr16[0] ) ) ; i++ ) {
+		value = ntohs ( in->s6_addr16[i] );
+		if ( value == 0 ) {
+			if ( len++ == 0 )
+				start = out;
+			if ( len > longest_len ) {
+				longest_start = start;
+				longest_len = len;
+			}
+		} else {
+			len = 0;
+		}
+		out += sprintf ( out, ":%x", value );
+	}
+
+	/* Abbreviate longest run of zeros, if applicable */
+	if ( longest_start ) {
+		dest = strcpy ( ( longest_start + 1 ),
+				( longest_start + ( 2 * longest_len ) ) );
+		if ( dest[0] == '\0' )
+			dest[1] = '\0';
+		dest[0] = ':';
+	}
+	return ( ( longest_start == buf ) ? buf : ( buf + 1 ) );
 }
 
+/**
+ * Transcribe IPv6 address
+ *
+ * @v net_addr	IPv6 address
+ * @ret string	IPv6 address in standard notation
+ *
+ */
 static const char * ipv6_ntoa ( const void *net_addr ) {
-	return inet6_ntoa ( * ( ( struct in6_addr * ) net_addr ) );
+	return inet6_ntoa ( net_addr );
 }
 
 /** IPv6 protocol */
@@ -383,3 +695,72 @@ struct tcpip_net_protocol ipv6_tcpip_protocol __tcpip_net_protocol = {
 	.sa_family = AF_INET6,
 	.tx = ipv6_tx,
 };
+
+/**
+ * Create IPv6 network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int ipv6_probe ( struct net_device *netdev ) {
+	struct ipv6_miniroute *miniroute;
+	struct in6_addr address;
+	int prefix_len;
+	int rc;
+
+	/* Construct link-local address from EUI-64 as per RFC 2464 */
+	prefix_len = ipv6_link_local ( &address, netdev );
+	if ( prefix_len < 0 ) {
+		rc = prefix_len;
+		DBGC ( netdev, "IPv6 %s could not construct link-local "
+		       "address: %s\n", netdev->name, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Create link-local address for this network device */
+	miniroute = add_ipv6_miniroute ( netdev, &address, prefix_len, NULL );
+	if ( ! miniroute )
+		return -ENOMEM;
+
+	return 0;
+}
+
+/**
+ * Handle IPv6 network device or link state change
+ *
+ * @v netdev		Network device
+ */
+static void ipv6_notify ( struct net_device *netdev __unused ) {
+
+	/* Nothing to do */
+}
+
+/**
+ * Destroy IPv6 network device
+ *
+ * @v netdev		Network device
+ */
+static void ipv6_remove ( struct net_device *netdev ) {
+	struct ipv6_miniroute *miniroute;
+	struct ipv6_miniroute *tmp;
+
+	/* Delete all miniroutes for this network device */
+	list_for_each_entry_safe ( miniroute, tmp, &ipv6_miniroutes, list ) {
+		if ( miniroute->netdev == netdev )
+			del_ipv6_miniroute ( miniroute );
+	}
+}
+
+/** IPv6 network device driver */
+struct net_driver ipv6_driver __net_driver = {
+	.name = "IPv6",
+	.probe = ipv6_probe,
+	.notify = ipv6_notify,
+	.remove = ipv6_remove,
+};
+
+/* Drag in ICMPv6 */
+REQUIRE_OBJECT ( icmpv6 );
+
+/* Drag in NDP */
+REQUIRE_OBJECT ( ndp );

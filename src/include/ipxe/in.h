@@ -50,6 +50,13 @@ struct in6_addr {
 #define s6_addr32       in6_u.u6_addr32
 };
 
+#define IN6_IS_ADDR_MULTICAST( addr )					\
+	( *( ( const uint8_t * ) (addr) ) == 0xff )
+
+#define IN6_IS_ADDR_LINKLOCAL( addr )					\
+	( ( *( ( const uint16_t * ) (addr) ) & htons ( 0xffc0 ) ) ==	\
+	  htonl ( 0xfe80 ) )
+
 /**
  * IPv4 socket address
  */
@@ -90,9 +97,13 @@ struct sockaddr_in6 {
 	uint16_t sin6_flags;
 	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
 	uint16_t sin6_port;
-        uint32_t        sin6_flowinfo;  /* Flow number */
-        struct in6_addr sin6_addr;      /* 128-bit destination address */
-        uint32_t        sin6_scope_id;  /* Scope ID */
+	/** Scope ID
+	 *
+	 * For link-local addresses, this is the network device index.
+	 */
+        uint16_t sin6_scope_id;
+	/** IPv6 address */
+        struct in6_addr sin6_addr;
 	/** Padding
 	 *
 	 * This ensures that a struct @c sockaddr_in6 is large
@@ -103,20 +114,12 @@ struct sockaddr_in6 {
 		  ( sizeof ( sa_family_t ) /* sin6_family */ +
 		    sizeof ( uint16_t ) /* sin6_flags */ +
 		    sizeof ( uint16_t ) /* sin6_port */ +
-		    sizeof ( uint32_t ) /* sin6_flowinfo */ +
-		    sizeof ( struct in6_addr ) /* sin6_addr */ +
-		    sizeof ( uint32_t ) /* sin6_scope_id */ ) ];
+		    sizeof ( uint16_t ) /* sin6_scope_id */ +
+		    sizeof ( struct in6_addr ) /* sin6_addr */ ) ];
 } __attribute__ (( may_alias ));
 
 extern int inet_aton ( const char *cp, struct in_addr *inp );
 extern char * inet_ntoa ( struct in_addr in );
-
-/* Adding the following for IP6 support
- *
-
-extern int inet6_aton ( const char *cp, struct in6_addr *inp );
-extern char * inet6_ntoa ( struct in_addr in );
-
- */
+extern char * inet6_ntoa ( const struct in6_addr *in6 );
 
 #endif	/* _IPXE_IN_H */

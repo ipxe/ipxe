@@ -22,3 +22,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #ifdef NET_PROTO_IPV4
 REQUIRE_OBJECT ( route_ipv4 );
 #endif
+#ifdef NET_PROTO_IPV6
+REQUIRE_OBJECT ( route_ipv6 );
+#endif

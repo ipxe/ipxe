@@ -290,7 +290,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 			DBGC ( sin_dest->sin_addr, "IPv4 could not hash "
 			       "multicast %s: %s\n",
 			       inet_ntoa ( next_hop ), strerror ( rc ) );
-			return rc;
+			goto err;
 		}
 		ll_dest = ll_dest_buf;
 	} else {
