@@ -14,7 +14,7 @@
 #include <ipxe/tcpip.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/settings.h>
-#include <ipxe/timer.h>
+#include <ipxe/fragment.h>
 
 /** @file
  *
@@ -29,12 +29,6 @@ static uint8_t next_ident_high = 0;
 
 /** List of IPv4 miniroutes */
 struct list_head ipv4_miniroutes = LIST_HEAD_INIT ( ipv4_miniroutes );
-
-/** List of fragment reassembly buffers */
-static LIST_HEAD ( ipv4_fragments );
-
-/** Fragment reassembly timeout */
-#define IP_FRAG_TIMEOUT ( TICKS_PER_SEC / 2 )
 
 /**
  * Add IPv4 minirouting table entry
@@ -133,130 +127,58 @@ static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
 }
 
 /**
- * Expire fragment reassembly buffer
+ * Check if IPv4 fragment matches fragment reassembly buffer
  *
- * @v timer		Retry timer
- * @v fail		Failure indicator
+ * @v fragment		Fragment reassembly buffer
+ * @v iobuf		I/O buffer
+ * @v hdrlen		Length of non-fragmentable potion of I/O buffer
+ * @ret is_fragment	Fragment matches this reassembly buffer
  */
-static void ipv4_fragment_expired ( struct retry_timer *timer,
-				    int fail __unused ) {
-	struct ipv4_fragment *frag =
-		container_of ( timer, struct ipv4_fragment, timer );
-	struct iphdr *iphdr = frag->iobuf->data;
+static int ipv4_is_fragment ( struct fragment *fragment,
+			      struct io_buffer *iobuf,
+			      size_t hdrlen __unused ) {
+	struct iphdr *frag_iphdr = fragment->iobuf->data;
+	struct iphdr *iphdr = iobuf->data;
 
-	DBGC ( iphdr->src, "IPv4 fragment %04x expired\n",
-	       ntohs ( iphdr->ident ) );
-	free_iob ( frag->iobuf );
-	list_del ( &frag->list );
-	free ( frag );
+	return ( ( iphdr->src.s_addr == frag_iphdr->src.s_addr ) &&
+		 ( iphdr->ident == frag_iphdr->ident ) );
 }
 
 /**
- * Find matching fragment reassembly buffer
- *
- * @v iphdr		IPv4 header
- * @ret frag		Fragment reassembly buffer, or NULL
- */
-static struct ipv4_fragment * ipv4_fragment ( struct iphdr *iphdr ) {
-	struct ipv4_fragment *frag;
-	struct iphdr *frag_iphdr;
-
-	list_for_each_entry ( frag, &ipv4_fragments, list ) {
-		frag_iphdr = frag->iobuf->data;
-
-		if ( ( iphdr->src.s_addr == frag_iphdr->src.s_addr ) &&
-		     ( iphdr->ident == frag_iphdr->ident ) ) {
-			return frag;
-		}
-	}
-
-	return NULL;
-}
-
-/**
- * Fragment reassembler
+ * Get IPv4 fragment offset
  *
  * @v iobuf		I/O buffer
- * @ret iobuf		Reassembled packet, or NULL
+ * @v hdrlen		Length of non-fragmentable potion of I/O buffer
+ * @ret offset		Offset
  */
-static struct io_buffer * ipv4_reassemble ( struct io_buffer *iobuf ) {
+static size_t ipv4_fragment_offset ( struct io_buffer *iobuf,
+				     size_t hdrlen __unused ) {
 	struct iphdr *iphdr = iobuf->data;
-	size_t offset = ( ( ntohs ( iphdr->frags ) & IP_MASK_OFFSET ) << 3 );
-	unsigned int more_frags = ( iphdr->frags & htons ( IP_MASK_MOREFRAGS ));
-	size_t hdrlen = ( ( iphdr->verhdrlen & IP_MASK_HLEN ) * 4 );
-	struct ipv4_fragment *frag;
-	size_t expected_offset;
-	struct io_buffer *new_iobuf;
 
-	/* Find matching fragment reassembly buffer, if any */
-	frag = ipv4_fragment ( iphdr );
-
-	/* Drop out-of-order fragments */
-	expected_offset = ( frag ? frag->offset : 0 );
-	if ( offset != expected_offset ) {
-		DBGC ( iphdr->src, "IPv4 dropping out-of-sequence fragment "
-		       "%04x (%zd+%zd, expected %zd)\n",
-		       ntohs ( iphdr->ident ), offset,
-		      ( iob_len ( iobuf ) - hdrlen ), expected_offset );
-		goto drop;
-	}
-
-	/* Create or extend fragment reassembly buffer as applicable */
-	if ( frag == NULL ) {
-
-		/* Create new fragment reassembly buffer */
-		frag = zalloc ( sizeof ( *frag ) );
-		if ( ! frag )
-			goto drop;
-		list_add ( &frag->list, &ipv4_fragments );
-		frag->iobuf = iobuf;
-		frag->offset = ( iob_len ( iobuf ) - hdrlen );
-		timer_init ( &frag->timer, ipv4_fragment_expired, NULL );
-
-	} else {
-
-		/* Extend reassembly buffer */
-		iob_pull ( iobuf, hdrlen );
-		new_iobuf = alloc_iob ( iob_len ( frag->iobuf ) +
-					iob_len ( iobuf ) );
-		if ( ! new_iobuf ) {
-			DBGC ( iphdr->src, "IPv4 could not extend reassembly "
-			       "buffer to %zd bytes\n",
-			       iob_len ( frag->iobuf ) + iob_len ( iobuf ) );
-			goto drop;
-		}
-		memcpy ( iob_put ( new_iobuf, iob_len ( frag->iobuf ) ),
-			 frag->iobuf->data, iob_len ( frag->iobuf ) );
-		memcpy ( iob_put ( new_iobuf, iob_len ( iobuf ) ),
-			 iobuf->data, iob_len ( iobuf ) );
-		free_iob ( frag->iobuf );
-		frag->iobuf = new_iobuf;
-		frag->offset += iob_len ( iobuf );
-		free_iob ( iobuf );
-		iphdr = frag->iobuf->data;
-		iphdr->len = ntohs ( iob_len ( frag->iobuf ) );
-
-		/* Stop fragment reassembly timer */
-		stop_timer ( &frag->timer );
-
-		/* If this is the final fragment, return it */
-		if ( ! more_frags ) {
-			iobuf = frag->iobuf;
-			list_del ( &frag->list );
-			free ( frag );
-			return iobuf;
-		}
-	}
-
-	/* (Re)start fragment reassembly timer */
-	start_timer_fixed ( &frag->timer, IP_FRAG_TIMEOUT );
-
-	return NULL;
-
- drop:
-	free_iob ( iobuf );
-	return NULL;
+	return ( ( ntohs ( iphdr->frags ) & IP_MASK_OFFSET ) << 3 );
 }
+
+/**
+ * Check if more fragments exist
+ *
+ * @v iobuf		I/O buffer
+ * @v hdrlen		Length of non-fragmentable potion of I/O buffer
+ * @ret more_frags	More fragments exist
+ */
+static int ipv4_more_fragments ( struct io_buffer *iobuf,
+				 size_t hdrlen __unused ) {
+	struct iphdr *iphdr = iobuf->data;
+
+	return ( iphdr->frags & htons ( IP_MASK_MOREFRAGS ) );
+}
+
+/** IPv4 fragment reassembler */
+static struct fragment_reassembler ipv4_reassembler = {
+	.list = LIST_HEAD_INIT ( ipv4_reassembler.list ),
+	.is_fragment = ipv4_is_fragment,
+	.fragment_offset = ipv4_fragment_offset,
+	.more_fragments = ipv4_more_fragments,
+};
 
 /**
  * Add IPv4 pseudo-header checksum to existing checksum
@@ -526,14 +448,14 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 
 	/* Perform fragment reassembly if applicable */
 	if ( iphdr->frags & htons ( IP_MASK_OFFSET | IP_MASK_MOREFRAGS ) ) {
-		/* Pass the fragment to ipv4_reassemble() which returns
+		/* Pass the fragment to fragment_reassemble() which returns
 		 * either a fully reassembled I/O buffer or NULL.
 		 */
-		iobuf = ipv4_reassemble ( iobuf );
+		iobuf = fragment_reassemble ( &ipv4_reassembler, iobuf,
+					      &hdrlen );
 		if ( ! iobuf )
 			return 0;
 		iphdr = iobuf->data;
-		hdrlen = ( ( iphdr->verhdrlen & IP_MASK_HLEN ) * 4 );
 	}
 
 	/* Construct socket addresses, calculate pseudo-header
