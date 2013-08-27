@@ -216,6 +216,9 @@ static int tap_probe(struct linux_device *device, struct linux_device_request *r
 	}
 
 	nic->interface = if_setting->value;
+	snprintf ( device->dev.name, sizeof ( device->dev.name ), "%s",
+		   nic->interface );
+	device->dev.desc.bus_type = BUS_TYPE_TAP;
 	if_setting->applied = 1;
 
 	/* Apply rest of the settings */

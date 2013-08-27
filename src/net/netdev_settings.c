@@ -120,6 +120,7 @@ static int netdev_fetch_bustype ( struct net_device *netdev, void *data,
 		[BUS_TYPE_EISA] = "EISA",
 		[BUS_TYPE_MCA] = "MCA",
 		[BUS_TYPE_ISA] = "ISA",
+		[BUS_TYPE_TAP] = "TAP",
 	};
 	struct device_description *desc = &netdev->dev->desc;
 	const char *bustype;
@@ -127,7 +128,7 @@ static int netdev_fetch_bustype ( struct net_device *netdev, void *data,
 	assert ( desc->bus_type < ( sizeof ( bustypes ) /
 				    sizeof ( bustypes[0] ) ) );
 	bustype = bustypes[desc->bus_type];
-	assert ( bustypes != NULL );
+	assert ( bustype != NULL );
 	strncpy ( data, bustype, len );
 	return strlen ( bustype );
 }
