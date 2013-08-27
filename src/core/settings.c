@@ -2247,29 +2247,8 @@ struct setting priority_setting __setting ( SETTING_MISC ) = {
  ******************************************************************************
  */
 
-/** A built-in setting operation */
-struct builtin_setting_operation {
-	/** Setting */
-	struct setting *setting;
-	/** Fetch setting value
-	 *
-	 * @v data		Buffer to fill with setting data
-	 * @v len		Length of buffer
-	 * @ret len		Length of setting data, or negative error
-	 */
-	int ( * fetch ) ( void *data, size_t len );
-};
-
 /** Built-in setting scope */
-static struct settings_scope builtin_scope;
-
-/** Error number setting */
-struct setting errno_setting __setting ( SETTING_MISC ) = {
-	.name = "errno",
-	.description = "Last error",
-	.type = &setting_type_uint32,
-	.scope = &builtin_scope,
-};
+struct settings_scope builtin_scope;
 
 /**
  * Fetch error number setting
@@ -2289,12 +2268,18 @@ static int errno_fetch ( void *data, size_t len ) {
 	return sizeof ( content );
 }
 
-/** Build architecture setting */
-struct setting buildarch_setting __setting ( SETTING_MISC ) = {
-	.name = "buildarch",
-	.description = "Build architecture",
-	.type = &setting_type_string,
+/** Error number setting */
+struct setting errno_setting __setting ( SETTING_MISC ) = {
+	.name = "errno",
+	.description = "Last error",
+	.type = &setting_type_uint32,
 	.scope = &builtin_scope,
+};
+
+/** Error number built-in setting */
+struct builtin_setting errno_builtin_setting __builtin_setting = {
+	.setting = &errno_setting,
+	.fetch = errno_fetch,
 };
 
 /**
@@ -2311,12 +2296,18 @@ static int buildarch_fetch ( void *data, size_t len ) {
 	return ( sizeof ( buildarch ) - 1 /* NUL */ );
 }
 
-/** Platform setting */
-struct setting platform_setting __setting ( SETTING_MISC ) = {
-	.name = "platform",
-	.description = "Platform",
+/** Build architecture setting */
+struct setting buildarch_setting __setting ( SETTING_MISC ) = {
+	.name = "buildarch",
+	.description = "Build architecture",
 	.type = &setting_type_string,
 	.scope = &builtin_scope,
+};
+
+/** Build architecture built-in setting */
+struct builtin_setting buildarch_builtin_setting __builtin_setting = {
+	.setting = &buildarch_setting,
+	.fetch = buildarch_fetch,
 };
 
 /**
@@ -2333,12 +2324,18 @@ static int platform_fetch ( void *data, size_t len ) {
 	return ( sizeof ( platform ) - 1 /* NUL */ );
 }
 
-/** Version setting */
-struct setting version_setting __setting ( SETTING_MISC ) = {
-	.name = "version",
-	.description = "Version",
+/** Platform setting */
+struct setting platform_setting __setting ( SETTING_MISC ) = {
+	.name = "platform",
+	.description = "Platform",
 	.type = &setting_type_string,
 	.scope = &builtin_scope,
+};
+
+/** Platform built-in setting */
+struct builtin_setting platform_builtin_setting __builtin_setting = {
+	.setting = &platform_setting,
+	.fetch = platform_fetch,
 };
 
 /**
@@ -2353,12 +2350,18 @@ static int version_fetch ( void *data, size_t len ) {
 	return ( strlen ( product_version ) );
 }
 
-/** List of built-in setting operations */
-static struct builtin_setting_operation builtin_setting_operations[] = {
-	{ &errno_setting, errno_fetch },
-	{ &buildarch_setting, buildarch_fetch },
-	{ &platform_setting, platform_fetch },
-	{ &version_setting, version_fetch },
+/** Version setting */
+struct setting version_setting __setting ( SETTING_MISC ) = {
+	.name = "version",
+	.description = "Version",
+	.type = &setting_type_string,
+	.scope = &builtin_scope,
+};
+
+/** Version built-in setting */
+struct builtin_setting version_builtin_setting __builtin_setting = {
+	.setting = &version_setting,
+	.fetch = version_fetch,
 };
 
 /**
@@ -2373,12 +2376,9 @@ static struct builtin_setting_operation builtin_setting_operations[] = {
 static int builtin_fetch ( struct settings *settings __unused,
 			   struct setting *setting,
 			   void *data, size_t len ) {
-	struct builtin_setting_operation *builtin;
-	unsigned int i;
+	struct builtin_setting *builtin;
 
-	for ( i = 0 ; i < ( sizeof ( builtin_setting_operations ) /
-			    sizeof ( builtin_setting_operations[0] ) ) ; i++ ) {
-		builtin = &builtin_setting_operations[i];
+	for_each_table_entry ( builtin, BUILTIN_SETTINGS ) {
 		if ( setting_cmp ( setting, builtin->setting ) == 0 )
 			return builtin->fetch ( data, len );
 	}

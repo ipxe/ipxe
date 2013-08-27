@@ -253,6 +253,28 @@ struct settings_applicator {
 /** Declare a settings applicator */
 #define __settings_applicator __table_entry ( SETTINGS_APPLICATORS, 01 )
 
+/** A built-in setting */
+struct builtin_setting {
+	/** Setting */
+	struct setting *setting;
+	/** Fetch setting value
+	 *
+	 * @v data		Buffer to fill with setting data
+	 * @v len		Length of buffer
+	 * @ret len		Length of setting data, or negative error
+	 */
+	int ( * fetch ) ( void *data, size_t len );
+};
+
+/** Built-in settings table */
+#define BUILTIN_SETTINGS __table ( struct builtin_setting, "builtin_settings" )
+
+/** Declare a built-in setting */
+#define __builtin_setting __table_entry ( BUILTIN_SETTINGS, 01 )
+
+/** Built-in setting scope */
+extern struct settings_scope builtin_scope;
+
 /**
  * A generic settings block
  *
