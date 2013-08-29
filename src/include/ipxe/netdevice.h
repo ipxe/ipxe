@@ -300,6 +300,8 @@ struct net_device {
 	struct list_head list;
 	/** List of open network devices */
 	struct list_head open_list;
+	/** Index of this network device */
+	unsigned int index;
 	/** Name of this network device */
 	char name[12];
 	/** Underlying hardware device */

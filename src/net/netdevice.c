@@ -498,10 +498,11 @@ int register_netdev ( struct net_device *netdev ) {
 	uint32_t seed;
 	int rc;
 
-	/* Create device name */
+	/* Record device index and create device name */
+	netdev->index = ifindex++;
 	if ( netdev->name[0] == '\0' ) {
 		snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
-			   ifindex++ );
+			   netdev->index );
 	}
 
 	/* Set initial link-layer address, if not already set */
