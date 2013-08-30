@@ -175,8 +175,17 @@ struct ll_protocol {
 	 *
 	 * @v ll_addr		Link-layer address
 	 * @v eth_addr		Ethernet-compatible address to fill in
+	 * @ret rc		Return status code
 	 */
 	int ( * eth_addr ) ( const void *ll_addr, void *eth_addr );
+	/**
+	 * Generate EUI-64 address
+	 *
+	 * @v ll_addr		Link-layer address
+	 * @v eui64		EUI-64 address to fill in
+	 * @ret rc		Return status code
+	 */
+	int ( * eui64 ) ( const void *ll_addr, void *eui64 );
 	/** Link-layer protocol
 	 *
 	 * This is an ARPHRD_XXX constant, in network byte order.

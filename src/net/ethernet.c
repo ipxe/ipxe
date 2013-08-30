@@ -165,6 +165,21 @@ int eth_eth_addr ( const void *ll_addr, void *eth_addr ) {
 	return 0;
 }
 
+/**
+ * Generate EUI-64 address
+ *
+ * @v ll_addr		Link-layer address
+ * @v eui64		EUI-64 address to fill in
+ * @ret rc		Return status code
+ */
+int eth_eui64 ( const void *ll_addr, void *eui64 ) {
+
+	memcpy ( ( eui64 + 0 ), ( ll_addr + 0 ), 3 );
+	memcpy ( ( eui64 + 5 ), ( ll_addr + 3 ), 3 );
+	*( ( uint16_t * ) ( eui64 + 3 ) ) = htons ( 0xfffe );
+	return 0;
+}
+
 /** Ethernet protocol */
 struct ll_protocol ethernet_protocol __ll_protocol = {
 	.name		= "Ethernet",
@@ -178,6 +193,7 @@ struct ll_protocol ethernet_protocol __ll_protocol = {
 	.ntoa		= eth_ntoa,
 	.mc_hash	= eth_mc_hash,
 	.eth_addr	= eth_eth_addr,
+	.eui64		= eth_eui64,
 };
 
 /**

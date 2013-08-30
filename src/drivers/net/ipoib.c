@@ -265,6 +265,7 @@ struct ll_protocol ipoib_protocol __ll_protocol = {
 	.ntoa		= eth_ntoa,
 	.mc_hash	= eth_mc_hash,
 	.eth_addr	= eth_eth_addr,
+	.eui64		= eth_eui64,
 	.flags		= LL_NAME_ONLY,
 };
 

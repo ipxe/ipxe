@@ -91,6 +91,7 @@ extern const char * eth_ntoa ( const void *ll_addr );
 extern int eth_mc_hash ( unsigned int af, const void *net_addr,
 			 void *ll_addr );
 extern int eth_eth_addr ( const void *ll_addr, void *eth_addr );
+extern int eth_eui64 ( const void *ll_addr, void *eui64 );
 extern struct net_device * alloc_etherdev ( size_t priv_size );
 
 #endif /* _IPXE_ETHERNET_H */
