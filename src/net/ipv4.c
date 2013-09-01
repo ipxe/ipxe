@@ -469,7 +469,7 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	dest.sin.sin_addr = iphdr->dest;
 	pshdr_csum = ipv4_pshdr_chksum ( iobuf, TCPIP_EMPTY_CSUM );
 	iob_pull ( iobuf, hdrlen );
-	if ( ( rc = tcpip_rx ( iobuf, iphdr->protocol, &src.st,
+	if ( ( rc = tcpip_rx ( iobuf, netdev, iphdr->protocol, &src.st,
 			       &dest.st, pshdr_csum ) ) != 0 ) {
 		DBGC ( src.sin.sin_addr, "IPv4 received packet rejected by "
 		       "stack: %s\n", strerror ( rc ) );

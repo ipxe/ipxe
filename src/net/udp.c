@@ -247,12 +247,15 @@ static struct udp_connection * udp_demux ( struct sockaddr_tcpip *local ) {
  * Process a received packet
  *
  * @v iobuf		I/O buffer
+ * @v netdev		Network device
  * @v st_src		Partially-filled source address
  * @v st_dest		Partially-filled destination address
  * @v pshdr_csum	Pseudo-header checksum
  * @ret rc		Return status code
  */
-static int udp_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src,
+static int udp_rx ( struct io_buffer *iobuf,
+		    struct net_device *netdev __unused,
+		    struct sockaddr_tcpip *st_src,
 		    struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum ) {
 	struct udp_header *udphdr = iobuf->data;
 	struct udp_connection *udp;

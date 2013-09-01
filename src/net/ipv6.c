@@ -260,7 +260,8 @@ static int ipv6_tx ( struct io_buffer *iobuf,
  *
  * Refer http://www.iana.org/assignments/ipv6-parameters for the numbers
  */
-static int ipv6_process_nxt_hdr ( struct io_buffer *iobuf, uint8_t nxt_hdr,
+static int ipv6_process_nxt_hdr ( struct io_buffer *iobuf,
+				  struct net_device *netdev, uint8_t nxt_hdr,
 		struct sockaddr_tcpip *src, struct sockaddr_tcpip *dest ) {
 	switch ( nxt_hdr ) {
 	case IP6_HOPBYHOP: 
@@ -278,7 +279,7 @@ static int ipv6_process_nxt_hdr ( struct io_buffer *iobuf, uint8_t nxt_hdr,
 		return 0;
 	}
 	/* Next header is not a IPv6 extension header */
-	return tcpip_rx ( iobuf, nxt_hdr, src, dest, 0 /* fixme */ );
+	return tcpip_rx ( iobuf, netdev, nxt_hdr, src, dest, 0 /* fixme */ );
 }
 
 /**
@@ -344,7 +345,7 @@ static int ipv6_rx ( struct io_buffer *iobuf,
 	iob_pull ( iobuf, sizeof ( *ip6hdr ) );
 
 	/* Send it to the transport layer */
-	return ipv6_process_nxt_hdr ( iobuf, ip6hdr->nxt_hdr, &src.st, &dest.st );
+	return ipv6_process_nxt_hdr ( iobuf, netdev, ip6hdr->nxt_hdr, &src.st, &dest.st );
 
   drop:
 	DBG ( "Packet dropped\n" );
