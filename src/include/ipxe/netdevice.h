@@ -44,7 +44,7 @@ struct device;
 #define MAX_LL_HEADER_LEN 36
 
 /** Maximum length of a network-layer address */
-#define MAX_NET_ADDR_LEN 4
+#define MAX_NET_ADDR_LEN 16
 
 /** Maximum length of a network-layer header
  *
