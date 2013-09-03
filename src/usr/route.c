@@ -19,28 +19,26 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <stdio.h>
 #include <ipxe/netdevice.h>
-#include <ipxe/ip.h>
 #include <usr/route.h>
 
 /** @file
  *
- * Routing table management
+ * Routing management
  *
  */
 
+/**
+ * Print routing table
+ *
+ */
 void route ( void ) {
-	struct ipv4_miniroute *miniroute;
+	struct net_device *netdev;
+	struct routing_family *family;
 
-	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
-		printf ( "%s: %s/", miniroute->netdev->name,
-			 inet_ntoa ( miniroute->address ) );
-		printf ( "%s", inet_ntoa ( miniroute->netmask ) );
-		if ( miniroute->gateway.s_addr )
-			printf ( " gw %s", inet_ntoa ( miniroute->gateway ) );
-		if ( ! netdev_is_open ( miniroute->netdev ) )
-			printf ( " (inaccessible)" );
-		printf ( "\n" );
+	for_each_netdev ( netdev ) {
+		for_each_table_entry ( family, ROUTING_FAMILIES ) {
+			family->print ( netdev );
+		}
 	}
 }
