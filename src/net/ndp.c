@@ -352,6 +352,9 @@ static int ndp_rx ( struct io_buffer *iobuf,
 		remaining -= option_len;
 	}
 
+	/* Success */
+	rc = 0;
+
  done:
 	free_iob ( iobuf );
 	return rc;
