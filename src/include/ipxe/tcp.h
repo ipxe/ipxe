@@ -316,10 +316,19 @@ struct tcp_options {
 /**
  * Path MTU
  *
- * We really ought to implement Path MTU discovery.  Until we do,
- * anything with a path MTU greater than this may fail.
+ * IPv6 requires all data link layers to support a datagram size of
+ * 1280 bytes.  We choose to use this as our maximum transmitted
+ * datagram size, on the assumption that any practical link layer we
+ * encounter will allow this size.  This is a very conservative
+ * assumption in practice, but the impact of making such a
+ * conservative assumption is insignificant since the amount of data
+ * that we transmit (rather than receive) is negligible.
+ *
+ * We allow space within this 1280 bytes for an IPv6 header, a TCP
+ * header, and a (padded) TCP timestamp option.
  */
-#define TCP_PATH_MTU 1460
+#define TCP_PATH_MTU							\
+	( 1280 - 40 /* IPv6 */ - 20 /* TCP */ - 12 /* TCP timestamp */ )
 
 /**
  * Advertised TCP MSS
