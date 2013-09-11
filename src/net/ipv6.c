@@ -623,10 +623,79 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 }
 
 /**
+ * Parse IPv6 address
+ *
+ * @v string		IPv6 address string
+ * @ret in		IPv6 address to fill in
+ * @ret rc		Return status code
+ */
+int inet6_aton ( const char *string, struct in6_addr *in ) {
+	uint16_t *word = in->s6_addr16;
+	uint16_t *end = ( word + ( sizeof ( in->s6_addr16 ) /
+				   sizeof ( in->s6_addr16[0] ) ) );
+	uint16_t *pad = NULL;
+	const char *nptr = string;
+	char *endptr;
+	unsigned long value;
+	size_t pad_len;
+	size_t move_len;
+
+	/* Parse string */
+	while ( 1 ) {
+
+		/* Parse current word */
+		value = strtoul ( nptr, &endptr, 16 );
+		if ( value > 0xffff ) {
+			DBG ( "IPv6 invalid word value %#lx in \"%s\"\n",
+			      value, string );
+			return -EINVAL;
+		}
+		*(word++) = htons ( value );
+
+		/* Parse separator */
+		if ( ! *endptr )
+			break;
+		if ( *endptr != ':' ) {
+			DBG ( "IPv6 invalid separator '%c' in \"%s\"\n",
+			      *endptr, string );
+			return -EINVAL;
+		}
+		if ( ( endptr == nptr ) && ( nptr != string ) ) {
+			if ( pad ) {
+				DBG ( "IPv6 invalid multiple \"::\" in "
+				      "\"%s\"\n", string );
+				return -EINVAL;
+			}
+			pad = word;
+		}
+		nptr = ( endptr + 1 );
+
+		/* Check for overrun */
+		if ( word == end ) {
+			DBG ( "IPv6 too many words in \"%s\"\n", string );
+			return -EINVAL;
+		}
+	}
+
+	/* Insert padding if specified */
+	if ( pad ) {
+		move_len = ( ( ( void * ) word ) - ( ( void * ) pad ) );
+		pad_len = ( ( ( void * ) end ) - ( ( void * ) word ) );
+		memmove ( ( ( ( void * ) pad ) + pad_len ), pad, move_len );
+		memset ( pad, 0, pad_len );
+	} else if ( word != end ) {
+		DBG ( "IPv6 underlength address \"%s\"\n", string );
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * Convert IPv6 address to standard notation
  *
- * @v in	IPv6 address
- * @ret string	IPv6 address in standard notation
+ * @v in		IPv6 address
+ * @ret string		IPv6 address string in canonical format
  *
  * RFC5952 defines the canonical format for IPv6 textual representation.
  */
@@ -672,8 +741,8 @@ char * inet6_ntoa ( const struct in6_addr *in ) {
 /**
  * Transcribe IPv6 address
  *
- * @v net_addr	IPv6 address
- * @ret string	IPv6 address in standard notation
+ * @v net_addr		IPv6 address
+ * @ret string		IPv6 address in standard notation
  *
  */
 static const char * ipv6_ntoa ( const void *net_addr ) {

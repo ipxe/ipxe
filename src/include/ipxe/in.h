@@ -120,6 +120,7 @@ struct sockaddr_in6 {
 
 extern int inet_aton ( const char *cp, struct in_addr *inp );
 extern char * inet_ntoa ( struct in_addr in );
-extern char * inet6_ntoa ( const struct in6_addr *in6 );
+extern int inet6_aton ( const char *string, struct in6_addr *in );
+extern char * inet6_ntoa ( const struct in6_addr *in );
 
 #endif	/* _IPXE_IN_H */
