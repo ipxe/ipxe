@@ -132,6 +132,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define IMAGE_TRUST_CMD	/* Image trust management commands */
 //#define PCI_CMD		/* PCI commands */
 //#define PARAM_CMD		/* Form parameter commands */
+//#define NEIGHBOUR_CMD		/* Neighbour management commands */
 
 /*
  * ROM-specific options

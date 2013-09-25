@@ -269,6 +269,9 @@ REQUIRE_OBJECT ( pci_cmd );
 #ifdef PARAM_CMD
 REQUIRE_OBJECT ( param_cmd );
 #endif
+#ifdef NEIGHBOUR_CMD
+REQUIRE_OBJECT ( neighbour_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
