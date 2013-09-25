@@ -80,6 +80,8 @@ int call_bootsector ( unsigned int segment, unsigned int offset,
 					   "movw %%ss, %%ax\n\t"
 					   "movw %%ax, %%cs:saved_ss\n\t"
 					   "movw %%sp, %%cs:saved_sp\n\t"
+					   /* Save frame pointer (gcc bug) */
+					   "movl %%ebp, %%cs:saved_ebp\n\t"
 					   /* Prepare jump to boot sector */
 					   "pushw %%bx\n\t"
 					   "pushw %%di\n\t"
@@ -99,11 +101,14 @@ int call_bootsector ( unsigned int segment, unsigned int offset,
 					   "sti\n\t"
 					   "lret\n\t"
 					   /* Preserved variables */
+					   "\nsaved_ebp: .long 0\n\t"
 					   "\nsaved_ss: .word 0\n\t"
 					   "\nsaved_sp: .word 0\n\t"
 					   "\nsaved_retaddr: .word 0\n\t"
 					   /* Boot failure return point */
 					   "\nbootsector_exec_fail:\n\t"
+					   /* Restore frame pointer (gcc bug) */
+					   "movl %%cs:saved_ebp, %%ebp\n\t"
 					   /* Restore stack pointer */
 					   "movw %%cs:saved_ss, %%ax\n\t"
 					   "movw %%ax, %%ss\n\t"
@@ -114,7 +119,7 @@ int call_bootsector ( unsigned int segment, unsigned int offset,
 			         "=d" ( discard_d )
 			       : "b" ( segment ), "D" ( offset ),
 			         "d" ( drive )
-			       : "eax", "ecx", "esi", "ebp" );
+			       : "eax", "ecx", "esi" );
 
 	DBG ( "Booted disk returned via INT 18 or 19\n" );
 

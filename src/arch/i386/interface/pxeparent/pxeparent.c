@@ -143,16 +143,18 @@ int pxeparent_call ( SEGOFF16_t entry, unsigned int function,
 	/* Call real-mode entry point.  This calling convention will
 	 * work with both the !PXE and the PXENV+ entry points.
 	 */
-	__asm__ __volatile__ ( REAL_CODE ( "pushw %%es\n\t"
+	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
+					   "pushw %%es\n\t"
 					   "pushw %%di\n\t"
 					   "pushw %%bx\n\t"
 					   "lcall *pxeparent_entry_point\n\t"
-					   "addw $6, %%sp\n\t" )
+					   "addw $6, %%sp\n\t"
+					   "popl %%ebp\n\t" /* gcc bug */ )
 			       : "=a" ( exit ), "=b" ( discard_b ),
 			         "=D" ( discard_D )
 			       : "b" ( function ),
 			         "D" ( __from_data16 ( &pxeparent_params ) )
-			       : "ecx", "edx", "esi", "ebp" );
+			       : "ecx", "edx", "esi" );
 
 	/* Determine return status code based on PXENV_EXIT and
 	 * PXENV_STATUS

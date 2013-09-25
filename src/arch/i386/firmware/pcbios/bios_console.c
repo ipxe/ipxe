@@ -167,7 +167,8 @@ static void bios_putchar ( int character ) {
 		return;
 
 	/* Print character with attribute */
-	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
+					   "sti\n\t"
 					   /* Skip non-printable characters */
 					   "cmpb $0x20, %%al\n\t"
 					   "jb 1f\n\t"
@@ -188,11 +189,11 @@ static void bios_putchar ( int character ) {
 					   "xorw %%bx, %%bx\n\t"
 					   "movb $0x0e, %%ah\n\t"
 					   "int $0x10\n\t"
-					   "cli\n\t" )
+					   "cli\n\t"
+					   "popl %%ebp\n\t" /* gcc bug */ )
 			       : "=a" ( discard_a ), "=b" ( discard_b ),
 			         "=c" ( discard_c )
-			       : "a" ( character ), "b" ( bios_attr )
-			       : "ebp" );
+			       : "a" ( character ), "b" ( bios_attr ) );
 }
 
 /**

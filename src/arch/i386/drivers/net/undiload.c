@@ -103,13 +103,15 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 
 	/* Call loader */
 	undi_loader_entry = undirom->loader_entry;
-	__asm__ __volatile__ ( REAL_CODE ( "pushw %%ds\n\t"
+	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
+					   "pushw %%ds\n\t"
 					   "pushw %%ax\n\t"
 					   "lcall *undi_loader_entry\n\t"
-					   "addw $4, %%sp\n\t" )
+					   "popl %%ebp\n\t" /* discard */
+					   "popl %%ebp\n\t" /* gcc bug */ )
 			       : "=a" ( exit )
 			       : "a" ( __from_data16 ( &undi_loader ) )
-			       : "ebx", "ecx", "edx", "esi", "edi", "ebp" );
+			       : "ebx", "ecx", "edx", "esi", "edi" );
 
 	if ( exit != PXENV_EXIT_SUCCESS ) {
 		/* Clear entry point */

@@ -248,7 +248,8 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 	       imgheader->execaddr.segoff.offset );
 
 	__asm__ __volatile__ (
-		REAL_CODE ( "pushw %%ds\n\t"	/* far pointer to bootp data */
+		REAL_CODE ( "pushl %%ebp\n\t"	/* gcc bug */
+			    "pushw %%ds\n\t"	/* far pointer to bootp data */
 			    "pushw %%bx\n\t"
 			    "pushl %%esi\n\t"	/* location */
 			    "pushw %%cs\n\t"	/* lcall execaddr */
@@ -258,13 +259,14 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 			    "pushl %%edi\n\t"
 			    "lret\n\t"
 			    "\n2:\n\t"
-			    "addw $8,%%sp\n\t"	/* clean up stack */ )
+			    "addw $8,%%sp\n\t"	/* clean up stack */
+			    "popl %%ebp\n\t"	/* gcc bug */ )
 		: "=a" ( rc ), "=D" ( discard_D ), "=S" ( discard_S ),
 		  "=b" ( discard_b )
 		: "D" ( imgheader->execaddr.segoff ),
 		  "S" ( imgheader->location ),
 		  "b" ( __from_data16 ( basemem_packet ) )
-		: "ecx", "edx", "ebp" );
+		: "ecx", "edx" );
 
 	return rc;
 }
@@ -288,11 +290,13 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 
 	/* Jump to OS with flat physical addressing */
 	__asm__ __volatile__ (
-		PHYS_CODE ( "pushl %%ebx\n\t" /* bootp data */
+		PHYS_CODE ( "pushl %%ebp\n\t" /* gcc bug */
+			    "pushl %%ebx\n\t" /* bootp data */
 			    "pushl %%esi\n\t" /* imgheader */
 			    "pushl %%eax\n\t" /* loaderinfo */
 			    "call *%%edi\n\t"
-			    "addl $12, %%esp\n\t" /* clean up stack */ )
+			    "addl $12, %%esp\n\t" /* clean up stack */
+			    "popl %%ebp\n\t" /* gcc bug */ )
 		: "=a" ( rc ), "=D" ( discard_D ), "=S" ( discard_S ),
 		  "=b" ( discard_b )
 		: "D" ( imgheader->execaddr.linear ),
@@ -300,7 +304,7 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 			imgheader->location.offset ),
 		  "b" ( virt_to_phys ( basemem_packet ) ),
 		  "a" ( virt_to_phys ( &loaderinfo ) )
-		: "ecx", "edx", "ebp", "memory" );
+		: "ecx", "edx", "memory" );
 
 	return rc;
 }
