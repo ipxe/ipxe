@@ -23,8 +23,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <ipxe/refcnt.h>
-#include <ipxe/list.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/retry.h>
 #include <ipxe/timer.h>
@@ -40,33 +38,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** A neighbour cache entry */
-struct neighbour {
-	/** Reference count */
-	struct refcnt refcnt;
-	/** List of neighbour cache entries */
-	struct list_head list;
-
-	/** Network device */
-	struct net_device *netdev;
-	/** Network-layer protocol */
-	struct net_protocol *net_protocol;
-	/** Network-layer destination address */
-	uint8_t net_dest[MAX_NET_ADDR_LEN];
-	/** Link-layer destination address */
-	uint8_t ll_dest[MAX_LL_ADDR_LEN];
-
-	/** Neighbour discovery protocol (if any) */
-	struct neighbour_discovery *discovery;
-	/** Network-layer source address (if any) */
-	uint8_t net_source[MAX_NET_ADDR_LEN];
-	/** Retransmission timer */
-	struct retry_timer timer;
-
-	/** Pending I/O buffers */
-	struct list_head tx_queue;
-};
-
 /** Neighbour discovery minimum timeout */
 #define NEIGHBOUR_MIN_TIMEOUT ( TICKS_PER_SEC / 8 )
 
@@ -74,7 +45,7 @@ struct neighbour {
 #define NEIGHBOUR_MAX_TIMEOUT ( TICKS_PER_SEC * 3 )
 
 /** The neighbour cache */
-static LIST_HEAD ( neighbours );
+struct list_head neighbours = LIST_HEAD_INIT ( neighbours );
 
 static void neighbour_expired ( struct retry_timer *timer, int over );
 
@@ -95,17 +66,6 @@ static void neighbour_free ( struct refcnt *refcnt ) {
 
 	/* Free neighbour */
 	free ( neighbour );
-}
-
-/**
- * Test if neighbour cache entry has a valid link-layer address
- *
- * @v neighbour		Neighbour cache entry
- * @ret has_ll_dest	Neighbour cache entry has a valid link-layer address
- */
-static inline __attribute__ (( always_inline )) int
-neighbour_has_ll_dest ( struct neighbour *neighbour ) {
-	return ( ! timer_running ( &neighbour->timer ) );
 }
 
 /**
