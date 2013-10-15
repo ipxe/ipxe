@@ -867,12 +867,17 @@ static int ocsp_check_signature ( struct ocsp_check *ocsp,
  */
 int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 	struct ocsp_response *response = &ocsp->response;
-	struct x509_certificate *signer = response->signer;
+	struct x509_certificate *signer;
 	int rc;
 
 	/* Sanity checks */
 	assert ( response->data != NULL );
-	assert ( signer != NULL );
+
+	/* The response may include a signer certificate; if this is
+	 * not present then the response must have been signed
+	 * directly by the issuer.
+	 */
+	signer = ( response->signer ? response->signer : ocsp->issuer );
 
 	/* Validate signer, if applicable.  If the signer is not the
 	 * issuer, then it must be signed directly by the issuer.
