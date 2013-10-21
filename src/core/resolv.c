@@ -23,10 +23,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <ipxe/in.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/process.h>
+#include <ipxe/socket.h>
 #include <ipxe/resolv.h>
 
 /** @file
@@ -100,7 +100,6 @@ static struct process_descriptor numeric_process_desc =
 static int numeric_resolv ( struct interface *resolv,
 			    const char *name, struct sockaddr *sa ) {
 	struct numeric_resolv *numeric;
-	struct sockaddr_in *sin;
 
 	/* Allocate and initialise structure */
 	numeric = zalloc ( sizeof ( *numeric ) );
@@ -112,16 +111,8 @@ static int numeric_resolv ( struct interface *resolv,
 		       &numeric->refcnt );
 	memcpy ( &numeric->sa, sa, sizeof ( numeric->sa ) );
 
-	DBGC ( numeric, "NUMERIC %p attempting to resolve \"%s\"\n",
-	       numeric, name );
-
 	/* Attempt to resolve name */
-	sin = ( ( struct sockaddr_in * ) &numeric->sa );
-	if ( inet_aton ( name, &sin->sin_addr ) != 0 ) {
-		sin->sin_family = AF_INET;
-	} else {
-		numeric->rc = -EINVAL;
-	}
+	numeric->rc = sock_aton ( name, &numeric->sa );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &numeric->resolv, resolv );
@@ -193,8 +184,8 @@ static int resmux_try ( struct resolv_mux *mux ) {
 static void resmux_child_resolv_done ( struct resolv_mux *mux,
 				       struct sockaddr *sa ) {
 
-	DBGC ( mux, "RESOLV %p resolved \"%s\" using method %s\n",
-	       mux, mux->name, mux->resolver->name );
+	DBGC ( mux, "RESOLV %p resolved \"%s\" to %s using method %s\n",
+	       mux, mux->name, sock_ntoa ( sa ), mux->resolver->name );
 
 	/* Pass resolution to parent */
 	resolv_done ( &mux->parent, sa );
