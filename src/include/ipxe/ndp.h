@@ -31,7 +31,7 @@ struct ndp_option {
 /** An NDP header */
 struct ndp_header {
 	/** ICMPv6 header */
-	struct icmpv6_header icmp;
+	struct icmp_header icmp;
 	/** Flags */
 	uint8_t flags;
 	/** Reserved */

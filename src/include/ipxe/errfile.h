@@ -184,7 +184,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_slam			( ERRFILE_NET | 0x00160000 )
 #define ERRFILE_ib_sma			( ERRFILE_NET | 0x00170000 )
 #define ERRFILE_ib_packet		( ERRFILE_NET | 0x00180000 )
-#define ERRFILE_icmp			( ERRFILE_NET | 0x00190000 )
+#define ERRFILE_icmpv4			( ERRFILE_NET | 0x00190000 )
 #define ERRFILE_ib_qset			( ERRFILE_NET | 0x001a0000 )
 #define ERRFILE_ib_gma			( ERRFILE_NET | 0x001b0000 )
 #define ERRFILE_ib_pathrec		( ERRFILE_NET | 0x001c0000 )
@@ -216,6 +216,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_oncrpc_iob		( ERRFILE_NET | 0x00360000 )
 #define ERRFILE_neighbour		( ERRFILE_NET | 0x00370000 )
 #define ERRFILE_socket			( ERRFILE_NET | 0x00380000 )
+#define ERRFILE_icmp			( ERRFILE_NET | 0x00390000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )

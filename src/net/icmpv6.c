@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/in.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/tcpip.h>
+#include <ipxe/ping.h>
 #include <ipxe/icmpv6.h>
 
 /** @file
@@ -32,6 +33,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * ICMPv6 protocol
  *
  */
+
+struct icmp_echo_protocol icmpv6_echo_protocol __icmp_echo_protocol;
 
 /**
  * Process received ICMPv6 echo request packet
@@ -42,50 +45,45 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v sin6_dest		Destination socket address
  * @ret rc		Return status code
  */
-static int icmpv6_rx_echo ( struct io_buffer *iobuf,
-			    struct net_device *netdev,
-			    struct sockaddr_in6 *sin6_src,
-			    struct sockaddr_in6 *sin6_dest __unused ) {
+static int icmpv6_rx_echo_request ( struct io_buffer *iobuf,
+				    struct net_device *netdev __unused,
+				    struct sockaddr_in6 *sin6_src,
+				    struct sockaddr_in6 *sin6_dest __unused ) {
 	struct sockaddr_tcpip *st_src =
 		( ( struct sockaddr_tcpip * ) sin6_src );
-	struct icmpv6_echo *echo = iobuf->data;
-	size_t len = iob_len ( iobuf );
-	int rc;
 
-	/* Sanity check */
-	if ( iob_len ( iobuf ) < sizeof ( *echo ) ) {
-		DBGC ( netdev, "ICMPv6 echo request too short at %zd bytes "
-		       "(min %zd bytes)\n", iob_len ( iobuf ),
-		       sizeof ( *echo ) );
-		rc = -EINVAL;
-		goto done;
-	}
-	DBGC ( netdev, "ICMPv6 echo request from %s (id %#04x seq %#04x)\n",
-	       inet6_ntoa ( &sin6_dest->sin6_addr ), ntohs ( echo->ident ),
-	       ntohs ( echo->sequence ) );
-
-	/* Convert echo request to echo reply and recalculate checksum */
-	echo->icmp.type = ICMPV6_ECHO_REPLY;
-	echo->icmp.chksum = 0;
-	echo->icmp.chksum = tcpip_chksum ( echo, len );
-
-	/* Transmit echo reply */
-	if ( ( rc = tcpip_tx ( iob_disown ( iobuf ), &icmpv6_protocol, NULL,
-			       st_src, netdev, &echo->icmp.chksum ) ) != 0 ) {
-		DBGC ( netdev, "ICMPv6 could not transmit reply: %s\n",
-		       strerror ( rc ) );
-		goto done;
-	}
-
- done:
-	free_iob ( iobuf );
-	return rc;
+	return icmp_rx_echo_request ( iobuf, st_src, &icmpv6_echo_protocol );
 }
 
-/** ICMPv6 echo request handlers */
-struct icmpv6_handler icmpv6_echo_handler __icmpv6_handler = {
+/** ICMPv6 echo request handler */
+struct icmpv6_handler icmpv6_echo_request_handler __icmpv6_handler = {
 	.type = ICMPV6_ECHO_REQUEST,
-	.rx = icmpv6_rx_echo,
+	.rx = icmpv6_rx_echo_request,
+};
+
+/**
+ * Process received ICMPv6 echo reply packet
+ *
+ * @v iobuf		I/O buffer
+ * @v netdev		Network device
+ * @v sin6_src		Source socket address
+ * @v sin6_dest		Destination socket address
+ * @ret rc		Return status code
+ */
+static int icmpv6_rx_echo_reply ( struct io_buffer *iobuf,
+				  struct net_device *netdev __unused,
+				  struct sockaddr_in6 *sin6_src,
+				  struct sockaddr_in6 *sin6_dest __unused ) {
+	struct sockaddr_tcpip *st_src =
+		( ( struct sockaddr_tcpip * ) sin6_src );
+
+	return icmp_rx_echo_reply ( iobuf, st_src );
+}
+
+/** ICMPv6 echo reply handler */
+struct icmpv6_handler icmpv6_echo_reply_handler __icmpv6_handler = {
+	.type = ICMPV6_ECHO_REPLY,
+	.rx = icmpv6_rx_echo_reply,
 };
 
 /**
@@ -119,7 +117,7 @@ static int icmpv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		       struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum ) {
 	struct sockaddr_in6 *sin6_src = ( ( struct sockaddr_in6 * ) st_src );
 	struct sockaddr_in6 *sin6_dest = ( ( struct sockaddr_in6 * ) st_dest );
-	struct icmpv6_header *icmp = iobuf->data;
+	struct icmp_header *icmp = iobuf->data;
 	size_t len = iob_len ( iobuf );
 	struct icmpv6_handler *handler;
 	unsigned int csum;
@@ -169,4 +167,13 @@ struct tcpip_protocol icmpv6_protocol __tcpip_protocol = {
 	.name = "ICMPv6",
 	.rx = icmpv6_rx,
 	.tcpip_proto = IP_ICMP6,
+};
+
+/** ICMPv6 echo protocol */
+struct icmp_echo_protocol icmpv6_echo_protocol __icmp_echo_protocol = {
+	.family = AF_INET6,
+	.request = ICMPV6_ECHO_REQUEST,
+	.reply = ICMPV6_ECHO_REPLY,
+	.tcpip_protocol = &icmpv6_protocol,
+	.net_checksum = 1,
 };
