@@ -28,6 +28,11 @@ extern int udp_sock_dgram;
 #define UDP_SOCK_DGRAM 0x2
 #define SOCK_DGRAM udp_sock_dgram
 
+/** Echo testing streams */
+extern int ping_sock_echo;
+#define PING_SOCK_ECHO 0x3
+#define SOCK_ECHO ping_sock_echo
+
 /** @} */
 
 /**
@@ -43,6 +48,8 @@ socket_semantics_name ( int semantics ) {
 		return "SOCK_STREAM";
 	} else if ( semantics == SOCK_DGRAM ) {
 		return "SOCK_DGRAM";
+	} else if ( semantics == SOCK_ECHO ) {
+		return "SOCK_ECHO";
 	} else {
 		return "SOCK_UNKNOWN";
 	}
@@ -69,6 +76,7 @@ socket_family_name ( int family ) {
 	switch ( family ) {
 	case AF_INET:		return "AF_INET";
 	case AF_INET6:		return "AF_INET6";
+	case AF_FC:		return "AF_FC";
 	default:		return "AF_UNKNOWN";
 	}
 }
