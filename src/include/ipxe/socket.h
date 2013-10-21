@@ -10,6 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <ipxe/tables.h>
 
 /**
  * @defgroup commtypes Communication semantics
@@ -98,5 +99,40 @@ struct sockaddr {
 	 */
 	char pad[ SA_LEN - sizeof ( sa_family_t ) ];
 } __attribute__ (( may_alias ));
+
+/**
+ * Socket address converter
+ *
+ */
+struct sockaddr_converter {
+	/** Socket address family
+	 *
+	 * This is an AF_XXX constant.
+	 */
+        sa_family_t family;
+	/** Transcribe socket address
+	 *
+	 * @v sa		Socket address
+	 * @ret string		Socket address string
+	 */
+	const char * ( * ntoa ) ( struct sockaddr *sa );
+	/** Parse socket address
+	 *
+	 * @v string		Socket address stringh
+	 * @v sa		Socket address to fill in
+	 * @ret rc		Return status code
+	 */
+	int ( * aton ) ( const char *string, struct sockaddr *sa );
+};
+
+/** Socket address converter table */
+#define SOCKADDR_CONVERTERS \
+	__table ( struct sockaddr_converter, "sockaddr_converters" )
+
+/** Declare a socket address converter */
+#define __sockaddr_converter __table_entry ( SOCKADDR_CONVERTERS, 01 )
+
+extern const char * sock_ntoa ( struct sockaddr *sa );
+extern int sock_aton ( const char *string, struct sockaddr *sa );
 
 #endif /* _IPXE_SOCKET_H */
