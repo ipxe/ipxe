@@ -524,6 +524,36 @@ static const char * ipv4_ntoa ( const void *net_addr ) {
 	return inet_ntoa ( * ( ( struct in_addr * ) net_addr ) );
 }
 
+/**
+ * Transcribe IPv4 socket address
+ *
+ * @v sa		Socket address
+ * @ret string		Socket address in standard notation
+ */
+static const char * ipv4_sock_ntoa ( struct sockaddr *sa ) {
+	struct sockaddr_in *sin = ( ( struct sockaddr_in * ) sa );
+
+	return inet_ntoa ( sin->sin_addr );
+}
+
+/**
+ * Parse IPv4 socket address
+ *
+ * @v string		Socket address string
+ * @v sa		Socket address to fill in
+ * @ret rc		Return status code
+ */
+static int ipv4_sock_aton ( const char *string, struct sockaddr *sa ) {
+	struct sockaddr_in *sin = ( ( struct sockaddr_in * ) sa );
+	struct in_addr in;
+
+	if ( inet_aton ( string, &in ) ) {
+		sin->sin_addr = in;
+		return 0;
+	}
+	return -EINVAL;
+}
+
 /** IPv4 protocol */
 struct net_protocol ipv4_protocol __net_protocol = {
 	.name = "IP",
@@ -544,6 +574,13 @@ struct tcpip_net_protocol ipv4_tcpip_protocol __tcpip_net_protocol = {
 struct arp_net_protocol ipv4_arp_protocol __arp_net_protocol = {
 	.net_protocol = &ipv4_protocol,
 	.check = ipv4_arp_check,
+};
+
+/** IPv4 socket address converter */
+struct sockaddr_converter ipv4_sockaddr_converter __sockaddr_converter = {
+	.family = AF_INET,
+	.ntoa = ipv4_sock_ntoa,
+	.aton = ipv4_sock_aton,
 };
 
 /******************************************************************************
