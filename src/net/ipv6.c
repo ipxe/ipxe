@@ -190,7 +190,7 @@ static void del_ipv6_miniroute ( struct ipv6_miniroute *miniroute ) {
  * @ret miniroute	Routing table entry to use, or NULL if no route
  */
 static struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
-					   struct in6_addr **dest ) {
+					    struct in6_addr **dest ) {
 	struct ipv6_miniroute *miniroute;
 	int local;
 
@@ -749,6 +749,96 @@ static const char * ipv6_ntoa ( const void *net_addr ) {
 	return inet6_ntoa ( net_addr );
 }
 
+/**
+ * Transcribe IPv6 socket address
+ *
+ * @v sa		Socket address
+ * @ret string		Socket address in standard notation
+ */
+static const char * ipv6_sock_ntoa ( struct sockaddr *sa ) {
+	static char buf[ 39 /* "xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx" */ +
+			 1 /* "%" */ + NETDEV_NAME_LEN + 1 /* NUL */ ];
+	struct sockaddr_in6 *sin6 = ( ( struct sockaddr_in6 * ) sa );
+	struct in6_addr *in = &sin6->sin6_addr;
+	struct net_device *netdev;
+	const char *netdev_name;
+
+	/* Identify network device, if applicable */
+	if ( IN6_IS_ADDR_LINKLOCAL ( in ) ) {
+		netdev = find_netdev_by_index ( sin6->sin6_scope_id );
+		netdev_name = ( netdev ? netdev->name : "UNKNOWN" );
+	} else {
+		netdev_name = NULL;
+	}
+
+	/* Format socket address */
+	snprintf ( buf, sizeof ( buf ), "%s%s%s", inet6_ntoa ( in ),
+		   ( netdev_name ? "%" : "" ),
+		   ( netdev_name ? netdev_name : "" ) );
+	return buf;
+}
+
+/**
+ * Parse IPv6 socket address
+ *
+ * @v string		Socket address string
+ * @v sa		Socket address to fill in
+ * @ret rc		Return status code
+ */
+static int ipv6_sock_aton ( const char *string, struct sockaddr *sa ) {
+	struct sockaddr_in6 *sin6 = ( ( struct sockaddr_in6 * ) sa );
+	struct in6_addr in;
+	struct net_device *netdev;
+	size_t len;
+	char *tmp;
+	char *in_string;
+	char *netdev_string;
+	int rc;
+
+	/* Create modifiable copy of string */
+	tmp = strdup ( string );
+	if ( ! tmp ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	in_string = tmp;
+
+	/* Strip surrounding "[...]", if present */
+	len = strlen ( in_string );
+	if ( ( in_string[0] == '[' ) && ( in_string[ len - 1 ] == ']' ) ) {
+		in_string[ len - 1 ] = '\0';
+		in_string++;
+	}
+
+	/* Split at network device name, if present */
+	netdev_string = strchr ( in_string, '%' );
+	if ( netdev_string )
+		*(netdev_string++) = '\0';
+
+	/* Parse IPv6 address portion */
+	if ( ( rc = inet6_aton ( in_string, &in ) ) != 0 )
+		goto err_inet6_aton;
+
+	/* Parse network device name, if present */
+	if ( netdev_string ) {
+		netdev = find_netdev ( netdev_string );
+		if ( ! netdev ) {
+			rc = -ENODEV;
+			goto err_find_netdev;
+		}
+		sin6->sin6_scope_id = netdev->index;
+	}
+
+	/* Copy IPv6 address portion to socket address */
+	memcpy ( &sin6->sin6_addr, &in, sizeof ( sin6->sin6_addr ) );
+
+ err_find_netdev:
+ err_inet6_aton:
+	free ( tmp );
+ err_alloc:
+	return rc;
+}
+
 /** IPv6 protocol */
 struct net_protocol ipv6_protocol __net_protocol = {
 	.name = "IPv6",
@@ -763,6 +853,13 @@ struct tcpip_net_protocol ipv6_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv6",
 	.sa_family = AF_INET6,
 	.tx = ipv6_tx,
+};
+
+/** IPv6 socket address converter */
+struct sockaddr_converter ipv6_sockaddr_converter __sockaddr_converter = {
+	.family = AF_INET6,
+	.ntoa = ipv6_sock_ntoa,
+	.aton = ipv6_sock_aton,
 };
 
 /**

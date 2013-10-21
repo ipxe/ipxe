@@ -292,6 +292,9 @@ struct net_device_stats {
 	struct net_device_error errors[NETDEV_MAX_UNIQUE_ERRORS];
 };
 
+/** Maximum length of a network device name */
+#define NETDEV_NAME_LEN 12
+
 /**
  * A network device
  *
@@ -312,7 +315,7 @@ struct net_device {
 	/** Index of this network device */
 	unsigned int index;
 	/** Name of this network device */
-	char name[12];
+	char name[NETDEV_NAME_LEN];
 	/** Underlying hardware device */
 	struct device *dev;
 
