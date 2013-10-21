@@ -685,6 +685,24 @@ struct net_device * find_netdev ( const char *name ) {
 }
 
 /**
+ * Get network device by index
+ *
+ * @v index		Network device index
+ * @ret netdev		Network device, or NULL
+ */
+struct net_device * find_netdev_by_index ( unsigned int index ) {
+	struct net_device *netdev;
+
+	/* Identify network device by index */
+	list_for_each_entry ( netdev, &net_devices, list ) {
+		if ( netdev->index == index )
+			return netdev;
+	}
+
+	return NULL;
+}
+
+/**
  * Get network device by PCI bus:dev.fn address
  *
  * @v bus_type		Bus type

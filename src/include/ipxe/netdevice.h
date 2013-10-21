@@ -605,6 +605,7 @@ extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void netdev_irq ( struct net_device *netdev, int enable );
 extern struct net_device * find_netdev ( const char *name );
+extern struct net_device * find_netdev_by_index ( unsigned int index );
 extern struct net_device * find_netdev_by_location ( unsigned int bus_type,
 						     unsigned int location );
 extern struct net_device * last_opened_netdev ( void );
