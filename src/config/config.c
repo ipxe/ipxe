@@ -272,6 +272,9 @@ REQUIRE_OBJECT ( param_cmd );
 #ifdef NEIGHBOUR_CMD
 REQUIRE_OBJECT ( neighbour_cmd );
 #endif
+#ifdef PING_CMD
+REQUIRE_OBJECT ( ping_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
