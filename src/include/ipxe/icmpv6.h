@@ -46,11 +46,14 @@ struct icmpv6_handler {
 /** ICMPv6 echo reply */
 #define ICMPV6_ECHO_REPLY 129
 
+/** ICMPv6 router advertisement */
+#define ICMPV6_ROUTER_ADVERTISEMENT 134
+
 /** ICMPv6 neighbour solicitation */
-#define ICMPV6_NDP_NEIGHBOUR_SOLICITATION 135
+#define ICMPV6_NEIGHBOUR_SOLICITATION 135
 
 /** ICMPv6 neighbour advertisement */
-#define ICMPV6_NDP_NEIGHBOUR_ADVERTISEMENT 136
+#define ICMPV6_NEIGHBOUR_ADVERTISEMENT 136
 
 extern struct tcpip_protocol icmpv6_protocol __tcpip_protocol;
 

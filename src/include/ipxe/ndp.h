@@ -28,8 +28,8 @@ struct ndp_option {
 /** NDP option block size */
 #define NDP_OPTION_BLKSZ 8
 
-/** An NDP header */
-struct ndp_header {
+/** An NDP neighbour solicitation or advertisement header */
+struct ndp_neighbour_header {
 	/** ICMPv6 header */
 	struct icmp_header icmp;
 	/** Flags */
@@ -43,13 +43,47 @@ struct ndp_header {
 } __attribute__ (( packed ));
 
 /** NDP router flag */
-#define NDP_ROUTER 0x80
+#define NDP_NEIGHBOUR_ROUTER 0x80
 
 /** NDP solicited flag */
-#define NDP_SOLICITED 0x40
+#define NDP_NEIGHBOUR_SOLICITED 0x40
 
 /** NDP override flag */
-#define NDP_OVERRIDE 0x20
+#define NDP_NEIGHBOUR_OVERRIDE 0x20
+
+/** An NDP router advertisement header */
+struct ndp_router_advertisement_header {
+	/** ICMPv6 header */
+	struct icmp_header icmp;
+	/** Current hop limit */
+	uint8_t hop_limit;
+	/** Flags */
+	uint8_t flags;
+	/** Router lifetime */
+	uint16_t lifetime;
+	/** Reachable time */
+	uint32_t reachable;
+	/** Retransmission timer */
+	uint32_t retransmit;
+	/** Options */
+	struct ndp_option option[0];
+} __attribute__ (( packed ));
+
+/** NDP managed address configuration */
+#define NDP_ROUTER_MANAGED 0x80
+
+/** NDP other configuration */
+#define NDP_ROUTER_OTHER 0x40
+
+/** An NDP header */
+union ndp_header {
+	/** ICMPv6 header */
+	struct icmp_header icmp;
+	/** Neighbour solicitation or advertisement header */
+	struct ndp_neighbour_header neigh;
+	/** Router advertisement header */
+	struct ndp_router_advertisement_header radv;
+} __attribute__ (( packed ));
 
 /** NDP source link-layer address option */
 #define NDP_OPT_LL_SOURCE 1
