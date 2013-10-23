@@ -173,7 +173,26 @@ struct ipv6_miniroute {
 };
 
 /**
- * Construct link-local address (via EUI-64)
+ * Construct local IPv6 address via EUI-64
+ *
+ * @v addr		Prefix to be completed
+ * @v netdev		Network device
+ * @ret prefix_len	Prefix length, or negative error
+ */
+static inline int ipv6_eui64 ( struct in6_addr *addr,
+			       struct net_device *netdev ) {
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
+	const void *ll_addr = netdev->ll_addr;
+	int rc;
+
+	if ( ( rc = ll_protocol->eui64 ( ll_addr, &addr->s6_addr[8] ) ) != 0 )
+		return rc;
+	addr->s6_addr[8] ^= 0x02;
+	return 64;
+}
+
+/**
+ * Construct link-local address via EUI-64
  *
  * @v addr		Address to construct
  * @v netdev		Network device
@@ -181,16 +200,10 @@ struct ipv6_miniroute {
  */
 static inline int ipv6_link_local ( struct in6_addr *addr,
 				    struct net_device *netdev ) {
-	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	const void *ll_addr = netdev->ll_addr;
-	int rc;
 
 	memset ( addr, 0, sizeof ( *addr ) );
 	addr->s6_addr16[0] = htons ( 0xfe80 );
-	if ( ( rc = ll_protocol->eui64 ( ll_addr, &addr->s6_addr[8] ) ) != 0 )
-		return rc;
-	addr->s6_addr[8] ^= 0x02;
-	return 64;
+	return ipv6_eui64 ( addr, netdev );
 }
 
 /**
@@ -214,5 +227,7 @@ extern struct list_head ipv6_miniroutes;
 extern struct net_protocol ipv6_protocol __net_protocol;
 
 extern int ipv6_has_addr ( struct net_device *netdev, struct in6_addr *addr );
+extern int ipv6_slaac ( struct net_device *netdev, struct in6_addr *prefix,
+			unsigned int prefix_len, struct in6_addr *router );
 
 #endif /* _IPXE_IPV6_H */

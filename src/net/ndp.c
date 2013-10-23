@@ -62,12 +62,13 @@ static int ndp_tx_neighbour ( struct net_device *netdev,
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct io_buffer *iobuf;
 	struct ndp_neighbour_header *neigh;
+	struct ndp_ll_addr_option *ll_addr_opt;
 	size_t option_len;
 	size_t len;
 	int rc;
 
 	/* Allocate and populate buffer */
-	option_len = ( ( sizeof ( neigh->option[0] ) +
+	option_len = ( ( sizeof ( *ll_addr_opt ) +
 			 ll_protocol->ll_addr_len + NDP_OPTION_BLKSZ - 1 ) &
 		       ~( NDP_OPTION_BLKSZ - 1 ) );
 	len = ( sizeof ( *neigh ) + option_len );
@@ -80,9 +81,10 @@ static int ndp_tx_neighbour ( struct net_device *netdev,
 	neigh->icmp.type = icmp_type;
 	neigh->flags = flags;
 	memcpy ( &neigh->target, target, sizeof ( neigh->target ) );
-	neigh->option[0].type = option_type;
-	neigh->option[0].blocks = ( option_len / NDP_OPTION_BLKSZ );
-	memcpy ( neigh->option[0].value, netdev->ll_addr,
+	ll_addr_opt = &neigh->option[0].ll_addr;
+	ll_addr_opt->header.type = option_type;
+	ll_addr_opt->header.blocks = ( option_len / NDP_OPTION_BLKSZ );
+	memcpy ( ll_addr_opt->ll_addr, netdev->ll_addr,
 		 ll_protocol->ll_addr_len );
 	neigh->icmp.chksum = tcpip_chksum ( neigh, len );
 
@@ -143,17 +145,18 @@ struct neighbour_discovery ndp_discovery = {
  * @v netdev		Network device
  * @v sin6_src		Source socket address
  * @v ndp		NDP packet
- * @v ll_addr		Source link-layer address
- * @v ll_addr_len	Source link-layer address length
+ * @v option		NDP option
+ * @v len		NDP option length
  * @ret rc		Return status code
  */
 static int
 ndp_rx_neighbour_solicitation_ll_source ( struct net_device *netdev,
 					  struct sockaddr_in6 *sin6_src,
 					  union ndp_header *ndp,
-					  const void *ll_addr,
-					  size_t ll_addr_len ) {
+					  union ndp_option *option,
+					  size_t len ) {
 	struct ndp_neighbour_header *neigh = &ndp->neigh;
+	struct ndp_ll_addr_option *ll_addr_opt = &option->ll_addr;
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	int rc;
 
@@ -164,20 +167,21 @@ ndp_rx_neighbour_solicitation_ll_source ( struct net_device *netdev,
 		return 0;
 
 	/* Sanity check */
-	if ( ll_addr_len < ll_protocol->ll_addr_len ) {
+	if ( offsetof ( typeof ( *ll_addr_opt ),
+			ll_addr[ll_protocol->ll_addr_len] ) > len ) {
 		DBGC ( netdev, "NDP neighbour solicitation link-layer address "
-		       "too short at %zd bytes (min %d bytes)\n",
-		       ll_addr_len, ll_protocol->ll_addr_len );
+		       "option too short at %zd bytes\n", len );
 		return -EINVAL;
 	}
 
 	/* Create or update neighbour cache entry */
 	if ( ( rc = neighbour_define ( netdev, &ipv6_protocol,
 				       &sin6_src->sin6_addr,
-				       ll_addr ) ) != 0 ) {
+				       ll_addr_opt->ll_addr ) ) != 0 ) {
 		DBGC ( netdev, "NDP could not define %s => %s: %s\n",
 		       inet6_ntoa ( &sin6_src->sin6_addr ),
-		       ll_protocol->ntoa ( ll_addr ), strerror ( rc ) );
+		       ll_protocol->ntoa ( ll_addr_opt->ll_addr ),
+		       strerror ( rc ) );
 		return rc;
 	}
 
@@ -199,8 +203,8 @@ ndp_rx_neighbour_solicitation_ll_source ( struct net_device *netdev,
  * @v netdev		Network device
  * @v sin6_src		Source socket address
  * @v ndp		NDP packet
- * @v ll_addr		Target link-layer address
- * @v ll_addr_len	Target link-layer address length
+ * @v option		NDP option
+ * @v len		NDP option length
  * @ret rc		Return status code
  */
 static int
@@ -208,26 +212,28 @@ ndp_rx_neighbour_advertisement_ll_target ( struct net_device *netdev,
 					   struct sockaddr_in6 *sin6_src
 						   __unused,
 					   union ndp_header *ndp,
-					   const void *ll_addr,
-					   size_t ll_addr_len ) {
+					   union ndp_option *option,
+					   size_t len ) {
 	struct ndp_neighbour_header *neigh = &ndp->neigh;
+	struct ndp_ll_addr_option *ll_addr_opt = &option->ll_addr;
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	int rc;
 
 	/* Sanity check */
-	if ( ll_addr_len < ll_protocol->ll_addr_len ) {
+	if ( offsetof ( typeof ( *ll_addr_opt ),
+			ll_addr[ll_protocol->ll_addr_len] ) > len ) {
 		DBGC ( netdev, "NDP neighbour advertisement link-layer address "
-		       "too short at %zd bytes (min %d bytes)\n",
-		       ll_addr_len, ll_protocol->ll_addr_len );
+		       "option too short at %zd bytes\n", len );
 		return -EINVAL;
 	}
 
 	/* Update neighbour cache entry, if any */
 	if ( ( rc = neighbour_update ( netdev, &ipv6_protocol, &neigh->target,
-				       ll_addr ) ) != 0 ) {
+				       ll_addr_opt->ll_addr ) ) != 0 ) {
 		DBGC ( netdev, "NDP could not update %s => %s: %s\n",
 		       inet6_ntoa ( &neigh->target ),
-		       ll_protocol->ntoa ( ll_addr ), strerror ( rc ) );
+		       ll_protocol->ntoa ( ll_addr_opt->ll_addr ),
+		       strerror ( rc ) );
 		return rc;
 	}
 
@@ -240,35 +246,89 @@ ndp_rx_neighbour_advertisement_ll_target ( struct net_device *netdev,
  * @v netdev		Network device
  * @v sin6_src		Source socket address
  * @v ndp		NDP packet
- * @v ll_addr		Target link-layer address
- * @v ll_addr_len	Target link-layer address length
+ * @v option		NDP option
+ * @v len		NDP option length
  * @ret rc		Return status code
  */
 static int
 ndp_rx_router_advertisement_ll_source ( struct net_device *netdev,
 					struct sockaddr_in6 *sin6_src,
 					union ndp_header *ndp __unused,
-					const void *ll_addr,
-					size_t ll_addr_len ) {
+					union ndp_option *option, size_t len ) {
+	struct ndp_ll_addr_option *ll_addr_opt = &option->ll_addr;
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	int rc;
 
 	/* Sanity check */
-	if ( ll_addr_len < ll_protocol->ll_addr_len ) {
+	if ( offsetof ( typeof ( *ll_addr_opt ),
+			ll_addr[ll_protocol->ll_addr_len] ) > len ) {
 		DBGC ( netdev, "NDP router advertisement link-layer address "
-		       "too short at %zd bytes (min %d bytes)\n",
-		       ll_addr_len, ll_protocol->ll_addr_len );
+		       "option too short at %zd bytes\n", len );
 		return -EINVAL;
 	}
 
 	/* Define neighbour cache entry */
 	if ( ( rc = neighbour_define ( netdev, &ipv6_protocol,
 				       &sin6_src->sin6_addr,
-				       ll_addr ) ) != 0 ) {
+				       ll_addr_opt->ll_addr ) ) != 0 ) {
 		DBGC ( netdev, "NDP could not define %s => %s: %s\n",
 		       inet6_ntoa ( &sin6_src->sin6_addr ),
-		       ll_protocol->ntoa ( ll_addr ), strerror ( rc ) );
+		       ll_protocol->ntoa ( ll_addr_opt->ll_addr ),
+		       strerror ( rc ) );
 		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Process NDP router advertisement prefix information option
+ *
+ * @v netdev		Network device
+ * @v sin6_src		Source socket address
+ * @v ndp		NDP packet
+ * @v option		NDP option
+ * @v len		NDP option length
+ * @ret rc		Return status code
+ */
+static int
+ndp_rx_router_advertisement_prefix ( struct net_device *netdev,
+				     struct sockaddr_in6 *sin6_src,
+				     union ndp_header *ndp,
+				     union ndp_option *option, size_t len ) {
+	struct ndp_router_advertisement_header *radv = &ndp->radv;
+	struct ndp_prefix_information_option *prefix_opt = &option->prefix;
+	struct in6_addr *router = &sin6_src->sin6_addr;
+	int rc;
+
+	/* Sanity check */
+	if ( sizeof ( *prefix_opt ) > len ) {
+		DBGC ( netdev, "NDP router advertisement prefix option too "
+		       "short at %zd bytes\n", len );
+		return -EINVAL;
+	}
+	DBGC ( netdev, "NDP found %sdefault router %s ",
+	       ( radv->lifetime ? "" : "non-" ),
+	       inet6_ntoa ( &sin6_src->sin6_addr ) );
+	DBGC ( netdev, "for %s-link %sautonomous prefix %s/%d\n",
+	       ( ( prefix_opt->flags & NDP_PREFIX_ON_LINK ) ? "on" : "off" ),
+	       ( ( prefix_opt->flags & NDP_PREFIX_AUTONOMOUS ) ? "" : "non-" ),
+	       inet6_ntoa ( &prefix_opt->prefix ),
+	       prefix_opt->prefix_len );
+
+	/* Perform stateless address autoconfiguration, if applicable */
+	if ( ( prefix_opt->flags &
+	       ( NDP_PREFIX_ON_LINK | NDP_PREFIX_AUTONOMOUS ) ) ==
+	     ( NDP_PREFIX_ON_LINK | NDP_PREFIX_AUTONOMOUS ) ) {
+		if ( ( rc = ipv6_slaac ( netdev, &prefix_opt->prefix,
+					 prefix_opt->prefix_len,
+					 ( radv->lifetime ?
+					   router : NULL ) ) ) != 0 ) {
+			DBGC ( netdev, "NDP could not autoconfigure prefix %s/"
+			       "%d: %s\n", inet6_ntoa ( &prefix_opt->prefix ),
+			       prefix_opt->prefix_len, strerror ( rc ) );
+			return rc;
+		}
 	}
 
 	return 0;
@@ -286,12 +346,12 @@ struct ndp_option_handler {
 	 * @v netdev		Network device
 	 * @v sin6_src		Source socket address
 	 * @v ndp		NDP packet
-	 * @v value		Option value
-	 * @v len		Option length
+	 * @v option		NDP option
 	 * @ret rc		Return status code
 	 */
 	int ( * rx ) ( struct net_device *netdev, struct sockaddr_in6 *sin6_src,
-		       union ndp_header *ndp, const void *value, size_t len );
+		       union ndp_header *ndp, union ndp_option *option,
+		       size_t len );
 };
 
 /** NDP option handlers */
@@ -311,6 +371,11 @@ static struct ndp_option_handler ndp_option_handlers[] = {
 		.option_type = NDP_OPT_LL_SOURCE,
 		.rx = ndp_rx_router_advertisement_ll_source,
 	},
+	{
+		.icmp_type = ICMPV6_ROUTER_ADVERTISEMENT,
+		.option_type = NDP_OPT_PREFIX,
+		.rx = ndp_rx_router_advertisement_prefix,
+	},
 };
 
 /**
@@ -319,15 +384,13 @@ static struct ndp_option_handler ndp_option_handlers[] = {
  * @v netdev		Network device
  * @v sin6_src		Source socket address
  * @v ndp		NDP packet
- * @v type		Option type
- * @v value		Option value
+ * @v option		NDP option
  * @v len		Option length
  * @ret rc		Return status code
  */
 static int ndp_rx_option ( struct net_device *netdev,
-			   struct sockaddr_in6 *sin6_src,
-			   union ndp_header *ndp, unsigned int type,
-			   const void *value, size_t len ) {
+			   struct sockaddr_in6 *sin6_src, union ndp_header *ndp,
+			   union ndp_option *option, size_t len ) {
 	struct ndp_option_handler *handler;
 	unsigned int i;
 
@@ -336,9 +399,9 @@ static int ndp_rx_option ( struct net_device *netdev,
 			    sizeof ( ndp_option_handlers[0] ) ) ; i++ ) {
 		handler = &ndp_option_handlers[i];
 		if ( ( handler->icmp_type == ndp->icmp.type ) &&
-		     ( handler->option_type == type ) ) {
+		     ( handler->option_type == option->header.type ) ) {
 			return handler->rx ( netdev, sin6_src, ndp,
-					     value, len );
+					     option, len );
 		}
 	}
 
@@ -360,10 +423,9 @@ static int ndp_rx ( struct io_buffer *iobuf,
 		    struct sockaddr_in6 *sin6_src,
 		    size_t offset ) {
 	union ndp_header *ndp = iobuf->data;
-	struct ndp_option *option;
+	union ndp_option *option;
 	size_t remaining;
 	size_t option_len;
-	size_t option_value_len;
 	int rc;
 
 	/* Sanity check */
@@ -380,23 +442,21 @@ static int ndp_rx ( struct io_buffer *iobuf,
 	while ( remaining ) {
 
 		/* Sanity check */
-		if ( ( remaining < sizeof ( *option ) ) ||
-		     ( option->blocks == 0 ) ||
-		     ( remaining < ( option->blocks * NDP_OPTION_BLKSZ ) ) ) {
+		if ( ( remaining < sizeof ( option->header ) ) ||
+		     ( option->header.blocks == 0 ) ||
+		     ( remaining < ( option->header.blocks *
+				     NDP_OPTION_BLKSZ ) ) ) {
 			DBGC ( netdev, "NDP bad option length:\n" );
 			DBGC_HDA ( netdev, 0, option, remaining );
 			rc = -EINVAL;
 			goto done;
 		}
-		option_len = ( option->blocks * NDP_OPTION_BLKSZ );
-		option_value_len = ( option_len - sizeof ( *option ) );
+		option_len = ( option->header.blocks * NDP_OPTION_BLKSZ );
 
 		/* Handle option */
-		if ( ( rc = ndp_rx_option ( netdev, sin6_src, ndp,
-					    option->type, option->value,
-					    option_value_len ) ) != 0 ) {
+		if ( ( rc = ndp_rx_option ( netdev, sin6_src, ndp, option,
+					    option_len ) ) != 0 )
 			goto done;
-		}
 
 		/* Move to next option */
 		option = ( ( ( void * ) option ) + option_len );

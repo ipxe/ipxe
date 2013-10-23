@@ -863,6 +863,53 @@ struct sockaddr_converter ipv6_sockaddr_converter __sockaddr_converter = {
 };
 
 /**
+ * Perform IPv6 stateless address autoconfiguration (SLAAC)
+ *
+ * @v netdev		Network device
+ * @v prefix		Prefix
+ * @v prefix_len	Prefix length
+ * @v router		Router address (or NULL)
+ * @ret rc		Return status code
+ */
+int ipv6_slaac ( struct net_device *netdev, struct in6_addr *prefix,
+		 unsigned int prefix_len, struct in6_addr *router ) {
+	struct ipv6_miniroute *miniroute;
+	struct ipv6_miniroute *tmp;
+	struct in6_addr address;
+	int check_prefix_len;
+	int rc;
+
+	/* Construct local address */
+	memcpy ( &address, prefix, sizeof ( address ) );
+	check_prefix_len = ipv6_eui64 ( &address, netdev );
+	if ( check_prefix_len < 0 ) {
+		rc = check_prefix_len;
+		DBGC ( netdev, "IPv6 %s could not construct SLAAC address: "
+		       "%s\n", netdev->name, strerror ( rc ) );
+		return rc;
+	}
+	if ( check_prefix_len != ( int ) prefix_len ) {
+		DBGC ( netdev, "IPv6 %s incorrect SLAAC prefix length %d "
+		       "(expected %d)\n", netdev->name, prefix_len,
+		       check_prefix_len );
+		return -EINVAL;
+	}
+
+	/* Delete any existing SLAAC miniroutes for this prefix */
+	list_for_each_entry_safe ( miniroute, tmp, &ipv6_miniroutes, list ) {
+		if ( ipv6_is_local ( miniroute, &address ) )
+			del_ipv6_miniroute ( miniroute );
+	}
+
+	/* Add miniroute */
+	miniroute = add_ipv6_miniroute ( netdev, &address, prefix_len, router );
+	if ( ! miniroute )
+		return -ENOMEM;
+
+	return 0;
+}
+
+/**
  * Create IPv6 network device
  *
  * @v netdev		Network device

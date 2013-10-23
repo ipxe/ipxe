@@ -15,18 +15,67 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/icmpv6.h>
 #include <ipxe/neighbour.h>
 
-/** An NDP option */
-struct ndp_option {
+/** An NDP option header */
+struct ndp_option_header {
 	/** Type */
 	uint8_t type;
 	/** Length (in blocks of 8 bytes) */
 	uint8_t blocks;
-	/** Value */
-	uint8_t value[0];
 } __attribute__ (( packed ));
 
 /** NDP option block size */
 #define NDP_OPTION_BLKSZ 8
+
+/** NDP source link-layer address option */
+#define NDP_OPT_LL_SOURCE 1
+
+/** NDP target link-layer address option */
+#define NDP_OPT_LL_TARGET 2
+
+/** NDP source or target link-layer address option */
+struct ndp_ll_addr_option {
+	/** NDP option header */
+	struct ndp_option_header header;
+	/** Link-layer address */
+	uint8_t ll_addr[0];
+} __attribute__ (( packed ));
+
+/** NDP prefix information option */
+#define NDP_OPT_PREFIX 3
+
+/** NDP prefix information */
+struct ndp_prefix_information_option {
+	/** NDP option header */
+	struct ndp_option_header header;
+	/** Prefix length */
+	uint8_t prefix_len;
+	/** Flags */
+	uint8_t flags;
+	/** Valid lifetime */
+	uint32_t valid;
+	/** Preferred lifetime */
+	uint32_t preferred;
+	/** Reserved */
+	uint32_t reserved;
+	/** Prefix */
+	struct in6_addr prefix;
+} __attribute__ (( packed ));
+
+/** NDP on-link flag */
+#define NDP_PREFIX_ON_LINK 0x80
+
+/** NDP autonomous address configuration flag */
+#define NDP_PREFIX_AUTONOMOUS 0x40
+
+/** An NDP option */
+union ndp_option {
+	/** Option header */
+	struct ndp_option_header header;
+	/** Source or target link-layer address option */
+	struct ndp_ll_addr_option ll_addr;
+	/** Prefix information option */
+	struct ndp_prefix_information_option prefix;
+} __attribute__ (( packed ));
 
 /** An NDP neighbour solicitation or advertisement header */
 struct ndp_neighbour_header {
@@ -39,7 +88,7 @@ struct ndp_neighbour_header {
 	/** Target address */
 	struct in6_addr target;
 	/** Options */
-	struct ndp_option option[0];
+	union ndp_option option[0];
 } __attribute__ (( packed ));
 
 /** NDP router flag */
@@ -66,7 +115,7 @@ struct ndp_router_advertisement_header {
 	/** Retransmission timer */
 	uint32_t retransmit;
 	/** Options */
-	struct ndp_option option[0];
+	union ndp_option option[0];
 } __attribute__ (( packed ));
 
 /** NDP managed address configuration */
@@ -84,12 +133,6 @@ union ndp_header {
 	/** Router advertisement header */
 	struct ndp_router_advertisement_header radv;
 } __attribute__ (( packed ));
-
-/** NDP source link-layer address option */
-#define NDP_OPT_LL_SOURCE 1
-
-/** NDP target link-layer address option */
-#define NDP_OPT_LL_TARGET 2
 
 extern struct neighbour_discovery ndp_discovery;
 
