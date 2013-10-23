@@ -250,7 +250,7 @@ static int ipv6_check_options ( struct ipv6_header *iphdr,
 		if ( option->type == IPV6_OPT_PAD1 ) {
 			option = ( ( ( void * ) option ) + 1 );
 		} else {
-			option = ( ( ( void * ) option ) + option->len );
+			option = ( ( ( void * ) option->value ) + option->len );
 		}
 	}
 	return 0;
