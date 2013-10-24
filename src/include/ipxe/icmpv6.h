@@ -46,6 +46,9 @@ struct icmpv6_handler {
 /** ICMPv6 echo reply */
 #define ICMPV6_ECHO_REPLY 129
 
+/** ICMPv6 router solicitation */
+#define ICMPV6_ROUTER_SOLICITATION 133
+
 /** ICMPv6 router advertisement */
 #define ICMPV6_ROUTER_ADVERTISEMENT 134
 

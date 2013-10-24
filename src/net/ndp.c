@@ -37,60 +37,52 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
- * Transmit NDP neighbour solicitation/advertisement packet
+ * Transmit NDP packet with link-layer address option
  *
  * @v netdev		Network device
  * @v sin6_src		Source socket address
  * @v sin6_dest		Destination socket address
- * @v target		Neighbour target address
- * @v icmp_type		ICMPv6 type
- * @v flags		NDP flags
+ * @v data		NDP header
+ * @v len		Size of NDP header
  * @v option_type	NDP option type
  * @ret rc		Return status code
  */
-static int ndp_tx_neighbour ( struct net_device *netdev,
-			      struct sockaddr_in6 *sin6_src,
-			      struct sockaddr_in6 *sin6_dest,
-			      const struct in6_addr *target,
-			      unsigned int icmp_type,
-			      unsigned int flags,
-			      unsigned int option_type ) {
+static int ndp_tx_ll_addr ( struct net_device *netdev,
+			    struct sockaddr_in6 *sin6_src,
+			    struct sockaddr_in6 *sin6_dest,
+			    const void *data, size_t len,
+			    unsigned int option_type ) {
 	struct sockaddr_tcpip *st_src =
 		( ( struct sockaddr_tcpip * ) sin6_src );
 	struct sockaddr_tcpip *st_dest =
 		( ( struct sockaddr_tcpip * ) sin6_dest );
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct io_buffer *iobuf;
-	struct ndp_neighbour_header *neigh;
 	struct ndp_ll_addr_option *ll_addr_opt;
+	union ndp_header *ndp;
 	size_t option_len;
-	size_t len;
 	int rc;
 
 	/* Allocate and populate buffer */
 	option_len = ( ( sizeof ( *ll_addr_opt ) +
 			 ll_protocol->ll_addr_len + NDP_OPTION_BLKSZ - 1 ) &
 		       ~( NDP_OPTION_BLKSZ - 1 ) );
-	len = ( sizeof ( *neigh ) + option_len );
-	iobuf = alloc_iob ( MAX_LL_NET_HEADER_LEN + len );
+	iobuf = alloc_iob ( MAX_LL_NET_HEADER_LEN + len + option_len );
 	if ( ! iobuf )
 		return -ENOMEM;
 	iob_reserve ( iobuf, MAX_LL_NET_HEADER_LEN );
-	neigh = iob_put ( iobuf, len );
-	memset ( neigh, 0, len );
-	neigh->icmp.type = icmp_type;
-	neigh->flags = flags;
-	memcpy ( &neigh->target, target, sizeof ( neigh->target ) );
-	ll_addr_opt = &neigh->option[0].ll_addr;
+	memcpy ( iob_put ( iobuf, len ), data, len );
+	ll_addr_opt = iob_put ( iobuf, option_len );
 	ll_addr_opt->header.type = option_type;
 	ll_addr_opt->header.blocks = ( option_len / NDP_OPTION_BLKSZ );
 	memcpy ( ll_addr_opt->ll_addr, netdev->ll_addr,
 		 ll_protocol->ll_addr_len );
-	neigh->icmp.chksum = tcpip_chksum ( neigh, len );
+	ndp = iobuf->data;
+	ndp->icmp.chksum = tcpip_chksum ( ndp, ( len + option_len ) );
 
 	/* Transmit packet */
 	if ( ( rc = tcpip_tx ( iobuf, &icmpv6_protocol, st_src, st_dest,
-			       netdev, &neigh->icmp.chksum ) ) != 0 ) {
+			       netdev, &ndp->icmp.chksum ) ) != 0 ) {
 		DBGC ( netdev, "NDP could not transmit packet: %s\n",
 		       strerror ( rc ) );
 		return rc;
@@ -113,6 +105,8 @@ static int ndp_tx_request ( struct net_device *netdev,
 			    const void *net_dest, const void *net_source ) {
 	struct sockaddr_in6 sin6_src;
 	struct sockaddr_in6 sin6_dest;
+	struct ndp_neighbour_header neigh;
+	int rc;
 
 	/* Construct source address */
 	memset ( &sin6_src, 0, sizeof ( sin6_src ) );
@@ -127,10 +121,18 @@ static int ndp_tx_request ( struct net_device *netdev,
 	sin6_dest.sin6_scope_id = netdev->index;
 	ipv6_solicited_node ( &sin6_dest.sin6_addr, net_dest );
 
+	/* Construct neighbour header */
+	memset ( &neigh, 0, sizeof ( neigh ) );
+	neigh.icmp.type = ICMPV6_NEIGHBOUR_SOLICITATION;
+	memcpy ( &neigh.target, net_dest, sizeof ( neigh.target ) );
+
 	/* Transmit neighbour discovery packet */
-	return ndp_tx_neighbour ( netdev, &sin6_src, &sin6_dest, net_dest,
-				  ICMPV6_NEIGHBOUR_SOLICITATION, 0,
-				  NDP_OPT_LL_SOURCE );
+	if ( ( rc = ndp_tx_ll_addr ( netdev, &sin6_src, &sin6_dest, &neigh,
+				     sizeof ( neigh ),
+				     NDP_OPT_LL_SOURCE ) ) != 0 )
+		return rc;
+
+	return 0;
 }
 
 /** NDP neighbour discovery protocol */
@@ -138,6 +140,35 @@ struct neighbour_discovery ndp_discovery = {
 	.name = "NDP",
 	.tx_request = ndp_tx_request,
 };
+
+/**
+ * Transmit NDP router solicitation
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+int ndp_tx_router_solicitation ( struct net_device *netdev ) {
+	struct ndp_router_solicitation_header rsol;
+	struct sockaddr_in6 sin6_dest;
+	int rc;
+
+	/* Construct multicast destination address */
+	memset ( &sin6_dest, 0, sizeof ( sin6_dest ) );
+	sin6_dest.sin6_family = AF_INET6;
+	sin6_dest.sin6_scope_id = netdev->index;
+	ipv6_all_routers ( &sin6_dest.sin6_addr );
+
+	/* Construct router solicitation */
+	memset ( &rsol, 0, sizeof ( rsol ) );
+	rsol.icmp.type = ICMPV6_ROUTER_SOLICITATION;
+
+	/* Transmit packet */
+	if ( ( rc = ndp_tx_ll_addr ( netdev, NULL, &sin6_dest, &rsol,
+				     sizeof ( rsol ), NDP_OPT_LL_SOURCE ) ) !=0)
+		return rc;
+
+	return 0;
+}
 
 /**
  * Process NDP neighbour solicitation source link-layer address option
@@ -185,14 +216,16 @@ ndp_rx_neighbour_solicitation_ll_source ( struct net_device *netdev,
 		return rc;
 	}
 
+	/* Convert neighbour header to advertisement */
+	memset ( neigh, 0, offsetof ( typeof ( *neigh ), target ) );
+	neigh->icmp.type = ICMPV6_NEIGHBOUR_ADVERTISEMENT;
+	neigh->flags = ( NDP_NEIGHBOUR_SOLICITED | NDP_NEIGHBOUR_OVERRIDE );
+
 	/* Send neighbour advertisement */
-	if ( ( rc = ndp_tx_neighbour ( netdev, NULL, sin6_src, &neigh->target,
-				       ICMPV6_NEIGHBOUR_ADVERTISEMENT,
-				       ( NDP_NEIGHBOUR_SOLICITED |
-					 NDP_NEIGHBOUR_OVERRIDE ),
-				       NDP_OPT_LL_TARGET ) ) != 0 ) {
+	if ( ( rc = ndp_tx_ll_addr ( netdev, NULL, sin6_src, neigh,
+				     sizeof ( *neigh ),
+				     NDP_OPT_LL_TARGET ) ) != 0 )
 		return rc;
-	}
 
 	return 0;
 }
@@ -511,7 +544,6 @@ ndp_rx_router_advertisement ( struct io_buffer *iobuf,
 	return ndp_rx ( iobuf, netdev, sin6_src,
 			offsetof ( typeof ( *radv ), option ) );
 }
-
 
 /** NDP ICMPv6 handlers */
 struct icmpv6_handler ndp_handlers[] __icmpv6_handler = {

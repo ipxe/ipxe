@@ -926,6 +926,7 @@ static int ipv6_probe ( struct net_device *netdev ) {
 	int rc;
 
 	/* Construct link-local address from EUI-64 as per RFC 2464 */
+	memset ( &address, 0, sizeof ( address ) );
 	prefix_len = ipv6_link_local ( &address, netdev );
 	if ( prefix_len < 0 ) {
 		rc = prefix_len;
