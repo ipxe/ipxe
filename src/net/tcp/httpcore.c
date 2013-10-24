@@ -51,6 +51,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/version.h>
 #include <ipxe/params.h>
 #include <ipxe/http.h>
+#include <ipxe/proxy.h>
 
 /* Disambiguate the various error causes */
 #define EACCES_401 __einfo_error ( EINFO_EACCES_401 )
@@ -235,15 +236,15 @@ static int http_socket_open ( struct http_request *http ) {
 
 	/* Open socket */
 	memset ( &server, 0, sizeof ( server ) );
-	server.st_port = htons ( uri_port ( uri, http->default_port ) );
+	server.st_port = htons ( proxied_uri_port ( uri, http->default_port ) );
 	socket = &http->socket;
 	if ( http->filter ) {
-		if ( ( rc = http->filter ( socket, uri->host, &socket ) ) != 0 )
+		if ( ( rc = http->filter ( socket, proxied_uri_host ( uri ), &socket ) ) != 0 )
 			return rc;
 	}
 	if ( ( rc = xfer_open_named_socket ( socket, SOCK_STREAM,
 					     ( struct sockaddr * ) &server,
-					     uri->host, NULL ) ) != 0 )
+					     proxied_uri_host ( uri ), NULL ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -1177,15 +1178,26 @@ static void http_step ( struct http_request *http ) {
 		   ( http->uri->params ? "POST" : "GET" ) );
 
 	/* Construct path?query request */
-	uri_len = ( unparse_uri ( NULL, 0, http->uri,
-				  URI_PATH_BIT | URI_QUERY_BIT )
+	if ( is_proxy_set ( ) ) {
+		uri_len = ( unparse_uri ( NULL, 0, http->uri,
+				  URI_ALL )
 		    + 1 /* possible "/" */ + 1 /* NUL */ );
+	} else {
+		uri_len = ( unparse_uri ( NULL, 0, http->uri,
+				   URI_PATH_BIT | URI_QUERY_BIT )
+		    + 1 /* possible "/" */ + 1 /* NUL */ );
+	}
 	uri = malloc ( uri_len );
 	if ( ! uri ) {
 		rc = -ENOMEM;
 		goto err_uri;
 	}
-	unparse_uri ( uri, uri_len, http->uri, URI_PATH_BIT | URI_QUERY_BIT );
+
+	if ( is_proxy_set ( ) ) {
+		unparse_uri ( uri, uri_len, http->uri, URI_ALL );
+	} else {
+		unparse_uri ( uri, uri_len, http->uri, URI_PATH_BIT | URI_QUERY_BIT );
+	}
 	if ( ! uri[0] ) {
 		uri[0] = '/';
 		uri[1] = '\0';

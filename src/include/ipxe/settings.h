@@ -404,6 +404,7 @@ extern struct setting uuid_setting __setting ( SETTING_HOST );
 extern struct setting next_server_setting __setting ( SETTING_BOOT );
 extern struct setting mac_setting __setting ( SETTING_NETDEV );
 extern struct setting busid_setting __setting ( SETTING_NETDEV );
+extern struct setting http_proxy_setting __setting ( SETTING_MISC );
 
 /**
  * Initialise a settings block
