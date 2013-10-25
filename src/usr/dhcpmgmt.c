@@ -51,12 +51,8 @@ int dhcp ( struct net_device *netdev ) {
 	/* Perform DHCP */
 	printf ( "DHCP (%s %s)", netdev->name,
 		 netdev->ll_protocol->ntoa ( netdev->ll_addr ) );
-	if ( ( rc = start_dhcp ( &monojob, netdev ) ) == 0 ) {
+	if ( ( rc = start_dhcp ( &monojob, netdev ) ) == 0 )
 		rc = monojob_wait ( "" );
-	} else if ( rc > 0 ) {
-		printf ( " using cached\n" );
-		rc = 0;
-	}
 
 	return rc;
 }

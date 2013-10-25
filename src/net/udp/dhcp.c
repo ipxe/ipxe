@@ -107,14 +107,6 @@ struct setting user_class_setting __setting ( SETTING_HOST_EXTRA ) = {
 	.type = &setting_type_string,
 };
 
-/** Use cached network settings */
-struct setting use_cached_setting __setting ( SETTING_MISC ) = {
-	.name = "use-cached",
-	.description = "Use cached settings",
-	.tag = DHCP_EB_USE_CACHED,
-	.type = &setting_type_uint8,
-};
-
 /**
  * Most recent DHCP transaction ID
  *
@@ -1285,36 +1277,19 @@ static struct sockaddr dhcp_peer = {
 };
 
 /**
- * Get cached DHCPACK where none exists
- */
-__weak void get_cached_dhcpack ( void ) { __keepme }
-
-/**
  * Start DHCP state machine on a network device
  *
  * @v job		Job control interface
  * @v netdev		Network device
- * @ret rc		Return status code, or positive if cached
+ * @ret rc		Return status code
  *
  * Starts DHCP on the specified network device.  If successful, the
  * DHCPACK (and ProxyDHCPACK, if applicable) will be registered as
  * option sources.
- *
- * On a return of 0, a background job has been started to perform the
- * DHCP request. Any nonzero return means the job has not been
- * started; a positive return value indicates the success condition of
- * having fetched the appropriate data from cached information.
  */
 int start_dhcp ( struct interface *job, struct net_device *netdev ) {
 	struct dhcp_session *dhcp;
 	int rc;
-
-	/* Check for cached DHCP information */
-	get_cached_dhcpack();
-	if ( fetch_uintz_setting ( NULL, &use_cached_setting ) ) {
-		DBG ( "DHCP using cached network settings\n" );
-		return 1;
-	}
 
 	/* Allocate and initialise structure */
 	dhcp = zalloc ( sizeof ( *dhcp ) );

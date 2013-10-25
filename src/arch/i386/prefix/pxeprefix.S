@@ -5,6 +5,8 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define PXENV_UNDI_GET_IFACE_INFO	0x0013
 #define	PXENV_STOP_UNDI			0x0015
 #define PXENV_UNLOAD_STACK		0x0070
+#define PXENV_GET_CACHED_INFO		0x0071
+#define PXENV_PACKET_TYPE_DHCP_ACK		0x0002
 #define PXENV_FILE_CMDLINE		0x00e8
 
 #define PXE_HACK_EB54			0x0001
@@ -20,7 +22,18 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define EB_MAGIC_1 ( 'E' + ( 't' << 8 ) + ( 'h' << 16 ) + ( 'e' << 24 ) )
 #define EB_MAGIC_2 ( 'r' + ( 'b' << 8 ) + ( 'o' << 16 ) + ( 'o' << 24 ) )
 
+/* Prefix memory layout:
+ *
+ *     iPXE binary image
+ *     Temporary stack
+ *     Temporary copy of DHCPACK packet
+ *     Temporary copy of command line
+ */
 #define PREFIX_STACK_SIZE 2048
+#define PREFIX_TEMP_DHCPACK PREFIX_STACK_SIZE
+#define PREFIX_TEMP_DHCPACK_SIZE ( 1260 /* sizeof ( BOOTPLAYER_t ) */ )
+#define PREFIX_TEMP_CMDLINE ( PREFIX_TEMP_DHCPACK + PREFIX_TEMP_DHCPACK_SIZE )
+#define PREFIX_TEMP_CMDLINE_SIZE 4096
 
 /*****************************************************************************
  * Entry point:	set operating context, print welcome message
@@ -382,6 +395,32 @@ get_iface_type:
 99:	movb	$0x0a, %al
 	call	print_character
 
+/*****************************************************************************
+ * Get cached DHCP_ACK packet
+ *****************************************************************************
+ */
+get_dhcpack:
+	/* Issue PXENV_GET_CACHED_INFO */
+	xorl	%esi, %esi
+	movw	%ss, %si
+	movw	%si, ( pxe_parameter_structure + 0x08 )
+	movw	$PREFIX_TEMP_DHCPACK, ( pxe_parameter_structure + 0x06 )
+	movw	$PREFIX_TEMP_DHCPACK_SIZE, ( pxe_parameter_structure +0x04 )
+	movw	$PXENV_PACKET_TYPE_DHCP_ACK, ( pxe_parameter_structure + 0x02 )
+	movw	$PXENV_GET_CACHED_INFO, %bx
+	call	pxe_call
+	jnc	1f
+	call	print_pxe_error
+	jmp	99f
+1:	/* Store physical address of packet */
+	shll	$4, %esi
+	addl	$PREFIX_TEMP_DHCPACK, %esi
+	movl	%esi, pxe_cached_dhcpack
+99:
+	.section ".prefix.data", "aw", @progbits
+pxe_cached_dhcpack:
+	.long	0
+	.previous
 
 /*****************************************************************************
  * Check for a command line
@@ -392,8 +431,8 @@ get_cmdline:
 	xorl	%esi, %esi
 	movw	%ss, %si
 	movw	%si, ( pxe_parameter_structure + 0x06 )
-	movw	$PREFIX_STACK_SIZE, ( pxe_parameter_structure + 0x04 )
-	movw	$0xffff, ( pxe_parameter_structure + 0x02 )
+	movw	$PREFIX_TEMP_CMDLINE, ( pxe_parameter_structure + 0x04 )
+	movw	$PREFIX_TEMP_CMDLINE_SIZE, ( pxe_parameter_structure + 0x02 )
 	movw	$PXENV_FILE_CMDLINE, %bx
 	call	pxe_call
 	jc	99f  /* Suppress errors; this is an iPXE extension API call */
@@ -403,7 +442,7 @@ get_cmdline:
 	jz	99f
 	/* Record command line */
 	shll	$4, %esi
-	addl	$PREFIX_STACK_SIZE, %esi
+	addl	$PREFIX_TEMP_CMDLINE, %esi
 	movl	%esi, pxe_cmdline
 99:
 	.section ".prefix.data", "aw", @progbits
@@ -761,6 +800,9 @@ run_ipxe:
 	/* Retrieve PXE command line, if any */
 	movl	pxe_cmdline, %esi
 
+	/* Retrieve cached DHCPACK, if any */
+	movl	pxe_cached_dhcpack, %ecx
+
 	/* Jump to .text16 segment with %ds pointing to .data16 */
 	movw	%bx, %ds
 	pushw	%ax
@@ -773,6 +815,9 @@ run_ipxe:
 
 	/* Store command-line pointer */
 	movl	%esi, cmdline_phys
+
+	/* Store cached DHCPACK pointer */
+	movl	%ecx, cached_dhcpack_phys
 
 	/* Run main program */
 	pushl	$main
