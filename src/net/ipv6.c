@@ -93,10 +93,10 @@ int ipv6_has_addr ( struct net_device *netdev, struct in6_addr *addr ) {
  *
  * @v miniroute		Routing table entry
  * @v address		IPv6 address
- * @ret is_local	Address is within this entry's local network
+ * @ret is_on_link	Address is within this entry's local network
  */
-static int ipv6_is_local ( struct ipv6_miniroute *miniroute,
-			   struct in6_addr *address ) {
+static int ipv6_is_on_link ( struct ipv6_miniroute *miniroute,
+			     struct in6_addr *address ) {
 	unsigned int i;
 
 	for ( i = 0 ; i < ( sizeof ( address->s6_addr32 ) /
@@ -192,7 +192,6 @@ static void del_ipv6_miniroute ( struct ipv6_miniroute *miniroute ) {
 static struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 					    struct in6_addr **dest ) {
 	struct ipv6_miniroute *miniroute;
-	int local;
 
 	/* Find first usable route in routing table */
 	list_for_each_entry ( miniroute, &ipv6_miniroutes, list ) {
@@ -201,25 +200,32 @@ static struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 		if ( ! netdev_is_open ( miniroute->netdev ) )
 			continue;
 
-		/* For link-local addresses, skip devices that are not
-		 * the specified network device.
-		 */
-		if ( IN6_IS_ADDR_LINKLOCAL ( *dest ) &&
-		     ( miniroute->netdev->index != scope_id ) )
-			continue;
+		if ( IN6_IS_ADDR_LINKLOCAL ( *dest ) ||
+		     IN6_IS_ADDR_MULTICAST ( *dest ) ) {
 
-		/* Skip non-gateway devices for which the prefix does
-		 * not match.
-		 */
-		local = ipv6_is_local ( miniroute, *dest );
-		if ( ! ( local || miniroute->has_router ) )
-			continue;
+			/* If destination is non-global, and the scope ID
+			 * matches this network device, then use this route.
+			 */
+			if ( miniroute->netdev->index == scope_id )
+				return miniroute;
 
-		/* Update next hop if applicable */
-		if ( ! local )
-			*dest = &miniroute->router;
+		} else {
 
-		return miniroute;
+			/* If destination is an on-link global
+			 * address, then use this route.
+			 */
+			if ( ipv6_is_on_link ( miniroute, *dest ) )
+				return miniroute;
+
+			/* If destination is an off-link global
+			 * address, and we have a default gateway,
+			 * then use this route.
+			 */
+			if ( miniroute->has_router ) {
+				*dest = &miniroute->router;
+				return miniroute;
+			}
+		}
 	}
 
 	return NULL;
@@ -363,6 +369,7 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 	struct sockaddr_in6 *sin6_dest = ( ( struct sockaddr_in6 * ) st_dest );
 	struct ipv6_miniroute *miniroute;
 	struct ipv6_header *iphdr;
+	struct in6_addr *src = NULL;
 	struct in6_addr *next_hop;
 	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
 	const void *ll_dest;
@@ -381,15 +388,9 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 
 	/* Use routing table to identify next hop and transmitting netdev */
 	next_hop = &iphdr->dest;
-	if ( sin6_src ) {
-		memcpy ( &iphdr->src, &sin6_src->sin6_addr,
-			 sizeof ( iphdr->src ) );
-	}
-	if ( ( ! IN6_IS_ADDR_MULTICAST ( next_hop ) ) &&
-	     ( ( miniroute = ipv6_route ( sin6_dest->sin6_scope_id,
-					  &next_hop ) ) != NULL ) ) {
-		memcpy ( &iphdr->src, &miniroute->address,
-			 sizeof ( iphdr->src ) );
+	if ( ( miniroute = ipv6_route ( sin6_dest->sin6_scope_id,
+					&next_hop ) ) != NULL ) {
+		src = &miniroute->address;
 		netdev = miniroute->netdev;
 	}
 	if ( ! netdev ) {
@@ -398,6 +399,9 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 		rc = -ENETUNREACH;
 		goto err;
 	}
+	if ( sin6_src )
+		src = &sin6_src->sin6_addr;
+	memcpy ( &iphdr->src, src, sizeof ( iphdr->src ) );
 
 	/* Fix up checksums */
 	if ( trans_csum ) {
@@ -897,7 +901,7 @@ int ipv6_slaac ( struct net_device *netdev, struct in6_addr *prefix,
 
 	/* Delete any existing SLAAC miniroutes for this prefix */
 	list_for_each_entry_safe ( miniroute, tmp, &ipv6_miniroutes, list ) {
-		if ( ipv6_is_local ( miniroute, &address ) )
+		if ( ipv6_is_on_link ( miniroute, &address ) )
 			del_ipv6_miniroute ( miniroute );
 	}
 
