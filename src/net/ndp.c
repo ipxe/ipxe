@@ -119,12 +119,12 @@ static int ndp_tx_request ( struct net_device *netdev,
 	sin6_src.sin6_family = AF_INET6;
 	memcpy ( &sin6_src.sin6_addr, net_source,
 		 sizeof ( sin6_src.sin6_addr ) );
-	sin6_src.sin6_scope_id = htons ( netdev->index );
+	sin6_src.sin6_scope_id = netdev->index;
 
 	/* Construct multicast destination address */
 	memset ( &sin6_dest, 0, sizeof ( sin6_dest ) );
 	sin6_dest.sin6_family = AF_INET6;
-	sin6_dest.sin6_scope_id = htons ( netdev->index );
+	sin6_dest.sin6_scope_id = netdev->index;
 	ipv6_solicited_node ( &sin6_dest.sin6_addr, net_dest );
 
 	/* Transmit neighbour discovery packet */

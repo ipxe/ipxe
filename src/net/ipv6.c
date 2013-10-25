@@ -386,7 +386,7 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 			 sizeof ( iphdr->src ) );
 	}
 	if ( ( ! IN6_IS_ADDR_MULTICAST ( next_hop ) ) &&
-	     ( ( miniroute = ipv6_route ( ntohl ( sin6_dest->sin6_scope_id ),
+	     ( ( miniroute = ipv6_route ( sin6_dest->sin6_scope_id,
 					  &next_hop ) ) != NULL ) ) {
 		memcpy ( &iphdr->src, &miniroute->address,
 			 sizeof ( iphdr->src ) );
@@ -599,12 +599,12 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	src.sin6.sin6_family = AF_INET6;
 	memcpy ( &src.sin6.sin6_addr, &iphdr->src,
 		 sizeof ( src.sin6.sin6_addr ) );
-	src.sin6.sin6_scope_id = htonl ( netdev->index );
+	src.sin6.sin6_scope_id = netdev->index;
 	memset ( &dest, 0, sizeof ( dest ) );
 	dest.sin6.sin6_family = AF_INET6;
 	memcpy ( &dest.sin6.sin6_addr, &iphdr->dest,
 		 sizeof ( dest.sin6.sin6_addr ) );
-	dest.sin6.sin6_scope_id = htonl ( netdev->index );
+	dest.sin6.sin6_scope_id = netdev->index;
 	iob_pull ( iobuf, hdrlen );
 	pshdr_csum = ipv6_pshdr_chksum ( iphdr, iob_len ( iobuf ),
 					 next_header, TCPIP_EMPTY_CSUM );
