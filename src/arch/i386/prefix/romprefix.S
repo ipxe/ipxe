@@ -295,6 +295,7 @@ no_pci3:
 	popl	%edx
 	popl	%ebx
 
+#ifndef NONPNP_FORCE
 	/* Check for PnP BIOS.  Although %es:di should point to the
 	 * PnP BIOS signature on entry, some BIOSes fail to do this.
 	 */
@@ -317,6 +318,7 @@ pnp_scan:
 	xorw	%di, %di
 	call	print_message
 	jmp	pnp_done
+#endif /* NONPNP_FORCE */
 no_pnp:	/* Not PnP-compliant - hook INT 19 */
 #ifdef NONPNP_HOOK_INT19
 	movw	$init_message_int19, %si

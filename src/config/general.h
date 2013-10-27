@@ -139,7 +139,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * ROM-specific options
  *
  */
+/* Some BIOSes do not allow to be configured to boot from option ROMs.
+ * The first option below enables hooking of INT19 on non-PnP BIOSes
+ * to allow iPXE to hijack the boot process. The second option allows
+ * this even for PnP BIOSes by enforcing the detection of a non-PnP BIOS. */
 #undef	NONPNP_HOOK_INT19	/* Hook INT19 on non-PnP BIOSes */
+#undef	NONPNP_FORCE		/* Force non-PnP BIOS */
 
 /*
  * Error message tables to include
