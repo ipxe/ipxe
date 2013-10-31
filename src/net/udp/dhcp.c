@@ -1471,3 +1471,9 @@ int start_pxebs ( struct interface *job, struct net_device *netdev,
 	ref_put ( &dhcp->refcnt );
 	return rc;
 }
+
+/** DHCP network device configurator */
+struct net_device_configurator dhcp_configurator __net_device_configurator = {
+	.name = "dhcp",
+	.start = start_dhcp,
+};
