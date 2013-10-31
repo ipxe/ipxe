@@ -90,8 +90,10 @@ static int netdev_has_ll_addr ( struct net_device *netdev ) {
 static void netdev_notify ( struct net_device *netdev ) {
 	struct net_driver *driver;
 
-	for_each_table_entry ( driver, NET_DRIVERS )
-		driver->notify ( netdev );
+	for_each_table_entry ( driver, NET_DRIVERS ) {
+		if ( driver->notify )
+			driver->notify ( netdev );
+	}
 }
 
 /**
@@ -535,7 +537,7 @@ int register_netdev ( struct net_device *netdev ) {
 
 	/* Probe device */
 	for_each_table_entry ( driver, NET_DRIVERS ) {
-		if ( ( rc = driver->probe ( netdev ) ) != 0 ) {
+		if ( driver->probe && ( rc = driver->probe ( netdev ) ) != 0 ) {
 			DBGC ( netdev, "NETDEV %s could not add %s device: "
 			       "%s\n", netdev->name, driver->name,
 			       strerror ( rc ) );
@@ -546,8 +548,10 @@ int register_netdev ( struct net_device *netdev ) {
 	return 0;
 
  err_probe:
-	for_each_table_entry_continue_reverse ( driver, NET_DRIVERS )
-		driver->remove ( netdev );
+	for_each_table_entry_continue_reverse ( driver, NET_DRIVERS ) {
+		if ( driver->remove )
+			driver->remove ( netdev );
+	}
 	clear_settings ( netdev_settings ( netdev ) );
 	unregister_settings ( netdev_settings ( netdev ) );
  err_register_settings:
@@ -629,8 +633,10 @@ void unregister_netdev ( struct net_device *netdev ) {
 	netdev_close ( netdev );
 
 	/* Remove device */
-	for_each_table_entry_reverse ( driver, NET_DRIVERS )
-		driver->remove ( netdev );
+	for_each_table_entry_reverse ( driver, NET_DRIVERS ) {
+		if ( driver->remove )
+			driver->remove ( netdev );
+	}
 
 	/* Unregister per-netdev configuration settings */
 	clear_settings ( netdev_settings ( netdev ) );

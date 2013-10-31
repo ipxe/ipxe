@@ -244,15 +244,6 @@ static int guestinfo_net_probe ( struct net_device *netdev ) {
 }
 
 /**
- * Handle network device or link state change
- *
- * @v netdev		Network device
- */
-static void guestinfo_net_notify ( struct net_device *netdev __unused ) {
-	/* Nothing to do */
-}
-
-/**
  * Remove per-netdevice GuestInfo settings
  *
  * @v netdev		Network device
@@ -276,6 +267,5 @@ static void guestinfo_net_remove ( struct net_device *netdev ) {
 struct net_driver guestinfo_net_driver __net_driver = {
 	.name = "GuestInfo",
 	.probe = guestinfo_net_probe,
-	.notify = guestinfo_net_notify,
 	.remove = guestinfo_net_remove,
 };

@@ -159,30 +159,8 @@ static int cachedhcp_probe ( struct net_device *netdev ) {
 	return 0;
 }
 
-/**
- * Handle network device link state change
- *
- * @v netdev		Network device
- */
-static void cachedhcp_notify ( struct net_device *netdev __unused ) {
-
-	/* Nothing to do */
-}
-
-/**
- * Handle network device removal
- *
- * @v netdev		Network device
- */
-static void cachedhcp_remove ( struct net_device *netdev __unused ) {
-
-	/* Nothing to do */
-}
-
 /** Cached DHCP packet network device driver */
 struct net_driver cachedhcp_driver __net_driver = {
 	.name = "cachedhcp",
 	.probe = cachedhcp_probe,
-	.notify = cachedhcp_notify,
-	.remove = cachedhcp_remove,
 };

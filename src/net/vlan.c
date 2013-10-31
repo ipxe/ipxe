@@ -440,16 +440,6 @@ int vlan_destroy ( struct net_device *netdev ) {
 }
 
 /**
- * Do nothing
- *
- * @v trunk		Trunk network device
- * @ret rc		Return status code
- */
-static int vlan_probe ( struct net_device *trunk __unused ) {
-	return 0;
-}
-
-/**
  * Handle trunk network device link state change
  *
  * @v trunk		Trunk network device
@@ -505,7 +495,6 @@ static void vlan_remove ( struct net_device *trunk ) {
 /** VLAN driver */
 struct net_driver vlan_driver __net_driver = {
 	.name = "VLAN",
-	.probe = vlan_probe,
 	.notify = vlan_notify,
 	.remove = vlan_remove,
 };

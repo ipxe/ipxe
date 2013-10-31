@@ -944,16 +944,6 @@ static int ipv6_probe ( struct net_device *netdev ) {
 }
 
 /**
- * Handle IPv6 network device or link state change
- *
- * @v netdev		Network device
- */
-static void ipv6_notify ( struct net_device *netdev __unused ) {
-
-	/* Nothing to do */
-}
-
-/**
  * Destroy IPv6 network device
  *
  * @v netdev		Network device
@@ -973,7 +963,6 @@ static void ipv6_remove ( struct net_device *netdev ) {
 struct net_driver ipv6_driver __net_driver = {
 	.name = "IPv6",
 	.probe = ipv6_probe,
-	.notify = ipv6_notify,
 	.remove = ipv6_remove,
 };
 

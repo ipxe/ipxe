@@ -376,16 +376,6 @@ int neighbour_define ( struct net_device *netdev,
 }
 
 /**
- * Update neighbour cache on network device creation
- *
- * @v netdev		Network device
- */
-static int neighbour_probe ( struct net_device *netdev __unused ) {
-	/* Nothing to do */
-	return 0;
-}
-
-/**
  * Update neighbour cache on network device state change or removal
  *
  * @v netdev		Network device
@@ -404,7 +394,6 @@ static void neighbour_flush ( struct net_device *netdev ) {
 /** Neighbour driver (for net device notifications) */
 struct net_driver neighbour_net_driver __net_driver = {
 	.name = "Neighbour",
-	.probe = neighbour_probe,
 	.notify = neighbour_flush,
 	.remove = neighbour_flush,
 };
