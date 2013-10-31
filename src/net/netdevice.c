@@ -54,6 +54,16 @@ static struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
 #define EINFO_EUNKNOWN_LINK_STATUS \
 	__einfo_uniqify ( EINFO_EINPROGRESS, 0x01, "Unknown" )
 
+/** Default not-yet-attempted-configuration status code */
+#define EUNUSED_CONFIG __einfo_error ( EINFO_EUNUSED_CONFIG )
+#define EINFO_EUNUSED_CONFIG \
+	__einfo_uniqify ( EINFO_EINPROGRESS, 0x02, "Unused" )
+
+/** Default configuration-in-progress status code */
+#define EINPROGRESS_CONFIG __einfo_error ( EINFO_EINPROGRESS_CONFIG )
+#define EINFO_EINPROGRESS_CONFIG \
+	__einfo_uniqify ( EINFO_EINPROGRESS, 0x03, "Incomplete" )
+
 /** Default link-down status code */
 #define ENOTCONN_LINK_DOWN __einfo_error ( EINFO_ENOTCONN_LINK_DOWN )
 #define EINFO_ENOTCONN_LINK_DOWN \
@@ -63,6 +73,8 @@ static struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
 struct errortab netdev_errors[] __errortab = {
 	__einfo_errortab ( EINFO_EUNKNOWN_LINK_STATUS ),
 	__einfo_errortab ( EINFO_ENOTCONN_LINK_DOWN ),
+	__einfo_errortab ( EINFO_EUNUSED_CONFIG ),
+	__einfo_errortab ( EINFO_EINPROGRESS_CONFIG ),
 };
 
 /**
@@ -444,6 +456,41 @@ static void netdev_rx_flush ( struct net_device *netdev ) {
 }
 
 /**
+ * Finish network device configuration
+ *
+ * @v config		Network device configuration
+ * @v rc		Reason for completion
+ */
+static void netdev_config_close ( struct net_device_configuration *config,
+				  int rc ) {
+	struct net_device_configurator *configurator = config->configurator;
+	struct net_device *netdev = config->netdev;
+
+	/* Restart interface */
+	intf_restart ( &config->job, rc );
+
+	/* Record configuration result */
+	config->rc = rc;
+	if ( rc == 0 ) {
+		DBGC ( netdev, "NETDEV %s configured via %s\n",
+		       netdev->name, configurator->name );
+	} else {
+		DBGC ( netdev, "NETDEV %s configuration via %s failed: %s\n",
+		       netdev->name, configurator->name, strerror ( rc ) );
+	}
+}
+
+/** Network device configuration interface operations */
+static struct interface_operation netdev_config_ops[] = {
+	INTF_OP ( intf_close, struct net_device_configuration *,
+		  netdev_config_close ),
+};
+
+/** Network device configuration interface descriptor */
+static struct interface_descriptor netdev_config_desc =
+	INTF_DESC ( struct net_device_configuration, job, netdev_config_ops );
+
+/**
  * Free network device
  *
  * @v refcnt		Network device reference counter
@@ -461,16 +508,22 @@ static void free_netdev ( struct refcnt *refcnt ) {
 /**
  * Allocate network device
  *
- * @v priv_size		Size of private data area (net_device::priv)
+ * @v priv_len		Length of private data area (net_device::priv)
  * @ret netdev		Network device, or NULL
  *
  * Allocates space for a network device and its private data area.
  */
-struct net_device * alloc_netdev ( size_t priv_size ) {
+struct net_device * alloc_netdev ( size_t priv_len ) {
 	struct net_device *netdev;
+	struct net_device_configurator *configurator;
+	struct net_device_configuration *config;
+	unsigned int num_configs;
+	size_t confs_len;
 	size_t total_len;
 
-	total_len = ( sizeof ( *netdev ) + priv_size );
+	num_configs = table_num_entries ( NET_DEVICE_CONFIGURATORS );
+	confs_len = ( num_configs * sizeof ( netdev->configs[0] ) );
+	total_len = ( sizeof ( *netdev ) + confs_len + priv_len );
 	netdev = zalloc ( total_len );
 	if ( netdev ) {
 		ref_init ( &netdev->refcnt, free_netdev );
@@ -479,7 +532,17 @@ struct net_device * alloc_netdev ( size_t priv_size ) {
 		INIT_LIST_HEAD ( &netdev->tx_deferred );
 		INIT_LIST_HEAD ( &netdev->rx_queue );
 		netdev_settings_init ( netdev );
-		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) );
+		config = netdev->configs;
+		for_each_table_entry ( configurator, NET_DEVICE_CONFIGURATORS ){
+			config->netdev = netdev;
+			config->configurator = configurator;
+			config->rc = -EUNUSED_CONFIG;
+			intf_init ( &config->job, &netdev_config_desc,
+				    &netdev->refcnt );
+			config++;
+		}
+		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) +
+				 confs_len );
 	}
 	return netdev;
 }
@@ -595,12 +658,23 @@ int netdev_open ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 void netdev_close ( struct net_device *netdev ) {
+	unsigned int num_configs;
+	unsigned int i;
 
 	/* Do nothing if device is already closed */
 	if ( ! ( netdev->state & NETDEV_OPEN ) )
 		return;
 
 	DBGC ( netdev, "NETDEV %s closing\n", netdev->name );
+
+	/* Terminate any ongoing configurations.  Use intf_close()
+	 * rather than intf_restart() to allow the cancellation to be
+	 * reported back to us if a configuration is actually in
+	 * progress.
+	 */
+	num_configs = table_num_entries ( NET_DEVICE_CONFIGURATORS );
+	for ( i = 0 ; i < num_configs ; i++ )
+		intf_close ( &netdev->configs[i].job, -ECANCELED );
 
 	/* Remove from open devices list */
 	list_del ( &netdev->open_list );
@@ -643,9 +717,9 @@ void unregister_netdev ( struct net_device *netdev ) {
 	unregister_settings ( netdev_settings ( netdev ) );
 
 	/* Remove from device list */
+	DBGC ( netdev, "NETDEV %s unregistered\n", netdev->name );
 	list_del ( &netdev->list );
 	netdev_put ( netdev );
-	DBGC ( netdev, "NETDEV %s unregistered\n", netdev->name );
 }
 
 /** Enable or disable interrupts
@@ -931,3 +1005,127 @@ static unsigned int net_discard ( void ) {
 struct cache_discarder net_discarder __cache_discarder ( CACHE_NORMAL ) = {
 	.discard = net_discard,
 };
+
+/**
+ * Find network device configurator
+ *
+ * @v name		Name
+ * @ret configurator	Network device configurator, or NULL
+ */
+struct net_device_configurator * find_netdev_configurator ( const char *name ) {
+	struct net_device_configurator *configurator;
+
+	for_each_table_entry ( configurator, NET_DEVICE_CONFIGURATORS ) {
+		if ( strcmp ( configurator->name, name ) == 0 )
+			return configurator;
+	}
+	return NULL;
+}
+
+/**
+ * Start network device configuration
+ *
+ * @v netdev		Network device
+ * @v configurator	Network device configurator
+ * @ret rc		Return status code
+ */
+int netdev_configure ( struct net_device *netdev,
+		       struct net_device_configurator *configurator ) {
+	struct net_device_configuration *config =
+		netdev_configuration ( netdev, configurator );
+	int rc;
+
+	/* Check applicability of configurator */
+	if ( ! netdev_configurator_applies ( netdev, configurator ) ) {
+		DBGC ( netdev, "NETDEV %s does not support configuration via "
+		       "%s\n", netdev->name, configurator->name );
+		return -ENOTSUP;
+	}
+
+	/* Terminate any ongoing configuration */
+	intf_restart ( &config->job, -ECANCELED );
+
+	/* Mark configuration as being in progress */
+	config->rc = -EINPROGRESS_CONFIG;
+
+	DBGC ( netdev, "NETDEV %s starting configuration via %s\n",
+	       netdev->name, configurator->name );
+
+	/* Start configuration */
+	if ( ( rc = configurator->start ( &config->job, netdev ) ) != 0 ) {
+		DBGC ( netdev, "NETDEV %s could not start configuration via "
+		       "%s: %s\n", netdev->name, configurator->name,
+		       strerror ( rc ) );
+		config->rc = rc;
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Start network device configuration via all supported configurators
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+int netdev_configure_all ( struct net_device *netdev ) {
+	struct net_device_configurator *configurator;
+	int rc;
+
+	/* Start configuration for each configurator */
+	for_each_table_entry ( configurator, NET_DEVICE_CONFIGURATORS ) {
+
+		/* Skip any inapplicable configurators */
+		if ( ! netdev_configurator_applies ( netdev, configurator ) )
+			continue;
+
+		/* Start configuration */
+		if ( ( rc = netdev_configure ( netdev, configurator ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Check if network device has a configuration with a specified status code
+ *
+ * @v netdev		Network device
+ * @v rc		Status code
+ * @ret has_rc		Network device has a configuration with this status code
+ */
+static int netdev_has_configuration_rc ( struct net_device *netdev, int rc ) {
+	unsigned int num_configs;
+	unsigned int i;
+
+	num_configs = table_num_entries ( NET_DEVICE_CONFIGURATORS );
+	for ( i = 0 ; i < num_configs ; i++ ) {
+		if ( netdev->configs[i].rc == rc )
+			return 1;
+	}
+	return 0;
+}
+
+/**
+ * Check if network device configuration is in progress
+ *
+ * @v netdev		Network device
+ * @ret is_in_progress	Network device configuration is in progress
+ */
+int netdev_configuration_in_progress ( struct net_device *netdev ) {
+
+	return netdev_has_configuration_rc ( netdev, -EINPROGRESS_CONFIG );
+}
+
+/**
+ * Check if network device has at least one successful configuration
+ *
+ * @v netdev		Network device
+ * @v configurator	Configurator
+ * @ret rc		Return status code
+ */
+int netdev_configuration_ok ( struct net_device *netdev ) {
+
+	return netdev_has_configuration_rc ( netdev, 0 );
+}
