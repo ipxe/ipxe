@@ -34,8 +34,24 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/**
+ * Close null interface
+ *
+ * @v intf		Null interface
+ * @v rc		Reason for close
+ */
+static void null_intf_close ( struct interface *intf __unused,
+			      int rc __unused ) {
+
+	/* Do nothing.  In particular, do not call intf_restart(),
+	 * since that would result in an infinite loop.
+	 */
+}
+
 /** Null interface operations */
-static struct interface_operation null_intf_op[] = {};
+static struct interface_operation null_intf_op[] = {
+	INTF_OP ( intf_close, struct interface *, null_intf_close ),
+};
 
 /** Null interface descriptor */
 struct interface_descriptor null_intf_desc =
@@ -233,7 +249,8 @@ void intf_close ( struct interface *intf, int rc ) {
 	if ( op ) {
 		op ( object, rc );
 	} else {
-		/* Default is to ignore intf_close() */
+		/* Default is to restart the interface */
+		intf_restart ( dest, rc );
 	}
 
 	intf_put ( dest );
