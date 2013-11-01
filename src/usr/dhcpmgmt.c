@@ -25,11 +25,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/netdevice.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/monojob.h>
-#include <ipxe/process.h>
+#include <ipxe/timer.h>
 #include <usr/ifmgmt.h>
 #include <usr/dhcpmgmt.h>
 
-#define LINK_WAIT_MS	15000
+/** Default time to wait for link-up */
+#define LINK_WAIT_TIMEOUT ( 15 * TICKS_PER_SEC )
 
 /** @file
  *
@@ -45,7 +46,7 @@ int dhcp ( struct net_device *netdev ) {
 		return rc;
 
 	/* Wait for link-up */
-	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_MS ) ) != 0 )
+	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_TIMEOUT ) ) != 0 )
 		return rc;
 
 	/* Perform DHCP */

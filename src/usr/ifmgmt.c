@@ -26,8 +26,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/console.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/device.h>
-#include <ipxe/process.h>
-#include <ipxe/keys.h>
+#include <ipxe/job.h>
+#include <ipxe/monojob.h>
+#include <ipxe/nap.h>
 #include <usr/ifmgmt.h>
 
 /** @file
@@ -104,49 +105,104 @@ void ifstat ( struct net_device *netdev ) {
 	ifstat_errors ( &netdev->rx_stats, "RXE" );
 }
 
+/** Network device poller */
+struct ifpoller {
+	/** Job control interface */
+	struct interface job;
+	/** Network device */
+	struct net_device *netdev;
+	/**
+	 * Check progress
+	 *
+	 * @v ifpoller		Network device poller
+	 * @ret ongoing_rc	Ongoing job status code (if known)
+	 */
+	int ( * progress ) ( struct ifpoller *ifpoller );
+};
+
+/**
+ * Report network device poller progress
+ *
+ * @v ifpoller		Network device poller
+ * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int ifpoller_progress ( struct ifpoller *ifpoller,
+			       struct job_progress *progress __unused ) {
+
+	/* Reduce CPU utilisation */
+	cpu_nap();
+
+	/* Hand off to current progress checker */
+	return ifpoller->progress ( ifpoller );
+}
+
+/** Network device poller operations */
+static struct interface_operation ifpoller_job_op[] = {
+	INTF_OP ( job_progress, struct ifpoller *, ifpoller_progress ),
+};
+
+/** Network device poller descriptor */
+static struct interface_descriptor ifpoller_job_desc =
+	INTF_DESC ( struct ifpoller, job, ifpoller_job_op );
+
+/**
+ * Poll network device until completion
+ *
+ * @v netdev		Network device
+ * @v timeout		Timeout period, in ticks
+ * @v progress		Method to check progress
+ * @ret rc		Return status code
+ */
+static int ifpoller_wait ( struct net_device *netdev, unsigned long timeout,
+			   int ( * progress ) ( struct ifpoller *ifpoller ) ) {
+	static struct ifpoller ifpoller = {
+		.job = INTF_INIT ( ifpoller_job_desc ),
+	};
+
+	ifpoller.netdev = netdev;
+	ifpoller.progress = progress;
+	intf_plug_plug ( &monojob, &ifpoller.job );
+	return monojob_wait ( "", timeout );
+}
+
+/**
+ * Check link-up progress
+ *
+ * @v ifpoller		Network device poller
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int iflinkwait_progress ( struct ifpoller *ifpoller ) {
+	struct net_device *netdev = ifpoller->netdev;
+	int ongoing_rc = netdev->link_rc;
+
+	/* Terminate successfully if link is up */
+	if ( ongoing_rc == 0 )
+		intf_close ( &ifpoller->job, 0 );
+
+	/* Otherwise, report link status as ongoing job status */
+	return ongoing_rc;
+}
+
 /**
  * Wait for link-up, with status indication
  *
  * @v netdev		Network device
- * @v max_wait_ms	Maximum time to wait, in ms
+ * @v timeout		Timeout period, in ticks
  */
-int iflinkwait ( struct net_device *netdev, unsigned int max_wait_ms ) {
-	int key;
+int iflinkwait ( struct net_device *netdev, unsigned long timeout ) {
 	int rc;
 
-	/* Allow link state to be updated */
-	netdev_poll ( netdev );
+	/* Ensure device is open */
+	if ( ( rc = ifopen ( netdev ) ) != 0 )
+		return rc;
 
+	/* Return immediately if link is already up */
+	netdev_poll ( netdev );
 	if ( netdev_link_ok ( netdev ) )
 		return 0;
 
-	printf ( "Waiting for link-up on %s...", netdev->name );
-
-	while ( 1 ) {
-		if ( netdev_link_ok ( netdev ) ) {
-			rc = 0;
-			break;
-		}
-		if ( max_wait_ms-- == 0 ) {
-			rc = netdev->link_rc;
-			break;
-		}
-		step();
-		if ( iskey() ) {
-			key = getchar();
-			if ( key == CTRL_C ) {
-				rc = -ECANCELED;
-				break;
-			}
-		}
-		mdelay ( 1 );
-	}
-
-	if ( rc == 0 ) {
-		printf ( " ok\n" );
-	} else {
-		printf ( " failed: %s\n", strerror ( rc ) );
-	}
-
-	return rc;
+	/* Wait for link-up */
+	printf ( "Waiting for link-up on %s", netdev->name );
+	return ifpoller_wait ( netdev, timeout, iflinkwait_progress );
 }

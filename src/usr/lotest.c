@@ -39,8 +39,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-#define LINK_WAIT_MS 15000
-
 /**
  * Process received packet
  *
@@ -189,9 +187,9 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 		return rc;
 
 	/* Wait for link-up */
-	if ( ( rc = iflinkwait ( sender, LINK_WAIT_MS ) ) != 0 )
+	if ( ( rc = iflinkwait ( sender, 0 ) ) != 0 )
 		return rc;
-	if ( ( rc = iflinkwait ( receiver, LINK_WAIT_MS ) ) != 0 )
+	if ( ( rc = iflinkwait ( receiver, 0 ) ) != 0 )
 		return rc;
 
 	/* Allocate data buffer */
