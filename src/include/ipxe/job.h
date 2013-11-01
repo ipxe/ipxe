@@ -30,9 +30,9 @@ struct job_progress {
 	unsigned long total;
 };
 
-extern void job_progress ( struct interface *intf,
-			   struct job_progress *progress );
+extern int job_progress ( struct interface *intf,
+			  struct job_progress *progress );
 #define job_progress_TYPE( object_type ) \
-	typeof ( void ( object_type, struct job_progress *progress ) )
+	typeof ( int ( object_type, struct job_progress *progress ) )
 
 #endif /* _IPXE_JOB_H */

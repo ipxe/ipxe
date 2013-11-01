@@ -131,9 +131,10 @@ static int downloader_ensure_size ( struct downloader *downloader,
  *
  * @v downloader	Downloader
  * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
  */
-static void downloader_progress ( struct downloader *downloader,
-				  struct job_progress *progress ) {
+static int downloader_progress ( struct downloader *downloader,
+				 struct job_progress *progress ) {
 
 	/* This is not entirely accurate, since downloaded data may
 	 * arrive out of order (e.g. with multicast protocols), but
@@ -141,6 +142,8 @@ static void downloader_progress ( struct downloader *downloader,
 	 */
 	progress->completed = downloader->pos;
 	progress->total = downloader->image->len;
+
+	return 0;
 }
 
 /****************************************************************************
