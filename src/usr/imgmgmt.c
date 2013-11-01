@@ -72,7 +72,7 @@ int imgdownload ( struct uri *uri, struct image **image ) {
 	}
 
 	/* Wait for download to complete */
-	if ( ( rc = monojob_wait ( uri_string_redacted ) ) != 0 )
+	if ( ( rc = monojob_wait ( uri_string_redacted, 0 ) ) != 0 )
 		goto err_monojob_wait;
 
 	/* Register image */

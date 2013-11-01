@@ -77,7 +77,7 @@ int imgverify ( struct image *image, struct image *signature,
 	list_for_each_entry ( info, &sig->info, list ) {
 		if ( ( rc = create_validator ( &monojob, info->chain ) ) != 0 )
 			goto err_create_validator;
-		if ( ( rc = monojob_wait ( NULL ) ) != 0 )
+		if ( ( rc = monojob_wait ( NULL, 0 ) ) != 0 )
 			goto err_validator_wait;
 	}
 

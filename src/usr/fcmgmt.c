@@ -112,5 +112,5 @@ int fcels ( struct fc_port *port, struct fc_port_id *peer_port_id,
 	}
 
 	/* Wait for ELS to complete */
-	return monojob_wait ( "" );
+	return monojob_wait ( "", 0 );
 }

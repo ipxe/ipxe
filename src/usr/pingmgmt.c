@@ -71,7 +71,7 @@ int ping ( const char *hostname, unsigned long timeout, size_t len ) {
 	}
 
 	/* Wait for ping to complete */
-	if ( ( rc = monojob_wait ( NULL ) ) != 0 ) {
+	if ( ( rc = monojob_wait ( NULL, 0 ) ) != 0 ) {
 		printf ( "Finished: %s\n", strerror ( rc ) );
 		return rc;
 	}

@@ -13,6 +13,6 @@ struct interface;
 
 extern struct interface monojob;
 
-extern int monojob_wait ( const char *string );
+extern int monojob_wait ( const char *string, unsigned long timeout );
 
 #endif /* _IPXE_MONOJOB_H */

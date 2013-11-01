@@ -186,7 +186,7 @@ int nslookup ( const char *name, const char *setting_name ) {
 
 	/* Perform name resolution */
 	if ( ( rc = resolv_setting ( &monojob, name, setting_name ) ) == 0 )
-		rc = monojob_wait ( NULL );
+		rc = monojob_wait ( NULL, 0 );
 	if ( rc != 0 ) {
 		printf ( "Could not resolve %s: %s\n", name, strerror ( rc ) );
 		return rc;

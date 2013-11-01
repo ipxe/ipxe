@@ -52,7 +52,7 @@ int dhcp ( struct net_device *netdev ) {
 	printf ( "DHCP (%s %s)", netdev->name,
 		 netdev->ll_protocol->ntoa ( netdev->ll_addr ) );
 	if ( ( rc = start_dhcp ( &monojob, netdev ) ) == 0 )
-		rc = monojob_wait ( "" );
+		rc = monojob_wait ( "", 0 );
 
 	return rc;
 }
@@ -63,7 +63,7 @@ int pxebs ( struct net_device *netdev, unsigned int pxe_type ) {
 	/* Perform PXE Boot Server Discovery */
 	printf ( "PXEBS (%s type %d)", netdev->name, pxe_type );
 	if ( ( rc = start_pxebs ( &monojob, netdev, pxe_type ) ) == 0 )
-		rc = monojob_wait ( "" );
+		rc = monojob_wait ( "", 0 );
 
 	return rc;
 }
