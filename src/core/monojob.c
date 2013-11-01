@@ -69,6 +69,7 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 	unsigned long total;
 	unsigned int percentage;
 	int shown_percentage = 0;
+	int ongoing_rc;
 	int key;
 	int rc;
 
@@ -97,10 +98,13 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 			last_keycheck = now;
 		}
 
+		/* Monitor progress */
+		ongoing_rc = job_progress ( &monojob, &progress );
+
 		/* Check for timeout, if applicable */
 		elapsed = ( now - start );
 		if ( timeout && ( elapsed >= timeout ) ) {
-			monojob_rc = -ETIMEDOUT;
+			monojob_rc = ( ongoing_rc ? ongoing_rc : -ETIMEDOUT );
 			break;
 		}
 
@@ -109,7 +113,6 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 		if ( string && ( elapsed >= TICKS_PER_SEC ) ) {
 			if ( shown_percentage )
 				printf ( "\b\b\b\b    \b\b\b\b" );
-			job_progress ( &monojob, &progress );
 			/* Normalise progress figures to avoid overflow */
 			completed = ( progress.completed / 128 );
 			total = ( progress.total / 128 );
