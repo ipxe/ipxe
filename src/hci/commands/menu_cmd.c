@@ -194,7 +194,7 @@ struct choose_options {
 	/** Menu name */
 	char *menu;
 	/** Timeout */
-	unsigned int timeout;
+	unsigned long timeout;
 	/** Default selection */
 	char *select;
 	/** Keep menu */
@@ -208,7 +208,7 @@ static struct option_descriptor choose_opts[] = {
 	OPTION_DESC ( "default", 'd', required_argument,
 		      struct choose_options, select, parse_string ),
 	OPTION_DESC ( "timeout", 't', required_argument,
-		      struct choose_options, timeout, parse_integer ),
+		      struct choose_options, timeout, parse_timeout ),
 	OPTION_DESC ( "keep", 'k', no_argument,
 		      struct choose_options, keep, parse_flag ),
 };

@@ -361,7 +361,7 @@ struct prompt_options {
 	/** Key to wait for */
 	unsigned int key;
 	/** Timeout */
-	unsigned int timeout;
+	unsigned long timeout;
 };
 
 /** "prompt" option list */
@@ -369,7 +369,7 @@ static struct option_descriptor prompt_opts[] = {
 	OPTION_DESC ( "key", 'k', required_argument,
 		      struct prompt_options, key, parse_key ),
 	OPTION_DESC ( "timeout", 't', required_argument,
-		      struct prompt_options, timeout, parse_integer ),
+		      struct prompt_options, timeout, parse_timeout ),
 };
 
 /** "prompt" command descriptor */

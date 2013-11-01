@@ -126,6 +126,7 @@ struct named_setting {
 
 extern int parse_string ( char *text, char **value );
 extern int parse_integer ( char *text, unsigned int *value );
+extern int parse_timeout ( char *text, unsigned long *value );
 extern int parse_netdev ( char *text, struct net_device **netdev );
 extern int parse_menu ( char *text, struct menu **menu );
 extern int parse_flag ( char *text __unused, int *flag );

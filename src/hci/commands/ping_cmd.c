@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <getopt.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
+#include <ipxe/timer.h>
 #include <usr/pingmgmt.h>
 
 /** @file
@@ -39,14 +40,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define PING_DEFAULT_SIZE 64
 
 /** Default timeout */
-#define PING_DEFAULT_TIMEOUT 1000
+#define PING_DEFAULT_TIMEOUT TICKS_PER_SEC
 
 /** "ping" options */
 struct ping_options {
 	/** Payload length */
 	unsigned int size;
 	/** Timeout (in ms) */
-	unsigned int timeout;
+	unsigned long timeout;
 };
 
 /** "ping" option list */
@@ -54,7 +55,7 @@ static struct option_descriptor ping_opts[] = {
 	OPTION_DESC ( "size", 's', required_argument,
 		      struct ping_options, size, parse_integer ),
 	OPTION_DESC ( "timeout", 't', required_argument,
-		      struct ping_options, timeout, parse_integer ),
+		      struct ping_options, timeout, parse_timeout ),
 };
 
 /** "ping" command descriptor */

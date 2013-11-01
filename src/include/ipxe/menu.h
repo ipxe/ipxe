@@ -43,7 +43,7 @@ extern struct menu_item * add_menu_item ( struct menu *menu, const char *label,
 					  int is_default );
 extern void destroy_menu ( struct menu *menu );
 extern struct menu * find_menu ( const char *name );
-extern int show_menu ( struct menu *menu, unsigned int timeout_ms,
+extern int show_menu ( struct menu *menu, unsigned long timeout,
 		       const char *select, struct menu_item **selected );
 
 #endif /* _IPXE_MENU_H */

@@ -303,11 +303,11 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
  * Show menu
  *
  * @v menu		Menu
- * @v wait_ms		Time to wait, in milliseconds (0=indefinite)
+ * @v timeout		Timeout period, in ticks (0=indefinite)
  * @ret selected	Selected item
  * @ret rc		Return status code
  */
-int show_menu ( struct menu *menu, unsigned int timeout_ms,
+int show_menu ( struct menu *menu, unsigned long timeout,
 		const char *select, struct menu_item **selected ) {
 	struct menu_item *item;
 	struct menu_ui ui;
@@ -318,7 +318,7 @@ int show_menu ( struct menu *menu, unsigned int timeout_ms,
 	/* Initialise UI */
 	memset ( &ui, 0, sizeof ( ui ) );
 	ui.menu = menu;
-	ui.timeout = ( ( timeout_ms * TICKS_PER_SEC ) / 1000 );
+	ui.timeout = timeout;
 	list_for_each_entry ( item, &menu->items, list ) {
 		if ( item->label ) {
 			if ( ! labelled_count )

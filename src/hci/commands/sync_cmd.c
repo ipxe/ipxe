@@ -24,7 +24,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <getopt.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
-#include <ipxe/timer.h>
 #include <ipxe/pending.h>
 
 /** @file
@@ -36,13 +35,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** "sync" options */
 struct sync_options {
 	/** Timeout */
-	unsigned int timeout;
+	unsigned long timeout;
 };
 
 /** "sync" option list */
 static struct option_descriptor sync_opts[] = {
 	OPTION_DESC ( "timeout", 't', required_argument,
-		      struct sync_options, timeout, parse_integer ),
+		      struct sync_options, timeout, parse_timeout ),
 };
 
 /** "sync" command descriptor */
@@ -59,7 +58,6 @@ static struct command_descriptor sync_cmd =
  */
 static int sync_exec ( int argc, char **argv ) {
 	struct sync_options opts;
-	unsigned long timeout;
 	int rc;
 
 	/* Parse options */
@@ -67,8 +65,7 @@ static int sync_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Wait for pending operations to complete */
-	timeout = ( ( opts.timeout * TICKS_PER_SEC ) / 1000 );
-	if ( ( rc = pending_wait ( timeout ) ) != 0 ) {
+	if ( ( rc = pending_wait ( opts.timeout ) ) != 0 ) {
 		printf ( "Operations did not complete: %s\n", strerror ( rc ) );
 		return rc;
 	}

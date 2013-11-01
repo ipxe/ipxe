@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/menu.h>
 #include <ipxe/settings.h>
 #include <ipxe/params.h>
+#include <ipxe/timer.h>
 #include <ipxe/parseopt.h>
 
 /** @file
@@ -91,6 +92,27 @@ int parse_integer ( char *text, unsigned int *value ) {
 		printf ( "\"%s\": invalid integer value\n", text );
 		return -EINVAL_INTEGER;
 	}
+
+	return 0;
+}
+
+/**
+ * Parse timeout value (in ms)
+ *
+ * @v text		Text
+ * @ret value		Integer value
+ * @ret rc		Return status code
+ */
+int parse_timeout ( char *text, unsigned long *value ) {
+	unsigned int value_ms;
+	int rc;
+
+	/* Parse raw integer value */
+	if ( ( rc = parse_integer ( text, &value_ms ) ) != 0 )
+		return rc;
+
+	/* Convert to a number of timer ticks */
+	*value = ( ( value_ms * TICKS_PER_SEC ) / 1000 );
 
 	return 0;
 }

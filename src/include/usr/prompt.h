@@ -9,6 +9,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-extern int prompt ( const char *text, unsigned int wait_ms, int key );
+extern int prompt ( const char *text, unsigned long timeout, int key );
 
 #endif /* _USR_PROMPT_H */
