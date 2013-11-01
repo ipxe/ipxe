@@ -31,7 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** Total count of pending operations */
-static int pending_total;
+int pending_total;
 
 /**
  * Mark an operation as pending
@@ -59,22 +59,4 @@ void pending_put ( struct pending_operation *pending ) {
 		DBGC ( pending, "PENDING %p decremented to %d (total %d)\n",
 		       pending, pending->count, pending_total );
 	}
-}
-
-/**
- * Wait for pending operations to complete
- *
- * @v timeout		Timeout period, in ticks (0=indefinite)
- * @ret rc		Return status code
- */
-int pending_wait ( unsigned long timeout ) {
-	unsigned long start = currticks();
-
-	do {
-		if ( pending_total == 0 )
-			return 0;
-		step();
-	} while ( ( timeout == 0 ) || ( ( currticks() - start ) < timeout ) );
-
-	return -ETIMEDOUT;
 }

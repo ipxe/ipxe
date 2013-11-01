@@ -9,8 +9,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <ipxe/list.h>
-
 /** A pending operation */
 struct pending_operation {
 	/** Pending count */
@@ -21,14 +19,24 @@ struct pending_operation {
  * Check if an operation is pending
  *
  * @v pending		Pending operation
- * @v is_pending	Operation is pending
+ * @ret is_pending	Operation is pending
  */
 static inline int is_pending ( struct pending_operation *pending ) {
 	return ( pending->count != 0 );
 }
 
+extern int pending_total;
+
+/**
+ * Check if any operations are pending
+ *
+ * @ret have_pending	Some operations are pending
+ */
+static inline int have_pending ( void ) {
+	return ( pending_total != 0 );
+}
+
 extern void pending_get ( struct pending_operation *pending );
 extern void pending_put ( struct pending_operation *pending );
-extern int pending_wait ( unsigned long timeout );
 
 #endif /* _IPXE_PENDING_H */

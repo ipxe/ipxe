@@ -24,7 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <getopt.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
-#include <ipxe/pending.h>
+#include <usr/sync.h>
 
 /** @file
  *
@@ -65,7 +65,7 @@ static int sync_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Wait for pending operations to complete */
-	if ( ( rc = pending_wait ( opts.timeout ) ) != 0 ) {
+	if ( ( rc = sync ( opts.timeout ) ) != 0 ) {
 		printf ( "Operations did not complete: %s\n", strerror ( rc ) );
 		return rc;
 	}
