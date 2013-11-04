@@ -14,6 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/settings.h>
 
 struct net_device;
+struct net_device_configurator;
 struct menu;
 struct parameters;
 
@@ -128,6 +129,9 @@ extern int parse_string ( char *text, char **value );
 extern int parse_integer ( char *text, unsigned int *value );
 extern int parse_timeout ( char *text, unsigned long *value );
 extern int parse_netdev ( char *text, struct net_device **netdev );
+extern int
+parse_netdev_configurator ( char *text,
+			    struct net_device_configurator **configurator );
 extern int parse_menu ( char *text, struct menu **menu );
 extern int parse_flag ( char *text __unused, int *flag );
 extern int parse_key ( char *text, unsigned int *key );

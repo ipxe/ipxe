@@ -140,6 +140,29 @@ int parse_netdev ( char *text, struct net_device **netdev ) {
 }
 
 /**
+ * Parse network device configurator name
+ *
+ * @v text		Text
+ * @ret configurator	Network device configurator
+ * @ret rc		Return status code
+ */
+int parse_netdev_configurator ( char *text,
+				struct net_device_configurator **configurator ){
+
+	/* Sanity check */
+	assert ( text != NULL );
+
+	/* Find network device configurator */
+	*configurator = find_netdev_configurator ( text );
+	if ( ! *configurator ) {
+		printf ( "\"%s\": no such configurator\n", text );
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+
+/**
  * Parse menu name
  *
  * @v text		Text
