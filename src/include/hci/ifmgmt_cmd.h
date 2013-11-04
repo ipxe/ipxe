@@ -26,13 +26,46 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 struct net_device;
 
-struct ifcommon_options {};
+/** An "if<xxx>" command descriptor */
+struct ifcommon_command_descriptor {
+	/** Command descriptor */
+	struct command_descriptor cmd;
+	/** Payload
+	 *
+	 * @v netdev		Network device
+	 * @v opts		Command options
+	 * @ret rc		Return status code
+	 */
+	int ( * payload ) ( struct net_device *netdev, void *opts );
+	/** Stop on first success */
+	int stop_on_first_success;
+};
 
-extern struct option_descriptor ifcommon_opts[0];
+/**
+ * Construct "if<xxx>" command descriptor
+ *
+ * @v _struct		Options structure type
+ * @v _options		Option descriptor array
+ * @v _check_args	Remaining argument checker
+ * @v _usage		Command usage
+ * @ret _command	Command descriptor
+ */
+#define IFCOMMON_COMMAND_DESC( _struct, _options, _min_args,		\
+			       _max_args, _usage, _payload,		\
+			       _stop_on_first_success )			\
+	{								\
+		.cmd = COMMAND_DESC ( _struct, _options, _min_args,	\
+				      _max_args, _usage ),		\
+		.payload = ( ( int ( * ) ( struct net_device *netdev,	\
+					   void *opts ) )		\
+			     ( ( ( ( int ( * ) ( struct net_device *,	\
+						 _struct * ) ) NULL )	\
+				 == ( typeof ( _payload ) * ) NULL )	\
+			       ? _payload : _payload ) ),		\
+		.stop_on_first_success = _stop_on_first_success,	\
+	}
 
 extern int ifcommon_exec (  int argc, char **argv,
-			    struct command_descriptor *cmd,
-			    int ( * payload ) ( struct net_device * ),
-			    int stop_on_first_success );
+			    struct ifcommon_command_descriptor *cmd );
 
 #endif /* _IFMGMT_CMD_H */

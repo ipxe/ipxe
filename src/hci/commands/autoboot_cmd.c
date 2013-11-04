@@ -33,10 +33,29 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** "autoboot" options */
+struct autoboot_options {};
+
+/** "autoboot" option list */
+static struct option_descriptor autoboot_opts[] = {};
+
+/**
+ * "autoboot" payload
+ *
+ * @v netdev		Network device
+ * @v opts		Command options
+ * @ret rc		Return status code
+ */
+static int autoboot_payload ( struct net_device *netdev,
+			      struct autoboot_options *opts __unused ) {
+	return netboot ( netdev );
+}
+
 /** "autoboot" command descriptor */
-static struct command_descriptor autoboot_cmd =
-	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]" );
+static struct ifcommon_command_descriptor autoboot_cmd =
+	IFCOMMON_COMMAND_DESC ( struct autoboot_options, autoboot_opts,
+				0, MAX_ARGUMENTS, "[<interface>...]",
+				autoboot_payload, 0 );
 
 /**
  * "autoboot" command
@@ -46,7 +65,7 @@ static struct command_descriptor autoboot_cmd =
  * @ret rc		Return status code
  */
 static int autoboot_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( argc, argv, &autoboot_cmd, netboot, 0 );
+	return ifcommon_exec ( argc, argv, &autoboot_cmd );
 }
 
 /** Booting commands */

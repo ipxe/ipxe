@@ -31,24 +31,33 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** "startpxe" command descriptor */
-static struct command_descriptor startpxe_cmd =
-	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>]" );
+/** "startpxe" options */
+struct startpxe_options {};
+
+/** "startpxe" option list */
+static struct option_descriptor startpxe_opts[] = {};
 
 /**
  * "startpxe" payload
  *
  * @v netdev		Network device
+ * @v opts		Command options
  * @ret rc		Return status code
  */
-static int startpxe_payload ( struct net_device *netdev ) {
+static int startpxe_payload ( struct net_device *netdev,
+			      struct startpxe_options *opts __unused ) {
 
 	if ( netdev_is_open ( netdev ) )
 		pxe_activate ( netdev );
 
 	return 0;
 }
+
+/** "startpxe" command descriptor */
+static struct ifcommon_command_descriptor startpxe_cmd =
+	IFCOMMON_COMMAND_DESC ( struct startpxe_options, startpxe_opts,
+				0, MAX_ARGUMENTS, "[<interface>]",
+				startpxe_payload, 0 );
 
 /**
  * The "startpxe" command
@@ -58,7 +67,7 @@ static int startpxe_payload ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int startpxe_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( argc, argv, &startpxe_cmd, startpxe_payload, 0 );
+	return ifcommon_exec ( argc, argv, &startpxe_cmd );
 }
 
 /** "stoppxe" options */

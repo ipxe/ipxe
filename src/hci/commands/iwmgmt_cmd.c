@@ -32,18 +32,21 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** "iwstat" command descriptor */
-static struct command_descriptor iwstat_cmd =
-	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]" );
+/** "iwstat" options */
+struct iwstat_options {};
+
+/** "iwstat" option list */
+static struct option_descriptor iwstat_opts[] = {};
 
 /**
  * "iwstat" payload
  *
  * @v netdev		Network device
+ * @v opts		Command options
  * @ret rc		Return status code
  */
-static int iwstat_payload ( struct net_device *netdev ) {
+static int iwstat_payload ( struct net_device *netdev,
+			    struct iwstat_options *opts __unused ) {
 	struct net80211_device *dev = net80211_get ( netdev );
 
 	if ( dev )
@@ -51,6 +54,12 @@ static int iwstat_payload ( struct net_device *netdev ) {
 
 	return 0;
 }
+
+/** "iwstat" command descriptor */
+static struct ifcommon_command_descriptor iwstat_cmd =
+	IFCOMMON_COMMAND_DESC ( struct iwstat_options, iwstat_opts,
+				0, MAX_ARGUMENTS, "[<interface>...]",
+				iwstat_payload, 0 );
 
 /**
  * The "iwstat" command
@@ -60,21 +69,24 @@ static int iwstat_payload ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int iwstat_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( argc, argv, &iwstat_cmd, iwstat_payload, 0 );
+	return ifcommon_exec ( argc, argv, &iwstat_cmd );
 }
 
-/** "iwlist" command descriptor */
-static struct command_descriptor iwlist_cmd =
-	COMMAND_DESC ( struct ifcommon_options, ifcommon_opts, 0, MAX_ARGUMENTS,
-		       "[<interface>...]" );
+/** "iwlist" options */
+struct iwlist_options {};
+
+/** "iwlist" option list */
+static struct option_descriptor iwlist_opts[] = {};
 
 /**
  * "iwlist" payload
  *
  * @v netdev		Network device
+ * @v opts		Command options
  * @ret rc		Return status code
  */
-static int iwlist_payload ( struct net_device *netdev ) {
+static int iwlist_payload ( struct net_device *netdev,
+			    struct iwlist_options *opts __unused ) {
 	struct net80211_device *dev = net80211_get ( netdev );
 
 	if ( dev )
@@ -82,6 +94,12 @@ static int iwlist_payload ( struct net_device *netdev ) {
 
 	return 0;
 }
+
+/** "iwlist" command descriptor */
+static struct ifcommon_command_descriptor iwlist_cmd =
+	IFCOMMON_COMMAND_DESC ( struct iwlist_options, iwlist_opts,
+				0, MAX_ARGUMENTS, "[<interface>...]",
+				iwlist_payload, 0 );
 
 /**
  * The "iwlist" command
@@ -91,7 +109,7 @@ static int iwlist_payload ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int iwlist_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( argc, argv, &iwlist_cmd, iwlist_payload, 0 );
+	return ifcommon_exec ( argc, argv, &iwlist_cmd );
 }
 
 /** Wireless interface management commands */
