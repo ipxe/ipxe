@@ -187,6 +187,61 @@ static int ifstat_exec ( int argc, char **argv ) {
 	return ifcommon_exec ( argc, argv, &ifstat_cmd );
 }
 
+/** "ifconf" options */
+struct ifconf_options {
+	/** Configurator */
+	struct net_device_configurator *configurator;
+};
+
+/** "ifconf" option list */
+static struct option_descriptor ifconf_opts[] = {
+	OPTION_DESC ( "configurator", 'c', required_argument,
+		      struct ifconf_options, configurator,
+		      parse_netdev_configurator ),
+};
+
+/**
+ * "ifconf" payload
+ *
+ * @v netdev		Network device
+ * @v opts		Command options
+ * @ret rc		Return status code
+ */
+static int ifconf_payload ( struct net_device *netdev,
+			    struct ifconf_options *opts ) {
+	int rc;
+
+	/* Attempt configuration */
+	if ( ( rc = ifconf ( netdev, opts->configurator ) ) != 0 ) {
+
+		/* Close device on failure, to avoid memory exhaustion */
+		netdev_close ( netdev );
+
+		return rc;
+	}
+
+	return 0;
+}
+
+/** "ifconf" command descriptor */
+static struct ifcommon_command_descriptor ifconf_cmd =
+	IFCOMMON_COMMAND_DESC ( struct ifconf_options, ifconf_opts,
+				0, MAX_ARGUMENTS,
+				"[--configurator <configurator>] "
+				"[<interface>...]",
+				ifconf_payload, 1 );
+
+/**
+ * The "ifconf" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int ifconf_exec ( int argc, char **argv ) {
+	return ifcommon_exec ( argc, argv, &ifconf_cmd );
+}
+
 /** Interface management commands */
 struct command ifmgmt_commands[] __command = {
 	{
@@ -200,5 +255,9 @@ struct command ifmgmt_commands[] __command = {
 	{
 		.name = "ifstat",
 		.exec = ifstat_exec,
+	},
+	{
+		.name = "ifconf",
+		.exec = ifconf_exec,
 	},
 };
