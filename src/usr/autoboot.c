@@ -38,7 +38,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/timer.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
-#include <usr/dhcpmgmt.h>
 #include <usr/imgmgmt.h>
 #include <usr/prompt.h>
 #include <usr/autoboot.h>
@@ -365,8 +364,8 @@ int netboot ( struct net_device *netdev ) {
 		goto err_ifopen;
 	ifstat ( netdev );
 
-	/* Configure device via DHCP */
-	if ( ( rc = dhcp ( netdev ) ) != 0 )
+	/* Configure device */
+	if ( ( rc = ifconf ( netdev, NULL ) ) != 0 )
 		goto err_dhcp;
 	route();
 
