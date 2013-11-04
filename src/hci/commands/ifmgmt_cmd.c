@@ -238,7 +238,7 @@ static struct ifcommon_command_descriptor ifconf_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int ifconf_exec ( int argc, char **argv ) {
+int ifconf_exec ( int argc, char **argv ) {
 	return ifcommon_exec ( argc, argv, &ifconf_cmd );
 }
 

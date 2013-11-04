@@ -67,5 +67,6 @@ struct ifcommon_command_descriptor {
 
 extern int ifcommon_exec (  int argc, char **argv,
 			    struct ifcommon_command_descriptor *cmd );
+extern int ifconf_exec ( int argc, char **argv );
 
 #endif /* _IFMGMT_CMD_H */
