@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/shell.h>
 #include <ipxe/features.h>
 #include <ipxe/image.h>
+#include <ipxe/timer.h>
 #include <usr/ifmgmt.h>
 #include <usr/route.h>
 #include <usr/dhcpmgmt.h>
@@ -468,7 +469,8 @@ static int shell_banner ( void ) {
 	/* Prompt user */
 	printf ( "\n" );
 	return ( prompt ( "Press Ctrl-B for the iPXE command line...",
-			  ( BANNER_TIMEOUT * 100 ), CTRL_B ) == 0 );
+			  ( ( BANNER_TIMEOUT * TICKS_PER_SEC ) / 10 ),
+			  CTRL_B ) == 0 );
 }
 
 /**
