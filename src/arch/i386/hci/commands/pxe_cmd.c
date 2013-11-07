@@ -78,7 +78,7 @@ static struct option_descriptor stoppxe_opts[] = {};
 
 /** "stoppxe" command descriptor */
 static struct command_descriptor stoppxe_cmd =
-	COMMAND_DESC ( struct stoppxe_options, stoppxe_opts, 0, 0, "" );
+	COMMAND_DESC ( struct stoppxe_options, stoppxe_opts, 0, 0, NULL );
 
 /**
  * The "stoppxe" command

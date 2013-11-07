@@ -39,7 +39,7 @@ static struct option_descriptor route_opts[] = {};
 
 /** "route" command descriptor */
 static struct command_descriptor route_cmd =
-	COMMAND_DESC ( struct route_options, route_opts, 0, 0, "" );
+	COMMAND_DESC ( struct route_options, route_opts, 0, 0, NULL );
 
 /**
  * The "route" command

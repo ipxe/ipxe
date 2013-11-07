@@ -54,8 +54,7 @@ static struct option_descriptor cpuid_opts[] = {
 
 /** "cpuid" command descriptor */
 static struct command_descriptor cpuid_cmd =
-	COMMAND_DESC ( struct cpuid_options, cpuid_opts, 1, 1,
-		       "[--ext] [--ecx] <bit>" );
+	COMMAND_DESC ( struct cpuid_options, cpuid_opts, 1, 1, "<bit>" );
 
 /**
  * The "cpuid" command

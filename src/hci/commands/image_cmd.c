@@ -47,21 +47,21 @@ struct imgsingle_options {
 };
 
 /** "img{single}" option list */
-static struct option_descriptor imgsingle_opts[] = {
-	OPTION_DESC ( "name", 'n', required_argument,
-		      struct imgsingle_options, name, parse_string ),
-	OPTION_DESC ( "replace", 'r', no_argument,
-		      struct imgsingle_options, replace, parse_flag ),
-	OPTION_DESC ( "autofree", 'a', no_argument,
-		      struct imgsingle_options, autofree, parse_flag ),
+static union {
+	/* "imgexec" takes all three options */
+	struct option_descriptor imgexec[3];
+	/* Other "img{single}" commands take only --name and --autofree */
+	struct option_descriptor imgsingle[2];
+} opts = {
+	.imgexec = {
+		OPTION_DESC ( "name", 'n', required_argument,
+			      struct imgsingle_options, name, parse_string ),
+		OPTION_DESC ( "autofree", 'a', no_argument,
+			      struct imgsingle_options, autofree, parse_flag ),
+		OPTION_DESC ( "replace", 'r', no_argument,
+			      struct imgsingle_options, replace, parse_flag ),
+	},
 };
-
-/** "img{single}" command descriptor */
-static struct command_descriptor imgsingle_cmd =
-	COMMAND_DESC ( struct imgsingle_options, imgsingle_opts,
-		       1, MAX_ARGUMENTS,
-		       "[--name <name>] [--autofree] "
-		       "<uri|image> [<arguments>...]" );
 
 /** An "img{single}" family command descriptor */
 struct imgsingle_descriptor {
@@ -174,9 +174,8 @@ static int imgsingle_exec ( int argc, char **argv,
 
 /** "imgfetch" command descriptor */
 static struct command_descriptor imgfetch_cmd =
-	COMMAND_DESC ( struct imgsingle_options, imgsingle_opts,
-		       1, MAX_ARGUMENTS,
-		       "[--name <name>] [--autofree] <uri> [<arguments>...]" );
+	COMMAND_DESC ( struct imgsingle_options, opts.imgsingle,
+		       1, MAX_ARGUMENTS, "<uri> [<arguments>...]" );
 
 /** "imgfetch" family command descriptor */
 struct imgsingle_descriptor imgfetch_desc = {
@@ -207,9 +206,14 @@ static int imgselect ( struct image *image,
 	return image_select ( image );
 }
 
+/** "imgselect" command descriptor */
+static struct command_descriptor imgselect_cmd =
+	COMMAND_DESC ( struct imgsingle_options, opts.imgsingle,
+		       1, MAX_ARGUMENTS, "<uri|image> [<arguments>...]" );
+
 /** "imgselect" family command descriptor */
 struct imgsingle_descriptor imgselect_desc = {
-	.cmd = &imgsingle_cmd,
+	.cmd = &imgselect_cmd,
 	.acquire = imgacquire,
 	.action = imgselect,
 	.verb = "select",
@@ -228,10 +232,8 @@ static int imgselect_exec ( int argc, char **argv ) {
 
 /** "imgexec" command descriptor */
 static struct command_descriptor imgexec_cmd =
-	COMMAND_DESC ( struct imgsingle_options, imgsingle_opts,
-		       0, MAX_ARGUMENTS,
-		       "[--autofree] [--replace] "
-		       "[<uri|image> [<arguments>...]]" );
+	COMMAND_DESC ( struct imgsingle_options, opts.imgexec,
+		       0, MAX_ARGUMENTS, "[<uri|image> [<arguments>...]]" );
 
 /**
  * "imgexec" command action
@@ -282,9 +284,14 @@ static int imgexec_exec ( int argc, char **argv) {
 	return imgsingle_exec ( argc, argv, &imgexec_desc );
 }
 
+/** "imgargs" command descriptor */
+static struct command_descriptor imgargs_cmd =
+	COMMAND_DESC ( struct imgsingle_options, opts.imgsingle,
+		       1, MAX_ARGUMENTS, "<uri|image> [<arguments>...]" );
+
 /** "imgargs" family command descriptor */
 struct imgsingle_descriptor imgargs_desc = {
-	.cmd = &imgsingle_cmd,
+	.cmd = &imgargs_cmd,
 	.acquire = imgacquire,
 	.preaction = image_clear_cmdline,
 };

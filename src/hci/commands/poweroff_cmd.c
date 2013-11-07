@@ -40,7 +40,7 @@ static struct option_descriptor poweroff_opts[] = {};
 
 /** "poweroff" command descriptor */
 static struct command_descriptor poweroff_cmd =
-	COMMAND_DESC ( struct poweroff_options, poweroff_opts, 0, 0, "" );
+	COMMAND_DESC ( struct poweroff_options, poweroff_opts, 0, 0, NULL );
 
 /**
  * The "poweroff" command

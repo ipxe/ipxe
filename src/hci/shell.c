@@ -107,7 +107,7 @@ static struct option_descriptor shell_opts[] = {};
 
 /** "shell" command descriptor */
 static struct command_descriptor shell_cmd =
-	COMMAND_DESC ( struct shell_options, shell_opts, 0, 0, "" );
+	COMMAND_DESC ( struct shell_options, shell_opts, 0, 0, NULL );
 
 /**
  * "shell" command

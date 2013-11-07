@@ -50,8 +50,7 @@ static struct option_descriptor params_opts[] = {
 
 /** "params" command descriptor */
 static struct command_descriptor params_cmd =
-	COMMAND_DESC ( struct params_options, params_opts, 0, 0,
-		       "[--name <name>] [--delete]" );
+	COMMAND_DESC ( struct params_options, params_opts, 0, 0, NULL );
 
 /**
  * The "params" command
@@ -96,7 +95,7 @@ static struct option_descriptor param_opts[] = {
 /** "param" command descriptor */
 static struct command_descriptor param_cmd =
 	COMMAND_DESC ( struct param_options, param_opts, 1, MAX_ARGUMENTS,
-		       "[--params <params>] <key> [<value>]" );
+		       "<key> [<value>]" );
 
 /**
  * The "param" command

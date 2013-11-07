@@ -60,8 +60,7 @@ static struct option_descriptor ping_opts[] = {
 
 /** "ping" command descriptor */
 static struct command_descriptor ping_cmd =
-	COMMAND_DESC ( struct ping_options, ping_opts, 1, 1,
-		       "[--size <size>] [--timeout <timeout>] <host>" );
+	COMMAND_DESC ( struct ping_options, ping_opts, 1, 1, "<host>" );
 
 /**
  * The "ping" command

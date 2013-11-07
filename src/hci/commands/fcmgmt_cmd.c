@@ -106,7 +106,7 @@ static struct option_descriptor fcstat_opts[] = {};
 
 /** "fcstat" command descriptor */
 static struct command_descriptor fcstat_cmd =
-	COMMAND_DESC ( struct fcstat_options, fcstat_opts, 0, 0, "" );
+	COMMAND_DESC ( struct fcstat_options, fcstat_opts, 0, 0, NULL );
 
 /**
  * The "fcstat" command
@@ -151,8 +151,7 @@ static struct option_descriptor fcels_opts[] = {
 
 /** "fcels" command descriptor */
 static struct command_descriptor fcels_cmd =
-	COMMAND_DESC ( struct fcels_options, fcels_opts, 1, 1,
-		       "[--port <port>] [--id <peer port id>] <request>" );
+	COMMAND_DESC ( struct fcels_options, fcels_opts, 1, 1, "<request>" );
 
 /**
  * The "fcels" command

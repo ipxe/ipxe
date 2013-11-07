@@ -38,7 +38,7 @@ static struct option_descriptor nstat_opts[] = {};
 
 /** "nstat" command descriptor */
 static struct command_descriptor nstat_cmd =
-	COMMAND_DESC ( struct nstat_options, nstat_opts, 0, 0, "" );
+	COMMAND_DESC ( struct nstat_options, nstat_opts, 0, 0, NULL );
 
 /**
  * The "nstat" command

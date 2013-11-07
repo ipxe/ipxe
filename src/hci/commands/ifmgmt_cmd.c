@@ -226,9 +226,7 @@ static int ifconf_payload ( struct net_device *netdev,
 /** "ifconf" command descriptor */
 static struct ifcommon_command_descriptor ifconf_cmd =
 	IFCOMMON_COMMAND_DESC ( struct ifconf_options, ifconf_opts,
-				0, MAX_ARGUMENTS,
-				"[--configurator <configurator>] "
-				"[<interface>...]",
+				0, MAX_ARGUMENTS, "[<interface>...]",
 				ifconf_payload, 1 );
 
 /**

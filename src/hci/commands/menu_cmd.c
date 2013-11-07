@@ -57,7 +57,7 @@ static struct option_descriptor menu_opts[] = {
 /** "menu" command descriptor */
 static struct command_descriptor menu_cmd =
 	COMMAND_DESC ( struct menu_options, menu_opts, 0, MAX_ARGUMENTS,
-		       "[--name <name>] [--delete] [<title>]" );
+		       "[<title>]" );
 
 /**
  * The "menu" command
@@ -131,8 +131,7 @@ static struct option_descriptor item_opts[] = {
 /** "item" command descriptor */
 static struct command_descriptor item_cmd =
 	COMMAND_DESC ( struct item_options, item_opts, 0, MAX_ARGUMENTS,
-		       "[--menu <menu>] [--key <key>] [--default] "
-		       "[<label>|--gap [<text>]]" );
+		       "[<label> [<text>]]" );
 
 /**
  * The "item" command
@@ -215,9 +214,7 @@ static struct option_descriptor choose_opts[] = {
 
 /** "choose" command descriptor */
 static struct command_descriptor choose_cmd =
-	COMMAND_DESC ( struct choose_options, choose_opts, 1, 1,
-		       "[--menu <menu>] [--default <label>] "
-		       "[--timeout <timeout>] [--keep] <setting>" );
+	COMMAND_DESC ( struct choose_options, choose_opts, 1, 1, "<setting>" );
 
 /**
  * The "choose" command

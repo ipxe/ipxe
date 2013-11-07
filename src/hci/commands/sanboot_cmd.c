@@ -46,30 +46,38 @@ struct sanboot_options {
 };
 
 /** "sanboot" option list */
-static struct option_descriptor sanboot_opts[] = {
-	OPTION_DESC ( "drive", 'd', required_argument,
-		      struct sanboot_options, drive, parse_integer ),
-	OPTION_DESC ( "no-describe", 'n', no_argument,
-		      struct sanboot_options, no_describe, parse_flag ),
-	OPTION_DESC ( "keep", 'k', no_argument,
-		      struct sanboot_options, keep, parse_flag ),
+static union {
+	/* "sanboot" takes all three options */
+	struct option_descriptor sanboot[3];
+	/* "sanhook" takes only --drive and --no-describe */
+	struct option_descriptor sanhook[2];
+	/* "sanunhook" takes only --drive */
+	struct option_descriptor sanunhook[1];
+} opts = {
+	.sanboot = {
+		OPTION_DESC ( "drive", 'd', required_argument,
+			      struct sanboot_options, drive, parse_integer ),
+		OPTION_DESC ( "no-describe", 'n', no_argument,
+			      struct sanboot_options, no_describe, parse_flag ),
+		OPTION_DESC ( "keep", 'k', no_argument,
+			      struct sanboot_options, keep, parse_flag ),
+	},
 };
+
 
 /** "sanhook" command descriptor */
 static struct command_descriptor sanhook_cmd =
-	COMMAND_DESC ( struct sanboot_options, sanboot_opts, 1, 1,
-		       "[--drive <drive>] [--no-describe] <root-path>" );
+	COMMAND_DESC ( struct sanboot_options, opts.sanhook, 1, 1,
+		       "<root-path>" );
 
 /** "sanboot" command descriptor */
 static struct command_descriptor sanboot_cmd =
-	COMMAND_DESC ( struct sanboot_options, sanboot_opts, 0, 1,
-		       "[--drive <drive>] [--no-describe] [--keep] "
+	COMMAND_DESC ( struct sanboot_options, opts.sanboot, 0, 1,
 		       "[<root-path>]" );
 
 /** "sanunhook" command descriptor */
 static struct command_descriptor sanunhook_cmd =
-	COMMAND_DESC ( struct sanboot_options, sanboot_opts, 0, 0,
-		       "[--drive <drive>]" );
+	COMMAND_DESC ( struct sanboot_options, opts.sanunhook, 0, 0, NULL );
 
 /**
  * The "sanboot", "sanhook" and "sanunhook" commands

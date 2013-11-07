@@ -46,8 +46,7 @@ static struct option_descriptor sync_opts[] = {
 
 /** "sync" command descriptor */
 static struct command_descriptor sync_cmd =
-	COMMAND_DESC ( struct sync_options, sync_opts, 0, 0,
-		       "[--timeout <timeout>]" );
+	COMMAND_DESC ( struct sync_options, sync_opts, 0, 0, NULL );
 
 /**
  * "sync" command

@@ -53,7 +53,6 @@ static struct option_descriptor vcreate_opts[] = {
 /** "vcreate" command descriptor */
 static struct command_descriptor vcreate_cmd =
 	COMMAND_DESC ( struct vcreate_options, vcreate_opts, 1, 1,
-		       "--tag <tag> [--priority <priority>] "
 		       "<trunk interface>" );
 
 /**

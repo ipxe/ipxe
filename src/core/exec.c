@@ -397,7 +397,7 @@ static struct option_descriptor echo_opts[] = {
 /** "echo" command descriptor */
 static struct command_descriptor echo_cmd =
 	COMMAND_DESC ( struct echo_options, echo_opts, 0, MAX_ARGUMENTS,
-		       "[-n] [...]" );
+		       "[...]" );
 
 /**
  * "echo" command

@@ -52,8 +52,7 @@ static struct option_descriptor imgtrust_opts[] = {
 
 /** "imgtrust" command descriptor */
 static struct command_descriptor imgtrust_cmd =
-	COMMAND_DESC ( struct imgtrust_options, imgtrust_opts, 0, 0,
-		       "[--allow] [--permanent]" );
+	COMMAND_DESC ( struct imgtrust_options, imgtrust_opts, 0, 0, NULL );
 
 /**
  * The "imgtrust" command
@@ -100,8 +99,7 @@ static struct option_descriptor imgverify_opts[] = {
 /** "imgverify" command descriptor */
 static struct command_descriptor imgverify_cmd =
 	COMMAND_DESC ( struct imgverify_options, imgverify_opts, 2, 2,
-		       "[--signer <signer>] [--keep] <uri|image> "
-		       "<signature uri|image>" );
+		       "<uri|image> <signature uri|image>" );
 
 /**
  * The "imgverify" command

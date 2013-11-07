@@ -326,8 +326,25 @@ int parse_parameters ( char *text, struct parameters **params ) {
  * @v argv		Argument list
  */
 void print_usage ( struct command_descriptor *cmd, char **argv ) {
-	printf ( "Usage:\n\n  %s %s\n\nSee http://ipxe.org/cmd/%s for further "
-		 "information\n", argv[0], cmd->usage, argv[0] );
+	struct option_descriptor *option;
+	unsigned int i;
+	int is_optional;
+
+	printf ( "Usage:\n\n  %s", argv[0] );
+	for ( i = 0 ; i < cmd->num_options ; i++ ) {
+		option = &cmd->options[i];
+		printf ( " [-%c|--%s", option->shortopt, option->longopt );
+		if ( option->has_arg ) {
+			is_optional = ( option->has_arg == optional_argument );
+			printf ( " %s<%s>%s", ( is_optional ? "[" : "" ),
+				 option->longopt, ( is_optional ? "]" : "" ) );
+		}
+		printf ( "]" );
+	}
+	if ( cmd->usage )
+		printf ( " %s", cmd->usage );
+	printf ( "\n\nSee http://ipxe.org/cmd/%s for further information\n",
+		 argv[0] );
 }
 
 /**

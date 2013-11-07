@@ -375,7 +375,7 @@ static struct option_descriptor prompt_opts[] = {
 /** "prompt" command descriptor */
 static struct command_descriptor prompt_cmd =
 	COMMAND_DESC ( struct prompt_options, prompt_opts, 0, MAX_ARGUMENTS,
-		       "[--key <key>] [--timeout <timeout>] [<text>]" );
+		       "[<text>]" );
 
 /**
  * "prompt" command
