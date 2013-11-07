@@ -19,6 +19,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
@@ -35,6 +36,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * IPv6 neighbour discovery protocol
  *
  */
+
+static int ipv6conf_rx_router_advertisement ( struct net_device *netdev,
+					      unsigned int flags );
 
 /**
  * Transmit NDP packet with link-layer address option
@@ -147,7 +151,7 @@ struct neighbour_discovery ndp_discovery = {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-int ndp_tx_router_solicitation ( struct net_device *netdev ) {
+static int ndp_tx_router_solicitation ( struct net_device *netdev ) {
 	struct ndp_router_solicitation_header rsol;
 	struct sockaddr_in6 sin6_dest;
 	int rc;
@@ -443,35 +447,33 @@ static int ndp_rx_option ( struct net_device *netdev,
 }
 
 /**
- * Process received NDP packet
+ * Process received NDP packet options
  *
- * @v iobuf		I/O buffer
  * @v netdev		Network device
  * @v sin6_src		Source socket address
+ * @v ndp		NDP header
  * @v offset		Offset to NDP options
+ * @v len		Length of NDP packet
  * @ret rc		Return status code
  */
-static int ndp_rx ( struct io_buffer *iobuf,
-		    struct net_device *netdev,
-		    struct sockaddr_in6 *sin6_src,
-		    size_t offset ) {
-	union ndp_header *ndp = iobuf->data;
+static int ndp_rx_options ( struct net_device *netdev,
+			    struct sockaddr_in6 *sin6_src,
+			    union ndp_header *ndp, size_t offset, size_t len ) {
 	union ndp_option *option;
 	size_t remaining;
 	size_t option_len;
 	int rc;
 
 	/* Sanity check */
-	if ( iob_len ( iobuf ) < offset ) {
+	if ( len < offset ) {
 		DBGC ( netdev, "NDP packet too short at %zd bytes (min %zd "
-		       "bytes)\n", iob_len ( iobuf ), offset );
-		rc = -EINVAL;
-		goto done;
+		       "bytes)\n", len, offset );
+		return -EINVAL;
 	}
 
 	/* Search for option */
 	option = ( ( ( void * ) ndp ) + offset );
-	remaining = ( iob_len ( iobuf ) - offset );
+	remaining = ( len - offset );
 	while ( remaining ) {
 
 		/* Sanity check */
@@ -481,27 +483,21 @@ static int ndp_rx ( struct io_buffer *iobuf,
 				     NDP_OPTION_BLKSZ ) ) ) {
 			DBGC ( netdev, "NDP bad option length:\n" );
 			DBGC_HDA ( netdev, 0, option, remaining );
-			rc = -EINVAL;
-			goto done;
+			return -EINVAL;
 		}
 		option_len = ( option->header.blocks * NDP_OPTION_BLKSZ );
 
 		/* Handle option */
 		if ( ( rc = ndp_rx_option ( netdev, sin6_src, ndp, option,
 					    option_len ) ) != 0 )
-			goto done;
+			return rc;
 
 		/* Move to next option */
 		option = ( ( ( void * ) option ) + option_len );
 		remaining -= option_len;
 	}
 
-	/* Success */
-	rc = 0;
-
- done:
-	free_iob ( iobuf );
-	return rc;
+	return 0;
 }
 
 /**
@@ -519,9 +515,18 @@ static int ndp_rx_neighbour ( struct io_buffer *iobuf,
 			      struct sockaddr_in6 *sin6_dest __unused ) {
 	union ndp_header *ndp = iobuf->data;
 	struct ndp_neighbour_header *neigh = &ndp->neigh;
+	size_t len = iob_len ( iobuf );
+	int rc;
 
-	return ndp_rx ( iobuf, netdev, sin6_src,
-			offsetof ( typeof ( *neigh ), option ) );
+	/* Process options */
+	if ( ( rc = ndp_rx_options ( netdev, sin6_src, ndp,
+				     offsetof ( typeof ( *neigh ), option ),
+				     len ) ) != 0 )
+		goto err_options;
+
+ err_options:
+	free_iob ( iobuf );
+	return rc;
 }
 
 /**
@@ -540,9 +545,24 @@ ndp_rx_router_advertisement ( struct io_buffer *iobuf,
 			      struct sockaddr_in6 *sin6_dest __unused ) {
 	union ndp_header *ndp = iobuf->data;
 	struct ndp_router_advertisement_header *radv = &ndp->radv;
+	size_t len = iob_len ( iobuf );
+	int rc;
 
-	return ndp_rx ( iobuf, netdev, sin6_src,
-			offsetof ( typeof ( *radv ), option ) );
+	/* Process options */
+	if ( ( rc = ndp_rx_options ( netdev, sin6_src, ndp,
+				     offsetof ( typeof ( *radv ), option ),
+				     len ) ) != 0 )
+		goto err_options;
+
+	/* Pass to IPv6 autoconfiguration */
+	if ( ( rc = ipv6conf_rx_router_advertisement ( netdev,
+						       radv->flags ) ) != 0 )
+		goto err_ipv6conf;
+
+ err_ipv6conf:
+ err_options:
+	free_iob ( iobuf );
+	return rc;
 }
 
 /** NDP ICMPv6 handlers */
@@ -559,4 +579,175 @@ struct icmpv6_handler ndp_handlers[] __icmpv6_handler = {
 		.type = ICMPV6_ROUTER_ADVERTISEMENT,
 		.rx = ndp_rx_router_advertisement,
 	},
+};
+
+/****************************************************************************
+ *
+ * IPv6 autoconfiguration
+ *
+ */
+
+/** An IPv6 configurator */
+struct ipv6conf {
+	/** Reference count */
+	struct refcnt refcnt;
+	/** List of configurators */
+	struct list_head list;
+
+	/** Job control interface */
+	struct interface job;
+
+	/** Network device being configured */
+	struct net_device *netdev;
+
+	/** Retransmission timer */
+	struct retry_timer timer;
+};
+
+/** List of IPv6 configurators */
+static LIST_HEAD ( ipv6confs );
+
+/**
+ * Free IPv6 configurator
+ *
+ * @v refcnt		Reference count
+ */
+static void ipv6conf_free ( struct refcnt *refcnt ) {
+	struct ipv6conf *ipv6conf =
+		container_of ( refcnt, struct ipv6conf, refcnt );
+
+	netdev_put ( ipv6conf->netdev );
+	free ( ipv6conf );
+}
+
+/**
+ * Identify IPv6 configurator by network device
+ *
+ * @v netdev		Network device
+ * @ret ipv6		IPv6 configurator, or NULL
+ */
+static struct ipv6conf * ipv6conf_demux ( struct net_device *netdev ) {
+	struct ipv6conf *ipv6conf;
+
+	list_for_each_entry ( ipv6conf, &ipv6confs, list ) {
+		if ( ipv6conf->netdev == netdev )
+			return ipv6conf;
+	}
+	return NULL;
+}
+
+/**
+ * Finish IPv6 autoconfiguration
+ *
+ * @v ipv6		IPv6 configurator
+ * @v rc		Reason for finishing
+ */
+static void ipv6conf_done ( struct ipv6conf *ipv6conf, int rc ) {
+
+	/* Shut down interfaces */
+	intf_shutdown ( &ipv6conf->job, rc );
+
+	/* Stop timer */
+	stop_timer ( &ipv6conf->timer );
+
+	/* Remove from list and drop list's reference */
+	list_del ( &ipv6conf->list );
+	ref_put ( &ipv6conf->refcnt );
+}
+
+/**
+ * Handle IPv6 configurator timer expiry
+ *
+ * @v timer		Retry timer
+ * @v fail		Failure indicator
+ */
+static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
+	struct ipv6conf *ipv6conf =
+		container_of ( timer, struct ipv6conf, timer );
+
+	/* If we have failed, terminate autoconfiguration */
+	if ( fail ) {
+		ipv6conf_done ( ipv6conf, -ETIMEDOUT );
+		return;
+	}
+
+	/* Otherwise, transmit router solicitation and restart timer */
+	start_timer ( &ipv6conf->timer );
+	ndp_tx_router_solicitation ( ipv6conf->netdev );
+}
+
+/**
+ * Handle router advertisement during IPv6 autoconfiguration
+ *
+ * @v netdev		Network device
+ * @v flags		Router flags
+ * @ret rc		Return status code
+ */
+static int ipv6conf_rx_router_advertisement ( struct net_device *netdev,
+					      unsigned int flags ) {
+	struct ipv6conf *ipv6conf;
+
+	/* Identify IPv6 configurator, if any */
+	ipv6conf = ipv6conf_demux ( netdev );
+	if ( ! ipv6conf ) {
+		/* Not an error; router advertisements are processed
+		 * as a background activity even when no explicit
+		 * autoconfiguration is taking place.
+		 */
+		return 0;
+	}
+
+	/* Fail if stateful address autoconfiguration is required */
+	if ( flags & NDP_ROUTER_MANAGED ) {
+		ipv6conf_done ( ipv6conf, -ENOTSUP );
+		return -ENOTSUP;
+	}
+
+	/* Mark autoconfiguration as complete */
+	ipv6conf_done ( ipv6conf, 0 );
+
+	return 0;
+}
+
+/** IPv6 configurator job interface operations */
+static struct interface_operation ipv6conf_job_op[] = {
+	INTF_OP ( intf_close, struct ipv6conf *, ipv6conf_done ),
+};
+
+/** IPv6 configurator job interface descriptor */
+static struct interface_descriptor ipv6conf_job_desc =
+	INTF_DESC ( struct ipv6conf, job, ipv6conf_job_op );
+
+/**
+ * Start IPv6 autoconfiguration
+ *
+ * @v job		Job control interface
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+int start_ipv6conf ( struct interface *job, struct net_device *netdev ) {
+	struct ipv6conf *ipv6conf;
+
+	/* Allocate and initialise structure */
+	ipv6conf = zalloc ( sizeof ( *ipv6conf ) );
+	if ( ! ipv6conf )
+		return -ENOMEM;
+	ref_init ( &ipv6conf->refcnt, ipv6conf_free );
+	intf_init ( &ipv6conf->job, &ipv6conf_job_desc, &ipv6conf->refcnt );
+	timer_init ( &ipv6conf->timer, ipv6conf_expired, &ipv6conf->refcnt );
+	ipv6conf->netdev = netdev_get ( netdev );
+
+	/* Start timer to initiate router solicitation */
+	start_timer_nodelay ( &ipv6conf->timer );
+
+	/* Attach parent interface, transfer reference to list, and return */
+	intf_plug_plug ( &ipv6conf->job, job );
+	list_add ( &ipv6conf->list, &ipv6confs );
+	return 0;
+}
+
+/** IPv6 network device configurator */
+struct net_device_configurator ipv6_configurator __net_device_configurator = {
+	.name = "ipv6",
+	.start = start_ipv6conf,
 };

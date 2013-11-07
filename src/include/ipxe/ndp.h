@@ -166,6 +166,4 @@ static inline int ndp_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 			      &ndp_discovery, net_source, ll_source );
 }
 
-extern int ndp_tx_router_solicitation ( struct net_device *netdev );
-
 #endif /* _IPXE_NDP_H */
