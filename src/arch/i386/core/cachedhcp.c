@@ -50,7 +50,7 @@ static struct dhcp_packet *cached_dhcpack;
  * Cached DHCPACK startup function
  *
  */
-static void cachedhcp_startup ( void ) {
+static void cachedhcp_init ( void ) {
 	struct dhcp_packet *dhcppkt;
 	struct dhcp_packet *tmp;
 	struct dhcphdr *dhcphdr;
@@ -98,13 +98,14 @@ static void cachedhcp_startup ( void ) {
 }
 
 /**
- * Cached DHCPACK shutdown function
+ * Cached DHCPACK startup function
  *
- * @v booting		Shutting down in order to boot
  */
-static void cachedhcp_shutdown ( int booting __unused ) {
+static void cachedhcp_startup ( void ) {
 
-	/* If cached DHCP packet has not yet been claimed, free it */
+	/* If cached DHCP packet was not claimed by any network device
+	 * during startup, then free it.
+	 */
 	if ( cached_dhcpack ) {
 		DBGC ( colour, "CACHEDHCP freeing unclaimed cached DHCPACK\n" );
 		dhcppkt_put ( cached_dhcpack );
@@ -113,9 +114,13 @@ static void cachedhcp_shutdown ( int booting __unused ) {
 }
 
 /** Cached DHCPACK initialisation function */
-struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+struct init_fn cachedhcp_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = cachedhcp_init,
+};
+
+/** Cached DHCPACK startup function */
+struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
 	.startup = cachedhcp_startup,
-	.shutdown = cachedhcp_shutdown,
 };
 
 /**
