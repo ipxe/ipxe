@@ -99,14 +99,6 @@ struct setting dhcp_server_setting __setting ( SETTING_MISC ) = {
 	.type = &setting_type_ipv4,
 };
 
-/** DHCP user class setting */
-struct setting user_class_setting __setting ( SETTING_HOST_EXTRA ) = {
-	.name = "user-class",
-	.description = "DHCP user class",
-	.tag = DHCP_USER_CLASS_ID,
-	.type = &setting_type_string,
-};
-
 /**
  * Most recent DHCP transaction ID
  *
