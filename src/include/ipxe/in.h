@@ -50,6 +50,12 @@ struct in6_addr {
 #define s6_addr32       in6_u.u6_addr32
 };
 
+#define IN6_IS_ADDR_UNSPECIFIED( addr )					\
+	( ( ( ( ( const uint32_t * ) (addr) )[0] ) |			\
+	    ( ( ( const uint32_t * ) (addr) )[1] ) |			\
+	    ( ( ( const uint32_t * ) (addr) )[2] ) |			\
+	    ( ( ( const uint32_t * ) (addr) )[3] ) ) == 0 )
+
 #define IN6_IS_ADDR_MULTICAST( addr )					\
 	( *( ( const uint8_t * ) (addr) ) == 0xff )
 

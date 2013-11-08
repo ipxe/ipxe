@@ -399,7 +399,7 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 		rc = -ENETUNREACH;
 		goto err;
 	}
-	if ( sin6_src )
+	if ( sin6_src && ! IN6_IS_ADDR_UNSPECIFIED ( &sin6_src->sin6_addr ) )
 		src = &sin6_src->sin6_addr;
 	memcpy ( &iphdr->src, src, sizeof ( iphdr->src ) );
 
