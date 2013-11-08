@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/ipv6.h>
 #include <ipxe/icmpv6.h>
 #include <ipxe/neighbour.h>
+#include <ipxe/dhcpv6.h>
 #include <ipxe/ndp.h>
 
 /** @file
@@ -596,6 +597,8 @@ struct ipv6conf {
 
 	/** Job control interface */
 	struct interface job;
+	/** DHCPv6 interface */
+	struct interface dhcp;
 
 	/** Network device being configured */
 	struct net_device *netdev;
@@ -646,6 +649,7 @@ static void ipv6conf_done ( struct ipv6conf *ipv6conf, int rc ) {
 
 	/* Shut down interfaces */
 	intf_shutdown ( &ipv6conf->job, rc );
+	intf_shutdown ( &ipv6conf->dhcp, rc );
 
 	/* Stop timer */
 	stop_timer ( &ipv6conf->timer );
@@ -686,6 +690,8 @@ static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
 static int ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 					      unsigned int flags ) {
 	struct ipv6conf *ipv6conf;
+	int stateful;
+	int rc;
 
 	/* Identify IPv6 configurator, if any */
 	ipv6conf = ipv6conf_demux ( netdev );
@@ -697,13 +703,28 @@ static int ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 		return 0;
 	}
 
-	/* Fail if stateful address autoconfiguration is required */
-	if ( flags & NDP_ROUTER_MANAGED ) {
-		ipv6conf_done ( ipv6conf, -ENOTSUP );
-		return -ENOTSUP;
+	/* If this is not the first solicited router advertisement, ignore it */
+	if ( ! timer_running ( &ipv6conf->timer ) )
+		return 0;
+
+	/* Stop router solicitation timer */
+	stop_timer ( &ipv6conf->timer );
+
+	/* Start DHCPv6 if required */
+	if ( flags & ( NDP_ROUTER_MANAGED | NDP_ROUTER_OTHER ) ) {
+		stateful = ( flags & NDP_ROUTER_MANAGED );
+		if ( ( rc = start_dhcpv6 ( &ipv6conf->dhcp, netdev,
+					   stateful ) ) != 0 ) {
+			DBGC ( netdev, "NDP could not start state%s DHCPv6: "
+			       "%s\n", ( stateful ? "ful" : "less" ),
+			       strerror ( rc ) );
+			ipv6conf_done ( ipv6conf, rc );
+			return rc;
+		}
+		return 0;
 	}
 
-	/* Mark autoconfiguration as complete */
+	/* Otherwise, terminate autoconfiguration */
 	ipv6conf_done ( ipv6conf, 0 );
 
 	return 0;
@@ -717,6 +738,15 @@ static struct interface_operation ipv6conf_job_op[] = {
 /** IPv6 configurator job interface descriptor */
 static struct interface_descriptor ipv6conf_job_desc =
 	INTF_DESC ( struct ipv6conf, job, ipv6conf_job_op );
+
+/** IPv6 configurator DHCPv6 interface operations */
+static struct interface_operation ipv6conf_dhcp_op[] = {
+	INTF_OP ( intf_close, struct ipv6conf *, ipv6conf_done ),
+};
+
+/** IPv6 configurator DHCPv6 interface descriptor */
+static struct interface_descriptor ipv6conf_dhcp_desc =
+	INTF_DESC ( struct ipv6conf, dhcp, ipv6conf_dhcp_op );
 
 /**
  * Start IPv6 autoconfiguration
@@ -734,6 +764,7 @@ int start_ipv6conf ( struct interface *job, struct net_device *netdev ) {
 		return -ENOMEM;
 	ref_init ( &ipv6conf->refcnt, ipv6conf_free );
 	intf_init ( &ipv6conf->job, &ipv6conf_job_desc, &ipv6conf->refcnt );
+	intf_init ( &ipv6conf->dhcp, &ipv6conf_dhcp_desc, &ipv6conf->refcnt );
 	timer_init ( &ipv6conf->timer, ipv6conf_expired, &ipv6conf->refcnt );
 	ipv6conf->netdev = netdev_get ( netdev );
 
