@@ -129,7 +129,7 @@ int base16_decode ( const char *encoded, uint8_t *raw ) {
 
 	DBG ( "Base16-decoded \"%s\" to:\n", encoded );
 	DBG_HDA ( 0, raw, len );
-	assert ( len <= base16_decoded_max_len ( encoded ) );
+	assert ( len <= ( int ) base16_decoded_max_len ( encoded ) );
 
 	return len;
 }
