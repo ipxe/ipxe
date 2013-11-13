@@ -38,6 +38,14 @@ shift
 dir=`mktemp -d bin/iso.dir.XXXXXX`
 cfg=$dir/isolinux.cfg
 cp -p $isolinux_bin $dir
+
+# syslinux 6.x needs a file called ldlinux.c32
+ldlinux_c32=$(dirname ${isolinux_bin})/ldlinux.c32
+if [ -s ${ldlinux_c32} ]
+then
+	cp -p ${ldlinux_c32} ${dir}
+fi
+
 cat > $cfg <<EOF
 # These default options can be changed in the geniso script
 SAY iPXE ISO boot image
