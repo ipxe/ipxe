@@ -867,6 +867,59 @@ struct sockaddr_converter ipv6_sockaddr_converter __sockaddr_converter = {
 };
 
 /**
+ * Parse IPv6 address setting value
+ *
+ * @v type		Setting type
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
+ */
+static int parse_ipv6_setting ( struct setting_type *type __unused,
+				const char *value, void *buf, size_t len ) {
+	struct in6_addr ipv6;
+	int rc;
+
+	/* Parse IPv6 address */
+	if ( ( rc = inet6_aton ( value, &ipv6 ) ) != 0 )
+		return rc;
+
+	/* Copy to buffer */
+	if ( len > sizeof ( ipv6 ) )
+		len = sizeof ( ipv6 );
+	memcpy ( buf, &ipv6, len );
+
+	return ( sizeof ( ipv6 ) );
+}
+
+/**
+ * Format IPv6 address setting value
+ *
+ * @v type		Setting type
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int format_ipv6_setting ( struct setting_type *type __unused,
+				 const void *raw, size_t raw_len, char *buf,
+				 size_t len ) {
+	const struct in6_addr *ipv6 = raw;
+
+	if ( raw_len < sizeof ( *ipv6 ) )
+		return -EINVAL;
+	return snprintf ( buf, len, "%s", inet6_ntoa ( ipv6 ) );
+}
+
+/** An IPv6 address setting type */
+struct setting_type setting_type_ipv6 __setting_type = {
+	.name = "ipv6",
+	.parse = parse_ipv6_setting,
+	.format = format_ipv6_setting,
+};
+
+/**
  * Perform IPv6 stateless address autoconfiguration (SLAAC)
  *
  * @v netdev		Network device

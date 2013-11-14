@@ -173,6 +173,12 @@ static struct setting test_ipv4_setting = {
 	.type = &setting_type_ipv4,
 };
 
+/** Test IPv6 address setting type */
+static struct setting test_ipv6_setting = {
+	.name = "test_ipv6",
+	.type = &setting_type_ipv6,
+};
+
 /** Test signed 8-bit integer setting type */
 static struct setting test_int8_setting = {
 	.name = "test_int8",
@@ -266,6 +272,16 @@ static void settings_test_exec ( void ) {
 		    RAW ( 192, 168, 0, 1 ) );
 	fetchf_ok ( &test_settings, &test_ipv4_setting,
 		    RAW ( 212, 13, 204, 60 ), "212.13.204.60" );
+
+	/* "ipv6" setting type */
+	storef_ok ( &test_settings, &test_ipv6_setting,
+		    "2001:ba8:0:1d4::6950:5845",
+		    RAW ( 0x20, 0x01, 0x0b, 0xa8, 0x00, 0x00, 0x01, 0xd4,
+			  0x00, 0x00, 0x00, 0x00, 0x69, 0x50, 0x58, 0x45 ) );
+	fetchf_ok ( &test_settings, &test_ipv6_setting,
+		    RAW ( 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			  0x02, 0x0c, 0x29, 0xff, 0xfe, 0xc5, 0x39, 0xa1 ),
+		    "fe80::20c:29ff:fec5:39a1" );
 
 	/* Integer setting types (as formatted strings) */
 	storef_ok ( &test_settings, &test_int8_setting,
