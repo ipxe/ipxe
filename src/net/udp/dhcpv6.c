@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/in.h>
 #include <ipxe/crc32.h>
 #include <ipxe/errortab.h>
+#include <ipxe/ipv6.h>
 #include <ipxe/dhcpv6.h>
 
 /** @file
@@ -408,16 +409,19 @@ enum dhcpv6_session_state_flags {
 	/** Include leased IPv6 address within request */
 	DHCPV6_TX_IAADDR = 0x02,
 	/** Record received server ID */
-	DHCPV6_RX_SERVER_ID = 0x04,
+	DHCPV6_RX_RECORD_SERVER_ID = 0x04,
 	/** Record received IPv6 address */
-	DHCPV6_RX_IAADDR = 0x08,
+	DHCPV6_RX_RECORD_IAADDR = 0x08,
+	/** Apply received IPv6 address */
+	DHCPV6_RX_APPLY_IAADDR = 0x10,
 };
 
 /** DHCPv6 request state */
 static struct dhcpv6_session_state dhcpv6_request = {
 	.tx_type = DHCPV6_REQUEST,
 	.rx_type = DHCPV6_REPLY,
-	.flags = ( DHCPV6_TX_IA_NA | DHCPV6_TX_IAADDR | DHCPV6_RX_IAADDR ),
+	.flags = ( DHCPV6_TX_IA_NA | DHCPV6_TX_IAADDR |
+		   DHCPV6_RX_RECORD_IAADDR | DHCPV6_RX_APPLY_IAADDR ),
 	.next = NULL,
 };
 
@@ -425,7 +429,8 @@ static struct dhcpv6_session_state dhcpv6_request = {
 static struct dhcpv6_session_state dhcpv6_solicit = {
 	.tx_type = DHCPV6_SOLICIT,
 	.rx_type = DHCPV6_ADVERTISE,
-	.flags = ( DHCPV6_TX_IA_NA | DHCPV6_RX_SERVER_ID | DHCPV6_RX_IAADDR ),
+	.flags = ( DHCPV6_TX_IA_NA | DHCPV6_RX_RECORD_SERVER_ID |
+		   DHCPV6_RX_RECORD_IAADDR ),
 	.next = &dhcpv6_request,
 };
 
@@ -785,7 +790,7 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 	}
 
 	/* Record identity association address, if applicable */
-	if ( dhcpv6->state->flags & DHCPV6_RX_IAADDR ) {
+	if ( dhcpv6->state->flags & DHCPV6_RX_RECORD_IAADDR ) {
 		if ( ( rc = dhcpv6_iaaddr ( &options, dhcpv6->iaid,
 					    &dhcpv6->lease ) ) != 0 ) {
 			DBGC ( dhcpv6, "DHCPv6 %s received %s with unusable "
@@ -802,7 +807,7 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 	}
 
 	/* Record server ID, if applicable */
-	if ( dhcpv6->state->flags & DHCPV6_RX_SERVER_ID ) {
+	if ( dhcpv6->state->flags & DHCPV6_RX_RECORD_SERVER_ID ) {
 		assert ( dhcpv6->server_duid == NULL );
 		option = dhcpv6_option ( &options, DHCPV6_SERVER_ID );
 		if ( ! option ) {
@@ -820,6 +825,19 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 		}
 		memcpy ( dhcpv6->server_duid, option->duid.duid,
 			 dhcpv6->server_duid_len );
+	}
+
+	/* Apply identity association address, if applicable */
+	if ( dhcpv6->state->flags & DHCPV6_RX_APPLY_IAADDR ) {
+		if ( ( rc = ipv6_set_address ( dhcpv6->netdev,
+					       &dhcpv6->lease ) ) != 0 ) {
+			DBGC ( dhcpv6, "DHCPv6 %s could not apply %s: %s\n",
+			       dhcpv6->netdev->name,
+			       inet6_ntoa ( &dhcpv6->lease ), strerror ( rc ) );
+			/* This is plausibly the error we want to return */
+			dhcpv6->rc = rc;
+			goto done;
+		}
 	}
 
 	/* Transition to next state or complete DHCPv6, as applicable */
