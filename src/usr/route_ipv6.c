@@ -44,8 +44,10 @@ static void route_ipv6_print ( struct net_device *netdev ) {
 		printf ( "%s: %s/%d", netdev->name,
 			 inet6_ntoa ( &miniroute->address ),
 			 miniroute->prefix_len );
-		if ( miniroute->has_router )
+		if ( miniroute->flags & IPV6_HAS_ROUTER )
 			printf ( " gw %s", inet6_ntoa ( &miniroute->router ) );
+		if ( ! ( miniroute->flags & IPV6_HAS_ADDRESS ) )
+			printf ( " (no address)" );
 		if ( ! netdev_is_open ( miniroute->netdev ) )
 			printf ( " (inaccessible)" );
 		printf ( "\n" );
