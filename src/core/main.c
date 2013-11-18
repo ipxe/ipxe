@@ -27,9 +27,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 __asmcall int main ( void ) {
 
+	/* Perform one-time-only initialisation (e.g. heap) */
+	initialise();
+
 	/* Some devices take an unreasonably long time to initialise */
 	printf ( PRODUCT_SHORT_NAME " initialising devices..." );
-	initialise();
 	startup();
 	printf ( "ok\n" );
 
