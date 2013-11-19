@@ -126,6 +126,7 @@ static void efi_snp_hii_questions ( struct efi_snp_device *snpdev,
 				    struct efi_ifr_builder *ifr,
 				    unsigned int varstore_id ) {
 	struct setting *setting;
+	struct setting *previous = NULL;
 	unsigned int name_id;
 	unsigned int prompt_id;
 	unsigned int help_id;
@@ -135,6 +136,9 @@ static void efi_snp_hii_questions ( struct efi_snp_device *snpdev,
 	for_each_table_entry ( setting, SETTINGS ) {
 		if ( ! efi_snp_hii_setting_applies ( snpdev, setting ) )
 			continue;
+		if ( previous && ( setting_cmp ( setting, previous ) == 0 ) )
+			continue;
+		previous = setting;
 		name_id = efi_ifr_string ( ifr, "%s", setting->name );
 		prompt_id = efi_ifr_string ( ifr, "%s", setting->description );
 		help_id = efi_ifr_string ( ifr, "http://ipxe.org/cfg/%s",

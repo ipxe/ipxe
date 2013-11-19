@@ -565,6 +565,31 @@ int setting_applies ( struct settings *settings,
 }
 
 /**
+ * Find setting applicable to settings block, if any
+ *
+ * @v settings		Settings block
+ * @v setting		Setting
+ * @ret setting		Applicable setting, if any
+ */
+static const struct setting *
+applicable_setting ( struct settings *settings, const struct setting *setting ){
+	const struct setting *applicable;
+
+	/* If setting is already applicable, use it */
+	if ( setting_applies ( settings, setting ) )
+		return setting;
+
+	/* Otherwise, look for a matching predefined setting which does apply */
+	for_each_table_entry ( applicable, SETTINGS ) {
+		if ( ( setting_cmp ( setting, applicable ) == 0 ) &&
+		     ( setting_applies ( settings, applicable ) ) )
+			return applicable;
+	}
+
+	return NULL;
+}
+
+/**
  * Store value of setting
  *
  * @v settings		Settings block, or NULL
@@ -580,7 +605,7 @@ int store_setting ( struct settings *settings, const struct setting *setting,
 	/* Find target settings block */
 	settings = settings_target ( settings );
 
-	/* Fail if tag does not apply to this settings block */
+	/* Fail if setting does not apply to this settings block */
 	if ( ! setting_applies ( settings, setting ) )
 		return -ENOTTY;
 
@@ -628,6 +653,7 @@ int store_setting ( struct settings *settings, const struct setting *setting,
 int fetch_setting ( struct settings *settings, const struct setting *setting,
 		    struct settings **origin, struct setting *fetched,
 		    void *data, size_t len ) {
+	const struct setting *applicable;
 	struct settings *child;
 	struct setting tmp;
 	int ret;
@@ -646,11 +672,11 @@ int fetch_setting ( struct settings *settings, const struct setting *setting,
 	if ( ! settings->op->fetch )
 		return -ENOTSUP;
 
-	/* Try this block first, if applicable */
-	if ( setting_applies ( settings, setting ) ) {
+	/* Try this block first, if an applicable setting exists */
+	if ( ( applicable = applicable_setting ( settings, setting ) ) ) {
 
 		/* Create modifiable copy of setting */
-		memcpy ( &tmp, setting, sizeof ( tmp ) );
+		memcpy ( &tmp, applicable, sizeof ( tmp ) );
 		if ( ( ret = settings->op->fetch ( settings, &tmp,
 						   data, len ) ) >= 0 ) {
 

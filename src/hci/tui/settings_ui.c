@@ -119,6 +119,7 @@ static unsigned int select_setting_row ( struct setting_widget *widget,
 					 unsigned int index ) {
 	struct settings *settings;
 	struct setting *setting;
+	struct setting *previous = NULL;
 	unsigned int count = 0;
 
 	/* Initialise structure */
@@ -146,11 +147,18 @@ static unsigned int select_setting_row ( struct setting_widget *widget,
 
 	/* Include any applicable settings */
 	for_each_table_entry ( setting, SETTINGS ) {
+
+		/* Skip inapplicable settings */
 		if ( ! setting_applies ( widget->settings, setting ) )
 			continue;
-		if ( count++ == index ) {
 
-			/* Read current setting value and origin */
+		/* Skip duplicate settings */
+		if ( previous && ( setting_cmp ( setting, previous ) == 0 ) )
+			continue;
+		previous = setting;
+
+		/* Read current setting value and origin */
+		if ( count++ == index ) {
 			fetchf_setting ( widget->settings, setting,
 					 &widget->row.origin,
 					 &widget->row.setting,
