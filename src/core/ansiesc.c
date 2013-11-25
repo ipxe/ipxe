@@ -32,19 +32,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Call ANSI escape sequence handler
  *
- * @v handlers		List of escape sequence handlers
+ * @v ctx		ANSI escape sequence context
  * @v function		Control function identifier
  * @v count		Parameter count
  * @v params		Parameter list
  */
-static void ansiesc_call_handler ( struct ansiesc_handler *handlers,
+static void ansiesc_call_handler ( struct ansiesc_context *ctx,
 				   unsigned int function, int count,
 				   int params[] ) {
+	struct ansiesc_handler *handlers = ctx->handlers;
 	struct ansiesc_handler *handler;
 
 	for ( handler = handlers ; handler->function ; handler++ ) {
 		if ( handler->function == function ) {
-			handler->handle ( count, params );
+			handler->handle ( ctx, count, params );
 			break;
 		}
 	}
@@ -67,6 +68,7 @@ static void ansiesc_call_handler ( struct ansiesc_handler *handlers,
  * sequences we are prepared to accept as valid.
  */
 int ansiesc_process ( struct ansiesc_context *ctx, int c ) {
+
 	if ( ctx->count == 0 ) {
 		if ( c == ESC ) {
 			/* First byte of CSI : begin escape sequence */
@@ -109,7 +111,7 @@ int ansiesc_process ( struct ansiesc_context *ctx, int c ) {
 			ctx->count = 0;
 			ctx->function <<= 8;
 			ctx->function |= c;
-			ansiesc_call_handler ( ctx->handlers, ctx->function,
+			ansiesc_call_handler ( ctx, ctx->function,
 					       count, ctx->params );
 		}
 		return -1;

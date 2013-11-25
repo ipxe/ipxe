@@ -111,10 +111,12 @@ static unsigned int syslog_severity = SYSLOG_DEFAULT_SEVERITY;
 /**
  * Handle ANSI set syslog priority (private sequence)
  *
+ * @v ctx		ANSI escape sequence context
  * @v count		Parameter count
  * @v params		List of graphic rendition aspects
  */
-static void syslog_handle_priority ( unsigned int count __unused,
+static void syslog_handle_priority ( struct ansiesc_context *ctx __unused,
+				     unsigned int count __unused,
 				     int params[] ) {
 	if ( params[0] >= 0 ) {
 		syslog_severity = params[0];
