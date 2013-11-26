@@ -227,6 +227,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_segment		      ( ERRFILE_IMAGE | 0x00030000 )
 #define ERRFILE_efi_image	      ( ERRFILE_IMAGE | 0x00040000 )
 #define ERRFILE_embedded	      ( ERRFILE_IMAGE | 0x00050000 )
+#define ERRFILE_pnm		      ( ERRFILE_IMAGE | 0x00060000 )
 
 #define ERRFILE_asn1		      ( ERRFILE_OTHER | 0x00000000 )
 #define ERRFILE_chap		      ( ERRFILE_OTHER | 0x00010000 )

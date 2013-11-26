@@ -194,6 +194,9 @@ REQUIRE_OBJECT ( efi_image );
 #ifdef IMAGE_SDI
 REQUIRE_OBJECT ( sdi );
 #endif
+#ifdef IMAGE_PNM
+REQUIRE_OBJECT ( pnm );
+#endif
 
 /*
  * Drag in all requested commands

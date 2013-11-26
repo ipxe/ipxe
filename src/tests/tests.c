@@ -49,3 +49,4 @@ REQUIRE_OBJECT ( rsa_test );
 REQUIRE_OBJECT ( x509_test );
 REQUIRE_OBJECT ( ocsp_test );
 REQUIRE_OBJECT ( cms_test );
+REQUIRE_OBJECT ( pnm_test );
