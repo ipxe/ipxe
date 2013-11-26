@@ -409,6 +409,8 @@ int image_select ( struct image *image ) {
 	/* Check that this image can be executed */
 	if ( ( rc = image_probe ( image ) ) != 0 )
 		return rc;
+	if ( ! image->type->exec )
+		return -ENOEXEC;
 
 	/* Mark image as selected */
 	image->flags |= IMAGE_SELECTED;
