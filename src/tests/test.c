@@ -45,8 +45,10 @@ static struct self_test *current_tests;
  * @v success		Test succeeded
  * @v file		Test code file
  * @v line		Test code line
+ * @v test		Test code
  */
-void test_ok ( int success, const char *file, unsigned int line ) {
+void test_ok ( int success, const char *file, unsigned int line,
+	       const char *test ) {
 
 	/* Sanity check */
 	assert ( current_tests != NULL );
@@ -57,8 +59,8 @@ void test_ok ( int success, const char *file, unsigned int line ) {
 	/* Report failure if applicable */
 	if ( ! success ) {
 		current_tests->failures++;
-		printf ( "FAILURE: \"%s\" test failed at %s line %d\n",
-			 current_tests->name, file, line );
+		printf ( "FAILURE: \"%s\" test failed at %s line %d: ( %s )\n",
+			 current_tests->name, file, line, test );
 	}
 }
 

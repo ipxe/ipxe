@@ -31,15 +31,16 @@ struct self_test {
 /** Declare a self-test */
 #define __self_test __table_entry ( SELF_TESTS, 01 )
 
-extern void test_ok ( int success, const char *file, unsigned int line );
+extern void test_ok ( int success, const char *file, unsigned int line,
+		      const char *test );
 
 /**
  * Report test result
  *
  * @v success		Test succeeded
  */
-#define ok( success ) do {				\
-	test_ok ( (success), __FILE__, __LINE__ );	\
+#define ok( success ) do {					\
+	test_ok ( (success), __FILE__, __LINE__, #success );	\
 	} while ( 0 )
 
 #endif /* _IPXE_TEST_H */
