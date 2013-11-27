@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/refcnt.h>
 
 struct uri;
+struct pixel_buffer;
 struct image_type;
 
 /** An executable image */
@@ -74,9 +75,10 @@ struct image {
 struct image_type {
 	/** Name of this image type */
 	char *name;
-	/** Probe image
+	/**
+	 * Probe image
 	 *
-	 * @v image		Executable image
+	 * @v image		Image
 	 * @ret rc		Return status code
 	 *
 	 * Return success if the image is of this image type.
@@ -85,10 +87,18 @@ struct image_type {
 	/**
 	 * Execute image
 	 *
-	 * @v image		Executable image
+	 * @v image		Image
 	 * @ret rc		Return status code
 	 */
 	int ( * exec ) ( struct image *image );
+	/**
+	 * Create pixel buffer from image
+	 *
+	 * @v image		Image
+	 * @v pixbuf		Pixel buffer to fill in
+	 * @ret rc		Return status code
+	 */
+	int ( * pixbuf ) ( struct image *image, struct pixel_buffer **pixbuf );
 };
 
 /**
@@ -159,6 +169,7 @@ extern int image_replace ( struct image *replacement );
 extern int image_select ( struct image *image );
 extern struct image * image_find_selected ( void );
 extern int image_set_trust ( int require_trusted, int permanent );
+extern int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf );
 
 /**
  * Increment reference count on an image
