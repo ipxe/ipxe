@@ -78,6 +78,13 @@ struct console_driver {
 	 */
 	int ( * iskey ) ( void );
 	/**
+	 * Configure console
+	 *
+	 * @v config		Console configuration, or NULL to reset
+	 * @ret rc		Return status code
+	 */
+	int ( * configure ) ( struct console_configuration *config );
+	/**
 	 * Console usage bitmask
 	 *
 	 * This is the bitwise OR of zero or more @c CONSOLE_USAGE_XXX
@@ -170,5 +177,15 @@ console_set_usage ( int usage ) {
 
 extern int iskey ( void );
 extern int getkey ( unsigned long timeout );
+extern int console_configure ( struct console_configuration *config );
+
+/**
+ * Reset console
+ *
+ */
+static inline __attribute__ (( always_inline )) void console_reset ( void ) {
+
+	console_configure ( NULL );
+}
 
 #endif /* _IPXE_CONSOLE_H */

@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <biosint.h>
 #include <bootsector.h>
+#include <ipxe/console.h>
 
 /** Vector for storing original INT 18 handler
  *
@@ -59,6 +60,9 @@ extern void bootsector_exec_fail ( void );
 int call_bootsector ( unsigned int segment, unsigned int offset,
 		      unsigned int drive ) {
 	int discard_b, discard_D, discard_d;
+
+	/* Reset console, since boot sector will probably use it */
+	console_reset();
 
 	DBG ( "Booting from boot sector at %04x:%04x\n", segment, offset );
 

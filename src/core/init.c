@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/device.h>
+#include <ipxe/console.h>
 #include <ipxe/init.h>
 
 /** @file
@@ -94,6 +95,9 @@ void shutdown ( int flags ) {
 		if ( startup_fn->shutdown )
 			startup_fn->shutdown ( flags );
 	}
+
+	/* Reset console */
+	console_reset();
 
 	started = 0;
 }

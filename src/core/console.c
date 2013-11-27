@@ -121,3 +121,35 @@ int getchar ( void ) {
 int iskey ( void ) {
 	return has_input() ? 1 : 0;
 }
+
+/**
+ * Configure console
+ *
+ * @v config		Console configuration
+ * @ret rc		Return status code
+ *
+ * The configuration is passed to all configurable consoles, including
+ * those which are currently disabled.  Consoles may choose to enable
+ * or disable themselves depending upon the configuration.
+ *
+ * If configuration fails, then all consoles will be reset.
+ */
+int console_configure ( struct console_configuration *config ) {
+	struct console_driver *console;
+	int rc;
+
+	/* Try to configure each console */
+	for_each_table_entry ( console, CONSOLES ) {
+		if ( ( console->configure ) &&
+		     ( ( rc = console->configure ( config ) ) != 0 ) )
+				goto err;
+	}
+
+	return 0;
+
+ err:
+	/* Reset all consoles, avoiding a potential infinite loop */
+	if ( config )
+		console_reset();
+	return rc;
+}

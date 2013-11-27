@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/segment.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/features.h>
+#include <ipxe/console.h>
 
 FEATURE ( FEATURE_IMAGE, "PXE", DHCP_EB_FEATURE_PXE, 1 );
 
@@ -73,6 +74,9 @@ static int pxe_exec ( struct image *image ) {
 
 	/* Set PXE command line */
 	pxe_cmdline = image->cmdline;
+
+	/* Reset console since PXE NBP will probably use it */
+	console_reset();
 
 	/* Start PXE NBP */
 	rc = pxe_start_nbp();
