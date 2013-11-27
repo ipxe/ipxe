@@ -135,6 +135,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define PARAM_CMD		/* Form parameter commands */
 //#define NEIGHBOUR_CMD		/* Neighbour management commands */
 //#define PING_CMD		/* Ping command */
+//#define CONSOLE_CMD		/* Console command */
 
 /*
  * ROM-specific options

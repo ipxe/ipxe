@@ -278,6 +278,9 @@ REQUIRE_OBJECT ( neighbour_cmd );
 #ifdef PING_CMD
 REQUIRE_OBJECT ( ping_cmd );
 #endif
+#ifdef CONSOLE_CMD
+REQUIRE_OBJECT ( console_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
