@@ -14,12 +14,26 @@ unsigned short _LINES = 24;
 
 static unsigned int saved_usage;
 
+static void ansiscr_attrs ( struct _curses_screen *scr, attr_t attrs ) {
+	int bold = ( attrs & A_BOLD );
+	attr_t cpair = PAIR_NUMBER ( attrs );
+	short fcol;
+	short bcol;
+
+	if ( scr->attrs != attrs ) {
+		scr->attrs = attrs;
+		pair_content ( cpair, &fcol, &bcol );
+		/* ANSI escape sequence to update character attributes */
+		printf ( "\033[0;%d;3%d;4%dm", ( bold ? 1 : 22 ), fcol, bcol );
+	}
+}
+
 static void ansiscr_reset ( struct _curses_screen *scr ) {
 	/* Reset terminal attributes and clear screen */
 	scr->attrs = 0;
 	scr->curs_x = 0;
 	scr->curs_y = 0;
-	printf ( "\033[0m" );
+	printf ( "\033[0m\033[2J" );
 }
 
 static void ansiscr_init ( struct _curses_screen *scr ) {
@@ -30,6 +44,11 @@ static void ansiscr_init ( struct _curses_screen *scr ) {
 static void ansiscr_exit ( struct _curses_screen *scr ) {
 	ansiscr_reset ( scr );
 	console_set_usage ( saved_usage );
+}
+
+static void ansiscr_erase ( struct _curses_screen *scr, attr_t attrs ) {
+	ansiscr_attrs ( scr, attrs );
+	printf ( "\033[2J" );
 }
 
 static void ansiscr_movetoyx ( struct _curses_screen *scr,
@@ -45,18 +64,9 @@ static void ansiscr_movetoyx ( struct _curses_screen *scr,
 static void ansiscr_putc ( struct _curses_screen *scr, chtype c ) {
 	unsigned int character = ( c & A_CHARTEXT );
 	attr_t attrs = ( c & ( A_ATTRIBUTES | A_COLOR ) );
-	int bold = ( attrs & A_BOLD );
-	attr_t cpair = PAIR_NUMBER ( attrs );
-	short fcol;
-	short bcol;
 
 	/* Update attributes if changed */
-	if ( attrs != scr->attrs ) {
-		scr->attrs = attrs;
-		pair_content ( cpair, &fcol, &bcol );
-		/* ANSI escape sequence to update character attributes */
-		printf ( "\033[0;%d;3%d;4%dm", ( bold ? 1 : 22 ), fcol, bcol );
-	}
+	ansiscr_attrs ( scr, attrs );
 
 	/* Print the actual character */
 	putchar ( character );
@@ -79,6 +89,7 @@ static bool ansiscr_peek ( struct _curses_screen *scr __unused ) {
 SCREEN _ansi_screen = {
 	.init		= ansiscr_init,
 	.exit		= ansiscr_exit,
+	.erase		= ansiscr_erase,
 	.movetoyx	= ansiscr_movetoyx,
 	.putc		= ansiscr_putc,
 	.getc		= ansiscr_getc,

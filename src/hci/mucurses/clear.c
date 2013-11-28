@@ -88,3 +88,13 @@ int werase ( WINDOW *win ) {
 	wclrtobot( win );
 	return OK;
 }
+
+/**
+ * Completely clear the screen
+ *
+ * @ret rc	return status code
+ */
+int erase ( void ) {
+	stdscr->scr->erase( stdscr->scr, stdscr->attrs );
+	return OK;
+}
