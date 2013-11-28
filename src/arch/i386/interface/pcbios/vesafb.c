@@ -70,14 +70,14 @@ struct console_driver vesafb_console __console_driver;
 struct vesafb {
 	/** Frame buffer console */
 	struct fbcon fbcon;
+	/** Physical start address */
+	physaddr_t start;
 	/** Pixel geometry */
 	struct fbcon_geometry pixel;
 	/** Colour mapping */
 	struct fbcon_colour_map map;
 	/** Font definition */
 	struct fbcon_font font;
-	/** Total length */
-	size_t len;
 	/** Saved VGA mode */
 	uint8_t saved_mode;
 };
@@ -215,12 +215,10 @@ static int vesafb_mode_list ( uint16_t **mode_numbers ) {
  *
  * @v mode_number	Mode number
  * @v mode		Mode information
- * @v pixbuf		Background picture (if any)
  * @ret rc		Return status code
  */
 static int vesafb_set_mode ( unsigned int mode_number,
-			     struct vbe_mode_info *mode,
-			     struct pixel_buffer *pixbuf ) {
+			     struct vbe_mode_info *mode ) {
 	uint16_t status;
 	int rc;
 
@@ -236,6 +234,7 @@ static int vesafb_set_mode ( unsigned int mode_number,
 	}
 
 	/* Record mode parameters */
+	vesafb.start = mode->phys_base_ptr;
 	vesafb.pixel.width = mode->x_resolution;
 	vesafb.pixel.height = mode->y_resolution;
 	vesafb.pixel.len = ( ( mode->bits_per_pixel + 7 ) / 8 );
@@ -251,37 +250,25 @@ static int vesafb_set_mode ( unsigned int mode_number,
 	vesafb.map.green_lsb = mode->green_field_position;
 	vesafb.map.blue_lsb = mode->blue_field_position;
 
-	/* Get font data */
-	vesafb_font();
-
-	/* Initialise frame buffer console */
-	fbcon_init ( &vesafb.fbcon, phys_to_user ( mode->phys_base_ptr ),
-		     &vesafb.pixel, &vesafb.map, &vesafb.font, pixbuf );
-
 	return 0;
 }
 
 /**
  * Select and set video mode
  *
+ * @v mode_numbers	Mode number list (terminated with VBE_MODE_END)
  * @v min_width		Minimum required width (in pixels)
  * @v min_height	Minimum required height (in pixels)
  * @v min_bpp		Minimum required colour depth (in bits per pixel)
- * @v pixbuf		Background picture (if any)
  * @ret rc		Return status code
  */
-static int vesafb_select_mode ( unsigned int min_width, unsigned int min_height,
-				unsigned int min_bpp,
-				struct pixel_buffer *pixbuf ) {
+static int vesafb_select_mode ( const uint16_t *mode_numbers,
+				unsigned int min_width, unsigned int min_height,
+				unsigned int min_bpp ) {
 	struct vbe_mode_info *mode = &vbe_buf.mode;
-	uint16_t *mode_numbers;
 	uint16_t mode_number;
 	uint16_t status;
 	int rc;
-
-	/* Get VESA mode list */
-	if ( ( rc = vesafb_mode_list ( &mode_numbers ) ) != 0 )
-		goto err_mode_list;
 
 	/* Find the first suitable mode */
 	while ( ( mode_number = *(mode_numbers++) ) != VBE_MODE_END ) {
@@ -339,18 +326,75 @@ static int vesafb_select_mode ( unsigned int min_width, unsigned int min_height,
 		}
 
 		/* Select this mode */
-		if ( ( rc = vesafb_set_mode ( mode_number, mode,
-					      pixbuf ) ) != 0 ) {
-			goto err_set_mode;
-		}
+		if ( ( rc = vesafb_set_mode ( mode_number, mode ) ) != 0 )
+			return rc;
 
-		break;
+		return 0;
 	}
 
- err_set_mode:
+	DBGC ( &vbe_buf, "VESAFB found no suitable mode\n" );
+	return -ENOENT;
+}
+
+/**
+ * Initialise VESA frame buffer
+ *
+ * @v min_width		Minimum required width (in pixels)
+ * @v min_height	Minimum required height (in pixels)
+ * @v min_bpp		Minimum required colour depth (in bits per pixel)
+ * @v pixbuf		Background picture (if any)
+ * @ret rc		Return status code
+ */
+static int vesafb_init ( unsigned int min_width, unsigned int min_height,
+			 unsigned int min_bpp, struct pixel_buffer *pixbuf ) {
+	uint32_t discard_b;
+	uint16_t *mode_numbers;
+	int rc;
+
+	/* Record current VGA mode */
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
+			       : "=a" ( vesafb.saved_mode ), "=b" ( discard_b )
+			       : "a" ( VBE_GET_VGA_MODE ) );
+	DBGC ( &vbe_buf, "VESAFB saved VGA mode %#02x\n", vesafb.saved_mode );
+
+	/* Get VESA mode list */
+	if ( ( rc = vesafb_mode_list ( &mode_numbers ) ) != 0 )
+		goto err_mode_list;
+
+	/* Select and set mode */
+	if ( ( rc = vesafb_select_mode ( mode_numbers, min_width, min_height,
+					 min_bpp ) ) != 0 )
+		goto err_select_mode;
+
+	/* Get font data */
+	vesafb_font();
+
+	/* Initialise frame buffer console */
+	fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
+		     &vesafb.pixel, &vesafb.map, &vesafb.font, pixbuf );
+
+ err_select_mode:
 	free ( mode_numbers );
  err_mode_list:
 	return rc;
+}
+
+/**
+ * Finalise VESA frame buffer
+ *
+ */
+static void vesafb_fini ( void ) {
+	uint32_t discard_a;
+
+	/* Finalise frame buffer console */
+	fbcon_fini ( &vesafb.fbcon );
+
+	/* Restore VGA mode */
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
+			       : "=a" ( discard_a )
+			       : "a" ( VBE_SET_VGA_MODE | vesafb.saved_mode ) );
+	DBGC ( &vbe_buf, "VESAFB restored VGA mode %#02x\n",
+	       vesafb.saved_mode );
 }
 
 /**
@@ -370,27 +414,14 @@ static void vesafb_putchar ( int character ) {
  * @ret rc		Return status code
  */
 static int vesafb_configure ( struct console_configuration *config ) {
-	uint32_t discard_a;
-	uint32_t discard_b;
 	int rc;
 
 	/* Reset console, if applicable */
 	if ( ! vesafb_console.disabled ) {
-		fbcon_fini ( &vesafb.fbcon );
-		__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
-				       : "=a" ( discard_a )
-				       : "a" ( VBE_SET_VGA_MODE |
-					       vesafb.saved_mode ) );
-		DBGC ( &vbe_buf, "VESAFB restored VGA mode %#02x\n",
-		       vesafb.saved_mode );
+		vesafb_fini();
 		bios_console.disabled &= ~CONSOLE_DISABLED_OUTPUT;
 	}
 	vesafb_console.disabled = CONSOLE_DISABLED;
-
-	/* Record current video mode */
-	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
-			       : "=a" ( vesafb.saved_mode ), "=b" ( discard_b )
-			       : "a" ( VBE_GET_VGA_MODE ) );
 
 	/* Do nothing more unless we have a usable configuration */
 	if ( ( config == NULL ) ||
@@ -398,9 +429,9 @@ static int vesafb_configure ( struct console_configuration *config ) {
 		return 0;
 	}
 
-	/* Try to select an appropriate mode */
-	if ( ( rc = vesafb_select_mode ( config->width, config->height,
-					 config->bpp, config->pixbuf ) ) != 0 )
+	/* Initialise VESA frame buffer */
+	if ( ( rc = vesafb_init ( config->width, config->height, config->bpp,
+				  config->pixbuf ) ) != 0 )
 		return rc;
 
 	/* Mark console as enabled */
