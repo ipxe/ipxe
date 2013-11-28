@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
 #include <errno.h>
+#include <limits.h>
 #include <realmode.h>
 #include <ipxe/console.h>
 #include <ipxe/io.h>
@@ -211,27 +212,61 @@ static int vesafb_mode_list ( uint16_t **mode_numbers ) {
 }
 
 /**
- * Set video mode
+ * Get video mode information
  *
  * @v mode_number	Mode number
- * @v mode		Mode information
  * @ret rc		Return status code
  */
-static int vesafb_set_mode ( unsigned int mode_number,
-			     struct vbe_mode_info *mode ) {
+static int vesafb_mode_info ( unsigned int mode_number ) {
+	struct vbe_mode_info *mode = &vbe_buf.mode;
 	uint16_t status;
 	int rc;
 
-	/* Select this mode */
+	/* Get mode information */
 	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
 			       : "=a" ( status )
-			       : "a" ( VBE_SET_MODE ),
-				 "b" ( mode_number ) );
+			       : "a" ( VBE_MODE_INFO ),
+				 "c" ( mode_number ),
+				 "D" ( __from_data16 ( mode ) )
+			       : "memory" );
 	if ( ( rc = vesafb_rc ( status ) ) != 0 ) {
-		DBGC ( &vbe_buf, "VESAFB could not set mode %04x: [%04x] %s\n",
-		       mode_number, status, strerror ( rc ) );
+		DBGC ( &vbe_buf, "VESAFB could not get mode %04x information: "
+		       "[%04x] %s\n", mode_number, status, strerror ( rc ) );
 		return rc;
 	}
+	DBGC ( &vbe_buf, "VESAFB mode %04x %dx%d %dbpp(%d:%d:%d:%d) model "
+	       "%02x [x%d]%s%s%s%s%s\n", mode_number, mode->x_resolution,
+	       mode->y_resolution, mode->bits_per_pixel, mode->rsvd_mask_size,
+	       mode->red_mask_size, mode->green_mask_size, mode->blue_mask_size,
+	       mode->memory_model, ( mode->number_of_image_pages + 1 ),
+	       ( ( mode->mode_attributes & VBE_MODE_ATTR_SUPPORTED ) ?
+		 "" : " [unsupported]" ),
+	       ( ( mode->mode_attributes & VBE_MODE_ATTR_TTY ) ?
+		 " [tty]" : "" ),
+	       ( ( mode->mode_attributes & VBE_MODE_ATTR_GRAPHICS ) ?
+		 "" : " [text]" ),
+	       ( ( mode->mode_attributes & VBE_MODE_ATTR_LINEAR ) ?
+		 "" : " [nonlinear]" ),
+	       ( ( mode->mode_attributes & VBE_MODE_ATTR_TRIPLE_BUF ) ?
+		 " [buf]" : "" ) );
+
+	return 0;
+}
+
+/**
+ * Set video mode
+ *
+ * @v mode_number	Mode number
+ * @ret rc		Return status code
+ */
+static int vesafb_set_mode ( unsigned int mode_number ) {
+	struct vbe_mode_info *mode = &vbe_buf.mode;
+	uint16_t status;
+	int rc;
+
+	/* Get mode information */
+	if ( ( rc = vesafb_mode_info ( mode_number ) ) != 0 )
+		return rc;
 
 	/* Record mode parameters */
 	vesafb.start = mode->phys_base_ptr;
@@ -250,24 +285,37 @@ static int vesafb_set_mode ( unsigned int mode_number,
 	vesafb.map.green_lsb = mode->green_field_position;
 	vesafb.map.blue_lsb = mode->blue_field_position;
 
+	/* Select this mode */
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
+			       : "=a" ( status )
+			       : "a" ( VBE_SET_MODE ),
+				 "b" ( mode_number ) );
+	if ( ( rc = vesafb_rc ( status ) ) != 0 ) {
+		DBGC ( &vbe_buf, "VESAFB could not set mode %04x: [%04x] %s\n",
+		       mode_number, status, strerror ( rc ) );
+		return rc;
+	}
+
 	return 0;
 }
 
 /**
- * Select and set video mode
+ * Select video mode
  *
  * @v mode_numbers	Mode number list (terminated with VBE_MODE_END)
  * @v min_width		Minimum required width (in pixels)
  * @v min_height	Minimum required height (in pixels)
  * @v min_bpp		Minimum required colour depth (in bits per pixel)
- * @ret rc		Return status code
+ * @ret mode_number	Mode number, or negative error
  */
 static int vesafb_select_mode ( const uint16_t *mode_numbers,
 				unsigned int min_width, unsigned int min_height,
 				unsigned int min_bpp ) {
 	struct vbe_mode_info *mode = &vbe_buf.mode;
+	int best_mode_number = -ENOENT;
+	unsigned int best_score = INT_MAX;
+	unsigned int score;
 	uint16_t mode_number;
-	uint16_t status;
 	int rc;
 
 	/* Find the first suitable mode */
@@ -277,35 +325,8 @@ static int vesafb_select_mode ( const uint16_t *mode_numbers,
 		mode_number |= VBE_MODE_LINEAR;
 
 		/* Get mode information */
-		__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
-				       : "=a" ( status )
-				       : "a" ( VBE_MODE_INFO ),
-					 "c" ( mode_number ),
-					 "D" ( __from_data16 ( mode ) )
-				       : "memory" );
-		if ( ( rc = vesafb_rc ( status ) ) != 0 ) {
-			DBGC ( &vbe_buf, "VESAFB could not get mode %04x "
-			       "information: [%04x] %s\n", mode_number,
-			       status, strerror ( rc ) );
+		if ( ( rc = vesafb_mode_info ( mode_number ) ) != 0 )
 			continue;
-		}
-		DBGC ( &vbe_buf, "VESAFB mode %04x %dx%d %dbpp(%d:%d:%d:%d) "
-		       "model %02x [x%d]%s%s%s%s%s\n", mode_number,
-		       mode->x_resolution, mode->y_resolution,
-		       mode->bits_per_pixel, mode->rsvd_mask_size,
-		       mode->red_mask_size,  mode->green_mask_size,
-		       mode->blue_mask_size, mode->memory_model,
-		       ( mode->number_of_image_pages + 1 ),
-		       ( ( mode->mode_attributes & VBE_MODE_ATTR_SUPPORTED ) ?
-			 "" : " [unsupported]" ),
-		       ( ( mode->mode_attributes & VBE_MODE_ATTR_TTY ) ?
-			 " [tty]" : "" ),
-		       ( ( mode->mode_attributes & VBE_MODE_ATTR_GRAPHICS ) ?
-			 "" : " [text]" ),
-		       ( ( mode->mode_attributes & VBE_MODE_ATTR_LINEAR ) ?
-			 "" : " [nonlinear]" ),
-		       ( ( mode->mode_attributes & VBE_MODE_ATTR_TRIPLE_BUF ) ?
-			 " [buf]" : "" ) );
 
 		/* Skip unusable modes */
 		if ( ( mode->mode_attributes & ( VBE_MODE_ATTR_SUPPORTED |
@@ -325,15 +346,28 @@ static int vesafb_select_mode ( const uint16_t *mode_numbers,
 			continue;
 		}
 
-		/* Select this mode */
-		if ( ( rc = vesafb_set_mode ( mode_number, mode ) ) != 0 )
-			return rc;
-
-		return 0;
+		/* Select this mode if it has the best (i.e. lowest)
+		 * score.  We choose the scoring system to favour
+		 * modes close to the specified width and height;
+		 * within modes of the same width and height we prefer
+		 * a higher colour depth.
+		 */
+		score = ( ( mode->x_resolution * mode->y_resolution ) -
+			  mode->bits_per_pixel );
+		if ( score < best_score ) {
+			best_mode_number = mode_number;
+			best_score = score;
+		}
 	}
 
-	DBGC ( &vbe_buf, "VESAFB found no suitable mode\n" );
-	return -ENOENT;
+	if ( best_mode_number >= 0 ) {
+		DBGC ( &vbe_buf, "VESAFB selected mode %04x\n",
+		       best_mode_number );
+	} else {
+		DBGC ( &vbe_buf, "VESAFB found no suitable mode\n" );
+	}
+
+	return best_mode_number;
 }
 
 /**
@@ -349,6 +383,7 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
 			 unsigned int min_bpp, struct pixel_buffer *pixbuf ) {
 	uint32_t discard_b;
 	uint16_t *mode_numbers;
+	int mode_number;
 	int rc;
 
 	/* Record current VGA mode */
@@ -361,10 +396,16 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
 	if ( ( rc = vesafb_mode_list ( &mode_numbers ) ) != 0 )
 		goto err_mode_list;
 
-	/* Select and set mode */
-	if ( ( rc = vesafb_select_mode ( mode_numbers, min_width, min_height,
-					 min_bpp ) ) != 0 )
+	/* Select mode */
+	if ( ( mode_number = vesafb_select_mode ( mode_numbers, min_width,
+						  min_height, min_bpp ) ) < 0 ){
+		rc = mode_number;
 		goto err_select_mode;
+	}
+
+	/* Set mode */
+	if ( ( rc = vesafb_set_mode ( mode_number ) ) != 0 )
+		goto err_set_mode;
 
 	/* Get font data */
 	vesafb_font();
@@ -373,6 +414,7 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
 	fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
 		     &vesafb.pixel, &vesafb.map, &vesafb.font, pixbuf );
 
+ err_set_mode:
  err_select_mode:
 	free ( mode_numbers );
  err_mode_list:
