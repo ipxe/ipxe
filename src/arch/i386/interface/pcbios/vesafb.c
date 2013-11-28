@@ -173,7 +173,7 @@ static int vesafb_mode_list ( uint16_t **mode_numbers ) {
 			       : "memory" );
 	if ( ( rc = vesafb_rc ( status ) ) != 0 ) {
 		DBGC ( &vbe_buf, "VESAFB could not get controller information: "
-		       "%s\n", strerror ( rc ) );
+		       "[%04x] %s\n", status, strerror ( rc ) );
 		return rc;
 	}
 	if ( controller->vbe_signature != VBE_CONTROLLER_SIGNATURE ) {
@@ -230,8 +230,8 @@ static int vesafb_set_mode ( unsigned int mode_number,
 			       : "a" ( VBE_SET_MODE ),
 				 "b" ( mode_number ) );
 	if ( ( rc = vesafb_rc ( status ) ) != 0 ) {
-		DBGC ( &vbe_buf, "VESAFB could not set mode %04x: %s\n",
-		       mode_number, strerror ( rc ) );
+		DBGC ( &vbe_buf, "VESAFB could not set mode %04x: [%04x] %s\n",
+		       mode_number, status, strerror ( rc ) );
 		return rc;
 	}
 
@@ -298,8 +298,8 @@ static int vesafb_select_mode ( unsigned int min_width, unsigned int min_height,
 				       : "memory" );
 		if ( ( rc = vesafb_rc ( status ) ) != 0 ) {
 			DBGC ( &vbe_buf, "VESAFB could not get mode %04x "
-			       "information: %s\n", mode_number,
-			       strerror ( rc ) );
+			       "information: [%04x] %s\n", mode_number,
+			       status, strerror ( rc ) );
 			goto err_mode_info;
 		}
 		DBGC ( &vbe_buf, "VESAFB mode %04x %dx%d %dbpp(%d:%d:%d:%d) "
