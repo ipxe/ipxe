@@ -62,7 +62,7 @@ struct ansiesc_handler {
 };
 
 /** Maximum number of parameters within a single escape sequence */
-#define ANSIESC_MAX_PARAMS 4
+#define ANSIESC_MAX_PARAMS 5
 
 /**
  * ANSI escape sequence context
