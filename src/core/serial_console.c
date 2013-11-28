@@ -30,7 +30,7 @@ struct console_driver serial_console __console_driver = {
 	.putchar = serial_putc,
 	.getchar = serial_getc,
 	.iskey = serial_ischar,
-	.disabled = 1,
+	.disabled = CONSOLE_DISABLED,
 	.usage = CONSOLE_SERIAL,
 };
 

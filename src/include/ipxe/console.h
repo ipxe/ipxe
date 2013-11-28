@@ -1,6 +1,7 @@
 #ifndef _IPXE_CONSOLE_H
 #define _IPXE_CONSOLE_H
 
+#include <stddef.h>
 #include <stdio.h>
 #include <ipxe/tables.h>
 
@@ -17,6 +18,20 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+struct pixel_buffer;
+
+/** A console configuration */
+struct console_configuration {
+	/** Width */
+	unsigned int width;
+	/** Height */
+	unsigned int height;
+	/** Colour depth */
+	unsigned int bpp;
+	/** Background picture, if any */
+	struct pixel_buffer *pixbuf;
+};
+
 /**
  * A console driver
  *
@@ -25,64 +40,60 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * #__console_driver.
  *
  * @note Consoles that cannot be used before their initialisation
- * function has completed should set #disabled=1 initially.  This
- * allows other console devices to still be used to print out early
- * debugging messages.
- *
+ * function has completed should set #disabled initially.  This allows
+ * other console devices to still be used to print out early debugging
+ * messages.
  */
 struct console_driver {
-	/** Console is disabled.
+	/**
+	 * Console disabled flags
 	 *
-	 * The console's putchar(), getchar() and iskey() methods will
-	 * not be called while #disabled==1.  Typically the console's
-	 * initialisation functions will set #disabled=0 upon
-	 * completion.
-	 *
+	 * This is the bitwise OR of zero or more console disabled
+	 * flags.
 	 */
 	int disabled;
-
-	/** Write a character to the console.
+	/**
+	 * Write a character to the console
 	 *
 	 * @v character		Character to be written
-	 * @ret None		-
-	 * @err None		-
-	 *
 	 */
-	void ( *putchar ) ( int character );
-
-	/** Read a character from the console.
+	void ( * putchar ) ( int character );
+	/**
+	 * Read a character from the console
 	 *
-	 * @v None		-
 	 * @ret character	Character read
-	 * @err None		-
 	 *
 	 * If no character is available to be read, this method will
 	 * block.  The character read should not be echoed back to the
 	 * console.
-	 *
 	 */
-	int ( *getchar ) ( void );
-
-	/** Check for available input.
+	int ( * getchar ) ( void );
+	/**
+	 * Check for available input
 	 *
-	 * @v None		-
-	 * @ret True		Input is available
-	 * @ret False		Input is not available
-	 * @err None		-
+	 * @ret is_available	Input is available
 	 *
-	 * This should return True if a subsequent call to getchar()
+	 * This should return true if a subsequent call to getchar()
 	 * will not block.
-	 *
 	 */
-	int ( *iskey ) ( void );
-
-	/** Console usage bitmask
+	int ( * iskey ) ( void );
+	/**
+	 * Console usage bitmask
 	 *
 	 * This is the bitwise OR of zero or more @c CONSOLE_USAGE_XXX
 	 * values.
 	 */
 	int usage;
 };
+
+/** Console is disabled for input */
+#define CONSOLE_DISABLED_INPUT 0x0001
+
+/** Console is disabled for output */
+#define CONSOLE_DISABLED_OUTPUT 0x0002
+
+/** Console is disabled for all uses */
+#define CONSOLE_DISABLED ( CONSOLE_DISABLED_INPUT | CONSOLE_DISABLED_OUTPUT )
 
 /** Console driver table */
 #define CONSOLES __table ( struct console_driver, "consoles" )

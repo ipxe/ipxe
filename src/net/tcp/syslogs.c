@@ -178,7 +178,7 @@ static void syslogs_putchar ( int character ) {
 /** Encrypted syslog console driver */
 struct console_driver syslogs_console __console_driver = {
 	.putchar = syslogs_putchar,
-	.disabled = 1,
+	.disabled = CONSOLE_DISABLED,
 	.usage = CONSOLE_SYSLOGS,
 };
 
@@ -227,7 +227,7 @@ static int apply_syslogs_settings ( void ) {
 	old_server = NULL;
 
 	/* Reset encrypted syslog connection */
-	syslogs_console.disabled = 1;
+	syslogs_console.disabled = CONSOLE_DISABLED;
 	intf_restart ( &syslogs, 0 );
 
 	/* Do nothing unless we have a log server */

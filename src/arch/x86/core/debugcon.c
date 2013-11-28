@@ -74,7 +74,7 @@ static void debugcon_init ( void ) {
 	check = inb ( DEBUG_PORT );
 	if ( check != DEBUG_PORT_CHECK ) {
 		DBG ( "Debug port not present; disabling console\n" );
-		debugcon_console.disabled = 1;
+		debugcon_console.disabled = CONSOLE_DISABLED;
 	}
 }
 

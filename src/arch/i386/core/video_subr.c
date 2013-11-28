@@ -104,7 +104,7 @@ static void vga_putc(int byte)
 
 struct console_driver vga_console __console_driver = {
 	.putchar = vga_putc,
-	.disabled = 1,
+	.disabled = CONSOLE_DISABLED,
 	.usage = CONSOLE_DIRECT_VGA,
 };
 

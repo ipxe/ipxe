@@ -102,7 +102,7 @@ static void vmconsole_putchar ( int character ) {
 /** VMware logfile console driver */
 struct console_driver vmconsole __console_driver = {
 	.putchar = vmconsole_putchar,
-	.disabled = 1,
+	.disabled = CONSOLE_DISABLED,
 	.usage = CONSOLE_VMWARE,
 };
 

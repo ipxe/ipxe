@@ -176,7 +176,7 @@ static void syslog_putchar ( int character ) {
 /** Syslog console driver */
 struct console_driver syslog_console __console_driver = {
 	.putchar = syslog_putchar,
-	.disabled = 1,
+	.disabled = CONSOLE_DISABLED,
 	.usage = CONSOLE_SYSLOG,
 };
 
@@ -222,7 +222,7 @@ static int apply_syslog_settings ( void ) {
 	}
 
 	/* Fetch log server */
-	syslog_console.disabled = 1;
+	syslog_console.disabled = CONSOLE_DISABLED;
 	old_addr.s_addr = sin_logserver->sin_addr.s_addr;
 	if ( ( len = fetch_ipv4_setting ( NULL, &syslog_setting,
 					  &sin_logserver->sin_addr ) ) >= 0 ) {
