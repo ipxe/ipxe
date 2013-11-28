@@ -300,7 +300,7 @@ static int vesafb_select_mode ( unsigned int min_width, unsigned int min_height,
 			DBGC ( &vbe_buf, "VESAFB could not get mode %04x "
 			       "information: [%04x] %s\n", mode_number,
 			       status, strerror ( rc ) );
-			goto err_mode_info;
+			continue;
 		}
 		DBGC ( &vbe_buf, "VESAFB mode %04x %dx%d %dbpp(%d:%d:%d:%d) "
 		       "model %02x [x%d]%s%s%s%s%s\n", mode_number,
@@ -348,7 +348,6 @@ static int vesafb_select_mode ( unsigned int min_width, unsigned int min_height,
 	}
 
  err_set_mode:
- err_mode_info:
 	free ( mode_numbers );
  err_mode_list:
 	return rc;
