@@ -147,6 +147,8 @@ struct fbcon {
 	struct fbcon_text text;
 	/** Background picture */
 	struct fbcon_picture picture;
+	/** Display cursor */
+	int show_cursor;
 };
 
 extern int fbcon_init ( struct fbcon *fbcon, userptr_t start,

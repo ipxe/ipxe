@@ -288,7 +288,7 @@ static void fbcon_redraw ( struct fbcon *fbcon ) {
  */
 static void fbcon_clear ( struct fbcon *fbcon, unsigned int ypos ) {
 	struct fbcon_text_cell cell = {
-		.foreground = 0,
+		.foreground = fbcon->foreground,
 		.background = fbcon->background,
 		.character = ' ',
 	};
@@ -317,19 +317,40 @@ static void fbcon_clear ( struct fbcon *fbcon, unsigned int ypos ) {
 static void fbcon_scroll ( struct fbcon *fbcon ) {
 	size_t row_len;
 
-	/* If we are not yet at the bottom of the screen, just update
-	 * the cursor position.
-	 */
-	if ( fbcon->ypos < ( fbcon->character.height - 1 ) ) {
-		fbcon->ypos++;
-		return;
-	}
+	/* Sanity check */
+	assert ( fbcon->ypos == fbcon->character.height );
 
-	/* Otherwise, scroll up character array */
+	/* Scroll up character array */
 	row_len = ( fbcon->character.width * sizeof ( struct fbcon_text_cell ));
 	memmove_user ( fbcon->text.start, 0, fbcon->text.start, row_len,
 		       ( row_len * ( fbcon->character.height - 1 ) ) );
 	fbcon_clear ( fbcon, ( fbcon->character.height - 1 ) );
+
+	/* Update cursor position */
+	fbcon->ypos--;
+}
+
+/**
+ * Draw character at cursor position
+ *
+ * @v fbcon		Frame buffer console
+ * @v show_cursor	Show cursor
+ */
+static void fbcon_draw_cursor ( struct fbcon *fbcon, int show_cursor ) {
+	struct fbcon_text_cell cell;
+	size_t offset;
+	uint32_t background;
+
+	offset = ( ( ( fbcon->ypos * fbcon->character.width ) + fbcon->xpos ) *
+		   sizeof ( cell ) );
+	copy_from_user ( &cell, fbcon->text.start, offset, sizeof ( cell ) );
+	if ( show_cursor ) {
+		background = cell.background;
+		cell.background = cell.foreground;
+		cell.foreground = ( ( background == FBCON_TRANSPARENT ) ?
+				    0 : background );
+	}
+	fbcon_draw_character ( fbcon, &cell, fbcon->xpos, fbcon->ypos );
 }
 
 /**
@@ -346,12 +367,14 @@ static void fbcon_handle_cup ( struct ansiesc_context *ctx,
 	int cx = ( params[1] - 1 );
 	int cy = ( params[0] - 1 );
 
+	fbcon_draw_cursor ( fbcon, 0 );
 	fbcon->xpos = cx;
 	if ( fbcon->xpos >= fbcon->character.width )
 		fbcon->xpos = ( fbcon->character.width - 1 );
 	fbcon->ypos = cy;
 	if ( fbcon->ypos >= fbcon->character.height )
 		fbcon->ypos = ( fbcon->character.height - 1 );
+	fbcon_draw_cursor ( fbcon, fbcon->show_cursor );
 }
 
 /**
@@ -375,6 +398,7 @@ static void fbcon_handle_ed ( struct ansiesc_context *ctx,
 	/* Reset cursor position */
 	fbcon->xpos = 0;
 	fbcon->ypos = 0;
+	fbcon_draw_cursor ( fbcon, fbcon->show_cursor );
 }
 
 /**
@@ -437,11 +461,45 @@ static void fbcon_handle_sgr ( struct ansiesc_context *ctx, unsigned int count,
 	}
 }
 
+/**
+ * Handle ANSI DECTCEM set (show cursor)
+ *
+ * @v ctx		ANSI escape sequence context
+ * @v count		Parameter count
+ * @v params		List of graphic rendition aspects
+ */
+static void fbcon_handle_dectcem_set ( struct ansiesc_context *ctx,
+				       unsigned int count __unused,
+				       int params[] __unused ) {
+	struct fbcon *fbcon = container_of ( ctx, struct fbcon, ctx );
+
+	fbcon->show_cursor = 1;
+	fbcon_draw_cursor ( fbcon, 1 );
+}
+
+/**
+ * Handle ANSI DECTCEM reset (hide cursor)
+ *
+ * @v ctx		ANSI escape sequence context
+ * @v count		Parameter count
+ * @v params		List of graphic rendition aspects
+ */
+static void fbcon_handle_dectcem_reset ( struct ansiesc_context *ctx,
+					 unsigned int count __unused,
+					 int params[] __unused ) {
+	struct fbcon *fbcon = container_of ( ctx, struct fbcon, ctx );
+
+	fbcon->show_cursor = 0;
+	fbcon_draw_cursor ( fbcon, 0 );
+}
+
 /** ANSI escape sequence handlers */
 static struct ansiesc_handler fbcon_ansiesc_handlers[] = {
 	{ ANSIESC_CUP, fbcon_handle_cup },
 	{ ANSIESC_ED, fbcon_handle_ed },
 	{ ANSIESC_SGR, fbcon_handle_sgr },
+	{ ANSIESC_DECTCEM_SET, fbcon_handle_dectcem_set },
+	{ ANSIESC_DECTCEM_RESET, fbcon_handle_dectcem_reset },
 	{ 0, NULL }
 };
 
@@ -462,35 +520,46 @@ void fbcon_putchar ( struct fbcon *fbcon, int character ) {
 	/* Handle control characters */
 	switch ( character ) {
 	case '\r':
+		fbcon_draw_cursor ( fbcon, 0 );
 		fbcon->xpos = 0;
-		return;
+		break;
 	case '\n':
+		fbcon_draw_cursor ( fbcon, 0 );
 		fbcon->xpos = 0;
-		fbcon_scroll ( fbcon );
-		return;
+		fbcon->ypos++;
+		break;
 	case '\b':
+		fbcon_draw_cursor ( fbcon, 0 );
 		if ( fbcon->xpos ) {
 			fbcon->xpos--;
 		} else if ( fbcon->ypos ) {
 			fbcon->xpos = ( fbcon->character.width - 1 );
 			fbcon->ypos--;
 		}
-		return;
+		break;
+	default:
+		/* Print character at current cursor position */
+		cell.foreground = ( fbcon->foreground | fbcon->bold );
+		cell.background = fbcon->background;
+		cell.character = character;
+		fbcon_store_character ( fbcon, &cell, fbcon->xpos, fbcon->ypos);
+		fbcon_draw_character ( fbcon, &cell, fbcon->xpos, fbcon->ypos );
+
+		/* Advance cursor */
+		fbcon->xpos++;
+		if ( fbcon->xpos >= fbcon->character.width ) {
+			fbcon->xpos = 0;
+			fbcon->ypos++;
+		}
+		break;
 	}
 
-	/* Print character at current cursor position */
-	cell.foreground = ( fbcon->foreground | fbcon->bold );
-	cell.background = fbcon->background;
-	cell.character = character;
-	fbcon_store_character ( fbcon, &cell, fbcon->xpos, fbcon->ypos );
-	fbcon_draw_character ( fbcon, &cell, fbcon->xpos, fbcon->ypos );
-
-	/* Advance cursor */
-	fbcon->xpos++;
-	if ( fbcon->xpos >= fbcon->character.width ) {
-		fbcon->xpos = 0;
+	/* Scroll screen if necessary */
+	if ( fbcon->ypos >= fbcon->character.height )
 		fbcon_scroll ( fbcon );
-	}
+
+	/* Show cursor */
+	fbcon_draw_cursor ( fbcon, fbcon->show_cursor );
 }
 
 /**
@@ -673,6 +742,7 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 	fbcon->map = map;
 	fbcon->font = font;
 	fbcon->ctx.handlers = fbcon_ansiesc_handlers;
+	fbcon->show_cursor = 1;
 
 	/* Derive overall length */
 	fbcon->len = ( pixel->height * pixel->stride );
