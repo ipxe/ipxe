@@ -57,7 +57,7 @@ do
 		;;
 	esac
 	first=$g
-	echo LABEL $b
+	echo LABEL $g
 	echo "" KERNEL $g
 	mcopy -m -i $img $f ::$g
 done >> $cfg
