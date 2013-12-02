@@ -500,6 +500,11 @@ CFLAGS		+= $(FS_FLAGS) $(DS_FLAGS)
 endif
 LDFLAGS		+= --gc-sections
 
+# Force creation of static binaries (required for OpenBSD, does no
+# harm on other platforms).
+#
+LDFLAGS		+= -static
+
 # compiler.h is needed for our linking and debugging system
 #
 CFLAGS		+= -include include/compiler.h
