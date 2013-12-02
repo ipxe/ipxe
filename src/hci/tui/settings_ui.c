@@ -472,6 +472,7 @@ static int main_loop ( struct settings *settings ) {
 				      CPAIR_EDIT : CPAIR_SELECT ), NULL );
 			draw_setting_row ( &widget );
 			color_set ( CPAIR_NORMAL, NULL );
+			curs_set ( widget.row.editing );
 			redraw = 0;
 		}
 
@@ -583,6 +584,7 @@ int settings_ui ( struct settings *settings ) {
 	init_pair ( CPAIR_ALERT, COLOR_ALERT_FG, COLOR_ALERT_BG );
 	init_pair ( CPAIR_URL, COLOR_URL_FG, COLOR_URL_BG );
 	color_set ( CPAIR_NORMAL, NULL );
+	curs_set ( 0 );
 	erase();
 	
 	rc = main_loop ( settings );
