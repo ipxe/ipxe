@@ -86,6 +86,11 @@ static bool ansiscr_peek ( struct _curses_screen *scr __unused ) {
 	return iskey();
 }
 
+static void ansiscr_cursor ( struct _curses_screen *scr __unused,
+			     int visibility ) {
+	printf ( "\033[?25%c", ( visibility ? 'h' : 'l' ) );
+}
+
 SCREEN _ansi_screen = {
 	.init		= ansiscr_init,
 	.exit		= ansiscr_exit,
@@ -94,4 +99,5 @@ SCREEN _ansi_screen = {
 	.putc		= ansiscr_putc,
 	.getc		= ansiscr_getc,
 	.peek		= ansiscr_peek,
+	.cursor		= ansiscr_cursor,
 };

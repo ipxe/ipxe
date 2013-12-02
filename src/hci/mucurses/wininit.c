@@ -31,6 +31,7 @@ WINDOW *initscr ( void ) {
 int endwin ( void ) {
 	attrset ( 0 );
 	color_set ( 0, NULL );
+	curs_set ( 1 );
 	mvprintw ( ( LINES - 1 ), 0, "\n" );
 	stdscr->scr->exit( stdscr->scr );
 	return OK;

@@ -75,6 +75,13 @@ typedef struct _curses_screen {
 	 * @ret FALSE	no character waiting in stream
 	 */
 	bool ( *peek ) ( struct _curses_screen *scr );
+	/**
+	 * Set cursor visibility
+	 *
+	 * @v scr	screen on which to operate
+	 * @v visibility cursor visibility
+	 */
+	void ( * cursor ) ( struct _curses_screen *scr, int visibility );
 } SCREEN;
 
 /** Curses Window struct */

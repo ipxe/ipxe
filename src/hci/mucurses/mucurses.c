@@ -144,3 +144,13 @@ int wmove ( WINDOW *win, int y, int x ) {
 	_wupdcurs(win);
 	return OK;
 }
+
+/**
+ * Set cursor visibility
+ *
+ * @v visibility cursor visibility
+ */
+int curs_set ( int visibility ) {
+	stdscr->scr->cursor ( stdscr->scr, visibility );
+	return OK;
+}
