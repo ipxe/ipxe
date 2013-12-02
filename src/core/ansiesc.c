@@ -99,7 +99,8 @@ int ansiesc_process ( struct ansiesc_context *ctx, int c ) {
 				DBG ( "Too many parameters in ANSI escape "
 				      "sequence\n" );
 			}
-		} else if ( ( c >= 0x20 ) && ( c <= 0x2f ) ) {
+		} else if ( ( ( c >= 0x20 ) && ( c <= 0x2f ) ) ||
+			    ( c == '?' ) ) {
 			/* Intermediate Byte */
 			ctx->function <<= 8;
 			ctx->function |= c;

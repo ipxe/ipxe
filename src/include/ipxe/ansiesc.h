@@ -124,6 +124,12 @@ struct ansiesc_context {
  */
 #define ANSIESC_LOG_PRIORITY 'p'
 
+/** Show cursor */
+#define ANSIESC_DECTCEM_SET ( ( '?' << 8 ) | 'h' )
+
+/** Hide cursor */
+#define ANSIESC_DECTCEM_RESET ( ( '?' << 8 ) | 'l' )
+
 /** @} */
 
 extern int ansiesc_process ( struct ansiesc_context *ctx, int c );
