@@ -349,6 +349,7 @@ int show_menu ( struct menu *menu, unsigned long timeout,
 	init_pair ( CPAIR_SELECT, COLOR_SELECT_FG, COLOR_SELECT_BG );
 	init_pair ( CPAIR_SEPARATOR, COLOR_SEPARATOR_FG, COLOR_SEPARATOR_BG );
 	color_set ( CPAIR_NORMAL, NULL );
+	curs_set ( 0 );
 	erase();
 
 	/* Draw initial content */
