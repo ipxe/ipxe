@@ -1860,7 +1860,7 @@ enum iscsi_root_path_component {
 };
 
 /** iSCSI initiator IQN setting */
-struct setting initiator_iqn_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
+const struct setting initiator_iqn_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 	.name = "initiator-iqn",
 	.description = "iSCSI initiator name",
 	.tag = DHCP_ISCSI_INITIATOR_IQN,
@@ -1868,7 +1868,7 @@ struct setting initiator_iqn_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 };
 
 /** iSCSI reverse username setting */
-struct setting reverse_username_setting __setting ( SETTING_AUTH_EXTRA ) = {
+const struct setting reverse_username_setting __setting ( SETTING_AUTH_EXTRA ) = {
 	.name = "reverse-username",
 	.description = "Reverse user name",
 	.tag = DHCP_EB_REVERSE_USERNAME,
@@ -1876,7 +1876,7 @@ struct setting reverse_username_setting __setting ( SETTING_AUTH_EXTRA ) = {
 };
 
 /** iSCSI reverse password setting */
-struct setting reverse_password_setting __setting ( SETTING_AUTH_EXTRA ) = {
+const struct setting reverse_password_setting __setting ( SETTING_AUTH_EXTRA ) = {
 	.name = "reverse-password",
 	.description = "Reverse password",
 	.tag = DHCP_EB_REVERSE_PASSWORD,
@@ -1947,46 +1947,23 @@ static int iscsi_fetch_settings ( struct iscsi_session *iscsi ) {
 	/* Fetch relevant settings.  Don't worry about freeing on
 	 * error, since iscsi_free() will take care of that anyway.
 	 */
-	if ( ( len = fetch_string_setting_copy ( NULL, &username_setting,
-					  &iscsi->initiator_username ) ) < 0 ) {
-		DBGC ( iscsi, "iSCSI %p could not fetch username: %s\n",
-		       iscsi, strerror ( len ) );
-		return len;
-	}
-	if ( ( len = fetch_string_setting_copy ( NULL, &password_setting,
-					  &iscsi->initiator_password ) ) < 0 ) {
-		DBGC ( iscsi, "iSCSI %p could not fetch password: %s\n",
-		       iscsi, strerror ( len ) );
-		return len;
-	}
-	if ( ( len = fetch_string_setting_copy( NULL, &reverse_username_setting,
-					     &iscsi->target_username ) ) < 0 ) {
-		DBGC ( iscsi, "iSCSI %p could not fetch reverse username: %s\n",
-		       iscsi, strerror ( len ) );
-		return len;
-	}
-	if ( ( len = fetch_string_setting_copy( NULL, &reverse_password_setting,
-					     &iscsi->target_password ) ) < 0 ) {
-		DBGC ( iscsi, "iSCSI %p could not fetch reverse password: %s\n",
-		       iscsi, strerror ( len ) );
-		return len;
-	}
+	fetch_string_setting_copy ( NULL, &username_setting,
+				    &iscsi->initiator_username );
+	fetch_string_setting_copy ( NULL, &password_setting,
+				    &iscsi->initiator_password );
+	fetch_string_setting_copy ( NULL, &reverse_username_setting,
+				    &iscsi->target_username );
+	fetch_string_setting_copy ( NULL, &reverse_password_setting,
+				    &iscsi->target_password );
 
-	/* Find a suitable initiator name */
-	if ( ( len = fetch_string_setting_copy ( NULL, &initiator_iqn_setting,
-					       &iscsi->initiator_iqn ) ) < 0 ) {
-		DBGC ( iscsi, "iSCSI %p could not fetch initiator IQN: %s\n",
-		       iscsi, strerror ( len ) );
-		return len;
-	}
+	/* Use explicit initiator IQN if provided */
+	fetch_string_setting_copy ( NULL, &initiator_iqn_setting,
+				    &iscsi->initiator_iqn );
 	if ( iscsi->initiator_iqn )
 		return 0;
-	if ( ( len = fetch_string_setting_copy ( NULL, &hostname_setting,
-						&hostname ) ) < 0 ) {
-		DBGC ( iscsi, "iSCSI %p could not fetch hostname: %s\n",
-		       iscsi, strerror ( len ) );
-		return len;
-	}
+
+	/* Otherwise, try to construct an initiator IQN from the hostname */
+	fetch_string_setting_copy ( NULL, &hostname_setting, &hostname );
 	if ( hostname ) {
 		len = asprintf ( &iscsi->initiator_iqn,
 				 ISCSI_DEFAULT_IQN_PREFIX ":%s", hostname );
@@ -1999,6 +1976,8 @@ static int iscsi_fetch_settings ( struct iscsi_session *iscsi ) {
 		assert ( iscsi->initiator_iqn );
 		return 0;
 	}
+
+	/* Otherwise, try to construct an initiator IQN from the UUID */
 	if ( ( len = fetch_uuid_setting ( NULL, &uuid_setting, &uuid ) ) < 0 ) {
 		DBGC ( iscsi, "iSCSI %p has no suitable initiator IQN\n",
 		       iscsi );

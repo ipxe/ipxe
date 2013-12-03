@@ -591,7 +591,7 @@ struct sockaddr_converter ipv4_sockaddr_converter __sockaddr_converter = {
  */
 
 /** IPv4 address setting */
-struct setting ip_setting __setting ( SETTING_IPv4 ) = {
+const struct setting ip_setting __setting ( SETTING_IPv4 ) = {
 	.name = "ip",
 	.description = "IP address",
 	.tag = DHCP_EB_YIADDR,
@@ -599,7 +599,7 @@ struct setting ip_setting __setting ( SETTING_IPv4 ) = {
 };
 
 /** IPv4 subnet mask setting */
-struct setting netmask_setting __setting ( SETTING_IPv4 ) = {
+const struct setting netmask_setting __setting ( SETTING_IPv4 ) = {
 	.name = "netmask",
 	.description = "Subnet mask",
 	.tag = DHCP_SUBNET_MASK,
@@ -607,7 +607,7 @@ struct setting netmask_setting __setting ( SETTING_IPv4 ) = {
 };
 
 /** Default gateway setting */
-struct setting gateway_setting __setting ( SETTING_IPv4 ) = {
+const struct setting gateway_setting __setting ( SETTING_IPv4 ) = {
 	.name = "gateway",
 	.description = "Default gateway",
 	.tag = DHCP_ROUTERS,

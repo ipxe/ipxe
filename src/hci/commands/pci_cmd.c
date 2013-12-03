@@ -68,8 +68,8 @@ static int pciscan_exec ( int argc, char **argv ) {
 		goto err_parse_setting;
 
 	/* Determine starting bus:dev.fn address */
-	if ( ( len = fetch_uint_setting ( setting.settings, &setting.setting,
-					  &prev ) ) < 0 ) {
+	if ( ( len = fetchn_setting ( setting.settings, &setting.setting,
+				      NULL, &setting.setting, &prev ) ) < 0 ) {
 		/* Setting not yet defined: start searching from 00:00.0 */
 		prev = 0;
 	} else {

@@ -72,11 +72,16 @@ struct setting_row_widget {
 	 * Valid only for rows that lead to new settings blocks.
 	 */
 	struct settings *settings;
+	/** Configuration setting origin
+	 *
+	 * Valid only for rows that represent individual settings.
+	 */
+	struct settings *origin;
 	/** Configuration setting
 	 *
 	 * Valid only for rows that represent individual settings.
 	 */
-	struct setting *setting;
+	struct setting setting;
 	/** Screen row */
 	unsigned int row;
 	/** Screen column */
@@ -85,8 +90,6 @@ struct setting_row_widget {
 	struct edit_box editbox;
 	/** Editing in progress flag */
 	int editing;
-	/** Setting originates from this block flag */
-	int originates_here;
 	/** Buffer for setting's value */
 	char value[256]; /* enough size for a DHCP string */
 };
@@ -115,7 +118,6 @@ struct setting_widget {
 static unsigned int select_setting_row ( struct setting_widget *widget,
 					 unsigned int index ) {
 	struct settings *settings;
-	struct settings *origin;
 	struct setting *setting;
 	unsigned int count = 0;
 
@@ -147,18 +149,13 @@ static unsigned int select_setting_row ( struct setting_widget *widget,
 		if ( ! setting_applies ( widget->settings, setting ) )
 			continue;
 		if ( count++ == index ) {
-			widget->row.setting = setting;
 
-			/* Read current setting value */
-			fetchf_setting ( widget->settings, widget->row.setting,
+			/* Read current setting value and origin */
+			fetchf_setting ( widget->settings, setting,
+					 &widget->row.origin,
+					 &widget->row.setting,
 					 widget->row.value,
 					 sizeof ( widget->row.value ) );
-
-			/* Check setting's origin */
-			origin = fetch_setting_origin ( widget->settings,
-							widget->row.setting );
-			widget->row.originates_here =
-				( origin == widget->settings );
 		}
 	}
 
@@ -209,7 +206,7 @@ static void draw_setting_row ( struct setting_widget *widget ) {
 
 		/* Construct dot-padded name */
 		memset ( text.name, '.', sizeof ( text.name ) );
-		string_copy ( text.name, widget->row.setting->name,
+		string_copy ( text.name, widget->row.setting.name,
 			      sizeof ( text.name ) );
 
 		/* Construct space-padded value */
@@ -222,8 +219,10 @@ static void draw_setting_row ( struct setting_widget *widget ) {
 	}
 
 	/* Print row */
-	if ( widget->row.originates_here || widget->row.settings )
+	if ( ( widget->row.origin == widget->settings ) ||
+	     ( widget->row.settings != NULL ) ) {
 		attron ( A_BOLD );
+	}
 	mvprintw ( widget->row.row, widget->row.col, "%s", text.start );
 	attroff ( A_BOLD );
 	move ( widget->row.row, widget->row.col + curs_offset );
@@ -237,7 +236,7 @@ static void draw_setting_row ( struct setting_widget *widget ) {
  * @ret key		Key returned to application, or zero
  */
 static int edit_setting ( struct setting_widget *widget, int key ) {
-	assert ( widget->row.setting != NULL );
+	assert ( widget->row.setting.name != NULL );
 	widget->row.editing = 1;
 	return edit_editbox ( &widget->row.editbox, key );
 }
@@ -248,8 +247,8 @@ static int edit_setting ( struct setting_widget *widget, int key ) {
  * @v widget		Setting widget
  */
 static int save_setting ( struct setting_widget *widget ) {
-	assert ( widget->row.setting != NULL );
-	return storef_setting ( widget->settings, widget->row.setting,
+	assert ( widget->row.setting.name != NULL );
+	return storef_setting ( widget->settings, &widget->row.setting,
 				widget->row.value );
 }
 
@@ -344,28 +343,26 @@ static void draw_title_row ( struct setting_widget *widget ) {
  * @v widget		Setting widget
  */
 static void draw_info_row ( struct setting_widget *widget ) {
-	struct settings *origin;
 	char buf[32];
 
 	/* Draw nothing unless this row represents a setting */
 	clearmsg ( INFO_ROW );
 	clearmsg ( INFO_ROW + 1 );
-	if ( ! widget->row.setting )
+	if ( ! widget->row.setting.name )
 		return;
 
 	/* Determine a suitable setting name */
-	origin = fetch_setting_origin ( widget->settings, widget->row.setting );
-	if ( ! origin )
-		origin = widget->settings;
-	setting_name ( origin, widget->row.setting, buf, sizeof ( buf ) );
+	setting_name ( ( widget->row.origin ?
+			 widget->row.origin : widget->settings ),
+		       &widget->row.setting, buf, sizeof ( buf ) );
 
 	/* Draw row */
 	attron ( A_BOLD );
-	msg ( INFO_ROW, "%s - %s", buf, widget->row.setting->description );
+	msg ( INFO_ROW, "%s - %s", buf, widget->row.setting.description );
 	attroff ( A_BOLD );
 	color_set ( CPAIR_URL, NULL );
 	msg ( ( INFO_ROW + 1 ), "http://ipxe.org/cfg/%s",
-	      widget->row.setting->name );
+	      widget->row.setting.name );
 	color_set ( CPAIR_NORMAL, NULL );
 }
 
@@ -384,7 +381,7 @@ static void draw_instruction_row ( struct setting_widget *widget ) {
 	} else {
 		msg ( INSTRUCTION_ROW,
 		      "%sCtrl-X - exit configuration utility",
-		      ( widget->row.originates_here ?
+		      ( ( widget->row.origin == widget->settings ) ?
 			"Ctrl-D - delete setting" INSTRUCTION_PAD : "" ) );
 	}
 }
@@ -479,7 +476,7 @@ static int main_loop ( struct settings *settings ) {
 		if ( widget.row.editing ) {
 
 			/* Sanity check */
-			assert ( widget.row.setting != NULL );
+			assert ( widget.row.setting.name != NULL );
 
 			/* Redraw edit box */
 			color_set ( CPAIR_EDIT, NULL );
@@ -530,10 +527,10 @@ static int main_loop ( struct settings *settings ) {
 				move = +widget.num_rows;
 				break;
 			case CTRL_D:
-				if ( ! widget.row.setting )
+				if ( ! widget.row.setting.name )
 					break;
 				if ( ( rc = delete_setting ( widget.settings,
-						widget.row.setting ) ) != 0 ) {
+						&widget.row.setting ) ) != 0 ) {
 					alert ( " %s ", strerror ( rc ) );
 				}
 				select_setting_row ( &widget, widget.current );
@@ -550,7 +547,7 @@ static int main_loop ( struct settings *settings ) {
 				}
 				/* Fall through */
 			default:
-				if ( widget.row.setting ) {
+				if ( widget.row.setting.name ) {
 					edit_setting ( &widget, key );
 					redraw = 1;
 				}

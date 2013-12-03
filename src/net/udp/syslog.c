@@ -188,7 +188,7 @@ struct console_driver syslog_console __console_driver = {
  */
 
 /** Syslog server setting */
-struct setting syslog_setting __setting ( SETTING_MISC ) = {
+const struct setting syslog_setting __setting ( SETTING_MISC ) = {
 	.name = "syslog",
 	.description = "Syslog server",
 	.tag = DHCP_LOG_SERVERS,
@@ -209,17 +209,9 @@ static int apply_syslog_settings ( void ) {
 
 	/* Fetch hostname and domain name */
 	free ( syslog_hostname );
-	if ( ( len = fetch_string_setting_copy ( NULL, &hostname_setting,
-						 &syslog_hostname ) ) < 0 ) {
-		rc = len;
-		DBG ( "SYSLOG could not fetch hostname: %s\n", strerror ( rc ));
-	}
+	fetch_string_setting_copy ( NULL, &hostname_setting, &syslog_hostname );
 	free ( syslog_domain );
-	if ( ( len = fetch_string_setting_copy ( NULL, &domain_setting,
-						 &syslog_domain ) ) < 0 ) {
-		rc = len;
-		DBG ( "SYSLOG could not fetch domain: %s\n", strerror ( rc ) );
-	}
+	fetch_string_setting_copy ( NULL, &domain_setting, &syslog_domain );
 
 	/* Fetch log server */
 	syslog_console.disabled = CONSOLE_DISABLED;

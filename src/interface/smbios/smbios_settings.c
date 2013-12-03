@@ -28,7 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/smbios.h>
 
 /** SMBIOS settings scope */
-static struct settings_scope smbios_settings_scope;
+static const struct settings_scope smbios_settings_scope;
 
 /**
  * Construct SMBIOS raw-data tag
@@ -63,7 +63,7 @@ static struct settings_scope smbios_settings_scope;
  * @ret applies		Setting applies within this settings block
  */
 static int smbios_applies ( struct settings *settings __unused,
-			    struct setting *setting ) {
+			    const struct setting *setting ) {
 
 	return ( setting->scope == &smbios_settings_scope );
 }
@@ -188,7 +188,7 @@ struct init_fn smbios_init_fn __init_fn ( INIT_NORMAL ) = {
 };
 
 /** UUID setting obtained via SMBIOS */
-struct setting uuid_setting __setting ( SETTING_HOST ) = {
+const struct setting uuid_setting __setting ( SETTING_HOST ) = {
 	.name = "uuid",
 	.description = "UUID",
 	.tag = SMBIOS_RAW_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
@@ -198,7 +198,7 @@ struct setting uuid_setting __setting ( SETTING_HOST ) = {
 };
 
 /** Other SMBIOS predefined settings */
-struct setting smbios_predefined_settings[] __setting ( SETTING_HOST_EXTRA ) = {
+const struct setting smbios_predefined_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 	{
 		.name = "manufacturer",
 		.description = "Manufacturer",

@@ -1093,7 +1093,7 @@ struct net80211_wlan
 
 
 /** 802.11 encryption key setting */
-extern struct setting net80211_key_setting __setting ( SETTING_NETDEV_EXTRA );
+extern const struct setting net80211_key_setting __setting ( SETTING_NETDEV_EXTRA );
 
 
 /**

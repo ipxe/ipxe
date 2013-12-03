@@ -107,7 +107,7 @@ static void ibft_set_ipaddr ( struct ibft_ipaddr *ipaddr, struct in_addr in ) {
  * @v count		Maximum number of IP addresses
  */
 static void ibft_set_ipaddr_setting ( struct ibft_ipaddr *ipaddr,
-				      struct setting *setting,
+				      const struct setting *setting,
 				      unsigned int count ) {
 	struct in_addr in[count];
 	unsigned int i;
@@ -183,11 +183,13 @@ static int ibft_set_string ( struct ibft_strings *strings,
  */
 static int ibft_set_string_setting ( struct ibft_strings *strings,
 				     struct ibft_string *string,
-				     struct setting *setting ) {
+				     const struct setting *setting ) {
+	struct settings *origin;
+	struct setting fetched;
 	int len;
 	char *dest;
 
-	len = fetch_setting_len ( NULL, setting );
+	len = fetch_setting ( NULL, setting, &origin, &fetched, NULL, 0 );
 	if ( len < 0 ) {
 		string->offset = 0;
 		string->len = 0;
@@ -197,7 +199,7 @@ static int ibft_set_string_setting ( struct ibft_strings *strings,
 	dest = ibft_alloc_string ( strings, string, len );
 	if ( ! dest )
 		return -ENOBUFS;
-	fetch_string_setting ( NULL, setting, dest, ( len + 1 ) );
+	fetch_string_setting ( origin, &fetched, dest, ( len + 1 ));
 
 	return 0;
 }

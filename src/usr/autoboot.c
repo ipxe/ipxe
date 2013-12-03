@@ -59,7 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define CYAN	"\033[36m"
 
 /** The "scriptlet" setting */
-struct setting scriptlet_setting __setting ( SETTING_MISC ) = {
+const struct setting scriptlet_setting __setting ( SETTING_MISC ) = {
 	.name = "scriptlet",
 	.description = "Boot scriptlet",
 	.tag = DHCP_EB_SCRIPTLET,
@@ -119,7 +119,7 @@ static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
 }
 
 /** The "keep-san" setting */
-struct setting keep_san_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
+const struct setting keep_san_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 	.name = "keep-san",
 	.description = "Preserve SAN connection",
 	.tag = DHCP_EB_KEEP_SAN,
@@ -127,7 +127,7 @@ struct setting keep_san_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 };
 
 /** The "skip-san-boot" setting */
-struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
+const struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA )={
 	.name = "skip-san-boot",
 	.description = "Do not boot from SAN device",
 	.tag = DHCP_EB_SKIP_SAN_BOOT,
@@ -256,16 +256,15 @@ struct uri * fetch_next_server_and_filename ( struct settings *settings ) {
 	struct uri *uri = NULL;
 	char *filename;
 
-	/* Determine settings block containing the filename, if any */
-	settings = fetch_setting_origin ( settings, &filename_setting );
-
-	/* If we have a filename, fetch it along with next-server */
-	if ( settings ) {
+	/* If we have a filename, fetch it along with the next-server
+	 * setting from the same settings block.
+	 */
+	if ( fetch_setting ( settings, &filename_setting, &settings,
+			     NULL, NULL, 0 ) >= 0 ) {
+		fetch_string_setting_copy ( settings, &filename_setting,
+					    &raw_filename );
 		fetch_ipv4_setting ( settings, &next_server_setting,
 				     &next_server );
-		if ( fetch_string_setting_copy ( settings, &filename_setting,
-						 &raw_filename ) < 0 )
-			goto err_fetch;
 	}
 
 	/* Expand filename setting */
@@ -286,7 +285,6 @@ struct uri * fetch_next_server_and_filename ( struct settings *settings ) {
 	free ( filename );
  err_expand:
 	free ( raw_filename );
- err_fetch:
 	return uri;
 }
 
@@ -297,25 +295,30 @@ struct uri * fetch_next_server_and_filename ( struct settings *settings ) {
  * @ret uri		URI, or NULL on failure
  */
 static struct uri * fetch_root_path ( struct settings *settings ) {
-	char buf[256];
+	struct uri *uri = NULL;
+	char *raw_root_path;
 	char *root_path;
-	struct uri *uri;
 
 	/* Fetch root-path setting */
-	fetch_string_setting ( settings, &root_path_setting,
-			       buf, sizeof ( buf ) );
-	if ( buf[0] )
-		printf ( "Root path: %s\n", buf );
+	fetch_string_setting_copy ( settings, &root_path_setting,
+				    &raw_root_path );
 
 	/* Expand filename setting */
-	root_path = expand_settings ( buf );
+	root_path = expand_settings ( raw_root_path ? raw_root_path : "" );
 	if ( ! root_path )
-		return NULL;
+		goto err_expand;
 
 	/* Parse root path */
+	if ( root_path[0] )
+		printf ( "Root path: %s\n", root_path );
 	uri = parse_uri ( root_path );
+	if ( ! uri )
+		goto err_parse;
 
+ err_parse:
 	free ( root_path );
+ err_expand:
+	free ( raw_root_path );
 	return uri;
 }
 
@@ -331,7 +334,7 @@ static int have_pxe_menu ( void ) {
 		= { .tag = DHCP_PXE_DISCOVERY_CONTROL };
 	struct setting pxe_boot_menu_setting
 		= { .tag = DHCP_PXE_BOOT_MENU };
-	char buf[256];
+	char buf[ 10 /* "PXEClient" + NUL */ ];
 	unsigned int pxe_discovery_control;
 
 	fetch_string_setting ( NULL, &vendor_class_id_setting,

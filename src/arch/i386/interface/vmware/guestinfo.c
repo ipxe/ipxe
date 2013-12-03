@@ -51,7 +51,7 @@ static int guestinfo_channel;
  */
 static int guestinfo_fetch_type ( struct settings *settings,
 				  struct setting *setting,
-				  struct setting_type *type,
+				  const struct setting_type *type,
 				  void *data, size_t len, int *found ) {
 	const char *parent_name = settings->parent->name;
 	char command[ 24 /* "info-get guestinfo.ipxe." */ +

@@ -190,7 +190,7 @@ struct console_driver syslogs_console __console_driver = {
  */
 
 /** Encrypted syslog server setting */
-struct setting syslogs_setting __setting ( SETTING_MISC ) = {
+const struct setting syslogs_setting __setting ( SETTING_MISC ) = {
 	.name = "syslogs",
 	.description = "Encrypted syslog server",
 	.tag = DHCP_EB_SYSLOGS_SERVER,
@@ -206,15 +206,10 @@ static int apply_syslogs_settings ( void ) {
 	static char *old_server;
 	char *server;
 	struct interface *socket;
-	int len;
 	int rc;
 
 	/* Fetch log server */
-	len = fetch_string_setting_copy ( NULL, &syslogs_setting, &server );
-	if ( len < 0 ) {
-		rc = len;
-		goto err_fetch_server;
-	}
+	fetch_string_setting_copy ( NULL, &syslogs_setting, &server );
 
 	/* Do nothing unless log server has changed */
 	if ( ( ( server == NULL ) && ( old_server == NULL ) ) ||
@@ -266,7 +261,6 @@ static int apply_syslogs_settings ( void ) {
  out_no_server:
  out_no_change:
 	free ( server );
- err_fetch_server:
 	return rc;
 }
 

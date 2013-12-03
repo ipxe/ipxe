@@ -236,8 +236,8 @@ static int trivial_init ( struct net80211_device *dev )
 	     dev->associating->crypto == NET80211_CRYPT_NONE )
 		return 0;	/* no crypto? OK. */
 
-	len = fetch_setting ( netdev_settings ( dev->netdev ),
-			      &net80211_key_setting, key, WEP_MAX_KEY );
+	len = fetch_raw_setting ( netdev_settings ( dev->netdev ),
+				  &net80211_key_setting, key, WEP_MAX_KEY );
 
 	if ( len <= 0 ) {
 		DBGC ( dev, "802.11 %p cannot do WEP without a key\n", dev );
@@ -278,8 +278,8 @@ static int trivial_change_key ( struct net80211_device *dev )
 	if ( ! dev->crypto || ( dev->crypto->init != wep_init ) )
 		change ^= 1;
 
-	len = fetch_setting ( netdev_settings ( dev->netdev ),
-			      &net80211_key_setting, key, WEP_MAX_KEY );
+	len = fetch_raw_setting ( netdev_settings ( dev->netdev ),
+				  &net80211_key_setting, key, WEP_MAX_KEY );
 	if ( len <= 0 )
 		change ^= 1;
 

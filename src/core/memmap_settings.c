@@ -108,7 +108,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define MEMMAP_SCALE( tag ) ( (tag) & 0x3f )
 
 /** Memory map settings scope */
-static struct settings_scope memmap_settings_scope;
+static const struct settings_scope memmap_settings_scope;
 
 /**
  * Check applicability of memory map setting
@@ -118,7 +118,7 @@ static struct settings_scope memmap_settings_scope;
  * @ret applies		Setting applies within this settings block
  */
 static int memmap_settings_applies ( struct settings *settings __unused,
-				     struct setting *setting ) {
+				     const struct setting *setting ) {
 
 	return ( setting->scope == &memmap_settings_scope );
 }
@@ -231,7 +231,7 @@ struct init_fn memmap_settings_init_fn __init_fn ( INIT_NORMAL ) = {
 };
 
 /** Memory map predefined settings */
-struct setting memmap_predefined_settings[] __setting ( SETTING_MISC ) = {
+const struct setting memmap_predefined_settings[] __setting ( SETTING_MISC ) = {
 	{
 		.name = "memsize",
 		.description = "Memory size (in MB)",

@@ -256,7 +256,7 @@ static int dhcpv6_iaaddr ( struct dhcpv6_option_list *options, uint32_t iaid,
  */
 
 /** DHCPv6 settings scope */
-static struct settings_scope dhcpv6_settings_scope;
+static const struct settings_scope dhcpv6_settings_scope;
 
 /** A DHCPv6 settings block */
 struct dhcpv6_settings {
@@ -276,7 +276,7 @@ struct dhcpv6_settings {
  * @ret applies		Setting applies within this settings block
  */
 static int dhcpv6_applies ( struct settings *settings __unused,
-			    struct setting *setting ) {
+			    const struct setting *setting ) {
 
 	return ( setting->scope == &dhcpv6_settings_scope );
 }
@@ -543,7 +543,7 @@ static size_t dhcpv6_user_class ( void *data, size_t len ) {
 	int actual_len;
 
 	/* Fetch user-class setting, if defined */
-	actual_len = fetch_setting ( NULL, &user_class_setting, data, len );
+	actual_len = fetch_raw_setting ( NULL, &user_class_setting, data, len );
 	if ( actual_len >= 0 )
 		return actual_len;
 

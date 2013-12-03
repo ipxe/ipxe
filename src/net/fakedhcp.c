@@ -49,8 +49,8 @@ static int copy_encap_settings ( struct dhcp_packet *dest,
 	struct setting setting = { .name = "" };
 	unsigned int subtag;
 	unsigned int tag;
+	void *data;
 	int len;
-	int check_len;
 	int rc;
 
 	for ( subtag = DHCP_MIN_OPTION; subtag <= DHCP_MAX_OPTION; subtag++ ) {
@@ -66,17 +66,11 @@ static int copy_encap_settings ( struct dhcp_packet *dest,
 		default:
 			/* Copy setting, if present */
 			setting.tag = tag;
-			len = fetch_setting_len ( source, &setting );
-			if ( len < 0 )
-				break;
-			{
-				char buf[len];
-
-				check_len = fetch_setting ( source, &setting,
-							    buf, sizeof (buf));
-				assert ( check_len == len );
-				if ( ( rc = dhcppkt_store ( dest, tag, buf,
-							    sizeof(buf) )) !=0)
+			len = fetch_raw_setting_copy ( source, &setting, &data);
+			if ( len >= 0 ) {
+				rc = dhcppkt_store ( dest, tag, data, len );
+				free ( data );
+				if ( rc != 0 )
 					return rc;
 			}
 			break;

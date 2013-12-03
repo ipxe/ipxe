@@ -594,7 +594,7 @@ struct resolver dns_resolver __resolver ( RESOLV_NORMAL ) = {
  */
 
 /** DNS server setting */
-struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
+const struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
 	.name = "dns",
 	.description = "DNS server",
 	.tag = DHCP_DNS_SERVERS,
@@ -622,11 +622,7 @@ static int apply_dns_settings ( void ) {
 
 	/* Get local domain DHCP option */
 	free ( localdomain );
-	if ( ( len = fetch_string_setting_copy ( NULL, &domain_setting,
-						 &localdomain ) ) < 0 ) {
-		DBG ( "DNS could not fetch local domain: %s\n",
-		      strerror ( len ) );
-	}
+	fetch_string_setting_copy ( NULL, &domain_setting, &localdomain );
 	if ( localdomain )
 		DBG ( "DNS local domain %s\n", localdomain );
 

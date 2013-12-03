@@ -117,7 +117,7 @@ enum cpuid_registers {
 #define CPUID_NUM_REGISTERS( tag ) ( ( ( (tag) >> 16 ) & 0x3 ) + 1 )
 
 /** CPUID settings scope */
-static struct settings_scope cpuid_settings_scope;
+static const struct settings_scope cpuid_settings_scope;
 
 /**
  * Check applicability of CPUID setting
@@ -127,7 +127,7 @@ static struct settings_scope cpuid_settings_scope;
  * @ret applies		Setting applies within this settings block
  */
 static int cpuid_settings_applies ( struct settings *settings __unused,
-				    struct setting *setting ) {
+				    const struct setting *setting ) {
 
 	return ( setting->scope == &cpuid_settings_scope );
 }
@@ -252,7 +252,7 @@ struct init_fn cpuid_settings_init_fn __init_fn ( INIT_NORMAL ) = {
 };
 
 /** CPUID predefined settings */
-struct setting cpuid_predefined_settings[] __setting ( SETTING_HOST_EXTRA ) = {
+const struct setting cpuid_predefined_settings[] __setting ( SETTING_HOST_EXTRA ) = {
 	{
 		.name = "cpuvendor",
 		.description = "CPU vendor",

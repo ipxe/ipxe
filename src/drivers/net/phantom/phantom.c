@@ -1455,7 +1455,7 @@ static struct net_device_operations phantom_operations = {
  */
 
 /** Phantom CLP settings scope */
-static struct settings_scope phantom_settings_scope;
+static const struct settings_scope phantom_settings_scope;
 
 /** Phantom CLP data
  *
@@ -1656,7 +1656,7 @@ static int phantom_clp_fetch ( struct phantom_nic *phantom, unsigned int port,
 /** A Phantom CLP setting */
 struct phantom_clp_setting {
 	/** iPXE setting */
-	struct setting *setting;
+	const struct setting *setting;
 	/** Setting number */
 	unsigned int clp_setting;
 };
@@ -1673,7 +1673,8 @@ static struct phantom_clp_setting clp_settings[] = {
  * @v clp_setting	Setting number, or 0 if not found
  */
 static unsigned int
-phantom_clp_setting ( struct phantom_nic *phantom, struct setting *setting ) {
+phantom_clp_setting ( struct phantom_nic *phantom,
+		      const struct setting *setting ) {
 	struct phantom_clp_setting *clp_setting;
 	unsigned int i;
 
@@ -1703,7 +1704,7 @@ phantom_clp_setting ( struct phantom_nic *phantom, struct setting *setting ) {
  * @ret applies		Setting applies within this settings block
  */
 static int phantom_setting_applies ( struct settings *settings,
-				     struct setting *setting ) {
+				     const struct setting *setting ) {
 	struct phantom_nic *phantom =
 		container_of ( settings, struct phantom_nic, settings );
 	unsigned int clp_setting;
@@ -1723,7 +1724,7 @@ static int phantom_setting_applies ( struct settings *settings,
  * @ret rc		Return status code
  */
 static int phantom_store_setting ( struct settings *settings,
-				   struct setting *setting,
+				   const struct setting *setting,
 				   const void *data, size_t len ) {
 	struct phantom_nic *phantom =
 		container_of ( settings, struct phantom_nic, settings );

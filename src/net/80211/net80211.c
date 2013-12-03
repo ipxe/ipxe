@@ -204,7 +204,7 @@ struct settings_applicator net80211_applicator __settings_applicator = {
  * If this is blank, we scan for all networks and use the one with the
  * greatest signal strength.
  */
-struct setting net80211_ssid_setting __setting ( SETTING_NETDEV_EXTRA ) = {
+const struct setting net80211_ssid_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "ssid",
 	.description = "Wireless SSID",
 	.type = &setting_type_string,
@@ -216,7 +216,7 @@ struct setting net80211_ssid_setting __setting ( SETTING_NETDEV_EXTRA ) = {
  * active scan (send probe packets). If this setting is nonzero, an
  * active scan on the 2.4GHz band will be used to associate.
  */
-struct setting net80211_active_setting __setting ( SETTING_NETDEV_EXTRA ) = {
+const struct setting net80211_active_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "active-scan",
 	.description = "Actively scan for wireless networks",
 	.type = &setting_type_int8,
@@ -228,7 +228,7 @@ struct setting net80211_active_setting __setting ( SETTING_NETDEV_EXTRA ) = {
  * normal iPXE method for entering hex settings; an ASCII string of
  * hex characters will not behave as expected.
  */
-struct setting net80211_key_setting __setting ( SETTING_NETDEV_EXTRA ) = {
+const struct setting net80211_key_setting __setting ( SETTING_NETDEV_EXTRA ) = {
 	.name = "key",
 	.description = "Wireless encryption key",
 	.type = &setting_type_string,

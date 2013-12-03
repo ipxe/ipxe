@@ -71,7 +71,7 @@ static void nslookup_close ( struct nslookup *nslookup, int rc ) {
 static void nslookup_resolv_done ( struct nslookup *nslookup,
 				   struct sockaddr *sa ) {
 	struct sockaddr_in *sin;
-	struct setting_type *default_type;
+	const struct setting_type *default_type;
 	struct settings *settings;
 	struct setting setting;
 	void *data;

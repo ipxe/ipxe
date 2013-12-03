@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** PCI device settings scope */
-static struct settings_scope pci_settings_scope;
+static const struct settings_scope pci_settings_scope;
 
 /**
  * Check applicability of PCI device setting
@@ -42,7 +42,7 @@ static struct settings_scope pci_settings_scope;
  * @ret applies		Setting applies within this settings block
  */
 static int pci_settings_applies ( struct settings *settings __unused,
-				  struct setting *setting ) {
+				  const struct setting *setting ) {
 
 	return ( setting->scope == &pci_settings_scope );
 }

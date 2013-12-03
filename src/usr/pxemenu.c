@@ -101,9 +101,9 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 
 	/* Fetch raw menu */
 	memset ( raw_menu, 0, sizeof ( raw_menu ) );
-	if ( ( raw_menu_len = fetch_setting ( NULL, &pxe_boot_menu_setting,
-					      raw_menu,
-					      sizeof ( raw_menu ) ) ) < 0 ) {
+	if ( ( raw_menu_len = fetch_raw_setting ( NULL, &pxe_boot_menu_setting,
+						  raw_menu,
+						  sizeof ( raw_menu ) ) ) < 0 ){
 		rc = raw_menu_len;
 		DBG ( "Could not retrieve raw PXE boot menu: %s\n",
 		      strerror ( rc ) );
@@ -116,8 +116,9 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 	raw_menu_end = ( raw_menu + raw_menu_len );
 
 	/* Fetch raw prompt length */
-	raw_prompt_len = fetch_setting_len ( NULL,
-					     &pxe_boot_menu_prompt_setting );
+	raw_prompt_len =
+		fetch_raw_setting ( NULL, &pxe_boot_menu_prompt_setting,
+				    NULL, 0 );
 	if ( raw_prompt_len < 0 )
 		raw_prompt_len = 0;
 
@@ -168,8 +169,8 @@ static int pxe_menu_parse ( struct pxe_menu **menu ) {
 	if ( raw_prompt_len ) {
 		raw_menu_prompt = ( ( ( void * ) raw_menu_item ) +
 				    1 /* NUL */ );
-		fetch_setting ( NULL, &pxe_boot_menu_prompt_setting,
-				raw_menu_prompt, raw_prompt_len );
+		fetch_raw_setting ( NULL, &pxe_boot_menu_prompt_setting,
+				    raw_menu_prompt, raw_prompt_len );
 		(*menu)->timeout =
 			( ( raw_menu_prompt->timeout == 0xff ) ?
 			  -1 : raw_menu_prompt->timeout );

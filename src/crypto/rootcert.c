@@ -100,8 +100,8 @@ static void rootcert_init ( void ) {
 		/* Fetch copy of "trust" setting, if it exists.  This
 		 * memory will never be freed.
 		 */
-		if ( ( len = fetch_setting_copy ( NULL, &trust_setting,
-						  &external ) ) >= 0 ) {
+		if ( ( len = fetch_raw_setting_copy ( NULL, &trust_setting,
+						      &external ) ) >= 0 ) {
 			root_certificates.fingerprints = external;
 			root_certificates.count = ( len / FINGERPRINT_LEN );
 		}

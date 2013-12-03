@@ -276,7 +276,9 @@ static int efi_snp_hii_fetch ( struct efi_snp_device *snpdev,
 			       const char *key, const char *value,
 			       wchar_t **results, int *have_setting ) {
 	struct settings *settings = efi_snp_hii_settings ( snpdev );
+	struct settings *origin;
 	struct setting *setting;
+	struct setting fetched;
 	int len;
 	char *buf;
 	char *encoded;
@@ -311,7 +313,8 @@ static int efi_snp_hii_fetch ( struct efi_snp_device *snpdev,
 	if ( setting_exists ( settings, setting ) ) {
 
 		/* Calculate formatted length */
-		len = fetchf_setting ( settings, setting, NULL, 0 );
+		len = fetchf_setting ( settings, setting, &origin, &fetched,
+				       NULL, 0 );
 		if ( len < 0 ) {
 			rc = len;
 			DBGC ( snpdev, "SNPDEV %p could not fetch %s: %s\n",
@@ -328,7 +331,8 @@ static int efi_snp_hii_fetch ( struct efi_snp_device *snpdev,
 		encoded = ( buf + len + 1 /* NUL */ );
 
 		/* Format value */
-		fetchf_setting ( settings, setting, buf, ( len + 1 /* NUL */ ));
+		fetchf_setting ( origin, &fetched, NULL, NULL, buf,
+				 ( len + 1 /* NUL */ ) );
 		for ( i = 0 ; i < len ; i++ ) {
 			sprintf ( ( encoded + ( 4 * i ) ), "%04x",
 				  *( ( uint8_t * ) buf + i ) );

@@ -92,7 +92,7 @@ static uint8_t dhcp_request_options_data[] = {
 };
 
 /** DHCP server address setting */
-struct setting dhcp_server_setting __setting ( SETTING_MISC ) = {
+const struct setting dhcp_server_setting __setting ( SETTING_MISC ) = {
 	.name = "dhcp-server",
 	.description = "DHCP server",
 	.tag = DHCP_SERVER_IDENTIFIER,
@@ -975,6 +975,7 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	uint8_t *dhcp_features;
 	size_t dhcp_features_len;
 	size_t ll_addr_len;
+	void *user_class;
 	ssize_t len;
 	int rc;
 
@@ -985,7 +986,7 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 					 data, max_len ) ) != 0 ) {
 		DBG ( "DHCP could not create DHCP packet: %s\n",
 		      strerror ( rc ) );
-		return rc;
+		goto err_create_packet;
 	}
 
 	/* Set client IP address */
@@ -998,17 +999,17 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 				    dhcp_features_len ) ) != 0 ) {
 		DBG ( "DHCP could not set features list option: %s\n",
 		      strerror ( rc ) );
-		return rc;
+		goto err_store_features;
 	}
 
 	/* Add options to identify the network device */
-	fetch_setting ( &netdev->settings.settings, &busid_setting, &dhcp_desc,
-		sizeof ( dhcp_desc ) );
+	fetch_raw_setting ( netdev_settings ( netdev ), &busid_setting,
+			    &dhcp_desc, sizeof ( dhcp_desc ) );
 	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_EB_BUS_ID, &dhcp_desc,
 				    sizeof ( dhcp_desc ) ) ) != 0 ) {
 		DBG ( "DHCP could not set bus ID option: %s\n",
 		      strerror ( rc ) );
-		return rc;
+		goto err_store_busid;
 	}
 
 	/* Add DHCP client identifier.  Required for Infiniband, and
@@ -1022,7 +1023,7 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 				    ( ll_addr_len + 1 ) ) ) != 0 ) {
 		DBG ( "DHCP could not set client ID: %s\n",
 		      strerror ( rc ) );
-		return rc;
+		goto err_store_client_id;
 	}
 
 	/* Add client UUID, if we have one.  Required for PXE.  The
@@ -1039,25 +1040,29 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 					    sizeof ( client_uuid ) ) ) != 0 ) {
 			DBG ( "DHCP could not set client UUID: %s\n",
 			      strerror ( rc ) );
-			return rc;
+			goto err_store_client_uuid;
 		}
 	}
 
 	/* Add user class, if we have one. */
-	if ( ( len = fetch_setting_len ( NULL, &user_class_setting ) ) >= 0 ) {
-		char user_class[len];
-		fetch_setting ( NULL, &user_class_setting, user_class,
-				sizeof ( user_class ) );
+	if ( ( len = fetch_raw_setting_copy ( NULL, &user_class_setting,
+					      &user_class ) ) >= 0 ) {
 		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_USER_CLASS_ID,
-					    &user_class,
-					    sizeof ( user_class ) ) ) != 0 ) {
+					    user_class, len ) ) != 0 ) {
 			DBG ( "DHCP could not set user class: %s\n",
 			      strerror ( rc ) );
-			return rc;
+			goto err_store_user_class;
 		}
 	}
 
-	return 0;
+ err_store_user_class:
+	free ( user_class );
+ err_store_client_uuid:
+ err_store_client_id:
+ err_store_busid:
+ err_store_features:
+ err_create_packet:
+	return rc;
 }
 
 /****************************************************************************
@@ -1384,7 +1389,8 @@ int start_pxebs ( struct interface *job, struct net_device *netdev,
 	int rc;
 
 	/* Get upper bound for PXE boot server IP address list */
-	pxebs_list_len = fetch_setting_len ( NULL, &pxe_boot_servers_setting );
+	pxebs_list_len = fetch_raw_setting ( NULL, &pxe_boot_servers_setting,
+					     NULL, 0 );
 	if ( pxebs_list_len < 0 )
 		pxebs_list_len = 0;
 
@@ -1422,8 +1428,8 @@ int start_pxebs ( struct interface *job, struct net_device *netdev,
 	if ( pxebs_list_len ) {
 		uint8_t buf[pxebs_list_len];
 
-		fetch_setting ( NULL, &pxe_boot_servers_setting,
-				buf, sizeof ( buf ) );
+		fetch_raw_setting ( NULL, &pxe_boot_servers_setting,
+				    buf, sizeof ( buf ) );
 		pxebs_list ( dhcp, buf, sizeof ( buf ), ip );
 	}
 	if ( ! dhcp->pxe_attempt->s_addr ) {

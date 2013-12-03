@@ -38,26 +38,26 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Report a formatted-store test result
  *
- * @v settings		Settings block
- * @v setting		Setting
- * @v formatted		Formatted value
- * @v raw_array		Expected raw value
+ * @v _settings		Settings block
+ * @v _setting		Setting
+ * @v _formatted	Formatted value
+ * @v _raw_array	Expected raw value
  */
-#define storef_ok( settings, setting, formatted, raw_array ) do {	\
-	const uint8_t expected[] = raw_array;				\
+#define storef_ok( _settings, _setting, _formatted, _raw_array ) do {	\
+	const uint8_t expected[] = _raw_array;				\
 	uint8_t actual[ sizeof ( expected ) ];				\
 	int len;							\
 									\
-	ok ( storef_setting ( settings, setting, formatted ) == 0 );	\
-	len = fetch_setting ( settings, setting, actual,		\
+	ok ( storef_setting ( _settings, _setting, _formatted ) == 0 );	\
+	len = fetch_setting ( _settings, _setting, NULL, NULL, actual,	\
 			      sizeof ( actual ) );			\
 	if ( len >= 0 ) {						\
-		DBGC ( settings, "Stored %s \"%s\", got:\n",		\
-		       (setting)->type->name, formatted );		\
-		DBGC_HDA ( settings, 0, actual, len );			\
+		DBGC ( _settings, "Stored %s \"%s\", got:\n",		\
+		       (_setting)->type->name, _formatted );		\
+		DBGC_HDA ( _settings, 0, actual, len );			\
 	} else {							\
-		DBGC ( settings, "Stored %s \"%s\", got error %s\n",	\
-		       (setting)->type->name, formatted,		\
+		DBGC ( _settings, "Stored %s \"%s\", got error %s\n",	\
+		       (_setting)->type->name, _formatted,		\
 		       strerror ( len ) );				\
 	}								\
 	ok ( len == ( int ) sizeof ( actual ) );			\
@@ -67,52 +67,52 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Report a formatted-fetch test result
  *
- * @v settings		Settings block
- * @v setting		Setting
- * @v raw_array		Raw value
- * @v formatted		Expected formatted value
+ * @v _settings		Settings block
+ * @v _setting		Setting
+ * @v _raw_array	Raw value
+ * @v _formatted	Expected formatted value
  */
-#define fetchf_ok( settings, setting, raw_array, formatted ) do {	\
-	const uint8_t raw[] = raw_array;				\
-	char actual[ strlen ( formatted ) + 1 ];			\
+#define fetchf_ok( _settings, _setting, _raw_array, _formatted ) do {	\
+	const uint8_t raw[] = _raw_array;				\
+	char actual[ strlen ( _formatted ) + 1 ];			\
 	int len;							\
 									\
-	ok ( store_setting ( settings, setting, raw,			\
+	ok ( store_setting ( _settings, _setting, raw,			\
 			     sizeof ( raw ) ) == 0 );			\
-	len = fetchf_setting ( settings, setting, actual,		\
+	len = fetchf_setting ( _settings, _setting, NULL, NULL, actual,	\
 			       sizeof ( actual ) );			\
-	DBGC ( settings, "Fetched %s \"%s\" from:\n",			\
-	       (setting)->type->name, actual );				\
-	DBGC_HDA ( settings, 0, raw, sizeof ( raw ) );			\
+	DBGC ( _settings, "Fetched %s \"%s\" from:\n",			\
+	       (_setting)->type->name, actual );			\
+	DBGC_HDA ( _settings, 0, raw, sizeof ( raw ) );			\
 	ok ( len == ( int ) ( sizeof ( actual ) - 1 ) );		\
-	ok ( strcmp ( actual, formatted ) == 0 );			\
+	ok ( strcmp ( actual, _formatted ) == 0 );			\
 	} while ( 0 )
 
 /**
  * Report a numeric-store test result
  *
- * @v settings		Settings block
- * @v setting		Setting
- * @v numeric		Numeric value
- * @v raw_array		Expected raw value
+ * @v _settings		Settings block
+ * @v _setting		Setting
+ * @v _numeric		Numeric value
+ * @v _raw_array	Expected raw value
  */
-#define storen_ok( settings, setting, numeric, raw_array ) do {		\
-	const uint8_t expected[] = raw_array;				\
+#define storen_ok( _settings, _setting, _numeric, _raw_array ) do {	\
+	const uint8_t expected[] = _raw_array;				\
 	uint8_t actual[ sizeof ( expected ) ];				\
 	int len;							\
 									\
-	ok ( storen_setting ( settings, setting, numeric ) == 0 );	\
-	len = fetch_setting ( settings, setting, actual,		\
+	ok ( storen_setting ( _settings, _setting, _numeric ) == 0 );	\
+	len = fetch_setting ( _settings, _setting, NULL, NULL, actual,	\
 			      sizeof ( actual ) );			\
 	if ( len >= 0 ) {						\
-		DBGC ( settings, "Stored %s %#lx, got:\n",		\
-		       (setting)->type->name,				\
-		       ( unsigned long ) numeric );			\
-		DBGC_HDA ( settings, 0, actual, len );			\
+		DBGC ( _settings, "Stored %s %#lx, got:\n",		\
+		       (_setting)->type->name,				\
+		       ( unsigned long ) _numeric );			\
+		DBGC_HDA ( _settings, 0, actual, len );			\
 	} else {							\
-		DBGC ( settings, "Stored %s %#lx, got error %s\n",	\
-		       (setting)->type->name,				\
-		       ( unsigned long ) numeric, strerror ( len ) );	\
+		DBGC ( _settings, "Stored %s %#lx, got error %s\n",	\
+		       (_setting)->type->name,				\
+		       ( unsigned long ) _numeric, strerror ( len ) );	\
 	}								\
 	ok ( len == ( int ) sizeof ( actual ) );			\
 	ok ( memcmp ( actual, expected, sizeof ( actual ) ) == 0 );	\
@@ -121,22 +121,23 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Report a numeric-fetch test result
  *
- * @v settings		Settings block
- * @v setting		Setting
- * @v raw_array		Raw array
- * @v numeric		Expected numeric value
+ * @v _settings		Settings block
+ * @v _setting		Setting
+ * @v _raw_array	Raw array
+ * @v _numeric		Expected numeric value
  */
-#define fetchn_ok( settings, setting, raw_array, numeric ) do {		\
-	const uint8_t raw[] = raw_array;				\
+#define fetchn_ok( _settings, _setting, _raw_array, _numeric ) do {	\
+	const uint8_t raw[] = _raw_array;				\
 	unsigned long actual;						\
 									\
-	ok ( store_setting ( settings, setting, raw,			\
+	ok ( store_setting ( _settings, _setting, raw,			\
 			     sizeof ( raw ) ) == 0 );			\
-	ok ( fetchn_setting ( settings, setting, &actual ) == 0 );	\
-	DBGC ( settings, "Fetched %s %#lx from:\n",			\
-	       (setting)->type->name, actual );				\
-	DBGC_HDA ( settings, 0, raw, sizeof ( raw ) );			\
-	ok ( actual == ( unsigned long ) numeric );			\
+	ok ( fetchn_setting ( _settings, _setting, NULL, NULL,		\
+			      &actual ) == 0 );				\
+	DBGC ( _settings, "Fetched %s %#lx from:\n",			\
+	       (_setting)->type->name, actual );			\
+	DBGC_HDA ( _settings, 0, raw, sizeof ( raw ) );			\
+	ok ( actual == ( unsigned long ) _numeric );			\
 	} while ( 0 )
 
 /** Test generic settings block */

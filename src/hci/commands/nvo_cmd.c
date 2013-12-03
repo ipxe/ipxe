@@ -58,8 +58,10 @@ static int show_exec ( int argc, char **argv ) {
 	struct show_options opts;
 	struct named_setting setting;
 	struct settings *origin;
+	struct setting fetched;
 	char name_buf[32];
 	char *value;
+	int len;
 	int rc;
 
 	/* Parse options */
@@ -71,19 +73,16 @@ static int show_exec ( int argc, char **argv ) {
 		goto err_parse_setting;
 
 	/* Fetch formatted setting value */
-	if ( ( rc = fetchf_setting_copy ( setting.settings, &setting.setting,
-					  &value ) ) < 0 ) {
+	if ( ( len = fetchf_setting_copy ( setting.settings, &setting.setting,
+					   &origin, &fetched, &value ) ) < 0 ) {
+		rc = len;
 		printf ( "Could not find \"%s\": %s\n",
 			 setting.setting.name, strerror ( rc ) );
 		goto err_fetchf;
 	}
 
-	/* Fetch origin and format fully-qualified name */
-	origin = fetch_setting_origin ( setting.settings, &setting.setting );
-	assert ( origin != NULL );
-	setting_name ( origin, &setting.setting, name_buf, sizeof ( name_buf ));
-
 	/* Print setting value */
+	setting_name ( origin, &fetched, name_buf, sizeof ( name_buf ) );
 	printf ( "%s = %s\n", name_buf, value );
 
 	/* Success */
@@ -234,7 +233,8 @@ static int read_value ( struct named_setting *setting, char **args __unused,
 	/* Read existing value, treating errors as equivalent to an
 	 * empty initial setting.
 	 */
-	fetchf_setting_copy ( setting->settings, &setting->setting, &existing );
+	fetchf_setting_copy ( setting->settings, &setting->setting,
+			      NULL, &setting->setting, &existing );
 
 	/* Read new value */
 	if ( ( rc = readline_history ( NULL, existing, NULL, value ) ) != 0 )
@@ -294,12 +294,11 @@ static int inc_exec ( int argc, char **argv ) {
 	     ( ( rc = parse_integer ( argv[ optind + 1 ], &increment ) ) != 0))
 		goto err_parse_increment;
 
-	/* Fetch existing setting value, if any, allowing for the fact
-	 * that numeric settings are big-endian and variable-length.
+	/* Read existing value, treating errors as equivalent to a
+	 * zero-valued :int32 initial setting.
 	 */
 	if ( ( rc = fetchn_setting ( setting.settings, &setting.setting,
-				     &value ) ) != 0 ) {
-		/* Treat as a non-existent :int32 setting with a zero value */
+				     NULL, &setting.setting, &value ) ) != 0 ) {
 		value = 0;
 		if ( ! setting.setting.type )
 			setting.setting.type = &setting_type_int32;
