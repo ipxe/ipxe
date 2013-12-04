@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 struct settings;
 struct in_addr;
+struct in6_addr;
 union uuid;
 
 /** A setting */
@@ -341,6 +342,12 @@ extern int fetch_ipv4_array_setting ( struct settings *settings,
 extern int fetch_ipv4_setting ( struct settings *settings,
 				const struct setting *setting,
 				struct in_addr *inp );
+extern int fetch_ipv6_array_setting ( struct settings *settings,
+				      const struct setting *setting,
+				      struct in6_addr *inp, unsigned int count);
+extern int fetch_ipv6_setting ( struct settings *settings,
+				const struct setting *setting,
+				struct in6_addr *inp );
 extern int fetch_int_setting ( struct settings *settings,
 			       const struct setting *setting, long *value );
 extern int fetch_uint_setting ( struct settings *settings,
