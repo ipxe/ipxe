@@ -362,7 +362,7 @@ static int dhcpv6_register ( struct dhcpv6_option_list *options,
 
 /** Options to be requested */
 static uint16_t dhcpv6_requested_options[] = {
-	htons ( DHCPV6_DNS_SERVER ), htons ( DHCPV6_DOMAIN_SEARCH ),
+	htons ( DHCPV6_DNS_SERVERS ), htons ( DHCPV6_DOMAIN_LIST ),
 };
 
 /**

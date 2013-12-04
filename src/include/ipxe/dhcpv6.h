@@ -147,10 +147,10 @@ struct dhcpv6_user_class_option {
 #define DHCPV6_USER_CLASS 15
 
 /** DHCPv6 DNS recursive name server option */
-#define DHCPV6_DNS_SERVER 23
+#define DHCPV6_DNS_SERVERS 23
 
 /** DHCPv6 domain search list option */
-#define DHCPV6_DOMAIN_SEARCH 24
+#define DHCPV6_DOMAIN_LIST 24
 
 /**
  * Any DHCPv6 option

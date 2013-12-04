@@ -37,6 +37,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tcpip.h>
 #include <ipxe/settings.h>
 #include <ipxe/features.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/dhcpv6.h>
 #include <ipxe/dns.h>
 
 /** @file
@@ -56,8 +58,15 @@ FEATURE ( FEATURE_PROTOCOL, "DNS", DHCP_EB_FEATURE_DNS, 1 );
 	__einfo_uniqify ( EINFO_ENXIO, 0x02, "No DNS servers available" )
 
 /** The DNS server */
-static struct sockaddr_tcpip nameserver = {
-	.st_port = htons ( DNS_PORT ),
+static union {
+	struct sockaddr sa;
+	struct sockaddr_tcpip st;
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
+} nameserver = {
+	.st = {
+		.st_port = htons ( DNS_PORT ),
+	},
 };
 
 /** The local domain */
@@ -75,7 +84,13 @@ struct dns_request {
 	struct retry_timer timer;
 
 	/** Socket address to fill in with resolved address */
-	struct sockaddr sa;
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+		struct sockaddr_in6 sin6;
+	} address;
+	/** Initial query type */
+	uint16_t qtype;
 	/** Current query packet */
 	struct dns_query query;
 	/** Location of query info structure within current packet
@@ -102,6 +117,24 @@ static void dns_done ( struct dns_request *dns, int rc ) {
 	/* Shut down interfaces */
 	intf_shutdown ( &dns->socket, rc );
 	intf_shutdown ( &dns->resolv, rc );
+}
+
+/**
+ * Mark DNS request as resolved and complete
+ *
+ * @v dns		DNS request
+ * @v rc		Return status code
+ */
+static void dns_resolved ( struct dns_request *dns ) {
+
+	DBGC ( dns, "DNS %p found address %s\n",
+	       dns, sock_ntoa ( &dns->address.sa ) );
+
+	/* Return resolved address */
+	resolv_done ( &dns->resolv, &dns->address.sa );
+
+	/* Mark operation as complete */
+	dns_done ( dns, 0 );
 }
 
 /**
@@ -345,7 +378,6 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 			      struct xfer_metadata *meta __unused ) {
 	const struct dns_header *reply = iobuf->data;
 	union dns_rr_info *rr_info;
-	struct sockaddr_in *sin;
 	unsigned int qtype = dns->qinfo->qtype;
 	int rc;
 
@@ -383,20 +415,23 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 	while ( ( rr_info = dns_find_rr ( dns, reply ) ) ) {
 		switch ( rr_info->common.type ) {
 
+		case htons ( DNS_TYPE_AAAA ):
+
+			/* Found the target AAAA record */
+			dns->address.sin6.sin6_family = AF_INET6;
+			memcpy ( &dns->address.sin6.sin6_addr,
+				 &rr_info->aaaa.in6_addr,
+				 sizeof ( dns->address.sin6.sin6_addr ) );
+			dns_resolved ( dns );
+			rc = 0;
+			goto done;
+
 		case htons ( DNS_TYPE_A ):
 
 			/* Found the target A record */
-			DBGC ( dns, "DNS %p found address %s\n",
-			       dns, inet_ntoa ( rr_info->a.in_addr ) );
-			sin = ( struct sockaddr_in * ) &dns->sa;
-			sin->sin_family = AF_INET;
-			sin->sin_addr = rr_info->a.in_addr;
-
-			/* Return resolved address */
-			resolv_done ( &dns->resolv, &dns->sa );
-
-			/* Mark operation as complete */
-			dns_done ( dns, 0 );
+			dns->address.sin.sin_family = AF_INET;
+			dns->address.sin.sin_addr = rr_info->a.in_addr;
+			dns_resolved ( dns );
 			rc = 0;
 			goto done;
 
@@ -407,7 +442,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 			dns->qinfo = ( void * ) dns_decompress_name ( reply,
 							 rr_info->cname.cname,
 							 dns->query.payload );
-			dns->qinfo->qtype = htons ( DNS_TYPE_A );
+			dns->qinfo->qtype = dns->qtype;
 			dns->qinfo->qclass = htons ( DNS_CLASS_IN );
 			
 			/* Terminate the operation if we recurse too far */
@@ -432,6 +467,16 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 	 */
 	switch ( qtype ) {
 
+	case htons ( DNS_TYPE_AAAA ):
+		/* We asked for an AAAA record and got nothing; try
+		 * the A.
+		 */
+		DBGC ( dns, "DNS %p found no AAAA record; trying A\n", dns );
+		dns->qinfo->qtype = htons ( DNS_TYPE_A );
+		dns_send_packet ( dns );
+		rc = 0;
+		goto done;
+
 	case htons ( DNS_TYPE_A ):
 		/* We asked for an A record and got nothing;
 		 * try the CNAME.
@@ -447,7 +492,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 		 * (i.e. if the next A query is already set up), then
 		 * issue it, otherwise abort.
 		 */
-		if ( dns->qinfo->qtype == htons ( DNS_TYPE_A ) ) {
+		if ( dns->qinfo->qtype == dns->qtype ) {
 			dns_send_packet ( dns );
 			rc = 0;
 			goto done;
@@ -519,7 +564,7 @@ static int dns_resolv ( struct interface *resolv,
 	int rc;
 
 	/* Fail immediately if no DNS servers */
-	if ( ! nameserver.st_family ) {
+	if ( ! nameserver.sa.sa_family ) {
 		DBG ( "DNS not attempting to resolve \"%s\": "
 		      "no DNS servers\n", name );
 		rc = -ENXIO_NO_NAMESERVER;
@@ -543,20 +588,32 @@ static int dns_resolv ( struct interface *resolv,
 	intf_init ( &dns->resolv, &dns_resolv_desc, &dns->refcnt );
 	intf_init ( &dns->socket, &dns_socket_desc, &dns->refcnt );
 	timer_init ( &dns->timer, dns_timer_expired, &dns->refcnt );
-	memcpy ( &dns->sa, sa, sizeof ( dns->sa ) );
+	memcpy ( &dns->address.sa, sa, sizeof ( dns->address.sa ) );
+
+	/* Determine initial query type */
+	switch ( nameserver.sa.sa_family ) {
+	case AF_INET:
+		dns->qtype = htons ( DNS_TYPE_A );
+		break;
+	case AF_INET6:
+		dns->qtype = htons ( DNS_TYPE_AAAA );
+		break;
+	default:
+		rc = -ENOTSUP;
+		goto err_qtype;
+	}
 
 	/* Create query */
 	dns->query.dns.flags = htons ( DNS_FLAG_QUERY | DNS_FLAG_OPCODE_QUERY |
 				       DNS_FLAG_RD );
 	dns->query.dns.qdcount = htons ( 1 );
 	dns->qinfo = ( void * ) dns_make_name ( fqdn, dns->query.payload );
-	dns->qinfo->qtype = htons ( DNS_TYPE_A );
+	dns->qinfo->qtype = dns->qtype;
 	dns->qinfo->qclass = htons ( DNS_CLASS_IN );
 
 	/* Open UDP connection */
 	if ( ( rc = xfer_open_socket ( &dns->socket, SOCK_DGRAM,
-				       ( struct sockaddr * ) &nameserver,
-				       NULL ) ) != 0 ) {
+				       &nameserver.sa, NULL ) ) != 0 ) {
 		DBGC ( dns, "DNS %p could not open socket: %s\n",
 		       dns, strerror ( rc ) );
 		goto err_open_socket;
@@ -572,10 +629,11 @@ static int dns_resolv ( struct interface *resolv,
 	return 0;	
 
  err_open_socket:
- err_alloc_dns:
+ err_qtype:
 	ref_put ( &dns->refcnt );
- err_qualify_name:
+ err_alloc_dns:
 	free ( fqdn );
+ err_qualify_name:
  err_no_nameserver:
 	return rc;
 }
@@ -593,12 +651,21 @@ struct resolver dns_resolver __resolver ( RESOLV_NORMAL ) = {
  ******************************************************************************
  */
 
-/** DNS server setting */
+/** IPv4 DNS server setting */
 const struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
 	.name = "dns",
 	.description = "DNS server",
 	.tag = DHCP_DNS_SERVERS,
 	.type = &setting_type_ipv4,
+};
+
+/** IPv6 DNS server setting */
+const struct setting dns6_setting __setting ( SETTING_IPv6_EXTRA ) = {
+	.name = "dns6",
+	.description = "DNS server",
+	.tag = DHCPV6_DNS_SERVERS,
+	.type = &setting_type_ipv6,
+	.scope = &ipv6_scope,
 };
 
 /**
@@ -607,17 +674,19 @@ const struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
  * @ret rc		Return status code
  */
 static int apply_dns_settings ( void ) {
-	struct sockaddr_in *sin_nameserver =
-		( struct sockaddr_in * ) &nameserver;
-	int len;
 
 	/* Fetch DNS server address */
-	nameserver.st_family = 0;
-	if ( ( len = fetch_ipv4_setting ( NULL, &dns_setting,
-					  &sin_nameserver->sin_addr ) ) >= 0 ){
-		nameserver.st_family = AF_INET;
+	nameserver.sa.sa_family = 0;
+	if ( fetch_ipv6_setting ( NULL, &dns6_setting,
+				  &nameserver.sin6.sin6_addr ) >= 0 ) {
+		nameserver.sin6.sin6_family = AF_INET6;
+	} else if ( fetch_ipv4_setting ( NULL, &dns_setting,
+					 &nameserver.sin.sin_addr ) >= 0 ) {
+		nameserver.sin.sin_family = AF_INET;
+	}
+	if ( nameserver.sa.sa_family ) {
 		DBG ( "DNS using nameserver %s\n",
-		      inet_ntoa ( sin_nameserver->sin_addr ) );
+		      sock_ntoa ( &nameserver.sa ) );
 	}
 
 	/* Get local domain DHCP option */
