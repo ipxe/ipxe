@@ -28,6 +28,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/in.h>
+#include <ipxe/ip.h>
+#include <ipxe/ipv6.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/uuid.h>
@@ -1648,7 +1650,7 @@ const struct setting_type setting_type_uristring __setting_type = {
 };
 
 /**
- * Parse IPv4 address setting value
+ * Parse IPv4 address setting value (when IPv4 support is not present)
  *
  * @v type		Setting type
  * @v value		Formatted setting value
@@ -1656,24 +1658,14 @@ const struct setting_type setting_type_uristring __setting_type = {
  * @v len		Length of buffer
  * @ret len		Length of raw value, or negative error
  */
-static int parse_ipv4_setting ( const struct setting_type *type __unused,
-				const char *value, void *buf, size_t len ) {
-	struct in_addr ipv4;
-
-	/* Parse IPv4 address */
-	if ( inet_aton ( value, &ipv4 ) == 0 )
-		return -EINVAL;
-
-	/* Copy to buffer */
-	if ( len > sizeof ( ipv4 ) )
-		len = sizeof ( ipv4 );
-	memcpy ( buf, &ipv4, len );
-
-	return ( sizeof ( ipv4 ) );
+__weak int parse_ipv4_setting ( const struct setting_type *type __unused,
+				const char *value __unused, void *buf __unused,
+				size_t len __unused ) {
+	return -ENOTSUP;
 }
 
 /**
- * Format IPv4 address setting value
+ * Format IPv4 address setting value (when IPv4 support is not present)
  *
  * @v type		Setting type
  * @v raw		Raw setting value
@@ -1682,14 +1674,11 @@ static int parse_ipv4_setting ( const struct setting_type *type __unused,
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int format_ipv4_setting ( const struct setting_type *type __unused,
-				 const void *raw, size_t raw_len, char *buf,
-				 size_t len ) {
-	const struct in_addr *ipv4 = raw;
-
-	if ( raw_len < sizeof ( *ipv4 ) )
-		return -EINVAL;
-	return snprintf ( buf, len, "%s", inet_ntoa ( *ipv4 ) );
+__weak int format_ipv4_setting ( const struct setting_type *type __unused,
+				 const void *raw __unused,
+				 size_t raw_len __unused, char *buf __unused,
+				 size_t len __unused ) {
+	return -ENOTSUP;
 }
 
 /** An IPv4 address setting type */
@@ -1698,6 +1687,48 @@ const struct setting_type setting_type_ipv4 __setting_type = {
 	.parse = parse_ipv4_setting,
 	.format = format_ipv4_setting,
 };
+
+/**
+ * Parse IPv6 address setting value (when IPv6 support is not present)
+ *
+ * @v type		Setting type
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
+ */
+__weak int parse_ipv6_setting ( const struct setting_type *type __unused,
+				const char *value __unused, void *buf __unused,
+				size_t len __unused ) {
+	return -ENOTSUP;
+}
+
+/**
+ * Format IPv6 address setting value (when IPv6 support is not present)
+ *
+ * @v type		Setting type
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+__weak int format_ipv6_setting ( const struct setting_type *type __unused,
+				 const void *raw __unused,
+				 size_t raw_len __unused, char *buf __unused,
+				 size_t len __unused ) {
+	return -ENOTSUP;
+}
+
+/** An IPv6 address setting type */
+const struct setting_type setting_type_ipv6 __setting_type = {
+	.name = "ipv6",
+	.parse = parse_ipv6_setting,
+	.format = format_ipv6_setting,
+};
+
+/** IPv6 settings scope */
+const struct settings_scope ipv6_scope;
 
 /**
  * Integer setting type indices

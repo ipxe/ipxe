@@ -247,5 +247,10 @@ extern int ipv6_set_prefix ( struct net_device *netdev, struct in6_addr *prefix,
 			     unsigned int prefix_len, struct in6_addr *router );
 extern int ipv6_set_address ( struct net_device *netdev,
 			      struct in6_addr *address );
+extern int parse_ipv6_setting ( const struct setting_type *type,
+				const char *value, void *buf, size_t len );
+extern int format_ipv6_setting ( const struct setting_type *type,
+				 const void *raw, size_t raw_len, char *buf,
+				 size_t len );
 
 #endif /* _IPXE_IPV6_H */

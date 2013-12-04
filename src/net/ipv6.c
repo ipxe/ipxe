@@ -954,8 +954,8 @@ struct sockaddr_converter ipv6_sockaddr_converter __sockaddr_converter = {
  * @v len		Length of buffer
  * @ret len		Length of raw value, or negative error
  */
-static int parse_ipv6_setting ( const struct setting_type *type __unused,
-				const char *value, void *buf, size_t len ) {
+int parse_ipv6_setting ( const struct setting_type *type __unused,
+			 const char *value, void *buf, size_t len ) {
 	struct in6_addr ipv6;
 	int rc;
 
@@ -981,22 +981,15 @@ static int parse_ipv6_setting ( const struct setting_type *type __unused,
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int format_ipv6_setting ( const struct setting_type *type __unused,
-				 const void *raw, size_t raw_len, char *buf,
-				 size_t len ) {
+int format_ipv6_setting ( const struct setting_type *type __unused,
+			  const void *raw, size_t raw_len, char *buf,
+			  size_t len ) {
 	const struct in6_addr *ipv6 = raw;
 
 	if ( raw_len < sizeof ( *ipv6 ) )
 		return -EINVAL;
 	return snprintf ( buf, len, "%s", inet6_ntoa ( ipv6 ) );
 }
-
-/** An IPv6 address setting type */
-const struct setting_type setting_type_ipv6 __setting_type = {
-	.name = "ipv6",
-	.parse = parse_ipv6_setting,
-	.format = format_ipv6_setting,
-};
 
 /**
  * Create IPv6 network device

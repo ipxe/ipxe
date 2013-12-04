@@ -590,6 +590,51 @@ struct sockaddr_converter ipv4_sockaddr_converter __sockaddr_converter = {
  ******************************************************************************
  */
 
+/**
+ * Parse IPv4 address setting value
+ *
+ * @v type		Setting type
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
+ */
+int parse_ipv4_setting ( const struct setting_type *type __unused,
+			 const char *value, void *buf, size_t len ) {
+	struct in_addr ipv4;
+
+	/* Parse IPv4 address */
+	if ( inet_aton ( value, &ipv4 ) == 0 )
+		return -EINVAL;
+
+	/* Copy to buffer */
+	if ( len > sizeof ( ipv4 ) )
+		len = sizeof ( ipv4 );
+	memcpy ( buf, &ipv4, len );
+
+	return ( sizeof ( ipv4 ) );
+}
+
+/**
+ * Format IPv4 address setting value
+ *
+ * @v type		Setting type
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+int format_ipv4_setting ( const struct setting_type *type __unused,
+			  const void *raw, size_t raw_len, char *buf,
+			  size_t len ) {
+	const struct in_addr *ipv4 = raw;
+
+	if ( raw_len < sizeof ( *ipv4 ) )
+		return -EINVAL;
+	return snprintf ( buf, len, "%s", inet_ntoa ( *ipv4 ) );
+}
+
 /** IPv4 address setting */
 const struct setting ip_setting __setting ( SETTING_IPv4 ) = {
 	.name = "ip",
