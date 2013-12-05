@@ -67,6 +67,36 @@ struct ndp_prefix_information_option {
 /** NDP autonomous address configuration flag */
 #define NDP_PREFIX_AUTONOMOUS 0x40
 
+/** NDP recursive DNS server option */
+#define NDP_OPT_RDNSS 25
+
+/** NDP recursive DNS server */
+struct ndp_rdnss_option {
+	/** NDP option header */
+	struct ndp_option_header header;
+	/** Reserved */
+	uint16_t reserved;
+	/** Lifetime */
+	uint32_t lifetime;
+	/** Addresses */
+	struct in6_addr addresses[0];
+} __attribute__ (( packed ));
+
+/** NDP DNS search list option */
+#define NDP_OPT_DNSSL 31
+
+/** NDP DNS search list */
+struct ndp_dnssl_option {
+	/** NDP option header */
+	struct ndp_option_header header;
+	/** Reserved */
+	uint16_t reserved;
+	/** Lifetime */
+	uint32_t lifetime;
+	/** Domain names */
+	uint8_t names[0];
+} __attribute__ (( packed ));
+
 /** An NDP option */
 union ndp_option {
 	/** Option header */
@@ -75,6 +105,10 @@ union ndp_option {
 	struct ndp_ll_addr_option ll_addr;
 	/** Prefix information option */
 	struct ndp_prefix_information_option prefix;
+	/** Recursive DNS server option */
+	struct ndp_rdnss_option rdnss;
+	/** DNS search list option */
+	struct ndp_dnssl_option dnssl;
 } __attribute__ (( packed ));
 
 /** An NDP neighbour solicitation or advertisement header */
@@ -165,5 +199,8 @@ static inline int ndp_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	return neighbour_tx ( iobuf, netdev, &ipv6_protocol, net_dest,
 			      &ndp_discovery, net_source, ll_source );
 }
+
+/** NDP settings block name */
+#define NDP_SETTINGS_NAME "ndp"
 
 #endif /* _IPXE_NDP_H */

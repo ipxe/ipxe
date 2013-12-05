@@ -38,8 +38,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-static int ipv6conf_rx_router_advertisement ( struct net_device *netdev,
-					      unsigned int flags );
+static int
+ipv6conf_rx_router_advertisement ( struct net_device *netdev,
+				   struct ndp_router_advertisement_header *radv,
+				   size_t len );
 
 /**
  * Transmit NDP packet with link-layer address option
@@ -585,8 +587,8 @@ ndp_rx_router_advertisement ( struct io_buffer *iobuf,
 		goto err_options;
 
 	/* Pass to IPv6 autoconfiguration */
-	if ( ( rc = ipv6conf_rx_router_advertisement ( netdev,
-						       radv->flags ) ) != 0 )
+	if ( ( rc = ipv6conf_rx_router_advertisement ( netdev, radv,
+						       len ) ) != 0 )
 		goto err_ipv6conf;
 
  err_ipv6conf:
@@ -609,6 +611,179 @@ struct icmpv6_handler ndp_handlers[] __icmpv6_handler = {
 		.type = ICMPV6_ROUTER_ADVERTISEMENT,
 		.rx = ndp_rx_router_advertisement,
 	},
+};
+
+/****************************************************************************
+ *
+ * NDP settings
+ *
+ */
+
+/** An NDP settings block */
+struct ndp_settings {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** Settings interface */
+	struct settings settings;
+	/** Length of NDP options */
+	size_t len;
+	/** NDP options */
+	union ndp_option option[0];
+};
+
+/** NDP settings scope */
+static const struct settings_scope ndp_settings_scope;
+
+/**
+ * Construct NDP tag
+ *
+ * @v type		NDP option type
+ * @v offset		Starting offset of data
+ * @ret tag		NDP tag
+ */
+#define NDP_TAG( type, offset )	( ( (offset) << 8 ) | (type) )
+
+/**
+ * Extract NDP tag type
+ *
+ * @v tag		NDP tag
+ * @ret type		NDP option type
+ */
+#define NDP_TAG_TYPE( tag ) ( (tag) & 0xff )
+
+/**
+ * Extract NDP tag offset
+ *
+ * @v tag		NDP tag
+ * @ret offset		Starting offset of data
+ */
+#define NDP_TAG_OFFSET( tag ) ( (tag) >> 8 )
+
+/**
+ * Check applicability of NDP setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @ret applies		Setting applies within this settings block
+ */
+static int ndp_applies ( struct settings *settings __unused,
+			 const struct setting *setting ) {
+
+	return ( setting->scope == &ndp_settings_scope );
+}
+
+/**
+ * Fetch value of NDP setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int ndp_fetch ( struct settings *settings,
+		       struct setting *setting,
+		       void *data, size_t len ) {
+	struct ndp_settings *ndpset =
+		container_of ( settings, struct ndp_settings, settings );
+	struct net_device *netdev =
+		container_of ( settings->parent, struct net_device,
+			       settings.settings );
+	union ndp_option *option;
+	unsigned int type = NDP_TAG_TYPE ( setting->tag );
+	unsigned int offset = NDP_TAG_OFFSET ( setting->tag );
+	size_t remaining;
+	size_t option_len;
+	size_t payload_len;
+
+	/* Scan through NDP options for requested type.  We can assume
+	 * that the options are well-formed, otherwise they would have
+	 * been rejected prior to being stored.
+	 */
+	option = ndpset->option;
+	remaining = ndpset->len;
+	while ( remaining ) {
+
+		/* Calculate option length */
+		option_len = ( option->header.blocks * NDP_OPTION_BLKSZ );
+
+		/* If this is the requested option, return it */
+		if ( option->header.type == type ) {
+
+			/* Sanity check */
+			if ( offset > option_len ) {
+				DBGC ( netdev, "NDP %s option %d too short\n",
+				       netdev->name, type );
+				return -EINVAL;
+			}
+			payload_len = ( option_len - offset );
+
+			/* Copy data to output buffer */
+			if ( len > payload_len )
+				len = payload_len;
+			memcpy ( data, ( ( ( void * ) option ) + offset ), len);
+			return payload_len;
+		}
+
+		/* Move to next option */
+		option = ( ( ( void * ) option ) + option_len );
+		remaining -= option_len;
+	}
+
+	return -ENOENT;
+}
+
+/** NDP settings operations */
+static struct settings_operations ndp_settings_operations = {
+	.applies = ndp_applies,
+	.fetch = ndp_fetch,
+};
+
+/**
+ * Register NDP settings
+ *
+ * @v netdev		Network device
+ * @v option		NDP options
+ * @v len		Length of options
+ * @ret rc		Return status code
+ */
+static int ndp_register_settings ( struct net_device *netdev,
+				   union ndp_option *option, size_t len ) {
+	struct settings *parent = netdev_settings ( netdev );
+	struct ndp_settings *ndpset;
+	int rc;
+
+	/* Allocate and initialise structure */
+	ndpset = zalloc ( sizeof ( *ndpset ) + len );
+	if ( ! ndpset ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	ref_init ( &ndpset->refcnt, NULL );
+	settings_init ( &ndpset->settings, &ndp_settings_operations,
+			&ndpset->refcnt, &ndp_settings_scope );
+	ndpset->len = len;
+	memcpy ( ndpset->option, option, len );
+
+	/* Register settings */
+	if ( ( rc = register_settings ( &ndpset->settings, parent,
+					NDP_SETTINGS_NAME ) ) != 0 )
+		goto err_register;
+
+ err_register:
+	ref_put ( &ndpset->refcnt );
+ err_alloc:
+	return rc;
+}
+
+/** DNS server setting */
+const struct setting ndp_dns6_setting __setting ( SETTING_IP_EXTRA, dns6 ) = {
+	.name = "dns6",
+	.description = "DNS server",
+	.tag = NDP_TAG ( NDP_OPT_RDNSS,
+			 offsetof ( struct ndp_rdnss_option, addresses ) ),
+	.type = &setting_type_ipv6,
+	.scope = &ndp_settings_scope,
 };
 
 /****************************************************************************
@@ -713,12 +888,19 @@ static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
  * Handle router advertisement during IPv6 autoconfiguration
  *
  * @v netdev		Network device
- * @v flags		Router flags
+ * @v radv		Router advertisement
+ * @v len		Length of router advertisement
  * @ret rc		Return status code
+ *
+ * This function assumes that the router advertisement is well-formed,
+ * since it must have already passed through option processing.
  */
-static int ipv6conf_rx_router_advertisement ( struct net_device *netdev,
-					      unsigned int flags ) {
+static int
+ipv6conf_rx_router_advertisement ( struct net_device *netdev,
+				   struct ndp_router_advertisement_header *radv,
+				   size_t len ) {
 	struct ipv6conf *ipv6conf;
+	size_t option_len;
 	int stateful;
 	int rc;
 
@@ -739,9 +921,15 @@ static int ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 	/* Stop router solicitation timer */
 	stop_timer ( &ipv6conf->timer );
 
+	/* Register NDP settings */
+	option_len = ( len - offsetof ( typeof ( *radv ), option ) );
+	if ( ( rc = ndp_register_settings ( netdev, radv->option,
+					    option_len ) ) != 0 )
+		return rc;
+
 	/* Start DHCPv6 if required */
-	if ( flags & ( NDP_ROUTER_MANAGED | NDP_ROUTER_OTHER ) ) {
-		stateful = ( flags & NDP_ROUTER_MANAGED );
+	if ( radv->flags & ( NDP_ROUTER_MANAGED | NDP_ROUTER_OTHER ) ) {
+		stateful = ( radv->flags & NDP_ROUTER_MANAGED );
 		if ( ( rc = start_dhcpv6 ( &ipv6conf->dhcp, netdev,
 					   stateful ) ) != 0 ) {
 			DBGC ( netdev, "NDP %s could not start state%s DHCPv6: "
