@@ -363,6 +363,7 @@ static int dhcpv6_register ( struct dhcpv6_option_list *options,
 /** Options to be requested */
 static uint16_t dhcpv6_requested_options[] = {
 	htons ( DHCPV6_DNS_SERVERS ), htons ( DHCPV6_DOMAIN_LIST ),
+	htons ( DHCPV6_BOOTFILE_URL ), htons ( DHCPV6_BOOTFILE_PARAM ),
 };
 
 /**
@@ -969,3 +970,12 @@ int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
 	ref_put ( &dhcpv6->refcnt );
 	return rc;
 }
+
+/** Boot filename setting */
+const struct setting filename6_setting __setting ( SETTING_BOOT, filename ) = {
+	.name = "filename",
+	.description = "Boot filename",
+	.tag = DHCPV6_BOOTFILE_URL,
+	.type = &setting_type_string,
+	.scope = &ipv6_scope,
+};
