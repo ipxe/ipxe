@@ -2346,7 +2346,7 @@ const struct setting hostname_setting __setting ( SETTING_HOST, hostname ) = {
 };
 
 /** Domain name setting */
-const struct setting domain_setting __setting ( SETTING_IPv4_EXTRA, domain ) = {
+const struct setting domain_setting __setting ( SETTING_IP_EXTRA, domain ) = {
 	.name = "domain",
 	.description = "DNS domain",
 	.tag = DHCP_DOMAIN_NAME,
