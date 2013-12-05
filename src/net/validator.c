@@ -121,7 +121,7 @@ static struct interface_descriptor validator_job_desc =
  */
 
 /** Cross-signed certificate source setting */
-const struct setting crosscert_setting __setting ( SETTING_CRYPTO ) = {
+const struct setting crosscert_setting __setting ( SETTING_CRYPTO, crosscert )={
 	.name = "crosscert",
 	.description = "Cross-signed certificate source",
 	.tag = DHCP_EB_CROSS_CERT,

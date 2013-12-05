@@ -195,7 +195,7 @@ struct console_driver syslog_console __console_driver = {
  */
 
 /** IPv4 syslog server setting */
-const struct setting syslog_setting __setting ( SETTING_MISC ) = {
+const struct setting syslog_setting __setting ( SETTING_MISC, syslog ) = {
 	.name = "syslog",
 	.description = "Syslog server",
 	.tag = DHCP_LOG_SERVERS,
@@ -203,7 +203,7 @@ const struct setting syslog_setting __setting ( SETTING_MISC ) = {
 };
 
 /** IPv6 syslog server setting */
-const struct setting syslog6_setting __setting ( SETTING_MISC ) = {
+const struct setting syslog6_setting __setting ( SETTING_MISC, syslog6 ) = {
 	.name = "syslog6",
 	.description = "Syslog server",
 	.tag = DHCPV6_LOG_SERVERS,

@@ -59,7 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define CYAN	"\033[36m"
 
 /** The "scriptlet" setting */
-const struct setting scriptlet_setting __setting ( SETTING_MISC ) = {
+const struct setting scriptlet_setting __setting ( SETTING_MISC, scriptlet ) = {
 	.name = "scriptlet",
 	.description = "Boot scriptlet",
 	.tag = DHCP_EB_SCRIPTLET,
@@ -119,7 +119,8 @@ static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
 }
 
 /** The "keep-san" setting */
-const struct setting keep_san_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
+const struct setting keep_san_setting __setting ( SETTING_SANBOOT_EXTRA,
+						  keep-san ) = {
 	.name = "keep-san",
 	.description = "Preserve SAN connection",
 	.tag = DHCP_EB_KEEP_SAN,
@@ -127,7 +128,8 @@ const struct setting keep_san_setting __setting ( SETTING_SANBOOT_EXTRA ) = {
 };
 
 /** The "skip-san-boot" setting */
-const struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA )={
+const struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA,
+						       skip-san-boot ) = {
 	.name = "skip-san-boot",
 	.description = "Do not boot from SAN device",
 	.tag = DHCP_EB_SKIP_SAN_BOOT,

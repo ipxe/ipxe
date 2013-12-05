@@ -2312,7 +2312,7 @@ char * expand_settings ( const char *string ) {
  */
 
 /** Hostname setting */
-const struct setting hostname_setting __setting ( SETTING_HOST ) = {
+const struct setting hostname_setting __setting ( SETTING_HOST, hostname ) = {
 	.name = "hostname",
 	.description = "Host name",
 	.tag = DHCP_HOST_NAME,
@@ -2320,7 +2320,7 @@ const struct setting hostname_setting __setting ( SETTING_HOST ) = {
 };
 
 /** Domain name setting */
-const struct setting domain_setting __setting ( SETTING_IPv4_EXTRA ) = {
+const struct setting domain_setting __setting ( SETTING_IPv4_EXTRA, domain ) = {
 	.name = "domain",
 	.description = "DNS domain",
 	.tag = DHCP_DOMAIN_NAME,
@@ -2328,7 +2328,7 @@ const struct setting domain_setting __setting ( SETTING_IPv4_EXTRA ) = {
 };
 
 /** TFTP server setting */
-const struct setting next_server_setting __setting ( SETTING_BOOT ) = {
+const struct setting next_server_setting __setting ( SETTING_BOOT,next-server)={
 	.name = "next-server",
 	.description = "TFTP server",
 	.tag = DHCP_EB_SIADDR,
@@ -2336,7 +2336,7 @@ const struct setting next_server_setting __setting ( SETTING_BOOT ) = {
 };
 
 /** Filename setting */
-const struct setting filename_setting __setting ( SETTING_BOOT ) = {
+const struct setting filename_setting __setting ( SETTING_BOOT, filename ) = {
 	.name = "filename",
 	.description = "Boot filename",
 	.tag = DHCP_BOOTFILE_NAME,
@@ -2344,7 +2344,7 @@ const struct setting filename_setting __setting ( SETTING_BOOT ) = {
 };
 
 /** Root path setting */
-const struct setting root_path_setting __setting ( SETTING_SANBOOT ) = {
+const struct setting root_path_setting __setting ( SETTING_SANBOOT, root-path)={
 	.name = "root-path",
 	.description = "SAN root path",
 	.tag = DHCP_ROOT_PATH,
@@ -2352,7 +2352,7 @@ const struct setting root_path_setting __setting ( SETTING_SANBOOT ) = {
 };
 
 /** Username setting */
-const struct setting username_setting __setting ( SETTING_AUTH ) = {
+const struct setting username_setting __setting ( SETTING_AUTH, username ) = {
 	.name = "username",
 	.description = "User name",
 	.tag = DHCP_EB_USERNAME,
@@ -2360,7 +2360,7 @@ const struct setting username_setting __setting ( SETTING_AUTH ) = {
 };
 
 /** Password setting */
-const struct setting password_setting __setting ( SETTING_AUTH ) = {
+const struct setting password_setting __setting ( SETTING_AUTH, password ) = {
 	.name = "password",
 	.description = "Password",
 	.tag = DHCP_EB_PASSWORD,
@@ -2368,7 +2368,7 @@ const struct setting password_setting __setting ( SETTING_AUTH ) = {
 };
 
 /** Priority setting */
-const struct setting priority_setting __setting ( SETTING_MISC ) = {
+const struct setting priority_setting __setting ( SETTING_MISC, priority ) = {
 	.name = "priority",
 	.description = "Settings priority",
 	.tag = DHCP_EB_PRIORITY,
@@ -2376,7 +2376,8 @@ const struct setting priority_setting __setting ( SETTING_MISC ) = {
 };
 
 /** DHCP user class setting */
-const struct setting user_class_setting __setting ( SETTING_HOST_EXTRA ) = {
+const struct setting user_class_setting __setting ( SETTING_HOST_EXTRA,
+						    user-class ) = {
 	.name = "user-class",
 	.description = "DHCP user class",
 	.tag = DHCP_USER_CLASS_ID,
@@ -2412,7 +2413,7 @@ static int errno_fetch ( void *data, size_t len ) {
 }
 
 /** Error number setting */
-const struct setting errno_setting __setting ( SETTING_MISC ) = {
+const struct setting errno_setting __setting ( SETTING_MISC, errno ) = {
 	.name = "errno",
 	.description = "Last error",
 	.type = &setting_type_uint32,
@@ -2440,7 +2441,7 @@ static int buildarch_fetch ( void *data, size_t len ) {
 }
 
 /** Build architecture setting */
-const struct setting buildarch_setting __setting ( SETTING_MISC ) = {
+const struct setting buildarch_setting __setting ( SETTING_MISC, buildarch ) = {
 	.name = "buildarch",
 	.description = "Build architecture",
 	.type = &setting_type_string,
@@ -2468,7 +2469,7 @@ static int platform_fetch ( void *data, size_t len ) {
 }
 
 /** Platform setting */
-const struct setting platform_setting __setting ( SETTING_MISC ) = {
+const struct setting platform_setting __setting ( SETTING_MISC, platform ) = {
 	.name = "platform",
 	.description = "Platform",
 	.type = &setting_type_string,
@@ -2494,7 +2495,7 @@ static int version_fetch ( void *data, size_t len ) {
 }
 
 /** Version setting */
-const struct setting version_setting __setting ( SETTING_MISC ) = {
+const struct setting version_setting __setting ( SETTING_MISC, version ) = {
 	.name = "version",
 	.description = "Version",
 	.type = &setting_type_string,

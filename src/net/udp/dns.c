@@ -652,7 +652,7 @@ struct resolver dns_resolver __resolver ( RESOLV_NORMAL ) = {
  */
 
 /** IPv4 DNS server setting */
-const struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
+const struct setting dns_setting __setting ( SETTING_IPv4_EXTRA, dns ) = {
 	.name = "dns",
 	.description = "DNS server",
 	.tag = DHCP_DNS_SERVERS,
@@ -660,7 +660,7 @@ const struct setting dns_setting __setting ( SETTING_IPv4_EXTRA ) = {
 };
 
 /** IPv6 DNS server setting */
-const struct setting dns6_setting __setting ( SETTING_IPv6_EXTRA ) = {
+const struct setting dns6_setting __setting ( SETTING_IPv6_EXTRA, dns6 ) = {
 	.name = "dns6",
 	.description = "DNS server",
 	.tag = DHCPV6_DNS_SERVERS,

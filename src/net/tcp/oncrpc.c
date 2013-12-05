@@ -58,14 +58,14 @@ struct oncrpc_cred oncrpc_auth_none = {
 	.length = 0
 };
 
-const struct setting uid_setting __setting ( SETTING_AUTH ) = {
+const struct setting uid_setting __setting ( SETTING_AUTH, uid ) = {
 	.name        = "uid",
 	.description = "User ID",
 	.tag         = DHCP_EB_UID,
 	.type        = &setting_type_uint32
 };
 
-const struct setting gid_setting __setting ( SETTING_AUTH ) = {
+const struct setting gid_setting __setting ( SETTING_AUTH, gid ) = {
 	.name        = "gid",
 	.description = "Group ID",
 	.tag         = DHCP_EB_GID,

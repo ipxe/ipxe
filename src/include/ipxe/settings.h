@@ -53,7 +53,8 @@ struct setting {
 #define SETTINGS __table ( struct setting, "settings" )
 
 /** Declare a configuration setting */
-#define __setting( setting_order ) __table_entry ( SETTINGS, setting_order )
+#define __setting( setting_order, name ) \
+	__table_entry ( SETTINGS, setting_order.name )
 
 /** @defgroup setting_order Setting ordering
  * @{
@@ -419,22 +420,38 @@ extern const struct setting_type setting_type_hexraw __setting_type;
 extern const struct setting_type setting_type_uuid __setting_type;
 extern const struct setting_type setting_type_busdevfn __setting_type;
 
-extern const struct setting ip_setting __setting ( SETTING_IPv4 );
-extern const struct setting netmask_setting __setting ( SETTING_IPv4 );
-extern const struct setting gateway_setting __setting ( SETTING_IPv4 );
-extern const struct setting dns_setting __setting ( SETTING_IPv4_EXTRA );
-extern const struct setting hostname_setting __setting ( SETTING_HOST );
-extern const struct setting domain_setting __setting ( SETTING_IPv4_EXTRA );
-extern const struct setting filename_setting __setting ( SETTING_BOOT );
-extern const struct setting root_path_setting __setting ( SETTING_SANBOOT );
-extern const struct setting username_setting __setting ( SETTING_AUTH );
-extern const struct setting password_setting __setting ( SETTING_AUTH );
-extern const struct setting priority_setting __setting ( SETTING_MISC );
-extern const struct setting uuid_setting __setting ( SETTING_HOST );
-extern const struct setting next_server_setting __setting ( SETTING_BOOT );
-extern const struct setting mac_setting __setting ( SETTING_NETDEV );
-extern const struct setting busid_setting __setting ( SETTING_NETDEV );
-extern const struct setting user_class_setting __setting ( SETTING_HOST_EXTRA );
+extern const struct setting
+ip_setting __setting ( SETTING_IPv4, ip );
+extern const struct setting
+netmask_setting __setting ( SETTING_IPv4, netmask );
+extern const struct setting
+gateway_setting __setting ( SETTING_IPv4, gateway );
+extern const struct setting
+dns_setting __setting ( SETTING_IPv4_EXTRA, dns );
+extern const struct setting
+hostname_setting __setting ( SETTING_HOST, hostname );
+extern const struct setting
+domain_setting __setting ( SETTING_IPv4_EXTRA, domain );
+extern const struct setting
+filename_setting __setting ( SETTING_BOOT, filename );
+extern const struct setting
+root_path_setting __setting ( SETTING_SANBOOT, root-path );
+extern const struct setting
+username_setting __setting ( SETTING_AUTH, username );
+extern const struct setting
+password_setting __setting ( SETTING_AUTH, password );
+extern const struct setting
+priority_setting __setting ( SETTING_MISC, priority );
+extern const struct setting
+uuid_setting __setting ( SETTING_HOST, uuid );
+extern const struct setting
+next_server_setting __setting ( SETTING_BOOT, next-server );
+extern const struct setting
+mac_setting __setting ( SETTING_NETDEV, mac );
+extern const struct setting
+busid_setting __setting ( SETTING_NETDEV, busid );
+extern const struct setting
+user_class_setting __setting ( SETTING_HOST_EXTRA, user-class );
 
 /**
  * Initialise a settings block

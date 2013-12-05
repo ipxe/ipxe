@@ -188,7 +188,7 @@ struct init_fn smbios_init_fn __init_fn ( INIT_NORMAL ) = {
 };
 
 /** UUID setting obtained via SMBIOS */
-const struct setting uuid_setting __setting ( SETTING_HOST ) = {
+const struct setting uuid_setting __setting ( SETTING_HOST, uuid ) = {
 	.name = "uuid",
 	.description = "UUID",
 	.tag = SMBIOS_RAW_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
@@ -197,42 +197,47 @@ const struct setting uuid_setting __setting ( SETTING_HOST ) = {
 	.scope = &smbios_settings_scope,
 };
 
-/** Other SMBIOS predefined settings */
-const struct setting smbios_predefined_settings[] __setting ( SETTING_HOST_EXTRA ) = {
-	{
-		.name = "manufacturer",
-		.description = "Manufacturer",
-		.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
-					   struct smbios_system_information,
-					   manufacturer ),
-		.type = &setting_type_string,
-		.scope = &smbios_settings_scope,
-	},
-	{
-		.name = "product",
-		.description = "Product name",
-		.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
-					   struct smbios_system_information,
-					   product ),
-		.type = &setting_type_string,
-		.scope = &smbios_settings_scope,
-	},
-	{
-		.name = "serial",
-		.description = "Serial number",
-		.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
-					   struct smbios_system_information,
-					   serial ),
-		.type = &setting_type_string,
-		.scope = &smbios_settings_scope,
-	},
-	{
-		.name = "asset",
-		.description = "Asset tag",
-		.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_ENCLOSURE_INFORMATION,
-					   struct smbios_enclosure_information,
-					   asset_tag ),
-		.type = &setting_type_string,
-		.scope = &smbios_settings_scope,
-	},
+/** Manufacturer name setting */
+const struct setting manufacturer_setting __setting ( SETTING_HOST_EXTRA,
+						      manufacturer ) = {
+	.name = "manufacturer",
+	.description = "Manufacturer",
+	.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
+				   struct smbios_system_information,
+				   manufacturer ),
+	.type = &setting_type_string,
+	.scope = &smbios_settings_scope,
+};
+
+/** Product name setting */
+const struct setting product_setting __setting ( SETTING_HOST_EXTRA, product )={
+	.name = "product",
+	.description = "Product name",
+	.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
+				   struct smbios_system_information,
+				   product ),
+	.type = &setting_type_string,
+	.scope = &smbios_settings_scope,
+};
+
+/** Serial number setting */
+const struct setting serial_setting __setting ( SETTING_HOST_EXTRA, serial ) = {
+	.name = "serial",
+	.description = "Serial number",
+	.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_SYSTEM_INFORMATION,
+				   struct smbios_system_information,
+				   serial ),
+	.type = &setting_type_string,
+	.scope = &smbios_settings_scope,
+};
+
+/** Asset tag setting */
+const struct setting asset_setting __setting ( SETTING_HOST_EXTRA, asset ) = {
+	.name = "asset",
+	.description = "Asset tag",
+	.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_ENCLOSURE_INFORMATION,
+				   struct smbios_enclosure_information,
+				   asset_tag ),
+	.type = &setting_type_string,
+	.scope = &smbios_settings_scope,
 };

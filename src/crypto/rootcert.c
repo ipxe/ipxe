@@ -58,7 +58,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static const uint8_t fingerprints[] = { TRUSTED };
 
 /** Root certificate fingerprint setting */
-static struct setting trust_setting __setting ( SETTING_CRYPTO ) = {
+static struct setting trust_setting __setting ( SETTING_CRYPTO, trust ) = {
 	.name = "trust",
 	.description = "Trusted root certificate fingerprints",
 	.tag = DHCP_EB_TRUST,

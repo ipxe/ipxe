@@ -231,12 +231,10 @@ struct init_fn memmap_settings_init_fn __init_fn ( INIT_NORMAL ) = {
 };
 
 /** Memory map predefined settings */
-const struct setting memmap_predefined_settings[] __setting ( SETTING_MISC ) = {
-	{
-		.name = "memsize",
-		.description = "Memory size (in MB)",
-		.tag = MEMMAP_TAG ( 0, 0x100, 0, 1, 1, 20 ),
-		.type = &setting_type_int32,
-		.scope = &memmap_settings_scope,
-	},
+const struct setting memsize_setting __setting ( SETTING_MISC, memsize ) = {
+	.name = "memsize",
+	.description = "Memory size (in MB)",
+	.tag = MEMMAP_TAG ( 0, 0x100, 0, 1, 1, 20 ),
+	.type = &setting_type_int32,
+	.scope = &memmap_settings_scope,
 };

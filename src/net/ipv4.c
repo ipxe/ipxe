@@ -636,7 +636,7 @@ int format_ipv4_setting ( const struct setting_type *type __unused,
 }
 
 /** IPv4 address setting */
-const struct setting ip_setting __setting ( SETTING_IPv4 ) = {
+const struct setting ip_setting __setting ( SETTING_IPv4, ip ) = {
 	.name = "ip",
 	.description = "IP address",
 	.tag = DHCP_EB_YIADDR,
@@ -644,7 +644,7 @@ const struct setting ip_setting __setting ( SETTING_IPv4 ) = {
 };
 
 /** IPv4 subnet mask setting */
-const struct setting netmask_setting __setting ( SETTING_IPv4 ) = {
+const struct setting netmask_setting __setting ( SETTING_IPv4, netmask ) = {
 	.name = "netmask",
 	.description = "Subnet mask",
 	.tag = DHCP_SUBNET_MASK,
@@ -652,7 +652,7 @@ const struct setting netmask_setting __setting ( SETTING_IPv4 ) = {
 };
 
 /** Default gateway setting */
-const struct setting gateway_setting __setting ( SETTING_IPv4 ) = {
+const struct setting gateway_setting __setting ( SETTING_IPv4, gateway ) = {
 	.name = "gateway",
 	.description = "Default gateway",
 	.tag = DHCP_ROUTERS,

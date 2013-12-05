@@ -36,27 +36,27 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** Network device predefined settings */
-const struct setting mac_setting __setting ( SETTING_NETDEV ) = {
+const struct setting mac_setting __setting ( SETTING_NETDEV, mac ) = {
 	.name = "mac",
 	.description = "MAC address",
 	.type = &setting_type_hex,
 };
-const struct setting bustype_setting __setting ( SETTING_NETDEV ) = {
+const struct setting bustype_setting __setting ( SETTING_NETDEV, bustype ) = {
 	.name = "bustype",
 	.description = "Bus type",
 	.type = &setting_type_string,
 };
-const struct setting busloc_setting __setting ( SETTING_NETDEV ) = {
+const struct setting busloc_setting __setting ( SETTING_NETDEV, busloc ) = {
 	.name = "busloc",
 	.description = "Bus location",
 	.type = &setting_type_uint32,
 };
-const struct setting busid_setting __setting ( SETTING_NETDEV ) = {
+const struct setting busid_setting __setting ( SETTING_NETDEV, busid ) = {
 	.name = "busid",
 	.description = "Bus ID",
 	.type = &setting_type_hex,
 };
-const struct setting chip_setting __setting ( SETTING_NETDEV ) = {
+const struct setting chip_setting __setting ( SETTING_NETDEV, chip ) = {
 	.name = "chip",
 	.description = "Chip",
 	.type = &setting_type_string,

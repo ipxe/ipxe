@@ -92,7 +92,7 @@ struct client_private_key client_private_key = {
 };
 
 /** Client certificate setting */
-static struct setting cert_setting __setting ( SETTING_CRYPTO ) = {
+static struct setting cert_setting __setting ( SETTING_CRYPTO, cert ) = {
 	.name = "cert",
 	.description = "Client certificate",
 	.tag = DHCP_EB_CERT,
@@ -100,7 +100,7 @@ static struct setting cert_setting __setting ( SETTING_CRYPTO ) = {
 };
 
 /** Client private key setting */
-static struct setting privkey_setting __setting ( SETTING_CRYPTO ) = {
+static struct setting privkey_setting __setting ( SETTING_CRYPTO, privkey ) = {
 	.name = "privkey",
 	.description = "Client private key",
 	.tag = DHCP_EB_KEY,

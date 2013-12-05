@@ -92,7 +92,8 @@ static uint8_t dhcp_request_options_data[] = {
 };
 
 /** DHCP server address setting */
-const struct setting dhcp_server_setting __setting ( SETTING_MISC ) = {
+const struct setting dhcp_server_setting __setting ( SETTING_MISC,
+						     dhcp-server ) = {
 	.name = "dhcp-server",
 	.description = "DHCP server",
 	.tag = DHCP_SERVER_IDENTIFIER,

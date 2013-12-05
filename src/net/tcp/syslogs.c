@@ -189,7 +189,7 @@ struct console_driver syslogs_console __console_driver = {
  */
 
 /** Encrypted syslog server setting */
-const struct setting syslogs_setting __setting ( SETTING_MISC ) = {
+const struct setting syslogs_setting __setting ( SETTING_MISC, syslogs ) = {
 	.name = "syslogs",
 	.description = "Encrypted syslog server",
 	.tag = DHCP_EB_SYSLOGS_SERVER,
