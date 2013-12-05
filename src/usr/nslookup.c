@@ -71,6 +71,7 @@ static void nslookup_close ( struct nslookup *nslookup, int rc ) {
 static void nslookup_resolv_done ( struct nslookup *nslookup,
 				   struct sockaddr *sa ) {
 	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
 	const struct setting_type *default_type;
 	struct settings *settings;
 	struct setting setting;
@@ -85,6 +86,12 @@ static void nslookup_resolv_done ( struct nslookup *nslookup,
 		data = &sin->sin_addr;
 		len = sizeof ( sin->sin_addr );
 		default_type = &setting_type_ipv4;
+		break;
+	case AF_INET6:
+		sin6 = ( ( struct sockaddr_in6 * ) sa );
+		data = &sin6->sin6_addr;
+		len = sizeof ( sin6->sin6_addr );
+		default_type = &setting_type_ipv6;
 		break;
 	default:
 		rc = -ENOTSUP;
