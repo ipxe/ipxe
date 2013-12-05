@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <ipxe/in.h>
+#include <ipxe/uuid.h>
 
 /** DHCPv6 server port */
 #define DHCPV6_SERVER_PORT 547
@@ -31,18 +32,16 @@ struct dhcpv6_option {
 	uint8_t data[0];
 } __attribute__ (( packed ));
 
-/** DHCP unique identifier based on link-layer address (DUID-LL) */
-struct dhcpv6_duid_ll {
+/** DHCP unique identifier based on UUID (DUID-UUID) */
+struct dhcpv6_duid_uuid {
 	/** Type */
 	uint16_t type;
-	/** Hardware type */
-	uint16_t htype;
-	/** Link-layer address */
-	uint8_t ll_addr[0];
+	/** UUID */
+	union uuid uuid;
 } __attribute__ (( packed ));
 
-/** DHCP unique identifier based on link-layer address (DUID-LL) */
-#define DHCPV6_DUID_LL 3
+/** DHCP unique identifier based on UUID (DUID-UUID) */
+#define DHCPV6_DUID_UUID 4
 
 /** DHCPv6 client or server identifier option */
 struct dhcpv6_duid_option {

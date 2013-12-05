@@ -457,9 +457,7 @@ struct dhcpv6_session {
 	/** Start time (in ticks) */
 	unsigned long start;
 	/** Client DUID */
-	void *client_duid;
-	/** Client DUID length */
-	size_t client_duid_len;
+	struct dhcpv6_duid_uuid client_duid;
 	/** Server DUID, if known */
 	void *server_duid;
 	/** Server DUID length */
@@ -578,7 +576,8 @@ static int dhcpv6_tx ( struct dhcpv6_session *dhcpv6 ) {
 	int rc;
 
 	/* Calculate lengths */
-	client_id_len = ( sizeof ( *client_id ) + dhcpv6->client_duid_len );
+	client_id_len = ( sizeof ( *client_id ) +
+			  sizeof ( dhcpv6->client_duid ) );
 	server_id_len = ( dhcpv6->server_duid ? ( sizeof ( *server_id ) +
 						  dhcpv6->server_duid_len ) :0);
 	if ( dhcpv6->state->flags & DHCPV6_TX_IA_NA ) {
@@ -614,8 +613,8 @@ static int dhcpv6_tx ( struct dhcpv6_session *dhcpv6 ) {
 	client_id->header.code = htons ( DHCPV6_CLIENT_ID );
 	client_id->header.len = htons ( client_id_len -
 					sizeof ( client_id->header ) );
-	memcpy ( client_id->duid, dhcpv6->client_duid,
-		 dhcpv6->client_duid_len );
+	memcpy ( client_id->duid, &dhcpv6->client_duid,
+		 sizeof ( dhcpv6->client_duid ) );
 
 	/* Construct server identifier, if applicable */
 	if ( server_id_len ) {
@@ -748,8 +747,8 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 
 	/* Verify client identifier */
 	if ( ( rc = dhcpv6_check_duid ( &options, DHCPV6_CLIENT_ID,
-					dhcpv6->client_duid,
-					dhcpv6->client_duid_len ) ) != 0 ) {
+					&dhcpv6->client_duid,
+					sizeof ( dhcpv6->client_duid ) ) ) !=0){
 		DBGC ( dhcpv6, "DHCPv6 %s received %s without correct client "
 		       "ID: %s\n", dhcpv6->netdev->name,
 		       dhcpv6_type_name ( dhcphdr->type ), strerror ( rc ) );
@@ -904,14 +903,12 @@ int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
 			struct sockaddr sa;
 		} server;
 	} addresses;
-	struct dhcpv6_duid_ll *client_duid;
-	size_t client_duid_len;
 	uint32_t xid;
+	int len;
 	int rc;
 
 	/* Allocate and initialise structure */
-	client_duid_len = ( sizeof ( *client_duid ) + ll_protocol->ll_addr_len);
-	dhcpv6 = zalloc ( sizeof ( *dhcpv6 ) + client_duid_len );
+	dhcpv6 = zalloc ( sizeof ( *dhcpv6 ) );
 	if ( ! dhcpv6 )
 		return -ENOMEM;
 	ref_init ( &dhcpv6->refcnt, dhcpv6_free );
@@ -921,8 +918,6 @@ int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
 	xid = random();
 	memcpy ( dhcpv6->xid, &xid, sizeof ( dhcpv6->xid ) );
 	dhcpv6->start = currticks();
-	dhcpv6->client_duid = ( ( ( void * ) dhcpv6 ) + sizeof ( *dhcpv6 ) );
-	dhcpv6->client_duid_len = client_duid_len;
 	timer_init ( &dhcpv6->timer, dhcpv6_timer_expired, &dhcpv6->refcnt );
 
 	/* Construct client and server addresses */
@@ -935,12 +930,17 @@ int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
 	addresses.server.sin6.sin6_scope_id = netdev->index;
 	addresses.server.sin6.sin6_port = htons ( DHCPV6_SERVER_PORT );
 
-	/* Construct client DUID and IAID from link-layer address */
-	client_duid = dhcpv6->client_duid;
-	client_duid->type = htons ( DHCPV6_DUID_LL );
-	client_duid->htype = ll_protocol->ll_proto;
-	memcpy ( client_duid->ll_addr, netdev->ll_addr,
-		 ll_protocol->ll_addr_len );
+	/* Construct client DUID from system UUID */
+	dhcpv6->client_duid.type = htons ( DHCPV6_DUID_UUID );
+	if ( ( len = fetch_uuid_setting ( NULL, &uuid_setting,
+					  &dhcpv6->client_duid.uuid ) ) < 0 ) {
+		rc = len;
+		DBGC ( dhcpv6, "DHCPv6 %s could not create DUID-UUID: %s\n",
+		       dhcpv6->netdev->name, strerror ( rc ) );
+		goto err_client_duid;
+	}
+
+	/* Construct IAID from link-layer address */
 	dhcpv6->iaid = crc32_le ( 0, netdev->ll_addr, ll_protocol->ll_addr_len);
 	DBGC ( dhcpv6, "DHCPv6 %s has XID %02x%02x%02x\n", dhcpv6->netdev->name,
 	       dhcpv6->xid[0], dhcpv6->xid[1], dhcpv6->xid[2] );
@@ -965,6 +965,7 @@ int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
 
  err_open_socket:
 	dhcpv6_finished ( dhcpv6, rc );
+ err_client_duid:
 	ref_put ( &dhcpv6->refcnt );
 	return rc;
 }
