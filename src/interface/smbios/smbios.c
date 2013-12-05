@@ -38,6 +38,54 @@ static struct smbios smbios = {
 };
 
 /**
+ * Scan for SMBIOS entry point structure
+ *
+ * @v start		Start address of region to scan
+ * @v len		Length of region to scan
+ * @v entry		SMBIOS entry point structure to fill in
+ * @ret rc		Return status code
+ */
+int find_smbios_entry ( userptr_t start, size_t len,
+			struct smbios_entry *entry ) {
+	uint8_t buf[256]; /* 256 is maximum length possible */
+	static size_t offset = 0; /* Avoid repeated attempts to locate SMBIOS */
+	size_t entry_len;
+	unsigned int i;
+	uint8_t sum;
+
+	/* Try to find SMBIOS */
+	for ( ; offset < len ; offset += 0x10 ) {
+
+		/* Read start of header and verify signature */
+		copy_from_user ( entry, start, offset, sizeof ( *entry ) );
+		if ( entry->signature != SMBIOS_SIGNATURE )
+			continue;
+
+		/* Read whole header and verify checksum */
+		entry_len = entry->len;
+		assert ( entry_len <= sizeof ( buf ) );
+		copy_from_user ( buf, start, offset, entry_len );
+		for ( i = 0, sum = 0 ; i < entry_len ; i++ ) {
+			sum += buf[i];
+		}
+		if ( sum != 0 ) {
+			DBG ( "SMBIOS at %08lx has bad checksum %02x\n",
+			      user_to_phys ( start, offset ), sum );
+			continue;
+		}
+
+		/* Fill result structure */
+		DBG ( "Found SMBIOS v%d.%d entry point at %08lx\n",
+		      entry->major, entry->minor,
+		      user_to_phys ( start, offset ) );
+		return 0;
+	}
+
+	DBG ( "No SMBIOS found\n" );
+	return -ENODEV;
+}
+
+/**
  * Find SMBIOS strings terminator
  *
  * @v offset		Offset to start of strings

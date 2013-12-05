@@ -41,49 +41,21 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret rc		Return status code
  */
 static int bios_find_smbios ( struct smbios *smbios ) {
-	union {
-		struct smbios_entry entry;
-		uint8_t bytes[256]; /* 256 is maximum length possible */
-	} u;
-	static unsigned int offset = 0;
-	size_t len;
-	unsigned int i;
-	uint8_t sum;
+	struct smbios_entry entry;
+	int rc;
 
-	/* Try to find SMBIOS */
-	for ( ; offset < 0x10000 ; offset += 0x10 ) {
+	/* Scan through BIOS segment to find SMBIOS entry point */
+	if ( ( rc = find_smbios_entry ( real_to_user ( BIOS_SEG, 0 ), 0x10000,
+					&entry ) ) != 0 )
+		return rc;
 
-		/* Read start of header and verify signature */
-		copy_from_real ( &u.entry, BIOS_SEG, offset,
-				 sizeof ( u.entry ));
-		if ( u.entry.signature != SMBIOS_SIGNATURE )
-			continue;
+	/* Fill in entry point descriptor structure */
+	smbios->address = phys_to_user ( entry.smbios_address );
+	smbios->len = entry.smbios_len;
+	smbios->count = entry.smbios_count;
+	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );
 
-		/* Read whole header and verify checksum */
-		len = u.entry.len;
-		copy_from_real ( &u.bytes, BIOS_SEG, offset, len );
-		for ( i = 0 , sum = 0 ; i < len ; i++ ) {
-			sum += u.bytes[i];
-		}
-		if ( sum != 0 ) {
-			DBG ( "SMBIOS at %04x:%04x has bad checksum %02x\n",
-			      BIOS_SEG, offset, sum );
-			continue;
-		}
-
-		/* Fill result structure */
-		DBG ( "Found SMBIOS v%d.%d entry point at %04x:%04x\n",
-		      u.entry.major, u.entry.minor, BIOS_SEG, offset );
-		smbios->address = phys_to_user ( u.entry.smbios_address );
-		smbios->len = u.entry.smbios_len;
-		smbios->count = u.entry.smbios_count;
-		smbios->version =
-			SMBIOS_VERSION ( u.entry.major, u.entry.minor );
-		return 0;
-	}
-
-	DBG ( "No SMBIOS found\n" );
-	return -ENODEV;
+	return 0;
 }
 
 PROVIDE_SMBIOS ( pcbios, find_smbios, bios_find_smbios );
