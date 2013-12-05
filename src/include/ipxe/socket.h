@@ -106,7 +106,7 @@ struct sockaddr {
 	 * family.
 	 */
 	char pad[ SA_LEN - sizeof ( sa_family_t ) ];
-} __attribute__ (( may_alias ));
+} __attribute__ (( packed, may_alias ));
 
 /**
  * Socket address converter

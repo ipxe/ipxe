@@ -60,7 +60,7 @@ struct sockaddr_fc {
 	 */
 	char pad[ sizeof ( struct sockaddr ) - sizeof ( sa_family_t )
 					     - sizeof ( struct fc_port_id ) ];
-} __attribute__ (( may_alias ));
+} __attribute__ (( packed, may_alias ));
 
 extern struct fc_port_id fc_empty_port_id;
 extern struct fc_port_id fc_f_port_id;

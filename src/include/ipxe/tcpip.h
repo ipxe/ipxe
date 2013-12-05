@@ -57,7 +57,7 @@ struct sockaddr_tcpip {
 		  ( sizeof ( sa_family_t ) /* st_family */ +
 		    sizeof ( uint16_t ) /* st_flags */ +
 		    sizeof ( uint16_t ) /* st_port */ ) ];
-} __attribute__ (( may_alias ));
+} __attribute__ (( packed, may_alias ));
 
 /** 
  * A transport-layer protocol of the TCP/IP stack (eg. UDP, TCP, etc)
