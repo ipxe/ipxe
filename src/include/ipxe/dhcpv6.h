@@ -152,6 +152,13 @@ struct dhcpv6_user_class_option {
 /** DHCPv6 domain search list option */
 #define DHCPV6_DOMAIN_LIST 24
 
+/** DHCPv6 syslog server option
+ *
+ * This option code has not yet been assigned by IANA.  Please update
+ * this definition once an option code has been assigned.
+ */
+#define DHCPV6_LOG_SERVERS 0xffffffffUL
+
 /**
  * Any DHCPv6 option
  *

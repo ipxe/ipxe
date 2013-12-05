@@ -49,7 +49,6 @@ struct console_driver syslogs_console __console_driver;
 
 /** The encrypted syslog server */
 static struct sockaddr_tcpip logserver = {
-	.st_family = AF_INET,
 	.st_port = htons ( SYSLOG_PORT ),
 };
 

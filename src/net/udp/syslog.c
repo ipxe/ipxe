@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/open.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/dhcp.h>
+#include <ipxe/dhcpv6.h>
 #include <ipxe/settings.h>
 #include <ipxe/console.h>
 #include <ipxe/lineconsole.h>
@@ -45,9 +46,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #endif
 
 /** The syslog server */
-static struct sockaddr_tcpip logserver = {
-	.st_family = AF_INET,
-	.st_port = htons ( SYSLOG_PORT ),
+static union {
+	struct sockaddr sa;
+	struct sockaddr_tcpip st;
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
+} logserver = {
+	.st = {
+		.st_port = htons ( SYSLOG_PORT ),
+	},
 };
 
 /** Syslog UDP interface operations */
@@ -187,12 +194,21 @@ struct console_driver syslog_console __console_driver = {
  ******************************************************************************
  */
 
-/** Syslog server setting */
+/** IPv4 syslog server setting */
 const struct setting syslog_setting __setting ( SETTING_MISC ) = {
 	.name = "syslog",
 	.description = "Syslog server",
 	.tag = DHCP_LOG_SERVERS,
 	.type = &setting_type_ipv4,
+};
+
+/** IPv6 syslog server setting */
+const struct setting syslog6_setting __setting ( SETTING_MISC ) = {
+	.name = "syslog6",
+	.description = "Syslog server",
+	.tag = DHCPV6_LOG_SERVERS,
+	.type = &setting_type_ipv6,
+	.scope = &ipv6_scope,
 };
 
 /**
@@ -201,10 +217,7 @@ const struct setting syslog_setting __setting ( SETTING_MISC ) = {
  * @ret rc		Return status code
  */
 static int apply_syslog_settings ( void ) {
-	struct sockaddr_in *sin_logserver =
-		( struct sockaddr_in * ) &logserver;
-	struct in_addr old_addr;
-	int len;
+	struct sockaddr old_logserver;
 	int rc;
 
 	/* Fetch hostname and domain name */
@@ -215,14 +228,23 @@ static int apply_syslog_settings ( void ) {
 
 	/* Fetch log server */
 	syslog_console.disabled = CONSOLE_DISABLED;
-	old_addr.s_addr = sin_logserver->sin_addr.s_addr;
-	if ( ( len = fetch_ipv4_setting ( NULL, &syslog_setting,
-					  &sin_logserver->sin_addr ) ) >= 0 ) {
+	memcpy ( &old_logserver, &logserver, sizeof ( old_logserver ) );
+	logserver.sa.sa_family = 0;
+	if ( fetch_ipv6_setting ( NULL, &syslog6_setting,
+				  &logserver.sin6.sin6_addr ) >= 0 ) {
+		logserver.sin6.sin6_family = AF_INET6;
+	} else if ( fetch_ipv4_setting ( NULL, &syslog_setting,
+					 &logserver.sin.sin_addr ) >= 0 ) {
+		logserver.sin.sin_family = AF_INET;
+	}
+	if ( logserver.sa.sa_family ) {
 		syslog_console.disabled = 0;
+		DBG ( "SYSLOG using log server %s\n",
+		      sock_ntoa ( &logserver.sa ) );
 	}
 
 	/* Do nothing unless log server has changed */
-	if ( sin_logserver->sin_addr.s_addr == old_addr.s_addr )
+	if ( memcmp ( &logserver, &old_logserver, sizeof ( logserver ) ) == 0 )
 		return 0;
 
 	/* Reset syslog connection */
@@ -236,14 +258,11 @@ static int apply_syslog_settings ( void ) {
 
 	/* Connect to log server */
 	if ( ( rc = xfer_open_socket ( &syslogger, SOCK_DGRAM,
-				       ( ( struct sockaddr * ) &logserver ),
-				       NULL ) ) != 0 ) {
+				       &logserver.sa, NULL ) ) != 0 ) {
 		DBG ( "SYSLOG cannot connect to log server: %s\n",
 		      strerror ( rc ) );
 		return rc;
 	}
-	DBG ( "SYSLOG using log server %s\n",
-	      inet_ntoa ( sin_logserver->sin_addr ) );
 
 	return 0;
 }
