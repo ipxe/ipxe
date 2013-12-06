@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/image.h>
 #include <ipxe/pixbuf.h>
 #include <ipxe/umalloc.h>
+#include <ipxe/console.h>
 #include <ipxe/fbcon.h>
 
 /**
@@ -780,6 +781,9 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 
 	/* Clear screen */
 	fbcon_clear ( fbcon, 0 );
+
+	/* Update console width and height */
+	console_set_size ( fbcon->character.width, fbcon->character.height );
 
 	return 0;
 
