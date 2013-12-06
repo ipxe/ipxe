@@ -171,7 +171,7 @@ static int vesafb_mode_list ( uint16_t **mode_numbers ) {
 			       : "=a" ( status )
 			       : "a" ( VBE_CONTROLLER_INFO ),
 				 "D" ( __from_data16 ( controller ) )
-			       : "memory" );
+			       : "memory", "ebx", "edx" );
 	if ( ( rc = vesafb_rc ( status ) ) != 0 ) {
 		DBGC ( &vbe_buf, "VESAFB could not get controller information: "
 		       "[%04x] %s\n", status, strerror ( rc ) );
