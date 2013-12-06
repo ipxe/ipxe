@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdarg.h>
+#include <ipxe/console.h>
 
 /** @file
  *
@@ -105,12 +106,10 @@ typedef struct _curses_window {
 } WINDOW;
 
 extern WINDOW _stdscr;
-extern unsigned short _COLS;
-extern unsigned short _LINES;
 
 #define stdscr ( &_stdscr )
-#define COLS _COLS
-#define LINES _LINES
+#define COLS console_width
+#define LINES console_height
 
 #define MUCURSES_BITS( mask, shift ) (( mask ) << (shift))
 #define CPAIR_SHIFT	8

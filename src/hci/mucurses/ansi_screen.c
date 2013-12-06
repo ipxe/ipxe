@@ -9,9 +9,6 @@ static void ansiscr_movetoyx(struct _curses_screen *scr,
                                unsigned int y, unsigned int x) __nonnull;
 static void ansiscr_putc(struct _curses_screen *scr, chtype c) __nonnull;
 
-unsigned short _COLS = 80;
-unsigned short _LINES = 24;
-
 static unsigned int saved_usage;
 
 static void ansiscr_attrs ( struct _curses_screen *scr, attr_t attrs ) {
@@ -72,7 +69,7 @@ static void ansiscr_putc ( struct _curses_screen *scr, chtype c ) {
 	putchar ( character );
 
 	/* Update expected cursor position */
-	if ( ++(scr->curs_x) == _COLS ) {
+	if ( ++(scr->curs_x) == COLS ) {
 		scr->curs_x = 0;
 		++scr->curs_y;
 	}

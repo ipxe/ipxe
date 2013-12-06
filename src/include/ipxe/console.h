@@ -159,7 +159,15 @@ struct console_driver {
  */
 #define CONSOLE_EXPLICIT( console ) ( ( 2 * console + 1 ) != 2 )
 
+/** Default console width */
+#define CONSOLE_DEFAULT_WIDTH 80
+
+/** Default console height */
+#define CONSOLE_DEFAULT_HEIGHT 25
+
 extern int console_usage;
+extern unsigned int console_width;
+extern unsigned int console_height;
 
 /**
  * Set console usage
@@ -173,6 +181,18 @@ console_set_usage ( int usage ) {
 
 	console_usage = usage;
 	return old_usage;
+}
+
+/**
+ * Set console size
+ *
+ * @v width		Width, in characters
+ * @v height		Height, in characters
+ */
+static inline __attribute__ (( always_inline )) void
+console_set_size ( unsigned int width, unsigned int height ) {
+	console_width = width;
+	console_height = height;
 }
 
 extern int iskey ( void );

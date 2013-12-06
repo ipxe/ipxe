@@ -10,6 +10,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Current console usage */
 int console_usage = CONSOLE_USAGE_STDOUT;
 
+/** Console width */
+unsigned int console_width = CONSOLE_DEFAULT_WIDTH;
+
+/** Console height */
+unsigned int console_height = CONSOLE_DEFAULT_HEIGHT;
+
 /**
  * Write a single character to each console device
  *
@@ -137,6 +143,9 @@ int iskey ( void ) {
 int console_configure ( struct console_configuration *config ) {
 	struct console_driver *console;
 	int rc;
+
+	/* Reset console width and height */
+	console_set_size ( CONSOLE_DEFAULT_WIDTH, CONSOLE_DEFAULT_HEIGHT );
 
 	/* Try to configure each console */
 	for_each_table_entry ( console, CONSOLES ) {
