@@ -45,25 +45,30 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define CPAIR_URL	5
 
 /* Screen layout */
-#define TITLE_ROW		1
-#define SETTINGS_LIST_ROW	3
-#define SETTINGS_LIST_COL	1
-#define SETTINGS_LIST_ROWS	15
-#define INFO_ROW		19
-#define ALERT_ROW		22
-#define INSTRUCTION_ROW		22
+#define TITLE_ROW		1U
+#define SETTINGS_LIST_ROW	3U
+#define SETTINGS_LIST_COL	1U
+#define SETTINGS_LIST_ROWS	( LINES - 6U - SETTINGS_LIST_ROW )
+#define INFO_ROW		( LINES - 5U )
+#define ALERT_ROW		( LINES - 2U )
+#define INSTRUCTION_ROW		( LINES - 2U )
 #define INSTRUCTION_PAD "     "
 
 /** Layout of text within a setting widget */
-struct setting_row_text {
-	char start[0];
-	char pad1[1];
-	char name[15];
-	char pad2[1];
-	char value[60];
-	char pad3[1];
-	char nul;
-} __attribute__ (( packed ));
+#define SETTING_ROW_TEXT( cols ) struct {				\
+	char start[0];							\
+	char pad1[1];							\
+	union {								\
+		char settings[ cols - 1 - 1 - 1 - 1 ];			\
+		struct {						\
+			char name[15];					\
+			char pad2[1];					\
+			char value[ cols - 1 - 15 - 1 - 1 - 1 - 1 ];	\
+		} setting;						\
+	} u;								\
+	char pad3[1];							\
+	char nul;							\
+} __attribute__ (( packed ))
 
 /** A setting row widget */
 struct setting_row_widget {
@@ -117,6 +122,7 @@ struct setting_widget {
  */
 static unsigned int select_setting_row ( struct setting_widget *widget,
 					 unsigned int index ) {
+	SETTING_ROW_TEXT ( COLS ) *text;
 	struct settings *settings;
 	struct setting *setting;
 	struct setting *previous = NULL;
@@ -171,13 +177,20 @@ static unsigned int select_setting_row ( struct setting_widget *widget,
 	init_editbox ( &widget->row.editbox, widget->row.value,
 		       sizeof ( widget->row.value ), NULL, widget->row.row,
 		       ( widget->row.col +
-			 offsetof ( struct setting_row_text, value ) ),
-		       sizeof ( ( ( struct setting_row_text * ) NULL )->value ),
-		       0 );
+			 offsetof ( typeof ( *text ), u.setting.value ) ),
+		       sizeof ( text->u.setting.value ), 0 );
 
 	return count;
 }
 
+/**
+ * Copy string without NUL termination
+ *
+ * @v dest		Destination
+ * @v src		Source
+ * @v len		Maximum length of destination
+ * @ret len		Length of (unterminated) string
+ */
 static size_t string_copy ( char *dest, const char *src, size_t len ) {
 	size_t src_len;
 
@@ -194,7 +207,7 @@ static size_t string_copy ( char *dest, const char *src, size_t len ) {
  * @v widget		Setting widget
  */
 static void draw_setting_row ( struct setting_widget *widget ) {
-	struct setting_row_text text;
+	SETTING_ROW_TEXT ( COLS ) text;
 	unsigned int curs_offset;
 	char *value;
 
@@ -206,24 +219,26 @@ static void draw_setting_row ( struct setting_widget *widget ) {
 	if ( widget->row.settings ) {
 
 		/* Construct space-padded name */
-		curs_offset = ( offsetof ( typeof ( text ), name ) +
-				string_copy ( text.name, widget->row.value,
-					      sizeof ( text.name ) ) );
+		curs_offset = ( offsetof ( typeof ( text ), u.settings ) +
+				string_copy ( text.u.settings,
+					      widget->row.value,
+					      sizeof ( text.u.settings ) ) );
 
 	} else {
 
 		/* Construct dot-padded name */
-		memset ( text.name, '.', sizeof ( text.name ) );
-		string_copy ( text.name, widget->row.setting.name,
-			      sizeof ( text.name ) );
+		memset ( text.u.setting.name, '.',
+			 sizeof ( text.u.setting.name ) );
+		string_copy ( text.u.setting.name, widget->row.setting.name,
+			      sizeof ( text.u.setting.name ) );
 
 		/* Construct space-padded value */
 		value = widget->row.value;
 		if ( ! *value )
 			value = "<not specified>";
-		curs_offset = ( offsetof ( typeof ( text ), value ) +
-				string_copy ( text.value, value,
-					      sizeof ( text.value ) ) );
+		curs_offset = ( offsetof ( typeof ( text ), u.setting.value ) +
+				string_copy ( text.u.setting.value, value,
+					      sizeof ( text.u.setting.value )));
 	}
 
 	/* Print row */
