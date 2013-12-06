@@ -127,7 +127,7 @@ realmode_swtch:
 start_sys:
 	.word	0
 kernel_version:
-	.word	0
+	.word	version_string - 0x200
 type_of_loader:
 	.byte	0
 loadflags:
@@ -165,6 +165,9 @@ hardware_subarch:
 	.long	0
 hardware_subarch_data:
 	.byte	0, 0, 0, 0, 0, 0, 0, 0
+
+version_string:
+	.asciz	VERSION
 
 /*
 	We don't need to do too much setup.

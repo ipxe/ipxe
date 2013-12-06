@@ -69,6 +69,10 @@ CFLAGS		+= -fshort-wchar
 #
 CFLAGS			+= -Ui386
 
+# Define version string for lkrnprefix.S
+#
+CFLAGS_lkrnprefix	+= -DVERSION="\"$(VERSION)\""
+
 # Locations of utilities
 #
 ISOLINUX_BIN_LIST	:= \
