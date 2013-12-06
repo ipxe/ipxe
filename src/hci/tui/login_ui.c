@@ -40,13 +40,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define CPAIR_EDIT		2
 
 /* Screen layout */
-#define USERNAME_LABEL_ROW	8
-#define USERNAME_ROW		10
-#define PASSWORD_LABEL_ROW	14
-#define PASSWORD_ROW		16
-#define LABEL_COL		36
-#define EDITBOX_COL		30
-#define EDITBOX_WIDTH		20
+#define USERNAME_LABEL_ROW	( ( LINES / 2U ) - 4U )
+#define USERNAME_ROW		( ( LINES / 2U ) - 2U )
+#define PASSWORD_LABEL_ROW	( ( LINES / 2U ) + 2U )
+#define PASSWORD_ROW		( ( LINES / 2U ) + 4U )
+#define LABEL_COL		( ( COLS / 2U ) - 4U )
+#define EDITBOX_COL		( ( COLS / 2U ) - 10U )
+#define EDITBOX_WIDTH		20U
 
 int login_ui ( void ) {
 	char username[64];
