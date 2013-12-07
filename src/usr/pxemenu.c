@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/keys.h>
 #include <ipxe/timer.h>
 #include <ipxe/uri.h>
+#include <ipxe/ansicol.h>
 #include <usr/dhcpmgmt.h>
 #include <usr/autoboot.h>
 
@@ -40,10 +41,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * PXE Boot Menus
  *
  */
-
-/* Colour pairs */
-#define CPAIR_NORMAL	1
-#define CPAIR_SELECT	2
 
 /** A PXE boot menu item */
 struct pxe_menu_item {
@@ -204,7 +201,7 @@ static void pxe_menu_draw_item ( struct pxe_menu *menu,
 
 	/* Draw row */
 	row = ( LINES - menu->num_items + index );
-	color_set ( ( selected ? CPAIR_SELECT : CPAIR_NORMAL ), NULL );
+	color_set ( ( selected ? CPAIR_PXE : CPAIR_DEFAULT ), NULL );
 	mvprintw ( row, 0, "%s", buf );
 	move ( row, 1 );
 }
@@ -224,9 +221,7 @@ static int pxe_menu_select ( struct pxe_menu *menu ) {
 	/* Initialise UI */
 	initscr();
 	start_color();
-	init_pair ( CPAIR_NORMAL, COLOR_WHITE, COLOR_BLACK );
-	init_pair ( CPAIR_SELECT, COLOR_BLACK, COLOR_WHITE );
-	color_set ( CPAIR_NORMAL, NULL );
+	color_set ( CPAIR_DEFAULT, NULL );
 
 	/* Draw initial menu */
 	for ( i = 0 ; i < menu->num_items ; i++ )

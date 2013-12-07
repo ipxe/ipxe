@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <curses.h>
+#include <ipxe/ansicol.h>
 #include <ipxe/console.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
@@ -14,14 +15,13 @@ static unsigned int saved_usage;
 static void ansiscr_attrs ( struct _curses_screen *scr, attr_t attrs ) {
 	int bold = ( attrs & A_BOLD );
 	attr_t cpair = PAIR_NUMBER ( attrs );
-	short fcol;
-	short bcol;
 
 	if ( scr->attrs != attrs ) {
 		scr->attrs = attrs;
-		pair_content ( cpair, &fcol, &bcol );
-		/* ANSI escape sequence to update character attributes */
-		printf ( "\033[0;%d;3%d;4%dm", ( bold ? 1 : 22 ), fcol, bcol );
+		/* Reset attributes and set/clear bold as appropriate */
+		printf ( "\033[0;%dm", ( bold ? 1 : 22 ) );
+		/* Set foreground and background colours */
+		ansicol_set_pair ( cpair );
 	}
 }
 
@@ -30,7 +30,9 @@ static void ansiscr_reset ( struct _curses_screen *scr ) {
 	scr->attrs = 0;
 	scr->curs_x = 0;
 	scr->curs_y = 0;
-	printf ( "\033[0m\033[2J" );
+	printf ( "\0330m" );
+	ansicol_set_pair ( CPAIR_DEFAULT );
+	printf ( "\033[2J" );
 }
 
 static void ansiscr_init ( struct _curses_screen *scr ) {

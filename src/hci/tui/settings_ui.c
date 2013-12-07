@@ -28,21 +28,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/settings.h>
 #include <ipxe/editbox.h>
 #include <ipxe/keys.h>
+#include <ipxe/ansicol.h>
 #include <ipxe/settings_ui.h>
-#include <config/colour.h>
 
 /** @file
  *
  * Option configuration console
  *
  */
-
-/* Colour pairs */
-#define CPAIR_NORMAL	1
-#define CPAIR_SELECT	2
-#define CPAIR_EDIT	3
-#define CPAIR_ALERT	4
-#define CPAIR_URL	5
 
 /* Screen layout */
 #define TITLE_ROW		1U
@@ -598,11 +591,6 @@ int settings_ui ( struct settings *settings ) {
 
 	initscr();
 	start_color();
-	init_pair ( CPAIR_NORMAL, COLOR_NORMAL_FG, COLOR_NORMAL_BG );
-	init_pair ( CPAIR_SELECT, COLOR_SELECT_FG, COLOR_SELECT_BG );
-	init_pair ( CPAIR_EDIT, COLOR_EDIT_FG, COLOR_EDIT_BG );
-	init_pair ( CPAIR_ALERT, COLOR_ALERT_FG, COLOR_ALERT_BG );
-	init_pair ( CPAIR_URL, COLOR_URL_FG, COLOR_URL_BG );
 	color_set ( CPAIR_NORMAL, NULL );
 	curs_set ( 0 );
 	erase();
