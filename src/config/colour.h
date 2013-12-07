@@ -27,6 +27,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define COLOR_URL_FG		COLOR_CYAN
 #define COLOR_URL_BG		COLOR_BLUE
 
+#define COLOR_PXE_FG		COLOR_BLACK
+#define COLOR_PXE_BG		COLOR_WHITE
+
 #include <config/local/colour.h>
 
 #endif /* CONFIG_COLOUR_H */
