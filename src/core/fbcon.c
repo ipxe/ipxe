@@ -340,16 +340,14 @@ static void fbcon_scroll ( struct fbcon *fbcon ) {
 static void fbcon_draw_cursor ( struct fbcon *fbcon, int show_cursor ) {
 	struct fbcon_text_cell cell;
 	size_t offset;
-	uint32_t background;
 
 	offset = ( ( ( fbcon->ypos * fbcon->character.width ) + fbcon->xpos ) *
 		   sizeof ( cell ) );
 	copy_from_user ( &cell, fbcon->text.start, offset, sizeof ( cell ) );
 	if ( show_cursor ) {
-		background = cell.background;
-		cell.background = cell.foreground;
-		cell.foreground = ( ( background == FBCON_TRANSPARENT ) ?
-				    0 : background );
+		cell.background = fbcon->foreground;
+		cell.foreground = ( ( fbcon->background == FBCON_TRANSPARENT ) ?
+				    0 : fbcon->background );
 	}
 	fbcon_draw_character ( fbcon, &cell, fbcon->xpos, fbcon->ypos );
 }
