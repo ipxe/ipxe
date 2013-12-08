@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/console.h>
 #include <ipxe/image.h>
 #include <ipxe/pixbuf.h>
+#include <ipxe/ansicol.h>
 #include <usr/imgmgmt.h>
 
 /** "console" options */
@@ -116,10 +117,134 @@ static int console_exec ( int argc, char **argv ) {
 	return rc;
 }
 
+/** "colour" options */
+struct colour_options {
+	/** Basic colour */
+	unsigned int basic;
+	/** 24-bit RGB value */
+	unsigned int rgb;
+};
+
+/** "colour" option list */
+static struct option_descriptor colour_opts[] = {
+	OPTION_DESC ( "basic", 'b', required_argument,
+		      struct colour_options, basic, parse_integer ),
+	OPTION_DESC ( "rgb", 'r', required_argument,
+		      struct colour_options, rgb, parse_integer ),
+};
+
+/** "colour" command descriptor */
+static struct command_descriptor colour_cmd =
+	COMMAND_DESC ( struct colour_options, colour_opts, 1, 1, "<colour>" );
+
+/**
+ * "colour" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int colour_exec ( int argc, char **argv ) {
+	struct colour_options opts;
+	unsigned int colour;
+	int rc;
+
+	/* Initialise options */
+	memset ( &opts, 0, sizeof ( opts ) );
+	opts.basic = COLOUR_DEFAULT;
+	opts.rgb = ANSICOL_NO_RGB;
+
+	/* Parse options */
+	if ( ( rc = reparse_options ( argc, argv, &colour_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Parse colour index */
+	if ( ( rc = parse_integer ( argv[optind], &colour ) ) != 0 )
+		return rc;
+
+	/* Define colour */
+	if ( ( rc = ansicol_define ( colour, opts.basic, opts.rgb ) ) != 0 ) {
+		printf ( "Could not define colour: %s\n", strerror ( rc ) );
+		return rc;
+	}
+
+	/* Reapply default colour pair, in case definition has changed */
+	ansicol_set_pair ( CPAIR_DEFAULT );
+
+	return 0;
+}
+
+/** "cpair" options */
+struct cpair_options {
+	/** Foreground colour */
+	unsigned int foreground;
+	/** Background colour */
+	unsigned int background;
+};
+
+/** "cpair" option list */
+static struct option_descriptor cpair_opts[] = {
+	OPTION_DESC ( "foreground", 'f', required_argument,
+		      struct cpair_options, foreground, parse_integer ),
+	OPTION_DESC ( "background", 'b', required_argument,
+		      struct cpair_options, background, parse_integer ),
+};
+
+/** "cpair" command descriptor */
+static struct command_descriptor cpair_cmd =
+	COMMAND_DESC ( struct cpair_options, cpair_opts, 1, 1, "<cpair>" );
+
+/**
+ * "cpair" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int cpair_exec ( int argc, char **argv ) {
+	struct cpair_options opts;
+	unsigned int cpair;
+	int rc;
+
+	/* Initialise options */
+	memset ( &opts, 0, sizeof ( opts ) );
+	opts.foreground = COLOUR_DEFAULT;
+	opts.background = COLOUR_DEFAULT;
+
+	/* Parse options */
+	if ( ( rc = reparse_options ( argc, argv, &cpair_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Parse colour pair index */
+	if ( ( rc = parse_integer ( argv[optind], &cpair ) ) != 0 )
+		return rc;
+
+	/* Define colour pair */
+	if ( ( rc = ansicol_define_pair ( cpair, opts.foreground,
+					  opts.background ) ) != 0 ) {
+		printf ( "Could not define colour pair: %s\n",
+			 strerror ( rc ) );
+		return rc;
+	}
+
+	/* Reapply default colour pair, in case definition has changed */
+	ansicol_set_pair ( CPAIR_DEFAULT );
+
+	return 0;
+}
+
 /** Console management commands */
 struct command console_commands[] __command = {
 	{
 		.name = "console",
 		.exec = console_exec,
+	},
+	{
+		.name = "colour",
+		.exec = colour_exec,
+	},
+	{
+		.name = "cpair",
+		.exec = cpair_exec,
 	},
 };
