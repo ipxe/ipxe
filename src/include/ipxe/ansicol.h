@@ -16,6 +16,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define COLOUR_DEFAULT 9
 #define COLOR_DEFAULT COLOUR_DEFAULT
 
+/** Magic colour
+ *
+ * The magic basic colour is automatically remapped to the colour
+ * stored in @c ansicol_magic.  This is used to allow the UI
+ * background to automatically become transparent when a background
+ * picture is used.
+ */
+#define ANSICOL_MAGIC 15
+
 /** RGB value for "not defined" */
 #define ANSICOL_NO_RGB 0x01000000
 
@@ -66,6 +75,8 @@ extern int ansicol_define_pair ( unsigned int cpair, unsigned int foreground,
 /* ansicoldef.c */
 extern int ansicol_define ( unsigned int colour, unsigned int ansi,
 			    uint32_t rgb );
+extern void ansicol_reset_magic ( void );
+extern void ansicol_set_magic_transparent ( void );
 
 /* Function provided by ansicol.c but overridden by ansicoldef.c, if present */
 extern void ansicol_set ( unsigned int colour, unsigned int which );

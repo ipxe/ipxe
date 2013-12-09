@@ -86,9 +86,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v basic		Basic colour
  * @ret ansicol		ANSI colour definition
  *
- * Colours default to being just a basic colour.
+ * Colours default to being just a basic colour.  If the colour
+ * matches the normal UI text background colour, then its basic colour
+ * value is set to @c ANSICOL_MAGIC.
  */
-#define ANSICOL_DEFAULT( basic ) ANSICOL_DEFINE ( (basic), ANSICOL_NO_RGB )
+#define ANSICOL_DEFAULT( basic )					\
+	ANSICOL_DEFINE ( ( ( (basic) == COLOR_NORMAL_BG ) ?		\
+			   ANSICOL_MAGIC : (basic) ),			\
+			 ANSICOL_NO_RGB )
 
 /** ANSI colour definitions */
 static uint32_t ansicols[] = {
@@ -101,6 +106,9 @@ static uint32_t ansicols[] = {
 	[COLOR_CYAN]	= ANSICOL_DEFAULT ( COLOR_CYAN ),
 	[COLOR_WHITE]	= ANSICOL_DEFAULT ( COLOR_WHITE ),
 };
+
+/** Magic basic colour */
+static uint8_t ansicol_magic = COLOR_NORMAL_BG;
 
 /**
  * Define ANSI colour
@@ -145,10 +153,10 @@ void ansicol_set ( unsigned int colour, unsigned int which ) {
 		ansicol = ANSICOL_DEFINE ( COLOUR_DEFAULT, ANSICOL_NO_RGB );
 	}
 
-	/* If basic colour is out of range, use the default colour */
+	/* If basic colour is out of range, use the magic colour */
 	basic = ANSICOL_BASIC ( ansicol );
 	if ( basic >= 10 )
-		basic = COLOR_DEFAULT;
+		basic = ansicol_magic;
 
 	/* Set basic colour first */
 	printf ( CSI "%c%dm", which, basic );
@@ -158,4 +166,26 @@ void ansicol_set ( unsigned int colour, unsigned int which ) {
 		printf ( CSI "%c8;2;%d;%d;%dm", which, ANSICOL_RED ( ansicol ),
 			 ANSICOL_GREEN ( ansicol ), ANSICOL_BLUE ( ansicol ) );
 	}
+}
+
+/**
+ * Reset magic colour
+ *
+ */
+void ansicol_reset_magic ( void ) {
+
+	/* Set to the compile-time default background colour */
+	ansicol_magic = COLOR_NORMAL_BG;
+}
+
+/**
+ * Set magic colour to transparent
+ *
+ */
+void ansicol_set_magic_transparent ( void ) {
+
+	/* Set to the console default colour (which will give a
+	 * transparent background on the framebuffer console).
+	 */
+	ansicol_magic = COLOR_DEFAULT;
 }
