@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <ipxe/console.h>
 #include <ipxe/io.h>
+#include <ipxe/ansicol.h>
 #include <ipxe/fbcon.h>
 #include <ipxe/vesafb.h>
 #include <config/console.h>
@@ -462,6 +463,7 @@ static int vesafb_configure ( struct console_configuration *config ) {
 	if ( ! vesafb_console.disabled ) {
 		vesafb_fini();
 		bios_console.disabled &= ~CONSOLE_DISABLED_OUTPUT;
+		ansicol_reset_magic();
 	}
 	vesafb_console.disabled = CONSOLE_DISABLED;
 
@@ -479,6 +481,10 @@ static int vesafb_configure ( struct console_configuration *config ) {
 	/* Mark console as enabled */
 	vesafb_console.disabled = 0;
 	bios_console.disabled |= CONSOLE_DISABLED_OUTPUT;
+
+	/* Set magic colour to transparent if we have a background picture */
+	if ( config->pixbuf )
+		ansicol_set_magic_transparent();
 
 	return 0;
 }
