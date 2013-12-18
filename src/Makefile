@@ -192,21 +192,21 @@ endif
 version :
 	@$(ECHO) "$(VERSION)"
 
+# set this from outside
+RPM_OUTDIR := $(CURDIR)
+RPM_EXTRA_OPTS :=
+RPM_EXTRA_REV :=
 RPM_VERSION := $(shell git rev-list HEAD -- * 2>/dev/null| wc -l)
-RPM_RELEASE := $(GITVERSION)
+RPM_RELEASE := $(GITVERSION)$(RPM_EXTRA_REV)
 RPM_NAME := ipxe
 RPM_PACKAGE_VERSION := $(RPM_NAME)-$(RPM_VERSION)
 RPM_PACKAGE_VERSION_RELEASE := $(RPM_PACKAGE_VERSION)-$(RPM_RELEASE)
 RPM_WORKDIR := $(shell mktemp -d -t $(RPM_NAME).XXXXXXXXXXXXXX)
 RPM_DIST_ARCHIVE := $(RPM_WORKDIR)/$(RPM_PACKAGE_VERSION).tar.gz
 RPM_DIST_SPECFILE := $(RPM_WORKDIR)/$(RPM_NAME).spec
-# set this from outside
-RPM_OUTDIR := $(CURDIR)
-RPM_EXTRA_OPTS :=
-RPM_EXTRA_REV :=
 srpm:
 	@git archive --format=tar --prefix=$(RPM_PACKAGE_VERSION)/ HEAD . | gzip -9 >$(RPM_DIST_ARCHIVE)
-	@sed -e 's/RPM_VERSION/$(RPM_VERSION)/g' -e 's/RPM_RELEASE/$(RPM_RELEASE)$(RPM_EXTRA_REV)/g' <ipxe.spec.in >$(RPM_DIST_SPECFILE)
+	@sed -e 's/RPM_VERSION/$(RPM_VERSION)/g' -e 's/RPM_RELEASE/$(RPM_RELEASE)/g' <ipxe.spec.in >$(RPM_DIST_SPECFILE)
 	@rpmbuild --define="_binary_payload w9.bzdio" \
 		--define="_source_filedigest_algorithm md5" \
 		--define="_binary_filedigest_algorithm md5" \
