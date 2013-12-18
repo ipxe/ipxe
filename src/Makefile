@@ -188,8 +188,36 @@ GITVERSION := $(shell git describe --always --abbrev=1 --match "" 2>/dev/null)
 ifneq ($(GITVERSION),)
 VERSION		+= ($(GITVERSION))
 endif
+
 version :
 	@$(ECHO) "$(VERSION)"
+
+RPM_VERSION := $(shell git rev-list HEAD -- * 2>/dev/null| wc -l)
+RPM_RELEASE := $(GITVERSION)
+RPM_NAME := ipxe
+RPM_PACKAGE_VERSION := $(RPM_NAME)-$(RPM_VERSION)
+RPM_PACKAGE_VERSION_RELEASE := $(RPM_PACKAGE_VERSION)-$(RPM_RELEASE)
+RPM_WORKDIR := $(shell mktemp -d -t $(RPM_NAME).XXXXXXXXXXXXXX)
+RPM_DIST_ARCHIVE := $(RPM_WORKDIR)/$(RPM_PACKAGE_VERSION).tar.gz
+RPM_DIST_SPECFILE := $(RPM_WORKDIR)/$(RPM_NAME).spec
+# set this from outside
+RPM_OUTDIR := $(CURDIR)
+RPM_EXTRA_OPTS :=
+srpm:
+	@git archive --format=tar.gz -o $(RPM_DIST_ARCHIVE) --prefix=$(RPM_PACKAGE_VERSION)/ HEAD .
+	@sed -e 's/RPM_VERSION/$(RPM_VERSION)/g' -e 's/RPM_RELEASE/$(RPM_RELEASE)/g' <ipxe.spec.in >$(RPM_DIST_SPECFILE)
+	@rpmbuild --define="_binary_payload w9.bzdio" \
+		--define="_source_filedigest_algorithm md5" \
+		--define="_binary_filedigest_algorithm md5" \
+		--define="_topdir $(RPM_WORKDIR)" \
+		--define="_sourcedir $(RPM_WORKDIR)" \
+		--define="_srcrpmdir $(RPM_OUTDIR)" \
+		$(RPM_EXTRA_OPTS) -bs $(RPM_DIST_SPECFILE)
+	@rm -Rf $(RPM_WORKDIR)
+
+# Only for testing purposes, better build the RPM with the help of mock in a chroot environment
+rpm: srpm
+	rpmbuild $(RPM_EXTRA_OPTS) --rebuild $(RPM_OUTDIR)/$(RPM_PACKAGE_VERSION_RELEASE).src.rpm
 
 ###############################################################################
 #
@@ -198,3 +226,5 @@ version :
 
 MAKEDEPS	+= Makefile.housekeeping
 include Makefile.housekeeping
+
+# vim: ai:ts=4:sw=4:et!
