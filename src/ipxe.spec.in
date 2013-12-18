@@ -1,6 +1,6 @@
 Name:           ipxe
 Version:        RPM_VERSION
-Release:        RPM_RELEASE
+Release:        RPM_RELEASE%{?dist}
 Summary:        Open Source Network Boot Firmware
 Group:          Applications/System
 License:        GPL

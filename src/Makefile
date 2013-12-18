@@ -203,9 +203,10 @@ RPM_DIST_SPECFILE := $(RPM_WORKDIR)/$(RPM_NAME).spec
 # set this from outside
 RPM_OUTDIR := $(CURDIR)
 RPM_EXTRA_OPTS :=
+RPM_EXTRA_REV :=
 srpm:
 	@git archive --format=tar --prefix=$(RPM_PACKAGE_VERSION)/ HEAD . | gzip -9 >$(RPM_DIST_ARCHIVE)
-	@sed -e 's/RPM_VERSION/$(RPM_VERSION)/g' -e 's/RPM_RELEASE/$(RPM_RELEASE)/g' <ipxe.spec.in >$(RPM_DIST_SPECFILE)
+	@sed -e 's/RPM_VERSION/$(RPM_VERSION)/g' -e 's/RPM_RELEASE/$(RPM_RELEASE)$(RPM_EXTRA_REV)/g' <ipxe.spec.in >$(RPM_DIST_SPECFILE)
 	@rpmbuild --define="_binary_payload w9.bzdio" \
 		--define="_source_filedigest_algorithm md5" \
 		--define="_binary_filedigest_algorithm md5" \
