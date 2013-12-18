@@ -1,0 +1,55 @@
+Name:           ipxe
+Version:        RPM_VERSION
+Release:        RPM_RELEASE
+Summary:        Open Source Network Boot Firmware
+Group:          Applications/System
+License:        GPL
+URL:            http://ipxe.org
+Source:         %{name}-%{version}.tar.gz
+BuildArch:      noarch
+BuildRequires:  gcc, make, binutils, binutils-devel, perl, syslinux, zlib-devel
+BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+
+# This RPM ships arch-dependant binaries that will not be run on the
+# system where the RPM will be installed. Hence the RPM is noarch
+# and we need to disable this check
+%global _binaries_in_noarch_packages_terminate_build 0
+
+%description
+iPXE is the leading open source network boot firmware. It provides a full PXE
+implementation enhanced with additional features such as:
+
+* boot from a web server via HTTP
+* boot from an iSCSI SAN
+* boot from a Fibre Channel SAN via FCoE
+* boot from an AoE SAN
+* boot from a wireless network
+* boot from a wide-area network
+* boot from an Infiniband network
+* control the boot process with a script
+
+You can use iPXE to replace the existing PXE ROM on your network card, or you
+can chainload into iPXE to obtain the features of iPXE without the hassle of
+reflashing.
+
+iPXE is free, open-source software licensed under the GNU GPL (with some
+portions under GPL-compatible licences), and is included in products from
+several network card manufacturers and OEMs.
+
+%prep
+%setup -q
+
+%build
+make
+rm -f bin/ipxe*tmp*
+
+%install
+install -m 0755 -d %{buildroot}%{_datarootdir}/%{name}
+install -m 0644 -t %{buildroot}%{_datarootdir}/%{name} bin/ipxe.*
+
+%files
+%defattr(-,root,root,-)
+%{_datarootdir}/%{name}
+
+%clean
+rm -Rf %{buildroot}
