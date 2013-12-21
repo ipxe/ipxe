@@ -146,13 +146,6 @@ define NEWLINE
 
 endef
 
-# Check for an old version of gas (binutils 2.9.1)
-#
-OLDGAS	:= $(shell $(AS) --version | grep -q '2\.9\.1' && $(ECHO) -DGAS291)
-WORKAROUND_CFLAGS += $(OLDGAS)
-oldgas :
-	@$(ECHO) $(oldgas)
-
 # Some widespread patched versions of gcc include -fstack-protector by
 # default, even when -ffreestanding is specified.  We therefore need
 # to disable -fstack-protector if the compiler supports it.
