@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <ctype.h>
 #include <ipxe/console.h>
 
 /**
@@ -96,9 +97,7 @@ static void dbg_hex_dump_da_row ( unsigned long dispaddr, const void *data,
 			continue;
 		}
 		byte = bytes[i];
-		if ( ( byte < 0x20 ) || ( byte >= 0x7f ) )
-			byte = '.';
-		dbg_printf ( "%c", byte );
+		dbg_printf ( "%c", ( isprint ( byte ) ? byte : '.' ) );
 	}
 	dbg_printf ( "\n" );
 }

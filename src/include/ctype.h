@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define islower(c)	((c) >= 'a' && (c) <= 'z')
 #define isupper(c)	((c) >= 'A' && (c) <= 'Z')
 #define isxdigit(c)	(isdigit(c) || ((c) >= 'A' && (c) <= 'F') || ((c) >= 'a' && (c) <= 'f'))
+#define isprint(c)	((c) >= ' ' && (c) <= '~' )
 
 static inline unsigned char tolower(unsigned char c)
 {
