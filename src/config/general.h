@@ -104,6 +104,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define	IMAGE_EFI		/* EFI image support */
 //#define	IMAGE_SDI		/* SDI image support */
 //#define	IMAGE_PNM		/* PNM image support */
+//#define	IMAGE_PNG		/* PNG image support */
 
 /*
  * Command-line commands to include

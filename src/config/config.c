@@ -200,6 +200,9 @@ REQUIRE_OBJECT ( sdi );
 #ifdef IMAGE_PNM
 REQUIRE_OBJECT ( pnm );
 #endif
+#ifdef IMAGE_PNG
+REQUIRE_OBJECT ( png );
+#endif
 
 /*
  * Drag in all requested commands
