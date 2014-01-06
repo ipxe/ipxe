@@ -243,36 +243,43 @@ PNM ( ppm_binary,
  * Report PNM test result
  *
  * @v test		PNM test
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define pnm_ok( test ) do {						\
-	struct pixel_buffer *pixbuf;					\
-	uint8_t data[ (test)->len ];					\
-	int rc;								\
-									\
-	/* Sanity check */						\
-	assert ( ( (test)->width * (test)->height *			\
-		   sizeof ( (test)->data[0] ) ) == (test)->len );	\
-									\
-	/* Correct image data pointer */				\
-	(test)->image->data =						\
-		virt_to_user ( ( void * ) (test)->image->data );	\
-									\
-	/* Perform tests */						\
-	ok ( image_probe ( (test)->image ) == 0 );			\
-	ok ( (test)->image->type == &pnm_image_type );			\
-	ok ( ( rc = image_pixbuf ( (test)->image, &pixbuf ) ) == 0 );	\
-	if ( rc == 0 ) {						\
-		ok ( pixbuf->width == (test)->width );			\
-		ok ( pixbuf->height == (test)->height );		\
-		ok ( pixbuf->len == (test)->len );			\
-		copy_from_user ( data, pixbuf->data, 0,			\
-				 sizeof ( data ) );			\
-		ok ( memcmp ( data, (test)->data,			\
-			      sizeof ( data ) ) == 0 );			\
-		DBGC_HDA ( (test)->image, 0, data, sizeof ( data ) );	\
-		pixbuf_put ( pixbuf );					\
-	}								\
-	} while ( 0 )
+static void pnm_okx ( struct pnm_test *test, const char *file,
+		      unsigned int line ) {
+	struct pixel_buffer *pixbuf;
+	int rc;
+
+	/* Sanity check */
+	assert ( ( test->width * test->height * sizeof ( test->data[0] ) )
+		 == test->len );
+
+	/* Correct image data pointer */
+	test->image->data = virt_to_user ( ( void * ) test->image->data );
+
+	/* Check that image is detected as PNM */
+	okx ( image_probe ( test->image ) == 0, file, line );
+	okx ( test->image->type == &pnm_image_type, file, line );
+
+	/* Check that a pixel buffer can be created from the image */
+	okx ( ( rc = image_pixbuf ( test->image, &pixbuf ) ) == 0, file, line );
+	if ( rc == 0 ) {
+
+		/* Check pixel buffer dimensions */
+		okx ( pixbuf->width == test->width, file, line );
+		okx ( pixbuf->height == test->height, file, line );
+
+		/* Check pixel buffer data */
+		okx ( pixbuf->len == test->len, file, line );
+		okx ( memcmp_user ( pixbuf->data, 0,
+				    virt_to_user ( test->data ), 0,
+				    test->len ) == 0, file, line );
+
+		pixbuf_put ( pixbuf );
+	}
+}
+#define pnm_ok( test ) pnm_okx ( test, __FILE__, __LINE__ )
 
 /**
  * Perform PNM self-test
