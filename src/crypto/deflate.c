@@ -609,7 +609,7 @@ int deflate_inflate ( struct deflate *deflate,
 		/* Calculate available amount of literal data */
 		in_remaining = ( in->len - in->offset );
 		len = deflate->remaining;
-		if ( len < in_remaining )
+		if ( len > in_remaining )
 			len = in_remaining;
 
 		/* Copy data to output buffer */

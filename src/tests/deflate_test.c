@@ -78,6 +78,12 @@ DEFLATE ( literal, DEFLATE_RAW,
 	  DATA ( 0x01, 0x04, 0x00, 0xfb, 0xff, 0x69, 0x50, 0x58, 0x45 ),
 	  DATA ( 0x69, 0x50, 0x58, 0x45 ) );
 
+/* "iPXE" string, no compression, split into two literals */
+DEFLATE ( split_literal, DEFLATE_RAW,
+	  DATA ( 0x00, 0x02, 0x00, 0xfd, 0xff, 0x69, 0x50, 0x01, 0x02, 0x00,
+		 0xfd, 0xff, 0x58, 0x45 ),
+	  DATA ( 0x69, 0x50, 0x58, 0x45 ) );
+
 /* Empty file */
 DEFLATE ( empty, DEFLATE_RAW, DATA ( 0x03, 0x00 ), DATA() );
 
@@ -215,6 +221,7 @@ static void deflate_test_exec ( void ) {
 		/* Test as a single pass */
 		deflate_ok ( deflate, &empty_literal, NULL );
 		deflate_ok ( deflate, &literal, NULL );
+		deflate_ok ( deflate, &split_literal, NULL );
 		deflate_ok ( deflate, &empty, NULL );
 		deflate_ok ( deflate, &hello_world, NULL );
 		deflate_ok ( deflate, &hello_hello_world, NULL );
