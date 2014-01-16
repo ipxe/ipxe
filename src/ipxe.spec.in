@@ -42,15 +42,29 @@ several network card manufacturers and OEMs.
 
 %build
 make
+make bin-%{_target}/ipxe.linux
 rm -f bin/ipxe*tmp*
 
 %install
 install -m 0755 -d %{buildroot}%{_datarootdir}/%{name}
 install -m 0644 -t %{buildroot}%{_datarootdir}/%{name} bin/ipxe.* bin/*kpxe
+install -m 0755 bin-%{_target}/ipxe.linux %{buildroot}/%{_bindir}/ipxe
 
 %files
 %defattr(-,root,root,-)
 %{_datarootdir}/%{name}
+
+%package linux
+Summary: %summary - Linux Build
+
+%description linux
+Linux Build of ipxe binary. Use this to try out ipxe in userspace without booting up a system.
+
+Very useful for ipxe script development.
+
+%files
+%defattr(-,root,root,-)
+%{_bindir}/ipxe
 
 %clean
 rm -Rf %{buildroot}
