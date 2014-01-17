@@ -103,14 +103,6 @@ struct fbcon_text {
 struct fbcon_picture {
 	/** Start address */
 	userptr_t start;
-	/** Pixel geometry */
-	struct fbcon_geometry pixel;
-	/** Character geometry */
-	struct fbcon_geometry character;
-	/** Margin */
-	struct fbcon_margin margin;
-	/** Indent to first character (in bytes) */
-	size_t indent;
 };
 
 /** A frame buffer console */
