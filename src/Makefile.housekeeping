@@ -686,7 +686,9 @@ CFLAGS_version += -DVERSION_MAJOR=$(VERSION_MAJOR) \
 		  -DVERSION="\"$(VERSION)\""
 # Make sure the version number gets updated on every git checkout
 ifneq ($(GITVERSION),)
+ifneq ($(wildcard ../.git/index),)
 $(BIN)/version.o : ../.git/index
+endif
 endif
 
 # We automatically generate rules for any file mentioned in AUTO_SRCS
