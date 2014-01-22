@@ -419,7 +419,7 @@ static int vesafb_init ( struct console_configuration *config ) {
 	/* Select mode */
 	if ( ( mode_number = vesafb_select_mode ( mode_numbers, config->width,
 						  config->height,
-						  config->bpp ) ) < 0 ) {
+						  config->depth ) ) < 0 ) {
 		rc = mode_number;
 		goto err_select_mode;
 	}

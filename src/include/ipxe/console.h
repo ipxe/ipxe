@@ -27,7 +27,7 @@ struct console_configuration {
 	/** Height */
 	unsigned int height;
 	/** Colour depth */
-	unsigned int bpp;
+	unsigned int depth;
 	/** Left margin */
 	unsigned int left;
 	/** Right margin */
