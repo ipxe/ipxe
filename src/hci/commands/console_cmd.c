@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/console.h>
 #include <ipxe/image.h>
 #include <ipxe/pixbuf.h>
+#include <ipxe/ansiesc.h>
 #include <ipxe/ansicol.h>
 #include <usr/imgmgmt.h>
 
@@ -113,6 +114,10 @@ static int console_exec ( int argc, char **argv ) {
 		printf ( "Could not configure console: %s\n", strerror ( rc ) );
 		goto err_configure;
 	}
+
+	/* Reapply default colour pair and clear screen */
+	ansicol_set_pair ( CPAIR_DEFAULT );
+	printf ( CSI "2J" CSI "H" );
 
  err_configure:
 	pixbuf_put ( opts.config.pixbuf );
