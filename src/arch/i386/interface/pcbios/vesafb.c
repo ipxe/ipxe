@@ -76,6 +76,8 @@ struct vesafb {
 	physaddr_t start;
 	/** Pixel geometry */
 	struct fbcon_geometry pixel;
+	/** Margin */
+	struct fbcon_margin margin;
 	/** Colour mapping */
 	struct fbcon_colour_map map;
 	/** Font definition */
@@ -428,8 +430,8 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
 
 	/* Initialise frame buffer console */
 	if ( ( rc = fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
-				 &vesafb.pixel, &vesafb.map, &vesafb.font,
-				 pixbuf ) ) != 0 )
+				 &vesafb.pixel, &vesafb.margin, &vesafb.map,
+				 &vesafb.font, pixbuf ) ) != 0 )
 		goto err_fbcon_init;
 
 	free ( mode_numbers );

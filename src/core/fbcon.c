@@ -573,6 +573,7 @@ static int fbcon_picture_init ( struct fbcon *fbcon,
  * @v fbcon		Frame buffer console
  * @v start		Start address
  * @v pixel		Pixel geometry
+ * @v margin		Minimum margin
  * @v map		Colour mapping
  * @v font		Font definition
  * @v pixbuf		Background picture (if any)
@@ -580,9 +581,12 @@ static int fbcon_picture_init ( struct fbcon *fbcon,
  */
 int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 		 struct fbcon_geometry *pixel,
+		 struct fbcon_margin *margin,
 		 struct fbcon_colour_map *map,
 		 struct fbcon_font *font,
 		 struct pixel_buffer *pixbuf ) {
+	int width;
+	int height;
 	unsigned int xgap;
 	unsigned int ygap;
 	int rc;
@@ -603,21 +607,31 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 	       user_to_phys ( fbcon->start, 0 ),
 	       user_to_phys ( fbcon->start, fbcon->len ) );
 
-	/* Derive character geometry from pixel geometry */
-	fbcon->character.width = ( pixel->width / FBCON_CHAR_WIDTH );
-	fbcon->character.height = ( pixel->height / FBCON_CHAR_HEIGHT );
-	fbcon->character.len = ( pixel->len * FBCON_CHAR_WIDTH );
-	fbcon->character.stride = ( pixel->stride * FBCON_CHAR_HEIGHT );
-
-	/* Calculate margin */
-	xgap = ( pixel->width % FBCON_CHAR_WIDTH );
-	ygap = ( pixel->height % FBCON_CHAR_HEIGHT );
-	fbcon->margin.left = ( xgap / 2 );
-	fbcon->margin.top = ( ygap / 2 );
-	fbcon->margin.right = ( xgap - fbcon->margin.left );
-	fbcon->margin.bottom = ( ygap - fbcon->margin.top );
+	/* Expand margin to accommodate whole characters */
+	width = ( pixel->width - margin->left - margin->right );
+	height = ( pixel->height - margin->top - margin->bottom );
+	if ( ( width < FBCON_CHAR_WIDTH ) || ( height < FBCON_CHAR_HEIGHT ) ) {
+		DBGC ( fbcon, "FBCON %p has unusable character area "
+		       "[%d-%d),[%d-%d)\n", fbcon,
+		       margin->left, ( pixel->width - margin->right ),
+		       margin->top, ( pixel->height - margin->bottom ) );
+		rc = -EINVAL;
+		goto err_margin;
+	}
+	xgap = ( width % FBCON_CHAR_WIDTH );
+	ygap = ( height % FBCON_CHAR_HEIGHT );
+	fbcon->margin.left = ( margin->left + ( xgap / 2 ) );
+	fbcon->margin.top = ( margin->top + ( ygap / 2 ) );
+	fbcon->margin.right = ( margin->right + ( xgap - ( xgap / 2 ) ) );
+	fbcon->margin.bottom = ( margin->bottom + ( ygap - ( ygap / 2 ) ) );
 	fbcon->indent = ( ( fbcon->margin.top * pixel->stride ) +
 			  ( fbcon->margin.left * pixel->len ) );
+
+	/* Derive character geometry from pixel geometry */
+	fbcon->character.width = ( width / FBCON_CHAR_WIDTH );
+	fbcon->character.height = ( height / FBCON_CHAR_HEIGHT );
+	fbcon->character.len = ( pixel->len * FBCON_CHAR_WIDTH );
+	fbcon->character.stride = ( pixel->stride * FBCON_CHAR_HEIGHT );
 	DBGC ( fbcon, "FBCON %p is pixel %dx%d, char %dx%d at "
 	       "[%d-%d),[%d-%d)\n", fbcon, fbcon->pixel->width,
 	       fbcon->pixel->height, fbcon->character.width,
@@ -662,6 +676,7 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
  err_picture:
 	ufree ( fbcon->text.start );
  err_text:
+ err_margin:
 	return rc;
 }
 

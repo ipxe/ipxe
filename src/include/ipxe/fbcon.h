@@ -145,6 +145,7 @@ struct fbcon {
 
 extern int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 			struct fbcon_geometry *pixel,
+			struct fbcon_margin *margin,
 			struct fbcon_colour_map *map,
 			struct fbcon_font *font,
 			struct pixel_buffer *pixbuf );
