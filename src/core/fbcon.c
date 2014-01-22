@@ -294,10 +294,10 @@ static void fbcon_handle_cup ( struct ansiesc_context *ctx,
 	fbcon_draw_cursor ( fbcon, 0 );
 	fbcon->xpos = cx;
 	if ( fbcon->xpos >= fbcon->character.width )
-		fbcon->xpos = ( fbcon->character.width - 1 );
+		fbcon->xpos = 0;
 	fbcon->ypos = cy;
 	if ( fbcon->ypos >= fbcon->character.height )
-		fbcon->ypos = ( fbcon->character.height - 1 );
+		fbcon->ypos = 0;
 	fbcon_draw_cursor ( fbcon, fbcon->show_cursor );
 }
 
