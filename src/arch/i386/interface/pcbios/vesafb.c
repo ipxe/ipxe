@@ -372,6 +372,21 @@ static int vesafb_select_mode ( const uint16_t *mode_numbers,
 }
 
 /**
+ * Restore video mode
+ *
+ */
+static void vesafb_restore ( void ) {
+	uint32_t discard_a;
+
+	/* Restore saved VGA mode */
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
+			       : "=a" ( discard_a )
+			       : "a" ( VBE_SET_VGA_MODE | vesafb.saved_mode ) );
+	DBGC ( &vbe_buf, "VESAFB restored VGA mode %#02x\n",
+	       vesafb.saved_mode );
+}
+
+/**
  * Initialise VESA frame buffer
  *
  * @v min_width		Minimum required width (in pixels)
@@ -412,10 +427,18 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
 	vesafb_font();
 
 	/* Initialise frame buffer console */
-	fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
-		     &vesafb.pixel, &vesafb.map, &vesafb.font, pixbuf );
+	if ( ( rc = fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
+				 &vesafb.pixel, &vesafb.map, &vesafb.font,
+				 pixbuf ) ) != 0 )
+		goto err_fbcon_init;
 
+	free ( mode_numbers );
+	return 0;
+
+	fbcon_fini ( &vesafb.fbcon );
+ err_fbcon_init:
  err_set_mode:
+	vesafb_restore();
  err_select_mode:
 	free ( mode_numbers );
  err_mode_list:
@@ -427,17 +450,12 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
  *
  */
 static void vesafb_fini ( void ) {
-	uint32_t discard_a;
 
 	/* Finalise frame buffer console */
 	fbcon_fini ( &vesafb.fbcon );
 
-	/* Restore VGA mode */
-	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
-			       : "=a" ( discard_a )
-			       : "a" ( VBE_SET_VGA_MODE | vesafb.saved_mode ) );
-	DBGC ( &vbe_buf, "VESAFB restored VGA mode %#02x\n",
-	       vesafb.saved_mode );
+	/* Restore saved VGA mode */
+	vesafb_restore();
 }
 
 /**
