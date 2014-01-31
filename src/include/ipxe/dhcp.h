@@ -290,6 +290,9 @@ struct dhcp_client_uuid {
 
 #define DHCP_CLIENT_UUID_TYPE 0
 
+/** DNS domain search list */
+#define DHCP_DOMAIN_SEARCH 119
+
 /** Etherboot-specific encapsulated options
  *
  * This encapsulated options field is used to contain all options

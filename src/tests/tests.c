@@ -52,3 +52,4 @@ REQUIRE_OBJECT ( cms_test );
 REQUIRE_OBJECT ( pnm_test );
 REQUIRE_OBJECT ( deflate_test );
 REQUIRE_OBJECT ( png_test );
+REQUIRE_OBJECT ( dns_test );
