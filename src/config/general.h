@@ -28,11 +28,22 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define PRODUCT_SHORT_NAME "iPXE"
 
 /*
- * Timer configuration
+ * Banner timeout configuration
  *
+ * This controls the timeout for the "Press Ctrl-B for the iPXE
+ * command line" banner displayed when iPXE starts up.  The value is
+ * specified in tenths of a second for which the banner should appear.
+ * A value of 0 disables the banner.
+ *
+ * ROM_BANNER_TIMEOUT controls the "Press Ctrl-B to configure iPXE"
+ * banner displayed only by ROM builds of iPXE during POST.  This
+ * defaults to being twice the length of BANNER_TIMEOUT, to allow for
+ * BIOSes that switch video modes immediately before calling the
+ * initialisation vector, thus rendering the banner almost invisible
+ * to the user.
  */
-#define BANNER_TIMEOUT	20	/* Tenths of a second for which the shell
-				   banner should appear */
+#define BANNER_TIMEOUT		20
+#define ROM_BANNER_TIMEOUT	( 2 * BANNER_TIMEOUT )
 
 /*
  * Network protocols

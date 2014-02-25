@@ -25,12 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER )
 	( PMM_HANDLE_BASE | 0x00002000 )
 #define PCI_FUNC_MASK 0x07
 
-/* ROM banner timeout.  Based on the configurable BANNER_TIMEOUT in
- * config.h, but converted to a number of (18Hz) timer ticks, and
- * doubled to allow for BIOSes that switch video modes immediately
- * beforehand, so rendering the message almost invisible to the user.
- */
-#define ROM_BANNER_TIMEOUT ( 2 * ( 18 * BANNER_TIMEOUT ) / 10 )
+/* ROM banner timeout, converted to a number of (18Hz) timer ticks. */
+#define ROM_BANNER_TIMEOUT_TICKS ( ( 18 * ROM_BANNER_TIMEOUT ) / 10 )
 
 /* Allow payload to be excluded from ROM size
  */
@@ -791,7 +787,7 @@ wait_for_key:
 	int	$0x16
 	jmp	1b
 2:	/* Wait for a key press */
-	movw	$ROM_BANNER_TIMEOUT, %cx
+	movw	$ROM_BANNER_TIMEOUT_TICKS, %cx
 3:	decw	%cx
 	js	99f		/* Exit with ZF clear */
 	/* Wait for timer tick to be updated */
