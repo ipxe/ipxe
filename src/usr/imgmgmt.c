@@ -48,13 +48,6 @@ int imgdownload ( struct uri *uri, struct image **image ) {
 	char *uri_string_redacted;
 	int rc;
 
-	/* Allocate image */
-	*image = alloc_image ( uri );
-	if ( ! *image ) {
-		rc = -ENOMEM;
-		goto err_alloc_image;
-	}
-
 	/* Construct redacted URI */
 	password = uri->password;
 	if ( password )
@@ -63,12 +56,25 @@ int imgdownload ( struct uri *uri, struct image **image ) {
 	uri->password = password;
 	if ( ! uri_string_redacted ) {
 		rc = -ENOMEM;
-		goto err_uri;
+		goto err_uri_string;
+	}
+
+	/* Resolve URI */
+	uri = resolve_uri ( cwuri, uri );
+	if ( ! uri ) {
+		rc = -ENOMEM;
+		goto err_resolve_uri;
+	}
+
+	/* Allocate image */
+	*image = alloc_image ( uri );
+	if ( ! *image ) {
+		rc = -ENOMEM;
+		goto err_alloc_image;
 	}
 
 	/* Create downloader */
-	if ( ( rc = create_downloader ( &monojob, *image, LOCATION_URI,
-					uri ) ) != 0 ) {
+	if ( ( rc = create_downloader ( &monojob, *image ) ) != 0 ) {
 		printf ( "Could not start download: %s\n", strerror ( rc ) );
 		goto err_create_downloader;
 	}
@@ -86,10 +92,12 @@ int imgdownload ( struct uri *uri, struct image **image ) {
  err_register_image:
  err_monojob_wait:
  err_create_downloader:
-	free ( uri_string_redacted );
- err_uri:
 	image_put ( *image );
  err_alloc_image:
+	uri_put ( uri );
+ err_resolve_uri:
+	free ( uri_string_redacted );
+ err_uri_string:
 	return rc;
 }
 

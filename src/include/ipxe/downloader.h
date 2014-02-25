@@ -12,7 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 struct interface;
 struct image;
 
-extern int create_downloader ( struct interface *job, struct image *image,
-			       int type, ... );
+extern int create_downloader ( struct interface *job, struct image *image );
 
 #endif /* _IPXE_DOWNLOADER_H */

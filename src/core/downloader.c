@@ -20,7 +20,6 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
-#include <stdarg.h>
 #include <errno.h>
 #include <syslog.h>
 #include <ipxe/iobuf.h>
@@ -229,17 +228,13 @@ static struct interface_descriptor downloader_job_desc =
  *
  * @v job		Job control interface
  * @v image		Image to fill with downloaded file
- * @v type		Location type to pass to xfer_open()
- * @v ...		Remaining arguments to pass to xfer_open()
  * @ret rc		Return status code
  *
- * Instantiates a downloader object to download the specified URI into
- * the specified image object.
+ * Instantiates a downloader object to download the content of the
+ * specified image from its URI.
  */
-int create_downloader ( struct interface *job, struct image *image,
-			int type, ... ) {
+int create_downloader ( struct interface *job, struct image *image ) {
 	struct downloader *downloader;
-	va_list args;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -252,21 +247,18 @@ int create_downloader ( struct interface *job, struct image *image,
 	intf_init ( &downloader->xfer, &downloader_xfer_desc,
 		    &downloader->refcnt );
 	downloader->image = image_get ( image );
-	va_start ( args, type );
 
 	/* Instantiate child objects and attach to our interfaces */
-	if ( ( rc = xfer_vopen ( &downloader->xfer, type, args ) ) != 0 )
+	if ( ( rc = xfer_open_uri ( &downloader->xfer, image->uri ) ) != 0 )
 		goto err;
 
 	/* Attach parent interface, mortalise self, and return */
 	intf_plug_plug ( &downloader->job, job );
 	ref_put ( &downloader->refcnt );
-	va_end ( args );
 	return 0;
 
  err:
 	downloader_finished ( downloader, rc );
 	ref_put ( &downloader->refcnt );
-	va_end ( args );
 	return rc;
 }
