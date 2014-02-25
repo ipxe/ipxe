@@ -738,7 +738,17 @@ exec:	/* Set %ds = %cs */
 	pushw	$1f
 	lret
 	.section ".text16", "awx", @progbits
-1:	/* Call main() */
+1:
+	/* Retrieve PCI bus:dev.fn */
+	movw	init_pci_busdevfn, %cx
+
+	/* Set up %ds for access to .data16 */
+	movw	%bx, %ds
+
+	/* Store PCI bus:dev.fn */
+	movw	%cx, autoboot_busdevfn
+
+	/* Call main() */
 	pushl	$main
 	pushw	%cs
 	call	prot_call
