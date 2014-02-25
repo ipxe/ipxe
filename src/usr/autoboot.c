@@ -49,6 +49,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** Device location of preferred autoboot device */
+struct device_description autoboot_device;
+
 /* Disambiguate the various error causes */
 #define ENOENT_BOOT __einfo_error ( EINFO_ENOENT_BOOT )
 #define EINFO_ENOENT_BOOT \
@@ -71,15 +74,6 @@ const struct setting scriptlet_setting __setting ( SETTING_MISC, scriptlet ) = {
  */
 __weak int pxe_menu_boot ( struct net_device *netdev __unused ) {
 	return -ENOTSUP;
-}
-
-/**
- * Identify the boot network device
- *
- * @ret netdev		Boot network device
- */
-static struct net_device * find_boot_netdev ( void ) {
-	return NULL;
 }
 
 /**
@@ -428,21 +422,36 @@ int netboot ( struct net_device *netdev ) {
 }
 
 /**
+ * Test if network device matches the autoboot device location
+ *
+ * @v netdev		Network device
+ * @ret is_autoboot	Network device matches the autoboot device location
+ */
+static int is_autoboot_device ( struct net_device *netdev ) {
+
+	return ( ( netdev->dev->desc.bus_type == autoboot_device.bus_type ) &&
+		 ( netdev->dev->desc.location == autoboot_device.location ) );
+}
+
+/**
  * Boot the system
  */
-int autoboot ( void ) {
-	struct net_device *boot_netdev;
+static int autoboot ( void ) {
 	struct net_device *netdev;
 	int rc = -ENODEV;
 
-	/* If we have an identifable boot device, try that first */
-	if ( ( boot_netdev = find_boot_netdev() ) )
-		rc = netboot ( boot_netdev );
-
-	/* If that fails, try booting from any of the other devices */
+	/* Try booting from each network device.  If we have a
+	 * specified autoboot device location, then use only devices
+	 * matching that location.
+	 */
 	for_each_netdev ( netdev ) {
-		if ( netdev == boot_netdev )
+
+		/* Skip any non-matching devices, if applicable */
+		if ( autoboot_device.bus_type &&
+		     ( ! is_autoboot_device ( netdev ) ) )
 			continue;
+
+		/* Attempt booting from this device */
 		rc = netboot ( netdev );
 	}
 
