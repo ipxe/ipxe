@@ -33,6 +33,29 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static LIST_HEAD ( parameters );
 
 /**
+ * Free form parameter list
+ *
+ * @v refcnt		Reference count
+ */
+static void free_parameters ( struct refcnt *refcnt ) {
+	struct parameters *params =
+		container_of ( refcnt, struct parameters, refcnt );
+	struct parameter *param;
+	struct parameter *tmp;
+
+	DBGC ( params, "PARAMS \"%s\" destroyed\n", params->name );
+
+	/* Free all parameters */
+	list_for_each_entry_safe ( param, tmp, &params->entries, list ) {
+		list_del ( &param->list );
+		free ( param );
+	}
+
+	/* Free parameter list */
+	free ( params );
+}
+
+/**
  * Find form parameter list by name
  *
  * @v name		Parameter list name (may be NULL)
@@ -63,14 +86,17 @@ struct parameters * create_parameters ( const char *name ) {
 
 	/* Destroy any existing parameter list of this name */
 	params = find_parameters ( name );
-	if ( params )
-		destroy_parameters ( params );
+	if ( params ) {
+		claim_parameters ( params );
+		params_put ( params );
+	}
 
 	/* Allocate parameter list */
 	name_len = ( name ? ( strlen ( name ) + 1 /* NUL */ ) : 0 );
 	params = zalloc ( sizeof ( *params ) + name_len );
 	if ( ! params )
 		return NULL;
+	ref_init ( &params->refcnt, free_parameters );
 	name_copy = ( ( void * ) ( params + 1 ) );
 
 	/* Populate parameter list */
@@ -124,42 +150,4 @@ struct parameter * add_parameter ( struct parameters *params,
 	DBGC ( params, "PARAMS \"%s\" added \"%s\"=\"%s\"\n",
 	       params->name, param->key, param->value );
 	return param;
-}
-
-/**
- * Destroy form parameter list
- *
- * @v params		Parameter list
- */
-void destroy_parameters ( struct parameters *params ) {
-	struct parameter *param;
-	struct parameter *tmp;
-
-	DBGC ( params, "PARAMS \"%s\" destroyed\n", params->name );
-
-	/* Free all parameters */
-	list_for_each_entry_safe ( param, tmp, &params->entries, list ) {
-		list_del ( &param->list );
-		free ( param );
-	}
-
-	/* Free parameter list */
-	list_del ( &params->list );
-	free ( params );
-}
-
-/**
- * Claim ownership of form parameter list
- *
- * @v params		Parameter list
- */
-void claim_parameters ( struct parameters *params ) {
-
-	DBGC ( params, "PARAMS \"%s\" claimed\n", params->name );
-
-	/* Remove from list of parameter lists */
-	list_del ( &params->list );
-
-	/* Reinitialise list to allow for subsequent destroy_parameters() */
-	INIT_LIST_HEAD ( &params->list );
 }

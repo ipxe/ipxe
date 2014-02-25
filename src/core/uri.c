@@ -72,8 +72,7 @@ static void dump_uri ( struct uri *uri ) {
 static void free_uri ( struct refcnt *refcnt ) {
 	struct uri *uri = container_of ( refcnt, struct uri, refcnt );
 
-	if ( uri->params )
-		destroy_parameters ( uri->params );
+	params_put ( uri->params );
 	free ( uri );
 }
 
@@ -89,6 +88,7 @@ static void free_uri ( struct refcnt *refcnt ) {
  */
 struct uri * parse_uri ( const char *uri_string ) {
 	struct uri *uri;
+	struct parameters *params;
 	char *raw;
 	char *tmp;
 	char *path;
@@ -111,9 +111,9 @@ struct uri * parse_uri ( const char *uri_string ) {
 	if ( ( tmp = strstr ( raw, "##params" ) ) ) {
 		*tmp = '\0';
 		tmp += 8 /* "##params" */;
-		uri->params = find_parameters ( *tmp ? ( tmp + 1 ) : NULL );
-		if ( uri->params ) {
-			claim_parameters ( uri->params );
+		params = find_parameters ( *tmp ? ( tmp + 1 ) : NULL );
+		if ( params ) {
+			uri->params = claim_parameters ( params );
 		} else {
 			/* Ignore non-existent submission blocks */
 		}
