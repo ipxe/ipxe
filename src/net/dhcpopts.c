@@ -202,7 +202,6 @@ static int resize_dhcp_option ( struct dhcp_options *options,
 	size_t new_encapsulator_len;
 	void *source;
 	void *dest;
-	void *end;
 	int rc;
 
 	/* Check for sufficient space */
@@ -245,8 +244,7 @@ static int resize_dhcp_option ( struct dhcp_options *options,
 	option = dhcp_option ( options, offset );
 	source = ( ( ( void * ) option ) + old_len );
 	dest = ( ( ( void * ) option ) + new_len );
-	end = ( options->data + options->alloc_len );
-	memmove ( dest, source, ( end - dest ) );
+	memmove ( dest, source, ( new_used_len - offset - new_len ) );
 
 	/* Shrink options block, if applicable */
 	if ( new_used_len < options->alloc_len ) {
