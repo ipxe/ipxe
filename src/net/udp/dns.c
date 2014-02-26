@@ -550,6 +550,9 @@ static int dns_question ( struct dns_request *dns ) {
 	/* Restore name */
 	dns->name.offset = offsetof ( typeof ( dns->buf ), name );
 
+	DBGC2 ( dns, "DNS %p question is %s type %s\n", dns,
+		dns_name ( &dns->name ), dns_type ( dns->question->qtype ) );
+
 	return 0;
 }
 
@@ -614,6 +617,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 	size_t answer_offset;
 	size_t next_offset;
 	size_t rdlength;
+	size_t name_len;
 	int rc;
 
 	/* Sanity check */
@@ -691,8 +695,12 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 		}
 
 		/* Skip non-matching names */
-		if ( dns_compare ( &buf, &dns->name ) != 0 )
+		if ( dns_compare ( &buf, &dns->name ) != 0 ) {
+			DBGC2 ( dns, "DNS %p ignoring response for %s type "
+				"%s\n", dns, dns_name ( &buf ),
+				dns_type ( rr->common.type ) );
 			continue;
+		}
 
 		/* Handle answer */
 		switch ( rr->common.type ) {
@@ -745,7 +753,9 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 			DBGC ( dns, "DNS %p found CNAME %s\n",
 			       dns, dns_name ( &buf ) );
 			dns->search.offset = dns->search.len;
-			dns_copy ( &buf, &dns->name );
+			name_len = dns_copy ( &buf, &dns->name );
+			dns->offset = ( offsetof ( typeof ( dns->buf ), name ) +
+					name_len - 1 /* Strip root label */ );
 			if ( ( rc = dns_question ( dns ) ) != 0 ) {
 				dns_done ( dns, rc );
 				goto done;
