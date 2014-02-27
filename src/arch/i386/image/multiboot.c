@@ -152,8 +152,7 @@ static physaddr_t multiboot_add_cmdline ( struct image *image ) {
 	size_t len;
 
 	/* Copy image URI to base memory buffer as start of command line */
-	len = ( unparse_uri ( buf, remaining, image->uri,
-			      URI_ALL ) + 1 /* NUL */ );
+	len = ( format_uri ( image->uri, buf, remaining ) + 1 /* NUL */ );
 	if ( len > remaining )
 		len = remaining;
 	mb_cmdline_offset += len;

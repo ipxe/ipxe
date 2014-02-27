@@ -91,8 +91,6 @@ static struct net_device * find_boot_netdev ( void ) {
  */
 static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
 						     const char *filename ) {
-	char buf[ 23 /* "tftp://xxx.xxx.xxx.xxx/" */ + strlen ( filename )
-		  + 1 /* NUL */ ];
 	struct uri *uri;
 
 	/* Parse filename */
@@ -100,17 +98,10 @@ static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
 	if ( ! uri )
 		return NULL;
 
-	/* Construct a tftp:// URI for the filename, if applicable.
-	 * We can't just rely on the current working URI, because the
-	 * relative URI resolution will remove the distinction between
-	 * filenames with and without initial slashes, which is
-	 * significant for TFTP.
-	 */
+	/* Construct a TFTP URI for the filename, if applicable */
 	if ( next_server.s_addr && filename[0] && ! uri_is_absolute ( uri ) ) {
 		uri_put ( uri );
-		snprintf ( buf, sizeof ( buf ), "tftp://%s/%s",
-			   inet_ntoa ( next_server ), filename );
-		uri = parse_uri ( buf );
+		uri = tftp_uri ( next_server, filename );
 		if ( ! uri )
 			return NULL;
 	}

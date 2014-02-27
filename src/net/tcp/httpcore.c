@@ -958,8 +958,8 @@ static void http_socket_close ( struct http_request *http, int rc ) {
  */
 static char * http_basic_auth ( struct http_request *http ) {
 	const char *user = http->uri->user;
-	const char *password =
-		( http->uri->password ? http->uri->password : "" );
+	const char *password = ( http->uri->password ?
+				 http->uri->password : "" );
 	size_t user_pw_len =
 		( strlen ( user ) + 1 /* ":" */ + strlen ( password ) );
 	char user_pw[ user_pw_len + 1 /* NUL */ ];
@@ -1000,8 +1000,8 @@ static char * http_basic_auth ( struct http_request *http ) {
 static char * http_digest_auth ( struct http_request *http,
 				 const char *method, const char *uri ) {
 	const char *user = http->uri->user;
-	const char *password =
-		( http->uri->password ? http->uri->password : "" );
+	const char *password = ( http->uri->password ?
+				 http->uri->password : "" );
 	const char *realm = http->auth_realm;
 	const char *nonce = http->auth_nonce;
 	const char *opaque = http->auth_opaque;
@@ -1088,7 +1088,7 @@ static size_t http_post_params ( struct http_request *http,
 		}
 
 		/* URI-encode the key */
-		frag_len = uri_encode ( param->key, buf, remaining, 0 );
+		frag_len = uri_encode ( param->key, 0, buf, remaining );
 		buf += frag_len;
 		len += frag_len;
 		remaining -= frag_len;
@@ -1101,7 +1101,7 @@ static size_t http_post_params ( struct http_request *http,
 		remaining--;
 
 		/* URI-encode the value */
-		frag_len = uri_encode ( param->value, buf, remaining, 0 );
+		frag_len = uri_encode ( param->value, 0, buf, remaining );
 		buf += frag_len;
 		len += frag_len;
 		remaining -= frag_len;
@@ -1149,9 +1149,11 @@ static struct io_buffer * http_post ( struct http_request *http ) {
  */
 static void http_step ( struct http_request *http ) {
 	struct io_buffer *post;
-	size_t uri_len;
+	struct uri host_uri;
+	struct uri path_uri;
+	char *host_uri_string;
+	char *path_uri_string;
 	char *method;
-	char *uri;
 	char *range;
 	char *auth;
 	char *content;
@@ -1176,19 +1178,24 @@ static void http_step ( struct http_request *http ) {
 	method = ( ( http->flags & HTTP_HEAD_ONLY ) ? "HEAD" :
 		   ( http->uri->params ? "POST" : "GET" ) );
 
-	/* Construct path?query request */
-	uri_len = ( unparse_uri ( NULL, 0, http->uri,
-				  URI_PATH_BIT | URI_QUERY_BIT )
-		    + 1 /* possible "/" */ + 1 /* NUL */ );
-	uri = malloc ( uri_len );
-	if ( ! uri ) {
+	/* Construct host URI */
+	memset ( &host_uri, 0, sizeof ( host_uri ) );
+	host_uri.host = http->uri->host;
+	host_uri.port = http->uri->port;
+	host_uri_string = format_uri_alloc ( &host_uri );
+	if ( ! host_uri_string ) {
 		rc = -ENOMEM;
-		goto err_uri;
+		goto err_host_uri;
 	}
-	unparse_uri ( uri, uri_len, http->uri, URI_PATH_BIT | URI_QUERY_BIT );
-	if ( ! uri[0] ) {
-		uri[0] = '/';
-		uri[1] = '\0';
+
+	/* Construct path URI */
+	memset ( &path_uri, 0, sizeof ( path_uri ) );
+	path_uri.path = ( http->uri->path ? http->uri->path : "/" );
+	path_uri.query = http->uri->query;
+	path_uri_string = format_uri_alloc ( &path_uri );
+	if ( ! path_uri_string ) {
+		rc = -ENOMEM;
+		goto err_path_uri;
 	}
 
 	/* Calculate range request parameters if applicable */
@@ -1213,7 +1220,7 @@ static void http_step ( struct http_request *http ) {
 			goto err_auth;
 		}
 	} else if ( http->flags & HTTP_DIGEST_AUTH ) {
-		auth = http_digest_auth ( http, method, uri );
+		auth = http_digest_auth ( http, method, path_uri_string );
 		if ( ! auth ) {
 			rc = -ENOMEM;
 			goto err_auth;
@@ -1248,14 +1255,11 @@ static void http_step ( struct http_request *http ) {
 	if ( ( rc = xfer_printf ( &http->socket,
 				  "%s %s HTTP/1.1\r\n"
 				  "User-Agent: iPXE/%s\r\n"
-				  "Host: %s%s%s\r\n"
+				  "Host: %s\r\n"
 				  "%s%s%s%s"
 				  "\r\n",
-				  method, uri, product_version, http->uri->host,
-				  ( http->uri->port ?
-				    ":" : "" ),
-				  ( http->uri->port ?
-				    http->uri->port : "" ),
+				  method, path_uri_string, product_version,
+				  host_uri_string,
 				  ( ( http->flags & HTTP_CLIENT_KEEPALIVE ) ?
 				    "Connection: keep-alive\r\n" : "" ),
 				  ( range ? range : "" ),
@@ -1281,8 +1285,10 @@ static void http_step ( struct http_request *http ) {
  err_auth:
 	free ( range );
  err_range:
-	free ( uri );
- err_uri:
+	free ( path_uri_string );
+ err_path_uri:
+	free ( host_uri_string );
+ err_host_uri:
 	if ( rc != 0 )
 		http_close ( http, rc );
 }

@@ -44,9 +44,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret rc		Return status code
  */
 int imgdownload ( struct uri *uri, struct image **image ) {
-	size_t len = ( unparse_uri ( NULL, 0, uri, URI_ALL ) + 1 );
-	char uri_string_redacted[len];
 	const char *password;
+	char *uri_string_redacted;
 	int rc;
 
 	/* Allocate image */
@@ -56,13 +55,16 @@ int imgdownload ( struct uri *uri, struct image **image ) {
 		goto err_alloc_image;
 	}
 
-	/* Redact password portion of URI, if necessary */
+	/* Construct redacted URI */
 	password = uri->password;
 	if ( password )
 		uri->password = "***";
-	unparse_uri ( uri_string_redacted, sizeof ( uri_string_redacted ),
-		      uri, URI_ALL );
+	uri_string_redacted = format_uri_alloc ( uri );
 	uri->password = password;
+	if ( ! uri_string_redacted ) {
+		rc = -ENOMEM;
+		goto err_uri;
+	}
 
 	/* Create downloader */
 	if ( ( rc = create_downloader ( &monojob, *image, LOCATION_URI,
@@ -81,16 +83,11 @@ int imgdownload ( struct uri *uri, struct image **image ) {
 		goto err_register_image;
 	}
 
-	/* Drop local reference to image.  Image is guaranteed to
-	 * remain in scope since it is registered.
-	 */
-	image_put ( *image );
-
-	return 0;
-
  err_register_image:
  err_monojob_wait:
  err_create_downloader:
+	free ( uri_string_redacted );
+ err_uri:
 	image_put ( *image );
  err_alloc_image:
 	return rc;

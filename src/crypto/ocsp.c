@@ -206,11 +206,12 @@ static int ocsp_request ( struct ocsp_check *ocsp ) {
  * @ret rc		Return status code
  */
 static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
+	struct uri path_uri;
 	char *base_uri_string;
-	char *base64_request;
-	size_t base64_request_len;
-	size_t uri_string_len;
-	size_t prefix_len;
+	char *path_base64_string;
+	char *path_uri_string;
+	size_t path_len;
+	int len;
 	int rc;
 
 	/* Sanity check */
@@ -222,44 +223,43 @@ static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
 		goto err_no_uri;
 	}
 
-	/* Base64-encode the request */
-	base64_request_len = ( base64_encoded_len ( ocsp->request.builder.len )
-			       + 1 /* NUL */ );
-	base64_request = malloc ( base64_request_len );
-	if ( ! base64_request ) {
+	/* Base64-encode the request as the URI path */
+	path_len = ( base64_encoded_len ( ocsp->request.builder.len )
+		     + 1 /* NUL */ );
+	path_base64_string = malloc ( path_len );
+	if ( ! path_base64_string ) {
 		rc = -ENOMEM;
-		goto err_alloc_base64;
+		goto err_path_base64;
 	}
 	base64_encode ( ocsp->request.builder.data, ocsp->request.builder.len,
-			base64_request );
+			path_base64_string );
 
-	/* Allocate URI string */
-	uri_string_len = ( strlen ( base_uri_string ) + 1 /* "/" */ +
-			   uri_encode ( base64_request, NULL, 0, URI_FRAGMENT )
-			   + 1 /* NUL */ );
-	ocsp->uri_string = malloc ( uri_string_len );
-	if ( ! ocsp->uri_string ) {
+	/* URI-encode the Base64-encoded request */
+	memset ( &path_uri, 0, sizeof ( path_uri ) );
+	path_uri.path = path_base64_string;
+	path_uri_string = format_uri_alloc ( &path_uri );
+	if ( ! path_uri_string ) {
 		rc = -ENOMEM;
-		goto err_alloc_uri;
+		goto err_path_uri;
 	}
 
 	/* Construct URI string */
-	prefix_len = snprintf ( ocsp->uri_string, uri_string_len,
-				"%s/", base_uri_string );
-	uri_encode ( base64_request, ( ocsp->uri_string + prefix_len ),
-		     ( uri_string_len - prefix_len ), URI_FRAGMENT );
+	if ( ( len = asprintf ( &ocsp->uri_string, "%s/%s", base_uri_string,
+				path_uri_string ) ) < 0 ) {
+		rc = len;
+		goto err_ocsp_uri;
+	}
 	DBGC2 ( ocsp, "OCSP %p \"%s\" URI is %s\n",
 		ocsp, ocsp->cert->subject.name, ocsp->uri_string );
 
-	/* Free base64-encoded request */
-	free ( base64_request );
-	base64_request = NULL;
+	/* Success */
+	rc = 0;
 
-	return 0;
-
- err_alloc_uri:
-	free ( base64_request );
- err_alloc_base64:
+ err_ocsp_uri:
+	free ( path_uri_string );
+ err_path_uri:
+	free ( path_base64_string );
+ err_path_base64:
  err_no_uri:
 	return rc;
 }
