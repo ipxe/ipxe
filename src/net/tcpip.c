@@ -5,6 +5,7 @@
 #include <byteswap.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/tables.h>
+#include <ipxe/ipstat.h>
 #include <ipxe/tcpip.h>
 
 /** @file
@@ -25,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v st_src		Partially-filled source address
  * @v st_dest		Partially-filled destination address
  * @v pshdr_csum	Pseudo-header checksum
+ * @v stats		IP statistics
  * @ret rc		Return status code
  *
  * This function expects a transport-layer segment from the network
@@ -35,20 +37,22 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 int tcpip_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	       uint8_t tcpip_proto, struct sockaddr_tcpip *st_src,
-	       struct sockaddr_tcpip *st_dest,
-	       uint16_t pshdr_csum ) {
+	       struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum,
+	       struct ip_statistics *stats ) {
 	struct tcpip_protocol *tcpip;
 
 	/* Hand off packet to the appropriate transport-layer protocol */
 	for_each_table_entry ( tcpip, TCPIP_PROTOCOLS ) {
 		if ( tcpip->tcpip_proto == tcpip_proto ) {
 			DBG ( "TCP/IP received %s packet\n", tcpip->name );
+			stats->in_delivers++;
 			return tcpip->rx ( iobuf, netdev, st_src, st_dest,
 					   pshdr_csum );
 		}
 	}
 
 	DBG ( "Unrecognised TCP/IP protocol %d\n", tcpip_proto );
+	stats->in_unknown_protos++;
 	free_iob ( iobuf );
 	return -EPROTONOSUPPORT;
 }

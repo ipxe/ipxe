@@ -27,6 +27,8 @@ struct fragment {
 	size_t hdrlen;
 	/** Reassembly timer */
 	struct retry_timer timer;
+	/** Fragment reassembler */
+	struct fragment_reassembler *fragments;
 };
 
 /** A fragment reassembler */
@@ -59,6 +61,8 @@ struct fragment_reassembler {
 	 * @ret more_frags	More fragments exist
 	 */
 	int ( * more_fragments ) ( struct io_buffer *iobuf, size_t hdrlen );
+	/** Associated IP statistics */
+	struct ip_statistics *stats;
 };
 
 extern struct io_buffer *

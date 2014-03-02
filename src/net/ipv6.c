@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/if_ether.h>
 #include <ipxe/crc32.h>
 #include <ipxe/fragment.h>
+#include <ipxe/ipstat.h>
 #include <ipxe/ndp.h>
 #include <ipxe/ipv6.h>
 
@@ -56,6 +57,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** List of IPv6 miniroutes */
 struct list_head ipv6_miniroutes = LIST_HEAD_INIT ( ipv6_miniroutes );
+
+/** IPv6 statistics */
+static struct ip_statistics ipv6_stats;
+
+/** IPv6 statistics family */
+struct ip_statistics_family
+ipv6_statistics_family __ip_statistics_family ( IP_STATISTICS_IPV6 ) = {
+	.version = 6,
+	.stats = &ipv6_stats,
+};
 
 /**
  * Determine debugging colour for IPv6 debug messages
@@ -398,6 +409,7 @@ static struct fragment_reassembler ipv6_reassembler = {
 	.is_fragment = ipv6_is_fragment,
 	.fragment_offset = ipv6_fragment_offset,
 	.more_fragments = ipv6_more_fragments,
+	.stats = &ipv6_stats,
 };
 
 /**
@@ -455,6 +467,9 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 	size_t len;
 	int rc;
 
+	/* Update statistics */
+	ipv6_stats.out_requests++;
+
 	/* Fill up the IPv6 header, except source address */
 	len = iob_len ( iobuf );
 	iphdr = iob_push ( iobuf, sizeof ( *iphdr ) );
@@ -475,6 +490,7 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 	if ( ! netdev ) {
 		DBGC ( ipv6col ( &iphdr->dest ), "IPv6 has no route to %s\n",
 		       inet6_ntoa ( &iphdr->dest ) );
+		ipv6_stats.out_no_routes++;
 		rc = -ENETUNREACH;
 		goto err;
 	}
@@ -498,6 +514,7 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 	/* Calculate link-layer destination address, if possible */
 	if ( IN6_IS_ADDR_MULTICAST ( next_hop ) ) {
 		/* Multicast address */
+		ipv6_stats.out_mcast_pkts++;
 		if ( ( rc = netdev->ll_protocol->mc_hash ( AF_INET6, next_hop,
 							   ll_dest_buf ) ) !=0){
 			DBGC ( ipv6col ( &iphdr->dest ), "IPv6 could not hash "
@@ -510,6 +527,10 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 		/* Unicast address */
 		ll_dest = NULL;
 	}
+
+	/* Update statistics */
+	ipv6_stats.out_transmits++;
+	ipv6_stats.out_octets += iob_len ( iobuf );
 
 	/* Hand off to link layer (via NDP if applicable) */
 	if ( ll_dest ) {
@@ -568,20 +589,29 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	int next_header;
 	int rc;
 
+	/* Update statistics */
+	ipv6_stats.in_receives++;
+	ipv6_stats.in_octets += iob_len ( iobuf );
+	if ( flags & LL_BROADCAST ) {
+		ipv6_stats.in_bcast_pkts++;
+	} else if ( flags & LL_MULTICAST ) {
+		ipv6_stats.in_mcast_pkts++;
+	}
+
 	/* Sanity check the IPv6 header */
 	if ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) {
 		DBGC ( ipv6col ( &iphdr->src ), "IPv6 packet too short at %zd "
 		       "bytes (min %zd bytes)\n", iob_len ( iobuf ),
 		       sizeof ( *iphdr ) );
 		rc = -EINVAL_LEN;
-		goto err;
+		goto err_header;
 	}
 	if ( ( iphdr->ver_tc_label & htonl ( IPV6_MASK_VER ) ) !=
 	     htonl ( IPV6_VER ) ) {
 		DBGC ( ipv6col ( &iphdr->src ), "IPv6 version %#08x not "
 		       "supported\n", ntohl ( iphdr->ver_tc_label ) );
 		rc = -ENOTSUP_VER;
-		goto err;
+		goto err_header;
 	}
 
 	/* Truncate packet to specified length */
@@ -589,8 +619,9 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	if ( len > iob_len ( iobuf ) ) {
 		DBGC ( ipv6col ( &iphdr->src ), "IPv6 length too long at %zd "
 		       "bytes (packet is %zd bytes)\n", len, iob_len ( iobuf ));
+		ipv6_stats.in_truncated_pkts++;
 		rc = -EINVAL_LEN;
-		goto err;
+		goto err_other;
 	}
 	iob_unput ( iobuf, ( iob_len ( iobuf ) - len - sizeof ( *iphdr ) ) );
 	hdrlen = sizeof ( *iphdr );
@@ -606,8 +637,9 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	     ( ! ipv6_has_addr ( netdev, &iphdr->dest ) ) ) {
 		DBGC ( ipv6col ( &iphdr->src ), "IPv6 discarding non-local "
 		       "unicast packet for %s\n", inet6_ntoa ( &iphdr->dest ) );
+		ipv6_stats.in_addr_errors++;
 		rc = -EPIPE;
-		goto err;
+		goto err_other;
 	}
 
 	/* Process any extension headers */
@@ -624,7 +656,7 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 			       "%zd bytes)\n", this_header,
 			       ( iob_len ( iobuf ) - hdrlen ), extlen );
 			rc = -EINVAL_LEN;
-			goto err;
+			goto err_header;
 		}
 
 		/* Determine size of extension header (if applicable) */
@@ -645,7 +677,7 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 			       "%zd bytes)\n", this_header,
 			       ( iob_len ( iobuf ) - hdrlen ), extlen );
 			rc = -EINVAL_LEN;
-			goto err;
+			goto err_header;
 		}
 		hdrlen += extlen;
 		next_header = ext->common.next_header;
@@ -662,7 +694,7 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 			/* Check that all options can be ignored */
 			if ( ( rc = ipv6_check_options ( iphdr, &ext->options,
 							 extlen ) ) != 0 )
-				goto err;
+				goto err_header;
 
 		} else if ( this_header == IPV6_FRAGMENT ) {
 
@@ -692,7 +724,7 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	pshdr_csum = ipv6_pshdr_chksum ( iphdr, iob_len ( iobuf ),
 					 next_header, TCPIP_EMPTY_CSUM );
 	if ( ( rc = tcpip_rx ( iobuf, netdev, next_header, &src.st, &dest.st,
-			       pshdr_csum ) ) != 0 ) {
+			       pshdr_csum, &ipv6_stats ) ) != 0 ) {
 		DBGC ( ipv6col ( &src.sin6.sin6_addr ), "IPv6 received packet "
 				"rejected by stack: %s\n", strerror ( rc ) );
 		return rc;
@@ -700,7 +732,9 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 
 	return 0;
 
- err:
+ err_header:
+	ipv6_stats.in_hdr_errors++;
+ err_other:
 	free_iob ( iobuf );
 	return rc;
 }

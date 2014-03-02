@@ -17,6 +17,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 struct io_buffer;
 struct net_device;
+struct ip_statistics;
 
 /** Empty checksum value
  *
@@ -132,7 +133,8 @@ struct tcpip_net_protocol {
 
 extern int tcpip_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		      uint8_t tcpip_proto, struct sockaddr_tcpip *st_src,
-		      struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
+		      struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum,
+		      struct ip_statistics *stats );
 extern int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip,
 		      struct sockaddr_tcpip *st_src,
 		      struct sockaddr_tcpip *st_dest,
