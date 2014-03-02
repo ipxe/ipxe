@@ -287,6 +287,9 @@ REQUIRE_OBJECT ( ping_cmd );
 #ifdef CONSOLE_CMD
 REQUIRE_OBJECT ( console_cmd );
 #endif
+#ifdef IPSTAT_CMD
+REQUIRE_OBJECT ( ipstat_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
