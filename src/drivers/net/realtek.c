@@ -415,11 +415,35 @@ static void realtek_check_link ( struct net_device *netdev ) {
 	if ( rtl->have_phy_regs ) {
 		phystatus = readb ( rtl->regs + RTL_PHYSTATUS );
 		link_up = ( phystatus & RTL_PHYSTATUS_LINKSTS );
-		DBGC ( rtl, "REALTEK %p PHY status is %02x\n", rtl, phystatus );
+		DBGC ( rtl, "REALTEK %p PHY status is %02x (%s%s%s%s%s%s, "
+		       "Link%s, %sDuplex)\n", rtl, phystatus,
+		       ( ( phystatus & RTL_PHYSTATUS_ENTBI ) ? "TBI" : "GMII" ),
+		       ( ( phystatus & RTL_PHYSTATUS_TXFLOW ) ?
+			 ", TxFlow" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_RXFLOW ) ?
+			 ", RxFlow" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_1000MF ) ?
+			 ", 1000Mbps" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_100M ) ?
+			 ", 100Mbps" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_10M ) ?
+			 ", 10Mbps" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_LINKSTS ) ?
+			 "Up" : "Down" ),
+		       ( ( phystatus & RTL_PHYSTATUS_FULLDUP ) ?
+			 "Full" : "Half" ) );
 	} else {
 		msr = readb ( rtl->regs + RTL_MSR );
 		link_up = ( ! ( msr & RTL_MSR_LINKB ) );
-		DBGC ( rtl, "REALTEK %p media status is %02x\n", rtl, msr );
+		DBGC ( rtl, "REALTEK %p media status is %02x (Link%s, "
+		       "%dMbps%s%s%s%s%s)\n", rtl, msr,
+		       ( ( msr & RTL_MSR_LINKB ) ? "Down" : "Up" ),
+		       ( ( msr & RTL_MSR_SPEED_10 ) ? 10 : 100 ),
+		       ( ( msr & RTL_MSR_TXFCE ) ? ", TxFlow" : "" ),
+		       ( ( msr & RTL_MSR_RXFCE ) ? ", RxFlow" : "" ),
+		       ( ( msr & RTL_MSR_AUX_STATUS ) ? ", AuxPwr" : "" ),
+		       ( ( msr & RTL_MSR_TXPF ) ? ", TxPause" : "" ),
+		       ( ( msr & RTL_MSR_RXPF ) ? ", RxPause" : "" ) );
 	}
 
 	/* Report link state */
