@@ -138,6 +138,25 @@ static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
 }
 
 /**
+ * Determine transmitting network device
+ *
+ * @v st_dest		Destination network-layer address
+ * @ret netdev		Transmitting network device, or NULL
+ */
+static struct net_device * ipv4_netdev ( struct sockaddr_tcpip *st_dest ) {
+	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
+	struct in_addr dest = sin_dest->sin_addr;
+	struct ipv4_miniroute *miniroute;
+
+	/* Find routing table entry */
+	miniroute = ipv4_route ( &dest );
+	if ( ! miniroute )
+		return NULL;
+
+	return miniroute->netdev;
+}
+
+/**
  * Check if IPv4 fragment matches fragment reassembly buffer
  *
  * @v fragment		Fragment reassembly buffer
@@ -603,6 +622,7 @@ struct tcpip_net_protocol ipv4_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv4",
 	.sa_family = AF_INET,
 	.tx = ipv4_tx,
+	.netdev = ipv4_netdev,
 };
 
 /** IPv4 ARP protocol */

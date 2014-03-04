@@ -322,6 +322,25 @@ static struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 }
 
 /**
+ * Determine transmitting network device
+ *
+ * @v st_dest		Destination network-layer address
+ * @ret netdev		Transmitting network device, or NULL
+ */
+static struct net_device * ipv6_netdev ( struct sockaddr_tcpip *st_dest ) {
+	struct sockaddr_in6 *sin6_dest = ( ( struct sockaddr_in6 * ) st_dest );
+	struct in6_addr *dest = &sin6_dest->sin6_addr;
+	struct ipv6_miniroute *miniroute;
+
+	/* Find routing table entry */
+	miniroute = ipv6_route ( sin6_dest->sin6_scope_id, &dest );
+	if ( ! miniroute )
+		return NULL;
+
+	return miniroute->netdev;
+}
+
+/**
  * Check that received options can be safely ignored
  *
  * @v iphdr		IPv6 header
@@ -970,6 +989,7 @@ struct tcpip_net_protocol ipv6_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv6",
 	.sa_family = AF_INET6,
 	.tx = ipv6_tx,
+	.netdev = ipv6_netdev,
 };
 
 /** IPv6 socket address converter */

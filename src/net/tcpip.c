@@ -18,7 +18,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-/** Process a received TCP/IP packet
+/**
+ * Process a received TCP/IP packet
  *
  * @v iobuf		I/O buffer
  * @v netdev		Network device
@@ -57,7 +58,27 @@ int tcpip_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	return -EPROTONOSUPPORT;
 }
 
-/** Transmit a TCP/IP packet
+/**
+ * Find TCP/IP network-layer protocol
+ *
+ * @v st_dest		Destination address
+ * @ret tcpip_net	TCP/IP network-layer protocol, or NULL if not found
+ */
+static struct tcpip_net_protocol *
+tcpip_net_protocol ( struct sockaddr_tcpip *st_dest ) {
+	struct tcpip_net_protocol *tcpip_net;
+
+	for_each_table_entry ( tcpip_net, TCPIP_NET_PROTOCOLS ) {
+		if ( tcpip_net->sa_family == st_dest->st_family )
+			return tcpip_net;
+	}
+
+	DBG ( "Unrecognised TCP/IP address family %d\n", st_dest->st_family );
+	return NULL;
+}
+
+/**
+ * Transmit a TCP/IP packet
  *
  * @v iobuf		I/O buffer
  * @v tcpip_protocol	Transport-layer protocol
@@ -73,17 +94,32 @@ int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip_protocol,
 	struct tcpip_net_protocol *tcpip_net;
 
 	/* Hand off packet to the appropriate network-layer protocol */
-	for_each_table_entry ( tcpip_net, TCPIP_NET_PROTOCOLS ) {
-		if ( tcpip_net->sa_family == st_dest->st_family ) {
-			DBG ( "TCP/IP sending %s packet\n", tcpip_net->name );
-			return tcpip_net->tx ( iobuf, tcpip_protocol, st_src,
-					       st_dest, netdev, trans_csum );
-		}
+	tcpip_net = tcpip_net_protocol ( st_dest );
+	if ( tcpip_net ) {
+		DBG ( "TCP/IP sending %s packet\n", tcpip_net->name );
+		return tcpip_net->tx ( iobuf, tcpip_protocol, st_src, st_dest,
+				       netdev, trans_csum );
 	}
-	
-	DBG ( "Unrecognised TCP/IP address family %d\n", st_dest->st_family );
+
 	free_iob ( iobuf );
 	return -EAFNOSUPPORT;
+}
+
+/**
+ * Determine transmitting network device
+ *
+ * @v st_dest		Destination address
+ * @ret netdev		Network device, or NULL
+ */
+struct net_device * tcpip_netdev ( struct sockaddr_tcpip *st_dest ) {
+	struct tcpip_net_protocol *tcpip_net;
+
+	/* Hand off to the appropriate network-layer protocol */
+	tcpip_net = tcpip_net_protocol ( st_dest );
+	if ( tcpip_net )
+		return tcpip_net->netdev ( st_dest );
+
+	return NULL;
 }
 
 /**
