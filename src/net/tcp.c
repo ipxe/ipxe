@@ -43,6 +43,8 @@ struct tcp_connection {
 	struct sockaddr_tcpip peer;
 	/** Local port */
 	unsigned int local_port;
+	/** Maximum segment size */
+	size_t mss;
 
 	/** Current TCP state */
 	unsigned int tcp_state;
@@ -250,6 +252,7 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	struct sockaddr_tcpip *st_peer = ( struct sockaddr_tcpip * ) peer;
 	struct sockaddr_tcpip *st_local = ( struct sockaddr_tcpip * ) local;
 	struct tcp_connection *tcp;
+	size_t mtu;
 	int port;
 	int rc;
 
@@ -270,6 +273,16 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	INIT_LIST_HEAD ( &tcp->tx_queue );
 	INIT_LIST_HEAD ( &tcp->rx_queue );
 	memcpy ( &tcp->peer, st_peer, sizeof ( tcp->peer ) );
+
+	/* Calculate MSS */
+	mtu = tcpip_mtu ( &tcp->peer );
+	if ( ! mtu ) {
+		DBGC ( tcp, "TCP %p has no route to %s\n",
+		       tcp, sock_ntoa ( peer ) );
+		rc = -ENETUNREACH;
+		goto err;
+	}
+	tcp->mss = ( mtu - sizeof ( struct tcp_header ) );
 
 	/* Bind to local port */
 	port = tcpip_bind ( st_local, tcp_port_available );
@@ -552,7 +565,7 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 		mssopt = iob_push ( iobuf, sizeof ( *mssopt ) );
 		mssopt->kind = TCP_OPTION_MSS;
 		mssopt->length = sizeof ( *mssopt );
-		mssopt->mss = htons ( TCP_MSS );
+		mssopt->mss = htons ( tcp->mss );
 		wsopt = iob_push ( iobuf, sizeof ( *wsopt ) );
 		wsopt->nop = TCP_OPTION_NOP;
 		wsopt->wsopt.kind = TCP_OPTION_WS;
