@@ -988,6 +988,7 @@ struct net_protocol ipv6_protocol __net_protocol = {
 struct tcpip_net_protocol ipv6_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv6",
 	.sa_family = AF_INET6,
+	.header_len = sizeof ( struct ipv6_header ),
 	.tx = ipv6_tx,
 	.netdev = ipv6_netdev,
 };

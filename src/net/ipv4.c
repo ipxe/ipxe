@@ -621,6 +621,7 @@ struct net_protocol ipv4_protocol __net_protocol = {
 struct tcpip_net_protocol ipv4_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv4",
 	.sa_family = AF_INET,
+	.header_len = sizeof ( struct iphdr ),
 	.tx = ipv4_tx,
 	.netdev = ipv4_netdev,
 };

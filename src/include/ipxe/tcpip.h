@@ -97,6 +97,8 @@ struct tcpip_net_protocol {
 	const char *name;
 	/** Network address family */
 	sa_family_t sa_family;
+	/** Fixed header length */
+	size_t header_len;
 	/**
 	 * Transmit packet
 	 *
@@ -148,6 +150,7 @@ extern int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip,
 		      struct net_device *netdev,
 		      uint16_t *trans_csum );
 extern struct net_device * tcpip_netdev ( struct sockaddr_tcpip *st_dest );
+extern size_t tcpip_mtu ( struct sockaddr_tcpip *st_dest );
 extern uint16_t generic_tcpip_continue_chksum ( uint16_t partial,
 						const void *data, size_t len );
 extern uint16_t tcpip_chksum ( const void *data, size_t len );

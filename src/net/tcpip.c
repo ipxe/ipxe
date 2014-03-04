@@ -6,6 +6,7 @@
 #include <ipxe/iobuf.h>
 #include <ipxe/tables.h>
 #include <ipxe/ipstat.h>
+#include <ipxe/netdevice.h>
 #include <ipxe/tcpip.h>
 
 /** @file
@@ -120,6 +121,34 @@ struct net_device * tcpip_netdev ( struct sockaddr_tcpip *st_dest ) {
 		return tcpip_net->netdev ( st_dest );
 
 	return NULL;
+}
+
+/**
+ * Determine maximum transmission unit
+ *
+ * @v st_dest		Destination address
+ * @ret mtu		Maximum transmission unit
+ */
+size_t tcpip_mtu ( struct sockaddr_tcpip *st_dest ) {
+	struct tcpip_net_protocol *tcpip_net;
+	struct net_device *netdev;
+	size_t mtu;
+
+	/* Find appropriate network-layer protocol */
+	tcpip_net = tcpip_net_protocol ( st_dest );
+	if ( ! tcpip_net )
+		return 0;
+
+	/* Find transmitting network device */
+	netdev = tcpip_net->netdev ( st_dest );
+	if ( ! netdev )
+		return 0;
+
+	/* Calculate MTU */
+	mtu = ( netdev->max_pkt_len - netdev->ll_protocol->ll_header_len -
+		tcpip_net->header_len );
+
+	return mtu;
 }
 
 /**
