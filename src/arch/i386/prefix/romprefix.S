@@ -740,13 +740,13 @@ exec:	/* Set %ds = %cs */
 	.section ".text16", "awx", @progbits
 1:
 	/* Retrieve PCI bus:dev.fn */
-	movw	init_pci_busdevfn, %cx
+	movw	init_pci_busdevfn, %ax
 
 	/* Set up %ds for access to .data16 */
 	movw	%bx, %ds
 
 	/* Store PCI bus:dev.fn */
-	movw	%cx, autoboot_busdevfn
+	movw	%ax, autoboot_busdevfn
 
 	/* Call main() */
 	pushl	$main
