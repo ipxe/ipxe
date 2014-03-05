@@ -890,6 +890,9 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 		}
 	}
 
+	/* Update window size */
+	tcp->snd_win = win;
+
 	/* Ignore ACKs that don't actually acknowledge any new data.
 	 * (In particular, do not stop the retransmission timer; this
 	 * avoids creating a sorceror's apprentice syndrome when a
@@ -911,10 +914,9 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 		pending_put ( &tcp->pending_flags );
 	}
 
-	/* Update SEQ and sent counters, and window size */
+	/* Update SEQ and sent counters */
 	tcp->snd_seq = ack;
 	tcp->snd_sent = 0;
-	tcp->snd_win = win;
 
 	/* Remove any acknowledged data from transmit queue */
 	tcp_process_tx_queue ( tcp, len, NULL, 1 );
