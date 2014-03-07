@@ -55,6 +55,12 @@ static unsigned long linux_ticks_per_sec(void)
  * linux doesn't provide an easy access to jiffies so implement it by measuring
  * the time since the first call to this function.
  *
+ * Since this function is used to seed the (non-cryptographic) random
+ * number generator, we round the start time down to the nearest whole
+ * second.  This minimises the chances of generating identical RNG
+ * sequences (and hence identical TCP port numbers, etc) on
+ * consecutive invocations of iPXE.
+ *
  * @ret ticks		Current time, in ticks
  */
 static unsigned long linux_currticks(void)
@@ -71,7 +77,7 @@ static unsigned long linux_currticks(void)
 	linux_gettimeofday(&now, NULL);
 
 	unsigned long ticks = (now.tv_sec - start.tv_sec) * linux_ticks_per_sec();
-	ticks += (now.tv_usec - start.tv_usec) / (long)(1000000 / linux_ticks_per_sec());
+	ticks += now.tv_usec / (long)(1000000 / linux_ticks_per_sec());
 
 	return ticks;
 }
