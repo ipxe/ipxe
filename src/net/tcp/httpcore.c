@@ -42,6 +42,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/socket.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/process.h>
+#include <ipxe/retry.h>
 #include <ipxe/linebuf.h>
 #include <ipxe/base64.h>
 #include <ipxe/base16.h>
@@ -103,6 +104,8 @@ enum http_flags {
 	HTTP_BASIC_AUTH = 0x0020,
 	/** Provide Digest authentication details */
 	HTTP_DIGEST_AUTH = 0x0040,
+	/** Socket must be reopened */
+	HTTP_REOPEN_SOCKET = 0x0080,
 };
 
 /** HTTP receive state */
@@ -179,6 +182,9 @@ struct http_request {
 	char *auth_nonce;
 	/** Authentication opaque string (if any) */
 	char *auth_opaque;
+
+	/** Request retry timer */
+	struct retry_timer timer;
 };
 
 /**
@@ -250,12 +256,42 @@ static int http_socket_open ( struct http_request *http ) {
 }
 
 /**
+ * Retry HTTP request
+ *
+ * @v timer		Retry timer
+ * @v fail		Failure indicator
+ */
+static void http_retry ( struct retry_timer *timer, int fail __unused ) {
+	struct http_request *http =
+		container_of ( timer, struct http_request, timer );
+	int rc;
+
+	/* Reopen socket if required */
+	if ( http->flags & HTTP_REOPEN_SOCKET ) {
+		http->flags &= ~HTTP_REOPEN_SOCKET;
+		DBGC ( http, "HTTP %p reopening connection\n", http );
+		if ( ( rc = http_socket_open ( http ) ) != 0 ) {
+			http_close ( http, rc );
+			return;
+		}
+	}
+
+	/* Retry the request if applicable */
+	if ( http->flags & HTTP_TRY_AGAIN ) {
+		http->flags &= ~HTTP_TRY_AGAIN;
+		DBGC ( http, "HTTP %p retrying request\n", http );
+		http->flags |= HTTP_TX_PENDING;
+		http->rx_state = HTTP_RX_RESPONSE;
+		process_add ( &http->process );
+	}
+}
+
+/**
  * Mark HTTP request as completed successfully
  *
  * @v http		HTTP request
  */
 static void http_done ( struct http_request *http ) {
-	int rc;
 
 	/* If we are not at an appropriate stage of the protocol
 	 * (including being in the middle of a chunked transfer),
@@ -296,25 +332,17 @@ static void http_done ( struct http_request *http ) {
 	}
 
 	/* If the server is not intending to keep the connection
-	 * alive, then reopen the socket.
+	 * alive, then close the socket and mark it as requiring
+	 * reopening.
 	 */
 	if ( ! ( http->flags & HTTP_SERVER_KEEPALIVE ) ) {
-		DBGC ( http, "HTTP %p reopening connection\n", http );
 		intf_restart ( &http->socket, 0 );
-		if ( ( rc = http_socket_open ( http ) ) != 0 ) {
-			http_close ( http, rc );
-			return;
-		}
+		http->flags &= ~HTTP_SERVER_KEEPALIVE;
+		http->flags |= HTTP_REOPEN_SOCKET;
 	}
-	http->flags &= ~HTTP_SERVER_KEEPALIVE;
 
-	/* Retry the request if applicable */
-	if ( http->flags & HTTP_TRY_AGAIN ) {
-		http->flags &= ~HTTP_TRY_AGAIN;
-		http->flags |= HTTP_TX_PENDING;
-		http->rx_state = HTTP_RX_RESPONSE;
-		process_add ( &http->process );
-	}
+	/* Start request retry timer */
+	start_timer_nodelay ( &http->timer );
 }
 
 /**
@@ -1467,6 +1495,7 @@ int http_open_filter ( struct interface *xfer, struct uri *uri,
 	http->filter = filter;
 	intf_init ( &http->socket, &http_socket_desc, &http->refcnt );
 	process_init ( &http->process, &http_process_desc, &http->refcnt );
+	timer_init ( &http->timer, http_retry, &http->refcnt );
 	http->flags = HTTP_TX_PENDING;
 
 	/* Open socket */
