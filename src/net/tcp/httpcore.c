@@ -43,6 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tcpip.h>
 #include <ipxe/process.h>
 #include <ipxe/retry.h>
+#include <ipxe/timer.h>
 #include <ipxe/linebuf.h>
 #include <ipxe/base64.h>
 #include <ipxe/base16.h>
@@ -87,6 +88,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** Block size used for HTTP block device request */
 #define HTTP_BLKSIZE 512
+
+/** Retry delay used when we cannot understand the Retry-After header */
+#define HTTP_RETRY_SECONDS 5
 
 /** HTTP flags */
 enum http_flags {
@@ -185,6 +189,8 @@ struct http_request {
 
 	/** Request retry timer */
 	struct retry_timer timer;
+	/** Retry delay (in timer ticks) */
+	unsigned long retry_delay;
 };
 
 /**
@@ -342,7 +348,8 @@ static void http_done ( struct http_request *http ) {
 	}
 
 	/* Start request retry timer */
-	start_timer_nodelay ( &http->timer );
+	start_timer_fixed ( &http->timer, http->retry_delay );
+	http->retry_delay = 0;
 }
 
 /**
@@ -664,6 +671,39 @@ static int http_rx_www_authenticate ( struct http_request *http, char *value ) {
 	return 0;
 }
 
+/**
+ * Handle HTTP Retry-After header
+ *
+ * @v http		HTTP request
+ * @v value		HTTP header value
+ * @ret rc		Return status code
+ */
+static int http_rx_retry_after ( struct http_request *http, char *value ) {
+	unsigned long seconds;
+	char *endp;
+
+	DBGC ( http, "HTTP %p retry requested (%s)\n", http, value );
+
+	/* If we received a 503 Service Unavailable response, then
+	 * retry after the specified number of seconds.  If the value
+	 * is not a simple number of seconds (e.g. a full HTTP date),
+	 * then retry after a fixed delay, since we don't have code
+	 * able to parse full HTTP dates.
+	 */
+	if ( http->code == 503 ) {
+		seconds = strtoul ( value, &endp, 10 );
+		if ( *endp != '\0' ) {
+			seconds = HTTP_RETRY_SECONDS;
+			DBGC ( http, "HTTP %p cannot understand \"%s\"; "
+			       "using %ld seconds\n", http, value, seconds );
+		}
+		http->flags |= HTTP_TRY_AGAIN;
+		http->retry_delay = ( seconds * TICKS_PER_SEC );
+	}
+
+	return 0;
+}
+
 /** An HTTP header handler */
 struct http_header_handler {
 	/** Name (e.g. "Content-Length") */
@@ -700,6 +740,10 @@ static struct http_header_handler http_header_handlers[] = {
 	{
 		.header = "WWW-Authenticate",
 		.rx = http_rx_www_authenticate,
+	},
+	{
+		.header = "Retry-After",
+		.rx = http_rx_retry_after,
 	},
 	{ NULL, NULL }
 };
