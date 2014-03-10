@@ -241,3 +241,14 @@ const struct setting asset_setting __setting ( SETTING_HOST_EXTRA, asset ) = {
 	.type = &setting_type_string,
 	.scope = &smbios_settings_scope,
 };
+
+/** Board serial setting - may differ from chassis serial*/
+const struct setting board_serial_setting __setting ( SETTING_HOST_EXTRA, board_serial ) = {
+	.name = "board-serial",
+	.description = "Base board serial",
+	.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_BASE_BOARD_INFORMATION,
+				   struct smbios_base_board_information,
+				   board_serial ),
+	.type = &setting_type_string,
+	.scope = &smbios_settings_scope,
+};
