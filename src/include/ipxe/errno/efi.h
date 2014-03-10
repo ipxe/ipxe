@@ -9,15 +9,15 @@
  * We derive our platform error codes from the possible values for
  * EFI_STATUS defined in the UEFI specification.
  *
- * EFI_STATUS codes are 32-bit values consisting of a top bit which is
- * set for errors and clear for warnings, and a mildly undefined
- * code of low bits indicating the precise error/warning code.
- * Errors and warnings have completely separate namespaces.
+ * EFI_STATUS codes are 32/64-bit values consisting of a top bit which
+ * is set for errors and clear for warnings, and a mildly undefined
+ * code of low bits indicating the precise error/warning code.  Errors
+ * and warnings have completely separate namespaces.
  *
  * We assume that no EFI_STATUS code will ever be defined which uses
  * more than bits 0-6 of the low bits.  We then choose to encode our
- * platform-specific error by mapping bit 31 of the EFI_STATUS to bit
- * 7 of the platform-specific error code, and preserving bits 0-6
+ * platform-specific error by mapping bit 31/63 of the EFI_STATUS to
+ * bit 7 of the platform-specific error code, and preserving bits 0-6
  * as-is.
  */
 
@@ -26,14 +26,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Uefi/UefiBaseType.h>
 
+/** Bit shift for EFI error/warning bit */
+#define EFI_ERR_SHIFT ( 8 * ( sizeof ( EFI_STATUS ) - 1 ) )
+
 /**
  * Convert platform error code to platform component of iPXE error code
  *
  * @v platform		Platform error code
  * @ret errno		Platform component of iPXE error code
  */
-#define PLATFORM_TO_ERRNO( platform ) \
-	( ( (platform) | ( (platform) >> 24 ) ) & 0xff )
+#define PLATFORM_TO_ERRNO( platform )					\
+	( ( (platform) |						\
+	    ( ( ( EFI_STATUS ) (platform) ) >> EFI_ERR_SHIFT ) ) & 0xff )
 
 /**
  * Convert iPXE error code to platform error code
@@ -41,8 +45,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v errno		iPXE error code
  * @ret platform	Platform error code
  */
-#define ERRNO_TO_PLATFORM( errno ) \
-	( ( ( (errno) << 24 ) | (errno) ) & 0x8000007f )
+#define ERRNO_TO_PLATFORM( errno )					\
+	( ( ( ( EFI_STATUS ) (errno) & 0x80 ) << EFI_ERR_SHIFT ) |	\
+	  ( (errno) & 0x7f ) )
 
 /* Platform-specific error codes */
 #define PLATFORM_ENOERR		EFI_SUCCESS
