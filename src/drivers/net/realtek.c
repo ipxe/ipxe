@@ -413,6 +413,7 @@ static void realtek_check_link ( struct net_device *netdev ) {
 
 	/* Determine link state */
 	if ( rtl->have_phy_regs ) {
+		mii_dump ( &rtl->mii );
 		phystatus = readb ( rtl->regs + RTL_PHYSTATUS );
 		link_up = ( phystatus & RTL_PHYSTATUS_LINKSTS );
 		DBGC ( rtl, "REALTEK %p PHY status is %02x (%s%s%s%s%s%s, "
