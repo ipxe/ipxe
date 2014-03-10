@@ -92,7 +92,7 @@ static int console_exec ( int argc, char **argv ) {
 	if ( opts.picture ) {
 
 		/* Acquire image */
-		if ( ( rc = imgacquire ( opts.picture, &image ) ) != 0 )
+		if ( ( rc = imgacquire ( opts.picture, 0, &image ) ) != 0 )
 			goto err_acquire;
 
 		/* Convert to pixel buffer */

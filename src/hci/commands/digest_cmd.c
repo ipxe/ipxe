@@ -77,7 +77,7 @@ static int digest_exec ( int argc, char **argv,
 	for ( i = optind ; i < argc ; i++ ) {
 
 		/* Acquire image */
-		if ( ( rc = imgacquire ( argv[i], &image ) ) != 0 )
+		if ( ( rc = imgacquire ( argv[i], 0, &image ) ) != 0 )
 			continue;
 		offset = 0;
 		len = image->len;

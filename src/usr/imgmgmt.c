@@ -40,10 +40,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Download a new image
  *
  * @v uri		URI
+ * @v timeout		Download timeout
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload ( struct uri *uri, struct image **image ) {
+int imgdownload ( struct uri *uri, unsigned long timeout,
+		  struct image **image ) {
 	const char *password;
 	char *uri_string_redacted;
 	int rc;
@@ -80,7 +82,7 @@ int imgdownload ( struct uri *uri, struct image **image ) {
 	}
 
 	/* Wait for download to complete */
-	if ( ( rc = monojob_wait ( uri_string_redacted, 0 ) ) != 0 )
+	if ( ( rc = monojob_wait ( uri_string_redacted, timeout ) ) != 0 )
 		goto err_monojob_wait;
 
 	/* Register image */
@@ -105,17 +107,19 @@ int imgdownload ( struct uri *uri, struct image **image ) {
  * Download a new image
  *
  * @v uri_string	URI string
+ * @v timeout		Download timeout
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload_string ( const char *uri_string, struct image **image ) {
+int imgdownload_string ( const char *uri_string, unsigned long timeout,
+			 struct image **image ) {
 	struct uri *uri;
 	int rc;
 
 	if ( ! ( uri = parse_uri ( uri_string ) ) )
 		return -ENOMEM;
 
-	rc = imgdownload ( uri, image );
+	rc = imgdownload ( uri, timeout, image );
 
 	uri_put ( uri );
 	return rc;
@@ -125,10 +129,12 @@ int imgdownload_string ( const char *uri_string, struct image **image ) {
  * Acquire an image
  *
  * @v name_uri		Name or URI string
+ * @v timeout		Download timeout
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgacquire ( const char *name_uri, struct image **image ) {
+int imgacquire ( const char *name_uri, unsigned long timeout,
+		 struct image **image ) {
 
 	/* If we already have an image with the specified name, use it */
 	*image = find_image ( name_uri );
@@ -136,7 +142,7 @@ int imgacquire ( const char *name_uri, struct image **image ) {
 		return 0;
 
 	/* Otherwise, download a new image */
-	return imgdownload_string ( name_uri, image );
+	return imgdownload_string ( name_uri, timeout, image );
 }
 
 /**

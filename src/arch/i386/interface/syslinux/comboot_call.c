@@ -188,7 +188,8 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 		DBG ( "COMBOOT: fetching initrd '%s'\n", initrd_file );
 
 		/* Fetch initrd */
-		if ( ( rc = imgdownload_string ( initrd_file, &initrd ) ) != 0){
+		if ( ( rc = imgdownload_string ( initrd_file, 0,
+						 &initrd ) ) != 0 ) {
 			DBG ( "COMBOOT: could not fetch initrd: %s\n",
 			      strerror ( rc ) );
 			return rc;
@@ -202,7 +203,7 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 	DBG ( "COMBOOT: fetching kernel '%s'\n", kernel_file );
 
 	/* Fetch kernel */
-	if ( ( rc = imgdownload_string ( kernel_file, &kernel ) ) != 0 ) {
+	if ( ( rc = imgdownload_string ( kernel_file, 0, &kernel ) ) != 0 ) {
 		DBG ( "COMBOOT: could not fetch kernel: %s\n",
 		      strerror ( rc ) );
 		return rc;
