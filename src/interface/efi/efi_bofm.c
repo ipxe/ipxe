@@ -387,7 +387,7 @@ static struct efi_driver efi_bofm_driver =
  * Install EFI BOFM driver
  *
  */
-static void efi_bofm_driver_init ( void ) {
+static void efi_bofm_driver_startup ( void ) {
 	struct efi_driver *efidrv = &efi_bofm_driver;
 	int rc;
 
@@ -401,7 +401,19 @@ static void efi_bofm_driver_init ( void ) {
 	DBGC ( efidrv, "EFIBOFM driver installed\n" );
 }
 
+/**
+ * Shut down EFI BOFM driver
+ *
+ * @v booting		System is shutting down for OS boot
+ */
+static void efi_bofm_driver_shutdown ( int booting __unused ) {
+	struct efi_driver *efidrv = &efi_bofm_driver;
+
+	efi_driver_uninstall ( efidrv );
+}
+
 /** EFI BOFM startup function */
 struct startup_fn startup_bofm __startup_fn ( STARTUP_EARLY ) = {
-	.startup = efi_bofm_driver_init,
+	.startup = efi_bofm_driver_startup,
+	.shutdown = efi_bofm_driver_shutdown,
 };

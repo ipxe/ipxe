@@ -122,7 +122,7 @@ efi_driver_get_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
  * Install EFI driver
  *
  * @v efidrv		EFI driver
- * @ret efirc		EFI status code
+ * @ret rc		Return status code
  */
 int efi_driver_install ( struct efi_driver *efidrv ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
@@ -143,7 +143,9 @@ int efi_driver_install ( struct efi_driver *efidrv ) {
 	efi_snprintf ( efidrv->wname,
 		       ( sizeof ( efidrv->wname ) /
 			 sizeof ( efidrv->wname[0] ) ),
-		       PRODUCT_SHORT_NAME " - %s", efidrv->name );
+		       PRODUCT_SHORT_NAME "%s%s",
+		       ( efidrv->name ? " - " : "" ),
+		       ( efidrv->name ? efidrv->name : "" ) );
 
 	/* Install driver */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
@@ -159,4 +161,44 @@ int efi_driver_install ( struct efi_driver *efidrv ) {
 
 	DBGC ( efidrv, "EFIDRV %s installed\n", efidrv->name );
 	return 0;
+}
+
+/**
+ * Uninstall EFI driver
+ *
+ * @v efidrv		EFI driver
+ */
+void efi_driver_uninstall ( struct efi_driver *efidrv ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE *handles;
+	UINTN num_handles;
+	EFI_STATUS efirc;
+	UINTN i;
+	int rc;
+
+	/* Disconnect the driver from its devices */
+	if ( ( efirc = bs->LocateHandleBuffer ( AllHandles, NULL, NULL,
+						&num_handles,
+						&handles ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( efidrv, "EFIDRV %s could not list handles: %s\n",
+		       efidrv->name, strerror ( rc ) );
+		/* No way to disconnect driver; leave it loaded */
+		return;
+	}
+	DBGC ( efidrv, "EFIDRV %s disconnecting devices\n", efidrv->name );
+	for ( i = 0 ; i < num_handles ; i++ ) {
+		bs->DisconnectController ( handles[i],
+					   efidrv->driver.DriverBindingHandle,
+					   NULL );
+	}
+	bs->FreePool ( handles );
+
+	/* Uninstall the driver */
+	bs->UninstallMultipleProtocolInterfaces (
+			efidrv->driver.DriverBindingHandle,
+			&efi_driver_binding_protocol_guid, &efidrv->driver,
+			&efi_component_name2_protocol_guid, &efidrv->wtf,
+			NULL );
+	DBGC ( efidrv, "EFIDRV %s uninstalled\n", efidrv->name );
 }

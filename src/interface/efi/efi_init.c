@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/uuid.h>
@@ -49,6 +50,64 @@ static EFI_GUID efi_loaded_image_device_path_protocol_guid
 
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
+
+/* Forward declarations */
+static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle );
+
+/**
+ * Check to see if driver supports a device
+ *
+ * @v driver		EFI driver
+ * @v device		EFI device
+ * @v child		Path to child device, if any
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_image_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
+		    EFI_HANDLE device __unused,
+		    EFI_DEVICE_PATH_PROTOCOL *child __unused ) {
+
+	return EFI_UNSUPPORTED;
+}
+
+/**
+ * Attach driver to device
+ *
+ * @v driver		EFI driver
+ * @v device		EFI device
+ * @v child		Path to child device, if any
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_image_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
+		EFI_HANDLE device __unused,
+		EFI_DEVICE_PATH_PROTOCOL *child __unused ) {
+
+	return EFI_UNSUPPORTED;
+}
+
+/**
+ * Detach driver from device
+ *
+ * @v driver		EFI driver
+ * @v device		EFI device
+ * @v pci		PCI device
+ * @v num_children	Number of child devices
+ * @v children		List of child devices
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_image_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
+	       EFI_HANDLE device __unused, UINTN num_children __unused,
+	       EFI_HANDLE *children __unused ) {
+
+	return EFI_UNSUPPORTED;
+}
+
+/** EFI loaded image driver */
+static struct efi_driver efi_image_driver =
+	EFI_DRIVER_INIT ( NULL, efi_image_supported, efi_image_start,
+			  efi_image_stop );
 
 /**
  * Shut down in preparation for booting an OS.
@@ -188,6 +247,44 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 		       "%s\n", strerror ( rc ) );
 		return efirc;
 	}
+
+	/* Install an EFI driver on the image handle, to allow the
+	 * driver to be subsequently unloaded.
+	 */
+	efi_image_driver.driver.DriverBindingHandle = image_handle;
+	if ( ( rc = efi_driver_install ( &efi_image_driver ) ) != 0 ) {
+		DBGC ( systab, "EFI could not install loaded image driver: "
+		       "%s\n", strerror ( rc ) );
+		return EFIRC ( rc );
+	}
+
+	/* Install image unload method */
+	efi_loaded_image->Unload = efi_unload;
+
+	return 0;
+}
+
+/**
+ * Shut down EFI environment
+ *
+ * @v image_handle	Image handle
+ */
+static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_SYSTEM_TABLE *systab = efi_systab;
+
+	DBGC ( systab, "EFI image unloading\n" );
+
+	/* Shut down */
+	shutdown_exit();
+
+	/* Uninstall exit boot services event */
+	bs->CloseEvent ( efi_shutdown_event );
+
+	/* Uninstall loaded image driver */
+	efi_driver_uninstall ( &efi_image_driver );
+
+	DBGC ( systab, "EFI image unloaded\n" );
 
 	return 0;
 }
