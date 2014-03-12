@@ -145,6 +145,8 @@ static void nfs_done ( struct nfs_request *nfs, int rc ) {
 
 	DBGC ( nfs, "NFS_OPEN %p completed (%s)\n", nfs, strerror ( rc ) );
 
+	free ( nfs->filename );
+
 	intf_shutdown ( &nfs->xfer, rc );
 	intf_shutdown ( &nfs->pm_intf, rc );
 	intf_shutdown ( &nfs->mount_intf, rc );
@@ -332,6 +334,15 @@ static int nfs_mount_deliver ( struct nfs_request *nfs,
 			DBGC ( nfs, "NFS_OPEN %p ENOTDIR received retrying" \
 			       "with %s\n", nfs, nfs->mountpoint );
 			goto done;
+		}
+
+		/* We need to strdup() nfs->filename since the code handling
+		 * symlink resolution make the assumption that it can be
+		 * free()ed. */
+		if ( ( nfs->filename = strdup ( nfs->filename ) ) == NULL )
+		{
+			rc = -ENOMEM;
+			goto err;
 		}
 
 		nfs->current_fh = mnt_reply.fh;
