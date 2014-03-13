@@ -75,7 +75,7 @@ void _wputch ( WINDOW *win, chtype ch, int wrap ) {
  * @v wrap	wrap "switch"
  */
 void _wputc ( WINDOW *win, char c, int wrap ) {
-	_wputch ( win, ( c | win->attrs ), wrap );
+	_wputch ( win, ( ( ( unsigned char ) c ) | win->attrs ), wrap );
 }
 
 /**

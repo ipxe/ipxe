@@ -167,7 +167,7 @@ static char * format_decimal ( char *end, signed long num, int width,
  * Call's the printf_context::handler() method and increments
  * printf_context::len.
  */
-static inline void cputchar ( struct printf_context *ctx, unsigned int c ) {
+static inline void cputchar ( struct printf_context *ctx, unsigned char c ) {
 	ctx->handler ( ctx, c );
 	++ctx->len;
 }
