@@ -109,6 +109,34 @@ static void netdev_notify ( struct net_device *netdev ) {
 }
 
 /**
+ * Freeze network device receive queue processing
+ *
+ * @v netdev		Network device
+ */
+void netdev_rx_freeze ( struct net_device *netdev ) {
+
+	/* Mark receive queue processing as frozen */
+	netdev->state |= NETDEV_RX_FROZEN;
+
+	/* Notify drivers of change */
+	netdev_notify ( netdev );
+}
+
+/**
+ * Unfreeze network device receive queue processing
+ *
+ * @v netdev		Network device
+ */
+void netdev_rx_unfreeze ( struct net_device *netdev ) {
+
+	/* Mark receive queue processing as not frozen */
+	netdev->state &= ~NETDEV_RX_FROZEN;
+
+	/* Notify drivers of change */
+	netdev_notify ( netdev );
+}
+
+/**
  * Mark network device as having a specific link state
  *
  * @v netdev		Network device

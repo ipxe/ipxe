@@ -658,6 +658,8 @@ netdev_rx_frozen ( struct net_device *netdev ) {
 	return ( netdev->state & NETDEV_RX_FROZEN );
 }
 
+extern void netdev_rx_freeze ( struct net_device *netdev );
+extern void netdev_rx_unfreeze ( struct net_device *netdev );
 extern void netdev_link_err ( struct net_device *netdev, int rc );
 extern void netdev_link_down ( struct net_device *netdev );
 extern int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf );
@@ -731,26 +733,6 @@ static inline void netdev_tx_complete_next ( struct net_device *netdev ) {
 static inline __attribute__ (( always_inline )) void
 netdev_link_up ( struct net_device *netdev ) {
 	netdev_link_err ( netdev, 0 );
-}
-
-/**
- * Freeze network device receive queue processing
- *
- * @v netdev		Network device
- */
-static inline __attribute__ (( always_inline )) void
-netdev_rx_freeze ( struct net_device *netdev ) {
-	netdev->state |= NETDEV_RX_FROZEN;
-}
-
-/**
- * Unfreeze network device receive queue processing
- *
- * @v netdev		Network device
- */
-static inline __attribute__ (( always_inline )) void
-netdev_rx_unfreeze ( struct net_device *netdev ) {
-	netdev->state &= ~NETDEV_RX_FROZEN;
 }
 
 #endif /* _IPXE_NETDEVICE_H */
