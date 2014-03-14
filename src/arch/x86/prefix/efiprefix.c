@@ -37,11 +37,16 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 
 	/* Initialise EFI environment */
 	if ( ( efirc = efi_init ( image_handle, systab ) ) != 0 )
-		return efirc;
+		goto err_init;
 
 	/* Call to main() */
-	if ( ( rc = main() ) != 0 )
-		return EFIRC ( rc );
+	if ( ( rc = main() ) != 0 ) {
+		efirc = EFIRC ( rc );
+		goto err_main;
+	}
 
-	return 0;
+ err_main:
+	efi_loaded_image->Unload ( image_handle );
+ err_init:
+	return efirc;
 }
