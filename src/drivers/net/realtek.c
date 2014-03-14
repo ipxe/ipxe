@@ -50,6 +50,33 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /******************************************************************************
  *
+ * Debugging
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Dump all registers (for debugging)
+ *
+ * @v rtl		Realtek device
+ */
+static __attribute__ (( unused )) void realtek_dump ( struct realtek_nic *rtl ){
+	uint8_t regs[256];
+	unsigned int i;
+
+	/* Do nothing unless debug output is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Dump registers (via byte accesses; may not work for all registers) */
+	for ( i = 0 ; i < sizeof ( regs ) ; i++ )
+		regs[i] = readb ( rtl->regs + i );
+	DBGC ( rtl, "REALTEK %p register dump:\n", rtl );
+	DBGC_HDA ( rtl, 0, regs, sizeof ( regs ) );
+}
+
+/******************************************************************************
+ *
  * EEPROM interface
  *
  ******************************************************************************
