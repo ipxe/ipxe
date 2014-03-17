@@ -708,8 +708,8 @@ static int realtek_open ( struct net_device *netdev ) {
 
 	/* Configure receiver */
 	rcr = readl ( rtl->regs + RTL_RCR );
-	rcr &= ~( RTL_RCR_RXFTH_MASK | RTL_RCR_RBLEN_MASK |
-		  RTL_RCR_MXDMA_MASK );
+	rcr &= ~( RTL_RCR_STOP_WORKING | RTL_RCR_RXFTH_MASK |
+		  RTL_RCR_RBLEN_MASK | RTL_RCR_MXDMA_MASK );
 	rcr |= ( RTL_RCR_RXFTH_DEFAULT | RTL_RCR_RBLEN_DEFAULT |
 		 RTL_RCR_MXDMA_DEFAULT | RTL_RCR_WRAP | RTL_RCR_AB |
 		 RTL_RCR_AM | RTL_RCR_APM | RTL_RCR_AAP );
