@@ -179,7 +179,7 @@ static int validator_append ( struct validator *validator,
 		}
 		cert = x509_last ( certs );
 		DBGC ( validator, "VALIDATOR %p found certificate %s\n",
-		       validator, cert->subject.name );
+		       validator, x509_name ( cert ) );
 
 		/* Move to next certificate */
 		asn1_skip_any ( &cursor );

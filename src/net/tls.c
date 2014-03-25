@@ -49,10 +49,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/tls.h>
 
 /* Disambiguate the various error causes */
-#define EACCES_WRONG_NAME __einfo_error ( EINFO_EACCES_WRONG_NAME )
-#define EINFO_EACCES_WRONG_NAME						\
-	__einfo_uniqify ( EINFO_EACCES, 0x02,				\
-			  "Incorrect server name" )
 #define EINVAL_CHANGE_CIPHER __einfo_error ( EINFO_EINVAL_CHANGE_CIPHER )
 #define EINFO_EINVAL_CHANGE_CIPHER					\
 	__einfo_uniqify ( EINFO_EINVAL, 0x01,				\
@@ -1479,7 +1475,7 @@ static int tls_parse_chain ( struct tls_session *tls,
 		}
 		cert = x509_last ( tls->chain );
 		DBGC ( tls, "TLS %p found certificate %s\n",
-		       tls, cert->subject.name );
+		       tls, x509_name ( cert ) );
 
 		/* Move to next certificate in list */
 		data = next;
@@ -2454,11 +2450,9 @@ static void tls_validator_done ( struct tls_session *tls, int rc ) {
 	assert ( cert != NULL );
 
 	/* Verify server name */
-	if ( ( cert->subject.name == NULL ) ||
-	     ( strcmp ( cert->subject.name, tls->name ) != 0 ) ) {
-		DBGC ( tls, "TLS %p server name incorrect (expected %s, got "
-		       "%s)\n", tls, tls->name, cert->subject.name );
-		rc = -EACCES_WRONG_NAME;
+	if ( ( rc = x509_check_name ( cert, tls->name ) ) != 0 ) {
+		DBGC ( tls, "TLS %p server certificate does not match %s: %s\n",
+		       tls, tls->name, strerror ( rc ) );
 		goto err;
 	}
 

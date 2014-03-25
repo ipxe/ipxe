@@ -130,7 +130,7 @@ static int cms_parse_certificates ( struct cms_signature *sig,
 		}
 		cert = x509_last ( sig->certificates );
 		DBGC ( sig, "CMS %p found certificate %s\n",
-		       sig, cert->subject.name );
+		       sig, x509_name ( cert ) );
 
 		/* Move to next certificate */
 		asn1_skip_any ( &cursor );
@@ -680,8 +680,7 @@ int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
 	/* Verify using all signerInfos */
 	list_for_each_entry ( info, &sig->info, list ) {
 		cert = x509_first ( info->chain );
-		if ( name && ( ( cert->subject.name == NULL ) ||
-			       ( strcmp ( cert->subject.name, name ) != 0 ) ) )
+		if ( name && ( x509_check_name ( cert, name ) != 0 ) )
 			continue;
 		if ( ( rc = cms_verify_signer_info ( sig, info, data, len,
 						     time, root ) ) != 0 )

@@ -65,7 +65,7 @@ struct x509_subject {
 	/** Raw subject */
 	struct asn1_cursor raw;
 	/** Common name */
-	char *name;
+	struct asn1_cursor common_name;
 	/** Public key information */
 	struct x509_public_key public_key;
 };
@@ -330,11 +330,14 @@ struct x509_root {
 	const void *fingerprints;
 };
 
+extern const char * x509_name ( struct x509_certificate *cert );
+
 extern int x509_certificate ( const void *data, size_t len,
 			      struct x509_certificate **cert );
 extern int x509_validate ( struct x509_certificate *cert,
 			   struct x509_certificate *issuer,
 			   time_t time, struct x509_root *root );
+extern int x509_check_name ( struct x509_certificate *cert, const char *name );
 
 extern struct x509_chain * x509_alloc_chain ( void );
 extern int x509_append ( struct x509_chain *chain,
