@@ -206,17 +206,17 @@ static int ocsp_request ( struct ocsp_check *ocsp ) {
  * @ret rc		Return status code
  */
 static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
+	struct x509_ocsp_responder *responder =
+		&ocsp->cert->extensions.auth_info.ocsp;
 	struct uri path_uri;
-	char *base_uri_string;
 	char *path_base64_string;
 	char *path_uri_string;
 	size_t path_len;
-	int len;
+	size_t len;
 	int rc;
 
 	/* Sanity check */
-	base_uri_string = ocsp->cert->extensions.auth_info.ocsp.uri;
-	if ( ! base_uri_string ) {
+	if ( ! responder->uri.len ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" has no OCSP URI\n",
 		       ocsp, x509_name ( ocsp->cert ) );
 		rc = -ENOTTY;
@@ -244,11 +244,14 @@ static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
 	}
 
 	/* Construct URI string */
-	if ( ( len = asprintf ( &ocsp->uri_string, "%s/%s", base_uri_string,
-				path_uri_string ) ) < 0 ) {
-		rc = len;
+	len = ( responder->uri.len + strlen ( path_uri_string ) + 1 /* NUL */ );
+	ocsp->uri_string = zalloc ( len );
+	if ( ! ocsp->uri_string ) {
+		rc = -ENOMEM;
 		goto err_ocsp_uri;
 	}
+	memcpy ( ocsp->uri_string, responder->uri.data, responder->uri.len );
+	strcpy ( &ocsp->uri_string[responder->uri.len], path_uri_string );
 	DBGC2 ( ocsp, "OCSP %p \"%s\" URI is %s\n",
 		ocsp, x509_name ( ocsp->cert ), ocsp->uri_string );
 

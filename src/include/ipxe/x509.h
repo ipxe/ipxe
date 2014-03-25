@@ -133,7 +133,7 @@ enum x509_extended_key_usage_bits {
 /** X.509 certificate OCSP responder */
 struct x509_ocsp_responder {
 	/** URI */
-	char *uri;
+	struct asn1_cursor uri;
 	/** OCSP status is good */
 	int good;
 };

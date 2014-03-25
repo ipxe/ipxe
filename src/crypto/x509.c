@@ -131,20 +131,6 @@ const char * x509_name ( struct x509_certificate *cert ) {
 }
 
 /**
- * Free X.509 certificate
- *
- * @v refcnt		Reference count
- */
-static void x509_free ( struct refcnt *refcnt ) {
-	struct x509_certificate *cert =
-		container_of ( refcnt, struct x509_certificate, refcnt );
-
-	DBGC2 ( cert, "X509 %p freed\n", cert );
-	free ( cert->extensions.auth_info.ocsp.uri );
-	free ( cert );
-}
-
-/**
  * Discard a cached certificate
  *
  * @ret discarded	Number of cached items discarded
@@ -626,24 +612,19 @@ static int x509_parse_extended_key_usage ( struct x509_certificate *cert,
 static int x509_parse_ocsp ( struct x509_certificate *cert,
 			     const struct asn1_cursor *raw ) {
 	struct x509_ocsp_responder *ocsp = &cert->extensions.auth_info.ocsp;
-	struct asn1_cursor cursor;
+	struct asn1_cursor *uri = &ocsp->uri;
 	int rc;
 
 	/* Enter accessLocation */
-	memcpy ( &cursor, raw, sizeof ( cursor ) );
-	if ( ( rc = asn1_enter ( &cursor, ASN1_IMPLICIT_TAG ( 6 ) ) ) != 0 ) {
+	memcpy ( uri, raw, sizeof ( *uri ) );
+	if ( ( rc = asn1_enter ( uri, ASN1_IMPLICIT_TAG ( 6 ) ) ) != 0 ) {
 		DBGC ( cert, "X509 %p OCSP does not contain "
 		       "uniformResourceIdentifier:\n", cert );
 		DBGC_HDA ( cert, 0, raw->data, raw->len );
 		return rc;
 	}
-
-	/* Record URI */
-	ocsp->uri = zalloc ( cursor.len + 1 /* NUL */ );
-	if ( ! ocsp->uri )
-		return -ENOMEM;
-	memcpy ( ocsp->uri, cursor.data, cursor.len );
-	DBGC2 ( cert, "X509 %p OCSP URI is %s:\n", cert, ocsp->uri );
+	DBGC2 ( cert, "X509 %p OCSP URI is:\n", cert );
+	DBGC2_HDA ( cert, 0, uri->data, uri->len );
 
 	return 0;
 }
@@ -1073,7 +1054,7 @@ int x509_certificate ( const void *data, size_t len,
 	*cert = zalloc ( sizeof ( **cert ) + cursor.len );
 	if ( ! *cert )
 		return -ENOMEM;
-	ref_init ( &(*cert)->refcnt, x509_free );
+	ref_init ( &(*cert)->refcnt, NULL );
 	INIT_LIST_HEAD ( &(*cert)->list );
 	raw = ( *cert + 1 );
 
@@ -1363,7 +1344,7 @@ int x509_validate ( struct x509_certificate *cert,
 	}
 
 	/* Fail if OCSP is required */
-	if ( cert->extensions.auth_info.ocsp.uri &&
+	if ( cert->extensions.auth_info.ocsp.uri.len &&
 	     ( ! cert->extensions.auth_info.ocsp.good ) ) {
 		DBGC ( cert, "X509 %p \"%s\" requires an OCSP check\n",
 		       cert, x509_name ( cert ) );
