@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <strings.h>
 #include <byteswap.h>
 #include <errno.h>
+#include <ctype.h>
 #include <assert.h>
 #include <ipxe/uri.h>
 #include <ipxe/refcnt.h>
@@ -441,7 +442,7 @@ static int http_rx_content_length ( struct http_request *http, char *value ) {
 
 	/* Parse content length */
 	content_len = strtoul ( value, &endp, 10 );
-	if ( *endp != '\0' ) {
+	if ( ! ( ( *endp == '\0' ) || isspace ( *endp ) ) ) {
 		DBGC ( http, "HTTP %p invalid Content-Length \"%s\"\n",
 		       http, value );
 		return -EINVAL_CONTENT_LENGTH;
