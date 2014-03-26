@@ -1139,15 +1139,6 @@ endif
 endif
 endif
 
-# Wrap up binary blobs (for embedded images)
-#
-$(BIN)/%.o : payload/%.img
-	$(QM)echo "  [WRAP] $@"
-	$(Q)$(LD) -b binary -r -o $@ $< --undefined obj_payload \
-		--defsym obj_$*=0
-
-BOBJS += $(patsubst payload/%.img,$(BIN)/%.o,$(wildcard payload/*.img))
-
 # Alias for ipxe.%
 #
 $(BIN)/etherboot.% : $(BIN)/ipxe.%
