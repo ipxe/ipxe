@@ -157,6 +157,16 @@ struct pubkey_algorithm {
 	 * @v ctx		Context
 	 */
 	void ( * final ) ( void *ctx );
+	/** Check that public key matches private key
+	 *
+	 * @v private_key	Private key
+	 * @v private_key_len	Private key length
+	 * @v public_key	Public key
+	 * @v public_key_len	Public key length
+	 * @ret rc		Return status code
+	 */
+	int ( * match ) ( const void *private_key, size_t private_key_len,
+			  const void *public_key, size_t public_key_len );
 };
 
 static inline void digest_init ( struct digest_algorithm *digest,
@@ -243,6 +253,14 @@ static inline int pubkey_verify ( struct pubkey_algorithm *pubkey, void *ctx,
 
 static inline void pubkey_final ( struct pubkey_algorithm *pubkey, void *ctx ) {
 	pubkey->final ( ctx );
+}
+
+static inline int pubkey_match ( struct pubkey_algorithm *pubkey,
+				 const void *private_key,
+				 size_t private_key_len, const void *public_key,
+				 size_t public_key_len ) {
+	return pubkey->match ( private_key, private_key_len, public_key,
+			       public_key_len );
 }
 
 extern struct digest_algorithm digest_null;
