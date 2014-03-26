@@ -674,9 +674,8 @@ CFLAGS_clientcert += $(if $(PRIVKEY),-DPRIVATE_KEY="\"$(PRIVKEY_INC)\"")
 # Unfortunately ccache does not detect this dependency and caches
 # builds even when the binary file has changed.
 #
-$(BIN)/embedded.o : override CC := env CCACHE_DISABLE=1 $(CC)
-
-$(BIN)/clientcert.o : override CC := env CCACHE_DISABLE=1 $(CC)
+$(BIN)/embedded.% : override CC := env CCACHE_DISABLE=1 $(CC)
+$(BIN)/clientcert.% : override CC := env CCACHE_DISABLE=1 $(CC)
 
 # Version number
 #
@@ -686,7 +685,7 @@ CFLAGS_version += -DVERSION_MAJOR=$(VERSION_MAJOR) \
 		  -DVERSION="\"$(VERSION)\""
 # Make sure the version number gets updated on every git checkout
 ifneq ($(GITVERSION),)
-$(BIN)/version.o : ../.git/index
+$(BIN)/version.% : ../.git/index
 endif
 
 # We automatically generate rules for any file mentioned in AUTO_SRCS
