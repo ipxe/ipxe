@@ -560,7 +560,7 @@ ifneq ($(EMBED_OLD),$(EMBED))
 $(shell $(ECHO) "$(EMBED)" > $(EMBEDDED_LIST))
 endif
 
-$(EMBEDDED_LIST) :
+$(EMBEDDED_LIST) : $(MAKEDEPS)
 
 VERYCLEANUP	+= $(EMBEDDED_LIST)
 
@@ -585,7 +585,7 @@ ifneq ($(TRUST_OLD),$(TRUST))
 $(shell $(ECHO) "$(TRUST)" > $(TRUSTED_LIST))
 endif
 
-$(TRUSTED_LIST) :
+$(TRUSTED_LIST) : $(MAKEDEPS)
 
 VERYCLEANUP	+= $(TRUSTED_LIST)
 
@@ -613,7 +613,7 @@ ifneq ($(CERT_OLD),$(CERT))
 $(shell $(ECHO) "$(CERT)" > $(CERT_LIST))
 endif
 
-$(CERT_LIST) :
+$(CERT_LIST) : $(MAKEDEPS)
 
 VERYCLEANUP += $(CERT_LIST)
 
@@ -649,7 +649,7 @@ ifneq ($(PRIVKEY_OLD),$(PRIVKEY))
 $(shell $(ECHO) "$(PRIVKEY)" > $(PRIVKEY_LIST))
 endif
 
-$(PRIVKEY_LIST) :
+$(PRIVKEY_LIST) : $(MAKEDEPS)
 
 VERYCLEANUP += $(PRIVKEY_LIST)
 
@@ -938,7 +938,7 @@ ifneq ($(BLIB_OBJS_OLD),$(BLIB_OBJS))
 $(shell $(ECHO) "$(BLIB_OBJS)" > $(BLIB_LIST))
 endif
 
-$(BLIB_LIST) :
+$(BLIB_LIST) : $(MAKEDEPS)
 
 VERYCLEANUP	+= $(BLIB_LIST)
 
