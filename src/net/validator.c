@@ -458,7 +458,7 @@ static void validator_step ( struct validator *validator ) {
 	 * previously.
 	 */
 	now = time ( NULL );
-	if ( ( rc = x509_validate_chain ( validator->chain, now,
+	if ( ( rc = x509_validate_chain ( validator->chain, now, NULL,
 					  NULL ) ) == 0 ) {
 		validator_finished ( validator, 0 );
 		return;

@@ -24,7 +24,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/list.h>
-#include <ipxe/malloc.h>
 #include <ipxe/asn1.h>
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
@@ -32,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/sha256.h>
 #include <ipxe/rsa.h>
 #include <ipxe/rootcert.h>
+#include <ipxe/certstore.h>
 #include <ipxe/x509.h>
 
 /** @file
@@ -107,9 +107,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_error ( EINFO_EACCES_WRONG_NAME )
 #define EINFO_EACCES_WRONG_NAME \
 	__einfo_uniqify ( EINFO_EACCES, 0x0a, "Incorrect certificate name" )
-
-/** Certificate cache */
-static LIST_HEAD ( x509_cache );
+#define EACCES_USELESS \
+	__einfo_error ( EINFO_EACCES_USELESS )
+#define EINFO_EACCES_USELESS \
+	__einfo_uniqify ( EINFO_EACCES, 0x0b, "No usable certificates" )
 
 /**
  * Get X.509 certificate name (for debugging)
@@ -129,32 +130,6 @@ const char * x509_name ( struct x509_certificate *cert ) {
 	buf[len] = '\0';
 	return buf;
 }
-
-/**
- * Discard a cached certificate
- *
- * @ret discarded	Number of cached items discarded
- */
-static unsigned int x509_discard ( void ) {
-	struct x509_certificate *cert;
-
-	/* Discard the least recently used certificate for which the
-	 * only reference is held by the cache itself.
-	 */
-	list_for_each_entry_reverse ( cert, &x509_cache, list ) {
-		if ( cert->refcnt.count == 0 ) {
-			list_del ( &cert->list );
-			x509_put ( cert );
-			return 1;
-		}
-	}
-	return 0;
-}
-
-/** X.509 cache discarder */
-struct cache_discarder x509_discarder __cache_discarder ( CACHE_NORMAL ) = {
-	.discard = x509_discard,
-};
 
 /** "commonName" object identifier */
 static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
@@ -955,8 +930,8 @@ static int x509_parse_tbscertificate ( struct x509_certificate *cert,
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int x509_parse ( struct x509_certificate *cert,
-			const struct asn1_cursor *raw ) {
+int x509_parse ( struct x509_certificate *cert,
+		 const struct asn1_cursor *raw ) {
 	struct x509_signature *signature = &cert->signature;
 	struct asn1_algorithm **signature_algorithm = &signature->algorithm;
 	struct asn1_bit_string *signature_value = &signature->value;
@@ -1032,22 +1007,12 @@ int x509_certificate ( const void *data, size_t len,
 	cursor.len = len;
 	asn1_shrink_any ( &cursor );
 
-	/* Search for certificate within cache */
-	list_for_each_entry ( (*cert), &x509_cache, list ) {
-		if ( asn1_compare ( &cursor, &(*cert)->raw ) == 0 ) {
+	/* Return stored certificate, if present */
+	if ( ( *cert = certstore_find ( &cursor ) ) != NULL ) {
 
-			DBGC2 ( *cert, "X509 %p \"%s\" cache hit\n",
-				*cert, x509_name ( *cert ) );
-
-			/* Mark as most recently used */
-			list_del ( &(*cert)->list );
-			list_add ( &(*cert)->list, &x509_cache );
-
-			/* Add caller's reference */
-			x509_get ( *cert );
-
-			return 0;
-		}
+		/* Add caller's reference */
+		x509_get ( *cert );
+		return 0;
 	}
 
 	/* Allocate and initialise certificate */
@@ -1055,7 +1020,6 @@ int x509_certificate ( const void *data, size_t len,
 	if ( ! *cert )
 		return -ENOMEM;
 	ref_init ( &(*cert)->refcnt, NULL );
-	INIT_LIST_HEAD ( &(*cert)->list );
 	raw = ( *cert + 1 );
 
 	/* Copy raw data */
@@ -1069,9 +1033,8 @@ int x509_certificate ( const void *data, size_t len,
 		return rc;
 	}
 
-	/* Add certificate to cache */
-	x509_get ( *cert );
-	list_add ( &(*cert)->list, &x509_cache );
+	/* Add certificate to store */
+	certstore_add ( *cert );
 
 	return 0;
 }
@@ -1221,7 +1184,7 @@ void x509_fingerprint ( struct x509_certificate *cert,
  * Check X.509 root certificate
  *
  * @v cert		X.509 certificate
- * @v root		X.509 root certificate store
+ * @v root		X.509 root certificate list
  * @ret rc		Return status code
  */
 int x509_check_root ( struct x509_certificate *cert, struct x509_root *root ) {
@@ -1282,7 +1245,7 @@ int x509_check_time ( struct x509_certificate *cert, time_t time ) {
  * @v cert		X.509 certificate
  * @v issuer		Issuing X.509 certificate (or NULL)
  * @v time		Time at which to validate certificate
- * @v root		Root certificate store, or NULL to use default
+ * @v root		Root certificate list, or NULL to use default
  * @ret rc		Return status code
  *
  * The issuing certificate must have already been validated.
@@ -1533,7 +1496,7 @@ int x509_auto_append ( struct x509_chain *chain, struct x509_chain *certs ) {
 	cert = x509_last ( chain );
 	if ( ! cert ) {
 		DBGC ( chain, "X509 chain %p has no certificates\n", chain );
-		return -EINVAL;
+		return -EACCES_EMPTY;
 	}
 
 	/* Append certificates, in order */
@@ -1560,17 +1523,23 @@ int x509_auto_append ( struct x509_chain *chain, struct x509_chain *certs ) {
  *
  * @v chain		X.509 certificate chain
  * @v time		Time at which to validate certificates
- * @v root		Root certificate store, or NULL to use default
+ * @v store		Certificate store, or NULL to use default
+ * @v root		Root certificate list, or NULL to use default
  * @ret rc		Return status code
  */
 int x509_validate_chain ( struct x509_chain *chain, time_t time,
-			  struct x509_root *root ) {
+			  struct x509_chain *store, struct x509_root *root ) {
 	struct x509_certificate *issuer = NULL;
 	struct x509_link *link;
 	int rc;
 
-	/* Error to be used if chain contains no certifictes */
-	rc = -EACCES_EMPTY;
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
+	/* Append any applicable certificates from the certificate store */
+	if ( ( rc = x509_auto_append ( chain, store ) ) != 0 )
+		return rc;
 
 	/* Find first certificate that can be validated as a
 	 * standalone (i.e.  is already valid, or can be validated as
@@ -1600,7 +1569,9 @@ int x509_validate_chain ( struct x509_chain *chain, time_t time,
 		return 0;
 	}
 
-	DBGC ( chain, "X509 chain %p found no valid certificates: %s\n",
-	       chain, strerror ( rc ) );
-	return rc;
+	DBGC ( chain, "X509 chain %p found no usable certificates\n", chain );
+	return -EACCES_USELESS;
 }
+
+/* Drag in certificate store */
+REQUIRE_OBJECT ( certstore );

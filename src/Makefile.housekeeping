@@ -601,7 +601,7 @@ rootcert_DEPS += $(TRUSTED_FILES) $(TRUSTED_LIST)
 
 CFLAGS_rootcert = $(if $(TRUSTED_FPS),-DTRUSTED="$(TRUSTED_FPS)")
 
-# (Single-element) list of client certificates
+# List of embedded certificates
 #
 CERT_LIST := $(BIN)/.certificate.list
 ifeq ($(wildcard $(CERT_LIST)),)
@@ -617,24 +617,43 @@ $(CERT_LIST) : $(MAKEDEPS)
 
 VERYCLEANUP += $(CERT_LIST)
 
-# Embedded client certificate
+# Embedded certificates concatenated and then split into one file per
+# certificate (even if original files contained certificate chains)
 #
-CERT_INC := $(BIN)/.certificate.der
+CERT_FILES := $(subst $(COMMA), ,$(CERT))
+CERT_CONCAT := $(BIN)/.certificates.pem
 
-ifdef CERT
-$(CERT_INC) : $(CERT) $(CERT_LIST)
+ifneq ($(CERT),)
+
+CERT_COUNT := $(shell grep "BEGIN CERTIFICATE" $(CERT_FILES) | wc -l)
+
+$(CERT_CONCAT) : $(CERT_FILES) $(CERT_LIST)
+	$(Q)cat $(CERT_FILES) > $@
+
+# We must use an (otherwise unnecessary) pattern rule here to encode
+# the fact that one "csplit" command generates multiple targets
+CERT_PEMS := $(foreach i,$(call seq,1,$(CERT_COUNT)),\
+	       $(BIN)/.certificate.pem.$(i))
+$(subst .pem.,.%.,$(CERT_PEMS)) : $(BIN)/.certificates.%
+	$(Q)$(CSPLIT) -q -n 1 -f $(BIN)/.certificate.pem. $< \
+		'/BEGIN CERTIFICATE/' '{*}'
+
+CERT_DERS := $(subst .certificate.pem.,.certificate.der.,$(CERT_PEMS))
+$(BIN)/.certificate.der.% : $(BIN)/.certificate.pem.%
 	$(Q)$(OPENSSL) x509 -in $< -outform DER -out $@
 
-clientcert_DEPS += $(CERT_INC)
+CERT_ALL := $(foreach i,$(call seq,1,$(CERT_COUNT)),\
+	      CERT ( $(i), \"$(word $(i),$(CERT_DERS))\" ))
+
 endif
 
-CLEANUP += $(CERT_INC)
+certstore_DEPS += $(CERT_LIST) $(CERT_FILES) $(CERT_PEMS) $(CERT_DERS)
 
-clientcert_DEPS += $(CERT_LIST)
+CFLAGS_certstore += -DCERT_ALL="$(CERT_ALL)"
 
-CFLAGS_clientcert += $(if $(CERT),-DCERTIFICATE="\"$(CERT_INC)\"")
+CLEANUP += $(BIN)/.certificate.* $(BIN)/.certificates.*
 
-# (Single-element) list of client private keys
+# (Single-element) list of private keys
 #
 ifdef KEY
 PRIVKEY	:= $(KEY) # Maintain backwards compatibility
@@ -653,7 +672,7 @@ $(PRIVKEY_LIST) : $(MAKEDEPS)
 
 VERYCLEANUP += $(PRIVKEY_LIST)
 
-# Embedded client private key
+# Embedded private key
 #
 PRIVKEY_INC := $(BIN)/.private_key.der
 
@@ -661,21 +680,22 @@ ifdef PRIVKEY
 $(PRIVKEY_INC) : $(PRIVKEY) $(PRIVKEY_LIST)
 	$(Q)$(OPENSSL) rsa -in $< -outform DER -out $@
 
-clientcert_DEPS += $(PRIVKEY_INC)
+privkey_DEPS += $(PRIVKEY_INC)
 endif
 
-CLEANUP += $(PRIVKEY_INC)
+CLEANUP += $(BIN)/.private_key.*
 
-clientcert_DEPS += $(PRIVKEY_LIST)
+privkey_DEPS += $(PRIVKEY_LIST)
 
-CFLAGS_clientcert += $(if $(PRIVKEY),-DPRIVATE_KEY="\"$(PRIVKEY_INC)\"")
+CFLAGS_privkey += $(if $(PRIVKEY),-DPRIVATE_KEY="\"$(PRIVKEY_INC)\"")
 
 # These files use .incbin inline assembly to include a binary file.
 # Unfortunately ccache does not detect this dependency and caches
 # builds even when the binary file has changed.
 #
 $(BIN)/embedded.% : override CC := env CCACHE_DISABLE=1 $(CC)
-$(BIN)/clientcert.% : override CC := env CCACHE_DISABLE=1 $(CC)
+$(BIN)/certstore.% : override CC := env CCACHE_DISABLE=1 $(CC)
+$(BIN)/privkey.% : override CC := env CCACHE_DISABLE=1 $(CC)
 
 # Version number
 #

@@ -34,6 +34,7 @@ OBJCOPY		:= $(CROSS_COMPILE)objcopy
 NM		:= $(CROSS_COMPILE)nm
 OBJDUMP		:= $(CROSS_COMPILE)objdump
 OPENSSL		:= openssl
+CSPLIT		:= csplit
 PARSEROM	:= ./util/parserom.pl
 FIXROM		:= ./util/fixrom.pl
 SYMCHECK	:= ./util/symcheck.pl

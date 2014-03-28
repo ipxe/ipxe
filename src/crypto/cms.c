@@ -617,18 +617,21 @@ static int cms_verify_digest ( struct cms_signature *sig,
  * @v data		Signed data
  * @v len		Length of signed data
  * @v time		Time at which to validate certificates
- * @v root		Root certificate store, or NULL to use default
+ * @v store		Certificate store, or NULL to use default
+ * @v root		Root certificate list, or NULL to use default
  * @ret rc		Return status code
  */
 static int cms_verify_signer_info ( struct cms_signature *sig,
 				    struct cms_signer_info *info,
 				    userptr_t data, size_t len,
-				    time_t time, struct x509_root *root ) {
+				    time_t time, struct x509_chain *store,
+				    struct x509_root *root ) {
 	struct x509_certificate *cert;
 	int rc;
 
 	/* Validate certificate chain */
-	if ( ( rc = x509_validate_chain ( info->chain, time, root ) ) != 0 ) {
+	if ( ( rc = x509_validate_chain ( info->chain, time, store,
+					  root ) ) != 0 ) {
 		DBGC ( sig, "CMS %p/%p could not validate chain: %s\n",
 		       sig, info, strerror ( rc ) );
 		return rc;
@@ -667,11 +670,13 @@ static int cms_verify_signer_info ( struct cms_signature *sig,
  * @v len		Length of signed data
  * @v name		Required common name, or NULL to check all signatures
  * @v time		Time at which to validate certificates
- * @v root		Root certificate store, or NULL to use default
+ * @v store		Certificate store, or NULL to use default
+ * @v root		Root certificate list, or NULL to use default
  * @ret rc		Return status code
  */
 int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
-		 const char *name, time_t time, struct x509_root *root ) {
+		 const char *name, time_t time, struct x509_chain *store,
+		 struct x509_root *root ) {
 	struct cms_signer_info *info;
 	struct x509_certificate *cert;
 	int count = 0;
@@ -682,8 +687,8 @@ int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
 		cert = x509_first ( info->chain );
 		if ( name && ( x509_check_name ( cert, name ) != 0 ) )
 			continue;
-		if ( ( rc = cms_verify_signer_info ( sig, info, data, len,
-						     time, root ) ) != 0 )
+		if ( ( rc = cms_verify_signer_info ( sig, info, data, len, time,
+						     store, root ) ) != 0 )
 			return rc;
 		count++;
 	}

@@ -241,8 +241,8 @@ struct tls_session {
 	struct digest_algorithm *handshake_digest;
 	/** Digest algorithm context used for handshake verification */
 	uint8_t *handshake_ctx;
-	/** Public-key algorithm used for Certificate Verify (if sent) */
-	struct pubkey_algorithm *verify_pubkey;
+	/** Client certificate (if used) */
+	struct x509_certificate *cert;
 
 	/** Server certificate chain */
 	struct x509_chain *chain;

@@ -156,12 +156,29 @@ struct x509_extensions {
 	struct x509_authority_info_access auth_info;
 };
 
+/** A link in an X.509 certificate chain */
+struct x509_link {
+	/** List of links */
+	struct list_head list;
+	/** Certificate */
+	struct x509_certificate *cert;
+};
+
+/** An X.509 certificate chain */
+struct x509_chain {
+	/** Reference count */
+	struct refcnt refcnt;
+	/** List of links */
+	struct list_head links;
+};
+
 /** An X.509 certificate */
 struct x509_certificate {
 	/** Reference count */
 	struct refcnt refcnt;
-	/** List of certificates in cache */
-	struct list_head list;
+
+	/** Link in certificate store */
+	struct x509_link store;
 
 	/** Certificate has been validated */
 	int valid;
@@ -211,22 +228,6 @@ static inline __attribute__ (( always_inline )) void
 x509_put ( struct x509_certificate *cert ) {
 	ref_put ( &cert->refcnt );
 }
-
-/** A link in an X.509 certificate chain */
-struct x509_link {
-	/** List of links */
-	struct list_head list;
-	/** Certificate */
-	struct x509_certificate *cert;
-};
-
-/** An X.509 certificate chain */
-struct x509_chain {
-	/** Reference count */
-	struct refcnt refcnt;
-	/** List of links */
-	struct list_head links;
-};
 
 /**
  * Get reference to X.509 certificate chain
@@ -331,7 +332,8 @@ struct x509_root {
 };
 
 extern const char * x509_name ( struct x509_certificate *cert );
-
+extern int x509_parse ( struct x509_certificate *cert,
+			const struct asn1_cursor *raw );
 extern int x509_certificate ( const void *data, size_t len,
 			      struct x509_certificate **cert );
 extern int x509_validate ( struct x509_certificate *cert,
@@ -347,6 +349,7 @@ extern int x509_append_raw ( struct x509_chain *chain, const void *data,
 extern int x509_auto_append ( struct x509_chain *chain,
 			      struct x509_chain *certs );
 extern int x509_validate_chain ( struct x509_chain *chain, time_t time,
+				 struct x509_chain *store,
 				 struct x509_root *root );
 
 /* Functions exposed only for unit testing */

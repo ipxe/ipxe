@@ -654,14 +654,20 @@ CHAIN ( useless_chain, &useless_crt, &leaf_crt,	&intermediate_crt, &root_crt );
 CHAIN ( bad_path_len_chain, &bad_path_len_crt, &useless_crt, &leaf_crt,
 	&intermediate_crt, &root_crt );
 
-/** Certificate store containing the iPXE self-test root CA */
+/** Empty certificate store */
+static struct x509_chain empty_store = {
+	.refcnt = REF_INIT ( ref_no_free ),
+	.links = LIST_HEAD_INIT ( empty_store.links ),
+};
+
+/** Root certificate list containing the iPXE self-test root CA */
 static struct x509_root test_root = {
 	.digest = &x509_test_algorithm,
 	.count = 1,
 	.fingerprints = root_crt_fingerprint,
 };
 
-/** Certificate store containing the iPXE self-test intermediate CA */
+/** Root certificate list containing the iPXE self-test intermediate CA */
 static struct x509_root intermediate_root = {
 	.digest = &x509_test_algorithm,
 	.count = 1,
@@ -813,12 +819,13 @@ static time_t test_ca_expired = 2205014905ULL; /* Wed Nov 16 00:08:25 2039 */
  *
  * @v chn		Test certificate chain
  * @v time		Test certificate validation time
- * @v root		Test root certificate store
+ * @v store		Test certificate store
+ * @v root		Test root certificate list
  */
-#define x509_validate_chain_ok( chn, time, root ) do {			\
+#define x509_validate_chain_ok( chn, time, store, root ) do {		\
 	x509_invalidate_chain ( (chn)->chain );				\
 	ok ( x509_validate_chain ( (chn)->chain, (time),		\
-				   (root) ) == 0 );			\
+				   (store), (root) ) == 0 );		\
 	} while ( 0 )
 
 /**
@@ -826,12 +833,13 @@ static time_t test_ca_expired = 2205014905ULL; /* Wed Nov 16 00:08:25 2039 */
  *
  * @v chn		Test certificate chain
  * @v time		Test certificate validation time
- * @v root		Test root certificate store
+ * @v store		Test certificate store
+ * @v root		Test root certificate list
  */
-#define x509_validate_chain_fail_ok( chn, time, root ) do {		\
+#define x509_validate_chain_fail_ok( chn, time, store, root ) do {	\
 	x509_invalidate_chain ( (chn)->chain );				\
 	ok ( x509_validate_chain ( (chn)->chain, (time),		\
-				   (root) ) != 0 );			\
+				   (store), (root) ) != 0 );		\
 	} while ( 0 )
 
 /**
@@ -898,25 +906,35 @@ static void x509_test_exec ( void ) {
 	x509_chain_ok ( &bad_path_len_chain );
 
 	/* Check certificate chains */
-	x509_validate_chain_ok ( &server_chain, test_time, &test_root );
-	x509_validate_chain_ok ( &server_chain, test_time, &intermediate_root );
-	x509_validate_chain_fail_ok ( &server_chain, test_time, &dummy_root );
+	x509_validate_chain_ok ( &server_chain, test_time,
+				 &empty_store, &test_root );
+	x509_validate_chain_ok ( &server_chain, test_time,
+				 &empty_store, &intermediate_root );
+	x509_validate_chain_fail_ok ( &server_chain, test_time,
+				      &empty_store, &dummy_root );
 	x509_validate_chain_fail_ok ( &broken_server_chain, test_time,
-				      &test_root );
+				      &empty_store, &test_root );
 	x509_validate_chain_fail_ok ( &incomplete_server_chain, test_time,
-				      &test_root );
+				      &empty_store, &test_root );
 	x509_validate_chain_ok ( &incomplete_server_chain, test_time,
-				 &intermediate_root );
-	x509_validate_chain_fail_ok ( &not_ca_chain, test_time, &test_root );
-	x509_validate_chain_ok ( &useless_chain, test_time, &test_root );
+				 &empty_store, &intermediate_root );
+	x509_validate_chain_fail_ok ( &not_ca_chain, test_time,
+				      &empty_store, &test_root );
+	x509_validate_chain_ok ( &useless_chain, test_time,
+				 &empty_store, &test_root );
 	x509_validate_chain_fail_ok ( &bad_path_len_chain, test_time,
-				      &test_root );
+				      &empty_store, &test_root );
 
 	/* Check certificate chain expiry times */
-	x509_validate_chain_fail_ok ( &server_chain, test_expired, &test_root );
-	x509_validate_chain_ok ( &useless_chain, test_expired, &test_root );
+	x509_validate_chain_fail_ok ( &server_chain, test_expired,
+				      &empty_store, &test_root );
+	x509_validate_chain_ok ( &useless_chain, test_expired,
+				 &empty_store, &test_root );
 	x509_validate_chain_fail_ok ( &useless_chain, test_ca_expired,
-				      &test_root );
+				      &empty_store, &test_root );
+
+	/* Sanity check */
+	assert ( list_empty ( &empty_store.links ) );
 
 	/* Drop chain references */
 	x509_chain_put ( bad_path_len_chain.chain );
