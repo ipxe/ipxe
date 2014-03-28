@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/list.h>
+#include <ipxe/base16.h>
 #include <ipxe/asn1.h>
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
@@ -120,14 +121,23 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 const char * x509_name ( struct x509_certificate *cert ) {
 	struct asn1_cursor *common_name = &cert->subject.common_name;
+	struct digest_algorithm *digest = &sha1_algorithm;
 	static char buf[64];
+	uint8_t fingerprint[ digest->digestsize ];
 	size_t len;
 
 	len = common_name->len;
-	if ( len > ( sizeof ( buf ) - 1 /* NUL */ ) )
-		len = ( sizeof ( buf ) - 1 /* NUL */ );
-	memcpy ( buf, common_name->data, len );
-	buf[len] = '\0';
+	if ( len ) {
+		/* Certificate has a commonName: use that */
+		if ( len > ( sizeof ( buf ) - 1 /* NUL */ ) )
+			len = ( sizeof ( buf ) - 1 /* NUL */ );
+		memcpy ( buf, common_name->data, len );
+		buf[len] = '\0';
+	} else {
+		/* Certificate has no commonName: use SHA-1 fingerprint */
+		x509_fingerprint ( cert, digest, fingerprint );
+		base16_encode ( fingerprint, sizeof ( fingerprint ), buf );
+	}
 	return buf;
 }
 
