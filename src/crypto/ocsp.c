@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/base64.h>
 #include <ipxe/uri.h>
 #include <ipxe/ocsp.h>
+#include <config/crypto.h>
 
 /** @file
  *
@@ -923,12 +924,12 @@ int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 	/* Check OCSP response is valid at the specified time
 	 * (allowing for some margin of error).
 	 */
-	if ( response->this_update > ( time + X509_ERROR_MARGIN_TIME ) ) {
+	if ( response->this_update > ( time + TIMESTAMP_ERROR_MARGIN ) ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" response is not yet valid (at "
 		       "time %lld)\n", ocsp, x509_name ( ocsp->cert ), time );
 		return -EACCES_STALE;
 	}
-	if ( response->next_update < ( time - X509_ERROR_MARGIN_TIME ) ) {
+	if ( response->next_update < ( time - TIMESTAMP_ERROR_MARGIN ) ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" response is stale (at time "
 		       "%lld)\n", ocsp, x509_name ( ocsp->cert ), time );
 		return -EACCES_STALE;

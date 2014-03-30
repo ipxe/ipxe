@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/rootcert.h>
 #include <ipxe/certstore.h>
 #include <ipxe/x509.h>
+#include <config/crypto.h>
 
 /** @file
  *
@@ -1233,12 +1234,12 @@ int x509_check_time ( struct x509_certificate *cert, time_t time ) {
 	struct x509_validity *validity = &cert->validity;
 
 	/* Check validity period */
-	if ( validity->not_before.time > ( time + X509_ERROR_MARGIN_TIME ) ) {
+	if ( validity->not_before.time > ( time + TIMESTAMP_ERROR_MARGIN ) ) {
 		DBGC ( cert, "X509 %p \"%s\" is not yet valid (at time %lld)\n",
 		       cert, x509_name ( cert ), time );
 		return -EACCES_EXPIRED;
 	}
-	if ( validity->not_after.time < ( time - X509_ERROR_MARGIN_TIME ) ) {
+	if ( validity->not_after.time < ( time - TIMESTAMP_ERROR_MARGIN ) ) {
 		DBGC ( cert, "X509 %p \"%s\" has expired (at time %lld)\n",
 		       cert, x509_name ( cert ), time );
 		return -EACCES_EXPIRED;
