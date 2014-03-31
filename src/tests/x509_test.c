@@ -701,118 +701,183 @@ static time_t test_ca_expired = 2205014905ULL; /* Wed Nov 16 00:08:25 2039 */
  * Report certificate parsing test result
  *
  * @v crt		Test certificate
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_certificate_ok( crt ) do {					\
-	ok ( x509_certificate ( (crt)->data, (crt)->len,		\
-				&(crt)->cert ) == 0 );			\
-	} while ( 0 )
+static void x509_certificate_okx ( struct x509_test_certificate *crt,
+				   const char *file, unsigned int line ) {
+
+	okx ( x509_certificate ( crt->data, crt->len, &crt->cert ) == 0,
+	      file, line );
+}
+#define x509_certificate_ok( crt ) \
+	x509_certificate_okx ( crt, __FILE__, __LINE__ )
 
 /**
  * Report cached certificate parsing test result
  *
  * @v crt		Test certificate
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_cached_ok( crt ) do {					\
-	struct x509_certificate *temp;					\
-	ok ( x509_certificate ( (crt)->data, (crt)->len,		\
-				&temp ) == 0 );				\
-	ok ( temp == (crt)->cert );					\
-	x509_put ( temp );						\
-	} while ( 0 )
+static void x509_cached_okx ( struct x509_test_certificate *crt,
+			      const char *file, unsigned int line ) {
+	struct x509_certificate *temp;
+
+	okx ( x509_certificate ( crt->data, crt->len, &temp ) == 0,
+	      file, line );
+	okx ( temp == crt->cert, file, line );
+	x509_put ( temp );
+}
+#define x509_cached_ok( crt ) x509_cached_okx ( crt, __FILE__, __LINE__ )
 
 /**
  * Report certificate fingerprint test result
  *
  * @v crt		Test certificate
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_fingerprint_ok( crt ) do {					\
-	uint8_t fingerprint[ x509_test_algorithm.digestsize ];		\
-	x509_fingerprint ( (crt)->cert, &x509_test_algorithm,		\
-			   fingerprint );				\
-	ok ( memcmp ( fingerprint, (crt)->fingerprint,			\
-		      sizeof ( fingerprint ) ) == 0 );			\
-	} while ( 0 )
+static void x509_fingerprint_okx ( struct x509_test_certificate *crt,
+				   const char *file, unsigned int line ) {
+	uint8_t fingerprint[ x509_test_algorithm.digestsize ];
+
+	x509_fingerprint ( crt->cert, &x509_test_algorithm, fingerprint );
+	okx ( memcmp ( fingerprint, crt->fingerprint,
+		       sizeof ( fingerprint ) ) == 0, file, line );
+}
+#define x509_fingerprint_ok( crt ) \
+	x509_fingerprint_okx ( crt, __FILE__, __LINE__ )
 
 /**
  * Report certificate issuer validation test result
  *
  * @v crt		Test certificate
  * @v issuer		Test issuer
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_check_issuer_ok( crt, issuer ) do {			\
-	ok ( x509_check_issuer ( (crt)->cert, (issuer)->cert ) == 0 );	\
-	} while ( 0 )
+static void x509_check_issuer_okx ( struct x509_test_certificate *crt,
+				    struct x509_test_certificate *issuer,
+				    const char *file, unsigned int line ) {
+
+	okx ( x509_check_issuer ( crt->cert, issuer->cert ) == 0, file, line );
+}
+#define x509_check_issuer_ok( crt, issuer ) \
+	x509_check_issuer_okx ( crt, issuer, __FILE__, __LINE__ )
 
 /**
  * Report certificate issuer validation failure test result
  *
  * @v crt		Test certificate
  * @v issuer		Test issuer
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_check_issuer_fail_ok( crt, issuer ) do {			\
-	ok ( x509_check_issuer ( (crt)->cert, (issuer)->cert ) != 0 );	\
-	} while ( 0 )
+static void x509_check_issuer_fail_okx ( struct x509_test_certificate *crt,
+					 struct x509_test_certificate *issuer,
+					 const char *file, unsigned int line ) {
+
+	okx ( x509_check_issuer ( crt->cert, issuer->cert ) != 0,
+	      file, line );
+}
+#define x509_check_issuer_fail_ok( crt, issuer ) \
+	x509_check_issuer_fail_okx ( crt, issuer, __FILE__, __LINE__ )
 
 /**
  * Report certificate root validation test result
  *
  * @v crt		Test certificate
  * @v root		Test root certificate store
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_check_root_ok( crt, root ) do {				\
-	ok ( x509_check_root ( (crt)->cert, root ) == 0 );		\
-	} while ( 0 )
+static void x509_check_root_okx ( struct x509_test_certificate *crt,
+				  struct x509_root *root, const char *file,
+				  unsigned int line ) {
+
+	okx ( x509_check_root ( crt->cert, root ) == 0, file, line );
+}
+#define x509_check_root_ok( crt, root ) \
+	x509_check_root_okx ( crt, root, __FILE__, __LINE__ )
 
 /**
  * Report certificate root validation failure test result
  *
  * @v crt		Test certificate
  * @v root		Test root certificate store
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_check_root_fail_ok( crt, root ) do {			\
-	ok ( x509_check_root ( (crt)->cert, root ) != 0 );		\
-	} while ( 0 )
+static void x509_check_root_fail_okx ( struct x509_test_certificate *crt,
+				       struct x509_root *root,
+				       const char *file, unsigned int line ) {
+
+	okx ( x509_check_root ( crt->cert, root ) != 0, file, line );
+}
+#define x509_check_root_fail_ok( crt, root ) \
+	x509_check_root_fail_okx ( crt, root, __FILE__, __LINE__ )
 
 /**
  * Report certificate time validation test result
  *
  * @v crt		Test certificate
  * @v time		Test time
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_check_time_ok( crt, time ) do {				\
-	ok ( x509_check_time ( (crt)->cert, time ) == 0 );		\
-	} while ( 0 )
+static void x509_check_time_okx ( struct x509_test_certificate *crt,
+				  time_t time, const char *file,
+				  unsigned int line ) {
+
+	okx ( x509_check_time ( crt->cert, time ) == 0, file, line );
+}
+#define x509_check_time_ok( crt, time ) \
+	x509_check_time_okx ( crt, time, __FILE__, __LINE__ )
 
 /**
  * Report certificate time validation failure test result
  *
  * @v crt		Test certificate
  * @v time		Test time
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_check_time_fail_ok( crt, time ) do {			\
-	ok ( x509_check_time ( (crt)->cert, time ) != 0 );		\
-	} while ( 0 )
+static void x509_check_time_fail_okx ( struct x509_test_certificate *crt,
+				       time_t time, const char *file,
+				       unsigned int line ) {
+
+	okx ( x509_check_time ( crt->cert, time ) != 0, file, line );
+}
+#define x509_check_time_fail_ok( crt, time ) \
+	x509_check_time_fail_okx ( crt, time, __FILE__, __LINE__ )
 
 /**
  * Report certificate chain parsing test result
  *
  * @v chn		Test certificate chain
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_chain_ok( chn ) do {					\
-	unsigned int i;							\
-	struct x509_certificate *first;					\
-	(chn)->chain = x509_alloc_chain();				\
-	ok ( (chn)->chain != NULL );					\
-	for ( i = 0 ; i < (chn)->count ; i++ ) {			\
-		ok ( x509_append ( (chn)->chain,			\
-				   (chn)->certs[i]->cert ) == 0 );	\
-	}								\
-	first = x509_first ( (chn)->chain );				\
-	ok ( first != NULL );						\
-	ok ( first->raw.len == (chn)->certs[0]->len );			\
-	ok ( memcmp ( first->raw.data, (chn)->certs[0]->data,		\
-		      first->raw.len ) == 0 );				\
-	} while ( 0 )
+static void x509_chain_okx ( struct x509_test_chain *chn, const char *file,
+			     unsigned int line ) {
+	unsigned int i;
+	struct x509_certificate *first;
+
+	chn->chain = x509_alloc_chain();
+	okx ( chn->chain != NULL, file, line );
+	for ( i = 0 ; i < chn->count ; i++ ) {
+		okx ( x509_append ( chn->chain, chn->certs[i]->cert ) == 0,
+		      file, line );
+	}
+	first = x509_first ( chn->chain );
+	okx ( first != NULL, file, line );
+	okx ( first->raw.len == chn->certs[0]->len, file, line );
+	okx ( memcmp ( first->raw.data, chn->certs[0]->data,
+		       first->raw.len ) == 0, file, line );
+}
+#define x509_chain_ok( chn ) \
+	x509_chain_okx ( chn, __FILE__, __LINE__ )
 
 /**
  * Report certificate chain validation test result
@@ -821,12 +886,20 @@ static time_t test_ca_expired = 2205014905ULL; /* Wed Nov 16 00:08:25 2039 */
  * @v time		Test certificate validation time
  * @v store		Test certificate store
  * @v root		Test root certificate list
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_validate_chain_ok( chn, time, store, root ) do {		\
-	x509_invalidate_chain ( (chn)->chain );				\
-	ok ( x509_validate_chain ( (chn)->chain, (time),		\
-				   (store), (root) ) == 0 );		\
-	} while ( 0 )
+static void x509_validate_chain_okx ( struct x509_test_chain *chn, time_t time,
+				      struct x509_chain *store,
+				      struct x509_root *root, const char *file,
+				      unsigned int line ) {
+
+	x509_invalidate_chain ( chn->chain );
+	okx ( x509_validate_chain ( chn->chain, time, store, root ) == 0,
+	      file, line );
+}
+#define x509_validate_chain_ok( chn, time, store, root ) \
+	x509_validate_chain_okx ( chn, time, store, root, __FILE__, __LINE__ )
 
 /**
  * Report certificate chain validation failure test result
@@ -835,12 +908,23 @@ static time_t test_ca_expired = 2205014905ULL; /* Wed Nov 16 00:08:25 2039 */
  * @v time		Test certificate validation time
  * @v store		Test certificate store
  * @v root		Test root certificate list
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define x509_validate_chain_fail_ok( chn, time, store, root ) do {	\
-	x509_invalidate_chain ( (chn)->chain );				\
-	ok ( x509_validate_chain ( (chn)->chain, (time),		\
-				   (store), (root) ) != 0 );		\
-	} while ( 0 )
+static void x509_validate_chain_fail_okx ( struct x509_test_chain *chn,
+					   time_t time,
+					   struct x509_chain *store,
+					   struct x509_root *root,
+					   const char *file,
+					   unsigned int line ) {
+
+	x509_invalidate_chain ( chn->chain );
+	okx ( x509_validate_chain ( chn->chain, time, store, root ) != 0,
+	      file, line );
+}
+#define x509_validate_chain_fail_ok( chn, time, store, root )		\
+	x509_validate_chain_fail_okx ( chn, time, store, root,		\
+				       __FILE__, __LINE__ )
 
 /**
  * Perform X.509 self-tests
