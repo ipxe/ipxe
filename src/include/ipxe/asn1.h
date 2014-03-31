@@ -222,6 +222,11 @@ struct asn1_builder_header {
 	ASN1_OID_SINGLE ( 5 ), ASN1_OID_SINGLE ( 7 ),		\
 	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 9 )
 
+/** ASN.1 OID for id-ce-subjectAltName (2.5.29.17) */
+#define ASN1_OID_SUBJECTALTNAME					\
+	ASN1_OID_INITIAL ( 2, 5 ), ASN1_OID_SINGLE ( 29 ),	\
+	ASN1_OID_SINGLE ( 17 )
+
 /** Define an ASN.1 cursor containing an OID */
 #define ASN1_OID_CURSOR( oid_value ) {				\
 		.data = oid_value,				\

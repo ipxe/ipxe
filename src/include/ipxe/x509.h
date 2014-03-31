@@ -136,6 +136,18 @@ struct x509_authority_info_access {
 	struct x509_ocsp_responder ocsp;
 };
 
+/** X.509 certificate subject alternative name */
+struct x509_subject_alt_name {
+	/** Names */
+	struct asn1_cursor names;
+};
+
+/** X.509 certificate general name types */
+enum x509_general_name_types {
+	X509_GENERAL_NAME_DNS = ASN1_IMPLICIT_TAG ( 2 ),
+	X509_GENERAL_NAME_URI = ASN1_IMPLICIT_TAG ( 6 ),
+};
+
 /** An X.509 certificate extensions set */
 struct x509_extensions {
 	/** Basic constraints */
@@ -146,6 +158,8 @@ struct x509_extensions {
 	struct x509_extended_key_usage ext_usage;
 	/** Authority information access */
 	struct x509_authority_info_access auth_info;
+	/** Subject alternative name */
+	struct x509_subject_alt_name alt_name;
 };
 
 /** A link in an X.509 certificate chain */

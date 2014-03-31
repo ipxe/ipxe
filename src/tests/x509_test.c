@@ -1023,7 +1023,16 @@ static void x509_test_exec ( void ) {
 
 	/* Check certificate names */
 	x509_check_name_ok ( &server_crt, "boot.test.ipxe.org" );
+	x509_check_name_ok ( &server_crt, "demo.test.ipxe.org" );
 	x509_check_name_fail_ok ( &server_crt, "incorrect.test.ipxe.org" );
+	x509_check_name_ok ( &server_crt, "anything.alt.test.ipxe.org" );
+	x509_check_name_ok ( &server_crt, "wildcard.alt.test.ipxe.org" );
+	x509_check_name_fail_ok ( &server_crt, "sub.domain.alt.test.ipxe.org" );
+	x509_check_name_fail_ok ( &server_crt, "alt.test.ipxe.org" );
+	x509_check_name_fail_ok ( &server_crt, "test.ipxe.org" );
+	x509_check_name_fail_ok ( &server_crt, "ipxe.org" );
+	x509_check_name_fail_ok ( &server_crt, "org" );
+	x509_check_name_fail_ok ( &server_crt, "" );
 
 	/* Parse all certificate chains */
 	x509_chain_ok ( &server_chain );

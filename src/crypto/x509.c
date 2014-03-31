@@ -603,7 +603,7 @@ static int x509_parse_ocsp ( struct x509_certificate *cert,
 
 	/* Enter accessLocation */
 	memcpy ( uri, raw, sizeof ( *uri ) );
-	if ( ( rc = asn1_enter ( uri, ASN1_IMPLICIT_TAG ( 6 ) ) ) != 0 ) {
+	if ( ( rc = asn1_enter ( uri, X509_GENERAL_NAME_URI ) ) != 0 ) {
 		DBGC ( cert, "X509 %p OCSP does not contain "
 		       "uniformResourceIdentifier:\n", cert );
 		DBGC_HDA ( cert, 0, raw->data, raw->len );
@@ -708,6 +708,33 @@ static int x509_parse_authority_info_access ( struct x509_certificate *cert,
 	return 0;
 }
 
+/**
+ * Parse X.509 certificate subject alternative name
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int x509_parse_subject_alt_name ( struct x509_certificate *cert,
+					 const struct asn1_cursor *raw ) {
+	struct x509_subject_alt_name *alt_name = &cert->extensions.alt_name;
+	struct asn1_cursor *names = &alt_name->names;
+	int rc;
+
+	/* Enter subjectAltName */
+	memcpy ( names, raw, sizeof ( *names ) );
+	if ( ( rc = asn1_enter ( names, ASN1_SEQUENCE ) ) != 0 ) {
+		DBGC ( cert, "X509 %p invalid subjectAltName: %s\n",
+		       cert, strerror ( rc ) );
+		DBGC_HDA ( cert, 0, raw->data, raw->len );
+		return rc;
+	}
+	DBGC2 ( cert, "X509 %p has subjectAltName:\n", cert );
+	DBGC2_HDA ( cert, 0, names->data, names->len );
+
+	return 0;
+}
+
 /** "id-ce-basicConstraints" object identifier */
 static uint8_t oid_ce_basic_constraints[] =
 	{ ASN1_OID_BASICCONSTRAINTS };
@@ -723,6 +750,10 @@ static uint8_t oid_ce_ext_key_usage[] =
 /** "id-pe-authorityInfoAccess" object identifier */
 static uint8_t oid_pe_authority_info_access[] =
 	{ ASN1_OID_AUTHORITYINFOACCESS };
+
+/** "id-ce-subjectAltName" object identifier */
+static uint8_t oid_ce_subject_alt_name[] =
+	{ ASN1_OID_SUBJECTALTNAME };
 
 /** Supported certificate extensions */
 static struct x509_extension x509_extensions[] = {
@@ -745,6 +776,11 @@ static struct x509_extension x509_extensions[] = {
 		.name = "authorityInfoAccess",
 		.oid = ASN1_OID_CURSOR ( oid_pe_authority_info_access ),
 		.parse = x509_parse_authority_info_access,
+	},
+	{
+		.name = "subjectAltName",
+		.oid = ASN1_OID_CURSOR ( oid_ce_subject_alt_name ),
+		.parse = x509_parse_subject_alt_name,
 	},
 };
 
@@ -1341,6 +1377,82 @@ int x509_validate ( struct x509_certificate *cert,
 }
 
 /**
+ * Check X.509 certificate alternative dNSName
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @v name		Name
+ * @ret rc		Return status code
+ */
+static int x509_check_dnsname ( struct x509_certificate *cert,
+				const struct asn1_cursor *raw,
+				const char *name ) {
+	const char *fullname = name;
+	const char *dnsname = raw->data;
+	size_t len = raw->len;
+
+	/* Check for wildcards */
+	if ( ( len >= 2 ) && ( dnsname[0] == '*' ) && ( dnsname[1] == '.' ) ) {
+
+		/* Skip initial "*." */
+		dnsname += 2;
+		len -= 2;
+
+		/* Skip initial portion of name to be tested */
+		name = strchr ( name, '.' );
+		if ( ! name )
+			return -ENOENT;
+		name++;
+	}
+
+	/* Compare names */
+	if ( ! ( ( strlen ( name ) == len ) &&
+		 ( memcmp ( name, dnsname, len ) == 0 ) ) )
+		return -ENOENT;
+
+	if ( name == fullname ) {
+		DBGC2 ( cert, "X509 %p \"%s\" subjectAltName matches \"%s\"\n",
+			cert, x509_name ( cert ), name );
+	} else {
+		DBGC2 ( cert, "X509 %p \"%s\" subjectAltName matches \"%s\" "
+			"(via \"*.%s\")\n", cert, x509_name ( cert ),
+			fullname, name );
+	}
+	return 0;
+}
+
+/**
+ * Check X.509 certificate alternative name
+ *
+ * @v cert		X.509 certificate
+ * @v raw		ASN.1 cursor
+ * @v name		Name
+ * @ret rc		Return status code
+ */
+static int x509_check_alt_name ( struct x509_certificate *cert,
+				 const struct asn1_cursor *raw,
+				 const char *name ) {
+	struct asn1_cursor alt_name;
+	unsigned int type;
+
+	/* Enter generalName */
+	memcpy ( &alt_name, raw, sizeof ( alt_name ) );
+	type = asn1_type ( &alt_name );
+	asn1_enter_any ( &alt_name );
+
+	/* Check this name */
+	switch ( type ) {
+	case X509_GENERAL_NAME_DNS :
+		return x509_check_dnsname ( cert, &alt_name, name );
+	default:
+		DBGC2 ( cert, "X509 %p \"%s\" unknown name of type %#02x:\n",
+			cert, x509_name ( cert ), type );
+		DBGC2_HDA ( cert, 0, alt_name.data, alt_name.len );
+		return -ENOTSUP;
+	}
+}
+
+/**
  * Check X.509 certificate name
  *
  * @v cert		X.509 certificate
@@ -1349,17 +1461,29 @@ int x509_validate ( struct x509_certificate *cert,
  */
 int x509_check_name ( struct x509_certificate *cert, const char *name ) {
 	struct asn1_cursor *common_name = &cert->subject.common_name;
-	size_t len = strlen ( name );
+	struct asn1_cursor alt_name;
+	int rc;
 
 	/* Check commonName */
-	if ( ! ( ( len == common_name->len ) &&
-		 ( memcmp ( name, common_name->data, len ) == 0 ) ) ) {
-		DBGC ( cert, "X509 %p \"%s\" does not match name \"%s\"\n",
-		       cert, x509_name ( cert ), name );
-		return -EACCES_WRONG_NAME;
+	if ( ( strlen ( name ) == common_name->len ) &&
+	     ( memcmp ( name, common_name->data, common_name->len ) == 0 ) ) {
+		DBGC2 ( cert, "X509 %p \"%s\" commonName matches \"%s\"\n",
+			cert, x509_name ( cert ), name );
+		return 0;
 	}
 
-	return 0;
+	/* Check any subjectAlternativeNames */
+	memcpy ( &alt_name, &cert->extensions.alt_name.names,
+		 sizeof ( alt_name ) );
+	for ( ; alt_name.len ; asn1_skip_any ( &alt_name ) ) {
+		if ( ( rc = x509_check_alt_name ( cert, &alt_name,
+						  name ) ) == 0 )
+			return 0;
+	}
+
+	DBGC ( cert, "X509 %p \"%s\" does not match name \"%s\"\n",
+	       cert, x509_name ( cert ), name );
+	return -EACCES_WRONG_NAME;
 }
 
 /**
