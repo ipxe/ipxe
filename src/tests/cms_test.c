@@ -1342,11 +1342,17 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
  * Report signature parsing test result
  *
  * @v sgn		Test signature
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define cms_signature_ok( sgn ) do {					\
-	ok ( cms_signature ( (sgn)->data, (sgn)->len,			\
-			     &(sgn)->sig ) == 0 );			\
-	} while ( 0 )
+static void cms_signature_okx ( struct cms_test_signature *sgn,
+				const char *file, unsigned int line ) {
+
+	okx ( cms_signature ( sgn->data, sgn->len, &sgn->sig ) == 0,
+	      file, line );
+}
+#define cms_signature_ok( sgn ) \
+	cms_signature_okx ( sgn, __FILE__, __LINE__ )
 
 /**
  * Report signature verification test result
@@ -1357,12 +1363,22 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
  * @v time		Test verification time
  * @v store		Test certificate store
  * @v root		Test root certificate list
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define cms_verify_ok( sgn, code, name, time, store, root ) do {	\
-	x509_invalidate_chain ( (sgn)->sig->certificates );		\
-	ok ( cms_verify ( (sgn)->sig, virt_to_user ( (code)->data ),	\
-			  (code)->len, name, time, store, root ) == 0 );\
-	} while ( 0 )
+static void cms_verify_okx ( struct cms_test_signature *sgn,
+			     struct cms_test_code *code, const char *name,
+			     time_t time, struct x509_chain *store,
+			     struct x509_root *root, const char *file,
+			     unsigned int line ) {
+
+	x509_invalidate_chain ( sgn->sig->certificates );
+	okx ( cms_verify ( sgn->sig, virt_to_user ( code->data ), code->len,
+			   name, time, store, root ) == 0, file, line );
+}
+#define cms_verify_ok( sgn, code, name, time, store, root )		\
+	cms_verify_okx ( sgn, code, name, time, store, root,		\
+			 __FILE__, __LINE__ )
 
 /**
  * Report signature verification failure test result
@@ -1373,12 +1389,22 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
  * @v time		Test verification time
  * @v store		Test certificate store
  * @v root		Test root certificate list
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define cms_verify_fail_ok( sgn, code, name, time, store, root ) do {	\
-	x509_invalidate_chain ( (sgn)->sig->certificates );		\
-	ok ( cms_verify ( (sgn)->sig, virt_to_user ( (code)->data ),	\
-			  (code)->len, name, time, store, root ) != 0 );\
-	} while ( 0 )
+static void cms_verify_fail_okx ( struct cms_test_signature *sgn,
+				  struct cms_test_code *code, const char *name,
+				  time_t time, struct x509_chain *store,
+				  struct x509_root *root, const char *file,
+				  unsigned int line ) {
+
+	x509_invalidate_chain ( sgn->sig->certificates );
+	okx ( cms_verify ( sgn->sig, virt_to_user ( code->data ), code->len,
+			   name, time, store, root ) != 0, file, line );
+}
+#define cms_verify_fail_ok( sgn, code, name, time, store, root )	\
+	cms_verify_fail_okx ( sgn, code, name, time, store, root,	\
+			      __FILE__, __LINE__ )
 
 /**
  * Perform CMS self-tests
