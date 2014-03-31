@@ -853,6 +853,40 @@ static void x509_check_time_fail_okx ( struct x509_test_certificate *crt,
 	x509_check_time_fail_okx ( crt, time, __FILE__, __LINE__ )
 
 /**
+ * Report certificate name validation test result
+ *
+ * @v crt		Test certificate
+ * @v name		Test name
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static void x509_check_name_okx ( struct x509_test_certificate *crt,
+				  const char *name, const char *file,
+				  unsigned int line ) {
+
+	okx ( x509_check_name ( crt->cert, name ) == 0, file, line );
+}
+#define x509_check_name_ok( crt, name ) \
+	x509_check_name_okx ( crt, name, __FILE__, __LINE__ )
+
+/**
+ * Report certificate name validation failure test result
+ *
+ * @v crt		Test certificate
+ * @v name		Test name
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static void x509_check_name_fail_okx ( struct x509_test_certificate *crt,
+				       const char *name, const char *file,
+				       unsigned int line ) {
+
+	okx ( x509_check_name ( crt->cert, name ) != 0, file, line );
+}
+#define x509_check_name_fail_ok( crt, name ) \
+	x509_check_name_fail_okx ( crt, name, __FILE__, __LINE__ )
+
+/**
  * Report certificate chain parsing test result
  *
  * @v chn		Test certificate chain
@@ -980,6 +1014,10 @@ static void x509_test_exec ( void ) {
 	x509_check_time_ok ( &root_crt, test_time );
 	x509_check_time_ok ( &root_crt, test_expired );
 	x509_check_time_fail_ok ( &root_crt, test_ca_expired );
+
+	/* Check certificate names */
+	x509_check_name_ok ( &server_crt, "boot.test.ipxe.org" );
+	x509_check_name_fail_ok ( &server_crt, "incorrect.test.ipxe.org" );
 
 	/* Parse all certificate chains */
 	x509_chain_ok ( &server_chain );
