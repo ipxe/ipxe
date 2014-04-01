@@ -1410,13 +1410,9 @@ static int x509_check_dnsname ( struct x509_certificate *cert,
 		 ( memcmp ( name, dnsname, len ) == 0 ) ) )
 		return -ENOENT;
 
-	if ( name == fullname ) {
-		DBGC2 ( cert, "X509 %p \"%s\" subjectAltName matches \"%s\"\n",
-			cert, x509_name ( cert ), name );
-	} else {
-		DBGC2 ( cert, "X509 %p \"%s\" subjectAltName matches \"%s\" "
-			"(via \"*.%s\")\n", cert, x509_name ( cert ),
-			fullname, name );
+	if ( name != fullname ) {
+		DBGC2 ( cert, "X509 %p \"%s\" found wildcard match for "
+			"\"*.%s\"\n", cert, x509_name ( cert ), name );
 	}
 	return 0;
 }
@@ -1465,8 +1461,7 @@ int x509_check_name ( struct x509_certificate *cert, const char *name ) {
 	int rc;
 
 	/* Check commonName */
-	if ( ( strlen ( name ) == common_name->len ) &&
-	     ( memcmp ( name, common_name->data, common_name->len ) == 0 ) ) {
+	if ( x509_check_dnsname ( cert, common_name, name ) == 0 ) {
 		DBGC2 ( cert, "X509 %p \"%s\" commonName matches \"%s\"\n",
 			cert, x509_name ( cert ), name );
 		return 0;
@@ -1477,8 +1472,11 @@ int x509_check_name ( struct x509_certificate *cert, const char *name ) {
 		 sizeof ( alt_name ) );
 	for ( ; alt_name.len ; asn1_skip_any ( &alt_name ) ) {
 		if ( ( rc = x509_check_alt_name ( cert, &alt_name,
-						  name ) ) == 0 )
+						  name ) ) == 0 ) {
+			DBGC2 ( cert, "X509 %p \"%s\" subjectAltName matches "
+				"\"%s\"\n", cert, x509_name ( cert ), name );
 			return 0;
+		}
 	}
 
 	DBGC ( cert, "X509 %p \"%s\" does not match name \"%s\"\n",
