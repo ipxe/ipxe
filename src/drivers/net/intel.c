@@ -593,7 +593,7 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	physaddr_t address;
 
 	/* Get next transmit descriptor */
-	if ( ( intel->tx.prod - intel->tx.cons ) >= INTEL_NUM_TX_DESC ) {
+	if ( ( intel->tx.prod - intel->tx.cons ) >= INTEL_TX_FILL ) {
 		DBGC ( intel, "INTEL %p out of transmit descriptors\n", intel );
 		return -ENOBUFS;
 	}

@@ -156,6 +156,9 @@ enum intel_descriptor_status {
  */
 #define INTEL_NUM_TX_DESC 16
 
+/** Transmit descriptor ring maximum fill level */
+#define INTEL_TX_FILL ( INTEL_NUM_TX_DESC - 1 )
+
 /** Receive/Transmit Descriptor Base Address Low (offset) */
 #define INTEL_xDBAL 0x00
 
