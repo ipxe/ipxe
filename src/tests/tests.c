@@ -55,3 +55,4 @@ REQUIRE_OBJECT ( deflate_test );
 REQUIRE_OBJECT ( png_test );
 REQUIRE_OBJECT ( dns_test );
 REQUIRE_OBJECT ( uri_test );
+REQUIRE_OBJECT ( profile_test );
