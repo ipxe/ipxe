@@ -5,6 +5,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <limits.h>
 #include <string.h>
+#include <bits/strings.h>
 
 static inline __attribute__ (( always_inline )) int
 __constant_flsl ( unsigned long x ) {
@@ -42,8 +43,7 @@ __constant_flsl ( unsigned long x ) {
 	return r;
 }
 
-/* We don't actually have these functions yet */
-extern int __flsl ( long x );
+int __flsl ( long x );
 
 #define flsl( x ) \
 	( __builtin_constant_p ( x ) ? __constant_flsl ( x ) : __flsl ( x ) )
