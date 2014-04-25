@@ -19,8 +19,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * The implicit calls to memcpy() and memset() which gcc can generate
  * do not seem to have this inconsistency; -mregparm and -mrtd affect
  * them in the same way as any other function.
+ *
+ * Update (25/4/14): it appears that more recent gcc versions do allow
+ * -mrtd to affect calls to the implicit arithmetic functions.  There
+ * is nothing obvious in the gcc changelogs to indicate precisely when
+ * this happened.  From experimentation with available gcc versions,
+ * the change occurred sometime between v4.6.3 and v4.7.2.  We assume
+ * that only versions up to v4.6.x require the special treatment.
  */
+#if ( __GNUC__ < 4 ) || ( ( __GNUC__ == 4 ) && ( __GNUC_MINOR__ <= 6 ) )
 #define __libgcc __attribute__ (( cdecl ))
+#else
+#define __libgcc
+#endif
 
 #endif /* ASSEMBLY */
 
