@@ -44,6 +44,72 @@ __attribute__ (( noinline )) int flsl_var ( long value ) {
 }
 
 /**
+ * Check current stack pointer
+ *
+ * @ret stack		A value at a fixed offset from the current stack pointer
+ *
+ * Used by check_divmod()
+ */
+static __attribute__ (( noinline )) void * stack_check ( void ) {
+	int a;
+	void *ret;
+
+	/* Hide the fact that we are returning the address of a local
+	 * variable, to prevent a compiler warning.
+	 */
+	__asm__ ( "\n" : "=g" ( ret ) : "0" ( &a ) );
+
+	return ret;
+}
+
+/**
+ * Check division/modulus operation
+ *
+ * One aspect of the calling convention for the implicit arithmetic
+ * functions (__udivmoddi4() etc) is whether the caller or the callee
+ * is expected to pop any stack-based arguments.  This distinction can
+ * be masked if the compiler chooses to uses a frame pointer in the
+ * caller, since the caller will then reload the stack pointer from
+ * the frame pointer and so can mask an error in the value of the
+ * stack pointer.
+ *
+ * We run the division operation in a loop, and check that the stack
+ * pointer does not change value on the second iteration.  To prevent
+ * the compiler from performing various optimisations which might
+ * invalidate our intended test (such as unrolling the loop, or moving
+ * the division operation outside the loop), we include some dummy
+ * inline assembly code.
+ */
+#define check_divmod( dividend, divisor, OP ) ( {			\
+	uint64_t result;						\
+	int count = 2;							\
+	void *check = NULL;						\
+									\
+	/* Prevent compiler from unrolling the loop */			\
+	__asm__ ( "\n" : "=g" ( count ) : "0" ( count ) );		\
+									\
+	do {								\
+		/* Check that stack pointer does not change between	\
+		 * loop iterations.					\
+		 */							\
+		if ( check ) {						\
+			assert ( check == stack_check() );		\
+		} else {						\
+			check = stack_check();				\
+		}							\
+									\
+		/* Perform division, preventing the compiler from	\
+		 * moving the division out of the loop.			\
+		 */							\
+		__asm__ ( "\n" : "=g" ( dividend ), "=g" ( divisor )	\
+			  : "0" ( dividend ), "1" ( divisor ) );	\
+	        result = ( dividend OP divisor );			\
+		__asm__ ( "\n" : "=g" ( result ) : "0" ( result ) );	\
+									\
+	} while ( --count );						\
+	result; } )
+
+/**
  * Force a use of runtime 64-bit unsigned integer division
  *
  * @v dividend		Dividend
@@ -52,7 +118,8 @@ __attribute__ (( noinline )) int flsl_var ( long value ) {
  */
 __attribute__ (( noinline )) uint64_t u64div_var ( uint64_t dividend,
 						   uint64_t divisor ) {
-	return ( dividend / divisor );
+
+	return check_divmod ( dividend, divisor, / );
 }
 
 /**
@@ -64,7 +131,8 @@ __attribute__ (( noinline )) uint64_t u64div_var ( uint64_t dividend,
  */
 __attribute__ (( noinline )) uint64_t u64mod_var ( uint64_t dividend,
 						   uint64_t divisor ) {
-	return ( dividend % divisor );
+
+	return check_divmod ( dividend, divisor, % );
 }
 
 /**
@@ -76,7 +144,8 @@ __attribute__ (( noinline )) uint64_t u64mod_var ( uint64_t dividend,
  */
 __attribute__ (( noinline )) int64_t s64div_var ( int64_t dividend,
 						  int64_t divisor ) {
-	return ( dividend / divisor );
+
+	return check_divmod ( dividend, divisor, / );
 }
 
 /**
@@ -88,7 +157,8 @@ __attribute__ (( noinline )) int64_t s64div_var ( int64_t dividend,
  */
 __attribute__ (( noinline )) int64_t s64mod_var ( int64_t dividend,
 						  int64_t divisor ) {
-	return ( dividend % divisor );
+
+	return check_divmod ( dividend, divisor, % );
 }
 
 /**
