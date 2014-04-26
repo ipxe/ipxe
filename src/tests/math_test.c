@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <strings.h>
 #include <assert.h>
 #include <ipxe/test.h>
+#include <ipxe/isqrt.h>
 
 /**
  * Force a call to the non-constant implementation of flsl()
@@ -269,6 +270,16 @@ static void math_test_exec ( void ) {
 		       -1LL, -0x9cb7d9d78556fb9LL );
 	u64divmod_ok ( 0, 0x5b2f2737f4ffULL, 0, 0 );
 	s64divmod_ok ( 0, 0xbb00ded72766207fULL, 0, 0 );
+
+	/* Test integer square root */
+	ok ( isqrt ( 0 ) == 0 );
+	ok ( isqrt ( 1 ) == 1 );
+	ok ( isqrt ( 255 ) == 15 );
+	ok ( isqrt ( 256 ) == 16 );
+	ok ( isqrt ( 257 ) == 16 );
+	ok ( isqrt ( 0xa53df2adUL ) == 52652 );
+	ok ( isqrt ( 0x123793c6UL ) == 17482 );
+	ok ( isqrt ( -1UL ) == ( -1UL >> ( 8 * sizeof ( unsigned long ) / 2 )));
 }
 
 /** Mathematical self-tests */
