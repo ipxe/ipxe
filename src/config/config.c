@@ -290,6 +290,9 @@ REQUIRE_OBJECT ( console_cmd );
 #ifdef IPSTAT_CMD
 REQUIRE_OBJECT ( ipstat_cmd );
 #endif
+#ifdef PROFSTAT_CMD
+REQUIRE_OBJECT ( profstat_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

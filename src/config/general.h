@@ -149,6 +149,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define PING_CMD		/* Ping command */
 //#define CONSOLE_CMD		/* Console command */
 //#define IPSTAT_CMD		/* IP statistics commands */
+//#define PROFSTAT_CMD		/* Profiling commands */
 
 /*
  * ROM-specific options
