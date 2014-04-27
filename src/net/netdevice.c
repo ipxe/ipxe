@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/malloc.h>
 #include <ipxe/device.h>
 #include <ipxe/errortab.h>
+#include <ipxe/profile.h>
 #include <ipxe/vlan.h>
 #include <ipxe/netdevice.h>
 
@@ -48,6 +49,15 @@ struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 
 /** List of open network devices, in reverse order of opening */
 static struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
+
+/** Network polling profiler */
+static struct profiler net_poll_profiler __profiler = { .name = "net.poll" };
+
+/** Network receive profiler */
+static struct profiler net_rx_profiler __profiler = { .name = "net.rx" };
+
+/** Network transmit profiler */
+static struct profiler net_tx_profiler __profiler = { .name = "net.tx" };
 
 /** Default unknown link status code */
 #define EUNKNOWN_LINK_STATUS __einfo_error ( EINFO_EUNKNOWN_LINK_STATUS )
@@ -227,6 +237,7 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
 	DBGC2 ( netdev, "NETDEV %s transmitting %p (%p+%zx)\n",
 		netdev->name, iobuf, iobuf->data, iob_len ( iobuf ) );
+	profile_start ( &net_tx_profiler );
 
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->tx_queue );
@@ -248,6 +259,7 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	if ( ( rc = netdev->op->transmit ( netdev, iobuf ) ) != 0 )
 		goto err;
 
+	profile_stop ( &net_tx_profiler );
 	return 0;
 
  err:
@@ -932,7 +944,9 @@ void net_poll ( void ) {
 	list_for_each_entry ( netdev, &net_devices, list ) {
 
 		/* Poll for new packets */
+		profile_start ( &net_poll_profiler );
 		netdev_poll ( netdev );
+		profile_stop ( &net_poll_profiler );
 
 		/* Leave received packets on the queue if receive
 		 * queue processing is currently frozen.  This will
@@ -949,6 +963,7 @@ void net_poll ( void ) {
 			DBGC2 ( netdev, "NETDEV %s processing %p (%p+%zx)\n",
 				netdev->name, iobuf, iobuf->data,
 				iob_len ( iobuf ) );
+			profile_start ( &net_rx_profiler );
 
 			/* Remove link-layer header */
 			ll_protocol = netdev->ll_protocol;
@@ -967,6 +982,7 @@ void net_poll ( void ) {
 				/* Record error for diagnosis */
 				netdev_rx_err ( netdev, NULL, rc );
 			}
+			profile_stop ( &net_rx_profiler );
 		}
 	}
 }
