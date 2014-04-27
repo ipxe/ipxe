@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
+#include <ipxe/profile.h>
 #include "intel.h"
 
 /** @file
@@ -37,6 +38,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Intel 10/100/1000 network card driver
  *
  */
+
+/** VM transmit profiler */
+static struct profiler intel_vm_tx_profiler __profiler =
+	{ .name = "intel.vm_tx" };
+
+/** VM receive refill profiler */
+static struct profiler intel_vm_refill_profiler __profiler =
+	{ .name = "intel.vm_refill" };
+
+/** VM poll profiler */
+static struct profiler intel_vm_poll_profiler __profiler =
+	{ .name = "intel.vm_poll" };
 
 /******************************************************************************
  *
@@ -471,7 +484,9 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 		intel->rx_iobuf[rx_idx] = iobuf;
 
 		/* Push descriptor to card */
+		profile_start ( &intel_vm_refill_profiler );
 		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
+		profile_stop ( &intel_vm_refill_profiler );
 
 		DBGC2 ( intel, "INTEL %p RX %d is [%llx,%llx)\n", intel, rx_idx,
 			( ( unsigned long long ) address ),
@@ -611,7 +626,9 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */
+	profile_start ( &intel_vm_tx_profiler );
 	writel ( tx_tail, intel->regs + intel->tx.reg + INTEL_xDT );
+	profile_stop ( &intel_vm_tx_profiler );
 
 	DBGC2 ( intel, "INTEL %p TX %d is [%llx,%llx)\n", intel, tx_idx,
 		( ( unsigned long long ) address ),
@@ -703,7 +720,9 @@ static void intel_poll ( struct net_device *netdev ) {
 	uint32_t icr;
 
 	/* Check for and acknowledge interrupts */
+	profile_start ( &intel_vm_poll_profiler );
 	icr = readl ( intel->regs + INTEL_ICR );
+	profile_stop ( &intel_vm_poll_profiler );
 	if ( ! icr )
 		return;
 
