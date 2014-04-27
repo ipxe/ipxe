@@ -456,19 +456,20 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 	unsigned int rx_idx;
 	unsigned int rx_tail;
 	physaddr_t address;
+	unsigned int refilled = 0;
 
+	/* Refill ring */
 	while ( ( intel->rx.prod - intel->rx.cons ) < INTEL_RX_FILL ) {
 
 		/* Allocate I/O buffer */
 		iobuf = alloc_iob ( INTEL_RX_MAX_LEN );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
-			return;
+			break;
 		}
 
 		/* Get next receive descriptor */
 		rx_idx = ( intel->rx.prod++ % INTEL_NUM_RX_DESC );
-		rx_tail = ( intel->rx.prod % INTEL_NUM_RX_DESC );
 		rx = &intel->rx.desc[rx_idx];
 
 		/* Populate receive descriptor */
@@ -477,20 +478,24 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 		rx->length = 0;
 		rx->status = 0;
 		rx->errors = 0;
-		wmb();
 
 		/* Record I/O buffer */
 		assert ( intel->rx_iobuf[rx_idx] == NULL );
 		intel->rx_iobuf[rx_idx] = iobuf;
 
-		/* Push descriptor to card */
-		profile_start ( &intel_vm_refill_profiler );
-		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
-		profile_stop ( &intel_vm_refill_profiler );
-
 		DBGC2 ( intel, "INTEL %p RX %d is [%llx,%llx)\n", intel, rx_idx,
 			( ( unsigned long long ) address ),
 			( ( unsigned long long ) address + INTEL_RX_MAX_LEN ) );
+		refilled++;
+	}
+
+	/* Push descriptors to card, if applicable */
+	if ( refilled ) {
+		wmb();
+		rx_tail = ( intel->rx.prod % INTEL_NUM_RX_DESC );
+		profile_start ( &intel_vm_refill_profiler );
+		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
+		profile_stop ( &intel_vm_refill_profiler );
 	}
 }
 
