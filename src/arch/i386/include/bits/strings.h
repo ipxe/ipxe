@@ -19,10 +19,29 @@ static inline __attribute__ (( always_inline )) int __flsl ( long value ) {
 	 * the input is non-zero.
 	 */
 	if ( value ) {
-		__asm__ ( "bsr %1, %0"
+		__asm__ ( "bsrl %1, %0"
 			  : "=r" ( msb_minus_one )
 			  : "rm" ( value ) );
 		return ( msb_minus_one + 1 );
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * Find last (i.e. most significant) set bit
+ *
+ * @v value		Value
+ * @ret msb		Most significant bit set in value (LSB=1), or zero
+ */
+static inline __attribute__ (( always_inline )) int __flsll ( long long value ){
+	unsigned long high = ( value >> 32 );
+	unsigned long low = ( value >> 0 );
+
+	if ( high ) {
+		return ( 32 + __flsl ( high ) );
+	} else if ( low ) {
+		return ( __flsl ( low ) );
 	} else {
 		return 0;
 	}

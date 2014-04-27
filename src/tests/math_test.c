@@ -45,6 +45,16 @@ __attribute__ (( noinline )) int flsl_var ( long value ) {
 }
 
 /**
+ * Force a call to the non-constant implementation of flsll()
+ *
+ * @v value		Value
+ * @ret msb		Most significant bit set in value (LSB=1), or zero
+ */
+__attribute__ (( noinline )) int flsll_var ( long long value ) {
+	return flsll ( value );
+}
+
+/**
  * Check current stack pointer
  *
  * @ret stack		A value at a fixed offset from the current stack pointer
@@ -182,6 +192,25 @@ flsl_okx ( long value, int msb, const char *file, unsigned int line ) {
 #define flsl_ok( value, msb ) flsl_okx ( value, msb, __FILE__, __LINE__ )
 
 /**
+ * Report a flsll() test result
+ *
+ * @v value		Value
+ * @v msb		Expected MSB
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static inline __attribute__ (( always_inline )) void
+flsll_okx ( long long value, int msb, const char *file, unsigned int line ) {
+
+	/* Verify as a constant (requires to be inlined) */
+	okx ( flsll ( value ) == msb, file, line );
+
+	/* Verify as a non-constant */
+	okx ( flsll_var ( value ) == msb, file, line );
+}
+#define flsll_ok( value, msb ) flsll_okx ( value, msb, __FILE__, __LINE__ )
+
+/**
  * Report a 64-bit unsigned integer division test result
  *
  * @v dividend		Dividend
@@ -250,6 +279,14 @@ static void math_test_exec ( void ) {
 	flsl_ok ( 0x69505845, 31 );
 	flsl_ok ( -1U, ( 8 * sizeof ( int ) ) );
 	flsl_ok ( -1UL, ( 8 * sizeof ( long ) ) );
+
+	/* Test flsll() */
+	flsll_ok ( 0, 0 );
+	flsll_ok ( 1, 1 );
+	flsll_ok ( 0x6d63623330ULL, 39 );
+	flsll_ok ( -1U, ( 8 * sizeof ( int ) ) );
+	flsll_ok ( -1UL, ( 8 * sizeof ( long ) ) );
+	flsll_ok ( -1ULL, ( 8 * sizeof ( long long ) ) );
 
 	/* Test 64-bit arithmetic
 	 *
