@@ -13,50 +13,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <setjmp.h>
 #include <ipxe/in.h>
 
-/** Descriptor in a 32-bit IDT */
-struct idt_descriptor {
-	uint16_t offset_low;
-	uint16_t selector;
-	uint16_t flags;
-	uint16_t offset_high;
-} __attribute__ (( packed ));
-
-/** Operand for the LIDT instruction */
-struct idt_register {
-	uint16_t limit;
-	uint32_t base;
-} __attribute__ (( packed ));
-
-/** Entry in the interrupt jump buffer */
-struct ijb_entry {
-	uint8_t pusha_instruction;
-	uint8_t mov_instruction;
-	uint8_t mov_value;
-	uint8_t jump_instruction;
-	uint32_t jump_destination;
-} __attribute__ (( packed ));
-
-/** The x86 opcode for "pushal" */
-#define IJB_PUSHA 0x60
-
-/** The x86 opcode for "movb $imm8,%al" */
-#define IJB_MOV_AL_IMM8 0xB0
-
-/** The x86 opcode for "jmp rel32" */
-#define IJB_JMP_REL32 0xE9
-
-/** Flags that specify a 32-bit interrupt gate with DPL=0 */
-#define IDT_INTERRUPT_GATE_FLAGS 0x8E00
-
-/** Address of COM32 interrupt descriptor table */
-#define COM32_IDT 0x100000
-
-/** Number of entries in a fully populated IDT */
-#define COM32_NUM_IDT_ENTRIES 256
-
-/** Address of COM32 interrupt jump buffer */
-#define COM32_IJB 0x100800
-
 /** Segment used for COMBOOT PSP and image */
 #define COMBOOT_PSP_SEG 0x07C0
 
@@ -153,7 +109,6 @@ extern void unhook_comboot_interrupts ( );
 extern void com32_intcall_wrapper ( );
 extern void com32_farcall_wrapper ( );
 extern void com32_cfarcall_wrapper ( );
-extern void com32_irq_wrapper ( );
 
 /* Resolve a hostname to an (IPv4) address */
 extern int comboot_resolv ( const char *name, struct in_addr *address );

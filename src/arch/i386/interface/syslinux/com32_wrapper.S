@@ -23,26 +23,6 @@ FILE_LICENCE ( GPL2_OR_LATER )
 	.arch i386
 	.code32
 
-	/*
-	 * This code is entered after running the following sequence out of
-	 * the interrupt jump buffer:
-	 *
-	 * pushal
-	 * movb $vector, %al
-	 * jmp com32_irq_wrapper
-	 */
-
-	.globl com32_irq_wrapper
-com32_irq_wrapper:
-
-	movzbl %al,%eax
-	pushl %eax
-	movl $com32_irq, %eax
-	call com32_wrapper
-	popl %eax
-	popal
-	iret
-
 	.globl com32_farcall_wrapper
 com32_farcall_wrapper:
 
@@ -68,9 +48,6 @@ com32_wrapper:
 
 	/* Switch to internal virtual address space */
 	call _phys_to_virt
-
-	/* Switch to internal IDT (if we have one for debugging) */
-	lidt com32_internal_idtr
 
 	mov %eax, (com32_helper_function)
 
@@ -98,9 +75,6 @@ com32_wrapper:
 	/* Save internal stack pointer and restore external stack pointer */
 	movl %esp, (com32_internal_esp)
 	movl (com32_external_esp), %esp
-
-	/* Switch to com32 IDT */
-	lidt com32_external_idtr
 
 	/* Switch to external flat physical address space */
 	call _virt_to_phys
