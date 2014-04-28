@@ -53,6 +53,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/acpi.h>
 #include <ipxe/version.h>
 #include <ipxe/params.h>
+#include <ipxe/profile.h>
 #include <ipxe/http.h>
 
 /* Disambiguate the various error causes */
@@ -92,6 +93,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** Retry delay used when we cannot understand the Retry-After header */
 #define HTTP_RETRY_SECONDS 5
+
+/** Receive profiler */
+static struct profiler http_rx_profiler __profiler = { .name = "http.rx" };
+
+/** Data transfer profiler */
+static struct profiler http_xfer_profiler __profiler = { .name = "http.xfer" };
 
 /** HTTP flags */
 enum http_flags {
@@ -892,6 +899,7 @@ static int http_socket_deliver ( struct http_request *http,
 	ssize_t line_len;
 	int rc = 0;
 
+	profile_start ( &http_rx_profiler );
 	while ( iobuf && iob_len ( iobuf ) ) {
 
 		switch ( http->rx_state ) {
@@ -927,16 +935,20 @@ static int http_socket_deliver ( struct http_request *http,
 				iob_pull ( iobuf, data_len );
 			} else if ( data_len < iob_len ( iobuf ) ) {
 				/* Deliver partial buffer as raw data */
+				profile_start ( &http_xfer_profiler );
 				rc = xfer_deliver_raw ( &http->xfer,
 							iobuf->data, data_len );
 				iob_pull ( iobuf, data_len );
 				if ( rc != 0 )
 					goto done;
+				profile_stop ( &http_xfer_profiler );
 			} else {
 				/* Deliver whole I/O buffer */
+				profile_start ( &http_xfer_profiler );
 				if ( ( rc = xfer_deliver_iob ( &http->xfer,
 						 iob_disown ( iobuf ) ) ) != 0 )
 					goto done;
+				profile_stop ( &http_xfer_profiler );
 			}
 			http->rx_len += data_len;
 			if ( http->chunk_remaining ) {
@@ -985,6 +997,7 @@ static int http_socket_deliver ( struct http_request *http,
 	if ( rc )
 		http_close ( http, rc );
 	free_iob ( iobuf );
+	profile_stop ( &http_rx_profiler );
 	return rc;
 }
 
