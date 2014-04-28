@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/image.h>
+#include <ipxe/profile.h>
 #include <ipxe/downloader.h>
 
 /** @file
@@ -36,6 +37,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Image downloader
  *
  */
+
+/** Receive profiler */
+static struct profiler downloader_rx_profiler __profiler =
+	{ .name = "downloader.rx" };
+
+/** Data copy profiler */
+static struct profiler downloader_copy_profiler __profiler =
+	{ .name = "downloader.copy" };
 
 /** A downloader */
 struct downloader {
@@ -166,6 +175,9 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 	size_t max;
 	int rc;
 
+	/* Start profiling */
+	profile_start ( &downloader_rx_profiler );
+
 	/* Calculate new buffer position */
 	if ( meta->flags & XFER_FL_ABS_OFFSET )
 		downloader->pos = 0;
@@ -178,8 +190,10 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 		goto done;
 
 	/* Copy data to buffer */
+	profile_start ( &downloader_copy_profiler );
 	copy_to_user ( downloader->image->data, downloader->pos,
 		       iobuf->data, len );
+	profile_stop ( &downloader_copy_profiler );
 
 	/* Update current buffer position */
 	downloader->pos += len;
@@ -188,6 +202,7 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 	free_iob ( iobuf );
 	if ( rc != 0 )
 		downloader_finished ( downloader, rc );
+	profile_stop ( &downloader_rx_profiler );
 	return rc;
 }
 
