@@ -15,6 +15,7 @@
 #include <ipxe/open.h>
 #include <ipxe/uri.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/profile.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/tcp.h>
 
@@ -154,6 +155,15 @@ struct tcp_rx_queued_header {
  * List of registered TCP connections
  */
 static LIST_HEAD ( tcp_conns );
+
+/** Transmit profiler */
+static struct profiler tcp_tx_profiler __profiler = { .name = "tcp.tx" };
+
+/** Receive profiler */
+static struct profiler tcp_rx_profiler __profiler = { .name = "tcp.rx" };
+
+/** Data transfer profiler */
+static struct profiler tcp_xfer_profiler __profiler = { .name = "tcp.xfer" };
 
 /* Forward declarations */
 static struct interface_descriptor tcp_xfer_desc;
@@ -502,6 +512,9 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 	uint32_t max_representable_win;
 	int rc;
 
+	/* Start profiling */
+	profile_start ( &tcp_tx_profiler );
+
 	/* If retransmission timer is already running, do nothing */
 	if ( timer_running ( &tcp->timer ) )
 		return 0;
@@ -613,6 +626,7 @@ static int tcp_xmit ( struct tcp_connection *tcp ) {
 	/* Clear ACK-pending flag */
 	tcp->flags &= ~TCP_ACK_PENDING;
 
+	profile_stop ( &tcp_tx_profiler );
 	return 0;
 }
 
@@ -966,11 +980,13 @@ static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
 	tcp_rx_seq ( tcp, len );
 
 	/* Deliver data to application */
+	profile_start ( &tcp_xfer_profiler );
 	if ( ( rc = xfer_deliver_iob ( &tcp->xfer, iobuf ) ) != 0 ) {
 		DBGC ( tcp, "TCP %p could not deliver %08x..%08x: %s\n",
 		       tcp, seq, ( seq + len ), strerror ( rc ) );
 		return rc;
 	}
+	profile_stop ( &tcp_xfer_profiler );
 
 	return 0;
 }
@@ -1156,6 +1172,9 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	size_t old_xfer_window;
 	int rc;
 
+	/* Start profiling */
+	profile_start ( &tcp_rx_profiler );
+
 	/* Sanity check packet */
 	if ( iob_len ( iobuf ) < sizeof ( *tcphdr ) ) {
 		DBG ( "TCP packet too short at %zd bytes (min %zd bytes)\n",
@@ -1268,6 +1287,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	if ( tcp_xfer_window ( tcp ) != old_xfer_window )
 		xfer_window_changed ( &tcp->xfer );
 
+	profile_stop ( &tcp_rx_profiler );
 	return 0;
 
  discard:
