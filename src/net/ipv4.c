@@ -16,6 +16,7 @@
 #include <ipxe/settings.h>
 #include <ipxe/fragment.h>
 #include <ipxe/ipstat.h>
+#include <ipxe/profile.h>
 
 /** @file
  *
@@ -40,6 +41,12 @@ ipv4_stats_family __ip_statistics_family ( IP_STATISTICS_IPV4 ) = {
 	.version = 4,
 	.stats = &ipv4_stats,
 };
+
+/** Transmit profiler */
+static struct profiler ipv4_tx_profiler __profiler = { .name = "ipv4.tx" };
+
+/** Receive profiler */
+static struct profiler ipv4_rx_profiler __profiler = { .name = "ipv4.rx" };
 
 /**
  * Add IPv4 minirouting table entry
@@ -263,6 +270,9 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	const void *ll_dest;
 	int rc;
 
+	/* Start profiling */
+	profile_start ( &ipv4_tx_profiler );
+
 	/* Update statistics */
 	ipv4_stats.out_requests++;
 
@@ -358,6 +368,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		}
 	}
 
+	profile_stop ( &ipv4_tx_profiler );
 	return 0;
 
  err:
@@ -429,6 +440,9 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	uint16_t csum;
 	uint16_t pshdr_csum;
 	int rc;
+
+	/* Start profiling */
+	profile_start ( &ipv4_rx_profiler );
 
 	/* Update statistics */
 	ipv4_stats.in_receives++;
@@ -528,6 +542,7 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 		return rc;
 	}
 
+	profile_stop ( &ipv4_rx_profiler );
 	return 0;
 
  err_header:
