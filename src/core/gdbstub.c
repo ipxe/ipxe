@@ -396,5 +396,6 @@ struct gdb_transport *find_gdb_transport ( const char *name ) {
 void gdbstub_start ( struct gdb_transport *trans ) {
 	stub.trans = trans;
 	stub.payload = &stub.buf [ 1 ];
+	gdbmach_init();
 	gdbmach_breakpoint();
 }

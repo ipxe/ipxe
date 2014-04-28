@@ -128,10 +128,15 @@ init_librm:
 	addr32 leal	(%eax, %edi), %ebx
 	movl	%ebx, rm_data16
 
-	/* Set GDT and IDT base */
+	/* Set GDT base */
 	movl	%eax, gdt_base
 	addl	$gdt, gdt_base
-	call	idt_init
+
+	/* Initialise IDT */
+	pushl	$init_idt
+	pushw	%cs
+	call	prot_call
+	popl	%eax /* discard */
 
 	/* Restore registers */
 	negl	%edi
@@ -141,14 +146,12 @@ init_librm:
 
 	.section ".text16", "ax", @progbits
 	.code16
-	.weak idt_init
 set_seg_base:
 1:	movw	%ax, 2(%bx)
 	rorl	$16, %eax
 	movb	%al, 4(%bx)
 	movb	%ah, 7(%bx)
 	roll	$16, %eax
-idt_init: /* Reuse the return opcode here */
 	ret
 
 /****************************************************************************
@@ -237,10 +240,8 @@ real_to_prot:
 	/* Return to virtual address */
 	ret
 
-	/* Default IDTR with no interrupts */
+	/* Default real-mode interrupt descriptor table */
 	.section ".data16", "aw", @progbits
-	.weak idtr
-idtr:
 rm_idtr:
 	.word 0xffff /* limit */
 	.long 0 /* base */
@@ -535,6 +536,46 @@ flatten_real_mode:
 	.code32
 flatten_dummy:
 	ret
+
+/****************************************************************************
+ * Interrupt wrapper
+ *
+ * Used by the protected-mode interrupt vectors to call the
+ * interrupt() function.
+ *
+ * May be entered with either physical or virtual stack segment.
+ ****************************************************************************
+ */
+	.globl interrupt_wrapper
+interrupt_wrapper:
+	/* Preserve segment registers and original %esp */
+	pushl	%ds
+	pushl	%es
+	pushl	%fs
+	pushl	%gs
+	pushl	%ss
+	pushl	%esp
+
+	/* Switch to virtual addressing */
+	call	_intr_to_virt
+
+	/* Expand IRQ number to whole %eax register */
+	movzbl	%al, %eax
+
+	/* Call interrupt handler */
+	call	interrupt
+
+	/* Restore original stack and segment registers */
+	lss	(%esp), %esp
+	popl	%ss
+	popl	%gs
+	popl	%fs
+	popl	%es
+	popl	%ds
+
+	/* Restore registers and return */
+	popal
+	iret
 
 /****************************************************************************
  * Stored real-mode and protected-mode stack pointers
