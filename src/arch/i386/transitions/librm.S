@@ -66,15 +66,15 @@ physical_ds:	/* 32 bit protected mode data segment, physical addresses */
 	.byte	0, 0x93, 0xcf, 0	
 
 	.org	gdt + REAL_CS, 0
-real_cs: 	/* 16 bit flat real mode code segment */
+real_cs: 	/* 16 bit real mode code segment */
 	.word	0xffff, 0
-	.byte	0, 0x9b, 0x8f, 0
+	.byte	0, 0x9b, 0x00, 0
 
 	.org	gdt + REAL_DS	
-real_ds:	/* 16 bit flat real mode data segment */
+real_ds:	/* 16 bit real mode data segment */
 	.word	0xffff, 0
-	.byte	0, 0x93, 0x8f, 0
-	
+	.byte	0, 0x93, 0x00, 0
+
 gdt_end:
 	.equ	gdt_length, gdt_end - gdt
 
@@ -505,6 +505,36 @@ real_call:
 	 */
 	.section ".data16", "aw", @progbits
 rc_function:	.word 0, 0
+
+/****************************************************************************
+ * flatten_real_mode (real-mode near call)
+ *
+ * Switch to flat real mode
+ *
+ ****************************************************************************
+ */
+	.section ".text16", "ax", @progbits
+	.code16
+	.globl flatten_real_mode
+flatten_real_mode:
+	/* Modify GDT to use flat real mode */
+	movb	$0x8f, real_cs + 6
+	movb	$0x8f, real_ds + 6
+	/* Call dummy protected-mode function */
+	pushl	$flatten_dummy
+	pushw	%cs
+	call	prot_call
+	addw	$4, %sp
+	/* Restore GDT */
+	movb	$0x00, real_cs + 6
+	movb	$0x00, real_ds + 6
+	/* Return */
+	ret
+
+	.section ".text", "ax", @progbits
+	.code32
+flatten_dummy:
+	ret
 
 /****************************************************************************
  * Stored real-mode and protected-mode stack pointers

@@ -754,6 +754,9 @@ exec:	/* Set %ds = %cs */
 	call	prot_call
 	popl	%eax /* discard */
 
+	/* Set up flat real mode for return to BIOS */
+	call	flatten_real_mode
+
 	/* Uninstall iPXE */
 	call	uninstall
 
