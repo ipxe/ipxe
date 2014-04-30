@@ -209,10 +209,10 @@ real_to_prot:
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
-	data32 ljmp	$VIRTUAL_CS, $1f
+	data32 ljmp	$VIRTUAL_CS, $r2p_pmode
 	.section ".text", "ax", @progbits
 	.code32
-1:
+r2p_pmode:
 	/* Set up protected-mode data segments and stack pointer */
 	movw	$VIRTUAL_DS, %ax
 	movw	%ax, %ds
@@ -294,10 +294,10 @@ prot_to_real:
 	movw	%ax, %fs
 	movw	%ax, %gs
 	movw	%ax, %ss
-	ljmp	$REAL_CS, $1f
+	ljmp	$REAL_CS, $p2r_rmode
 	.section ".text16", "ax", @progbits
 	.code16
-1:
+p2r_rmode:
 	/* Switch to real mode */
 	movl	%cr0, %eax
 	andb	$0!CR0_PE, %al
@@ -400,11 +400,11 @@ prot_call:
 
 	/* Switch to protected mode and move register dump to PM stack */
 	movl	$PC_OFFSET_END, %ecx
-	pushl	$1f
+	pushl	$pc_pmode
 	jmp	real_to_prot
 	.section ".text", "ax", @progbits
 	.code32
-1:
+pc_pmode:
 	/* Call function */
 	leal	PC_OFFSET_IX86(%esp), %eax
 	pushl	%eax
@@ -413,11 +413,11 @@ prot_call:
 
 	/* Switch to real mode and move register dump back to RM stack */
 	movl	$PC_OFFSET_END, %ecx
-	pushl	$1f
+	pushl	$pc_rmode
 	jmp	prot_to_real
 	.section ".text16", "ax", @progbits
 	.code16
-1:	
+pc_rmode:
 	/* Reload GDT and IDT, restore registers and flags and return */
 	movw	%sp, %bp
 	data32 lgdt (%bp)
@@ -475,11 +475,11 @@ real_call:
 
 	/* Switch to real mode and move register dump to RM stack  */
 	movl	$( RC_OFFSET_RETADDR + 4 /* function pointer copy */ ), %ecx
-	pushl	$1f
+	pushl	$rc_rmode
 	jmp	prot_to_real
 	.section ".text16", "ax", @progbits
 	.code16
-1:
+rc_rmode:
 	/* Call real-mode function */
 	popl	rc_function
 	popal
@@ -491,11 +491,11 @@ real_call:
 
 	/* Switch to protected mode and move register dump back to PM stack */
 	movl	$RC_OFFSET_RETADDR, %ecx
-	pushl	$1f
+	pushl	$rc_pmode
 	jmp	real_to_prot
 	.section ".text", "ax", @progbits
 	.code32
-1:
+rc_pmode:
 	/* Restore registers and return */
 	popal
 	ret
