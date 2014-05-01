@@ -72,7 +72,7 @@ real_cs: 	/* 16 bit real mode code segment */
 
 	.org	gdt + REAL_DS	
 real_ds:	/* 16 bit real mode data segment */
-	.word	0xffff, 0
+	.word	0xffff, ( REAL_DS << 4 )
 	.byte	0, 0x93, 0x00, 0
 
 gdt_end:
@@ -111,20 +111,18 @@ init_librm:
 	/* Store rm_cs and text16, set up real_cs segment */
 	xorl	%eax, %eax
 	movw	%cs, %ax
-	movw	%ax, rm_cs
+	movw	%ax, %cs:rm_cs
 	shll	$4, %eax
 	movw	$real_cs, %bx
 	call	set_seg_base
 	addr32 leal	(%eax, %edi), %ebx
 	movl	%ebx, rm_text16
 
-	/* Store rm_ds and data16, set up real_ds segment */
+	/* Store rm_ds and data16 */
 	xorl	%eax, %eax
 	movw	%ds, %ax
 	movw	%ax, %cs:rm_ds
 	shll	$4, %eax
-	movw	$real_ds, %bx
-	call	set_seg_base
 	addr32 leal	(%eax, %edi), %ebx
 	movl	%ebx, rm_data16
 
@@ -241,7 +239,7 @@ r2p_pmode:
 	ret
 
 	/* Default real-mode interrupt descriptor table */
-	.section ".data16", "aw", @progbits
+	.section ".data", "aw", @progbits
 rm_idtr:
 	.word 0xffff /* limit */
 	.long 0 /* base */
@@ -287,6 +285,9 @@ prot_to_real:
 	/* Record protected-mode %esp (after removal of data) */
 	movl	%esi, pm_esp
 
+	/* Reset IDTR to the real-mode defaults */
+	lidt	rm_idtr
+
 	/* Load real-mode segment limits */
 	movw	$REAL_DS, %ax
 	movw	%ax, %ds
@@ -302,9 +303,9 @@ p2r_rmode:
 	movl	%cr0, %eax
 	andb	$0!CR0_PE, %al
 	movl	%eax, %cr0
-	ljmp	*p2r_jump_vector
-p2r_jump_target:
-
+p2r_ljmp_rm_cs:
+	ljmp	$0, $1f
+1:
 	/* Set up real-mode data segments and stack pointer */
 	movw	%cs:rm_ds, %ax
 	movw	%ax, %ds
@@ -314,26 +315,23 @@ p2r_jump_target:
 	movw	%bp, %ss
 	movl	%edx, %esp
 
-	/* Reset IDTR to the real-mode defaults */
-	data32 lidt rm_idtr
-
 	/* Return to real-mode address */
 	data32 ret
 
 
 	/* Real-mode code and data segments.  Assigned by the call to
 	 * init_librm.  rm_cs doubles as the segment part of the jump
-	 * vector used by prot_to_real.  rm_ds is located in .text16
-	 * rather than .data16 because code needs to be able to locate
-	 * the data segment.
+	 * instruction used by prot_to_real.  Both are located in
+	 * .text16 rather than .data16: rm_cs since it forms part of
+	 * the jump instruction within the code segment, and rm_ds
+	 * since real-mode code needs to be able to locate the data
+	 * segment with no other reference available.
 	 */
-	.section ".data16", "aw", @progbits
-p2r_jump_vector:
-	.word	p2r_jump_target
 	.globl rm_cs
-rm_cs:	.word 0
-	.globl rm_ds
+	.equ	rm_cs, ( p2r_ljmp_rm_cs + 3 )
+
 	.section ".text16.data", "aw", @progbits
+	.globl rm_ds
 rm_ds:	.word 0
 
 /****************************************************************************
