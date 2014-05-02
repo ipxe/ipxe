@@ -21,6 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/uaccess.h>
 #include <ipxe/init.h>
+#include <ipxe/profile.h>
 #include <setjmp.h>
 #include <registers.h>
 #include <biosint.h>
@@ -47,6 +48,26 @@ extern void pxe_int_1a ( void );
 
 /** INT 1A hooked flag */
 static int int_1a_hooked = 0;
+
+/** PXENV_UNDI_TRANSMIT API call profiler */
+static struct profiler pxe_api_tx_profiler __profiler =
+	{ .name = "pxeapi.tx" };
+
+/** PXENV_UNDI_ISR API call profiler */
+static struct profiler pxe_api_isr_profiler __profiler =
+	{ .name = "pxeapi.isr" };
+
+/** PXE unknown API call profiler
+ *
+ * This profiler can be used to measure the overhead of a dummy PXE
+ * API call.
+ */
+static struct profiler pxe_api_unknown_profiler __profiler =
+	{ .name = "pxeapi.unknown" };
+
+/** Miscellaneous PXE API call profiler */
+static struct profiler pxe_api_misc_profiler __profiler =
+	{ .name = "pxeapi.misc" };
 
 /**
  * Handle an unknown PXE API call
@@ -81,6 +102,27 @@ static struct pxe_api_call * find_pxe_api_call ( uint16_t opcode ) {
 }
 
 /**
+ * Determine applicable profiler (for debugging)
+ *
+ * @v opcode		PXE opcode
+ * @ret profiler	Profiler
+ */
+static struct profiler * pxe_api_profiler ( unsigned int opcode ) {
+
+	/* Determine applicable profiler */
+	switch ( opcode ) {
+	case PXENV_UNDI_TRANSMIT:
+		return &pxe_api_tx_profiler;
+	case PXENV_UNDI_ISR:
+		return &pxe_api_isr_profiler;
+	case PXENV_UNKNOWN:
+		return &pxe_api_unknown_profiler;
+	default:
+		return &pxe_api_misc_profiler;
+	}
+}
+
+/**
  * Dispatch PXE API call
  *
  * @v bx		PXE opcode
@@ -90,9 +132,13 @@ static struct pxe_api_call * find_pxe_api_call ( uint16_t opcode ) {
 __asmcall void pxe_api_call ( struct i386_all_regs *ix86 ) {
 	uint16_t opcode = ix86->regs.bx;
 	userptr_t uparams = real_to_user ( ix86->segs.es, ix86->regs.di );
+	struct profiler *profiler = pxe_api_profiler ( opcode );
 	struct pxe_api_call *call;
 	union u_PXENV_ANY params;
 	PXENV_EXIT_t ret;
+
+	/* Start profiling */
+	profile_start ( profiler );
 
 	/* Locate API call */
 	call = find_pxe_api_call ( opcode );
@@ -113,6 +159,9 @@ __asmcall void pxe_api_call ( struct i386_all_regs *ix86 ) {
 	/* Copy modified parameter block back to caller and return */
 	copy_to_user ( uparams, 0, &params, call->params_len );
 	ix86->regs.ax = ret;
+
+	/* Stop profiling, if applicable */
+	profile_stop ( profiler );
 }
 
 /**
