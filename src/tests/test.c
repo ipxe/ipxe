@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/test.h>
 #include <ipxe/init.h>
 #include <ipxe/image.h>
+#include <usr/profstat.h>
 
 /** Current self-test set */
 static struct self_test *current_tests;
@@ -134,6 +135,7 @@ static int run_all_tests ( void ) {
 		return -EINPROGRESS;
 	} else {
 		printf ( "OK: all %d tests passed\n", total );
+		profstat();
 		return 0;
 	}
 }
