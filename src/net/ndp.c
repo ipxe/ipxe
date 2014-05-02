@@ -786,6 +786,16 @@ const struct setting ndp_dns6_setting __setting ( SETTING_IP_EXTRA, dns6 ) = {
 	.scope = &ndp_settings_scope,
 };
 
+/** DNS search list setting */
+const struct setting ndp_dnssl_setting __setting ( SETTING_IP_EXTRA, dnssl ) = {
+	.name = "dnssl",
+	.description = "DNS search list",
+	.tag = NDP_TAG ( NDP_OPT_DNSSL,
+			 offsetof ( struct ndp_dnssl_option, names ) ),
+	.type = &setting_type_dnssl,
+	.scope = &ndp_settings_scope,
+};
+
 /****************************************************************************
  *
  * IPv6 autoconfiguration

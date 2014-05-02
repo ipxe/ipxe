@@ -250,16 +250,9 @@ REQUEST_EXPANDED ( CONFIG_SYMBOL );
  *
  */
 
-/*
- * If debug_OBJECT is set to a true value, the macro DBG(...) will
- * expand to printf(...) when compiling OBJECT, and the symbol
- * DEBUG_LEVEL will be inserted into the object file.
- *
- */
-#define DEBUG_SYMBOL PREFIX_OBJECT ( debug_ )
-
-#if DEBUG_SYMBOL == 0
+#ifndef DBGLVL_MAX
 #define NDEBUG
+#define DBGLVL_MAX 0
 #endif
 
 #ifndef ASSEMBLY
@@ -275,12 +268,6 @@ extern void dbg_md5_da ( unsigned long dispaddr,
 			 const void *data, unsigned long len );
 extern void dbg_pause ( void );
 extern void dbg_more ( void );
-
-#if DEBUG_SYMBOL
-#define DBGLVL_MAX DEBUG_SYMBOL
-#else
-#define DBGLVL_MAX 0
-#endif
 
 /* Allow for selective disabling of enabled debug levels */
 #if DBGLVL_MAX

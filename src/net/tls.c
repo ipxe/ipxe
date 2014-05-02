@@ -43,16 +43,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/x509.h>
-#include <ipxe/clientcert.h>
+#include <ipxe/privkey.h>
+#include <ipxe/certstore.h>
 #include <ipxe/rbg.h>
 #include <ipxe/validator.h>
 #include <ipxe/tls.h>
 
 /* Disambiguate the various error causes */
-#define EACCES_WRONG_NAME __einfo_error ( EINFO_EACCES_WRONG_NAME )
-#define EINFO_EACCES_WRONG_NAME						\
-	__einfo_uniqify ( EINFO_EACCES, 0x02,				\
-			  "Incorrect server name" )
 #define EINVAL_CHANGE_CIPHER __einfo_error ( EINFO_EINVAL_CHANGE_CIPHER )
 #define EINFO_EINVAL_CHANGE_CIPHER					\
 	__einfo_uniqify ( EINFO_EINVAL, 0x01,				\
@@ -161,6 +158,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_EPERM_VERIFY						\
 	__einfo_uniqify ( EINFO_EPERM, 0x02,				\
 			  "Handshake verification failed" )
+#define EPERM_CLIENT_CERT __einfo_error ( EINFO_EPERM_CLIENT_CERT )
+#define EINFO_EPERM_CLIENT_CERT						\
+	__einfo_uniqify ( EINFO_EPERM, 0x03,				\
+			  "No suitable client certificate available" )
 #define EPROTO_VERSION __einfo_error ( EINFO_EPROTO_VERSION )
 #define EINFO_EPROTO_VERSION						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x01,				\
@@ -311,6 +312,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
+	x509_put ( tls->cert );
 	x509_chain_put ( tls->chain );
 
 	/* Free TLS structure itself */
@@ -1034,40 +1036,15 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_certificate ( struct tls_session *tls ) {
-	int num_certificates = ( have_client_certificate() ? 1 : 0 );
 	struct {
 		uint32_t type_length;
 		uint8_t length[3];
 		struct {
 			uint8_t length[3];
-			uint8_t data[ client_certificate.len ];
-		} __attribute__ (( packed )) certificates[num_certificates];
+			uint8_t data[ tls->cert->raw.len ];
+		} __attribute__ (( packed )) certificates[1];
 	} __attribute__ (( packed )) *certificate;
-	struct x509_certificate *cert;
 	int rc;
-
-	/* If we have a certificate to send, determine the applicable
-	 * public-key algorithm and schedule transmission of
-	 * CertificateVerify.
-	 */
-	if ( num_certificates ) {
-
-		/* Parse certificate to determine public-key algorithm */
-		if ( ( rc = x509_certificate ( client_certificate.data,
-					       client_certificate.len,
-					       &cert ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not parse client "
-			       "certificate: %s\n", tls, strerror ( rc ) );
-			return rc;
-		}
-		tls->verify_pubkey = cert->signature_algorithm->pubkey;
-		x509_put ( cert );
-		cert = NULL;
-
-		/* Schedule CertificateVerify transmission */
-		tls->tx_pending |= TLS_TX_CERTIFICATE_VERIFY;
-		tls_tx_resume ( tls );
-	}
 
 	/* Allocate storage for Certificate record (which may be too
 	 * large for the stack).
@@ -1083,13 +1060,11 @@ static int tls_send_certificate ( struct tls_session *tls ) {
 			  sizeof ( certificate->type_length ) ) );
 	tls_set_uint24 ( certificate->length,
 			 sizeof ( certificate->certificates ) );
-	if ( num_certificates ) {
-		tls_set_uint24 ( certificate->certificates[0].length,
-				 sizeof ( certificate->certificates[0].data ) );
-		memcpy ( certificate->certificates[0].data,
-			 client_certificate.data,
+	tls_set_uint24 ( certificate->certificates[0].length,
 			 sizeof ( certificate->certificates[0].data ) );
-	}
+	memcpy ( certificate->certificates[0].data,
+		 tls->cert->raw.data,
+		 sizeof ( certificate->certificates[0].data ) );
 
 	/* Transmit record */
 	rc = tls_send_handshake ( tls, certificate, sizeof ( *certificate ) );
@@ -1152,7 +1127,8 @@ static int tls_send_client_key_exchange ( struct tls_session *tls ) {
  */
 static int tls_send_certificate_verify ( struct tls_session *tls ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
-	struct pubkey_algorithm *pubkey = tls->verify_pubkey;
+	struct x509_certificate *cert = tls->cert;
+	struct pubkey_algorithm *pubkey = cert->signature_algorithm->pubkey;
 	uint8_t digest_out[ digest->digestsize ];
 	uint8_t ctx[ pubkey->ctxsize ];
 	struct tls_signature_hash_algorithm *sig_hash = NULL;
@@ -1162,8 +1138,8 @@ static int tls_send_certificate_verify ( struct tls_session *tls ) {
 	tls_verify_handshake ( tls, digest_out );
 
 	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, ctx, client_private_key.data,
-				  client_private_key.len ) ) != 0 ) {
+	if ( ( rc = pubkey_init ( pubkey, ctx, private_key.data,
+				  private_key.len ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not initialise %s client private "
 		       "key: %s\n", tls, pubkey->name, strerror ( rc ) );
 		goto err_pubkey_init;
@@ -1479,7 +1455,7 @@ static int tls_parse_chain ( struct tls_session *tls,
 		}
 		cert = x509_last ( tls->chain );
 		DBGC ( tls, "TLS %p found certificate %s\n",
-		       tls, cert->subject.name );
+		       tls, x509_name ( cert ) );
 
 		/* Move to next certificate in list */
 		data = next;
@@ -1545,9 +1521,19 @@ static int tls_new_certificate_request ( struct tls_session *tls,
 	 * in parsing the Certificate Request.
 	 */
 
-	/* Schedule Certificate transmission */
-	tls->tx_pending |= TLS_TX_CERTIFICATE;
-	tls_tx_resume ( tls );
+	/* Free any existing client certificate */
+	x509_put ( tls->cert );
+
+	/* Determine client certificate to be sent */
+	tls->cert = certstore_find_key ( &private_key );
+	if ( ! tls->cert ) {
+		DBGC ( tls, "TLS %p could not find certificate corresponding "
+		       "to private key\n", tls );
+		return -EPERM_CLIENT_CERT;
+	}
+	x509_get ( tls->cert );
+	DBGC ( tls, "TLS %p sending client certificate %s\n",
+	       tls, x509_name ( tls->cert ) );
 
 	return 0;
 }
@@ -2454,11 +2440,9 @@ static void tls_validator_done ( struct tls_session *tls, int rc ) {
 	assert ( cert != NULL );
 
 	/* Verify server name */
-	if ( ( cert->subject.name == NULL ) ||
-	     ( strcmp ( cert->subject.name, tls->name ) != 0 ) ) {
-		DBGC ( tls, "TLS %p server name incorrect (expected %s, got "
-		       "%s)\n", tls, tls->name, cert->subject.name );
-		rc = -EACCES_WRONG_NAME;
+	if ( ( rc = x509_check_name ( cert, tls->name ) ) != 0 ) {
+		DBGC ( tls, "TLS %p server certificate does not match %s: %s\n",
+		       tls, tls->name, strerror ( rc ) );
 		goto err;
 	}
 
@@ -2475,6 +2459,10 @@ static void tls_validator_done ( struct tls_session *tls, int rc ) {
 	tls->tx_pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
 			     TLS_TX_CHANGE_CIPHER |
 			     TLS_TX_FINISHED );
+	if ( tls->cert ) {
+		tls->tx_pending |= ( TLS_TX_CERTIFICATE |
+				     TLS_TX_CERTIFICATE_VERIFY );
+	}
 	tls_tx_resume ( tls );
 
 	return;

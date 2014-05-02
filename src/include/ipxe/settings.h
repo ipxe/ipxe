@@ -417,6 +417,7 @@ extern const struct setting_type setting_type_hexhyp __setting_type;
 extern const struct setting_type setting_type_hexraw __setting_type;
 extern const struct setting_type setting_type_uuid __setting_type;
 extern const struct setting_type setting_type_busdevfn __setting_type;
+extern const struct setting_type setting_type_dnssl __setting_type;
 
 extern const struct setting
 ip_setting __setting ( SETTING_IP, ip );

@@ -36,6 +36,7 @@ _virt_to_phys:
 	addl	%ebp, 12(%esp)
 
 	/* Switch to physical code segment */
+	cli
 	pushl	$PHYSICAL_CS
 	leal	1f(%ebp), %eax
 	pushl	%eax
@@ -44,10 +45,10 @@ _virt_to_phys:
 	/* Reload other segment registers and adjust %esp */
 	movl	$PHYSICAL_DS, %eax
 	movl	%eax, %ds
-	movl	%eax, %es	
-	movl	%eax, %fs	
+	movl	%eax, %es
+	movl	%eax, %fs
 	movl	%eax, %gs
-	movl	%eax, %ss	
+	movl	%eax, %ss
 	addl	%ebp, %esp
 
 	/* Restore registers and flags, and return */
@@ -64,9 +65,6 @@ _virt_to_phys:
  * selectors.  All other registers are preserved.  Flags are
  * preserved.
  *
- * Note that this depends on the GDT already being correctly set up
- * (e.g. by a call to run_here()).
- *
  * Parameters: none
  * Returns: none
  ****************************************************************************
@@ -79,23 +77,67 @@ _phys_to_virt:
 	pushl	%ebp
 
 	/* Switch to virtual code segment */
+	cli
 	ljmp	$VIRTUAL_CS, $1f
-1:	
+1:
 	/* Reload data segment registers */
 	movl	$VIRTUAL_DS, %eax
 	movl	%eax, %ds
-	movl	%eax, %es	
-	movl	%eax, %fs	
+	movl	%eax, %es
+	movl	%eax, %fs
 	movl	%eax, %gs
 
 	/* Reload stack segment and adjust %esp */
 	movl	virt_offset, %ebp
-	movl	%eax, %ss	
+	movl	%eax, %ss
 	subl	%ebp, %esp
 
 	/* Change the return address to a virtual address */
 	subl	%ebp, 12(%esp)
 
+	/* Restore registers and flags, and return */
+	popl	%ebp
+	popl	%eax
+	popfl
+	ret
+
+/****************************************************************************
+ * _intr_to_virt (virtual code segment, virtual or physical stack segment)
+ *
+ * Switch from virtual code segment with either a virtual or physical
+ * stack segment to using virtual addressing.  %esp is adjusted if
+ * necessary to a virtual value.  Segment registers are set to virtual
+ * selectors.  All other registers are preserved.  Flags are
+ * preserved.
+ *
+ * Parameters: none
+ * Returns: none
+ ****************************************************************************
+ */
+	.globl _intr_to_virt
+_intr_to_virt:
+	/* Preserve registers and flags */
+	pushfl
+	pushl	%eax
+	pushl	%ebp
+
+	/* Check whether stack segment is physical or virtual */
+	movl	%ss, %eax
+	cmpw	$VIRTUAL_DS, %ax
+	movl	$VIRTUAL_DS, %eax
+
+	/* Reload data segment registers */
+	movl	%eax, %ds
+	movl	%eax, %es
+	movl	%eax, %fs
+	movl	%eax, %gs
+
+	/* Reload stack segment and adjust %esp if necessary */
+	je	1f
+	movl	virt_offset, %ebp
+	movl	%eax, %ss
+	subl	%ebp, %esp
+1:
 	/* Restore registers and flags, and return */
 	popl	%ebp
 	popl	%eax

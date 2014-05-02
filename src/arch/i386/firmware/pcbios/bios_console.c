@@ -101,7 +101,9 @@ static void bios_handle_ed ( struct ansiesc_context *ctx __unused,
 					   "int $0x10\n\t"
 					   "cli\n\t" )
 			       : : "a" ( 0x0600 ), "b" ( bios_attr << 8 ),
-			           "c" ( 0 ), "d" ( 0xfefe ) );
+				   "c" ( 0 ),
+				   "d" ( ( ( console_height - 1 ) << 8 ) |
+					 ( console_width - 1 ) ) );
 }
 
 /**

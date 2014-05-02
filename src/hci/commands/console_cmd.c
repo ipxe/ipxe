@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/console.h>
 #include <ipxe/image.h>
 #include <ipxe/pixbuf.h>
+#include <ipxe/ansiesc.h>
 #include <ipxe/ansicol.h>
 #include <usr/imgmgmt.h>
 
@@ -51,8 +52,16 @@ static struct option_descriptor console_opts[] = {
 		      struct console_options, config.width, parse_integer ),
 	OPTION_DESC ( "y", 'y', required_argument,
 		      struct console_options, config.height, parse_integer ),
-	OPTION_DESC ( "bpp", 'b', required_argument,
-		      struct console_options, config.bpp, parse_integer ),
+	OPTION_DESC ( "left", 'l', required_argument,
+		      struct console_options, config.left, parse_integer ),
+	OPTION_DESC ( "right", 'r', required_argument,
+		      struct console_options, config.right, parse_integer ),
+	OPTION_DESC ( "top", 't', required_argument,
+		      struct console_options, config.top, parse_integer ),
+	OPTION_DESC ( "bottom", 'b', required_argument,
+		      struct console_options, config.bottom, parse_integer ),
+	OPTION_DESC ( "depth", 'd', required_argument,
+		      struct console_options, config.depth, parse_integer ),
 	OPTION_DESC ( "picture", 'p', required_argument,
 		      struct console_options, picture, parse_string ),
 	OPTION_DESC ( "keep", 'k', no_argument,
@@ -83,7 +92,7 @@ static int console_exec ( int argc, char **argv ) {
 	if ( opts.picture ) {
 
 		/* Acquire image */
-		if ( ( rc = imgacquire ( opts.picture, &image ) ) != 0 )
+		if ( ( rc = imgacquire ( opts.picture, 0, &image ) ) != 0 )
 			goto err_acquire;
 
 		/* Convert to pixel buffer */
@@ -105,6 +114,10 @@ static int console_exec ( int argc, char **argv ) {
 		printf ( "Could not configure console: %s\n", strerror ( rc ) );
 		goto err_configure;
 	}
+
+	/* Reapply default colour pair and clear screen */
+	ansicol_set_pair ( CPAIR_DEFAULT );
+	printf ( CSI "2J" CSI "H" );
 
  err_configure:
 	pixbuf_put ( opts.config.pixbuf );

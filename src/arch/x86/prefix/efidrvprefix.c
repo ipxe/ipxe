@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <ipxe/init.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_snp.h>
 
 /**
  * EFI entry point
@@ -42,7 +43,8 @@ EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
 	initialise();
 	startup();
 
+	/* Release network devices for use via SNP */
+	efi_snp_release();
+
 	return 0;
 }
-
-REQUIRE_OBJECT ( efi_snp );

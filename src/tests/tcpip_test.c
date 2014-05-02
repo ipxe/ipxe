@@ -36,6 +36,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/profile.h>
 #include <ipxe/tcpip.h>
 
+/** Number of sample iterations for profiling */
+#define PROFILE_COUNT 16
+
 /** A TCP/IP fixed-data test */
 struct tcpip_test {
 	/** Data */
@@ -142,51 +145,74 @@ static uint16_t rfc_tcpip_chksum ( const void *data, size_t len ) {
  * Report TCP/IP fixed-data test result
  *
  * @v test		TCP/IP test
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define tcpip_ok( test ) do {						\
-	uint16_t expected;						\
-	uint16_t generic_sum;						\
-	uint16_t sum;							\
-	expected = rfc_tcpip_chksum ( (test)->data, (test)->len );	\
-	generic_sum = generic_tcpip_continue_chksum ( TCPIP_EMPTY_CSUM,	\
-						      (test)->data,	\
-						      (test)->len );	\
-	ok ( generic_sum == expected );					\
-	sum = tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, (test)->data,	\
-				      (test)->len );			\
-	ok ( sum == expected );						\
-	} while ( 0 )
+static void tcpip_okx ( struct tcpip_test *test, const char *file,
+			unsigned int line ) {
+	uint16_t expected;
+	uint16_t generic_sum;
+	uint16_t sum;
+
+	/* Verify generic_tcpip_continue_chksum() result */
+	expected = rfc_tcpip_chksum ( test->data, test->len );
+	generic_sum = generic_tcpip_continue_chksum ( TCPIP_EMPTY_CSUM,
+						      test->data, test->len );
+	okx ( generic_sum == expected, file, line );
+
+	/* Verify optimised tcpip_continue_chksum() result */
+	sum = tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, test->data, test->len );
+	okx ( sum == expected, file, line );
+}
+#define tcpip_ok( test ) tcpip_okx ( test, __FILE__, __LINE__ )
 
 /**
  * Report TCP/IP pseudorandom-data test result
  *
  * @v test		TCP/IP test
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define tcpip_random_ok( test ) do {					\
-	uint8_t *data = ( tcpip_data + (test)->offset );		\
-	uint16_t expected;						\
-	uint16_t generic_sum;						\
-	uint16_t sum;							\
-	unsigned long elapsed;						\
-	unsigned int i;							\
-	assert ( ( (test)->len + (test)->offset ) <=			\
-		 sizeof ( tcpip_data ) );				\
-	srandom ( (test)->seed );					\
-	for ( i = 0 ; i < (test)->len ; i++ )				\
-		data[i] = random();					\
-	expected = rfc_tcpip_chksum ( data, (test)->len );		\
-	generic_sum = generic_tcpip_continue_chksum ( TCPIP_EMPTY_CSUM,	\
-						      data,		\
-						      (test)->len );	\
-	ok ( generic_sum == expected );					\
-	simple_profile();						\
-	sum = tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, data,		\
-				      (test)->len );			\
-	elapsed = simple_profile();					\
-	ok ( sum == expected );						\
-	DBG ( "TCPIP checksummed %zd bytes (+%zd) in %ld ticks\n",	\
-	      (test)->len, (test)->offset, elapsed );			\
-	} while ( 0 )
+static void tcpip_random_okx ( struct tcpip_random_test *test,
+			       const char *file, unsigned int line ) {
+	uint8_t *data = ( tcpip_data + test->offset );
+	struct profiler profiler;
+	uint16_t expected;
+	uint16_t generic_sum;
+	uint16_t sum;
+	unsigned int i;
+
+	/* Sanity check */
+	assert ( ( test->len + test->offset ) <= sizeof ( tcpip_data ) );
+
+	/* Generate random data */
+	srandom ( test->seed );
+	for ( i = 0 ; i < test->len ; i++ )
+		data[i] = random();
+
+	/* Verify generic_tcpip_continue_chksum() result */
+	expected = rfc_tcpip_chksum ( data, test->len );
+	generic_sum = generic_tcpip_continue_chksum ( TCPIP_EMPTY_CSUM,
+						      data, test->len );
+	okx ( generic_sum == expected, file, line );
+
+	/* Verify optimised tcpip_continue_chksum() result */
+	sum = tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, data, test->len );
+	okx ( sum == expected, file, line );
+
+	/* Profile optimised calculation */
+	memset ( &profiler, 0, sizeof ( profiler ) );
+	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
+		profile_start ( &profiler );
+		sum = tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, data,
+					      test->len );
+		profile_stop ( &profiler );
+	}
+	DBG ( "TCPIP checksummed %zd bytes (+%zd) in %ld +/- %ld ticks\n",
+	      test->len, test->offset, profile_mean ( &profiler ),
+	      profile_stddev ( &profiler ) );
+}
+#define tcpip_random_ok( test ) tcpip_random_okx ( test, __FILE__, __LINE__ )
 
 /**
  * Perform TCP/IP self-tests

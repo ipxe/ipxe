@@ -204,8 +204,8 @@ static void serial_init ( void ) {
 	/* disable interrupts */
 	uart_writeb(0x0, UART_BASE + UART_IER);
 
-	/* disable fifo's */
-	uart_writeb(0x00, UART_BASE + UART_FCR);
+	/* enable fifos */
+	uart_writeb(0x01, UART_BASE + UART_FCR);
 
 	/* Set clear to send, so flow control works... */
 	uart_writeb((1<<1), UART_BASE + UART_MCR);

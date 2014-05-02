@@ -84,7 +84,7 @@ int imgverify ( struct image *image, struct image *signature,
 	/* Use signature to verify image */
 	now = time ( NULL );
 	if ( ( rc = cms_verify ( sig, image->data, image->len,
-				 name, now, NULL ) ) != 0 )
+				 name, now, NULL, NULL ) ) != 0 )
 		goto err_verify;
 
 	/* Drop reference to signature */

@@ -76,6 +76,13 @@ UACCESS_INLINE ( efi, memmove_user ) ( userptr_t dest, off_t dest_off,
 	trivial_memmove_user ( dest, dest_off, src, src_off, len );
 }
 
+static inline __always_inline int
+UACCESS_INLINE ( efi, memcmp_user ) ( userptr_t first, off_t first_off,
+				      userptr_t second, off_t second_off,
+				      size_t len ) {
+	return trivial_memcmp_user ( first, first_off, second, second_off, len);
+}
+
 static inline __always_inline void
 UACCESS_INLINE ( efi, memset_user ) ( userptr_t buffer, off_t offset,
 					int c, size_t len ) {

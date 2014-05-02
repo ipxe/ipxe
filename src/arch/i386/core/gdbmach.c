@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/gdbstub.h>
+#include <librm.h>
 #include <gdbmach.h>
 
 /** @file
@@ -149,4 +150,31 @@ __asmcall void gdbmach_handler ( int signo, gdbreg_t *regs ) {
 	gdbmach_disable_hwbps();
 	gdbstub_handler ( signo, regs );
 	gdbmach_enable_hwbps();
+}
+
+static void * gdbmach_interrupt_vectors[] = {
+	gdbmach_nocode_sigfpe,		/* Divide by zero */
+	gdbmach_nocode_sigtrap,		/* Debug trap */
+	NULL,				/* Non-maskable interrupt */
+	gdbmach_nocode_sigtrap,		/* Breakpoint */
+	gdbmach_nocode_sigstkflt,	/* Overflow */
+	gdbmach_nocode_sigstkflt,	/* Bound range exceeded */
+	gdbmach_nocode_sigill,		/* Invalid opcode */
+	NULL,				/* Device not available */
+	gdbmach_withcode_sigbus,	/* Double fault */
+	NULL,				/* Coprocessor segment overrun */
+	gdbmach_withcode_sigsegv,	/* Invalid TSS */
+	gdbmach_withcode_sigsegv,	/* Segment not present */
+	gdbmach_withcode_sigsegv,	/* Stack segment fault */
+	gdbmach_withcode_sigsegv,	/* General protection fault */
+	gdbmach_withcode_sigsegv,	/* Page fault */
+};
+
+void gdbmach_init ( void ) {
+	unsigned int i;
+
+	for ( i = 0 ; i < ( sizeof ( gdbmach_interrupt_vectors ) /
+			    sizeof ( gdbmach_interrupt_vectors[0] ) ) ; i++ ) {
+		set_interrupt_vector ( i, gdbmach_interrupt_vectors[i] );
+	}
 }

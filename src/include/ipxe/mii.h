@@ -78,6 +78,37 @@ mii_write ( struct mii_interface *mii, unsigned int reg, unsigned int data ) {
 	return mii->op->write ( mii, reg, data );
 }
 
+/**
+ * Dump MII registers (for debugging)
+ *
+ * @v mii		MII interface
+ */
+static inline void
+mii_dump ( struct mii_interface *mii ) {
+	unsigned int i;
+	int data;
+
+	/* Do nothing unless debug output is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Dump basic MII register set */
+	for ( i = 0 ; i < 16 ; i++ ) {
+		if ( ( i % 8 ) == 0 ) {
+			DBGC ( mii, "MII %p registers %02x-%02x:",
+			       mii, i, ( i + 7 ) );
+		}
+		data = mii_read ( mii, i );
+		if ( data >= 0 ) {
+			DBGC ( mii, " %04x", data );
+		} else {
+			DBGC ( mii, " XXXX" );
+		}
+		if ( ( i % 8 ) == 7 )
+			DBGC ( mii, "\n" );
+	}
+}
+
 /** Maximum time to wait for a reset, in milliseconds */
 #define MII_RESET_MAX_WAIT_MS 500
 

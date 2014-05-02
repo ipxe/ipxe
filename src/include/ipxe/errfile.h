@@ -231,6 +231,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_efi_image	      ( ERRFILE_IMAGE | 0x00040000 )
 #define ERRFILE_embedded	      ( ERRFILE_IMAGE | 0x00050000 )
 #define ERRFILE_pnm		      ( ERRFILE_IMAGE | 0x00060000 )
+#define ERRFILE_png		      ( ERRFILE_IMAGE | 0x00070000 )
 
 #define ERRFILE_asn1		      ( ERRFILE_OTHER | 0x00000000 )
 #define ERRFILE_chap		      ( ERRFILE_OTHER | 0x00010000 )
@@ -297,6 +298,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_efi_reboot	      ( ERRFILE_OTHER | 0x003e0000 )
 #define ERRFILE_memmap_settings	      ( ERRFILE_OTHER | 0x003f0000 )
 #define ERRFILE_param_cmd	      ( ERRFILE_OTHER | 0x00400000 )
+#define ERRFILE_deflate		      ( ERRFILE_OTHER | 0x00410000 )
 
 /** @} */
 

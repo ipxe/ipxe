@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <strings.h>
 #include <byteswap.h>
 #include <errno.h>
+#include <ctype.h>
 #include <assert.h>
 #include <ipxe/uri.h>
 #include <ipxe/refcnt.h>
@@ -42,6 +43,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/socket.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/process.h>
+#include <ipxe/retry.h>
+#include <ipxe/timer.h>
 #include <ipxe/linebuf.h>
 #include <ipxe/base64.h>
 #include <ipxe/base16.h>
@@ -50,6 +53,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/acpi.h>
 #include <ipxe/version.h>
 #include <ipxe/params.h>
+#include <ipxe/profile.h>
 #include <ipxe/http.h>
 
 /* Disambiguate the various error causes */
@@ -87,6 +91,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Block size used for HTTP block device request */
 #define HTTP_BLKSIZE 512
 
+/** Retry delay used when we cannot understand the Retry-After header */
+#define HTTP_RETRY_SECONDS 5
+
+/** Receive profiler */
+static struct profiler http_rx_profiler __profiler = { .name = "http.rx" };
+
+/** Data transfer profiler */
+static struct profiler http_xfer_profiler __profiler = { .name = "http.xfer" };
+
 /** HTTP flags */
 enum http_flags {
 	/** Request is waiting to be transmitted */
@@ -103,6 +116,8 @@ enum http_flags {
 	HTTP_BASIC_AUTH = 0x0020,
 	/** Provide Digest authentication details */
 	HTTP_DIGEST_AUTH = 0x0040,
+	/** Socket must be reopened */
+	HTTP_REOPEN_SOCKET = 0x0080,
 };
 
 /** HTTP receive state */
@@ -179,6 +194,11 @@ struct http_request {
 	char *auth_nonce;
 	/** Authentication opaque string (if any) */
 	char *auth_opaque;
+
+	/** Request retry timer */
+	struct retry_timer timer;
+	/** Retry delay (in timer ticks) */
+	unsigned long retry_delay;
 };
 
 /**
@@ -250,12 +270,42 @@ static int http_socket_open ( struct http_request *http ) {
 }
 
 /**
+ * Retry HTTP request
+ *
+ * @v timer		Retry timer
+ * @v fail		Failure indicator
+ */
+static void http_retry ( struct retry_timer *timer, int fail __unused ) {
+	struct http_request *http =
+		container_of ( timer, struct http_request, timer );
+	int rc;
+
+	/* Reopen socket if required */
+	if ( http->flags & HTTP_REOPEN_SOCKET ) {
+		http->flags &= ~HTTP_REOPEN_SOCKET;
+		DBGC ( http, "HTTP %p reopening connection\n", http );
+		if ( ( rc = http_socket_open ( http ) ) != 0 ) {
+			http_close ( http, rc );
+			return;
+		}
+	}
+
+	/* Retry the request if applicable */
+	if ( http->flags & HTTP_TRY_AGAIN ) {
+		http->flags &= ~HTTP_TRY_AGAIN;
+		DBGC ( http, "HTTP %p retrying request\n", http );
+		http->flags |= HTTP_TX_PENDING;
+		http->rx_state = HTTP_RX_RESPONSE;
+		process_add ( &http->process );
+	}
+}
+
+/**
  * Mark HTTP request as completed successfully
  *
  * @v http		HTTP request
  */
 static void http_done ( struct http_request *http ) {
-	int rc;
 
 	/* If we are not at an appropriate stage of the protocol
 	 * (including being in the middle of a chunked transfer),
@@ -296,25 +346,18 @@ static void http_done ( struct http_request *http ) {
 	}
 
 	/* If the server is not intending to keep the connection
-	 * alive, then reopen the socket.
+	 * alive, then close the socket and mark it as requiring
+	 * reopening.
 	 */
 	if ( ! ( http->flags & HTTP_SERVER_KEEPALIVE ) ) {
-		DBGC ( http, "HTTP %p reopening connection\n", http );
 		intf_restart ( &http->socket, 0 );
-		if ( ( rc = http_socket_open ( http ) ) != 0 ) {
-			http_close ( http, rc );
-			return;
-		}
+		http->flags &= ~HTTP_SERVER_KEEPALIVE;
+		http->flags |= HTTP_REOPEN_SOCKET;
 	}
-	http->flags &= ~HTTP_SERVER_KEEPALIVE;
 
-	/* Retry the request if applicable */
-	if ( http->flags & HTTP_TRY_AGAIN ) {
-		http->flags &= ~HTTP_TRY_AGAIN;
-		http->flags |= HTTP_TX_PENDING;
-		http->rx_state = HTTP_RX_RESPONSE;
-		process_add ( &http->process );
-	}
+	/* Start request retry timer */
+	start_timer_fixed ( &http->timer, http->retry_delay );
+	http->retry_delay = 0;
 }
 
 /**
@@ -406,7 +449,7 @@ static int http_rx_content_length ( struct http_request *http, char *value ) {
 
 	/* Parse content length */
 	content_len = strtoul ( value, &endp, 10 );
-	if ( *endp != '\0' ) {
+	if ( ! ( ( *endp == '\0' ) || isspace ( *endp ) ) ) {
 		DBGC ( http, "HTTP %p invalid Content-Length \"%s\"\n",
 		       http, value );
 		return -EINVAL_CONTENT_LENGTH;
@@ -636,6 +679,39 @@ static int http_rx_www_authenticate ( struct http_request *http, char *value ) {
 	return 0;
 }
 
+/**
+ * Handle HTTP Retry-After header
+ *
+ * @v http		HTTP request
+ * @v value		HTTP header value
+ * @ret rc		Return status code
+ */
+static int http_rx_retry_after ( struct http_request *http, char *value ) {
+	unsigned long seconds;
+	char *endp;
+
+	DBGC ( http, "HTTP %p retry requested (%s)\n", http, value );
+
+	/* If we received a 503 Service Unavailable response, then
+	 * retry after the specified number of seconds.  If the value
+	 * is not a simple number of seconds (e.g. a full HTTP date),
+	 * then retry after a fixed delay, since we don't have code
+	 * able to parse full HTTP dates.
+	 */
+	if ( http->code == 503 ) {
+		seconds = strtoul ( value, &endp, 10 );
+		if ( *endp != '\0' ) {
+			seconds = HTTP_RETRY_SECONDS;
+			DBGC ( http, "HTTP %p cannot understand \"%s\"; "
+			       "using %ld seconds\n", http, value, seconds );
+		}
+		http->flags |= HTTP_TRY_AGAIN;
+		http->retry_delay = ( seconds * TICKS_PER_SEC );
+	}
+
+	return 0;
+}
+
 /** An HTTP header handler */
 struct http_header_handler {
 	/** Name (e.g. "Content-Length") */
@@ -672,6 +748,10 @@ static struct http_header_handler http_header_handlers[] = {
 	{
 		.header = "WWW-Authenticate",
 		.rx = http_rx_www_authenticate,
+	},
+	{
+		.header = "Retry-After",
+		.rx = http_rx_retry_after,
 	},
 	{ NULL, NULL }
 };
@@ -819,6 +899,7 @@ static int http_socket_deliver ( struct http_request *http,
 	ssize_t line_len;
 	int rc = 0;
 
+	profile_start ( &http_rx_profiler );
 	while ( iobuf && iob_len ( iobuf ) ) {
 
 		switch ( http->rx_state ) {
@@ -854,16 +935,20 @@ static int http_socket_deliver ( struct http_request *http,
 				iob_pull ( iobuf, data_len );
 			} else if ( data_len < iob_len ( iobuf ) ) {
 				/* Deliver partial buffer as raw data */
+				profile_start ( &http_xfer_profiler );
 				rc = xfer_deliver_raw ( &http->xfer,
 							iobuf->data, data_len );
 				iob_pull ( iobuf, data_len );
 				if ( rc != 0 )
 					goto done;
+				profile_stop ( &http_xfer_profiler );
 			} else {
 				/* Deliver whole I/O buffer */
+				profile_start ( &http_xfer_profiler );
 				if ( ( rc = xfer_deliver_iob ( &http->xfer,
 						 iob_disown ( iobuf ) ) ) != 0 )
 					goto done;
+				profile_stop ( &http_xfer_profiler );
 			}
 			http->rx_len += data_len;
 			if ( http->chunk_remaining ) {
@@ -912,6 +997,7 @@ static int http_socket_deliver ( struct http_request *http,
 	if ( rc )
 		http_close ( http, rc );
 	free_iob ( iobuf );
+	profile_stop ( &http_rx_profiler );
 	return rc;
 }
 
@@ -958,8 +1044,8 @@ static void http_socket_close ( struct http_request *http, int rc ) {
  */
 static char * http_basic_auth ( struct http_request *http ) {
 	const char *user = http->uri->user;
-	const char *password =
-		( http->uri->password ? http->uri->password : "" );
+	const char *password = ( http->uri->password ?
+				 http->uri->password : "" );
 	size_t user_pw_len =
 		( strlen ( user ) + 1 /* ":" */ + strlen ( password ) );
 	char user_pw[ user_pw_len + 1 /* NUL */ ];
@@ -1000,8 +1086,8 @@ static char * http_basic_auth ( struct http_request *http ) {
 static char * http_digest_auth ( struct http_request *http,
 				 const char *method, const char *uri ) {
 	const char *user = http->uri->user;
-	const char *password =
-		( http->uri->password ? http->uri->password : "" );
+	const char *password = ( http->uri->password ?
+				 http->uri->password : "" );
 	const char *realm = http->auth_realm;
 	const char *nonce = http->auth_nonce;
 	const char *opaque = http->auth_opaque;
@@ -1088,7 +1174,7 @@ static size_t http_post_params ( struct http_request *http,
 		}
 
 		/* URI-encode the key */
-		frag_len = uri_encode ( param->key, buf, remaining, 0 );
+		frag_len = uri_encode ( param->key, 0, buf, remaining );
 		buf += frag_len;
 		len += frag_len;
 		remaining -= frag_len;
@@ -1101,7 +1187,7 @@ static size_t http_post_params ( struct http_request *http,
 		remaining--;
 
 		/* URI-encode the value */
-		frag_len = uri_encode ( param->value, buf, remaining, 0 );
+		frag_len = uri_encode ( param->value, 0, buf, remaining );
 		buf += frag_len;
 		len += frag_len;
 		remaining -= frag_len;
@@ -1149,9 +1235,11 @@ static struct io_buffer * http_post ( struct http_request *http ) {
  */
 static void http_step ( struct http_request *http ) {
 	struct io_buffer *post;
-	size_t uri_len;
+	struct uri host_uri;
+	struct uri path_uri;
+	char *host_uri_string;
+	char *path_uri_string;
 	char *method;
-	char *uri;
 	char *range;
 	char *auth;
 	char *content;
@@ -1176,19 +1264,24 @@ static void http_step ( struct http_request *http ) {
 	method = ( ( http->flags & HTTP_HEAD_ONLY ) ? "HEAD" :
 		   ( http->uri->params ? "POST" : "GET" ) );
 
-	/* Construct path?query request */
-	uri_len = ( unparse_uri ( NULL, 0, http->uri,
-				  URI_PATH_BIT | URI_QUERY_BIT )
-		    + 1 /* possible "/" */ + 1 /* NUL */ );
-	uri = malloc ( uri_len );
-	if ( ! uri ) {
+	/* Construct host URI */
+	memset ( &host_uri, 0, sizeof ( host_uri ) );
+	host_uri.host = http->uri->host;
+	host_uri.port = http->uri->port;
+	host_uri_string = format_uri_alloc ( &host_uri );
+	if ( ! host_uri_string ) {
 		rc = -ENOMEM;
-		goto err_uri;
+		goto err_host_uri;
 	}
-	unparse_uri ( uri, uri_len, http->uri, URI_PATH_BIT | URI_QUERY_BIT );
-	if ( ! uri[0] ) {
-		uri[0] = '/';
-		uri[1] = '\0';
+
+	/* Construct path URI */
+	memset ( &path_uri, 0, sizeof ( path_uri ) );
+	path_uri.path = ( http->uri->path ? http->uri->path : "/" );
+	path_uri.query = http->uri->query;
+	path_uri_string = format_uri_alloc ( &path_uri );
+	if ( ! path_uri_string ) {
+		rc = -ENOMEM;
+		goto err_path_uri;
 	}
 
 	/* Calculate range request parameters if applicable */
@@ -1213,7 +1306,7 @@ static void http_step ( struct http_request *http ) {
 			goto err_auth;
 		}
 	} else if ( http->flags & HTTP_DIGEST_AUTH ) {
-		auth = http_digest_auth ( http, method, uri );
+		auth = http_digest_auth ( http, method, path_uri_string );
 		if ( ! auth ) {
 			rc = -ENOMEM;
 			goto err_auth;
@@ -1248,14 +1341,11 @@ static void http_step ( struct http_request *http ) {
 	if ( ( rc = xfer_printf ( &http->socket,
 				  "%s %s HTTP/1.1\r\n"
 				  "User-Agent: iPXE/%s\r\n"
-				  "Host: %s%s%s\r\n"
+				  "Host: %s\r\n"
 				  "%s%s%s%s"
 				  "\r\n",
-				  method, uri, product_version, http->uri->host,
-				  ( http->uri->port ?
-				    ":" : "" ),
-				  ( http->uri->port ?
-				    http->uri->port : "" ),
+				  method, path_uri_string, product_version,
+				  host_uri_string,
 				  ( ( http->flags & HTTP_CLIENT_KEEPALIVE ) ?
 				    "Connection: keep-alive\r\n" : "" ),
 				  ( range ? range : "" ),
@@ -1281,8 +1371,10 @@ static void http_step ( struct http_request *http ) {
  err_auth:
 	free ( range );
  err_range:
-	free ( uri );
- err_uri:
+	free ( path_uri_string );
+ err_path_uri:
+	free ( host_uri_string );
+ err_host_uri:
 	if ( rc != 0 )
 		http_close ( http, rc );
 }
@@ -1461,6 +1553,7 @@ int http_open_filter ( struct interface *xfer, struct uri *uri,
 	http->filter = filter;
 	intf_init ( &http->socket, &http_socket_desc, &http->refcnt );
 	process_init ( &http->process, &http_process_desc, &http->refcnt );
+	timer_init ( &http->timer, http_retry, &http->refcnt );
 	http->flags = HTTP_TX_PENDING;
 
 	/* Open socket */

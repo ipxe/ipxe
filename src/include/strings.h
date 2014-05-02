@@ -5,17 +5,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <limits.h>
 #include <string.h>
+#include <bits/strings.h>
 
 static inline __attribute__ (( always_inline )) int
-__constant_flsl ( unsigned long x ) {
+__constant_flsll ( unsigned long long x ) {
 	int r = 0;
 
-#if ULONG_MAX > 0xffffffff
-	if ( x & 0xffffffff00000000UL ) {
+	if ( x & 0xffffffff00000000ULL ) {
 		x >>= 32;
 		r += 32;
 	}
-#endif
 	if ( x & 0xffff0000UL ) {
 		x >>= 16;
 		r += 16;
@@ -42,8 +41,16 @@ __constant_flsl ( unsigned long x ) {
 	return r;
 }
 
-/* We don't actually have these functions yet */
-extern int __flsl ( long x );
+static inline __attribute__ (( always_inline )) int
+__constant_flsl ( unsigned long x ) {
+	return __constant_flsll ( x );
+}
+
+int __flsll ( long long x );
+int __flsl ( long x );
+
+#define flsll( x ) \
+	( __builtin_constant_p ( x ) ? __constant_flsll ( x ) : __flsll ( x ) )
 
 #define flsl( x ) \
 	( __builtin_constant_p ( x ) ? __constant_flsl ( x ) : __flsl ( x ) )

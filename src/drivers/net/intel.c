@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
+#include <ipxe/profile.h>
 #include "intel.h"
 
 /** @file
@@ -37,6 +38,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Intel 10/100/1000 network card driver
  *
  */
+
+/** VM transmit profiler */
+static struct profiler intel_vm_tx_profiler __profiler =
+	{ .name = "intel.vm_tx" };
+
+/** VM receive refill profiler */
+static struct profiler intel_vm_refill_profiler __profiler =
+	{ .name = "intel.vm_refill" };
+
+/** VM poll profiler */
+static struct profiler intel_vm_poll_profiler __profiler =
+	{ .name = "intel.vm_poll" };
 
 /******************************************************************************
  *
@@ -443,19 +456,20 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 	unsigned int rx_idx;
 	unsigned int rx_tail;
 	physaddr_t address;
+	unsigned int refilled = 0;
 
+	/* Refill ring */
 	while ( ( intel->rx.prod - intel->rx.cons ) < INTEL_RX_FILL ) {
 
 		/* Allocate I/O buffer */
 		iobuf = alloc_iob ( INTEL_RX_MAX_LEN );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
-			return;
+			break;
 		}
 
 		/* Get next receive descriptor */
 		rx_idx = ( intel->rx.prod++ % INTEL_NUM_RX_DESC );
-		rx_tail = ( intel->rx.prod % INTEL_NUM_RX_DESC );
 		rx = &intel->rx.desc[rx_idx];
 
 		/* Populate receive descriptor */
@@ -464,18 +478,24 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 		rx->length = 0;
 		rx->status = 0;
 		rx->errors = 0;
-		wmb();
 
 		/* Record I/O buffer */
 		assert ( intel->rx_iobuf[rx_idx] == NULL );
 		intel->rx_iobuf[rx_idx] = iobuf;
 
-		/* Push descriptor to card */
-		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
-
 		DBGC2 ( intel, "INTEL %p RX %d is [%llx,%llx)\n", intel, rx_idx,
 			( ( unsigned long long ) address ),
 			( ( unsigned long long ) address + INTEL_RX_MAX_LEN ) );
+		refilled++;
+	}
+
+	/* Push descriptors to card, if applicable */
+	if ( refilled ) {
+		wmb();
+		rx_tail = ( intel->rx.prod % INTEL_NUM_RX_DESC );
+		profile_start ( &intel_vm_refill_profiler );
+		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
+		profile_stop ( &intel_vm_refill_profiler );
 	}
 }
 
@@ -593,7 +613,7 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	physaddr_t address;
 
 	/* Get next transmit descriptor */
-	if ( ( intel->tx.prod - intel->tx.cons ) >= INTEL_NUM_TX_DESC ) {
+	if ( ( intel->tx.prod - intel->tx.cons ) >= INTEL_TX_FILL ) {
 		DBGC ( intel, "INTEL %p out of transmit descriptors\n", intel );
 		return -ENOBUFS;
 	}
@@ -611,7 +631,9 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */
+	profile_start ( &intel_vm_tx_profiler );
 	writel ( tx_tail, intel->regs + intel->tx.reg + INTEL_xDT );
+	profile_stop ( &intel_vm_tx_profiler );
 
 	DBGC2 ( intel, "INTEL %p TX %d is [%llx,%llx)\n", intel, tx_idx,
 		( ( unsigned long long ) address ),
@@ -703,7 +725,9 @@ static void intel_poll ( struct net_device *netdev ) {
 	uint32_t icr;
 
 	/* Check for and acknowledge interrupts */
+	profile_start ( &intel_vm_poll_profiler );
 	icr = readl ( intel->regs + INTEL_ICR );
+	profile_stop ( &intel_vm_poll_profiler );
 	if ( ! icr )
 		return;
 

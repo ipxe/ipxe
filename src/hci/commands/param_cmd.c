@@ -74,8 +74,10 @@ static int params_exec ( int argc, char **argv ) {
 		return -ENOMEM;
 
 	/* Destroy parameter list, if applicable */
-	if ( opts.delete )
-		destroy_parameters ( params );
+	if ( opts.delete ) {
+		claim_parameters ( params );
+		params_put ( params );
+	}
 
 	return 0;
 }

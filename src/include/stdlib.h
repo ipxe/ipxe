@@ -93,6 +93,10 @@ static inline void srand ( unsigned int seed ) {
  ****************************************************************************
  */
 
+static inline __attribute__ (( always_inline )) int abs ( int value ) {
+	return __builtin_abs ( value );
+}
+
 extern int system ( const char *command );
 extern __asmcall int main ( void );
 

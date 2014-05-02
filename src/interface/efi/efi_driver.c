@@ -119,10 +119,74 @@ efi_driver_get_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
 }
 
 /**
+ * Try to connect EFI driver
+ *
+ * @v efidrv		EFI driver
+ * @v handle		Controller handle
+ */
+static void efi_driver_connect ( struct efi_driver *efidrv, EFI_HANDLE handle ){
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE drivers[2] = { efidrv->driver.DriverBindingHandle, NULL };
+
+	bs->ConnectController ( handle, drivers, NULL, FALSE );
+}
+
+/**
+ * Try to disconnect EFI driver
+ *
+ * @v efidrv		EFI driver
+ * @v handle		Controller handle
+ */
+static void efi_driver_disconnect ( struct efi_driver *efidrv,
+				    EFI_HANDLE handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	bs->DisconnectController ( handle, efidrv->driver.DriverBindingHandle,
+				   NULL );
+}
+
+/**
+ * Connect/disconnect EFI driver from all handles
+ *
+ * @v efidrv		EFI driver
+ * @v method		Connect/disconnect method
+ * @ret rc		Return status code
+ */
+static int efi_driver_handles ( struct efi_driver *efidrv,
+				void ( * method ) ( struct efi_driver *efidrv,
+						    EFI_HANDLE handle ) ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE *handles;
+	UINTN num_handles;
+	EFI_STATUS efirc;
+	UINTN i;
+	int rc;
+
+	/* Enumerate all handles */
+	if ( ( efirc = bs->LocateHandleBuffer ( AllHandles, NULL, NULL,
+						&num_handles,
+						&handles ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( efidrv, "EFIDRV %s could not list handles: %s\n",
+		       efidrv->name, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Connect/disconnect driver from all handles */
+	for ( i = 0 ; i < num_handles ; i++ )
+		method ( efidrv, handles[i] );
+
+	/* Free list of handles */
+	bs->FreePool ( handles );
+
+	return 0;
+}
+
+/**
  * Install EFI driver
  *
  * @v efidrv		EFI driver
- * @ret efirc		EFI status code
+ * @ret rc		Return status code
  */
 int efi_driver_install ( struct efi_driver *efidrv ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
@@ -143,7 +207,9 @@ int efi_driver_install ( struct efi_driver *efidrv ) {
 	efi_snprintf ( efidrv->wname,
 		       ( sizeof ( efidrv->wname ) /
 			 sizeof ( efidrv->wname[0] ) ),
-		       PRODUCT_SHORT_NAME " - %s", efidrv->name );
+		       PRODUCT_SHORT_NAME "%s%s",
+		       ( efidrv->name ? " - " : "" ),
+		       ( efidrv->name ? efidrv->name : "" ) );
 
 	/* Install driver */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
@@ -157,6 +223,31 @@ int efi_driver_install ( struct efi_driver *efidrv ) {
 		return rc;
 	}
 
+	/* Connect devices */
+	DBGC ( efidrv, "EFIDRV %s connecting devices\n", efidrv->name );
+	efi_driver_handles ( efidrv, efi_driver_connect );
+
 	DBGC ( efidrv, "EFIDRV %s installed\n", efidrv->name );
 	return 0;
+}
+
+/**
+ * Uninstall EFI driver
+ *
+ * @v efidrv		EFI driver
+ */
+void efi_driver_uninstall ( struct efi_driver *efidrv ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Disconnect the driver from its devices */
+	DBGC ( efidrv, "EFIDRV %s disconnecting devices\n", efidrv->name );
+	efi_driver_handles ( efidrv, efi_driver_disconnect );
+
+	/* Uninstall the driver */
+	bs->UninstallMultipleProtocolInterfaces (
+			efidrv->driver.DriverBindingHandle,
+			&efi_driver_binding_protocol_guid, &efidrv->driver,
+			&efi_component_name2_protocol_guid, &efidrv->wtf,
+			NULL );
+	DBGC ( efidrv, "EFIDRV %s uninstalled\n", efidrv->name );
 }

@@ -23,6 +23,7 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
+#include <ctype.h>
 #include <byteswap.h>
 #include <ipxe/socket.h>
 #include <ipxe/tcpip.h>
@@ -460,6 +461,25 @@ static struct interface_descriptor ftp_xfer_desc =
  */
 
 /**
+ * Check validity of FTP control channel string
+ *
+ * @v string		String
+ * @ret rc		Return status code
+ */
+static int ftp_check_string ( const char *string ) {
+	char c;
+
+	/* The FTP control channel is line-based.  Check for invalid
+	 * non-printable characters (e.g. newlines).
+	 */
+	while ( ( c = *(string++) ) ) {
+		if ( ! isprint ( c ) )
+			return -EINVAL;
+	}
+	return 0;
+}
+
+/**
  * Initiate an FTP connection
  *
  * @v xfer		Data transfer interface
@@ -472,10 +492,17 @@ static int ftp_open ( struct interface *xfer, struct uri *uri ) {
 	int rc;
 
 	/* Sanity checks */
-	if ( ! uri->path )
-		return -EINVAL;
 	if ( ! uri->host )
 		return -EINVAL;
+	if ( ! uri->path )
+		return -EINVAL;
+	if ( ( rc = ftp_check_string ( uri->path ) ) != 0 )
+		return rc;
+	if ( uri->user && ( ( rc = ftp_check_string ( uri->user ) ) != 0 ) )
+		return rc;
+	if ( uri->password &&
+	     ( ( rc = ftp_check_string ( uri->password ) ) != 0 ) )
+		return rc;
 
 	/* Allocate and populate structure */
 	ftp = zalloc ( sizeof ( *ftp ) );

@@ -33,11 +33,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
 EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 			       EFI_SYSTEM_TABLE *systab ) {
 	EFI_STATUS efirc;
+	int rc;
 
 	/* Initialise EFI environment */
 	if ( ( efirc = efi_init ( image_handle, systab ) ) != 0 )
-		return efirc;
+		goto err_init;
 
 	/* Call to main() */
-	return EFIRC ( main () );
+	if ( ( rc = main() ) != 0 ) {
+		efirc = EFIRC ( rc );
+		goto err_main;
+	}
+
+ err_main:
+	efi_loaded_image->Unload ( image_handle );
+ err_init:
+	return efirc;
 }

@@ -36,6 +36,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/profile.h>
 #include "cbc_test.h"
 
+/** Number of sample iterations for profiling */
+#define PROFILE_COUNT 16
+
 /**
  * Test CBC encryption
  *
@@ -115,8 +118,7 @@ static unsigned long cbc_cost ( struct cipher_algorithm *cipher,
 	uint8_t key[key_len];
 	uint8_t iv[cipher->blocksize];
 	uint8_t ctx[cipher->ctxsize];
-	union profiler profiler;
-	unsigned long long elapsed;
+	struct profiler profiler;
 	unsigned long cost;
 	unsigned int i;
 	int rc;
@@ -135,13 +137,17 @@ static unsigned long cbc_cost ( struct cipher_algorithm *cipher,
 	assert ( rc == 0 );
 	cipher_setiv ( cipher, ctx, iv );
 
-	/* Time operation */
-	profile ( &profiler );
-	op ( cipher, ctx, random, random, sizeof ( random ) );
-	elapsed = profile ( &profiler );
+	/* Profile cipher operation */
+	memset ( &profiler, 0, sizeof ( profiler ) );
+	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
+		profile_start ( &profiler );
+		op ( cipher, ctx, random, random, sizeof ( random ) );
+		profile_stop ( &profiler );
+	}
 
 	/* Round to nearest whole number of cycles per byte */
-	cost = ( ( elapsed + ( sizeof ( random ) / 2 ) ) / sizeof ( random ) );
+	cost = ( ( profile_mean ( &profiler ) + ( sizeof ( random ) / 2 ) ) /
+		 sizeof ( random ) );
 
 	return cost;
 }

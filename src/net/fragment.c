@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <ipxe/retry.h>
 #include <ipxe/timer.h>
+#include <ipxe/ipstat.h>
 #include <ipxe/fragment.h>
 
 /** @file
@@ -45,6 +46,7 @@ static void fragment_expired ( struct retry_timer *timer, int fail __unused ) {
 	DBGC ( fragment, "FRAG %p expired\n", fragment );
 	free_iob ( fragment->iobuf );
 	list_del ( &fragment->list );
+	fragment->fragments->stats->reasm_fails++;
 	free ( fragment );
 }
 
@@ -89,6 +91,9 @@ struct io_buffer * fragment_reassemble ( struct fragment_reassembler *fragments,
 	size_t expected_offset;
 	int more_frags;
 
+	/* Update statistics */
+	fragments->stats->reasm_reqds++;
+
 	/* Find matching fragment reassembly buffer, if any */
 	fragment = fragment_find ( fragments, iobuf, *hdrlen );
 
@@ -115,6 +120,7 @@ struct io_buffer * fragment_reassemble ( struct fragment_reassembler *fragments,
 		fragment->iobuf = iobuf;
 		fragment->hdrlen = *hdrlen;
 		timer_init ( &fragment->timer, fragment_expired, NULL );
+		fragment->fragments = fragments;
 		DBGC ( fragment, "FRAG %p [0,%zd)\n", fragment,
 		       ( iob_len ( iobuf ) - *hdrlen ) );
 
@@ -157,6 +163,7 @@ struct io_buffer * fragment_reassemble ( struct fragment_reassembler *fragments,
 			*hdrlen = fragment->hdrlen;
 			list_del ( &fragment->list );
 			free ( fragment );
+			fragments->stats->reasm_oks++;
 			return iobuf;
 		}
 	}
@@ -167,6 +174,7 @@ struct io_buffer * fragment_reassemble ( struct fragment_reassembler *fragments,
 	return NULL;
 
  drop:
+	fragments->stats->reasm_fails++;
 	free_iob ( iobuf );
 	return NULL;
 }

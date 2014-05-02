@@ -15,6 +15,8 @@
 #include <ipxe/dhcp.h>
 #include <ipxe/settings.h>
 #include <ipxe/fragment.h>
+#include <ipxe/ipstat.h>
+#include <ipxe/profile.h>
 
 /** @file
  *
@@ -29,6 +31,22 @@ static uint8_t next_ident_high = 0;
 
 /** List of IPv4 miniroutes */
 struct list_head ipv4_miniroutes = LIST_HEAD_INIT ( ipv4_miniroutes );
+
+/** IPv4 statistics */
+static struct ip_statistics ipv4_stats;
+
+/** IPv4 statistics family */
+struct ip_statistics_family
+ipv4_stats_family __ip_statistics_family ( IP_STATISTICS_IPV4 ) = {
+	.version = 4,
+	.stats = &ipv4_stats,
+};
+
+/** Transmit profiler */
+static struct profiler ipv4_tx_profiler __profiler = { .name = "ipv4.tx" };
+
+/** Receive profiler */
+static struct profiler ipv4_rx_profiler __profiler = { .name = "ipv4.rx" };
 
 /**
  * Add IPv4 minirouting table entry
@@ -127,6 +145,25 @@ static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
 }
 
 /**
+ * Determine transmitting network device
+ *
+ * @v st_dest		Destination network-layer address
+ * @ret netdev		Transmitting network device, or NULL
+ */
+static struct net_device * ipv4_netdev ( struct sockaddr_tcpip *st_dest ) {
+	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
+	struct in_addr dest = sin_dest->sin_addr;
+	struct ipv4_miniroute *miniroute;
+
+	/* Find routing table entry */
+	miniroute = ipv4_route ( &dest );
+	if ( ! miniroute )
+		return NULL;
+
+	return miniroute->netdev;
+}
+
+/**
  * Check if IPv4 fragment matches fragment reassembly buffer
  *
  * @v fragment		Fragment reassembly buffer
@@ -178,6 +215,7 @@ static struct fragment_reassembler ipv4_reassembler = {
 	.is_fragment = ipv4_is_fragment,
 	.fragment_offset = ipv4_fragment_offset,
 	.more_fragments = ipv4_more_fragments,
+	.stats = &ipv4_stats,
 };
 
 /**
@@ -232,6 +270,12 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	const void *ll_dest;
 	int rc;
 
+	/* Start profiling */
+	profile_start ( &ipv4_tx_profiler );
+
+	/* Update statistics */
+	ipv4_stats.out_requests++;
+
 	/* Fill up the IP header, except source address */
 	memset ( iphdr, 0, sizeof ( *iphdr ) );
 	iphdr->verhdrlen = ( IP_VER | ( sizeof ( *iphdr ) / 4 ) );
@@ -255,6 +299,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	if ( ! netdev ) {
 		DBGC ( sin_dest->sin_addr, "IPv4 has no route to %s\n",
 		       inet_ntoa ( iphdr->dest ) );
+		ipv4_stats.out_no_routes++;
 		rc = -ENETUNREACH;
 		goto err;
 	}
@@ -282,9 +327,11 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	/* Calculate link-layer destination address, if possible */
 	if ( ( ( next_hop.s_addr ^ INADDR_BROADCAST ) & ~netmask.s_addr ) == 0){
 		/* Broadcast address */
+		ipv4_stats.out_bcast_pkts++;
 		ll_dest = netdev->ll_broadcast;
 	} else if ( IN_MULTICAST ( ntohl ( next_hop.s_addr ) ) ) {
 		/* Multicast address */
+		ipv4_stats.out_mcast_pkts++;
 		if ( ( rc = netdev->ll_protocol->mc_hash ( AF_INET, &next_hop,
 							   ll_dest_buf ) ) !=0){
 			DBGC ( sin_dest->sin_addr, "IPv4 could not hash "
@@ -297,6 +344,10 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		/* Unicast address */
 		ll_dest = NULL;
 	}
+
+	/* Update statistics */
+	ipv4_stats.out_transmits++;
+	ipv4_stats.out_octets += iob_len ( iobuf );
 
 	/* Hand off to link layer (via ARP if applicable) */
 	if ( ll_dest ) {
@@ -317,6 +368,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		}
 	}
 
+	profile_stop ( &ipv4_tx_profiler );
 	return 0;
 
  err:
@@ -389,43 +441,56 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	uint16_t pshdr_csum;
 	int rc;
 
+	/* Start profiling */
+	profile_start ( &ipv4_rx_profiler );
+
+	/* Update statistics */
+	ipv4_stats.in_receives++;
+	ipv4_stats.in_octets += iob_len ( iobuf );
+	if ( flags & LL_BROADCAST ) {
+		ipv4_stats.in_bcast_pkts++;
+	} else if ( flags & LL_MULTICAST ) {
+		ipv4_stats.in_mcast_pkts++;
+	}
+
 	/* Sanity check the IPv4 header */
 	if ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) {
 		DBGC ( iphdr->src, "IPv4 packet too short at %zd bytes (min "
 		       "%zd bytes)\n", iob_len ( iobuf ), sizeof ( *iphdr ) );
-		goto err;
+		goto err_header;
 	}
 	if ( ( iphdr->verhdrlen & IP_MASK_VER ) != IP_VER ) {
 		DBGC ( iphdr->src, "IPv4 version %#02x not supported\n",
 		       iphdr->verhdrlen );
-		goto err;
+		goto err_header;
 	}
 	hdrlen = ( ( iphdr->verhdrlen & IP_MASK_HLEN ) * 4 );
 	if ( hdrlen < sizeof ( *iphdr ) ) {
 		DBGC ( iphdr->src, "IPv4 header too short at %zd bytes (min "
 		       "%zd bytes)\n", hdrlen, sizeof ( *iphdr ) );
-		goto err;
+		goto err_header;
 	}
 	if ( hdrlen > iob_len ( iobuf ) ) {
 		DBGC ( iphdr->src, "IPv4 header too long at %zd bytes "
 		       "(packet is %zd bytes)\n", hdrlen, iob_len ( iobuf ) );
-		goto err;
+		goto err_header;
 	}
 	if ( ( csum = tcpip_chksum ( iphdr, hdrlen ) ) != 0 ) {
 		DBGC ( iphdr->src, "IPv4 checksum incorrect (is %04x "
 		       "including checksum field, should be 0000)\n", csum );
-		goto err;
+		goto err_header;
 	}
 	len = ntohs ( iphdr->len );
 	if ( len < hdrlen ) {
 		DBGC ( iphdr->src, "IPv4 length too short at %zd bytes "
 		       "(header is %zd bytes)\n", len, hdrlen );
-		goto err;
+		goto err_header;
 	}
 	if ( len > iob_len ( iobuf ) ) {
 		DBGC ( iphdr->src, "IPv4 length too long at %zd bytes "
 		       "(packet is %zd bytes)\n", len, iob_len ( iobuf ) );
-		goto err;
+		ipv4_stats.in_truncated_pkts++;
+		goto err_other;
 	}
 
 	/* Truncate packet to correct length */
@@ -443,7 +508,8 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	     ( ! ipv4_has_addr ( netdev, iphdr->dest ) ) ) {
 		DBGC ( iphdr->src, "IPv4 discarding non-local unicast packet "
 		       "for %s\n", inet_ntoa ( iphdr->dest ) );
-		goto err;
+		ipv4_stats.in_addr_errors++;
+		goto err_other;
 	}
 
 	/* Perform fragment reassembly if applicable */
@@ -470,15 +536,18 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	pshdr_csum = ipv4_pshdr_chksum ( iobuf, TCPIP_EMPTY_CSUM );
 	iob_pull ( iobuf, hdrlen );
 	if ( ( rc = tcpip_rx ( iobuf, netdev, iphdr->protocol, &src.st,
-			       &dest.st, pshdr_csum ) ) != 0 ) {
+			       &dest.st, pshdr_csum, &ipv4_stats ) ) != 0 ) {
 		DBGC ( src.sin.sin_addr, "IPv4 received packet rejected by "
 		       "stack: %s\n", strerror ( rc ) );
 		return rc;
 	}
 
+	profile_stop ( &ipv4_rx_profiler );
 	return 0;
 
- err:
+ err_header:
+	ipv4_stats.in_hdr_errors++;
+ err_other:
 	free_iob ( iobuf );
 	return -EINVAL;
 }
@@ -567,7 +636,9 @@ struct net_protocol ipv4_protocol __net_protocol = {
 struct tcpip_net_protocol ipv4_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv4",
 	.sa_family = AF_INET,
+	.header_len = sizeof ( struct iphdr ),
 	.tx = ipv4_tx,
+	.netdev = ipv4_netdev,
 };
 
 /** IPv4 ARP protocol */

@@ -34,6 +34,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/test.h>
 #include <ipxe/profile.h>
 
+/** Number of sample iterations for profiling */
+#define PROFILE_COUNT 16
+
 /* Provide global functions to allow inspection of generated code */
 
 void memcpy_0 ( void *dest, void *src ) { memcpy ( dest, src, 0 ); }
@@ -120,10 +123,10 @@ __attribute__ (( noinline )) void * memcpy_var ( void *dest, const void *src,
  */
 static void memcpy_test_speed ( unsigned int dest_offset,
 				unsigned int src_offset, size_t len ) {
+	struct profiler profiler;
 	uint8_t *dest;
 	uint8_t *src;
 	unsigned int i;
-	unsigned long elapsed;
 
 	/* Allocate blocks */
 	dest = malloc ( len + dest_offset );
@@ -135,21 +138,26 @@ static void memcpy_test_speed ( unsigned int dest_offset,
 	for ( i = 0 ; i < len ; i++ )
 		src[ src_offset + i ] = random();
 
-	/* Perform memcpy() */
-	simple_profile();
+	/* Check correctness of copied data */
 	memcpy ( ( dest + dest_offset ), ( src + src_offset ), len );
-	elapsed = simple_profile();
-
-	/* Check copied data */
 	ok ( memcmp ( ( dest + dest_offset ), ( src + src_offset ),
 		      len ) == 0 );
+
+	/* Profile memcpy() */
+	memset ( &profiler, 0, sizeof ( profiler ) );
+	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
+		profile_start ( &profiler );
+		memcpy ( ( dest + dest_offset ), ( src + src_offset ), len );
+		profile_stop ( &profiler );
+	}
 
 	/* Free blocks */
 	free ( dest );
 	free ( src );
 
-	DBG ( "MEMCPY copied %zd bytes (+%d => +%d) in %ld ticks\n",
-	      len, src_offset, dest_offset, elapsed );
+	DBG ( "MEMCPY copied %zd bytes (+%d => +%d) in %ld +/- %ld ticks\n",
+	      len, src_offset, dest_offset, profile_mean ( &profiler ),
+	      profile_stddev ( &profiler ) );
 }
 
 /**

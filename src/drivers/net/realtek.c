@@ -50,6 +50,33 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /******************************************************************************
  *
+ * Debugging
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Dump all registers (for debugging)
+ *
+ * @v rtl		Realtek device
+ */
+static __attribute__ (( unused )) void realtek_dump ( struct realtek_nic *rtl ){
+	uint8_t regs[256];
+	unsigned int i;
+
+	/* Do nothing unless debug output is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Dump registers (via byte accesses; may not work for all registers) */
+	for ( i = 0 ; i < sizeof ( regs ) ; i++ )
+		regs[i] = readb ( rtl->regs + i );
+	DBGC ( rtl, "REALTEK %p register dump:\n", rtl );
+	DBGC_HDA ( rtl, 0, regs, sizeof ( regs ) );
+}
+
+/******************************************************************************
+ *
  * EEPROM interface
  *
  ******************************************************************************
@@ -413,13 +440,38 @@ static void realtek_check_link ( struct net_device *netdev ) {
 
 	/* Determine link state */
 	if ( rtl->have_phy_regs ) {
+		mii_dump ( &rtl->mii );
 		phystatus = readb ( rtl->regs + RTL_PHYSTATUS );
 		link_up = ( phystatus & RTL_PHYSTATUS_LINKSTS );
-		DBGC ( rtl, "REALTEK %p PHY status is %02x\n", rtl, phystatus );
+		DBGC ( rtl, "REALTEK %p PHY status is %02x (%s%s%s%s%s%s, "
+		       "Link%s, %sDuplex)\n", rtl, phystatus,
+		       ( ( phystatus & RTL_PHYSTATUS_ENTBI ) ? "TBI" : "GMII" ),
+		       ( ( phystatus & RTL_PHYSTATUS_TXFLOW ) ?
+			 ", TxFlow" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_RXFLOW ) ?
+			 ", RxFlow" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_1000MF ) ?
+			 ", 1000Mbps" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_100M ) ?
+			 ", 100Mbps" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_10M ) ?
+			 ", 10Mbps" : "" ),
+		       ( ( phystatus & RTL_PHYSTATUS_LINKSTS ) ?
+			 "Up" : "Down" ),
+		       ( ( phystatus & RTL_PHYSTATUS_FULLDUP ) ?
+			 "Full" : "Half" ) );
 	} else {
 		msr = readb ( rtl->regs + RTL_MSR );
 		link_up = ( ! ( msr & RTL_MSR_LINKB ) );
-		DBGC ( rtl, "REALTEK %p media status is %02x\n", rtl, msr );
+		DBGC ( rtl, "REALTEK %p media status is %02x (Link%s, "
+		       "%dMbps%s%s%s%s%s)\n", rtl, msr,
+		       ( ( msr & RTL_MSR_LINKB ) ? "Down" : "Up" ),
+		       ( ( msr & RTL_MSR_SPEED_10 ) ? 10 : 100 ),
+		       ( ( msr & RTL_MSR_TXFCE ) ? ", TxFlow" : "" ),
+		       ( ( msr & RTL_MSR_RXFCE ) ? ", RxFlow" : "" ),
+		       ( ( msr & RTL_MSR_AUX_STATUS ) ? ", AuxPwr" : "" ),
+		       ( ( msr & RTL_MSR_TXPF ) ? ", TxPause" : "" ),
+		       ( ( msr & RTL_MSR_RXPF ) ? ", RxPause" : "" ) );
 	}
 
 	/* Report link state */
@@ -656,8 +708,8 @@ static int realtek_open ( struct net_device *netdev ) {
 
 	/* Configure receiver */
 	rcr = readl ( rtl->regs + RTL_RCR );
-	rcr &= ~( RTL_RCR_RXFTH_MASK | RTL_RCR_RBLEN_MASK |
-		  RTL_RCR_MXDMA_MASK );
+	rcr &= ~( RTL_RCR_STOP_WORKING | RTL_RCR_RXFTH_MASK |
+		  RTL_RCR_RBLEN_MASK | RTL_RCR_MXDMA_MASK );
 	rcr |= ( RTL_RCR_RXFTH_DEFAULT | RTL_RCR_RBLEN_DEFAULT |
 		 RTL_RCR_MXDMA_DEFAULT | RTL_RCR_WRAP | RTL_RCR_AB |
 		 RTL_RCR_AM | RTL_RCR_APM | RTL_RCR_AAP );

@@ -45,5 +45,6 @@ extern EFI_DEVICE_PATH_PROTOCOL *
 efi_devpath_end ( EFI_DEVICE_PATH_PROTOCOL *path );
 
 extern int efi_driver_install ( struct efi_driver *efidrv );
+extern void efi_driver_uninstall ( struct efi_driver *efidrv );
 
 #endif /* _IPXE_EFI_DRIVER_H */

@@ -38,9 +38,12 @@ extern void test_ok ( int success, const char *file, unsigned int line,
  * Report test result
  *
  * @v success		Test succeeded
+ * @v file		File name
+ * @v line		Line number
  */
-#define ok( success ) do {					\
-	test_ok ( (success), __FILE__, __LINE__, #success );	\
-	} while ( 0 )
+#define okx( success, file, line ) \
+	test_ok ( success, file, line, #success )
+#define ok( success ) \
+	okx ( success, __FILE__, __LINE__ )
 
 #endif /* _IPXE_TEST_H */

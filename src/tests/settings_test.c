@@ -162,12 +162,6 @@ static struct setting test_string_setting = {
 	.type = &setting_type_string,
 };
 
-/** Test URI-encoded string setting */
-static struct setting test_uristring_setting = {
-	.name = "test_uristring",
-	.type = &setting_type_uristring,
-};
-
 /** Test IPv4 address setting type */
 static struct setting test_ipv4_setting = {
 	.name = "test_ipv4",
@@ -260,13 +254,6 @@ static void settings_test_exec ( void ) {
 		    RAW ( 'h', 'e', 'l', 'l', 'o' ) );
 	fetchf_ok ( &test_settings, &test_string_setting,
 		    RAW ( 'w', 'o', 'r', 'l', 'd' ), "world" );
-
-	/* "uristring" setting type */
-	storef_ok ( &test_settings, &test_uristring_setting, "hello%20world",
-		    RAW ( 'h', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l',
-			  'd' ) );
-	fetchf_ok ( &test_settings, &test_uristring_setting,
-		    RAW ( 1, 2, 3, 4, 5 ), "%01%02%03%04%05" );
 
 	/* "ipv4" setting type */
 	storef_ok ( &test_settings, &test_ipv4_setting, "192.168.0.1",

@@ -219,6 +219,9 @@ static int efi_image_exec ( struct image *image ) {
 	loaded.image->LoadOptionsSize =
 		( ( wcslen ( cmdline ) + 1 /* NUL */ ) * sizeof ( wchar_t ) );
 
+	/* Release network devices for use via SNP */
+	efi_snp_release();
+
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
 		rc = -EEFI_START ( efirc );
@@ -231,6 +234,7 @@ static int efi_image_exec ( struct image *image ) {
 	rc = 0;
 
  err_start_image:
+	efi_snp_claim();
  err_open_protocol:
 	/* Unload the image.  We can't leave it loaded, because we
 	 * have no "unload" operation.

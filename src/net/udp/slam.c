@@ -723,7 +723,7 @@ static int slam_open ( struct interface *xfer, struct uri *uri ) {
 
 	/* Open multicast socket */
 	memcpy ( &multicast, &default_multicast, sizeof ( multicast ) );
-	if ( uri->path && 
+	if ( uri->path &&
 	     ( ( rc = slam_parse_multicast_address ( slam, uri->path,
 						     &multicast ) ) != 0 ) ) {
 		goto err;

@@ -25,11 +25,17 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/* Forcibly enable assertions */
+#undef NDEBUG
+
 #include <stdlib.h>
 #include <string.h>
 #include <ipxe/crypto.h>
 #include <ipxe/profile.h>
 #include "digest_test.h"
+
+/** Number of sample iterations for profiling */
+#define PROFILE_COUNT 16
 
 /**
  * Test digest algorithm
@@ -81,8 +87,7 @@ unsigned long digest_cost ( struct digest_algorithm *digest ) {
 	static uint8_t random[8192]; /* Too large for stack */
 	uint8_t ctx[digest->ctxsize];
 	uint8_t out[digest->digestsize];
-	union profiler profiler;
-	unsigned long long elapsed;
+	struct profiler profiler;
 	unsigned long cost;
 	unsigned int i;
 
@@ -91,15 +96,19 @@ unsigned long digest_cost ( struct digest_algorithm *digest ) {
 	for ( i = 0 ; i < sizeof ( random ) ; i++ )
 		random[i] = rand();
 
-	/* Time digest calculation */
-	profile ( &profiler );
-	digest_init ( digest, ctx );
-	digest_update ( digest, ctx, random, sizeof ( random ) );
-	digest_final ( digest, ctx, out );
-	elapsed = profile ( &profiler );
+	/* Profile digest calculation */
+	memset ( &profiler, 0, sizeof ( profiler ) );
+	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
+		profile_start ( &profiler );
+		digest_init ( digest, ctx );
+		digest_update ( digest, ctx, random, sizeof ( random ) );
+		digest_final ( digest, ctx, out );
+		profile_stop ( &profiler );
+	}
 
 	/* Round to nearest whole number of cycles per byte */
-	cost = ( ( elapsed + ( sizeof ( random ) / 2 ) ) / sizeof ( random ) );
+	cost = ( ( profile_mean ( &profiler ) + ( sizeof ( random ) / 2 ) ) /
+		 sizeof ( random ) );
 
 	return cost;
 }

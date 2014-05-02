@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Drag in all applicable self-tests */
 REQUIRE_OBJECT ( memcpy_test );
 REQUIRE_OBJECT ( string_test );
+REQUIRE_OBJECT ( math_test );
 REQUIRE_OBJECT ( vsprintf_test );
 REQUIRE_OBJECT ( list_test );
 REQUIRE_OBJECT ( byteswap_test );
@@ -50,3 +51,8 @@ REQUIRE_OBJECT ( x509_test );
 REQUIRE_OBJECT ( ocsp_test );
 REQUIRE_OBJECT ( cms_test );
 REQUIRE_OBJECT ( pnm_test );
+REQUIRE_OBJECT ( deflate_test );
+REQUIRE_OBJECT ( png_test );
+REQUIRE_OBJECT ( dns_test );
+REQUIRE_OBJECT ( uri_test );
+REQUIRE_OBJECT ( profile_test );

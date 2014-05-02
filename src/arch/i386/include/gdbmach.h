@@ -46,6 +46,14 @@ enum {
 	GDBMACH_AWATCH,
 };
 
+/* Interrupt vectors */
+extern void gdbmach_nocode_sigfpe ( void );
+extern void gdbmach_nocode_sigtrap ( void );
+extern void gdbmach_nocode_sigstkflt ( void );
+extern void gdbmach_nocode_sigill ( void );
+extern void gdbmach_withcode_sigbus ( void );
+extern void gdbmach_withcode_sigsegv ( void );
+
 static inline void gdbmach_set_pc ( gdbreg_t *regs, gdbreg_t pc ) {
 	regs [ GDBMACH_EIP ] = pc;
 }
@@ -60,5 +68,7 @@ static inline void gdbmach_breakpoint ( void ) {
 }
 
 extern int gdbmach_set_breakpoint ( int type, unsigned long addr, size_t len, int enable );
+
+extern void gdbmach_init ( void );
 
 #endif /* GDBMACH_H */

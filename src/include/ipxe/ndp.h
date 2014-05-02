@@ -24,7 +24,7 @@ struct ndp_option_header {
 } __attribute__ (( packed ));
 
 /** NDP option block size */
-#define NDP_OPTION_BLKSZ 8
+#define NDP_OPTION_BLKSZ 8U
 
 /** NDP source link-layer address option */
 #define NDP_OPT_LL_SOURCE 1

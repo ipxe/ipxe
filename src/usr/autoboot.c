@@ -49,6 +49,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** Device location of preferred autoboot device */
+struct device_description autoboot_device;
+
 /* Disambiguate the various error causes */
 #define ENOENT_BOOT __einfo_error ( EINFO_ENOENT_BOOT )
 #define EINFO_ENOENT_BOOT \
@@ -74,15 +77,6 @@ __weak int pxe_menu_boot ( struct net_device *netdev __unused ) {
 }
 
 /**
- * Identify the boot network device
- *
- * @ret netdev		Boot network device
- */
-static struct net_device * find_boot_netdev ( void ) {
-	return NULL;
-}
-
-/**
  * Parse next-server and filename into a URI
  *
  * @v next_server	Next-server address
@@ -91,8 +85,6 @@ static struct net_device * find_boot_netdev ( void ) {
  */
 static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
 						     const char *filename ) {
-	char buf[ 23 /* "tftp://xxx.xxx.xxx.xxx/" */ + strlen ( filename )
-		  + 1 /* NUL */ ];
 	struct uri *uri;
 
 	/* Parse filename */
@@ -100,17 +92,10 @@ static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
 	if ( ! uri )
 		return NULL;
 
-	/* Construct a tftp:// URI for the filename, if applicable.
-	 * We can't just rely on the current working URI, because the
-	 * relative URI resolution will remove the distinction between
-	 * filenames with and without initial slashes, which is
-	 * significant for TFTP.
-	 */
+	/* Construct a TFTP URI for the filename, if applicable */
 	if ( next_server.s_addr && filename[0] && ! uri_is_absolute ( uri ) ) {
 		uri_put ( uri );
-		snprintf ( buf, sizeof ( buf ), "tftp://%s/%s",
-			   inet_ntoa ( next_server ), filename );
-		uri = parse_uri ( buf );
+		uri = tftp_uri ( next_server, filename );
 		if ( ! uri )
 			return NULL;
 	}
@@ -180,7 +165,7 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 
 	/* Attempt filename boot if applicable */
 	if ( filename ) {
-		if ( ( rc = imgdownload ( filename, &image ) ) != 0 )
+		if ( ( rc = imgdownload ( filename, 0, &image ) ) != 0 )
 			goto err_download;
 		image->flags |= IMAGE_AUTO_UNREGISTER;
 		if ( ( rc = image_exec ( image ) ) != 0 ) {
@@ -437,21 +422,36 @@ int netboot ( struct net_device *netdev ) {
 }
 
 /**
+ * Test if network device matches the autoboot device location
+ *
+ * @v netdev		Network device
+ * @ret is_autoboot	Network device matches the autoboot device location
+ */
+static int is_autoboot_device ( struct net_device *netdev ) {
+
+	return ( ( netdev->dev->desc.bus_type == autoboot_device.bus_type ) &&
+		 ( netdev->dev->desc.location == autoboot_device.location ) );
+}
+
+/**
  * Boot the system
  */
-int autoboot ( void ) {
-	struct net_device *boot_netdev;
+static int autoboot ( void ) {
 	struct net_device *netdev;
 	int rc = -ENODEV;
 
-	/* If we have an identifable boot device, try that first */
-	if ( ( boot_netdev = find_boot_netdev() ) )
-		rc = netboot ( boot_netdev );
-
-	/* If that fails, try booting from any of the other devices */
+	/* Try booting from each network device.  If we have a
+	 * specified autoboot device location, then use only devices
+	 * matching that location.
+	 */
 	for_each_netdev ( netdev ) {
-		if ( netdev == boot_netdev )
+
+		/* Skip any non-matching devices, if applicable */
+		if ( autoboot_device.bus_type &&
+		     ( ! is_autoboot_device ( netdev ) ) )
 			continue;
+
+		/* Attempt booting from this device */
 		rc = netboot ( netdev );
 	}
 

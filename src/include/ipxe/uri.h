@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stddef.h>
 #include <stdlib.h>
 #include <ipxe/refcnt.h>
+#include <ipxe/in.h>
 
 struct parameters;
 
@@ -71,37 +72,38 @@ struct uri {
 	struct parameters *params;
 } __attribute__ (( packed ));
 
-/** A field in a URI
+/**
+ * Access URI field
  *
- * The order of the indices in this enumeration must match the order
- * of the fields in the URI structure.
+ * @v uri		URI
+ * @v field		URI field index
+ * @ret field		URI field (as an lvalue)
  */
-enum {
-	URI_SCHEME = 0,		URI_SCHEME_BIT = ( 1 << URI_SCHEME ),
-	URI_OPAQUE = 1,		URI_OPAQUE_BIT = ( 1 << URI_OPAQUE ),
-	URI_USER = 2,		URI_USER_BIT = ( 1 << URI_USER ),
-	URI_PASSWORD = 3,	URI_PASSWORD_BIT = ( 1 << URI_PASSWORD ),
-	URI_HOST = 4,		URI_HOST_BIT = ( 1 << URI_HOST ),
-	URI_PORT = 5,		URI_PORT_BIT = ( 1 << URI_PORT ),
-	URI_PATH = 6,		URI_PATH_BIT = ( 1 << URI_PATH ),
-	URI_QUERY = 7,		URI_QUERY_BIT = ( 1 << URI_QUERY ),
-	URI_FRAGMENT = 8,	URI_FRAGMENT_BIT = ( 1 << URI_FRAGMENT ),
+#define uri_field( uri, field ) (&uri->scheme)[field]
 
-	URI_FIRST_FIELD = URI_SCHEME,
-	URI_LAST_FIELD = URI_FRAGMENT,
+/**
+ * Calculate index of a URI field
+ *
+ * @v name		URI field name
+ * @ret field		URI field index
+ */
+#define URI_FIELD( name )						\
+	( ( offsetof ( struct uri, name ) -				\
+	    offsetof ( struct uri, scheme ) ) / sizeof ( void * ) )
+
+/** URI fields */
+enum uri_fields {
+	URI_SCHEME = URI_FIELD ( scheme ),
+	URI_OPAQUE = URI_FIELD ( opaque ),
+	URI_USER = URI_FIELD ( user ),
+	URI_PASSWORD = URI_FIELD ( password ),
+	URI_HOST = URI_FIELD ( host ),
+	URI_PORT = URI_FIELD ( port ),
+	URI_PATH = URI_FIELD ( path ),
+	URI_QUERY = URI_FIELD ( query ),
+	URI_FRAGMENT = URI_FIELD ( fragment ),
+	URI_FIELDS
 };
-
-/** Extract field from URI */
-#define uri_get_field( uri, field )	(&uri->scheme)[field]
-
-/** All URI fields */
-#define URI_ALL		( URI_SCHEME_BIT | URI_OPAQUE_BIT | URI_USER_BIT | \
-			  URI_PASSWORD_BIT | URI_HOST_BIT | URI_PORT_BIT | \
-			  URI_PATH_BIT | URI_QUERY_BIT | URI_FRAGMENT_BIT )
-
-/** URI fields that should be decoded on storage */
-#define URI_ENCODED	( URI_USER_BIT | URI_PASSWORD_BIT | URI_HOST_BIT | \
-			  URI_PATH_BIT | URI_QUERY_BIT | URI_FRAGMENT_BIT )
 
 /**
  * URI is an absolute URI
@@ -125,8 +127,8 @@ static inline int uri_is_absolute ( const struct uri *uri ) {
  */
 static inline int uri_has_opaque ( const struct uri *uri ) {
 	return ( uri->opaque && ( uri->opaque[0] != '\0' ) );
-
 }
+
 /**
  * URI has a path
  *
@@ -189,18 +191,20 @@ uri_put ( struct uri *uri ) {
 
 extern struct uri *cwuri;
 
+extern size_t uri_encode ( const char *string, unsigned int field,
+			   char *buf, ssize_t len );
 extern struct uri * parse_uri ( const char *uri_string );
-extern unsigned int uri_port ( struct uri *uri, unsigned int default_port );
-extern int unparse_uri ( char *buf, size_t size, struct uri *uri,
-			 unsigned int fields );
-extern struct uri * uri_dup ( struct uri *uri );
+extern size_t format_uri ( const struct uri *uri, char *buf, size_t len );
+extern char * format_uri_alloc ( const struct uri *uri );
+extern unsigned int uri_port ( const struct uri *uri,
+			       unsigned int default_port );
+extern struct uri * uri_dup ( const struct uri *uri );
 extern char * resolve_path ( const char *base_path,
 			     const char *relative_path );
-extern struct uri * resolve_uri ( struct uri *base_uri,
+extern struct uri * resolve_uri ( const struct uri *base_uri,
 				  struct uri *relative_uri );
+extern struct uri * tftp_uri ( struct in_addr next_server,
+			       const char *filename );
 extern void churi ( struct uri *uri );
-extern size_t uri_encode ( const char *raw_string, char *buf, ssize_t len,
-			   int field );
-extern size_t uri_decode ( const char *encoded_string, char *buf, ssize_t len );
 
 #endif /* _IPXE_URI_H */

@@ -76,6 +76,8 @@ struct vesafb {
 	physaddr_t start;
 	/** Pixel geometry */
 	struct fbcon_geometry pixel;
+	/** Margin */
+	struct fbcon_margin margin;
 	/** Colour mapping */
 	struct fbcon_colour_map map;
 	/** Font definition */
@@ -372,18 +374,35 @@ static int vesafb_select_mode ( const uint16_t *mode_numbers,
 }
 
 /**
+ * Restore video mode
+ *
+ */
+static void vesafb_restore ( void ) {
+	uint32_t discard_a;
+
+	/* Restore saved VGA mode */
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
+			       : "=a" ( discard_a )
+			       : "a" ( VBE_SET_VGA_MODE | vesafb.saved_mode ) );
+	DBGC ( &vbe_buf, "VESAFB restored VGA mode %#02x\n",
+	       vesafb.saved_mode );
+}
+
+/**
  * Initialise VESA frame buffer
  *
- * @v min_width		Minimum required width (in pixels)
- * @v min_height	Minimum required height (in pixels)
- * @v min_bpp		Minimum required colour depth (in bits per pixel)
- * @v pixbuf		Background picture (if any)
+ * @v config		Console configuration, or NULL to reset
  * @ret rc		Return status code
  */
-static int vesafb_init ( unsigned int min_width, unsigned int min_height,
-			 unsigned int min_bpp, struct pixel_buffer *pixbuf ) {
+static int vesafb_init ( struct console_configuration *config ) {
 	uint32_t discard_b;
 	uint16_t *mode_numbers;
+	unsigned int xgap;
+	unsigned int ygap;
+	unsigned int left;
+	unsigned int right;
+	unsigned int top;
+	unsigned int bottom;
 	int mode_number;
 	int rc;
 
@@ -398,8 +417,9 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
 		goto err_mode_list;
 
 	/* Select mode */
-	if ( ( mode_number = vesafb_select_mode ( mode_numbers, min_width,
-						  min_height, min_bpp ) ) < 0 ){
+	if ( ( mode_number = vesafb_select_mode ( mode_numbers, config->width,
+						  config->height,
+						  config->depth ) ) < 0 ) {
 		rc = mode_number;
 		goto err_select_mode;
 	}
@@ -408,14 +428,40 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
 	if ( ( rc = vesafb_set_mode ( mode_number ) ) != 0 )
 		goto err_set_mode;
 
+	/* Calculate margin.  If the actual screen size is larger than
+	 * the requested screen size, then update the margins so that
+	 * the margin remains relative to the requested screen size.
+	 * (As an exception, if a zero margin was specified then treat
+	 * this as meaning "expand to edge of actual screen".)
+	 */
+	xgap = ( vesafb.pixel.width - config->width );
+	ygap = ( vesafb.pixel.height - config->height );
+	left = ( xgap / 2 );
+	right = ( xgap - left );
+	top = ( ygap / 2 );
+	bottom = ( ygap - top );
+	vesafb.margin.left = ( config->left + ( config->left ? left : 0 ) );
+	vesafb.margin.right = ( config->right + ( config->right ? right : 0 ) );
+	vesafb.margin.top = ( config->top + ( config->top ? top : 0 ) );
+	vesafb.margin.bottom =
+		( config->bottom + ( config->bottom ? bottom : 0 ) );
+
 	/* Get font data */
 	vesafb_font();
 
 	/* Initialise frame buffer console */
-	fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
-		     &vesafb.pixel, &vesafb.map, &vesafb.font, pixbuf );
+	if ( ( rc = fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
+				 &vesafb.pixel, &vesafb.margin, &vesafb.map,
+				 &vesafb.font, config->pixbuf ) ) != 0 )
+		goto err_fbcon_init;
 
+	free ( mode_numbers );
+	return 0;
+
+	fbcon_fini ( &vesafb.fbcon );
+ err_fbcon_init:
  err_set_mode:
+	vesafb_restore();
  err_select_mode:
 	free ( mode_numbers );
  err_mode_list:
@@ -427,17 +473,12 @@ static int vesafb_init ( unsigned int min_width, unsigned int min_height,
  *
  */
 static void vesafb_fini ( void ) {
-	uint32_t discard_a;
 
 	/* Finalise frame buffer console */
 	fbcon_fini ( &vesafb.fbcon );
 
-	/* Restore VGA mode */
-	__asm__ __volatile__ ( REAL_CODE ( "int $0x10" )
-			       : "=a" ( discard_a )
-			       : "a" ( VBE_SET_VGA_MODE | vesafb.saved_mode ) );
-	DBGC ( &vbe_buf, "VESAFB restored VGA mode %#02x\n",
-	       vesafb.saved_mode );
+	/* Restore saved VGA mode */
+	vesafb_restore();
 }
 
 /**
@@ -474,8 +515,7 @@ static int vesafb_configure ( struct console_configuration *config ) {
 	}
 
 	/* Initialise VESA frame buffer */
-	if ( ( rc = vesafb_init ( config->width, config->height, config->bpp,
-				  config->pixbuf ) ) != 0 )
+	if ( ( rc = vesafb_init ( config ) ) != 0 )
 		return rc;
 
 	/* Mark console as enabled */

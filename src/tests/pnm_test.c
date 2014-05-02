@@ -33,44 +33,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/pixbuf.h>
 #include <ipxe/pnm.h>
 #include <ipxe/test.h>
+#include "pixbuf_test.h"
 
 /** Define inline pixel data */
 #define DATA(...) { __VA_ARGS__ }
 
-/** A PNM test */
-struct pnm_test {
-	/** Source image */
-	struct image *image;
-	/** Pixel data */
-	const uint32_t *data;
-	/** Length of pixel data */
-	size_t len;
-	/** Width */
-	unsigned int width;
-	/** Height */
-	unsigned int height;
-};
-
-/** Define a PNM test */
-#define PNM( NAME, FILE, WIDTH, HEIGHT, DATA )				\
-	static const char NAME ## _file[] = FILE;			\
-	static const uint32_t NAME ## _data[] = DATA;			\
-	static struct image NAME ## _image = {				\
-		.refcnt = REF_INIT ( ref_no_free ),			\
-		.name = #NAME,						\
-		.data = ( userptr_t ) ( NAME ## _file ),		\
-		.len = sizeof ( NAME ## _file ),			\
-	};								\
-	static struct pnm_test NAME = {					\
-		.image = & NAME ## _image,				\
-		.data = NAME ## _data,					\
-		.len = sizeof ( NAME ## _data ),			\
-		.width = WIDTH,						\
-		.height = HEIGHT,					\
-	};
-
 /** PBM ASCII example (from Wikipedia) */
-PNM ( pbm_ascii,
+PIX ( pbm_ascii, &pnm_image_type,
       "P1\n"
       "# This is an example bitmap of the letter \"J\"\n"
       "6 10\n"
@@ -97,7 +66,7 @@ PNM ( pbm_ascii,
 	     0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff ) );
 
 /** PGM ASCII example (from Wikipedia) */
-PNM ( pgm_ascii,
+PIX ( pgm_ascii, &pnm_image_type,
       "P2\n"
       "# Shows the word \"FEEP\" (example from Netpbm man page on PGM)\n"
       "24 7\n"
@@ -140,7 +109,7 @@ PNM ( pgm_ascii,
 	     0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000 ) );
 
 /** PPM ASCII example (from Wikipedia) */
-PNM ( ppm_ascii,
+PIX ( ppm_ascii, &pnm_image_type,
       "P3\n"
       "# The P3 means colors are in ASCII, then 3 columns and 2 rows,\n"
       "# then 255 for max color, then RGB triplets\n"
@@ -152,7 +121,7 @@ PNM ( ppm_ascii,
       DATA ( 0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xffffff, 0x000000 ) );
 
 /** PBM ASCII with no space between pixel values */
-PNM ( pbm_ascii_no_space,
+PIX ( pbm_ascii_no_space, &pnm_image_type,
       "P1\n"
       "3 3\n"
       "001\n"
@@ -163,7 +132,7 @@ PNM ( pbm_ascii_no_space,
 	     0x000000, 0x000000, 0x000000 ) );
 
 /** PBM binary example (converted from Wikipedia) */
-PNM ( pbm_binary,
+PIX ( pbm_binary, &pnm_image_type,
       DATA ( 0x50, 0x34, 0x0a, 0x23, 0x20, 0x43, 0x52, 0x45, 0x41, 0x54, 0x4f,
 	     0x52, 0x3a, 0x20, 0x47, 0x49, 0x4d, 0x50, 0x20, 0x50, 0x4e, 0x4d,
 	     0x20, 0x46, 0x69, 0x6c, 0x74, 0x65, 0x72, 0x20, 0x56, 0x65, 0x72,
@@ -183,7 +152,7 @@ PNM ( pbm_binary,
 	     0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff ) );
 
 /** PGM binary example (converted from Wikipedia) */
-PNM ( pgm_binary,
+PIX ( pgm_binary, &pnm_image_type,
       DATA ( 0x50, 0x35, 0x0a, 0x32, 0x34, 0x20, 0x37, 0x0a, 0x31, 0x35, 0x0a,
 	     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -232,7 +201,7 @@ PNM ( pgm_binary,
 	     0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000 ) );
 
 /** PPM binary example (converted from Wikipedia) */
-PNM ( ppm_binary,
+PIX ( ppm_binary, &pnm_image_type,
       DATA ( 0x50, 0x36, 0x0a, 0x33, 0x20, 0x32, 0x0a, 0x32, 0x35, 0x35, 0x0a,
 	     0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff,
 	     0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00 ),
@@ -240,53 +209,18 @@ PNM ( ppm_binary,
       DATA ( 0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xffffff, 0x000000 ) );
 
 /**
- * Report PNM test result
- *
- * @v test		PNM test
- */
-#define pnm_ok( test ) do {						\
-	struct pixel_buffer *pixbuf;					\
-	uint8_t data[ (test)->len ];					\
-	int rc;								\
-									\
-	/* Sanity check */						\
-	assert ( ( (test)->width * (test)->height *			\
-		   sizeof ( (test)->data[0] ) ) == (test)->len );	\
-									\
-	/* Correct image data pointer */				\
-	(test)->image->data =						\
-		virt_to_user ( ( void * ) (test)->image->data );	\
-									\
-	/* Perform tests */						\
-	ok ( image_probe ( (test)->image ) == 0 );			\
-	ok ( (test)->image->type == &pnm_image_type );			\
-	ok ( ( rc = image_pixbuf ( (test)->image, &pixbuf ) ) == 0 );	\
-	if ( rc == 0 ) {						\
-		ok ( pixbuf->width == (test)->width );			\
-		ok ( pixbuf->height == (test)->height );		\
-		ok ( pixbuf->len == (test)->len );			\
-		copy_from_user ( data, pixbuf->data, 0,			\
-				 sizeof ( data ) );			\
-		ok ( memcmp ( data, (test)->data,			\
-			      sizeof ( data ) ) == 0 );			\
-		DBGC_HDA ( (test)->image, 0, data, sizeof ( data ) );	\
-		pixbuf_put ( pixbuf );					\
-	}								\
-	} while ( 0 )
-
-/**
  * Perform PNM self-test
  *
  */
 static void pnm_test_exec ( void ) {
 
-	pnm_ok ( &pbm_ascii );
-	pnm_ok ( &pgm_ascii );
-	pnm_ok ( &ppm_ascii );
-	pnm_ok ( &pbm_ascii_no_space );
-	pnm_ok ( &pbm_binary );
-	pnm_ok ( &pgm_binary );
-	pnm_ok ( &ppm_binary );
+	pixbuf_ok ( &pbm_ascii );
+	pixbuf_ok ( &pgm_ascii );
+	pixbuf_ok ( &ppm_ascii );
+	pixbuf_ok ( &pbm_ascii_no_space );
+	pixbuf_ok ( &pbm_binary );
+	pixbuf_ok ( &pgm_binary );
+	pixbuf_ok ( &ppm_binary );
 }
 
 /** PNM self-test */

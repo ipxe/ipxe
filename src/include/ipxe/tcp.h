@@ -330,16 +330,6 @@ struct tcp_options {
 #define TCP_PATH_MTU							\
 	( 1280 - 40 /* IPv6 */ - 20 /* TCP */ - 12 /* TCP timestamp */ )
 
-/**
- * Advertised TCP MSS
- *
- * We currently hardcode this to a reasonable value and hope that the
- * sender uses path MTU discovery.  The alternative is breaking the
- * abstraction layer so that we can find out the MTU from the IP layer
- * (which would have to find out from the net device layer).
- */
-#define TCP_MSS 1460
-
 /** TCP maximum segment lifetime
  *
  * Currently set to 2 minutes, as per RFC 793.

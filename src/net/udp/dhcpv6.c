@@ -979,3 +979,12 @@ const struct setting filename6_setting __setting ( SETTING_BOOT, filename ) = {
 	.type = &setting_type_string,
 	.scope = &ipv6_scope,
 };
+
+/** DNS search list setting */
+const struct setting dnssl6_setting __setting ( SETTING_IP_EXTRA, dnssl ) = {
+	.name = "dnssl",
+	.description = "DNS search list",
+	.tag = DHCPV6_DOMAIN_LIST,
+	.type = &setting_type_dnssl,
+	.scope = &ipv6_scope,
+};

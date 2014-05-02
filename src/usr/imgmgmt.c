@@ -40,14 +40,33 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Download a new image
  *
  * @v uri		URI
+ * @v timeout		Download timeout
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload ( struct uri *uri, struct image **image ) {
-	size_t len = ( unparse_uri ( NULL, 0, uri, URI_ALL ) + 1 );
-	char uri_string_redacted[len];
+int imgdownload ( struct uri *uri, unsigned long timeout,
+		  struct image **image ) {
 	const char *password;
+	char *uri_string_redacted;
 	int rc;
+
+	/* Construct redacted URI */
+	password = uri->password;
+	if ( password )
+		uri->password = "***";
+	uri_string_redacted = format_uri_alloc ( uri );
+	uri->password = password;
+	if ( ! uri_string_redacted ) {
+		rc = -ENOMEM;
+		goto err_uri_string;
+	}
+
+	/* Resolve URI */
+	uri = resolve_uri ( cwuri, uri );
+	if ( ! uri ) {
+		rc = -ENOMEM;
+		goto err_resolve_uri;
+	}
 
 	/* Allocate image */
 	*image = alloc_image ( uri );
@@ -56,23 +75,14 @@ int imgdownload ( struct uri *uri, struct image **image ) {
 		goto err_alloc_image;
 	}
 
-	/* Redact password portion of URI, if necessary */
-	password = uri->password;
-	if ( password )
-		uri->password = "***";
-	unparse_uri ( uri_string_redacted, sizeof ( uri_string_redacted ),
-		      uri, URI_ALL );
-	uri->password = password;
-
 	/* Create downloader */
-	if ( ( rc = create_downloader ( &monojob, *image, LOCATION_URI,
-					uri ) ) != 0 ) {
+	if ( ( rc = create_downloader ( &monojob, *image ) ) != 0 ) {
 		printf ( "Could not start download: %s\n", strerror ( rc ) );
 		goto err_create_downloader;
 	}
 
 	/* Wait for download to complete */
-	if ( ( rc = monojob_wait ( uri_string_redacted, 0 ) ) != 0 )
+	if ( ( rc = monojob_wait ( uri_string_redacted, timeout ) ) != 0 )
 		goto err_monojob_wait;
 
 	/* Register image */
@@ -81,18 +91,15 @@ int imgdownload ( struct uri *uri, struct image **image ) {
 		goto err_register_image;
 	}
 
-	/* Drop local reference to image.  Image is guaranteed to
-	 * remain in scope since it is registered.
-	 */
-	image_put ( *image );
-
-	return 0;
-
  err_register_image:
  err_monojob_wait:
  err_create_downloader:
 	image_put ( *image );
  err_alloc_image:
+	uri_put ( uri );
+ err_resolve_uri:
+	free ( uri_string_redacted );
+ err_uri_string:
 	return rc;
 }
 
@@ -100,17 +107,19 @@ int imgdownload ( struct uri *uri, struct image **image ) {
  * Download a new image
  *
  * @v uri_string	URI string
+ * @v timeout		Download timeout
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload_string ( const char *uri_string, struct image **image ) {
+int imgdownload_string ( const char *uri_string, unsigned long timeout,
+			 struct image **image ) {
 	struct uri *uri;
 	int rc;
 
 	if ( ! ( uri = parse_uri ( uri_string ) ) )
 		return -ENOMEM;
 
-	rc = imgdownload ( uri, image );
+	rc = imgdownload ( uri, timeout, image );
 
 	uri_put ( uri );
 	return rc;
@@ -120,10 +129,12 @@ int imgdownload_string ( const char *uri_string, struct image **image ) {
  * Acquire an image
  *
  * @v name_uri		Name or URI string
+ * @v timeout		Download timeout
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgacquire ( const char *name_uri, struct image **image ) {
+int imgacquire ( const char *name_uri, unsigned long timeout,
+		 struct image **image ) {
 
 	/* If we already have an image with the specified name, use it */
 	*image = find_image ( name_uri );
@@ -131,7 +142,7 @@ int imgacquire ( const char *name_uri, struct image **image ) {
 		return 0;
 
 	/* Otherwise, download a new image */
-	return imgdownload_string ( name_uri, image );
+	return imgdownload_string ( name_uri, timeout, image );
 }
 
 /**

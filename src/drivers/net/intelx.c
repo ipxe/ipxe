@@ -454,6 +454,8 @@ static void intelx_remove ( struct pci_device *pci ) {
 /** PCI device IDs */
 static struct pci_device_id intelx_nics[] = {
 	PCI_ROM ( 0x8086, 0x10fb, "82599", "82599", 0 ),
+	PCI_ROM ( 0x8086, 0x1528, "x540at2", "X540-AT2", 0 ),
+	PCI_ROM ( 0x8086, 0x154d, "x520", "X520", 0 ),
 };
 
 /** PCI driver */

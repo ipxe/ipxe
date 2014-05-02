@@ -200,6 +200,9 @@ REQUIRE_OBJECT ( sdi );
 #ifdef IMAGE_PNM
 REQUIRE_OBJECT ( pnm );
 #endif
+#ifdef IMAGE_PNG
+REQUIRE_OBJECT ( png );
+#endif
 
 /*
  * Drag in all requested commands
@@ -283,6 +286,12 @@ REQUIRE_OBJECT ( ping_cmd );
 #endif
 #ifdef CONSOLE_CMD
 REQUIRE_OBJECT ( console_cmd );
+#endif
+#ifdef IPSTAT_CMD
+REQUIRE_OBJECT ( ipstat_cmd );
+#endif
+#ifdef PROFSTAT_CMD
+REQUIRE_OBJECT ( profstat_cmd );
 #endif
 
 /*

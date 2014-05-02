@@ -20,7 +20,6 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
-#include <stdarg.h>
 #include <errno.h>
 #include <syslog.h>
 #include <ipxe/iobuf.h>
@@ -30,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/image.h>
+#include <ipxe/profile.h>
 #include <ipxe/downloader.h>
 
 /** @file
@@ -37,6 +37,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * Image downloader
  *
  */
+
+/** Receive profiler */
+static struct profiler downloader_rx_profiler __profiler =
+	{ .name = "downloader.rx" };
+
+/** Data copy profiler */
+static struct profiler downloader_copy_profiler __profiler =
+	{ .name = "downloader.copy" };
 
 /** A downloader */
 struct downloader {
@@ -167,6 +175,9 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 	size_t max;
 	int rc;
 
+	/* Start profiling */
+	profile_start ( &downloader_rx_profiler );
+
 	/* Calculate new buffer position */
 	if ( meta->flags & XFER_FL_ABS_OFFSET )
 		downloader->pos = 0;
@@ -179,8 +190,10 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 		goto done;
 
 	/* Copy data to buffer */
+	profile_start ( &downloader_copy_profiler );
 	copy_to_user ( downloader->image->data, downloader->pos,
 		       iobuf->data, len );
+	profile_stop ( &downloader_copy_profiler );
 
 	/* Update current buffer position */
 	downloader->pos += len;
@@ -189,6 +202,7 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 	free_iob ( iobuf );
 	if ( rc != 0 )
 		downloader_finished ( downloader, rc );
+	profile_stop ( &downloader_rx_profiler );
 	return rc;
 }
 
@@ -229,17 +243,13 @@ static struct interface_descriptor downloader_job_desc =
  *
  * @v job		Job control interface
  * @v image		Image to fill with downloaded file
- * @v type		Location type to pass to xfer_open()
- * @v ...		Remaining arguments to pass to xfer_open()
  * @ret rc		Return status code
  *
- * Instantiates a downloader object to download the specified URI into
- * the specified image object.
+ * Instantiates a downloader object to download the content of the
+ * specified image from its URI.
  */
-int create_downloader ( struct interface *job, struct image *image,
-			int type, ... ) {
+int create_downloader ( struct interface *job, struct image *image ) {
 	struct downloader *downloader;
-	va_list args;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -252,21 +262,18 @@ int create_downloader ( struct interface *job, struct image *image,
 	intf_init ( &downloader->xfer, &downloader_xfer_desc,
 		    &downloader->refcnt );
 	downloader->image = image_get ( image );
-	va_start ( args, type );
 
 	/* Instantiate child objects and attach to our interfaces */
-	if ( ( rc = xfer_vopen ( &downloader->xfer, type, args ) ) != 0 )
+	if ( ( rc = xfer_open_uri ( &downloader->xfer, image->uri ) ) != 0 )
 		goto err;
 
 	/* Attach parent interface, mortalise self, and return */
 	intf_plug_plug ( &downloader->job, job );
 	ref_put ( &downloader->refcnt );
-	va_end ( args );
 	return 0;
 
  err:
 	downloader_finished ( downloader, rc );
 	ref_put ( &downloader->refcnt );
-	va_end ( args );
 	return rc;
 }

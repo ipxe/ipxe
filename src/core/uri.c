@@ -35,33 +35,183 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uri.h>
 
 /**
+ * Decode URI field (in place)
+ *
+ * @v string		String
+ *
+ * URI decoding can never increase the length of a string; we can
+ * therefore safely decode in place.
+ */
+static void uri_decode ( char *string ) {
+	char *dest = string;
+	char hexbuf[3];
+	char *hexbuf_end;
+	char c;
+	char decoded;
+	unsigned int skip;
+
+	/* Copy string, decoding escaped characters as necessary */
+	do {
+		c = *(string++);
+		if ( c == '%' ) {
+			snprintf ( hexbuf, sizeof ( hexbuf ), "%s", string );
+			decoded = strtoul ( hexbuf, &hexbuf_end, 16 );
+			skip = ( hexbuf_end - hexbuf );
+			string += skip;
+			if ( skip )
+				c = decoded;
+		}
+		*(dest++) = c;
+	} while ( c );
+}
+
+/**
+ * Check if character should be escaped within a URI field
+ *
+ * @v c			Character
+ * @v field		URI field index
+ * @ret escaped		Character should be escaped
+ */
+static int uri_character_escaped ( char c, unsigned int field ) {
+
+	/* Non-printing characters and whitespace should always be
+	 * escaped, since they cannot sensibly be displayed as part of
+	 * a coherent URL string.  (This test also catches control
+	 * characters such as CR and LF, which could affect the
+	 * operation of line-based protocols such as HTTP.)
+	 *
+	 * We should also escape characters which would alter the
+	 * interpretation of the URL if not escaped, i.e. characters
+	 * which have significance to the URL parser.  We should not
+	 * blindly escape all such characters, because this would lead
+	 * to some very strange-looking URLs (e.g. if we were to
+	 * always escape '/' as "%2F" even within the URI path).
+	 *
+	 * We do not need to be perfect.  Our primary role is as a
+	 * consumer of URIs rather than a producer; the main situation
+	 * in which we produce a URI string is for display to a human
+	 * user, who can probably tolerate some variance from the
+	 * formal specification.  The only situation in which we
+	 * currently produce a URI string to be consumed by a computer
+	 * is when constructing an HTTP request URI, which contains
+	 * only the path and query fields.
+	 *
+	 * We can therefore sacrifice some correctness for the sake of
+	 * code size.  For example, colons within the URI host should
+	 * be escaped unless they form part of an IPv6 literal
+	 * address; doing this correctly would require the URI
+	 * formatter to be aware of whether or not the URI host
+	 * contained an IPv4 address, an IPv6 address, or a host name.
+	 * We choose to simplify and never escape colons within the
+	 * URI host field: in the event of a pathological hostname
+	 * containing colons, this could potentially produce a URI
+	 * string which could not be reparsed.
+	 *
+	 * After excluding non-printing characters, whitespace, and
+	 * '%', the full set of characters with significance to the
+	 * URL parser is "/#:@?".  We choose for each URI field which
+	 * of these require escaping in our use cases.
+	 */
+	static const char *escaped[URI_FIELDS] = {
+		/* Scheme: escape everything */
+		[URI_SCHEME]	= "/#:@?",
+		/* Opaque part: escape characters which would affect
+		 * the reparsing of the URI, allowing everything else
+		 * (e.g. ':', which will appear in iSCSI URIs).
+		 */
+		[URI_OPAQUE]	= "/#",
+		/* User name: escape everything */
+		[URI_USER]	= "/#:@?",
+		/* Password: escape everything */
+		[URI_PASSWORD]	= "/#:@?",
+		/* Host name: escape everything except ':', which may
+		 * appear as part of an IPv6 literal address.
+		 */
+		[URI_HOST]	= "/#@?",
+		/* Port number: escape everything */
+		[URI_PORT]	= "/#:@?",
+		/* Path: escape everything except '/', which usually
+		 * appears within paths.
+		 */
+		[URI_PATH]	= "#:@?",
+		/* Query: escape everything except '/', which
+		 * sometimes appears within queries.
+		 */
+		[URI_QUERY]	= "#:@?",
+		/* Fragment: escape everything */
+		[URI_FRAGMENT]	= "/#:@?",
+	};
+
+	return ( /* Always escape non-printing characters and whitespace */
+		 ( ! isprint ( c ) ) || ( c == ' ' ) ||
+		 /* Always escape '%' */
+		 ( c == '%' ) ||
+		 /* Escape field-specific characters */
+		 strchr ( escaped[field], c ) );
+}
+
+/**
+ * Encode URI field
+ *
+ * @v uri		URI
+ * @v field		URI field index
+ * @v buf		Buffer to contain encoded string
+ * @v len		Length of buffer
+ * @ret len		Length of encoded string (excluding NUL)
+ */
+size_t uri_encode ( const char *string, unsigned int field,
+		    char *buf, ssize_t len ) {
+	ssize_t remaining = len;
+	size_t used;
+	char c;
+
+	/* Ensure encoded string is NUL-terminated even if empty */
+	if ( len > 0 )
+		buf[0] = '\0';
+
+	/* Copy string, escaping as necessary */
+	while ( ( c = *(string++) ) ) {
+		if ( uri_character_escaped ( c, field ) ) {
+			used = ssnprintf ( buf, remaining, "%%%02X", c );
+		} else {
+			used = ssnprintf ( buf, remaining, "%c", c );
+		}
+		buf += used;
+		remaining -= used;
+	}
+
+	return ( len - remaining );
+}
+
+/**
  * Dump URI for debugging
  *
  * @v uri		URI
  */
-static void dump_uri ( struct uri *uri ) {
+static void uri_dump ( const struct uri *uri ) {
+
 	if ( ! uri )
 		return;
 	if ( uri->scheme )
-		DBG ( " scheme \"%s\"", uri->scheme );
+		DBGC ( uri, " scheme \"%s\"", uri->scheme );
 	if ( uri->opaque )
-		DBG ( " opaque \"%s\"", uri->opaque );
+		DBGC ( uri, " opaque \"%s\"", uri->opaque );
 	if ( uri->user )
-		DBG ( " user \"%s\"", uri->user );
+		DBGC ( uri, " user \"%s\"", uri->user );
 	if ( uri->password )
-		DBG ( " password \"%s\"", uri->password );
+		DBGC ( uri, " password \"%s\"", uri->password );
 	if ( uri->host )
-		DBG ( " host \"%s\"", uri->host );
+		DBGC ( uri, " host \"%s\"", uri->host );
 	if ( uri->port )
-		DBG ( " port \"%s\"", uri->port );
+		DBGC ( uri, " port \"%s\"", uri->port );
 	if ( uri->path )
-		DBG ( " path \"%s\"", uri->path );
+		DBGC ( uri, " path \"%s\"", uri->path );
 	if ( uri->query )
-		DBG ( " query \"%s\"", uri->query );
+		DBGC ( uri, " query \"%s\"", uri->query );
 	if ( uri->fragment )
-		DBG ( " fragment \"%s\"", uri->fragment );
+		DBGC ( uri, " fragment \"%s\"", uri->fragment );
 	if ( uri->params )
-		DBG ( " params \"%s\"", uri->params->name );
+		DBGC ( uri, " params \"%s\"", uri->params->name );
 }
 
 /**
@@ -69,11 +219,10 @@ static void dump_uri ( struct uri *uri ) {
  *
  * @v refcnt		Reference count
  */
-static void free_uri ( struct refcnt *refcnt ) {
+static void uri_free ( struct refcnt *refcnt ) {
 	struct uri *uri = container_of ( refcnt, struct uri, refcnt );
 
-	if ( uri->params )
-		destroy_parameters ( uri->params );
+	params_put ( uri->params );
 	free ( uri );
 }
 
@@ -89,20 +238,21 @@ static void free_uri ( struct refcnt *refcnt ) {
  */
 struct uri * parse_uri ( const char *uri_string ) {
 	struct uri *uri;
+	struct parameters *params;
 	char *raw;
 	char *tmp;
 	char *path;
 	char *authority;
-	int i;
 	size_t raw_len;
+	unsigned int field;
 
 	/* Allocate space for URI struct and a copy of the string */
 	raw_len = ( strlen ( uri_string ) + 1 /* NUL */ );
 	uri = zalloc ( sizeof ( *uri ) + raw_len );
 	if ( ! uri )
 		return NULL;
-	ref_init ( &uri->refcnt, free_uri );
-	raw = ( ( ( char * ) uri ) + sizeof ( *uri ) );
+	ref_init ( &uri->refcnt, uri_free );
+	raw = ( ( ( void * ) uri ) + sizeof ( *uri ) );
 
 	/* Copy in the raw string */
 	memcpy ( raw, uri_string, raw_len );
@@ -111,9 +261,9 @@ struct uri * parse_uri ( const char *uri_string ) {
 	if ( ( tmp = strstr ( raw, "##params" ) ) ) {
 		*tmp = '\0';
 		tmp += 8 /* "##params" */;
-		uri->params = find_parameters ( *tmp ? ( tmp + 1 ) : NULL );
-		if ( uri->params ) {
-			claim_parameters ( uri->params );
+		params = find_parameters ( *tmp ? ( tmp + 1 ) : NULL );
+		if ( params ) {
+			uri->params = claim_parameters ( params );
 		} else {
 			/* Ignore non-existent submission blocks */
 		}
@@ -125,12 +275,8 @@ struct uri * parse_uri ( const char *uri_string ) {
 		uri->fragment = tmp;
 	}
 
-	/* Identify absolute/relative URI.  We ignore schemes that are
-	 * apparently only a single character long, since otherwise we
-	 * misinterpret a DOS-style path name ("C:\path\to\file") as a
-	 * URI with scheme="C",opaque="\path\to\file".
-	 */
-	if ( ( tmp = strchr ( raw, ':' ) ) && ( tmp > ( raw + 1 ) ) ) {
+	/* Identify absolute/relative URI */
+	if ( ( tmp = strchr ( raw, ':' ) ) ) {
 		/* Absolute URI: identify hierarchical/opaque */
 		uri->scheme = raw;
 		*(tmp++) = '\0';
@@ -158,6 +304,12 @@ struct uri * parse_uri ( const char *uri_string ) {
 		*(tmp++) = '\0';
 		uri->query = tmp;
 	}
+
+	/* If we have no path remaining, then we're already finished
+	 * processing.
+	 */
+	if ( ! path[0] )
+		goto done;
 
 	/* Identify net/absolute/relative path */
 	if ( strncmp ( path, "//", 2 ) == 0 ) {
@@ -205,23 +357,22 @@ struct uri * parse_uri ( const char *uri_string ) {
 	}
 
 	/* Split host into host[:port] */
-	if ( ( tmp = strchr ( uri->host, ':' ) ) ) {
+	if ( ( uri->host[ strlen ( uri->host ) - 1 ] != ']' ) &&
+	     ( tmp = strrchr ( uri->host, ':' ) ) ) {
 		*(tmp++) = '\0';
 		uri->port = tmp;
 	}
 
-	/* Decode fields that should be decoded */
-	for ( i = URI_FIRST_FIELD; i <= URI_LAST_FIELD; i++ ) {
-		const char *field = uri_get_field ( uri, i );
-		if ( field && ( URI_ENCODED & ( 1 << i ) ) )
-			uri_decode ( field, ( char * ) field,
-				     strlen ( field ) + 1 /* NUL */ );
+	/* Decode fields in-place */
+	for ( field = 0 ; field < URI_FIELDS ; field++ ) {
+		if ( uri_field ( uri, field ) )
+			uri_decode ( ( char * ) uri_field ( uri, field ) );
 	}
 
  done:
-	DBG ( "URI \"%s\" split into", uri_string );
-	dump_uri ( uri );
-	DBG ( "\n" );
+	DBGC ( uri, "URI parsed \"%s\" to", uri_string );
+	uri_dump ( uri );
+	DBGC ( uri, "\n" );
 
 	return uri;
 }
@@ -233,80 +384,135 @@ struct uri * parse_uri ( const char *uri_string ) {
  * @v default_port	Default port to use if none specified in URI
  * @ret port		Port
  */
-unsigned int uri_port ( struct uri *uri, unsigned int default_port ) {
+unsigned int uri_port ( const struct uri *uri, unsigned int default_port ) {
+
 	if ( ( ! uri ) || ( ! uri->port ) )
 		return default_port;
+
 	return ( strtoul ( uri->port, NULL, 0 ) );
 }
 
 /**
- * Unparse URI
+ * Format URI
  *
+ * @v uri		URI
  * @v buf		Buffer to fill with URI string
  * @v size		Size of buffer
- * @v uri		URI to write into buffer, or NULL
- * @v fields		Bitmask of fields to include in URI string, or URI_ALL
  * @ret len		Length of URI string
  */
-int unparse_uri ( char *buf, size_t size, struct uri *uri,
-		  unsigned int fields ) {
-	/* List of characters that typically go before certain fields */
-	static char separators[] = { /* scheme */ 0, /* opaque */ ':',
-				     /* user */ 0, /* password */ ':',
-				     /* host */ '@', /* port */ ':',
-				     /* path */ 0, /* query */ '?',
-				     /* fragment */ '#' };
-	int used = 0;
-	int i;
-
-	DBG ( "URI unparsing" );
-	dump_uri ( uri );
-	DBG ( "\n" );
+size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
+	static const char prefixes[URI_FIELDS] = {
+		[URI_OPAQUE] = ':',
+		[URI_PASSWORD] = ':',
+		[URI_PORT] = ':',
+		[URI_PATH] = '/',
+		[URI_QUERY] = '?',
+		[URI_FRAGMENT] = '#',
+	};
+	char prefix;
+	size_t used = 0;
+	unsigned int field;
 
 	/* Ensure buffer is NUL-terminated */
-	if ( size )
+	if ( len )
 		buf[0] = '\0';
 
 	/* Special-case NULL URI */
 	if ( ! uri )
 		return 0;
 
-	/* Iterate through requested fields */
-	for ( i = URI_FIRST_FIELD; i <= URI_LAST_FIELD; i++ ) {
-		const char *field = uri_get_field ( uri, i );
-		char sep = separators[i];
+	/* Generate fields */
+	for ( field = 0 ; field < URI_FIELDS ; field++ ) {
 
-		/* Ensure `fields' only contains bits for fields that exist */
-		if ( ! field )
-			fields &= ~( 1 << i );
+		/* Skip non-existent fields */
+		if ( ! uri_field ( uri, field ) )
+			continue;
 
-		/* Store this field if we were asked to */
-		if ( fields & ( 1 << i ) ) {
-			/* Print :// if we're non-opaque and had a scheme */
-			if ( ( fields & URI_SCHEME_BIT ) &&
-			     ( i > URI_OPAQUE ) ) {
-				used += ssnprintf ( buf + used, size - used,
-						    "://" );
-				/* Only print :// once */
-				fields &= ~URI_SCHEME_BIT;
-			}
+		/* Prefix this field, if applicable */
+		prefix = prefixes[field];
+		if ( ( field == URI_HOST ) && ( uri->user != NULL ) )
+			prefix = '@';
+		if ( ( field == URI_PATH ) && ( uri->path[0] == '/' ) )
+			prefix = '\0';
+		if ( prefix ) {
+			used += ssnprintf ( ( buf + used ), ( len - used ),
+					    "%c", prefix );
+		}
 
-			/* Only print separator if an earlier field exists */
-			if ( sep && ( fields & ( ( 1 << i ) - 1 ) ) )
-				used += ssnprintf ( buf + used, size - used,
-						    "%c", sep );
+		/* Encode this field */
+		used += uri_encode ( uri_field ( uri, field ), field,
+				     ( buf + used ), ( len - used ) );
 
-			/* Print contents of field, possibly encoded */
-			if ( URI_ENCODED & ( 1 << i ) )
-				used += uri_encode ( field, buf + used,
-						     size - used, i );
-			else
-				used += ssnprintf ( buf + used, size - used,
-						    "%s", field );
+		/* Suffix this field, if applicable */
+		if ( ( field == URI_SCHEME ) && ( ! uri->opaque ) ) {
+			used += ssnprintf ( ( buf + used ), ( len - used ),
+					    "://" );
 		}
 	}
 
+	if ( len ) {
+		DBGC ( uri, "URI formatted" );
+		uri_dump ( uri );
+		DBGC ( uri, " to \"%s%s\"\n", buf,
+		       ( ( used > len ) ? "<TRUNCATED>" : "" ) );
+	}
+
 	return used;
+}
+
+/**
+ * Format URI
+ *
+ * @v uri		URI
+ * @ret string		URI string, or NULL on failure
+ *
+ * The caller is responsible for eventually freeing the allocated
+ * memory.
+ */
+char * format_uri_alloc ( const struct uri *uri ) {
+	size_t len;
+	char *string;
+
+	len = ( format_uri ( uri, NULL, 0 ) + 1 /* NUL */ );
+	string = malloc ( len );
+	if ( string )
+		format_uri ( uri, string, len );
+	return string;
+}
+
+/**
+ * Copy URI fields
+ *
+ * @v src		Source URI
+ * @v dest		Destination URI, or NULL to calculate length
+ * @ret len		Length of raw URI
+ */
+static size_t uri_copy_fields ( const struct uri *src, struct uri *dest ) {
+	size_t len = sizeof ( *dest );
+	char *out = ( ( void * ) dest + len );
+	unsigned int field;
+	size_t field_len;
+
+	/* Copy existent fields */
+	for ( field = 0 ; field < URI_FIELDS ; field++ ) {
+
+		/* Skip non-existent fields */
+		if ( ! uri_field ( src, field ) )
+			continue;
+
+		/* Calculate field length */
+		field_len = ( strlen ( uri_field ( src, field ) )
+			      + 1 /* NUL */ );
+		len += field_len;
+
+		/* Copy field, if applicable */
+		if ( dest ) {
+			memcpy ( out, uri_field ( src, field ), field_len );
+			uri_field ( dest, field ) = out;
+			out += field_len;
+		}
+	}
+	return len;
 }
 
 /**
@@ -317,12 +523,28 @@ int unparse_uri ( char *buf, size_t size, struct uri *uri,
  *
  * Creates a modifiable copy of a URI.
  */
-struct uri * uri_dup ( struct uri *uri ) {
-	size_t len = ( unparse_uri ( NULL, 0, uri, URI_ALL ) + 1 );
-	char buf[len];
+struct uri * uri_dup ( const struct uri *uri ) {
+	struct uri *dup;
+	size_t len;
 
-	unparse_uri ( buf, len, uri, URI_ALL );
-	return parse_uri ( buf );
+	/* Allocate new URI */
+	len = uri_copy_fields ( uri, NULL );
+	dup = zalloc ( len );
+	if ( ! dup )
+		return NULL;
+	ref_init ( &dup->refcnt, uri_free );
+
+	/* Copy fields */
+	uri_copy_fields ( uri, dup );
+
+	/* Copy parameters */
+	dup->params = params_get ( uri->params );
+
+	DBGC ( uri, "URI duplicated" );
+	uri_dump ( uri );
+	DBGC ( uri, "\n" );
+
+	return dup;
 }
 
 /**
@@ -398,7 +620,7 @@ char * resolve_path ( const char *base_path,
  * relative URI (e.g. "../initrds/initrd.gz") and produces a new URI
  * (e.g. "http://ipxe.org/initrds/initrd.gz").
  */
-struct uri * resolve_uri ( struct uri *base_uri,
+struct uri * resolve_uri ( const struct uri *base_uri,
 			   struct uri *relative_uri ) {
 	struct uri tmp_uri;
 	char *tmp_path = NULL;
@@ -417,11 +639,16 @@ struct uri * resolve_uri ( struct uri *base_uri,
 		tmp_uri.path = tmp_path;
 		tmp_uri.query = relative_uri->query;
 		tmp_uri.fragment = relative_uri->fragment;
+		tmp_uri.params = relative_uri->params;
 	} else if ( relative_uri->query ) {
 		tmp_uri.query = relative_uri->query;
 		tmp_uri.fragment = relative_uri->fragment;
+		tmp_uri.params = relative_uri->params;
 	} else if ( relative_uri->fragment ) {
 		tmp_uri.fragment = relative_uri->fragment;
+		tmp_uri.params = relative_uri->params;
+	} else if ( relative_uri->params ) {
+		tmp_uri.params = relative_uri->params;
 	}
 
 	/* Create demangled URI */
@@ -431,100 +658,23 @@ struct uri * resolve_uri ( struct uri *base_uri,
 }
 
 /**
- * Test for unreserved URI characters
+ * Construct TFTP URI from next-server and filename
  *
- * @v c			Character to test
- * @v field		Field of URI in which character lies
- * @ret is_unreserved	Character is an unreserved character
+ * @v next_server	Next-server address
+ * @v filename		Filename
+ * @ret uri		URI, or NULL on failure
+ *
+ * TFTP filenames specified via the DHCP next-server field often
+ * contain characters such as ':' or '#' which would confuse the
+ * generic URI parser.  We provide a mechanism for directly
+ * constructing a TFTP URI from the next-server and filename.
  */
-static int is_unreserved_uri_char ( int c, int field ) {
-	/* According to RFC3986, the unreserved character set is
-	 *
-	 * A-Z a-z 0-9 - _ . ~
-	 *
-	 * but we also pass & ; = in queries, / in paths,
-	 * and everything in opaques
-	 */
-	int ok = ( isupper ( c ) || islower ( c ) || isdigit ( c ) ||
-		    ( c == '-' ) || ( c == '_' ) ||
-		    ( c == '.' ) || ( c == '~' ) );
+struct uri * tftp_uri ( struct in_addr next_server, const char *filename ) {
+	struct uri uri;
 
-	if ( field == URI_QUERY )
-		ok = ok || ( c == ';' ) || ( c == '&' ) || ( c == '=' );
-
-	if ( field == URI_PATH )
-		ok = ok || ( c == '/' );
-
-	if ( field == URI_OPAQUE )
-		ok = 1;
-
-	return ok;
-}
-
-/**
- * URI-encode string
- *
- * @v raw_string	String to be URI-encoded
- * @v buf		Buffer to contain encoded string
- * @v len		Length of buffer
- * @v field		Field of URI in which string lies
- * @ret len		Length of encoded string (excluding NUL)
- */
-size_t uri_encode ( const char *raw_string, char *buf, ssize_t len,
-		    int field ) {
-	ssize_t remaining = len;
-	size_t used;
-	unsigned char c;
-
-	if ( len > 0 )
-		buf[0] = '\0';
-
-	while ( ( c = *(raw_string++) ) ) {
-		if ( is_unreserved_uri_char ( c, field ) ) {
-			used = ssnprintf ( buf, remaining, "%c", c );
-		} else {
-			used = ssnprintf ( buf, remaining, "%%%02X", c );
-		}
-		buf += used;
-		remaining -= used;
-	}
-
-	return ( len - remaining );
-}
-
-/**
- * Decode URI-encoded string
- *
- * @v encoded_string	URI-encoded string
- * @v buf		Buffer to contain decoded string
- * @v len		Length of buffer
- * @ret len		Length of decoded string (excluding NUL)
- *
- * This function may be used in-place, with @a buf the same as
- * @a encoded_string.
- */
-size_t uri_decode ( const char *encoded_string, char *buf, ssize_t len ) {
-	ssize_t remaining;
-	char hexbuf[3];
-	char *hexbuf_end;
-	unsigned char c;
-
-	for ( remaining = len; *encoded_string; remaining-- ) {
-		if ( *encoded_string == '%' ) {
-			encoded_string++;
-			snprintf ( hexbuf, sizeof ( hexbuf ), "%s",
-				   encoded_string );
-			c = strtoul ( hexbuf, &hexbuf_end, 16 );
-			encoded_string += ( hexbuf_end - hexbuf );
-		} else {
-			c = *(encoded_string++);
-		}
-		if ( remaining > 1 )
-			*buf++ = c;
-	}
-
-	if ( len )
-		*buf = 0;
-
-	return ( len - remaining );
+	memset ( &uri, 0, sizeof ( uri ) );
+	uri.scheme = "tftp";
+	uri.host = inet_ntoa ( next_server );
+	uri.path = filename;
+	return uri_dup ( &uri );
 }

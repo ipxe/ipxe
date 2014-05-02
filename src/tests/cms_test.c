@@ -1305,7 +1305,13 @@ static uint8_t root_crt_fingerprint[] =
 		      0x96, 0xe7, 0xa8, 0x6d, 0x63, 0x2d, 0x32, 0x38,
 		      0xaf, 0x00, 0xc4, 0x1a, 0xfc, 0xd8, 0xac, 0xc3 );
 
-/** Certificate store containing the iPXE self-test root CA */
+/** Empty certificate store */
+static struct x509_chain empty_store = {
+	.refcnt = REF_INIT ( ref_no_free ),
+	.links = LIST_HEAD_INIT ( empty_store.links ),
+};
+
+/** Root certificate list containing the iPXE self-test root CA */
 static struct x509_root test_root = {
 	.digest = &cms_test_algorithm,
 	.count = 1,
@@ -1336,11 +1342,17 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
  * Report signature parsing test result
  *
  * @v sgn		Test signature
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define cms_signature_ok( sgn ) do {					\
-	ok ( cms_signature ( (sgn)->data, (sgn)->len,			\
-			     &(sgn)->sig ) == 0 );			\
-	} while ( 0 )
+static void cms_signature_okx ( struct cms_test_signature *sgn,
+				const char *file, unsigned int line ) {
+
+	okx ( cms_signature ( sgn->data, sgn->len, &sgn->sig ) == 0,
+	      file, line );
+}
+#define cms_signature_ok( sgn ) \
+	cms_signature_okx ( sgn, __FILE__, __LINE__ )
 
 /**
  * Report signature verification test result
@@ -1349,13 +1361,24 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
  * @v code		Test signed code
  * @v name		Test verification name
  * @v time		Test verification time
- * @v root		Test root certificate store
+ * @v store		Test certificate store
+ * @v root		Test root certificate list
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define cms_verify_ok( sgn, code, name, time, root ) do {		\
-	x509_invalidate_chain ( (sgn)->sig->certificates );		\
-	ok ( cms_verify ( (sgn)->sig, virt_to_user ( (code)->data ),	\
-			  (code)->len, name, time, root ) == 0 );	\
-	} while ( 0 )
+static void cms_verify_okx ( struct cms_test_signature *sgn,
+			     struct cms_test_code *code, const char *name,
+			     time_t time, struct x509_chain *store,
+			     struct x509_root *root, const char *file,
+			     unsigned int line ) {
+
+	x509_invalidate_chain ( sgn->sig->certificates );
+	okx ( cms_verify ( sgn->sig, virt_to_user ( code->data ), code->len,
+			   name, time, store, root ) == 0, file, line );
+}
+#define cms_verify_ok( sgn, code, name, time, store, root )		\
+	cms_verify_okx ( sgn, code, name, time, store, root,		\
+			 __FILE__, __LINE__ )
 
 /**
  * Report signature verification failure test result
@@ -1364,13 +1387,24 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
  * @v code		Test signed code
  * @v name		Test verification name
  * @v time		Test verification time
- * @v root		Test root certificate store
+ * @v store		Test certificate store
+ * @v root		Test root certificate list
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define cms_verify_fail_ok( sgn, code, name, time, root ) do {		\
-	x509_invalidate_chain ( (sgn)->sig->certificates );		\
-	ok ( cms_verify ( (sgn)->sig, virt_to_user ( (code)->data ),	\
-			  (code)->len, name, time, root ) != 0 );	\
-	} while ( 0 )
+static void cms_verify_fail_okx ( struct cms_test_signature *sgn,
+				  struct cms_test_code *code, const char *name,
+				  time_t time, struct x509_chain *store,
+				  struct x509_root *root, const char *file,
+				  unsigned int line ) {
+
+	x509_invalidate_chain ( sgn->sig->certificates );
+	okx ( cms_verify ( sgn->sig, virt_to_user ( code->data ), code->len,
+			   name, time, store, root ) != 0, file, line );
+}
+#define cms_verify_fail_ok( sgn, code, name, time, store, root )	\
+	cms_verify_fail_okx ( sgn, code, name, time, store, root,	\
+			      __FILE__, __LINE__ )
 
 /**
  * Perform CMS self-tests
@@ -1385,38 +1419,42 @@ static void cms_test_exec ( void ) {
 	cms_signature_ok ( &nonsigned_sig );
 
 	/* Check good signature */
+	cms_verify_ok ( &codesigned_sig, &test_code, "codesign.test.ipxe.org",
+			test_time, &empty_store, &test_root );
 	cms_verify_ok ( &codesigned_sig, &test_code,
-			"codesign.test.ipxe.org", test_time, &test_root );
-	cms_verify_ok ( &codesigned_sig, &test_code,
-			NULL, test_time, &test_root );
+			NULL, test_time, &empty_store, &test_root );
 
 	/* Check incorrect signer name */
 	cms_verify_fail_ok ( &codesigned_sig, &test_code,
-			     "wrongname.test.ipxe.org", test_time, &test_root );
+			     "wrongname.test.ipxe.org", test_time,
+			     &empty_store, &test_root );
 
 	/* Check non-code-signing certificate */
 	cms_verify_fail_ok ( &genericsigned_sig, &test_code,
-			     NULL, test_time, &test_root );
+			     NULL, test_time, &empty_store, &test_root );
 
 	/* Check non-signing certificate */
 	cms_verify_fail_ok ( &nonsigned_sig, &test_code,
-			     NULL, test_time, &test_root );
+			     NULL, test_time, &empty_store, &test_root );
 
 	/* Check broken chain */
 	cms_verify_fail_ok ( &brokenchain_sig, &test_code,
-			     NULL, test_time, &test_root );
+			     NULL, test_time, &empty_store, &test_root );
 
 	/* Check untrusted signature */
 	cms_verify_fail_ok ( &codesigned_sig, &test_code,
-			     NULL, test_time, &dummy_root );
+			     NULL, test_time, &empty_store, &dummy_root );
 
 	/* Check incorrect signed content */
 	cms_verify_fail_ok ( &codesigned_sig, &bad_code,
-			     NULL, test_time, &test_root );
+			     NULL, test_time, &empty_store, &test_root );
 
 	/* Check expired signature */
 	cms_verify_fail_ok ( &codesigned_sig, &test_code,
-			     NULL, test_expired, &test_root );
+			     NULL, test_expired, &empty_store, &test_root );
+
+	/* Sanity check */
+	assert ( list_empty ( &empty_store.links ) );
 
 	/* Drop signature references */
 	cms_put ( nonsigned_sig.sig );

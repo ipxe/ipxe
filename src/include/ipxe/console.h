@@ -27,7 +27,15 @@ struct console_configuration {
 	/** Height */
 	unsigned int height;
 	/** Colour depth */
-	unsigned int bpp;
+	unsigned int depth;
+	/** Left margin */
+	unsigned int left;
+	/** Right margin */
+	unsigned int right;
+	/** Top margin */
+	unsigned int top;
+	/** Bottom margin */
+	unsigned int bottom;
 	/** Background picture, if any */
 	struct pixel_buffer *pixbuf;
 };

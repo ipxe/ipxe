@@ -519,6 +519,9 @@ static void efipci_driver_shutdown ( int booting __unused ) {
 	struct efi_pci_device *efipci;
 	struct efi_pci_device *tmp;
 
+	/* Uninstall driver */
+	efi_driver_uninstall ( efidrv );
+
 	/* Shut down any remaining devices */
 	list_for_each_entry_safe ( efipci, tmp, &efi_pci_devices, list ) {
 		DBGC ( efipci, "EFIPCI " PCI_FMT " still active at shutdown; "

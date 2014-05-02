@@ -41,13 +41,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/init.h>
 #include <ipxe/io.h>
 
-struct idt_register com32_external_idtr = {
-	.limit = COM32_NUM_IDT_ENTRIES * sizeof ( struct idt_descriptor ) - 1,
-	.base = COM32_IDT
-};
-
-struct idt_register com32_internal_idtr;
-
 /**
  * Execute COMBOOT image
  *
@@ -95,8 +88,6 @@ static int com32_exec_loop ( struct image *image ) {
 		unregister_image ( image );
 
 		__asm__ __volatile__ (
-			"sidt com32_internal_idtr\n\t"
-			"lidt com32_external_idtr\n\t"	       /* Set up IDT */
 			"movl %%esp, (com32_internal_esp)\n\t" /* Save internal virtual address space ESP */
 			"movl (com32_external_esp), %%esp\n\t" /* Switch to COM32 ESP (top of available memory) */
 			"call _virt_to_phys\n\t"               /* Switch to flat physical address space */
@@ -110,8 +101,7 @@ static int com32_exec_loop ( struct image *image ) {
 			"pushl $6\n\t"                         /* Number of additional arguments */
 			"call *%6\n\t"                         /* Execute image */
 			"cli\n\t"			       /* Disable interrupts */
-			"call _phys_to_virt\n\t"	       /* Switch back to internal virtual address space */
-			"lidt com32_internal_idtr\n\t"	       /* Switch back to internal IDT (for debugging) */
+			"call _phys_to_virt\n\t"               /* Switch back to internal virtual address space */
 			"movl (com32_internal_esp), %%esp\n\t" /* Switch back to internal stack */
 		:
 		:
@@ -201,55 +191,25 @@ static int com32_identify ( struct image *image ) {
 
 
 /**
- * Load COM32 image into memory and set up the IDT
+ * Load COM32 image into memory
  * @v image		COM32 image
  * @ret rc		Return status code
  */
 static int com32_load_image ( struct image *image ) {
-	physaddr_t com32_irq_wrapper_phys;
-	struct idt_descriptor *idt;
-	struct ijb_entry *ijb;
 	size_t filesz, memsz;
 	userptr_t buffer;
-	int rc, i;
+	int rc;
 
-	/* The interrupt descriptor table, interrupt jump buffer, and
-	 * image data are all contiguous in memory. Prepare them all at once.
-	 */
-	filesz = image->len +
-		COM32_NUM_IDT_ENTRIES * sizeof ( struct idt_descriptor ) +
-		COM32_NUM_IDT_ENTRIES * sizeof ( struct ijb_entry );
+	filesz = image->len;
 	memsz = filesz;
-	buffer = phys_to_user ( COM32_IDT );
+	buffer = phys_to_user ( COM32_START_PHYS );
 	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
 		DBGC ( image, "COM32 %p: could not prepare segment: %s\n",
 		       image, strerror ( rc ) );
 		return rc;
 	}
 
-	/* Write the IDT and IJB */
-	idt = phys_to_virt ( COM32_IDT );
-	ijb = phys_to_virt ( COM32_IJB );
-	com32_irq_wrapper_phys = virt_to_phys ( com32_irq_wrapper );
-
-	for ( i = 0; i < COM32_NUM_IDT_ENTRIES; i++ ) {
-		uint32_t ijb_address = virt_to_phys ( &ijb[i] );
-
-		idt[i].offset_low = ijb_address & 0xFFFF;
-		idt[i].selector = PHYSICAL_CS;
-		idt[i].flags = IDT_INTERRUPT_GATE_FLAGS;
-		idt[i].offset_high = ijb_address >> 16;
-
-		ijb[i].pusha_instruction = IJB_PUSHA;
-		ijb[i].mov_instruction = IJB_MOV_AL_IMM8;
-		ijb[i].mov_value = i;
-		ijb[i].jump_instruction = IJB_JMP_REL32;
-		ijb[i].jump_destination = com32_irq_wrapper_phys -
-			virt_to_phys ( &ijb[i + 1] );
-	}
-
 	/* Copy image to segment */
-	buffer = phys_to_user ( COM32_START_PHYS );
 	memcpy_user ( buffer, 0, image->data, 0, filesz );
 
 	return 0;

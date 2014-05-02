@@ -17,6 +17,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 struct io_buffer;
 struct net_device;
+struct ip_statistics;
 
 /** Empty checksum value
  *
@@ -96,6 +97,8 @@ struct tcpip_net_protocol {
 	const char *name;
 	/** Network address family */
 	sa_family_t sa_family;
+	/** Fixed header length */
+	size_t header_len;
 	/**
 	 * Transmit packet
 	 *
@@ -115,6 +118,13 @@ struct tcpip_net_protocol {
 		       struct sockaddr_tcpip *st_dest,
 		       struct net_device *netdev,
 		       uint16_t *trans_csum );
+	/**
+	 * Determine transmitting network device
+	 *
+	 * @v st_dest		Destination address
+	 * @ret netdev		Network device, or NULL
+	 */
+	struct net_device * ( * netdev ) ( struct sockaddr_tcpip *dest );
 };
 
 /** TCP/IP transport-layer protocol table */
@@ -132,12 +142,15 @@ struct tcpip_net_protocol {
 
 extern int tcpip_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		      uint8_t tcpip_proto, struct sockaddr_tcpip *st_src,
-		      struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
+		      struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum,
+		      struct ip_statistics *stats );
 extern int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip,
 		      struct sockaddr_tcpip *st_src,
 		      struct sockaddr_tcpip *st_dest,
 		      struct net_device *netdev,
 		      uint16_t *trans_csum );
+extern struct net_device * tcpip_netdev ( struct sockaddr_tcpip *st_dest );
+extern size_t tcpip_mtu ( struct sockaddr_tcpip *st_dest );
 extern uint16_t generic_tcpip_continue_chksum ( uint16_t partial,
 						const void *data, size_t len );
 extern uint16_t tcpip_chksum ( const void *data, size_t len );

@@ -202,13 +202,11 @@ static int rsa_alloc ( struct rsa_context *context, size_t modulus_len,
 /**
  * Parse RSA integer
  *
- * @v context		RSA context
  * @v integer		Integer to fill in
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int rsa_parse_integer ( struct rsa_context *context,
-			       struct asn1_cursor *integer,
+static int rsa_parse_integer ( struct asn1_cursor *integer,
 			       const struct asn1_cursor *raw ) {
 
 	/* Enter integer */
@@ -223,11 +221,71 @@ static int rsa_parse_integer ( struct rsa_context *context,
 	}
 
 	/* Fail if cursor or integer are invalid */
-	if ( ! integer->len ) {
-		DBGC ( context, "RSA %p invalid integer:\n", context );
-		DBGC_HDA ( context, 0, raw->data, raw->len );
+	if ( ! integer->len )
 		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * Parse RSA modulus and exponent
+ *
+ * @v modulus		Modulus to fill in
+ * @v exponent		Exponent to fill in
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
+			       struct asn1_cursor *exponent,
+			       const struct asn1_cursor *raw ) {
+	struct asn1_bit_string bits;
+	struct asn1_cursor cursor;
+	int is_private;
+	int rc;
+
+	/* Enter subjectPublicKeyInfo/RSAPrivateKey */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	asn1_enter ( &cursor, ASN1_SEQUENCE );
+
+	/* Determine key format */
+	if ( asn1_type ( &cursor ) == ASN1_INTEGER ) {
+
+		/* Private key */
+		is_private = 1;
+
+		/* Skip version */
+		asn1_skip_any ( &cursor );
+
+	} else {
+
+		/* Public key */
+		is_private = 0;
+
+		/* Skip algorithm */
+		asn1_skip ( &cursor, ASN1_SEQUENCE );
+
+		/* Enter subjectPublicKey */
+		if ( ( rc = asn1_integral_bit_string ( &cursor, &bits ) ) != 0 )
+			return rc;
+		cursor.data = bits.data;
+		cursor.len = bits.len;
+
+		/* Enter RSAPublicKey */
+		asn1_enter ( &cursor, ASN1_SEQUENCE );
 	}
+
+	/* Extract modulus */
+	if ( ( rc = rsa_parse_integer ( modulus, &cursor ) ) != 0 )
+		return rc;
+	asn1_skip_any ( &cursor );
+
+	/* Skip public exponent, if applicable */
+	if ( is_private )
+		asn1_skip ( &cursor, ASN1_INTEGER );
+
+	/* Extract publicExponent/privateExponent */
+	if ( ( rc = rsa_parse_integer ( exponent, &cursor ) ) != 0 )
+		return rc;
 
 	return 0;
 }
@@ -242,11 +300,9 @@ static int rsa_parse_integer ( struct rsa_context *context,
  */
 static int rsa_init ( void *ctx, const void *key, size_t key_len ) {
 	struct rsa_context *context = ctx;
-	struct asn1_bit_string bits;
 	struct asn1_cursor modulus;
 	struct asn1_cursor exponent;
 	struct asn1_cursor cursor;
-	int is_private;
 	int rc;
 
 	/* Initialise context */
@@ -256,46 +312,12 @@ static int rsa_init ( void *ctx, const void *key, size_t key_len ) {
 	cursor.data = key;
 	cursor.len = key_len;
 
-	/* Enter subjectPublicKeyInfo/RSAPrivateKey */
-	asn1_enter ( &cursor, ASN1_SEQUENCE );
-
-	/* Determine key format */
-	if ( asn1_type ( &cursor ) == ASN1_INTEGER ) {
-		/* Private key */
-		is_private = 1;
-
-		/* Skip version */
-		asn1_skip_any ( &cursor );
-
-	} else {
-		/* Public key */
-		is_private = 0;
-
-		/* Skip algorithm */
-		asn1_skip ( &cursor, ASN1_SEQUENCE );
-
-		/* Enter subjectPublicKey */
-		if ( ( rc = asn1_integral_bit_string ( &cursor, &bits ) ) != 0 )
-			goto err_parse;
-		cursor.data = bits.data;
-		cursor.len = bits.len;
-
-		/* Enter RSAPublicKey */
-		asn1_enter ( &cursor, ASN1_SEQUENCE );
+	/* Parse modulus and exponent */
+	if ( ( rc = rsa_parse_mod_exp ( &modulus, &exponent, &cursor ) ) != 0 ){
+		DBGC ( context, "RSA %p invalid modulus/exponent:\n", context );
+		DBGC_HDA ( context, 0, cursor.data, cursor.len );
+		goto err_parse;
 	}
-
-	/* Extract modulus */
-	if ( ( rc = rsa_parse_integer ( context, &modulus, &cursor ) ) != 0 )
-		goto err_parse;
-	asn1_skip_any ( &cursor );
-
-	/* Skip public exponent, if applicable */
-	if ( is_private )
-		asn1_skip ( &cursor, ASN1_INTEGER );
-
-	/* Extract publicExponent/privateExponent */
-	if ( ( rc = rsa_parse_integer ( context, &exponent, &cursor ) ) != 0 )
-		goto err_parse;
 
 	DBGC ( context, "RSA %p modulus:\n", context );
 	DBGC_HDA ( context, 0, modulus.data, modulus.len );
@@ -628,6 +650,46 @@ static void rsa_final ( void *ctx ) {
 	rsa_free ( context );
 }
 
+/**
+ * Check for matching RSA public/private key pair
+ *
+ * @v private_key	Private key
+ * @v private_key_len	Private key length
+ * @v public_key	Public key
+ * @v public_key_len	Public key length
+ * @ret rc		Return status code
+ */
+static int rsa_match ( const void *private_key, size_t private_key_len,
+		       const void *public_key, size_t public_key_len ) {
+	struct asn1_cursor private_modulus;
+	struct asn1_cursor private_exponent;
+	struct asn1_cursor private_cursor;
+	struct asn1_cursor public_modulus;
+	struct asn1_cursor public_exponent;
+	struct asn1_cursor public_cursor;
+	int rc;
+
+	/* Initialise cursors */
+	private_cursor.data = private_key;
+	private_cursor.len = private_key_len;
+	public_cursor.data = public_key;
+	public_cursor.len = public_key_len;
+
+	/* Parse moduli and exponents */
+	if ( ( rc = rsa_parse_mod_exp ( &private_modulus, &private_exponent,
+					&private_cursor ) ) != 0 )
+		return rc;
+	if ( ( rc = rsa_parse_mod_exp ( &public_modulus, &public_exponent,
+					&public_cursor ) ) != 0 )
+		return rc;
+
+	/* Compare moduli */
+	if ( asn1_compare ( &private_modulus, &public_modulus ) != 0 )
+		return -ENOTTY;
+
+	return 0;
+}
+
 /** RSA public-key algorithm */
 struct pubkey_algorithm rsa_algorithm = {
 	.name		= "rsa",
@@ -639,4 +701,5 @@ struct pubkey_algorithm rsa_algorithm = {
 	.sign		= rsa_sign,
 	.verify		= rsa_verify,
 	.final		= rsa_final,
+	.match		= rsa_match,
 };
