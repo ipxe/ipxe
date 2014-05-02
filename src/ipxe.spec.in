@@ -45,12 +45,12 @@ make
 rm -f bin/ipxe*tmp*
 
 %install
-install -m 0755 -d %{buildroot}%{_datarootdir}/%{name}
-install -m 0644 -t %{buildroot}%{_datarootdir}/%{name} bin/ipxe.* bin/*kpxe
+install -m 0755 -d %{buildroot}%{_libdir}/%{name}
+install -m 0644 -t %{buildroot}%{_libdir}/%{name} bin/ipxe.* bin/*kpxe
 
 %files
 %defattr(-,root,root,-)
-%{_datarootdir}/%{name}
+%{_libdir}/%{name}
 
 %clean
 rm -Rf %{buildroot}
