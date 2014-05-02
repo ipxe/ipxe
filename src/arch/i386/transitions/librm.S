@@ -200,10 +200,22 @@ real_to_prot:
 	addr32 leal (%eax,%edx), %esi
 	subl	rm_virt_offset, %esi
 
+	/* Load protected-mode global descriptor table */
+	data32 lgdt gdtr
+
+	/* Zero segment registers.  This wastes around 12 cycles on
+	 * real hardware, but saves a substantial number of emulated
+	 * instructions under KVM.
+	 */
+	xorw	%ax, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+	movw	%ax, %ss
+
 	/* Switch to protected mode */
 	cli
-	data32 lgdt gdtr
-	data32 lidt idtr
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
@@ -219,6 +231,9 @@ r2p_pmode:
 	movw	%ax, %gs
 	movw	%ax, %ss
 	movl	pm_esp, %esp
+
+	/* Load protected-mode interrupt descriptor table */
+	lidt	idtr
 
 	/* Record real-mode %ss:sp (after removal of data) */
 	movw	%bp, rm_ss

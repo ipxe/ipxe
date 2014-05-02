@@ -522,8 +522,11 @@ alloc_basemem:
 	subw	$_data16_memsz_pgh, %ax
 	pushw	%ax
 
-	/* Calculate .text16 segment address */
+	/* Calculate .text16 segment address.  Round down to ensure
+	 * low bits are zero, to speed up mode transitions under KVM.
+	 */
 	subw	$_text16_memsz_pgh, %ax
+	andb	$~0x03, %al
 	pushw	%ax
 
 	/* Update FBMS */

@@ -26,10 +26,9 @@ static struct interrupt_vector intr_vec[ IRQ_MAX + 1 ];
 struct interrupt_descriptor idt[NUM_INT] __attribute__ (( aligned ( 16 ) ));
 
 /** The interrupt descriptor table register */
-struct idtr __data16 ( idtr ) = {
+struct idtr idtr = {
 	.limit = ( sizeof ( idt ) - 1 ),
 };
-#define idtr __use_data16 ( idtr )
 
 /**
  * Allocate space on the real-mode stack and copy data there from a
