@@ -343,10 +343,10 @@ static void undinet_poll ( struct net_device *netdev ) {
 		if ( ! undinet_isr_triggered() ) {
 			/* Allow interrupt to occur */
 			profile_start ( &undinet_irq_profiler );
-			__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
-							   "nop\n\t"
-							   "nop\n\t"
-							   "cli\n\t" ) : : );
+			__asm__ __volatile__ ( "sti\n\t"
+					       "nop\n\t"
+					       "nop\n\t"
+					       "cli\n\t" );
 			profile_stop ( &undinet_irq_profiler );
 
 			/* If interrupts are known to be supported,
