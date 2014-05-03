@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/dhcp.h>
+#include <ipxe/profile.h>
 #include <pxeparent.h>
 #include <pxe_api.h>
 #include <pxe_types.h>
@@ -36,6 +37,59 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_uniqify ( EINFO_EPLATFORM, 0x01,			\
 			  "External PXE API error" )
 #define EPXECALL( status ) EPLATFORM ( EINFO_EPXECALL, status )
+
+/** A parent PXE API call profiler */
+struct pxeparent_profiler {
+	/** Total time spent performing REAL_CALL() */
+	struct profiler total;
+	/** Time spent transitioning to real mode */
+	struct profiler p2r;
+	/** Time spent in external code */
+	struct profiler ext;
+	/** Time spent transitioning back to protected mode */
+	struct profiler r2p;
+};
+
+/** PXENV_UNDI_TRANSMIT profiler */
+static struct pxeparent_profiler pxeparent_tx_profiler __profiler = {
+	{ .name = "pxeparent.tx" },
+	{ .name = "pxeparent.tx_p2r" },
+	{ .name = "pxeparent.tx_ext" },
+	{ .name = "pxeparent.tx_r2p" },
+};
+
+/** PXENV_UNDI_ISR profiler
+ *
+ * Note that this profiler will not see calls to
+ * PXENV_UNDI_ISR_IN_START, which are handled by the UNDI ISR and do
+ * not go via pxeparent_call().
+ */
+static struct pxeparent_profiler pxeparent_isr_profiler __profiler = {
+	{ .name = "pxeparent.isr" },
+	{ .name = "pxeparent.isr_p2r" },
+	{ .name = "pxeparent.isr_ext" },
+	{ .name = "pxeparent.isr_r2p" },
+};
+
+/** PXE unknown API call profiler
+ *
+ * This profiler can be used to measure the overhead of a dummy PXE
+ * API call.
+ */
+static struct pxeparent_profiler pxeparent_unknown_profiler __profiler = {
+	{ .name = "pxeparent.unknown" },
+	{ .name = "pxeparent.unknown_p2r" },
+	{ .name = "pxeparent.unknown_ext" },
+	{ .name = "pxeparent.unknown_r2p" },
+};
+
+/** Miscellaneous PXE API call profiler */
+static struct pxeparent_profiler pxeparent_misc_profiler __profiler = {
+	{ .name = "pxeparent.misc" },
+	{ .name = "pxeparent.misc_p2r" },
+	{ .name = "pxeparent.misc_ext" },
+	{ .name = "pxeparent.misc_r2p" },
+};
 
 /**
  * Name PXE API call
@@ -104,10 +158,31 @@ pxeparent_function_name ( unsigned int function ) {
 }
 
 /**
+ * Determine applicable profiler pair (for debugging)
+ *
+ * @v function		API call number
+ * @ret profiler	Profiler
+ */
+static struct pxeparent_profiler * pxeparent_profiler ( unsigned int function ){
+
+	/* Determine applicable profiler */
+	switch ( function ) {
+	case PXENV_UNDI_TRANSMIT:
+		return &pxeparent_tx_profiler;
+	case PXENV_UNDI_ISR:
+		return &pxeparent_isr_profiler;
+	case PXENV_UNKNOWN:
+		return &pxeparent_unknown_profiler;
+	default:
+		return &pxeparent_misc_profiler;
+	}
+}
+
+/**
  * PXE parent parameter block
  *
- * Used as the paramter block for all parent PXE API calls.  Resides in base
- * memory.
+ * Used as the parameter block for all parent PXE API calls.  Resides
+ * in base memory.
  */
 static union u_PXENV_ANY __bss16 ( pxeparent_params );
 #define pxeparent_params __use_data16 ( pxeparent_params )
@@ -131,8 +206,11 @@ SEGOFF16_t __bss16 ( pxeparent_entry_point );
  */
 int pxeparent_call ( SEGOFF16_t entry, unsigned int function,
 		     void *params, size_t params_len ) {
+	struct pxeparent_profiler *profiler = pxeparent_profiler ( function );
 	PXENV_EXIT_t exit;
-	int discard_b, discard_D;
+	unsigned long started;
+	unsigned long stopped;
+	int discard_D;
 	int rc;
 
 	/* Copy parameter block and entry point */
@@ -143,18 +221,31 @@ int pxeparent_call ( SEGOFF16_t entry, unsigned int function,
 	/* Call real-mode entry point.  This calling convention will
 	 * work with both the !PXE and the PXENV+ entry points.
 	 */
+	profile_start ( &profiler->total );
 	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
+					   "rdtsc\n\t"
+					   "pushl %%eax\n\t"
 					   "pushw %%es\n\t"
 					   "pushw %%di\n\t"
 					   "pushw %%bx\n\t"
 					   "lcall *pxeparent_entry_point\n\t"
+					   "movw %%ax, %%bx\n\t"
+					   "rdtsc\n\t"
 					   "addw $6, %%sp\n\t"
+					   "popl %%edx\n\t"
 					   "popl %%ebp\n\t" /* gcc bug */ )
-			       : "=a" ( exit ), "=b" ( discard_b ),
-			         "=D" ( discard_D )
+			       : "=a" ( stopped ), "=d" ( started ),
+				 "=b" ( exit ), "=D" ( discard_D )
 			       : "b" ( function ),
 			         "D" ( __from_data16 ( &pxeparent_params ) )
-			       : "ecx", "edx", "esi" );
+			       : "ecx", "esi" );
+	profile_stop ( &profiler->total );
+	profile_start_at ( &profiler->p2r, profiler->total.started );
+	profile_stop_at ( &profiler->p2r, started );
+	profile_start_at ( &profiler->ext, started );
+	profile_stop_at ( &profiler->ext, stopped );
+	profile_start_at ( &profiler->r2p, stopped );
+	profile_stop_at ( &profiler->r2p, profiler->total.stopped );
 
 	/* Determine return status code based on PXENV_EXIT and
 	 * PXENV_STATUS
