@@ -72,6 +72,9 @@ struct undi_nic {
 /** Delay between retries of PXENV_UNDI_INITIALIZE */
 #define UNDI_INITIALIZE_RETRY_DELAY_MS 200
 
+/** Maximum number of calls to PXENV_UNDI_ISR per poll */
+#define UNDI_POLL_QUOTA 4
+
 /** Alignment of received frame payload */
 #define UNDI_RX_ALIGN 16
 
@@ -328,6 +331,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 	struct undi_nic *undinic = netdev->priv;
 	struct s_PXENV_UNDI_ISR undi_isr;
 	struct io_buffer *iobuf = NULL;
+	unsigned int quota = UNDI_POLL_QUOTA;
 	size_t len;
 	size_t reserve_len;
 	size_t frag_len;
@@ -366,7 +370,7 @@ static void undinet_poll ( struct net_device *netdev ) {
 	}
 
 	/* Run through the ISR loop */
-	while ( 1 ) {
+	while ( quota-- ) {
 		profile_start ( &undinet_isr_call_profiler );
 		if ( ( rc = pxeparent_call ( undinet_entry, PXENV_UNDI_ISR,
 					     &undi_isr,
