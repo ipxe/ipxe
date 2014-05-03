@@ -51,7 +51,8 @@ static struct profiler r2p_profiler __profiler = { .name = "r2p" };
  */
 static void librm_test_exec ( void ) {
 	unsigned int i;
-	unsigned long p2r_elapsed;
+	unsigned long timestamp;
+	unsigned int discard_d;
 
 	/* Profile mode transitions.  We want to profile each
 	 * direction of the transition separately, so perform an RDTSC
@@ -61,10 +62,11 @@ static void librm_test_exec ( void ) {
 	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
 		profile_start ( &p2r_profiler );
 		__asm__ __volatile__ ( REAL_CODE ( "rdtsc\n\t" )
-				       : "=A" ( r2p_profiler.started ) : );
+				       : "=a" ( timestamp ), "=d" ( discard_d )
+				       : );
+		profile_start_at ( &r2p_profiler, timestamp );
 		profile_stop ( &r2p_profiler );
-		p2r_elapsed = ( r2p_profiler.started - p2r_profiler.started );
-		profile_update ( &p2r_profiler, p2r_elapsed );
+		profile_stop_at ( &p2r_profiler, timestamp );
 	}
 }
 

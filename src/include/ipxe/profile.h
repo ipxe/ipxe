@@ -9,7 +9,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <stdint.h>
 #include <bits/profile.h>
 #include <ipxe/tables.h>
 
@@ -26,7 +25,9 @@ struct profiler {
 	/** Name */
 	const char *name;
 	/** Start timestamp */
-	uint64_t started;
+	unsigned long started;
+	/** Stop timestamp */
+	unsigned long stopped;
 	/** Number of samples */
 	unsigned int count;
 	/** Mean sample value (scaled) */
@@ -66,13 +67,43 @@ extern unsigned long profile_stddev ( struct profiler *profiler );
  * Start profiling
  *
  * @v profiler		Profiler
+ * @v started		Start timestamp
+ */
+static inline __attribute__ (( always_inline )) void
+profile_start_at ( struct profiler *profiler, unsigned long started ) {
+
+	/* If profiling is active then record start timestamp */
+	if ( PROFILING )
+		profiler->started = started;
+}
+
+/**
+ * Start profiling
+ *
+ * @v profiler		Profiler
  */
 static inline __attribute__ (( always_inline )) void
 profile_start ( struct profiler *profiler ) {
 
 	/* If profiling is active then record start timestamp */
 	if ( PROFILING )
-		profiler->started = profile_timestamp();
+		profile_start_at ( profiler, profile_timestamp() );
+}
+
+/**
+ * Record profiling result
+ *
+ * @v profiler		Profiler
+ * @v stopped		Stop timestamp
+ */
+static inline __attribute__ (( always_inline )) void
+profile_stop_at ( struct profiler *profiler, unsigned long stopped ) {
+
+	/* If profiling is active then record end timestamp and update stats */
+	if ( PROFILING ) {
+		profiler->stopped = stopped;
+		profile_update ( profiler, ( stopped - profiler->started ) );
+	}
 }
 
 /**
@@ -82,13 +113,10 @@ profile_start ( struct profiler *profiler ) {
  */
 static inline __attribute__ (( always_inline )) void
 profile_stop ( struct profiler *profiler ) {
-	uint64_t ended;
 
 	/* If profiling is active then record end timestamp and update stats */
-	if ( PROFILING ) {
-		ended = profile_timestamp();
-		profile_update ( profiler, ( ended - profiler->started ) );
-	}
+	if ( PROFILING )
+		profile_stop_at ( profiler, profile_timestamp() );
 }
 
 #endif /* _IPXE_PROFILE_H */
