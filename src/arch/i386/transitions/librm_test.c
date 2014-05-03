@@ -45,6 +45,19 @@ static struct profiler p2r_profiler __profiler = { .name = "p2r" };
 /** Real-to-protected mode transition profiler */
 static struct profiler r2p_profiler __profiler = { .name = "r2p" };
 
+/** Real-mode call profiler */
+static struct profiler real_call_profiler __profiler = { .name = "real_call" };
+
+/** Protected-mode call profiler */
+static struct profiler prot_call_profiler __profiler = { .name = "prot_call" };
+
+/**
+ * Dummy protected-mode function
+ */
+static void librm_test_prot_call ( void ) {
+	/* Do nothing */
+}
+
 /**
  * Perform real mode transition self-tests
  *
@@ -52,6 +65,8 @@ static struct profiler r2p_profiler __profiler = { .name = "r2p" };
 static void librm_test_exec ( void ) {
 	unsigned int i;
 	unsigned long timestamp;
+	unsigned long started;
+	unsigned long stopped;
 	unsigned int discard_d;
 
 	/* Profile mode transitions.  We want to profile each
@@ -67,6 +82,29 @@ static void librm_test_exec ( void ) {
 		profile_start_at ( &r2p_profiler, timestamp );
 		profile_stop ( &r2p_profiler );
 		profile_stop_at ( &p2r_profiler, timestamp );
+	}
+
+	/* Profile complete real-mode call cycle */
+	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
+		profile_start ( &real_call_profiler );
+		__asm__ __volatile__ ( REAL_CODE ( "" ) : : );
+		profile_stop ( &real_call_profiler );
+	}
+
+	/* Profile complete protected-mode call cycle */
+	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
+		__asm__ __volatile__ ( REAL_CODE ( "rdtsc\n\t"
+						   "movl %0, %2\n\t"
+						   "pushl %3\n\t"
+						   "pushw %%cs\n\t"
+						   "call prot_call\n\t"
+						   "addw $4, %%sp\n\t"
+						   "rdtsc\n\t" )
+				       : "=a" ( stopped ), "=d" ( discard_d ),
+					 "=r" ( started )
+				       : "i" ( librm_test_prot_call ) );
+		profile_start_at ( &prot_call_profiler, started );
+		profile_stop_at ( &prot_call_profiler, stopped );
 	}
 }
 
