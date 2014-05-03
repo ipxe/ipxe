@@ -330,8 +330,10 @@ pxenv_undi_transmit ( struct s_PXENV_UNDI_TRANSMIT *undi_transmit ) {
 	 * processing at this point, to work around callers that never
 	 * call PXENV_UNDI_OPEN before attempting to use the UNDI API.
 	 */
-	netdev_rx_freeze ( pxe_netdev );
-	netdev_irq ( pxe_netdev, 1 );
+	if ( ! netdev_rx_frozen ( pxe_netdev ) ) {
+		netdev_rx_freeze ( pxe_netdev );
+		netdev_irq ( pxe_netdev, 1 );
+	}
 
 	/* Identify network-layer protocol */
 	switch ( undi_transmit->Protocol ) {
