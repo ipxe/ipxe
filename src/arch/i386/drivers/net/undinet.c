@@ -370,8 +370,10 @@ static void undinet_poll ( struct net_device *netdev ) {
 		profile_start ( &undinet_isr_call_profiler );
 		if ( ( rc = pxeparent_call ( undinet_entry, PXENV_UNDI_ISR,
 					     &undi_isr,
-					     sizeof ( undi_isr ) ) ) != 0 )
+					     sizeof ( undi_isr ) ) ) != 0 ) {
+			netdev_rx_err ( netdev, NULL, rc );
 			break;
+		}
 		profile_stop ( &undinet_isr_call_profiler );
 		switch ( undi_isr.FuncFlag ) {
 		case PXENV_UNDI_ISR_OUT_TRANSMIT:
