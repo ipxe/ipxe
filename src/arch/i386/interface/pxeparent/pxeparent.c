@@ -240,12 +240,12 @@ int pxeparent_call ( SEGOFF16_t entry, unsigned int function,
 			         "D" ( __from_data16 ( &pxeparent_params ) )
 			       : "ecx", "esi" );
 	profile_stop ( &profiler->total );
-	profile_start_at ( &profiler->p2r, profiler->total.started );
+	profile_start_at ( &profiler->p2r, profile_started ( &profiler->total));
 	profile_stop_at ( &profiler->p2r, started );
 	profile_start_at ( &profiler->ext, started );
 	profile_stop_at ( &profiler->ext, stopped );
 	profile_start_at ( &profiler->r2p, stopped );
-	profile_stop_at ( &profiler->r2p, profiler->total.stopped );
+	profile_stop_at ( &profiler->r2p, profile_stopped ( &profiler->total ));
 
 	/* Determine return status code based on PXENV_EXIT and
 	 * PXENV_STATUS

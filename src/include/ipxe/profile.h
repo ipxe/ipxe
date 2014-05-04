@@ -58,10 +58,64 @@ struct profiler {
 #define __profiler
 #endif
 
+extern unsigned long profile_excluded;
+
 extern void profile_update ( struct profiler *profiler, unsigned long sample );
 extern unsigned long profile_mean ( struct profiler *profiler );
 extern unsigned long profile_variance ( struct profiler *profiler );
 extern unsigned long profile_stddev ( struct profiler *profiler );
+
+/**
+ * Get start time
+ *
+ * @v profiler		Profiler
+ * @ret started		Start time
+ */
+static inline __attribute__ (( always_inline )) unsigned long
+profile_started ( struct profiler *profiler ) {
+
+	/* If profiling is active then return start time */
+	if ( PROFILING ) {
+		return ( profiler->started + profile_excluded );
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * Get stop time
+ *
+ * @v profiler		Profiler
+ * @ret stopped		Stop time
+ */
+static inline __attribute__ (( always_inline )) unsigned long
+profile_stopped ( struct profiler *profiler ) {
+
+	/* If profiling is active then return start time */
+	if ( PROFILING ) {
+		return ( profiler->stopped + profile_excluded );
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * Get elapsed time
+ *
+ * @v profiler		Profiler
+ * @ret elapsed		Elapsed time
+ */
+static inline __attribute__ (( always_inline )) unsigned long
+profile_elapsed ( struct profiler *profiler ) {
+
+	/* If profiling is active then return elapsed time */
+	if ( PROFILING ) {
+		return ( profile_stopped ( profiler ) -
+			 profile_started ( profiler ) );
+	} else {
+		return 0;
+	}
+}
 
 /**
  * Start profiling
@@ -74,7 +128,23 @@ profile_start_at ( struct profiler *profiler, unsigned long started ) {
 
 	/* If profiling is active then record start timestamp */
 	if ( PROFILING )
-		profiler->started = started;
+		profiler->started = ( started - profile_excluded );
+}
+
+/**
+ * Stop profiling
+ *
+ * @v profiler		Profiler
+ * @v stopped		Stop timestamp
+ */
+static inline __attribute__ (( always_inline )) void
+profile_stop_at ( struct profiler *profiler, unsigned long stopped ) {
+
+	/* If profiling is active then record end timestamp and update stats */
+	if ( PROFILING ) {
+		profiler->stopped = ( stopped - profile_excluded );
+		profile_update ( profiler, profile_elapsed ( profiler ) );
+	}
 }
 
 /**
@@ -91,23 +161,7 @@ profile_start ( struct profiler *profiler ) {
 }
 
 /**
- * Record profiling result
- *
- * @v profiler		Profiler
- * @v stopped		Stop timestamp
- */
-static inline __attribute__ (( always_inline )) void
-profile_stop_at ( struct profiler *profiler, unsigned long stopped ) {
-
-	/* If profiling is active then record end timestamp and update stats */
-	if ( PROFILING ) {
-		profiler->stopped = stopped;
-		profile_update ( profiler, ( stopped - profiler->started ) );
-	}
-}
-
-/**
- * Record profiling result
+ * Stop profiling
  *
  * @v profiler		Profiler
  */
@@ -117,6 +171,19 @@ profile_stop ( struct profiler *profiler ) {
 	/* If profiling is active then record end timestamp and update stats */
 	if ( PROFILING )
 		profile_stop_at ( profiler, profile_timestamp() );
+}
+
+/**
+ * Exclude time from other ongoing profiling results
+ *
+ * @v profiler		Profiler
+ */
+static inline __attribute__ (( always_inline )) void
+profile_exclude ( struct profiler *profiler ) {
+
+	/* If profiling is active then update accumulated excluded time */
+	if ( PROFILING )
+		profile_excluded += profile_elapsed ( profiler );
 }
 
 #endif /* _IPXE_PROFILE_H */

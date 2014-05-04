@@ -8,6 +8,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <ipxe/profile.h>
 #include <realmode.h>
 #include <pic8259.h>
 
@@ -29,6 +30,12 @@ struct interrupt_descriptor idt[NUM_INT] __attribute__ (( aligned ( 16 ) ));
 struct idtr idtr = {
 	.limit = ( sizeof ( idt ) - 1 ),
 };
+
+/** Timer interrupt profiler */
+static struct profiler timer_irq_profiler __profiler = { .name = "irq.timer" };
+
+/** Other interrupt profiler */
+static struct profiler other_irq_profiler __profiler = { .name = "irq.other" };
 
 /**
  * Allocate space on the real-mode stack and copy data there from a
@@ -104,18 +111,38 @@ void init_idt ( void ) {
 }
 
 /**
+ * Determine interrupt profiler (for debugging)
+ *
+ * @v intr		Interrupt number
+ * @ret profiler	Profiler
+ */
+static struct profiler * interrupt_profiler ( int intr ) {
+
+	switch ( intr ) {
+	case IRQ_INT ( 0 ) :
+		return &timer_irq_profiler;
+	default:
+		return &other_irq_profiler;
+	}
+}
+
+/**
  * Interrupt handler
  *
- * @v irq		Interrupt number
+ * @v intr		Interrupt number
  */
-void __attribute__ (( cdecl, regparm ( 1 ) )) interrupt ( int irq ) {
+void __attribute__ (( cdecl, regparm ( 1 ) )) interrupt ( int intr ) {
+	struct profiler *profiler = interrupt_profiler ( intr );
 	uint32_t discard_eax;
 
 	/* Reissue interrupt in real mode */
+	profile_start ( profiler );
 	__asm__ __volatile__ ( REAL_CODE ( "movb %%al, %%cs:(1f + 1)\n\t"
 					   "\n1:\n\t"
 					   "int $0x00\n\t" )
-			       : "=a" ( discard_eax ) : "0" ( irq ) );
+			       : "=a" ( discard_eax ) : "0" ( intr ) );
+	profile_stop ( profiler );
+	profile_exclude ( profiler );
 }
 
 PROVIDE_UACCESS_INLINE ( librm, phys_to_user );

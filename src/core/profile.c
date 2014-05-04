@@ -40,6 +40,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * to avoid the use of floating-point instructions.
  */
 
+/** Accumulated time excluded from profiling */
+unsigned long profile_excluded;
+
 /**
  * Format a hex fraction (for debugging)
  *
