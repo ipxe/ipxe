@@ -496,6 +496,7 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 		profile_start ( &intel_vm_refill_profiler );
 		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
 		profile_stop ( &intel_vm_refill_profiler );
+		profile_exclude ( &intel_vm_refill_profiler );
 	}
 }
 
@@ -634,6 +635,7 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	profile_start ( &intel_vm_tx_profiler );
 	writel ( tx_tail, intel->regs + intel->tx.reg + INTEL_xDT );
 	profile_stop ( &intel_vm_tx_profiler );
+	profile_exclude ( &intel_vm_tx_profiler );
 
 	DBGC2 ( intel, "INTEL %p TX %d is [%llx,%llx)\n", intel, tx_idx,
 		( ( unsigned long long ) address ),
@@ -728,6 +730,7 @@ static void intel_poll ( struct net_device *netdev ) {
 	profile_start ( &intel_vm_poll_profiler );
 	icr = readl ( intel->regs + INTEL_ICR );
 	profile_stop ( &intel_vm_poll_profiler );
+	profile_exclude ( &intel_vm_poll_profiler );
 	if ( ! icr )
 		return;
 
