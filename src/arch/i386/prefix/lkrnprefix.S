@@ -1,123 +1,59 @@
-/*
-	Copyright (C) 2000, Entity Cyber, Inc.
-
-	Authors: Gary Byers (gb@thinguin.org)
-		 Marty Connor (mdc@thinguin.org)
-
-	This software may be used and distributed according to the terms
-	of the GNU Public License (GPL), incorporated herein by reference.
-
-	Description:	
-
-	This is just a little bit of code and data that can get prepended
-	to a ROM image in order to allow bootloaders to load the result
-	as if it were a Linux kernel image.
-
-	A real Linux kernel image consists of a one-sector boot loader
-	(to load the image from a floppy disk), followed a few sectors
-	of setup code, followed by the kernel code itself.  There's
-	a table in the first sector (starting at offset 497) that indicates
-	how many sectors of setup code follow the first sector and which
-	contains some other parameters that aren't interesting in this
-	case.
-
-	When a bootloader loads the sectors that comprise a kernel image,
-	it doesn't execute the code in the first sector (since that code
-	would try to load the image from a floppy disk.)  The code in the
-	first sector below doesn't expect to get executed (and prints an
-	error message if it ever -is- executed.)
-
-	We don't require much in the way of setup code.  Historically, the
-	Linux kernel required at least 4 sectors of setup code.
-	Therefore, at least 4 sectors must be present even though we don't
-	use them.
-
-*/
-
 FILE_LICENCE ( GPL_ANY )
 
-#define	SETUPSECS 4		/* Minimal nr of setup-sectors */
-#define PREFIXSIZE ((SETUPSECS+1)*512)
-#define PREFIXPGH (PREFIXSIZE / 16 )
-#define	BOOTSEG  0x07C0		/* original address of boot-sector */
-#define	INITSEG  0x9000		/* we move boot here - out of the way */
-#define	SETUPSEG 0x9020		/* setup starts here */
-#define SYSSEG   0x1000		/* system loaded at 0x10000 (65536). */
+#define BZI_RM_SEGMENT 0x1000
+#define BZI_LOAD_HIGH_ADDR 0x100000
 
 	.text
-	.code16
 	.arch i386
-	.org	0
+	.code16
 	.section ".prefix", "ax", @progbits
 	.globl	_lkrn_start
 _lkrn_start:
-/* 
-	This is a minimal boot sector.	If anyone tries to execute it (e.g., if
-	a .lilo file is dd'ed to a floppy), print an error message. 
-*/
 
-bootsector: 
-	jmp	$BOOTSEG, $1f	/* reload cs:ip to match relocation addr */
-1:
-	movw	$0x2000, %di		/*  0x2000 is arbitrary value >= length
-					    of bootsect + room for stack */
+/*****************************************************************************
+ *
+ * Kernel header
+ *
+ * We place our prefix (i.e. our .prefix and .text16.early sections)
+ * within the bzImage real-mode portion which gets loaded at
+ * 1000:0000, and our payload (i.e. everything else) within the
+ * bzImage protected-mode portion which gets loaded at 0x100000
+ * upwards.
+ *
+ */
 
-	movw	$BOOTSEG, %ax
-	movw	%ax,%ds
-	movw	%ax,%es
-
-	cli
-	movw	%ax, %ss		/* put stack at BOOTSEG:0x2000. */
-	movw	%di,%sp
-	sti
-
-	movw	$why_end-why, %cx
-	movw	$why, %si
-
-	movw	$0x0007, %bx		/* page 0, attribute 7 (normal) */
-	movb	$0x0e, %ah		/* write char, tty mode */
-prloop: 
-	lodsb
-	int	$0x10
-	loop	prloop
-freeze: jmp	freeze
-
-why:	.ascii	"This image cannot be loaded from a floppy disk.\r\n"
-why_end: 
-
-
-/*
-	The following header is documented in the Linux source code at
-	Documentation/x86/boot.txt
-*/
-	.org	497
-setup_sects: 
-	.byte	SETUPSECS
-root_flags: 
-	.word	0
-syssize: 
-	.long	-PREFIXPGH
-
+	.org	0x1f1
+setup_sects:
+	.byte	-1 /* Allow for initial "boot sector" */
 	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"ADDL"
+	.ascii	"ADHL"
+	.long	setup_sects
+	.long	512
+	.long	0
+	.previous
+root_flags:
+	.word	0
+syssize:
+	.long	0
+	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
+	.ascii	"ADPL"
 	.long	syssize
 	.long	16
 	.long	0
 	.previous
-	
-ram_size: 
+ram_size:
 	.word	0
-vid_mode: 
+vid_mode:
 	.word	0
-root_dev: 
+root_dev:
 	.word	0
-boot_flag: 
-	.word	0xAA55
+boot_flag:
+	.word	0xaa55
 jump:
 	/* Manually specify a two-byte jmp instruction here rather
-	 * than leaving it up to the assembler. */
-	.byte	0xeb
-	.byte	setup_code - header
+	 * than leaving it up to the assembler.
+	 */
+	.byte	0xeb, ( setup - header )
 header:
 	.byte	'H', 'd', 'r', 'S'
 version:
@@ -125,13 +61,13 @@ version:
 realmode_swtch:
 	.long	0
 start_sys:
-	.word	0
+	.word	BZI_RM_SEGMENT
 kernel_version:
 	.word	version_string - 0x200
 type_of_loader:
 	.byte	0
 loadflags:
-	.byte	0
+	.byte	0x01 /* LOADED_HIGH */
 setup_move_size:
 	.word	0
 code32_start:
@@ -144,21 +80,22 @@ bootsect_kludge:
 	.long	0
 heap_end_ptr:
 	.word	0
-pad1:
-	.word	0
+ext_loader_ver:
+	.byte	0
+ext_loader_type:
+	.byte	0
 cmd_line_ptr:
 	.long	0
 initrd_addr_max:
-	/* We don't use an initrd but some bootloaders (e.g. SYSLINUX) have
-	 * been known to require this field.  Set the value to 2 GB.  This
-	 * value is also used by the Linux kernel. */
-	.long	0x7fffffff
+	.long	0xffffffff
 kernel_alignment:
 	.long	0
 relocatable_kernel:
 	.byte	0
-pad2:
-	.byte	0, 0, 0
+min_alignment:
+	.byte	0
+xloadflags:
+	.word	0
 cmdline_size:
 	.long	0x7ff
 hardware_subarch:
@@ -169,28 +106,16 @@ hardware_subarch_data:
 version_string:
 	.asciz	VERSION
 
-/*
-	We don't need to do too much setup.
-
-	This code gets loaded at SETUPSEG:0.  It wants to start
-	executing the image that's loaded at SYSSEG:0 and
-	whose entry point is SYSSEG:0.
-*/
-setup_code:
-	/* We expect to be contiguous in memory once loaded.  The Linux image
-	 * boot process requires that setup code is loaded separately from
-	 * "non-real code".  Since we don't need any information that's left
-	 * in the prefix, it doesn't matter: we just have to ensure that
-	 * %cs:0000 is where the start of the image *would* be.
-	 */
-	ljmp	$(SYSSEG-(PREFIXSIZE/16)), $run_ipxe
-
-
-	.org	PREFIXSIZE
-/*
-	We're now at the beginning of the kernel proper.
+/*****************************************************************************
+ *
+ * Setup code
+ *
  */
-run_ipxe:
+
+setup:
+	/* Fix up code segment */
+	ljmp	$BZI_RM_SEGMENT, $1f
+1:
 	/* Set up stack just below 0x7c00 and clear direction flag */
 	xorw	%ax, %ax
 	movw	%ax, %ss
@@ -198,7 +123,7 @@ run_ipxe:
 	cld
 
 	/* Retrieve command-line pointer */
-	movl	%ds:cmd_line_ptr, %edx
+	movl	cmd_line_ptr, %edx
 	testl	%edx, %edx
 	jz	no_cmd_line
 
@@ -240,7 +165,6 @@ no_cmd_line:
 	jnz	1f
 	orl	$0xffffffff, %ebp /* Allow arbitrary relocation if no initrd */
 1:
-
 	/* Install iPXE */
 	call	alloc_basemem
 	xorl	%esi, %esi
@@ -282,3 +206,30 @@ no_cmd_line:
 
 	/* Boot next device */
 	int $0x18
+
+/*****************************************************************************
+ *
+ * Open payload (called by libprefix)
+ *
+ * Parameters:
+ *   %ds:0000 : Prefix
+ *   %esi : Buffer for copy of image source (or zero if no buffer available)
+ *   %ecx : Expected offset within buffer of first payload block
+ * Returns:
+ *   %esi : Valid image source address (buffered or unbuffered)
+ *   %ecx : Actual offset within buffer of first payload block
+ *   CF set on error
+ */
+
+	.section ".text16.early", "awx", @progbits
+	.globl	open_payload
+open_payload:
+
+	/* Our payload will always end up at BZI_LOAD_HIGH_ADDR */
+	movl	$BZI_LOAD_HIGH_ADDR, %esi
+	xorl	%ecx, %ecx
+	lret
+
+	/* Payload must be aligned to a whole number of setup sectors */
+	.globl	_payload_align
+	.equ	_payload_align, 512
