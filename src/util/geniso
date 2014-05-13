@@ -37,13 +37,13 @@ out=$1
 shift
 dir=`mktemp -d bin/iso.dir.XXXXXX`
 cfg=$dir/isolinux.cfg
-cp -p $isolinux_bin $dir
+cp $isolinux_bin $dir
 
 # syslinux 6.x needs a file called ldlinux.c32
 ldlinux_c32=$(dirname ${isolinux_bin})/ldlinux.c32
 if [ -s ${ldlinux_c32} ]
 then
-	cp -p ${ldlinux_c32} ${dir}
+	cp ${ldlinux_c32} ${dir}
 fi
 
 cat > $cfg <<EOF
@@ -70,7 +70,7 @@ do
 	first=$g
 	echo LABEL $b
 	echo "" KERNEL $g
-	cp -p $f $dir/$g
+	cp $f $dir/$g
 done >> $cfg
 $mkisofs -quiet -l -o $out -c boot.cat -b isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table $dir
 rm -fr $dir

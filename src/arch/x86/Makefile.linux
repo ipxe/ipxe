@@ -10,4 +10,4 @@ SRCDIRS += arch/x86/core/linux
 
 $(BIN)/%.linux : $(BIN)/%.linux.tmp
 	$(QM)$(ECHO) "  [FINISH] $@"
-	$(Q)cp -p $< $@
+	$(Q)$(CP) $< $@
