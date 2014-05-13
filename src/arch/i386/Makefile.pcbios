@@ -49,13 +49,13 @@ LIST_NAME_mrom := ROMS
 NON_AUTO_MEDIA	+= iso
 %iso:	%lkrn util/geniso
 	$(QM)$(ECHO) "  [GENISO] $@"
-	$(Q)ISOLINUX_BIN=$(ISOLINUX_BIN) bash util/geniso $@ $<
+	$(Q)ISOLINUX_BIN=$(ISOLINUX_BIN) VERSION="$(VERSION)" bash util/geniso -o $@ $<
 
 # rule to make a floppy emulation ISO boot image
 NON_AUTO_MEDIA	+= liso
-%liso:	%lkrn util/genliso
-	$(QM)$(ECHO) "  [GENLISO] $@"
-	$(Q)bash util/genliso $@ $<
+%liso:	%lkrn util/geniso
+	$(QM)$(ECHO) "  [GENISO] $@"
+	$(Q)VERSION="$(VERSION)" bash util/geniso -l -o $@ $<
 
 # rule to make a syslinux floppy image (mountable, bootable)
 NON_AUTO_MEDIA	+= sdsk
