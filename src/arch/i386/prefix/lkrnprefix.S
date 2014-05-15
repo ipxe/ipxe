@@ -1,6 +1,5 @@
 FILE_LICENCE ( GPL_ANY )
 
-#define BZI_RM_SEGMENT 0x1000
 #define BZI_LOAD_HIGH_ADDR 0x100000
 
 	.text
@@ -61,7 +60,7 @@ version:
 realmode_swtch:
 	.long	0
 start_sys:
-	.word	BZI_RM_SEGMENT
+	.word	0
 kernel_version:
 	.word	version_string - 0x200
 type_of_loader:
@@ -114,7 +113,9 @@ version_string:
 
 setup:
 	/* Fix up code segment */
-	ljmp	$BZI_RM_SEGMENT, $1f
+	pushw	%ds
+	pushw	$1f
+	lret
 1:
 	/* Set up stack just below 0x7c00 and clear direction flag */
 	xorw	%ax, %ax
