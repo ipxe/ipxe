@@ -329,6 +329,17 @@ static int tftp_send_rrq ( struct tftp_request *tftp ) {
 	struct io_buffer *iobuf;
 	size_t blksize;
 
+        /* Strip initial '/' if present.  If we were opened via the
+         * URI interface, then there will be an initial '/', since a
+         * full tftp:// URI provides no way to specify a non-absolute
+         * path.  However, many TFTP servers (particularly Windows
+         * TFTP servers) complain about having an initial '/', and it
+         * violates user expectations to have a '/' silently added to
+         * the DHCP-specified filename.
+        */
+        if ( *path == '/' )
+                path++;
+
 	DBGC ( tftp, "TFTP %p requesting \"%s\"\n", tftp, path );
 
 	/* Allocate buffer */
