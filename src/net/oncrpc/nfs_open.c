@@ -145,7 +145,7 @@ static void nfs_done ( struct nfs_request *nfs, int rc ) {
 
 	DBGC ( nfs, "NFS_OPEN %p completed (%s)\n", nfs, strerror ( rc ) );
 
-	free ( nfs->filename );
+	free ( nfs->filename - nfs->filename_offset );
 
 	intf_shutdown ( &nfs->xfer, rc );
 	intf_shutdown ( &nfs->pm_intf, rc );
@@ -327,8 +327,9 @@ static int nfs_mount_deliver ( struct nfs_request *nfs,
 				goto err;
 
 			sep = strrchr ( nfs->mountpoint, '/' );
-			nfs->filename[-1] = '/';
-			nfs->filename     = sep + 1;
+			nfs->filename[-1]    = '/';
+			nfs->filename_offset = sep + 1 - nfs->filename;
+			nfs->filename        = sep + 1;
 			*sep = '\0';
 
 			DBGC ( nfs, "NFS_OPEN %p ENOTDIR received retrying" \
