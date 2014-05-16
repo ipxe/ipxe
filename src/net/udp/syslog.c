@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <byteswap.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
@@ -91,15 +92,15 @@ static char *syslog_domain;
  */
 int syslog_send ( struct interface *xfer, unsigned int severity,
 		  const char *message, const char *terminator ) {
+	const char *hostname = ( syslog_hostname ? syslog_hostname : "" );
+	const char *domain = ( ( hostname[0] && syslog_domain ) ?
+			       syslog_domain : "" );
 
 	return xfer_printf ( xfer, "<%d>%s%s%s%sipxe: %s%s",
 			     SYSLOG_PRIORITY ( SYSLOG_DEFAULT_FACILITY,
-					       severity ),
-			     ( syslog_hostname ? syslog_hostname : "" ),
-			     ( syslog_domain ? "." : "" ),
-			     ( syslog_domain ? syslog_domain : "" ),
-			     ( ( syslog_hostname || syslog_domain ) ? " " : ""),
-			     message, terminator );
+					       severity ), hostname,
+			     ( domain[0] ? "." : "" ), domain,
+			     ( hostname[0] ? " " : "" ), message, terminator );
 }
 
 /******************************************************************************
@@ -212,6 +213,28 @@ const struct setting syslog6_setting __setting ( SETTING_MISC, syslog6 ) = {
 };
 
 /**
+ * Strip invalid characters from host/domain name
+ *
+ * @v name		Name to strip
+ */
+static void syslog_fix_name ( char *name ) {
+	char *fixed = name;
+	int c;
+
+	/* Do nothing if name does not exist */
+	if ( ! name )
+		return;
+
+	/* Strip any non-printable or whitespace characters from the name */
+	do {
+		c = *(name++);
+		*fixed = c;
+		if ( isprint ( c ) && ! isspace ( c ) )
+			fixed++;
+	} while ( c );
+}
+
+/**
  * Apply syslog settings
  *
  * @ret rc		Return status code
@@ -223,8 +246,10 @@ static int apply_syslog_settings ( void ) {
 	/* Fetch hostname and domain name */
 	free ( syslog_hostname );
 	fetch_string_setting_copy ( NULL, &hostname_setting, &syslog_hostname );
+	syslog_fix_name ( syslog_hostname );
 	free ( syslog_domain );
 	fetch_string_setting_copy ( NULL, &domain_setting, &syslog_domain );
+	syslog_fix_name ( syslog_domain );
 
 	/* Fetch log server */
 	syslog_console.disabled = CONSOLE_DISABLED;
