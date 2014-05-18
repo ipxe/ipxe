@@ -337,11 +337,9 @@ void * memchr(const void *s, int c, size_t n)
 
 char * strndup(const char *s, size_t n)
 {
-        size_t len = strlen(s);
+        size_t len = strnlen(s,n);
         char *new;
 
-        if (len>n)
-                len = n;
         new = malloc(len+1);
         if (new) {
                 new[len] = '\0';

@@ -134,6 +134,26 @@ static void string_test_exec ( void ) {
 		ok ( strcmp ( dup, orig ) == 0 );
 		free ( dup );
 	}
+
+	/* Test strndup() */
+	{
+		const char *normal = "testing testing";
+		const char unterminated[6] = { 'h', 'e', 'l', 'l', 'o', '!' };
+		char *dup;
+		dup = strndup ( normal, 32 );
+		ok ( dup != NULL );
+		ok ( dup != normal );
+		ok ( strcmp ( dup, normal ) == 0 );
+		free ( dup );
+		dup = strndup ( normal, 4 );
+		ok ( dup != NULL );
+		ok ( strcmp ( dup, "test" ) == 0 );
+		free ( dup );
+		dup = strndup ( unterminated, 5 );
+		ok ( dup != NULL );
+		ok ( strcmp ( dup, "hello" ) == 0 );
+		free ( dup );
+	}
 }
 
 /** String self-test */
