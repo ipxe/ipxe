@@ -34,19 +34,12 @@ EFI_HANDLE efi_image_handle;
 /** Loaded image protocol for this image */
 EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 
-/** Loaded image protocol device path for this image */
-EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
-
 /** System table passed to entry point */
 EFI_SYSTEM_TABLE *efi_systab;
 
 /** EFI loaded image protocol GUID */
 static EFI_GUID efi_loaded_image_protocol_guid
 	= EFI_LOADED_IMAGE_PROTOCOL_GUID;
-
-/** EFI loaded image device path protocol GUID */
-static EFI_GUID efi_loaded_image_device_path_protocol_guid
-	= EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID;
 
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
@@ -152,7 +145,6 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	struct efi_protocol *prot;
 	struct efi_config_table *tab;
 	void *loaded_image;
-	void *loaded_image_path;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -219,21 +211,6 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	efi_loaded_image = loaded_image;
 	DBGC ( systab, "EFI image base address %p\n",
 	       efi_loaded_image->ImageBase );
-
-	/* Get loaded image device path protocol */
-	if ( ( efirc = bs->OpenProtocol ( image_handle,
-				&efi_loaded_image_device_path_protocol_guid,
-				&loaded_image_path, image_handle, NULL,
-				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( systab, "EFI could not get loaded image device path "
-		       "protocol: %s", strerror ( rc ) );
-		return efirc;
-	}
-	efi_loaded_image_path = loaded_image_path;
-	DBGC ( systab, "EFI image device path " );
-	DBGC_EFI_DEVPATH ( systab, efi_loaded_image_path );
-	DBGC ( systab, "\n" );
 
 	/* EFI is perfectly capable of gracefully shutting down any
 	 * loaded devices if it decides to fall back to a legacy boot.
