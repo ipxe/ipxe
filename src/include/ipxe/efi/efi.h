@@ -59,6 +59,8 @@ struct efi_protocol {
 	EFI_GUID guid;
 	/** Variable containing pointer to protocol structure */
 	void **protocol;
+	/** Protocol is required */
+	int required;
 };
 
 /** EFI protocol table */
@@ -78,6 +80,21 @@ struct efi_protocol {
 		.protocol = ( ( void ** ) ( void * )			     \
 			      ( ( (_ptr) == ( ( _protocol ** ) (_ptr) ) ) ?  \
 				(_ptr) : (_ptr) ) ),			     \
+		.required = 1,						     \
+	}
+
+/** Declare an EFI protocol to be requested by iPXE
+ *
+ * @v _protocol		EFI protocol name
+ * @v _ptr		Pointer to protocol instance
+ */
+#define EFI_REQUEST_PROTOCOL( _protocol, _ptr )				     \
+	struct efi_protocol __ ## _protocol __efi_protocol = {		     \
+		.guid = _protocol ## _GUID,				     \
+		.protocol = ( ( void ** ) ( void * )			     \
+			      ( ( (_ptr) == ( ( _protocol ** ) (_ptr) ) ) ?  \
+				(_ptr) : (_ptr) ) ),			     \
+		.required = 0,						     \
 	}
 
 /** An EFI configuration table used by iPXE */

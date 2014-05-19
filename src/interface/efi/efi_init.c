@@ -187,8 +187,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 		} else {
 			DBGC ( systab, "EFI does not provide protocol %s\n",
 			       efi_guid_ntoa ( &prot->guid ) );
-			/* All protocols are required */
-			return efirc;
+			/* Fail if protocol is required */
+			if ( prot->required )
+				return efirc;
 		}
 	}
 
