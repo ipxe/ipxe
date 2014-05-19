@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** Device path to text protocol */
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
-EFI_REQUIRE_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
+EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
 
 /**
  * Convert GUID to a printable string
@@ -99,19 +99,25 @@ void dbg_efi_devpath ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	size_t len;
 
 	/* Convert path to a textual representation */
+	if ( ! efidpt )
+		goto err_no_efidpt;
 	text = efidpt->ConvertDevicePathToText ( path, TRUE, FALSE );
-	if ( ! text ) {
-		printf ( "<cannot convert>:\n" );
-		end = efi_devpath_end ( path );
-		len = ( ( ( void * ) end ) - ( ( void * ) path ) +
-			sizeof ( *end ) );
-		dbg_hex_dump_da ( 0, path, len );
-		return;
-	}
+	if ( ! text )
+		goto err_convert;
 
 	/* Print path */
 	printf ( "%ls", text );
 
 	/* Free path */
 	bs->FreePool ( text );
+
+	return;
+
+ err_convert:
+ err_no_efidpt:
+	printf ( "<cannot convert>:\n" );
+	end = efi_devpath_end ( path );
+	len = ( ( ( void * ) end ) - ( ( void * ) path ) +
+		sizeof ( *end ) );
+	dbg_hex_dump_da ( 0, path, len );
 }
