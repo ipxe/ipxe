@@ -75,7 +75,7 @@ static EFI_GUID efi_hii_ibm_ucm_compliant_formset_guid
 
 /** EFI HII database protocol */
 static EFI_HII_DATABASE_PROTOCOL *efihii;
-EFI_REQUIRE_PROTOCOL ( EFI_HII_DATABASE_PROTOCOL, &efihii );
+EFI_REQUEST_PROTOCOL ( EFI_HII_DATABASE_PROTOCOL, &efihii );
 
 /**
  * Identify settings to be exposed via HII
@@ -649,6 +649,10 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 	int efirc;
 	int rc;
 
+	/* Do nothing if HII database protocol is not supported */
+	if ( ! efihii )
+		return 0;
+
 	/* Initialise HII protocol */
 	memcpy ( &snpdev->hii, &efi_snp_device_hii, sizeof ( snpdev->hii ) );
 
@@ -705,6 +709,11 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 void efi_snp_hii_uninstall ( struct efi_snp_device *snpdev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
+	/* Do nothing if HII database protocol is not supported */
+	if ( ! efihii )
+		return;
+
+	/* Uninstall protocols and remove package list */
 	bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
 			&efi_hii_config_access_protocol_guid, &snpdev->hii,
