@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** Default Infiniband partition key */
 #define IB_PKEY_DEFAULT 0xffff
+#define IB_PKEY_DEFAULT_IDX 0x0
 
 /** Infiniband partition key full membership flag */
 #define IB_PKEY_FULL 0x8000
@@ -131,6 +132,10 @@ struct ib_multicast_gid {
 	struct list_head list;
 	/** Multicast GID */
 	union ib_gid gid;
+	/** QP number */
+	unsigned int qpn;
+	/** GID protocol */
+	u8 protocol;
 };
 
 /** An Infiniband queue pair type */
@@ -386,6 +391,14 @@ struct ib_device_operations {
 	 */
 	int ( * set_pkey_table ) ( struct ib_device *ibdev,
 				   union ib_mad *mad );
+	/** Get number of physical ports
+	 *
+	 * @v ibdev		Infiniband device
+	 *  
+	 * This method is required only by adapters that do not have
+	 * an embedded SMA.
+	 */
+	int ( * num_phy_ports ) ( struct ib_device *ibdev );
 };
 
 /** An Infiniband device */
@@ -452,6 +465,13 @@ struct ib_device {
 	void *drv_priv;
 	/** Owner private data */
 	void *owner_priv;
+	/** VEP number */
+	u8 vep_number;
+	/** Ethernet MAC */
+	unsigned long eth_mac_l;
+	u16 eth_mac_h;
+	/** Port protocol */
+	u8 protocol;
 };
 
 /** An Infiniband upper-layer driver */
