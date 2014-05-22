@@ -2983,10 +2983,8 @@ static int hermon_map_icm ( struct hermon *hermon,
 	MLX_FILL_1 ( init_hca, 53,
 		     multicast_parameters.log_mc_table_hash_sz,
 		     log_num_mcs - 1 );
-	MLX_FILL_2 ( init_hca, 54,
-		     multicast_parameters.log_mc_table_sz, log_num_mcs,
-		     multicast_parameters.uc_group_steering,
-		     ( hermon->cap.vep_uc_steering ? 1 : 0 ) );
+	MLX_FILL_1 ( init_hca, 54,
+		     multicast_parameters.log_mc_table_sz, log_num_mcs );
 	DBGC ( hermon, "ConnectX3 %p ICM MC is %d x %#zx at [%08llx,%08llx)\n",
 	       hermon, ( 1 << log_num_mcs ),
 	       sizeof ( struct hermonprm_mcg_entry ),
@@ -3874,12 +3872,14 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 		goto err_modify_qp;
 	}
 
+#if 0
 	/* Add steering */
 	if ( ( rc = hermon_eth_add_steer ( ibdev, port->eth_qp ) ) != 0 ) {
 		printf ( "ConnectX3 %p port %d failed to add steering:"
 		       " %s\n", hermon, ibdev->port, strerror ( rc ) );
 		goto err_add_steer;
 	}
+#endif
 
 	/* Fill receive rings */
 	ib_refill_recv ( ibdev, port->eth_qp );
@@ -3893,9 +3893,9 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 	MLX_FILL_1 ( &set_port.general, 1,
 		     mtu, ( ETH_FRAME_LEN + 40 /* Used by card */ ) );
 	MLX_FILL_1 ( &set_port.general, 2,
-		     pptx,  port->port_nv_conf.flow_control.pptx );
+		     pfctx, ( 1 << FCOE_VLAN_PRIORITY ) );
 	MLX_FILL_1 ( &set_port.general, 3,
-		     pprx, port->port_nv_conf.flow_control.pprx );
+		     pfcrx, ( 1 << FCOE_VLAN_PRIORITY ) );
 	if ( ( rc = hermon_cmd_set_port ( hermon, 1,
 					  ( HERMON_SET_PORT_GENERAL_PARAM |
 					    ibdev->port ),
@@ -3908,14 +3908,20 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 
 	/* Set port mac table */
 	memset ( &set_port, 0, sizeof ( set_port ) );
-	MLX_FILL_3 ( set_port.mac_table, 0,
-		     mac_vep, ibdev->vep_number,
-		     v, 1,
-		     mac_h, ibdev->eth_mac_h );
-	MLX_FILL_1 ( set_port.mac_table, 1,
-		     mac_l, ibdev->eth_mac_l );
+	MLX_FILL_1 ( &set_port.rqp_calc, 0, base_qpn, port->eth_qp->qpn );
+	MLX_FILL_1 ( &set_port.rqp_calc, 2,
+		     mac_miss_index, 128 /* MAC misses go to promisc QP */ );
+	MLX_FILL_2 ( &set_port.rqp_calc, 3,
+		     vlan_miss_index, 127 /* VLAN misses go to promisc QP */,
+		     no_vlan_index, 126 /* VLAN-free go to promisc QP */ );
+	MLX_FILL_2 ( &set_port.rqp_calc, 5,
+		     promisc_qpn, port->eth_qp->qpn,
+		     en_uc_promisc, 1 );
+	MLX_FILL_2 ( &set_port.rqp_calc, 6,
+		     def_mcast_qpn, port->eth_qp->qpn,
+		     mc_promisc_mode, 2 /* Receive all multicasts */ );
 	if ( ( rc = hermon_cmd_set_port ( hermon, 1,
-					  ( HERMON_SET_PORT_MAC_TABLE |
+					  ( HERMON_SET_PORT_RECEIVE_QP |
 					    ibdev->port ),
 					  &set_port ) ) != 0 ) {
 		printf ( "ConnectX3 %p port %d could not set port mac "
@@ -3940,8 +3946,8 @@ static int hermon_eth_open ( struct net_device *netdev ) {
  err_init_port:
  err_set_port_general_params:
  err_set_port_mac_table:
- err_add_steer:
-	hermon_eth_release_steer ( ibdev, port->eth_qp );
+// err_add_steer:
+//	hermon_eth_release_steer ( ibdev, port->eth_qp );
  err_modify_qp:
 	ib_destroy_qp ( ibdev, port->eth_qp );
  err_create_qp:
@@ -3969,10 +3975,10 @@ static void hermon_eth_close ( struct net_device *netdev ) {
 		       hermon, ibdev->port, strerror ( rc ) );
 		/* Nothing we can do about this */
 	}
-
+#if 0
 	/* Release steering */
 	hermon_eth_release_steer ( ibdev, port->eth_qp );
-
+#endif
 	/* Tear down the queues */
 	ib_destroy_qp ( ibdev, port->eth_qp );
 	ib_destroy_cq ( ibdev, port->eth_cq );
