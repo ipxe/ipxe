@@ -515,7 +515,8 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 	}
 	if ( sin6_src && ! IN6_IS_ADDR_UNSPECIFIED ( &sin6_src->sin6_addr ) )
 		src = &sin6_src->sin6_addr;
-	memcpy ( &iphdr->src, src, sizeof ( iphdr->src ) );
+	if ( src )
+		memcpy ( &iphdr->src, src, sizeof ( iphdr->src ) );
 
 	/* Fix up checksums */
 	if ( trans_csum ) {
