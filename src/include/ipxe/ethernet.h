@@ -87,6 +87,7 @@ extern int eth_pull ( struct net_device *netdev, struct io_buffer *iobuf,
 		      const void **ll_dest, const void **ll_source,
 		      uint16_t *net_proto, unsigned int *flags );
 extern void eth_init_addr ( const void *hw_addr, void *ll_addr );
+extern void eth_random_addr ( void *hw_addr );
 extern const char * eth_ntoa ( const void *ll_addr );
 extern int eth_mc_hash ( unsigned int af, const void *net_addr,
 			 void *ll_addr );

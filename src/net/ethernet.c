@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <byteswap.h>
@@ -110,6 +111,21 @@ int eth_pull ( struct net_device *netdev __unused, struct io_buffer *iobuf,
  */
 void eth_init_addr ( const void *hw_addr, void *ll_addr ) {
 	memcpy ( ll_addr, hw_addr, ETH_ALEN );
+}
+
+/**
+ * Generate random Ethernet address
+ *
+ * @v hw_addr		Generated hardware address
+ */
+void eth_random_addr ( void *hw_addr ) {
+	uint8_t *addr = hw_addr;
+	unsigned int i;
+
+	for ( i = 0 ; i < ETH_ALEN ; i++ )
+		addr[i] = random();
+	addr[0] &= ~0x01; /* Clear multicast bit */
+	addr[0] |= 0x02; /* Set locally-assigned bit */
 }
 
 /**
