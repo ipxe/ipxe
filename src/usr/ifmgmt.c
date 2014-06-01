@@ -28,7 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/device.h>
 #include <ipxe/job.h>
 #include <ipxe/monojob.h>
-#include <ipxe/nap.h>
 #include <ipxe/timer.h>
 #include <usr/ifmgmt.h>
 
@@ -141,9 +140,6 @@ struct ifpoller {
  */
 static int ifpoller_progress ( struct ifpoller *ifpoller,
 			       struct job_progress *progress __unused ) {
-
-	/* Reduce CPU utilisation */
-	cpu_nap();
 
 	/* Hand off to current progress checker */
 	return ifpoller->progress ( ifpoller );
