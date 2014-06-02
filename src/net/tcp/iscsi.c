@@ -412,11 +412,12 @@ static int iscsi_rx_scsi_response ( struct iscsi_session *iscsi,
 		= &iscsi->rx_bhs.scsi_response;
 	struct scsi_rsp rsp;
 	uint32_t residual_count;
+	size_t data_len;
 	int rc;
 
 	/* Buffer up the PDU data */
 	if ( ( rc = iscsi_rx_buffered_data ( iscsi, data, len ) ) != 0 ) {
-		DBGC ( iscsi, "iSCSI %p could not buffer login response: %s\n",
+		DBGC ( iscsi, "iSCSI %p could not buffer SCSI response: %s\n",
 		       iscsi, strerror ( rc ) );
 		return rc;
 	}
@@ -432,9 +433,11 @@ static int iscsi_rx_scsi_response ( struct iscsi_session *iscsi,
 	} else if ( response->flags & ISCSI_DATA_FLAG_UNDERFLOW ) {
 		rsp.overrun = -(residual_count);
 	}
-	if ( ISCSI_DATA_LEN ( response->lengths ) )
-		memcpy ( &rsp.sense, ( iscsi->rx_buffer + 2 ),
-			 sizeof ( rsp.sense ) );
+	data_len = ISCSI_DATA_LEN ( response->lengths );
+	if ( data_len ) {
+		scsi_parse_sense ( ( iscsi->rx_buffer + 2 ), ( data_len - 2 ),
+				   &rsp.sense );
+	}
 	iscsi_rx_buffered_data_done ( iscsi );
 
 	/* Check for errors */
