@@ -617,6 +617,10 @@ static int igbvf_open ( struct net_device *netdev )
 
 	DBG ("igbvf_open\n");
 
+	/* Update MAC address */
+	memcpy ( adapter->hw.mac.addr, netdev->ll_addr, ETH_ALEN );
+	igbvf_reset( adapter );
+
 	/* allocate transmit descriptors */
 	err = igbvf_setup_tx_resources ( adapter );
 	if (err) {
