@@ -44,6 +44,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/dhcppkt.h>
 #include <ipxe/dhcp_arch.h>
 #include <ipxe/features.h>
+#include <ipxe/process.h>
+#include <ipxe/nap.h>
 
 /** @file
  *
@@ -227,6 +229,9 @@ struct dhcp_session {
 	unsigned int count;
 	/** Start time of the current state (in ticks) */
 	unsigned long start;
+
+	/** Process */
+	struct process process;
 };
 
 /**
@@ -253,6 +258,9 @@ static void dhcp_finished ( struct dhcp_session *dhcp, int rc ) {
 
 	/* Stop retry timer */
 	stop_timer ( &dhcp->timer );
+
+	/* Stop process */
+	process_del ( &dhcp->process );
 
 	/* Shut down interfaces */
 	intf_shutdown ( &dhcp->xfer, rc );
@@ -1243,6 +1251,15 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
 	dhcp->state->expired ( dhcp );
 }
 
+/**
+ * DHCP process
+ *
+ * @v dhcp		DHCP session
+ */
+static void dhcp_step ( struct dhcp_session *dhcp __unused) {
+	cpu_nap();
+}
+
 /****************************************************************************
  *
  * Job control interface
@@ -1257,6 +1274,10 @@ static struct interface_operation dhcp_job_op[] = {
 /** DHCP job control interface descriptor */
 static struct interface_descriptor dhcp_job_desc =
 	INTF_DESC ( struct dhcp_session, job, dhcp_job_op );
+
+/** DHCP process descriptor */
+static struct process_descriptor dhcp_process_desc =
+	PROC_DESC ( struct dhcp_session, process, dhcp_step );
 
 /****************************************************************************
  *
@@ -1298,6 +1319,7 @@ int start_dhcp ( struct interface *job, struct net_device *netdev ) {
 	intf_init ( &dhcp->job, &dhcp_job_desc, &dhcp->refcnt );
 	intf_init ( &dhcp->xfer, &dhcp_xfer_desc, &dhcp->refcnt );
 	timer_init ( &dhcp->timer, dhcp_timer_expired, &dhcp->refcnt );
+	process_init ( &dhcp->process, &dhcp_process_desc, &dhcp->refcnt );
 	dhcp->netdev = netdev_get ( netdev );
 	dhcp->local.sin_family = AF_INET;
 	dhcp->local.sin_port = htons ( BOOTPC_PORT );
