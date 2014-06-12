@@ -197,6 +197,14 @@ struct ibft_nic {
 /** NIC global / link local */
 #define IBFT_FL_NIC_GLOBAL 0x04
 
+/** NIC IP address origin */
+#define IBFT_NIC_ORIGIN_OTHER 0x00
+#define IBFT_NIC_ORIGIN_MANUAL 0x01
+#define IBFT_NIC_ORIGIN_WELLKNOWN 0x02
+#define IBFT_NIC_ORIGIN_DHCP 0x03
+#define IBFT_NIC_ORIGIN_RA 0x04
+#define IBFT_NIC_ORIGIN_UNCHANGED 0x0f
+
 /**
  * iBFT Target structure
  *

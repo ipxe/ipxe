@@ -236,6 +236,7 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	struct in_addr netmask_addr = { 0 };
 	unsigned int netmask_count = 0;
 	struct settings *parent = netdev_settings ( netdev );
+	struct settings *origin;
 	int rc;
 
 	/* Fill in common header */
@@ -244,6 +245,12 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	nic->header.length = cpu_to_le16 ( sizeof ( *nic ) );
 	nic->header.flags = ( IBFT_FL_NIC_BLOCK_VALID |
 			      IBFT_FL_NIC_FIRMWARE_BOOT_SELECTED );
+
+	/* Determine origin of IP address */
+	fetch_setting ( parent, &ip_setting, &origin, NULL, NULL, 0 );
+	nic->origin = ( ( origin == parent ) ?
+			IBFT_NIC_ORIGIN_MANUAL : IBFT_NIC_ORIGIN_DHCP );
+	DBG ( "iBFT NIC origin = %d\n", nic->origin );
 
 	/* Extract values from configuration settings */
 	ibft_set_ipaddr_setting ( parent, &nic->ip_address, &ip_setting, 1 );
