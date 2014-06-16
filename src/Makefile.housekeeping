@@ -710,6 +710,31 @@ $(BIN)/version.o : ../.git/index
 endif
 endif
 
+# Debug message autocolourisation range
+#
+DBGCOL_LIST	:= $(BIN)/.dbgcol.list
+ifeq ($(wildcard $(DBGCOL_LIST)),)
+DBGCOL_OLD := <invalid>
+else
+DBGCOL_OLD := $(shell cat $(DBGCOL_LIST))
+endif
+ifneq ($(DBGCOL_OLD),$(DBGCOL))
+$(shell $(ECHO) "$(DBGCOL)" > $(DBGCOL_LIST))
+endif
+
+$(DBGCOL_LIST) : $(MAKEDEPS)
+
+VERYCLEANUP += $(DBGCOL_LIST)
+
+DBGCOL_COLOURS := $(subst -, ,$(DBGCOL))
+DBGCOL_MIN := $(word 1,$(DBGCOL_COLOURS))
+DBGCOL_MAX := $(word 2,$(DBGCOL_COLOURS))
+
+debug_DEPS += $(DBGCOL_LIST)
+
+CFLAGS_debug += $(if $(DBGCOL_MIN),-DDBGCOL_MIN=$(DBGCOL_MIN))
+CFLAGS_debug += $(if $(DBGCOL_MAX),-DDBGCOL_MAX=$(DBGCOL_MAX))
+
 # We automatically generate rules for any file mentioned in AUTO_SRCS
 # using the following set of templates.  We use $(eval ...) if
 # available, otherwise we generate separate Makefile fragments and
