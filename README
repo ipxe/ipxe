@@ -1,8 +1,26 @@
-iPXE README File
+iPXE
+===
+[![Build Status](https://travis-ci.org/csc/ipxe.svg?branch=master)](https://travis-ci.org/csc/ipxe)
 
-Quick start guide:
+iPXE is the leading open source network boot firmware. It provides a full PXE implementation enhanced with additional features such as:
 
-   cd src
-   make
+* boot from a web server via HTTP
+* boot from an iSCSI SAN
+* boot from a Fibre Channel SAN via FCoE
+* boot from an AoE SAN
+* boot from a wireless network
+* boot from a wide-area network
+* boot from an Infiniband network
+* control the boot process with a []script](http://ipxe.org/scripting)
 
-For any more detailed instructions, see http://ipxe.org
+You can use iPXE to [replace the existing PXE ROM on your network card](http://ipxe.org/howto/romburning), or you can [chainload into iPXE](http://ipxe.org/howto/chainloading) to obtain the features of iPXE without the hassle of reflashing.
+
+iPXE is free, open-source software [licensed](http://ipxe.org/licensing) under the GNU GPL (with some portions under GPL-compatible licences), and is included in products from several network card manufacturers and OEMs.
+
+For more info, check [ipxe.org]()http://ipxe.org/)
+
+Changes to the original iPXE
+===
+This fork of the original [iPXE](https://github.com/ipxe/ipxe) is a 99.99% genuine copy but we have turned ```IMAGE_COMBOOT``` flag on to enable SYSLINUX COMBOOT image support (we also added .travis.yml to enable builds via [travis-CI.org](https://travis-ci.org/csc/ipxe)).  
+
+This change allows booting of [ESXi 5.x VMs](https://github.com/csc/Hanlon/issues/46)
