@@ -23,12 +23,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <ipxe/version.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_driver.h>
-#include <config/general.h>
 
 /** @file
  *
@@ -207,7 +207,7 @@ int efi_driver_install ( struct efi_driver *efidrv ) {
 	efi_snprintf ( efidrv->wname,
 		       ( sizeof ( efidrv->wname ) /
 			 sizeof ( efidrv->wname[0] ) ),
-		       PRODUCT_SHORT_NAME "%s%s",
+		       "%s%s%s", product_short_name,
 		       ( efidrv->name ? " - " : "" ),
 		       ( efidrv->name ? efidrv->name : "" ) );
 

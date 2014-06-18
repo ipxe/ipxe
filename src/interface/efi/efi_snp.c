@@ -28,12 +28,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/in.h>
 #include <ipxe/pci.h>
+#include <ipxe/version.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_pci.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
-#include <config/general.h>
 #include <usr/autoboot.h>
 
 /** EFI simple network protocol GUID */
@@ -988,12 +988,12 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	efi_snprintf ( snpdev->driver_name,
 		       ( sizeof ( snpdev->driver_name ) /
 			 sizeof ( snpdev->driver_name[0] ) ),
-		       PRODUCT_SHORT_NAME " %s", netdev->dev->driver_name );
+		       "%s %s", product_short_name, netdev->dev->driver_name );
 	efi_snprintf ( snpdev->controller_name,
 		       ( sizeof ( snpdev->controller_name ) /
 			 sizeof ( snpdev->controller_name[0] ) ),
-		       PRODUCT_SHORT_NAME " %s (%s)",
-		       netdev->name, netdev_addr ( netdev ) );
+		       "%s %s (%s)", product_short_name, netdev->name,
+		       netdev_addr ( netdev ) );
 	snpdev->name2.GetDriverName = efi_snp_get_driver_name;
 	snpdev->name2.GetControllerName = efi_snp_get_controller_name;
 	snpdev->name2.SupportedLanguages = "en";
