@@ -8,43 +8,52 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <ipxe/tables.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/Protocol/DriverBinding.h>
-#include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
 
 /** An EFI driver */
 struct efi_driver {
 	/** Name */
 	const char *name;
-	/** EFI name */
-	CHAR16 wname[32];
-	/** EFI driver binding protocol */
-	EFI_DRIVER_BINDING_PROTOCOL driver;
-	/** EFI component name protocol */
-	EFI_COMPONENT_NAME2_PROTOCOL wtf;
+	/**
+	 * Check if driver supports device
+	 *
+	 * @v device		Device
+	 * @ret rc		Return status code
+	 */
+	int ( * supported ) ( EFI_HANDLE device );
+	/**
+	 * Attach driver to device
+	 *
+	 * @v device		Device
+	 * @ret rc		Return status code
+	 */
+	int ( * start ) ( EFI_HANDLE device );
+	/**
+	 * Detach driver from device
+	 *
+	 * @v device		Device
+	 */
+	void ( * stop ) ( EFI_HANDLE device );
 };
 
-/** Initialise an EFI driver
- *
- * @v name		Driver name
- * @v supported		Device supported method
- * @v start		Device start method
- * @v stop		Device stop method
- */
-#define EFI_DRIVER_INIT( _name, _supported, _start, _stop ) {	\
-	.name = _name,						\
-	.driver = {						\
-		.Supported = _supported,			\
-		.Start = _start,				\
-		.Stop = _stop,					\
-		.Version = 0x10,				\
-	} }
+/** EFI driver table */
+#define EFI_DRIVERS __table ( struct efi_driver, "efi_drivers" )
+
+/** Declare an EFI driver */
+#define __efi_driver( order ) __table_entry ( EFI_DRIVERS, order )
+
+#define EFI_DRIVER_EARLY	01	/**< Early drivers */
+#define EFI_DRIVER_NORMAL	02	/**< Normal drivers */
+#define EFI_DRIVER_LATE		03	/**< Late drivers */
 
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_devpath_end ( EFI_DEVICE_PATH_PROTOCOL *path );
-
-extern int efi_driver_install ( struct efi_driver *efidrv );
-extern void efi_driver_uninstall ( struct efi_driver *efidrv );
+extern int efi_driver_install ( void );
+extern void efi_driver_uninstall ( void );
+extern int efi_driver_connect_all ( void );
+extern void efi_driver_disconnect_all ( void );
+extern void efi_driver_reconnect_all ( void );
 
 #endif /* _IPXE_EFI_DRIVER_H */

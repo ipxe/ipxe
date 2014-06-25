@@ -21,12 +21,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <errno.h>
+#include <ipxe/init.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
-#include <ipxe/efi/Protocol/DevicePath.h>
-#include <ipxe/uuid.h>
-#include <ipxe/init.h>
 
 /** Image handle passed to entry point */
 EFI_HANDLE efi_image_handle;
@@ -46,61 +44,6 @@ static EFI_EVENT efi_shutdown_event;
 
 /* Forward declarations */
 static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle );
-
-/**
- * Check to see if driver supports a device
- *
- * @v driver		EFI driver
- * @v device		EFI device
- * @v child		Path to child device, if any
- * @ret efirc		EFI status code
- */
-static EFI_STATUS EFIAPI
-efi_image_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
-		    EFI_HANDLE device __unused,
-		    EFI_DEVICE_PATH_PROTOCOL *child __unused ) {
-
-	return EFI_UNSUPPORTED;
-}
-
-/**
- * Attach driver to device
- *
- * @v driver		EFI driver
- * @v device		EFI device
- * @v child		Path to child device, if any
- * @ret efirc		EFI status code
- */
-static EFI_STATUS EFIAPI
-efi_image_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
-		EFI_HANDLE device __unused,
-		EFI_DEVICE_PATH_PROTOCOL *child __unused ) {
-
-	return EFI_UNSUPPORTED;
-}
-
-/**
- * Detach driver from device
- *
- * @v driver		EFI driver
- * @v device		EFI device
- * @v pci		PCI device
- * @v num_children	Number of child devices
- * @v children		List of child devices
- * @ret efirc		EFI status code
- */
-static EFI_STATUS EFIAPI
-efi_image_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
-	       EFI_HANDLE device __unused, UINTN num_children __unused,
-	       EFI_HANDLE *children __unused ) {
-
-	return EFI_UNSUPPORTED;
-}
-
-/** EFI loaded image driver */
-static struct efi_driver efi_image_driver =
-	EFI_DRIVER_INIT ( NULL, efi_image_supported, efi_image_start,
-			  efi_image_stop );
 
 /**
  * Shut down in preparation for booting an OS.
@@ -153,18 +96,24 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	efi_systab = systab;
 
 	/* Sanity checks */
-	if ( ! systab )
-		return EFI_NOT_AVAILABLE_YET;
-	if ( ! systab->ConOut )
-		return EFI_NOT_AVAILABLE_YET;
+	if ( ! systab ) {
+		efirc = EFI_NOT_AVAILABLE_YET;
+		goto err_sanity;
+	}
+	if ( ! systab->ConOut ) {
+		efirc = EFI_NOT_AVAILABLE_YET;
+		goto err_sanity;
+	}
 	if ( ! systab->BootServices ) {
 		DBGC ( systab, "EFI provided no BootServices entry point\n" );
-		return EFI_NOT_AVAILABLE_YET;
+		efirc = EFI_NOT_AVAILABLE_YET;
+		goto err_sanity;
 	}
 	if ( ! systab->RuntimeServices ) {
 		DBGC ( systab, "EFI provided no RuntimeServices entry "
 		       "point\n" );
-		return EFI_NOT_AVAILABLE_YET;
+		efirc = EFI_NOT_AVAILABLE_YET;
+		goto err_sanity;
 	}
 	DBGC ( systab, "EFI handle %p systab %p\n", image_handle, systab );
 	bs = systab->BootServices;
@@ -181,7 +130,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			       efi_guid_ntoa ( &prot->guid ) );
 			/* Fail if protocol is required */
 			if ( prot->required )
-				return efirc;
+				goto err_missing_protocol;
 		}
 	}
 
@@ -193,8 +142,10 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 		} else {
 			DBGC ( systab, "EFI does not provide configuration "
 			       "table %s\n", efi_guid_ntoa ( &tab->guid ) );
-			if ( tab->required )
-				return EFI_NOT_AVAILABLE_YET;
+			if ( tab->required ) {
+				efirc = EFI_NOT_AVAILABLE_YET;
+				goto err_missing_table;
+			}
 		}
 	}
 
@@ -206,7 +157,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 		rc = -EEFI ( efirc );
 		DBGC ( systab, "EFI could not get loaded image protocol: %s",
 		       strerror ( rc ) );
-		return efirc;
+		goto err_no_loaded_image;
 	}
 	efi_loaded_image = loaded_image;
 	DBGC ( systab, "EFI image base address %p\n",
@@ -223,23 +174,31 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 		rc = -EEFI ( efirc );
 		DBGC ( systab, "EFI could not create ExitBootServices event: "
 		       "%s\n", strerror ( rc ) );
-		return efirc;
+		goto err_create_event;
 	}
 
-	/* Install an EFI driver on the image handle, to allow the
-	 * driver to be subsequently unloaded.
-	 */
-	efi_image_driver.driver.DriverBindingHandle = image_handle;
-	if ( ( rc = efi_driver_install ( &efi_image_driver ) ) != 0 ) {
-		DBGC ( systab, "EFI could not install loaded image driver: "
-		       "%s\n", strerror ( rc ) );
-		return EFIRC ( rc );
+	/* Install driver binding protocol */
+	if ( ( rc = efi_driver_install() ) != 0 ) {
+		DBGC ( systab, "EFI could not install driver: %s\n",
+		       strerror ( rc ) );
+		efirc = EFIRC ( rc );
+		goto err_driver_install;
 	}
 
 	/* Install image unload method */
 	efi_loaded_image->Unload = efi_unload;
 
 	return 0;
+
+	efi_driver_uninstall();
+ err_driver_install:
+	bs->CloseEvent ( efi_shutdown_event );
+ err_create_event:
+ err_no_loaded_image:
+ err_missing_table:
+ err_missing_protocol:
+ err_sanity:
+	return efirc;
 }
 
 /**
@@ -256,11 +215,14 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 	/* Shut down */
 	shutdown_exit();
 
+	/* Disconnect any remaining devices */
+	efi_driver_disconnect_all();
+
+	/* Uninstall driver binding protocol */
+	efi_driver_uninstall();
+
 	/* Uninstall exit boot services event */
 	bs->CloseEvent ( efi_shutdown_event );
-
-	/* Uninstall loaded image driver */
-	efi_driver_uninstall ( &efi_image_driver );
 
 	DBGC ( systab, "EFI image unloaded\n" );
 
