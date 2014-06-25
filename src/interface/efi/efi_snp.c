@@ -992,7 +992,8 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	efi_snprintf ( snpdev->controller_name,
 		       ( sizeof ( snpdev->controller_name ) /
 			 sizeof ( snpdev->controller_name[0] ) ),
-		       "%s %s (%s)", product_short_name, netdev->name,
+		       "%s %s (%s, %s)", product_short_name,
+		       netdev->dev->driver_name, netdev->dev->name,
 		       netdev_addr ( netdev ) );
 	snpdev->name2.GetDriverName = efi_snp_get_driver_name;
 	snpdev->name2.GetControllerName = efi_snp_get_controller_name;

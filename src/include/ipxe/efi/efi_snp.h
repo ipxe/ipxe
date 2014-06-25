@@ -65,7 +65,7 @@ struct efi_snp_device {
 	/** Driver name */
 	wchar_t driver_name[16];
 	/** Controller name */
-	wchar_t controller_name[32];
+	wchar_t controller_name[64];
 	/** The device path
 	 *
 	 * This field is variable in size and must appear at the end
