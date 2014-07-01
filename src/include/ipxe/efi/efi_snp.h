@@ -24,8 +24,8 @@ struct efi_snp_device {
 	struct list_head list;
 	/** The underlying iPXE network device */
 	struct net_device *netdev;
-	/** The underlying EFI PCI device */
-	struct efi_pci_device *efipci;
+	/** The underlying EFI device */
+	struct efi_device *efidev;
 	/** EFI device handle */
 	EFI_HANDLE handle;
 	/** The SNP structure itself */
@@ -76,6 +76,7 @@ struct efi_snp_device {
 
 extern int efi_snp_hii_install ( struct efi_snp_device *snpdev );
 extern void efi_snp_hii_uninstall ( struct efi_snp_device *snpdev );
+extern struct efi_snp_device * find_snpdev ( EFI_HANDLE handle );
 extern struct efi_snp_device * last_opened_snpdev ( void );
 extern void efi_snp_claim ( void );
 extern void efi_snp_release ( void );
