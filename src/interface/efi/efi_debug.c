@@ -35,6 +35,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
 
+/** Device path protocol GUID */
+static EFI_GUID efi_device_path_protocol_guid
+	= EFI_DEVICE_PATH_PROTOCOL_GUID;
+
 /** Device path to text protocol */
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
 EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
@@ -88,36 +92,62 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 }
 
 /**
- * Print device path
+ * Get textual representation of device path
  *
  * @v path		Device path
+ * @ret text		Textual representation of device path, or NULL
  */
-void dbg_efi_devpath ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_DEVICE_PATH_PROTOCOL *end;
-	CHAR16 *text;
-	size_t len;
+	static char text[256];
+	CHAR16 *wtext;
 
 	/* Convert path to a textual representation */
 	if ( ! efidpt )
-		goto err_no_efidpt;
-	text = efidpt->ConvertDevicePathToText ( path, TRUE, FALSE );
-	if ( ! text )
-		goto err_convert;
+		return NULL;
+	wtext = efidpt->ConvertDevicePathToText ( path, TRUE, FALSE );
+	if ( ! wtext )
+		return NULL;
 
-	/* Print path */
-	printf ( "%ls", text );
+	/* Store path in buffer */
+	snprintf ( text, sizeof ( text ), "%ls", wtext );
 
 	/* Free path */
-	bs->FreePool ( text );
+	bs->FreePool ( wtext );
 
-	return;
+	return text;
+}
 
- err_convert:
- err_no_efidpt:
-	printf ( "<cannot convert>:\n" );
-	end = efi_devpath_end ( path );
-	len = ( ( ( void * ) end ) - ( ( void * ) path ) +
-		sizeof ( *end ) );
-	dbg_hex_dump_da ( 0, path, len );
+/**
+ * Get textual representation of device path for a handle
+ *
+ * @v handle		EFI handle
+ * @ret text		Textual representation of device path, or NULL
+ */
+const char * efi_handle_devpath_text ( EFI_HANDLE handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_DEVICE_PATH_PROTOCOL *path;
+		void *interface;
+	} path;
+	const char *text;
+	EFI_STATUS efirc;
+
+	/* Obtain device path, if any */
+	if ( ( efirc = bs->OpenProtocol ( handle,
+					  &efi_device_path_protocol_guid,
+					  &path.interface, efi_image_handle,
+					  handle,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		return NULL;
+	}
+
+	/* Format device path */
+	text = efi_devpath_text ( path.path );
+
+	/* Close device path */
+	bs->CloseProtocol ( handle, &efi_device_path_protocol_guid,
+			    efi_image_handle, handle );
+
+	return text;
 }

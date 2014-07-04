@@ -96,6 +96,7 @@ SRCDIRS		+= config
 # automatic build system.
 #
 NON_AUTO_SRCS	:=
+NON_AUTO_SRCS	+= core/version.c
 NON_AUTO_SRCS	+= drivers/net/prism2.c
 
 # INCDIRS lists the include path

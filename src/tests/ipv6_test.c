@@ -37,6 +37,30 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Define inline IPv6 address */
 #define IPV6(...) { __VA_ARGS__ }
 
+/** The unspecified IPv6 address */
+static const struct in6_addr sample_unspecified = {
+	.s6_addr = IPV6 ( 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ),
+};
+
+/** A sample link-local IPv6 address */
+static const struct in6_addr sample_link_local = {
+	.s6_addr = IPV6 ( 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			  0x00, 0x00, 0x69, 0xff, 0xfe, 0x50, 0x58, 0x45 ),
+};
+
+/** A sample global IPv6 address */
+static const struct in6_addr sample_global = {
+	.s6_addr = IPV6 ( 0x20, 0x01, 0x0b, 0xa8, 0x00, 0x00, 0x01, 0xd4,
+			  0x00, 0x00, 0x00, 0x00, 0x69, 0x50, 0x58, 0x45 ),
+};
+
+/** A sample multicast IPv6 address */
+static const struct in6_addr sample_multicast = {
+	.s6_addr = IPV6 ( 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 ),
+};
+
 /**
  * Report an inet6_ntoa() test result
  *
@@ -96,6 +120,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 static void ipv6_test_exec ( void ) {
+
+	/* Address testing macros */
+	ok (   IN6_IS_ADDR_UNSPECIFIED ( &sample_unspecified ) );
+	ok ( ! IN6_IS_ADDR_UNSPECIFIED ( &sample_link_local ) );
+	ok ( ! IN6_IS_ADDR_UNSPECIFIED ( &sample_global ) );
+	ok ( ! IN6_IS_ADDR_UNSPECIFIED ( &sample_multicast ) );
+	ok ( ! IN6_IS_ADDR_MULTICAST ( &sample_unspecified ) );
+	ok ( ! IN6_IS_ADDR_MULTICAST ( &sample_link_local ) );
+	ok ( ! IN6_IS_ADDR_MULTICAST ( &sample_global ) );
+	ok (   IN6_IS_ADDR_MULTICAST ( &sample_multicast ) );
+	ok ( ! IN6_IS_ADDR_LINKLOCAL ( &sample_unspecified ) );
+	ok (   IN6_IS_ADDR_LINKLOCAL ( &sample_link_local ) );
+	ok ( ! IN6_IS_ADDR_LINKLOCAL ( &sample_global ) );
+	ok ( ! IN6_IS_ADDR_LINKLOCAL ( &sample_multicast ) );
 
 	/* inet6_ntoa() tests */
 	inet6_ntoa_ok ( IPV6 ( 0x20, 0x01, 0x0b, 0xa8, 0x00, 0x00, 0x01, 0xd4,

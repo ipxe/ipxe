@@ -102,17 +102,19 @@ static void ibft_set_ipaddr ( struct ibft_ipaddr *ipaddr, struct in_addr in ) {
 /**
  * Fill in an IP address within iBFT from configuration setting
  *
+ * @v settings		Parent settings block, or NULL
  * @v ipaddr		IP address field
  * @v setting		Configuration setting
  * @v count		Maximum number of IP addresses
  */
-static void ibft_set_ipaddr_setting ( struct ibft_ipaddr *ipaddr,
+static void ibft_set_ipaddr_setting ( struct settings *settings,
+				      struct ibft_ipaddr *ipaddr,
 				      const struct setting *setting,
 				      unsigned int count ) {
 	struct in_addr in[count];
 	unsigned int i;
 
-	fetch_ipv4_array_setting ( NULL, setting, in, count );
+	fetch_ipv4_array_setting ( settings, setting, in, count );
 	for ( i = 0 ; i < count ; i++ ) {
 		ibft_set_ipaddr ( &ipaddr[i], in[i] );
 	}
@@ -176,12 +178,14 @@ static int ibft_set_string ( struct ibft_strings *strings,
 /**
  * Fill in a string field within iBFT from configuration setting
  *
+ * @v settings		Parent settings block, or NULL
  * @v strings		iBFT string block descriptor
  * @v string		String field
  * @v setting		Configuration setting
  * @ret rc		Return status code
  */
-static int ibft_set_string_setting ( struct ibft_strings *strings,
+static int ibft_set_string_setting ( struct settings *settings,
+				     struct ibft_strings *strings,
 				     struct ibft_string *string,
 				     const struct setting *setting ) {
 	struct settings *origin;
@@ -189,7 +193,7 @@ static int ibft_set_string_setting ( struct ibft_strings *strings,
 	int len;
 	char *dest;
 
-	len = fetch_setting ( NULL, setting, &origin, &fetched, NULL, 0 );
+	len = fetch_setting ( settings, setting, &origin, &fetched, NULL, 0 );
 	if ( len < 0 ) {
 		string->offset = 0;
 		string->len = 0;
@@ -231,6 +235,8 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct in_addr netmask_addr = { 0 };
 	unsigned int netmask_count = 0;
+	struct settings *parent = netdev_settings ( netdev );
+	struct settings *origin;
 	int rc;
 
 	/* Fill in common header */
@@ -240,24 +246,30 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	nic->header.flags = ( IBFT_FL_NIC_BLOCK_VALID |
 			      IBFT_FL_NIC_FIRMWARE_BOOT_SELECTED );
 
+	/* Determine origin of IP address */
+	fetch_setting ( parent, &ip_setting, &origin, NULL, NULL, 0 );
+	nic->origin = ( ( origin == parent ) ?
+			IBFT_NIC_ORIGIN_MANUAL : IBFT_NIC_ORIGIN_DHCP );
+	DBG ( "iBFT NIC origin = %d\n", nic->origin );
+
 	/* Extract values from configuration settings */
-	ibft_set_ipaddr_setting ( &nic->ip_address, &ip_setting, 1 );
+	ibft_set_ipaddr_setting ( parent, &nic->ip_address, &ip_setting, 1 );
 	DBG ( "iBFT NIC IP = %s\n", ibft_ipaddr ( &nic->ip_address ) );
-	ibft_set_ipaddr_setting ( &nic->gateway, &gateway_setting, 1 );
+	ibft_set_ipaddr_setting ( parent, &nic->gateway, &gateway_setting, 1 );
 	DBG ( "iBFT NIC gateway = %s\n", ibft_ipaddr ( &nic->gateway ) );
-	ibft_set_ipaddr_setting ( &nic->dns[0], &dns_setting,
+	ibft_set_ipaddr_setting ( NULL, &nic->dns[0], &dns_setting,
 				  ( sizeof ( nic->dns ) /
 				    sizeof ( nic->dns[0] ) ) );
 	DBG ( "iBFT NIC DNS = %s", ibft_ipaddr ( &nic->dns[0] ) );
 	DBG ( ", %s\n", ibft_ipaddr ( &nic->dns[1] ) );
-	if ( ( rc = ibft_set_string_setting ( strings, &nic->hostname,
+	if ( ( rc = ibft_set_string_setting ( NULL, strings, &nic->hostname,
 					      &hostname_setting ) ) != 0 )
 		return rc;
 	DBG ( "iBFT NIC hostname = %s\n",
 	      ibft_string ( strings, &nic->hostname ) );
 
 	/* Derive subnet mask prefix from subnet mask */
-	fetch_ipv4_setting ( NULL, &netmask_setting, &netmask_addr );
+	fetch_ipv4_setting ( parent, &netmask_setting, &netmask_addr );
 	while ( netmask_addr.s_addr ) {
 		if ( netmask_addr.s_addr & 0x1 )
 			netmask_count++;

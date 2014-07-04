@@ -267,8 +267,8 @@ struct scsi_cmd {
 	size_t data_in_len;
 };
 
-/** SCSI sense data */
-struct scsi_sns {
+/** SCSI fixed-format sense data */
+struct scsi_sns_fixed {
 	/** Response code */
 	uint8_t code;
 	/** Reserved */
@@ -277,7 +277,43 @@ struct scsi_sns {
 	uint8_t key;
 	/** Information */
 	uint32_t info;
+	/** Additional sense length */
+	uint8_t len;
+	/** Command-specific information */
+	uint32_t cs_info;
+	/** Additional sense code and qualifier */
+	uint16_t additional;
+} __attribute__ (( packed ));
+
+/** SCSI descriptor-format sense data */
+struct scsi_sns_descriptor {
+	/** Response code */
+	uint8_t code;
+	/** Sense key */
+	uint8_t key;
+	/** Additional sense code and qualifier */
+	uint16_t additional;
+} __attribute__ (( packed ));
+
+/** SCSI sense data */
+union scsi_sns {
+	/** Response code */
+	uint8_t code;
+	/** Fixed-format sense data */
+	struct scsi_sns_fixed fixed;
+	/** Descriptor-format sense data */
+	struct scsi_sns_descriptor desc;
 };
+
+/** SCSI sense response code mask */
+#define SCSI_SENSE_CODE_MASK 0x7f
+
+/** Test if SCSI sense data is in fixed format
+ *
+ * @v code		Response code
+ * @ret is_fixed	Sense data is in fixed format
+ */
+#define SCSI_SENSE_FIXED( code ) ( ( (code) & 0x7e ) == 0x70 )
 
 /** SCSI sense key mask */
 #define SCSI_SENSE_KEY_MASK 0x0f
@@ -288,11 +324,18 @@ struct scsi_rsp {
 	uint8_t status;
 	/** Data overrun (or negative underrun) */
 	ssize_t overrun;
-	/** Autosense data (if any) */
-	struct scsi_sns sense;
+	/** Autosense data (if any)
+	 *
+	 * To minimise code size, this is stored as the first four
+	 * bytes of a descriptor-format sense data block (even if the
+	 * response code indicates fixed-format sense data).
+	 */
+	struct scsi_sns_descriptor sense;
 };
 
 extern int scsi_parse_lun ( const char *lun_string, struct scsi_lun *lun );
+extern void scsi_parse_sense ( const void *data, size_t len,
+			       struct scsi_sns_descriptor *sense );
 
 extern int scsi_command ( struct interface *control, struct interface *data,
 			  struct scsi_cmd *command );

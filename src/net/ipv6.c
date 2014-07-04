@@ -515,7 +515,8 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 	}
 	if ( sin6_src && ! IN6_IS_ADDR_UNSPECIFIED ( &sin6_src->sin6_addr ) )
 		src = &sin6_src->sin6_addr;
-	memcpy ( &iphdr->src, src, sizeof ( iphdr->src ) );
+	if ( src )
+		memcpy ( &iphdr->src, src, sizeof ( iphdr->src ) );
 
 	/* Fix up checksums */
 	if ( trans_csum ) {
@@ -900,7 +901,7 @@ static const char * ipv6_sock_ntoa ( struct sockaddr *sa ) {
 	const char *netdev_name;
 
 	/* Identify network device, if applicable */
-	if ( IN6_IS_ADDR_LINKLOCAL ( in ) ) {
+	if ( IN6_IS_ADDR_LINKLOCAL ( in ) || IN6_IS_ADDR_MULTICAST ( in ) ) {
 		netdev = find_netdev_by_index ( sin6->sin6_scope_id );
 		netdev_name = ( netdev ? netdev->name : "UNKNOWN" );
 	} else {

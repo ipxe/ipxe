@@ -617,6 +617,10 @@ static int igbvf_open ( struct net_device *netdev )
 
 	DBG ("igbvf_open\n");
 
+	/* Update MAC address */
+	memcpy ( adapter->hw.mac.addr, netdev->ll_addr, ETH_ALEN );
+	igbvf_reset( adapter );
+
 	/* allocate transmit descriptors */
 	err = igbvf_setup_tx_resources ( adapter );
 	if (err) {
@@ -871,19 +875,13 @@ int igbvf_probe ( struct pci_device *pdev )
 			DBG ("Error reading MAC address\n");
 			goto err_hw_init;
 		}
+		if ( ! is_valid_ether_addr(adapter->hw.mac.addr) ) {
+			/* Assign random MAC address */
+			eth_random_addr(adapter->hw.mac.addr);
+		}
 	}
 
 	memcpy ( netdev->hw_addr, adapter->hw.mac.addr, ETH_ALEN );
-
-	if ( ! is_valid_ether_addr( netdev->hw_addr ) ) {
-		DBG ("Invalid MAC Address: "
-		        "%02x:%02x:%02x:%02x:%02x:%02x\n",
-		        netdev->hw_addr[0], netdev->hw_addr[1],
-		        netdev->hw_addr[2], netdev->hw_addr[3],
-		        netdev->hw_addr[4], netdev->hw_addr[5]);
-		err = -EIO;
-		goto err_hw_init;
-	}
 
 	/* reset the hardware with the new settings */
 	igbvf_reset ( adapter );

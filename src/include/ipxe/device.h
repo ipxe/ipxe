@@ -57,6 +57,9 @@ struct device_description {
 /** TAP bus type */
 #define BUS_TYPE_TAP 6
 
+/** EFI bus type */
+#define BUS_TYPE_EFI 7
+
 /** A hardware device */
 struct device {
 	/** Name */

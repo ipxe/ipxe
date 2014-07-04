@@ -61,7 +61,7 @@ struct in6_addr {
 
 #define IN6_IS_ADDR_LINKLOCAL( addr )					\
 	( ( *( ( const uint16_t * ) (addr) ) & htons ( 0xffc0 ) ) ==	\
-	  htonl ( 0xfe80 ) )
+	  htons ( 0xfe80 ) )
 
 /**
  * IPv4 socket address
