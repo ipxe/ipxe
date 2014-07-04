@@ -1,0 +1,3 @@
+#!ipxe
+dhcp || reboot
+chain default.ipxe || exit
