@@ -28,22 +28,21 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/device.h>
-#include <ipxe/netdevice.h>
+#include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 
-/** A network device that consumes the EFI Simple Network Protocol */
+/** An SNP device */
 struct snp_device {
-	/** Underlying simple network protocol instance */
+	/** EFI device */
+	struct efi_device *efidev;
+	/** Simple network protocol */
 	EFI_SIMPLE_NETWORK_PROTOCOL *snp;
-
 	/** Generic device */
 	struct device dev;
-
 	/** Network device */
 	struct net_device *netdev;
-
-	/** State to put the snp in when removing the device */
-	uint32 removal_state;
+	/** State to restore when removing the device */
+	UINT32 removal_state;
 };
 
 #endif /* _SNP_H */

@@ -8,43 +8,91 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <ipxe/device.h>
+#include <ipxe/tables.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/Protocol/DriverBinding.h>
-#include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
+
+/** An EFI device */
+struct efi_device {
+	/** Generic device */
+	struct device dev;
+	/** EFI device handle */
+	EFI_HANDLE device;
+	/** Device path */
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	/** Driver for this device */
+	struct efi_driver *driver;
+	/** Driver-private data */
+	void *priv;
+};
 
 /** An EFI driver */
 struct efi_driver {
 	/** Name */
 	const char *name;
-	/** EFI name */
-	CHAR16 wname[32];
-	/** EFI driver binding protocol */
-	EFI_DRIVER_BINDING_PROTOCOL driver;
-	/** EFI component name protocol */
-	EFI_COMPONENT_NAME2_PROTOCOL wtf;
+	/**
+	 * Check if driver supports device
+	 *
+	 * @v device		EFI device handle
+	 * @ret rc		Return status code
+	 */
+	int ( * supported ) ( EFI_HANDLE device );
+	/**
+	 * Attach driver to device
+	 *
+	 * @v efidev		EFI device
+	 * @ret rc		Return status code
+	 */
+	int ( * start ) ( struct efi_device *efidev );
+	/**
+	 * Detach driver from device
+	 *
+	 * @v efidev		EFI device
+	 */
+	void ( * stop ) ( struct efi_device *efidev );
 };
 
-/** Initialise an EFI driver
+/** EFI driver table */
+#define EFI_DRIVERS __table ( struct efi_driver, "efi_drivers" )
+
+/** Declare an EFI driver */
+#define __efi_driver( order ) __table_entry ( EFI_DRIVERS, order )
+
+#define EFI_DRIVER_EARLY	01	/**< Early drivers */
+#define EFI_DRIVER_NORMAL	02	/**< Normal drivers */
+#define EFI_DRIVER_LATE		03	/**< Late drivers */
+
+/**
+ * Set EFI driver-private data
  *
- * @v name		Driver name
- * @v supported		Device supported method
- * @v start		Device start method
- * @v stop		Device stop method
+ * @v efidev		EFI device
+ * @v priv		Private data
  */
-#define EFI_DRIVER_INIT( _name, _supported, _start, _stop ) {	\
-	.name = _name,						\
-	.driver = {						\
-		.Supported = _supported,			\
-		.Start = _start,				\
-		.Stop = _stop,					\
-		.Version = 0x10,				\
-	} }
+static inline void efidev_set_drvdata ( struct efi_device *efidev,
+					void *priv ) {
+	efidev->priv = priv;
+}
+
+/**
+ * Get EFI driver-private data
+ *
+ * @v efidev		EFI device
+ * @ret priv		Private data
+ */
+static inline void * efidev_get_drvdata ( struct efi_device *efidev ) {
+	return efidev->priv;
+}
 
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_devpath_end ( EFI_DEVICE_PATH_PROTOCOL *path );
-
-extern int efi_driver_install ( struct efi_driver *efidrv );
-extern void efi_driver_uninstall ( struct efi_driver *efidrv );
+extern struct efi_device * efidev_parent ( struct device *dev );
+extern int efidev_child_add ( struct efi_device *efidev, EFI_HANDLE device );
+extern void efidev_child_del ( struct efi_device *efidev, EFI_HANDLE device );
+extern int efi_driver_install ( void );
+extern void efi_driver_uninstall ( void );
+extern int efi_driver_connect_all ( void );
+extern void efi_driver_disconnect_all ( void );
+extern void efi_driver_reconnect_all ( void );
 
 #endif /* _IPXE_EFI_DRIVER_H */

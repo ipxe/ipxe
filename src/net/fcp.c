@@ -551,7 +551,6 @@ static int fcpcmd_recv_rsp ( struct fcp_command *fcpcmd,
 	struct fcp_device *fcpdev = fcpcmd->fcpdev;
 	struct scsi_cmd *command = &fcpcmd->command;
 	struct fcp_rsp *rsp = iobuf->data;
-	struct scsi_sense *sense;
 	struct scsi_rsp response;
 	int rc;
 
@@ -607,8 +606,8 @@ static int fcpcmd_recv_rsp ( struct fcp_command *fcpcmd,
 		if ( rsp->flags & FCP_RSP_RESIDUAL_UNDERRUN )
 			response.overrun = -response.overrun;
 	}
-	if ( ( sense = fcp_rsp_sense_data ( rsp ) ) != NULL )
-		memcpy ( &response.sense, sense, sizeof ( response.sense ) );
+	scsi_parse_sense ( fcp_rsp_sense_data ( rsp ),
+			   fcp_rsp_sense_data_len ( rsp ), &response.sense );
 
 	/* Free buffer before sending response, to minimise
 	 * out-of-memory errors.
