@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 VMware, Inc.  All Rights Reserved.
+ * Copyright (C) 2014 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -13,37 +13,84 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
  */
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <errno.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <ipxe/io.h>
+#include <errno.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
-#include <ipxe/if_ether.h>
 #include <ipxe/ethernet.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
-#include "snp.h"
+#include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_pci.h>
 #include "snpnet.h"
 
 /** @file
  *
- * SNP network device driver
+ * SNP NIC driver
  *
  */
 
-/** SNP net device structure */
-struct snpnet_device {
-	/** The underlying simple network protocol */
+/** An SNP NIC */
+struct snp_nic {
+	/** EFI device */
+	struct efi_device *efidev;
+	/** Simple network protocol */
 	EFI_SIMPLE_NETWORK_PROTOCOL *snp;
+	/** Generic device */
+	struct device dev;
 
-	/** State that the SNP should be in after close */
-	UINT32 close_state;
+	/** Maximum packet size
+	 *
+	 * This is calculated as the sum of MediaHeaderSize and
+	 * MaxPacketSize, and may therefore be an overestimate.
+	 */
+	size_t mtu;
+
+	/** Current transmit buffer */
+	struct io_buffer *txbuf;
+	/** Current receive buffer */
+	struct io_buffer *rxbuf;
 };
+
+/** Maximum number of received packets per poll */
+#define SNP_RX_QUOTA 4
+
+/** EFI simple network protocol GUID */
+static EFI_GUID efi_simple_network_protocol_guid
+	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
+
+/** EFI PCI I/O protocol GUID */
+static EFI_GUID efi_pci_io_protocol_guid
+	= EFI_PCI_IO_PROTOCOL_GUID;
+
+/**
+ * Check link state
+ *
+ * @v netdev		Network device
+ */
+static void snpnet_check_link ( struct net_device *netdev ) {
+	struct snp_nic *snp = netdev_priv ( netdev );
+	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
+
+	/* Do nothing unless media presence detection is supported */
+	if ( ! mode->MediaPresentSupported )
+		return;
+
+	/* Report any link status change */
+	if ( mode->MediaPresent && ( ! netdev_link_ok ( netdev ) ) ) {
+		netdev_link_up ( netdev );
+	} else if ( ( ! mode->MediaPresent ) && netdev_link_ok ( netdev ) ) {
+		netdev_link_down ( netdev );
+	}
+}
 
 /**
  * Transmit packet
@@ -54,29 +101,66 @@ struct snpnet_device {
  */
 static int snpnet_transmit ( struct net_device *netdev,
 			     struct io_buffer *iobuf ) {
-	struct snpnet_device *snpnetdev = netdev->priv;
-	EFI_SIMPLE_NETWORK_PROTOCOL *snp = snpnetdev->snp;
-	void *txbuf=NULL;
-	size_t len = iob_len ( iobuf );
+	struct snp_nic *snp = netdev_priv ( netdev );
 	EFI_STATUS efirc;
 	int rc;
 
-	if ( ( efirc = snp->Transmit ( snp, 0, len, iobuf->data, NULL, NULL,
-				       NULL ) ) != 0 ) {
-		return -EEFI ( efirc );
+	/* Defer the packet if there is already a transmission in progress */
+	if ( snp->txbuf ) {
+		netdev_tx_defer ( netdev, iobuf );
+		return 0;
 	}
-	/* since GetStatus is so inconsistent, don't try more than one outstanding transmit at a time */
-	while ( txbuf == NULL ) {
-		if ( ( efirc = snp->GetStatus ( snp, NULL, &txbuf ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( snp, "SNP %p could not get status %s\n", snp,
-			       strerror ( rc ) );
-			break;
-		}
 
+	/* Transmit packet */
+	if ( ( efirc = snp->snp->Transmit ( snp->snp, 0, iob_len ( iobuf ),
+					    iobuf->data, NULL, NULL,
+					    NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( snp, "SNP %s could not transmit: %s\n",
+		       netdev->name, strerror ( rc ) );
+		return rc;
 	}
-	netdev_tx_complete ( netdev, iobuf );
+	snp->txbuf = iobuf;
+
 	return 0;
+}
+
+/**
+ * Poll for completed packets
+ *
+ * @v netdev		Network device
+ */
+static void snpnet_poll_tx ( struct net_device *netdev ) {
+	struct snp_nic *snp = netdev->priv;
+	UINT32 irq;
+	VOID *txbuf;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Get status */
+	if ( ( efirc = snp->snp->GetStatus ( snp->snp, &irq, &txbuf ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( snp, "SNP %s could not get status: %s\n",
+		       netdev->name, strerror ( rc ) );
+		netdev_rx_err ( netdev, NULL, rc );
+		return;
+	}
+
+	/* Do nothing unless we have a completion */
+	if ( ! txbuf )
+		return;
+
+	/* Sanity check */
+	if ( ! snp->txbuf ) {
+		DBGC ( snp, "SNP %s reported spurious TX completion\n",
+		       netdev->name );
+		netdev_tx_err ( netdev, NULL, -EPIPE );
+		return;
+	}
+
+	/* Complete transmission */
+	netdev_tx_complete ( netdev, snp->txbuf );
+	snp->txbuf = NULL;
 }
 
 /**
@@ -84,267 +168,371 @@ static int snpnet_transmit ( struct net_device *netdev,
  *
  * @v netdev		Network device
  */
-static void snpnet_poll ( struct net_device *netdev ) {
-	struct snpnet_device *snpnetdev = netdev->priv;
-	EFI_SIMPLE_NETWORK_PROTOCOL *snp = snpnetdev->snp;
-	struct io_buffer *iobuf = NULL;
+static void snpnet_poll_rx ( struct net_device *netdev ) {
+	struct snp_nic *snp = netdev->priv;
 	UINTN len;
+	unsigned int quota;
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Process received packets */
-	while ( 1 ) {
-		/* The spec is not clear if the max packet size refers to the
-		 * payload or the entire packet including headers. The Receive
-		 * function needs a buffer large enough to contain the headers,
-		 * and potentially a 4-byte CRC and 4-byte VLAN tag (?), so add
-		 * some breathing room.
-		 */
-		len = snp->Mode->MaxPacketSize + ETH_HLEN + 8;
-		iobuf = alloc_iob ( len );
-		if ( iobuf == NULL ) {
-			netdev_rx_err ( netdev, NULL, -ENOMEM );
-			break;
+	/* Retrieve up to SNP_RX_QUOTA packets */
+	for ( quota = SNP_RX_QUOTA ; quota ; quota-- ) {
+
+		/* Allocate buffer, if required */
+		if ( ! snp->rxbuf ) {
+			snp->rxbuf = alloc_iob ( snp->mtu );
+			if ( ! snp->rxbuf ) {
+				/* Leave for next poll */
+				break;
+			}
 		}
 
-		efirc = snp->Receive ( snp, NULL, &len, iobuf->data,
-				       NULL, NULL, NULL );
+		/* Receive packet */
+		len = iob_tailroom ( snp->rxbuf );
+		if ( ( efirc = snp->snp->Receive ( snp->snp, NULL, &len,
+						   snp->rxbuf->data, NULL,
+						   NULL, NULL ) ) != 0 ) {
 
-		/* No packets left? */
-		if ( efirc == EFI_NOT_READY ) {
-			free_iob ( iobuf );
-			break;
-		}
+			/* EFI_NOT_READY is just the usual "no packet"
+			 * status indication; ignore it.
+			 */
+			if ( efirc == EFI_NOT_READY )
+				break;
 
-		/* Other error? */
-		if ( efirc != 0 ) {
+			/* Anything else is an error */
 			rc = -EEFI ( efirc );
-			DBGC ( snp, "SNP %p receive packet error: %s "
-				    "(len was %zd, is now %zd)\n",
-			       snp, strerror ( rc ), iob_len(iobuf),
-			       (size_t)len );
-			netdev_rx_err ( netdev, iobuf, rc );
+			DBGC ( snp, "SNP %s could not receive: %s\n",
+			       netdev->name, strerror ( rc ) );
+			netdev_rx_err ( netdev, NULL, rc );
 			break;
 		}
 
-		/* Packet is valid, deliver it */
-		iob_put ( iobuf, len );
-		netdev_rx ( netdev, iob_disown ( iobuf ) );
+		/* Hand off to network stack */
+		iob_put ( snp->rxbuf, len );
+		netdev_rx ( netdev, snp->rxbuf );
+		snp->rxbuf = NULL;
 	}
 }
 
 /**
- * Open NIC
+ * Poll for completed packets
  *
- * @v netdev		Net device
+ * @v netdev		Network device
+ */
+static void snpnet_poll ( struct net_device *netdev ) {
+
+	/* Process any TX completions */
+	snpnet_poll_tx ( netdev );
+
+	/* Process any RX completions */
+	snpnet_poll_rx ( netdev );
+
+	/* Check for link state changes */
+	snpnet_check_link ( netdev );
+}
+
+/**
+ * Open network device
+ *
+ * @v netdev		Network device
  * @ret rc		Return status code
  */
 static int snpnet_open ( struct net_device *netdev ) {
-	struct snpnet_device *snpnetdev = netdev->priv;
-	EFI_SIMPLE_NETWORK_PROTOCOL *snp = snpnetdev->snp;
-	EFI_MAC_ADDRESS *mac;
-	UINT32 enableFlags, disableFlags;
+	struct snp_nic *snp = netdev->priv;
+	EFI_MAC_ADDRESS *mac = ( ( void * ) netdev->ll_addr );
+	UINT32 filters;
 	EFI_STATUS efirc;
 	int rc;
 
-	snpnetdev->close_state = snp->Mode->State;
-	if ( snp->Mode->State != EfiSimpleNetworkInitialized ) {
-		if ( ( efirc = snp->Initialize ( snp, 0, 0 ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( snp, "SNP %p could not initialize: %s\n",
-			       snp, strerror ( rc ) );
-			return rc;
-		}
-	}
-
-        /* Use the default MAC address */
-	mac = ( ( void * ) netdev->ll_addr );
-	if ( ( efirc = snp->StationAddress ( snp, FALSE, mac ) ) != 0 ) {
+	/* Try setting MAC address (before initialising) */
+	if ( ( efirc = snp->snp->StationAddress ( snp->snp, FALSE, mac ) ) !=0){
 		rc = -EEFI ( efirc );
-		DBGC ( snp, "SNP %p could not reset station address: %s\n",
-		       snp, strerror ( rc ) );
+		DBGC ( snp, "SNP %s could not set station address before "
+		       "initialising: %s\n", netdev->name, strerror ( rc ) );
+		/* Ignore error */
 	}
 
-	/* Set up receive filters to receive unicast and broadcast packets
-	 * always. Also, enable either promiscuous multicast (if possible) or
-	 * promiscuous operation, in order to catch all multicast packets.
-	 */
-	enableFlags = snp->Mode->ReceiveFilterMask &
-		      ( EFI_SIMPLE_NETWORK_RECEIVE_UNICAST |
-			EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST );
-	disableFlags = snp->Mode->ReceiveFilterMask &
-		       ( EFI_SIMPLE_NETWORK_RECEIVE_MULTICAST |
-			 EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS |
-			 EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS_MULTICAST );
-	if ( snp->Mode->ReceiveFilterMask &
-	     EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS_MULTICAST ) {
-		enableFlags |= EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS_MULTICAST;
-	} else if ( snp->Mode->ReceiveFilterMask &
-		    EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS ) {
-		enableFlags |= EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS;
-	}
-	disableFlags &= ~enableFlags;
-	if ( ( efirc = snp->ReceiveFilters ( snp, enableFlags, disableFlags,
-					     FALSE, 0, NULL ) ) != 0 ) {
+	/* Initialise NIC */
+	if ( ( efirc = snp->snp->Initialize ( snp->snp, 0, 0 ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( snp, "SNP %p could not set receive filters: %s\n",
-		       snp, strerror ( rc ) );
+		DBGC ( snp, "SNP %s could not initialise: %s\n",
+		       netdev->name, strerror ( rc ) );
+		return rc;
 	}
 
-	DBGC ( snp, "SNP %p opened\n", snp );
+	/* Try setting MAC address (after initialising) */
+	if ( ( efirc = snp->snp->StationAddress ( snp->snp, FALSE, mac ) ) !=0){
+		rc = -EEFI ( efirc );
+		DBGC ( snp, "SNP %s could not set station address after "
+		       "initialising: %s\n", netdev->name, strerror ( rc ) );
+		/* Ignore error */
+	}
+
+	/* Set receive filters */
+	filters = ( EFI_SIMPLE_NETWORK_RECEIVE_UNICAST |
+		    EFI_SIMPLE_NETWORK_RECEIVE_MULTICAST |
+		    EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST |
+		    EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS |
+		    EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS_MULTICAST );
+	if ( ( efirc = snp->snp->ReceiveFilters ( snp->snp, filters, 0, FALSE,
+						  0, NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( snp, "SNP %s could not set receive filters: %s\n",
+		       netdev->name, strerror ( rc ) );
+		/* Ignore error */
+	}
+
 	return 0;
 }
 
 /**
- * Close NIC
+ * Close network device
  *
- * @v netdev		Net device
+ * @v netdev		Network device
  */
 static void snpnet_close ( struct net_device *netdev ) {
-	struct snpnet_device *snpnetdev = netdev->priv;
-	EFI_SIMPLE_NETWORK_PROTOCOL *snp = snpnetdev->snp;
+	struct snp_nic *snp = netdev->priv;
 	EFI_STATUS efirc;
 	int rc;
 
-	if ( snpnetdev->close_state != EfiSimpleNetworkInitialized ) {
-		if ( ( efirc = snp->Shutdown ( snp ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( snp, "SNP %p could not shut down: %s\n",
-			       snp, strerror ( rc ) );
-		}
+	/* Shut down NIC */
+	if ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( snp, "SNP %s could not shut down: %s\n",
+		       netdev->name, strerror ( rc ) );
+		/* Nothing we can do about this */
 	}
-}
 
-/**
- * Enable/disable interrupts
- *
- * @v netdev		Net device
- * @v enable		Interrupts should be enabled
- */
-static void snpnet_irq ( struct net_device *netdev, int enable ) {
-	struct snpnet_device *snpnetdev = netdev->priv;
-	EFI_SIMPLE_NETWORK_PROTOCOL *snp = snpnetdev->snp;
+	/* Discard transmit buffer, if applicable */
+	if ( snp->txbuf ) {
+		netdev_tx_complete_err ( netdev, snp->txbuf, -ECANCELED );
+		snp->txbuf = NULL;
+	}
 
-	/* On EFI, interrupts are never necessary. (This function is only
-	 * required for BIOS PXE.) If interrupts were required, they could be
-	 * simulated using a fast timer.
-	 */
-	DBGC ( snp, "SNP %p cannot %s interrupts\n",
-	       snp, ( enable ? "enable" : "disable" ) );
+	/* Discard receive buffer, if applicable */
+	if ( snp->rxbuf ) {
+		free_iob ( snp->rxbuf );
+		snp->rxbuf = NULL;
+	}
 }
 
 /** SNP network device operations */
 static struct net_device_operations snpnet_operations = {
-	.open		= snpnet_open,
-	.close		= snpnet_close,
-	.transmit	= snpnet_transmit,
-	.poll		= snpnet_poll,
-	.irq   		= snpnet_irq,
+	.open = snpnet_open,
+	.close = snpnet_close,
+	.transmit = snpnet_transmit,
+	.poll = snpnet_poll,
 };
 
 /**
- * Probe SNP device
+ * Get underlying PCI device information
  *
- * @v snpdev		SNP device
+ * @v efidev		EFI device
+ * @v dev		Generic device to fill in
  * @ret rc		Return status code
  */
-int snpnet_probe ( struct snp_device *snpdev ) {
-	EFI_SIMPLE_NETWORK_PROTOCOL *snp = snpdev->snp;
+static int snpnet_pci_info ( struct efi_device *efidev, struct device *dev ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_DEVICE_PATH_PROTOCOL *devpath = efidev->path;
+	struct pci_device pci;
+	EFI_HANDLE device;
 	EFI_STATUS efirc;
-	struct net_device *netdev;
-	struct snpnet_device *snpnetdev;
 	int rc;
 
-	DBGC ( snp, "SNP %p probing...\n", snp );
+	/* Check for presence of PCI I/O protocol */
+	if ( ( efirc = bs->LocateDevicePath ( &efi_pci_io_protocol_guid,
+					      &devpath, &device ) ) != 0 ) {
+		DBGC ( efidev->device, "SNP %p %s is not a PCI device\n",
+		       efidev->device, efi_devpath_text ( efidev->path ) );
+		return -EEFI ( efirc );
+	}
 
-	/* Allocate net device */
-	netdev = alloc_etherdev ( sizeof ( struct snpnet_device ) );
-	if ( ! netdev )
-		return -ENOMEM;
+	/* Get PCI device information */
+	if ( ( rc = efipci_info ( device, &pci ) ) != 0 ) {
+		DBGC ( efidev->device, "SNP %p %s could not get PCI "
+		       "information: %s\n", efidev->device,
+		       efi_devpath_text ( efidev->path ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Populate SNP device information */
+	memcpy ( &dev->desc, &pci.dev.desc, sizeof ( dev->desc ) );
+	snprintf ( dev->name, sizeof ( dev->name ), "SNP-%s", pci.dev.name );
+
+	return 0;
+}
+
+/**
+ * Get underlying device information
+ *
+ * @v efidev		EFI device
+ * @v dev		Generic device to fill in
+ * @ret rc		Return status code
+ */
+static int snpnet_dev_info ( struct efi_device *efidev, struct device *dev ) {
+	int rc;
+
+	/* Try getting underlying PCI device information */
+	if ( ( rc = snpnet_pci_info ( efidev, dev ) ) == 0 )
+		return 0;
+
+	DBGC ( efidev->device, "SNP %p %s could not get underlying device "
+	       "information\n", efidev->device,
+	       efi_devpath_text ( efidev->path ) );
+	return -ENOTTY;
+}
+
+/**
+ * Attach driver to device
+ *
+ * @v efidev		EFI device
+ * @ret rc		Return status code
+ */
+int snpnet_start ( struct efi_device *efidev ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE device = efidev->device;
+	EFI_SIMPLE_NETWORK_MODE *mode;
+	struct net_device *netdev;
+	struct snp_nic *snp;
+	void *interface;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Open SNP protocol */
+	if ( ( efirc = bs->OpenProtocol ( device,
+					  &efi_simple_network_protocol_guid,
+					  &interface, efi_image_handle, device,
+					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
+					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( device, "SNP %p %s cannot open SNP protocol: %s\n",
+		       device, efi_devpath_text ( efidev->path ),
+		       strerror ( rc ) );
+		goto err_open_protocol;
+	}
+
+	/* Allocate and initialise structure */
+	netdev = alloc_etherdev ( sizeof ( *snp ) );
+	if ( ! netdev ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 	netdev_init ( netdev, &snpnet_operations );
-	netdev->dev = &snpdev->dev;
-	snpdev->netdev = netdev;
-	snpnetdev = netdev->priv;
-	snpnetdev->snp = snp;
-	snpdev->removal_state = snp->Mode->State;
+	snp = netdev->priv;
+	snp->efidev = efidev;
+	snp->snp = interface;
+	mode = snp->snp->Mode;
+	efidev_set_drvdata ( efidev, netdev );
 
-	/* Start the interface */
-	if ( snp->Mode->State == EfiSimpleNetworkStopped ) {
-		if ( ( efirc = snp->Start ( snp ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( snp, "SNP %p could not start: %s\n", snp,
-			       strerror ( rc ) );
-			goto err_start;
-		}
+	/* Populate underlying device information */
+	if ( ( rc = snpnet_dev_info ( efidev, &snp->dev ) ) != 0 )
+		goto err_info;
+	snp->dev.driver_name = "SNP";
+	snp->dev.parent = &efidev->dev;
+	list_add ( &snp->dev.siblings, &efidev->dev.children );
+	INIT_LIST_HEAD ( &snp->dev.children );
+	netdev->dev = &snp->dev;
+
+	/* Bring to the Started state */
+	if ( ( mode->State == EfiSimpleNetworkStopped ) &&
+	     ( ( efirc = snp->snp->Start ( snp->snp ) ) != 0 ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( device, "SNP %p %s could not start: %s\n", device,
+		       efi_devpath_text ( efidev->path ), strerror ( rc ) );
+		goto err_start;
+	}
+	if ( ( mode->State == EfiSimpleNetworkInitialized ) &&
+	     ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( device, "SNP %p %s could not shut down: %s\n", device,
+		       efi_devpath_text ( efidev->path ), strerror ( rc ) );
+		goto err_shutdown;
 	}
 
-	if ( snp->Mode->HwAddressSize > sizeof ( netdev->hw_addr ) ) {
-		DBGC ( snp, "SNP %p hardware address is too large\n", snp );
-		rc = -EINVAL;
-		goto err_hwaddr;
+	/* Populate network device parameters */
+	if ( mode->HwAddressSize != netdev->ll_protocol->hw_addr_len ) {
+		DBGC ( device, "SNP %p %s has invalid hardware address "
+		       "length %d\n", device, efi_devpath_text ( efidev->path ),
+		       mode->HwAddressSize );
+		rc = -ENOTSUP;
+		goto err_hw_addr_len;
 	}
-	memcpy ( netdev->hw_addr, snp->Mode->PermanentAddress.Addr,
-		 snp->Mode->HwAddressSize );
+	memcpy ( netdev->hw_addr, &mode->PermanentAddress,
+		 netdev->ll_protocol->hw_addr_len );
+	if ( mode->HwAddressSize != netdev->ll_protocol->ll_addr_len ) {
+		DBGC ( device, "SNP %p %s has invalid link-layer address "
+		       "length %d\n", device, efi_devpath_text ( efidev->path ),
+		       mode->HwAddressSize );
+		rc = -ENOTSUP;
+		goto err_ll_addr_len;
+	}
+	memcpy ( netdev->ll_addr, &mode->CurrentAddress,
+		 netdev->ll_protocol->ll_addr_len );
+	snp->mtu = ( snp->snp->Mode->MaxPacketSize +
+		     snp->snp->Mode->MediaHeaderSize );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
-		goto err_register;
+		goto err_register_netdev;
+	DBGC ( device, "SNP %p %s registered as %s\n", device,
+	       efi_devpath_text ( efidev->path ), netdev->name );
 
-	/* Mark as link up; we don't handle link state */
-	netdev_link_up ( netdev );
+	/* Set initial link state */
+	if ( snp->snp->Mode->MediaPresentSupported ) {
+		snpnet_check_link ( netdev );
+	} else {
+		netdev_link_up ( netdev );
+	}
 
-	DBGC ( snp, "SNP %p added\n", snp );
 	return 0;
 
-err_register:
-err_hwaddr:
-	if ( snpdev->removal_state == EfiSimpleNetworkStopped )
-		snp->Stop ( snp );
-
-err_start:
+	unregister_netdev ( netdev );
+ err_register_netdev:
+ err_ll_addr_len:
+ err_hw_addr_len:
+ err_shutdown:
+ err_start:
+	list_del ( &snp->dev.siblings );
+ err_info:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
-	snpdev->netdev = NULL;
+ err_alloc:
+	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
+			    efi_image_handle, device );
+ err_open_protocol:
 	return rc;
 }
 
 /**
- * Remove SNP device
+ * Detach driver from device
  *
- * @v snpdev		SNP device
- */
-void snpnet_remove ( struct snp_device *snpdev ) {
-	EFI_SIMPLE_NETWORK_PROTOCOL *snp = snpdev->snp;
-	struct net_device *netdev = snpdev->netdev;
+ * @v efidev		EFI device
+  */
+void snpnet_stop ( struct efi_device *efidev ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct net_device *netdev = efidev_get_drvdata ( efidev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_STATUS efirc;
 	int rc;
 
-	if ( snp->Mode->State == EfiSimpleNetworkInitialized &&
-	     snpdev->removal_state != EfiSimpleNetworkInitialized ) {
-		DBGC ( snp, "SNP %p shutting down\n", snp );
-		if ( ( efirc = snp->Shutdown ( snp ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( snp, "SNP %p could not shut down: %s\n",
-			       snp, strerror ( rc ) );
-		}
-	}
-
-	if ( snp->Mode->State == EfiSimpleNetworkStarted &&
-	     snpdev->removal_state == EfiSimpleNetworkStopped ) {
-		DBGC ( snp, "SNP %p stopping\n", snp );
-		if ( ( efirc = snp->Stop ( snp ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( snp, "SNP %p could not be stopped: %s\n",
-			       snp, strerror ( rc ) );
-		}
-	}
-
-	/* Unregister net device */
+	/* Unregister network device */
 	unregister_netdev ( netdev );
 
+	/* Stop SNP protocol */
+	if ( ( efirc = snp->snp->Stop ( snp->snp ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( efidev->device, "SNP %p %s could not stop: %s\n",
+		       efidev->device, efi_devpath_text ( efidev->path ),
+		       strerror ( rc ) );
+		/* Nothing we can do about this */
+	}
+
 	/* Free network device */
+	list_del ( &snp->dev.siblings );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 
-	DBGC ( snp, "SNP %p removed\n", snp );
+	/* Close SNP protocol */
+	bs->CloseProtocol ( efidev->device, &efi_simple_network_protocol_guid,
+			    efi_image_handle, efidev->device );
 }
