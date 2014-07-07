@@ -34,10 +34,8 @@ uint16_t __bss16 ( autoboot_busdevfn );
  */
 static void pci_autoboot_init ( void ) {
 
-	if ( autoboot_busdevfn ) {
-		autoboot_device.bus_type = BUS_TYPE_PCI;
-		autoboot_device.location = autoboot_busdevfn;
-	}
+	if ( autoboot_busdevfn )
+		set_autoboot_busloc ( BUS_TYPE_PCI, autoboot_busdevfn );
 }
 
 /** PCI autoboot device initialisation function */

@@ -9,8 +9,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <ipxe/in.h>
 #include <ipxe/device.h>
+
 struct net_device;
 struct uri;
 struct settings;
@@ -26,7 +26,9 @@ enum uriboot_flags {
 			 URIBOOT_NO_SAN_BOOT |	   \
 			 URIBOOT_NO_SAN_UNHOOK )
 
-extern struct device_description autoboot_device;
+extern void set_autoboot_busloc ( unsigned int bus_type,
+				  unsigned int location );
+extern void set_autoboot_ll_addr ( const void *ll_addr, size_t len );
 
 extern int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 		     unsigned int flags );
