@@ -19,16 +19,14 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <errno.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_autoboot.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
-#include <ipxe/efi/efi_driver.h>
-#include <ipxe/efi/efi_snp.h>
-#include "snpnet.h"
+#include <usr/autoboot.h>
 
 /** @file
  *
- * SNP driver
+ * EFI autoboot device
  *
  */
 
@@ -37,41 +35,37 @@ static EFI_GUID efi_simple_network_protocol_guid
 	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
 
 /**
- * Check to see if driver supports a device
+ * Identify autoboot device
  *
- * @v device		EFI device handle
- * @ret rc		Return status code
  */
-static int snp_supported ( EFI_HANDLE device ) {
+void efi_set_autoboot ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_SIMPLE_NETWORK_PROTOCOL *snp;
+		void *interface;
+	} snp;
+	EFI_SIMPLE_NETWORK_MODE *mode;
 	EFI_STATUS efirc;
 
-	/* Check that this is not a device we are providing ourselves */
-	if ( find_snpdev ( device ) != NULL ) {
-		DBGCP ( device, "SNP %p %s is provided by this binary\n",
-			device, efi_handle_devpath_text ( device ) );
-		return -ENOTTY;
-	}
-
-	/* Test for presence of simple network protocol */
-	if ( ( efirc = bs->OpenProtocol ( device,
+	/* Look for an SNP instance on the image's device handle */
+	if ( ( efirc = bs->OpenProtocol ( efi_loaded_image->DeviceHandle,
 					  &efi_simple_network_protocol_guid,
-					  NULL, efi_image_handle, device,
-					  EFI_OPEN_PROTOCOL_TEST_PROTOCOL))!=0){
-		DBGCP ( device, "SNP %p %s is not an SNP device\n",
-			device, efi_handle_devpath_text ( device ) );
-		return -EEFI ( efirc );
+					  &snp.interface, efi_image_handle,
+					  NULL,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		DBGC ( efi_loaded_image, "EFI found no autoboot device\n" );
+		return;
 	}
-	DBGC ( device, "SNP %p %s is an SNP device\n",
-	       device, efi_handle_devpath_text ( device ) );
 
-	return 0;
+	/* Record autoboot device */
+	mode = snp.snp->Mode;
+	set_autoboot_ll_addr ( &mode->CurrentAddress, mode->HwAddressSize );
+	DBGC ( efi_loaded_image, "EFI found autoboot link-layer address:\n" );
+	DBGC_HDA ( efi_loaded_image, 0, &mode->CurrentAddress,
+		   mode->HwAddressSize );
+
+	/* Close protocol */
+	bs->CloseProtocol ( efi_loaded_image->DeviceHandle,
+			    &efi_simple_network_protocol_guid,
+			    efi_image_handle, NULL );
 }
-
-/** EFI SNP driver */
-struct efi_driver snp_driver __efi_driver ( EFI_DRIVER_NORMAL ) = {
-	.name = "SNP",
-	.supported = snp_supported,
-	.start = snpnet_start,
-	.stop = snpnet_stop,
-};

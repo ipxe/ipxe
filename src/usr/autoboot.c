@@ -49,8 +49,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** Device location of preferred autoboot device */
-struct device_description autoboot_device;
+/** Link-layer address of preferred autoboot device, if known */
+static uint8_t autoboot_ll_addr[MAX_LL_ADDR_LEN];
+
+/** Device location of preferred autoboot device, if known */
+static struct device_description autoboot_desc;
+
+/** Autoboot device tester */
+static int ( * is_autoboot_device ) ( struct net_device *netdev );
 
 /* Disambiguate the various error causes */
 #define ENOENT_BOOT __einfo_error ( EINFO_ENOENT_BOOT )
@@ -422,15 +428,60 @@ int netboot ( struct net_device *netdev ) {
 }
 
 /**
- * Test if network device matches the autoboot device location
+ * Test if network device matches the autoboot device bus type and location
  *
  * @v netdev		Network device
- * @ret is_autoboot	Network device matches the autoboot device location
+ * @ret is_autoboot	Network device matches the autoboot device
  */
-static int is_autoboot_device ( struct net_device *netdev ) {
+static int is_autoboot_busloc ( struct net_device *netdev ) {
 
-	return ( ( netdev->dev->desc.bus_type == autoboot_device.bus_type ) &&
-		 ( netdev->dev->desc.location == autoboot_device.location ) );
+	return ( ( netdev->dev->desc.bus_type == autoboot_desc.bus_type ) &&
+		 ( netdev->dev->desc.location == autoboot_desc.location ) );
+}
+
+/**
+ * Identify autoboot device by bus type and location
+ *
+ * @v bus_type		Bus type
+ * @v location		Location
+ */
+void set_autoboot_busloc ( unsigned int bus_type, unsigned int location ) {
+
+	/* Record autoboot device description */
+	autoboot_desc.bus_type = bus_type;
+	autoboot_desc.location = location;
+
+	/* Mark autoboot device as present */
+	is_autoboot_device = is_autoboot_busloc;
+}
+
+/**
+ * Test if network device matches the autoboot device link-layer address
+ *
+ * @v netdev		Network device
+ * @ret is_autoboot	Network device matches the autoboot device
+ */
+static int is_autoboot_ll_addr ( struct net_device *netdev ) {
+
+	return ( memcmp ( netdev->ll_addr, autoboot_ll_addr,
+			  netdev->ll_protocol->ll_addr_len ) == 0 );
+}
+
+/**
+ * Identify autoboot device by link-layer address
+ *
+ * @v ll_addr		Link-layer address
+ * @v len		Length of link-layer address
+ */
+void set_autoboot_ll_addr ( const void *ll_addr, size_t len ) {
+
+	/* Record autoboot link-layer address (truncated if necessary) */
+	if ( len > sizeof ( autoboot_ll_addr ) )
+		len = sizeof ( autoboot_ll_addr );
+	memcpy ( autoboot_ll_addr, ll_addr, len );
+
+	/* Mark autoboot device as present */
+	is_autoboot_device = is_autoboot_ll_addr;
 }
 
 /**
@@ -447,8 +498,7 @@ static int autoboot ( void ) {
 	for_each_netdev ( netdev ) {
 
 		/* Skip any non-matching devices, if applicable */
-		if ( autoboot_device.bus_type &&
-		     ( ! is_autoboot_device ( netdev ) ) )
+		if ( is_autoboot_device && ( ! is_autoboot_device ( netdev ) ) )
 			continue;
 
 		/* Attempt booting from this device */
