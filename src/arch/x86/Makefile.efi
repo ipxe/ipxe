@@ -15,6 +15,10 @@ NON_AUTO_MEDIA	+= efidrv
 NON_AUTO_MEDIA	+= drv.efi
 NON_AUTO_MEDIA	+= efirom
 
+# Include SNP driver in the all-drivers build
+#
+DRIVERS += snp
+
 # Rules for building EFI files
 #
 $(BIN)/%.efi : $(BIN)/%.efi.tmp $(ELF2EFI)
