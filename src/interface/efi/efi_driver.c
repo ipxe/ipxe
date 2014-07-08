@@ -269,6 +269,13 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 
 	/* Try to start this device */
 	for_each_table_entry ( efidrv, EFI_DRIVERS ) {
+		if ( ( rc = efidrv->supported ( device ) ) != 0 ) {
+			DBGC ( device, "EFIDEV %p %s is not supported by "
+			       "driver \"%s\": %s\n",
+			       device, efi_devpath_text ( efidev->path ),
+			       efidrv->name, strerror ( rc ) );
+			continue;
+		}
 		if ( ( rc = efidrv->start ( efidev ) ) == 0 ) {
 			efidev->driver = efidrv;
 			DBGC ( device, "EFIDRV %p %s using driver \"%s\"\n",
