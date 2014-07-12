@@ -459,7 +459,7 @@ static int x509_parse_basic_constraints ( struct x509_certificate *cert,
 			return -EINVAL;
 		}
 		basic->path_len = path_len;
-		DBGC2 ( cert, "X509 %p path length constraint is %u\n",
+		DBGC2 ( cert, "X509 %p path length constraint is %d\n",
 			cert, basic->path_len );
 	}
 
