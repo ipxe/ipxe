@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
+#include <ipxe/efi/Protocol/DiskIo.h>
 #include <ipxe/efi/Guid/FileInfo.h>
 #include <ipxe/efi/Guid/FileSystemInfo.h>
 #include <ipxe/efi/efi_strings.h>
@@ -54,6 +55,10 @@ static EFI_GUID efi_file_system_info_id = EFI_FILE_SYSTEM_INFO_ID;
 /** EFI block I/O protocol GUID */
 static EFI_GUID efi_block_io_protocol_guid
 	= EFI_BLOCK_IO_PROTOCOL_GUID;
+
+/** EFI disk I/O protocol GUID */
+static EFI_GUID efi_disk_io_protocol_guid
+	= EFI_DISK_IO_PROTOCOL_GUID;
 
 /** EFI media ID */
 #define EFI_MEDIA_ID_MAGIC 0x69505845
@@ -506,7 +511,7 @@ static EFI_STATUS EFIAPI
 efi_block_io_read_blocks ( EFI_BLOCK_IO_PROTOCOL *this __unused,
 			   UINT32 MediaId __unused, EFI_LBA lba __unused,
 			   UINTN len __unused, VOID *data __unused ) {
-	return EFI_DEVICE_ERROR;
+	return EFI_NO_MEDIA;
 }
 
 /** Dummy block I/O write */
@@ -514,7 +519,7 @@ static EFI_STATUS EFIAPI
 efi_block_io_write_blocks ( EFI_BLOCK_IO_PROTOCOL *this __unused,
 			    UINT32 MediaId __unused, EFI_LBA lba __unused,
 			    UINTN len __unused, VOID *data __unused ) {
-	return EFI_DEVICE_ERROR;
+	return EFI_NO_MEDIA;
 }
 
 /** Dummy block I/O flush */
@@ -541,6 +546,29 @@ static EFI_BLOCK_IO_PROTOCOL efi_block_io_protocol = {
 	.FlushBlocks = efi_block_io_flush_blocks,
 };
 
+/** Dummy disk I/O read */
+static EFI_STATUS EFIAPI
+efi_disk_io_read_disk ( EFI_DISK_IO_PROTOCOL *this __unused,
+			UINT32 MediaId __unused, UINT64 offset __unused,
+			UINTN len __unused, VOID *data __unused ) {
+	return EFI_NO_MEDIA;
+}
+
+/** Dummy disk I/O write */
+static EFI_STATUS EFIAPI
+efi_disk_io_write_disk ( EFI_DISK_IO_PROTOCOL *this __unused,
+			 UINT32 MediaId __unused, UINT64 offset __unused,
+			 UINTN len __unused, VOID *data __unused ) {
+	return EFI_NO_MEDIA;
+}
+
+/** Dummy EFI disk I/O protocol */
+static EFI_DISK_IO_PROTOCOL efi_disk_io_protocol = {
+	.Revision = EFI_DISK_IO_PROTOCOL_REVISION,
+	.ReadDisk = efi_disk_io_read_disk,
+	.WriteDisk = efi_disk_io_write_disk,
+};
+
 /**
  * Install EFI simple file system protocol
  *
@@ -549,29 +577,79 @@ static EFI_BLOCK_IO_PROTOCOL efi_block_io_protocol = {
  */
 int efi_file_install ( EFI_HANDLE *handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_DISK_IO_PROTOCOL *diskio;
+		void *interface;
+	} diskio;
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Install the simple file system protocol and the block I/O
-	 * protocol.  We don't have a block device, but large parts of
-	 * the EDK2 codebase make the assumption that file systems are
-	 * normally attached to block devices, and so we create a
-	 * dummy block device on the same handle just to keep things
-	 * looking normal.
+	/* Install the simple file system protocol, block I/O
+	 * protocol, and disk I/O protocol.  We don't have a block
+	 * device, but large parts of the EDK2 codebase make the
+	 * assumption that file systems are normally attached to block
+	 * devices, and so we create a dummy block device on the same
+	 * handle just to keep things looking normal.
 	 */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
 			handle,
 			&efi_block_io_protocol_guid,
 			&efi_block_io_protocol,
+			&efi_disk_io_protocol_guid,
+			&efi_disk_io_protocol,
 			&efi_simple_file_system_protocol_guid,
 			&efi_simple_file_system_protocol, NULL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( handle, "Could not install simple file system protocol: "
-		       "%s\n", strerror ( rc ) );
-		return rc;
+		DBGC ( handle, "Could not install simple file system "
+		       "protocols: %s\n", strerror ( rc ) );
+		goto err_install;
 	}
 
+	/* The FAT filesystem driver has a bug: if a block device
+	 * contains no FAT filesystem but does have an
+	 * EFI_SIMPLE_FILE_SYSTEM_PROTOCOL instance, the FAT driver
+	 * will assume that it must have previously installed the
+	 * EFI_SIMPLE_FILE_SYSTEM_PROTOCOL.  This causes the FAT
+	 * driver to claim control of our device, and to refuse to
+	 * stop driving it, which prevents us from later uninstalling
+	 * correctly.
+	 *
+	 * Work around this bug by opening the disk I/O protocol
+	 * ourselves, thereby preventing the FAT driver from opening
+	 * it.
+	 *
+	 * Note that the alternative approach of opening the block I/O
+	 * protocol (and thereby in theory preventing DiskIo from
+	 * attaching to the block I/O protocol) causes an endless loop
+	 * of calls to our DRIVER_STOP method when starting the EFI
+	 * shell.  I have no idea why this is.
+	 */
+	if ( ( efirc = bs->OpenProtocol ( *handle, &efi_disk_io_protocol_guid,
+					  &diskio.interface, efi_image_handle,
+					  *handle,
+					  EFI_OPEN_PROTOCOL_BY_DRIVER ) ) != 0){
+		rc = -EEFI ( efirc );
+		DBGC ( handle, "Could not open disk I/O protocol: %s\n",
+		       strerror ( rc ) );
+		goto err_open;
+	}
+	assert ( diskio.diskio == &efi_disk_io_protocol );
+
 	return 0;
+
+	bs->CloseProtocol ( *handle, &efi_disk_io_protocol_guid,
+			    efi_image_handle, *handle );
+ err_open:
+	bs->UninstallMultipleProtocolInterfaces (
+			*handle,
+			&efi_simple_file_system_protocol_guid,
+			&efi_simple_file_system_protocol,
+			&efi_disk_io_protocol_guid,
+			&efi_disk_io_protocol,
+			&efi_block_io_protocol_guid,
+			&efi_block_io_protocol, NULL );
+ err_install:
+	return rc;
 }
 
 /**
@@ -581,16 +659,29 @@ int efi_file_install ( EFI_HANDLE *handle ) {
  */
 void efi_file_uninstall ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Close our own disk I/O protocol */
+	bs->CloseProtocol ( handle, &efi_disk_io_protocol_guid,
+			    efi_image_handle, handle );
 
 	/* We must install the file system protocol first, since
 	 * otherwise the EDK2 code will attempt to helpfully uninstall
 	 * it when the block I/O protocol is uninstalled, leading to a
 	 * system lock-up.
 	 */
-	bs->UninstallMultipleProtocolInterfaces (
+	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			handle,
 			&efi_simple_file_system_protocol_guid,
 			&efi_simple_file_system_protocol,
+			&efi_disk_io_protocol_guid,
+			&efi_disk_io_protocol,
 			&efi_block_io_protocol_guid,
-			&efi_block_io_protocol, NULL );
+			&efi_block_io_protocol, NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( handle, "Could not uninstall simple file system "
+		       "protocols: %s\n", strerror ( rc ) );
+		/* Oh dear */
+	}
 }
