@@ -2,7 +2,7 @@
   Provides string functions, linked list functions, math functions, synchronization
   functions, and CPU architecture-specific functions.
 
-Copyright (c) 2006 - 2012, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2013, Intel Corporation. All rights reserved.<BR>
 Portions copyright (c) 2008 - 2009, Apple Inc. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
@@ -147,6 +147,39 @@ typedef struct {
 #define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 4
 
 #endif  // defined (MDE_CPU_ARM)
+
+#if defined (MDE_CPU_AARCH64)
+typedef struct {
+  // GP regs
+  UINT64    X19;
+  UINT64    X20;
+  UINT64    X21;
+  UINT64    X22;
+  UINT64    X23;
+  UINT64    X24;
+  UINT64    X25;
+  UINT64    X26;
+  UINT64    X27;
+  UINT64    X28;
+  UINT64    FP;
+  UINT64    LR;
+  UINT64    IP0;
+
+  // FP regs
+  UINT64    D8;
+  UINT64    D9;
+  UINT64    D10;
+  UINT64    D11;
+  UINT64    D12;
+  UINT64    D13;
+  UINT64    D14;
+  UINT64    D15;
+} BASE_LIBRARY_JUMP_BUFFER;
+
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 8
+
+#endif  // defined (MDE_CPU_AARCH64)
+
 
 //
 // String Services
@@ -1359,7 +1392,7 @@ InsertTailList (
   @param  List  A pointer to the head node of a doubly linked list.
 
   @return The first node of a doubly linked list.
-  @retval NULL  The list is empty.
+  @retval List  The list is empty.
 
 **/
 LIST_ENTRY *

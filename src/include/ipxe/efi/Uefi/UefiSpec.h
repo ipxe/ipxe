@@ -1,11 +1,11 @@
 /** @file
   Include file that supports UEFI.
 
-  This include file must contain things defined in the UEFI 2.3 specification.
-  If a code construct is defined in the UEFI 2.3 specification it must be included
+  This include file must contain things defined in the UEFI 2.4 specification.
+  If a code construct is defined in the UEFI 2.4 specification it must be included
   by this include file.
 
-Copyright (c) 2006 - 2012, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2014, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials are licensed and made available under
 the terms and conditions of the BSD License that accompanies this distribution.
 The full text of the license may be found at
@@ -459,11 +459,11 @@ typedef enum {
   ///
   TimerCancel,
   ///
-  /// An event is to be signalled periodically at a specified interval from the current time.
+  /// An event is to be signaled periodically at a specified interval from the current time.
   ///
   TimerPeriodic,
   ///
-  /// An event is to be signalled once at a specified interval from the current time.
+  /// An event is to be signaled once at a specified interval from the current time.
   ///
   TimerRelative
 } EFI_TIMER_DELAY;
@@ -664,13 +664,20 @@ EFI_STATUS
                                  then EFI_INVALID_PARAMETER is returned.
   @param  VendorGuid             A unique identifier for the vendor.
   @param  Attributes             Attributes bitmask to set for the variable.
-  @param  DataSize               The size in bytes of the Data buffer. A size of zero causes the
-                                 variable to be deleted.
+  @param  DataSize               The size in bytes of the Data buffer. Unless the EFI_VARIABLE_APPEND_WRITE,
+                                 EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS, or
+                                 EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute is set, a size of zero
+                                 causes the variable to be deleted. When the EFI_VARIABLE_APPEND_WRITE attribute is
+                                 set, then a SetVariable() call with a DataSize of zero will not cause any change to
+                                 the variable value (the timestamp associated with the variable may be updated however
+                                 even if no new data value is provided,see the description of the
+                                 EFI_VARIABLE_AUTHENTICATION_2 descriptor below. In this case the DataSize will not
+                                 be zero since the EFI_VARIABLE_AUTHENTICATION_2 descriptor will be populated).
   @param  Data                   The contents for the variable.
 
   @retval EFI_SUCCESS            The firmware has successfully stored the variable and its data as
                                  defined by the Attributes.
-  @retval EFI_INVALID_PARAMETER  An invalid combination of attribute bits was supplied, or the
+  @retval EFI_INVALID_PARAMETER  An invalid combination of attribute bits, name, and GUID was supplied, or the
                                  DataSize exceeds the maximum allowed.
   @retval EFI_INVALID_PARAMETER  VariableName is an empty string.
   @retval EFI_OUT_OF_RESOURCES   Not enough storage is available to hold the variable and its data.
@@ -678,8 +685,9 @@ EFI_STATUS
   @retval EFI_WRITE_PROTECTED    The variable in question is read-only.
   @retval EFI_WRITE_PROTECTED    The variable in question cannot be deleted.
   @retval EFI_SECURITY_VIOLATION The variable could not be written due to EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS
-                                 set but the AuthInfo does NOT pass the validation check carried out
-                                 by the firmware.
+                                 or EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACESS being set, but the AuthInfo
+                                 does NOT pass the validation check carried out by the firmware.
+
   @retval EFI_NOT_FOUND          The variable trying to be updated or deleted was not found.
 
 **/
@@ -989,7 +997,15 @@ typedef enum {
   /// state.  If the system does not support this reset type, then when the system
   /// is rebooted, it should exhibit the EfiResetCold attributes.
   ///
-  EfiResetShutdown
+  EfiResetShutdown,
+  ///
+  /// Used to induce a system-wide reset. The exact type of the reset is defined by
+  /// the EFI_GUID that follows the Null-terminated Unicode string passed into
+  /// ResetData. If the platform does not recognize the EFI_GUID in ResetData the
+  /// platform must pick a supported reset type to perform. The platform may
+  /// optionally log the parameters from any non-normal reset that occurs.
+  ///
+  EfiResetPlatformSpecific
 } EFI_RESET_TYPE;
 
 /**
@@ -1150,6 +1166,8 @@ EFI_STATUS
   @retval EFI_OUT_OF_RESOURCES  There was not enough memory in pool to install all the protocols.
   @retval EFI_ALREADY_STARTED   A Device Path Protocol instance was passed in that is already present in
                                 the handle database.
+  @retval EFI_INVALID_PARAMETER Handle is NULL.
+  @retval EFI_INVALID_PARAMETER Protocol is already installed on the handle specified by Handle.
 
 **/
 typedef
@@ -1655,7 +1673,11 @@ typedef struct {
   @retval EFI_INVALID_PARAMETER CapsuleCount is 0.
   @retval EFI_DEVICE_ERROR      The capsule update was started, but failed due to a device error.
   @retval EFI_UNSUPPORTED       The capsule type is not supported on this platform.
-  @retval EFI_OUT_OF_RESOURCES  There were insufficient resources to process the capsule.
+  @retval EFI_OUT_OF_RESOURCES  When ExitBootServices() has been previously called this error indicates the capsule
+                                is compatible with this platform but is not capable of being submitted or processed
+                                in runtime. The caller may resubmit the capsule prior to ExitBootServices().
+  @retval EFI_OUT_OF_RESOURCES  When ExitBootServices() has not been previously called then this error indicates
+                                the capsule is compatible with this platform but there are insufficient resources to process.
 
 **/
 typedef
@@ -1682,7 +1704,11 @@ EFI_STATUS
   @retval EFI_UNSUPPORTED       The capsule type is not supported on this platform, and
                                 MaximumCapsuleSize and ResetType are undefined.
   @retval EFI_INVALID_PARAMETER MaximumCapsuleSize is NULL.
-  @retval EFI_OUT_OF_RESOURCES  There were insufficient resources to process the query request.
+  @retval EFI_OUT_OF_RESOURCES  When ExitBootServices() has been previously called this error indicates the capsule
+                                is compatible with this platform but is not capable of being submitted or processed
+                                in runtime. The caller may resubmit the capsule prior to ExitBootServices().
+  @retval EFI_OUT_OF_RESOURCES  When ExitBootServices() has not been previously called then this error indicates
+                                the capsule is compatible with this platform but there are insufficient resources to process.
 
 **/
 typedef
@@ -1728,12 +1754,17 @@ EFI_STATUS
 //
 // Firmware should stop at a firmware user interface on next boot
 //
-#define EFI_OS_INDICATIONS_BOOT_TO_FW_UI    0x0000000000000001
+#define EFI_OS_INDICATIONS_BOOT_TO_FW_UI                    0x0000000000000001
+#define EFI_OS_INDICATIONS_TIMESTAMP_REVOCATION             0x0000000000000002
+#define EFI_OS_INDICATIONS_FILE_CAPSULE_DELIVERY_SUPPORTED  0x0000000000000004
+#define EFI_OS_INDICATIONS_FMP_CAPSULE_SUPPORTED            0x0000000000000008
+#define EFI_OS_INDICATIONS_CAPSULE_RESULT_VAR_SUPPORTED     0x0000000000000010
 
 //
 // EFI Runtime Services Table
 //
 #define EFI_SYSTEM_TABLE_SIGNATURE      SIGNATURE_64 ('I','B','I',' ','S','Y','S','T')
+#define EFI_2_40_SYSTEM_TABLE_REVISION  ((2 << 16) | (40))
 #define EFI_2_31_SYSTEM_TABLE_REVISION  ((2 << 16) | (31))
 #define EFI_2_30_SYSTEM_TABLE_REVISION  ((2 << 16) | (30))
 #define EFI_2_20_SYSTEM_TABLE_REVISION  ((2 << 16) | (20))
@@ -1741,10 +1772,11 @@ EFI_STATUS
 #define EFI_2_00_SYSTEM_TABLE_REVISION  ((2 << 16) | (00))
 #define EFI_1_10_SYSTEM_TABLE_REVISION  ((1 << 16) | (10))
 #define EFI_1_02_SYSTEM_TABLE_REVISION  ((1 << 16) | (02))
-#define EFI_SYSTEM_TABLE_REVISION       EFI_2_31_SYSTEM_TABLE_REVISION
+#define EFI_SYSTEM_TABLE_REVISION       EFI_2_40_SYSTEM_TABLE_REVISION
+#define EFI_SPECIFICATION_VERSION       EFI_SYSTEM_TABLE_REVISION
 
 #define EFI_RUNTIME_SERVICES_SIGNATURE  SIGNATURE_64 ('R','U','N','T','S','E','R','V')
-#define EFI_RUNTIME_SERVICES_REVISION   EFI_2_31_SYSTEM_TABLE_REVISION
+#define EFI_RUNTIME_SERVICES_REVISION   EFI_SPECIFICATION_VERSION
 
 ///
 /// EFI Runtime Services Table.
@@ -1796,7 +1828,7 @@ typedef struct {
 
 
 #define EFI_BOOT_SERVICES_SIGNATURE   SIGNATURE_64 ('B','O','O','T','S','E','R','V')
-#define EFI_BOOT_SERVICES_REVISION    EFI_2_31_SYSTEM_TABLE_REVISION
+#define EFI_BOOT_SERVICES_REVISION    EFI_SPECIFICATION_VERSION
 
 ///
 /// EFI Boot Services Table.
@@ -2013,41 +2045,46 @@ EFI_STATUS
 ///
 /// EFI Boot Key Data
 ///
-typedef UINT32 EFI_BOOT_KEY_DATA;
-///
-/// Indicates the revision of the EFI_KEY_OPTION structure. This revision level should be 0.
-///
-#define EFI_KEY_OPTION_REVISION_MASK        0x000000FF
-///
-/// Either the left or right Shift keys must be pressed (1) or must not be pressed (0).
-///
-#define EFI_KEY_OPTION_SHIFT_PRESSED_MASK   BIT8
-///
-/// Either the left or right Control keys must be pressed (1) or must not be pressed (0).
-///
-#define EFI_KEY_OPTION_CONTROL_PRESSED_MASK BIT9
-///
-/// Either the left or right Alt keys must be pressed (1) or must not be pressed (0).
-///
-#define EFI_KEY_OPTION_ALT_PRESSED_MASK     BIT10
-///
-/// Either the left or right Logo keys must be pressed (1) or must not be pressed (0).
-///
-#define EFI_KEY_OPTION_LOGO_PRESSED_MASK    BIT11
-///
-/// The Menu key must be pressed (1) or must not be pressed (0).
-///
-#define EFI_KEY_OPTION_MENU_PRESSED_MASK    BIT12
-///
-/// The SysReq key must be pressed (1) or must not be pressed (0).
-///
-#define EFI_KEY_OPTION_SYS_REQ_PRESSED_MASK BIT13
-///
-/// Specifies the actual number of entries in EFI_KEY_OPTION.Keys, from 0-3. If
-/// zero, then only the shift state is considered. If more than one, then the boot option will
-/// only be launched if all of the specified keys are pressed with the same shift state.
-///
-#define EFI_KEY_OPTION_INPUT_KEY_COUNT_MASK (BIT30 | BIT31)
+typedef union {
+  struct {
+    ///
+    /// Indicates the revision of the EFI_KEY_OPTION structure. This revision level should be 0.
+    ///
+    UINT32  Revision        : 8;
+    ///
+    /// Either the left or right Shift keys must be pressed (1) or must not be pressed (0).
+    ///
+    UINT32  ShiftPressed    : 1;
+    ///
+    /// Either the left or right Control keys must be pressed (1) or must not be pressed (0).
+    ///
+    UINT32  ControlPressed  : 1;
+    ///
+    /// Either the left or right Alt keys must be pressed (1) or must not be pressed (0).
+    ///
+    UINT32  AltPressed      : 1;
+    ///
+    /// Either the left or right Logo keys must be pressed (1) or must not be pressed (0).
+    ///
+    UINT32  LogoPressed     : 1;
+    ///
+    /// The Menu key must be pressed (1) or must not be pressed (0).
+    ///
+    UINT32  MenuPressed     : 1;
+    ///
+    /// The SysReq key must be pressed (1) or must not be pressed (0).
+    ///
+    UINT32  SysReqPressed    : 1;
+    UINT32  Reserved        : 16;
+    ///
+    /// Specifies the actual number of entries in EFI_KEY_OPTION.Keys, from 0-3. If
+    /// zero, then only the shift state is considered. If more than one, then the boot option will
+    /// only be launched if all of the specified keys are pressed with the same shift state.
+    ///
+    UINT32  InputKeyCount   : 2;
+  } Options;
+  UINT32  PackedValue;
+} EFI_BOOT_KEY_DATA;
 
 ///
 /// EFI Key Option.
@@ -2085,6 +2122,7 @@ typedef struct {
 #define EFI_REMOVABLE_MEDIA_FILE_NAME_IA64    L"\\EFI\\BOOT\\BOOTIA64.EFI"
 #define EFI_REMOVABLE_MEDIA_FILE_NAME_X64     L"\\EFI\\BOOT\\BOOTX64.EFI"
 #define EFI_REMOVABLE_MEDIA_FILE_NAME_ARM     L"\\EFI\\BOOT\\BOOTARM.EFI"
+#define EFI_REMOVABLE_MEDIA_FILE_NAME_AARCH64 L"\\EFI\\BOOT\\BOOTAA64.EFI"
 
 #if   defined (MDE_CPU_IA32)
   #define EFI_REMOVABLE_MEDIA_FILE_NAME   EFI_REMOVABLE_MEDIA_FILE_NAME_IA32
@@ -2095,6 +2133,8 @@ typedef struct {
 #elif defined (MDE_CPU_EBC)
 #elif defined (MDE_CPU_ARM)
   #define EFI_REMOVABLE_MEDIA_FILE_NAME   EFI_REMOVABLE_MEDIA_FILE_NAME_ARM
+#elif defined (MDE_CPU_AARCH64)
+  #define EFI_REMOVABLE_MEDIA_FILE_NAME   EFI_REMOVABLE_MEDIA_FILE_NAME_AARCH64
 #else
   #error Unknown Processor Type
 #endif
