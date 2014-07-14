@@ -50,6 +50,9 @@ struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 /** List of open network devices, in reverse order of opening */
 static struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
 
+/** Network device index */
+static unsigned int netdev_index = 0;
+
 /** Network polling profiler */
 static struct profiler net_poll_profiler __profiler = { .name = "net.poll" };
 
@@ -597,14 +600,13 @@ struct net_device * alloc_netdev ( size_t priv_len ) {
  * devices.
  */
 int register_netdev ( struct net_device *netdev ) {
-	static unsigned int ifindex = 0;
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct net_driver *driver;
 	uint32_t seed;
 	int rc;
 
 	/* Record device index and create device name */
-	netdev->index = ifindex++;
+	netdev->index = netdev_index++;
 	if ( netdev->name[0] == '\0' ) {
 		snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
 			   netdev->index );
@@ -764,6 +766,10 @@ void unregister_netdev ( struct net_device *netdev ) {
 	DBGC ( netdev, "NETDEV %s unregistered\n", netdev->name );
 	list_del ( &netdev->list );
 	netdev_put ( netdev );
+
+	/* Reset network device index if no devices remain */
+	if ( list_empty ( &net_devices ) )
+		netdev_index = 0;
 }
 
 /** Enable or disable interrupts
