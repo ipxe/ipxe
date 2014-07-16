@@ -241,6 +241,10 @@ static int skeleton_probe ( struct pci_device *pci ) {
 
 	/* Map registers */
 	skel->regs = ioremap ( pci->membase, SKELETON_BAR_SIZE );
+	if ( ! skel->regs ) {
+		rc = -ENODEV;
+		goto err_ioremap;
+	}
 
 	/* Reset the NIC */
 	if ( ( rc = skeleton_reset ( skel ) ) != 0 )
@@ -269,6 +273,7 @@ static int skeleton_probe ( struct pci_device *pci ) {
 	skeleton_reset ( skel );
  err_reset:
 	iounmap ( skel->regs );
+ err_ioremap:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
