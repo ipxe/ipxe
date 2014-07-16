@@ -151,6 +151,8 @@ static void iscsi_start_login ( struct iscsi_session *iscsi );
 static void iscsi_start_data_out ( struct iscsi_session *iscsi,
 				   unsigned int datasn );
 
+LIST_HEAD( iscsi_session_list );
+
 /**
  * Finish receiving PDU data into buffer
  *
@@ -200,6 +202,7 @@ static void iscsi_free ( struct refcnt *refcnt ) {
 	struct iscsi_session *iscsi =
 		container_of ( refcnt, struct iscsi_session, refcnt );
 
+	list_del ( &iscsi->node );
 	free ( iscsi->initiator_iqn );
 	free ( iscsi->target_address );
 	free ( iscsi->target_iqn );
@@ -2070,6 +2073,8 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
 		rc = -ENOMEM;
 		goto err_zalloc;
 	}
+	INIT_LIST_HEAD( &iscsi->node);
+	list_add_tail ( &iscsi->node, &iscsi_session_list );
 	ref_init ( &iscsi->refcnt, iscsi_free );
 	intf_init ( &iscsi->control, &iscsi_control_desc, &iscsi->refcnt );
 	intf_init ( &iscsi->data, &iscsi_data_desc, &iscsi->refcnt );
