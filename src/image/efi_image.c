@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_file.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
+#include <ipxe/efi/efi_wrap.h>
 #include <ipxe/image.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -221,6 +222,9 @@ static int efi_image_exec ( struct image *image ) {
 
 	/* Release network devices for use via SNP */
 	efi_snp_release();
+
+	/* Wrap calls made by the loaded image (for debugging) */
+	efi_wrap ( handle, loaded.image );
 
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
