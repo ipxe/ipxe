@@ -24,8 +24,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/ConsoleControl/ConsoleControl.h>
 #include <ipxe/ansiesc.h>
 #include <ipxe/console.h>
+#include <ipxe/init.h>
 #include <config/console.h>
 
 #define ATTR_BOLD		0x08
@@ -60,6 +62,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** Current character attribute */
 static unsigned int efi_attr = ATTR_DEFAULT;
+
+/** Console control protocol */
+static EFI_CONSOLE_CONTROL_PROTOCOL *conctrl;
+EFI_REQUEST_PROTOCOL ( EFI_CONSOLE_CONTROL_PROTOCOL, &conctrl );
 
 /**
  * Handle ANSI CUP (cursor position)
@@ -286,9 +292,37 @@ static int efi_iskey ( void ) {
 	return 0;
 }
 
+/** EFI console driver */
 struct console_driver efi_console __console_driver = {
 	.putchar = efi_putchar,
 	.getchar = efi_getchar,
 	.iskey = efi_iskey,
 	.usage = CONSOLE_EFI,
+};
+
+/**
+ * Initialise EFI console
+ *
+ */
+static void efi_console_init ( void ) {
+	EFI_CONSOLE_CONTROL_SCREEN_MODE mode;
+
+	/* On some older EFI 1.10 implementations, we must use the
+	 * (now obsolete) EFI_CONSOLE_CONTROL_PROTOCOL to switch the
+	 * console into text mode.
+	 */
+	if ( conctrl ) {
+		conctrl->GetMode ( conctrl, &mode, NULL, NULL );
+		if ( mode != EfiConsoleControlScreenText ) {
+			conctrl->SetMode ( conctrl,
+					   EfiConsoleControlScreenText );
+		}
+	}
+}
+
+/**
+ * EFI console initialisation function
+ */
+struct init_fn efi_console_init_fn __init_fn ( INIT_EARLY ) = {
+	.initialise = efi_console_init,
 };
