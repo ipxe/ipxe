@@ -34,6 +34,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
+#include <ipxe/efi/Protocol/BlockIo.h>
+#include <ipxe/efi/Protocol/DiskIo.h>
+#include <ipxe/efi/Protocol/SimpleFileSystem.h>
+#include <ipxe/efi/Protocol/SimpleNetwork.h>
 
 /** Device path protocol GUID */
 static EFI_GUID efi_device_path_protocol_guid
@@ -42,6 +46,24 @@ static EFI_GUID efi_device_path_protocol_guid
 /** Device path to text protocol */
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
 EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
+
+/** A well-known GUID */
+struct efi_well_known_guid {
+	/** GUID */
+	EFI_GUID guid;
+	/** Name */
+	const char *name;
+};
+
+/** Well-known GUIDs */
+static struct efi_well_known_guid efi_well_known_guids[] = {
+	{ EFI_BLOCK_IO_PROTOCOL_GUID,		"BlockIo" },
+	{ EFI_DISK_IO_PROTOCOL_GUID,		"DiskIo" },
+	{ EFI_DEVICE_PATH_PROTOCOL_GUID,	"DevicePath" },
+	{ EFI_LOADED_IMAGE_PROTOCOL_GUID,	"LoadedImage" },
+	{ EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID,	"SimpleFileSystem" },
+	{ EFI_SIMPLE_NETWORK_PROTOCOL_GUID,	"SimpleNetwork" },
+};
 
 /**
  * Convert GUID to a printable string
@@ -54,6 +76,16 @@ const char * efi_guid_ntoa ( EFI_GUID *guid ) {
 		union uuid uuid;
 		EFI_GUID guid;
 	} u;
+	unsigned int i;
+
+	/* Check for a match against well-known GUIDs */
+	for ( i = 0 ; i < ( sizeof ( efi_well_known_guids ) /
+			    sizeof ( efi_well_known_guids[0] ) ) ; i++ ) {
+		if ( memcmp ( guid, &efi_well_known_guids[i].guid,
+			      sizeof ( *guid ) ) == 0 ) {
+			return efi_well_known_guids[i].name;
+		}
+	}
 
 	/* Convert GUID to standard endianness */
 	memcpy ( &u.guid, guid, sizeof ( u.guid ) );
