@@ -45,7 +45,7 @@ IOAPI_INLINE ( x86, bus_to_phys ) ( unsigned long bus_addr ) {
 
 static inline __always_inline void *
 IOAPI_INLINE ( x86, ioremap ) ( unsigned long bus_addr, size_t len __unused ) {
-	return phys_to_virt ( bus_addr );
+	return ( bus_addr ? phys_to_virt ( bus_addr ) : NULL );
 }
 
 static inline __always_inline void
