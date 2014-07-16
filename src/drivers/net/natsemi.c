@@ -854,6 +854,10 @@ static int natsemi_probe ( struct pci_device *pci ) {
 
 	/* Map registers */
 	natsemi->regs = ioremap ( pci->membase, NATSEMI_BAR_SIZE );
+	if ( ! natsemi->regs ) {
+		rc = -ENODEV;
+		goto err_ioremap;
+	}
 
 	/* Reset the NIC */
 	if ( ( rc = natsemi_reset ( natsemi ) ) != 0 )
@@ -881,6 +885,7 @@ static int natsemi_probe ( struct pci_device *pci ) {
 	natsemi_reset ( natsemi );
  err_reset:
 	iounmap ( natsemi->regs );
+ err_ioremap:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
