@@ -602,8 +602,16 @@ static int vmxnet3_probe ( struct pci_device *pci ) {
 	/* Map PCI BARs */
 	vmxnet->pt = ioremap ( pci_bar_start ( pci, VMXNET3_PT_BAR ),
 			       VMXNET3_PT_LEN );
+	if ( ! vmxnet->pt ) {
+		rc = -ENODEV;
+		goto err_ioremap_pt;
+	}
 	vmxnet->vd = ioremap ( pci_bar_start ( pci, VMXNET3_VD_BAR ),
 			       VMXNET3_VD_LEN );
+	if ( ! vmxnet->vd ) {
+		rc = -ENODEV;
+		goto err_ioremap_vd;
+	}
 
 	/* Version check */
 	if ( ( rc = vmxnet3_check_version ( vmxnet ) ) != 0 )
@@ -633,7 +641,9 @@ static int vmxnet3_probe ( struct pci_device *pci ) {
  err_reset:
  err_check_version:
 	iounmap ( vmxnet->vd );
+ err_ioremap_vd:
 	iounmap ( vmxnet->pt );
+ err_ioremap_pt:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc_etherdev:
