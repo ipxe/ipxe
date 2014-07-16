@@ -603,6 +603,10 @@ static int myson_probe ( struct pci_device *pci ) {
 
 	/* Map registers */
 	myson->regs = ioremap ( pci->membase, MYSON_BAR_SIZE );
+	if ( ! myson->regs ) {
+		rc = -ENODEV;
+		goto err_ioremap;
+	}
 
 	/* Reset the NIC */
 	if ( ( rc = myson_reset ( myson ) ) != 0 )
@@ -627,6 +631,7 @@ static int myson_probe ( struct pci_device *pci ) {
 	myson_reset ( myson );
  err_reset:
 	iounmap ( myson->regs );
+ err_ioremap:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
