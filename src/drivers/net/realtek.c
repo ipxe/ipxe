@@ -1119,6 +1119,10 @@ static int realtek_probe ( struct pci_device *pci ) {
 
 	/* Map registers */
 	rtl->regs = ioremap ( pci->membase, RTL_BAR_SIZE );
+	if ( ! rtl->regs ) {
+		rc = -ENODEV;
+		goto err_ioremap;
+	}
 
 	/* Reset the NIC */
 	if ( ( rc = realtek_reset ( rtl ) ) != 0 )
@@ -1177,6 +1181,7 @@ static int realtek_probe ( struct pci_device *pci ) {
 	realtek_reset ( rtl );
  err_reset:
 	iounmap ( rtl->regs );
+ err_ioremap:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
