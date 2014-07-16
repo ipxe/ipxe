@@ -75,6 +75,8 @@ extern struct list_head ipv4_miniroutes;
 extern struct net_protocol ipv4_protocol __net_protocol;
 
 extern int ipv4_has_any_addr ( struct net_device *netdev );
+extern struct ipv4_miniroute * ipv4_route ( unsigned int scope_id,
+					    struct in_addr *dest );
 extern int parse_ipv4_setting ( const struct setting_type *type,
 				const char *value, void *buf, size_t len );
 extern int format_ipv4_setting ( const struct setting_type *type,

@@ -37,6 +37,8 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/in.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/ip.h>
+#include <ipxe/ipv6.h>
 #include <ipxe/vlan.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/iscsi.h>
@@ -85,6 +87,13 @@ struct ibft_strings {
 	size_t len;
 };
 
+static int ibft_ipaddr_is_ipv6 ( struct ibft_ipaddr *ipaddr )
+{
+	uint8_t prefix[12] = { 0, 0, 0, 0, 0, 0,
+			       0, 0, 0, 0, 0xff, 0xff };
+	return (memcmp(ipaddr->raw, &prefix, sizeof (prefix) ));
+}
+
 /**
  * Fill in an IP address field within iBFT
  *
@@ -94,8 +103,8 @@ struct ibft_strings {
 static void ibft_set_ipaddr ( struct ibft_ipaddr *ipaddr, struct in_addr in ) {
 	memset ( ipaddr, 0, sizeof ( *ipaddr ) );
 	if ( in.s_addr ) {
-		ipaddr->in = in;
-		ipaddr->ones = 0xffff;
+		ipaddr->in.in = in;
+		ipaddr->in.ones = 0xffff;
 	}
 }
 
@@ -121,6 +130,41 @@ static void ibft_set_ipaddr_setting ( struct settings *settings,
 }
 
 /**
+ * Fill in an IPv6 address field within iBFT
+ *
+ * @v ipaddr		IP address field
+ * @v in6		IPv6 address
+ */
+static void ibft_set_ip6addr ( struct ibft_ipaddr *ipaddr,
+			       struct in6_addr in6 ) {
+	memset ( ipaddr, 0, sizeof ( *ipaddr ) );
+	if ( in6.s6_addr ) {
+		ipaddr->in6 = in6;
+	}
+}
+
+/**
+ * Fill in an IPv6 address within iBFT from configuration setting
+ *
+ * @v settings		Parent settings block, or NULL
+ * @v ipaddr		address field
+ * @v setting		Configuration setting
+ * @v count		Maximum number of IP addresses
+ */
+static void ibft_set_ip6addr_setting ( struct settings *settings,
+				       struct ibft_ipaddr *ipaddr,
+				       const struct setting *setting,
+				       unsigned int count ) {
+	struct in6_addr in6[count];
+	unsigned int i;
+
+	fetch_ipv6_array_setting ( settings, setting, in6, count );
+	for ( i = 0 ; i < count ; i++ ) {
+		ibft_set_ip6addr ( &ipaddr[i], in6[i] );
+	}
+}
+
+/**
  * Read IP address from iBFT (for debugging)
  *
  * @v strings		iBFT string block descriptor
@@ -128,7 +172,10 @@ static void ibft_set_ipaddr_setting ( struct settings *settings,
  * @ret ipaddr		IP address string
  */
 static const char * ibft_ipaddr ( struct ibft_ipaddr *ipaddr ) {
-	return inet_ntoa ( ipaddr->in );
+	if ( ibft_ipaddr_is_ipv6(ipaddr) )
+		return inet6_ntoa( &ipaddr->in6 );
+	else
+		return inet_ntoa ( ipaddr->in.in );
 }
 
 /**
@@ -222,6 +269,92 @@ static const char * ibft_string ( struct ibft_strings *strings,
 }
 
 /**
+ * Fill in IPv4 specific parts of the  NIC portion of iBFT
+ *
+ * @v nic		NIC portion of iBFT
+ * @v dest		IPv4 target address
+ * @ret netdev		Return Network device
+ */
+static struct net_device *ibft_fill_nic_ipv4 ( struct ibft_nic *nic,
+					       struct sockaddr_in *dest) {
+	struct ipv4_miniroute *route4 = ipv4_route(dest->sin_scope_id,
+						   &dest->sin_addr);
+	struct settings *parent;
+	struct settings *origin;
+	struct in_addr netmask_addr = { 0 };
+	unsigned int netmask_count = 0;
+
+	/* Determine origin of IP address */
+	parent = netdev_settings(route4->netdev);
+	fetch_setting ( parent, &ip_setting, &origin, NULL, NULL, 0 );
+
+	nic->origin = ( ( origin == parent ) ?
+			IBFT_NIC_ORIGIN_MANUAL : IBFT_NIC_ORIGIN_DHCP );
+	DBG ( "iBFT NIC origin = %d\n", nic->origin );
+
+	/* Extract values from configuration settings */
+	fetch_setting ( parent, &ip_setting, &origin, NULL, NULL, 0 );
+
+	ibft_set_ipaddr ( &nic->ip_address, route4->address );
+	DBG ( "iBFT NIC IP = %s\n", ibft_ipaddr ( &nic->ip_address ) );
+	ibft_set_ipaddr ( &nic->gateway, route4->gateway );
+	DBG ( "iBFT NIC gateway = %s\n", ibft_ipaddr ( &nic->gateway ) );
+	ibft_set_ipaddr_setting ( NULL, &nic->dns[0], &dns_setting,
+				  ( sizeof ( nic->dns ) /
+				    sizeof ( nic->dns[0] ) ) );
+	ibft_set_ipaddr_setting ( parent, &nic->dhcp, &dhcp_server_setting, 1 );
+	DBG ( "iBFT NIC DNS = %s", ibft_ipaddr ( &nic->dns[0] ) );
+	DBG ( ", %s\n", ibft_ipaddr ( &nic->dns[1] ) );
+	/* Derive subnet mask prefix from subnet mask */
+	netmask_addr = route4->netmask;
+	while ( netmask_addr.s_addr ) {
+		if ( netmask_addr.s_addr & 0x1 )
+			netmask_count++;
+		netmask_addr.s_addr >>= 1;
+	}
+	nic->subnet_mask_prefix = netmask_count;
+	DBG ( "iBFT NIC subnet = /%d\n", nic->subnet_mask_prefix );
+	return route4->netdev;
+}
+
+/**
+ * Fill in IPv6 specific parts of the NIC portion of iBFT
+ *
+ * @v nic		NIC portion of iBFT
+ * @v dest		IPv6 destination address
+ * @ret rc		Return network device
+ */
+static struct net_device * ibft_fill_nic_ipv6 ( struct ibft_nic *nic,
+						struct sockaddr_in6 * dest ) {
+	struct ipv6_miniroute *route6;
+	struct in6_addr *router = &dest->sin6_addr;
+	struct settings *parent;
+	struct settings *origin;
+
+	route6 = ipv6_route(dest->sin6_scope_id, &router);
+	parent = netdev_settings(route6->netdev);
+	fetch_setting ( parent, &ip6_setting, &origin, NULL, NULL, 0 );
+	nic->origin = ( ( origin == parent ) ?
+			IBFT_NIC_ORIGIN_MANUAL : IBFT_NIC_ORIGIN_DHCP );
+	DBG ( "iBFT NIC origin = %d\n", nic->origin );
+
+	/* Extract values from configuration settings */
+	ibft_set_ip6addr ( &nic->ip_address, route6->address );
+	DBG ( "iBFT NIC IP = %s\n", ibft_ipaddr ( &nic->ip_address ) );
+	ibft_set_ip6addr ( &nic->gateway, *router );
+	DBG ( "iBFT NIC gateway = %s\n", ibft_ipaddr ( &nic->gateway ) );
+	ibft_set_ip6addr_setting ( NULL, &nic->dns[0], &dns6_setting,
+				   ( sizeof ( nic->dns ) /
+				     sizeof ( nic->dns[0] ) ) );
+	DBG ( "iBFT NIC DNS = %s", ibft_ipaddr ( &nic->dns[0] ) );
+	DBG ( ", %s\n", ibft_ipaddr ( &nic->dns[1] ) );
+	nic->subnet_mask_prefix = route6->prefix_len;
+	DBG ( "iBFT NIC subnet = /%d\n", nic->subnet_mask_prefix );
+
+	return route6->netdev;
+}
+
+/**
  * Fill in NIC portion of iBFT
  *
  * @v nic		NIC portion of iBFT
@@ -231,12 +364,13 @@ static const char * ibft_string ( struct ibft_strings *strings,
  */
 static int ibft_fill_nic ( struct ibft_nic *nic,
 			   struct ibft_strings *strings,
-			   struct net_device *netdev ) {
-	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	struct in_addr netmask_addr = { 0 };
-	unsigned int netmask_count = 0;
-	struct settings *parent = netdev_settings ( netdev );
-	struct settings *origin;
+			   struct iscsi_session *iscsi ) {
+	struct sockaddr_in *sin_target =
+		( struct sockaddr_in * ) &iscsi->target_sockaddr;
+	struct sockaddr_in6 *sin6_target =
+		( struct sockaddr_in6 * ) &iscsi->target_sockaddr;
+	struct net_device *netdev;
+	struct ll_protocol *ll_protocol;
 	int rc;
 
 	/* Fill in common header */
@@ -246,42 +380,15 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	nic->header.flags = ( IBFT_FL_NIC_BLOCK_VALID |
 			      IBFT_FL_NIC_FIRMWARE_BOOT_SELECTED );
 
-	/* Determine origin of IP address */
-	fetch_setting ( parent, &ip_setting, &origin, NULL, NULL, 0 );
-	nic->origin = ( ( origin == parent ) ?
-			IBFT_NIC_ORIGIN_MANUAL : IBFT_NIC_ORIGIN_DHCP );
-	DBG ( "iBFT NIC origin = %d\n", nic->origin );
-
-	/* Extract values from configuration settings */
-	ibft_set_ipaddr_setting ( parent, &nic->ip_address, &ip_setting, 1 );
-	DBG ( "iBFT NIC IP = %s\n", ibft_ipaddr ( &nic->ip_address ) );
-	ibft_set_ipaddr_setting ( parent, &nic->gateway, &gateway_setting, 1 );
-	DBG ( "iBFT NIC gateway = %s\n", ibft_ipaddr ( &nic->gateway ) );
-	ibft_set_ipaddr_setting ( NULL, &nic->dns[0], &dns_setting,
-				  ( sizeof ( nic->dns ) /
-				    sizeof ( nic->dns[0] ) ) );
-	ibft_set_ipaddr_setting ( parent, &nic->dhcp, &dhcp_server_setting, 1 );
-	DBG ( "iBFT NIC DNS = %s", ibft_ipaddr ( &nic->dns[0] ) );
-	DBG ( ", %s\n", ibft_ipaddr ( &nic->dns[1] ) );
-	if ( ( rc = ibft_set_string_setting ( NULL, strings, &nic->hostname,
-					      &hostname_setting ) ) != 0 )
-		return rc;
-	DBG ( "iBFT NIC hostname = %s\n",
-	      ibft_string ( strings, &nic->hostname ) );
-
-	/* Derive subnet mask prefix from subnet mask */
-	fetch_ipv4_setting ( parent, &netmask_setting, &netmask_addr );
-	while ( netmask_addr.s_addr ) {
-		if ( netmask_addr.s_addr & 0x1 )
-			netmask_count++;
-		netmask_addr.s_addr >>= 1;
-	}
-	nic->subnet_mask_prefix = netmask_count;
-	DBG ( "iBFT NIC subnet = /%d\n", nic->subnet_mask_prefix );
+	if (sin_target->sin_family == AF_INET)
+		netdev = ibft_fill_nic_ipv4( nic, sin_target );
+	else
+		netdev = ibft_fill_nic_ipv6( nic, sin6_target );
 
 	/* Extract values from net-device configuration */
 	nic->vlan = cpu_to_le16 ( vlan_tag ( netdev ) );
 	DBG ( "iBFT NIC VLAN = %02x\n", le16_to_cpu ( nic->vlan ) );
+	ll_protocol = netdev->ll_protocol;
 	if ( ( rc = ll_protocol->eth_addr ( netdev->ll_addr,
 					    nic->mac_address ) ) != 0 ) {
 		DBG ( "Could not determine iBFT MAC: %s\n", strerror ( rc ) );
@@ -290,6 +397,12 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
 	DBG ( "iBFT NIC MAC = %s\n", eth_ntoa ( nic->mac_address ) );
 	nic->pci_bus_dev_func = cpu_to_le16 ( netdev->dev->desc.location );
 	DBG ( "iBFT NIC PCI = %04x\n", le16_to_cpu ( nic->pci_bus_dev_func ) );
+
+	if ( ( rc = ibft_set_string_setting ( NULL, strings, &nic->hostname,
+					      &hostname_setting ) ) != 0 )
+		return rc;
+	DBG ( "iBFT NIC hostname = %s\n",
+	      ibft_string ( strings, &nic->hostname ) );
 
 	return 0;
 }
@@ -405,8 +518,16 @@ static int ibft_fill_target ( struct ibft_target *target,
 			      struct iscsi_session *iscsi ) {
 	struct sockaddr_in *sin_target =
 		( struct sockaddr_in * ) &iscsi->target_sockaddr;
+	struct sockaddr_in6 *sin6_target =
+		( struct sockaddr_in6 * ) &iscsi->target_sockaddr;
 	int rc;
 
+	if (sin6_target->sin6_family != AF_INET6 &&
+	    sin_target->sin_family != AF_INET) {
+		DBG ( "iBFT invalid IP address type %d\n",
+		      sin6_target->sin6_family );
+		return -EPROTONOSUPPORT;
+	}
 	/* Fill in common header */
 	target->header.structure_id = IBFT_STRUCTURE_ID_TARGET;
 	target->header.version = 1;
@@ -415,10 +536,19 @@ static int ibft_fill_target ( struct ibft_target *target,
 				 IBFT_FL_TARGET_FIRMWARE_BOOT_SELECTED );
 
 	/* Fill in Target values */
-	ibft_set_ipaddr ( &target->ip_address, sin_target->sin_addr );
-	DBG ( "iBFT target IP = %s\n", ibft_ipaddr ( &target->ip_address ) );
-	target->socket = cpu_to_le16 ( ntohs ( sin_target->sin_port ) );
-	DBG ( "iBFT target port = %d\n", target->socket );
+	if (sin_target->sin_family == AF_INET) {
+		ibft_set_ipaddr ( &target->ip_address, sin_target->sin_addr );
+		DBG ( "iBFT target IP = %s\n",
+		      ibft_ipaddr ( &target->ip_address ) );
+		target->socket = cpu_to_le16 ( ntohs ( sin_target->sin_port ) );
+		DBG ( "iBFT target port = %d\n", target->socket );
+	} else {
+		ibft_set_ip6addr ( &target->ip_address, sin6_target->sin6_addr );
+		DBG ( "iBFT target IP = %s\n",
+		      ibft_ipaddr ( &target->ip_address ) );
+		target->socket = cpu_to_le16 ( ntohs ( sin6_target->sin6_port ) );
+		DBG ( "iBFT target port = %d\n", target->socket );
+	}
 	memcpy ( &target->boot_lun, &iscsi->lun, sizeof ( target->boot_lun ) );
 	DBG ( "iBFT target boot LUN = " SCSI_LUN_FORMAT "\n",
 	      SCSI_LUN_DATA ( target->boot_lun ) );
@@ -454,18 +584,7 @@ int ibft_describe ( struct iscsi_session *iscsi,
 		.offset = offsetof ( typeof ( *ibft ), strings ),
 		.len = len,
 	};
-	struct net_device *netdev;
 	int rc;
-
-	/* Ugly hack.  Now that we have a generic interface mechanism
-	 * that can support ioctls, we can potentially eliminate this.
-	 */
-	netdev = last_opened_netdev();
-	if ( ! netdev ) {
-		DBGC ( iscsi, "iSCSI %p cannot guess network device\n",
-		       iscsi );
-		return -ENODEV;
-	}
 
 	/* Fill in ACPI header */
 	ibft->table.acpi.signature = cpu_to_le32 ( IBFT_SIG );
@@ -485,7 +604,8 @@ int ibft_describe ( struct iscsi_session *iscsi,
 		cpu_to_le16 ( offsetof ( typeof ( *ibft ), target ) );
 
 	/* Fill in NIC, Initiator and Target blocks */
-	if ( ( rc = ibft_fill_nic ( &ibft->nic, &strings, netdev ) ) != 0 )
+	if ( ( rc = ibft_fill_nic ( &ibft->nic, &strings,
+				    iscsi ) ) != 0 )
 		return rc;
 	if ( ( rc = ibft_fill_initiator ( &ibft->initiator, &strings,
 					  iscsi ) ) != 0 )
