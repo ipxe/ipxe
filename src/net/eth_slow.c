@@ -167,7 +167,8 @@ static int eth_slow_lacp_rx ( struct io_buffer *iobuf,
 	lacp->actor.key = htons ( 1 );
 	lacp->actor.port_priority = htons ( LACP_PORT_PRIORITY_MAX );
 	lacp->actor.port = htons ( 1 );
-	lacp->actor.state = ( LACP_STATE_IN_SYNC |
+	lacp->actor.state = ( LACP_STATE_AGGREGATABLE |
+			      LACP_STATE_IN_SYNC |
 			      LACP_STATE_COLLECTING |
 			      LACP_STATE_DISTRIBUTING |
 			      ( lacp->partner.state & LACP_STATE_FAST ) );
