@@ -28,6 +28,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** Page shift */
+#define PAGE_SHIFT 12
+
 /*
  * Physical<->Bus and Bus<->I/O address mappings
  *

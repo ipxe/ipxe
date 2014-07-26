@@ -1,8 +1,5 @@
 #ifndef _VIRTIO_RING_H_
 # define _VIRTIO_RING_H_
-#define PAGE_SHIFT (12)
-#define PAGE_SIZE  (1<<PAGE_SHIFT)
-#define PAGE_MASK  (PAGE_SIZE-1)
 
 /* Status byte for guest to report progress, and synchronize features. */
 /* We have seen device and processed generic fields (VIRTIO_CONFIG_F_VIRTIO) */
