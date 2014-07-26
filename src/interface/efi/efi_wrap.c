@@ -227,11 +227,13 @@ void efi_wrap ( EFI_HANDLE handle, EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 
 	/* Provide system table wrapper to image */
 	loaded->SystemTable = &efi_systab_wrapper;
-	DBGC ( colour, "Wrapped image %p %s at base %p\n", handle,
-	       efi_handle_devpath_text ( handle ), loaded->ImageBase );
+	DBGC ( colour, "Wrapped image %p %s at base %p has protocols:\n",
+	       handle, efi_handle_devpath_text ( handle ), loaded->ImageBase );
+	DBGC_EFI_PROTOCOLS ( colour, handle );
 	DBGC ( colour, "Parent image %p %s\n", loaded->ParentHandle,
 	       efi_handle_devpath_text ( loaded->ParentHandle ) );
 	DBGC ( colour, "Device %p %s ", loaded->DeviceHandle,
 	       efi_handle_devpath_text ( loaded->DeviceHandle ) );
-	DBGC ( colour, "file %s\n", efi_devpath_text ( loaded->FilePath ) );
+	DBGC ( colour, "file %p %s\n", loaded->FilePath,
+	       efi_devpath_text ( loaded->FilePath ) );
 }

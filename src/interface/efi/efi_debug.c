@@ -61,6 +61,7 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	{ EFI_DISK_IO_PROTOCOL_GUID,		"DiskIo" },
 	{ EFI_DEVICE_PATH_PROTOCOL_GUID,	"DevicePath" },
 	{ EFI_LOADED_IMAGE_PROTOCOL_GUID,	"LoadedImage" },
+	{ EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID, "LoadedImageDevicePath" },
 	{ EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID,	"SimpleFileSystem" },
 	{ EFI_SIMPLE_NETWORK_PROTOCOL_GUID,	"SimpleNetwork" },
 };
