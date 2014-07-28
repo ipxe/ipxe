@@ -190,8 +190,8 @@ VERSION_PATCH	= 0
 EXTRAVERSION	= +
 MM_VERSION	= $(VERSION_MAJOR).$(VERSION_MINOR)
 VERSION		= $(MM_VERSION).$(VERSION_PATCH)$(EXTRAVERSION)
+ifneq ($(wildcard ../.git),)
 GITVERSION := $(shell git describe --always --abbrev=1 --match "" 2>/dev/null)
-ifneq ($(GITVERSION),)
 VERSION		+= ($(GITVERSION))
 endif
 version :
