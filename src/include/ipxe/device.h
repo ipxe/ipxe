@@ -60,6 +60,9 @@ struct device_description {
 /** EFI bus type */
 #define BUS_TYPE_EFI 7
 
+/** Xen bus type */
+#define BUS_TYPE_XEN 8
+
 /** A hardware device */
 struct device {
 	/** Name */

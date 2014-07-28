@@ -301,6 +301,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_memmap_settings	      ( ERRFILE_OTHER | 0x003f0000 )
 #define ERRFILE_param_cmd	      ( ERRFILE_OTHER | 0x00400000 )
 #define ERRFILE_deflate		      ( ERRFILE_OTHER | 0x00410000 )
+#define ERRFILE_xenstore	      ( ERRFILE_OTHER | 0x00420000 )
+#define ERRFILE_xenbus		      ( ERRFILE_OTHER | 0x00430000 )
+#define ERRFILE_xengrant	      ( ERRFILE_OTHER | 0x00440000 )
 
 /** @} */
 
