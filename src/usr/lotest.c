@@ -39,8 +39,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** Loopback testing in progress flag */
-static int lotest_active;
+/** Current loopback test receiver */
+static struct net_device *lotest_receiver;
 
 /** Loopback testing received packets */
 static LIST_HEAD ( lotest_queue );
@@ -56,13 +56,13 @@ static LIST_HEAD ( lotest_queue );
  * @ret rc		Return status code
  */
 static int lotest_rx ( struct io_buffer *iobuf,
-		       struct net_device *netdev __unused,
+		       struct net_device *netdev,
 		       const void *ll_dest __unused,
 		       const void *ll_source __unused,
 		       unsigned int flags __unused ) {
 
 	/* Add to received packet queue if currently performing a test */
-	if ( lotest_active ) {
+	if ( netdev == lotest_receiver ) {
 		list_add_tail ( &iobuf->list, &lotest_queue );
 	} else {
 		free_iob ( iobuf );
@@ -223,7 +223,7 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 
 	/* Start loopback test */
 	lotest_flush();
-	lotest_active = 1;
+	lotest_receiver = receiver;
 
 	/* Perform loopback test */
 	for ( successes = 0 ; ; successes++ ) {
@@ -261,7 +261,7 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 	printf ( "\n");
 
 	/* Stop loopback testing */
-	lotest_active = 0;
+	lotest_receiver = NULL;
 	lotest_flush();
 
 	/* Dump final statistics */
