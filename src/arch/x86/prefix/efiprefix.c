@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/device.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_autoboot.h>
 
 /**
@@ -45,6 +46,9 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 	/* Record autoboot device (if any) */
 	efi_set_autoboot();
 
+	/* Claim SNP devices for use by iPXE */
+	efi_snp_claim();
+
 	/* Call to main() */
 	if ( ( rc = main() ) != 0 ) {
 		efirc = EFIRC ( rc );
@@ -52,6 +56,7 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 	}
 
  err_main:
+	efi_snp_release();
 	efi_loaded_image->Unload ( image_handle );
 	efi_driver_reconnect_all();
  err_init:

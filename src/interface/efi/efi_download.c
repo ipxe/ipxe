@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_download.h>
 
 /** iPXE download protocol GUID */
@@ -63,6 +64,8 @@ static void efi_download_close ( struct efi_download_file *file, int rc ) {
 	file->finish_callback ( file->context, EFIRC ( rc ) );
 
 	intf_shutdown ( &file->xfer, rc );
+
+	efi_snp_release();
 }
 
 /**
@@ -147,6 +150,7 @@ efi_download_start ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
 		return EFIRC ( rc );
 	}
 
+	efi_snp_claim();
 	file->pos = 0;
 	file->data_callback = DataCallback;
 	file->finish_callback = FinishCallback;

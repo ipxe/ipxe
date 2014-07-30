@@ -67,6 +67,9 @@ static EFI_GUID efi_load_file_protocol_guid
 /** List of SNP devices */
 static LIST_HEAD ( efi_snp_devices );
 
+/** Network devices are currently claimed for use by iPXE */
+static int efi_snp_claimed;
+
 /**
  * Set EFI SNP mode state
  *
@@ -83,7 +86,7 @@ static void efi_snp_set_state ( struct efi_snp_device *snpdev ) {
 	} else if ( ! netdev_is_open ( netdev ) ) {
 		/* Network device not opened; report as Started */
 		mode->State = EfiSimpleNetworkStarted;
-	} else if ( ! netdev_rx_frozen ( netdev ) ) {
+	} else if ( efi_snp_claimed ) {
 		/* Network device opened but claimed for use by iPXE; report
 		 * as Started to inhibit receive polling.
 		 */
@@ -162,7 +165,7 @@ efi_snp_start ( EFI_SIMPLE_NETWORK_PROTOCOL *snp ) {
 	DBGC2 ( snpdev, "SNPDEV %p START\n", snpdev );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	snpdev->started = 1;
@@ -184,7 +187,7 @@ efi_snp_stop ( EFI_SIMPLE_NETWORK_PROTOCOL *snp ) {
 	DBGC2 ( snpdev, "SNPDEV %p STOP\n", snpdev );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	snpdev->started = 0;
@@ -212,7 +215,7 @@ efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		( ( unsigned long ) extra_tx_bufsize ) );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	if ( ( rc = netdev_open ( snpdev->netdev ) ) != 0 ) {
@@ -242,7 +245,7 @@ efi_snp_reset ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN ext_verify ) {
 		snpdev, ( ext_verify ? "with" : "without" ) );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	netdev_close ( snpdev->netdev );
@@ -272,7 +275,7 @@ efi_snp_shutdown ( EFI_SIMPLE_NETWORK_PROTOCOL *snp ) {
 	DBGC2 ( snpdev, "SNPDEV %p SHUTDOWN\n", snpdev );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	netdev_close ( snpdev->netdev );
@@ -309,7 +312,7 @@ efi_snp_receive_filters ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, UINT32 enable,
 	}
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	/* Lie through our teeth, otherwise MNP refuses to accept us */
@@ -335,7 +338,7 @@ efi_snp_station_address ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN reset,
 		( reset ? "reset" : ll_protocol->ntoa ( new ) ) );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	/* Set the MAC address */
@@ -372,7 +375,7 @@ efi_snp_statistics ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN reset,
 		( reset ? " reset" : "" ) );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	/* Gather statistics */
@@ -424,7 +427,7 @@ efi_snp_mcast_ip_to_mac ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN ipv6,
 	DBGC2 ( snpdev, "SNPDEV %p MCAST_IP_TO_MAC %s\n", snpdev, ip_str );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	/* Try to hash the address */
@@ -461,7 +464,7 @@ efi_snp_nvdata ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN read,
 		DBGC2_HDA ( snpdev, offset, data, len );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	return EFI_UNSUPPORTED;
@@ -484,7 +487,7 @@ efi_snp_get_status ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	DBGC2 ( snpdev, "SNPDEV %p GET_STATUS", snpdev );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	/* Poll the network device */
@@ -583,7 +586,7 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	DBGC2 ( snpdev, "\n" );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	/* Sanity checks */
@@ -695,7 +698,7 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		( ( unsigned long ) *len ) );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
 	/* Poll the network device */
@@ -759,7 +762,7 @@ static VOID EFIAPI efi_snp_wait_for_packet ( EFI_EVENT event,
 		return;
 
 	/* Do nothing if net device is currently claimed for use by iPXE */
-	if ( ! netdev_rx_frozen ( snpdev->netdev ) )
+	if ( efi_snp_claimed )
 		return;
 
 	/* Poll the network device */
@@ -1184,23 +1187,17 @@ struct efi_snp_device * last_opened_snpdev ( void ) {
 }
 
 /**
- * Claim network devices for use by iPXE
+ * Set SNP claimed/released state
  *
+ * @v claimed		Network devices are claimed for use by iPXE
  */
-void efi_snp_claim ( void ) {
-	struct net_device *netdev;
+void efi_snp_set_claimed ( int claimed ) {
+	struct efi_snp_device *snpdev;
 
-	for_each_netdev ( netdev )
-		netdev_rx_unfreeze ( netdev );
-}
+	/* Claim SNP devices */
+	efi_snp_claimed = claimed;
 
-/**
- * Release network devices for use via SNP
- *
- */
-void efi_snp_release ( void ) {
-	struct net_device *netdev;
-
-	for_each_netdev ( netdev )
-		netdev_rx_freeze ( netdev );
+	/* Update SNP mode state for each interface */
+	list_for_each_entry ( snpdev, &efi_snp_devices, list )
+		efi_snp_set_state ( snpdev );
 }
