@@ -1053,7 +1053,10 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	if ( ( rc = efi_snp_hii_install ( snpdev ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not install HII: %s\n",
 		       snpdev, strerror ( rc ) );
-		goto err_hii_install;
+		/* HII fails on several platforms.  It's
+		 * non-essential, so treat this as a non-fatal
+		 * error.
+		 */
 	}
 
 	/* Add to list of SNP devices */
@@ -1064,8 +1067,8 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	       efi_devpath_text ( &snpdev->path ) );
 	return 0;
 
-	efi_snp_hii_uninstall ( snpdev );
- err_hii_install:
+	if ( snpdev->package_list )
+		efi_snp_hii_uninstall ( snpdev );
 	efidev_child_del ( efidev, snpdev->handle );
  err_efidev_child_add:
 	bs->UninstallMultipleProtocolInterfaces (
@@ -1130,7 +1133,8 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 	}
 
 	/* Uninstall the SNP */
-	efi_snp_hii_uninstall ( snpdev );
+	if ( snpdev->package_list )
+		efi_snp_hii_uninstall ( snpdev );
 	efidev_child_del ( snpdev->efidev, snpdev->handle );
 	list_del ( &snpdev->list );
 	bs->UninstallMultipleProtocolInterfaces (

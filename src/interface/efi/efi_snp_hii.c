@@ -649,8 +649,10 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 	int rc;
 
 	/* Do nothing if HII database protocol is not supported */
-	if ( ! efihii )
-		return 0;
+	if ( ! efihii ) {
+		rc = -ENOTSUP;
+		goto err_no_hii;
+	}
 
 	/* Initialise HII protocol */
 	memcpy ( &snpdev->hii, &efi_snp_device_hii, sizeof ( snpdev->hii ) );
@@ -697,6 +699,7 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 	free ( snpdev->package_list );
 	snpdev->package_list = NULL;
  err_build_package_list:
+ err_no_hii:
 	return rc;
 }
 
