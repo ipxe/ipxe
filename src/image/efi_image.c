@@ -229,8 +229,8 @@ static int efi_image_exec ( struct image *image ) {
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
 		rc = -EEFI_START ( efirc );
-		DBGC ( image, "EFIIMAGE %p returned with status %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "EFIIMAGE %p could not start (or returned with "
+		       "error): %s\n", image, strerror ( rc ) );
 		goto err_start_image;
 	}
 
@@ -240,14 +240,22 @@ static int efi_image_exec ( struct image *image ) {
  err_start_image:
 	efi_snp_claim();
  err_open_protocol:
-	/* Unload the image.  We can't leave it loaded, because we
-	 * have no "unload" operation.
+	/* If there was no error, then the image must have been
+	 * started and returned successfully.  It either unloaded
+	 * itself, or it intended to remain loaded (e.g. it was a
+	 * driver).  We therefore do not unload successful images.
+	 *
+	 * If there was an error, attempt to unload the image.  This
+	 * may not work.  In particular, there is no way to tell
+	 * whether an error returned from StartImage() was due to
+	 * being unable to start the image (in which case we probably
+	 * should call UnloadImage()), or due to the image itself
+	 * returning an error (in which case we probably should not
+	 * call UnloadImage()).  We therefore ignore any failures from
+	 * the UnloadImage() call itself.
 	 */
-	if ( ( efirc = bs->UnloadImage ( handle ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( image, "EFIIMAGE %p could not unload: %s\n",
-		       image, strerror ( rc ) );
-	}
+	if ( rc != 0 )
+		bs->UnloadImage ( handle );
  err_load_image:
 	free ( cmdline );
  err_cmdline:
