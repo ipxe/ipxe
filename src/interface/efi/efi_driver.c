@@ -261,8 +261,10 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 					  &devpath.interface,
 					  efi_image_handle, device,
 					  EFI_OPEN_PROTOCOL_BY_DRIVER ) ) != 0){
-		DBGC ( device, "EFIDRV %p %s has no device path\n",
-		       device, efi_handle_devpath_text ( device ) );
+		rc = -EEFI ( efirc );
+		DBGC ( device, "EFIDRV %p %s could not open device path: %s\n",
+		       device, efi_handle_devpath_text ( device ),
+		       strerror ( rc ) );
 		goto err_no_device_path;
 	}
 	efidev->path = devpath.devpath;
