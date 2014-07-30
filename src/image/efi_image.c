@@ -209,6 +209,13 @@ static int efi_image_exec ( struct image *image ) {
 		goto err_open_protocol;
 	}
 
+	/* Some EFI 1.10 implementations seem not to fill in DeviceHandle */
+	if ( loaded.image->DeviceHandle == NULL ) {
+		DBGC ( image, "EFIIMAGE %p filling in missing DeviceHandle\n",
+		       image );
+		loaded.image->DeviceHandle = snpdev->handle;
+	}
+
 	/* Sanity checks */
 	assert ( loaded.image->ParentHandle == efi_image_handle );
 	assert ( loaded.image->DeviceHandle == snpdev->handle );
