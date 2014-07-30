@@ -47,6 +47,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/Protocol/PciRootBridgeIo.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
+#include <ipxe/efi/IndustryStandard/PeImage.h>
 
 /** Block I/O protocol GUID */
 static EFI_GUID efi_block_io_protocol_guid
@@ -237,6 +238,240 @@ const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	bs->FreePool ( wtext );
 
 	return text;
+}
+
+/**
+ * Get driver name
+ *
+ * @v wtf		Component name protocol
+ * @ret name		Driver name, or NULL
+ */
+static const char * efi_driver_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf ) {
+	static char name[64];
+	CHAR16 *driver_name;
+	EFI_STATUS efirc;
+
+	/* Try "en" first; if that fails then try the first language */
+	if ( ( ( efirc = wtf->GetDriverName ( wtf, "en",
+					      &driver_name ) ) != 0 ) &&
+	     ( ( efirc = wtf->GetDriverName ( wtf, wtf->SupportedLanguages,
+					      &driver_name ) ) != 0 ) ) {
+		return NULL;
+	}
+
+	/* Convert name from CHAR16 to char */
+	snprintf ( name, sizeof ( name ), "%ls", driver_name );
+	return name;
+}
+
+/**
+ * Get PE/COFF debug filename
+ *
+ * @v loaded		Loaded image
+ * @ret name		PE/COFF debug filename, or NULL
+ */
+static const char *
+efi_pecoff_debug_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
+	static char buf[32];
+	EFI_IMAGE_DOS_HEADER *dos = loaded->ImageBase;
+	EFI_IMAGE_OPTIONAL_HEADER_UNION *pe;
+	EFI_IMAGE_OPTIONAL_HEADER32 *opt32;
+	EFI_IMAGE_OPTIONAL_HEADER64 *opt64;
+	EFI_IMAGE_DATA_DIRECTORY *datadir;
+	EFI_IMAGE_DEBUG_DIRECTORY_ENTRY *debug;
+	EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY *codeview;
+	size_t max_len;
+	char *name;
+	char *tmp;
+
+	/* Parse DOS header */
+	if ( ! dos ) {
+		DBGC ( loaded, "Missing DOS header\n" );
+		return NULL;
+	}
+	if ( dos->e_magic != EFI_IMAGE_DOS_SIGNATURE ) {
+		DBGC ( loaded, "Bad DOS signature\n" );
+		return NULL;
+	}
+	pe = ( loaded->ImageBase + dos->e_lfanew );
+
+	/* Parse PE header */
+	if ( pe->Pe32.Signature != EFI_IMAGE_NT_SIGNATURE ) {
+		DBGC ( loaded, "Bad PE signature\n" );
+		return NULL;
+	}
+	opt32 = &pe->Pe32.OptionalHeader;
+	opt64 = &pe->Pe32Plus.OptionalHeader;
+	if ( opt32->Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC ) {
+		datadir = opt32->DataDirectory;
+	} else if ( opt64->Magic == EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC ) {
+		datadir = opt64->DataDirectory;
+	} else {
+		DBGC ( loaded, "Bad optional header signature\n" );
+		return NULL;
+	}
+
+	/* Parse data directory entry */
+	if ( ! datadir[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG].VirtualAddress ) {
+		DBGC ( loaded, "Empty debug directory entry\n" );
+		return NULL;
+	}
+	debug = ( loaded->ImageBase +
+		  datadir[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG].VirtualAddress );
+
+	/* Parse debug directory entry */
+	if ( debug->Type != EFI_IMAGE_DEBUG_TYPE_CODEVIEW ) {
+		DBGC ( loaded, "Not a CodeView debug directory entry\n" );
+		return NULL;
+	}
+	codeview = ( loaded->ImageBase + debug->RVA );
+
+	/* Parse CodeView entry */
+	if ( codeview->Signature != CODEVIEW_SIGNATURE_NB10 ) {
+		DBGC ( loaded, "Bad CodeView signature\n" );
+		return NULL;
+	}
+	name = ( ( ( void * ) codeview ) + sizeof ( *codeview ) );
+
+	/* Sanity check - avoid scanning endlessly through memory */
+	max_len = EFI_PAGE_SIZE; /* Reasonably sane */
+	if ( strnlen ( name, max_len ) == max_len ) {
+		DBGC ( loaded, "Excessively long or invalid CodeView name\n" );
+		return NULL;
+	}
+
+	/* Skip any directory components.  We cannot modify this data
+	 * or create a temporary buffer, so do not use basename().
+	 */
+	while ( ( ( tmp = strchr ( name, '/' ) ) != NULL ) ||
+		( ( tmp = strchr ( name, '\\' ) ) != NULL ) ) {
+		name = ( tmp + 1 );
+	}
+
+	/* Copy base name to buffer */
+	snprintf ( buf, sizeof ( buf ), "%s", name );
+
+	/* Strip file suffix, if present */
+	if ( ( tmp = strrchr ( name, '.' ) ) != NULL )
+		*tmp = '\0';
+
+	return name;
+}
+
+/**
+ * Get initial loaded image name
+ *
+ * @v loaded		Loaded image
+ * @ret name		Initial loaded image name, or NULL
+ */
+static const char *
+efi_first_loaded_image_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
+
+	return ( ( loaded->ParentHandle == NULL ) ? "DxeCore(?)" : NULL );
+}
+
+/**
+ * Get loaded image name from file path
+ *
+ * @v loaded		Loaded image
+ * @ret name		Loaded image name, or NULL
+ */
+static const char *
+efi_loaded_image_filepath_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
+
+	return efi_devpath_text ( loaded->FilePath );
+}
+
+/** An EFI handle name type */
+struct efi_handle_name_type {
+	/** Protocol */
+	EFI_GUID *protocol;
+	/**
+	 * Get name
+	 *
+	 * @v interface		Protocol interface
+	 * @ret name		Name of handle, or NULL on failure
+	 */
+	const char * ( * name ) ( void *interface );
+};
+
+/**
+ * Define an EFI handle name type
+ *
+ * @v protocol		Protocol interface
+ * @v name		Method to get name
+ * @ret type		EFI handle name type
+ */
+#define EFI_HANDLE_NAME_TYPE( protocol, name ) {	\
+	(protocol),					\
+	( const char * ( * ) ( void * ) ) (name),	\
+	}
+
+/** EFI handle name types */
+static struct efi_handle_name_type efi_handle_name_types[] = {
+	/* Device path */
+	EFI_HANDLE_NAME_TYPE ( &efi_device_path_protocol_guid,
+			       efi_devpath_text ),
+	/* Driver name (for driver image handles) */
+	EFI_HANDLE_NAME_TYPE ( &efi_component_name2_protocol_guid,
+			       efi_driver_name ),
+	/* PE/COFF debug filename (for image handles) */
+	EFI_HANDLE_NAME_TYPE ( &efi_loaded_image_protocol_guid,
+			       efi_pecoff_debug_name ),
+	/* Loaded image device path (for image handles) */
+	EFI_HANDLE_NAME_TYPE ( &efi_loaded_image_device_path_protocol_guid,
+			       efi_devpath_text ),
+	/* First loaded image name (for the DxeCore image) */
+	EFI_HANDLE_NAME_TYPE ( &efi_loaded_image_protocol_guid,
+			       efi_first_loaded_image_name ),
+	/* Handle's loaded image file path (for image handles) */
+	EFI_HANDLE_NAME_TYPE ( &efi_loaded_image_protocol_guid,
+			       efi_loaded_image_filepath_name ),
+};
+
+/**
+ * Get name of an EFI handle
+ *
+ * @v handle		EFI handle
+ * @ret text		Name of handle, or NULL
+ */
+const char * efi_handle_name ( EFI_HANDLE handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_handle_name_type *type;
+	unsigned int i;
+	void *interface;
+	const char *name;
+	EFI_STATUS efirc;
+
+	/* Fail immediately for NULL handles */
+	if ( ! handle )
+		return NULL;
+
+	/* Try each name type in turn */
+	for ( i = 0 ; i < ( sizeof ( efi_handle_name_types ) /
+			    sizeof ( efi_handle_name_types[0] ) ) ; i++ ) {
+		type = &efi_handle_name_types[i];
+
+		/* Try to open the applicable protocol */
+		efirc = bs->OpenProtocol ( handle, type->protocol, &interface,
+					   efi_image_handle, handle,
+					   EFI_OPEN_PROTOCOL_GET_PROTOCOL );
+		if ( efirc != 0 )
+			continue;
+
+		/* Try to get name from this protocol */
+		name = type->name ( interface );
+
+		/* Close protocol */
+		bs->CloseProtocol ( handle, type->protocol,
+				    efi_image_handle, handle );
+
+		/* Use this name, if possible */
+		if ( name && name[0] )
+			return name;
+	}
+
+	return "UNKNOWN";
 }
 
 /**
