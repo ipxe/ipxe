@@ -153,12 +153,25 @@ extern const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern const char * efi_handle_devpath_text ( EFI_HANDLE handle );
 extern const char * efi_handle_name ( EFI_HANDLE handle );
 
+extern void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol );
 extern void dbg_efi_protocols ( EFI_HANDLE handle );
+
+#define DBG_EFI_OPENERS_IF( level, handle, protocol ) do {	\
+		if ( DBG_ ## level ) {				\
+			dbg_efi_openers ( handle, protocol );	\
+		}						\
+	} while ( 0 )
 
 #define DBG_EFI_PROTOCOLS_IF( level, handle ) do {		\
 		if ( DBG_ ## level ) {				\
 			dbg_efi_protocols ( handle );		\
 		}						\
+	} while ( 0 )
+
+#define DBGC_EFI_OPENERS_IF( level, id, ... ) do {		\
+		DBG_AC_IF ( level, id );			\
+		DBG_EFI_OPENERS_IF ( level, __VA_ARGS__ );	\
+		DBG_DC_IF ( level );				\
 	} while ( 0 )
 
 #define DBGC_EFI_PROTOCOLS_IF( level, id, ... ) do {		\
@@ -167,8 +180,20 @@ extern void dbg_efi_protocols ( EFI_HANDLE handle );
 		DBG_DC_IF ( level );				\
 	} while ( 0 )
 
+#define DBGC_EFI_OPENERS( ... )					\
+	DBGC_EFI_OPENERS_IF ( LOG, ##__VA_ARGS__ )
 #define DBGC_EFI_PROTOCOLS( ... )				\
-	DBGC_EFI_PROTOCOLS_IF( LOG, ##__VA_ARGS__ )
+	DBGC_EFI_PROTOCOLS_IF ( LOG, ##__VA_ARGS__ )
+
+#define DBGC2_EFI_OPENERS( ... )				\
+	DBGC_EFI_OPENERS_IF ( EXTRA, ##__VA_ARGS__ )
+#define DBGC2_EFI_PROTOCOLS( ... )				\
+	DBGC_EFI_PROTOCOLS_IF ( EXTRA, ##__VA_ARGS__ )
+
+#define DBGCP_EFI_OPENERS( ... )				\
+	DBGC_EFI_OPENERS_IF ( PROFILE, ##__VA_ARGS__ )
+#define DBGCP_EFI_PROTOCOLS( ... )				\
+	DBGC_EFI_PROTOCOLS_IF ( PROFILE, ##__VA_ARGS__ )
 
 extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );

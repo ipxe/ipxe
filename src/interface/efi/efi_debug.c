@@ -184,13 +184,85 @@ const char * efi_guid_ntoa ( EFI_GUID *guid ) {
 }
 
 /**
+ * Name protocol open attributes
+ *
+ * @v attributes	Protocol open attributes
+ * @ret name		Protocol open attributes name
+ *
+ * Returns a (static) string with characters for each set bit
+ * corresponding to BY_(H)ANDLE_PROTOCOL, (G)ET_PROTOCOL,
+ * (T)EST_PROTOCOL, BY_(C)HILD_CONTROLLER, BY_(D)RIVER, and
+ * E(X)CLUSIVE.
+ */
+static const char * efi_open_attributes_name ( unsigned int attributes ) {
+	static char attribute_chars[] = "HGTCDX";
+	static char name[ sizeof ( attribute_chars ) ];
+	char *tmp = name;
+	unsigned int i;
+
+	for ( i = 0 ; i < ( sizeof ( attribute_chars ) - 1 ) ; i++ ) {
+		if ( attributes & ( 1 << i ) )
+			*(tmp++) = attribute_chars[i];
+	}
+	*tmp = '\0';
+
+	return name;
+}
+
+/**
+ * Print list of openers of a given protocol on a given handle
+ *
+ * @v handle		EFI handle
+ * @v protocol		Protocol GUID
+ */
+void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *openers;
+	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener;
+	UINTN count;
+	unsigned int i;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Retrieve list of openers */
+	if ( ( efirc = bs->OpenProtocolInformation ( handle, protocol, &openers,
+						     &count ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		printf ( "EFI could not retrieve openers for %s on %p: %s\n",
+			 efi_guid_ntoa ( protocol ), handle, strerror ( rc ) );
+		return;
+	}
+
+	/* Dump list of openers */
+	for ( i = 0 ; i < count ; i++ ) {
+		opener = &openers[i];
+		printf ( "HANDLE %p %s %s opened %dx (%s)",
+			 handle, efi_handle_name ( handle ),
+			 efi_guid_ntoa ( protocol ), opener->OpenCount,
+			 efi_open_attributes_name ( opener->Attributes ) );
+		printf ( " by %p %s", opener->AgentHandle,
+			 efi_handle_name ( opener->AgentHandle ) );
+		if ( opener->ControllerHandle == handle ) {
+			printf ( "\n" );
+		} else {
+			printf ( " for %p %s\n", opener->ControllerHandle,
+				 efi_handle_name ( opener->ControllerHandle ) );
+		}
+	}
+
+	/* Free list */
+	bs->FreePool ( openers );
+}
+
+/**
  * Print list of protocol handlers attached to a handle
  *
  * @v handle		EFI handle
  */
 void dbg_efi_protocols ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-        EFI_GUID **protocols;
+	EFI_GUID **protocols;
+	EFI_GUID *protocol;
 	UINTN count;
 	unsigned int i;
 	EFI_STATUS efirc;
@@ -206,8 +278,13 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 	}
 
 	/* Dump list of protocols */
-	for ( i = 0 ; i < count ; i++ )
-		printf ( "%s\n", efi_guid_ntoa ( protocols[i] ) );
+	for ( i = 0 ; i < count ; i++ ) {
+		protocol = protocols[i];
+		printf ( "HANDLE %p %s %s supported\n",
+			 handle, efi_handle_name ( handle ),
+			 efi_guid_ntoa ( protocol ) );
+		dbg_efi_openers ( handle, protocol );
+	}
 
 	/* Free list */
 	bs->FreePool ( protocols );
