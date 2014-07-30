@@ -685,6 +685,8 @@ extern struct net_device * find_netdev ( const char *name );
 extern struct net_device * find_netdev_by_index ( unsigned int index );
 extern struct net_device * find_netdev_by_location ( unsigned int bus_type,
 						     unsigned int location );
+extern struct net_device *
+find_netdev_by_ll_addr ( struct ll_protocol *ll_protocol, const void *ll_addr );
 extern struct net_device * last_opened_netdev ( void );
 extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest,
