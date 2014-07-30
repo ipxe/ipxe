@@ -32,16 +32,81 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uuid.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/Protocol/BlockIo.h>
+#include <ipxe/efi/Protocol/BusSpecificDriverOverride.h>
+#include <ipxe/efi/Protocol/ComponentName.h>
+#include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
-#include <ipxe/efi/Protocol/BlockIo.h>
 #include <ipxe/efi/Protocol/DiskIo.h>
+#include <ipxe/efi/Protocol/DriverBinding.h>
+#include <ipxe/efi/Protocol/LoadFile.h>
+#include <ipxe/efi/Protocol/LoadFile2.h>
+#include <ipxe/efi/Protocol/LoadedImage.h>
+#include <ipxe/efi/Protocol/PciIo.h>
+#include <ipxe/efi/Protocol/PciRootBridgeIo.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
+
+/** Block I/O protocol GUID */
+static EFI_GUID efi_block_io_protocol_guid
+	= EFI_BLOCK_IO_PROTOCOL_GUID;
+
+/** Bus specific driver override protocol GUID */
+static EFI_GUID efi_bus_specific_driver_override_protocol_guid
+	= EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_GUID;
+
+/** Component name protocol GUID */
+static EFI_GUID efi_component_name_protocol_guid
+	= EFI_COMPONENT_NAME_PROTOCOL_GUID;
+
+/** Component name 2 protocol GUID */
+static EFI_GUID efi_component_name2_protocol_guid
+	= EFI_COMPONENT_NAME2_PROTOCOL_GUID;
 
 /** Device path protocol GUID */
 static EFI_GUID efi_device_path_protocol_guid
 	= EFI_DEVICE_PATH_PROTOCOL_GUID;
+
+/** Disk I/O protocol GUID */
+static EFI_GUID efi_disk_io_protocol_guid
+	= EFI_DISK_IO_PROTOCOL_GUID;
+
+/** Driver binding protocol GUID */
+static EFI_GUID efi_driver_binding_protocol_guid
+	= EFI_DRIVER_BINDING_PROTOCOL_GUID;
+
+/** Load file protocol GUID */
+static EFI_GUID efi_load_file_protocol_guid
+	= EFI_LOAD_FILE_PROTOCOL_GUID;
+
+/** Load file 2 protocol GUID */
+static EFI_GUID efi_load_file2_protocol_guid
+	= EFI_LOAD_FILE2_PROTOCOL_GUID;
+
+/** Loaded image protocol GUID */
+static EFI_GUID efi_loaded_image_protocol_guid
+	= EFI_LOADED_IMAGE_PROTOCOL_GUID;
+
+/** Loaded image device path protocol GUID */
+static EFI_GUID efi_loaded_image_device_path_protocol_guid
+	= EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID;
+
+/** PCI I/O protocol GUID */
+static EFI_GUID efi_pci_io_protocol_guid
+	= EFI_PCI_IO_PROTOCOL_GUID;
+
+/** PCI root bridge I/O protocol GUID */
+static EFI_GUID efi_pci_root_bridge_io_protocol_guid
+	= EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID;
+
+/** Simple file system protocol GUID */
+static EFI_GUID efi_simple_file_system_protocol_guid
+	= EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
+
+/** Simple network protocol guid */
+static EFI_GUID efi_simple_network_protocol_guid
+	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
 
 /** Device path to text protocol */
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
@@ -50,20 +115,43 @@ EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
 /** A well-known GUID */
 struct efi_well_known_guid {
 	/** GUID */
-	EFI_GUID guid;
+	EFI_GUID *guid;
 	/** Name */
 	const char *name;
 };
 
 /** Well-known GUIDs */
 static struct efi_well_known_guid efi_well_known_guids[] = {
-	{ EFI_BLOCK_IO_PROTOCOL_GUID,		"BlockIo" },
-	{ EFI_DISK_IO_PROTOCOL_GUID,		"DiskIo" },
-	{ EFI_DEVICE_PATH_PROTOCOL_GUID,	"DevicePath" },
-	{ EFI_LOADED_IMAGE_PROTOCOL_GUID,	"LoadedImage" },
-	{ EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID, "LoadedImageDevicePath" },
-	{ EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID,	"SimpleFileSystem" },
-	{ EFI_SIMPLE_NETWORK_PROTOCOL_GUID,	"SimpleNetwork" },
+	{ &efi_block_io_protocol_guid,
+	  "BlockIo" },
+	{ &efi_bus_specific_driver_override_protocol_guid,
+	  "BusSpecificDriverOverride" },
+	{ &efi_component_name2_protocol_guid,
+	  "ComponentName2" },
+	{ &efi_component_name_protocol_guid,
+	  "ComponentName" },
+	{ &efi_device_path_protocol_guid,
+	  "DevicePath" },
+	{ &efi_driver_binding_protocol_guid,
+	  "DriverBinding" },
+	{ &efi_disk_io_protocol_guid,
+	  "DiskIo" },
+	{ &efi_load_file_protocol_guid,
+	  "LoadFile" },
+	{ &efi_load_file2_protocol_guid,
+	  "LoadFile2" },
+	{ &efi_loaded_image_protocol_guid,
+	  "LoadedImage" },
+	{ &efi_loaded_image_device_path_protocol_guid,
+	  "LoadedImageDevicePath"},
+	{ &efi_pci_io_protocol_guid,
+	  "PciIo" },
+	{ &efi_pci_root_bridge_io_protocol_guid,
+	  "PciRootBridgeIo" },
+	{ &efi_simple_file_system_protocol_guid,
+	  "SimpleFileSystem" },
+	{ &efi_simple_network_protocol_guid,
+	  "SimpleNetwork" },
 };
 
 /**
@@ -82,7 +170,7 @@ const char * efi_guid_ntoa ( EFI_GUID *guid ) {
 	/* Check for a match against well-known GUIDs */
 	for ( i = 0 ; i < ( sizeof ( efi_well_known_guids ) /
 			    sizeof ( efi_well_known_guids[0] ) ) ; i++ ) {
-		if ( memcmp ( guid, &efi_well_known_guids[i].guid,
+		if ( memcmp ( guid, efi_well_known_guids[i].guid,
 			      sizeof ( *guid ) ) == 0 ) {
 			return efi_well_known_guids[i].name;
 		}
