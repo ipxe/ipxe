@@ -41,6 +41,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EFIAPI __attribute__((cdecl,regparm(0)))
 #endif
 
+/* EFI headers define EFI_HANDLE as a void pointer, which renders type
+ * checking somewhat useless.  Work around this bizarre sabotage
+ * attempt by redefining EFI_HANDLE as a pointer to an anonymous
+ * structure.
+ */
+#define EFI_HANDLE STUPID_EFI_HANDLE
+#include <ipxe/efi/Uefi/UefiBaseType.h>
+#undef EFI_HANDLE
+typedef struct {} *EFI_HANDLE;
+
 /* Include the top-level EFI header files */
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/PiDxe.h>
