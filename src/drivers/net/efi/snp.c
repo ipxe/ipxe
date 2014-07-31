@@ -49,7 +49,7 @@ static int snp_supported ( EFI_HANDLE device ) {
 	/* Check that this is not a device we are providing ourselves */
 	if ( find_snpdev ( device ) != NULL ) {
 		DBGCP ( device, "SNP %p %s is provided by this binary\n",
-			device, efi_handle_devpath_text ( device ) );
+			device, efi_handle_name ( device ) );
 		return -ENOTTY;
 	}
 
@@ -59,11 +59,11 @@ static int snp_supported ( EFI_HANDLE device ) {
 					  NULL, efi_image_handle, device,
 					  EFI_OPEN_PROTOCOL_TEST_PROTOCOL))!=0){
 		DBGCP ( device, "SNP %p %s is not an SNP device\n",
-			device, efi_handle_devpath_text ( device ) );
+			device, efi_handle_name ( device ) );
 		return -EEFI ( efirc );
 	}
 	DBGC ( device, "SNP %p %s is an SNP device\n",
-	       device, efi_handle_devpath_text ( device ) );
+	       device, efi_handle_name ( device ) );
 
 	return 0;
 }

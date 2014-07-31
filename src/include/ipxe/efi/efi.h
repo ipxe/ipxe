@@ -150,7 +150,6 @@ extern EFI_SYSTEM_TABLE *efi_systab;
 
 extern const char * efi_guid_ntoa ( EFI_GUID *guid );
 extern const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path );
-extern const char * efi_handle_devpath_text ( EFI_HANDLE handle );
 extern const char * efi_handle_name ( EFI_HANDLE handle );
 
 extern void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol );

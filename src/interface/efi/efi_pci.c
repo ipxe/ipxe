@@ -149,8 +149,7 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 					  device, attributes ) ) != 0 ) {
 		rc = -EEFI_PCI ( efirc );
 		DBGCP ( device, "EFIPCI %p %s cannot open PCI protocols: %s\n",
-			device, efi_handle_devpath_text ( device ),
-			strerror ( rc ) );
+			device, efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open_protocol;
 	}
 
@@ -160,14 +159,13 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 						    &pci_fn ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFIPCI %p %s could not get PCI location: %s\n",
-		       device, efi_handle_devpath_text ( device ),
-		       strerror ( rc ) );
+		       device, efi_handle_name ( device ), strerror ( rc ) );
 		goto err_get_location;
 	}
-	DBGC2 ( device, "EFIPCI %p %s is PCI %04lx:%02lx:%02lx.%lx\n",
-		device, efi_handle_devpath_text ( device ),
-		( ( unsigned long ) pci_segment ), ( ( unsigned long ) pci_bus),
-		( ( unsigned long ) pci_dev ), ( ( unsigned long ) pci_fn ) );
+	DBGC2 ( device, "EFIPCI %p %s is PCI %04lx:%02lx:%02lx.%lx\n", device,
+		efi_handle_name ( device ), ( ( unsigned long ) pci_segment ),
+		( ( unsigned long ) pci_bus ), ( ( unsigned long ) pci_dev ),
+		( ( unsigned long ) pci_fn ) );
 
 	/* Try to enable I/O cycles, memory cycles, and bus mastering.
 	 * Some platforms will 'helpfully' report errors if these bits
@@ -189,7 +187,7 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 	pci_init ( pci, PCI_BUSDEVFN ( pci_bus, pci_dev, pci_fn ) );
 	if ( ( rc = pci_read_config ( pci ) ) != 0 ) {
 		DBGC ( device, "EFIPCI %p %s cannot read PCI configuration: "
-		       "%s\n", device, efi_handle_devpath_text ( device ),
+		       "%s\n", device, efi_handle_name ( device ),
 		       strerror ( rc ) );
 		goto err_pci_read_config;
 	}
@@ -261,11 +259,11 @@ static int efipci_supported ( EFI_HANDLE device ) {
 	/* Look for a driver */
 	if ( ( rc = pci_find_driver ( &pci ) ) != 0 ) {
 		DBGCP ( device, "EFIPCI %p %s has no driver\n",
-			device, efi_handle_devpath_text ( device ) );
+			device, efi_handle_name ( device ) );
 		return rc;
 	}
 	DBGC ( device, "EFIPCI %p %s has driver \"%s\"\n",
-	       device, efi_handle_devpath_text ( device ), pci.id->name );
+	       device, efi_handle_name ( device ), pci.id->name );
 
 	return 0;
 }

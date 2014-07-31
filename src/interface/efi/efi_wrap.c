@@ -107,7 +107,7 @@ efi_handle_protocol_wrapper ( EFI_HANDLE handle, EFI_GUID *protocol,
 	EFI_STATUS efirc;
 
 	DBGC ( colour, "HandleProtocol ( %p %s, %s, ... ) ", handle,
-	       efi_handle_devpath_text ( handle ), efi_guid_ntoa ( protocol ) );
+	       efi_handle_name ( handle ), efi_guid_ntoa ( protocol ) );
 	efirc = bs->HandleProtocol ( handle, protocol, interface );
 	DBGC ( colour, "= %s ( %p ) -> %p\n",
 	       efi_status ( efirc ), *interface, retaddr );
@@ -153,7 +153,7 @@ efi_locate_device_path_wrapper ( EFI_GUID *protocol,
 	DBGC ( colour, "= %s ( %p, ",
 	       efi_status ( efirc ), efi_devpath_text ( *device_path ) );
 	DBGC ( colour, "%p %s ) -> %p\n",
-	       *device, efi_handle_devpath_text ( *device ), retaddr );
+	       *device, efi_handle_name ( *device ), retaddr );
 	return efirc;
 }
 
@@ -170,11 +170,11 @@ efi_open_protocol_wrapper ( EFI_HANDLE handle, EFI_GUID *protocol,
 	EFI_STATUS efirc;
 
 	DBGC ( colour, "OpenProtocol ( %p %s, %s, ..., ", handle,
-	       efi_handle_devpath_text ( handle ), efi_guid_ntoa ( protocol ) );
+	       efi_handle_name ( handle ), efi_guid_ntoa ( protocol ) );
 	DBGC ( colour, "%p %s, ", agent_handle,
-	       efi_handle_devpath_text ( agent_handle ) );
+	       efi_handle_name ( agent_handle ) );
 	DBGC ( colour, "%p %s, %#x ) ", controller_handle,
-	       efi_handle_devpath_text ( controller_handle ), attributes );
+	       efi_handle_name ( controller_handle ), attributes );
 	efirc = bs->OpenProtocol ( handle, protocol, interface, agent_handle,
 				   controller_handle, attributes );
 	DBGC ( colour, "= %s ( %p ) -> %p\n",
@@ -228,12 +228,12 @@ void efi_wrap ( EFI_HANDLE handle, EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 	/* Provide system table wrapper to image */
 	loaded->SystemTable = &efi_systab_wrapper;
 	DBGC ( colour, "Wrapped image %p %s at base %p has protocols:\n",
-	       handle, efi_handle_devpath_text ( handle ), loaded->ImageBase );
+	       handle, efi_handle_name ( handle ), loaded->ImageBase );
 	DBGC_EFI_PROTOCOLS ( colour, handle );
 	DBGC ( colour, "Parent image %p %s\n", loaded->ParentHandle,
-	       efi_handle_devpath_text ( loaded->ParentHandle ) );
+	       efi_handle_name ( loaded->ParentHandle ) );
 	DBGC ( colour, "Device %p %s ", loaded->DeviceHandle,
-	       efi_handle_devpath_text ( loaded->DeviceHandle ) );
+	       efi_handle_name ( loaded->DeviceHandle ) );
 	DBGC ( colour, "file %p %s\n", loaded->FilePath,
 	       efi_devpath_text ( loaded->FilePath ) );
 }

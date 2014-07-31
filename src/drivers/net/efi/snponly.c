@@ -43,7 +43,7 @@ static int snponly_supported ( EFI_HANDLE device ) {
 		return -ENOTTY;
 
 	DBGC ( device, "SNP %p %s is the SNP chainloading device\n",
-	       device, efi_handle_devpath_text ( device ) );
+	       device, efi_handle_name ( device ) );
 
 	return 0;
 }

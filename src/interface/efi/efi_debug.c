@@ -550,37 +550,3 @@ const char * efi_handle_name ( EFI_HANDLE handle ) {
 
 	return "UNKNOWN";
 }
-
-/**
- * Get textual representation of device path for a handle
- *
- * @v handle		EFI handle
- * @ret text		Textual representation of device path, or NULL
- */
-const char * efi_handle_devpath_text ( EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_DEVICE_PATH_PROTOCOL *path;
-		void *interface;
-	} path;
-	const char *text;
-	EFI_STATUS efirc;
-
-	/* Obtain device path, if any */
-	if ( ( efirc = bs->OpenProtocol ( handle,
-					  &efi_device_path_protocol_guid,
-					  &path.interface, efi_image_handle,
-					  handle,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		return NULL;
-	}
-
-	/* Format device path */
-	text = efi_devpath_text ( path.path );
-
-	/* Close device path */
-	bs->CloseProtocol ( handle, &efi_device_path_protocol_guid,
-			    efi_image_handle, handle );
-
-	return text;
-}

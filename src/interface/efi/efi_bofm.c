@@ -175,7 +175,7 @@ static int efi_bofm_supported ( EFI_HANDLE device ) {
 	/* Look for a BOFM driver */
 	if ( ( rc = bofm_find_driver ( &pci ) ) != 0 ) {
 		DBGCP ( device, "EFIBOFM %p %s has no driver\n",
-			device, efi_handle_devpath_text ( device ) );
+			device, efi_handle_name ( device ) );
 		return rc;
 	}
 
@@ -184,7 +184,7 @@ static int efi_bofm_supported ( EFI_HANDLE device ) {
 					    &bofm1.interface ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFIBOFM %p %s cannot find BOFM protocol\n",
-		       device, efi_handle_devpath_text ( device ) );
+		       device, efi_handle_name ( device ) );
 		return rc;
 	}
 
@@ -195,13 +195,12 @@ static int efi_bofm_supported ( EFI_HANDLE device ) {
 						      0x02 /* Version */ ))!=0){
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFIBOFM %p %s could not register support: %s\n",
-		       device, efi_handle_devpath_text ( device ),
-		       strerror ( rc ) );
+		       device, efi_handle_name ( device ), strerror ( rc ) );
 		return rc;
 	}
 
 	DBGC ( device, "EFIBOFM %p %s has driver \"%s\"\n",
-	       device, efi_handle_devpath_text ( device ), pci.id->name );
+	       device, efi_handle_name ( device ), pci.id->name );
 	return 0;
 }
 
