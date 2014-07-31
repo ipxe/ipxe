@@ -1045,7 +1045,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	if ( ( rc = efidev_child_add ( efidev, snpdev->handle ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not become child of %p %s: "
 		       "%s\n", snpdev, efidev->device,
-		       efi_devpath_text ( efidev->path ), strerror ( rc ) );
+		       efi_handle_name ( efidev->device ), strerror ( rc ) );
 		goto err_efidev_child_add;
 	}
 
@@ -1064,7 +1064,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 
 	DBGC ( snpdev, "SNPDEV %p installed for %s as device %p %s\n",
 	       snpdev, netdev->name, snpdev->handle,
-	       efi_devpath_text ( &snpdev->path ) );
+	       efi_handle_name ( snpdev->handle ) );
 	return 0;
 
 	if ( snpdev->package_list )

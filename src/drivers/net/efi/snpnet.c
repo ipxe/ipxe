@@ -334,24 +334,24 @@ static struct net_device_operations snpnet_operations = {
 static int snpnet_pci_info ( struct efi_device *efidev, struct device *dev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_DEVICE_PATH_PROTOCOL *devpath = efidev->path;
+	EFI_HANDLE device = efidev->device;
 	struct pci_device pci;
-	EFI_HANDLE device;
+	EFI_HANDLE pci_device;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Check for presence of PCI I/O protocol */
 	if ( ( efirc = bs->LocateDevicePath ( &efi_pci_io_protocol_guid,
-					      &devpath, &device ) ) != 0 ) {
-		DBGC ( efidev->device, "SNP %p %s is not a PCI device\n",
-		       efidev->device, efi_devpath_text ( efidev->path ) );
+					      &devpath, &pci_device ) ) != 0 ) {
+		DBGC ( device, "SNP %p %s is not a PCI device\n",
+		       device, efi_handle_name ( device ) );
 		return -EEFI ( efirc );
 	}
 
 	/* Get PCI device information */
-	if ( ( rc = efipci_info ( device, &pci ) ) != 0 ) {
-		DBGC ( efidev->device, "SNP %p %s could not get PCI "
-		       "information: %s\n", efidev->device,
-		       efi_devpath_text ( efidev->path ), strerror ( rc ) );
+	if ( ( rc = efipci_info ( pci_device, &pci ) ) != 0 ) {
+		DBGC ( device, "SNP %p %s could not get PCI information: %s\n",
+		       device, efi_handle_name ( device ), strerror ( rc ) );
 		return rc;
 	}
 
@@ -370,15 +370,15 @@ static int snpnet_pci_info ( struct efi_device *efidev, struct device *dev ) {
  * @ret rc		Return status code
  */
 static int snpnet_dev_info ( struct efi_device *efidev, struct device *dev ) {
+	EFI_HANDLE device = efidev->device;
 	int rc;
 
 	/* Try getting underlying PCI device information */
 	if ( ( rc = snpnet_pci_info ( efidev, dev ) ) == 0 )
 		return 0;
 
-	DBGC ( efidev->device, "SNP %p %s could not get underlying device "
-	       "information\n", efidev->device,
-	       efi_devpath_text ( efidev->path ) );
+	DBGC ( device, "SNP %p %s could not get underlying device "
+	       "information\n", device, efi_handle_name ( device ) );
 	return -ENOTTY;
 }
 
@@ -406,8 +406,7 @@ int snpnet_start ( struct efi_device *efidev ) {
 					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
 		rc = -EEFI ( efirc );
 		DBGC ( device, "SNP %p %s cannot open SNP protocol: %s\n",
-		       device, efi_devpath_text ( efidev->path ),
-		       strerror ( rc ) );
+		       device, efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open_protocol;
 	}
 
@@ -438,21 +437,21 @@ int snpnet_start ( struct efi_device *efidev ) {
 	     ( ( efirc = snp->snp->Start ( snp->snp ) ) != 0 ) ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "SNP %p %s could not start: %s\n", device,
-		       efi_devpath_text ( efidev->path ), strerror ( rc ) );
+		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_start;
 	}
 	if ( ( mode->State == EfiSimpleNetworkInitialized ) &&
 	     ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "SNP %p %s could not shut down: %s\n", device,
-		       efi_devpath_text ( efidev->path ), strerror ( rc ) );
+		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_shutdown;
 	}
 
 	/* Populate network device parameters */
 	if ( mode->HwAddressSize != netdev->ll_protocol->hw_addr_len ) {
 		DBGC ( device, "SNP %p %s has invalid hardware address "
-		       "length %d\n", device, efi_devpath_text ( efidev->path ),
+		       "length %d\n", device, efi_handle_name ( device ),
 		       mode->HwAddressSize );
 		rc = -ENOTSUP;
 		goto err_hw_addr_len;
@@ -461,7 +460,7 @@ int snpnet_start ( struct efi_device *efidev ) {
 		 netdev->ll_protocol->hw_addr_len );
 	if ( mode->HwAddressSize != netdev->ll_protocol->ll_addr_len ) {
 		DBGC ( device, "SNP %p %s has invalid link-layer address "
-		       "length %d\n", device, efi_devpath_text ( efidev->path ),
+		       "length %d\n", device, efi_handle_name ( device ),
 		       mode->HwAddressSize );
 		rc = -ENOTSUP;
 		goto err_ll_addr_len;
@@ -474,8 +473,8 @@ int snpnet_start ( struct efi_device *efidev ) {
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
-	DBGC ( device, "SNP %p %s registered as %s\n", device,
-	       efi_devpath_text ( efidev->path ), netdev->name );
+	DBGC ( device, "SNP %p %s registered as %s\n",
+	       device, efi_handle_name ( device ), netdev->name );
 
 	/* Set initial link state */
 	if ( snp->snp->Mode->MediaPresentSupported ) {
@@ -512,6 +511,7 @@ void snpnet_stop ( struct efi_device *efidev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct net_device *netdev = efidev_get_drvdata ( efidev );
 	struct snp_nic *snp = netdev->priv;
+	EFI_HANDLE device = efidev->device;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -521,9 +521,8 @@ void snpnet_stop ( struct efi_device *efidev ) {
 	/* Stop SNP protocol */
 	if ( ( efirc = snp->snp->Stop ( snp->snp ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( efidev->device, "SNP %p %s could not stop: %s\n",
-		       efidev->device, efi_devpath_text ( efidev->path ),
-		       strerror ( rc ) );
+		DBGC ( device, "SNP %p %s could not stop: %s\n", device,
+		       efi_handle_name ( device ), strerror ( rc ) );
 		/* Nothing we can do about this */
 	}
 
@@ -533,6 +532,6 @@ void snpnet_stop ( struct efi_device *efidev ) {
 	netdev_put ( netdev );
 
 	/* Close SNP protocol */
-	bs->CloseProtocol ( efidev->device, &efi_simple_network_protocol_guid,
-			    efi_image_handle, efidev->device );
+	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
+			    efi_image_handle, device );
 }
