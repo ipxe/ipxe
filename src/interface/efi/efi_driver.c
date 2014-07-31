@@ -490,9 +490,15 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 	}
 
 	/* Disconnect any existing drivers */
+	DBGC2 ( device, "EFIDRV %p %s before disconnecting:\n",
+		device, efi_handle_name ( device ) );
+	DBGC2_EFI_PROTOCOLS ( device, device );
 	DBGC ( device, "EFIDRV %p %s disconnecting existing drivers\n",
 	       device, efi_handle_name ( device ) );
 	bs->DisconnectController ( device, NULL, NULL );
+	DBGC2 ( device, "EFIDRV %p %s after disconnecting:\n",
+		device, efi_handle_name ( device ) );
+	DBGC2_EFI_PROTOCOLS ( device, device );
 
 	/* Connect our driver */
 	DBGC ( device, "EFIDRV %p %s connecting new drivers\n",
@@ -505,6 +511,9 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 		       strerror ( rc ) );
 		return rc;
 	}
+	DBGC2 ( device, "EFIDRV %p %s after connecting:\n",
+		device, efi_handle_name ( device ) );
+	DBGC2_EFI_PROTOCOLS ( device, device );
 
 	return 0;
 }
