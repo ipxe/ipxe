@@ -356,41 +356,50 @@ efi_pecoff_debug_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 	EFI_IMAGE_OPTIONAL_HEADER64 *opt64;
 	EFI_IMAGE_DATA_DIRECTORY *datadir;
 	EFI_IMAGE_DEBUG_DIRECTORY_ENTRY *debug;
-	EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY *codeview;
+	EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY *codeview_nb10;
+	EFI_IMAGE_DEBUG_CODEVIEW_RSDS_ENTRY *codeview_rsds;
+	EFI_IMAGE_DEBUG_CODEVIEW_MTOC_ENTRY *codeview_mtoc;
+	uint16_t dos_magic;
+	uint32_t pe_magic;
+	uint16_t opt_magic;
+	uint32_t codeview_magic;
 	size_t max_len;
 	char *name;
 	char *tmp;
 
 	/* Parse DOS header */
 	if ( ! dos ) {
-		DBGC ( loaded, "Missing DOS header\n" );
+		DBG ( "[Missing DOS header]" );
 		return NULL;
 	}
-	if ( dos->e_magic != EFI_IMAGE_DOS_SIGNATURE ) {
-		DBGC ( loaded, "Bad DOS signature\n" );
+	dos_magic = dos->e_magic;
+	if ( dos_magic != EFI_IMAGE_DOS_SIGNATURE ) {
+		DBG ( "[Bad DOS signature %#04x]", dos_magic );
 		return NULL;
 	}
 	pe = ( loaded->ImageBase + dos->e_lfanew );
 
 	/* Parse PE header */
-	if ( pe->Pe32.Signature != EFI_IMAGE_NT_SIGNATURE ) {
-		DBGC ( loaded, "Bad PE signature\n" );
+	pe_magic = pe->Pe32.Signature;
+	if ( pe_magic != EFI_IMAGE_NT_SIGNATURE ) {
+		DBG ( "[Bad PE signature %#08x]", pe_magic );
 		return NULL;
 	}
 	opt32 = &pe->Pe32.OptionalHeader;
 	opt64 = &pe->Pe32Plus.OptionalHeader;
-	if ( opt32->Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC ) {
+	opt_magic = opt32->Magic;
+	if ( opt_magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC ) {
 		datadir = opt32->DataDirectory;
-	} else if ( opt64->Magic == EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC ) {
+	} else if ( opt_magic == EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC ) {
 		datadir = opt64->DataDirectory;
 	} else {
-		DBGC ( loaded, "Bad optional header signature\n" );
+		DBG ( "[Bad optional header signature %#04x]", opt_magic );
 		return NULL;
 	}
 
 	/* Parse data directory entry */
 	if ( ! datadir[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG].VirtualAddress ) {
-		DBGC ( loaded, "Empty debug directory entry\n" );
+		DBG ( "[Empty debug directory entry]" );
 		return NULL;
 	}
 	debug = ( loaded->ImageBase +
@@ -398,22 +407,31 @@ efi_pecoff_debug_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 
 	/* Parse debug directory entry */
 	if ( debug->Type != EFI_IMAGE_DEBUG_TYPE_CODEVIEW ) {
-		DBGC ( loaded, "Not a CodeView debug directory entry\n" );
+		DBG ( "[Not a CodeView debug directory entry (type %d)]",
+		      debug->Type );
 		return NULL;
 	}
-	codeview = ( loaded->ImageBase + debug->RVA );
+	codeview_nb10 = ( loaded->ImageBase + debug->RVA );
+	codeview_rsds = ( loaded->ImageBase + debug->RVA );
+	codeview_mtoc = ( loaded->ImageBase + debug->RVA );
+	codeview_magic = codeview_nb10->Signature;
 
 	/* Parse CodeView entry */
-	if ( codeview->Signature != CODEVIEW_SIGNATURE_NB10 ) {
-		DBGC ( loaded, "Bad CodeView signature\n" );
+	if ( codeview_magic == CODEVIEW_SIGNATURE_NB10 ) {
+		name = ( ( void * ) ( codeview_nb10 + 1 ) );
+	} else if ( codeview_magic == CODEVIEW_SIGNATURE_RSDS ) {
+		name = ( ( void * ) ( codeview_rsds + 1 ) );
+	} else if ( codeview_magic == CODEVIEW_SIGNATURE_MTOC ) {
+		name = ( ( void * ) ( codeview_mtoc + 1 ) );
+	} else {
+		DBG ( "[Bad CodeView signature %#08x]", codeview_magic );
 		return NULL;
 	}
-	name = ( ( ( void * ) codeview ) + sizeof ( *codeview ) );
 
 	/* Sanity check - avoid scanning endlessly through memory */
 	max_len = EFI_PAGE_SIZE; /* Reasonably sane */
 	if ( strnlen ( name, max_len ) == max_len ) {
-		DBGC ( loaded, "Excessively long or invalid CodeView name\n" );
+		DBG ( "[Excessively long or invalid CodeView name]" );
 		return NULL;
 	}
 
@@ -528,20 +546,26 @@ const char * efi_handle_name ( EFI_HANDLE handle ) {
 	for ( i = 0 ; i < ( sizeof ( efi_handle_name_types ) /
 			    sizeof ( efi_handle_name_types[0] ) ) ; i++ ) {
 		type = &efi_handle_name_types[i];
+		DBG2 ( "<%d", i );
 
 		/* Try to open the applicable protocol */
 		efirc = bs->OpenProtocol ( handle, type->protocol, &interface,
 					   efi_image_handle, handle,
 					   EFI_OPEN_PROTOCOL_GET_PROTOCOL );
-		if ( efirc != 0 )
+		if ( efirc != 0 ) {
+			DBG2 ( ">" );
 			continue;
+		}
 
 		/* Try to get name from this protocol */
+		DBG2 ( "-" );
 		name = type->name ( interface );
+		DBG2 ( "%c", ( name ? ( name[0] ? 'Y' : 'E' ) : 'N' ) );
 
 		/* Close protocol */
 		bs->CloseProtocol ( handle, type->protocol,
 				    efi_image_handle, handle );
+		DBG2 ( ">" );
 
 		/* Use this name, if possible */
 		if ( name && name[0] )
