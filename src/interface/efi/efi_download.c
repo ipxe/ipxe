@@ -205,13 +205,13 @@ static IPXE_DOWNLOAD_PROTOCOL ipxe_download_protocol_interface = {
  * @v handle		EFI handle
  * @ret rc		Return status code
  */
-int efi_download_install ( EFI_HANDLE *handle ) {
+int efi_download_install ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_STATUS efirc;
 	int rc;
 
 	efirc = bs->InstallMultipleProtocolInterfaces (
-			handle,
+			&handle,
 			&ipxe_download_protocol_guid,
 			&ipxe_download_protocol_interface,
 			NULL );

@@ -157,14 +157,14 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Install file I/O protocols */
-	if ( ( rc = efi_file_install ( &snpdev->handle ) ) != 0 ) {
+	if ( ( rc = efi_file_install ( snpdev->handle ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %p could not install file protocol: "
 		       "%s\n", image, strerror ( rc ) );
 		goto err_file_install;
 	}
 
 	/* Install iPXE download protocol */
-	if ( ( rc = efi_download_install ( &snpdev->handle ) ) != 0 ) {
+	if ( ( rc = efi_download_install ( snpdev->handle ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %p could not install iPXE download "
 		       "protocol: %s\n", image, strerror ( rc ) );
 		goto err_download_install;

@@ -151,7 +151,7 @@ struct _IPXE_DOWNLOAD_PROTOCOL {
     0x3eaeaebd, 0xdecf, 0x493b, { 0x9b, 0xd1, 0xcd, 0xb2, 0xde, 0xca, 0xe7, 0x19 } \
   }
 
-extern int efi_download_install ( EFI_HANDLE *device );
-extern void efi_download_uninstall ( EFI_HANDLE device );
+extern int efi_download_install ( EFI_HANDLE handle );
+extern void efi_download_uninstall ( EFI_HANDLE handle );
 
 #endif /* _IPXE_DOWNLOAD_H */

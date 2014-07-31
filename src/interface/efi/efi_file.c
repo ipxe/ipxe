@@ -575,7 +575,7 @@ static EFI_DISK_IO_PROTOCOL efi_disk_io_protocol = {
  * @v handle		EFI handle
  * @ret rc		Return status code
  */
-int efi_file_install ( EFI_HANDLE *handle ) {
+int efi_file_install ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_DISK_IO_PROTOCOL *diskio;
@@ -592,7 +592,7 @@ int efi_file_install ( EFI_HANDLE *handle ) {
 	 * handle just to keep things looking normal.
 	 */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
-			handle,
+			&handle,
 			&efi_block_io_protocol_guid,
 			&efi_block_io_protocol,
 			&efi_disk_io_protocol_guid,
@@ -624,9 +624,9 @@ int efi_file_install ( EFI_HANDLE *handle ) {
 	 * of calls to our DRIVER_STOP method when starting the EFI
 	 * shell.  I have no idea why this is.
 	 */
-	if ( ( efirc = bs->OpenProtocol ( *handle, &efi_disk_io_protocol_guid,
+	if ( ( efirc = bs->OpenProtocol ( handle, &efi_disk_io_protocol_guid,
 					  &diskio.interface, efi_image_handle,
-					  *handle,
+					  handle,
 					  EFI_OPEN_PROTOCOL_BY_DRIVER ) ) != 0){
 		rc = -EEFI ( efirc );
 		DBGC ( handle, "Could not open disk I/O protocol: %s\n",
@@ -637,11 +637,11 @@ int efi_file_install ( EFI_HANDLE *handle ) {
 
 	return 0;
 
-	bs->CloseProtocol ( *handle, &efi_disk_io_protocol_guid,
-			    efi_image_handle, *handle );
+	bs->CloseProtocol ( handle, &efi_disk_io_protocol_guid,
+			    efi_image_handle, handle );
  err_open:
 	bs->UninstallMultipleProtocolInterfaces (
-			*handle,
+			handle,
 			&efi_simple_file_system_protocol_guid,
 			&efi_simple_file_system_protocol,
 			&efi_disk_io_protocol_guid,

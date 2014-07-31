@@ -7,7 +7,7 @@
  *
  */
 
-extern int efi_file_install ( EFI_HANDLE *handle );
+extern int efi_file_install ( EFI_HANDLE handle );
 extern void efi_file_uninstall ( EFI_HANDLE handle );
 
 #endif /* _IPXE_EFI_FILE_H */
