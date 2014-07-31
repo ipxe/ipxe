@@ -407,6 +407,8 @@ int snpnet_start ( struct efi_device *efidev ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "SNP %p %s cannot open SNP protocol: %s\n",
 		       device, efi_handle_name ( device ), strerror ( rc ) );
+		DBGC_EFI_OPENERS ( device, device,
+				   &efi_simple_network_protocol_guid );
 		goto err_open_protocol;
 	}
 

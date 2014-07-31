@@ -631,6 +631,7 @@ int efi_file_install ( EFI_HANDLE handle ) {
 		rc = -EEFI ( efirc );
 		DBGC ( handle, "Could not open disk I/O protocol: %s\n",
 		       strerror ( rc ) );
+		DBGC_EFI_OPENERS ( handle, handle, &efi_disk_io_protocol_guid );
 		goto err_open;
 	}
 	assert ( diskio.diskio == &efi_disk_io_protocol );

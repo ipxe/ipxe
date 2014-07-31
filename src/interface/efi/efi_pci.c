@@ -292,6 +292,7 @@ static int efipci_start ( struct efi_device *efidev ) {
 				  pci ) ) != 0 ) {
 		DBGC ( device, "EFIPCI %p %s could not open PCI device: %s\n",
 		       device, efi_handle_name ( device ), strerror ( rc ) );
+		DBGC_EFI_OPENERS ( device, device, &efi_pci_io_protocol_guid );
 		goto err_open;
 	}
 

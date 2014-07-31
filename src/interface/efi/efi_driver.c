@@ -137,6 +137,8 @@ int efidev_child_add ( struct efi_device *efidev, EFI_HANDLE device ) {
 		       efidev->device, efi_handle_name ( efidev->device ) );
 		DBGC ( efidev->device, " %p %s: %s\n", device,
 		       efi_handle_name ( device ), strerror ( rc ) );
+		DBGC_EFI_OPENERS ( efidev->device, efidev->device,
+				   &efi_device_path_protocol_guid );
 		return rc;
 	}
 
@@ -264,6 +266,8 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		DBGC ( device, "EFIDRV %p %s could not open device path: %s\n",
 		       device, efi_handle_name ( device ),
 		       strerror ( rc ) );
+		DBGC_EFI_OPENERS ( device, device,
+				   &efi_device_path_protocol_guid );
 		goto err_no_device_path;
 	}
 	efidev->path = devpath.devpath;
