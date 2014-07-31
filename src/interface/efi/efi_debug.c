@@ -168,6 +168,10 @@ const char * efi_guid_ntoa ( EFI_GUID *guid ) {
 	} u;
 	unsigned int i;
 
+	/* Sanity check */
+	if ( ! guid )
+		return NULL;
+
 	/* Check for a match against well-known GUIDs */
 	for ( i = 0 ; i < ( sizeof ( efi_well_known_guids ) /
 			    sizeof ( efi_well_known_guids[0] ) ) ; i++ ) {
@@ -224,6 +228,13 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Sanity check */
+	if ( ( ! handle ) || ( ! protocol ) ) {
+		printf ( "EFI could not retrieve openers for %s on %p\n",
+			 efi_guid_ntoa ( protocol ), handle );
+		return;
+	}
+
 	/* Retrieve list of openers */
 	if ( ( efirc = bs->OpenProtocolInformation ( handle, protocol, &openers,
 						     &count ) ) != 0 ) {
@@ -268,6 +279,12 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Sanity check */
+	if ( ! handle ) {
+		printf ( "EFI could not retrieve protocols for %p\n", handle );
+		return;
+	}
+
 	/* Retrieve list of protocols */
 	if ( ( efirc = bs->ProtocolsPerHandle ( handle, &protocols,
 						&count ) ) != 0 ) {
@@ -301,9 +318,17 @@ const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	static char text[256];
 	CHAR16 *wtext;
 
-	/* Convert path to a textual representation */
-	if ( ! efidpt )
+	/* Sanity checks */
+	if ( ! efidpt ) {
+		DBG ( "[No DevicePathToText]" );
 		return NULL;
+	}
+	if ( ! path ) {
+		DBG ( "[NULL DevicePath]" );
+		return NULL;
+	}
+
+	/* Convert path to a textual representation */
 	wtext = efidpt->ConvertDevicePathToText ( path, TRUE, FALSE );
 	if ( ! wtext )
 		return NULL;
@@ -328,6 +353,12 @@ static const char * efi_driver_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf ) {
 	CHAR16 *driver_name;
 	EFI_STATUS efirc;
 
+	/* Sanity check */
+	if ( ! wtf ) {
+		DBG ( "[NULL ComponentName2]" );
+		return NULL;
+	}
+
 	/* Try "en" first; if that fails then try the first language */
 	if ( ( ( efirc = wtf->GetDriverName ( wtf, "en",
 					      &driver_name ) ) != 0 ) &&
@@ -350,7 +381,7 @@ static const char * efi_driver_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf ) {
 static const char *
 efi_pecoff_debug_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 	static char buf[32];
-	EFI_IMAGE_DOS_HEADER *dos = loaded->ImageBase;
+	EFI_IMAGE_DOS_HEADER *dos;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *pe;
 	EFI_IMAGE_OPTIONAL_HEADER32 *opt32;
 	EFI_IMAGE_OPTIONAL_HEADER64 *opt64;
@@ -367,7 +398,14 @@ efi_pecoff_debug_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 	char *name;
 	char *tmp;
 
+	/* Sanity check */
+	if ( ! loaded ) {
+		DBG ( "[NULL LoadedImage]" );
+		return NULL;
+	}
+
 	/* Parse DOS header */
+	dos = loaded->ImageBase;
 	if ( ! dos ) {
 		DBG ( "[Missing DOS header]" );
 		return NULL;
@@ -462,6 +500,12 @@ efi_pecoff_debug_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 static const char *
 efi_first_loaded_image_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 
+	/* Sanity check */
+	if ( ! loaded ) {
+		DBG ( "[NULL LoadedImage]" );
+		return NULL;
+	}
+
 	return ( ( loaded->ParentHandle == NULL ) ? "DxeCore(?)" : NULL );
 }
 
@@ -473,6 +517,12 @@ efi_first_loaded_image_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
  */
 static const char *
 efi_loaded_image_filepath_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
+
+	/* Sanity check */
+	if ( ! loaded ) {
+		DBG ( "[NULL LoadedImage]" );
+		return NULL;
+	}
 
 	return efi_devpath_text ( loaded->FilePath );
 }
