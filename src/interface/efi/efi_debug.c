@@ -348,7 +348,37 @@ const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
  * @v wtf		Component name protocol
  * @ret name		Driver name, or NULL
  */
-static const char * efi_driver_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf ) {
+static const char * efi_driver_name ( EFI_COMPONENT_NAME_PROTOCOL *wtf ) {
+	static char name[64];
+	CHAR16 *driver_name;
+	EFI_STATUS efirc;
+
+	/* Sanity check */
+	if ( ! wtf ) {
+		DBG ( "[NULL ComponentName]" );
+		return NULL;
+	}
+
+	/* Try "eng" first; if that fails then try the first language */
+	if ( ( ( efirc = wtf->GetDriverName ( wtf, "eng",
+					      &driver_name ) ) != 0 ) &&
+	     ( ( efirc = wtf->GetDriverName ( wtf, wtf->SupportedLanguages,
+					      &driver_name ) ) != 0 ) ) {
+		return NULL;
+	}
+
+	/* Convert name from CHAR16 to char */
+	snprintf ( name, sizeof ( name ), "%ls", driver_name );
+	return name;
+}
+
+/**
+ * Get driver name
+ *
+ * @v wtf		Component name protocol
+ * @ret name		Driver name, or NULL
+ */
+static const char * efi_driver_name2 ( EFI_COMPONENT_NAME2_PROTOCOL *wtf ) {
 	static char name[64];
 	CHAR16 *driver_name;
 	EFI_STATUS efirc;
@@ -559,6 +589,9 @@ static struct efi_handle_name_type efi_handle_name_types[] = {
 			       efi_devpath_text ),
 	/* Driver name (for driver image handles) */
 	EFI_HANDLE_NAME_TYPE ( &efi_component_name2_protocol_guid,
+			       efi_driver_name2 ),
+	/* Driver name (via obsolete original ComponentName protocol) */
+	EFI_HANDLE_NAME_TYPE ( &efi_component_name_protocol_guid,
 			       efi_driver_name ),
 	/* PE/COFF debug filename (for image handles) */
 	EFI_HANDLE_NAME_TYPE ( &efi_loaded_image_protocol_guid,
