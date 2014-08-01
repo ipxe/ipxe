@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/uuid.h>
+#include <ipxe/base16.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
@@ -316,16 +317,29 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	static char text[256];
+	void *start;
+	void *end;
+	size_t max_len;
+	size_t len;
 	CHAR16 *wtext;
 
 	/* Sanity checks */
-	if ( ! efidpt ) {
-		DBG ( "[No DevicePathToText]" );
-		return NULL;
-	}
 	if ( ! path ) {
 		DBG ( "[NULL DevicePath]" );
 		return NULL;
+	}
+
+	/* If we have no DevicePathToText protocol then use a raw hex string */
+	if ( ! efidpt ) {
+		DBG ( "[No DevicePathToText]" );
+		start = path;
+		end = efi_devpath_end ( path );
+		len = ( end - start );
+		max_len = ( ( sizeof ( text ) - 1 /* NUL */ ) / 2 /* "xx" */ );
+		if ( len > max_len )
+			len = max_len;
+		base16_encode ( start, len, text );
+		return text;
 	}
 
 	/* Convert path to a textual representation */
