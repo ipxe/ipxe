@@ -208,13 +208,8 @@ efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 static EFI_STATUS EFIAPI
 efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		   EFI_HANDLE device, EFI_DEVICE_PATH_PROTOCOL *child ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_driver *efidrv;
 	struct efi_device *efidev;
-	union {
-		EFI_DEVICE_PATH_PROTOCOL *devpath;
-		void *interface;
-	} devpath;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -244,22 +239,6 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	INIT_LIST_HEAD ( &efidev->dev.children );
 	list_add ( &efidev->dev.siblings, &efi_devices );
 
-	/* Open device path protocol */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_device_path_protocol_guid,
-					  &devpath.interface,
-					  efi_image_handle, device,
-					  EFI_OPEN_PROTOCOL_BY_DRIVER ) ) != 0){
-		rc = -EEFI ( efirc );
-		DBGC ( device, "EFIDRV %p %s could not open device path: %s\n",
-		       device, efi_handle_name ( device ),
-		       strerror ( rc ) );
-		DBGC_EFI_OPENERS ( device, device,
-				   &efi_device_path_protocol_guid );
-		goto err_no_device_path;
-	}
-	efidev->path = devpath.devpath;
-
 	/* Try to start this device */
 	for_each_table_entry ( efidrv, EFI_DRIVERS ) {
 		if ( ( rc = efidrv->supported ( device ) ) != 0 ) {
@@ -282,9 +261,6 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	}
 	efirc = EFI_UNSUPPORTED;
 
-	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
-			    efi_image_handle, device );
- err_no_device_path:
 	list_del ( &efidev->dev.siblings );
 	free ( efidev );
  err_alloc:
@@ -306,7 +282,6 @@ static EFI_STATUS EFIAPI
 efi_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		  EFI_HANDLE device, UINTN num_children,
 		  EFI_HANDLE *children ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_driver *efidrv;
 	struct efi_device *efidev;
 	UINTN i;
@@ -331,8 +306,6 @@ efi_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	efidrv = efidev->driver;
 	assert ( efidrv != NULL );
 	efidrv->stop ( efidev );
-	bs->CloseProtocol ( efidev->device, &efi_device_path_protocol_guid,
-			    efi_image_handle, efidev->device );
 	list_del ( &efidev->dev.siblings );
 	free ( efidev );
 

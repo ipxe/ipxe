@@ -167,7 +167,7 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Create device path for image */
-	path = efi_image_path ( image, &snpdev->path );
+	path = efi_image_path ( image, snpdev->path );
 	if ( ! path ) {
 		DBGC ( image, "EFIIMAGE %p could not create device path\n",
 		       image );

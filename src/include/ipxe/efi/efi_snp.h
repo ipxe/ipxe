@@ -66,12 +66,8 @@ struct efi_snp_device {
 	wchar_t driver_name[16];
 	/** Controller name */
 	wchar_t controller_name[64];
-	/** The device path
-	 *
-	 * This field is variable in size and must appear at the end
-	 * of the structure.
-	 */
-	EFI_DEVICE_PATH_PROTOCOL path;
+	/** The device path */
+	EFI_DEVICE_PATH_PROTOCOL *path;
 };
 
 extern int efi_snp_hii_install ( struct efi_snp_device *snpdev );
