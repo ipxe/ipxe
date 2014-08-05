@@ -495,7 +495,14 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 	DBGC2_EFI_PROTOCOLS ( device, device );
 	DBGC ( device, "EFIDRV %p %s disconnecting existing drivers\n",
 	       device, efi_handle_name ( device ) );
-	bs->DisconnectController ( device, NULL, NULL );
+	if ( ( efirc = bs->DisconnectController ( device, NULL,
+						  NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( device, "EFIDRV %p %s could not disconnect existing "
+		       "drivers: %s\n", device, efi_handle_name ( device ),
+		       strerror ( rc ) );
+		/* Ignore the error and attempt to connect our drivers */
+	}
 	DBGC2 ( device, "EFIDRV %p %s after disconnecting:\n",
 		device, efi_handle_name ( device ) );
 	DBGC2_EFI_PROTOCOLS ( device, device );
