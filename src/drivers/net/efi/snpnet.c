@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/vsprintf.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi_driver.h>
@@ -70,6 +71,65 @@ static EFI_GUID efi_simple_network_protocol_guid
 /** EFI PCI I/O protocol GUID */
 static EFI_GUID efi_pci_io_protocol_guid
 	= EFI_PCI_IO_PROTOCOL_GUID;
+
+/**
+ * Format SNP MAC address (for debugging)
+ *
+ * @v mac		MAC address
+ * @v len		Length of MAC address
+ * @ret text		MAC address as text
+ */
+static const char * snpnet_mac_text ( EFI_MAC_ADDRESS *mac, size_t len ) {
+	static char buf[ sizeof ( *mac ) * 3 /* "xx:" or "xx\0" */ ];
+	size_t used = 0;
+	unsigned int i;
+
+	for ( i = 0 ; i < len ; i++ ) {
+		used += ssnprintf ( &buf[used], ( sizeof ( buf ) - used ),
+				    "%s%02x", ( used ? ":" : "" ),
+				    mac->Addr[i] );
+	}
+	return buf;
+}
+
+/**
+ * Dump SNP mode information (for debugging)
+ *
+ * @v netdev		Network device
+ */
+static void snpnet_dump_mode ( struct net_device *netdev ) {
+	struct snp_nic *snp = netdev_priv ( netdev );
+	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
+	size_t mac_len = mode->HwAddressSize;
+	unsigned int i;
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_EXTRA )
+		return;
+
+	DBGC2 ( snp, "SNP %s st %d type %d hdr %d pkt %d rxflt %#x/%#x%s "
+		"nvram %d acc %d mcast %d/%d\n", netdev->name, mode->State,
+		mode->IfType, mode->MediaHeaderSize, mode->MaxPacketSize,
+		mode->ReceiveFilterSetting, mode->ReceiveFilterMask,
+		( mode->MultipleTxSupported ? " multitx" : "" ),
+		mode->NvRamSize, mode->NvRamAccessSize,
+		mode->MCastFilterCount, mode->MaxMCastFilterCount );
+	DBGC2 ( snp, "SNP %s hw %s", netdev->name,
+		snpnet_mac_text ( &mode->PermanentAddress, mac_len ) );
+	DBGC2 ( snp, " addr %s%s",
+		snpnet_mac_text ( &mode->CurrentAddress, mac_len ),
+		( mode->MacAddressChangeable ? "" : "(f)" ) );
+	DBGC2 ( snp, " bcast %s\n",
+		snpnet_mac_text ( &mode->BroadcastAddress, mac_len ) );
+	for ( i = 0 ; i < mode->MCastFilterCount ; i++ ) {
+		DBGC2 ( snp, "SNP %s mcast %s\n", netdev->name,
+			snpnet_mac_text ( &mode->MCastFilter[i], mac_len ) );
+	}
+	DBGC2 ( snp, "SNP %s media %s\n", netdev->name,
+		( mode->MediaPresentSupported ?
+		  ( mode->MediaPresent ? "present" : "not present" ) :
+		  "presence not supported" ) );
+}
 
 /**
  * Check link state
@@ -255,6 +315,7 @@ static int snpnet_open ( struct net_device *netdev ) {
 	/* Initialise NIC */
 	if ( ( efirc = snp->snp->Initialize ( snp->snp, 0, 0 ) ) != 0 ) {
 		rc = -EEFI ( efirc );
+		snpnet_dump_mode ( netdev );
 		DBGC ( snp, "SNP %s could not initialise: %s\n",
 		       netdev->name, strerror ( rc ) );
 		return rc;
@@ -281,6 +342,9 @@ static int snpnet_open ( struct net_device *netdev ) {
 		       netdev->name, strerror ( rc ) );
 		/* Ignore error */
 	}
+
+	/* Dump mode information (for debugging) */
+	snpnet_dump_mode ( netdev );
 
 	return 0;
 }
