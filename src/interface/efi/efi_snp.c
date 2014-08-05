@@ -34,14 +34,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_snp.h>
 #include <usr/autoboot.h>
 
-/** EFI simple network protocol GUID */
-static EFI_GUID efi_simple_network_protocol_guid
-	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
-
-/** EFI device path protocol GUID */
-static EFI_GUID efi_device_path_protocol_guid
-	= EFI_DEVICE_PATH_PROTOCOL_GUID;
-
 /** EFI network interface identifier GUID */
 static EFI_GUID efi_nii_protocol_guid
 	= EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL_GUID;
@@ -55,14 +47,6 @@ static EFI_GUID efi_nii31_protocol_guid = {
 	0x1ACED566, 0x76ED, 0x4218,
 	{ 0xBC, 0x81, 0x76, 0x7F, 0x1F, 0x97, 0x7A, 0x89 }
 };
-
-/** EFI component name protocol GUID */
-static EFI_GUID efi_component_name2_protocol_guid
-	= EFI_COMPONENT_NAME2_PROTOCOL_GUID;
-
-/** EFI load file protocol GUID */
-static EFI_GUID efi_load_file_protocol_guid
-	= EFI_LOAD_FILE_PROTOCOL_GUID;
 
 /** List of SNP devices */
 static LIST_HEAD ( efi_snp_devices );

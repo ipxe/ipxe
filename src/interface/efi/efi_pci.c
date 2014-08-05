@@ -120,10 +120,6 @@ PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_dword );
  ******************************************************************************
  */
 
-/** EFI PCI I/O protocol GUID */
-static EFI_GUID efi_pci_io_protocol_guid
-	= EFI_PCI_IO_PROTOCOL_GUID;
-
 /**
  * Open EFI PCI device
  *

@@ -153,6 +153,22 @@ struct efi_config_table {
  */
 #define EEFI( efirc ) EPLATFORM ( EINFO_EPLATFORM, efirc )
 
+extern EFI_GUID efi_block_io_protocol_guid;
+extern EFI_GUID efi_bus_specific_driver_override_protocol_guid;
+extern EFI_GUID efi_component_name_protocol_guid;
+extern EFI_GUID efi_component_name2_protocol_guid;
+extern EFI_GUID efi_device_path_protocol_guid;
+extern EFI_GUID efi_disk_io_protocol_guid;
+extern EFI_GUID efi_driver_binding_protocol_guid;
+extern EFI_GUID efi_load_file_protocol_guid;
+extern EFI_GUID efi_load_file2_protocol_guid;
+extern EFI_GUID efi_loaded_image_protocol_guid;
+extern EFI_GUID efi_loaded_image_device_path_protocol_guid;
+extern EFI_GUID efi_pci_io_protocol_guid;
+extern EFI_GUID efi_pci_root_bridge_io_protocol_guid;
+extern EFI_GUID efi_simple_file_system_protocol_guid;
+extern EFI_GUID efi_simple_network_protocol_guid;
+
 extern EFI_HANDLE efi_image_handle;
 extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 extern EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;

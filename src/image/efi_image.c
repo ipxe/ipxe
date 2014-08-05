@@ -52,10 +52,6 @@ FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 			  "Could not start image" )
 #define EEFI_START( efirc ) EPLATFORM ( EINFO_EEFI_START, efirc )
 
-/** EFI loaded image protocol GUID */
-static EFI_GUID efi_loaded_image_protocol_guid =
-	EFI_LOADED_IMAGE_PROTOCOL_GUID;
-
 /**
  * Create device path for image
  *

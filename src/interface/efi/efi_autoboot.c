@@ -30,10 +30,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** EFI simple network protocol GUID */
-static EFI_GUID efi_simple_network_protocol_guid
-	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
-
 /**
  * Identify autoboot device
  *

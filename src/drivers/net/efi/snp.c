@@ -21,7 +21,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_snp.h>
 #include "snpnet.h"
@@ -31,10 +30,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * SNP driver
  *
  */
-
-/** EFI simple network protocol GUID */
-static EFI_GUID efi_simple_network_protocol_guid
-	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
 
 /**
  * Check to see if driver supports a device

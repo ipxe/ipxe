@@ -42,23 +42,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_file.h>
 
-/** EFI simple file system protocol GUID */
-static EFI_GUID efi_simple_file_system_protocol_guid
-	= EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
-
 /** EFI file information GUID */
 static EFI_GUID efi_file_info_id = EFI_FILE_INFO_ID;
 
 /** EFI file system information GUID */
 static EFI_GUID efi_file_system_info_id = EFI_FILE_SYSTEM_INFO_ID;
-
-/** EFI block I/O protocol GUID */
-static EFI_GUID efi_block_io_protocol_guid
-	= EFI_BLOCK_IO_PROTOCOL_GUID;
-
-/** EFI disk I/O protocol GUID */
-static EFI_GUID efi_disk_io_protocol_guid
-	= EFI_DISK_IO_PROTOCOL_GUID;
 
 /** EFI media ID */
 #define EFI_MEDIA_ID_MAGIC 0x69505845

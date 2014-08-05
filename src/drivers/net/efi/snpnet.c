@@ -64,14 +64,6 @@ struct snp_nic {
 /** Maximum number of received packets per poll */
 #define SNP_RX_QUOTA 4
 
-/** EFI simple network protocol GUID */
-static EFI_GUID efi_simple_network_protocol_guid
-	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
-
-/** EFI PCI I/O protocol GUID */
-static EFI_GUID efi_pci_io_protocol_guid
-	= EFI_PCI_IO_PROTOCOL_GUID;
-
 /**
  * Format SNP MAC address (for debugging)
  *

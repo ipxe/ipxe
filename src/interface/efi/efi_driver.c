@@ -40,18 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 static EFI_DRIVER_BINDING_PROTOCOL efi_driver_binding;
 
-/** EFI driver binding protocol GUID */
-static EFI_GUID efi_driver_binding_protocol_guid
-	= EFI_DRIVER_BINDING_PROTOCOL_GUID;
-
-/** EFI component name protocol GUID */
-static EFI_GUID efi_component_name2_protocol_guid
-	= EFI_COMPONENT_NAME2_PROTOCOL_GUID;
-
-/** EFI device path protocol GUID */
-static EFI_GUID efi_device_path_protocol_guid
-	= EFI_DEVICE_PATH_PROTOCOL_GUID;
-
 /** List of controlled EFI devices */
 static LIST_HEAD ( efi_devices );
 

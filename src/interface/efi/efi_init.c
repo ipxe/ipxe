@@ -35,10 +35,6 @@ EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 /** System table passed to entry point */
 EFI_SYSTEM_TABLE *efi_systab;
 
-/** EFI loaded image protocol GUID */
-static EFI_GUID efi_loaded_image_protocol_guid
-	= EFI_LOADED_IMAGE_PROTOCOL_GUID;
-
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
 
