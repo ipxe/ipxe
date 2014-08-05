@@ -335,7 +335,7 @@ static int snpnet_open ( struct net_device *netdev ) {
 		    EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST |
 		    EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS |
 		    EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS_MULTICAST );
-	if ( ( efirc = snp->snp->ReceiveFilters ( snp->snp, filters, 0, FALSE,
+	if ( ( efirc = snp->snp->ReceiveFilters ( snp->snp, filters, 0, TRUE,
 						  0, NULL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( snp, "SNP %s could not set receive filters: %s\n",
