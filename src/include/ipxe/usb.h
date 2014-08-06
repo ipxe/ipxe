@@ -14,6 +14,14 @@
 	.name = _name,						\
 }
 
+
+/** USB driver table **/
+#define USB_DRIVERS __table ( struct usb_driver, "usb_driver" )
+
+/** Declare a USB driver */
+#define __usb_driver __table_entry ( USB_DRIVERS, 01 )
+
+
 #define USB_URB_STATUS_INPROGRESS	1
 #define USB_URB_STATUS_COMPLETE		0
 #define USB_URB_STATUS_ERROR		-1
@@ -104,8 +112,6 @@ struct usb_driver {
 
 	void (*remove)(struct usb_device *udev);
 };
-
-#define __usb_driver __table (struct usb_driver, usb_drivers, 01)
 
 struct urb {
 	/* private: usb core and host controller only fields in the urb */
