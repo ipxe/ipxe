@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <gpxe/usb.h>
+#include <ipxe/usb.h>
 #include <stdio.h>
 
 struct urb *usb_alloc_urb(void)
