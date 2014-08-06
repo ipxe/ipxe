@@ -49,6 +49,58 @@ EFI_DEVICE_PATH_PROTOCOL * efi_devpath_end ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 }
 
 /**
+ * Locate parent device supporting a given protocol
+ *
+ * @v device		EFI device handle
+ * @v protocol		Protocol GUID
+ * @v parent		Parent EFI device handle to fill in
+ * @ret rc		Return status code
+ */
+int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
+			EFI_HANDLE *parent ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_DEVICE_PATH_PROTOCOL *path;
+		void *interface;
+	} path;
+	EFI_DEVICE_PATH_PROTOCOL *devpath;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Get device path */
+	if ( ( efirc = bs->OpenProtocol ( device,
+					  &efi_device_path_protocol_guid,
+					  &path.interface,
+					  efi_image_handle, device,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( device, "EFIDEV %p %s cannot open device path: %s\n",
+		       device, efi_handle_name ( device ), strerror ( rc ) );
+		goto err_open_device_path;
+	}
+	devpath = path.path;
+
+	/* Check for presence of specified protocol */
+	if ( ( efirc = bs->LocateDevicePath ( protocol, &devpath,
+					      parent ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( device, "EFIDEV %p %s has no parent supporting %s: %s\n",
+		       device, efi_handle_name ( device ),
+		       efi_guid_ntoa ( protocol ), strerror ( rc ) );
+		goto err_locate_protocol;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_locate_protocol:
+	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
+			    efi_image_handle, device );
+ err_open_device_path:
+	return rc;
+}
+
+/**
  * Add EFI device as child of another EFI device
  *
  * @v parent		EFI parent device handle

@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_pci.h>
+#include <ipxe/efi/efi_utils.h>
 #include "snpnet.h"
 
 /** @file
@@ -414,57 +415,31 @@ static struct net_device_operations snpnet_operations = {
  * @ret rc		Return status code
  */
 static int snpnet_pci_info ( struct efi_device *efidev, struct device *dev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efidev->device;
-	union {
-		EFI_DEVICE_PATH_PROTOCOL *path;
-		void *interface;
-	} path;
-	EFI_DEVICE_PATH_PROTOCOL *devpath;
-	struct pci_device pci;
 	EFI_HANDLE pci_device;
-	EFI_STATUS efirc;
+	struct pci_device pci;
 	int rc;
 
-	/* Get device path */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_device_path_protocol_guid,
-					  &path.interface,
-					  efi_image_handle, device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
-		DBGC ( device, "SNP %p %s cannot open device path: %s\n",
+	/* Find parent PCI device */
+	if ( ( rc = efi_locate_device ( device, &efi_pci_io_protocol_guid,
+					&pci_device ) ) != 0 ) {
+		DBGC ( device, "SNP %p %s is not a PCI device: %s\n",
 		       device, efi_handle_name ( device ), strerror ( rc ) );
-		goto err_open_device_path;
-	}
-	devpath = path.path;
-
-	/* Check for presence of PCI I/O protocol */
-	if ( ( efirc = bs->LocateDevicePath ( &efi_pci_io_protocol_guid,
-					      &devpath, &pci_device ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( device, "SNP %p %s is not a PCI device\n",
-		       device, efi_handle_name ( device ) );
-		goto err_locate_pci_io;
+		return rc;
 	}
 
 	/* Get PCI device information */
 	if ( ( rc = efipci_info ( pci_device, &pci ) ) != 0 ) {
 		DBGC ( device, "SNP %p %s could not get PCI information: %s\n",
 		       device, efi_handle_name ( device ), strerror ( rc ) );
-		goto err_efipci_info;
+		return rc;
 	}
 
 	/* Populate SNP device information */
 	memcpy ( &dev->desc, &pci.dev.desc, sizeof ( dev->desc ) );
 	snprintf ( dev->name, sizeof ( dev->name ), "SNP-%s", pci.dev.name );
 
- err_efipci_info:
- err_locate_pci_io:
-	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
-			    efi_image_handle, device );
- err_open_device_path:
-	return rc;
+	return 0;
 }
 
 /**
