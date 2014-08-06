@@ -38,9 +38,9 @@
 void uhci_print_td_info(struct uhci_td *td)
 {
 
-	DBG("TD INFO\n LP : %lx Vf : %lx Q : %lx T : %lx Status : %lx "
-		"ActLen : %lx MaxLen : %lx D : %lx EP : %lx "
-		"DEV : %lx PID : %lx BUFFER : %lx\n",
+	DBG("TD INFO\n LP : %zx Vf : %zx Q : %zx T : %zx Status : %zx "
+		"ActLen : %zx MaxLen : %zx D : %zx EP : %zx "
+		"DEV : %zx PID : %zx BUFFER : %zx\n",
 		td->link & 0xFFFFFFF0, td->link & UHCI_PTR_DEPTH,
 		td->link & UHCI_PTR_QH,	td->link & UHCI_PTR_TERM,
 		uhci_status_bits(td->status) >> 16,
@@ -53,7 +53,7 @@ void uhci_print_td_info(struct uhci_td *td)
 
 void uhci_print_qh_info(struct uhci_qh *qh)
 {
-	DBG("QH INFO\n QHLP : %lx Q : %lx T %lx\n"
+	DBG("QH INFO\n QHLP : %zx Q : %zx T %zx\n"
 		"\tQELP : %lx : Q : %lx T : %lx\n",
 		qh->link & 0xFFFFFFF0, (qh->link & UHCI_PTR_QH) >> 1,
 		qh->link & UHCI_PTR_TERM, qh->element & 0xFFFFFFF0,
@@ -70,7 +70,7 @@ void uhci_print_uhci_info(struct uhci_hcd *uhci)
 	frnum = inw(uhci->io_addr + USBFRNUM);
 	frnum &= 0x3ff;
 
-	DBG("UHCI STATUS\n\t%s %s Frnum %ld\n",
+	DBG("UHCI STATUS\n\t%s %s Frnum %zd\n",
 		(status & USBSTS_HCH)?"Halted":"Not Halted",
 		(status & USBSTS_HCPE)?"Sched Error":"Schedule Fine",
 		frnum);
@@ -738,8 +738,7 @@ static void uhci_init(struct usb_hcd *hcd)
 	uhci->next_devnum = 2;
 }
 
-static int uhci_hcd_pci_probe(struct pci_device *pci,
-					const struct pci_device_id *id __unused)
+static int uhci_hcd_pci_probe(struct pci_device *pci)
 {
 	struct usb_hcd *hcd;
 
