@@ -692,7 +692,7 @@ static int ohci_hcd_pci_probe(struct pci_device *pci,
 		goto err_ioremap;
 	}
 
-	DBG("OHCI Adapter Found at 0x%zx\n", hcd->res_addr);
+	DBG("OHCI Adapter Found at 0x%lx\n", hcd->res_addr);
 
 	ohci_init(ohci);
 
