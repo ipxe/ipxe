@@ -1,10 +1,7 @@
-#ifndef _GPXE_USB_H
-#define _GPXE_USB_H
-
-#include <gpxe/usb/ch9.h>
-#include <gpxe/tables.h>
-#include <gpxe/device.h>
-#include <io.h>
+#include <ipxe/usb/ch9.h>
+#include <ipxe/tables.h>
+#include <ipxe/device.h>
+#include <ipxe/io.h>
 
 /*
  * USB_ROM is used to build up entries in a struct usb_id array.  It
