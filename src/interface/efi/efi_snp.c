@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
+#include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/efi_snp.h>
 #include <usr/autoboot.h>
 
@@ -1047,11 +1048,11 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	}
 
 	/* Add as child of EFI parent device */
-	if ( ( rc = efidev_child_add ( efidev, snpdev->handle ) ) != 0 ) {
+	if ( ( rc = efi_child_add ( efidev->device, snpdev->handle ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not become child of %p %s: "
 		       "%s\n", snpdev, efidev->device,
 		       efi_handle_name ( efidev->device ), strerror ( rc ) );
-		goto err_efidev_child_add;
+		goto err_efi_child_add;
 	}
 
 	/* Install HII */
@@ -1078,8 +1079,8 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 
 	if ( snpdev->package_list )
 		efi_snp_hii_uninstall ( snpdev );
-	efidev_child_del ( efidev, snpdev->handle );
- err_efidev_child_add:
+	efi_child_del ( efidev->device, snpdev->handle );
+ err_efi_child_add:
 	bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
@@ -1149,7 +1150,7 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 	/* Uninstall the SNP */
 	if ( snpdev->package_list )
 		efi_snp_hii_uninstall ( snpdev );
-	efidev_child_del ( snpdev->efidev, snpdev->handle );
+	efi_child_del ( snpdev->efidev->device, snpdev->handle );
 	list_del ( &snpdev->list );
 	bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,

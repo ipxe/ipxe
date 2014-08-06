@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_download.h>
 #include <ipxe/efi/efi_file.h>
-#include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_wrap.h>
 #include <ipxe/image.h>

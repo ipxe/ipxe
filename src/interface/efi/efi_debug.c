@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/uuid.h>
 #include <ipxe/base16.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
