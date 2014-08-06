@@ -152,11 +152,43 @@ static void efi_handle_sgr ( struct ansiesc_context *ctx __unused,
 	conout->SetAttribute ( conout, efi_attr );
 }
 
+/**
+ * Handle ANSI DECTCEM set (show cursor)
+ *
+ * @v ctx		ANSI escape sequence context
+ * @v count		Parameter count
+ * @v params		List of graphic rendition aspects
+ */
+static void efi_handle_dectcem_set ( struct ansiesc_context *ctx __unused,
+				     unsigned int count __unused,
+				     int params[] __unused ) {
+	EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *conout = efi_systab->ConOut;
+
+	conout->EnableCursor ( conout, TRUE );
+}
+
+/**
+ * Handle ANSI DECTCEM reset (hide cursor)
+ *
+ * @v ctx		ANSI escape sequence context
+ * @v count		Parameter count
+ * @v params		List of graphic rendition aspects
+ */
+static void efi_handle_dectcem_reset ( struct ansiesc_context *ctx __unused,
+				       unsigned int count __unused,
+				       int params[] __unused ) {
+	EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *conout = efi_systab->ConOut;
+
+	conout->EnableCursor ( conout, FALSE );
+}
+
 /** EFI console ANSI escape sequence handlers */
 static struct ansiesc_handler efi_ansiesc_handlers[] = {
 	{ ANSIESC_CUP, efi_handle_cup },
 	{ ANSIESC_ED, efi_handle_ed },
 	{ ANSIESC_SGR, efi_handle_sgr },
+	{ ANSIESC_DECTCEM_SET, efi_handle_dectcem_set },
+	{ ANSIESC_DECTCEM_RESET, efi_handle_dectcem_reset },
 	{ 0, NULL }
 };
 
