@@ -1,10 +1,10 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <gpxe/usb.h>
-#include <gpxe/pci.h>
-#include <gpxe/malloc.h>
-#include <io.h>
+#include <ipxe/usb.h>
+#include <ipxe/pci.h>
+#include <ipxe/malloc.h>
+#include <ipxe/io.h>
 
 #include "ohci.h"
 
