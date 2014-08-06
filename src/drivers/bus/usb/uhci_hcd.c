@@ -54,7 +54,7 @@ void uhci_print_td_info(struct uhci_td *td)
 void uhci_print_qh_info(struct uhci_qh *qh)
 {
 	DBG("QH INFO\n QHLP : %zx Q : %zx T %zx\n"
-		"\tQELP : %lx : Q : %lx T : %lx\n",
+		"\tQELP : %zx : Q : %zx T : %zx\n",
 		qh->link & 0xFFFFFFF0, (qh->link & UHCI_PTR_QH) >> 1,
 		qh->link & UHCI_PTR_TERM, qh->element & 0xFFFFFFF0,
 		(qh->element & UHCI_PTR_QH) >> 1 , qh->link & UHCI_PTR_TERM);
