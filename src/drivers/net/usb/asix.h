@@ -1,6 +1,3 @@
-#ifndef _GPXE_ASIX_H
-#define _GPXE_ASIX_H
-
 #define AX_CMD_SET_SW_MII		0x06
 #define AX_CMD_READ_MII_REG		0x07
 #define AX_CMD_WRITE_MII_REG		0x08
@@ -145,4 +142,3 @@ struct asix {
 	struct list_head	rx_done_queue;
 };
 
-#endif
