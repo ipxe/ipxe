@@ -105,7 +105,7 @@ static inline int reset_port (struct ohci_hcd *ohci, unsigned port)
 		 * presumably other disconnect paths might do it too.
 		 */
 		if (limit_2 < 0) {
-			DBG("port[%d] reset timeout, stat %08lx\n",
+			DBG("port[%d] reset timeout, stat %08zx\n",
 				port, temp);
 			break;
 		}
@@ -583,7 +583,7 @@ static int ohci_start(struct ohci_hcd *ohci)
 	ohci->fminterval = temp & 0x3fff;
 
 	if (ohci->fminterval != FI)
-		DBG("fminterval delta %lx\n",ohci->fminterval - FI);
+		DBG("fminterval delta %zx\n",ohci->fminterval - FI);
 	ohci->fminterval |= FSMP (ohci->fminterval) << 16;
 
 	switch (ohci->hc_control & OHCI_CTRL_HCFS) {
@@ -692,7 +692,7 @@ static int ohci_hcd_pci_probe(struct pci_device *pci,
 		goto err_ioremap;
 	}
 
-	DBG("OHCI Adapter Found at 0x%lx\n", hcd->res_addr);
+	DBG("OHCI Adapter Found at 0x%zx\n", hcd->res_addr);
 
 	ohci_init(ohci);
 
