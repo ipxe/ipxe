@@ -1,6 +1,3 @@
-#ifndef _GPXE_DM9601_H
-#define _GPXE_DM9601_H
-
 #include <gpxe/usb.h>
 #include <gpxe/usb/ch9.h>
 #include <gpxe/netdevice.h>
@@ -19,6 +16,4 @@ struct dm9601 {
 	struct net_device *net;
 	uint16_t			maxpacket;
 };
-
-#endif
 

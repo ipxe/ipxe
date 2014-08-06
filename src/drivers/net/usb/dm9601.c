@@ -1,10 +1,10 @@
 #include <unistd.h>
 #include <stdlib.h>
-#include <gpxe/if_ether.h>
-#include <gpxe/usb.h>
-#include <gpxe/malloc.h>
-#include <gpxe/ethernet.h>
-#include <gpxe/iobuf.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/usb.h>
+#include <ipxe/malloc.h>
+#include <ipxe/ethernet.h>
+#include <ipxe/iobuf.h>
 #include <mii.h>
 #include <errno.h>
 #include <little_bswap.h>
