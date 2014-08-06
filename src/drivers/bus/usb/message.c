@@ -1,9 +1,9 @@
 #include <errno.h>
-#include <gpxe/usb.h>
+#include <ipxe/usb.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <gpxe/malloc.h>
+#include <ipxe/malloc.h>
 #include <stdio.h>
 #include <little_bswap.h>
 
