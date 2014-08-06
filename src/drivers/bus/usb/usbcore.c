@@ -29,7 +29,7 @@ int usb_probe (struct usb_device *udev) {
 
 	DBG ("Adding,  USB device %04x:%04x\n", vendor, device);
 	
-	for (driver = usb_drivers ; driver < usb_drivers_end; driver++) {
+        for_each_table_entry ( driver, USB_DRIVERS ) {
 		for (i = 0; i < driver->id_count; i++ ) {
 			id = &driver->ids[i];
 			if ((id->vendor != 0xffff) &&
