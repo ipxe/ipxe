@@ -1,8 +1,5 @@
-#ifndef _GPXE_UHCI_HCD_H
-#define _GPXE_UHCI_HCD_H
-
-#include <gpxe/list.h>
-#include <gpxe/usb.h>
+#include <ipxe/list.h>
+#include <ipxe/usb.h>
 
 #include "hcd.h"
 
@@ -209,4 +206,3 @@ struct uhci_urb_priv {
 void uhci_print_td_info(struct uhci_td *td);
 void uhci_print_qh_info(struct uhci_qh *qh);
 
-#endif
