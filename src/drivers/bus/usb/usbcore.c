@@ -1,10 +1,10 @@
 #include <errno.h>
 #include <stdio.h>
-#include <gpxe/tables.h>
+#include <ipxe/tables.h>
 #include <stdlib.h>
-#include <gpxe/usb.h>
+#include <ipxe/usb.h>
 #include <little_bswap.h>
-#include <gpxe/usb/ch9.h>
+#include <ipxe/usb/ch9.h>
 
 /* USB Device number. Starts from 2 */
 static unsigned int usb_devnum = 2;
