@@ -266,6 +266,9 @@ int readline_history ( const char *prompt, const char *prefill,
 	if ( prompt )
 		printf ( "%s", prompt );
 
+	/* Ensure cursor is visible */
+	printf ( "\033[?25h" );
+
 	/* Initialise editable string */
 	memset ( &string, 0, sizeof ( string ) );
 	init_editstring ( &string, buf, sizeof ( buf ) );
