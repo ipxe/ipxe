@@ -1,12 +1,12 @@
 #include <errno.h>
 #include <little_bswap.h>
 #include <stdlib.h>
-#include <gpxe/malloc.h>
+#include <ipxe/malloc.h>
 #include <unistd.h>
-#include <gpxe/pci.h>
+#include <ipxe/pci.h>
 #include <stdio.h>
 
-#include <gpxe/usb/ch9.h>
+#include <ipxe/usb/ch9.h>
 #include "uhci_hcd.h"
 #include "hcd.h"
 

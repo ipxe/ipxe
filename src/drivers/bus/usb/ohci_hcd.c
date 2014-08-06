@@ -651,8 +651,7 @@ static int ohci_start(struct ohci_hcd *ohci)
 
 	return 0;
 }
-static int ohci_hcd_pci_probe(struct pci_device *pci,
-					const struct pci_device_id *id __unused)
+static int ohci_hcd_pci_probe(struct pci_device *pci)
 {
 	struct usb_hcd *hcd;
 	struct ohci_hcd *ohci;
