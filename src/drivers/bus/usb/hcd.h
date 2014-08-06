@@ -1,6 +1,3 @@
-#ifndef _GPXE_HCD_H
-#define _GPXE_HCD_H
-
 /*
  * USB Packet IDs (PIDs)
  */
@@ -21,8 +18,4 @@
 #define USB_PID_SETUP			0x2d
 #define USB_PID_STALL			0x1e
 #define USB_PID_MDATA			0x0f	/* USB 2.0 */
-
-
-
-#endif
 
