@@ -207,4 +207,3 @@ int usb_get_configuration(struct usb_device *udev);
 /* Remove all devices attached to a HC */
 void usb_hcd_remove_all_devices(struct usb_hcd *hcd);
 
-#endif
