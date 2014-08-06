@@ -9,11 +9,6 @@
 /* USB Device number. Starts from 2 */
 static unsigned int usb_devnum = 2;
 
-static struct usb_driver usb_drivers[0]
-	__table_start (struct usb_driver, usb_drivers);
-static struct usb_driver usb_drivers_end[0]
-	__table_end (struct usb_driver, usb_drivers);
-
 /**
  * Probe a USB device
  *
