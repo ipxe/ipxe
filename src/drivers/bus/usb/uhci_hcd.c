@@ -546,7 +546,7 @@ static int reset_port(struct uhci_hcd *uhci, int port)
 	udelay(10);
 #define PE_NUM_TRIES 15
 	for (i = 0; i < PE_NUM_TRIES; i++) {
-		DBG("PE : Trying %d time\n %x", i, status);
+		DBG("PE : Trying %d time\nStatus : %x \n", i, status);
 		SET_RH_PORTSTAT(USBPORTSC_PE, uhci->io_addr + (port *2) + USBPORTSC1);
 		mdelay(10);
 		status = inw(uhci->io_addr + (port * 2) + USBPORTSC1);
