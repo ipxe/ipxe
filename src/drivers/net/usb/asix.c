@@ -483,7 +483,7 @@ int asix_88178_probe(struct usb_device *udev,
 	memcpy(netdev->ll_addr, buf, ETH_ALEN);
 	
 	phyid = asix_get_phyid(asix);
-	DBG("PHYID=0x%08lx\n", phyid);
+	DBG("PHYID=0x%08zx\n", phyid);
 
 	if (asix->phy == PHY_MODE_MARVELL) {
 		marvell_phy_init(asix);
@@ -635,7 +635,7 @@ int asix_88772_probe(struct usb_device *udev,
 	memcpy(netdev->ll_addr, buf, ETH_ALEN);
 
 	phyid = asix_get_phyid(asix);
-	DBG("PHYID=0x%08lx", phyid);
+	DBG("PHYID=0x%08zx", phyid);
 
 	if ((ret = asix_sw_reset(asix, AX_SWRESET_PRL)) < 0)
 		goto out;
