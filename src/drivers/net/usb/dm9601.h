@@ -1,6 +1,6 @@
-#include <gpxe/usb.h>
-#include <gpxe/usb/ch9.h>
-#include <gpxe/netdevice.h>
+#include <ipxe/usb.h>
+#include <ipxe/usb/ch9.h>
+#include <ipxe/netdevice.h>
 
 #define DM9601_MTU			1522
 struct dm9601 {
