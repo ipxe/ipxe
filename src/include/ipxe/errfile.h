@@ -77,6 +77,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_linux		     ( ERRFILE_DRIVER | 0x00050000 )
 #define ERRFILE_pcivpd		     ( ERRFILE_DRIVER | 0x00060000 )
 
+#define ERRFILE_uhci_hcd             ( ERRFILE_DRIVER | 0x00080000 )
+#define ERRFILE_ohci_hcd             ( ERRFILE_DRIVER | 0x00081000 )
+#define ERRFILE_message              ( ERRFILE_DRIVER | 0x00082000 )
+#define ERRFILE_usbcore              ( ERRFILE_DRIVER | 0x00083000 )
+
 #define ERRFILE_nvs		     ( ERRFILE_DRIVER | 0x00100000 )
 #define ERRFILE_spi		     ( ERRFILE_DRIVER | 0x00110000 )
 #define ERRFILE_i2c_bit		     ( ERRFILE_DRIVER | 0x00120000 )
