@@ -1,4 +1,3 @@
-#include <ipxe/usb.h>
 #include <ipxe/usb/ch9.h>
 #include <ipxe/netdevice.h>
 
