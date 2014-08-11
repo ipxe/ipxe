@@ -356,3 +356,10 @@ REQUIRE_OBJECT ( memmap_settings );
 #define REQUIRE_KEYMAP_OBJECT( _map ) REQUIRE_OBJECT ( keymap_ ## _map )
 #define REQUIRE_KEYMAP( _map ) REQUIRE_KEYMAP_OBJECT ( _map )
 REQUIRE_KEYMAP ( KEYBOARD_MAP );
+
+/* usb host drivers aren't picked up so drag them in here */
+REQUIRE_OBJECT ( message );
+REQUIRE_OBJECT ( urb );
+REQUIRE_OBJECT ( usbcore );
+REQUIRE_OBJECT ( uhci_hcd );
+
