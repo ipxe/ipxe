@@ -815,7 +815,7 @@ static void uhci_hcd_pci_remove(struct pci_device *pci)
 }
 
 static struct pci_device_id uhci_hcd_pci_ids[] = {
-	PCI_ROM(0xffff, 0xffff, "UHCI HCD", "UHCI USB Controller", 0),
+        PCI_ROM(0xffff, 0xffff, "UHCI HCD", "UHCI USB Controller", 0), 
 };
 
 struct pci_driver uhci_hcd_pci_driver __pci_driver = {

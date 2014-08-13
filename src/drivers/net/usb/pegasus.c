@@ -20,7 +20,7 @@ static const char driver_name[] = "pegasus";
 
 static struct usb_eth_dev usb_dev_id[] = {
 #define	PEGASUS_DEV(pn, vid, pid, flags)	\
-	{.name = pn, .vendor = vid, .device = pid, .private = flags},
+	{.name = pn, .vendor = vid, .device = pid, .private = flags },
 #include "pegasus.h"
 #undef	PEGASUS_DEV
 	{NULL, 0, 0, 0},
@@ -28,13 +28,81 @@ static struct usb_eth_dev usb_dev_id[] = {
 };
 
 static struct usb_device_id pegasus_ids[] = {
-#define	PEGASUS_DEV(pn, vid, dev, flags) \
-	USB_ROM (vid,dev, "pegasus", pn),
-#include "pegasus.h"
-#undef	PEGASUS_DEV
-	{NULL, 0, 0},
-	{NULL, 0, 0}
+USB_ROM(0x0506, 0x4601, "pegasus", "3Com USB Ethernet 3C460B", 0 ), 
+USB_ROM(0x0557, 0x2007, "pegasus", "ATEN USB Ethernet UC-110T", 0 ),
+USB_ROM(0x07b8, 0x110c, "pegasus", "USB HPNA/Ethernet", 0 ),
+USB_ROM(0x07b8, 0x4104, "pegasus", "USB HPNA/Ethernet", 0 ),
+USB_ROM(0x07b8, 0x4004, "pegasus", "USB HPNA/Ethernet", 0 ),
+USB_ROM(0x07b8, 0x4007, "pegasus", "USB HPNA/Ethernet", 0 ),
+USB_ROM(0x07b8, 0x4102, "pegasus", "USB 10/100 Fast Ethernet", 0 ),
+USB_ROM(0x07b8, 0x4002, "pegasus", "USB 10/100 Fast Ethernet", 0 ),
+USB_ROM(0x07b8, 0x400b, "pegasus", "USB 10/100 Fast Ethernet", 0 ),
+USB_ROM(0x07b8, 0x400c, "pegasus", "USB 10/100 Fast Ethernet", 0 ),
+USB_ROM(0x07b8, 0xabc1, "pegasus", "USB 10/100 Fast Ethernet", 0 ),
+USB_ROM(0x07b8, 0x200c, "pegasus", "USB 10/100 Fast Ethernet", 0 ),
+USB_ROM(0x083a, 0x1046, "pegasus", "Accton USB 10/100 Ethernet Adapter", 0 ),
+USB_ROM(0x083a, 0x5046, "pegasus", "SpeedStream USB 10/100 Ethernet", 0 ),
+USB_ROM(0x083a, 0xb004, "pegasus", "Philips USB 10/100 Ethernet", 0 ),
+USB_ROM(0x07a6, 0x8511, "pegasus", "ADMtek ADM8511 USB Ethernet", 0 ),
+USB_ROM(0x07a6, 0x8513, "pegasus", "ADMtek ADM8513 USB Ethernet", 0 ),
+USB_ROM(0x07a6, 0x8515, "pegasus", "ADMtek ADM8515 USB-2.0 Ethernet", 0 ),
+USB_ROM(0x07a6, 0x0986, "pegasus", "ADMtek AN986 USB Ethernet", 0 ),
+USB_ROM(0x07a6, 0x07c2, "pegasus", "ADMtek AN986A USB MAC", 0 ),
+USB_ROM(0x3334, 0x1701, "pegasus", "AEI USB Fast Ethernet Adapter", 0 ),
+USB_ROM(0x07c9, 0xb100, "pegasus", "Allied Telesyn Int. AT-USB100", 0 ),
+USB_ROM(0x050d, 0x0121, "pegasus", "Belkin F5D5050 USB Ethernet", 0 ),
+USB_ROM(0x08dd, 0x0986, "pegasus", "Billionton USB-100", 0 ),
+USB_ROM(0x08dd, 0x0987, "pegasus", "Billionton USBLP-100", 0 ),
+USB_ROM(0x049f, 0x8511, "pegasus", "iPAQ Networking 10/100 USB", 0 ),
+USB_ROM(0x08dd, 0x0988, "pegasus", "Billionton USBEL-100", 0 ),
+USB_ROM(0x08dd, 0x8511, "pegasus", "Billionton USBE-100", 0 ),
+USB_ROM(0x07aa, 0x0004, "pegasus", "Corega FEther USB-TX", 0 ),
+USB_ROM(0x07aa, 0x000d, "pegasus", "Corega FEther USB-TXS", 0 ),
+USB_ROM(0x2001, 0x4001, "pegasus", "D-Link DSB-650TX", 0 ),
+USB_ROM(0x2001, 0x4002, "pegasus", "D-Link DSB-650TX", 0 ),
+USB_ROM(0x2001, 0x4102, "pegasus", "D-Link DSB-650TX", 0 ),
+USB_ROM(0x2001, 0x400b, "pegasus", "D-Link DSB-650TX", 0 ),
+USB_ROM(0x2001, 0x200c, "pegasus", "D-Link DSB-650TX", 0 ),
+USB_ROM(0x2001, 0x4003, "pegasus", "D-Link DSB-650TX", 0 ),
+USB_ROM(0x2001, 0xabc1, "pegasus", "D-Link DSB-650", 0 ),
+USB_ROM(0x0db7, 0x0002, "pegasus", "GOLDPFEIL USB Adapter", 0 ),
+USB_ROM(0x056e, 0x4010, "pegasus", "ELECOM USB Ethernet LD-USB20", 0 ),
+USB_ROM(0x1342, 0x0304, "pegasus", "EasiDock Ethernet", 0 ),
+USB_ROM(0x05cc, 0x3000, "pegasus", "Elsa Micolink USB2Ethernet", 0 ),
+USB_ROM(0x1044, 0x8002, "pegasus", "GIGABYTE GN-BR402W Wireless Router", 0 ),
+USB_ROM(0x0e66, 0x400c, "pegasus", "Hawking UF100 10/100 Ethernet", 0 ),
+USB_ROM(0x03f0, 0x811c, "pegasus", "HP hn210c Ethernet USB", 0 ),
+USB_ROM(0x04bb, 0x0904, "pegasus", "IO DATA USB ET/TX", 0 ),
+USB_ROM(0x04bb, 0x0913, "pegasus", "IO DATA USB ET/TX-S", 0 ),
+USB_ROM(0x0951, 0x000a, "pegasus", "Kingston KNU101TX Ethernet", 0 ),
+USB_ROM(0x056e, 0x4002, "pegasus", "LANEED USB Ethernet LD-USB/TX", 0 ),
+USB_ROM(0x056e, 0x4005, "pegasus", "LANEED USB Ethernet LD-USBL/TX", 0 ),
+USB_ROM(0x056e, 0x400b, "pegasus", "LANEED USB Ethernet LD-USB/TX", 0 ),
+USB_ROM(0x056e, 0xabc1, "pegasus", "LANEED USB Ethernet LD-USB/T", 0 ),
+USB_ROM(0x056e, 0x200c, "pegasus", "LANEED USB Ethernet LD-USB/TX", 0 ),
+USB_ROM(0x066b, 0x2202, "pegasus", "Linksys USB10TX", 0 ),
+USB_ROM(0x066b, 0x2203, "pegasus", "Linksys USB100TX", 0 ),
+USB_ROM(0x066b, 0x2204, "pegasus", "Linksys USB100TX", 0 ),
+USB_ROM(0x066b, 0x2206, "pegasus", "Linksys USB10T Ethernet Adapter", 0 ),
+USB_ROM(0x077b, 0x08b4, "pegasus", "Linksys USBVPN1", 0 ),
+USB_ROM(0x066b, 0x400b, "pegasus", "Linksys USB USB100TX", 0 ),
+USB_ROM(0x066b, 0x200c, "pegasus", "Linksys USB10TX", 0 ),
+USB_ROM(0x0411, 0x0001, "pegasus", "MELCO/BUFFALO LUA-TX", 0 ),
+USB_ROM(0x0411, 0x0005, "pegasus", "MELCO/BUFFALO LUA-TX", 0 ),
+USB_ROM(0x0411, 0x0009, "pegasus", "MELCO/BUFFALO LUA2-TX", 0 ),
+USB_ROM(0x045e, 0x007a, "pegasus", "Microsoft MN-110", 0 ),
+USB_ROM(0x0846, 0x1020, "pegasus", "NETGEAR FA101", 0 ),
+USB_ROM(0x0b39, 0x0109, "pegasus", "OCT Inc.", 0 ),
+USB_ROM(0x0b39, 0x0901, "pegasus", "OCT USB TO Ethernet", 0 ),
+USB_ROM(0x08d1, 0x0003, "pegasus", "smartNIC 2 PnP Adapter", 0 ),
+USB_ROM(0x0707, 0x0200, "pegasus", "SMC 202 USB Ethernet", 0 ),
+USB_ROM(0x0707, 0x0201, "pegasus", "SMC 2206 USB Ethernet", 0 ),
+USB_ROM(0x15e8, 0x9100, "pegasus", "SOHOware NUB100 Ethernet", 0 ),
+USB_ROM(0x15e8, 0x9110, "pegasus", "SOHOware NUB110 Ethernet", 0 ),
+USB_ROM(0x067c, 0x1001, "pegasus", "SpeedStream USB 10/100 Ethernet", 0 ),
 };
+
+
 
 static int get_registers(pegasus_t * pegasus, uint16_t indx, uint16_t size,
 			 void *data)

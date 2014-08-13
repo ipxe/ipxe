@@ -8,12 +8,14 @@
  * is also parsed by parserom.pl to generate Makefile rules and files
  * for rom-o-matic.
  */
-#define USB_ROM( _vendor, _device, _name, _description ) {	\
-	.vendor = _vendor,					\
-	.device = _device,					\
-	.name = _name,						\
+#define USB_ID( _vendor, _device, _name, _description, _data ) {        \
+        .vendor = _vendor,                                              \
+        .device = _device,                                              \
+        .name = _name,                                                  \
+        .driver_data = _data                                            \
 }
-
+#define USB_ROM( _vendor, _device, _name, _description, _data ) \
+        USB_ID( _vendor, _device, _name, _description, _data )
 
 /** USB driver table **/
 #define USB_DRIVERS __table ( struct usb_driver, "usb_driver" )
@@ -74,6 +76,8 @@ struct usb_device_id {
 	uint16_t vendor;
 	/** device ID */
 	uint16_t device;
+        /** Arbitrary driver data */
+        unsigned long driver_data;
 };
 
 struct usb_device {

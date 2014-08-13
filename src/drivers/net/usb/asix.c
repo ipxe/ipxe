@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/usb.h>
+#include <ipxe/pci.h>
 #include <ipxe/malloc.h>
 #include <ipxe/ethernet.h>
 #include <ipxe/iobuf.h>
@@ -691,9 +692,9 @@ out:
 }
 
 static struct usb_device_id asix_88178_ids[] = {
-	USB_ROM (0x1737, 0x0039, "asix", "Linksys USB1000"),
-	USB_ROM (0x04bb, 0x0939, "asix", "IO-DATA ETG-US2"),
-	USB_ROM (0x050d, 0x5055, "asix", "Belkin F5D5055"),
+	USB_ROM(0x1737, 0x0039, "asix", "Linksys USB1000", 0),
+	USB_ROM(0x04bb, 0x0939, "asix", "IO-DATA ETG-US2", 0),
+	USB_ROM(0x050d, 0x5055, "asix", "Belkin F5D5055", 0),
 };
 
 struct usb_driver asix_88178_usb_driver __usb_driver = {
@@ -704,8 +705,8 @@ struct usb_driver asix_88178_usb_driver __usb_driver = {
 
 
 static struct usb_device_id asix_88772_ids[] = {
-	USB_ROM (0x2001, 0x3c05, "asix", "DLink DUB-E100"),
-        USB_ROM (0x0b95, 0x772a, "asix", "ASIX AX88772A"),
+	USB_ROM(0x2001, 0x3c05, "asix", "DLink DUB-E100", 0),
+        USB_ROM(0x0b95, 0x772a, "asix", "ASIX AX88772A", 0),
 };
 
 struct usb_driver asix_88772_usb_driver __usb_driver = {

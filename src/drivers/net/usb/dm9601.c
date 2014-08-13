@@ -471,7 +471,7 @@ err_alloc_etherdev:
 }
 
 static struct usb_device_id dm9601_ids[] = {
-	USB_ROM(0x0a46, 0x9601, "DM9601", "Davicom 9601"),
+	USB_ROM(0x0a46, 0x9601, "DM9601", "Davicom 9601", 0),
 };
 
 struct usb_driver dm9601_usb_driver  __usb_driver = {
