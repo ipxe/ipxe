@@ -510,6 +510,7 @@ static void hvm_remove ( struct pci_device *pci ) {
 /** PCI device IDs */
 static struct pci_device_id hvm_ids[] = {
 	PCI_ROM ( 0x5853, 0x0001, "hvm", "hvm", 0 ),
+	PCI_ROM ( 0x5853, 0x0002, "hvm2", "hvm2", 0 ),
 };
 
 /** PCI driver */
