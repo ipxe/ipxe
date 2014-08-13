@@ -118,7 +118,7 @@ int xenbus_set_state ( struct xen_device *xendev, int state ) {
  * @v xendev		Xen device
  * @ret state		Backend state, or negative error
  */
-static int xenbus_backend_state ( struct xen_device *xendev ) {
+int xenbus_backend_state ( struct xen_device *xendev ) {
 	unsigned long state;
 	int rc;
 

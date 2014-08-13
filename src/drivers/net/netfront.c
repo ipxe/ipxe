@@ -63,6 +63,55 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
+ * Reset device
+ *
+ * @v netfront		Netfront device
+ * @ret rc		Return status code
+ */
+static int netfront_reset ( struct netfront_nic *netfront ) {
+	struct xen_device *xendev = netfront->xendev;
+	int state;
+	int rc;
+
+	/* Get current backend state */
+	if ( ( state = xenbus_backend_state ( xendev ) ) < 0 ) {
+		rc = state;
+		DBGC ( netfront, "NETFRONT %s could not read backend state: "
+		       "%s\n", xendev->key, strerror ( rc ) );
+		return rc;
+	}
+
+	/* If the backend is not already in InitWait, then mark
+	 * frontend as Closed to shut down the backend.
+	 */
+	if ( state != XenbusStateInitWait ) {
+
+		/* Set state to Closed */
+		xenbus_set_state ( xendev, XenbusStateClosed );
+
+		/* Wait for backend to reach Closed */
+		if ( ( rc = xenbus_backend_wait ( xendev,
+						  XenbusStateClosed ) ) != 0 ) {
+			DBGC ( netfront, "NETFRONT %s backend did not reach "
+			       "Closed: %s\n", xendev->key, strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	/* Reset state to Initialising */
+	xenbus_set_state ( xendev, XenbusStateInitialising );
+
+	/* Wait for backend to reach InitWait */
+	if ( ( rc = xenbus_backend_wait ( xendev, XenbusStateInitWait ) ) != 0){
+		DBGC ( netfront, "NETFRONT %s backend did not reach InitWait: "
+		       "%s\n", xendev->key, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Fetch MAC address
  *
  * @v netfront		Netfront device
@@ -510,6 +559,10 @@ static int netfront_open ( struct net_device *netdev ) {
 	struct xen_device *xendev = netfront->xendev;
 	int rc;
 
+	/* Ensure device is in a suitable initial state */
+	if ( ( rc = netfront_reset ( netfront ) ) != 0 )
+		goto err_reset;
+
 	/* Create transmit descriptor ring */
 	if ( ( rc = netfront_create_ring ( netfront, &netfront->tx ) ) != 0 )
 		goto err_create_tx;
@@ -563,7 +616,7 @@ static int netfront_open ( struct net_device *netdev ) {
 	return 0;
 
  err_backend_wait:
-	xenbus_set_state ( xendev, XenbusStateInitialising );
+	netfront_reset ( netfront );
  err_set_state:
 	netfront_rm ( netfront, "feature-no-csum-offload" );
  err_feature_no_csum_offload:
@@ -575,6 +628,7 @@ static int netfront_open ( struct net_device *netdev ) {
  err_create_rx:
 	netfront_destroy_ring ( netfront, &netfront->tx, NULL );
  err_create_tx:
+ err_reset:
 	return rc;
 }
 
@@ -588,13 +642,10 @@ static void netfront_close ( struct net_device *netdev ) {
 	struct xen_device *xendev = netfront->xendev;
 	int rc;
 
-	/* Set state to Closed */
-	xenbus_set_state ( xendev, XenbusStateClosed );
-
-	/* Wait for backend to close, thereby ensuring that grant
-	 * references are no longer in use, etc.
+	/* Reset devic, thereby ensuring that grant references are no
+	 * longer in use, etc.
 	 */
-	if ( ( rc = xenbus_backend_wait ( xendev, XenbusStateClosed ) ) != 0 ) {
+	if ( ( rc = netfront_reset ( netfront ) ) != 0 ) {
 		DBGC ( netfront, "NETFRONT %s could not disconnect from "
 		       "backend: %s\n", xendev->key, strerror ( rc ) );
 		/* Things will probably go _very_ badly wrong if this
@@ -608,9 +659,6 @@ static void netfront_close ( struct net_device *netdev ) {
 	} else {
 		netdev_link_down ( netdev );
 	}
-
-	/* Reset state to Initialising */
-	xenbus_set_state ( xendev, XenbusStateInitialising );
 
 	/* Delete flags */
 	netfront_rm ( netfront, "feature-no-csum-offload" );
@@ -834,6 +882,12 @@ static int netfront_probe ( struct xen_device *xendev ) {
 	/* Fetch MAC address */
 	if ( ( rc = netfront_read_mac ( netfront, netdev->hw_addr ) ) != 0 )
 		goto err_read_mac;
+
+	/* Reset device.  Ignore failures; allow the device to be
+	 * registered so that reset errors can be observed by the user
+	 * when attempting to open the device.
+	 */
+	netfront_reset ( netfront );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )

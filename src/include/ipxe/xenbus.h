@@ -78,6 +78,7 @@ static inline void * xen_get_drvdata ( struct xen_device *xendev ) {
 }
 
 extern int xenbus_set_state ( struct xen_device *xendev, int state );
+extern int xenbus_backend_state ( struct xen_device *xendev );
 extern int xenbus_backend_wait ( struct xen_device *xendev, int state );
 extern int xenbus_probe ( struct xen_hypervisor *xen, struct device *parent );
 extern void xenbus_remove ( struct xen_hypervisor *xen, struct device *parent );
