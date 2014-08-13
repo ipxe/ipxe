@@ -145,22 +145,24 @@ static void hvm_unmap_hypercall ( struct hvm_device *hvm ) {
  *
  * @v hvm		HVM device
  * @v space		Source mapping space
- * @v pages		Number of pages
+ * @v len		Length (must be a multiple of PAGE_SIZE)
  * @ret mmio		MMIO space address, or NULL on error
  */
 static void * hvm_ioremap ( struct hvm_device *hvm, unsigned int space,
-			    unsigned int pages ) {
+			    size_t len ) {
 	struct xen_add_to_physmap add;
 	struct xen_remove_from_physmap remove;
+	unsigned int pages = ( len / PAGE_SIZE );
 	physaddr_t mmio_phys;
 	unsigned int i;
-	size_t len;
 	void *mmio;
 	int xenrc;
 	int rc;
 
+	/* Sanity check */
+	assert ( ( len % PAGE_SIZE ) == 0 );
+
 	/* Check for available space */
-	len = ( pages * PAGE_SIZE );
 	if ( ( hvm->mmio_offset + len ) > hvm->mmio_len ) {
 		DBGC ( hvm, "HVM could not allocate %zd bytes of MMIO space "
 		       "(%zd of %zd remaining)\n", len,
@@ -218,12 +220,12 @@ static void * hvm_ioremap ( struct hvm_device *hvm, unsigned int space,
  *
  * @v hvm		HVM device
  * @v mmio		MMIO space address
- * @v pages		Number of pages
+ * @v len		Length (must be a multiple of PAGE_SIZE)
  */
-static void hvm_iounmap ( struct hvm_device *hvm, void *mmio,
-			  unsigned int pages ) {
+static void hvm_iounmap ( struct hvm_device *hvm, void *mmio, size_t len ) {
 	struct xen_remove_from_physmap remove;
 	physaddr_t mmio_phys = virt_to_phys ( mmio );
+	unsigned int pages = ( len / PAGE_SIZE );
 	unsigned int i;
 	int xenrc;
 	int rc;
@@ -258,7 +260,8 @@ static int hvm_map_shared_info ( struct hvm_device *hvm ) {
 	int rc;
 
 	/* Map shared info page */
-	hvm->xen.shared = hvm_ioremap ( hvm, XENMAPSPACE_shared_info, 1 );
+	hvm->xen.shared = hvm_ioremap ( hvm, XENMAPSPACE_shared_info,
+					PAGE_SIZE );
 	if ( ! hvm->xen.shared ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -273,7 +276,7 @@ static int hvm_map_shared_info ( struct hvm_device *hvm ) {
 
 	return 0;
 
-	hvm_iounmap ( hvm, hvm->xen.shared, 1 );
+	hvm_iounmap ( hvm, hvm->xen.shared, PAGE_SIZE );
  err_alloc:
 	return rc;
 }
@@ -286,7 +289,7 @@ static int hvm_map_shared_info ( struct hvm_device *hvm ) {
 static void hvm_unmap_shared_info ( struct hvm_device *hvm ) {
 
 	/* Unmap shared info page */
-	hvm_iounmap ( hvm, hvm->xen.shared, 1 );
+	hvm_iounmap ( hvm, hvm->xen.shared, PAGE_SIZE );
 }
 
 /**
@@ -296,56 +299,26 @@ static void hvm_unmap_shared_info ( struct hvm_device *hvm ) {
  * @ret rc		Return status code
  */
 static int hvm_map_grant ( struct hvm_device *hvm ) {
-	struct gnttab_query_size size;
-	struct gnttab_set_version version;
 	physaddr_t grant_phys;
-	size_t len;
-	int xenrc;
 	int rc;
 
-	/* Get grant table size */
-	size.dom = DOMID_SELF;
-	if ( ( xenrc = xengrant_query_size ( &hvm->xen, &size ) ) != 0 ) {
-		rc = -EXEN ( xenrc );
-		DBGC ( hvm, "HVM could not get grant table size: %s\n",
+	/* Initialise grant table */
+	if ( ( rc = xengrant_init ( &hvm->xen ) ) != 0 ) {
+		DBGC ( hvm, "HVM could not initialise grant table: %s\n",
 		       strerror ( rc ) );
-		goto err_query_size;
-	}
-	len = ( size.nr_frames * PAGE_SIZE );
-
-	/* Configure to use version 2 tables */
-	version.version = 2;
-	if ( ( xenrc = xengrant_set_version ( &hvm->xen, &version ) ) != 0 ) {
-		rc = -EXEN ( xenrc );
-		DBGC ( hvm, "HVM could not set version 2 grant table: %s\n",
-		       strerror ( rc ) );
-		goto err_set_version;
-	}
-	if ( version.version != 2 ) {
-		DBGC ( hvm, "HVM could not set version 2 grant table\n" );
-		rc = -ENOTTY;
-		goto err_set_version;
+		return rc;
 	}
 
 	/* Map grant table */
 	hvm->xen.grant.table = hvm_ioremap ( hvm, XENMAPSPACE_grant_table,
-					     size.nr_frames );
-	if ( ! hvm->xen.grant.table ) {
-		rc = -ENODEV;
-		goto err_ioremap;
-	}
+					     hvm->xen.grant.len );
+	if ( ! hvm->xen.grant.table )
+		return -ENODEV;
+
 	grant_phys = virt_to_phys ( hvm->xen.grant.table );
 	DBGC2 ( hvm, "HVM mapped grant table at [%08lx,%08lx)\n",
-		grant_phys, ( grant_phys + len ) );
-	hvm->xen.grant.count = ( len / sizeof ( hvm->xen.grant.table[0] ) );
-
+		grant_phys, ( grant_phys + hvm->xen.grant.len ) );
 	return 0;
-
-	hvm_iounmap ( hvm, hvm->xen.grant.table, size.nr_frames );
- err_ioremap:
- err_set_version:
- err_query_size:
-	return rc;
 }
 
 /**
@@ -354,11 +327,9 @@ static int hvm_map_grant ( struct hvm_device *hvm ) {
  * @v hvm		HVM device
  */
 static void hvm_unmap_grant ( struct hvm_device *hvm ) {
-	size_t len;
 
 	/* Unmap grant table */
-	len = ( hvm->xen.grant.count * sizeof ( hvm->xen.grant.table[0] ) );
-	hvm_iounmap ( hvm, hvm->xen.grant.table, ( len / PAGE_SIZE ) );
+	hvm_iounmap ( hvm, hvm->xen.grant.table, hvm->xen.grant.len );
 }
 
 /**

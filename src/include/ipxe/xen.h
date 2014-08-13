@@ -27,9 +27,11 @@ struct xen_hypercall;
 /** A Xen grant table */
 struct xen_grant {
 	/** Grant table entries */
-	union grant_entry_v2 *table;
-	/** Number of grant table entries (must be a power of two) */
-	unsigned int count;
+	struct grant_entry_v1 *table;
+	/** Total grant table length */
+	size_t len;
+	/** Entry size shift (for later version tables) */
+	unsigned int shift;
 	/** Number of grant table entries in use */
 	unsigned int used;
 	/** Most recently used grant reference */

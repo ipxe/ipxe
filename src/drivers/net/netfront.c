@@ -292,8 +292,13 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
 	}
 
 	/* Grant access to shared ring */
-	xengrant_permit_access ( xen, ring->ref, xendev->backend_id, 0,
-				 ring->sring.raw );
+	if ( ( rc = xengrant_permit_access ( xen, ring->ref, xendev->backend_id,
+					     0, ring->sring.raw ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not permit access to "
+		       "%#08lx: %s\n", xendev->key,
+		       virt_to_phys ( ring->sring.raw ), strerror ( rc ) );
+		goto err_permit_access;
+	}
 
 	/* Publish shared ring reference */
 	if ( ( rc = netfront_write_num ( netfront, ring->ref_key,
@@ -309,6 +314,7 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
 	netfront_rm ( netfront, ring->ref_key );
  err_write_num:
 	xengrant_invalidate ( xen, ring->ref );
+ err_permit_access:
 	free_dma ( ring->sring.raw, PAGE_SIZE );
  err_alloc:
 	return rc;
@@ -320,39 +326,53 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
  * @v netfront		Netfront device
  * @v ring		Descriptor ring
  * @v iobuf		I/O buffer
+ * @v id		Buffer ID to fill in
  * @v ref		Grant reference to fill in
- * @ret id		Buffer ID
+ * @ret rc		Return status code
  *
  * The caller is responsible for ensuring that there is space in the
  * ring.
  */
-static unsigned int netfront_push ( struct netfront_nic *netfront,
-				    struct netfront_ring *ring,
-				    struct io_buffer *iobuf,
-				    grant_ref_t *ref ) {
+static int netfront_push ( struct netfront_nic *netfront,
+			   struct netfront_ring *ring, struct io_buffer *iobuf,
+			   uint16_t *id, grant_ref_t *ref ) {
 	struct xen_device *xendev = netfront->xendev;
 	struct xen_hypervisor *xen = xendev->xen;
-	unsigned int id;
+	unsigned int next_id;
+	unsigned int next_ref;
+	int rc;
 
 	/* Sanity check */
 	assert ( ! netfront_ring_is_full ( ring ) );
 
 	/* Allocate buffer ID */
-	id = ring->ids[ ( ring->id_prod++ ) & ( ring->count - 1 ) ];
-
-	/* Store I/O buffer */
-	assert ( ring->iobufs[id] == NULL );
-	ring->iobufs[id] = iobuf;
+	next_id = ring->ids[ ring->id_prod & ( ring->count - 1 ) ];
+	next_ref = ring->refs[next_id];
 
 	/* Grant access to I/O buffer page.  I/O buffers are naturally
 	 * aligned, so we never need to worry about crossing a page
 	 * boundary.
 	 */
-	*ref = ring->refs[id];
-	xengrant_permit_access ( xen, ring->refs[id], xendev->backend_id, 0,
-				 iobuf->data );
+	if ( ( rc = xengrant_permit_access ( xen, next_ref, xendev->backend_id,
+					     0, iobuf->data ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not permit access to "
+		       "%#08lx: %s\n", xendev->key,
+		       virt_to_phys ( iobuf->data ), strerror ( rc ) );
+		return rc;
+	}
 
-	return id;
+	/* Store I/O buffer */
+	assert ( ring->iobufs[next_id] == NULL );
+	ring->iobufs[next_id] = iobuf;
+
+	/* Consume buffer ID */
+	ring->id_prod++;
+
+	/* Return buffer ID and grant reference */
+	*id = next_id;
+	*ref = next_ref;
+
+	return 0;
 }
 
 /**
@@ -431,13 +451,15 @@ static void netfront_destroy_ring ( struct netfront_nic *netfront,
 /**
  * Refill receive descriptor ring
  *
- * @v netfront		Netfront device
+ * @v netdev		Network device
  */
-static void netfront_refill_rx ( struct netfront_nic *netfront ) {
+static void netfront_refill_rx ( struct net_device *netdev ) {
+	struct netfront_nic *netfront = netdev->priv;
 	struct xen_device *xendev = netfront->xendev;
 	struct io_buffer *iobuf;
 	struct netif_rx_request *request;
 	int notify;
+	int rc;
 
 	/* Do nothing if ring is already full */
 	if ( netfront_ring_is_full ( &netfront->rx ) )
@@ -455,12 +477,19 @@ static void netfront_refill_rx ( struct netfront_nic *netfront ) {
 
 		/* Add to descriptor ring */
 		request = RING_GET_REQUEST ( &netfront->rx_fring,
-					     netfront->rx_fring.req_prod_pvt++);
-		request->id = netfront_push ( netfront, &netfront->rx, iobuf,
-					      &request->gref );
+					     netfront->rx_fring.req_prod_pvt );
+		if ( ( rc = netfront_push ( netfront, &netfront->rx,
+					    iobuf, &request->id,
+					    &request->gref ) ) != 0 ) {
+			netdev_rx_err ( netdev, iobuf, rc );
+			break;
+		}
 		DBGC2 ( netfront, "NETFRONT %s RX id %d ref %d is %#08lx+%zx\n",
 			xendev->key, request->id, request->gref,
 			virt_to_phys ( iobuf->data ), iob_tailroom ( iobuf ) );
+
+		/* Move to next descriptor */
+		netfront->rx_fring.req_prod_pvt++;
 
 	} while ( ! netfront_ring_is_full ( &netfront->rx ) );
 
@@ -526,7 +555,7 @@ static int netfront_open ( struct net_device *netdev ) {
 	}
 
 	/* Refill receive descriptor ring */
-	netfront_refill_rx ( netfront );
+	netfront_refill_rx ( netdev );
 
 	/* Set link up */
 	netdev_link_up ( netdev );
@@ -614,6 +643,7 @@ static int netfront_transmit ( struct net_device *netdev,
 	struct xen_device *xendev = netfront->xendev;
 	struct netif_tx_request *request;
 	int notify;
+	int rc;
 
 	/* Check that we have space in the ring */
 	if ( netfront_ring_is_full ( &netfront->tx ) ) {
@@ -624,15 +654,20 @@ static int netfront_transmit ( struct net_device *netdev,
 
 	/* Add to descriptor ring */
 	request = RING_GET_REQUEST ( &netfront->tx_fring,
-				     netfront->tx_fring.req_prod_pvt++ );
-	request->id = netfront_push ( netfront, &netfront->tx, iobuf,
-				      &request->gref );
+				     netfront->tx_fring.req_prod_pvt );
+	if ( ( rc = netfront_push ( netfront, &netfront->tx, iobuf,
+				    &request->id, &request->gref ) ) != 0 ) {
+		return rc;
+	}
 	request->offset = ( virt_to_phys ( iobuf->data ) & ( PAGE_SIZE - 1 ) );
 	request->flags = NETTXF_data_validated;
 	request->size = iob_len ( iobuf );
 	DBGC2 ( netfront, "NETFRONT %s TX id %d ref %d is %#08lx+%zx\n",
 		xendev->key, request->id, request->gref,
 		virt_to_phys ( iobuf->data ), iob_len ( iobuf ) );
+
+	/* Consume descriptor */
+	netfront->tx_fring.req_prod_pvt++;
 
 	/* Push new descriptor and notify backend if applicable */
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY ( &netfront->tx_fring, notify );
@@ -727,7 +762,6 @@ static void netfront_poll_rx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void netfront_poll ( struct net_device *netdev ) {
-	struct netfront_nic *netfront = netdev->priv;
 
 	/* Poll for TX completions */
 	netfront_poll_tx ( netdev );
@@ -736,7 +770,7 @@ static void netfront_poll ( struct net_device *netdev ) {
 	netfront_poll_rx ( netdev );
 
 	/* Refill RX descriptor ring */
-	netfront_refill_rx ( netfront );
+	netfront_refill_rx ( netdev );
 }
 
 /** Network device operations */
