@@ -882,7 +882,7 @@ static int smc9000_probe ( struct nic *nic, struct isa_device *isa ) {
 
    /* is it using AUI or 10BaseT ? */
    SMC_SELECT_BANK(nic->ioaddr, 1);
-   if (inw(nic->ioaddr + CONFIG) & CFG_AUI_SELECT)
+   if (inw(nic->ioaddr + CFG) & CFG_AUI_SELECT)
      media = 2;
    else
      media = 1;
@@ -911,12 +911,12 @@ static int smc9000_probe ( struct nic *nic, struct isa_device *isa ) {
    /* Select which interface to use */
    SMC_SELECT_BANK(nic->ioaddr, 1);
    if ( media == 1 ) {
-      _outw( inw( nic->ioaddr + CONFIG ) & ~CFG_AUI_SELECT,
-	   nic->ioaddr + CONFIG );
+      _outw( inw( nic->ioaddr + CFG ) & ~CFG_AUI_SELECT,
+	   nic->ioaddr + CFG );
    }
    else if ( media == 2 ) {
-      _outw( inw( nic->ioaddr + CONFIG ) | CFG_AUI_SELECT,
-	   nic->ioaddr + CONFIG );
+      _outw( inw( nic->ioaddr + CFG ) | CFG_AUI_SELECT,
+	   nic->ioaddr + CFG );
    }
 
    smc_phy_configure(nic->ioaddr);

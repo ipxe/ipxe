@@ -131,7 +131,7 @@ typedef unsigned long int		dword;
 #define RPC_DEFAULT (RPC_ANEG | (RPC_LED_100 << RPC_LSXA_SHFT) | (RPC_LED_FD << RPC_LSXB_SHFT) | RPC_SPEED | RPC_DPLX)
 
 /* BANK 1 */
-#define CONFIG			0
+#define CFG			0
 #define CFG_AUI_SELECT		0x100
 #define	BASE			2
 #define	ADDR0			4
