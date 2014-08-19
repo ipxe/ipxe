@@ -689,6 +689,34 @@ privkey_DEPS += $(PRIVKEY_LIST)
 
 CFLAGS_privkey += $(if $(PRIVKEY),-DPRIVATE_KEY="\"$(PRIVKEY_INC)\"")
 
+# (Single-element) list of named configurations
+#
+CONFIG_LIST := $(BIN)/.config.list
+ifeq ($(wildcard $(CONFIG_LIST)),)
+CONFIG_OLD := <invalid>
+else
+CONFIG_OLD := $(shell cat $(CONFIG_LIST))
+endif
+ifneq ($(CONFIG_OLD),$(CONFIG))
+$(shell $(ECHO) "$(CONFIG)" > $(CONFIG_LIST))
+endif
+
+$(CONFIG_LIST) : $(MAKEDEPS)
+
+VERYCLEANUP += $(CONFIG_LIST)
+
+# Named configurations
+#
+ifneq ($(CONFIG),)
+ifneq ($(wildcard config/$(CONFIG)),)
+CFLAGS	+= -DCONFIG=$(CONFIG)
+endif
+CFLAGS	+= -DLOCAL_CONFIG=$(CONFIG)
+endif
+
+config/named.h : $(CONFIG_LIST)
+	$(Q)$(TOUCH) $@
+
 # These files use .incbin inline assembly to include a binary file.
 # Unfortunately ccache does not detect this dependency and caches
 # builds even when the binary file has changed.
@@ -1260,8 +1288,16 @@ CLEANUP += $(EINFO)
 #
 # Local configs
 #
-config/local/%.h :
-	$(Q)touch $@
+CONFIG_HEADERS := $(patsubst config/%,%,$(wildcard config/*.h))
+
+$(foreach HEADER,$(CONFIG_HEADERS),config/local/$(HEADER)) :
+	$(Q)$(TOUCH) $@
+
+ifneq ($(CONFIG),)
+$(foreach HEADER,$(CONFIG_HEADERS),config/local/$(CONFIG)/$(HEADER)) :
+	$(Q)$(MKDIR) -p $(dir $@)
+	$(Q)$(TOUCH) $@
+endif
 
 ###############################################################################
 #

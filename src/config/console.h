@@ -28,6 +28,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define	LOG_LEVEL	LOG_NONE
 
+#include <config/named.h>
+#include NAMED_CONFIG(console.h)
 #include <config/local/console.h>
+#include LOCAL_NAMED_CONFIG(console.h)
 
 #endif /* CONFIG_CONSOLE_H */

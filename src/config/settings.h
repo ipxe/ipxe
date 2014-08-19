@@ -14,6 +14,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#define	MEMMAP_SETTINGS	/* Memory map settings */
 //#define	VMWARE_SETTINGS	/* VMware GuestInfo settings */
 
+#include <config/named.h>
+#include NAMED_CONFIG(settings.h)
 #include <config/local/settings.h>
+#include LOCAL_NAMED_CONFIG(settings.h)
 
 #endif /* CONFIG_SETTINGS_H */

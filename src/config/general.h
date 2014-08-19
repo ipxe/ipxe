@@ -182,6 +182,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #undef	GDBUDP			/* Remote GDB debugging over UDP
 				 * (both may be set) */
 
+#include <config/named.h>
+#include NAMED_CONFIG(general.h)
 #include <config/local/general.h>
+#include LOCAL_NAMED_CONFIG(general.h)
 
 #endif /* CONFIG_GENERAL_H */

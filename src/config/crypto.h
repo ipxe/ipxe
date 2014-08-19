@@ -17,6 +17,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 #define TIMESTAMP_ERROR_MARGIN ( ( 12 * 60 + 30 ) * 60 )
 
+#include <config/named.h>
+#include NAMED_CONFIG(crypto.h)
 #include <config/local/crypto.h>
+#include LOCAL_NAMED_CONFIG(crypto.h)
 
 #endif /* CONFIG_CRYPTO_H */
