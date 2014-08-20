@@ -287,6 +287,7 @@ static void __attribute__ (( unused )) intel_diag ( struct intel_nic *intel ) {
  */
 static int intel_reset ( struct intel_nic *intel ) {
 	uint32_t pbs;
+	uint32_t pba;
 	uint32_t ctrl;
 	uint32_t status;
 
@@ -295,10 +296,14 @@ static int intel_reset ( struct intel_nic *intel ) {
 	 */
 	pbs = readl ( intel->regs + INTEL_PBS );
 	if ( ( pbs == 0x14 ) || ( pbs == 0x18 ) ) {
-		DBGC ( intel, "INTEL %p WARNING: applying ICH PBS/PBA errata "
-		       "(found PBS %#08x)\n", intel, pbs );
+		DBGC ( intel, "INTEL %p WARNING: applying ICH PBS/PBA errata\n",
+		       intel );
+		pba = readl ( intel->regs + INTEL_PBA );
 		writel ( 0x08, intel->regs + INTEL_PBA );
 		writel ( 0x10, intel->regs + INTEL_PBS );
+		DBGC ( intel, "INTEL %p PBS %#08x->%#08x PBA %#08x->%#08x\n",
+		       intel, pbs, readl ( intel->regs + INTEL_PBS ),
+		       pba, readl ( intel->regs + INTEL_PBA ) );
 	}
 
 	/* Always reset MAC.  Required to reset the TX and RX rings. */
