@@ -295,8 +295,8 @@ static int intel_reset ( struct intel_nic *intel ) {
 	 */
 	pbs = readl ( intel->regs + INTEL_PBS );
 	if ( ( pbs == 0x14 ) || ( pbs == 0x18 ) ) {
-		DBGC ( intel, "INTEL %p WARNING: applying ICH PBS/PBA errata\n",
-		       intel );
+		DBGC ( intel, "INTEL %p WARNING: applying ICH PBS/PBA errata "
+		       "(found PBS %#08x)\n", intel, pbs );
 		writel ( 0x08, intel->regs + INTEL_PBA );
 		writel ( 0x10, intel->regs + INTEL_PBS );
 	}
