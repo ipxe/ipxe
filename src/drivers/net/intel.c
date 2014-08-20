@@ -294,10 +294,10 @@ static int intel_reset ( struct intel_nic *intel ) {
 	/* Force RX and TX packet buffer allocation, to work around an
 	 * errata in ICH devices.
 	 */
-	pbs = readl ( intel->regs + INTEL_PBS );
-	if ( ( pbs == 0x14 ) || ( pbs == 0x18 ) ) {
+	if ( intel->flags & INTEL_PBS_ERRATA ) {
 		DBGC ( intel, "INTEL %p WARNING: applying ICH PBS/PBA errata\n",
 		       intel );
+		pbs = readl ( intel->regs + INTEL_PBS );
 		pba = readl ( intel->regs + INTEL_PBA );
 		writel ( 0x08, intel->regs + INTEL_PBA );
 		writel ( 0x10, intel->regs + INTEL_PBS );
@@ -816,6 +816,7 @@ static int intel_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intel, 0, sizeof ( *intel ) );
 	intel->port = PCI_FUNC ( pci->busdevfn );
+	intel->flags = pci->id->driver_data;
 	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTEL_TD );
 	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTEL_RD );
 
@@ -911,11 +912,11 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1026, "82545gm", "82545GM", 0 ),
 	PCI_ROM ( 0x8086, 0x1027, "82545gm-1", "82545GM", 0 ),
 	PCI_ROM ( 0x8086, 0x1028, "82545gm-2", "82545GM", 0 ),
-	PCI_ROM ( 0x8086, 0x1049, "82566mm", "82566MM", 0 ),
-	PCI_ROM ( 0x8086, 0x104a, "82566dm", "82566DM", 0 ),
-	PCI_ROM ( 0x8086, 0x104b, "82566dc", "82566DC", 0 ),
-	PCI_ROM ( 0x8086, 0x104c, "82562v", "82562V 10/100", 0 ),
-	PCI_ROM ( 0x8086, 0x104d, "82566mc", "82566MC", 0 ),
+	PCI_ROM ( 0x8086, 0x1049, "82566mm", "82566MM", INTEL_PBS_ERRATA ),
+	PCI_ROM ( 0x8086, 0x104a, "82566dm", "82566DM", INTEL_PBS_ERRATA ),
+	PCI_ROM ( 0x8086, 0x104b, "82566dc", "82566DC", INTEL_PBS_ERRATA ),
+	PCI_ROM ( 0x8086, 0x104c, "82562v", "82562V", INTEL_PBS_ERRATA ),
+	PCI_ROM ( 0x8086, 0x104d, "82566mc", "82566MC", INTEL_PBS_ERRATA ),
 	PCI_ROM ( 0x8086, 0x105e, "82571eb", "82571EB", 0 ),
 	PCI_ROM ( 0x8086, 0x105f, "82571eb-1", "82571EB", 0 ),
 	PCI_ROM ( 0x8086, 0x1060, "82571eb-2", "82571EB", 0 ),
@@ -948,11 +949,11 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x10bc, "82571eb", "82571EB (Copper)", 0 ),
 	PCI_ROM ( 0x8086, 0x10bd, "82566dm-2", "82566DM-2", 0 ),
 	PCI_ROM ( 0x8086, 0x10bf, "82567lf", "82567LF", 0 ),
-	PCI_ROM ( 0x8086, 0x10c0, "82562v-2", "82562V-2 10/100", 0 ),
-	PCI_ROM ( 0x8086, 0x10c2, "82562g-2", "82562G-2 10/100", 0 ),
-	PCI_ROM ( 0x8086, 0x10c3, "82562gt-2", "82562GT-2 10/100", 0 ),
-	PCI_ROM ( 0x8086, 0x10c4, "82562gt", "82562GT 10/100", 0 ),
-	PCI_ROM ( 0x8086, 0x10c5, "82562g", "82562G 10/100", 0 ),
+	PCI_ROM ( 0x8086, 0x10c0, "82562v-2", "82562V-2", 0 ),
+	PCI_ROM ( 0x8086, 0x10c2, "82562g-2", "82562G-2", 0 ),
+	PCI_ROM ( 0x8086, 0x10c3, "82562gt-2", "82562GT-2", 0 ),
+	PCI_ROM ( 0x8086, 0x10c4, "82562gt", "82562GT", INTEL_PBS_ERRATA ),
+	PCI_ROM ( 0x8086, 0x10c5, "82562g", "82562G", INTEL_PBS_ERRATA ),
 	PCI_ROM ( 0x8086, 0x10c9, "82576", "82576", 0 ),
 	PCI_ROM ( 0x8086, 0x10cb, "82567v", "82567V", 0 ),
 	PCI_ROM ( 0x8086, 0x10cc, "82567lm-2", "82567LM-2", 0 ),
@@ -975,7 +976,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x10f0, "82578dc", "82578DC", 0 ),
 	PCI_ROM ( 0x8086, 0x10f5, "82567lm", "82567LM", 0 ),
 	PCI_ROM ( 0x8086, 0x10f6, "82574l", "82574L", 0 ),
-	PCI_ROM ( 0x8086, 0x1501, "82567v-3", "82567V-3", 0 ),
+	PCI_ROM ( 0x8086, 0x1501, "82567v-3", "82567V-3", INTEL_PBS_ERRATA ),
 	PCI_ROM ( 0x8086, 0x1502, "82579lm", "82579LM", 0 ),
 	PCI_ROM ( 0x8086, 0x1503, "82579v", "82579V", 0 ),
 	PCI_ROM ( 0x8086, 0x150a, "82576ns", "82576NS", 0 ),

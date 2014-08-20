@@ -229,6 +229,8 @@ struct intel_nic {
 	void *regs;
 	/** Port number (for multi-port devices) */
 	unsigned int port;
+	/** Flags */
+	unsigned int flags;
 
 	/** EEPROM */
 	struct nvs_device eeprom;
@@ -243,6 +245,12 @@ struct intel_nic {
 	struct intel_ring rx;
 	/** Receive I/O buffers */
 	struct io_buffer *rx_iobuf[INTEL_NUM_RX_DESC];
+};
+
+/** Driver flags */
+enum intel_flags {
+	/** PBS/PBA errata workaround required */
+	INTEL_PBS_ERRATA = 0x0001,
 };
 
 extern int intel_create_ring ( struct intel_nic *intel,
