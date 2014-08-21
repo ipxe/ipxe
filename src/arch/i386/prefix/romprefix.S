@@ -208,15 +208,8 @@ init:
 	pushw	%cs
 	popw	%ds
 
-	/* Shuffle some registers around.  We need %di available for
-	 * the print_xxx functions, and in a register that's
-	 * addressable from %es, so shuffle as follows:
-	 *
-	 *    %di (pointer to PnP structure) => %bx
-	 *    %bx (runtime segment address, for PCI 3.0) => %gs
-	 */
+	/* Store PCI 3.0 runtime segment address for later use */
 	movw	%bx, %gs
-	movw	%di, %bx
 
 	/* Store PCI bus:dev.fn address */
 	movw	%ax, init_pci_busdevfn
