@@ -1,0 +1,16 @@
+Build using this command line:
+
+make CONFIG=vbox EMBED=config/vbox/embedded.ipxe bin/intel--virtio-net--pcnet32.rom
+
+Max size of a VirtualBox ROM is 56KB, 57344 bytes. There should be no need
+to pad the image as long as the binary is smaller or equal to this size.
+
+The embedded script is required because VirtualBox uses the ROM as an ISA
+ROM, which will not perform any autoboot behavior.  The bundled embedded
+script reproduces the default autoboot behavior.
+
+To use the ROM in VirtualBox you need to enable it using this command:
+
+vboxmanage setextradata global \
+    VBoxInternal/Devices/pcbios/0/Config/LanBootRom \
+    path/to/intel--virtio-net--pcnet32.rom
