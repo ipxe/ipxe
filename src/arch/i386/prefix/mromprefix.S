@@ -32,8 +32,8 @@ FILE_LICENCE ( GPL2_OR_LATER )
 
 #define ROMPREFIX_EXCLUDE_PAYLOAD 1
 #define ROMPREFIX_MORE_IMAGES 1
-#define _rom_start _mrom_start
-#include "romprefix.S"
+#define _pcirom_start _mrom_start
+#include "pciromprefix.S"
 
 	.text
 	.arch i386

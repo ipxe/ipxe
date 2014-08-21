@@ -16,6 +16,8 @@ SRCDIRS		+= arch/i386/drivers/net
 #
 MEDIA		+= rom
 MEDIA		+= mrom
+MEDIA		+= pcirom
+MEDIA		+= isarom
 MEDIA		+= pxe
 MEDIA		+= kpxe
 MEDIA		+= kkpxe
@@ -31,6 +33,8 @@ MEDIA		+= exe
 #
 PAD_rom		= $(PERL) $(PADIMG) --blksize=512 --byte=0xff
 PAD_mrom	= $(PAD_rom)
+PAD_pcirom	= $(PAD_rom)
+PAD_isarom	= $(PAD_rom)
 PAD_dsk		= $(PERL) $(PADIMG) --blksize=512
 PAD_hd		= $(PERL) $(PADIMG) --blksize=32768
 PAD_exe		= $(PERL) $(PADIMG) --blksize=512
@@ -39,11 +43,15 @@ PAD_exe		= $(PERL) $(PADIMG) --blksize=512
 #
 FINALISE_rom	= $(PERL) $(FIXROM)
 FINALISE_mrom	= $(FINALISE_rom)
+FINALISE_pcirom	= $(FINALISE_rom)
+FINALISE_isarom	= $(FINALISE_rom)
 
-# Use $(ROMS) rather than $(DRIVERS) for "allroms" and "allmroms"
+# Use $(ROMS) rather than $(DRIVERS) for "allroms", "allmroms", etc.
 #
 LIST_NAME_rom := ROMS
 LIST_NAME_mrom := ROMS
+LIST_NAME_pcirom := ROMS
+LIST_NAME_isarom := ROMS
 
 # rule to make a non-emulation ISO boot image
 NON_AUTO_MEDIA	+= iso

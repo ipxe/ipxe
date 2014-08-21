@@ -46,6 +46,12 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define INDICATOR 0x80
 #endif
 
+/* Default to building a PCI ROM if no bus type is specified
+ */
+#ifndef BUSTYPE
+#define BUSTYPE "PCIR"
+#endif
+
 	.text
 	.code16
 	.arch i386
@@ -64,8 +70,10 @@ checksum:
 	.word	ipxeheader
 	.org	0x16
 	.word	undiheader
+.ifeqs	BUSTYPE, "PCIR"
 	.org	0x18
 	.word	pciheader
+.endif
 	.org	0x1a
 	.word	pnpheader
 	.size romheader, . - romheader
@@ -77,6 +85,7 @@ checksum:
 	.long	0
 	.previous
 
+.ifeqs	BUSTYPE, "PCIR"
 pciheader:
 	.ascii	"PCIR"			/* Signature */
 	.word	pci_vendor_id		/* Vendor identification */ 
@@ -107,6 +116,7 @@ pciheader_runtime_length:
 	.long	512
 	.long	0
 	.previous
+.endif	/* PCIR */
 
 	/* PnP doesn't require any particular alignment, but IBM
 	 * BIOSes will scan on 16-byte boundaries rather than using
@@ -148,11 +158,14 @@ mfgstr:
  */
 prodstr:
 	.ascii	PRODUCT_SHORT_NAME
+.ifeqs	BUSTYPE, "PCIR"
 prodstr_separator:
 	.byte	0
 	.ascii	"(PCI "
 prodstr_pci_id:
-	.asciz	"xx:xx.x)"		/* Filled in by init code */
+	.ascii	"xx:xx.x)"		/* Filled in by init code */
+.endif	/* PCIR */
+	.byte	0
 	.size prodstr, . - prodstr
 
 	.globl	undiheader	
@@ -167,7 +180,7 @@ undiheader:
 	.word	_data16_memsz		/* Stack segment size */
 	.word	_data16_memsz		/* Data segment size */
 	.word	_text16_memsz		/* Code segment size */
-	.ascii	"PCIR"			/* Bus type */
+	.ascii	BUSTYPE			/* Bus type */
 	.equ undiheader_len, . - undiheader
 	.size undiheader, . - undiheader
 
@@ -208,31 +221,39 @@ init:
 	pushw	%cs
 	popw	%ds
 
-	/* Store PCI 3.0 runtime segment address for later use */
-	movw	%bx, %gs
-
-	/* Store PCI bus:dev.fn address */
-	movw	%ax, init_pci_busdevfn
-
 	/* Print message as early as possible */
 	movw	$init_message, %si
 	xorw	%di, %di
 	call	print_message
-	call	print_pci_busdevfn
 
-	/* Fill in product name string, if possible */
+	/* Store PCI 3.0 runtime segment address for later use, if
+	 * applicable.
+	 */
+.ifeqs	BUSTYPE, "PCIR"
+	movw	%bx, %gs
+.endif
+
+	/* Store PCI bus:dev.fn address, print PCI bus:dev.fn, and add
+	 * PCI bus:dev.fn to product name string, if applicable.
+	 */
+.ifeqs	BUSTYPE, "PCIR"
+	xorw	%di, %di
+	call	print_space
+	movw	%ax, init_pci_busdevfn
+	call	print_pci_busdevfn
 	movw	$prodstr_pci_id, %di
 	call	print_pci_busdevfn
 	movb	$( ' ' ), prodstr_separator
+.endif
 
 	/* Print segment address */
-	movb	$( ' ' ), %al
 	xorw	%di, %di
-	call	print_character
+	call	print_space
 	movw	%cs, %ax
 	call	print_hex_word
 
-	/* Check for PCI BIOS version */
+	/* Check for PCI BIOS version, if applicable */
+.ifeqs	BUSTYPE, "PCIR"
 	pushl	%ebx
 	pushl	%edx
 	pushl	%edi
@@ -283,6 +304,7 @@ no_pci3:
 1:	popl	%edi
 	popl	%edx
 	popl	%ebx
+.endif	/* PCIR */
 
 	/* Check for PnP BIOS.  Although %es:di should point to the
 	 * PnP BIOS signature on entry, some BIOSes fail to do this.
@@ -396,13 +418,13 @@ no_pmm:
 	loop	1b
 	subb	%bl, checksum
 
-	/* Copy self to option ROM space.  Required for PCI3.0, which
-	 * loads us to a temporary location in low memory.  Will be a
-	 * no-op for lower PCI versions.
+	/* Copy self to option ROM space, if applicable.  Required for
+	 * PCI3.0, which loads us to a temporary location in low
+	 * memory.  Will be a no-op for lower PCI versions.
 	 */
-	movb	$( ' ' ), %al
+.ifeqs	BUSTYPE, "PCIR"
 	xorw	%di, %di
-	call	print_character
+	call	print_space
 	movw	%gs, %ax
 	call	print_hex_word
 	movzbw	romheader_size, %cx
@@ -411,10 +433,13 @@ no_pmm:
 	xorw	%si, %si
 	xorw	%di, %di
 	cs rep	movsb
+.endif
 
-	/* Skip prompt if this is not the first PCI function */
+	/* Skip prompt if this is not the first PCI function, if applicable */
+.ifeqs	BUSTYPE, "PCIR"
 	testb	$PCI_FUNC_MASK, init_pci_busdevfn
 	jnz	no_shell
+.endif
 	/* Prompt for POST-time shell */
 	movw	$init_message_prompt, %si
 	xorw	%di, %di
@@ -564,11 +589,13 @@ init_message:
 	.ascii	"\n"
 	.ascii	PRODUCT_NAME
 	.ascii	"\n"
-	.asciz	"iPXE (http://ipxe.org) "
+	.asciz	"iPXE (http://ipxe.org)"
 	.size	init_message, . - init_message
+.ifeqs	BUSTYPE, "PCIR"
 init_message_pci:
 	.asciz	" PCI"
 	.size	init_message_pci, . - init_message_pci
+.endif	/* PCIR */
 init_message_pnp:
 	.asciz	" PnP"
 	.size	init_message_pnp, . - init_message_pnp
@@ -591,9 +618,11 @@ init_message_done:
 /* PCI bus:dev.fn
  *
  */
+.ifeqs	BUSTYPE, "PCIR"
 init_pci_busdevfn:
 	.word	0
 	.size	init_pci_busdevfn, . - init_pci_busdevfn
+.endif	/* PCIR */
 
 /* Image source area
  *
@@ -732,14 +761,18 @@ exec:	/* Set %ds = %cs */
 	lret
 	.section ".text16", "awx", @progbits
 1:
-	/* Retrieve PCI bus:dev.fn */
+	/* Retrieve PCI bus:dev.fn, if applicable */
+.ifeqs	BUSTYPE, "PCIR"
 	movw	init_pci_busdevfn, %ax
+.endif
 
 	/* Set up %ds for access to .data16 */
 	movw	%bx, %ds
 
-	/* Store PCI bus:dev.fn */
+	/* Store PCI bus:dev.fn, if applicable */
+.ifeqs	BUSTYPE, "PCIR"
 	movw	%ax, autoboot_busdevfn
+.endif
 
 	/* Call main() */
 	pushl	$main

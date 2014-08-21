@@ -902,19 +902,22 @@ CLEANUP		+= $(BIN)/NIC	# Doesn't match the $(BIN)/*.* pattern
 # derive the variables:
 # 
 # TGT_ELEMENTS : the elements of the target (e.g. "dfe538 prism2_pci")
-# TGT_PREFIX   : the prefix type (e.g. "rom")
+# TGT_PREFIX   : the prefix type (e.g. "pcirom")
 # TGT_DRIVERS  : the driver for each element (e.g. "rtl8139 prism2_pci")
 # TGT_ROM_NAME : the ROM name (e.g. "dfe538")
 #
 DRIVERS_ipxe	= $(DRIVERS)
 CARD_DRIVER	= $(firstword $(DRIVER_$(1)) $(1))
 TGT_ELEMENTS	= $(subst --, ,$(firstword $(subst ., ,$(notdir $@))))
-TGT_PREFIX	= $(word 2,$(subst ., ,$(notdir $@)))
 TGT_ROM_NAME	= $(firstword $(TGT_ELEMENTS))
 TGT_DRIVERS	= $(strip $(if $(DRIVERS_$(TGT_ROM_NAME)), \
 			       $(DRIVERS_$(TGT_ROM_NAME)), \
 			       $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
 			         $(call CARD_DRIVER,$(TGT_ELEMENT))) ))
+TGT_PREFIX_NAME	= $(word 2,$(subst ., ,$(notdir $@)))
+TGT_PREFIX	= $(strip $(if $(filter rom,$(TGT_PREFIX_NAME)), \
+			       $(ROM_TYPE_$(TGT_ROM_NAME))rom, \
+			       $(TGT_PREFIX_NAME)))
 
 # Look up ROM IDs for the current target
 # (e.g. "bin/dfe538--prism2_pci.rom.tmp") and derive the variables:
