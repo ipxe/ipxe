@@ -66,6 +66,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "DriverBinding" },
 	{ &efi_disk_io_protocol_guid,
 	  "DiskIo" },
+	{ &efi_graphics_output_protocol_guid,
+	  "GraphicsOutput" },
 	{ &efi_load_file_protocol_guid,
 	  "LoadFile" },
 	{ &efi_load_file2_protocol_guid,
@@ -78,10 +80,14 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "PciIo" },
 	{ &efi_pci_root_bridge_io_protocol_guid,
 	  "PciRootBridgeIo" },
+	{ &efi_pxe_base_code_protocol_guid,
+	  "PxeBaseCode" },
 	{ &efi_simple_file_system_protocol_guid,
 	  "SimpleFileSystem" },
 	{ &efi_simple_network_protocol_guid,
 	  "SimpleNetwork" },
+	{ &efi_tcg_protocol_guid,
+	  "Tcg" },
 };
 
 /**

@@ -28,13 +28,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/Protocol/DevicePathToText.h>
 #include <ipxe/efi/Protocol/DiskIo.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
+#include <ipxe/efi/Protocol/GraphicsOutput.h>
 #include <ipxe/efi/Protocol/LoadFile.h>
 #include <ipxe/efi/Protocol/LoadFile2.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/efi/Protocol/PciIo.h>
 #include <ipxe/efi/Protocol/PciRootBridgeIo.h>
+#include <ipxe/efi/Protocol/PxeBaseCode.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
+#include <ipxe/efi/Protocol/TcgService.h>
 
 /** @file
  *
@@ -70,6 +73,10 @@ EFI_GUID efi_disk_io_protocol_guid
 EFI_GUID efi_driver_binding_protocol_guid
 	= EFI_DRIVER_BINDING_PROTOCOL_GUID;
 
+/** Graphics output protocol GUID */
+EFI_GUID efi_graphics_output_protocol_guid
+	= EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+
 /** Load file protocol GUID */
 EFI_GUID efi_load_file_protocol_guid
 	= EFI_LOAD_FILE_PROTOCOL_GUID;
@@ -94,10 +101,18 @@ EFI_GUID efi_pci_io_protocol_guid
 EFI_GUID efi_pci_root_bridge_io_protocol_guid
 	= EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID;
 
+/** PXE base code protocol GUID */
+EFI_GUID efi_pxe_base_code_protocol_guid
+	= EFI_PXE_BASE_CODE_PROTOCOL_GUID;
+
 /** Simple file system protocol GUID */
 EFI_GUID efi_simple_file_system_protocol_guid
 	= EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
 
-/** Simple network protocol guid */
+/** Simple network protocol GUID */
 EFI_GUID efi_simple_network_protocol_guid
 	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
+
+/** TCG protocol GUID */
+EFI_GUID efi_tcg_protocol_guid
+	= EFI_TCG_PROTOCOL_GUID;
