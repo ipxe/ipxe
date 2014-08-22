@@ -898,14 +898,13 @@ $(BIN)/NIC : $(AUTO_DEPS)
 	@perl -ne 'chomp; print "$$1\n" if /\# NIC\t(.*)$$/' $^ >> $@
 CLEANUP		+= $(BIN)/NIC	# Doesn't match the $(BIN)/*.* pattern
 
-# Analyse a target name (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and
+# Analyse a target name (e.g. "bin/dfe538--prism2_pci.rom.tmp") and
 # derive the variables:
 # 
 # TGT_ELEMENTS : the elements of the target (e.g. "dfe538 prism2_pci")
-# TGT_PREFIX   : the prefix type (e.g. "zrom")
+# TGT_PREFIX   : the prefix type (e.g. "rom")
 # TGT_DRIVERS  : the driver for each element (e.g. "rtl8139 prism2_pci")
 # TGT_ROM_NAME : the ROM name (e.g. "dfe538")
-# TGT_MEDIA    : the media type (e.g. "rom")
 #
 DRIVERS_ipxe	= $(DRIVERS)
 CARD_DRIVER	= $(firstword $(DRIVER_$(1)) $(1))
@@ -916,10 +915,9 @@ TGT_DRIVERS	= $(strip $(if $(DRIVERS_$(TGT_ROM_NAME)), \
 			       $(DRIVERS_$(TGT_ROM_NAME)), \
 			       $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
 			         $(call CARD_DRIVER,$(TGT_ELEMENT))) ))
-TGT_MEDIA	= $(subst z,,$(TGT_PREFIX))
 
 # Look up ROM IDs for the current target
-# (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and derive the variables:
+# (e.g. "bin/dfe538--prism2_pci.rom.tmp") and derive the variables:
 #
 # TGT_PCI_VENDOR : the PCI vendor ID (e.g. "0x1186")
 # TGT_PCI_DEVICE : the PCI device ID (e.g. "0x1300")
@@ -928,7 +926,7 @@ TGT_PCI_VENDOR	= $(PCI_VENDOR_$(TGT_ROM_NAME))
 TGT_PCI_DEVICE	= $(PCI_DEVICE_$(TGT_ROM_NAME))
 
 # Calculate link-time options for the current target
-# (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and derive the variables:
+# (e.g. "bin/dfe538--prism2_pci.rom.tmp") and derive the variables:
 #
 # TGT_LD_DRIVERS : symbols to require in order to drag in the relevant drivers
 #		   (e.g. "obj_rtl8139 obj_prism2_pci")
@@ -941,7 +939,7 @@ TGT_LD_IDS	= pci_vendor_id=$(firstword $(TGT_PCI_VENDOR) 0) \
 TGT_LD_ENTRY	= _$(TGT_PREFIX)_start
 
 # Calculate linker flags based on link-time options for the current
-# target type (e.g. "bin/dfe538--prism2_pci.zrom.tmp") and derive the
+# target type (e.g. "bin/dfe538--prism2_pci.rom.tmp") and derive the
 # variables:
 #
 # TGT_LD_FLAGS : target-specific flags to pass to linker (e.g.
@@ -972,7 +970,6 @@ $(BIN)/%.info :
 	@$(ECHO) 'Prefix               : $(TGT_PREFIX)'
 	@$(ECHO) 'Drivers              : $(TGT_DRIVERS)'
 	@$(ECHO) 'ROM name             : $(TGT_ROM_NAME)'
-	@$(ECHO) 'Media                : $(TGT_MEDIA)'
 	@$(ECHO)
 	@$(ECHO) 'PCI vendor           : $(TGT_PCI_VENDOR)'
 	@$(ECHO) 'PCI device           : $(TGT_PCI_DEVICE)'
