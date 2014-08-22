@@ -1,7 +1,6 @@
 /* Disabled from config/defaults/pcbios.h */
 
 #undef IMAGE_ELF
-#undef IMAGE_MULTIBOOT
 #undef SANBOOT_PROTO_ISCSI
 #undef SANBOOT_PROTO_AOE
 #undef SANBOOT_PROTO_IB_SRP

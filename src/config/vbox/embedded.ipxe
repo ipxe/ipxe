@@ -1,5 +1,0 @@
-#!ipxe
-prompt --key 0x02 --timeout 2000 Press Ctrl-B to enter the iPXE shell... && shell || goto auto
-exit
-:auto
-autoboot
