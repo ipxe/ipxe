@@ -30,6 +30,8 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define PCI_BAR_5			0x24
 #define PCI_BAR_EXPROM			0x30
 
+#define PCIR_SIGNATURE ( 'P' + ( 'C' << 8 ) + ( 'I' << 16 ) + ( 'R' << 24 ) )
+
 #define ROMPREFIX_EXCLUDE_PAYLOAD 1
 #define ROMPREFIX_MORE_IMAGES 1
 #define _pcirom_start _mrom_start
@@ -158,18 +160,26 @@ find_mem_bar:
 	call	pci_write_config_dword
 
 	/* Locate our ROM image */
-1:	movl	$0xaa55, %ecx		/* 55aa signature */
+1:	movl	$0xaa55, %ecx				/* 55aa signature */
 	addr32 es cmpw %cx, (%eax)
-	je	2f
-	stc
-	movl	%eax, %esi		/* Report failure address */
-	jmp	99f
-2:	addr32 es cmpl $_build_id, build_id(%eax)
+	jne	2f
+	movl	$PCIR_SIGNATURE, %ecx			/* PCIR signature */
+	addr32 es movzwl 0x18(%eax), %edx
+	addr32 es cmpl %ecx, (%eax,%edx)
+	jne	2f
+	addr32 es cmpl $_build_id, build_id(%eax)	/* iPXE build ID */
 	je	3f
-	addr32 es movzbl 2(%eax), %ecx
+	movl	$0x80, %ecx				/* Last image */
+	addr32 es testb %cl, 0x15(%eax,%edx)
+	jnz	2f
+	addr32 es movzwl 0x10(%eax,%edx), %ecx		/* PCIR image length */
 	shll	$9, %ecx
 	addl	%ecx, %eax
 	jmp	1b
+2:	/* Failure */
+	stc
+	movl	%eax, %esi		/* Report failure address */
+	jmp	99f
 3:
 
 	/* Copy payload to buffer, or set buffer address to BAR address */
