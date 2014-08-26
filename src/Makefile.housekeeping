@@ -717,6 +717,8 @@ endif
 config/named.h : $(CONFIG_LIST)
 	$(Q)$(TOUCH) $@
 
+.PRECIOUS : config/named.h
+
 # These files use .incbin inline assembly to include a binary file.
 # Unfortunately ccache does not detect this dependency and caches
 # builds even when the binary file has changed.
@@ -1289,14 +1291,25 @@ CLEANUP += $(EINFO)
 # Local configs
 #
 CONFIG_HEADERS := $(patsubst config/%,%,$(wildcard config/*.h))
+CONFIG_LOCAL_HEADERS := $(foreach HEADER,$(CONFIG_HEADERS),\
+				  config/local/$(HEADER))
 
-$(foreach HEADER,$(CONFIG_HEADERS),config/local/$(HEADER)) :
+$(CONFIG_LOCAL_HEADERS) :
 	$(Q)$(TOUCH) $@
+
+.PRECIOUS : $(CONFIG_LOCAL_HEADERS)
 
 ifneq ($(CONFIG),)
-$(foreach HEADER,$(CONFIG_HEADERS),config/local/$(CONFIG)/$(HEADER)) :
+
+CONFIG_LOCAL_NAMED_HEADERS := $(foreach HEADER,$(CONFIG_HEADERS),\
+					config/local/$(CONFIG)/$(HEADER))
+
+$(CONFIG_LOCAL_NAMED_HEADERS) :
 	$(Q)$(MKDIR) -p $(dir $@)
 	$(Q)$(TOUCH) $@
+
+.PRECIOUS : $(CONFIG_LOCAL_NAMED_HEADERS)
+
 endif
 
 ###############################################################################
