@@ -196,7 +196,7 @@ find_mem_bar:
 	movl	%eax, %esi
 	addr32 es movzbl 2(%esi), %ecx
 	shll	$7, %ecx
-	addr32 es movzbl 2(%esi,%ecx,4), %edx
+	addr32 es movzwl mpciheader_image_length(%esi,%ecx,4), %edx
 	shll	$7, %edx
 	addl	%edx, %ecx
 	addr32 es rep movsl
@@ -463,19 +463,11 @@ pci_set_mem_access:
 	.org	0x00
 mromheader:
 	.word	0xaa55			/* BIOS extension signature */
-mromheader_size: .byte 0		/* Size in 512-byte blocks */
 	.org	0x18
 	.word	mpciheader
 	.org	0x1a
 	.word	0
 	.size	mromheader, . - mromheader
-
-	.section ".zinfo.fixup", "a", @progbits	/* Compressor fixups */
-	.ascii	"APPB"
-	.long	mromheader_size
-	.long	512
-	.long	0
-	.previous
 
 mpciheader:
 	.ascii	"PCIR"			/* Signature */
