@@ -266,11 +266,10 @@ sub set {
 
   # Split out any data belonging to the next image
   delete $self->{next_image};
-  my $length = ( $hash->{length} * 512 );
   my $pci_header = $hash->pci_header();
-  if ( ( $length < length $data ) &&
-       ( defined $pci_header ) &&
+  if ( ( defined $pci_header ) &&
        ( ! ( $pci_header->{last_image} & PCI_LAST_IMAGE ) ) ) {
+    my $length = ( $pci_header->{image_length} * 512 );
     my $remainder = substr ( $data, $length );
     $data = substr ( $data, 0, $length );
     $self->{next_image} = new Option::ROM;
