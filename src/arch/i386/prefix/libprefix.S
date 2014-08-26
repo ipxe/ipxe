@@ -748,7 +748,10 @@ a20_death_message:
 	call	print_hex_dword
 	movw	$payload_death_message, %si
 	call	print_message
-2:	jmp	2b
+2:	/* Halt system */
+	cli
+	hlt
+	jmp	2b
 	.section ".prefix.data", "aw", @progbits
 payload_death_message:
 	.asciz	"\nPayload inaccessible - cannot continue\n"
