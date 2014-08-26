@@ -99,6 +99,7 @@ find_mem_bar:
 	jle	1f
 	stc
 	movl	$0xbabababa, %esi	/* Report "No suitable BAR" */
+	movl	rom_bar_size, %ecx
 	jmp	99f
 1:	movw	$4, %bp
 
@@ -157,7 +158,8 @@ find_mem_bar:
 	call	pci_write_config_dword
 
 	/* Locate our ROM image */
-1:	addr32 es cmpw $0xaa55, (%eax)
+1:	movl	$0xaa55, %ecx		/* 55aa signature */
+	addr32 es cmpw %cx, (%eax)
 	je	2f
 	stc
 	movl	%eax, %esi		/* Report failure address */

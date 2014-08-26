@@ -746,6 +746,9 @@ a20_death_message:
 	xorw	%di, %di
 	movl	%esi, %eax
 	call	print_hex_dword
+	call	print_space
+	movl	%ecx, %eax
+	call	print_hex_dword
 	movw	$payload_death_message, %si
 	call	print_message
 2:	/* Halt system */
