@@ -136,6 +136,35 @@ efi_locate_handle_wrapper ( EFI_LOCATE_SEARCH_TYPE search_type,
 }
 
 /**
+ * Wrap LoadImage()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_load_image_wrapper ( BOOLEAN boot_policy, EFI_HANDLE parent_image_handle,
+			 EFI_DEVICE_PATH_PROTOCOL *device_path,
+			 VOID *source_buffer, UINTN source_size,
+			 EFI_HANDLE *image_handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	EFI_STATUS efirc;
+
+	DBGC ( colour, "LoadImage ( %d, %p %s, ", boot_policy,
+	       parent_image_handle, efi_handle_name ( parent_image_handle ) );
+	DBGC ( colour, "%s, %p, %#llx, ... ) ",
+	       efi_devpath_text ( device_path ), source_buffer,
+	       ( ( unsigned long long ) source_size ) );
+	efirc = bs->LoadImage ( boot_policy, parent_image_handle, device_path,
+				source_buffer, source_size, image_handle );
+	DBGC ( colour, "= %s ( ", efi_status ( efirc ) );
+	if ( efirc == 0 ) {
+		DBGC ( colour, "%p %s ", *image_handle,
+		       efi_handle_name ( *image_handle ) );
+	}
+	DBGC ( colour, ") -> %p\n", retaddr );
+	return efirc;
+}
+
+/**
  * Wrap LocateDevicePath()
  *
  */
@@ -222,6 +251,7 @@ void efi_wrap ( EFI_HANDLE handle, EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 	efi_bs_wrapper.HandleProtocol	= efi_handle_protocol_wrapper;
 	efi_bs_wrapper.LocateHandle	= efi_locate_handle_wrapper;
 	efi_bs_wrapper.LocateDevicePath	= efi_locate_device_path_wrapper;
+	efi_bs_wrapper.LoadImage	= efi_load_image_wrapper;
 	efi_bs_wrapper.OpenProtocol	= efi_open_protocol_wrapper;
 	efi_bs_wrapper.LocateProtocol	= efi_locate_protocol_wrapper;
 
