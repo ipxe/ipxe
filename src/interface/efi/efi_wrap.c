@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/efi/efi_wrap.h>
@@ -136,6 +137,28 @@ efi_locate_handle_wrapper ( EFI_LOCATE_SEARCH_TYPE search_type,
 }
 
 /**
+ * Wrap LocateDevicePath()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_locate_device_path_wrapper ( EFI_GUID *protocol,
+				 EFI_DEVICE_PATH_PROTOCOL **device_path,
+				 EFI_HANDLE *device ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	EFI_STATUS efirc;
+
+	DBGC ( colour, "LocateDevicePath ( %s, %s, ... ) ",
+	       efi_guid_ntoa ( protocol ), efi_devpath_text ( *device_path ) );
+	efirc = bs->LocateDevicePath ( protocol, device_path, device );
+	DBGC ( colour, "= %s ( %p, ",
+	       efi_status ( efirc ), efi_devpath_text ( *device_path ) );
+	DBGC ( colour, "%p %s ) -> %p\n",
+	       *device, efi_handle_name ( *device ), retaddr );
+	return efirc;
+}
+
+/**
  * Wrap LoadImage()
  *
  */
@@ -161,28 +184,29 @@ efi_load_image_wrapper ( BOOLEAN boot_policy, EFI_HANDLE parent_image_handle,
 		       efi_handle_name ( *image_handle ) );
 	}
 	DBGC ( colour, ") -> %p\n", retaddr );
+
+	/* Wrap the new image */
+	if ( efirc == 0 )
+		efi_wrap ( *image_handle );
+
 	return efirc;
 }
 
 /**
- * Wrap LocateDevicePath()
+ * Wrap ExitBootServices()
  *
  */
 static EFI_STATUS EFIAPI
-efi_locate_device_path_wrapper ( EFI_GUID *protocol,
-				 EFI_DEVICE_PATH_PROTOCOL **device_path,
-				 EFI_HANDLE *device ) {
+efi_exit_boot_services_wrapper ( EFI_HANDLE image_handle, UINTN map_key ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_STATUS efirc;
 
-	DBGC ( colour, "LocateDevicePath ( %s, %s, ... ) ",
-	       efi_guid_ntoa ( protocol ), efi_devpath_text ( *device_path ) );
-	efirc = bs->LocateDevicePath ( protocol, device_path, device );
-	DBGC ( colour, "= %s ( %p, ",
-	       efi_status ( efirc ), efi_devpath_text ( *device_path ) );
-	DBGC ( colour, "%p %s ) -> %p\n",
-	       *device, efi_handle_name ( *device ), retaddr );
+	DBGC ( colour, "ExitBootServices ( %p %s, %#llx ) ",
+	       image_handle, efi_handle_name ( image_handle ),
+	       ( ( unsigned long long ) map_key ) );
+	efirc = bs->ExitBootServices ( image_handle, map_key );
+	DBGC ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
 	return efirc;
 }
 
@@ -234,10 +258,15 @@ efi_locate_protocol_wrapper ( EFI_GUID *protocol, VOID *registration,
  * Wrap the calls made by a loaded image
  *
  * @v handle		Image handle
- * @v loaded		Loaded image protocol
  */
-void efi_wrap ( EFI_HANDLE handle, EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
+ void efi_wrap ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_LOADED_IMAGE_PROTOCOL *image;
+		void *intf;
+	} loaded;
+	EFI_STATUS efirc;
+	int rc;
 
 	/* Do nothing unless debugging is enabled */
 	if ( ! DBG_LOG )
@@ -252,18 +281,35 @@ void efi_wrap ( EFI_HANDLE handle, EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 	efi_bs_wrapper.LocateHandle	= efi_locate_handle_wrapper;
 	efi_bs_wrapper.LocateDevicePath	= efi_locate_device_path_wrapper;
 	efi_bs_wrapper.LoadImage	= efi_load_image_wrapper;
+	efi_bs_wrapper.ExitBootServices	= efi_exit_boot_services_wrapper;
 	efi_bs_wrapper.OpenProtocol	= efi_open_protocol_wrapper;
 	efi_bs_wrapper.LocateProtocol	= efi_locate_protocol_wrapper;
 
+	/* Open loaded image protocol */
+	if ( ( efirc = bs->OpenProtocol ( handle,
+					  &efi_loaded_image_protocol_guid,
+					  &loaded.intf, efi_image_handle, NULL,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( colour, "Could not get loaded image protocol for %p %s: "
+		       "%s\n", handle, efi_handle_name ( handle ),
+		       strerror ( rc ) );
+		return;
+	}
+
 	/* Provide system table wrapper to image */
-	loaded->SystemTable = &efi_systab_wrapper;
+	loaded.image->SystemTable = &efi_systab_wrapper;
 	DBGC ( colour, "Wrapped image %p %s at base %p has protocols:\n",
-	       handle, efi_handle_name ( handle ), loaded->ImageBase );
+	       handle, efi_handle_name ( handle ), loaded.image->ImageBase );
 	DBGC_EFI_PROTOCOLS ( colour, handle );
-	DBGC ( colour, "Parent image %p %s\n", loaded->ParentHandle,
-	       efi_handle_name ( loaded->ParentHandle ) );
-	DBGC ( colour, "Device %p %s ", loaded->DeviceHandle,
-	       efi_handle_name ( loaded->DeviceHandle ) );
-	DBGC ( colour, "file %p %s\n", loaded->FilePath,
-	       efi_devpath_text ( loaded->FilePath ) );
+	DBGC ( colour, "Parent image %p %s\n", loaded.image->ParentHandle,
+	       efi_handle_name ( loaded.image->ParentHandle ) );
+	DBGC ( colour, "Device %p %s ", loaded.image->DeviceHandle,
+	       efi_handle_name ( loaded.image->DeviceHandle ) );
+	DBGC ( colour, "file %p %s\n", loaded.image->FilePath,
+	       efi_devpath_text ( loaded.image->FilePath ) );
+
+	/* Close loaded image protocol */
+	bs->CloseProtocol ( handle, &efi_loaded_image_protocol_guid,
+			    efi_image_handle, NULL );
 }

@@ -227,7 +227,7 @@ static int efi_image_exec ( struct image *image ) {
 	efi_snp_release();
 
 	/* Wrap calls made by the loaded image (for debugging) */
-	efi_wrap ( handle, loaded.image );
+	efi_wrap ( handle );
 
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
