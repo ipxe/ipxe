@@ -406,7 +406,6 @@ int asix_88178_probe(struct usb_device *udev,
 	uint8_t buf[ETH_ALEN];
 	uint16_t eeprom;
 	uint8_t status;
-	int gpio0 = 0;
 	uint32_t phyid;
 	int ret;
 
@@ -447,14 +446,6 @@ int asix_88178_probe(struct usb_device *udev,
 
 	DBG("EEPROM index 0x17 is 0x%04x\n", eeprom);
 
-	if (eeprom == cpu_to_le16(0xffff)) {
-		asix->phy = PHY_MODE_MARVELL;
-		gpio0 = 1;
-	} else {
-		asix->phy = le16_to_cpu(eeprom) & 7;
-		gpio0 = (le16_to_cpu(eeprom) & 0x80) ? 0 : 1;
-	}
-	
 	asix_write_gpio(asix, AX_GPIO_RSE | AX_GPIO_GPO_1 | AX_GPIO_GPO1EN, 40);
 	if ((le16_to_cpu(eeprom) >> 8) != 1) {
 		asix_write_gpio(asix, 0x003c, 30);
