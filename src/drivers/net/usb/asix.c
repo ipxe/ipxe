@@ -148,7 +148,7 @@ static inline int asix_get_phy_addr(struct asix *asix)
 		DBG("Error reading PHYID register: %02x\n", ret);
 		goto out;
 	}
-	DBG("asix_get_phy_addr() returning 0x%04x\n", *((uint16_t *)buf));
+	DBG("asix_get_phy_addr() returning 0x%04x\n", *((char *)buf));
 	ret = buf[1];
 
 out:
@@ -278,7 +278,7 @@ err_buffer_malloc:
 void asix_poll ( struct net_device *netdev) {
 	struct asix *asix = netdev_priv(netdev);
 	struct urb *urb;
-	uint8_t *buffer, *packet;
+	uint8_t *buffer;
 	struct io_buffer *iobuf;
 	uint8_t status = 0;
 	unsigned int len;
@@ -293,7 +293,6 @@ void asix_poll ( struct net_device *netdev) {
 			head = (uint8_t *) buffer;
 			memcpy(&header, head, sizeof(header));
 			header = le32_to_cpu(header);
-			packet = head + sizeof(header);
 	
 			if ((short)(header & 0x0000ffff) !=
 			    ~((short)((header & 0xffff0000) >> 16))) {

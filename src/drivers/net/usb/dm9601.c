@@ -337,7 +337,6 @@ void dm9601_poll ( struct net_device *netdev) {
 	uint8_t *buffer;
 	struct io_buffer *iobuf;
 	uint8_t status = 0;
-	uint8_t rx_status = 0;
 	unsigned int len;
 	
 	dm9601 = netdev_priv(netdev);
@@ -349,7 +348,6 @@ void dm9601_poll ( struct net_device *netdev) {
 			DBG("Error enquing packet\n");
 
 		buffer = urb->transfer_buffer;
-		rx_status = buffer[0];
 		len = (buffer[1] | (buffer[2] << 8)) - 4;
 		DBG("RX one packet len = %x:%x\n", buffer[1], buffer[2]);
 		
