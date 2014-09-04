@@ -55,6 +55,7 @@ static inline __always_inline int
 PCIAPI_INLINE ( efi, pci_read_config_byte ) ( struct pci_device *pci,
 					      unsigned int where,
 					      uint8_t *value ) {
+	*value = 0xff;
 	return efipci_read ( pci,
 			     EFIPCI_LOCATION ( where, EFIPCI_WIDTH_BYTE ),
 			     value );
@@ -72,6 +73,7 @@ static inline __always_inline int
 PCIAPI_INLINE ( efi, pci_read_config_word ) ( struct pci_device *pci,
 					      unsigned int where,
 					      uint16_t *value ) {
+	*value = 0xffff;
 	return efipci_read ( pci,
 			     EFIPCI_LOCATION ( where, EFIPCI_WIDTH_WORD ),
 			     value );
@@ -89,6 +91,7 @@ static inline __always_inline int
 PCIAPI_INLINE ( efi, pci_read_config_dword ) ( struct pci_device *pci,
 					       unsigned int where,
 					       uint32_t *value ) {
+	*value = 0xffffffffUL;
 	return efipci_read ( pci,
 			     EFIPCI_LOCATION ( where, EFIPCI_WIDTH_DWORD ),
 			     value );
