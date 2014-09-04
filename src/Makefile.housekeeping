@@ -229,7 +229,7 @@ endif
 # Determine how many different BIN directories are mentioned in the
 # make goals.
 #
-BIN_GOALS	:= $(filter bin/% bin-%,$(MAKECMDGOALS))
+BIN_GOALS	:= $(filter bin bin/% bin-%,$(MAKECMDGOALS))
 BIN_GOALS_BINS	:= $(sort $(foreach BG,$(BIN_GOALS),\
 				    $(firstword $(subst /, ,$(BG)))))
 NUM_BINS	:= $(words $(BIN_GOALS_BINS))
@@ -1439,6 +1439,13 @@ hci/keymap/keymap_%.c :
 #
 # Clean-up
 #
+
+ifeq ($(NUM_BINS),0)
+ALLBINS		:= bin{,-*}
+CLEANUP		:= $(patsubst $(BIN)/%,$(ALLBINS)/%,$(CLEANUP))
+VERYCLEANUP	:= $(patsubst $(BIN)/%,$(ALLBINS)/%,$(VERYCLEANUP))
+endif
+
 clean :
 	$(RM) $(CLEANUP)
 
