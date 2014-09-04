@@ -447,19 +447,22 @@ static int snpnet_pci_info ( struct efi_device *efidev, struct device *dev ) {
  *
  * @v efidev		EFI device
  * @v dev		Generic device to fill in
- * @ret rc		Return status code
  */
-static int snpnet_dev_info ( struct efi_device *efidev, struct device *dev ) {
+static void snpnet_dev_info ( struct efi_device *efidev, struct device *dev ) {
 	EFI_HANDLE device = efidev->device;
 	int rc;
 
 	/* Try getting underlying PCI device information */
 	if ( ( rc = snpnet_pci_info ( efidev, dev ) ) == 0 )
-		return 0;
+		return;
 
+	/* If we cannot get any underlying device information, fall
+	 * back to providing information about the EFI handle.
+	 */
 	DBGC ( device, "SNP %p %s could not get underlying device "
 	       "information\n", device, efi_handle_name ( device ) );
-	return -ENOTTY;
+	dev->desc.bus_type = BUS_TYPE_EFI;
+	snprintf ( dev->name, sizeof ( dev->name ), "SNP-%p", device );
 }
 
 /**
@@ -506,8 +509,7 @@ int snpnet_start ( struct efi_device *efidev ) {
 	efidev_set_drvdata ( efidev, netdev );
 
 	/* Populate underlying device information */
-	if ( ( rc = snpnet_dev_info ( efidev, &snp->dev ) ) != 0 )
-		goto err_info;
+	snpnet_dev_info ( efidev, &snp->dev );
 	snp->dev.driver_name = "SNP";
 	snp->dev.parent = &efidev->dev;
 	list_add ( &snp->dev.siblings, &efidev->dev.children );
@@ -574,7 +576,6 @@ int snpnet_start ( struct efi_device *efidev ) {
  err_shutdown:
  err_start:
 	list_del ( &snp->dev.siblings );
- err_info:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
