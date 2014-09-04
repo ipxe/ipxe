@@ -59,7 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /** PCI root bridge I/O protocol */
 static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *efipci;
-EFI_REQUIRE_PROTOCOL ( EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL, &efipci );
+EFI_REQUEST_PROTOCOL ( EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL, &efipci );
 
 static unsigned long efipci_address ( struct pci_device *pci,
 				      unsigned long location ) {
@@ -73,6 +73,9 @@ int efipci_read ( struct pci_device *pci, unsigned long location,
 		  void *value ) {
 	EFI_STATUS efirc;
 	int rc;
+
+	if ( ! efipci )
+		return -ENOTSUP;
 
 	if ( ( efirc = efipci->Pci.Read ( efipci, EFIPCI_WIDTH ( location ),
 					  efipci_address ( pci, location ), 1,
@@ -91,6 +94,9 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 		   unsigned long value ) {
 	EFI_STATUS efirc;
 	int rc;
+
+	if ( ! efipci )
+		return -ENOTSUP;
 
 	if ( ( efirc = efipci->Pci.Write ( efipci, EFIPCI_WIDTH ( location ),
 					   efipci_address ( pci, location ), 1,
