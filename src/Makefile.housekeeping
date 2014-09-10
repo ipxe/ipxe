@@ -1268,6 +1268,11 @@ $(EFIROM) : util/efirom.c $(MAKEDEPS)
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -o $@ $<
 CLEANUP += $(EFIROM)
 
+$(EFIFATBIN) : util/efifatbin.c $(MAKEDEPS)
+	$(QM)$(ECHO) "  [HOSTCC] $@"
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -o $@ $<
+CLEANUP += $(EFIFATBIN)
+
 ###############################################################################
 #
 # The ICC fixup utility
