@@ -280,12 +280,17 @@ static int efi_image_exec ( struct image *image ) {
  */
 static int efi_image_probe ( struct image *image ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	static EFI_DEVICE_PATH_PROTOCOL empty_path = {
+		.Type = END_DEVICE_PATH_TYPE,
+		.SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE,
+		.Length[0] = sizeof ( empty_path ),
+	};
 	EFI_HANDLE handle;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Attempt loading image */
-	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, NULL,
+	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, &empty_path,
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
