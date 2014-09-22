@@ -130,6 +130,29 @@ static inline const char * dhcp_msgtype_name ( unsigned int msgtype ) {
 	}
 }
 
+/**
+ * Transcribe DHCP client hardware address (for debugging)
+ *
+ * @v chaddr		Client hardware address
+ * @v hlen		Client hardware address length
+ */
+static const char * dhcp_chaddr_ntoa ( const void *chaddr, size_t hlen ) {
+	static char buf[ 48 /* 16 x ( "xx" + ":" or NUL ) */ ];
+	const uint8_t *chaddr_bytes = chaddr;
+	char *tmp = buf;
+
+	/* Sanity check */
+	assert ( hlen < ( sizeof ( buf ) / 3 ) );
+
+	/* Transcribe address */
+	while ( hlen-- ) {
+		tmp += sprintf ( tmp, "%s%02x", ( ( tmp == buf ) ? "" : ":" ),
+				 *(chaddr_bytes++) );
+	}
+
+	return buf;
+}
+
 /****************************************************************************
  *
  * DHCP session
@@ -1159,6 +1182,8 @@ static int dhcp_deliver ( struct dhcp_session *dhcp,
 	struct dhcphdr *dhcphdr;
 	uint8_t msgtype = 0;
 	struct in_addr server_id = { 0 };
+	uint8_t chaddr[ sizeof ( dhcphdr->chaddr ) ];
+	unsigned int hlen;
 	int rc = 0;
 
 	/* Sanity checks */
@@ -1203,9 +1228,21 @@ static int dhcp_deliver ( struct dhcp_session *dhcp,
 		goto err_xid;
 	};
 
+	/* Check for matching client hardware address */
+	hlen = dhcp_chaddr ( dhcp->netdev, chaddr, NULL );
+	if ( memcmp ( dhcphdr->chaddr, chaddr, hlen ) != 0 ) {
+		DBGC ( dhcp, "DHCP %p %s from %s:%d has bad chaddr %s\n",
+		       dhcp, dhcp_msgtype_name ( msgtype ),
+		       inet_ntoa ( peer->sin_addr ), ntohs ( peer->sin_port ),
+		       dhcp_chaddr_ntoa ( dhcphdr->chaddr, hlen ) );
+		rc = -EINVAL;
+		goto err_chaddr;
+	}
+
 	/* Handle packet based on current state */
 	dhcp->state->rx ( dhcp, dhcppkt, peer, msgtype, server_id );
 
+ err_chaddr:
  err_xid:
 	dhcppkt_put ( dhcppkt );
  err_alloc_dhcppkt:
