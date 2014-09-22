@@ -130,29 +130,6 @@ static inline const char * dhcp_msgtype_name ( unsigned int msgtype ) {
 	}
 }
 
-/**
- * Transcribe DHCP client hardware address (for debugging)
- *
- * @v chaddr		Client hardware address
- * @v hlen		Client hardware address length
- */
-static const char * dhcp_chaddr_ntoa ( const void *chaddr, size_t hlen ) {
-	static char buf[ 48 /* 16 x ( "xx" + ":" or NUL ) */ ];
-	const uint8_t *chaddr_bytes = chaddr;
-	char *tmp = buf;
-
-	/* Sanity check */
-	assert ( hlen < ( sizeof ( buf ) / 3 ) );
-
-	/* Transcribe address */
-	while ( hlen-- ) {
-		tmp += sprintf ( tmp, "%s%02x", ( ( tmp == buf ) ? "" : ":" ),
-				 *(chaddr_bytes++) );
-	}
-
-	return buf;
-}
-
 /****************************************************************************
  *
  * DHCP session
@@ -865,53 +842,6 @@ static struct dhcp_session_state dhcp_state_pxebs = {
  */
 
 /**
- * Construct DHCP client hardware address field and broadcast flag
- *
- * @v netdev		Network device
- * @v chaddr		Hardware address buffer
- * @v flags		Flags to set (or NULL)
- * @ret hlen		Hardware address length
- */
-unsigned int dhcp_chaddr ( struct net_device *netdev, void *chaddr,
-			   uint16_t *flags ) {
-	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	struct dhcphdr *dhcphdr;
-	int rc;
-
-	/* If the link-layer address cannot fit into the chaddr field
-	 * (as is the case for IPoIB) then try using the Ethernet-
-	 * compatible link-layer address.  If we do this, set the
-	 * broadcast flag, since chaddr then does not represent a
-	 * valid link-layer address for the return path.
-	 *
-	 * If we cannot produce an Ethernet-compatible link-layer
-	 * address, try using the hardware address.
-	 *
-	 * If even the hardware address is too large, use an empty
-	 * chaddr field and set the broadcast flag.
-	 *
-	 * This goes against RFC4390, but RFC4390 mandates that we use
-	 * a DHCP client identifier that conforms with RFC4361, which
-	 * we cannot do without either persistent (NIC-independent)
-	 * storage, or by eliminating the hardware address completely
-	 * from the DHCP packet, which seems unfriendly to users.
-	 */
-	if ( ll_protocol->ll_addr_len <= sizeof ( dhcphdr->chaddr ) ) {
-		memcpy ( chaddr, netdev->ll_addr, ll_protocol->ll_addr_len );
-		return ll_protocol->ll_addr_len;
-	}
-	if ( flags )
-		*flags |= htons ( BOOTP_FL_BROADCAST );
-	if ( ( rc = ll_protocol->eth_addr ( netdev->ll_addr, chaddr ) ) == 0 )
-		return ETH_ALEN;
-	if ( ll_protocol->hw_addr_len <= sizeof ( dhcphdr->chaddr ) ) {
-		memcpy ( chaddr, netdev->hw_addr, ll_protocol->hw_addr_len );
-		return ll_protocol->hw_addr_len;
-	}
-	return 0;
-}
-
-/**
  * Create a DHCP packet
  *
  * @v dhcppkt		DHCP packet structure to fill in
@@ -1176,14 +1106,14 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 static int dhcp_deliver ( struct dhcp_session *dhcp,
 			  struct io_buffer *iobuf,
 			  struct xfer_metadata *meta ) {
+	struct net_device *netdev = dhcp->netdev;
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct sockaddr_in *peer;
 	size_t data_len;
 	struct dhcp_packet *dhcppkt;
 	struct dhcphdr *dhcphdr;
 	uint8_t msgtype = 0;
 	struct in_addr server_id = { 0 };
-	uint8_t chaddr[ sizeof ( dhcphdr->chaddr ) ];
-	unsigned int hlen;
 	int rc = 0;
 
 	/* Sanity checks */
@@ -1229,12 +1159,12 @@ static int dhcp_deliver ( struct dhcp_session *dhcp,
 	};
 
 	/* Check for matching client hardware address */
-	hlen = dhcp_chaddr ( dhcp->netdev, chaddr, NULL );
-	if ( memcmp ( dhcphdr->chaddr, chaddr, hlen ) != 0 ) {
+	if ( memcmp ( dhcphdr->chaddr, netdev->ll_addr,
+		      ll_protocol->ll_addr_len ) != 0 ) {
 		DBGC ( dhcp, "DHCP %p %s from %s:%d has bad chaddr %s\n",
 		       dhcp, dhcp_msgtype_name ( msgtype ),
 		       inet_ntoa ( peer->sin_addr ), ntohs ( peer->sin_port ),
-		       dhcp_chaddr_ntoa ( dhcphdr->chaddr, hlen ) );
+		       ll_protocol->ntoa ( dhcphdr->chaddr ) );
 		rc = -EINVAL;
 		goto err_chaddr;
 	}
