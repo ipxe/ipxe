@@ -698,6 +698,7 @@ static struct usb_device_id asix_88772_ids[] = {
 	USB_ROM(0x17ef, 0x7203, "asix", "Lenovo U2L 100-Y1", 0),
 	USB_ROM(0x2001, 0x3c05, "asix", "DLink DUB-E100", 0),
         USB_ROM(0x0b95, 0x772a, "asix", "ASIX AX88772A", 0),
+        USB_ROM(0x05ac, 0x1402, "asix", "Apple Inc.", 0),
 };
 
 struct usb_driver asix_88772_usb_driver __usb_driver = {
