@@ -35,20 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_snp.h>
 #include <usr/autoboot.h>
 
-/** EFI network interface identifier GUID */
-static EFI_GUID efi_nii_protocol_guid
-	= EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL_GUID;
-
-/** EFI network interface identifier GUID (extra special version) */
-static EFI_GUID efi_nii31_protocol_guid = {
-	/* At some point, it seems that someone decided to change the
-	 * GUID.  Current EFI builds ignore the older GUID, older EFI
-	 * builds ignore the newer GUID, so we have to expose both.
-	 */
-	0x1ACED566, 0x76ED, 0x4218,
-	{ 0xBC, 0x81, 0x76, 0x7F, 0x1F, 0x97, 0x7A, 0x89 }
-};
-
 /** List of SNP devices */
 static LIST_HEAD ( efi_snp_devices );
 

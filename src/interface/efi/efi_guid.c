@@ -29,9 +29,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/Protocol/DiskIo.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/GraphicsOutput.h>
+#include <ipxe/efi/Protocol/HiiConfigAccess.h>
 #include <ipxe/efi/Protocol/LoadFile.h>
 #include <ipxe/efi/Protocol/LoadFile2.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
+#include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
 #include <ipxe/efi/Protocol/PciIo.h>
 #include <ipxe/efi/Protocol/PciRootBridgeIo.h>
 #include <ipxe/efi/Protocol/PxeBaseCode.h>
@@ -77,6 +79,10 @@ EFI_GUID efi_driver_binding_protocol_guid
 EFI_GUID efi_graphics_output_protocol_guid
 	= EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 
+/** HII configuration access protocol GUID */
+EFI_GUID efi_hii_config_access_protocol_guid
+	= EFI_HII_CONFIG_ACCESS_PROTOCOL_GUID;
+
 /** Load file protocol GUID */
 EFI_GUID efi_load_file_protocol_guid
 	= EFI_LOAD_FILE_PROTOCOL_GUID;
@@ -92,6 +98,14 @@ EFI_GUID efi_loaded_image_protocol_guid
 /** Loaded image device path protocol GUID */
 EFI_GUID efi_loaded_image_device_path_protocol_guid
 	= EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID;
+
+/** Network interface identifier protocol GUID (old version) */
+EFI_GUID efi_nii_protocol_guid
+	= EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL_GUID;
+
+/** Network interface identifier protocol GUID (new version) */
+EFI_GUID efi_nii31_protocol_guid
+	= EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL_GUID_31;
 
 /** PCI I/O protocol GUID */
 EFI_GUID efi_pci_io_protocol_guid
