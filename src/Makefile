@@ -66,6 +66,7 @@ SRCDIRS		+= core
 SRCDIRS		+= net net/oncrpc net/tcp net/udp net/infiniband net/80211
 SRCDIRS		+= image
 SRCDIRS		+= drivers/bus
+SRCDIRS  	+= drivers/bus/usb
 SRCDIRS		+= drivers/net
 SRCDIRS		+= drivers/net/e1000
 SRCDIRS		+= drivers/net/e1000e

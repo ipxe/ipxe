@@ -1,0 +1,22 @@
+Initial host controller driver and host usbcore stack
+has been added.
+
+cd src
+make DEBUG=uhci_hcd,ohci_hcd,urb,messages,usbcore
+
+will compile a special image with DBG messages turned on
+will log to the default console
+
+for testing
+
+cd src
+qemu -cdrom bin/ipxe.iso -bootp http://192.168.2.125/gtest/gtest.gpxe -usbdevice host:0b95:772a -net nic -net user -serial file:logfile.log
+
+will start a virtual machine, if it is one with usbdevice pass through, the vm will capture the device and successfully probe it
+tested with uhci_hcd hardware [only]
+
+[warning] iso image was used because ipxe.usb image must be padded properly or qemu will not properly load it
+
+-serial file option will capture vm console output to a text file in the current directory which can then be scrolled back and forth in an editor for further study
+
+[note] the code follows a linux usb host stack 'architectural' pattern, class drivers will also need to be added to support usb devices attached to the usb host controller device, a usb-ethernet-device is a 'usb class device' which can be attached to a usb host controller
