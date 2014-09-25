@@ -153,19 +153,30 @@ struct efi_config_table {
  */
 #define EEFI( efirc ) EPLATFORM ( EINFO_EPLATFORM, efirc )
 
+extern EFI_GUID efi_arp_protocol_guid;
+extern EFI_GUID efi_arp_service_binding_protocol_guid;
 extern EFI_GUID efi_block_io_protocol_guid;
 extern EFI_GUID efi_bus_specific_driver_override_protocol_guid;
 extern EFI_GUID efi_component_name_protocol_guid;
 extern EFI_GUID efi_component_name2_protocol_guid;
 extern EFI_GUID efi_device_path_protocol_guid;
+extern EFI_GUID efi_dhcp4_protocol_guid;
+extern EFI_GUID efi_dhcp4_service_binding_protocol_guid;
 extern EFI_GUID efi_disk_io_protocol_guid;
 extern EFI_GUID efi_driver_binding_protocol_guid;
 extern EFI_GUID efi_graphics_output_protocol_guid;
 extern EFI_GUID efi_hii_config_access_protocol_guid;
+extern EFI_GUID efi_ip4_protocol_guid;
+extern EFI_GUID efi_ip4_config_protocol_guid;
+extern EFI_GUID efi_ip4_service_binding_protocol_guid;
 extern EFI_GUID efi_load_file_protocol_guid;
 extern EFI_GUID efi_load_file2_protocol_guid;
 extern EFI_GUID efi_loaded_image_protocol_guid;
 extern EFI_GUID efi_loaded_image_device_path_protocol_guid;
+extern EFI_GUID efi_managed_network_protocol_guid;
+extern EFI_GUID efi_managed_network_service_binding_protocol_guid;
+extern EFI_GUID efi_mtftp4_protocol_guid;
+extern EFI_GUID efi_mtftp4_service_binding_protocol_guid;
 extern EFI_GUID efi_nii_protocol_guid;
 extern EFI_GUID efi_nii31_protocol_guid;
 extern EFI_GUID efi_pci_io_protocol_guid;
@@ -174,6 +185,11 @@ extern EFI_GUID efi_pxe_base_code_protocol_guid;
 extern EFI_GUID efi_simple_file_system_protocol_guid;
 extern EFI_GUID efi_simple_network_protocol_guid;
 extern EFI_GUID efi_tcg_protocol_guid;
+extern EFI_GUID efi_tcp4_protocol_guid;
+extern EFI_GUID efi_tcp4_service_binding_protocol_guid;
+extern EFI_GUID efi_udp4_protocol_guid;
+extern EFI_GUID efi_udp4_service_binding_protocol_guid;
+extern EFI_GUID efi_vlan_config_protocol_guid;
 
 extern EFI_HANDLE efi_image_handle;
 extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;

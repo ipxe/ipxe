@@ -42,6 +42,18 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
 EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
 
+/** Iscsi4Dxe module GUID */
+static EFI_GUID efi_iscsi4_dxe_guid = {
+	0x4579b72d, 0x7ec4, 0x4dd4,
+	{ 0x84, 0x86, 0x08, 0x3c, 0x86, 0xb1, 0x82, 0xa7 }
+};
+
+/** VlanConfigDxe module GUID */
+static EFI_GUID efi_vlan_config_dxe_guid = {
+	0xe4f61863, 0xfe2c, 0x4b56,
+	{ 0xa8, 0xf4, 0x08, 0x51, 0x9b, 0xc4, 0x39, 0xdf }
+};
+
 /** A well-known GUID */
 struct efi_well_known_guid {
 	/** GUID */
@@ -52,24 +64,40 @@ struct efi_well_known_guid {
 
 /** Well-known GUIDs */
 static struct efi_well_known_guid efi_well_known_guids[] = {
+	{ &efi_arp_protocol_guid,
+	  "Arp" },
+	{ &efi_arp_service_binding_protocol_guid,
+	  "ArpSb" },
 	{ &efi_block_io_protocol_guid,
 	  "BlockIo" },
 	{ &efi_bus_specific_driver_override_protocol_guid,
 	  "BusSpecificDriverOverride" },
-	{ &efi_component_name2_protocol_guid,
-	  "ComponentName2" },
 	{ &efi_component_name_protocol_guid,
 	  "ComponentName" },
+	{ &efi_component_name2_protocol_guid,
+	  "ComponentName2" },
 	{ &efi_device_path_protocol_guid,
 	  "DevicePath" },
 	{ &efi_driver_binding_protocol_guid,
 	  "DriverBinding" },
+	{ &efi_dhcp4_protocol_guid,
+	  "Dhcp4" },
+	{ &efi_dhcp4_service_binding_protocol_guid,
+	  "Dhcp4Sb" },
 	{ &efi_disk_io_protocol_guid,
 	  "DiskIo" },
 	{ &efi_graphics_output_protocol_guid,
 	  "GraphicsOutput" },
 	{ &efi_hii_config_access_protocol_guid,
 	  "HiiConfigAccess" },
+	{ &efi_ip4_protocol_guid,
+	  "Ip4" },
+	{ &efi_ip4_config_protocol_guid,
+	  "Ip4Config" },
+	{ &efi_ip4_service_binding_protocol_guid,
+	  "Ip4Sb" },
+	{ &efi_iscsi4_dxe_guid,
+	  "IScsi4Dxe" },
 	{ &efi_load_file_protocol_guid,
 	  "LoadFile" },
 	{ &efi_load_file2_protocol_guid,
@@ -78,6 +106,14 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "LoadedImage" },
 	{ &efi_loaded_image_device_path_protocol_guid,
 	  "LoadedImageDevicePath"},
+	{ &efi_managed_network_protocol_guid,
+	  "ManagedNetwork" },
+	{ &efi_managed_network_service_binding_protocol_guid,
+	  "ManagedNetworkSb" },
+	{ &efi_mtftp4_protocol_guid,
+	  "Mtftp4" },
+	{ &efi_mtftp4_service_binding_protocol_guid,
+	  "Mtftp4Sb" },
 	{ &efi_nii_protocol_guid,
 	  "Nii" },
 	{ &efi_nii31_protocol_guid,
@@ -94,6 +130,18 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "SimpleNetwork" },
 	{ &efi_tcg_protocol_guid,
 	  "Tcg" },
+	{ &efi_tcp4_protocol_guid,
+	  "Tcp4" },
+	{ &efi_tcp4_service_binding_protocol_guid,
+	  "Tcp4Sb" },
+	{ &efi_udp4_protocol_guid,
+	  "Udp4" },
+	{ &efi_udp4_service_binding_protocol_guid,
+	  "Udp4Sb" },
+	{ &efi_vlan_config_protocol_guid,
+	  "VlanConfig" },
+	{ &efi_vlan_config_dxe_guid,
+	  "VlanConfigDxe" },
 };
 
 /**
