@@ -40,7 +40,7 @@ sub rom {
 }
 
 while ( <DRV> ) {
-  next unless /(PCI|ISA)_ROM\s*\(/;
+  next unless /(PCI|USB|ISA)_ROM\s*\(/;
 
   if ( /^\s*PCI_ROM\s*\(
          \s*0x([0-9A-Fa-f]{4})\s*, # PCI vendor
@@ -52,6 +52,16 @@ while ( <DRV> ) {
     ( my $vendor, my $device, my $image, my $desc ) = ( lc $1, lc $2, $3, $4 );
     rom ( "pci", lc "${vendor}${device}", $desc, $vendor, $device );
     rom ( "pci", $image, $desc, $vendor, $device, 1 );
+  } elsif ( /^\s*USB_ROM\s*\(
+         \s*0x([0-9A-Fa-f]{4})\s*, # USB vendor
+         \s*0x([0-9A-Fa-f]{4})\s*, # USB device
+         \s*\"([^\"]*)\"\s*,       # Image
+         \s*\"([^\"]*)\"\s*,       # Description
+         \s*.*\s*                  # Driver data
+       \)/x ) {
+    ( my $vendor, my $device, my $image, my $desc ) = ( lc $1, lc $2, $3, $4 );
+    rom ( "usb", lc "${vendor}${device}", $desc, $vendor, $device );
+    rom ( "usb", $image, $desc, $vendor, $device, 1 );
   } elsif ( /^\s*ISA_ROM\s*\(
 	      \s*\"([^\"]*)\"\s*,  # Image
 	      \s*\"([^\"]*)\"\s*   # Description
@@ -59,7 +69,7 @@ while ( <DRV> ) {
     ( my $image, my $desc ) = ( $1, $2 );
     rom ( "isa", $image, $desc );
   } else {
-    warn "Malformed PCI_ROM or ISA_ROM macro on line $. of $source\n";
+    warn "Malformed PCI_ROM, ISA_ROM or USB_ROM macro on line $. of $source\n";
   }
 }
 

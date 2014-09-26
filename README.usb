@@ -1,0 +1,56 @@
+host controller driver, host usbcore stack and device drivers
+have been added, the build system parserom.pl has been updated
+to support automatically building hcd and device driver support
+into the default bin/ipxe.dsk, bin/ipxe.usb, bin/ipxe.iso images
+
+cd src directory
+# make 
+
+example: to test with qemu
+
+cd src directory
+qemu -cdrom bin/ipxe.iso -bootp http://192.168.2.125/itest/itest.ipxe -usbdevice host:0b95:772a -net nic -net user
+
+< where > '-usbdevice host:0b95:772a' is used to 'pass-through' a specific USB device from the qemu host
+
+this will start a qemu virtual machine
+
+[warning:] the iso image was used because a ipxe.usb image must be padded properly or qemu will not properly load it
+
+[note:] the usb support code follows a linux usb host stack 'architectural' pattern 
+
+====================================================
+USB Ethernet Adapters attach to USB Host Controllers
+====================================================
+
+[uhci] type controllers are supported at this time
+
+[ehci] type controllers also appear to work
+
+***
+[ohci] type controllers are [not] supported at this time
+***
+
+========================================================
+USB Device Drivers communicate thru USB Host Controllers
+========================================================
+
+[asix] type adapters are supported [and] have been tested
+
+[dm9601] type adapters [may] work
+
+[pegasus] type adapters [may] work
+
+***
+consult the USB_ROM information for each driver in the src files
+
+ipxe/src/drivers/net/usb/asix.c
+ipxe/src/drivers/net/usb/dm9601.c
+ipxe/src/drivers/net/usb/pegasus.c
+
+to see if the the USB ID for a USB device matches a driver
+
+the USB ID for a device can be found on the device, via the manufacturer, or
+by looking them up in a public repository such as https://usb-ids.gowdy.us/
+***
+

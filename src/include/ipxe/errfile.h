@@ -77,6 +77,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_linux		     ( ERRFILE_DRIVER | 0x00050000 )
 #define ERRFILE_pcivpd		     ( ERRFILE_DRIVER | 0x00060000 )
 
+#define ERRFILE_uhci_hcd             ( ERRFILE_DRIVER | 0x00080000 )
+#define ERRFILE_ohci_hcd             ( ERRFILE_DRIVER | 0x00081000 )
+#define ERRFILE_message              ( ERRFILE_DRIVER | 0x00082000 )
+#define ERRFILE_usbcore              ( ERRFILE_DRIVER | 0x00083000 )
+
 #define ERRFILE_nvs		     ( ERRFILE_DRIVER | 0x00100000 )
 #define ERRFILE_spi		     ( ERRFILE_DRIVER | 0x00110000 )
 #define ERRFILE_i2c_bit		     ( ERRFILE_DRIVER | 0x00120000 )
@@ -156,6 +161,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_intelx		     ( ERRFILE_DRIVER | 0x00670000 )
 #define ERRFILE_snp		     ( ERRFILE_DRIVER | 0x00680000 )
 #define ERRFILE_netfront	     ( ERRFILE_DRIVER | 0x00690000 )
+#define ERRFILE_asix                 ( ERRFILE_DRIVER | 0x006a0000 )
+#define ERRFILE_dm9601               ( ERRFILE_DRIVER | 0x006b0000 )
+#define ERRFILE_pegasus              ( ERRFILE_DRIVER | 0x006c0000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
