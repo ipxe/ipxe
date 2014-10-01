@@ -323,7 +323,7 @@ void tftp_set_mtftp_port ( unsigned int port ) {
  * @ret rc		Return status code
  */
 static int tftp_send_rrq ( struct tftp_request *tftp ) {
-	const char *path = tftp->uri->path;
+	const char *path = tftp->uri->path+1;
 	struct tftp_rrq *rrq;
 	size_t len;
 	struct io_buffer *iobuf;
