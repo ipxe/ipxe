@@ -137,12 +137,14 @@ static int smbios_fetch ( struct settings *settings __unused,
 		 */
 		raw = &buf[tag_offset];
 		if ( ( setting->type == &setting_type_uuid ) &&
-		     ( tag_len == sizeof ( uuid ) ) &&
-		     ( smbios_version() >= SMBIOS_VERSION ( 2, 6 ) ) ) {
-			DBG ( "SMBIOS detected mangled UUID\n" );
+		     ( tag_len == sizeof ( uuid ) ) )  {
 			memcpy ( &uuid, &buf[tag_offset], sizeof ( uuid ) );
-			uuid_mangle ( &uuid );
-			raw = &uuid;
+			DBG ( "SMBIOS detected mangled UUID\n" );
+            if ( ( smbios_version() >= SMBIOS_VERSION ( 2, 6 ) ) ||
+                 ( uuid.canonical.a == 0x4c4c4544 ) ) {
+                uuid_mangle ( &uuid );
+                raw = &uuid;
+            }
 		}
 
 		/* Return data */
