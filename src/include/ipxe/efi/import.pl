@@ -78,9 +78,8 @@ sub try_import_file {
 	# Write out line
 	print $outfh "$_\n";
 	# Apply FILE_LICENCE() immediately after include guard
-	if ( defined $maybe_guard ) {
+	if ( defined $maybe_guard && ! defined $guard ) {
 	  if ( /^\#define\s+_?_${maybe_guard}_?_$/ ) {
-	    die "Duplicate header guard detected in $infile\n" if $guard;
 	    $guard = $maybe_guard;
 	    print $outfh "\nFILE_LICENCE ( $licence );\n" if $licence;
 	  }
