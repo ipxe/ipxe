@@ -185,6 +185,7 @@ static int snpnet_transmit ( struct net_device *netdev,
  */
 static void snpnet_poll_tx ( struct net_device *netdev ) {
 	struct snp_nic *snp = netdev->priv;
+	struct io_buffer *iobuf;
 	UINT32 irq;
 	VOID *txbuf;
 	EFI_STATUS efirc;
@@ -212,8 +213,9 @@ static void snpnet_poll_tx ( struct net_device *netdev ) {
 	}
 
 	/* Complete transmission */
-	netdev_tx_complete ( netdev, snp->txbuf );
+	iobuf = snp->txbuf;
 	snp->txbuf = NULL;
+	netdev_tx_complete ( netdev, iobuf );
 }
 
 /**
