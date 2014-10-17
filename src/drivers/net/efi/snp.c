@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_snp.h>
 #include "snpnet.h"
+#include "nii.h"
 
 /** @file
  *
@@ -63,10 +64,50 @@ static int snp_supported ( EFI_HANDLE device ) {
 	return 0;
 }
 
+/**
+ * Check to see if driver supports a device
+ *
+ * @v device		EFI device handle
+ * @ret rc		Return status code
+ */
+static int nii_supported ( EFI_HANDLE device ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+
+	/* Check that this is not a device we are providing ourselves */
+	if ( find_snpdev ( device ) != NULL ) {
+		DBGCP ( device, "NII %p %s is provided by this binary\n",
+			device, efi_handle_name ( device ) );
+		return -ENOTTY;
+	}
+
+	/* Test for presence of NII protocol */
+	if ( ( efirc = bs->OpenProtocol ( device,
+					  &efi_nii31_protocol_guid,
+					  NULL, efi_image_handle, device,
+					  EFI_OPEN_PROTOCOL_TEST_PROTOCOL))!=0){
+		DBGCP ( device, "NII %p %s is not an NII device\n",
+			device, efi_handle_name ( device ) );
+		return -EEFI ( efirc );
+	}
+	DBGC ( device, "NII %p %s is an NII device\n",
+	       device, efi_handle_name ( device ) );
+
+	return 0;
+}
+
 /** EFI SNP driver */
 struct efi_driver snp_driver __efi_driver ( EFI_DRIVER_NORMAL ) = {
 	.name = "SNP",
 	.supported = snp_supported,
 	.start = snpnet_start,
 	.stop = snpnet_stop,
+};
+
+/** EFI NII driver */
+struct efi_driver nii_driver __efi_driver ( EFI_DRIVER_NORMAL ) = {
+	.name = "NII",
+	.supported = nii_supported,
+	.start = nii_start,
+	.stop = nii_stop,
 };
