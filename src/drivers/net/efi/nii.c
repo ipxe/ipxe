@@ -1037,6 +1037,11 @@ static int nii_start ( struct efi_device *efidev ) {
 
 	/* Locate UNDI and entry point */
 	nii->undi = ( ( void * ) ( intptr_t ) nii->nii->Id );
+	if ( ! nii->undi ) {
+		DBGC ( nii, "NII %s has no UNDI\n", nii->dev.name );
+		rc = -ENODEV;
+		goto err_no_undi;
+	}
 	if ( nii->undi->Implementation & PXE_ROMID_IMP_HW_UNDI ) {
 		DBGC ( nii, "NII %s is a mythical hardware UNDI\n",
 		       nii->dev.name );
@@ -1085,6 +1090,7 @@ static int nii_start ( struct efi_device *efidev ) {
 	nii_pci_close ( nii );
  err_pci_open:
  err_hw_undi:
+ err_no_undi:
 	bs->CloseProtocol ( device, &efi_nii31_protocol_guid,
 			    efi_image_handle, device );
  err_open_protocol:
