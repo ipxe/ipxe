@@ -58,14 +58,16 @@ static void ping_callback ( struct sockaddr *peer, unsigned int sequence,
  * @v hostname		Hostname
  * @v timeout		Timeout between pings, in ticks
  * @v len		Payload length
+ * @v count		Number of packets to send (or zero for no limit)
  * @ret rc		Return status code
  */
-int ping ( const char *hostname, unsigned long timeout, size_t len ) {
+int ping ( const char *hostname, unsigned long timeout, size_t len,
+	   unsigned int count ) {
 	int rc;
 
 	/* Create pinger */
-	if ( ( rc = create_pinger ( &monojob, hostname, timeout,
-				    len, ping_callback ) ) != 0 ) {
+	if ( ( rc = create_pinger ( &monojob, hostname, timeout, len,
+				    count, ping_callback ) ) != 0 ) {
 		printf ( "Could not start ping: %s\n", strerror ( rc ) );
 		return rc;
 	}

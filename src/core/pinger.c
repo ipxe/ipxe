@@ -70,6 +70,10 @@ struct pinger {
 	uint16_t sequence;
 	/** Response for current sequence number is still pending */
 	int pending;
+	/** Number of remaining expiry events (zero to continue indefinitely) */
+	unsigned int remaining;
+	/** Return status */
+	int rc;
 
 	/** Callback function
 	 *
@@ -164,7 +168,12 @@ static void pinger_expired ( struct retry_timer *timer, int over __unused ) {
 	/* If no response has been received, notify the callback function */
 	if ( pinger->pending )
 		pinger->callback ( NULL, pinger->sequence, 0, -ETIMEDOUT );
-	pinger->pending = 1;
+
+	/* Check for termination */
+	if ( pinger->remaining && ( --pinger->remaining == 0 ) ) {
+		pinger_close ( pinger, pinger->rc );
+		return;
+	}
 
 	/* Increase sequence number */
 	pinger->sequence++;
@@ -173,6 +182,7 @@ static void pinger_expired ( struct retry_timer *timer, int over __unused ) {
 	 * case the transmission attempt fails.
 	 */
 	start_timer_fixed ( &pinger->timer, pinger->timeout );
+	pinger->pending = 1;
 
 	/* Allocate I/O buffer */
 	iobuf = xfer_alloc_iob ( &pinger->xfer, pinger->len );
@@ -210,6 +220,7 @@ static int pinger_deliver ( struct pinger *pinger, struct io_buffer *iobuf,
 			    struct xfer_metadata *meta ) {
 	size_t len = iob_len ( iobuf );
 	uint16_t sequence = meta->offset;
+	int terminate = 0;
 	int rc;
 
 	/* Clear response pending flag, if applicable */
@@ -218,18 +229,35 @@ static int pinger_deliver ( struct pinger *pinger, struct io_buffer *iobuf,
 
 	/* Check for errors */
 	if ( len != pinger->len ) {
+		/* Incorrect length: terminate immediately if we are
+		 * not pinging indefinitely.
+		 */
 		DBGC ( pinger, "PINGER %p received incorrect length %zd "
 		       "(expected %zd)\n", pinger, len, pinger->len );
 		rc = -EPROTO_LEN;
+		terminate = ( pinger->remaining != 0 );
 	} else if ( ( rc = pinger_verify ( pinger, iobuf->data ) ) != 0 ) {
+		/* Incorrect data: terminate immediately if we are not
+		 * pinging indefinitely.
+		 */
 		DBGC ( pinger, "PINGER %p received incorrect data:\n", pinger );
 		DBGC_HDA ( pinger, 0, iobuf->data, iob_len ( iobuf ) );
+		terminate = ( pinger->remaining != 0 );
 	} else if ( sequence != pinger->sequence ) {
+		/* Incorrect sequence number (probably a delayed response):
+		 * report via callback but otherwise ignore.
+		 */
 		DBGC ( pinger, "PINGER %p received sequence %d (expected %d)\n",
 		       pinger, sequence, pinger->sequence );
 		rc = -EPROTO_SEQ;
+		terminate = 0;
 	} else {
+		/* Success: record that a packet was successfully received,
+		 * and terminate if we expect to send no further packets.
+		 */
 		rc = 0;
+		pinger->rc = 0;
+		terminate = ( pinger->remaining == 1 );
 	}
 
 	/* Discard I/O buffer */
@@ -237,6 +265,10 @@ static int pinger_deliver ( struct pinger *pinger, struct io_buffer *iobuf,
 
 	/* Notify callback function */
 	pinger->callback ( meta->src, sequence, len, rc );
+
+	/* Terminate if applicable */
+	if ( terminate )
+		pinger_close ( pinger, rc );
 
 	return rc;
 }
@@ -268,10 +300,11 @@ static struct interface_descriptor pinger_job_desc =
  * @v hostname		Hostname to ping
  * @v timeout		Timeout (in ticks)
  * @v len		Payload length
+ * @v count		Number of packets to send (or zero for no limit)
  * @ret rc		Return status code
  */
 int create_pinger ( struct interface *job, const char *hostname,
-		    unsigned long timeout, size_t len,
+		    unsigned long timeout, size_t len, unsigned int count,
 		    void ( * callback ) ( struct sockaddr *src,
 					  unsigned int sequence, size_t len,
 					  int rc ) ) {
@@ -292,7 +325,9 @@ int create_pinger ( struct interface *job, const char *hostname,
 	timer_init ( &pinger->timer, pinger_expired, &pinger->refcnt );
 	pinger->timeout = timeout;
 	pinger->len = len;
+	pinger->remaining = ( count ? ( count + 1 /* Initial packet */ ) : 0 );
 	pinger->callback = callback;
+	pinger->rc = -ETIMEDOUT;
 
 	/* Open socket */
 	if ( ( rc = xfer_open_named_socket ( &pinger->xfer, SOCK_ECHO, NULL,

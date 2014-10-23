@@ -48,6 +48,8 @@ struct ping_options {
 	unsigned int size;
 	/** Timeout (in ms) */
 	unsigned long timeout;
+	/** Number of packets to send (or zero for no limit) */
+	unsigned int count;
 };
 
 /** "ping" option list */
@@ -56,6 +58,8 @@ static struct option_descriptor ping_opts[] = {
 		      struct ping_options, size, parse_integer ),
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct ping_options, timeout, parse_timeout ),
+	OPTION_DESC ( "count", 'c', required_argument,
+		      struct ping_options, count, parse_integer ),
 };
 
 /** "ping" command descriptor */
@@ -87,7 +91,8 @@ static int ping_exec ( int argc, char **argv ) {
 	hostname = argv[optind];
 
 	/* Ping */
-	if ( ( rc = ping ( hostname, opts.timeout, opts.size ) ) != 0 )
+	if ( ( rc = ping ( hostname, opts.timeout, opts.size,
+			   opts.count ) ) != 0 )
 		return rc;
 
 	return 0;
