@@ -166,7 +166,7 @@ static void pinger_expired ( struct retry_timer *timer, int over __unused ) {
 	int rc;
 
 	/* If no response has been received, notify the callback function */
-	if ( pinger->pending )
+	if ( pinger->pending && pinger->callback )
 		pinger->callback ( NULL, pinger->sequence, 0, -ETIMEDOUT );
 
 	/* Check for termination */
@@ -263,8 +263,9 @@ static int pinger_deliver ( struct pinger *pinger, struct io_buffer *iobuf,
 	/* Discard I/O buffer */
 	free_iob ( iobuf );
 
-	/* Notify callback function */
-	pinger->callback ( meta->src, sequence, len, rc );
+	/* Notify callback function, if applicable */
+	if ( pinger->callback )
+		pinger->callback ( meta->src, sequence, len, rc );
 
 	/* Terminate if applicable */
 	if ( terminate )
@@ -301,6 +302,7 @@ static struct interface_descriptor pinger_job_desc =
  * @v timeout		Timeout (in ticks)
  * @v len		Payload length
  * @v count		Number of packets to send (or zero for no limit)
+ * @v callback		Callback function (or NULL)
  * @ret rc		Return status code
  */
 int create_pinger ( struct interface *job, const char *hostname,

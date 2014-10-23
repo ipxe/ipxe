@@ -50,6 +50,8 @@ struct ping_options {
 	unsigned long timeout;
 	/** Number of packets to send (or zero for no limit) */
 	unsigned int count;
+	/** Inhibit output */
+	int quiet;
 };
 
 /** "ping" option list */
@@ -60,6 +62,8 @@ static struct option_descriptor ping_opts[] = {
 		      struct ping_options, timeout, parse_timeout ),
 	OPTION_DESC ( "count", 'c', required_argument,
 		      struct ping_options, count, parse_integer ),
+	OPTION_DESC ( "quiet", 'q', no_argument,
+		      struct ping_options, quiet, parse_flag ),
 };
 
 /** "ping" command descriptor */
@@ -92,7 +96,7 @@ static int ping_exec ( int argc, char **argv ) {
 
 	/* Ping */
 	if ( ( rc = ping ( hostname, opts.timeout, opts.size,
-			   opts.count ) ) != 0 )
+			   opts.count, opts.quiet ) ) != 0 )
 		return rc;
 
 	return 0;

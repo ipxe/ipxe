@@ -12,6 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 
 extern int ping ( const char *hostname, unsigned long timeout, size_t len,
-		  unsigned int count );
+		  unsigned int count, int quiet );
 
 #endif /* _USR_PINGMGMT_H */
