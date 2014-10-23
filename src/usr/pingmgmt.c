@@ -36,7 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Display ping result
  *
- * @v src		Source socket address
+ * @v src		Source socket address, or NULL
  * @v sequence		Sequence number
  * @v len		Payload length
  * @v rc		Status code
@@ -46,7 +46,7 @@ static void ping_callback ( struct sockaddr *peer, unsigned int sequence,
 
 	/* Display ping response */
 	printf ( "%zd bytes from %s: seq=%d",
-		 len, sock_ntoa ( peer ), sequence );
+		 len, ( peer ? sock_ntoa ( peer ) : "<none>" ), sequence );
 	if ( rc != 0 )
 		printf ( ": %s", strerror ( rc ) );
 	printf ( "\n" );

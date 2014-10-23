@@ -68,10 +68,12 @@ struct pinger {
 	size_t len;
 	/** Current sequence number */
 	uint16_t sequence;
+	/** Response for current sequence number is still pending */
+	int pending;
 
 	/** Callback function
 	 *
-	 * @v src		Source socket address
+	 * @v src		Source socket address, or NULL
 	 * @v sequence		Sequence number
 	 * @v len		Payload length
 	 * @v rc		Status code
@@ -159,6 +161,11 @@ static void pinger_expired ( struct retry_timer *timer, int over __unused ) {
 	struct io_buffer *iobuf;
 	int rc;
 
+	/* If no response has been received, notify the callback function */
+	if ( pinger->pending )
+		pinger->callback ( NULL, pinger->sequence, 0, -ETIMEDOUT );
+	pinger->pending = 1;
+
 	/* Increase sequence number */
 	pinger->sequence++;
 
@@ -204,6 +211,10 @@ static int pinger_deliver ( struct pinger *pinger, struct io_buffer *iobuf,
 	size_t len = iob_len ( iobuf );
 	uint16_t sequence = meta->offset;
 	int rc;
+
+	/* Clear response pending flag, if applicable */
+	if ( sequence == pinger->sequence )
+		pinger->pending = 0;
 
 	/* Check for errors */
 	if ( len != pinger->len ) {
