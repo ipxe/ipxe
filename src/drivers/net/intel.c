@@ -232,15 +232,15 @@ static int intel_fetch_mac ( struct intel_nic *intel, uint8_t *hw_addr ) {
 	DBGC ( intel, "INTEL %p has autoloaded MAC address %s\n",
 	       intel, eth_ntoa ( mac.raw ) );
 
-	/* Try to read address from EEPROM */
-	if ( ( rc = intel_fetch_mac_eeprom ( intel, hw_addr ) ) == 0 )
-		return 0;
-
 	/* Use current address if valid */
 	if ( is_valid_ether_addr ( mac.raw ) ) {
 		memcpy ( hw_addr, mac.raw, ETH_ALEN );
 		return 0;
 	}
+
+	/* Otherwise, try to read address from EEPROM */
+	if ( ( rc = intel_fetch_mac_eeprom ( intel, hw_addr ) ) == 0 )
+		return 0;
 
 	DBGC ( intel, "INTEL %p has no MAC address to use\n", intel );
 	return -ENOENT;
