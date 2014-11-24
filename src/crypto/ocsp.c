@@ -405,12 +405,17 @@ static int ocsp_compare_responder_name ( struct ocsp_check *ocsp,
 static int ocsp_compare_responder_key_hash ( struct ocsp_check *ocsp,
 					     struct x509_certificate *cert ) {
 	struct ocsp_responder *responder = &ocsp->response.responder;
+	struct asn1_cursor key_hash;
 	uint8_t ctx[SHA1_CTX_SIZE];
 	uint8_t digest[SHA1_DIGEST_SIZE];
 	int difference;
 
+	/* Enter responder key hash */
+	memcpy ( &key_hash, &responder->id, sizeof ( key_hash ) );
+	asn1_enter ( &key_hash, ASN1_OCTET_STRING );
+
 	/* Sanity check */
-	difference = ( sizeof ( digest ) - responder->id.len );
+	difference = ( sizeof ( digest ) - key_hash.len );
 	if ( difference )
 		return difference;
 
@@ -421,8 +426,8 @@ static int ocsp_compare_responder_key_hash ( struct ocsp_check *ocsp,
 			cert->subject.public_key.raw_bits.len );
 	digest_final ( &sha1_algorithm, ctx, digest );
 
-	/* Compare responder ID with SHA1 hash of certificate's public key */
-	return memcmp ( digest, responder->id.data, sizeof ( digest ) );
+	/* Compare responder key hash with hash of certificate's public key */
+	return memcmp ( digest, key_hash.data, sizeof ( digest ) );
 }
 
 /**
