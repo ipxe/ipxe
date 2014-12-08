@@ -36,7 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Display ping result
  *
- * @v src		Source socket address
+ * @v src		Source socket address, or NULL
  * @v sequence		Sequence number
  * @v len		Payload length
  * @v rc		Status code
@@ -46,7 +46,7 @@ static void ping_callback ( struct sockaddr *peer, unsigned int sequence,
 
 	/* Display ping response */
 	printf ( "%zd bytes from %s: seq=%d",
-		 len, sock_ntoa ( peer ), sequence );
+		 len, ( peer ? sock_ntoa ( peer ) : "<none>" ), sequence );
 	if ( rc != 0 )
 		printf ( ": %s", strerror ( rc ) );
 	printf ( "\n" );
@@ -58,21 +58,25 @@ static void ping_callback ( struct sockaddr *peer, unsigned int sequence,
  * @v hostname		Hostname
  * @v timeout		Timeout between pings, in ticks
  * @v len		Payload length
+ * @v count		Number of packets to send (or zero for no limit)
+ * @v quiet		Inhibit output
  * @ret rc		Return status code
  */
-int ping ( const char *hostname, unsigned long timeout, size_t len ) {
+int ping ( const char *hostname, unsigned long timeout, size_t len,
+	   unsigned int count, int quiet ) {
 	int rc;
 
 	/* Create pinger */
-	if ( ( rc = create_pinger ( &monojob, hostname, timeout,
-				    len, ping_callback ) ) != 0 ) {
+	if ( ( rc = create_pinger ( &monojob, hostname, timeout, len, count,
+				    ( quiet ? NULL : ping_callback ) ) ) != 0 ){
 		printf ( "Could not start ping: %s\n", strerror ( rc ) );
 		return rc;
 	}
 
 	/* Wait for ping to complete */
 	if ( ( rc = monojob_wait ( NULL, 0 ) ) != 0 ) {
-		printf ( "Finished: %s\n", strerror ( rc ) );
+		if ( ! quiet )
+			printf ( "Finished: %s\n", strerror ( rc ) );
 		return rc;
 	}
 

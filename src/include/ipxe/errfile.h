@@ -156,6 +156,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_intelx		     ( ERRFILE_DRIVER | 0x00670000 )
 #define ERRFILE_snp		     ( ERRFILE_DRIVER | 0x00680000 )
 #define ERRFILE_netfront	     ( ERRFILE_DRIVER | 0x00690000 )
+#define ERRFILE_nii		     ( ERRFILE_DRIVER | 0x006a0000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )

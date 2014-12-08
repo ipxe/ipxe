@@ -19,9 +19,11 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_pci.h>
 #include <ipxe/efi/efi_utils.h>
 
 /** @file
@@ -151,4 +153,66 @@ void efi_child_del ( EFI_HANDLE parent, EFI_HANDLE child ) {
 		parent, efi_handle_name ( parent ) );
 	DBGC2 ( parent, " %p %s\n",
 		child, efi_handle_name ( child ) );
+}
+
+/**
+ * Get underlying PCI device information
+ *
+ * @v device		EFI device handle
+ * @v prefix		Device name prefix
+ * @v dev		Generic device to fill in
+ * @ret rc		Return status code
+ */
+static int efi_pci_info ( EFI_HANDLE device, const char *prefix,
+			  struct device *dev ) {
+	EFI_HANDLE pci_device;
+	struct pci_device pci;
+	int rc;
+
+	/* Find parent PCI device */
+	if ( ( rc = efi_locate_device ( device, &efi_pci_io_protocol_guid,
+					&pci_device ) ) != 0 ) {
+		DBGC ( device, "EFIDEV %p %s is not a PCI device: %s\n",
+		       device, efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Get PCI device information */
+	if ( ( rc = efipci_info ( pci_device, &pci ) ) != 0 ) {
+		DBGC ( device, "EFIDEV %p %s could not get PCI information: "
+		       "%s\n", device, efi_handle_name ( device ),
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Populate device information */
+	memcpy ( &dev->desc, &pci.dev.desc, sizeof ( dev->desc ) );
+	snprintf ( dev->name, sizeof ( dev->name ), "%s-%s",
+		   prefix, pci.dev.name );
+
+	return 0;
+}
+
+/**
+ * Get underlying device information
+ *
+ * @v device		EFI device handle
+ * @v prefix		Device name prefix
+ * @v dev		Generic device to fill in
+ */
+void efi_device_info ( EFI_HANDLE device, const char *prefix,
+		       struct device *dev ) {
+	int rc;
+
+	/* Try getting underlying PCI device information */
+	if ( ( rc = efi_pci_info ( device, prefix, dev ) ) == 0 )
+		return;
+
+	/* If we cannot get any underlying device information, fall
+	 * back to providing information about the EFI handle.
+	 */
+	DBGC ( device, "EFIDEV %p %s could not get underlying device "
+	       "information\n", device, efi_handle_name ( device ) );
+	dev->desc.bus_type = BUS_TYPE_EFI;
+	snprintf ( dev->name, sizeof ( dev->name ), "%s-%p", prefix, device );
 }

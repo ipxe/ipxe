@@ -30,7 +30,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi_driver.h>
-#include <ipxe/efi/efi_pci.h>
 #include <ipxe/efi/efi_utils.h>
 #include "snpnet.h"
 
@@ -185,6 +184,7 @@ static int snpnet_transmit ( struct net_device *netdev,
  */
 static void snpnet_poll_tx ( struct net_device *netdev ) {
 	struct snp_nic *snp = netdev->priv;
+	struct io_buffer *iobuf;
 	UINT32 irq;
 	VOID *txbuf;
 	EFI_STATUS efirc;
@@ -212,8 +212,9 @@ static void snpnet_poll_tx ( struct net_device *netdev ) {
 	}
 
 	/* Complete transmission */
-	netdev_tx_complete ( netdev, snp->txbuf );
+	iobuf = snp->txbuf;
 	snp->txbuf = NULL;
+	netdev_tx_complete ( netdev, iobuf );
 }
 
 /**
@@ -408,64 +409,6 @@ static struct net_device_operations snpnet_operations = {
 };
 
 /**
- * Get underlying PCI device information
- *
- * @v efidev		EFI device
- * @v dev		Generic device to fill in
- * @ret rc		Return status code
- */
-static int snpnet_pci_info ( struct efi_device *efidev, struct device *dev ) {
-	EFI_HANDLE device = efidev->device;
-	EFI_HANDLE pci_device;
-	struct pci_device pci;
-	int rc;
-
-	/* Find parent PCI device */
-	if ( ( rc = efi_locate_device ( device, &efi_pci_io_protocol_guid,
-					&pci_device ) ) != 0 ) {
-		DBGC ( device, "SNP %p %s is not a PCI device: %s\n",
-		       device, efi_handle_name ( device ), strerror ( rc ) );
-		return rc;
-	}
-
-	/* Get PCI device information */
-	if ( ( rc = efipci_info ( pci_device, &pci ) ) != 0 ) {
-		DBGC ( device, "SNP %p %s could not get PCI information: %s\n",
-		       device, efi_handle_name ( device ), strerror ( rc ) );
-		return rc;
-	}
-
-	/* Populate SNP device information */
-	memcpy ( &dev->desc, &pci.dev.desc, sizeof ( dev->desc ) );
-	snprintf ( dev->name, sizeof ( dev->name ), "SNP-%s", pci.dev.name );
-
-	return 0;
-}
-
-/**
- * Get underlying device information
- *
- * @v efidev		EFI device
- * @v dev		Generic device to fill in
- */
-static void snpnet_dev_info ( struct efi_device *efidev, struct device *dev ) {
-	EFI_HANDLE device = efidev->device;
-	int rc;
-
-	/* Try getting underlying PCI device information */
-	if ( ( rc = snpnet_pci_info ( efidev, dev ) ) == 0 )
-		return;
-
-	/* If we cannot get any underlying device information, fall
-	 * back to providing information about the EFI handle.
-	 */
-	DBGC ( device, "SNP %p %s could not get underlying device "
-	       "information\n", device, efi_handle_name ( device ) );
-	dev->desc.bus_type = BUS_TYPE_EFI;
-	snprintf ( dev->name, sizeof ( dev->name ), "SNP-%p", device );
-}
-
-/**
  * Attach driver to device
  *
  * @v efidev		EFI device
@@ -509,7 +452,7 @@ int snpnet_start ( struct efi_device *efidev ) {
 	efidev_set_drvdata ( efidev, netdev );
 
 	/* Populate underlying device information */
-	snpnet_dev_info ( efidev, &snp->dev );
+	efi_device_info ( device, "SNP", &snp->dev );
 	snp->dev.driver_name = "SNP";
 	snp->dev.parent = &efidev->dev;
 	list_add ( &snp->dev.siblings, &efidev->dev.children );
