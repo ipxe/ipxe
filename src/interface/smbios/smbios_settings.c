@@ -253,3 +253,15 @@ const struct setting board_serial_setting __setting ( SETTING_HOST_EXTRA,
 	.type = &setting_type_string,
 	.scope = &smbios_settings_scope,
 };
+
+/** Board product setting (may differ from system product) */
+const struct setting board_product_setting __setting ( SETTING_HOST_EXTRA,
+						      board_serial ) = {
+	.name = "board-product",
+	.description = "Base board product",
+	.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_BASE_BOARD_INFORMATION,
+				   struct smbios_base_board_information,
+				   product ),
+	.type = &setting_type_string,
+	.scope = &smbios_settings_scope,
+};
