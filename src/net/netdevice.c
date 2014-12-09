@@ -1080,7 +1080,7 @@ static unsigned int net_discard ( void ) {
 
 			/* Discard first deferred packet */
 			list_del ( &iobuf->list );
-			free ( iobuf );
+			free_iob ( iobuf );
 
 			/* Report discard */
 			discarded++;
