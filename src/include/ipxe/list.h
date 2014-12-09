@@ -69,6 +69,8 @@ struct list_head {
 #define list_add( new, head ) do {				\
 	list_check ( (head) );					\
 	extern_list_add ( (new), (head) );			\
+	list_check ( (head) );					\
+	list_check ( (new) );					\
 	} while ( 0 )
 static inline void inline_list_add ( struct list_head *new,
 				     struct list_head *head ) {
@@ -91,6 +93,8 @@ extern void extern_list_add ( struct list_head *new,
 #define list_add_tail( new, head ) do {				\
 	list_check ( (head) );					\
 	extern_list_add_tail ( (new), (head) );			\
+	list_check ( (head) );					\
+	list_check ( (new) );					\
 	} while ( 0 )
 static inline void inline_list_add_tail ( struct list_head *new,
 					  struct list_head *head ) {
