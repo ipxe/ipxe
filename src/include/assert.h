@@ -20,6 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 extern unsigned int assertion_failures;
 
+#define ASSERTED ( ASSERTING && ( assertion_failures != 0 ) )
+
 /** printf() for assertions
  *
  * This function exists so that the assert() macro can expand to
