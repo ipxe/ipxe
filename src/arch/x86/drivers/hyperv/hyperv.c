@@ -559,3 +559,6 @@ struct root_device hv_root_device __root_device = {
 	.dev = { .name = "Hyper-V" },
 	.driver = &hv_root_driver,
 };
+
+/* Drag in netvsc driver */
+REQUIRE_OBJECT ( netvsc );
