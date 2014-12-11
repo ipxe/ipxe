@@ -39,6 +39,9 @@ struct x86_features {
 /** Get standard features */
 #define CPUID_FEATURES 0x00000001UL
 
+/** Hypervisor is present */
+#define CPUID_FEATURES_INTEL_ECX_HYPERVISOR 0x80000000UL
+
 /** Get largest extended function */
 #define CPUID_AMD_MAX_FN 0x80000000UL
 

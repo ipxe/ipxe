@@ -11,9 +11,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/io.h>
 
-/* For segoff_t */
-#include "realmode.h"
-
 #define IRQ_PIC_CUTOFF 8
 
 /* 8259 register locations */

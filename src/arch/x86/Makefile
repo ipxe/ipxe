@@ -9,6 +9,7 @@ SRCDIRS		+= arch/x86/interface/efi
 SRCDIRS		+= arch/x86/prefix
 SRCDIRS		+= arch/x86/hci/commands
 SRCDIRS		+= arch/x86/drivers/xen
+SRCDIRS		+= arch/x86/drivers/hyperv
 
 # breaks building some of the linux-related objects
 CFLAGS		+= -Ulinux
