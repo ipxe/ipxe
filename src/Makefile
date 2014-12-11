@@ -86,6 +86,7 @@ SRCDIRS		+= drivers/infiniband
 SRCDIRS		+= interface/pxe interface/efi interface/smbios
 SRCDIRS		+= interface/bofm
 SRCDIRS		+= interface/xen
+SRCDIRS		+= interface/hyperv
 SRCDIRS		+= tests
 SRCDIRS		+= crypto crypto/axtls crypto/matrixssl
 SRCDIRS		+= hci hci/commands hci/tui

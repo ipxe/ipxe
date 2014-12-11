@@ -197,6 +197,8 @@ struct hv_hypervisor {
 	struct hv_synic synic;
 	/** Message buffer */
 	union hv_message_buffer *message;
+	/** Virtual machine bus */
+	struct vmbus *vmbus;
 };
 
 #include <bits/hyperv.h>

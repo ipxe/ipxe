@@ -63,6 +63,9 @@ struct device_description {
 /** Xen bus type */
 #define BUS_TYPE_XEN 8
 
+/** Hyper-V bus type */
+#define BUS_TYPE_HV 9
+
 /** A hardware device */
 struct device {
 	/** Name */

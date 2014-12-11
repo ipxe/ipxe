@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/cpuid.h>
 #include <ipxe/msr.h>
 #include <ipxe/hyperv.h>
+#include <ipxe/vmbus.h>
 #include "hyperv.h"
 
 /** Maximum time to wait for a message response
@@ -506,9 +507,15 @@ static int hv_probe ( struct root_device *rootdev ) {
 	if ( ( rc = hv_map_synic ( hv ) ) != 0 )
 		goto err_map_synic;
 
+	/* Probe Hyper-V devices */
+	if ( ( rc = vmbus_probe ( hv, &rootdev->dev ) ) != 0 )
+		goto err_vmbus_probe;
+
 	rootdev_set_drvdata ( rootdev, hv );
 	return 0;
 
+	vmbus_remove ( hv, &rootdev->dev );
+ err_vmbus_probe:
 	hv_unmap_synic ( hv );
  err_map_synic:
 	hv_unmap_hypercall ( hv );
@@ -532,6 +539,7 @@ static int hv_probe ( struct root_device *rootdev ) {
 static void hv_remove ( struct root_device *rootdev ) {
 	struct hv_hypervisor *hv = rootdev_get_drvdata ( rootdev );
 
+	vmbus_remove ( hv, &rootdev->dev );
 	hv_unmap_synic ( hv );
 	hv_unmap_hypercall ( hv );
 	hv_free_message ( hv );
