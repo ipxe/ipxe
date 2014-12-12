@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/pci.h>
 #include <ipxe/io.h>
 #include <ipxe/malloc.h>
+#include <ipxe/profile.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/if_ether.h>
@@ -39,6 +40,22 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** VM command profiler */
+static struct profiler vmxnet3_vm_command_profiler __profiler =
+	{ .name = "vmxnet3.vm_command" };
+
+/** VM transmit profiler */
+static struct profiler vmxnet3_vm_tx_profiler __profiler =
+	{ .name = "vmxnet3.vm_tx" };
+
+/** VM receive refill profiler */
+static struct profiler vmxnet3_vm_refill_profiler __profiler =
+	{ .name = "vmxnet3.vm_refill" };
+
+/** VM event profiler */
+static struct profiler vmxnet3_vm_event_profiler __profiler =
+	{ .name = "vmxnet3.vm_event" };
+
 /**
  * Issue command
  *
@@ -48,10 +65,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 static inline uint32_t vmxnet3_command ( struct vmxnet3_nic *vmxnet,
 					 uint32_t command ) {
+	uint32_t result;
 
 	/* Issue command */
+	profile_start ( &vmxnet3_vm_command_profiler );
 	writel ( command, ( vmxnet->vd + VMXNET3_VD_CMD ) );
-	return readl ( vmxnet->vd + VMXNET3_VD_CMD );
+	result = readl ( vmxnet->vd + VMXNET3_VD_CMD );
+	profile_stop ( &vmxnet3_vm_command_profiler );
+	profile_exclude ( &vmxnet3_vm_command_profiler );
+
+	return result;
 }
 
 /**
@@ -92,8 +115,11 @@ static int vmxnet3_transmit ( struct net_device *netdev,
 
 	/* Hand over descriptor to NIC */
 	wmb();
+	profile_start ( &vmxnet3_vm_tx_profiler );
 	writel ( ( vmxnet->count.tx_prod % VMXNET3_NUM_TX_DESC ),
 		 ( vmxnet->pt + VMXNET3_PT_TXPROD ) );
+	profile_stop ( &vmxnet3_vm_tx_profiler );
+	profile_exclude ( &vmxnet3_vm_tx_profiler );
 
 	return 0;
 }
@@ -212,8 +238,11 @@ static void vmxnet3_refill_rx ( struct net_device *netdev ) {
 	/* Hand over any new descriptors to NIC */
 	if ( vmxnet->count.rx_prod != orig_rx_prod ) {
 		wmb();
+		profile_start ( &vmxnet3_vm_refill_profiler );
 		writel ( ( vmxnet->count.rx_prod % VMXNET3_NUM_RX_DESC ),
 			 ( vmxnet->pt + VMXNET3_PT_RXPROD ) );
+		profile_stop ( &vmxnet3_vm_refill_profiler );
+		profile_exclude ( &vmxnet3_vm_refill_profiler );
 	}
 }
 
@@ -331,7 +360,10 @@ static void vmxnet3_poll_events ( struct net_device *netdev ) {
 	events = le32_to_cpu ( vmxnet->dma->shared.ecr );
 
 	/* Acknowledge these events */
+	profile_start ( &vmxnet3_vm_event_profiler );
 	writel ( events, ( vmxnet->vd + VMXNET3_VD_ECR ) );
+	profile_stop ( &vmxnet3_vm_event_profiler );
+	profile_exclude ( &vmxnet3_vm_event_profiler );
 
 	/* Check for link state change */
 	if ( events & VMXNET3_ECR_LINK ) {
