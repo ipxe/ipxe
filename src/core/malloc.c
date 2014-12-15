@@ -237,6 +237,10 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	struct memory_block *post;
 	struct memory_block *ptr;
 
+	/* Sanity checks */
+	assert ( size != 0 );
+	assert ( ( align == 0 ) || ( ( align & ( align - 1 ) ) == 0 ) );
+
 	valgrind_make_blocks_defined();
 
 	/* Round up size to multiple of MIN_MEMBLOCK_SIZE and
@@ -338,6 +342,7 @@ void free_memblock ( void *ptr, size_t size ) {
 	/* Round up size to match actual size that alloc_memblock()
 	 * would have used.
 	 */
+	assert ( size != 0 );
 	size = ( size + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
 	freeing = ptr;
 	VALGRIND_MAKE_MEM_DEFINED ( freeing, sizeof ( *freeing ) );
@@ -444,6 +449,7 @@ void * realloc ( void *old_ptr, size_t new_size ) {
 					   data );
 		VALGRIND_MAKE_MEM_DEFINED ( old_block, offsetof ( struct autosized_block, data ) );
 		old_total_size = old_block->size;
+		assert ( old_total_size != 0 );
 		old_size = ( old_total_size -
 			     offsetof ( struct autosized_block, data ) );
 		memcpy ( new_ptr, old_ptr,
