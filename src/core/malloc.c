@@ -187,6 +187,42 @@ static inline void valgrind_make_blocks_noaccess ( void ) {
 }
 
 /**
+ * Check integrity of the blocks in the free list
+ *
+ */
+static inline void check_blocks ( void ) {
+	struct memory_block *block;
+	struct memory_block *prev = NULL;
+
+	if ( ! ASSERTING )
+		return;
+
+	list_for_each_entry ( block, &free_blocks, list ) {
+
+		/* Check that list structure is intact */
+		list_check ( &block->list );
+
+		/* Check that block size is not too small */
+		assert ( block->size >= sizeof ( *block ) );
+		assert ( block->size >= MIN_MEMBLOCK_SIZE );
+
+		/* Check that block does not wrap beyond end of address space */
+		assert ( ( ( void * ) block + block->size ) >
+			 ( ( void * ) block ) );
+
+		/* Check that blocks remain in ascending order, and
+		 * that adjacent blocks have been merged.
+		 */
+		if ( prev ) {
+			assert ( ( ( void * ) block ) > ( ( void * ) prev ) );
+			assert ( ( ( void * ) block ) >
+				 ( ( ( void * ) prev ) + prev->size ) );
+		}
+		prev = block;
+	}
+}
+
+/**
  * Discard some cached data
  *
  * @ret discarded	Number of cached items discarded
@@ -242,6 +278,7 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	assert ( ( align == 0 ) || ( ( align & ( align - 1 ) ) == 0 ) );
 
 	valgrind_make_blocks_defined();
+	check_blocks();
 
 	/* Round up size to multiple of MIN_MEMBLOCK_SIZE and
 	 * calculate alignment mask.
@@ -314,6 +351,7 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	}
 
  done:
+	check_blocks();
 	valgrind_make_blocks_noaccess();
 	return ptr;
 }
@@ -338,6 +376,7 @@ void free_memblock ( void *ptr, size_t size ) {
 		return;
 
 	valgrind_make_blocks_defined();
+	check_blocks();
 
 	/* Round up size to match actual size that alloc_memblock()
 	 * would have used.
@@ -346,11 +385,29 @@ void free_memblock ( void *ptr, size_t size ) {
 	size = ( size + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
 	freeing = ptr;
 	VALGRIND_MAKE_MEM_DEFINED ( freeing, sizeof ( *freeing ) );
-	freeing->size = size;
 	DBGC2 ( &heap, "Freeing [%p,%p)\n",
 		freeing, ( ( ( void * ) freeing ) + size ) );
 
+	/* Check that this block does not overlap the free list */
+	if ( ASSERTING ) {
+		list_for_each_entry ( block, &free_blocks, list ) {
+			if ( ( ( ( void * ) block ) <
+			       ( ( void * ) freeing + size ) ) &&
+			     ( ( void * ) freeing <
+			       ( ( void * ) block + block->size ) ) ) {
+				assert ( 0 );
+				DBGC ( &heap, "Double free of [%p,%p) "
+				       "overlapping [%p,%p) detected from %p\n",
+				       freeing,
+				       ( ( ( void * ) freeing ) + size ), block,
+				       ( ( void * ) block + block->size ),
+				       __builtin_return_address ( 0 ) );
+			}
+		}
+	}
+
 	/* Insert/merge into free list */
+	freeing->size = size;
 	list_for_each_entry_safe ( block, tmp, &free_blocks, list ) {
 		/* Calculate gaps before and after the "freeing" block */
 		gap_before = ( ( ( void * ) freeing ) - 
@@ -392,6 +449,7 @@ void free_memblock ( void *ptr, size_t size ) {
 	/* Update free memory counter */
 	freemem += size;
 
+	check_blocks();
 	valgrind_make_blocks_noaccess();
 }
 
