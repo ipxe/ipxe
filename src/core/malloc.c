@@ -245,7 +245,8 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	size = ( size + MIN_MEMBLOCK_SIZE - 1 ) & ~( MIN_MEMBLOCK_SIZE - 1 );
 	align_mask = ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 );
 
-	DBG ( "Allocating %#zx (aligned %#zx+%zx)\n", size, align, offset );
+	DBGC2 ( &heap, "Allocating %#zx (aligned %#zx+%zx)\n",
+		size, align, offset );
 	while ( 1 ) {
 		/* Search through blocks for the first one with enough space */
 		list_for_each_entry ( block, &free_blocks, list ) {
@@ -261,10 +262,10 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 				pre   = block;
 				block = ( ( ( void * ) pre   ) + pre_size );
 				post  = ( ( ( void * ) block ) + size     );
-				DBG ( "[%p,%p) -> [%p,%p) + [%p,%p)\n", pre,
-				      ( ( ( void * ) pre ) + pre->size ),
-				      pre, block, post,
-				      ( ( ( void * ) pre ) + pre->size ) );
+				DBGC2 ( &heap, "[%p,%p) -> [%p,%p) + [%p,%p)\n",
+					pre, ( ( ( void * ) pre ) + pre->size ),
+					pre, block, post,
+					( ( ( void * ) pre ) + pre->size ) );
 				/* If there is a "post" block, add it in to
 				 * the free list.  Leak it if it is too small
 				 * (which can happen only at the very end of
@@ -291,8 +292,8 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 				/* Update total free memory */
 				freemem -= size;
 				/* Return allocated block */
-				DBG ( "Allocated [%p,%p)\n", block,
-				      ( ( ( void * ) block ) + size ) );
+				DBGC2 ( &heap, "Allocated [%p,%p)\n", block,
+					( ( ( void * ) block ) + size ) );
 				ptr = block;
 				goto done;
 			}
@@ -301,8 +302,8 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 		/* Try discarding some cached data to free up memory */
 		if ( ! discard_cache() ) {
 			/* Nothing available to discard */
-			DBG ( "Failed to allocate %#zx (aligned %#zx)\n",
-			      size, align );
+			DBGC ( &heap, "Failed to allocate %#zx (aligned "
+			       "%#zx)\n", size, align );
 			ptr = NULL;
 			goto done;
 		}
@@ -341,7 +342,8 @@ void free_memblock ( void *ptr, size_t size ) {
 	freeing = ptr;
 	VALGRIND_MAKE_MEM_DEFINED ( freeing, sizeof ( *freeing ) );
 	freeing->size = size;
-	DBG ( "Freeing [%p,%p)\n", freeing, ( ( ( void * ) freeing ) + size ));
+	DBGC2 ( &heap, "Freeing [%p,%p)\n",
+		freeing, ( ( ( void * ) freeing ) + size ) );
 
 	/* Insert/merge into free list */
 	list_for_each_entry_safe ( block, tmp, &free_blocks, list ) {
@@ -352,10 +354,11 @@ void free_memblock ( void *ptr, size_t size ) {
 			      ( ( ( void * ) freeing ) + freeing->size ) );
 		/* Merge with immediately preceding block, if possible */
 		if ( gap_before == 0 ) {
-			DBG ( "[%p,%p) + [%p,%p) -> [%p,%p)\n", block,
-			      ( ( ( void * ) block ) + block->size ), freeing,
-			      ( ( ( void * ) freeing ) + freeing->size ),block,
-			      ( ( ( void * ) freeing ) + freeing->size ) );
+			DBGC2 ( &heap, "[%p,%p) + [%p,%p) -> [%p,%p)\n", block,
+				( ( ( void * ) block ) + block->size ), freeing,
+				( ( ( void * ) freeing ) + freeing->size ),
+				block,
+				( ( ( void * ) freeing ) + freeing->size ) );
 			block->size += size;
 			list_del ( &block->list );
 			freeing = block;
@@ -369,13 +372,14 @@ void free_memblock ( void *ptr, size_t size ) {
 	 * possible, merge the following block into the "freeing"
 	 * block.
 	 */
-	DBG ( "[%p,%p)\n", freeing, ( ( ( void * ) freeing ) + freeing->size));
+	DBGC2 ( &heap, "[%p,%p)\n",
+		freeing, ( ( ( void * ) freeing ) + freeing->size ) );
 	list_add_tail ( &freeing->list, &block->list );
 	if ( gap_after == 0 ) {
-		DBG ( "[%p,%p) + [%p,%p) -> [%p,%p)\n", freeing,
-		      ( ( ( void * ) freeing ) + freeing->size ), block,
-		      ( ( ( void * ) block ) + block->size ), freeing,
-		      ( ( ( void * ) block ) + block->size ) );
+		DBGC2 ( &heap, "[%p,%p) + [%p,%p) -> [%p,%p)\n", freeing,
+			( ( ( void * ) freeing ) + freeing->size ), block,
+			( ( ( void * ) block ) + block->size ), freeing,
+			( ( ( void * ) block ) + block->size ) );
 		freeing->size += block->size;
 		list_del ( &block->list );
 	}
