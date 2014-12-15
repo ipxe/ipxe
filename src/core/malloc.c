@@ -517,6 +517,10 @@ void * realloc ( void *old_ptr, size_t new_size ) {
 		VALGRIND_FREELIKE_BLOCK ( old_ptr, 0 );
 	}
 
+	if ( ASSERTED ) {
+		DBGC ( &heap, "Possible memory corruption detected from %p\n",
+		       __builtin_return_address ( 0 ) );
+	}
 	return new_ptr;
 }
 
@@ -530,7 +534,14 @@ void * realloc ( void *old_ptr, size_t new_size ) {
  * will be aligned to at least a multiple of sizeof(void*).
  */
 void * malloc ( size_t size ) {
-	return realloc ( NULL, size );
+	void *ptr;
+
+	ptr = realloc ( NULL, size );
+	if ( ASSERTED ) {
+		DBGC ( &heap, "Possible memory corruption detected from %p\n",
+		       __builtin_return_address ( 0 ) );
+	}
+	return ptr;
 }
 
 /**
@@ -544,7 +555,12 @@ void * malloc ( size_t size ) {
  * If @c ptr is NULL, no action is taken.
  */
 void free ( void *ptr ) {
+
 	realloc ( ptr, 0 );
+	if ( ASSERTED ) {
+		DBGC ( &heap, "Possible memory corruption detected from %p\n",
+		       __builtin_return_address ( 0 ) );
+	}
 }
 
 /**
@@ -564,6 +580,10 @@ void * zalloc ( size_t size ) {
 	data = malloc ( size );
 	if ( data )
 		memset ( data, 0, size );
+	if ( ASSERTED ) {
+		DBGC ( &heap, "Possible memory corruption detected from %p\n",
+		       __builtin_return_address ( 0 ) );
+	}
 	return data;
 }
 
