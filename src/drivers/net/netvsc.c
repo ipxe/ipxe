@@ -262,8 +262,11 @@ static int netvsc_revoke_buffer ( struct netvsc_device *netvsc,
 
 	/* Send message and wait for completion */
 	if ( ( rc = netvsc_control ( netvsc, buffer->revoke_xrid,
-				     &msg, sizeof ( msg ) ) ) != 0 )
+				     &msg, sizeof ( msg ) ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not revoke buffer: %s\n",
+		       netvsc->name, strerror ( rc ) );
 		return rc;
+	}
 
 	return 0;
 }
@@ -637,14 +640,8 @@ static int netvsc_create_buffer ( struct netvsc_device *netvsc,
 		goto err_register_pages;
 	}
 
-	/* Establish data buffer */
-	if ( ( rc = netvsc_establish_buffer ( netvsc, buffer ) ) != 0 )
-		goto err_establish_buffer;
-
 	return 0;
 
-	netvsc_revoke_buffer ( netvsc, buffer );
- err_establish_buffer:
 	vmbus_unregister_pages ( vmdev, &buffer->pages );
  err_register_pages:
 	vmbus_gpadl_teardown ( vmdev, gpadl );
@@ -664,16 +661,6 @@ static void netvsc_destroy_buffer ( struct netvsc_device *netvsc,
 				    struct netvsc_buffer *buffer ) {
 	struct vmbus_device *vmdev = netvsc->vmdev;
 	int rc;
-
-	/* Revoke buffer */
-	if ( ( rc = netvsc_revoke_buffer ( netvsc, buffer ) ) != 0 ) {
-		DBGC ( netvsc, "NETVSC %s could not revoke buffer: %s\n",
-		       netvsc->name, strerror ( rc ) );
-		/* Continue to attempt to tear down the GPA descriptor
-		 * list, which should forcibly prevent the host from
-		 * subsequently accessing this memory.
-		 */
-	}
 
 	/* Unregister transfer pages */
 	vmbus_unregister_pages ( vmdev, &buffer->pages );
@@ -704,6 +691,10 @@ static int netvsc_open ( struct rndis_device *rndis ) {
 	struct netvsc_device *netvsc = rndis->priv;
 	int rc;
 
+	/* Initialise receive buffer */
+	if ( ( rc = netvsc_create_buffer ( netvsc, &netvsc->rx ) ) != 0 )
+		goto err_create_rx;
+
 	/* Open channel */
 	if ( ( rc = vmbus_open ( netvsc->vmdev, &netvsc_channel_operations,
 				 PAGE_SIZE, PAGE_SIZE, NETVSC_MTU ) ) != 0 ) {
@@ -722,20 +713,22 @@ static int netvsc_open ( struct rndis_device *rndis ) {
 	if ( ( rc = netvsc_create_ring ( netvsc, &netvsc->tx ) ) != 0 )
 		goto err_create_tx;
 
-	/* Initialise receive buffer */
-	if ( ( rc = netvsc_create_buffer ( netvsc, &netvsc->rx ) ) != 0 )
-		goto err_create_rx;
+	/* Establish receive buffer */
+	if ( ( rc = netvsc_establish_buffer ( netvsc, &netvsc->rx ) ) != 0 )
+		goto err_establish_rx;
 
 	return 0;
 
-	netvsc_destroy_buffer ( netvsc, &netvsc->rx );
- err_create_rx:
+	netvsc_revoke_buffer ( netvsc, &netvsc->rx );
+ err_establish_rx:
 	netvsc_destroy_ring ( netvsc, &netvsc->tx, NULL );
  err_create_tx:
  err_ndis_version:
  err_initialise:
 	vmbus_close ( netvsc->vmdev );
  err_vmbus_open:
+	netvsc_destroy_buffer ( netvsc, &netvsc->rx );
+ err_create_rx:
 	return rc;
 }
 
@@ -747,14 +740,17 @@ static int netvsc_open ( struct rndis_device *rndis ) {
 static void netvsc_close ( struct rndis_device *rndis ) {
 	struct netvsc_device *netvsc = rndis->priv;
 
-	/* Destroy receive buffer */
-	netvsc_destroy_buffer ( netvsc, &netvsc->rx );
+	/* Revoke receive buffer */
+	netvsc_revoke_buffer ( netvsc, &netvsc->rx );
 
 	/* Destroy transmit ring */
 	netvsc_destroy_ring ( netvsc, &netvsc->tx, netvsc_cancel_transmit );
 
 	/* Close channel */
 	vmbus_close ( netvsc->vmdev );
+
+	/* Destroy receive buffer */
+	netvsc_destroy_buffer ( netvsc, &netvsc->rx );
 }
 
 /** RNDIS operations */
