@@ -88,7 +88,7 @@ struct rndis_initialise_completion {
 } __attribute__ (( packed ));
 
 /** RNDIS halt message */
-#define RNIS_HALT_MSG 0x00000003UL
+#define RNDIS_HALT_MSG 0x00000003UL
 
 /** RNDIS halt message */
 struct rndis_halt_message {

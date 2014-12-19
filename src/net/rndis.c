@@ -368,6 +368,56 @@ static int rndis_initialise ( struct rndis_device *rndis ) {
 }
 
 /**
+ * Transmit halt message
+ *
+ * @v rndis		RNDIS device
+ * @ret rc		Return status code
+ */
+static int rndis_tx_halt ( struct rndis_device *rndis ) {
+	struct io_buffer *iobuf;
+	struct rndis_halt_message *msg;
+	int rc;
+
+	/* Allocate I/O buffer */
+	iobuf = rndis_alloc_iob ( sizeof ( *msg ) );
+	if ( ! iobuf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Construct message */
+	msg = iob_put ( iobuf, sizeof ( *msg ) );
+	memset ( msg, 0, sizeof ( *msg ) );
+
+	/* Transmit message */
+	if ( ( rc = rndis_tx_message ( rndis, iobuf, RNDIS_HALT_MSG ) ) != 0 )
+		goto err_tx;
+
+	return 0;
+
+ err_tx:
+	free_iob ( iobuf );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Halt RNDIS
+ *
+ * @v rndis		RNDIS device
+ * @ret rc		Return status code
+ */
+static int rndis_halt ( struct rndis_device *rndis ) {
+	int rc;
+
+	/* Transmit halt message */
+	if ( ( rc = rndis_tx_halt ( rndis ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
  * Transmit OID message
  *
  * @v rndis		RNDIS device
@@ -822,6 +872,7 @@ static int rndis_open ( struct net_device *netdev ) {
 
  err_query_link:
  err_set_filter:
+	rndis_halt ( rndis );
  err_initialise:
 	rndis->op->close ( rndis );
  err_open:
@@ -835,6 +886,9 @@ static int rndis_open ( struct net_device *netdev ) {
  */
 static void rndis_close ( struct net_device *netdev ) {
 	struct rndis_device *rndis = netdev->priv;
+
+	/* Halt RNDIS device */
+	rndis_halt ( rndis );
 
 	/* Close RNDIS device */
 	rndis->op->close ( rndis );
@@ -947,6 +1001,9 @@ int register_rndis ( struct rndis_device *rndis ) {
 				NULL, 0 ) ) != 0 )
 		goto err_query_link;
 
+	/* Halt RNDIS device */
+	rndis_halt ( rndis );
+
 	/* Close RNDIS device */
 	rndis->op->close ( rndis );
 
@@ -955,6 +1012,7 @@ int register_rndis ( struct rndis_device *rndis ) {
  err_query_link:
  err_query_current:
  err_query_permanent:
+	rndis_halt ( rndis );
  err_initialise:
 	rndis->op->close ( rndis );
  err_open:
