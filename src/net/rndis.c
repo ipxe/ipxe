@@ -54,6 +54,38 @@ static struct io_buffer * rndis_alloc_iob ( size_t len ) {
 }
 
 /**
+ * Wait for completion
+ *
+ * @v rndis		RNDIS device
+ * @v wait_id		Request ID
+ * @ret rc		Return status code
+ */
+static int rndis_wait ( struct rndis_device *rndis, unsigned int wait_id ) {
+	unsigned int i;
+
+	/* Record query ID */
+	rndis->wait_id = wait_id;
+
+	/* Wait for operation to complete */
+	for ( i = 0 ; i < RNDIS_MAX_WAIT_MS ; i++ ) {
+
+		/* Check for completion */
+		if ( ! rndis->wait_id )
+			return rndis->wait_rc;
+
+		/* Poll RNDIS device */
+		rndis->op->poll ( rndis );
+
+		/* Delay for 1ms */
+		mdelay ( 1 );
+	}
+
+	DBGC ( rndis, "RNDIS %s timed out waiting for ID %#08x\n",
+	       rndis->name, wait_id );
+	return -ETIMEDOUT;
+}
+
+/**
  * Transmit message
  *
  * @v rndis		RNDIS device
@@ -225,6 +257,114 @@ static void rndis_rx_data ( struct rndis_device *rndis,
  err_len:
 	/* Report error to network stack */
 	netdev_rx_err ( netdev, iob_disown ( iobuf ), rc );
+}
+
+/**
+ * Transmit initialisation message
+ *
+ * @v rndis		RNDIS device
+ * @v id		Request ID
+ * @ret rc		Return status code
+ */
+static int rndis_tx_initialise ( struct rndis_device *rndis, unsigned int id ) {
+	struct io_buffer *iobuf;
+	struct rndis_initialise_message *msg;
+	int rc;
+
+	/* Allocate I/O buffer */
+	iobuf = rndis_alloc_iob ( sizeof ( *msg ) );
+	if ( ! iobuf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Construct message */
+	msg = iob_put ( iobuf, sizeof ( *msg ) );
+	memset ( msg, 0, sizeof ( *msg ) );
+	msg->id = id; /* Non-endian */
+	msg->major = cpu_to_le32 ( RNDIS_VERSION_MAJOR );
+	msg->minor = cpu_to_le32 ( RNDIS_VERSION_MINOR );
+	msg->mtu = cpu_to_le32 ( RNDIS_MTU );
+
+	/* Transmit message */
+	if ( ( rc = rndis_tx_message ( rndis, iobuf,
+				       RNDIS_INITIALISE_MSG ) ) != 0 )
+		goto err_tx;
+
+	return 0;
+
+ err_tx:
+	free_iob ( iobuf );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Receive initialisation completion
+ *
+ * @v rndis		RNDIS device
+ * @v iobuf		I/O buffer
+ */
+static void rndis_rx_initialise ( struct rndis_device *rndis,
+				  struct io_buffer *iobuf ) {
+	struct rndis_initialise_completion *cmplt;
+	size_t len = iob_len ( iobuf );
+	unsigned int id;
+	int rc;
+
+	/* Sanity check */
+	if ( len < sizeof ( *cmplt ) ) {
+		DBGC ( rndis, "RNDIS %s received underlength initialisation "
+		       "completion:\n", rndis->name );
+		DBGC_HDA ( rndis, 0, iobuf->data, len );
+		rc = -EINVAL;
+		goto err_len;
+	}
+	cmplt = iobuf->data;
+
+	/* Extract request ID */
+	id = cmplt->id; /* Non-endian */
+
+	/* Check status */
+	if ( cmplt->status ) {
+		DBGC ( rndis, "RNDIS %s received initialisation completion "
+		       "failure %#08x\n", rndis->name,
+		       le32_to_cpu ( cmplt->status ) );
+		rc = -EIO;
+		goto err_status;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_status:
+	/* Record completion result if applicable */
+	if ( id == rndis->wait_id ) {
+		rndis->wait_id = 0;
+		rndis->wait_rc = rc;
+	}
+ err_len:
+	free_iob ( iobuf );
+}
+
+/**
+ * Initialise RNDIS
+ *
+ * @v rndis		RNDIS device
+ * @ret rc		Return status code
+ */
+static int rndis_initialise ( struct rndis_device *rndis ) {
+	int rc;
+
+	/* Transmit initialisation message */
+	if ( ( rc = rndis_tx_initialise ( rndis, RNDIS_INIT_ID ) ) != 0 )
+		return rc;
+
+	/* Wait for response */
+	if ( ( rc = rndis_wait ( rndis, RNDIS_INIT_ID ) ) != 0 )
+		return rc;
+
+	return 0;
 }
 
 /**
@@ -443,33 +583,17 @@ static void rndis_rx_set_oid ( struct rndis_device *rndis,
  */
 static int rndis_oid ( struct rndis_device *rndis, unsigned int oid,
 		       const void *data, size_t len ) {
-	unsigned int i;
 	int rc;
 
 	/* Transmit query */
 	if ( ( rc = rndis_tx_oid ( rndis, oid, data, len ) ) != 0 )
 		return rc;
 
-	/* Record query ID */
-	rndis->wait_id = oid;
+	/* Wait for response */
+	if ( ( rc = rndis_wait ( rndis, oid ) ) != 0 )
+		return rc;
 
-	/* Wait for operation to complete */
-	for ( i = 0 ; i < RNDIS_MAX_WAIT_MS ; i++ ) {
-
-		/* Check for completion */
-		if ( ! rndis->wait_id )
-			return rndis->wait_rc;
-
-		/* Poll RNDIS device */
-		rndis->op->poll ( rndis );
-
-		/* Delay for 1ms */
-		mdelay ( 1 );
-	}
-
-	DBGC ( rndis, "RNDIS %s timed out waiting for OID %#08x\n",
-	       rndis->name, oid );
-	return -ETIMEDOUT;
+	return 0;
 }
 
 /**
@@ -550,6 +674,10 @@ static void rndis_rx_message ( struct rndis_device *rndis,
 		rndis_rx_data ( rndis, iob_disown ( iobuf ) );
 		break;
 
+	case RNDIS_INITIALISE_CMPLT:
+		rndis_rx_initialise ( rndis, iob_disown ( iobuf ) );
+		break;
+
 	case RNDIS_QUERY_CMPLT:
 		rndis_rx_query_oid ( rndis, iob_disown ( iobuf ) );
 		break;
@@ -615,8 +743,9 @@ void rndis_rx ( struct rndis_device *rndis, struct io_buffer *iobuf ) {
 		/* Parse and check header */
 		type = le32_to_cpu ( header->type );
 		len = le32_to_cpu ( header->len );
-		if ( len > iob_len ( iobuf ) ) {
-			DBGC ( rndis, "RNDIS %s received underlength packet:\n",
+		if ( ( len < sizeof ( *header ) ) ||
+		     ( len > iob_len ( iobuf ) ) ) {
+			DBGC ( rndis, "RNDIS %s received malformed packet:\n",
 			       rndis->name );
 			DBGC_HDA ( rndis, 0, iobuf->data, iob_len ( iobuf ) );
 			rc = -EINVAL;
@@ -667,6 +796,10 @@ static int rndis_open ( struct net_device *netdev ) {
 		goto err_open;
 	}
 
+	/* Initialise RNDIS */
+	if ( ( rc = rndis_initialise ( rndis ) ) != 0 )
+		goto err_initialise;
+
 	/* Set receive filter */
 	filter = cpu_to_le32 ( RNDIS_FILTER_UNICAST |
 			       RNDIS_FILTER_MULTICAST |
@@ -689,6 +822,7 @@ static int rndis_open ( struct net_device *netdev ) {
 
  err_query_link:
  err_set_filter:
+ err_initialise:
 	rndis->op->close ( rndis );
  err_open:
 	return rc;
@@ -794,6 +928,10 @@ int register_rndis ( struct rndis_device *rndis ) {
 		goto err_open;
 	}
 
+	/* Initialise RNDIS */
+	if ( ( rc = rndis_initialise ( rndis ) ) != 0 )
+		goto err_initialise;
+
 	/* Query permanent MAC address */
 	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_802_3_PERMANENT_ADDRESS,
 				NULL, 0 ) ) != 0 )
@@ -817,6 +955,7 @@ int register_rndis ( struct rndis_device *rndis ) {
  err_query_link:
  err_query_current:
  err_query_permanent:
+ err_initialise:
 	rndis->op->close ( rndis );
  err_open:
 	unregister_netdev ( netdev );

@@ -28,10 +28,10 @@ struct rndis_header {
 } __attribute__ (( packed ));
 
 /** RNDIS initialise message */
-#define RNDIS_INITIALIZE_MSG 0x00000002UL
+#define RNDIS_INITIALISE_MSG 0x00000002UL
 
 /** RNDIS initialise message */
-struct rndis_initialize_message {
+struct rndis_initialise_message {
 	/** Request ID */
 	uint32_t id;
 	/** Major version */
@@ -41,6 +41,24 @@ struct rndis_initialize_message {
 	/** Maximum transfer size */
 	uint32_t mtu;
 } __attribute__ (( packed ));
+
+/** Request ID used for initialisation
+ *
+ * This is a policy decision.
+ */
+#define RNDIS_INIT_ID 0xe110e110UL
+
+/** RNDIS major version */
+#define RNDIS_VERSION_MAJOR 1
+
+/** RNDIS minor version */
+#define RNDIS_VERSION_MINOR 0
+
+/** RNDIS maximum transfer size
+ *
+ * This is a policy decision.
+ */
+#define RNDIS_MTU 2048
 
 /** RNDIS initialise completion */
 #define RNDIS_INITIALISE_CMPLT 0x80000002UL
