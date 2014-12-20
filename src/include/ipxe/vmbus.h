@@ -403,21 +403,16 @@ struct vmbus_channel_operations {
 	 * @v xid		Transaction ID
 	 * @v data		Data
 	 * @v len		Length of data
-	 * @v iobuf		I/O buffer, or NULL if allocation failed
+	 * @v list		List of I/O buffers
 	 * @ret rc		Return status code
 	 *
 	 * This function takes ownership of the I/O buffer.  It should
 	 * eventually call vmbus_send_completion() to indicate to the
 	 * host that the buffer can be reused.
-	 *
-	 * Note that this function will be called even if we failed to
-	 * allocate or populate the I/O buffer; this is to allow for a
-	 * completion to be sent even in the event of a transient
-	 * memory shortage failure.
 	 */
 	int ( * recv_data ) ( struct vmbus_device *vmdev, uint64_t xid,
 			      const void *data, size_t len,
-			      struct io_buffer *iobuf );
+			      struct list_head *list );
 	/**
 	 * Handle received completion packet
 	 *

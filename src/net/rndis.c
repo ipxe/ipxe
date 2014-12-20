@@ -759,67 +759,30 @@ static void rndis_rx_message ( struct rndis_device *rndis,
  * Receive packet from underlying transport layer
  *
  * @v rndis		RNDIS device
- * @v iobuf		I/O buffer, or NULL if allocation failed
+ * @v iobuf		I/O buffer
  */
 void rndis_rx ( struct rndis_device *rndis, struct io_buffer *iobuf ) {
 	struct net_device *netdev = rndis->netdev;
 	struct rndis_header *header;
-	struct io_buffer *msg;
-	size_t len;
 	unsigned int type;
 	int rc;
 
-	/* Record dropped packet if I/O buffer is missing */
-	if ( ! iobuf ) {
-		DBGC2 ( rndis, "RNDIS %s received dropped packet\n",
-			rndis->name );
-		rc = -ENOBUFS;
+	/* Sanity check */
+	if ( iob_len ( iobuf ) < sizeof ( *header ) ) {
+		DBGC ( rndis, "RNDIS %s received underlength packet:\n",
+		       rndis->name );
+		DBGC_HDA ( rndis, 0, iobuf->data, iob_len ( iobuf ) );
+		rc = -EINVAL;
 		goto drop;
 	}
+	header = iobuf->data;
 
-	/* Split packet into messages */
-	while ( iobuf ) {
+	/* Parse and strip header */
+	type = le32_to_cpu ( header->type );
+	iob_pull ( iobuf, sizeof ( *header ) );
 
-		/* Sanity check */
-		if ( iob_len ( iobuf ) < sizeof ( *header ) ) {
-			DBGC ( rndis, "RNDIS %s received underlength packet:\n",
-			       rndis->name );
-			DBGC_HDA ( rndis, 0, iobuf->data, iob_len ( iobuf ) );
-			rc = -EINVAL;
-			goto drop;
-		}
-		header = iobuf->data;
-
-		/* Parse and check header */
-		type = le32_to_cpu ( header->type );
-		len = le32_to_cpu ( header->len );
-		if ( ( len < sizeof ( *header ) ) ||
-		     ( len > iob_len ( iobuf ) ) ) {
-			DBGC ( rndis, "RNDIS %s received malformed packet:\n",
-			       rndis->name );
-			DBGC_HDA ( rndis, 0, iobuf->data, iob_len ( iobuf ) );
-			rc = -EINVAL;
-			goto drop;
-		}
-
-		/* Split buffer if required */
-		if ( len < iob_len ( iobuf ) ) {
-			msg = iob_split ( iobuf, len );
-			if ( ! msg ) {
-				rc = -ENOMEM;
-				goto drop;
-			}
-		} else {
-			msg = iobuf;
-			iobuf = NULL;
-		}
-
-		/* Strip header */
-		iob_pull ( msg, sizeof ( *header ) );
-
-		/* Handle message */
-		rndis_rx_message ( rndis, iob_disown ( msg ), type );
-	}
+	/* Handle message */
+	rndis_rx_message ( rndis, iob_disown ( iobuf ), type );
 
 	return;
 

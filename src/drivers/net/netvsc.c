@@ -298,15 +298,17 @@ static int netvsc_recv_control ( struct vmbus_device *vmdev, uint64_t xid,
  * @v xid		Transaction ID
  * @v data		Data
  * @v len		Length of data
- * @v iobuf		I/O buffer, or NULL if allocation failed
+ * @v list		List of I/O buffers
  * @ret rc		Return status code
  */
 static int netvsc_recv_data ( struct vmbus_device *vmdev, uint64_t xid,
 			      const void *data, size_t len,
-			      struct io_buffer *iobuf ) {
+			      struct list_head *list ) {
 	struct rndis_device *rndis = vmbus_get_drvdata ( vmdev );
 	struct netvsc_device *netvsc = rndis->priv;
 	const struct netvsc_rndis_message *msg = data;
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
 	int rc;
 
 	/* Sanity check */
@@ -324,21 +326,27 @@ static int netvsc_recv_data ( struct vmbus_device *vmdev, uint64_t xid,
 		goto err_sanity;
 	}
 
-	/* Send completion back to host (even if I/O buffer was missing) */
+	/* Send completion back to host */
 	if ( ( rc = vmbus_send_completion ( vmdev, xid, NULL, 0 ) ) != 0 ) {
 		DBGC ( netvsc, "NETVSC %s could not send completion: %s\n",
 		       netvsc->name, strerror ( rc ) );
 		goto err_completion;
 	}
 
-	/* Hand off to RNDIS (even if I/O buffer was missing) */
-	rndis_rx ( rndis, iob_disown ( iobuf ) );
+	/* Hand off to RNDIS */
+	list_for_each_entry_safe ( iobuf, tmp, list, list ) {
+		list_del ( &iobuf->list );
+		rndis_rx ( rndis, iob_disown ( iobuf ) );
+	}
 
 	return 0;
 
  err_completion:
  err_sanity:
-	free_iob ( iobuf );
+	list_for_each_entry_safe ( iobuf, tmp, list, list ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+	}
 	return rc;
 }
 

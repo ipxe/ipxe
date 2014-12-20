@@ -807,20 +807,21 @@ static struct vmbus_xfer_pages * vmbus_xfer_pages ( struct vmbus_device *vmdev,
 }
 
 /**
- * Construct I/O buffer from transfer pages
+ * Construct I/O buffer list from transfer pages
  *
  * @v vmdev		VMBus device
  * @v header		Transfer page header
- * @ret iobuf		I/O buffer, or NULL on error
+ * @v list		I/O buffer list to populate
+ * @ret rc		Return status code
  */
-static struct io_buffer *
-vmbus_xfer_page_iobuf ( struct vmbus_device *vmdev,
-			struct vmbus_packet_header *header ) {
+static int vmbus_xfer_page_iobufs ( struct vmbus_device *vmdev,
+				    struct vmbus_packet_header *header,
+				    struct list_head *list ) {
 	struct vmbus_xfer_page_header *page_header =
 		container_of ( header, struct vmbus_xfer_page_header, header );
 	struct vmbus_xfer_pages *pages;
 	struct io_buffer *iobuf;
-	size_t total_len;
+	struct io_buffer *tmp;
 	size_t len;
 	size_t offset;
 	unsigned int range_count;
@@ -832,28 +833,32 @@ vmbus_xfer_page_iobuf ( struct vmbus_device *vmdev,
 
 	/* Locate page set */
 	pages = vmbus_xfer_pages ( vmdev, page_header->pageset );
-	if ( ! pages )
+	if ( ! pages ) {
+		rc = -ENOENT;
 		goto err_pages;
+	}
 
-	/* Determine total length */
+	/* Allocate and populate I/O buffers */
 	range_count = le32_to_cpu ( page_header->range_count );
-	for ( total_len = 0, i = 0 ; i < range_count ; i++ ) {
-		len = le32_to_cpu ( page_header->range[i].len );
-		total_len += len;
-	}
-
-	/* Allocate I/O buffer */
-	iobuf = alloc_iob ( total_len );
-	if ( ! iobuf ) {
-		DBGC ( vmdev, "VMBUS %s could not allocate %zd-byte I/O "
-		       "buffer\n", vmdev->dev.name, total_len );
-		goto err_alloc;
-	}
-
-	/* Populate I/O buffer */
 	for ( i = 0 ; i < range_count ; i++ ) {
+
+		/* Parse header */
 		len = le32_to_cpu ( page_header->range[i].len );
 		offset = le32_to_cpu ( page_header->range[i].offset );
+
+		/* Allocate I/O buffer */
+		iobuf = alloc_iob ( len );
+		if ( ! iobuf ) {
+			DBGC ( vmdev, "VMBUS %s could not allocate %zd-byte "
+			       "I/O buffer\n", vmdev->dev.name, len );
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+
+		/* Add I/O buffer to list */
+		list_add ( &iobuf->list, list );
+
+		/* Populate I/O buffer */
 		if ( ( rc = pages->op->copy ( pages, iob_put ( iobuf, len ),
 					      offset, len ) ) != 0 ) {
 			DBGC ( vmdev, "VMBUS %s could not populate I/O buffer "
@@ -863,13 +868,16 @@ vmbus_xfer_page_iobuf ( struct vmbus_device *vmdev,
 		}
 	}
 
-	return iobuf;
+	return 0;
 
  err_copy:
-	free_iob ( iobuf );
  err_alloc:
+	list_for_each_entry_safe ( iobuf, tmp, list, list ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+	}
  err_pages:
-	return NULL;
+	return rc;
 }
 
 /**
@@ -880,7 +888,7 @@ vmbus_xfer_page_iobuf ( struct vmbus_device *vmdev,
  */
 int vmbus_poll ( struct vmbus_device *vmdev ) {
 	struct vmbus_packet_header *header = vmdev->packet;
-	struct io_buffer *iobuf;
+	struct list_head list;
 	void *data;
 	size_t header_len;
 	size_t len;
@@ -929,6 +937,14 @@ int vmbus_poll ( struct vmbus_device *vmdev ) {
 	DBGC2_HDA ( vmdev, old_cons, header, ring_len );
 	assert ( ( ( cons - old_cons ) & ( vmdev->in_len - 1 ) ) == ring_len );
 
+	/* Allocate I/O buffers, if applicable */
+	INIT_LIST_HEAD ( &list );
+	if ( header->type == cpu_to_le16 ( VMBUS_DATA_XFER_PAGES ) ) {
+		if ( ( rc = vmbus_xfer_page_iobufs ( vmdev, header,
+						     &list ) ) != 0 )
+			return rc;
+	}
+
 	/* Update producer index */
 	rmb();
 	vmdev->in->cons = cpu_to_le32 ( cons );
@@ -948,12 +964,8 @@ int vmbus_poll ( struct vmbus_device *vmdev ) {
 		break;
 
 	case cpu_to_le16 ( VMBUS_DATA_XFER_PAGES ) :
-		iobuf = vmbus_xfer_page_iobuf ( vmdev, header );
-		/* Call recv_data() even if I/O buffer allocation
-		 * failed, to allow for completions to be sent.
-		 */
 		if ( ( rc = vmdev->op->recv_data ( vmdev, xid, data, len,
-						   iob_disown ( iobuf ) ) )!=0){
+						   &list ) ) != 0 ) {
 			DBGC ( vmdev, "VMBUS %s could not handle data packet: "
 			       "%s\n", vmdev->dev.name, strerror ( rc ) );
 			return rc;
