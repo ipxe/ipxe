@@ -1092,8 +1092,8 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 			/* Look for a driver */
 			driver = vmbus_find_driver ( type );
 			if ( ! driver ) {
-				DBGC ( vmbus, "VMBUS %p has no driver for "
-				       "type %s\n", vmbus, uuid_ntoa ( type ) );
+				DBGC2 ( vmbus, "VMBUS %p has no driver for "
+					"type %s\n", vmbus, uuid_ntoa ( type ));
 				/* Not a fatal error */
 				continue;
 			}
