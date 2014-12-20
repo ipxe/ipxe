@@ -435,9 +435,11 @@ static struct vmbus_channel_operations netvsc_channel_operations = {
  */
 static void netvsc_poll ( struct rndis_device *rndis ) {
 	struct netvsc_device *netvsc = rndis->priv;
+	struct vmbus_device *vmdev = netvsc->vmdev;
 
 	/* Poll VMBus device */
-	vmbus_poll ( netvsc->vmdev );
+	while ( vmbus_has_data ( vmdev ) )
+		vmbus_poll ( vmdev );
 }
 
 /**
