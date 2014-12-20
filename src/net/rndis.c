@@ -829,6 +829,28 @@ void rndis_rx ( struct rndis_device *rndis, struct io_buffer *iobuf ) {
 }
 
 /**
+ * Set receive filter
+ *
+ * @v rndis		RNDIS device
+ * @v filter		Receive filter
+ * @ret rc		Return status code
+ */
+static int rndis_filter ( struct rndis_device *rndis, unsigned int filter ) {
+	uint32_t value = cpu_to_le32 ( filter );
+	int rc;
+
+	/* Set receive filter */
+	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_GEN_CURRENT_PACKET_FILTER,
+				&value, sizeof ( value ) ) ) != 0 ) {
+		DBGC ( rndis, "RNDIS %s could not set receive filter to %#08x: "
+		       "%s\n", rndis->name, filter, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Open network device
  *
  * @v netdev		Network device
@@ -836,7 +858,6 @@ void rndis_rx ( struct rndis_device *rndis, struct io_buffer *iobuf ) {
  */
 static int rndis_open ( struct net_device *netdev ) {
 	struct rndis_device *rndis = netdev->priv;
-	uint32_t filter;
 	int rc;
 
 	/* Open RNDIS device */
@@ -851,17 +872,12 @@ static int rndis_open ( struct net_device *netdev ) {
 		goto err_initialise;
 
 	/* Set receive filter */
-	filter = cpu_to_le32 ( RNDIS_FILTER_UNICAST |
-			       RNDIS_FILTER_MULTICAST |
-			       RNDIS_FILTER_ALL_MULTICAST |
-			       RNDIS_FILTER_BROADCAST |
-			       RNDIS_FILTER_PROMISCUOUS );
-	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_GEN_CURRENT_PACKET_FILTER,
-				&filter, sizeof ( filter ) ) ) != 0 ) {
-		DBGC ( rndis, "RNDIS %s could not set receive filter: %s\n",
-		       rndis->name, strerror ( rc ) );
+	if ( ( rc = rndis_filter ( rndis, ( RNDIS_FILTER_UNICAST |
+					    RNDIS_FILTER_MULTICAST |
+					    RNDIS_FILTER_ALL_MULTICAST |
+					    RNDIS_FILTER_BROADCAST |
+					    RNDIS_FILTER_PROMISCUOUS ) ) ) != 0)
 		goto err_set_filter;
-	}
 
 	/* Update link status */
 	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_GEN_MEDIA_CONNECT_STATUS,
@@ -886,6 +902,9 @@ static int rndis_open ( struct net_device *netdev ) {
  */
 static void rndis_close ( struct net_device *netdev ) {
 	struct rndis_device *rndis = netdev->priv;
+
+	/* Clear receive filter */
+	rndis_filter ( rndis, 0 );
 
 	/* Halt RNDIS device */
 	rndis_halt ( rndis );
