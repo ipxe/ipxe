@@ -191,6 +191,8 @@ enum rndis_status {
 	RNDIS_STATUS_MEDIA_CONNECT = 0x4001000bUL,
 	/** Device is disconnected from the medium */
 	RNDIS_STATUS_MEDIA_DISCONNECT = 0x4001000cUL,
+	/** Unknown start-of-day status code */
+	RNDIS_STATUS_WTF_WORLD = 0x40020006UL,
 };
 
 /** RNDIS keepalive message */

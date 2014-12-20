@@ -686,6 +686,10 @@ static void rndis_rx_status ( struct rndis_device *rndis,
 		netdev_link_down ( netdev );
 		break;
 
+	case RNDIS_STATUS_WTF_WORLD:
+		/* Ignore */
+		break;
+
 	default:
 		DBGC ( rndis, "RNDIS %s unexpected status %#08x:\n",
 		       rndis->name, status );
