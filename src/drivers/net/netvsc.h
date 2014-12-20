@@ -24,7 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * must be sufficiently small to guarantee that we never run out of
  * space in the VMBus outbound ring buffer.
  */
-#define NETVSC_TX_NUM_DESC 8
+#define NETVSC_TX_NUM_DESC 32
 
 /** RX data buffer page set ID
  *
