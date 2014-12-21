@@ -42,8 +42,17 @@ union vmbus_version {
 	};
 } __attribute__ (( packed ));
 
-/** Oldest known VMBus protocol version (Windows Server 2008) */
-#define VMBUS_VERSION_WS2008 ( ( 0 << 16 ) | ( 13 << 0 ) )
+/** Known VMBus protocol versions */
+enum vmbus_raw_version {
+	/** Windows Server 2008 */
+	VMBUS_VERSION_WS2008 = ( ( 0 << 16 ) | ( 13 << 0 ) ),
+	/** Windows 7 */
+	VMBUS_VERSION_WIN7 = ( ( 1 << 16 ) | ( 1 << 0 ) ),
+	/** Windows 8 */
+	VMBUS_VERSION_WIN8 = ( ( 2 << 16 ) | ( 4 << 0 ) ),
+	/** Windows 8.1 */
+	VMBUS_VERSION_WIN8_1 = ( ( 3 << 16 ) | ( 0 << 0 ) ),
+};
 
 /** Guest physical address range descriptor */
 struct vmbus_gpa_range {
@@ -82,6 +91,7 @@ enum vmbus_message_type {
 	VMBUS_INITIATE_CONTACT = 14,
 	VMBUS_VERSION_RESPONSE = 15,
 	VMBUS_UNLOAD = 16,
+	VMBUS_UNLOAD_RESPONSE = 17,
 };
 
 /** VMBus "offer channel" message */

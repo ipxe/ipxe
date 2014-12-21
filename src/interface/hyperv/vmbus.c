@@ -38,13 +38,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/hyperv.h>
 #include <ipxe/vmbus.h>
 
-/** Chosen VMBus protocol version
- *
- * This is a policy decision.  We use the oldest common version in
- * order to avoid including any version-specific code.
- */
-#define VMBUS_VERSION VMBUS_VERSION_WS2008
-
 /** VMBus initial GPADL ID
  *
  * This is an opaque value with no meaning.  The Linux kernel uses
@@ -122,9 +115,11 @@ static int vmbus_wait_for_message ( struct hv_hypervisor *hv ) {
  * Initiate contact
  *
  * @v hv		Hyper-V hypervisor
+ * @v raw		VMBus protocol (raw) version
  * @ret rc		Return status code
  */
-static int vmbus_initiate_contact ( struct hv_hypervisor *hv ) {
+static int vmbus_initiate_contact ( struct hv_hypervisor *hv,
+				    unsigned int raw ) {
 	struct vmbus *vmbus = hv->vmbus;
 	const struct vmbus_version_response *version = &vmbus->message->version;
 	struct vmbus_initiate_contact initiate;
@@ -133,7 +128,7 @@ static int vmbus_initiate_contact ( struct hv_hypervisor *hv ) {
 	/* Construct message */
 	memset ( &initiate, 0, sizeof ( initiate ) );
 	initiate.header.type = cpu_to_le32 ( VMBUS_INITIATE_CONTACT );
-	initiate.version.raw = cpu_to_le32 ( VMBUS_VERSION );
+	initiate.version.raw = cpu_to_le32 ( raw );
 	initiate.intr = virt_to_phys ( vmbus->intr );
 	initiate.monitor_in = virt_to_phys ( vmbus->monitor_in );
 	initiate.monitor_out = virt_to_phys ( vmbus->monitor_out );
@@ -158,7 +153,7 @@ static int vmbus_initiate_contact ( struct hv_hypervisor *hv ) {
 		       vmbus );
 		return -ENOTSUP;
 	}
-	if ( version->version.raw != cpu_to_le32 ( VMBUS_VERSION ) ) {
+	if ( version->version.raw != cpu_to_le32 ( raw ) ) {
 		DBGC ( vmbus, "VMBUS %p unexpected version %d.%d\n",
 		       vmbus, le16_to_cpu ( version->version.major ),
 		       le16_to_cpu ( version->version.minor ) );
@@ -178,8 +173,69 @@ static int vmbus_initiate_contact ( struct hv_hypervisor *hv ) {
  * @ret rc		Return status code
  */
 static int vmbus_unload ( struct hv_hypervisor *hv ) {
+	struct vmbus *vmbus = hv->vmbus;
+	const struct vmbus_message_header *header = &vmbus->message->header;
+	int rc;
 
-	return vmbus_post_empty_message ( hv, VMBUS_UNLOAD );
+	/* Post message */
+	if ( ( rc = vmbus_post_empty_message ( hv, VMBUS_UNLOAD ) ) != 0 )
+		return rc;
+
+	/* Wait for response */
+	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+		return rc;
+
+	/* Check response */
+	if ( header->type != cpu_to_le32 ( VMBUS_UNLOAD_RESPONSE ) ) {
+		DBGC ( vmbus, "VMBUS %p unexpected unload response type %d\n",
+		       vmbus, le32_to_cpu ( header->type ) );
+		return -EPROTO;
+	}
+
+	return 0;
+}
+
+/**
+ * Negotiate protocol version
+ *
+ * @v hv		Hyper-V hypervisor
+ * @ret rc		Return status code
+ */
+static int vmbus_negotiate_version ( struct hv_hypervisor *hv ) {
+	int rc;
+
+	/* We require the ability to disconnect from and reconnect to
+	 * VMBus; if we don't have this then there is no (viable) way
+	 * for a loaded operating system to continue to use any VMBus
+	 * devices.  (There is also a small but non-zero risk that the
+	 * host will continue to write to our interrupt and monitor
+	 * pages, since the VMBUS_UNLOAD message in earlier versions
+	 * is essentially a no-op.)
+	 *
+	 * This requires us to ensure that the host supports protocol
+	 * version 3.0 (VMBUS_VERSION_WIN8_1).  However, we can't
+	 * actually _use_ protocol version 3.0, since doing so causes
+	 * an iSCSI-booted Windows Server 2012 R2 VM to crash due to a
+	 * NULL pointer dereference in vmbus.sys.
+	 *
+	 * To work around this problem, we first ensure that we can
+	 * connect using protocol v3.0, then disconnect and reconnect
+	 * using the oldest known protocol.
+	 */
+
+	/* Initiate contact to check for required protocol support */
+	if ( ( rc = vmbus_initiate_contact ( hv, VMBUS_VERSION_WIN8_1 ) ) != 0 )
+		return rc;
+
+	/* Terminate contact */
+	if ( ( rc = vmbus_unload ( hv ) ) != 0 )
+		return rc;
+
+	/* Reinitiate contact using the oldest known protocol version */
+	if ( ( rc = vmbus_initiate_contact ( hv, VMBUS_VERSION_WS2008 ) ) != 0 )
+		return rc;
+
+	return 0;
 }
 
 /**
@@ -1232,9 +1288,9 @@ int vmbus_probe ( struct hv_hypervisor *hv, struct device *parent ) {
 	/* Enable message interrupt */
 	hv_enable_sint ( hv, VMBUS_MESSAGE_SINT );
 
-	/* Initiate contact */
-	if ( ( rc = vmbus_initiate_contact ( hv ) ) != 0 )
-		goto err_initiate_contact;
+	/* Negotiate protocol version */
+	if ( ( rc = vmbus_negotiate_version ( hv ) ) != 0 )
+		goto err_negotiate_version;
 
 	/* Enumerate channels */
 	if ( ( rc = vmbus_probe_channels ( hv, parent ) ) != 0 )
@@ -1245,7 +1301,7 @@ int vmbus_probe ( struct hv_hypervisor *hv, struct device *parent ) {
 	vmbus_remove_channels ( hv, parent );
  err_probe_channels:
 	vmbus_unload ( hv );
- err_initiate_contact:
+ err_negotiate_version:
 	hv_disable_sint ( hv, VMBUS_MESSAGE_SINT );
 	hv_free_pages ( hv, vmbus->intr, vmbus->monitor_in, vmbus->monitor_out,
 			NULL );
