@@ -16,3 +16,7 @@ CFLAGS		+= -Ulinux
 
 # disable valgrind
 CFLAGS		+= -DNVALGRIND
+
+# Include Hyper-V driver in the all-drivers build
+#
+DRIVERS += hyperv
