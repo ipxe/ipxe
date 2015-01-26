@@ -639,16 +639,6 @@ struct dhcphdr {
  */
 #define DHCP_MIN_LEN 552
 
-/** Timeouts for sending DHCP packets */
-#define DHCP_MIN_TIMEOUT ( 1 * TICKS_PER_SEC )
-#define DHCP_MAX_TIMEOUT ( 10 * TICKS_PER_SEC )
-
-/** Maximum time that we will wait for ProxyDHCP responses */
-#define PROXYDHCP_MAX_TIMEOUT ( 2 * TICKS_PER_SEC )
-
-/** Maximum time that we will wait for Boot Server responses */
-#define PXEBS_MAX_TIMEOUT ( 3 * TICKS_PER_SEC )
-
 /** Settings block name used for DHCP responses */
 #define DHCP_SETTINGS_NAME "dhcp"
 

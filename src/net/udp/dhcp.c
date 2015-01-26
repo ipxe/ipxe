@@ -44,6 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/dhcppkt.h>
 #include <ipxe/dhcp_arch.h>
 #include <ipxe/features.h>
+#include <config/dhcp.h>
 
 /** @file
  *
@@ -171,8 +172,9 @@ struct dhcp_session_state {
 	void ( * expired ) ( struct dhcp_session *dhcp );
 	/** Transmitted message type */
 	uint8_t tx_msgtype;
-	/** Apply minimum timeout */
-	uint8_t apply_min_timeout;
+	/** Timeout parameters */
+	uint8_t min_timeout_sec;
+	uint8_t max_timeout_sec;
 };
 
 static struct dhcp_session_state dhcp_state_discover;
@@ -272,9 +274,8 @@ static void dhcp_set_state ( struct dhcp_session *dhcp,
 	dhcp->state = state;
 	dhcp->start = currticks();
 	stop_timer ( &dhcp->timer );
-	dhcp->timer.min_timeout =
-		( state->apply_min_timeout ? DHCP_MIN_TIMEOUT : 0 );
-	dhcp->timer.max_timeout = DHCP_MAX_TIMEOUT;
+	dhcp->timer.min_timeout = state->min_timeout_sec * TICKS_PER_SEC;
+	dhcp->timer.max_timeout = state->max_timeout_sec * TICKS_PER_SEC;
 	start_timer_nodelay ( &dhcp->timer );
 }
 
@@ -415,7 +416,7 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 	/* If we can't yet transition to DHCPREQUEST, do nothing */
 	elapsed = ( currticks() - dhcp->start );
 	if ( ! ( dhcp->no_pxedhcp || dhcp->proxy_offer ||
-		 ( elapsed > PROXYDHCP_MAX_TIMEOUT ) ) )
+		 ( elapsed > DHCP_DISC_PROXY_TIMEOUT_SEC * TICKS_PER_SEC ) ) )
 		return;
 
 	/* Transition to DHCPREQUEST */
@@ -431,7 +432,8 @@ static void dhcp_discovery_expired ( struct dhcp_session *dhcp ) {
 	unsigned long elapsed = ( currticks() - dhcp->start );
 
 	/* Give up waiting for ProxyDHCP before we reach the failure point */
-	if ( dhcp->offer.s_addr && ( elapsed > PROXYDHCP_MAX_TIMEOUT ) ) {
+	if ( dhcp->offer.s_addr &&
+	     ( elapsed > DHCP_DISC_PROXY_TIMEOUT_SEC * TICKS_PER_SEC ) ) {
 		dhcp_set_state ( dhcp, &dhcp_state_request );
 		return;
 	}
@@ -447,7 +449,8 @@ static struct dhcp_session_state dhcp_state_discover = {
 	.rx			= dhcp_discovery_rx,
 	.expired		= dhcp_discovery_expired,
 	.tx_msgtype		= DHCPDISCOVER,
-	.apply_min_timeout	= 1,
+	.min_timeout_sec	= DHCP_DISC_START_TIMEOUT_SEC,
+	.max_timeout_sec	= DHCP_DISC_END_TIMEOUT_SEC,
 };
 
 /**
@@ -584,7 +587,8 @@ static struct dhcp_session_state dhcp_state_request = {
 	.rx			= dhcp_request_rx,
 	.expired		= dhcp_request_expired,
 	.tx_msgtype		= DHCPREQUEST,
-	.apply_min_timeout	= 0,
+	.min_timeout_sec	= DHCP_REQ_START_TIMEOUT_SEC,
+	.max_timeout_sec	= DHCP_REQ_END_TIMEOUT_SEC,
 };
 
 /**
@@ -669,7 +673,7 @@ static void dhcp_proxy_expired ( struct dhcp_session *dhcp ) {
 	unsigned long elapsed = ( currticks() - dhcp->start );
 
 	/* Give up waiting for ProxyDHCP before we reach the failure point */
-	if ( elapsed > PROXYDHCP_MAX_TIMEOUT ) {
+	if ( elapsed > DHCP_REQ_PROXY_TIMEOUT_SEC * TICKS_PER_SEC ) {
 		dhcp_finished ( dhcp, 0 );
 		return;
 	}
@@ -685,7 +689,8 @@ static struct dhcp_session_state dhcp_state_proxy = {
 	.rx			= dhcp_proxy_rx,
 	.expired		= dhcp_proxy_expired,
 	.tx_msgtype		= DHCPREQUEST,
-	.apply_min_timeout	= 0,
+	.min_timeout_sec	= DHCP_PROXY_START_TIMEOUT_SEC,
+	.max_timeout_sec	= DHCP_PROXY_END_TIMEOUT_SEC,
 };
 
 /**
@@ -810,7 +815,7 @@ static void dhcp_pxebs_expired ( struct dhcp_session *dhcp ) {
 	/* Give up waiting before we reach the failure point, and fail
 	 * over to the next server in the attempt list
 	 */
-	if ( elapsed > PXEBS_MAX_TIMEOUT ) {
+	if ( elapsed > PXEBS_MAX_TIMEOUT_SEC * TICKS_PER_SEC ) {
 		dhcp->pxe_attempt++;
 		if ( dhcp->pxe_attempt->s_addr ) {
 			dhcp_set_state ( dhcp, &dhcp_state_pxebs );
@@ -832,7 +837,8 @@ static struct dhcp_session_state dhcp_state_pxebs = {
 	.rx			= dhcp_pxebs_rx,
 	.expired		= dhcp_pxebs_expired,
 	.tx_msgtype		= DHCPREQUEST,
-	.apply_min_timeout	= 1,
+	.min_timeout_sec	= PXEBS_START_TIMEOUT_SEC,
+	.max_timeout_sec	= PXEBS_END_TIMEOUT_SEC,
 };
 
 /****************************************************************************
