@@ -78,6 +78,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_pcivpd		     ( ERRFILE_DRIVER | 0x00060000 )
 #define ERRFILE_usb		     ( ERRFILE_DRIVER | 0x00070000 )
 #define ERRFILE_usbhub		     ( ERRFILE_DRIVER | 0x00080000 )
+#define ERRFILE_xhci		     ( ERRFILE_DRIVER | 0x00090000 )
 
 #define ERRFILE_nvs		     ( ERRFILE_DRIVER | 0x00100000 )
 #define ERRFILE_spi		     ( ERRFILE_DRIVER | 0x00110000 )

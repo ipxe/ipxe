@@ -18,3 +18,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /*
  * Drag in USB controllers
  */
+#ifdef USB_HCD_XHCI
+REQUIRE_OBJECT ( xhci );
+#endif

@@ -36,6 +36,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
 #define	SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
 
+#define	USB_HCD_XHCI		/* xHCI USB host controller */
+
 #define	REBOOT_CMD		/* Reboot command */
 #define	CPUID_CMD		/* x86 CPU feature detection command */
 
