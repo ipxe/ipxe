@@ -161,6 +161,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ERRFILE_netfront	     ( ERRFILE_DRIVER | 0x00690000 )
 #define ERRFILE_nii		     ( ERRFILE_DRIVER | 0x006a0000 )
 #define ERRFILE_netvsc		     ( ERRFILE_DRIVER | 0x006b0000 )
+#define ERRFILE_ecm		     ( ERRFILE_DRIVER | 0x006c0000 )
+#define ERRFILE_ncm		     ( ERRFILE_DRIVER | 0x006d0000 )
 
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
