@@ -83,6 +83,7 @@ SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
 SRCDIRS		+= drivers/infiniband
+SRCDIRS		+= drivers/usb
 SRCDIRS		+= interface/pxe interface/efi interface/smbios
 SRCDIRS		+= interface/bofm
 SRCDIRS		+= interface/xen
