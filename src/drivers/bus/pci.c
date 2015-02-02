@@ -253,6 +253,8 @@ int pci_find_driver ( struct pci_device *pci ) {
 	unsigned int i;
 
 	for_each_table_entry ( driver, PCI_DRIVERS ) {
+		if ( ( driver->class.class ^ pci->class ) & driver->class.mask )
+			continue;
 		for ( i = 0 ; i < driver->id_count ; i++ ) {
 			id = &driver->ids[i];
 			if ( ( id->vendor != PCI_ANY_ID ) &&
@@ -334,14 +336,15 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 
 		/* Look for a driver */
 		if ( ( rc = pci_find_driver ( pci ) ) != 0 ) {
-			DBGC ( pci, PCI_FMT " (%04x:%04x) has no driver\n",
-			       PCI_ARGS ( pci ), pci->vendor, pci->device );
+			DBGC ( pci, PCI_FMT " (%04x:%04x class %06x) has no "
+			       "driver\n", PCI_ARGS ( pci ), pci->vendor,
+			       pci->device, pci->class );
 			continue;
 		}
 
 		/* Add to device hierarchy */
 		pci->dev.parent = &rootdev->dev;
-		list_add ( &pci->dev.siblings, &rootdev->dev.children);
+		list_add ( &pci->dev.siblings, &rootdev->dev.children );
 
 		/* Look for a driver */
 		if ( ( rc = pci_probe ( pci ) ) == 0 ) {

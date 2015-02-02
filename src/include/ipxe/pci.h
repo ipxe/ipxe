@@ -279,6 +279,29 @@ struct pci_device_id {
 /** Match-anything ID */
 #define PCI_ANY_ID 0xffff
 
+/** A PCI class ID */
+struct pci_class_id {
+	/** Class */
+	uint32_t class;
+	/** Class mask */
+	uint32_t mask;
+};
+
+/** Construct PCI class ID
+ *
+ * @v base		Base class (or PCI_ANY_ID)
+ * @v sub		Subclass (or PCI_ANY_ID)
+ * @v progif		Programming interface (or PCI_ANY_ID)
+ */
+#define PCI_CLASS(base,sub,progif) {					   \
+	.class = ( ( ( (base) & 0xff ) << 16 ) |			   \
+		   ( ( (sub) & 0xff ) << 8 ) |				   \
+		   ( ( (progif) & 0xff) << 0 ) ),			   \
+	.mask = ( ( ( ( (base) == PCI_ANY_ID ) ? 0x00 : 0xff ) << 16 ) |   \
+		  ( ( ( (sub) == PCI_ANY_ID ) ? 0x00 : 0xff ) << 8 ) |	   \
+		  ( ( ( (progif) == PCI_ANY_ID ) ? 0x00 : 0xff ) << 0 ) ), \
+	}
+
 /** A PCI device */
 struct pci_device {
 	/** Generic device */
@@ -322,6 +345,8 @@ struct pci_driver {
 	struct pci_device_id *ids;
 	/** Number of entries in PCI ID table */
 	unsigned int id_count;
+	/** PCI class ID */
+	struct pci_class_id class;
 	/**
 	 * Probe device
 	 *
