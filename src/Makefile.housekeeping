@@ -1012,7 +1012,7 @@ BLIB		= $(BIN)/blib.a
 $(BLIB) : $(BLIB_OBJS) $(BLIB_LIST) $(MAKEDEPS)
 	$(Q)$(RM) $(BLIB)
 	$(QM)$(ECHO) "  [AR] $@"
-	$(Q)$(AR) r $@ $(BLIB_OBJS)
+	$(Q)$(AR) r $@ $(sort $(BLIB_OBJS))
 	$(Q)$(RANLIB) $@
 blib : $(BLIB)
 
