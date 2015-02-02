@@ -66,10 +66,13 @@ struct device_description {
 /** Hyper-V bus type */
 #define BUS_TYPE_HV 9
 
+/** USB bus type */
+#define BUS_TYPE_USB 10
+
 /** A hardware device */
 struct device {
 	/** Name */
-	char name[16];
+	char name[32];
 	/** Driver name */
 	const char *driver_name;
 	/** Device description */
