@@ -649,6 +649,25 @@ struct xhci_trb_port_status {
 /** A port status change transfer request block */
 #define XHCI_TRB_PORT_STATUS XHCI_TRB_TYPE ( 34 )
 
+/** A port status change transfer request block */
+struct xhci_trb_host_controller {
+	/** Reserved */
+	uint64_t reserved_a;
+	/** Reserved */
+	uint8_t reserved_b[3];
+	/** Completion code */
+	uint8_t code;
+	/** Flags */
+	uint8_t flags;
+	/** Type */
+	uint8_t type;
+	/** Reserved */
+	uint16_t reserved_c;
+} __attribute__ (( packed ));
+
+/** A port status change transfer request block */
+#define XHCI_TRB_HOST_CONTROLLER XHCI_TRB_TYPE ( 37 )
+
 /** A transfer request block */
 union xhci_trb {
 	/** Template */
@@ -683,6 +702,8 @@ union xhci_trb {
 	struct xhci_trb_complete complete;
 	/** Port status changed event */
 	struct xhci_trb_port_status port;
+	/** Host controller event */
+	struct xhci_trb_host_controller host;
 } __attribute__ (( packed ));
 
 /** An input control context */

@@ -1616,6 +1616,22 @@ static void xhci_port_status ( struct xhci_device *xhci,
 }
 
 /**
+ * Handle host controller event
+ *
+ * @v xhci		xHCI device
+ * @v host		Host controller event
+ */
+static void xhci_host_controller ( struct xhci_device *xhci,
+				   struct xhci_trb_host_controller *host ) {
+	int rc;
+
+	/* Construct error */
+	rc = -ECODE ( host->code );
+	DBGC ( xhci, "XHCI %p host controller event (code %d): %s\n",
+	       xhci, host->code, strerror ( rc ) );
+}
+
+/**
  * Poll event ring
  *
  * @v xhci		xHCI device
@@ -1654,6 +1670,10 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
 
 		case XHCI_TRB_PORT_STATUS:
 			xhci_port_status ( xhci, &trb->port );
+			break;
+
+		case XHCI_TRB_HOST_CONTROLLER:
+			xhci_host_controller ( xhci, &trb->host );
 			break;
 
 		default:
