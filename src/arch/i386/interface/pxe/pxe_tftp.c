@@ -171,8 +171,7 @@ static struct pxe_tftp_connection pxe_tftp = {
  * @ret rc		Return status code
  */
 static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
-			   const unsigned char *filename, size_t blksize,
-			   int sizeonly ) {
+			   const unsigned char *filename, size_t blksize ) {
 	char uri_string[PXE_TFTP_URI_LEN];
 	struct in_addr address;
 	int rc;
@@ -189,10 +188,9 @@ static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
 	address.s_addr = ipaddress;
 	if ( ! port )
 		port = htons ( TFTP_PORT );
-	snprintf ( uri_string, sizeof ( uri_string ), "tftp%s://%s:%d%s%s",
-		   sizeonly ? "size" : "", inet_ntoa ( address ),
-		   ntohs ( port ), ( ( filename[0] == '/' ) ? "" : "/" ),
-		   filename );
+	snprintf ( uri_string, sizeof ( uri_string ), "tftp://%s:%d%s%s",
+		   inet_ntoa ( address ), ntohs ( port ),
+		   ( ( filename[0] == '/' ) ? "" : "/" ), filename );
 	DBG ( " %s", uri_string );
 
 	/* Open PXE TFTP connection */
@@ -259,8 +257,7 @@ static PXENV_EXIT_t pxenv_tftp_open ( struct s_PXENV_TFTP_OPEN *tftp_open ) {
 	if ( ( rc = pxe_tftp_open ( tftp_open->ServerIPAddress,
 				    tftp_open->TFTPPort,
 				    tftp_open->FileName,
-				    tftp_open->PacketSize,
-				    0) ) != 0 ) {
+				    tftp_open->PacketSize ) ) != 0 ) {
 		tftp_open->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
@@ -483,7 +480,7 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 
 	/* Open TFTP file */
 	if ( ( rc = pxe_tftp_open ( tftp_read_file->ServerIPAddress, 0,
-				    tftp_read_file->FileName, 0, 0 ) ) != 0 ) {
+				    tftp_read_file->FileName, 0 ) ) != 0 ) {
 		tftp_read_file->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
@@ -553,7 +550,7 @@ static PXENV_EXIT_t pxenv_tftp_get_fsize ( struct s_PXENV_TFTP_GET_FSIZE
 
 	/* Open TFTP file */
 	if ( ( rc = pxe_tftp_open ( tftp_get_fsize->ServerIPAddress, 0,
-				    tftp_get_fsize->FileName, 0, 1 ) ) != 0 ) {
+				    tftp_get_fsize->FileName, 0 ) ) != 0 ) {
 		tftp_get_fsize->Status = PXENV_STATUS ( rc );
 		return PXENV_EXIT_FAILURE;
 	}
