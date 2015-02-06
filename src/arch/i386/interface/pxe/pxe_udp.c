@@ -34,14 +34,26 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+/** A PXE UDP pseudo-header */
+struct pxe_udp_pseudo_header {
+	/** Source IP address */
+	IP4_t src_ip;
+	/** Source port */
+	UDP_PORT_t s_port;
+	/** Destination IP address */
+	IP4_t dest_ip;
+	/** Destination port */
+	UDP_PORT_t d_port;
+} __attribute__ (( packed ));
+
 /** A PXE UDP connection */
 struct pxe_udp_connection {
 	/** Data transfer interface to UDP stack */
 	struct interface xfer;
 	/** Local address */
 	struct sockaddr_in local;
-	/** Current PXENV_UDP_READ parameter block */
-	struct s_PXENV_UDP_READ *pxenv_udp_read;
+	/** List of received packets */
+	struct list_head list;
 };
 
 /**
@@ -58,45 +70,38 @@ struct pxe_udp_connection {
 static int pxe_udp_deliver ( struct pxe_udp_connection *pxe_udp,
 			     struct io_buffer *iobuf,
 			     struct xfer_metadata *meta ) {
-	struct s_PXENV_UDP_READ *pxenv_udp_read = pxe_udp->pxenv_udp_read;
+	struct pxe_udp_pseudo_header *pshdr;
 	struct sockaddr_in *sin_src;
 	struct sockaddr_in *sin_dest;
-	userptr_t buffer;
-	size_t len;
-	int rc = 0;
+	int rc;
 
-	if ( ! pxenv_udp_read ) {
-		DBG ( "PXE discarded UDP packet\n" );
-		rc = -ENOBUFS;
-		goto done;
-	}
-
-	/* Copy packet to buffer and record length */
-	buffer = real_to_user ( pxenv_udp_read->buffer.segment,
-				pxenv_udp_read->buffer.offset );
-	len = iob_len ( iobuf );
-	if ( len > pxenv_udp_read->buffer_size )
-		len = pxenv_udp_read->buffer_size;
-	copy_to_user ( buffer, 0, iobuf->data, len );
-	pxenv_udp_read->buffer_size = len;
-
-	/* Fill in source/dest information */
+	/* Extract metadata */
 	assert ( meta );
 	sin_src = ( struct sockaddr_in * ) meta->src;
 	assert ( sin_src );
 	assert ( sin_src->sin_family == AF_INET );
-	pxenv_udp_read->src_ip = sin_src->sin_addr.s_addr;
-	pxenv_udp_read->s_port = sin_src->sin_port;
 	sin_dest = ( struct sockaddr_in * ) meta->dest;
 	assert ( sin_dest );
 	assert ( sin_dest->sin_family == AF_INET );
-	pxenv_udp_read->dest_ip = sin_dest->sin_addr.s_addr;
-	pxenv_udp_read->d_port = sin_dest->sin_port;
 
-	/* Mark as received */
-	pxe_udp->pxenv_udp_read = NULL;
+	/* Construct pseudo-header */
+	if ( ( rc = iob_ensure_headroom ( iobuf, sizeof ( *pshdr ) ) ) != 0 ) {
+		DBG ( "PXE could not prepend pseudo-header\n" );
+		rc = -ENOMEM;
+		goto drop;
+	}
+	pshdr = iob_push ( iobuf, sizeof ( *pshdr ) );
+	pshdr->src_ip = sin_src->sin_addr.s_addr;
+	pshdr->s_port = sin_src->sin_port;
+	pshdr->dest_ip = sin_dest->sin_addr.s_addr;
+	pshdr->d_port = sin_dest->sin_port;
 
- done:
+	/* Add to queue */
+	list_add_tail ( &iobuf->list, &pxe_udp->list );
+
+	return 0;
+
+ drop:
 	free_iob ( iobuf );
 	return rc;
 }
@@ -116,6 +121,7 @@ static struct pxe_udp_connection pxe_udp = {
 	.local = {
 		.sin_family = AF_INET,
 	},
+	.list = LIST_HEAD_INIT ( pxe_udp.list ),
 };
 
 /**
@@ -205,10 +211,19 @@ static PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *pxenv_udp_open ) {
  */
 static PXENV_EXIT_t
 pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *pxenv_udp_close ) {
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
+
 	DBG ( "PXENV_UDP_CLOSE\n" );
 
 	/* Close UDP connection */
 	intf_restart ( &pxe_udp.xfer, 0 );
+
+	/* Discard any received packets */
+	list_for_each_entry_safe ( iobuf, tmp, &pxe_udp.list, list ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+	}
 
 	pxenv_udp_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -365,20 +380,32 @@ pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	struct in_addr dest_ip_wanted = { .s_addr = pxenv_udp_read->dest_ip };
 	struct in_addr dest_ip;
+	struct io_buffer *iobuf;
+	struct pxe_udp_pseudo_header *pshdr;
 	uint16_t d_port_wanted = pxenv_udp_read->d_port;
 	uint16_t d_port;
+	userptr_t buffer;
+	size_t len;
 
-	/* Try receiving a packet */
-	pxe_udp.pxenv_udp_read = pxenv_udp_read;
-	step();
-	if ( pxe_udp.pxenv_udp_read ) {
+	/* Try receiving a packet, if the queue is empty */
+	if ( list_empty ( &pxe_udp.list ) )
+		step();
+
+	/* Remove first packet from the queue */
+	iobuf = list_first_entry ( &pxe_udp.list, struct io_buffer, list );
+	if ( ! iobuf ) {
 		/* No packet received */
 		DBG2 ( "PXENV_UDP_READ\n" );
-		pxe_udp.pxenv_udp_read = NULL;
 		goto no_packet;
 	}
-	dest_ip.s_addr = pxenv_udp_read->dest_ip;
-	d_port = pxenv_udp_read->d_port;
+	list_del ( &iobuf->list );
+
+	/* Strip pseudo-header */
+	assert ( iob_len ( iobuf ) >= sizeof ( *pshdr ) );
+	pshdr = iobuf->data;
+	iob_pull ( iobuf, sizeof ( *pshdr ) );
+	dest_ip.s_addr = pshdr->dest_ip;
+	d_port = pshdr->d_port;
 	DBG ( "PXENV_UDP_READ" );
 
 	/* Filter on destination address and/or port */
@@ -386,13 +413,28 @@ static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	     ( dest_ip_wanted.s_addr != dest_ip.s_addr ) ) {
 		DBG ( " wrong IP %s", inet_ntoa ( dest_ip ) );
 		DBG ( " (wanted %s)\n", inet_ntoa ( dest_ip_wanted ) );
-		goto no_packet;
+		goto drop;
 	}
 	if ( d_port_wanted && ( d_port_wanted != d_port ) ) {
 		DBG ( " wrong port %d", htons ( d_port ) );
 		DBG ( " (wanted %d)\n", htons ( d_port_wanted ) );
-		goto no_packet;
+		goto drop;
 	}
+
+	/* Copy packet to buffer and record length */
+	buffer = real_to_user ( pxenv_udp_read->buffer.segment,
+				pxenv_udp_read->buffer.offset );
+	len = iob_len ( iobuf );
+	if ( len > pxenv_udp_read->buffer_size )
+		len = pxenv_udp_read->buffer_size;
+	copy_to_user ( buffer, 0, iobuf->data, len );
+	pxenv_udp_read->buffer_size = len;
+
+	/* Fill in source/dest information */
+	pxenv_udp_read->src_ip = pshdr->src_ip;
+	pxenv_udp_read->s_port = pshdr->s_port;
+	pxenv_udp_read->dest_ip = pshdr->dest_ip;
+	pxenv_udp_read->d_port = pshdr->d_port;
 
 	DBG ( " %04x:%04x+%x %s:", pxenv_udp_read->buffer.segment,
 	      pxenv_udp_read->buffer.offset, pxenv_udp_read->buffer_size,
@@ -401,9 +443,14 @@ static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	      inet_ntoa ( *( ( struct in_addr * ) &pxenv_udp_read->dest_ip ) ),
 	      ntohs ( pxenv_udp_read->d_port ) );
 
+	/* Free I/O buffer */
+	free_iob ( iobuf );
+
 	pxenv_udp_read->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
 
+ drop:
+	free_iob ( iobuf );
  no_packet:
 	pxenv_udp_read->Status = PXENV_STATUS_FAILURE;
 	return PXENV_EXIT_FAILURE;
