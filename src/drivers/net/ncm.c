@@ -390,6 +390,7 @@ static void ncm_in_complete ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 	size_t ndp_len;
 	size_t pkt_offset;
 	size_t pkt_len;
+	size_t headroom;
 	size_t len;
 
 	/* Profile overall bulk IN completion */
@@ -460,13 +461,22 @@ static void ncm_in_complete ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 		 * while the device is running.  We therefore copy the
 		 * data to a new I/O buffer even if this is the only
 		 * (or last) packet within the buffer.
+		 *
+		 * We reserve enough space at the start of each buffer
+		 * to allow for our own transmission header, to
+		 * support protocols such as ARP which may modify the
+		 * received packet and reuse the same I/O buffer for
+		 * transmission.
 		 */
-		pkt = alloc_iob ( pkt_len );
+		headroom = ( sizeof ( struct ncm_ntb_header ) +
+			     ncm->out.padding );
+		pkt = alloc_iob ( headroom + pkt_len );
 		if ( ! pkt ) {
 			/* Record error and continue */
 			netdev_rx_err ( netdev, NULL, -ENOMEM );
 			continue;
 		}
+		iob_reserve ( pkt, headroom );
 		memcpy ( iob_put ( pkt, pkt_len ),
 			 ( iobuf->data + pkt_offset ), pkt_len );
 
