@@ -74,12 +74,11 @@ struct ncm_set_ntb_input_size {
 	uint32_t mtu;
 } __attribute__ (( packed ));
 
-/** NTB input size
- *
- * This is a policy decision.  2048 is the minimum size which must be
- * supported according to the specification.
- */
-#define NCM_NTB_INPUT_SIZE 2048
+/** Minimum allowed NTB input size */
+#define NCM_MIN_NTB_INPUT_SIZE 2048
+
+/** Maximum allowed NTB input size (16-bit) */
+#define NCM_MAX_NTB_INPUT_SIZE 65536
 
 /** CDC-NCM transfer header (16-bit) */
 struct ncm_transfer_header {
@@ -140,6 +139,26 @@ struct ncm_ntb_header {
 	struct ncm_datagram_descriptor desc[2];
 } __attribute__ (( packed ));
 
+/** A CDC-NCM receive ring */
+struct ncm_rx_ring {
+	/** USB endpoint */
+	struct usb_endpoint ep;
+	/** I/O buffer size */
+	size_t mtu;
+	/** Recycled buffer list */
+	struct list_head list;
+};
+
+/** A CDC-NCM transmit ring */
+struct ncm_tx_ring {
+	/** USB endpoint */
+	struct usb_endpoint ep;
+	/** Transmitted packet sequence number */
+	uint16_t sequence;
+	/** Alignment padding required on transmitted packets */
+	size_t padding;
+};
+
 /** A CDC-NCM network device */
 struct ncm_device {
 	/** USB device */
@@ -154,33 +173,39 @@ struct ncm_device {
 	/** Data interface */
 	unsigned int data;
 
-	/** Interrupt endpoint */
-	struct usb_endpoint intr;
-	/** Bulk IN endpoint */
-	struct usb_endpoint in;
-	/** Bulk OUT endpoint */
-	struct usb_endpoint out;
+	/** Maximum supported NTB input size */
+	size_t mtu;
 
-	/** Recycled interrupt I/O buffers */
-	struct list_head intrs;
-	/** Current bulk IN ring fill level */
-	unsigned int fill;
-	/** Transmitted packet sequence number */
-	uint16_t sequence;
-	/** Alignment padding required on transmitted packets */
-	size_t padding;
+	/** Interrupt ring */
+	struct ncm_rx_ring intr;
+	/** Bulk IN ring */
+	struct ncm_rx_ring in;
+	/** Bulk OUT ring */
+	struct ncm_tx_ring out;
 };
 
-/** Bulk IN ring fill level
+/** Bulk IN ring minimum buffer count
  *
  * This is a policy decision.
  */
-#define NCM_IN_FILL 16
+#define NCM_IN_MIN_COUNT 3
 
-/** Interrupt ring fill level
+/** Bulk IN ring minimum total buffer size
  *
  * This is a policy decision.
  */
-#define NCM_INTR_FILL 2
+#define NCM_IN_MIN_SIZE 16384
+
+/** Bulk IN ring maximum total buffer size
+ *
+ * This is a policy decision.
+ */
+#define NCM_IN_MAX_SIZE 131072
+
+/** Interrupt ring buffer count
+ *
+ * This is a policy decision.
+ */
+#define NCM_INTR_COUNT 2
 
 #endif /* _NCM_H */
