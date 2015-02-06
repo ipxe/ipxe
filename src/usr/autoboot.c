@@ -101,7 +101,7 @@ static struct uri * parse_next_server_and_filename ( struct in_addr next_server,
 	/* Construct a TFTP URI for the filename, if applicable */
 	if ( next_server.s_addr && filename[0] && ! uri_is_absolute ( uri ) ) {
 		uri_put ( uri );
-		uri = tftp_uri ( next_server, filename );
+		uri = tftp_uri ( next_server, 0, filename );
 		if ( ! uri )
 			return NULL;
 	}

@@ -203,7 +203,7 @@ extern char * resolve_path ( const char *base_path,
 			     const char *relative_path );
 extern struct uri * resolve_uri ( const struct uri *base_uri,
 				  struct uri *relative_uri );
-extern struct uri * tftp_uri ( struct in_addr next_server,
+extern struct uri * tftp_uri ( struct in_addr next_server, unsigned int port,
 			       const char *filename );
 extern void churi ( struct uri *uri );
 

@@ -661,6 +661,7 @@ struct uri * resolve_uri ( const struct uri *base_uri,
  * Construct TFTP URI from next-server and filename
  *
  * @v next_server	Next-server address
+ * @v port		Port number, or zero to use the default port
  * @v filename		Filename
  * @ret uri		URI, or NULL on failure
  *
@@ -669,12 +670,18 @@ struct uri * resolve_uri ( const struct uri *base_uri,
  * generic URI parser.  We provide a mechanism for directly
  * constructing a TFTP URI from the next-server and filename.
  */
-struct uri * tftp_uri ( struct in_addr next_server, const char *filename ) {
+struct uri * tftp_uri ( struct in_addr next_server, unsigned int port,
+			const char *filename ) {
+	char buf[ 6 /* "65535" + NUL */ ];
 	struct uri uri;
 
 	memset ( &uri, 0, sizeof ( uri ) );
 	uri.scheme = "tftp";
 	uri.host = inet_ntoa ( next_server );
+	if ( port ) {
+		snprintf ( buf, sizeof ( buf ), "%d", port );
+		uri.port = buf;
+	}
 	uri.path = filename;
 	return uri_dup ( &uri );
 }
