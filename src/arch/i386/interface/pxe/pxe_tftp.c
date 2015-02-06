@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/process.h>
+#include <ipxe/uri.h>
 #include <pxe.h>
 
 /** A PXE TFTP connection */
@@ -170,10 +171,10 @@ static struct pxe_tftp_connection pxe_tftp = {
  * @v blksize		Requested block size
  * @ret rc		Return status code
  */
-static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
-			   const unsigned char *filename, size_t blksize ) {
-	char uri_string[PXE_TFTP_URI_LEN];
+static int pxe_tftp_open ( IP4_t ipaddress, UDP_PORT_t port,
+			   UINT8_t *filename, UINT16_t blksize ) {
 	struct in_addr address;
+	struct uri *uri;
 	int rc;
 
 	/* Reset PXE TFTP connection structure */
@@ -184,18 +185,20 @@ static int pxe_tftp_open ( uint32_t ipaddress, unsigned int port,
 	pxe_tftp.blksize = blksize;
 	pxe_tftp.rc = -EINPROGRESS;
 
-	/* Construct URI string */
+	/* Construct URI */
 	address.s_addr = ipaddress;
-	if ( ! port )
-		port = htons ( TFTP_PORT );
-	snprintf ( uri_string, sizeof ( uri_string ), "tftp://%s:%d%s%s",
-		   inet_ntoa ( address ), ntohs ( port ),
-		   ( ( filename[0] == '/' ) ? "" : "/" ), filename );
-	DBG ( " %s", uri_string );
+	DBG ( " %s", inet_ntoa ( address ) );
+	if ( port )
+		DBG ( ":%d", ntohs ( port ) );
+	DBG ( ":%s", filename );
+	uri = tftp_uri ( address, ntohs ( port ), ( ( char * ) filename ) );
+	if ( ! uri ) {
+		DBG ( " could not create URI\n" );
+		return -ENOMEM;
+	}
 
 	/* Open PXE TFTP connection */
-	if ( ( rc = xfer_open_uri_string ( &pxe_tftp.xfer,
-					   uri_string ) ) != 0 ) {
+	if ( ( rc = xfer_open_uri ( &pxe_tftp.xfer, uri ) ) != 0 ) {
 		DBG ( " could not open (%s)\n", strerror ( rc ) );
 		return rc;
 	}
