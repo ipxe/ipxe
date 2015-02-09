@@ -831,7 +831,7 @@ usb_probe_all ( struct usb_device *usb,
 		func->dev.desc.vendor = le16_to_cpu ( usb->device.vendor );
 		func->dev.desc.device = le16_to_cpu ( usb->device.product );
 		snprintf ( func->dev.name, sizeof ( func->dev.name ),
-			   "%s-%d", usb->name, first );
+			   "%s-%d.%d", usb->name, config->config, first );
 		INIT_LIST_HEAD ( &func->dev.children );
 		func->dev.parent = bus->dev;
 
@@ -905,6 +905,133 @@ static void usb_remove_all ( struct usb_device *usb ) {
 	}
 }
 
+/**
+ * Select USB device configuration
+ *
+ * @v usb		USB device
+ * @v index		Configuration index
+ * @ret rc		Return status code
+ */
+static int usb_configure ( struct usb_device *usb, unsigned int index ) {
+	struct usb_configuration_descriptor partial;
+	struct usb_configuration_descriptor *config;
+	size_t len;
+	int rc;
+
+	/* Read first part of configuration descriptor to get size */
+	if ( ( rc = usb_get_config_descriptor ( usb, index, &partial,
+						sizeof ( partial ) ) ) != 0 ) {
+		DBGC ( usb, "USB %s could not get configuration descriptor %d: "
+		       "%s\n", usb->name, index, strerror ( rc ) );
+		goto err_get_partial;
+	}
+	len = le16_to_cpu ( partial.len );
+	if ( len < sizeof ( partial ) ) {
+		DBGC ( usb, "USB %s underlength configuraton descriptor %d\n",
+		       usb->name, index );
+		rc = -EINVAL;
+		goto err_partial_len;
+	}
+
+	/* Allocate buffer for whole configuration descriptor */
+	config = malloc ( len );
+	if ( ! config ) {
+		rc = -ENOMEM;
+		goto err_alloc_config;
+	}
+
+	/* Read whole configuration descriptor */
+	if ( ( rc = usb_get_config_descriptor ( usb, index, config,
+						len ) ) != 0 ) {
+		DBGC ( usb, "USB %s could not get configuration descriptor %d: "
+		       "%s\n", usb->name, index, strerror ( rc ) );
+		goto err_get_config_descriptor;
+	}
+	if ( config->len != partial.len ) {
+		DBGC ( usb, "USB %s bad configuration descriptor %d length\n",
+		       usb->name, index );
+		rc = -EINVAL;
+		goto err_config_len;
+	}
+
+	/* Set configuration */
+	if ( ( rc = usb_set_configuration ( usb, config->config ) ) != 0){
+		DBGC ( usb, "USB %s could not set configuration %d: %s\n",
+		       usb->name, config->config, strerror ( rc ) );
+		goto err_set_configuration;
+	}
+
+	/* Probe USB device drivers */
+	usb_probe_all ( usb, config );
+
+	/* Free configuration descriptor */
+	free ( config );
+
+	return 0;
+
+	usb_remove_all ( usb );
+	usb_set_configuration ( usb, 0 );
+ err_set_configuration:
+ err_config_len:
+ err_get_config_descriptor:
+	free ( config );
+ err_alloc_config:
+ err_partial_len:
+ err_get_partial:
+	return rc;
+}
+
+/**
+ * Clear USB device configuration
+ *
+ * @v usb		USB device
+ */
+static void usb_deconfigure ( struct usb_device *usb ) {
+	unsigned int i;
+
+	/* Remove device drivers */
+	usb_remove_all ( usb );
+
+	/* Sanity checks */
+	for ( i = 0 ; i < ( sizeof ( usb->ep ) / sizeof ( usb->ep[0] ) ) ; i++){
+		if ( i != USB_ENDPOINT_IDX ( USB_EP0_ADDRESS ) )
+			assert ( usb->ep[i] == NULL );
+	}
+
+	/* Clear device configuration */
+	usb_set_configuration ( usb, 0 );
+}
+
+/**
+ * Find and select a supported USB device configuration
+ *
+ * @v usb		USB device
+ * @ret rc		Return status code
+ */
+static int usb_configure_any ( struct usb_device *usb ) {
+	unsigned int index;
+	int rc = -ENOENT;
+
+	/* Attempt all configuration indexes */
+	for ( index = 0 ; index < usb->device.configurations ; index++ ) {
+
+		/* Attempt this configuration index */
+		if ( ( rc = usb_configure ( usb, index ) ) != 0 )
+			continue;
+
+		/* If we have no drivers, then try the next configuration */
+		if ( list_empty ( &usb->functions ) ) {
+			rc = -ENOTSUP;
+			usb_deconfigure ( usb );
+			continue;
+		}
+
+		return 0;
+	}
+
+	return rc;
+}
+
 /******************************************************************************
  *
  * USB device
@@ -948,11 +1075,8 @@ static int register_usb ( struct usb_device *usb ) {
 	struct usb_port *port = usb->port;
 	struct usb_hub *hub = port->hub;
 	struct usb_bus *bus = hub->bus;
-	struct usb_configuration_descriptor partial;
-	struct usb_configuration_descriptor *config;
 	unsigned int protocol;
 	size_t mtu;
-	size_t len;
 	int rc;
 
 	/* Add to port */
@@ -1040,65 +1164,14 @@ static int register_usb ( struct usb_device *usb ) {
 	       usb_bcd ( le16_to_cpu ( usb->device.protocol ) ),
 	       usb_speed_name ( port->speed ), usb->control.mtu );
 
-	/* Read first part of configuration descriptor to get size */
-	if ( ( rc = usb_get_config_descriptor ( usb, 0, &partial,
-						sizeof ( partial ) ) ) != 0 ) {
-		DBGC ( usb, "USB %s could not get configuration descriptor: "
-		       "%s\n", usb->name, strerror ( rc ) );
-		goto err_get_partial;
-	}
-	len = le16_to_cpu ( partial.len );
-	if ( len < sizeof ( partial ) ) {
-		DBGC ( usb, "USB %s underlength configuraton descriptor\n",
-		       usb->name );
-		rc = -EINVAL;
-		goto err_partial_len;
-	}
-
-	/* Allocate buffer for whole configuration descriptor */
-	config = malloc ( len );
-	if ( ! config ) {
-		rc = -ENOMEM;
-		goto err_alloc_config;
-	}
-
-	/* Read whole configuration descriptor */
-	if ( ( rc = usb_get_config_descriptor ( usb, 0, config, len ) ) != 0 ) {
-		DBGC ( usb, "USB %s could not get configuration descriptor: "
-		       "%s\n", usb->name, strerror ( rc ) );
-		goto err_get_config_descriptor;
-	}
-	if ( config->len != partial.len ) {
-		DBGC ( usb, "USB %s bad configuration descriptor length\n",
-		       usb->name );
-		rc = -EINVAL;
-		goto err_config_len;
-	}
-
-	/* Set configuration */
-	if ( ( rc = usb_set_configuration ( usb, config->config ) ) != 0){
-		DBGC ( usb, "USB %s could not set configuration %#02x: %s\n",
-		       usb->name, config->config, strerror ( rc ) );
-		goto err_set_configuration;
-	}
-
-	/* Probe USB device drivers */
-	usb_probe_all ( usb, config );
-
-	/* Free configuration descriptor */
-	free ( config );
+	/* Configure device */
+	if ( ( rc = usb_configure_any ( usb ) ) != 0 )
+		goto err_configure_any;
 
 	return 0;
 
-	usb_remove_all ( usb );
-	usb_set_configuration ( usb, 0 );
- err_set_configuration:
- err_config_len:
- err_get_config_descriptor:
-	free ( config );
- err_alloc_config:
- err_partial_len:
- err_get_partial:
+	usb_deconfigure ( usb );
+ err_configure_any:
  err_get_device_descriptor:
  err_mtu:
  err_get_mtu:
@@ -1126,20 +1199,12 @@ static void unregister_usb ( struct usb_device *usb ) {
 	struct usb_hub *hub = port->hub;
 	struct io_buffer *iobuf;
 	struct io_buffer *tmp;
-	unsigned int i;
-
-	/* Remove device drivers */
-	usb_remove_all ( usb );
 
 	/* Sanity checks */
-	for ( i = 0 ; i < ( sizeof ( usb->ep ) / sizeof ( usb->ep[0] ) ) ; i++){
-		if ( i != USB_ENDPOINT_IDX ( USB_EP0_ADDRESS ) )
-			assert ( usb->ep[i] == NULL );
-	}
 	assert ( port->usb == usb );
 
 	/* Clear device configuration */
-	usb_set_configuration ( usb, 0 );
+	usb_deconfigure ( usb );
 
 	/* Close control endpoint */
 	usb_endpoint_close ( &usb->control );

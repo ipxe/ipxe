@@ -1034,13 +1034,13 @@ usb_get_config_descriptor ( struct usb_device *usb, unsigned int index,
  * Set USB configuration
  *
  * @v usb		USB device
- * @v config		Configuration value
+ * @v index		Configuration index
  * @ret rc		Return status code
  */
 static inline __attribute__ (( always_inline )) int
-usb_set_configuration ( struct usb_device *usb, unsigned int config ) {
+usb_set_configuration ( struct usb_device *usb, unsigned int index ) {
 
-	return usb_control ( usb, USB_SET_CONFIGURATION, config, 0, NULL, 0 );
+	return usb_control ( usb, USB_SET_CONFIGURATION, index, 0, NULL, 0 );
 }
 
 /**
