@@ -14,6 +14,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Class code for communications devices */
 #define USB_CLASS_CDC 2
 
+/** Union functional descriptor */
+struct cdc_union_descriptor {
+	/** Descriptor header */
+	struct usb_descriptor_header header;
+	/** Descriptor subtype */
+	uint8_t subtype;
+	/** Interfaces (variable-length) */
+	uint8_t interface[1];
+} __attribute__ (( packed ));
+
+/** Union functional descriptor subtype */
+#define CDC_SUBTYPE_UNION 6
+
 /** Ethernet descriptor subtype */
 #define CDC_SUBTYPE_ETHERNET 15
 
@@ -34,5 +47,9 @@ struct cdc_connection_speed_change {
 	/** Uplink bit rate, in bits per second */
 	uint32_t up;
 } __attribute__ (( packed ));
+
+extern struct cdc_union_descriptor *
+cdc_union_descriptor ( struct usb_configuration_descriptor *config,
+		       struct usb_interface_descriptor *interface );
 
 #endif /* _IPXE_CDC_H */

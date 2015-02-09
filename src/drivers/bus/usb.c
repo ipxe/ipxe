@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <byteswap.h>
 #include <ipxe/usb.h>
+#include <ipxe/cdc.h>
 
 /** @file
  *
@@ -678,6 +679,7 @@ static int usb_function ( struct usb_function *func,
 	struct usb_device *usb = func->usb;
 	struct usb_interface_association_descriptor *association;
 	struct usb_interface_descriptor *interface;
+	struct cdc_union_descriptor *cdc_union;
 	unsigned int i;
 
 	/* First, look for an interface association descriptor */
@@ -685,8 +687,7 @@ static int usb_function ( struct usb_function *func,
 	if ( association ) {
 
 		/* Sanity check */
-		if ( ( association->first + association->count ) >
-		     config->interfaces ) {
+		if ( association->count > config->interfaces ) {
 			DBGC ( usb, "USB %s has invalid association [%d-%d)\n",
 			       func->name, association->first,
 			       ( association->first + association->count ) );
@@ -714,6 +715,30 @@ static int usb_function ( struct usb_function *func,
 	memcpy ( &func->class, &interface->class, sizeof ( func->class ) );
 	func->count = 1;
 	func->interface[0] = first;
+
+	/* Look for a CDC union descriptor, if applicable */
+	if ( ( func->class.class == USB_CLASS_CDC ) &&
+	     ( cdc_union = cdc_union_descriptor ( config, interface ) ) ) {
+
+		/* Determine interface count */
+		func->count = ( ( cdc_union->header.len -
+				  offsetof ( typeof ( *cdc_union ),
+					     interface[0] ) ) /
+				sizeof ( cdc_union->interface[0] ) );
+		if ( func->count > config->interfaces ) {
+			DBGC ( usb, "USB %s has invalid union functional "
+			       "descriptor with %d interfaces\n",
+			       func->name, func->count );
+			return -ERANGE;
+		}
+
+		/* Describe function */
+		for ( i = 0 ; i < func->count ; i++ )
+			func->interface[i] = cdc_union->interface[i];
+
+		return 0;
+	}
+
 	return 0;
 }
 
@@ -842,7 +867,11 @@ usb_probe_all ( struct usb_device *usb,
 
 		/* Mark interfaces as used */
 		for ( i = 0 ; i < func->count ; i++ ) {
-			assert ( func->interface[i] < config->interfaces );
+			if ( func->interface[i] >= config->interfaces ) {
+				DBGC ( usb, "USB %s has invalid interface %d\n",
+				       func->name, func->interface[i] );
+				goto err_interface;
+			}
 			used[ func->interface[i] ] = 1;
 		}
 
@@ -872,6 +901,7 @@ usb_probe_all ( struct usb_device *usb,
 	err_probe:
 		free ( func );
 	err_alloc:
+	err_interface:
 	err_function:
 		/* Continue registering other functions */
 		continue;
