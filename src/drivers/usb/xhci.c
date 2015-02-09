@@ -1986,6 +1986,7 @@ static void xhci_configure_endpoint_input ( struct xhci_device *xhci,
 
 	/* Populate endpoint context */
 	ep_ctx = ( input + xhci_input_context_offset ( xhci, endpoint->ctx ) );
+	ep_ctx->interval = endpoint->interval;
 	ep_ctx->type = endpoint->type;
 	ep_ctx->burst = endpoint->ep->burst;
 	ep_ctx->mtu = cpu_to_le16 ( endpoint->ep->mtu );
@@ -2252,6 +2253,7 @@ static int xhci_endpoint_open ( struct usb_endpoint *ep ) {
 	struct xhci_endpoint *endpoint;
 	unsigned int ctx;
 	unsigned int type;
+	unsigned int interval;
 	int rc;
 
 	/* Calculate context index */
@@ -2264,6 +2266,13 @@ static int xhci_endpoint_open ( struct usb_endpoint *ep ) {
 		type = XHCI_EP_TYPE_CONTROL;
 	if ( ep->address & USB_DIR_IN )
 		type |= XHCI_EP_TYPE_IN;
+
+	/* Calculate interval */
+	if ( type & XHCI_EP_TYPE_PERIODIC ) {
+		interval = ( fls ( ep->interval ) - 1 );
+	} else {
+		interval = ep->interval;
+	}
 
 	/* Allocate and initialise structure */
 	endpoint = zalloc ( sizeof ( *endpoint ) );
@@ -2278,6 +2287,7 @@ static int xhci_endpoint_open ( struct usb_endpoint *ep ) {
 	endpoint->ep = ep;
 	endpoint->ctx = ctx;
 	endpoint->type = type;
+	endpoint->interval = interval;
 	endpoint->context = ( ( ( void * ) slot->context ) +
 			      xhci_device_context_offset ( xhci, ctx ) );
 

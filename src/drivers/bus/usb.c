@@ -227,10 +227,13 @@ int usb_endpoint_described ( struct usb_endpoint *ep,
 			     struct usb_configuration_descriptor *config,
 			     struct usb_interface_descriptor *interface,
 			     unsigned int type, unsigned int index ) {
+	struct usb_device *usb = ep->usb;
+	struct usb_port *port = usb->port;
 	struct usb_endpoint_descriptor *desc;
 	struct usb_endpoint_companion_descriptor *descx;
 	unsigned int sizes;
 	unsigned int burst;
+	unsigned int interval;
 	size_t mtu;
 
 	/* Locate endpoint descriptor */
@@ -246,9 +249,23 @@ int usb_endpoint_described ( struct usb_endpoint *ep,
 	mtu = USB_ENDPOINT_MTU ( sizes );
 	burst = ( descx ? descx->burst : USB_ENDPOINT_BURST ( sizes ) );
 
+	/* Calculate interval */
+	if ( type == USB_INTERRUPT ) {
+		if ( port->speed >= USB_SPEED_HIGH ) {
+			/* 2^(desc->interval-1) is a microframe count */
+			interval = ( 1 << ( desc->interval - 1 ) );
+		} else {
+			/* desc->interval is a (whole) frame count */
+			interval = ( desc->interval << 3 );
+		}
+	} else {
+		/* desc->interval is a microframe count */
+		interval = desc->interval;
+	}
+
 	/* Describe endpoint */
 	usb_endpoint_describe ( ep, desc->endpoint, desc->attributes,
-				mtu, burst );
+				mtu, burst, interval );
 	return 0;
 }
 
@@ -286,8 +303,9 @@ int usb_endpoint_open ( struct usb_endpoint *ep ) {
 	}
 	ep->open = 1;
 
-	DBGC2 ( usb, "USB %s %s opened with MTU %zd (burst %d)\n", usb->name,
-		usb_endpoint_name ( ep->address ), ep->mtu, ep->burst );
+	DBGC2 ( usb, "USB %s %s opened with MTU %zd, burst %d, interval %d\n",
+		usb->name, usb_endpoint_name ( ep->address ), ep->mtu,
+		ep->burst, ep->interval );
 	return 0;
 
 	ep->open = 0;
@@ -1147,7 +1165,8 @@ static int register_usb ( struct usb_device *usb ) {
 	/* Describe control endpoint */
 	mtu = USB_EP0_DEFAULT_MTU ( port->speed );
 	usb_endpoint_describe ( &usb->control, USB_EP0_ADDRESS,
-				USB_EP0_ATTRIBUTES, mtu, USB_EP0_BURST );
+				USB_EP0_ATTRIBUTES, mtu, USB_EP0_BURST,
+				USB_EP0_INTERVAL );
 
 	/* Open control endpoint */
 	if ( ( rc = usb_endpoint_open ( &usb->control ) ) != 0 )

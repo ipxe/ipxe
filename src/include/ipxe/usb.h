@@ -372,6 +372,8 @@ struct usb_endpoint {
 	size_t mtu;
 	/** Maximum burst size */
 	unsigned int burst;
+	/** Interval (in microframes) */
+	unsigned int interval;
 
 	/** Endpoint is open */
 	int open;
@@ -462,6 +464,9 @@ struct usb_endpoint_driver_operations {
 /** Control endpoint maximum burst size */
 #define USB_EP0_BURST 0
 
+/** Control endpoint interval */
+#define USB_EP0_INTERVAL 0
+
 /** Maximum endpoint number */
 #define USB_ENDPOINT_MAX 0x0f
 
@@ -496,16 +501,18 @@ usb_endpoint_init ( struct usb_endpoint *ep, struct usb_device *usb,
  * @v attributes	Attributes
  * @v mtu		Maximum packet size
  * @v burst		Maximum burst size
+ * @v interval		Interval (in microframes)
  */
 static inline __attribute__ (( always_inline )) void
 usb_endpoint_describe ( struct usb_endpoint *ep, unsigned int address,
 			unsigned int attributes, size_t mtu,
-			unsigned int burst ) {
+			unsigned int burst, unsigned int interval ) {
 
 	ep->address = address;
 	ep->attributes = attributes;
 	ep->mtu = mtu;
 	ep->burst = burst;
+	ep->interval = interval;
 }
 
 /**

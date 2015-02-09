@@ -806,6 +806,9 @@ enum xhci_endpoint_state {
 /** Input endpoint type */
 #define XHCI_EP_TYPE_IN XHCI_EP_TYPE ( 4 )
 
+/** Periodic endpoint type */
+#define XHCI_EP_TYPE_PERIODIC XHCI_EP_TYPE ( 1 )
+
 /** Endpoint dequeue cycle state */
 #define XHCI_EP_DCS 0x00000001UL
 
@@ -1078,6 +1081,8 @@ struct xhci_endpoint {
 	unsigned int ctx;
 	/** Endpoint type */
 	unsigned int type;
+	/** Endpoint interval */
+	unsigned int interval;
 	/** Endpoint context */
 	struct xhci_endpoint_context *context;
 	/** Transfer ring */
