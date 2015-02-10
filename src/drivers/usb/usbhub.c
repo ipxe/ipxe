@@ -52,7 +52,7 @@ static void hub_refill ( struct usb_hub_device *hubdev ) {
 		iob_put ( iobuf, ( mtu - iob_len ( iobuf ) ) );
 
 		/* Enqueue I/O buffer */
-		if ( ( rc = usb_stream ( &hubdev->intr, iobuf ) ) != 0 ) {
+		if ( ( rc = usb_stream ( &hubdev->intr, iobuf, 0 ) ) != 0 ) {
 			DBGC ( hubdev, "HUB %s could not enqueue interrupt: "
 			       "%s\n", hubdev->name, strerror ( rc ) );
 			/* Leave in available list and wait for next refill */

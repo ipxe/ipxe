@@ -428,10 +428,11 @@ struct usb_endpoint_host_operations {
 	 *
 	 * @v ep		USB endpoint
 	 * @v iobuf		I/O buffer
+	 * @v terminate		Terminate using a short packet
 	 * @ret rc		Return status code
 	 */
-	int ( * stream ) ( struct usb_endpoint *ep,
-			   struct io_buffer *iobuf );
+	int ( * stream ) ( struct usb_endpoint *ep, struct io_buffer *iobuf,
+			   int terminate );
 };
 
 /** USB endpoint driver operations */
@@ -547,7 +548,8 @@ extern void usb_endpoint_close ( struct usb_endpoint *ep );
 extern int usb_message ( struct usb_endpoint *ep, unsigned int request,
 			 unsigned int value, unsigned int index,
 			 struct io_buffer *iobuf );
-extern int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf );
+extern int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
+			int terminate );
 extern void usb_complete_err ( struct usb_endpoint *ep,
 			       struct io_buffer *iobuf, int rc );
 

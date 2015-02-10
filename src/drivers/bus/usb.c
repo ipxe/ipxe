@@ -451,9 +451,11 @@ int usb_message ( struct usb_endpoint *ep, unsigned int request,
  *
  * @v ep		USB endpoint
  * @v iobuf		I/O buffer
+ * @v terminate		Terminate using a short packet
  * @ret rc		Return status code
  */
-int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf ) {
+int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
+		 int terminate ) {
 	struct usb_device *usb = ep->usb;
 	struct usb_port *port = usb->port;
 	int rc;
@@ -467,7 +469,7 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf ) {
 		return rc;
 
 	/* Enqueue stream transfer */
-	if ( ( rc = ep->host->stream ( ep, iobuf ) ) != 0 ) {
+	if ( ( rc = ep->host->stream ( ep, iobuf, terminate ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not enqueue stream transfer: %s\n",
 		       usb->name, usb_endpoint_name ( ep->address ),
 		       strerror ( rc ) );

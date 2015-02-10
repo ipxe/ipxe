@@ -2457,27 +2457,37 @@ static int xhci_endpoint_message ( struct usb_endpoint *ep,
  *
  * @v ep		USB endpoint
  * @v iobuf		I/O buffer
+ * @v terminate		Terminate using a short packet
  * @ret rc		Return status code
  */
 static int xhci_endpoint_stream ( struct usb_endpoint *ep,
-				  struct io_buffer *iobuf ) {
+				  struct io_buffer *iobuf, int terminate ) {
 	struct xhci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
-	union xhci_trb trb;
+	union xhci_trb trbs[ 1 /* Normal */ + 1 /* Possible zero-length */ ];
+	union xhci_trb *trb = trbs;
 	struct xhci_trb_normal *normal;
+	size_t len = iob_len ( iobuf );
 	int rc;
 
 	/* Profile stream transfers */
 	profile_start ( &xhci_stream_profiler );
 
 	/* Construct normal TRBs */
-	normal = &trb.normal;
+	memset ( &trbs, 0, sizeof ( trbs ) );
+	normal = &(trb++)->normal;
 	normal->data = cpu_to_le64 ( virt_to_phys ( iobuf->data ) );
-	normal->len = cpu_to_le32 ( iob_len ( iobuf ) );
-	normal->flags = XHCI_TRB_IOC;
+	normal->len = cpu_to_le32 ( len );
 	normal->type = XHCI_TRB_NORMAL;
+	if ( terminate && ( ( len & ( ep->mtu - 1 ) ) == 0 ) ) {
+		normal->flags = XHCI_TRB_CH;
+		normal = &(trb++)->normal;
+		normal->type = XHCI_TRB_NORMAL;
+	}
+	normal->flags = XHCI_TRB_IOC;
 
 	/* Enqueue TRBs */
-	if ( ( rc = xhci_enqueue ( &endpoint->ring, iobuf, &trb ) ) != 0 )
+	if ( ( rc = xhci_enqueue_multi ( &endpoint->ring, iobuf, trbs,
+					 ( trb - trbs ) ) ) != 0 )
 		return rc;
 
 	/* Ring the doorbell */

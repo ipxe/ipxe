@@ -145,7 +145,7 @@ static int ncm_rx_refill ( struct ncm_device *ncm, struct ncm_rx_ring *ring ) {
 		iob_put ( iobuf, ( ring->mtu - iob_len ( iobuf ) ) );
 
 		/* Enqueue I/O buffer */
-		if ( ( rc = usb_stream ( &ring->ep, iobuf ) ) != 0 ) {
+		if ( ( rc = usb_stream ( &ring->ep, iobuf, 0 ) ) != 0 ) {
 			DBGC ( ncm, "NCM %p could not enqueue %s: %s\n", ncm,
 			       ncm_rx_name ( ncm, ring ), strerror ( rc ) );
 			/* Leave in recycled list and wait for next refill */
@@ -548,7 +548,7 @@ static int ncm_out_transmit ( struct ncm_device *ncm,
 	memset ( &header->desc[1], 0, sizeof ( header->desc[1] ) );
 
 	/* Enqueue I/O buffer */
-	if ( ( rc = usb_stream ( &ncm->out.ep, iobuf ) ) != 0 )
+	if ( ( rc = usb_stream ( &ncm->out.ep, iobuf, 0 ) ) != 0 )
 		return rc;
 
 	/* Increment sequence number */
