@@ -590,7 +590,8 @@ init_message:
 	.ascii	"\n"
 	.ascii	PRODUCT_NAME
 	.ascii	"\n"
-	.asciz	"iPXE (http://ipxe.org)"
+	.ascii	PRODUCT_SHORT_NAME
+	.asciz	" (http://ipxe.org)"
 	.size	init_message, . - init_message
 .ifeqs	BUSTYPE, "PCIR"
 init_message_pci:

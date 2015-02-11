@@ -42,6 +42,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <usr/prompt.h>
 #include <usr/autoboot.h>
 #include <config/general.h>
+#include <config/branding.h>
 
 /** @file
  *
@@ -522,7 +523,8 @@ static int shell_banner ( void ) {
 
 	/* Prompt user */
 	printf ( "\n" );
-	return ( prompt ( "Press Ctrl-B for the iPXE command line...",
+	return ( prompt ( "Press Ctrl-B for the " PRODUCT_SHORT_NAME
+			  " command line...",
 			  ( ( BANNER_TIMEOUT * TICKS_PER_SEC ) / 10 ),
 			  CTRL_B ) == 0 );
 }
@@ -549,10 +551,10 @@ void ipxe ( struct net_device *netdev ) {
 	 * do so.
 	 *
 	 */
-	printf ( NORMAL "\n\n%s\n" BOLD "iPXE %s"
+	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD PRODUCT_SHORT_NAME " %s"
 		 NORMAL " -- Open Source Network Boot Firmware -- "
 		 CYAN "http://ipxe.org" NORMAL "\n"
-		 "Features:", product_name, product_version );
+		 "Features:", product_version );
 	for_each_table_entry ( feature, FEATURES )
 		printf ( " %s", feature->name );
 	printf ( "\n" );

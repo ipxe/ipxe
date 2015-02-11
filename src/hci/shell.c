@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/shell.h>
+#include <config/branding.h>
 
 /** @file
  *
@@ -36,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** The shell prompt string */
-static const char shell_prompt[] = "iPXE> ";
+static const char shell_prompt[] = PRODUCT_SHORT_NAME "> ";
 
 /**
  * "help" command
