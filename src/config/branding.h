@@ -117,6 +117,49 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 #define PRODUCT_COMMAND_URI "http://ipxe.org/cmd/%s"
 
+/*
+ * Setting help messages
+ *
+ * iPXE setting help messages include a URI constructed from the
+ * setting name, such as
+ *
+ *   "http://ipxe.org/cfg/initiator-iqn"
+ *
+ * The iPXE web site includes documentation for the settings used by
+ * iPXE, including:
+ *
+ * - details of the corresponding DHCP option number.
+ *
+ * - details of the corresponding ISC dhcpd option name.
+ *
+ * - examples of using the setting from the iPXE command line, or in
+ *   iPXE scripts.
+ *
+ * - examples of configuring the setting via a DHCP server.
+ *
+ * - a formal description of the setting.
+ *
+ * - links to documentation for related settings.
+ *
+ * - links to documentation for relevant build options.
+ *
+ * - general notes about the setting.
+ *
+ * If you want to provide your own documentation for all of the
+ * settings used by iPXE, rather than using the existing support
+ * infrastructure provided by http://ipxe.org, then you may define a
+ * custom URI to be included within setting help messages.
+ *
+ * Note that the custom URI is a printf() format string which must
+ * include a format specifier for the setting name.
+ *
+ * [ Please also note that the existing documentation is licensed
+ *   under Creative Commons terms which require attribution to the
+ *   iPXE project and prohibit the alteration or removal of any
+ *   references to "iPXE". ]
+ */
+#define PRODUCT_SETTING_URI "http://ipxe.org/cfg/%s"
+
 #include <config/local/branding.h>
 
 #endif /* CONFIG_BRANDING_H */

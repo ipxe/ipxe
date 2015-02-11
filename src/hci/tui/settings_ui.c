@@ -378,8 +378,7 @@ static void draw_info_row ( struct setting_widget *widget ) {
 	msg ( INFO_ROW, "%s - %s", buf, widget->row.setting.description );
 	attroff ( A_BOLD );
 	color_set ( CPAIR_URL, NULL );
-	msg ( ( INFO_ROW + 1 ), "http://ipxe.org/cfg/%s",
-	      widget->row.setting.name );
+	msg ( ( INFO_ROW + 1 ), PRODUCT_SETTING_URI, widget->row.setting.name );
 	color_set ( CPAIR_NORMAL, NULL );
 }
 

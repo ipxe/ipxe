@@ -59,6 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_hii.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_strings.h>
+#include <config/branding.h>
 
 /** EFI platform setup formset GUID */
 static EFI_GUID efi_hii_platform_setup_formset_guid
@@ -136,7 +137,7 @@ static void efi_snp_hii_questions ( struct efi_snp_device *snpdev,
 		previous = setting;
 		name_id = efi_ifr_string ( ifr, "%s", setting->name );
 		prompt_id = efi_ifr_string ( ifr, "%s", setting->description );
-		help_id = efi_ifr_string ( ifr, "http://ipxe.org/cfg/%s",
+		help_id = efi_ifr_string ( ifr, PRODUCT_SETTING_URI,
 					   setting->name );
 		question_id = setting->tag;
 		efi_ifr_string_op ( ifr, prompt_id, help_id,
