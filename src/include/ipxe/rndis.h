@@ -347,6 +347,8 @@ extern void rndis_tx_complete_err ( struct rndis_device *rndis,
 extern int rndis_tx_defer ( struct rndis_device *rndis,
 			    struct io_buffer *iobuf );
 extern void rndis_rx ( struct rndis_device *rndis, struct io_buffer *iobuf );
+extern void rndis_rx_err ( struct rndis_device *rndis, struct io_buffer *iobuf,
+			   int rc );
 
 extern struct rndis_device * alloc_rndis ( size_t priv_len );
 extern int register_rndis ( struct rndis_device *rndis );

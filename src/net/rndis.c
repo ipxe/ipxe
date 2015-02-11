@@ -796,6 +796,21 @@ void rndis_rx ( struct rndis_device *rndis, struct io_buffer *iobuf ) {
 }
 
 /**
+ * Discard packet from underlying transport layer
+ *
+ * @v rndis		RNDIS device
+ * @v iobuf		I/O buffer
+ * @v rc		Packet status code
+ */
+void rndis_rx_err ( struct rndis_device *rndis, struct io_buffer *iobuf,
+		    int rc ) {
+	struct net_device *netdev = rndis->netdev;
+
+	/* Record error */
+	netdev_rx_err ( netdev, iob_disown ( iobuf ), rc );
+}
+
+/**
  * Set receive filter
  *
  * @v rndis		RNDIS device
