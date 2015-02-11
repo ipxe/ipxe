@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 #define PRODUCT_NAME ""
 #define PRODUCT_SHORT_NAME "iPXE"
+#define PRODUCT_URI "http://ipxe.org"
 
 #include <config/local/branding.h>
 
