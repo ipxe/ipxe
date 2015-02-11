@@ -2774,6 +2774,11 @@ static int xhci_hub_open ( struct usb_hub *hub ) {
 		}
 	}
 
+	/* Some xHCI cards seem to require an additional delay after
+	 * setting the link state to RxDetect.
+	 */
+	mdelay ( XHCI_LINK_STATE_DELAY_MS );
+
 	/* Record hub driver private data */
 	usb_hub_set_drvdata ( hub, xhci );
 
