@@ -552,7 +552,7 @@ void ipxe ( struct net_device *netdev ) {
 	 *
 	 */
 	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD PRODUCT_SHORT_NAME " %s"
-		 NORMAL " -- Open Source Network Boot Firmware -- "
+		 NORMAL " -- " PRODUCT_TAG_LINE " -- "
 		 CYAN PRODUCT_URI NORMAL "\nFeatures:", product_version );
 	for_each_table_entry ( feature, FEATURES )
 		printf ( " %s", feature->name );

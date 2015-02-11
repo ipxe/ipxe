@@ -29,6 +29,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define PRODUCT_URI "http://ipxe.org"
 
 /*
+ * Tag line
+ *
+ * If your PRODUCT_SHORT_NAME is longer than the four characters used
+ * by "iPXE", then the standard tag line "Open Source Network Boot
+ * Firmware" is unlikely to fit neatly onto the screen.
+ */
+#define PRODUCT_TAG_LINE "Open Source Network Boot Firmware"
+
+/*
  * Error messages
  *
  * iPXE error messages comprise a summary error message
