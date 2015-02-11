@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ipxe/errortab.h>
+#include <config/branding.h>
 
 /** @file
  *
@@ -88,11 +89,11 @@ const char * strerror ( int errno ) {
 	/* Construct the error message */
 	if ( errortab ) {
 		snprintf ( errbuf, sizeof ( errbuf ),
-			   "%s (http://ipxe.org/%08x)",
+			   "%s (" PRODUCT_ERROR_URI ")",
 			   errortab->text, errno );
 	} else {
 		snprintf ( errbuf, sizeof ( errbuf ),
-			   "Error %#08x (http://ipxe.org/%08x)",
+			   "Error %#08x (" PRODUCT_ERROR_URI ")",
 			   errno, errno );
 	}
 
