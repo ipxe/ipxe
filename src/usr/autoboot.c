@@ -542,7 +542,7 @@ void ipxe ( struct net_device *netdev ) {
 	 *
 	 *
 	 * If you wish to brand this build of iPXE, please do so by
-	 * defining the string PRODUCT_NAME in config/general.h.
+	 * defining the string PRODUCT_NAME in config/branding.h.
 	 *
 	 * While nothing in the GPL prevents you from removing all
 	 * references to iPXE or http://ipxe.org, we prefer you not to

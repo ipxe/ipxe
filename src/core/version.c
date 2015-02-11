@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/features.h>
 #include <ipxe/version.h>
 #include <config/general.h>
+#include <config/branding.h>
 
 /**
  * Create wide-character version of string
