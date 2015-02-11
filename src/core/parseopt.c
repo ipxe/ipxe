@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/params.h>
 #include <ipxe/timer.h>
 #include <ipxe/parseopt.h>
+#include <config/branding.h>
 
 /** @file
  *
@@ -343,7 +344,7 @@ void print_usage ( struct command_descriptor *cmd, char **argv ) {
 	}
 	if ( cmd->usage )
 		printf ( " %s", cmd->usage );
-	printf ( "\n\nSee http://ipxe.org/cmd/%s for further information\n",
+	printf ( "\n\nSee " PRODUCT_COMMAND_URI " for further information\n",
 		 argv[0] );
 }
 

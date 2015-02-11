@@ -73,6 +73,50 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 #define PRODUCT_ERROR_URI "http://ipxe.org/%08x"
 
+/*
+ * Command help messages
+ *
+ * iPXE command help messages include a URI constructed from the
+ * command name, such as
+ *
+ *   "See http://ipxe.org/cmd/vcreate for further information"
+ *
+ * The iPXE web site includes documentation for the commands provided
+ * by the iPXE shell, including:
+ *
+ * - details of the command syntax (e.g. "vcreate --tag <tag>
+ *   [--priority <priority>] <trunk interface>").
+ *
+ * - example usages of the command (e.g. "vcreate --tag 123 net0")
+ *
+ * - a formal description of the command (e.g. "Create a VLAN network
+ *   interface on an existing trunk network interface. The new network
+ *   interface will be named by appending a hyphen and the VLAN tag
+ *   value to the trunk network interface name.")
+ *
+ * - details of the possible exit statuses from the command.
+ *
+ * - links to documentation for related commands (e.g. "vdestroy")
+ *
+ * - links to documentation for relevant build options (e.g. "VLAN_CMD").
+ *
+ * - general hints and tips on using the command.
+ *
+ * If you want to provide your own documentation for all of the
+ * commands provided by the iPXE shell, rather than using the existing
+ * support infrastructure provided by http://ipxe.org, then you may
+ * define a custom URI to be included within command help messages.
+ *
+ * Note that the custom URI is a printf() format string which must
+ * include a format specifier for the command name.
+ *
+ * [ Please also note that the existing documentation is licensed
+ *   under Creative Commons terms which require attribution to the
+ *   iPXE project and prohibit the alteration or removal of any
+ *   references to "iPXE". ]
+ */
+#define PRODUCT_COMMAND_URI "http://ipxe.org/cmd/%s"
+
 #include <config/local/branding.h>
 
 #endif /* CONFIG_BRANDING_H */
