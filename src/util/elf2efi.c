@@ -481,8 +481,7 @@ static void process_reloc ( bfd *bfd __attribute__ (( unused )),
 	} else if ( strcmp ( howto->name, "R_X86_64_64" ) == 0 ) {
 		/* Generate an 8-byte PE relocation */
 		generate_pe_reloc ( pe_reltab, offset, 8 );
-	} else if ( ( strcmp ( howto->name, "R_386_32" ) == 0 ) ||
-		    ( strcmp ( howto->name, "R_X86_64_32" ) == 0 ) ) {
+	} else if ( strcmp ( howto->name, "R_386_32" ) == 0 ) {
 		/* Generate a 4-byte PE relocation */
 		generate_pe_reloc ( pe_reltab, offset, 4 );
 	} else if ( strcmp ( howto->name, "R_386_16" ) == 0 ) {
