@@ -139,26 +139,6 @@ struct ncm_ntb_header {
 	struct ncm_datagram_descriptor desc[2];
 } __attribute__ (( packed ));
 
-/** A CDC-NCM receive ring */
-struct ncm_rx_ring {
-	/** USB endpoint */
-	struct usb_endpoint ep;
-	/** I/O buffer size */
-	size_t mtu;
-	/** Recycled buffer list */
-	struct list_head list;
-};
-
-/** A CDC-NCM transmit ring */
-struct ncm_tx_ring {
-	/** USB endpoint */
-	struct usb_endpoint ep;
-	/** Transmitted packet sequence number */
-	uint16_t sequence;
-	/** Alignment padding required on transmitted packets */
-	size_t padding;
-};
-
 /** A CDC-NCM network device */
 struct ncm_device {
 	/** USB device */
@@ -175,13 +155,17 @@ struct ncm_device {
 
 	/** Maximum supported NTB input size */
 	size_t mtu;
+	/** Transmitted packet sequence number */
+	uint16_t sequence;
+	/** Alignment padding required on transmitted packets */
+	size_t padding;
 
-	/** Interrupt ring */
-	struct ncm_rx_ring intr;
-	/** Bulk IN ring */
-	struct ncm_rx_ring in;
-	/** Bulk OUT ring */
-	struct ncm_tx_ring out;
+	/** Interrupt endpoint */
+	struct usb_endpoint intr;
+	/** Bulk IN endpoint */
+	struct usb_endpoint in;
+	/** Bulk OUT endpoint */
+	struct usb_endpoint out;
 };
 
 /** Bulk IN ring minimum buffer count
