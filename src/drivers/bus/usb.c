@@ -1314,6 +1314,9 @@ static int usb_attached ( struct usb_port *port ) {
 	struct usb_device *usb;
 	int rc;
 
+	/* Mark port as attached */
+	port->attached = 1;
+
 	/* Sanity checks */
 	assert ( port->usb == NULL );
 
@@ -1345,8 +1348,12 @@ static int usb_attached ( struct usb_port *port ) {
 static void usb_detached ( struct usb_port *port ) {
 	struct usb_device *usb = port->usb;
 
-	/* Sanity checks */
-	assert ( port->usb != NULL );
+	/* Mark port as detached */
+	port->attached = 0;
+
+	/* Do nothing if we have no USB device */
+	if ( ! usb )
+		return;
 
 	/* Unregister USB device */
 	unregister_usb ( usb );
@@ -1373,10 +1380,10 @@ static int usb_hotplug ( struct usb_port *port ) {
 	}
 
 	/* Handle attached/detached device as applicable */
-	if ( port->speed && ! port->usb ) {
+	if ( port->speed && ! port->attached ) {
 		/* Newly attached device */
 		return usb_attached ( port );
-	} else if ( port->usb && ! port->speed ) {
+	} else if ( port->attached && ! port->speed ) {
 		/* Newly detached device */
 		usb_detached ( port );
 		return 0;
@@ -1546,7 +1553,7 @@ void unregister_usb_hub ( struct usb_hub *hub ) {
 	/* Detach all devices */
 	for ( i = 1 ; i <= hub->ports ; i++ ) {
 		port = usb_port ( hub, i );
-		if ( port->usb )
+		if ( port->attached )
 			usb_detached ( port );
 	}
 
@@ -1576,6 +1583,7 @@ void free_usb_hub ( struct usb_hub *hub ) {
 	/* Sanity checks */
 	for ( i = 1 ; i <= hub->ports ; i++ ) {
 		port = usb_port ( hub, i );
+		assert ( ! port->attached );
 		assert ( port->usb == NULL );
 		assert ( list_empty ( &port->list ) );
 	}

@@ -702,7 +702,13 @@ struct usb_port {
 	unsigned int protocol;
 	/** Port speed */
 	unsigned int speed;
-	/** Currently attached device (if any) */
+	/** Port has an attached device */
+	int attached;
+	/** Currently attached device (if in use)
+	 *
+	 * Note that this field will be NULL if the attached device
+	 * has been freed (e.g. because there were no drivers found).
+	 */
 	struct usb_device *usb;
 	/** List of changed ports */
 	struct list_head list;
