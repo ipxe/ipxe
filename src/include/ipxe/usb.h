@@ -379,6 +379,8 @@ struct usb_endpoint {
 	int open;
 	/** Current failure state (if any) */
 	int rc;
+	/** Buffer fill level */
+	unsigned int fill;
 
 	/** Host controller operations */
 	struct usb_endpoint_host_operations *host;
@@ -386,6 +388,13 @@ struct usb_endpoint {
 	void *priv;
 	/** Driver operations */
 	struct usb_endpoint_driver_operations *driver;
+
+	/** Recycled I/O buffer list */
+	struct list_head recycled;
+	/** Refill buffer length */
+	size_t len;
+	/** Maximum fill level */
+	unsigned int max;
 };
 
 /** USB endpoint host controller operations */
@@ -552,6 +561,37 @@ extern int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 			int terminate );
 extern void usb_complete_err ( struct usb_endpoint *ep,
 			       struct io_buffer *iobuf, int rc );
+
+/**
+ * Initialise USB endpoint refill
+ *
+ * @v ep		USB endpoint
+ * @v len		Refill buffer length (or zero to use endpoint's MTU)
+ * @v max		Maximum fill level
+ */
+static inline __attribute__ (( always_inline )) void
+usb_refill_init ( struct usb_endpoint *ep, size_t len, unsigned int max ) {
+
+	INIT_LIST_HEAD ( &ep->recycled );
+	ep->len = len;
+	ep->max = max;
+}
+
+/**
+ * Recycle I/O buffer
+ *
+ * @v ep		USB endpoint
+ * @v iobuf		I/O buffer
+ */
+static inline __attribute__ (( always_inline )) void
+usb_recycle ( struct usb_endpoint *ep, struct io_buffer *iobuf ) {
+
+	list_add_tail ( &iobuf->list, &ep->recycled );
+}
+
+extern int usb_prefill ( struct usb_endpoint *ep );
+extern int usb_refill ( struct usb_endpoint *ep );
+extern void usb_flush ( struct usb_endpoint *ep );
 
 /**
  * A USB function

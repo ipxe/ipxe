@@ -313,6 +313,8 @@ int usb_endpoint_open ( struct usb_endpoint *ep ) {
  err_open:
 	usb->ep[idx] = NULL;
  err_already:
+	if ( ep->max )
+		usb_flush ( ep );
 	return rc;
 }
 
@@ -331,9 +333,14 @@ void usb_endpoint_close ( struct usb_endpoint *ep ) {
 	/* Close endpoint */
 	ep->open = 0;
 	ep->host->close ( ep );
+	assert ( ep->fill == 0 );
 
 	/* Remove from endpoint list */
 	usb->ep[idx] = NULL;
+
+	/* Discard any recycled buffers, if applicable */
+	if ( ep->max )
+		usb_flush ( ep );
 }
 
 /**
@@ -443,6 +450,9 @@ int usb_message ( struct usb_endpoint *ep, unsigned int request,
 		return rc;
 	}
 
+	/* Increment fill level */
+	ep->fill++;
+
 	return 0;
 }
 
@@ -476,6 +486,9 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 		return rc;
 	}
 
+	/* Increment fill level */
+	ep->fill++;
+
 	return 0;
 }
 
@@ -490,6 +503,10 @@ void usb_complete_err ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 			int rc ) {
 	struct usb_device *usb = ep->usb;
 
+	/* Decrement fill level */
+	assert ( ep->fill > 0 );
+	ep->fill--;
+
 	/* Record error (if any) */
 	ep->rc = rc;
 	if ( ( rc != 0 ) && ep->open ) {
@@ -500,6 +517,117 @@ void usb_complete_err ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 
 	/* Report completion */
 	ep->driver->complete ( ep, iobuf, rc );
+}
+
+/******************************************************************************
+ *
+ * Endpoint refilling
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Prefill endpoint recycled buffer list
+ *
+ * @v ep		USB endpoint
+ * @ret rc		Return status code
+ */
+int usb_prefill ( struct usb_endpoint *ep ) {
+	struct io_buffer *iobuf;
+	size_t len = ( ep->len ? ep->len : ep->mtu );
+	unsigned int fill;
+	int rc;
+
+	/* Sanity checks */
+	assert ( ep->fill == 0 );
+	assert ( ep->max > 0 );
+	assert ( list_empty ( &ep->recycled ) );
+
+	/* Fill recycled buffer list */
+	for ( fill = 0 ; fill < ep->max ; fill++ ) {
+
+		/* Allocate I/O buffer */
+		iobuf = alloc_iob ( len );
+		if ( ! iobuf ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+
+		/* Add to recycled buffer list */
+		list_add_tail ( &iobuf->list, &ep->recycled );
+	}
+
+	return 0;
+
+ err_alloc:
+	usb_flush ( ep );
+	return rc;
+}
+
+/**
+ * Refill endpoint
+ *
+ * @v ep		USB endpoint
+ * @ret rc		Return status code
+ */
+int usb_refill ( struct usb_endpoint *ep ) {
+	struct io_buffer *iobuf;
+	size_t len = ( ep->len ? ep->len : ep->mtu );
+	int rc;
+
+	/* Sanity checks */
+	assert ( ep->open );
+	assert ( ep->max > 0 );
+
+	/* Refill endpoint */
+	while ( ep->fill < ep->max ) {
+
+		/* Get or allocate buffer */
+		if ( list_empty ( &ep->recycled ) ) {
+			/* Recycled buffer list is empty; allocate new buffer */
+			iobuf = alloc_iob ( len );
+			if ( ! iobuf )
+				return -ENOMEM;
+		} else {
+			/* Get buffer from recycled buffer list */
+			iobuf = list_first_entry ( &ep->recycled,
+						   struct io_buffer, list );
+			assert ( iobuf != NULL );
+			list_del ( &iobuf->list );
+		}
+
+		/* Reset buffer to maximum size */
+		assert ( iob_len ( iobuf ) <= len );
+		iob_put ( iobuf, ( len - iob_len ( iobuf ) ) );
+
+		/* Enqueue buffer */
+		if ( ( rc = usb_stream ( ep, iobuf, 0 ) ) != 0 ) {
+			list_add ( &iobuf->list, &ep->recycled );
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Discard endpoint recycled buffer list
+ *
+ * @v ep		USB endpoint
+ */
+void usb_flush ( struct usb_endpoint *ep ) {
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
+
+	/* Sanity checks */
+	assert ( ! ep->open );
+	assert ( ep->max > 0 );
+
+	/* Free all I/O buffers */
+	list_for_each_entry_safe ( iobuf, tmp, &ep->recycled, list ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+	}
 }
 
 /******************************************************************************
