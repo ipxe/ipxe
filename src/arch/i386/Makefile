@@ -69,6 +69,17 @@ CFLAGS		+= -fshort-wchar
 #
 CFLAGS			+= -Ui386
 
+# Some widespread patched versions of gcc include -fPIE -Wl,-pie by
+# default.  Note that gcc will exit *successfully* if it fails to
+# recognise an option that starts with "no", so we have to test for
+# output on stderr instead of checking the exit status.
+#
+ifeq ($(CCTYPE),gcc)
+PIE_TEST = [ -z "`$(CC) -fno-PIE -nopie -x c -c /dev/null -o /dev/null 2>&1`" ]
+PIE_FLAGS := $(shell $(PIE_TEST) && $(ECHO) '-fno-PIE -nopie')
+WORKAROUND_CFLAGS += $(PIE_FLAGS)
+endif
+
 # Define version string for lkrnprefix.S
 #
 CFLAGS_lkrnprefix	+= -DVERSION="\"$(VERSION)\""
