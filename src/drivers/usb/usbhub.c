@@ -40,27 +40,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v hubdev		Hub device
  */
 static void hub_refill ( struct usb_hub_device *hubdev ) {
-	struct io_buffer *iobuf;
-	size_t mtu = hubdev->intr.mtu;
 	int rc;
 
-	/* Enqueue any available I/O buffers */
-	while ( ( iobuf = list_first_entry ( &hubdev->intrs, struct io_buffer,
-					     list ) ) ) {
-
-		/* Reset size */
-		iob_put ( iobuf, ( mtu - iob_len ( iobuf ) ) );
-
-		/* Enqueue I/O buffer */
-		if ( ( rc = usb_stream ( &hubdev->intr, iobuf, 0 ) ) != 0 ) {
-			DBGC ( hubdev, "HUB %s could not enqueue interrupt: "
-			       "%s\n", hubdev->name, strerror ( rc ) );
-			/* Leave in available list and wait for next refill */
-			return;
-		}
-
-		/* Remove from available list */
-		list_del ( &iobuf->list );
+	/* Refill interrupt endpoint */
+	if ( ( rc = usb_refill ( &hubdev->intr ) ) != 0 ) {
+		DBGC ( hubdev, "HUB %s could not refill interrupt: %s\n",
+		       hubdev->name, strerror ( rc ) );
+		/* Continue attempting to refill */
+		return;
 	}
 
 	/* Stop refill process */
@@ -119,9 +106,6 @@ static void hub_complete ( struct usb_endpoint *ep,
 	}
 
  done:
-	/* Return I/O buffer to available list */
-	list_add_tail ( &iobuf->list, &hubdev->intrs );
-
 	/* Start refill process */
 	process_add ( &hubdev->refill );
 }
@@ -140,8 +124,6 @@ static struct usb_endpoint_driver_operations usb_hub_intr_operations = {
 static int hub_open ( struct usb_hub *hub ) {
 	struct usb_hub_device *hubdev = usb_hub_get_drvdata ( hub );
 	struct usb_device *usb = hubdev->usb;
-	struct io_buffer *iobuf;
-	struct io_buffer *tmp;
 	unsigned int i;
 	int rc;
 
@@ -154,16 +136,6 @@ static int hub_open ( struct usb_hub *hub ) {
 			       "%s\n", hubdev->name, i, strerror ( rc ) );
 			goto err_power;
 		}
-	}
-
-	/* Allocate I/O buffers */
-	for ( i = 0 ; i < USB_HUB_INTR_FILL ; i++ ) {
-		iobuf = alloc_iob ( hubdev->intr.mtu );
-		if ( ! iobuf ) {
-			rc = -ENOMEM;
-			goto err_alloc_iob;
-		}
-		list_add ( &iobuf->list, &hubdev->intrs );
 	}
 
 	/* Open interrupt endpoint */
@@ -183,11 +155,6 @@ static int hub_open ( struct usb_hub *hub ) {
 
 	usb_endpoint_close ( &hubdev->intr );
  err_open:
- err_alloc_iob:
-	list_for_each_entry_safe ( iobuf, tmp, &hubdev->intrs, list ) {
-		list_del ( &iobuf->list );
-		free_iob ( iobuf );
-	}
  err_power:
 	return rc;
 }
@@ -199,20 +166,12 @@ static int hub_open ( struct usb_hub *hub ) {
  */
 static void hub_close ( struct usb_hub *hub ) {
 	struct usb_hub_device *hubdev = usb_hub_get_drvdata ( hub );
-	struct io_buffer *iobuf;
-	struct io_buffer *tmp;
 
 	/* Close interrupt endpoint */
 	usb_endpoint_close ( &hubdev->intr );
 
 	/* Stop refill process */
 	process_del ( &hubdev->refill );
-
-	/* Free I/O buffers */
-	list_for_each_entry_safe ( iobuf, tmp, &hubdev->intrs, list ) {
-		list_del ( &iobuf->list );
-		free_iob ( iobuf );
-	}
 }
 
 /**
@@ -415,7 +374,7 @@ static int hub_probe ( struct usb_function *func,
 	hubdev->features =
 		( enhanced ? USB_HUB_FEATURES_ENHANCED : USB_HUB_FEATURES );
 	usb_endpoint_init ( &hubdev->intr, usb, &usb_hub_intr_operations );
-	INIT_LIST_HEAD ( &hubdev->intrs );
+	usb_refill_init ( &hubdev->intr, 0, USB_HUB_INTR_FILL );
 	process_init_stopped ( &hubdev->refill, &hub_refill_desc, NULL );
 
 	/* Locate hub interface descriptor */
@@ -510,7 +469,6 @@ static void hub_remove ( struct usb_function *func ) {
 	/* Unregister hub */
 	unregister_usb_hub ( hubdev->hub );
 	assert ( ! process_running ( &hubdev->refill ) );
-	assert ( list_empty ( &hubdev->intrs ) );
 
 	/* Free hub */
 	free_usb_hub ( hubdev->hub );

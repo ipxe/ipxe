@@ -227,8 +227,6 @@ struct usb_hub_device {
 
 	/** Interrupt endpoint */
 	struct usb_endpoint intr;
-	/** Recycled interrupt I/O buffers */
-	struct list_head intrs;
 	/** Interrupt endpoint refill process */
 	struct process refill;
 };
