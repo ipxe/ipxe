@@ -64,24 +64,6 @@ struct ecm_ethernet_descriptor {
 	uint8_t wol;
 } __attribute__ (( packed ));
 
-/** A CDC-ECM receive ring */
-struct ecm_rx_ring {
-	/** USB endpoint */
-	struct usb_endpoint ep;
-	/** I/O buffer size */
-	size_t mtu;
-	/** Fill level */
-	unsigned int fill;
-	/** Maximum fill level */
-	unsigned int max;
-};
-
-/** A CDC-ECM transmit ring */
-struct ecm_tx_ring {
-	/** USB endpoint */
-	struct usb_endpoint ep;
-};
-
 /** A CDC-ECM network device */
 struct ecm_device {
 	/** USB device */
@@ -96,12 +78,12 @@ struct ecm_device {
 	/** Data interface */
 	unsigned int data;
 
-	/** Interrupt ring */
-	struct ecm_rx_ring intr;
-	/** Bulk IN ring */
-	struct ecm_rx_ring in;
-	/** Bulk OUT ring */
-	struct ecm_tx_ring out;
+	/** Interrupt endpoint */
+	struct usb_endpoint intr;
+	/** Bulk IN endpoint */
+	struct usb_endpoint in;
+	/** Bulk OUT endpoint */
+	struct usb_endpoint out;
 };
 
 /** Interrupt maximum fill level
