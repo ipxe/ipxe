@@ -18,18 +18,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** CDC-NCM subclass */
 #define USB_SUBCLASS_CDC_NCM 0x0d
 
-/** CDC-NCM interfaces */
-enum ncm_interfaces {
-	/** Communications interface */
-	NCM_INTERFACE_COMMS = 0,
-	/** Data interface */
-	NCM_INTERFACE_DATA,
-	NCM_INTERFACE_COUNT
-};
-
-/** Alternate setting for CDC-NCM data interface */
-#define NCM_DATA_ALTERNATE 1
-
 /** Get NTB parameters */
 #define NCM_GET_NTB_PARAMETERS						\
 	( USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE |		\
@@ -147,11 +135,8 @@ struct ncm_device {
 	struct usb_bus *bus;
 	/** Network device */
 	struct net_device *netdev;
-
-	/** Communications interface */
-	unsigned int comms;
-	/** Data interface */
-	unsigned int data;
+	/** USB network device */
+	struct usbnet_device usbnet;
 
 	/** Maximum supported NTB input size */
 	size_t mtu;
@@ -159,13 +144,6 @@ struct ncm_device {
 	uint16_t sequence;
 	/** Alignment padding required on transmitted packets */
 	size_t padding;
-
-	/** Interrupt endpoint */
-	struct usb_endpoint intr;
-	/** Bulk IN endpoint */
-	struct usb_endpoint in;
-	/** Bulk OUT endpoint */
-	struct usb_endpoint out;
 };
 
 /** Bulk IN ring minimum buffer count
