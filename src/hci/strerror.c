@@ -75,7 +75,7 @@ static struct errortab * find_closest_error ( int errno ) {
  * call to strerror().
  *
  */
-const char * strerror ( int errno ) {
+char * strerror ( int errno ) {
 	static char errbuf[64];
 	struct errortab *errortab;
 

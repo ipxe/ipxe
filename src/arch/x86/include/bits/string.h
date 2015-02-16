@@ -28,8 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-#define __HAVE_ARCH_MEMCPY
-
 extern void * __memcpy ( void *dest, const void *src, size_t len );
 extern void * __memcpy_reverse ( void *dest, const void *src, size_t len );
 
@@ -169,8 +167,6 @@ memcpy ( void *dest, const void *src, size_t len ) {
 	}
 }
 
-#define __HAVE_ARCH_MEMMOVE
-
 extern void * __memmove ( void *dest, const void *src, size_t len );
 
 /**
@@ -196,8 +192,6 @@ memmove ( void *dest, const void *src, size_t len ) {
 	}
 }
 
-#define __HAVE_ARCH_MEMSET
-
 /**
  * Fill memory region
  *
@@ -216,17 +210,5 @@ static inline void * memset ( void *dest, int fill, size_t len ) {
 			       : "memory" );
 	return dest;
 }
-
-#define __HAVE_ARCH_MEMSWAP
-
-extern void * memswap ( void *dest, void *src, size_t len );
-
-#define __HAVE_ARCH_STRNCMP
-
-extern int strncmp ( const char *str1, const char *str2, size_t len );
-
-#define __HAVE_ARCH_STRLEN
-
-extern size_t strlen ( const char *string );
 
 #endif /* X86_BITS_STRING_H */
