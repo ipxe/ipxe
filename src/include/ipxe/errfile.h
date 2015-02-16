@@ -164,7 +164,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_ecm		     ( ERRFILE_DRIVER | 0x006c0000 )
 #define ERRFILE_ncm		     ( ERRFILE_DRIVER | 0x006d0000 )
 #define ERRFILE_usbnet		     ( ERRFILE_DRIVER | 0x006e0000 )
-
+#define ERRFILE_dm96xx		     ( ERRFILE_DRIVER | 0x006f0000 )
 #define ERRFILE_scsi		     ( ERRFILE_DRIVER | 0x00700000 )
 #define ERRFILE_arbel		     ( ERRFILE_DRIVER | 0x00710000 )
 #define ERRFILE_hermon		     ( ERRFILE_DRIVER | 0x00720000 )

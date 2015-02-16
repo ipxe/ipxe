@@ -78,6 +78,9 @@ struct usb_setup_packet {
 /** Class-specific request type */
 #define USB_TYPE_CLASS ( 1 << 5 )
 
+/** Vendor-specific request type */
+#define USB_TYPE_VENDOR ( 2 << 5 )
+
 /** Request recipient is the device */
 #define USB_RECIP_DEVICE ( 0 << 0 )
 
