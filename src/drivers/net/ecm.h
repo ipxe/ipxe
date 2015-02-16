@@ -10,22 +10,11 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/usb.h>
+#include <ipxe/usbnet.h>
 #include <ipxe/cdc.h>
 
 /** CDC-ECM subclass */
 #define USB_SUBCLASS_CDC_ECM 0x06
-
-/** CDC-ECM interfaces */
-enum ecm_interfaces {
-	/** Communications interface */
-	ECM_INTERFACE_COMMS = 0,
-	/** Data interface */
-	ECM_INTERFACE_DATA,
-	ECM_INTERFACE_COUNT
-};
-
-/** Alternate setting for CDC-ECM data interface */
-#define ECM_DATA_ALTERNATE 1
 
 /** Set Ethernet packet filter */
 #define ECM_SET_ETHERNET_PACKET_FILTER					\
@@ -72,18 +61,8 @@ struct ecm_device {
 	struct usb_bus *bus;
 	/** Network device */
 	struct net_device *netdev;
-
-	/** Communications interface */
-	unsigned int comms;
-	/** Data interface */
-	unsigned int data;
-
-	/** Interrupt endpoint */
-	struct usb_endpoint intr;
-	/** Bulk IN endpoint */
-	struct usb_endpoint in;
-	/** Bulk OUT endpoint */
-	struct usb_endpoint out;
+	/** USB network device */
+	struct usbnet_device usbnet;
 };
 
 /** Interrupt maximum fill level

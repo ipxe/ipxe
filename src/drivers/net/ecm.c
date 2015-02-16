@@ -126,7 +126,8 @@ int ecm_fetch_mac ( struct usb_device *usb,
  */
 static void ecm_intr_complete ( struct usb_endpoint *ep,
 				struct io_buffer *iobuf, int rc ) {
-	struct ecm_device *ecm = container_of ( ep, struct ecm_device, intr );
+	struct ecm_device *ecm = container_of ( ep, struct ecm_device,
+						usbnet.intr );
 	struct net_device *netdev = ecm->netdev;
 	struct usb_setup_packet *message;
 	size_t len = iob_len ( iobuf );
@@ -197,43 +198,6 @@ static struct usb_endpoint_driver_operations ecm_intr_operations = {
 	.complete = ecm_intr_complete,
 };
 
-/**
- * Open communications interface
- *
- * @v ecm		CDC-ECM device
- * @ret rc		Return status code
- */
-static int ecm_comms_open ( struct ecm_device *ecm ) {
-	int rc;
-
-	/* Open interrupt endpoint */
-	if ( ( rc = usb_endpoint_open ( &ecm->intr ) ) != 0 ) {
-		DBGC ( ecm, "ECM %p could not open interrupt: %s\n",
-		       ecm, strerror ( rc ) );
-		goto err_open;
-	}
-
-	/* Refill interrupt endpoint */
-	usb_refill ( &ecm->intr );
-
-	return 0;
-
-	usb_endpoint_close ( &ecm->intr );
- err_open:
-	return rc;
-}
-
-/**
- * Close communications interface
- *
- * @v ecm		CDC-ECM device
- */
-static void ecm_comms_close ( struct ecm_device *ecm ) {
-
-	/* Close interrupt endpoint */
-	usb_endpoint_close ( &ecm->intr );
-}
-
 /******************************************************************************
  *
  * CDC-ECM data interface
@@ -250,7 +214,8 @@ static void ecm_comms_close ( struct ecm_device *ecm ) {
  */
 static void ecm_in_complete ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 			      int rc ) {
-	struct ecm_device *ecm = container_of ( ep, struct ecm_device, in );
+	struct ecm_device *ecm = container_of ( ep, struct ecm_device,
+						usbnet.in );
 	struct net_device *netdev = ecm->netdev;
 
 	/* Profile receive completions */
@@ -299,7 +264,7 @@ static int ecm_out_transmit ( struct ecm_device *ecm,
 	profile_start ( &ecm_out_profiler );
 
 	/* Enqueue I/O buffer */
-	if ( ( rc = usb_stream ( &ecm->out, iobuf, 1 ) ) != 0 )
+	if ( ( rc = usb_stream ( &ecm->usbnet.out, iobuf, 1 ) ) != 0 )
 		return rc;
 
 	profile_stop ( &ecm_out_profiler );
@@ -315,7 +280,8 @@ static int ecm_out_transmit ( struct ecm_device *ecm,
  */
 static void ecm_out_complete ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 			       int rc ) {
-	struct ecm_device *ecm = container_of ( ep, struct ecm_device, out );
+	struct ecm_device *ecm = container_of ( ep, struct ecm_device,
+						usbnet.out );
 	struct net_device *netdev = ecm->netdev;
 
 	/* Report TX completion */
@@ -326,68 +292,6 @@ static void ecm_out_complete ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 static struct usb_endpoint_driver_operations ecm_out_operations = {
 	.complete = ecm_out_complete,
 };
-
-/**
- * Open data interface
- *
- * @v ecm		CDC-ECM device
- * @ret rc		Return status code
- */
-static int ecm_data_open ( struct ecm_device *ecm ) {
-	struct usb_device *usb = ecm->usb;
-	int rc;
-
-	/* Select alternate setting for data interface */
-	if ( ( rc = usb_set_interface ( usb, ecm->data,
-					ECM_DATA_ALTERNATE ) ) != 0 ) {
-		DBGC ( ecm, "ECM %p could not set alternate interface: %s\n",
-		       ecm, strerror ( rc ) );
-		goto err_set_interface;
-	}
-
-	/* Open bulk IN endpoint */
-	if ( ( rc = usb_endpoint_open ( &ecm->in ) ) != 0 ) {
-		DBGC ( ecm, "ECM %p could not open bulk IN: %s\n",
-		       ecm, strerror ( rc ) );
-		goto err_open_in;
-	}
-
-	/* Open bulk OUT endpoint */
-	if ( ( rc = usb_endpoint_open ( &ecm->out ) ) != 0 ) {
-		DBGC ( ecm, "ECM %p could not open bulk OUT: %s\n",
-		       ecm, strerror ( rc ) );
-		goto err_open_out;
-	}
-
-	/* Refill bulk IN endpoint */
-	usb_refill ( &ecm->in );
-
-	return 0;
-
-	usb_endpoint_close ( &ecm->out );
- err_open_out:
-	usb_endpoint_close ( &ecm->in );
- err_open_in:
-	usb_set_interface ( usb, ecm->data, 0 );
- err_set_interface:
-	return rc;
-}
-
-/**
- * Close data interface
- *
- * @v ecm		CDC-ECM device
- */
-static void ecm_data_close ( struct ecm_device *ecm ) {
-	struct usb_device *usb = ecm->usb;
-
-	/* Close endpoints */
-	usb_endpoint_close ( &ecm->out );
-	usb_endpoint_close ( &ecm->in );
-
-	/* Reset data interface */
-	usb_set_interface ( usb, ecm->data, 0 );
-}
 
 /******************************************************************************
  *
@@ -408,13 +312,12 @@ static int ecm_open ( struct net_device *netdev ) {
 	unsigned int filter;
 	int rc;
 
-	/* Open communications interface */
-	if ( ( rc = ecm_comms_open ( ecm ) ) != 0 )
-		goto err_comms_open;
-
-	/* Open data interface */
-	if ( ( rc = ecm_data_open ( ecm ) ) != 0 )
-		goto err_data_open;
+	/* Open USB network device */
+	if ( ( rc = usbnet_open ( &ecm->usbnet ) ) != 0 ) {
+		DBGC ( ecm, "ECM %p could not open: %s\n",
+		       ecm, strerror ( rc ) );
+		goto err_open;
+	}
 
 	/* Set packet filter */
 	filter = ( ECM_PACKET_TYPE_PROMISCUOUS |
@@ -422,7 +325,7 @@ static int ecm_open ( struct net_device *netdev ) {
 		   ECM_PACKET_TYPE_DIRECTED |
 		   ECM_PACKET_TYPE_BROADCAST );
 	if ( ( rc = usb_control ( usb, ECM_SET_ETHERNET_PACKET_FILTER,
-				  filter, ecm->comms, NULL, 0 ) ) != 0 ) {
+				  filter, ecm->usbnet.comms, NULL, 0 ) ) != 0 ){
 		DBGC ( ecm, "ECM %p could not set packet filter: %s\n",
 		       ecm, strerror ( rc ) );
 		goto err_set_filter;
@@ -431,10 +334,8 @@ static int ecm_open ( struct net_device *netdev ) {
 	return 0;
 
  err_set_filter:
-	ecm_data_close ( ecm );
- err_data_open:
-	ecm_comms_close ( ecm );
- err_comms_open:
+	usbnet_close ( &ecm->usbnet );
+ err_open:
 	return rc;
 }
 
@@ -446,11 +347,8 @@ static int ecm_open ( struct net_device *netdev ) {
 static void ecm_close ( struct net_device *netdev ) {
 	struct ecm_device *ecm = netdev->priv;
 
-	/* Close data interface */
-	ecm_data_close ( ecm );
-
-	/* Close communications interface */
-	ecm_comms_close ( ecm );
+	/* Close USB network device */
+	usbnet_close ( &ecm->usbnet );
 }
 
 /**
@@ -484,12 +382,8 @@ static void ecm_poll ( struct net_device *netdev ) {
 	/* Poll USB bus */
 	usb_poll ( ecm->bus );
 
-	/* Refill interrupt endpoint */
-	if ( ( rc = usb_refill ( &ecm->intr ) ) != 0 )
-		netdev_rx_err ( netdev, NULL, rc );
-
-	/* Refill bulk IN endpoint */
-	if ( ( rc = usb_refill ( &ecm->in ) ) != 0 )
+	/* Refill endpoints */
+	if ( ( rc = usbnet_refill ( &ecm->usbnet ) ) != 0 )
 		netdev_rx_err ( netdev, NULL, rc );
 }
 
@@ -521,7 +415,6 @@ static int ecm_probe ( struct usb_function *func,
 	struct net_device *netdev;
 	struct ecm_device *ecm;
 	struct usb_interface_descriptor *comms;
-	struct usb_interface_descriptor *data;
 	struct ecm_ethernet_descriptor *ethernet;
 	int rc;
 
@@ -538,65 +431,22 @@ static int ecm_probe ( struct usb_function *func,
 	ecm->usb = usb;
 	ecm->bus = usb->port->hub->bus;
 	ecm->netdev = netdev;
-	usb_endpoint_init ( &ecm->intr, usb, &ecm_intr_operations );
-	usb_endpoint_init ( &ecm->in, usb, &ecm_in_operations );
-	usb_endpoint_init ( &ecm->out, usb, &ecm_out_operations );
-	usb_refill_init ( &ecm->intr, 0, ECM_INTR_MAX_FILL );
-	usb_refill_init ( &ecm->in, ECM_IN_MTU, ECM_IN_MAX_FILL );
+	usbnet_init ( &ecm->usbnet, func, &ecm_intr_operations,
+		      &ecm_in_operations, &ecm_out_operations );
+	usb_refill_init ( &ecm->usbnet.intr, 0, ECM_INTR_MAX_FILL );
+	usb_refill_init ( &ecm->usbnet.in, ECM_IN_MTU, ECM_IN_MAX_FILL );
 	DBGC ( ecm, "ECM %p on %s\n", ecm, func->name );
 
-	/* Identify interfaces */
-	if ( func->count < ECM_INTERFACE_COUNT ) {
-		DBGC ( ecm, "ECM %p has only %d interfaces\n",
-		       ecm, func->count );
-		rc = -EINVAL;
-		goto err_count;
-	}
-	ecm->comms = func->interface[ECM_INTERFACE_COMMS];
-	ecm->data = func->interface[ECM_INTERFACE_DATA];
-
-	/* Locate communications interface descriptor */
-	comms = usb_interface_descriptor ( config, ecm->comms, 0 );
-	if ( ! comms ) {
-		DBGC ( ecm, "ECM %p has no communications interface\n", ecm );
-		rc = -EINVAL;
-		goto err_comms;
-	}
-
-	/* Locate data interface descriptor */
-	data = usb_interface_descriptor ( config, ecm->data,
-					  ECM_DATA_ALTERNATE );
-	if ( ! data ) {
-		DBGC ( ecm, "ECM %p has no data interface\n", ecm );
-		rc = -EINVAL;
-		goto err_data;
-	}
-
-	/* Describe interrupt endpoint */
-	if ( ( rc = usb_endpoint_described ( &ecm->intr, config, comms,
-					     USB_INTERRUPT, 0 ) ) != 0 ) {
-		DBGC ( ecm, "ECM %p could not describe interrupt endpoint: "
-		       "%s\n", ecm, strerror ( rc ) );
-		goto err_interrupt;
-	}
-
-	/* Describe bulk IN endpoint */
-	if ( ( rc = usb_endpoint_described ( &ecm->in, config, data,
-					     USB_BULK_IN, 0 ) ) != 0 ) {
-		DBGC ( ecm, "ECM %p could not describe bulk IN endpoint: "
-		       "%s\n", ecm, strerror ( rc ) );
-		goto err_bulk_in;
-	}
-
-	/* Describe bulk OUT endpoint */
-	if ( ( rc = usb_endpoint_described ( &ecm->out, config, data,
-					     USB_BULK_OUT, 0 ) ) != 0 ) {
-		DBGC ( ecm, "ECM %p could not describe bulk OUT endpoint: "
-		       "%s\n", ecm, strerror ( rc ) );
-		goto err_bulk_out;
+	/* Describe USB network device */
+	if ( ( rc = usbnet_describe ( &ecm->usbnet, config ) ) != 0 ) {
+		DBGC ( ecm, "ECM %p could not describe: %s\n",
+		       ecm, strerror ( rc ) );
+		goto err_describe;
 	}
 
 	/* Locate Ethernet descriptor */
+	comms = usb_interface_descriptor ( config, ecm->usbnet.comms, 0 );
+	assert ( comms != NULL );
 	ethernet = ecm_ethernet_descriptor ( config, comms );
 	if ( ! ethernet ) {
 		DBGC ( ecm, "ECM %p has no Ethernet descriptor\n", ecm );
@@ -622,12 +472,7 @@ static int ecm_probe ( struct usb_function *func,
  err_register:
  err_fetch_mac:
  err_ethernet:
- err_bulk_out:
- err_bulk_in:
- err_interrupt:
- err_data:
- err_comms:
- err_count:
+ err_describe:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
