@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <ipxe/test.h>
 
 /**
@@ -63,6 +64,18 @@ static void string_test_exec ( void ) {
 	ok ( *(strchr ( "Testing", 'g' )) == 'g' );
 	ok ( strchr ( "Testing", 'x' ) == NULL );
 
+	/* Test strrchr() */
+	ok ( strrchr ( "", 'a' ) == NULL );
+	ok ( *(strrchr ( "Haystack", 'a' )) == 'a' );
+	ok ( *(strrchr ( "Haystack", 'k' )) == 'k' );
+	ok ( strrchr ( "Haystack", 'x' ) == NULL );
+
+	/* Test memchr() */
+	ok ( memchr ( "", '\0', 0 ) == NULL );
+	ok ( *((uint8_t *)memchr ( "post\0null", 'l', 9 )) == 'l' );
+	ok ( *((uint8_t *)memchr ( "post\0null", '\0', 9 )) == '\0' );
+	ok ( memchr ( "thingy", 'z', 6 ) == NULL );
+
 	/* Test strcmp() */
 	ok ( strcmp ( "", "" ) == 0 );
 	ok ( strcmp ( "Hello", "Hello" ) == 0 );
@@ -78,10 +91,30 @@ static void string_test_exec ( void ) {
 	ok ( strncmp ( "Goodbye", "Goodbye world", 32 ) != 0 );
 	ok ( strncmp ( "Goodbye", "Goodbye world", 7 ) == 0 );
 
+	/* Test strcasecmp() */
+	ok ( strcasecmp ( "", "" ) == 0 );
+	ok ( strcasecmp ( "Uncle Jack", "Uncle jack" ) == 0 );
+	ok ( strcasecmp ( "Uncle Jack", "Uncle" ) != 0 );
+	ok ( strcasecmp ( "Uncle", "Uncle Jack" ) != 0 );
+	ok ( strcasecmp ( "not", "equal" ) != 0 );
+
 	/* Test memcmp() */
 	ok ( memcmp ( "", "", 0 ) == 0 );
 	ok ( memcmp ( "Foo", "Foo", 3 ) == 0 );
 	ok ( memcmp ( "Foo", "Bar", 3 ) != 0 );
+
+	/* Test strstr() */
+	{
+		const char haystack[] = "find me!";
+		char *found;
+
+		found = strstr ( haystack, "find" );
+		ok ( found == &haystack[0] );
+		found = strstr ( haystack, "me" );
+		ok ( found == &haystack[5] );
+		found = strstr ( haystack, "me." );
+		ok ( found == NULL );
+	}
 
 	/* Test memset() */
 	{
@@ -153,6 +186,61 @@ static void string_test_exec ( void ) {
 		ok ( dup != NULL );
 		ok ( strcmp ( dup, "hello" ) == 0 );
 		free ( dup );
+	}
+
+	/* Test strcpy() */
+	{
+		const char longer[7] = "copyme";
+		const char shorter[3] = "hi";
+		char dest[7];
+		char *copy;
+
+		copy = strcpy ( dest, longer );
+		ok ( copy == dest );
+		ok ( memcmp ( dest, longer, 7 ) == 0 );
+		copy = strcpy ( dest, shorter );
+		ok ( copy == dest );
+		ok ( memcmp ( dest, shorter, 3 ) == 0 );
+		ok ( memcmp ( ( dest + 3 ), ( longer + 3 ), 4 ) == 0 );
+	}
+
+	/* Test strncpy() */
+	{
+		const char src[5] = "copy";
+		const char orig[8] = { 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x' };
+		const char zero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+		char dest[8];
+		char *copy;
+
+		memcpy ( dest, orig, sizeof ( dest ) );
+		copy = strncpy ( dest, src, 5 );
+		ok ( copy == dest );
+		ok ( memcmp ( dest, src, 5 ) == 0 );
+		ok ( memcmp ( dest + 5, orig + 5, 3 ) == 0 );
+		memcpy ( dest, orig, sizeof ( dest ) );
+		copy = strncpy ( dest, src, 4 );
+		ok ( copy == dest );
+		ok ( memcmp ( dest, src, 4 ) == 0 );
+		ok ( memcmp ( dest + 4, orig + 4, 4 ) == 0 );
+		memcpy ( dest, orig, sizeof ( dest ) );
+		copy = strncpy ( dest, src, 8 );
+		ok ( copy == dest );
+		ok ( memcmp ( dest, src, 5 ) == 0 );
+		ok ( memcmp ( dest + 5, zero + 5, 3 ) == 0 );
+		memcpy ( dest, orig, sizeof ( dest ) );
+		copy = strncpy ( dest, "", 8 );
+		ok ( copy == dest );
+		ok ( memcmp ( dest, zero, 8 ) == 0 );
+	}
+
+	/* Test strcat() */
+	{
+		char buf[16] = "append";
+		char *dest;
+
+		dest = strcat ( buf, " this" );
+		ok ( dest == buf );
+		ok ( strcmp ( buf, "append this" ) == 0 );
 	}
 }
 
