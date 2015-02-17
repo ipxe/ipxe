@@ -200,7 +200,8 @@ memmove ( void *dest, const void *src, size_t len ) {
  * @v len		Length
  * @ret dest		Destination address
  */
-static inline void * memset ( void *dest, int fill, size_t len ) {
+static inline __attribute__ (( always_inline )) void *
+__memset ( void *dest, int fill, size_t len ) {
 	void *discard_D;
 	size_t discard_c;
 
@@ -209,6 +210,131 @@ static inline void * memset ( void *dest, int fill, size_t len ) {
 			       : "0" ( dest ), "1" ( len ), "a" ( fill )
 			       : "memory" );
 	return dest;
+}
+
+/**
+ * Fill memory region with zero (where length is a compile-time constant)
+ *
+ * @v dest		Destination address
+ * @v len		Length
+ * @ret dest		Destination address
+ */
+static inline __attribute__ (( always_inline )) void *
+__constant_memset_zero ( void *dest, size_t len ) {
+	union {
+		uint32_t u32[2];
+		uint16_t u16[4];
+		uint8_t  u8[8];
+	} __attribute__ (( __may_alias__ )) *dest_u = dest;
+	void *edi;
+	uint32_t eax;
+
+	switch ( len ) {
+	case 0 : /* 0 bytes */
+		return dest;
+
+	/* Single-register moves.  Almost certainly better than a
+	 * string operation.  We can avoid clobbering any registers,
+	 * we can reuse a zero that happens to already be in a
+	 * register, and we can optimise away the code entirely if the
+	 * memset() is used to clear a region which then gets
+	 * immediately overwritten.
+	 */
+	case 1 : /* 3 bytes */
+		dest_u->u8[0] = 0;
+		return dest;
+	case 2: /* 5 bytes */
+		dest_u->u16[0] = 0;
+		return dest;
+	case 4: /* 6 bytes */
+		dest_u->u32[0] = 0;
+		return dest;
+
+	/* Double-register moves.  Very probably better than a string
+	 * operation.
+	 */
+	case 3 : /* 9 bytes */
+		dest_u->u16[0] = 0;
+		dest_u->u8[2]  = 0;
+		return dest;
+	case 5 : /* 10 bytes */
+		dest_u->u32[0] = 0;
+		dest_u->u8[4]  = 0;
+		return dest;
+	case 6 : /* 12 bytes */
+		dest_u->u32[0] = 0;
+		dest_u->u16[2] = 0;
+		return dest;
+	case 8 : /* 13 bytes */
+		dest_u->u32[0] = 0;
+		dest_u->u32[1] = 0;
+		return dest;
+	}
+
+	/* As with memcpy(), we can potentially save space by using
+	 * multiple single-byte "stos" instructions instead of loading
+	 * up ecx and using "rep stosb".
+	 *
+	 * "load ecx, rep movsb" is 7 bytes, plus an average of 1 byte
+	 * to allow for saving/restoring ecx 50% of the time.
+	 *
+	 * "stosl" and "stosb" are 1 byte each, "stosw" is two bytes.
+	 *
+	 * The calculations are therefore the same as for memcpy(),
+	 * giving a cutoff point of around 26 bytes.
+	 */
+
+	edi = dest;
+	eax = 0;
+
+	if ( len >= 26 )
+		return __memset ( dest, 0, len );
+
+	if ( len >= 6*4 )
+		__asm__ __volatile__ ( "stosl" : "=&D" ( edi ), "=&a" ( eax )
+				       : "0" ( edi ), "1" ( eax ) : "memory" );
+	if ( len >= 5*4 )
+		__asm__ __volatile__ ( "stosl" : "=&D" ( edi ), "=&a" ( eax )
+				       : "0" ( edi ), "1" ( eax ) : "memory" );
+	if ( len >= 4*4 )
+		__asm__ __volatile__ ( "stosl" : "=&D" ( edi ), "=&a" ( eax )
+				       : "0" ( edi ), "1" ( eax ) : "memory" );
+	if ( len >= 3*4 )
+		__asm__ __volatile__ ( "stosl" : "=&D" ( edi ), "=&a" ( eax )
+				       : "0" ( edi ), "1" ( eax ) : "memory" );
+	if ( len >= 2*4 )
+		__asm__ __volatile__ ( "stosl" : "=&D" ( edi ), "=&a" ( eax )
+				       : "0" ( edi ), "1" ( eax ) : "memory" );
+	if ( len >= 1*4 )
+		__asm__ __volatile__ ( "stosl" : "=&D" ( edi ), "=&a" ( eax )
+				       : "0" ( edi ), "1" ( eax ) : "memory" );
+	if ( ( len % 4 ) >= 2 )
+		__asm__ __volatile__ ( "stosw" : "=&D" ( edi ), "=&a" ( eax )
+				       : "0" ( edi ), "1" ( eax ) : "memory" );
+	if ( ( len % 2 ) >= 1 )
+		__asm__ __volatile__ ( "stosb" : "=&D" ( edi ), "=&a" ( eax )
+				       : "0" ( edi ), "1" ( eax ) : "memory" );
+
+	return dest;
+}
+
+/**
+ * Fill memory region
+ *
+ * @v dest		Destination address
+ * @v fill		Fill pattern
+ * @v len		Length
+ * @ret dest		Destination address
+ */
+static inline __attribute__ (( always_inline )) void *
+memset ( void *dest, int fill, size_t len ) {
+
+	if ( __builtin_constant_p ( fill ) && ( fill == 0 ) &&
+	     __builtin_constant_p ( len ) ) {
+		return __constant_memset_zero ( dest, len );
+	} else {
+		return __memset ( dest, fill, len );
+	}
 }
 
 #endif /* X86_BITS_STRING_H */
