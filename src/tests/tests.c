@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /* Drag in all applicable self-tests */
+REQUIRE_OBJECT ( memset_test );
 REQUIRE_OBJECT ( memcpy_test );
 REQUIRE_OBJECT ( string_test );
 REQUIRE_OBJECT ( math_test );
