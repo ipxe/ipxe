@@ -15,7 +15,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define TIMER_PREFIX_pcbios __pcbios_
 #endif
 
-#include <ipxe/timer2.h>
+#include <ipxe/pit8254.h>
 
 /**
  * Delay for a fixed number of microseconds
@@ -25,9 +25,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static inline __always_inline void
 TIMER_INLINE ( pcbios, udelay ) ( unsigned long usecs ) {
 	/* BIOS timer is not high-resolution enough for udelay(), so
-	 * we use timer2
+	 * we use the 8254 Programmable Interval Timer.
 	 */
-	timer2_udelay ( usecs );
+	pit8254_udelay ( usecs );
 }
 
 /**

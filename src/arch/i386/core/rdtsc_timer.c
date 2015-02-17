@@ -27,7 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <assert.h>
 #include <ipxe/timer.h>
-#include <ipxe/timer2.h>
+#include <ipxe/pit8254.h>
 
 /**
  * Number of TSC ticks per microsecond
@@ -56,10 +56,10 @@ static void rdtsc_udelay ( unsigned long usecs ) {
 			elapsed = ( currticks() - start );
 		} while ( elapsed < ( usecs * rdtsc_ticks_per_usec ) );
 	} else {
-		/* Not yet calibrated; use timer2 and calibrate
+		/* Not yet calibrated; use 8254 PIT and calibrate
 		 * based on result.
 		 */
-		timer2_udelay ( usecs );
+		pit8254_udelay ( usecs );
 		elapsed = ( currticks() - start );
 		rdtsc_ticks_per_usec = ( elapsed / usecs );
 		DBG ( "RDTSC timer calibrated: %ld ticks in %ld usecs "
