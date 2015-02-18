@@ -38,6 +38,7 @@ REQUIRE_OBJECT ( base16_test );
 REQUIRE_OBJECT ( settings_test );
 REQUIRE_OBJECT ( time_test );
 REQUIRE_OBJECT ( tcpip_test );
+REQUIRE_OBJECT ( ipv4_test );
 REQUIRE_OBJECT ( ipv6_test );
 REQUIRE_OBJECT ( crc32_test );
 REQUIRE_OBJECT ( md5_test );
