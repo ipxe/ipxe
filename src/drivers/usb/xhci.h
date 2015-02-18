@@ -178,6 +178,9 @@ enum xhci_default_psi_value {
 /** Command ring cycle state */
 #define XHCI_CRCR_RCS 0x00000001UL
 
+/** Command abort */
+#define XHCI_CRCR_CA 0x00000004UL
+
 /** Command ring running */
 #define XHCI_CRCR_CRR 0x00000008UL
 
@@ -629,6 +632,8 @@ enum xhci_completion_code {
 	XHCI_CMPLT_SUCCESS = 1,
 	/** Short packet */
 	XHCI_CMPLT_SHORT = 13,
+	/** Command ring stopped */
+	XHCI_CMPLT_CMD_STOPPED = 24,
 };
 
 /** A port status change transfer request block */
@@ -987,6 +992,12 @@ xhci_ring_consumed ( struct xhci_trb_ring *ring ) {
  */
 #define XHCI_COMMAND_MAX_WAIT_MS 500
 
+/** Time to delay after aborting a command
+ *
+ * This is a policy decision
+ */
+#define XHCI_COMMAND_ABORT_DELAY_MS 500
+
 /** Maximum time to wait for a port reset to complete
  *
  * This is a policy decision.
@@ -1042,8 +1053,8 @@ struct xhci_device {
 	struct xhci_trb_ring command;
 	/** Event ring */
 	struct xhci_event_ring event;
-	/** Current command completion buffer (if any) */
-	union xhci_trb *completion;
+	/** Current command (if any) */
+	union xhci_trb *pending;
 
 	/** Device slots, indexed by slot ID */
 	struct xhci_slot **slot;

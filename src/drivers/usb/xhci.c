@@ -1199,6 +1199,22 @@ static int xhci_ring_alloc ( struct xhci_device *xhci,
 }
 
 /**
+ * Reset transfer request block ring
+ *
+ * @v ring		TRB ring
+ */
+static void xhci_ring_reset ( struct xhci_trb_ring *ring ) {
+	unsigned int count = ( 1U << ring->shift );
+
+	/* Reset producer and consumer counters */
+	ring->prod = 0;
+	ring->cons = 0;
+
+	/* Reset TRBs (except Link TRB) */
+	memset ( ring->trb, 0, ( count * sizeof ( ring->trb[0] ) ) );
+}
+
+/**
  * Free transfer request block ring
  *
  * @v ring		TRB ring
@@ -1574,6 +1590,22 @@ static void xhci_transfer ( struct xhci_device *xhci,
  */
 static void xhci_complete ( struct xhci_device *xhci,
 			    struct xhci_trb_complete *complete ) {
+	int rc;
+
+	/* Ignore "command ring stopped" notifications */
+	if ( complete->code == XHCI_CMPLT_CMD_STOPPED ) {
+		DBGC2 ( xhci, "XHCI %p command ring stopped\n", xhci );
+		return;
+	}
+
+	/* Ignore unexpected completions */
+	if ( ! xhci->pending ) {
+		rc = -ECODE ( complete->code );
+		DBGC ( xhci, "XHCI %p unexpected completion (code %d): %s\n",
+		       xhci, complete->code, strerror ( rc ) );
+		DBGC_HDA ( xhci, 0, complete, sizeof ( *complete ) );
+		return;
+	}
 
 	/* Dequeue command TRB */
 	xhci_dequeue ( &xhci->command );
@@ -1582,15 +1614,9 @@ static void xhci_complete ( struct xhci_device *xhci,
 	assert ( xhci_ring_consumed ( &xhci->command ) ==
 		 le64_to_cpu ( complete->command ) );
 
-	/* Record completion if applicable */
-	if ( xhci->completion ) {
-		memcpy ( xhci->completion, complete,
-			 sizeof ( *xhci->completion ) );
-		xhci->completion = NULL;
-	} else {
-		DBGC ( xhci, "XHCI %p unexpected completion:\n", xhci );
-		DBGC_HDA ( xhci, 0, complete, sizeof ( *complete ) );
-	}
+	/* Record completion */
+	memcpy ( xhci->pending, complete, sizeof ( *xhci->pending ) );
+	xhci->pending = NULL;
 }
 
 /**
@@ -1697,6 +1723,33 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
 }
 
 /**
+ * Abort command
+ *
+ * @v xhci		xHCI device
+ */
+static void xhci_abort ( struct xhci_device *xhci ) {
+	physaddr_t crp;
+
+	/* Abort the command */
+	DBGC2 ( xhci, "XHCI %p aborting command\n", xhci );
+	xhci_writeq ( xhci, XHCI_CRCR_CA, xhci->op + XHCI_OP_CRCR );
+
+	/* Allow time for command to abort */
+	mdelay ( XHCI_COMMAND_ABORT_DELAY_MS );
+
+	/* Sanity check */
+	assert ( ( readl ( xhci->op + XHCI_OP_CRCR ) & XHCI_CRCR_CRR ) == 0 );
+
+	/* Consume (and ignore) any final command status */
+	xhci_event_poll ( xhci );
+
+	/* Reset the command ring control register */
+	xhci_ring_reset ( &xhci->command );
+	crp = virt_to_phys ( xhci->command.trb );
+	xhci_writeq ( xhci, ( crp | XHCI_CRCR_RCS ), xhci->op + XHCI_OP_CRCR );
+}
+
+/**
  * Issue command and wait for completion
  *
  * @v xhci		xHCI device
@@ -1711,8 +1764,8 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 	unsigned int i;
 	int rc;
 
-	/* Record the completion buffer */
-	xhci->completion = trb;
+	/* Record the pending command */
+	xhci->pending = trb;
 
 	/* Enqueue the command */
 	if ( ( rc = xhci_enqueue ( &xhci->command, NULL, trb ) ) != 0 )
@@ -1728,7 +1781,7 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 		xhci_event_poll ( xhci );
 
 		/* Check for completion */
-		if ( ! xhci->completion ) {
+		if ( ! xhci->pending ) {
 			if ( complete->code != XHCI_CMPLT_SUCCESS ) {
 				rc = -ECODE ( complete->code );
 				DBGC ( xhci, "XHCI %p command failed (code "
@@ -1748,8 +1801,11 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 	DBGC ( xhci, "XHCI %p timed out waiting for completion\n", xhci );
 	rc = -ETIMEDOUT;
 
+	/* Abort command */
+	xhci_abort ( xhci );
+
  err_enqueue:
-	xhci->completion = NULL;
+	xhci->pending = NULL;
 	return rc;
 }
 
