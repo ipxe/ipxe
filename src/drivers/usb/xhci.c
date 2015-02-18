@@ -2587,13 +2587,28 @@ static void xhci_device_close ( struct usb_device *usb ) {
 	struct xhci_device *xhci = slot->xhci;
 	size_t len = xhci_device_context_offset ( xhci, XHCI_CTX_END );
 	unsigned int id = slot->id;
+	int rc;
 
 	/* Disable slot */
-	xhci_disable_slot ( xhci, id );
+	if ( ( rc = xhci_disable_slot ( xhci, id ) ) != 0 ) {
+		/* Slot is still enabled.  Leak the slot context,
+		 * since the controller may still write to this
+		 * memory, and leave the DCBAA entry intact.
+		 *
+		 * If the controller later reports that this same slot
+		 * has been re-enabled, then some assertions will be
+		 * triggered.
+		 */
+		DBGC ( xhci, "XHCI %p slot %d leaking context memory\n",
+		      xhci, slot->id );
+		slot->context = NULL;
+	}
 
 	/* Free slot */
-	free_dma ( slot->context, len );
-	xhci->dcbaa[id] = 0;
+	if ( slot->context ) {
+		free_dma ( slot->context, len );
+		xhci->dcbaa[id] = 0;
+	}
 	xhci->slot[id] = NULL;
 	free ( slot );
 }
