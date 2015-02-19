@@ -31,8 +31,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <ipxe/string.h>
 #include <ipxe/test.h>
 
 /**
@@ -241,6 +243,52 @@ static void string_test_exec ( void ) {
 		dest = strcat ( buf, " this" );
 		ok ( dest == buf );
 		ok ( strcmp ( buf, "append this" ) == 0 );
+	}
+
+	/* Test digit_value() */
+	{
+		unsigned int i;
+		char buf[2];
+		for ( i = 0 ; i < 16 ; i++ ) {
+			snprintf ( buf, sizeof ( buf ), "%x", i );
+			ok ( digit_value ( buf[0] ) == i );
+			snprintf ( buf, sizeof ( buf ), "%X", i );
+			ok ( digit_value ( buf[0] ) == i );
+		}
+		ok ( digit_value ( 0 ) >= 16 );
+		ok ( digit_value ( 9 ) >= 16 );
+		ok ( digit_value ( '0' - 1 ) >= 16 );
+		ok ( digit_value ( '9' + 1 ) >= 16 );
+		ok ( digit_value ( 'A' - 1 ) >= 16 );
+		ok ( digit_value ( 'F' + 1 ) >= 16 );
+		ok ( digit_value ( 'a' - 1 ) >= 16 );
+		ok ( digit_value ( 'f' + 1 ) >= 16 );
+	}
+
+	/* Test strtoul() */
+	ok ( strtoul ( "12345", NULL, 0 ) == 12345UL );
+	ok ( strtoul ( "  741", NULL, 10 ) == 741UL );
+	ok ( strtoul ( " 555a", NULL, 0 ) == 555UL );
+	ok ( strtoul ( " 555a", NULL, 16 ) == 0x555aUL );
+	ok ( strtoul ( "-12", NULL, 0 ) == -12UL );
+	ok ( strtoul ( "+3", NULL, 0 ) == 3UL );
+	ok ( strtoul ( "721", NULL, 0 ) == 721UL );
+	ok ( strtoul ( "721", NULL, 8 ) == 0721UL );
+	ok ( strtoul ( "0721", NULL, 0 ) == 0721UL );
+	ok ( strtoul ( "", NULL, 0 ) == 0UL );
+	ok ( strtoul ( "\t0xcAfe", NULL, 0 ) == 0xcafeUL );
+	ok ( strtoul ( "0xffffffff", NULL, 0 ) == 0xffffffffUL );
+	{
+		static const char string[] = "123aHa.world";
+		char *endp;
+		ok ( strtoul ( string, &endp, 0 ) == 123UL );
+		ok ( endp == &string[3] );
+		ok ( strtoul ( string, &endp, 16 ) == 0x123aUL );
+		ok ( endp == &string[4] );
+		ok ( strtoul ( string, &endp, 26 ) ==
+		     ( ( ( ( ( 1 * 26 + 2 ) * 26 + 3 ) * 26 + 10 ) * 26
+			 + 17 ) * 26 + 10 ) );
+		ok ( endp == &string[6] );
 	}
 }
 

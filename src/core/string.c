@@ -366,3 +366,132 @@ char * strndup ( const char *src, size_t max ) {
         }
         return dup;
 }
+
+/**
+ * Calculate digit value
+ *
+ * @v character		Digit character
+ * @ret digit		Digit value
+ *
+ * Invalid digits will be returned as a value greater than or equal to
+ * the numeric base.
+ */
+unsigned int digit_value ( unsigned int character ) {
+
+	if ( character >= 'a' )
+		return ( character - ( 'a' - 10 ) );
+	if ( character >= 'A' )
+		return ( character - ( 'A' - 10 ) );
+	if ( character <= '9' )
+		return ( character - '0' );
+	return character;
+}
+
+/**
+ * Preprocess string for strtoul() or strtoull()
+ *
+ * @v string		String
+ * @v negate		Final value should be negated
+ * @v base		Numeric base
+ * @ret string		Remaining string
+ */
+static const char * strtoul_pre ( const char *string, int *negate, int *base ) {
+
+	/* Skip any leading whitespace */
+	while ( isspace ( *string ) )
+		string++;
+
+	/* Process arithmetic sign, if present */
+	*negate = 0;
+	if ( *string == '-' ) {
+		string++;
+		*negate = 1;
+	} else if ( *string == '+' ) {
+		string++;
+	}
+
+	/* Process base, if present */
+	if ( *base == 0 ) {
+		*base = 10;
+		if ( *string == '0' ) {
+			string++;
+			*base = 8;
+			if ( ( *string & ~0x20 ) == 'X' ) {
+				string++;
+				*base = 16;
+			}
+		}
+	}
+
+	return string;
+}
+
+/**
+ * Convert string to numeric value
+ *
+ * @v string		String
+ * @v endp		End pointer (or NULL)
+ * @v base		Numeric base (or zero to autodetect)
+ * @ret value		Numeric value
+ */
+unsigned long strtoul ( const char *string, char **endp, int base ) {
+	unsigned long value = 0;
+	unsigned int digit;
+	int negate;
+
+	/* Preprocess string */
+	string = strtoul_pre ( string, &negate, &base );
+
+	/* Process digits */
+	for ( ; ; string++ ) {
+		digit = digit_value ( *string );
+		if ( digit >= ( unsigned int ) base )
+			break;
+		value = ( ( value * base ) + digit );
+	}
+
+	/* Negate value if, applicable */
+	if ( negate )
+		value = -value;
+
+	/* Fill in end pointer, if applicable */
+	if ( endp )
+		*endp = ( ( char * ) string );
+
+	return value;
+}
+
+/**
+ * Convert string to numeric value
+ *
+ * @v string		String
+ * @v endp		End pointer (or NULL)
+ * @v base		Numeric base (or zero to autodetect)
+ * @ret value		Numeric value
+ */
+unsigned long long strtoull ( const char *string, char **endp, int base ) {
+	unsigned long long value = 0;
+	unsigned int digit;
+	int negate;
+
+	/* Preprocess string */
+	string = strtoul_pre ( string, &negate, &base );
+
+	/* Process digits */
+	for ( ; ; string++ ) {
+		digit = digit_value ( *string );
+		if ( digit >= ( unsigned int ) base )
+			break;
+		value = ( ( value * base ) + digit );
+	}
+
+	/* Negate value if, applicable */
+	if ( negate )
+		value = -value;
+
+	/* Fill in end pointer, if applicable */
+	if ( endp )
+		*endp = ( ( char * ) string );
+
+	return value;
+}
