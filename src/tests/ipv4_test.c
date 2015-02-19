@@ -138,6 +138,8 @@ static void ipv4_test_exec ( void ) {
 	inet_aton_fail_ok ( "256.0.0.1" ); /* Byte out of range */
 	inet_aton_fail_ok ( "212.13.204.60.1" ); /* Too long */
 	inet_aton_fail_ok ( "127.0.0" ); /* Too short */
+	inet_aton_fail_ok ( "1.2.3.a" ); /* Invalid characters */
+	inet_aton_fail_ok ( "127.0..1" ); /* Missing bytes */
 }
 
 /** IPv4 self-test */

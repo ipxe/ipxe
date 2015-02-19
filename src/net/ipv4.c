@@ -589,10 +589,42 @@ static int ipv4_arp_check ( struct net_device *netdev, const void *net_addr ) {
 }
 
 /**
+ * Parse IPv4 address
+ *
+ * @v string		IPv4 address string
+ * @ret in		IPv4 address to fill in
+ * @ret ok		IPv4 address is valid
+ *
+ * Note that this function returns nonzero iff the address is valid,
+ * to match the standard BSD API function of the same name.  Unlike
+ * most other iPXE functions, a zero therefore indicates failure.
+ */
+int inet_aton ( const char *string, struct in_addr *in ) {
+	const char *separator = "...";
+	uint8_t *byte = ( ( uint8_t * ) in );
+	char *endp;
+	unsigned long value;
+
+	while ( 1 ) {
+		value = strtoul ( string, &endp, 0 );
+		if ( string == endp )
+			return 0;
+		if ( value > 0xff )
+			return 0;
+		*(byte++) = value;
+		if ( *endp != *separator )
+			return 0;
+		if ( ! *(separator++) )
+			return 1;
+		string = ( endp + 1 );
+	}
+}
+
+/**
  * Convert IPv4 address to dotted-quad notation
  *
- * @v in	IP address
- * @ret string	IP address in dotted-quad notation
+ * @v in		IPv4 address
+ * @ret string		IPv4 address in dotted-quad notation
  */
 char * inet_ntoa ( struct in_addr in ) {
 	static char buf[16]; /* "xxx.xxx.xxx.xxx" */
@@ -603,10 +635,10 @@ char * inet_ntoa ( struct in_addr in ) {
 }
 
 /**
- * Transcribe IP address
+ * Transcribe IPv4 address
  *
- * @v net_addr	IP address
- * @ret string	IP address in dotted-quad notation
+ * @v net_addr		IPv4 address
+ * @ret string		IPv4 address in dotted-quad notation
  *
  */
 static const char * ipv4_ntoa ( const void *net_addr ) {
