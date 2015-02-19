@@ -150,6 +150,8 @@ static int hv_check_hv ( struct hv_hypervisor *hv ) {
 	uint32_t discard_ebx;
 	uint32_t discard_ecx;
 	uint32_t discard_edx;
+	uint32_t available;
+	uint32_t permissions;
 
 	/* Check for presence of a hypervisor (not necessarily Hyper-V) */
 	x86_features ( &features );
@@ -165,6 +167,30 @@ static int hv_check_hv ( struct hv_hypervisor *hv ) {
 		DBGC ( hv, "HV %p not running in Hyper-V (interface ID "
 		       "%#08x)\n", hv, interface_id );
 		return -ENODEV;
+	}
+
+	/* Check that required features and privileges are available */
+	cpuid ( HV_CPUID_FEATURES, &available, &permissions, &discard_ecx,
+		&discard_edx );
+	if ( ! ( available & HV_FEATURES_AVAIL_HYPERCALL_MSR ) ) {
+		DBGC ( hv, "HV %p has no hypercall MSRs (features %08x:%08x)\n",
+		       hv, available, permissions );
+		return -ENODEV;
+	}
+	if ( ! ( available & HV_FEATURES_AVAIL_SYNIC_MSR ) ) {
+		DBGC ( hv, "HV %p has no SynIC MSRs (features %08x:%08x)\n",
+		       hv, available, permissions );
+		return -ENODEV;
+	}
+	if ( ! ( permissions & HV_FEATURES_PERM_POST_MESSAGES ) ) {
+		DBGC ( hv, "HV %p cannot post messages (features %08x:%08x)\n",
+		       hv, available, permissions );
+		return -EACCES;
+	}
+	if ( ! ( permissions & HV_FEATURES_PERM_SIGNAL_EVENTS ) ) {
+		DBGC ( hv, "HV %p cannot signal events (features %08x:%08x)",
+		       hv, available, permissions );
+		return -EACCES;
 	}
 
 	return 0;
