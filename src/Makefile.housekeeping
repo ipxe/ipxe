@@ -1220,15 +1220,12 @@ endif # defined(BIN)
 #
 # The compression utilities
 #
-$(NRV2B) : util/nrv2b.c $(MAKEDEPS)
-	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) -DENCODE -DDECODE -DMAIN -DVERBOSE \
-		       -DNDEBUG -DBITSIZE=32 -DENDIAN=0 -o $@ $<
-CLEANUP	+= $(NRV2B)
 
-$(ZBIN) : util/zbin.c util/nrv2b.c $(MAKEDEPS)
+ZBIN_LDFLAGS := -llzma
+
+$(ZBIN) : util/zbin.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) -o $@ $<
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $< $(ZBIN_LDFLAGS) -o $@
 CLEANUP += $(ZBIN)
 
 ###############################################################################
