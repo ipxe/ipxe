@@ -27,6 +27,13 @@ SECTIONS {
     PROVIDE ( _max_align = 16 );
 
     /*
+     * Allow decompressor to require a minimum amount of temporary stack
+     * space.
+     *
+     */
+    PROVIDE ( _min_decompress_stack = 0 );
+
+    /*
      * The prefix
      *
      */
@@ -87,6 +94,7 @@ SECTIONS {
 	*(.bss16.*)
 	*(.stack16)
 	*(.stack16.*)
+	. = MAX ( ., _mdata16 + _min_decompress_stack );
 	_edata16 = .;
     }
     _data16_filesz	= ABSOLUTE ( _mdata16 ) - ABSOLUTE ( _data16 );
