@@ -730,6 +730,17 @@ int __debug_disable;
 #define FILE_LICENCE_MIT \
 	PROVIDE_SYMBOL ( PREFIX_OBJECT ( __licence__mit__ ) )
 
+/** Declare a file as being under GPLv2+ or UBDL
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be licensed under the GNU GPL; "either version 2 of the License, or
+ * (at your option) any later version" and also states that it may be
+ * distributed under the terms of the Unmodified Binary Distribution
+ * Licence (as given in the file COPYING.UBDL).
+ */
+#define FILE_LICENCE_GPL2_OR_LATER_OR_UBDL \
+	PROVIDE_SYMBOL ( PREFIX_OBJECT ( __licence__gpl2_or_later_or_ubdl__ ) )
+
 /** Declare a particular licence as applying to a file */
 #define FILE_LICENCE( _licence ) FILE_LICENCE_ ## _licence
 
