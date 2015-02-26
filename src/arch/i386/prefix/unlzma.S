@@ -194,7 +194,6 @@ high:		.rept	( 1 << 8 )
 
 	.struct	0
 lzma_dec:
-in_start:	.long	0
 out_start:	.long	0
 rc_code:	.long	0
 rc_range:	.long	0
@@ -487,7 +486,7 @@ rc_direct:
 lzma_literal:
 	/* Get most recent output byte, if available */
 	xorl	%ebx, %ebx
-	cmpl	%esi, in_start(%ebp)
+	cmpl	%edi, out_start(%ebp)
 	je	1f
 	movb	%es:-1(%edi), %bh
 1:	/* Locate probability estimate set */
@@ -901,7 +900,6 @@ decompress:
 	popw	%es
 	popl	%edi
 	/* Initialise remaining parameters */
-	movl	%esi, in_start(%ebp)
 	movl	%edi, out_start(%ebp)
 	print_character $('\n')
 	ADDR32 lodsb	/* discard initial byte */
