@@ -55,25 +55,58 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #endif /* CODE16 */
 
 /****************************************************************************
- * Debugging (via 0xe9 debug port)
+ * Debugging
  ****************************************************************************
+ *
+ * This code will usually run in 16-bit protected mode, in which case
+ * only the 0xe9 debug port (present on some virtual machines) can be
+ * used.
+ *
+ * To debug on real hardware, build with DEBUG=libprefix.  This will
+ * cause this code to be called in flat real mode, and so DEBUG_INT10
+ * may be used.
  */
 
-#define DEBUG 0
+/* Enable debugging via 0xe9 debug port */
+#define DEBUG_E9 0
 
-#if DEBUG
-	.macro	print_character, char
+/* Enable debugging via BIOS INT 10 (works only when in flat real mode) */
+#define DEBUG_INT10 0
+
+#if ( DEBUG_E9 || DEBUG_INT10 )
+	.macro	print_character, reg
+	pushfl
 	pushw	%ax
-	movb 	$\char, %al
+	pushw	%bx
+	pushw	%bp
+	movb 	\reg, %al
+	movw	$0x0007, %bx
+	movb	$0x0e, %ah
+#if DEBUG_E9
 	outb	%al, $0xe9
+#endif
+#if DEBUG_INT10
+	cmpb	$('\n'), %al
+	jne	L\@
+	int	$0x10
+	movb	$('\r'), %al
+L\@:	int	$0x10
+#endif
+	popw	%bp
+	popw	%bx
 	popw	%ax
+	popfl
 	.endm
 
 	.macro	print_hex_nibble
+	pushfl
+	pushw	%ax
 	cmpb	$10, %al
 	sbb	$0x69, %al
 	das
-	outb	%al, $0xe9
+	print_character %al
+	popw	%ax
+	popfl
 	.endm
 
 	.macro	print_hex_byte, reg
@@ -205,8 +238,6 @@ literal:	.rept	( ( 1 << LZMA_LC ) * 0x300 )
  * Returns:
  *   %ds:%esi : compressed input data pointer (possibly updated)
  *   %eax : current range
- * Corrupts:
- *   %eax
  *****************************************************************************
  */
 rc_normalise:
@@ -476,7 +507,7 @@ lzma_literal:
 	/* Store output byte */
 	ADDR32 stosb
 	print_hex_byte %al
-	print_character ' '
+	print_character $(' ')
 	/* Update LZMA state */
 	subb	$3, %dl
 	jns	1f
@@ -562,14 +593,14 @@ lzma_len:
  *****************************************************************************
  */
 match:	/* Update repeated match list */
-	print_character '['
+	print_character $('[')
 	movl	$3, %ecx
 	jmp	1f
 match_rep:
-	print_character '['
-	print_character 'R'
+	print_character $('[')
+	print_character $('R')
 	print_hex_byte %cl
-	print_character '='
+	print_character $('=')
 	movzbl	%cl, %ecx
 	movl	reps(%ebp,%ecx,4), %eax
 	jcxz	2f
@@ -582,10 +613,10 @@ match_rep:
 	/* Get stored match length */
 	movzwl	len(%ebp), %ecx
 	print_hex_dword	%eax
-	print_character '+'
+	print_character $('+')
 	print_hex_word %cx
-	print_character ']'
-	print_character ' '
+	print_character $(']')
+	print_character $(' ')
 	/* Abort with CF set if match distance is out of range */
 	movl	out_start(%ebp), %esi
 	negl	%esi
@@ -872,13 +903,13 @@ decompress:
 	/* Initialise remaining parameters */
 	movl	%esi, in_start(%ebp)
 	movl	%edi, out_start(%ebp)
-	print_character '\n'
+	print_character $('\n')
 	ADDR32 lodsb	/* discard initial byte */
 	print_hex_byte %al
 	ADDR32 lodsl
 	bswapl	%eax
 	print_hex_dword %eax
-	print_character '\n'
+	print_character $('\n')
 	movl	%eax, rc_code(%ebp)
 	decl	rc_range(%ebp)
 	movl	$STATE_LIT_LIT, %edx
@@ -886,7 +917,7 @@ decompress:
 	call	lzma_decode
 	jnc	1b
 	call	rc_normalise
-	print_character '\n'
+	print_character $('\n')
 	/* Undo BCJ filter */
 	pushl	%esi
 	movl	out_start(%ebp), %esi
