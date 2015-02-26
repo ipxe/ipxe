@@ -394,8 +394,10 @@ process_bytes:
 	movw	%ax, %fs
 	movw	%ax, %gs
 
+#ifdef NDEBUG
 	/* Call memcpy()-like function */
 	call	*%bx
+#endif
 
 	/* Return to (flat) real mode */
 	movl	%cr0, %eax
@@ -408,6 +410,20 @@ process_bytes:
 	popw	%es
 	popw	%fs
 	popw	%gs
+
+#ifndef NDEBUG
+	/* Call memcpy()-like function in flat real mode (to allow for
+	 * debug output via INT 10).
+	 */
+	pushw	%ds
+	pushw	%es
+	xorw	%ax, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	call	*%bx
+	popw	%es
+	popw	%ds
+#endif
 
 	/* Restore GDT */
 	data32 lgdt -8(%bp)
