@@ -885,6 +885,7 @@ decompress:
 1:	/* Decompress until we reach end of buffer */
 	call	lzma_decode
 	jnc	1b
+	call	rc_normalise
 	print_character '\n'
 	/* Undo BCJ filter */
 	pushl	%esi
