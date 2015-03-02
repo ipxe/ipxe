@@ -35,11 +35,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Check to see if character is a space
  *
- * @v c			Character
+ * @v character		Character
  * @ret isspace		Character is a space
  */
-int isspace ( int c ) {
-	switch ( c ) {
+int isspace ( int character ) {
+
+	switch ( character ) {
 	case ' ' :
 	case '\f' :
 	case '\n' :
