@@ -22,7 +22,6 @@ FILE_LICENCE ( GPL2_ONLY );
 #include <ipxe/device.h>
 #include <ipxe/tables.h>
 #include <ipxe/pci_io.h>
-#include "pci_ids.h"
 
 /*
  * PCI constants
@@ -263,6 +262,56 @@ FILE_LICENCE ( GPL2_ONLY );
 #define  PCI_ERR_COR_REP_TIMER	0x00001000	/* Replay Timer Timeout */
 #define PCI_ERR_COR_MASK	20	/* Correctable Error Mask */
 	/* Same bits as above */
+
+/* Device classes and subclasses */
+
+#define PCI_CLASS_NONE			0x00
+
+#define PCI_CLASS_STORAGE		0x01
+
+#define PCI_CLASS_NETWORK		0x02
+#define PCI_CLASS_NETWORK_ETHERNET	0x00
+#define PCI_CLASS_NETWORK_TOKENRING	0x01
+#define PCI_CLASS_NETWORK_FDDI		0x02
+#define PCI_CLASS_NETWORK_ATM		0x03
+#define PCI_CLASS_NETWORK_ISDN		0x04
+#define PCI_CLASS_NETWORK_WORLDFIP	0x05
+#define PCI_CLASS_NETWORK_PICMG		0x06
+
+#define PCI_CLASS_DISPLAY		0x03
+
+#define PCI_CLASS_MEDIA			0x04
+
+#define PCI_CLASS_MEMORY		0x05
+
+#define PCI_CLASS_BRIDGE		0x06
+
+#define PCI_CLASS_COMMS			0x07
+
+#define PCI_CLASS_GENERIC		0x08
+
+#define PCI_CLASS_INPUT			0x09
+
+#define PCI_CLASS_DOCK			0x0a
+
+#define PCI_CLASS_CPU			0x0b
+
+#define PCI_CLASS_SERIAL		0x0c
+#define PCI_CLASS_SERIAL_USB		0x03
+#define PCI_CLASS_SERIAL_USB_UHCI	0x00
+#define PCI_CLASS_SERIAL_USB_OHCI	0x10
+#define PCI_CLASS_SERIAL_USB_EHCI	0x20
+#define PCI_CLASS_SERIAL_USB_XHCI	0x30
+
+#define PCI_CLASS_WIFI			0x0d
+
+#define PCI_CLASS_IO			0x0e
+
+#define PCI_CLASS_SATELLITE		0x0f
+
+#define PCI_CLASS_CRYPTO		0x10
+
+#define PCI_CLASS_DATA			0x11
 
 /** A PCI device ID list entry */
 struct pci_device_id {
