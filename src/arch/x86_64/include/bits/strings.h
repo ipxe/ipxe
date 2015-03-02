@@ -1,7 +1,7 @@
 #ifndef _BITS_STRINGS_H
 #define _BITS_STRINGS_H
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * Find last (i.e. most significant) set bit

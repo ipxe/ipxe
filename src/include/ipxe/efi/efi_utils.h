@@ -6,7 +6,7 @@
  * EFI utilities
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/DevicePath.h>

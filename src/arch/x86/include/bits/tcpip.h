@@ -7,7 +7,7 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 extern uint16_t x86_tcpip_continue_chksum ( uint16_t partial,
 					    const void *data, size_t len );

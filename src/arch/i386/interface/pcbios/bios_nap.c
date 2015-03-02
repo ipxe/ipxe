@@ -1,7 +1,7 @@
 #include <ipxe/nap.h>
 #include <realmode.h>
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * Save power by halting the CPU until the next interrupt

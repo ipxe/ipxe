@@ -1,7 +1,7 @@
 #ifndef _IPXE_EFI_PROCESSOR_BIND_H
 #define _IPXE_EFI_PROCESSOR_BIND_H
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /*
  * EFI header files rely on having the CPU architecture directory

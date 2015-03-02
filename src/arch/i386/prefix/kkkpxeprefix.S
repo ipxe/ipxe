@@ -5,7 +5,7 @@
  *****************************************************************************
  */
 
-FILE_LICENCE ( GPL2_OR_LATER )
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 /* Since we have the whole stack, we can use cached DHCP information */
 REQUIRE_OBJECT ( pxeparent_dhcp )

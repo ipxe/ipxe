@@ -7,7 +7,7 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /* Define Xen interface version before including any Xen header files */
 #define __XEN_INTERFACE_VERSION__ 0x00040400

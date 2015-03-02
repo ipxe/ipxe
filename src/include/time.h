@@ -6,7 +6,7 @@
  * Date and time
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <sys/time.h>
 #include <ipxe/time.h>

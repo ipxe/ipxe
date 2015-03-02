@@ -13,7 +13,7 @@
  *    http://wiki.osdev.org/CMOS
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <pic8259.h>
 
