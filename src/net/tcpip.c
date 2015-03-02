@@ -17,7 +17,7 @@
  * TCP/IP transport-network layer interface
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * Process a received TCP/IP packet

@@ -1,7 +1,7 @@
 #ifndef PXE_H
 #define PXE_H
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include "pxe_types.h"
 #include "pxe_error.h"

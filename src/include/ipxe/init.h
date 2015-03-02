@@ -1,7 +1,7 @@
 #ifndef _IPXE_INIT_H
 #define _IPXE_INIT_H
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/tables.h>
 

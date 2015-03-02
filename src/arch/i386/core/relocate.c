@@ -8,7 +8,7 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /*
  * The linker passes in the symbol _max_align, which is the alignment

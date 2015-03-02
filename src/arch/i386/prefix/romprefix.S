@@ -6,7 +6,7 @@
  * table so using a noticeable amount of stack space is a no-no.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER )
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 #include <config/general.h>
 #include <config/branding.h>
