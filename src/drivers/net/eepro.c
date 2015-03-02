@@ -601,9 +601,9 @@ static int eepro_probe ( struct nic *nic, struct isa_device *isa ) {
 		l_eepro = 0;
 		name = "Intel 82595-based LAN card";
 	}
-	station_addr.saddr[0] = swap16(station_addr.saddr[0]);
-	station_addr.saddr[1] = swap16(station_addr.saddr[1]);
-	station_addr.saddr[2] = swap16(station_addr.saddr[2]);
+	station_addr.saddr[0] = bswap_16(station_addr.saddr[0]);
+	station_addr.saddr[1] = bswap_16(station_addr.saddr[1]);
+	station_addr.saddr[2] = bswap_16(station_addr.saddr[2]);
 	for (i = 0; i < ETH_ALEN; i++) {
 		nic->node_addr[i] = station_addr.caddr[i];
 	}
