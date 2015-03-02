@@ -8,6 +8,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 /**
  * Add string of single-byte characters and renditions to a window
  *
