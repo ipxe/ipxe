@@ -499,10 +499,10 @@ int register_settings ( struct settings *settings, struct settings *parent,
  */
 void unregister_settings ( struct settings *settings ) {
 	struct settings *child;
-	struct settings *tmp;
 
 	/* Unregister child settings */
-	list_for_each_entry_safe ( child, tmp, &settings->children, siblings ) {
+	while ( ( child = list_first_entry ( &settings->children,
+					     struct settings, siblings ) ) ) {
 		unregister_settings ( child );
 	}
 
