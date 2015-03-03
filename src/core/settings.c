@@ -15,9 +15,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
  * 02110-1301, USA.
+ *
+ * You can also choose to distribute this program under the terms of
+ * the Unmodified Binary Distribution Licence (as given in the file
+ * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -337,17 +341,20 @@ struct settings * autovivify_child_settings ( struct settings *parent,
  */
 const char * settings_name ( struct settings *settings ) {
 	static char buf[16];
-	char tmp[ sizeof ( buf ) ];
+	char tmp[ 1 /* '.' */ + sizeof ( buf ) ];
 
 	/* Find target settings block */
 	settings = settings_target ( settings );
 
 	/* Construct name */
-	for ( buf[2] = buf[0] = 0 ; settings ; settings = settings->parent ) {
-		memcpy ( tmp, buf, sizeof ( tmp ) );
-		snprintf ( buf, sizeof ( buf ), ".%s%s", settings->name, tmp );
+	buf[0] = '\0';
+	tmp[0] = '\0';
+	for ( ; settings->parent ; settings = settings->parent ) {
+		memcpy ( ( tmp + 1 ), buf, ( sizeof ( tmp ) - 1 ) );
+		snprintf ( buf, sizeof ( buf ), "%s%s", settings->name, tmp );
+		tmp[0] = '.';
 	}
-	return ( buf + 2 );
+	return buf;
 }
 
 /**
