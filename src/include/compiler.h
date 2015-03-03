@@ -97,9 +97,6 @@
  * necessary to satisfy the reference. However, the undefined symbol
  * is not referenced in any relocations, so the link can still succeed
  * if no file contains it.
- *
- * A symbol passed to this macro may not be referenced anywhere
- * else in the file. If you want to do that, see IMPORT_SYMBOL().
  */
 #ifdef ASSEMBLY
 #define REQUEST_SYMBOL( _sym )				\
@@ -108,51 +105,6 @@
 #define REQUEST_SYMBOL( _sym )				\
 	__asm__ ( ".equ\t__need_" #_sym ", " #_sym )
 #endif /* ASSEMBLY */
-
-/** Set up a symbol to be usable in another file by IMPORT_SYMBOL()
- *
- * The symbol must already be marked as global.
- */
-#define EXPORT_SYMBOL( _sym )	PROVIDE_SYMBOL ( __export_ ## _sym )
-
-/** Make a symbol usable to this file if available at link time
- *
- * If no file passed to the linker contains the symbol, it will have
- * @c NULL value to future uses. Keep in mind that the symbol value is
- * really the @e address of a variable or function; see the code
- * snippet below.
- *
- * In C using IMPORT_SYMBOL, you must specify the declaration as the
- * second argument, for instance
- *
- * @code
- *   IMPORT_SYMBOL ( my_func, int my_func ( int arg ) );
- *   IMPORT_SYMBOL ( my_var, int my_var );
- *
- *   void use_imports ( void ) {
- * 	if ( my_func && &my_var )
- * 	   my_var = my_func ( my_var );
- *   }
- * @endcode
- *
- * GCC considers a weak declaration to override a strong one no matter
- * which comes first, so it is safe to include a header file declaring
- * the imported symbol normally, but providing the declaration to
- * IMPORT_SYMBOL is still required.
- *
- * If no EXPORT_SYMBOL declaration exists for the imported symbol in
- * another file, the behavior will be most likely be identical to that
- * for an unavailable symbol.
- */
-#ifdef ASSEMBLY
-#define IMPORT_SYMBOL( _sym )				\
-	REQUEST_SYMBOL ( __export_ ## _sym ) ;		\
-	.weak	_sym
-#else /* ASSEMBLY */
-#define IMPORT_SYMBOL( _sym, _decl )			\
-	REQUEST_SYMBOL ( __export_ ## _sym ) ;		\
-	extern _decl __attribute__ (( weak ))
-#endif
 
 /** @} */
 
