@@ -26,7 +26,7 @@ int pci_find_capability ( struct pci_device *pci, int cap ) {
 		return 0;
 
 	pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdr_type );
-	switch ( hdr_type & 0x7F ) {
+	switch ( hdr_type & PCI_HEADER_TYPE_MASK ) {
 	case PCI_HEADER_TYPE_NORMAL:
 	case PCI_HEADER_TYPE_BRIDGE:
 	default:
@@ -38,13 +38,13 @@ int pci_find_capability ( struct pci_device *pci, int cap ) {
 	}
 	while ( ttl-- && pos >= 0x40 ) {
 		pos &= ~3;
-		pci_read_config_byte ( pci, pos + PCI_CAP_LIST_ID, &id );
+		pci_read_config_byte ( pci, pos + PCI_CAP_ID, &id );
 		DBG ( "PCI Capability: %d\n", id );
 		if ( id == 0xff )
 			break;
 		if ( id == cap )
 			return pos;
-		pci_read_config_byte ( pci, pos + PCI_CAP_LIST_NEXT, &pos );
+		pci_read_config_byte ( pci, pos + PCI_CAP_NEXT, &pos );
 	}
 	return 0;
 }
@@ -76,9 +76,9 @@ unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg ) {
 	/* Restore the original command register. This reenables decoding. */
 	pci_write_config_word ( pci, PCI_COMMAND, cmd );
 	if ( start & PCI_BASE_ADDRESS_SPACE_IO ) {
-		size &= PCI_BASE_ADDRESS_IO_MASK;
+		size &= ~PCI_BASE_ADDRESS_IO_MASK;
 	} else {
-		size &= PCI_BASE_ADDRESS_MEM_MASK;
+		size &= ~PCI_BASE_ADDRESS_MEM_MASK;
 	}
 	/* Find the lowest bit set */
 	size = size & ~( size - 1 );

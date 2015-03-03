@@ -54,10 +54,10 @@ static int prism2_find_plx ( hfa384x_t *hw, struct pci_device *p )
   
   /* Obtain all memory and IO base addresses */
   pci_read_config_dword( p, PLX_LOCAL_CONFIG_REGISTER_BASE, &plx_lcr);
-  plx_lcr &= PCI_BASE_ADDRESS_IO_MASK;
+  plx_lcr &= ~PCI_BASE_ADDRESS_IO_MASK;
   pci_read_config_dword( p, PRISM2_PLX_ATTR_MEM_BASE, &attr_mem);
   pci_read_config_dword( p, PRISM2_PLX_IO_BASE, &iobase);
-  iobase &= PCI_BASE_ADDRESS_IO_MASK;
+  iobase &= ~PCI_BASE_ADDRESS_IO_MASK;
 
   /* Fill out hw structure */
   hw->iobase = iobase;

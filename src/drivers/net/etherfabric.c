@@ -3176,7 +3176,7 @@ falcon_probe_nic_variant ( struct efab_nic *efab, struct pci_device *pci )
 	uint8_t revision;
 
 	/* PCI revision */
-	pci_read_config_byte ( pci, PCI_CLASS_REVISION, &revision );
+	pci_read_config_byte ( pci, PCI_REVISION, &revision );
 	efab->pci_revision = revision;
 
 	/* Asic vs FPGA */
