@@ -346,6 +346,7 @@ int pxe_start_nbp ( void ) {
 	return 0;
 }
 
+REQUIRING_SYMBOL ( pxe_api_call );
 REQUIRE_OBJECT ( pxe_preboot );
 REQUIRE_OBJECT ( pxe_undi );
 REQUIRE_OBJECT ( pxe_udp );

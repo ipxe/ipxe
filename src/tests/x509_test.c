@@ -1109,6 +1109,7 @@ struct self_test x509_test __self_test = {
 };
 
 /* Drag in algorithms required for tests */
+REQUIRING_SYMBOL ( x509_test );
 REQUIRE_OBJECT ( rsa );
 REQUIRE_OBJECT ( sha1 );
 REQUIRE_OBJECT ( sha256 );

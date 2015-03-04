@@ -1104,6 +1104,9 @@ struct net_driver ipv6_driver __net_driver = {
 	.remove = ipv6_remove,
 };
 
+/* Drag in objects via ipv6_protocol */
+REQUIRING_SYMBOL ( ipv6_protocol );
+
 /* Drag in ICMPv6 */
 REQUIRE_OBJECT ( icmpv6 );
 

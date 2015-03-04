@@ -173,6 +173,9 @@ struct command image_trust_commands[] __command = {
 	},
 };
 
+/* Drag in objects via command list */
+REQUIRING_SYMBOL ( image_trust_commands );
+
 /* Drag in objects typically required for signature verification */
 REQUIRE_OBJECT ( rsa );
 REQUIRE_OBJECT ( md5 );

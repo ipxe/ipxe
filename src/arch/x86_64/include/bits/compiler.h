@@ -1,6 +1,9 @@
 #ifndef _BITS_COMPILER_H
 #define _BITS_COMPILER_H
 
+/** Dummy relocation type */
+#define RELOC_TYPE_NONE R_X86_64_NONE
+
 #ifndef ASSEMBLY
 
 /** Declare a function with standard calling conventions */

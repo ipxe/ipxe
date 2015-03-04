@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /* Drag in all applicable self-tests */
+PROVIDE_REQUIRING_SYMBOL();
 REQUIRE_OBJECT ( memset_test );
 REQUIRE_OBJECT ( memcpy_test );
 REQUIRE_OBJECT ( string_test );

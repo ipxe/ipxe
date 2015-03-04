@@ -3,6 +3,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+/** Dummy relocation type */
+#define RELOC_TYPE_NONE R_386_NONE
+
 #ifndef ASSEMBLY
 
 /** Declare a function with standard calling conventions */

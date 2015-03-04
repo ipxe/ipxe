@@ -8,6 +8,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 /* Provide the PXENV_FILE_EXIT_HOOK API call */
+REQUIRING_SYMBOL ( _kkkpxe_start )
 REQUIRE_OBJECT ( pxe_exit_hook )
 
 #define PXELOADER_KEEP_UNDI

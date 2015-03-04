@@ -1861,5 +1861,6 @@ struct self_test ocsp_test __self_test = {
 };
 
 /* Drag in algorithms required for tests */
+REQUIRING_SYMBOL ( ocsp_test );
 REQUIRE_OBJECT ( rsa );
 REQUIRE_OBJECT ( sha1 );

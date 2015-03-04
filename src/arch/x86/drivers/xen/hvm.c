@@ -496,5 +496,8 @@ struct pci_driver hvm_driver __pci_driver = {
 	.remove = hvm_remove,
 };
 
+/* Drag in objects via hvm_driver */
+REQUIRING_SYMBOL ( hvm_driver );
+
 /* Drag in netfront driver */
 REQUIRE_OBJECT ( netfront );

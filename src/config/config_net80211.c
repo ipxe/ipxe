@@ -25,6 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+PROVIDE_REQUIRING_SYMBOL();
+
 /*
  * Drag in 802.11-specific commands
  *

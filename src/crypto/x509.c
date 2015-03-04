@@ -1765,5 +1765,8 @@ int x509_validate_chain ( struct x509_chain *chain, time_t time,
 	return -EACCES_USELESS;
 }
 
+/* Drag in objects via x509_validate() */
+REQUIRING_SYMBOL ( x509_validate );
+
 /* Drag in certificate store */
 REQUIRE_OBJECT ( certstore );

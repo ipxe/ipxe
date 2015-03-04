@@ -44,6 +44,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * in the final iPXE executable built.
  */
 
+PROVIDE_REQUIRING_SYMBOL();
+
 /*
  * Drag in all requested console types
  *

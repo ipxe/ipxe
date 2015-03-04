@@ -590,5 +590,8 @@ struct root_device hv_root_device __root_device = {
 	.driver = &hv_root_driver,
 };
 
+/* Drag in objects via hv_root_device */
+REQUIRING_SYMBOL ( hv_root_device );
+
 /* Drag in netvsc driver */
 REQUIRE_OBJECT ( netvsc );

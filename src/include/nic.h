@@ -276,6 +276,7 @@ static inline void * legacy_isa_get_drvdata ( void *hwdev ) {
 	_name ## _isa_legacy_remove ( struct isa_device *isa ) {	  \
 		return legacy_remove ( isa, legacy_isa_get_drvdata,	  \
 				       _name ## _disable );		  \
-	}
+	}								  \
+	PROVIDE_REQUIRING_SYMBOL()
 
 #endif	/* NIC_H */

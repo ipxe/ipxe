@@ -57,54 +57,101 @@
  * @{
  */
 
-/** Provide a symbol within this object file */
-#ifdef ASSEMBLY
-#define PROVIDE_SYMBOL( _sym )				\
-	.section ".provided", "a", @nobits ;		\
-	.hidden _sym ;					\
-	.globl	_sym ;					\
-	_sym: ;						\
-	.previous
-#else /* ASSEMBLY */
-#define PROVIDE_SYMBOL( _sym )				\
-	char _sym[0]					\
-	  __attribute__ (( section ( ".provided" ) ))
-#endif /* ASSEMBLY */
-
-/** Require a symbol within this object file
+/**
+ * Provide a symbol within this object file
  *
- * The symbol is referenced by a relocation in a discarded section, so
- * if it is not available at link time the link will fail.
+ * @v symbol		Symbol name
  */
 #ifdef ASSEMBLY
-#define REQUIRE_SYMBOL( _sym )				\
-	.section ".discard", "a", @progbits ;		\
-	.extern	_sym ;					\
-	.long	_sym ;					\
+#define PROVIDE_SYMBOL( symbol )				\
+	.section ".provided", "a", @nobits ;			\
+	.hidden symbol ;					\
+	.globl	symbol ;					\
+	symbol: ;						\
 	.previous
-#else /* ASSEMBLY */
-#define REQUIRE_SYMBOL( _sym )				\
-	extern char _sym;				\
-	static char * _C2 ( _C2 ( __require_, _sym ), _C2 ( _, __LINE__ ) ) \
-		__attribute__ (( section ( ".discard" ), used )) \
-		= &_sym
+#else
+#define PROVIDE_SYMBOL( symbol )				\
+	char symbol[0]						\
+	  __attribute__ (( section ( ".provided" ) ))
 #endif
 
-/** Request that a symbol be available at runtime
+/**
+ * Request a symbol
  *
- * The requested symbol is entered as undefined into the symbol table
- * for this object, so the linker will pull in other object files as
- * necessary to satisfy the reference. However, the undefined symbol
- * is not referenced in any relocations, so the link can still succeed
- * if no file contains it.
+ * @v symbol		Symbol name
+ *
+ * Request a symbol to be included within the link.  If the symbol
+ * cannot be found, the link will succeed anyway.
  */
 #ifdef ASSEMBLY
-#define REQUEST_SYMBOL( _sym )				\
-	.equ	__need_ ## _sym, _sym
-#else /* ASSEMBLY */
-#define REQUEST_SYMBOL( _sym )				\
-	__asm__ ( ".equ\t__need_" #_sym ", " #_sym )
-#endif /* ASSEMBLY */
+#define REQUEST_SYMBOL( symbol )				\
+	.equ __request_ ## symbol, symbol
+#else
+#define REQUEST_SYMBOL( symbol )				\
+	__asm__ ( ".equ __request_" #symbol ", " #symbol )
+#endif
+
+/**
+ * Require a symbol
+ *
+ * @v symbol		Symbol name
+ *
+ * Require a symbol to be included within the link.  If the symbol
+ * cannot be found, the link will fail.
+ *
+ * To use this macro within a file, you must also specify the file's
+ * "requiring symbol" using the REQUIRING_SYMBOL() or
+ * PROVIDE_REQUIRING_SYMBOL() macros.
+ */
+#ifdef ASSEMBLY
+#define REQUIRE_SYMBOL( symbol )				\
+	.reloc __requiring_symbol__, RELOC_TYPE_NONE, symbol
+#else
+#define REQUIRE_SYMBOL( symbol )				\
+	__asm__ ( ".reloc __requiring_symbol__, "		\
+		  _S2 ( RELOC_TYPE_NONE ) ", " #symbol )
+#endif
+
+/**
+ * Specify the file's requiring symbol
+ *
+ * @v symbol		Symbol name
+ *
+ * REQUIRE_SYMBOL() works by defining a dummy relocation record
+ * against a nominated "requiring symbol".  The presence of the
+ * nominated requiring symbol will drag in all of the symbols
+ * specified using REQUIRE_SYMBOL().
+ */
+#ifdef ASSEMBLY
+#define REQUIRING_SYMBOL( symbol )				\
+	.equ __requiring_symbol__, symbol
+#else
+#define REQUIRING_SYMBOL( symbol )				\
+	__asm__ ( ".equ __requiring_symbol__, " #symbol )
+#endif
+
+/**
+ * Provide a file's requiring symbol
+ *
+ * If the file contains no symbols that can be used as the requiring
+ * symbol, you can provide a dummy one-byte-long symbol using
+ * PROVIDE_REQUIRING_SYMBOL().
+ */
+#ifdef ASSEMBLY
+#define PROVIDE_REQUIRING_SYMBOL()				\
+	.section ".tbl.requiring_symbols", "a", @progbits ;	\
+	__requiring_symbol__:	.byte 0 ;			\
+	.size __requiring_symbol__, . - __requiring_symbol__ ;	\
+	.previous
+#else
+#define PROVIDE_REQUIRING_SYMBOL()				\
+	__asm__ ( ".section \".tbl.requiring_symbols\", "	\
+		  "         \"a\", @progbits\n"			\
+		  "__requiring_symbol__:\t.byte 0\n"		\
+		  ".size __requiring_symbol__, "		\
+		  "      . - __requiring_symbol__\n"		\
+		  ".previous" )
+#endif
 
 /** @} */
 
@@ -119,11 +166,29 @@
 /** Always provide the symbol for the current object (defined by -DOBJECT) */
 PROVIDE_SYMBOL ( OBJECT_SYMBOL );
 
-/** Explicitly require another object */
-#define REQUIRE_OBJECT( _obj ) REQUIRE_SYMBOL ( obj_ ## _obj )
+/**
+ * Request an object
+ *
+ * @v object		Object name
+ *
+ * Request an object to be included within the link.  If the object
+ * cannot be found, the link will succeed anyway.
+ */
+#define REQUEST_OBJECT( object ) REQUEST_SYMBOL ( obj_ ## object )
 
-/** Pull in another object if it exists */
-#define REQUEST_OBJECT( _obj ) REQUEST_SYMBOL ( obj_ ## _obj )
+/**
+ * Require an object
+ *
+ * @v object		Object name
+ *
+ * Require an object to be included within the link.  If the object
+ * cannot be found, the link will fail.
+ *
+ * To use this macro within a file, you must also specify the file's
+ * "requiring symbol" using the REQUIRING_SYMBOL() or
+ * PROVIDE_REQUIRING_SYMBOL() macros.
+ */
+#define REQUIRE_OBJECT( object ) REQUIRE_SYMBOL ( obj_ ## object )
 
 /** @} */
 
@@ -685,8 +750,8 @@ int __debug_disable;
 
 /** @} */
 
-/* This file itself is under GPLv2-or-later */
-FILE_LICENCE ( GPL2_OR_LATER );
+/* This file itself is under GPLv2+/UBDL */
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <bits/compiler.h>
 

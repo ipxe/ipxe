@@ -2827,5 +2827,8 @@ struct errortab common_wireless_errors[] __errortab = {
 	__einfo_errortab ( EINFO_ECONNREFUSED_AUTH_ALGO_UNSUPP ),
 };
 
+/* Drag in objects via net80211_ll_protocol */
+REQUIRING_SYMBOL ( net80211_ll_protocol );
+
 /* Drag in 802.11 configuration */
 REQUIRE_OBJECT ( config_net80211 );

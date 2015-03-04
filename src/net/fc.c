@@ -1940,5 +1940,8 @@ struct fc_ulp * fc_ulp_get_port_id_type ( struct fc_port *port,
 	return NULL;
 }
 
+/* Drag in objects via fc_ports */
+REQUIRING_SYMBOL ( fc_ports );
+
 /* Drag in Fibre Channel configuration */
 REQUIRE_OBJECT ( config_fc );

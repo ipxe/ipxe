@@ -29,6 +29,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+PROVIDE_REQUIRING_SYMBOL();
+
 /*
  * Provide UNDI loader if PXE stack is requested
  *

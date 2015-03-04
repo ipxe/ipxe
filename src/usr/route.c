@@ -48,4 +48,5 @@ void route ( void ) {
 }
 
 /* Drag in routing management configuration */
+REQUIRING_SYMBOL ( route );
 REQUIRE_OBJECT ( config_route );

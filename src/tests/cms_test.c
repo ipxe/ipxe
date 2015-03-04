@@ -1474,6 +1474,7 @@ struct self_test cms_test __self_test = {
 };
 
 /* Drag in algorithms required for tests */
+REQUIRING_SYMBOL ( cms_test );
 REQUIRE_OBJECT ( rsa );
 REQUIRE_OBJECT ( md5 );
 REQUIRE_OBJECT ( sha1 );

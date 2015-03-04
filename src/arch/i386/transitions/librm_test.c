@@ -118,4 +118,5 @@ struct self_test librm_test __self_test = {
 	.exec = librm_test_exec,
 };
 
+REQUIRING_SYMBOL ( librm_test );
 REQUIRE_OBJECT ( test );
