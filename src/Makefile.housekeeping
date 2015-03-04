@@ -1305,31 +1305,6 @@ endif
 
 ###############################################################################
 #
-# Auto-incrementing build serial number.  Append "bs" to your list of
-# build targets to get a serial number printed at the end of the
-# build.  Enable -DBUILD_SERIAL in order to see it when the code runs.
-#
-BUILDSERIAL_H		= config/.buildserial.h
-BUILDSERIAL_NOW		= config/.buildserial.now
-BUILDSERIAL_NEXT	= config/.buildserial.next
-
-$(BUILDSERIAL_NOW) $(BUILDSERIAL_NEXT) :
-	$(ECHO) 1 > $@
-
-$(BUILDSERIAL_H) : $(BUILDSERIAL_NOW) $(BUILDSERIAL_NEXT)
-	$(ECHO) '#define BUILD_SERIAL_NUM $(shell cat $<)' > $@
-
-ifeq ($(filter bs,$(MAKECMDGOALS)),bs)
-$(shell diff -q $(BUILDSERIAL_NOW) $(BUILDSERIAL_NEXT) > /dev/null || \
-	cp -f $(BUILDSERIAL_NEXT) $(BUILDSERIAL_NOW))
-endif
-
-bs : $(BUILDSERIAL_NOW)
-	@$(ECHO) $$(( $(shell cat $<) + 1 )) > $(BUILDSERIAL_NEXT)
-	@$(ECHO) "Build serial number is $(shell cat $<)"
-
-###############################################################################
-#
 # Build the TAGS file(s) for emacs
 #
 TAGS :

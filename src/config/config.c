@@ -45,34 +45,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /*
- * Build ID string calculations
- *
- */
-#undef XSTR
-#undef STR
-#define XSTR(s) STR(s)
-#define STR(s) #s
-
-#ifdef BUILD_SERIAL
-#include "config/.buildserial.h"
-#define BUILD_SERIAL_STR " #" XSTR(BUILD_SERIAL_NUM)
-#else
-#define BUILD_SERIAL_STR ""
-#endif
-
-#ifdef BUILD_ID
-#define BUILD_ID_STR " " BUILD_ID
-#else
-#define BUILD_ID_STR ""
-#endif
-
-#if defined(BUILD_ID) || defined(BUILD_SERIAL)
-#define BUILD_STRING " [build" BUILD_ID_STR BUILD_SERIAL_STR "]"
-#else
-#define BUILD_STRING ""
-#endif
-
-/*
  * Drag in all requested console types
  *
  */
