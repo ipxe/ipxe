@@ -46,3 +46,6 @@ void route ( void ) {
 		}
 	}
 }
+
+/* Drag in routing management configuration */
+REQUIRE_OBJECT ( config_route );

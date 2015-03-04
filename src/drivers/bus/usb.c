@@ -1903,5 +1903,8 @@ struct usb_port * usb_root_hub_port ( struct usb_device *usb ) {
 	return usb->port;
 }
 
+/* Drag in USB configuration */
+REQUIRE_OBJECT ( config_usb );
+
 /* Drag in hub driver */
 REQUIRE_OBJECT ( usbhub );

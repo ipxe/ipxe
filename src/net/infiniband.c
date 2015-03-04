@@ -999,5 +999,8 @@ struct ib_device * last_opened_ibdev ( void ) {
 	return ibdev;
 }
 
+/* Drag in Infiniband configuration */
+REQUIRE_OBJECT ( config_infiniband );
+
 /* Drag in IPoIB */
 REQUIRE_OBJECT ( ipoib );

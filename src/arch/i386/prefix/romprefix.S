@@ -874,3 +874,6 @@ wait_for_tick:
 	popl	%eax
 	ret
 	.size wait_for_tick, . - wait_for_tick
+
+/* Drag in ROM configuration */
+REQUIRE_OBJECT ( config_romprefix )
