@@ -76,8 +76,8 @@ void start_timer_fixed ( struct retry_timer *timer, unsigned long timeout ) {
 	/* Record timeout */
 	timer->timeout = timeout;
 
-	DBG2 ( "Timer %p started at time %ld (expires at %ld)\n",
-	       timer, timer->start, ( timer->start + timer->timeout ) );
+	DBGC2 ( timer, "Timer %p started at time %ld (expires at %ld)\n",
+		timer, timer->start, ( timer->start + timer->timeout ) );
 }
 
 /**
@@ -126,8 +126,8 @@ void stop_timer ( struct retry_timer *timer ) {
 	list_del ( &timer->list );
 	runtime = ( now - timer->start );
 	timer->running = 0;
-	DBG2 ( "Timer %p stopped at time %ld (ran for %ld)\n",
-	       timer, now, runtime );
+	DBGC2 ( timer, "Timer %p stopped at time %ld (ran for %ld)\n",
+		timer, now, runtime );
 
 	/* Update timer.  Variables are:
 	 *
@@ -150,8 +150,8 @@ void stop_timer ( struct retry_timer *timer ) {
 		timer->timeout -= ( timer->timeout >> 3 );
 		timer->timeout += ( runtime >> 1 );
 		if ( timer->timeout != old_timeout ) {
-			DBG ( "Timer %p timeout updated to %ld\n",
-			      timer, timer->timeout );
+			DBGC ( timer, "Timer %p timeout updated to %ld\n",
+			       timer, timer->timeout );
 		}
 	}
 
@@ -169,8 +169,8 @@ static void timer_expired ( struct retry_timer *timer ) {
 	int fail;
 
 	/* Stop timer without performing RTT calculations */
-	DBG2 ( "Timer %p stopped at time %ld on expiry\n",
-	       timer, currticks() );
+	DBGC2 ( timer, "Timer %p stopped at time %ld on expiry\n",
+		timer, currticks() );
 	assert ( timer->running );
 	list_del ( &timer->list );
 	timer->running = 0;
@@ -180,8 +180,8 @@ static void timer_expired ( struct retry_timer *timer ) {
 	timer->timeout <<= 1;
 	if ( ( fail = ( timer->timeout > max ) ) )
 		timer->timeout = max;
-	DBG ( "Timer %p timeout backed off to %ld\n",
-	      timer, timer->timeout );
+	DBGC ( timer, "Timer %p timeout backed off to %ld\n",
+	       timer, timer->timeout );
 
 	/* Call expiry callback */
 	timer->expired ( timer, fail );
