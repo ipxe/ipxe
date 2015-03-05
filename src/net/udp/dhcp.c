@@ -278,8 +278,9 @@ static void dhcp_set_state ( struct dhcp_session *dhcp,
 	dhcp->state = state;
 	dhcp->start = currticks();
 	stop_timer ( &dhcp->timer );
-	dhcp->timer.min_timeout = state->min_timeout_sec * TICKS_PER_SEC;
-	dhcp->timer.max_timeout = state->max_timeout_sec * TICKS_PER_SEC;
+	set_timer_limits ( &dhcp->timer,
+			   ( state->min_timeout_sec * TICKS_PER_SEC ),
+			   ( state->max_timeout_sec * TICKS_PER_SEC ) );
 	start_timer_nodelay ( &dhcp->timer );
 }
 

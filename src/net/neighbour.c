@@ -95,8 +95,8 @@ static struct neighbour * neighbour_create ( struct net_device *netdev,
 	memcpy ( neighbour->net_dest, net_dest,
 		 net_protocol->net_addr_len );
 	timer_init ( &neighbour->timer, neighbour_expired, &neighbour->refcnt );
-	neighbour->timer.min_timeout = NEIGHBOUR_MIN_TIMEOUT;
-	neighbour->timer.max_timeout = NEIGHBOUR_MAX_TIMEOUT;
+	set_timer_limits ( &neighbour->timer, NEIGHBOUR_MIN_TIMEOUT,
+			   NEIGHBOUR_MAX_TIMEOUT );
 	INIT_LIST_HEAD ( &neighbour->tx_queue );
 
 	/* Transfer ownership to cache */
