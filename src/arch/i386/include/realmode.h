@@ -65,6 +65,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
+ * Convert segment:offset address to user buffer
+ *
+ * @v segment		Real-mode segment
+ * @v offset		Real-mode offset
+ * @ret buffer		User buffer
+ */
+static inline __always_inline userptr_t
+real_to_user ( unsigned int segment, unsigned int offset ) {
+	return ( phys_to_user ( ( segment << 4 ) + offset ) );
+}
+
+/**
  * Copy data to base memory
  *
  * @v dest_seg		Destination segment

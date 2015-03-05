@@ -11,6 +11,7 @@
 #include <ipxe/udp.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/process.h>
+#include <realmode.h>
 #include <pxe.h>
 
 /*

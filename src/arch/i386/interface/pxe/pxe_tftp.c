@@ -41,6 +41,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/open.h>
 #include <ipxe/process.h>
 #include <ipxe/uri.h>
+#include <realmode.h>
 #include <pxe.h>
 
 /** A PXE TFTP connection */
