@@ -3019,7 +3019,8 @@ static struct usb_host_operations xhci_operations = {
  * @v xhci		xHCI device
  * @v pci		PCI device
  */
-static void xhci_pch ( struct xhci_device *xhci, struct pci_device *pci ) {
+static void xhci_pch_fix ( struct xhci_device *xhci, struct pci_device *pci ) {
+	struct xhci_pch *pch = &xhci->pch;
 	uint32_t xusb2pr;
 	uint32_t xusb2prm;
 	uint32_t usb3pssen;
@@ -3034,6 +3035,7 @@ static void xhci_pch ( struct xhci_device *xhci, struct pci_device *pci ) {
 		DBGC ( xhci, "XHCI %p enabling SuperSpeed on ports %08x\n",
 		       xhci, ( usb3prm & ~usb3pssen ) );
 	}
+	pch->usb3pssen = usb3pssen;
 	usb3pssen |= usb3prm;
 	pci_write_config_dword ( pci, XHCI_PCH_USB3PSSEN, usb3pssen );
 
@@ -3044,8 +3046,25 @@ static void xhci_pch ( struct xhci_device *xhci, struct pci_device *pci ) {
 		DBGC ( xhci, "XHCI %p routing ports %08x from EHCI to xHCI\n",
 		       xhci, ( xusb2prm & ~xusb2pr ) );
 	}
+	pch->xusb2pr = xusb2pr;
 	xusb2pr |= xusb2prm;
 	pci_write_config_dword ( pci, XHCI_PCH_XUSB2PR, xusb2pr );
+}
+
+/**
+ * Undo Intel PCH-specific quirk fixes
+ *
+ * @v xhci		xHCI device
+ * @v pci		PCI device
+ */
+static void xhci_pch_undo ( struct xhci_device *xhci, struct pci_device *pci ) {
+	struct xhci_pch *pch = &xhci->pch;
+
+	/* Restore USB2 port routing to original state */
+	pci_write_config_dword ( pci, XHCI_PCH_XUSB2PR, pch->xusb2pr );
+
+	/* Restore SuperSpeed capability to original state */
+	pci_write_config_dword ( pci, XHCI_PCH_USB3PSSEN, pch->usb3pssen );
 }
 
 /**
@@ -3091,7 +3110,7 @@ static int xhci_probe ( struct pci_device *pci ) {
 
 	/* Fix Intel PCH-specific quirks, if applicable */
 	if ( pci->id->driver_data & XHCI_PCH )
-		xhci_pch ( xhci, pci );
+		xhci_pch_fix ( xhci, pci );
 
 	/* Reset device */
 	if ( ( rc = xhci_reset ( xhci ) ) != 0 )
@@ -3126,6 +3145,8 @@ static int xhci_probe ( struct pci_device *pci ) {
  err_alloc_bus:
 	xhci_reset ( xhci );
  err_reset:
+	if ( pci->id->driver_data & XHCI_PCH )
+		xhci_pch_undo ( xhci, pci );
 	xhci_legacy_release ( xhci );
  err_legacy_claim:
 	iounmap ( xhci->regs );
@@ -3147,6 +3168,8 @@ static void xhci_remove ( struct pci_device *pci ) {
 	unregister_usb_bus ( bus );
 	free_usb_bus ( bus );
 	xhci_reset ( xhci );
+	if ( pci->id->driver_data & XHCI_PCH )
+		xhci_pch_undo ( xhci, pci );
 	xhci_legacy_release ( xhci );
 	iounmap ( xhci->regs );
 	free ( xhci );

@@ -1004,6 +1004,29 @@ xhci_ring_consumed ( struct xhci_trb_ring *ring ) {
  */
 #define XHCI_PORT_RESET_MAX_WAIT_MS 500
 
+/** Intel PCH quirk */
+struct xhci_pch {
+	/** USB2 port routing register original value */
+	uint32_t xusb2pr;
+	/** USB3 port SuperSpeed enable register original value */
+	uint32_t usb3pssen;
+};
+
+/** Intel PCH quirk flag */
+#define XHCI_PCH 0x0001
+
+/** Intel PCH USB2 port routing register */
+#define XHCI_PCH_XUSB2PR 0xd0
+
+/** Intel PCH USB2 port routing mask register */
+#define XHCI_PCH_XUSB2PRM 0xd4
+
+/** Intel PCH SuperSpeed enable register */
+#define XHCI_PCH_USB3PSSEN 0xd8
+
+/** Intel PCH USB3 port routing mask register */
+#define XHCI_PCH_USB3PRM 0xdc
+
 /** An xHCI device */
 struct xhci_device {
 	/** Registers */
@@ -1061,6 +1084,9 @@ struct xhci_device {
 
 	/** USB bus */
 	struct usb_bus *bus;
+
+	/** Intel PCH quirk */
+	struct xhci_pch pch;
 };
 
 /** An xHCI device slot */
@@ -1102,20 +1128,5 @@ struct xhci_endpoint {
 	/** Transfer ring */
 	struct xhci_trb_ring ring;
 };
-
-/** Intel PCH quirk */
-#define XHCI_PCH 0x0001
-
-/** Intel PCH USB2 port routing register */
-#define XHCI_PCH_XUSB2PR 0xd0
-
-/** Intel PCH USB2 port routing mask register */
-#define XHCI_PCH_XUSB2PRM 0xd4
-
-/** Intel PCH USB3 port SuperSpeed enable register */
-#define XHCI_PCH_USB3PSSEN 0xd8
-
-/** Intel PCH USB3 port routing mask register */
-#define XHCI_PCH_USB3PRM 0xdc
 
 #endif /* _IPXE_XHCI_H */
