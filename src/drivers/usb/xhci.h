@@ -1103,4 +1103,19 @@ struct xhci_endpoint {
 	struct xhci_trb_ring ring;
 };
 
+/** Intel PCH quirk */
+#define XHCI_PCH 0x0001
+
+/** Intel PCH USB2 port routing register */
+#define XHCI_PCH_XUSB2PR 0xd0
+
+/** Intel PCH USB2 port routing mask register */
+#define XHCI_PCH_XUSB2PRM 0xd4
+
+/** Intel PCH USB3 port SuperSpeed enable register */
+#define XHCI_PCH_USB3PSSEN 0xd8
+
+/** Intel PCH USB3 port routing mask register */
+#define XHCI_PCH_USB3PRM 0xdc
+
 #endif /* _IPXE_XHCI_H */

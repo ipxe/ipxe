@@ -3014,6 +3014,41 @@ static struct usb_host_operations xhci_operations = {
 };
 
 /**
+ * Fix Intel PCH-specific quirks
+ *
+ * @v xhci		xHCI device
+ * @v pci		PCI device
+ */
+static void xhci_pch ( struct xhci_device *xhci, struct pci_device *pci ) {
+	uint32_t xusb2pr;
+	uint32_t xusb2prm;
+	uint32_t usb3pssen;
+	uint32_t usb3prm;
+
+	/* Enable SuperSpeed capability.  Do this before rerouting
+	 * USB2 ports, so that USB3 devices connect at SuperSpeed.
+	 */
+	pci_read_config_dword ( pci, XHCI_PCH_USB3PSSEN, &usb3pssen );
+	pci_read_config_dword ( pci, XHCI_PCH_USB3PRM, &usb3prm );
+	if ( usb3prm & ~usb3pssen ) {
+		DBGC ( xhci, "XHCI %p enabling SuperSpeed on ports %08x\n",
+		       xhci, ( usb3prm & ~usb3pssen ) );
+	}
+	usb3pssen |= usb3prm;
+	pci_write_config_dword ( pci, XHCI_PCH_USB3PSSEN, usb3pssen );
+
+	/* Route USB2 ports from EHCI to xHCI */
+	pci_read_config_dword ( pci, XHCI_PCH_XUSB2PR, &xusb2pr );
+	pci_read_config_dword ( pci, XHCI_PCH_XUSB2PRM, &xusb2prm );
+	if ( xusb2prm & ~xusb2pr ) {
+		DBGC ( xhci, "XHCI %p routing ports %08x from EHCI to xHCI\n",
+		       xhci, ( xusb2prm & ~xusb2pr ) );
+	}
+	xusb2pr |= xusb2prm;
+	pci_write_config_dword ( pci, XHCI_PCH_XUSB2PR, xusb2pr );
+}
+
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -3053,6 +3088,10 @@ static int xhci_probe ( struct pci_device *pci ) {
 	xhci_legacy_init ( xhci );
 	if ( ( rc = xhci_legacy_claim ( xhci ) ) != 0 )
 		goto err_legacy_claim;
+
+	/* Fix Intel PCH-specific quirks, if applicable */
+	if ( pci->id->driver_data & XHCI_PCH )
+		xhci_pch ( xhci, pci );
 
 	/* Reset device */
 	if ( ( rc = xhci_reset ( xhci ) ) != 0 )
@@ -3115,6 +3154,7 @@ static void xhci_remove ( struct pci_device *pci ) {
 
 /** XHCI PCI device IDs */
 static struct pci_device_id xhci_ids[] = {
+	PCI_ROM ( 0x8086, 0xffff, "xhci-pch", "xHCI (Intel PCH)", XHCI_PCH ),
 	PCI_ROM ( 0xffff, 0xffff, "xhci", "xHCI", 0 ),
 };
 
