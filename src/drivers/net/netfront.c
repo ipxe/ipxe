@@ -597,6 +597,11 @@ static int netfront_open ( struct net_device *netdev ) {
 					  "feature-no-csum-offload" ) ) != 0 )
 		goto err_feature_no_csum_offload;
 
+	/* Inform backend that we will send notifications for RX requests */
+	if ( ( rc = netfront_write_flag ( netfront,
+					  "feature-rx-notify" ) ) != 0 )
+		goto err_feature_rx_notify;
+
 	/* Set state to Connected */
 	if ( ( rc = xenbus_set_state ( xendev, XenbusStateConnected ) ) != 0 ) {
 		DBGC ( netfront, "NETFRONT %s could not set state=\"%d\": %s\n",
@@ -622,6 +627,8 @@ static int netfront_open ( struct net_device *netdev ) {
  err_backend_wait:
 	netfront_reset ( netfront );
  err_set_state:
+	netfront_rm ( netfront, "feature-rx-notify" );
+ err_feature_rx_notify:
 	netfront_rm ( netfront, "feature-no-csum-offload" );
  err_feature_no_csum_offload:
 	netfront_rm ( netfront, "request-rx-copy" );
@@ -665,6 +672,7 @@ static void netfront_close ( struct net_device *netdev ) {
 	}
 
 	/* Delete flags */
+	netfront_rm ( netfront, "feature-rx-notify" );
 	netfront_rm ( netfront, "feature-no-csum-offload" );
 	netfront_rm ( netfront, "request-rx-copy" );
 
