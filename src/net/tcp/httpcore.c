@@ -120,8 +120,12 @@ enum http_flags {
 	HTTP_BASIC_AUTH = 0x0020,
 	/** Provide Digest authentication details */
 	HTTP_DIGEST_AUTH = 0x0040,
+	/** Include qop parameter in Digest authentication reponse */
+	HTTP_DIGEST_AUTH_QOP = 0x0080,
+	/** Use MD5-sess algorithm for Digest authentication */
+	HTTP_DIGEST_AUTH_MD5_SESS = 0x0100,
 	/** Socket must be reopened */
-	HTTP_REOPEN_SOCKET = 0x0080,
+	HTTP_REOPEN_SOCKET = 0x0200,
 };
 
 /** HTTP receive state */
@@ -615,6 +619,18 @@ static int http_rx_digest_auth ( struct http_request *http, char *params ) {
 			/* Not an error; "opaque" is optional */
 		}
 
+		/* Check for presence of qop */
+		if ( strstr ( params, "qop=\"" ) != NULL )
+			http->flags |= HTTP_DIGEST_AUTH_QOP;
+
+		/* Check for MD5-sess.  For some bizarre reason,
+		 * RFC2617 requires this to be unquoted, which means
+		 * that http_digest_param() cannot be used.
+		 */
+		if ( strstr ( params, "algorithm=MD5-sess" ) != NULL )
+			http->flags |= HTTP_DIGEST_AUTH_MD5_SESS;
+
+		/* Retry using digest authentication */
 		http->flags |= ( HTTP_TRY_AGAIN | HTTP_DIGEST_AUTH );
 	}
 
@@ -1133,10 +1149,13 @@ static char * http_digest_auth ( struct http_request *http,
 	const char *realm = http->auth_realm;
 	const char *nonce = http->auth_nonce;
 	const char *opaque = http->auth_opaque;
+	char cnonce[ 9 /* "xxxxxxxx" + NUL */ ];
 	struct md5_context ctx;
 	char ha1[ base16_encoded_len ( MD5_DIGEST_SIZE ) + 1 /* NUL */ ];
 	char ha2[ base16_encoded_len ( MD5_DIGEST_SIZE ) + 1 /* NUL */ ];
 	char response[ base16_encoded_len ( MD5_DIGEST_SIZE ) + 1 /* NUL */ ];
+	int qop = ( http->flags & HTTP_DIGEST_AUTH_QOP );
+	int md5sess = ( qop && ( http->flags & HTTP_DIGEST_AUTH_MD5_SESS ) );
 	char *auth;
 	int len;
 
@@ -1145,12 +1164,22 @@ static char * http_digest_auth ( struct http_request *http,
 	assert ( realm != NULL );
 	assert ( nonce != NULL );
 
+	/* Generate a client nonce */
+	snprintf ( cnonce, sizeof ( cnonce ), "%08lx", random() );
+
 	/* Generate HA1 */
 	http_digest_init ( &ctx );
 	http_digest_update ( &ctx, user );
 	http_digest_update ( &ctx, realm );
 	http_digest_update ( &ctx, password );
 	http_digest_final ( &ctx, ha1 );
+	if ( md5sess ) {
+		http_digest_init ( &ctx );
+		http_digest_update ( &ctx, ha1 );
+		http_digest_update ( &ctx, nonce );
+		http_digest_update ( &ctx, cnonce );
+		http_digest_final ( &ctx, ha1 );
+	}
 
 	/* Generate HA2 */
 	http_digest_init ( &ctx );
@@ -1162,13 +1191,24 @@ static char * http_digest_auth ( struct http_request *http,
 	http_digest_init ( &ctx );
 	http_digest_update ( &ctx, ha1 );
 	http_digest_update ( &ctx, nonce );
+	if ( qop ) {
+		http_digest_update ( &ctx, "00000001" /* nc */ );
+		http_digest_update ( &ctx, cnonce );
+		http_digest_update ( &ctx, "auth" /* qop */ );
+	}
 	http_digest_update ( &ctx, ha2 );
 	http_digest_final ( &ctx, response );
 
 	/* Generate the authorisation string */
 	len = asprintf ( &auth, "Authorization: Digest username=\"%s\", "
 			 "realm=\"%s\", nonce=\"%s\", uri=\"%s\", "
-			 "%s%s%sresponse=\"%s\"\r\n", user, realm, nonce, uri,
+			 "%s%s%s%s%s%s%s%sresponse=\"%s\"\r\n",
+			 user, realm, nonce, uri,
+			 ( qop ? "qop=\"auth\", algorithm=" : "" ),
+			 ( qop ? ( md5sess ? "MD5-sess, " : "MD5, " ) : "" ),
+			 ( qop ? "nc=00000001, cnonce=\"" : "" ),
+			 ( qop ? cnonce : "" ),
+			 ( qop ? "\", " : "" ),
 			 ( opaque ? "opaque=\"" : "" ),
 			 ( opaque ? opaque : "" ),
 			 ( opaque ? "\", " : "" ), response );
