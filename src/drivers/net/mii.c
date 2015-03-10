@@ -115,3 +115,35 @@ int mii_reset ( struct mii_interface *mii ) {
 	DBGC ( mii, "MII %p timed out waiting for reset\n", mii );
 	return -ETIMEDOUT;
 }
+
+/**
+ * Update link status via MII
+ *
+ * @v mii		MII interface
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+int mii_check_link ( struct mii_interface *mii, struct net_device *netdev ) {
+	int bmsr;
+	int link;
+	int rc;
+
+	/* Read BMSR */
+	bmsr = mii_read ( mii, MII_BMSR );
+	if ( bmsr < 0 ) {
+		rc = bmsr;
+		return rc;
+	}
+
+	/* Report link status */
+	link = ( bmsr & BMSR_LSTATUS );
+	DBGC ( mii, "MII %p link %s (BMSR %#04x)\n",
+	       mii, ( link ? "up" : "down" ), bmsr );
+	if ( link ) {
+		netdev_link_up ( netdev );
+	} else {
+		netdev_link_down ( netdev );
+	}
+
+	return 0;
+}

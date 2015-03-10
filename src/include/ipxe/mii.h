@@ -114,5 +114,7 @@ mii_dump ( struct mii_interface *mii ) {
 
 extern int mii_restart ( struct mii_interface *mii );
 extern int mii_reset ( struct mii_interface *mii );
+extern int mii_check_link ( struct mii_interface *mii,
+			    struct net_device *netdev );
 
 #endif /* _IPXE_MII_H */
