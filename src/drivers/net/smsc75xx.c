@@ -915,7 +915,8 @@ static void smsc75xx_poll ( struct net_device *netdev ) {
 
 	/* Record RX FIFO overflow if applicable */
 	if ( int_sts & SMSC75XX_INT_STS_RDFO_INT ) {
-		DBGC ( smsc75xx, "SMSC75XX %p RX FIFO overflowed\n", smsc75xx );
+		DBGC2 ( smsc75xx, "SMSC75XX %p RX FIFO overflowed\n",
+			smsc75xx );
 		netdev_rx_err ( netdev, NULL, -ENOBUFS );
 		int_sts &= ~SMSC75XX_INT_STS_RDFO_INT;
 	}
