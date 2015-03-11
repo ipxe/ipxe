@@ -79,6 +79,48 @@ struct tcp_window_scale_padded_option {
  */
 #define TCP_RX_WINDOW_SCALE 9
 
+/** TCP selective acknowledgement permitted option */
+struct tcp_sack_permitted_option {
+	uint8_t kind;
+	uint8_t length;
+} __attribute__ (( packed ));
+
+/** Padded TCP selective acknowledgement permitted option (used for sending) */
+struct tcp_sack_permitted_padded_option {
+	uint8_t nop[2];
+	struct tcp_sack_permitted_option spopt;
+} __attribute__ (( packed ));
+
+/** Code for the TCP selective acknowledgement permitted option */
+#define TCP_OPTION_SACK_PERMITTED 4
+
+/** TCP selective acknowledgement option */
+struct tcp_sack_option {
+	uint8_t kind;
+	uint8_t length;
+} __attribute__ (( packed ));
+
+/** TCP selective acknowledgement block */
+struct tcp_sack_block {
+	uint32_t left;
+	uint32_t right;
+} __attribute__ (( packed ));
+
+/** Maximum number of selective acknowledgement blocks
+ *
+ * This allows for the presence of the TCP timestamp option.
+ */
+#define TCP_SACK_MAX 3
+
+/** Padded TCP selective acknowledgement option (used for sending) */
+struct tcp_sack_padded_option {
+	uint8_t nop[2];
+	struct tcp_sack_option sackopt;
+} __attribute__ (( packed ));
+
+/** Code for the TCP selective acknowledgement option */
+#define TCP_OPTION_SACK 5
+
 /** TCP timestamp option */
 struct tcp_timestamp_option {
 	uint8_t kind;
@@ -102,6 +144,8 @@ struct tcp_options {
 	const struct tcp_mss_option *mssopt;
 	/** Window scale option, if present */
 	const struct tcp_window_scale_option *wsopt;
+	/** SACK permitted option, if present */
+	const struct tcp_sack_permitted_option *spopt;
 	/** Timestamp option, if present */
 	const struct tcp_timestamp_option *tsopt;
 };
