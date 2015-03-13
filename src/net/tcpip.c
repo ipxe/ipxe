@@ -235,7 +235,7 @@ int tcpip_bind ( struct sockaddr_tcpip *st_local,
 	/* Otherwise, find an available port in the range [1,1023] or
 	 * [1025,65535] as appropriate.
 	 */
-	min_port = ( ( ( ! flags ) & TCPIP_BIND_PRIVILEGED ) + 1 );
+	min_port = ( ( ( ~flags ) & TCPIP_BIND_PRIVILEGED ) + 1 );
 	max_port = ( ( flags & TCPIP_BIND_PRIVILEGED ) - 1 );
 	offset = random();
 	for ( i = 0 ; i <= max_port ; i++ ) {
