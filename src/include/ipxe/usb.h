@@ -1178,6 +1178,9 @@ extern unsigned int usb_route_string ( struct usb_device *usb );
 extern unsigned int usb_depth ( struct usb_device *usb );
 extern struct usb_port * usb_root_hub_port ( struct usb_device *usb );
 
+/** Minimum reset time */
+#define USB_RESET_DELAY_MS 50
+
 /** Maximum time to wait for a control transaction to complete
  *
  * This is a policy decision.

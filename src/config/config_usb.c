@@ -37,3 +37,6 @@ PROVIDE_REQUIRING_SYMBOL();
 #ifdef USB_HCD_XHCI
 REQUIRE_OBJECT ( xhci );
 #endif
+#ifdef USB_HCD_EHCI
+REQUIRE_OBJECT ( ehci );
+#endif
