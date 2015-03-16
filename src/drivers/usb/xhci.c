@@ -3117,7 +3117,7 @@ static int xhci_probe ( struct pci_device *pci ) {
 		goto err_reset;
 
 	/* Allocate USB bus */
-	xhci->bus = alloc_usb_bus ( &pci->dev, xhci->ports,
+	xhci->bus = alloc_usb_bus ( &pci->dev, xhci->ports, XHCI_MTU,
 				    &xhci_operations );
 	if ( ! xhci->bus ) {
 		rc = -ENOMEM;

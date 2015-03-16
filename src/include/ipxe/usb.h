@@ -865,6 +865,9 @@ struct usb_bus {
 	/** Host controller operations set */
 	struct usb_host_operations *op;
 
+	/** Largest transfer allowed on the bus */
+	size_t mtu;
+
 	/** Root hub */
 	struct usb_hub *hub;
 
@@ -1138,7 +1141,8 @@ extern void free_usb_hub ( struct usb_hub *hub );
 
 extern void usb_port_changed ( struct usb_port *port );
 
-extern struct usb_bus * alloc_usb_bus ( struct device *dev, unsigned int ports,
+extern struct usb_bus * alloc_usb_bus ( struct device *dev,
+					unsigned int ports, size_t mtu,
 					struct usb_host_operations *op );
 extern int register_usb_bus ( struct usb_bus *bus );
 extern void unregister_usb_bus ( struct usb_bus *bus );

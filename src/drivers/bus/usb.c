@@ -1736,11 +1736,12 @@ void free_usb_hub ( struct usb_hub *hub ) {
  *
  * @v dev		Underlying hardware device
  * @v ports		Number of root hub ports
+ * @v mtu		Largest transfer allowed on the bus
  * @v op		Host controller operations
  * @ret bus		USB bus, or NULL on allocation failure
  */
 struct usb_bus * alloc_usb_bus ( struct device *dev, unsigned int ports,
-				 struct usb_host_operations *op ) {
+				 size_t mtu, struct usb_host_operations *op ) {
 	struct usb_bus *bus;
 
 	/* Allocate and initialise structure */
@@ -1749,6 +1750,7 @@ struct usb_bus * alloc_usb_bus ( struct device *dev, unsigned int ports,
 		goto err_alloc_bus;
 	bus->name = dev->name;
 	bus->dev = dev;
+	bus->mtu = mtu;
 	bus->op = op;
 	INIT_LIST_HEAD ( &bus->devices );
 	INIT_LIST_HEAD ( &bus->hubs );

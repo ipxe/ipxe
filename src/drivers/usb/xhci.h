@@ -24,6 +24,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define XHCI_MIN_ALIGN 64
 
+/** Maximum transfer size */
+#define XHCI_MTU 65536
+
 /** xHCI PCI BAR */
 #define XHCI_BAR PCI_BASE_ADDRESS_0
 
