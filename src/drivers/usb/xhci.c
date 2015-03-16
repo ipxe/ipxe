@@ -556,16 +556,15 @@ static void xhci_legacy_init ( struct xhci_device *xhci ) {
  * Claim ownership from BIOS
  *
  * @v xhci		xHCI device
- * @ret rc		Return status code
  */
-static int xhci_legacy_claim ( struct xhci_device *xhci ) {
+static void xhci_legacy_claim ( struct xhci_device *xhci ) {
 	uint32_t ctlsts;
 	uint8_t bios;
 	unsigned int i;
 
 	/* Do nothing unless legacy support capability is present */
 	if ( ! xhci->legacy )
-		return 0;
+		return;
 
 	/* Claim ownership */
 	writeb ( XHCI_USBLEGSUP_OS_OWNED,
@@ -585,16 +584,19 @@ static int xhci_legacy_claim ( struct xhci_device *xhci ) {
 				DBGC ( xhci, "XHCI %p warning: BIOS retained "
 				       "SMIs: %08x\n", xhci, ctlsts );
 			}
-			return 0;
+			return;
 		}
 
 		/* Delay */
 		mdelay ( 1 );
 	}
 
-	DBGC ( xhci, "XHCI %p timed out waiting for BIOS to release "
-	       "ownership\n", xhci );
-	return -ETIMEDOUT;
+	/* BIOS did not release ownership.  Claim it forcibly by
+	 * disabling all SMIs.
+	 */
+	DBGC ( xhci, "XHCI %p could not claim ownership from BIOS: forcibly "
+	       "disabling SMIs\n", xhci );
+	writel ( 0, xhci->cap + xhci->legacy + XHCI_USBLEGSUP_CTLSTS );
 }
 
 /**
@@ -3105,8 +3107,7 @@ static int xhci_probe ( struct pci_device *pci ) {
 
 	/* Initialise USB legacy support and claim ownership */
 	xhci_legacy_init ( xhci );
-	if ( ( rc = xhci_legacy_claim ( xhci ) ) != 0 )
-		goto err_legacy_claim;
+	xhci_legacy_claim ( xhci );
 
 	/* Fix Intel PCH-specific quirks, if applicable */
 	if ( pci->id->driver_data & XHCI_PCH )
@@ -3148,7 +3149,6 @@ static int xhci_probe ( struct pci_device *pci ) {
 	if ( pci->id->driver_data & XHCI_PCH )
 		xhci_pch_undo ( xhci, pci );
 	xhci_legacy_release ( xhci );
- err_legacy_claim:
 	iounmap ( xhci->regs );
  err_ioremap:
 	free ( xhci );
