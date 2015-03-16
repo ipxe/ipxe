@@ -867,6 +867,17 @@ struct usb_bus {
 
 	/** Largest transfer allowed on the bus */
 	size_t mtu;
+	/** Address in-use mask
+	 *
+	 * This is used only by buses which perform manual address
+	 * assignment.  USB allows for addresses in the range [1,127].
+	 * We use a simple bitmask which restricts us to the range
+	 * [1,64]; this is unlikely to be a problem in practice.  For
+	 * comparison: controllers which perform autonomous address
+	 * assignment (such as xHCI) typically allow for only 32
+	 * devices per bus anyway.
+	 */
+	unsigned long long addresses;
 
 	/** Root hub */
 	struct usb_hub *hub;
@@ -1022,6 +1033,19 @@ usb_set_feature ( struct usb_device *usb, unsigned int type,
 }
 
 /**
+ * Set address
+ *
+ * @v usb		USB device
+ * @v address		Device address
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+usb_set_address ( struct usb_device *usb, unsigned int address ) {
+
+	return usb_control ( usb, USB_SET_ADDRESS, address, 0, NULL, 0 );
+}
+
+/**
  * Get USB descriptor
  *
  * @v usb		USB device
@@ -1148,6 +1172,8 @@ extern int register_usb_bus ( struct usb_bus *bus );
 extern void unregister_usb_bus ( struct usb_bus *bus );
 extern void free_usb_bus ( struct usb_bus *bus );
 
+extern int usb_alloc_address ( struct usb_bus *bus );
+extern void usb_free_address ( struct usb_bus *bus, unsigned int address );
 extern unsigned int usb_route_string ( struct usb_device *usb );
 extern unsigned int usb_depth ( struct usb_device *usb );
 extern struct usb_port * usb_root_hub_port ( struct usb_device *usb );
