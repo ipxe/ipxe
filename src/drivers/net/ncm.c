@@ -157,6 +157,7 @@ static struct usb_endpoint_driver_operations ncm_intr_operations = {
  * @ret rc		Return status code
  */
 static int ncm_in_prefill ( struct ncm_device *ncm ) {
+	struct usb_bus *bus = ncm->bus;
 	size_t mtu;
 	unsigned int count;
 	int rc;
@@ -177,6 +178,8 @@ static int ncm_in_prefill ( struct ncm_device *ncm ) {
 
 		/* Attempt allocation at this MTU */
 		if ( mtu > NCM_MAX_NTB_INPUT_SIZE )
+			continue;
+		if ( mtu > bus->mtu )
 			continue;
 		count = ( NCM_IN_MIN_SIZE / mtu );
 		if ( count < NCM_IN_MIN_COUNT )
