@@ -439,9 +439,14 @@ int netboot ( struct net_device *netdev ) {
  * @ret is_autoboot	Network device matches the autoboot device
  */
 static int is_autoboot_busloc ( struct net_device *netdev ) {
+	struct device *dev;
 
-	return ( ( netdev->dev->desc.bus_type == autoboot_desc.bus_type ) &&
-		 ( netdev->dev->desc.location == autoboot_desc.location ) );
+	for ( dev = netdev->dev ; dev ; dev = dev->parent ) {
+		if ( ( dev->desc.bus_type == autoboot_desc.bus_type ) &&
+		     ( dev->desc.location == autoboot_desc.location ) )
+			return 1;
+	}
+	return 0;
 }
 
 /**
