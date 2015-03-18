@@ -1281,6 +1281,9 @@ static int register_usb ( struct usb_device *usb ) {
 		goto err_enable;
 	}
 
+	/* Allow recovery interval since port may have been reset */
+	mdelay ( USB_RESET_RECOVER_DELAY_MS );
+
 	/* Get device speed */
 	if ( ( rc = hub->driver->speed ( hub, port ) ) != 0 ) {
 		DBGC ( hub, "USB hub %s port %d could not get speed: %s\n",
@@ -1315,6 +1318,9 @@ static int register_usb ( struct usb_device *usb ) {
 		goto err_address;
 	}
 	DBGC2 ( usb, "USB %s assigned address %d\n", usb->name, usb->address );
+
+	/* Allow recovery interval after Set Address command */
+	mdelay ( USB_SET_ADDRESS_RECOVER_DELAY_MS );
 
 	/* Read first part of device descriptor to get EP0 MTU */
 	if ( ( rc = usb_get_mtu ( usb, &usb->device ) ) != 0 ) {

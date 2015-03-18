@@ -1178,20 +1178,42 @@ extern unsigned int usb_route_string ( struct usb_device *usb );
 extern unsigned int usb_depth ( struct usb_device *usb );
 extern struct usb_port * usb_root_hub_port ( struct usb_device *usb );
 
-/** Minimum reset time */
+/** Minimum reset time
+ *
+ * Section 7.1.7.5 of the USB2 specification states that root hub
+ * ports should assert reset signalling for at least 50ms.
+ */
 #define USB_RESET_DELAY_MS 50
+
+/** Reset recovery time
+ *
+ * Section 9.2.6.2 of the USB2 specification states that the
+ * "recovery" interval after a port reset is 10ms.
+ */
+#define USB_RESET_RECOVER_DELAY_MS 10
 
 /** Maximum time to wait for a control transaction to complete
  *
- * This is a policy decision.
+ * Section 9.2.6.1 of the USB2 specification states that the upper
+ * limit for commands to be processed is 5 seconds.
  */
-#define USB_CONTROL_MAX_WAIT_MS 100
+#define USB_CONTROL_MAX_WAIT_MS 5000
+
+/** Set address recovery time
+ *
+ * Section 9.2.6.3 of the USB2 specification states that devices are
+ * allowed a 2ms recovery interval after receiving a new address.
+ */
+#define USB_SET_ADDRESS_RECOVER_DELAY_MS 2
 
 /** Time to wait for ports to stabilise
  *
- * This is a policy decision.
+ * Section 7.1.7.3 of the USB specification states that we must allow
+ * 100ms for devices to signal attachment, and an additional 100ms for
+ * connection debouncing.  (This delay is parallelised across all
+ * ports on a hub; we do not delay separately for each port.)
  */
-#define USB_PORT_DELAY_MS 100
+#define USB_PORT_DELAY_MS 200
 
 /** A USB device ID */
 struct usb_device_id {

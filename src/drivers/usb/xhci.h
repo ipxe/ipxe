@@ -991,9 +991,11 @@ xhci_ring_consumed ( struct xhci_trb_ring *ring ) {
 
 /** Maximum time to wait for a command to complete
  *
- * This is a policy decision.
+ * The "address device" command involves waiting for a response to a
+ * USB control transaction, and so we must wait for up to the 5000ms
+ * that USB allows for devices to respond to control transactions.
  */
-#define XHCI_COMMAND_MAX_WAIT_MS 500
+#define XHCI_COMMAND_MAX_WAIT_MS USB_CONTROL_MAX_WAIT_MS
 
 /** Time to delay after aborting a command
  *
