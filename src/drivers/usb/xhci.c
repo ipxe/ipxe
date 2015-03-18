@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/umalloc.h>
 #include <ipxe/pci.h>
 #include <ipxe/usb.h>
+#include <ipxe/init.h>
 #include <ipxe/profile.h>
 #include "xhci.h"
 
@@ -521,6 +522,9 @@ static inline void xhci_dump_port ( struct xhci_device *xhci,
  ******************************************************************************
  */
 
+/** Prevent the release of ownership back to BIOS */
+static int xhci_legacy_prevent_release;
+
 /**
  * Initialise USB legacy support
  *
@@ -609,6 +613,12 @@ static void xhci_legacy_release ( struct xhci_device *xhci ) {
 	/* Do nothing unless legacy support capability is present */
 	if ( ! xhci->legacy )
 		return;
+
+	/* Do nothing if releasing ownership is prevented */
+	if ( xhci_legacy_prevent_release ) {
+		DBGC ( xhci, "XHCI %p not releasing ownership to BIOS\n", xhci);
+		return;
+	}
 
 	/* Release ownership */
 	writeb ( 0, xhci->cap + xhci->legacy + XHCI_USBLEGSUP_OS );
@@ -3189,4 +3199,21 @@ struct pci_driver xhci_driver __pci_driver = {
 			     PCI_CLASS_SERIAL_USB_XHCI ),
 	.probe = xhci_probe,
 	.remove = xhci_remove,
+};
+
+/**
+ * Prepare for exit
+ *
+ * @v booting		System is shutting down for OS boot
+ */
+static void xhci_shutdown ( int booting ) {
+	/* If we are shutting down to boot an OS, then prevent the
+	 * release of ownership back to BIOS.
+	 */
+	xhci_legacy_prevent_release = booting;
+}
+
+/** Startup/shutdown function */
+struct startup_fn xhci_startup __startup_fn ( STARTUP_LATE ) = {
+	.shutdown = xhci_shutdown,
 };
