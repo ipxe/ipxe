@@ -249,6 +249,9 @@ struct usb_endpoint_descriptor {
 /** Endpoint attribute transfer type mask */
 #define USB_ENDPOINT_ATTR_TYPE_MASK 0x03
 
+/** Endpoint periodic type */
+#define USB_ENDPOINT_ATTR_PERIODIC 0x01
+
 /** Control endpoint transfer type */
 #define USB_ENDPOINT_ATTR_CONTROL 0x00
 
@@ -1189,6 +1192,7 @@ extern void usb_free_address ( struct usb_bus *bus, unsigned int address );
 extern unsigned int usb_route_string ( struct usb_device *usb );
 extern unsigned int usb_depth ( struct usb_device *usb );
 extern struct usb_port * usb_root_hub_port ( struct usb_device *usb );
+extern struct usb_port * usb_transaction_translator ( struct usb_device *usb );
 
 /** Minimum reset time
  *

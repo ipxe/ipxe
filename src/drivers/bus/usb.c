@@ -322,6 +322,37 @@ int usb_endpoint_open ( struct usb_endpoint *ep ) {
 }
 
 /**
+ * Clear transaction translator (if applicable)
+ *
+ * @v ep		USB endpoint
+ * @ret rc		Return status code
+ */
+static int usb_endpoint_clear_tt ( struct usb_endpoint *ep ) {
+	struct usb_device *usb = ep->usb;
+	struct usb_port *tt;
+	int rc;
+
+	/* Do nothing if this is a periodic endpoint */
+	if ( ep->attributes & USB_ENDPOINT_ATTR_PERIODIC )
+		return 0;
+
+	/* Do nothing if this endpoint is not behind a transaction translator */
+	tt = usb_transaction_translator ( usb );
+	if ( ! tt )
+		return 0;
+
+	/* Clear transaction translator buffer */
+	if ( ( rc = tt->hub->driver->clear_tt ( tt->hub, tt, ep ) ) != 0 ) {
+		DBGC ( usb, "USB %s %s could not clear transaction translator: "
+		       "%s\n", usb->name, usb_endpoint_name ( ep->address ),
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Close USB endpoint
  *
  * @v ep		USB endpoint
@@ -345,6 +376,9 @@ void usb_endpoint_close ( struct usb_endpoint *ep ) {
 	/* Discard any recycled buffers, if applicable */
 	if ( ep->max )
 		usb_flush ( ep );
+
+	/* Clear transaction translator, if applicable */
+	usb_endpoint_clear_tt ( ep );
 }
 
 /**
@@ -368,6 +402,10 @@ static int usb_endpoint_reset ( struct usb_endpoint *ep ) {
 		       strerror ( rc ) );
 		return rc;
 	}
+
+	/* Clear transaction translator, if applicable */
+	if ( ( rc = usb_endpoint_clear_tt ( ep ) ) != 0 )
+		return rc;
 
 	/* Clear endpoint halt, if applicable */
 	type = ( ep->attributes & USB_ENDPOINT_ATTR_TYPE_MASK );
@@ -1949,14 +1987,16 @@ void usb_free_address ( struct usb_bus *bus, unsigned int address ) {
  * @ret route		USB route string
  */
 unsigned int usb_route_string ( struct usb_device *usb ) {
+	struct usb_device *parent;
 	unsigned int route;
 
 	/* Navigate up to root hub, constructing route string as we go */
-	for ( route = 0 ; usb->port->hub->usb ; usb = usb->port->hub->usb ) {
+	for ( route = 0 ; ( parent = usb->port->hub->usb ) ; usb = parent ) {
 		route <<= 4;
 		route |= ( ( usb->port->address > 0xf ) ?
 			   0xf : usb->port->address );
 	}
+
 	return route;
 }
 
@@ -1967,10 +2007,11 @@ unsigned int usb_route_string ( struct usb_device *usb ) {
  * @ret depth		Hub depth
  */
 unsigned int usb_depth ( struct usb_device *usb ) {
+	struct usb_device *parent;
 	unsigned int depth;
 
 	/* Navigate up to root hub, constructing depth as we go */
-	for ( depth = 0 ; usb->port->hub->usb ; usb = usb->port->hub->usb )
+	for ( depth = 0 ; ( parent = usb->port->hub->usb ) ; usb = parent )
 		depth++;
 
 	return depth;
@@ -1983,12 +2024,35 @@ unsigned int usb_depth ( struct usb_device *usb ) {
  * @ret port		Root hub port
  */
 struct usb_port * usb_root_hub_port ( struct usb_device *usb ) {
+	struct usb_device *parent;
 
 	/* Navigate up to root hub */
-	while ( usb->port->hub->usb )
-		usb = usb->port->hub->usb;
+	while ( ( parent = usb->port->hub->usb ) )
+		usb = parent;
 
 	return usb->port;
+}
+
+/**
+ * Get USB transaction translator
+ *
+ * @v usb		USB device
+ * @ret port		Transaction translator port, or NULL
+ */
+struct usb_port * usb_transaction_translator ( struct usb_device *usb ) {
+	struct usb_device *parent;
+
+	/* Navigate up to root hub.  If we find a low-speed or
+	 * full-speed port with a higher-speed parent device, then
+	 * that port is the transaction translator.
+	 */
+	for ( ; ( parent = usb->port->hub->usb ) ; usb = parent ) {
+		if ( ( usb->port->speed <= USB_SPEED_FULL ) &&
+		     ( parent->port->speed > USB_SPEED_FULL ) )
+			return usb->port;
+	}
+
+	return NULL;
 }
 
 /* Drag in objects via register_usb_bus() */
