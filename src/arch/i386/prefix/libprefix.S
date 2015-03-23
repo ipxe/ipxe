@@ -851,7 +851,7 @@ payload_death_message:
 #endif /* KEEP_IT_REAL */
 
 	/* Switch back to original stack and zero .bss16 */
-	lss	%ss:(%esp), %esp
+	addr32 lss %ss:(%esp), %esp
 	pushl	%edi
 	pushw	%es
 	movw	%bx, %es
