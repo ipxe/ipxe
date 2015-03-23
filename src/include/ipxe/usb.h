@@ -820,6 +820,15 @@ struct usb_hub_driver_operations {
 	 * @ret rc		Return status code
 	 */
 	int ( * speed ) ( struct usb_hub *hub, struct usb_port *port );
+	/** Clear transaction translator buffer
+	 *
+	 * @v hub		USB hub
+	 * @v port		USB port
+	 * @v ep		USB endpoint
+	 * @ret rc		Return status code
+	 */
+	int ( * clear_tt ) ( struct usb_hub *hub, struct usb_port *port,
+			     struct usb_endpoint *ep );
 };
 
 /**

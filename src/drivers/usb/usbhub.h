@@ -129,6 +129,11 @@ struct usb_hub_port_status {
 	( USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_DEVICE |		\
 	  USB_REQUEST_TYPE ( 12 ) )
 
+/** Clear transaction translator buffer */
+#define USB_HUB_CLEAR_TT_BUFFER						\
+	( USB_DIR_OUT | USB_TYPE_CLASS | USB_HUB_RECIP_PORT |		\
+	  USB_REQUEST_TYPE ( 8 ) )
+
 /**
  * Get hub descriptor
  *
@@ -213,6 +218,34 @@ usb_hub_set_hub_depth ( struct usb_device *usb, unsigned int depth ) {
 
 	return usb_control ( usb, USB_HUB_SET_HUB_DEPTH, depth, 0, NULL, 0 );
 }
+
+/**
+ * Clear transaction translator buffer
+ *
+ * @v usb		USB device
+ * @v device		Device address
+ * @v endpoint		Endpoint address
+ * @v attributes	Endpoint attributes
+ * @v tt_port		Transaction translator port (or 1 for single-TT hubs)
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+usb_hub_clear_tt_buffer ( struct usb_device *usb, unsigned int device,
+			  unsigned int endpoint, unsigned int attributes,
+			  unsigned int tt_port ) {
+	unsigned int value;
+
+	/* Calculate value */
+	value = ( ( ( endpoint & USB_ENDPOINT_MAX ) << 0 ) | ( device << 4 ) |
+		  ( ( attributes & USB_ENDPOINT_ATTR_TYPE_MASK ) << 11 ) |
+		  ( ( endpoint & USB_ENDPOINT_IN ) << 8 ) );
+
+	return usb_control ( usb, USB_HUB_CLEAR_TT_BUFFER, value,
+			     tt_port, NULL, 0 );
+}
+
+/** Transaction translator port value for single-TT hubs */
+#define USB_HUB_TT_SINGLE 1
 
 /** A USB hub device */
 struct usb_hub_device {

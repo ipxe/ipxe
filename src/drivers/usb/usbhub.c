@@ -338,6 +338,35 @@ static int hub_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	return 0;
 }
 
+/**
+ * Clear transaction translator buffer
+ *
+ * @v hub		USB hub
+ * @v port		USB port
+ * @v ep		USB endpoint
+ * @ret rc		Return status code
+ */
+static int hub_clear_tt ( struct usb_hub *hub, struct usb_port *port,
+			  struct usb_endpoint *ep ) {
+	struct usb_hub_device *hubdev = usb_hub_get_drvdata ( hub );
+	struct usb_device *usb = hubdev->usb;
+	int rc;
+
+	/* Clear transaction translator buffer.  All hubs must support
+	 * single-TT operation; we simplify our code by supporting
+	 * only this configuration.
+	 */
+	if ( ( rc = usb_hub_clear_tt_buffer ( usb, ep->usb->address,
+					      ep->address, ep->attributes,
+					      USB_HUB_TT_SINGLE ) ) != 0 ) {
+		DBGC ( hubdev, "HUB %s port %d could not clear TT buffer: %s\n",
+		       hubdev->name, port->address, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
 /** USB hub operations */
 static struct usb_hub_driver_operations hub_operations = {
 	.open = hub_open,
@@ -345,6 +374,7 @@ static struct usb_hub_driver_operations hub_operations = {
 	.enable = hub_enable,
 	.disable = hub_disable,
 	.speed = hub_speed,
+	.clear_tt = hub_clear_tt,
 };
 
 /**
