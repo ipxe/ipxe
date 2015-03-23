@@ -2437,6 +2437,9 @@ static int xhci_endpoint_reset ( struct usb_endpoint *ep ) {
 	if ( ( rc = xhci_set_tr_dequeue_pointer ( xhci, slot, endpoint ) ) != 0)
 		return rc;
 
+	/* Ring doorbell to resume processing */
+	xhci_doorbell ( &endpoint->ring );
+
 	DBGC ( xhci, "XHCI %p slot %d ctx %d reset\n",
 	       xhci, slot->id, endpoint->ctx );
 	return 0;
