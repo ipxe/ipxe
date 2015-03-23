@@ -380,10 +380,11 @@ struct usb_endpoint {
 
 	/** Endpoint is open */
 	int open;
-	/** Current failure state (if any) */
-	int rc;
 	/** Buffer fill level */
 	unsigned int fill;
+
+	/** List of halted endpoints */
+	struct list_head halted;
 
 	/** Host controller operations */
 	struct usb_endpoint_host_operations *host;
@@ -754,7 +755,7 @@ struct usb_port {
 	 */
 	struct usb_device *usb;
 	/** List of changed ports */
-	struct list_head list;
+	struct list_head changed;
 };
 
 /** A USB hub */
@@ -888,6 +889,8 @@ struct usb_bus {
 	struct list_head hubs;
 	/** List of changed ports */
 	struct list_head changed;
+	/** List of halted endpoints */
+	struct list_head halted;
 	/** Process */
 	struct process process;
 
