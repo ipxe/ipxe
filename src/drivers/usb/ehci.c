@@ -545,7 +545,7 @@ static int ehci_enqueue ( struct ehci_device *ehci, struct ehci_ring *ring,
 		assert ( xfer->len <= EHCI_LEN_MASK );
 		assert ( EHCI_FL_TOGGLE == EHCI_LEN_TOGGLE );
 		desc->len = cpu_to_le16 ( xfer->len | toggle );
-		desc->flags = xfer->flags;
+		desc->flags = ( xfer->flags | EHCI_FL_CERR_MAX );
 
 		/* Copy data to immediate data buffer (if requested) */
 		data = xfer->data;
@@ -902,19 +902,16 @@ static uint32_t ehci_endpoint_characteristics ( struct usb_endpoint *ep ) {
 		chr |= EHCI_CHR_TOGGLE;
 
 	/* Determine endpoint speed */
-	switch ( usb->port->speed ) {
-	case USB_SPEED_HIGH :
+	if ( usb->port->speed == USB_SPEED_HIGH ) {
 		chr |= EHCI_CHR_EPS_HIGH;
-		break;
-	case USB_SPEED_FULL :
-		chr |= EHCI_CHR_EPS_FULL;
-		break;
-	default:
-		assert ( usb->port->speed == USB_SPEED_LOW );
-		chr |= EHCI_CHR_EPS_LOW;
+	} else {
+		if ( usb->port->speed == USB_SPEED_FULL ) {
+			chr |= EHCI_CHR_EPS_FULL;
+		} else {
+			chr |= EHCI_CHR_EPS_LOW;
+		}
 		if ( attr == USB_ENDPOINT_ATTR_CONTROL )
 			chr |= EHCI_CHR_CONTROL;
-		break;
 	}
 
 	return chr;
@@ -927,6 +924,8 @@ static uint32_t ehci_endpoint_characteristics ( struct usb_endpoint *ep ) {
  * @ret cap		Endpoint capabilities
  */
 static uint32_t ehci_endpoint_capabilities ( struct usb_endpoint *ep ) {
+	struct usb_device *usb = ep->usb;
+	struct usb_port *tt = usb_transaction_translator ( usb );
 	unsigned int attr = ( ep->attributes & USB_ENDPOINT_ATTR_TYPE_MASK );
 	uint32_t cap;
 	unsigned int i;
@@ -941,6 +940,15 @@ static uint32_t ehci_endpoint_capabilities ( struct usb_endpoint *ep ) {
 		      i += ep->interval ) {
 			cap |= EHCI_CAP_INTR_SCHED ( i );
 		}
+	}
+
+	/* Set transaction translator hub address and port, if applicable */
+	if ( tt ) {
+		assert ( tt->hub->usb );
+		cap |= ( EHCI_CAP_TT_HUB ( tt->hub->usb->address ) |
+			 EHCI_CAP_TT_PORT ( tt->address ) );
+		if ( attr == USB_ENDPOINT_ATTR_INTERRUPT )
+			cap |= EHCI_CAP_SPLIT_SCHED_DEFAULT;
 	}
 
 	return cap;

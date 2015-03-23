@@ -285,6 +285,12 @@ struct ehci_transfer_descriptor {
 /** SETUP token */
 #define EHCI_FL_PID_SETUP EHCI_FL_PID ( 2 )
 
+/** Error counter */
+#define EHCI_FL_CERR( count ) ( (count) << 2 )
+
+/** Error counter maximum value */
+#define EHCI_FL_CERR_MAX EHCI_FL_CERR ( 3 )
+
 /** Interrupt on completion */
 #define EHCI_FL_IOC 0x80
 
@@ -340,6 +346,34 @@ struct ehci_queue_head {
 
 /** Interrupt schedule mask */
 #define EHCI_CAP_INTR_SCHED( uframe ) ( 1 << ( (uframe) + 0 ) )
+
+/** Split completion schedule mask */
+#define EHCI_CAP_SPLIT_SCHED( uframe ) ( 1 << ( (uframe) + 8 ) )
+
+/** Default split completion schedule mask
+ *
+ * We schedule all split starts in microframe 0, on the assumption
+ * that we will never have to deal with more than sixteen actively
+ * interrupting devices via the same transaction translator.  We
+ * schedule split completions for all remaining microframes after
+ * microframe 1 (in which the low-speed or full-speed transaction is
+ * assumed to execute).  This is a very crude approximation designed
+ * to avoid the need for calculating exactly when low-speed and
+ * full-speed transactions will execute.  Since we only ever deal with
+ * interrupt endpoints (rather than isochronous endpoints), the volume
+ * of periodic traffic is extremely low, and this approximation should
+ * remain valid.
+ */
+#define EHCI_CAP_SPLIT_SCHED_DEFAULT					\
+	( EHCI_CAP_SPLIT_SCHED ( 2 ) | EHCI_CAP_SPLIT_SCHED ( 3 ) |	\
+	  EHCI_CAP_SPLIT_SCHED ( 4 ) | EHCI_CAP_SPLIT_SCHED ( 5 ) |	\
+	  EHCI_CAP_SPLIT_SCHED ( 6 ) | EHCI_CAP_SPLIT_SCHED ( 7 ) )
+
+/** Transaction translator hub address */
+#define EHCI_CAP_TT_HUB( address ) ( (address) << 16 )
+
+/** Transaction translator port number */
+#define EHCI_CAP_TT_PORT( port ) ( (port) << 23 )
 
 /** High-bandwidth pipe multiplier */
 #define EHCI_CAP_MULT( mult ) ( (mult) << 30 )
