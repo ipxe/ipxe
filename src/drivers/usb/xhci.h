@@ -1110,6 +1110,12 @@ struct xhci_slot {
 	unsigned int port;
 	/** Protocol speed ID */
 	unsigned int psiv;
+	/** Number of ports (if this device is a hub) */
+	unsigned int ports;
+	/** Transaction translator slot ID */
+	unsigned int tt_id;
+	/** Transaction translator port */
+	unsigned int tt_port;
 	/** Endpoints, indexed by context ID */
 	struct xhci_endpoint *endpoint[XHCI_CTX_END];
 };

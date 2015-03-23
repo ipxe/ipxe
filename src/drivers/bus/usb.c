@@ -1692,6 +1692,7 @@ struct usb_hub * alloc_usb_hub ( struct usb_bus *bus, struct usb_device *usb,
 		hub->protocol = usb->port->protocol;
 	hub->ports = ports;
 	hub->driver = driver;
+	hub->host = &bus->op->hub;
 
 	/* Initialise port list */
 	for ( i = 1 ; i <= hub->ports ; i++ ) {
@@ -1721,11 +1722,18 @@ int register_usb_hub ( struct usb_hub *hub ) {
 	/* Add to hub list */
 	list_add_tail ( &hub->list, &bus->hubs );
 
-	/* Open hub */
+	/* Open hub (host controller) */
+	if ( ( rc = hub->host->open ( hub ) ) != 0 ) {
+		DBGC ( hub, "USB hub %s could not open: %s\n",
+		       hub->name, strerror ( rc ) );
+		goto err_host_open;
+	}
+
+	/* Open hub (driver) */
 	if ( ( rc = hub->driver->open ( hub ) ) != 0 ) {
 		DBGC ( hub, "USB hub %s could not open: %s\n",
 		       hub->name, strerror ( rc ) );
-		goto err_open;
+		goto err_driver_open;
 	}
 
 	/* Delay to allow ports to stabilise */
@@ -1747,7 +1755,9 @@ int register_usb_hub ( struct usb_hub *hub ) {
 	return 0;
 
 	hub->driver->close ( hub );
- err_open:
+ err_driver_open:
+	hub->host->close ( hub );
+ err_host_open:
 	list_del ( &hub->list );
 	return rc;
 }
@@ -1768,8 +1778,11 @@ void unregister_usb_hub ( struct usb_hub *hub ) {
 			usb_detached ( port );
 	}
 
-	/* Close hub */
+	/* Close hub (driver) */
 	hub->driver->close ( hub );
+
+	/* Close hub (host controller) */
+	hub->host->close ( hub );
 
 	/* Cancel any pending port status changes */
 	for ( i = 1 ; i <= hub->ports ; i++ ) {
@@ -1839,7 +1852,7 @@ struct usb_bus * alloc_usb_bus ( struct device *dev, unsigned int ports,
 	bus->host = &bus->op->bus;
 
 	/* Allocate root hub */
-	bus->hub = alloc_usb_hub ( bus, NULL, ports, &op->hub );
+	bus->hub = alloc_usb_hub ( bus, NULL, ports, &op->root );
 	if ( ! bus->hub )
 		goto err_alloc_hub;
 

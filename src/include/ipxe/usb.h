@@ -777,6 +777,8 @@ struct usb_hub {
 	/** List of hubs */
 	struct list_head list;
 
+	/** Host controller operations */
+	struct usb_hub_host_operations *host;
 	/** Driver operations */
 	struct usb_hub_driver_operations *driver;
 	/** Driver private data */
@@ -789,7 +791,22 @@ struct usb_hub {
 	struct usb_port port[0];
 };
 
-/** USB hub operations */
+/** USB hub host controller operations */
+struct usb_hub_host_operations {
+	/** Open hub
+	 *
+	 * @v hub		USB hub
+	 * @ret rc		Return status code
+	 */
+	int ( * open ) ( struct usb_hub *hub );
+	/** Close hub
+	 *
+	 * @v hub		USB hub
+	 */
+	void ( * close ) ( struct usb_hub *hub );
+};
+
+/** USB hub driver operations */
 struct usb_hub_driver_operations {
 	/** Open hub
 	 *
@@ -940,8 +957,10 @@ struct usb_host_operations {
 	struct usb_device_host_operations device;
 	/** Bus operations */
 	struct usb_bus_host_operations bus;
+	/** Hub operations */
+	struct usb_hub_host_operations hub;
 	/** Root hub operations */
-	struct usb_hub_driver_operations hub;
+	struct usb_hub_driver_operations root;
 };
 
 /**

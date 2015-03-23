@@ -1990,6 +1990,8 @@ static void xhci_address_device_input ( struct xhci_device *xhci,
 	slot_ctx->info = cpu_to_le32 ( XHCI_SLOT_INFO ( 1, 0, slot->psiv,
 							slot->route ) );
 	slot_ctx->port = slot->port;
+	slot_ctx->tt_id = slot->tt_id;
+	slot_ctx->tt_port = slot->tt_port;
 
 	/* Populate control endpoint context */
 	ep_ctx = ( input + xhci_input_context_offset ( xhci, XHCI_CTX_EP0 ) );
@@ -2039,7 +2041,7 @@ static inline int xhci_address_device ( struct xhci_device *xhci,
  * @v input		Input context
  */
 static void xhci_configure_endpoint_input ( struct xhci_device *xhci,
-					    struct xhci_slot *slot __unused,
+					    struct xhci_slot *slot,
 					    struct xhci_endpoint *endpoint,
 					    void *input ) {
 	struct xhci_control_context *control_ctx;
@@ -2054,7 +2056,9 @@ static void xhci_configure_endpoint_input ( struct xhci_device *xhci,
 	/* Populate slot context */
 	slot_ctx = ( input + xhci_input_context_offset ( xhci, XHCI_CTX_SLOT ));
 	slot_ctx->info = cpu_to_le32 ( XHCI_SLOT_INFO ( ( XHCI_CTX_END - 1 ),
-							0, 0, 0 ) );
+							( slot->ports ? 1 : 0 ),
+							slot->psiv, 0 ) );
+	slot_ctx->ports = slot->ports;
 
 	/* Populate endpoint context */
 	ep_ctx = ( input + xhci_input_context_offset ( xhci, endpoint->ctx ) );
@@ -2587,7 +2591,9 @@ static int xhci_endpoint_stream ( struct usb_endpoint *ep,
  */
 static int xhci_device_open ( struct usb_device *usb ) {
 	struct xhci_device *xhci = usb_bus_get_hostdata ( usb->port->hub->bus );
+	struct usb_port *tt = usb_transaction_translator ( usb );
 	struct xhci_slot *slot;
+	struct xhci_slot *tt_slot;
 	size_t len;
 	int type;
 	int id;
@@ -2621,6 +2627,11 @@ static int xhci_device_open ( struct usb_device *usb ) {
 	slot->xhci = xhci;
 	slot->usb = usb;
 	slot->id = id;
+	if ( tt ) {
+		tt_slot = usb_get_hostdata ( tt->hub->usb );
+		slot->tt_id = tt_slot->id;
+		slot->tt_port = tt->address;
+	}
 
 	/* Allocate a device context */
 	len = xhci_device_context_offset ( xhci, XHCI_CTX_END );
@@ -2819,6 +2830,51 @@ static void xhci_bus_poll ( struct usb_bus *bus ) {
 
 /******************************************************************************
  *
+ * Hub operations
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Open hub
+ *
+ * @v hub		USB hub
+ * @ret rc		Return status code
+ */
+static int xhci_hub_open ( struct usb_hub *hub ) {
+	struct xhci_slot *slot;
+
+	/* Do nothing if this is the root hub */
+	if ( ! hub->usb )
+		return 0;
+
+	/* Get device slot */
+	slot = usb_get_hostdata ( hub->usb );
+
+	/* Update device slot hub parameters.  We don't inform the
+	 * hardware of this information until the hub's interrupt
+	 * endpoint is opened, since the only mechanism for so doing
+	 * provided by the xHCI specification is a Configure Endpoint
+	 * command, and we can't issue that command until we have a
+	 * non-EP0 endpoint to configure.
+	 */
+	slot->ports = hub->ports;
+
+	return 0;
+}
+
+/**
+ * Close hub
+ *
+ * @v hub		USB hub
+ */
+static void xhci_hub_close ( struct usb_hub *hub __unused ) {
+
+	/* Nothing to do */
+}
+
+/******************************************************************************
+ *
  * Root hub operations
  *
  ******************************************************************************
@@ -2830,7 +2886,7 @@ static void xhci_bus_poll ( struct usb_bus *bus ) {
  * @v hub		USB hub
  * @ret rc		Return status code
  */
-static int xhci_hub_open ( struct usb_hub *hub ) {
+static int xhci_root_open ( struct usb_hub *hub ) {
 	struct usb_bus *bus = hub->bus;
 	struct xhci_device *xhci = usb_bus_get_hostdata ( bus );
 	struct usb_port *port;
@@ -2880,7 +2936,7 @@ static int xhci_hub_open ( struct usb_hub *hub ) {
  *
  * @v hub		USB hub
  */
-static void xhci_hub_close ( struct usb_hub *hub ) {
+static void xhci_root_close ( struct usb_hub *hub ) {
 
 	/* Clear hub driver private data */
 	usb_hub_set_drvdata ( hub, NULL );
@@ -2893,7 +2949,7 @@ static void xhci_hub_close ( struct usb_hub *hub ) {
  * @v port		USB port
  * @ret rc		Return status code
  */
-static int xhci_hub_enable ( struct usb_hub *hub, struct usb_port *port ) {
+static int xhci_root_enable ( struct usb_hub *hub, struct usb_port *port ) {
 	struct xhci_device *xhci = usb_hub_get_drvdata ( hub );
 	uint32_t portsc;
 	unsigned int i;
@@ -2930,7 +2986,7 @@ static int xhci_hub_enable ( struct usb_hub *hub, struct usb_port *port ) {
  * @v port		USB port
  * @ret rc		Return status code
  */
-static int xhci_hub_disable ( struct usb_hub *hub, struct usb_port *port ) {
+static int xhci_root_disable ( struct usb_hub *hub, struct usb_port *port ) {
 	struct xhci_device *xhci = usb_hub_get_drvdata ( hub );
 	uint32_t portsc;
 
@@ -2950,7 +3006,7 @@ static int xhci_hub_disable ( struct usb_hub *hub, struct usb_port *port ) {
  * @v port		USB port
  * @ret rc		Return status code
  */
-static int xhci_hub_speed ( struct usb_hub *hub, struct usb_port *port ) {
+static int xhci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	struct xhci_device *xhci = usb_hub_get_drvdata ( hub );
 	uint32_t portsc;
 	unsigned int psiv;
@@ -3000,8 +3056,8 @@ static int xhci_hub_speed ( struct usb_hub *hub, struct usb_port *port ) {
  * @v ep		USB endpoint
  * @ret rc		Return status code
  */
-static int xhci_hub_clear_tt ( struct usb_hub *hub, struct usb_port *port,
-			       struct usb_endpoint *ep ) {
+static int xhci_root_clear_tt ( struct usb_hub *hub, struct usb_port *port,
+				struct usb_endpoint *ep ) {
 	struct ehci_device *ehci = usb_hub_get_drvdata ( hub );
 
 	/* Should never be called; this is a root hub */
@@ -3041,10 +3097,14 @@ static struct usb_host_operations xhci_operations = {
 	.hub = {
 		.open = xhci_hub_open,
 		.close = xhci_hub_close,
-		.enable = xhci_hub_enable,
-		.disable = xhci_hub_disable,
-		.speed = xhci_hub_speed,
-		.clear_tt = xhci_hub_clear_tt,
+	},
+	.root = {
+		.open = xhci_root_open,
+		.close = xhci_root_close,
+		.enable = xhci_root_enable,
+		.disable = xhci_root_disable,
+		.speed = xhci_root_speed,
+		.clear_tt = xhci_root_clear_tt,
 	},
 };
 

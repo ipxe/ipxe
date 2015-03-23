@@ -1332,6 +1332,35 @@ static int ehci_device_address ( struct usb_device *usb ) {
 
 /******************************************************************************
  *
+ * Hub operations
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Open hub
+ *
+ * @v hub		USB hub
+ * @ret rc		Return status code
+ */
+static int ehci_hub_open ( struct usb_hub *hub __unused ) {
+
+	/* Nothing to do */
+	return 0;
+}
+
+/**
+ * Close hub
+ *
+ * @v hub		USB hub
+ */
+static void ehci_hub_close ( struct usb_hub *hub __unused ) {
+
+	/* Nothing to do */
+}
+
+/******************************************************************************
+ *
  * Root hub operations
  *
  ******************************************************************************
@@ -1343,7 +1372,7 @@ static int ehci_device_address ( struct usb_device *usb ) {
  * @v hub		USB hub
  * @ret rc		Return status code
  */
-static int ehci_hub_open ( struct usb_hub *hub ) {
+static int ehci_root_open ( struct usb_hub *hub ) {
 	struct usb_bus *bus = hub->bus;
 	struct ehci_device *ehci = usb_bus_get_hostdata ( bus );
 	uint32_t portsc;
@@ -1374,7 +1403,7 @@ static int ehci_hub_open ( struct usb_hub *hub ) {
  *
  * @v hub		USB hub
  */
-static void ehci_hub_close ( struct usb_hub *hub ) {
+static void ehci_root_close ( struct usb_hub *hub ) {
 	struct ehci_device *ehci = usb_hub_get_drvdata ( hub );
 
 	/* Route all ports back to companion controllers */
@@ -1391,7 +1420,7 @@ static void ehci_hub_close ( struct usb_hub *hub ) {
  * @v port		USB port
  * @ret rc		Return status code
  */
-static int ehci_hub_enable ( struct usb_hub *hub, struct usb_port *port ) {
+static int ehci_root_enable ( struct usb_hub *hub, struct usb_port *port ) {
 	struct ehci_device *ehci = usb_hub_get_drvdata ( hub );
 	uint32_t portsc;
 	unsigned int line;
@@ -1449,7 +1478,7 @@ static int ehci_hub_enable ( struct usb_hub *hub, struct usb_port *port ) {
  * @v port		USB port
  * @ret rc		Return status code
  */
-static int ehci_hub_disable ( struct usb_hub *hub, struct usb_port *port ) {
+static int ehci_root_disable ( struct usb_hub *hub, struct usb_port *port ) {
 	struct ehci_device *ehci = usb_hub_get_drvdata ( hub );
 	uint32_t portsc;
 
@@ -1468,7 +1497,7 @@ static int ehci_hub_disable ( struct usb_hub *hub, struct usb_port *port ) {
  * @v port		USB port
  * @ret rc		Return status code
  */
-static int ehci_hub_speed ( struct usb_hub *hub, struct usb_port *port ) {
+static int ehci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	struct ehci_device *ehci = usb_hub_get_drvdata ( hub );
 	uint32_t portsc;
 	unsigned int speed;
@@ -1512,8 +1541,8 @@ static int ehci_hub_speed ( struct usb_hub *hub, struct usb_port *port ) {
  * @v ep		USB endpoint
  * @ret rc		Return status code
  */
-static int ehci_hub_clear_tt ( struct usb_hub *hub, struct usb_port *port,
-			       struct usb_endpoint *ep ) {
+static int ehci_root_clear_tt ( struct usb_hub *hub, struct usb_port *port,
+				struct usb_endpoint *ep ) {
 	struct ehci_device *ehci = usb_hub_get_drvdata ( hub );
 
 	/* Should never be called; this is a root hub */
@@ -1529,7 +1558,7 @@ static int ehci_hub_clear_tt ( struct usb_hub *hub, struct usb_port *port,
  * @v hub		USB hub
  * @v port		USB port
  */
-static void ehci_hub_poll ( struct usb_hub *hub, struct usb_port *port ) {
+static void ehci_root_poll ( struct usb_hub *hub, struct usb_port *port ) {
 	struct ehci_device *ehci = usb_hub_get_drvdata ( hub );
 	uint32_t portsc;
 	uint32_t change;
@@ -1692,7 +1721,7 @@ static void ehci_bus_poll ( struct usb_bus *bus ) {
 
 		/* Iterate over all ports looking for status changes */
 		for ( i = 1 ; i <= ehci->ports ; i++ )
-			ehci_hub_poll ( hub, usb_port ( hub, i ) );
+			ehci_root_poll ( hub, usb_port ( hub, i ) );
 	}
 
 	/* Report fatal errors */
@@ -1730,10 +1759,14 @@ static struct usb_host_operations ehci_operations = {
 	.hub = {
 		.open = ehci_hub_open,
 		.close = ehci_hub_close,
-		.enable = ehci_hub_enable,
-		.disable = ehci_hub_disable,
-		.speed = ehci_hub_speed,
-		.clear_tt = ehci_hub_clear_tt,
+	},
+	.root = {
+		.open = ehci_root_open,
+		.close = ehci_root_close,
+		.enable = ehci_root_enable,
+		.disable = ehci_root_disable,
+		.speed = ehci_root_speed,
+		.clear_tt = ehci_root_clear_tt,
 	},
 };
 
