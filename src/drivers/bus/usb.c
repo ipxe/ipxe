@@ -708,10 +708,6 @@ static void usb_control_complete ( struct usb_endpoint *ep,
 	/* Record completion status in buffer */
 	pshdr = iob_push ( iobuf, sizeof ( *pshdr ) );
 	pshdr->rc = rc;
-	if ( rc != 0 ) {
-		DBGC ( usb, "USB %s control transaction failed: %s\n",
-		       usb->name, strerror ( rc ) );
-	}
 
 	/* Add to list of completed I/O buffers */
 	list_add_tail ( &iobuf->list, &usb->complete );
@@ -793,6 +789,9 @@ int usb_control ( struct usb_device *usb, unsigned int request,
 
 			/* Fail immediately if completion was in error */
 			if ( rc != 0 ) {
+				DBGC ( usb, "USB %s control %04x:%04x:%04x "
+				       "failed: %s\n", usb->name, request,
+				       value, index, strerror ( rc ) );
 				free_iob ( cmplt );
 				return rc;
 			}
@@ -809,8 +808,8 @@ int usb_control ( struct usb_device *usb, unsigned int request,
 		mdelay ( 1 );
 	}
 
-	DBGC ( usb, "USB %s timed out waiting for control transaction\n",
-	       usb->name );
+	DBGC ( usb, "USB %s timed out waiting for control %04x:%04x:%04x\n",
+	       usb->name, request, value, index );
 	return -ETIMEDOUT;
 
  err_message:
