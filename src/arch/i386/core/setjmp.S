@@ -52,9 +52,9 @@ longjmp:
 1:	/* Restore stack pointer */
 	movl	env_stack(%edx), %esp
 	/* Restore other registers */
-	movl	env_ebx(%edx), %esp
-	movl	env_esi(%edx), %esp
-	movl	env_edi(%edx), %esp
+	movl	env_ebx(%edx), %ebx
+	movl	env_esi(%edx), %esi
+	movl	env_edi(%edx), %edi
 	movl	env_ebp(%edx), %ebp
 	/* Replace return address on the new stack */
 	popl	%ecx	/* discard */
