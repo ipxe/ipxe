@@ -131,8 +131,8 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
 		},
 	};
 
-	DBGC ( virtnet, "VIRTIO-NET %p enqueuing iobuf %p on vq %d\n",
-	       virtnet, iobuf, vq_idx );
+	DBGC2 ( virtnet, "VIRTIO-NET %p enqueuing iobuf %p on vq %d\n",
+		virtnet, iobuf, vq_idx );
 
 	vring_add_buf ( vq, list, out, in, iobuf, 0 );
 	vring_kick ( virtnet->ioaddr, vq, 1 );
@@ -256,8 +256,8 @@ static void virtnet_process_tx_packets ( struct net_device *netdev ) {
 	while ( vring_more_used ( tx_vq ) ) {
 		struct io_buffer *iobuf = vring_get_buf ( tx_vq, NULL );
 
-		DBGC ( virtnet, "VIRTIO-NET %p tx complete iobuf %p\n",
-		       virtnet, iobuf );
+		DBGC2 ( virtnet, "VIRTIO-NET %p tx complete iobuf %p\n",
+			virtnet, iobuf );
 
 		netdev_tx_complete ( netdev, iobuf );
 	}
@@ -283,8 +283,8 @@ static void virtnet_process_rx_packets ( struct net_device *netdev ) {
 		iob_unput ( iobuf, RX_BUF_SIZE );
 		iob_put ( iobuf, len - sizeof ( struct virtio_net_hdr ) );
 
-		DBGC ( virtnet, "VIRTIO-NET %p rx complete iobuf %p len %zd\n",
-		       virtnet, iobuf, iob_len ( iobuf ) );
+		DBGC2 ( virtnet, "VIRTIO-NET %p rx complete iobuf %p len %zd\n",
+			virtnet, iobuf, iob_len ( iobuf ) );
 
 		/* Pass completed packet to the network stack */
 		netdev_rx ( netdev, iobuf );
