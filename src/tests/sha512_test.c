@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *  http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA512.pdf
  *  http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA384.pdf
  *  http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA512_256.pdf
+ *  http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA512_224.pdf
  *
  */
 
@@ -124,6 +125,28 @@ DIGEST_TEST ( sha512_256_nist_abc_stu, &sha512_256_algorithm,
 		       0x9d, 0x3e, 0xf8, 0x3e, 0xe6, 0x14, 0x6f, 0xea, 0xc8,
 		       0x61, 0xe1, 0x9b, 0x56, 0x3a ) );
 
+/* Empty test vector (digest obtained from "shasum -a 512224 /dev/null") */
+DIGEST_TEST ( sha512_224_empty, &sha512_224_algorithm, DIGEST_EMPTY,
+	      DIGEST ( 0x6e, 0xd0, 0xdd, 0x02, 0x80, 0x6f, 0xa8, 0x9e, 0x25,
+		       0xde, 0x06, 0x0c, 0x19, 0xd3, 0xac, 0x86, 0xca, 0xbb,
+		       0x87, 0xd6, 0xa0, 0xdd, 0xd0, 0x5c, 0x33, 0x3b, 0x84,
+		       0xf4 ) );
+
+/* NIST test vector "abc" */
+DIGEST_TEST ( sha512_224_nist_abc, &sha512_224_algorithm, DIGEST_NIST_ABC,
+	      DIGEST ( 0x46, 0x34, 0x27, 0x0f, 0x70, 0x7b, 0x6a, 0x54, 0xda,
+		       0xae, 0x75, 0x30, 0x46, 0x08, 0x42, 0xe2, 0x0e, 0x37,
+		       0xed, 0x26, 0x5c, 0xee, 0xe9, 0xa4, 0x3e, 0x89, 0x24,
+		       0xaa ) );
+
+/* NIST test vector "abc...stu" */
+DIGEST_TEST ( sha512_224_nist_abc_stu, &sha512_224_algorithm,
+	      DIGEST_NIST_ABC_STU,
+	      DIGEST ( 0x23, 0xfe, 0xc5, 0xbb, 0x94, 0xd6, 0x0b, 0x23, 0x30,
+		       0x81, 0x92, 0x64, 0x0b, 0x0c, 0x45, 0x33, 0x35, 0xd6,
+		       0x64, 0x73, 0x4f, 0xe4, 0x0e, 0x72, 0x68, 0x67, 0x4a,
+		       0xf9 ) );
+
 /**
  * Perform SHA-512 family self-test
  *
@@ -140,6 +163,9 @@ static void sha512_test_exec ( void ) {
 	digest_ok ( &sha512_256_empty );
 	digest_ok ( &sha512_256_nist_abc );
 	digest_ok ( &sha512_256_nist_abc_stu );
+	digest_ok ( &sha512_224_empty );
+	digest_ok ( &sha512_224_nist_abc );
+	digest_ok ( &sha512_224_nist_abc_stu );
 
 	/* Speed tests */
 	DBG ( "SHA512 required %ld cycles per byte\n",
@@ -148,6 +174,8 @@ static void sha512_test_exec ( void ) {
 	      digest_cost ( &sha384_algorithm ) );
 	DBG ( "SHA512/256 required %ld cycles per byte\n",
 	      digest_cost ( &sha512_256_algorithm ) );
+	DBG ( "SHA512/224 required %ld cycles per byte\n",
+	      digest_cost ( &sha512_224_algorithm ) );
 }
 
 /** SHA-512 family self-test */
