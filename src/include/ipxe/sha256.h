@@ -58,6 +58,8 @@ union sha256_digest_data_dwords {
 struct sha256_context {
 	/** Amount of accumulated data */
 	size_t len;
+	/** Digest size */
+	size_t digestsize;
 	/** Digest and accumulated data */
 	union sha256_digest_data_dwords ddd;
 } __attribute__ (( packed ));
@@ -68,6 +70,16 @@ struct sha256_context {
 /** SHA-256 digest size */
 #define SHA256_DIGEST_SIZE sizeof ( struct sha256_digest )
 
+/** SHA-224 digest size */
+#define SHA224_DIGEST_SIZE ( SHA256_DIGEST_SIZE * 224 / 256 )
+
+extern void sha256_family_init ( struct sha256_context *context,
+				 const struct sha256_digest *init,
+				 size_t digestsize );
+extern void sha256_update ( void *ctx, const void *data, size_t len );
+extern void sha256_final ( void *ctx, void *out );
+
 extern struct digest_algorithm sha256_algorithm;
+extern struct digest_algorithm sha224_algorithm;
 
 #endif /* _IPXE_SHA256_H */

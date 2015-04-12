@@ -69,6 +69,37 @@ static const uint32_t k[64] = {
 	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
+/** SHA-256 initial digest values */
+static const struct sha256_digest sha256_init_digest = {
+	.h = {
+		cpu_to_be32 ( 0x6a09e667 ),
+		cpu_to_be32 ( 0xbb67ae85 ),
+		cpu_to_be32 ( 0x3c6ef372 ),
+		cpu_to_be32 ( 0xa54ff53a ),
+		cpu_to_be32 ( 0x510e527f ),
+		cpu_to_be32 ( 0x9b05688c ),
+		cpu_to_be32 ( 0x1f83d9ab ),
+		cpu_to_be32 ( 0x5be0cd19 ),
+	},
+};
+
+/**
+ * Initialise SHA-256 family algorithm
+ *
+ * @v context		SHA-256 context
+ * @v init		Initial digest values
+ * @v digestsize	Digest size
+ */
+void sha256_family_init ( struct sha256_context *context,
+			  const struct sha256_digest *init,
+			  size_t digestsize ) {
+
+	context->len = 0;
+	context->digestsize = digestsize;
+	memcpy ( &context->ddd.dd.digest, init,
+		 sizeof ( context->ddd.dd.digest ) );
+}
+
 /**
  * Initialise SHA-256 algorithm
  *
@@ -77,15 +108,8 @@ static const uint32_t k[64] = {
 static void sha256_init ( void *ctx ) {
 	struct sha256_context *context = ctx;
 
-	context->ddd.dd.digest.h[0] = cpu_to_be32 ( 0x6a09e667 );
-	context->ddd.dd.digest.h[1] = cpu_to_be32 ( 0xbb67ae85 );
-	context->ddd.dd.digest.h[2] = cpu_to_be32 ( 0x3c6ef372 );
-	context->ddd.dd.digest.h[3] = cpu_to_be32 ( 0xa54ff53a );
-	context->ddd.dd.digest.h[4] = cpu_to_be32 ( 0x510e527f );
-	context->ddd.dd.digest.h[5] = cpu_to_be32 ( 0x9b05688c );
-	context->ddd.dd.digest.h[6] = cpu_to_be32 ( 0x1f83d9ab );
-	context->ddd.dd.digest.h[7] = cpu_to_be32 ( 0x5be0cd19 );
-	context->len = 0;
+	sha256_family_init ( context, &sha256_init_digest,
+			     sizeof ( struct sha256_digest ) );
 }
 
 /**
@@ -190,7 +214,7 @@ static void sha256_digest ( struct sha256_context *context ) {
  * @v data		Data
  * @v len		Length of data
  */
-static void sha256_update ( void *ctx, const void *data, size_t len ) {
+void sha256_update ( void *ctx, const void *data, size_t len ) {
 	struct sha256_context *context = ctx;
 	const uint8_t *byte = data;
 	size_t offset;
@@ -213,7 +237,7 @@ static void sha256_update ( void *ctx, const void *data, size_t len ) {
  * @v ctx		SHA-256 context
  * @v out		Output buffer
  */
-static void sha256_final ( void *ctx, void *out ) {
+void sha256_final ( void *ctx, void *out ) {
 	struct sha256_context *context = ctx;
 	uint64_t len_bits;
 	uint8_t pad;
@@ -234,8 +258,7 @@ static void sha256_final ( void *ctx, void *out ) {
 	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
 
 	/* Copy out final digest */
-	memcpy ( out, &context->ddd.dd.digest,
-		 sizeof ( context->ddd.dd.digest ) );
+	memcpy ( out, &context->ddd.dd.digest, context->digestsize );
 }
 
 /** SHA-256 algorithm */

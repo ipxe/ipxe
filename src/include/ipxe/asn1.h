@@ -160,6 +160,13 @@ struct asn1_builder_header {
 	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
 	ASN1_OID_SINGLE ( 2 ), ASN1_OID_SINGLE ( 1 )
 
+/** ASN.1 OID for id-sha224 (2.16.840.1.101.3.4.2.4) */
+#define ASN1_OID_SHA224						\
+	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 101 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
+	ASN1_OID_SINGLE ( 2 ), ASN1_OID_SINGLE ( 4 )
+
 /** ASN.1 OID for commonName (2.5.4.3) */
 #define ASN1_OID_COMMON_NAME					\
 	ASN1_OID_INITIAL ( 2, 5 ), ASN1_OID_SINGLE ( 4 ),	\
