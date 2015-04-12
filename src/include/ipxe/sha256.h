@@ -12,6 +12,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/crypto.h>
 
+/** SHA-256 number of rounds */
+#define SHA256_ROUNDS 64
+
 /** An SHA-256 digest */
 struct sha256_digest {
 	/** Hash output */

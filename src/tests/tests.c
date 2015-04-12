@@ -49,6 +49,7 @@ REQUIRE_OBJECT ( crc32_test );
 REQUIRE_OBJECT ( md5_test );
 REQUIRE_OBJECT ( sha1_test );
 REQUIRE_OBJECT ( sha256_test );
+REQUIRE_OBJECT ( sha512_test );
 REQUIRE_OBJECT ( aes_cbc_test );
 REQUIRE_OBJECT ( hmac_drbg_test );
 REQUIRE_OBJECT ( hash_df_test );

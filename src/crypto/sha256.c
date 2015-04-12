@@ -51,11 +51,11 @@ struct sha256_variables {
 	uint32_t f;
 	uint32_t g;
 	uint32_t h;
-	uint32_t w[64];
+	uint32_t w[SHA256_ROUNDS];
 } __attribute__ (( packed ));
 
 /** SHA-256 constants */
-static const uint32_t k[64] = {
+static const uint32_t k[SHA256_ROUNDS] = {
 	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
 	0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
 	0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
@@ -167,7 +167,7 @@ static void sha256_digest ( struct sha256_context *context ) {
 	}
 
 	/* Initialise w[16..63] */
-	for ( i = 16 ; i < 64 ; i++ ) {
+	for ( i = 16 ; i < SHA256_ROUNDS ; i++ ) {
 		s0 = ( ror32 ( w[i-15], 7 ) ^ ror32 ( w[i-15], 18 ) ^
 		       ( w[i-15] >> 3 ) );
 		s1 = ( ror32 ( w[i-2], 17 ) ^ ror32 ( w[i-2], 19 ) ^
@@ -176,7 +176,7 @@ static void sha256_digest ( struct sha256_context *context ) {
 	}
 
 	/* Main loop */
-	for ( i = 0 ; i < 64 ; i++ ) {
+	for ( i = 0 ; i < SHA256_ROUNDS ; i++ ) {
 		s0 = ( ror32 ( *a, 2 ) ^ ror32 ( *a, 13 ) ^ ror32 ( *a, 22 ) );
 		maj = ( ( *a & *b ) ^ ( *a & *c ) ^ ( *b & *c ) );
 		t2 = ( s0 + maj );
