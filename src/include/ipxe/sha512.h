@@ -78,6 +78,9 @@ struct sha512_context {
 /** SHA-384 digest size */
 #define SHA384_DIGEST_SIZE ( SHA512_DIGEST_SIZE * 384 / 512 )
 
+/** SHA-512/256 digest size */
+#define SHA512_256_DIGEST_SIZE ( SHA512_DIGEST_SIZE * 256 / 512 )
+
 extern void sha512_family_init ( struct sha512_context *context,
 				 const struct sha512_digest *init,
 				 size_t digestsize );
@@ -86,5 +89,6 @@ extern void sha512_final ( void *ctx, void *out );
 
 extern struct digest_algorithm sha512_algorithm;
 extern struct digest_algorithm sha384_algorithm;
+extern struct digest_algorithm sha512_256_algorithm;
 
 #endif /* IPXE_SHA512_H */
