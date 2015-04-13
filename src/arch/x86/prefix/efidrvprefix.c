@@ -21,7 +21,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
 #include <ipxe/init.h>
+#include <ipxe/device.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_driver.h>
 
 /**
  * EFI entry point
@@ -44,3 +46,36 @@ EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
 
 	return 0;
 }
+
+/**
+ * Probe EFI root bus
+ *
+ * @v rootdev		EFI root device
+ */
+static int efi_probe ( struct root_device *rootdev __unused ) {
+
+	/* Do nothing */
+	return 0;
+}
+
+/**
+ * Remove EFI root bus
+ *
+ * @v rootdev		EFI root device
+ */
+static void efi_remove ( struct root_device *rootdev __unused ) {
+
+	efi_driver_disconnect_all();
+}
+
+/** EFI root device driver */
+static struct root_driver efi_root_driver = {
+	.probe = efi_probe,
+	.remove = efi_remove,
+};
+
+/** EFI root device */
+struct root_device efi_root_device __root_device = {
+	.dev = { .name = "EFI" },
+	.driver = &efi_root_driver,
+};
