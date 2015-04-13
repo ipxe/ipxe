@@ -140,6 +140,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #undef	NONPNP_HOOK_INT19	/* Hook INT19 on non-PnP BIOSes */
+#define	AUTOBOOT_ROM_FILTER	/* Autoboot only devices matching our ROM */
 
 /*
  * Error message tables to include

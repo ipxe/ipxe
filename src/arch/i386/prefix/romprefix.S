@@ -775,7 +775,9 @@ exec:	/* Set %ds = %cs */
 
 	/* Store PCI bus:dev.fn, if applicable */
 .ifeqs	BUSTYPE, "PCIR"
+#ifdef AUTOBOOT_ROM_FILTER
 	movw	%ax, autoboot_busdevfn
+#endif /* AUTOBOOT_ROM_FILTER */
 .endif
 
 	/* Call main() */
