@@ -237,6 +237,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_dhcpv6			( ERRFILE_NET | 0x003b0000 )
 #define ERRFILE_nfs_uri			( ERRFILE_NET | 0x003c0000 )
 #define ERRFILE_rndis			( ERRFILE_NET | 0x003d0000 )
+#define ERRFILE_pccrc			( ERRFILE_NET | 0x003e0000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
