@@ -2954,13 +2954,11 @@ static int xhci_root_enable ( struct usb_hub *hub, struct usb_port *port ) {
 	uint32_t portsc;
 	unsigned int i;
 
-	/* Reset port if applicable */
-	if ( port->protocol < USB_PROTO_3_0 ) {
-		portsc = readl ( xhci->op + XHCI_OP_PORTSC ( port->address ) );
-		portsc &= XHCI_PORTSC_PRESERVE;
-		portsc |= XHCI_PORTSC_PR;
-		writel ( portsc, xhci->op + XHCI_OP_PORTSC ( port->address ) );
-	}
+	/* Reset port */
+	portsc = readl ( xhci->op + XHCI_OP_PORTSC ( port->address ) );
+	portsc &= XHCI_PORTSC_PRESERVE;
+	portsc |= XHCI_PORTSC_PR;
+	writel ( portsc, xhci->op + XHCI_OP_PORTSC ( port->address ) );
 
 	/* Wait for port to become enabled */
 	for ( i = 0 ; i < XHCI_PORT_RESET_MAX_WAIT_MS ; i++ ) {
