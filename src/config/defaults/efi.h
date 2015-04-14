@@ -7,7 +7,7 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define UACCESS_EFI
 #define IOAPI_X86
@@ -19,7 +19,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define SMBIOS_EFI
 #define SANBOOT_NULL
 #define BOFM_EFI
-#define ENTROPY_NULL
+#define ENTROPY_EFI
 #define TIME_NULL
 #define REBOOT_EFI
 
