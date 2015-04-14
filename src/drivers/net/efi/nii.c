@@ -172,6 +172,9 @@ struct nii_nic {
 	/** Saved task priority level */
 	EFI_TPL saved_tpl;
 
+	/** Media status is supported */
+	int media;
+
 	/** Current transmit buffer */
 	struct io_buffer *txbuf;
 	/** Current receive buffer */
@@ -556,6 +559,7 @@ static int nii_get_init_info ( struct nii_nic *nii,
 	nii->buffer_len = db.MemoryRequired;
 	nii->mtu = ( db.FrameDataLen + db.MediaHeaderLen );
 	netdev->max_pkt_len = nii->mtu;
+	nii->media = ( stat & PXE_STATFLAGS_GET_STATUS_NO_MEDIA_SUPPORTED );
 
 	return 0;
 }
@@ -878,11 +882,14 @@ static void nii_poll ( struct net_device *netdev ) {
 	int stat;
 	int rc;
 
+	/* Construct data block */
+	memset ( &db, 0, sizeof ( db ) );
+
 	/* Get status */
 	op = NII_OP ( PXE_OPCODE_GET_STATUS,
 		      ( PXE_OPFLAGS_GET_INTERRUPT_STATUS |
 			PXE_OPFLAGS_GET_TRANSMITTED_BUFFERS |
-			PXE_OPFLAGS_GET_MEDIA_STATUS ) );
+			( nii->media ? PXE_OPFLAGS_GET_MEDIA_STATUS : 0 ) ) );
 	if ( ( stat = nii_issue_db ( nii, op, &db, sizeof ( db ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
 		DBGC ( nii, "NII %s could not get status: %s\n",
@@ -897,7 +904,8 @@ static void nii_poll ( struct net_device *netdev ) {
 	nii_poll_rx ( netdev );
 
 	/* Check for link state changes */
-	nii_poll_link ( netdev, stat );
+	if ( nii->media )
+		nii_poll_link ( netdev, stat );
 }
 
 /**
@@ -1056,6 +1064,10 @@ int nii_start ( struct efi_device *efidev ) {
 		goto err_register_netdev;
 	DBGC ( nii, "NII %s registered as %s for %p %s\n", nii->dev.name,
 	       netdev->name, device, efi_handle_name ( device ) );
+
+	/* Set initial link state (if media detection is not supported) */
+	if ( ! nii->media )
+		netdev_link_up ( netdev );
 
 	return 0;
 
