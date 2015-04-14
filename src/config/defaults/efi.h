@@ -20,7 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SANBOOT_NULL
 #define BOFM_EFI
 #define ENTROPY_EFI
-#define TIME_NULL
+#define TIME_EFI
 #define REBOOT_EFI
 
 #define	IMAGE_EFI		/* EFI image support */
