@@ -25,13 +25,32 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <ipxe/entropy.h>
+#include <ipxe/crc32.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/Rng.h>
 
 /** @file
  *
  * EFI entropy source
  *
  */
+
+/** Random number generator protocol */
+static EFI_RNG_PROTOCOL *efirng;
+EFI_REQUEST_PROTOCOL ( EFI_RNG_PROTOCOL, &efirng );
+
+/** Minimum number of bytes to request from RNG
+ *
+ * The UEFI spec states (for no apparently good reason) that "When a
+ * Deterministic Random Bit Generator (DRBG) is used on the output of
+ * a (raw) entropy source, its security level must be at least 256
+ * bits."  The EDK2 codebase (mis)interprets this to mean that the
+ * call to GetRNG() should fail if given a buffer less than 32 bytes.
+ *
+ * Incidentally, nothing in the EFI RNG protocol provides any way to
+ * report the actual amount of entropy returned by GetRNG().
+ */
+#define EFI_ENTROPY_RNG_LEN 32
 
 /** Time (in 100ns units) to delay waiting for timer tick
  *
@@ -55,6 +74,9 @@ static int efi_entropy_enable ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_STATUS efirc;
 	int rc;
+
+	DBGC ( &tick, "ENTROPY %s RNG protocol\n",
+	       ( efirng ? "has" : "has no" ) );
 
 	/* Create timer tick event */
 	if ( ( efirc = bs->CreateEvent ( EVT_TIMER, TPL_NOTIFY, NULL, NULL,
@@ -80,7 +102,7 @@ static void efi_entropy_disable ( void ) {
 }
 
 /**
- * Wait for an RTC tick
+ * Wait for a timer tick
  *
  * @ret low		TSC low-order bits, or negative error
  */
@@ -114,12 +136,12 @@ static int efi_entropy_tick ( void ) {
 }
 
 /**
- * Get noise sample
+ * Get noise sample from timer ticks
  *
  * @ret noise		Noise sample
  * @ret rc		Return status code
  */
-static int efi_get_noise ( noise_sample_t *noise ) {
+static int efi_get_noise_ticks ( noise_sample_t *noise ) {
 	int before;
 	int after;
 	int rc;
@@ -140,6 +162,57 @@ static int efi_get_noise ( noise_sample_t *noise ) {
 
 	/* Use TSC delta as noise sample */
 	*noise = ( after - before );
+
+	return 0;
+}
+
+/**
+ * Get noise sample from RNG protocol
+ *
+ * @ret noise		Noise sample
+ * @ret rc		Return status code
+ */
+static int efi_get_noise_rng ( noise_sample_t *noise ) {
+	uint8_t buf[EFI_ENTROPY_RNG_LEN];
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Fail if we have no EFI RNG protocol */
+	if ( ! efirng )
+		return -ENOTSUP;
+
+	/* Get the minimum allowed number of random bytes */
+	if ( ( efirc = efirng->GetRNG ( efirng, NULL, EFI_ENTROPY_RNG_LEN,
+					buf ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( &tick, "ENTROPY could not read from RNG: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Reduce random bytes to a single noise sample.  This seems
+	 * like overkill, but we have no way of knowing how much
+	 * entropy is actually present in the bytes returned by the
+	 * RNG protocol.
+	 */
+	*noise = crc32_le ( 0, buf, sizeof ( buf ) );
+
+	return 0;
+}
+
+/**
+ * Get noise sample
+ *
+ * @ret noise		Noise sample
+ * @ret rc		Return status code
+ */
+static int efi_get_noise ( noise_sample_t *noise ) {
+	int rc;
+
+	/* Try RNG first, falling back to timer ticks */
+	if ( ( ( rc = efi_get_noise_rng ( noise ) ) != 0 ) &&
+	     ( ( rc = efi_get_noise_ticks ( noise ) ) != 0 ) )
+		return rc;
 
 	return 0;
 }
