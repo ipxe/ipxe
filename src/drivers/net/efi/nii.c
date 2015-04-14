@@ -568,6 +568,7 @@ static int nii_get_init_info ( struct nii_nic *nii,
  */
 static int nii_initialise ( struct nii_nic *nii ) {
 	PXE_CPB_INITIALIZE cpb;
+	PXE_DB_INITIALIZE db;
 	unsigned int op;
 	int stat;
 	int rc;
@@ -584,10 +585,14 @@ static int nii_initialise ( struct nii_nic *nii ) {
 	cpb.MemoryAddr = ( ( intptr_t ) nii->buffer );
 	cpb.MemoryLength = nii->buffer_len;
 
+	/* Construct data block */
+	memset ( &db, 0, sizeof ( db ) );
+
 	/* Issue command */
 	op = NII_OP ( PXE_OPCODE_INITIALIZE,
 		      PXE_OPFLAGS_INITIALIZE_DO_NOT_DETECT_CABLE );
-	if ( ( stat = nii_issue_cpb ( nii, op, &cpb, sizeof ( cpb ) ) ) < 0 ) {
+	if ( ( stat = nii_issue_cpb_db ( nii, op, &cpb, sizeof ( cpb ),
+					 &db, sizeof ( db ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
 		DBGC ( nii, "NII %s could not initialise: %s\n",
 		       nii->dev.name, strerror ( rc ) );
