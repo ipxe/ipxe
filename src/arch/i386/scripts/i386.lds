@@ -41,6 +41,7 @@ SECTIONS {
     .prefix 0x0 : AT ( _prefix_lma ) {
 	_prefix = .;
 	*(.prefix)
+	*(SORT(.pci_devlist.*))
 	*(.prefix.*)
 	_mprefix = .;
     } .bss.prefix (NOLOAD) : AT ( _end_lma ) {

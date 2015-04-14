@@ -508,6 +508,22 @@ OBJ_CFLAGS	= $(CFLAGS_$(OBJECT)) -DOBJECT=$(subst -,_,$(OBJECT))
 $(BIN)/%.flags :
 	@$(ECHO) $(OBJ_CFLAGS)
 
+# Device ID tables (using IDs extracted by parserom.pl)
+#
+define obj_pci_id_asm
+	.section ".pci_devlist.$(1)", "a", @progbits
+	.globl pci_devlist_$(1)
+pci_devlist_$(1):
+	.short ( 0x$(1) & 0xffff )
+
+endef
+define obj_isa_id_asm
+endef
+OBJ_IDS_ASM	= $(foreach ROM,$(ROMS_$(OBJECT)),$(call obj_$(ROM_TYPE_$(ROM))_id_asm,$(ROM)))
+OBJ_IDS_ASM_NL	= $(subst $(NEWLINE),\n,$(OBJ_IDS_ASM))
+$(BIN)/%.ids :
+	@$(ECHO_E) '$(OBJ_IDS_ASM_NL)'
+
 # ICC requires postprocessing objects to fix up table alignments
 #
 ifeq ($(CCTYPE),icc)
@@ -522,6 +538,7 @@ endif
 #
 COMPILE_c	= $(CC) $(CFLAGS) $(CFLAGS_c) $(OBJ_CFLAGS)
 RULE_c		= $(Q)$(COMPILE_c) -c $< -o $@ $(POST_O)
+RULE_c_to_ids.o = $(Q)$(ECHO_E) '$(OBJ_IDS_ASM_NL)' | $(ASSEMBLE_S) -o $@
 RULE_c_to_dbg%.o = $(Q)$(COMPILE_c) -DDBGLVL_MAX=$* -c $< -o $@ $(POST_O)
 RULE_c_to_c	= $(Q)$(COMPILE_c) -E -c $< > $@
 RULE_c_to_s	= $(Q)$(COMPILE_c) -S -g0 -c $< -o $@
@@ -532,7 +549,7 @@ RULE_S		= $(Q)$(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
 RULE_S_to_dbg%.o = $(Q)$(PREPROCESS_S) -DDBGLVL_MAX=$* $< | $(ASSEMBLE_S) -o $@
 RULE_S_to_s	= $(Q)$(PREPROCESS_S) $< > $@
 
-DEBUG_TARGETS	+= dbg%.o c s
+GENERIC_TARGETS	+= ids.o dbg%.o c s
 
 # List of embedded images included in the last build of embedded.o.
 # This is needed in order to correctly rebuild embedded.o whenever the
@@ -784,8 +801,8 @@ define rules_template_parts
 $$(BIN)/$(3).o : $(1) $$(MAKEDEPS) $$(POST_O_DEPS) $$($(3)_DEPS)
 	$$(QM)$(ECHO) "  [BUILD] $$@"
 	$$(RULE_$(2))
-BOBJS += $$(BIN)/$(3).o
-$(foreach TGT,$(DEBUG_TARGETS),$(if $(RULE_$(2)_to_$(TGT)),$(NEWLINE)$(call rules_template_target,$(1),$(2),$(3),$(TGT))))
+BOBJS += $$(BIN)/$(3).o $(if $(ROMS_$(3)),$$(BIN)/$(3).ids.o)
+$(foreach TGT,$(GENERIC_TARGETS),$(if $(RULE_$(2)_to_$(TGT)),$(NEWLINE)$(call rules_template_target,$(1),$(2),$(3),$(TGT))))
 $$(BIN)/deps/$(1).d : $$($(3)_DEPS)
 TAGS : $$($(3)_DEPS)
 endef
@@ -930,6 +947,8 @@ TGT_PCI_DEVICE	= $(PCI_DEVICE_$(TGT_ROM_NAME))
 TGT_LD_DRIVERS	= $(subst -,_,$(patsubst %,obj_%,$(TGT_DRIVERS)))
 TGT_LD_IDS	= pci_vendor_id=$(firstword $(TGT_PCI_VENDOR) 0) \
 		  pci_device_id=$(firstword $(TGT_PCI_DEVICE) 0)
+TGT_LD_DEVLIST	= $(foreach ELEM,$(TGT_ELEMENTS),$(if $(PCI_VENDOR_$(ELEM)),\
+		    pci_devlist_$(patsubst 0x%,%,$(PCI_VENDOR_$(ELEM)))$(patsubst 0x%,%,$(PCI_DEVICE_$(ELEM)))))
 TGT_LD_ENTRY	= _$(TGT_PREFIX)_start
 
 # Calculate linker flags based on link-time options for the current
@@ -940,7 +959,8 @@ TGT_LD_ENTRY	= _$(TGT_PREFIX)_start
 #		 "-u obj_zpciprefix -u obj_rtl8139 -u obj_prism2_pci
 #		  --defsym pci_vendor=0x1186 --defsym pci_device=0x1300")
 #
-TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_ENTRY) $(TGT_LD_DRIVERS) obj_config,\
+TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_ENTRY) $(TGT_LD_DRIVERS) \
+		    $(TGT_LD_DEVLIST) obj_config,\
 		    -u $(SYM) --defsym check_$(SYM)=$(SYM) ) \
 		  $(patsubst %,--defsym %,$(TGT_LD_IDS)) \
 		  -e $(TGT_LD_ENTRY)
@@ -970,6 +990,7 @@ $(BIN)/%.info :
 	@$(ECHO)
 	@$(ECHO) 'LD driver symbols    : $(TGT_LD_DRIVERS)'
 	@$(ECHO) 'LD ID symbols        : $(TGT_LD_IDS)'
+	@$(ECHO) 'LD devlist symbols   : $(TGT_LD_DEVLIST)'
 	@$(ECHO) 'LD entry point       : $(TGT_LD_ENTRY)'
 	@$(ECHO)
 	@$(ECHO) 'LD target flags      : $(TGT_LD_FLAGS)'
