@@ -232,6 +232,9 @@ literal:	.rept	( ( 1 << LZMA_LC ) * 0x300 )
 	.equ	sizeof__lzma_dec, . - lzma_dec
 	.previous
 
+	/* Some binutils versions seem not to handle .struct/.previous */
+	.section ".prefix.lib", "ax", @progbits
+
 /*****************************************************************************
  * Normalise range encoder
  *
