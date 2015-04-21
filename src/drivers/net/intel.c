@@ -572,6 +572,13 @@ static int intel_open ( struct net_device *netdev ) {
 	/* Update link state */
 	intel_check_link ( netdev );
 
+	/* Apply required errata */
+	if ( intel->flags & INTEL_VMWARE ) {
+		DBGC ( intel, "INTEL %p applying VMware errata workaround\n",
+		       intel );
+		intel->force_icr = INTEL_IRQ_RXT0;
+	}
+
 	return 0;
 
 	intel_destroy_ring ( intel, &intel->rx );
@@ -740,6 +747,7 @@ static void intel_poll ( struct net_device *netdev ) {
 	icr = readl ( intel->regs + INTEL_ICR );
 	profile_stop ( &intel_vm_poll_profiler );
 	profile_exclude ( &intel_vm_poll_profiler );
+	icr |= intel->force_icr;
 	if ( ! icr )
 		return;
 
@@ -907,7 +915,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x100c, "82544gc", "82544GC (Copper)", 0 ),
 	PCI_ROM ( 0x8086, 0x100d, "82544gc-l", "82544GC (LOM)", 0 ),
 	PCI_ROM ( 0x8086, 0x100e, "82540em", "82540EM", 0 ),
-	PCI_ROM ( 0x8086, 0x100f, "82545em", "82545EM (Copper)", 0 ),
+	PCI_ROM ( 0x8086, 0x100f, "82545em", "82545EM (Copper)", INTEL_VMWARE ),
 	PCI_ROM ( 0x8086, 0x1010, "82546eb", "82546EB (Copper)", 0 ),
 	PCI_ROM ( 0x8086, 0x1011, "82545em-f", "82545EM (Fiber)", 0 ),
 	PCI_ROM ( 0x8086, 0x1012, "82546eb-f", "82546EB (Fiber)", 0 ),

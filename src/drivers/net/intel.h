@@ -233,6 +233,8 @@ struct intel_nic {
 	unsigned int port;
 	/** Flags */
 	unsigned int flags;
+	/** Forced interrupts */
+	unsigned int force_icr;
 
 	/** EEPROM */
 	struct nvs_device eeprom;
@@ -253,6 +255,8 @@ struct intel_nic {
 enum intel_flags {
 	/** PBS/PBA errata workaround required */
 	INTEL_PBS_ERRATA = 0x0001,
+	/** VMware missing interrupt workaround required */
+	INTEL_VMWARE = 0x0002,
 };
 
 extern int intel_create_ring ( struct intel_nic *intel,
