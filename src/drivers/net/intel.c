@@ -759,6 +759,14 @@ static void intel_poll ( struct net_device *netdev ) {
 	if ( icr & INTEL_IRQ_LSC )
 		intel_check_link ( netdev );
 
+	/* Check for unexpected interrupts */
+	if ( icr & ~( INTEL_IRQ_TXDW | INTEL_IRQ_TXQE | INTEL_IRQ_LSC |
+		      INTEL_IRQ_RXDMT0 | INTEL_IRQ_RXT0 | INTEL_IRQ_RXO ) ) {
+		DBGC ( intel, "INTEL %p unexpected ICR %08x\n", intel, icr );
+		/* Report as a TX error */
+		netdev_tx_err ( netdev, NULL, -ENOTSUP );
+	}
+
 	/* Refill RX ring */
 	intel_refill_rx ( intel );
 }
