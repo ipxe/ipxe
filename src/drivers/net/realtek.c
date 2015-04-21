@@ -198,7 +198,6 @@ static int realtek_init_eeprom ( struct net_device *netdev ) {
 		DBGC ( rtl, "REALTEK %p EEPROM is a 93C46\n", rtl );
 		init_at93c46 ( &rtl->eeprom, 16 );
 	}
-	rtl->eeprom.bus = &rtl->spibit.bus;
 
 	/* Check for EEPROM presence.  Some onboard NICs will have no
 	 * EEPROM connected, with the BIOS being responsible for
@@ -1089,6 +1088,7 @@ static void realtek_detect ( struct realtek_nic *rtl ) {
 			       rtl );
 			rtl->legacy = 1;
 		}
+		rtl->eeprom.bus = &rtl->spibit.bus;
 	}
 }
 
@@ -1136,7 +1136,8 @@ static int realtek_probe ( struct pci_device *pci ) {
 	realtek_detect ( rtl );
 
 	/* Initialise EEPROM */
-	if ( ( rc = realtek_init_eeprom ( netdev ) ) == 0 ) {
+	if ( rtl->eeprom.bus &&
+	     ( ( rc = realtek_init_eeprom ( netdev ) ) == 0 ) ) {
 
 		/* Read MAC address from EEPROM */
 		if ( ( rc = nvs_read ( &rtl->eeprom.nvs, RTL_EEPROM_MAC,
