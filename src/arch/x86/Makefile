@@ -19,4 +19,4 @@ CFLAGS		+= -DNVALGRIND
 
 # Include Hyper-V driver in the all-drivers build
 #
-DRIVERS += hyperv
+DRIVERS_hyperv += hyperv

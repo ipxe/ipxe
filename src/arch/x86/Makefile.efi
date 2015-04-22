@@ -17,7 +17,7 @@ NON_AUTO_MEDIA	+= efirom
 
 # Include SNP driver in the all-drivers build
 #
-DRIVERS += snp
+DRIVERS_net += snp
 
 # Rules for building EFI files
 #
