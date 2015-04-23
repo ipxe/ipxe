@@ -1637,9 +1637,9 @@ static int tls_new_handshake ( struct tls_session *tls,
 			uint8_t length[3];
 			uint8_t payload[0];
 		} __attribute__ (( packed )) *handshake = data;
-		void *payload = &handshake->payload;
+		const void *payload = &handshake->payload;
 		size_t payload_len = tls_uint24 ( handshake->length );
-		void *next = ( payload + payload_len );
+		const void *next = ( payload + payload_len );
 
 		/* Sanity check */
 		if ( next > end ) {
