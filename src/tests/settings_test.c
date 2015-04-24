@@ -232,6 +232,12 @@ static struct setting test_hexraw_setting = {
 	.type = &setting_type_hexraw,
 };
 
+/** Test Base64 setting type */
+static struct setting test_base64_setting = {
+	.name = "test_base64",
+	.type = &setting_type_base64,
+};
+
 /** Test UUID setting type */
 static struct setting test_uuid_setting = {
 	.name = "test_uuid",
@@ -382,6 +388,15 @@ static void settings_test_exec ( void ) {
 		    RAW ( 0x9e, 0x4b, 0x6e, 0xef, 0x36, 0xb6, 0x46, 0xfe, 0x8f,
 			  0x17, 0x06, 0x39, 0x6b, 0xf4, 0x48, 0x4e ),
 		    "9e4b6eef36b646fe8f1706396bf4484e" );
+
+	/* "base64" setting type */
+	storef_ok ( &test_settings, &test_base64_setting,
+		    "cGFzc6\nNwaHJhc2U= ",
+		    RAW ( 0x70, 0x61, 0x73, 0x73, 0xa3, 0x70, 0x68, 0x72, 0x61,
+			  0x73, 0x65 ) );
+	fetchf_ok ( &test_settings, &test_base64_setting,
+		    RAW ( 0x80, 0x81, 0x82, 0x83, 0x84, 0x00, 0xff ),
+		    "gIGCg4QA/w==" );
 
 	/* "uuid" setting type (no store capability) */
 	fetchf_ok ( &test_settings, &test_uuid_setting,
