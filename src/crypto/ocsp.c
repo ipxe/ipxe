@@ -233,7 +233,7 @@ static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
 		goto err_path_base64;
 	}
 	base64_encode ( ocsp->request.builder.data, ocsp->request.builder.len,
-			path_base64_string );
+			path_base64_string, path_len );
 
 	/* URI-encode the Base64-encoded request */
 	memset ( &path_uri, 0, sizeof ( path_uri ) );

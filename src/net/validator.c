@@ -254,7 +254,8 @@ static int validator_start_download ( struct validator *validator,
 	/* Generate URI string */
 	len = snprintf ( uri_string, uri_string_len, "%s/%08x.der?subject=",
 			 crosscert, crc );
-	base64_encode ( issuer->data, issuer->len, ( uri_string + len ) );
+	base64_encode ( issuer->data, issuer->len, ( uri_string + len ),
+			( uri_string_len - len ) );
 	DBGC ( validator, "VALIDATOR %p downloading cross-signed certificate "
 	       "from %s\n", validator, uri_string );
 

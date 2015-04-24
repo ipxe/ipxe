@@ -1081,7 +1081,8 @@ static char * http_basic_auth ( struct http_request *http ) {
 	snprintf ( user_pw, sizeof ( user_pw ), "%s:%s", user, password );
 
 	/* Base64-encode the "user:password" string */
-	base64_encode ( ( void * ) user_pw, user_pw_len, user_pw_base64 );
+	base64_encode ( user_pw, user_pw_len, user_pw_base64,
+			sizeof ( user_pw_base64 ) );
 
 	/* Generate the authorisation string */
 	len = asprintf ( &auth, "Authorization: Basic %s\r\n",

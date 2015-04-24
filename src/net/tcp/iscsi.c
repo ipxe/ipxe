@@ -845,7 +845,7 @@ static int iscsi_large_binary_decode ( const char *encoded, uint8_t *raw,
 		case 'x' :
 			return base16_decode ( encoded, raw, len );
 		case 'b' :
-			return base64_decode ( encoded, raw );
+			return base64_decode ( encoded, raw, len );
 		}
 	}
 
