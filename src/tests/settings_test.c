@@ -403,3 +403,7 @@ struct self_test settings_test __self_test = {
 	.name = "settings",
 	.exec = settings_test_exec,
 };
+
+/* Include real IPv6 setting type */
+REQUIRING_SYMBOL ( settings_test );
+REQUIRE_OBJECT ( ipv6 );
