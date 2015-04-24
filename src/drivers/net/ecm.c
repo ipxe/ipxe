@@ -105,7 +105,7 @@ int ecm_fetch_mac ( struct usb_device *usb,
 		return -EINVAL;
 
 	/* Decode MAC address */
-	len = base16_decode ( buf, hw_addr );
+	len = base16_decode ( buf, hw_addr, ETH_ALEN );
 	if ( len < 0 ) {
 		rc = len;
 		return rc;

@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/string.h>
+#include <ipxe/vsprintf.h>
 #include <ipxe/base16.h>
 
 /** @file
@@ -37,48 +38,42 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Base16-encode data
+ * Encode hexadecimal string (with optional byte separator character)
  *
+ * @v separator		Byte separator character, or 0 for no separator
  * @v raw		Raw data
- * @v len		Length of raw data
- * @v encoded		Buffer for encoded string
- *
- * The buffer must be the correct length for the encoded string.  Use
- * something like
- *
- *     char buf[ base16_encoded_len ( len ) + 1 ];
- *
- * (the +1 is for the terminating NUL) to provide a buffer of the
- * correct size.
+ * @v raw_len		Length of raw data
+ * @v data		Buffer
+ * @v len		Length of buffer
+ * @ret len		Encoded length
  */
-void base16_encode ( const uint8_t *raw, size_t len, char *encoded ) {
-	const uint8_t *raw_bytes = raw;
-	char *encoded_bytes = encoded;
-	size_t remaining = len;
+size_t hex_encode ( char separator, const void *raw, size_t raw_len,
+		    char *data, size_t len ) {
+	const uint8_t *bytes = raw;
+	const char delimiter[2] = { separator, '\0' };
+	size_t used = 0;
+	unsigned int i;
 
-	/* Encode each byte */
-	for ( ; remaining-- ; encoded_bytes += 2 ) {
-		sprintf ( encoded_bytes, "%02x", *(raw_bytes++) );
+	if ( len )
+		data[0] = 0; /* Ensure that a terminating NUL exists */
+	for ( i = 0 ; i < raw_len ; i++ ) {
+		used += ssnprintf ( ( data + used ), ( len - used ),
+				    "%s%02x", ( used ? delimiter : "" ),
+				    bytes[i] );
 	}
-
-	/* Ensure terminating NUL exists even if length was zero */
-	*encoded_bytes = '\0';
-
-	DBG ( "Base16-encoded to \"%s\":\n", encoded );
-	DBG_HDA ( 0, raw, len );
-	assert ( strlen ( encoded ) == base16_encoded_len ( len ) );
+	return used;
 }
 
 /**
- * Decode hexadecimal string
+ * Decode hexadecimal string (with optional byte separator character)
  *
- * @v encoded		Encoded string
  * @v separator		Byte separator character, or 0 for no separator
+ * @v encoded		Encoded string
  * @v data		Buffer
  * @v len		Length of buffer
  * @ret len		Length of data, or negative error
  */
-int hex_decode ( const char *encoded, char separator, void *data, size_t len ) {
+int hex_decode ( char separator, const char *encoded, void *data, size_t len ) {
 	uint8_t *out = data;
 	unsigned int count = 0;
 	unsigned int sixteens;
@@ -109,32 +104,4 @@ int hex_decode ( const char *encoded, char separator, void *data, size_t len ) {
 
 	}
 	return count;
-}
-
-/**
- * Base16-decode data
- *
- * @v encoded		Encoded string
- * @v raw		Raw data
- * @ret len		Length of raw data, or negative error
- *
- * The buffer must be large enough to contain the decoded data.  Use
- * something like
- *
- *     char buf[ base16_decoded_max_len ( encoded ) ];
- *
- * to provide a buffer of the correct size.
- */
-int base16_decode ( const char *encoded, uint8_t *raw ) {
-	int len;
-
-	len = hex_decode ( encoded, 0, raw, -1UL );
-	if ( len < 0 )
-		return len;
-
-	DBG ( "Base16-decoded \"%s\" to:\n", encoded );
-	DBG_HDA ( 0, raw, len );
-	assert ( len <= ( int ) base16_decoded_max_len ( encoded ) );
-
-	return len;
 }

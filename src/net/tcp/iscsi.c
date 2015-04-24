@@ -709,7 +709,7 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 		char buf[ base16_encoded_len ( iscsi->chap.response_len ) + 1 ];
 		assert ( iscsi->initiator_username != NULL );
 		base16_encode ( iscsi->chap.response, iscsi->chap.response_len,
-				buf );
+				buf, sizeof ( buf ) );
 		used += ssnprintf ( data + used, len - used,
 				    "CHAP_N=%s%cCHAP_R=0x%s%c",
 				    iscsi->initiator_username, 0, buf, 0 );
@@ -719,7 +719,7 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 		size_t challenge_len = ( sizeof ( iscsi->chap_challenge ) - 1 );
 		char buf[ base16_encoded_len ( challenge_len ) + 1 ];
 		base16_encode ( ( iscsi->chap_challenge + 1 ), challenge_len,
-				buf );
+				buf, sizeof ( buf ) );
 		used += ssnprintf ( data + used, len - used,
 				    "CHAP_I=%d%cCHAP_C=0x%s%c",
 				    iscsi->chap_challenge[0], 0, buf, 0 );
@@ -833,15 +833,17 @@ static int iscsi_tx_login_request ( struct iscsi_session *iscsi ) {
  *
  * @v encoded		Encoded large binary value
  * @v raw		Raw data
+ * @v len		Length of data buffer
  * @ret len		Length of raw data, or negative error
  */
-static int iscsi_large_binary_decode ( const char *encoded, uint8_t *raw ) {
+static int iscsi_large_binary_decode ( const char *encoded, uint8_t *raw,
+				       size_t len ) {
 
 	/* Check for initial '0x' or '0b' and decode as appropriate */
 	if ( *(encoded++) == '0' ) {
 		switch ( tolower ( *(encoded++) ) ) {
 		case 'x' :
-			return base16_decode ( encoded, raw );
+			return base16_decode ( encoded, raw, len );
 		case 'b' :
 			return base64_decode ( encoded, raw );
 		}
@@ -980,7 +982,7 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 	int rc;
 
 	/* Process challenge */
-	len = iscsi_large_binary_decode ( value, buf );
+	len = iscsi_large_binary_decode ( value, buf, sizeof ( buf ) );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( iscsi, "iSCSI %p invalid CHAP challenge \"%s\": %s\n",
@@ -1065,7 +1067,7 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 	chap_respond ( &iscsi->chap );
 
 	/* Process response */
-	len = iscsi_large_binary_decode ( value, buf );
+	len = iscsi_large_binary_decode ( value, buf, sizeof ( buf ) );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( iscsi, "iSCSI %p invalid CHAP response \"%s\": %s\n",

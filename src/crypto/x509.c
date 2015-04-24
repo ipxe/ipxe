@@ -143,7 +143,8 @@ const char * x509_name ( struct x509_certificate *cert ) {
 	} else {
 		/* Certificate has no commonName: use SHA-1 fingerprint */
 		x509_fingerprint ( cert, digest, fingerprint );
-		base16_encode ( fingerprint, sizeof ( fingerprint ), buf );
+		base16_encode ( fingerprint, sizeof ( fingerprint ),
+				buf, sizeof ( buf ) );
 	}
 	return buf;
 }

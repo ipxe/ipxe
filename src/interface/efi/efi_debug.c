@@ -330,7 +330,7 @@ const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 		max_len = ( ( sizeof ( text ) - 1 /* NUL */ ) / 2 /* "xx" */ );
 		if ( len > max_len )
 			len = max_len;
-		base16_encode ( start, len, text );
+		base16_encode ( start, len, text, sizeof ( text ) );
 		return text;
 	}
 

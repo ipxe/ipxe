@@ -63,7 +63,7 @@ peerdist_info_hash_ntoa ( const struct peerdist_info *info, const void *hash ) {
 	assert ( base16_encoded_len ( digestsize ) < sizeof ( buf ) );
 
 	/* Transcribe hash value */
-	base16_encode ( hash, digestsize, buf );
+	base16_encode ( hash, digestsize, buf, sizeof ( buf ) );
 	return buf;
 }
 

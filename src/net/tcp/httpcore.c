@@ -1122,12 +1122,14 @@ static void http_digest_update ( struct md5_context *ctx, const char *string ) {
  *
  * @v ctx		Digest context
  * @v out		Buffer for digest output
+ * @v len		Buffer length
  */
-static void http_digest_final ( struct md5_context *ctx, char *out ) {
+static void http_digest_final ( struct md5_context *ctx, char *out,
+				size_t len ) {
 	uint8_t digest[MD5_DIGEST_SIZE];
 
 	digest_final ( &md5_algorithm, ctx, digest );
-	base16_encode ( digest, sizeof ( digest ), out );
+	base16_encode ( digest, sizeof ( digest ), out, len );
 }
 
 /**
@@ -1172,20 +1174,20 @@ static char * http_digest_auth ( struct http_request *http,
 	http_digest_update ( &ctx, user );
 	http_digest_update ( &ctx, realm );
 	http_digest_update ( &ctx, password );
-	http_digest_final ( &ctx, ha1 );
+	http_digest_final ( &ctx, ha1, sizeof ( ha1 ) );
 	if ( md5sess ) {
 		http_digest_init ( &ctx );
 		http_digest_update ( &ctx, ha1 );
 		http_digest_update ( &ctx, nonce );
 		http_digest_update ( &ctx, cnonce );
-		http_digest_final ( &ctx, ha1 );
+		http_digest_final ( &ctx, ha1, sizeof ( ha1 ) );
 	}
 
 	/* Generate HA2 */
 	http_digest_init ( &ctx );
 	http_digest_update ( &ctx, method );
 	http_digest_update ( &ctx, uri );
-	http_digest_final ( &ctx, ha2 );
+	http_digest_final ( &ctx, ha2, sizeof ( ha2 ) );
 
 	/* Generate response */
 	http_digest_init ( &ctx );
@@ -1197,7 +1199,7 @@ static char * http_digest_auth ( struct http_request *http,
 		http_digest_update ( &ctx, "auth" /* qop */ );
 	}
 	http_digest_update ( &ctx, ha2 );
-	http_digest_final ( &ctx, response );
+	http_digest_final ( &ctx, response, sizeof ( response ) );
 
 	/* Generate the authorisation string */
 	len = asprintf ( &auth, "Authorization: Digest username=\"%s\", "

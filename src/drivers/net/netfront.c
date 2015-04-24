@@ -139,7 +139,7 @@ static int netfront_read_mac ( struct netfront_nic *netfront, void *hw_addr ) {
 		xendev->key, mac );
 
 	/* Decode MAC address */
-	len = hex_decode ( mac, ':', hw_addr, ETH_ALEN );
+	len = hex_decode ( ':', mac, hw_addr, ETH_ALEN );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( netfront, "NETFRONT %s could not decode MAC address "
