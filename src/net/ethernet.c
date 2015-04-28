@@ -46,6 +46,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Ethernet broadcast MAC address */
 uint8_t eth_broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
+/** Empty Ethernet MAC address */
+uint8_t eth_empty[ETH_ALEN];
+
 /**
  * Check if Ethernet packet has an 802.3 LLC header
  *
@@ -232,7 +235,8 @@ int eth_eth_addr ( const void *ll_addr, void *eth_addr ) {
  * @ret rc		Return status code
  */
 int eth_eui64 ( const void *ll_addr, void *eui64 ) {
-
+	if (!memcmp(ll_addr, eth_empty, ETH_ALEN))
+		return -ENXIO;
 	memcpy ( ( eui64 + 0 ), ( ll_addr + 0 ), 3 );
 	memcpy ( ( eui64 + 5 ), ( ll_addr + 3 ), 3 );
 	*( ( uint16_t * ) ( eui64 + 3 ) ) = htons ( 0xfffe );
