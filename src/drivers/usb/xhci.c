@@ -2472,16 +2472,15 @@ static int xhci_endpoint_mtu ( struct usb_endpoint *ep ) {
  * Enqueue message transfer
  *
  * @v ep		USB endpoint
- * @v packet		Setup packet
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
 static int xhci_endpoint_message ( struct usb_endpoint *ep,
-				   struct usb_setup_packet *packet,
 				   struct io_buffer *iobuf ) {
 	struct xhci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
-	unsigned int input = ( le16_to_cpu ( packet->request ) & USB_DIR_IN );
-	size_t len = iob_len ( iobuf );
+	struct usb_setup_packet *packet;
+	unsigned int input;
+	size_t len;
 	union xhci_trb trbs[ 1 /* setup */ + 1 /* possible data */ +
 			     1 /* status */ ];
 	union xhci_trb *trb = trbs;
@@ -2495,11 +2494,16 @@ static int xhci_endpoint_message ( struct usb_endpoint *ep,
 
 	/* Construct setup stage TRB */
 	memset ( trbs, 0, sizeof ( trbs ) );
+	assert ( iob_len ( iobuf ) >= sizeof ( *packet ) );
+	packet = iobuf->data;
+	iob_pull ( iobuf, sizeof ( *packet ) );
 	setup = &(trb++)->setup;
 	memcpy ( &setup->packet, packet, sizeof ( setup->packet ) );
 	setup->len = cpu_to_le32 ( sizeof ( *packet ) );
 	setup->flags = XHCI_TRB_IDT;
 	setup->type = XHCI_TRB_SETUP;
+	len = iob_len ( iobuf );
+	input = ( packet->request & cpu_to_le16 ( USB_DIR_IN ) );
 	if ( len )
 		setup->direction = ( input ? XHCI_SETUP_IN : XHCI_SETUP_OUT );
 

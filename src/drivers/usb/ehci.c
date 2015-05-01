@@ -528,8 +528,6 @@ static int ehci_enqueue ( struct ehci_device *ehci, struct ehci_ring *ring,
 
 	/* Fail if any portion is unreachable */
 	for ( i = 0 ; i < count ; i++ ) {
-		if ( xfer->flags & EHCI_FL_IMMEDIATE )
-			continue;
 		phys = ( virt_to_phys ( xfer[i].data ) + xfer[i].len - 1 );
 		if ( ( phys > 0xffffffffUL ) && ( ! ehci->addr64 ) )
 			return -ENOTSUP;
@@ -547,16 +545,9 @@ static int ehci_enqueue ( struct ehci_device *ehci, struct ehci_ring *ring,
 		desc->len = cpu_to_le16 ( xfer->len | toggle );
 		desc->flags = ( xfer->flags | EHCI_FL_CERR_MAX );
 
-		/* Copy data to immediate data buffer (if requested) */
+		/* Populate buffer pointers */
 		data = xfer->data;
 		len = xfer->len;
-		if ( xfer->flags & EHCI_FL_IMMEDIATE ) {
-			assert ( len <= sizeof ( desc->immediate ) );
-			memcpy ( desc->immediate, data, len );
-			data = desc->immediate;
-		}
-
-		/* Populate buffer pointers */
 		for ( i = 0 ; len ; i++ ) {
 
 			/* Calculate length of this fragment */
@@ -1103,28 +1094,32 @@ static int ehci_endpoint_mtu ( struct usb_endpoint *ep ) {
  * Enqueue message transfer
  *
  * @v ep		USB endpoint
- * @v packet		Setup packet
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
 static int ehci_endpoint_message ( struct usb_endpoint *ep,
-				   struct usb_setup_packet *packet,
 				   struct io_buffer *iobuf ) {
 	struct ehci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
 	struct ehci_device *ehci = endpoint->ehci;
-	unsigned int input = ( packet->request & cpu_to_le16 ( USB_DIR_IN ) );
+	struct usb_setup_packet *packet;
+	unsigned int input;
 	struct ehci_transfer xfers[3];
 	struct ehci_transfer *xfer = xfers;
-	size_t len = iob_len ( iobuf );
+	size_t len;
 	int rc;
 
 	/* Construct setup stage */
+	assert ( iob_len ( iobuf ) >= sizeof ( *packet ) );
+	packet = iobuf->data;
+	iob_pull ( iobuf, sizeof ( *packet ) );
 	xfer->data = packet;
 	xfer->len = sizeof ( *packet );
-	xfer->flags = ( EHCI_FL_IMMEDIATE | EHCI_FL_PID_SETUP );
+	xfer->flags = EHCI_FL_PID_SETUP;
 	xfer++;
 
 	/* Construct data stage, if applicable */
+	len = iob_len ( iobuf );
+	input = ( packet->request & cpu_to_le16 ( USB_DIR_IN ) );
 	if ( len ) {
 		xfer->data = iobuf->data;
 		xfer->len = len;

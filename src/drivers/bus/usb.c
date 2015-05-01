@@ -460,15 +460,21 @@ static int usb_endpoint_mtu ( struct usb_endpoint *ep, size_t mtu ) {
  * @v index		Index parameter
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
+ *
+ * The I/O buffer must have sufficient headroom to contain a setup
+ * packet.
  */
 int usb_message ( struct usb_endpoint *ep, unsigned int request,
 		  unsigned int value, unsigned int index,
 		  struct io_buffer *iobuf ) {
 	struct usb_device *usb = ep->usb;
 	struct usb_port *port = usb->port;
-	struct usb_setup_packet packet;
+	struct usb_setup_packet *packet;
 	size_t len = iob_len ( iobuf );
 	int rc;
+
+	/* Sanity check */
+	assert ( iob_headroom ( iobuf ) >= sizeof ( *packet ) );
 
 	/* Fail immediately if device has been unplugged */
 	if ( port->speed == USB_SPEED_NONE )
@@ -484,13 +490,14 @@ int usb_message ( struct usb_endpoint *ep, unsigned int request,
 		memset ( iobuf->data, 0, len );
 
 	/* Construct setup packet */
-	packet.request = cpu_to_le16 ( request );
-	packet.value = cpu_to_le16 ( value );
-	packet.index = cpu_to_le16 ( index );
-	packet.len = cpu_to_le16 ( len );
+	packet = iob_push ( iobuf, sizeof ( *packet ) );
+	packet->request = cpu_to_le16 ( request );
+	packet->value = cpu_to_le16 ( value );
+	packet->index = cpu_to_le16 ( index );
+	packet->len = cpu_to_le16 ( len );
 
 	/* Enqueue message transfer */
-	if ( ( rc = ep->host->message ( ep, &packet, iobuf ) ) != 0 ) {
+	if ( ( rc = ep->host->message ( ep, iobuf ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not enqueue message transfer: "
 		       "%s\n", usb->name, usb_endpoint_name ( ep->address ),
 		       strerror ( rc ) );
@@ -734,19 +741,23 @@ int usb_control ( struct usb_device *usb, unsigned int request,
 		  size_t len ) {
 	struct usb_bus *bus = usb->port->hub->bus;
 	struct usb_endpoint *ep = &usb->control;
-	struct usb_control_pseudo_header *pshdr;
 	struct io_buffer *iobuf;
 	struct io_buffer *cmplt;
+	union {
+		struct usb_setup_packet setup;
+		struct usb_control_pseudo_header pshdr;
+	} *headroom;
+	struct usb_control_pseudo_header *pshdr;
 	unsigned int i;
 	int rc;
 
 	/* Allocate I/O buffer */
-	iobuf = alloc_iob ( sizeof ( *pshdr ) + len );
+	iobuf = alloc_iob ( sizeof ( *headroom ) + len );
 	if ( ! iobuf ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	iob_reserve ( iobuf, sizeof ( *pshdr ) );
+	iob_reserve ( iobuf, sizeof ( *headroom ) );
 	iob_put ( iobuf, len );
 	if ( request & USB_DIR_IN ) {
 		memset ( data, 0, len );

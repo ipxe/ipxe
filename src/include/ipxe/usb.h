@@ -433,12 +433,10 @@ struct usb_endpoint_host_operations {
 	/** Enqueue message transfer
 	 *
 	 * @v ep		USB endpoint
-	 * @v packet		Setup packet
-	 * @v iobuf		I/O buffer (if any)
+	 * @v iobuf		I/O buffer
 	 * @ret rc		Return status code
 	 */
 	int ( * message ) ( struct usb_endpoint *ep,
-			    struct usb_setup_packet *setup,
 			    struct io_buffer *iobuf );
 	/** Enqueue stream transfer
 	 *

@@ -241,21 +241,8 @@ struct ehci_transfer_descriptor {
 	uint32_t low[5];
 	/** Extended buffer pointers (high 32 bits) */
 	uint32_t high[5];
-
-	/** Immediate data buffer
-	 *
-	 * This is not part of the hardware data structure.  Transfer
-	 * descriptors must be aligned to a 32-byte boundary.  Create
-	 * an array of descriptors therefore requires 12 bytes of
-	 * padding at the end of each descriptor.
-	 *
-	 * We can use this padding as an immediate data buffer (for
-	 * setup packets).  This avoids the need for separate
-	 * allocations.  As a bonus, there is no need to check this
-	 * buffer for reachability, since it is contained within a
-	 * transfer descriptor which must already be reachable.
-	 */
-	uint8_t immediate[12];
+	/** Reserved */
+	uint8_t reserved[12];
 } __attribute__ (( packed ));
 
 /** Transaction error */
@@ -482,9 +469,6 @@ struct ehci_transfer {
 	 */
 	unsigned int flags;
 };
-
-/** Copy data to immediate data buffer */
-#define EHCI_FL_IMMEDIATE 0x0100
 
 /** Set initial data toggle */
 #define EHCI_FL_TOGGLE 0x8000
