@@ -1498,6 +1498,7 @@ static int ehci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	unsigned int speed;
 	unsigned int line;
 	int ccs;
+	int csc;
 	int ped;
 
 	/* Read port status */
@@ -1505,8 +1506,13 @@ static int ehci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	DBGC2 ( ehci, "EHCI %p port %d status is %08x\n",
 		ehci, port->address, portsc );
 	ccs = ( portsc & EHCI_PORTSC_CCS );
+	csc = ( portsc & EHCI_PORTSC_CSC );
 	ped = ( portsc & EHCI_PORTSC_PED );
 	line = EHCI_PORTSC_LINE_STATUS ( portsc );
+
+	/* Record disconnections and clear changes */
+	port->disconnected |= csc;
+	writel ( portsc, ehci->op + EHCI_OP_PORTSC ( port->address ) );
 
 	/* Determine port speed */
 	if ( ! ccs ) {
@@ -1564,7 +1570,8 @@ static void ehci_root_poll ( struct usb_hub *hub, struct usb_port *port ) {
 	if ( ! change )
 		return;
 
-	/* Acknowledge changes */
+	/* Record disconnections and clear changes */
+	port->disconnected |= ( portsc & EHCI_PORTSC_CSC );
 	writel ( portsc, ehci->op + EHCI_OP_PORTSC ( port->address ) );
 
 	/* Report port status change */

@@ -1589,18 +1589,20 @@ static int usb_hotplug ( struct usb_port *port ) {
 		return rc;
 	}
 
-	/* Handle attached/detached device as applicable */
-	if ( port->speed && ! port->attached ) {
-		/* Newly attached device */
-		return usb_attached ( port );
-	} else if ( port->attached && ! port->speed ) {
-		/* Newly detached device */
+	/* Detach device, if applicable */
+	if ( port->attached && ( port->disconnected || ! port->speed ) )
 		usb_detached ( port );
-		return 0;
-	} else {
-		/* Ignore */
-		return 0;
+
+	/* Attach device, if applicable */
+	if ( port->speed && ! port->attached ) {
+		if ( ( rc = usb_attached ( port ) ) != 0 )
+			return rc;
 	}
+
+	/* Clear any recorded disconnections */
+	port->disconnected = 0;
+
+	return 0;
 }
 
 /******************************************************************************

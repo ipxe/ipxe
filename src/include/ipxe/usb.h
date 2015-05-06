@@ -747,6 +747,12 @@ struct usb_port {
 	unsigned int protocol;
 	/** Port speed */
 	unsigned int speed;
+	/** Port disconnection has been detected
+	 *
+	 * This should be set whenever the underlying hardware reports
+	 * a connection status change.
+	 */
+	int disconnected;
 	/** Port has an attached device */
 	int attached;
 	/** Currently attached device (if in use)

@@ -1532,10 +1532,10 @@ static void xhci_event_free ( struct xhci_device *xhci ) {
  * Handle transfer event
  *
  * @v xhci		xHCI device
- * @v transfer		Transfer event TRB
+ * @v trb		Transfer event TRB
  */
 static void xhci_transfer ( struct xhci_device *xhci,
-			    struct xhci_trb_transfer *transfer ) {
+			    struct xhci_trb_transfer *trb ) {
 	struct xhci_slot *slot;
 	struct xhci_endpoint *endpoint;
 	struct io_buffer *iobuf;
@@ -1545,20 +1545,20 @@ static void xhci_transfer ( struct xhci_device *xhci,
 	profile_start ( &xhci_transfer_profiler );
 
 	/* Identify slot */
-	if ( ( transfer->slot > xhci->slots ) ||
-	     ( ( slot = xhci->slot[transfer->slot] ) == NULL ) ) {
+	if ( ( trb->slot > xhci->slots ) ||
+	     ( ( slot = xhci->slot[trb->slot] ) == NULL ) ) {
 		DBGC ( xhci, "XHCI %p transfer event invalid slot %d:\n",
-		       xhci, transfer->slot );
-		DBGC_HDA ( xhci, 0, transfer, sizeof ( *transfer ) );
+		       xhci, trb->slot );
+		DBGC_HDA ( xhci, 0, trb, sizeof ( *trb ) );
 		return;
 	}
 
 	/* Identify endpoint */
-	if ( ( transfer->endpoint > XHCI_CTX_END ) ||
-	     ( ( endpoint = slot->endpoint[transfer->endpoint] ) == NULL ) ) {
+	if ( ( trb->endpoint > XHCI_CTX_END ) ||
+	     ( ( endpoint = slot->endpoint[trb->endpoint] ) == NULL ) ) {
 		DBGC ( xhci, "XHCI %p slot %d transfer event invalid epid "
-		       "%d:\n", xhci, slot->id, transfer->endpoint );
-		DBGC_HDA ( xhci, 0, transfer, sizeof ( *transfer ) );
+		       "%d:\n", xhci, slot->id, trb->endpoint );
+		DBGC_HDA ( xhci, 0, trb, sizeof ( *trb ) );
 		return;
 	}
 
@@ -1567,15 +1567,15 @@ static void xhci_transfer ( struct xhci_device *xhci,
 	assert ( iobuf != NULL );
 
 	/* Check for errors */
-	if ( ! ( ( transfer->code == XHCI_CMPLT_SUCCESS ) ||
-		 ( transfer->code == XHCI_CMPLT_SHORT ) ) ) {
+	if ( ! ( ( trb->code == XHCI_CMPLT_SUCCESS ) ||
+		 ( trb->code == XHCI_CMPLT_SHORT ) ) ) {
 
 		/* Construct error */
-		rc = -ECODE ( transfer->code );
+		rc = -ECODE ( trb->code );
 		DBGC ( xhci, "XHCI %p slot %d ctx %d failed (code %d): %s\n",
-		       xhci, slot->id, endpoint->ctx, transfer->code,
+		       xhci, slot->id, endpoint->ctx, trb->code,
 		       strerror ( rc ) );
-		DBGC_HDA ( xhci, 0, transfer, sizeof ( *transfer ) );
+		DBGC_HDA ( xhci, 0, trb, sizeof ( *trb ) );
 
 		/* Sanity check */
 		assert ( ( endpoint->context->state & XHCI_ENDPOINT_STATE_MASK )
@@ -1587,11 +1587,11 @@ static void xhci_transfer ( struct xhci_device *xhci,
 	}
 
 	/* Record actual transfer size */
-	iob_unput ( iobuf, le16_to_cpu ( transfer->residual ) );
+	iob_unput ( iobuf, le16_to_cpu ( trb->residual ) );
 
 	/* Sanity check (for successful completions only) */
 	assert ( xhci_ring_consumed ( &endpoint->ring ) ==
-		 le64_to_cpu ( transfer->transfer ) );
+		 le64_to_cpu ( trb->transfer ) );
 
 	/* Report completion to USB core */
 	usb_complete ( endpoint->ep, iobuf );
@@ -1602,24 +1602,24 @@ static void xhci_transfer ( struct xhci_device *xhci,
  * Handle command completion event
  *
  * @v xhci		xHCI device
- * @v complete		Command completion event
+ * @v trb		Command completion event
  */
 static void xhci_complete ( struct xhci_device *xhci,
-			    struct xhci_trb_complete *complete ) {
+			    struct xhci_trb_complete *trb ) {
 	int rc;
 
 	/* Ignore "command ring stopped" notifications */
-	if ( complete->code == XHCI_CMPLT_CMD_STOPPED ) {
+	if ( trb->code == XHCI_CMPLT_CMD_STOPPED ) {
 		DBGC2 ( xhci, "XHCI %p command ring stopped\n", xhci );
 		return;
 	}
 
 	/* Ignore unexpected completions */
 	if ( ! xhci->pending ) {
-		rc = -ECODE ( complete->code );
+		rc = -ECODE ( trb->code );
 		DBGC ( xhci, "XHCI %p unexpected completion (code %d): %s\n",
-		       xhci, complete->code, strerror ( rc ) );
-		DBGC_HDA ( xhci, 0, complete, sizeof ( *complete ) );
+		       xhci, trb->code, strerror ( rc ) );
+		DBGC_HDA ( xhci, 0, trb, sizeof ( *trb ) );
 		return;
 	}
 
@@ -1628,10 +1628,10 @@ static void xhci_complete ( struct xhci_device *xhci,
 
 	/* Sanity check */
 	assert ( xhci_ring_consumed ( &xhci->command ) ==
-		 le64_to_cpu ( complete->command ) );
+		 le64_to_cpu ( trb->command ) );
 
 	/* Record completion */
-	memcpy ( xhci->pending, complete, sizeof ( *xhci->pending ) );
+	memcpy ( xhci->pending, trb, sizeof ( *xhci->pending ) );
 	xhci->pending = NULL;
 }
 
@@ -1639,38 +1639,40 @@ static void xhci_complete ( struct xhci_device *xhci,
  * Handle port status event
  *
  * @v xhci		xHCI device
- * @v port		Port status event
+ * @v trb		Port status event
  */
 static void xhci_port_status ( struct xhci_device *xhci,
-			       struct xhci_trb_port_status *port ) {
+			       struct xhci_trb_port_status *trb ) {
+	struct usb_port *port = usb_port ( xhci->bus->hub, trb->port );
 	uint32_t portsc;
 
 	/* Sanity check */
-	assert ( ( port->port > 0 ) && ( port->port <= xhci->ports ) );
+	assert ( ( trb->port > 0 ) && ( trb->port <= xhci->ports ) );
 
-	/* Clear port status change bits */
-	portsc = readl ( xhci->op + XHCI_OP_PORTSC ( port->port ) );
+	/* Record disconnections and clear changes */
+	portsc = readl ( xhci->op + XHCI_OP_PORTSC ( trb->port ) );
+	port->disconnected |= ( portsc & XHCI_PORTSC_CSC );
 	portsc &= ( XHCI_PORTSC_PRESERVE | XHCI_PORTSC_CHANGE );
-	writel ( portsc, xhci->op + XHCI_OP_PORTSC ( port->port ) );
+	writel ( portsc, xhci->op + XHCI_OP_PORTSC ( trb->port ) );
 
 	/* Report port status change */
-	usb_port_changed ( usb_port ( xhci->bus->hub, port->port ) );
+	usb_port_changed ( port );
 }
 
 /**
  * Handle host controller event
  *
  * @v xhci		xHCI device
- * @v host		Host controller event
+ * @v trb		Host controller event
  */
 static void xhci_host_controller ( struct xhci_device *xhci,
-				   struct xhci_trb_host_controller *host ) {
+				   struct xhci_trb_host_controller *trb ) {
 	int rc;
 
 	/* Construct error */
-	rc = -ECODE ( host->code );
+	rc = -ECODE ( trb->code );
 	DBGC ( xhci, "XHCI %p host controller event (code %d): %s\n",
-	       xhci, host->code, strerror ( rc ) );
+	       xhci, trb->code, strerror ( rc ) );
 }
 
 /**
@@ -3014,6 +3016,7 @@ static int xhci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	unsigned int psiv;
 	int ccs;
 	int ped;
+	int csc;
 	int speed;
 	int rc;
 
@@ -3021,9 +3024,17 @@ static int xhci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	portsc = readl ( xhci->op + XHCI_OP_PORTSC ( port->address ) );
 	DBGC2 ( xhci, "XHCI %p port %d status is %08x\n",
 		xhci, port->address, portsc );
-
-	/* Check whether or not port is connected */
 	ccs = ( portsc & XHCI_PORTSC_CCS );
+	ped = ( portsc & XHCI_PORTSC_PED );
+	csc = ( portsc & XHCI_PORTSC_CSC );
+	psiv = XHCI_PORTSC_PSIV ( portsc );
+
+	/* Record disconnections and clear changes */
+	port->disconnected |= csc;
+	portsc &= ( XHCI_PORTSC_PRESERVE | XHCI_PORTSC_CHANGE );
+	writel ( portsc, xhci->op + XHCI_OP_PORTSC ( port->address ) );
+
+	/* Port speed is not valid unless port is connected */
 	if ( ! ccs ) {
 		port->speed = USB_SPEED_NONE;
 		return 0;
@@ -3032,14 +3043,12 @@ static int xhci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	/* For USB2 ports, the PSIV field is not valid until the port
 	 * completes reset and becomes enabled.
 	 */
-	ped = ( portsc & XHCI_PORTSC_PED );
 	if ( ( port->protocol < USB_PROTO_3_0 ) && ! ped ) {
 		port->speed = USB_SPEED_FULL;
 		return 0;
 	}
 
 	/* Get port speed and map to generic USB speed */
-	psiv = XHCI_PORTSC_PSIV ( portsc );
 	speed = xhci_port_speed ( xhci, port->address, psiv );
 	if ( speed < 0 ) {
 		rc = speed;
