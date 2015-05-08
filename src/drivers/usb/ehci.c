@@ -337,6 +337,32 @@ static void ehci_poll_companions ( struct ehci_device *ehci ) {
 	}
 }
 
+/**
+ * Locate EHCI companion controller
+ *
+ * @v pci		PCI device
+ * @ret busdevfn	EHCI companion controller bus:dev.fn (if any)
+ */
+unsigned int ehci_companion ( struct pci_device *pci ) {
+	struct pci_device tmp;
+	unsigned int busdevfn;
+	int rc;
+
+	/* Look for an EHCI function on the same PCI device */
+	busdevfn = pci->busdevfn;
+	while ( ++busdevfn <= PCI_LAST_FUNC ( pci->busdevfn ) ) {
+		pci_init ( &tmp, busdevfn );
+		if ( ( rc = pci_read_config ( &tmp ) ) != 0 )
+			continue;
+		if ( tmp.class == PCI_CLASS ( PCI_CLASS_SERIAL,
+					      PCI_CLASS_SERIAL_USB,
+					      PCI_CLASS_SERIAL_USB_EHCI ) )
+			return busdevfn;
+	}
+
+	return 0;
+}
+
 /******************************************************************************
  *
  * Run / stop / reset

@@ -537,4 +537,6 @@ struct ehci_endpoint {
 	struct ehci_ring ring;
 };
 
+extern unsigned int ehci_companion ( struct pci_device *pci );
+
 #endif /* _IPXE_EHCI_H */
