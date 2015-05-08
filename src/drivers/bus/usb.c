@@ -43,6 +43,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** List of USB buses */
 struct list_head usb_buses = LIST_HEAD_INIT ( usb_buses );
 
+/** List of changed ports */
+static struct list_head usb_changed = LIST_HEAD_INIT ( usb_changed );
+
+/** List of halted endpoints */
+static struct list_head usb_halted = LIST_HEAD_INIT ( usb_halted );
+
 /******************************************************************************
  *
  * Utility functions
@@ -560,7 +566,6 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 void usb_complete_err ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 			int rc ) {
 	struct usb_device *usb = ep->usb;
-	struct usb_bus *bus = usb->port->hub->bus;
 
 	/* Decrement fill level */
 	assert ( ep->fill > 0 );
@@ -572,7 +577,7 @@ void usb_complete_err ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 		       usb->name, usb_endpoint_name ( ep->address ),
 		       strerror ( rc ) );
 		list_del ( &ep->halted );
-		list_add_tail ( &ep->halted, &bus->halted );
+		list_add_tail ( &ep->halted, &usb_halted );
 	}
 
 	/* Report completion */
@@ -1576,12 +1581,12 @@ static void usb_detached ( struct usb_port *port ) {
 }
 
 /**
- * Handle newly attached or detached USB devices
+ * Handle newly attached or detached USB device
  *
  * @v port		USB port
  * @ret rc		Return status code
  */
-static int usb_hotplug ( struct usb_port *port ) {
+static int usb_hotplugged ( struct usb_port *port ) {
 	struct usb_hub *hub = port->hub;
 	int rc;
 
@@ -1621,43 +1626,26 @@ static int usb_hotplug ( struct usb_port *port ) {
  * @v port		USB port
  */
 void usb_port_changed ( struct usb_port *port ) {
-	struct usb_hub *hub = port->hub;
-	struct usb_bus *bus = hub->bus;
 
 	/* Record hub port status change */
 	list_del ( &port->changed );
-	list_add_tail ( &port->changed, &bus->changed );
+	list_add_tail ( &port->changed, &usb_changed );
 }
 
 /**
- * USB process
+ * Handle newly attached or detached USB device
  *
- * @v bus		USB bus
  */
-static void usb_step ( struct usb_bus *bus ) {
-	struct usb_endpoint *ep;
+static void usb_hotplug ( void ) {
 	struct usb_port *port;
-
-	/* Poll bus */
-	usb_poll ( bus );
-
-	/* Attempt to reset first halted endpoint in list, if any.  We
-	 * do not attempt to process the complete list, since this
-	 * would require extra code to allow for the facts that the
-	 * halted endpoint list may change as we do so, and that
-	 * resetting an endpoint may fail.
-	 */
-	if ( ( ep = list_first_entry ( &bus->halted, struct usb_endpoint,
-				       halted ) ) != NULL )
-		usb_endpoint_reset ( ep );
 
 	/* Handle any changed ports, allowing for the fact that the
 	 * port list may change as we perform hotplug actions.
 	 */
-	while ( ! list_empty ( &bus->changed ) ) {
+	while ( ! list_empty ( &usb_changed ) ) {
 
 		/* Get first changed port */
-		port = list_first_entry ( &bus->changed, struct usb_port,
+		port = list_first_entry ( &usb_changed, struct usb_port,
 					  changed );
 		assert ( port != NULL );
 
@@ -1666,13 +1654,39 @@ static void usb_step ( struct usb_bus *bus ) {
 		INIT_LIST_HEAD ( &port->changed );
 
 		/* Perform appropriate hotplug action */
-		usb_hotplug ( port );
+		usb_hotplugged ( port );
 	}
 }
 
+/**
+ * USB process
+ *
+ * @v process		USB process
+ */
+static void usb_step ( struct process *process __unused ) {
+	struct usb_bus *bus;
+	struct usb_endpoint *ep;
+
+	/* Poll all buses */
+	for_each_usb_bus ( bus )
+		usb_poll ( bus );
+
+	/* Attempt to reset first halted endpoint in list, if any.  We
+	 * do not attempt to process the complete list, since this
+	 * would require extra code to allow for the facts that the
+	 * halted endpoint list may change as we do so, and that
+	 * resetting an endpoint may fail.
+	 */
+	if ( ( ep = list_first_entry ( &usb_halted, struct usb_endpoint,
+				       halted ) ) != NULL )
+		usb_endpoint_reset ( ep );
+
+	/* Handle any changed ports */
+	usb_hotplug();
+}
+
 /** USB process */
-static struct process_descriptor usb_process_desc =
-	PROC_DESC ( struct usb_bus, process, usb_step );
+PERMANENT_PROCESS ( usb_process, usb_step );
 
 /******************************************************************************
  *
@@ -1755,10 +1769,10 @@ int register_usb_hub ( struct usb_hub *hub ) {
 	/* Delay to allow ports to stabilise */
 	mdelay ( USB_PORT_DELAY_MS );
 
-	/* Attach any devices already present */
+	/* Mark all ports as changed */
 	for ( i = 1 ; i <= hub->ports ; i++ ) {
 		port = usb_port ( hub, i );
-		usb_hotplug ( port );
+		usb_port_changed ( port );
 	}
 
 	/* Some hubs seem to defer reporting device connections until
@@ -1766,7 +1780,10 @@ int register_usb_hub ( struct usb_hub *hub ) {
 	 * Poll the bus once now in order to pick up any such
 	 * connections.
 	 */
-	usb_step ( bus );
+	usb_poll ( bus );
+
+	/* Attach any devices already present */
+	usb_hotplug();
 
 	return 0;
 
@@ -1862,9 +1879,6 @@ struct usb_bus * alloc_usb_bus ( struct device *dev, unsigned int ports,
 	bus->op = op;
 	INIT_LIST_HEAD ( &bus->devices );
 	INIT_LIST_HEAD ( &bus->hubs );
-	INIT_LIST_HEAD ( &bus->changed );
-	INIT_LIST_HEAD ( &bus->halted );
-	process_init_stopped ( &bus->process, &usb_process_desc, NULL );
 	bus->host = &bus->op->bus;
 
 	/* Allocate root hub */
@@ -1904,9 +1918,6 @@ int register_usb_bus ( struct usb_bus *bus ) {
 	if ( ( rc = register_usb_hub ( bus->hub ) ) != 0 )
 		goto err_register_hub;
 
-	/* Start bus process */
-	process_add ( &bus->process );
-
 	return 0;
 
 	unregister_usb_hub ( bus->hub );
@@ -1926,10 +1937,6 @@ void unregister_usb_bus ( struct usb_bus *bus ) {
 
 	/* Sanity checks */
 	assert ( bus->hub != NULL );
-	assert ( process_running ( &bus->process ) );
-
-	/* Stop bus process */
-	process_del ( &bus->process );
 
 	/* Unregister root hub */
 	unregister_usb_hub ( bus->hub );
@@ -1943,7 +1950,6 @@ void unregister_usb_bus ( struct usb_bus *bus ) {
 	/* Sanity checks */
 	assert ( list_empty ( &bus->devices ) );
 	assert ( list_empty ( &bus->hubs ) );
-	assert ( ! process_running ( &bus->process ) );
 }
 
 /**
@@ -1952,11 +1958,16 @@ void unregister_usb_bus ( struct usb_bus *bus ) {
  * @v bus		USB bus
  */
 void free_usb_bus ( struct usb_bus *bus ) {
+	struct usb_endpoint *ep;
+	struct usb_port *port;
 
 	/* Sanity checks */
 	assert ( list_empty ( &bus->devices ) );
 	assert ( list_empty ( &bus->hubs ) );
-	assert ( ! process_running ( &bus->process ) );
+	list_for_each_entry ( ep, &usb_halted, halted )
+		assert ( ep->usb->port->hub->bus != bus );
+	list_for_each_entry ( port, &usb_changed, changed )
+		assert ( port->hub->bus != bus );
 
 	/* Free root hub */
 	free_usb_hub ( bus->hub );

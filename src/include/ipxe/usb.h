@@ -922,12 +922,6 @@ struct usb_bus {
 	struct list_head devices;
 	/** List of hubs */
 	struct list_head hubs;
-	/** List of changed ports */
-	struct list_head changed;
-	/** List of halted endpoints */
-	struct list_head halted;
-	/** Process */
-	struct process process;
 
 	/** Host controller operations */
 	struct usb_bus_host_operations *host;
