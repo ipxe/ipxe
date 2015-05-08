@@ -290,13 +290,22 @@ static struct net_device *ibft_fill_nic_ipv4 ( struct ibft_nic *nic,
 	parent = netdev_settings(route4->netdev);
 	fetch_setting ( parent, &ip_setting, &origin, NULL, NULL, 0 );
 
-	nic->origin = ( ( origin == parent ) ?
-			IBFT_NIC_ORIGIN_MANUAL : IBFT_NIC_ORIGIN_DHCP );
+	nic->origin = IBFT_NIC_ORIGIN_MANUAL;
+	/* Check if the IPv4 address originates from DHCP */
+	if (strstr(settings_name(origin), "dhcp")) {
+		struct in_addr dhcp;
+
+		nic->origin = IBFT_NIC_ORIGIN_DHCP;
+		if ( fetch_ipv4_setting( parent, &dhcp_server_setting,
+					 &dhcp ) > 0 ) {
+			ibft_set_ipaddr ( &nic->dhcp, dhcp );
+			DBG ( "iBFT NIC[%d] DHCP = %s\n",
+			      nic->header.index,
+			      ibft_ipaddr ( &nic->dhcp ) );
+		}
+	}
 	DBG ( "iBFT NIC[%d] origin = %d\n",
 	      nic->header.index, nic->origin );
-
-	/* Extract values from configuration settings */
-	fetch_setting ( parent, &ip_setting, &origin, NULL, NULL, 0 );
 
 	ibft_set_ipaddr ( &nic->ip_address, route4->address );
 	DBG ( "iBFT NIC[%d] IP = %s\n", nic->header.index,
@@ -339,8 +348,20 @@ static struct net_device * ibft_fill_nic_ipv6 ( struct ibft_nic *nic,
 
 	parent = netdev_settings(route6->netdev);
 	fetch_setting ( parent, &ip6_setting, &origin, NULL, NULL, 0 );
-	nic->origin = ( ( origin == parent ) ?
-			IBFT_NIC_ORIGIN_MANUAL : IBFT_NIC_ORIGIN_DHCP );
+	nic->origin = IBFT_NIC_ORIGIN_MANUAL;
+	/* Check if the IPv6 address originates from DHCP */
+	if (strstr(settings_name(origin), "dhcp")) {
+		struct in6_addr dhcp6;
+
+		nic->origin = IBFT_NIC_ORIGIN_DHCP;
+		if ( fetch_ipv6_setting( parent, &dhcp6_server_setting,
+					 &dhcp6 ) > 0 ) {
+			ibft_set_ip6addr(&nic->dhcp, dhcp6 );
+			DBG ( "iBFT NIC[%d] DHCP = %s\n",
+			      nic->header.index,
+			      ibft_ipaddr ( &nic->dhcp ) );
+		}
+	}
 	DBG ( "iBFT NIC[%d] origin = %d\n",
 	      nic->header.index, nic->origin );
 
