@@ -1877,8 +1877,8 @@ static struct pci_device_id ehci_ids[] = {
 struct pci_driver ehci_driver __pci_driver = {
 	.ids = ehci_ids,
 	.id_count = ( sizeof ( ehci_ids ) / sizeof ( ehci_ids[0] ) ),
-	.class = PCI_CLASS ( PCI_CLASS_SERIAL, PCI_CLASS_SERIAL_USB,
-			     PCI_CLASS_SERIAL_USB_EHCI ),
+	.class = PCI_CLASS_ID ( PCI_CLASS_SERIAL, PCI_CLASS_SERIAL_USB,
+				PCI_CLASS_SERIAL_USB_EHCI ),
 	.probe = ehci_probe,
 	.remove = ehci_remove,
 };

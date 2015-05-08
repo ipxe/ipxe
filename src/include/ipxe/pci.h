@@ -118,6 +118,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CLASS_SERIAL_USB_EHCI	 0x20	/**< ECHI USB controller */
 #define PCI_CLASS_SERIAL_USB_XHCI	 0x30	/**< xHCI USB controller */
 
+/** Construct PCI class
+ *
+ * @v base		Base class (or PCI_ANY_ID)
+ * @v sub		Subclass (or PCI_ANY_ID)
+ * @v progif		Programming interface (or PCI_ANY_ID)
+ */
+#define PCI_CLASS( base, sub, progif )					\
+	( ( ( (base) & 0xff ) << 16 ) |	( ( (sub) & 0xff ) << 8 ) |	\
+	  ( ( (progif) & 0xff) << 0 ) )
+
 /** A PCI device ID list entry */
 struct pci_device_id {
 	/** Name */
@@ -147,10 +157,8 @@ struct pci_class_id {
  * @v sub		Subclass (or PCI_ANY_ID)
  * @v progif		Programming interface (or PCI_ANY_ID)
  */
-#define PCI_CLASS(base,sub,progif) {					   \
-	.class = ( ( ( (base) & 0xff ) << 16 ) |			   \
-		   ( ( (sub) & 0xff ) << 8 ) |				   \
-		   ( ( (progif) & 0xff) << 0 ) ),			   \
+#define PCI_CLASS_ID( base, sub, progif ) {				   \
+	.class = PCI_CLASS ( base, sub, progif ),			   \
 	.mask = ( ( ( ( (base) == PCI_ANY_ID ) ? 0x00 : 0xff ) << 16 ) |   \
 		  ( ( ( (sub) == PCI_ANY_ID ) ? 0x00 : 0xff ) << 8 ) |	   \
 		  ( ( ( (progif) == PCI_ANY_ID ) ? 0x00 : 0xff ) << 0 ) ), \

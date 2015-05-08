@@ -3280,8 +3280,8 @@ static struct pci_device_id xhci_ids[] = {
 struct pci_driver xhci_driver __pci_driver = {
 	.ids = xhci_ids,
 	.id_count = ( sizeof ( xhci_ids ) / sizeof ( xhci_ids[0] ) ),
-	.class = PCI_CLASS ( PCI_CLASS_SERIAL, PCI_CLASS_SERIAL_USB,
-			     PCI_CLASS_SERIAL_USB_XHCI ),
+	.class = PCI_CLASS_ID ( PCI_CLASS_SERIAL, PCI_CLASS_SERIAL_USB,
+				PCI_CLASS_SERIAL_USB_XHCI ),
 	.probe = xhci_probe,
 	.remove = xhci_remove,
 };
