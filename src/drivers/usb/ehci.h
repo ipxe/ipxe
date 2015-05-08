@@ -424,6 +424,12 @@ ehci_ring_remaining ( struct ehci_ring *ring ) {
  */
 #define EHCI_PORT_POWER_DELAY_MS 20
 
+/** Time to delay after releasing ownership of a port
+ *
+ * This is a policy decision.
+ */
+#define EHCI_DISOWN_DELAY_MS 100
+
 /** Maximum time to wait for BIOS to release ownership
  *
  * This is a policy decision.

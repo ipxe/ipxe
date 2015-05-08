@@ -294,6 +294,51 @@ static void ehci_legacy_release ( struct ehci_device *ehci,
 
 /******************************************************************************
  *
+ * Companion controllers
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Poll child companion controllers
+ *
+ * @v ehci		EHCI device
+ */
+static void ehci_poll_companions ( struct ehci_device *ehci ) {
+	struct usb_bus *bus;
+	struct device_description *desc;
+
+	/* Poll any USB buses belonging to child companion controllers */
+	for_each_usb_bus ( bus ) {
+
+		/* Get underlying devices description */
+		desc = &bus->dev->desc;
+
+		/* Skip buses that are not PCI devices */
+		if ( desc->bus_type != BUS_TYPE_PCI )
+			continue;
+
+		/* Skip buses that are not part of the same PCI device */
+		if ( PCI_FIRST_FUNC ( desc->location ) !=
+		     PCI_FIRST_FUNC ( ehci->bus->dev->desc.location ) )
+			continue;
+
+		/* Skip buses that are not UHCI or OHCI PCI devices */
+		if ( ( desc->class != PCI_CLASS ( PCI_CLASS_SERIAL,
+						  PCI_CLASS_SERIAL_USB,
+						  PCI_CLASS_SERIAL_USB_UHCI ))&&
+		     ( desc->class != PCI_CLASS ( PCI_CLASS_SERIAL,
+						  PCI_CLASS_SERIAL_USB,
+						  PCI_CLASS_SERIAL_USB_OHCI ) ))
+			continue;
+
+		/* Poll child companion controller bus */
+		usb_poll ( bus );
+	}
+}
+
+/******************************************************************************
+ *
  * Run / stop / reset
  *
  ******************************************************************************
@@ -1460,9 +1505,17 @@ static int ehci_root_enable ( struct usb_hub *hub, struct usb_port *port ) {
 	return -ETIMEDOUT;
 
  disown:
+	/* Disown port */
 	portsc &= ~EHCI_PORTSC_CHANGE;
 	portsc |= EHCI_PORTSC_OWNER;
 	writel ( portsc, ehci->op + EHCI_OP_PORTSC ( port->address ) );
+
+	/* Delay to allow child companion controllers to settle */
+	mdelay ( EHCI_DISOWN_DELAY_MS );
+
+	/* Poll child companion controllers */
+	ehci_poll_companions ( ehci );
+
 	return -ENODEV;
 }
 
