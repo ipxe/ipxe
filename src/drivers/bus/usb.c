@@ -40,6 +40,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+/** List of USB buses */
+struct list_head usb_buses = LIST_HEAD_INIT ( usb_buses );
+
 /******************************************************************************
  *
  * Utility functions
@@ -1894,6 +1897,9 @@ int register_usb_bus ( struct usb_bus *bus ) {
 	if ( ( rc = bus->host->open ( bus ) ) != 0 )
 		goto err_open;
 
+	/* Add to list of USB buses */
+	list_add_tail ( &bus->list, &usb_buses );
+
 	/* Register root hub */
 	if ( ( rc = register_usb_hub ( bus->hub ) ) != 0 )
 		goto err_register_hub;
@@ -1905,6 +1911,7 @@ int register_usb_bus ( struct usb_bus *bus ) {
 
 	unregister_usb_hub ( bus->hub );
  err_register_hub:
+	list_del ( &bus->list );
 	bus->host->close ( bus );
  err_open:
 	return rc;
@@ -1926,6 +1933,9 @@ void unregister_usb_bus ( struct usb_bus *bus ) {
 
 	/* Unregister root hub */
 	unregister_usb_hub ( bus->hub );
+
+	/* Remove from list of USB buses */
+	list_del ( &bus->list );
 
 	/* Close bus */
 	bus->host->close ( bus );

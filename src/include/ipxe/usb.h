@@ -916,6 +916,8 @@ struct usb_bus {
 	/** Root hub */
 	struct usb_hub *hub;
 
+	/** List of USB buses */
+	struct list_head list;
 	/** List of devices */
 	struct list_head devices;
 	/** List of hubs */
@@ -998,6 +1000,10 @@ static inline __attribute__ (( always_inline )) void
 usb_poll ( struct usb_bus *bus ) {
 	bus->host->poll ( bus );
 }
+
+/** Iterate over all USB buses */
+#define for_each_usb_bus( bus ) \
+	list_for_each_entry ( (bus), &usb_buses, list )
 
 /**
  * Complete transfer (without error)
@@ -1181,6 +1187,8 @@ usb_set_interface ( struct usb_device *usb, unsigned int interface,
 	return usb_control ( usb, USB_SET_INTERFACE, alternate, interface,
 			     NULL, 0 );
 }
+
+extern struct list_head usb_buses;
 
 extern struct usb_interface_descriptor *
 usb_interface_descriptor ( struct usb_configuration_descriptor *config,
