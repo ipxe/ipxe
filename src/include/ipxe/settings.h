@@ -481,6 +481,8 @@ extern const struct setting
 board_serial_setting __setting ( SETTING_HOST_EXTRA, board-serial );
 extern const struct setting dhcp_server_setting __setting ( SETTING_MISC,
 							    dhcp-server );
+extern const struct setting dhcp6_server_setting __setting ( SETTING_MISC,
+							     dhcp6-server );
 
 /**
  * Initialise a settings block

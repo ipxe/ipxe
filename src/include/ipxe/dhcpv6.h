@@ -178,6 +178,9 @@ struct dhcpv6_user_class_option {
 /** DHCPv6 client network interface identifier option */
 #define DHCPV6_CLIENT_NDI 62
 
+/** DHCPv6 server address meta-option */
+#define DHCPV6_SERVER_ADDR 0xfffe
+
 /** DHCPv6 syslog server option
  *
  * This option code has not yet been assigned by IANA.  Please update

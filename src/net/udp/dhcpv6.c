@@ -268,6 +268,8 @@ struct dhcpv6_settings {
 	struct settings settings;
 	/** Leased address */
 	struct in6_addr lease;
+	/** Server address */
+	struct in6_addr server;
 	/** Option list */
 	struct dhcpv6_option_list options;
 };
@@ -311,6 +313,30 @@ static int dhcpv6_fetch_lease ( struct dhcpv6_settings *dhcpv6set,
 }
 
 /**
+ * Fetch value of DHCPv6 server address
+ *
+ * @v dhcpset		DHCPv6 settings
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int dhcpv6_fetch_server ( struct dhcpv6_settings *dhcpv6set,
+				 void *data, size_t len ) {
+	struct in6_addr *server = &dhcpv6set->server;
+
+	/* Do nothing unless a server address exists */
+	if ( IN6_IS_ADDR_UNSPECIFIED ( server ) )
+		return -ENOENT;
+
+	/* Copy server address */
+	if ( len > sizeof ( *server ) )
+		len = sizeof ( *server );
+	memcpy ( data, server, len );
+
+	return sizeof ( *server );
+}
+
+/**
  * Fetch value of DHCPv6 setting
  *
  * @v settings		Settings block
@@ -330,6 +356,10 @@ static int dhcpv6_fetch ( struct settings *settings,
 	/* Handle leased address */
 	if ( setting_cmp ( setting, &ip6_setting ) == 0 )
 		return dhcpv6_fetch_lease ( dhcpv6set, data, len );
+
+	/* Handle server address */
+	if ( setting_cmp ( setting, &dhcp6_server_setting ) == 0 )
+		return dhcpv6_fetch_server ( dhcpv6set, data, len );
 
 	/* Find option */
 	option = dhcpv6_option ( &dhcpv6set->options, setting->tag );
@@ -359,6 +389,7 @@ static struct settings_operations dhcpv6_settings_operations = {
  * @ret rc		Return status code
  */
 static int dhcpv6_register ( struct in6_addr *lease,
+			     struct in6_addr *server,
 			     struct dhcpv6_option_list *options,
 			     struct settings *parent ) {
 	struct dhcpv6_settings *dhcpv6set;
@@ -382,6 +413,7 @@ static int dhcpv6_register ( struct in6_addr *lease,
 	dhcpv6set->options.data = data;
 	dhcpv6set->options.len = len;
 	memcpy ( &dhcpv6set->lease, lease, sizeof ( dhcpv6set->lease ) );
+	memcpy ( &dhcpv6set->server, server, sizeof ( dhcpv6set->server ) );
 
 	/* Register settings */
 	if ( ( rc = register_settings ( &dhcpv6set->settings, parent,
@@ -876,8 +908,8 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 	}
 
 	/* Register settings */
-	if ( ( rc = dhcpv6_register ( &dhcpv6->lease, &options,
-				      parent ) ) != 0 ) {
+	if ( ( rc = dhcpv6_register ( &dhcpv6->lease, &src->sin6_addr,
+				      &options, parent ) ) != 0 ) {
 		DBGC ( dhcpv6, "DHCPv6 %s could not register settings: %s\n",
 		       dhcpv6->netdev->name, strerror ( rc ) );
 		goto done;
@@ -1015,3 +1047,14 @@ const struct setting dnssl6_setting __setting ( SETTING_IP_EXTRA, dnssl ) = {
 	.type = &setting_type_dnssl,
 	.scope = &dhcpv6_scope,
 };
+
+/** DHCPv6 server address */
+const struct setting dhcp6_server_setting __setting ( SETTING_MISC,
+						      dhcp6-server ) = {
+	.name = "dhcp6-server",
+	.description = "DHCPv6 server",
+	.tag = DHCPV6_SERVER_ADDR,
+	.type = &setting_type_ipv6,
+	.scope = &dhcpv6_scope,
+};
+
