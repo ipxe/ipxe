@@ -1976,6 +1976,26 @@ void free_usb_bus ( struct usb_bus *bus ) {
 	free ( bus );
 }
 
+/**
+ * Find USB bus by device location
+ *
+ * @v bus_type		Bus type
+ * @v location		Bus location
+ * @ret bus		USB bus, or NULL
+ */
+struct usb_bus * find_usb_bus_by_location ( unsigned int bus_type,
+					    unsigned int location ) {
+	struct usb_bus *bus;
+
+	for_each_usb_bus ( bus ) {
+		if ( ( bus->dev->desc.bus_type == bus_type ) &&
+		     ( bus->dev->desc.location == location ) )
+			return bus;
+	}
+
+	return NULL;
+}
+
 /******************************************************************************
  *
  * USB address assignment

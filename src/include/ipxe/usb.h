@@ -1211,6 +1211,8 @@ extern struct usb_bus * alloc_usb_bus ( struct device *dev,
 extern int register_usb_bus ( struct usb_bus *bus );
 extern void unregister_usb_bus ( struct usb_bus *bus );
 extern void free_usb_bus ( struct usb_bus *bus );
+extern struct usb_bus * find_usb_bus_by_location ( unsigned int bus_type,
+						   unsigned int location );
 
 extern int usb_alloc_address ( struct usb_bus *bus );
 extern void usb_free_address ( struct usb_bus *bus, unsigned int address );
