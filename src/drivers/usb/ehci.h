@@ -483,6 +483,8 @@ struct ehci_transfer {
 struct ehci_device {
 	/** Registers */
 	void *regs;
+	/** Name */
+	const char *name;
 
 	/** Capability registers */
 	void *cap;
