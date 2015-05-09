@@ -307,6 +307,8 @@ uhci_ring_remaining ( struct uhci_ring *ring ) {
 struct uhci_device {
 	/** Registers */
 	unsigned long regs;
+	/** Name */
+	const char *name;
 
 	/** EHCI companion controller bus:dev.fn address (if any) */
 	unsigned int companion;

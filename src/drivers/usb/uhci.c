@@ -117,7 +117,7 @@ static int uhci_stop ( struct uhci_device *uhci ) {
 		mdelay ( 1 );
 	}
 
-	DBGC ( uhci, "UHCI %p timed out waiting for stop\n", uhci );
+	DBGC ( uhci, "UHCI %s timed out waiting for stop\n", uhci->name );
 	return -ETIMEDOUT;
 }
 
@@ -155,7 +155,7 @@ static int uhci_reset ( struct uhci_device *uhci ) {
 		mdelay ( 1 );
 	}
 
-	DBGC ( uhci, "UHCI %p timed out waiting for reset\n", uhci );
+	DBGC ( uhci, "UHCI %s timed out waiting for reset\n", uhci->name );
 	return -ETIMEDOUT;
 }
 
@@ -541,7 +541,7 @@ static void uhci_periodic_schedule ( struct uhci_device *uhci ) {
 	 * safely run concurrently with hardware execution of the
 	 * schedule.
 	 */
-	DBGCP ( uhci, "UHCI %p periodic schedule: ", uhci );
+	DBGCP ( uhci, "UHCI %s periodic schedule: ", uhci->name );
 	link = end = uhci_link_qh ( uhci->head );
 	list_for_each_entry_reverse ( endpoint, &uhci->periodic, schedule ) {
 		queue = endpoint->ring.head;
@@ -554,7 +554,7 @@ static void uhci_periodic_schedule ( struct uhci_device *uhci ) {
 	DBGCP ( uhci, "\n" );
 
 	/* Populate periodic frame list */
-	DBGCP ( uhci, "UHCI %p periodic frame list:", uhci );
+	DBGCP ( uhci, "UHCI %s periodic frame list:", uhci->name );
 	for ( i = 0 ; i < UHCI_FRAMES ; i++ ) {
 
 		/* Calculate maximum interval (in microframes) which
@@ -930,9 +930,10 @@ static void uhci_endpoint_poll ( struct uhci_endpoint *endpoint ) {
 		 * and report the error to the USB core.
 		 */
 		if ( desc->status & UHCI_STATUS_STALLED ) {
-			DBGC ( uhci, "UHCI %p %s endpoint %02x completion "
-			       "%d.%d failed (status %02x)\n", uhci, usb->name,
-			       ep->address, index, xfer->cons, desc->status );
+			DBGC ( uhci, "UHCI %s %s completion %d.%d failed "
+			       "(status %02x)\n", usb->name,
+			       usb_endpoint_name ( ep ), index,
+			       xfer->cons, desc->status );
 			link = UHCI_LINK_TERMINATE;
 			ring->head->current = cpu_to_le32 ( link );
 			wmb();
@@ -1062,8 +1063,8 @@ static int uhci_device_address ( struct usb_device *usb ) {
 	address = usb_alloc_address ( bus );
 	if ( address < 0 ) {
 		rc = address;
-		DBGC ( uhci, "UHCI %p %s could not allocate address: %s\n",
-		       uhci, usb->name, strerror ( rc ) );
+		DBGC ( uhci, "UHCI %s could not allocate address: %s\n",
+		       usb->name, strerror ( rc ) );
 		goto err_alloc_address;
 	}
 
@@ -1184,8 +1185,8 @@ static int uhci_root_enable ( struct usb_hub *hub, struct usb_port *port ) {
 		mdelay ( 1 );
 	}
 
-	DBGC ( uhci, "UHCI %p timed out waiting for port %d to enable "
-	       "(status %04x)\n",  uhci, port->address, portsc );
+	DBGC ( uhci, "UHCI %s-%d timed out waiting for port to enable "
+	       "(status %04x)\n",  uhci->name, port->address, portsc );
 	return -ETIMEDOUT;
 }
 
@@ -1217,6 +1218,7 @@ static int uhci_root_disable ( struct usb_hub *hub, struct usb_port *port ) {
  */
 static int uhci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 	struct uhci_device *uhci = usb_hub_get_drvdata ( hub );
+	struct pci_device pci;
 	uint16_t portsc;
 	unsigned int speed;
 
@@ -1231,8 +1233,9 @@ static int uhci_root_speed ( struct usb_hub *hub, struct usb_port *port ) {
 		/* Defer connection detection until companion
 		 * controller has been enumerated.
 		 */
-		DBGC ( uhci, "UHCI %p port %d deferring connection\n",
-		       uhci, port->address );
+		pci_init ( &pci, uhci->companion );
+		DBGC ( uhci, "UHCI %s-%d deferring for companion " PCI_FMT "\n",
+		       uhci->name, port->address, PCI_ARGS ( &pci ) );
 		speed = USB_SPEED_NONE;
 	} else if ( portsc & UHCI_PORTSC_LS ) {
 		/* Low-speed device */
@@ -1263,8 +1266,8 @@ static int uhci_root_clear_tt ( struct usb_hub *hub, struct usb_port *port,
 	struct uhci_device *uhci = usb_hub_get_drvdata ( hub );
 
 	/* Should never be called; this is a root hub */
-	DBGC ( uhci, "UHCI %p port %d nonsensical CLEAR_TT for %s endpoint "
-	       "%02x\n", uhci, port->address, ep->usb->name, ep->address );
+	DBGC ( uhci, "UHCI %s-%d nonsensical CLEAR_TT for %s %s\n", uhci->name,
+	       port->address, ep->usb->name, usb_endpoint_name ( ep ) );
 
 	return -ENOTSUP;
 }
@@ -1479,6 +1482,7 @@ static int uhci_probe ( struct pci_device *pci ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
+	uhci->name = pci->dev.name;
 	INIT_LIST_HEAD ( &uhci->endpoints );
 	INIT_LIST_HEAD ( &uhci->async );
 	INIT_LIST_HEAD ( &uhci->periodic );
