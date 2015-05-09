@@ -57,22 +57,6 @@ static struct list_head usb_halted = LIST_HEAD_INIT ( usb_halted );
  */
 
 /**
- * Get USB endpoint name (for debugging)
- *
- * @v address		Endpoint address
- * @ret name		Endpoint name
- */
-static inline const char * usb_endpoint_name ( unsigned int address ) {
-	static char buf[ 9 /* "EPxx OUT" + NUL */ ];
-
-	snprintf ( buf, sizeof ( buf ), "EP%d%s",
-		   ( address & USB_ENDPOINT_MAX ),
-		   ( address ?
-		     ( ( address & USB_ENDPOINT_IN ) ? " IN" : " OUT" ) : "" ));
-	return buf;
-}
-
-/**
  * Get USB speed name (for debugging)
  *
  * @v speed		Speed
@@ -228,6 +212,23 @@ usb_endpoint_companion_descriptor ( struct usb_configuration_descriptor *config,
  */
 
 /**
+ * Get USB endpoint name (for debugging)
+ *
+ * @v ep		USB endpoint
+ * @ret name		Endpoint name
+ */
+const char * usb_endpoint_name ( struct usb_endpoint *ep ) {
+	static char buf[ 9 /* "EPxx OUT" + NUL */ ];
+	unsigned int address = ep->address;
+
+	snprintf ( buf, sizeof ( buf ), "EP%d%s",
+		   ( address & USB_ENDPOINT_MAX ),
+		   ( address ?
+		     ( ( address & USB_ENDPOINT_IN ) ? " IN" : " OUT" ) : "" ));
+	return buf;
+}
+
+/**
  * Describe USB endpoint from device configuration
  *
  * @v ep		USB endpoint
@@ -300,7 +301,7 @@ int usb_endpoint_open ( struct usb_endpoint *ep ) {
 	/* Add to endpoint list */
 	if ( usb->ep[idx] != NULL ) {
 		DBGC ( usb, "USB %s %s is already open\n",
-		       usb->name, usb_endpoint_name ( ep->address ) );
+		       usb->name, usb_endpoint_name ( ep ) );
 		rc = -EALREADY;
 		goto err_already;
 	}
@@ -310,14 +311,14 @@ int usb_endpoint_open ( struct usb_endpoint *ep ) {
 	/* Open endpoint */
 	if ( ( rc = ep->host->open ( ep ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not open: %s\n", usb->name,
-		       usb_endpoint_name ( ep->address ), strerror ( rc ) );
+		       usb_endpoint_name ( ep ), strerror ( rc ) );
 		goto err_open;
 	}
 	ep->open = 1;
 
 	DBGC2 ( usb, "USB %s %s opened with MTU %zd, burst %d, interval %d\n",
-		usb->name, usb_endpoint_name ( ep->address ), ep->mtu,
-		ep->burst, ep->interval );
+		usb->name, usb_endpoint_name ( ep ), ep->mtu, ep->burst,
+		ep->interval );
 	return 0;
 
 	ep->open = 0;
@@ -353,7 +354,7 @@ static int usb_endpoint_clear_tt ( struct usb_endpoint *ep ) {
 	/* Clear transaction translator buffer */
 	if ( ( rc = tt->hub->driver->clear_tt ( tt->hub, tt, ep ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not clear transaction translator: "
-		       "%s\n", usb->name, usb_endpoint_name ( ep->address ),
+		       "%s\n", usb->name, usb_endpoint_name ( ep ),
 		       strerror ( rc ) );
 		return rc;
 	}
@@ -407,8 +408,7 @@ static int usb_endpoint_reset ( struct usb_endpoint *ep ) {
 	/* Reset endpoint */
 	if ( ( rc = ep->host->reset ( ep ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not reset: %s\n",
-		       usb->name, usb_endpoint_name ( ep->address ),
-		       strerror ( rc ) );
+		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		return rc;
 	}
 
@@ -423,8 +423,7 @@ static int usb_endpoint_reset ( struct usb_endpoint *ep ) {
 					  USB_ENDPOINT_HALT,
 					  ep->address ) ) != 0 ) ) {
 		DBGC ( usb, "USB %s %s could not clear endpoint halt: %s\n",
-		       usb->name, usb_endpoint_name ( ep->address ),
-		       strerror ( rc ) );
+		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		return rc;
 	}
 
@@ -433,7 +432,7 @@ static int usb_endpoint_reset ( struct usb_endpoint *ep ) {
 	INIT_LIST_HEAD ( &ep->halted );
 
 	DBGC ( usb, "USB %s %s reset\n",
-	       usb->name, usb_endpoint_name ( ep->address ) );
+	       usb->name, usb_endpoint_name ( ep ) );
 	return 0;
 }
 
@@ -452,8 +451,7 @@ static int usb_endpoint_mtu ( struct usb_endpoint *ep, size_t mtu ) {
 	ep->mtu = mtu;
 	if ( ( rc = ep->host->mtu ( ep ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not update MTU: %s\n",
-		       usb->name, usb_endpoint_name ( ep->address ),
-		       strerror ( rc ) );
+		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		return rc;
 	}
 
@@ -508,7 +506,7 @@ int usb_message ( struct usb_endpoint *ep, unsigned int request,
 	/* Enqueue message transfer */
 	if ( ( rc = ep->host->message ( ep, iobuf ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not enqueue message transfer: "
-		       "%s\n", usb->name, usb_endpoint_name ( ep->address ),
+		       "%s\n", usb->name, usb_endpoint_name ( ep ),
 		       strerror ( rc ) );
 		return rc;
 	}
@@ -545,8 +543,7 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 	/* Enqueue stream transfer */
 	if ( ( rc = ep->host->stream ( ep, iobuf, terminate ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not enqueue stream transfer: %s\n",
-		       usb->name, usb_endpoint_name ( ep->address ),
-		       strerror ( rc ) );
+		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		return rc;
 	}
 
@@ -574,8 +571,7 @@ void usb_complete_err ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 	/* Schedule reset, if applicable */
 	if ( ( rc != 0 ) && ep->open ) {
 		DBGC ( usb, "USB %s %s completion failed: %s\n",
-		       usb->name, usb_endpoint_name ( ep->address ),
-		       strerror ( rc ) );
+		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		list_del ( &ep->halted );
 		list_add_tail ( &ep->halted, &usb_halted );
 	}

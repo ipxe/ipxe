@@ -562,6 +562,7 @@ usb_endpoint_get_hostdata ( struct usb_endpoint *ep ) {
 	return ep->priv;
 }
 
+extern const char * usb_endpoint_name ( struct usb_endpoint *ep );
 extern int
 usb_endpoint_described ( struct usb_endpoint *ep,
 			 struct usb_configuration_descriptor *config,
