@@ -54,6 +54,16 @@ enum usb_speed {
 	USB_SPEED_SUPER = USB_SPEED ( 5, 3 ),
 };
 
+/** USB packet IDs */
+enum usb_pid {
+	/** IN PID */
+	USB_PID_IN = 0x69,
+	/** OUT PID */
+	USB_PID_OUT = 0xe1,
+	/** SETUP PID */
+	USB_PID_SETUP = 0x2d,
+};
+
 /** A USB setup data packet */
 struct usb_setup_packet {
 	/** Request */

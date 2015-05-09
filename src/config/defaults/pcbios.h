@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define	USB_HCD_XHCI		/* xHCI USB host controller */
 #define	USB_HCD_EHCI		/* EHCI USB host controller */
+#define	USB_HCD_UHCI		/* UHCI USB host controller */
 
 #define	REBOOT_CMD		/* Reboot command */
 #define	CPUID_CMD		/* x86 CPU feature detection command */

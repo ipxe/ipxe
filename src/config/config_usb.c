@@ -40,3 +40,6 @@ REQUIRE_OBJECT ( xhci );
 #ifdef USB_HCD_EHCI
 REQUIRE_OBJECT ( ehci );
 #endif
+#ifdef USB_HCD_UHCI
+REQUIRE_OBJECT ( uhci );
+#endif
