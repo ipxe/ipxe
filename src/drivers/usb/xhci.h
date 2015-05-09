@@ -1036,6 +1036,8 @@ struct xhci_pch {
 struct xhci_device {
 	/** Registers */
 	void *regs;
+	/** Name */
+	const char *name;
 
 	/** Capability registers */
 	void *cap;
