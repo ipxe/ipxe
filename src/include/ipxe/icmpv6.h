@@ -40,6 +40,18 @@ struct icmpv6_handler {
 /** Declare an ICMPv6 handler */
 #define __icmpv6_handler __table_entry ( ICMPV6_HANDLERS, 01 )
 
+/** ICMPv6 destination unreachable */
+#define ICMPV6_DESTINATION_UNREACHABLE 1
+
+/** ICMPv6 packet too big */
+#define ICMPV6_PACKET_TOO_BIG 2
+
+/** ICMPv6 time exceeded */
+#define ICMPV6_TIME_EXCEEDED 3
+
+/** ICMPv6 parameter problem */
+#define ICMPV6_PARAMETER_PROBLEM 4
+
 /** ICMPv6 echo request */
 #define ICMPV6_ECHO_REQUEST 128
 
