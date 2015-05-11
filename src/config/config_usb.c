@@ -43,3 +43,10 @@ REQUIRE_OBJECT ( ehci );
 #ifdef USB_HCD_UHCI
 REQUIRE_OBJECT ( uhci );
 #endif
+
+/*
+ * Drag in USB peripherals
+ */
+#ifdef USB_KEYBOARD
+REQUIRE_OBJECT ( usbkbd );
+#endif

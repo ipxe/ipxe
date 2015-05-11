@@ -19,6 +19,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#undef	USB_HCD_EHCI		/* EHCI USB host controller */
 //#undef	USB_HCD_UHCI		/* UHCI USB host controller */
 
+/*
+ * USB peripherals
+ *
+ */
+//#undef	USB_KEYBOARD		/* USB keyboards */
+
 #include <config/named.h>
 #include NAMED_CONFIG(usb.h)
 #include <config/local/usb.h>
