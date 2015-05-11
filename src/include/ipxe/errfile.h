@@ -81,6 +81,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_xhci		     ( ERRFILE_DRIVER | 0x00090000 )
 #define ERRFILE_ehci		     ( ERRFILE_DRIVER | 0x000a0000 )
 #define ERRFILE_uhci		     ( ERRFILE_DRIVER | 0x000b0000 )
+#define ERRFILE_usbhid		     ( ERRFILE_DRIVER | 0x000c0000 )
 
 #define ERRFILE_nvs		     ( ERRFILE_DRIVER | 0x00100000 )
 #define ERRFILE_spi		     ( ERRFILE_DRIVER | 0x00110000 )
