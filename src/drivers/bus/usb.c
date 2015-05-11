@@ -265,7 +265,8 @@ int usb_endpoint_described ( struct usb_endpoint *ep,
 	burst = ( descx ? descx->burst : USB_ENDPOINT_BURST ( sizes ) );
 
 	/* Calculate interval */
-	if ( type == USB_INTERRUPT ) {
+	if ( ( type & USB_ENDPOINT_ATTR_TYPE_MASK ) ==
+	     USB_ENDPOINT_ATTR_INTERRUPT ) {
 		if ( port->speed >= USB_SPEED_HIGH ) {
 			/* 2^(desc->interval-1) is a microframe count */
 			interval = ( 1 << ( desc->interval - 1 ) );

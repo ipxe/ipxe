@@ -425,7 +425,7 @@ static int hub_probe ( struct usb_function *func,
 
 	/* Locate interrupt endpoint descriptor */
 	if ( ( rc = usb_endpoint_described ( &hubdev->intr, config, interface,
-					     USB_INTERRUPT, 0 ) ) != 0 ) {
+					     USB_INTERRUPT_IN, 0 ) ) != 0 ) {
 		DBGC ( hubdev, "HUB %s could not describe interrupt endpoint: "
 		       "%s\n", hubdev->name, strerror ( rc ) );
 		goto err_endpoint;

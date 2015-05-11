@@ -185,7 +185,7 @@ static int usbnet_comms_describe ( struct usbnet_device *usbnet,
 
 		/* Describe interrupt endpoint */
 		if ( ( rc = usb_endpoint_described ( &usbnet->intr, config,
-						     desc, USB_INTERRUPT,
+						     desc, USB_INTERRUPT_IN,
 						     0 ) ) != 0 )
 			continue;
 

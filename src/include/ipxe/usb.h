@@ -277,8 +277,11 @@ struct usb_endpoint_descriptor {
 /** Bulk IN endpoint (internal) type */
 #define USB_BULK_IN ( USB_ENDPOINT_ATTR_BULK | USB_DIR_IN )
 
-/** Interrupt endpoint (internal) type */
-#define USB_INTERRUPT ( USB_ENDPOINT_ATTR_INTERRUPT | USB_DIR_IN )
+/** Interrupt IN endpoint (internal) type */
+#define USB_INTERRUPT_IN ( USB_ENDPOINT_ATTR_INTERRUPT | USB_DIR_IN )
+
+/** Interrupt OUT endpoint (internal) type */
+#define USB_INTERRUPT_OUT ( USB_ENDPOINT_ATTR_INTERRUPT | USB_DIR_OUT )
 
 /** USB endpoint MTU */
 #define USB_ENDPOINT_MTU(sizes) ( ( (sizes) >> 0 ) & 0x07ff )
