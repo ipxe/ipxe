@@ -1779,9 +1779,6 @@ int register_usb_hub ( struct usb_hub *hub ) {
 	 */
 	usb_poll ( bus );
 
-	/* Attach any devices already present */
-	usb_hotplug();
-
 	return 0;
 
 	hub->driver->close ( hub );
@@ -1914,6 +1911,9 @@ int register_usb_bus ( struct usb_bus *bus ) {
 	/* Register root hub */
 	if ( ( rc = register_usb_hub ( bus->hub ) ) != 0 )
 		goto err_register_hub;
+
+	/* Attach any devices already present */
+	usb_hotplug();
 
 	return 0;
 
