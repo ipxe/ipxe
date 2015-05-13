@@ -1591,7 +1591,7 @@ static int usb_hotplugged ( struct usb_port *port ) {
 	if ( ( rc = hub->driver->speed ( hub, port ) ) != 0 ) {
 		DBGC ( hub, "USB hub %s port %d could not get speed: %s\n",
 		       hub->name, port->address, strerror ( rc ) );
-		return rc;
+		goto err_speed;
 	}
 
 	/* Detach device, if applicable */
@@ -1599,15 +1599,15 @@ static int usb_hotplugged ( struct usb_port *port ) {
 		usb_detached ( port );
 
 	/* Attach device, if applicable */
-	if ( port->speed && ! port->attached ) {
-		if ( ( rc = usb_attached ( port ) ) != 0 )
-			return rc;
-	}
+	if ( port->speed && ( ! port->attached ) &&
+	     ( ( rc = usb_attached ( port ) ) != 0 ) )
+		goto err_attached;
 
+ err_attached:
+ err_speed:
 	/* Clear any recorded disconnections */
 	port->disconnected = 0;
-
-	return 0;
+	return rc;
 }
 
 /******************************************************************************
