@@ -252,32 +252,6 @@ static int intel_fetch_mac ( struct intel_nic *intel, uint8_t *hw_addr ) {
 
 /******************************************************************************
  *
- * Diagnostics
- *
- ******************************************************************************
- */
-
-/**
- * Dump diagnostic information
- *
- * @v intel		Intel device
- */
-static void __attribute__ (( unused )) intel_diag ( struct intel_nic *intel ) {
-
-	DBGC ( intel, "INTEL %p TX %04x(%02x)/%04x(%02x) "
-	       "RX %04x(%02x)/%04x(%02x)\n", intel,
-	       ( intel->tx.cons & 0xffff ),
-	       readl ( intel->regs + intel->tx.reg + INTEL_xDH ),
-	       ( intel->tx.prod & 0xffff ),
-	       readl ( intel->regs + intel->tx.reg + INTEL_xDT ),
-	       ( intel->rx.cons & 0xffff ),
-	       readl ( intel->regs + intel->rx.reg + INTEL_xDH ),
-	       ( intel->rx.prod & 0xffff ),
-	       readl ( intel->regs + intel->rx.reg + INTEL_xDT ) );
-}
-
-/******************************************************************************
- *
  * Device reset
  *
  ******************************************************************************

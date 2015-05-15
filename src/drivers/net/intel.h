@@ -259,6 +259,25 @@ enum intel_flags {
 	INTEL_VMWARE = 0x0002,
 };
 
+/**
+ * Dump diagnostic information
+ *
+ * @v intel		Intel device
+ */
+static inline void intel_diag ( struct intel_nic *intel ) {
+
+	DBGC ( intel, "INTEL %p TX %04x(%02x)/%04x(%02x) "
+	       "RX %04x(%02x)/%04x(%02x)\n", intel,
+	       ( intel->tx.cons & 0xffff ),
+	       readl ( intel->regs + intel->tx.reg + INTEL_xDH ),
+	       ( intel->tx.prod & 0xffff ),
+	       readl ( intel->regs + intel->tx.reg + INTEL_xDT ),
+	       ( intel->rx.cons & 0xffff ),
+	       readl ( intel->regs + intel->rx.reg + INTEL_xDH ),
+	       ( intel->rx.prod & 0xffff ),
+	       readl ( intel->regs + intel->rx.reg + INTEL_xDT ) );
+}
+
 extern int intel_create_ring ( struct intel_nic *intel,
 			       struct intel_ring *ring );
 extern void intel_destroy_ring ( struct intel_nic *intel,
