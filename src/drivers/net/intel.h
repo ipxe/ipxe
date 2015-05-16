@@ -243,6 +243,29 @@ intel_init_ring ( struct intel_ring *ring, unsigned int count, unsigned int reg,
 	ring->describe = describe;
 }
 
+/** An Intel virtual function mailbox */
+struct intel_mailbox {
+	/** Mailbox control register */
+	unsigned int ctrl;
+	/** Mailbox memory base */
+	unsigned int mem;
+};
+
+/**
+ * Initialise mailbox
+ *
+ * @v mbox		Mailbox
+ * @v ctrl		Mailbox control register
+ * @v mem		Mailbox memory register base
+ */
+static inline __attribute__ (( always_inline )) void
+intel_init_mbox ( struct intel_mailbox *mbox, unsigned int ctrl,
+		  unsigned int mem ) {
+
+	mbox->ctrl = ctrl;
+	mbox->mem = mem;
+}
+
 /** An Intel network card */
 struct intel_nic {
 	/** Registers */
@@ -260,6 +283,9 @@ struct intel_nic {
 	uint32_t eerd_done;
 	/** EEPROM address shift */
 	unsigned int eerd_addr_shift;
+
+	/** Mailbox */
+	struct intel_mailbox mbox;
 
 	/** Transmit descriptor ring */
 	struct intel_ring tx;
