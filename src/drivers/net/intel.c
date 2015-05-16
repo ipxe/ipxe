@@ -349,6 +349,67 @@ static void intel_check_link ( struct net_device *netdev ) {
 
 /******************************************************************************
  *
+ * Descriptors
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Populate transmit descriptor
+ *
+ * @v tx		Transmit descriptor
+ * @v addr		Data buffer address
+ * @v len		Length of data
+ */
+void intel_describe_tx ( struct intel_descriptor *tx, physaddr_t addr,
+			 size_t len ) {
+
+	/* Populate transmit descriptor */
+	tx->address = cpu_to_le64 ( addr );
+	tx->length = cpu_to_le16 ( len );
+	tx->flags = 0;
+	tx->command = ( INTEL_DESC_CMD_RS | INTEL_DESC_CMD_IFCS |
+			INTEL_DESC_CMD_EOP );
+	tx->status = 0;
+}
+
+/**
+ * Populate advanced transmit descriptor
+ *
+ * @v tx		Transmit descriptor
+ * @v addr		Data buffer address
+ * @v len		Length of data
+ */
+void intel_describe_tx_adv ( struct intel_descriptor *tx, physaddr_t addr,
+			     size_t len ) {
+
+	/* Populate advanced transmit descriptor */
+	tx->address = cpu_to_le64 ( addr );
+	tx->length = cpu_to_le16 ( len );
+	tx->flags = INTEL_DESC_FL_DTYP_DATA;
+	tx->command = ( INTEL_DESC_CMD_DEXT | INTEL_DESC_CMD_RS |
+			INTEL_DESC_CMD_IFCS | INTEL_DESC_CMD_EOP );
+	tx->status = cpu_to_le32 ( INTEL_DESC_STATUS_PAYLEN ( len ) );
+}
+
+/**
+ * Populate receive descriptor
+ *
+ * @v rx		Receive descriptor
+ * @v addr		Data buffer address
+ * @v len		Length of data
+ */
+void intel_describe_rx ( struct intel_descriptor *rx, physaddr_t addr,
+			 size_t len __unused ) {
+
+	/* Populate transmit descriptor */
+	rx->address = cpu_to_le64 ( addr );
+	rx->length = 0;
+	rx->status = 0;
+}
+
+/******************************************************************************
+ *
  * Network device interface
  *
  ******************************************************************************
@@ -457,10 +518,7 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 
 		/* Populate receive descriptor */
 		address = virt_to_bus ( iobuf->data );
-		rx->address = cpu_to_le64 ( address );
-		rx->length = 0;
-		rx->status = 0;
-		rx->errors = 0;
+		intel->rx.describe ( rx, address, 0 );
 
 		/* Record I/O buffer */
 		assert ( intel->rx_iobuf[rx_idx] == NULL );
@@ -602,6 +660,7 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	unsigned int tx_idx;
 	unsigned int tx_tail;
 	physaddr_t address;
+	size_t len;
 
 	/* Get next transmit descriptor */
 	if ( ( intel->tx.prod - intel->tx.cons ) >= INTEL_TX_FILL ) {
@@ -614,11 +673,8 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
 	/* Populate transmit descriptor */
 	address = virt_to_bus ( iobuf->data );
-	tx->address = cpu_to_le64 ( address );
-	tx->length = cpu_to_le16 ( iob_len ( iobuf ) );
-	tx->command = ( INTEL_DESC_CMD_RS | INTEL_DESC_CMD_IFCS |
-			INTEL_DESC_CMD_EOP );
-	tx->status = 0;
+	len = iob_len ( iobuf );
+	intel->tx.describe ( tx, address, len );
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */
@@ -629,7 +685,7 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
 	DBGC2 ( intel, "INTEL %p TX %d is [%llx,%llx)\n", intel, tx_idx,
 		( ( unsigned long long ) address ),
-		( ( unsigned long long ) address + iob_len ( iobuf ) ) );
+		( ( unsigned long long ) address + len ) );
 
 	return 0;
 }
@@ -652,7 +708,7 @@ void intel_poll_tx ( struct net_device *netdev ) {
 		tx = &intel->tx.desc[tx_idx];
 
 		/* Stop if descriptor is still in use */
-		if ( ! ( tx->status & INTEL_DESC_STATUS_DD ) )
+		if ( ! ( tx->status & cpu_to_le32 ( INTEL_DESC_STATUS_DD ) ) )
 			return;
 
 		DBGC2 ( intel, "INTEL %p TX %d complete\n", intel, tx_idx );
@@ -683,7 +739,7 @@ void intel_poll_rx ( struct net_device *netdev ) {
 		rx = &intel->rx.desc[rx_idx];
 
 		/* Stop if descriptor is still in use */
-		if ( ! ( rx->status & INTEL_DESC_STATUS_DD ) )
+		if ( ! ( rx->status & cpu_to_le32 ( INTEL_DESC_STATUS_DD ) ) )
 			return;
 
 		/* Populate I/O buffer */
@@ -693,10 +749,10 @@ void intel_poll_rx ( struct net_device *netdev ) {
 		iob_put ( iobuf, len );
 
 		/* Hand off to network stack */
-		if ( rx->errors ) {
+		if ( rx->status & cpu_to_le32 ( INTEL_DESC_STATUS_RXE ) ) {
 			DBGC ( intel, "INTEL %p RX %d error (length %zd, "
-			       "errors %02x)\n",
-			       intel, rx_idx, len, rx->errors );
+			       "status %08x)\n", intel, rx_idx, len,
+			       le32_to_cpu ( rx->status ) );
 			netdev_rx_err ( netdev, iobuf, -EIO );
 		} else {
 			DBGC2 ( intel, "INTEL %p RX %d complete (length %zd)\n",
@@ -811,8 +867,10 @@ static int intel_probe ( struct pci_device *pci ) {
 	memset ( intel, 0, sizeof ( *intel ) );
 	intel->port = PCI_FUNC ( pci->busdevfn );
 	intel->flags = pci->id->driver_data;
-	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTEL_TD );
-	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTEL_RD );
+	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTEL_TD,
+			  intel_describe_tx );
+	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTEL_RD,
+			  intel_describe_rx );
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );

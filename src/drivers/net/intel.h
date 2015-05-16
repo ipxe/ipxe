@@ -22,33 +22,38 @@ struct intel_descriptor {
 	uint64_t address;
 	/** Length */
 	uint16_t length;
-	/** Reserved */
-	uint8_t reserved_a;
+	/** Flags */
+	uint8_t flags;
 	/** Command */
 	uint8_t command;
 	/** Status */
-	uint8_t status;
-	/** Errors */
-	uint8_t errors;
-	/** Reserved */
-	uint16_t reserved_b;
+	uint32_t status;
 } __attribute__ (( packed ));
 
-/** Packet descriptor command bits */
-enum intel_descriptor_command {
-	/** Report status */
-	INTEL_DESC_CMD_RS = 0x08,
-	/** Insert frame checksum (CRC) */
-	INTEL_DESC_CMD_IFCS = 0x02,
-	/** End of packet */
-	INTEL_DESC_CMD_EOP = 0x01,
-};
+/** Descriptor type */
+#define INTEL_DESC_FL_DTYP( dtyp ) ( (dtyp) << 4 )
+#define INTEL_DESC_FL_DTYP_DATA INTEL_DESC_FL_DTYP ( 0x03 )
 
-/** Packet descriptor status bits */
-enum intel_descriptor_status {
-	/** Descriptor done */
-	INTEL_DESC_STATUS_DD = 0x01,
-};
+/** Descriptor extension */
+#define INTEL_DESC_CMD_DEXT 0x20
+
+/** Report status */
+#define INTEL_DESC_CMD_RS 0x08
+
+/** Insert frame checksum (CRC) */
+#define INTEL_DESC_CMD_IFCS 0x02
+
+/** End of packet */
+#define INTEL_DESC_CMD_EOP 0x01
+
+/** Descriptor done */
+#define INTEL_DESC_STATUS_DD 0x00000001UL
+
+/** Receive error */
+#define INTEL_DESC_STATUS_RXE 0x00000100UL
+
+/** Payload length */
+#define INTEL_DESC_STATUS_PAYLEN( len ) ( (len) << 14 )
 
 /** Device Control Register */
 #define INTEL_CTRL 0x00000UL
@@ -209,6 +214,15 @@ struct intel_ring {
 	unsigned int reg;
 	/** Length (in bytes) */
 	size_t len;
+
+	/** Populate descriptor
+	 *
+	 * @v desc		Descriptor
+	 * @v addr		Data buffer address
+	 * @v len		Length of data
+	 */
+	void ( * describe ) ( struct intel_descriptor *desc, physaddr_t addr,
+			      size_t len );
 };
 
 /**
@@ -217,12 +231,16 @@ struct intel_ring {
  * @v ring		Descriptor ring
  * @v count		Number of descriptors
  * @v reg		Descriptor register block
+ * @v describe		Method to populate descriptor
  */
 static inline __attribute__ (( always_inline)) void
-intel_init_ring ( struct intel_ring *ring, unsigned int count,
-		  unsigned int reg ) {
+intel_init_ring ( struct intel_ring *ring, unsigned int count, unsigned int reg,
+		  void ( * describe ) ( struct intel_descriptor *desc,
+					physaddr_t addr, size_t len ) ) {
+
 	ring->len = ( count * sizeof ( ring->desc[0] ) );
 	ring->reg = reg;
+	ring->describe = describe;
 }
 
 /** An Intel network card */
@@ -278,6 +296,12 @@ static inline void intel_diag ( struct intel_nic *intel ) {
 	       readl ( intel->regs + intel->rx.reg + INTEL_xDT ) );
 }
 
+extern void intel_describe_tx ( struct intel_descriptor *tx,
+				physaddr_t addr, size_t len );
+extern void intel_describe_tx_adv ( struct intel_descriptor *tx,
+				    physaddr_t addr, size_t len );
+extern void intel_describe_rx ( struct intel_descriptor *rx,
+				physaddr_t addr, size_t len );
 extern int intel_create_ring ( struct intel_nic *intel,
 			       struct intel_ring *ring );
 extern void intel_destroy_ring ( struct intel_nic *intel,
