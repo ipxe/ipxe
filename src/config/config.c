@@ -84,6 +84,9 @@ REQUIRE_OBJECT ( debugcon );
 #ifdef CONSOLE_VESAFB
 REQUIRE_OBJECT ( vesafb );
 #endif
+#ifdef CONSOLE_INT13
+REQUIRE_OBJECT ( int13con );
+#endif
 
 /*
  * Drag in all requested network protocols
