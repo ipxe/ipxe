@@ -71,7 +71,28 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define INTELXVF_SRRCTL_DESCTYPE_DEFAULT INTELXVF_SRRCTL_DESCTYPE ( 0x00 )
 #define INTELXVF_SRRCTL_DESCTYPE_MASK INTELXVF_SRRCTL_DESCTYPE ( 0x07 )
 
+/** Good Packets Received Count */
+#define INTELXVF_GPRC 0x101c
+
+/** Good Packets Received Count Low */
+#define INTELXVF_GORCL 0x1020
+
+/** Good Packets Received Count High */
+#define INTELXVF_GORCH 0x1024
+
+/* Multicast Packets Received Count */
+#define INTELXVF_MPRC 0x1034
+
 /** Transmit Descriptor register block */
 #define INTELXVF_TD 0x2000UL
+
+/** Good Packets Transmitted Count */
+#define INTELXVF_GPTC 0x201c
+
+/** Good Packets Transmitted Count Low */
+#define INTELXVF_GOTCL 0x2020
+
+/** Good Packets Transmitted Count High */
+#define INTELXVF_GOTCH 0x2024
 
 #endif /* _INTELXVF_H */

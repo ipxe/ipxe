@@ -40,6 +40,31 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /******************************************************************************
  *
+ * Diagnostics
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Dump statistics
+ *
+ * @v intel		Intel device
+ */
+static __attribute__ (( unused )) void
+intelxvf_stats ( struct intel_nic *intel ) {
+
+	DBGC ( intel, "INTEL %p TX %d (%#x%08x) RX %d (%#x%08x) multi %d\n",
+	       intel, readl ( intel->regs + INTELXVF_GPTC ),
+	       readl ( intel->regs + INTELXVF_GOTCH ),
+	       readl ( intel->regs + INTELXVF_GOTCL ),
+	       readl ( intel->regs + INTELXVF_GPRC ),
+	       readl ( intel->regs + INTELXVF_GORCH ),
+	       readl ( intel->regs + INTELXVF_GORCL ),
+	       readl ( intel->regs + INTELXVF_MPRC ) );
+}
+
+/******************************************************************************
+ *
  * Device reset
  *
  ******************************************************************************
