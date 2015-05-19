@@ -146,8 +146,7 @@ int intelvf_mbox_wait ( struct intel_nic *intel ) {
  * @v msg		Message buffer
  * @ret rc		Return status code
  */
-static int intelvf_mbox_msg ( struct intel_nic *intel,
-			      union intelvf_msg *msg ) {
+int intelvf_mbox_msg ( struct intel_nic *intel, union intelvf_msg *msg ) {
 	struct intel_mailbox *mbox = &intel->mbox;
 	uint32_t ctrl;
 	uint32_t seen = 0;
@@ -296,6 +295,44 @@ int intelvf_mbox_set_mac ( struct intel_nic *intel, const uint8_t *ll_addr ) {
 	/* Check that we were allowed to set the MAC address */
 	if ( ! ( msg.hdr & INTELVF_MSG_ACK ) ) {
 		DBGC ( intel, "INTEL %p set MAC address refused\n", intel );
+		return -EPERM;
+	}
+
+	return 0;
+}
+
+/**
+ * Send set MTU message
+ *
+ * @v intel		Intel device
+ * @v mtu		Maximum packet size
+ * @ret rc		Return status code
+ */
+int intelvf_mbox_set_mtu ( struct intel_nic *intel, size_t mtu ) {
+	union intelvf_msg msg;
+	int rc;
+
+	/* Send set MTU message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.hdr = INTELVF_MSG_TYPE_SET_MTU;
+	msg.mtu.mtu = mtu;
+	if ( ( rc = intelvf_mbox_msg ( intel, &msg ) ) != 0 ) {
+		DBGC ( intel, "INTEL %p set MTU failed: %s\n",
+		       intel, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Check response */
+	if ( ( msg.hdr & INTELVF_MSG_TYPE_MASK ) != INTELVF_MSG_TYPE_SET_MTU ) {
+		DBGC ( intel, "INTEL %p set MTU unexpected response:\n",
+		       intel );
+		DBGC_HDA ( intel, 0, &msg, sizeof ( msg ) );
+		return -EPROTO;
+	}
+
+	/* Check that we were allowed to set the MTU */
+	if ( ! ( msg.hdr & INTELVF_MSG_ACK ) ) {
+		DBGC ( intel, "INTEL %p set MTU refused\n", intel );
 		return -EPERM;
 	}
 

@@ -95,4 +95,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Good Packets Transmitted Count High */
 #define INTELXVF_GOTCH 0x2024
 
+/** Negotiate API version mailbox message */
+#define INTELXVF_MSG_TYPE_VERSION 0x00000008UL
+
+/** API version 1.1 */
+#define INTELXVF_MSG_VERSION_1_1 0x00000002UL
+
 #endif /* _INTELXVF_H */

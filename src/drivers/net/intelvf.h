@@ -34,6 +34,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Set MAC address mailbox message */
 #define INTELVF_MSG_TYPE_SET_MAC 0x00000002UL
 
+/** Set MTU mailbox message */
+#define INTELVF_MSG_TYPE_SET_MTU 0x00000005UL
+
 /** Control ("ping") mailbox message */
 #define INTELVF_MSG_TYPE_CONTROL 0x00000100UL
 
@@ -59,12 +62,32 @@ struct intelvf_msg_mac {
 	uint8_t reserved[ (-ETH_ALEN) & 0x3 ];
 } __attribute__ (( packed ));
 
+/** Version number mailbox message */
+struct intelvf_msg_version {
+	/** Message header */
+	uint32_t hdr;
+	/** API version */
+	uint32_t version;
+} __attribute__ (( packed ));
+
+/** MTU mailbox message */
+struct intelvf_msg_mtu {
+	/** Message header */
+	uint32_t hdr;
+	/** Maximum packet size */
+	uint32_t mtu;
+} __attribute__ (( packed ));
+
 /** Mailbox message */
 union intelvf_msg {
 	/** Message header */
 	uint32_t hdr;
 	/** MAC address message */
 	struct intelvf_msg_mac mac;
+	/** Version number message */
+	struct intelvf_msg_version version;
+	/** MTU message */
+	struct intelvf_msg_mtu mtu;
 	/** Raw dwords */
 	uint32_t dword[0];
 };
@@ -75,10 +98,12 @@ union intelvf_msg {
  */
 #define INTELVF_MBOX_MAX_WAIT_MS 500
 
+extern int intelvf_mbox_msg ( struct intel_nic *intel, union intelvf_msg *msg );
 extern int intelvf_mbox_poll ( struct intel_nic *intel );
 extern int intelvf_mbox_wait ( struct intel_nic *intel );
 extern int intelvf_mbox_reset ( struct intel_nic *intel, uint8_t *hw_addr );
 extern int intelvf_mbox_set_mac ( struct intel_nic *intel,
 				  const uint8_t *ll_addr );
+extern int intelvf_mbox_set_mtu ( struct intel_nic *intel, size_t mtu );
 
 #endif /* _INTELVF_H */

@@ -111,6 +111,53 @@ static void intelxvf_check_link ( struct net_device *netdev ) {
 
 /******************************************************************************
  *
+ * Mailbox messages
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Send negotiate API version message
+ *
+ * @v intel		Intel device
+ * @v version		Requested version
+ * @ret rc		Return status code
+ */
+static int intelxvf_mbox_version ( struct intel_nic *intel,
+				   unsigned int version ) {
+	union intelvf_msg msg;
+	int rc;
+
+	/* Send set MTU message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.hdr = INTELXVF_MSG_TYPE_VERSION;
+	msg.version.version = version;
+	if ( ( rc = intelvf_mbox_msg ( intel, &msg ) ) != 0 ) {
+		DBGC ( intel, "INTEL %p negotiate API version failed: %s\n",
+		       intel, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Check response */
+	if ( ( msg.hdr & INTELVF_MSG_TYPE_MASK ) != INTELXVF_MSG_TYPE_VERSION ){
+		DBGC ( intel, "INTEL %p negotiate API version unexpected "
+		       "response:\n", intel );
+		DBGC_HDA ( intel, 0, &msg, sizeof ( msg ) );
+		return -EPROTO;
+	}
+
+	/* Check that this version is supported */
+	if ( ! ( msg.hdr & INTELVF_MSG_ACK ) ) {
+		DBGC ( intel, "INTEL %p negotiate API version failed\n",
+		       intel );
+		return -EPERM;
+	}
+
+	return 0;
+}
+
+/******************************************************************************
+ *
  * Network device interface
  *
  ******************************************************************************
@@ -138,11 +185,27 @@ static int intelxvf_open ( struct net_device *netdev ) {
 		goto err_mbox_reset;
 	}
 
+	/* Negotiate API version 1.1.  If we do not negotiate at least
+	 * this version, then the RX datapath will remain disabled if
+	 * the PF has jumbo frames enabled.
+	 *
+	 * Ignore failures, since the host may not actually support
+	 * v1.1.
+	 */
+	intelxvf_mbox_version ( intel, INTELXVF_MSG_VERSION_1_1 );
+
 	/* Set MAC address */
 	if ( ( rc = intelvf_mbox_set_mac ( intel, netdev->ll_addr ) ) != 0 ) {
 		DBGC ( intel, "INTEL %p could not set MAC address: %s\n",
 		       intel, strerror ( rc ) );
 		goto err_mbox_set_mac;
+	}
+
+	/* Set MTU */
+	if ( ( rc = intelvf_mbox_set_mtu ( intel, netdev->max_pkt_len ) ) != 0){
+		DBGC ( intel, "INTEL %p could not set MTU %zd: %s\n",
+		       intel, netdev->max_pkt_len, strerror ( rc ) );
+		goto err_mbox_set_mtu;
 	}
 
 	/* Create transmit descriptor ring */
@@ -188,6 +251,7 @@ static int intelxvf_open ( struct net_device *netdev ) {
  err_create_rx:
 	intel_destroy_ring ( intel, &intel->tx );
  err_create_tx:
+ err_mbox_set_mtu:
  err_mbox_set_mac:
  err_mbox_reset:
 	intelxvf_reset ( intel );
