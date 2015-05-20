@@ -322,7 +322,7 @@ int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 			netdev->name, net_protocol->name,
 			net_protocol->ntoa ( net_dest ) );
 		list_add_tail ( &iobuf->list, &neighbour->tx_queue );
-		return -EAGAIN;
+		return 0;
 	}
 }
 
