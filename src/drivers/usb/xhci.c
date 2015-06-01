@@ -2622,6 +2622,7 @@ static int xhci_device_open ( struct usb_device *usb ) {
 		rc = id;
 		goto err_enable_slot;
 	}
+	assert ( ( id > 0 ) && ( id <= xhci->slots ) );
 	assert ( xhci->slot[id] == NULL );
 
 	/* Allocate and initialise structure */
@@ -2761,7 +2762,7 @@ static int xhci_bus_open ( struct usb_bus *bus ) {
 	int rc;
 
 	/* Allocate device slot array */
-	xhci->slot = zalloc ( xhci->slots * sizeof ( xhci->slot[0] ) );
+	xhci->slot = zalloc ( ( xhci->slots + 1 ) * sizeof ( xhci->slot[0] ) );
 	if ( ! xhci->slot ) {
 		rc = -ENOMEM;
 		goto err_slot_alloc;
@@ -2813,7 +2814,7 @@ static void xhci_bus_close ( struct usb_bus *bus ) {
 
 	/* Sanity checks */
 	assert ( xhci->slot != NULL );
-	for ( i = 0 ; i < xhci->slots ; i++ )
+	for ( i = 0 ; i <= xhci->slots ; i++ )
 		assert ( xhci->slot[i] == NULL );
 
 	xhci_stop ( xhci );
