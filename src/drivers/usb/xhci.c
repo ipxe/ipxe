@@ -2622,7 +2622,7 @@ static int xhci_device_open ( struct usb_device *usb ) {
 		rc = id;
 		goto err_enable_slot;
 	}
-	assert ( ( id > 0 ) && ( id <= xhci->slots ) );
+	assert ( ( id > 0 ) && ( ( unsigned int ) id <= xhci->slots ) );
 	assert ( xhci->slot[id] == NULL );
 
 	/* Allocate and initialise structure */
