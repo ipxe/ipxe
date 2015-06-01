@@ -100,6 +100,8 @@ struct errortab ipoib_errors[] __errortab = {
 	__einfo_errortab ( EINFO_EINPROGRESS_JOINING ),
 };
 
+static struct net_device_operations ipoib_operations;
+
 /****************************************************************************
  *
  * IPoIB REMAC cache
@@ -206,14 +208,20 @@ static void ipoib_flush_remac ( struct ipoib_device *ipoib ) {
  * @ret discarded	Number of cached items discarded
  */
 static unsigned int ipoib_discard_remac ( void ) {
-	struct ib_device *ibdev;
+	struct net_device *netdev;
 	struct ipoib_device *ipoib;
 	struct ipoib_peer *peer;
 	unsigned int discarded = 0;
 
 	/* Try to discard one cache entry for each IPoIB device */
-	for_each_ibdev ( ibdev ) {
-		ipoib = ib_get_ownerdata ( ibdev );
+	for_each_netdev ( netdev ) {
+
+		/* Skip non-IPoIB devices */
+		if ( netdev->op != &ipoib_operations )
+			continue;
+		ipoib = netdev->priv;
+
+		/* Discard least recently used cache entry (if any) */
 		list_for_each_entry_reverse ( peer, &ipoib->peers, list ) {
 			list_del ( &peer->list );
 			free ( peer );
