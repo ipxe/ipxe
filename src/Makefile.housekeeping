@@ -949,9 +949,8 @@ CLEANUP		+= $(BIN)/NIC	# Doesn't match the $(BIN)/*.* pattern
 
 # Select drivers to be included in the all-drivers build
 #
-DRIVERS		= $(DRIVERS_net) $(DRIVERS_infiniband) \
+DRIVERS_ipxe	= $(DRIVERS_net) $(DRIVERS_infiniband) \
 		  $(DRIVERS_xen) $(DRIVERS_hyperv)
-DRIVERS_ipxe	= $(DRIVERS)
 
 # Analyse a target name (e.g. "bin/dfe538--prism2_pci.rom.tmp") and
 # derive the variables:

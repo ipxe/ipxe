@@ -162,6 +162,7 @@ sub print_make_rules {
         print "# NIC\t\n";
         print "# NIC\tfamily\t$state->{family}\n";
         print "DRIVERS_$state->{driver_class} += $state->{driver_name}\n";
+        print "DRIVERS += $state->{driver_name}\n";
         print "\n";
         $state->{'is_header_printed'} = 1;
     }
