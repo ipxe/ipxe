@@ -1038,6 +1038,8 @@ struct xhci_device {
 	void *regs;
 	/** Name */
 	const char *name;
+	/** Quirks */
+	unsigned int quirks;
 
 	/** Capability registers */
 	void *cap;

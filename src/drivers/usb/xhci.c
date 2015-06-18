@@ -3197,6 +3197,7 @@ static int xhci_probe ( struct pci_device *pci ) {
 		goto err_alloc;
 	}
 	xhci->name = pci->dev.name;
+	xhci->quirks = pci->id->driver_data;
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
@@ -3218,7 +3219,7 @@ static int xhci_probe ( struct pci_device *pci ) {
 	xhci_legacy_claim ( xhci );
 
 	/* Fix Intel PCH-specific quirks, if applicable */
-	if ( pci->id->driver_data & XHCI_PCH )
+	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_fix ( xhci, pci );
 
 	/* Reset device */
@@ -3254,7 +3255,7 @@ static int xhci_probe ( struct pci_device *pci ) {
  err_alloc_bus:
 	xhci_reset ( xhci );
  err_reset:
-	if ( pci->id->driver_data & XHCI_PCH )
+	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_undo ( xhci, pci );
 	xhci_legacy_release ( xhci );
 	iounmap ( xhci->regs );
@@ -3276,7 +3277,7 @@ static void xhci_remove ( struct pci_device *pci ) {
 	unregister_usb_bus ( bus );
 	free_usb_bus ( bus );
 	xhci_reset ( xhci );
-	if ( pci->id->driver_data & XHCI_PCH )
+	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_undo ( xhci, pci );
 	xhci_legacy_release ( xhci );
 	iounmap ( xhci->regs );
