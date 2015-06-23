@@ -42,7 +42,11 @@ static int pcibios_num_bus ( void ) {
 	int discard_a, discard_D;
 	uint8_t max_bus;
 
-	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
+	/* We issue this call using flat real mode, to work around a
+	 * bug in some HP BIOSes.
+	 */
+	__asm__ __volatile__ ( REAL_CODE ( "call flatten_real_mode\n\t"
+					   "stc\n\t"
 					   "int $0x1a\n\t"
 					   "jnc 1f\n\t"
 					   "xorw %%cx, %%cx\n\t"
