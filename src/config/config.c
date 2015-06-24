@@ -158,6 +158,7 @@ REQUIRE_OBJECT ( nbi );
 #endif
 #ifdef IMAGE_ELF
 REQUIRE_OBJECT ( elfboot );
+REQUIRE_OBJECT ( freebsd );
 #endif
 #ifdef IMAGE_MULTIBOOT
 REQUIRE_OBJECT ( multiboot );
