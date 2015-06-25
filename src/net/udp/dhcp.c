@@ -436,6 +436,15 @@ static void dhcp_discovery_rx ( struct dhcp_session *dhcp,
 static void dhcp_discovery_expired ( struct dhcp_session *dhcp ) {
 	unsigned long elapsed = ( currticks() - dhcp->start );
 
+	/* If link is blocked, defer DHCP discovery (and reset timeout) */
+	if ( netdev_link_blocked ( dhcp->netdev ) ) {
+		DBGC ( dhcp, "DHCP %p deferring discovery\n", dhcp );
+		start_timer_fixed ( &dhcp->timer,
+				    ( DHCP_DISC_START_TIMEOUT_SEC *
+				      TICKS_PER_SEC ) );
+		return;
+	}
+
 	/* Give up waiting for ProxyDHCP before we reach the failure point */
 	if ( dhcp->offer.s_addr &&
 	     ( elapsed > DHCP_DISC_PROXY_TIMEOUT_SEC * TICKS_PER_SEC ) ) {
