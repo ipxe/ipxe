@@ -65,7 +65,7 @@ static int stp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    const void *ll_source __unused,
 		    unsigned int flags __unused ) {
 	struct stp_bpdu *stp;
-	unsigned int timeout;
+	unsigned int hello;
 	int rc;
 
 	/* Sanity check */
@@ -110,8 +110,8 @@ static int stp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		       "forwarding\n",
 		       netdev->name, eth_ntoa ( stp->sender.mac ),
 		       ntohs ( stp->port ), stp->flags );
-		timeout = ( ntohs ( stp->hello ) * TICKS_PER_SEC * 2 );
-		netdev_link_block ( netdev, timeout );
+		hello = ( ( ntohs ( stp->hello ) * TICKS_PER_SEC ) / 256 );
+		netdev_link_block ( netdev, ( hello * 2 ) );
 		rc = -ENETUNREACH;
 		goto done;
 	}
