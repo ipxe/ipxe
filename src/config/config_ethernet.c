@@ -40,3 +40,6 @@ REQUIRE_OBJECT ( aoe );
 #ifdef NET_PROTO_FCOE
 REQUIRE_OBJECT ( fcoe );
 #endif
+#ifdef NET_PROTO_STP
+REQUIRE_OBJECT ( stp );
+#endif
