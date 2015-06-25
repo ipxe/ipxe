@@ -161,6 +161,9 @@ void netdev_rx_unfreeze ( struct net_device *netdev ) {
  */
 void netdev_link_err ( struct net_device *netdev, int rc ) {
 
+	/* Stop link block timer */
+	stop_timer ( &netdev->link_block );
+
 	/* Record link state */
 	netdev->link_rc = rc;
 	if ( netdev->link_rc == 0 ) {
@@ -188,6 +191,50 @@ void netdev_link_down ( struct net_device *netdev ) {
 	     ( netdev->link_rc == -EUNKNOWN_LINK_STATUS ) ) {
 		netdev_link_err ( netdev, -ENOTCONN_LINK_DOWN );
 	}
+}
+
+/**
+ * Mark network device link as being blocked
+ *
+ * @v netdev		Network device
+ * @v timeout		Timeout (in ticks)
+ */
+void netdev_link_block ( struct net_device *netdev, unsigned long timeout ) {
+
+	/* Start link block timer */
+	if ( ! netdev_link_blocked ( netdev ) ) {
+		DBGC ( netdev, "NETDEV %s link blocked for %ld ticks\n",
+		       netdev->name, timeout );
+	}
+	start_timer_fixed ( &netdev->link_block, timeout );
+}
+
+/**
+ * Mark network device link as being unblocked
+ *
+ * @v netdev		Network device
+ */
+void netdev_link_unblock ( struct net_device *netdev ) {
+
+	/* Stop link block timer */
+	if ( netdev_link_blocked ( netdev ) )
+		DBGC ( netdev, "NETDEV %s link unblocked\n", netdev->name );
+	stop_timer ( &netdev->link_block );
+}
+
+/**
+ * Handle network device link block timer expiry
+ *
+ * @v timer		Link block timer
+ * @v fail		Failure indicator
+ */
+static void netdev_link_block_expired ( struct retry_timer *timer,
+					int fail __unused ) {
+	struct net_device *netdev =
+		container_of ( timer, struct net_device, link_block );
+
+	/* Assume link is no longer blocked */
+	DBGC ( netdev, "NETDEV %s link block expired\n", netdev->name );
 }
 
 /**
@@ -545,7 +592,8 @@ static struct interface_descriptor netdev_config_desc =
 static void free_netdev ( struct refcnt *refcnt ) {
 	struct net_device *netdev =
 		container_of ( refcnt, struct net_device, refcnt );
-	
+
+	stop_timer ( &netdev->link_block );
 	netdev_tx_flush ( netdev );
 	netdev_rx_flush ( netdev );
 	clear_settings ( netdev_settings ( netdev ) );
@@ -575,6 +623,8 @@ struct net_device * alloc_netdev ( size_t priv_len ) {
 	if ( netdev ) {
 		ref_init ( &netdev->refcnt, free_netdev );
 		netdev->link_rc = -EUNKNOWN_LINK_STATUS;
+		timer_init ( &netdev->link_block, netdev_link_block_expired,
+			     &netdev->refcnt );
 		INIT_LIST_HEAD ( &netdev->tx_queue );
 		INIT_LIST_HEAD ( &netdev->tx_deferred );
 		INIT_LIST_HEAD ( &netdev->rx_queue );

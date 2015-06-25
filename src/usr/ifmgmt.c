@@ -103,11 +103,12 @@ static void ifstat_errors ( struct net_device_stats *stats,
  */
 void ifstat ( struct net_device *netdev ) {
 	printf ( "%s: %s using %s on %s (%s)\n"
-		 "  [Link:%s, TX:%d TXE:%d RX:%d RXE:%d]\n",
+		 "  [Link:%s%s, TX:%d TXE:%d RX:%d RXE:%d]\n",
 		 netdev->name, netdev_addr ( netdev ),
 		 netdev->dev->driver_name, netdev->dev->name,
 		 ( netdev_is_open ( netdev ) ? "open" : "closed" ),
 		 ( netdev_link_ok ( netdev ) ? "up" : "down" ),
+		 ( netdev_link_blocked ( netdev ) ? " (blocked)" : "" ),
 		 netdev->tx_stats.good, netdev->tx_stats.bad,
 		 netdev->rx_stats.good, netdev->rx_stats.bad );
 	if ( ! netdev_link_ok ( netdev ) ) {
