@@ -467,6 +467,7 @@ pci_set_mem_access:
 	.org	0x00
 mromheader:
 	.word	0xaa55			/* BIOS extension signature */
+	.byte	0x01			/* Dummy size (BIOS bug workaround) */
 	.org	0x18
 	.word	mpciheader
 	.org	0x1a
