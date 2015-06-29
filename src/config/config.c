@@ -55,7 +55,7 @@ PROVIDE_REQUIRING_SYMBOL();
 REQUIRE_OBJECT ( bios_console );
 #endif
 #ifdef CONSOLE_SERIAL
-REQUIRE_OBJECT ( serial_console );
+REQUIRE_OBJECT ( serial );
 #endif
 #ifdef CONSOLE_DIRECT_VGA
 REQUIRE_OBJECT ( video_subr );

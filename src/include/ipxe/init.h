@@ -26,10 +26,9 @@ struct init_fn {
  */
 
 #define INIT_EARLY	01	/**< Early initialisation */
-#define INIT_SERIAL	02	/**< Serial driver initialisation */
-#define	INIT_CONSOLE	03	/**< Console initialisation */
-#define INIT_NORMAL	04	/**< Normal initialisation */
-#define INIT_LATE	05	/**< Late initialisation */
+#define	INIT_CONSOLE	02	/**< Console initialisation */
+#define INIT_NORMAL	03	/**< Normal initialisation */
+#define INIT_LATE	04	/**< Late initialisation */
 
 /** @} */
 
