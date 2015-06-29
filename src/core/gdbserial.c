@@ -24,6 +24,8 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <ipxe/uart.h>
 #include <ipxe/gdbstub.h>
@@ -54,6 +56,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** GDB serial UART */
 static struct uart gdbserial_uart;
 
+struct gdb_transport serial_gdb_transport __gdb_transport;
+
 static size_t gdbserial_recv ( char *buf, size_t len ) {
 
 	assert ( len > 0 );
@@ -69,15 +73,27 @@ static void gdbserial_send ( const char *buf, size_t len ) {
 	}
 }
 
-static int gdbserial_init ( int argc __unused, char **argv __unused ) {
-	int rc;
+static int gdbserial_init ( int argc, char **argv ) {
+	unsigned int port;
+	char *endp;
 
-	if ( ( rc = uart_select ( &gdbserial_uart, GDBSERIAL_PORT ) ) != 0 )
-		return rc;
+	if ( argc == 0 ) {
+		port = GDBSERIAL_PORT;
+	} else if ( argc == 1 ) {
+		port = strtoul ( argv[0], &endp, 10 );
+		if ( *endp ) {
+			printf ( "serial: invalid port\n" );
+			return 1;
+		}
+	} else {
+		printf ( "serial: syntax <port>\n" );
+		return 1;
+	}
 
-	if ( ( rc = uart_init ( &gdbserial_uart, GDBSERIAL_BAUD,
-				GDBSERIAL_LCR ) ) != 0 )
-		return rc;
+	if ( ! gdbserial_configure ( port, GDBSERIAL_BAUD, GDBSERIAL_LCR ) ) {
+		printf ( "serial: unable to configure\n" );
+		return 1;
+	}
 
 	return 0;
 }
@@ -88,3 +104,16 @@ struct gdb_transport serial_gdb_transport __gdb_transport = {
 	.recv = gdbserial_recv,
 	.send = gdbserial_send,
 };
+
+struct gdb_transport * gdbserial_configure ( unsigned int port,
+					     unsigned int baud, uint8_t lcr ) {
+	int rc;
+
+	if ( ( rc = uart_select ( &gdbserial_uart, port ) ) != 0 )
+		return NULL;
+
+	if ( ( rc = uart_init ( &gdbserial_uart, baud, lcr ) ) != 0 )
+		return NULL;
+
+	return &serial_gdb_transport;
+}
