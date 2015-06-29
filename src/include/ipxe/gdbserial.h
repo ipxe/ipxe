@@ -9,13 +9,4 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-struct gdb_transport;
-
-/**
- * Set up the serial transport
- *
- * @ret transport suitable for starting the GDB stub or NULL on error
- */
-struct gdb_transport *gdbserial_configure ( void );
-
 #endif /* _IPXE_GDBSERIAL_H */
