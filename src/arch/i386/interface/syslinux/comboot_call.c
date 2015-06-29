@@ -463,6 +463,10 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 		}
 		break;
 
+	case 0x000C: /* Perform final cleanup */
+		shutdown_boot();
+		break;
+
 	case 0x000E: /* Get configuration file name */
 		/* FIXME: stub */
 		ix86->segs.es = rm_ds;
