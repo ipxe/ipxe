@@ -33,8 +33,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/errortab.h>
 #include <ipxe/malloc.h>
 #include <ipxe/if_arp.h>
+#include <ipxe/arp.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/ip.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/infiniband.h>
@@ -47,6 +49,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * IP over Infiniband
  */
+
+/* Disambiguate the various error causes */
+#define ENXIO_ARP_REPLY __einfo_error ( EINFO_ENXIO_ARP_REPLY )
+#define EINFO_ENXIO_ARP_REPLY						\
+	__einfo_uniqify ( EINFO_ENXIO, 0x01,				\
+			  "Missing REMAC for ARP reply target address" )
+#define ENXIO_NON_IPV4 __einfo_error ( EINFO_ENXIO_NON_IPV4 )
+#define EINFO_ENXIO_NON_IPV4						\
+	__einfo_uniqify ( EINFO_ENXIO, 0x02,				\
+			  "Missing REMAC for non-IPv4 packet" )
+#define ENXIO_ARP_SENT __einfo_error ( EINFO_ENXIO_ARP_SENT )
+#define EINFO_ENXIO_ARP_SENT						\
+	__einfo_uniqify ( EINFO_ENXIO, 0x03,				\
+			  "Missing REMAC for IPv4 packet (ARP sent)" )
 
 /** Number of IPoIB send work queue entries */
 #define IPOIB_NUM_SEND_WQES 2
@@ -336,8 +352,11 @@ static int ipoib_translate_tx_arp ( struct net_device *netdev,
 	/* Look up REMAC, if applicable */
 	if ( arphdr->ar_op == ARPOP_REPLY ) {
 		target_ha = ipoib_find_remac ( ipoib, arp_target_pa ( arphdr ));
-		if ( ! target_ha )
-			return -ENXIO;
+		if ( ! target_ha ) {
+			DBGC ( ipoib, "IPoIB %p no REMAC for %s ARP reply\n",
+			       ipoib, eth_ntoa ( arp_target_pa ( arphdr ) ) );
+			return -ENXIO_ARP_REPLY;
+		}
 	}
 
 	/* Construct new packet */
@@ -473,6 +492,7 @@ static int ipoib_transmit ( struct net_device *netdev,
 	struct ipoib_device *ipoib = netdev->priv;
 	struct ib_device *ibdev = ipoib->ibdev;
 	struct ethhdr *ethhdr;
+	struct iphdr *iphdr;
 	struct ipoib_hdr *ipoib_hdr;
 	struct ipoib_mac *mac;
 	struct ib_address_vector dest;
@@ -497,9 +517,34 @@ static int ipoib_transmit ( struct net_device *netdev,
 	iob_pull ( iobuf, sizeof ( *ethhdr ) );
 
 	/* Identify destination address */
-	mac = ipoib_find_remac ( ipoib, ( ( void *) ethhdr->h_dest ) );
-	if ( ! mac )
-		return -ENXIO;
+	mac = ipoib_find_remac ( ipoib, ( ( void * ) ethhdr->h_dest ) );
+	if ( ! mac ) {
+		/* Generate a new ARP request (if possible) to trigger
+		 * population of the REMAC cache entry.
+		 */
+		if ( ( net_proto != htons ( ETH_P_IP ) ) ||
+		     ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) ) {
+			DBGC ( ipoib, "IPoIB %p no REMAC for %s non-IPv4 "
+			       "packet type %04x\n", ipoib,
+			       eth_ntoa ( ethhdr->h_dest ),
+			       ntohs ( net_proto ) );
+			return -ENXIO_NON_IPV4;
+		}
+		iphdr = iobuf->data;
+		if ( ( rc = arp_tx_request ( netdev, &ipv4_protocol,
+					     &iphdr->dest, &iphdr->src ) ) !=0){
+			DBGC ( ipoib, "IPoIB %p could not ARP for %s/%s/",
+			       ipoib, eth_ntoa ( ethhdr->h_dest ),
+			       inet_ntoa ( iphdr->dest ) );
+			DBGC ( ipoib, "%s: %s\n", inet_ntoa ( iphdr->src ),
+			       strerror ( rc ) );
+			return rc;
+		}
+		DBGC ( ipoib, "IPoIB %p no REMAC for %s/%s/", ipoib,
+		       eth_ntoa ( ethhdr->h_dest ), inet_ntoa ( iphdr->dest ) );
+		DBGC  ( ipoib, "%s\n", inet_ntoa ( iphdr->src ) );
+		return -ENXIO_ARP_SENT;
+	}
 
 	/* Translate packet if applicable */
 	if ( ( rc = ipoib_translate_tx ( netdev, iobuf, net_proto ) ) != 0 )

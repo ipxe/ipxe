@@ -56,9 +56,9 @@ struct net_protocol arp_protocol __net_protocol;
  * @v net_source	Source network-layer address
  * @ret rc		Return status code
  */
-static int arp_tx_request ( struct net_device *netdev,
-			    struct net_protocol *net_protocol,
-			    const void *net_dest, const void *net_source ) {
+int arp_tx_request ( struct net_device *netdev,
+		     struct net_protocol *net_protocol,
+		     const void *net_dest, const void *net_source ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct io_buffer *iobuf;
 	struct arphdr *arphdr;
