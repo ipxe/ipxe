@@ -234,7 +234,7 @@ static unsigned int ipoib_discard_remac ( void ) {
 }
 
 /** IPoIB cache discarder */
-struct cache_discarder ipoib_discarder __cache_discarder ( CACHE_NORMAL ) = {
+struct cache_discarder ipoib_discarder __cache_discarder ( CACHE_EXPENSIVE ) = {
 	.discard = ipoib_discard_remac,
 };
 
