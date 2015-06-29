@@ -178,18 +178,16 @@ pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO *get_cached_info ) {
 	}
 	info = &cached_info[idx];
 
-	/* Construct cached version of packet, if not already constructed. */
-	if ( ! info->dhcphdr.op ) {
-		/* Construct DHCP packet */
-		creator = &pxe_dhcp_packet_creators[idx];
-		if ( ( rc = creator->create ( pxe_netdev, info,
-					      sizeof ( *info ) ) ) != 0 ) {
-			DBGC ( &pxe_netdev, " failed to build packet: %s\n",
-			       strerror ( rc ) );
-			goto err;
-		}
+	/* Construct DHCP packet */
+	creator = &pxe_dhcp_packet_creators[idx];
+	if ( ( rc = creator->create ( pxe_netdev, info,
+				      sizeof ( *info ) ) ) != 0 ) {
+		DBGC ( &pxe_netdev, " failed to build packet: %s\n",
+		       strerror ( rc ) );
+		goto err;
 	}
 
+	/* Copy packet (if applicable) */
 	len = get_cached_info->BufferSize;
 	if ( len == 0 ) {
 		/* Point client at our cached buffer.
