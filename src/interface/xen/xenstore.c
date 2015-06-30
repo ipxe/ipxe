@@ -242,6 +242,10 @@ static int xenstore_response ( struct xen_hypervisor *xen, uint32_t req_id,
 	char *string;
 	int rc;
 
+	/* Wait for response to become available */
+	while ( ! xenevent_pending ( xen, xen->store.port ) )
+		cpu_nap();
+
 	/* Receive message header */
 	xenstore_recv ( xen, &msg, sizeof ( msg ) );
 	*len = msg.len;
