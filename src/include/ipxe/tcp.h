@@ -420,6 +420,13 @@ static inline int tcp_in_window ( uint32_t seq, uint32_t start,
 	return ( ( seq - start ) < len );
 }
 
+/** TCP finish wait time
+ *
+ * Currently set to one second, since we should not allow a slowly
+ * responding server to substantially delay a call to shutdown().
+ */
+#define TCP_FINISH_TIMEOUT ( 1 * TICKS_PER_SEC )
+
 extern struct tcpip_protocol tcp_protocol __tcpip_protocol;
 
 #endif /* _IPXE_TCP_H */

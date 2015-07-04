@@ -1502,12 +1502,67 @@ struct cache_discarder tcp_discarder __cache_discarder ( CACHE_NORMAL ) = {
 };
 
 /**
+ * Find first TCP connection that has not yet been closed
+ *
+ * @ret tcp		First unclosed connection, or NULL
+ */
+static struct tcp_connection * tcp_first_unclosed ( void ) {
+	struct tcp_connection *tcp;
+
+	/* Find first connection which has not yet been closed */
+	list_for_each_entry ( tcp, &tcp_conns, list ) {
+		if ( ! ( tcp->flags & TCP_XFER_CLOSED ) )
+			return tcp;
+	}
+	return NULL;
+}
+
+/**
+ * Find first TCP connection that has not yet finished all operations
+ *
+ * @ret tcp		First unfinished connection, or NULL
+ */
+static struct tcp_connection * tcp_first_unfinished ( void ) {
+	struct tcp_connection *tcp;
+
+	/* Find first connection which has not yet closed gracefully,
+	 * or which still has a pending transmission (e.g. to ACK the
+	 * received FIN).
+	 */
+	list_for_each_entry ( tcp, &tcp_conns, list ) {
+		if ( ( ! TCP_CLOSED_GRACEFULLY ( tcp->tcp_state ) ) ||
+		     process_running ( &tcp->process ) ) {
+			return tcp;
+		}
+	}
+	return NULL;
+}
+
+/**
  * Shut down all TCP connections
  *
  */
 static void tcp_shutdown ( int booting __unused ) {
 	struct tcp_connection *tcp;
+	unsigned long start;
+	unsigned long elapsed;
 
+	/* Initiate a graceful close of all connections, allowing for
+	 * the fact that the connection list may change as we do so.
+	 */
+	while ( ( tcp = tcp_first_unclosed() ) ) {
+		DBGC ( tcp, "TCP %p closing for shutdown\n", tcp );
+		tcp_close ( tcp, -ECANCELED );
+	}
+
+	/* Wait for all connections to finish closing gracefully */
+	start = currticks();
+	while ( ( tcp = tcp_first_unfinished() ) &&
+		( ( elapsed = ( currticks() - start ) ) < TCP_FINISH_TIMEOUT )){
+		step();
+	}
+
+	/* Forcibly close any remaining connections */
 	while ( ( tcp = list_first_entry ( &tcp_conns, struct tcp_connection,
 					   list ) ) != NULL ) {
 		tcp->tcp_state = TCP_CLOSED;
@@ -1517,7 +1572,7 @@ static void tcp_shutdown ( int booting __unused ) {
 }
 
 /** TCP shutdown function */
-struct startup_fn tcp_startup_fn __startup_fn ( STARTUP_EARLY ) = {
+struct startup_fn tcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
 	.shutdown = tcp_shutdown,
 };
 
