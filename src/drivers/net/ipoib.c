@@ -146,8 +146,10 @@ static struct ipoib_mac * ipoib_find_remac ( struct ipoib_device *ipoib,
 					     const struct ipoib_remac *remac ) {
 	struct ipoib_peer *peer;
 
-	/* Check for broadcast REMAC */
-	if ( is_broadcast_ether_addr ( remac ) )
+	/* Check for broadcast or multicast REMAC.  We transmit
+	 * multicasts as broadcasts for simplicity.
+	 */
+	if ( is_multicast_ether_addr ( remac ) )
 		return &ipoib->broadcast;
 
 	/* Try to find via REMAC cache */
