@@ -138,18 +138,8 @@ size_t xfer_window ( struct interface *intf ) {
  * generating an xfer_window_changed() message.
  */
 void xfer_window_changed ( struct interface *intf ) {
-	struct interface *dest;
-	xfer_window_changed_TYPE ( void * ) *op =
-		intf_get_dest_op ( intf, xfer_window_changed, &dest );
-	void *object = intf_object ( dest );
 
-	if ( op ) {
-		op ( object );
-	} else {
-		/* Default is to do nothing */
-	}
-
-	intf_put ( dest );
+	intf_poke ( intf, xfer_window_changed );
 }
 
 /**
