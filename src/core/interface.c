@@ -311,3 +311,28 @@ void intf_restart ( struct interface *intf, int rc ) {
 	 */
 	intf->desc = desc;
 }
+
+/**
+ * Poke an object interface
+ *
+ * @v intf		Object interface
+ * @v type		Operation type
+ *
+ * This is a helper function to implement methods which take no
+ * parameters and return nothing.
+ */
+void intf_poke ( struct interface *intf,
+		 void ( type ) ( struct interface *intf ) ) {
+	struct interface *dest;
+	intf_poke_TYPE ( void * ) *op =
+		intf_get_dest_op_untyped ( intf, type, &dest );
+	void *object = intf_object ( dest );
+
+	if ( op ) {
+		op ( object );
+	} else {
+		/* Default is to do nothing */
+	}
+
+	intf_put ( dest );
+}
