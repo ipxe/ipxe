@@ -83,7 +83,7 @@ static void validator_free ( struct refcnt *refcnt ) {
 	DBGC2 ( validator, "VALIDATOR %p freed\n", validator );
 	x509_chain_put ( validator->chain );
 	ocsp_put ( validator->ocsp );
-	xferbuf_done ( &validator->buffer );
+	xferbuf_free ( &validator->buffer );
 	free ( validator );
 }
 
@@ -392,7 +392,7 @@ static void validator_xfer_close ( struct validator *validator, int rc ) {
 		goto err_append;
 
 	/* Free downloaded data */
-	xferbuf_done ( &validator->buffer );
+	xferbuf_free ( &validator->buffer );
 
 	/* Resume validation process */
 	process_add ( &validator->process );
@@ -557,6 +557,7 @@ int create_validator ( struct interface *job, struct x509_chain *chain ) {
 	process_init ( &validator->process, &validator_process_desc,
 		       &validator->refcnt );
 	validator->chain = x509_chain_get ( chain );
+	xferbuf_malloc_init ( &validator->buffer );
 
 	/* Attach parent interface, mortalise self, and return */
 	intf_plug_plug ( &validator->job, job );
