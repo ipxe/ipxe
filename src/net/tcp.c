@@ -400,6 +400,7 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 
 		tcp->tcp_state |= TCP_STATE_SENT ( TCP_FIN );
 		tcp_dump_state ( tcp );
+		process_add ( &tcp->process );
 
 		/* Add a pending operation for the FIN */
 		pending_get ( &tcp->pending_flags );
