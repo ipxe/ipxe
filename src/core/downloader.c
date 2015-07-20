@@ -153,9 +153,23 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
 	return rc;
 }
 
+/**
+ * Get underlying data transfer buffer
+ *
+ * @v downloader	Downloader
+ * @ret xferbuf		Data transfer buffer, or NULL on error
+ */
+static struct xfer_buffer *
+downloader_xfer_buffer ( struct downloader *downloader ) {
+
+	/* Provide direct access to underlying data transfer buffer */
+	return &downloader->buffer;
+}
+
 /** Downloader data transfer interface operations */
 static struct interface_operation downloader_xfer_operations[] = {
 	INTF_OP ( xfer_deliver, struct downloader *, downloader_xfer_deliver ),
+	INTF_OP ( xfer_buffer, struct downloader *, downloader_xfer_buffer ),
 	INTF_OP ( intf_close, struct downloader *, downloader_finished ),
 };
 
