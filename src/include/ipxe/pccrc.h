@@ -402,6 +402,8 @@ struct peerdist_info_block {
 	 * Note that this range may exceed the overall content range.
 	 */
 	struct peerdist_range range;
+	/** Trimmed content range */
+	struct peerdist_range trim;
 	/** Block hash */
 	uint8_t hash[PEERDIST_DIGEST_MAX_SIZE];
 };

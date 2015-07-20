@@ -45,6 +45,24 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Define inline raw data */
 #define DATA(...) { __VA_ARGS__ }
 
+/**
+ * Define an inline content range
+ *
+ * @v START		Start offset
+ * @v END		End offset
+ * @ret range		Content range
+ */
+#define RANGE( START, END ) { .start = START, .end = END }
+
+/**
+ * Define an inline trimmed content range
+ *
+ * @v START		Start offset
+ * @v END		End offset
+ * @ret trim		Trimmed content range
+ */
+#define TRIM( START, END ) { .start = START, .end = END }
+
 /** A content information test */
 struct peerdist_info_test {
 	/** Raw content information */
@@ -55,6 +73,8 @@ struct peerdist_info_test {
 	struct digest_algorithm *expected_digest;
 	/** Expected digest size */
 	size_t expected_digestsize;
+	/** Expected content range */
+	struct peerdist_range expected_range;
 	/** Expected trimmed content range */
 	struct peerdist_range expected_trim;
 	/** Expected number of segments */
@@ -68,8 +88,8 @@ struct peerdist_info_test {
  * @v DATA		Raw content information
  * @v DIGEST		Expected digest algorithm
  * @v DIGESTSIZE	Expected digest size
- * @v START		Expected trimmed content range start offset
- * @v END		Expected trimmed content range end offset
+ * @v RANGE		Expected content range
+ * @v TRIM		Expected trimmer content range
  * @v SEGMENTS		Expected number of segments
  * @ret test		Content information test
  *
@@ -93,18 +113,16 @@ struct peerdist_info_test {
  *   X-P2P-PeerDist: Version=1.1
  *   X-P2P-PeerDistEx: MinContentInformation=2.0, MaxContentInformation=2.0
  */
-#define PEERDIST_INFO_TEST( name, DATA, DIGEST, DIGESTSIZE, START, END,	\
-			    SEGMENTS )					\
+#define PEERDIST_INFO_TEST( name, DATA, DIGEST, DIGESTSIZE, RANGE,	\
+			    TRIM, SEGMENTS )				\
 	static const uint8_t name ## _data[] = DATA;			\
 	static struct peerdist_info_test name = {			\
 		.data = name ## _data,					\
 		.len = sizeof ( name ## _data ),			\
 		.expected_digest = DIGEST,				\
 		.expected_digestsize = DIGESTSIZE,			\
-		.expected_trim = {					\
-			.start = START,					\
-			.end = END,					\
-		},							\
+		.expected_range = RANGE,				\
+		.expected_trim = TRIM,					\
 		.expected_segments = SEGMENTS,				\
 	}
 
@@ -131,8 +149,7 @@ struct peerdist_info_segment_test {
  *
  * @v name		Test name
  * @v INDEX		Segment index
- * @v START		Expected content range start offset
- * @v END		Expected content range end offset
+ * @v RANGE		Expected content range
  * @v BLOCKS		Expected number of blocks
  * @v BLKSIZE		Expected block size
  * @v HASH		Expected segment hash of data
@@ -140,14 +157,11 @@ struct peerdist_info_segment_test {
  * @v ID		Expected segment identifier
  * @ret test		Content information segment test
  */
-#define PEERDIST_INFO_SEGMENT_TEST( name, INDEX, START, END, BLOCKS,	\
+#define PEERDIST_INFO_SEGMENT_TEST( name, INDEX, RANGE, BLOCKS,		\
 				    BLKSIZE, HASH, SECRET, ID )		\
 	static struct peerdist_info_segment_test name = {		\
 		.index = INDEX,						\
-		.expected_range = {					\
-			.start = START,					\
-			.end = END,					\
-		},							\
+		.expected_range = RANGE,				\
 		.expected_blocks = BLOCKS,				\
 		.expected_blksize = BLKSIZE,				\
 		.expected_hash = HASH,					\
@@ -161,6 +175,8 @@ struct peerdist_info_block_test {
 	unsigned int index;
 	/** Expected content range */
 	struct peerdist_range expected_range;
+	/** Expected trimmed content range */
+	struct peerdist_range expected_trim;
 	/** Expected hash of data */
 	uint8_t expected_hash[PEERDIST_DIGEST_MAX_SIZE];
 };
@@ -170,18 +186,16 @@ struct peerdist_info_block_test {
  *
  * @v name		Test name
  * @v INDEX		Block index
- * @v START		Expected content range start offset
- * @v END		Expected content range end offset
+ * @v RANGE		Expected content range
+ * @v TRIM		Expected trimmed content range
  * @v HASH		Expected hash of data
  * @ret test		Content information block test
  */
-#define PEERDIST_INFO_BLOCK_TEST( name, INDEX, START, END, HASH )	\
+#define PEERDIST_INFO_BLOCK_TEST( name, INDEX, RANGE, TRIM, HASH )	\
 	static struct peerdist_info_block_test name = {			\
 		.index = INDEX,						\
-		.expected_range = {					\
-			.start = START,					\
-			.end = END,					\
-		},							\
+		.expected_range = RANGE,				\
+		.expected_trim = TRIM,					\
 		.expected_hash = HASH,					\
 	}
 
@@ -242,11 +256,11 @@ PEERDIST_INFO_TEST ( iis_85_png_v1,
 	       0xaf, 0xe4, 0x57, 0xa9, 0x50, 0x3b, 0x45, 0x48, 0xf6, 0x6e, 0xd3,
 	       0xb1, 0x88, 0xdc, 0xfd, 0xa0, 0xac, 0x38, 0x2b, 0x09, 0x71, 0x1a,
 	       0xcc ),
-	&sha256_algorithm, 32, 0, 99710, 1 );
+	&sha256_algorithm, 32, RANGE ( 0, 99710 ), TRIM ( 0, 99710 ), 1 );
 
 /** IIS logo (iis-85.png) content information version 1 segment 0 */
 PEERDIST_INFO_SEGMENT_TEST ( iis_85_png_v1_s0, 0,
-	0, 99710, 2, 65536,
+	RANGE ( 0, 99710 ), 2, 65536,
 	DATA ( 0xd8, 0xd9, 0x76, 0x35, 0x4a, 0x48, 0x72, 0xe9, 0x25, 0x76, 0x18,
 	       0x03, 0xf4, 0x58, 0xd9, 0xda, 0xaa, 0x67, 0xf8, 0xe3, 0x1c, 0x63,
 	       0x0f, 0xb7, 0x4e, 0x6a, 0x31, 0x2e, 0xf8, 0xa2, 0x5a, 0xba ),
@@ -259,14 +273,16 @@ PEERDIST_INFO_SEGMENT_TEST ( iis_85_png_v1_s0, 0,
 
 /** IIS logo (iis-85.png) content information version 1 segment 0 block 0 */
 PEERDIST_INFO_BLOCK_TEST ( iis_85_png_v1_s0_b0, 0,
-	0, 65536,
+	RANGE ( 0, 65536 ),
+	TRIM ( 0, 65536 ),
 	DATA ( 0x73, 0xc1, 0x8a, 0xb8, 0x54, 0x91, 0x10, 0xf8, 0xe9, 0x0e, 0x71,
 	       0xbb, 0xc3, 0xab, 0x2a, 0xa8, 0xc4, 0x4d, 0x13, 0xf4, 0x92, 0x94,
 	       0x99, 0x25, 0x5b, 0x66, 0x0f, 0x24, 0xec, 0x77, 0x80, 0x0b ) );
 
 /** IIS logo (iis-85.png) content information version 1 segment 0 block 1 */
 PEERDIST_INFO_BLOCK_TEST ( iis_85_png_v1_s0_b1, 1,
-	65536, 99710,
+	RANGE ( 65536, 99710 ),
+	TRIM ( 65536, 99710 ),
 	DATA ( 0x97, 0x4b, 0xdd, 0x65, 0x56, 0x7f, 0xde, 0xec, 0xcd, 0xaf, 0xe4,
 	       0x57, 0xa9, 0x50, 0x3b, 0x45, 0x48, 0xf6, 0x6e, 0xd3, 0xb1, 0x88,
 	       0xdc, 0xfd, 0xa0, 0xac, 0x38, 0x2b, 0x09, 0x71, 0x1a, 0xcc ) );
@@ -289,11 +305,11 @@ PEERDIST_INFO_TEST ( iis_85_png_v2,
 	       0x77, 0x83, 0xe4, 0xf8, 0x07, 0x64, 0x7b, 0x63, 0xf1, 0x46, 0xb5,
 	       0x2f, 0x4a, 0xc8, 0x9c, 0xcc, 0x7a, 0xbf, 0x5f, 0xa1, 0x1a, 0xca,
 	       0xfc, 0x2a, 0xcf, 0x50, 0x28, 0x58, 0x6c ),
-	&sha512_algorithm, 32, 0, 99710, 2 );
+	&sha512_algorithm, 32, RANGE ( 0, 99710 ), TRIM ( 0, 99710 ), 2 );
 
 /** IIS logo (iis-85.png) content information version 2 segment 0 */
 PEERDIST_INFO_SEGMENT_TEST ( iis_85_png_v2_s0, 0,
-	0, 39390, 1, 39390,
+	RANGE ( 0, 39390 ), 1, 39390,
 	DATA ( 0xe0, 0xd0, 0xc3, 0x58, 0xe2, 0x68, 0x4b, 0x62, 0x33, 0x0d, 0x32,
 	       0xb5, 0xf1, 0x97, 0x87, 0x24, 0xa0, 0xd0, 0xa5, 0x2b, 0xdc, 0x5e,
 	       0x78, 0x1f, 0xae, 0x71, 0xff, 0x57, 0xa8, 0xbe, 0x3d, 0xd4 ),
@@ -306,14 +322,15 @@ PEERDIST_INFO_SEGMENT_TEST ( iis_85_png_v2_s0, 0,
 
 /** IIS logo (iis-85.png) content information version 2 segment 0 block 0 */
 PEERDIST_INFO_BLOCK_TEST ( iis_85_png_v2_s0_b0, 0,
-	0, 39390,
+	RANGE ( 0, 39390 ),
+	TRIM ( 0, 39390 ),
 	DATA ( 0xe0, 0xd0, 0xc3, 0x58, 0xe2, 0x68, 0x4b, 0x62, 0x33, 0x0d, 0x32,
 	       0xb5, 0xf1, 0x97, 0x87, 0x24, 0xa0, 0xd0, 0xa5, 0x2b, 0xdc, 0x5e,
 	       0x78, 0x1f, 0xae, 0x71, 0xff, 0x57, 0xa8, 0xbe, 0x3d, 0xd4 ) );
 
 /** IIS logo (iis-85.png) content information version 2 segment 1 */
 PEERDIST_INFO_SEGMENT_TEST ( iis_85_png_v2_s1, 1,
-	39390, 99710, 1, 60320,
+	RANGE ( 39390, 99710 ), 1, 60320,
 	DATA ( 0x33, 0x81, 0xd0, 0xd0, 0xcb, 0x74, 0xf4, 0xb6, 0x13, 0xd8, 0x21,
 	       0x0f, 0x37, 0xf0, 0x02, 0xa0, 0x6f, 0x39, 0x10, 0x58, 0x60, 0x96,
 	       0xa1, 0x30, 0xd3, 0x43, 0x98, 0xc0, 0x8e, 0x66, 0xd7, 0xbc ),
@@ -326,7 +343,8 @@ PEERDIST_INFO_SEGMENT_TEST ( iis_85_png_v2_s1, 1,
 
 /** IIS logo (iis-85.png) content information version 2 segment 1 block 0 */
 PEERDIST_INFO_BLOCK_TEST ( iis_85_png_v2_s1_b0, 0,
-	39390, 99710,
+	RANGE ( 39390, 99710 ),
+	TRIM ( 39390, 99710 ),
 	DATA ( 0x33, 0x81, 0xd0, 0xd0, 0xcb, 0x74, 0xf4, 0xb6, 0x13, 0xd8, 0x21,
 	       0x0f, 0x37, 0xf0, 0x02, 0xa0, 0x6f, 0x39, 0x10, 0x58, 0x60, 0x96,
 	       0xa1, 0x30, 0xd3, 0x43, 0x98, 0xc0, 0x8e, 0x66, 0xd7, 0xbc ) );
@@ -352,10 +370,12 @@ static void peerdist_info_okx ( struct peerdist_info_test *test,
 	okx ( info->raw.len == test->len, file, line );
 	okx ( info->digest == test->expected_digest, file, line );
 	okx ( info->digestsize == test->expected_digestsize, file, line );
-	okx ( info->trim.start >= info->range.start, file, line );
+	okx ( info->range.start == test->expected_range.start, file, line );
+	okx ( info->range.end == test->expected_range.end, file, line );
 	okx ( info->trim.start == test->expected_trim.start, file, line );
-	okx ( info->trim.end <= info->range.end, file, line );
 	okx ( info->trim.end == test->expected_trim.end, file, line );
+	okx ( info->trim.start >= info->range.start, file, line );
+	okx ( info->trim.end <= info->range.end, file, line );
 	okx ( info->segments == test->expected_segments, file, line );
 }
 #define peerdist_info_ok( test, info ) \
@@ -423,6 +443,8 @@ peerdist_info_block_okx ( struct peerdist_info_block_test *test,
 	okx ( block->index == test->index, file, line );
 	okx ( block->range.start == test->expected_range.start, file, line );
 	okx ( block->range.end == test->expected_range.end, file, line );
+	okx ( block->trim.start == test->expected_trim.start, file, line );
+	okx ( block->trim.end == test->expected_trim.end, file, line );
 	okx ( memcmp ( block->hash, test->expected_hash,
 		       digestsize ) == 0, file, line );
 }

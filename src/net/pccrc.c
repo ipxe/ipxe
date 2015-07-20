@@ -747,7 +747,7 @@ int peerdist_info_segment ( const struct peerdist_info *info,
 	if ( ( rc = info->op->segment ( segment ) ) != 0 )
 		return rc;
 
-	DBGC2 ( info, "PCCRC %p segment %d covers [%08zx,%08zx) with %d "
+	DBGC2 ( info, "PCCRC %p segment %d range [%08zx,%08zx) with %d "
 		"blocks\n", info, segment->index, segment->range.start,
 		segment->range.end, segment->blocks );
 	DBGC2 ( info, "PCCRC %p segment %d digest %s\n", info, segment->index,
@@ -771,6 +771,8 @@ int peerdist_info_block ( const struct peerdist_info_segment *segment,
 			  struct peerdist_info_block *block,
 			  unsigned int index ) {
 	const struct peerdist_info *info = segment->info;
+	size_t start;
+	size_t end;
 	int rc;
 
 	/* Sanity checks */
@@ -793,11 +795,24 @@ int peerdist_info_block ( const struct peerdist_info_segment *segment,
 	if ( ( rc = info->op->block ( block ) ) != 0 )
 		return rc;
 
+	/* Calculate trimmed range */
+	start = block->range.start;
+	if ( start < info->trim.start )
+		start = info->trim.start;
+	end = block->range.end;
+	if ( end > info->trim.end )
+		end = info->trim.end;
+	if ( end < start )
+		end = start;
+	block->trim.start = start;
+	block->trim.end = end;
+
 	DBGC2 ( info, "PCCRC %p segment %d block %d hash %s\n",
 		info, segment->index, block->index,
 		peerdist_info_hash_ntoa ( info, block->hash ) );
-	DBGC2 ( info, "PCCRC %p segment %d block %d covers [%08zx,%08zx)\n",
-		info, segment->index, block->index, block->range.start,
-		block->range.end );
+	DBGC2 ( info, "PCCRC %p segment %d block %d range [%08zx,%08zx) covers "
+		"[%08zx,%08zx)\n", info, segment->index, block->index,
+		block->range.start, block->range.end, block->trim.start,
+		block->trim.end );
 	return 0;
 }
