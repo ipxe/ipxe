@@ -283,3 +283,42 @@ struct xfer_buffer_operations xferbuf_umalloc_operations = {
 	.write = xferbuf_umalloc_write,
 	.read = xferbuf_umalloc_read,
 };
+
+/**
+ * Get underlying data transfer buffer
+ *
+ * @v interface		Data transfer interface
+ * @ret xferbuf		Data transfer buffer, or NULL on error
+ *
+ * This call will check that the xfer_buffer() handler belongs to the
+ * destination interface which also provides xfer_deliver() for this
+ * interface.
+ *
+ * This is done to prevent accidental accesses to a data transfer
+ * buffer which may be located behind a non-transparent datapath via a
+ * series of pass-through interfaces.
+ */
+struct xfer_buffer * xfer_buffer ( struct interface *intf ) {
+	struct interface *dest;
+	xfer_buffer_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, xfer_buffer, &dest );
+	void *object = intf_object ( dest );
+	struct interface *xfer_deliver_dest;
+	struct xfer_buffer *xferbuf;
+
+	/* Check that this operation is provided by the same interface
+	 * which handles xfer_deliver().
+	 */
+	intf_get_dest_op ( intf, xfer_deliver, &xfer_deliver_dest );
+
+	if ( op && ( dest == xfer_deliver_dest ) ) {
+		xferbuf = op ( object );
+	} else {
+		/* Default is to not have a data transfer buffer */
+		xferbuf = NULL;
+	}
+
+	intf_put ( xfer_deliver_dest );
+	intf_put ( dest );
+	return xferbuf;
+}

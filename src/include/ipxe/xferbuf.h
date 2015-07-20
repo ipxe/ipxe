@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/uaccess.h>
+#include <ipxe/interface.h>
 #include <ipxe/xfer.h>
 
 /** A data transfer buffer */
@@ -96,5 +97,9 @@ extern int xferbuf_read ( struct xfer_buffer *xferbuf, size_t offset,
 extern int xferbuf_deliver ( struct xfer_buffer *xferbuf,
 			     struct io_buffer *iobuf,
 			     struct xfer_metadata *meta );
+
+extern struct xfer_buffer * xfer_buffer ( struct interface *intf );
+#define xfer_buffer_TYPE( object_type ) \
+	typeof ( struct xfer_buffer * ( object_type ) )
 
 #endif /* _IPXE_XFERBUF_H */
