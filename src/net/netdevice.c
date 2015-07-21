@@ -676,11 +676,11 @@ int register_netdev ( struct net_device *netdev ) {
 	}
 
 	/* Record device index and create device name */
-	netdev->index = netdev_index++;
 	if ( netdev->name[0] == '\0' ) {
 		snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
-			   netdev->index );
+			   netdev_index );
 	}
+	netdev->index = ++netdev_index;
 
 	/* Use least significant bits of the link-layer address to
 	 * improve the randomness of the (non-cryptographic) random
