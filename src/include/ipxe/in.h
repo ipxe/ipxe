@@ -85,6 +85,11 @@ struct sockaddr_in {
 	uint16_t sin_flags;
 	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
 	uint16_t sin_port;
+	/** Scope ID (part of struct @c sockaddr_tcpip)
+	 *
+	 * For multicast addresses, this is the network device index.
+	 */
+        uint16_t sin_scope_id;
 	/** IPv4 address */
 	struct in_addr sin_addr;
 	/** Padding
@@ -96,6 +101,7 @@ struct sockaddr_in {
 		  ( sizeof ( sa_family_t ) /* sin_family */ +
 		    sizeof ( uint16_t ) /* sin_flags */ +
 		    sizeof ( uint16_t ) /* sin_port */ +
+		    sizeof ( uint16_t ) /* sin_scope_id */ +
 		    sizeof ( struct in_addr ) /* sin_addr */ ) ];
 } __attribute__ (( packed, may_alias ));
 
@@ -112,9 +118,10 @@ struct sockaddr_in6 {
 	uint16_t sin6_flags;
 	/** TCP/IP port (part of struct @c sockaddr_tcpip) */
 	uint16_t sin6_port;
-	/** Scope ID
+	/** Scope ID (part of struct @c sockaddr_tcpip)
 	 *
-	 * For link-local addresses, this is the network device index.
+	 * For link-local or multicast addresses, this is the network
+	 * device index.
 	 */
         uint16_t sin6_scope_id;
 	/** IPv6 address */

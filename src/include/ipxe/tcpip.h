@@ -48,6 +48,12 @@ struct sockaddr_tcpip {
 	uint16_t st_flags;
 	/** TCP/IP port */
 	uint16_t st_port;
+	/** Scope ID
+	 *
+	 * For link-local or multicast addresses, this is the network
+	 * device index.
+	 */
+        uint16_t st_scope_id;
 	/** Padding
 	 *
 	 * This ensures that a struct @c sockaddr_tcpip is large
@@ -57,7 +63,8 @@ struct sockaddr_tcpip {
 	char pad[ sizeof ( struct sockaddr ) -
 		  ( sizeof ( sa_family_t ) /* st_family */ +
 		    sizeof ( uint16_t ) /* st_flags */ +
-		    sizeof ( uint16_t ) /* st_port */ ) ];
+		    sizeof ( uint16_t ) /* st_port */ +
+		    sizeof ( uint16_t ) /* st_scope_id */ ) ];
 } __attribute__ (( packed, may_alias ));
 
 /** 

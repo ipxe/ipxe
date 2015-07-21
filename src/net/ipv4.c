@@ -139,6 +139,7 @@ static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 /**
  * Perform IPv4 routing
  *
+ * @v scope_id		Destination address scope ID
  * @v dest		Final destination address
  * @ret dest		Next hop destination address
  * @ret miniroute	Routing table entry to use, or NULL if no route
@@ -146,22 +147,42 @@ static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
  * If the route requires use of a gateway, the next hop destination
  * address will be overwritten with the gateway address.
  */
-static struct ipv4_miniroute * ipv4_route ( struct in_addr *dest ) {
+static struct ipv4_miniroute * ipv4_route ( unsigned int scope_id,
+					    struct in_addr *dest ) {
 	struct ipv4_miniroute *miniroute;
-	int local;
-	int has_gw;
 
 	/* Find first usable route in routing table */
 	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
+
+		/* Skip closed network devices */
 		if ( ! netdev_is_open ( miniroute->netdev ) )
 			continue;
-		local = ( ( ( dest->s_addr ^ miniroute->address.s_addr )
-			    & miniroute->netmask.s_addr ) == 0 );
-		has_gw = ( miniroute->gateway.s_addr );
-		if ( local || has_gw ) {
-			if ( ! local )
+
+		if ( IN_IS_MULTICAST ( dest->s_addr ) ) {
+
+			/* If destination is non-global, and the scope ID
+			 * matches this network device, then use this route.
+			 */
+			if ( miniroute->netdev->index == scope_id )
+				return miniroute;
+
+		} else {
+
+			/* If destination is an on-link global
+			 * address, then use this route.
+			 */
+			if ( ( ( dest->s_addr ^ miniroute->address.s_addr )
+			       & miniroute->netmask.s_addr ) == 0 )
+				return miniroute;
+
+			/* If destination is an off-link global
+			 * address, and we have a default gateway,
+			 * then use this route.
+			 */
+			if ( miniroute->gateway.s_addr ) {
 				*dest = miniroute->gateway;
-			return miniroute;
+				return miniroute;
+			}
 		}
 	}
 
@@ -180,7 +201,7 @@ static struct net_device * ipv4_netdev ( struct sockaddr_tcpip *st_dest ) {
 	struct ipv4_miniroute *miniroute;
 
 	/* Find routing table entry */
-	miniroute = ipv4_route ( &dest );
+	miniroute = ipv4_route ( sin_dest->sin_scope_id, &dest );
 	if ( ! miniroute )
 		return NULL;
 
@@ -314,8 +335,8 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	if ( sin_src )
 		iphdr->src = sin_src->sin_addr;
 	if ( ( next_hop.s_addr != INADDR_BROADCAST ) &&
-	     ( ! IN_IS_MULTICAST ( next_hop.s_addr ) ) &&
-	     ( ( miniroute = ipv4_route ( &next_hop ) ) != NULL ) ) {
+	     ( ( miniroute = ipv4_route ( sin_dest->sin_scope_id,
+					  &next_hop ) ) != NULL ) ) {
 		iphdr->src = miniroute->address;
 		netmask = miniroute->netmask;
 		netdev = miniroute->netdev;
