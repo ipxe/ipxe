@@ -39,7 +39,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/test.h>
 
 /** Define inline IPv4 address */
-#define IPV4(a,b,c,d) ( ( (a) << 24 ) | ( (b) << 16 ) | ( (c) << 8 ) | (d) )
+#define IPV4(a,b,c,d) \
+	htonl ( ( (a) << 24 ) | ( (b) << 16 ) | ( (c) << 8 ) | (d) )
 
 /**
  * Report an inet_ntoa() test result
@@ -51,7 +52,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 static void inet_ntoa_okx ( uint32_t addr, const char *text, const char *file,
 			    unsigned int line ) {
-	struct in_addr in = { .s_addr = htonl ( addr ) };
+	struct in_addr in = { .s_addr = addr };
 	char *actual;
 
 	/* Format address */
@@ -81,7 +82,7 @@ static void inet_aton_okx ( const char *text, uint32_t addr, const char *file,
 	/* Parse address */
 	okx ( inet_aton ( text, &actual ) != 0, file, line );
 	DBG ( "inet_aton ( \"%s\" ) = %s\n", text, inet_ntoa ( actual ) );
-	okx ( ntohl ( actual.s_addr ) == addr, file, line );
+	okx ( actual.s_addr == addr, file, line );
 };
 #define inet_aton_ok( text, addr ) \
 	inet_aton_okx ( text, addr, __FILE__, __LINE__ )
@@ -110,23 +111,23 @@ static void inet_aton_fail_okx ( const char *text, const char *file,
 static void ipv4_test_exec ( void ) {
 
 	/* Address testing macros */
-	ok (   IN_CLASSA ( IPV4 ( 10, 0, 0, 1 ) ) );
-	ok ( ! IN_CLASSB ( IPV4 ( 10, 0, 0, 1 ) ) );
-	ok ( ! IN_CLASSC ( IPV4 ( 10, 0, 0, 1 ) ) );
-	ok ( ! IN_CLASSA ( IPV4 ( 172, 16, 0, 1 ) ) );
-	ok (   IN_CLASSB ( IPV4 ( 172, 16, 0, 1 ) ) );
-	ok ( ! IN_CLASSC ( IPV4 ( 172, 16, 0, 1 ) ) );
-	ok ( ! IN_CLASSA ( IPV4 ( 192, 168, 0, 1 ) ) );
-	ok ( ! IN_CLASSB ( IPV4 ( 192, 168, 0, 1 ) ) );
-	ok (   IN_CLASSC ( IPV4 ( 192, 168, 0, 1 ) ) );
-	ok ( ! IN_MULTICAST ( IPV4 ( 127, 0, 0, 1 ) ) );
-	ok ( ! IN_MULTICAST ( IPV4 ( 8, 8, 8, 8 ) ) );
-	ok ( ! IN_MULTICAST ( IPV4 ( 0, 0, 0, 0 ) ) );
-	ok ( ! IN_MULTICAST ( IPV4 ( 223, 0, 0, 1 ) ) );
-	ok ( ! IN_MULTICAST ( IPV4 ( 240, 0, 0, 1 ) ) );
-	ok (   IN_MULTICAST ( IPV4 ( 224, 0, 0, 1 ) ) );
-	ok (   IN_MULTICAST ( IPV4 ( 231, 89, 0, 2 ) ) );
-	ok (   IN_MULTICAST ( IPV4 ( 239, 6, 1, 17 ) ) );
+	ok (   IN_IS_CLASSA ( IPV4 ( 10, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSB ( IPV4 ( 10, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSC ( IPV4 ( 10, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSA ( IPV4 ( 172, 16, 0, 1 ) ) );
+	ok (   IN_IS_CLASSB ( IPV4 ( 172, 16, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSC ( IPV4 ( 172, 16, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSA ( IPV4 ( 192, 168, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSB ( IPV4 ( 192, 168, 0, 1 ) ) );
+	ok (   IN_IS_CLASSC ( IPV4 ( 192, 168, 0, 1 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 127, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 8, 8, 8, 8 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 0, 0, 0, 0 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 223, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 240, 0, 0, 1 ) ) );
+	ok (   IN_IS_MULTICAST ( IPV4 ( 224, 0, 0, 1 ) ) );
+	ok (   IN_IS_MULTICAST ( IPV4 ( 231, 89, 0, 2 ) ) );
+	ok (   IN_IS_MULTICAST ( IPV4 ( 239, 6, 1, 17 ) ) );
 
 	/* inet_ntoa() tests */
 	inet_ntoa_ok ( IPV4 ( 127, 0, 0, 1 ), "127.0.0.1" );

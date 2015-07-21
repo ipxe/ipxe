@@ -314,7 +314,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	if ( sin_src )
 		iphdr->src = sin_src->sin_addr;
 	if ( ( next_hop.s_addr != INADDR_BROADCAST ) &&
-	     ( ! IN_MULTICAST ( ntohl ( next_hop.s_addr ) ) ) &&
+	     ( ! IN_IS_MULTICAST ( next_hop.s_addr ) ) &&
 	     ( ( miniroute = ipv4_route ( &next_hop ) ) != NULL ) ) {
 		iphdr->src = miniroute->address;
 		netmask = miniroute->netmask;
@@ -353,7 +353,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		/* Broadcast address */
 		ipv4_stats.out_bcast_pkts++;
 		ll_dest = netdev->ll_broadcast;
-	} else if ( IN_MULTICAST ( ntohl ( next_hop.s_addr ) ) ) {
+	} else if ( IN_IS_MULTICAST ( next_hop.s_addr ) ) {
 		/* Multicast address */
 		ipv4_stats.out_mcast_pkts++;
 		if ( ( rc = netdev->ll_protocol->mc_hash ( AF_INET, &next_hop,
@@ -816,12 +816,12 @@ static int ipv4_create_routes ( void ) {
 		fetch_ipv4_setting ( settings, &netmask_setting, &netmask );
 		/* Calculate default netmask, if necessary */
 		if ( ! netmask.s_addr ) {
-			if ( IN_CLASSA ( ntohl ( address.s_addr ) ) ) {
-				netmask.s_addr = htonl ( IN_CLASSA_NET );
-			} else if ( IN_CLASSB ( ntohl ( address.s_addr ) ) ) {
-				netmask.s_addr = htonl ( IN_CLASSB_NET );
-			} else if ( IN_CLASSC ( ntohl ( address.s_addr ) ) ) {
-				netmask.s_addr = htonl ( IN_CLASSC_NET );
+			if ( IN_IS_CLASSA ( address.s_addr ) ) {
+				netmask.s_addr = INADDR_NET_CLASSA;
+			} else if ( IN_IS_CLASSB ( address.s_addr ) ) {
+				netmask.s_addr = INADDR_NET_CLASSB;
+			} else if ( IN_IS_CLASSC ( address.s_addr ) ) {
+				netmask.s_addr = INADDR_NET_CLASSC;
 			}
 		}
 		/* Get default gateway, if present */

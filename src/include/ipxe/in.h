@@ -4,6 +4,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
+#include <byteswap.h>
 #include <ipxe/socket.h>
 
 /* Protocol numbers */
@@ -15,17 +16,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /* IP address constants */
 
-#define INADDR_NONE 0xffffffff
+#define INADDR_NONE		htonl ( 0xffffffff )
 
-#define INADDR_BROADCAST 0xffffffff
+#define INADDR_BROADCAST	htonl ( 0xffffffff )
 
-#define	IN_CLASSA(addr)		( ( (addr) & 0x80000000 ) == 0x00000000 )
-#define	IN_CLASSA_NET		0xff000000
-#define	IN_CLASSB(addr)		( ( (addr) & 0xc0000000 ) == 0x80000000 )
-#define	IN_CLASSB_NET		0xffff0000
-#define	IN_CLASSC(addr)		( ( (addr) & 0xe0000000 ) == 0xc0000000 )
-#define	IN_CLASSC_NET		0xffffff00
-#define IN_MULTICAST(addr)	( ( (addr) & 0xf0000000 ) == 0xe0000000 )
+#define	INADDR_NET_CLASSA	htonl ( 0xff000000 )
+#define	INADDR_NET_CLASSB	htonl ( 0xffff0000 )
+#define	INADDR_NET_CLASSC	htonl ( 0xffffff00 )
+
+#define	IN_IS_CLASSA( addr ) \
+	( ( (addr) & htonl ( 0x80000000 ) ) == htonl ( 0x00000000 ) )
+#define	IN_IS_CLASSB( addr ) \
+	( ( (addr) & htonl ( 0xc0000000 ) ) == htonl ( 0x80000000 ) )
+#define	IN_IS_CLASSC( addr ) \
+	( ( (addr) & htonl ( 0xe0000000 ) ) == htonl ( 0xc0000000 ) )
+#define IN_IS_MULTICAST( addr ) \
+	( ( (addr) & htonl ( 0xf0000000 ) ) == htonl ( 0xe0000000 ) )
 
 /**
  * IP address structure
