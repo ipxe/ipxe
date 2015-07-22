@@ -51,3 +51,32 @@ int inject_fault_nonzero ( unsigned int rate ) {
 	 */
 	return -EFAULT;
 }
+
+/**
+ * Corrupt data with a specified probability
+ *
+ * @v rate		Reciprocal of fault probability (must be non-zero)
+ * @v data		Data
+ * @v len		Length of data
+ * @ret rc		Return status code
+ */
+void inject_corruption_nonzero ( unsigned int rate, const void *data,
+				 size_t len ) {
+	uint8_t *writable;
+	size_t offset;
+
+	/* Do nothing if we have no data to corrupt */
+	if ( ! len )
+		return;
+
+	/* Do nothing unless we want to inject a fault now */
+	if ( ! inject_fault_nonzero ( rate ) )
+		return;
+
+	/* Get a writable pointer to the nominally read-only data */
+	writable = ( ( uint8_t * ) data );
+
+	/* Pick a random victim byte and zap it */
+	offset = ( random() % len );
+	writable[offset] ^= random();
+}
