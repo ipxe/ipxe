@@ -34,12 +34,46 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/efi_snp.h>
 #include <usr/autoboot.h>
+#include <config/general.h>
 
 /** List of SNP devices */
 static LIST_HEAD ( efi_snp_devices );
 
 /** Network devices are currently claimed for use by iPXE */
 static int efi_snp_claimed;
+
+/* Downgrade user experience if configured to do so
+ *
+ * The default UEFI user experience for network boot is somewhat
+ * excremental: only TFTP is available as a download protocol, and if
+ * anything goes wrong the user will be shown just a dot on an
+ * otherwise blank screen.  (Some programmer was clearly determined to
+ * win a bet that they could outshine Apple at producing uninformative
+ * error messages.)
+ *
+ * For comparison, the default iPXE user experience provides the
+ * option to use protocols designed more recently than 1980 (such as
+ * HTTP and iSCSI), and if anything goes wrong the the user will be
+ * shown one of over 1200 different error messages, complete with a
+ * link to a wiki page describing that specific error.
+ *
+ * We default to upgrading the user experience to match that available
+ * in a "legacy" BIOS environment, by installing our own instance of
+ * EFI_LOAD_FILE_PROTOCOL.
+ *
+ * Note that unfortunately we can't sensibly provide the choice of
+ * both options to the user in the same build, because the UEFI boot
+ * menu ignores the multitude of ways in which a network device handle
+ * can be described and opaquely labels both menu entries as just "EFI
+ * Network".
+ */
+#ifdef EFI_DOWNGRADE_UX
+static EFI_GUID dummy_load_file_protocol_guid = {
+	0x6f6c7323, 0x2077, 0x7523,
+	{ 0x6e, 0x68, 0x65, 0x6c, 0x70, 0x66, 0x75, 0x6c }
+};
+#define efi_load_file_protocol_guid dummy_load_file_protocol_guid
+#endif
 
 /**
  * Set EFI SNP mode state
