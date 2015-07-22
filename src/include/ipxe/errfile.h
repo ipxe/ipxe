@@ -68,6 +68,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_fbcon		       ( ERRFILE_CORE | 0x001c0000 )
 #define ERRFILE_ansicol		       ( ERRFILE_CORE | 0x001d0000 )
 #define ERRFILE_ansicoldef	       ( ERRFILE_CORE | 0x001e0000 )
+#define ERRFILE_fault		       ( ERRFILE_CORE | 0x001f0000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
