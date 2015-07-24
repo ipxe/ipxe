@@ -384,12 +384,12 @@ static void draw_instruction_row ( struct settings_ui *ui ) {
 	if ( ui->row.editing ) {
 		msg ( INSTRUCTION_ROW,
 		      "Enter - accept changes" INSTRUCTION_PAD
-		      "Ctrl-C - discard changes" );
+		      "ESC - discard changes" );
 	} else {
 		msg ( INSTRUCTION_ROW,
-		      "%sCtrl-X - exit configuration utility",
+		      "%sESC - exit configuration utility",
 		      ( ( ui->row.origin == ui->settings ) ?
-			"Ctrl-D - delete setting" INSTRUCTION_PAD : "" ) );
+			"TAB - delete setting" INSTRUCTION_PAD : "" ) );
 	}
 }
 
@@ -486,7 +486,7 @@ static int main_loop ( struct settings *settings ) {
 				if ( ( rc = save_setting ( &ui ) ) != 0 )
 					alert ( " %s ", strerror ( rc ) );
 				/* Fall through */
-			case CTRL_C:
+			case ESC:
 				select_setting_row ( &ui, ui.scroll.current );
 				redraw = 1;
 				break;
@@ -516,7 +516,7 @@ static int main_loop ( struct settings *settings ) {
 
 		/* Handle non-navigation keys */
 		switch ( key ) {
-		case CTRL_D:
+		case TAB:
 			if ( ! ui.row.setting.name )
 				break;
 			if ( ( rc = delete_setting ( ui.settings,
@@ -526,7 +526,7 @@ static int main_loop ( struct settings *settings ) {
 			select_setting_row ( &ui, ui.scroll.current );
 			redraw = 1;
 			break;
-		case CTRL_X:
+		case ESC:
 			return 0;
 		case CR:
 		case LF:
