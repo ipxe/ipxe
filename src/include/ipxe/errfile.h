@@ -264,7 +264,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_imgmgmt		      ( ERRFILE_OTHER | 0x00050000 )
 #define ERRFILE_pxe_tftp	      ( ERRFILE_OTHER | 0x00060000 )
 #define ERRFILE_pxe_udp		      ( ERRFILE_OTHER | 0x00070000 )
-#define ERRFILE_axtls_aes	      ( ERRFILE_OTHER | 0x00080000 )
+#define ERRFILE_aes	 	      ( ERRFILE_OTHER | 0x00080000 )
 #define ERRFILE_cipher		      ( ERRFILE_OTHER | 0x00090000 )
 #define ERRFILE_image_cmd	      ( ERRFILE_OTHER | 0x000a0000 )
 #define ERRFILE_uri_test	      ( ERRFILE_OTHER | 0x000b0000 )
