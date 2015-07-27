@@ -156,13 +156,17 @@ static struct aes_table aes_invmixcolumns;
  */
 static inline __attribute__ (( always_inline )) uint32_t
 aes_entry_column ( const union aes_table_entry *entry, unsigned int column ) {
-	const uint8_t *first __attribute__ (( may_alias ));
+	const union {
+		uint8_t byte;
+		uint32_t column;
+	} __attribute__ (( may_alias )) *product;
 
-	/* Locate start of relevant four-byte subset */
-	first = &entry->byte[ 4 - column ];
+	/* Locate relevant four-byte subset */
+	product = container_of ( &entry->byte[ 4 - column ],
+				 typeof ( *product ), byte );
 
 	/* Extract this four-byte subset */
-	return ( *( ( uint32_t * ) first ) );
+	return product->column;
 }
 
 /**
