@@ -309,7 +309,7 @@ struct xfer_buffer * xfer_buffer ( struct interface *intf ) {
 	/* Check that this operation is provided by the same interface
 	 * which handles xfer_deliver().
 	 */
-	intf_get_dest_op ( intf, xfer_deliver, &xfer_deliver_dest );
+	( void ) intf_get_dest_op ( intf, xfer_deliver, &xfer_deliver_dest );
 
 	if ( op && ( dest == xfer_deliver_dest ) ) {
 		xferbuf = op ( object );
