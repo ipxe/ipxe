@@ -26,6 +26,7 @@ extern void axtls_aes_encrypt ( const AES_CTX *ctx, uint32_t *data );
 extern void axtls_aes_decrypt ( const AES_CTX *ctx, uint32_t *data );
 
 extern struct cipher_algorithm aes_algorithm;
+extern struct cipher_algorithm aes_ecb_algorithm;
 extern struct cipher_algorithm aes_cbc_algorithm;
 
 int aes_wrap ( const void *kek, const void *src, void *dest, int nblk );

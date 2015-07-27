@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <assert.h>
 #include <byteswap.h>
 #include <ipxe/crypto.h>
+#include <ipxe/ecb.h>
 #include <ipxe/cbc.h>
 #include <ipxe/aes.h>
 #include "crypto/axtls/crypto.h"
@@ -155,6 +156,10 @@ struct cipher_algorithm aes_algorithm = {
 	.decrypt = aes_decrypt,
 };
 
-/* AES with cipher-block chaining */
+/* AES in Electronic Codebook mode */
+ECB_CIPHER ( aes_ecb, aes_ecb_algorithm,
+	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );
+
+/* AES in Cipher Block Chaining mode */
 CBC_CIPHER ( aes_cbc, aes_cbc_algorithm,
 	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );
