@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * CBC self-tests
+ * Cipher self-tests
  *
  */
 
@@ -38,86 +38,90 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/crypto.h>
 #include <ipxe/profile.h>
-#include "cbc_test.h"
+#include <ipxe/test.h>
+#include "cipher_test.h"
 
 /** Number of sample iterations for profiling */
 #define PROFILE_COUNT 16
 
 /**
- * Test CBC encryption
+ * Report a cipher encryption test result
  *
- * @v cipher			Cipher algorithm
- * @v key			Key
- * @v key_len			Length of key
- * @v iv			Initialisation vector
- * @v plaintext			Plaintext data
- * @v expected_ciphertext	Expected ciphertext data
- * @v len			Length of data
- * @ret ok			Ciphertext is as expected
+ * @v test		Cipher test
+ * @v file		Test code file
+ * @v line		Test code line
  */
-int cbc_test_encrypt ( struct cipher_algorithm *cipher, const void *key,
-		       size_t key_len, const void *iv, const void *plaintext,
-		       const void *expected_ciphertext, size_t len ) {
+void cipher_encrypt_okx ( struct cipher_test *test, const char *file,
+			  unsigned int line ) {
+	struct cipher_algorithm *cipher = test->cipher;
+	size_t len = test->len;
 	uint8_t ctx[cipher->ctxsize];
 	uint8_t ciphertext[len];
-	int rc;
 
 	/* Initialise cipher */
-	rc = cipher_setkey ( cipher, ctx, key, key_len );
-	assert ( rc == 0 );
-	cipher_setiv ( cipher, ctx, iv );
+	okx ( cipher_setkey ( cipher, ctx, test->key, test->key_len ) == 0,
+	      file, line );
+	cipher_setiv ( cipher, ctx, test->iv );
 
 	/* Perform encryption */
-	cipher_encrypt ( cipher, ctx, plaintext, ciphertext, len );
+	cipher_encrypt ( cipher, ctx, test->plaintext, ciphertext, len );
 
-	/* Verify result */
-	return ( memcmp ( ciphertext, expected_ciphertext, len ) == 0 );
+	/* Compare against expected ciphertext */
+	okx ( memcmp ( ciphertext, test->ciphertext, len ) == 0, file, line );
 }
 
 /**
- * Test CBC decryption
+ * Report a cipher decryption test result
  *
- * @v cipher			Cipher algorithm
- * @v key			Key
- * @v key_len			Length of key
- * @v iv			Initialisation vector
- * @v ciphertext		Ciphertext data
- * @v expected_plaintext	Expected plaintext data
- * @v len			Length of data
- * @ret ok			Plaintext is as expected
+ * @v test		Cipher test
+ * @v file		Test code file
+ * @v line		Test code line
  */
-int cbc_test_decrypt ( struct cipher_algorithm *cipher, const void *key,
-		       size_t key_len, const void *iv, const void *ciphertext,
-		       const void *expected_plaintext, size_t len ) {
+void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
+			  unsigned int line ) {
+	struct cipher_algorithm *cipher = test->cipher;
+	size_t len = test->len;
 	uint8_t ctx[cipher->ctxsize];
 	uint8_t plaintext[len];
-	int rc;
 
 	/* Initialise cipher */
-	rc = cipher_setkey ( cipher, ctx, key, key_len );
-	assert ( rc == 0 );
-	cipher_setiv ( cipher, ctx, iv );
+	okx ( cipher_setkey ( cipher, ctx, test->key, test->key_len ) == 0,
+	      file, line );
+	cipher_setiv ( cipher, ctx, test->iv );
 
 	/* Perform encryption */
-	cipher_decrypt ( cipher, ctx, ciphertext, plaintext, len );
+	cipher_decrypt ( cipher, ctx, test->ciphertext, plaintext, len );
 
-	/* Verify result */
-	return ( memcmp ( plaintext, expected_plaintext, len ) == 0 );
+	/* Compare against expected plaintext */
+	okx ( memcmp ( plaintext, test->plaintext, len ) == 0, file, line );
 }
 
 /**
- * Calculate CBC encryption or decryption cost
+ * Report a cipher encryption and decryption test result
+ *
+ * @v test		Cipher test
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+void cipher_okx ( struct cipher_test *test, const char *file,
+		  unsigned int line ) {
+
+	cipher_encrypt_okx ( test, file, line );
+	cipher_decrypt_okx ( test, file, line );
+}
+
+/**
+ * Calculate cipher encryption or decryption cost
  *
  * @v cipher			Cipher algorithm
  * @v key_len			Length of key
  * @v op			Encryption or decryption operation
  * @ret cost			Cost (in cycles per byte)
  */
-static unsigned long cbc_cost ( struct cipher_algorithm *cipher,
-				size_t key_len,
-				void ( * op ) ( struct cipher_algorithm *cipher,
-						void *ctx, const void *src,
-						void *dst, size_t len ) ) {
+static unsigned long
+cipher_cost ( struct cipher_algorithm *cipher, size_t key_len,
+	      void ( * op ) ( struct cipher_algorithm *cipher, void *ctx,
+			      const void *src, void *dst, size_t len ) ) {
 	static uint8_t random[8192]; /* Too large for stack */
 	uint8_t key[key_len];
 	uint8_t iv[cipher->blocksize];
@@ -157,25 +161,25 @@ static unsigned long cbc_cost ( struct cipher_algorithm *cipher,
 }
 
 /**
- * Calculate CBC encryption cost
+ * Calculate cipher encryption cost
  *
  * @v cipher			Cipher algorithm
  * @v key_len			Length of key
  * @ret cost			Cost (in cycles per byte)
  */
-unsigned long cbc_cost_encrypt ( struct cipher_algorithm *cipher,
-				 size_t key_len ) {
-	return cbc_cost ( cipher, key_len, cipher_encrypt );
+unsigned long cipher_cost_encrypt ( struct cipher_algorithm *cipher,
+				    size_t key_len ) {
+	return cipher_cost ( cipher, key_len, cipher_encrypt );
 }
 
 /**
- * Calculate CBC decryption cost
+ * Calculate cipher decryption cost
  *
  * @v cipher			Cipher algorithm
  * @v key_len			Length of key
  * @ret cost			Cost (in cycles per byte)
  */
-unsigned long cbc_cost_decrypt ( struct cipher_algorithm *cipher,
-				 size_t key_len ) {
-	return cbc_cost ( cipher, key_len, cipher_decrypt );
+unsigned long cipher_cost_decrypt ( struct cipher_algorithm *cipher,
+				    size_t key_len ) {
+	return cipher_cost ( cipher, key_len, cipher_decrypt );
 }

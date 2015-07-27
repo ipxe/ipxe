@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * AES-in-CBC-mode tests
+ * AES tests
  *
  * These test vectors are provided by NIST as part of the
  * Cryptographic Toolkit Examples, downloadable from:
@@ -41,88 +41,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <ipxe/aes.h>
 #include <ipxe/test.h>
-#include "cbc_test.h"
+#include "cipher_test.h"
 
-/** Define inline key */
-#define KEY(...) { __VA_ARGS__ }
-
-/** Define inline initialisation vector */
-#define IV(...) { __VA_ARGS__ }
-
-/** Define inline plaintext data */
-#define PLAINTEXT(...) { __VA_ARGS__ }
-
-/** Define inline ciphertext data */
-#define CIPHERTEXT(...) { __VA_ARGS__ }
-
-/** An AES-in-CBC-mode test */
-struct aes_cbc_test {
-	/** Key */
-	const void *key;
-	/** Length of key */
-	size_t key_len;
-	/** Initialisation vector */
-	const void *iv;
-	/** Length of initialisation vector */
-	size_t iv_len;
-	/** Plaintext */
-	const void *plaintext;
-	/** Length of plaintext */
-	size_t plaintext_len;
-	/** Ciphertext */
-	const void *ciphertext;
-	/** Length of ciphertext */
-	size_t ciphertext_len;
-};
-
-/**
- * Define an AES-in-CBC-mode test
- *
- * @v name		Test name
- * @v key_array		Key
- * @v iv_array		Initialisation vector
- * @v plaintext_array	Plaintext
- * @v ciphertext_array	Ciphertext
- * @ret test		AES-in-CBC-mode test
- */
-#define AES_CBC_TEST( name, key_array, iv_array, plaintext_array,	\
-		      ciphertext_array )				\
-	static const uint8_t name ## _key [] = key_array;		\
-	static const uint8_t name ## _iv [] = iv_array;			\
-	static const uint8_t name ## _plaintext [] = plaintext_array;	\
-	static const uint8_t name ## _ciphertext [] = ciphertext_array;	\
-	static struct aes_cbc_test name = {				\
-		.key = name ## _key,					\
-		.key_len = sizeof ( name ## _key ),			\
-		.iv = name ## _iv,					\
-		.iv_len = sizeof ( name ## _iv ),			\
-		.plaintext = name ## _plaintext,			\
-		.plaintext_len = sizeof ( name ## _plaintext ),		\
-		.ciphertext = name ## _ciphertext,			\
-		.ciphertext_len = sizeof ( name ## _ciphertext ),	\
-	}
-
-/**
- * Report AES-in-CBC-mode
- *
- * @v state		HMAC_DRBG internal state
- * @v test		Instantiation test
- */
-#define aes_cbc_ok( test ) do {						\
-	struct cipher_algorithm *cipher = &aes_cbc_algorithm;		\
-									\
-	assert ( (test)->iv_len == cipher->blocksize );			\
-	assert ( (test)->plaintext_len == (test)->ciphertext_len );	\
-	cbc_encrypt_ok ( cipher, (test)->key, (test)->key_len,		\
-			 (test)->iv, (test)->plaintext,			\
-			 (test)->ciphertext, (test)->plaintext_len );	\
-	cbc_decrypt_ok ( cipher, (test)->key, (test)->key_len,		\
-			 (test)->iv, (test)->ciphertext,		\
-			 (test)->plaintext, (test)->ciphertext_len );	\
-	} while ( 0 )
-
-/** CBC_AES128 */
-AES_CBC_TEST ( test_128,
+/** AES-128-CBC */
+CIPHER_TEST ( aes_128_cbc, &aes_cbc_algorithm,
 	KEY ( 0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15,
 	      0x88, 0x09, 0xcf, 0x4f, 0x3c ),
 	IV ( 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
@@ -144,8 +66,8 @@ AES_CBC_TEST ( test_128,
 		     0x3f, 0xf1, 0xca, 0xa1, 0x68, 0x1f, 0xac, 0x09,
 		     0x12, 0x0e, 0xca, 0x30, 0x75, 0x86, 0xe1, 0xa7 ) );
 
-/** CBC_AES256 */
-AES_CBC_TEST ( test_256,
+/** AES-256-CBC */
+CIPHER_TEST ( aes_256_cbc, &aes_cbc_algorithm,
 	KEY ( 0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe, 0x2b, 0x73, 0xae,
 	      0xf0, 0x85, 0x7d, 0x77, 0x81, 0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61,
 	      0x08, 0xd7, 0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4 ),
@@ -169,29 +91,28 @@ AES_CBC_TEST ( test_256,
 		     0xda, 0x6c, 0x19, 0x07, 0x8c, 0x6a, 0x9d, 0x1b ) );
 
 /**
- * Perform AES-in-CBC-mode self-test
+ * Perform AES self-test
  *
  */
-static void aes_cbc_test_exec ( void ) {
-	struct cipher_algorithm *cipher = &aes_cbc_algorithm;
+static void aes_test_exec ( void ) {
+	struct cipher_algorithm *cbc = &aes_cbc_algorithm;
+	unsigned int keylen;
 
 	/* Correctness tests */
-	aes_cbc_ok ( &test_128 );
-	aes_cbc_ok ( &test_256 );
+	cipher_ok ( &aes_128_cbc );
+	cipher_ok ( &aes_256_cbc );
 
 	/* Speed tests */
-	DBG ( "AES128 encryption required %ld cycles per byte\n",
-	      cbc_cost_encrypt ( cipher, test_128.key_len ) );
-	DBG ( "AES128 decryption required %ld cycles per byte\n",
-	      cbc_cost_decrypt ( cipher, test_128.key_len ) );
-	DBG ( "AES256 encryption required %ld cycles per byte\n",
-	      cbc_cost_encrypt ( cipher, test_256.key_len ) );
-	DBG ( "AES256 decryption required %ld cycles per byte\n",
-	      cbc_cost_decrypt ( cipher, test_256.key_len ) );
+	for ( keylen = 128 ; keylen <= 256 ; keylen += 128 ) {
+		DBG ( "AES-%d-CBC encryption required %ld cycles per byte\n",
+		      keylen, cipher_cost_encrypt ( cbc, ( keylen / 8 ) ) );
+		DBG ( "AES-%d-CBC decryption required %ld cycles per byte\n",
+		      keylen, cipher_cost_decrypt ( cbc, ( keylen / 8 ) ) );
+	}
 }
 
-/** AES-in-CBC-mode self-test */
-struct self_test aes_cbc_test __self_test = {
-	.name = "aes_cbc",
-	.exec = aes_cbc_test_exec,
+/** AES self-test */
+struct self_test aes_test __self_test = {
+	.name = "aes",
+	.exec = aes_test_exec,
 };
