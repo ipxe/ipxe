@@ -1439,8 +1439,10 @@ static void iscsi_tx_done ( struct iscsi_session *iscsi ) {
 	switch ( common->opcode & ISCSI_OPCODE_MASK ) {
 	case ISCSI_OPCODE_DATA_OUT:
 		iscsi_data_out_done ( iscsi );
+		break;
 	case ISCSI_OPCODE_LOGIN_REQUEST:
 		iscsi_login_request_done ( iscsi );
+		break;
 	default:
 		/* No action */
 		break;
