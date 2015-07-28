@@ -63,6 +63,9 @@ struct in6_addr {
 	( ( *( ( const uint16_t * ) (addr) ) & htons ( 0xffc0 ) ) ==	\
 	  htons ( 0xfe80 ) )
 
+#define IN6_IS_ADDR_NONGLOBAL( addr )					\
+	( IN6_IS_ADDR_LINKLOCAL (addr) || IN6_IS_ADDR_MULTICAST (addr) )
+
 /**
  * IPv4 socket address
  */

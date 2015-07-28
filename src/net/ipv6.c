@@ -290,8 +290,7 @@ static struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 		if ( ! ( miniroute->flags & IPV6_HAS_ADDRESS ) )
 			continue;
 
-		if ( IN6_IS_ADDR_LINKLOCAL ( *dest ) ||
-		     IN6_IS_ADDR_MULTICAST ( *dest ) ) {
+		if ( IN6_IS_ADDR_NONGLOBAL ( *dest ) ) {
 
 			/* If destination is non-global, and the scope ID
 			 * matches this network device, then use this route.
@@ -901,7 +900,7 @@ static const char * ipv6_sock_ntoa ( struct sockaddr *sa ) {
 	const char *netdev_name;
 
 	/* Identify network device, if applicable */
-	if ( IN6_IS_ADDR_LINKLOCAL ( in ) || IN6_IS_ADDR_MULTICAST ( in ) ) {
+	if ( IN6_IS_ADDR_NONGLOBAL ( in ) ) {
 		netdev = find_netdev_by_index ( sin6->sin6_scope_id );
 		netdev_name = ( netdev ? netdev->name : "UNKNOWN" );
 	} else {
@@ -956,14 +955,26 @@ static int ipv6_sock_aton ( const char *string, struct sockaddr *sa ) {
 	if ( ( rc = inet6_aton ( in_string, &in ) ) != 0 )
 		goto err_inet6_aton;
 
-	/* Parse network device name, if present */
+	/* Parse scope ID, if applicable */
 	if ( netdev_string ) {
+
+		/* Parse explicit network device name, if present */
 		netdev = find_netdev ( netdev_string );
 		if ( ! netdev ) {
 			rc = -ENODEV;
 			goto err_find_netdev;
 		}
 		sin6->sin6_scope_id = netdev->index;
+
+	} else if ( IN6_IS_ADDR_NONGLOBAL ( &in ) ) {
+
+		/* If no network device is explicitly specified for a
+		 * link-local or multicast address, default to using
+		 * "netX" (if existent).
+		 */
+		netdev = last_opened_netdev();
+		if ( netdev )
+			sin6->sin6_scope_id = netdev->index;
 	}
 
 	/* Copy IPv6 address portion to socket address */
