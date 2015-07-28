@@ -389,6 +389,10 @@ int vlan_create ( struct net_device *trunk, unsigned int tag,
 	snprintf ( netdev->name, sizeof ( netdev->name ), "%s-%d",
 		   trunk->name, vlan->tag );
 
+	/* Mark device as not supporting interrupts, if applicable */
+	if ( ! netdev_irq_supported ( trunk ) )
+		netdev->state |= NETDEV_IRQ_UNSUPPORTED;
+
 	/* Register VLAN device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
 		DBGC ( netdev, "VLAN %s could not register: %s\n",

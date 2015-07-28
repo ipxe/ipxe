@@ -805,6 +805,10 @@ int net80211_register ( struct net80211_device *dev,
 		 NET80211_MAX_CHANNELS * sizeof ( dev->channels[0] ) );
 	dev->channel = 0;
 
+	/* Mark device as not supporting interrupts, if applicable */
+	if ( ! ops->irq )
+		dev->netdev->state |= NETDEV_IRQ_UNSUPPORTED;
+
 	list_add_tail ( &dev->list, &net80211_devices );
 	return register_netdev ( dev->netdev );
 }

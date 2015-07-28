@@ -430,6 +430,14 @@ struct net_device {
 /** Network device receive queue processing is frozen */
 #define NETDEV_RX_FROZEN 0x0004
 
+/** Network device interrupts are unsupported
+ *
+ * This flag can be used by a network device to indicate that
+ * interrupts are not supported despite the presence of an irq()
+ * method.
+ */
+#define NETDEV_IRQ_UNSUPPORTED 0x0008
+
 /** Link-layer protocol table */
 #define LL_PROTOCOLS __table ( struct ll_protocol, "ll_protocols" )
 
@@ -646,7 +654,8 @@ netdev_is_open ( struct net_device *netdev ) {
  */
 static inline __attribute__ (( always_inline )) int
 netdev_irq_supported ( struct net_device *netdev ) {
-	return ( netdev->op->irq != NULL );
+	return ( ( netdev->op->irq != NULL ) &&
+		 ! ( netdev->state & NETDEV_IRQ_UNSUPPORTED ) );
 }
 
 /**
