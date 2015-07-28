@@ -246,6 +246,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_rndis			( ERRFILE_NET | 0x003d0000 )
 #define ERRFILE_pccrc			( ERRFILE_NET | 0x003e0000 )
 #define ERRFILE_stp			( ERRFILE_NET | 0x003f0000 )
+#define ERRFILE_pccrd			( ERRFILE_NET | 0x00400000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
