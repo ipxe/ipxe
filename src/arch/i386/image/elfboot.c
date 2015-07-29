@@ -79,6 +79,27 @@ static int elfboot_exec ( struct image *image ) {
 }
 
 /**
+ * Check that ELF segment uses flat physical addressing
+ *
+ * @v image		ELF file
+ * @v phdr		ELF program header
+ * @v dest		Destination address
+ * @ret rc		Return status code
+ */
+static int elfboot_check_segment ( struct image *image, Elf_Phdr *phdr,
+				   physaddr_t dest ) {
+
+	/* Check that ELF segment uses flat physical addressing */
+	if ( phdr->p_vaddr != dest ) {
+		DBGC ( image, "ELF %p uses virtual addressing (phys %x, "
+		       "virt %x)\n", image, phdr->p_paddr, phdr->p_vaddr );
+		return -ENOEXEC;
+	}
+
+	return 0;
+}
+
+/**
  * Probe ELF image
  *
  * @v image		ELF file
@@ -95,12 +116,22 @@ static int elfboot_probe ( struct image *image ) {
 		[EI_DATA]	= ELFDATA2LSB,
 		[EI_VERSION]	= EV_CURRENT,
 	};
+	physaddr_t entry;
+	physaddr_t max;
+	int rc;
 
 	/* Read ELF header */
 	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
 	if ( memcmp ( ehdr.e_ident, e_ident, sizeof ( e_ident ) ) != 0 ) {
-		DBG ( "Invalid ELF identifier\n" );
+		DBGC ( image, "Invalid ELF identifier\n" );
 		return -ENOEXEC;
+	}
+
+	/* Check that this image uses flat physical addressing */
+	if ( ( rc = elf_segments ( image, &ehdr, elfboot_check_segment,
+				   &entry, &max ) ) != 0 ) {
+		DBGC ( image, "Unloadable ELF image\n" );
+		return rc;
 	}
 
 	return 0;
