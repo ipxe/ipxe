@@ -84,7 +84,6 @@ rmjmp_buf comboot_return;
 /* Mode flags set by INT 22h AX=0017h */
 static uint16_t comboot_graphics_mode = 0;
 
-
 /**
  * Print a string with a particular terminator
  */
@@ -713,3 +712,6 @@ void unhook_comboot_interrupts ( ) {
 	unhook_bios_interrupt ( 0x22, ( unsigned int ) int22_wrapper,
 				&int22_vector );
 }
+
+/* Avoid dragging in serial console support unconditionally */
+struct uart serial_console __attribute__ (( weak ));
