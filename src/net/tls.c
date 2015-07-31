@@ -179,20 +179,29 @@ static void tls_clear_cipher ( struct tls_session *tls,
  ******************************************************************************
  */
 
+/** A TLS 24-bit integer
+ *
+ * TLS uses 24-bit integers in several places, which are awkward to
+ * parse in C.
+ */
+typedef struct {
+	/** High byte */
+	uint8_t high;
+	/** Low word */
+	uint16_t low;
+} __attribute__ (( packed )) tls24_t;
+
 /**
  * Extract 24-bit field value
  *
  * @v field24		24-bit field
  * @ret value		Field value
  *
- * TLS uses 24-bit integers in several places, which are awkward to
- * parse in C.
  */
 static inline __attribute__ (( always_inline )) unsigned long
-tls_uint24 ( const uint8_t field24[3] ) {
-	const uint32_t *field32 __attribute__ (( may_alias )) =
-		( ( const void * ) field24 );
-	return ( be32_to_cpu ( *field32 ) >> 8 );
+tls_uint24 ( const tls24_t *field24 ) {
+
+	return ( ( field24->high << 16 ) | be16_to_cpu ( field24->low ) );
 }
 
 /**
@@ -200,13 +209,11 @@ tls_uint24 ( const uint8_t field24[3] ) {
  *
  * @v field24		24-bit field
  * @v value		Field value
- *
- * The field must be pre-zeroed.
  */
-static void tls_set_uint24 ( uint8_t field24[3], unsigned long value ) {
-	uint32_t *field32 __attribute__ (( may_alias )) =
-		( ( void * ) field24 );
-	*field32 |= cpu_to_be32 ( value << 8 );
+static void tls_set_uint24 ( tls24_t *field24, unsigned long value ) {
+
+	field24->high = ( value >> 16 );
+	field24->low = cpu_to_be16 ( value );
 }
 
 /**
@@ -1038,9 +1045,9 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 static int tls_send_certificate ( struct tls_session *tls ) {
 	struct {
 		uint32_t type_length;
-		uint8_t length[3];
+		tls24_t length;
 		struct {
-			uint8_t length[3];
+			tls24_t length;
 			uint8_t data[ tls->cert->raw.len ];
 		} __attribute__ (( packed )) certificates[1];
 	} __attribute__ (( packed )) *certificate;
@@ -1058,9 +1065,9 @@ static int tls_send_certificate ( struct tls_session *tls ) {
 		( cpu_to_le32 ( TLS_CERTIFICATE ) |
 		  htonl ( sizeof ( *certificate ) -
 			  sizeof ( certificate->type_length ) ) );
-	tls_set_uint24 ( certificate->length,
+	tls_set_uint24 ( &certificate->length,
 			 sizeof ( certificate->certificates ) );
-	tls_set_uint24 ( certificate->certificates[0].length,
+	tls_set_uint24 ( &certificate->certificates[0].length,
 			 sizeof ( certificate->certificates[0].data ) );
 	memcpy ( certificate->certificates[0].data,
 		 tls->cert->raw.data,
@@ -1412,7 +1419,7 @@ static int tls_parse_chain ( struct tls_session *tls,
 			     const void *data, size_t len ) {
 	const void *end = ( data + len );
 	const struct {
-		uint8_t length[3];
+		tls24_t length;
 		uint8_t data[0];
 	} __attribute__ (( packed )) *certificate;
 	size_t certificate_len;
@@ -1436,7 +1443,7 @@ static int tls_parse_chain ( struct tls_session *tls,
 
 		/* Extract raw certificate data */
 		certificate = data;
-		certificate_len = tls_uint24 ( certificate->length );
+		certificate_len = tls_uint24 ( &certificate->length );
 		next = ( certificate->data + certificate_len );
 		if ( next > end ) {
 			DBGC ( tls, "TLS %p overlength certificate:\n", tls );
@@ -1482,10 +1489,10 @@ static int tls_parse_chain ( struct tls_session *tls,
 static int tls_new_certificate ( struct tls_session *tls,
 				 const void *data, size_t len ) {
 	const struct {
-		uint8_t length[3];
+		tls24_t length;
 		uint8_t certificates[0];
 	} __attribute__ (( packed )) *certificate = data;
-	size_t certificates_len = tls_uint24 ( certificate->length );
+	size_t certificates_len = tls_uint24 ( &certificate->length );
 	const void *end = ( certificate->certificates + certificates_len );
 	int rc;
 
@@ -1634,11 +1641,11 @@ static int tls_new_handshake ( struct tls_session *tls,
 	while ( data != end ) {
 		const struct {
 			uint8_t type;
-			uint8_t length[3];
+			tls24_t length;
 			uint8_t payload[0];
 		} __attribute__ (( packed )) *handshake = data;
 		const void *payload = &handshake->payload;
-		size_t payload_len = tls_uint24 ( handshake->length );
+		size_t payload_len = tls_uint24 ( &handshake->length );
 		const void *next = ( payload + payload_len );
 
 		/* Sanity check */
