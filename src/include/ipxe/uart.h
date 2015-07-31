@@ -126,6 +126,7 @@ static inline uint8_t uart_receive ( struct uart *uart ) {
 
 extern void uart_transmit ( struct uart *uart, uint8_t data );
 extern void uart_flush ( struct uart *uart );
+extern int uart_exists ( struct uart *uart );
 extern int uart_init ( struct uart *uart, unsigned int baud, uint8_t lcr );
 
 #endif /* _IPXE_UART_H */

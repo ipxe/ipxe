@@ -48,15 +48,22 @@ static uint16_t uart_base[] = {
  * @ret rc		Return status code
  */
 int uart_select ( struct uart *uart, unsigned int port ) {
-
-	/* Clear UART base */
-	uart->base = NULL;
+	int rc;
 
 	/* Set new UART base */
-	if ( port < ( sizeof ( uart_base ) / sizeof ( uart_base[0] ) ) ) {
-		uart->base = ( ( void * ) ( intptr_t ) uart_base[port] );
-		return 0;
-	} else {
-		return -ENODEV;
+	if ( port >= ( sizeof ( uart_base ) / sizeof ( uart_base[0] ) ) ) {
+		rc = -ENODEV;
+		goto err;
 	}
+	uart->base = ( ( void * ) ( intptr_t ) uart_base[port] );
+
+	/* Check that UART exists */
+	if ( ( rc = uart_exists ( uart ) ) != 0 )
+		goto err;
+
+	return 0;
+
+ err:
+	uart->base = NULL;
+	return rc;
 }

@@ -80,6 +80,29 @@ void uart_flush ( struct uart *uart ) {
 }
 
 /**
+ * Check for existence of UART
+ *
+ * @v uart		UART
+ * @ret rc		Return status code
+ */
+int uart_exists ( struct uart *uart ) {
+
+	/* Fail if no UART port is defined */
+	if ( ! uart->base )
+		return -ENODEV;
+
+	/* Fail if UART scratch register seems not to be present */
+	uart_write ( uart, UART_SCR, 0x18 );
+	if ( uart_read ( uart, UART_SCR ) != 0x18 )
+		return -ENODEV;
+	uart_write ( uart, UART_SCR, 0xae );
+	if ( uart_read ( uart, UART_SCR ) != 0xae )
+		return -ENODEV;
+
+	return 0;
+}
+
+/**
  * Initialise UART
  *
  * @v uart		UART
@@ -90,16 +113,11 @@ void uart_flush ( struct uart *uart ) {
 int uart_init ( struct uart *uart, unsigned int baud, uint8_t lcr ) {
 	uint8_t dlm;
 	uint8_t dll;
+	int rc;
 
 	/* Check for existence of UART */
-	if ( ! uart->base )
-		return -ENODEV;
-	uart_write ( uart, UART_SCR, 0x18 );
-	if ( uart_read ( uart, UART_SCR ) != 0x18 )
-		return -ENODEV;
-	uart_write ( uart, UART_SCR, 0xae );
-	if ( uart_read ( uart, UART_SCR ) != 0xae )
-		return -ENODEV;
+	if ( ( rc = uart_exists ( uart ) ) != 0 )
+		return rc;
 
 	/* Configure divisor and line control register, if applicable */
 	if ( ! lcr )
