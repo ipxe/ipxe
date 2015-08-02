@@ -1771,3 +1771,6 @@ REQUIRING_SYMBOL ( x509_validate );
 
 /* Drag in certificate store */
 REQUIRE_OBJECT ( certstore );
+
+/* Drag in crypto configuration */
+REQUIRE_OBJECT ( config_crypto );

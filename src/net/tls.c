@@ -666,41 +666,8 @@ struct tls_cipher_suite tls_cipher_suite_null = {
 	.digest = &digest_null,
 };
 
-/** Supported cipher suites, in order of preference */
-struct tls_cipher_suite tls_cipher_suites[] = {
-	{
-		.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 ),
-		.key_len = ( 256 / 8 ),
-		.pubkey = &rsa_algorithm,
-		.cipher = &aes_cbc_algorithm,
-		.digest = &sha256_algorithm,
-	},
-	{
-		.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 ),
-		.key_len = ( 128 / 8 ),
-		.pubkey = &rsa_algorithm,
-		.cipher = &aes_cbc_algorithm,
-		.digest = &sha256_algorithm,
-	},
-	{
-		.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA ),
-		.key_len = ( 256 / 8 ),
-		.pubkey = &rsa_algorithm,
-		.cipher = &aes_cbc_algorithm,
-		.digest = &sha1_algorithm,
-	},
-	{
-		.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA ),
-		.key_len = ( 128 / 8 ),
-		.pubkey = &rsa_algorithm,
-		.cipher = &aes_cbc_algorithm,
-		.digest = &sha1_algorithm,
-	},
-};
-
 /** Number of supported cipher suites */
-#define TLS_NUM_CIPHER_SUITES \
-	( sizeof ( tls_cipher_suites ) / sizeof ( tls_cipher_suites[0] ) )
+#define TLS_NUM_CIPHER_SUITES table_num_entries ( TLS_CIPHER_SUITES )
 
 /**
  * Identify cipher suite
@@ -711,11 +678,9 @@ struct tls_cipher_suite tls_cipher_suites[] = {
 static struct tls_cipher_suite *
 tls_find_cipher_suite ( unsigned int cipher_suite ) {
 	struct tls_cipher_suite *suite;
-	unsigned int i;
 
 	/* Identify cipher suite */
-	for ( i = 0 ; i < TLS_NUM_CIPHER_SUITES ; i++ ) {
-		suite = &tls_cipher_suites[i];
+	for_each_table_entry ( suite, TLS_CIPHER_SUITES ) {
 		if ( suite->code == cipher_suite )
 			return suite;
 	}
@@ -848,34 +813,9 @@ static int tls_change_cipher ( struct tls_session *tls,
  ******************************************************************************
  */
 
-/** Supported signature and hash algorithms
- *
- * Note that the default (TLSv1.1 and earlier) algorithm using
- * MD5+SHA1 is never explicitly specified.
- */
-struct tls_signature_hash_algorithm tls_signature_hash_algorithms[] = {
-	{
-		.code = {
-			.signature = TLS_RSA_ALGORITHM,
-			.hash = TLS_SHA1_ALGORITHM,
-		},
-		.pubkey = &rsa_algorithm,
-		.digest = &sha1_algorithm,
-	},
-	{
-		.code = {
-			.signature = TLS_RSA_ALGORITHM,
-			.hash = TLS_SHA256_ALGORITHM,
-		},
-		.pubkey = &rsa_algorithm,
-		.digest = &sha256_algorithm,
-	},
-};
-
 /** Number of supported signature and hash algorithms */
-#define TLS_NUM_SIG_HASH_ALGORITHMS			\
-	( sizeof ( tls_signature_hash_algorithms ) /	\
-	  sizeof ( tls_signature_hash_algorithms[0] ) )
+#define TLS_NUM_SIG_HASH_ALGORITHMS \
+	table_num_entries ( TLS_SIG_HASH_ALGORITHMS )
 
 /**
  * Find TLS signature and hash algorithm
@@ -888,11 +828,9 @@ static struct tls_signature_hash_algorithm *
 tls_signature_hash_algorithm ( struct pubkey_algorithm *pubkey,
 			       struct digest_algorithm *digest ) {
 	struct tls_signature_hash_algorithm *sig_hash;
-	unsigned int i;
 
 	/* Identify signature and hash algorithm */
-	for ( i = 0 ; i < TLS_NUM_SIG_HASH_ALGORITHMS ; i++ ) {
-		sig_hash = &tls_signature_hash_algorithms[i];
+	for_each_table_entry ( sig_hash, TLS_SIG_HASH_ALGORITHMS ) {
 		if ( ( sig_hash->pubkey == pubkey ) &&
 		     ( sig_hash->digest == digest ) ) {
 			return sig_hash;
@@ -1018,6 +956,8 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 			} __attribute__ (( packed )) signature_algorithms;
 		} __attribute__ (( packed )) extensions;
 	} __attribute__ (( packed )) hello;
+	struct tls_cipher_suite *suite;
+	struct tls_signature_hash_algorithm *sighash;
 	unsigned int i;
 
 	memset ( &hello, 0, sizeof ( hello ) );
@@ -1027,8 +967,8 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 	hello.version = htons ( tls->version );
 	memcpy ( &hello.random, &tls->client_random, sizeof ( hello.random ) );
 	hello.cipher_suite_len = htons ( sizeof ( hello.cipher_suites ) );
-	for ( i = 0 ; i < TLS_NUM_CIPHER_SUITES ; i++ )
-		hello.cipher_suites[i] = tls_cipher_suites[i].code;
+	i = 0 ; for_each_table_entry ( suite, TLS_CIPHER_SUITES )
+		hello.cipher_suites[i++] = suite->code;
 	hello.compression_methods_len = sizeof ( hello.compression_methods );
 	hello.extensions_len = htons ( sizeof ( hello.extensions ) );
 	hello.extensions.server_name_type = htons ( TLS_SERVER_NAME );
@@ -1053,10 +993,8 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 		= htons ( sizeof ( hello.extensions.signature_algorithms ) );
 	hello.extensions.signature_algorithms.len
 		= htons ( sizeof ( hello.extensions.signature_algorithms.code));
-	for ( i = 0 ; i < TLS_NUM_SIG_HASH_ALGORITHMS ; i++ ) {
-		hello.extensions.signature_algorithms.code[i]
-			= tls_signature_hash_algorithms[i].code;
-	}
+	i = 0 ; for_each_table_entry ( sighash, TLS_SIG_HASH_ALGORITHMS )
+		hello.extensions.signature_algorithms.code[i++] = sighash->code;
 
 	return tls_send_handshake ( tls, &hello, sizeof ( hello ) );
 }
@@ -2669,3 +2607,9 @@ int add_tls ( struct interface *xfer, const char *name,
  err_alloc:
 	return rc;
 }
+
+/* Drag in objects via add_tls() */
+REQUIRING_SYMBOL ( add_tls );
+
+/* Drag in crypto configuration */
+REQUIRE_OBJECT ( config_crypto );
