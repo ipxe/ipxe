@@ -857,6 +857,14 @@ struct tls_signature_hash_algorithm tls_signature_hash_algorithms[] = {
 	{
 		.code = {
 			.signature = TLS_RSA_ALGORITHM,
+			.hash = TLS_SHA1_ALGORITHM,
+		},
+		.pubkey = &rsa_algorithm,
+		.digest = &sha1_algorithm,
+	},
+	{
+		.code = {
+			.signature = TLS_RSA_ALGORITHM,
 			.hash = TLS_SHA256_ALGORITHM,
 		},
 		.pubkey = &rsa_algorithm,
@@ -1001,6 +1009,13 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 			struct {
 				uint8_t max;
 			} __attribute__ (( packed )) max_fragment_length;
+			uint16_t signature_algorithms_type;
+			uint16_t signature_algorithms_len;
+			struct {
+				uint16_t len;
+				struct tls_signature_hash_id
+					code[TLS_NUM_SIG_HASH_ALGORITHMS];
+			} __attribute__ (( packed )) signature_algorithms;
 		} __attribute__ (( packed )) extensions;
 	} __attribute__ (( packed )) hello;
 	unsigned int i;
@@ -1032,6 +1047,16 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 		= htons ( sizeof ( hello.extensions.max_fragment_length ) );
 	hello.extensions.max_fragment_length.max
 		= TLS_MAX_FRAGMENT_LENGTH_4096;
+	hello.extensions.signature_algorithms_type
+		= htons ( TLS_SIGNATURE_ALGORITHMS );
+	hello.extensions.signature_algorithms_len
+		= htons ( sizeof ( hello.extensions.signature_algorithms ) );
+	hello.extensions.signature_algorithms.len
+		= htons ( sizeof ( hello.extensions.signature_algorithms.code));
+	for ( i = 0 ; i < TLS_NUM_SIG_HASH_ALGORITHMS ; i++ ) {
+		hello.extensions.signature_algorithms.code[i]
+			= tls_signature_hash_algorithms[i].code;
+	}
 
 	return tls_send_handshake ( tls, &hello, sizeof ( hello ) );
 }

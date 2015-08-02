@@ -101,6 +101,9 @@ struct tls_header {
 #define TLS_MAX_FRAGMENT_LENGTH_2048 3
 #define TLS_MAX_FRAGMENT_LENGTH_4096 4
 
+/* TLS signature algorithms extension */
+#define TLS_SIGNATURE_ALGORITHMS 13
+
 /** TLS RX state machine state */
 enum tls_rx_state {
 	TLS_RX_HEADER = 0,
