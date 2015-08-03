@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_watchdog.h>
 #include <ipxe/efi/efi_snp.h>
 #include <usr/autoboot.h>
 #include <config/general.h>
@@ -881,8 +882,14 @@ efi_snp_load_file ( EFI_LOAD_FILE_PROTOCOL *load_file,
 	/* Claim network devices for use by iPXE */
 	efi_snp_claim();
 
+	/* Start watchdog holdoff timer */
+	efi_watchdog_start();
+
 	/* Boot from network device */
 	ipxe ( netdev );
+
+	/* Stop watchdog holdoff timer */
+	efi_watchdog_stop();
 
 	/* Release network devices for use via SNP */
 	efi_snp_release();

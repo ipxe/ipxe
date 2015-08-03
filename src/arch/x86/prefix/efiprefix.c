@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_autoboot.h>
+#include <ipxe/efi/efi_watchdog.h>
 
 /**
  * EFI entry point
@@ -49,6 +50,9 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 	/* Claim SNP devices for use by iPXE */
 	efi_snp_claim();
 
+	/* Start watchdog holdoff timer */
+	efi_watchdog_start();
+
 	/* Call to main() */
 	if ( ( rc = main() ) != 0 ) {
 		efirc = EFIRC ( rc );
@@ -56,6 +60,7 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 	}
 
  err_main:
+	efi_watchdog_stop();
 	efi_snp_release();
 	efi_loaded_image->Unload ( image_handle );
 	efi_driver_reconnect_all();
