@@ -791,7 +791,8 @@ static void ipoib_link_state_changed ( struct ib_device *ibdev ) {
 	int rc;
 
 	/* Leave existing broadcast group */
-	ipoib_leave_broadcast_group ( ipoib );
+	if ( ipoib->qp )
+		ipoib_leave_broadcast_group ( ipoib );
 
 	/* Update MAC address based on potentially-new GID prefix */
 	memcpy ( &ipoib->mac.gid.s.prefix, &ibdev->gid.s.prefix,
@@ -806,7 +807,7 @@ static void ipoib_link_state_changed ( struct ib_device *ibdev ) {
 	netdev_link_err ( netdev, ( rc ? rc : -EINPROGRESS_JOINING ) );
 
 	/* Join new broadcast group */
-	if ( ib_is_open ( ibdev ) && ib_link_ok ( ibdev ) &&
+	if ( ib_is_open ( ibdev ) && ib_link_ok ( ibdev ) && ipoib->qp &&
 	     ( ( rc = ipoib_join_broadcast_group ( ipoib ) ) != 0 ) ) {
 		DBGC ( ipoib, "IPoIB %p could not rejoin broadcast group: "
 		       "%s\n", ipoib, strerror ( rc ) );
@@ -894,7 +895,9 @@ static void ipoib_close ( struct net_device *netdev ) {
 
 	/* Tear down the queues */
 	ib_destroy_qp ( ibdev, ipoib->qp );
+	ipoib->qp = NULL;
 	ib_destroy_cq ( ibdev, ipoib->cq );
+	ipoib->cq = NULL;
 
 	/* Close IB device */
 	ib_close ( ibdev );

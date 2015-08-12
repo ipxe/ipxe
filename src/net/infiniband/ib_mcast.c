@@ -150,6 +150,9 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	DBGC ( ibdev, "IBDEV %p QPN %lx joining " IB_GID_FMT "\n",
 	       ibdev, qp->qpn, IB_GID_ARGS ( gid ) );
 
+	/* Sanity check */
+	assert ( qp != NULL );
+
 	/* Initialise structure */
 	membership->qp = qp;
 	memcpy ( &membership->gid, gid, sizeof ( membership->gid ) );
@@ -198,6 +201,9 @@ void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 
 	DBGC ( ibdev, "IBDEV %p QPN %lx leaving " IB_GID_FMT "\n",
 	       ibdev, qp->qpn, IB_GID_ARGS ( gid ) );
+
+	/* Sanity check */
+	assert ( qp != NULL );
 
 	/* Detach from multicast GID */
 	ib_mcast_detach ( ibdev, qp, &membership->gid );
