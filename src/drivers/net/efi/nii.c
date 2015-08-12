@@ -415,6 +415,13 @@ static int nii_issue_cpb_db ( struct nii_nic *nii, unsigned int op, void *cpb,
 	cdb.IFnum = nii->nii->IfNum;
 
 	/* Issue command */
+	DBGC2 ( nii, "NII %s issuing %02x:%04x ifnum %d%s%s\n",
+		nii->dev.name, cdb.OpCode, cdb.OpFlags, cdb.IFnum,
+		( cpb ? " cpb" : "" ), ( db ? " db" : "" ) );
+	if ( cpb )
+		DBGC2_HD ( nii, cpb, cpb_len );
+	if ( db )
+		DBGC2_HD ( nii, db, db_len );
 	nii->issue ( ( intptr_t ) &cdb );
 
 	/* Check completion status */
@@ -710,21 +717,24 @@ static int nii_set_station_address ( struct nii_nic *nii,
  * @ret rc		Return status code
  */
 static int nii_set_rx_filters ( struct nii_nic *nii ) {
+	unsigned int flags;
 	unsigned int op;
 	int stat;
 	int rc;
 
+	/* Construct receive filter set */
+	flags = ( PXE_OPFLAGS_RECEIVE_FILTER_ENABLE |
+		  PXE_OPFLAGS_RECEIVE_FILTER_UNICAST |
+		  PXE_OPFLAGS_RECEIVE_FILTER_BROADCAST |
+		  PXE_OPFLAGS_RECEIVE_FILTER_PROMISCUOUS |
+		  PXE_OPFLAGS_RECEIVE_FILTER_ALL_MULTICAST );
+
 	/* Issue command */
-	op = NII_OP ( PXE_OPCODE_RECEIVE_FILTERS,
-		      ( PXE_OPFLAGS_RECEIVE_FILTER_ENABLE |
-			PXE_OPFLAGS_RECEIVE_FILTER_UNICAST |
-			PXE_OPFLAGS_RECEIVE_FILTER_BROADCAST |
-			PXE_OPFLAGS_RECEIVE_FILTER_PROMISCUOUS |
-			PXE_OPFLAGS_RECEIVE_FILTER_ALL_MULTICAST ) );
+	op = NII_OP ( PXE_OPCODE_RECEIVE_FILTERS, flags );
 	if ( ( stat = nii_issue ( nii, op ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
-		DBGC ( nii, "NII %s could not set receive filters: %s\n",
-		       nii->dev.name, strerror ( rc ) );
+		DBGC ( nii, "NII %s could not set receive filters %#04x: %s\n",
+		       nii->dev.name, flags, strerror ( rc ) );
 		return rc;
 	}
 
@@ -1036,8 +1046,9 @@ int nii_start ( struct efi_device *efidev ) {
 		nii->issue = ( ( ( void * ) nii->undi ) +
 			       nii->undi->EntryPoint );
 	}
-	DBGC ( nii, "NII %s using UNDI v%x.%x at %p entry %p\n", nii->dev.name,
-	       nii->nii->MajorVer, nii->nii->MinorVer, nii->undi, nii->issue );
+	DBGC ( nii, "NII %s using UNDI v%x.%x at %p entry %p impl %#08x\n",
+	       nii->dev.name, nii->nii->MajorVer, nii->nii->MinorVer,
+	       nii->undi, nii->issue, nii->undi->Implementation );
 
 	/* Open PCI I/O protocols and locate BARs */
 	if ( ( rc = nii_pci_open ( nii ) ) != 0 )
