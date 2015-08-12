@@ -487,6 +487,8 @@ static int nii_start_undi ( struct nii_nic *nii ) {
 	cpb.Unique_ID = ( ( intptr_t ) nii );
 
 	/* Issue command */
+	DBGC2 ( nii, "start NII %s\n",
+	        nii->dev.name);
 	if ( ( stat = nii_issue_cpb ( nii, PXE_OPCODE_START, &cpb,
 				      sizeof ( cpb ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
@@ -508,6 +510,8 @@ static void nii_stop_undi ( struct nii_nic *nii ) {
 	int rc;
 
 	/* Issue command */
+	DBGC2 ( nii, "stop NII %s\n",
+	        nii->dev.name);
 	if ( ( stat = nii_issue ( nii, PXE_OPCODE_STOP ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
 		DBGC ( nii, "NII %s could not stop: %s\n",
@@ -531,6 +535,8 @@ static int nii_get_init_info ( struct nii_nic *nii,
 	int rc;
 
 	/* Issue command */
+	DBGC2 ( nii, "get NII %s init info\n",
+	        nii->dev.name);
 	if ( ( stat = nii_issue_db ( nii, PXE_OPCODE_GET_INIT_INFO, &db,
 				     sizeof ( db ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
@@ -595,6 +601,8 @@ static int nii_initialise ( struct nii_nic *nii ) {
 	/* Issue command */
 	op = NII_OP ( PXE_OPCODE_INITIALIZE,
 		      PXE_OPFLAGS_INITIALIZE_DO_NOT_DETECT_CABLE );
+	DBGC2 ( nii, "initialise NII %s\n",
+	        nii->dev.name);
 	if ( ( stat = nii_issue_cpb_db ( nii, op, &cpb, sizeof ( cpb ),
 					 &db, sizeof ( db ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
@@ -621,6 +629,8 @@ static void nii_shutdown ( struct nii_nic *nii ) {
 	int rc;
 
 	/* Issue command */
+	DBGC2 ( nii, "shutdown NII %s\n",
+	        nii->dev.name);
 	if ( ( stat = nii_issue ( nii, PXE_OPCODE_SHUTDOWN ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
 		DBGC ( nii, "NII %s could not shut down: %s\n",
@@ -651,6 +661,8 @@ static int nii_get_station_address ( struct nii_nic *nii,
 		goto err_initialise;
 
 	/* Issue command */
+	DBGC2 ( nii, "get NII %s station address\n",
+	        nii->dev.name);
 	if ( ( stat = nii_issue_db ( nii, PXE_OPCODE_STATION_ADDRESS, &db,
 				     sizeof ( db ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
@@ -692,6 +704,8 @@ static int nii_set_station_address ( struct nii_nic *nii,
 		 netdev->ll_protocol->ll_addr_len );
 
 	/* Issue command */
+	DBGC2 ( nii, "NII %s set station address\n",
+	        nii->dev.name);
 	if ( ( stat = nii_issue_cpb ( nii, PXE_OPCODE_STATION_ADDRESS,
 				      &cpb, sizeof ( cpb ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
@@ -710,17 +724,20 @@ static int nii_set_station_address ( struct nii_nic *nii,
  * @ret rc		Return status code
  */
 static int nii_set_rx_filters ( struct nii_nic *nii ) {
-	unsigned int op;
+	unsigned int op,flags = 0;
 	int stat;
 	int rc;
 
+	flags = PXE_OPFLAGS_RECEIVE_FILTER_ENABLE |
+		PXE_OPFLAGS_RECEIVE_FILTER_UNICAST |
+		PXE_OPFLAGS_RECEIVE_FILTER_BROADCAST |
+		PXE_OPFLAGS_RECEIVE_FILTER_PROMISCUOUS |
+		PXE_OPFLAGS_RECEIVE_FILTER_ALL_MULTICAST;
+	op = NII_OP ( PXE_OPCODE_RECEIVE_FILTERS, flags );
+	
 	/* Issue command */
-	op = NII_OP ( PXE_OPCODE_RECEIVE_FILTERS,
-		      ( PXE_OPFLAGS_RECEIVE_FILTER_ENABLE |
-			PXE_OPFLAGS_RECEIVE_FILTER_UNICAST |
-			PXE_OPFLAGS_RECEIVE_FILTER_BROADCAST |
-			PXE_OPFLAGS_RECEIVE_FILTER_PROMISCUOUS |
-			PXE_OPFLAGS_RECEIVE_FILTER_ALL_MULTICAST ) );
+	DBGC2 ( nii, "set rx filters for NII %s: 0x%x\n",
+		nii->dev.name, flags);
 	if ( ( stat = nii_issue ( nii, op ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
 		DBGC ( nii, "NII %s could not set receive filters: %s\n",
@@ -758,6 +775,8 @@ static int nii_transmit ( struct net_device *netdev,
 	cpb.MediaheaderLen = netdev->ll_protocol->ll_header_len;
 
 	/* Transmit packet */
+	DBGC2 ( nii, "NII %s transmit\n",
+	        nii->dev.name);
 	if ( ( stat = nii_issue_cpb ( nii, PXE_OPCODE_TRANSMIT, &cpb,
 				      sizeof ( cpb ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
@@ -1038,6 +1057,8 @@ int nii_start ( struct efi_device *efidev ) {
 	}
 	DBGC ( nii, "NII %s using UNDI v%x.%x at %p entry %p\n", nii->dev.name,
 	       nii->nii->MajorVer, nii->nii->MinorVer, nii->undi, nii->issue );
+	DBGC ( nii, "NII %s implements: 0x%x\n", 
+	        nii->dev.name, nii->undi->Implementation);
 
 	/* Open PCI I/O protocols and locate BARs */
 	if ( ( rc = nii_pci_open ( nii ) ) != 0 )
