@@ -460,11 +460,11 @@ process_bytes:
 
 	/* Convert %ds:esi and %es:edi back to physical addresses */
 	xorl	%eax, %eax
-	movw	%ds, %cx
+	movw    %ds, %ax
 	shll	$4, %eax
 	addl	%eax, %esi
 	xorl	%eax, %eax
-	movw	%es, %cx
+	movw    %es, %ax
 	shll	$4, %eax
 	addl	%eax, %edi
 
