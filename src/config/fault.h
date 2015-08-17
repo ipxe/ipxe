@@ -14,6 +14,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Drop every N transmitted or received network packets */
 #define	NETDEV_DISCARD_RATE 0
 
+/* Drop every N transmitted or received PeerDist discovery packets */
+#define PEERDISC_DISCARD_RATE 0
+
 #include <config/local/fault.h>
 
 #endif /* CONFIG_FAULT_H */
