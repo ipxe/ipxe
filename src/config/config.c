@@ -140,6 +140,9 @@ REQUIRE_OBJECT ( slam );
 #ifdef SANBOOT_PROTO_ISCSI
 REQUIRE_OBJECT ( iscsi );
 #endif
+#ifdef SANBOOT_PROTO_HTTP
+REQUIRE_OBJECT ( httpblock );
+#endif
 
 /*
  * Drag in all requested resolvers

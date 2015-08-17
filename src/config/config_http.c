@@ -1,10 +1,8 @@
 /*
- * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of the
- * License, or any later version.
+ * License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -23,27 +21,22 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-/**
- * @file
+#include <config/general.h>
+
+/** @file
  *
- * Hyper Text Transfer Protocol (HTTP)
+ * HTTP extensions
  *
  */
 
-#include <ipxe/open.h>
-#include <ipxe/http.h>
-#include <ipxe/features.h>
+PROVIDE_REQUIRING_SYMBOL();
 
-FEATURE ( FEATURE_PROTOCOL, "HTTP", DHCP_EB_FEATURE_HTTP, 1 );
-
-/** HTTP URI opener */
-struct uri_opener http_uri_opener __uri_opener = {
-	.scheme	= "http",
-	.open	= http_open_uri,
-};
-
-/** HTTP URI scheme */
-struct http_scheme http_scheme __http_scheme = {
-	.name = "http",
-	.port = HTTP_PORT,
-};
+/*
+ * Drag in HTTP extensions
+ */
+#ifdef HTTP_AUTH_BASIC
+REQUIRE_OBJECT ( httpbasic );
+#endif
+#ifdef HTTP_AUTH_DIGEST
+REQUIRE_OBJECT ( httpdigest );
+#endif

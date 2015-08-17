@@ -67,6 +67,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#undef	SANBOOT_PROTO_AOE	/* AoE protocol */
 //#undef	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
 //#undef	SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
+//#undef	SANBOOT_PROTO_HTTP	/* HTTP SAN protocol */
+
+/*
+ * HTTP extensions
+ *
+ */
+#define HTTP_AUTH_BASIC		/* Basic authentication */
+#define HTTP_AUTH_DIGEST	/* Digest authentication */
 
 /*
  * 802.11 cryptosystems and handshaking protocols
