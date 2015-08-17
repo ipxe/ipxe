@@ -254,6 +254,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_httpdigest		( ERRFILE_NET | 0x00440000 )
 #define ERRFILE_peerdisc		( ERRFILE_NET | 0x00450000 )
 #define ERRFILE_peerblk			( ERRFILE_NET | 0x00460000 )
+#define ERRFILE_peermux			( ERRFILE_NET | 0x00470000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
