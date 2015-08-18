@@ -670,6 +670,8 @@ static void dhcp_proxy_rx ( struct dhcp_session *dhcp,
 		DBGC ( dhcp, " (%s/", inet_ntoa ( server_id ) );
 		DBGC ( dhcp, "%s)", inet_ntoa ( pseudo_id ) );
 	}
+	if ( dhcp_has_pxeopts ( dhcppkt ) )
+		DBGC ( dhcp, " pxe" );
 	DBGC ( dhcp, "\n" );
 
 	/* Filter out unacceptable responses */
@@ -678,6 +680,8 @@ static void dhcp_proxy_rx ( struct dhcp_session *dhcp,
 	if ( ( msgtype != DHCPOFFER ) && ( msgtype != DHCPACK ) )
 		return;
 	if ( ( pseudo_id.s_addr != dhcp->proxy_server.s_addr ) )
+		return;
+	if ( ! dhcp_has_pxeopts ( dhcppkt ) )
 		return;
 
 	/* Register settings */
