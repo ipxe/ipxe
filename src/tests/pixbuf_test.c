@@ -57,8 +57,8 @@ void pixbuf_okx ( struct pixel_buffer_test *test, const char *file,
 	/* Correct image data pointer */
 	test->image->data = virt_to_user ( ( void * ) test->image->data );
 
-	/* Check that image is detected as PNM */
-	okx ( image_probe ( test->image ) == 0, file, line );
+	/* Check that image is detected as correct type */
+	okx ( register_image ( test->image ) == 0, file, line );
 	okx ( test->image->type == test->type, file, line );
 
 	/* Check that a pixel buffer can be created from the image */
@@ -77,4 +77,7 @@ void pixbuf_okx ( struct pixel_buffer_test *test, const char *file,
 
 		pixbuf_put ( pixbuf );
 	}
+
+	/* Unregister image */
+	unregister_image ( test->image );
 }

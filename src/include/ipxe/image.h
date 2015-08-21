@@ -163,7 +163,6 @@ extern int image_set_cmdline ( struct image *image, const char *cmdline );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
 struct image * find_image ( const char *name );
-extern int image_probe ( struct image *image );
 extern int image_exec ( struct image *image );
 extern int image_replace ( struct image *replacement );
 extern int image_select ( struct image *image );
