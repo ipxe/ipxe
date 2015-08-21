@@ -178,6 +178,7 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 	if ( filename ) {
 		if ( ( rc = imgdownload ( filename, 0, &image ) ) != 0 )
 			goto err_download;
+		imgstat ( image );
 		image->flags |= IMAGE_AUTO_UNREGISTER;
 		if ( ( rc = image_exec ( image ) ) != 0 ) {
 			printf ( "Could not boot image: %s\n",
