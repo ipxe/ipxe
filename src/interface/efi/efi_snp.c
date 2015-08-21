@@ -871,6 +871,7 @@ efi_snp_load_file ( EFI_LOAD_FILE_PROTOCOL *load_file,
 	struct efi_snp_device *snpdev =
 		container_of ( load_file, struct efi_snp_device, load_file );
 	struct net_device *netdev = snpdev->netdev;
+	int rc;
 
 	/* Fail unless this is a boot attempt */
 	if ( ! booting ) {
@@ -886,16 +887,13 @@ efi_snp_load_file ( EFI_LOAD_FILE_PROTOCOL *load_file,
 	efi_watchdog_start();
 
 	/* Boot from network device */
-	ipxe ( netdev );
+	if ( ( rc = ipxe ( netdev ) ) != 0 )
+		goto err_ipxe;
 
-	/* Stop watchdog holdoff timer */
+ err_ipxe:
 	efi_watchdog_stop();
-
-	/* Release network devices for use via SNP */
 	efi_snp_release();
-
-	/* Assume boot process was aborted */
-	return EFI_ABORTED;
+	return EFIRC ( rc );
 }
 
 /** Load file protocol */

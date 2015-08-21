@@ -542,11 +542,13 @@ static int shell_banner ( void ) {
  * Main iPXE flow of execution
  *
  * @v netdev		Network device, or NULL
+ * @ret rc		Return status code
  */
-void ipxe ( struct net_device *netdev ) {
+int ipxe ( struct net_device *netdev ) {
 	struct feature *feature;
 	struct image *image;
 	char *scriptlet;
+	int rc;
 
 	/*
 	 * Print welcome banner
@@ -570,28 +572,30 @@ void ipxe ( struct net_device *netdev ) {
 	/* Boot system */
 	if ( ( image = first_image() ) != NULL ) {
 		/* We have an embedded image; execute it */
-		image_exec ( image );
+		return image_exec ( image );
 	} else if ( shell_banner() ) {
 		/* User wants shell; just give them a shell */
-		shell();
+		return shell();
 	} else {
 		fetch_string_setting_copy ( NULL, &scriptlet_setting,
 					    &scriptlet );
 		if ( scriptlet ) {
 			/* User has defined a scriptlet; execute it */
-			system ( scriptlet );
+			rc = system ( scriptlet );
 			free ( scriptlet );
+			return rc;
 		} else {
 			/* Try booting.  If booting fails, offer the
 			 * user another chance to enter the shell.
 			 */
 			if ( netdev ) {
-				netboot ( netdev );
+				rc = netboot ( netdev );
 			} else {
-				autoboot();
+				rc = autoboot();
 			}
 			if ( shell_banner() )
-				shell();
+				rc = shell();
+			return rc;
 		}
 	}
 }
