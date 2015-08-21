@@ -38,6 +38,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/netdevice.h>
 #include <ipxe/features.h>
 #include <ipxe/console.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/IndustryStandard/PeImage.h>
 
 FEATURE ( FEATURE_IMAGE, "PXE", DHCP_EB_FEATURE_PXE, 1 );
 
@@ -125,9 +127,45 @@ int pxe_probe ( struct image *image ) {
 	return 0;
 }
 
+/**
+ * Probe PXE image (with rejection of potential EFI images)
+ *
+ * @v image		PXE file
+ * @ret rc		Return status code
+ */
+int pxe_probe_no_mz ( struct image *image ) {
+	uint16_t magic;
+	int rc;
+
+	/* Probe PXE image */
+	if ( ( rc = pxe_probe ( image ) ) != 0 )
+		return rc;
+
+	/* Reject image with an "MZ" signature which may indicate an
+	 * EFI image incorrectly handed out to a BIOS system.
+	 */
+	if ( image->len >= sizeof ( magic ) ) {
+		copy_from_user ( &magic, image->data, 0, sizeof ( magic ) );
+		if ( magic == cpu_to_le16 ( EFI_IMAGE_DOS_SIGNATURE ) ) {
+			DBGC ( image, "IMAGE %p may be an EFI image\n",
+			       image );
+			return -ENOTTY;
+		}
+	}
+
+	return 0;
+}
+
 /** PXE image type */
-struct image_type pxe_image_type __image_type ( PROBE_PXE ) = {
-	.name = "PXE",
-	.probe = pxe_probe,
-	.exec = pxe_exec,
+struct image_type pxe_image_type[] __image_type ( PROBE_PXE ) = {
+	{
+		.name = "PXE-NBP",
+		.probe = pxe_probe_no_mz,
+		.exec = pxe_exec,
+	},
+	{
+		.name = "PXE-NBP (may be EFI?)",
+		.probe = pxe_probe,
+		.exec = pxe_exec,
+	},
 };
