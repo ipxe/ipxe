@@ -1666,15 +1666,43 @@ const struct setting_type setting_type_string __setting_type = {
 	.format = format_string_setting,
 };
 
-/** A URI-encoded string setting type
+/**
+ * Parse URI-encoded string setting value
  *
- * This setting type is obsolete; the name ":uristring" is retained to
- * avoid breaking existing scripts.
+ * @v type		Setting type
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @ret len		Length of raw value, or negative error
  */
+static int parse_uristring_setting ( const struct setting_type *type __unused,
+				     const char *value, void *buf, size_t len ){
+
+	return uri_decode ( value, buf, len );
+}
+
+/**
+ * Format URI-encoded string setting value
+ *
+ * @v type		Setting type
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int format_uristring_setting ( const struct setting_type *type __unused,
+				      const void *raw, size_t raw_len,
+				      char *buf, size_t len ) {
+
+	return uri_encode ( 0, raw, raw_len, buf, len );
+}
+
+/** A URI-encoded string setting type */
 const struct setting_type setting_type_uristring __setting_type = {
 	.name = "uristring",
-	.parse = parse_string_setting,
-	.format = format_string_setting,
+	.parse = parse_uristring_setting,
+	.format = format_uristring_setting,
 };
 
 /**

@@ -1826,7 +1826,7 @@ static size_t http_params ( struct parameters *params, char *buf, size_t len ) {
 		}
 
 		/* URI-encode the key */
-		frag_len = uri_encode ( param->key, 0, buf, remaining );
+		frag_len = uri_encode_string ( 0, param->key, buf, remaining );
 		buf += frag_len;
 		len += frag_len;
 		remaining -= frag_len;
@@ -1839,7 +1839,7 @@ static size_t http_params ( struct parameters *params, char *buf, size_t len ) {
 		remaining--;
 
 		/* URI-encode the value */
-		frag_len = uri_encode ( param->value, 0, buf, remaining );
+		frag_len = uri_encode_string ( 0, param->value, buf, remaining);
 		buf += frag_len;
 		len += frag_len;
 		remaining -= frag_len;
