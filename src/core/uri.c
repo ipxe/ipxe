@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ctype.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/params.h>
+#include <ipxe/tcpip.h>
 #include <ipxe/uri.h>
 
 /**
@@ -711,30 +712,50 @@ struct uri * resolve_uri ( const struct uri *base_uri,
 }
 
 /**
- * Construct TFTP URI from next-server and filename
+ * Construct URI from server address and filename
  *
- * @v next_server	Next-server address
- * @v port		Port number, or zero to use the default port
+ * @v sa_server		Server address
  * @v filename		Filename
  * @ret uri		URI, or NULL on failure
  *
- * TFTP filenames specified via the DHCP next-server field often
+ * PXE TFTP filenames specified via the DHCP next-server field often
  * contain characters such as ':' or '#' which would confuse the
  * generic URI parser.  We provide a mechanism for directly
  * constructing a TFTP URI from the next-server and filename.
  */
-struct uri * tftp_uri ( struct in_addr next_server, unsigned int port,
-			const char *filename ) {
+struct uri * pxe_uri ( struct sockaddr *sa_server, const char *filename ) {
 	char buf[ 6 /* "65535" + NUL */ ];
-	struct uri uri;
+	struct sockaddr_tcpip *st_server =
+		( ( struct sockaddr_tcpip * ) sa_server );
+	struct uri tmp;
+	struct uri *uri;
 
-	memset ( &uri, 0, sizeof ( uri ) );
-	uri.scheme = "tftp";
-	uri.host = inet_ntoa ( next_server );
-	if ( port ) {
-		snprintf ( buf, sizeof ( buf ), "%d", port );
-		uri.port = buf;
+	/* Fail if filename is empty */
+	if ( ! ( filename && filename[0] ) )
+		return NULL;
+
+	/* If filename is a hierarchical absolute URI, then use that
+	 * URI.  (We accept only hierarchical absolute URIs, since PXE
+	 * filenames sometimes start with DOS drive letters such as
+	 * "C:\", which get misinterpreted as opaque absolute URIs.)
+	 */
+	uri = parse_uri ( filename );
+	if ( uri && uri_is_absolute ( uri ) && ( ! uri->opaque ) )
+		return uri;
+	uri_put ( uri );
+
+	/* Otherwise, construct a TFTP URI directly */
+	memset ( &tmp, 0, sizeof ( tmp ) );
+	tmp.scheme = "tftp";
+	tmp.host = sock_ntoa ( sa_server );
+	if ( ! tmp.host )
+		return NULL;
+	if ( st_server->st_port ) {
+		snprintf ( buf, sizeof ( buf ), "%d",
+			   ntohs ( st_server->st_port ) );
+		tmp.port = buf;
 	}
-	uri.path = filename;
-	return uri_dup ( &uri );
+	tmp.path = filename;
+	uri = uri_dup ( &tmp );
+	return uri;
 }

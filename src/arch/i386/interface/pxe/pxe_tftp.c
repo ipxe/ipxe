@@ -160,25 +160,20 @@ static struct pxe_tftp_connection pxe_tftp = {
 };
 
 /**
- * Maximum length of a PXE TFTP URI
- *
- * The PXE TFTP API provides 128 characters for the filename; the
- * extra 128 bytes allow for the remainder of the URI.
- */
-#define PXE_TFTP_URI_LEN 256
-
-/**
  * Open PXE TFTP connection
  *
  * @v ipaddress		IP address
- * @v port		TFTP server port
+ * @v port		TFTP server port (in network byte order)
  * @v filename		File name
  * @v blksize		Requested block size
  * @ret rc		Return status code
  */
 static int pxe_tftp_open ( IP4_t ipaddress, UDP_PORT_t port,
 			   UINT8_t *filename, UINT16_t blksize ) {
-	struct in_addr address;
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+	} server;
 	struct uri *uri;
 	int rc;
 
@@ -191,12 +186,15 @@ static int pxe_tftp_open ( IP4_t ipaddress, UDP_PORT_t port,
 	pxe_tftp.rc = -EINPROGRESS;
 
 	/* Construct URI */
-	address.s_addr = ipaddress;
-	DBG ( " %s", inet_ntoa ( address ) );
+	memset ( &server, 0, sizeof ( server ) );
+	server.sin.sin_family = AF_INET;
+	server.sin.sin_addr.s_addr = ipaddress;
+	server.sin.sin_port = port;
+	DBG ( " %s", sock_ntoa ( &server.sa ) );
 	if ( port )
 		DBG ( ":%d", ntohs ( port ) );
 	DBG ( ":%s", filename );
-	uri = tftp_uri ( address, ntohs ( port ), ( ( char * ) filename ) );
+	uri = pxe_uri ( &server.sa, ( ( char * ) filename ) );
 	if ( ! uri ) {
 		DBG ( " could not create URI\n" );
 		return -ENOMEM;
