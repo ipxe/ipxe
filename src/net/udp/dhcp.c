@@ -296,8 +296,9 @@ static void dhcp_set_state ( struct dhcp_session *dhcp,
  */
 static int dhcp_has_pxeopts ( struct dhcp_packet *dhcppkt ) {
 
-	/* Check for a boot filename */
-	if ( dhcppkt_fetch ( dhcppkt, DHCP_BOOTFILE_NAME, NULL, 0 ) > 0 )
+	/* Check for a next-server and boot filename */
+	if ( dhcppkt->dhcphdr->siaddr.s_addr &&
+	     ( dhcppkt_fetch ( dhcppkt, DHCP_BOOTFILE_NAME, NULL, 0 ) > 0 ) )
 		return 1;
 
 	/* Check for a PXE boot menu */
