@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/uuid.h>
 #include <ipxe/base16.h>
+#include <ipxe/vsprintf.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
@@ -632,7 +633,10 @@ static struct efi_handle_name_type efi_handle_name_types[] = {
 const __attribute__ (( pure )) char * efi_handle_name ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_handle_name_type *type;
-	static char buf[32];
+	static char buf[256];
+	size_t used = 0;
+	EFI_GUID **protocols;
+	UINTN count;
 	unsigned int i;
 	void *interface;
 	const char *name;
@@ -672,7 +676,19 @@ const __attribute__ (( pure )) char * efi_handle_name ( EFI_HANDLE handle ) {
 			return name;
 	}
 
-	/* Use raw handle value if no name found */
-	snprintf ( buf, sizeof ( buf ), "UNKNOWN<%p>", handle );
+	/* If no name is found, then use the raw handle value and a
+	 * list of installed protocols.
+	 */
+	used = ssnprintf ( buf, sizeof ( buf ), "UNKNOWN<%p", handle );
+	if ( ( efirc = bs->ProtocolsPerHandle ( handle, &protocols,
+						&count ) ) == 0 ) {
+		for ( i = 0 ; i < count ; i++ ) {
+			used += ssnprintf ( ( buf + used ),
+					    ( sizeof ( buf ) - used ), ",%s",
+					    efi_guid_ntoa ( protocols[i] ) );
+		}
+		bs->FreePool ( protocols );
+	}
+	used += ssnprintf ( ( buf + used ), ( sizeof ( buf ) - used ), ">" );
 	return buf;
 }
