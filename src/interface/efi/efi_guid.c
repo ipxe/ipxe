@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/BusSpecificDriverOverride.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
+#include <ipxe/efi/Protocol/ConsoleControl/ConsoleControl.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
 #include <ipxe/efi/Protocol/Dhcp4.h>
@@ -47,11 +48,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/PciIo.h>
 #include <ipxe/efi/Protocol/PciRootBridgeIo.h>
 #include <ipxe/efi/Protocol/PxeBaseCode.h>
+#include <ipxe/efi/Protocol/SerialIo.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/Protocol/TcgService.h>
 #include <ipxe/efi/Protocol/Tcp4.h>
 #include <ipxe/efi/Protocol/Udp4.h>
+#include <ipxe/efi/Protocol/UgaDraw.h>
+#include <ipxe/efi/Protocol/UnicodeCollation.h>
 #include <ipxe/efi/Protocol/VlanConfig.h>
 
 /** @file
@@ -83,6 +87,10 @@ EFI_GUID efi_component_name_protocol_guid
 /** Component name 2 protocol GUID */
 EFI_GUID efi_component_name2_protocol_guid
 	= EFI_COMPONENT_NAME2_PROTOCOL_GUID;
+
+/** Console control protocol GUID */
+EFI_GUID efi_console_control_protocol_guid
+	= EFI_CONSOLE_CONTROL_PROTOCOL_GUID;
 
 /** Device path protocol GUID */
 EFI_GUID efi_device_path_protocol_guid
@@ -176,6 +184,10 @@ EFI_GUID efi_pci_root_bridge_io_protocol_guid
 EFI_GUID efi_pxe_base_code_protocol_guid
 	= EFI_PXE_BASE_CODE_PROTOCOL_GUID;
 
+/** Serial I/O protocol GUID */
+EFI_GUID efi_serial_io_protocol_guid
+	= EFI_SERIAL_IO_PROTOCOL_GUID;
+
 /** Simple file system protocol GUID */
 EFI_GUID efi_simple_file_system_protocol_guid
 	= EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
@@ -203,6 +215,14 @@ EFI_GUID efi_udp4_protocol_guid
 /** UDPv4 service binding protocol GUID */
 EFI_GUID efi_udp4_service_binding_protocol_guid
 	= EFI_UDP4_SERVICE_BINDING_PROTOCOL_GUID;
+
+/** UGA draw protocol GUID */
+EFI_GUID efi_uga_draw_protocol_guid
+	= EFI_UGA_DRAW_PROTOCOL_GUID;
+
+/** Unicode collation protocol GUID */
+EFI_GUID efi_unicode_collation_protocol_guid
+	= EFI_UNICODE_COLLATION_PROTOCOL_GUID;
 
 /** VLAN configuration protocol GUID */
 EFI_GUID efi_vlan_config_protocol_guid
