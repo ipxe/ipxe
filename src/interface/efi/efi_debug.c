@@ -162,7 +162,7 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
  * @v guid		GUID
  * @ret string		Printable string
  */
-const char * efi_guid_ntoa ( EFI_GUID *guid ) {
+const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid ) {
 	union {
 		union uuid uuid;
 		EFI_GUID guid;
@@ -314,7 +314,8 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
  * @v path		Device path
  * @ret text		Textual representation of device path, or NULL
  */
-const char * efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+const __attribute__ (( pure )) char *
+efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	static char text[256];
 	void *start;
@@ -627,7 +628,7 @@ static struct efi_handle_name_type efi_handle_name_types[] = {
  * @v handle		EFI handle
  * @ret text		Name of handle, or NULL
  */
-const char * efi_handle_name ( EFI_HANDLE handle ) {
+const __attribute__ (( pure )) char * efi_handle_name ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_handle_name_type *type;
 	unsigned int i;
