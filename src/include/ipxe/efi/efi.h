@@ -202,6 +202,10 @@ extern EFI_SYSTEM_TABLE *efi_systab;
 
 extern const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid );
 extern const __attribute__ (( pure )) char *
+efi_locate_search_type_name ( EFI_LOCATE_SEARCH_TYPE search_type );
+extern const __attribute__ (( pure )) char *
+efi_open_attributes_name ( unsigned int attributes );
+extern const __attribute__ (( pure )) char *
 efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern const __attribute__ (( pure )) char *
 efi_handle_name ( EFI_HANDLE handle );

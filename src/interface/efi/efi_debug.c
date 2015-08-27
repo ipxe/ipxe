@@ -190,6 +190,26 @@ const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid ) {
 }
 
 /**
+ * Name locate search type
+ *
+ * @v search_type	Locate search type
+ * @ret name		Locate search type name
+ */
+const __attribute__ (( pure )) char *
+efi_locate_search_type_name ( EFI_LOCATE_SEARCH_TYPE search_type ) {
+	static char buf[16];
+
+	switch ( search_type ) {
+	case AllHandles :	return "AllHandles";
+	case ByRegisterNotify:	return "ByRegisterNotify";
+	case ByProtocol:	return "ByProtocol";
+	default:
+		snprintf ( buf, sizeof ( buf ), "UNKNOWN<%d>", search_type );
+		return buf;
+	}
+}
+
+/**
  * Name protocol open attributes
  *
  * @v attributes	Protocol open attributes
@@ -200,7 +220,8 @@ const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid ) {
  * (T)EST_PROTOCOL, BY_(C)HILD_CONTROLLER, BY_(D)RIVER, and
  * E(X)CLUSIVE.
  */
-static const char * efi_open_attributes_name ( unsigned int attributes ) {
+const __attribute__ (( pure )) char *
+efi_open_attributes_name ( unsigned int attributes ) {
 	static char attribute_chars[] = "HGTCDX";
 	static char name[ sizeof ( attribute_chars ) ];
 	char *tmp = name;
