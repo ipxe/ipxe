@@ -96,30 +96,29 @@ efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	struct efi_driver *efidrv;
 	int rc;
 
-	DBGCP ( device, "EFIDRV %p %s DRIVER_SUPPORTED",
-		device, efi_handle_name ( device ) );
+	DBGCP ( device, "EFIDRV %s DRIVER_SUPPORTED",
+		efi_handle_name ( device ) );
 	if ( child )
 		DBGCP ( device, " (child %s)", efi_devpath_text ( child ) );
 	DBGCP ( device, "\n" );
 
 	/* Do nothing if we are already driving this device */
 	if ( efidev_find ( device ) != NULL ) {
-		DBGCP ( device, "EFIDRV %p %s is already started\n",
-			device, efi_handle_name ( device ) );
+		DBGCP ( device, "EFIDRV %s is already started\n",
+			efi_handle_name ( device ) );
 		return EFI_ALREADY_STARTED;
 	}
 
 	/* Look for a driver claiming to support this device */
 	for_each_table_entry ( efidrv, EFI_DRIVERS ) {
 		if ( ( rc = efidrv->supported ( device ) ) == 0 ) {
-			DBGC ( device, "EFIDRV %p %s has driver \"%s\"\n",
-			       device, efi_handle_name ( device ),
-			       efidrv->name );
+			DBGC ( device, "EFIDRV %s has driver \"%s\"\n",
+			       efi_handle_name ( device ), efidrv->name );
 			return 0;
 		}
 	}
-	DBGCP ( device, "EFIDRV %p %s has no driver\n",
-		device, efi_handle_name ( device ) );
+	DBGCP ( device, "EFIDRV %s has no driver\n",
+		efi_handle_name ( device ) );
 
 	return EFI_UNSUPPORTED;
 }
@@ -140,8 +139,7 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	EFI_STATUS efirc;
 	int rc;
 
-	DBGC ( device, "EFIDRV %p %s DRIVER_START",
-	       device, efi_handle_name ( device ) );
+	DBGC ( device, "EFIDRV %s DRIVER_START", efi_handle_name ( device ) );
 	if ( child )
 		DBGC ( device, " (child %s)", efi_devpath_text ( child ) );
 	DBGC ( device, "\n" );
@@ -149,8 +147,8 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	/* Do nothing if we are already driving this device */
 	efidev = efidev_find ( device );
 	if ( efidev ) {
-		DBGCP ( device, "EFIDRV %p %s is already started\n",
-			device, efi_handle_name ( device ) );
+		DBGCP ( device, "EFIDRV %s is already started\n",
+			efi_handle_name ( device ) );
 		efirc = EFI_ALREADY_STARTED;
 		goto err_already_started;
 	}
@@ -169,22 +167,22 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	/* Try to start this device */
 	for_each_table_entry ( efidrv, EFI_DRIVERS ) {
 		if ( ( rc = efidrv->supported ( device ) ) != 0 ) {
-			DBGC ( device, "EFIDRV %p %s is not supported by "
-			       "driver \"%s\": %s\n", device,
-			       efi_handle_name ( device ), efidrv->name,
+			DBGC ( device, "EFIDRV %s is not supported by driver "
+			       "\"%s\": %s\n", efi_handle_name ( device ),
+			       efidrv->name,
 			       strerror ( rc ) );
 			continue;
 		}
 		if ( ( rc = efidrv->start ( efidev ) ) == 0 ) {
 			efidev->driver = efidrv;
-			DBGC ( device, "EFIDRV %p %s using driver \"%s\"\n",
-			       device, efi_handle_name ( device ),
+			DBGC ( device, "EFIDRV %s using driver \"%s\"\n",
+			       efi_handle_name ( device ),
 			       efidev->driver->name );
 			return 0;
 		}
-		DBGC ( device, "EFIDRV %p %s could not start driver \"%s\": "
-		       "%s\n", device, efi_handle_name ( device ),
-		       efidrv->name, strerror ( rc ) );
+		DBGC ( device, "EFIDRV %s could not start driver \"%s\": %s\n",
+		       efi_handle_name ( device ), efidrv->name,
+		       strerror ( rc ) );
 	}
 	efirc = EFI_UNSUPPORTED;
 
@@ -213,19 +211,18 @@ efi_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	struct efi_device *efidev;
 	UINTN i;
 
-	DBGC ( device, "EFIDRV %p %s DRIVER_STOP",
-	       device, efi_handle_name ( device ) );
+	DBGC ( device, "EFIDRV %s DRIVER_STOP", efi_handle_name ( device ) );
 	for ( i = 0 ; i < num_children ; i++ ) {
-		DBGC ( device, "%s%p %s", ( i ? ", " : " child " ),
-		       children[i], efi_handle_name ( children[i] ) );
+		DBGC ( device, "%s%s", ( i ? ", " : " child " ),
+		       efi_handle_name ( children[i] ) );
 	}
 	DBGC ( device, "\n" );
 
 	/* Do nothing unless we are driving this device */
 	efidev = efidev_find ( device );
 	if ( ! efidev ) {
-		DBGCP ( device, "EFIDRV %p %s is not started\n",
-			device, efi_handle_name ( device ) );
+		DBGCP ( device, "EFIDRV %s is not started\n",
+			efi_handle_name ( device ) );
 		return 0;
 	}
 
@@ -378,36 +375,35 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 	}
 
 	/* Disconnect any existing drivers */
-	DBGC2 ( device, "EFIDRV %p %s before disconnecting:\n",
-		device, efi_handle_name ( device ) );
+	DBGC2 ( device, "EFIDRV %s before disconnecting:\n",
+		efi_handle_name ( device ) );
 	DBGC2_EFI_PROTOCOLS ( device, device );
-	DBGC ( device, "EFIDRV %p %s disconnecting existing drivers\n",
-	       device, efi_handle_name ( device ) );
+	DBGC ( device, "EFIDRV %s disconnecting existing drivers\n",
+	       efi_handle_name ( device ) );
 	if ( ( efirc = bs->DisconnectController ( device, NULL,
 						  NULL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( device, "EFIDRV %p %s could not disconnect existing "
-		       "drivers: %s\n", device, efi_handle_name ( device ),
+		DBGC ( device, "EFIDRV %s could not disconnect existing "
+		       "drivers: %s\n", efi_handle_name ( device ),
 		       strerror ( rc ) );
 		/* Ignore the error and attempt to connect our drivers */
 	}
-	DBGC2 ( device, "EFIDRV %p %s after disconnecting:\n",
-		device, efi_handle_name ( device ) );
+	DBGC2 ( device, "EFIDRV %s after disconnecting:\n",
+		efi_handle_name ( device ) );
 	DBGC2_EFI_PROTOCOLS ( device, device );
 
 	/* Connect our driver */
-	DBGC ( device, "EFIDRV %p %s connecting new drivers\n",
-	       device, efi_handle_name ( device ) );
+	DBGC ( device, "EFIDRV %s connecting new drivers\n",
+	       efi_handle_name ( device ) );
 	if ( ( efirc = bs->ConnectController ( device, drivers, NULL,
 					       FALSE ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( device, "EFIDRV %p %s could not connect new drivers: "
-		       "%s\n", device, efi_handle_name ( device ),
-		       strerror ( rc ) );
+		DBGC ( device, "EFIDRV %s could not connect new drivers: "
+		       "%s\n", efi_handle_name ( device ), strerror ( rc ) );
 		return rc;
 	}
-	DBGC2 ( device, "EFIDRV %p %s after connecting:\n",
-		device, efi_handle_name ( device ) );
+	DBGC2 ( device, "EFIDRV %s after connecting:\n",
+		efi_handle_name ( device ) );
 	DBGC2_EFI_PROTOCOLS ( device, device );
 
 	return 0;

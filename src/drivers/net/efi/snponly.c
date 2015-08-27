@@ -81,14 +81,14 @@ static int chained_locate ( struct chained_protocol *chained ) {
 	/* Locate handle supporting this protocol */
 	if ( ( rc = efi_locate_device ( device, chained->protocol,
 					&parent ) ) != 0 ) {
-		DBGC ( device, "CHAINED %p %s does not support %s: %s\n",
-		       device, efi_handle_name ( device ),
+		DBGC ( device, "CHAINED %s does not support %s: %s\n",
+		       efi_handle_name ( device ),
 		       efi_guid_ntoa ( chained->protocol ), strerror ( rc ) );
 		goto err_locate_device;
 	}
-	DBGC ( device, "CHAINED %p %s found %s on ", device,
-	       efi_handle_name ( device ), efi_guid_ntoa ( chained->protocol ));
-	DBGC ( device, "%p %s\n", parent, efi_handle_name ( parent ) );
+	DBGC ( device, "CHAINED %s found %s on ", efi_handle_name ( device ),
+	       efi_guid_ntoa ( chained->protocol ) );
+	DBGC ( device, "%s\n", efi_handle_name ( parent ) );
 
 	/* Get protocol instance */
 	if ( ( efirc = bs->OpenProtocol ( parent, chained->protocol,
@@ -96,11 +96,11 @@ static int chained_locate ( struct chained_protocol *chained ) {
 					  device,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
 		rc = -EEFI ( efirc );
-		DBGC ( device, "CHAINED %p %s could not open %s on ",
-		       device, efi_handle_name ( device ),
+		DBGC ( device, "CHAINED %s could not open %s on ",
+		       efi_handle_name ( device ),
 		       efi_guid_ntoa ( chained->protocol ) );
-		DBGC ( device, "%p %s: %s\n",
-		       parent, efi_handle_name ( parent ), strerror ( rc ) );
+		DBGC ( device, "%s: %s\n",
+		       efi_handle_name ( parent ), strerror ( rc ) );
 		goto err_open_protocol;
 	}
 
@@ -130,25 +130,25 @@ static int chained_supported ( EFI_HANDLE device,
 					  efi_image_handle, device,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
 		rc = -EEFI ( efirc );
-		DBGCP ( device, "CHAINED %p %s is not a %s device\n",
-			device, efi_handle_name ( device ),
+		DBGCP ( device, "CHAINED %s is not a %s device\n",
+			efi_handle_name ( device ),
 			efi_guid_ntoa ( chained->protocol ) );
 		goto err_open_protocol;
 	}
 
 	/* Test for a match against the chainloading device */
 	if ( interface != chained->interface ) {
-		DBGC ( device, "CHAINED %p %s %p is not the chainloaded "
-		       "%s\n", device, efi_handle_name ( device ),
-		       interface, efi_guid_ntoa ( chained->protocol ) );
+		DBGC ( device, "CHAINED %s %p is not the chainloaded %s\n",
+		       efi_handle_name ( device ), interface,
+		       efi_guid_ntoa ( chained->protocol ) );
 		rc = -ENOTTY;
 		goto err_no_match;
 	}
 
 	/* Success */
 	rc = 0;
-	DBGC ( device, "CHAINED %p %s %p is the chainloaded %s\n",
-	       device, efi_handle_name ( device ), interface,
+	DBGC ( device, "CHAINED %s %p is the chainloaded %s\n",
+	       efi_handle_name ( device ), interface,
 	       efi_guid_ntoa ( chained->protocol ) );
 
  err_no_match:

@@ -154,8 +154,8 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 					  &pci_io.interface, efi_image_handle,
 					  device, attributes ) ) != 0 ) {
 		rc = -EEFI_PCI ( efirc );
-		DBGCP ( device, "EFIPCI %p %s cannot open PCI protocols: %s\n",
-			device, efi_handle_name ( device ), strerror ( rc ) );
+		DBGCP ( device, "EFIPCI %s cannot open PCI protocols: %s\n",
+			efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open_protocol;
 	}
 
@@ -164,11 +164,11 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 						    &pci_bus, &pci_dev,
 						    &pci_fn ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( device, "EFIPCI %p %s could not get PCI location: %s\n",
-		       device, efi_handle_name ( device ), strerror ( rc ) );
+		DBGC ( device, "EFIPCI %s could not get PCI location: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_get_location;
 	}
-	DBGC2 ( device, "EFIPCI %p %s is PCI %04lx:%02lx:%02lx.%lx\n", device,
+	DBGC2 ( device, "EFIPCI %s is PCI %04lx:%02lx:%02lx.%lx\n",
 		efi_handle_name ( device ), ( ( unsigned long ) pci_segment ),
 		( ( unsigned long ) pci_bus ), ( ( unsigned long ) pci_dev ),
 		( ( unsigned long ) pci_fn ) );
@@ -192,9 +192,8 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 	/* Populate PCI device */
 	pci_init ( pci, PCI_BUSDEVFN ( pci_bus, pci_dev, pci_fn ) );
 	if ( ( rc = pci_read_config ( pci ) ) != 0 ) {
-		DBGC ( device, "EFIPCI %p %s cannot read PCI configuration: "
-		       "%s\n", device, efi_handle_name ( device ),
-		       strerror ( rc ) );
+		DBGC ( device, "EFIPCI %s cannot read PCI configuration: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_pci_read_config;
 	}
 
@@ -264,12 +263,12 @@ static int efipci_supported ( EFI_HANDLE device ) {
 
 	/* Look for a driver */
 	if ( ( rc = pci_find_driver ( &pci ) ) != 0 ) {
-		DBGCP ( device, "EFIPCI %p %s has no driver\n",
-			device, efi_handle_name ( device ) );
+		DBGCP ( device, "EFIPCI %s has no driver\n",
+			efi_handle_name ( device ) );
 		return rc;
 	}
-	DBGC ( device, "EFIPCI %p %s has driver \"%s\"\n",
-	       device, efi_handle_name ( device ), pci.id->name );
+	DBGC ( device, "EFIPCI %s has driver \"%s\"\n",
+	       efi_handle_name ( device ), pci.id->name );
 
 	return 0;
 }
@@ -296,16 +295,16 @@ static int efipci_start ( struct efi_device *efidev ) {
 	if ( ( rc = efipci_open ( device, ( EFI_OPEN_PROTOCOL_BY_DRIVER |
 					    EFI_OPEN_PROTOCOL_EXCLUSIVE ),
 				  pci ) ) != 0 ) {
-		DBGC ( device, "EFIPCI %p %s could not open PCI device: %s\n",
-		       device, efi_handle_name ( device ), strerror ( rc ) );
+		DBGC ( device, "EFIPCI %s could not open PCI device: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
 		DBGC_EFI_OPENERS ( device, device, &efi_pci_io_protocol_guid );
 		goto err_open;
 	}
 
 	/* Find driver */
 	if ( ( rc = pci_find_driver ( pci ) ) != 0 ) {
-		DBGC ( device, "EFIPCI %p %s has no driver\n",
-		       device, efi_handle_name ( device ) );
+		DBGC ( device, "EFIPCI %s has no driver\n",
+		       efi_handle_name ( device ) );
 		goto err_find_driver;
 	}
 
@@ -315,13 +314,13 @@ static int efipci_start ( struct efi_device *efidev ) {
 
 	/* Probe driver */
 	if ( ( rc = pci_probe ( pci ) ) != 0 ) {
-		DBGC ( device, "EFIPCI %p %s could not probe driver \"%s\": "
-		       "%s\n", device, efi_handle_name ( device ),
-		       pci->id->name, strerror ( rc ) );
+		DBGC ( device, "EFIPCI %s could not probe driver \"%s\": %s\n",
+		       efi_handle_name ( device ), pci->id->name,
+		       strerror ( rc ) );
 		goto err_probe;
 	}
-	DBGC ( device, "EFIPCI %p %s using driver \"%s\"\n",
-	       device, efi_handle_name ( device ), pci->id->name );
+	DBGC ( device, "EFIPCI %s using driver \"%s\"\n",
+	       efi_handle_name ( device ), pci->id->name );
 
 	efidev_set_drvdata ( efidev, pci );
 	return 0;

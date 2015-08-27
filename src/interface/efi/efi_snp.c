@@ -1024,9 +1024,9 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 					  efidev->device,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
 		rc = -EEFI ( efirc );
-		DBGC ( snpdev, "SNPDEV %p cannot get %p %s device path: %s\n",
-		       snpdev, efidev->device,
-		       efi_handle_name ( efidev->device ), strerror ( rc ) );
+		DBGC ( snpdev, "SNPDEV %p cannot get %s device path: %s\n",
+		       snpdev, efi_handle_name ( efidev->device ),
+		       strerror ( rc ) );
 		goto err_open_device_path;
 	}
 
@@ -1067,16 +1067,16 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( snpdev, "SNPDEV %p could not install protocols: "
-		       "%s\n", snpdev, strerror ( rc ) );
+		DBGC ( snpdev, "SNPDEV %p could not install protocols: %s\n",
+		       snpdev, strerror ( rc ) );
 		goto err_install_protocol_interface;
 	}
 
 	/* Add as child of EFI parent device */
 	if ( ( rc = efi_child_add ( efidev->device, snpdev->handle ) ) != 0 ) {
-		DBGC ( snpdev, "SNPDEV %p could not become child of %p %s: "
-		       "%s\n", snpdev, efidev->device,
-		       efi_handle_name ( efidev->device ), strerror ( rc ) );
+		DBGC ( snpdev, "SNPDEV %p could not become child of %s: %s\n",
+		       snpdev, efi_handle_name ( efidev->device ),
+		       strerror ( rc ) );
 		goto err_efi_child_add;
 	}
 
@@ -1097,9 +1097,8 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	bs->CloseProtocol ( efidev->device, &efi_device_path_protocol_guid,
 			    efi_image_handle, efidev->device );
 
-	DBGC ( snpdev, "SNPDEV %p installed for %s as device %p %s\n",
-	       snpdev, netdev->name, snpdev->handle,
-	       efi_handle_name ( snpdev->handle ) );
+	DBGC ( snpdev, "SNPDEV %p installed for %s as device %s\n",
+	       snpdev, netdev->name, efi_handle_name ( snpdev->handle ) );
 	return 0;
 
 	if ( snpdev->package_list )

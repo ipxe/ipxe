@@ -231,8 +231,9 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 
 	/* Sanity check */
 	if ( ( ! handle ) || ( ! protocol ) ) {
-		printf ( "EFI could not retrieve openers for %s on %p\n",
-			 efi_guid_ntoa ( protocol ), handle );
+		printf ( "HANDLE %s could not retrieve openers for %s\n",
+			 efi_handle_name ( handle ),
+			 efi_guid_ntoa ( protocol ) );
 		return;
 	}
 
@@ -240,24 +241,24 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 	if ( ( efirc = bs->OpenProtocolInformation ( handle, protocol, &openers,
 						     &count ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		printf ( "EFI could not retrieve openers for %s on %p: %s\n",
-			 efi_guid_ntoa ( protocol ), handle, strerror ( rc ) );
+		printf ( "HANDLE %s could not retrieve openers for %s: %s\n",
+			 efi_handle_name ( handle ),
+			 efi_guid_ntoa ( protocol ), strerror ( rc ) );
 		return;
 	}
 
 	/* Dump list of openers */
 	for ( i = 0 ; i < count ; i++ ) {
 		opener = &openers[i];
-		printf ( "HANDLE %p %s %s opened %dx (%s)",
-			 handle, efi_handle_name ( handle ),
+		printf ( "HANDLE %s %s opened %dx (%s)",
+			 efi_handle_name ( handle ),
 			 efi_guid_ntoa ( protocol ), opener->OpenCount,
 			 efi_open_attributes_name ( opener->Attributes ) );
-		printf ( " by %p %s", opener->AgentHandle,
-			 efi_handle_name ( opener->AgentHandle ) );
+		printf ( " by %s", efi_handle_name ( opener->AgentHandle ) );
 		if ( opener->ControllerHandle == handle ) {
 			printf ( "\n" );
 		} else {
-			printf ( " for %p %s\n", opener->ControllerHandle,
+			printf ( " for %s\n",
 				 efi_handle_name ( opener->ControllerHandle ) );
 		}
 	}
@@ -282,7 +283,8 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 
 	/* Sanity check */
 	if ( ! handle ) {
-		printf ( "EFI could not retrieve protocols for %p\n", handle );
+		printf ( "HANDLE %s could not retrieve protocols\n",
+			 efi_handle_name ( handle ) );
 		return;
 	}
 
@@ -290,16 +292,15 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 	if ( ( efirc = bs->ProtocolsPerHandle ( handle, &protocols,
 						&count ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		printf ( "EFI could not retrieve protocols for %p: %s\n",
-			 handle, strerror ( rc ) );
+		printf ( "HANDLE %s could not retrieve protocols: %s\n",
+			 efi_handle_name ( handle ), strerror ( rc ) );
 		return;
 	}
 
 	/* Dump list of protocols */
 	for ( i = 0 ; i < count ; i++ ) {
 		protocol = protocols[i];
-		printf ( "HANDLE %p %s %s supported\n",
-			 handle, efi_handle_name ( handle ),
+		printf ( "HANDLE %s %s supported\n", efi_handle_name ( handle ),
 			 efi_guid_ntoa ( protocol ) );
 		dbg_efi_openers ( handle, protocol );
 	}
@@ -631,6 +632,7 @@ static struct efi_handle_name_type efi_handle_name_types[] = {
 const __attribute__ (( pure )) char * efi_handle_name ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_handle_name_type *type;
+	static char buf[32];
 	unsigned int i;
 	void *interface;
 	const char *name;
@@ -670,5 +672,7 @@ const __attribute__ (( pure )) char * efi_handle_name ( EFI_HANDLE handle ) {
 			return name;
 	}
 
-	return "UNKNOWN";
+	/* Use raw handle value if no name found */
+	snprintf ( buf, sizeof ( buf ), "UNKNOWN<%p>", handle );
+	return buf;
 }
