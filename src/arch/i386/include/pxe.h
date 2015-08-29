@@ -192,6 +192,7 @@ extern struct net_device *pxe_netdev;
 extern const char *pxe_cmdline;
 
 extern void pxe_set_netdev ( struct net_device *netdev );
+extern void pxe_fake_cached_info ( void );
 extern PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 					   *tftp_read_file );
 extern PXENV_EXIT_t undi_loader ( struct s_UNDI_LOADER *undi_loader );

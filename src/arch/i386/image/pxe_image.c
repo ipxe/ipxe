@@ -78,6 +78,9 @@ static int pxe_exec ( struct image *image ) {
 	/* Activate PXE */
 	pxe_activate ( netdev );
 
+	/* Construct fake DHCP packets */
+	pxe_fake_cached_info();
+
 	/* Set PXE command line */
 	pxe_cmdline = image->cmdline;
 

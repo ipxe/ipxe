@@ -129,6 +129,38 @@ static union pxe_cached_info __bss16_array ( cached_info, [NUM_CACHED_INFOS] );
 #define cached_info __use_data16 ( cached_info )
 
 /**
+ * Construct cached DHCP packets
+ *
+ */
+void pxe_fake_cached_info ( void ) {
+	struct pxe_dhcp_packet_creator *creator;
+	union pxe_cached_info *info;
+	unsigned int i;
+	int rc;
+
+	/* Sanity check */
+	assert ( pxe_netdev != NULL );
+
+	/* Erase any stale packets */
+	memset ( cached_info, 0, sizeof ( cached_info ) );
+
+	/* Construct all DHCP packets */
+	for ( i = 0 ; i < ( sizeof ( pxe_dhcp_packet_creators ) /
+			    sizeof ( pxe_dhcp_packet_creators[0] ) ) ; i++ ) {
+
+		/* Construct DHCP packet */
+		creator = &pxe_dhcp_packet_creators[i];
+		info = &cached_info[i];
+		if ( ( rc = creator->create ( pxe_netdev, info,
+					      sizeof ( *info ) ) ) != 0 ) {
+			DBGC ( &pxe_netdev, " failed to build packet: %s\n",
+			       strerror ( rc ) );
+			/* Continue constructing remaining packets */
+		}
+	}
+}
+
+/**
  * UNLOAD BASE CODE STACK
  *
  * @v None				-
@@ -149,12 +181,10 @@ pxenv_unload_stack ( struct s_PXENV_UNLOAD_STACK *unload_stack ) {
  */
 static PXENV_EXIT_t
 pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO *get_cached_info ) {
-	struct pxe_dhcp_packet_creator *creator;
 	union pxe_cached_info *info;
 	unsigned int idx;
 	size_t len;
 	userptr_t buffer;
-	int rc;
 
 	DBGC ( &pxe_netdev, "PXENV_GET_CACHED_INFO %s to %04x:%04x+%x",
 	       pxenv_get_cached_info_name ( get_cached_info->PacketType ),
@@ -162,30 +192,14 @@ pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO *get_cached_info ) {
 	       get_cached_info->Buffer.offset, get_cached_info->BufferSize );
 
 	/* Sanity check */
-	if ( ! pxe_netdev ) {
-		DBGC ( &pxe_netdev, "PXENV_GET_CACHED_INFO called with no "
-		       "network device\n" );
-		get_cached_info->Status = PXENV_STATUS_UNDI_INVALID_STATE;
-		return PXENV_EXIT_FAILURE;
-	}
-
-	/* Sanity check */
         idx = ( get_cached_info->PacketType - 1 );
 	if ( idx >= NUM_CACHED_INFOS ) {
 		DBGC ( &pxe_netdev, " bad PacketType %d\n",
 		       get_cached_info->PacketType );
-		goto err;
+		get_cached_info->Status = PXENV_STATUS_UNSUPPORTED;
+		return PXENV_EXIT_FAILURE;
 	}
 	info = &cached_info[idx];
-
-	/* Construct DHCP packet */
-	creator = &pxe_dhcp_packet_creators[idx];
-	if ( ( rc = creator->create ( pxe_netdev, info,
-				      sizeof ( *info ) ) ) != 0 ) {
-		DBGC ( &pxe_netdev, " failed to build packet: %s\n",
-		       strerror ( rc ) );
-		goto err;
-	}
 
 	/* Copy packet (if applicable) */
 	len = get_cached_info->BufferSize;
@@ -238,10 +252,6 @@ pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO *get_cached_info ) {
 	DBGC ( &pxe_netdev, "\n" );
 	get_cached_info->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
-
- err:
-	get_cached_info->Status = PXENV_STATUS_OUT_OF_RESOURCES;
-	return PXENV_EXIT_FAILURE;
 }
 
 /* PXENV_RESTART_TFTP
