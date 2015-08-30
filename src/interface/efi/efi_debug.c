@@ -69,6 +69,8 @@ struct efi_well_known_guid {
 
 /** Well-known GUIDs */
 static struct efi_well_known_guid efi_well_known_guids[] = {
+	{ &efi_absolute_pointer_protocol_guid,
+	  "AbsolutePointer" },
 	{ &efi_arp_protocol_guid,
 	  "Arp" },
 	{ &efi_arp_service_binding_protocol_guid,
@@ -137,12 +139,22 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "SimpleFileSystem" },
 	{ &efi_simple_network_protocol_guid,
 	  "SimpleNetwork" },
+	{ &efi_simple_pointer_protocol_guid,
+	  "SimplePointer" },
+	{ &efi_simple_text_input_protocol_guid,
+	  "SimpleTextInput" },
+	{ &efi_simple_text_input_ex_protocol_guid,
+	  "SimpleTextInputEx" },
+	{ &efi_simple_text_output_protocol_guid,
+	  "SimpleTextOutput" },
 	{ &efi_tcg_protocol_guid,
 	  "Tcg" },
 	{ &efi_tcp4_protocol_guid,
 	  "Tcp4" },
 	{ &efi_tcp4_service_binding_protocol_guid,
 	  "Tcp4Sb" },
+	{ &efi_tree_protocol_guid,
+	  "TrEE" },
 	{ &efi_udp4_protocol_guid,
 	  "Udp4" },
 	{ &efi_udp4_service_binding_protocol_guid,
@@ -595,6 +607,42 @@ efi_loaded_image_filepath_name ( EFI_LOADED_IMAGE_PROTOCOL *loaded ) {
 	return efi_devpath_text ( loaded->FilePath );
 }
 
+/**
+ * Get console input handle name
+ *
+ * @v input		Simple text input protocol
+ * @ret name		Console input handle name, or NULL
+ */
+static const char *
+efi_conin_name ( EFI_SIMPLE_TEXT_INPUT_PROTOCOL *input ) {
+
+	/* Check for match against ConIn */
+	if ( input == efi_systab->ConIn )
+		return "ConIn";
+
+	return NULL;
+}
+
+/**
+ * Get console output handle name
+ *
+ * @v output		Simple text output protocol
+ * @ret name		Console output handle name, or NULL
+ */
+static const char *
+efi_conout_name ( EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *output ) {
+
+	/* Check for match against ConOut */
+	if ( output == efi_systab->ConOut )
+		return "ConOut";
+
+	/* Check for match against StdErr (if different from ConOut) */
+	if ( output == efi_systab->StdErr )
+		return "StdErr";
+
+	return NULL;
+}
+
 /** An EFI handle name type */
 struct efi_handle_name_type {
 	/** Protocol */
@@ -643,6 +691,12 @@ static struct efi_handle_name_type efi_handle_name_types[] = {
 	/* Handle's loaded image file path (for image handles) */
 	EFI_HANDLE_NAME_TYPE ( &efi_loaded_image_protocol_guid,
 			       efi_loaded_image_filepath_name ),
+	/* Our standard input file handle */
+	EFI_HANDLE_NAME_TYPE ( &efi_simple_text_input_protocol_guid,
+			       efi_conin_name ),
+	/* Our standard output and standard error file handles */
+	EFI_HANDLE_NAME_TYPE ( &efi_simple_text_output_protocol_guid,
+			       efi_conout_name ),
 };
 
 /**

@@ -153,6 +153,7 @@ struct efi_config_table {
  */
 #define EEFI( efirc ) EPLATFORM ( EINFO_EPLATFORM, efirc )
 
+extern EFI_GUID efi_absolute_pointer_protocol_guid;
 extern EFI_GUID efi_arp_protocol_guid;
 extern EFI_GUID efi_arp_service_binding_protocol_guid;
 extern EFI_GUID efi_block_io_protocol_guid;
@@ -186,9 +187,14 @@ extern EFI_GUID efi_pxe_base_code_protocol_guid;
 extern EFI_GUID efi_serial_io_protocol_guid;
 extern EFI_GUID efi_simple_file_system_protocol_guid;
 extern EFI_GUID efi_simple_network_protocol_guid;
+extern EFI_GUID efi_simple_pointer_protocol_guid;
+extern EFI_GUID efi_simple_text_input_protocol_guid;
+extern EFI_GUID efi_simple_text_input_ex_protocol_guid;
+extern EFI_GUID efi_simple_text_output_protocol_guid;
 extern EFI_GUID efi_tcg_protocol_guid;
 extern EFI_GUID efi_tcp4_protocol_guid;
 extern EFI_GUID efi_tcp4_service_binding_protocol_guid;
+extern EFI_GUID efi_tree_protocol_guid;
 extern EFI_GUID efi_udp4_protocol_guid;
 extern EFI_GUID efi_udp4_service_binding_protocol_guid;
 extern EFI_GUID efi_uga_draw_protocol_guid;

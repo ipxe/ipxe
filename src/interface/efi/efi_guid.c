@@ -24,6 +24,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/AbsolutePointer.h>
 #include <ipxe/efi/Protocol/Arp.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
 #include <ipxe/efi/Protocol/BusSpecificDriverOverride.h>
@@ -51,6 +52,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/SerialIo.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
+#include <ipxe/efi/Protocol/SimplePointer.h>
+#include <ipxe/efi/Protocol/SimpleTextIn.h>
+#include <ipxe/efi/Protocol/SimpleTextInEx.h>
+#include <ipxe/efi/Protocol/SimpleTextOut.h>
 #include <ipxe/efi/Protocol/TcgService.h>
 #include <ipxe/efi/Protocol/Tcp4.h>
 #include <ipxe/efi/Protocol/Udp4.h>
@@ -63,6 +68,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * EFI GUIDs
  *
  */
+
+/* TrEE protocol GUID definition in EDK2 headers is broken (missing braces) */
+#define EFI_TREE_PROTOCOL_GUID						\
+	{ 0x607f766c, 0x7455, 0x42be,					\
+	  { 0x93, 0x0b, 0xe4, 0xd7, 0x6d, 0xb2, 0x72, 0x0f } }
+
+/** Absolute pointer protocol GUID */
+EFI_GUID efi_absolute_pointer_protocol_guid
+	= EFI_ABSOLUTE_POINTER_PROTOCOL_GUID;
 
 /** ARP protocol GUID */
 EFI_GUID efi_arp_protocol_guid
@@ -196,6 +210,22 @@ EFI_GUID efi_simple_file_system_protocol_guid
 EFI_GUID efi_simple_network_protocol_guid
 	= EFI_SIMPLE_NETWORK_PROTOCOL_GUID;
 
+/** Simple pointer protocol GUID */
+EFI_GUID efi_simple_pointer_protocol_guid
+	= EFI_SIMPLE_POINTER_PROTOCOL_GUID;
+
+/** Simple text input protocol GUID */
+EFI_GUID efi_simple_text_input_protocol_guid
+	= EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
+
+/** Simple text input extension protocol GUID */
+EFI_GUID efi_simple_text_input_ex_protocol_guid
+	= EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID;
+
+/** Simple text output protocol GUID */
+EFI_GUID efi_simple_text_output_protocol_guid
+	= EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID;
+
 /** TCG protocol GUID */
 EFI_GUID efi_tcg_protocol_guid
 	= EFI_TCG_PROTOCOL_GUID;
@@ -207,6 +237,10 @@ EFI_GUID efi_tcp4_protocol_guid
 /** TCPv4 service binding protocol GUID */
 EFI_GUID efi_tcp4_service_binding_protocol_guid
 	= EFI_TCP4_SERVICE_BINDING_PROTOCOL_GUID;
+
+/** TrEE protocol GUID */
+EFI_GUID efi_tree_protocol_guid
+	= EFI_TREE_PROTOCOL_GUID;
 
 /** UDPv4 protocol GUID */
 EFI_GUID efi_udp4_protocol_guid
