@@ -339,6 +339,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_vmbus		      ( ERRFILE_OTHER | 0x00470000 )
 #define ERRFILE_efi_time	      ( ERRFILE_OTHER | 0x00480000 )
 #define ERRFILE_efi_watchdog	      ( ERRFILE_OTHER | 0x00490000 )
+#define ERRFILE_efi_pxe		      ( ERRFILE_OTHER | 0x004a0000 )
 
 /** @} */
 

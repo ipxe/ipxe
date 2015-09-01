@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_wrap.h>
+#include <ipxe/efi/efi_pxe.h>
 #include <ipxe/image.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -159,6 +160,13 @@ static int efi_image_exec ( struct image *image ) {
 		goto err_file_install;
 	}
 
+	/* Install PXE base code protocol */
+	if ( ( rc = efi_pxe_install ( snpdev->handle, snpdev->netdev ) ) != 0 ){
+		DBGC ( image, "EFIIMAGE %p could not install PXE protocol: "
+		       "%s\n", image, strerror ( rc ) );
+		goto err_pxe_install;
+	}
+
 	/* Install iPXE download protocol */
 	if ( ( rc = efi_download_install ( snpdev->handle ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %p could not install iPXE download "
@@ -266,6 +274,8 @@ static int efi_image_exec ( struct image *image ) {
  err_image_path:
 	efi_download_uninstall ( snpdev->handle );
  err_download_install:
+	efi_pxe_uninstall ( snpdev->handle );
+ err_pxe_install:
 	efi_file_uninstall ( snpdev->handle );
  err_file_install:
  err_no_snpdev:
