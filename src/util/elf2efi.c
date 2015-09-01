@@ -41,6 +41,7 @@
 struct pe_section {
 	struct pe_section *next;
 	EFI_IMAGE_SECTION_HEADER hdr;
+	void ( * fixup ) ( struct pe_section *section );
 	uint8_t contents[0];
 };
 
@@ -548,6 +549,20 @@ create_reloc_section ( struct pe_header *pe_header,
 }
 
 /**
+ * Fix up debug section
+ *
+ * @v debug		Debug section
+ */
+static void fixup_debug_section ( struct pe_section *debug ) {
+	EFI_IMAGE_DEBUG_DIRECTORY_ENTRY *contents;
+
+	/* Fix up FileOffset */
+	contents = ( ( void * ) debug->contents );
+	contents->FileOffset += ( debug->hdr.PointerToRawData -
+				  debug->hdr.VirtualAddress );
+}
+
+/**
  * Create debug section
  *
  * @v pe_header		PE file header
@@ -581,6 +596,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	debug->hdr.Characteristics = ( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
 				       EFI_IMAGE_SCN_MEM_NOT_PAGED |
 				       EFI_IMAGE_SCN_MEM_READ );
+	debug->fixup = fixup_debug_section;
 
 	/* Create section contents */
 	contents->debug.TimeDateStamp = 0x10d1a884;
@@ -589,6 +605,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 		( sizeof ( *contents ) - sizeof ( contents->debug ) );
 	contents->debug.RVA = ( debug->hdr.VirtualAddress +
 				offsetof ( typeof ( *contents ), rsds ) );
+	contents->debug.FileOffset = contents->debug.RVA;
 	contents->rsds.Signature = CODEVIEW_SIGNATURE_RSDS;
 	snprintf ( contents->name, sizeof ( contents->name ), "%s",
 		   filename );
@@ -629,6 +646,8 @@ static void write_pe_file ( struct pe_header *pe_header,
 			fpos += section->hdr.SizeOfRawData;
 			fpos = efi_file_align ( fpos );
 		}
+		if ( section->fixup )
+			section->fixup ( section );
 	}
 
 	/* Write file header */
