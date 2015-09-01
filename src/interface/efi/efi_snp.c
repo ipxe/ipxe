@@ -334,11 +334,13 @@ efi_snp_receive_filters ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, UINT32 enable,
 			    snpdev->netdev->ll_protocol->ll_addr_len );
 	}
 
-	/* Fail if net device is currently claimed for use by iPXE */
-	if ( efi_snp_claimed )
-		return EFI_NOT_READY;
-
-	/* Lie through our teeth, otherwise MNP refuses to accept us */
+	/* Lie through our teeth, otherwise MNP refuses to accept us.
+	 *
+	 * Return success even if the SNP device is currently claimed
+	 * for use by iPXE, since otherwise Windows Deployment
+	 * Services refuses to attempt to receive further packets via
+	 * our EFI PXE Base Code protocol.
+	 */
 	return 0;
 }
 
