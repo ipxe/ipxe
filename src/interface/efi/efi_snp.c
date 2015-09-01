@@ -1231,15 +1231,16 @@ struct efi_snp_device * last_opened_snpdev ( void ) {
 }
 
 /**
- * Set SNP claimed/released state
+ * Add to SNP claimed/released count
  *
- * @v claimed		Network devices are claimed for use by iPXE
+ * @v delta		Claim count change
  */
-void efi_snp_set_claimed ( int claimed ) {
+void efi_snp_add_claim ( int delta ) {
 	struct efi_snp_device *snpdev;
 
 	/* Claim SNP devices */
-	efi_snp_claimed = claimed;
+	efi_snp_claimed += delta;
+	assert ( efi_snp_claimed >= 0 );
 
 	/* Update SNP mode state for each interface */
 	list_for_each_entry ( snpdev, &efi_snp_devices, list )
