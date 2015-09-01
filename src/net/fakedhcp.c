@@ -199,6 +199,10 @@ int create_fakepxebsack ( struct net_device *netdev,
 		return rc;
 	}
 
+	/* Populate ciaddr */
+	fetch_ipv4_setting ( netdev_settings ( netdev ), &ip_setting,
+			     &dhcppkt.dhcphdr->ciaddr );
+
 	/* Merge in ProxyDHCP options */
 	if ( proxy_settings &&
 	     ( ( rc = copy_settings ( &dhcppkt, proxy_settings ) ) != 0 ) ) {
