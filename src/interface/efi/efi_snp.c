@@ -1101,6 +1101,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	       snpdev, netdev->name, efi_handle_name ( snpdev->handle ) );
 	return 0;
 
+	list_del ( &snpdev->list );
 	if ( snpdev->package_list )
 		efi_snp_hii_uninstall ( snpdev );
 	efi_child_del ( efidev->device, snpdev->handle );
@@ -1172,10 +1173,10 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 	}
 
 	/* Uninstall the SNP */
+	list_del ( &snpdev->list );
 	if ( snpdev->package_list )
 		efi_snp_hii_uninstall ( snpdev );
 	efi_child_del ( snpdev->efidev->device, snpdev->handle );
-	list_del ( &snpdev->list );
 	bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
