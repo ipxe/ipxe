@@ -600,7 +600,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	debugdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]);
 	debugdir->VirtualAddress = debug->hdr.VirtualAddress;
-	debugdir->Size = debug->hdr.Misc.VirtualSize;
+	debugdir->Size = sizeof ( contents->debug );
 
 	return debug;
 }
