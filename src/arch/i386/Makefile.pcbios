@@ -57,7 +57,8 @@ LIST_NAME_isarom := ROMS
 NON_AUTO_MEDIA	+= iso
 %iso:	%lkrn util/geniso
 	$(QM)$(ECHO) "  [GENISO] $@"
-	$(Q)ISOLINUX_BIN=$(ISOLINUX_BIN) VERSION="$(VERSION)" bash util/geniso -o $@ $<
+	$(Q)ISOLINUX_BIN=$(ISOLINUX_BIN) LDLINUX_C32=$(LDLINUX_C32) \
+	    VERSION="$(VERSION)" bash util/geniso -o $@ $<
 
 # rule to make a floppy emulation ISO boot image
 NON_AUTO_MEDIA	+= liso
