@@ -199,6 +199,9 @@ extern EFI_GUID efi_udp4_protocol_guid;
 extern EFI_GUID efi_udp4_service_binding_protocol_guid;
 extern EFI_GUID efi_uga_draw_protocol_guid;
 extern EFI_GUID efi_unicode_collation_protocol_guid;
+extern EFI_GUID efi_usb_hc_protocol_guid;
+extern EFI_GUID efi_usb2_hc_protocol_guid;
+extern EFI_GUID efi_usb_io_protocol_guid;
 extern EFI_GUID efi_vlan_config_protocol_guid;
 
 extern EFI_HANDLE efi_image_handle;

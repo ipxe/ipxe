@@ -61,6 +61,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/Udp4.h>
 #include <ipxe/efi/Protocol/UgaDraw.h>
 #include <ipxe/efi/Protocol/UnicodeCollation.h>
+#include <ipxe/efi/Protocol/UsbHostController.h>
+#include <ipxe/efi/Protocol/Usb2HostController.h>
+#include <ipxe/efi/Protocol/UsbIo.h>
 #include <ipxe/efi/Protocol/VlanConfig.h>
 
 /** @file
@@ -257,6 +260,18 @@ EFI_GUID efi_uga_draw_protocol_guid
 /** Unicode collation protocol GUID */
 EFI_GUID efi_unicode_collation_protocol_guid
 	= EFI_UNICODE_COLLATION_PROTOCOL_GUID;
+
+/** USB host controller protocol GUID */
+EFI_GUID efi_usb_hc_protocol_guid
+	= EFI_USB_HC_PROTOCOL_GUID;
+
+/** USB2 host controller protocol GUID */
+EFI_GUID efi_usb2_hc_protocol_guid
+	= EFI_USB2_HC_PROTOCOL_GUID;
+
+/** USB I/O protocol GUID */
+EFI_GUID efi_usb_io_protocol_guid
+	= EFI_USB_IO_PROTOCOL_GUID;
 
 /** VLAN configuration protocol GUID */
 EFI_GUID efi_vlan_config_protocol_guid
