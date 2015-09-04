@@ -68,7 +68,7 @@ enum usb_pid {
 struct usb_setup_packet {
 	/** Request */
 	uint16_t request;
-	/** Value paramer */
+	/** Value parameter */
 	uint16_t value;
 	/** Index parameter */
 	uint16_t index;
@@ -90,6 +90,9 @@ struct usb_setup_packet {
 
 /** Vendor-specific request type */
 #define USB_TYPE_VENDOR ( 2 << 5 )
+
+/** Request recipient mask */
+#define USB_RECIP_MASK ( 0x1f << 0 )
 
 /** Request recipient is the device */
 #define USB_RECIP_DEVICE ( 0 << 0 )

@@ -43,6 +43,9 @@ REQUIRE_OBJECT ( ehci );
 #ifdef USB_HCD_UHCI
 REQUIRE_OBJECT ( uhci );
 #endif
+#ifdef USB_HCD_USBIO
+REQUIRE_OBJECT ( usbio );
+#endif
 
 /*
  * Drag in USB peripherals
