@@ -1316,4 +1316,9 @@ struct usb_driver {
 /** Declare a USB driver */
 #define __usb_driver __table_entry ( USB_DRIVERS, 01 )
 
+extern struct usb_driver * usb_find_driver ( unsigned int vendor,
+					     unsigned int product,
+					     struct usb_class *class,
+					     struct usb_device_id **id );
+
 #endif /* _IPXE_USB_H */

@@ -972,22 +972,40 @@ static int usb_function ( struct usb_function *func,
 }
 
 /**
- * Check for a USB device ID match
+ * Find USB device driver
  *
- * @v func		USB function
- * @v id		Device ID
- * @ret matches		Device ID matches
+ * @v vendor		Vendor ID
+ * @v product		Product ID
+ * @v class		Class
+ * @ret id		USB device ID, or NULL
+ * @ret driver		USB device driver, or NULL
  */
-static int
-usb_device_id_matches ( struct usb_function *func, struct usb_device_id *id ) {
+struct usb_driver * usb_find_driver ( unsigned int vendor, unsigned int product,
+				      struct usb_class *class,
+				      struct usb_device_id **id ) {
+	struct usb_driver *driver;
+	unsigned int i;
 
-	return ( ( ( id->vendor == func->dev.desc.vendor ) ||
-		   ( id->vendor == USB_ANY_ID ) ) &&
-		 ( ( id->product == func->dev.desc.device ) ||
-		   ( id->product == USB_ANY_ID ) ) &&
-		 ( id->class.class == func->class.class ) &&
-		 ( id->class.subclass == func->class.subclass ) &&
-		 ( id->class.protocol == func->class.protocol ) );
+	/* Look for a matching driver */
+	for_each_table_entry ( driver, USB_DRIVERS ) {
+		for ( i = 0 ; i < driver->id_count ; i++ ) {
+
+			/* Check for a matching ID */
+			*id = &driver->ids[i];
+			if ( ( ( (*id)->vendor == vendor ) ||
+			       ( (*id)->vendor == USB_ANY_ID ) ) &&
+			     ( ( (*id)->product == product ) ||
+			       ( (*id)->product == USB_ANY_ID ) ) &&
+			     ( (*id)->class.class == class->class ) &&
+			     ( (*id)->class.subclass == class->subclass ) &&
+			     ( (*id)->class.protocol == class->protocol ) )
+				return driver;
+		}
+	}
+
+	/* Not found */
+	*id = NULL;
+	return NULL;
 }
 
 /**
@@ -1002,39 +1020,30 @@ static int usb_probe ( struct usb_function *func,
 	struct usb_device *usb = func->usb;
 	struct usb_driver *driver;
 	struct usb_device_id *id;
-	unsigned int i;
 	int rc;
 
-	/* Look for a matching driver */
-	for_each_table_entry ( driver, USB_DRIVERS ) {
-		for ( i = 0 ; i < driver->id_count ; i++ ) {
-
-			/* Check for a matching ID */
-			id = &driver->ids[i];
-			if ( ! usb_device_id_matches ( func, id ) )
-				continue;
-
-			/* Probe driver */
-			if ( ( rc = driver->probe ( func, config ) ) != 0 ) {
-				DBGC ( usb, "USB %s failed to probe driver %s: "
-				       "%s\n", func->name, id->name,
-				       strerror ( rc ) );
-				/* Continue trying other drivers */
-				continue;
-			}
-
-			/* Record driver */
-			func->driver = driver;
-			func->dev.driver_name = id->name;
-			return 0;
-		}
+	/* Identify driver */
+	driver = usb_find_driver ( func->dev.desc.vendor, func->dev.desc.device,
+				   &func->class, &id );
+	if ( ! driver ) {
+		DBGC ( usb, "USB %s %04x:%04x class %d:%d:%d has no driver\n",
+		       func->name, func->dev.desc.vendor, func->dev.desc.device,
+		       func->class.class, func->class.subclass,
+		       func->class.protocol );
+		return -ENOENT;
 	}
 
-	/* No driver found */
-	DBGC ( usb, "USB %s %04x:%04x class %d:%d:%d has no driver\n",
-	       func->name, func->dev.desc.vendor, func->dev.desc.device,
-	       func->class.class, func->class.subclass, func->class.protocol );
-	return -ENOENT;
+	/* Probe driver */
+	if ( ( rc = driver->probe ( func, config ) ) != 0 ) {
+		DBGC ( usb, "USB %s failed to probe driver %s: %s\n",
+		       func->name, id->name, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Record driver */
+	func->driver = driver;
+	func->dev.driver_name = id->name;
+	return 0;
 }
 
 /**
