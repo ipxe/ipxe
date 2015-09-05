@@ -1097,6 +1097,7 @@ usb_probe_all ( struct usb_device *usb,
 			   "%s-%d.%d", usb->name, config->config, first );
 		INIT_LIST_HEAD ( &func->dev.children );
 		func->dev.parent = bus->dev;
+		list_add_tail ( &func->list, &usb->functions );
 
 		/* Identify function */
 		if ( ( rc = usb_function ( func, config, first ) ) != 0 )
@@ -1125,22 +1126,19 @@ usb_probe_all ( struct usb_device *usb,
 			       func->interface[i] );
 		DBGC ( usb, " using driver %s\n", func->dev.driver_name );
 
-		/* Add to list of functions */
-		list_add ( &func->list, &usb->functions );
-
 		/* Add to device hierarchy */
 		list_add_tail ( &func->dev.siblings, &bus->dev->children );
 
 		continue;
 
 		list_del ( &func->dev.siblings );
-		list_del ( &func->list );
 		usb_remove ( func );
 	err_probe:
-		free ( func );
-	err_alloc:
 	err_interface:
 	err_function:
+		list_del ( &func->list );
+		free ( func );
+	err_alloc:
 		/* Continue registering other functions */
 		continue;
 	}
