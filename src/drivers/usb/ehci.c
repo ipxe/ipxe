@@ -603,6 +603,8 @@ static int ehci_enqueue ( struct ehci_device *ehci, struct ehci_ring *ring,
 
 	/* Fail if any portion is unreachable */
 	for ( i = 0 ; i < count ; i++ ) {
+		if ( ! xfer[i].len )
+			continue;
 		phys = ( virt_to_phys ( xfer[i].data ) + xfer[i].len - 1 );
 		if ( ( phys > 0xffffffffUL ) && ( ! ehci->addr64 ) )
 			return -ENOTSUP;
