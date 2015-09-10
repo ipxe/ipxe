@@ -936,10 +936,6 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_device *efidev;
 	struct efi_snp_device *snpdev;
-	union {
-		EFI_DEVICE_PATH_PROTOCOL *path;
-		void *interface;
-	} path;
 	EFI_DEVICE_PATH_PROTOCOL *path_end;
 	MAC_ADDR_DEVICE_PATH *macpath;
 	size_t path_prefix_len = 0;
@@ -1019,21 +1015,8 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 				       sizeof ( snpdev->name[0] ) ),
 		       "%s", netdev->name );
 
-	/* Get the parent device path */
-	if ( ( efirc = bs->OpenProtocol ( efidev->device,
-					  &efi_device_path_protocol_guid,
-					  &path.interface, efi_image_handle,
-					  efidev->device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
-		DBGC ( snpdev, "SNPDEV %p cannot get %s device path: %s\n",
-		       snpdev, efi_handle_name ( efidev->device ),
-		       strerror ( rc ) );
-		goto err_open_device_path;
-	}
-
 	/* Allocate the new device path */
-	path_prefix_len = efi_devpath_len ( path.path );
+	path_prefix_len = efi_devpath_len ( efidev->path );
 	snpdev->path = zalloc ( path_prefix_len + sizeof ( *macpath ) +
 				sizeof ( *path_end ) );
 	if ( ! snpdev->path ) {
@@ -1042,7 +1025,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	}
 
 	/* Populate the device path */
-	memcpy ( snpdev->path, path.path, path_prefix_len );
+	memcpy ( snpdev->path, efidev->path, path_prefix_len );
 	macpath = ( ( ( void * ) snpdev->path ) + path_prefix_len );
 	path_end = ( ( void * ) ( macpath + 1 ) );
 	memset ( macpath, 0, sizeof ( *macpath ) );
@@ -1119,9 +1102,6 @@ static int efi_snp_probe ( struct net_device *netdev ) {
  err_install_protocol_interface:
 	free ( snpdev->path );
  err_alloc_device_path:
-	bs->CloseProtocol ( efidev->device, &efi_device_path_protocol_guid,
-			    efi_image_handle, efidev->device );
- err_open_device_path:
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
  err_create_event:
  err_ll_addr_len:
