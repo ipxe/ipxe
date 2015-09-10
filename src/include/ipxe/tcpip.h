@@ -19,11 +19,38 @@ struct io_buffer;
 struct net_device;
 struct ip_statistics;
 
+/** Positive zero checksum value */
+#define TCPIP_POSITIVE_ZERO_CSUM 0x0000
+
+/** Negative zero checksum value */
+#define TCPIP_NEGATIVE_ZERO_CSUM 0xffff
+
 /** Empty checksum value
  *
- * This is the TCP/IP checksum over a zero-length block of data.
+ * All of our TCP/IP checksum algorithms will return only the positive
+ * representation of zero (0x0000) for a zero checksum over non-zero
+ * input data.  This property arises since the end-around carry used
+ * to mimic one's complement addition using unsigned arithmetic
+ * prevents the running total from ever returning to 0x0000.  The
+ * running total will therefore use only the negative representation
+ * of zero (0xffff).  Since the return value is the one's complement
+ * negation of the running total (calculated by simply bit-inverting
+ * the running total), the return value will therefore use only the
+ * positive representation of zero (0x0000).
+ *
+ * It is a very common misconception (found in many places such as
+ * RFC1624) that this is a property guaranteed by the underlying
+ * mathematics.  It is not; the choice of which zero representation is
+ * used is merely an artifact of the software implementation of the
+ * checksum algorithm.
+ *
+ * For consistency, we choose to use the positive representation of
+ * zero (0x0000) for the checksum of a zero-length block of data.
+ * This ensures that all of our TCP/IP checksum algorithms will return
+ * only the positive representation of zero (0x0000) for a zero
+ * checksum (regardless of the input data).
  */
-#define TCPIP_EMPTY_CSUM 0xffff
+#define TCPIP_EMPTY_CSUM TCPIP_POSITIVE_ZERO_CSUM
 
 /** TCP/IP address flags */
 enum tcpip_st_flags {
@@ -88,6 +115,13 @@ struct tcpip_protocol {
         int ( * rx ) ( struct io_buffer *iobuf, struct net_device *netdev,
 		       struct sockaddr_tcpip *st_src,
 		       struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum );
+	/** Preferred zero checksum value
+	 *
+	 * The checksum is a one's complement value: zero may be
+	 * represented by either positive zero (0x0000) or negative
+	 * zero (0xffff).
+	 */
+	uint16_t zero_csum;
         /** 
 	 * Transport-layer protocol number
 	 *

@@ -522,6 +522,8 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 		*trans_csum = ipv6_pshdr_chksum ( iphdr, len,
 						  tcpip_protocol->tcpip_proto,
 						  *trans_csum );
+		if ( ! *trans_csum )
+			*trans_csum = tcpip_protocol->zero_csum;
 	}
 
 	/* Print IPv6 header for debugging */
