@@ -1033,8 +1033,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	}
 
 	/* Allocate the new device path */
-	path_end = efi_devpath_end ( path.path );
-	path_prefix_len = ( ( ( void * ) path_end ) - ( ( void * ) path.path ));
+	path_prefix_len = efi_devpath_len ( path.path );
 	snpdev->path = zalloc ( path_prefix_len + sizeof ( *macpath ) +
 				sizeof ( *path_end ) );
 	if ( ! snpdev->path ) {

@@ -51,6 +51,18 @@ EFI_DEVICE_PATH_PROTOCOL * efi_devpath_end ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 }
 
 /**
+ * Find length of device path (excluding terminator)
+ *
+ * @v path		Path to device
+ * @ret path_len	Length of device path
+ */
+size_t efi_devpath_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_DEVICE_PATH_PROTOCOL *end = efi_devpath_end ( path );
+
+	return ( ( ( void * ) end ) - ( ( void * ) path ) );
+}
+
+/**
  * Locate parent device supporting a given protocol
  *
  * @v device		EFI device handle

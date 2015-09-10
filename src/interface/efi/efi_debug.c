@@ -359,9 +359,6 @@ const __attribute__ (( pure )) char *
 efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	static char text[256];
-	void *start;
-	void *end;
-	size_t max_len;
 	size_t len;
 	CHAR16 *wtext;
 
@@ -374,13 +371,8 @@ efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	/* If we have no DevicePathToText protocol then use a raw hex string */
 	if ( ! efidpt ) {
 		DBG ( "[No DevicePathToText]" );
-		start = path;
-		end = efi_devpath_end ( path );
-		len = ( end - start );
-		max_len = ( ( sizeof ( text ) - 1 /* NUL */ ) / 2 /* "xx" */ );
-		if ( len > max_len )
-			len = max_len;
-		base16_encode ( start, len, text, sizeof ( text ) );
+		len = efi_devpath_len ( path );
+		base16_encode ( path, len, text, sizeof ( text ) );
 		return text;
 	}
 

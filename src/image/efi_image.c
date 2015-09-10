@@ -73,8 +73,7 @@ efi_image_path ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
 	size_t len;
 
 	/* Calculate device path lengths */
-	end = efi_devpath_end ( parent );
-	prefix_len = ( ( void * ) end - ( void * ) parent );
+	prefix_len = efi_devpath_len ( parent );
 	name_len = strlen ( image->name );
 	filepath_len = ( SIZE_OF_FILEPATH_DEVICE_PATH +
 			 ( name_len + 1 /* NUL */ ) * sizeof ( wchar_t ) );

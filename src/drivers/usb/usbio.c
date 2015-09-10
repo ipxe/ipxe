@@ -1492,15 +1492,14 @@ static int usbio_path ( struct usbio_device *usbio ) {
 	path = u.interface;
 
 	/* Locate end of device path and sanity check */
-	end = efi_devpath_end ( path );
-	len = ( ( ( void * ) end ) - ( ( void * ) path ) );
+	len = efi_devpath_len ( path );
 	if ( len < sizeof ( *usbpath ) ) {
 		DBGC ( usbio, "USBIO %s underlength device path\n",
 		       efi_handle_name ( handle ) );
 		rc = -EINVAL;
 		goto err_underlength;
 	}
-	usbpath = ( ( ( void * ) end ) - sizeof ( *usbpath ) );
+	usbpath = ( ( ( void * ) path ) + len - sizeof ( *usbpath ) );
 	if ( ! ( ( usbpath->Header.Type == MESSAGING_DEVICE_PATH ) &&
 		 ( usbpath->Header.SubType == MSG_USB_DP ) ) ) {
 		DBGC ( usbio, "USBIO %s not a USB device path: ",
