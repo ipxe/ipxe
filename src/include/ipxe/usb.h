@@ -458,11 +458,11 @@ struct usb_endpoint_host_operations {
 	 *
 	 * @v ep		USB endpoint
 	 * @v iobuf		I/O buffer
-	 * @v terminate		Terminate using a short packet
+	 * @v zlp		Append a zero-length packet
 	 * @ret rc		Return status code
 	 */
 	int ( * stream ) ( struct usb_endpoint *ep, struct io_buffer *iobuf,
-			   int terminate );
+			   int zlp );
 };
 
 /** USB endpoint driver operations */

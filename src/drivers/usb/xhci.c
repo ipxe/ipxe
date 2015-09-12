@@ -2546,11 +2546,11 @@ static int xhci_endpoint_message ( struct usb_endpoint *ep,
  *
  * @v ep		USB endpoint
  * @v iobuf		I/O buffer
- * @v terminate		Terminate using a short packet
+ * @v zlp		Append a zero-length packet
  * @ret rc		Return status code
  */
 static int xhci_endpoint_stream ( struct usb_endpoint *ep,
-				  struct io_buffer *iobuf, int terminate ) {
+				  struct io_buffer *iobuf, int zlp ) {
 	struct xhci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
 	union xhci_trb trbs[ 1 /* Normal */ + 1 /* Possible zero-length */ ];
 	union xhci_trb *trb = trbs;
@@ -2567,7 +2567,7 @@ static int xhci_endpoint_stream ( struct usb_endpoint *ep,
 	normal->data = cpu_to_le64 ( virt_to_phys ( iobuf->data ) );
 	normal->len = cpu_to_le32 ( len );
 	normal->type = XHCI_TRB_NORMAL;
-	if ( terminate && ( ( len & ( ep->mtu - 1 ) ) == 0 ) ) {
+	if ( zlp ) {
 		normal->flags = XHCI_TRB_CH;
 		normal = &(trb++)->normal;
 		normal->type = XHCI_TRB_NORMAL;

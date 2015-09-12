@@ -1223,11 +1223,11 @@ static int ehci_endpoint_message ( struct usb_endpoint *ep,
  *
  * @v ep		USB endpoint
  * @v iobuf		I/O buffer
- * @v terminate		Terminate using a short packet
+ * @v zlp		Append a zero-length packet
  * @ret rc		Return status code
  */
 static int ehci_endpoint_stream ( struct usb_endpoint *ep,
-				  struct io_buffer *iobuf, int terminate ) {
+				  struct io_buffer *iobuf, int zlp ) {
 	struct ehci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
 	struct ehci_device *ehci = endpoint->ehci;
 	unsigned int input = ( ep->address & USB_DIR_IN );
@@ -1242,7 +1242,7 @@ static int ehci_endpoint_stream ( struct usb_endpoint *ep,
 	xfer->flags = ( EHCI_FL_IOC |
 			( input ? EHCI_FL_PID_IN : EHCI_FL_PID_OUT ) );
 	xfer++;
-	if ( terminate && ( ( len & ( ep->mtu - 1 ) ) == 0 ) ) {
+	if ( zlp ) {
 		xfer->data = NULL;
 		xfer->len = 0;
 		assert ( ! input );

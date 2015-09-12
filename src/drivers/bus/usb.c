@@ -530,6 +530,7 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 		 int terminate ) {
 	struct usb_device *usb = ep->usb;
 	struct usb_port *port = usb->port;
+	int zlp;
 	int rc;
 
 	/* Fail immediately if device has been unplugged */
@@ -541,8 +542,13 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 	     ( ( rc = usb_endpoint_reset ( ep ) ) != 0 ) )
 		return rc;
 
+	/* Append a zero-length packet if necessary */
+	zlp = terminate;
+	if ( iob_len ( iobuf ) & ( ep->mtu - 1 ) )
+		zlp = 0;
+
 	/* Enqueue stream transfer */
-	if ( ( rc = ep->host->stream ( ep, iobuf, terminate ) ) != 0 ) {
+	if ( ( rc = ep->host->stream ( ep, iobuf, zlp ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not enqueue stream transfer: %s\n",
 		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		return rc;

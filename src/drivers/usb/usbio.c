@@ -1005,17 +1005,14 @@ static int usbio_endpoint_message ( struct usb_endpoint *ep,
  *
  * @v ep		USB endpoint
  * @v iobuf		I/O buffer
- * @v terminate		Terminate using a short packet
+ * @v zlp		Append a zero-length packet
  * @ret rc		Return status code
  */
 static int usbio_endpoint_stream ( struct usb_endpoint *ep,
-				   struct io_buffer *iobuf, int terminate ) {
-	size_t len = iob_len ( iobuf );
-	int zlen;
+				   struct io_buffer *iobuf, int zlp ) {
 
 	/* Enqueue transfer */
-	zlen = ( terminate && ( ( len & ( ep->mtu - 1 ) ) == 0 ) );
-	return usbio_endpoint_enqueue ( ep, iobuf, ( zlen ? USBIO_ZLEN : 0 ) );
+	return usbio_endpoint_enqueue ( ep, iobuf, ( zlp ? USBIO_ZLEN : 0 ) );
 }
 
 /**
