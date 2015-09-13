@@ -1221,6 +1221,30 @@ static int ehci_endpoint_message ( struct usb_endpoint *ep,
 }
 
 /**
+ * Calculate number of transfer descriptors
+ *
+ * @v len		Length of data
+ * @v zlp		Append a zero-length packet
+ * @ret count		Number of transfer descriptors
+ */
+static unsigned int ehci_endpoint_count ( size_t len, int zlp ) {
+	unsigned int count;
+
+	/* Split into 16kB transfers.  A single transfer can handle up
+	 * to 20kB if it happens to be page-aligned, or up to 16kB
+	 * with arbitrary alignment.  We simplify the code by assuming
+	 * that we can fit only 16kB into each transfer.
+	 */
+	count = ( ( len + EHCI_MTU - 1 ) / EHCI_MTU );
+
+	/* Append a zero-length transfer if applicable */
+	if ( zlp || ( count == 0 ) )
+		count++;
+
+	return count;
+}
+
+/**
  * Enqueue stream transfer
  *
  * @v ep		USB endpoint
@@ -1232,29 +1256,40 @@ static int ehci_endpoint_stream ( struct usb_endpoint *ep,
 				  struct io_buffer *iobuf, int zlp ) {
 	struct ehci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
 	struct ehci_device *ehci = endpoint->ehci;
-	unsigned int input = ( ep->address & USB_DIR_IN );
-	struct ehci_transfer xfers[2];
-	struct ehci_transfer *xfer = xfers;
+	void *data = iobuf->data;
 	size_t len = iob_len ( iobuf );
+	unsigned int count = ehci_endpoint_count ( len, zlp );
+	unsigned int input = ( ep->address & USB_DIR_IN );
+	unsigned int flags = ( input ? EHCI_FL_PID_IN : EHCI_FL_PID_OUT );
+	struct ehci_transfer xfers[count];
+	struct ehci_transfer *xfer = xfers;
+	size_t xfer_len;
+	unsigned int i;
 	int rc;
 
-	/* Create transfer */
-	xfer->data = iobuf->data;
-	xfer->len = len;
-	xfer->flags = ( EHCI_FL_IOC |
-			( input ? EHCI_FL_PID_IN : EHCI_FL_PID_OUT ) );
-	xfer++;
-	if ( zlp ) {
-		xfer->data = NULL;
-		xfer->len = 0;
-		assert ( ! input );
-		xfer->flags = ( EHCI_FL_IOC | EHCI_FL_PID_OUT );
+	/* Create transfers */
+	for ( i = 0 ; i < count ; i++ ) {
+
+		/* Calculate transfer length */
+		xfer_len = EHCI_MTU;
+		if ( xfer_len > len )
+			xfer_len = len;
+
+		/* Create transfer */
+		xfer->data = data;
+		xfer->len = xfer_len;
+		xfer->flags = flags;
+
+		/* Move to next transfer */
+		data += xfer_len;
+		len -= xfer_len;
 		xfer++;
 	}
+	xfer[-1].flags |= EHCI_FL_IOC;
 
 	/* Enqueue transfer */
 	if ( ( rc = ehci_enqueue ( ehci, &endpoint->ring, iobuf, xfers,
-				   ( xfer - xfers ) ) ) != 0 )
+				   count ) ) != 0 )
 		return rc;
 
 	return 0;
