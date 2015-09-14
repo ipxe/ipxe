@@ -517,24 +517,9 @@ static void hub_remove ( struct usb_function *func ) {
 /** USB hub device IDs */
 static struct usb_device_id hub_ids[] = {
 	{
-		.name = "hub-1",
+		.name = "hub",
 		.vendor = USB_ANY_ID,
 		.product = USB_ANY_ID,
-		.class = {
-			.class = USB_CLASS_HUB,
-			.subclass = 0,
-			.protocol = 0,
-		},
-	},
-	{
-		.name = "hub-2",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-		.class = {
-			.class = USB_CLASS_HUB,
-			.subclass = 0,
-			.protocol = 1,
-		},
 	},
 };
 
@@ -542,6 +527,7 @@ static struct usb_device_id hub_ids[] = {
 struct usb_driver usb_hub_driver __usb_driver = {
 	.ids = hub_ids,
 	.id_count = ( sizeof ( hub_ids ) / sizeof ( hub_ids[0] ) ),
+	.class = USB_CLASS_ID ( USB_CLASS_HUB, 0, USB_ANY_ID ),
 	.score = USB_SCORE_NORMAL,
 	.probe = hub_probe,
 	.remove = hub_remove,

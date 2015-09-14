@@ -985,6 +985,7 @@ static int usb_describe ( struct usb_device *usb,
 	unsigned int i;
 
 	/* Fill in vendor and product ID */
+	memset ( desc, 0, sizeof ( *desc ) );
 	desc->vendor = le16_to_cpu ( usb->device.vendor );
 	desc->product = le16_to_cpu ( usb->device.product );
 
@@ -1023,7 +1024,7 @@ static int usb_describe ( struct usb_device *usb,
 	interfaces[0] = first;
 
 	/* Look for a CDC union descriptor, if applicable */
-	if ( ( desc->class.class == USB_CLASS_CDC ) &&
+	if ( ( desc->class.class.class == USB_CLASS_CDC ) &&
 	     ( cdc_union = cdc_union_descriptor ( config, interface ) ) ) {
 
 		/* Determine interface count */
@@ -1096,15 +1097,17 @@ struct usb_driver * usb_find_driver ( struct usb_function_descriptor *desc,
 	for_each_table_entry ( driver, USB_DRIVERS ) {
 		for ( i = 0 ; i < driver->id_count ; i++ ) {
 
-			/* Check for a matching ID */
+			/* Ignore non-matching driver class */
+			if ( ( driver->class.class.scalar ^ desc->class.scalar )
+			     & driver->class.mask.scalar )
+				continue;
+
+			/* Look for a matching ID */
 			*id = &driver->ids[i];
 			if ( ( ( (*id)->vendor == desc->vendor ) ||
 			       ( (*id)->vendor == USB_ANY_ID ) ) &&
 			     ( ( (*id)->product == desc->product ) ||
-			       ( (*id)->product == USB_ANY_ID ) ) &&
-			     ( (*id)->class.class == desc->class.class ) &&
-			     ( (*id)->class.subclass == desc->class.subclass )&&
-			     ( (*id)->class.protocol == desc->class.protocol ) )
+			       ( (*id)->product == USB_ANY_ID ) ) )
 				return driver;
 		}
 	}
@@ -1178,8 +1181,9 @@ static int usb_probe ( struct usb_function *func,
 	if ( ! driver ) {
 		DBGC ( usb, "USB %s %04x:%04x class %d:%d:%d has no driver\n",
 		       func->name, func->desc.vendor, func->desc.product,
-		       func->desc.class.class, func->desc.class.subclass,
-		       func->desc.class.protocol );
+		       func->desc.class.class.class,
+		       func->desc.class.class.subclass,
+		       func->desc.class.class.protocol );
 		return -ENOENT;
 	}
 
@@ -1265,8 +1269,9 @@ usb_probe_all ( struct usb_device *usb,
 			goto err_probe;
 		DBGC ( usb, "USB %s %04x:%04x class %d:%d:%d interfaces ",
 		       func->name, func->desc.vendor, func->desc.product,
-		       func->desc.class.class, func->desc.class.subclass,
-		       func->desc.class.protocol );
+		       func->desc.class.class.class,
+		       func->desc.class.class.subclass,
+		       func->desc.class.class.protocol );
 		for ( i = 0 ; i < func->desc.count ; i++ )
 			DBGC ( usb, "%s%d", ( i ? "," : "" ),
 			       func->interface[i] );

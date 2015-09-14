@@ -655,11 +655,6 @@ static struct usb_device_id ncm_ids[] = {
 		.name = "cdc-ncm",
 		.vendor = USB_ANY_ID,
 		.product = USB_ANY_ID,
-		.class = {
-			.class = USB_CLASS_CDC,
-			.subclass = USB_SUBCLASS_CDC_NCM,
-			.protocol = 0,
-		},
 	},
 };
 
@@ -667,6 +662,7 @@ static struct usb_device_id ncm_ids[] = {
 struct usb_driver ncm_driver __usb_driver = {
 	.ids = ncm_ids,
 	.id_count = ( sizeof ( ncm_ids ) / sizeof ( ncm_ids[0] ) ),
+	.class = USB_CLASS_ID ( USB_CLASS_CDC, USB_SUBCLASS_CDC_NCM, 0 ),
 	.score = USB_SCORE_NORMAL,
 	.probe = ncm_probe,
 	.remove = ncm_remove,

@@ -437,11 +437,6 @@ static struct usb_device_id usbkbd_ids[] = {
 		.name = "kbd",
 		.vendor = USB_ANY_ID,
 		.product = USB_ANY_ID,
-		.class = {
-			.class = USB_CLASS_HID,
-			.subclass = USB_SUBCLASS_HID_BOOT,
-			.protocol = USBKBD_PROTOCOL,
-		},
 	},
 };
 
@@ -449,6 +444,8 @@ static struct usb_device_id usbkbd_ids[] = {
 struct usb_driver usbkbd_driver __usb_driver = {
 	.ids = usbkbd_ids,
 	.id_count = ( sizeof ( usbkbd_ids ) / sizeof ( usbkbd_ids[0] ) ),
+	.class = USB_CLASS_ID ( USB_CLASS_HID, USB_SUBCLASS_HID_BOOT,
+				USBKBD_PROTOCOL ),
 	.score = USB_SCORE_NORMAL,
 	.probe = usbkbd_probe,
 	.remove = usbkbd_remove,

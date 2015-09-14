@@ -1316,6 +1316,7 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
 		goto err_get_device_descriptor;
 	}
+	memset ( &desc, 0, sizeof ( desc ) );
 	desc.vendor = device.IdVendor;
 	desc.product = device.IdProduct;
 
@@ -1327,9 +1328,9 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
 		goto err_get_interface_descriptor;
 	}
-	desc.class.class = interface.InterfaceClass;
-	desc.class.subclass = interface.InterfaceSubClass;
-	desc.class.protocol = interface.InterfaceProtocol;
+	desc.class.class.class = interface.InterfaceClass;
+	desc.class.class.subclass = interface.InterfaceSubClass;
+	desc.class.class.protocol = interface.InterfaceProtocol;
 
 	/* Look for a driver for this interface */
 	driver = usb_find_driver ( &desc, &id );

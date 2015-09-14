@@ -615,6 +615,14 @@ extern int usb_prefill ( struct usb_endpoint *ep );
 extern int usb_refill ( struct usb_endpoint *ep );
 extern void usb_flush ( struct usb_endpoint *ep );
 
+/** A USB class descriptor */
+union usb_class_descriptor {
+	/** Class */
+	struct usb_class class;
+	/** Scalar value */
+	uint32_t scalar;
+};
+
 /**
  * A USB function descriptor
  *
@@ -627,7 +635,7 @@ struct usb_function_descriptor {
 	/** Product ID */
 	uint16_t product;
 	/** Class */
-	struct usb_class class;
+	union usb_class_descriptor class;
 	/** Number of interfaces */
 	unsigned int count;
 };
@@ -1298,12 +1306,41 @@ struct usb_device_id {
 	uint16_t vendor;
 	/** Product ID */
 	uint16_t product;
-	/** Class */
-	struct usb_class class;
 };
 
 /** Match-anything ID */
 #define USB_ANY_ID 0xffff
+
+/** A USB class ID */
+struct usb_class_id {
+	/** Class */
+	union usb_class_descriptor class;
+	/** Class mask */
+	union usb_class_descriptor mask;
+};
+
+/** Construct USB class ID
+ *
+ * @v base		Base class code (or USB_ANY_ID)
+ * @v subclass		Subclass code (or USB_ANY_ID)
+ * @v protocol		Protocol code (or USB_ANY_ID)
+ */
+#define USB_CLASS_ID( base, subclass, protocol ) {			\
+	.class = {							\
+		.class = {						\
+			( (base) & 0xff ),				\
+			( (subclass) & 0xff ),				\
+			( (protocol) & 0xff ),				\
+		},							\
+	},								\
+	.mask = {							\
+		.class = {						\
+			( ( (base) == USB_ANY_ID ) ? 0x00 : 0xff ),	\
+			( ( (subclass) == USB_ANY_ID ) ? 0x00 : 0xff ),	\
+			( ( (protocol) == USB_ANY_ID ) ? 0x00 : 0xff ),	\
+		},							\
+		},							\
+	}
 
 /** A USB driver */
 struct usb_driver {
@@ -1311,6 +1348,8 @@ struct usb_driver {
 	struct usb_device_id *ids;
 	/** Number of entries in ID table */
 	unsigned int id_count;
+	/** Class ID */
+	struct usb_class_id class;
 	/** Driver score
 	 *
 	 * This is used to determine the preferred configuration for a
