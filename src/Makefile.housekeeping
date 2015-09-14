@@ -1301,7 +1301,7 @@ CLEANUP += $(ZBIN)
 ELF2EFI_CFLAGS	:= -I$(BINUTILS_DIR)/include -I$(BFD_DIR)/include \
 		   -I$(ZLIB_DIR)/include -idirafter include
 ELF2EFI_LDFLAGS	:= -L$(BINUTILS_DIR)/lib -L$(BFD_DIR)/lib -L$(ZLIB_DIR)/lib \
-		   -lbfd -ldl -liberty -lz -Wl,--no-warn-search-mismatch
+		   -lbfd -ldl -lz -Wl,--no-warn-search-mismatch
 
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
