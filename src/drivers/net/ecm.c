@@ -515,6 +515,7 @@ static struct usb_device_id ecm_ids[] = {
 struct usb_driver ecm_driver __usb_driver = {
 	.ids = ecm_ids,
 	.id_count = ( sizeof ( ecm_ids ) / sizeof ( ecm_ids[0] ) ),
+	.score = USB_SCORE_NORMAL,
 	.probe = ecm_probe,
 	.remove = ecm_remove,
 };

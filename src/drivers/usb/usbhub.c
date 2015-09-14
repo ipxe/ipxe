@@ -542,6 +542,7 @@ static struct usb_device_id hub_ids[] = {
 struct usb_driver usb_hub_driver __usb_driver = {
 	.ids = hub_ids,
 	.id_count = ( sizeof ( hub_ids ) / sizeof ( hub_ids[0] ) ),
+	.score = USB_SCORE_NORMAL,
 	.probe = hub_probe,
 	.remove = hub_remove,
 };

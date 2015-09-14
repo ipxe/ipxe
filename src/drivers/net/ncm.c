@@ -667,6 +667,7 @@ static struct usb_device_id ncm_ids[] = {
 struct usb_driver ncm_driver __usb_driver = {
 	.ids = ncm_ids,
 	.id_count = ( sizeof ( ncm_ids ) / sizeof ( ncm_ids[0] ) ),
+	.score = USB_SCORE_NORMAL,
 	.probe = ncm_probe,
 	.remove = ncm_remove,
 };

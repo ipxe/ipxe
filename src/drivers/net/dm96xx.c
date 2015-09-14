@@ -666,6 +666,7 @@ static struct usb_device_id dm96xx_ids[] = {
 struct usb_driver dm96xx_driver __usb_driver = {
 	.ids = dm96xx_ids,
 	.id_count = ( sizeof ( dm96xx_ids ) / sizeof ( dm96xx_ids[0] ) ),
+	.score = USB_SCORE_NORMAL,
 	.probe = dm96xx_probe,
 	.remove = dm96xx_remove,
 };

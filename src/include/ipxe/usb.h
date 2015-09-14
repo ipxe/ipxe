@@ -616,6 +616,23 @@ extern int usb_refill ( struct usb_endpoint *ep );
 extern void usb_flush ( struct usb_endpoint *ep );
 
 /**
+ * A USB function descriptor
+ *
+ * This is an internal descriptor used to represent an association of
+ * interfaces within a USB device.
+ */
+struct usb_function_descriptor {
+	/** Vendor ID */
+	uint16_t vendor;
+	/** Product ID */
+	uint16_t product;
+	/** Class */
+	struct usb_class class;
+	/** Number of interfaces */
+	unsigned int count;
+};
+
+/**
  * A USB function
  *
  * A USB function represents an association of interfaces within a USB
@@ -626,10 +643,8 @@ struct usb_function {
 	const char *name;
 	/** USB device */
 	struct usb_device *usb;
-	/** Class */
-	struct usb_class class;
-	/** Number of interfaces */
-	unsigned int count;
+	/** Function descriptor */
+	struct usb_function_descriptor desc;
 	/** Generic device */
 	struct device dev;
 	/** List of functions within this USB device */
@@ -1161,7 +1176,7 @@ usb_get_device_descriptor ( struct usb_device *usb,
  * @v data		Configuration descriptor to fill in
  * @ret rc		Return status code
  */
-static inline __attribute (( always_inline )) int
+static inline __attribute__ (( always_inline )) int
 usb_get_config_descriptor ( struct usb_device *usb, unsigned int index,
 			    struct usb_configuration_descriptor *data,
 			    size_t len ) {
@@ -1296,6 +1311,12 @@ struct usb_driver {
 	struct usb_device_id *ids;
 	/** Number of entries in ID table */
 	unsigned int id_count;
+	/** Driver score
+	 *
+	 * This is used to determine the preferred configuration for a
+	 * USB device.
+	 */
+	unsigned int score;
 	/**
 	 * Probe device
 	 *
@@ -1319,9 +1340,18 @@ struct usb_driver {
 /** Declare a USB driver */
 #define __usb_driver __table_entry ( USB_DRIVERS, 01 )
 
-extern struct usb_driver * usb_find_driver ( unsigned int vendor,
-					     unsigned int product,
-					     struct usb_class *class,
-					     struct usb_device_id **id );
+/** USB driver scores */
+enum usb_driver_score {
+	/** Fallback driver (has no effect on overall score) */
+	USB_SCORE_FALLBACK = 0,
+	/** Deprecated driver */
+	USB_SCORE_DEPRECATED = 1,
+	/** Normal driver */
+	USB_SCORE_NORMAL = 2,
+};
+
+extern struct usb_driver *
+usb_find_driver ( struct usb_function_descriptor *desc,
+		  struct usb_device_id **id );
 
 #endif /* _IPXE_USB_H */

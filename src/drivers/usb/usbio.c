@@ -158,7 +158,7 @@ static int usbio_interface ( struct usbio_device *usbio,
 					continue;
 
 				/* Iterate over all interfaces for a match */
-				for ( i = 0 ; i < func->count ; i++ ) {
+				for ( i = 0 ; i < func->desc.count ; i++ ) {
 					if ( interface->interface ==
 					     func->interface[i] )
 						return interface->interface;
@@ -1287,15 +1287,13 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_USB_DEVICE_DESCRIPTOR device;
 	EFI_USB_INTERFACE_DESCRIPTOR interface;
-	struct usb_class class;
+	struct usb_function_descriptor desc;
 	struct usb_driver *driver;
 	struct usb_device_id *id;
 	union {
 		void *interface;
 		EFI_USB_IO_PROTOCOL *io;
 	} usb;
-	unsigned int vendor;
-	unsigned int product;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -1318,8 +1316,8 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
 		goto err_get_device_descriptor;
 	}
-	vendor = device.IdVendor;
-	product = device.IdProduct;
+	desc.vendor = device.IdVendor;
+	desc.product = device.IdProduct;
 
 	/* Get interface descriptor */
 	if ( ( efirc = usb.io->UsbGetInterfaceDescriptor ( usb.io,
@@ -1329,12 +1327,12 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
 		goto err_get_interface_descriptor;
 	}
-	class.class = interface.InterfaceClass;
-	class.subclass = interface.InterfaceSubClass;
-	class.protocol = interface.InterfaceProtocol;
+	desc.class.class = interface.InterfaceClass;
+	desc.class.subclass = interface.InterfaceSubClass;
+	desc.class.protocol = interface.InterfaceProtocol;
 
 	/* Look for a driver for this interface */
-	driver = usb_find_driver ( vendor, product, &class, &id );
+	driver = usb_find_driver ( &desc, &id );
 	if ( ! driver ) {
 		rc = -ENOTSUP;
 		goto err_unsupported;
