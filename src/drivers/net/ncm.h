@@ -51,6 +51,11 @@ struct ncm_ntb_parameters {
 	uint16_t max;
 } __attribute__ (( packed ));
 
+/** Set MAC address */
+#define NCM_SET_NET_ADDRESS						\
+	( USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE |		\
+	  USB_REQUEST_TYPE ( 0x82 ) )
+
 /** Set NTB input size */
 #define NCM_SET_NTB_INPUT_SIZE						\
 	( USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE |		\

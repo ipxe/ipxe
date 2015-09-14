@@ -453,6 +453,15 @@ static int ncm_open ( struct net_device *netdev ) {
 		goto err_set_ntb_input_size;
 	}
 
+	/* Set MAC address */
+	if ( ( rc = usb_control ( usb, NCM_SET_NET_ADDRESS, 0,
+				  ncm->usbnet.comms, netdev->ll_addr,
+				  netdev->ll_protocol->ll_addr_len ) ) != 0 ) {
+		DBGC ( ncm, "NCM %p could not set MAC address: %s\n",
+		       ncm, strerror ( rc ) );
+		/* Ignore error and continue */
+	}
+
 	/* Open USB network device */
 	if ( ( rc = usbnet_open ( &ncm->usbnet ) ) != 0 ) {
 		DBGC ( ncm, "NCM %p could not open: %s\n",
