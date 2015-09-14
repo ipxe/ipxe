@@ -20,6 +20,7 @@
 #define _GNU_SOURCE
 #define PACKAGE "elf2efi"
 #define PACKAGE_VERSION "1"
+#define FILE_LICENCE(...) extern void __file_licence ( void )
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -30,7 +31,7 @@
 #include <assert.h>
 #include <getopt.h>
 #include <bfd.h>
-#include <ipxe/efi/efi.h>
+#include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 #include <libgen.h>
 
