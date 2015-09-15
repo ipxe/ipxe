@@ -265,6 +265,9 @@ struct init_fn pxe_init_fn __init_fn ( INIT_NORMAL ) = {
  * @v netdev		Net device to use as PXE net device
  */
 void pxe_activate ( struct net_device *netdev ) {
+	uint32_t discard_a;
+	uint32_t discard_b;
+	uint32_t discard_d;
 
 	/* Ensure INT 1A is hooked */
 	if ( ! int_1a_hooked ) {
@@ -276,6 +279,15 @@ void pxe_activate ( struct net_device *netdev ) {
 
 	/* Set PXE network device */
 	pxe_set_netdev ( netdev );
+
+	/* Notify BIOS of installation */
+	__asm__ __volatile__ ( REAL_CODE ( "pushw %%cs\n\t"
+					   "popw %%es\n\t"
+					   "int $0x1a\n\t" )
+			       : "=a" ( discard_a ), "=b" ( discard_b ),
+				 "=d" ( discard_d )
+			       : "0" ( 0x564e ),
+				 "1" ( __from_text16 ( &pxenv ) ) );
 }
 
 /**
