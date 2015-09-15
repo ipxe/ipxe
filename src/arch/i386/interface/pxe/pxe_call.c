@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/uaccess.h>
 #include <ipxe/init.h>
 #include <ipxe/profile.h>
+#include <ipxe/netdevice.h>
 #include <setjmp.h>
 #include <registers.h>
 #include <biosint.h>
@@ -357,6 +358,31 @@ int pxe_start_nbp ( void ) {
 
 	return 0;
 }
+
+/**
+ * Notify BIOS of existence of network device
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int pxe_notify ( struct net_device *netdev ) {
+
+	/* Do nothing if we already have a network device */
+	if ( pxe_netdev )
+		return 0;
+
+	/* Activate (and deactivate) PXE stack to notify BIOS */
+	pxe_activate ( netdev );
+	pxe_deactivate();
+
+	return 0;
+}
+
+/** PXE BIOS notification driver */
+struct net_driver pxe_driver __net_driver = {
+	.name = "PXE",
+	.probe = pxe_notify,
+};
 
 REQUIRING_SYMBOL ( pxe_api_call );
 REQUIRE_OBJECT ( pxe_preboot );
