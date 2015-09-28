@@ -254,7 +254,7 @@ efi_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	if ( ! efidev ) {
 		DBGCP ( device, "EFIDRV %s is not started\n",
 			efi_handle_name ( device ) );
-		return 0;
+		return EFI_DEVICE_ERROR;
 	}
 
 	/* Stop this device */
