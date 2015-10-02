@@ -237,6 +237,7 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 	struct http_scheme *scheme;
 	struct sockaddr_tcpip server;
 	struct interface *socket;
+	unsigned int port;
 	int rc;
 
 	/* Identify scheme */
@@ -248,6 +249,9 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 	if ( ! uri->host )
 		return -EINVAL;
 
+	/* Identify port */
+	port = uri_port ( uri, scheme->port );
+
 	/* Look for a reusable connection in the pool */
 	list_for_each_entry ( conn, &http_connection_pool, pool.list ) {
 
@@ -257,15 +261,16 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 
 		/* Reuse connection, if possible */
 		if ( ( scheme == conn->scheme ) &&
-		     ( strcmp ( uri->host, conn->uri->host ) == 0 ) ) {
+		     ( strcmp ( uri->host, conn->uri->host ) == 0 ) &&
+		     ( port == uri_port ( conn->uri, scheme->port ) ) ) {
 
 			/* Remove from connection pool, stop timer,
 			 * attach to parent interface, and return.
 			 */
 			pool_del ( &conn->pool );
 			intf_plug_plug ( &conn->xfer, xfer );
-			DBGC2 ( conn, "HTTPCONN %p reused %s://%s\n",
-				conn, conn->scheme->name, conn->uri->host );
+			DBGC2 ( conn, "HTTPCONN %p reused %s://%s:%d\n", conn,
+				conn->scheme->name, conn->uri->host, port );
 			return 0;
 		}
 	}
@@ -281,7 +286,7 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 
 	/* Open socket */
 	memset ( &server, 0, sizeof ( server ) );
-	server.st_port = htons ( uri_port ( uri, scheme->port ) );
+	server.st_port = htons ( port );
 	socket = &conn->socket;
 	if ( scheme->filter &&
 	     ( ( rc = scheme->filter ( socket, uri->host, &socket ) ) != 0 ) )
@@ -296,13 +301,13 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 	ref_put ( &conn->refcnt );
 
 	DBGC2 ( conn, "HTTPCONN %p created %s://%s:%d\n", conn,
-		conn->scheme->name, conn->uri->host, ntohs ( server.st_port ) );
+		conn->scheme->name, conn->uri->host, port );
 	return 0;
 
  err_open:
  err_filter:
-	DBGC2 ( conn, "HTTPCONN %p could not create %s://%s: %s\n",
-		conn, conn->scheme->name, conn->uri->host, strerror ( rc ) );
+	DBGC2 ( conn, "HTTPCONN %p could not create %s://%s:%d: %s\n", conn,
+		conn->scheme->name, conn->uri->host, port, strerror ( rc ) );
 	http_conn_close ( conn, rc );
 	ref_put ( &conn->refcnt );
 	return rc;
