@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/in.h>
 #include <ipxe/version.h>
+#include <ipxe/console.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
@@ -1494,6 +1495,9 @@ efi_snp_load_file ( EFI_LOAD_FILE_PROTOCOL *load_file,
 	/* Boot from network device */
 	if ( ( rc = ipxe ( netdev ) ) != 0 )
 		goto err_ipxe;
+
+	/* Reset console */
+	console_reset();
 
  err_ipxe:
 	efi_watchdog_stop();

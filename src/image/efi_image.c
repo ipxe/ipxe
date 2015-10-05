@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/init.h>
 #include <ipxe/features.h>
 #include <ipxe/uri.h>
+#include <ipxe/console.h>
 
 FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 
@@ -235,6 +236,9 @@ static int efi_image_exec ( struct image *image ) {
 
 	/* Wrap calls made by the loaded image (for debugging) */
 	efi_wrap ( handle );
+
+	/* Reset console since image will probably use it */
+	console_reset();
 
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {

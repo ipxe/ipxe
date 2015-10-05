@@ -342,6 +342,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_watchdog	      ( ERRFILE_OTHER | 0x00490000 )
 #define ERRFILE_efi_pxe		      ( ERRFILE_OTHER | 0x004a0000 )
 #define ERRFILE_efi_usb		      ( ERRFILE_OTHER | 0x004b0000 )
+#define ERRFILE_efi_fbcon	      ( ERRFILE_OTHER | 0x004c0000 )
 
 /** @} */
 

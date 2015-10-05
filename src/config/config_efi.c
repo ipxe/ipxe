@@ -39,3 +39,9 @@ PROVIDE_REQUIRING_SYMBOL();
 #ifdef CONSOLE_EFI
 REQUIRE_OBJECT ( efi_console );
 #endif
+#ifdef CONSOLE_EFIFB
+REQUIRE_OBJECT ( efi_fbcon );
+#endif
+#ifdef CONSOLE_FRAMEBUFFER
+REQUIRE_OBJECT ( efi_fbcon );
+#endif
