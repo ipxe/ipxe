@@ -6,7 +6,7 @@
   environment. There are a set of base libraries in the Mde Package that can
   be used to implement base modules.
 
-Copyright (c) 2006 - 2013, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2015, Intel Corporation. All rights reserved.<BR>
 Portions copyright (c) 2008 - 2009, Apple Inc. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
@@ -29,6 +29,12 @@ FILE_LICENCE ( BSD3 );
 //
 #include <ipxe/efi/ProcessorBind.h>
 
+#if defined(_MSC_EXTENSIONS)
+//
+// Disable warning when last field of data structure is a zero sized array.
+//
+#pragma warning ( disable : 4200 )
+#endif
 
 /**
   Verifies the storage size of a given data type.
@@ -1017,6 +1023,47 @@ typedef UINTN RETURN_STATUS;
 **/
 #define SIGNATURE_64(A, B, C, D, E, F, G, H) \
     (SIGNATURE_32 (A, B, C, D) | ((UINT64) (SIGNATURE_32 (E, F, G, H)) << 32))
+
+#if defined(_MSC_EXTENSIONS) && !defined (MDE_CPU_EBC)
+  #pragma intrinsic(_ReturnAddress)
+  /**
+    Get the return address of the calling funcation.
+
+    Based on intrinsic function _ReturnAddress that provides the address of
+    the instruction in the calling function that will be executed after
+    control returns to the caller.
+
+    @param L    Return Level.
+
+    @return The return address of the calling funcation or 0 if L != 0.
+
+  **/
+  #define RETURN_ADDRESS(L)     ((L == 0) ? _ReturnAddress() : (VOID *) 0)
+#elif defined(__GNUC__)
+  void * __builtin_return_address (unsigned int level);
+  /**
+    Get the return address of the calling funcation.
+
+    Based on built-in Function __builtin_return_address that returns
+    the return address of the current function, or of one of its callers.
+
+    @param L    Return Level.
+
+    @return The return address of the calling funcation.
+
+  **/
+  #define RETURN_ADDRESS(L)     __builtin_return_address (L)
+#else
+  /**
+    Get the return address of the calling funcation.
+
+    @param L    Return Level.
+
+    @return 0 as compilers don't support this feature.
+
+  **/
+  #define RETURN_ADDRESS(L)     ((VOID *) 0)
+#endif
 
 #endif
 
