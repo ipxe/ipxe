@@ -614,6 +614,9 @@ int efi_file_install ( EFI_HANDLE handle ) {
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Reset root directory state */
+	efi_file_root.pos = 0;
+
 	/* Install the simple file system protocol, block I/O
 	 * protocol, and disk I/O protocol.  We don't have a block
 	 * device, but large parts of the EDK2 codebase make the
