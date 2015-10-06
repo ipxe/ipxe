@@ -99,6 +99,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "GraphicsOutput" },
 	{ &efi_hii_config_access_protocol_guid,
 	  "HiiConfigAccess" },
+	{ &efi_hii_font_protocol_guid,
+	  "HiiFont" },
 	{ &efi_ip4_protocol_guid,
 	  "Ip4" },
 	{ &efi_ip4_config_protocol_guid,

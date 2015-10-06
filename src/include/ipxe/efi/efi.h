@@ -168,6 +168,7 @@ extern EFI_GUID efi_disk_io_protocol_guid;
 extern EFI_GUID efi_driver_binding_protocol_guid;
 extern EFI_GUID efi_graphics_output_protocol_guid;
 extern EFI_GUID efi_hii_config_access_protocol_guid;
+extern EFI_GUID efi_hii_font_protocol_guid;
 extern EFI_GUID efi_ip4_protocol_guid;
 extern EFI_GUID efi_ip4_config_protocol_guid;
 extern EFI_GUID efi_ip4_service_binding_protocol_guid;
