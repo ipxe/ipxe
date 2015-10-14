@@ -66,6 +66,9 @@ struct console_driver bios_console __attribute__ (( weak ));
 #define CONSOLE_VESAFB ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )
 #endif
 
+/** Character height */
+#define VESAFB_CHAR_HEIGHT 16
+
 /** Font corresponding to selected character width and height */
 #define VESAFB_FONT VBE_FONT_8x16
 
@@ -86,6 +89,8 @@ struct vesafb {
 	struct fbcon_colour_map map;
 	/** Font definition */
 	struct fbcon_font font;
+	/** Character glyphs */
+	struct segoff glyphs;
 	/** Saved VGA mode */
 	uint8_t saved_mode;
 };
@@ -119,11 +124,23 @@ static int vesafb_rc ( unsigned int status ) {
 }
 
 /**
+ * Get character glyph
+ *
+ * @v character		Character
+ * @v glyph		Character glyph to fill in
+ */
+static void vesafb_glyph ( unsigned int character, uint8_t *glyph ) {
+	size_t offset = ( character * VESAFB_CHAR_HEIGHT );
+
+	copy_from_real ( glyph, vesafb.glyphs.segment,
+			 ( vesafb.glyphs.offset + offset ), VESAFB_CHAR_HEIGHT);
+}
+
+/**
  * Get font definition
  *
  */
 static void vesafb_font ( void ) {
-	struct segoff font;
 
 	/* Get font information
 	 *
@@ -144,13 +161,14 @@ static void vesafb_font ( void ) {
 					   "movw %%es, %%cx\n\t"
 					   "movw %%bp, %%dx\n\t"
 					   "popw %%bp\n\t" /* gcc bug */ )
-			       : "=c" ( font.segment ),
-				 "=d" ( font.offset )
+			       : "=c" ( vesafb.glyphs.segment ),
+				 "=d" ( vesafb.glyphs.offset )
 			       : "a" ( VBE_GET_FONT ),
 				 "b" ( VESAFB_FONT ) );
 	DBGC ( &vbe_buf, "VESAFB has font %04x at %04x:%04x\n",
-	       VESAFB_FONT, font.segment, font.offset );
-	vesafb.font.start = real_to_user ( font.segment, font.offset );
+	       VESAFB_FONT, vesafb.glyphs.segment, vesafb.glyphs.offset );
+	vesafb.font.height = VESAFB_CHAR_HEIGHT;
+	vesafb.font.glyph = vesafb_glyph;
 }
 
 /**

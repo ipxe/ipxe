@@ -18,9 +18,6 @@ struct pixel_buffer;
 /** Character width, in pixels */
 #define FBCON_CHAR_WIDTH 9
 
-/** Character height, in pixels */
-#define FBCON_CHAR_HEIGHT 16
-
 /** Bold colour modifier (RGB value) */
 #define FBCON_BOLD 0x555555
 
@@ -30,14 +27,21 @@ struct pixel_buffer;
 /** A font glyph */
 struct fbcon_font_glyph {
 	/** Row bitmask */
-	uint8_t bitmask[FBCON_CHAR_HEIGHT];
-} __attribute__ (( packed ));
+	uint8_t bitmask[0];
+};
 
 /** A font definition */
 struct fbcon_font {
-	/** Character glyphs */
-	userptr_t start;
-} __attribute__ (( packed ));
+	/** Character height (in pixels) */
+	unsigned int height;
+	/**
+	 * Get character glyph
+	 *
+	 * @v character		Character
+	 * @v glyph		Character glyph to fill in
+	 */
+	void ( * glyph ) ( unsigned int character, uint8_t *glyph );
+};
 
 /** A frame buffer geometry
  *

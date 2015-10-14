@@ -156,7 +156,7 @@ static void fbcon_store ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
  */
 static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 			 unsigned int xpos, unsigned int ypos ) {
-	struct fbcon_font_glyph glyph;
+	uint8_t glyph[fbcon->font->height];
 	size_t offset;
 	size_t pixel_len;
 	size_t skip_len;
@@ -167,9 +167,7 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 	void *src;
 
 	/* Get font character */
-	copy_from_user ( &glyph, fbcon->font->start,
-			 ( cell->character * sizeof ( glyph ) ),
-			 sizeof ( glyph ) );
+	fbcon->font->glyph ( cell->character, glyph );
 
 	/* Calculate pixel geometry */
 	offset = ( fbcon->indent +
@@ -182,7 +180,7 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 	transparent = ( cell->background == FBCON_TRANSPARENT );
 
 	/* Draw character rows */
-	for ( row = 0 ; row < FBCON_CHAR_HEIGHT ; row++ ) {
+	for ( row = 0 ; row < fbcon->font->height ; row++ ) {
 
 		/* Draw background picture, if applicable */
 		if ( transparent ) {
@@ -197,7 +195,7 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 		}
 
 		/* Draw character row */
-		for ( column = FBCON_CHAR_WIDTH, bitmask = glyph.bitmask[row] ;
+		for ( column = FBCON_CHAR_WIDTH, bitmask = glyph[row] ;
 		      column ; column--, bitmask <<= 1, offset += pixel_len ) {
 			if ( bitmask & 0x80 ) {
 				src = &cell->foreground;
@@ -614,7 +612,8 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 	/* Expand margin to accommodate whole characters */
 	width = ( pixel->width - margin->left - margin->right );
 	height = ( pixel->height - margin->top - margin->bottom );
-	if ( ( width < FBCON_CHAR_WIDTH ) || ( height < FBCON_CHAR_HEIGHT ) ) {
+	if ( ( width < FBCON_CHAR_WIDTH ) ||
+	     ( height < ( ( int ) font->height ) ) ) {
 		DBGC ( fbcon, "FBCON %p has unusable character area "
 		       "[%d-%d),[%d-%d)\n", fbcon,
 		       margin->left, ( pixel->width - margin->right ),
@@ -623,7 +622,7 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 		goto err_margin;
 	}
 	xgap = ( width % FBCON_CHAR_WIDTH );
-	ygap = ( height % FBCON_CHAR_HEIGHT );
+	ygap = ( height % font->height );
 	fbcon->margin.left = ( margin->left + ( xgap / 2 ) );
 	fbcon->margin.top = ( margin->top + ( ygap / 2 ) );
 	fbcon->margin.right = ( margin->right + ( xgap - ( xgap / 2 ) ) );
@@ -633,9 +632,9 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 
 	/* Derive character geometry from pixel geometry */
 	fbcon->character.width = ( width / FBCON_CHAR_WIDTH );
-	fbcon->character.height = ( height / FBCON_CHAR_HEIGHT );
+	fbcon->character.height = ( height / font->height );
 	fbcon->character.len = ( pixel->len * FBCON_CHAR_WIDTH );
-	fbcon->character.stride = ( pixel->stride * FBCON_CHAR_HEIGHT );
+	fbcon->character.stride = ( pixel->stride * font->height );
 	DBGC ( fbcon, "FBCON %p is pixel %dx%d, char %dx%d at "
 	       "[%d-%d),[%d-%d)\n", fbcon, fbcon->pixel->width,
 	       fbcon->pixel->height, fbcon->character.width,
