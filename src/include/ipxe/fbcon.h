@@ -12,8 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/ansiesc.h>
 #include <ipxe/uaccess.h>
-
-struct pixel_buffer;
+#include <ipxe/console.h>
 
 /** Character width, in pixels */
 #define FBCON_CHAR_WIDTH 9
@@ -149,10 +148,9 @@ struct fbcon {
 
 extern int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 			struct fbcon_geometry *pixel,
-			struct fbcon_margin *margin,
 			struct fbcon_colour_map *map,
 			struct fbcon_font *font,
-			struct pixel_buffer *pixbuf );
+			struct console_configuration *config );
 extern void fbcon_fini ( struct fbcon *fbcon );
 extern void fbcon_putchar ( struct fbcon *fbcon, int character );
 

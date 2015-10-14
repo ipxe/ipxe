@@ -83,8 +83,6 @@ struct vesafb {
 	physaddr_t start;
 	/** Pixel geometry */
 	struct fbcon_geometry pixel;
-	/** Margin */
-	struct fbcon_margin margin;
 	/** Colour mapping */
 	struct fbcon_colour_map map;
 	/** Font definition */
@@ -419,12 +417,6 @@ static void vesafb_restore ( void ) {
 static int vesafb_init ( struct console_configuration *config ) {
 	uint32_t discard_b;
 	uint16_t *mode_numbers;
-	unsigned int xgap;
-	unsigned int ygap;
-	unsigned int left;
-	unsigned int right;
-	unsigned int top;
-	unsigned int bottom;
 	int mode_number;
 	int rc;
 
@@ -450,31 +442,13 @@ static int vesafb_init ( struct console_configuration *config ) {
 	if ( ( rc = vesafb_set_mode ( mode_number ) ) != 0 )
 		goto err_set_mode;
 
-	/* Calculate margin.  If the actual screen size is larger than
-	 * the requested screen size, then update the margins so that
-	 * the margin remains relative to the requested screen size.
-	 * (As an exception, if a zero margin was specified then treat
-	 * this as meaning "expand to edge of actual screen".)
-	 */
-	xgap = ( vesafb.pixel.width - config->width );
-	ygap = ( vesafb.pixel.height - config->height );
-	left = ( xgap / 2 );
-	right = ( xgap - left );
-	top = ( ygap / 2 );
-	bottom = ( ygap - top );
-	vesafb.margin.left = ( config->left + ( config->left ? left : 0 ) );
-	vesafb.margin.right = ( config->right + ( config->right ? right : 0 ) );
-	vesafb.margin.top = ( config->top + ( config->top ? top : 0 ) );
-	vesafb.margin.bottom =
-		( config->bottom + ( config->bottom ? bottom : 0 ) );
-
 	/* Get font data */
 	vesafb_font();
 
 	/* Initialise frame buffer console */
 	if ( ( rc = fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
-				 &vesafb.pixel, &vesafb.margin, &vesafb.map,
-				 &vesafb.font, config->pixbuf ) ) != 0 )
+				 &vesafb.pixel, &vesafb.map, &vesafb.font,
+				 config ) ) != 0 )
 		goto err_fbcon_init;
 
 	free ( mode_numbers );
