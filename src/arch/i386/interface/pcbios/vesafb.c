@@ -60,7 +60,13 @@ struct console_driver bios_console __attribute__ (( weak ));
 #define EIO_VBE( code )							\
 	EUNIQ ( EINFO_EIO, (code), EIO_FAILED, EIO_HARDWARE, EIO_MODE )
 
-/* Set default console usage if applicable */
+/* Set default console usage if applicable
+ *
+ * We accept either CONSOLE_FRAMEBUFFER or CONSOLE_VESAFB.
+ */
+#if ( defined ( CONSOLE_FRAMEBUFFER ) && ! defined ( CONSOLE_VESAFB ) )
+#define CONSOLE_VESAFB CONSOLE_FRAMEBUFFER
+#endif
 #if ! ( defined ( CONSOLE_VESAFB ) && CONSOLE_EXPLICIT ( CONSOLE_VESAFB ) )
 #undef CONSOLE_VESAFB
 #define CONSOLE_VESAFB ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )

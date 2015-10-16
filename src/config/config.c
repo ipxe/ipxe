@@ -51,9 +51,6 @@ PROVIDE_REQUIRING_SYMBOL();
  *
  */
 
-#ifdef CONSOLE_PCBIOS
-REQUIRE_OBJECT ( bios_console );
-#endif
 #ifdef CONSOLE_SERIAL
 REQUIRE_OBJECT ( serial );
 #endif
@@ -80,12 +77,6 @@ REQUIRE_OBJECT ( vmconsole );
 #endif
 #ifdef CONSOLE_DEBUGCON
 REQUIRE_OBJECT ( debugcon );
-#endif
-#ifdef CONSOLE_VESAFB
-REQUIRE_OBJECT ( vesafb );
-#endif
-#ifdef CONSOLE_INT13
-REQUIRE_OBJECT ( int13con );
 #endif
 
 /*

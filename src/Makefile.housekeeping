@@ -1005,7 +1005,7 @@ TGT_LD_ENTRY	= _$(TGT_PREFIX)_start
 #		  --defsym pci_vendor=0x1186 --defsym pci_device=0x1300")
 #
 TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_ENTRY) $(TGT_LD_DRIVERS) \
-		    $(TGT_LD_DEVLIST) obj_config,\
+		    $(TGT_LD_DEVLIST) obj_config obj_config_$(PLATFORM),\
 		    -u $(SYM) --defsym check_$(SYM)=$(SYM) ) \
 		  $(patsubst %,--defsym %,$(TGT_LD_IDS)) \
 		  -e $(TGT_LD_ENTRY)
