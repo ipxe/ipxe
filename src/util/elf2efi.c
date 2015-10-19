@@ -70,20 +70,14 @@
 
 #endif
 
-#define EFI_FILE_ALIGN 0x20
+#define ELF_MREL( mach, type ) ( (mach) | ( (type) << 16 ) )
 
-struct elf_machine {
-	unsigned int pe_machine;
-	unsigned int r_none;
-	unsigned int r_abs;
-	unsigned int r_pcrel;
-};
+#define EFI_FILE_ALIGN 0x20
 
 struct elf_file {
 	void *data;
 	size_t len;
 	const Elf_Ehdr *ehdr;
-	struct elf_machine *machine;
 };
 
 struct pe_section {
@@ -134,20 +128,6 @@ static struct pe_header efi_pe_header = {
 				EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES,
 		},
 	},
-};
-
-static struct elf_machine machine_i386 = {
-	.pe_machine = EFI_IMAGE_MACHINE_IA32,
-	.r_none = R_386_NONE,
-	.r_abs = R_386_32,
-	.r_pcrel = R_386_PC32,
-};
-
-static struct elf_machine machine_x86_64 = {
-	.pe_machine = EFI_IMAGE_MACHINE_X64,
-	.r_none = R_X86_64_NONE,
-	.r_abs = R_X86_64_64,
-	.r_pcrel = R_X86_64_PC32,
 };
 
 /** Command-line options */
@@ -355,19 +335,6 @@ static void read_elf_file ( const char *name, struct elf_file *elf ) {
 			exit ( 1 );
 		}
 	}
-
-	/* Identify architecture */
-	switch ( ehdr->e_machine ) {
-	case EM_386:
-		elf->machine = &machine_i386;
-		break;
-	case EM_X86_64:
-		elf->machine = &machine_x86_64;
-		break;
-	default:
-		eprintf ( "Unknown ELF architecture %d\n", ehdr->e_machine );
-		exit ( 1 );
-	}
 }
 
 /**
@@ -413,6 +380,36 @@ static const char * elf_string ( struct elf_file *elf, unsigned int section,
 	string = ( elf->data + shdr->sh_offset + offset );
 
 	return string;
+}
+
+/**
+ * Set machine architecture
+ *
+ * @v elf		ELF file
+ * @v pe_header		PE file header
+ */
+static void set_machine ( struct elf_file *elf, struct pe_header *pe_header ) {
+	const Elf_Ehdr *ehdr = elf->ehdr;
+	uint16_t machine;
+
+	/* Identify machine architecture */
+	switch ( ehdr->e_machine ) {
+	case EM_386:
+		machine = EFI_IMAGE_MACHINE_IA32;
+		break;
+	case EM_X86_64:
+		machine = EFI_IMAGE_MACHINE_X64;
+		break;
+	case EM_ARM:
+		machine = EFI_IMAGE_MACHINE_ARMTHUMB_MIXED;
+		break;
+	default:
+		eprintf ( "Unknown ELF architecture %d\n", ehdr->e_machine );
+		exit ( 1 );
+	}
+
+	/* Set machine architecture */
+	pe_header->nt.FileHeader.Machine = machine;
 }
 
 /**
@@ -568,6 +565,7 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 			    const Elf_Rel *rel, struct pe_relocs **pe_reltab ) {
 	unsigned int type = ELF_R_TYPE ( rel->r_info );
 	unsigned int sym = ELF_R_SYM ( rel->r_info );
+	unsigned int mrel = ELF_MREL ( elf->ehdr->e_machine, type );
 	size_t offset = ( shdr->sh_addr + rel->r_offset );
 
 	/* Look up symbol and process relocation */
@@ -579,18 +577,36 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 		/* Skip absolute symbols; the symbol value won't
 		 * change when the object is loaded.
 		 */
-	} else if ( type == elf->machine->r_none ) {
-		/* Ignore dummy relocations used by REQUIRE_SYMBOL() */
-	} else if ( type == elf->machine->r_abs ) {
-		/* Generate an 8-byte or 4-byte PE relocation */
-		generate_pe_reloc ( pe_reltab, offset, sizeof ( Elf_Addr ) );
-	} else if ( type == elf->machine->r_pcrel ) {
-		/* Skip PC-relative relocations; all relative offsets
-		 * remain unaltered when the object is loaded.
-		 */
 	} else {
-		eprintf ( "Unrecognised relocation type %d\n", type );
-		exit ( 1 );
+		switch ( mrel ) {
+		case ELF_MREL ( EM_386, R_386_NONE ) :
+		case ELF_MREL ( EM_ARM, R_ARM_NONE ) :
+		case ELF_MREL ( EM_X86_64, R_X86_64_NONE ) :
+			/* Ignore dummy relocations used by REQUIRE_SYMBOL() */
+			break;
+		case ELF_MREL ( EM_386, R_386_32 ) :
+		case ELF_MREL ( EM_ARM, R_ARM_ABS32 ) :
+			/* Generate a 4-byte PE relocation */
+			generate_pe_reloc ( pe_reltab, offset, 4 );
+			break;
+		case ELF_MREL ( EM_X86_64, R_X86_64_64 ) :
+			/* Generate an 8-byte PE relocation */
+			generate_pe_reloc ( pe_reltab, offset, 8 );
+			break;
+		case ELF_MREL ( EM_386, R_386_PC32 ) :
+		case ELF_MREL ( EM_ARM, R_ARM_CALL ) :
+		case ELF_MREL ( EM_ARM, R_ARM_THM_PC22 ) :
+		case ELF_MREL ( EM_ARM, R_ARM_THM_JUMP24 ) :
+		case ELF_MREL ( EM_X86_64, R_X86_64_PC32 ) :
+			/* Skip PC-relative relocations; all relative
+			 * offsets remain unaltered when the object is
+			 * loaded.
+			 */
+			break;
+		default:
+			eprintf ( "Unrecognised relocation type %d\n", type );
+			exit ( 1 );
+		}
 	}
 }
 
@@ -835,7 +851,7 @@ static void elf2pe ( const char *elf_name, const char *pe_name,
 
 	/* Initialise the PE header */
 	memcpy ( &pe_header, &efi_pe_header, sizeof ( pe_header ) );
-	pe_header.nt.FileHeader.Machine = elf.machine->pe_machine;
+	set_machine ( &elf, &pe_header );
 	pe_header.nt.OptionalHeader.AddressOfEntryPoint = elf.ehdr->e_entry;
 	pe_header.nt.OptionalHeader.Subsystem = opts->subsystem;
 
