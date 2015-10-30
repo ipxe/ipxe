@@ -446,6 +446,7 @@ static void dhcp_discovery_expired ( struct dhcp_session *dhcp ) {
 	/* If link is blocked, defer DHCP discovery (and reset timeout) */
 	if ( netdev_link_blocked ( dhcp->netdev ) ) {
 		DBGC ( dhcp, "DHCP %p deferring discovery\n", dhcp );
+		dhcp->start = currticks();
 		start_timer_fixed ( &dhcp->timer,
 				    ( DHCP_DISC_START_TIMEOUT_SEC *
 				      TICKS_PER_SEC ) );
