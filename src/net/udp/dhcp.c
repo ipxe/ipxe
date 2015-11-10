@@ -444,7 +444,8 @@ static void dhcp_discovery_expired ( struct dhcp_session *dhcp ) {
 	unsigned long elapsed = ( currticks() - dhcp->start );
 
 	/* If link is blocked, defer DHCP discovery (and reset timeout) */
-	if ( netdev_link_blocked ( dhcp->netdev ) ) {
+	if ( netdev_link_blocked ( dhcp->netdev ) &&
+	     ( dhcp->count <= DHCP_DISC_MAX_DEFERRALS ) ) {
 		DBGC ( dhcp, "DHCP %p deferring discovery\n", dhcp );
 		dhcp->start = currticks();
 		start_timer_fixed ( &dhcp->timer,
@@ -1115,7 +1116,7 @@ static int dhcp_tx ( struct dhcp_session *dhcp ) {
 	 * session state into packet traces.  Useful for extracting
 	 * debug information from non-debug builds.
 	 */
-	dhcppkt.dhcphdr->secs = htons ( ( ++(dhcp->count) << 2 ) |
+	dhcppkt.dhcphdr->secs = htons ( ( dhcp->count << 2 ) |
 					( dhcp->offer.s_addr ? 0x02 : 0 ) |
 					( dhcp->proxy_offer ? 0x01 : 0 ) );
 
@@ -1258,6 +1259,9 @@ static void dhcp_timer_expired ( struct retry_timer *timer, int fail ) {
 		dhcp_finished ( dhcp, -ETIMEDOUT );
 		return;
 	}
+
+	/* Increment transmission counter */
+	dhcp->count++;
 
 	/* Handle timer expiry based on current state */
 	dhcp->state->expired ( dhcp );

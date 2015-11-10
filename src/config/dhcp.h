@@ -25,6 +25,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define DHCP_DISC_END_TIMEOUT_SEC	32	/* as per PXE spec */
 
 /*
+ * Maximum number of discovery deferrals due to blocked links
+ * (e.g. from non-forwarding STP ports)
+ */
+#define DHCP_DISC_MAX_DEFERRALS		60
+
+/*
  * ProxyDHCP offers are given precedence by continue to wait for them
  * after a valid DHCPOFFER is received.  We'll wait through this
  * timeout for it.  The PXE spec indicates waiting through the 4 & 8
