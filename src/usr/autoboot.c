@@ -501,6 +501,7 @@ static int autoboot ( void ) {
  * @ret	enter_shell	User wants to enter shell
  */
 static int shell_banner ( void ) {
+        int key;
 
 	/* Skip prompt if timeout is zero */
 	if ( BANNER_TIMEOUT <= 0 )
@@ -508,10 +509,17 @@ static int shell_banner ( void ) {
 
 	/* Prompt user */
 	printf ( "\n" );
-	return ( prompt ( "Press Ctrl-B for the " PRODUCT_SHORT_NAME
+	key = prompt ( "Press Ctrl-B for the " PRODUCT_SHORT_NAME
 			  " command line...",
-			  ( ( BANNER_TIMEOUT * TICKS_PER_SEC ) / 10 ),
-			  CTRL_B ) == 0 );
+			  ( ( BANNER_TIMEOUT * TICKS_PER_SEC ) / 10 ) );
+        if ( key < 0 )
+                return key;
+
+        /* Check for correct keypress */
+        if ( key != CTRL_B )
+                return -ECANCELED;
+
+        return 0;
 }
 
 /**
