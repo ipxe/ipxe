@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/segment.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
+#include <ipxe/console.h>
 
 FEATURE ( FEATURE_IMAGE, "COMBOOT", DHCP_EB_FEATURE_COMBOOT, 1 );
 
@@ -315,6 +316,9 @@ static int comboot_exec ( struct image *image ) {
 	if ( ( rc = comboot_prepare_segment ( image ) ) != 0 ) {
 		return rc;
 	}
+
+	/* Reset console */
+	console_reset();
 
 	return comboot_exec_loop ( image );
 }

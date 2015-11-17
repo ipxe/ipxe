@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/segment.h>
 #include <ipxe/init.h>
 #include <ipxe/io.h>
+#include <ipxe/console.h>
 
 /**
  * Execute COMBOOT image
@@ -280,6 +281,9 @@ static int com32_exec ( struct image *image ) {
 	if ( ( rc = com32_prepare_bounce_buffer ( image ) ) != 0 ) {
 		return rc;
 	}
+
+	/* Reset console */
+	console_reset();
 
 	return com32_exec_loop ( image );
 }
