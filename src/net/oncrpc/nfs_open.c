@@ -41,6 +41,9 @@
 #include <ipxe/portmap.h>
 #include <ipxe/mount.h>
 #include <ipxe/nfs_uri.h>
+#include <ipxe/blockdev.h>
+#include <ipxe/blocktrans.h>
+#include <ipxe/acpi.h>
 
 /** @file
  *
@@ -51,12 +54,14 @@
 FEATURE ( FEATURE_PROTOCOL, "NFS", DHCP_EB_FEATURE_NFS, 1 );
 
 #define NFS_RSIZE 100000
+/** Block size used for nfs block device requests */
+#define NFS_BLKSIZE 512
 
 enum nfs_pm_state {
 	NFS_PORTMAP_NONE = 0,
 	NFS_PORTMAP_MOUNTPORT,
 	NFS_PORTMAP_NFSPORT,
-	MFS_PORTMAP_CLOSED,
+	NFS_PORTMAP_CLOSED,
 };
 
 enum nfs_mount_state {
@@ -75,6 +80,11 @@ enum nfs_state {
 	NFS_READ,
 	NFS_READ_SENT,
 	NFS_CLOSED,
+};
+
+enum nfs_mode {
+	NFS_READ_ALL = 0,
+	NFS_BLOCK_MODE,
 };
 
 /**
@@ -106,13 +116,21 @@ struct nfs_request {
 
 	struct nfs_fh           readlink_fh;
 	struct nfs_fh           current_fh;
+	struct nfs_fh		dir_fh;		// the handle for the opened dir
 	uint64_t                file_offset;
+	size_t			bytes_to_read;
 
 	size_t                  remaining;
 	int                     eof;
+	enum nfs_mode		mode;
+};
+struct nfs_range_request {
+	uint64_t                file_offset;
+	size_t			bytes_to_read;
 };
 
 static void nfs_step ( struct nfs_request *nfs );
+static int nfs_open(struct interface *data, struct nfs_uri *uri, char *hostname, enum nfs_mode mode, struct nfs_range_request *range);
 
 /**
  * Free NFS request
@@ -148,6 +166,90 @@ static void nfs_done ( struct nfs_request *nfs, int rc ) {
 	intf_shutdown ( &nfs->pm_intf, rc );
 	intf_shutdown ( &nfs->mount_intf, rc );
 	intf_shutdown ( &nfs->nfs_intf, rc );
+}
+
+int nfs_acpi_describe ( struct nfs_request *nfs,
+			 struct acpi_description_header *acpi, size_t len ) {
+
+	DBGC ( nfs, "NFS %p cannot yet describe device in an ACPI table\n",
+	       nfs );
+	( void ) acpi;
+	( void ) len;
+	return 0;
+}
+
+/**
+ * Read from block device
+ *
+ * @v nfs		NFS transaction
+ * @v data		Data interface
+ * @v lba		Starting logical block address
+ * @v count		Number of logical blocks
+ * @v buffer		Data buffer
+ * @v len		Length of data buffer
+ * @ret rc		Return status code
+ */
+int nfs_block_read ( struct nfs_request *nfs, struct interface *data,
+		      uint64_t lba, unsigned int count, userptr_t buffer,
+		      size_t len ) {
+	int rc;
+	struct nfs_range_request range;
+
+	DBGC(nfs,"NFS_OPEN %p block %d+%d read\n",nfs,(int)lba,count);
+	/* Sanity check */
+	assert ( len == ( count * NFS_BLKSIZE ) );
+
+	range.file_offset = lba * NFS_BLKSIZE;
+	range.bytes_to_read = len;
+
+	/* Start a range request to retrieve the block(s) */
+	if ( ( rc = nfs_open ( data, &nfs->uri, nfs->hostname, NFS_BLOCK_MODE, &range) ) != 0 )
+		goto err_open;
+
+	/* Insert block device translator */
+	if ( ( rc = block_translate ( data, buffer, len ) ) != 0 ) {
+		DBGC ( nfs, "NFS %p could not insert block translator: %s\n",
+		       nfs, strerror ( rc ) );
+		goto err_translate;
+	}
+
+	return 0;
+
+ err_translate:
+	intf_restart ( data, rc );
+ err_open:
+	return rc;
+}
+
+/**
+ * Read block device capacity
+ *
+ * @v control		Control interface
+ * @v data		Data interface
+ * @ret rc		Return status code
+ */
+int nfs_block_read_capacity ( struct nfs_request *nfs,
+			       struct interface *data ) {
+	int rc;
+
+	DBGC(nfs,"block read capacity\n");
+	/* Start a HEAD request to retrieve the capacity */
+	if ( ( rc = nfs_open ( data, &nfs->uri, nfs->hostname, NFS_BLOCK_MODE, NULL) ) != 0 )
+		goto err_open;
+
+	/* Insert block device translator */
+	if ( ( rc = block_translate ( data, UNULL, NFS_BLKSIZE ) ) != 0 ) {
+		DBGC ( nfs, "NFS %p could not insert block translator: %s\n",
+		       nfs, strerror ( rc ) );
+		goto err_translate;
+	}
+
+	return 0;
+
+ err_translate:
+	intf_restart ( data, rc );
+ err_open:
+	return rc;
 }
 
 static int nfs_connect ( struct interface *intf, uint16_t port,
@@ -186,7 +288,7 @@ static void nfs_pm_step ( struct nfs_request *nfs ) {
 		if ( rc != 0 )
 			goto err;
 
-		nfs->pm_state++;
+		nfs->pm_state = NFS_PORTMAP_MOUNTPORT;
 		return;
 	}
 
@@ -233,7 +335,7 @@ static int nfs_pm_deliver ( struct nfs_request *nfs,
 		if ( rc != 0 )
 			goto err;
 
-		nfs->pm_state++;
+		nfs->pm_state = NFS_PORTMAP_NFSPORT;
 		nfs_pm_step ( nfs );
 
 		goto done;
@@ -252,7 +354,7 @@ static int nfs_pm_deliver ( struct nfs_request *nfs,
 			goto err;
 
 		intf_shutdown ( &nfs->pm_intf, 0 );
-		nfs->pm_state++;
+		nfs->pm_state = NFS_PORTMAP_CLOSED;
 
 		goto done;
 	}
@@ -280,7 +382,7 @@ static void nfs_mount_step ( struct nfs_request *nfs ) {
 		if ( rc != 0 )
 			goto err;
 
-		nfs->mount_state++;
+		nfs->mount_state = NFS_MOUNT_MNT;
 		return;
 	}
 
@@ -336,13 +438,13 @@ static int nfs_mount_deliver ( struct nfs_request *nfs,
 			DBGC ( nfs, "NFS_OPEN %p MNT failed retrying with " \
 			       "%s\n", nfs, nfs_uri_mountpoint ( &nfs->uri ) );
 
-			nfs->mount_state--;
+			nfs->mount_state = NFS_MOUNT_NONE;
 			nfs_mount_step ( nfs );
 
 			goto done;
 		}
 
-		nfs->current_fh = mnt_reply.fh;
+		nfs->dir_fh = mnt_reply.fh;
 		nfs->nfs_state = NFS_LOOKUP;
 		nfs_step ( nfs );
 
@@ -378,11 +480,11 @@ static void nfs_step ( struct nfs_request *nfs ) {
                        path_component );
 
 		rc = nfs_lookup ( &nfs->nfs_intf, &nfs->nfs_session,
-		                  &nfs->current_fh, path_component );
+		                  &nfs->dir_fh, path_component );
 		if ( rc != 0 )
 			goto err;
 
-		nfs->nfs_state++;
+		nfs->nfs_state = NFS_LOOKUP_SENT;
 		return;
 	}
 
@@ -395,20 +497,23 @@ static void nfs_step ( struct nfs_request *nfs ) {
 		if ( rc != 0 )
 			goto err;
 
-		nfs->nfs_state++;
+		nfs->nfs_state = NFS_READLINK_SENT;
 		return;
 	}
 
 	if ( nfs->nfs_state == NFS_READ ) {
-		DBGC ( nfs, "NFS_OPEN %p READ call\n", nfs );
+		size_t len = NFS_RSIZE;
+		if (len > nfs->bytes_to_read) len = nfs->bytes_to_read;
+
+		DBGC ( nfs, "NFS_OPEN %p READ(%d,%d) call\n", nfs, (int)nfs->file_offset, len);
 
 		rc = nfs_read ( &nfs->nfs_intf, &nfs->nfs_session,
 		                &nfs->current_fh, nfs->file_offset,
-		                NFS_RSIZE );
+		                len );
 		if ( rc != 0 )
 			goto err;
 
-		nfs->nfs_state++;
+		nfs->nfs_state = NFS_READ_SENT;
 		return;
 	}
 
@@ -446,10 +551,25 @@ static int nfs_deliver ( struct nfs_request *nfs,
 		} else {
 			nfs->current_fh = lookup_reply.fh;
 
-			if ( nfs->uri.lookup_pos[0] == '\0' )
-				nfs->nfs_state = NFS_READ;
-			else
-				nfs->nfs_state--;
+			if ( nfs->uri.lookup_pos[0] == '\0' ) {
+				if (nfs->mode == NFS_READ_ALL) {
+					nfs->bytes_to_read = lookup_reply.size;
+					nfs->nfs_state = NFS_READ;
+				} else {
+					if (nfs->bytes_to_read) {
+						nfs->nfs_state = NFS_READ;
+						nfs_step(nfs);
+					} else {
+						xfer_seek(&nfs->xfer, lookup_reply.size);
+						xfer_seek(&nfs->xfer, 0);
+						intf_shutdown ( &nfs->nfs_intf, 0 );
+						nfs->nfs_state = NFS_CLOSED;
+						nfs->mount_state = NFS_MOUNT_UMNT;
+						nfs_mount_step ( nfs );
+					}
+				}
+			} else
+				nfs->nfs_state = NFS_LOOKUP;
 		}
 
 		nfs_step ( nfs );
@@ -509,6 +629,7 @@ static int nfs_deliver ( struct nfs_request *nfs,
 			}
 
 			nfs->file_offset += read_reply.count;
+			nfs->bytes_to_read -= read_reply.count;
 			nfs->remaining    = read_reply.count;
 			nfs->eof          = read_reply.eof;
 		}
@@ -527,13 +648,25 @@ static int nfs_deliver ( struct nfs_request *nfs,
 			goto err;
 
 		if ( nfs->remaining == 0 ) {
-			if ( ! nfs->eof ) {
-				nfs->nfs_state--;
+			if (nfs->mode == NFS_BLOCK_MODE) {
+				if (nfs->bytes_to_read) {
+					nfs->nfs_state = NFS_READ;
+					nfs_step(nfs);
+				} else {
+					intf_shutdown ( &nfs->nfs_intf, 0 );
+					nfs->nfs_state = NFS_CLOSED;
+					nfs->mount_state = NFS_MOUNT_UMNT;
+					nfs_mount_step ( nfs );
+				}
+			} else if ( ! nfs->eof ) {
+				DBGC(nfs,"NFS_OPEN condition1\n");
+				nfs->nfs_state = NFS_READ;
 				nfs_step ( nfs );
 			} else {
+				DBGC(nfs,"NFS_OPEN condition2\n");
 				intf_shutdown ( &nfs->nfs_intf, 0 );
-				nfs->nfs_state++;
-				nfs->mount_state++;
+				nfs->nfs_state = NFS_CLOSED;
+				nfs->mount_state = NFS_MOUNT_UMNT;
 				nfs_mount_step ( nfs );
 			}
 		}
@@ -554,14 +687,19 @@ done:
  *
  */
 
+// OP's exposed to ipxe
 static struct interface_operation nfs_xfer_operations[] = {
 	INTF_OP ( intf_close, struct nfs_request *, nfs_done ),
+	INTF_OP ( block_read, struct nfs_request *, nfs_block_read ),
+	INTF_OP ( block_read_capacity, struct nfs_request *,  nfs_block_read_capacity ),
+	INTF_OP ( acpi_describe, struct nfs_request *,  nfs_acpi_describe ),
 };
 
 /** NFS data transfer interface descriptor */
 static struct interface_descriptor nfs_xfer_desc =
 	INTF_DESC ( struct nfs_request, xfer, nfs_xfer_operations );
 
+// OP's for the portmap socket
 static struct interface_operation nfs_pm_operations[] = {
 	INTF_OP ( intf_close, struct nfs_request *, nfs_done ),
 	INTF_OP ( xfer_deliver, struct nfs_request *, nfs_pm_deliver ),
@@ -571,6 +709,7 @@ static struct interface_operation nfs_pm_operations[] = {
 static struct interface_descriptor nfs_pm_desc =
 	INTF_DESC ( struct nfs_request, pm_intf, nfs_pm_operations );
 
+// OP's for the mount socket
 static struct interface_operation nfs_mount_operations[] = {
 	INTF_OP ( intf_close, struct nfs_request *, nfs_done ),
 	INTF_OP ( xfer_deliver, struct nfs_request *, nfs_mount_deliver ),
@@ -580,6 +719,7 @@ static struct interface_operation nfs_mount_operations[] = {
 static struct interface_descriptor nfs_mount_desc =
 	INTF_DESC ( struct nfs_request, mount_intf, nfs_mount_operations );
 
+// OP's for the main nfs socket
 static struct interface_operation nfs_operations[] = {
 	INTF_OP ( intf_close, struct nfs_request *, nfs_done ),
 	INTF_OP ( xfer_deliver, struct nfs_request *, nfs_deliver ),
@@ -596,38 +736,36 @@ static struct interface_descriptor nfs_desc =
  *
  */
 
-static int nfs_parse_uri ( struct nfs_request *nfs, const struct uri *uri ) {
+static int nfs_parse_uri ( struct nfs_uri *uri_temp, char **hostname, const struct uri *uri ) {
 	int     rc;
 
 	if ( ! uri || ! uri->host || ! uri->path )
 		return -EINVAL;
 
-	if ( ( rc = nfs_uri_init ( &nfs->uri, uri ) ) != 0 )
+	if ( ( rc = nfs_uri_init ( uri_temp, uri ) ) != 0 )
 		return rc;
 
-	if ( ! ( nfs->hostname = strdup ( uri->host ) ) ) {
+	if ( ! ( *hostname = strdup ( uri->host ) ) ) {
 		rc = -ENOMEM;
 		goto err_hostname;
 	}
 
-	DBGC ( nfs, "NFS_OPEN %p URI parsed: (mountpoint=%s, path=%s)\n",
-	       nfs, nfs_uri_mountpoint ( &nfs->uri), nfs->uri.path );
-
 	return 0;
 
 err_hostname:
-	nfs_uri_free ( &nfs->uri );
+	nfs_uri_free ( uri_temp );
 	return rc;
 }
 
-/**
- * Initiate a NFS connection
- *
- * @v xfer		Data transfer interface
- * @v uri		Uniform Resource Identifier
- * @ret rc		Return status code
- */
-static int nfs_open ( struct interface *xfer, struct uri *uri ) {
+static int nfs_uri_copy(struct nfs_uri *dest, struct nfs_uri *src) {
+	dest->mountpoint = strdup(src->mountpoint);
+	dest->filename = strdup(src->filename);
+	dest->path = strdup(src->path);
+	dest->lookup_pos = dest->path;
+
+	return 0;
+}
+static int nfs_open(struct interface *xfer, struct nfs_uri *uri, char *hostname, enum nfs_mode mode, struct nfs_range_request *range) {
 	int                     rc;
 	struct nfs_request      *nfs;
 
@@ -635,9 +773,14 @@ static int nfs_open ( struct interface *xfer, struct uri *uri ) {
 	if ( ! nfs )
 		return -ENOMEM;
 
-	rc = nfs_parse_uri( nfs, uri );
-	if ( rc != 0 )
-		goto err_uri;
+	nfs->hostname = strdup(hostname);
+
+	rc = nfs_uri_copy(&nfs->uri,uri);
+	if (rc != 0) goto err_uri;
+
+	DBGC ( nfs, "NFS_OPEN %p URI parsed: (mountpoint=%s, path=%s)\n",
+	       nfs, nfs_uri_mountpoint ( &nfs->uri), nfs->uri.path );
+
 
 	rc = oncrpc_init_cred_sys ( &nfs->auth_sys );
 	if ( rc != 0 )
@@ -664,8 +807,24 @@ static int nfs_open ( struct interface *xfer, struct uri *uri ) {
 	intf_plug_plug ( &nfs->xfer, xfer );
 	ref_put ( &nfs->refcnt );
 
-	return 0;
+	nfs->mode = mode;
 
+	if (mode == NFS_BLOCK_MODE) {
+		if (range) {
+			nfs->file_offset = range->file_offset;
+			nfs->bytes_to_read = range->bytes_to_read;
+			//nfs->remaining = 0;
+			//nfs->nfs_state = NFS_READ;
+			//nfs_step(nfs);
+		} else {
+			nfs->file_offset = 0;
+			nfs->bytes_to_read = 0;
+			//nfs->nfs_state = NFS_LOOKUP;
+			//nfs_step(nfs);
+		}
+	}
+
+	return 0;
 err_connect:
 	free ( nfs->auth_sys.hostname );
 err_cred:
@@ -676,8 +835,31 @@ err_uri:
 	return rc;
 }
 
+/**
+ * Initiate a NFS connection
+ *
+ * @v xfer		Data transfer interface
+ * @v uri		Uniform Resource Identifier
+ * @ret rc		Return status code
+ */
+static int nfs_open_uri ( struct interface *xfer, struct uri *uri ) {
+	int                     rc;
+	struct nfs_uri      uri_temp;
+	char *hostname_temp;
+
+	rc = nfs_parse_uri( &uri_temp, &hostname_temp,uri );
+	if ( rc != 0 )
+		goto err_uri;
+
+	nfs_open(xfer,&uri_temp,hostname_temp,NFS_READ_ALL,NULL);
+
+	return 0;
+err_uri:
+	return rc;
+}
+
 /** NFS URI opener */
 struct uri_opener nfs_uri_opener __uri_opener = {
 	.scheme	= "nfs",
-	.open	= nfs_open,
+	.open	= nfs_open_uri,
 };
