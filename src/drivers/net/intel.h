@@ -301,6 +301,8 @@ enum intel_flags {
 	INTEL_PBS_ERRATA = 0x0001,
 	/** VMware missing interrupt workaround required */
 	INTEL_VMWARE = 0x0002,
+	/** PHY reset is broken */
+	INTEL_NO_PHY_RST = 0x0004,
 };
 
 /**
