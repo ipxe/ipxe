@@ -212,6 +212,13 @@ typedef unsigned char pseudo_bit_t;
 		   BIT_ASSEMBLE_6 ( _ptr, QWORD_OFFSET ( _ptr, _field1 ),     \
 				    _field1, __VA_ARGS__ ) )
 
+#define BIT_QWORD_PTR( _ptr, _field )					      \
+	( {								      \
+		unsigned int __index = QWORD_OFFSET ( _ptr, _field );	      \
+		uint64_t *__ptr = &(_ptr)->u.qwords[__index];		      \
+		__ptr;							      \
+	} )
+
 /** Extract value of named field */
 #define BIT_GET64( _ptr, _field )					      \
 	( {								      \
