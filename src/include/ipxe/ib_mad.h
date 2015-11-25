@@ -144,6 +144,9 @@ struct ib_port_info {
 #define IB_LINK_SPEED_SDR		0x01
 #define IB_LINK_SPEED_DDR		0x02
 #define IB_LINK_SPEED_QDR		0x04
+#define IB_LINK_SPEED_FDR10		0x08
+#define IB_LINK_SPEED_FDR		0x10
+#define IB_LINK_SPEED_EDR		0x20
 
 #define IB_PORT_STATE_DOWN		0x01
 #define IB_PORT_STATE_INIT		0x02
