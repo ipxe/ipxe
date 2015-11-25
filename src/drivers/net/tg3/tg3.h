@@ -52,7 +52,6 @@
 #define PCI_X_CMD			2       /* Modes & Features */
 #define PCI_X_CMD_ERO			0x0002  /* Enable Relaxed Ordering */
 
-#define PCI_EXP_DEVCTL			8       /* Device Control */
 #define PCI_EXP_DEVCTL_RELAX_EN		0x0010 /* Enable relaxed ordering */
 #define PCI_EXP_DEVCTL_NOSNOOP_EN	0x0800  /* Enable No Snoop */
 #define PCI_EXP_DEVCTL_PAYLOAD		0x00e0  /* Max_Payload_Size */

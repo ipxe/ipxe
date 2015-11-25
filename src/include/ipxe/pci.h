@@ -104,6 +104,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_PM_CTRL_PME_ENABLE		0x0100	/**< PME pin enable */
 #define PCI_PM_CTRL_PME_STATUS		0x8000	/**< PME pin status */
 
+/** PCI Express */
+#define PCI_EXP_DEVCTL		0x08
+#define PCI_EXP_DEVCTL_FLR		0x8000	/**< Function level reset */
+
 /** Uncorrectable error status */
 #define PCI_ERR_UNCOR_STATUS	0x04
 
@@ -127,6 +131,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CLASS( base, sub, progif )					\
 	( ( ( (base) & 0xff ) << 16 ) |	( ( (sub) & 0xff ) << 8 ) |	\
 	  ( ( (progif) & 0xff) << 0 ) )
+
+/** PCI Express function level reset delay (in ms) */
+#define PCI_EXP_FLR_DELAY_MS 100
 
 /** A PCI device ID list entry */
 struct pci_device_id {
