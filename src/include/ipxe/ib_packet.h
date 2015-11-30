@@ -19,6 +19,7 @@ union ib_guid {
 	uint8_t bytes[8];
 	uint16_t words[4];
 	uint32_t dwords[2];
+	uint64_t qword;
 };
 
 /** Infiniband Globally Unique Identifier debug message format */
@@ -33,6 +34,7 @@ union ib_gid {
 	uint8_t bytes[16];
 	uint16_t words[8];
 	uint32_t dwords[4];
+	uint64_t qwords[2];
 	struct {
 		union ib_guid prefix;
 		union ib_guid guid;
