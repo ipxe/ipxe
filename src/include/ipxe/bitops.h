@@ -38,19 +38,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /* Endianness selection.
  *
- * This is a property of the NIC, not a property of the host CPU.
+ * This is a property of the device, not a property of the host CPU.
  */
 #ifdef BITOPS_LITTLE_ENDIAN
 #define cpu_to_BIT64	cpu_to_le64
 #define cpu_to_BIT32	cpu_to_le32
 #define BIT64_to_cpu	le64_to_cpu
 #define BIT32_to_cpu	le32_to_cpu
+#define QWORD_SHIFT( offset, width ) (offset)
 #endif
 #ifdef BITOPS_BIG_ENDIAN
 #define cpu_to_BIT64	cpu_to_be64
 #define cpu_to_BIT32	cpu_to_be32
 #define BIT64_to_cpu	be64_to_cpu
 #define BIT32_to_cpu	be32_to_cpu
+#define QWORD_SHIFT( offset, width ) ( 64 - (offset) - (width) )
 #endif
 
 /** Datatype used to represent a bit in the pseudo-structures */
@@ -93,6 +95,11 @@ typedef unsigned char pseudo_bit_t;
 #define QWORD_BIT_OFFSET( _ptr, _index, _field )			      \
 	( BIT_OFFSET ( _ptr, _field ) - ( 64 * (_index) ) )
 
+/** Qword bit shift for a field within a pseudo_bit_t structure */
+#define QWORD_BIT_SHIFT( _ptr, _index, _field )				      \
+	QWORD_SHIFT ( QWORD_BIT_OFFSET ( _ptr, _index, _field ),	      \
+		      BIT_WIDTH ( _ptr, _field ) )
+
 /** Bit mask for a field within a pseudo_bit_t structure */
 #define BIT_MASK( _ptr, _field )					      \
 	( ( ~( ( uint64_t ) 0 ) ) >>					      \
@@ -105,7 +112,7 @@ typedef unsigned char pseudo_bit_t;
 
 #define BIT_ASSEMBLE_1( _ptr, _index, _field, _value )			      \
 	( ( ( uint64_t) (_value) ) <<					      \
-	  QWORD_BIT_OFFSET ( _ptr, _index, _field ) )
+	  QWORD_BIT_SHIFT ( _ptr, _index, _field ) )
 
 #define BIT_ASSEMBLE_2( _ptr, _index, _field, _value, ... )		      \
 	( BIT_ASSEMBLE_1 ( _ptr, _index, _field, _value ) |		      \
@@ -138,7 +145,7 @@ typedef unsigned char pseudo_bit_t;
 
 #define BIT_MASK_1( _ptr, _index, _field )				      \
 	( BIT_MASK ( _ptr, _field ) <<					      \
-	  QWORD_BIT_OFFSET ( _ptr, _index, _field ) )
+	  QWORD_BIT_SHIFT ( _ptr, _index, _field ) )
 
 #define BIT_MASK_2( _ptr, _index, _field, ... )				      \
 	( BIT_MASK_1 ( _ptr, _index, _field ) |				      \
@@ -165,7 +172,7 @@ typedef unsigned char pseudo_bit_t;
 	  BIT_MASK_6 ( _ptr, _index, __VA_ARGS__ ) )
 
 /*
- * Populate little-endian qwords from named fields and values
+ * Populate device-endian qwords from named fields and values
  *
  */
 
@@ -212,7 +219,7 @@ typedef unsigned char pseudo_bit_t;
 		uint64_t *__ptr = &(_ptr)->u.qwords[__index];		      \
 		uint64_t __value = BIT64_to_cpu ( *__ptr );		      \
 		__value >>=						      \
-		    QWORD_BIT_OFFSET ( _ptr, __index, _field );		      \
+		    QWORD_BIT_SHIFT ( _ptr, __index, _field );		      \
 		__value &= BIT_MASK ( _ptr, _field );			      \
 		__value;						      \
 	} )
@@ -225,7 +232,7 @@ typedef unsigned char pseudo_bit_t;
 		unsigned int __index = QWORD_OFFSET ( _ptr, _field );	      \
 		uint64_t *__ptr = &(_ptr)->u.qwords[__index];		      \
 		unsigned int __shift =					      \
-			QWORD_BIT_OFFSET ( _ptr, __index, _field );	      \
+			QWORD_BIT_SHIFT ( _ptr, __index, _field );	      \
 		uint64_t __value = (_value);				      \
 		*__ptr &= cpu_to_BIT64 ( ~( BIT_MASK ( _ptr, _field ) <<      \
 					    __shift ) );		      \
