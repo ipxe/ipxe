@@ -120,7 +120,7 @@ case "${LEGACY}" in
 		;;
 	0)
 		# copy isolinux bootloader
-		cp ${ISOLINUX_BIN} ${dir}
+		install -m 644 ${ISOLINUX_BIN} ${dir}
 
 		# syslinux 6.x needs a file called ldlinux.c32
 		if [ -n "${LDLINUX_C32}" -a -s "${LDLINUX_C32}" ]; then

@@ -95,6 +95,7 @@ SYSLINUX_DIR_LIST	:= \
 	/usr/share/syslinux/modules/bios \
 	/usr/local/share/syslinux \
 	/usr/local/share/syslinux/bios \
+	/usr/local/share/syslinux/bios/core \
 	/usr/local/share/syslinux/modules/bios \
 	/usr/lib/ISOLINUX
 ISOLINUX_BIN_LIST	:= \
