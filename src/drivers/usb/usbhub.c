@@ -496,9 +496,10 @@ static void hub_remove ( struct usb_function *func ) {
 	unsigned int i;
 
 	/* If hub has been unplugged, mark all ports as unplugged */
-	if ( usb->port->speed == USB_SPEED_NONE ) {
+	if ( usb->port->disconnected ) {
 		for ( i = 1 ; i <= hub->ports ; i++ ) {
 			port = usb_port ( hub, i );
+			port->disconnected = 1;
 			port->speed = USB_SPEED_NONE;
 		}
 	}

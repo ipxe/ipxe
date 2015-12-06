@@ -485,7 +485,7 @@ int usb_message ( struct usb_endpoint *ep, unsigned int request,
 	assert ( iob_headroom ( iobuf ) >= sizeof ( *packet ) );
 
 	/* Fail immediately if device has been unplugged */
-	if ( port->speed == USB_SPEED_NONE )
+	if ( port->disconnected )
 		return -ENODEV;
 
 	/* Reset endpoint if required */
@@ -534,7 +534,7 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 	int rc;
 
 	/* Fail immediately if device has been unplugged */
-	if ( port->speed == USB_SPEED_NONE )
+	if ( port->disconnected )
 		return -ENODEV;
 
 	/* Reset endpoint if required */
@@ -1717,23 +1717,24 @@ static int usb_hotplugged ( struct usb_port *port ) {
 	if ( ( rc = hub->driver->speed ( hub, port ) ) != 0 ) {
 		DBGC ( hub, "USB hub %s port %d could not get speed: %s\n",
 		       hub->name, port->address, strerror ( rc ) );
-		goto err_speed;
+		/* Treat as a disconnection */
+		port->disconnected = 1;
+		port->speed = USB_SPEED_NONE;
 	}
 
 	/* Detach device, if applicable */
 	if ( port->attached && ( port->disconnected || ! port->speed ) )
 		usb_detached ( port );
 
+	/* Clear any recorded disconnections */
+	port->disconnected = 0;
+
 	/* Attach device, if applicable */
 	if ( port->speed && ( ! port->attached ) &&
 	     ( ( rc = usb_attached ( port ) ) != 0 ) )
-		goto err_attached;
+		return rc;
 
- err_attached:
- err_speed:
-	/* Clear any recorded disconnections */
-	port->disconnected = 0;
-	return rc;
+	return 0;
 }
 
 /******************************************************************************
