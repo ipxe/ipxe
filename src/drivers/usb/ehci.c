@@ -970,10 +970,10 @@ static uint32_t ehci_endpoint_characteristics ( struct usb_endpoint *ep ) {
 		chr |= EHCI_CHR_TOGGLE;
 
 	/* Determine endpoint speed */
-	if ( usb->port->speed == USB_SPEED_HIGH ) {
+	if ( usb->speed == USB_SPEED_HIGH ) {
 		chr |= EHCI_CHR_EPS_HIGH;
 	} else {
-		if ( usb->port->speed == USB_SPEED_FULL ) {
+		if ( usb->speed == USB_SPEED_FULL ) {
 			chr |= EHCI_CHR_EPS_FULL;
 		} else {
 			chr |= EHCI_CHR_EPS_LOW;

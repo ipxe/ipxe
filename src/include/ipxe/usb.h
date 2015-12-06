@@ -698,6 +698,8 @@ struct usb_device {
 	char name[32];
 	/** USB port */
 	struct usb_port *port;
+	/** Device speed */
+	unsigned int speed;
 	/** List of devices on this bus */
 	struct list_head list;
 	/** Device address, if assigned */

@@ -243,7 +243,6 @@ int usb_endpoint_described ( struct usb_endpoint *ep,
 			     struct usb_interface_descriptor *interface,
 			     unsigned int type, unsigned int index ) {
 	struct usb_device *usb = ep->usb;
-	struct usb_port *port = usb->port;
 	struct usb_endpoint_descriptor *desc;
 	struct usb_endpoint_companion_descriptor *descx;
 	unsigned int sizes;
@@ -267,7 +266,7 @@ int usb_endpoint_described ( struct usb_endpoint *ep,
 	/* Calculate interval */
 	if ( ( type & USB_ENDPOINT_ATTR_TYPE_MASK ) ==
 	     USB_ENDPOINT_ATTR_INTERRUPT ) {
-		if ( port->speed >= USB_SPEED_HIGH ) {
+		if ( usb->speed >= USB_SPEED_HIGH ) {
 			/* 2^(desc->interval-1) is a microframe count */
 			interval = ( 1 << ( desc->interval - 1 ) );
 		} else {
@@ -1492,8 +1491,9 @@ static int register_usb ( struct usb_device *usb ) {
 		       hub->name, port->address, strerror ( rc ) );
 		goto err_speed;
 	}
+	usb->speed = port->speed;
 	DBGC2 ( usb, "USB %s attached as %s-speed device\n",
-		usb->name, usb_speed_name ( port->speed ) );
+		usb->name, usb_speed_name ( usb->speed ) );
 
 	/* Open device */
 	if ( ( rc = usb->host->open ( usb ) ) != 0 ) {
@@ -1503,7 +1503,7 @@ static int register_usb ( struct usb_device *usb ) {
 	}
 
 	/* Describe control endpoint */
-	mtu = USB_EP0_DEFAULT_MTU ( port->speed );
+	mtu = USB_EP0_DEFAULT_MTU ( usb->speed );
 	usb_endpoint_describe ( &usb->control, USB_EP0_ADDRESS,
 				USB_EP0_ATTRIBUTES, mtu, USB_EP0_BURST,
 				USB_EP0_INTERVAL );
@@ -1554,7 +1554,7 @@ static int register_usb ( struct usb_device *usb ) {
 	       le16_to_cpu ( usb->device.product ), usb->device.class.class,
 	       usb->device.class.subclass, usb->device.class.protocol,
 	       usb_bcd ( le16_to_cpu ( usb->device.protocol ) ),
-	       usb_speed_name ( port->speed ), usb->control.mtu );
+	       usb_speed_name ( usb->speed ), usb->control.mtu );
 
 	/* Configure device */
 	if ( ( rc = usb_autoconfigure ( usb ) ) != 0 )
@@ -2233,12 +2233,12 @@ struct usb_port * usb_transaction_translator ( struct usb_device *usb ) {
 	struct usb_device *parent;
 
 	/* Navigate up to root hub.  If we find a low-speed or
-	 * full-speed port with a higher-speed parent device, then
-	 * that port is the transaction translator.
+	 * full-speed device with a higher-speed parent hub, then that
+	 * device's port is the transaction translator.
 	 */
 	for ( ; ( parent = usb->port->hub->usb ) ; usb = parent ) {
-		if ( ( usb->port->speed <= USB_SPEED_FULL ) &&
-		     ( parent->port->speed > USB_SPEED_FULL ) )
+		if ( ( usb->speed <= USB_SPEED_FULL ) &&
+		     ( parent->speed > USB_SPEED_FULL ) )
 			return usb->port;
 	}
 

@@ -2753,7 +2753,6 @@ static void xhci_device_close ( struct usb_device *usb ) {
 static int xhci_device_address ( struct usb_device *usb ) {
 	struct xhci_slot *slot = usb_get_hostdata ( usb );
 	struct xhci_device *xhci = slot->xhci;
-	struct usb_port *port = usb->port;
 	struct usb_port *root_port;
 	int psiv;
 	int rc;
@@ -2766,7 +2765,7 @@ static int xhci_device_address ( struct usb_device *usb ) {
 	slot->port = root_port->address;
 
 	/* Calculate protocol speed ID */
-	psiv = xhci_port_psiv ( xhci, slot->port, port->speed );
+	psiv = xhci_port_psiv ( xhci, slot->port, usb->speed );
 	if ( psiv < 0 ) {
 		rc = psiv;
 		return rc;
