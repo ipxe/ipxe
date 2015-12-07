@@ -2606,6 +2606,12 @@ static int xhci_endpoint_stream ( struct usb_endpoint *ep,
 		len -= trb_len;
 		trb++;
 	}
+
+	/* Mark zero-length packet (if present) as a separate transfer */
+	if ( zlp && ( count > 1 ) )
+		trb[-2].normal.flags = 0;
+
+	/* Generate completion for final TRB */
 	trb[-1].normal.flags = XHCI_TRB_IOC;
 
 	/* Enqueue TRBs */
