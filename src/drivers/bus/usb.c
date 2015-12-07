@@ -1186,6 +1186,11 @@ static int usb_probe ( struct usb_function *func,
 		return -ENOENT;
 	}
 
+	/* Record driver */
+	func->driver = driver;
+	func->id = id;
+	func->dev.driver_name = id->name;
+
 	/* Probe driver */
 	if ( ( rc = driver->probe ( func, config ) ) != 0 ) {
 		DBGC ( usb, "USB %s failed to probe driver %s: %s\n",
@@ -1193,9 +1198,6 @@ static int usb_probe ( struct usb_function *func,
 		return rc;
 	}
 
-	/* Record driver */
-	func->driver = driver;
-	func->dev.driver_name = id->name;
 	return 0;
 }
 

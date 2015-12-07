@@ -662,6 +662,8 @@ struct usb_function {
 	struct usb_driver *driver;
 	/** Driver private data */
 	void *priv;
+	/** Driver device ID */
+	struct usb_device_id *id;
 
 	/** List of interface numbers
 	 *
@@ -1308,6 +1310,8 @@ struct usb_device_id {
 	uint16_t vendor;
 	/** Product ID */
 	uint16_t product;
+	/** Arbitrary driver data */
+	unsigned long driver_data;
 };
 
 /** Match-anything ID */
