@@ -960,13 +960,13 @@ DRIVERS_ipxe	= $(DRIVERS_net) $(DRIVERS_infiniband) \
 # TGT_DRIVERS  : the driver for each element (e.g. "rtl8139 prism2_pci")
 # TGT_ROM_NAME : the ROM name (e.g. "dfe538")
 #
-CARD_DRIVER	= $(firstword $(DRIVER_$(1)) $(1))
 TGT_ELEMENTS	= $(subst --, ,$(firstword $(subst ., ,$(notdir $@))))
 TGT_ROM_NAME	= $(firstword $(TGT_ELEMENTS))
-TGT_DRIVERS	= $(strip $(if $(DRIVERS_$(TGT_ROM_NAME)), \
-			       $(DRIVERS_$(TGT_ROM_NAME)), \
-			       $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
-			         $(call CARD_DRIVER,$(TGT_ELEMENT))) ))
+TGT_DRIVERS	= $(strip $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
+				    $(if $(DRIVERS_$(TGT_ELEMENT)), \
+					 $(DRIVERS_$(TGT_ELEMENT)), \
+					 $(firstword $(DRIVER_$(TGT_ELEMENT)) \
+						     $(TGT_ELEMENT)))))
 TGT_PREFIX_NAME	= $(word 2,$(subst ., ,$(notdir $@)))
 TGT_PREFIX	= $(strip $(if $(filter rom,$(TGT_PREFIX_NAME)), \
 			       $(ROM_TYPE_$(TGT_ROM_NAME))rom, \
