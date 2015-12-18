@@ -26,9 +26,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <realmode.h>
 #include <bios.h>
+#include <biosint.h>
 #include <ipxe/console.h>
 #include <ipxe/ansiesc.h>
+#include <ipxe/keys.h>
 #include <ipxe/keymap.h>
+#include <ipxe/init.h>
 #include <config/console.h>
 
 #define ATTR_BOLD		0x08
@@ -65,6 +68,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Current character attribute */
 static unsigned int bios_attr = ATTR_DEFAULT;
+
+/** Keypress injection lock */
+static uint8_t __text16 ( bios_inject_lock );
+#define bios_inject_lock __use_text16 ( bios_inject_lock )
+
+/** Vector for chaining to other INT 16 handlers */
+static struct segoff __text16 ( int16_vector );
+#define int16_vector __use_text16 ( int16_vector )
+
+/** Assembly wrapper */
+extern void int16_wrapper ( void );
 
 /**
  * Handle ANSI CUP (cursor position)
@@ -265,30 +279,35 @@ static void bios_putchar ( int character ) {
  * not in the middle of such a sequence, this will point to a NUL
  * (note: not "will be NULL").
  */
-static const char *ansi_input = "";
+static const char *bios_ansi_input = "";
 
-/** A mapping from a BIOS scan code to an ANSI escape sequence */
-#define BIOS_KEY( key, ansi ) key ansi "\0"
+/** A BIOS key */
+struct bios_key {
+	/** Scancode */
+	uint8_t scancode;
+	/** Key code */
+	uint16_t key;
+} __attribute__ (( packed ));
 
-/** Mapping from BIOS scan codes to ANSI escape sequences */
-static const char ansi_sequences[] = {
-	BIOS_KEY ( "\x53", "[3~" )	/* Delete */
-	BIOS_KEY ( "\x48", "[A" )	/* Up arrow */
-	BIOS_KEY ( "\x50", "[B" )	/* Down arrow */
-	BIOS_KEY ( "\x4b", "[D" )	/* Left arrow */
-	BIOS_KEY ( "\x4d", "[C" )	/* Right arrow */
-	BIOS_KEY ( "\x47", "[H" )	/* Home */
-	BIOS_KEY ( "\x4f", "[F" )	/* End */
-	BIOS_KEY ( "\x49", "[5~" )	/* Page up */
-	BIOS_KEY ( "\x51", "[6~" )	/* Page down */
-	BIOS_KEY ( "\x3f", "[15~" )	/* F5 */
-	BIOS_KEY ( "\x40", "[17~" )	/* F6 */
-	BIOS_KEY ( "\x41", "[18~" )	/* F7 */
-	BIOS_KEY ( "\x42", "[19~" )	/* F8 (required for PXE) */
-	BIOS_KEY ( "\x43", "[20~" )	/* F9 */
-	BIOS_KEY ( "\x44", "[21~" )	/* F10 */
-	BIOS_KEY ( "\x85", "[23~" )	/* F11 */
-	BIOS_KEY ( "\x86", "[24~" )	/* F12 */
+/** Mapping from BIOS scan codes to iPXE key codes */
+static const struct bios_key bios_keys[] = {
+	{ 0x53, KEY_DC },
+	{ 0x48, KEY_UP },
+	{ 0x50, KEY_DOWN },
+	{ 0x4b, KEY_LEFT },
+	{ 0x4d, KEY_RIGHT },
+	{ 0x47, KEY_HOME },
+	{ 0x4f, KEY_END },
+	{ 0x49, KEY_PPAGE },
+	{ 0x51, KEY_NPAGE },
+	{ 0x3f, KEY_F5 },
+	{ 0x40, KEY_F6 },
+	{ 0x41, KEY_F7 },
+	{ 0x42, KEY_F8 },
+	{ 0x43, KEY_F9 },
+	{ 0x44, KEY_F10 },
+	{ 0x85, KEY_F11 },
+	{ 0x86, KEY_F12 },
 };
 
 /**
@@ -297,14 +316,35 @@ static const char ansi_sequences[] = {
  * @v scancode		BIOS scancode
  * @ret ansi_seq	ANSI escape sequence, if any, otherwise NULL
  */
-static const char * scancode_to_ansi_seq ( unsigned int scancode ) {
-	const char *seq = ansi_sequences;
+static const char * bios_ansi_seq ( unsigned int scancode ) {
+	static char buf[ 5 /* "[" + two digits + terminator + NUL */ ];
+	unsigned int key;
+	unsigned int terminator;
+	unsigned int n;
+	unsigned int i;
+	char *tmp = buf;
 
-	while ( *seq ) {
-		if ( *(seq++) == ( ( char ) scancode ) )
-			return seq;
-		seq += ( strlen ( seq ) + 1 );
+	/* Construct ANSI escape sequence for scancode, if known */
+	for ( i = 0 ; i < ( sizeof ( bios_keys ) /
+			    sizeof ( bios_keys[0] ) ) ; i++ ) {
+
+		/* Look for matching scancode */
+		if ( bios_keys[i].scancode != scancode )
+			continue;
+
+		/* Construct escape sequence */
+		key = bios_keys[i].key;
+		n = KEY_ANSI_N ( key );
+		terminator = KEY_ANSI_TERMINATOR ( key );
+		*(tmp++) = '[';
+		if ( n )
+			tmp += sprintf ( tmp, "%d", n );
+		*(tmp++) = terminator;
+		*(tmp++) = '\0';
+		assert ( tmp <= &buf[ sizeof ( buf ) ] );
+		return buf;
 	}
+
 	DBG ( "Unrecognised BIOS scancode %02x\n", scancode );
 	return NULL;
 }
@@ -336,16 +376,23 @@ static int bios_getchar ( void ) {
 	const char *ansi_seq;
 
 	/* If we are mid-sequence, pass out the next byte */
-	if ( ( character = *ansi_input ) ) {
-		ansi_input++;
+	if ( ( character = *bios_ansi_input ) ) {
+		bios_ansi_input++;
 		return character;
 	}
 
+	/* Do nothing if injection is in progress */
+	if ( bios_inject_lock )
+		return 0;
+
 	/* Read character from real BIOS console */
+	bios_inject_lock++;
 	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
 					   "int $0x16\n\t"
 					   "cli\n\t" )
-			       : "=a" ( keypress ) : "a" ( 0x1000 ) );
+			       : "=a" ( keypress )
+			       : "a" ( 0x1000 ), "m" ( bios_inject_lock ) );
+	bios_inject_lock--;
 	character = ( keypress & 0xff );
 
 	/* If it's a normal character, just map and return it */
@@ -353,9 +400,9 @@ static int bios_getchar ( void ) {
 		return bios_keymap ( character );
 
 	/* Otherwise, check for a special key that we know about */
-	if ( ( ansi_seq = scancode_to_ansi_seq ( keypress >> 8 ) ) ) {
+	if ( ( ansi_seq = bios_ansi_seq ( keypress >> 8 ) ) ) {
 		/* Start of escape sequence: return ESC (0x1b) */
-		ansi_input = ansi_seq;
+		bios_ansi_input = ansi_seq;
 		return 0x1b;
 	}
 
@@ -373,23 +420,147 @@ static int bios_iskey ( void ) {
 	unsigned int flags;
 
 	/* If we are mid-sequence, we are always ready */
-	if ( *ansi_input )
+	if ( *bios_ansi_input )
 		return 1;
 
+	/* Do nothing if injection is in progress */
+	if ( bios_inject_lock )
+		return 0;
+
 	/* Otherwise check the real BIOS console */
+	bios_inject_lock++;
 	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
 					   "int $0x16\n\t"
 					   "pushfw\n\t"
 					   "popw %w0\n\t"
 					   "cli\n\t" )
 			       : "=r" ( flags ), "=a" ( discard_a )
-			       : "a" ( 0x1100 ) );
+			       : "a" ( 0x1100 ), "m" ( bios_inject_lock ) );
+	bios_inject_lock--;
 	return ( ! ( flags & ZF ) );
 }
 
+/** BIOS console */
 struct console_driver bios_console __console_driver = {
 	.putchar = bios_putchar,
 	.getchar = bios_getchar,
 	.iskey = bios_iskey,
 	.usage = CONSOLE_PCBIOS,
+};
+
+/**
+ * Inject keypresses
+ *
+ * @v ix86		Registers as passed to INT 16
+ */
+static __asmcall void bios_inject ( struct i386_all_regs *ix86 ) {
+	unsigned int discard_a;
+	unsigned int scancode;
+	unsigned int i;
+	uint16_t keypress;
+	int key;
+
+	/* If this is a blocking call, then loop until the
+	 * non-blocking variant of the call indicates that a keypress
+	 * is available.  Do this without acquiring the injection
+	 * lock, so that injection may take place.
+	 */
+	if ( ( ix86->regs.ah & ~0x10 ) == 0x00 ) {
+		__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
+						   "\n1:\n\t"
+						   "pushw %%ax\n\t"
+						   "int $0x16\n\t"
+						   "popw %%ax\n\t"
+						   "jc 2f\n\t"
+						   "jz 1b\n\t"
+						   "\n2:\n\t"
+						   "cli\n\t" )
+				       : "=a" ( discard_a )
+				       : "a" ( ix86->regs.eax | 0x0100 ),
+					 "m" ( bios_inject_lock ) );
+	}
+
+	/* Acquire injection lock */
+	bios_inject_lock++;
+
+	/* Check for keypresses */
+	if ( iskey() ) {
+
+		/* Get key */
+		key = getkey ( 0 );
+
+		/* Reverse internal CR->LF mapping */
+		if ( key == '\n' )
+			key = '\r';
+
+		/* Convert to keypress */
+		keypress = ( ( key << 8 ) | key );
+
+		/* Handle special keys */
+		if ( key >= KEY_MIN ) {
+			for ( i = 0 ; i < ( sizeof ( bios_keys ) /
+					    sizeof ( bios_keys[0] ) ) ; i++ ) {
+				if ( bios_keys[i].key == key ) {
+					scancode = bios_keys[i].scancode;
+					keypress = ( scancode << 8 );
+					break;
+				}
+			}
+		}
+
+		/* Inject keypress */
+		DBGC ( &bios_console, "BIOS injecting keypress %04x\n",
+		       keypress );
+		__asm__ __volatile__ ( REAL_CODE ( "int $0x16\n\t" )
+				       : "=a" ( discard_a )
+				       : "a" ( 0x0500 ), "c" ( keypress ),
+					 "m" ( bios_inject_lock ) );
+	}
+
+	/* Release injection lock */
+	bios_inject_lock--;
+}
+
+/**
+ * Start up keypress injection
+ *
+ */
+static void bios_inject_startup ( void ) {
+
+	/* Assembly wrapper to call bios_inject() */
+	__asm__ __volatile__ (
+		TEXT16_CODE ( "\nint16_wrapper:\n\t"
+			      "pushfw\n\t"
+			      "cmpb $0, %%cs:bios_inject_lock\n\t"
+			      "jnz 1f\n\t"
+			      "pushl %0\n\t"
+			      "pushw %%cs\n\t"
+			      "call prot_call\n\t"
+			      "addw $4, %%sp\n\t"
+			      "\n1:\n\t"
+			      "popfw\n\t"
+			      "ljmp *%%cs:int16_vector\n\t" )
+		: : "i" ( bios_inject ) );
+
+	/* Hook INT 16 */
+	hook_bios_interrupt ( 0x16, ( ( unsigned int ) int16_wrapper ),
+			      &int16_vector );
+}
+
+/**
+ * Shut down keypress injection
+ *
+ * @v booting		System is shutting down for OS boot
+ */
+static void bios_inject_shutdown ( int booting __unused ) {
+
+	/* Unhook INT 16 */
+	unhook_bios_interrupt ( 0x16, ( ( unsigned int ) int16_wrapper ),
+				&int16_vector );
+}
+
+/** Keypress injection startup function */
+struct startup_fn bios_inject_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.startup = bios_inject_startup,
+	.shutdown = bios_inject_shutdown,
 };
