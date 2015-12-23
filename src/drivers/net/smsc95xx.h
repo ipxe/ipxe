@@ -251,4 +251,7 @@ struct smsc95xx_device {
 	  ETH_FRAME_LEN + 4 /* possible VLAN header */		\
 	  + 4 /* CRC */ )
 
+/** Honeywell VM3 MAC address OEM string index */
+#define SMSC95XX_VM3_OEM_STRING_MAC 2
+
 #endif /* _SMSC95XX_H */

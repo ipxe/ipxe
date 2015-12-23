@@ -31,6 +31,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/usb.h>
 #include <ipxe/usbnet.h>
 #include <ipxe/profile.h>
+#include <ipxe/base16.h>
+#include <ipxe/smbios.h>
 #include "smsc95xx.h"
 
 /** @file
@@ -279,6 +281,111 @@ static int smsc95xx_fetch_mac_eeprom ( struct smsc95xx_device *smsc95xx,
 		return -ENODEV;
 	}
 
+	DBGC ( smsc95xx, "SMSC95XX %p using EEPROM MAC %s\n",
+	       smsc95xx, eth_ntoa ( hw_addr ) );
+	return 0;
+}
+
+/**
+ * Construct MAC address for Honeywell VM3
+ *
+ * @v smsc95xx		SMSC95xx device
+ * @v hw_addr		Hardware address to fill in
+ * @ret rc		Return status code
+ */
+static int smsc95xx_fetch_mac_vm3 ( struct smsc95xx_device *smsc95xx,
+				    uint8_t *hw_addr ) {
+	struct smbios_structure structure;
+	struct smbios_system_information system;
+	struct {
+		char manufacturer[ 10 /* "Honeywell" + NUL */ ];
+		char product[ 4 /* "VM3" + NUL */ ];
+		char mac[ base16_encoded_len ( ETH_ALEN ) + 1 /* NUL */ ];
+	} strings;
+	int len;
+	int rc;
+
+	/* Find system information */
+	if ( ( rc = find_smbios_structure ( SMBIOS_TYPE_SYSTEM_INFORMATION, 0,
+					    &structure ) ) != 0 ) {
+		DBGC ( smsc95xx, "SMSC95XX %p could not find system "
+		       "information: %s\n", smsc95xx, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Read system information */
+	if ( ( rc = read_smbios_structure ( &structure, &system,
+					    sizeof ( system ) ) ) != 0 ) {
+		DBGC ( smsc95xx, "SMSC95XX %p could not read system "
+		       "information: %s\n", smsc95xx, strerror ( rc ) );
+		return rc;
+	}
+
+	/* NUL-terminate all strings to be fetched */
+	memset ( &strings, 0, sizeof ( strings ) );
+
+	/* Fetch system manufacturer name */
+	len = read_smbios_string ( &structure, system.manufacturer,
+				   strings.manufacturer,
+				   ( sizeof ( strings.manufacturer ) - 1 ) );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( smsc95xx, "SMSC95XX %p could not read manufacturer "
+		       "name: %s\n", smsc95xx, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Fetch system product name */
+	len = read_smbios_string ( &structure, system.product, strings.product,
+				   ( sizeof ( strings.product ) - 1 ) );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( smsc95xx, "SMSC95XX %p could not read product name: "
+		       "%s\n", smsc95xx, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Ignore non-VM3 devices */
+	if ( ( strcmp ( strings.manufacturer, "Honeywell" ) != 0 ) ||
+	     ( strcmp ( strings.product, "VM3" ) != 0 ) )
+		return -ENOTTY;
+
+	/* Find OEM strings */
+	if ( ( rc = find_smbios_structure ( SMBIOS_TYPE_OEM_STRINGS, 0,
+					    &structure ) ) != 0 ) {
+		DBGC ( smsc95xx, "SMSC95XX %p could not find OEM strings: %s\n",
+		       smsc95xx, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Fetch MAC address */
+	len = read_smbios_string ( &structure, SMSC95XX_VM3_OEM_STRING_MAC,
+				   strings.mac, ( sizeof ( strings.mac ) - 1 ));
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( smsc95xx, "SMSC95XX %p could not read OEM string: %s\n",
+		       smsc95xx, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Sanity check */
+	if ( len != ( ( int ) ( sizeof ( strings.mac ) - 1 ) ) ) {
+		DBGC ( smsc95xx, "SMSC95XX %p invalid MAC address \"%s\"\n",
+		       smsc95xx, strings.mac );
+		return -EINVAL;
+	}
+
+	/* Decode MAC address */
+	len = base16_decode ( strings.mac, hw_addr, ETH_ALEN );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( smsc95xx, "SMSC95XX %p invalid MAC address \"%s\"\n",
+		       smsc95xx, strings.mac );
+		return rc;
+	}
+
+	DBGC ( smsc95xx, "SMSC95XX %p using VM3 MAC %s\n",
+	       smsc95xx, eth_ntoa ( hw_addr ) );
 	return 0;
 }
 
@@ -297,8 +404,14 @@ static int smsc95xx_fetch_mac ( struct smsc95xx_device *smsc95xx,
 	if ( ( rc = smsc95xx_fetch_mac_eeprom ( smsc95xx, hw_addr ) ) == 0 )
 		return 0;
 
+	/* Construct MAC address for Honeywell VM3, if applicable */
+	if ( ( rc = smsc95xx_fetch_mac_vm3 ( smsc95xx, hw_addr ) ) == 0 )
+		return 0;
+
 	/* Otherwise, generate a random MAC address */
 	eth_random_addr ( hw_addr );
+	DBGC ( smsc95xx, "SMSC95XX %p using random MAC %s\n",
+	       smsc95xx, eth_ntoa ( hw_addr ) );
 	return 0;
 }
 
