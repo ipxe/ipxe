@@ -251,6 +251,59 @@ static int smsc95xx_eeprom_read ( struct smsc95xx_device *smsc95xx,
 
 /******************************************************************************
  *
+ * MAC address
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Fetch MAC address from EEPROM
+ *
+ * @v smsc95xx		SMSC95xx device
+ * @v hw_addr		Hardware address to fill in
+ * @ret rc		Return status code
+ */
+static int smsc95xx_fetch_mac_eeprom ( struct smsc95xx_device *smsc95xx,
+				       uint8_t *hw_addr ) {
+	int rc;
+
+	/* Read MAC address from EEPROM */
+	if ( ( rc = smsc95xx_eeprom_read ( smsc95xx, SMSC95XX_EEPROM_MAC,
+					   hw_addr, ETH_ALEN ) ) != 0 )
+		return rc;
+
+	/* Check that EEPROM is physically present */
+	if ( ! is_valid_ether_addr ( hw_addr ) ) {
+		DBGC ( smsc95xx, "SMSC95XX %p has no EEPROM (%s)\n",
+		       smsc95xx, eth_ntoa ( hw_addr ) );
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+/**
+ * Fetch MAC address
+ *
+ * @v smsc95xx		SMSC95xx device
+ * @v hw_addr		Hardware address to fill in
+ * @ret rc		Return status code
+ */
+static int smsc95xx_fetch_mac ( struct smsc95xx_device *smsc95xx,
+				uint8_t *hw_addr ) {
+	int rc;
+
+	/* Read MAC address from EEPROM, if present */
+	if ( ( rc = smsc95xx_fetch_mac_eeprom ( smsc95xx, hw_addr ) ) == 0 )
+		return 0;
+
+	/* Otherwise, generate a random MAC address */
+	eth_random_addr ( hw_addr );
+	return 0;
+}
+
+/******************************************************************************
+ *
  * MII access
  *
  ******************************************************************************
@@ -980,16 +1033,8 @@ static int smsc95xx_probe ( struct usb_function *func,
 		goto err_reset;
 
 	/* Read MAC address */
-	if ( ( rc = smsc95xx_eeprom_read ( smsc95xx, SMSC95XX_EEPROM_MAC,
-					   netdev->hw_addr, ETH_ALEN ) ) != 0 )
-		goto err_eeprom_read;
-
-	/* Generate MAC address if EEPROM is not present */
-	if ( ! is_valid_ether_addr ( netdev->hw_addr ) ) {
-		DBGC ( smsc95xx, "SMSC95XX %p has no EEPROM (%s)\n",
-		       smsc95xx, eth_ntoa ( netdev->hw_addr ) );
-		eth_random_addr ( netdev->hw_addr );
-	}
+	if ( ( rc = smsc95xx_fetch_mac ( smsc95xx, netdev->hw_addr ) ) != 0 )
+		goto err_fetch_mac;
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
@@ -1000,7 +1045,7 @@ static int smsc95xx_probe ( struct usb_function *func,
 
 	unregister_netdev ( netdev );
  err_register:
- err_eeprom_read:
+ err_fetch_mac:
  err_reset:
  err_describe:
 	netdev_nullify ( netdev );
