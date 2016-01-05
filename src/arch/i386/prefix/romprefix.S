@@ -123,7 +123,7 @@ pci_devlist_end:
 	.long	pciheader_image_length
 	.long	512
 	.long	0
-	.ascii	ZINFO_TYPE_ADxW
+	.ascii	"ADHW"
 	.long	pciheader_runtime_length
 	.long	512
 	.long	0
@@ -435,13 +435,25 @@ no_pmm:
 	 * memory.  Will be a no-op for lower PCI versions.
 	 */
 .ifeqs	BUSTYPE, "PCIR"
+	/* Get runtime segment address and length */
+	movw	%gs, %ax
+	movw	%ax, %es
+	movzbw	romheader_size, %cx
+	/* Print runtime segment address */
 	xorw	%di, %di
 	call	print_space
-	movw	%gs, %ax
 	call	print_hex_word
-	movzbw	romheader_size, %cx
+	/* Fail if we have insufficient space in final location */
+	movw	%cs, %si
+	cmpw	%si, %ax
+	je	1f
+	cmpw	pciheader_runtime_length, %cx
+	jbe	1f
+	movb	$( '!' ), %al
+	call	print_character
+	xorw	%cx, %cx
+1:	/* Copy to final location */
 	shlw	$9, %cx
-	movw	%ax, %es
 	xorw	%si, %si
 	xorw	%di, %di
 	cs rep	movsb
