@@ -33,6 +33,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	( USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE |		\
 	  USB_REQUEST_TYPE ( 0x0a ) )
 
+/** Set report */
+#define USBHID_SET_REPORT						\
+	( USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE |		\
+	  USB_REQUEST_TYPE ( 0x09 ) )
+
+/** Input report type */
+#define USBHID_REPORT_INPUT 0x01
+
+/** Output report type */
+#define USBHID_REPORT_OUTPUT 0x02
+
+/** Feature report type */
+#define USBHID_REPORT_FEATURE 0x03
+
 /** A USB human interface device */
 struct usb_hid {
 	/** USB function */
@@ -95,6 +109,26 @@ usbhid_set_idle ( struct usb_device *usb, unsigned int interface,
 	return usb_control ( usb, USBHID_SET_IDLE,
 			     ( ( duration << 8 ) | report ),
 			     interface, NULL, 0 );
+}
+
+/**
+ * Set report
+ *
+ * @v usb		USB device
+ * @v interface		Interface number
+ * @v type		Report type
+ * @v report		Report ID
+ * @v data		Report data
+ * @v len		Length of report data
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+usbhid_set_report ( struct usb_device *usb, unsigned int interface,
+		    unsigned int type, unsigned int report, void *data,
+		    size_t len ) {
+
+	return usb_control ( usb, USBHID_SET_REPORT, ( ( type << 8 ) | report ),
+			     interface, data, len );
 }
 
 extern int usbhid_open ( struct usb_hid *hid );
