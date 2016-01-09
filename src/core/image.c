@@ -88,7 +88,6 @@ static void free_image ( struct refcnt *refcnt ) {
  * @ret image		Executable image
  */
 struct image * alloc_image ( struct uri *uri ) {
-	const char *name;
 	struct image *image;
 	int rc;
 
@@ -99,21 +98,40 @@ struct image * alloc_image ( struct uri *uri ) {
 
 	/* Initialise image */
 	ref_init ( &image->refcnt, free_image );
-	if ( uri ) {
-		image->uri = uri_get ( uri );
-		if ( uri->path ) {
-			name = basename ( ( char * ) uri->path );
-			if ( ( rc = image_set_name ( image, name ) ) != 0 )
-				goto err_set_name;
-		}
-	}
+	if ( uri && ( ( rc = image_set_uri ( image, uri ) ) != 0 ) )
+		goto err_set_uri;
 
 	return image;
 
- err_set_name:
+ err_set_uri:
 	image_put ( image );
  err_alloc:
 	return NULL;
+}
+
+/**
+ * Set image URI
+ *
+ * @v image		Image
+ * @v uri		New image URI
+ * @ret rc		Return status code
+ */
+int image_set_uri ( struct image *image, struct uri *uri ) {
+	const char *name;
+	int rc;
+
+	/* Set name, if image does not already have one */
+	if ( uri->path && ( ! ( image->name && image->name[0] ) ) ) {
+		name = basename ( ( char * ) uri->path );
+		if ( ( rc = image_set_name ( image, name ) ) != 0 )
+			return rc;
+	}
+
+	/* Update image URI */
+	uri_put ( image->uri );
+	image->uri = uri_get ( uri );
+
+	return 0;
 }
 
 /**
