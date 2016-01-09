@@ -685,6 +685,51 @@ int http_open ( struct interface *xfer, struct http_method *method,
 }
 
 /**
+ * Redirect HTTP transaction
+ *
+ * @v http		HTTP transaction
+ * @v location		New location
+ * @ret rc		Return status code
+ */
+static int http_redirect ( struct http_transaction *http,
+			   const char *location ) {
+	struct uri *location_uri;
+	struct uri *resolved_uri;
+	int rc;
+
+	DBGC2 ( http, "HTTP %p redirecting to \"%s\"\n", http, location );
+
+	/* Parse location URI */
+	location_uri = parse_uri ( location );
+	if ( ! location_uri ) {
+		rc = -ENOMEM;
+		goto err_parse_uri;
+	}
+
+	/* Resolve as relative to original URI */
+	resolved_uri = resolve_uri ( http->uri, location_uri );
+	if ( ! resolved_uri ) {
+		rc = -ENOMEM;
+		goto err_resolve_uri;
+	}
+
+	/* Redirect to new URI */
+	if ( ( rc = xfer_redirect ( &http->xfer, LOCATION_URI,
+				    resolved_uri ) ) != 0 ) {
+		DBGC ( http, "HTTP %p could not redirect: %s\n",
+		       http, strerror ( rc ) );
+		goto err_redirect;
+	}
+
+ err_redirect:
+	uri_put ( resolved_uri );
+ err_resolve_uri:
+	uri_put ( location_uri );
+ err_parse_uri:
+	return rc;
+}
+
+/**
  * Handle successful transfer completion
  *
  * @v http		HTTP transaction
@@ -717,14 +762,8 @@ static int http_transfer_complete ( struct http_transaction *http ) {
 
 	/* Perform redirection, if applicable */
 	if ( ( location = http->response.location ) ) {
-		DBGC2 ( http, "HTTP %p redirecting to \"%s\"\n",
-			http, location );
-		if ( ( rc = xfer_redirect ( &http->xfer, LOCATION_URI_STRING,
-					    location ) ) != 0 ) {
-			DBGC ( http, "HTTP %p could not redirect: %s\n",
-			       http, strerror ( rc ) );
+		if ( ( rc = http_redirect ( http, location ) ) != 0 )
 			return rc;
-		}
 		http_close ( http, 0 );
 		return 0;
 	}
