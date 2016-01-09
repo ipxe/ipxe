@@ -136,9 +136,9 @@ static int downloader_progress ( struct downloader *downloader,
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int downloader_xfer_deliver ( struct downloader *downloader,
-				     struct io_buffer *iobuf,
-				     struct xfer_metadata *meta ) {
+static int downloader_deliver ( struct downloader *downloader,
+				struct io_buffer *iobuf,
+				struct xfer_metadata *meta ) {
 	int rc;
 
 	/* Add data to buffer */
@@ -160,16 +160,51 @@ static int downloader_xfer_deliver ( struct downloader *downloader,
  * @ret xferbuf		Data transfer buffer, or NULL on error
  */
 static struct xfer_buffer *
-downloader_xfer_buffer ( struct downloader *downloader ) {
+downloader_buffer ( struct downloader *downloader ) {
 
 	/* Provide direct access to underlying data transfer buffer */
 	return &downloader->buffer;
 }
 
+/**
+ * Redirect data transfer interface
+ *
+ * @v downloader	Downloader
+ * @v type		New location type
+ * @v args		Remaining arguments depend upon location type
+ * @ret rc		Return status code
+ */
+static int downloader_vredirect ( struct downloader *downloader, int type,
+				  va_list args ) {
+	va_list tmp;
+	struct uri *uri;
+	int rc;
+
+	/* Intercept redirects to a LOCATION_URI and update the image URI */
+	if ( type == LOCATION_URI ) {
+
+		/* Extract URI argument */
+		va_copy ( tmp, args );
+		uri = va_arg ( tmp, struct uri * );
+		va_end ( tmp );
+
+		/* Set image URI */
+		if ( ( rc = image_set_uri ( downloader->image, uri ) ) != 0 )
+			return rc;
+	}
+
+	/* Redirect to new location */
+	if ( ( rc = xfer_vreopen ( &downloader->xfer, type, args ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
 /** Downloader data transfer interface operations */
 static struct interface_operation downloader_xfer_operations[] = {
-	INTF_OP ( xfer_deliver, struct downloader *, downloader_xfer_deliver ),
-	INTF_OP ( xfer_buffer, struct downloader *, downloader_xfer_buffer ),
+	INTF_OP ( xfer_deliver, struct downloader *, downloader_deliver ),
+	INTF_OP ( xfer_buffer, struct downloader *, downloader_buffer ),
+	INTF_OP ( xfer_vredirect, struct downloader *, downloader_vredirect ),
 	INTF_OP ( intf_close, struct downloader *, downloader_finished ),
 };
 
