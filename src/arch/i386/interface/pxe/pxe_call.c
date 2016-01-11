@@ -307,8 +307,8 @@ int pxe_deactivate ( void ) {
 		if ( ( rc = unhook_bios_interrupt ( 0x1a,
 						    (unsigned int) pxe_int_1a,
 						    &pxe_int_1a_vector ))!= 0){
-			DBG ( "Could not unhook INT 1A: %s\n",
-			      strerror ( rc ) );
+			DBGC ( &pxe_netdev, "PXE could not unhook INT 1A: %s\n",
+			       strerror ( rc ) );
 			return rc;
 		}
 		devices_put();
@@ -334,7 +334,7 @@ int pxe_start_nbp ( void ) {
 	/* Allow restarting NBP via PXENV_RESTART_TFTP */
 	jmp = rmsetjmp ( pxe_restart_nbp );
 	if ( jmp )
-		DBG ( "Restarting NBP (%x)\n", jmp );
+		DBGC ( &pxe_netdev, "PXE NBP restarting (%x)\n", jmp );
 
 	/* Far call to PXE NBP */
 	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
