@@ -54,6 +54,12 @@ extern void pxe_int_1a ( void );
 /** INT 1A hooked flag */
 static int int_1a_hooked = 0;
 
+/** Real-mode code segment size */
+extern char _text16_memsz[];
+
+/** Real-mode data segment size */
+extern char _data16_memsz[];
+
 /** PXENV_UNDI_TRANSMIT API call profiler */
 static struct profiler pxe_api_tx_profiler __profiler =
 	{ .name = "pxeapi.tx" };
@@ -330,6 +336,11 @@ int pxe_start_nbp ( void ) {
 	int jmp;
 	int discard_b, discard_c, discard_d, discard_D;
 	uint16_t status;
+
+	DBGC ( &pxe_netdev, "PXE NBP starting with netdev %s, code %04x:%04x, "
+	       "data %04x:%04x\n", ( pxe_netdev ? pxe_netdev->name : "<none>" ),
+	       rm_cs, ( ( unsigned int ) _text16_memsz ),
+	       rm_ds, ( ( unsigned int ) _data16_memsz ) );
 
 	/* Allow restarting NBP via PXENV_RESTART_TFTP */
 	jmp = rmsetjmp ( pxe_restart_nbp );
