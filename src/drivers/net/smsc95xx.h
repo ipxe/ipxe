@@ -43,6 +43,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMSC95XX_HW_CFG_BIR		0x00001000UL	/**< Bulk IN use NAK */
 #define SMSC95XX_HW_CFG_LRST		0x00000008UL	/**< Soft lite reset */
 
+/** LED GPIO configuration register */
+#define SMSC95XX_LED_GPIO_CFG 0x024
+#define SMSC95XX_LED_GPIO_CFG_GPCTL2(x)	( (x) << 24 )	/**< GPIO 2 control */
+#define SMSC95XX_LED_GPIO_CFG_GPCTL2_NSPD_LED \
+	SMSC95XX_LED_GPIO_CFG_GPCTL2 ( 1 )		/**< Link speed LED */
+#define SMSC95XX_LED_GPIO_CFG_GPCTL1(x)	( (x) << 20 )	/**< GPIO 1 control */
+#define SMSC95XX_LED_GPIO_CFG_GPCTL1_NLNKA_LED \
+	SMSC95XX_LED_GPIO_CFG_GPCTL1 ( 1 )		/**< Activity LED */
+#define SMSC95XX_LED_GPIO_CFG_GPCTL0(x)	( (x) << 16 )	/**< GPIO 0 control */
+#define SMSC95XX_LED_GPIO_CFG_GPCTL0_NFDX_LED \
+	SMSC95XX_LED_GPIO_CFG_GPCTL0 ( 1 )		/**< Full-duplex LED */
+
 /** EEPROM command register */
 #define SMSC95XX_E2P_CMD 0x030
 #define SMSC95XX_E2P_CMD_EPC_BSY	0x80000000UL	/**< EPC busy */
