@@ -40,15 +40,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Disambiguate the various error causes */
 #define ENOTSUP_PROTOCOL __einfo_error ( EINFO_ENOTSUP_PROTOCOL )
 #define EINFO_ENOTSUP_PROTOCOL					\
-	__einfo_uniqify ( EINFO_ENOTSUP, 0x01,			\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x02,			\
 			  "Non-STP packet received" )
 #define ENOTSUP_VERSION __einfo_error ( EINFO_ENOTSUP_VERSION )
 #define EINFO_ENOTSUP_VERSION					\
-	__einfo_uniqify ( EINFO_ENOTSUP, 0x01,			\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x03,			\
 			  "Legacy STP packet received" )
 #define ENOTSUP_TYPE __einfo_error ( EINFO_ENOTSUP_TYPE )
 #define EINFO_ENOTSUP_TYPE					\
-	__einfo_uniqify ( EINFO_ENOTSUP, 0x01,			\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x04,			\
 			  "Non-RSTP packet received" )
 
 /**
