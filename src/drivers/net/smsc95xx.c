@@ -1142,8 +1142,10 @@ static int smsc95xx_probe ( struct usb_function *func,
 		      &smsc95xx_in_operations, &smsc95xx_out_operations );
 	usb_refill_init ( &smsc95xx->usbnet.intr, 0, 0,
 			  SMSC95XX_INTR_MAX_FILL );
-	usb_refill_init ( &smsc95xx->usbnet.in, 0, SMSC95XX_IN_MTU,
-			  SMSC95XX_IN_MAX_FILL );
+	usb_refill_init ( &smsc95xx->usbnet.in,
+			  ( sizeof ( struct smsc95xx_tx_header ) -
+			    sizeof ( struct smsc95xx_rx_header ) ),
+			  SMSC95XX_IN_MTU, SMSC95XX_IN_MAX_FILL );
 	mii_init ( &smsc95xx->mii, &smsc95xx_mii_operations );
 	DBGC ( smsc95xx, "SMSC95XX %p on %s\n", smsc95xx, func->name );
 
