@@ -437,8 +437,8 @@ static int ecm_probe ( struct usb_function *func,
 	ecm->netdev = netdev;
 	usbnet_init ( &ecm->usbnet, func, &ecm_intr_operations,
 		      &ecm_in_operations, &ecm_out_operations );
-	usb_refill_init ( &ecm->usbnet.intr, 0, ECM_INTR_MAX_FILL );
-	usb_refill_init ( &ecm->usbnet.in, ECM_IN_MTU, ECM_IN_MAX_FILL );
+	usb_refill_init ( &ecm->usbnet.intr, 0, 0, ECM_INTR_MAX_FILL );
+	usb_refill_init ( &ecm->usbnet.in, 0, ECM_IN_MTU, ECM_IN_MAX_FILL );
 	DBGC ( ecm, "ECM %p on %s\n", ecm, func->name );
 
 	/* Describe USB network device */

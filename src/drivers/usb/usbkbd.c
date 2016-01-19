@@ -425,7 +425,7 @@ static int usbkbd_probe ( struct usb_function *func,
 	kbd->name = func->name;
 	kbd->bus = usb->port->hub->bus;
 	usbhid_init ( &kbd->hid, func, &usbkbd_operations, NULL );
-	usb_refill_init ( &kbd->hid.in, sizeof ( kbd->report ),
+	usb_refill_init ( &kbd->hid.in, 0, sizeof ( kbd->report ),
 			  USBKBD_INTR_MAX_FILL );
 
 	/* Describe USB human interface device */

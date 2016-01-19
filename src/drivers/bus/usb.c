@@ -601,6 +601,7 @@ void usb_complete_err ( struct usb_endpoint *ep, struct io_buffer *iobuf,
  */
 int usb_prefill ( struct usb_endpoint *ep ) {
 	struct io_buffer *iobuf;
+	size_t reserve = ep->reserve;
 	size_t len = ( ep->len ? ep->len : ep->mtu );
 	unsigned int fill;
 	int rc;
@@ -614,11 +615,12 @@ int usb_prefill ( struct usb_endpoint *ep ) {
 	for ( fill = 0 ; fill < ep->max ; fill++ ) {
 
 		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( len );
+		iobuf = alloc_iob ( reserve + len );
 		if ( ! iobuf ) {
 			rc = -ENOMEM;
 			goto err_alloc;
 		}
+		iob_reserve ( iobuf, reserve );
 
 		/* Add to recycled buffer list */
 		list_add_tail ( &iobuf->list, &ep->recycled );
@@ -639,6 +641,7 @@ int usb_prefill ( struct usb_endpoint *ep ) {
  */
 int usb_refill ( struct usb_endpoint *ep ) {
 	struct io_buffer *iobuf;
+	size_t reserve = ep->reserve;
 	size_t len = ( ep->len ? ep->len : ep->mtu );
 	int rc;
 
@@ -652,9 +655,10 @@ int usb_refill ( struct usb_endpoint *ep ) {
 		/* Get or allocate buffer */
 		if ( list_empty ( &ep->recycled ) ) {
 			/* Recycled buffer list is empty; allocate new buffer */
-			iobuf = alloc_iob ( len );
+			iobuf = alloc_iob ( reserve + len );
 			if ( ! iobuf )
 				return -ENOMEM;
+			iob_reserve ( iobuf, reserve );
 		} else {
 			/* Get buffer from recycled buffer list */
 			iobuf = list_first_entry ( &ep->recycled,

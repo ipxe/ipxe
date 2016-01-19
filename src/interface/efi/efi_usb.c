@@ -472,7 +472,7 @@ static int efi_usb_async_start ( struct efi_usb_interface *usbintf,
 	usbep->context = context;
 
 	/* Prefill endpoint */
-	usb_refill_init ( &usbep->ep, len, EFI_USB_ASYNC_FILL );
+	usb_refill_init ( &usbep->ep, 0, len, EFI_USB_ASYNC_FILL );
 	if ( ( rc = usb_prefill ( &usbep->ep ) ) != 0 ) {
 		DBGC ( usbdev, "USBDEV %s %s could not prefill: %s\n",
 		       usbintf->name, usb_endpoint_name ( &usbep->ep ),

@@ -416,7 +416,7 @@ static int hub_probe ( struct usb_function *func,
 		( enhanced ? USB_HUB_FEATURES_ENHANCED : USB_HUB_FEATURES );
 	hubdev->flags = func->id->driver_data;
 	usb_endpoint_init ( &hubdev->intr, usb, &usb_hub_intr_operations );
-	usb_refill_init ( &hubdev->intr, 0, USB_HUB_INTR_FILL );
+	usb_refill_init ( &hubdev->intr, 0, 0, USB_HUB_INTR_FILL );
 	process_init_stopped ( &hubdev->refill, &hub_refill_desc, NULL );
 
 	/* Locate hub interface descriptor */

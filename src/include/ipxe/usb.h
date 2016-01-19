@@ -414,7 +414,9 @@ struct usb_endpoint {
 
 	/** Recycled I/O buffer list */
 	struct list_head recycled;
-	/** Refill buffer length */
+	/** Refill buffer reserved header length */
+	size_t reserve;
+	/** Refill buffer payload length */
 	size_t len;
 	/** Maximum fill level */
 	unsigned int max;
@@ -588,13 +590,16 @@ extern void usb_complete_err ( struct usb_endpoint *ep,
  * Initialise USB endpoint refill
  *
  * @v ep		USB endpoint
- * @v len		Refill buffer length (or zero to use endpoint's MTU)
+ * @v reserve		Refill buffer reserved header length
+ * @v len		Refill buffer payload length (zero for endpoint's MTU)
  * @v max		Maximum fill level
  */
 static inline __attribute__ (( always_inline )) void
-usb_refill_init ( struct usb_endpoint *ep, size_t len, unsigned int max ) {
+usb_refill_init ( struct usb_endpoint *ep, size_t reserve, size_t len,
+		  unsigned int max ) {
 
 	INIT_LIST_HEAD ( &ep->recycled );
+	ep->reserve = reserve;
 	ep->len = len;
 	ep->max = max;
 }

@@ -979,8 +979,9 @@ static int smsc75xx_probe ( struct usb_function *func,
 	smsc75xx->netdev = netdev;
 	usbnet_init ( &smsc75xx->usbnet, func, &smsc75xx_intr_operations,
 		      &smsc75xx_in_operations, &smsc75xx_out_operations );
-	usb_refill_init ( &smsc75xx->usbnet.intr, 0, SMSC75XX_INTR_MAX_FILL );
-	usb_refill_init ( &smsc75xx->usbnet.in, SMSC75XX_IN_MTU,
+	usb_refill_init ( &smsc75xx->usbnet.intr, 0, 0,
+			  SMSC75XX_INTR_MAX_FILL );
+	usb_refill_init ( &smsc75xx->usbnet.in, 0, SMSC75XX_IN_MTU,
 			  SMSC75XX_IN_MAX_FILL );
 	mii_init ( &smsc75xx->mii, &smsc75xx_mii_operations );
 	DBGC ( smsc75xx, "SMSC75XX %p on %s\n", smsc75xx, func->name );

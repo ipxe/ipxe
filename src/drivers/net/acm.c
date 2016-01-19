@@ -447,8 +447,8 @@ static int acm_probe ( struct usb_function *func,
 	acm->rndis = rndis;
 	usbnet_init ( &acm->usbnet, func, &acm_intr_operations,
 		      &acm_in_operations, &acm_out_operations );
-	usb_refill_init ( &acm->usbnet.intr, 0, ACM_INTR_MAX_FILL );
-	usb_refill_init ( &acm->usbnet.in, ACM_IN_MTU, ACM_IN_MAX_FILL );
+	usb_refill_init ( &acm->usbnet.intr, 0, 0, ACM_INTR_MAX_FILL );
+	usb_refill_init ( &acm->usbnet.in, 0, ACM_IN_MTU, ACM_IN_MAX_FILL );
 
 	/* Describe USB network device */
 	if ( ( rc = usbnet_describe ( &acm->usbnet, config ) ) != 0 ) {
