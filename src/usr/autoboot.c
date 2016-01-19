@@ -379,8 +379,8 @@ int netboot ( struct net_device *netdev ) {
 	 * it may represent an NFS root.
 	 */
 	if ( filename && root_path &&
-	     ( ! ( uri_is_absolute ( root_path ) ||
-		   ( xfer_uri_opener ( root_path->scheme ) == NULL ) ) ) ) {
+	     ( ( ! uri_is_absolute ( root_path ) ) ||
+	       ( xfer_uri_opener ( root_path->scheme ) == NULL ) ) ) {
 		printf ( "Ignoring unsupported root path\n" );
 		uri_put ( root_path );
 		root_path = NULL;
