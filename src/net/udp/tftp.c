@@ -325,7 +325,7 @@ void tftp_set_mtftp_port ( unsigned int port ) {
  * @ret rc		Return status code
  */
 static int tftp_send_rrq ( struct tftp_request *tftp ) {
-	const char *path = tftp->uri->path;
+	const char *path = ( tftp->uri->path + 1 /* skip '/' */ );
 	struct tftp_rrq *rrq;
 	size_t len;
 	struct io_buffer *iobuf;
@@ -1066,6 +1066,8 @@ static int tftp_core_open ( struct interface *xfer, struct uri *uri,
 	if ( ! uri->host )
 		return -EINVAL;
 	if ( ! uri->path )
+		return -EINVAL;
+	if ( uri->path[0] != '/' )
 		return -EINVAL;
 
 	/* Allocate and populate TFTP structure */

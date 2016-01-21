@@ -368,7 +368,7 @@ struct uri * parse_uri ( const char *uri_string ) {
 		goto done;
 
 	/* Identify net/absolute/relative path */
-	if ( strncmp ( path, "//", 2 ) == 0 ) {
+	if ( uri->scheme && ( strncmp ( path, "//", 2 ) == 0 ) ) {
 		/* Net path.  If this is terminated by the first '/'
 		 * of an absolute path, then we have no space for a
 		 * terminator after the authority field, so shuffle
@@ -459,7 +459,6 @@ size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 		[URI_OPAQUE] = ':',
 		[URI_PASSWORD] = ':',
 		[URI_PORT] = ':',
-		[URI_PATH] = '/',
 		[URI_QUERY] = '?',
 		[URI_FRAGMENT] = '#',
 	};
@@ -486,8 +485,6 @@ size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 		prefix = prefixes[field];
 		if ( ( field == URI_HOST ) && ( uri->user != NULL ) )
 			prefix = '@';
-		if ( ( field == URI_PATH ) && ( uri->path[0] == '/' ) )
-			prefix = '\0';
 		if ( prefix ) {
 			used += ssnprintf ( ( buf + used ), ( len - used ),
 					    "%c", prefix );
@@ -715,6 +712,55 @@ struct uri * resolve_uri ( const struct uri *base_uri,
 }
 
 /**
+ * Construct TFTP URI from server address and filename
+ *
+ * @v sa_server		Server address
+ * @v filename		Filename
+ * @ret uri		URI, or NULL on failure
+ */
+static struct uri * tftp_uri ( struct sockaddr *sa_server,
+			       const char *filename ) {
+	struct sockaddr_tcpip *st_server =
+		( ( struct sockaddr_tcpip * ) sa_server );
+	char buf[ 6 /* "65535" + NUL */ ];
+	char *path;
+	struct uri tmp;
+	struct uri *uri = NULL;
+
+	/* Initialise TFTP URI */
+	memset ( &tmp, 0, sizeof ( tmp ) );
+	tmp.scheme = "tftp";
+
+	/* Construct TFTP server address */
+	tmp.host = sock_ntoa ( sa_server );
+	if ( ! tmp.host )
+		goto err_host;
+
+	/* Construct TFTP server port, if applicable */
+	if ( st_server->st_port ) {
+		snprintf ( buf, sizeof ( buf ), "%d",
+			   ntohs ( st_server->st_port ) );
+		tmp.port = buf;
+	}
+
+	/* Construct TFTP path */
+	if ( asprintf ( &path, "/%s", filename ) < 0 )
+		goto err_path;
+	tmp.path = path;
+
+	/* Demangle URI */
+	uri = uri_dup ( &tmp );
+	if ( ! uri )
+		goto err_uri;
+
+ err_uri:
+	free ( path );
+ err_path:
+ err_host:
+	return uri;
+}
+
+/**
  * Construct URI from server address and filename
  *
  * @v sa_server		Server address
@@ -727,10 +773,6 @@ struct uri * resolve_uri ( const struct uri *base_uri,
  * constructing a TFTP URI from the next-server and filename.
  */
 struct uri * pxe_uri ( struct sockaddr *sa_server, const char *filename ) {
-	char buf[ 6 /* "65535" + NUL */ ];
-	struct sockaddr_tcpip *st_server =
-		( ( struct sockaddr_tcpip * ) sa_server );
-	struct uri tmp;
 	struct uri *uri;
 
 	/* Fail if filename is empty */
@@ -748,17 +790,5 @@ struct uri * pxe_uri ( struct sockaddr *sa_server, const char *filename ) {
 	uri_put ( uri );
 
 	/* Otherwise, construct a TFTP URI directly */
-	memset ( &tmp, 0, sizeof ( tmp ) );
-	tmp.scheme = "tftp";
-	tmp.host = sock_ntoa ( sa_server );
-	if ( ! tmp.host )
-		return NULL;
-	if ( st_server->st_port ) {
-		snprintf ( buf, sizeof ( buf ), "%d",
-			   ntohs ( st_server->st_port ) );
-		tmp.port = buf;
-	}
-	tmp.path = filename;
-	uri = uri_dup ( &tmp );
-	return uri;
+	return tftp_uri ( sa_server, filename );
 }

@@ -713,9 +713,9 @@ static struct uri_pxe_test uri_pxe_absolute_path = {
 	{
 		.scheme = "tftp",
 		.host = "192.168.0.2",
-		.path = "/absolute/path",
+		.path = "//absolute/path",
 	},
-	"tftp://192.168.0.2/absolute/path",
+	"tftp://192.168.0.2//absolute/path",
 };
 
 /** PXE URI with relative path */
@@ -731,7 +731,7 @@ static struct uri_pxe_test uri_pxe_relative_path = {
 	{
 		.scheme = "tftp",
 		.host = "192.168.0.3",
-		.path = "relative/path",
+		.path = "/relative/path",
 	},
 	"tftp://192.168.0.3/relative/path",
 };
@@ -749,7 +749,7 @@ static struct uri_pxe_test uri_pxe_icky = {
 	{
 		.scheme = "tftp",
 		.host = "10.0.0.6",
-		.path = "C:\\tftpboot\\icky#path",
+		.path = "/C:\\tftpboot\\icky#path",
 	},
 	"tftp://10.0.0.6/C%3A\\tftpboot\\icky%23path",
 };
@@ -769,9 +769,9 @@ static struct uri_pxe_test uri_pxe_port = {
 		.scheme = "tftp",
 		.host = "192.168.0.1",
 		.port = "4069",
-		.path = "/another/path",
+		.path = "//another/path",
 	},
-	"tftp://192.168.0.1:4069/another/path",
+	"tftp://192.168.0.1:4069//another/path",
 };
 
 /** Current working URI test */
