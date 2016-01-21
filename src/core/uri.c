@@ -606,7 +606,7 @@ struct uri * uri_dup ( const struct uri *uri ) {
  *
  * @v base_uri		Base path
  * @v relative_uri	Relative path
- * @ret resolved_uri	Resolved path
+ * @ret resolved_uri	Resolved path, or NULL on failure
  *
  * Takes a base path (e.g. "/var/lib/tftpboot/vmlinuz" and a relative
  * path (e.g. "initrd.gz") and produces a new path
@@ -617,9 +617,8 @@ struct uri * uri_dup ( const struct uri *uri ) {
  */
 char * resolve_path ( const char *base_path,
 		      const char *relative_path ) {
-	size_t base_len = ( strlen ( base_path ) + 1 );
-	char base_path_copy[base_len];
-	char *base_tmp = base_path_copy;
+	char *base_copy;
+	char *base_tmp;
 	char *resolved;
 
 	/* If relative path is absolute, just re-use it */
@@ -627,8 +626,12 @@ char * resolve_path ( const char *base_path,
 		return strdup ( relative_path );
 
 	/* Create modifiable copy of path for dirname() */
-	memcpy ( base_tmp, base_path, base_len );
-	base_tmp = dirname ( base_tmp );
+	base_copy = strdup ( base_path );
+	if ( ! base_copy )
+		return NULL;
+
+	/* Strip filename portion of base path */
+	base_tmp = dirname ( base_copy );
 
 	/* Process "./" and "../" elements */
 	while ( *relative_path == '.' ) {
@@ -658,8 +661,8 @@ char * resolve_path ( const char *base_path,
 	if ( asprintf ( &resolved, "%s%s%s", base_tmp,
 			( ( base_tmp[ strlen ( base_tmp ) - 1 ] == '/' ) ?
 			  "" : "/" ), relative_path ) < 0 )
-		return NULL;
-
+		resolved = NULL;
+	free ( base_copy );
 	return resolved;
 }
 
@@ -668,7 +671,7 @@ char * resolve_path ( const char *base_path,
  *
  * @v base_uri		Base URI, or NULL
  * @v relative_uri	Relative URI
- * @ret resolved_uri	Resolved URI
+ * @ret resolved_uri	Resolved URI, or NULL on failure
  *
  * Takes a base URI (e.g. "http://ipxe.org/kernels/vmlinuz" and a
  * relative URI (e.g. "../initrds/initrd.gz") and produces a new URI
