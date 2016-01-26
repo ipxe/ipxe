@@ -419,11 +419,11 @@ struct uri * parse_uri ( const char *uri_string ) {
 		uri->port = tmp;
 	}
 
+ done:
 	/* Decode fields in-place */
 	for ( field = 0 ; field < URI_FIELDS ; field++ )
 		uri_decode_inplace ( uri, field );
 
- done:
 	DBGC ( uri, "URI parsed \"%s\" to", uri_string );
 	uri_dump ( uri );
 	DBGC ( uri, "\n" );

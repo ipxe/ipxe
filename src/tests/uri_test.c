@@ -499,6 +499,18 @@ static struct uri_test uri_mailto = {
 	{ .scheme = "mailto", .opaque = "ipxe-devel@lists.ipxe.org" }
 };
 
+/** Basic path-only URI */
+static struct uri_test uri_path = {
+	"/var/lib/tftpboot/pxelinux.0",
+	{ .path = "/var/lib/tftpboot/pxelinux.0" },
+};
+
+/** Path-only URI with escaped characters */
+static struct uri_test uri_path_escaped = {
+	"/hello%20world%3F",
+	{ .path = "/hello world?" },
+};
+
 /** HTTP URI with all the trimmings */
 static struct uri_test uri_http_all = {
 	"http://anon:password@example.com:3001/~foo/cgi-bin/foo.pl?a=b&c=d#bit",
@@ -877,6 +889,8 @@ static void uri_test_exec ( void ) {
 	uri_parse_format_dup_ok ( &uri_empty );
 	uri_parse_format_dup_ok ( &uri_boot_ipxe_org );
 	uri_parse_format_dup_ok ( &uri_mailto );
+	uri_parse_format_dup_ok ( &uri_path );
+	uri_parse_format_dup_ok ( &uri_path_escaped );
 	uri_parse_format_dup_ok ( &uri_http_all );
 	uri_parse_format_dup_ok ( &uri_http_escaped );
 	uri_parse_ok ( &uri_http_escaped_improper ); /* Parse only */
