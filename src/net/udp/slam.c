@@ -415,6 +415,8 @@ static int slam_pull_value ( struct slam_request *slam,
 static int slam_pull_header ( struct slam_request *slam,
 			      struct io_buffer *iobuf ) {
 	void *header = iobuf->data;
+	unsigned long total_bytes;
+	unsigned long block_size;
 	int rc;
 
 	/* If header matches cached header, just pull it and return */
@@ -431,12 +433,16 @@ static int slam_pull_header ( struct slam_request *slam,
 	 */
 	if ( ( rc = slam_pull_value ( slam, iobuf, NULL ) ) != 0 )
 		return rc;
-	if ( ( rc = slam_pull_value ( slam, iobuf,
-				      &slam->total_bytes ) ) != 0 )
+	if ( ( rc = slam_pull_value ( slam, iobuf, &total_bytes ) ) != 0 )
 		return rc;
-	if ( ( rc = slam_pull_value ( slam, iobuf,
-				      &slam->block_size ) ) != 0 )
+	if ( ( rc = slam_pull_value ( slam, iobuf, &block_size ) ) != 0 )
 		return rc;
+
+	/* Sanity check */
+	if ( block_size == 0 ) {
+		DBGC ( slam, "SLAM %p ignoring zero block size\n", slam );
+		return -EINVAL;
+	}
 
 	/* Update the cached header */
 	slam->header_len = ( iobuf->data - header );
@@ -444,9 +450,9 @@ static int slam_pull_header ( struct slam_request *slam,
 	memcpy ( slam->header, header, slam->header_len );
 
 	/* Calculate number of blocks */
-	slam->num_blocks = ( ( slam->total_bytes + slam->block_size - 1 ) /
-			     slam->block_size );
-
+	slam->total_bytes = total_bytes;
+	slam->block_size = block_size;
+	slam->num_blocks = ( ( total_bytes + block_size - 1 ) / block_size );
 	DBGC ( slam, "SLAM %p has total bytes %ld, block size %ld, num "
 	       "blocks %ld\n", slam, slam->total_bytes, slam->block_size,
 	       slam->num_blocks );
