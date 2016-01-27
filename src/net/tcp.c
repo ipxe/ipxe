@@ -904,50 +904,86 @@ static struct tcp_connection * tcp_demux ( unsigned int local_port ) {
 /**
  * Parse TCP received options
  *
- * @v tcp		TCP connection
- * @v data		Raw options data
- * @v len		Raw options length
+ * @v tcp		TCP connection (may be NULL)
+ * @v tcphdr		TCP header
+ * @v hlen		TCP header length
  * @v options		Options structure to fill in
+ * @ret rc		Return status code
  */
-static void tcp_rx_opts ( struct tcp_connection *tcp, const void *data,
-			  size_t len, struct tcp_options *options ) {
-	const void *end = ( data + len );
+static int tcp_rx_opts ( struct tcp_connection *tcp,
+			 const struct tcp_header *tcphdr, size_t hlen,
+			 struct tcp_options *options ) {
+	const void *data = ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) );
+	const void *end = ( ( ( void * ) tcphdr ) + hlen );
 	const struct tcp_option *option;
 	unsigned int kind;
+	size_t remaining;
+	size_t min;
 
+	/* Sanity check */
+	assert ( hlen >= sizeof ( *tcphdr ) );
+
+	/* Parse options */
 	memset ( options, 0, sizeof ( *options ) );
-	while ( data < end ) {
+	while ( ( remaining = ( end - data ) ) ) {
+
+		/* Extract option code */
 		option = data;
 		kind = option->kind;
+
+		/* Handle single-byte options */
 		if ( kind == TCP_OPTION_END )
-			return;
+			break;
 		if ( kind == TCP_OPTION_NOP ) {
 			data++;
 			continue;
 		}
+
+		/* Handle multi-byte options */
+		min = sizeof ( *option );
 		switch ( kind ) {
 		case TCP_OPTION_MSS:
-			options->mssopt = data;
+			/* Ignore received MSS */
 			break;
 		case TCP_OPTION_WS:
 			options->wsopt = data;
+			min = sizeof ( *options->wsopt );
 			break;
 		case TCP_OPTION_SACK_PERMITTED:
 			options->spopt = data;
+			min = sizeof ( *options->spopt );
 			break;
 		case TCP_OPTION_SACK:
 			/* Ignore received SACKs */
 			break;
 		case TCP_OPTION_TS:
 			options->tsopt = data;
+			min = sizeof ( *options->tsopt );
 			break;
 		default:
 			DBGC ( tcp, "TCP %p received unknown option %d\n",
 			       tcp, kind );
 			break;
 		}
+		if ( remaining < min ) {
+			DBGC ( tcp, "TCP %p received truncated option %d\n",
+			       tcp, kind );
+			return -EINVAL;
+		}
+		if ( option->length < min ) {
+			DBGC ( tcp, "TCP %p received underlength option %d\n",
+			       tcp, kind );
+			return -EINVAL;
+		}
+		if ( option->length > remaining ) {
+			DBGC ( tcp, "TCP %p received overlength option %d\n",
+			       tcp, kind );
+			return -EINVAL;
+		}
 		data += option->length;
 	}
+
+	return 0;
 }
 
 /**
@@ -1011,6 +1047,12 @@ static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq,
 			tcp->snd_win_scale = options->wsopt->scale;
 			tcp->rcv_win_scale = TCP_RX_WINDOW_SCALE;
 		}
+		DBGC ( tcp, "TCP %p using %stimestamps, %sSACK, TX window "
+		       "x%d, RX window x%d\n", tcp,
+		       ( ( tcp->flags & TCP_TS_ENABLED ) ? "" : "no " ),
+		       ( ( tcp->flags & TCP_SACK_ENABLED ) ? "" : "no " ),
+		       ( 1 << tcp->snd_win_scale ),
+		       ( 1 << tcp->rcv_win_scale ) );
 	}
 
 	/* Ignore duplicate SYN */
@@ -1369,8 +1411,8 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	ack = ntohl ( tcphdr->ack );
 	raw_win = ntohs ( tcphdr->win );
 	flags = tcphdr->flags;
-	tcp_rx_opts ( tcp, ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) ),
-		      ( hlen - sizeof ( *tcphdr ) ), &options );
+	if ( ( rc = tcp_rx_opts ( tcp, tcphdr, hlen, &options ) ) != 0 )
+		goto discard;
 	if ( tcp && options.tsopt )
 		tcp->ts_val = ntohl ( options.tsopt->tsval );
 	iob_pull ( iobuf, hlen );

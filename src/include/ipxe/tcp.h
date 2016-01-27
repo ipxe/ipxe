@@ -140,8 +140,6 @@ struct tcp_timestamp_padded_option {
 
 /** Parsed TCP options */
 struct tcp_options {
-	/** MSS option, if present */
-	const struct tcp_mss_option *mssopt;
 	/** Window scale option, if present */
 	const struct tcp_window_scale_option *wsopt;
 	/** SACK permitted option, if present */
