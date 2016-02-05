@@ -175,6 +175,61 @@ static int ehci_ctrl_reachable ( struct ehci_device *ehci, void *ptr ) {
 
 /******************************************************************************
  *
+ * Diagnostics
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Dump host controller registers
+ *
+ * @v ehci		EHCI device
+ */
+static __unused void ehci_dump ( struct ehci_device *ehci ) {
+	uint8_t caplength;
+	uint16_t hciversion;
+	uint32_t hcsparams;
+	uint32_t hccparams;
+	uint32_t usbcmd;
+	uint32_t usbsts;
+	uint32_t usbintr;
+	uint32_t frindex;
+	uint32_t ctrldssegment;
+	uint32_t periodiclistbase;
+	uint32_t asynclistaddr;
+	uint32_t configflag;
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Dump capability registers */
+	caplength = readb ( ehci->cap + EHCI_CAP_CAPLENGTH );
+	hciversion = readw ( ehci->cap + EHCI_CAP_HCIVERSION );
+	hcsparams = readl ( ehci->cap + EHCI_CAP_HCSPARAMS );
+	hccparams = readl ( ehci->cap + EHCI_CAP_HCCPARAMS );
+	DBGC ( ehci, "EHCI %s caplen %02x hciversion %04x hcsparams %08x "
+	       "hccparams %08x\n", ehci->name, caplength, hciversion,
+	       hcsparams,  hccparams );
+
+	/* Dump operational registers */
+	usbcmd = readl ( ehci->op + EHCI_OP_USBCMD );
+	usbsts = readl ( ehci->op + EHCI_OP_USBSTS );
+	usbintr = readl ( ehci->op + EHCI_OP_USBINTR );
+	frindex = readl ( ehci->op + EHCI_OP_FRINDEX );
+	ctrldssegment = readl ( ehci->op + EHCI_OP_CTRLDSSEGMENT );
+	periodiclistbase = readl ( ehci->op + EHCI_OP_PERIODICLISTBASE );
+	asynclistaddr = readl ( ehci->op + EHCI_OP_ASYNCLISTADDR );
+	configflag = readl ( ehci->op + EHCI_OP_CONFIGFLAG );
+	DBGC ( ehci, "EHCI %s usbcmd %08x usbsts %08x usbint %08x frindx "
+	       "%08x\n", ehci->name, usbcmd, usbsts, usbintr, frindex );
+	DBGC ( ehci, "EHCI %s ctrlds %08x period %08x asyncl %08x cfgflg "
+	       "%08x\n", ehci->name, ctrldssegment, periodiclistbase,
+	       asynclistaddr, configflag );
+}
+
+/******************************************************************************
+ *
  * USB legacy support
  *
  ******************************************************************************
@@ -233,6 +288,14 @@ static void ehci_legacy_claim ( struct ehci_device *ehci,
 	if ( ! legacy )
 		return;
 
+	/* Dump original SMI usage */
+	pci_read_config_dword ( pci, ( legacy + EHCI_USBLEGSUP_CTLSTS ),
+				&ctlsts );
+	if ( ctlsts ) {
+		DBGC ( ehci, "EHCI %s BIOS using SMIs: %08x\n",
+		       ehci->name, ctlsts );
+	}
+
 	/* Claim ownership */
 	pci_write_config_byte ( pci, ( legacy + EHCI_USBLEGSUP_OS ),
 				EHCI_USBLEGSUP_OS_OWNED );
@@ -276,9 +339,11 @@ static void ehci_legacy_claim ( struct ehci_device *ehci,
  */
 static void ehci_legacy_release ( struct ehci_device *ehci,
 				  struct pci_device *pci ) {
+	unsigned int legacy = ehci->legacy;
+	uint32_t ctlsts;
 
 	/* Do nothing unless legacy support capability is present */
-	if ( ! ehci->legacy )
+	if ( ! legacy )
 		return;
 
 	/* Do nothing if releasing ownership is prevented */
@@ -289,8 +354,14 @@ static void ehci_legacy_release ( struct ehci_device *ehci,
 	}
 
 	/* Release ownership */
-	pci_write_config_byte ( pci, ( ehci->legacy + EHCI_USBLEGSUP_OS ), 0 );
+	pci_write_config_byte ( pci, ( legacy + EHCI_USBLEGSUP_OS ), 0 );
 	DBGC ( ehci, "EHCI %s released ownership to BIOS\n", ehci->name );
+
+	/* Dump restored SMI usage */
+	pci_read_config_dword ( pci, ( legacy + EHCI_USBLEGSUP_CTLSTS ),
+				&ctlsts );
+	DBGC ( ehci, "EHCI %s BIOS reclaimed SMIs: %08x\n",
+	       ehci->name, ctlsts );
 }
 
 /******************************************************************************
