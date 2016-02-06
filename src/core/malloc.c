@@ -291,9 +291,17 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	 */
 	actual_size = ( ( size + MIN_MEMBLOCK_SIZE - 1 ) &
 			~( MIN_MEMBLOCK_SIZE - 1 ) );
+	if ( ! actual_size ) {
+		/* The requested size is not permitted to be zero.  A
+		 * zero result at this point indicates that either the
+		 * original requested size was zero, or that unsigned
+		 * integer overflow has occurred.
+		 */
+		ptr = NULL;
+		goto done;
+	}
 	assert ( actual_size >= size );
 	align_mask = ( ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 ) );
-	assert ( ( actual_size + align_mask ) > actual_size );
 
 	DBGC2 ( &heap, "Allocating %#zx (aligned %#zx+%zx)\n",
 		size, align, offset );
@@ -302,7 +310,8 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 		list_for_each_entry ( block, &free_blocks, list ) {
 			pre_size = ( ( offset - virt_to_phys ( block ) )
 				     & align_mask );
-			if ( block->size < ( pre_size + actual_size ) )
+			if ( ( block->size < pre_size ) ||
+			     ( ( block->size - pre_size ) < actual_size ) )
 				continue;
 			post_size = ( block->size - pre_size - actual_size );
 			/* Split block into pre-block, block, and
@@ -506,6 +515,8 @@ void * realloc ( void *old_ptr, size_t new_size ) {
 	if ( new_size ) {
 		new_total_size = ( new_size +
 				   offsetof ( struct autosized_block, data ) );
+		if ( new_total_size < new_size )
+			return NULL;
 		new_block = alloc_memblock ( new_total_size, 1, 0 );
 		if ( ! new_block )
 			return NULL;
