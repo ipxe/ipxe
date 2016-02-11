@@ -58,6 +58,7 @@ static void cachedhcp_init ( void ) {
 	struct dhcp_packet *dhcppkt;
 	struct dhcp_packet *tmp;
 	struct dhcphdr *dhcphdr;
+	size_t max_len;
 	size_t len;
 
 	/* Do nothing if no cached DHCPACK is present */
@@ -69,23 +70,25 @@ static void cachedhcp_init ( void ) {
 	/* No reliable way to determine length before parsing packet;
 	 * start by assuming maximum length permitted by PXE.
 	 */
-	len = sizeof ( BOOTPLAYER_t );
+	max_len = sizeof ( BOOTPLAYER_t );
 
 	/* Allocate and populate DHCP packet */
-	dhcppkt = zalloc ( sizeof ( *dhcppkt ) + len );
+	dhcppkt = zalloc ( sizeof ( *dhcppkt ) + max_len );
 	if ( ! dhcppkt ) {
 		DBGC ( colour, "CACHEDHCP could not allocate copy\n" );
 		return;
 	}
 	dhcphdr = ( ( ( void * ) dhcppkt ) + sizeof ( *dhcppkt ) );
 	copy_from_user ( dhcphdr, phys_to_user ( cached_dhcpack_phys ), 0,
-			 len );
-	dhcppkt_init ( dhcppkt, dhcphdr, len );
+			 max_len );
+	dhcppkt_init ( dhcppkt, dhcphdr, max_len );
 
-	/* Resize packet to required length.  If reallocation fails,
-	 * just continue to use the original packet.
+	/* Shrink packet to required length.  If reallocation fails,
+	 * just continue to use the original packet and waste the
+	 * unused space.
 	 */
 	len = dhcppkt_len ( dhcppkt );
+	assert ( len <= max_len );
 	tmp = realloc ( dhcppkt, ( sizeof ( *dhcppkt ) + len ) );
 	if ( tmp )
 		dhcppkt = tmp;
