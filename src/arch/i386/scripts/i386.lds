@@ -247,8 +247,8 @@ SECTIONS {
      * Values calculated to save code from doing it
      *
      */
-    _text16_memsz_pgh	= ( ( _text16_memsz + 15 ) / 16 );
-    _data16_memsz_pgh	= ( ( _data16_memsz + 15 ) / 16 );
+    _text16_memsz_ppgh	= ( ( ( _text16_memsz + 63 ) / 64 ) * 4 );
+    _data16_memsz_ppgh	= ( ( ( _data16_memsz + 63 ) / 64 ) * 4 );
     _textdata_memsz_pgh	= ( ( _textdata_memsz + 15 ) / 16 );
     _textdata_memsz_kb	= ( ( _textdata_memsz + 1023 ) / 1024 );
 }
