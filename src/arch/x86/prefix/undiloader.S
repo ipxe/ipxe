@@ -41,9 +41,7 @@ undiloader:
 	pushw	%ax
 	pushw	$prot_call
 	lret
-1:	popw	%bx	/* discard */
-	popw	%bx	/* discard */
-	/* Restore registers and return */
+1:	/* Restore registers and return */
 	popw	%bx
 	popw	%es
 	popw	%ds

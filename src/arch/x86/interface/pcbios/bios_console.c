@@ -536,7 +536,6 @@ static void bios_inject_startup ( void ) {
 			      "pushl %0\n\t"
 			      "pushw %%cs\n\t"
 			      "call prot_call\n\t"
-			      "addw $4, %%sp\n\t"
 			      "\n1:\n\t"
 			      "popfw\n\t"
 			      "ljmp *%%cs:int16_vector\n\t" )

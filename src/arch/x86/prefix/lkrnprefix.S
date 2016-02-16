@@ -200,7 +200,6 @@ no_cmd_line:
 	pushl	$main
 	pushw	%cs
 	call	prot_call
-	popl	%ecx /* discard */
 
 	/* Uninstall iPXE */
 	call	uninstall

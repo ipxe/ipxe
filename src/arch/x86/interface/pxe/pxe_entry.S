@@ -123,7 +123,6 @@ pxenv_entry:
 	pushl	$pxe_api_call
 	pushw	%cs
 	call	prot_call
-	addl	$4, %esp
 	lret
 	.size	pxenv_entry, . - pxenv_entry
 

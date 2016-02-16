@@ -880,7 +880,6 @@ payload_death_message:
 	movw	%ax, (prot_call_vector+2)
 	pushl	$relocate
 	lcall	*prot_call_vector
-	popl	%edx /* discard */
 
 	/* Copy code to new location */
 	progress "  copy\n"

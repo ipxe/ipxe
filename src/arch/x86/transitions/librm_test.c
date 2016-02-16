@@ -108,7 +108,6 @@ static void librm_test_exec ( void ) {
 						   "pushl %k3\n\t"
 						   "pushw %%cs\n\t"
 						   "call prot_call\n\t"
-						   "addw $4, %%sp\n\t"
 						   "rdtsc\n\t" )
 				       : "=a" ( stopped ), "=d" ( discard_d ),
 					 "=R" ( started )

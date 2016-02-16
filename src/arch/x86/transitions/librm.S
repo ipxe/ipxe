@@ -134,7 +134,6 @@ init_librm:
 	pushl	$init_idt
 	pushw	%cs
 	call	prot_call
-	popl	%eax /* discard */
 
 	/* Restore registers */
 	negl	%edi
@@ -385,8 +384,8 @@ rm_gdtr:
  *
  * Example usage:
  *	pushl	$pxe_api_call
+ *	pushw	%cs
  *	call	prot_call
- *	addw	$4, %sp
  * to call in to the C function
  *      void pxe_api_call ( struct i386_all_regs *ix86 );
  ****************************************************************************
@@ -455,7 +454,7 @@ pc_rmode:
 	 */
 	addr32 movl -20(%esp), %esp
 	popfl
-	lret
+	lret	$4
 
 /****************************************************************************
  * real_call (protected-mode near call, 32-bit virtual return address)
@@ -554,7 +553,6 @@ flatten_real_mode:
 	pushl	$flatten_dummy
 	pushw	%cs
 	call	prot_call
-	addw	$4, %sp
 	/* Restore GDT */
 	movb	$0x00, real_cs + 6
 	movb	$0x00, real_ds + 6
