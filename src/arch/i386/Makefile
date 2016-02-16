@@ -84,28 +84,6 @@ endif
 #
 CFLAGS_lkrnprefix	+= -DVERSION="\"$(VERSION)\""
 
-# Locations of isolinux files
-#
-SYSLINUX_DIR_LIST	:= \
-	/usr/lib/syslinux \
-	/usr/lib/syslinux/bios \
-	/usr/lib/syslinux/modules/bios \
-	/usr/share/syslinux \
-	/usr/share/syslinux/bios \
-	/usr/share/syslinux/modules/bios \
-	/usr/local/share/syslinux \
-	/usr/local/share/syslinux/bios \
-	/usr/local/share/syslinux/modules/bios \
-	/usr/lib/ISOLINUX
-ISOLINUX_BIN_LIST	:= \
-	$(ISOLINUX_BIN) \
-	$(patsubst %,%/isolinux.bin,$(SYSLINUX_DIR_LIST))
-LDLINUX_C32_LIST	:= \
-	$(LDLINUX_C32) \
-	$(patsubst %,%/ldlinux.c32,$(SYSLINUX_DIR_LIST))
-ISOLINUX_BIN	= $(firstword $(wildcard $(ISOLINUX_BIN_LIST)))
-LDLINUX_C32	= $(firstword $(wildcard $(LDLINUX_C32_LIST)))
-
 # i386-specific directories containing source files
 #
 SRCDIRS		+= arch/i386/core arch/i386/transitions arch/i386/prefix
