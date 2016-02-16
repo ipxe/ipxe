@@ -631,9 +631,9 @@ static int bzimage_exec ( struct image *image ) {
 					   "pushw %w2\n\t"
 					   "pushw $0\n\t"
 					   "lret\n\t" )
-			       : : "r" ( bzimg.rm_kernel_seg ),
-			           "r" ( bzimg.rm_heap ),
-			           "r" ( bzimg.rm_kernel_seg + 0x20 ) );
+			       : : "R" ( bzimg.rm_kernel_seg ),
+			           "R" ( bzimg.rm_heap ),
+			           "R" ( bzimg.rm_kernel_seg + 0x20 ) );
 
 	/* There is no way for the image to return, since we provide
 	 * no return address.
