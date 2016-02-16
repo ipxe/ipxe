@@ -16,7 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 extern char _max_align[];
-#define max_align ( ( unsigned int ) _max_align )
+#define max_align ( ( size_t ) _max_align )
 
 /* Linker symbols */
 extern char _textdata[];
@@ -44,8 +44,8 @@ extern char _etextdata[];
  */
 __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	struct memory_map memmap;
-	unsigned long start, end, size, padded_size, max;
-	unsigned long new_start, new_end;
+	uint32_t start, end, size, padded_size, max;
+	uint32_t new_start, new_end;
 	unsigned i;
 
 	/* Get memory map and current location */
@@ -55,15 +55,15 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	size = ( end - start );
 	padded_size = ( size + max_align - 1 );
 
-	DBG ( "Relocate: currently at [%lx,%lx)\n"
-	      "...need %lx bytes for %d-byte alignment\n",
+	DBG ( "Relocate: currently at [%x,%x)\n"
+	      "...need %x bytes for %zd-byte alignment\n",
 	      start, end, padded_size, max_align );
 
 	/* Determine maximum usable address */
 	max = MAX_ADDR;
 	if ( ix86->regs.ebp < max ) {
 		max = ix86->regs.ebp;
-		DBG ( "Limiting relocation to [0,%lx)\n", max );
+		DBG ( "Limiting relocation to [0,%x)\n", max );
 	}
 
 	/* Walk through the memory map and find the highest address
@@ -72,7 +72,7 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	new_end = end;
 	for ( i = 0 ; i < memmap.count ; i++ ) {
 		struct memory_region *region = &memmap.regions[i];
-		unsigned long r_start, r_end;
+		uint32_t r_start, r_end;
 
 		DBG ( "Considering [%llx,%llx)\n", region->start, region->end);
 		
@@ -81,17 +81,17 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 		 * with using just 32-bit arithmetic after this stage.
 		 */
 		if ( region->start > max ) {
-			DBG ( "...starts after max=%lx\n", max );
+			DBG ( "...starts after max=%x\n", max );
 			continue;
 		}
 		r_start = region->start;
 		if ( region->end > max ) {
-			DBG ( "...end truncated to max=%lx\n", max );
+			DBG ( "...end truncated to max=%x\n", max );
 			r_end = max;
 		} else {
 			r_end = region->end;
 		}
-		DBG ( "...usable portion is [%lx,%lx)\n", r_start, r_end );
+		DBG ( "...usable portion is [%x,%x)\n", r_start, r_end );
 
 		/* If we have rounded down r_end below r_ start, skip
 		 * this block.
@@ -103,7 +103,7 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 
 		/* Check that there is enough space to fit in iPXE */
 		if ( ( r_end - r_start ) < size ) {
-			DBG ( "...too small (need %lx bytes)\n", size );
+			DBG ( "...too small (need %x bytes)\n", size );
 			continue;
 		}
 
@@ -128,7 +128,7 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	new_start += ( start - new_start ) & ( max_align - 1 );
 	new_end = new_start + size;
 
-	DBG ( "Relocating from [%lx,%lx) to [%lx,%lx)\n",
+	DBG ( "Relocating from [%x,%x) to [%x,%x)\n",
 	      start, end, new_start, new_end );
 	
 	/* Let prefix know what to copy */
