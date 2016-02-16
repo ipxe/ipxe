@@ -192,7 +192,6 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 #define REAL_CODE( asm_code_str )			\
 	"push $1f\n\t"					\
 	"call real_call\n\t"				\
-	"addl $4, %%esp\n\t"				\
 	TEXT16_CODE ( "\n1:\n\t"			\
 		      asm_code_str			\
 		      "\n\t"				\

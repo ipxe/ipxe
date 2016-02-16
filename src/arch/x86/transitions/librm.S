@@ -518,7 +518,7 @@ rc_rmode:
 rc_pmode:
 	/* Restore registers and return */
 	popal
-	ret
+	ret	$4
 
 
 	/* Function vector, used because "call xx(%sp)" is not a valid
