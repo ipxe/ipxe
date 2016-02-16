@@ -36,10 +36,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <rtc.h>
 #include <ipxe/entropy.h>
 
-/** RTC "interrupt triggered" flag */
-static uint8_t __text16 ( rtc_flag );
-#define rtc_flag __use_text16 ( rtc_flag )
-
 /** RTC interrupt handler */
 extern void rtc_isr ( void );
 
@@ -58,23 +54,24 @@ static void rtc_hook_isr ( void ) {
 			      /* Preserve registers */
 			      "pushw %%ax\n\t"
 			      /* Set "interrupt triggered" flag */
-			      "cs movb $0x01, %c0\n\t"
+			      "movb $0x01, %%cs:rtc_flag\n\t"
 			      /* Read RTC status register C to
 			       * acknowledge interrupt
 			       */
-			      "movb %3, %%al\n\t"
-			      "outb %%al, %1\n\t"
-			      "inb %2\n\t"
+			      "movb %2, %%al\n\t"
+			      "outb %%al, %0\n\t"
+			      "inb %1\n\t"
 			      /* Send EOI */
 			      "movb $0x20, %%al\n\t"
 			      "outb %%al, $0xa0\n\t"
 			      "outb %%al, $0x20\n\t"
 			      /* Restore registers and return */
 			      "popw %%ax\n\t"
-			      "iret\n\t" )
+			      "iret\n\t"
+			      "\nrtc_flag:\n\t"
+			      ".byte 0\n\t" )
 		:
-		: "p" ( __from_text16 ( &rtc_flag ) ),
-		  "i" ( CMOS_ADDRESS ), "i" ( CMOS_DATA ),
+		: "i" ( CMOS_ADDRESS ), "i" ( CMOS_DATA ),
 		  "i" ( RTC_STATUS_C ) );
 
 	hook_bios_interrupt ( RTC_INT, ( intptr_t ) rtc_isr, &rtc_old_handler );
@@ -167,9 +164,9 @@ uint8_t rtc_sample ( void ) {
 		REAL_CODE ( /* Enable interrupts */
 			    "sti\n\t"
 			    /* Wait for RTC interrupt */
-			    "cs movb %b2, %c4\n\t"
+			    "movb %b2, %%cs:rtc_flag\n\t"
 			    "\n1:\n\t"
-			    "cs xchgb %b2, %c4\n\t" /* Serialize */
+			    "xchgb %b2, %%cs:rtc_flag\n\t" /* Serialize */
 			    "testb %b2, %b2\n\t"
 			    "jz 1b\n\t"
 			    /* Read "before" TSC */
@@ -178,9 +175,9 @@ uint8_t rtc_sample ( void ) {
 			    "pushl %0\n\t"
 			    /* Wait for another RTC interrupt */
 			    "xorb %b2, %b2\n\t"
-			    "cs movb %b2, %c4\n\t"
+			    "movb %b2, %%cs:rtc_flag\n\t"
 			    "\n1:\n\t"
-			    "cs xchgb %b2, %c4\n\t" /* Serialize */
+			    "xchgb %b2, %%cs:rtc_flag\n\t" /* Serialize */
 			    "testb %b2, %b2\n\t"
 			    "jz 1b\n\t"
 			    /* Read "after" TSC */
@@ -191,7 +188,7 @@ uint8_t rtc_sample ( void ) {
 			    "cli\n\t"
 			    )
 		: "=a" ( after ), "=d" ( before ), "=q" ( temp )
-		: "2" ( 0 ), "p" ( __from_text16 ( &rtc_flag ) ) );
+		: "2" ( 0 ) );
 
 	return ( after - before );
 }
