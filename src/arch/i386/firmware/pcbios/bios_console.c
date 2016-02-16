@@ -434,7 +434,7 @@ static int bios_iskey ( void ) {
 					   "pushfw\n\t"
 					   "popw %w0\n\t"
 					   "cli\n\t" )
-			       : "=r" ( flags ), "=a" ( discard_a )
+			       : "=R" ( flags ), "=a" ( discard_a )
 			       : "a" ( 0x1100 ), "m" ( bios_inject_lock ) );
 	bios_inject_lock--;
 	return ( ! ( flags & ZF ) );
