@@ -80,8 +80,8 @@ void set_interrupt_vector ( unsigned int intr, void *vector ) {
 	idte = &idt[intr];
 	idte->segment = VIRTUAL_CS;
 	idte->attr = ( vector ? ( IDTE_PRESENT | IDTE_TYPE_IRQ32 ) : 0 );
-	idte->low = ( ( ( uint32_t ) vector ) & 0xffff );
-	idte->high = ( ( ( uint32_t ) vector ) >> 16 );
+	idte->low = ( ( ( intptr_t ) vector ) & 0xffff );
+	idte->high = ( ( ( intptr_t ) vector ) >> 16 );
 }
 
 /**
@@ -99,8 +99,8 @@ void init_idt ( void ) {
 		vec->movb = MOVB_INSN;
 		vec->intr = intr;
 		vec->jmp = JMP_INSN;
-		vec->offset = ( ( uint32_t ) interrupt_wrapper -
-				( uint32_t ) vec->next );
+		vec->offset = ( ( intptr_t ) interrupt_wrapper -
+				( intptr_t ) vec->next );
 		set_interrupt_vector ( intr, vec );
 	}
 	DBGC ( &intr_vec[0], "INTn vector at %p+%zxn (phys %#lx+%zxn)\n",
@@ -132,7 +132,7 @@ static struct profiler * interrupt_profiler ( int intr ) {
  *
  * @v intr		Interrupt number
  */
-void __attribute__ (( cdecl, regparm ( 1 ) )) interrupt ( int intr ) {
+void __attribute__ (( regparm ( 1 ) )) interrupt ( int intr ) {
 	struct profiler *profiler = interrupt_profiler ( intr );
 	uint32_t discard_eax;
 

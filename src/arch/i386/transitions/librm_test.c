@@ -69,9 +69,11 @@ static void librm_test_prot_call ( void ) {
 static void librm_test_exec ( void ) {
 	unsigned int i;
 	unsigned long timestamp;
-	unsigned long started;
-	unsigned long stopped;
-	unsigned int discard_d;
+	uint32_t timestamp_lo;
+	uint32_t timestamp_hi;
+	uint32_t started;
+	uint32_t stopped;
+	uint32_t discard_d;
 
 	/* Profile mode transitions.  We want to profile each
 	 * direction of the transition separately, so perform an RDTSC
@@ -81,8 +83,12 @@ static void librm_test_exec ( void ) {
 	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
 		profile_start ( &p2r_profiler );
 		__asm__ __volatile__ ( REAL_CODE ( "rdtsc\n\t" )
-				       : "=a" ( timestamp ), "=d" ( discard_d )
+				       : "=a" ( timestamp_lo ),
+					 "=d" ( timestamp_hi )
 				       : );
+		timestamp = timestamp_lo;
+		if ( sizeof ( timestamp ) > sizeof ( timestamp_lo ) )
+			timestamp |= ( ( ( uint64_t ) timestamp_hi ) << 32 );
 		profile_start_at ( &r2p_profiler, timestamp );
 		profile_stop ( &r2p_profiler );
 		profile_stop_at ( &p2r_profiler, timestamp );
@@ -98,14 +104,14 @@ static void librm_test_exec ( void ) {
 	/* Profile complete protected-mode call cycle */
 	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
 		__asm__ __volatile__ ( REAL_CODE ( "rdtsc\n\t"
-						   "movl %0, %2\n\t"
-						   "pushl %3\n\t"
+						   "movl %k0, %k2\n\t"
+						   "pushl %k3\n\t"
 						   "pushw %%cs\n\t"
 						   "call prot_call\n\t"
 						   "addw $4, %%sp\n\t"
 						   "rdtsc\n\t" )
 				       : "=a" ( stopped ), "=d" ( discard_d ),
-					 "=r" ( started )
+					 "=R" ( started )
 				       : "i" ( librm_test_prot_call ) );
 		profile_start_at ( &prot_call_profiler, started );
 		profile_stop_at ( &prot_call_profiler, stopped );

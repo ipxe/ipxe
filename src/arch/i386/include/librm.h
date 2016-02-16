@@ -173,17 +173,24 @@ extern uint16_t __text16 ( rm_ds );
 extern uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size );
 extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 
+/* CODE_DEFAULT: restore default .code32/.code64 directive */
+#ifdef __x86_64__
+#define CODE_DEFAULT ".code64"
+#else
+#define CODE_DEFAULT ".code32"
+#endif
+
 /* TEXT16_CODE: declare a fragment of code that resides in .text16 */
 #define TEXT16_CODE( asm_code_str )			\
 	".section \".text16\", \"ax\", @progbits\n\t"	\
 	".code16\n\t"					\
 	asm_code_str "\n\t"				\
-	".code32\n\t"					\
+	CODE_DEFAULT "\n\t"				\
 	".previous\n\t"
 
 /* REAL_CODE: declare a fragment of code that executes in real mode */
 #define REAL_CODE( asm_code_str )			\
-	"pushl $1f\n\t"					\
+	"push $1f\n\t"					\
 	"call real_call\n\t"				\
 	"addl $4, %%esp\n\t"				\
 	TEXT16_CODE ( "\n1:\n\t"			\
@@ -194,8 +201,10 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 /* PHYS_CODE: declare a fragment of code that executes in flat physical mode */
 #define PHYS_CODE( asm_code_str )			\
 	"call _virt_to_phys\n\t"			\
+	".code32\n\t"					\
 	asm_code_str					\
-	"call _phys_to_virt\n\t"
+	"call _phys_to_virt\n\t"			\
+	CODE_DEFAULT "\n\t"
 
 /** Number of interrupts */
 #define NUM_INT 256
