@@ -27,7 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/init.h>
 #include <ipxe/profile.h>
 #include <ipxe/netdevice.h>
-#include <setjmp.h>
+#include <rmsetjmp.h>
 #include <registers.h>
 #include <biosint.h>
 #include <pxe.h>

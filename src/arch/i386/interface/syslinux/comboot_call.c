@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <comboot.h>
 #include <bzimage.h>
 #include <pxe_call.h>
-#include <setjmp.h>
+#include <rmsetjmp.h>
 #include <string.h>
 #include <ipxe/posix_io.h>
 #include <ipxe/process.h>

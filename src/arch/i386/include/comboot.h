@@ -10,7 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
-#include <setjmp.h>
+#include <rmsetjmp.h>
 #include <ipxe/in.h>
 
 /** Segment used for COMBOOT PSP and image */

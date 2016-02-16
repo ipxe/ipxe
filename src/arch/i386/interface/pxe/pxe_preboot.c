@@ -33,7 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#include <setjmp.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/fakedhcp.h>
@@ -44,6 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/if_ether.h>
 #include <basemem_packet.h>
 #include <biosint.h>
+#include <rmsetjmp.h>
 #include "pxe.h"
 #include "pxe_call.h"
 

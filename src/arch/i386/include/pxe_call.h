@@ -10,7 +10,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <pxe_api.h>
 #include <realmode.h>
-#include <setjmp.h>
+#include <rmsetjmp.h>
 
 struct net_device;
 
