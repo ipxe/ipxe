@@ -3,7 +3,7 @@
 
 /** @file
  *
- * i386-specific time API implementations
+ * x86-specific time API implementations
  *
  */
 

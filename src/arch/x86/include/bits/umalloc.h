@@ -3,7 +3,7 @@
 
 /** @file
  *
- * i386-specific user memory allocation API implementations
+ * x86-specific user memory allocation API implementations
  *
  */
 

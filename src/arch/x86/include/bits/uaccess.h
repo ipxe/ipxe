@@ -3,7 +3,7 @@
 
 /** @file
  *
- * i386-specific user access API implementations
+ * x86-specific user access API implementations
  *
  */
 

@@ -3,10 +3,13 @@
 
 /** @file
  *
- * x86_64-specific CPU sleeping API implementations
+ * x86-specific CPU sleeping API implementations
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+
+#include <ipxe/bios_nap.h>
 #include <ipxe/efi/efix86_nap.h>
 
 #endif /* _BITS_MAP_H */

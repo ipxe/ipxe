@@ -3,7 +3,7 @@
 
 /** @file
  *
- * i386-specific SMBIOS API implementations
+ * x86-specific SMBIOS API implementations
  *
  */
 

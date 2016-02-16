@@ -3,7 +3,7 @@
 
 /** @file
  *
- * i386-specific reboot API implementations
+ * x86-specific reboot API implementations
  *
  */
 

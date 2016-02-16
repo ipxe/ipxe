@@ -3,7 +3,7 @@
 
 /** @file
  *
- * i386-specific timer API implementations
+ * x86-specific timer API implementations
  *
  */
 
