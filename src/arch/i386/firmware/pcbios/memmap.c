@@ -92,7 +92,7 @@ static unsigned int extmemsize_e801 ( void ) {
 					   "int $0x15\n\t"
 					   "pushfw\n\t"
 					   "popw %w0\n\t" )
-			       : "=r" ( flags ),
+			       : "=R" ( flags ),
 				 "=a" ( extmem_1m_to_16m_k ),
 				 "=b" ( extmem_16m_plus_64k ),
 				 "=c" ( confmem_1m_to_16m_k ),
