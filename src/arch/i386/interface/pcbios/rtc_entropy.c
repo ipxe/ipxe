@@ -77,8 +77,7 @@ static void rtc_hook_isr ( void ) {
 		  "i" ( CMOS_ADDRESS ), "i" ( CMOS_DATA ),
 		  "i" ( RTC_STATUS_C ) );
 
-	hook_bios_interrupt ( RTC_INT, ( unsigned int ) rtc_isr,
-			      &rtc_old_handler );
+	hook_bios_interrupt ( RTC_INT, ( intptr_t ) rtc_isr, &rtc_old_handler );
 }
 
 /**
@@ -88,7 +87,7 @@ static void rtc_hook_isr ( void ) {
 static void rtc_unhook_isr ( void ) {
 	int rc;
 
-	rc = unhook_bios_interrupt ( RTC_INT, ( unsigned int ) rtc_isr,
+	rc = unhook_bios_interrupt ( RTC_INT, ( intptr_t ) rtc_isr,
 				     &rtc_old_handler );
 	assert ( rc == 0 ); /* Should always be able to unhook */
 }

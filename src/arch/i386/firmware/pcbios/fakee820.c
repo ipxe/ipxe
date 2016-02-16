@@ -88,11 +88,11 @@ void fake_e820 ( void ) {
 			      "ljmp *%%cs:real_int15_vector\n\t" )
 		: : "i" ( sizeof ( e820map ) ) );
 
-	hook_bios_interrupt ( 0x15, ( unsigned int ) int15_fakee820,
+	hook_bios_interrupt ( 0x15, ( intptr_t ) int15_fakee820,
 			      &real_int15_vector );
 }
 
 void unfake_e820 ( void ) {
-	unhook_bios_interrupt ( 0x15, ( unsigned int ) int15_fakee820,
+	unhook_bios_interrupt ( 0x15, ( intptr_t ) int15_fakee820,
 				&real_int15_vector );
 }

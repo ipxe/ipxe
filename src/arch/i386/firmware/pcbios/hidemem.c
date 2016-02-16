@@ -179,8 +179,7 @@ static void hide_etherboot ( void ) {
 	}
 
 	/* Hook INT 15 */
-	hook_bios_interrupt ( 0x15, ( unsigned int ) int15,
-			      &int15_vector );
+	hook_bios_interrupt ( 0x15, ( intptr_t ) int15, &int15_vector );
 
 	/* Dump memory map after mangling */
 	DBG ( "Hidden iPXE from system memory map\n" );
@@ -210,7 +209,7 @@ static void unhide_etherboot ( int flags __unused ) {
 	}
 
 	/* Try to unhook INT 15 */
-	if ( ( rc = unhook_bios_interrupt ( 0x15, ( unsigned int ) int15,
+	if ( ( rc = unhook_bios_interrupt ( 0x15, ( intptr_t ) int15,
 					    &int15_vector ) ) != 0 ) {
 		DBG ( "Cannot unhook INT15: %s\n", strerror ( rc ) );
 		/* Leave it hooked; there's nothing else we can do,

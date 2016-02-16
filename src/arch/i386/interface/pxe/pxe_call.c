@@ -278,7 +278,7 @@ void pxe_activate ( struct net_device *netdev ) {
 
 	/* Ensure INT 1A is hooked */
 	if ( ! int_1a_hooked ) {
-		hook_bios_interrupt ( 0x1a, ( unsigned int ) pxe_int_1a,
+		hook_bios_interrupt ( 0x1a, ( intptr_t ) pxe_int_1a,
 				      &pxe_int_1a_vector );
 		devices_get();
 		int_1a_hooked = 1;
@@ -311,7 +311,7 @@ int pxe_deactivate ( void ) {
 	/* Ensure INT 1A is unhooked, if possible */
 	if ( int_1a_hooked ) {
 		if ( ( rc = unhook_bios_interrupt ( 0x1a,
-						    (unsigned int) pxe_int_1a,
+						    ( intptr_t ) pxe_int_1a,
 						    &pxe_int_1a_vector ))!= 0){
 			DBGC ( &pxe_netdev, "PXE could not unhook INT 1A: %s\n",
 			       strerror ( rc ) );

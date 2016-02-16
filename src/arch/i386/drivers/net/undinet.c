@@ -143,8 +143,7 @@ static void undinet_hook_isr ( unsigned int irq ) {
 	assert ( undiisr_irq == 0 );
 
 	undiisr_irq = irq;
-	hook_bios_interrupt ( IRQ_INT ( irq ),
-			      ( ( unsigned int ) undiisr ),
+	hook_bios_interrupt ( IRQ_INT ( irq ), ( ( intptr_t ) undiisr ),
 			      &undiisr_next_handler );
 }
 
@@ -157,8 +156,7 @@ static void undinet_unhook_isr ( unsigned int irq ) {
 
 	assert ( irq <= IRQ_MAX );
 
-	unhook_bios_interrupt ( IRQ_INT ( irq ),
-				( ( unsigned int ) undiisr ),
+	unhook_bios_interrupt ( IRQ_INT ( irq ), ( ( intptr_t ) undiisr ),
 				&undiisr_next_handler );
 	undiisr_irq = 0;
 }

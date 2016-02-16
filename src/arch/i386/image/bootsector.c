@@ -71,9 +71,9 @@ int call_bootsector ( unsigned int segment, unsigned int offset,
 	DBG ( "Booting from boot sector at %04x:%04x\n", segment, offset );
 
 	/* Hook INTs 18 and 19 to capture failure paths */
-	hook_bios_interrupt ( 0x18, ( unsigned int ) bootsector_exec_fail,
+	hook_bios_interrupt ( 0x18, ( intptr_t ) bootsector_exec_fail,
 			      &int18_vector );
-	hook_bios_interrupt ( 0x19, ( unsigned int ) bootsector_exec_fail,
+	hook_bios_interrupt ( 0x19, ( intptr_t ) bootsector_exec_fail,
 			      &int19_vector );
 
 	/* Boot the loaded sector
@@ -132,9 +132,9 @@ int call_bootsector ( unsigned int segment, unsigned int offset,
 	DBG ( "Booted disk returned via INT 18 or 19\n" );
 
 	/* Unhook INTs 18 and 19 */
-	unhook_bios_interrupt ( 0x18, ( unsigned int ) bootsector_exec_fail,
+	unhook_bios_interrupt ( 0x18, ( intptr_t ) bootsector_exec_fail,
 				&int18_vector );
-	unhook_bios_interrupt ( 0x19, ( unsigned int ) bootsector_exec_fail,
+	unhook_bios_interrupt ( 0x19, ( intptr_t ) bootsector_exec_fail,
 				&int19_vector );
 	
 	return -ECANCELED;

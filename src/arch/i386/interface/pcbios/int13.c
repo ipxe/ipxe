@@ -1516,15 +1516,14 @@ static void int13_hook_vector ( void ) {
 			     "iret\n\t" )
 	       : : "i" ( int13 ) );
 
-	hook_bios_interrupt ( 0x13, ( unsigned int ) int13_wrapper,
-			      &int13_vector );
+	hook_bios_interrupt ( 0x13, ( intptr_t ) int13_wrapper, &int13_vector );
 }
 
 /**
  * Unhook INT 13 handler
  */
 static void int13_unhook_vector ( void ) {
-	unhook_bios_interrupt ( 0x13, ( unsigned int ) int13_wrapper,
+	unhook_bios_interrupt ( 0x13, ( intptr_t ) int13_wrapper,
 				&int13_vector );
 }
 

@@ -543,7 +543,7 @@ static void bios_inject_startup ( void ) {
 		: : "i" ( bios_inject ) );
 
 	/* Hook INT 16 */
-	hook_bios_interrupt ( 0x16, ( ( unsigned int ) int16_wrapper ),
+	hook_bios_interrupt ( 0x16, ( ( intptr_t ) int16_wrapper ),
 			      &int16_vector );
 }
 
@@ -555,7 +555,7 @@ static void bios_inject_startup ( void ) {
 static void bios_inject_shutdown ( int booting __unused ) {
 
 	/* Unhook INT 16 */
-	unhook_bios_interrupt ( 0x16, ( ( unsigned int ) int16_wrapper ),
+	unhook_bios_interrupt ( 0x16, ( ( intptr_t ) int16_wrapper ),
 				&int16_vector );
 }
 

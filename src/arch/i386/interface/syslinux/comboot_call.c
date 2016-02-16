@@ -668,8 +668,7 @@ void hook_comboot_interrupts ( ) {
 		              "iret\n\t" )
 		          : : "i" ( int20 ) );
 
-	hook_bios_interrupt ( 0x20, ( unsigned int ) int20_wrapper,
-		                      &int20_vector );
+	hook_bios_interrupt ( 0x20, ( intptr_t ) int20_wrapper, &int20_vector );
 
 	__asm__ __volatile__ (
 		TEXT16_CODE ( "\nint21_wrapper:\n\t"
@@ -681,8 +680,7 @@ void hook_comboot_interrupts ( ) {
 		              "iret\n\t" )
 		          : : "i" ( int21 ) );
 
-	hook_bios_interrupt ( 0x21, ( unsigned int ) int21_wrapper,
-	                      &int21_vector );
+	hook_bios_interrupt ( 0x21, ( intptr_t ) int21_wrapper, &int21_vector );
 
 	__asm__  __volatile__ (
 		TEXT16_CODE ( "\nint22_wrapper:\n\t"
@@ -694,8 +692,7 @@ void hook_comboot_interrupts ( ) {
 		              "iret\n\t" )
 		          : : "i" ( int22) );
 
-	hook_bios_interrupt ( 0x22, ( unsigned int ) int22_wrapper,
-	                      &int22_vector );
+	hook_bios_interrupt ( 0x22, ( intptr_t ) int22_wrapper, &int22_vector );
 }
 
 /**
@@ -703,13 +700,13 @@ void hook_comboot_interrupts ( ) {
  */
 void unhook_comboot_interrupts ( ) {
 
-	unhook_bios_interrupt ( 0x20, ( unsigned int ) int20_wrapper,
+	unhook_bios_interrupt ( 0x20, ( intptr_t ) int20_wrapper,
 				&int20_vector );
 
-	unhook_bios_interrupt ( 0x21, ( unsigned int ) int21_wrapper,
+	unhook_bios_interrupt ( 0x21, ( intptr_t ) int21_wrapper,
 				&int21_vector );
 
-	unhook_bios_interrupt ( 0x22, ( unsigned int ) int22_wrapper,
+	unhook_bios_interrupt ( 0x22, ( intptr_t ) int22_wrapper,
 				&int22_vector );
 }
 
