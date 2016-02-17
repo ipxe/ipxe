@@ -827,6 +827,7 @@ payload_death_message:
 	movw	%ax, %di
 	addl	$0x400, %edi
 	subl	$_textdata_memsz_kb, %edi
+	andw	$~0x03, %di
 	shll	$10, %edi
 	/* Sanity check: if we have ended up below 1MB, use 1MB */
 	cmpl	$0x100000, %edi
