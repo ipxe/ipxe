@@ -390,13 +390,14 @@ rm_gdtr:
  *      void pxe_api_call ( struct i386_all_regs *ix86 );
  ****************************************************************************
  */
-
-#define PC_OFFSET_GDT ( 0 )
-#define PC_OFFSET_IDT ( PC_OFFSET_GDT + 6 )
-#define PC_OFFSET_IX86 ( PC_OFFSET_IDT + 6 )
-#define PC_OFFSET_RETADDR ( PC_OFFSET_IX86 + SIZEOF_I386_ALL_REGS )
-#define PC_OFFSET_FUNCTION ( PC_OFFSET_RETADDR + 4 )
-#define PC_OFFSET_END ( PC_OFFSET_FUNCTION + 4 )
+	.struct	0
+PC_OFFSET_GDT:		.space	6
+PC_OFFSET_IDT:		.space	6
+PC_OFFSET_IX86:		.space	SIZEOF_I386_ALL_REGS
+PC_OFFSET_RETADDR:	.space	4
+PC_OFFSET_FUNCTION:	.space	4
+PC_OFFSET_END:
+	.previous
 
 	.section ".text16.prot_call", "ax", @progbits
 	.code16
@@ -478,11 +479,13 @@ pc_rmode:
  * Returns: none
  ****************************************************************************
  */
-
-#define RC_OFFSET_PRESERVE_REGS ( 0 )
-#define RC_OFFSET_RETADDR ( RC_OFFSET_PRESERVE_REGS + SIZEOF_I386_REGS )
-#define RC_OFFSET_FUNCTION ( RC_OFFSET_RETADDR + 4 )
-#define RC_OFFSET_END ( RC_OFFSET_FUNCTION + 4 )
+	.struct	0
+RC_OFFSET_REGS:		.space	SIZEOF_I386_REGS
+RC_OFFSET_REGS_END:
+RC_OFFSET_RETADDR:	.space	4
+RC_OFFSET_FUNCTION:	.space	4
+RC_OFFSET_END:
+	.previous
 
 	.section ".text.real_call", "ax", @progbits
 	.code32
@@ -493,7 +496,7 @@ real_call:
 	pushl	RC_OFFSET_FUNCTION(%esp)
 
 	/* Switch to real mode and move register dump to RM stack  */
-	movl	$( RC_OFFSET_RETADDR + 4 /* function pointer copy */ ), %ecx
+	movl	$( RC_OFFSET_REGS_END + 4 /* function pointer copy */ ), %ecx
 	pushl	$rc_rmode
 	movl	$rm_default_gdtr_idtr, %esi
 	jmp	prot_to_real
@@ -510,7 +513,7 @@ rc_rmode:
 	cld
 
 	/* Switch to protected mode and move register dump back to PM stack */
-	movl	$RC_OFFSET_RETADDR, %ecx
+	movl	$RC_OFFSET_REGS_END, %ecx
 	pushl	$rc_pmode
 	jmp	real_to_prot
 	.section ".text.real_call", "ax", @progbits
