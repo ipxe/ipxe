@@ -69,7 +69,7 @@ progress_\@:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.print_character", "awx", @progbits
 	.code16
 	.globl	print_character
 print_character:
@@ -107,7 +107,7 @@ print_character:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.print_space", "awx", @progbits
 	.code16
 	.globl	print_space
 print_space:
@@ -132,7 +132,7 @@ print_space:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.print_message", "awx", @progbits
 	.code16
 	.globl	print_message
 print_message:
@@ -162,7 +162,7 @@ print_message:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.print_hex", "awx", @progbits
 	.code16
 	.globl	print_hex_dword
 print_hex_dword:
@@ -210,7 +210,7 @@ print_hex_nibble:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.print_pci_busdevfn", "awx", @progbits
 	.code16
 	.globl	print_pci_busdevfn
 print_pci_busdevfn:
@@ -247,7 +247,7 @@ print_pci_busdevfn:
  *   %ds:di : next character in output buffer (if applicable)
  *****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.print_kill_line", "awx", @progbits
 	.code16
 	.globl	print_kill_line
 print_kill_line:
@@ -285,7 +285,7 @@ print_kill_line:
  *   None
  ****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.copy_bytes", "awx", @progbits
 	.code16
 copy_bytes:
 	pushl	%ecx
@@ -308,7 +308,7 @@ copy_bytes:
  *   None
  ****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.zero_bytes", "awx", @progbits
 	.code16
 zero_bytes:
 	pushl	%ecx
@@ -343,7 +343,7 @@ zero_bytes:
  *   None
  ****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.process_bytes", "awx", @progbits
 	.code16
 process_bytes:
 
@@ -495,7 +495,7 @@ process_bytes:
  *   none
  ****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.install_block", "awx", @progbits
 	.code16
 install_block:
 	/* Preserve registers */
@@ -544,7 +544,7 @@ install_block:
  *   none
  ****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.alloc_basemem", "awx", @progbits
 	.code16
 	.globl	alloc_basemem
 alloc_basemem:
@@ -591,7 +591,7 @@ alloc_basemem:
  *   none
  ****************************************************************************
  */
-	.section ".text16", "ax", @progbits
+	.section ".text16.free_basemem", "ax", @progbits
 	.code16
 	.globl	free_basemem
 free_basemem:
@@ -625,7 +625,7 @@ free_basemem:
 	ret
 	.size free_basemem, . - free_basemem
 
-	.section ".text16.data", "aw", @progbits
+	.section ".text16.data.hooked_bios_interrupts", "aw", @progbits
 	.globl	hooked_bios_interrupts
 hooked_bios_interrupts:
 	.word	0
@@ -645,7 +645,7 @@ hooked_bios_interrupts:
  *   none
  ****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.install", "awx", @progbits
 	.code16
 	.globl install
 install:
@@ -688,7 +688,7 @@ install:
  *   none
  ****************************************************************************
  */
-	.section ".prefix.lib", "awx", @progbits
+	.section ".prefix.install_prealloc", "awx", @progbits
 	.code16
 	.globl install_prealloc
 install_prealloc:
@@ -751,7 +751,7 @@ install_prealloc:
 	xorw	%di, %di
 	call	print_message
 2:	jmp	2b
-	.section ".prefix.data", "aw", @progbits
+	.section ".prefix.data.a20_death_message", "aw", @progbits
 a20_death_message:
 	.asciz	"\nHigh memory inaccessible - cannot continue\n"
 	.size	a20_death_message, . - a20_death_message
@@ -780,7 +780,7 @@ a20_death_message:
 	cli
 	hlt
 	jmp	2b
-	.section ".prefix.data", "aw", @progbits
+	.section ".prefix.data.payload_death_message", "aw", @progbits
 payload_death_message:
 	.asciz	"\nPayload inaccessible - cannot continue\n"
 	.size	payload_death_message, . - payload_death_message
@@ -918,7 +918,7 @@ payload_death_message:
 	/* Vectors for far calls to .text16 functions.  Must be in
 	 * .data16, since .prefix may not be writable.
 	 */
-	.section ".data16", "aw", @progbits
+	.section ".data16.install_prealloc", "aw", @progbits
 #ifdef KEEP_IT_REAL
 init_libkir_vector:
 	.word init_libkir
@@ -940,7 +940,7 @@ close_payload_vector:
 	.size close_payload_vector, . - close_payload_vector
 
 	/* Dummy routines to open and close payload */
-	.section ".text16.early.data", "aw", @progbits
+	.section ".text16.early.data.open_payload", "aw", @progbits
 	.weak	open_payload
 	.weak	close_payload
 open_payload:
@@ -963,7 +963,7 @@ close_payload:
  *   none
  ****************************************************************************
  */
-	.section ".text16", "ax", @progbits
+	.section ".text16.uninstall", "ax", @progbits
 	.code16
 	.globl uninstall
 uninstall:
