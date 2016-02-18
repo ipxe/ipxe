@@ -14,6 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define REAL_CS 0x28
 #define REAL_DS 0x30
 #define P2R_DS 0x38
+#define LONG_CS 0x40
 
 /* Calculate symbol address within VIRTUAL_CS or VIRTUAL_DS
  *
@@ -286,16 +287,24 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 /** Number of interrupts */
 #define NUM_INT 256
 
-/** An interrupt descriptor table register */
-struct idtr {
+/** A 32-bit interrupt descriptor table register */
+struct idtr32 {
 	/** Limit */
 	uint16_t limit;
 	/** Base */
 	uint32_t base;
 } __attribute__ (( packed ));
 
-/** An interrupt descriptor table entry */
-struct interrupt_descriptor {
+/** A 64-bit interrupt descriptor table register */
+struct idtr64 {
+	/** Limit */
+	uint16_t limit;
+	/** Base */
+	uint64_t base;
+} __attribute__ (( packed ));
+
+/** A 32-bit interrupt descriptor table entry */
+struct interrupt32_descriptor {
 	/** Low 16 bits of address */
 	uint16_t low;
 	/** Code segment */
@@ -308,23 +317,44 @@ struct interrupt_descriptor {
 	uint16_t high;
 } __attribute__ (( packed ));
 
+/** A 64-bit interrupt descriptor table entry */
+struct interrupt64_descriptor {
+	/** Low 16 bits of address */
+	uint16_t low;
+	/** Code segment */
+	uint16_t segment;
+	/** Unused */
+	uint8_t unused;
+	/** Type and attributes */
+	uint8_t attr;
+	/** Middle 16 bits of address */
+	uint16_t mid;
+	/** High 32 bits of address */
+	uint32_t high;
+	/** Reserved */
+	uint32_t reserved;
+} __attribute__ (( packed ));
+
 /** Interrupt descriptor is present */
 #define IDTE_PRESENT 0x80
 
 /** Interrupt descriptor 32-bit interrupt gate type */
 #define IDTE_TYPE_IRQ32 0x0e
 
+/** Interrupt descriptor 64-bit interrupt gate type */
+#define IDTE_TYPE_IRQ64 0x0e
+
 /** An interrupt vector
  *
  * Each interrupt vector comprises an eight-byte fragment of code:
  *
- *   60			pushal
+ *   50			pushl %eax (or pushq %rax in long mode)
  *   b0 xx		movb $INT, %al
  *   e9 xx xx xx xx	jmp interrupt_wrapper
  */
 struct interrupt_vector {
-	/** "pushal" instruction */
-	uint8_t pushal;
+	/** "push" instruction */
+	uint8_t push;
 	/** "movb" instruction */
 	uint8_t movb;
 	/** Interrupt number */
@@ -337,8 +367,8 @@ struct interrupt_vector {
 	uint8_t next[0];
 } __attribute__ (( packed ));
 
-/** "pushal" instruction */
-#define PUSHAL_INSN 0x60
+/** "push %eax" instruction */
+#define PUSH_INSN 0x50
 
 /** "movb" instruction */
 #define MOVB_INSN 0xb0

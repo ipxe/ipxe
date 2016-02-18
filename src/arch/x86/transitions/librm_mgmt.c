@@ -23,12 +23,22 @@ extern char interrupt_wrapper[];
 /** The interrupt vectors */
 static struct interrupt_vector intr_vec[NUM_INT];
 
-/** The interrupt descriptor table */
-struct interrupt_descriptor idt[NUM_INT] __attribute__ (( aligned ( 16 ) ));
+/** The 32-bit interrupt descriptor table */
+static struct interrupt32_descriptor
+idt32[NUM_INT] __attribute__ (( aligned ( 16 ) ));
+
+/** The 32-bit interrupt descriptor table register */
+struct idtr32 idtr32 = {
+	.limit = ( sizeof ( idt32 ) - 1 ),
+};
+
+/** The 64-bit interrupt descriptor table */
+static struct interrupt64_descriptor
+idt64[NUM_INT] __attribute__ (( aligned ( 16 ) ));
 
 /** The interrupt descriptor table register */
-struct idtr idtr = {
-	.limit = ( sizeof ( idt ) - 1 ),
+struct idtr64 idtr64 = {
+	.limit = ( sizeof ( idt64 ) - 1 ),
 };
 
 /** Timer interrupt profiler */
@@ -75,13 +85,27 @@ void remove_user_from_rm_stack ( userptr_t data, size_t size ) {
  * @v vector		Interrupt vector, or NULL to disable
  */
 void set_interrupt_vector ( unsigned int intr, void *vector ) {
-	struct interrupt_descriptor *idte;
+	struct interrupt32_descriptor *idte32;
+	struct interrupt64_descriptor *idte64;
+	intptr_t addr = ( ( intptr_t ) vector );
 
-	idte = &idt[intr];
-	idte->segment = VIRTUAL_CS;
-	idte->attr = ( vector ? ( IDTE_PRESENT | IDTE_TYPE_IRQ32 ) : 0 );
-	idte->low = ( ( ( intptr_t ) vector ) & 0xffff );
-	idte->high = ( ( ( intptr_t ) vector ) >> 16 );
+	/* Populate 32-bit interrupt descriptor */
+	idte32 = &idt32[intr];
+	idte32->segment = VIRTUAL_CS;
+	idte32->attr = ( vector ? ( IDTE_PRESENT | IDTE_TYPE_IRQ32 ) : 0 );
+	idte32->low = ( addr >> 0 );
+	idte32->high = ( addr >> 16 );
+
+	/* Populate 64-bit interrupt descriptor, if applicable */
+	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {
+		idte64 = &idt64[intr];
+		idte64->segment = LONG_CS;
+		idte64->attr = ( vector ?
+				 ( IDTE_PRESENT | IDTE_TYPE_IRQ64 ) : 0 );
+		idte64->low = ( addr >> 0 );
+		idte64->mid = ( addr >> 16 );
+		idte64->high = ( ( ( uint64_t ) addr ) >> 32 );
+	}
 }
 
 /**
@@ -95,7 +119,7 @@ void init_idt ( void ) {
 	/* Initialise the interrupt descriptor table and interrupt vectors */
 	for ( intr = 0 ; intr < NUM_INT ; intr++ ) {
 		vec = &intr_vec[intr];
-		vec->pushal = PUSHAL_INSN;
+		vec->push = PUSH_INSN;
 		vec->movb = MOVB_INSN;
 		vec->intr = intr;
 		vec->jmp = JMP_INSN;
@@ -107,8 +131,14 @@ void init_idt ( void ) {
 	       intr_vec, sizeof ( intr_vec[0] ),
 	       virt_to_phys ( intr_vec ), sizeof ( intr_vec[0] ) );
 
-	/* Initialise the interrupt descriptor table register */
-	idtr.base = virt_to_phys ( idt );
+	/* Initialise the 32-bit interrupt descriptor table register */
+	idtr32.base = virt_to_phys ( idt32 );
+
+	/* Initialise the 64-bit interrupt descriptor table register,
+	 * if applicable.
+	 */
+	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) )
+		idtr64.base = virt_to_phys ( idt64 );
 }
 
 /**

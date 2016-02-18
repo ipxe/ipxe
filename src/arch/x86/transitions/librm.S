@@ -19,6 +19,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 /* CR4: physical address extensions */
 #define CR4_PAE ( 1 << 5 )
 
+/* Extended feature enable MSR (EFER) */
+#define MSR_EFER 0xc0000080
+
+/* EFER: long mode enable */
+#define EFER_LME ( 1 << 8 )
+
 /* Page: present */
 #define PG_P 0x01
 
@@ -49,12 +55,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define SIZEOF_REAL_MODE_REGS	( SIZEOF_I386_SEG_REGS + SIZEOF_I386_REGS )
 #define SIZEOF_I386_FLAGS	4
 #define SIZEOF_I386_ALL_REGS	( SIZEOF_REAL_MODE_REGS + SIZEOF_I386_FLAGS )
+#define SIZEOF_X86_64_REGS	128
 
 /* Size of an address */
 #ifdef __x86_64__
 #define SIZEOF_ADDR 8
 #else
 #define SIZEOF_ADDR 4
+#endif
+
+/* Default code size */
+#ifdef __x86_64__
+#define CODE_DEFAULT code64
+#else
+#define CODE_DEFAULT code32
 #endif
 
 /* Selectively assemble code for 32-bit/64-bit builds */
@@ -123,6 +137,11 @@ real_ds:	/* 16 bit real mode data segment */
 p2r_ds:		/* 16 bit real mode data segment for prot_to_real transition */
 	.word	0xffff, ( P2R_DS << 4 )
 	.byte	0, 0x93, 0x00, 0
+
+	.org	gdt + LONG_CS, 0
+long_cs:	/* 64 bit long mode code segment */
+	.word	0, 0
+	.byte	0, 0x9a, 0x20, 0
 
 gdt_end:
 	.equ	gdt_length, gdt_end - gdt
@@ -256,10 +275,9 @@ init_librm:
 .if32 ;	subl	%edi, %eax ; .endif
 	movl	%eax, rm_data16
 
-.if64 ;	/* Reset page tables, if applicable */
-	xorl	%eax, %eax
-	movl	%eax, pml4
-.endif
+	/* Configure virt_call for protected mode, if applicable */
+.if64 ;	movl	$VIRTUAL(vc_pmode), %cs:vc_jmp_offset ; .endif
+
 	/* Switch to protected mode */
 	virtcall init_librm_pmode
 	.section ".text.init_librm", "ax", @progbits
@@ -276,8 +294,10 @@ init_librm_pmode:
 	rep movsl
 	popw	%ds
 
-.if64 ;	/* Initialise page tables, if applicable */
+.if64 ;	/* Initialise long mode, if applicable */
 	movl	VIRTUAL(virt_offset), %edi
+	leal	VIRTUAL(p2l_ljmp_target)(%edi), %eax
+	movl	%eax, VIRTUAL(p2l_ljmp_offset)
 	call	init_pages
 .endif
 	/* Return to real mode */
@@ -285,6 +305,9 @@ init_librm_pmode:
 	.section ".text16.init_librm", "ax", @progbits
 	.code16
 init_librm_rmode:
+
+	/* Configure virt_call for long mode, if applicable */
+.if64 ;	movl	$VIRTUAL(vc_lmode), %cs:vc_jmp_offset ; .endif
 
 	/* Initialise IDT */
 	virtcall init_idt
@@ -361,9 +384,10 @@ real_to_prot:
 	movw	%ax, %gs
 	movw	%ax, %ss
 
-	/* Switch to protected mode */
+	/* Switch to protected mode (with paging disabled if applicable) */
 	cli
 	movl	%cr0, %eax
+.if64 ;	andl	$~CR0_PG, %eax ; .endif
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
 	data32 ljmp	$VIRTUAL_CS, $VIRTUAL(r2p_pmode)
@@ -380,7 +404,7 @@ r2p_pmode:
 	movl	VIRTUAL(pm_esp), %esp
 
 	/* Load protected-mode interrupt descriptor table */
-	lidt	VIRTUAL(idtr)
+	lidt	VIRTUAL(idtr32)
 
 	/* Record real-mode %ss:sp (after removal of data) */
 	movw	%bp, VIRTUAL(rm_ss)
@@ -640,10 +664,233 @@ intr_to_prot:
 	.equ	_intr_to_virt, intr_to_prot
 
 /****************************************************************************
+ * prot_to_long (protected-mode near call, 32-bit virtual return address)
+ *
+ * Switch from 32-bit protected mode with virtual addresses to 64-bit
+ * long mode.  The protected-mode %esp is adjusted to a physical
+ * address.  All other registers are preserved.
+ *
+ * The return address for this function should be a 32-bit (sic)
+ * virtual address.
+ *
+ ****************************************************************************
+ */
+	.if64
+
+	.section ".text.prot_to_long", "ax", @progbits
+	.code32
+prot_to_long:
+	/* Preserve registers */
+	pushl	%eax
+	pushl	%ecx
+	pushl	%edx
+
+	/* Set up PML4 */
+	movl	VIRTUAL(pml4), %eax
+	movl	%eax, %cr3
+
+	/* Enable PAE */
+	movl	%cr4, %eax
+	orb	$CR4_PAE, %al
+	movl	%eax, %cr4
+
+	/* Enable long mode */
+	movl	$MSR_EFER, %ecx
+	rdmsr
+	orw	$EFER_LME, %ax
+	wrmsr
+
+	/* Enable paging */
+	movl	%cr0, %eax
+	orl	$CR0_PG, %eax
+	movl	%eax, %cr0
+
+	/* Restore registers */
+	popl	%edx
+	popl	%ecx
+	popl	%eax
+
+	/* Construct 64-bit return address */
+	pushl	(%esp)
+	movl	$0xffffffff, 4(%esp)
+p2l_ljmp:
+	/* Switch to long mode (using a physical %rip) */
+	ljmp	$LONG_CS, $0
+	.code64
+p2l_lmode:
+	/* Adjust and zero-extend %esp to a physical address */
+	addl	virt_offset, %esp
+
+	/* Use long-mode IDT */
+	lidt	idtr64
+
+	/* Return to virtual address */
+	ret
+
+	/* Long mode jump offset and target.  Required since an ljmp
+	 * in protected mode will zero-extend the offset, and so
+	 * cannot reach an address within the negative 2GB as used by
+	 * -mcmodel=kernel.  Assigned by the call to init_librm.
+	 */
+	.equ	p2l_ljmp_offset, ( p2l_ljmp + 1 )
+	.equ	p2l_ljmp_target, p2l_lmode
+
+	.endif
+
+/****************************************************************************
+ * long_to_prot (long-mode near call, 64-bit virtual return address)
+ *
+ * Switch from 64-bit long mode to 32-bit protected mode with virtual
+ * addresses.  The long-mode %rsp is adjusted to a virtual address.
+ * All other registers are preserved.
+ *
+ * The return address for this function should be a 64-bit (sic)
+ * virtual address.
+ *
+ ****************************************************************************
+ */
+	.if64
+
+	.section ".text.long_to_prot", "ax", @progbits
+	.code64
+long_to_prot:
+	/* Switch to protected mode */
+	ljmp	*l2p_vector
+	.code32
+l2p_pmode:
+	/* Adjust %esp to a virtual address */
+	subl	VIRTUAL(virt_offset), %esp
+
+	/* Preserve registers */
+	pushl	%eax
+	pushl	%ecx
+	pushl	%edx
+
+	/* Disable paging */
+	movl	%cr0, %eax
+	andl	$~CR0_PG, %eax
+	movl	%eax, %cr0
+
+	/* Disable PAE (in case external non-PAE-aware code enables paging) */
+	movl	%cr4, %eax
+	andb	$~CR4_PAE, %al
+	movl	%eax, %cr4
+
+	/* Disable long mode */
+	movl	$MSR_EFER, %ecx
+	rdmsr
+	andw	$~EFER_LME, %ax
+	wrmsr
+
+	/* Restore registers */
+	popl	%edx
+	popl	%ecx
+	popl	%eax
+
+	/* Use protected-mode IDT */
+	lidt	VIRTUAL(idtr32)
+
+	/* Return */
+	ret	$4
+
+	/* Long mode jump vector.  Required since there is no "ljmp
+	 * immediate" instruction in long mode.
+	 */
+	.section ".data.l2p_vector", "aw", @progbits
+l2p_vector:
+	.long	VIRTUAL(l2p_pmode), VIRTUAL_CS
+
+	.endif
+
+/****************************************************************************
+ * long_save_regs (long-mode near call, 64-bit virtual return address)
+ *
+ * Preserve registers that are accessible only in long mode.  This
+ * includes %r8-%r15 and the upper halves of %rax, %rbx, %rcx, %rdx,
+ * %rsi, %rdi, and %rbp.
+ *
+ ****************************************************************************
+ */
+	.if64
+
+	.section ".text.long_preserve_regs", "ax", @progbits
+	.code64
+long_preserve_regs:
+	/* Preserve registers */
+	pushq	%rax
+	pushq	%rcx
+	pushq	%rdx
+	pushq	%rbx
+	pushq	%rsp
+	pushq	%rbp
+	pushq	%rsi
+	pushq	%rdi
+	pushq	%r8
+	pushq	%r9
+	pushq	%r10
+	pushq	%r11
+	pushq	%r12
+	pushq	%r13
+	pushq	%r14
+	pushq	%r15
+
+	/* Return */
+	jmp	*SIZEOF_X86_64_REGS(%rsp)
+
+	.endif
+
+/****************************************************************************
+ * long_restore_regs (long-mode near call, 64-bit virtual return address)
+ *
+ * Restore registers that are accessible only in long mode.  This
+ * includes %r8-%r15 and the upper halves of %rax, %rbx, %rcx, %rdx,
+ * %rsi, %rdi, and %rbp.
+ *
+ ****************************************************************************
+ */
+	.if64
+
+	.section ".text.long_restore_regs", "ax", @progbits
+	.code64
+long_restore_regs:
+	/* Move return address above register dump */
+	popq	SIZEOF_X86_64_REGS(%rsp)
+
+	/* Restore registers */
+	popq	%r15
+	popq	%r14
+	popq	%r13
+	popq	%r12
+	popq	%r11
+	popq	%r10
+	popq	%r9
+	popq	%r8
+	movl	%edi, (%rsp)
+	popq	%rdi
+	movl	%esi, (%rsp)
+	popq	%rsi
+	movl	%ebp, (%rsp)
+	popq	%rbp
+	leaq	8(%rsp), %rsp /* discard */
+	movl	%ebx, (%rsp)
+	popq	%rbx
+	movl	%edx, (%rsp)
+	popq	%rdx
+	movl	%ecx, (%rsp)
+	popq	%rcx
+	movl	%eax, (%rsp)
+	popq	%rax
+
+	/* Return */
+	ret
+
+	.endif
+
+/****************************************************************************
  * virt_call (real-mode near call, 16-bit real-mode near return address)
  *
- * Call a specific C function in the protected-mode code.  The
- * prototype of the C function must be
+ * Call a specific C function in 32-bit protected mode or 64-bit long
+ * mode (as applicable).  The prototype of the C function must be
  *   void function ( struct i386_all_regs *ix86 ); 
  * ix86 will point to a struct containing the real-mode registers
  * at entry to virt_call().
@@ -662,7 +909,7 @@ intr_to_prot:
  * critical data to registers before calling main()).
  *
  * Parameters:
- *   function : virtual address of protected-mode function to call
+ *   function : 32-bit virtual address of function to call
  *
  * Example usage:
  *	pushl	$pxe_api_call
@@ -674,6 +921,12 @@ intr_to_prot:
 	.struct	0
 VC_OFFSET_GDT:		.space	6
 VC_OFFSET_IDT:		.space	6
+.if64
+VC_OFFSET_PADDING64:	.space	4 /* for alignment */
+VC_OFFSET_CR3:		.space	4
+VC_OFFSET_CR4:		.space	4
+VC_OFFSET_EMER:		.space	8
+.endif
 VC_OFFSET_IX86:		.space	SIZEOF_I386_ALL_REGS
 VC_OFFSET_PADDING:	.space	2 /* for alignment */
 VC_OFFSET_RETADDR:	.space	2
@@ -701,22 +954,49 @@ virt_call:
 	sidt	VC_OFFSET_IDT(%bp)
 	sgdt	VC_OFFSET_GDT(%bp)
 
+.if64 ;	/* Preserve control registers, if applicable */
+	movl	$MSR_EFER, %ecx
+	rdmsr
+	movl	%eax, (VC_OFFSET_EMER+0)(%bp)
+	movl	%edx, (VC_OFFSET_EMER+4)(%bp)
+	movl	%cr4, %eax
+	movl	%eax, VC_OFFSET_CR4(%bp)
+	movl	%cr3, %eax
+	movl	%eax, VC_OFFSET_CR3(%bp)
+.endif
 	/* For sanity's sake, clear the direction flag as soon as possible */
 	cld
 
 	/* Switch to protected mode and move register dump to PM stack */
 	movl	$VC_OFFSET_END, %ecx
 	pushl	$VIRTUAL(vc_pmode)
-	jmp	real_to_prot
+vc_jmp:	jmp	real_to_prot
 	.section ".text.virt_call", "ax", @progbits
 	.code32
 vc_pmode:
-	/* Call function */
+	/* Call function (in protected mode) */
 	leal	VC_OFFSET_IX86(%esp), %eax
 	pushl	%eax
 	call	*(VC_OFFSET_FUNCTION+4)(%esp)
 	popl	%eax /* discard */
 
+.if64 ; /* Switch to long mode */
+	jmp	1f
+vc_lmode:
+	call	prot_to_long
+	.code64
+
+	/* Call function (in long mode) */
+	leaq	VC_OFFSET_IX86(%rsp), %rdi
+	pushq	%rdi
+	movslq	(VC_OFFSET_FUNCTION+8)(%rsp), %rax
+	callq	*%rax
+	popq	%rdi /* discard */
+
+	/* Switch to protected mode */
+	call	long_to_prot
+1:	.code32
+.endif
 	/* Switch to real mode and move register dump back to RM stack */
 	movl	$VC_OFFSET_END, %ecx
 	movl	%esp, %esi
@@ -725,6 +1005,17 @@ vc_pmode:
 	.section ".text16.virt_call", "ax", @progbits
 	.code16
 vc_rmode:
+.if64 ;	/* Restore control registers, if applicable */
+	movw	%sp, %bp
+	movl	VC_OFFSET_CR3(%bp), %eax
+	movl	%eax, %cr3
+	movl	VC_OFFSET_CR4(%bp), %eax
+	movl	%eax, %cr4
+	movl	(VC_OFFSET_EMER+0)(%bp), %eax
+	movl	(VC_OFFSET_EMER+4)(%bp), %edx
+	movl	$MSR_EFER, %ecx
+	wrmsr
+.endif
 	/* Restore registers and flags and return */
 	addw	$( VC_OFFSET_IX86 + 4 /* also skip %cs and %ss */ ), %sp
 	popw	%ds
@@ -744,18 +1035,23 @@ vc_rmode:
 	/* Return and discard function parameters */
 	ret	$( VC_OFFSET_END - VC_OFFSET_PARAMS )
 
+
+	/* Protected-mode jump target */
+	.equ	vc_jmp_offset, ( vc_jmp - 4 )
+
 /****************************************************************************
  * real_call (protected-mode near call, 32-bit virtual return address)
+ * real_call (long-mode near call, 64-bit virtual return address)
  *
- * Call a real-mode function from protected-mode code.
+ * Call a real-mode function from protected-mode or long-mode code.
  *
  * The non-segment register values will be passed directly to the
  * real-mode code.  The segment registers will be set as per
  * prot_to_real.  The non-segment register values set by the real-mode
- * function will be passed back to the protected-mode caller.  A
- * result of this is that this routine cannot be called directly from
- * C code, since it clobbers registers that the C ABI expects the
- * callee to preserve.
+ * function will be passed back to the protected-mode or long-mode
+ * caller.  A result of this is that this routine cannot be called
+ * directly from C code, since it clobbers registers that the C ABI
+ * expects the callee to preserve.
  *
  * librm.h defines a convenient macro REAL_CODE() for using real_call.
  * See librm.h and realmode.h for details and examples.
@@ -769,16 +1065,25 @@ vc_rmode:
 	.struct	0
 RC_OFFSET_REGS:		.space	SIZEOF_I386_REGS
 RC_OFFSET_REGS_END:
-RC_OFFSET_RETADDR:	.space	4
+.if64
+RC_OFFSET_LREGS:	.space	SIZEOF_X86_64_REGS
+RC_OFFSET_LREG_RETADDR:	.space	SIZEOF_ADDR
+.endif
+RC_OFFSET_RETADDR:	.space	SIZEOF_ADDR
 RC_OFFSET_PARAMS:
-RC_OFFSET_FUNCTION:	.space	4
+RC_OFFSET_FUNCTION:	.space	SIZEOF_ADDR
 RC_OFFSET_END:
 	.previous
 
 	.section ".text.real_call", "ax", @progbits
-	.code32
+	.CODE_DEFAULT
 	.globl real_call
 real_call:
+.if64 ;	/* Preserve registers and switch to protected mode, if applicable */
+	call	long_preserve_regs
+	call	long_to_prot
+	.code32
+.endif
 	/* Create register dump and function pointer copy on PM stack */
 	pushal
 	pushl	RC_OFFSET_FUNCTION(%esp)
@@ -810,6 +1115,11 @@ rc_pmode:
 	/* Restore registers */
 	popal
 
+.if64 ; /* Switch to long mode and restore registers, if applicable */
+	call	prot_to_long
+	.code64
+	call	long_restore_regs
+.endif
 	/* Return and discard function parameters */
 	ret	$( RC_OFFSET_END - RC_OFFSET_PARAMS )
 
@@ -830,6 +1140,7 @@ rm_default_gdtr_idtr:
 
 /****************************************************************************
  * phys_call (protected-mode near call, 32-bit virtual return address)
+ * phys_call (long-mode near call, 64-bit virtual return address)
  *
  * Call a function with flat 32-bit physical addressing
  *
@@ -846,16 +1157,25 @@ rm_default_gdtr_idtr:
  ****************************************************************************
  */
 	.struct 0
-PHC_OFFSET_RETADDR:	.space	4
+.if64
+PHC_OFFSET_LREGS:	.space	SIZEOF_X86_64_REGS
+PHC_OFFSET_LREG_RETADDR:.space	SIZEOF_ADDR
+.endif
+PHC_OFFSET_RETADDR:	.space	SIZEOF_ADDR
 PHC_OFFSET_PARAMS:
-PHC_OFFSET_FUNCTION:	.space	4
+PHC_OFFSET_FUNCTION:	.space	SIZEOF_ADDR
 PHC_OFFSET_END:
 	.previous
 
 	.section ".text.phys_call", "ax", @progbits
-	.code32
+	.CODE_DEFAULT
 	.globl phys_call
 phys_call:
+.if64 ;	/* Preserve registers and switch to protected mode, if applicable */
+	call	long_preserve_regs
+	call	long_to_prot
+	.code32
+.endif
 	/* Adjust function pointer to a physical address */
 	pushl	%ebp
 	movl	VIRTUAL(virt_offset), %ebp
@@ -874,6 +1194,11 @@ phys_call:
 	/* Switch to virtual addresses */
 	call	phys_to_prot
 
+.if64 ; /* Switch to long mode and restore registers, if applicable */
+	call	prot_to_long
+	.code64
+	call	long_restore_regs
+.endif
 	/* Return and discard function parameters */
 	ret	$( PHC_OFFSET_END - PHC_OFFSET_PARAMS )
 
@@ -900,15 +1225,15 @@ flatten_real_mode:
 	ret
 
 	.section ".text.flatten_dummy", "ax", @progbits
-	.code32
+	.CODE_DEFAULT
 flatten_dummy:
 	ret
 
 /****************************************************************************
  * Interrupt wrapper
  *
- * Used by the protected-mode interrupt vectors to call the
- * interrupt() function.
+ * Used by the protected-mode and long-mode interrupt vectors to call
+ * the interrupt() function.
  *
  * May be entered with either physical or virtual stack segment.
  ****************************************************************************
@@ -917,6 +1242,24 @@ flatten_dummy:
 	.code32
 	.globl interrupt_wrapper
 interrupt_wrapper:
+	/* Preserve registers (excluding already-saved %eax and
+	 * otherwise unused registers which are callee-save for both
+	 * 32-bit and 64-bit ABIs).
+	 */
+	pushl	%ebx
+	pushl	%ecx
+	pushl	%edx
+	pushl	%esi
+	pushl	%edi
+
+	/* Expand IRQ number to whole %eax register */
+	movzbl	%al, %eax
+
+.if64 ; /* Skip transition to long mode, if applicable */
+	movw	%cs, %bx
+	cmpw	$LONG_CS, %bx
+	je	1f
+.endif
 	/* Preserve segment registers and original %esp */
 	pushl	%ds
 	pushl	%es
@@ -927,14 +1270,39 @@ interrupt_wrapper:
 
 	/* Switch to virtual addressing */
 	call	intr_to_prot
+.if64
+	/* Switch to long mode */
+	call	prot_to_long
+	.code64
 
-	/* Expand IRQ number to whole %eax register */
-	movzbl	%al, %eax
+1:	/* Preserve long-mode caller-save registers */
+	pushq	%r8
+	pushq	%r9
+	pushq	%r10
+	pushq	%r11
 
+	/* Expand IRQ number to whole %rdi register */
+	movl	%eax, %edi
+.endif
 	/* Call interrupt handler */
 	call	interrupt
+.if64
+	/* Restore long-mode caller-save registers */
+	popq	%r11
+	popq	%r10
+	popq	%r9
+	popq	%r8
 
-	/* Restore original stack and segment registers */
+	/* Skip transition back to protected mode, if applicable */
+	cmpw	$LONG_CS, %bx
+	je	1f
+
+	/* Switch to protected mode */
+	call	long_to_prot
+	.code32
+	cmpw	$LONG_CS, %bx
+.endif
+	/* Restore segment registers and original %esp */
 	lss	(%esp), %esp
 	popl	%ss
 	popl	%gs
@@ -942,9 +1310,17 @@ interrupt_wrapper:
 	popl	%es
 	popl	%ds
 
-	/* Restore registers and return */
-	popal
-	iret
+1:	/* Restore registers */
+	popl	%edi
+	popl	%esi
+	popl	%edx
+	popl	%ecx
+	popl	%ebx
+	popl	%eax
+
+	/* Return from interrupt (with REX prefix if required) */
+.if64 ; jne 1f ; .byte 0x48 ; .endif
+1:	iret
 
 /****************************************************************************
  * Page tables
@@ -1022,7 +1398,7 @@ pde_low:
 pte_textdata:
 	/* Allocated by linker script; must be at the end of .textdata */
 
-	.section ".bss16.pml4", "aw", @nobits
+	.section ".bss.pml4", "aw", @nobits
 pml4:	.long	0
 
 /****************************************************************************
@@ -1080,9 +1456,7 @@ init_pages:
 
 	/* Record PML4 physical address */
 	leal	VIRTUAL(pml4e)(%edi), %eax
-	movl	VIRTUAL(data16), %ebx
-	subl	%edi, %ebx
-	movl	%eax, pml4(%ebx)
+	movl	%eax, VIRTUAL(pml4)
 
 	/* Return */
 	ret
