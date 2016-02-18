@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  * "non absolute segment" error.  This is most probably a bug in gas.
  ****************************************************************************
  */
-	.section ".data16", "aw", @progbits
+	.section ".data16.gdt", "aw", @progbits
 	.align 16
 gdt:
 gdtr:		/* The first GDT entry is unused, the GDTR can fit here. */
@@ -89,7 +89,7 @@ gdt_end:
  *   %edi : Physical base of protected-mode code (virt_offset)
  ****************************************************************************
  */
-	.section ".text16", "ax", @progbits
+	.section ".text16.init_librm", "ax", @progbits
 	.code16
 	.globl init_librm
 init_librm:
@@ -141,7 +141,7 @@ init_librm:
 	popl	%eax
 	lret
 
-	.section ".text16", "ax", @progbits
+	.section ".text16.set_seg_base", "ax", @progbits
 	.code16
 set_seg_base:
 1:	movw	%ax, 2(%bx)
@@ -167,7 +167,7 @@ set_seg_base:
  *
  ****************************************************************************
  */
-	.section ".text16", "ax", @progbits
+	.section ".text16.real_to_prot", "ax", @progbits
 	.code16
 real_to_prot:
 	/* Enable A20 line */
@@ -219,7 +219,7 @@ real_to_prot:
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
 	data32 ljmp	$VIRTUAL_CS, $r2p_pmode
-	.section ".text", "ax", @progbits
+	.section ".text.real_to_prot", "ax", @progbits
 	.code32
 r2p_pmode:
 	/* Set up protected-mode data segments and stack pointer */
@@ -272,7 +272,7 @@ r2p_pmode:
  *
  ****************************************************************************
  */
-	.section ".text", "ax", @progbits
+	.section ".text.prot_to_real", "ax", @progbits
 	.code32
 prot_to_real:
 	/* Copy real-mode global descriptor table register to RM code segment */
@@ -311,7 +311,7 @@ prot_to_real:
 	movw	%ax, %gs
 	movw	%ax, %ss
 	ljmp	$REAL_CS, $p2r_rmode
-	.section ".text16", "ax", @progbits
+	.section ".text16.prot_to_real", "ax", @progbits
 	.code16
 p2r_rmode:
 	/* Load real-mode GDT */
@@ -347,12 +347,12 @@ p2r_ljmp_rm_cs:
 	.globl rm_cs
 	.equ	rm_cs, ( p2r_ljmp_rm_cs + 3 )
 
-	.section ".text16.data", "aw", @progbits
+	.section ".text16.data.rm_ds", "aw", @progbits
 	.globl rm_ds
 rm_ds:	.word 0
 
 	/* Real-mode global and interrupt descriptor table registers */
-	.section ".text16.data", "aw", @progbits
+	.section ".text16.data.rm_gdtr", "aw", @progbits
 rm_gdtr:
 	.word 0 /* Limit */
 	.long 0 /* Base */
@@ -398,7 +398,7 @@ rm_gdtr:
 #define PC_OFFSET_FUNCTION ( PC_OFFSET_RETADDR + 4 )
 #define PC_OFFSET_END ( PC_OFFSET_FUNCTION + 4 )
 
-	.section ".text16", "ax", @progbits
+	.section ".text16.prot_call", "ax", @progbits
 	.code16
 	.globl prot_call
 prot_call:
@@ -423,7 +423,7 @@ prot_call:
 	movl	$PC_OFFSET_END, %ecx
 	pushl	$pc_pmode
 	jmp	real_to_prot
-	.section ".text", "ax", @progbits
+	.section ".text.prot_call", "ax", @progbits
 	.code32
 pc_pmode:
 	/* Call function */
@@ -437,7 +437,7 @@ pc_pmode:
 	movl	%esp, %esi
 	pushl	$pc_rmode
 	jmp	prot_to_real
-	.section ".text16", "ax", @progbits
+	.section ".text16.prot_call", "ax", @progbits
 	.code16
 pc_rmode:
 	/* Restore registers and flags and return */
@@ -484,7 +484,7 @@ pc_rmode:
 #define RC_OFFSET_FUNCTION ( RC_OFFSET_RETADDR + 4 )
 #define RC_OFFSET_END ( RC_OFFSET_FUNCTION + 4 )
 
-	.section ".text", "ax", @progbits
+	.section ".text.real_call", "ax", @progbits
 	.code32
 	.globl real_call
 real_call:
@@ -497,7 +497,7 @@ real_call:
 	pushl	$rc_rmode
 	movl	$rm_default_gdtr_idtr, %esi
 	jmp	prot_to_real
-	.section ".text16", "ax", @progbits
+	.section ".text16.real_call", "ax", @progbits
 	.code16
 rc_rmode:
 	/* Call real-mode function */
@@ -513,7 +513,7 @@ rc_rmode:
 	movl	$RC_OFFSET_RETADDR, %ecx
 	pushl	$rc_pmode
 	jmp	real_to_prot
-	.section ".text", "ax", @progbits
+	.section ".text.real_call", "ax", @progbits
 	.code32
 rc_pmode:
 	/* Restore registers and return */
@@ -524,11 +524,11 @@ rc_pmode:
 	/* Function vector, used because "call xx(%sp)" is not a valid
 	 * 16-bit expression.
 	 */
-	.section ".data16", "aw", @progbits
+	.section ".bss16.rc_function", "aw", @nobits
 rc_function:	.word 0, 0
 
 	/* Default real-mode global and interrupt descriptor table registers */
-	.section ".data", "aw", @progbits
+	.section ".data.rm_default_gdtr_idtr", "aw", @progbits
 rm_default_gdtr_idtr:
 	.word 0		/* Global descriptor table limit */
 	.long 0		/* Global descriptor table base */
@@ -542,7 +542,7 @@ rm_default_gdtr_idtr:
  *
  ****************************************************************************
  */
-	.section ".text16", "ax", @progbits
+	.section ".text16.flatten_real_mode", "ax", @progbits
 	.code16
 	.globl flatten_real_mode
 flatten_real_mode:
@@ -559,7 +559,7 @@ flatten_real_mode:
 	/* Return */
 	ret
 
-	.section ".text", "ax", @progbits
+	.section ".text.flatten_dummy", "ax", @progbits
 	.code32
 flatten_dummy:
 	ret
@@ -638,11 +638,15 @@ interrupt_wrapper:
  * to us.
  ****************************************************************************
  */
-	.section ".data", "aw", @progbits
+	.section ".bss.rm_sp", "aw", @nobits
 	.globl rm_sp
 rm_sp:	.word 0
+
+	.section ".bss.rm_ss", "aw", @nobits
 	.globl rm_ss
 rm_ss:	.word 0
+
+	.section ".data.pm_esp", "aw", @progbits
 pm_esp:	.long _estack
 
 /****************************************************************************
@@ -654,13 +658,13 @@ pm_esp:	.long _estack
  ****************************************************************************
  */
 	/* Internal copies, created by init_librm (which runs in real mode) */
-	.section ".data16", "aw", @progbits
+	.section ".bss16.rm_virt_offset", "aw", @nobits
 rm_virt_offset:	.long 0
 rm_text16:	.long 0
 rm_data16:	.long 0
 
 	/* Externally-visible copies, created by real_to_prot */
-	.section ".data", "aw", @progbits
+	.section ".bss.virt_offset", "aw", @nobits
 	.globl virt_offset
 virt_offset:	.long 0	
 	.globl text16
