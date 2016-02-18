@@ -402,19 +402,22 @@ pmm_scan:
 	/* Shrink ROM */
 	movb	shrunk_rom_size, %al
 	movb	%al, romheader_size
-1:	/* Allocate decompression PMM block.  Round up the size to the
-	 * nearest 128kB and use the size within the PMM handle; this
-	 * allows the same decompression area to be shared between
-	 * multiple iPXE ROMs even with differing build IDs
+1:	/* Allocate decompression PMM block.  Allow 4kB for page
+	 * alignment and round up the size to the nearest 128kB, then
+	 * use the size within the PMM handle; this allows the same
+	 * decompression area to be shared between multiple iPXE ROMs
+	 * even with differing build IDs
 	 */
 	movl	$_textdata_memsz_pgh, %ecx
-	addl	$0x00001fff, %ecx
-	andl	$0xffffe000, %ecx
+	addl	$( 0x00000100 /* 4kB */ + 0x00001fff /* 128kB - 1 */ ), %ecx
+	andl	$( 0xffffe000 /* ~( 128kB - 1 ) */ ), %ecx
 	movl	%ecx, %ebx
 	shrw	$12, %bx
 	orl	$PMM_HANDLE_BASE_DECOMPRESS_TO, %ebx
 	movw	$get_pmm_decompress_to, %bp
 	call	get_pmm
+	addl	$( 0x00000fff /* 4kB - 1 */ ), %esi
+	andl	$( 0xfffff000 /* ~( 4kB - 1 ) */ ), %esi
 	movl	%esi, decompress_to
 	/* Restore registers */
 	popal
