@@ -131,8 +131,7 @@ init_librm:
 	addl	$gdt, gdt_base
 
 	/* Initialise IDT */
-	pushl	$init_idt
-	call	prot_call
+	virtcall init_idt
 
 	/* Restore registers */
 	negl	%edi
@@ -554,8 +553,7 @@ flatten_real_mode:
 	movb	$0x8f, real_cs + 6
 	movb	$0x8f, real_ds + 6
 	/* Call dummy protected-mode function */
-	pushl	$flatten_dummy
-	call	prot_call
+	virtcall flatten_dummy
 	/* Restore GDT */
 	movb	$0x00, real_cs + 6
 	movb	$0x00, real_ds + 6

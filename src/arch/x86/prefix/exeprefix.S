@@ -24,6 +24,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <librm.h>
+
 /* Initial temporary stack size */
 #define EXE_STACK_SIZE 0x400
 
@@ -148,8 +150,7 @@ _exe_start:
 	movl	%esi, cmdline_phys
 
 	/* Run iPXE */
-	pushl	$main
-	call	prot_call
+	virtcall main
 
 	/* Uninstall iPXE */
 	call	uninstall

@@ -18,6 +18,8 @@
 
 FILE_LICENCE ( GPL2_ONLY )
 
+#include <librm.h>
+
 .equ	BOOTSEG, 0x07C0			/* original address of boot-sector */
 
 .equ	SYSSEG, 0x1000			/* system loaded at SYSSEG<<4 */
@@ -370,8 +372,8 @@ start_runtime:
 	lret
 	.section ".text16", "awx", @progbits
 1:
-	pushl	$main
-	call	prot_call
+	/* Run iPXE */
+	virtcall main
 
 	/* Uninstall iPXE */
 	call	uninstall

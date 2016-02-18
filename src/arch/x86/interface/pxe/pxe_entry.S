@@ -24,6 +24,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <librm.h>
+
 	.arch i386
 
 /****************************************************************************
@@ -120,8 +122,7 @@ pxenv_null_entry:
 	.section ".text16", "ax", @progbits
 	.code16
 pxenv_entry:
-	pushl	$pxe_api_call
-	call	prot_call
+	virtcall pxe_api_call
 	lret
 	.size	pxenv_entry, . - pxenv_entry
 

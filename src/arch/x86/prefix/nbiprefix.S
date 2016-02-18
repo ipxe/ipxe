@@ -1,5 +1,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <librm.h>
+
 	.text
 	.arch i386
 	.code16
@@ -66,8 +68,8 @@ _nbi_start:
 	lret
 	.section ".text16", "awx", @progbits
 1:
-	pushl	$main
-	call	prot_call
+	/* Run iPXE */
+	virtcall main
 
 	/* Uninstall iPXE */
 	call	uninstall

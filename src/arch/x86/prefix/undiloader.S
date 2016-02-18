@@ -1,5 +1,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <librm.h>
+
 	.text
 	.code16
 	.arch i386
@@ -45,8 +47,7 @@ undiloader:
 	.section ".text16", "ax", @progbits
 1:
 	/* Call UNDI loader C code */
-	pushl	$pxe_loader_call
-	call	prot_call
+	virtcall pxe_loader_call
 
 1:	/* Restore registers and return */
 	popw	%bx

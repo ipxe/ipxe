@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 	.org 0
 	.code16
 
+#include <librm.h>
 #include <undi.h>
 
 #define STACK_MAGIC ( 'L' + ( 'R' << 8 ) + ( 'E' << 16 ) + ( 'T' << 24 ) )
@@ -820,8 +821,7 @@ run_ipxe:
 	movl	%ecx, cached_dhcpack_phys
 
 	/* Run main program */
-	pushl	$main
-	call	prot_call
+	virtcall main
 
 	/* Uninstall iPXE */
 	call	uninstall

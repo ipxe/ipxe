@@ -19,13 +19,34 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define LONG_DS 0x40
 #endif
 
-#ifndef ASSEMBLY
+#ifdef ASSEMBLY
+
+/**
+ * Call C function from real-mode code
+ *
+ * @v function		C function
+ */
+.macro virtcall function
+	pushl	$\function
+	call	prot_call
+.endm
+
+#else /* ASSEMBLY */
 
 #ifdef UACCESS_LIBRM
 #define UACCESS_PREFIX_librm
 #else
 #define UACCESS_PREFIX_librm __librm_
 #endif
+
+/**
+ * Call C function from real-mode code
+ *
+ * @v function		C function
+ */
+#define VIRT_CALL( function )						\
+	"pushl $( " #function " )\n\t"					\
+	"call prot_call\n\t"
 
 /* Variables in librm.S */
 extern unsigned long virt_offset;

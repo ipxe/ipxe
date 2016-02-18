@@ -56,9 +56,9 @@ static struct profiler real_call_profiler __profiler = { .name = "real_call" };
 static struct profiler prot_call_profiler __profiler = { .name = "prot_call" };
 
 /**
- * Dummy protected-mode function
+ * Dummy function for profiling tests
  */
-static void librm_test_prot_call ( void ) {
+static __asmcall void librm_test_call ( struct i386_all_regs *ix86 __unused ) {
 	/* Do nothing */
 }
 
@@ -97,7 +97,7 @@ static void librm_test_exec ( void ) {
 	/* Profile complete real-mode call cycle */
 	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
 		profile_start ( &real_call_profiler );
-		__asm__ __volatile__ ( REAL_CODE ( "" ) : : );
+		__asm__ __volatile__ ( REAL_CODE ( "" ) );
 		profile_stop ( &real_call_profiler );
 	}
 
@@ -105,12 +105,10 @@ static void librm_test_exec ( void ) {
 	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
 		__asm__ __volatile__ ( REAL_CODE ( "rdtsc\n\t"
 						   "movl %k0, %k2\n\t"
-						   "pushl %k3\n\t"
-						   "call prot_call\n\t"
+						   VIRT_CALL ( librm_test_call )
 						   "rdtsc\n\t" )
 				       : "=a" ( stopped ), "=d" ( discard_d ),
-					 "=R" ( started )
-				       : "i" ( librm_test_prot_call ) );
+					 "=R" ( started ) : );
 		profile_start_at ( &prot_call_profiler, started );
 		profile_stop_at ( &prot_call_profiler, stopped );
 	}

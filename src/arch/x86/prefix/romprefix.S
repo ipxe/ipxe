@@ -8,6 +8,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <librm.h>
 #include <config/general.h>
 #include <config/branding.h>
 
@@ -806,9 +807,8 @@ exec:	/* Set %ds = %cs */
 #endif /* AUTOBOOT_ROM_FILTER */
 .endif
 
-	/* Call main() */
-	pushl	$main
-	call	prot_call
+	/* Run iPXE */
+	virtcall main
 
 	/* Set up flat real mode for return to BIOS */
 	call	flatten_real_mode

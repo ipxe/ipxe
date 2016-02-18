@@ -1480,8 +1480,7 @@ static void int13_hook_vector ( void ) {
 			     /* Clear OF, set CF, call int13() */
 			     "orb $0, %%al\n\t" 
 			     "stc\n\t"
-			     "pushl %0\n\t"
-			     "call prot_call\n\t"
+			     VIRT_CALL ( int13 )
 			     /* Chain if OF not set */
 			     "jo 1f\n\t"
 			     "pushfw\n\t"
@@ -1512,8 +1511,7 @@ static void int13_hook_vector ( void ) {
 			     "\n3:\n\t"
 			     "movw %%bp, %%sp\n\t"
 			     "popw %%bp\n\t"
-			     "iret\n\t" )
-	       : : "i" ( int13 ) );
+			     "iret\n\t" ) : : );
 
 	hook_bios_interrupt ( 0x13, ( intptr_t ) int13_wrapper, &int13_vector );
 }

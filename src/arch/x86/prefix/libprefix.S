@@ -24,6 +24,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <librm.h>
+
 	.arch i386
 
 /* Image compression enabled */
@@ -887,8 +889,7 @@ payload_death_message:
 	 * ready for the copy to the new location.
 	 */
 	progress "  relocate\n"
-	pushl	$relocate
-	call	prot_call
+	virtcall relocate
 
 	/* Jump back to .prefix segment */
 	pushw	$1f

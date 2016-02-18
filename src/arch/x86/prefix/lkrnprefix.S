@@ -1,5 +1,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <librm.h>
+
 #define BZI_LOAD_HIGH_ADDR 0x100000
 
 	.text
@@ -197,8 +199,7 @@ no_cmd_line:
 	movl	%ecx, initrd_len
 
 	/* Run iPXE */
-	pushl	$main
-	call	prot_call
+	virtcall main
 
 	/* Uninstall iPXE */
 	call	uninstall
