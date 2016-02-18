@@ -534,7 +534,6 @@ static void bios_inject_startup ( void ) {
 			      "cmpb $0, %%cs:bios_inject_lock\n\t"
 			      "jnz 1f\n\t"
 			      "pushl %0\n\t"
-			      "pushw %%cs\n\t"
 			      "call prot_call\n\t"
 			      "\n1:\n\t"
 			      "popfw\n\t"

@@ -121,7 +121,6 @@ pxenv_null_entry:
 	.code16
 pxenv_entry:
 	pushl	$pxe_api_call
-	pushw	%cs
 	call	prot_call
 	lret
 	.size	pxenv_entry, . - pxenv_entry

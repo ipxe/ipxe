@@ -7,7 +7,6 @@ void __asmcall _dump_regs ( struct i386_all_regs *ix86 ) {
 		TEXT16_CODE ( ".globl dump_regs\n\t"
 			      "\ndump_regs:\n\t"
 			      "pushl $_dump_regs\n\t"
-			      "pushw %%cs\n\t"
 			      "call prot_call\n\t"
 			      "ret\n\t" ) : : );
 

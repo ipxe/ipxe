@@ -198,7 +198,6 @@ no_cmd_line:
 
 	/* Run iPXE */
 	pushl	$main
-	pushw	%cs
 	call	prot_call
 
 	/* Uninstall iPXE */

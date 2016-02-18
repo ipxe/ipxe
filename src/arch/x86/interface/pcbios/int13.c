@@ -1481,7 +1481,6 @@ static void int13_hook_vector ( void ) {
 			     "orb $0, %%al\n\t" 
 			     "stc\n\t"
 			     "pushl %0\n\t"
-			     "pushw %%cs\n\t"
 			     "call prot_call\n\t"
 			     /* Chain if OF not set */
 			     "jo 1f\n\t"

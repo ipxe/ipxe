@@ -661,7 +661,6 @@ void hook_comboot_interrupts ( ) {
 	__asm__ __volatile__ (
 		TEXT16_CODE ( "\nint20_wrapper:\n\t"
 		              "pushl %0\n\t"
-		              "pushw %%cs\n\t"
 		              "call prot_call\n\t"
 			      "clc\n\t"
 			      "call patch_cf\n\t"
@@ -673,7 +672,6 @@ void hook_comboot_interrupts ( ) {
 	__asm__ __volatile__ (
 		TEXT16_CODE ( "\nint21_wrapper:\n\t"
 		              "pushl %0\n\t"
-		              "pushw %%cs\n\t"
 		              "call prot_call\n\t"
 			      "clc\n\t"
 			      "call patch_cf\n\t"
@@ -685,7 +683,6 @@ void hook_comboot_interrupts ( ) {
 	__asm__  __volatile__ (
 		TEXT16_CODE ( "\nint22_wrapper:\n\t"
 		              "pushl %0\n\t"
-		              "pushw %%cs\n\t"
 		              "call prot_call\n\t"
 			      "clc\n\t"
 			      "call patch_cf\n\t"

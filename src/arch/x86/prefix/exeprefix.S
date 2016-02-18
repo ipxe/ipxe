@@ -149,7 +149,6 @@ _exe_start:
 
 	/* Run iPXE */
 	pushl	$main
-	pushw	%cs
 	call	prot_call
 
 	/* Uninstall iPXE */

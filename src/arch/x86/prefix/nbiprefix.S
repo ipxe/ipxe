@@ -67,7 +67,6 @@ _nbi_start:
 	.section ".text16", "awx", @progbits
 1:
 	pushl	$main
-	pushw	%cs
 	call	prot_call
 
 	/* Uninstall iPXE */

@@ -46,7 +46,6 @@ undiloader:
 1:
 	/* Call UNDI loader C code */
 	pushl	$pxe_loader_call
-	pushw	%cs
 	call	prot_call
 
 1:	/* Restore registers and return */

@@ -888,7 +888,6 @@ payload_death_message:
 	 */
 	progress "  relocate\n"
 	pushl	$relocate
-	pushw	%cs
 	call	prot_call
 
 	/* Jump back to .prefix segment */

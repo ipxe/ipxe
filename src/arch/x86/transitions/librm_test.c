@@ -106,7 +106,6 @@ static void librm_test_exec ( void ) {
 		__asm__ __volatile__ ( REAL_CODE ( "rdtsc\n\t"
 						   "movl %k0, %k2\n\t"
 						   "pushl %k3\n\t"
-						   "pushw %%cs\n\t"
 						   "call prot_call\n\t"
 						   "rdtsc\n\t" )
 				       : "=a" ( stopped ), "=d" ( discard_d ),

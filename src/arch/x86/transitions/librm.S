@@ -132,7 +132,6 @@ init_librm:
 
 	/* Initialise IDT */
 	pushl	$init_idt
-	pushw	%cs
 	call	prot_call
 
 	/* Restore registers */
@@ -358,7 +357,7 @@ rm_gdtr:
 	.long 0 /* Base */
 
 /****************************************************************************
- * prot_call (real-mode far call, 16-bit real-mode far return address)
+ * prot_call (real-mode near call, 16-bit real-mode near return address)
  *
  * Call a specific C function in the protected-mode code.  The
  * prototype of the C function must be
@@ -384,7 +383,6 @@ rm_gdtr:
  *
  * Example usage:
  *	pushl	$pxe_api_call
- *	pushw	%cs
  *	call	prot_call
  * to call in to the C function
  *      void pxe_api_call ( struct i386_all_regs *ix86 );
@@ -394,7 +392,8 @@ rm_gdtr:
 PC_OFFSET_GDT:		.space	6
 PC_OFFSET_IDT:		.space	6
 PC_OFFSET_IX86:		.space	SIZEOF_I386_ALL_REGS
-PC_OFFSET_RETADDR:	.space	4
+PC_OFFSET_PADDING:	.space	2 /* for alignment */
+PC_OFFSET_RETADDR:	.space	2
 PC_OFFSET_FUNCTION:	.space	4
 PC_OFFSET_END:
 	.previous
@@ -404,6 +403,7 @@ PC_OFFSET_END:
 	.globl prot_call
 prot_call:
 	/* Preserve registers, flags and GDT on external RM stack */
+	pushfw	/* padding */
 	pushfl
 	pushal
 	pushw	%gs
@@ -455,7 +455,8 @@ pc_rmode:
 	 */
 	addr32 movl -20(%esp), %esp
 	popfl
-	lret	$4
+	popfw	/* padding */
+	ret	$4
 
 /****************************************************************************
  * real_call (protected-mode near call, 32-bit virtual return address)
@@ -554,7 +555,6 @@ flatten_real_mode:
 	movb	$0x8f, real_ds + 6
 	/* Call dummy protected-mode function */
 	pushl	$flatten_dummy
-	pushw	%cs
 	call	prot_call
 	/* Restore GDT */
 	movb	$0x00, real_cs + 6

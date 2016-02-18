@@ -821,7 +821,6 @@ run_ipxe:
 
 	/* Run main program */
 	pushl	$main
-	pushw	%cs
 	call	prot_call
 
 	/* Uninstall iPXE */

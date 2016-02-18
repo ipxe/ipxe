@@ -808,7 +808,6 @@ exec:	/* Set %ds = %cs */
 
 	/* Call main() */
 	pushl	$main
-	pushw	%cs
 	call	prot_call
 
 	/* Set up flat real mode for return to BIOS */
