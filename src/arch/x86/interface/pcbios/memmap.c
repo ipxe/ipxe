@@ -174,7 +174,7 @@ static int meme820 ( struct memory_map *memmap ) {
 	struct memory_region *prev_region = NULL;
 	uint32_t next = 0;
 	uint32_t smap;
-	size_t size;
+	uint32_t size;
 	unsigned int flags;
 	unsigned int discard_D;
 
@@ -216,7 +216,7 @@ static int meme820 ( struct memory_map *memmap ) {
 		}
 
 		if ( size < E820_MIN_SIZE ) {
-			DBG ( "INT 15,e820 returned only %zd bytes\n", size );
+			DBG ( "INT 15,e820 returned only %d bytes\n", size );
 			return -EINVAL;
 		}
 

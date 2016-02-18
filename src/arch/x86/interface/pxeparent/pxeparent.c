@@ -208,8 +208,10 @@ int pxeparent_call ( SEGOFF16_t entry, unsigned int function,
 		     void *params, size_t params_len ) {
 	struct pxeparent_profiler *profiler = pxeparent_profiler ( function );
 	PXENV_EXIT_t exit;
-	unsigned long started;
-	unsigned long stopped;
+	uint32_t before;
+	uint32_t started;
+	uint32_t stopped;
+	uint32_t after;
 	int discard_D;
 	int rc;
 
@@ -240,12 +242,14 @@ int pxeparent_call ( SEGOFF16_t entry, unsigned int function,
 			         "D" ( __from_data16 ( &pxeparent_params ) )
 			       : "ecx", "esi" );
 	profile_stop ( &profiler->total );
-	profile_start_at ( &profiler->p2r, profile_started ( &profiler->total));
+	before = profile_started ( &profiler->total );
+	after = profile_stopped ( &profiler->total );
+	profile_start_at ( &profiler->p2r, before );
 	profile_stop_at ( &profiler->p2r, started );
 	profile_start_at ( &profiler->ext, started );
 	profile_stop_at ( &profiler->ext, stopped );
 	profile_start_at ( &profiler->r2p, stopped );
-	profile_stop_at ( &profiler->r2p, profile_stopped ( &profiler->total ));
+	profile_stop_at ( &profiler->r2p, after );
 
 	/* Determine return status code based on PXENV_EXIT and
 	 * PXENV_STATUS

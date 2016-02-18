@@ -187,7 +187,7 @@ uint8_t rtc_sample ( void ) {
 			    /* Disable interrupts */
 			    "cli\n\t"
 			    )
-		: "=a" ( after ), "=d" ( before ), "=q" ( temp )
+		: "=a" ( after ), "=d" ( before ), "=Q" ( temp )
 		: "2" ( 0 ) );
 
 	return ( after - before );

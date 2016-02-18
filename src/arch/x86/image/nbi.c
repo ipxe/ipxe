@@ -241,7 +241,7 @@ static int nbi_process_segments ( struct image *image,
  */
 static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
 	int discard_D, discard_S, discard_b;
-	int rc;
+	int32_t rc;
 
 	DBGC ( image, "NBI %p executing 16-bit image at %04x:%04x\n", image,
 	       imgheader->execaddr.segoff.segment,
@@ -283,7 +283,7 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 		0
 	};
 	int discard_D, discard_S, discard_b;
-	int rc;
+	int32_t rc;
 
 	DBGC ( image, "NBI %p executing 32-bit image at %lx\n",
 	       image, imgheader->execaddr.linear );

@@ -70,7 +70,7 @@ static int pcibios_num_bus ( void ) {
  */
 int pcibios_read ( struct pci_device *pci, uint32_t command, uint32_t *value ){
 	int discard_b, discard_D;
-	int status;
+	uint16_t status;
 
 	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
 					   "int $0x1a\n\t"
@@ -85,7 +85,7 @@ int pcibios_read ( struct pci_device *pci, uint32_t command, uint32_t *value ){
 				 "b" ( pci->busdevfn )
 			       : "edx" );
 
-	return ( ( status >> 8 ) & 0xff );
+	return ( status >> 8 );
 }
 
 /**
@@ -98,7 +98,7 @@ int pcibios_read ( struct pci_device *pci, uint32_t command, uint32_t *value ){
  */
 int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 	int discard_b, discard_c, discard_D;
-	int status;
+	uint16_t status;
 
 	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
 					   "int $0x1a\n\t"
@@ -111,7 +111,7 @@ int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 			         "b" ( pci->busdevfn ), "c" ( value )
 			       : "edx" );
 	
-	return ( ( status >> 8 ) & 0xff );
+	return ( status >> 8 );
 }
 
 PROVIDE_PCIAPI ( pcbios, pci_num_bus, pcibios_num_bus );
