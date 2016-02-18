@@ -867,6 +867,15 @@ payload_death_message:
 	movw	%ax, (init_librm_vector+2)
 	lcall	*init_librm_vector
 
+	/* Prepare for return to .prefix segment */
+	pushw	%cs
+
+	/* Jump to .text16 segment */
+	pushw	%ax
+	pushw	$1f
+	lret
+	.section ".text16.install_prealloc", "ax", @progbits
+1:
 	/* Inhibit INT 15,e820 and INT 15,e801 if applicable */
 	testl	%ebp, %ebp
 	jnz	1f
@@ -878,10 +887,15 @@ payload_death_message:
 	 * ready for the copy to the new location.
 	 */
 	progress "  relocate\n"
-	movw	%ax, (prot_call_vector+2)
 	pushl	$relocate
-	lcall	*prot_call_vector
+	pushw	%cs
+	call	prot_call
 
+	/* Jump back to .prefix segment */
+	pushw	$1f
+	lret
+	.section ".prefix.install_prealloc", "awx", @progbits
+1:
 	/* Copy code to new location */
 	progress "  copy\n"
 	pushl	%edi
@@ -929,10 +943,6 @@ init_librm_vector:
 	.word init_librm
 	.word 0
 	.size init_librm_vector, . - init_librm_vector
-prot_call_vector:
-	.word prot_call
-	.word 0
-	.size prot_call_vector, . - prot_call_vector
 #endif
 close_payload_vector:
 	.word close_payload

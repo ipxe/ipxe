@@ -18,13 +18,16 @@ undiloader:
 	pushw	%ds
 	pushw	%es
 	pushw	%bx
+
 	/* ROM segment address to %ds */
 	pushw	%cs
 	popw	%ds
+
 	/* UNDI loader parameter structure address into %es:%di */
 	movw	%sp, %bx
 	movw	%ss:22(%bx), %di
 	movw	%ss:24(%bx), %es
+
 	/* Install to specified real-mode addresses */
 	pushw	%di
 	movw	%es:12(%di), %bx
@@ -34,13 +37,18 @@ undiloader:
 	orl	$0xffffffff, %ebp	/* Allow arbitrary relocation */
 	call	install_prealloc
 	popw	%di
+
+	/* Jump to .text16 segment */
+	pushw	%ax
+	pushw	$1f
+	lret
+	.section ".text16", "ax", @progbits
+1:
 	/* Call UNDI loader C code */
 	pushl	$pxe_loader_call
 	pushw	%cs
-	pushw	$1f
-	pushw	%ax
-	pushw	$prot_call
-	lret
+	call	prot_call
+
 1:	/* Restore registers and return */
 	popw	%bx
 	popw	%es
@@ -49,4 +57,3 @@ undiloader:
 	popl	%edi
 	popl	%esi
 	lret
-	.size undiloader, . - undiloader
