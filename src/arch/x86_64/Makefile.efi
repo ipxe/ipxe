@@ -1,5 +1,9 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
+# Use %rip-relative addressing wherever possible.
+#
+CFLAGS		+= -fpie
+
 # EFI probably doesn't guarantee us a red zone, so let's not rely on it.
 #
 CFLAGS		+= -mno-red-zone

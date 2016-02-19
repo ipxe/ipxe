@@ -19,8 +19,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define SIZEOF_REAL_MODE_REGS	( SIZEOF_I386_SEG_REGS + SIZEOF_I386_REGS )
 #define SIZEOF_I386_FLAGS	4
 #define SIZEOF_I386_ALL_REGS	( SIZEOF_REAL_MODE_REGS + SIZEOF_I386_FLAGS )
-	
-	.arch i386
+
+/* Size of an address */
+#ifdef __x86_64__
+#define SIZEOF_ADDR 8
+#else
+#define SIZEOF_ADDR 4
+#endif
+
+/* Selectively assemble code for 32-bit/64-bit builds */
+#ifdef __x86_64__
+#define if32 if 0
+#define if64 if 1
+#else
+#define if32 if 1
+#define if64 if 0
+#endif
 
 /****************************************************************************
  * Global descriptor table
@@ -126,7 +140,7 @@ rm_sp:	.word 0
 rm_ss:	.word 0
 
 	.section ".data.pm_esp", "aw", @progbits
-pm_esp:	.long _estack
+pm_esp:	.long VIRTUAL(_estack)
 
 /****************************************************************************
  * Virtual address offsets
@@ -137,9 +151,9 @@ pm_esp:	.long _estack
  ****************************************************************************
  */
 	.struct 0
-VA_VIRT_OFFSET:	.space	4
-VA_TEXT16:	.space	4
-VA_DATA16:	.space	4
+VA_VIRT_OFFSET:	.space	SIZEOF_ADDR
+VA_TEXT16:	.space	SIZEOF_ADDR
+VA_DATA16:	.space	SIZEOF_ADDR
 VA_SIZE:
 	.previous
 
@@ -168,7 +182,7 @@ virt_addrs:	.space	VA_SIZE
  * Parameters:
  *   %cs : .text16 segment
  *   %ds : .data16 segment
- *   %edi : Physical base of protected-mode code (virt_offset)
+ *   %edi : Physical base of protected-mode code
  ****************************************************************************
  */
 	.section ".text16.init_librm", "ax", @progbits
@@ -181,7 +195,9 @@ init_librm:
 	pushl	%edi
 
 	/* Store rm_virt_offset and set up virtual_cs and virtual_ds segments */
+	subl	$VIRTUAL(_textdata), %edi
 	movl	%edi, rm_virt_offset
+.if64 ;	setae	(rm_virt_offset+4) ; .endif
 	movl	%edi, %eax
 	movw	$virtual_cs, %bx
 	call	set_seg_base
@@ -195,7 +211,7 @@ init_librm:
 	shll	$4, %eax
 	movw	$real_cs, %bx
 	call	set_seg_base
-	subl	%edi, %eax
+.if32 ;	subl	%edi, %eax ; .endif
 	movl	%eax, rm_text16
 
 	/* Store rm_ds and rm_data16, set up real_ds segment and GDT base */
@@ -207,7 +223,7 @@ init_librm:
 	call	set_seg_base
 	movl	%eax, gdt_base
 	addl	$gdt, gdt_base
-	subl	%edi, %eax
+.if32 ;	subl	%edi, %eax ; .endif
 	movl	%eax, rm_data16
 
 	/* Switch to protected mode */
@@ -221,7 +237,7 @@ init_librm_pmode:
 	movw	$REAL_DS, %ax
 	movw	%ax, %ds
 	movl	$rm_virt_addrs, %esi
-	movl	$virt_addrs, %edi
+	movl	$VIRTUAL(virt_addrs), %edi
 	movl	$( VA_SIZE / 4 ), %ecx
 	rep movsl
 	popw	%ds
@@ -312,7 +328,7 @@ real_to_prot:
 	movl	%cr0, %eax
 	orb	$CR0_PE, %al
 	movl	%eax, %cr0
-	data32 ljmp	$VIRTUAL_CS, $r2p_pmode
+	data32 ljmp	$VIRTUAL_CS, $VIRTUAL(r2p_pmode)
 	.section ".text.real_to_prot", "ax", @progbits
 	.code32
 r2p_pmode:
@@ -323,15 +339,15 @@ r2p_pmode:
 	movw	%ax, %fs
 	movw	%ax, %gs
 	movw	%ax, %ss
-	movl	pm_esp, %esp
+	movl	VIRTUAL(pm_esp), %esp
 
 	/* Load protected-mode interrupt descriptor table */
-	lidt	idtr
+	lidt	VIRTUAL(idtr)
 
 	/* Record real-mode %ss:sp (after removal of data) */
-	movw	%bp, rm_ss
+	movw	%bp, VIRTUAL(rm_ss)
 	addl	%ecx, %edx
-	movw	%dx, rm_sp
+	movw	%dx, VIRTUAL(rm_sp)
 
 	/* Move data from RM stack to PM stack */
 	subl	%ecx, %esp
@@ -365,7 +381,8 @@ r2p_pmode:
 	.code32
 prot_to_real:
 	/* Copy real-mode global descriptor table register to RM code segment */
-	movl	text16, %edi
+	movl	VIRTUAL(text16), %edi
+.if64 ;	subl	VIRTUAL(virt_offset), %edi ; .endif
 	leal	rm_gdtr(%edi), %edi
 	movsw
 	movsl
@@ -377,20 +394,20 @@ prot_to_real:
 	addl	$4, %ecx
 
 	/* Real-mode %ss:sp => %ebp:edx and virtual address => %edi */
-	movzwl	rm_ss, %ebp
-	movzwl	rm_sp, %edx
+	movzwl	VIRTUAL(rm_ss), %ebp
+	movzwl	VIRTUAL(rm_sp), %edx
 	subl	%ecx, %edx
 	movl	%ebp, %eax
 	shll	$4, %eax
 	leal	(%eax,%edx), %edi
-	subl	virt_offset, %edi
+	subl	VIRTUAL(virt_offset), %edi
 
 	/* Move data from PM stack to RM stack */
 	movl	%esp, %esi
 	rep movsb
 
 	/* Record protected-mode %esp (after removal of data) */
-	movl	%esi, pm_esp
+	movl	%esi, VIRTUAL(pm_esp)
 
 	/* Load real-mode segment limits */
 	movw	$P2R_DS, %ax
@@ -512,7 +529,7 @@ prot_call:
 
 	/* Switch to protected mode and move register dump to PM stack */
 	movl	$PC_OFFSET_END, %ecx
-	pushl	$pc_pmode
+	pushl	$VIRTUAL(pc_pmode)
 	jmp	real_to_prot
 	.section ".text.prot_call", "ax", @progbits
 	.code32
@@ -589,7 +606,7 @@ real_call:
 	/* Switch to real mode and move register dump to RM stack  */
 	movl	$( RC_OFFSET_REGS_END + 4 /* function pointer copy */ ), %ecx
 	pushl	$rc_rmode
-	movl	$rm_default_gdtr_idtr, %esi
+	movl	$VIRTUAL(rm_default_gdtr_idtr), %esi
 	jmp	prot_to_real
 	.section ".text16.real_call", "ax", @progbits
 	.code16
@@ -605,7 +622,7 @@ rc_rmode:
 
 	/* Switch to protected mode and move register dump back to PM stack */
 	movl	$RC_OFFSET_REGS_END, %ecx
-	pushl	$rc_pmode
+	pushl	$VIRTUAL(rc_pmode)
 	jmp	real_to_prot
 	.section ".text.real_call", "ax", @progbits
 	.code32
@@ -665,6 +682,8 @@ flatten_dummy:
  * May be entered with either physical or virtual stack segment.
  ****************************************************************************
  */
+	.section ".text.interrupt_wrapper", "ax", @progbits
+	.code32
 	.globl interrupt_wrapper
 interrupt_wrapper:
 	/* Preserve segment registers and original %esp */

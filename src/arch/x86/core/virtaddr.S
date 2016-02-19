@@ -32,13 +32,13 @@ _virt_to_phys:
 	pushl	%ebp
 
 	/* Change return address to a physical address */
-	movl	virt_offset, %ebp
+	movl	VIRTUAL(virt_offset), %ebp
 	addl	%ebp, 12(%esp)
 
 	/* Switch to physical code segment */
 	cli
 	pushl	$PHYSICAL_CS
-	leal	1f(%ebp), %eax
+	leal	VIRTUAL(1f)(%ebp), %eax
 	pushl	%eax
 	lret
 1:
@@ -78,7 +78,7 @@ _phys_to_virt:
 
 	/* Switch to virtual code segment */
 	cli
-	ljmp	$VIRTUAL_CS, $1f
+	ljmp	$VIRTUAL_CS, $VIRTUAL(1f)
 1:
 	/* Reload data segment registers */
 	movl	$VIRTUAL_DS, %eax
@@ -88,7 +88,7 @@ _phys_to_virt:
 	movl	%eax, %gs
 
 	/* Reload stack segment and adjust %esp */
-	movl	virt_offset, %ebp
+	movl	VIRTUAL(virt_offset), %ebp
 	movl	%eax, %ss
 	subl	%ebp, %esp
 
@@ -134,7 +134,7 @@ _intr_to_virt:
 
 	/* Reload stack segment and adjust %esp if necessary */
 	je	1f
-	movl	virt_offset, %ebp
+	movl	VIRTUAL(virt_offset), %ebp
 	movl	%eax, %ss
 	subl	%ebp, %esp
 1:

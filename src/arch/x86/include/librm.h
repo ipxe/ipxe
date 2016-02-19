@@ -7,7 +7,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * Don't change these unless you really know what you're doing.
  */
-
 #define VIRTUAL_CS 0x08
 #define VIRTUAL_DS 0x10
 #define PHYSICAL_CS 0x18
@@ -15,6 +14,40 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define REAL_CS 0x28
 #define REAL_DS 0x30
 #define P2R_DS 0x38
+
+/* Calculate symbol address within VIRTUAL_CS or VIRTUAL_DS
+ *
+ * In a 64-bit build, we set the bases of VIRTUAL_CS and VIRTUAL_DS
+ * such that truncating a .textdata symbol value to 32 bits gives a
+ * valid 32-bit virtual address.
+ *
+ * The C code is compiled with -mcmodel=kernel and so we must place
+ * all .textdata symbols within the negative 2GB of the 64-bit address
+ * space.  Consequently, all .textdata symbols will have the MSB set
+ * after truncation to 32 bits.  This means that a straightforward
+ * R_X86_64_32 relocation record for the symbol will fail, since the
+ * truncated symbol value will not correctly zero-extend to the
+ * original 64-bit value.
+ *
+ * Using an R_X86_64_32S relocation record would work, but there is no
+ * (sensible) way to generate these relocation records within 32-bit
+ * or 16-bit code.
+ *
+ * The simplest solution is to generate an R_X86_64_32 relocation
+ * record with an addend of (-0xffffffff00000000).  Since all
+ * .textdata symbols are within the negative 2GB of the 64-bit address
+ * space, this addend acts to effectively truncate the symbol to 32
+ * bits, thereby matching the semantics of the R_X86_64_32 relocation
+ * records generated for 32-bit and 16-bit code.
+ *
+ * In a 32-bit build, this problem does not exist, and we can just use
+ * the .textdata symbol values directly.
+ */
+#ifdef __x86_64__
+#define VIRTUAL(address) ( (address) - 0xffffffff00000000 )
+#else
+#define VIRTUAL(address) (address)
+#endif
 
 #ifdef ASSEMBLY
 
@@ -24,7 +57,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v function		C function
  */
 .macro virtcall function
-	pushl	$\function
+	pushl	$VIRTUAL(\function)
 	call	prot_call
 .endm
 
@@ -42,7 +75,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v function		C function
  */
 #define VIRT_CALL( function )						\
-	"pushl $( " #function " )\n\t"					\
+	"pushl $( " _S2 ( VIRTUAL ( function ) ) " )\n\t"		\
 	"call prot_call\n\t"
 
 /* Variables in librm.S */
