@@ -27,10 +27,18 @@ SECTIONS {
     PROVIDE ( _max_align = 16 );
 
     /*
-     * Default to not generating space for page tables
+     * Values used in page table calculations
+     *
+     * On older versions of ld (without the SANE_EXPR feature),
+     * numeric literals within a section description tend to be
+     * interpreted as section-relative symbols.
      *
      */
-    PROVIDE ( _use_page_tables = 0 );
+    _page_size = 4096;
+    _page_size_1 = ( _page_size - 1 );
+    _pte_size = 8;
+    _pte_count = ( _page_size / _pte_size );
+    _pte_count_1 = ( _pte_count - 1 );
 
     /*
      * Allow decompressor to require a minimum amount of temporary stack
@@ -133,12 +141,18 @@ SECTIONS {
 	*(COMMON)
 	*(.stack)
 	*(.stack.*)
+	_pages = .;
 	*(.pages)
 	*(.pages.*)
-	_textdata_paged_len = ABSOLUTE ( . - _textdata );
-	_textdata_ptes = ABSOLUTE ( ( _textdata_paged_len + 4095 ) / 4096 );
-	_textdata_pdes = ABSOLUTE ( ( _textdata_ptes + 511 ) / 512 );
-	. += ( _use_page_tables ? ( _textdata_pdes * 4096 ) : 0 );
+	_use_page_tables = ABSOLUTE ( . ) - ABSOLUTE ( _pages );
+	_textdata_paged_len =
+	    ABSOLUTE ( ABSOLUTE ( . ) - ABSOLUTE ( _textdata ) );
+	_textdata_ptes =
+	    ABSOLUTE ( ( _textdata_paged_len + _page_size_1 ) / _page_size );
+	_textdata_pdes =
+	    ABSOLUTE ( ( _textdata_ptes + _pte_count_1 ) / _pte_count );
+	. += ( _use_page_tables ? ( _textdata_pdes * _page_size ) : 0 );
+	_epages = .;
 	_etextdata = .;
     }
     _textdata_filesz	= ABSOLUTE ( _mtextdata ) - ABSOLUTE ( _textdata );
