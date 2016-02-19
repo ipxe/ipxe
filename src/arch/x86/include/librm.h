@@ -14,10 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PHYSICAL_DS 0x20
 #define REAL_CS 0x28
 #define REAL_DS 0x30
-#if 0
-#define LONG_CS 0x38
-#define LONG_DS 0x40
-#endif
+#define P2R_DS 0x38
 
 #ifdef ASSEMBLY
 

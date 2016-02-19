@@ -70,13 +70,95 @@ real_cs: 	/* 16 bit real mode code segment */
 	.word	0xffff, 0
 	.byte	0, 0x9b, 0x00, 0
 
-	.org	gdt + REAL_DS	
+	.org	gdt + REAL_DS, 0
 real_ds:	/* 16 bit real mode data segment */
-	.word	0xffff, ( REAL_DS << 4 )
+	.word	0xffff, 0
+	.byte	0, 0x93, 0x00, 0
+
+	.org	gdt + P2R_DS, 0
+p2r_ds:		/* 16 bit real mode data segment for prot_to_real transition */
+	.word	0xffff, ( P2R_DS << 4 )
 	.byte	0, 0x93, 0x00, 0
 
 gdt_end:
 	.equ	gdt_length, gdt_end - gdt
+
+/****************************************************************************
+ * Stored real-mode and protected-mode stack pointers
+ *
+ * The real-mode stack pointer is stored here whenever real_to_prot
+ * is called and restored whenever prot_to_real is called.  The
+ * converse happens for the protected-mode stack pointer.
+ *
+ * Despite initial appearances this scheme is, in fact re-entrant,
+ * because program flow dictates that we always return via the point
+ * we left by.  For example:
+ *    PXE API call entry
+ *  1   real => prot
+ *        ...
+ *        Print a text string
+ *	    ...
+ *  2       prot => real
+ *            INT 10
+ *  3       real => prot
+ *	    ...
+ *        ...
+ *  4   prot => real
+ *    PXE API call exit
+ *
+ * At point 1, the RM mode stack value, say RPXE, is stored in
+ * rm_ss,sp.  We want this value to still be present in rm_ss,sp when
+ * we reach point 4.
+ *
+ * At point 2, the RM stack value is restored from RPXE.  At point 3,
+ * the RM stack value is again stored in rm_ss,sp.  This *does*
+ * overwrite the RPXE that we have stored there, but it's the same
+ * value, since the code between points 2 and 3 has managed to return
+ * to us.
+ ****************************************************************************
+ */
+	.section ".bss.rm_sp", "aw", @nobits
+	.globl rm_sp
+rm_sp:	.word 0
+
+	.section ".bss.rm_ss", "aw", @nobits
+	.globl rm_ss
+rm_ss:	.word 0
+
+	.section ".data.pm_esp", "aw", @progbits
+pm_esp:	.long _estack
+
+/****************************************************************************
+ * Virtual address offsets
+ *
+ * These are used by the protected-mode code to map between virtual
+ * and physical addresses, and to access variables in the .text16 or
+ * .data16 segments.
+ ****************************************************************************
+ */
+	.struct 0
+VA_VIRT_OFFSET:	.space	4
+VA_TEXT16:	.space	4
+VA_DATA16:	.space	4
+VA_SIZE:
+	.previous
+
+	/* Internal copies, used only by librm itself */
+	.section ".bss16.rm_virt_addrs", "aw", @nobits
+rm_virt_addrs:	.space	VA_SIZE
+	.equ	rm_virt_offset, ( rm_virt_addrs + VA_VIRT_OFFSET )
+	.equ	rm_text16, ( rm_virt_addrs + VA_TEXT16 )
+	.equ	rm_data16, ( rm_virt_addrs + VA_DATA16 )
+
+	/* Externally visible variables, used by C code */
+	.section ".bss.virt_addrs", "aw", @nobits
+virt_addrs:	.space	VA_SIZE
+	.globl	virt_offset
+	.equ	virt_offset, ( virt_addrs + VA_VIRT_OFFSET )
+	.globl	text16
+	.equ	text16, ( virt_addrs + VA_TEXT16 )
+	.globl	data16
+	.equ	data16, ( virt_addrs + VA_DATA16 )
 
 /****************************************************************************
  * init_librm (real-mode far call, 16-bit real-mode far return address)
@@ -96,45 +178,65 @@ init_librm:
 	/* Preserve registers */
 	pushl	%eax
 	pushl	%ebx
+	pushl	%edi
 
-	/* Store virt_offset and set up virtual_cs and virtual_ds segments */
+	/* Store rm_virt_offset and set up virtual_cs and virtual_ds segments */
+	movl	%edi, rm_virt_offset
 	movl	%edi, %eax
 	movw	$virtual_cs, %bx
 	call	set_seg_base
 	movw	$virtual_ds, %bx
-	call	set_seg_base	
-	movl	%edi, rm_virt_offset
+	call	set_seg_base
 
-	/* Negate virt_offset */
-	negl	%edi
-		
-	/* Store rm_cs and text16, set up real_cs segment */
+	/* Store rm_cs and rm_text16, set up real_cs segment */
 	xorl	%eax, %eax
 	movw	%cs, %ax
 	movw	%ax, %cs:rm_cs
 	shll	$4, %eax
 	movw	$real_cs, %bx
 	call	set_seg_base
-	addr32 leal	(%eax, %edi), %ebx
-	movl	%ebx, rm_text16
+	subl	%edi, %eax
+	movl	%eax, rm_text16
 
-	/* Store rm_ds and data16 */
+	/* Store rm_ds and rm_data16, set up real_ds segment and GDT base */
 	xorl	%eax, %eax
 	movw	%ds, %ax
 	movw	%ax, %cs:rm_ds
 	shll	$4, %eax
-	addr32 leal	(%eax, %edi), %ebx
-	movl	%ebx, rm_data16
-
-	/* Set GDT base */
+	movw	$real_ds, %bx
+	call	set_seg_base
 	movl	%eax, gdt_base
 	addl	$gdt, gdt_base
+	subl	%edi, %eax
+	movl	%eax, rm_data16
+
+	/* Switch to protected mode */
+	virtcall init_librm_pmode
+	.section ".text.init_librm", "ax", @progbits
+	.code32
+init_librm_pmode:
+
+	/* Store virt_offset, text16, and data16 */
+	pushw	%ds
+	movw	$REAL_DS, %ax
+	movw	%ax, %ds
+	movl	$rm_virt_addrs, %esi
+	movl	$virt_addrs, %edi
+	movl	$( VA_SIZE / 4 ), %ecx
+	rep movsl
+	popw	%ds
+
+	/* Return to real mode */
+	ret
+	.section ".text16.init_librm", "ax", @progbits
+	.code16
+init_librm_rmode:
 
 	/* Initialise IDT */
 	virtcall init_idt
 
 	/* Restore registers */
-	negl	%edi
+	popl	%edi
 	popl	%ebx
 	popl	%eax
 	lret
@@ -177,16 +279,10 @@ real_to_prot:
 1:	jc	1b
 
 	/* Make sure we have our data segment available */
-	movw	%cs:rm_ds, %ax
-	movw	%ax, %ds
+	movw	%cs:rm_ds, %ds
 
-	/* Add virt_offset, text16 and data16 to stack to be
-	 * copied, and also copy the return address.
-	 */
-	pushl	rm_virt_offset
-	pushl	rm_text16
-	pushl	rm_data16
-	addw	$16, %cx /* %ecx must be less than 64kB anyway */
+	/* Add protected-mode return address to length of data to be copied */
+	addw	$4, %cx /* %ecx must be less than 64kB anyway */
 
 	/* Real-mode %ss:%sp => %ebp:%edx and virtual address => %esi */
 	xorl	%ebp, %ebp
@@ -242,11 +338,6 @@ r2p_pmode:
 	movl	%esp, %edi
 	rep movsb
 
-	/* Publish virt_offset, text16 and data16 for PM code to use */
-	popl	data16
-	popl	text16
-	popl	virt_offset
-
 	/* Return to virtual address */
 	ret
 
@@ -284,7 +375,7 @@ prot_to_real:
 
 	/* Add return address to data to be moved to RM stack */
 	addl	$4, %ecx
-	
+
 	/* Real-mode %ss:sp => %ebp:edx and virtual address => %edi */
 	movzwl	rm_ss, %ebp
 	movzwl	rm_sp, %edx
@@ -293,16 +384,16 @@ prot_to_real:
 	shll	$4, %eax
 	leal	(%eax,%edx), %edi
 	subl	virt_offset, %edi
-	
+
 	/* Move data from PM stack to RM stack */
 	movl	%esp, %esi
 	rep movsb
-	
+
 	/* Record protected-mode %esp (after removal of data) */
 	movl	%esi, pm_esp
 
 	/* Load real-mode segment limits */
-	movw	$REAL_DS, %ax
+	movw	$P2R_DS, %ax
 	movw	%ax, %ds
 	movw	%ax, %es
 	movw	%ax, %fs
@@ -604,71 +695,3 @@ interrupt_wrapper:
 	/* Restore registers and return */
 	popal
 	iret
-
-/****************************************************************************
- * Stored real-mode and protected-mode stack pointers
- *
- * The real-mode stack pointer is stored here whenever real_to_prot
- * is called and restored whenever prot_to_real is called.  The
- * converse happens for the protected-mode stack pointer.
- *
- * Despite initial appearances this scheme is, in fact re-entrant,
- * because program flow dictates that we always return via the point
- * we left by.  For example:
- *    PXE API call entry
- *  1   real => prot
- *        ...
- *        Print a text string
- *	    ...
- *  2       prot => real
- *            INT 10
- *  3       real => prot
- *	    ...
- *        ...
- *  4   prot => real
- *    PXE API call exit
- *
- * At point 1, the RM mode stack value, say RPXE, is stored in
- * rm_ss,sp.  We want this value to still be present in rm_ss,sp when
- * we reach point 4.
- *
- * At point 2, the RM stack value is restored from RPXE.  At point 3,
- * the RM stack value is again stored in rm_ss,sp.  This *does*
- * overwrite the RPXE that we have stored there, but it's the same
- * value, since the code between points 2 and 3 has managed to return
- * to us.
- ****************************************************************************
- */
-	.section ".bss.rm_sp", "aw", @nobits
-	.globl rm_sp
-rm_sp:	.word 0
-
-	.section ".bss.rm_ss", "aw", @nobits
-	.globl rm_ss
-rm_ss:	.word 0
-
-	.section ".data.pm_esp", "aw", @progbits
-pm_esp:	.long _estack
-
-/****************************************************************************
- * Virtual address offsets
- *
- * These are used by the protected-mode code to map between virtual
- * and physical addresses, and to access variables in the .text16 or
- * .data16 segments.
- ****************************************************************************
- */
-	/* Internal copies, created by init_librm (which runs in real mode) */
-	.section ".bss16.rm_virt_offset", "aw", @nobits
-rm_virt_offset:	.long 0
-rm_text16:	.long 0
-rm_data16:	.long 0
-
-	/* Externally-visible copies, created by real_to_prot */
-	.section ".bss.virt_offset", "aw", @nobits
-	.globl virt_offset
-virt_offset:	.long 0	
-	.globl text16
-text16:		.long 0
-	.globl data16
-data16:		.long 0
