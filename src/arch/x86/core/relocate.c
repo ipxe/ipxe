@@ -10,14 +10,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-/*
- * The linker passes in the symbol _max_align, which is the alignment
- * that we must preserve, in bytes.
- *
- */
-extern char _max_align[];
-#define max_align ( ( size_t ) _max_align )
-
 /* Linker symbols */
 extern char _textdata[];
 extern char _etextdata[];
@@ -29,6 +21,12 @@ extern char _etextdata[];
  * old code - mcb30
  */
 #define MAX_ADDR (0xfff00000UL)
+
+/* Preserve alignment to a 4kB page
+ *
+ * Required for x86_64, and doesn't hurt for i386.
+ */
+#define ALIGN 4096
 
 /**
  * Relocate iPXE
@@ -53,11 +51,11 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	start = virt_to_phys ( _textdata );
 	end = virt_to_phys ( _etextdata );
 	size = ( end - start );
-	padded_size = ( size + max_align - 1 );
+	padded_size = ( size + ALIGN - 1 );
 
 	DBG ( "Relocate: currently at [%x,%x)\n"
-	      "...need %x bytes for %zd-byte alignment\n",
-	      start, end, padded_size, max_align );
+	      "...need %x bytes for %d-byte alignment\n",
+	      start, end, padded_size, ALIGN );
 
 	/* Determine maximum usable address */
 	max = MAX_ADDR;
@@ -125,7 +123,7 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	 * required alignemnt.
 	 */
 	new_start = new_end - padded_size;
-	new_start += ( start - new_start ) & ( max_align - 1 );
+	new_start += ( ( start - new_start ) & ( ALIGN - 1 ) );
 	new_end = new_start + size;
 
 	DBG ( "Relocating from [%x,%x) to [%x,%x)\n",
