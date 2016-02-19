@@ -9,6 +9,10 @@ LDFLAGS		+= --section-start=.textdata=0xffffffffeb000000
 #
 CFLAGS		+= -mno-red-zone
 
+# Generate extra space for page tables to cover .textdata
+#
+LDFLAGS		+= --defsym=_use_page_tables=1
+
 # Include generic BIOS Makefile
 #
 MAKEDEPS	+= arch/x86/Makefile.pcbios

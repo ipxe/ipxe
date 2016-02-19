@@ -27,6 +27,12 @@ SECTIONS {
     PROVIDE ( _max_align = 16 );
 
     /*
+     * Default to not generating space for page tables
+     *
+     */
+    PROVIDE ( _use_page_tables = 0 );
+
+    /*
      * Allow decompressor to require a minimum amount of temporary stack
      * space.
      *
@@ -127,6 +133,12 @@ SECTIONS {
 	*(COMMON)
 	*(.stack)
 	*(.stack.*)
+	*(.pages)
+	*(.pages.*)
+	_textdata_paged_len = ABSOLUTE ( . - _textdata );
+	_textdata_ptes = ABSOLUTE ( ( _textdata_paged_len + 4095 ) / 4096 );
+	_textdata_pdes = ABSOLUTE ( ( _textdata_ptes + 511 ) / 512 );
+	. += ( _use_page_tables ? ( _textdata_pdes * 4096 ) : 0 );
 	_etextdata = .;
     }
     _textdata_filesz	= ABSOLUTE ( _mtextdata ) - ABSOLUTE ( _textdata );

@@ -10,8 +10,38 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 /* Drag in local definitions */
 #include "librm.h"
 
-/* For switches to/from protected mode */
-#define CR0_PE 1
+/* CR0: protection enabled */
+#define CR0_PE ( 1 << 0 )
+
+/* CR0: paging */
+#define CR0_PG ( 1 << 31 )
+
+/* CR4: physical address extensions */
+#define CR4_PAE ( 1 << 5 )
+
+/* Page: present */
+#define PG_P 0x01
+
+/* Page: read/write */
+#define PG_RW 0x02
+
+/* Page: user/supervisor */
+#define PG_US 0x04
+
+/* Page: page size */
+#define PG_PS 0x80
+
+/* Size of various paging-related data structures */
+#define SIZEOF_PTE_LOG2 3
+#define SIZEOF_PTE ( 1 << SIZEOF_PTE_LOG2 )
+#define SIZEOF_PT_LOG2 12
+#define SIZEOF_PT ( 1 << SIZEOF_PT_LOG2 )
+#define SIZEOF_4KB_PAGE_LOG2 12
+#define SIZEOF_4KB_PAGE ( 1 << SIZEOF_4KB_PAGE_LOG2 )
+#define SIZEOF_2MB_PAGE_LOG2 21
+#define SIZEOF_2MB_PAGE ( 1 << SIZEOF_2MB_PAGE_LOG2 )
+#define SIZEOF_LOW_4GB_LOG2 32
+#define SIZEOF_LOW_4GB ( 1 << SIZEOF_LOW_4GB_LOG2 )
 
 /* Size of various C data structures */
 #define SIZEOF_I386_SEG_REGS	12
@@ -226,6 +256,10 @@ init_librm:
 .if32 ;	subl	%edi, %eax ; .endif
 	movl	%eax, rm_data16
 
+.if64 ;	/* Reset page tables, if applicable */
+	xorl	%eax, %eax
+	movl	%eax, pml4
+.endif
 	/* Switch to protected mode */
 	virtcall init_librm_pmode
 	.section ".text.init_librm", "ax", @progbits
@@ -242,6 +276,10 @@ init_librm_pmode:
 	rep movsl
 	popw	%ds
 
+.if64 ;	/* Initialise page tables, if applicable */
+	movl	VIRTUAL(virt_offset), %edi
+	call	init_pages
+.endif
 	/* Return to real mode */
 	ret
 	.section ".text16.init_librm", "ax", @progbits
@@ -714,3 +752,144 @@ interrupt_wrapper:
 	/* Restore registers and return */
 	popal
 	iret
+
+/****************************************************************************
+ * Page tables
+ *
+ ****************************************************************************
+ */
+	.section ".pages", "aw", @nobits
+	.align	SIZEOF_PT
+
+	/* Page map level 4 entries (PML4Es)
+	 *
+	 * This comprises
+	 *
+	 * - PML4E[0x000] covering [0x0000000000000000-0x0000007fffffffff]
+	 * - PML4E[0x1ff] covering [0xffffff8000000000-0xffffffffffffffff]
+	 *
+	 * These point to the PDPT.  This creates some aliased
+	 * addresses within unused portions of the 64-bit address
+	 * space, but allows us to use just a single PDPT.
+	 */
+pml4e:
+	.space	SIZEOF_PT
+	.size	pml4e, . - pml4e
+
+	/* Page directory pointer table entries (PDPTEs)
+	 *
+	 * This comprises:
+	 *
+	 * - PDPTE[0x000] covering [0x0000000000000000-0x000000003fffffff]
+	 * - PDPTE[0x001] covering [0x0000000040000000-0x000000007fffffff]
+	 * - PDPTE[0x002] covering [0x0000000080000000-0x00000000bfffffff]
+	 * - PDPTE[0x003] covering [0x00000000c0000000-0x00000000ffffffff]
+	 *
+	 * These point to the appropriate page directories (in pde_low)
+	 * used to identity-map the whole of the 32-bit address space.
+	 *
+	 * - PDPTE[0x1ff] covering [0xffffffffc0000000-0xffffffffffffffff]
+	 *
+	 * This points back to the PDPT itself, allowing the PDPT to be
+	 * (ab)used to hold PDEs covering .textdata.
+	 *
+	 * - PDE[N-M] covering [_textdata,_end)
+	 *
+	 * These are used to point to the page tables (in pte_textdata)
+	 * used to map our .textdata section.  Note that each PDE
+	 * covers 2MB, so we are likely to use only a single PDE in
+	 * practice.
+	 */
+pdpte:
+	.space	SIZEOF_PT
+	.size	pdpte, . - pdpte
+	.equ	pde_textdata, pdpte /* (ab)use */
+
+	/* Page directory entries (PDEs) for the low 4GB
+	 *
+	 * This comprises 2048 2MB pages to identity-map the whole of
+	 * the 32-bit address space.
+	 */
+pde_low:
+	.equ	PDE_LOW_PTES, ( SIZEOF_LOW_4GB / SIZEOF_2MB_PAGE )
+	.equ	PDE_LOW_PTS, ( ( PDE_LOW_PTES * SIZEOF_PTE ) / SIZEOF_PT )
+	.space	( PDE_LOW_PTS * SIZEOF_PT )
+	.size	pde_low, . - pde_low
+
+	/* Page table entries (PTEs) for .textdata
+	 *
+	 * This comprises enough 4kB pages to map the whole of
+	 * .textdata.  The required number of PTEs is calculated by
+	 * the linker script.
+	 *
+	 * Note that these mappings do not cover the PTEs themselves.
+	 * This does not matter, since code running with paging
+	 * enabled never needs to access these PTEs.
+	 */
+pte_textdata:
+	/* Allocated by linker script; must be at the end of .textdata */
+
+	.section ".bss16.pml4", "aw", @nobits
+pml4:	.long	0
+
+/****************************************************************************
+ * init_pages (protected-mode near call)
+ *
+ * Initialise the page tables ready for long mode.
+ *
+ * Parameters:
+ *   %edi : virt_offset
+ ****************************************************************************
+ */
+	.section ".text.init_pages", "ax", @progbits
+	.code32
+init_pages:
+	/* Initialise PML4Es for low 4GB and negative 2GB */
+	leal	( VIRTUAL(pdpte) + ( PG_P | PG_RW | PG_US ) )(%edi), %eax
+	movl	%eax, VIRTUAL(pml4e)
+	movl	%eax, ( VIRTUAL(pml4e) + SIZEOF_PT - SIZEOF_PTE )
+
+	/* Initialise PDPTE for negative 1GB */
+	movl	%eax, ( VIRTUAL(pdpte) + SIZEOF_PT - SIZEOF_PTE )
+
+	/* Initialise PDPTEs for low 4GB */
+	movl	$PDE_LOW_PTS, %ecx
+	leal	( VIRTUAL(pde_low) + ( PDE_LOW_PTS * SIZEOF_PT ) + \
+		  ( PG_P | PG_RW | PG_US ) )(%edi), %eax
+1:	subl	$SIZEOF_PT, %eax
+	movl	%eax, ( VIRTUAL(pdpte) - SIZEOF_PTE )(,%ecx,SIZEOF_PTE)
+	loop	1b
+
+	/* Initialise PDEs for low 4GB */
+	movl	$PDE_LOW_PTES, %ecx
+	leal	( 0 + ( PG_P | PG_RW | PG_US | PG_PS ) ), %eax
+1:	subl	$SIZEOF_2MB_PAGE, %eax
+	movl	%eax, ( VIRTUAL(pde_low) - SIZEOF_PTE )(,%ecx,SIZEOF_PTE)
+	loop	1b
+
+	/* Initialise PDEs for .textdata */
+	movl	$_textdata_pdes, %ecx
+	leal	( VIRTUAL(_etextdata) + ( PG_P | PG_RW | PG_US ) )(%edi), %eax
+	movl	$VIRTUAL(_textdata), %ebx
+	shrl	$( SIZEOF_2MB_PAGE_LOG2 - SIZEOF_PTE_LOG2 ), %ebx
+	andl	$( SIZEOF_PT - 1 ), %ebx
+1:	subl	$SIZEOF_PT, %eax
+	movl	%eax, (VIRTUAL(pde_textdata) - SIZEOF_PTE)(%ebx,%ecx,SIZEOF_PTE)
+	loop	1b
+
+	/* Initialise PTEs for .textdata */
+	movl	$_textdata_ptes, %ecx
+	leal	( VIRTUAL(_textdata) + ( PG_P | PG_RW | PG_US ) )(%edi), %eax
+	addl	$_textdata_paged_len, %eax
+1:	subl	$SIZEOF_4KB_PAGE, %eax
+	movl	%eax, ( VIRTUAL(pte_textdata) - SIZEOF_PTE )(,%ecx,SIZEOF_PTE)
+	loop	1b
+
+	/* Record PML4 physical address */
+	leal	VIRTUAL(pml4e)(%edi), %eax
+	movl	VIRTUAL(data16), %ebx
+	subl	%edi, %ebx
+	movl	%eax, pml4(%ebx)
+
+	/* Return */
+	ret
