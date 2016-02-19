@@ -250,11 +250,16 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 
 /* PHYS_CODE: declare a fragment of code that executes in flat physical mode */
 #define PHYS_CODE( asm_code_str )			\
-	"call _virt_to_phys\n\t"			\
+	"push $1f\n\t"					\
+	"call phys_call\n\t"				\
+	".section \".text.phys\", \"ax\", @progbits\n\t"\
 	".code32\n\t"					\
+	"\n1:\n\t"					\
 	asm_code_str					\
-	"call _phys_to_virt\n\t"			\
-	CODE_DEFAULT "\n\t"
+	"\n\t"						\
+	"ret\n\t"					\
+	CODE_DEFAULT "\n\t"				\
+	".previous\n\t"
 
 /** Number of interrupts */
 #define NUM_INT 256

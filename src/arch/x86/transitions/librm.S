@@ -502,6 +502,150 @@ rm_gdtr:
 	.long 0 /* Base */
 
 /****************************************************************************
+ * phys_to_prot (protected-mode near call, 32-bit physical return address)
+ *
+ * Switch from 32-bit protected mode with physical addresses to 32-bit
+ * protected mode with virtual addresses.  %esp is adjusted to a
+ * virtual address.  All other registers and flags are preserved.
+ *
+ * The return address for this function should be a 32-bit physical
+ * (sic) address.
+ *
+ ****************************************************************************
+ */
+	.section ".text.phys_to_prot", "ax", @progbits
+	.code32
+	.globl phys_to_prot
+phys_to_prot:
+	/* Preserve registers and flags */
+	pushfl
+	pushl	%eax
+	pushl	%ebp
+
+	/* Switch to virtual code segment */
+	cli
+	ljmp	$VIRTUAL_CS, $VIRTUAL(1f)
+1:
+	/* Switch to virtual data segment and adjust %esp */
+	movw	$VIRTUAL_DS, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+	movw	%ax, %ss
+	movl	VIRTUAL(virt_offset), %ebp
+	subl	%ebp, %esp
+
+	/* Adjust return address to a virtual address */
+	subl	%ebp, 12(%esp)
+
+	/* Restore registers and flags, and return */
+	popl	%ebp
+	popl	%eax
+	popfl
+	ret
+
+	/* Expose as _phys_to_virt for use by COMBOOT */
+	.globl	_phys_to_virt
+	.equ	_phys_to_virt, phys_to_prot
+
+/****************************************************************************
+ * prot_to_phys (protected-mode near call, 32-bit virtual return address)
+ *
+ * Switch from 32-bit protected mode with virtual addresses to 32-bit
+ * protected mode with physical addresses.  %esp is adjusted to a
+ * physical address.  All other registers and flags are preserved.
+ *
+ * The return address for this function should be a 32-bit virtual
+ * (sic) address.
+ *
+ ****************************************************************************
+ */
+	.section ".text.prot_to_phys", "ax", @progbits
+	.code32
+prot_to_phys:
+	/* Preserve registers and flags */
+	pushfl
+	pushl	%eax
+	pushl	%ebp
+
+	/* Adjust return address to a physical address */
+	movl	VIRTUAL(virt_offset), %ebp
+	addl	%ebp, 12(%esp)
+
+	/* Switch to physical code segment */
+	cli
+	pushl	$PHYSICAL_CS
+	leal	VIRTUAL(1f)(%ebp), %eax
+	pushl	%eax
+	lret
+1:
+	/* Switch to physical data segment and adjust %esp */
+	movw	$PHYSICAL_DS, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+	movw	%ax, %ss
+	addl	%ebp, %esp
+
+	/* Restore registers and flags, and return */
+	popl	%ebp
+	popl	%eax
+	popfl
+	ret
+
+	/* Expose as _virt_to_phys for use by COMBOOT */
+	.globl	_virt_to_phys
+	.equ	_virt_to_phys, prot_to_phys
+
+/****************************************************************************
+ * intr_to_prot (protected-mode near call, 32-bit virtual return address)
+ *
+ * Switch from 32-bit protected mode with a virtual code segment and
+ * either a physical or virtual stack segment to 32-bit protected mode
+ * with normal virtual addresses.  %esp is adjusted if necessary to a
+ * virtual address.  All other registers and flags are preserved.
+ *
+ * The return address for this function should be a 32-bit virtual
+ * address.
+ *
+ ****************************************************************************
+ */
+	.section ".text.intr_to_prot", "ax", @progbits
+	.code32
+	.globl intr_to_prot
+intr_to_prot:
+	/* Preserve registers and flags */
+	pushfl
+	pushl	%eax
+
+	/* Check whether stack segment is physical or virtual */
+	movw	%ss, %ax
+	cmpw	$VIRTUAL_DS, %ax
+	movw	$VIRTUAL_DS, %ax
+
+	/* Reload data segment registers */
+	movw	%ax, %ds
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+
+	/* Reload stack segment and adjust %esp if necessary */
+	je	1f
+	movw	%ax, %ss
+	subl	VIRTUAL(virt_offset), %esp
+1:
+	/* Restore registers and flags, and return */
+	popl	%eax
+	popfl
+	ret
+
+	/* Expose as _intr_to_virt for use by GDB */
+	.globl	_intr_to_virt
+	.equ	_intr_to_virt, intr_to_prot
+
+/****************************************************************************
  * prot_call (real-mode near call, 16-bit real-mode near return address)
  *
  * Call a specific C function in the protected-mode code.  The
@@ -539,6 +683,7 @@ PC_OFFSET_IDT:		.space	6
 PC_OFFSET_IX86:		.space	SIZEOF_I386_ALL_REGS
 PC_OFFSET_PADDING:	.space	2 /* for alignment */
 PC_OFFSET_RETADDR:	.space	2
+PC_OFFSET_PARAMS:
 PC_OFFSET_FUNCTION:	.space	4
 PC_OFFSET_END:
 	.previous
@@ -601,7 +746,9 @@ pc_rmode:
 	addr32 movl -20(%esp), %esp
 	popfl
 	popfw	/* padding */
-	ret	$4
+
+	/* Return and discard function parameters */
+	ret	$( PC_OFFSET_END - PC_OFFSET_PARAMS )
 
 /****************************************************************************
  * real_call (protected-mode near call, 32-bit virtual return address)
@@ -620,7 +767,7 @@ pc_rmode:
  * See librm.h and realmode.h for details and examples.
  *
  * Parameters:
- *   (32-bit) near pointer to real-mode function to call
+ *   function : offset within .text16 of real-mode function to call
  *
  * Returns: none
  ****************************************************************************
@@ -629,6 +776,7 @@ pc_rmode:
 RC_OFFSET_REGS:		.space	SIZEOF_I386_REGS
 RC_OFFSET_REGS_END:
 RC_OFFSET_RETADDR:	.space	4
+RC_OFFSET_PARAMS:
 RC_OFFSET_FUNCTION:	.space	4
 RC_OFFSET_END:
 	.previous
@@ -665,9 +813,11 @@ rc_rmode:
 	.section ".text.real_call", "ax", @progbits
 	.code32
 rc_pmode:
-	/* Restore registers and return */
+	/* Restore registers */
 	popal
-	ret	$4
+
+	/* Return and discard function parameters */
+	ret	$( RC_OFFSET_END - RC_OFFSET_PARAMS )
 
 
 	/* Function vector, used because "call xx(%sp)" is not a valid
@@ -683,6 +833,55 @@ rm_default_gdtr_idtr:
 	.long 0		/* Global descriptor table base */
 	.word 0x03ff	/* Interrupt descriptor table limit */
 	.long 0		/* Interrupt descriptor table base */
+
+/****************************************************************************
+ * phys_call (protected-mode near call, 32-bit virtual return address)
+ *
+ * Call a function with flat 32-bit physical addressing
+ *
+ * The non-segment register values will be passed directly to the
+ * function.  The segment registers will be set for flat 32-bit
+ * physical addressing.  The non-segment register values set by the
+ * function will be passed back to the caller.
+ *
+ * librm.h defines a convenient macro PHYS_CODE() for using phys_call.
+ *
+ * Parameters:
+ *   function : virtual (sic) address of function to call
+ *
+ ****************************************************************************
+ */
+	.struct 0
+PHC_OFFSET_RETADDR:	.space	4
+PHC_OFFSET_PARAMS:
+PHC_OFFSET_FUNCTION:	.space	4
+PHC_OFFSET_END:
+	.previous
+
+	.section ".text.phys_call", "ax", @progbits
+	.code32
+	.globl phys_call
+phys_call:
+	/* Adjust function pointer to a physical address */
+	pushl	%ebp
+	movl	VIRTUAL(virt_offset), %ebp
+	addl	%ebp, ( PHC_OFFSET_FUNCTION + 4 /* saved %ebp */ )(%esp)
+	popl	%ebp
+
+	/* Switch to physical addresses */
+	call	prot_to_phys
+
+	/* Call function */
+	call	*PHC_OFFSET_FUNCTION(%esp)
+
+	/* For sanity's sake, clear the direction flag as soon as possible */
+	cld
+
+	/* Switch to virtual addresses */
+	call	phys_to_prot
+
+	/* Return and discard function parameters */
+	ret	$( PHC_OFFSET_END - PHC_OFFSET_PARAMS )
 
 /****************************************************************************
  * flatten_real_mode (real-mode near call)
@@ -733,7 +932,7 @@ interrupt_wrapper:
 	pushl	%esp
 
 	/* Switch to virtual addressing */
-	call	_intr_to_virt
+	call	intr_to_prot
 
 	/* Expand IRQ number to whole %eax register */
 	movzbl	%al, %eax
