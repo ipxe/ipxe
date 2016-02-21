@@ -79,7 +79,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	"call prot_call\n\t"
 
 /* Variables in librm.S */
-extern unsigned long virt_offset;
+extern const unsigned long virt_offset;
 
 /**
  * Convert physical address to user pointer
@@ -170,8 +170,8 @@ UACCESS_INLINE ( librm, memchr_user ) ( userptr_t buffer, off_t offset,
  *
  */
 
-extern char *data16;
-extern char *text16;
+extern char * const data16;
+extern char * const text16;
 
 #define __data16( variable )						\
 	__attribute__ (( section ( ".data16" ) ))			\
@@ -216,9 +216,9 @@ extern char *text16;
 /* Variables in librm.S, present in the normal data segment */
 extern uint16_t rm_sp;
 extern uint16_t rm_ss;
-extern uint16_t __text16 ( rm_cs );
+extern const uint16_t __text16 ( rm_cs );
 #define rm_cs __use_text16 ( rm_cs )
-extern uint16_t __text16 ( rm_ds );
+extern const uint16_t __text16 ( rm_ds );
 #define rm_ds __use_text16 ( rm_ds )
 
 extern uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size );
