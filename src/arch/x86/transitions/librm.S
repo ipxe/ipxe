@@ -506,7 +506,7 @@ rm_gdtr:
  *
  * Switch from 32-bit protected mode with physical addresses to 32-bit
  * protected mode with virtual addresses.  %esp is adjusted to a
- * virtual address.  All other registers and flags are preserved.
+ * virtual address.  All other registers are preserved.
  *
  * The return address for this function should be a 32-bit physical
  * (sic) address.
@@ -517,8 +517,7 @@ rm_gdtr:
 	.code32
 	.globl phys_to_prot
 phys_to_prot:
-	/* Preserve registers and flags */
-	pushfl
+	/* Preserve registers */
 	pushl	%eax
 	pushl	%ebp
 
@@ -537,12 +536,11 @@ phys_to_prot:
 	subl	%ebp, %esp
 
 	/* Adjust return address to a virtual address */
-	subl	%ebp, 12(%esp)
+	subl	%ebp, 8(%esp)
 
-	/* Restore registers and flags, and return */
+	/* Restore registers and return */
 	popl	%ebp
 	popl	%eax
-	popfl
 	ret
 
 	/* Expose as _phys_to_virt for use by COMBOOT */
@@ -554,7 +552,7 @@ phys_to_prot:
  *
  * Switch from 32-bit protected mode with virtual addresses to 32-bit
  * protected mode with physical addresses.  %esp is adjusted to a
- * physical address.  All other registers and flags are preserved.
+ * physical address.  All other registers are preserved.
  *
  * The return address for this function should be a 32-bit virtual
  * (sic) address.
@@ -564,14 +562,13 @@ phys_to_prot:
 	.section ".text.prot_to_phys", "ax", @progbits
 	.code32
 prot_to_phys:
-	/* Preserve registers and flags */
-	pushfl
+	/* Preserve registers */
 	pushl	%eax
 	pushl	%ebp
 
 	/* Adjust return address to a physical address */
 	movl	VIRTUAL(virt_offset), %ebp
-	addl	%ebp, 12(%esp)
+	addl	%ebp, 8(%esp)
 
 	/* Switch to physical code segment */
 	cli
@@ -589,10 +586,9 @@ prot_to_phys:
 	movw	%ax, %ss
 	addl	%ebp, %esp
 
-	/* Restore registers and flags, and return */
+	/* Restore registers and return */
 	popl	%ebp
 	popl	%eax
-	popfl
 	ret
 
 	/* Expose as _virt_to_phys for use by COMBOOT */
@@ -605,7 +601,7 @@ prot_to_phys:
  * Switch from 32-bit protected mode with a virtual code segment and
  * either a physical or virtual stack segment to 32-bit protected mode
  * with normal virtual addresses.  %esp is adjusted if necessary to a
- * virtual address.  All other registers and flags are preserved.
+ * virtual address.  All other registers are preserved.
  *
  * The return address for this function should be a 32-bit virtual
  * address.
@@ -616,8 +612,7 @@ prot_to_phys:
 	.code32
 	.globl intr_to_prot
 intr_to_prot:
-	/* Preserve registers and flags */
-	pushfl
+	/* Preserve registers */
 	pushl	%eax
 
 	/* Check whether stack segment is physical or virtual */
@@ -636,9 +631,8 @@ intr_to_prot:
 	movw	%ax, %ss
 	subl	VIRTUAL(virt_offset), %esp
 1:
-	/* Restore registers and flags, and return */
+	/* Restore registers and return */
 	popl	%eax
-	popfl
 	ret
 
 	/* Expose as _intr_to_virt for use by GDB */
