@@ -89,6 +89,15 @@ extern const unsigned long virt_offset;
  */
 static inline __always_inline userptr_t
 UACCESS_INLINE ( librm, phys_to_user ) ( unsigned long phys_addr ) {
+
+	/* In a 64-bit build, any valid physical address is directly
+	 * usable as a virtual address, since the low 4GB is
+	 * identity-mapped.
+	 */
+	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) )
+		return phys_addr;
+
+	/* In a 32-bit build, subtract virt_offset */
 	return ( phys_addr - virt_offset );
 }
 
@@ -101,7 +110,20 @@ UACCESS_INLINE ( librm, phys_to_user ) ( unsigned long phys_addr ) {
  */
 static inline __always_inline unsigned long
 UACCESS_INLINE ( librm, user_to_phys ) ( userptr_t userptr, off_t offset ) {
-	return ( userptr + offset + virt_offset );
+	unsigned long addr = ( userptr + offset );
+
+	/* In a 64-bit build, any virtual address in the low 4GB is
+	 * directly usable as a physical address, since the low 4GB is
+	 * identity-mapped.
+	 */
+	if ( ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) &&
+	     ( addr <= 0xffffffffUL ) )
+		return addr;
+
+	/* In a 32-bit build or in a 64-bit build with a virtual
+	 * address above 4GB: add virt_offset
+	 */
+	return ( addr + virt_offset );
 }
 
 static inline __always_inline userptr_t
