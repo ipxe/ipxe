@@ -640,19 +640,19 @@ intr_to_prot:
 	.equ	_intr_to_virt, intr_to_prot
 
 /****************************************************************************
- * prot_call (real-mode near call, 16-bit real-mode near return address)
+ * virt_call (real-mode near call, 16-bit real-mode near return address)
  *
  * Call a specific C function in the protected-mode code.  The
  * prototype of the C function must be
  *   void function ( struct i386_all_regs *ix86 ); 
  * ix86 will point to a struct containing the real-mode registers
- * at entry to prot_call.  
+ * at entry to virt_call().
  *
- * All registers will be preserved across prot_call(), unless the C
+ * All registers will be preserved across virt_call(), unless the C
  * function explicitly overwrites values in ix86.  Interrupt status
  * and GDT will also be preserved.  Gate A20 will be enabled.
  *
- * Note that prot_call() does not rely on the real-mode stack
+ * Note that virt_call() does not rely on the real-mode stack
  * remaining intact in order to return, since everything relevant is
  * copied to the protected-mode stack for the duration of the call.
  * In particular, this means that a real-mode prefix can make a call
@@ -666,26 +666,26 @@ intr_to_prot:
  *
  * Example usage:
  *	pushl	$pxe_api_call
- *	call	prot_call
+ *	call	virt_call
  * to call in to the C function
  *      void pxe_api_call ( struct i386_all_regs *ix86 );
  ****************************************************************************
  */
 	.struct	0
-PC_OFFSET_GDT:		.space	6
-PC_OFFSET_IDT:		.space	6
-PC_OFFSET_IX86:		.space	SIZEOF_I386_ALL_REGS
-PC_OFFSET_PADDING:	.space	2 /* for alignment */
-PC_OFFSET_RETADDR:	.space	2
-PC_OFFSET_PARAMS:
-PC_OFFSET_FUNCTION:	.space	4
-PC_OFFSET_END:
+VC_OFFSET_GDT:		.space	6
+VC_OFFSET_IDT:		.space	6
+VC_OFFSET_IX86:		.space	SIZEOF_I386_ALL_REGS
+VC_OFFSET_PADDING:	.space	2 /* for alignment */
+VC_OFFSET_RETADDR:	.space	2
+VC_OFFSET_PARAMS:
+VC_OFFSET_FUNCTION:	.space	4
+VC_OFFSET_END:
 	.previous
 
-	.section ".text16.prot_call", "ax", @progbits
+	.section ".text16.virt_call", "ax", @progbits
 	.code16
-	.globl prot_call
-prot_call:
+	.globl virt_call
+virt_call:
 	/* Preserve registers, flags and GDT on external RM stack */
 	pushfw	/* padding */
 	pushfl
@@ -696,37 +696,37 @@ prot_call:
 	pushw	%ds
 	pushw	%ss
 	pushw	%cs
-	subw	$PC_OFFSET_IX86, %sp
+	subw	$VC_OFFSET_IX86, %sp
 	movw	%sp, %bp
-	sidt	PC_OFFSET_IDT(%bp)
-	sgdt	PC_OFFSET_GDT(%bp)
+	sidt	VC_OFFSET_IDT(%bp)
+	sgdt	VC_OFFSET_GDT(%bp)
 
 	/* For sanity's sake, clear the direction flag as soon as possible */
 	cld
 
 	/* Switch to protected mode and move register dump to PM stack */
-	movl	$PC_OFFSET_END, %ecx
-	pushl	$VIRTUAL(pc_pmode)
+	movl	$VC_OFFSET_END, %ecx
+	pushl	$VIRTUAL(vc_pmode)
 	jmp	real_to_prot
-	.section ".text.prot_call", "ax", @progbits
+	.section ".text.virt_call", "ax", @progbits
 	.code32
-pc_pmode:
+vc_pmode:
 	/* Call function */
-	leal	PC_OFFSET_IX86(%esp), %eax
+	leal	VC_OFFSET_IX86(%esp), %eax
 	pushl	%eax
-	call	*(PC_OFFSET_FUNCTION+4)(%esp)
+	call	*(VC_OFFSET_FUNCTION+4)(%esp)
 	popl	%eax /* discard */
 
 	/* Switch to real mode and move register dump back to RM stack */
-	movl	$PC_OFFSET_END, %ecx
+	movl	$VC_OFFSET_END, %ecx
 	movl	%esp, %esi
-	pushl	$pc_rmode
+	pushl	$vc_rmode
 	jmp	prot_to_real
-	.section ".text16.prot_call", "ax", @progbits
+	.section ".text16.virt_call", "ax", @progbits
 	.code16
-pc_rmode:
+vc_rmode:
 	/* Restore registers and flags and return */
-	addw	$( PC_OFFSET_IX86 + 4 /* also skip %cs and %ss */ ), %sp
+	addw	$( VC_OFFSET_IX86 + 4 /* also skip %cs and %ss */ ), %sp
 	popw	%ds
 	popw	%es
 	popw	%fs
@@ -742,7 +742,7 @@ pc_rmode:
 	popfw	/* padding */
 
 	/* Return and discard function parameters */
-	ret	$( PC_OFFSET_END - PC_OFFSET_PARAMS )
+	ret	$( VC_OFFSET_END - VC_OFFSET_PARAMS )
 
 /****************************************************************************
  * real_call (protected-mode near call, 32-bit virtual return address)

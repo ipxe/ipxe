@@ -167,7 +167,7 @@ struct i386_seg_regs {
  *
  * @endcode
  *
- * prot_call() and kir_call() create this data structure on the stack
+ * virt_call() and kir_call() create this data structure on the stack
  * and pass in a pointer to this structure.
  *
  */

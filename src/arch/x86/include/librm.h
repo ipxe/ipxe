@@ -58,7 +58,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 .macro virtcall function
 	pushl	$VIRTUAL(\function)
-	call	prot_call
+	call	virt_call
 .endm
 
 #else /* ASSEMBLY */
@@ -76,7 +76,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define VIRT_CALL( function )						\
 	"pushl $( " _S2 ( VIRTUAL ( function ) ) " )\n\t"		\
-	"call prot_call\n\t"
+	"call virt_call\n\t"
 
 /* Variables in librm.S */
 extern const unsigned long virt_offset;
