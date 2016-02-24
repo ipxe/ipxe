@@ -86,6 +86,13 @@ NON_AUTO_MEDIA	+= iso
 	$(Q)ISOLINUX_BIN=$(ISOLINUX_BIN) LDLINUX_C32=$(LDLINUX_C32) \
 	    VERSION="$(VERSION)" bash util/geniso -o $@ $<
 
+# rule to make a non-emulation ISO boot image with EFI support
+NON_AUTO_MEDIA += eiso
+%eiso: %lkrn bin-i386-efi/ipxe.efi bin-x86_64-efi/ipxe.efi util/geniso
+	$(QM)$(ECHO) "  [GENISO] $@"
+	$(Q)ISOLINUX_BIN=$(ISOLINUX_BIN) LDLINUX_C32=$(LDLINUX_C32) \
+	    VERSION="$(VERSION)" bash util/geniso -e -o $@ $<
+
 # rule to make a floppy emulation ISO boot image
 NON_AUTO_MEDIA	+= liso
 %liso:	%lkrn util/geniso

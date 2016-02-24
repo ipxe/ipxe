@@ -6,16 +6,21 @@ function help() {
 	echo "usage: ${0} [OPTIONS] foo.lkrn [bar.lkrn,...]"
 	echo
 	echo "where OPTIONS are:"
+	echo " -e       build image with EFI support"
 	echo " -h       show this help"
 	echo " -l       build legacy image with floppy emulation"
 	echo " -o FILE  save iso image to file"
 }
 
+EFI=0
 LEGACY=0
 FIRST=""
 
-while getopts "hlo:" opt; do
+while getopts "ehlo:" opt; do
 	case ${opt} in
+		e)
+			EFI=1
+			;;
 		h)
 			help
 			exit 0
@@ -37,17 +42,25 @@ if [ -z "${OUT}" ]; then
 	exit 1
 fi
 
-# There should either be mkisofs or the compatible genisoimage program
-for command in genisoimage mkisofs; do
-	if ${command} --version >/dev/null 2>/dev/null; then
-		mkisofs=(${command})
-		break
-	fi
-done
-
-if [ -z "${mkisofs}" ]; then
-	echo "${0}: mkisofs or genisoimage not found, please install or set PATH" >&2
+# We need xorriso (from libisoburn) for EFI support, so try that first.
+if xorriso --version >/dev/null 2>/dev/null; then
+	mkisofs=(xorriso -as mkisofs)
+elif [ ${EFI} -eq 1 ]; then
+	echo "${0}: xorriso not found, but required for EFI support. Please install." >&2
 	exit 1
+else
+	# fall back to mkisofs or the compatible genisoimage program
+	for command in genisoimage mkisofs; do
+		if ${command} --version >/dev/null 2>/dev/null; then
+			mkisofs=(${command})
+			break
+		fi
+	done
+
+	if [ -z "${mkisofs}" ]; then
+		echo "${0}: mkisofs or genisoimage not found, please install or set PATH" >&2
+		exit 1
+	fi
 fi
 
 dir=$(mktemp -d bin/iso.dir.XXXXXX)
@@ -122,13 +135,28 @@ case "${LEGACY}" in
 		# copy isolinux bootloader
 		cp ${ISOLINUX_BIN} ${dir}
 
+		mkisofs+=(-b isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table)
+
+		if [ "${EFI}" -eq 1 ]; then
+			# generate EFI image
+			img=${dir}/efiboot.img
+
+			mformat -f 2880 -C -i ${img} ::
+			mmd -i ${img} "::/EFI"
+			mmd -i ${img} "::/EFI/BOOT"
+			mcopy -m -i ${img} bin-x86_64-efi/ipxe.efi "::EFI/BOOT/BOOTX64.EFI"
+			mcopy -m -i ${img} bin-i386-efi/ipxe.efi "::EFI/BOOT/BOOTIA32.EFI"
+
+			mkisofs+=(-eltorito-alt-boot -e efiboot.img -isohybrid-gpt-basdat -no-emul-boot)
+		fi
+
 		# syslinux 6.x needs a file called ldlinux.c32
 		if [ -n "${LDLINUX_C32}" -a -s "${LDLINUX_C32}" ]; then
 			cp ${LDLINUX_C32} ${dir}
 		fi
 
 		# generate the iso image
-		"${mkisofs[@]}" -b isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table -output ${OUT} ${dir}
+		"${mkisofs[@]}" -output ${OUT} ${dir}
 
 		# isohybrid will be used if available
 		if isohybrid --version >/dev/null 2>/dev/null; then
