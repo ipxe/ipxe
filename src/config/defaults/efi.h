@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define UACCESS_EFI
 #define IOAPI_X86
+#define IOMAP_VIRT
 #define PCIAPI_EFI
 #define CONSOLE_EFI
 #define TIMER_EFI
