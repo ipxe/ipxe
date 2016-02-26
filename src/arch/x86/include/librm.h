@@ -378,6 +378,51 @@ struct interrupt_vector {
 
 extern void set_interrupt_vector ( unsigned int intr, void *vector );
 
+/** A page table */
+struct page_table {
+	/** Page address and flags */
+	uint64_t page[512];
+};
+
+/** Page flags */
+enum page_flags {
+	/** Page is present */
+	PAGE_P = 0x01,
+	/** Page is writable */
+	PAGE_RW = 0x02,
+	/** Page is accessible by user code */
+	PAGE_US = 0x04,
+	/** Page-level write-through */
+	PAGE_PWT = 0x08,
+	/** Page-level cache disable */
+	PAGE_PCD = 0x10,
+	/** Page is a large page */
+	PAGE_PS = 0x80,
+	/** Page is the last page in an allocation
+	 *
+	 * This bit is ignored by the hardware.  We use it to track
+	 * the size of allocations made by ioremap().
+	 */
+	PAGE_LAST = 0x800,
+};
+
+/** The I/O space page table */
+extern struct page_table io_pages;
+
+/** I/O page size
+ *
+ * We choose to use 2MB pages for I/O space, to minimise the number of
+ * page table entries required.
+ */
+#define IO_PAGE_SIZE 0x200000UL
+
+/** I/O page base address
+ *
+ * We choose to place I/O space immediately above the identity-mapped
+ * 32-bit address space.
+ */
+#define IO_BASE ( ( void * ) 0x100000000ULL )
+
 #endif /* ASSEMBLY */
 
 #endif /* LIBRM_H */

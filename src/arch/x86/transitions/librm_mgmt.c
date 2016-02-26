@@ -8,6 +8,8 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
+#include <strings.h>
+#include <assert.h>
 #include <ipxe/profile.h>
 #include <realmode.h>
 #include <pic8259.h>
@@ -176,6 +178,123 @@ void __attribute__ (( regparm ( 1 ) )) interrupt ( int intr ) {
 	profile_exclude ( profiler );
 }
 
+/**
+ * Map pages for I/O
+ *
+ * @v bus_addr		Bus address
+ * @v len		Length of region
+ * @ret io_addr		I/O address
+ */
+static void * ioremap_pages ( unsigned long bus_addr, size_t len ) {
+	unsigned long start;
+	unsigned int count;
+	unsigned int stride;
+	unsigned int first;
+	unsigned int i;
+	size_t offset;
+	void *io_addr;
+
+	DBGC ( &io_pages, "IO mapping %08lx+%zx\n", bus_addr, len );
+
+	/* Sanity check */
+	assert ( len != 0 );
+
+	/* Round down start address to a page boundary */
+	start = ( bus_addr & ~( IO_PAGE_SIZE - 1 ) );
+	offset = ( bus_addr - start );
+	assert ( offset < IO_PAGE_SIZE );
+
+	/* Calculate number of pages required */
+	count = ( ( offset + len + IO_PAGE_SIZE - 1 ) / IO_PAGE_SIZE );
+	assert ( count != 0 );
+	assert ( count < ( sizeof ( io_pages.page ) /
+			   sizeof ( io_pages.page[0] ) ) );
+
+	/* Round up number of pages to a power of two */
+	stride = ( 1 << ( fls ( count ) - 1 ) );
+	assert ( count <= stride );
+
+	/* Allocate pages */
+	for ( first = 0 ; first < ( sizeof ( io_pages.page ) /
+				    sizeof ( io_pages.page[0] ) ) ;
+	      first += stride ) {
+
+		/* Calculate I/O address */
+		io_addr = ( IO_BASE + ( first * IO_PAGE_SIZE ) + offset );
+
+		/* Check that page table entries are available */
+		for ( i = first ; i < ( first + count ) ; i++ ) {
+			if ( io_pages.page[i] & PAGE_P ) {
+				io_addr = NULL;
+				break;
+			}
+		}
+		if ( ! io_addr )
+			continue;
+
+		/* Create page table entries */
+		for ( i = first ; i < ( first + count ) ; i++ ) {
+			io_pages.page[i] = ( start | PAGE_P | PAGE_RW |
+					     PAGE_US | PAGE_PWT | PAGE_PCD |
+					     PAGE_PS );
+			start += IO_PAGE_SIZE;
+		}
+
+		/* Mark last page as being the last in this allocation */
+		io_pages.page[ i - 1 ] |= PAGE_LAST;
+
+		/* Return I/O address */
+		DBGC ( &io_pages, "IO mapped %08lx+%zx to %p using PTEs "
+		       "[%d-%d]\n", bus_addr, len, io_addr, first,
+		       ( first + count - 1 ) );
+		return io_addr;
+	}
+
+	DBGC ( &io_pages, "IO could not map %08lx+%zx\n", bus_addr, len );
+	return NULL;
+}
+
+/**
+ * Unmap pages for I/O
+ *
+ * @v io_addr		I/O address
+ */
+static void iounmap_pages ( volatile const void *io_addr ) {
+	volatile const void *invalidate = io_addr;
+	unsigned int first;
+	unsigned int i;
+	int is_last;
+
+	DBGC ( &io_pages, "IO unmapping %p\n", io_addr );
+
+	/* Calculate first page table entry */
+	first = ( ( io_addr - IO_BASE ) / IO_PAGE_SIZE );
+
+	/* Clear page table entries */
+	for ( i = first ; ; i++ ) {
+
+		/* Sanity check */
+		assert ( io_pages.page[i] & PAGE_P );
+
+		/* Check if this is the last page in this allocation */
+		is_last = ( io_pages.page[i] & PAGE_LAST );
+
+		/* Clear page table entry */
+		io_pages.page[i] = 0;
+
+		/* Invalidate TLB for this page */
+		__asm__ __volatile__ ( "invlpg (%0)" : : "r" ( invalidate ) );
+		invalidate += IO_PAGE_SIZE;
+
+		/* Terminate if this was the last page */
+		if ( is_last )
+			break;
+	}
+
+	DBGC ( &io_pages, "IO unmapped %p using PTEs [%d-%d]\n",
+	       io_addr, first, i );
+}
+
 PROVIDE_UACCESS_INLINE ( librm, phys_to_user );
 PROVIDE_UACCESS_INLINE ( librm, user_to_phys );
 PROVIDE_UACCESS_INLINE ( librm, virt_to_user );
@@ -186,3 +305,6 @@ PROVIDE_UACCESS_INLINE ( librm, memmove_user );
 PROVIDE_UACCESS_INLINE ( librm, memset_user );
 PROVIDE_UACCESS_INLINE ( librm, strlen_user );
 PROVIDE_UACCESS_INLINE ( librm, memchr_user );
+PROVIDE_IOMAP_INLINE ( pages, io_to_bus );
+PROVIDE_IOMAP ( pages, ioremap, ioremap_pages );
+PROVIDE_IOMAP ( pages, iounmap, iounmap_pages );

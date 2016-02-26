@@ -1340,10 +1340,18 @@ interrupt_wrapper:
 	 * These point to the PDPT.  This creates some aliased
 	 * addresses within unused portions of the 64-bit address
 	 * space, but allows us to use just a single PDPT.
+	 *
+	 * - PDE[...] covering arbitrary 2MB portions of I/O space
+	 *
+	 * These are 2MB pages created by ioremap() to cover I/O
+	 * device addresses.
 	 */
 pml4e:
 	.space	SIZEOF_PT
 	.size	pml4e, . - pml4e
+
+	.globl	io_pages
+	.equ	io_pages, pml4e
 
 	/* Page directory pointer table entries (PDPTEs)
 	 *
@@ -1356,6 +1364,11 @@ pml4e:
 	 *
 	 * These point to the appropriate page directories (in pde_low)
 	 * used to identity-map the whole of the 32-bit address space.
+	 *
+	 * - PDPTE[0x004] covering [0x0000000100000000-0x000000013fffffff]
+	 *
+	 * This points back to the PML4, allowing the PML4 to be
+	 * (ab)used to hold 2MB pages used for I/O device addresses.
 	 *
 	 * - PDPTE[0x1ff] covering [0xffffffffc0000000-0xffffffffffffffff]
 	 *
@@ -1420,6 +1433,10 @@ init_pages:
 
 	/* Initialise PDPTE for negative 1GB */
 	movl	%eax, ( VIRTUAL(pdpte) + SIZEOF_PT - SIZEOF_PTE )
+
+	/* Initialise PDPTE for I/O space */
+	leal	( VIRTUAL(pml4e) + ( PG_P | PG_RW | PG_US ) )(%edi), %eax
+	movl	%eax, ( VIRTUAL(pdpte) + ( PDE_LOW_PTS * SIZEOF_PTE ) )
 
 	/* Initialise PDPTEs for low 4GB */
 	movl	$PDE_LOW_PTS, %ecx
