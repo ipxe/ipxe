@@ -219,8 +219,25 @@ struct ib_sa_hdr {
 	uint32_t comp_mask[2];
 } __attribute__ (( packed ));
 
-#define IB_SA_ATTR_MC_MEMBER_REC		0x38
+#define IB_SA_ATTR_SERVICE_REC			0x31
 #define IB_SA_ATTR_PATH_REC			0x35
+#define IB_SA_ATTR_MC_MEMBER_REC		0x38
+
+struct ib_service_record {
+	uint64_t id;
+	union ib_gid gid;
+	uint16_t pkey;
+	uint16_t reserved;
+	uint32_t lease;
+	uint8_t key[16];
+	char name[64];
+	uint8_t data8[16];
+	uint16_t data16[8];
+	uint32_t data32[4];
+	uint64_t data64[2];
+} __attribute__ (( packed ));
+
+#define IB_SA_SERVICE_REC_NAME			(1<<6)
 
 struct ib_path_record {
 	uint32_t reserved0[2];
@@ -278,6 +295,7 @@ struct ib_mc_member_record {
 #define IB_SA_MCMEMBER_REC_PROXY_JOIN		(1<<17)
 
 union ib_sa_data {
+	struct ib_service_record service_record;
 	struct ib_path_record path_record;
 	struct ib_mc_member_record mc_member_record;
 } __attribute__ (( packed ));
