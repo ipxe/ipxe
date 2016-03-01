@@ -79,6 +79,8 @@ struct ipoib_device {
 	struct net_device *netdev;
 	/** Underlying Infiniband device */
 	struct ib_device *ibdev;
+	/** List of IPoIB devices */
+	struct list_head list;
 	/** Completion queue */
 	struct ib_completion_queue *cq;
 	/** Queue pair */
@@ -115,6 +117,9 @@ static struct ipoib_mac ipoib_broadcast = {
 struct errortab ipoib_errors[] __errortab = {
 	__einfo_errortab ( EINFO_EINPROGRESS_JOINING ),
 };
+
+/** List of all IPoIB devices */
+static LIST_HEAD ( ipoib_devices );
 
 static struct net_device_operations ipoib_operations;
 
@@ -783,11 +788,11 @@ static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
 /**
  * Handle link status change
  *
- * @v ibdev		Infiniband device
+ * @v ipoib		IPoIB device
  */
-static void ipoib_link_state_changed ( struct ib_device *ibdev ) {
-	struct net_device *netdev = ib_get_ownerdata ( ibdev );
-	struct ipoib_device *ipoib = netdev->priv;
+static void ipoib_link_state_changed ( struct ipoib_device *ipoib ) {
+	struct ib_device *ibdev = ipoib->ibdev;
+	struct net_device *netdev = ipoib->netdev;
 	int rc;
 
 	/* Leave existing broadcast group */
@@ -862,7 +867,7 @@ static int ipoib_open ( struct net_device *netdev ) {
 	ib_refill_recv ( ibdev, ipoib->qp );
 
 	/* Fake a link status change to join the broadcast group */
-	ipoib_link_state_changed ( ibdev );
+	ipoib_link_state_changed ( ipoib );
 
 	return 0;
 
@@ -928,7 +933,6 @@ static int ipoib_probe ( struct ib_device *ibdev ) {
 		return -ENOMEM;
 	netdev_init ( netdev, &ipoib_operations );
 	ipoib = netdev->priv;
-	ib_set_ownerdata ( ibdev, netdev );
 	netdev->dev = ibdev->dev;
 	memset ( ipoib, 0, sizeof ( *ipoib ) );
 	ipoib->netdev = netdev;
@@ -947,16 +951,37 @@ static int ipoib_probe ( struct ib_device *ibdev ) {
 	memcpy ( &ipoib->broadcast, &ipoib_broadcast,
 		 sizeof ( ipoib->broadcast ) );
 
+	/* Add to list of IPoIB devices */
+	list_add_tail ( &ipoib->list, &ipoib_devices );
+
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
 
 	return 0;
 
+	unregister_netdev ( netdev );
  err_register_netdev:
+	list_del ( &ipoib->list );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;
+}
+
+/**
+ * Handle device or link status change
+ *
+ * @v ibdev		Infiniband device
+ */
+static void ipoib_notify ( struct ib_device *ibdev ) {
+	struct ipoib_device *ipoib;
+
+	/* Handle link status change for any attached IPoIB devices */
+	list_for_each_entry ( ipoib, &ipoib_devices, list ) {
+		if ( ipoib->ibdev != ibdev )
+			continue;
+		ipoib_link_state_changed ( ipoib );
+	}
 }
 
 /**
@@ -965,17 +990,26 @@ static int ipoib_probe ( struct ib_device *ibdev ) {
  * @v ibdev		Infiniband device
  */
 static void ipoib_remove ( struct ib_device *ibdev ) {
-	struct net_device *netdev = ib_get_ownerdata ( ibdev );
+	struct ipoib_device *ipoib;
+	struct ipoib_device *tmp;
+	struct net_device *netdev;
 
-	unregister_netdev ( netdev );
-	netdev_nullify ( netdev );
-	netdev_put ( netdev );
+	/* Remove any attached IPoIB devices */
+	list_for_each_entry_safe ( ipoib, tmp, &ipoib_devices, list ) {
+		if ( ipoib->ibdev != ibdev )
+			continue;
+		netdev = ipoib->netdev;
+		unregister_netdev ( netdev );
+		list_del ( &ipoib->list );
+		netdev_nullify ( netdev );
+		netdev_put ( netdev );
+	}
 }
 
 /** IPoIB driver */
 struct ib_driver ipoib_driver __ib_driver = {
 	.name = "IPoIB",
 	.probe = ipoib_probe,
-	.notify = ipoib_link_state_changed,
+	.notify = ipoib_notify,
 	.remove = ipoib_remove,
 };

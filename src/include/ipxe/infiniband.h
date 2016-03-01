@@ -450,8 +450,6 @@ struct ib_device {
 
 	/** Driver private data */
 	void *drv_priv;
-	/** Owner private data */
-	void *owner_priv;
 };
 
 /** An Infiniband upper-layer driver */
@@ -693,28 +691,6 @@ ib_set_drvdata ( struct ib_device *ibdev, void *priv ) {
 static inline __always_inline void *
 ib_get_drvdata ( struct ib_device *ibdev ) {
 	return ibdev->drv_priv;
-}
-
-/**
- * Set Infiniband device owner-private data
- *
- * @v ibdev		Infiniband device
- * @v priv		Private data
- */
-static inline __always_inline void
-ib_set_ownerdata ( struct ib_device *ibdev, void *priv ) {
-	ibdev->owner_priv = priv;
-}
-
-/**
- * Get Infiniband device owner-private data
- *
- * @v ibdev		Infiniband device
- * @ret priv		Private data
- */
-static inline __always_inline void *
-ib_get_ownerdata ( struct ib_device *ibdev ) {
-	return ibdev->owner_priv;
 }
 
 #endif /* _IPXE_INFINIBAND_H */
