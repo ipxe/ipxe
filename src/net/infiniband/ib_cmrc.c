@@ -117,6 +117,9 @@ static void ib_cmrc_shutdown ( struct ib_cmrc_connection *cmrc ) {
 	ib_destroy_cq ( cmrc->ibdev, cmrc->cq );
 	ib_close ( cmrc->ibdev );
 
+	/* Cancel any pending shutdown */
+	process_del ( &cmrc->shutdown );
+
 	/* Drop the remaining reference */
 	ref_put ( &cmrc->refcnt );
 }
