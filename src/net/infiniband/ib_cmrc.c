@@ -303,6 +303,8 @@ static int ib_cmrc_xfer_deliver ( struct ib_cmrc_connection *cmrc,
 			rc = -ENOMEM;
 			goto out;
 		}
+		DBGC ( cmrc, "CMRC %p using CM %08x\n",
+		       cmrc, cmrc->conn->local_id );
 
 	} else {
 
