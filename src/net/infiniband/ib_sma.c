@@ -358,7 +358,7 @@ struct ib_mad_agent ib_sma_agent[] __ib_mad_agent = {
 int ib_create_sma ( struct ib_device *ibdev, struct ib_mad_interface *mi ) {
 
 	/* Nothing to do */
-	DBGC ( ibdev, "IBDEV %p SMA using SMI %p\n", ibdev, mi );
+	DBGC ( ibdev, "IBDEV %s SMA using SMI %p\n", ibdev->name, mi );
 
 	return 0;
 }

@@ -466,8 +466,8 @@ ib_create_conn ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	/* Add to list of connections */
 	list_add ( &conn->list, &ib_cm_conns );
 
-	DBGC ( conn, "CM %p created for IBDEV %p QPN %lx\n",
-	       conn, ibdev, qp->qpn );
+	DBGC ( conn, "CM %p created for IBDEV %s QPN %lx\n",
+	       conn, ibdev->name, qp->qpn );
 	DBGC ( conn, "CM %p connecting to " IB_GID_FMT " " IB_GUID_FMT "\n",
 	       conn, IB_GID_ARGS ( dgid ), IB_GUID_ARGS ( service_id ) );
 

@@ -388,6 +388,9 @@ struct ib_device_operations {
 				   union ib_mad *mad );
 };
 
+/** Maximum length of an Infiniband device name */
+#define IBDEV_NAME_LEN 8
+
 /** An Infiniband device */
 struct ib_device {
 	/** Reference counter */
@@ -396,6 +399,10 @@ struct ib_device {
 	struct list_head list;
 	/** List of open Infiniband devices */
 	struct list_head open_list;
+	/** Index of this Infiniband device */
+	unsigned int index;
+	/** Name of this Infiniband device */
+	char name[IBDEV_NAME_LEN];
 	/** Underlying device */
 	struct device *dev;
 	/** List of completion queues */

@@ -54,6 +54,9 @@ struct list_head ib_devices = LIST_HEAD_INIT ( ib_devices );
 /** List of open Infiniband devices, in reverse order of opening */
 static struct list_head open_ib_devices = LIST_HEAD_INIT ( open_ib_devices );
 
+/** Infiniband device index */
+static unsigned int ibdev_index = 0;
+
 /** Post send work queue entry profiler */
 static struct profiler ib_post_send_profiler __profiler =
 	{ .name = "ib.post_send" };
@@ -97,7 +100,7 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	struct ib_completion_queue *cq;
 	int rc;
 
-	DBGC ( ibdev, "IBDEV %p creating completion queue\n", ibdev );
+	DBGC ( ibdev, "IBDEV %s creating completion queue\n", ibdev->name );
 
 	/* Allocate and initialise data structure */
 	cq = zalloc ( sizeof ( *cq ) );
@@ -111,13 +114,13 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 
 	/* Perform device-specific initialisation and get CQN */
 	if ( ( rc = ibdev->op->create_cq ( ibdev, cq ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not initialise completion "
-		       "queue: %s\n", ibdev, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s could not initialise completion "
+		       "queue: %s\n", ibdev->name, strerror ( rc ) );
 		goto err_dev_create_cq;
 	}
 
-	DBGC ( ibdev, "IBDEV %p created %d-entry completion queue %p (%p) "
-	       "with CQN %#lx\n", ibdev, num_cqes, cq,
+	DBGC ( ibdev, "IBDEV %s created %d-entry completion queue %p (%p) "
+	       "with CQN %#lx\n", ibdev->name, num_cqes, cq,
 	       ib_cq_get_drvdata ( cq ), cq->cqn );
 	return cq;
 
@@ -137,8 +140,8 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
  */
 void ib_destroy_cq ( struct ib_device *ibdev,
 		     struct ib_completion_queue *cq ) {
-	DBGC ( ibdev, "IBDEV %p destroying completion queue %#lx\n",
-	       ibdev, cq->cqn );
+	DBGC ( ibdev, "IBDEV %s destroying completion queue %#lx\n",
+	       ibdev->name, cq->cqn );
 	assert ( list_empty ( &cq->work_queues ) );
 	ibdev->op->destroy_cq ( ibdev, cq );
 	list_del ( &cq->list );
@@ -198,7 +201,7 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	size_t total_size;
 	int rc;
 
-	DBGC ( ibdev, "IBDEV %p creating queue pair\n", ibdev );
+	DBGC ( ibdev, "IBDEV %s creating queue pair\n", ibdev->name );
 
 	/* Allocate and initialise data structure */
 	total_size = ( sizeof ( *qp ) +
@@ -229,17 +232,17 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 
 	/* Perform device-specific initialisation and get QPN */
 	if ( ( rc = ibdev->op->create_qp ( ibdev, qp ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not initialise queue pair: "
-		       "%s\n", ibdev, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s could not initialise queue pair: "
+		       "%s\n", ibdev->name, strerror ( rc ) );
 		goto err_dev_create_qp;
 	}
-	DBGC ( ibdev, "IBDEV %p created queue pair %p (%p) with QPN %#lx\n",
-	       ibdev, qp, ib_qp_get_drvdata ( qp ), qp->qpn );
-	DBGC ( ibdev, "IBDEV %p QPN %#lx has %d send entries at [%p,%p)\n",
-	       ibdev, qp->qpn, num_send_wqes, qp->send.iobufs,
+	DBGC ( ibdev, "IBDEV %s created queue pair %p (%p) with QPN %#lx\n",
+	       ibdev->name, qp, ib_qp_get_drvdata ( qp ), qp->qpn );
+	DBGC ( ibdev, "IBDEV %s QPN %#lx has %d send entries at [%p,%p)\n",
+	       ibdev->name, qp->qpn, num_send_wqes, qp->send.iobufs,
 	       qp->recv.iobufs );
-	DBGC ( ibdev, "IBDEV %p QPN %#lx has %d receive entries at [%p,%p)\n",
-	       ibdev, qp->qpn, num_recv_wqes, qp->recv.iobufs,
+	DBGC ( ibdev, "IBDEV %s QPN %#lx has %d receive entries at [%p,%p)\n",
+	       ibdev->name, qp->qpn, num_recv_wqes, qp->recv.iobufs,
 	       ( ( ( void * ) qp ) + total_size ) );
 
 	/* Calculate externally-visible QPN */
@@ -255,8 +258,8 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 		break;
 	}
 	if ( qp->ext_qpn != qp->qpn ) {
-		DBGC ( ibdev, "IBDEV %p QPN %#lx has external QPN %#lx\n",
-		       ibdev, qp->qpn, qp->ext_qpn );
+		DBGC ( ibdev, "IBDEV %s QPN %#lx has external QPN %#lx\n",
+		       ibdev->name, qp->qpn, qp->ext_qpn );
 	}
 
 	return qp;
@@ -281,11 +284,11 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	int rc;
 
-	DBGC ( ibdev, "IBDEV %p modifying QPN %#lx\n", ibdev, qp->qpn );
+	DBGC ( ibdev, "IBDEV %s modifying QPN %#lx\n", ibdev->name, qp->qpn );
 
 	if ( ( rc = ibdev->op->modify_qp ( ibdev, qp ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not modify QPN %#lx: %s\n",
-		       ibdev, qp->qpn, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s could not modify QPN %#lx: %s\n",
+		       ibdev->name, qp->qpn, strerror ( rc ) );
 		return rc;
 	}
 
@@ -302,8 +305,8 @@ void ib_destroy_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	struct io_buffer *iobuf;
 	unsigned int i;
 
-	DBGC ( ibdev, "IBDEV %p destroying QPN %#lx\n",
-	       ibdev, qp->qpn );
+	DBGC ( ibdev, "IBDEV %s destroying QPN %#lx\n",
+	       ibdev->name, qp->qpn );
 
 	assert ( list_empty ( &qp->mgids ) );
 
@@ -411,8 +414,8 @@ int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 
 	/* Check queue fill level */
 	if ( qp->send.fill >= qp->send.num_wqes ) {
-		DBGC ( ibdev, "IBDEV %p QPN %#lx send queue full\n",
-		       ibdev, qp->qpn );
+		DBGC ( ibdev, "IBDEV %s QPN %#lx send queue full\n",
+		       ibdev->name, qp->qpn );
 		return -ENOBUFS;
 	}
 
@@ -432,8 +435,8 @@ int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 
 	/* Post to hardware */
 	if ( ( rc = ibdev->op->post_send ( ibdev, qp, dest, iobuf ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p QPN %#lx could not post send WQE: "
-		       "%s\n", ibdev, qp->qpn, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s QPN %#lx could not post send WQE: "
+		       "%s\n", ibdev->name, qp->qpn, strerror ( rc ) );
 		return rc;
 	}
 
@@ -463,22 +466,22 @@ int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 
 	/* Check packet length */
 	if ( iob_tailroom ( iobuf ) < IB_MAX_PAYLOAD_SIZE ) {
-		DBGC ( ibdev, "IBDEV %p QPN %#lx wrong RX buffer size (%zd)\n",
-		       ibdev, qp->qpn, iob_tailroom ( iobuf ) );
+		DBGC ( ibdev, "IBDEV %s QPN %#lx wrong RX buffer size (%zd)\n",
+		       ibdev->name, qp->qpn, iob_tailroom ( iobuf ) );
 		return -EINVAL;
 	}
 
 	/* Check queue fill level */
 	if ( qp->recv.fill >= qp->recv.num_wqes ) {
-		DBGC ( ibdev, "IBDEV %p QPN %#lx receive queue full\n",
-		       ibdev, qp->qpn );
+		DBGC ( ibdev, "IBDEV %s QPN %#lx receive queue full\n",
+		       ibdev->name, qp->qpn );
 		return -ENOBUFS;
 	}
 
 	/* Post to hardware */
 	if ( ( rc = ibdev->op->post_recv ( ibdev, qp, iobuf ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p QPN %#lx could not post receive WQE: "
-		       "%s\n", ibdev, qp->qpn, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s QPN %#lx could not post receive WQE: "
+		       "%s\n", ibdev->name, qp->qpn, strerror ( rc ) );
 		return rc;
 	}
 
@@ -556,8 +559,8 @@ void ib_refill_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 
 		/* Post I/O buffer */
 		if ( ( rc = ib_post_recv ( ibdev, qp, iobuf ) ) != 0 ) {
-			DBGC ( ibdev, "IBDEV %p could not refill: %s\n",
-			       ibdev, strerror ( rc ) );
+			DBGC ( ibdev, "IBDEV %s could not refill: %s\n",
+			       ibdev->name, strerror ( rc ) );
 			free_iob ( iobuf );
 			/* Give up */
 			return;
@@ -623,8 +626,8 @@ static void ib_notify ( struct ib_device *ibdev ) {
  */
 void ib_link_state_changed ( struct ib_device *ibdev ) {
 
-	DBGC ( ibdev, "IBDEV %p link state is %s\n",
-	       ibdev, ib_link_state_text ( ibdev ) );
+	DBGC ( ibdev, "IBDEV %s link state is %s\n",
+	       ibdev->name, ib_link_state_text ( ibdev ) );
 
 	/* Notify drivers of link state change */
 	ib_notify ( ibdev );
@@ -647,30 +650,30 @@ int ib_open ( struct ib_device *ibdev ) {
 
 	/* Open device */
 	if ( ( rc = ibdev->op->open ( ibdev ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not open: %s\n",
-		       ibdev, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s could not open: %s\n",
+		       ibdev->name, strerror ( rc ) );
 		goto err_open;
 	}
 
 	/* Create subnet management interface */
 	ibdev->smi = ib_create_mi ( ibdev, IB_QPT_SMI );
 	if ( ! ibdev->smi ) {
-		DBGC ( ibdev, "IBDEV %p could not create SMI\n", ibdev );
+		DBGC ( ibdev, "IBDEV %s could not create SMI\n", ibdev->name );
 		rc = -ENOMEM;
 		goto err_create_smi;
 	}
 
 	/* Create subnet management agent */
 	if ( ( rc = ib_create_sma ( ibdev, ibdev->smi ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not create SMA: %s\n",
-		       ibdev, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s could not create SMA: %s\n",
+		       ibdev->name, strerror ( rc ) );
 		goto err_create_sma;
 	}
 
 	/* Create general services interface */
 	ibdev->gsi = ib_create_mi ( ibdev, IB_QPT_GSI );
 	if ( ! ibdev->gsi ) {
-		DBGC ( ibdev, "IBDEV %p could not create GSI\n", ibdev );
+		DBGC ( ibdev, "IBDEV %s could not create GSI\n", ibdev->name );
 		rc = -ENOMEM;
 		goto err_create_gsi;
 	}
@@ -833,14 +836,14 @@ int ib_set_port_info ( struct ib_device *ibdev, union ib_mad *mad ) {
 
 	/* Adapters with embedded SMAs do not need to support this method */
 	if ( ! ibdev->op->set_port_info ) {
-		DBGC ( ibdev, "IBDEV %p does not support setting port "
-		       "information\n", ibdev );
+		DBGC ( ibdev, "IBDEV %s does not support setting port "
+		       "information\n", ibdev->name );
 		return -ENOTSUP;
 	}
 
 	if ( ( rc = ibdev->op->set_port_info ( ibdev, mad ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not set port information: %s\n",
-		       ibdev, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s could not set port information: %s\n",
+		       ibdev->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -858,14 +861,14 @@ int ib_set_pkey_table ( struct ib_device *ibdev, union ib_mad *mad ) {
 
 	/* Adapters with embedded SMAs do not need to support this method */
 	if ( ! ibdev->op->set_pkey_table ) {
-		DBGC ( ibdev, "IBDEV %p does not support setting partition "
-		       "key table\n", ibdev );
+		DBGC ( ibdev, "IBDEV %s does not support setting partition "
+		       "key table\n", ibdev->name );
 		return -ENOTSUP;
 	}
 
 	if ( ( rc = ibdev->op->set_pkey_table ( ibdev, mad ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %p could not set partition key table: "
-		       "%s\n", ibdev, strerror ( rc ) );
+		DBGC ( ibdev, "IBDEV %s could not set partition key table: "
+		       "%s\n", ibdev->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -954,17 +957,24 @@ int register_ibdev ( struct ib_device *ibdev ) {
 	struct ib_driver *driver;
 	int rc;
 
+	/* Record device index and create device name */
+	if ( ibdev->name[0] == '\0' ) {
+		snprintf ( ibdev->name, sizeof ( ibdev->name ), "inf%d",
+			   ibdev_index );
+	}
+	ibdev->index = ++ibdev_index;
+
 	/* Add to device list */
 	ibdev_get ( ibdev );
 	list_add_tail ( &ibdev->list, &ib_devices );
-	DBGC ( ibdev, "IBDEV %p registered (phys %s)\n", ibdev,
+	DBGC ( ibdev, "IBDEV %s registered (phys %s)\n", ibdev->name,
 	       ibdev->dev->name );
 
 	/* Probe device */
 	for_each_table_entry ( driver, IB_DRIVERS ) {
 		if ( ( rc = driver->probe ( ibdev ) ) != 0 ) {
-			DBGC ( ibdev, "IBDEV %p could not add %s device: %s\n",
-			       ibdev, driver->name, strerror ( rc ) );
+			DBGC ( ibdev, "IBDEV %s could not add %s device: %s\n",
+			       ibdev->name, driver->name, strerror ( rc ) );
 			goto err_probe;
 		}
 	}
@@ -994,7 +1004,11 @@ void unregister_ibdev ( struct ib_device *ibdev ) {
 	/* Remove from device list */
 	list_del ( &ibdev->list );
 	ibdev_put ( ibdev );
-	DBGC ( ibdev, "IBDEV %p unregistered\n", ibdev );
+	DBGC ( ibdev, "IBDEV %s unregistered\n", ibdev->name );
+
+	/* Reset device index if no devices remain */
+	if ( list_empty ( &ib_devices ) )
+		ibdev_index = 0;
 }
 
 /**
