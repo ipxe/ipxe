@@ -75,6 +75,12 @@ static void ib_path_complete ( struct ib_device *ibdev,
 	       "%d\n", ibdev->name, IB_GID_ARGS ( dgid ), path->av.lid,
 	       path->av.sl, path->av.rate );
 
+	/* Use only the LID if no GRH is needed for this path */
+	if ( memcmp ( &path->av.gid.s.prefix, &ibdev->gid.s.prefix,
+		      sizeof ( path->av.gid.s.prefix ) ) == 0 ) {
+		path->av.gid_present = 0;
+	}
+
  out:
 	/* Destroy the completed transaction */
 	ib_destroy_madx ( ibdev, mi, madx );
@@ -244,13 +250,6 @@ int ib_resolve_path ( struct ib_device *ibdev, struct ib_address_vector *av ) {
 	union ib_gid *gid = &av->gid;
 	struct ib_cached_path *cached;
 	unsigned int cache_idx;
-
-	/* Sanity check */
-	if ( ! av->gid_present ) {
-		DBGC ( ibdev, "IBDEV %s attempt to look up path without GID\n",
-		       ibdev->name );
-		return -EINVAL;
-	}
 
 	/* Look in cache for a matching entry */
 	cached = ib_find_path_cache_entry ( ibdev, gid );
