@@ -65,6 +65,7 @@ static struct ib_connection * ib_cm_find ( uint32_t local_id ) {
  *
  * @v ibdev		Infiniband device
  * @v mi		Management interface
+ * @v tid		Transaction identifier
  * @v av		Address vector
  * @v local_id		Local communication ID
  * @v remote_id		Remote communication ID
@@ -72,6 +73,7 @@ static struct ib_connection * ib_cm_find ( uint32_t local_id ) {
  */
 static int ib_cm_send_rtu ( struct ib_device *ibdev,
 			    struct ib_mad_interface *mi,
+			    struct ib_mad_tid *tid,
 			    struct ib_address_vector *av,
 			    uint32_t local_id, uint32_t remote_id ) {
 	union ib_mad mad;
@@ -83,6 +85,7 @@ static int ib_cm_send_rtu ( struct ib_device *ibdev,
 	mad.hdr.mgmt_class = IB_MGMT_CLASS_CM;
 	mad.hdr.class_version = IB_CM_CLASS_VERSION;
 	mad.hdr.method = IB_MGMT_METHOD_SEND;
+	memcpy ( &mad.hdr.tid, tid, sizeof ( mad.hdr.tid ) );
 	mad.hdr.attr_id = htons ( IB_CM_ATTR_READY_TO_USE );
 	rtu->local_id = htonl ( local_id );
 	rtu->remote_id = htonl ( remote_id );
@@ -121,7 +124,8 @@ static void ib_cm_recv_rep ( struct ib_device *ibdev,
 	conn = ib_cm_find ( local_id );
 	if ( conn ) {
 		/* Try to send "ready to use" reply */
-		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, av, conn->local_id,
+		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, &mad->hdr.tid, av,
+					     conn->local_id,
 					     conn->remote_id ) ) != 0 ) {
 			/* Ignore errors; the remote end will retry */
 		}
@@ -135,6 +139,7 @@ static void ib_cm_recv_rep ( struct ib_device *ibdev,
  *
  * @v ibdev		Infiniband device
  * @v mi		Management interface
+ * @v tid		Transaction identifier
  * @v av		Address vector
  * @v local_id		Local communication ID
  * @v remote_id		Remote communication ID
@@ -142,6 +147,7 @@ static void ib_cm_recv_rep ( struct ib_device *ibdev,
  */
 static int ib_cm_send_drep ( struct ib_device *ibdev,
 			     struct ib_mad_interface *mi,
+			     struct ib_mad_tid *tid,
 			     struct ib_address_vector *av,
 			     uint32_t local_id, uint32_t remote_id ) {
 	union ib_mad mad;
@@ -153,6 +159,7 @@ static int ib_cm_send_drep ( struct ib_device *ibdev,
 	mad.hdr.mgmt_class = IB_MGMT_CLASS_CM;
 	mad.hdr.class_version = IB_CM_CLASS_VERSION;
 	mad.hdr.method = IB_MGMT_METHOD_SEND;
+	memcpy ( &mad.hdr.tid, tid, sizeof ( mad.hdr.tid ) );
 	mad.hdr.attr_id = htons ( IB_CM_ATTR_DISCONNECT_REPLY );
 	drep->local_id = htonl ( local_id );
 	drep->remote_id = htonl ( remote_id );
@@ -197,7 +204,7 @@ static void ib_cm_recv_dreq ( struct ib_device *ibdev,
 	}
 
 	/* Send reply */
-	if ( ( rc = ib_cm_send_drep ( ibdev, mi, av, local_id,
+	if ( ( rc = ib_cm_send_drep ( ibdev, mi, &mad->hdr.tid, av, local_id,
 				      remote_id ) ) != 0 ) {
 		/* Ignore errors; the remote end will retry */
 	}
@@ -294,7 +301,8 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 		}
 
 		/* Send "ready to use" reply */
-		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, av, conn->local_id,
+		if ( ( rc = ib_cm_send_rtu ( ibdev, mi, &mad->hdr.tid, av,
+					     conn->local_id,
 					     conn->remote_id ) ) != 0 ) {
 			/* Treat as non-fatal */
 			rc = 0;

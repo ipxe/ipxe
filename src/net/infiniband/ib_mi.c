@@ -106,7 +106,7 @@ static int ib_mi_handle ( struct ib_device *ibdev,
 
 	/* Otherwise, ignore it */
 	DBGC ( mi, "MI %p RX TID %08x%08x ignored\n",
-	       mi, ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ) );
+	       mi, ntohl ( hdr->tid.high ), ntohl ( hdr->tid.low ) );
 	return -ENOTSUP;
 }
 
@@ -152,7 +152,7 @@ static void ib_mi_complete_recv ( struct ib_device *ibdev,
 		goto out;
 	}
 	DBGC ( mi, "MI %p RX TID %08x%08x (%02x,%02x,%02x,%04x) status "
-	       "%04x\n", mi, ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ),
+	       "%04x\n", mi, ntohl ( hdr->tid.high ), ntohl ( hdr->tid.low ),
 	       hdr->mgmt_class, hdr->class_version, hdr->method,
 	       ntohs ( hdr->attr_id ), ntohs ( hdr->status ) );
 	DBGC2_HDA ( mi, 0, mad, sizeof ( *mad ) );
@@ -192,12 +192,12 @@ int ib_mi_send ( struct ib_device *ibdev, struct ib_mad_interface *mi,
 
 	/* Set common fields */
 	hdr->base_version = IB_MGMT_BASE_VERSION;
-	if ( ( hdr->tid[0] == 0 ) && ( hdr->tid[1] == 0 ) ) {
-		hdr->tid[0] = htonl ( IB_MI_TID_MAGIC );
-		hdr->tid[1] = htonl ( ++next_tid );
+	if ( ( hdr->tid.high == 0 ) && ( hdr->tid.low == 0 ) ) {
+		hdr->tid.high = htonl ( IB_MI_TID_MAGIC );
+		hdr->tid.low = htonl ( ++next_tid );
 	}
 	DBGC ( mi, "MI %p TX TID %08x%08x (%02x,%02x,%02x,%04x) status "
-	       "%04x\n", mi, ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ),
+	       "%04x\n", mi, ntohl ( hdr->tid.high ), ntohl ( hdr->tid.low ),
 	       hdr->mgmt_class, hdr->class_version, hdr->method,
 	       ntohs ( hdr->attr_id ), ntohs ( hdr->status ) );
 	DBGC2_HDA ( mi, 0, mad, sizeof ( *mad ) );
@@ -217,8 +217,8 @@ int ib_mi_send ( struct ib_device *ibdev, struct ib_mad_interface *mi,
 			smp->return_path.hops[hop_pointer] = ibdev->port;
 		} else {
 			DBGC ( mi, "MI %p TX TID %08x%08x invalid hop pointer "
-			       "%d\n", mi, ntohl ( hdr->tid[0] ),
-			       ntohl ( hdr->tid[1] ), hop_pointer );
+			       "%d\n", mi, ntohl ( hdr->tid.high ),
+			       ntohl ( hdr->tid.low ), hop_pointer );
 			return -EINVAL;
 		}
 	}
@@ -228,7 +228,7 @@ int ib_mi_send ( struct ib_device *ibdev, struct ib_mad_interface *mi,
 	if ( ! iobuf ) {
 		DBGC ( mi, "MI %p could not allocate buffer for TID "
 		       "%08x%08x\n",
-		       mi, ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ) );
+		       mi, ntohl ( hdr->tid.high ), ntohl ( hdr->tid.low ) );
 		return -ENOMEM;
 	}
 	memcpy ( iob_put ( iobuf, sizeof ( *mad ) ), mad, sizeof ( *mad ) );
@@ -236,7 +236,7 @@ int ib_mi_send ( struct ib_device *ibdev, struct ib_mad_interface *mi,
 	/* Send I/O buffer */
 	if ( ( rc = ib_post_send ( ibdev, mi->qp, av, iobuf ) ) != 0 ) {
 		DBGC ( mi, "MI %p TX TID %08x%08x failed: %s\n",
-		       mi,  ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ),
+		       mi,  ntohl ( hdr->tid.high ), ntohl ( hdr->tid.low ),
 		       strerror ( rc ) );
 		free_iob ( iobuf );
 		return rc;
@@ -261,7 +261,7 @@ static void ib_mi_timer_expired ( struct retry_timer *timer, int expired ) {
 	/* Abandon transaction if we have tried too many times */
 	if ( expired ) {
 		DBGC ( mi, "MI %p abandoning TID %08x%08x\n",
-		       mi, ntohl ( hdr->tid[0] ), ntohl ( hdr->tid[1] ) );
+		       mi, ntohl ( hdr->tid.high ), ntohl ( hdr->tid.low ) );
 		madx->op->complete ( ibdev, mi, madx, -ETIMEDOUT, NULL, NULL );
 		return;
 	}
@@ -408,8 +408,8 @@ void ib_destroy_mi ( struct ib_device *ibdev, struct ib_mad_interface *mi ) {
 	/* Flush any outstanding requests */
 	list_for_each_entry_safe ( madx, tmp, &mi->madx, list ) {
 		DBGC ( mi, "MI %p destroyed while TID %08x%08x in progress\n",
-		       mi, ntohl ( madx->mad.hdr.tid[0] ),
-		       ntohl ( madx->mad.hdr.tid[1] ) );
+		       mi, ntohl ( madx->mad.hdr.tid.high ),
+		       ntohl ( madx->mad.hdr.tid.low ) );
 		madx->op->complete ( ibdev, mi, madx, -ECANCELED, NULL, NULL );
 	}
 

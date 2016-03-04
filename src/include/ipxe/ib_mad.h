@@ -525,6 +525,12 @@ union ib_mad_class_specific {
 	struct ib_smp_class_specific smp;
 } __attribute__ (( packed ));
 
+/** A management datagram transaction identifier */
+struct ib_mad_tid {
+	uint32_t high;
+	uint32_t low;
+} __attribute__ (( packed ));
+
 /** A management datagram common header
  *
  * Defined in section 13.4.2 of the IBA.
@@ -536,7 +542,7 @@ struct ib_mad_hdr {
 	uint8_t method;
 	uint16_t status;
 	union ib_mad_class_specific class_specific;
-	uint32_t tid[2];
+	struct ib_mad_tid tid;
 	uint16_t attr_id;
 	uint8_t reserved[2];
 	uint32_t attr_mod;
