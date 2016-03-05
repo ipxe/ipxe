@@ -19,6 +19,8 @@ struct ib_mc_membership {
 	struct ib_queue_pair *qp;
 	/** Multicast GID */
 	union ib_gid gid;
+	/** Attached to multicast GID */
+	int attached;
 	/** Multicast group join transaction */
 	struct ib_mad_transaction *madx;
 	/** Handle join success/failure

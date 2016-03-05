@@ -89,14 +89,8 @@ struct ipoib_device {
 	struct ipoib_mac mac;
 	/** Broadcast MAC */
 	struct ipoib_mac broadcast;
-	/** Joined to IPv4 broadcast multicast group
-	 *
-	 * This flag indicates whether or not we have initiated the
-	 * join to the IPv4 broadcast multicast group.
-	 */
-	int broadcast_joined;
 	/** IPv4 broadcast multicast group membership */
-	struct ib_mc_membership broadcast_membership;
+	struct ib_mc_membership membership;
 	/** REMAC cache */
 	struct list_head peers;
 };
@@ -742,8 +736,8 @@ void ipoib_join_complete ( struct ib_device *ibdev __unused,
 			   struct ib_queue_pair *qp __unused,
 			   struct ib_mc_membership *membership, int rc,
 			   union ib_mad *mad __unused ) {
-	struct ipoib_device *ipoib = container_of ( membership,
-				   struct ipoib_device, broadcast_membership );
+	struct ipoib_device *ipoib =
+		container_of ( membership, struct ipoib_device, membership );
 
 	/* Record join status as link status */
 	netdev_link_err ( ipoib->netdev, rc );
@@ -759,14 +753,12 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 	int rc;
 
 	if ( ( rc = ib_mcast_join ( ipoib->ibdev, ipoib->qp,
-				    &ipoib->broadcast_membership,
-				    &ipoib->broadcast.gid,
+				    &ipoib->membership, &ipoib->broadcast.gid,
 				    ipoib_join_complete ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
 		       ipoib, strerror ( rc ) );
 		return rc;
 	}
-	ipoib->broadcast_joined = 1;
 
 	return 0;
 }
@@ -778,11 +770,7 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
  */
 static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
 
-	if ( ipoib->broadcast_joined ) {
-		ib_mcast_leave ( ipoib->ibdev, ipoib->qp,
-				 &ipoib->broadcast_membership );
-		ipoib->broadcast_joined = 0;
-	}
+	ib_mcast_leave ( ipoib->ibdev, ipoib->qp, &ipoib->membership );
 }
 
 /**

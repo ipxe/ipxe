@@ -150,8 +150,9 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	DBGC ( ibdev, "IBDEV %s QPN %#lx joining " IB_GID_FMT "\n",
 	       ibdev->name, qp->qpn, IB_GID_ARGS ( gid ) );
 
-	/* Sanity check */
+	/* Sanity checks */
 	assert ( qp != NULL );
+	assert ( ! membership->attached );
 
 	/* Initialise structure */
 	membership->qp = qp;
@@ -164,6 +165,7 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		       ibdev->name, qp->qpn, strerror ( rc ) );
 		goto err_mcast_attach;
 	}
+	membership->attached = 1;
 
 	/* Initiate multicast membership join */
 	ib_mcast_mad ( ibdev, gid, 1, &mad );
@@ -182,6 +184,7 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	ib_destroy_madx ( ibdev, ibdev->gsi, membership->madx );
  err_create_madx:
 	ib_mcast_detach ( ibdev, qp, gid );
+	membership->attached = 0;
  err_mcast_attach:
 	return rc;
 }
@@ -199,6 +202,10 @@ void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	union ib_mad mad;
 	int rc;
 
+	/* Do nothing if we are already detached from the multicast GID */
+	if ( ! membership->attached )
+		return;
+
 	DBGC ( ibdev, "IBDEV %s QPN %#lx leaving " IB_GID_FMT "\n",
 	       ibdev->name, qp->qpn, IB_GID_ARGS ( gid ) );
 
@@ -207,6 +214,7 @@ void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 
 	/* Detach from multicast GID */
 	ib_mcast_detach ( ibdev, qp, &membership->gid );
+	membership->attached = 0;
 
 	/* Cancel multicast membership join, if applicable */
 	if ( membership->madx ) {
