@@ -37,3 +37,10 @@ PROVIDE_REQUIRING_SYMBOL();
 #ifdef SANBOOT_PROTO_IB_SRP
 REQUIRE_OBJECT ( ib_srp );
 #endif
+
+/*
+ * Drag in Infiniband-specific commands
+ */
+#ifdef IBMGMT_CMD
+REQUIRE_OBJECT ( ibmgmt_cmd );
+#endif
