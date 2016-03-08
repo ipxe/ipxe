@@ -435,7 +435,7 @@ int ib_cmrc_open ( struct interface *xfer, struct ib_device *ibdev,
 	/* Create queue pair */
 	cmrc->qp = ib_create_qp ( ibdev, IB_QPT_RC, IB_CMRC_NUM_SEND_WQES,
 				  cmrc->cq, IB_CMRC_NUM_RECV_WQES, cmrc->cq,
-				  &ib_cmrc_queue_pair_ops );
+				  &ib_cmrc_queue_pair_ops, name );
 	if ( ! cmrc->qp ) {
 		DBGC ( cmrc, "CMRC %s %s could not create queue pair\n",
 		       ibdev->name, cmrc->name );

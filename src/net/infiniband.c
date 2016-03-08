@@ -107,7 +107,7 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	if ( ! cq )
 		goto err_alloc_cq;
 	cq->ibdev = ibdev;
-	list_add ( &cq->list, &ibdev->cqs );
+	list_add_tail ( &cq->list, &ibdev->cqs );
 	cq->num_cqes = num_cqes;
 	INIT_LIST_HEAD ( &cq->work_queues );
 	cq->op = op;
@@ -185,6 +185,7 @@ void ib_poll_cq ( struct ib_device *ibdev,
  * @v num_recv_wqes	Number of receive work queue entries
  * @v recv_cq		Receive completion queue
  * @v op		Queue pair operations
+ * @v name		Queue pair name
  * @ret qp		Queue pair
  *
  * The queue pair will be left in the INIT state; you must call
@@ -196,7 +197,8 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 				      struct ib_completion_queue *send_cq,
 				      unsigned int num_recv_wqes,
 				      struct ib_completion_queue *recv_cq,
-				      struct ib_queue_pair_operations *op ) {
+				      struct ib_queue_pair_operations *op,
+				      const char *name ) {
 	struct ib_queue_pair *qp;
 	size_t total_size;
 	int rc;
@@ -211,24 +213,25 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	if ( ! qp )
 		goto err_alloc_qp;
 	qp->ibdev = ibdev;
-	list_add ( &qp->list, &ibdev->qps );
+	list_add_tail ( &qp->list, &ibdev->qps );
 	qp->type = type;
 	qp->send.qp = qp;
 	qp->send.is_send = 1;
 	qp->send.cq = send_cq;
-	list_add ( &qp->send.list, &send_cq->work_queues );
+	list_add_tail ( &qp->send.list, &send_cq->work_queues );
 	qp->send.psn = ( random() & 0xffffffUL );
 	qp->send.num_wqes = num_send_wqes;
 	qp->send.iobufs = ( ( ( void * ) qp ) + sizeof ( *qp ) );
 	qp->recv.qp = qp;
 	qp->recv.cq = recv_cq;
-	list_add ( &qp->recv.list, &recv_cq->work_queues );
+	list_add_tail ( &qp->recv.list, &recv_cq->work_queues );
 	qp->recv.psn = ( random() & 0xffffffUL );
 	qp->recv.num_wqes = num_recv_wqes;
 	qp->recv.iobufs = ( ( ( void * ) qp ) + sizeof ( *qp ) +
 			    ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ));
 	INIT_LIST_HEAD ( &qp->mgids );
 	qp->op = op;
+	qp->name = name;
 
 	/* Perform device-specific initialisation and get QPN */
 	if ( ( rc = ibdev->op->create_qp ( ibdev, qp ) ) != 0 ) {
@@ -756,7 +759,7 @@ int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		goto err_alloc_mgid;
 	}
 	memcpy ( &mgid->gid, gid, sizeof ( mgid->gid ) );
-	list_add ( &mgid->list, &qp->mgids );
+	list_add_tail ( &mgid->list, &qp->mgids );
 
 	/* Add to hardware multicast GID list */
 	if ( ( rc = ibdev->op->mcast_attach ( ibdev, qp, gid ) ) != 0 )

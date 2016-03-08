@@ -3242,7 +3242,7 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 	port->eth_qp = ib_create_qp ( ibdev, IB_QPT_ETH,
 				      HERMON_ETH_NUM_SEND_WQES, port->eth_cq,
 				      HERMON_ETH_NUM_RECV_WQES, port->eth_cq,
-				      &hermon_eth_qp_op );
+				      &hermon_eth_qp_op, netdev->name );
 	if ( ! port->eth_qp ) {
 		DBGC ( hermon, "Hermon %p port %d could not create queue "
 		       "pair\n", hermon, ibdev->port );

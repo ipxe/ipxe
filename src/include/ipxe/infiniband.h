@@ -158,6 +158,8 @@ struct ib_queue_pair {
 	struct ib_device *ibdev;
 	/** List of queue pairs on this Infiniband device */
 	struct list_head list;
+	/** Queue pair name */
+	const char *name;
 	/** Queue pair number */
 	unsigned long qpn;
 	/** Externally-visible queue pair number
@@ -498,7 +500,7 @@ extern struct ib_queue_pair *
 ib_create_qp ( struct ib_device *ibdev, enum ib_queue_pair_type type,
 	       unsigned int num_send_wqes, struct ib_completion_queue *send_cq,
 	       unsigned int num_recv_wqes, struct ib_completion_queue *recv_cq,
-	       struct ib_queue_pair_operations *op );
+	       struct ib_queue_pair_operations *op, const char *name );
 extern int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp );
 extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );

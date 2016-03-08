@@ -346,6 +346,7 @@ void ib_destroy_madx ( struct ib_device *ibdev __unused,
 struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
 					 enum ib_queue_pair_type type ) {
 	struct ib_mad_interface *mi;
+	const char *name;
 	int rc;
 
 	/* Allocate and initialise fields */
@@ -363,16 +364,17 @@ struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
 	}
 
 	/* Create queue pair */
+	name = ( ( type == IB_QPT_SMI ) ? "SMI" : "GSI" );
 	mi->qp = ib_create_qp ( ibdev, type, IB_MI_NUM_SEND_WQES, mi->cq,
 				IB_MI_NUM_RECV_WQES, mi->cq,
-				&ib_mi_queue_pair_ops );
+				&ib_mi_queue_pair_ops, name );
 	if ( ! mi->qp ) {
 		DBGC ( mi, "MI %p could not allocate queue pair\n", mi );
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( mi->qp, mi );
 	DBGC ( mi, "MI %p (%s) running on QPN %#lx\n",
-	       mi, ( ( type == IB_QPT_SMI ) ? "SMI" : "GSI" ), mi->qp->qpn );
+	       mi, mi->qp->name, mi->qp->qpn );
 
 	/* Set queue key */
 	mi->qp->qkey = ( ( type == IB_QPT_SMI ) ? IB_QKEY_SMI : IB_QKEY_GSI );
