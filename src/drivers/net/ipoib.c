@@ -503,8 +503,10 @@ static int ipoib_transmit ( struct net_device *netdev,
 	struct ethhdr *ethhdr;
 	struct iphdr *iphdr;
 	struct ipoib_hdr *ipoib_hdr;
+	struct ipoib_remac *remac;
 	struct ipoib_mac *mac;
-	struct ib_address_vector dest;
+	struct ib_address_vector *dest;
+	struct ib_address_vector av;
 	uint16_t net_proto;
 	int rc;
 
@@ -522,12 +524,32 @@ static int ipoib_transmit ( struct net_device *netdev,
 
 	/* Strip eIPoIB header */
 	ethhdr = iobuf->data;
+	remac = ( ( struct ipoib_remac * ) ethhdr->h_dest );
 	net_proto = ethhdr->h_protocol;
 	iob_pull ( iobuf, sizeof ( *ethhdr ) );
 
 	/* Identify destination address */
-	mac = ipoib_find_remac ( ipoib, ( ( void * ) ethhdr->h_dest ) );
-	if ( ! mac ) {
+	if ( is_multicast_ether_addr ( remac ) ) {
+
+		/* Transmit multicasts as broadcasts, for simplicity */
+		dest = &ipoib->broadcast.av;
+
+	} else if ( ( mac = ipoib_find_remac ( ipoib, remac ) ) ) {
+
+		/* Construct address vector from IPoIB MAC */
+		dest = &av;
+		memset ( dest, 0, sizeof ( *dest ) );
+		dest->qpn = ( ntohl ( mac->flags__qpn ) & IB_QPN_MASK );
+		dest->qkey = ipoib->broadcast.av.qkey;
+		dest->gid_present = 1;
+		memcpy ( &dest->gid, &mac->gid, sizeof ( dest->gid ) );
+		if ( ( rc = ib_resolve_path ( ibdev, dest ) ) != 0 ) {
+			/* Path not resolved yet */
+			return rc;
+		}
+
+	} else {
+
 		/* Generate a new ARP request (if possible) to trigger
 		 * population of the REMAC cache entry.
 		 */
@@ -564,18 +586,8 @@ static int ipoib_transmit ( struct net_device *netdev,
 	ipoib_hdr->proto = net_proto;
 	ipoib_hdr->reserved = 0;
 
-	/* Construct address vector */
-	memset ( &dest, 0, sizeof ( dest ) );
-	dest.qpn = ( ntohl ( mac->flags__qpn ) & IB_QPN_MASK );
-	dest.qkey = ipoib->broadcast.av.qkey;
-	dest.gid_present = 1;
-	memcpy ( &dest.gid, &mac->gid, sizeof ( dest.gid ) );
-	if ( ( rc = ib_resolve_path ( ibdev, &dest ) ) != 0 ) {
-		/* Path not resolved yet */
-		return rc;
-	}
-
-	return ib_post_send ( ibdev, ipoib->qp, &dest, iobuf );
+	/* Transmit packet */
+	return ib_post_send ( ibdev, ipoib->qp, dest, iobuf );
 }
 
 /**
