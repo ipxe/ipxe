@@ -48,6 +48,9 @@ union ib_gid {
 #define IB_GID_ARGS( gid ) \
 	IB_GUID_ARGS ( &(gid)->s.prefix ), IB_GUID_ARGS ( &(gid)->s.guid )
 
+/** Test for multicast GID */
+#define IB_GID_MULTICAST( gid ) ( (gid)->bytes[0] == 0xff )
+
 /** An Infiniband Local Route Header */
 struct ib_local_route_header {
 	/** Virtual lane and link version */

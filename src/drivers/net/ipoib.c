@@ -671,8 +671,8 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 	ethhdr->h_protocol = net_proto;
 
 	/* Construct destination address */
-	if ( IB_LID_MULTICAST ( dest->lid ) ) {
-		/* Multicast LID; use the Ethernet broadcast address */
+	if ( dest->gid_present && IB_GID_MULTICAST ( &dest->gid ) ) {
+		/* Multicast GID: use the Ethernet broadcast address */
 		memcpy ( &ethhdr->h_dest, eth_broadcast,
 			 sizeof ( ethhdr->h_dest ) );
 	} else {
