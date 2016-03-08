@@ -770,7 +770,7 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 	/* Join multicast group */
 	if ( ( rc = ib_mcast_join ( ipoib->ibdev, ipoib->qp,
 				    &ipoib->broadcast.membership,
-				    &ipoib->broadcast.av,
+				    &ipoib->broadcast.av, 0,
 				    ipoib_join_complete ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
 		       ipoib, strerror ( rc ) );

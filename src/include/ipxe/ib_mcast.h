@@ -33,7 +33,7 @@ struct ib_mc_membership {
 
 extern int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			   struct ib_mc_membership *membership,
-			   struct ib_address_vector *av,
+			   struct ib_address_vector *av, unsigned int mask,
 			   void ( * joined ) ( struct ib_mc_membership *memb,
 					       int rc ) );
 

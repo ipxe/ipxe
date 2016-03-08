@@ -43,25 +43,32 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v ibdev		Infiniband device
  * @v av		Address vector
- * @v join		Join (rather than leave) group
+ * @v method		Method (IB_MGMT_METHOD_SET or IB_MGMT_METHOD_DELETE)
+ * @v mask		Additional component mask
  * @v mad		MAD to fill in
  */
 static void ib_mcast_mad ( struct ib_device *ibdev,
 			   struct ib_address_vector *av,
-			   int join, union ib_mad *mad ) {
+			   unsigned int method, unsigned int mask,
+			   union ib_mad *mad ) {
 	struct ib_mad_sa *sa = &mad->sa;
 
 	/* Construct multicast membership record request */
 	memset ( sa, 0, sizeof ( *sa ) );
 	sa->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
 	sa->mad_hdr.class_version = IB_SA_CLASS_VERSION;
-	sa->mad_hdr.method =
-		( join ? IB_MGMT_METHOD_SET : IB_MGMT_METHOD_DELETE );
+	sa->mad_hdr.method = method;
 	sa->mad_hdr.attr_id = htons ( IB_SA_ATTR_MC_MEMBER_REC );
 	sa->sa_hdr.comp_mask[1] =
 		htonl ( IB_SA_MCMEMBER_REC_MGID | IB_SA_MCMEMBER_REC_PORT_GID |
-			IB_SA_MCMEMBER_REC_JOIN_STATE );
-	sa->sa_data.mc_member_record.scope__join_state = 1;
+			IB_SA_MCMEMBER_REC_JOIN_STATE | mask );
+	sa->sa_data.mc_member_record.qkey = htonl ( av->qkey );
+	sa->sa_data.mc_member_record.pkey =
+		htons ( ibdev->pkey | IB_PKEY_FULL );
+	sa->sa_data.mc_member_record.rate_selector__rate = av->rate;
+	sa->sa_data.mc_member_record.sl__flow_label__hop_limit =
+		htonl ( av->sl << 28 );
+	sa->sa_data.mc_member_record.scope__join_state = 0x01;
 	memcpy ( &sa->sa_data.mc_member_record.mgid, &av->gid,
 		 sizeof ( sa->sa_data.mc_member_record.mgid ) );
 	memcpy ( &sa->sa_data.mc_member_record.port_gid, &ibdev->gid,
@@ -144,7 +151,7 @@ static struct ib_mad_transaction_operations ib_mcast_op = {
  */
 int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		    struct ib_mc_membership *membership,
-		    struct ib_address_vector *av,
+		    struct ib_address_vector *av, unsigned int mask,
 		    void ( * complete ) ( struct ib_mc_membership *membership,
 					  int rc ) ) {
 	union ib_mad mad;
@@ -171,7 +178,7 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	membership->attached = 1;
 
 	/* Initiate multicast membership join */
-	ib_mcast_mad ( ibdev, av, 1, &mad );
+	ib_mcast_mad ( ibdev, av, IB_MGMT_METHOD_SET, mask, &mad );
 	membership->madx = ib_create_madx ( ibdev, ibdev->gsi, &mad, NULL,
 					    &ib_mcast_op );
 	if ( ! membership->madx ) {
@@ -226,7 +233,7 @@ void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	}
 
 	/* Send a single group leave MAD */
-	ib_mcast_mad ( ibdev, av, 0, &mad );
+	ib_mcast_mad ( ibdev, av, IB_MGMT_METHOD_DELETE, 0, &mad );
 	if ( ( rc = ib_mi_send ( ibdev, ibdev->gsi, &mad, NULL ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %s QPN %#lx could not send leave request: "
 		       "%s\n", ibdev->name, qp->qpn, strerror ( rc ) );
