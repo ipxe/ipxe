@@ -73,6 +73,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Number of IPoIB completion entries */
 #define IPOIB_NUM_CQES 8
 
+/** An IPoIB broadcast address */
+struct ipoib_broadcast {
+	/** MAC address */
+	struct ipoib_mac mac;
+	/** Address vector */
+	struct ib_address_vector av;
+	/** Multicast group membership */
+	struct ib_mc_membership membership;
+};
+
 /** An IPoIB device */
 struct ipoib_device {
 	/** Network device */
@@ -87,10 +97,8 @@ struct ipoib_device {
 	struct ib_queue_pair *qp;
 	/** Local MAC */
 	struct ipoib_mac mac;
-	/** Broadcast MAC */
-	struct ipoib_mac broadcast;
-	/** IPv4 broadcast multicast group membership */
-	struct ib_mc_membership membership;
+	/** Broadcast address */
+	struct ipoib_broadcast broadcast;
 	/** REMAC cache */
 	struct list_head peers;
 };
@@ -149,7 +157,7 @@ static struct ipoib_mac * ipoib_find_remac ( struct ipoib_device *ipoib,
 	 * multicasts as broadcasts for simplicity.
 	 */
 	if ( is_multicast_ether_addr ( remac ) )
-		return &ipoib->broadcast;
+		return &ipoib->broadcast.mac;
 
 	/* Try to find via REMAC cache */
 	list_for_each_entry ( peer, &ipoib->peers, list ) {
@@ -559,6 +567,7 @@ static int ipoib_transmit ( struct net_device *netdev,
 	/* Construct address vector */
 	memset ( &dest, 0, sizeof ( dest ) );
 	dest.qpn = ( ntohl ( mac->flags__qpn ) & IB_QPN_MASK );
+	dest.qkey = ipoib->broadcast.av.qkey;
 	dest.gid_present = 1;
 	memcpy ( &dest.gid, &mac->gid, sizeof ( dest.gid ) );
 	if ( ( rc = ib_resolve_path ( ibdev, &dest ) ) != 0 ) {
@@ -650,8 +659,9 @@ static void ipoib_complete_recv ( struct ib_device *ibdev __unused,
 	ethhdr->h_protocol = net_proto;
 
 	/* Construct destination address */
-	if ( dest->gid_present && ( memcmp ( &dest->gid, &ipoib->broadcast.gid,
-					     sizeof ( dest->gid ) ) == 0 ) ) {
+	if ( dest->gid_present &&
+	     ( memcmp ( &dest->gid, &ipoib->broadcast.mac.gid,
+			sizeof ( dest->gid ) ) == 0 ) ) {
 		/* Broadcast GID; use the Ethernet broadcast address */
 		memcpy ( &ethhdr->h_dest, eth_broadcast,
 			 sizeof ( ethhdr->h_dest ) );
@@ -726,18 +736,13 @@ static void ipoib_poll ( struct net_device *netdev ) {
 /**
  * Handle IPv4 broadcast multicast group join completion
  *
- * @v ibdev		Infiniband device
- * @v qp		Queue pair
  * @v membership	Multicast group membership
  * @v rc		Status code
- * @v mad		Response MAD (or NULL on error)
  */
-void ipoib_join_complete ( struct ib_device *ibdev __unused,
-			   struct ib_queue_pair *qp __unused,
-			   struct ib_mc_membership *membership, int rc,
-			   union ib_mad *mad __unused ) {
-	struct ipoib_device *ipoib =
-		container_of ( membership, struct ipoib_device, membership );
+void ipoib_join_complete ( struct ib_mc_membership *membership, int rc ) {
+	struct ipoib_device *ipoib = container_of ( membership,
+						    struct ipoib_device,
+						    broadcast.membership );
 
 	/* Record join status as link status */
 	netdev_link_err ( ipoib->netdev, rc );
@@ -752,8 +757,10 @@ void ipoib_join_complete ( struct ib_device *ibdev __unused,
 static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
 	int rc;
 
+	/* Join multicast group */
 	if ( ( rc = ib_mcast_join ( ipoib->ibdev, ipoib->qp,
-				    &ipoib->membership, &ipoib->broadcast.gid,
+				    &ipoib->broadcast.membership,
+				    &ipoib->broadcast.av,
 				    ipoib_join_complete ) ) != 0 ) {
 		DBGC ( ipoib, "IPoIB %p could not join broadcast group: %s\n",
 		       ipoib, strerror ( rc ) );
@@ -770,7 +777,9 @@ static int ipoib_join_broadcast_group ( struct ipoib_device *ipoib ) {
  */
 static void ipoib_leave_broadcast_group ( struct ipoib_device *ipoib ) {
 
-	ib_mcast_leave ( ipoib->ibdev, ipoib->qp, &ipoib->membership );
+	/* Leave multicast group */
+	ib_mcast_leave ( ipoib->ibdev, ipoib->qp,
+			 &ipoib->broadcast.membership );
 }
 
 /**
@@ -791,9 +800,16 @@ static void ipoib_link_state_changed ( struct ipoib_device *ipoib ) {
 	memcpy ( &ipoib->mac.gid.s.prefix, &ibdev->gid.s.prefix,
 		 sizeof ( ipoib->mac.gid.s.prefix ) );
 
-	/* Update broadcast GID based on potentially-new partition key */
-	ipoib->broadcast.gid.words[2] =
+	/* Update broadcast MAC GID based on potentially-new partition key */
+	ipoib->broadcast.mac.gid.words[2] =
 		htons ( ibdev->pkey | IB_PKEY_FULL );
+
+	/* Construct broadcast address vector from broadcast MAC address */
+	memset ( &ipoib->broadcast.av, 0, sizeof ( ipoib->broadcast.av ) );
+	ipoib->broadcast.av.qpn = IB_QPN_BROADCAST;
+	ipoib->broadcast.av.gid_present = 1;
+	memcpy ( &ipoib->broadcast.av.gid, &ipoib->broadcast.mac.gid,
+		 sizeof ( ipoib->broadcast.av.gid ) );
 
 	/* Set net device link state to reflect Infiniband link state */
 	rc = ib_link_rc ( ibdev );
@@ -936,8 +952,8 @@ static int ipoib_probe ( struct ib_device *ibdev ) {
 		 sizeof ( ipoib->mac.gid.s.guid ) );
 
 	/* Set default broadcast MAC address */
-	memcpy ( &ipoib->broadcast, &ipoib_broadcast,
-		 sizeof ( ipoib->broadcast ) );
+	memcpy ( &ipoib->broadcast.mac, &ipoib_broadcast,
+		 sizeof ( ipoib->broadcast.mac ) );
 
 	/* Add to list of IPoIB devices */
 	list_add_tail ( &ipoib->list, &ipoib_devices );
