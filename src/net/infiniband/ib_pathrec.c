@@ -258,6 +258,7 @@ int ib_resolve_path ( struct ib_device *ibdev, struct ib_address_vector *av ) {
 		av->lid = cached->path->av.lid;
 		av->rate = cached->path->av.rate;
 		av->sl = cached->path->av.sl;
+		av->gid_present = cached->path->av.gid_present;
 		DBGC2 ( ibdev, "IBDEV %s cache hit for " IB_GID_FMT "\n",
 			ibdev->name, IB_GID_ARGS ( gid ) );
 		return 0;
