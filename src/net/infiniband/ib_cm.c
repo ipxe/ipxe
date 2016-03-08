@@ -280,7 +280,7 @@ static void ib_cm_req_complete ( struct ib_device *ibdev,
 		qp->send.psn = ( ntohl ( rep->starting_psn ) >> 8 );
 		private_data = &rep->private_data;
 		private_data_len = sizeof ( rep->private_data );
-		DBGC ( conn, "CM %p connected to QPN %lx PSN %x\n",
+		DBGC ( conn, "CM %p connected to QPN %#lx PSN %#x\n",
 		       conn, qp->av.qpn, qp->send.psn );
 
 		/* Modify queue pair */
@@ -466,7 +466,7 @@ ib_create_conn ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	/* Add to list of connections */
 	list_add ( &conn->list, &ib_cm_conns );
 
-	DBGC ( conn, "CM %p created for IBDEV %s QPN %lx\n",
+	DBGC ( conn, "CM %p created for IBDEV %s QPN %#lx\n",
 	       conn, ibdev->name, qp->qpn );
 	DBGC ( conn, "CM %p connecting to " IB_GID_FMT " " IB_GUID_FMT "\n",
 	       conn, IB_GID_ARGS ( dgid ), IB_GUID_ARGS ( service_id ) );

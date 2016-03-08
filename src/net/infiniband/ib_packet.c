@@ -234,7 +234,7 @@ int ib_pull ( struct ib_device *ibdev, struct io_buffer *iobuf,
 		} else {
 			if ( ! ( *qp = ib_find_qp_qpn ( ibdev, dest->qpn ) ) ) {
 				DBGC ( ibdev, "IBDEV %s RX for nonexistent "
-				       "QPN %lx\n", ibdev->name, dest->qpn );
+				       "QPN %#lx\n", ibdev->name, dest->qpn );
 				return -ENODEV;
 			}
 		}

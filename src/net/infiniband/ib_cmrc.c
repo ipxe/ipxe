@@ -428,7 +428,7 @@ int ib_cmrc_open ( struct interface *xfer, struct ib_device *ibdev,
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( cmrc->qp, cmrc );
-	DBGC ( cmrc, "CMRC %p using QPN %lx\n", cmrc, cmrc->qp->qpn );
+	DBGC ( cmrc, "CMRC %p using QPN %#lx\n", cmrc, cmrc->qp->qpn );
 
 	/* Attach to parent interface, transfer reference (implicitly)
 	 * to our shutdown process, and return.

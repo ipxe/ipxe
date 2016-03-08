@@ -94,7 +94,7 @@ static void ib_mcast_complete ( struct ib_device *ibdev,
 	if ( ( rc == 0 ) && ( mad->hdr.status != htons ( IB_MGMT_STATUS_OK ) ))
 		rc = -ENOTCONN;
 	if ( rc != 0 ) {
-		DBGC ( ibdev, "IBDEV %s QPN %lx join failed: %s\n",
+		DBGC ( ibdev, "IBDEV %s QPN %#lx join failed: %s\n",
 		       ibdev->name, qp->qpn, strerror ( rc ) );
 		goto out;
 	}
@@ -102,14 +102,14 @@ static void ib_mcast_complete ( struct ib_device *ibdev,
 	/* Extract values from MAD */
 	joined = ( mad->hdr.method == IB_MGMT_METHOD_GET_RESP );
 	qkey = ntohl ( mc_member_record->qkey );
-	DBGC ( ibdev, "IBDEV %s QPN %lx %s " IB_GID_FMT " qkey %lx\n",
+	DBGC ( ibdev, "IBDEV %s QPN %#lx %s " IB_GID_FMT " qkey %lx\n",
 	       ibdev->name, qp->qpn, ( joined ? "joined" : "left" ),
 	       IB_GID_ARGS ( gid ), qkey );
 
 	/* Set queue key */
 	qp->qkey = qkey;
 	if ( ( rc = ib_modify_qp ( ibdev, qp ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %s QPN %lx could not modify qkey: %s\n",
+		DBGC ( ibdev, "IBDEV %s QPN %#lx could not modify qkey: %s\n",
 		       ibdev->name, qp->qpn, strerror ( rc ) );
 		goto out;
 	}
@@ -147,7 +147,7 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	union ib_mad mad;
 	int rc;
 
-	DBGC ( ibdev, "IBDEV %s QPN %lx joining " IB_GID_FMT "\n",
+	DBGC ( ibdev, "IBDEV %s QPN %#lx joining " IB_GID_FMT "\n",
 	       ibdev->name, qp->qpn, IB_GID_ARGS ( gid ) );
 
 	/* Sanity check */
@@ -160,7 +160,7 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 
 	/* Attach queue pair to multicast GID */
 	if ( ( rc = ib_mcast_attach ( ibdev, qp, gid ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %s QPN %lx could not attach: %s\n",
+		DBGC ( ibdev, "IBDEV %s QPN %#lx could not attach: %s\n",
 		       ibdev->name, qp->qpn, strerror ( rc ) );
 		goto err_mcast_attach;
 	}
@@ -170,7 +170,7 @@ int ib_mcast_join ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	membership->madx = ib_create_madx ( ibdev, ibdev->gsi, &mad, NULL,
 					    &ib_mcast_op );
 	if ( ! membership->madx ) {
-		DBGC ( ibdev, "IBDEV %s QPN %lx could not create join "
+		DBGC ( ibdev, "IBDEV %s QPN %#lx could not create join "
 		       "transaction\n", ibdev->name, qp->qpn );
 		rc = -ENOMEM;
 		goto err_create_madx;
@@ -199,7 +199,7 @@ void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	union ib_mad mad;
 	int rc;
 
-	DBGC ( ibdev, "IBDEV %s QPN %lx leaving " IB_GID_FMT "\n",
+	DBGC ( ibdev, "IBDEV %s QPN %#lx leaving " IB_GID_FMT "\n",
 	       ibdev->name, qp->qpn, IB_GID_ARGS ( gid ) );
 
 	/* Sanity check */
@@ -217,7 +217,7 @@ void ib_mcast_leave ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	/* Send a single group leave MAD */
 	ib_mcast_mad ( ibdev, &membership->gid, 0, &mad );
 	if ( ( rc = ib_mi_send ( ibdev, ibdev->gsi, &mad, NULL ) ) != 0 ) {
-		DBGC ( ibdev, "IBDEV %s QPN %lx could not send leave request: "
+		DBGC ( ibdev, "IBDEV %s QPN %#lx could not send leave request: "
 		       "%s\n", ibdev->name, qp->qpn, strerror ( rc ) );
 	}
 }
