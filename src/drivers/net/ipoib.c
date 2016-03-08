@@ -65,13 +65,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 			  "Missing REMAC for IPv4 packet (ARP sent)" )
 
 /** Number of IPoIB send work queue entries */
-#define IPOIB_NUM_SEND_WQES 2
+#define IPOIB_NUM_SEND_WQES 8
 
 /** Number of IPoIB receive work queue entries */
 #define IPOIB_NUM_RECV_WQES 4
 
 /** Number of IPoIB completion entries */
-#define IPOIB_NUM_CQES 8
+#define IPOIB_NUM_CQES 16
 
 /** An IPoIB broadcast address */
 struct ipoib_broadcast {
