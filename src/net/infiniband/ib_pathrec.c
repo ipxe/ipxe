@@ -71,7 +71,7 @@ static void ib_path_complete ( struct ib_device *ibdev,
 	path->av.lid = ntohs ( pathrec->dlid );
 	path->av.sl = ( pathrec->reserved__sl & 0x0f );
 	path->av.rate = ( pathrec->rate_selector__rate & 0x3f );
-	DBGC ( ibdev, "IBDEV %s path to " IB_GID_FMT " is %04x sl %d rate "
+	DBGC ( ibdev, "IBDEV %s path to " IB_GID_FMT " lid %d sl %d rate "
 	       "%d\n", ibdev->name, IB_GID_ARGS ( dgid ), path->av.lid,
 	       path->av.sl, path->av.rate );
 
