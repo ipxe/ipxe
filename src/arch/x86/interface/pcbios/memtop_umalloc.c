@@ -38,6 +38,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/memblock.h>
 #include <ipxe/umalloc.h>
 
+/** Maximum usable address for external allocated memory */
+#define EM_MAX_ADDRESS 0xffffffffUL
+
 /** Alignment of external allocated memory */
 #define EM_ALIGN ( 4 * 1024 )
 
@@ -60,6 +63,56 @@ static userptr_t bottom = UNULL;
 
 /** Remaining space on heap */
 static size_t heap_size;
+
+/**
+ * Find largest usable memory region
+ *
+ * @ret start		Start of region
+ * @ret len		Length of region
+ */
+size_t largest_memblock ( userptr_t *start ) {
+	struct memory_map memmap;
+	struct memory_region *region;
+	physaddr_t max = EM_MAX_ADDRESS;
+	physaddr_t region_start;
+	physaddr_t region_end;
+	size_t region_len;
+	unsigned int i;
+	size_t len = 0;
+
+	/* Avoid returning uninitialised data on error */
+	*start = UNULL;
+
+	/* Scan through all memory regions */
+	get_memmap ( &memmap );
+	for ( i = 0 ; i < memmap.count ; i++ ) {
+		region = &memmap.regions[i];
+		DBG ( "Considering [%llx,%llx)\n", region->start, region->end );
+
+		/* Truncate block to maximum physical address */
+		if ( region->start > max ) {
+			DBG ( "...starts after maximum address %lx\n", max );
+			continue;
+		}
+		region_start = region->start;
+		if ( region->end > max ) {
+			DBG ( "...end truncated to maximum address %lx\n", max);
+			region_end = 0; /* =max, given the wraparound */
+		} else {
+			region_end = region->end;
+		}
+		region_len = ( region_end - region_start );
+
+		/* Use largest block */
+		if ( region_len > len ) {
+			DBG ( "...new best block found\n" );
+			*start = phys_to_user ( region_start );
+			len = region_len;
+		}
+	}
+
+	return len;
+}
 
 /**
  * Initialise external heap
