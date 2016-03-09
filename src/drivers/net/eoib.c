@@ -454,8 +454,8 @@ static int eoib_join_broadcast_group ( struct eoib_device *eoib ) {
 
 	/* Join multicast group */
 	if ( ( rc = ib_mcast_join ( eoib->ibdev, eoib->qp,
-				    &eoib->membership, &eoib->broadcast, 0,
-				    eoib_join_complete ) ) != 0 ) {
+				    &eoib->membership, &eoib->broadcast,
+				    eoib->mask, eoib_join_complete ) ) != 0 ) {
 		DBGC ( eoib, "EoIB %s could not join broadcast group: %s\n",
 		       eoib->name, strerror ( rc ) );
 		return rc;

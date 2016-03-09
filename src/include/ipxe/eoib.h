@@ -48,7 +48,28 @@ struct eoib_device {
 
 	/** Peer cache */
 	struct list_head peers;
+
+	/** Multicast group additional component mask */
+	unsigned int mask;
 };
+
+/**
+ * Force creation of multicast group
+ *
+ * @v eoib		EoIB device
+ */
+static inline void eoib_force_group_creation ( struct eoib_device *eoib ) {
+
+	/* Some dubious EoIB implementations require each endpoint to
+	 * force the creation of the multicast group.  Yes, this makes
+	 * it impossible for the group parameters (e.g. SL) to ever be
+	 * modified without breaking backwards compatiblity with every
+	 * existing driver.
+	 */
+	eoib->mask = ( IB_SA_MCMEMBER_REC_PKEY | IB_SA_MCMEMBER_REC_QKEY |
+		       IB_SA_MCMEMBER_REC_SL | IB_SA_MCMEMBER_REC_FLOW_LABEL |
+		       IB_SA_MCMEMBER_REC_TRAFFIC_CLASS );
+}
 
 extern int eoib_create ( struct ib_device *ibdev, const uint8_t *hw_addr,
 			 struct ib_address_vector *broadcast,
