@@ -269,6 +269,14 @@ static void eoib_rx_av ( struct eoib_device *eoib, const uint8_t *mac,
 		return;
 	}
 
+	/* Some dubious EoIB implementations utilise an Ethernet-to-
+	 * EoIB gateway that will send packets from the wrong QPN.
+	 */
+	if ( eoib_has_gateway ( eoib ) &&
+	     ( memcmp ( gid, &eoib->gateway.gid, sizeof ( *gid ) ) == 0 ) ) {
+		qpn = eoib->gateway.qpn;
+	}
+
 	/* Do nothing if peer cache entry is complete and correct */
 	if ( ( peer->av.lid == av->lid ) && ( peer->av.qpn == qpn ) ) {
 		DBGCP ( eoib, "EoIB %s %s RX unchanged\n",
@@ -326,9 +334,14 @@ static int eoib_transmit ( struct net_device *netdev,
 	if ( iob_len ( iobuf ) < zlen )
 		iob_pad ( iobuf, zlen );
 
-	/* If we have no unicast address then send as a broadcast */
-	if ( ! av )
+	/* If we have no unicast address then send as a broadcast,
+	 * with a duplicate sent to the gateway if applicable.
+	 */
+	if ( ! av ) {
 		av = &eoib->broadcast;
+		if ( eoib_has_gateway ( eoib ) )
+			eoib->duplicate ( eoib, iobuf );
+	}
 
 	/* Post send work queue entry */
 	return ib_post_send ( eoib->ibdev, eoib->qp, av, iobuf );
@@ -797,3 +810,86 @@ struct net_protocol eoib_heartbeat_protocol __net_protocol = {
 	.rx = eoib_heartbeat_rx,
 	.ntoa = eoib_heartbeat_ntoa,
 };
+
+/****************************************************************************
+ *
+ * EoIB gateway
+ *
+ ****************************************************************************
+ *
+ * Some dubious EoIB implementations require all broadcast traffic to
+ * be sent twice: once to the actual broadcast group, and once as a
+ * unicast to the EoIB-to-Ethernet gateway.  This somewhat curious
+ * design arises since the EoIB-to-Ethernet gateway hardware lacks the
+ * ability to attach a queue pair to a multicast GID (or LID), and so
+ * cannot receive traffic sent to the broadcast group.
+ *
+ */
+
+/**
+ * Transmit duplicate packet to the EoIB gateway
+ *
+ * @v eoib		EoIB device
+ * @v original		Original I/O buffer
+ */
+static void eoib_duplicate ( struct eoib_device *eoib,
+			     struct io_buffer *original ) {
+	struct net_device *netdev = eoib->netdev;
+	struct ib_device *ibdev = eoib->ibdev;
+	struct ib_address_vector *av = &eoib->gateway;
+	size_t len = iob_len ( original );
+	struct io_buffer *copy;
+	int rc;
+
+	/* Create copy of I/O buffer */
+	copy = alloc_iob ( len );
+	if ( ! copy ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	memcpy ( iob_put ( copy, len ), original->data, len );
+
+	/* Append to network device's transmit queue */
+	list_add_tail ( &copy->list, &original->list );
+
+	/* Resolve path to gateway */
+	if ( ( rc = ib_resolve_path ( ibdev, av ) ) != 0 ) {
+		DBGC ( eoib, "EoIB %s no path to gateway: %s\n",
+		       eoib->name, strerror ( rc ) );
+		goto err_path;
+	}
+
+	/* Force use of GRH even for local destinations */
+	av->gid_present = 1;
+
+	/* Post send work queue entry */
+	if ( ( rc = ib_post_send ( eoib->ibdev, eoib->qp, av, copy ) ) != 0 )
+		goto err_post_send;
+
+	return;
+
+ err_post_send:
+ err_path:
+ err_alloc:
+	netdev_tx_complete_err ( netdev, copy, rc );
+}
+
+/**
+ * Set EoIB gateway
+ *
+ * @v eoib		EoIB device
+ * @v av		Address vector, or NULL to clear gateway
+ */
+void eoib_set_gateway ( struct eoib_device *eoib,
+			struct ib_address_vector *av ) {
+
+	if ( av ) {
+		DBGC ( eoib, "EoIB %s using gateway " IB_GID_FMT "\n",
+		       eoib->name, IB_GID_ARGS ( &av->gid ) );
+		memcpy ( &eoib->gateway, av, sizeof ( eoib->gateway ) );
+		eoib->duplicate = eoib_duplicate;
+	} else {
+		DBGC ( eoib, "EoIB %s not using gateway\n", eoib->name );
+		eoib->duplicate = NULL;
+	}
+}

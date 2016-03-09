@@ -49,9 +49,29 @@ struct eoib_device {
 	/** Peer cache */
 	struct list_head peers;
 
+	/** Send duplicate packet to gateway (or NULL)
+	 *
+	 * @v eoib		EoIB device
+	 * @v original		Original I/O buffer
+	 */
+	void ( * duplicate ) ( struct eoib_device *eoib,
+			       struct io_buffer *original );
+	/** Gateway (if any) */
+	struct ib_address_vector gateway;
 	/** Multicast group additional component mask */
 	unsigned int mask;
 };
+
+/**
+ * Check if EoIB device uses a gateway
+ *
+ * @v eoib		EoIB device
+ * @v has_gw		EoIB device uses a gateway
+ */
+static inline int eoib_has_gateway ( struct eoib_device *eoib ) {
+
+	return ( eoib->duplicate != NULL );
+}
 
 /**
  * Force creation of multicast group
@@ -77,5 +97,7 @@ extern int eoib_create ( struct ib_device *ibdev, const uint8_t *hw_addr,
 extern struct eoib_device * eoib_find ( struct ib_device *ibdev,
 					const uint8_t *hw_addr );
 extern void eoib_destroy ( struct eoib_device *eoib );
+extern void eoib_set_gateway ( struct eoib_device *eoib,
+			       struct ib_address_vector *av );
 
 #endif /* _IPXE_EOIB_H */
