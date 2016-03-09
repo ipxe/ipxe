@@ -44,6 +44,9 @@ REQUIRE_OBJECT ( ib_srp );
 #ifdef VNIC_IPOIB
 REQUIRE_OBJECT ( ipoib );
 #endif
+#ifdef VNIC_XSIGO
+REQUIRE_OBJECT ( xsigo );
+#endif
 
 /*
  * Drag in Infiniband-specific commands

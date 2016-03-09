@@ -158,6 +158,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #define VNIC_IPOIB		/* Infiniband IPoIB virtual NICs */
+//#define VNIC_XSIGO		/* Infiniband Xsigo virtual NICs */
 
 /*
  * Error message tables to include
