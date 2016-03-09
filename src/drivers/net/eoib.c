@@ -752,3 +752,48 @@ struct ib_driver eoib_driver __ib_driver = {
 	.notify = eoib_notify,
 	.remove = eoib_remove,
 };
+
+/****************************************************************************
+ *
+ * EoIB heartbeat packets
+ *
+ ****************************************************************************
+ */
+
+/**
+ * Silently ignore incoming EoIB heartbeat packets
+ *
+ * @v iobuf		I/O buffer
+ * @v netdev		Network device
+ * @v ll_source		Link-layer source address
+ * @v flags		Packet flags
+ * @ret rc		Return status code
+ */
+static int eoib_heartbeat_rx ( struct io_buffer *iobuf,
+			       struct net_device *netdev __unused,
+			       const void *ll_dest __unused,
+			       const void *ll_source __unused,
+			       unsigned int flags __unused ) {
+	free_iob ( iobuf );
+	return 0;
+}
+
+/**
+ * Transcribe EoIB heartbeat address
+ *
+ * @v net_addr		EoIB heartbeat address
+ * @ret string		"<EoIB>"
+ *
+ * This operation is meaningless for the EoIB heartbeat protocol.
+ */
+static const char * eoib_heartbeat_ntoa ( const void *net_addr __unused ) {
+	return "<EoIB>";
+}
+
+/** EoIB heartbeat network protocol */
+struct net_protocol eoib_heartbeat_protocol __net_protocol = {
+	.name = "EoIB",
+	.net_proto = htons ( EOIB_MAGIC ),
+	.rx = eoib_heartbeat_rx,
+	.ntoa = eoib_heartbeat_ntoa,
+};
