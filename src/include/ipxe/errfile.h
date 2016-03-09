@@ -185,6 +185,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_intelxvf	     ( ERRFILE_DRIVER | 0x00790000 )
 #define ERRFILE_smsc95xx	     ( ERRFILE_DRIVER | 0x007a0000 )
 #define ERRFILE_acm		     ( ERRFILE_DRIVER | 0x007b0000 )
+#define ERRFILE_eoib		     ( ERRFILE_DRIVER | 0x007c0000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
