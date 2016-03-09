@@ -1052,6 +1052,3 @@ REQUIRING_SYMBOL ( register_ibdev );
 
 /* Drag in Infiniband configuration */
 REQUIRE_OBJECT ( config_infiniband );
-
-/* Drag in IPoIB */
-REQUIRE_OBJECT ( ipoib );

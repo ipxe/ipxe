@@ -39,6 +39,13 @@ REQUIRE_OBJECT ( ib_srp );
 #endif
 
 /*
+ * Drag in Infiniband-specific virtual network devices
+ */
+#ifdef VNIC_IPOIB
+REQUIRE_OBJECT ( ipoib );
+#endif
+
+/*
  * Drag in Infiniband-specific commands
  */
 #ifdef IBMGMT_CMD

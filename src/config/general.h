@@ -154,6 +154,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	AUTOBOOT_ROM_FILTER	/* Autoboot only devices matching our ROM */
 
 /*
+ * Virtual network devices
+ *
+ */
+#define VNIC_IPOIB		/* Infiniband IPoIB virtual NICs */
+
+/*
  * Error message tables to include
  *
  */
