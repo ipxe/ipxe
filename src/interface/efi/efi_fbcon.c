@@ -128,10 +128,26 @@ static int efifb_glyphs ( void ) {
 		rc = -EEFI ( efirc );
 		DBGC ( &efifb, "EFIFB could not get font information: %s\n",
 		       strerror ( rc ) );
-		goto err_info;
-	}
-	assert ( info != NULL );
-	efifb.font.height = info->FontInfo.FontSize;
+
+		/* If we can't get font info, get font height using alternate
+		 * method */
+		for ( character = 0 ; character < 256 ; character++ ) {
+			if ( ! isprint ( character ) )
+				continue;
+			blt = NULL;
+			if ( ( efirc = efifb.hiifont->GetGlyph ( efifb.hiifont,
+								 character,
+								 info, &blt,
+								 NULL ) ) != 0 ) {
+				rc = -EEFI ( efirc );
+				DBGC ( &efifb, "EFIFB could not get glyph %d: %s\n",
+				       character, strerror ( rc ) );
+			}
+			if ( efifb.font.height < blt->Height )
+				efifb.font.height = blt->Height;
+		}
+	} else
+		efifb.font.height = info->FontInfo.FontSize;
 
 	/* Allocate glyph data */
 	len = ( 256 * efifb.font.height * sizeof ( bitmask ) );
@@ -199,7 +215,6 @@ static int efifb_glyphs ( void ) {
 	ufree ( efifb.glyphs );
  err_alloc:
 	bs->FreePool ( info );
- err_info:
 	return rc;
 }
 
@@ -434,6 +449,8 @@ static int efifb_init ( struct console_configuration *config ) {
 		DBGC ( &efifb, "EFIFB could not set mode %d: %s\n",
 		       mode, strerror ( rc ) );
 		goto err_set_mode;
+	} else {
+                DBGC2 ( &efifb, "EFIFB set mode %d\n", mode );
 	}
 	info = efifb.gop->Mode->Info;
 
