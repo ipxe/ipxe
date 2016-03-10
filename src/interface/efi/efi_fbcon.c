@@ -110,7 +110,6 @@ static void efifb_glyph ( unsigned int character, uint8_t *glyph ) {
  */
 static int efifb_glyphs ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_FONT_DISPLAY_INFO *info;
 	EFI_IMAGE_OUTPUT *blt;
 	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *pixel;
 	size_t offset;
@@ -122,16 +121,42 @@ static int efifb_glyphs ( void ) {
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Get font height */
-	if ( ( efirc = efifb.hiifont->GetFontInfo ( efifb.hiifont, NULL, NULL,
-						    &info, NULL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( &efifb, "EFIFB could not get font information: %s\n",
-		       strerror ( rc ) );
-		goto err_info;
+	/* Get font height.  The GetFontInfo() call nominally returns
+	 * this information in an EFI_FONT_DISPLAY_INFO structure, but
+	 * is known to fail on many UEFI implementations.  Instead, we
+	 * iterate over all printable characters to find the maximum
+	 * height.
+	 */
+	efifb.font.height = 0;
+	for ( character = 0 ; character < 256 ; character++ ) {
+
+		/* Skip non-printable characters */
+		if ( ! isprint ( character ) )
+			continue;
+
+		/* Get glyph */
+		blt = NULL;
+		if ( ( efirc = efifb.hiifont->GetGlyph ( efifb.hiifont,
+							 character, NULL, &blt,
+							 NULL ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( &efifb, "EFIFB could not get glyph %d: %s\n",
+			       character, strerror ( rc ) );
+			continue;
+		}
+		assert ( blt != NULL );
+
+		/* Calculate maximum height */
+		if ( efifb.font.height < blt->Height )
+			efifb.font.height = blt->Height;
+
+		/* Free glyph */
+		bs->FreePool ( blt );
 	}
-	assert ( info != NULL );
-	efifb.font.height = info->FontInfo.FontSize;
+	if ( ! efifb.font.height ) {
+		DBGC ( &efifb, "EFIFB could not get font height\n" );
+		return -ENOENT;
+	}
 
 	/* Allocate glyph data */
 	len = ( 256 * efifb.font.height * sizeof ( bitmask ) );
@@ -152,7 +177,7 @@ static int efifb_glyphs ( void ) {
 		/* Get glyph */
 		blt = NULL;
 		if ( ( efirc = efifb.hiifont->GetGlyph ( efifb.hiifont,
-							 character, info, &blt,
+							 character, NULL, &blt,
 							 NULL ) ) != 0 ) {
 			rc = -EEFI ( efirc );
 			DBGC ( &efifb, "EFIFB could not get glyph %d: %s\n",
@@ -187,19 +212,16 @@ static int efifb_glyphs ( void ) {
 			copy_to_user ( efifb.glyphs, offset++, &bitmask,
 				       sizeof ( bitmask ) );
 		}
+
+		/* Free glyph */
 		bs->FreePool ( blt );
 	}
-
-	/* Free font information */
-	bs->FreePool ( info );
 
 	efifb.font.glyph = efifb_glyph;
 	return 0;
 
 	ufree ( efifb.glyphs );
  err_alloc:
-	bs->FreePool ( info );
- err_info:
 	return rc;
 }
 
