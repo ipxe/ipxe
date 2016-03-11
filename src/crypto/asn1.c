@@ -82,18 +82,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_ENOTTY, 0x01, "Inappropriate algorithm" )
 
 /**
- * Invalidate ASN.1 object cursor
- *
- * @v cursor		ASN.1 object cursor
- */
-void asn1_invalidate_cursor ( struct asn1_cursor *cursor ) {
-	static uint8_t asn1_invalid_object[] = { ASN1_END, 0 };
-
-	cursor->data = asn1_invalid_object;
-	cursor->len = 0;
-}
-
-/**
  * Start parsing ASN.1 object
  *
  * @v cursor		ASN.1 object cursor
