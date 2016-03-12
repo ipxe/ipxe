@@ -3320,43 +3320,25 @@ void tg3_write_indirect_mbox(struct tg3 *tp, u32 off, u32 val);
 
 /* Functions & macros to verify TG3_FLAGS types */
 
-static inline int variable_test_bit(int nr, volatile const unsigned long *addr)
-{
-	int oldbit;
-
-	asm volatile("bt %2,%1\n\t"
-	             "sbb %0,%0"
-	             : "=r" (oldbit)
-	             : "m" (*(unsigned long *)addr), "Ir" (nr));
-
-	return oldbit;
-}
-
 static inline int _tg3_flag(enum TG3_FLAGS flag, unsigned long *bits)
 {
-	return variable_test_bit(flag, bits);
-}
-
-#define BITOP_ADDR(x) "+m" (*(volatile long *) (x))
-
-static inline void __set_bit(int nr, volatile unsigned long *addr)
-{
-	asm volatile("bts %1,%0" : BITOP_ADDR(addr) : "Ir" (nr) : "memory");
+	unsigned int index = ( flag / ( 8 * sizeof ( *bits ) ) );
+	unsigned int bit = ( flag % ( 8 * sizeof ( *bits ) ) );
+	return ( bits[index] & ( 1UL << bit ) );
 }
 
 static inline void _tg3_flag_set(enum TG3_FLAGS flag, unsigned long *bits)
 {
-	__set_bit(flag, bits);
-}
-
-static inline void __clear_bit(int nr, volatile unsigned long *addr)
-{
-	asm volatile("btr %1,%0" : BITOP_ADDR(addr) : "Ir" (nr));
+	unsigned int index = ( flag / ( 8 * sizeof ( *bits ) ) );
+	unsigned int bit = ( flag % ( 8 * sizeof ( *bits ) ) );
+	bits[index] |= ( 1UL << bit );
 }
 
 static inline void _tg3_flag_clear(enum TG3_FLAGS flag, unsigned long *bits)
 {
-	__clear_bit(flag, bits);
+	unsigned int index = ( flag / ( 8 * sizeof ( *bits ) ) );
+	unsigned int bit = ( flag % ( 8 * sizeof ( *bits ) ) );
+	bits[index] &= ~( 1UL << bit );
 }
 
 #define tg3_flag(tp, flag)				\
