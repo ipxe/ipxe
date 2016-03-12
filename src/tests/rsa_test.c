@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Forcibly enable assertions */
 #undef NDEBUG
 
+#include <string.h>
 #include <ipxe/crypto.h>
 #include <ipxe/rsa.h>
 #include <ipxe/md5.h>
