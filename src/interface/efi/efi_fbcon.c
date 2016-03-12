@@ -311,10 +311,13 @@ static int efifb_colour_map ( EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info,
  * @v min_width		Minimum required width (in pixels)
  * @v min_height	Minimum required height (in pixels)
  * @v min_bpp		Minimum required colour depth (in bits per pixel)
+ * @v automode		Automatically choose optimum mode, ignoring width and height
+ * @v maxwidth		Automatically choose widest mode, ignoring width and height
  * @ret mode_number	Mode number, or negative error
  */
 static int efifb_select_mode ( unsigned int min_width, unsigned int min_height,
-			       unsigned int min_bpp ) {
+			       unsigned int min_bpp, unsigned int automode,
+			       unsigned int maxwidth ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct fbcon_colour_map map;
 	EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info;
@@ -348,21 +351,43 @@ static int efifb_select_mode ( unsigned int min_width, unsigned int min_height,
 			goto err_map;
 		}
 
-		/* Skip modes not meeting the requirements */
-		if ( ( info->HorizontalResolution < min_width ) ||
-		     ( info->VerticalResolution < min_height ) ||
-		     ( ( ( unsigned int ) bpp ) < min_bpp ) ) {
-			goto err_requirements;
+		/* If automode is on, choose first available mode */
+		if ( automode && !maxwidth ) {
+			bs->FreePool ( info );
+			best_mode_number = mode;
+			break;
 		}
 
-		/* Select this mode if it has the best (i.e. lowest)
-		 * score.  We choose the scoring system to favour
-		 * modes close to the specified width and height;
-		 * within modes of the same width and height we prefer
-		 * a higher colour depth.
-		 */
-		score = ( ( info->HorizontalResolution *
-			    info->VerticalResolution ) - bpp );
+		/* If maxwidth is on, choose widest mode */
+		if ( maxwidth ) {
+			/* Select this mode if it has the best (i.e. lowest)
+			 * score.  We choose the scoring system to favour
+			 * first the widest modes, then the tallest modes, then
+			 * the modes with the largest depth.
+			 */
+
+			score = ( ( 1000000000 / info->HorizontalResolution ) +
+				  ( 1000000 / info->VerticalResolution ) +
+				    bpp );
+
+		/* Otherwise, choose smallest mode that fits requirements */
+		} else {
+			/* Skip modes not meeting the requirements */
+			if ( ( info->HorizontalResolution < min_width ) ||
+			     ( info->VerticalResolution < min_height ) ||
+			     ( ( ( unsigned int ) bpp ) < min_bpp ) ) {
+				goto err_requirements;
+			}
+
+			/* Select this mode if it has the best (i.e. lowest)
+			 * score.  We choose the scoring system to favour
+			 * modes close to the specified width and height;
+			 * within modes of the same width and height we prefer
+			 * a higher colour depth.
+			 */
+			score = ( ( info->HorizontalResolution *
+				    info->VerticalResolution ) - bpp );
+		}
 		if ( score < best_score ) {
 			best_mode_number = mode;
 			best_score = score;
@@ -445,7 +470,8 @@ static int efifb_init ( struct console_configuration *config ) {
 
 	/* Select mode */
 	if ( ( mode = efifb_select_mode ( config->width, config->height,
-					  config->depth ) ) < 0 ) {
+					  config->depth, config->automode,
+					  config->maxwidth ) ) < 0 ) {
 		rc = mode;
 		goto err_select_mode;
 	}
@@ -545,7 +571,8 @@ static int efifb_configure ( struct console_configuration *config ) {
 
 	/* Do nothing more unless we have a usable configuration */
 	if ( ( config == NULL ) ||
-	     ( config->width == 0 ) || ( config->height == 0 ) ) {
+	     ( ( ( config->width == 0 ) || ( config->height == 0 ) ) &&
+	       ( config->automode == 0 ) && ( config->maxwidth == 0 ) ) ) {
 		return 0;
 	}
 
