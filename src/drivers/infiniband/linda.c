@@ -112,32 +112,21 @@ struct linda {
  * This card requires atomic 64-bit accesses.  Strange things happen
  * if you try to use 32-bit accesses; sometimes they work, sometimes
  * they don't, sometimes you get random data.
- *
- * These accessors use the "movq" MMX instruction, and so won't work
- * on really old Pentiums (which won't have PCIe anyway, so this is
- * something of a moot point).
  */
 
 /**
  * Read Linda qword register
  *
  * @v linda		Linda device
- * @v dwords		Register buffer to read into
+ * @v qword		Register buffer to read into
  * @v offset		Register offset
  */
-static void linda_readq ( struct linda *linda, uint32_t *dwords,
+static void linda_readq ( struct linda *linda, uint64_t *qword,
 			  unsigned long offset ) {
-	void *addr = ( linda->regs + offset );
-
-	__asm__ __volatile__ ( "movq (%1), %%mm0\n\t"
-			       "movq %%mm0, (%0)\n\t"
-			       : : "r" ( dwords ), "r" ( addr ) : "memory" );
-
-	DBGIO ( "[%08lx] => %08x%08x\n",
-		virt_to_phys ( addr ), dwords[1], dwords[0] );
+	*qword = readq ( linda->regs + offset );
 }
 #define linda_readq( _linda, _ptr, _offset ) \
-	linda_readq ( (_linda), (_ptr)->u.dwords, (_offset) )
+	linda_readq ( (_linda), (_ptr)->u.qwords, (_offset) )
 #define linda_readq_array8b( _linda, _ptr, _offset, _idx ) \
 	linda_readq ( (_linda), (_ptr), ( (_offset) + ( (_idx) * 8 ) ) )
 #define linda_readq_array64k( _linda, _ptr, _offset, _idx ) \
@@ -147,22 +136,15 @@ static void linda_readq ( struct linda *linda, uint32_t *dwords,
  * Write Linda qword register
  *
  * @v linda		Linda device
- * @v dwords		Register buffer to write
+ * @v qword		Register buffer to write
  * @v offset		Register offset
  */
-static void linda_writeq ( struct linda *linda, const uint32_t *dwords,
+static void linda_writeq ( struct linda *linda, const uint64_t *qword,
 			   unsigned long offset ) {
-	void *addr = ( linda->regs + offset );
-
-	DBGIO ( "[%08lx] <= %08x%08x\n",
-		virt_to_phys ( addr ), dwords[1], dwords[0] );
-
-	__asm__ __volatile__ ( "movq (%0), %%mm0\n\t"
-			       "movq %%mm0, (%1)\n\t"
-			       : : "r" ( dwords ), "r" ( addr ) : "memory" );
+	writeq ( *qword, ( linda->regs + offset ) );
 }
 #define linda_writeq( _linda, _ptr, _offset ) \
-	linda_writeq ( (_linda), (_ptr)->u.dwords, (_offset) )
+	linda_writeq ( (_linda), (_ptr)->u.qwords, (_offset) )
 #define linda_writeq_array8b( _linda, _ptr, _offset, _idx ) \
 	linda_writeq ( (_linda), (_ptr), ( (_offset) + ( (_idx) * 8 ) ) )
 #define linda_writeq_array64k( _linda, _ptr, _offset, _idx ) \
