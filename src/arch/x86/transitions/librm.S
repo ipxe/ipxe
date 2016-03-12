@@ -940,7 +940,7 @@ VC_OFFSET_END:
 	.globl virt_call
 virt_call:
 	/* Preserve registers, flags and GDT on external RM stack */
-	pushfw	/* padding */
+	pushw	%ss /* padding */
 	pushfl
 	pushal
 	pushw	%gs
@@ -1030,7 +1030,7 @@ vc_rmode:
 	 */
 	addr32 movl -20(%esp), %esp
 	popfl
-	popfw	/* padding */
+	popw	%ss /* padding */
 
 	/* Return and discard function parameters */
 	ret	$( VC_OFFSET_END - VC_OFFSET_PARAMS )
