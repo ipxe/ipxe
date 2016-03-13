@@ -1,11 +1,11 @@
 /** @file
   Include file that supports UEFI.
 
-  This include file must contain things defined in the UEFI 2.5 specification.
-  If a code construct is defined in the UEFI 2.5 specification it must be included
+  This include file must contain things defined in the UEFI 2.6 specification.
+  If a code construct is defined in the UEFI 2.6 specification it must be included
   by this include file.
 
-Copyright (c) 2006 - 2015, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2016, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials are licensed and made available under
 the terms and conditions of the BSD License that accompanies this distribution.
 The full text of the license may be found at
@@ -138,8 +138,7 @@ typedef struct {
                                 MemoryType values in the range 0x70000000..0x7FFFFFFF
                                 are reserved for OEM use. MemoryType values in the range
                                 0x80000000..0xFFFFFFFF are reserved for use by UEFI OS loaders
-                                that are provided by operating system vendors. The only illegal
-                                memory type values are those in the range EfiMaxMemoryType..0x6FFFFFFF.
+                                that are provided by operating system vendors.
   @param[in]       Pages        The number of contiguous 4 KB pages to allocate.
   @param[in, out]  Memory       The pointer to a physical address. On input, the way in which the address is
                                 used depends on the value of Type.
@@ -150,7 +149,7 @@ typedef struct {
                                 2) MemoryType is in the range
                                 EfiMaxMemoryType..0x6FFFFFFF.
                                 3) Memory is NULL.
-                                4) MemoryType was EfiPersistentMemory.
+                                4) MemoryType is EfiPersistentMemory.
   @retval EFI_OUT_OF_RESOURCES  The pages could not be allocated.
   @retval EFI_NOT_FOUND         The requested pages could not be found.
 
@@ -225,16 +224,16 @@ EFI_STATUS
                                 MemoryType values in the range 0x70000000..0x7FFFFFFF
                                 are reserved for OEM use. MemoryType values in the range
                                 0x80000000..0xFFFFFFFF are reserved for use by UEFI OS loaders
-                                that are provided by operating system vendors. The only illegal
-                                memory type values are those in the range EfiMaxMemoryType..0x6FFFFFFF.
+                                that are provided by operating system vendors.
   @param[in]   Size             The number of bytes to allocate from the pool.
   @param[out]  Buffer           A pointer to a pointer to the allocated buffer if the call succeeds;
                                 undefined otherwise.
 
   @retval EFI_SUCCESS           The requested number of bytes was allocated.
   @retval EFI_OUT_OF_RESOURCES  The pool requested could not be allocated.
-  @retval EFI_INVALID_PARAMETER PoolType was invalid or Buffer is NULL.
-                                PoolType was EfiPersistentMemory.
+  @retval EFI_INVALID_PARAMETER Buffer is NULL.
+                                PoolType is in the range EfiMaxMemoryType..0x6FFFFFFF.
+                                PoolType is EfiPersistentMemory.
 
 **/
 typedef
@@ -630,7 +629,8 @@ VOID
                                  attributes bitmask for the variable.
   @param[in, out]  DataSize      On input, the size in bytes of the return Data buffer.
                                  On output the size of data returned in Data.
-  @param[out]      Data          The buffer to return the contents of the variable.
+  @param[out]      Data          The buffer to return the contents of the variable. May be NULL
+                                 with a zero DataSize in order to determine the size buffer needed.
 
   @retval EFI_SUCCESS            The function completed successfully.
   @retval EFI_NOT_FOUND          The variable was not found.
@@ -650,7 +650,7 @@ EFI_STATUS
   IN     EFI_GUID                    *VendorGuid,
   OUT    UINT32                      *Attributes,    OPTIONAL
   IN OUT UINTN                       *DataSize,
-  OUT    VOID                        *Data
+  OUT    VOID                        *Data           OPTIONAL
   );
 
 /**
@@ -1752,11 +1752,13 @@ EFI_STATUS
 #define EFI_OS_INDICATIONS_FILE_CAPSULE_DELIVERY_SUPPORTED  0x0000000000000004
 #define EFI_OS_INDICATIONS_FMP_CAPSULE_SUPPORTED            0x0000000000000008
 #define EFI_OS_INDICATIONS_CAPSULE_RESULT_VAR_SUPPORTED     0x0000000000000010
+#define EFI_OS_INDICATIONS_START_PLATFORM_RECOVERY          0x0000000000000040
 
 //
 // EFI Runtime Services Table
 //
 #define EFI_SYSTEM_TABLE_SIGNATURE      SIGNATURE_64 ('I','B','I',' ','S','Y','S','T')
+#define EFI_2_60_SYSTEM_TABLE_REVISION  ((2 << 16) | (60))
 #define EFI_2_50_SYSTEM_TABLE_REVISION  ((2 << 16) | (50))
 #define EFI_2_40_SYSTEM_TABLE_REVISION  ((2 << 16) | (40))
 #define EFI_2_31_SYSTEM_TABLE_REVISION  ((2 << 16) | (31))
@@ -1766,7 +1768,7 @@ EFI_STATUS
 #define EFI_2_00_SYSTEM_TABLE_REVISION  ((2 << 16) | (00))
 #define EFI_1_10_SYSTEM_TABLE_REVISION  ((1 << 16) | (10))
 #define EFI_1_02_SYSTEM_TABLE_REVISION  ((1 << 16) | (02))
-#define EFI_SYSTEM_TABLE_REVISION       EFI_2_50_SYSTEM_TABLE_REVISION
+#define EFI_SYSTEM_TABLE_REVISION       EFI_2_60_SYSTEM_TABLE_REVISION
 #define EFI_SPECIFICATION_VERSION       EFI_SYSTEM_TABLE_REVISION
 
 #define EFI_RUNTIME_SERVICES_SIGNATURE  SIGNATURE_64 ('R','U','N','T','S','E','R','V')

@@ -96,7 +96,7 @@ FILE_LICENCE ( BSD3 );
 //
 #pragma warning ( disable : 4206 )
 
-#if _MSC_VER == 1800
+#if _MSC_VER == 1800 || _MSC_VER == 1900
 
 //
 // Disable these warnings for VS2013.
@@ -104,13 +104,13 @@ FILE_LICENCE ( BSD3 );
 
 //
 // This warning is for potentially uninitialized local variable, and it may cause false
-// positive issues in VS2013 build
+// positive issues in VS2013 and VS2015 build
 //
 #pragma warning ( disable : 4701 )
 
 //
 // This warning is for potentially uninitialized local pointer variable, and it may cause
-// false positive issues in VS2013 build
+// false positive issues in VS2013 and VS2015 build
 //
 #pragma warning ( disable : 4703 )
 
