@@ -9,6 +9,7 @@ ASFLAGS		:=
 LDFLAGS		:=
 HOST_CFLAGS	:=
 MAKEDEPS	:= Makefile
+CROSS_COMPILE	?= $(CROSS)
 
 ###############################################################################
 #
