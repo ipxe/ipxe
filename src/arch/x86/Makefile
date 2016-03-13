@@ -1,3 +1,8 @@
+# Assembler section type character
+#
+ASM_TCHAR	:= @
+ASM_TCHAR_OPS	:= @
+
 # Include common x86 headers
 #
 INCDIRS		+= arch/x86/include

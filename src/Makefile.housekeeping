@@ -491,6 +491,11 @@ LDFLAGS		+= -static
 #
 CFLAGS		+= -include include/compiler.h
 
+# The section type character (e.g. "@" in "@progbits") varies by
+# architecture.
+#
+CFLAGS		+= -DASM_TCHAR='$(ASM_TCHAR)' -DASM_TCHAR_OPS='$(ASM_TCHAR_OPS)'
+
 # CFLAGS for specific object types
 #
 CFLAGS_c	+=
@@ -896,7 +901,7 @@ endif
 # Device ID tables (using IDs from ROM definition file)
 #
 define obj_pci_id_asm
-	.section ".pci_devlist.$(1)", "a", @progbits
+	.section ".pci_devlist.$(1)", "a", $(ASM_TCHAR)progbits
 	.globl pci_devlist_$(1)
 pci_devlist_$(1):
 	.short ( 0x$(1) & 0xffff )

@@ -54,7 +54,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Raw private key data */
 extern char private_key_data[];
 extern char private_key_len[];
-__asm__ ( ".section \".rodata\", \"a\", @progbits\n\t"
+__asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"
 	  "\nprivate_key_data:\n\t"
 #ifdef PRIVATE_KEY
 	  ".incbin \"" PRIVATE_KEY "\"\n\t"
