@@ -456,7 +456,6 @@ unsigned int uri_port ( const struct uri *uri, unsigned int default_port ) {
  */
 size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 	static const char prefixes[URI_FIELDS] = {
-		[URI_OPAQUE] = ':',
 		[URI_PASSWORD] = ':',
 		[URI_PORT] = ':',
 		[URI_QUERY] = '?',
@@ -495,9 +494,9 @@ size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 					    ( buf + used ), ( len - used ) );
 
 		/* Suffix this field, if applicable */
-		if ( ( field == URI_SCHEME ) && ( ! uri->opaque ) ) {
+		if ( field == URI_SCHEME ) {
 			used += ssnprintf ( ( buf + used ), ( len - used ),
-					    "://" );
+					    ":%s", ( uri->host ? "//" : "" ) );
 		}
 	}
 

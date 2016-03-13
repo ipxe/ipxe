@@ -610,6 +610,34 @@ static struct uri_test uri_iscsi = {
 	},
 };
 
+/** File URI with relative (opaque) path */
+static struct uri_test uri_file_relative = {
+	"file:script.ipxe",
+	{
+		.scheme = "file",
+		.opaque = "script.ipxe",
+	},
+};
+
+/** File URI with absolute path */
+static struct uri_test uri_file_absolute = {
+	"file:/boot/script.ipxe",
+	{
+		.scheme = "file",
+		.path = "/boot/script.ipxe",
+	},
+};
+
+/** File URI with volume name */
+static struct uri_test uri_file_volume = {
+	"file://hpilo/boot/script.ipxe",
+	{
+		.scheme = "file",
+		.host = "hpilo",
+		.path = "/boot/script.ipxe",
+	},
+};
+
 /** URI with port number */
 static struct uri_port_test uri_explicit_port = {
 	"http://192.168.0.1:8080/boot.php",
@@ -899,6 +927,9 @@ static void uri_test_exec ( void ) {
 	uri_parse_format_dup_ok ( &uri_ipv6_local );
 	uri_parse_ok ( &uri_ipv6_local_non_conforming ); /* Parse only */
 	uri_parse_format_dup_ok ( &uri_iscsi );
+	uri_parse_format_dup_ok ( &uri_file_relative );
+	uri_parse_format_dup_ok ( &uri_file_absolute );
+	uri_parse_format_dup_ok ( &uri_file_volume );
 
 	/** URI port number tests */
 	uri_port_ok ( &uri_explicit_port );
