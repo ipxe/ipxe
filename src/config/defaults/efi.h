@@ -24,6 +24,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define TIME_EFI
 #define REBOOT_EFI
 
+#define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
+
 #define	IMAGE_EFI		/* EFI image support */
 #define	IMAGE_SCRIPT		/* iPXE script image support */
 
