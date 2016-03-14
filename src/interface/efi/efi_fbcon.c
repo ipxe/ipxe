@@ -30,7 +30,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
@@ -315,11 +314,10 @@ static int efifb_colour_map ( EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info,
  * @v   y		Preferred Y resolution
  * @ret efirc		Return status code
  */
-static EFI_STATUS efifb_preferred_resolution (unsigned int *x, unsigned int *y) {
+static int efifb_preferred_resolution (unsigned int *x, unsigned int *y) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_EDID_ACTIVE_PROTOCOL *edid_protocol;
 	EFI_STATUS efirc = EFI_NOT_FOUND;
-	edid_info *info;
 	int rc;
 	void *interface;
 
@@ -343,31 +341,10 @@ static EFI_STATUS efifb_preferred_resolution (unsigned int *x, unsigned int *y) 
 		goto err_locate_edid;
 	}
 
-	/* Decode EDID */
-	info = malloc ( sizeof ( edid_info ) );
-        if ( ! info ) {
-		rc = -ENOMEM;
-                DBGC ( &efifb, "EFIFB could not allocate %zd bytes for "
-                       "EDID: %s\n", sizeof ( edid_info ), strerror ( rc ) );
-                efirc = EFI_OUT_OF_RESOURCES;
-                goto err_locate_edid;
-        }
-	if ( ! edid_decode ( edid_protocol->Edid, info ) ) {
-		rc = -ENOENT;
-		DBGC ( &efifb, "EFIFB unable to decode EDID: %s\n",
-		       strerror ( rc ) );
-		goto err_decode_edid;
-	}
-
-	/* Dump monitor EDID info if debug level > 2 */
-	edid_dump_monitor_info ( info );
-
 	/* Get preferred resolution from EDID */
-	if ( edid_get_preferred_resolution ( info, x, y ) )
+	if ( edid_get_preferred_resolution ( edid_protocol->Edid, x, y ) )
 		efirc = 0;
 
-err_decode_edid:
-	free ( info );
 err_locate_edid:
 	return efirc;
 }
