@@ -157,7 +157,7 @@ static int uri_character_escaped ( char c, unsigned int field ) {
 		 * the reparsing of the URI, allowing everything else
 		 * (e.g. ':', which will appear in iSCSI URIs).
 		 */
-		[URI_OPAQUE]	= "/#",
+		[URI_OPAQUE]	= "#",
 		/* User name: escape everything */
 		[URI_USER]	= "/#:@?",
 		/* Password: escape everything */

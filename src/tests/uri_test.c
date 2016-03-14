@@ -612,10 +612,10 @@ static struct uri_test uri_iscsi = {
 
 /** File URI with relative (opaque) path */
 static struct uri_test uri_file_relative = {
-	"file:script.ipxe",
+	"file:boot/script.ipxe",
 	{
 		.scheme = "file",
-		.opaque = "script.ipxe",
+		.opaque = "boot/script.ipxe",
 	},
 };
 
