@@ -70,6 +70,8 @@ static struct option_descriptor console_opts[] = {
 		      struct console_options, picture, parse_string ),
 	OPTION_DESC ( "keep", 'k', no_argument,
 		      struct console_options, keep, parse_flag ),
+	OPTION_DESC ( "auto", 'a', no_argument,
+		      struct console_options, config.automode, parse_flag ),
 };
 
 /** "console" command descriptor */

@@ -30,13 +30,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
+#include <edid.h>
 #include <errno.h>
 #include <assert.h>
 #include <limits.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/Protocol/EdidActive.h>
 #include <ipxe/efi/Protocol/GraphicsOutput.h>
 #include <ipxe/efi/Protocol/HiiFont.h>
 #include <ipxe/ansicol.h>
@@ -306,26 +309,102 @@ static int efifb_colour_map ( EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info,
 }
 
 /**
+ * Get preferred monitor resolution from EDID
+ *
+ * @v   x		Preferred X resolution
+ * @v   y		Preferred Y resolution
+ * @ret efirc		Return status code
+ */
+static EFI_STATUS efifb_preferred_resolution (unsigned int *x, unsigned int *y) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_EDID_ACTIVE_PROTOCOL *edid_protocol;
+	EFI_STATUS efirc = EFI_NOT_FOUND;
+	edid_info *info;
+	int rc;
+	void *interface;
+
+	/* Locate EDID active protocol */
+	if ( ( efirc = bs->LocateProtocol ( &efi_edid_active_protocol_guid,
+					    NULL, &interface ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( &efifb, "EFIFB could not detect active EDID "
+		       "protocol: %s\n", strerror ( rc ) );
+		goto err_locate_edid;
+	}
+	edid_protocol = interface;
+
+	DBGC2 ( &efifb, "EFIFB EDID size: %i\n", edid_protocol->SizeOfEdid );
+
+	/* Verify that EDID does actually exist */
+	if ( ( edid_protocol->SizeOfEdid == 0 ) ||
+	     ( edid_protocol->Edid == NULL ) ) {
+		rc = -ENOENT;
+		DBGC ( &efifb, "EFIFB empty EDID: %s\n", strerror ( rc ) );
+		goto err_locate_edid;
+	}
+
+	/* Decode EDID */
+	info = malloc ( sizeof ( edid_info ) );
+        if ( ! info ) {
+		rc = -ENOMEM;
+                DBGC ( &efifb, "EFIFB could not allocate %zd bytes for "
+                       "EDID: %s\n", sizeof ( edid_info ), strerror ( rc ) );
+                efirc = EFI_OUT_OF_RESOURCES;
+                goto err_locate_edid;
+        }
+	if ( ! edid_decode ( edid_protocol->Edid, info ) ) {
+		rc = -ENOENT;
+		DBGC ( &efifb, "EFIFB unable to decode EDID: %s\n",
+		       strerror ( rc ) );
+		goto err_decode_edid;
+	}
+
+	/* Dump monitor EDID info if debug level > 2 */
+	edid_dump_monitor_info ( info );
+
+	/* Get preferred resolution from EDID */
+	if ( edid_get_preferred_resolution ( info, x, y ) )
+		efirc = 0;
+
+err_decode_edid:
+	free ( info );
+err_locate_edid:
+	return efirc;
+}
+
+/**
  * Select video mode
  *
  * @v min_width		Minimum required width (in pixels)
  * @v min_height	Minimum required height (in pixels)
  * @v min_bpp		Minimum required colour depth (in bits per pixel)
+ * @v automode		Automatically choose optimum mode, ignoring width and height
  * @ret mode_number	Mode number, or negative error
  */
 static int efifb_select_mode ( unsigned int min_width, unsigned int min_height,
-			       unsigned int min_bpp ) {
+			       unsigned int min_bpp, unsigned int automode ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct fbcon_colour_map map;
 	EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info;
 	int best_mode_number = -ENOENT;
 	unsigned int best_score = INT_MAX;
 	unsigned int score;
-	unsigned int mode;
+	unsigned int mode = 0;
 	int bpp;
 	UINTN size;
 	EFI_STATUS efirc;
 	int rc;
+
+	if ( automode )
+		/* Overwrite min_width and min_height with preferred
+		 * resolution */
+		if ( ( efirc = efifb_preferred_resolution ( &min_width,
+						&min_height ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( &efifb, "EFIFB EDID has no preferred resolution"
+			       "information: %s\n", strerror ( rc ) );
+			goto err_query;
+		}
 
 	/* Find the best mode */
 	for ( mode = 0 ; mode < efifb.gop->Mode->MaxMode ; mode++ ) {
@@ -445,7 +524,8 @@ static int efifb_init ( struct console_configuration *config ) {
 
 	/* Select mode */
 	if ( ( mode = efifb_select_mode ( config->width, config->height,
-					  config->depth ) ) < 0 ) {
+					  config->depth,
+					  config->automode) ) < 0 ) {
 		rc = mode;
 		goto err_select_mode;
 	}
@@ -545,7 +625,8 @@ static int efifb_configure ( struct console_configuration *config ) {
 
 	/* Do nothing more unless we have a usable configuration */
 	if ( ( config == NULL ) ||
-	     ( config->width == 0 ) || ( config->height == 0 ) ) {
+	     ( ( ( config->width == 0 ) || ( config->height == 0 ) ) &&
+	       ( config->automode == 0 ) ) ) {
 		return 0;
 	}
 

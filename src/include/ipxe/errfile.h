@@ -71,6 +71,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_fault		       ( ERRFILE_CORE | 0x001f0000 )
 #define ERRFILE_blocktrans	       ( ERRFILE_CORE | 0x00200000 )
 #define ERRFILE_pixbuf		       ( ERRFILE_CORE | 0x00210000 )
+#define ERRFILE_edid		       ( ERRFILE_CORE | 0x00220000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )

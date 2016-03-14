@@ -38,6 +38,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/Dhcp4.h>
 #include <ipxe/efi/Protocol/DiskIo.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
+#include <ipxe/efi/Protocol/EdidActive.h>
+#include <ipxe/efi/Protocol/EdidDiscovered.h>
 #include <ipxe/efi/Protocol/GraphicsOutput.h>
 #include <ipxe/efi/Protocol/HiiConfigAccess.h>
 #include <ipxe/efi/Protocol/HiiFont.h>
@@ -145,6 +147,14 @@ EFI_GUID efi_driver_binding_protocol_guid
 /** Graphics output protocol GUID */
 EFI_GUID efi_graphics_output_protocol_guid
 	= EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+
+/** EDID active protocol GUID */
+EFI_GUID efi_edid_active_protocol_guid
+	= EFI_EDID_ACTIVE_PROTOCOL_GUID;
+
+/** EDID discovered protocol GUID */
+EFI_GUID efi_edid_discovered_protocol_guid
+	= EFI_EDID_DISCOVERED_PROTOCOL_GUID;
 
 /** HII configuration access protocol GUID */
 EFI_GUID efi_hii_config_access_protocol_guid
