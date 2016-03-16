@@ -39,6 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/nap.h>
 #include <ipxe/malloc.h>
 #include <ipxe/iobuf.h>
+#include <ipxe/bitops.h>
 #include <ipxe/hyperv.h>
 #include <ipxe/vmbus.h>
 
@@ -559,7 +560,7 @@ static void vmbus_signal_monitor ( struct vmbus_device *vmdev ) {
 	group = ( vmdev->monitor / ( 8 * sizeof ( trigger->pending ) ));
 	bit = ( vmdev->monitor % ( 8 * sizeof ( trigger->pending ) ) );
 	trigger = &vmbus->monitor_out->trigger[group];
-	hv_set_bit ( trigger, bit );
+	set_bit ( bit, trigger );
 }
 
 /**
@@ -720,7 +721,7 @@ static int vmbus_send ( struct vmbus_device *vmdev,
 		return 0;
 
 	/* Set channel bit in interrupt page */
-	hv_set_bit ( vmbus->intr->out, vmdev->channel );
+	set_bit ( vmdev->channel, vmbus->intr->out );
 
 	/* Signal the host */
 	vmdev->signal ( vmdev );
