@@ -1,5 +1,5 @@
-#ifndef _IPXE_BITOPS_H
-#define _IPXE_BITOPS_H
+#ifndef _IPXE_PSEUDOBIT_H
+#define _IPXE_PSEUDOBIT_H
 
 /*
  * Copyright (C) 2008 Michael Brown <mbrown@fensystems.co.uk>.
@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * @file
  *
- * Bit operations
+ * Pseudo-bit structures
  *
  */
 
@@ -40,14 +40,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * This is a property of the device, not a property of the host CPU.
  */
-#ifdef BITOPS_LITTLE_ENDIAN
+#ifdef PSEUDOBIT_LITTLE_ENDIAN
 #define cpu_to_BIT64	cpu_to_le64
 #define cpu_to_BIT32	cpu_to_le32
 #define BIT64_to_cpu	le64_to_cpu
 #define BIT32_to_cpu	le32_to_cpu
 #define QWORD_SHIFT( offset, width ) (offset)
 #endif
-#ifdef BITOPS_BIG_ENDIAN
+#ifdef PSEUDOBIT_BIG_ENDIAN
 #define cpu_to_BIT64	cpu_to_be64
 #define cpu_to_BIT32	cpu_to_be32
 #define BIT64_to_cpu	be64_to_cpu
@@ -246,4 +246,4 @@ typedef unsigned char pseudo_bit_t;
 		*__ptr |= cpu_to_BIT64 ( __value << __shift );		      \
 	} while ( 0 )
 
-#endif /* _IPXE_BITOPS_H */
+#endif /* _IPXE_PSEUDOBIT_H */
