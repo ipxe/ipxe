@@ -33,7 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
-#include <edid.h>
 #include <errno.h>
 #include <assert.h>
 #include <limits.h>
@@ -46,6 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/console.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/rotate.h>
+#include <edid.h>
 #include <config/console.h>
 
 /* Avoid dragging in EFI console if not otherwise used */
