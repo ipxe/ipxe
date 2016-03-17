@@ -84,6 +84,7 @@ endif
 #
 SRCDIRS		+= arch/i386/core
 SRCDIRS		+= arch/i386/image
+SRCDIRS		+= arch/i386/tests
 SRCDIRS		+= arch/i386/interface/syslinux
 
 # Include common x86 Makefile

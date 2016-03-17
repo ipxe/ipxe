@@ -2,7 +2,7 @@
 	org 100h
 
 	jmp start
-	
+
 shuffle_start:
 	push 0xB800
 	pop es
