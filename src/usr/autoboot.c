@@ -127,7 +127,9 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 
 	/* Hook SAN device, if applicable */
 	if ( root_path ) {
-		if ( ( rc = san_hook ( root_path, drive ) ) != 0 ) {
+		drive = san_hook ( root_path, drive );
+		if ( drive < 0 ) {
+			rc = drive;
 			printf ( "Could not open SAN device: %s\n",
 				 strerror ( rc ) );
 			goto err_san_hook;
@@ -136,7 +138,7 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 	}
 
 	/* Describe SAN device, if applicable */
-	if ( ( drive >= 0 ) && ! ( flags & URIBOOT_NO_SAN_DESCRIBE ) ) {
+	if ( ! ( flags & URIBOOT_NO_SAN_DESCRIBE ) ) {
 		if ( ( rc = san_describe ( drive ) ) != 0 ) {
 			printf ( "Could not describe SAN device %#02x: %s\n",
 				 drive, strerror ( rc ) );
@@ -170,7 +172,7 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
 	}
 
 	/* Attempt SAN boot if applicable */
-	if ( ( drive >= 0 ) && ! ( flags & URIBOOT_NO_SAN_BOOT ) ) {
+	if ( ! ( flags & URIBOOT_NO_SAN_BOOT ) ) {
 		if ( fetch_intz_setting ( NULL, &skip_san_boot_setting) == 0 ) {
 			printf ( "Booting from SAN device %#02x\n", drive );
 			rc = san_boot ( drive );
@@ -188,7 +190,7 @@ int uriboot ( struct uri *filename, struct uri *root_path, int drive,
  err_download:
  err_san_describe:
 	/* Unhook SAN device, if applicable */
-	if ( ( drive >= 0 ) && ! ( flags & URIBOOT_NO_SAN_UNHOOK ) ) {
+	if ( ! ( flags & URIBOOT_NO_SAN_UNHOOK ) ) {
 		if ( fetch_intz_setting ( NULL, &keep_san_setting ) == 0 ) {
 			san_unhook ( drive );
 			printf ( "Unregistered SAN device %#02x\n", drive );

@@ -1588,7 +1588,7 @@ static void int13_free ( struct refcnt *refcnt ) {
  *
  * @v uri		URI
  * @v drive		Drive number
- * @ret rc		Return status code
+ * @ret drive		Drive number, or negative error
  *
  * Registers the drive with the INT 13 emulation subsystem, and hooks
  * the INT 13 interrupt vector (if not already hooked).
@@ -1602,6 +1602,10 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	/* Calculate natural drive number */
 	int13_sync_num_drives();
 	natural_drive = ( ( drive & 0x80 ) ? ( num_drives | 0x80 ) : num_fdds );
+
+	/* Use natural drive number if directed to do so */
+	if ( ( drive & 0x7f ) == 0x7f )
+		drive = natural_drive;
 
 	/* Check that drive number is not in use */
 	list_for_each_entry ( int13, &int13s, list ) {
@@ -1661,7 +1665,7 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 	int13_sync_num_drives();
 
 	free ( scratch );
-	return 0;
+	return drive;
 
  err_guess_geometry:
  err_parse_iso9660:
