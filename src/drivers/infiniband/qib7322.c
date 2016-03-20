@@ -2289,7 +2289,7 @@ static int qib7322_probe ( struct pci_device *pci ) {
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
 
-	/* Get PCI BARs */
+	/* Map PCI BARs */
 	qib7322->regs = ioremap ( pci->membase, QIB7322_BAR0_SIZE );
 	DBGC2 ( qib7322, "QIB7322 %p has BAR at %08lx\n",
 		qib7322, pci->membase );
@@ -2384,6 +2384,7 @@ static int qib7322_probe ( struct pci_device *pci ) {
  err_init_recv:
  err_read_eeprom:
  err_init_i2c:
+	iounmap ( qib7322->regs );
 	free ( qib7322 );
  err_alloc_qib7322:
 	return rc;
@@ -2406,6 +2407,7 @@ static void qib7322_remove ( struct pci_device *pci ) {
 		ibdev_put ( qib7322->ibdev[i] );
 	qib7322_fini_send ( qib7322 );
 	qib7322_fini_recv ( qib7322 );
+	iounmap ( qib7322->regs );
 	free ( qib7322 );
 }
 
