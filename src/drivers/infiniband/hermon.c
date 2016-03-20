@@ -3748,24 +3748,6 @@ static void hermon_free ( struct hermon *hermon ) {
 }
 
 /**
- * Initialise Hermon PCI parameters
- *
- * @v hermon		Hermon device
- */
-static void hermon_pci_init ( struct hermon *hermon ) {
-	struct pci_device *pci = hermon->pci;
-
-	/* Fix up PCI device */
-	adjust_pci_device ( pci );
-
-	/* Get PCI BARs */
-	hermon->config = ioremap ( pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR),
-				   HERMON_PCI_CONFIG_BAR_SIZE );
-	hermon->uar = ioremap ( pci_bar_start ( pci, HERMON_PCI_UAR_BAR ),
-				HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
-}
-
-/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -3789,8 +3771,14 @@ static int hermon_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, hermon );
 	hermon->pci = pci;
 
-	/* Initialise PCI parameters */
-	hermon_pci_init ( hermon );
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+
+	/* Map PCI BARs */
+	hermon->config = ioremap ( pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR ),
+				   HERMON_PCI_CONFIG_BAR_SIZE );
+	hermon->uar = ioremap ( pci_bar_start ( pci, HERMON_PCI_UAR_BAR ),
+				HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
 
 	/* Reset device */
 	hermon_reset ( hermon );
@@ -3885,6 +3873,8 @@ static int hermon_probe ( struct pci_device *pci ) {
  err_get_cap:
 	hermon_stop_firmware ( hermon );
  err_start_firmware:
+	iounmap ( hermon->uar );
+	iounmap ( hermon->config );
 	hermon_free ( hermon );
  err_alloc:
 	return rc;
@@ -3910,6 +3900,8 @@ static void hermon_remove ( struct pci_device *pci ) {
 	}
 	for ( i = ( hermon->cap.num_ports - 1 ) ; i >= 0 ; i-- )
 		ibdev_put ( hermon->port[i].ibdev );
+	iounmap ( hermon->uar );
+	iounmap ( hermon->config );
 	hermon_free ( hermon );
 }
 
@@ -3933,8 +3925,12 @@ static int hermon_bofm_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, hermon );
 	hermon->pci = pci;
 
-	/* Initialise PCI parameters */
-	hermon_pci_init ( hermon );
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+
+	/* Map PCI BAR */
+	hermon->config = ioremap ( pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR ),
+				   HERMON_PCI_CONFIG_BAR_SIZE );
 
 	/* Initialise BOFM device */
 	bofm_init ( &hermon->bofm, pci, &hermon_bofm_operations );
@@ -3949,6 +3945,7 @@ static int hermon_bofm_probe ( struct pci_device *pci ) {
 	return 0;
 
  err_bofm_register:
+	iounmap ( hermon->config );
 	hermon_free ( hermon );
  err_alloc:
 	return rc;
@@ -3963,6 +3960,7 @@ static void hermon_bofm_remove ( struct pci_device *pci ) {
 	struct hermon *hermon = pci_get_drvdata ( pci );
 
 	bofm_unregister ( &hermon->bofm );
+	iounmap ( hermon->config );
 	hermon_free ( hermon );
 }
 
