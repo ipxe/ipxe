@@ -2327,7 +2327,7 @@ static int linda_probe ( struct pci_device *pci ) {
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
 
-	/* Get PCI BARs */
+	/* Map PCI BARs */
 	linda->regs = ioremap ( pci->membase, LINDA_BAR0_SIZE );
 	DBGC2 ( linda, "Linda %p has BAR at %08lx\n", linda, pci->membase );
 
@@ -2388,6 +2388,7 @@ static int linda_probe ( struct pci_device *pci ) {
  err_init_ib_serdes:
  err_read_eeprom:
  err_init_i2c:
+	iounmap ( linda->regs );
 	ibdev_put ( ibdev );
  err_alloc_ibdev:
 	return rc;
@@ -2405,6 +2406,7 @@ static void linda_remove ( struct pci_device *pci ) {
 	unregister_ibdev ( ibdev );
 	linda_fini_recv ( linda );
 	linda_fini_send ( linda );
+	iounmap ( linda->regs );
 	ibdev_put ( ibdev );
 }
 
