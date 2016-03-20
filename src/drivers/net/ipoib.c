@@ -1027,3 +1027,21 @@ struct ib_driver ipoib_driver __ib_driver = {
 	.notify = ipoib_notify,
 	.remove = ipoib_remove,
 };
+
+/**
+ * Find IPoIB network device
+ *
+ * @v ibdev		Infiniband device
+ * @ret netdev		IPoIB network device, or NULL if not found
+ */
+struct net_device * ipoib_netdev ( struct ib_device *ibdev ) {
+	struct ipoib_device *ipoib;
+
+	/* Find matching IPoIB device */
+	list_for_each_entry ( ipoib, &ipoib_devices, list ) {
+		if ( ipoib->ibdev != ibdev )
+			continue;
+		return ipoib->netdev;
+	}
+	return NULL;
+}
