@@ -3000,6 +3000,16 @@ static int arbel_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, arbel );
 	arbel->pci = pci;
 
+	/* Fix up PCI device */
+	adjust_pci_device ( pci );
+
+	/* Map PCI BARs */
+	arbel->config = ioremap ( pci_bar_start ( pci, ARBEL_PCI_CONFIG_BAR ),
+				  ARBEL_PCI_CONFIG_BAR_SIZE );
+	arbel->uar = ioremap ( ( pci_bar_start ( pci, ARBEL_PCI_UAR_BAR ) +
+				 ARBEL_PCI_UAR_IDX * ARBEL_PCI_UAR_SIZE ),
+			       ARBEL_PCI_UAR_SIZE );
+
 	/* Allocate Infiniband devices */
 	for ( i = 0 ; i < ARBEL_NUM_PORTS ; i++ ) {
 		ibdev = alloc_ibdev ( 0 );
@@ -3013,16 +3023,6 @@ static int arbel_probe ( struct pci_device *pci ) {
 		ibdev->port = ( ARBEL_PORT_BASE + i );
 		ib_set_drvdata ( ibdev, arbel );
 	}
-
-	/* Fix up PCI device */
-	adjust_pci_device ( pci );
-
-	/* Get PCI BARs */
-	arbel->config = ioremap ( pci_bar_start ( pci, ARBEL_PCI_CONFIG_BAR ),
-				  ARBEL_PCI_CONFIG_BAR_SIZE );
-	arbel->uar = ioremap ( ( pci_bar_start ( pci, ARBEL_PCI_UAR_BAR ) +
-				 ARBEL_PCI_UAR_IDX * ARBEL_PCI_UAR_SIZE ),
-			       ARBEL_PCI_UAR_SIZE );
 
 	/* Reset device */
 	arbel_reset ( arbel );
@@ -3072,6 +3072,8 @@ static int arbel_probe ( struct pci_device *pci ) {
  err_alloc_ibdev:
 	for ( i-- ; i >= 0 ; i-- )
 		ibdev_put ( arbel->ibdev[i] );
+	iounmap ( arbel->uar );
+	iounmap ( arbel->config );
 	arbel_free ( arbel );
  err_alloc:
 	return rc;
@@ -3090,6 +3092,8 @@ static void arbel_remove ( struct pci_device *pci ) {
 		unregister_ibdev ( arbel->ibdev[i] );
 	for ( i = ( ARBEL_NUM_PORTS - 1 ) ; i >= 0 ; i-- )
 		ibdev_put ( arbel->ibdev[i] );
+	iounmap ( arbel->uar );
+	iounmap ( arbel->config );
 	arbel_free ( arbel );
 }
 
