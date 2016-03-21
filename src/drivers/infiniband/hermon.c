@@ -1111,6 +1111,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
 	struct hermon_queue_pair *hermon_qp;
 	struct hermonprm_qp_ee_state_transitions qpctx;
+	struct hermonprm_wqe_segment_data_ptr *data;
+	unsigned int i;
 	int rc;
 
 	/* Calculate queue pair number */
@@ -1147,8 +1149,14 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 				     sizeof ( hermon_qp->send.wqe[0] ) );
 	hermon_qp->recv.wqe_size = ( qp->recv.num_wqes *
 				     sizeof ( hermon_qp->recv.wqe[0] ) );
+	if ( ( qp->type == IB_QPT_SMI ) || ( qp->type == IB_QPT_GSI ) ||
+	     ( qp->type == IB_QPT_UD ) ) {
+		hermon_qp->recv.grh_size = ( qp->recv.num_wqes *
+					     sizeof ( hermon_qp->recv.grh[0] ));
+	}
 	hermon_qp->wqe_size = ( hermon_qp->send.wqe_size +
-				hermon_qp->recv.wqe_size );
+				hermon_qp->recv.wqe_size +
+				hermon_qp->recv.grh_size );
 	hermon_qp->wqe = malloc_dma ( hermon_qp->wqe_size,
 				      sizeof ( hermon_qp->send.wqe[0] ) );
 	if ( ! hermon_qp->wqe ) {
@@ -1156,9 +1164,21 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		goto err_alloc_wqe;
 	}
 	hermon_qp->send.wqe = hermon_qp->wqe;
-	memset ( hermon_qp->send.wqe, 0xff, hermon_qp->send.wqe_size );
 	hermon_qp->recv.wqe = ( hermon_qp->wqe + hermon_qp->send.wqe_size );
+	if ( hermon_qp->recv.grh_size ) {
+		hermon_qp->recv.grh = ( hermon_qp->wqe +
+					hermon_qp->send.wqe_size +
+					hermon_qp->recv.wqe_size );
+	}
+
+	/* Initialise work queue entries */
+	memset ( hermon_qp->send.wqe, 0xff, hermon_qp->send.wqe_size );
 	memset ( hermon_qp->recv.wqe, 0, hermon_qp->recv.wqe_size );
+	data = &hermon_qp->recv.wqe[0].recv.data[0];
+	for ( i = 0 ; i < ( hermon_qp->recv.wqe_size / sizeof ( *data ) ); i++){
+		MLX_FILL_1 ( data, 1, l_key, HERMON_INVALID_LKEY );
+		data++;
+	}
 
 	/* Allocate MTT entries */
 	if ( ( rc = hermon_alloc_mtt ( hermon, hermon_qp->wqe,
@@ -1633,6 +1653,8 @@ static int hermon_post_recv ( struct ib_device *ibdev,
 	struct ib_work_queue *wq = &qp->recv;
 	struct hermon_recv_work_queue *hermon_recv_wq = &hermon_qp->recv;
 	struct hermonprm_recv_wqe *wqe;
+	struct hermonprm_wqe_segment_data_ptr *data;
+	struct ib_global_route_header *grh;
 	unsigned int wqe_idx_mask;
 
 	/* Allocate work queue entry */
@@ -1646,12 +1668,19 @@ static int hermon_post_recv ( struct ib_device *ibdev,
 	wqe = &hermon_recv_wq->wqe[wq->next_idx & wqe_idx_mask].recv;
 
 	/* Construct work queue entry */
-	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_tailroom ( iobuf ) );
-	MLX_FILL_1 ( &wqe->data[0], 1, l_key, hermon->lkey );
-	MLX_FILL_H ( &wqe->data[0], 2,
-		     local_address_h, virt_to_bus ( iobuf->data ) );
-	MLX_FILL_1 ( &wqe->data[0], 3,
-		     local_address_l, virt_to_bus ( iobuf->data ) );
+	data = &wqe->data[0];
+	if ( hermon_qp->recv.grh ) {
+		grh = &hermon_qp->recv.grh[wq->next_idx & wqe_idx_mask];
+		MLX_FILL_1 ( data, 0, byte_count, sizeof ( *grh ) );
+		MLX_FILL_1 ( data, 1, l_key, hermon->lkey );
+		MLX_FILL_H ( data, 2, local_address_h, virt_to_bus ( grh ) );
+		MLX_FILL_1 ( data, 3, local_address_l, virt_to_bus ( grh ) );
+		data++;
+	}
+	MLX_FILL_1 ( data, 0, byte_count, iob_tailroom ( iobuf ) );
+	MLX_FILL_1 ( data, 1, l_key, hermon->lkey );
+	MLX_FILL_H ( data, 2, local_address_h, virt_to_bus ( iobuf->data ) );
+	MLX_FILL_1 ( data, 3, local_address_l, virt_to_bus ( iobuf->data ) );
 
 	/* Update work queue's index */
 	wq->next_idx++;
@@ -1676,6 +1705,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 			     struct ib_completion_queue *cq,
 			     union hermonprm_completion_entry *cqe ) {
 	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermon_queue_pair *hermon_qp;
 	struct ib_work_queue *wq;
 	struct ib_queue_pair *qp;
 	struct io_buffer *iobuf;
@@ -1713,6 +1743,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 		return -EIO;
 	}
 	qp = wq->qp;
+	hermon_qp = ib_qp_get_drvdata ( qp );
 
 	/* Identify work queue entry */
 	wqe_idx = MLX_GET ( &cqe->normal, wqe_counter );
@@ -1747,9 +1778,9 @@ static int hermon_complete ( struct ib_device *ibdev,
 		case IB_QPT_SMI:
 		case IB_QPT_GSI:
 		case IB_QPT_UD:
-			assert ( iob_len ( iobuf ) >= sizeof ( *grh ) );
-			grh = iobuf->data;
-			iob_pull ( iobuf, sizeof ( *grh ) );
+			/* Locate corresponding GRH */
+			assert ( hermon_qp->recv.grh != NULL );
+			grh = &hermon_qp->recv.grh[ wqe_idx & wqe_idx_mask ];
 			/* Construct address vector */
 			source = &recv_source;
 			source->qpn = MLX_GET ( &cqe->normal, srq_rqpn );
