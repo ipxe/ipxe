@@ -15,6 +15,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/tables.h>
 #include <ipxe/ib_packet.h>
 #include <ipxe/ib_mad.h>
+#include <ipxe/if_ether.h>
 
 /** Subnet management interface QPN */
 #define IB_QPN_SMI 0
@@ -456,6 +457,9 @@ struct ib_device {
 	struct ib_mad_interface *smi;
 	/** General services interface */
 	struct ib_mad_interface *gsi;
+
+	/** IPoIB LEMAC (if non-default) */
+	uint8_t lemac[ETH_ALEN];
 
 	/** Driver private data */
 	void *drv_priv;

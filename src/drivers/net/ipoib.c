@@ -956,6 +956,7 @@ static int ipoib_probe ( struct ib_device *ibdev ) {
 	/* Extract hardware address */
 	memcpy ( netdev->hw_addr, &ibdev->gid.s.guid,
 		 sizeof ( ibdev->gid.s.guid ) );
+	memcpy ( netdev->ll_addr, ibdev->lemac, ETH_ALEN );
 
 	/* Set local MAC address */
 	memcpy ( &ipoib->mac.gid.s.guid, &ibdev->gid.s.guid,
