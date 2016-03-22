@@ -120,7 +120,7 @@ const char *golan_qp_state_as_string[] = {
 	"ERR"
 };
 
-inline int golan_check_rc_and_cmd_status ( struct golan_cmd_layout *cmd, int rc ) {
+inline static int golan_check_rc_and_cmd_status ( struct golan_cmd_layout *cmd, int rc ) {
 	struct golan_outbox_hdr *out_hdr = ( struct golan_outbox_hdr * ) ( cmd->out );
 	if ( rc == -EBUSY ) {
 		DBG ( "HCA is busy (rc = -EBUSY)\n" );
