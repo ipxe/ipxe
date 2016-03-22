@@ -403,12 +403,12 @@ struct dhcp_netdev_desc {
 /** Use cached network settings (obsolete; do not reuse this value) */
 #define DHCP_EB_USE_CACHED DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb2 )
 
-/** BIOS drive number
+/** SAN drive number
  *
- * This is the drive number for a drive emulated via INT 13.  0x80 is
+ * This is the drive number for a SAN-hooked drive.  For BIOS, 0x80 is
  * the first hard disk, 0x81 is the second hard disk, etc.
  */
-#define DHCP_EB_BIOS_DRIVE DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbd )
+#define DHCP_EB_SAN_DRIVE DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbd )
 
 /** Username
  *
