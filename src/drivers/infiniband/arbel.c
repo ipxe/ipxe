@@ -1646,8 +1646,6 @@ static int arbel_complete ( struct ib_device *ibdev,
 		MLX_FILL_1 ( &recv_wqe->data[0], 0, byte_count, 0 );
 		MLX_FILL_1 ( &recv_wqe->data[0], 1,
 			     l_key, ARBEL_INVALID_LKEY );
-		assert ( len <= iob_tailroom ( iobuf ) );
-		iob_put ( iobuf, len );
 		memset ( &recv_dest, 0, sizeof ( recv_dest ) );
 		recv_dest.qpn = qpn;
 		switch ( qp->type ) {
@@ -1657,6 +1655,7 @@ static int arbel_complete ( struct ib_device *ibdev,
 			/* Locate corresponding GRH */
 			assert ( arbel_recv_wq->grh != NULL );
 			grh = &arbel_recv_wq->grh[wqe_idx];
+			len -= sizeof ( *grh );
 			/* Construct address vector */
 			source = &recv_source;
 			memset ( source, 0, sizeof ( *source ) );
@@ -1677,6 +1676,8 @@ static int arbel_complete ( struct ib_device *ibdev,
 			assert ( 0 );
 			return -EINVAL;
 		}
+		assert ( len <= iob_tailroom ( iobuf ) );
+		iob_put ( iobuf, len );
 		/* Hand off to completion handler */
 		ib_complete_recv ( ibdev, qp, &recv_dest, source, iobuf, rc );
 	}
