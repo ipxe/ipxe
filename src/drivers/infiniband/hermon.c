@@ -1769,8 +1769,6 @@ static int hermon_complete ( struct ib_device *ibdev,
 	} else {
 		/* Set received length */
 		len = MLX_GET ( &cqe->normal, byte_cnt );
-		assert ( len <= iob_tailroom ( iobuf ) );
-		iob_put ( iobuf, len );
 		memset ( &recv_dest, 0, sizeof ( recv_dest ) );
 		recv_dest.qpn = qpn;
 		memset ( &recv_source, 0, sizeof ( recv_source ) );
@@ -1781,6 +1779,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 			/* Locate corresponding GRH */
 			assert ( hermon_qp->recv.grh != NULL );
 			grh = &hermon_qp->recv.grh[ wqe_idx & wqe_idx_mask ];
+			len -= sizeof ( *grh );
 			/* Construct address vector */
 			source = &recv_source;
 			source->qpn = MLX_GET ( &cqe->normal, srq_rqpn );
@@ -1806,6 +1805,8 @@ static int hermon_complete ( struct ib_device *ibdev,
 			assert ( 0 );
 			return -EINVAL;
 		}
+		assert ( len <= iob_tailroom ( iobuf ) );
+		iob_put ( iobuf, len );
 		/* Hand off to completion handler */
 		ib_complete_recv ( ibdev, qp, &recv_dest, source, iobuf, rc );
 	}
