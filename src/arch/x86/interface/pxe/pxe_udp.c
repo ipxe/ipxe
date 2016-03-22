@@ -11,6 +11,7 @@
 #include <ipxe/udp.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/process.h>
+#include <ipxe/netdevice.h>
 #include <realmode.h>
 #include <pxe.h>
 
@@ -179,6 +180,15 @@ static PXENV_EXIT_t pxenv_udp_open ( struct s_PXENV_UDP_OPEN *pxenv_udp_open ) {
 	/* Record source IP address */
 	pxe_udp.local.sin_addr.s_addr = pxenv_udp_open->src_ip;
 	DBG ( " %s\n", inet_ntoa ( pxe_udp.local.sin_addr ) );
+
+	/* Open network device, if necessary */
+	if ( pxe_netdev && ( ! netdev_is_open ( pxe_netdev ) ) &&
+	     ( ( rc = netdev_open ( pxe_netdev ) ) != 0 ) ) {
+		DBG ( "PXENV_UDP_OPEN could not (implicitly) open %s: %s\n",
+		      pxe_netdev->name, strerror ( rc ) );
+		pxenv_udp_open->Status = PXENV_STATUS ( rc );
+		return PXENV_EXIT_FAILURE;
+	}
 
 	/* Open promiscuous UDP connection */
 	intf_restart ( &pxe_udp.xfer, 0 );
