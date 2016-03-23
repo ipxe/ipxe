@@ -341,6 +341,7 @@ zero_bytes:
  * Returns:
  *   %esi : next source physical address
  *   %edi : next destination physical address
+ *   CF : as returned by memcpy()-like function
  * Corrupts:
  *   None
  ****************************************************************************
@@ -356,6 +357,7 @@ process_bytes:
 	pushl	%ebp
 
 	/* Construct GDT on stack (since .prefix may not be writable) */
+	.equ	GDT_LEN, 0x20
 	.equ	PM_DS, 0x18	/* Flat data segment */
 	pushl	$0x00cf9300
 	pushl	$0x0000ffff
@@ -369,7 +371,7 @@ process_bytes:
 	pushw	$0xffff
 	pushl	$0		/* Base and length */
 	pushw	%ss
-	pushw	$0x1f
+	pushw	$( GDT_LEN - 1 )
 	movzwl	%sp, %ebp
 	shll	$4, 0x02(%bp)
 	addl	%ebp, 0x02(%bp)
@@ -407,7 +409,9 @@ process_bytes:
 
 	/* Return to (flat) real mode */
 	movl	%cr0, %eax
+	pushfw
 	andb	$0!CR0_PE, %al
+	popfw
 	movl	%eax, %cr0
 	lret
 2:	/* lret will ljmp to here */
@@ -433,7 +437,7 @@ process_bytes:
 
 	/* Restore GDT */
 	data32 lgdt -8(%bp)
-	addw	$( 8 /* saved GDT */ + ( PM_DS + 8 ) /* GDT on stack */ ), %sp
+	leaw	GDT_LEN(%bp), %sp
 
 	/* Restore registers and return */
 	popl	%ebp
@@ -461,6 +465,7 @@ process_bytes:
 	call	*%bx
 
 	/* Convert %ds:esi and %es:edi back to physical addresses */
+	pushfw
 	xorl	%eax, %eax
 	movw    %ds, %ax
 	shll	$4, %eax
@@ -469,6 +474,7 @@ process_bytes:
 	movw    %es, %ax
 	shll	$4, %eax
 	addl	%eax, %edi
+	popfw
 
 	/* Restore registers and return */
 	popw	%es
@@ -493,6 +499,7 @@ process_bytes:
  * Returns:
  *   %esi : next source physical address (will be a multiple of 16)
  *   %edi : next destination physical address (will be a multiple of 16)
+ *   CF set on failure
  * Corrupts:
  *   none
  ****************************************************************************
@@ -511,6 +518,7 @@ install_block:
 	movw	$copy_bytes, %bx
 #endif
 	call	process_bytes
+	jc	99f
 
 	/* Zero .bss portion */
 	negl	%ecx
@@ -522,9 +530,9 @@ install_block:
 	addl	$0xf, %esi
 	andl	$~0xf, %esi
 	addl	$0xf, %edi
-	andl	$~0xf, %edi
+	andl	$~0xf, %edi /* Will also clear CF */
 
-	/* Restore registers and return */
+99:	/* Restore registers and return */
 	popw	%bx
 	popl	%ecx
 	ret
@@ -730,6 +738,7 @@ install_prealloc:
 	movl	$_text16_early_filesz, %ecx
 	movl	$_text16_early_memsz, %edx
 	call	install_block		/* .text16.early */
+	jc	install_block_death
 	popl	%ecx			/* Calculate offset to next block */
 	subl	%esi, %ecx
 	negl	%ecx
@@ -748,17 +757,8 @@ install_prealloc:
 	pushw	$access_highmem
 	lret
 1:	/* Die if we could not access high memory */
-	jnc	3f
-	movw	$a20_death_message, %si
-	xorw	%di, %di
-	call	print_message
-2:	jmp	2b
-	.section ".prefix.data.a20_death_message", "aw", @progbits
-a20_death_message:
-	.asciz	"\nHigh memory inaccessible - cannot continue\n"
-	.size	a20_death_message, . - a20_death_message
-	.previous
-3:
+	jc	access_highmem_death
+
 #endif
 
 	/* Open payload (which may not yet be in memory) */
@@ -769,25 +769,7 @@ a20_death_message:
 	pushw	$open_payload
 	lret
 1:	/* Die if we could not access the payload */
-	jnc	3f
-	xorw	%di, %di
-	movl	%esi, %eax
-	call	print_hex_dword
-	call	print_space
-	movl	%ecx, %eax
-	call	print_hex_dword
-	movw	$payload_death_message, %si
-	call	print_message
-2:	/* Halt system */
-	cli
-	hlt
-	jmp	2b
-	.section ".prefix.data.payload_death_message", "aw", @progbits
-payload_death_message:
-	.asciz	"\nPayload inaccessible - cannot continue\n"
-	.size	payload_death_message, . - payload_death_message
-	.previous
-3:
+	jc	open_payload_death
 
 	/* Calculate physical address of payload (i.e. first source) */
 	testl	%esi, %esi
@@ -801,12 +783,14 @@ payload_death_message:
 	movl	$_text16_late_filesz, %ecx
 	movl	$_text16_late_memsz, %edx
 	call	install_block		/* .text16.late */
+	jc	install_block_death
 	progress "  .data16\n"
 	movzwl	%bx, %edi
 	shll	$4, %edi
 	movl	$_data16_filesz, %ecx
 	movl	$_data16_filesz, %edx	/* do not zero our temporary stack */
 	call	install_block		/* .data16 */
+	jc	install_block_death
 
 	/* Set up %ds for access to .data16 */
 	movw	%bx, %ds
@@ -846,6 +830,7 @@ payload_death_message:
 	movl	$_textdata_filesz, %ecx
 	movl	$_textdata_memsz, %edx
 	call	install_block
+	jc	install_block_death
 	popl	%edi
 
 #endif /* KEEP_IT_REAL */
@@ -959,6 +944,52 @@ close_payload:
 	lret
 	.size	open_payload, . - open_payload
 	.size	close_payload, . - close_payload
+
+	/* Report installation failure */
+	.section ".prefix.install_death", "ax", @progbits
+install_death:
+	pushw	%cs
+	popw	%ds
+	xorw	%di, %di
+	call	print_hex_dword
+	call	print_space
+	movl	%esi, %eax
+	call	print_hex_dword
+	call	print_space
+	movl	%ecx, %eax
+	call	print_hex_dword
+	movw	$install_death_message, %si
+	call	print_message
+2:	/* Halt system */
+	cli
+	hlt
+	jmp	2b
+	.size	install_death, . - install_death
+	.section ".prefix.data.install_death_message", "aw", @progbits
+install_death_message:
+	.asciz	"\nInstallation failed - cannot continue\n"
+	.size	install_death_message, . - install_death_message
+
+	/* Report failure to access high memory */
+	.section ".prefix.install_block_death", "ax", @progbits
+install_block_death:
+	movl	$0x1b101b10, %eax
+	jmp	install_death
+	.size	install_block_death, . - install_block_death
+
+	/* Report failure to access high memory */
+	.section ".prefix.access_highmem_death", "ax", @progbits
+access_highmem_death:
+	movl	$0x0a200a20, %eax
+	jmp	install_death
+	.size	access_highmem_death, . - access_highmem_death
+
+	/* Report failure to open payload */
+	.section ".prefix.open_payload_death", "ax", @progbits
+open_payload_death:
+	xorl	%eax, %eax
+	jmp	install_death
+	.size	open_payload_death, . - open_payload_death
 
 /****************************************************************************
  * uninstall

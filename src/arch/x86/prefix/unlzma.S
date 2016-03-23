@@ -58,6 +58,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	.code32
 #endif /* CODE16 */
 
+#define CRCPOLY 0xedb88320
+#define CRCSEED 0xffffffff
+
 /****************************************************************************
  * Debugging
  ****************************************************************************
@@ -863,6 +866,44 @@ bcj_filter:
 	.size	bcj_filter, . - bcj_filter
 
 /****************************************************************************
+ * Verify CRC32
+ *
+ * Parameters:
+ *   %ds:%esi : Start of compressed input data
+ *   %edx : Length of compressed input data (including CRC)
+ * Returns:
+ *   CF clear if CRC32 is zero
+ *   All other registers are preserved
+ * Corrupts:
+ *   %eax
+ *   %ebx
+ *   %ecx
+ *   %edx
+ *   %esi
+ ****************************************************************************
+ */
+verify_crc32:
+	/* Calculate CRC */
+	addl	%esi, %edx
+	movl	$CRCSEED, %ebx
+1:	ADDR32 lodsb
+	xorb	%al, %bl
+	movw	$8, %cx
+2:	rcrl	%ebx
+	jnc	3f
+	xorl	$CRCPOLY, %ebx
+3:	ADDR16 loop 2b
+	cmpl	%esi, %edx
+	jne	1b
+	/* Set CF if result is nonzero */
+	testl	%ebx, %ebx
+	jz	1f
+	stc
+1:	/* Return */
+	ret
+	.size	verify_crc32, . - verify_crc32
+
+/****************************************************************************
  * decompress (real-mode or 16/32-bit protected-mode near call)
  *
  * Decompress data
@@ -873,6 +914,7 @@ bcj_filter:
  * Returns:
  *   %ds:%esi - End of compressed input data
  *   %es:%edi - End of decompressed output data
+ *   CF set if CRC32 was incorrect
  *   All other registers are preserved
  *
  * NOTE: It would be possible to build a smaller version of the
@@ -888,6 +930,13 @@ decompress:
 	pushl	%ecx
 	pushl	%edx
 	pushl	%ebp
+	/* Verify CRC32 */
+	ADDR32 lodsl
+	movl	%eax, %edx
+	pushl	%esi
+	call	verify_crc32
+	popl	%esi
+	jc	99f
 	/* Allocate parameter block */
 	subl	$sizeof__lzma_dec, %esp
 	movl	%esp, %ebp
@@ -928,8 +977,11 @@ decompress:
 	movl	out_start(%ebp), %esi
 	call	bcj_filter
 	popl	%esi
-	/* Restore registers and return */
+	/* Skip CRC */
+	ADDR32 lodsl
+	/* Free parameter block (and clear CF) */
 	addl	$sizeof__lzma_dec, %esp
+99:	/* Restore registers and return */
 	popl	%ebp
 	popl	%edx
 	popl	%ecx
