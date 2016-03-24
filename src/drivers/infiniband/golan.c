@@ -2446,6 +2446,7 @@ err_golan_probe_alloc_ibdev:
 	golan_bring_down ( golan );
 err_golan_bringup:
 err_fw_ver_cmdif:
+	iounmap( golan->iseg );
 	golan_free_pages( &golan->pages );
 err_golan_golan_init_pages:
 	free ( golan );
@@ -2474,7 +2475,7 @@ static void golan_remove_normal ( struct pci_device *pci ) {
 	}
 
 	golan_bring_down(golan);
-
+	iounmap( golan->iseg );
 	golan_free_pages( &golan->pages );
 	free(golan);
 }
