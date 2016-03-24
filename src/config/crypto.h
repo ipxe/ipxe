@@ -50,6 +50,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define TIMESTAMP_ERROR_MARGIN ( ( 12 * 60 + 30 ) * 60 )
 
+/** Default cross-signed certificate source
+ *
+ * This is the default location from which iPXE will attempt to
+ * download cross-signed certificates in order to complete a
+ * certificate chain.
+ */
+#define CROSSCERT "http://ca.ipxe.org/auto"
+
 #include <config/named.h>
 #include NAMED_CONFIG(crypto.h)
 #include <config/local/crypto.h>
