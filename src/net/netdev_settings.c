@@ -141,7 +141,8 @@ static int netdev_fetch_bustype ( struct net_device *netdev, void *data,
 	assert ( desc->bus_type < ( sizeof ( bustypes ) /
 				    sizeof ( bustypes[0] ) ) );
 	bustype = bustypes[desc->bus_type];
-	assert ( bustype != NULL );
+	if ( ! bustype )
+		return -ENOENT;
 	strncpy ( data, bustype, len );
 	return strlen ( bustype );
 }
