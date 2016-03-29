@@ -462,6 +462,8 @@ extern const struct setting
 asset_setting __setting ( SETTING_HOST_EXTRA, asset );
 extern const struct setting
 board_serial_setting __setting ( SETTING_HOST_EXTRA, board-serial );
+extern const struct setting dhcp_server_setting __setting ( SETTING_MISC,
+							    dhcp-server );
 
 /**
  * Initialise a settings block
