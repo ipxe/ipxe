@@ -1271,8 +1271,15 @@ static void linda_complete_recv ( struct ib_device *ibdev,
 			/* Completing the eager buffer described in
 			 * this header entry.
 			 */
-			iob_put ( iobuf, payload_len );
-			rc = ( err ? -EIO : ( useegrbfr ? 0 : -ECANCELED ) );
+			if ( payload_len <= iob_tailroom ( iobuf ) ) {
+				iob_put ( iobuf, payload_len );
+				rc = ( err ?
+				       -EIO : ( useegrbfr ? 0 : -ECANCELED ) );
+			} else {
+				DBGC ( linda, "Linda %p bad payload len %zd\n",
+				       linda, payload_len );
+				rc = -EPROTO;
+			}
 			/* Redirect to target QP if necessary */
 			if ( qp != intended_qp ) {
 				DBGC ( linda, "Linda %p redirecting QPN %ld "
@@ -1283,7 +1290,7 @@ static void linda_complete_recv ( struct ib_device *ibdev,
 				intended_qp->recv.fill++;
 			}
 			ib_complete_recv ( ibdev, intended_qp, &dest, &source,
-					   iobuf, rc);
+					   iobuf, rc );
 		} else {
 			/* Completing on a skipped-over eager buffer */
 			ib_complete_recv ( ibdev, qp, &dest, &source, iobuf,
