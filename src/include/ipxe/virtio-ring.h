@@ -1,6 +1,8 @@
 #ifndef _VIRTIO_RING_H_
 # define _VIRTIO_RING_H_
 
+#include <ipxe/virtio-pci.h>
+
 /* Status byte for guest to report progress, and synchronize features. */
 /* We have seen device and processed generic fields (VIRTIO_CONFIG_F_VIRTIO) */
 #define VIRTIO_CONFIG_S_ACKNOWLEDGE     1
@@ -79,6 +81,7 @@ struct vring_virtqueue {
    void *vdata[MAX_QUEUE_NUM];
    /* PCI */
    int queue_index;
+   struct virtio_pci_region notification;
 };
 
 struct vring_list {
@@ -142,6 +145,7 @@ void *vring_get_buf(struct vring_virtqueue *vq, unsigned int *len);
 void vring_add_buf(struct vring_virtqueue *vq, struct vring_list list[],
                    unsigned int out, unsigned int in,
                    void *index, int num_added);
-void vring_kick(unsigned int ioaddr, struct vring_virtqueue *vq, int num_added);
+void vring_kick(struct virtio_pci_modern_device *vdev, unsigned int ioaddr,
+                struct vring_virtqueue *vq, int num_added);
 
 #endif /* _VIRTIO_RING_H_ */

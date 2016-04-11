@@ -24,14 +24,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <ipxe/list.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/pci.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/ethernet.h>
-#include <ipxe/virtio-ring.h>
 #include <ipxe/virtio-pci.h>
+#include <ipxe/virtio-ring.h>
 #include "virtio-net.h"
 
 /*
@@ -135,7 +136,7 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
 		virtnet, iobuf, vq_idx );
 
 	vring_add_buf ( vq, list, out, in, iobuf, 0 );
-	vring_kick ( virtnet->ioaddr, vq, 1 );
+	vring_kick ( NULL, virtnet->ioaddr, vq, 1 );
 }
 
 /** Try to keep rx virtqueue filled with iobufs
