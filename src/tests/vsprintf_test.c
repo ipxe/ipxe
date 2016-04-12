@@ -39,21 +39,32 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Report an snprintf() test result
  *
+ * @v len		Buffer length
+ * @v expected		Expected result
+ * @v file		Test code file
+ * @v line		Test code line
+ * @v format		Format string
+ * @v ...		Arguments
  */
-#define snprintf_ok( len, result, format, ... ) do {			\
-	char actual[ (len) ];						\
-	const char expected[] = result;					\
-	size_t actual_len;						\
-									\
-	actual_len = snprintf ( actual, sizeof ( actual ),		\
-				format, ##__VA_ARGS__ );		\
-	ok ( actual_len >= strlen ( result ) );				\
-	ok ( strcmp ( actual, expected ) == 0 );			\
-	if ( strcmp ( actual, expected ) != 0 ) {			\
-		DBG ( "SNPRINTF expected \"%s\", got \"%s\"\n",		\
-		      expected, actual );				\
-	}								\
-	} while ( 0 )
+static void snprintf_okx ( size_t len, const char *expected, const char *file,
+			   unsigned int line, const char *fmt, ... ) {
+	char actual[len];
+	size_t actual_len;
+	va_list args;
+
+	va_start ( args, fmt );
+	actual_len = vsnprintf ( actual, sizeof ( actual ), fmt, args );
+	va_end ( args );
+	okx ( actual_len >= strlen ( expected ), file, line );
+	okx ( strcmp ( actual, expected ) == 0, file, line );
+	if ( strcmp ( actual, expected ) != 0 ) {
+		DBG ( "SNPRINTF expected \"%s\", got \"%s\"\n",
+		      expected, actual );
+	}
+}
+#define snprintf_ok( len, result, format, ... )				\
+	snprintf_okx ( len, result, __FILE__, __LINE__, format,		\
+		       ##__VA_ARGS__ )
 
 /**
  * Perform vsprintf() self-tests
