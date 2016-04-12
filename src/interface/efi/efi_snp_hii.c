@@ -546,6 +546,13 @@ efi_snp_hii_extract_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
 	/* Initialise results */
 	*results = NULL;
 
+	/* Work around apparently broken UEFI specification */
+	if ( ! ( request && request[0] ) ) {
+		DBGC ( snpdev, "SNPDEV %p ExtractConfig ignoring malformed "
+		       "request\n", snpdev );
+		return EFI_INVALID_PARAMETER;
+	}
+
 	/* Process all request fragments */
 	for ( pos = *progress = request ; *progress && **progress ;
 	      pos = *progress + 1 ) {
