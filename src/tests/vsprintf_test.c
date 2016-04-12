@@ -108,6 +108,10 @@ static void vsprintf_test_exec ( void ) {
 	snprintf_ok ( 64, "PCI 00:1f.3", "PCI %02x:%02x.%x", 0x00, 0x1f, 0x03 );
 	snprintf_ok ( 64, "Region [1000000,3f000000)", "Region [%llx,%llx)",
 		      0x1000000ULL, 0x3f000000ULL );
+
+	/* Null string (used for debug messages) */
+	snprintf_ok ( 16, "<NULL>", "%s", ( ( char * ) NULL ) );
+	snprintf_ok ( 16, "<NULL>", "%ls", ( ( wchar_t * ) NULL ) );
 }
 
 /** vsprintf() self-test */
