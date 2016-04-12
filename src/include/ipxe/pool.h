@@ -112,7 +112,7 @@ pool_is_reopenable ( struct pooled_connection *pool ) {
 	/* A connection is reopenable if it has been recycled but is
 	 * not yet known to be alive.
 	 */
-	return ( ( pool->flags & POOL_RECYCLED ) &
+	return ( ( pool->flags & POOL_RECYCLED ) &&
 		 ( ! ( pool->flags & POOL_ALIVE ) ) );
 }
 
