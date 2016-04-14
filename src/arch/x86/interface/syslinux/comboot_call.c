@@ -489,7 +489,7 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 			struct in_addr addr;
 
 			copy_from_user ( hostname, hostname_u, 0, len + 1 );
-			
+
 			/* TODO:
 			 * "If the hostname does not contain a dot (.), the
 			 * local domain name is automatically appended."
@@ -519,7 +519,7 @@ static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
 
 		/* Jump to real-mode entry point */
 		__asm__ __volatile__ (
-			REAL_CODE ( 
+			REAL_CODE (
 				"pushw %0\n\t"
 				"popw %%ds\n\t"
 				"pushl %1\n\t"

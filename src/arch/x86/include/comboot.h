@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define COMBOOT_FEATURE_LOCAL_BOOT (1 << 0)
 #define COMBOOT_FEATURE_IDLE_LOOP  (1 << 1)
 
-/** Maximum number of shuffle descriptors for 
+/** Maximum number of shuffle descriptors for
  * shuffle and boot functions
  * (INT 22h AX=0012h, 001Ah, 001Bh)
  */
@@ -102,7 +102,7 @@ typedef struct {
 extern void hook_comboot_interrupts ( );
 extern void unhook_comboot_interrupts ( );
 
-/* These are not the correct prototypes, but it doens't matter, 
+/* These are not the correct prototypes, but it doens't matter,
  * as we only ever get the address of these functions;
  * they are only called from COM32 code running in PHYS_CODE
  */
@@ -115,8 +115,6 @@ extern int comboot_resolv ( const char *name, struct in_addr *address );
 
 /* setjmp/longjmp context buffer used to return after loading an image */
 extern rmjmp_buf comboot_return;
-
-extern void *com32_external_esp;
 
 #define COMBOOT_EXIT 1
 #define COMBOOT_EXIT_RUN_KERNEL 2

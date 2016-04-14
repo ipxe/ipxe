@@ -64,7 +64,7 @@ struct comboot_psp {
 
 /**
  * Copy command line to PSP
- * 
+ *
  * @v image		COMBOOT image
  */
 static void comboot_copy_cmdline ( struct image * image, userptr_t seg_userptr ) {
@@ -97,7 +97,7 @@ static void comboot_copy_cmdline ( struct image * image, userptr_t seg_userptr )
 
 /**
  * Initialize PSP
- * 
+ *
  * @v image		COMBOOT image
  * @v seg_userptr	segment to initialize
  */
@@ -213,7 +213,7 @@ static int comboot_exec_loop ( struct image *image ) {
 
 /**
  * Check image name extension
- * 
+ *
  * @v image		COMBOOT image
  * @ret rc		Return status code
  */
@@ -254,7 +254,7 @@ static int comboot_prepare_segment ( struct image *image )
 	seg_userptr = real_to_user ( COMBOOT_PSP_SEG, 0 );
 
 	/* Allow etra 0x100 bytes before image for PSP */
-	filesz = image->len + 0x100; 
+	filesz = image->len + 0x100;
 
 	/* Ensure the entire 64k segment is free */
 	memsz = 0xFFFF;
@@ -289,7 +289,7 @@ static int comboot_probe ( struct image *image ) {
 
 	/* Check if this is a COMBOOT image */
 	if ( ( rc = comboot_identify ( image ) ) != 0 ) {
-		
+
 		return rc;
 	}
 
@@ -304,7 +304,7 @@ static int comboot_probe ( struct image *image ) {
  */
 static int comboot_exec ( struct image *image ) {
 	int rc;
-	
+
 	/* Sanity check for filesize */
 	if( image->len >= 0xFF00 ) {
 		DBGC( image, "COMBOOT %p: image too large\n",

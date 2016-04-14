@@ -567,9 +567,10 @@ phys_to_prot:
 	popl	%eax
 	ret
 
-	/* Expose as _phys_to_virt for use by COMBOOT */
+.if32	/* Expose as _phys_to_virt for use by COMBOOT, if applicable */
 	.globl	_phys_to_virt
 	.equ	_phys_to_virt, phys_to_prot
+.endif
 
 /****************************************************************************
  * prot_to_phys (protected-mode near call, 32-bit virtual return address)
@@ -615,9 +616,10 @@ prot_to_phys:
 	popl	%eax
 	ret
 
-	/* Expose as _virt_to_phys for use by COMBOOT */
+.if32	/* Expose as _virt_to_phys for use by COMBOOT, if applicable */
 	.globl	_virt_to_phys
 	.equ	_virt_to_phys, prot_to_phys
+.endif
 
 /****************************************************************************
  * intr_to_prot (protected-mode near call, 32-bit virtual return address)
@@ -1201,6 +1203,66 @@ phys_call:
 .endif
 	/* Return and discard function parameters */
 	ret	$( PHC_OFFSET_END - PHC_OFFSET_PARAMS )
+
+/****************************************************************************
+ * phys_to_long (protected-mode near call, 32-bit physical return address)
+ *
+ * Used by COMBOOT.
+ *
+ ****************************************************************************
+ */
+	.if64
+
+	.section ".text.phys_to_long", "ax", @progbits
+	.code32
+phys_to_long:
+
+	/* Switch to virtual addresses */
+	call	phys_to_prot
+
+	/* Convert to 32-bit virtual return address */
+	pushl	%eax
+	movl	VIRTUAL(virt_offset), %eax
+	subl	%eax, 4(%esp)
+	popl	%eax
+
+	/* Switch to long mode and return */
+	jmp	prot_to_long
+
+	/* Expose as _phys_to_virt for use by COMBOOT */
+	.globl  _phys_to_virt
+	.equ    _phys_to_virt, phys_to_long
+
+	.endif
+
+/****************************************************************************
+ * long_to_phys (long-mode near call, 64-bit virtual return address)
+ *
+ * Used by COMBOOT.
+ *
+ ****************************************************************************
+ */
+	.if64
+
+	.section ".text.long_to_phys", "ax", @progbits
+	.code64
+long_to_phys:
+
+	/* Switch to protected mode */
+	call	long_to_prot
+	.code32
+
+	/* Convert to 32-bit virtual return address */
+	popl	(%esp)
+
+	/* Switch to physical addresses and return */
+	jmp	prot_to_phys
+
+	/* Expose as _virt_to_phys for use by COMBOOT */
+	.globl  _virt_to_phys
+	.equ    _virt_to_phys, long_to_phys
+
+	.endif
 
 /****************************************************************************
  * flatten_real_mode (real-mode near call)

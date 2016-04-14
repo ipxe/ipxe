@@ -46,6 +46,9 @@ uint16_t __bss16 ( com32_saved_sp );
  */
 void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physaddr_t outregs_phys ) {
 
+	DBGC ( &com32_regs, "COM32 INT%x in %#08lx out %#08lx\n",
+	       interrupt, inregs_phys, outregs_phys );
+
 	memcpy_user ( virt_to_user( &com32_regs ), 0,
 	              phys_to_user ( inregs_phys ), 0,
 	              sizeof(com32sys_t) );
@@ -76,7 +79,7 @@ void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physad
 		            /* patch INT instruction */
 		            "pushw %%ax\n\t"
 		            "movb %%ss:(com32_int_vector), %%al\n\t"
-		            "movb %%al, %%cs:(com32_intcall_instr + 1)\n\t" 
+		            "movb %%al, %%cs:(com32_intcall_instr + 1)\n\t"
 		            /* perform a jump to avoid problems with cache
 		             * consistency in self-modifying code on some CPUs (486)
 		             */
@@ -106,7 +109,7 @@ void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physad
 
 	if ( outregs_phys ) {
 		memcpy_user ( phys_to_user ( outregs_phys ), 0,
-		              virt_to_user( &com32_regs ), 0, 
+		              virt_to_user( &com32_regs ), 0,
 		              sizeof(com32sys_t) );
 	}
 }
@@ -115,6 +118,9 @@ void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physad
  * Farcall helper
  */
 void __asmcall com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t outregs_phys ) {
+
+	DBGC ( &com32_regs, "COM32 farcall %04x:%04x in %#08lx out %#08lx\n",
+	       ( proc >> 16 ), ( proc & 0xffff ), inregs_phys, outregs_phys );
 
 	memcpy_user ( virt_to_user( &com32_regs ), 0,
 	              phys_to_user ( inregs_phys ), 0,
@@ -165,7 +171,7 @@ void __asmcall com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t
 
 	if ( outregs_phys ) {
 		memcpy_user ( phys_to_user ( outregs_phys ), 0,
-		              virt_to_user( &com32_regs ), 0, 
+		              virt_to_user( &com32_regs ), 0,
 		              sizeof(com32sys_t) );
 	}
 }
@@ -176,13 +182,16 @@ void __asmcall com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t
 int __asmcall com32_cfarcall ( uint32_t proc, physaddr_t stack, size_t stacksz ) {
 	int32_t eax;
 
+	DBGC ( &com32_regs, "COM32 cfarcall %04x:%04x params %#08lx+%#zx\n",
+	       ( proc >> 16 ), ( proc & 0xffff ), stack, stacksz );
+
 	copy_user_to_rm_stack ( phys_to_user ( stack ), stacksz );
 	com32_farcall_proc = proc;
 
 	__asm__ __volatile__ (
 		REAL_CODE ( "lcall *%%ss:(com32_farcall_proc)\n\t" )
 		: "=a" (eax)
-		: 
+		:
 		: "ecx", "edx" );
 
 	remove_user_from_rm_stack ( 0, stacksz );

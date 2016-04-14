@@ -37,4 +37,3 @@ source:	dd 0
 	dd shuffle_len
 
 num_shuffle_descriptors equ 1
-

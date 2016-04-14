@@ -76,8 +76,6 @@ static int com32_exec_loop ( struct image *image ) {
 
 		assert ( avail_mem_top != 0 );
 
-		com32_external_esp = phys_to_virt ( avail_mem_top );
-
 		/* Hook COMBOOT API interrupts */
 		hook_comboot_interrupts();
 
@@ -88,34 +86,44 @@ static int com32_exec_loop ( struct image *image ) {
 		 */
 		unregister_image ( image );
 
-		__asm__ __volatile__ (
-			"movl %%esp, (com32_internal_esp)\n\t" /* Save internal virtual address space ESP */
-			"movl (com32_external_esp), %%esp\n\t" /* Switch to COM32 ESP (top of available memory) */
-			"call _virt_to_phys\n\t"               /* Switch to flat physical address space */
-			"sti\n\t"			       /* Enable interrupts */
-			"pushl %0\n\t"                         /* Pointer to CDECL helper function */
-			"pushl %1\n\t"                         /* Pointer to FAR call helper function */
-			"pushl %2\n\t"                         /* Size of low memory bounce buffer */
-			"pushl %3\n\t"                         /* Pointer to low memory bounce buffer */
-			"pushl %4\n\t"                         /* Pointer to INT call helper function */
-			"pushl %5\n\t"                         /* Pointer to the command line arguments */
-			"pushl $6\n\t"                         /* Number of additional arguments */
-			"call *%6\n\t"                         /* Execute image */
-			"cli\n\t"			       /* Disable interrupts */
-			"call _phys_to_virt\n\t"               /* Switch back to internal virtual address space */
-			"movl (com32_internal_esp), %%esp\n\t" /* Switch back to internal stack */
-		:
-		:
-			/* %0 */ "r" ( virt_to_phys ( com32_cfarcall_wrapper ) ),
-			/* %1 */ "r" ( virt_to_phys ( com32_farcall_wrapper ) ),
-			/* %2 */ "r" ( get_fbms() * 1024 - (COM32_BOUNCE_SEG << 4) ),
-			/* %3 */ "i" ( COM32_BOUNCE_SEG << 4 ),
-			/* %4 */ "r" ( virt_to_phys ( com32_intcall_wrapper ) ),
-			/* %5 */ "r" ( virt_to_phys ( image->cmdline ?
-						      image->cmdline : "" ) ),
-			/* %6 */ "r" ( COM32_START_PHYS )
-		:
-			"memory" );
+		__asm__ __volatile__ ( PHYS_CODE (
+			/* Preserve registers */
+			"pushal\n\t"
+			/* Preserve stack pointer */
+			"subl $4, %k0\n\t"
+			"movl %%esp, (%k0)\n\t"
+			/* Switch to COM32 stack */
+			"movl %k0, %%esp\n\t"
+			/* Enable interrupts */
+			"sti\n\t"
+			/* Construct stack frame */
+			"pushl %k1\n\t"
+			"pushl %k2\n\t"
+			"pushl %k3\n\t"
+			"pushl %k4\n\t"
+			"pushl %k5\n\t"
+			"pushl %k6\n\t"
+			"pushl $6\n\t"
+			/* Call COM32 entry point */
+			"movl %k7, %k0\n\t"
+			"call *%k0\n\t"
+			/* Disable interrupts */
+			"cli\n\t"
+			/* Restore stack pointer */
+			"movl 24(%%esp), %%esp\n\t"
+			/* Restore registers */
+			"popal\n\t" )
+			:
+			: "r" ( avail_mem_top ),
+			  "r" ( virt_to_phys ( com32_cfarcall_wrapper ) ),
+			  "r" ( virt_to_phys ( com32_farcall_wrapper ) ),
+			  "r" ( get_fbms() * 1024 - ( COM32_BOUNCE_SEG << 4 ) ),
+			  "i" ( COM32_BOUNCE_SEG << 4 ),
+			  "r" ( virt_to_phys ( com32_intcall_wrapper ) ),
+			  "r" ( virt_to_phys ( image->cmdline ?
+					       image->cmdline : "" ) ),
+			  "i" ( COM32_START_PHYS )
+			: "memory" );
 		DBGC ( image, "COM32 %p: returned\n", image );
 		break;
 
@@ -147,7 +155,7 @@ static int com32_exec_loop ( struct image *image ) {
 
 /**
  * Check image name extension
- * 
+ *
  * @v image		COM32 image
  * @ret rc		Return status code
  */
@@ -155,7 +163,7 @@ static int com32_identify ( struct image *image ) {
 	const char *ext;
 	static const uint8_t magic[] = { 0xB8, 0xFF, 0x4C, 0xCD, 0x21 };
 	uint8_t buf[5];
-	
+
 	if ( image->len >= 5 ) {
 		/* Check for magic number
 		 * mov eax,21cd4cffh
