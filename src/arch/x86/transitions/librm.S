@@ -207,6 +207,7 @@ VC_TMP_CR3:		.space	4
 VC_TMP_CR4:		.space	4
 VC_TMP_EMER:		.space	8
 .endif
+VC_TMP_FXSAVE:		.space	512
 VC_TMP_END:
 	.previous
 
@@ -1000,8 +1001,11 @@ virt_call:
 	/* Claim ownership of temporary static buffer */
 	cli
 
-	/* Preserve GDT and IDT in temporary static buffer */
+	/* Preserve FPU, MMX and SSE state in temporary static buffer */
 	movw	%cs:rm_ds, %ds
+	fxsave	( rm_tmpbuf + VC_TMP_FXSAVE )
+
+	/* Preserve GDT and IDT in temporary static buffer */
 	sidt	( rm_tmpbuf + VC_TMP_IDT )
 	sgdt	( rm_tmpbuf + VC_TMP_GDT )
 
@@ -1066,6 +1070,9 @@ vc_rmode:
 	movl	$MSR_EFER, %ecx
 	wrmsr
 .endif
+	/* Restore FPU, MMX and SSE state from temporary static buffer */
+	fxrstor	( rm_tmpbuf + VC_TMP_FXSAVE )
+
 	/* Restore registers and flags and return */
 	popl	%eax /* skip %cs and %ss */
 	popw	%ds
