@@ -143,29 +143,67 @@ static void pci_read_bases ( struct pci_device *pci ) {
  *
  * @v pci		PCI device
  *
- * Set device to be a busmaster in case BIOS neglected to do so.  Also
- * adjust PCI latency timer to a reasonable value, 32.
+ * Set device to be a bus master in case BIOS neglected to do so.  Enable
+ * both memory and I/O space access.  Also adjust PCI latency timer to a
+ * reasonable value, 32.
  */
 void adjust_pci_device ( struct pci_device *pci ) {
+	pci_enable_device ( pci,
+			    PCI_COMMAND_MASTER | PCI_COMMAND_MEM |
+			    PCI_COMMAND_IO,
+			    32 );
+}
+
+/**
+ * Enable PCI device
+ *
+ * @v pci		PCI device
+ * @v flags		PCI command flags to enable
+ * @v latency		Minimum desired PCI latency timer or 0 to not adjust it
+ * @ret old_flags	Original PCI command flags
+ *
+ * Enable device by setting bits in the command register in case BIOS neglected
+ * to do so.  Also optionally adjust the PCI latency timer.
+ */
+unsigned pci_enable_device ( struct pci_device *pci, unsigned flags,
+	                     unsigned char latency ) {
 	unsigned short new_command, pci_command;
 	unsigned char pci_latency;
 
 	pci_read_config_word ( pci, PCI_COMMAND, &pci_command );
-	new_command = ( pci_command | PCI_COMMAND_MASTER |
-			PCI_COMMAND_MEM | PCI_COMMAND_IO );
+	new_command = ( pci_command | flags );
 	if ( pci_command != new_command ) {
-		DBGC ( pci, PCI_FMT " device not enabled by BIOS! Updating "
+		DBGC ( pci, PCI_FMT " device not fully enabled by BIOS! Updating "
 		       "PCI command %04x->%04x\n",
 		       PCI_ARGS ( pci ), pci_command, new_command );
 		pci_write_config_word ( pci, PCI_COMMAND, new_command );
 	}
 
-	pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
-	if ( pci_latency < 32 ) {
-		DBGC ( pci, PCI_FMT " latency timer is unreasonably low at "
-		       "%d. Setting to 32.\n", PCI_ARGS ( pci ), pci_latency );
-		pci_write_config_byte ( pci, PCI_LATENCY_TIMER, 32);
+	if ( latency ) {
+		pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency );
+		if ( pci_latency < latency ) {
+			DBGC ( pci, PCI_FMT " latency timer is unreasonably low at "
+			       "%d. Setting to %d.\n", PCI_ARGS ( pci ),
+			       pci_latency, latency );
+			pci_write_config_byte ( pci, PCI_LATENCY_TIMER, latency );
+		}
 	}
+	return pci_command;
+}
+
+/**
+ * Restore PCI device
+ *
+ * @v pci		PCI device
+ * @v old_flags		Flags to restore, returned from pci_enable_device
+ *
+ * Restore the command register of a PCI device to state it had before we
+ * changed it.
+ */
+void pci_restore_device ( struct pci_device *pci, unsigned old_flags ) {
+	DBGC ( pci, PCI_FMT " restoring PCI command to %04x\n",
+	       PCI_ARGS ( pci ), old_flags );
+	pci_write_config_word ( pci, PCI_COMMAND, old_flags );
 }
 
 /**
