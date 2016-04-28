@@ -387,6 +387,16 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
         if (err) {
             goto err_map_notify;
         }
+
+        /* enable memory or I/O access if not already enabled */
+        switch (vq->notification.flags & VIRTIO_PCI_REGION_TYPE_MASK) {
+            case VIRTIO_PCI_REGION_PORT:
+                pci_enable_device(vdev->pci, PCI_COMMAND_IO, 0);
+                break;
+            case VIRTIO_PCI_REGION_MEMORY:
+                pci_enable_device(vdev->pci, PCI_COMMAND_MEM, 0);
+                break;
+        }
     }
 
     /* Select and activate all queues. Has to be done last: once we do
