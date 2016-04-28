@@ -191,7 +191,7 @@ static int image_probe ( struct image *image ) {
 			image->type = type;
 			DBGC ( image, "IMAGE %s is %s\n",
 			       image->name, type->name );
-			break;
+			return 0;
 		}
 		DBGC ( image, "IMAGE %s is not %s: %s\n", image->name,
 		       type->name, strerror ( rc ) );
