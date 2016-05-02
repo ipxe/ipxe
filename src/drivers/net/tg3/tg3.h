@@ -3324,7 +3324,7 @@ static inline int _tg3_flag(enum TG3_FLAGS flag, unsigned long *bits)
 {
 	unsigned int index = ( flag / ( 8 * sizeof ( *bits ) ) );
 	unsigned int bit = ( flag % ( 8 * sizeof ( *bits ) ) );
-	return ( bits[index] & ( 1UL << bit ) );
+	return ( !! ( bits[index] & ( 1UL << bit ) ) );
 }
 
 static inline void _tg3_flag_set(enum TG3_FLAGS flag, unsigned long *bits)
