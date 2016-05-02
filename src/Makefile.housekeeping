@@ -1303,20 +1303,18 @@ CLEANUP += $(ZBIN)
 #
 # The EFI image converter
 #
-ELF2EFI_CFLAGS	:= -I$(BINUTILS_DIR)/include -I$(BFD_DIR)/include \
-		   -I$(ZLIB_DIR)/include -idirafter include
-ELF2EFI_LDFLAGS	:= -L$(BINUTILS_DIR)/lib -L$(BFD_DIR)/lib -L$(ZLIB_DIR)/lib \
-		   -lbfd -ldl -lz -Wl,--no-warn-search-mismatch
+ELF2EFI_CFLAGS	:= -I$(ZLIB_DIR)/include -idirafter include
+ELF2EFI_LDFLAGS	:= -L$(ZLIB_DIR)/lib -lz -Wl,--no-warn-search-mismatch
 
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET_IA32 $< \
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET32 $< \
 		$(ELF2EFI_LDFLAGS) -o $@
 CLEANUP += $(ELF2EFI32)
 
 $(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET_X64 $< \
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET64 $< \
 		$(ELF2EFI_LDFLAGS) -o $@
 CLEANUP += $(ELF2EFI64)
 

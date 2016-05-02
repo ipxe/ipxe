@@ -53,8 +53,6 @@ EINFO		:= ./util/einfo
 GENKEYMAP	:= ./util/genkeymap.pl
 DOXYGEN		:= doxygen
 LCAB		:= lcab
-BINUTILS_DIR	:= /usr
-BFD_DIR		:= $(BINUTILS_DIR)
 ZLIB_DIR	:= /usr
 
 ###############################################################################
