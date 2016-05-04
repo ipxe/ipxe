@@ -53,7 +53,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define ERRFILE_cpuid_cmd      ( ERRFILE_ARCH | ERRFILE_OTHER | 0x00000000 )
 #define ERRFILE_cpuid_settings ( ERRFILE_ARCH | ERRFILE_OTHER | 0x00010000 )
-#define ERRFILE_efi_entropy    ( ERRFILE_ARCH | ERRFILE_OTHER | 0x00020000 )
 
 /** @} */
 

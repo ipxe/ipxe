@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/entropy.h>
 #include <ipxe/crc32.h>
+#include <ipxe/profile.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/Rng.h>
 
@@ -104,13 +105,12 @@ static void efi_entropy_disable ( void ) {
 /**
  * Wait for a timer tick
  *
- * @ret low		TSC low-order bits, or negative error
+ * @ret low		CPU profiling low-order bits, or negative error
  */
 static int efi_entropy_tick ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	UINTN index;
 	uint16_t low;
-	uint32_t discard_d;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -129,8 +129,8 @@ static int efi_entropy_tick ( void ) {
 		return rc;
 	}
 
-	/* Get current TSC low-order bits */
-	__asm__ __volatile__ ( "rdtsc" : "=a" ( low ), "=d" ( discard_d ) );
+	/* Get current CPU profiling timestamp low-order bits */
+	low = profile_timestamp();
 
 	return low;
 }
