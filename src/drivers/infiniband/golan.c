@@ -843,6 +843,7 @@ err_create_eq_eqe_alloc:
 static void golan_destory_eq(struct golan *golan)
 {
 	struct golan_cmd_layout	*cmd;
+	struct golan_destroy_eq_mbox_in *in;
 	uint8_t eqn = golan->eq.eqn;
 	int rc;
 
@@ -853,7 +854,8 @@ static void golan_destory_eq(struct golan *golan)
 					sizeof(struct golan_destroy_eq_mbox_in),
 					sizeof(struct golan_destroy_eq_mbox_out));
 
-	((struct golan_destroy_eq_mbox_in *)(cmd->in))->eqn = eqn;
+	in = GOLAN_MBOX_IN ( cmd, in );
+	in->eqn = eqn;
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX, __FUNCTION__);
 	GOLAN_PRINT_RC_AND_CMD_STATUS;
 
@@ -1630,6 +1632,7 @@ static int golan_post_recv(struct ib_device *ibdev,
 static int golan_query_vport_context ( struct ib_device *ibdev ) {
 	struct golan *golan = ib_get_drvdata ( ibdev );
 	struct golan_cmd_layout	*cmd;
+	struct golan_query_hca_vport_context_inbox *in;
 	struct golan_query_hca_vport_context_data *context_data;
 	int rc;
 
@@ -1638,7 +1641,8 @@ static int golan_query_vport_context ( struct ib_device *ibdev ) {
 			sizeof(struct golan_query_hca_vport_context_inbox),
 			sizeof(struct golan_query_hca_vport_context_outbox) );
 
-	((struct golan_query_hca_vport_context_inbox *)(cmd->in))->port_num = (u8)ibdev->port;
+	in = GOLAN_MBOX_IN ( cmd, in );
+	in->port_num = (u8)ibdev->port;
 
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX, __FUNCTION__ );
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_query_vport_context_cmd );
@@ -1662,6 +1666,7 @@ err_query_vport_context_cmd:
 static int golan_query_vport_gid ( struct ib_device *ibdev ) {
 	struct golan *golan = ib_get_drvdata( ibdev );
 	struct golan_cmd_layout	*cmd;
+	struct golan_query_hca_vport_gid_inbox *in;
 	union ib_gid *ib_gid;
 	int rc;
 
@@ -1670,8 +1675,9 @@ static int golan_query_vport_gid ( struct ib_device *ibdev ) {
 			sizeof(struct golan_query_hca_vport_gid_inbox),
 			sizeof(struct golan_query_hca_vport_gid_outbox) );
 
-	((struct golan_query_hca_vport_gid_inbox *)(cmd->in))->port_num = (u8)ibdev->port;
-	((struct golan_query_hca_vport_gid_inbox *)(cmd->in))->gid_index = 0;
+	in = GOLAN_MBOX_IN ( cmd, in );
+	in->port_num = (u8)ibdev->port;
+	in->gid_index = 0;
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX, __FUNCTION__ );
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_query_vport_gid_cmd );
 
@@ -1688,6 +1694,7 @@ err_query_vport_gid_cmd:
 static int golan_query_vport_pkey ( struct ib_device *ibdev ) {
 	struct golan *golan = ib_get_drvdata ( ibdev );
 	struct golan_cmd_layout	*cmd;
+	struct golan_query_hca_vport_pkey_inbox *in;
 	//struct golan_query_hca_vport_pkey_data *pkey_table;
 	int pkey_table_size_in_entries = (1 << (7 + golan->caps.pkey_table_size));
 	int rc;
@@ -1698,8 +1705,9 @@ static int golan_query_vport_pkey ( struct ib_device *ibdev ) {
 			sizeof(struct golan_outbox_hdr) + 8 +
 			sizeof(struct golan_query_hca_vport_pkey_data) * pkey_table_size_in_entries );
 
-	((struct golan_query_hca_vport_pkey_inbox *)(cmd->in))->port_num = (u8)ibdev->port;
-	((struct golan_query_hca_vport_pkey_inbox *)(cmd->in))->pkey_index = 0xffff;
+	in = GOLAN_MBOX_IN ( cmd, in );
+	in->port_num = (u8)ibdev->port;
+	in->pkey_index = 0xffff;
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX, __FUNCTION__ );
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_query_vport_pkey_cmd );
 

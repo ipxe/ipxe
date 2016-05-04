@@ -74,6 +74,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define GET_INBOX(golan, idx)		(&(((struct mbox *)(golan->mboxes.inbox))[idx]))
 #define GET_OUTBOX(golan, idx)		(&(((struct mbox *)(golan->mboxes.outbox))[idx]))
 
+#define GOLAN_MBOX_IN( cmd_ptr, in_ptr ) ( {				  \
+	union {								  \
+		__be32 raw[4];						  \
+		typeof ( *(in_ptr) ) cooked;				  \
+	} *u = container_of ( &(cmd_ptr)->in[0], typeof ( *u ), raw[0] ); \
+	&u->cooked; } )
+
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
 /* Fw status fields */
