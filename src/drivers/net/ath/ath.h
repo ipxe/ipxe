@@ -101,8 +101,6 @@ static inline u32 get_unaligned_le32(const void *p)
  */
 #define	ATH_KEYMAX	        128     /* max key cache size we handle */
 
-static const u8 ath_bcast_mac[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-
 struct ath_ani {
 	int caldone;
 	unsigned int longcal_timer;
