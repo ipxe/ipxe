@@ -33,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** An ARM I/O qword */
-union arm_io_qword {
+union arm32_io_qword {
 	uint64_t qword;
 	uint32_t dword[2];
 };
@@ -44,12 +44,12 @@ union arm_io_qword {
  * @v io_addr		I/O address
  * @ret data		Value read
  *
- * This is not atomic for ARM.
+ * This is not atomic for ARM32.
  */
-static uint64_t arm_readq ( volatile uint64_t *io_addr ) {
-	volatile union arm_io_qword *ptr =
-		container_of ( io_addr, union arm_io_qword, qword );
-	union arm_io_qword tmp;
+static uint64_t arm32_readq ( volatile uint64_t *io_addr ) {
+	volatile union arm32_io_qword *ptr =
+		container_of ( io_addr, union arm32_io_qword, qword );
+	union arm32_io_qword tmp;
 
 	tmp.dword[0] = readl ( &ptr->dword[0] );
 	tmp.dword[1] = readl ( &ptr->dword[1] );
@@ -62,12 +62,12 @@ static uint64_t arm_readq ( volatile uint64_t *io_addr ) {
  * @v data		Value to write
  * @v io_addr		I/O address
  *
- * This is not atomic for ARM.
+ * This is not atomic for ARM32.
  */
-static void arm_writeq ( uint64_t data, volatile uint64_t *io_addr ) {
-	volatile union arm_io_qword *ptr =
-		container_of ( io_addr, union arm_io_qword, qword );
-	union arm_io_qword tmp;
+static void arm32_writeq ( uint64_t data, volatile uint64_t *io_addr ) {
+	volatile union arm32_io_qword *ptr =
+		container_of ( io_addr, union arm32_io_qword, qword );
+	union arm32_io_qword tmp;
 
 	tmp.qword = data;
 	writel ( tmp.dword[0], &ptr->dword[0] );
@@ -84,5 +84,5 @@ PROVIDE_IOAPI_INLINE ( arm, writew );
 PROVIDE_IOAPI_INLINE ( arm, writel );
 PROVIDE_IOAPI_INLINE ( arm, iodelay );
 PROVIDE_IOAPI_INLINE ( arm, mb );
-PROVIDE_IOAPI ( arm, readq, arm_readq );
-PROVIDE_IOAPI ( arm, writeq, arm_writeq );
+PROVIDE_IOAPI ( arm, readq, arm32_readq );
+PROVIDE_IOAPI ( arm, writeq, arm32_writeq );
