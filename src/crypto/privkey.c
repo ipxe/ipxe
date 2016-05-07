@@ -69,6 +69,12 @@ struct asn1_cursor private_key = {
 	.len = ( ( size_t ) private_key_len ),
 };
 
+/** Default private key */
+static struct asn1_cursor default_private_key = {
+	.data = private_key_data,
+	.len = ( ( size_t ) private_key_len ),
+};
+
 /** Private key setting */
 static struct setting privkey_setting __setting ( SETTING_CRYPTO, privkey ) = {
 	.name = "privkey",
@@ -92,8 +98,8 @@ static int privkey_apply_settings ( void ) {
 	if ( ALLOW_KEY_OVERRIDE ) {
 
 		/* Restore default private key */
-		private_key.data = private_key_data;
-		private_key.len = ( ( size_t ) private_key_len );
+		memcpy ( &private_key, &default_private_key,
+			 sizeof ( private_key ) );
 
 		/* Fetch new private key, if any */
 		free ( key_data );
