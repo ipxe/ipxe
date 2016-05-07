@@ -40,7 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	CPUID_CMD		/* x86 CPU feature detection command */
 #endif
 
-#if defined ( __arm__ )
+#if defined ( __arm__ ) || defined ( __aarch64__ )
 #define IOAPI_ARM
 #define NAP_EFIARM
 #endif

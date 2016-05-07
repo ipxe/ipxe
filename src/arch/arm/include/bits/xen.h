@@ -10,12 +10,21 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /* Hypercall registers */
+#ifdef __aarch64__
+#define XEN_HC "x16"
+#define XEN_REG1 "x0"
+#define XEN_REG2 "x1"
+#define XEN_REG3 "x2"
+#define XEN_REG4 "x3"
+#define XEN_REG5 "x4"
+#else
 #define XEN_HC "r12"
 #define XEN_REG1 "r0"
 #define XEN_REG2 "r1"
 #define XEN_REG3 "r2"
 #define XEN_REG4 "r3"
 #define XEN_REG5 "r4"
+#endif
 
 /**
  * Issue hypercall with one argument

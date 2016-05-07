@@ -72,6 +72,11 @@
 
 #define ELF_MREL( mach, type ) ( (mach) | ( (type) << 16 ) )
 
+/* Seems to be missing from elf.h */
+#ifndef R_AARCH64_NULL
+#define R_AARCH64_NULL 256
+#endif
+
 #define EFI_FILE_ALIGN 0x20
 
 struct elf_file {
@@ -403,6 +408,9 @@ static void set_machine ( struct elf_file *elf, struct pe_header *pe_header ) {
 	case EM_ARM:
 		machine = EFI_IMAGE_MACHINE_ARMTHUMB_MIXED;
 		break;
+	case EM_AARCH64:
+		machine = EFI_IMAGE_MACHINE_AARCH64;
+		break;
 	default:
 		eprintf ( "Unknown ELF architecture %d\n", ehdr->e_machine );
 		exit ( 1 );
@@ -582,6 +590,8 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 		case ELF_MREL ( EM_386, R_386_NONE ) :
 		case ELF_MREL ( EM_ARM, R_ARM_NONE ) :
 		case ELF_MREL ( EM_X86_64, R_X86_64_NONE ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_NONE ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_NULL ) :
 			/* Ignore dummy relocations used by REQUIRE_SYMBOL() */
 			break;
 		case ELF_MREL ( EM_386, R_386_32 ) :
@@ -590,6 +600,7 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 			generate_pe_reloc ( pe_reltab, offset, 4 );
 			break;
 		case ELF_MREL ( EM_X86_64, R_X86_64_64 ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_ABS64 ) :
 			/* Generate an 8-byte PE relocation */
 			generate_pe_reloc ( pe_reltab, offset, 8 );
 			break;
@@ -598,6 +609,15 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 		case ELF_MREL ( EM_ARM, R_ARM_THM_PC22 ) :
 		case ELF_MREL ( EM_ARM, R_ARM_THM_JUMP24 ) :
 		case ELF_MREL ( EM_X86_64, R_X86_64_PC32 ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_CALL26 ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_JUMP26 ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_ADR_PREL_LO21 ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_ADR_PREL_PG_HI21 ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_ADD_ABS_LO12_NC ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_LDST8_ABS_LO12_NC ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_LDST16_ABS_LO12_NC ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_LDST32_ABS_LO12_NC ) :
+		case ELF_MREL ( EM_AARCH64, R_AARCH64_LDST64_ABS_LO12_NC ) :
 			/* Skip PC-relative relocations; all relative
 			 * offsets remain unaltered when the object is
 			 * loaded.

@@ -84,5 +84,10 @@ PROVIDE_IOAPI_INLINE ( arm, writew );
 PROVIDE_IOAPI_INLINE ( arm, writel );
 PROVIDE_IOAPI_INLINE ( arm, iodelay );
 PROVIDE_IOAPI_INLINE ( arm, mb );
+#ifdef __aarch64__
+PROVIDE_IOAPI_INLINE ( arm, readq );
+PROVIDE_IOAPI_INLINE ( arm, writeq );
+#else
 PROVIDE_IOAPI ( arm, readq, arm32_readq );
 PROVIDE_IOAPI ( arm, writeq, arm32_writeq );
+#endif
