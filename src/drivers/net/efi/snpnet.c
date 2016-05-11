@@ -191,6 +191,7 @@ static void snpnet_poll_tx ( struct net_device *netdev ) {
 	int rc;
 
 	/* Get status */
+	txbuf = NULL;
 	if ( ( efirc = snp->snp->GetStatus ( snp->snp, &irq, &txbuf ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( snp, "SNP %s could not get status: %s\n",
