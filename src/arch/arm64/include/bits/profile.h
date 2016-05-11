@@ -21,9 +21,7 @@ profile_timestamp ( void ) {
 	uint64_t cycles;
 
 	/* Read cycle counter */
-	__asm__ __volatile__ ( "msr PMCR_EL0, %1\n\t"
-			       "mrs %0, PMCCNTR_EL0\n\t"
-			       : "=r" ( cycles ) : "r" ( 1 ) );
+	__asm__ __volatile__ ( "mrs %0, CNTVCT_EL0\n\t" : "=r" ( cycles ) );
 	return cycles;
 }
 
