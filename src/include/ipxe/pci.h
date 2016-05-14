@@ -94,6 +94,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CAP_ID_VPD			0x03	/**< Vital product data */
 #define PCI_CAP_ID_VNDR			0x09	/**< Vendor-specific */
 #define PCI_CAP_ID_EXP			0x10	/**< PCI Express */
+#define PCI_CAP_ID_EA			0x14	/**< Enhanced Allocation */
 
 /** Next capability */
 #define PCI_CAP_NEXT		0x01
