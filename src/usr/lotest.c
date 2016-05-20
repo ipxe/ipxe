@@ -188,13 +188,15 @@ static int loopback_wait ( void *data, size_t len ) {
  * @v sender		Sending network device
  * @v receiver		Received network device
  * @v mtu		Packet size (excluding link-layer headers)
+ * @v broadcast		Use broadcast link-layer address
  * @ret rc		Return status code
  */
 int loopback_test ( struct net_device *sender, struct net_device *receiver,
-		    size_t mtu ) {
+		    size_t mtu, int broadcast ) {
 	uint8_t *buf;
 	uint32_t *seq;
 	struct io_buffer *iobuf;
+	const void *ll_dest;
 	unsigned int i;
 	unsigned int successes;
 	int rc;
@@ -219,9 +221,13 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 		return -ENOMEM;
 	seq = ( ( void * ) buf );
 
+	/* Determine destination address */
+	ll_dest = ( broadcast ? sender->ll_broadcast : receiver->ll_addr );
+
 	/* Print initial statistics */
-	printf ( "Performing loopback test from %s to %s with %zd byte MTU\n",
-		 sender->name, receiver->name, mtu );
+	printf ( "Performing %sloopback test from %s to %s with %zd byte MTU\n",
+		 ( broadcast ? "broadcast " : "" ), sender->name,
+		 receiver->name, mtu );
 	ifstat ( sender );
 	ifstat ( receiver );
 
@@ -250,7 +256,7 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 
 		/* Transmit packet */
 		if ( ( rc = net_tx ( iob_disown ( iobuf ), sender,
-				     &lotest_protocol, receiver->ll_addr,
+				     &lotest_protocol, ll_dest,
 				     sender->ll_addr ) ) != 0 ) {
 			printf ( "\nFailed to transmit packet: %s",
 				 strerror ( rc ) );
