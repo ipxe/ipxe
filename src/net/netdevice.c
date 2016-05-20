@@ -733,6 +733,8 @@ int register_netdev ( struct net_device *netdev ) {
 	clear_settings ( netdev_settings ( netdev ) );
 	unregister_settings ( netdev_settings ( netdev ) );
  err_register_settings:
+	list_del ( &netdev->list );
+	netdev_put ( netdev );
  err_duplicate:
 	return rc;
 }
