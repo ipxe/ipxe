@@ -40,7 +40,7 @@ struct setting {
 	 * (such as a DHCP option number, or an SMBIOS structure and
 	 * field number).
 	 */
-	unsigned int tag;
+	unsigned long tag;
 	/** Setting scope (or NULL)
 	 *
 	 * For historic reasons, a NULL scope with a non-zero tag
