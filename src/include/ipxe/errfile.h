@@ -190,6 +190,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_flexboot_nodnic	     ( ERRFILE_DRIVER | 0x007e0000 )
 #define ERRFILE_virtio_pci	     ( ERRFILE_DRIVER | 0x007f0000 )
 #define ERRFILE_pciea		     ( ERRFILE_DRIVER | 0x00c00000 )
+#define ERRFILE_axge		     ( ERRFILE_DRIVER | 0x00c10000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
