@@ -189,8 +189,8 @@ char * http_token ( char **line, char **value ) {
 	if ( value )
 		*value = NULL;
 
-	/* Skip any initial whitespace */
-	while ( isspace ( **line ) )
+	/* Skip any initial whitespace or commas */
+	while ( ( isspace ( **line ) ) || ( **line == ',' ) )
 		(*line)++;
 
 	/* Check for end of line and record token position */
@@ -201,8 +201,8 @@ char * http_token ( char **line, char **value ) {
 	/* Scan for end of token */
 	while ( ( c = **line ) ) {
 
-		/* Terminate if we hit an unquoted whitespace */
-		if ( isspace ( c ) && ! quote )
+		/* Terminate if we hit an unquoted whitespace or comma */
+		if ( ( isspace ( c ) || ( c == ',' ) ) && ! quote )
 			break;
 
 		/* Terminate if we hit a closing quote */
@@ -1315,19 +1315,17 @@ http_response_transfer_encoding __http_response_header = {
  * @ret rc		Return status code
  */
 static int http_parse_connection ( struct http_transaction *http, char *line ) {
+	char *token;
 
 	/* Check for known connection intentions */
-	if ( strcasecmp ( line, "keep-alive" ) == 0 ) {
-		http->response.flags |= HTTP_RESPONSE_KEEPALIVE;
-		return 0;
-	}
-	if ( strcasecmp ( line, "close" ) == 0 ) {
-		http->response.flags &= ~HTTP_RESPONSE_KEEPALIVE;
-		return 0;
+	while ( ( token = http_token ( &line, NULL ) ) ) {
+		if ( strcasecmp ( token, "keep-alive" ) == 0 )
+			http->response.flags |= HTTP_RESPONSE_KEEPALIVE;
+		if ( strcasecmp ( token, "close" ) == 0 )
+			http->response.flags &= ~HTTP_RESPONSE_KEEPALIVE;
 	}
 
-	DBGC ( http, "HTTP %p unrecognised Connection \"%s\"\n", http, line );
-	return -ENOTSUP_CONNECTION;
+	return 0;
 }
 
 /** HTTP "Connection" header */
