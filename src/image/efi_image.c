@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/features.h>
 #include <ipxe/uri.h>
 #include <ipxe/console.h>
+#include <ipxe/applenetboot.h>
 
 FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 
@@ -170,6 +171,13 @@ static int efi_image_exec ( struct image *image ) {
 	/* Install iPXE download protocol */
 	if ( ( rc = efi_download_install ( snpdev->handle ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %p could not install iPXE download "
+		       "protocol: %s\n", image, strerror ( rc ) );
+		goto err_download_install;
+	}
+
+	/* Install Apple NetBoot protocol */
+	if ( ( rc = efi_applenetboot_install ( snpdev->handle ) ) != 0 ) {
+		DBGC ( image, "EFIIMAGE %p could not install Apple NetBoot "
 		       "protocol: %s\n", image, strerror ( rc ) );
 		goto err_download_install;
 	}
