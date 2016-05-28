@@ -175,6 +175,61 @@ static int ehci_ctrl_reachable ( struct ehci_device *ehci, void *ptr ) {
 
 /******************************************************************************
  *
+ * Diagnostics
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Dump host controller registers
+ *
+ * @v ehci		EHCI device
+ */
+static __unused void ehci_dump ( struct ehci_device *ehci ) {
+	uint8_t caplength;
+	uint16_t hciversion;
+	uint32_t hcsparams;
+	uint32_t hccparams;
+	uint32_t usbcmd;
+	uint32_t usbsts;
+	uint32_t usbintr;
+	uint32_t frindex;
+	uint32_t ctrldssegment;
+	uint32_t periodiclistbase;
+	uint32_t asynclistaddr;
+	uint32_t configflag;
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Dump capability registers */
+	caplength = readb ( ehci->cap + EHCI_CAP_CAPLENGTH );
+	hciversion = readw ( ehci->cap + EHCI_CAP_HCIVERSION );
+	hcsparams = readl ( ehci->cap + EHCI_CAP_HCSPARAMS );
+	hccparams = readl ( ehci->cap + EHCI_CAP_HCCPARAMS );
+	DBGC ( ehci, "EHCI %s caplen %02x hciversion %04x hcsparams %08x "
+	       "hccparams %08x\n", ehci->name, caplength, hciversion,
+	       hcsparams,  hccparams );
+
+	/* Dump operational registers */
+	usbcmd = readl ( ehci->op + EHCI_OP_USBCMD );
+	usbsts = readl ( ehci->op + EHCI_OP_USBSTS );
+	usbintr = readl ( ehci->op + EHCI_OP_USBINTR );
+	frindex = readl ( ehci->op + EHCI_OP_FRINDEX );
+	ctrldssegment = readl ( ehci->op + EHCI_OP_CTRLDSSEGMENT );
+	periodiclistbase = readl ( ehci->op + EHCI_OP_PERIODICLISTBASE );
+	asynclistaddr = readl ( ehci->op + EHCI_OP_ASYNCLISTADDR );
+	configflag = readl ( ehci->op + EHCI_OP_CONFIGFLAG );
+	DBGC ( ehci, "EHCI %s usbcmd %08x usbsts %08x usbint %08x frindx "
+	       "%08x\n", ehci->name, usbcmd, usbsts, usbintr, frindex );
+	DBGC ( ehci, "EHCI %s ctrlds %08x period %08x asyncl %08x cfgflg "
+	       "%08x\n", ehci->name, ctrldssegment, periodiclistbase,
+	       asynclistaddr, configflag );
+}
+
+/******************************************************************************
+ *
  * USB legacy support
  *
  ******************************************************************************
@@ -233,6 +288,14 @@ static void ehci_legacy_claim ( struct ehci_device *ehci,
 	if ( ! legacy )
 		return;
 
+	/* Dump original SMI usage */
+	pci_read_config_dword ( pci, ( legacy + EHCI_USBLEGSUP_CTLSTS ),
+				&ctlsts );
+	if ( ctlsts ) {
+		DBGC ( ehci, "EHCI %s BIOS using SMIs: %08x\n",
+		       ehci->name, ctlsts );
+	}
+
 	/* Claim ownership */
 	pci_write_config_byte ( pci, ( legacy + EHCI_USBLEGSUP_OS ),
 				EHCI_USBLEGSUP_OS_OWNED );
@@ -276,9 +339,11 @@ static void ehci_legacy_claim ( struct ehci_device *ehci,
  */
 static void ehci_legacy_release ( struct ehci_device *ehci,
 				  struct pci_device *pci ) {
+	unsigned int legacy = ehci->legacy;
+	uint32_t ctlsts;
 
 	/* Do nothing unless legacy support capability is present */
-	if ( ! ehci->legacy )
+	if ( ! legacy )
 		return;
 
 	/* Do nothing if releasing ownership is prevented */
@@ -289,8 +354,14 @@ static void ehci_legacy_release ( struct ehci_device *ehci,
 	}
 
 	/* Release ownership */
-	pci_write_config_byte ( pci, ( ehci->legacy + EHCI_USBLEGSUP_OS ), 0 );
+	pci_write_config_byte ( pci, ( legacy + EHCI_USBLEGSUP_OS ), 0 );
 	DBGC ( ehci, "EHCI %s released ownership to BIOS\n", ehci->name );
+
+	/* Dump restored SMI usage */
+	pci_read_config_dword ( pci, ( legacy + EHCI_USBLEGSUP_CTLSTS ),
+				&ctlsts );
+	DBGC ( ehci, "EHCI %s BIOS reclaimed SMIs: %08x\n",
+	       ehci->name, ctlsts );
 }
 
 /******************************************************************************
@@ -603,6 +674,8 @@ static int ehci_enqueue ( struct ehci_device *ehci, struct ehci_ring *ring,
 
 	/* Fail if any portion is unreachable */
 	for ( i = 0 ; i < count ; i++ ) {
+		if ( ! xfer[i].len )
+			continue;
 		phys = ( virt_to_phys ( xfer[i].data ) + xfer[i].len - 1 );
 		if ( ( phys > 0xffffffffUL ) && ( ! ehci->addr64 ) )
 			return -ENOTSUP;
@@ -968,10 +1041,10 @@ static uint32_t ehci_endpoint_characteristics ( struct usb_endpoint *ep ) {
 		chr |= EHCI_CHR_TOGGLE;
 
 	/* Determine endpoint speed */
-	if ( usb->port->speed == USB_SPEED_HIGH ) {
+	if ( usb->speed == USB_SPEED_HIGH ) {
 		chr |= EHCI_CHR_EPS_HIGH;
 	} else {
-		if ( usb->port->speed == USB_SPEED_FULL ) {
+		if ( usb->speed == USB_SPEED_FULL ) {
 			chr |= EHCI_CHR_EPS_FULL;
 		} else {
 			chr |= EHCI_CHR_EPS_LOW;
@@ -1219,40 +1292,75 @@ static int ehci_endpoint_message ( struct usb_endpoint *ep,
 }
 
 /**
+ * Calculate number of transfer descriptors
+ *
+ * @v len		Length of data
+ * @v zlp		Append a zero-length packet
+ * @ret count		Number of transfer descriptors
+ */
+static unsigned int ehci_endpoint_count ( size_t len, int zlp ) {
+	unsigned int count;
+
+	/* Split into 16kB transfers.  A single transfer can handle up
+	 * to 20kB if it happens to be page-aligned, or up to 16kB
+	 * with arbitrary alignment.  We simplify the code by assuming
+	 * that we can fit only 16kB into each transfer.
+	 */
+	count = ( ( len + EHCI_MTU - 1 ) / EHCI_MTU );
+
+	/* Append a zero-length transfer if applicable */
+	if ( zlp || ( count == 0 ) )
+		count++;
+
+	return count;
+}
+
+/**
  * Enqueue stream transfer
  *
  * @v ep		USB endpoint
  * @v iobuf		I/O buffer
- * @v terminate		Terminate using a short packet
+ * @v zlp		Append a zero-length packet
  * @ret rc		Return status code
  */
 static int ehci_endpoint_stream ( struct usb_endpoint *ep,
-				  struct io_buffer *iobuf, int terminate ) {
+				  struct io_buffer *iobuf, int zlp ) {
 	struct ehci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
 	struct ehci_device *ehci = endpoint->ehci;
-	unsigned int input = ( ep->address & USB_DIR_IN );
-	struct ehci_transfer xfers[2];
-	struct ehci_transfer *xfer = xfers;
+	void *data = iobuf->data;
 	size_t len = iob_len ( iobuf );
+	unsigned int count = ehci_endpoint_count ( len, zlp );
+	unsigned int input = ( ep->address & USB_DIR_IN );
+	unsigned int flags = ( input ? EHCI_FL_PID_IN : EHCI_FL_PID_OUT );
+	struct ehci_transfer xfers[count];
+	struct ehci_transfer *xfer = xfers;
+	size_t xfer_len;
+	unsigned int i;
 	int rc;
 
-	/* Create transfer */
-	xfer->data = iobuf->data;
-	xfer->len = len;
-	xfer->flags = ( EHCI_FL_IOC |
-			( input ? EHCI_FL_PID_IN : EHCI_FL_PID_OUT ) );
-	xfer++;
-	if ( terminate && ( ( len & ( ep->mtu - 1 ) ) == 0 ) ) {
-		xfer->data = NULL;
-		xfer->len = 0;
-		assert ( ! input );
-		xfer->flags = ( EHCI_FL_IOC | EHCI_FL_PID_OUT );
+	/* Create transfers */
+	for ( i = 0 ; i < count ; i++ ) {
+
+		/* Calculate transfer length */
+		xfer_len = EHCI_MTU;
+		if ( xfer_len > len )
+			xfer_len = len;
+
+		/* Create transfer */
+		xfer->data = data;
+		xfer->len = xfer_len;
+		xfer->flags = flags;
+
+		/* Move to next transfer */
+		data += xfer_len;
+		len -= xfer_len;
 		xfer++;
 	}
+	xfer[-1].flags |= EHCI_FL_IOC;
 
 	/* Enqueue transfer */
 	if ( ( rc = ehci_enqueue ( ehci, &endpoint->ring, iobuf, xfers,
-				   ( xfer - xfers ) ) ) != 0 )
+				   count ) ) != 0 )
 		return rc;
 
 	return 0;

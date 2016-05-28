@@ -62,5 +62,6 @@ struct ipoib_remac {
 
 extern const char * ipoib_ntoa ( const void *ll_addr );
 extern struct net_device * alloc_ipoibdev ( size_t priv_size );
+extern struct net_device * ipoib_netdev ( struct ib_device *ibdev );
 
 #endif /* _IPXE_IPOIB_H */

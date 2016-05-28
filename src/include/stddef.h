@@ -34,7 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define container_of( ptr, type, field ) ( {				\
 	type *__container;						\
-	const typeof ( __container->field ) *__field = (ptr);		\
+	const volatile typeof ( __container->field ) *__field = (ptr);	\
 	__container = ( ( ( void * ) __field ) -			\
 			offsetof ( type, field ) );			\
 	__container; } )

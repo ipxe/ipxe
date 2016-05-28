@@ -979,8 +979,9 @@ static int smsc75xx_probe ( struct usb_function *func,
 	smsc75xx->netdev = netdev;
 	usbnet_init ( &smsc75xx->usbnet, func, &smsc75xx_intr_operations,
 		      &smsc75xx_in_operations, &smsc75xx_out_operations );
-	usb_refill_init ( &smsc75xx->usbnet.intr, 0, SMSC75XX_INTR_MAX_FILL );
-	usb_refill_init ( &smsc75xx->usbnet.in, SMSC75XX_IN_MTU,
+	usb_refill_init ( &smsc75xx->usbnet.intr, 0, 0,
+			  SMSC75XX_INTR_MAX_FILL );
+	usb_refill_init ( &smsc75xx->usbnet.in, 0, SMSC75XX_IN_MTU,
 			  SMSC75XX_IN_MAX_FILL );
 	mii_init ( &smsc75xx->mii, &smsc75xx_mii_operations );
 	DBGC ( smsc75xx, "SMSC75XX %p on %s\n", smsc75xx, func->name );
@@ -1038,13 +1039,11 @@ static struct usb_device_id smsc75xx_ids[] = {
 		.name = "smsc7500",
 		.vendor = 0x0424,
 		.product = 0x7500,
-		.class = { 0xff, 0x00, 0xff },
 	},
 	{
 		.name = "smsc7505",
 		.vendor = 0x0424,
 		.product = 0x7505,
-		.class = { 0xff, 0x00, 0xff },
 	},
 };
 
@@ -1052,6 +1051,8 @@ static struct usb_device_id smsc75xx_ids[] = {
 struct usb_driver smsc75xx_driver __usb_driver = {
 	.ids = smsc75xx_ids,
 	.id_count = ( sizeof ( smsc75xx_ids ) / sizeof ( smsc75xx_ids[0] ) ),
+	.class = USB_CLASS_ID ( 0xff, 0x00, 0xff ),
+	.score = USB_SCORE_NORMAL,
 	.probe = smsc75xx_probe,
 	.remove = smsc75xx_remove,
 };

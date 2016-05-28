@@ -145,7 +145,7 @@ static int memmap_settings_fetch ( struct settings *settings,
 	unsigned int i;
 	unsigned int count;
 
-	DBGC ( settings, "MEMMAP start %d count %d %s%s%s%s scale %d\n",
+	DBGC ( settings, "MEMMAP start %ld count %ld %s%s%s%s scale %ld\n",
 	       MEMMAP_START ( setting->tag ), MEMMAP_COUNT ( setting->tag ),
 	       ( MEMMAP_INCLUDE_START ( setting->tag ) ? "start" : "" ),
 	       ( ( MEMMAP_INCLUDE_START ( setting->tag ) &&

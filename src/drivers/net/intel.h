@@ -99,8 +99,8 @@ struct intel_descriptor {
 #define INTEL_IRQ_TXQE		0x00000002UL	/**< Transmit queue empty */
 #define INTEL_IRQ_LSC		0x00000004UL	/**< Link status change */
 #define INTEL_IRQ_RXDMT0	0x00000010UL	/**< Receive queue low */
+#define INTEL_IRQ_RXO		0x00000040UL	/**< Receive overrun */
 #define INTEL_IRQ_RXT0		0x00000080UL	/**< Receive timer */
-#define INTEL_IRQ_RXO		0x00000400UL	/**< Receive overrun */
 
 /** Interrupt Mask Set/Read Register */
 #define INTEL_IMS 0x000d0UL
@@ -301,6 +301,8 @@ enum intel_flags {
 	INTEL_PBS_ERRATA = 0x0001,
 	/** VMware missing interrupt workaround required */
 	INTEL_VMWARE = 0x0002,
+	/** PHY reset is broken */
+	INTEL_NO_PHY_RST = 0x0004,
 };
 
 /**

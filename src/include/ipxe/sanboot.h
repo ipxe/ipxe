@@ -70,7 +70,7 @@ unsigned int san_default_drive ( void );
  *
  * @v uri		URI
  * @v drive		Drive number
- * @ret rc		Return status code
+ * @ret drive		Drive number, or negative error
  */
 int san_hook ( struct uri *uri, unsigned int drive );
 

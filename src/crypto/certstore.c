@@ -45,7 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define CERT( _index, _path )						\
 	extern char stored_cert_ ## _index ## _data[];			\
 	extern char stored_cert_ ## _index ## _len[];			\
-	__asm__ ( ".section \".rodata\", \"a\", @progbits\n\t"		\
+	__asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"	\
 		  "\nstored_cert_" #_index "_data:\n\t"			\
 		  ".incbin \"" _path "\"\n\t"				\
 		  "\nstored_cert_" #_index "_end:\n\t"			\

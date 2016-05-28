@@ -189,8 +189,8 @@ char * http_token ( char **line, char **value ) {
 	if ( value )
 		*value = NULL;
 
-	/* Skip any initial whitespace */
-	while ( isspace ( **line ) )
+	/* Skip any initial whitespace or commas */
+	while ( ( isspace ( **line ) ) || ( **line == ',' ) )
 		(*line)++;
 
 	/* Check for end of line and record token position */
@@ -201,8 +201,8 @@ char * http_token ( char **line, char **value ) {
 	/* Scan for end of token */
 	while ( ( c = **line ) ) {
 
-		/* Terminate if we hit an unquoted whitespace */
-		if ( isspace ( c ) && ! quote )
+		/* Terminate if we hit an unquoted whitespace or comma */
+		if ( ( isspace ( c ) || ( c == ',' ) ) && ! quote )
 			break;
 
 		/* Terminate if we hit a closing quote */
@@ -685,6 +685,51 @@ int http_open ( struct interface *xfer, struct http_method *method,
 }
 
 /**
+ * Redirect HTTP transaction
+ *
+ * @v http		HTTP transaction
+ * @v location		New location
+ * @ret rc		Return status code
+ */
+static int http_redirect ( struct http_transaction *http,
+			   const char *location ) {
+	struct uri *location_uri;
+	struct uri *resolved_uri;
+	int rc;
+
+	DBGC2 ( http, "HTTP %p redirecting to \"%s\"\n", http, location );
+
+	/* Parse location URI */
+	location_uri = parse_uri ( location );
+	if ( ! location_uri ) {
+		rc = -ENOMEM;
+		goto err_parse_uri;
+	}
+
+	/* Resolve as relative to original URI */
+	resolved_uri = resolve_uri ( http->uri, location_uri );
+	if ( ! resolved_uri ) {
+		rc = -ENOMEM;
+		goto err_resolve_uri;
+	}
+
+	/* Redirect to new URI */
+	if ( ( rc = xfer_redirect ( &http->xfer, LOCATION_URI,
+				    resolved_uri ) ) != 0 ) {
+		DBGC ( http, "HTTP %p could not redirect: %s\n",
+		       http, strerror ( rc ) );
+		goto err_redirect;
+	}
+
+ err_redirect:
+	uri_put ( resolved_uri );
+ err_resolve_uri:
+	uri_put ( location_uri );
+ err_parse_uri:
+	return rc;
+}
+
+/**
  * Handle successful transfer completion
  *
  * @v http		HTTP transaction
@@ -717,14 +762,8 @@ static int http_transfer_complete ( struct http_transaction *http ) {
 
 	/* Perform redirection, if applicable */
 	if ( ( location = http->response.location ) ) {
-		DBGC2 ( http, "HTTP %p redirecting to \"%s\"\n",
-			http, location );
-		if ( ( rc = xfer_redirect ( &http->xfer, LOCATION_URI_STRING,
-					    location ) ) != 0 ) {
-			DBGC ( http, "HTTP %p could not redirect: %s\n",
-			       http, strerror ( rc ) );
+		if ( ( rc = http_redirect ( http, location ) ) != 0 )
 			return rc;
-		}
 		http_close ( http, 0 );
 		return 0;
 	}
@@ -1276,19 +1315,17 @@ http_response_transfer_encoding __http_response_header = {
  * @ret rc		Return status code
  */
 static int http_parse_connection ( struct http_transaction *http, char *line ) {
+	char *token;
 
 	/* Check for known connection intentions */
-	if ( strcasecmp ( line, "keep-alive" ) == 0 ) {
-		http->response.flags |= HTTP_RESPONSE_KEEPALIVE;
-		return 0;
-	}
-	if ( strcasecmp ( line, "close" ) == 0 ) {
-		http->response.flags &= ~HTTP_RESPONSE_KEEPALIVE;
-		return 0;
+	while ( ( token = http_token ( &line, NULL ) ) ) {
+		if ( strcasecmp ( token, "keep-alive" ) == 0 )
+			http->response.flags |= HTTP_RESPONSE_KEEPALIVE;
+		if ( strcasecmp ( token, "close" ) == 0 )
+			http->response.flags &= ~HTTP_RESPONSE_KEEPALIVE;
 	}
 
-	DBGC ( http, "HTTP %p unrecognised Connection \"%s\"\n", http, line );
-	return -ENOTSUP_CONNECTION;
+	return 0;
 }
 
 /** HTTP "Connection" header */
@@ -1826,7 +1863,7 @@ static size_t http_params ( struct parameters *params, char *buf, size_t len ) {
 		}
 
 		/* URI-encode the key */
-		frag_len = uri_encode ( param->key, 0, buf, remaining );
+		frag_len = uri_encode_string ( 0, param->key, buf, remaining );
 		buf += frag_len;
 		len += frag_len;
 		remaining -= frag_len;
@@ -1839,7 +1876,7 @@ static size_t http_params ( struct parameters *params, char *buf, size_t len ) {
 		remaining--;
 
 		/* URI-encode the value */
-		frag_len = uri_encode ( param->value, 0, buf, remaining );
+		frag_len = uri_encode_string ( 0, param->value, buf, remaining);
 		buf += frag_len;
 		len += frag_len;
 		remaining -= frag_len;

@@ -532,8 +532,8 @@ static int dm96xx_probe ( struct usb_function *func,
 	dm96xx->netdev = netdev;
 	usbnet_init ( &dm96xx->usbnet, func, &dm96xx_intr_operations,
 		      &dm96xx_in_operations, &dm96xx_out_operations );
-	usb_refill_init ( &dm96xx->usbnet.intr, 0, DM96XX_INTR_MAX_FILL );
-	usb_refill_init ( &dm96xx->usbnet.in, DM96XX_IN_MTU,
+	usb_refill_init ( &dm96xx->usbnet.intr, 0, 0, DM96XX_INTR_MAX_FILL );
+	usb_refill_init ( &dm96xx->usbnet.in, 0, DM96XX_IN_MTU,
 			  DM96XX_IN_MAX_FILL );
 	DBGC ( dm96xx, "DM96XX %p on %s\n", dm96xx, func->name );
 
@@ -666,6 +666,8 @@ static struct usb_device_id dm96xx_ids[] = {
 struct usb_driver dm96xx_driver __usb_driver = {
 	.ids = dm96xx_ids,
 	.id_count = ( sizeof ( dm96xx_ids ) / sizeof ( dm96xx_ids[0] ) ),
+	.class = USB_CLASS_ID ( USB_ANY_ID, USB_ANY_ID, USB_ANY_ID ),
+	.score = USB_SCORE_NORMAL,
 	.probe = dm96xx_probe,
 	.remove = dm96xx_remove,
 };

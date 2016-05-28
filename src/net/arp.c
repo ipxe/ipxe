@@ -139,7 +139,14 @@ static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	struct arp_net_protocol *arp_net_protocol;
 	struct net_protocol *net_protocol;
 	struct ll_protocol *ll_protocol;
+	size_t len = iob_len ( iobuf );
 	int rc;
+
+	/* Sanity check */
+	if ( ( len < sizeof ( *arphdr ) ) || ( len < arp_len ( arphdr ) ) ) {
+		rc = -EINVAL;
+		goto done;
+	}
 
 	/* Identify network-layer and link-layer protocols */
 	arp_net_protocol = arp_find_protocol ( arphdr->ar_pro );

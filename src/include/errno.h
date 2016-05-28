@@ -258,7 +258,7 @@ static inline void eplatform_discard ( int dummy __unused, ... ) {}
  * @ret error		Error
  */
 #define __einfo_error( einfo ) ( {					\
-	__asm__ ( ".section \".einfo\", \"\", @progbits\n\t"		\
+	__asm__ ( ".section \".einfo\", \"\", " PROGBITS_OPS "\n\t"	\
 		  ".align 8\n\t"					\
 		  "\n1:\n\t"						\
 		  ".long ( 4f - 1b )\n\t"				\

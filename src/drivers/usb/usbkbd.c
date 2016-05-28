@@ -53,13 +53,14 @@ static LIST_HEAD ( usb_keyboards );
  *
  * @v keycode		Keycode
  * @v modifiers		Modifiers
+ * @v leds		LED state
  * @ret key		iPXE key
  *
  * Key codes are defined in the USB HID Usage Tables Keyboard/Keypad
  * page.
  */
-static unsigned int usbkbd_map ( unsigned int keycode,
-				 unsigned int modifiers ) {
+static unsigned int usbkbd_map ( unsigned int keycode, unsigned int modifiers,
+				 unsigned int leds ) {
 	unsigned int key;
 
 	if ( keycode < USBKBD_KEY_A ) {
@@ -70,7 +71,8 @@ static unsigned int usbkbd_map ( unsigned int keycode,
 		key = ( keycode - USBKBD_KEY_A + 'a' );
 		if ( modifiers & USBKBD_CTRL ) {
 			key -= ( 'a' - CTRL_A );
-		} else if ( modifiers & USBKBD_SHIFT ) {
+		} else if ( ( modifiers & USBKBD_SHIFT ) ||
+			    ( leds & USBKBD_LED_CAPS_LOCK ) ) {
 			key -= ( 'a' - 'A' );
 		}
 	} else if ( keycode <= USBKBD_KEY_0 ) {
@@ -100,7 +102,22 @@ static unsigned int usbkbd_map ( unsigned int keycode,
 			KEY_PPAGE, KEY_DC, KEY_END, KEY_NPAGE, KEY_RIGHT,
 			KEY_LEFT, KEY_DOWN, KEY_UP
 		};
-		key = special[ keycode - USBKBD_KEY_CAPSLOCK ];
+		key = special[ keycode - USBKBD_KEY_CAPS_LOCK ];
+	} else if ( keycode <= USBKBD_KEY_PAD_ENTER ) {
+		/* Keypad (unaffected by Num Lock) */
+		key = "\0/*-+\n" [ keycode - USBKBD_KEY_NUM_LOCK ];
+	} else if ( keycode <= USBKBD_KEY_PAD_DOT ) {
+		/* Keypad (affected by Num Lock) */
+		if ( leds & USBKBD_LED_NUM_LOCK ) {
+			key = "1234567890." [ keycode - USBKBD_KEY_PAD_1 ];
+		} else {
+			static const uint16_t keypad[] = {
+				KEY_END, KEY_DOWN, KEY_NPAGE, KEY_LEFT, 0,
+				KEY_RIGHT, KEY_HOME, KEY_UP, KEY_PPAGE,
+				KEY_IC, KEY_DC
+			};
+			key = keypad[ keycode - USBKBD_KEY_PAD_1 ];
+		};
 	} else {
 		key = 0;
 	}
@@ -124,10 +141,25 @@ static unsigned int usbkbd_map ( unsigned int keycode,
  */
 static void usbkbd_produce ( struct usb_keyboard *kbd, unsigned int keycode,
 			     unsigned int modifiers ) {
+	unsigned int leds = 0;
 	unsigned int key;
 
+	/* Check for LED-modifying keys */
+	if ( keycode == USBKBD_KEY_CAPS_LOCK ) {
+		leds = USBKBD_LED_CAPS_LOCK;
+	} else if ( keycode == USBKBD_KEY_NUM_LOCK ) {
+		leds = USBKBD_LED_NUM_LOCK;
+	}
+
+	/* Handle LED-modifying keys */
+	if ( leds ) {
+		kbd->leds ^= leds;
+		kbd->leds_changed = 1;
+		return;
+	}
+
 	/* Map to iPXE key */
-	key = usbkbd_map ( keycode, modifiers );
+	key = usbkbd_map ( keycode, modifiers, kbd->leds );
 
 	/* Do nothing if this keycode has no corresponding iPXE key */
 	if ( ! key ) {
@@ -335,6 +367,37 @@ static struct usb_endpoint_driver_operations usbkbd_operations = {
 
 /******************************************************************************
  *
+ * Keyboard LEDs
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Set keyboard LEDs
+ *
+ * @v kbd		USB keyboard
+ * @ret rc		Return status code
+ */
+static int usbkbd_set_leds ( struct usb_keyboard *kbd ) {
+	struct usb_function *func = kbd->hid.func;
+	int rc;
+
+	DBGC2 ( kbd, "KBD %s setting LEDs to %#02x\n", kbd->name, kbd->leds );
+
+	/* Set keyboard LEDs */
+	if ( ( rc = usbhid_set_report ( func->usb, func->interface[0],
+					USBHID_REPORT_OUTPUT, 0, &kbd->leds,
+					sizeof ( kbd->leds ) ) ) != 0 ) {
+		DBGC ( kbd, "KBD %s could not set LEDs to %#02x: %s\n",
+		       kbd->name, kbd->leds, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/******************************************************************************
+ *
  * USB interface
  *
  ******************************************************************************
@@ -362,7 +425,7 @@ static int usbkbd_probe ( struct usb_function *func,
 	kbd->name = func->name;
 	kbd->bus = usb->port->hub->bus;
 	usbhid_init ( &kbd->hid, func, &usbkbd_operations, NULL );
-	usb_refill_init ( &kbd->hid.in, sizeof ( kbd->report ),
+	usb_refill_init ( &kbd->hid.in, 0, sizeof ( kbd->report ),
 			  USBKBD_INTR_MAX_FILL );
 
 	/* Describe USB human interface device */
@@ -399,6 +462,9 @@ static int usbkbd_probe ( struct usb_function *func,
 
 	/* Add to list of USB keyboards */
 	list_add_tail ( &kbd->list, &usb_keyboards );
+
+	/* Set initial LED state */
+	usbkbd_set_leds ( kbd );
 
 	usb_func_set_drvdata ( func, kbd );
 	return 0;
@@ -437,11 +503,6 @@ static struct usb_device_id usbkbd_ids[] = {
 		.name = "kbd",
 		.vendor = USB_ANY_ID,
 		.product = USB_ANY_ID,
-		.class = {
-			.class = USB_CLASS_HID,
-			.subclass = USB_SUBCLASS_HID_BOOT,
-			.protocol = USBKBD_PROTOCOL,
-		},
 	},
 };
 
@@ -449,6 +510,9 @@ static struct usb_device_id usbkbd_ids[] = {
 struct usb_driver usbkbd_driver __usb_driver = {
 	.ids = usbkbd_ids,
 	.id_count = ( sizeof ( usbkbd_ids ) / sizeof ( usbkbd_ids[0] ) ),
+	.class = USB_CLASS_ID ( USB_CLASS_HID, USB_SUBCLASS_HID_BOOT,
+				USBKBD_PROTOCOL ),
+	.score = USB_SCORE_NORMAL,
 	.probe = usbkbd_probe,
 	.remove = usbkbd_remove,
 };
@@ -486,10 +550,20 @@ static int usbkbd_iskey ( void ) {
 	struct usb_keyboard *kbd;
 	unsigned int fill;
 
-	/* Poll all USB keyboards and refill endpoints */
+	/* Poll USB keyboards, refill endpoints, and set LEDs if applicable */
 	list_for_each_entry ( kbd, &usb_keyboards, list ) {
+
+		/* Poll keyboard */
 		usb_poll ( kbd->bus );
+
+		/* Refill endpoints */
 		usb_refill ( &kbd->hid.in );
+
+		/* Update keyboard LEDs, if applicable */
+		if ( kbd->leds_changed ) {
+			usbkbd_set_leds ( kbd );
+			kbd->leds_changed = 0;
+		}
 	}
 
 	/* Check for a non-empty keyboard buffer */

@@ -700,17 +700,20 @@ static int peerblk_parse_header ( struct peerdist_block *peerblk ) {
 		return -EPROTO;
 	}
 
-	/* Allocate cipher context.  Freeing the cipher context (on
-	 * error or otherwise) is handled by peerblk_reset().
+	/* Allocate cipher context, if applicable.  Freeing the cipher
+	 * context (on error or otherwise) is handled by peerblk_reset().
 	 */
 	peerblk->cipher = cipher;
 	assert ( peerblk->cipherctx == NULL );
-	peerblk->cipherctx = malloc ( cipher->ctxsize );
-	if ( ! peerblk->cipherctx )
-		return -ENOMEM;
+	if ( cipher ) {
+		peerblk->cipherctx = malloc ( cipher->ctxsize );
+		if ( ! peerblk->cipherctx )
+			return -ENOMEM;
+	}
 
-	/* Initialise cipher */
-	if ( ( rc = cipher_setkey ( cipher, peerblk->cipherctx, peerblk->secret,
+	/* Initialise cipher, if applicable */
+	if ( cipher &&
+	     ( rc = cipher_setkey ( cipher, peerblk->cipherctx, peerblk->secret,
 				    keylen ) ) != 0 ) {
 		DBGC ( peerblk, "PEERBLK %p %d.%d could not set key: %s\n",
 		       peerblk, peerblk->segment, peerblk->block,

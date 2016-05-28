@@ -697,7 +697,7 @@ static int uhci_endpoint_open ( struct usb_endpoint *ep ) {
 		goto err_ring_alloc;
 	endpoint->ring.mtu = ep->mtu;
 	endpoint->ring.flags = UHCI_FL_CERR_MAX;
-	if ( usb->port->speed < USB_SPEED_FULL )
+	if ( usb->speed < USB_SPEED_FULL )
 		endpoint->ring.flags |= UHCI_FL_LS;
 	endpoint->ring.control = ( UHCI_CONTROL_DEVICE ( usb->address ) |
 				   UHCI_CONTROL_ENDPOINT ( ep->address ) );
@@ -835,22 +835,20 @@ static int uhci_endpoint_message ( struct usb_endpoint *ep,
  *
  * @v ep		USB endpoint
  * @v iobuf		I/O buffer
- * @v terminate		Terminate using a short packet
+ * @v zlp		Append a zero-length packet
  * @ret rc		Return status code
  */
 static int uhci_endpoint_stream ( struct usb_endpoint *ep,
-				  struct io_buffer *iobuf, int terminate ) {
+				  struct io_buffer *iobuf, int zlp ) {
 	struct uhci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
 	struct uhci_ring *ring = &endpoint->ring;
 	unsigned int count;
 	size_t len;
 	int input;
-	int zlp;
 	int rc;
 
 	/* Calculate number of descriptors */
 	len = iob_len ( iobuf );
-	zlp = ( terminate && ( ( len & ( ring->mtu - 1 ) ) == 0 ) );
 	count = ( ( ( len + ring->mtu - 1 ) / ring->mtu ) + ( zlp ? 1 : 0 ) );
 
 	/* Enqueue transfer */

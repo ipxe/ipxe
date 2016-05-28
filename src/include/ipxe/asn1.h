@@ -315,14 +315,26 @@ struct asn1_bit_string {
 } __attribute__ (( packed ));
 
 /**
+ * Invalidate ASN.1 object cursor
+ *
+ * @v cursor		ASN.1 object cursor
+ */
+static inline __attribute__ (( always_inline )) void
+asn1_invalidate_cursor ( struct asn1_cursor *cursor ) {
+	cursor->len = 0;
+}
+
+/**
  * Extract ASN.1 type
  *
  * @v cursor		ASN.1 object cursor
- * @ret type		Type
+ * @ret type		Type, or ASN1_END if cursor is invalid
  */
 static inline __attribute__ (( always_inline )) unsigned int
 asn1_type ( const struct asn1_cursor *cursor ) {
-	return ( *( ( const uint8_t * ) cursor->data ) );
+	const uint8_t *type = cursor->data;
+
+	return ( ( cursor->len >= sizeof ( *type ) ) ? *type : ASN1_END );
 }
 
 extern void asn1_invalidate_cursor ( struct asn1_cursor *cursor );

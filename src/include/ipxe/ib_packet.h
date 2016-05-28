@@ -19,6 +19,7 @@ union ib_guid {
 	uint8_t bytes[8];
 	uint16_t words[4];
 	uint32_t dwords[2];
+	uint64_t qword;
 };
 
 /** Infiniband Globally Unique Identifier debug message format */
@@ -33,6 +34,7 @@ union ib_gid {
 	uint8_t bytes[16];
 	uint16_t words[8];
 	uint32_t dwords[4];
+	uint64_t qwords[2];
 	struct {
 		union ib_guid prefix;
 		union ib_guid guid;
@@ -45,6 +47,9 @@ union ib_gid {
 /** Infiniband Global Identifier debug message arguments */
 #define IB_GID_ARGS( gid ) \
 	IB_GUID_ARGS ( &(gid)->s.prefix ), IB_GUID_ARGS ( &(gid)->s.guid )
+
+/** Test for multicast GID */
+#define IB_GID_MULTICAST( gid ) ( (gid)->bytes[0] == 0xff )
 
 /** An Infiniband Local Route Header */
 struct ib_local_route_header {

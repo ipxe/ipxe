@@ -675,6 +675,14 @@ int register_netdev ( struct net_device *netdev ) {
 		goto err_duplicate;
 	}
 
+	/* Reject named network devices that already exist */
+	if ( netdev->name[0] && ( duplicate = find_netdev ( netdev->name ) ) ) {
+		DBGC ( netdev, "NETDEV rejecting duplicate name %s\n",
+		       duplicate->name );
+		rc = -EEXIST;
+		goto err_duplicate;
+	}
+
 	/* Record device index and create device name */
 	if ( netdev->name[0] == '\0' ) {
 		snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
@@ -725,6 +733,8 @@ int register_netdev ( struct net_device *netdev ) {
 	clear_settings ( netdev_settings ( netdev ) );
 	unregister_settings ( netdev_settings ( netdev ) );
  err_register_settings:
+	list_del ( &netdev->list );
+	netdev_put ( netdev );
  err_duplicate:
 	return rc;
 }

@@ -437,8 +437,8 @@ static int ecm_probe ( struct usb_function *func,
 	ecm->netdev = netdev;
 	usbnet_init ( &ecm->usbnet, func, &ecm_intr_operations,
 		      &ecm_in_operations, &ecm_out_operations );
-	usb_refill_init ( &ecm->usbnet.intr, 0, ECM_INTR_MAX_FILL );
-	usb_refill_init ( &ecm->usbnet.in, ECM_IN_MTU, ECM_IN_MAX_FILL );
+	usb_refill_init ( &ecm->usbnet.intr, 0, 0, ECM_INTR_MAX_FILL );
+	usb_refill_init ( &ecm->usbnet.in, 0, ECM_IN_MTU, ECM_IN_MAX_FILL );
 	DBGC ( ecm, "ECM %p on %s\n", ecm, func->name );
 
 	/* Describe USB network device */
@@ -503,11 +503,6 @@ static struct usb_device_id ecm_ids[] = {
 		.name = "cdc-ecm",
 		.vendor = USB_ANY_ID,
 		.product = USB_ANY_ID,
-		.class = {
-			.class = USB_CLASS_CDC,
-			.subclass = USB_SUBCLASS_CDC_ECM,
-			.protocol = 0,
-		},
 	},
 };
 
@@ -515,6 +510,8 @@ static struct usb_device_id ecm_ids[] = {
 struct usb_driver ecm_driver __usb_driver = {
 	.ids = ecm_ids,
 	.id_count = ( sizeof ( ecm_ids ) / sizeof ( ecm_ids[0] ) ),
+	.class = USB_CLASS_ID ( USB_CLASS_CDC, USB_SUBCLASS_CDC_ECM, 0 ),
+	.score = USB_SCORE_NORMAL,
 	.probe = ecm_probe,
 	.remove = ecm_remove,
 };

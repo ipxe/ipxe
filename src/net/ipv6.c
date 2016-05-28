@@ -522,6 +522,8 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 		*trans_csum = ipv6_pshdr_chksum ( iphdr, len,
 						  tcpip_protocol->tcpip_proto,
 						  *trans_csum );
+		if ( ! *trans_csum )
+			*trans_csum = tcpip_protocol->zero_csum;
 	}
 
 	/* Print IPv6 header for debugging */
@@ -1001,6 +1003,7 @@ struct tcpip_net_protocol ipv6_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv6",
 	.sa_family = AF_INET6,
 	.header_len = sizeof ( struct ipv6_header ),
+	.net_protocol = &ipv6_protocol,
 	.tx = ipv6_tx,
 	.netdev = ipv6_netdev,
 };

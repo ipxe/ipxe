@@ -37,3 +37,20 @@ PROVIDE_REQUIRING_SYMBOL();
 #ifdef SANBOOT_PROTO_IB_SRP
 REQUIRE_OBJECT ( ib_srp );
 #endif
+
+/*
+ * Drag in Infiniband-specific virtual network devices
+ */
+#ifdef VNIC_IPOIB
+REQUIRE_OBJECT ( ipoib );
+#endif
+#ifdef VNIC_XSIGO
+REQUIRE_OBJECT ( xsigo );
+#endif
+
+/*
+ * Drag in Infiniband-specific commands
+ */
+#ifdef IBMGMT_CMD
+REQUIRE_OBJECT ( ibmgmt_cmd );
+#endif

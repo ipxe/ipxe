@@ -65,6 +65,10 @@ struct pixel_buffer * alloc_pixbuf ( unsigned int width, unsigned int height ) {
 	pixbuf->height = height;
 	pixbuf->len = ( width * height * sizeof ( uint32_t ) );
 
+	/* Check for multiplication overflow */
+	if ( ( ( pixbuf->len / sizeof ( uint32_t ) ) / width ) != height )
+		goto err_overflow;
+
 	/* Allocate pixel data buffer */
 	pixbuf->data = umalloc ( pixbuf->len );
 	if ( ! pixbuf->data )
@@ -73,6 +77,7 @@ struct pixel_buffer * alloc_pixbuf ( unsigned int width, unsigned int height ) {
 	return pixbuf;
 
  err_alloc_data:
+ err_overflow:
 	pixbuf_put ( pixbuf );
  err_alloc_pixbuf:
 	return NULL;

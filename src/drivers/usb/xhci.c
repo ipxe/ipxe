@@ -2542,20 +2542,44 @@ static int xhci_endpoint_message ( struct usb_endpoint *ep,
 }
 
 /**
+ * Calculate number of TRBs
+ *
+ * @v len		Length of data
+ * @v zlp		Append a zero-length packet
+ * @ret count		Number of transfer descriptors
+ */
+static unsigned int xhci_endpoint_count ( size_t len, int zlp ) {
+	unsigned int count;
+
+	/* Split into 64kB TRBs */
+	count = ( ( len + XHCI_MTU - 1 ) / XHCI_MTU );
+
+	/* Append a zero-length TRB if applicable */
+	if ( zlp || ( count == 0 ) )
+		count++;
+
+	return count;
+}
+
+/**
  * Enqueue stream transfer
  *
  * @v ep		USB endpoint
  * @v iobuf		I/O buffer
- * @v terminate		Terminate using a short packet
+ * @v zlp		Append a zero-length packet
  * @ret rc		Return status code
  */
 static int xhci_endpoint_stream ( struct usb_endpoint *ep,
-				  struct io_buffer *iobuf, int terminate ) {
+				  struct io_buffer *iobuf, int zlp ) {
 	struct xhci_endpoint *endpoint = usb_endpoint_get_hostdata ( ep );
-	union xhci_trb trbs[ 1 /* Normal */ + 1 /* Possible zero-length */ ];
+	void *data = iobuf->data;
+	size_t len = iob_len ( iobuf );
+	unsigned int count = xhci_endpoint_count ( len, zlp );
+	union xhci_trb trbs[count];
 	union xhci_trb *trb = trbs;
 	struct xhci_trb_normal *normal;
-	size_t len = iob_len ( iobuf );
+	unsigned int i;
+	size_t trb_len;
 	int rc;
 
 	/* Profile stream transfers */
@@ -2563,20 +2587,36 @@ static int xhci_endpoint_stream ( struct usb_endpoint *ep,
 
 	/* Construct normal TRBs */
 	memset ( &trbs, 0, sizeof ( trbs ) );
-	normal = &(trb++)->normal;
-	normal->data = cpu_to_le64 ( virt_to_phys ( iobuf->data ) );
-	normal->len = cpu_to_le32 ( len );
-	normal->type = XHCI_TRB_NORMAL;
-	if ( terminate && ( ( len & ( ep->mtu - 1 ) ) == 0 ) ) {
-		normal->flags = XHCI_TRB_CH;
-		normal = &(trb++)->normal;
+	for ( i = 0 ; i < count ; i ++ ) {
+
+		/* Calculate TRB length */
+		trb_len = XHCI_MTU;
+		if ( trb_len > len )
+			trb_len = len;
+
+		/* Construct normal TRB */
+		normal = &trb->normal;
+		normal->data = cpu_to_le64 ( virt_to_phys ( data ) );
+		normal->len = cpu_to_le32 ( trb_len );
 		normal->type = XHCI_TRB_NORMAL;
+		normal->flags = XHCI_TRB_CH;
+
+		/* Move to next TRB */
+		data += trb_len;
+		len -= trb_len;
+		trb++;
 	}
-	normal->flags = XHCI_TRB_IOC;
+
+	/* Mark zero-length packet (if present) as a separate transfer */
+	if ( zlp && ( count > 1 ) )
+		trb[-2].normal.flags = 0;
+
+	/* Generate completion for final TRB */
+	trb[-1].normal.flags = XHCI_TRB_IOC;
 
 	/* Enqueue TRBs */
 	if ( ( rc = xhci_enqueue_multi ( &endpoint->ring, iobuf, trbs,
-					 ( trb - trbs ) ) ) != 0 )
+					 count ) ) != 0 )
 		return rc;
 
 	/* Ring the doorbell */
@@ -2719,7 +2759,6 @@ static void xhci_device_close ( struct usb_device *usb ) {
 static int xhci_device_address ( struct usb_device *usb ) {
 	struct xhci_slot *slot = usb_get_hostdata ( usb );
 	struct xhci_device *xhci = slot->xhci;
-	struct usb_port *port = usb->port;
 	struct usb_port *root_port;
 	int psiv;
 	int rc;
@@ -2732,7 +2771,7 @@ static int xhci_device_address ( struct usb_device *usb ) {
 	slot->port = root_port->address;
 
 	/* Calculate protocol speed ID */
-	psiv = xhci_port_psiv ( xhci, slot->port, port->speed );
+	psiv = xhci_port_psiv ( xhci, slot->port, usb->speed );
 	if ( psiv < 0 ) {
 		rc = psiv;
 		return rc;

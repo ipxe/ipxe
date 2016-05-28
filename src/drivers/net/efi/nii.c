@@ -1125,8 +1125,8 @@ int nii_start ( struct efi_device *efidev ) {
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
-	DBGC ( nii, "NII %s registered as %s for %p %s\n", nii->dev.name,
-	       netdev->name, device, efi_handle_name ( device ) );
+	DBGC ( nii, "NII %s registered as %s for %s\n", nii->dev.name,
+	       netdev->name, efi_handle_name ( device ) );
 
 	/* Set initial link state (if media detection is not supported) */
 	if ( ! nii->media )

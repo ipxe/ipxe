@@ -295,14 +295,23 @@ static int intel_reset ( struct intel_nic *intel ) {
 	writel ( ctrl, intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
 
-	/* If link is already up, do not attempt to reset the PHY.  On
-	 * some models (notably ICH), performing a PHY reset seems to
-	 * drop the link speed to 10Mbps.
+	/* On some models (notably ICH), the PHY reset mechanism
+	 * appears to be broken.  In particular, the PHY_CTRL register
+	 * will be correctly loaded from NVM but the values will not
+	 * be propagated to the "OEM bits" PHY register.  This
+	 * typically has the effect of dropping the link speed to
+	 * 10Mbps.
+	 *
+	 * Work around this problem by skipping the PHY reset if
+	 * either (a) the link is already up, or (b) this particular
+	 * NIC is known to be broken.
 	 */
 	status = readl ( intel->regs + INTEL_STATUS );
-	if ( status & INTEL_STATUS_LU ) {
-		DBGC ( intel, "INTEL %p MAC reset (ctrl %08x)\n",
-		       intel, ctrl );
+	if ( ( intel->flags & INTEL_NO_PHY_RST ) ||
+	     ( status & INTEL_STATUS_LU ) ) {
+		DBGC ( intel, "INTEL %p %sMAC reset (ctrl %08x)\n", intel,
+		       ( ( intel->flags & INTEL_NO_PHY_RST ) ? "forced " : "" ),
+		       ctrl );
 		return 0;
 	}
 
@@ -1029,7 +1038,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x10f5, "82567lm", "82567LM", 0 ),
 	PCI_ROM ( 0x8086, 0x10f6, "82574l", "82574L", 0 ),
 	PCI_ROM ( 0x8086, 0x1501, "82567v-3", "82567V-3", INTEL_PBS_ERRATA ),
-	PCI_ROM ( 0x8086, 0x1502, "82579lm", "82579LM", 0 ),
+	PCI_ROM ( 0x8086, 0x1502, "82579lm", "82579LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x1503, "82579v", "82579V", 0 ),
 	PCI_ROM ( 0x8086, 0x150a, "82576ns", "82576NS", 0 ),
 	PCI_ROM ( 0x8086, 0x150c, "82583v", "82583V", 0 ),
@@ -1048,14 +1057,17 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1526, "82576-5", "82576", 0 ),
 	PCI_ROM ( 0x8086, 0x1527, "82580-f2", "82580 Fiber", 0 ),
 	PCI_ROM ( 0x8086, 0x1533, "i210", "I210", 0 ),
-	PCI_ROM ( 0x8086, 0x153a, "i217lm", "I217-LM", 0 ),
+	PCI_ROM ( 0x8086, 0x1539, "i211", "I211", 0 ),
+	PCI_ROM ( 0x8086, 0x153a, "i217lm", "I217-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x153b, "i217v", "I217-V", 0 ),
 	PCI_ROM ( 0x8086, 0x1559, "i218v", "I218-V", 0),
 	PCI_ROM ( 0x8086, 0x155a, "i218lm", "I218-LM", 0),
-	PCI_ROM ( 0x8086, 0x15a0, "i218lm-2", "I218-LM", 0 ),
+	PCI_ROM ( 0x8086, 0x157b, "i210-2", "I210", 0 ),
+	PCI_ROM ( 0x8086, 0x15a0, "i218lm-2", "I218-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x15a1, "i218v-2", "I218-V", 0 ),
-	PCI_ROM ( 0x8086, 0x15a2, "i218lm-3", "I218-LM", 0 ),
-	PCI_ROM ( 0x8086, 0x15a3, "i218v-3", "I218-V", 0 ),
+	PCI_ROM ( 0x8086, 0x15a2, "i218lm-3", "I218-LM", INTEL_NO_PHY_RST ),
+	PCI_ROM ( 0x8086, 0x15a3, "i218v-3", "I218-V", INTEL_NO_PHY_RST ),
+	PCI_ROM ( 0x8086, 0x15b8, "i219v-2", "I219-V (2)", 0 ),
 	PCI_ROM ( 0x8086, 0x294c, "82566dc-2", "82566DC-2", 0 ),
 	PCI_ROM ( 0x8086, 0x2e6e, "cemedia", "CE Media Processor", 0 ),
 };

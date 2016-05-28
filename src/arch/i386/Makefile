@@ -80,34 +80,10 @@ PIE_FLAGS := $(shell $(PIE_TEST) && $(ECHO) '-fno-PIE -nopie')
 WORKAROUND_CFLAGS += $(PIE_FLAGS)
 endif
 
-# Define version string for lkrnprefix.S
-#
-CFLAGS_lkrnprefix	+= -DVERSION="\"$(VERSION)\""
-
-# Locations of utilities
-#
-ISOLINUX_BIN_LIST	:= \
-	$(ISOLINUX_BIN) \
-	/usr/lib/syslinux/isolinux.bin \
-	/usr/lib/syslinux/bios/isolinux.bin \
-	/usr/share/syslinux/isolinux.bin \
-	/usr/share/syslinux/bios/isolinux.bin \
-	/usr/local/share/syslinux/isolinux.bin \
-	/usr/local/share/syslinux/bios/isolinux.bin \
-	/usr/lib/ISOLINUX/isolinux.bin
-ISOLINUX_BIN	= $(firstword $(wildcard $(ISOLINUX_BIN_LIST)))
-
 # i386-specific directories containing source files
 #
-SRCDIRS		+= arch/i386/core arch/i386/transitions arch/i386/prefix
-SRCDIRS		+= arch/i386/firmware/pcbios
-SRCDIRS		+= arch/i386/image
-SRCDIRS		+= arch/i386/interface/pcbios
-SRCDIRS		+= arch/i386/interface/pxe
-SRCDIRS		+= arch/i386/interface/pxeparent
-SRCDIRS 	+= arch/i386/interface/syslinux
-SRCDIRS		+= arch/i386/interface/vmware
-SRCDIRS		+= arch/i386/hci/commands
+SRCDIRS		+= arch/i386/core
+SRCDIRS		+= arch/i386/tests
 
 # Include common x86 Makefile
 #

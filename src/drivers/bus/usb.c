@@ -243,7 +243,6 @@ int usb_endpoint_described ( struct usb_endpoint *ep,
 			     struct usb_interface_descriptor *interface,
 			     unsigned int type, unsigned int index ) {
 	struct usb_device *usb = ep->usb;
-	struct usb_port *port = usb->port;
 	struct usb_endpoint_descriptor *desc;
 	struct usb_endpoint_companion_descriptor *descx;
 	unsigned int sizes;
@@ -267,7 +266,7 @@ int usb_endpoint_described ( struct usb_endpoint *ep,
 	/* Calculate interval */
 	if ( ( type & USB_ENDPOINT_ATTR_TYPE_MASK ) ==
 	     USB_ENDPOINT_ATTR_INTERRUPT ) {
-		if ( port->speed >= USB_SPEED_HIGH ) {
+		if ( usb->speed >= USB_SPEED_HIGH ) {
 			/* 2^(desc->interval-1) is a microframe count */
 			interval = ( 1 << ( desc->interval - 1 ) );
 		} else {
@@ -485,7 +484,7 @@ int usb_message ( struct usb_endpoint *ep, unsigned int request,
 	assert ( iob_headroom ( iobuf ) >= sizeof ( *packet ) );
 
 	/* Fail immediately if device has been unplugged */
-	if ( port->speed == USB_SPEED_NONE )
+	if ( port->disconnected )
 		return -ENODEV;
 
 	/* Reset endpoint if required */
@@ -530,10 +529,11 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 		 int terminate ) {
 	struct usb_device *usb = ep->usb;
 	struct usb_port *port = usb->port;
+	int zlp;
 	int rc;
 
 	/* Fail immediately if device has been unplugged */
-	if ( port->speed == USB_SPEED_NONE )
+	if ( port->disconnected )
 		return -ENODEV;
 
 	/* Reset endpoint if required */
@@ -541,8 +541,13 @@ int usb_stream ( struct usb_endpoint *ep, struct io_buffer *iobuf,
 	     ( ( rc = usb_endpoint_reset ( ep ) ) != 0 ) )
 		return rc;
 
+	/* Append a zero-length packet if necessary */
+	zlp = terminate;
+	if ( iob_len ( iobuf ) & ( ep->mtu - 1 ) )
+		zlp = 0;
+
 	/* Enqueue stream transfer */
-	if ( ( rc = ep->host->stream ( ep, iobuf, terminate ) ) != 0 ) {
+	if ( ( rc = ep->host->stream ( ep, iobuf, zlp ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not enqueue stream transfer: %s\n",
 		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		return rc;
@@ -596,6 +601,7 @@ void usb_complete_err ( struct usb_endpoint *ep, struct io_buffer *iobuf,
  */
 int usb_prefill ( struct usb_endpoint *ep ) {
 	struct io_buffer *iobuf;
+	size_t reserve = ep->reserve;
 	size_t len = ( ep->len ? ep->len : ep->mtu );
 	unsigned int fill;
 	int rc;
@@ -609,11 +615,12 @@ int usb_prefill ( struct usb_endpoint *ep ) {
 	for ( fill = 0 ; fill < ep->max ; fill++ ) {
 
 		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( len );
+		iobuf = alloc_iob ( reserve + len );
 		if ( ! iobuf ) {
 			rc = -ENOMEM;
 			goto err_alloc;
 		}
+		iob_reserve ( iobuf, reserve );
 
 		/* Add to recycled buffer list */
 		list_add_tail ( &iobuf->list, &ep->recycled );
@@ -634,6 +641,7 @@ int usb_prefill ( struct usb_endpoint *ep ) {
  */
 int usb_refill ( struct usb_endpoint *ep ) {
 	struct io_buffer *iobuf;
+	size_t reserve = ep->reserve;
 	size_t len = ( ep->len ? ep->len : ep->mtu );
 	int rc;
 
@@ -647,9 +655,10 @@ int usb_refill ( struct usb_endpoint *ep ) {
 		/* Get or allocate buffer */
 		if ( list_empty ( &ep->recycled ) ) {
 			/* Recycled buffer list is empty; allocate new buffer */
-			iobuf = alloc_iob ( len );
+			iobuf = alloc_iob ( reserve + len );
 			if ( ! iobuf )
 				return -ENOMEM;
+			iob_reserve ( iobuf, reserve );
 		} else {
 			/* Get buffer from recycled buffer list */
 			iobuf = list_first_entry ( &ep->recycled,
@@ -895,75 +904,155 @@ int usb_get_string_descriptor ( struct usb_device *usb, unsigned int index,
  */
 
 /**
+ * Get USB configuration descriptor
+ *
+ * @v usb		USB device
+ * @v index		Configuration index
+ * @ret config		Configuration descriptor
+ * @ret rc		Return status code
+ *
+ * The configuration descriptor is dynamically allocated and must
+ * eventually be freed by the caller.
+ */
+static int
+usb_config_descriptor ( struct usb_device *usb, unsigned int index,
+			struct usb_configuration_descriptor **config ) {
+	struct usb_configuration_descriptor partial;
+	size_t len;
+	int rc;
+
+	/* Read first part of configuration descriptor to get size */
+	if ( ( rc = usb_get_config_descriptor ( usb, index, &partial,
+						sizeof ( partial ) ) ) != 0 ) {
+		DBGC ( usb, "USB %s could not get configuration descriptor %d: "
+		       "%s\n", usb->name, index, strerror ( rc ) );
+		goto err_get_partial;
+	}
+	len = le16_to_cpu ( partial.len );
+	if ( len < sizeof ( partial ) ) {
+		DBGC ( usb, "USB %s underlength configuraton descriptor %d\n",
+		       usb->name, index );
+		rc = -EINVAL;
+		goto err_partial_len;
+	}
+
+	/* Allocate buffer for whole configuration descriptor */
+	*config = malloc ( len );
+	if ( ! *config ) {
+		rc = -ENOMEM;
+		goto err_alloc_config;
+	}
+
+	/* Read whole configuration descriptor */
+	if ( ( rc = usb_get_config_descriptor ( usb, index, *config,
+						len ) ) != 0 ) {
+		DBGC ( usb, "USB %s could not get configuration descriptor %d: "
+		       "%s\n", usb->name, index, strerror ( rc ) );
+		goto err_get_config_descriptor;
+	}
+	if ( (*config)->len != partial.len ) {
+		DBGC ( usb, "USB %s bad configuration descriptor %d length\n",
+		       usb->name, index );
+		rc = -EINVAL;
+		goto err_config_len;
+	}
+
+	return 0;
+
+ err_config_len:
+ err_get_config_descriptor:
+	free ( *config );
+ err_alloc_config:
+ err_partial_len:
+ err_get_partial:
+	return rc;
+}
+
+/**
  * Describe USB function
  *
- * @v func		USB function
+ * @v usb		USB device
  * @v config		Configuration descriptor
  * @v first		First interface number
+ * @v interfaces	Interface list to fill in
+ * @v desc		Function descriptor to fill in
  * @ret rc		Return status code
  */
-static int usb_function ( struct usb_function *func,
+static int usb_describe ( struct usb_device *usb,
 			  struct usb_configuration_descriptor *config,
-			  unsigned int first ) {
-	struct usb_device *usb = func->usb;
+			  unsigned int first, uint8_t *interfaces,
+			  struct usb_function_descriptor *desc ) {
 	struct usb_interface_association_descriptor *association;
 	struct usb_interface_descriptor *interface;
 	struct cdc_union_descriptor *cdc_union;
 	unsigned int i;
+
+	/* Fill in vendor and product ID */
+	memset ( desc, 0, sizeof ( *desc ) );
+	desc->vendor = le16_to_cpu ( usb->device.vendor );
+	desc->product = le16_to_cpu ( usb->device.product );
 
 	/* First, look for an interface association descriptor */
 	association = usb_interface_association_descriptor ( config, first );
 	if ( association ) {
 
 		/* Sanity check */
-		if ( association->count > config->interfaces ) {
+		assert ( association->first == first );
+		if ( ( first + association->count ) > config->interfaces ) {
 			DBGC ( usb, "USB %s has invalid association [%d-%d)\n",
-			       func->name, association->first,
-			       ( association->first + association->count ) );
+			       usb->name, first, ( first + association->count));
 			return -ERANGE;
 		}
 
 		/* Describe function */
-		memcpy ( &func->class, &association->class,
-			 sizeof ( func->class ) );
-		func->count = association->count;
+		memcpy ( &desc->class, &association->class,
+			 sizeof ( desc->class ) );
+		desc->count = association->count;
 		for ( i = 0 ; i < association->count ; i++ )
-			func->interface[i] = ( association->first + i );
+			interfaces[i] = ( first + i );
 		return 0;
 	}
 
 	/* Next, look for an interface descriptor */
 	interface = usb_interface_descriptor ( config, first, 0 );
 	if ( ! interface ) {
-		DBGC ( usb, "USB %s has no interface descriptor\n",
-		       func->name );
+		DBGC ( usb, "USB %s has no descriptor for interface %d\n",
+		       usb->name, first );
 		return -ENOENT;
 	}
 
 	/* Describe function */
-	memcpy ( &func->class, &interface->class, sizeof ( func->class ) );
-	func->count = 1;
-	func->interface[0] = first;
+	memcpy ( &desc->class, &interface->class, sizeof ( desc->class ) );
+	desc->count = 1;
+	interfaces[0] = first;
 
 	/* Look for a CDC union descriptor, if applicable */
-	if ( ( func->class.class == USB_CLASS_CDC ) &&
+	if ( ( desc->class.class.class == USB_CLASS_CDC ) &&
 	     ( cdc_union = cdc_union_descriptor ( config, interface ) ) ) {
 
 		/* Determine interface count */
-		func->count = ( ( cdc_union->header.len -
+		desc->count = ( ( cdc_union->header.len -
 				  offsetof ( typeof ( *cdc_union ),
 					     interface[0] ) ) /
 				sizeof ( cdc_union->interface[0] ) );
-		if ( func->count > config->interfaces ) {
+		if ( desc->count > config->interfaces ) {
 			DBGC ( usb, "USB %s has invalid union functional "
 			       "descriptor with %d interfaces\n",
-			       func->name, func->count );
+			       usb->name, desc->count );
 			return -ERANGE;
 		}
 
 		/* Describe function */
-		for ( i = 0 ; i < func->count ; i++ )
-			func->interface[i] = cdc_union->interface[i];
+		for ( i = 0 ; i < desc->count ; i++ ) {
+			if ( cdc_union->interface[i] >= config->interfaces ) {
+				DBGC ( usb, "USB %s has invalid union "
+				       "functional descriptor covering "
+				       "interface %d\n", usb->name,
+				       cdc_union->interface[i] );
+				return -ERANGE;
+			}
+			interfaces[i] = cdc_union->interface[i];
+		}
 
 		return 0;
 	}
@@ -972,22 +1061,108 @@ static int usb_function ( struct usb_function *func,
 }
 
 /**
- * Check for a USB device ID match
+ * Update list of used interface
  *
- * @v func		USB function
- * @v id		Device ID
- * @ret matches		Device ID matches
+ * @v usb		USB device
+ * @v count		Number of interfaces
+ * @v interface		List of interfaces
+ * @v used		List of already-used interfaces
+ * @ret rc		Return status code
  */
-static int
-usb_device_id_matches ( struct usb_function *func, struct usb_device_id *id ) {
+static int usb_used ( struct usb_device *usb, unsigned int count,
+		      uint8_t *interface, uint8_t *used ) {
+	unsigned int i;
 
-	return ( ( ( id->vendor == func->dev.desc.vendor ) ||
-		   ( id->vendor == USB_ANY_ID ) ) &&
-		 ( ( id->product == func->dev.desc.device ) ||
-		   ( id->product == USB_ANY_ID ) ) &&
-		 ( id->class.class == func->class.class ) &&
-		 ( id->class.subclass == func->class.subclass ) &&
-		 ( id->class.protocol == func->class.protocol ) );
+	for ( i = 0 ; i < count ; i++ ) {
+		if ( used[interface[i]] ) {
+			DBGC ( usb, "USB %s interface %d already in use\n",
+			       usb->name, interface[i] );
+			return -EINVAL;
+		}
+		used[interface[i]] = 1;
+	}
+	return 0;
+}
+
+/**
+ * Find USB device driver
+ *
+ * @v desc		Function descriptor
+ * @ret id		USB device ID, or NULL
+ * @ret driver		USB device driver, or NULL
+ */
+struct usb_driver * usb_find_driver ( struct usb_function_descriptor *desc,
+				      struct usb_device_id **id ) {
+	struct usb_driver *driver;
+	unsigned int i;
+
+	/* Look for a matching driver */
+	for_each_table_entry ( driver, USB_DRIVERS ) {
+		for ( i = 0 ; i < driver->id_count ; i++ ) {
+
+			/* Ignore non-matching driver class */
+			if ( ( driver->class.class.scalar ^ desc->class.scalar )
+			     & driver->class.mask.scalar )
+				continue;
+
+			/* Look for a matching ID */
+			*id = &driver->ids[i];
+			if ( ( ( (*id)->vendor == desc->vendor ) ||
+			       ( (*id)->vendor == USB_ANY_ID ) ) &&
+			     ( ( (*id)->product == desc->product ) ||
+			       ( (*id)->product == USB_ANY_ID ) ) )
+				return driver;
+		}
+	}
+
+	/* Not found */
+	*id = NULL;
+	return NULL;
+}
+
+/**
+ * Get USB device configuration score
+ *
+ * @v usb		USB device
+ * @v config		Configuration descriptor
+ * @ret score		Device configuration score, or negative error
+ */
+static int usb_score ( struct usb_device *usb,
+		       struct usb_configuration_descriptor *config ) {
+	uint8_t used[config->interfaces];
+	uint8_t interface[config->interfaces];
+	struct usb_function_descriptor desc;
+	struct usb_driver *driver;
+	struct usb_device_id *id;
+	unsigned int first;
+	unsigned int score = 0;
+	int rc;
+
+	/* Identify each function in turn */
+	memset ( used, 0, sizeof ( used ) );
+	for ( first = 0 ; first < config->interfaces ; first++ ) {
+
+		/* Skip interfaces already used */
+		if ( used[first] )
+			continue;
+
+		/* Describe function */
+		if ( ( rc = usb_describe ( usb, config, first, interface,
+					   &desc ) ) != 0 )
+			return rc;
+
+		/* Update used interfaces */
+		if ( ( rc = usb_used ( usb, desc.count, interface,
+				       used ) ) != 0 )
+			return rc;
+
+		/* Look for a driver for this function */
+		driver = usb_find_driver ( &desc, &id );
+		if ( driver )
+			score += driver->score;
+	}
+
+	return score;
 }
 
 /**
@@ -1002,39 +1177,32 @@ static int usb_probe ( struct usb_function *func,
 	struct usb_device *usb = func->usb;
 	struct usb_driver *driver;
 	struct usb_device_id *id;
-	unsigned int i;
 	int rc;
 
-	/* Look for a matching driver */
-	for_each_table_entry ( driver, USB_DRIVERS ) {
-		for ( i = 0 ; i < driver->id_count ; i++ ) {
-
-			/* Check for a matching ID */
-			id = &driver->ids[i];
-			if ( ! usb_device_id_matches ( func, id ) )
-				continue;
-
-			/* Probe driver */
-			if ( ( rc = driver->probe ( func, config ) ) != 0 ) {
-				DBGC ( usb, "USB %s failed to probe driver %s: "
-				       "%s\n", func->name, id->name,
-				       strerror ( rc ) );
-				/* Continue trying other drivers */
-				continue;
-			}
-
-			/* Record driver */
-			func->driver = driver;
-			func->dev.driver_name = id->name;
-			return 0;
-		}
+	/* Identify driver */
+	driver = usb_find_driver ( &func->desc, &id );
+	if ( ! driver ) {
+		DBGC ( usb, "USB %s %04x:%04x class %d:%d:%d has no driver\n",
+		       func->name, func->desc.vendor, func->desc.product,
+		       func->desc.class.class.class,
+		       func->desc.class.class.subclass,
+		       func->desc.class.class.protocol );
+		return -ENOENT;
 	}
 
-	/* No driver found */
-	DBGC ( usb, "USB %s %04x:%04x class %d:%d:%d has no driver\n",
-	       func->name, func->dev.desc.vendor, func->dev.desc.device,
-	       func->class.class, func->class.subclass, func->class.protocol );
-	return -ENOENT;
+	/* Record driver */
+	func->driver = driver;
+	func->id = id;
+	func->dev.driver_name = id->name;
+
+	/* Probe driver */
+	if ( ( rc = driver->probe ( func, config ) ) != 0 ) {
+		DBGC ( usb, "USB %s failed to probe driver %s: %s\n",
+		       func->name, id->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -1088,36 +1256,31 @@ usb_probe_all ( struct usb_device *usb,
 			   "%s-%d.%d", usb->name, config->config, first );
 		INIT_LIST_HEAD ( &func->dev.children );
 		func->dev.parent = bus->dev;
+		list_add_tail ( &func->list, &usb->functions );
 
 		/* Identify function */
-		if ( ( rc = usb_function ( func, config, first ) ) != 0 )
-			goto err_function;
-		assert ( func->count <= config->interfaces );
+		if ( ( rc = usb_describe ( usb, config, first, func->interface,
+					   &func->desc ) ) != 0 )
+			goto err_describe;
+		assert ( func->desc.count <= config->interfaces );
 
 		/* Mark interfaces as used */
-		for ( i = 0 ; i < func->count ; i++ ) {
-			if ( func->interface[i] >= config->interfaces ) {
-				DBGC ( usb, "USB %s has invalid interface %d\n",
-				       func->name, func->interface[i] );
-				goto err_interface;
-			}
-			used[ func->interface[i] ] = 1;
-		}
+		if ( ( rc = usb_used ( usb, func->desc.count, func->interface,
+				       used ) ) != 0 )
+			goto err_used;
 
 		/* Probe device driver */
 		if ( ( rc = usb_probe ( func, config ) ) != 0 )
 			goto err_probe;
 		DBGC ( usb, "USB %s %04x:%04x class %d:%d:%d interfaces ",
-		       func->name, func->dev.desc.vendor, func->dev.desc.device,
-		       func->class.class, func->class.subclass,
-		       func->class.protocol );
-		for ( i = 0 ; i < func->count ; i++ )
+		       func->name, func->desc.vendor, func->desc.product,
+		       func->desc.class.class.class,
+		       func->desc.class.class.subclass,
+		       func->desc.class.class.protocol );
+		for ( i = 0 ; i < func->desc.count ; i++ )
 			DBGC ( usb, "%s%d", ( i ? "," : "" ),
 			       func->interface[i] );
 		DBGC ( usb, " using driver %s\n", func->dev.driver_name );
-
-		/* Add to list of functions */
-		list_add ( &func->list, &usb->functions );
 
 		/* Add to device hierarchy */
 		list_add_tail ( &func->dev.siblings, &bus->dev->children );
@@ -1125,13 +1288,13 @@ usb_probe_all ( struct usb_device *usb,
 		continue;
 
 		list_del ( &func->dev.siblings );
-		list_del ( &func->list );
 		usb_remove ( func );
 	err_probe:
+	err_used:
+	err_describe:
+		list_del ( &func->list );
 		free ( func );
 	err_alloc:
-	err_interface:
-	err_function:
 		/* Continue registering other functions */
 		continue;
 	}
@@ -1165,82 +1328,6 @@ static void usb_remove_all ( struct usb_device *usb ) {
 }
 
 /**
- * Select USB device configuration
- *
- * @v usb		USB device
- * @v index		Configuration index
- * @ret rc		Return status code
- */
-static int usb_configure ( struct usb_device *usb, unsigned int index ) {
-	struct usb_configuration_descriptor partial;
-	struct usb_configuration_descriptor *config;
-	size_t len;
-	int rc;
-
-	/* Read first part of configuration descriptor to get size */
-	if ( ( rc = usb_get_config_descriptor ( usb, index, &partial,
-						sizeof ( partial ) ) ) != 0 ) {
-		DBGC ( usb, "USB %s could not get configuration descriptor %d: "
-		       "%s\n", usb->name, index, strerror ( rc ) );
-		goto err_get_partial;
-	}
-	len = le16_to_cpu ( partial.len );
-	if ( len < sizeof ( partial ) ) {
-		DBGC ( usb, "USB %s underlength configuraton descriptor %d\n",
-		       usb->name, index );
-		rc = -EINVAL;
-		goto err_partial_len;
-	}
-
-	/* Allocate buffer for whole configuration descriptor */
-	config = malloc ( len );
-	if ( ! config ) {
-		rc = -ENOMEM;
-		goto err_alloc_config;
-	}
-
-	/* Read whole configuration descriptor */
-	if ( ( rc = usb_get_config_descriptor ( usb, index, config,
-						len ) ) != 0 ) {
-		DBGC ( usb, "USB %s could not get configuration descriptor %d: "
-		       "%s\n", usb->name, index, strerror ( rc ) );
-		goto err_get_config_descriptor;
-	}
-	if ( config->len != partial.len ) {
-		DBGC ( usb, "USB %s bad configuration descriptor %d length\n",
-		       usb->name, index );
-		rc = -EINVAL;
-		goto err_config_len;
-	}
-
-	/* Set configuration */
-	if ( ( rc = usb_set_configuration ( usb, config->config ) ) != 0){
-		DBGC ( usb, "USB %s could not set configuration %d: %s\n",
-		       usb->name, config->config, strerror ( rc ) );
-		goto err_set_configuration;
-	}
-
-	/* Probe USB device drivers */
-	usb_probe_all ( usb, config );
-
-	/* Free configuration descriptor */
-	free ( config );
-
-	return 0;
-
-	usb_remove_all ( usb );
-	usb_set_configuration ( usb, 0 );
- err_set_configuration:
- err_config_len:
- err_get_config_descriptor:
-	free ( config );
- err_alloc_config:
- err_partial_len:
- err_get_partial:
-	return rc;
-}
-
-/**
  * Clear USB device configuration
  *
  * @v usb		USB device
@@ -1262,32 +1349,76 @@ static void usb_deconfigure ( struct usb_device *usb ) {
 }
 
 /**
- * Find and select a supported USB device configuration
+ * Choose our preferred USB device configuration
  *
  * @v usb		USB device
  * @ret rc		Return status code
  */
-static int usb_configure_any ( struct usb_device *usb ) {
+static int usb_autoconfigure ( struct usb_device *usb ) {
+	struct usb_configuration_descriptor *config;
+	unsigned int preferred = 0;
 	unsigned int index;
-	int rc = -ENOENT;
+	int score;
+	int best = 0;
+	int rc;
 
-	/* Attempt all configuration indexes */
+	/* Calculate driver score for each configuration index */
 	for ( index = 0 ; index < usb->device.configurations ; index++ ) {
 
-		/* Attempt this configuration index */
-		if ( ( rc = usb_configure ( usb, index ) ) != 0 )
-			continue;
+		/* Read configuration descriptor */
+		if ( ( rc = usb_config_descriptor ( usb, index,
+						    &config ) ) != 0 )
+			goto err_config;
 
-		/* If we have no drivers, then try the next configuration */
-		if ( list_empty ( &usb->functions ) ) {
-			rc = -ENOTSUP;
-			usb_deconfigure ( usb );
-			continue;
+		/* Get score for this configuration */
+		score = usb_score ( usb, config );
+		if ( score < 0 ) {
+			rc = score;
+			goto err_score;
+		}
+		DBGC2 ( usb, "USB %s configuration %d score %d\n",
+			usb->name, config->config, score );
+
+		/* Record as preferred configuration, if applicable */
+		if ( score > best ) {
+			best = score;
+			preferred = index;
 		}
 
-		return 0;
+		/* Free configuration descriptor */
+		free ( config );
+		config = NULL;
 	}
 
+	/* Read preferred configuration descriptor */
+	if ( ( rc = usb_config_descriptor ( usb, preferred, &config ) ) != 0 )
+		goto err_preferred;
+
+	/* Set configuration */
+	if ( ( rc = usb_set_configuration ( usb, config->config ) ) != 0){
+		DBGC ( usb, "USB %s could not set configuration %d: %s\n",
+		       usb->name, config->config, strerror ( rc ) );
+		goto err_set_configuration;
+	}
+
+	/* Probe USB device drivers */
+	usb_probe_all ( usb, config );
+
+	/* Free configuration descriptor */
+	free ( config );
+
+	return 0;
+
+	usb_remove_all ( usb );
+	usb_set_configuration ( usb, 0 );
+ err_set_configuration:
+	free ( config );
+ err_preferred:
+	return rc;
+
+ err_score:
+	free ( config );
+ err_config:
 	return rc;
 }
 
@@ -1366,8 +1497,9 @@ static int register_usb ( struct usb_device *usb ) {
 		       hub->name, port->address, strerror ( rc ) );
 		goto err_speed;
 	}
+	usb->speed = port->speed;
 	DBGC2 ( usb, "USB %s attached as %s-speed device\n",
-		usb->name, usb_speed_name ( port->speed ) );
+		usb->name, usb_speed_name ( usb->speed ) );
 
 	/* Open device */
 	if ( ( rc = usb->host->open ( usb ) ) != 0 ) {
@@ -1377,7 +1509,7 @@ static int register_usb ( struct usb_device *usb ) {
 	}
 
 	/* Describe control endpoint */
-	mtu = USB_EP0_DEFAULT_MTU ( port->speed );
+	mtu = USB_EP0_DEFAULT_MTU ( usb->speed );
 	usb_endpoint_describe ( &usb->control, USB_EP0_ADDRESS,
 				USB_EP0_ATTRIBUTES, mtu, USB_EP0_BURST,
 				USB_EP0_INTERVAL );
@@ -1428,16 +1560,16 @@ static int register_usb ( struct usb_device *usb ) {
 	       le16_to_cpu ( usb->device.product ), usb->device.class.class,
 	       usb->device.class.subclass, usb->device.class.protocol,
 	       usb_bcd ( le16_to_cpu ( usb->device.protocol ) ),
-	       usb_speed_name ( port->speed ), usb->control.mtu );
+	       usb_speed_name ( usb->speed ), usb->control.mtu );
 
 	/* Configure device */
-	if ( ( rc = usb_configure_any ( usb ) ) != 0 )
-		goto err_configure_any;
+	if ( ( rc = usb_autoconfigure ( usb ) ) != 0 )
+		goto err_autoconfigure;
 
 	return 0;
 
 	usb_deconfigure ( usb );
- err_configure_any:
+ err_autoconfigure:
  err_get_device_descriptor:
  err_mtu:
  err_get_mtu:
@@ -1591,23 +1723,24 @@ static int usb_hotplugged ( struct usb_port *port ) {
 	if ( ( rc = hub->driver->speed ( hub, port ) ) != 0 ) {
 		DBGC ( hub, "USB hub %s port %d could not get speed: %s\n",
 		       hub->name, port->address, strerror ( rc ) );
-		goto err_speed;
+		/* Treat as a disconnection */
+		port->disconnected = 1;
+		port->speed = USB_SPEED_NONE;
 	}
 
 	/* Detach device, if applicable */
 	if ( port->attached && ( port->disconnected || ! port->speed ) )
 		usb_detached ( port );
 
+	/* Clear any recorded disconnections */
+	port->disconnected = 0;
+
 	/* Attach device, if applicable */
 	if ( port->speed && ( ! port->attached ) &&
 	     ( ( rc = usb_attached ( port ) ) != 0 ) )
-		goto err_attached;
+		return rc;
 
- err_attached:
- err_speed:
-	/* Clear any recorded disconnections */
-	port->disconnected = 0;
-	return rc;
+	return 0;
 }
 
 /******************************************************************************
@@ -2106,12 +2239,12 @@ struct usb_port * usb_transaction_translator ( struct usb_device *usb ) {
 	struct usb_device *parent;
 
 	/* Navigate up to root hub.  If we find a low-speed or
-	 * full-speed port with a higher-speed parent device, then
-	 * that port is the transaction translator.
+	 * full-speed device with a higher-speed parent hub, then that
+	 * device's port is the transaction translator.
 	 */
 	for ( ; ( parent = usb->port->hub->usb ) ; usb = parent ) {
-		if ( ( usb->port->speed <= USB_SPEED_FULL ) &&
-		     ( parent->port->speed > USB_SPEED_FULL ) )
+		if ( ( usb->speed <= USB_SPEED_FULL ) &&
+		     ( parent->speed > USB_SPEED_FULL ) )
 			return usb->port;
 	}
 

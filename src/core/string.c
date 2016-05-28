@@ -81,7 +81,7 @@ void * generic_memmove ( void *dest, const void *src, size_t len ) {
 	uint8_t *dest_bytes = ( dest + len );
 
 	if ( dest < src )
-		return memcpy ( dest, src, len );
+		return generic_memcpy ( dest, src, len );
 	while ( len-- )
 		*(--dest_bytes) = *(--src_bytes);
 	return dest;

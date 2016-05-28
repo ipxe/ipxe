@@ -493,6 +493,9 @@ struct vmxnet3_nic {
 /** MTU size */
 #define VMXNET3_MTU ( ETH_FRAME_LEN + 4 /* VLAN */ + 4 /* FCS */ )
 
+/** Transmit ring maximum fill level */
+#define VMXNET3_TX_FILL ( VMXNET3_NUM_TX_DESC - 1 )
+
 /** Receive ring maximum fill level */
 #define VMXNET3_RX_FILL 8
 

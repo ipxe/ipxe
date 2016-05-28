@@ -491,6 +491,11 @@ LDFLAGS		+= -static
 #
 CFLAGS		+= -include include/compiler.h
 
+# The section type character (e.g. "@" in "@progbits") varies by
+# architecture.
+#
+CFLAGS		+= -DASM_TCHAR='$(ASM_TCHAR)' -DASM_TCHAR_OPS='$(ASM_TCHAR_OPS)'
+
 # CFLAGS for specific object types
 #
 CFLAGS_c	+=
@@ -734,8 +739,8 @@ $(DBGCOL_LIST) : $(MAKEDEPS)
 VERYCLEANUP += $(DBGCOL_LIST)
 
 DBGCOL_COLOURS := $(subst -, ,$(DBGCOL))
-DBGCOL_MIN := $(word 1,$(DBGCOL_COLOURS))
-DBGCOL_MAX := $(word 2,$(DBGCOL_COLOURS))
+DBGCOL_MIN := $(firstword $(DBGCOL_COLOURS))
+DBGCOL_MAX := $(lastword $(DBGCOL_COLOURS))
 
 debug_DEPS += $(DBGCOL_LIST)
 
@@ -896,7 +901,7 @@ endif
 # Device ID tables (using IDs from ROM definition file)
 #
 define obj_pci_id_asm
-	.section ".pci_devlist.$(1)", "a", @progbits
+	.section ".pci_devlist.$(1)", "a", $(ASM_TCHAR)progbits
 	.globl pci_devlist_$(1)
 pci_devlist_$(1):
 	.short ( 0x$(1) & 0xffff )
@@ -960,13 +965,13 @@ DRIVERS_ipxe	= $(DRIVERS_net) $(DRIVERS_infiniband) \
 # TGT_DRIVERS  : the driver for each element (e.g. "rtl8139 prism2_pci")
 # TGT_ROM_NAME : the ROM name (e.g. "dfe538")
 #
-CARD_DRIVER	= $(firstword $(DRIVER_$(1)) $(1))
 TGT_ELEMENTS	= $(subst --, ,$(firstword $(subst ., ,$(notdir $@))))
 TGT_ROM_NAME	= $(firstword $(TGT_ELEMENTS))
-TGT_DRIVERS	= $(strip $(if $(DRIVERS_$(TGT_ROM_NAME)), \
-			       $(DRIVERS_$(TGT_ROM_NAME)), \
-			       $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
-			         $(call CARD_DRIVER,$(TGT_ELEMENT))) ))
+TGT_DRIVERS	= $(strip $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
+				    $(if $(DRIVERS_$(TGT_ELEMENT)), \
+					 $(DRIVERS_$(TGT_ELEMENT)), \
+					 $(firstword $(DRIVER_$(TGT_ELEMENT)) \
+						     $(TGT_ELEMENT)))))
 TGT_PREFIX_NAME	= $(word 2,$(subst ., ,$(notdir $@)))
 TGT_PREFIX	= $(strip $(if $(filter rom,$(TGT_PREFIX_NAME)), \
 			       $(ROM_TYPE_$(TGT_ROM_NAME))rom, \
@@ -1005,7 +1010,7 @@ TGT_LD_ENTRY	= _$(TGT_PREFIX)_start
 #		  --defsym pci_vendor=0x1186 --defsym pci_device=0x1300")
 #
 TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_ENTRY) $(TGT_LD_DRIVERS) \
-		    $(TGT_LD_DEVLIST) obj_config,\
+		    $(TGT_LD_DEVLIST) obj_config obj_config_$(PLATFORM),\
 		    -u $(SYM) --defsym check_$(SYM)=$(SYM) ) \
 		  $(patsubst %,--defsym %,$(TGT_LD_IDS)) \
 		  -e $(TGT_LD_ENTRY)
@@ -1298,21 +1303,15 @@ CLEANUP += $(ZBIN)
 #
 # The EFI image converter
 #
-ELF2EFI_CFLAGS	:= -I$(BINUTILS_DIR)/include -I$(BFD_DIR)/include \
-		   -I$(ZLIB_DIR)/include -idirafter include
-ELF2EFI_LDFLAGS	:= -L$(BINUTILS_DIR)/lib -L$(BFD_DIR)/lib -L$(ZLIB_DIR)/lib \
-		   -lbfd -ldl -liberty -lz -Wl,--no-warn-search-mismatch
 
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET_IA32 $< \
-		$(ELF2EFI_LDFLAGS) -o $@
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -DEFI_TARGET32 $< -o $@
 CLEANUP += $(ELF2EFI32)
 
 $(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET_X64 $< \
-		$(ELF2EFI_LDFLAGS) -o $@
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -DEFI_TARGET64 $< -o $@
 CLEANUP += $(ELF2EFI64)
 
 $(EFIROM) : util/efirom.c $(MAKEDEPS)

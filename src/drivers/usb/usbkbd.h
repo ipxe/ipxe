@@ -68,8 +68,20 @@ enum usb_keycode {
 	USBKBD_KEY_SPACE = 0x2c,
 	USBKBD_KEY_MINUS = 0x2d,
 	USBKBD_KEY_SLASH = 0x38,
-	USBKBD_KEY_CAPSLOCK = 0x39,
+	USBKBD_KEY_CAPS_LOCK = 0x39,
+	USBKBD_KEY_F1 = 0x3a,
 	USBKBD_KEY_UP = 0x52,
+	USBKBD_KEY_NUM_LOCK = 0x53,
+	USBKBD_KEY_PAD_ENTER = 0x58,
+	USBKBD_KEY_PAD_1 = 0x59,
+	USBKBD_KEY_PAD_DOT = 0x63,
+};
+
+/** USB keyboard LEDs */
+enum usb_keyboard_led {
+	USBKBD_LED_NUM_LOCK = 0x01,
+	USBKBD_LED_CAPS_LOCK = 0x02,
+	USBKBD_LED_SCROLL_LOCK = 0x04,
 };
 
 /** Keyboard idle duration (in 4ms units)
@@ -119,6 +131,11 @@ struct usb_keyboard {
 	unsigned int keycode;
 	/** Autorepeat hold-off time (in number of completions reported) */
 	unsigned int holdoff;
+
+	/** Keyboard LED state */
+	uint8_t leds;
+	/** Keyboard LEDs changed */
+	uint8_t leds_changed;
 
 	/** Keyboard buffer
 	 *

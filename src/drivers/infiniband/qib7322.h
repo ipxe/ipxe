@@ -33,8 +33,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-#define BITOPS_LITTLE_ENDIAN
-#include <ipxe/bitops.h>
+#define PSEUDOBIT_LITTLE_ENDIAN
+#include <ipxe/pseudobit.h>
 #include "qib_7322_regs.h"
 
 /** A QIB7322 GPIO register */

@@ -358,8 +358,11 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 			       ( ( netdev->rx_stats.good & 0xf ) << 0 ) );
 
 	/* Fix up checksums */
-	if ( trans_csum )
+	if ( trans_csum ) {
 		*trans_csum = ipv4_pshdr_chksum ( iobuf, *trans_csum );
+		if ( ! *trans_csum )
+			*trans_csum = tcpip_protocol->zero_csum;
+	}
 	iphdr->chksum = tcpip_chksum ( iphdr, sizeof ( *iphdr ) );
 
 	/* Print IP4 header for debugging */
@@ -714,6 +717,7 @@ struct tcpip_net_protocol ipv4_tcpip_protocol __tcpip_net_protocol = {
 	.name = "IPv4",
 	.sa_family = AF_INET,
 	.header_len = sizeof ( struct iphdr ),
+	.net_protocol = &ipv4_protocol,
 	.tx = ipv4_tx,
 	.netdev = ipv4_netdev,
 };
