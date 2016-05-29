@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/AbsolutePointer.h>
+#include <ipxe/efi/Protocol/AppleNetBoot.h>
 #include <ipxe/efi/Protocol/Arp.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
 #include <ipxe/efi/Protocol/BusSpecificDriverOverride.h>
@@ -83,6 +84,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Absolute pointer protocol GUID */
 EFI_GUID efi_absolute_pointer_protocol_guid
 	= EFI_ABSOLUTE_POINTER_PROTOCOL_GUID;
+
+/** Apple NetBoot protocol GUID */
+EFI_GUID efi_apple_net_boot_protocol_guid
+	= EFI_APPLE_NET_BOOT_PROTOCOL_GUID;
 
 /** ARP protocol GUID */
 EFI_GUID efi_arp_protocol_guid

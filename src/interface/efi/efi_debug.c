@@ -71,6 +71,8 @@ struct efi_well_known_guid {
 static struct efi_well_known_guid efi_well_known_guids[] = {
 	{ &efi_absolute_pointer_protocol_guid,
 	  "AbsolutePointer" },
+	{ &efi_apple_net_boot_protocol_guid,
+	  "AppleNetBoot" },
 	{ &efi_arp_protocol_guid,
 	  "Arp" },
 	{ &efi_arp_service_binding_protocol_guid,
