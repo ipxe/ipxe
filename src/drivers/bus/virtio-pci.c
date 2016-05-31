@@ -253,21 +253,21 @@ int virtio_pci_map_capability(struct pci_device *pci, int cap, size_t minlen,
                           &length);
 
     if (length <= start) {
-        DBG("VIRTIO-PCI bad capability len %u (>%u expected)\n", length, start);
+        DBG("VIRTIO-PCI bad capability len %d (>%d expected)\n", length, start);
         return -EINVAL;
     }
     if (length - start < minlen) {
-        DBG("VIRTIO-PCI bad capability len %u (>=%zu expected)\n", length, minlen);
+        DBG("VIRTIO-PCI bad capability len %d (>=%zd expected)\n", length, minlen);
         return -EINVAL;
     }
     length -= start;
     if (start + offset < offset) {
-        DBG("VIRTIO-PCI map wrap-around %u+%u\n", start, offset);
+        DBG("VIRTIO-PCI map wrap-around %d+%d\n", start, offset);
         return -EINVAL;
     }
     offset += start;
     if (offset & (align - 1)) {
-        DBG("VIRTIO-PCI offset %u not aligned to %u\n", offset, align);
+        DBG("VIRTIO-PCI offset %d not aligned to %d\n", offset, align);
         return -EINVAL;
     }
     if (length > size) {
@@ -276,9 +276,9 @@ int virtio_pci_map_capability(struct pci_device *pci, int cap, size_t minlen,
 
     if (minlen + offset < minlen ||
         minlen + offset > pci_bar_size(pci, PCI_BASE_ADDRESS(bar))) {
-        DBG("VIRTIO-PCI map virtio %zu@%u out of range on bar %i length %lu\n",
+        DBG("VIRTIO-PCI map virtio %zd@%d out of range on bar %i length %ld\n",
             minlen, offset,
-            bar, (unsigned long)pci_bar_size(pci, PCI_BASE_ADDRESS(bar)));
+            bar, pci_bar_size(pci, PCI_BASE_ADDRESS(bar)));
         return -EINVAL;
     }
 
@@ -354,7 +354,7 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
             return -ENOENT;
 
         if (size & (size - 1)) {
-            DBG("VIRTIO-PCI %p: bad queue size %u", vdev, size);
+            DBG("VIRTIO-PCI %p: bad queue size %d", vdev, size);
             return -EINVAL;
         }
 
