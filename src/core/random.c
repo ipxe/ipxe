@@ -18,6 +18,8 @@ static int32_t rnd_seed = 0;
  */
 void srandom ( unsigned int seed ) {
 	rnd_seed = seed;
+	if ( ! rnd_seed )
+		rnd_seed = 4; /* Chosen by fair dice roll */
 }
 
 /**
