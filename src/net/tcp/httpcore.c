@@ -1201,13 +1201,17 @@ static int http_parse_header ( struct http_transaction *http, char *line ) {
 	DBGC2 ( http, "HTTP %p RX %s\n", http, line );
 
 	/* Extract header name */
-	sep = strstr ( line, ": " );
+	sep = strchr ( line, ':' );
 	if ( ! sep ) {
 		DBGC ( http, "HTTP %p malformed header \"%s\"\n", http, line );
 		return -EINVAL_HEADER;
 	}
 	*sep = '\0';
-	line = ( sep + 2 /* ": " */ );
+
+	/* Extract remainder of line */
+	line = ( sep + 1 );
+	while ( isspace ( *line ) )
+		line++;
 
 	/* Process header, if recognised */
 	for_each_table_entry ( header, HTTP_RESPONSE_HEADERS ) {
