@@ -422,7 +422,9 @@ static void settings_test_exec ( void ) {
 
 	/* "busdevfn" setting type (no store capability) */
 	fetchf_ok ( &test_settings, &test_busdevfn_setting,
-		    RAW ( 0x03, 0x45 ), "03:08.5" );
+		    RAW ( 0x03, 0x45 ), "0000:03:08.5" );
+	fetchf_ok ( &test_settings, &test_busdevfn_setting,
+		    RAW ( 0x00, 0x02, 0x0a, 0x21 ), "0002:0a:04.1" );
 
 	/* Clear and unregister test settings block */
 	clear_settings ( &test_settings );
