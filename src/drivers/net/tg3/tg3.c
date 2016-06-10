@@ -545,7 +545,7 @@ static int tg3_test_dma(struct tg3 *tp)
 		goto out_nofree;
 	}
 	buf_dma = virt_to_bus(buf);
-	DBGC2(tp->dev, "dma test buffer, virt: %p phys: %#08x\n", buf, buf_dma);
+	DBGC2(tp->dev, "dma test buffer, virt: %p phys: %#016lx\n", buf, buf_dma);
 
 	if (tg3_flag(tp, 57765_PLUS)) {
 		tp->dma_rwctrl = DMA_RWCTRL_DIS_CACHE_ALIGNMENT;

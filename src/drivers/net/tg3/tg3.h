@@ -2788,7 +2788,7 @@ struct tg3_hw_stats {
 	u8				__reserved4[0xb00-0x9c8];
 };
 
-typedef u32 dma_addr_t;
+typedef unsigned long dma_addr_t;
 
 /* 'mapping' is superfluous as the chip does not write into
  * the tx/rx post rings so we could just fetch it from there.
