@@ -113,6 +113,8 @@ struct tcp_connection {
 	struct process process;
 	/** Retransmission timer */
 	struct retry_timer timer;
+	/** Keepalive timer */
+	struct retry_timer keepalive;
 	/** Shutdown (TIME_WAIT) timer */
 	struct retry_timer wait;
 
@@ -177,6 +179,7 @@ static struct profiler tcp_xfer_profiler __profiler = { .name = "tcp.xfer" };
 static struct process_descriptor tcp_process_desc;
 static struct interface_descriptor tcp_xfer_desc;
 static void tcp_expired ( struct retry_timer *timer, int over );
+static void tcp_keepalive_expired ( struct retry_timer *timer, int over );
 static void tcp_wait_expired ( struct retry_timer *timer, int over );
 static struct tcp_connection * tcp_demux ( unsigned int local_port );
 static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
@@ -284,6 +287,7 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	intf_init ( &tcp->xfer, &tcp_xfer_desc, &tcp->refcnt );
 	process_init_stopped ( &tcp->process, &tcp_process_desc, &tcp->refcnt );
 	timer_init ( &tcp->timer, tcp_expired, &tcp->refcnt );
+	timer_init ( &tcp->keepalive, tcp_keepalive_expired, &tcp->refcnt );
 	timer_init ( &tcp->wait, tcp_wait_expired, &tcp->refcnt );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
@@ -380,6 +384,7 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 		/* Remove from list and drop reference */
 		process_del ( &tcp->process );
 		stop_timer ( &tcp->timer );
+		stop_timer ( &tcp->keepalive );
 		stop_timer ( &tcp->wait );
 		list_del ( &tcp->list );
 		ref_put ( &tcp->refcnt );
@@ -393,6 +398,9 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 	 */
 	if ( ! ( tcp->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
 		tcp_rx_ack ( tcp, ( tcp->snd_seq + 1 ), 0 );
+
+	/* Stop keepalive timer */
+	stop_timer ( &tcp->keepalive );
 
 	/* If we have no data remaining to send, start sending FIN */
 	if ( list_empty ( &tcp->tx_queue ) &&
@@ -802,6 +810,32 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 }
 
 /**
+ * Keepalive timer expired
+ *
+ * @v timer		Keepalive timer
+ * @v over		Failure indicator
+ */
+static void tcp_keepalive_expired ( struct retry_timer *timer,
+				    int over __unused ) {
+	struct tcp_connection *tcp =
+		container_of ( timer, struct tcp_connection, keepalive );
+
+	DBGC ( tcp, "TCP %p sending keepalive\n", tcp );
+
+	/* Reset keepalive timer */
+	start_timer_fixed ( &tcp->keepalive, TCP_KEEPALIVE_DELAY );
+
+	/* Send keepalive.  We do this only to preserve or restore
+	 * state in intermediate devices (e.g. firewall NAT tables);
+	 * we don't actually care about eliciting a response to verify
+	 * that the peer is still alive.  We therefore send just a
+	 * pure ACK, to keep our transmit path simple.
+	 */
+	tcp->flags |= TCP_ACK_PENDING;
+	tcp_xmit ( tcp );
+}
+
+/**
  * Shutdown timer expired
  *
  * @v timer		Shutdown timer
@@ -1104,6 +1138,10 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 
 	/* Update window size */
 	tcp->snd_win = win;
+
+	/* Hold off (or start) the keepalive timer, if applicable */
+	if ( ! ( tcp->tcp_state & TCP_STATE_SENT ( TCP_FIN ) ) )
+		start_timer_fixed ( &tcp->keepalive, TCP_KEEPALIVE_DELAY );
 
 	/* Ignore ACKs that don't actually acknowledge any new data.
 	 * (In particular, do not stop the retransmission timer; this

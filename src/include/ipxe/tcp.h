@@ -379,6 +379,14 @@ struct tcp_options {
 #define TCP_MSL ( 2 * 60 * TICKS_PER_SEC )
 
 /**
+ * TCP keepalive period
+ *
+ * We send keepalive ACKs after this period of inactivity has elapsed
+ * on an established connection.
+ */
+#define TCP_KEEPALIVE_DELAY ( 15 * TICKS_PER_SEC )
+
+/**
  * TCP maximum header length
  *
  */
