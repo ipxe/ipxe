@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/pciea.h>
 #include <ipxe/umalloc.h>
 #include "thunderx.h"
+#include "thunderxcfg.h"
 
 /** @file
  *
@@ -55,6 +56,10 @@ static LIST_HEAD ( txnic_pfs );
 
 /** Debug colour for physical function and BGX messages */
 #define TXNICCOL(x) ( &txnic_pfs + (x)->node )
+
+/** Board configuration protocol */
+static EFI_THUNDER_CONFIG_PROTOCOL *txcfg;
+EFI_REQUEST_PROTOCOL ( EFI_THUNDER_CONFIG_PROTOCOL, &txcfg );
 
 /******************************************************************************
  *
@@ -1479,6 +1484,39 @@ static void txnic_bgx_init ( struct txnic_bgx *bgx, unsigned int type ) {
 }
 
 /**
+ * Get MAC address
+ *
+ * @v lmac		Logical MAC
+ */
+static void txnic_bgx_mac ( struct txnic_lmac *lmac ) {
+	struct txnic_bgx *bgx = lmac->bgx;
+	BOARD_CFG *boardcfg;
+	NODE_CFG *nodecfg;
+	BGX_CFG *bgxcfg;
+	LMAC_CFG *lmaccfg;
+
+	/* Extract MAC from Board Configuration protocol, if available */
+	if ( txcfg ) {
+		boardcfg = txcfg->BoardConfig;
+		nodecfg = &boardcfg->Node[ bgx->node % MAX_NODES ];
+		bgxcfg = &nodecfg->BgxCfg[ bgx->idx % BGX_PER_NODE_COUNT ];
+		lmaccfg = &bgxcfg->Lmacs[ lmac->idx % LMAC_PER_BGX_COUNT ];
+		lmac->mac.be64 = cpu_to_be64 ( lmaccfg->MacAddress );
+	} else {
+		DBGC ( TXNICCOL ( bgx ), "TXNIC %d/%d/%d has no board "
+		       "configuration protocol\n", bgx->node, bgx->idx,
+		       lmac->idx );
+	}
+
+	/* Use random MAC address if none available */
+	if ( ! lmac->mac.be64 ) {
+		DBGC ( TXNICCOL ( bgx ), "TXNIC %d/%d/%d has no MAC address\n",
+		       bgx->node, bgx->idx, lmac->idx );
+		eth_random_addr ( lmac->mac.raw );
+	}
+}
+
+/**
  * Initialise Super PHY Unit (SPU)
  *
  * @v lmac		Logical MAC
@@ -1533,7 +1571,7 @@ static void txnic_bgx_lmac_init ( struct txnic_bgx *bgx,
 	lmac->idx = TXNIC_VNIC_IDX ( bgx->idx, lmac_idx );
 
 	/* Set MAC address */
-	eth_random_addr ( lmac->mac.raw );
+	txnic_bgx_mac ( lmac );
 
 	/* Initialise PHY */
 	txnic_bgx_spu_init ( lmac );
