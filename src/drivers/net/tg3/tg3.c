@@ -486,6 +486,8 @@ static void tg3_poll(struct net_device *dev)
 	 */
 	tp->hw_status->status &= ~SD_STATUS_UPDATED;
 
+	mb();
+
 	tg3_poll_link(tp);
 	tg3_tx_complete(dev);
 	tg3_rx_complete(dev);
