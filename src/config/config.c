@@ -278,6 +278,9 @@ REQUIRE_OBJECT ( ipstat_cmd );
 #ifdef PROFSTAT_CMD
 REQUIRE_OBJECT ( profstat_cmd );
 #endif
+#ifdef NTP_CMD
+REQUIRE_OBJECT ( ntp_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

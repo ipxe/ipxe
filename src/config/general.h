@@ -147,6 +147,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define CONSOLE_CMD		/* Console command */
 //#define IPSTAT_CMD		/* IP statistics commands */
 //#define PROFSTAT_CMD		/* Profiling commands */
+//#define NTP_CMD		/* NTP commands */
 
 /*
  * ROM-specific options
