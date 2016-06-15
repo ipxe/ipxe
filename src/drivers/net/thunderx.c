@@ -939,7 +939,7 @@ static int txnic_lmac_open ( struct net_device *netdev ) {
 	unsigned int tl3_idx = TXNIC_TL3_IDX ( vnic_idx );
 	unsigned int tl2_idx = TXNIC_TL2_IDX ( vnic_idx );
 	void *lmregs = ( pf->regs + TXNIC_PF_LMAC ( vnic_idx ) );
-	void *chregs = ( pf->regs + TXNIC_PF_CHAN ( vnic_idx ) );
+	void *chregs = ( pf->regs + TXNIC_PF_CHAN ( chan_idx ) );
 	void *qsregs = ( pf->regs + TXNIC_PF_QS ( vnic_idx ) );
 	size_t max_pkt_size;
 	int rc;
