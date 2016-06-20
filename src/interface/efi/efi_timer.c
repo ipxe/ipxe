@@ -126,13 +126,27 @@ static void efi_tick_startup ( void ) {
  */
 static void efi_tick_shutdown ( int booting __unused ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
 
 	/* Stop timer tick */
-	bs->SetTimer ( efi_tick_event, TimerCancel, 0 );
+	if ( ( efirc = bs->SetTimer ( efi_tick_event, TimerCancel, 0 ) ) != 0 ){
+		rc = -EEFI ( efirc );
+		DBGC ( colour, "EFI could not stop timer tick: %s\n",
+		       strerror ( rc ) );
+		/* Self-destruct initiated */
+		return;
+	}
 	DBGC ( colour, "EFI timer stopped\n" );
 
 	/* Destroy timer tick event */
-	bs->CloseEvent ( efi_tick_event );
+	if ( ( efirc = bs->CloseEvent ( efi_tick_event ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( colour, "EFI could not destroy timer tick: %s\n",
+		       strerror ( rc ) );
+		/* Probably non-fatal */
+		return;
+	}
 }
 
 /** Timer tick startup function */
