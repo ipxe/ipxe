@@ -280,8 +280,8 @@ struct smsc75xx_device {
 	uint32_t int_sts;
 };
 
-/** Reset delay (in microseconds) */
-#define SMSC75XX_RESET_DELAY_US 2
+/** Maximum time to wait for reset (in milliseconds) */
+#define SMSC75XX_RESET_MAX_WAIT_MS 100
 
 /** Maximum time to wait for EEPROM (in milliseconds) */
 #define SMSC75XX_EEPROM_MAX_WAIT_MS 100

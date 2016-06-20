@@ -511,6 +511,7 @@ static int smsc75xx_dump_statistics ( struct smsc75xx_device *smsc75xx ) {
  */
 static int smsc75xx_reset ( struct smsc75xx_device *smsc75xx ) {
 	uint32_t hw_cfg;
+	unsigned int i;
 	int rc;
 
 	/* Reset device */
@@ -519,18 +520,22 @@ static int smsc75xx_reset ( struct smsc75xx_device *smsc75xx ) {
 		return rc;
 
 	/* Wait for reset to complete */
-	udelay ( SMSC75XX_RESET_DELAY_US );
+	for ( i = 0 ; i < SMSC75XX_RESET_MAX_WAIT_MS ; i++ ) {
 
-	/* Check that reset has completed */
-	if ( ( rc = smsc75xx_readl ( smsc75xx, SMSC75XX_HW_CFG,
-				     &hw_cfg ) ) != 0 )
-		return rc;
-	if ( hw_cfg & SMSC75XX_HW_CFG_LRST ) {
-		DBGC ( smsc75xx, "SMSC75XX %p failed to reset\n", smsc75xx );
-		return -ETIMEDOUT;
+		/* Check if reset has completed */
+		if ( ( rc = smsc75xx_readl ( smsc75xx, SMSC75XX_HW_CFG,
+					     &hw_cfg ) ) != 0 )
+			return rc;
+		if ( ! ( hw_cfg & SMSC75XX_HW_CFG_LRST ) )
+			return 0;
+
+		/* Delay */
+		mdelay ( 1 );
 	}
 
-	return 0;
+	DBGC ( smsc75xx, "SMSC75XX %p timed out waiting for reset\n",
+	       smsc75xx );
+	return -ETIMEDOUT;
 }
 
 /******************************************************************************
