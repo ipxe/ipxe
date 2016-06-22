@@ -203,9 +203,9 @@ EFI_STATUS
 ///
 /// Protocol structure
 ///
-typedef struct _EFI_THUNDER_CONFIG_PROTOCOL {
+struct _EFI_THUNDER_CONFIG_PROTOCOL {
   EFI_THUNDER_CONFIG_PROTOCOL_GET_CONFIG GetConfig;
   BOARD_CFG* BoardConfig;
-} EFI_THUNDER_CONFIG_PROTOCOL;
+};
 
 #endif /* _THUNDERXCFG_H */
