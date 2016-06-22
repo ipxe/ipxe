@@ -1651,7 +1651,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	macpath->Header.SubType = MSG_MAC_ADDR_DP;
 	macpath->Header.Length[0] = sizeof ( *macpath );
 	memcpy ( &macpath->MacAddress, netdev->ll_addr,
-		 sizeof ( macpath->MacAddress ) );
+		 netdev->ll_protocol->ll_addr_len );
 	macpath->IfType = ntohs ( netdev->ll_protocol->ll_proto );
 	if ( ( tag = vlan_tag ( netdev ) ) ) {
 		vlanpath = ( ( ( void * ) macpath ) + sizeof ( *macpath ) );
