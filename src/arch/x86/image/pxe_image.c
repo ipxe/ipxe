@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <pxe.h>
 #include <pxe_call.h>
+#include <pic8259.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
@@ -86,6 +87,10 @@ static int pxe_exec ( struct image *image ) {
 
 	/* Reset console since PXE NBP will probably use it */
 	console_reset();
+
+	/* Disable IRQ, if applicable */
+	if ( netdev_irq_supported ( netdev ) && netdev->dev->desc.irq )
+		disable_irq ( netdev->dev->desc.irq );
 
 	/* Start PXE NBP */
 	rc = pxe_start_nbp();
