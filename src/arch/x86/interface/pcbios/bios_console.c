@@ -98,9 +98,7 @@ static void bios_handle_cup ( struct ansiesc_context *ctx __unused,
 	if ( cy < 0 )
 		cy = 0;
 
-	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
-					   "int $0x10\n\t"
-					   "cli\n\t" )
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10\n\t" )
 			       : : "a" ( 0x0200 ), "b" ( 1 ),
 			           "d" ( ( cy << 8 ) | cx ) );
 }
@@ -118,9 +116,7 @@ static void bios_handle_ed ( struct ansiesc_context *ctx __unused,
 	/* We assume that we always clear the whole screen */
 	assert ( params[0] == ANSIESC_ED_ALL );
 
-	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
-					   "int $0x10\n\t"
-					   "cli\n\t" )
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10\n\t" )
 			       : : "a" ( 0x0600 ), "b" ( bios_attr << 8 ),
 				   "c" ( 0 ),
 				   "d" ( ( ( console_height - 1 ) << 8 ) |
@@ -188,9 +184,7 @@ static void bios_handle_dectcem_set ( struct ansiesc_context *ctx __unused,
 	/* Get character height */
 	get_real ( height, BDA_SEG, BDA_CHAR_HEIGHT );
 
-	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
-					   "int $0x10\n\t"
-					   "cli\n\t" )
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10\n\t" )
 			       : : "a" ( 0x0100 ),
 				   "c" ( ( ( height - 2 ) << 8 ) |
 					 ( height - 1 ) ) );
@@ -207,9 +201,7 @@ static void bios_handle_dectcem_reset ( struct ansiesc_context *ctx __unused,
 					unsigned int count __unused,
 					int params[] __unused ) {
 
-	__asm__ __volatile__ ( REAL_CODE ( "sti\n\t"
-					   "int $0x10\n\t"
-					   "cli\n\t" )
+	__asm__ __volatile__ ( REAL_CODE ( "int $0x10\n\t" )
 			       : : "a" ( 0x0100 ), "c" ( 0x2000 ) );
 }
 
@@ -243,7 +235,6 @@ static void bios_putchar ( int character ) {
 
 	/* Print character with attribute */
 	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
-					   "sti\n\t"
 					   /* Skip non-printable characters */
 					   "cmpb $0x20, %%al\n\t"
 					   "jb 1f\n\t"
@@ -264,7 +255,6 @@ static void bios_putchar ( int character ) {
 					   "xorw %%bx, %%bx\n\t"
 					   "movb $0x0e, %%ah\n\t"
 					   "int $0x10\n\t"
-					   "cli\n\t"
 					   "popl %%ebp\n\t" /* gcc bug */ )
 			       : "=a" ( discard_a ), "=b" ( discard_b ),
 			         "=c" ( discard_c )
