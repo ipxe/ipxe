@@ -210,6 +210,29 @@ struct dhcp_pxe_boot_menu_item {
 /** Vendor class identifier */
 #define DHCP_VENDOR_CLASS_ID 60
 
+/** Vendor class identifier for PXE clients */
+#define DHCP_VENDOR_PXECLIENT( arch, ndi )				\
+	'P', 'X', 'E', 'C', 'l', 'i', 'e', 'n', 't', ':',		\
+	'A', 'r', 'c', 'h', ':', DHCP_VENDOR_PXECLIENT_ARCH ( arch ),	\
+	':', 'U', 'N', 'D', 'I', ':', DHCP_VENDOR_PXECLIENT_UNDI ( ndi )
+
+/** Vendor class identifier architecture for PXE clients */
+#define DHCP_VENDOR_PXECLIENT_ARCH( arch )				\
+	( '0' + ( ( (arch) / 10000 ) % 10 ) ),				\
+	( '0' + ( ( (arch) /  1000 ) % 10 ) ),				\
+	( '0' + ( ( (arch) /   100 ) % 10 ) ),				\
+	( '0' + ( ( (arch) /    10 ) % 10 ) ),				\
+	( '0' + ( ( (arch) /     1 ) % 10 ) )
+
+/** Vendor class identifier UNDI version for PXE clients */
+#define DHCP_VENDOR_PXECLIENT_UNDI( type, major, minor )		\
+	DHCP_VENDOR_PXECLIENT_UNDI_VERSION ( major ),			\
+	DHCP_VENDOR_PXECLIENT_UNDI_VERSION ( minor )
+#define DHCP_VENDOR_PXECLIENT_UNDI_VERSION( version )			\
+	( '0' + ( ( (version) /   100 ) % 10 ) ),			\
+	( '0' + ( ( (version) /    10 ) % 10 ) ),			\
+	( '0' + ( ( (version) /     1 ) % 10 ) )
+
 /** Client identifier */
 #define DHCP_CLIENT_ID 61
 
