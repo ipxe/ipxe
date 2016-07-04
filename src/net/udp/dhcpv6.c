@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crc32.h>
 #include <ipxe/errortab.h>
 #include <ipxe/ipv6.h>
+#include <ipxe/dhcp_arch.h>
 #include <ipxe/dhcpv6.h>
 
 /** @file
@@ -364,10 +365,17 @@ static int dhcpv6_register ( struct dhcpv6_option_list *options,
  *
  */
 
-/** Options to be requested */
-static uint16_t dhcpv6_requested_options[] = {
-	htons ( DHCPV6_DNS_SERVERS ), htons ( DHCPV6_DOMAIN_LIST ),
-	htons ( DHCPV6_BOOTFILE_URL ), htons ( DHCPV6_BOOTFILE_PARAM ),
+/** Raw option data for options common to all DHCPv6 requests */
+static uint8_t dhcpv6_request_options_data[] = {
+	DHCPV6_CODE ( DHCPV6_OPTION_REQUEST ),
+	DHCPV6_OPTION ( DHCPV6_CODE ( DHCPV6_DNS_SERVERS ),
+			DHCPV6_CODE ( DHCPV6_DOMAIN_LIST ),
+			DHCPV6_CODE ( DHCPV6_BOOTFILE_URL ),
+			DHCPV6_CODE ( DHCPV6_BOOTFILE_PARAM ) ),
+	DHCPV6_CODE ( DHCPV6_CLIENT_ARCHITECTURE ),
+	DHCPV6_WORD ( DHCP_ARCH_CLIENT_ARCHITECTURE ),
+	DHCPV6_CODE ( DHCPV6_CLIENT_NDI ),
+	DHCPV6_OPTION ( DHCP_ARCH_CLIENT_NDI )
 };
 
 /**
@@ -565,15 +573,14 @@ static int dhcpv6_tx ( struct dhcpv6_session *dhcpv6 ) {
 	struct dhcpv6_duid_option *server_id;
 	struct dhcpv6_ia_na_option *ia_na;
 	struct dhcpv6_iaaddr_option *iaaddr;
-	struct dhcpv6_option_request_option *option_request;
 	struct dhcpv6_user_class_option *user_class;
 	struct dhcpv6_elapsed_time_option *elapsed;
 	struct dhcpv6_header *dhcphdr;
 	struct io_buffer *iobuf;
+	void *options;
 	size_t client_id_len;
 	size_t server_id_len;
 	size_t ia_na_len;
-	size_t option_request_len;
 	size_t user_class_string_len;
 	size_t user_class_len;
 	size_t elapsed_len;
@@ -592,16 +599,14 @@ static int dhcpv6_tx ( struct dhcpv6_session *dhcpv6 ) {
 	} else {
 		ia_na_len = 0;
 	}
-	option_request_len = ( sizeof ( *option_request ) +
-			       sizeof ( dhcpv6_requested_options ) );
 	user_class_string_len = dhcpv6_user_class ( NULL, 0 );
 	user_class_len = ( sizeof ( *user_class ) +
 			   sizeof ( user_class->user_class[0] ) +
 			   user_class_string_len );
 	elapsed_len = sizeof ( *elapsed );
 	total_len = ( sizeof ( *dhcphdr ) + client_id_len + server_id_len +
-		      ia_na_len + option_request_len + user_class_len +
-		      elapsed_len );
+		      ia_na_len + sizeof ( dhcpv6_request_options_data ) +
+		      user_class_len + elapsed_len );
 
 	/* Allocate packet */
 	iobuf = xfer_alloc_iob ( &dhcpv6->xfer, total_len );
@@ -652,13 +657,10 @@ static int dhcpv6_tx ( struct dhcpv6_session *dhcpv6 ) {
 		}
 	}
 
-	/* Construct option request */
-	option_request = iob_put ( iobuf, option_request_len );
-	option_request->header.code = htons ( DHCPV6_OPTION_REQUEST );
-	option_request->header.len = htons ( option_request_len -
-					     sizeof ( option_request->header ));
-	memcpy ( option_request->requested, dhcpv6_requested_options,
-		 sizeof ( dhcpv6_requested_options ) );
+	/* Construct fixed request options */
+	options = iob_put ( iobuf, sizeof ( dhcpv6_request_options_data ) );
+	memcpy ( options, dhcpv6_request_options_data,
+		 sizeof ( dhcpv6_request_options_data ) );
 
 	/* Construct user class */
 	user_class = iob_put ( iobuf, user_class_len );

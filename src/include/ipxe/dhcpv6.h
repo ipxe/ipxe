@@ -157,12 +157,45 @@ struct dhcpv6_user_class_option {
 /** DHCPv6 bootfile parameters option */
 #define DHCPV6_BOOTFILE_PARAM 60
 
+/** DHCPv6 client system architecture option */
+#define DHCPV6_CLIENT_ARCHITECTURE 61
+
+/** DHCPv6 client network interface identifier option */
+#define DHCPV6_CLIENT_NDI 62
+
 /** DHCPv6 syslog server option
  *
  * This option code has not yet been assigned by IANA.  Please update
  * this definition once an option code has been assigned.
  */
 #define DHCPV6_LOG_SERVERS 0xffffffffUL
+
+/** Construct a DHCPv6 option code */
+#define DHCPV6_CODE( code ) \
+	( ( (code) >> 8 ) & 0xff ), ( ( (code) >> 0 ) & 0xff )
+
+/** Construct a DHCPv6 option length */
+#define DHCPV6_LEN( len ) \
+	( ( (len) >> 8 ) & 0xff ), ( ( (len) >> 0 ) & 0xff )
+
+/** Construct a DHCPv6 option from a list of bytes */
+#define DHCPV6_OPTION( ... ) \
+	DHCPV6_LEN ( VA_ARG_COUNT ( __VA_ARGS__ ) ), __VA_ARGS__
+
+/** Construct a DHCPv6 option from a list of characters */
+#define DHCPV6_STRING( ... ) DHCPV6_OPTION ( __VA_ARGS__ )
+
+/** Construct a byte-valued DHCPv6 option */
+#define DHCPV6_BYTE( value ) DHCPV6_OPTION ( value )
+
+/** Construct a word-valued DHCPv6 option */
+#define DHCPV6_WORD( value ) DHCPV6_OPTION ( ( ( (value) >> 8 ) & 0xff ), \
+					     ( ( (value) >> 0 ) & 0xff ) )
+/** Construct a dword-valued DHCPv6 option */
+#define DHCPV6_DWORD( value ) DHCPV6_OPTION ( ( ( (value) >> 24 ) & 0xff ), \
+					      ( ( (value) >> 16 ) & 0xff ), \
+					      ( ( (value) >>  8 ) & 0xff ), \
+					      ( ( (value) >>  0 ) & 0xff ) )
 
 /**
  * Any DHCPv6 option
