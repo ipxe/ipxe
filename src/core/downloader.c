@@ -190,14 +190,18 @@ static int downloader_vredirect ( struct downloader *downloader, int type,
 
 		/* Set image URI */
 		if ( ( rc = image_set_uri ( downloader->image, uri ) ) != 0 )
-			return rc;
+			goto err;
 	}
 
 	/* Redirect to new location */
 	if ( ( rc = xfer_vreopen ( &downloader->xfer, type, args ) ) != 0 )
-		return rc;
+		goto err;
 
 	return 0;
+
+ err:
+	downloader_finished ( downloader, rc );
+	return rc;
 }
 
 /** Downloader data transfer interface operations */
