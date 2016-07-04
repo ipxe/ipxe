@@ -1710,6 +1710,7 @@ static int iscsi_vredirect ( struct iscsi_session *iscsi, int type,
 			     va_list args ) {
 	va_list tmp;
 	struct sockaddr *peer;
+	int rc;
 
 	/* Intercept redirects to a LOCATION_SOCKET and record the IP
 	 * address for the iBFT.  This is a bit of a hack, but avoids
@@ -1725,7 +1726,15 @@ static int iscsi_vredirect ( struct iscsi_session *iscsi, int type,
 		va_end ( tmp );
 	}
 
-	return xfer_vreopen ( &iscsi->socket, type, args );
+	/* Redirect to new location */
+	if ( ( rc = xfer_vreopen ( &iscsi->socket, type, args ) ) != 0 )
+		goto err;
+
+	return 0;
+
+ err:
+	iscsi_close ( iscsi, rc );
+	return rc;
 }
 
 /** iSCSI socket interface operations */
