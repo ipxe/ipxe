@@ -81,12 +81,17 @@ int xfer_vredirect ( struct interface *intf, int type, va_list args ) {
 		 * xfer_vreopen(), we create a temporary interface in
 		 * order to be able to send xfer_window_changed() to
 		 * the parent.
+		 *
+		 * If redirection fails, then send intf_close() to the
+		 * parent interface.
 		 */
 		intf_plug ( &tmp, dest );
 		rc = xfer_vreopen ( dest, type, args );
 		if ( rc == 0 ) {
 			xfer_window_changed ( dest );
 			xfer_window_changed ( &tmp );
+		} else {
+			intf_close ( &tmp, rc );
 		}
 		intf_unplug ( &tmp );
 	}
