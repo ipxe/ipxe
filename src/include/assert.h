@@ -12,10 +12,12 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#ifndef ASSERTING
 #ifdef NDEBUG
 #define ASSERTING 0
 #else
 #define ASSERTING 1
+#endif
 #endif
 
 extern unsigned int assertion_failures;

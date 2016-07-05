@@ -720,6 +720,33 @@ config/named.h : $(CONFIG_LIST)
 
 .PRECIOUS : config/named.h
 
+# (Single-element) list of assertion configuration
+#
+ASSERT_LIST := $(BIN)/.assert.list
+ifeq ($(wildcard $(ASSERT_LIST)),)
+ASSERT_OLD := <invalid>
+else
+ASSERT_OLD := $(shell cat $(ASSERT_LIST))
+endif
+ifneq ($(ASSERT_OLD),$(ASSERT))
+$(shell $(ECHO) "$(ASSERT)" > $(ASSERT_LIST))
+endif
+
+$(ASSERT_LIST) : $(MAKEDEPS)
+
+VERYCLEANUP += $(ASSERT_LIST)
+
+# Assertion configuration
+#
+ifneq ($(ASSERT),)
+CFLAGS	+= -DASSERTING=$(ASSERT)
+endif
+
+include/assert.h : $(ASSERT_LIST)
+	$(Q)$(TOUCH) $@
+
+.PRECIOUS : include/assert.h
+
 # These files use .incbin inline assembly to include a binary file.
 # Unfortunately ccache does not detect this dependency and caches
 # builds even when the binary file has changed.
