@@ -523,19 +523,25 @@ POST_O		:=
 POST_O_DEPS	:=
 endif
 
+# Debug level calculations
+#
+DBGLVL_MAX	= -DDBGLVL_MAX=$(firstword $(subst ., ,$(1)))
+DBGLVL_DFLT	= -DDBGLVL_DFLT=$(lastword $(subst ., ,$(1)))
+DBGLVL		= $(call DBGLVL_MAX,$(1)) $(call DBGLVL_DFLT,$(1))
+
 # Rules for specific object types.
 #
 COMPILE_c	= $(CC) $(CFLAGS) $(CFLAGS_c) $(OBJ_CFLAGS)
 RULE_c		= $(Q)$(COMPILE_c) -c $< -o $@ $(POST_O)
 RULE_c_to_ids.o = $(Q)$(ECHO_E) '$(OBJ_IDS_ASM_NL)' | $(ASSEMBLE_S) -o $@
-RULE_c_to_dbg%.o = $(Q)$(COMPILE_c) -DDBGLVL_MAX=$* -c $< -o $@ $(POST_O)
+RULE_c_to_dbg%.o= $(Q)$(COMPILE_c) $(call DBGLVL,$*) -c $< -o $@ $(POST_O)
 RULE_c_to_c	= $(Q)$(COMPILE_c) -E -c $< > $@
 RULE_c_to_s	= $(Q)$(COMPILE_c) -S -g0 -c $< -o $@
 
 PREPROCESS_S	= $(CPP) $(CFLAGS) $(CFLAGS_S) $(OBJ_CFLAGS)
 ASSEMBLE_S	= $(AS) $(ASFLAGS)
 RULE_S		= $(Q)$(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
-RULE_S_to_dbg%.o = $(Q)$(PREPROCESS_S) -DDBGLVL_MAX=$* $< | $(ASSEMBLE_S) -o $@
+RULE_S_to_dbg%.o= $(Q)$(PREPROCESS_S) $(call DBGLVL,$*) $< | $(ASSEMBLE_S) -o $@
 RULE_S_to_s	= $(Q)$(PREPROCESS_S) $< > $@
 
 GENERIC_TARGETS	+= ids.o dbg%.o c s
@@ -1019,10 +1025,12 @@ TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_ENTRY) $(TGT_LD_DRIVERS) \
 # the target.
 #
 DEBUG_LIST	= $(subst $(COMMA), ,$(DEBUG))
-DEBUG_OBJ_LEVEL	= $(firstword $(word 2,$(subst :, ,$(1))) 1)
-DEBUG_OBJ_BASE	= $(word 1,$(subst :, ,$(1))).dbg$(call DEBUG_OBJ_LEVEL,$(1))
-DEBUG_OBJ	= $(BIN)/$(call DEBUG_OBJ_BASE,$(1)).o
-DEBUG_ORIG_OBJ	= $(BIN)/$(word 1,$(subst :, ,$(1))).o
+DEBUG_MAX	= $(firstword $(word 2,$(subst :, ,$(1))) 1)
+DEBUG_DFLT	= $(if $(word 3,$(subst :, ,$(1))),.$(word 3,$(subst :, ,$(1))))
+DEBUG_LEVEL	= $(call DEBUG_MAX,$(1))$(call DEBUG_DFLT,$(1))
+DEBUG_BASE	= $(firstword $(subst :, ,$(1))).dbg$(call DEBUG_LEVEL,$(1))
+DEBUG_OBJ	= $(BIN)/$(call DEBUG_BASE,$(1)).o
+DEBUG_ORIG_OBJ	= $(BIN)/$(firstword $(subst :, ,$(1))).o
 DEBUG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_OBJ,$(D)))
 DEBUG_ORIG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_ORIG_OBJ,$(D)))
 BLIB_OBJS	= $(DEBUG_OBJS) $(filter-out $(DEBUG_ORIG_OBJS),$(BOBJS))

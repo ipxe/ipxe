@@ -270,6 +270,10 @@ PROVIDE_SYMBOL ( OBJECT_SYMBOL );
 #define DBGLVL_MAX 0
 #endif
 
+#ifndef DBGLVL_DFLT
+#define DBGLVL_DFLT DBGLVL_MAX
+#endif
+
 #ifndef ASSEMBLY
 
 /** printf() for debugging */
@@ -286,7 +290,7 @@ extern void dbg_more ( void );
 
 /* Allow for selective disabling of enabled debug levels */
 #define __debug_disable( object ) _C2 ( __debug_disable_, object )
-char __debug_disable(OBJECT);
+char __debug_disable(OBJECT) = ( DBGLVL_MAX & ~DBGLVL_DFLT );
 #define DBG_DISABLE_OBJECT( object, level ) do {		\
 	extern char __debug_disable(object);			\
 	__debug_disable(object) |= (level);			\
