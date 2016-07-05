@@ -747,6 +747,33 @@ include/assert.h : $(ASSERT_LIST)
 
 .PRECIOUS : include/assert.h
 
+# (Single-element) list of profiling configuration
+#
+PROFILE_LIST := $(BIN)/.profile.list
+ifeq ($(wildcard $(PROFILE_LIST)),)
+PROFILE_OLD := <invalid>
+else
+PROFILE_OLD := $(shell cat $(PROFILE_LIST))
+endif
+ifneq ($(PROFILE_OLD),$(PROFILE))
+$(shell $(ECHO) "$(PROFILE)" > $(PROFILE_LIST))
+endif
+
+$(PROFILE_LIST) : $(MAKEDEPS)
+
+VERYCLEANUP += $(PROFILE_LIST)
+
+# Profiling configuration
+#
+ifneq ($(PROFILE),)
+CFLAGS	+= -DPROFILING=$(PROFILE)
+endif
+
+include/ipxe/profile.h : $(PROFILE_LIST)
+	$(Q)$(TOUCH) $@
+
+.PRECIOUS : include/ipxe/profile.h
+
 # These files use .incbin inline assembly to include a binary file.
 # Unfortunately ccache does not detect this dependency and caches
 # builds even when the binary file has changed.
