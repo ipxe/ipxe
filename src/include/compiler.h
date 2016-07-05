@@ -285,14 +285,23 @@ extern void dbg_pause ( void );
 extern void dbg_more ( void );
 
 /* Allow for selective disabling of enabled debug levels */
+#define __debug_disable( object ) _C2 ( __debug_disable_, object )
+char __debug_disable(OBJECT);
+#define DBG_DISABLE_OBJECT( object, level ) do {		\
+	extern char __debug_disable(object);			\
+	__debug_disable(object) |= (level);			\
+	} while ( 0 )
+#define DBG_ENABLE_OBJECT( object, level ) do {			\
+	extern char __debug_disable(object);			\
+	__debug_disable(object) &= ~(level);			\
+	} while ( 0 )
 #if DBGLVL_MAX
-int __debug_disable;
-#define DBGLVL ( DBGLVL_MAX & ~__debug_disable )
+#define DBGLVL ( DBGLVL_MAX & ~__debug_disable(OBJECT) )
 #define DBG_DISABLE( level ) do {				\
-	__debug_disable |= (level);				\
+	__debug_disable(OBJECT) |= ( (level) & DBGLVL_MAX );	\
 	} while ( 0 )
 #define DBG_ENABLE( level ) do {				\
-	__debug_disable &= ~(level);				\
+	__debug_disable(OBJECT) &= ~( (level) & DBGLVL_MAX );	\
 	} while ( 0 )
 #else
 #define DBGLVL 0
