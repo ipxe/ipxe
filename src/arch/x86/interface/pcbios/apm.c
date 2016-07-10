@@ -32,14 +32,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <realmode.h>
-#include <ipxe/reboot.h>
+#include <ipxe/apm.h>
 
 /**
  * Power off the computer using APM
  *
  * @ret rc		Return status code
  */
-static int apm_poweroff ( void ) {
+int apm_poweroff ( void ) {
 	uint16_t apm_version;
 	uint16_t apm_signature;
 	uint16_t apm_flags;
@@ -108,5 +108,3 @@ static int apm_poweroff ( void ) {
 	/* Should never happen */
 	return -ECANCELED;
 }
-
-PROVIDE_REBOOT ( pcbios, poweroff, apm_poweroff );
