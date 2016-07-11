@@ -23,6 +23,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <unistd.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <realmode.h>
@@ -110,6 +111,11 @@ int acpi_poweroff ( void ) {
 		outw ( ( ACPI_PM1_CNT_SLP_TYP ( slp_typb ) |
 			 ACPI_PM1_CNT_SLP_EN ), pm1b_cnt );
 	}
+
+	/* On some systems, execution will continue briefly.  Delay to
+	 * avoid potentially confusing log messages.
+	 */
+	mdelay ( 1000 );
 
 	DBGC ( colour, "ACPI power off failed\n" );
 	return -EPROTO;
