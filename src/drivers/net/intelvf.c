@@ -338,3 +338,44 @@ int intelvf_mbox_set_mtu ( struct intel_nic *intel, size_t mtu ) {
 
 	return 0;
 }
+
+/**
+ * Get queue configuration
+ *
+ * @v intel		Intel device
+ * @v vlan_thing	VLAN hand-waving thing to fill in
+ * @ret rc		Return status code
+ */
+int intelvf_mbox_queues ( struct intel_nic *intel, int *vlan_thing ) {
+	union intelvf_msg msg;
+	int rc;
+
+	/* Send queue configuration message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.hdr = INTELVF_MSG_TYPE_GET_QUEUES;
+	if ( ( rc = intelvf_mbox_msg ( intel, &msg ) ) != 0 ) {
+		DBGC ( intel, "INTEL %p get queue configuration failed: %s\n",
+		       intel, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Check response */
+	if ( ( msg.hdr & INTELVF_MSG_TYPE_MASK ) !=INTELVF_MSG_TYPE_GET_QUEUES){
+		DBGC ( intel, "INTEL %p get queue configuration unexpected "
+		       "response:\n", intel );
+		DBGC_HDA ( intel, 0, &msg, sizeof ( msg ) );
+		return -EPROTO;
+	}
+
+	/* Check that we were allowed to get the queue configuration */
+	if ( ! ( msg.hdr & INTELVF_MSG_ACK ) ) {
+		DBGC ( intel, "INTEL %p get queue configuration refused\n",
+		       intel );
+		return -EPERM;
+	}
+
+	/* Extract VLAN hand-waving thing */
+	*vlan_thing = msg.queues.vlan_thing;
+
+	return 0;
+}

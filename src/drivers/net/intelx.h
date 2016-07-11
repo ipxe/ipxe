@@ -71,6 +71,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Receive Descriptor register block */
 #define INTELX_RD 0x01000UL
 
+/** Receive Descriptor Control Register */
+#define INTELX_RXDCTL_VME	0x40000000UL	/**< Strip VLAN tag */
+
 /** Split Receive Control Register */
 #define INTELX_SRRCTL 0x02100UL
 #define INTELX_SRRCTL_BSIZE(kb)	( (kb) << 0 )	/**< Receive buffer size */
