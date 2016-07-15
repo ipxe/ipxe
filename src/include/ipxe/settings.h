@@ -62,18 +62,22 @@ struct setting {
 
 #define SETTING_NETDEV		01 /**< Network device settings */
 #define SETTING_NETDEV_EXTRA	02 /**< Network device additional settings */
-#define SETTING_IP		03 /**< IPv4 settings */
-#define SETTING_IP_EXTRA	04 /**< IPv4 additional settings */
-#define SETTING_BOOT		05 /**< Generic boot settings */
-#define SETTING_BOOT_EXTRA	06 /**< Generic boot additional settings */
-#define SETTING_SANBOOT		07 /**< SAN boot settings */
-#define SETTING_SANBOOT_EXTRA	08 /**< SAN boot additional settings */
-#define SETTING_HOST		09 /**< Host identity settings */
-#define SETTING_HOST_EXTRA	10 /**< Host identity additional settings */
-#define SETTING_AUTH		11 /**< Authentication settings */
-#define SETTING_AUTH_EXTRA	12 /**< Authentication additional settings */
-#define SETTING_CRYPTO		13 /**< Cryptography settings */
-#define SETTING_MISC		14 /**< Miscellaneous settings */
+#define SETTING_IP4		03 /**< IPv4 settings */
+#define SETTING_IP4_EXTRA	04 /**< IPv4 additional settings */
+#define SETTING_IP6		05 /**< IPv6 settings */
+#define SETTING_IP6_EXTRA	06 /**< IPv6 additional settings */
+#define SETTING_IP		07 /**< IPv4 settings */
+#define SETTING_IP_EXTRA	08 /**< IPv4 additional settings */
+#define SETTING_BOOT		09 /**< Generic boot settings */
+#define SETTING_BOOT_EXTRA	10 /**< Generic boot additional settings */
+#define SETTING_SANBOOT		11 /**< SAN boot settings */
+#define SETTING_SANBOOT_EXTRA	12 /**< SAN boot additional settings */
+#define SETTING_HOST		13 /**< Host identity settings */
+#define SETTING_HOST_EXTRA	14 /**< Host identity additional settings */
+#define SETTING_AUTH		15 /**< Authentication settings */
+#define SETTING_AUTH_EXTRA	16 /**< Authentication additional settings */
+#define SETTING_CRYPTO		17 /**< Cryptography settings */
+#define SETTING_MISC		18 /**< Miscellaneous settings */
 
 /** @} */
 
@@ -421,13 +425,13 @@ extern const struct setting_type setting_type_busdevfn __setting_type;
 extern const struct setting_type setting_type_dnssl __setting_type;
 
 extern const struct setting
-ip_setting __setting ( SETTING_IP, ip );
+ip_setting __setting ( SETTING_IP4, ip );
 extern const struct setting
-netmask_setting __setting ( SETTING_IP, netmask );
+netmask_setting __setting ( SETTING_IP4, netmask );
 extern const struct setting
-gateway_setting __setting ( SETTING_IP, gateway );
+gateway_setting __setting ( SETTING_IP4, gateway );
 extern const struct setting
-dns_setting __setting ( SETTING_IP_EXTRA, dns );
+dns_setting __setting ( SETTING_IP4_EXTRA, dns );
 extern const struct setting
 hostname_setting __setting ( SETTING_HOST, hostname );
 extern const struct setting

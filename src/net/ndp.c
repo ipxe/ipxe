@@ -785,7 +785,7 @@ static int ndp_register_settings ( struct net_device *netdev,
 }
 
 /** DNS server setting */
-const struct setting ndp_dns6_setting __setting ( SETTING_IP_EXTRA, dns6 ) = {
+const struct setting ndp_dns6_setting __setting ( SETTING_IP6_EXTRA, dns6 ) = {
 	.name = "dns6",
 	.description = "DNS server",
 	.tag = NDP_TAG ( NDP_OPT_RDNSS,

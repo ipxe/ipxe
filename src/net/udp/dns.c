@@ -1048,7 +1048,7 @@ const struct setting_type setting_type_dnssl __setting_type = {
 };
 
 /** IPv4 DNS server setting */
-const struct setting dns_setting __setting ( SETTING_IP_EXTRA, dns ) = {
+const struct setting dns_setting __setting ( SETTING_IP4_EXTRA, dns ) = {
 	.name = "dns",
 	.description = "DNS server",
 	.tag = DHCP_DNS_SERVERS,
@@ -1056,7 +1056,7 @@ const struct setting dns_setting __setting ( SETTING_IP_EXTRA, dns ) = {
 };
 
 /** IPv6 DNS server setting */
-const struct setting dns6_setting __setting ( SETTING_IP_EXTRA, dns6 ) = {
+const struct setting dns6_setting __setting ( SETTING_IP6_EXTRA, dns6 ) = {
 	.name = "dns6",
 	.description = "DNS server",
 	.tag = DHCPV6_DNS_SERVERS,
