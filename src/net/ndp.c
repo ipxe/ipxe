@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+static struct ipv6conf * ipv6conf_demux ( struct net_device *netdev );
 static int
 ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 				   struct ndp_router_advertisement_header *radv,
@@ -341,6 +342,7 @@ ndp_rx_router_advertisement_prefix ( struct net_device *netdev,
 	struct ndp_prefix_information_option *prefix_opt = &option->prefix;
 	struct in6_addr *router = &sin6_src->sin6_addr;
 	struct in6_addr address;
+	struct ipv6conf *ipv6conf;
 	int prefix_len;
 	int rc;
 
@@ -350,14 +352,21 @@ ndp_rx_router_advertisement_prefix ( struct net_device *netdev,
 		       "short at %zd bytes\n", netdev->name, len );
 		return -EINVAL;
 	}
+
+	/* Identify IPv6 configurator, if any */
+	ipv6conf = ipv6conf_demux ( netdev );
 	DBGC ( netdev, "NDP %s found %sdefault router %s ",
 	       netdev->name, ( radv->lifetime ? "" : "non-" ),
 	       inet6_ntoa ( &sin6_src->sin6_addr ) );
-	DBGC ( netdev, "for %s-link %sautonomous prefix %s/%d\n",
+	DBGC ( netdev, "for %s-link %sautonomous prefix %s/%d%s\n",
 	       ( ( prefix_opt->flags & NDP_PREFIX_ON_LINK ) ? "on" : "off" ),
 	       ( ( prefix_opt->flags & NDP_PREFIX_AUTONOMOUS ) ? "" : "non-" ),
 	       inet6_ntoa ( &prefix_opt->prefix ),
-	       prefix_opt->prefix_len );
+	       prefix_opt->prefix_len, ( ipv6conf ? "" : " (ignored)" ) );
+
+	/* Do nothing unless IPv6 autoconfiguration is in progress */
+	if ( ! ipv6conf )
+		return 0;
 
 	/* Ignore off-link prefixes */
 	if ( ! ( prefix_opt->flags & NDP_PREFIX_ON_LINK ) )
@@ -915,13 +924,10 @@ ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 
 	/* Identify IPv6 configurator, if any */
 	ipv6conf = ipv6conf_demux ( netdev );
-	if ( ! ipv6conf ) {
-		/* Not an error; router advertisements are processed
-		 * as a background activity even when no explicit
-		 * autoconfiguration is taking place.
-		 */
+
+	/* Do nothing unless IPv6 autoconfiguration is in progress */
+	if ( ! ipv6conf )
 		return 0;
-	}
 
 	/* If this is not the first solicited router advertisement, ignore it */
 	if ( ! timer_running ( &ipv6conf->timer ) )
