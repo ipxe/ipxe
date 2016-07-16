@@ -280,7 +280,7 @@ struct dhcpv6_settings {
 static int dhcpv6_applies ( struct settings *settings __unused,
 			    const struct setting *setting ) {
 
-	return ( setting->scope == &ipv6_scope );
+	return ( setting->scope == &dhcpv6_scope );
 }
 
 /**
@@ -341,7 +341,7 @@ static int dhcpv6_register ( struct dhcpv6_option_list *options,
 	}
 	ref_init ( &dhcpv6set->refcnt, NULL );
 	settings_init ( &dhcpv6set->settings, &dhcpv6_settings_operations,
-			&dhcpv6set->refcnt, &ipv6_scope );
+			&dhcpv6set->refcnt, &dhcpv6_scope );
 	data = ( ( ( void * ) dhcpv6set ) + sizeof ( *dhcpv6set ) );
 	len = options->len;
 	memcpy ( data, options->data, len );
@@ -987,7 +987,7 @@ const struct setting filename6_setting __setting ( SETTING_BOOT, filename ) = {
 	.description = "Boot filename",
 	.tag = DHCPV6_BOOTFILE_URL,
 	.type = &setting_type_string,
-	.scope = &ipv6_scope,
+	.scope = &dhcpv6_scope,
 };
 
 /** DNS search list setting */
@@ -996,5 +996,5 @@ const struct setting dnssl6_setting __setting ( SETTING_IP_EXTRA, dnssl ) = {
 	.description = "DNS search list",
 	.tag = DHCPV6_DOMAIN_LIST,
 	.type = &setting_type_dnssl,
-	.scope = &ipv6_scope,
+	.scope = &dhcpv6_scope,
 };

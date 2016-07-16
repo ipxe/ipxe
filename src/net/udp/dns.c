@@ -1061,7 +1061,7 @@ const struct setting dns6_setting __setting ( SETTING_IP6_EXTRA, dns6 ) = {
 	.description = "DNS server",
 	.tag = DHCPV6_DNS_SERVERS,
 	.type = &setting_type_ipv6,
-	.scope = &ipv6_scope,
+	.scope = &dhcpv6_scope,
 };
 
 /** DNS search list */
