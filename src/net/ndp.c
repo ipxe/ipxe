@@ -636,7 +636,7 @@ struct ndp_settings {
 	/** Length of NDP options */
 	size_t len;
 	/** NDP options */
-	union ndp_option option[0];
+	union ndp_option options[0];
 };
 
 /** NDP settings scope */
@@ -647,9 +647,11 @@ static const struct settings_scope ndp_settings_scope;
  *
  * @v type		NDP option type
  * @v offset		Starting offset of data
+ * @v len		Length of data (or 0 to use all remaining data)
  * @ret tag		NDP tag
  */
-#define NDP_TAG( type, offset )	( ( (offset) << 8 ) | (type) )
+#define NDP_TAG( type, offset, len ) \
+	( ( (len) << 16 ) | ( (offset) << 8 ) | (type) )
 
 /**
  * Extract NDP tag type
@@ -657,7 +659,7 @@ static const struct settings_scope ndp_settings_scope;
  * @v tag		NDP tag
  * @ret type		NDP option type
  */
-#define NDP_TAG_TYPE( tag ) ( (tag) & 0xff )
+#define NDP_TAG_TYPE( tag ) ( ( (tag) >> 0 ) & 0xff )
 
 /**
  * Extract NDP tag offset
@@ -665,7 +667,23 @@ static const struct settings_scope ndp_settings_scope;
  * @v tag		NDP tag
  * @ret offset		Starting offset of data
  */
-#define NDP_TAG_OFFSET( tag ) ( (tag) >> 8 )
+#define NDP_TAG_OFFSET( tag ) ( ( (tag) >> 8 ) & 0xff )
+
+/**
+ * Extract NDP tag length
+ *
+ * @v tag		NDP tag
+ * @ret len		Length of data (or 0 to use all remaining data)
+ */
+#define NDP_TAG_LEN( tag ) ( ( (tag) >> 16 ) & 0xff )
+
+/**
+ * Extract NDP tag instance
+ *
+ * @v tag		NDP tag
+ * @ret instance	Instance
+ */
+#define NDP_TAG_INSTANCE( tag ) ( ( (tag) >> 24 ) & 0xff )
 
 /**
  * Check applicability of NDP setting
@@ -698,44 +716,58 @@ static int ndp_fetch ( struct settings *settings,
 		container_of ( settings->parent, struct net_device,
 			       settings.settings );
 	union ndp_option *option;
-	unsigned int type = NDP_TAG_TYPE ( setting->tag );
-	unsigned int offset = NDP_TAG_OFFSET ( setting->tag );
-	size_t remaining;
+	unsigned int tag_type;
+	unsigned int tag_offset;
+	unsigned int tag_len;
+	unsigned int tag_instance;
+	size_t offset;
 	size_t option_len;
-	size_t payload_len;
+	void *option_data;
+
+	/* Parse setting tag */
+	tag_type = NDP_TAG_TYPE ( setting->tag );
+	tag_offset = NDP_TAG_OFFSET ( setting->tag );
+	tag_len = NDP_TAG_LEN ( setting->tag );
+	tag_instance = NDP_TAG_INSTANCE ( setting->tag );
 
 	/* Scan through NDP options for requested type.  We can assume
 	 * that the options are well-formed, otherwise they would have
 	 * been rejected prior to being stored.
 	 */
-	option = ndpset->option;
-	remaining = ndpset->len;
-	while ( remaining ) {
+	for ( offset = 0 ; offset < ndpset->len ; offset += option_len ) {
 
 		/* Calculate option length */
+		option = ( ( ( void * ) ndpset->options ) + offset );
 		option_len = ( option->header.blocks * NDP_OPTION_BLKSZ );
 
-		/* If this is the requested option, return it */
-		if ( option->header.type == type ) {
+		/* Skip options that do not match this tag */
+		if ( option->header.type != tag_type )
+			continue;
 
-			/* Sanity check */
-			if ( offset > option_len ) {
-				DBGC ( netdev, "NDP %s option %d too short\n",
-				       netdev->name, type );
-				return -EINVAL;
-			}
-			payload_len = ( option_len - offset );
+		/* Skip previous instances of this option */
+		if ( tag_instance-- != 0 )
+			continue;
 
-			/* Copy data to output buffer */
-			if ( len > payload_len )
-				len = payload_len;
-			memcpy ( data, ( ( ( void * ) option ) + offset ), len);
-			return payload_len;
+		/* Sanity check */
+		if ( ( tag_offset + tag_len ) > option_len ) {
+			DBGC ( netdev, "NDP %s option %d too short\n",
+			       netdev->name, tag_type );
+			return -EINVAL;
 		}
+		if ( ! tag_len )
+			tag_len = ( option_len - tag_offset );
+		option_data = ( ( ( void * ) option ) + tag_offset );
 
-		/* Move to next option */
-		option = ( ( ( void * ) option ) + option_len );
-		remaining -= option_len;
+		/* Copy data to output buffer */
+		if ( len > tag_len )
+			len = tag_len;
+		memcpy ( data, option_data, len );
+
+		/* Default to hex if no type is specified */
+		if ( ! setting->type )
+			setting->type = &setting_type_hex;
+
+		return tag_len;
 	}
 
 	return -ENOENT;
@@ -751,12 +783,12 @@ static struct settings_operations ndp_settings_operations = {
  * Register NDP settings
  *
  * @v netdev		Network device
- * @v option		NDP options
+ * @v options		NDP options
  * @v len		Length of options
  * @ret rc		Return status code
  */
 static int ndp_register_settings ( struct net_device *netdev,
-				   union ndp_option *option, size_t len ) {
+				   union ndp_option *options, size_t len ) {
 	struct settings *parent = netdev_settings ( netdev );
 	struct ndp_settings *ndpset;
 	int rc;
@@ -771,7 +803,7 @@ static int ndp_register_settings ( struct net_device *netdev,
 	settings_init ( &ndpset->settings, &ndp_settings_operations,
 			&ndpset->refcnt, &ndp_settings_scope );
 	ndpset->len = len;
-	memcpy ( ndpset->option, option, len );
+	memcpy ( ndpset->options, options, len );
 
 	/* Register settings */
 	if ( ( rc = register_settings ( &ndpset->settings, parent,
@@ -789,7 +821,7 @@ const struct setting ndp_dns6_setting __setting ( SETTING_IP6_EXTRA, dns6 ) = {
 	.name = "dns6",
 	.description = "DNS server",
 	.tag = NDP_TAG ( NDP_OPT_RDNSS,
-			 offsetof ( struct ndp_rdnss_option, addresses ) ),
+			 offsetof ( struct ndp_rdnss_option, addresses ), 0 ),
 	.type = &setting_type_ipv6,
 	.scope = &ndp_settings_scope,
 };
@@ -799,7 +831,7 @@ const struct setting ndp_dnssl_setting __setting ( SETTING_IP_EXTRA, dnssl ) = {
 	.name = "dnssl",
 	.description = "DNS search list",
 	.tag = NDP_TAG ( NDP_OPT_DNSSL,
-			 offsetof ( struct ndp_dnssl_option, names ) ),
+			 offsetof ( struct ndp_dnssl_option, names ), 0 ),
 	.type = &setting_type_dnssl,
 	.scope = &ndp_settings_scope,
 };
