@@ -284,6 +284,9 @@ struct builtin_setting {
 extern const struct settings_scope builtin_scope;
 
 /** IPv6 setting scope */
+extern const struct settings_scope ipv6_scope;
+
+/** DHCPv6 setting scope */
 extern const struct settings_scope dhcpv6_scope;
 
 /**
@@ -432,6 +435,12 @@ extern const struct setting
 gateway_setting __setting ( SETTING_IP4, gateway );
 extern const struct setting
 dns_setting __setting ( SETTING_IP4_EXTRA, dns );
+extern const struct setting
+ip6_setting __setting ( SETTING_IP6, ip6 );
+extern const struct setting
+len6_setting __setting ( SETTING_IP6, len6 );
+extern const struct setting
+gateway6_setting __setting ( SETTING_IP6, gateway6 );
 extern const struct setting
 hostname_setting __setting ( SETTING_HOST, hostname );
 extern const struct setting

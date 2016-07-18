@@ -1061,6 +1061,33 @@ int format_ipv6_setting ( const struct setting_type *type __unused,
 	return snprintf ( buf, len, "%s", inet6_ntoa ( ipv6 ) );
 }
 
+/** IPv6 settings scope */
+const struct settings_scope ipv6_scope;
+
+/** IPv6 address setting */
+const struct setting ip6_setting __setting ( SETTING_IP6, ip6 ) = {
+	.name = "ip6",
+	.description = "IPv6 address",
+	.type = &setting_type_ipv6,
+	.scope = &ipv6_scope,
+};
+
+/** IPv6 prefix length setting */
+const struct setting len6_setting __setting ( SETTING_IP6, len6 ) = {
+	.name = "len6",
+	.description = "IPv6 prefix length",
+	.type = &setting_type_int8,
+	.scope = &ipv6_scope,
+};
+
+/** Default gateway setting */
+const struct setting gateway6_setting __setting ( SETTING_IP6, gateway6 ) = {
+	.name = "gateway6",
+	.description = "IPv6 gateway",
+	.type = &setting_type_ipv6,
+	.scope = &ipv6_scope,
+};
+
 /**
  * Create IPv6 network device
  *
