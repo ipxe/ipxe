@@ -331,6 +331,7 @@ struct settings * autovivify_child_settings ( struct settings *parent,
 				&new_child->autovivified.refcnt );
 	settings = &new_child->autovivified.generic.settings;
 	register_settings ( settings, parent, new_child->name );
+	ref_put ( settings->refcnt );
 	return settings;
 }
 
