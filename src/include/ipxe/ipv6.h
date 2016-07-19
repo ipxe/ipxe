@@ -238,6 +238,9 @@ static inline void ipv6_all_routers ( struct in6_addr *addr ) {
 	addr->s6_addr[15] = 2;
 }
 
+/** IPv6 link-local address settings block name */
+#define IPV6_SETTINGS_NAME "link"
+
 extern struct list_head ipv6_miniroutes;
 
 extern struct net_protocol ipv6_protocol __net_protocol;

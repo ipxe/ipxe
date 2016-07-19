@@ -1089,6 +1089,115 @@ const struct setting gateway6_setting __setting ( SETTING_IP6, gateway6 ) = {
 };
 
 /**
+ * Check applicability of IPv6 link-local address setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @ret applies		Setting applies within this settings block
+ */
+static int ipv6_applies ( struct settings *settings __unused,
+			  const struct setting *setting ) {
+
+	return ( setting->scope == &ipv6_scope );
+}
+
+/**
+ * Fetch IPv6 link-local address setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int ipv6_fetch ( struct settings *settings, struct setting *setting,
+			void *data, size_t len ) {
+	struct net_device *netdev =
+		container_of ( settings->parent, struct net_device,
+			       settings.settings );
+	struct in6_addr ip6;
+	uint8_t *len6;
+	int prefix_len;
+	int rc;
+
+	/* Construct link-local address from EUI-64 as per RFC 2464 */
+	memset ( &ip6, 0, sizeof ( ip6 ) );
+	prefix_len = ipv6_link_local ( &ip6, netdev );
+	if ( prefix_len < 0 ) {
+		rc = prefix_len;
+		return rc;
+	}
+
+	/* Handle setting */
+	if ( setting_cmp ( setting, &ip6_setting ) == 0 ) {
+
+		/* Return link-local ip6 */
+		if ( len > sizeof ( ip6 ) )
+			len = sizeof ( ip6 );
+		memcpy ( data, &ip6, len );
+		return sizeof ( ip6 );
+
+	} else if ( setting_cmp ( setting, &len6_setting ) == 0 ) {
+
+		/* Return prefix length */
+		if ( len ) {
+			len6 = data;
+			*len6 = prefix_len;
+		}
+		return sizeof ( *len6 );
+
+	}
+
+	return -ENOENT;
+}
+
+/** IPv6 link-local address settings operations */
+static struct settings_operations ipv6_settings_operations = {
+	.applies = ipv6_applies,
+	.fetch = ipv6_fetch,
+};
+
+/** IPv6 link-local address settings */
+struct ipv6_settings {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** Settings interface */
+	struct settings settings;
+};
+
+/**
+ * Register IPv6 link-local address settings
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int ipv6_register_settings ( struct net_device *netdev ) {
+	struct settings *parent = netdev_settings ( netdev );
+	struct ipv6_settings *ipv6set;
+	int rc;
+
+	/* Allocate and initialise structure */
+	ipv6set = zalloc ( sizeof ( *ipv6set ) );
+	if ( ! ipv6set ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	ref_init ( &ipv6set->refcnt, NULL );
+	settings_init ( &ipv6set->settings, &ipv6_settings_operations,
+			&ipv6set->refcnt, &ipv6_scope );
+
+	/* Register settings */
+	if ( ( rc = register_settings ( &ipv6set->settings, parent,
+					IPV6_SETTINGS_NAME ) ) != 0 )
+		goto err_register;
+
+ err_register:
+	ref_put ( &ipv6set->refcnt );
+ err_alloc:
+	return rc;
+}
+
+/**
  * Create IPv6 network device
  *
  * @v netdev		Network device
@@ -1115,6 +1224,10 @@ static int ipv6_probe ( struct net_device *netdev ) {
 					 IPV6_HAS_ADDRESS );
 	if ( ! miniroute )
 		return -ENOMEM;
+
+	/* Register link-local address settings */
+	if ( ( rc = ipv6_register_settings ( netdev ) ) != 0 )
+		return rc;
 
 	return 0;
 }
