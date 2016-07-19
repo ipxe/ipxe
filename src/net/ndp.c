@@ -342,11 +342,6 @@ ndp_rx_router_advertisement_prefix ( struct net_device *netdev,
 				     union ndp_option *option, size_t len ) {
 	struct ndp_router_advertisement_header *radv = &ndp->radv;
 	struct ndp_prefix_information_option *prefix_opt = &option->prefix;
-	struct in6_addr *router = &sin6_src->sin6_addr;
-	struct in6_addr address;
-	struct ipv6conf *ipv6conf;
-	int prefix_len;
-	int rc;
 
 	/* Sanity check */
 	if ( sizeof ( *prefix_opt ) > len ) {
@@ -355,59 +350,13 @@ ndp_rx_router_advertisement_prefix ( struct net_device *netdev,
 		return -EINVAL;
 	}
 
-	/* Identify IPv6 configurator, if any */
-	ipv6conf = ipv6conf_demux ( netdev );
 	DBGC ( netdev, "NDP %s found %sdefault router %s ",
 	       netdev->name, ( radv->lifetime ? "" : "non-" ),
 	       inet6_ntoa ( &sin6_src->sin6_addr ) );
-	DBGC ( netdev, "for %s-link %sautonomous prefix %s/%d%s\n",
+	DBGC ( netdev, "for %s-link %sautonomous prefix %s/%d\n",
 	       ( ( prefix_opt->flags & NDP_PREFIX_ON_LINK ) ? "on" : "off" ),
 	       ( ( prefix_opt->flags & NDP_PREFIX_AUTONOMOUS ) ? "" : "non-" ),
-	       inet6_ntoa ( &prefix_opt->prefix ),
-	       prefix_opt->prefix_len, ( ipv6conf ? "" : " (ignored)" ) );
-
-	/* Do nothing unless IPv6 autoconfiguration is in progress */
-	if ( ! ipv6conf )
-		return 0;
-
-	/* Ignore off-link prefixes */
-	if ( ! ( prefix_opt->flags & NDP_PREFIX_ON_LINK ) )
-		return 0;
-
-	/* Define prefix */
-	if ( ( rc = ipv6_set_prefix ( netdev, &prefix_opt->prefix,
-				      prefix_opt->prefix_len,
-				      ( radv->lifetime ?
-					router : NULL ) ) ) != 0 ) {
-		DBGC ( netdev, "NDP %s could not define prefix %s/%d: %s\n",
-		       netdev->name, inet6_ntoa ( &prefix_opt->prefix ),
-		       prefix_opt->prefix_len, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Perform stateless address autoconfiguration, if applicable */
-	if ( prefix_opt->flags & NDP_PREFIX_AUTONOMOUS ) {
-		memcpy ( &address, &prefix_opt->prefix, sizeof ( address ) );
-		prefix_len = ipv6_eui64 ( &address, netdev );
-		if ( prefix_len < 0 ) {
-			rc = prefix_len;
-			DBGC ( netdev, "NDP %s could not construct SLAAC "
-			       "address: %s\n", netdev->name, strerror ( rc ) );
-			return rc;
-		}
-		if ( prefix_len != prefix_opt->prefix_len ) {
-			DBGC ( netdev, "NDP %s incorrect SLAAC prefix length "
-			       "%d (expected %d)\n", netdev->name,
-			       prefix_opt->prefix_len, prefix_len );
-			return -EINVAL;
-		}
-		if ( ( rc = ipv6_set_address ( netdev, &address ) ) != 0 ) {
-			DBGC ( netdev, "NDP %s could not set address %s: %s\n",
-			       netdev->name, inet6_ntoa ( &address ),
-			       strerror ( rc ) );
-			return rc;
-		}
-	}
+	       inet6_ntoa ( &prefix_opt->prefix ), prefix_opt->prefix_len );
 
 	return 0;
 }

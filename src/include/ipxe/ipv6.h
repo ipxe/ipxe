@@ -25,6 +25,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** IPv6 maximum hop limit */
 #define IPV6_HOP_LIMIT 0xff
 
+/** IPv6 default prefix length */
+#define IPV6_DEFAULT_PREFIX_LEN 64
+
+/** IPv6 maximum prefix length */
+#define IPV6_MAX_PREFIX_LEN 128
+
 /** IPv6 header */
 struct ipv6_header {
 	/** Version (4 bits), Traffic class (8 bits), Flow label (20 bits) */
@@ -258,10 +264,6 @@ extern struct list_head ipv6_miniroutes;
 extern struct net_protocol ipv6_protocol __net_protocol;
 
 extern int ipv6_has_addr ( struct net_device *netdev, struct in6_addr *addr );
-extern int ipv6_set_prefix ( struct net_device *netdev, struct in6_addr *prefix,
-			     unsigned int prefix_len, struct in6_addr *router );
-extern int ipv6_set_address ( struct net_device *netdev,
-			      struct in6_addr *address );
 extern int parse_ipv6_setting ( const struct setting_type *type,
 				const char *value, void *buf, size_t len );
 extern int format_ipv6_setting ( const struct setting_type *type,

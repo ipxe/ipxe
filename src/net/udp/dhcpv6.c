@@ -462,8 +462,6 @@ enum dhcpv6_session_state_flags {
 	DHCPV6_RX_RECORD_SERVER_ID = 0x04,
 	/** Record received IPv6 address */
 	DHCPV6_RX_RECORD_IAADDR = 0x08,
-	/** Apply received IPv6 address */
-	DHCPV6_RX_APPLY_IAADDR = 0x10,
 };
 
 /** DHCPv6 request state */
@@ -471,7 +469,7 @@ static struct dhcpv6_session_state dhcpv6_request = {
 	.tx_type = DHCPV6_REQUEST,
 	.rx_type = DHCPV6_REPLY,
 	.flags = ( DHCPV6_TX_IA_NA | DHCPV6_TX_IAADDR |
-		   DHCPV6_RX_RECORD_IAADDR | DHCPV6_RX_APPLY_IAADDR ),
+		   DHCPV6_RX_RECORD_IAADDR ),
 	.next = NULL,
 };
 
@@ -868,19 +866,6 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 		}
 		memcpy ( dhcpv6->server_duid, option->duid.duid,
 			 dhcpv6->server_duid_len );
-	}
-
-	/* Apply identity association address, if applicable */
-	if ( dhcpv6->state->flags & DHCPV6_RX_APPLY_IAADDR ) {
-		if ( ( rc = ipv6_set_address ( dhcpv6->netdev,
-					       &dhcpv6->lease ) ) != 0 ) {
-			DBGC ( dhcpv6, "DHCPv6 %s could not apply %s: %s\n",
-			       dhcpv6->netdev->name,
-			       inet6_ntoa ( &dhcpv6->lease ), strerror ( rc ) );
-			/* This is plausibly the error we want to return */
-			dhcpv6->rc = rc;
-			goto done;
-		}
 	}
 
 	/* Transition to next state, if applicable */
