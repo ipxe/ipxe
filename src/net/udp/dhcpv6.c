@@ -375,6 +375,7 @@ static int dhcpv6_register ( struct in6_addr *lease,
 	ref_init ( &dhcpv6set->refcnt, NULL );
 	settings_init ( &dhcpv6set->settings, &dhcpv6_settings_operations,
 			&dhcpv6set->refcnt, &dhcpv6_scope );
+	dhcpv6set->settings.order = IPV6_ORDER_DHCPV6;
 	data = ( ( ( void * ) dhcpv6set ) + sizeof ( *dhcpv6set ) );
 	len = options->len;
 	memcpy ( data, options->data, len );

@@ -1185,6 +1185,7 @@ static int ipv6_register_settings ( struct net_device *netdev ) {
 	ref_init ( &ipv6set->refcnt, NULL );
 	settings_init ( &ipv6set->settings, &ipv6_settings_operations,
 			&ipv6set->refcnt, &ipv6_scope );
+	ipv6set->settings.order = IPV6_ORDER_LINK_LOCAL;
 
 	/* Register settings */
 	if ( ( rc = register_settings ( &ipv6set->settings, parent,

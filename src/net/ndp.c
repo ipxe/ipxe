@@ -981,17 +981,28 @@ static int ndp_register_settings ( struct net_device *netdev,
 	size_t option_len;
 	unsigned int prefixes;
 	unsigned int instance;
+	int order;
 	int rc;
 
 	/* Count number of prefix options.  We can assume that the
 	 * options are well-formed, otherwise they would have been
 	 * rejected prior to being stored.
 	 */
+	order = IPV6_ORDER_PREFIX_ONLY;
 	for ( prefixes = 0, offset = 0 ; offset < len ; offset += option_len ) {
+
+		/* Skip non-prefix options */
 		option = ( ( ( void * ) options ) + offset );
 		option_len = ( option->header.blocks * NDP_OPTION_BLKSZ );
-		if ( option->header.type == NDP_OPT_PREFIX )
-			prefixes++;
+		if ( option->header.type != NDP_OPT_PREFIX )
+			continue;
+
+		/* Count number of prefixes */
+		prefixes++;
+
+		/* Increase overall order if we have SLAAC addresses */
+		if ( option->prefix.flags & NDP_PREFIX_AUTONOMOUS )
+			order = IPV6_ORDER_SLAAC;
 	}
 
 	/* Allocate and initialise structure */
@@ -1004,6 +1015,7 @@ static int ndp_register_settings ( struct net_device *netdev,
 	ref_init ( &ndpset->refcnt, NULL );
 	settings_init ( &ndpset->settings, &ndp_settings_operations,
 			&ndpset->refcnt, &ndp_settings_scope );
+	ndpset->settings.order = order;
 	memcpy ( &ndpset->router, router, sizeof ( ndpset->router ) );
 	ndpset->lifetime = lifetime;
 	ndpset->len = len;
@@ -1028,6 +1040,9 @@ static int ndp_register_settings ( struct net_device *netdev,
 		settings_init ( &prefset->settings,
 				&ndp_prefix_settings_operations,
 				&ndpset->refcnt, &ndp_settings_scope );
+		prefset->settings.order =
+			( ( option->prefix.flags & NDP_PREFIX_AUTONOMOUS ) ?
+			  IPV6_ORDER_SLAAC : IPV6_ORDER_PREFIX_ONLY );
 		prefset->prefix = &option->prefix;
 		snprintf ( prefset->name, sizeof ( prefset->name ), "%d",
 			   instance++ );

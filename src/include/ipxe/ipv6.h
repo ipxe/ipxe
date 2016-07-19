@@ -238,6 +238,18 @@ static inline void ipv6_all_routers ( struct in6_addr *addr ) {
 	addr->s6_addr[15] = 2;
 }
 
+/** IPv6 settings sibling order */
+enum ipv6_settings_order {
+	/** No address */
+	IPV6_ORDER_PREFIX_ONLY = -4,
+	/** Link-local address */
+	IPV6_ORDER_LINK_LOCAL = -3,
+	/** Address assigned via SLAAC */
+	IPV6_ORDER_SLAAC = -2,
+	/** Address assigned via DHCPv6 */
+	IPV6_ORDER_DHCPV6 = -1,
+};
+
 /** IPv6 link-local address settings block name */
 #define IPV6_SETTINGS_NAME "link"
 
