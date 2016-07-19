@@ -452,6 +452,8 @@ static void reprioritise_settings ( struct settings *settings ) {
 		tmp_priority = fetch_intz_setting ( tmp, &priority_setting );
 		if ( priority > tmp_priority )
 			break;
+		if ( settings->order > tmp->order )
+			break;
 	}
 	list_add_tail ( &settings->siblings, &tmp->siblings );
 

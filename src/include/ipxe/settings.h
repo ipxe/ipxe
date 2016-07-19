@@ -144,6 +144,8 @@ struct settings {
 	struct settings_operations *op;
 	/** Default scope for numerical settings constructed for this block */
 	const struct settings_scope *default_scope;
+	/** Sibling ordering */
+	int order;
 };
 
 /**
