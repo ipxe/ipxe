@@ -266,6 +266,8 @@ struct dhcpv6_settings {
 	struct refcnt refcnt;
 	/** Settings block */
 	struct settings settings;
+	/** Leased address */
+	struct in6_addr lease;
 	/** Option list */
 	struct dhcpv6_option_list options;
 };
@@ -280,7 +282,32 @@ struct dhcpv6_settings {
 static int dhcpv6_applies ( struct settings *settings __unused,
 			    const struct setting *setting ) {
 
-	return ( setting->scope == &dhcpv6_scope );
+	return ( ( setting->scope == &dhcpv6_scope ) ||
+		 ( setting_cmp ( setting, &ip6_setting ) == 0 ) );
+}
+
+/**
+ * Fetch value of DHCPv6 leased address
+ *
+ * @v dhcpset		DHCPv6 settings
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int dhcpv6_fetch_lease ( struct dhcpv6_settings *dhcpv6set,
+				void *data, size_t len ) {
+	struct in6_addr *lease = &dhcpv6set->lease;
+
+	/* Do nothing unless a leased address exists */
+	if ( IN6_IS_ADDR_UNSPECIFIED ( lease ) )
+		return -ENOENT;
+
+	/* Copy leased address */
+	if ( len > sizeof ( *lease ) )
+		len = sizeof ( *lease );
+	memcpy ( data, lease, len );
+
+	return sizeof ( *lease );
 }
 
 /**
@@ -299,6 +326,10 @@ static int dhcpv6_fetch ( struct settings *settings,
 		container_of ( settings, struct dhcpv6_settings, settings );
 	const union dhcpv6_any_option *option;
 	size_t option_len;
+
+	/* Handle leased address */
+	if ( setting_cmp ( setting, &ip6_setting ) == 0 )
+		return dhcpv6_fetch_lease ( dhcpv6set, data, len );
 
 	/* Find option */
 	option = dhcpv6_option ( &dhcpv6set->options, setting->tag );
@@ -322,11 +353,13 @@ static struct settings_operations dhcpv6_settings_operations = {
 /**
  * Register DHCPv6 options as network device settings
  *
+ * @v lease		DHCPv6 leased address
  * @v options		DHCPv6 option list
  * @v parent		Parent settings block
  * @ret rc		Return status code
  */
-static int dhcpv6_register ( struct dhcpv6_option_list *options,
+static int dhcpv6_register ( struct in6_addr *lease,
+			     struct dhcpv6_option_list *options,
 			     struct settings *parent ) {
 	struct dhcpv6_settings *dhcpv6set;
 	void *data;
@@ -347,6 +380,7 @@ static int dhcpv6_register ( struct dhcpv6_option_list *options,
 	memcpy ( data, options->data, len );
 	dhcpv6set->options.data = data;
 	dhcpv6set->options.len = len;
+	memcpy ( &dhcpv6set->lease, lease, sizeof ( dhcpv6set->lease ) );
 
 	/* Register settings */
 	if ( ( rc = register_settings ( &dhcpv6set->settings, parent,
@@ -848,27 +882,24 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 		}
 	}
 
-	/* Transition to next state or complete DHCPv6, as applicable */
+	/* Transition to next state, if applicable */
 	if ( dhcpv6->state->next ) {
-
-		/* Transition to next state */
 		dhcpv6_set_state ( dhcpv6, dhcpv6->state->next );
 		rc = 0;
-
-	} else {
-
-		/* Register settings */
-		if ( ( rc = dhcpv6_register ( &options, parent ) ) != 0 ) {
-			DBGC ( dhcpv6, "DHCPv6 %s could not register "
-			       "settings: %s\n", dhcpv6->netdev->name,
-			       strerror ( rc ) );
-			goto done;
-		}
-
-		/* Mark as complete */
-		dhcpv6_finished ( dhcpv6, 0 );
-		DBGC ( dhcpv6, "DHCPv6 %s complete\n", dhcpv6->netdev->name );
+		goto done;
 	}
+
+	/* Register settings */
+	if ( ( rc = dhcpv6_register ( &dhcpv6->lease, &options,
+				      parent ) ) != 0 ) {
+		DBGC ( dhcpv6, "DHCPv6 %s could not register settings: %s\n",
+		       dhcpv6->netdev->name, strerror ( rc ) );
+		goto done;
+	}
+
+	/* Mark as complete */
+	dhcpv6_finished ( dhcpv6, 0 );
+	DBGC ( dhcpv6, "DHCPv6 %s complete\n", dhcpv6->netdev->name );
 
  done:
 	free_iob ( iobuf );
