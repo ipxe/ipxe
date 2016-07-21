@@ -286,7 +286,7 @@ struct builtin_setting {
 extern const struct settings_scope builtin_scope;
 
 /** IPv6 setting scope */
-extern const struct settings_scope ipv6_scope;
+extern const struct settings_scope ipv6_settings_scope;
 
 /** DHCPv6 setting scope */
 extern const struct settings_scope dhcpv6_scope;

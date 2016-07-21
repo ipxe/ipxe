@@ -1040,14 +1040,14 @@ int format_ipv6_setting ( const struct setting_type *type __unused,
 }
 
 /** IPv6 settings scope */
-const struct settings_scope ipv6_scope;
+const struct settings_scope ipv6_settings_scope;
 
 /** IPv6 address setting */
 const struct setting ip6_setting __setting ( SETTING_IP6, ip6 ) = {
 	.name = "ip6",
 	.description = "IPv6 address",
 	.type = &setting_type_ipv6,
-	.scope = &ipv6_scope,
+	.scope = &ipv6_settings_scope,
 };
 
 /** IPv6 prefix length setting */
@@ -1055,7 +1055,7 @@ const struct setting len6_setting __setting ( SETTING_IP6, len6 ) = {
 	.name = "len6",
 	.description = "IPv6 prefix length",
 	.type = &setting_type_int8,
-	.scope = &ipv6_scope,
+	.scope = &ipv6_settings_scope,
 };
 
 /** Default gateway setting */
@@ -1063,7 +1063,7 @@ const struct setting gateway6_setting __setting ( SETTING_IP6, gateway6 ) = {
 	.name = "gateway6",
 	.description = "IPv6 gateway",
 	.type = &setting_type_ipv6,
-	.scope = &ipv6_scope,
+	.scope = &ipv6_settings_scope,
 };
 
 /**
@@ -1076,7 +1076,7 @@ const struct setting gateway6_setting __setting ( SETTING_IP6, gateway6 ) = {
 static int ipv6_applies ( struct settings *settings __unused,
 			  const struct setting *setting ) {
 
-	return ( setting->scope == &ipv6_scope );
+	return ( setting->scope == &ipv6_settings_scope );
 }
 
 /**
@@ -1162,7 +1162,7 @@ static int ipv6_register_settings ( struct net_device *netdev ) {
 	}
 	ref_init ( &ipv6set->refcnt, NULL );
 	settings_init ( &ipv6set->settings, &ipv6_settings_operations,
-			&ipv6set->refcnt, &ipv6_scope );
+			&ipv6set->refcnt, &ipv6_settings_scope );
 	ipv6set->settings.order = IPV6_ORDER_LINK_LOCAL;
 
 	/* Register settings */

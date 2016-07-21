@@ -755,7 +755,7 @@ static struct settings_operations ndp_settings_operations = {
 static int ndp_prefix_applies ( struct settings *settings __unused,
 				const struct setting *setting ) {
 
-	return ( setting->scope == &ipv6_scope );
+	return ( setting->scope == &ipv6_settings_scope );
 }
 
 /**
