@@ -70,22 +70,27 @@ static const struct in6_addr sample_multicast = {
  *
  * @v addr		IPv6 address
  * @v text		Expected textual representation
+ * @v file		Test code file
+ * @v line		Test code line
  */
+static void inet6_ntoa_okx ( const struct in6_addr *addr, const char *text,
+			     const char *file, unsigned int line ) {
+	char *actual;
+
+	actual = inet6_ntoa ( addr );
+	DBG ( "inet6_ntoa ( %04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ) "
+	      "= %s\n", ntohs ( addr->s6_addr16[0] ),
+	      ntohs ( addr->s6_addr16[1] ), ntohs ( addr->s6_addr16[2] ),
+	      ntohs ( addr->s6_addr16[3] ), ntohs ( addr->s6_addr16[4] ),
+	      ntohs ( addr->s6_addr16[5] ), ntohs ( addr->s6_addr16[6] ),
+	      ntohs ( addr->s6_addr16[7] ), actual );
+	okx ( strcmp ( actual, text ) == 0, file, line );
+}
 #define inet6_ntoa_ok( addr, text ) do {				\
 	static const struct in6_addr in = {				\
 		.s6_addr = addr,					\
 	};								\
-	static const char expected[] = text;				\
-	char *actual;							\
-									\
-	actual = inet6_ntoa ( &in );					\
-	DBG ( "inet6_ntoa ( %04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ) "	\
-	      "= %s\n", ntohs ( in.s6_addr16[0] ),			\
-	      ntohs ( in.s6_addr16[1] ), ntohs ( in.s6_addr16[2] ),	\
-	      ntohs ( in.s6_addr16[3] ), ntohs ( in.s6_addr16[4] ),	\
-	      ntohs ( in.s6_addr16[5] ), ntohs ( in.s6_addr16[6] ),	\
-	      ntohs ( in.s6_addr16[7] ), actual );			\
-	ok ( strcmp ( actual, expected ) == 0 );			\
+	inet6_ntoa_okx ( &in, text, __FILE__, __LINE__ );		\
 	} while ( 0 )
 
 /**
@@ -93,31 +98,40 @@ static const struct in6_addr sample_multicast = {
  *
  * @v text		Textual representation
  * @v addr		Expected IPv6 address
+ * @v file		Test code file
+ * @v line		Test code line
  */
+static void inet6_aton_okx ( const char *text, const struct in6_addr *addr,
+			     const char *file, unsigned int line ) {
+	struct in6_addr actual;
+
+	okx ( inet6_aton ( text, &actual ) == 0, file, line );
+	DBG ( "inet6_aton ( \"%s\" ) = %s\n", text, inet6_ntoa ( &actual ) );
+	okx ( memcmp ( &actual, addr, sizeof ( actual ) ) == 0,
+	      file, line );
+}
 #define inet6_aton_ok( text, addr ) do {				\
-	static const char string[] = text;				\
-	static const struct in6_addr expected = {			\
+	static const struct in6_addr in = {				\
 		.s6_addr = addr,					\
 	};								\
-	struct in6_addr actual;						\
-									\
-	ok ( inet6_aton ( string, &actual ) == 0 );			\
-	DBG ( "inet6_aton ( \"%s\" ) = %s\n", string,			\
-	      inet6_ntoa ( &actual ) );					\
-	ok ( memcmp ( &actual, &expected, sizeof ( actual ) ) == 0 );	\
+	inet6_aton_okx ( text, &in, __FILE__, __LINE__ );		\
 	} while ( 0 )
 
 /**
  * Report an inet6_aton() failure test result
  *
  * @v text		Textual representation
+ * @v file		Test code file
+ * @v line		Test code line
  */
-#define inet6_aton_fail_ok( text ) do {					\
-	static const char string[] = text;				\
-	struct in6_addr dummy;						\
-									\
-	ok ( inet6_aton ( string, &dummy ) != 0 );			\
-	} while ( 0 )
+static void inet6_aton_fail_okx ( const char *text, const char *file,
+				  unsigned int line ) {
+	struct in6_addr dummy;
+
+	okx ( inet6_aton ( text, &dummy ) != 0, file, line );
+}
+#define inet6_aton_fail_ok( text )					\
+	inet6_aton_fail_okx ( text, __FILE__, __LINE__ )
 
 /**
  * Perform IPv6 self-tests
