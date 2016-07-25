@@ -23,6 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
@@ -79,6 +80,40 @@ static uint32_t ipv6col ( struct in6_addr *in ) {
 }
 
 /**
+ * Determine IPv6 address scope
+ *
+ * @v addr		IPv6 address
+ * @ret scope		Address scope
+ */
+static unsigned int ipv6_scope ( const struct in6_addr *addr ) {
+
+	/* Multicast addresses directly include a scope field */
+	if ( IN6_IS_ADDR_MULTICAST ( addr ) )
+		return ipv6_multicast_scope ( addr );
+
+	/* Link-local addresses have link-local scope */
+	if ( IN6_IS_ADDR_LINKLOCAL ( addr ) )
+		return IPV6_SCOPE_LINK_LOCAL;
+
+	/* Site-local addresses have site-local scope */
+	if ( IN6_IS_ADDR_SITELOCAL ( addr ) )
+		return IPV6_SCOPE_SITE_LOCAL;
+
+	/* Unique local addresses do not directly map to a defined
+	 * scope.  They effectively have a scope which is wider than
+	 * link-local but narrower than global.  Since the only
+	 * multicast packets that we transmit are link-local, we can
+	 * simply choose an arbitrary scope between link-local and
+	 * global.
+	 */
+	if ( IN6_IS_ADDR_ULA ( addr ) )
+		return IPV6_SCOPE_ORGANISATION_LOCAL;
+
+	/* All other addresses are assumed to be global */
+	return IPV6_SCOPE_GLOBAL;
+}
+
+/**
  * Dump IPv6 routing table entry
  *
  * @v miniroute		Routing table entry
@@ -119,23 +154,32 @@ int ipv6_has_addr ( struct net_device *netdev, struct in6_addr *addr ) {
 }
 
 /**
- * Check if IPv6 address is within a routing table entry's local network
+ * Count matching bits of an IPv6 routing table entry prefix
  *
  * @v miniroute		Routing table entry
  * @v address		IPv6 address
- * @ret is_on_link	Address is within this entry's local network
+ * @ret match_len	Number of matching prefix bits
  */
-static int ipv6_is_on_link ( struct ipv6_miniroute *miniroute,
-			     struct in6_addr *address ) {
+static unsigned int ipv6_match_len ( struct ipv6_miniroute *miniroute,
+				     struct in6_addr *address ) {
+	unsigned int match_len = 0;
 	unsigned int i;
+	uint32_t diff;
 
 	for ( i = 0 ; i < ( sizeof ( address->s6_addr32 ) /
 			    sizeof ( address->s6_addr32[0] ) ) ; i++ ) {
-		if ( (( address->s6_addr32[i] ^ miniroute->address.s6_addr32[i])
-		      & miniroute->prefix_mask.s6_addr32[i] ) != 0 )
-			return 0;
+
+		diff = ntohl ( ~( ( ~( address->s6_addr32[i] ^
+				       miniroute->address.s6_addr32[i] ) )
+				  & miniroute->prefix_mask.s6_addr32[i] ) );
+		match_len += 32;
+		if ( diff ) {
+			match_len -= flsl ( diff );
+			break;
+		}
 	}
-	return 1;
+
+	return match_len;
 }
 
 /**
@@ -148,12 +192,15 @@ static int ipv6_is_on_link ( struct ipv6_miniroute *miniroute,
 static struct ipv6_miniroute * ipv6_miniroute ( struct net_device *netdev,
 						struct in6_addr *address ) {
 	struct ipv6_miniroute *miniroute;
+	unsigned int match_len;
 
 	list_for_each_entry ( miniroute, &ipv6_miniroutes, list ) {
-		if ( ( miniroute->netdev == netdev ) &&
-		     ipv6_is_on_link ( miniroute, address ) ) {
-			return miniroute;
-		}
+		if ( miniroute->netdev != netdev )
+			continue;
+		match_len = ipv6_match_len ( miniroute, address );
+		if ( match_len < miniroute->prefix_len )
+			continue;
+		return miniroute;
 	}
 	return NULL;
 }
@@ -167,10 +214,8 @@ static struct ipv6_miniroute * ipv6_miniroute ( struct net_device *netdev,
  * @v router		Router address (if any)
  * @ret rc		Return status code
  */
-static int ipv6_add_miniroute ( struct net_device *netdev,
-				struct in6_addr *address,
-				unsigned int prefix_len,
-				struct in6_addr *router ) {
+int ipv6_add_miniroute ( struct net_device *netdev, struct in6_addr *address,
+			 unsigned int prefix_len, struct in6_addr *router ) {
 	struct ipv6_miniroute *miniroute;
 	uint8_t *prefix_mask;
 	unsigned int remaining;
@@ -178,7 +223,12 @@ static int ipv6_add_miniroute ( struct net_device *netdev,
 
 	/* Find or create routing table entry */
 	miniroute = ipv6_miniroute ( netdev, address );
-	if ( ! miniroute ) {
+	if ( miniroute ) {
+
+		/* Remove from existing position in routing table */
+		list_del ( &miniroute->list );
+
+	} else {
 
 		/* Create new routing table entry */
 		miniroute = zalloc ( sizeof ( *miniroute ) );
@@ -202,10 +252,10 @@ static int ipv6_add_miniroute ( struct net_device *netdev,
 		}
 		if ( remaining )
 			*prefix_mask <<= ( 8 - remaining );
-
-		/* Add to list of routes */
-		list_add ( &miniroute->list, &ipv6_miniroutes );
 	}
+
+	/* Add to start of routing table */
+	list_add ( &miniroute->list, &ipv6_miniroutes );
 
 	/* Set or update address, if applicable */
 	for ( i = 0 ; i < ( sizeof ( address->s6_addr32 ) /
@@ -220,13 +270,14 @@ static int ipv6_add_miniroute ( struct net_device *netdev,
 	if ( miniroute->prefix_len == IPV6_MAX_PREFIX_LEN )
 		miniroute->flags |= IPV6_HAS_ADDRESS;
 
+	/* Update scope */
+	miniroute->scope = ipv6_scope ( &miniroute->address );
+
 	/* Set or update router, if applicable */
 	if ( router ) {
 		memcpy ( &miniroute->router, router,
 			 sizeof ( miniroute->router ) );
 		miniroute->flags |= IPV6_HAS_ROUTER;
-		list_del ( &miniroute->list );
-		list_add_tail ( &miniroute->list, &ipv6_miniroutes );
 	}
 
 	ipv6_dump_miniroute ( miniroute );
@@ -238,7 +289,7 @@ static int ipv6_add_miniroute ( struct net_device *netdev,
  *
  * @v miniroute		Routing table entry
  */
-static void ipv6_del_miniroute ( struct ipv6_miniroute *miniroute ) {
+void ipv6_del_miniroute ( struct ipv6_miniroute *miniroute ) {
 
 	netdev_put ( miniroute->netdev );
 	list_del ( &miniroute->list );
@@ -253,9 +304,17 @@ static void ipv6_del_miniroute ( struct ipv6_miniroute *miniroute ) {
  * @ret dest		Next hop destination address
  * @ret miniroute	Routing table entry to use, or NULL if no route
  */
-static struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
-					    struct in6_addr **dest ) {
+struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
+				     struct in6_addr **dest ) {
 	struct ipv6_miniroute *miniroute;
+	struct ipv6_miniroute *chosen = NULL;
+	unsigned int best = 0;
+	unsigned int match_len;
+	unsigned int score;
+	unsigned int scope;
+
+	/* Calculate destination address scope */
+	scope = ipv6_scope ( *dest );
 
 	/* Find first usable route in routing table */
 	list_for_each_entry ( miniroute, &ipv6_miniroutes, list ) {
@@ -264,35 +323,52 @@ static struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 		if ( ! netdev_is_open ( miniroute->netdev ) )
 			continue;
 
-		/* Skip routing table entries with no usable source address */
+		/* Skip entries with no usable source address */
 		if ( ! ( miniroute->flags & IPV6_HAS_ADDRESS ) )
 			continue;
 
-		if ( IN6_IS_ADDR_NONGLOBAL ( *dest ) ) {
+		/* Skip entries with a non-matching scope ID, if
+		 * destination specifies a scope ID.
+		 */
+		if ( scope_id && ( miniroute->netdev->index != scope_id ) )
+			continue;
 
-			/* If destination is non-global, and the scope ID
-			 * matches this network device, then use this route.
-			 */
-			if ( miniroute->netdev->index == scope_id )
-				return miniroute;
+		/* Skip entries that are out of scope */
+		if ( miniroute->scope < scope )
+			continue;
 
-		} else {
+		/* Calculate match length */
+		match_len = ipv6_match_len ( miniroute, *dest );
 
-			/* If destination is an on-link global
-			 * address, then use this route.
-			 */
-			if ( ipv6_is_on_link ( miniroute, *dest ) )
-				return miniroute;
+		/* If destination is on-link, then use this route */
+		if ( match_len >= miniroute->prefix_len )
+			return miniroute;
 
-			/* If destination is an off-link global
-			 * address, and we have a default gateway,
-			 * then use this route.
-			 */
-			if ( miniroute->flags & IPV6_HAS_ROUTER ) {
-				*dest = &miniroute->router;
-				return miniroute;
-			}
+		/* If destination is unicast, then skip off-link
+		 * entries with no router.
+		 */
+		if ( ! ( IN6_IS_ADDR_MULTICAST ( *dest ) ||
+			 ( miniroute->flags & IPV6_HAS_ROUTER ) ) )
+			continue;
+
+		/* Choose best route, defined as being the route with
+		 * the smallest viable scope.  If two routes both have
+		 * the same scope, then prefer the route with the
+		 * longest match length.
+		 */
+		score = ( ( ( IPV6_SCOPE_MAX + 1 - miniroute->scope ) << 8 )
+			  + match_len );
+		if ( score > best ) {
+			chosen = miniroute;
+			best = score;
 		}
+	}
+
+	/* Return chosen route, if any */
+	if ( chosen ) {
+		if ( ! IN6_IS_ADDR_MULTICAST ( *dest ) )
+			*dest = &chosen->router;
+		return chosen;
 	}
 
 	return NULL;
@@ -880,7 +956,7 @@ static const char * ipv6_sock_ntoa ( struct sockaddr *sa ) {
 	const char *netdev_name;
 
 	/* Identify network device, if applicable */
-	if ( IN6_IS_ADDR_NONGLOBAL ( in ) ) {
+	if ( IN6_IS_ADDR_LINKLOCAL ( in ) || IN6_IS_ADDR_MULTICAST ( in ) ) {
 		netdev = find_netdev_by_index ( sin6->sin6_scope_id );
 		netdev_name = ( netdev ? netdev->name : "UNKNOWN" );
 	} else {
@@ -946,7 +1022,8 @@ static int ipv6_sock_aton ( const char *string, struct sockaddr *sa ) {
 		}
 		sin6->sin6_scope_id = netdev->index;
 
-	} else if ( IN6_IS_ADDR_NONGLOBAL ( &in ) ) {
+	} else if ( IN6_IS_ADDR_LINKLOCAL ( &in ) ||
+		    IN6_IS_ADDR_MULTICAST ( &in ) ) {
 
 		/* If no network device is explicitly specified for a
 		 * link-local or multicast address, default to using
