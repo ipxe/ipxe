@@ -1121,6 +1121,7 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 	const struct vmbus_message_header *header = &vmbus->message->header;
 	const struct vmbus_offer_channel *offer = &vmbus->message->offer;
 	const union uuid *type;
+	union uuid instance;
 	struct vmbus_driver *driver;
 	struct vmbus_device *vmdev;
 	struct vmbus_device *tmp;
@@ -1165,8 +1166,11 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 				rc = -ENOMEM;
 				goto err_alloc_vmdev;
 			}
+			memcpy ( &instance, &offer->instance,
+				 sizeof ( instance ) );
+			uuid_mangle ( &instance );
 			snprintf ( vmdev->dev.name, sizeof ( vmdev->dev.name ),
-				   "vmbus:%02x", channel );
+				   "{%s}", uuid_ntoa ( &instance ) );
 			vmdev->dev.desc.bus_type = BUS_TYPE_HV;
 			INIT_LIST_HEAD ( &vmdev->dev.children );
 			list_add_tail ( &vmdev->dev.siblings,
