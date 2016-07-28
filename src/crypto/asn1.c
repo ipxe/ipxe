@@ -86,6 +86,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v cursor		ASN.1 object cursor
  * @v type		Expected type, or ASN1_ANY
+ * @v extra		Additional length not present within partial cursor
  * @ret len		Length of object body, or negative error
  *
  * The object cursor will be updated to point to the start of the
@@ -93,7 +94,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * the length of the object body (i.e. the number of bytes until the
  * following object tag, if any) is returned.
  */
-static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
+int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
 	unsigned int len_len;
 	unsigned int len;
 
@@ -135,9 +136,9 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 		cursor->data++;
 		cursor->len--;
 	}
-	if ( cursor->len < len ) {
+	if ( ( cursor->len + extra ) < len ) {
 		DBGC ( cursor, "ASN1 %p bad length %d (max %zd)\n",
-		       cursor, len, cursor->len );
+		       cursor, len, ( cursor->len + extra ) );
 		return -EINVAL_ASN1_LEN;
 	}
 
@@ -158,7 +159,7 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
-	len = asn1_start ( cursor, type );
+	len = asn1_start ( cursor, type, 0 );
 	if ( len < 0 ) {
 		asn1_invalidate_cursor ( cursor );
 		return len;
@@ -185,7 +186,7 @@ int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
 int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
-	len = asn1_start ( cursor, type );
+	len = asn1_start ( cursor, type, 0 );
 	if ( len < 0 )
 		return len;
 
@@ -242,7 +243,7 @@ int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type ) {
 
 	/* Find end of object */
 	memcpy ( &temp, cursor, sizeof ( temp ) );
-	len = asn1_start ( &temp, type );
+	len = asn1_start ( &temp, type, 0 );
 	if ( len < 0 ) {
 		asn1_invalidate_cursor ( cursor );
 		return len;
