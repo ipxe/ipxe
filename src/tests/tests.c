@@ -69,3 +69,4 @@ REQUIRE_OBJECT ( pccrc_test );
 REQUIRE_OBJECT ( linebuf_test );
 REQUIRE_OBJECT ( iobuf_test );
 REQUIRE_OBJECT ( bitops_test );
+REQUIRE_OBJECT ( der_test );
