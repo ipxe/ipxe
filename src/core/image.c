@@ -505,3 +505,38 @@ int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf ) {
 
 	return 0;
 }
+
+/**
+ * Extract ASN.1 object from image
+ *
+ * @v image		Image
+ * @v offset		Offset within image
+ * @v cursor		ASN.1 cursor to fill in
+ * @ret next		Offset to next image, or negative error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated ASN.1 cursor.
+ */
+int image_asn1 ( struct image *image, size_t offset,
+		 struct asn1_cursor **cursor ) {
+	int next;
+	int rc;
+
+	/* Sanity check */
+	assert ( offset <= image->len );
+
+	/* Check that this image can be used to extract an ASN.1 object */
+	if ( ! ( image->type && image->type->asn1 ) )
+		return -ENOTSUP;
+
+	/* Try creating ASN.1 cursor */
+	next = image->type->asn1 ( image, offset, cursor );
+	if ( next < 0 ) {
+		rc = next;
+		DBGC ( image, "IMAGE %s could not extract ASN.1 object: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return next;
+}
