@@ -191,6 +191,9 @@ REQUIRE_OBJECT ( png );
 #ifdef IMAGE_DER
 REQUIRE_OBJECT ( der );
 #endif
+#ifdef IMAGE_PEM
+REQUIRE_OBJECT ( pem );
+#endif
 
 /*
  * Drag in all requested commands
