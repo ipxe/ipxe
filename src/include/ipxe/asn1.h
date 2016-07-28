@@ -337,7 +337,6 @@ asn1_type ( const struct asn1_cursor *cursor ) {
 	return ( ( cursor->len >= sizeof ( *type ) ) ? *type : ASN1_END );
 }
 
-extern void asn1_invalidate_cursor ( struct asn1_cursor *cursor );
 extern int asn1_enter ( struct asn1_cursor *cursor, unsigned int type );
 extern int asn1_skip_if_exists ( struct asn1_cursor *cursor,
 				 unsigned int type );
