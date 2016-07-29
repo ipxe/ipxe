@@ -30,7 +30,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <stdlib.h>
+#include <errno.h>
 #include <ipxe/umalloc.h>
+#include <ipxe/image.h>
 #include <ipxe/pixbuf.h>
 
 /**
@@ -82,3 +84,33 @@ struct pixel_buffer * alloc_pixbuf ( unsigned int width, unsigned int height ) {
  err_alloc_pixbuf:
 	return NULL;
 }
+
+/**
+ * Create pixel buffer from image
+ *
+ * @v image		Image
+ * @v pixbuf		Pixel buffer to fill in
+ * @ret rc		Return status code
+ */
+int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf ) {
+	int rc;
+
+	/* Check that this image can be used to create a pixel buffer */
+	if ( ! ( image->type && image->type->pixbuf ) )
+		return -ENOTSUP;
+
+	/* Try creating pixel buffer */
+	if ( ( rc = image->type->pixbuf ( image, pixbuf ) ) != 0 ) {
+		DBGC ( image, "IMAGE %s could not create pixel buffer: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/* Drag in objects via image_pixbuf() */
+REQUIRING_SYMBOL ( image_pixbuf );
+
+/* Drag in pixel buffer image formats */
+REQUIRE_OBJECT ( config_pixbuf );

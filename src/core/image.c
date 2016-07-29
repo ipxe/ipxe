@@ -481,27 +481,3 @@ int image_set_trust ( int require_trusted, int permanent ) {
 
 	return 0;
 }
-
-/**
- * Create pixel buffer from image
- *
- * @v image		Image
- * @v pixbuf		Pixel buffer to fill in
- * @ret rc		Return status code
- */
-int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf ) {
-	int rc;
-
-	/* Check that this image can be used to create a pixel buffer */
-	if ( ! ( image->type && image->type->pixbuf ) )
-		return -ENOTSUP;
-
-	/* Try creating pixel buffer */
-	if ( ( rc = image->type->pixbuf ( image, pixbuf ) ) != 0 ) {
-		DBGC ( image, "IMAGE %s could not create pixel buffer: %s\n",
-		       image->name, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
