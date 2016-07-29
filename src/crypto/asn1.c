@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <time.h>
 #include <ipxe/tables.h>
+#include <ipxe/image.h>
 #include <ipxe/asn1.h>
 
 /** @file
@@ -838,3 +839,44 @@ int asn1_wrap ( struct asn1_builder *builder, unsigned int type ) {
 
 	return 0;
 }
+
+/**
+ * Extract ASN.1 object from image
+ *
+ * @v image		Image
+ * @v offset		Offset within image
+ * @v cursor		ASN.1 cursor to fill in
+ * @ret next		Offset to next image, or negative error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated ASN.1 cursor.
+ */
+int image_asn1 ( struct image *image, size_t offset,
+		 struct asn1_cursor **cursor ) {
+	int next;
+	int rc;
+
+	/* Sanity check */
+	assert ( offset <= image->len );
+
+	/* Check that this image can be used to extract an ASN.1 object */
+	if ( ! ( image->type && image->type->asn1 ) )
+		return -ENOTSUP;
+
+	/* Try creating ASN.1 cursor */
+	next = image->type->asn1 ( image, offset, cursor );
+	if ( next < 0 ) {
+		rc = next;
+		DBGC ( image, "IMAGE %s could not extract ASN.1 object: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return next;
+}
+
+/* Drag in objects via image_asn1() */
+REQUIRING_SYMBOL ( image_asn1 );
+
+/* Drag in ASN.1 image formats */
+REQUIRE_OBJECT ( config_asn1 );

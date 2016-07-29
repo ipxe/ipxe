@@ -188,12 +188,6 @@ REQUIRE_OBJECT ( pnm );
 #ifdef IMAGE_PNG
 REQUIRE_OBJECT ( png );
 #endif
-#ifdef IMAGE_DER
-REQUIRE_OBJECT ( der );
-#endif
-#ifdef IMAGE_PEM
-REQUIRE_OBJECT ( pem );
-#endif
 
 /*
  * Drag in all requested commands
