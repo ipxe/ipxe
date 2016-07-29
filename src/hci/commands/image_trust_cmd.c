@@ -172,9 +172,3 @@ struct command image_trust_commands[] __command = {
 		.exec = imgverify_exec,
 	},
 };
-
-/* Drag in objects via command list */
-REQUIRING_SYMBOL ( image_trust_commands );
-
-/* Drag in objects typically required for signature verification */
-REQUIRE_OBJECT ( der );
