@@ -152,6 +152,10 @@ void certstore_add ( struct x509_certificate *cert ) {
  */
 void certstore_del ( struct x509_certificate *cert ) {
 
+	/* Ignore attempts to remove permanent certificates */
+	if ( cert->flags & X509_FL_PERMANENT )
+		return;
+
 	/* Remove certificate from store */
 	DBGC ( &certstore, "CERTSTORE removed certificate %s\n",
 	       x509_name ( cert ) );
@@ -171,11 +175,22 @@ static unsigned int certstore_discard ( void ) {
 	 * only reference is held by the store itself.
 	 */
 	list_for_each_entry_reverse ( cert, &certstore.links, store.list ) {
-		if ( cert->refcnt.count == 0 ) {
-			certstore_del ( cert );
-			return 1;
-		}
+
+		/* Skip certificates for which another reference is held */
+		if ( cert->refcnt.count > 0 )
+			continue;
+
+		/* Skip certificates that were added at build time or
+		 * added explicitly at run time.
+		 */
+		if ( cert->flags & ( X509_FL_PERMANENT | X509_FL_EXPLICIT ) )
+			continue;
+
+		/* Discard certificate */
+		certstore_del ( cert );
+		return 1;
 	}
+
 	return 0;
 }
 

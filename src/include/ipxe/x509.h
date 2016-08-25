@@ -220,6 +220,10 @@ struct x509_certificate {
 enum x509_flags {
 	/** Certificate has been validated */
 	X509_FL_VALIDATED = 0x0001,
+	/** Certificate was added at build time */
+	X509_FL_PERMANENT = 0x0002,
+	/** Certificate was added explicitly at run time */
+	X509_FL_EXPLICIT = 0x0004,
 };
 
 /**
