@@ -39,6 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/certstore.h>
 #include <ipxe/socket.h>
 #include <ipxe/in.h>
+#include <ipxe/image.h>
 #include <ipxe/x509.h>
 #include <config/crypto.h>
 
@@ -1764,6 +1765,47 @@ int x509_validate_chain ( struct x509_chain *chain, time_t time,
 
 	DBGC ( chain, "X509 chain %p found no usable certificates\n", chain );
 	return -EACCES_USELESS;
+}
+
+/**
+ * Extract X.509 certificate object from image
+ *
+ * @v image		Image
+ * @v offset		Offset within image
+ * @ret cert		X.509 certificate
+ * @ret next		Offset to next image, or negative error
+ *
+ * On success, the caller holds a reference to the X.509 certificate,
+ * and is responsible for ultimately calling x509_put().
+ */
+int image_x509 ( struct image *image, size_t offset,
+		 struct x509_certificate **cert ) {
+	struct asn1_cursor *cursor;
+	int next;
+	int rc;
+
+	/* Get ASN.1 object */
+	next = image_asn1 ( image, offset, &cursor );
+	if ( next < 0 ) {
+		rc = next;
+		goto err_asn1;
+	}
+
+	/* Parse certificate */
+	if ( ( rc = x509_certificate ( cursor->data, cursor->len,
+				       cert ) ) != 0 )
+		goto err_certificate;
+
+	/* Free ASN.1 object */
+	free ( cursor );
+
+	return next;
+
+	x509_put ( *cert );
+ err_certificate:
+	free ( cursor );
+ err_asn1:
+	return rc;
 }
 
 /* Drag in objects via x509_validate() */

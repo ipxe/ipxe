@@ -16,6 +16,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/refcnt.h>
 #include <ipxe/list.h>
 
+struct image;
+
 /** An X.509 serial number */
 struct x509_serial {
 	/** Raw serial number */
@@ -358,6 +360,8 @@ extern int x509_auto_append ( struct x509_chain *chain,
 extern int x509_validate_chain ( struct x509_chain *chain, time_t time,
 				 struct x509_chain *store,
 				 struct x509_root *root );
+extern int image_x509 ( struct image *image, size_t offset,
+			struct x509_certificate **cert );
 
 /* Functions exposed only for unit testing */
 extern int x509_check_issuer ( struct x509_certificate *cert,
