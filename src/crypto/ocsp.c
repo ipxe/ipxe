@@ -282,7 +282,7 @@ int ocsp_check ( struct x509_certificate *cert,
 	/* Sanity checks */
 	assert ( cert != NULL );
 	assert ( issuer != NULL );
-	assert ( issuer->valid );
+	assert ( x509_is_valid ( issuer ) );
 
 	/* Allocate and initialise check */
 	*ocsp = zalloc ( sizeof ( **ocsp ) );

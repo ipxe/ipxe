@@ -189,8 +189,8 @@ struct x509_certificate {
 	/** Link in certificate store */
 	struct x509_link store;
 
-	/** Certificate has been validated */
-	int valid;
+	/** Flags */
+	unsigned int flags;
 	/** Maximum number of subsequent certificates in chain */
 	unsigned int path_remaining;
 
@@ -214,6 +214,12 @@ struct x509_certificate {
 	struct x509_signature signature;
 	/** Extensions */
 	struct x509_extensions extensions;
+};
+
+/** X.509 certificate flags */
+enum x509_flags {
+	/** Certificate has been validated */
+	X509_FL_VALIDATED = 0x0001,
 };
 
 /**
@@ -374,12 +380,21 @@ extern int x509_check_root ( struct x509_certificate *cert,
 extern int x509_check_time ( struct x509_certificate *cert, time_t time );
 
 /**
+ * Check if X.509 certificate is valid
+ *
+ * @v cert		X.509 certificate
+ */
+static inline int x509_is_valid ( struct x509_certificate *cert ) {
+	return ( cert->flags & X509_FL_VALIDATED );
+}
+
+/**
  * Invalidate X.509 certificate
  *
  * @v cert		X.509 certificate
  */
 static inline void x509_invalidate ( struct x509_certificate *cert ) {
-	cert->valid = 0;
+	cert->flags &= ~X509_FL_VALIDATED;
 	cert->path_remaining = 0;
 }
 

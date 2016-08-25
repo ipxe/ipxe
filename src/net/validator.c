@@ -478,7 +478,7 @@ static void validator_step ( struct validator *validator ) {
 		issuer = link->cert;
 		if ( ! cert )
 			continue;
-		if ( ! issuer->valid )
+		if ( ! x509_is_valid ( issuer ) )
 			continue;
 		/* The issuer is valid, but this certificate is not
 		 * yet valid.  If OCSP is applicable, start it.

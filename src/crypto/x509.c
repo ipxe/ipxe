@@ -1320,7 +1320,7 @@ int x509_validate ( struct x509_certificate *cert,
 		root = &root_certificates;
 
 	/* Return success if certificate has already been validated */
-	if ( cert->valid )
+	if ( x509_is_valid ( cert ) )
 		return 0;
 
 	/* Fail if certificate is invalid at specified time */
@@ -1329,7 +1329,7 @@ int x509_validate ( struct x509_certificate *cert,
 
 	/* Succeed if certificate is a trusted root certificate */
 	if ( x509_check_root ( cert, root ) == 0 ) {
-		cert->valid = 1;
+		cert->flags |= X509_FL_VALIDATED;
 		cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
 		return 0;
 	}
@@ -1342,7 +1342,7 @@ int x509_validate ( struct x509_certificate *cert,
 	}
 
 	/* Fail unless issuer has already been validated */
-	if ( ! issuer->valid ) {
+	if ( ! x509_is_valid ( issuer ) ) {
 		DBGC ( cert, "X509 %p \"%s\" ", cert, x509_name ( cert ) );
 		DBGC ( cert, "issuer %p \"%s\" has not yet been validated\n",
 		       issuer, x509_name ( issuer ) );
@@ -1376,7 +1376,7 @@ int x509_validate ( struct x509_certificate *cert,
 		cert->path_remaining = max_path_remaining;
 
 	/* Mark certificate as valid */
-	cert->valid = 1;
+	cert->flags |= X509_FL_VALIDATED;
 
 	DBGC ( cert, "X509 %p \"%s\" successfully validated using ",
 	       cert, x509_name ( cert ) );
