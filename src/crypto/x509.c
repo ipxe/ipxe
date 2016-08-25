@@ -122,10 +122,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_EACCES, 0x0b, "No usable certificates" )
 
 /**
- * Get X.509 certificate name (for debugging)
+ * Get X.509 certificate display name
  *
  * @v cert		X.509 certificate
- * @ret name		Name (for debugging)
+ * @ret name		Display name
  */
 const char * x509_name ( struct x509_certificate *cert ) {
 	struct asn1_cursor *common_name = &cert->subject.common_name;
