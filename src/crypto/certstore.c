@@ -146,6 +146,20 @@ void certstore_add ( struct x509_certificate *cert ) {
 }
 
 /**
+ * Remove certificate from store
+ *
+ * @v cert		X.509 certificate
+ */
+void certstore_del ( struct x509_certificate *cert ) {
+
+	/* Remove certificate from store */
+	DBGC ( &certstore, "CERTSTORE removed certificate %s\n",
+	       x509_name ( cert ) );
+	list_del ( &cert->store.list );
+	x509_put ( cert );
+}
+
+/**
  * Discard a stored certificate
  *
  * @ret discarded	Number of cached items discarded
@@ -158,10 +172,7 @@ static unsigned int certstore_discard ( void ) {
 	 */
 	list_for_each_entry_reverse ( cert, &certstore.links, store.list ) {
 		if ( cert->refcnt.count == 0 ) {
-			DBGC ( &certstore, "CERTSTORE discarded certificate "
-			       "%s\n", x509_name ( cert ) );
-			list_del ( &cert->store.list );
-			x509_put ( cert );
+			certstore_del ( cert );
 			return 1;
 		}
 	}
