@@ -349,6 +349,34 @@ extern void extern_list_splice_tail_init ( struct list_head *list,
 	  list_entry ( (list)->prev, type, member ) )
 
 /**
+ * Get the container of the next entry in a list
+ *
+ * @v pos		Current list entry
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ * @ret next		Next list entry, or NULL at end of list
+ */
+#define list_next_entry( pos, head, member ) ( {		\
+	typeof (pos) next = list_entry ( (pos)->member.next,	\
+					 typeof ( *(pos) ),	\
+					 member );		\
+	( ( &next->member == (head) ) ? NULL : next ); } )
+
+/**
+ * Get the container of the previous entry in a list
+ *
+ * @v pos		Current list entry
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ * @ret next		Next list entry, or NULL at end of list
+ */
+#define list_prev_entry( pos, head, member ) ( {		\
+	typeof (pos) prev = list_entry ( (pos)->member.prev,	\
+					 typeof ( *(pos) ),	\
+					 member );		\
+	( ( &prev->member == (head) ) ? NULL : prev ); } )
+
+/**
  * Iterate over a list
  *
  * @v pos		Iterator
