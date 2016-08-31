@@ -240,6 +240,7 @@ static void certstore_init ( void ) {
 		 * permanent reference to it.
 		 */
 		certstore_add ( cert );
+		cert->flags |= X509_FL_PERMANENT;
 		DBGC ( &certstore, "CERTSTORE permanent certificate %d is %s\n",
 		       i, x509_name ( cert ) );
 	}
