@@ -183,6 +183,7 @@ static int intelx_open ( struct net_device *netdev ) {
 	uint32_t rdrxctl;
 	uint32_t rxctrl;
 	uint32_t dca_rxctrl;
+	uint32_t autoc;
 	int rc;
 
 	/* Create transmit descriptor ring */
@@ -258,6 +259,16 @@ static int intelx_open ( struct net_device *netdev ) {
 
 	/* Fill receive ring */
 	intel_refill_rx ( intel );
+
+	/* Support 1G autoneg */
+	autoc = readl ( intel->regs + INTELX_AUTOC );
+	DBGC ( intel, "INTEL %p neg (autoc %08x)\n", intel, autoc );
+	autoc &= ~INTELX_AUTOC_LMS_MASK;
+	autoc |= INTELX_AUTOC_LMS_KX4_KX_KR_1G_AN;
+	autoc |= INTELX_AUTOC_KX_SUPP;
+	autoc |= INTELX_AUTOC_AN_RESTART;
+	writel ( autoc, intel->regs + INTELX_AUTOC );
+	DBGC ( intel, "INTEL %p neg (autoc %08x)\n", intel, autoc );
 
 	/* Update link state */
 	intelx_check_link ( netdev );
