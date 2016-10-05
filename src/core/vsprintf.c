@@ -218,7 +218,9 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 		/* Process field width */
 		width = 0;
 		for ( ; ; fmt++ ) {
-			if ( ( ( unsigned ) ( *fmt - '0' ) ) < 10 ) {
+			if ( *fmt == '*' ) {
+				width = va_arg(args, int);
+			} else if ( ( ( unsigned ) ( *fmt - '0' ) ) < 10 ) {
 				width = ( width * 10 ) + ( *fmt - '0' );
 			} else {
 				break;
