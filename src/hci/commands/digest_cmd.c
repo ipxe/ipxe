@@ -48,6 +48,35 @@ static struct command_descriptor digest_cmd =
 	COMMAND_DESC ( struct digest_options, digest_opts, 1, MAX_ARGUMENTS,
 		       "<image> [<image>...]" );
 
+static int digest_one(char *imageuri, uint8_t *digest_out, struct image **image, struct digest_algorithm *digest) {
+	uint8_t digest_ctx[digest->ctxsize];
+	size_t frag_len;
+	uint8_t buf[128];
+	size_t offset;
+	size_t len;
+	int rc;
+
+	/* Acquire image */
+	if ( ( rc = imgacquire ( imageuri, 0, image ) ) != 0 )
+		return rc;
+	offset = 0;
+	len = (*image)->len;
+
+	/* calculate digest */
+	digest_init ( digest, digest_ctx );
+	while ( len ) {
+		frag_len = len;
+		if ( frag_len > sizeof ( buf ) )
+			frag_len = sizeof ( buf );
+		copy_from_user ( buf, (*image)->data, offset, frag_len );
+		digest_update ( digest, digest_ctx, buf, frag_len );
+		len -= frag_len;
+		offset += frag_len;
+	}
+	digest_final ( digest, digest_ctx, digest_out );
+	return 0;
+}
+
 /**
  * The "digest" command
  *
@@ -60,12 +89,7 @@ static int digest_exec ( int argc, char **argv,
 			 struct digest_algorithm *digest ) {
 	struct digest_options opts;
 	struct image *image;
-	uint8_t digest_ctx[digest->ctxsize];
 	uint8_t digest_out[digest->digestsize];
-	uint8_t buf[128];
-	size_t offset;
-	size_t len;
-	size_t frag_len;
 	int i;
 	unsigned j;
 	int rc;
@@ -76,24 +100,8 @@ static int digest_exec ( int argc, char **argv,
 
 	for ( i = optind ; i < argc ; i++ ) {
 
-		/* Acquire image */
-		if ( ( rc = imgacquire ( argv[i], 0, &image ) ) != 0 )
+		if ( ( rc = digest_one ( argv[i], digest_out, &image, digest) ) != 0 )
 			continue;
-		offset = 0;
-		len = image->len;
-
-		/* calculate digest */
-		digest_init ( digest, digest_ctx );
-		while ( len ) {
-			frag_len = len;
-			if ( frag_len > sizeof ( buf ) )
-				frag_len = sizeof ( buf );
-			copy_from_user ( buf, image->data, offset, frag_len );
-			digest_update ( digest, digest_ctx, buf, frag_len );
-			len -= frag_len;
-			offset += frag_len;
-		}
-		digest_final ( digest, digest_ctx, digest_out );
 
 		for ( j = 0 ; j < sizeof ( digest_out ) ; j++ )
 			printf ( "%02x", digest_out[j] );
