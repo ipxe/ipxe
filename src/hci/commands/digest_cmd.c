@@ -48,6 +48,13 @@ static struct command_descriptor digest_cmd =
 	COMMAND_DESC ( struct digest_options, digest_opts, 1, MAX_ARGUMENTS,
 		       "<image> [<image>...]" );
 
+struct digest_verify_options {};
+
+/** "digest_verify" command descriptor */
+static struct command_descriptor digest_verify_cmd =
+	COMMAND_DESC ( struct digest_verify_options, digest_opts, 1, MAX_ARGUMENTS,
+		       "<image> <digesthex>" );
+
 static int digest_one(char *imageuri, uint8_t *digest_out, struct image **image, struct digest_algorithm *digest) {
 	uint8_t digest_ctx[digest->ctxsize];
 	size_t frag_len;
@@ -112,12 +119,70 @@ static int digest_exec ( int argc, char **argv,
 	return 0;
 }
 
+/**
+ * The "digest_verify" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @v digest		Digest algorithm
+ * @ret rc		Return status code
+ */
+static int digest_verify_exec ( int argc, char **argv,
+			 struct digest_algorithm *digest ) {
+	struct digest_options opts;
+	struct image *image;
+	uint8_t digest_out[digest->digestsize];
+	unsigned j;
+	int rc;
+	char *intended_digest;
+	char digest_str[3];
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &digest_verify_cmd, &opts ) ) != 0 )
+		return rc;
+
+	if ( argc != 3 ) {
+		printf( "argc should be 3, not %i\n", argc );
+		sleep( 2 );
+		return -1;
+	}
+
+	if ( ( rc = digest_one ( argv[optind], digest_out, &image, digest) ) != 0 )
+		return rc;
+	intended_digest = argv[optind+1];
+	if ( strlen(intended_digest) != 2 * sizeof ( digest_out ) ) {
+		printf ( "reference digest has wrong length\n" );
+		sleep ( 2 );
+		return 1;
+	}
+
+	for ( j = 0 ; j < sizeof ( digest_out ) ; j++ ) {
+		snprintf ( digest_str, 3, "%02x", digest_out[j] );
+#ifndef NDEBUG
+		printf ( "comparing %s to %s\n", digest_str, intended_digest );
+#endif
+		if ( strncmp(digest_str, intended_digest, 2) != 0 ) {
+			printf ( "digest verification failed for %s %s\n", argv[optind], argv[optind+1] );
+			sleep ( 2 );
+			return 1;
+		}
+		intended_digest+=2;
+	}
+
+	printf ( "  verified %s\n", image->name );
+	return 0;
+}
+
 static int md5sum_exec ( int argc, char **argv ) {
 	return digest_exec ( argc, argv, &md5_algorithm );
 }
 
 static int sha1sum_exec ( int argc, char **argv ) {
 	return digest_exec ( argc, argv, &sha1_algorithm );
+}
+
+static int sha1verify_exec ( int argc, char **argv ) {
+	return digest_verify_exec ( argc, argv, &sha1_algorithm );
 }
 
 struct command md5sum_command __command = {
@@ -128,4 +193,9 @@ struct command md5sum_command __command = {
 struct command sha1sum_command __command = {
 	.name = "sha1sum",
 	.exec = sha1sum_exec,
+};
+
+struct command sha1verify_command __command = {
+	.name = "sha1verify",
+	.exec = sha1verify_exec,
 };
