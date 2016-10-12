@@ -55,12 +55,14 @@ static struct command_descriptor digest_verify_cmd =
 	COMMAND_DESC ( struct digest_verify_options, digest_opts, 1, MAX_ARGUMENTS,
 		       "<image> <digesthex>" );
 
-static int digest_one(char *imageuri, uint8_t *digest_out, struct image **image, struct digest_algorithm *digest) {
+static int digest_one(char *imageuri, char *digest_out_hex, struct image **image, struct digest_algorithm *digest) {
 	uint8_t digest_ctx[digest->ctxsize];
 	size_t frag_len;
 	uint8_t buf[128];
+	uint8_t digest_out[digest->digestsize];
 	size_t offset;
 	size_t len;
+	unsigned j;
 	int rc;
 
 	/* Acquire image */
@@ -81,6 +83,10 @@ static int digest_one(char *imageuri, uint8_t *digest_out, struct image **image,
 		offset += frag_len;
 	}
 	digest_final ( digest, digest_ctx, digest_out );
+	for ( j = 0 ; j < sizeof ( digest_out ) ; j++ ) {
+		snprintf ( digest_out_hex + 2 * j, 3, "%02x", digest_out[j] );
+	}
+
 	return 0;
 }
 
@@ -96,9 +102,8 @@ static int digest_exec ( int argc, char **argv,
 			 struct digest_algorithm *digest ) {
 	struct digest_options opts;
 	struct image *image;
-	uint8_t digest_out[digest->digestsize];
+	char digest_out_hex[1 + 2 * digest->digestsize];
 	int i;
-	unsigned j;
 	int rc;
 
 	/* Parse options */
@@ -107,13 +112,10 @@ static int digest_exec ( int argc, char **argv,
 
 	for ( i = optind ; i < argc ; i++ ) {
 
-		if ( ( rc = digest_one ( argv[i], digest_out, &image, digest) ) != 0 )
+		if ( ( rc = digest_one ( argv[i], digest_out_hex, &image, digest) ) != 0 )
 			continue;
 
-		for ( j = 0 ; j < sizeof ( digest_out ) ; j++ )
-			printf ( "%02x", digest_out[j] );
-
-		printf ( "  %s\n", image->name );
+		printf ( "%s  %s\n", digest_out_hex, image->name );
 	}
 
 	return 0;
@@ -131,11 +133,9 @@ static int digest_verify_exec ( int argc, char **argv,
 			 struct digest_algorithm *digest ) {
 	struct digest_options opts;
 	struct image *image;
-	uint8_t digest_out[digest->digestsize];
-	unsigned j;
+	char digest_out_hex[1 + 2 * digest->digestsize];
 	int rc;
 	char *intended_digest;
-	char digest_str[3];
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &digest_verify_cmd, &opts ) ) != 0 )
@@ -147,26 +147,22 @@ static int digest_verify_exec ( int argc, char **argv,
 		return -1;
 	}
 
-	if ( ( rc = digest_one ( argv[optind], digest_out, &image, digest) ) != 0 )
+	if ( ( rc = digest_one ( argv[optind], digest_out_hex, &image, digest) ) != 0 )
 		return rc;
 	intended_digest = argv[optind+1];
-	if ( strlen(intended_digest) != 2 * sizeof ( digest_out ) ) {
+	if ( strlen( intended_digest ) != 2 * digest->digestsize ) {
 		printf ( "reference digest has wrong length\n" );
 		sleep ( 2 );
 		return 1;
 	}
 
-	for ( j = 0 ; j < sizeof ( digest_out ) ; j++ ) {
-		snprintf ( digest_str, 3, "%02x", digest_out[j] );
 #ifndef NDEBUG
-		printf ( "comparing %s to %s\n", digest_str, intended_digest );
+	printf ( "comparing %s to %s\n", digest_out_hex, intended_digest );
 #endif
-		if ( strncmp(digest_str, intended_digest, 2) != 0 ) {
-			printf ( "digest verification failed for %s %s\n", argv[optind], argv[optind+1] );
-			sleep ( 2 );
-			return 1;
-		}
-		intended_digest+=2;
+	if ( strncmp( digest_out_hex, intended_digest, 2 * digest->digestsize ) != 0 ) {
+		printf ( "digest verification failed for %s %s\n", argv[optind], argv[optind+1] );
+		sleep ( 2 );
+		return 1;
 	}
 
 	printf ( "  verified %s\n", image->name );
