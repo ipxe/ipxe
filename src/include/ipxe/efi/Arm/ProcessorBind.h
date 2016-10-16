@@ -30,9 +30,16 @@ FILE_LICENCE ( BSD3 );
 #pragma pack()
 #endif
 
+//
+// RVCT does not support the __builtin_unreachable() macro
+//
+#ifdef __ARMCC_VERSION
+#define UNREACHABLE()
+#endif
+
 #if _MSC_EXTENSIONS
   //
-  // use Microsoft* C complier dependent integer width types
+  // use Microsoft* C compiler dependent integer width types
   //
   typedef unsigned __int64    UINT64;
   typedef __int64             INT64;

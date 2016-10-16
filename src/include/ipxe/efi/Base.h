@@ -87,6 +87,117 @@ VERIFY_SIZE_OF (CHAR16, 2);
 #endif
 
 //
+// Should be used in combination with NORETURN to avoid 'noreturn' returns
+// warnings.
+//
+#ifndef UNREACHABLE
+  #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 4)
+    ///
+    /// Signal compilers and analyzers that this call is not reachable.  It is
+    /// up to the compiler to remove any code past that point.
+    /// Not implemented by GCC 4.4 or earlier.
+    ///
+    #define UNREACHABLE()  __builtin_unreachable ()
+  #elif defined (__has_feature)
+    #if __has_builtin (__builtin_unreachable)
+      ///
+      /// Signal compilers and analyzers that this call is not reachable.  It is
+      /// up to the compiler to remove any code past that point.
+      ///
+      #define UNREACHABLE()  __builtin_unreachable ()
+    #endif
+  #endif
+
+  #ifndef UNREACHABLE
+    ///
+    /// Signal compilers and analyzers that this call is not reachable.  It is
+    /// up to the compiler to remove any code past that point.
+    ///
+    #define UNREACHABLE()
+  #endif
+#endif
+
+//
+// Signaling compilers and analyzers that a certain function cannot return may
+// remove all following code and thus lead to better optimization and less
+// false positives.
+//
+#ifndef NORETURN
+  #if defined (__GNUC__) || defined (__clang__)
+    ///
+    /// Signal compilers and analyzers that the function cannot return.
+    /// It is up to the compiler to remove any code past a call to functions
+    /// flagged with this attribute.
+    ///
+    #define NORETURN  __attribute__((noreturn))
+  #elif defined(_MSC_EXTENSIONS) && !defined(MDE_CPU_EBC)
+    ///
+    /// Signal compilers and analyzers that the function cannot return.
+    /// It is up to the compiler to remove any code past a call to functions
+    /// flagged with this attribute.
+    ///
+    #define NORETURN  __declspec(noreturn)
+  #else
+    ///
+    /// Signal compilers and analyzers that the function cannot return.
+    /// It is up to the compiler to remove any code past a call to functions
+    /// flagged with this attribute.
+    ///
+    #define NORETURN
+  #endif
+#endif
+
+//
+// Should be used in combination with ANALYZER_NORETURN to avoid 'noreturn'
+// returns warnings.
+//
+#ifndef ANALYZER_UNREACHABLE
+  #ifdef __clang_analyzer__
+    #if __has_builtin (__builtin_unreachable)
+      ///
+      /// Signal the analyzer that this call is not reachable.
+      /// This excludes compilers.
+      ///
+      #define ANALYZER_UNREACHABLE()  __builtin_unreachable ()
+    #endif
+  #endif
+
+  #ifndef ANALYZER_UNREACHABLE
+    ///
+    /// Signal the analyzer that this call is not reachable.
+    /// This excludes compilers.
+    ///
+    #define ANALYZER_UNREACHABLE()
+  #endif
+#endif
+
+//
+// Static Analyzers may issue errors about potential NULL-dereferences when
+// dereferencing a pointer, that has been checked before, outside of a
+// NULL-check.  This may lead to false positives, such as when using ASSERT()
+// for verification.
+//
+#ifndef ANALYZER_NORETURN
+  #ifdef __has_feature
+    #if __has_feature (attribute_analyzer_noreturn)
+      ///
+      /// Signal analyzers that the function cannot return.
+      /// This excludes compilers.
+      ///
+      #define ANALYZER_NORETURN  __attribute__((analyzer_noreturn))
+    #endif
+  #endif
+
+  #ifndef ANALYZER_NORETURN
+    ///
+    /// Signal the analyzer that the function cannot return.
+    /// This excludes compilers.
+    ///
+    #define ANALYZER_NORETURN
+  #endif
+#endif
+
+//
 // For symbol name in assembly code, an extra "_" is sometimes necessary
 //
 
@@ -193,7 +304,7 @@ struct _LIST_ENTRY {
 
 //
 //  UEFI specification claims 1 and 0. We are concerned about the
-//  complier portability so we did it this way.
+//  compiler portability so we did it this way.
 //
 
 ///
@@ -480,7 +591,31 @@ struct _LIST_ENTRY {
 
 #define VA_COPY(Dest, Start)          __va_copy (Dest, Start)
 
-#elif defined(__GNUC__) && !defined(NO_BUILTIN_VA_FUNCS)
+#elif defined(__GNUC__)
+
+#if defined(MDE_CPU_X64) && !defined(NO_MSABI_VA_FUNCS)
+//
+// X64 only. Use MS ABI version of GCC built-in macros for variable argument lists.
+//
+///
+/// Both GCC and LLVM 3.8 for X64 support new variable argument intrinsics for Microsoft ABI
+///
+
+///
+/// Variable used to traverse the list of arguments. This type can vary by
+/// implementation and could be an array or structure.
+///
+typedef __builtin_ms_va_list VA_LIST;
+
+#define VA_START(Marker, Parameter)  __builtin_ms_va_start (Marker, Parameter)
+
+#define VA_ARG(Marker, TYPE)         ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
+
+#define VA_END(Marker)               __builtin_ms_va_end (Marker)
+
+#define VA_COPY(Dest, Start)         __builtin_ms_va_copy (Dest, Start)
+
+#else
 //
 // Use GCC built-in macros for variable argument lists.
 //
@@ -498,6 +633,8 @@ typedef __builtin_va_list VA_LIST;
 #define VA_END(Marker)               __builtin_va_end (Marker)
 
 #define VA_COPY(Dest, Start)         __builtin_va_copy (Dest, Start)
+
+#endif
 
 #else
 ///
@@ -1038,7 +1175,7 @@ typedef UINTN RETURN_STATUS;
 #if defined(_MSC_EXTENSIONS) && !defined (__INTEL_COMPILER) && !defined (MDE_CPU_EBC)
   #pragma intrinsic(_ReturnAddress)
   /**
-    Get the return address of the calling funcation.
+    Get the return address of the calling function.
 
     Based on intrinsic function _ReturnAddress that provides the address of
     the instruction in the calling function that will be executed after
@@ -1046,27 +1183,27 @@ typedef UINTN RETURN_STATUS;
 
     @param L    Return Level.
 
-    @return The return address of the calling funcation or 0 if L != 0.
+    @return The return address of the calling function or 0 if L != 0.
 
   **/
   #define RETURN_ADDRESS(L)     ((L == 0) ? _ReturnAddress() : (VOID *) 0)
 #elif defined(__GNUC__)
   void * __builtin_return_address (unsigned int level);
   /**
-    Get the return address of the calling funcation.
+    Get the return address of the calling function.
 
     Based on built-in Function __builtin_return_address that returns
     the return address of the current function, or of one of its callers.
 
     @param L    Return Level.
 
-    @return The return address of the calling funcation.
+    @return The return address of the calling function.
 
   **/
   #define RETURN_ADDRESS(L)     __builtin_return_address (L)
 #else
   /**
-    Get the return address of the calling funcation.
+    Get the return address of the calling function.
 
     @param L    Return Level.
 

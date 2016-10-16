@@ -29,6 +29,19 @@ FILE_LICENCE ( BSD3 );
 #pragma pack()
 #endif
 
+#if defined(__GNUC__) && defined(__pic__) && !defined(USING_LTO)
+//
+// Mark all symbol declarations and references as hidden, meaning they will
+// not be subject to symbol preemption. This allows the compiler to refer to
+// symbols directly using relative references rather than via the GOT, which
+// contains absolute symbol addresses that are subject to runtime relocation.
+//
+// The LTO linker will not emit GOT based relocations when all symbol
+// references can be resolved locally, and so there is no need to set the
+// pragma in that case (and doing so will cause other issues).
+//
+#pragma GCC visibility push (hidden)
+#endif
 
 #if defined(__INTEL_COMPILER)
 //
@@ -82,7 +95,7 @@ FILE_LICENCE ( BSD3 );
 #pragma warning ( disable : 4057 )
 
 //
-// ASSERT(FALSE) or while (TRUE) are legal constructes so supress this warning
+// ASSERT(FALSE) or while (TRUE) are legal constructs so suppress this warning
 //
 #pragma warning ( disable : 4127 )
 
@@ -121,7 +134,7 @@ FILE_LICENCE ( BSD3 );
 
 #if defined(_MSC_EXTENSIONS)
   //
-  // use Microsoft C complier dependent integer width types
+  // use Microsoft C compiler dependent integer width types
   //
 
   ///
