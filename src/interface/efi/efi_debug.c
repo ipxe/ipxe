@@ -79,6 +79,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "ArpSb" },
 	{ &efi_block_io_protocol_guid,
 	  "BlockIo" },
+	{ &efi_block_io2_protocol_guid,
+	  "BlockIo2" },
 	{ &efi_bus_specific_driver_override_protocol_guid,
 	  "BusSpecificDriverOverride" },
 	{ &efi_component_name_protocol_guid,

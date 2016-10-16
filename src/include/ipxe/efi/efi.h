@@ -158,6 +158,7 @@ extern EFI_GUID efi_apple_net_boot_protocol_guid;
 extern EFI_GUID efi_arp_protocol_guid;
 extern EFI_GUID efi_arp_service_binding_protocol_guid;
 extern EFI_GUID efi_block_io_protocol_guid;
+extern EFI_GUID efi_block_io2_protocol_guid;
 extern EFI_GUID efi_bus_specific_driver_override_protocol_guid;
 extern EFI_GUID efi_component_name_protocol_guid;
 extern EFI_GUID efi_component_name2_protocol_guid;
