@@ -190,6 +190,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #undef	GDBUDP			/* Remote GDB debugging over UDP
 				 * (both may be set) */
 //#define EFI_DOWNGRADE_UX	/* Downgrade UEFI user experience */
+#define	TIVOLI_VMM_WORKAROUND	/* Work around the Tivoli VMM's garbling of SSE
+				 * registers when iPXE traps to it due to
+				 * privileged instructions */
 
 #include <config/named.h>
 #include NAMED_CONFIG(general.h)
