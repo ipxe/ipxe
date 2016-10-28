@@ -522,10 +522,12 @@ static void bzimage_load_initrds ( struct image *image,
 
 	/* Find highest usable address */
 	top = userptr_add ( highest->data, bzimage_align ( highest->len ) );
-	if ( user_to_phys ( top, 0 ) > bzimg->mem_limit )
-		top = phys_to_user ( bzimg->mem_limit );
+	if ( user_to_phys ( top, -1 ) > bzimg->mem_limit ) {
+		top = phys_to_user ( ( bzimg->mem_limit + 1 ) &
+				     ~( INITRD_ALIGN - 1 ) );
+	}
 	DBGC ( image, "bzImage %p loading initrds from %#08lx downwards\n",
-	       image, user_to_phys ( top, 0 ) );
+	       image, user_to_phys ( top, -1 ) );
 
 	/* Load initrds in order */
 	for_each_image ( initrd ) {
