@@ -231,6 +231,7 @@ static void iscsi_close ( struct iscsi_session *iscsi, int rc ) {
 	process_del ( &iscsi->process );
 
 	/* Shut down interfaces */
+	intf_nullify ( &iscsi->data ); /* avoid potential loops */
 	intf_shutdown ( &iscsi->socket, rc );
 	intf_shutdown ( &iscsi->control, rc );
 	intf_shutdown ( &iscsi->data, rc );
