@@ -54,6 +54,7 @@ struct uri;
 
 /* Include all architecture-independent sanboot API headers */
 #include <ipxe/null_sanboot.h>
+#include <ipxe/efi/efi_block.h>
 
 /* Include all architecture-dependent sanboot API headers */
 #include <bits/sanboot.h>
