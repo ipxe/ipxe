@@ -53,8 +53,6 @@ struct undi_device {
 	 */
 	UINT16_t flags;
 
-	/** Generic device */
-	struct device dev;
 	/** Driver-private data
 	 *
 	 * Use undi_set_drvdata() and undi_get_drvdata() to access this

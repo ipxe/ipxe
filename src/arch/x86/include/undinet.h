@@ -10,8 +10,9 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 struct undi_device;
+struct device;
 
-extern int undinet_probe ( struct undi_device *undi );
+extern int undinet_probe ( struct undi_device *undi, struct device *dev );
 extern void undinet_remove ( struct undi_device *undi );
 
 #endif /* _UNDINET_H */
