@@ -873,7 +873,6 @@ install_prealloc:
 	 * relocate() will return with %esi, %edi and %ecx set up
 	 * ready for the copy to the new location.
 	 */
-	progress "  relocate\n"
 	virtcall relocate
 
 	/* Jump back to .prefix segment */
