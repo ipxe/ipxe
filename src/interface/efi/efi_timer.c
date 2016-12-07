@@ -70,6 +70,31 @@ static void efi_udelay ( unsigned long usecs ) {
  */
 static unsigned long efi_currticks ( void ) {
 
+	/* EFI provides no clean way for device drivers to shut down
+	 * in preparation for handover to a booted operating system.
+	 * The platform firmware simply doesn't bother to call the
+	 * drivers' Stop() methods.  Instead, drivers must register an
+	 * EVT_SIGNAL_EXIT_BOOT_SERVICES event to be signalled when
+	 * ExitBootServices() is called, and clean up without any
+	 * reference to the EFI driver model.
+	 *
+	 * Unfortunately, all timers silently stop working when
+	 * ExitBootServices() is called.  Even more unfortunately, and
+	 * for no discernible reason, this happens before any
+	 * EVT_SIGNAL_EXIT_BOOT_SERVICES events are signalled.  The
+	 * net effect of this entertaining design choice is that any
+	 * timeout loops on the shutdown path (e.g. for gracefully
+	 * closing outstanding TCP connections) may wait indefinitely.
+	 *
+	 * There is no way to report failure from currticks(), since
+	 * the API lazily assumes that the host system continues to
+	 * travel through time in the usual direction.  Work around
+	 * EFI's violation of this assumption by falling back to a
+	 * simple free-running monotonic counter.
+	 */
+	if ( efi_shutdown_in_progress )
+		efi_jiffies++;
+
 	return efi_jiffies;
 }
 
