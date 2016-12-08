@@ -22,7 +22,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
-#include <byteswap.h>
 #include <ipxe/pci.h>
 #include <ipxe/malloc.h>
 #include <ipxe/umalloc.h>
@@ -31,10 +30,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/vlan.h>
 #include <ipxe/io.h>
 #include "flexboot_nodnic.h"
-#include "mlx_utils/mlx_lib/mlx_nvconfig/mlx_nvconfig.h"
-#include "mlx_utils/mlx_lib/mlx_nvconfig/mlx_nvconfig_defaults.h"
-#include "mlx_utils/include/public/mlx_pci_gw.h"
-#include "mlx_utils/mlx_lib/mlx_vmac/mlx_vmac.h"
 #include "mlx_utils/include/public/mlx_types.h"
 #include "mlx_utils/include/public/mlx_utils.h"
 #include "mlx_utils/include/public/mlx_bail.h"
@@ -43,6 +38,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include "mlx_utils/include/public/mlx_pci.h"
 #include "mlx_nodnic/include/mlx_device.h"
 #include "mlx_nodnic/include/mlx_port.h"
+#include <byteswap.h>
+#include <usr/ifmgmt.h>
+#include "mlx_utils/mlx_lib/mlx_nvconfig/mlx_nvconfig.h"
+#include "mlx_utils/mlx_lib/mlx_nvconfig/mlx_nvconfig_defaults.h"
+#include "mlx_utils/include/public/mlx_pci_gw.h"
+#include "mlx_utils/mlx_lib/mlx_vmac/mlx_vmac.h"
 
 /***************************************************************************
  *
@@ -52,10 +53,27 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 static int flexboot_nodnic_arm_cq ( struct flexboot_nodnic_port *port ) {
 #ifndef DEVICE_CX3
-	mlx_uint32 val = ( port->eth_cq->next_idx & 0xffff );
-	if ( nodnic_port_set ( & port->port_priv, nodnic_port_option_arm_cq, val ) ) {
-		MLX_DEBUG_ERROR( port->port_priv.device, "Failed to arm the CQ\n" );
-		return MLX_FAILED;
+	mlx_uint32 val32 = 0;
+	union arm_cq_uar cq_uar;
+
+#define ARM_CQ_UAR_CQ_CI_MASK 0xffffff
+#define ARM_CQ_UAR_CMDSN_MASK 3
+#define ARM_CQ_UAR_CMDSN_OFFSET 28
+#define ARM_CQ_UAR_CQ_CI_OFFSET 0x20
+	if ( port->port_priv.device->device_cap.support_bar_cq_ctrl ) {
+		cq_uar.dword[0] = cpu_to_be32((port->eth_cq->next_idx  & ARM_CQ_UAR_CQ_CI_MASK) |
+				((port->cmdsn++ & ARM_CQ_UAR_CMDSN_MASK) << ARM_CQ_UAR_CMDSN_OFFSET));
+		cq_uar.dword[1] = cpu_to_be32(port->eth_cq->cqn);
+		wmb();
+		writeq(cq_uar.qword, port->port_priv.device->uar.virt + ARM_CQ_UAR_CQ_CI_OFFSET);
+		port->port_priv.arm_cq_doorbell_record->dword[0] = cq_uar.dword[1];
+		port->port_priv.arm_cq_doorbell_record->dword[1] = cq_uar.dword[0];
+	} else {
+		val32 = ( port->eth_cq->next_idx & 0xffffff );
+		if ( nodnic_port_set ( & port->port_priv, nodnic_port_option_arm_cq, val32 ) ) {
+			MLX_DEBUG_ERROR( port->port_priv.device, "Failed to arm the CQ\n" );
+			return MLX_FAILED;
+		}
 	}
 #else
 	mlx_utils *utils = port->port_priv.device->utils;
@@ -77,7 +95,7 @@ static int flexboot_nodnic_arm_cq ( struct flexboot_nodnic_port *port ) {
 		data = ( ( ( port->eth_cq->next_idx & 0xffff ) << 16 ) | 0x0080 );
 		/* Write the new index and update FW that new data was submitted */
 		mlx_pci_mem_write ( utils, MlxPciWidthUint32, 0,
-				( mlx_uint64 ) & ( ptr->armcq_cq_ci_dword ), 1, &data );
+				( mlx_uintn ) & ( ptr->armcq_cq_ci_dword ), 1, &data );
 	}
 #endif
 	return 0;
@@ -96,6 +114,7 @@ static int flexboot_nodnic_create_cq ( struct ib_device *ibdev ,
 	struct flexboot_nodnic_port *port = &flexboot_nodnic->port[ibdev->port - 1];
 	struct flexboot_nodnic_completion_queue *flexboot_nodnic_cq;
 	mlx_status status = MLX_SUCCESS;
+	mlx_uint32 cqn;
 
 	flexboot_nodnic_cq = (struct flexboot_nodnic_completion_queue *)
 			zalloc(sizeof(*flexboot_nodnic_cq));
@@ -114,10 +133,18 @@ static int flexboot_nodnic_create_cq ( struct ib_device *ibdev ,
 	flexboot_nodnic->callbacks->cqe_set_owner(
 			flexboot_nodnic_cq->nodnic_completion_queue->cq_virt,
 			cq->num_cqes);
-
+	if ( flexboot_nodnic->device_priv.device_cap.support_bar_cq_ctrl ) {
+		status = nodnic_port_query(&port->port_priv,
+					nodnic_port_option_cq_n_index,
+					(mlx_uint32 *)&cqn );
+		MLX_FATAL_CHECK_STATUS(status, read_cqn_err,
+				"failed to query cqn");
+		cq->cqn = cqn;
+	}
 
 	ib_cq_set_drvdata ( cq, flexboot_nodnic_cq );
 	return status;
+read_cqn_err:
 create_err:
 	free(flexboot_nodnic_cq);
 qp_alloc_err:
@@ -450,6 +477,9 @@ static int flexboot_nodnic_post_send ( struct ib_device *ibdev,
 
 	status = port->port_priv.send_doorbell ( &port->port_priv,
 				&send_ring->nodnic_ring, ( mlx_uint16 ) wq->next_idx );
+	if ( flexboot_nodnic->callbacks->tx_uar_send_doorbell_fn ) {
+		flexboot_nodnic->callbacks->tx_uar_send_doorbell_fn ( ibdev, wqbb );
+	}
 	if ( status != 0 ) {
 		DBGC ( flexboot_nodnic, "flexboot_nodnic %p ring send doorbell failed\n", flexboot_nodnic );
 	}
@@ -1293,11 +1323,13 @@ int flexboot_nodnic_is_supported ( struct pci_device *pci ) {
 	mlx_pci_gw_teardown( &utils );
 
 pci_gw_init_err:
+	mlx_utils_teardown(&utils);
 utils_init_err:
 	DBG ( "%s: NODNIC is %s supported (status = %d)\n",
 			__FUNCTION__, ( is_supported ? "": "not" ), status );
 	return is_supported;
 }
+
 
 void flexboot_nodnic_copy_mac ( uint8_t mac_addr[], uint32_t low_byte,
 		uint16_t high_byte ) {
@@ -1329,12 +1361,13 @@ static mlx_status flexboot_nodnic_get_factory_mac (
 	status = mlx_vmac_query_virt_mac ( flexboot_nodnic_priv->device_priv.utils,
 			&virt_mac );
 	if ( ! status ) {
-		DBGC ( flexboot_nodnic_priv, "NODNIC %p Failed to set the virtual MAC\n",
-			flexboot_nodnic_priv );
+		DBGC ( flexboot_nodnic_priv, "NODNIC %p Failed to set the virtual MAC\n"
+			,flexboot_nodnic_priv );
 	}
 
 	return status;
 }
+
 
 /**
  * Set port masking
@@ -1359,6 +1392,79 @@ static int flexboot_nodnic_set_port_masking ( struct flexboot_nodnic *flexboot_n
 	}
 
 	return 0;
+}
+
+int init_mlx_utils ( mlx_utils **utils, struct pci_device *pci ) {
+	int rc = 0;
+
+	*utils = ( mlx_utils * ) zalloc ( sizeof ( mlx_utils ) );
+	if ( *utils == NULL ) {
+		DBGC ( utils, "%s: Failed to allocate utils\n", __FUNCTION__ );
+		rc = -1;
+		goto err_utils_alloc;
+	}
+	if ( mlx_utils_init ( *utils, pci ) ) {
+		DBGC ( utils, "%s: mlx_utils_init failed\n", __FUNCTION__ );
+		rc = -1;
+		goto err_utils_init;
+	}
+	if ( mlx_pci_gw_init ( *utils ) ){
+		DBGC ( utils, "%s: mlx_pci_gw_init failed\n", __FUNCTION__ );
+		rc = -1;
+		goto err_cmd_init;
+	}
+
+	return 0;
+
+	mlx_pci_gw_teardown ( *utils );
+err_cmd_init:
+	mlx_utils_teardown ( *utils );
+err_utils_init:
+	free ( *utils );
+err_utils_alloc:
+	*utils = NULL;
+
+	return rc;
+}
+
+void free_mlx_utils ( mlx_utils **utils ) {
+
+	mlx_pci_gw_teardown ( *utils );
+	mlx_utils_teardown ( *utils );
+	free ( *utils );
+	*utils = NULL;
+}
+
+/**
+ * Initialise Nodnic PCI parameters
+ *
+ * @v hermon		Nodnic device
+ */
+static int flexboot_nodnic_alloc_uar ( struct flexboot_nodnic *flexboot_nodnic ) {
+	mlx_status status = MLX_SUCCESS;
+	struct pci_device *pci = flexboot_nodnic->pci;
+	nodnic_uar *uar = &flexboot_nodnic->port[0].port_priv.device->uar;
+
+	if ( ! flexboot_nodnic->device_priv.utils ) {
+		uar->virt = NULL;
+		DBGC ( flexboot_nodnic, "%s: mlx_utils is not initialized \n", __FUNCTION__ );
+		return -EINVAL;
+	}
+
+	if  ( ! flexboot_nodnic->device_priv.device_cap.support_uar_tx_db ) {
+		DBGC ( flexboot_nodnic, "%s: tx db using uar is not supported \n", __FUNCTION__ );
+		return -ENOTSUP;
+	}
+	/* read uar offset then allocate */
+	if  ( ( status = nodnic_port_set_send_uar_offset ( &flexboot_nodnic->port[0].port_priv ) ) ) {
+		DBGC ( flexboot_nodnic, "%s: nodnic_port_set_send_uar_offset failed,"
+				"status = %d\n", __FUNCTION__, status );
+		return -EINVAL;
+	}
+	uar->phys = ( pci_bar_start ( pci, FLEXBOOT_NODNIC_HCA_BAR ) + (mlx_uint32)uar->offset );
+	uar->virt = ( void * )( ioremap ( uar->phys, FLEXBOOT_NODNIC_PAGE_SIZE ) );
+
+	return status;
 }
 
 int flexboot_nodnic_probe ( struct pci_device *pci,
@@ -1388,21 +1494,10 @@ int flexboot_nodnic_probe ( struct pci_device *pci,
 	pci_set_drvdata ( pci, flexboot_nodnic_priv );
 
 	device_priv = &flexboot_nodnic_priv->device_priv;
-	device_priv->utils = (mlx_utils *)zalloc( sizeof ( mlx_utils ) );
-	if ( device_priv->utils == NULL ) {
-		DBGC ( flexboot_nodnic_priv, "%s: Failed to allocate utils\n", __FUNCTION__ );
-		status = MLX_OUT_OF_RESOURCES;
-		goto utils_err_alloc;
-	}
-
-	status = mlx_utils_init( device_priv->utils, pci );
-	MLX_FATAL_CHECK_STATUS(status, utils_init_err,
-			"mlx_utils_init failed");
-
-	/* nodnic init*/
-	status = mlx_pci_gw_init( device_priv->utils );
-	MLX_FATAL_CHECK_STATUS(status, cmd_init_err,
-			"mlx_pci_gw_init failed");
+	/* init mlx utils */
+	status = init_mlx_utils ( & device_priv->utils, pci );
+	MLX_FATAL_CHECK_STATUS(status, err_utils_init,
+				"init_mlx_utils failed");
 
 	/* init device */
 	status = nodnic_device_init( device_priv );
@@ -1425,6 +1520,11 @@ int flexboot_nodnic_probe ( struct pci_device *pci,
 	status = flexboot_nodnic_thin_init_ports( flexboot_nodnic_priv );
 	MLX_FATAL_CHECK_STATUS(status, err_thin_init_ports,
 						"flexboot_nodnic_thin_init_ports failed");
+
+	if ( ( status = flexboot_nodnic_alloc_uar ( flexboot_nodnic_priv ) ) ) {
+		DBGC(flexboot_nodnic_priv, "%s: flexboot_nodnic_pci_init failed"
+				" ( status = %d )\n",__FUNCTION__, status );
+	}
 
 	/* device reg */
 	status = flexboot_nodnic_set_ports_type( flexboot_nodnic_priv );
@@ -1456,11 +1556,8 @@ err_set_masking:
 get_cap_err:
 	nodnic_device_teardown ( device_priv );
 device_init_err:
-	mlx_pci_gw_teardown ( device_priv->utils );
-cmd_init_err:
-utils_init_err:
-	free ( device_priv->utils );
-utils_err_alloc:
+	free_mlx_utils ( & device_priv->utils );
+err_utils_init:
 	free ( flexboot_nodnic_priv );
 device_err_alloc:
 	return status;
@@ -1473,7 +1570,6 @@ void flexboot_nodnic_remove ( struct pci_device *pci )
 
 	flexboot_nodnic_ports_unregister_dev ( flexboot_nodnic_priv );
 	nodnic_device_teardown( device_priv );
-	mlx_pci_gw_teardown( device_priv->utils );
-	free( device_priv->utils );
+	free_mlx_utils ( & device_priv->utils );
 	free( flexboot_nodnic_priv );
 }

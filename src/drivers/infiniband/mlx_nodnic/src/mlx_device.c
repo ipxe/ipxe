@@ -169,11 +169,17 @@ nodnic_device_clear_int (
 	mlx_status 			status = MLX_SUCCESS;
 	mlx_uint32			disable = 1;
 #ifndef DEVICE_CX3
-	status = nodnic_cmd_write(device_priv, NODNIC_NIC_DISABLE_INT_OFFSET, disable);
+#define NODNIC_CLEAR_INT_BAR_OFFSET 0x100C
+	if ( device_priv->device_cap.support_bar_cq_ctrl ) {
+		status = mlx_pci_mem_write ( device_priv->utils, MlxPciWidthUint32, 0,
+			( mlx_uint64 ) ( NODNIC_CLEAR_INT_BAR_OFFSET ), 1, &disable );
+	} else {
+		status = nodnic_cmd_write(device_priv, NODNIC_NIC_DISABLE_INT_OFFSET, disable);
+	}
 	MLX_CHECK_STATUS(device_priv, status, clear_int_done, "failed writing to disable_bit");
 #else
 	mlx_utils *utils = device_priv->utils;
-	mlx_uint64 clear_int = (mlx_uint64)(device_priv->crspace_clear_int);
+	mlx_uint64 clear_int = (mlx_uintn)(device_priv->crspace_clear_int);
 	mlx_uint32 swapped = 0;
 
 	if (device_priv->device_cap.crspace_doorbells == 0) {
@@ -303,6 +309,30 @@ nodnic_device_get_cap(
 	status = nodnic_cmd_read(device_priv, device_priv->device_offset + 0x14, (mlx_uint32*)&guid_l);
 	MLX_FATAL_CHECK_STATUS(status, read_err, "failed to read nodnic guid_l");
 	device_priv->device_guid = guid_l | (guid_h << 32);
+
+#define NODNIC_DEVICE_SUPPORT_RX_PI_DMA_OFFSET 31
+#define NODNIC_DEVICE_SUPPORT_RX_PI_DMA_MASK 0x1
+#define NODNIC_DEVICE_SUPPORT_UAR_TRX_DB_OFFSET 29
+#define NODNIC_DEVICE_SUPPORT_UAR_TRX_DB_MASK 0x1
+#define NODNIC_DEVICE_SUPPORT_BAR_CQ_CONTROL_OFFSET 27
+#define NODNIC_DEVICE_SUPPORT_BAR_CQ_CONTROL_MASK 0x1
+	status = nodnic_cmd_read(device_priv, device_priv->device_offset + 0x1c, &buffer);
+	MLX_FATAL_CHECK_STATUS(status, read_err, "failed to read nodnic support_rx_pi_dma");
+	if ( sizeof ( mlx_uintn ) == sizeof ( mlx_uint32 ) ) {
+		device_cap->support_rx_pi_dma = FALSE;
+		device_cap->support_uar_tx_db = FALSE;
+		device_cap->support_bar_cq_ctrl = FALSE;
+	} else {
+		device_cap->support_rx_pi_dma = CHECK_BIT(buffer, NODNIC_DEVICE_SUPPORT_RX_PI_DMA_OFFSET);
+		device_cap->support_uar_tx_db = CHECK_BIT(buffer, NODNIC_DEVICE_SUPPORT_UAR_TRX_DB_OFFSET);
+		device_cap->support_bar_cq_ctrl = CHECK_BIT(buffer, NODNIC_DEVICE_SUPPORT_BAR_CQ_CONTROL_OFFSET);
+	}
+
+#define NODNIC_DEVICE_LOG_UAR_PAGE_SIZE_OFFSET 0
+#define NODNIC_DEVICE_LOG_UAR_PAGE_SIZE_MASK 0xFF
+	status = nodnic_cmd_read(device_priv, device_priv->device_offset + 0x20, &buffer);
+	MLX_FATAL_CHECK_STATUS(status, read_err, "failed to read nodnic log_uar_page_size");
+	device_cap->log_uar_page_size = ( buffer >> NODNIC_DEVICE_LOG_UAR_PAGE_SIZE_OFFSET) & NODNIC_DEVICE_LOG_UAR_PAGE_SIZE_MASK;
 read_err:
 parm_err:
 	return status;

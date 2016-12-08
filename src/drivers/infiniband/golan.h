@@ -22,14 +22,15 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <byteswap.h>
-#include <errno.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <ipxe/io.h>
 #include <ipxe/pci.h>
 #include <ipxe/pcibackup.h>
+#include <byteswap.h>
+#include <errno.h>
+#include <ipxe/io.h>
+#include <stdio.h>
+#include <unistd.h>
 #include "CIB_PRM.h"
+#include "mlx_utils/include/public/mlx_utils.h"
 
 #define GOLAN_PCI_CONFIG_BAR_SIZE	0x100000//HERMON_PCI_CONFIG_BAR_SIZE //TODO: What is the BAR size?
 
@@ -319,6 +320,7 @@ struct golan {
 	uint32_t			pdn;
 	u32				mkey;
 	u32				flags;
+	mlx_utils		*utils;
 
 	struct golan_port		ports[GOLAN_MAX_PORTS];
 };

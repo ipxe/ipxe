@@ -42,6 +42,7 @@ struct nvconfig_tlv_mapping nvconfig_tlv_mapping[] = {
 		TlvMappingEntry(0x2020, 0x2020, NVRAM_TLV_CLASS_PHYSICAL_PORT, FALSE),
 		TlvMappingEntry(0x2021, 0x221, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2023, 0x223, NVRAM_TLV_CLASS_HOST, FALSE),
+		TlvMappingEntry(0x2006, 0x206, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2100, 0x230, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2101, 0x231, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2102, 0x232, NVRAM_TLV_CLASS_HOST, FALSE),
@@ -53,6 +54,7 @@ struct nvconfig_tlv_mapping nvconfig_tlv_mapping[] = {
 		TlvMappingEntry(0x2108, 0x238, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2109, 0x239, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x210A, 0x23A, NVRAM_TLV_CLASS_HOST, FALSE),
+		TlvMappingEntry(0x2022, 0x222, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2200, 0x240, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2201, 0x241, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2202, 0x242, NVRAM_TLV_CLASS_HOST, FALSE),
@@ -60,6 +62,11 @@ struct nvconfig_tlv_mapping nvconfig_tlv_mapping[] = {
 		TlvMappingEntry(0x2204, 0x244, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2205, 0x245, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2207, 0x247, NVRAM_TLV_CLASS_HOST, FALSE),
+		TlvMappingEntry(0x2002, 0x202, NVRAM_TLV_CLASS_HOST, FALSE),
+		TlvMappingEntry(0x2004, 0x204, NVRAM_TLV_CLASS_HOST, FALSE),
+		TlvMappingEntry(0x110, 0x110, NVRAM_TLV_CLASS_HOST, FALSE),
+		TlvMappingEntry(0x192, 0x192, NVRAM_TLV_CLASS_GLOBAL, FALSE),
+		TlvMappingEntry(0x101, 0x101, NVRAM_TLV_CLASS_GLOBAL, TRUE),
 		TlvMappingEntry(0, 0, 0, 0),
 };
 

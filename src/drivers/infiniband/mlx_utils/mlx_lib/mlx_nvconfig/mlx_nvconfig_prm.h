@@ -33,12 +33,15 @@ enum {
 	OCSD_OCBB_TYPE 					= 0x2011,
 	FLOW_CONTROL_TYPE				= 0x2020,
 	BOOT_SETTINGS_TYPE				= 0x2021,
+	NV_ROM_FLEXBOOT_DEBUG				= 0x2004,
+
 	ISCSI_GENERAL_SETTINGS_TYPE		= 0x2100,
 	IB_BOOT_SETTING_TYPE			= 0x2022,
 	IB_DHCP_SETTINGS_TYPE			= 0x2023,
 	GLOPAL_PCI_SETTINGS_TYPE		= 0x80,
 	GLOPAL_PCI_CAPS_TYPE			= 0x81,
 	GLOBAL_ROM_INI_TYPE				= 0x100,
+	NV_VIRT_NET_ADDR				= 0x110,
 
 	// Types for iSCSI strings
 	DHCP_VEND_ID					= 0x2101,
@@ -59,6 +62,8 @@ enum {
 	FIRST_TGT_ISCSI_NAME			= 0x2204,
 	FIRST_TGT_CHAP_ID				= 0x2205,
 	FIRST_TGT_CHAP_PWD				= 0x2207,
+	NV_ROM_DEBUG_LEVEL				= 0x2002,
+	NV_ROM_CAP_TYPE					= 0x101,
 };
 
 union mlx_nvconfig_nic_boot_conf {
@@ -78,7 +83,9 @@ union mlx_nvconfig_nic_boot_ext_conf {
 	struct {
 		mlx_uint32	linkup_timeout	: 8;
 		mlx_uint32	ip_ver			: 2;
-		mlx_uint32	reserved0		: 22;
+		mlx_uint32	reserved0		: 6;
+		mlx_uint32	undi_network_wait_to : 8;
+		mlx_uint32	reserved1		: 8;
 	};
 	mlx_uint32 dword;
 };
@@ -194,7 +201,8 @@ union mlx_nvconfig_iscsi_general {
 		/*-------------------*/
 		mlx_uint32	lun_busy_retry_count:8;
 		mlx_uint32	link_up_delay_time	:8;
-		mlx_uint32	reserved4			:16;
+		mlx_uint32	drive_num			:8;
+		mlx_uint32	reserved4			:8;
 	};
 	mlx_uint32 dword[3];
 };
@@ -226,34 +234,98 @@ union mlx_nvconfig_vpi_link_conf {
 };
 
 struct  mlx_nvcofnig_romini {
-	mlx_uint32 reserved0    :1;
+	mlx_uint32 reserved0    		:1;
 	mlx_uint32 shared_memory_en     :1;
-	mlx_uint32 hii_vpi_en   :1;
-	mlx_uint32 tech_enum    :1;
-	mlx_uint32 reserved1    :4;
+	mlx_uint32 hii_vpi_en   		:1;
+	mlx_uint32 tech_enum    		:1;
+	mlx_uint32 reserved1    		:4;
 	mlx_uint32 static_component_name_string :1;
 	mlx_uint32 hii_iscsi_configuration      :1;
-	mlx_uint32 hii_ibm_aim  :1;
+	mlx_uint32 hii_ibm_aim  		:1;
 	mlx_uint32 hii_platform_setup   :1;
 	mlx_uint32 hii_bdf_decimal      :1;
 	mlx_uint32 hii_read_only        :1;
-	mlx_uint32 reserved2    :10;
+	mlx_uint32 reserved2    		:10;
 	mlx_uint32 mac_enum             :1;
-	mlx_uint32 port_enum    :1;
+	mlx_uint32 port_enum    		:1;
 	mlx_uint32 flash_en             :1;
 	mlx_uint32 fmp_en               :1;
 	mlx_uint32 bofm_en              :1;
-	mlx_uint32 platform_to_driver_en                :1;
+	mlx_uint32 platform_to_driver_en:1;
 	mlx_uint32 hii_en               :1;
 	mlx_uint32 undi_en              :1;
 	/* -------------- */
 	mlx_uint64 dhcp_user_class;
 	/* -------------- */
-	mlx_uint32 reserved3    :22;
+	mlx_uint32 reserved3    		:10;
+	mlx_uint32 ucm_single_port		:1;
+	mlx_uint32 tivoli_wa_en			:1;
+	mlx_uint32 dhcp_pxe_discovery_control_dis	:1;
+	mlx_uint32 hii_flexaddr_override:1;
+	mlx_uint32 hii_flexaddr_setting :1;
+	mlx_uint32 guided_ops			:1;
+	mlx_uint32 hii_type				:4;
+	mlx_uint32 hii_mriname2			:1;
+	mlx_uint32 hii_aim_ucm_ver2		:1;
 	mlx_uint32 uri_boot_retry_delay :4;
 	mlx_uint32 uri_boot_retry       :4;
 	mlx_uint32 option_rom_debug     :1;
 	mlx_uint32 promiscuous_vlan     :1;
+
+} __attribute__ ((packed));
+
+union mlx_nvconfig_debug_conf {
+	struct {
+	mlx_uint32	dbg_log_en				:1;
+	mlx_uint32	reserved1				:31;
+		/***************************************************/
+	mlx_uint32	stp_dbg_lvl				:2;
+	mlx_uint32	romprefix_dbg_lvl		:2;
+	mlx_uint32	dhcp_dbg_lvl			:2;
+	mlx_uint32	dhcpv6_dbg_lvl			:2;
+	mlx_uint32	arp_dbg_lvl				:2;
+	mlx_uint32	neighbor_dbg_lvl		:2;
+	mlx_uint32	ndp_dbg_lvl				:2;
+	mlx_uint32	uri_dbg_lvl				:2;
+	mlx_uint32	driver_dbg_lvl			:2;
+	mlx_uint32	nodnic_dbg_lvl			:2;
+	mlx_uint32	nodnic_cmd_dbg_lvl		:2;
+	mlx_uint32	nodnic_device_dbg_lvl	:2;
+	mlx_uint32	nodnic_port_dbg_lvl		:2;
+	mlx_uint32	netdevice_dbg_lvl		:2;
+	mlx_uint32	tftp_dbg_lvl			:2;
+	mlx_uint32	udp_dbg_lvl				:2;
+		/***************************************************/
+	mlx_uint32	tcp_dbg_lvl				:2;
+	mlx_uint32	tcpip_dbg_lvl			:2;
+	mlx_uint32	ipv4_dbg_lvl			:2;
+	mlx_uint32	ipv6_dbg_lvl			:2;
+	mlx_uint32	drv_set_dbg_lvl			:2;
+	mlx_uint32	stat_update_dbg_lvl		:2;
+	mlx_uint32	pxe_undi_dbg_lvl		:2;
+	mlx_uint32	reserved2				:18;
+	};
+	mlx_uint32 dword[3];
+};
+
+union mlx_nvconfig_flexboot_debug {
+	struct {
+	mlx_uint32	reserved0				:29;
+	mlx_uint32	panic_behavior				:2;
+	mlx_uint32	boot_to_shell				:1;
+	};
+	mlx_uint32 dword;
+};
+
+union mlx_nvconfig_rom_cap_conf {
+	struct {
+		mlx_uint32	reserved0			:28;
+		mlx_uint32	uefi_logs_en		:1;
+		mlx_uint32	flexboot_debug_en	:1;
+		mlx_uint32	boot_debug_log_en	:1;
+		mlx_uint32	boot_ip_ver_en		:1;
+	};
+	mlx_uint32 dword;
 };
 
 #endif /* MLX_NVCONFIG_PRM_H_ */

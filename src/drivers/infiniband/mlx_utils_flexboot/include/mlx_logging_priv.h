@@ -12,8 +12,8 @@
 #include <compiler.h>
 
 #define MLX_DEBUG_FATAL_ERROR_PRIVATE(...)		do {				\
-		DBG("%s: ",__func__);						\
-		DBG(__VA_ARGS__);			\
+		printf("%s: ",__func__);						\
+		printf(__VA_ARGS__);			\
 	} while ( 0 )
 
 #define MLX_DEBUG_ERROR_PRIVATE(id, ...)		do {				\
@@ -56,6 +56,7 @@
 		DBG2(__VA_ARGS__);			\
 	} while ( 0 )
 
+#define MLX_PRINT_PRIVATE(...)				printf(__VA_ARGS__)
 
 
 #endif /* STUB_MLXUTILS_INCLUDE_PRIVATE_FLEXBOOT_DEBUG_H_ */

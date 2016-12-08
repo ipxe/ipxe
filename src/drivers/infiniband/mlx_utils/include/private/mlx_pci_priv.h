@@ -31,6 +31,11 @@ mlx_pci_init_priv(
 			);
 
 mlx_status
+mlx_pci_teardown_priv(
+			IN mlx_utils *utils
+			);
+
+mlx_status
 mlx_pci_read_priv(
 			IN mlx_utils *utils,
 			IN mlx_pci_width width,

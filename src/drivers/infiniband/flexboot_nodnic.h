@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/io.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/netdevice.h>
+#include "mlx_utils/mlx_lib/mlx_nvconfig/mlx_nvconfig.h"
 
 /*
  * If defined, use interrupts in NODNIC driver
@@ -37,6 +38,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define FLEXBOOT_NODNIC_PORT_BASE		1
 
 #define FLEXBOOT_NODNIC_OPCODE_SEND		0xa
+#define FLEXBOOT_NODNIC_HCA_BAR	PCI_BASE_ADDRESS_0	//BAR 0
+#define FLEXBOOT_NODNIC_PAGE_SHIFT	12
+#define	FLEXBOOT_NODNIC_PAGE_SIZE		(1 << FLEXBOOT_NODNIC_PAGE_SHIFT)
+#define FLEXBOOT_NODNIC_PAGE_MASK		(FLEXBOOT_NODNIC_PAGE_SIZE - 1)
 
 /* Port protocol */
 enum flexboot_nodnic_protocol {
@@ -60,6 +65,7 @@ struct flexboot_nodnic_port {
 	struct ib_completion_queue *eth_cq;
 	/** Ethernet queue pair */
 	struct ib_queue_pair *eth_qp;
+	mlx_uint8 cmdsn;
 };
 
 
@@ -136,6 +142,21 @@ struct cqe_data{
 	mlx_uint32 byte_cnt;
 };
 
+union arm_cq_uar {
+	struct {
+		//big endian
+		mlx_uint32 reserved0	:2;
+		mlx_uint32 cmdn			:2;
+		mlx_uint32 reserved1	:3;
+		mlx_uint32 cmd			:1;
+		mlx_uint32 cq_ci		:24;
+		mlx_uint32 reserved2	:8;
+		mlx_uint32 cq_n		:24;
+	};
+	mlx_uint32 dword[2];
+	mlx_uint64 qword;
+};
+
 struct flexboot_nodnic_callbacks {
 	mlx_status ( * fill_completion ) ( void *cqe, struct cqe_data *cqe_data );
 	mlx_status ( * cqe_set_owner ) ( void *cq, unsigned int num_cqes );
@@ -149,6 +170,10 @@ struct flexboot_nodnic_callbacks {
 				unsigned long wqe_idx
 				);
 	void ( * irq ) ( struct net_device *netdev, int enable );
+	mlx_status ( * tx_uar_send_doorbell_fn ) (
+					struct ib_device *ibdev,
+					struct nodnic_send_wqbb *wqbb
+					);
 };
 
 int flexboot_nodnic_probe ( struct pci_device *pci,
@@ -159,5 +184,6 @@ void flexboot_nodnic_eth_irq ( struct net_device *netdev, int enable );
 int flexboot_nodnic_is_supported ( struct pci_device *pci );
 void flexboot_nodnic_copy_mac ( uint8_t mac_addr[], uint32_t low_byte,
 		uint16_t high_byte );
-
+int init_mlx_utils ( mlx_utils **utils, struct pci_device *pci );
+void free_mlx_utils ( mlx_utils **utils );
 #endif /* SRC_DRIVERS_INFINIBAND_FLEXBOOT_NODNIC_FLEXBOOT_NODNIC_H_ */

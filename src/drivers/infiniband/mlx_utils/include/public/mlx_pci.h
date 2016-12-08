@@ -37,6 +37,11 @@ mlx_pci_init(
 			);
 
 mlx_status
+mlx_pci_teardown(
+			IN mlx_utils *utils
+			);
+
+mlx_status
 mlx_pci_read(
 			IN mlx_utils *utils,
 			IN mlx_pci_width width,
