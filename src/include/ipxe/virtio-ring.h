@@ -71,14 +71,12 @@ struct vring {
          + PAGE_MASK) & ~PAGE_MASK) + \
          (sizeof(struct vring_used) + sizeof(struct vring_used_elem) * num))
 
-typedef unsigned char virtio_queue_t[PAGE_MASK + vring_size(MAX_QUEUE_NUM)];
-
 struct vring_virtqueue {
-   virtio_queue_t queue;
+   unsigned char *queue;
    struct vring vring;
    u16 free_head;
    u16 last_used_idx;
-   void *vdata[MAX_QUEUE_NUM];
+   void **vdata;
    /* PCI */
    int queue_index;
    struct virtio_pci_region notification;

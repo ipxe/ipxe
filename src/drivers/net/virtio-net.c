@@ -185,6 +185,7 @@ static void virtnet_free_virtqueues ( struct net_device *netdev ) {
 
 	for ( i = 0; i < QUEUE_NB; i++ ) {
 		virtio_pci_unmap_capability ( &virtnet->virtqueue[i].notification );
+		vp_free_vq ( &virtnet->virtqueue[i] );
 	}
 
 	free ( virtnet->virtqueue );
