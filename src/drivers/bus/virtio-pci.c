@@ -358,12 +358,18 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
             return -EINVAL;
         }
 
+        if (size > MAX_QUEUE_NUM) {
+            /* iPXE networking tends to be not perf critical so there's no
+             * need to accept large queue sizes.
+             */
+            size = MAX_QUEUE_NUM;
+        }
+
         vq = &vqs[i];
         vq->queue_index = i;
 
         /* get offset of notification word for this vq */
         off = vpm_ioread16(vdev, &vdev->common, COMMON_OFFSET(queue_notify_off));
-        vq->vring.num = size;
 
         vring_init(&vq->vring, size, (unsigned char *)vq->queue);
 
