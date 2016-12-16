@@ -196,8 +196,10 @@ static inline void vp_del_vq(unsigned int ioaddr, int queue_index)
 
 struct vring_virtqueue;
 
+void vp_free_vq(struct vring_virtqueue *vq);
 int vp_find_vq(unsigned int ioaddr, int queue_index,
                struct vring_virtqueue *vq);
+
 
 /* Virtio 1.0 I/O routines abstract away the three possible HW access
  * mechanisms - memory, port I/O, and PCI cfg space access. Also built-in
