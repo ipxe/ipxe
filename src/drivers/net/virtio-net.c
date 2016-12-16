@@ -175,6 +175,22 @@ static void virtnet_refill_rx_virtqueue ( struct net_device *netdev ) {
 	}
 }
 
+/** Helper to free all virtqueue memory
+ *
+ * @v netdev		Network device
+ */
+static void virtnet_free_virtqueues ( struct net_device *netdev ) {
+	struct virtnet_nic *virtnet = netdev->priv;
+	int i;
+
+	for ( i = 0; i < QUEUE_NB; i++ ) {
+		virtio_pci_unmap_capability ( &virtnet->virtqueue[i].notification );
+	}
+
+	free ( virtnet->virtqueue );
+	virtnet->virtqueue = NULL;
+}
+
 /** Open network device, legacy virtio 0.9.5
  *
  * @v netdev	Network device
@@ -200,8 +216,7 @@ static int virtnet_open_legacy ( struct net_device *netdev ) {
 		if ( vp_find_vq ( ioaddr, i, &virtnet->virtqueue[i] ) == -1 ) {
 			DBGC ( virtnet, "VIRTIO-NET %p cannot register queue %d\n",
 			       virtnet, i );
-			free ( virtnet->virtqueue );
-			virtnet->virtqueue = NULL;
+			virtnet_free_virtqueues ( netdev );
 			return -ENOENT;
 		}
 	}
@@ -263,8 +278,7 @@ static int virtnet_open_modern ( struct net_device *netdev ) {
 	if ( vpm_find_vqs ( &virtnet->vdev, QUEUE_NB, virtnet->virtqueue ) ) {
 		DBGC ( virtnet, "VIRTIO-NET %p cannot register queues\n",
 		       virtnet );
-		free ( virtnet->virtqueue );
-		virtnet->virtqueue = NULL;
+		virtnet_free_virtqueues ( netdev );
 		vpm_add_status ( &virtnet->vdev, VIRTIO_CONFIG_S_FAILED );
 		return -ENOENT;
 	}
@@ -304,7 +318,6 @@ static void virtnet_close ( struct net_device *netdev ) {
 	struct virtnet_nic *virtnet = netdev->priv;
 	struct io_buffer *iobuf;
 	struct io_buffer *next_iobuf;
-	int i;
 
 	if ( virtnet->virtio_version ) {
 		vpm_reset ( &virtnet->vdev );
@@ -313,12 +326,7 @@ static void virtnet_close ( struct net_device *netdev ) {
 	}
 
 	/* Virtqueues can be freed now that NIC is reset */
-	for ( i = 0 ; i < QUEUE_NB ; i++ ) {
-		virtio_pci_unmap_capability ( &virtnet->virtqueue[i].notification );
-	}
-
-	free ( virtnet->virtqueue );
-	virtnet->virtqueue = NULL;
+	virtnet_free_virtqueues ( netdev );
 
 	/* Free rx iobufs */
 	list_for_each_entry_safe ( iobuf, next_iobuf, &virtnet->rx_iobufs, list ) {

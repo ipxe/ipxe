@@ -391,7 +391,7 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
             off * notify_offset_multiplier, 2,
             &vq->notification);
         if (err) {
-            goto err_map_notify;
+            return err;
         }
     }
 
@@ -405,11 +405,4 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
         vpm_iowrite16(vdev, &vdev->common, 1, COMMON_OFFSET(queue_enable));
     }
     return 0;
-
-err_map_notify:
-    /* Undo the virtio_pci_map_capability calls. */
-    while (i-- > 0) {
-        virtio_pci_unmap_capability(&vqs[i].notification);
-    }
-    return err;
 }
