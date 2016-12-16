@@ -95,7 +95,7 @@ static inline void vring_init(struct vring *vr,
    unsigned int i;
    unsigned long pa;
 
-        vr->num = num;
+   vr->num = num;
 
    /* physical address of desc must be page aligned */
 
@@ -103,13 +103,13 @@ static inline void vring_init(struct vring *vr,
    pa = (pa + PAGE_MASK) & ~PAGE_MASK;
    vr->desc = phys_to_virt(pa);
 
-        vr->avail = (struct vring_avail *)&vr->desc[num];
+   vr->avail = (struct vring_avail *)&vr->desc[num];
 
    /* physical address of used must be page aligned */
 
    pa = virt_to_phys(&vr->avail->ring[num]);
    pa = (pa + PAGE_MASK) & ~PAGE_MASK;
-        vr->used = phys_to_virt(pa);
+   vr->used = phys_to_virt(pa);
 
    for (i = 0; i < num - 1; i++)
            vr->desc[i].next = i + 1;
