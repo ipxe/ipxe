@@ -787,12 +787,9 @@ static int http_transfer_complete ( struct http_transaction *http ) {
 	/* Restart content decoding interfaces (which may be attached
 	 * to the same object).
 	 */
-	intf_nullify ( &http->content );
-	intf_nullify ( &http->transfer );
+	intf_nullify ( &http->transfer ); /* avoid potential loops */
 	intf_restart ( &http->content, http->response.rc );
 	intf_restart ( &http->transfer, http->response.rc );
-	http->content.desc = &http_content_desc;
-	http->transfer.desc = &http_transfer_desc;
 	intf_plug_plug ( &http->transfer, &http->content );
 	http->len = 0;
 	assert ( http->remaining == 0 );

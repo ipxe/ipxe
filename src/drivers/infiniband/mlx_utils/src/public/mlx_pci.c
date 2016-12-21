@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
+
 #include "../../include/private/mlx_pci_priv.h"
 #include "../../include/public/mlx_pci.h"
 
@@ -34,6 +35,21 @@ mlx_pci_init(
 		goto bail;
 	}
 	status = mlx_pci_init_priv(utils);
+bail:
+	return status;
+}
+
+mlx_status
+mlx_pci_teardown(
+			IN mlx_utils *utils
+			)
+{
+	mlx_status status = MLX_SUCCESS;
+	if( utils == NULL){
+		status = MLX_INVALID_PARAMETER;
+		goto bail;
+	}
+	status = mlx_pci_teardown_priv(utils);
 bail:
 	return status;
 }

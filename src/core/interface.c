@@ -295,7 +295,6 @@ void intf_shutdown ( struct interface *intf, int rc ) {
  * blocked during shutdown.
  */
 void intf_restart ( struct interface *intf, int rc ) {
-	struct interface_descriptor *desc = intf->desc;
 
 	/* Shut down the interface */
 	intf_shutdown ( intf, rc );
@@ -309,7 +308,7 @@ void intf_restart ( struct interface *intf, int rc ) {
 	 * infinite loop as the intf_close() operations on each side
 	 * of the link call each other recursively.
 	 */
-	intf->desc = desc;
+	intf_reinit ( intf );
 }
 
 /**

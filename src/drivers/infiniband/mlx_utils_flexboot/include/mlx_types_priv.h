@@ -33,7 +33,7 @@ typedef uint8_t		mlx_uint8;
 typedef uint16_t	mlx_uint16;
 typedef uint32_t	mlx_uint32;
 typedef uint64_t	mlx_uint64;
-typedef uint32_t 	mlx_uintn;
+typedef unsigned long	mlx_uintn;
 
 typedef int8_t		mlx_int8;
 typedef int16_t		mlx_int16;;

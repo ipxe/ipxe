@@ -456,6 +456,24 @@ pci_set_mem_access:
 	ret
 	.size	pci_set_mem_access, . - pci_set_mem_access
 
+/* Update image source address for UNDI loader
+ *
+ * Parameters:
+ *   %esi : Image source address
+ * Returns:
+ *   %esi : Image source address
+ */
+	.section ".prefix", "ax", @progbits
+	.globl	undiloader_source
+undiloader_source:
+	/* Always use expansion ROM BAR directly when installing via
+	 * the UNDI loader entry point, since the PMM-allocated block
+	 * may collide with whatever is calling the UNDI loader entry
+	 * point.
+	 */
+	xorl	%esi, %esi
+	ret
+
 /* Payload prefix
  *
  * We include a dummy ROM header to cover the "hidden" portion of the

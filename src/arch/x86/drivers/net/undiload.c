@@ -72,7 +72,8 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	/* Only one UNDI instance may be loaded at any given time */
 	if ( undi_loader_entry.segment ) {
 		DBG ( "UNDI %p cannot load multiple instances\n", undi );
-		return -EBUSY;
+		rc = -EBUSY;
+		goto err_multiple;
 	}
 
 	/* Set up START_UNDI parameters */
@@ -90,10 +91,15 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	undi_loader.UNDI_CS = fbms_seg;
 	fbms_seg -= ( ( undirom->data_size + 0x0f ) >> 4 );
 	undi_loader.UNDI_DS = fbms_seg;
+	undi->fbms = ( fbms_seg >> 6 );
+	set_fbms ( undi->fbms );
+	DBGC ( undi, "UNDI %p allocated [%d,%d) kB of base memory\n",
+	       undi, undi->fbms, undi->restore_fbms );
 
 	/* Debug info */
-	DBGC ( undi, "UNDI %p loading UNDI ROM %p to CS %04x DS %04x for ",
-	       undi, undirom, undi_loader.UNDI_CS, undi_loader.UNDI_DS );
+	DBGC ( undi, "UNDI %p loading ROM %p to CS %04x:%04zx DS %04x:%04zx "
+	       "for ", undi, undirom, undi_loader.UNDI_CS, undirom->code_size,
+	       undi_loader.UNDI_DS, undirom->data_size );
 	if ( undi->pci_busdevfn != UNDI_NO_PCI_BUSDEVFN ) {
 		unsigned int bus = ( undi->pci_busdevfn >> 8 );
 		unsigned int devfn = ( undi->pci_busdevfn & 0xff );
@@ -116,15 +122,11 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 			       : "=a" ( exit )
 			       : "a" ( __from_data16 ( &undi_loader ) )
 			       : "ebx", "ecx", "edx", "esi", "edi" );
-
 	if ( exit != PXENV_EXIT_SUCCESS ) {
-		/* Clear entry point */
-		memset ( &undi_loader_entry, 0, sizeof ( undi_loader_entry ) );
-
 		rc = -EUNDILOAD ( undi_loader.Status );
 		DBGC ( undi, "UNDI %p loader failed: %s\n",
 		       undi, strerror ( rc ) );
-		return rc;
+		goto err_loader;
 	}
 
 	/* Populate PXE device structure */
@@ -138,13 +140,13 @@ int undi_load ( struct undi_device *undi, struct undi_rom *undirom ) {
 	       undi->pxenv.offset, undi->ppxe.segment, undi->ppxe.offset,
 	       undi->entry.segment, undi->entry.offset );
 
-	/* Update free base memory counter */
-	undi->fbms = ( fbms_seg >> 6 );
-	set_fbms ( undi->fbms );
-	DBGC ( undi, "UNDI %p using [%d,%d) kB of base memory\n",
-	       undi, undi->fbms, undi->restore_fbms );
-
 	return 0;
+
+ err_loader:
+	set_fbms ( undi->restore_fbms );
+	memset ( &undi_loader_entry, 0, sizeof ( undi_loader_entry ) );
+ err_multiple:
+	return rc;
 }
 
 /**

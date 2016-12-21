@@ -168,7 +168,7 @@ static int undirom_probe ( unsigned int rom_segment ) {
 
 	/* Add to UNDI ROM list and return */
 	DBGC ( undirom, "UNDIROM %p registered\n", undirom );
-	list_add ( &undirom->list, &undiroms );
+	list_add_tail ( &undirom->list, &undiroms );
 	return 0;
 
  err:

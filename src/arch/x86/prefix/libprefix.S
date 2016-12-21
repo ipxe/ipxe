@@ -36,10 +36,24 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 /* Allow for DBG()-style messages within libprefix */
 #ifdef NDEBUG
-	.macro	progress message
+	.macro	progress message, regs:vararg
 	.endm
 #else
-	.macro	progress message
+	.macro	dumpreg reg, others:vararg
+	pushl	%eax
+	movl	\reg, %eax
+	pushw	%di
+	xorw	%di, %di
+	call	print_space
+	call	print_hex_dword
+	popw	%di
+	popl	%eax
+	.ifnb	\others
+	dumpreg \others
+	.endif
+	.endm
+
+	.macro	progress message, regs:vararg
 	pushfl
 	pushw	%ds
 	pushw	%si
@@ -51,6 +65,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 	call	print_message
 	popw	%di
 	popw	%si
+	.ifnb	\regs
+	dumpreg \regs
+	.endif
+	pushw	%di
+	pushw	%ax
+	xorw	%di, %di
+	movb	$( '\n' ), %al
+	call	print_character
+	popw	%ax
+	popw	%di
 	popw	%ds
 	popfl
 	.section ".prefix.data", "aw", @progbits
@@ -659,7 +683,7 @@ hooked_bios_interrupts:
 	.code16
 	.globl install
 install:
-	progress "install:\n"
+	progress "\ninstall:"
 	/* Preserve registers */
 	pushl	%esi
 	pushl	%edi
@@ -702,7 +726,7 @@ install:
 	.code16
 	.globl install_prealloc
 install_prealloc:
-	progress "install_prealloc:\n"
+	progress "\ninstall_prealloc:", %eax, %ebx, %esi, %edi, %ebp
 	/* Save registers on external stack */
 	pushal
 	pushw	%ds
@@ -726,7 +750,6 @@ install_prealloc:
 	pushl	%edi
 
 	/* Install .text16.early and calculate %ecx as offset to next block */
-	progress "  .text16.early\n"
 	pushl	%esi
 	xorl	%esi, %esi
 	movw	%cs, %si
@@ -737,6 +760,7 @@ install_prealloc:
 	shll	$4, %edi
 	movl	$_text16_early_filesz, %ecx
 	movl	$_text16_early_memsz, %edx
+	progress "  .text16.early  ", %esi, %edi, %ecx, %edx
 	call	install_block		/* .text16.early */
 	jc	install_block_death
 	popl	%ecx			/* Calculate offset to next block */
@@ -750,7 +774,7 @@ install_prealloc:
 	 * already have 4GB segment limits as a result of calling
 	 * install_block.)
 	 */
-	progress "  access_highmem\n"
+	progress "  access_highmem"
 	pushw	%cs
 	pushw	$1f
 	pushw	%ax
@@ -762,7 +786,7 @@ install_prealloc:
 #endif
 
 	/* Open payload (which may not yet be in memory) */
-	progress "  open_payload\n"
+	progress "  open_payload   ", %esi, %ecx
 	pushw	%cs
 	pushw	$1f
 	pushw	%ax
@@ -779,16 +803,16 @@ install_prealloc:
 1:	addl	%ecx, %esi
 
 	/* Install .text16.late and .data16 */
-	progress "  .text16.late\n"
 	movl	$_text16_late_filesz, %ecx
 	movl	$_text16_late_memsz, %edx
+	progress "  .text16.late   ", %esi, %edi, %ecx, %edx
 	call	install_block		/* .text16.late */
 	jc	install_block_death
-	progress "  .data16\n"
 	movzwl	%bx, %edi
 	shll	$4, %edi
 	movl	$_data16_filesz, %ecx
 	movl	$_data16_filesz, %edx	/* do not zero our temporary stack */
+	progress "  .data16        ", %esi, %edi, %ecx, %edx
 	call	install_block		/* .data16 */
 	jc	install_block_death
 
@@ -825,10 +849,10 @@ install_prealloc:
 	 * prior to reading the E820 memory map and relocating
 	 * properly.
 	 */
-	progress "  .textdata\n"
 	pushl	%edi
 	movl	$_textdata_filesz, %ecx
 	movl	$_textdata_memsz, %edx
+	progress "  .textdata      ", %esi, %edi, %ecx, %edx
 	call	install_block
 	jc	install_block_death
 	popl	%edi
@@ -850,7 +874,7 @@ install_prealloc:
 #ifndef KEEP_IT_REAL
 
 	/* Initialise librm at current location */
-	progress "  init_librm\n"
+	progress "  init_librm     ", %eax, %ebx, %edi
 	movw	%ax, (init_librm_vector+2)
 	lcall	*init_librm_vector
 
@@ -873,7 +897,6 @@ install_prealloc:
 	 * relocate() will return with %esi, %edi and %ecx set up
 	 * ready for the copy to the new location.
 	 */
-	progress "  relocate\n"
 	virtcall relocate
 
 	/* Jump back to .prefix segment */
@@ -882,7 +905,7 @@ install_prealloc:
 	.section ".prefix.install_prealloc", "awx", @progbits
 1:
 	/* Copy code to new location */
-	progress "  copy\n"
+	progress "  copy           ", %esi, %edi, %ecx
 	pushl	%edi
 	pushw	%bx
 	movw	$copy_bytes, %bx
@@ -891,7 +914,7 @@ install_prealloc:
 	popl	%edi
 
 	/* Initialise librm at new location */
-	progress "  init_librm\n"
+	progress "  init_librm     ", %eax, %ebx, %edi
 	lcall	*init_librm_vector
 
 #else /* KEEP_IT_REAL */
@@ -903,7 +926,7 @@ install_prealloc:
 #endif /* KEEP_IT_REAL */
 
 	/* Close access to payload */
-	progress "  close_payload\n"
+	progress "  close_payload"
 	movw	%ax, (close_payload_vector+2)
 	lcall	*close_payload_vector
 

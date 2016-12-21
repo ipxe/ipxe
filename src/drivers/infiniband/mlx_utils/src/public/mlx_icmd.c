@@ -316,7 +316,7 @@ mlx_icmd_send_command(
 				)
 {
 	mlx_status status = MLX_SUCCESS;
-	mlx_uint32 icmd_status = MLX_FAILED;
+	mlx_uint32 icmd_status = 0;
 
 	if (utils == NULL || data == NULL) {
 		status = MLX_INVALID_PARAMETER;

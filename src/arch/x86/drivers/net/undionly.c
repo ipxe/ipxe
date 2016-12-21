@@ -50,6 +50,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * addition to the UNDI driver, build e.g. "bin/undi.dsk".
  */
 
+/** UNDI root bus device */
+static struct device undibus_dev;
+
 /**
  * Probe UNDI root bus
  *
@@ -60,6 +63,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 static int undibus_probe ( struct root_device *rootdev ) {
 	struct undi_device *undi = &preloaded_undi;
+	struct device *dev = &undibus_dev;
 	int rc;
 
 	/* Check for a valie preloaded UNDI device */
@@ -69,34 +73,32 @@ static int undibus_probe ( struct root_device *rootdev ) {
 	}
 
 	/* Add to device hierarchy */
-	undi->dev.driver_name = "undionly";
+	dev->driver_name = "undionly";
 	if ( undi->pci_busdevfn != UNDI_NO_PCI_BUSDEVFN ) {
-		undi->dev.desc.bus_type = BUS_TYPE_PCI;
-		undi->dev.desc.location = undi->pci_busdevfn;
-		undi->dev.desc.vendor = undi->pci_vendor;
-		undi->dev.desc.device = undi->pci_device;
-		snprintf ( undi->dev.name, sizeof ( undi->dev.name ),
-			   "UNDI-PCI%02x:%02x.%x",
-			   PCI_BUS ( undi->pci_busdevfn ),
+		dev->desc.bus_type = BUS_TYPE_PCI;
+		dev->desc.location = undi->pci_busdevfn;
+		dev->desc.vendor = undi->pci_vendor;
+		dev->desc.device = undi->pci_device;
+		snprintf ( dev->name, sizeof ( dev->name ),
+			   "0000:%02x:%02x.%x", PCI_BUS ( undi->pci_busdevfn ),
 			   PCI_SLOT ( undi->pci_busdevfn ),
 			   PCI_FUNC ( undi->pci_busdevfn ) );
 	} else if ( undi->isapnp_csn != UNDI_NO_ISAPNP_CSN ) {
-		undi->dev.desc.bus_type = BUS_TYPE_ISAPNP;
-		snprintf ( undi->dev.name, sizeof ( undi->dev.name ),
-			   "UNDI-ISAPNP" );
+		dev->desc.bus_type = BUS_TYPE_ISAPNP;
+		snprintf ( dev->name, sizeof ( dev->name ), "ISAPNP" );
 	}
-	undi->dev.parent = &rootdev->dev;
-	list_add ( &undi->dev.siblings, &rootdev->dev.children);
-	INIT_LIST_HEAD ( &undi->dev.children );
+	dev->parent = &rootdev->dev;
+	list_add ( &dev->siblings, &rootdev->dev.children);
+	INIT_LIST_HEAD ( &dev->children );
 
 	/* Create network device */
-	if ( ( rc = undinet_probe ( undi ) ) != 0 )
+	if ( ( rc = undinet_probe ( undi, dev ) ) != 0 )
 		goto err;
 
 	return 0;
 
  err:
-	list_del ( &undi->dev.siblings );
+	list_del ( &dev->siblings );
 	return rc;
 }
 
@@ -107,9 +109,10 @@ static int undibus_probe ( struct root_device *rootdev ) {
  */
 static void undibus_remove ( struct root_device *rootdev __unused ) {
 	struct undi_device *undi = &preloaded_undi;
+	struct device *dev = &undibus_dev;
 
 	undinet_remove ( undi );
-	list_del ( &undi->dev.siblings );
+	list_del ( &dev->siblings );
 }
 
 /** UNDI bus root device driver */

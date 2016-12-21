@@ -21,31 +21,32 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
 #include <strings.h>
-#include <byteswap.h>
 #include <ipxe/malloc.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_smc.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
+#include "flexboot_nodnic.h"
 #include <ipxe/ethernet.h>
 #include <ipxe/if_ether.h>
+#include <usr/ifmgmt.h>
 #include <ipxe/in.h>
+#include <byteswap.h>
+#include "mlx_utils/include/public/mlx_pci_gw.h"
+#include <config/general.h>
 #include <ipxe/ipoib.h>
-#include "flexboot_nodnic.h"
+#include "mlx_nodnic/include/mlx_port.h"
 #include "nodnic_shomron_prm.h"
 #include "golan.h"
 #include "mlx_utils/include/public/mlx_bail.h"
 #include "mlx_utils/mlx_lib/mlx_link_speed/mlx_link_speed.h"
-#include "mlx_utils/mlx_lib/mlx_nvconfig/mlx_nvconfig.h"
-#include "mlx_utils/include/public/mlx_pci_gw.h"
-#include "mlx_nodnic/include/mlx_port.h"
 
+#define DEVICE_IS_CIB( device ) ( device == 0x1011 )
 /******************************************************************************/
 /************* Very simple memory management for umalloced pages **************/
 /******* Temporary solution until full memory management is implemented *******/
 /******************************************************************************/
-#define GOLAN_PAGES	20
 struct golan_page {
 	struct list_head list;
 	userptr_t addr;
@@ -61,8 +62,7 @@ static void golan_free_pages ( struct list_head *head ) {
 }
 
 static int golan_init_pages ( struct list_head *head ) {
-	struct golan_page *new_entry;
-	int rc, i;
+	int rc = 0;
 
 	if ( !head ) {
 		rc = -EINVAL;
@@ -70,26 +70,8 @@ static int golan_init_pages ( struct list_head *head ) {
 	}
 
 	INIT_LIST_HEAD ( head );
+	return rc;
 
-	for ( i = 0; i < GOLAN_PAGES; i++ ) {
-		new_entry = zalloc ( sizeof ( *new_entry ) );
-		if ( new_entry == NULL ) {
-			rc = -ENOMEM;
-			goto err_golan_init_pages_alloc_page;
-		}
-		new_entry->addr = umalloc ( GOLAN_PAGE_SIZE );
-		if ( new_entry->addr == UNULL ) {
-			free ( new_entry );
-			rc = -ENOMEM;
-			goto err_golan_init_pages_alloc_page;
-		}
-		list_add ( &new_entry->list, head );
-	}
-
-	return 0;
-
-err_golan_init_pages_alloc_page:
-	golan_free_pages ( head );
 err_golan_init_pages_bad_param:
 	return rc;
 }
@@ -98,16 +80,42 @@ static userptr_t golan_get_page ( struct list_head *head ) {
 	struct golan_page *page;
 	userptr_t addr;
 
-	if ( list_empty ( head ) )
-		return UNULL;
-
-	page = list_first_entry ( head, struct golan_page, list );
-	list_del ( &page->list );
-	addr = page->addr;
-	free ( page );
+	if ( list_empty ( head ) ) {
+		addr = umalloc ( GOLAN_PAGE_SIZE );
+		if ( addr == UNULL ) {
+			goto err_golan_iget_page_alloc_page;
+		}
+	} else {
+		page = list_first_entry ( head, struct golan_page, list );
+		list_del ( &page->list );
+		addr = page->addr;
+		free ( page );
+	}
+err_golan_iget_page_alloc_page:
 	return addr;
 }
 
+static int golan_return_page ( struct list_head *head,
+		userptr_t addr ) {
+	struct golan_page *new_entry;
+	int rc = 0;
+
+	if ( ! head ) {
+		rc = -EINVAL;
+		goto err_golan_return_page_bad_param;
+	}
+	new_entry = zalloc ( sizeof ( *new_entry ) );
+	if ( new_entry == NULL ) {
+		rc = -ENOMEM;
+		goto err_golan_return_page_alloc_page;
+	}
+	new_entry->addr = addr;
+	list_add_tail( &new_entry->list, head );
+
+err_golan_return_page_alloc_page:
+err_golan_return_page_bad_param:
+	return rc;
+}
 /******************************************************************************/
 
 const char *golan_qp_state_as_string[] = {
@@ -450,8 +458,8 @@ err_query_hca_cap:
 
 static inline int golan_take_pages ( struct golan *golan, uint32_t pages, __be16 func_id ) {
 	uint32_t out_num_entries = 0;
-	int size_ibox =  sizeof(struct golan_manage_pages_inbox);
-	int size_obox = sizeof(struct golan_manage_pages_outbox);
+	int size_ibox = 0;
+	int size_obox = 0;
 	int rc = 0;
 
 	DBGC(golan, "%s\n", __FUNCTION__);
@@ -463,8 +471,8 @@ static inline int golan_take_pages ( struct golan *golan, uint32_t pages, __be16
 		struct golan_manage_pages_inbox *in;
 		struct golan_manage_pages_outbox_data *out;
 
-		size_ibox += (pas_num * GOLAN_PAS_SIZE);
-		size_obox += (pas_num * GOLAN_PAS_SIZE);
+		size_ibox = sizeof(struct golan_manage_pages_inbox) + (pas_num * GOLAN_PAS_SIZE);
+		size_obox = sizeof(struct golan_manage_pages_outbox) + (pas_num * GOLAN_PAS_SIZE);
 
 		cmd = write_cmd(golan, MEM_CMD_IDX, GOLAN_CMD_OP_MANAGE_PAGES, GOLAN_PAGES_TAKE,
 				MEM_MBOX, MEM_MBOX,
@@ -480,7 +488,7 @@ static inline int golan_take_pages ( struct golan *golan, uint32_t pages, __be16
 			out = (struct golan_manage_pages_outbox_data *)GET_OUTBOX(golan, MEM_MBOX);
 			out_num_entries = be32_to_cpu(((struct golan_manage_pages_outbox *)(cmd->out))->num_entries);
 			for (i = 0; i < out_num_entries; ++i) {
-				ufree(BE64_BUS_2_USR(out->pas[i]));
+				golan_return_page ( &golan->pages, ( BE64_BUS_2_USR( out->pas[i] ) ) );
 			}
 		} else {
 			if ( rc == -EBUSY ) {
@@ -503,8 +511,8 @@ static inline int golan_take_pages ( struct golan *golan, uint32_t pages, __be16
 
 static inline int golan_provide_pages ( struct golan *golan , uint32_t pages, __be16 func_id ) {
 	struct mbox *mailbox;
-	int size_ibox =  sizeof(struct golan_manage_pages_inbox);
-	int size_obox = sizeof(struct golan_manage_pages_outbox);
+	int size_ibox = 0;
+	int size_obox = 0;
 	int rc = 0;
 
 	DBGC(golan, "%s\n", __FUNCTION__);
@@ -517,8 +525,8 @@ static inline int golan_provide_pages ( struct golan *golan , uint32_t pages, __
 		userptr_t addr = 0;
 
 		mailbox = GET_INBOX(golan, MEM_MBOX);
-		size_ibox += (pas_num * GOLAN_PAS_SIZE);
-		size_obox += (pas_num * GOLAN_PAS_SIZE);
+		size_ibox = sizeof(struct golan_manage_pages_inbox) + (pas_num * GOLAN_PAS_SIZE);
+		size_obox = sizeof(struct golan_manage_pages_outbox) + (pas_num * GOLAN_PAS_SIZE);
 
 		cmd = write_cmd(golan, MEM_CMD_IDX, GOLAN_CMD_OP_MANAGE_PAGES, GOLAN_PAGES_GIVE,
 				MEM_MBOX, MEM_MBOX,
@@ -531,7 +539,7 @@ static inline int golan_provide_pages ( struct golan *golan , uint32_t pages, __
 		in->num_entries = cpu_to_be32(pas_num);
 
 		for ( i = 0 , j = MANAGE_PAGES_PSA_OFFSET; i < pas_num; ++i ,++j ) {
-			if (!(addr = umalloc(GOLAN_PAGE_SIZE))) {
+			if ( ! ( addr = golan_get_page ( & golan->pages ) ) ) {
 				rc = -ENOMEM;
 				DBGC (golan ,"Couldnt allocated page \n");
 				goto malloc_dma_failed;
@@ -555,7 +563,7 @@ static inline int golan_provide_pages ( struct golan *golan , uint32_t pages, __
 						get_cmd( golan , MEM_CMD_IDX )->status_own,
 						be32_to_cpu(CMD_SYND(golan, MEM_CMD_IDX)), pas_num);
 			}
-			ufree ( addr );
+			golan_return_page ( &golan->pages ,addr );
 			goto err_send_command;
 		}
 	}
@@ -834,7 +842,7 @@ static int golan_create_eq(struct golan *golan)
 	return 0;
 
 err_create_eq_cmd:
-	ufree(virt_to_user(golan->eq.eqes));
+	golan_return_page ( & golan->pages, virt_to_user ( eq->eqes ) );
 err_create_eq_eqe_alloc:
 	DBGC (golan ,"%s [%d] out\n", __FUNCTION__, rc);
 	return rc;
@@ -859,7 +867,7 @@ static void golan_destory_eq(struct golan *golan)
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX, __FUNCTION__);
 	GOLAN_PRINT_RC_AND_CMD_STATUS;
 
-	ufree(virt_to_user(golan->eq.eqes));
+	golan_return_page ( &golan->pages, virt_to_user ( golan->eq.eqes ) );
 	golan->eq.eqn = 0;
 
 	DBGC( golan, "%s Event queue (0x%x) was destroyed\n", __FUNCTION__, eqn);
@@ -1063,7 +1071,7 @@ static int golan_create_cq(struct ib_device *ibdev,
 	return 0;
 
 err_create_cq_cmd:
-	ufree(virt_to_user(golan_cq->cqes));
+	golan_return_page ( & golan->pages, virt_to_user ( golan_cq->cqes ) );
 err_create_cq_cqe_alloc:
 	free_dma(golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE);
 err_create_cq_db_alloc:
@@ -1100,7 +1108,7 @@ static void golan_destroy_cq(struct ib_device *ibdev,
 	cq->cqn = 0;
 
 	ib_cq_set_drvdata(cq, NULL);
-	ufree(virt_to_user(golan_cq->cqes));
+	golan_return_page ( & golan->pages, virt_to_user ( golan_cq->cqes ) );
 	free_dma(golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE);
 	free(golan_cq);
 
@@ -1272,7 +1280,7 @@ static int golan_create_qp_aux(struct ib_device *ibdev,
 err_create_qp_cmd:
 	free_dma(golan_qp->doorbell_record, sizeof(struct golan_qp_db));
 err_create_qp_db_alloc:
-	ufree((userptr_t)golan_qp->wqes);
+	golan_return_page ( & golan->pages, ( userptr_t ) golan_qp->wqes );
 err_create_qp_wqe_alloc:
 err_create_qp_sq_size:
 err_create_qp_sq_wqe_size:
@@ -1326,7 +1334,7 @@ static int golan_modify_qp_rst_to_init(struct ib_device *ibdev,
 
 	in->ctx.pri_path.port		= ibdev->port;
 	in->ctx.flags			|= cpu_to_be32(GOLAN_QP_PM_MIGRATED << GOLAN_QP_CTX_PM_STATE_BIT);
-	in->ctx.pri_path.pkey_index	= 0; /* default index */
+	in->ctx.pri_path.pkey_index	= 0;
 	/* QK is 0 */
 	/* QP cntr set 0 */
 	return rc;
@@ -1480,7 +1488,7 @@ static void golan_destroy_qp(struct ib_device *ibdev,
 
 	ib_qp_set_drvdata(qp, NULL);
 	free_dma(golan_qp->doorbell_record, sizeof(struct golan_qp_db));
-	ufree((userptr_t)golan_qp->wqes);
+	golan_return_page ( & golan->pages, ( userptr_t ) golan_qp->wqes );
 	free(golan_qp);
 
 	DBGC( golan ,"%s QP 0x%lx was destroyed\n", __FUNCTION__, qpn);
@@ -1694,8 +1702,8 @@ err_query_vport_gid_cmd:
 static int golan_query_vport_pkey ( struct ib_device *ibdev ) {
 	struct golan *golan = ib_get_drvdata ( ibdev );
 	struct golan_cmd_layout	*cmd;
-	struct golan_query_hca_vport_pkey_inbox *in;
 	//struct golan_query_hca_vport_pkey_data *pkey_table;
+	struct golan_query_hca_vport_pkey_inbox *in;
 	int pkey_table_size_in_entries = (1 << (7 + golan->caps.pkey_table_size));
 	int rc;
 
@@ -2244,26 +2252,24 @@ static inline void golan_bring_down(struct golan *golan)
 }
 
 static int golan_set_link_speed ( struct golan *golan ){
-	mlx_utils utils;
 	mlx_status status;
 	int i = 0;
+	int utils_inited = 0;
 
-	memset ( &utils, 0, sizeof ( utils ) );
-
-	status = mlx_utils_init ( &utils, golan->pci );
-	MLX_CHECK_STATUS ( golan->pci, status, utils_init_err, "mlx_utils_init failed" );
-
-	status = mlx_pci_gw_init ( &utils );
-	MLX_CHECK_STATUS ( golan->pci, status, pci_gw_init_err, "mlx_pci_gw_init failed" );
+	if ( ! golan->utils ) {
+		utils_inited = 1;
+		status = init_mlx_utils ( & golan->utils, golan->pci );
+		MLX_CHECK_STATUS ( golan->pci, status, utils_init_err, "mlx_utils_init failed" );
+	}
 
 	for ( i = 0; i < golan->caps.num_ports; ++i ) {
-		status = mlx_set_link_speed( &utils, i + 1, LINK_SPEED_IB, LINK_SPEED_SDR );
+		status = mlx_set_link_speed ( golan->utils, i + 1, LINK_SPEED_IB, LINK_SPEED_SDR );
 		MLX_CHECK_STATUS ( golan->pci, status, set_link_speed_err, "mlx_set_link_speed failed" );
 	}
 
 set_link_speed_err:
-	mlx_pci_gw_teardown( &utils );
-pci_gw_init_err:
+if ( utils_inited )
+	free_mlx_utils ( & golan->utils );
 utils_init_err:
 	return status;
 }
@@ -2344,7 +2350,16 @@ out:
  *
  * @v ibdev		Infiniband device
  */
-static void golan_ib_close ( struct ib_device *ibdev __unused ) {}
+static void golan_ib_close ( struct ib_device *ibdev ) {
+	struct golan *golan = NULL;
+
+	DBG ( "%s start\n", __FUNCTION__ );
+	if ( ! ibdev )
+		return;
+	golan = ib_get_drvdata ( ibdev );
+	golan_bring_down ( golan );
+	DBG ( "%s end\n", __FUNCTION__ );
+}
 
 /**
  * Initialise Infiniband link
@@ -2353,11 +2368,13 @@ static void golan_ib_close ( struct ib_device *ibdev __unused ) {}
  * @ret rc		Return status code
  */
 static int golan_ib_open ( struct ib_device *ibdev ) {
+	struct golan *golan = NULL;
 	DBG ( "%s start\n", __FUNCTION__ );
 
 	if ( ! ibdev )
 		return -EINVAL;
-
+	golan = ib_get_drvdata ( ibdev );
+	golan_bring_up ( golan );
 	golan_ib_update ( ibdev );
 
 	DBG ( "%s end\n", __FUNCTION__ );
@@ -2417,6 +2434,12 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 		goto err_golan_bringup;
 	}
 
+	if ( ! DEVICE_IS_CIB ( pci->device ) ) {
+		if ( init_mlx_utils ( & golan->utils, pci ) ) {
+			rc = -1;
+			goto err_utils_init;
+		}
+	}
 	/* Allocate Infiniband devices */
 	for (i = 0; i < golan->caps.num_ports; ++i) {
 		ibdev = alloc_ibdev( 0 );
@@ -2435,9 +2458,12 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 	/* Register devices */
 	for ( i = 0; i < golan->caps.num_ports; ++i ) {
 		port = &golan->ports[i];
-		if ((rc = golan_register_ibdev ( port ) ) != 0 )
+		if ((rc = golan_register_ibdev ( port ) ) != 0 ) {
 			goto err_golan_probe_register_ibdev;
+		}
 	}
+
+	golan_bring_down ( golan );
 
 	return 0;
 
@@ -2450,7 +2476,10 @@ err_golan_probe_register_ibdev:
 err_golan_probe_alloc_ibdev:
 	for ( i-- ; ( signed int ) i >= 0 ; i-- )
 		ibdev_put ( golan->ports[i].ibdev );
-
+	if ( ! DEVICE_IS_CIB ( pci->device ) ) {
+		free_mlx_utils ( & golan->utils );
+	}
+err_utils_init:
 	golan_bring_down ( golan );
 err_golan_bringup:
 err_fw_ver_cmdif:
@@ -2476,13 +2505,13 @@ static void golan_remove_normal ( struct pci_device *pci ) {
 	}
 	for ( i = ( golan->caps.num_ports - 1 ) ; i >= 0 ; i-- ) {
 		netdev_nullify ( golan->ports[i].netdev );
-		netdev_put ( golan->ports[i].netdev );
 	}
 	for ( i = ( golan->caps.num_ports - 1 ) ; i >= 0 ; i-- ) {
 		ibdev_put ( golan->ports[i].ibdev );
 	}
-
-	golan_bring_down(golan);
+	if ( ! DEVICE_IS_CIB ( pci->device ) ) {
+		free_mlx_utils ( & golan->utils );
+	}
 	iounmap( golan->iseg );
 	golan_free_pages( &golan->pages );
 	free(golan);
@@ -2491,6 +2520,26 @@ static void golan_remove_normal ( struct pci_device *pci ) {
 /***************************************************************************
  * NODNIC operations
  **************************************************************************/
+static mlx_status shomron_tx_uar_send_db ( struct ib_device *ibdev,
+		struct nodnic_send_wqbb *wqbb ) {
+	mlx_status status = MLX_SUCCESS;
+	struct flexboot_nodnic *flexboot_nodnic = ib_get_drvdata ( ibdev );
+	struct shomron_nodnic_eth_send_wqe *eth_wqe =
+			( struct shomron_nodnic_eth_send_wqe * )wqbb;
+	struct shomronprm_wqe_segment_ctrl_send *ctrl;
+
+	if ( ! ibdev || ! eth_wqe || ! flexboot_nodnic->device_priv.uar.virt ) {
+		DBG("%s: Invalid parameters\n",__FUNCTION__);
+		status = MLX_FAILED;
+		goto err;
+	}
+	wmb();
+	ctrl = & eth_wqe->ctrl;
+	writeq(*((__be64 *)ctrl), flexboot_nodnic->device_priv.uar.virt + 0x800);
+err:
+	return status;
+}
+
 static mlx_status shomron_fill_eth_send_wqe ( struct ib_device *ibdev,
 			   struct ib_queue_pair *qp, struct ib_address_vector *av __unused,
 			   struct io_buffer *iobuf, struct nodnic_send_wqbb *wqbb,
@@ -2599,12 +2648,13 @@ struct flexboot_nodnic_callbacks shomron_nodnic_callbacks = {
 	.fill_completion = shomron_fill_completion,
 	.cqe_set_owner = shomron_cqe_set_owner,
 	.irq = flexboot_nodnic_eth_irq,
+	.tx_uar_send_doorbell_fn = shomron_tx_uar_send_db,
 };
 
 static int shomron_nodnic_supported = 0;
 
 static int shomron_nodnic_is_supported ( struct pci_device *pci ) {
-	if ( pci->device == 0x1011 )
+	if ( DEVICE_IS_CIB ( pci->device ) )
 		return 0;
 
 	return flexboot_nodnic_is_supported ( pci );
@@ -2624,15 +2674,9 @@ static int golan_probe ( struct pci_device *pci ) {
 
 	shomron_nodnic_supported = shomron_nodnic_is_supported ( pci );
 	if ( shomron_nodnic_supported ) {
+		DBG ( "%s: Using NODNIC driver\n", __FUNCTION__ );
 		rc = flexboot_nodnic_probe ( pci, &shomron_nodnic_callbacks, NULL );
-		if ( rc == 0 ) {
-			DBG ( "%s: Using NODNIC driver\n", __FUNCTION__ );
-			goto probe_done;
-		}
-		shomron_nodnic_supported = 0;
-	}
-
-	if ( ! shomron_nodnic_supported ) {
+	} else {
 		DBG ( "%s: Using normal driver\n", __FUNCTION__ );
 		rc = golan_probe_normal ( pci );
 	}
@@ -2662,6 +2706,8 @@ static struct pci_device_id golan_nics[] = {
 	PCI_ROM ( 0x15b3, 0x1011, "ConnectIB", "ConnectIB HCA driver: DevID 4113", 0 ),
 	PCI_ROM ( 0x15b3, 0x1013, "ConnectX-4", "ConnectX-4 HCA driver, DevID 4115", 0 ),
 	PCI_ROM ( 0x15b3, 0x1015, "ConnectX-4Lx", "ConnectX-4Lx HCA driver, DevID 4117", 0 ),
+	PCI_ROM ( 0x15b3, 0x1017, "ConnectX-5", "ConnectX-5 HCA driver, DevID 4119", 0 ),
+	PCI_ROM ( 0x15b3, 0x1019, "ConnectX-5EX", "ConnectX-5EX HCA driver, DevID 4121", 0 ),
 };
 
 struct pci_driver golan_driver __pci_driver = {

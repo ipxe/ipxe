@@ -598,19 +598,19 @@ static const struct undinet_irq_broken undinet_irq_broken_list[] = {
 /**
  * Check for devices with broken support for generating interrupts
  *
- * @v undi		UNDI device
+ * @v desc		Device description
  * @ret irq_is_broken	Interrupt support is broken; no interrupts are generated
  */
-static int undinet_irq_is_broken ( struct undi_device *undi ) {
+static int undinet_irq_is_broken ( struct device_description *desc ) {
 	const struct undinet_irq_broken *broken;
 	unsigned int i;
 
 	for ( i = 0 ; i < ( sizeof ( undinet_irq_broken_list ) /
 			    sizeof ( undinet_irq_broken_list[0] ) ) ; i++ ) {
 		broken = &undinet_irq_broken_list[i];
-		if ( ( undi->dev.desc.bus_type == BUS_TYPE_PCI ) &&
-		     ( undi->dev.desc.vendor == broken->pci_vendor ) &&
-		     ( undi->dev.desc.device == broken->pci_device ) ) {
+		if ( ( desc->bus_type == BUS_TYPE_PCI ) &&
+		     ( desc->vendor == broken->pci_vendor ) &&
+		     ( desc->device == broken->pci_device ) ) {
 			return 1;
 		}
 	}
@@ -621,9 +621,10 @@ static int undinet_irq_is_broken ( struct undi_device *undi ) {
  * Probe UNDI device
  *
  * @v undi		UNDI device
+ * @v dev		Underlying generic device
  * @ret rc		Return status code
  */
-int undinet_probe ( struct undi_device *undi ) {
+int undinet_probe ( struct undi_device *undi, struct device *dev ) {
 	struct net_device *netdev;
 	struct undi_nic *undinic;
 	struct s_PXENV_START_UNDI start_undi;
@@ -644,7 +645,7 @@ int undinet_probe ( struct undi_device *undi ) {
 	netdev_init ( netdev, &undinet_operations );
 	undinic = netdev->priv;
 	undi_set_drvdata ( undi, netdev );
-	netdev->dev = &undi->dev;
+	netdev->dev = dev;
 	memset ( undinic, 0, sizeof ( *undinic ) );
 	undinet_entry = undi->entry;
 	DBGC ( undinic, "UNDINIC %p using UNDI %p\n", undinic, undi );
@@ -733,7 +734,7 @@ int undinet_probe ( struct undi_device *undi ) {
 		       undinic );
 		undinic->hacks |= UNDI_HACK_EB54;
 	}
-	if ( undinet_irq_is_broken ( undi ) ) {
+	if ( undinet_irq_is_broken ( &dev->desc ) ) {
 		DBGC ( undinic, "UNDINIC %p forcing polling mode due to "
 		       "broken interrupts\n", undinic );
 		undinic->irq_supported = 0;

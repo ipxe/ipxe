@@ -47,6 +47,9 @@ typedef enum {
 #ifdef DEVICE_CX3
 	nodnic_port_option_crspace_en,
 #endif
+	nodnic_port_option_send_ring0_uar_index,
+	nodnic_port_option_send_ring1_uar_index,
+	nodnic_port_option_cq_n_index,
 }nodnic_port_option;
 
 struct nodnic_port_data_entry{
@@ -226,4 +229,14 @@ nodnic_port_read_port_management_change_event(
 						IN nodnic_port_priv		*port_priv,
 						OUT mlx_boolean			*change_event
 						);
+mlx_status
+nodnic_port_set_send_uar_offset(
+		IN  nodnic_port_priv	*port_priv
+		);
+
+mlx_status
+nodnic_port_update_tx_db_func(
+		IN nodnic_device_priv	*device_priv,
+		IN nodnic_port_priv		*port_priv
+		);
 #endif /* STUB_NODNIC_PORT_H_ */

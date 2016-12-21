@@ -107,6 +107,22 @@ struct nvconfig_nvda {
 	mlx_uint8 data[NVCONFIG_MAX_TLV_SIZE];
 };
 
+struct nv_conf_cap {
+	/** WOL En/Dis **/
+	mlx_uint8	wol_en;
+	/** VPI En/Dis **/
+	mlx_uint8	vpi_en;
+};
+
+struct mlx_nvconfig_virt_net_addr {
+		mlx_uint32	reserved1		:29;
+		mlx_uint32	erase_on_powerup:1;
+		mlx_uint32	reserverd2		:1;
+		mlx_uint32 	virtual_mac_en 	:1;
+		mlx_uint32	virtual_mac_high;
+		mlx_uint32	virtual_mac_low;
+};
+
 
 mlx_status
 nvconfig_query_capability(

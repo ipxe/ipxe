@@ -94,23 +94,14 @@ static int undipci_probe ( struct pci_device *pci ) {
 		}
 	}
 
-	/* Add to device hierarchy */
-	snprintf ( undi->dev.name, sizeof ( undi->dev.name ),
-		   "UNDI-%s", pci->dev.name );
-	memcpy ( &undi->dev.desc, &pci->dev.desc, sizeof ( undi->dev.desc ) );
-	undi->dev.parent = &pci->dev;
-	INIT_LIST_HEAD ( &undi->dev.children );
-	list_add ( &undi->dev.siblings, &pci->dev.children );
-
 	/* Create network device */
-	if ( ( rc = undinet_probe ( undi ) ) != 0 )
+	if ( ( rc = undinet_probe ( undi, &pci->dev ) ) != 0 )
 		goto err_undinet_probe;
 	
 	return 0;
 
  err_undinet_probe:
 	undi_unload ( undi );
-	list_del ( &undi->dev.siblings );
  err_find_rom:
  err_load_pci:
 	free ( undi );
@@ -128,7 +119,6 @@ static void undipci_remove ( struct pci_device *pci ) {
 
 	undinet_remove ( undi );
 	undi_unload ( undi );
-	list_del ( &undi->dev.siblings );
 	free ( undi );
 	pci_set_drvdata ( pci, NULL );
 }

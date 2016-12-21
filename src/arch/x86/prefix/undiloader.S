@@ -35,7 +35,8 @@ undiloader:
 	movw	%es:12(%di), %bx
 	movw	%es:14(%di), %ax
 	movl	image_source, %esi
-	movl	decompress_to, %edi
+	call	undiloader_source
+	xorl	%edi, %edi
 	orl	$0xffffffff, %ebp	/* Allow arbitrary relocation */
 	call	install_prealloc
 	popw	%di
@@ -57,3 +58,16 @@ undiloader:
 	popl	%edi
 	popl	%esi
 	lret
+
+/* Update image source address for UNDI loader
+ *
+ * Parameters:
+ *   %esi : Image source address
+ * Returns:
+ *   %esi : Image source address
+ */
+	.section ".prefix", "ax", @progbits
+	.globl	undiloader_source
+	.weak	undiloader_source
+undiloader_source:
+	ret

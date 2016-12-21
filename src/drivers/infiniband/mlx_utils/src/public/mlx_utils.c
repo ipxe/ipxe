@@ -20,10 +20,10 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
+
 #include "../../include/private/mlx_utils_priv.h"
 #include "../../include/public/mlx_pci.h"
 #include "../../include/public/mlx_utils.h"
-
 mlx_status
 mlx_utils_init(
 				IN mlx_utils *utils,
@@ -44,11 +44,12 @@ bail:
 
 mlx_status
 mlx_utils_teardown(
-				IN mlx_utils *utils __attribute__ ((unused))
+				IN mlx_utils *utils
 				)
 {
 	mlx_status status = MLX_SUCCESS;
 	mlx_utils_free_lock(utils);
+	mlx_pci_teardown(utils);
 	return status;
 }
 

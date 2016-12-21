@@ -86,13 +86,13 @@ nvconfig_get_boot_ext_default_conf(
 			"TLV not found. Using hard-coded defaults ");
 	port_conf_def->linkup_timeout = nic_boot_ext_conf->linkup_timeout;
 	port_conf_def->ip_ver = nic_boot_ext_conf->ip_ver;
-
+	port_conf_def->undi_network_wait_to = nic_boot_ext_conf->undi_network_wait_to;
 	return MLX_SUCCESS;
 
 nvdata_access_err:
 	port_conf_def->linkup_timeout = DEFAULT_BOOT_LINK_UP_TO;
 	port_conf_def->ip_ver = DEFAULT_BOOT_IP_VER;
-
+	port_conf_def->undi_network_wait_to = DEFAULT_BOOT_UNDI_NETWORK_WAIT_TO;
 	return status;
 }
 
@@ -185,8 +185,12 @@ nvconfig_get_iscsi_gen_default_conf(
 	port_conf_def->iscsi_chap_auth_en = iscsi_gen->chap_auth_en;
 	port_conf_def->iscsi_lun_busy_retry_count = iscsi_gen->lun_busy_retry_count;
 	port_conf_def->iscsi_link_up_delay_time = iscsi_gen->link_up_delay_time;
+	port_conf_def->iscsi_drive_num = iscsi_gen->drive_num;
+
+	return MLX_SUCCESS;
 
 nvdata_access_err:
+	port_conf_def->iscsi_drive_num = DEFAULT_ISCSI_DRIVE_NUM;
 	return status;
 }
 
@@ -327,6 +331,27 @@ nvdata_access_err:
 	return status;
 }
 
+static
+mlx_status
+nvconfig_get_rom_cap_default_conf( IN void *data,
+		IN int status, OUT void *def_struct) {
+	union mlx_nvconfig_rom_cap_conf *rom_cap_conf =
+			(union mlx_nvconfig_rom_cap_conf *) data;
+	struct mlx_nvconfig_conf_defaults *conf_def =
+			(struct mlx_nvconfig_conf_defaults *) def_struct;
+
+	MLX_CHECK_STATUS(NULL, status, nvdata_access_err,
+			"TLV not found. Using hard-coded defaults ");
+	conf_def->boot_ip_ver_en = rom_cap_conf->boot_ip_ver_en;
+
+	return MLX_SUCCESS;
+
+nvdata_access_err:
+	rom_cap_conf->boot_ip_ver_en = DEFAULT_BOOT_IP_VERSION_EN;
+
+	return status;
+}
+
 static struct tlv_default tlv_port_defaults[] = {
 	TlvDefaultEntry(BOOT_SETTINGS_TYPE, union mlx_nvconfig_nic_boot_conf, &nvconfig_get_boot_default_conf),
 	TlvDefaultEntry(BOOT_SETTINGS_EXT_TYPE, union mlx_nvconfig_nic_boot_ext_conf, &nvconfig_get_boot_ext_default_conf),
@@ -343,6 +368,7 @@ static struct tlv_default tlv_general_defaults[] = {
 	TlvDefaultEntry(GLOPAL_PCI_CAPS_TYPE, union mlx_nvconfig_virt_caps, &nvconfig_get_nv_virt_caps_default_conf),
 	TlvDefaultEntry(GLOPAL_PCI_SETTINGS_TYPE, union mlx_nvconfig_virt_conf, &nvconfig_get_nv_virt_default_conf),
 	TlvDefaultEntry(OCSD_OCBB_TYPE, union mlx_nvconfig_ocsd_ocbb_conf, &nvconfig_get_ocsd_ocbb_default_conf),
+	TlvDefaultEntry(NV_ROM_CAP_TYPE, union mlx_nvconfig_rom_cap_conf, &nvconfig_get_rom_cap_default_conf),
 };
 
 static
