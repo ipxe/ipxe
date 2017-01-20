@@ -108,3 +108,42 @@ void * linux_mremap ( void *old_address, __kernel_size_t old_size,
 int linux_munmap ( void *addr, __kernel_size_t length ) {
 	return linux_syscall ( __NR_munmap, addr, length );
 }
+
+int linux_socket ( int domain, int type_, int protocol ) {
+#ifdef __NR_socket
+	return linux_syscall ( __NR_socket, domain, type_, protocol );
+#else
+#ifndef SOCKOP_socket
+# define SOCKOP_socket 1
+#endif
+	unsigned long sc_args[] = { domain, type_, protocol };
+	return linux_syscall ( __NR_socketcall, SOCKOP_socket, sc_args );
+#endif
+}
+
+int linux_bind ( int fd, const struct sockaddr *addr, socklen_t addrlen ) {
+#ifdef __NR_bind
+	return linux_syscall ( __NR_bind, fd, addr, addrlen );
+#else
+#ifndef SOCKOP_bind
+# define SOCKOP_bind 2
+#endif
+	unsigned long sc_args[] = { fd, (unsigned long)addr, addrlen };
+	return linux_syscall ( __NR_socketcall, SOCKOP_bind, sc_args );
+#endif
+}
+
+ssize_t linux_sendto ( int fd, const void *buf, size_t len, int flags,
+		       const struct sockaddr *daddr, socklen_t addrlen ) {
+#ifdef __NR_sendto
+	return linux_syscall ( __NR_sendto, fd, buf, len, flags,
+			       daddr, addrlen );
+#else
+#ifndef SOCKOP_sendto
+# define SOCKOP_sendto 11
+#endif
+	unsigned long sc_args[] = { fd, (unsigned long)buf, len,
+				    flags, (unsigned long)daddr, addrlen };
+	return linux_syscall ( __NR_socketcall, SOCKOP_sendto, sc_args );
+#endif
+}
