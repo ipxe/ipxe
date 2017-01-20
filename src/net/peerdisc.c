@@ -408,7 +408,7 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 	} random_uuid;
 	size_t uuid_len;
 	size_t id_len;
-	char *uuid;
+	const char *uuid;
 	char *uuid_copy;
 	char *id_copy;
 	unsigned int i;
