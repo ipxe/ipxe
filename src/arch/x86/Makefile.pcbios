@@ -120,6 +120,11 @@ NON_AUTO_MEDIA	+= usb
 	$(QM)$(ECHO) "  [FINISH] $@"
 	$(Q)cat $^ > $@
 
+NON_AUTO_MEDIA	+= vhd
+%vhd: %usb
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(QEMUIMG) convert -f raw -O vpc $< $@
+
 # Padded floppy image (e.g. for iLO)
 NON_AUTO_MEDIA += pdsk
 %pdsk : %dsk

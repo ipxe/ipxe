@@ -53,6 +53,7 @@ EINFO		:= ./util/einfo
 GENKEYMAP	:= ./util/genkeymap.pl
 DOXYGEN		:= doxygen
 LCAB		:= lcab
+QEMUIMG		:= qemu-img
 
 ###############################################################################
 #
