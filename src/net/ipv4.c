@@ -552,6 +552,7 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 
 	/* Discard unicast packets not destined for us */
 	if ( ( ! ( flags & LL_MULTICAST ) ) &&
+	     ( iphdr->dest.s_addr != INADDR_BROADCAST ) &&
 	     ipv4_has_any_addr ( netdev ) &&
 	     ( ! ipv4_has_addr ( netdev, iphdr->dest ) ) ) {
 		DBGC ( iphdr->src, "IPv4 discarding non-local unicast packet "
