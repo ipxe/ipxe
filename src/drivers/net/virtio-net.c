@@ -104,8 +104,8 @@ struct virtnet_nic {
 	/** Pending rx packet count */
 	unsigned int rx_num_iobufs;
 
-	/** Virtio net packet header, we only need one */
-	struct virtio_net_hdr_modern empty_header;
+	/** Virtio net dummy packet headers */
+	struct virtio_net_hdr_modern empty_header[QUEUE_NB];
 };
 
 /** Add an iobuf to a virtqueue
@@ -120,19 +120,24 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
 				  int vq_idx, struct io_buffer *iobuf ) {
 	struct virtnet_nic *virtnet = netdev->priv;
 	struct vring_virtqueue *vq = &virtnet->virtqueue[vq_idx];
+	struct virtio_net_hdr_modern *header = &virtnet->empty_header[vq_idx];
 	unsigned int out = ( vq_idx == TX_INDEX ) ? 2 : 0;
 	unsigned int in = ( vq_idx == TX_INDEX ) ? 0 : 2;
-	size_t header_len = virtnet->virtio_version
-		? sizeof ( virtnet->empty_header )
-		: sizeof ( virtnet->empty_header.legacy );
+	size_t header_len = ( virtnet->virtio_version ?
+			      sizeof ( *header ) : sizeof ( header->legacy ) );
 	struct vring_list list[] = {
 		{
 			/* Share a single zeroed virtio net header between all
-			 * rx and tx packets.  This works because this driver
+			 * packets in a ring.  This works because this driver
 			 * does not use any advanced features so none of the
 			 * header fields get used.
+			 *
+			 * Some host implementations (notably Google Compute
+			 * Platform) are known to unconditionally write back
+			 * to header->flags for received packets.  Work around
+			 * this by using separate RX and TX headers.
 			 */
-			.addr = ( char* ) &virtnet->empty_header,
+			.addr = ( char* ) header,
 			.length = header_len,
 		},
 		{
