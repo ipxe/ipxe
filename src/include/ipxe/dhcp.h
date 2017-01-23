@@ -83,6 +83,9 @@ struct dhcp_packet;
 /** Root path */
 #define DHCP_ROOT_PATH 17
 
+/** Maximum transmission unit */
+#define DHCP_MTU 26
+
 /** Vendor encapsulated options */
 #define DHCP_VENDOR_ENCAP 43
 

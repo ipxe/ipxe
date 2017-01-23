@@ -70,6 +70,12 @@ const struct setting ifname_setting __setting ( SETTING_NETDEV, ifname ) = {
 	.description = "Interface name",
 	.type = &setting_type_string,
 };
+const struct setting mtu_setting __setting ( SETTING_NETDEV, mtu ) = {
+	.name = "mtu",
+	.description = "MTU",
+	.type = &setting_type_int16,
+	.tag = DHCP_MTU,
+};
 
 /**
  * Store MAC address setting
@@ -376,4 +382,59 @@ static void netdev_redirect_settings_init ( void ) {
 /** "netX" settings initialiser */
 struct init_fn netdev_redirect_settings_init_fn __init_fn ( INIT_LATE ) = {
 	.initialise = netdev_redirect_settings_init,
+};
+
+/**
+ * Apply network device settings
+ *
+ * @ret rc		Return status code
+ */
+static int apply_netdev_settings ( void ) {
+	struct net_device *netdev;
+	struct settings *settings;
+	struct ll_protocol *ll_protocol;
+	size_t old_max_pkt_len;
+	size_t mtu;
+	int rc;
+
+	/* Process settings for each network device */
+	for_each_netdev ( netdev ) {
+
+		/* Get network device settings */
+		settings = netdev_settings ( netdev );
+
+		/* Get MTU */
+		mtu = fetch_uintz_setting ( settings, &mtu_setting );
+
+		/* Do nothing unless MTU is specified */
+		if ( ! mtu )
+			continue;
+
+		/* Update maximum packet length */
+		ll_protocol = netdev->ll_protocol;
+		old_max_pkt_len = netdev->max_pkt_len;
+		netdev->max_pkt_len = ( mtu + ll_protocol->ll_header_len );
+		if ( netdev->max_pkt_len != old_max_pkt_len ) {
+			DBGC ( netdev, "NETDEV %s MTU is %zd\n",
+			       netdev->name, mtu );
+		}
+
+		/* Close and reopen network device if MTU has increased */
+		if ( netdev_is_open ( netdev ) &&
+		     ( netdev->max_pkt_len > old_max_pkt_len ) ) {
+			netdev_close ( netdev );
+			if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
+				DBGC ( netdev, "NETDEV %s could not reopen: "
+				       "%s\n", netdev->name, strerror ( rc ) );
+				return rc;
+			}
+		}
+	}
+
+	return 0;
+}
+
+/** Network device settings applicator */
+struct settings_applicator netdev_applicator __settings_applicator = {
+	.apply = apply_netdev_settings,
 };
