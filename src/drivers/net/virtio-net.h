@@ -4,6 +4,7 @@
 /* The feature bitmap for virtio net */
 #define VIRTIO_NET_F_CSUM       0       /* Host handles pkts w/ partial csum */
 #define VIRTIO_NET_F_GUEST_CSUM 1       /* Guest handles pkts w/ partial csum */
+#define VIRTIO_NET_F_MTU        3       /* Initial MTU advice */
 #define VIRTIO_NET_F_MAC        5       /* Host has given MAC address. */
 #define VIRTIO_NET_F_GSO        6       /* Host handles pkts w/ any GSO type */
 #define VIRTIO_NET_F_GUEST_TSO4 7       /* Guest can handle TSOv4 in. */
@@ -25,6 +26,15 @@ struct virtio_net_config
 {
    /* The config defining mac address (if VIRTIO_NET_F_MAC) */
    u8 mac[6];
+   /* See VIRTIO_NET_F_STATUS and VIRTIO_NET_S_* above */
+   u16 status;
+   /* Maximum number of each of transmit and receive queues;
+    * see VIRTIO_NET_F_MQ and VIRTIO_NET_CTRL_MQ.
+    * Legal values are between 1 and 0x8000
+    */
+   u16 max_virtqueue_pairs;
+   /* Default maximum transmit unit advice */
+   u16 mtu;
 } __attribute__((packed));
 
 /* This is the first element of the scatter-gather list.  If you don't
