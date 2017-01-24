@@ -90,12 +90,12 @@ static int vmbus_post_empty_message ( struct hv_hypervisor *hv,
 }
 
 /**
- * Wait for received message
+ * Wait for received message of any type
  *
  * @v hv		Hyper-V hypervisor
  * @ret rc		Return status code
  */
-static int vmbus_wait_for_message ( struct hv_hypervisor *hv ) {
+static int vmbus_wait_for_any_message ( struct hv_hypervisor *hv ) {
 	struct vmbus *vmbus = hv->vmbus;
 	int rc;
 
@@ -114,6 +114,38 @@ static int vmbus_wait_for_message ( struct hv_hypervisor *hv ) {
 	}
 
 	return 0;
+}
+
+/**
+ * Wait for received message of a specified type, ignoring any others
+ *
+ * @v hv		Hyper-V hypervisor
+ * @v type		Message type
+ * @ret rc		Return status code
+ */
+static int vmbus_wait_for_message ( struct hv_hypervisor *hv,
+				    unsigned int type ) {
+	struct vmbus *vmbus = hv->vmbus;
+	const struct vmbus_message_header *header = &vmbus->message->header;
+	int rc;
+
+	/* Loop until specified message arrives, or until an error occurs */
+	while ( 1 ) {
+
+		/* Wait for message */
+		if ( ( rc = vmbus_wait_for_any_message ( hv ) ) != 0 )
+			return rc;
+
+		/* Check for requested message type */
+		if ( header->type == cpu_to_le32 ( type ) )
+			return 0;
+
+		/* Ignore any other messages (e.g. due to additional
+		 * channels being offered at runtime).
+		 */
+		DBGC ( vmbus, "VMBUS %p ignoring message type %d (expecting "
+		       "%d)\n", vmbus, le32_to_cpu ( header->type ), type );
+	}
 }
 
 /**
@@ -144,15 +176,10 @@ static int vmbus_initiate_contact ( struct hv_hypervisor *hv,
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv, VMBUS_VERSION_RESPONSE ) ) !=0)
 		return rc;
 
 	/* Check response */
-	if ( version->header.type != cpu_to_le32 ( VMBUS_VERSION_RESPONSE ) ) {
-		DBGC ( vmbus, "VMBUS %p unexpected version response type %d\n",
-		       vmbus, le32_to_cpu ( version->header.type ) );
-		return -EPROTO;
-	}
 	if ( ! version->supported ) {
 		DBGC ( vmbus, "VMBUS %p requested version not supported\n",
 		       vmbus );
@@ -178,8 +205,6 @@ static int vmbus_initiate_contact ( struct hv_hypervisor *hv,
  * @ret rc		Return status code
  */
 static int vmbus_unload ( struct hv_hypervisor *hv ) {
-	struct vmbus *vmbus = hv->vmbus;
-	const struct vmbus_message_header *header = &vmbus->message->header;
 	int rc;
 
 	/* Post message */
@@ -187,15 +212,8 @@ static int vmbus_unload ( struct hv_hypervisor *hv ) {
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv, VMBUS_UNLOAD_RESPONSE ) ) != 0)
 		return rc;
-
-	/* Check response */
-	if ( header->type != cpu_to_le32 ( VMBUS_UNLOAD_RESPONSE ) ) {
-		DBGC ( vmbus, "VMBUS %p unexpected unload response type %d\n",
-		       vmbus, le32_to_cpu ( header->type ) );
-		return -EPROTO;
-	}
 
 	return 0;
 }
@@ -290,15 +308,10 @@ int vmbus_establish_gpadl ( struct vmbus_device *vmdev, userptr_t data,
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv, VMBUS_GPADL_CREATED ) ) != 0 )
 		return rc;
 
 	/* Check response */
-	if ( created->header.type != cpu_to_le32 ( VMBUS_GPADL_CREATED ) ) {
-		DBGC ( vmdev, "VMBUS %s unexpected GPADL response type %d\n",
-		       vmdev->dev.name, le32_to_cpu ( created->header.type ) );
-		return -EPROTO;
-	}
 	if ( created->channel != cpu_to_le32 ( vmdev->channel ) ) {
 		DBGC ( vmdev, "VMBUS %s unexpected GPADL channel %d\n",
 		       vmdev->dev.name, le32_to_cpu ( created->channel ) );
@@ -346,15 +359,10 @@ int vmbus_gpadl_teardown ( struct vmbus_device *vmdev, unsigned int gpadl ) {
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv, VMBUS_GPADL_TORNDOWN ) ) != 0 )
 		return rc;
 
 	/* Check response */
-	if ( torndown->header.type != cpu_to_le32 ( VMBUS_GPADL_TORNDOWN ) ) {
-		DBGC ( vmdev, "VMBUS %s unexpected GPADL response type %d\n",
-		       vmdev->dev.name, le32_to_cpu ( torndown->header.type ) );
-		return -EPROTO;
-	}
 	if ( torndown->gpadl != cpu_to_le32 ( gpadl ) ) {
 		DBGC ( vmdev, "VMBUS %s unexpected GPADL ID %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( torndown->gpadl ) );
@@ -443,15 +451,11 @@ int vmbus_open ( struct vmbus_device *vmdev,
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv,
+					     VMBUS_OPEN_CHANNEL_RESULT ) ) != 0)
 		return rc;
 
 	/* Check response */
-	if ( opened->header.type != cpu_to_le32 ( VMBUS_OPEN_CHANNEL_RESULT ) ){
-		DBGC ( vmdev, "VMBUS %s unexpected open response type %d\n",
-		       vmdev->dev.name, le32_to_cpu ( opened->header.type ) );
-		return -EPROTO;
-	}
 	if ( opened->channel != cpu_to_le32 ( vmdev->channel ) ) {
 		DBGC ( vmdev, "VMBUS %s unexpected opened channel %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( opened->channel ) );
@@ -1136,8 +1140,8 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 	while ( 1 ) {
 
 		/* Wait for response */
-		if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
-			goto err_wait_for_message;
+		if ( ( rc = vmbus_wait_for_any_message ( hv ) ) != 0 )
+			goto err_wait_for_any_message;
 
 		/* Handle response */
 		if ( header->type == cpu_to_le32 ( VMBUS_OFFER_CHANNEL ) ) {
@@ -1223,7 +1227,7 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 	}
  err_unexpected_offer:
  err_alloc_vmdev:
- err_wait_for_message:
+ err_wait_for_any_message:
 	/* Free any devices allocated (but potentially not yet probed) */
 	list_for_each_entry_safe ( vmdev, tmp, &parent->children,
 				   dev.siblings ) {
