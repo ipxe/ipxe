@@ -37,8 +37,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /* Register command values */
 #define OCW3_ID 0x08
-#define OCW3_READ_IRR 0x03
-#define OCW3_READ_ISR 0x02
+#define OCW3_READ_IRR 0x02
+#define OCW3_READ_ISR 0x03
 #define ICR_EOI_NON_SPECIFIC 0x20
 #define ICR_EOI_NOP 0x40
 #define ICR_EOI_SPECIFIC 0x60
