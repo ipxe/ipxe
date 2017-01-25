@@ -393,7 +393,8 @@ static int apply_netdev_settings ( void ) {
 	struct net_device *netdev;
 	struct settings *settings;
 	struct ll_protocol *ll_protocol;
-	size_t old_max_pkt_len;
+	size_t max_mtu;
+	size_t old_mtu;
 	size_t mtu;
 	int rc;
 
@@ -410,18 +411,25 @@ static int apply_netdev_settings ( void ) {
 		if ( ! mtu )
 			continue;
 
-		/* Update maximum packet length */
+		/* Limit MTU to maximum supported by hardware */
 		ll_protocol = netdev->ll_protocol;
-		old_max_pkt_len = netdev->max_pkt_len;
-		netdev->max_pkt_len = ( mtu + ll_protocol->ll_header_len );
-		if ( netdev->max_pkt_len != old_max_pkt_len ) {
+		max_mtu = ( netdev->max_pkt_len - ll_protocol->ll_header_len );
+		if ( mtu > max_mtu ) {
+			DBGC ( netdev, "NETDEV %s cannot support MTU %zd (max "
+			       "%zd)\n", netdev->name, mtu, max_mtu );
+			mtu = max_mtu;
+		}
+
+		/* Update maximum packet length */
+		old_mtu = netdev->mtu;
+		netdev->mtu = mtu;
+		if ( mtu != old_mtu ) {
 			DBGC ( netdev, "NETDEV %s MTU is %zd\n",
 			       netdev->name, mtu );
 		}
 
 		/* Close and reopen network device if MTU has increased */
-		if ( netdev_is_open ( netdev ) &&
-		     ( netdev->max_pkt_len > old_max_pkt_len ) ) {
+		if ( netdev_is_open ( netdev ) && ( mtu > old_mtu ) ) {
 			netdev_close ( netdev );
 			if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
 				DBGC ( netdev, "NETDEV %s could not reopen: "

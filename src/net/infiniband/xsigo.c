@@ -323,6 +323,7 @@ static int xve_update_mtu ( struct xsigo_nic *xve, struct eoib_device *eoib,
 	 * not the EoIB header.
 	 */
 	netdev->max_pkt_len = ( mtu + sizeof ( struct ethhdr ) );
+	netdev->mtu = mtu;
 	DBGC ( xve, "XVE %s has MTU %zd\n", xve->name, mtu );
 
 	return 0;

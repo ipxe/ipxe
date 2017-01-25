@@ -663,6 +663,12 @@ int register_netdev ( struct net_device *netdev ) {
 		ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
 	}
 
+	/* Set MTU, if not already set */
+	if ( ! netdev->mtu ) {
+		netdev->mtu = ( netdev->max_pkt_len -
+				ll_protocol->ll_header_len );
+	}
+
 	/* Reject network devices that are already available via a
 	 * different hardware device.
 	 */
