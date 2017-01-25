@@ -32,9 +32,9 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <elf.h>
+#include <libgen.h>
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
-#include <libgen.h>
 
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 
