@@ -32,6 +32,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/timer.h>
 #include <realmode.h>
 #include <bios.h>
+#include <ipxe/pit8254.h>
+
+/** Number of ticks per day
+ *
+ * This seems to be the normative value, as used by e.g. SeaBIOS to
+ * decide when to set the midnight rollover flag.
+ */
+#define BIOS_TICKS_PER_DAY 0x1800b0
+
+/** Number of ticks per BIOS tick */
+#define TICKS_PER_BIOS_TICK \
+	( ( TICKS_PER_SEC * 60 * 60 * 24 ) / BIOS_TICKS_PER_DAY )
 
 /**
  * Get current system time in ticks
@@ -43,7 +55,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * of calling timeofday BIOS interrupt.
  */
 static unsigned long bios_currticks ( void ) {
-	static int days = 0;
+	static uint32_t offset;
 	uint32_t ticks;
 	uint8_t midnight;
 
@@ -53,18 +65,25 @@ static unsigned long bios_currticks ( void ) {
 			       "nop\n\t"
 			       "cli\n\t" );
 
-	get_real ( ticks, BDA_SEG, 0x006c );
-	get_real ( midnight, BDA_SEG, 0x0070 );
+	/* Read current BIOS time of day */
+	get_real ( ticks, BDA_SEG, BDA_TICKS );
+	get_real ( midnight, BDA_SEG, BDA_MIDNIGHT );
 
+	/* Handle midnight rollover */
 	if ( midnight ) {
 		midnight = 0;
-		put_real ( midnight, BDA_SEG, 0x0070 );
-		days += 0x1800b0;
+		put_real ( midnight, BDA_SEG, BDA_MIDNIGHT );
+		offset += BIOS_TICKS_PER_DAY;
 	}
+	ticks += offset;
 
-	return ( days + ticks );
+	/* Convert to timer ticks */
+	return ( ticks * TICKS_PER_BIOS_TICK );
 }
 
-PROVIDE_TIMER_INLINE ( pcbios, udelay );
-PROVIDE_TIMER ( pcbios, currticks, bios_currticks );
-PROVIDE_TIMER_INLINE ( pcbios, ticks_per_sec );
+/** BIOS timer */
+struct timer bios_timer __timer ( TIMER_NORMAL ) = {
+	.name = "bios",
+	.currticks = bios_currticks,
+	.udelay = pit8254_udelay,
+};

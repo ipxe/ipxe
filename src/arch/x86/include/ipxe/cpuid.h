@@ -57,6 +57,12 @@ struct x86_features {
 /** Get CPU model */
 #define CPUID_MODEL 0x80000002UL
 
+/** Get APM information */
+#define CPUID_APM 0x80000007UL
+
+/** Invariant TSC */
+#define CPUID_APM_EDX_TSC_INVARIANT 0x00000100UL
+
 /**
  * Issue CPUID instruction
  *

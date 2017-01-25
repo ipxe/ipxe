@@ -36,6 +36,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+/**
+ * Number of jiffies per second
+ *
+ * This is a policy decision.
+ */
+#define EFI_JIFFIES_PER_SEC 32
+
 /** Current tick count */
 static unsigned long efi_jiffies;
 
@@ -95,7 +102,7 @@ static unsigned long efi_currticks ( void ) {
 	if ( efi_shutdown_in_progress )
 		efi_jiffies++;
 
-	return efi_jiffies;
+	return ( efi_jiffies * ( TICKS_PER_SEC / EFI_JIFFIES_PER_SEC ) );
 }
 
 /**
@@ -133,7 +140,7 @@ static void efi_tick_startup ( void ) {
 
 	/* Start timer tick */
 	if ( ( efirc = bs->SetTimer ( efi_tick_event, TimerPeriodic,
-				      ( 10000000 / EFI_TICKS_PER_SEC ) ) ) !=0){
+				      ( 10000000 / EFI_JIFFIES_PER_SEC ) ))!=0){
 		rc = -EEFI ( efirc );
 		DBGC ( colour, "EFI could not start timer tick: %s\n",
 		       strerror ( rc ) );
@@ -141,7 +148,7 @@ static void efi_tick_startup ( void ) {
 		return;
 	}
 	DBGC ( colour, "EFI timer started at %d ticks per second\n",
-	       EFI_TICKS_PER_SEC );
+	       EFI_JIFFIES_PER_SEC );
 }
 
 /**
@@ -180,6 +187,9 @@ struct startup_fn efi_tick_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 	.shutdown = efi_tick_shutdown,
 };
 
-PROVIDE_TIMER ( efi, udelay, efi_udelay );
-PROVIDE_TIMER ( efi, currticks, efi_currticks );
-PROVIDE_TIMER_INLINE ( efi, ticks_per_sec );
+/** EFI timer */
+struct timer efi_timer __timer ( TIMER_NORMAL ) = {
+	.name = "efi",
+	.currticks = efi_currticks,
+	.udelay = efi_udelay,
+};

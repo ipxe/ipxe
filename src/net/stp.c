@@ -110,7 +110,7 @@ static int stp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		       "forwarding\n",
 		       netdev->name, eth_ntoa ( stp->sender.mac ),
 		       ntohs ( stp->port ), stp->flags );
-		hello = ( ( ntohs ( stp->hello ) * TICKS_PER_SEC ) / 256 );
+		hello = ( ntohs ( stp->hello ) * ( TICKS_PER_SEC / 256 ) );
 		netdev_link_block ( netdev, ( hello * 2 ) );
 		rc = -ENETUNREACH;
 		goto done;

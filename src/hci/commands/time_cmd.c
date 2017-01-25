@@ -68,7 +68,7 @@ static int time_exec ( int argc, char **argv ) {
 	start = currticks();
 	rc = execv ( argv[1], argv + 1 );
 	elapsed = ( currticks() - start );
-	decisecs = ( 10 * elapsed / ticks_per_sec() );
+	decisecs = ( 10 * elapsed / TICKS_PER_SEC );
 
 	printf ( "%s: %d.%ds\n", argv[0],
 		 ( decisecs / 10 ), ( decisecs % 10 ) );

@@ -1381,7 +1381,7 @@ ath5k_poll(struct net80211_device *dev)
 	unsigned int counter = 1000;
 
 	if (currticks() - sc->last_calib_ticks >
-	    ATH5K_CALIB_INTERVAL * ticks_per_sec()) {
+	    ATH5K_CALIB_INTERVAL * TICKS_PER_SEC) {
 		ath5k_calibrate(sc);
 		sc->last_calib_ticks = currticks();
 	}

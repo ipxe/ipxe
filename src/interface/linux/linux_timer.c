@@ -40,16 +40,6 @@ static void linux_udelay(unsigned long usecs)
 }
 
 /**
- * Get number of ticks per second
- *
- * @ret ticks_per_sec	Number of ticks per second
- */
-static unsigned long linux_ticks_per_sec(void)
-{
-	return 1000;
-}
-
-/**
  * Get current system time in ticks
  *
  * linux doesn't provide an easy access to jiffies so implement it by measuring
@@ -67,21 +57,25 @@ static unsigned long linux_currticks(void)
 {
 	static struct timeval start;
 	static int initialized = 0;
+	struct timeval now;
+	unsigned long ticks;
 
 	if (! initialized) {
 		linux_gettimeofday(&start, NULL);
 		initialized = 1;
 	}
 
-	struct timeval now;
 	linux_gettimeofday(&now, NULL);
 
-	unsigned long ticks = (now.tv_sec - start.tv_sec) * linux_ticks_per_sec();
-	ticks += now.tv_usec / (long)(1000000 / linux_ticks_per_sec());
+	ticks = ( ( now.tv_sec - start.tv_sec ) * TICKS_PER_SEC );
+	ticks += ( now.tv_usec / ( 1000000 / TICKS_PER_SEC ) );
 
 	return ticks;
 }
 
-PROVIDE_TIMER(linux, udelay, linux_udelay);
-PROVIDE_TIMER(linux, currticks, linux_currticks);
-PROVIDE_TIMER(linux, ticks_per_sec, linux_ticks_per_sec);
+/** Linux timer */
+struct timer linux_timer __timer ( TIMER_NORMAL ) = {
+	.name = "linux",
+	.currticks = linux_currticks,
+	.udelay = linux_udelay,
+};

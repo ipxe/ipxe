@@ -117,7 +117,7 @@ int parse_timeout ( char *text, unsigned long *value ) {
 		return rc;
 
 	/* Convert to a number of timer ticks */
-	*value = ( ( value_ms * TICKS_PER_SEC ) / 1000 );
+	*value = ( value_ms * TICKS_PER_MS );
 
 	return 0;
 }

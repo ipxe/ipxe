@@ -1321,7 +1321,7 @@ struct net80211_probe_ctx * net80211_probe_start ( struct net80211_device *dev,
 	ctx->ticks_start = currticks();
 	ctx->ticks_beacon = 0;
 	ctx->ticks_channel = currticks();
-	ctx->hop_time = ticks_per_sec() / ( active ? 2 : 6 );
+	ctx->hop_time = TICKS_PER_SEC / ( active ? 2 : 6 );
 
 	/*
 	 * Channels on 2.4GHz overlap, and the most commonly used
@@ -1363,8 +1363,8 @@ struct net80211_probe_ctx * net80211_probe_start ( struct net80211_device *dev,
 int net80211_probe_step ( struct net80211_probe_ctx *ctx )
 {
 	struct net80211_device *dev = ctx->dev;
-	u32 start_timeout = NET80211_PROBE_TIMEOUT * ticks_per_sec();
-	u32 gather_timeout = ticks_per_sec();
+	u32 start_timeout = NET80211_PROBE_TIMEOUT * TICKS_PER_SEC;
+	u32 gather_timeout = TICKS_PER_SEC;
 	u32 now = currticks();
 	struct io_buffer *iob;
 	int signal;
@@ -2606,7 +2606,7 @@ static void net80211_rx_frag ( struct net80211_device *dev,
 		/* start a frag cache entry */
 		int i, newest = -1;
 		u32 curr_ticks = currticks(), newest_ticks = 0;
-		u32 timeout = ticks_per_sec() * NET80211_FRAG_TIMEOUT;
+		u32 timeout = TICKS_PER_SEC * NET80211_FRAG_TIMEOUT;
 
 		for ( i = 0; i < NET80211_NR_CONCURRENT_FRAGS; i++ ) {
 			if ( dev->frags[i].in_use == 0 )
