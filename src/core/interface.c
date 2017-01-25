@@ -79,9 +79,6 @@ struct interface null_intf = INTF_INIT ( null_intf_desc );
  * The reference to the existing destination interface is dropped, a
  * reference to the new destination interface is obtained, and the
  * interface is updated to point to the new destination interface.
- *
- * Note that there is no "unplug" call; instead you must plug the
- * interface into a null interface.
  */
 void intf_plug ( struct interface *intf, struct interface *dest ) {
 	DBGC ( INTF_COL ( intf ),
