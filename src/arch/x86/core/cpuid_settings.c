@@ -149,48 +149,25 @@ static int cpuid_settings_fetch ( struct settings *settings,
 				  struct setting *setting,
 				  void *data, size_t len ) {
 	uint32_t function;
-	uint32_t max_function;
 	uint32_t num_functions;
 	uint32_t registers;
 	uint32_t num_registers;
 	uint32_t buf[4];
 	uint32_t output;
-	uint32_t discard_b;
-	uint32_t discard_c;
-	uint32_t discard_d;
 	size_t frag_len;
 	size_t result_len = 0;
-
-	/* Fail unless CPUID is supported */
-	if ( ! cpuid_is_supported() ) {
-		DBGC ( settings, "CPUID not supported\n" );
-		return -ENOTSUP;
-	}
-
-	/* Find highest supported function number within this set */
-	function = CPUID_FUNCTION ( setting->tag );
-	cpuid ( function & CPUID_EXTENDED, &max_function, &discard_b,
-		&discard_c, &discard_d );
-
-	/* Fail if maximum function number is meaningless (e.g. if we
-	 * are attempting to call an extended function on a CPU which
-	 * does not support them).
-	 */
-	if ( ( max_function & CPUID_AMD_CHECK_MASK ) !=
-	     ( function & CPUID_AMD_CHECK_MASK ) ) {
-		DBGC ( settings, "CPUID invalid maximum function\n" );
-		return -ENOTSUP;
-	}
+	int rc;
 
 	/* Call each function in turn */
+	function = CPUID_FUNCTION ( setting->tag );
 	num_functions = CPUID_NUM_FUNCTIONS ( setting->tag );
 	for ( ; num_functions-- ; function++ ) {
 
 		/* Fail if this function is not supported */
-		if ( function > max_function ) {
-			DBGC ( settings, "CPUID function %#08x not supported\n",
-			       function );
-			return -ENOTSUP;
+		if ( ( rc = cpuid_supported ( function ) ) != 0 ) {
+			DBGC ( settings, "CPUID function %#08x not supported: "
+			       "%s\n", function, strerror ( rc ) );
+			return rc;
 		}
 
 		/* Issue CPUID */

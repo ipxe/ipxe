@@ -24,6 +24,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
+#include <errno.h>
 #include <ipxe/cpuid.h>
 
 /** @file
@@ -32,15 +33,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+/** Colour for debug messages */
+#define colour 0x861d
+
 /**
  * Check whether or not CPUID instruction is supported
  *
- * @ret is_supported	CPUID instruction is supported
+ * @ret rc		Return status code
  */
-int cpuid_is_supported ( void ) {
+static int cpuid_instruction_supported ( void ) {
 	unsigned long original;
 	unsigned long inverted;
 
+	/* Check for instruction existence via flag modifiability */
 	__asm__ ( "pushf\n\t"
 		  "pushf\n\t"
 		  "pop %0\n\t"
@@ -53,7 +58,54 @@ int cpuid_is_supported ( void ) {
 		  "popf\n\t"
 		  : "=&r" ( original ), "=&r" ( inverted )
 		  : "ir" ( CPUID_FLAG ) );
-	return ( ( original ^ inverted ) & CPUID_FLAG );
+	if ( ! ( ( original ^ inverted ) & CPUID_FLAG ) ) {
+		DBGC ( colour, "CPUID instruction is not supported\n" );
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+
+/**
+ * Check whether or not CPUID function is supported
+ *
+ * @v function		CPUID function
+ * @ret rc		Return status code
+ */
+int cpuid_supported ( uint32_t function ) {
+	uint32_t max_function;
+	uint32_t discard_b;
+	uint32_t discard_c;
+	uint32_t discard_d;
+	int rc;
+
+	/* Check that CPUID instruction is available */
+	if ( ( rc = cpuid_instruction_supported() ) != 0 )
+		return rc;
+
+	/* Find highest supported function number within this family */
+	cpuid ( ( function & CPUID_EXTENDED ), &max_function, &discard_b,
+		&discard_c, &discard_d );
+
+	/* Fail if maximum function number is meaningless (e.g. if we
+	 * are attempting to call an extended function on a CPU which
+	 * does not support them).
+	 */
+	if ( ( max_function & CPUID_AMD_CHECK_MASK ) !=
+	     ( function & CPUID_AMD_CHECK_MASK ) ) {
+		DBGC ( colour, "CPUID invalid maximum function %#08x\n",
+		       max_function );
+		return -EINVAL;
+	}
+
+	/* Fail if this function is not supported */
+	if ( function > max_function ) {
+		DBGC ( colour, "CPUID function %#08x not supported\n",
+		       function );
+		return -ENOTTY;
+	}
+
+	return 0;
 }
 
 /**
@@ -62,18 +114,13 @@ int cpuid_is_supported ( void ) {
  * @v features		x86 CPU features to fill in
  */
 static void x86_intel_features ( struct x86_features *features ) {
-	uint32_t max_level;
 	uint32_t discard_a;
 	uint32_t discard_b;
-	uint32_t discard_c;
-	uint32_t discard_d;
+	int rc;
 
 	/* Check that features are available via CPUID */
-	cpuid ( CPUID_VENDOR_ID, &max_level, &discard_b, &discard_c,
-		&discard_d );
-	if ( max_level < CPUID_FEATURES ) {
-		DBGC ( features, "CPUID has no Intel-defined features (max "
-		       "level %08x)\n", max_level );
+	if ( ( rc = cpuid_supported ( CPUID_FEATURES ) ) != 0 ) {
+		DBGC ( features, "CPUID has no Intel-defined features\n" );
 		return;
 	}
 
@@ -91,22 +138,13 @@ static void x86_intel_features ( struct x86_features *features ) {
  * @v features		x86 CPU features to fill in
  */
 static void x86_amd_features ( struct x86_features *features ) {
-	uint32_t max_level;
 	uint32_t discard_a;
 	uint32_t discard_b;
-	uint32_t discard_c;
-	uint32_t discard_d;
+	int rc;
 
 	/* Check that features are available via CPUID */
-	cpuid ( CPUID_AMD_MAX_FN, &max_level, &discard_b, &discard_c,
-		&discard_d );
-	if ( ( max_level & CPUID_AMD_CHECK_MASK ) != CPUID_AMD_CHECK ) {
-		DBGC ( features, "CPUID has no extended functions\n" );
-		return;
-	}
-	if ( max_level < CPUID_AMD_FEATURES ) {
-		DBGC ( features, "CPUID has no AMD-defined features (max "
-		       "level %08x)\n", max_level );
+	if ( ( rc = cpuid_supported ( CPUID_AMD_FEATURES ) ) != 0 ) {
+		DBGC ( features, "CPUID has no AMD-defined features\n" );
 		return;
 	}
 
@@ -126,12 +164,6 @@ void x86_features ( struct x86_features *features ) {
 
 	/* Clear all features */
 	memset ( features, 0, sizeof ( *features ) );
-
-	/* Check that CPUID instruction is available */
-	if ( ! cpuid_is_supported() ) {
-		DBGC ( features, "CPUID instruction is not supported\n" );
-		return;
-	}
 
 	/* Get Intel-defined features */
 	x86_intel_features ( features );
