@@ -113,7 +113,10 @@ void intf_plug_plug ( struct interface *a, struct interface *b ) {
  * @v intf		Object interface
  */
 void intf_unplug ( struct interface *intf ) {
-	intf_plug ( intf, &null_intf );
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " unplug\n",
+	       INTF_INTF_DBG ( intf, intf->dest ) );
+	intf_put ( intf->dest );
+	intf->dest = &null_intf;
 }
 
 /**
