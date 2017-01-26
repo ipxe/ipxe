@@ -1751,7 +1751,7 @@ static void int13_unhook ( unsigned int drive ) {
  * @ret rc		Return status code
  */
 static int int13_load_mbr ( unsigned int drive, struct segoff *address ) {
-	uint8_t status;
+	uint16_t status;
 	int discard_b, discard_c, discard_d;
 	uint16_t magic;
 
@@ -1775,7 +1775,7 @@ static int int13_load_mbr ( unsigned int drive, struct segoff *address ) {
 			       : "a" ( 0x0201 ), "b" ( *address ),
 				 "c" ( 1 ), "d" ( drive ) );
 	if ( status ) {
-		DBG ( "INT13 drive %02x could not read MBR (status %02x)\n",
+		DBG ( "INT13 drive %02x could not read MBR (status %04x)\n",
 		      drive, status );
 		return -EIO;
 	}
@@ -1818,7 +1818,7 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
 		struct eltorito_validation_entry valid;
 		struct eltorito_boot_entry boot;
 	} __attribute__ (( packed )) catalog;
-	uint8_t status;
+	uint16_t status;
 
 	/* Use INT 13, 4d to read the boot catalog */
 	__asm__ __volatile__ ( REAL_CODE ( "stc\n\t"
@@ -1833,7 +1833,7 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
 				 "S" ( __from_data16 ( &eltorito_cmd ) ) );
 	if ( status ) {
 		DBG ( "INT13 drive %02x could not read El Torito boot catalog "
-		      "(status %02x)\n", drive, status );
+		      "(status %04x)\n", drive, status );
 		return -EIO;
 	}
 	copy_from_user ( &catalog, phys_to_user ( eltorito_cmd.buffer ), 0,
@@ -1880,7 +1880,7 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
 				 "S" ( __from_data16 ( &eltorito_address ) ) );
 	if ( status ) {
 		DBG ( "INT13 drive %02x could not read El Torito boot image "
-		      "(status %02x)\n", drive, status );
+		      "(status %04x)\n", drive, status );
 		return -EIO;
 	}
 
