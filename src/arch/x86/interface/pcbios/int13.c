@@ -561,6 +561,8 @@ static int int13_guess_geometry_hdd ( struct int13_drive *int13, void *scratch,
 	struct master_boot_record *mbr = scratch;
 	struct partition_table_entry *partition;
 	unsigned int i;
+	unsigned int end_head;
+	unsigned int end_sector;
 	int rc;
 
 	/* Default guess is xx/255/63 */
@@ -586,10 +588,12 @@ static int int13_guess_geometry_hdd ( struct int13_drive *int13, void *scratch,
 	 */
 	for ( i = 0 ; i < 4 ; i++ ) {
 		partition = &mbr->partitions[i];
-		if ( ! partition->type )
+		end_head = PART_HEAD ( partition->chs_end );
+		end_sector = PART_SECTOR ( partition->chs_end );
+		if ( ! ( partition->type && end_head && end_sector ) )
 			continue;
-		*heads = ( PART_HEAD ( partition->chs_end ) + 1 );
-		*sectors = PART_SECTOR ( partition->chs_end );
+		*heads = ( end_head + 1 );
+		*sectors = end_sector;
 		DBGC ( int13, "INT13 drive %02x guessing C/H/S xx/%d/%d based "
 		       "on partition %d\n",
 		       int13->drive, *heads, *sectors, ( i + 1 ) );
