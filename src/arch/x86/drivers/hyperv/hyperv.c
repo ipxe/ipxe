@@ -39,6 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <pic8259.h>
 #include <ipxe/malloc.h>
 #include <ipxe/device.h>
+#include <ipxe/timer.h>
 #include <ipxe/cpuid.h>
 #include <ipxe/msr.h>
 #include <ipxe/hyperv.h>
@@ -50,6 +51,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * This is a policy decision.
  */
 #define HV_MESSAGE_MAX_WAIT_MS 1000
+
+/** Hyper-V timer frequency (fixed 10Mhz) */
+#define HV_TIMER_HZ 10000000
+
+/** Hyper-V timer scale factor (used to avoid 64-bit division) */
+#define HV_TIMER_SHIFT 18
 
 /**
  * Convert a Hyper-V status code to an iPXE status code
@@ -145,22 +152,19 @@ static void hv_free_message ( struct hv_hypervisor *hv ) {
 /**
  * Check whether or not we are running in Hyper-V
  *
- * @v hv		Hyper-V hypervisor
  * @ret rc		Return status code
  */
-static int hv_check_hv ( struct hv_hypervisor *hv ) {
+static int hv_check_hv ( void ) {
 	struct x86_features features;
 	uint32_t interface_id;
 	uint32_t discard_ebx;
 	uint32_t discard_ecx;
 	uint32_t discard_edx;
-	uint32_t available;
-	uint32_t permissions;
 
 	/* Check for presence of a hypervisor (not necessarily Hyper-V) */
 	x86_features ( &features );
 	if ( ! ( features.intel.ecx & CPUID_FEATURES_INTEL_ECX_HYPERVISOR ) ) {
-		DBGC ( hv, "HV %p not running in a hypervisor\n", hv );
+		DBGC ( HV_INTERFACE_ID, "HV not running in a hypervisor\n" );
 		return -ENODEV;
 	}
 
@@ -168,10 +172,25 @@ static int hv_check_hv ( struct hv_hypervisor *hv ) {
 	cpuid ( HV_CPUID_INTERFACE_ID, &interface_id, &discard_ebx,
 		&discard_ecx, &discard_edx );
 	if ( interface_id != HV_INTERFACE_ID ) {
-		DBGC ( hv, "HV %p not running in Hyper-V (interface ID "
-		       "%#08x)\n", hv, interface_id );
+		DBGC ( HV_INTERFACE_ID, "HV not running in Hyper-V (interface "
+		       "ID %#08x)\n", interface_id );
 		return -ENODEV;
 	}
+
+	return 0;
+}
+
+/**
+ * Check required features
+ *
+ * @v hv		Hyper-V hypervisor
+ * @ret rc		Return status code
+ */
+static int hv_check_features ( struct hv_hypervisor *hv ) {
+	uint32_t available;
+	uint32_t permissions;
+	uint32_t discard_ecx;
+	uint32_t discard_edx;
 
 	/* Check that required features and privileges are available */
 	cpuid ( HV_CPUID_FEATURES, &available, &permissions, &discard_ecx,
@@ -509,6 +528,10 @@ static int hv_probe ( struct root_device *rootdev ) {
 	struct hv_hypervisor *hv;
 	int rc;
 
+	/* Check we are running in Hyper-V */
+	if ( ( rc = hv_check_hv() ) != 0 )
+		goto err_check_hv;
+
 	/* Allocate and initialise structure */
 	hv = zalloc ( sizeof ( *hv ) );
 	if ( ! hv ) {
@@ -516,9 +539,9 @@ static int hv_probe ( struct root_device *rootdev ) {
 		goto err_alloc;
 	}
 
-	/* Check we are running in Hyper-V */
-	if ( ( rc = hv_check_hv ( hv ) ) != 0 )
-		goto err_check_hv;
+	/* Check features */
+	if ( ( rc = hv_check_features ( hv ) ) != 0 )
+		goto err_check_features;
 
 	/* Allocate pages */
 	if ( ( rc = hv_alloc_pages ( hv, &hv->hypercall, &hv->synic.message,
@@ -555,9 +578,10 @@ static int hv_probe ( struct root_device *rootdev ) {
 	hv_free_pages ( hv, hv->hypercall, hv->synic.message, hv->synic.event,
 			NULL );
  err_alloc_pages:
- err_check_hv:
+ err_check_features:
 	free ( hv );
  err_alloc:
+ err_check_hv:
 	return rc;
 }
 
@@ -588,6 +612,73 @@ static struct root_driver hv_root_driver = {
 struct root_device hv_root_device __root_device = {
 	.dev = { .name = "Hyper-V" },
 	.driver = &hv_root_driver,
+};
+
+/**
+ * Probe timer
+ *
+ * @ret rc		Return status code
+ */
+static int hv_timer_probe ( void ) {
+	uint32_t available;
+	uint32_t discard_ebx;
+	uint32_t discard_ecx;
+	uint32_t discard_edx;
+	int rc;
+
+	/* Check we are running in Hyper-V */
+	if ( ( rc = hv_check_hv() ) != 0 )
+		return rc;
+
+	/* Check for available reference counter */
+	cpuid ( HV_CPUID_FEATURES, &available, &discard_ebx, &discard_ecx,
+		&discard_edx );
+	if ( ! ( available & HV_FEATURES_AVAIL_TIME_REF_COUNT_MSR ) ) {
+		DBGC ( HV_INTERFACE_ID, "HV has no time reference counter\n" );
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+/**
+ * Get current system time in ticks
+ *
+ * @ret ticks		Current time, in ticks
+ */
+static unsigned long hv_currticks ( void ) {
+
+	/* Calculate time using a combination of bit shifts and
+	 * multiplication (to avoid a 64-bit division).
+	 */
+	return ( ( rdmsr ( HV_X64_MSR_TIME_REF_COUNT ) >> HV_TIMER_SHIFT ) *
+		 ( TICKS_PER_SEC / ( HV_TIMER_HZ >> HV_TIMER_SHIFT ) ) );
+}
+
+/**
+ * Delay for a fixed number of microseconds
+ *
+ * @v usecs		Number of microseconds for which to delay
+ */
+static void hv_udelay ( unsigned long usecs ) {
+	uint32_t start;
+	uint32_t elapsed;
+	uint32_t threshold;
+
+	/* Spin until specified number of 10MHz ticks have elapsed */
+	start = rdmsr ( HV_X64_MSR_TIME_REF_COUNT );
+	threshold = ( usecs * ( HV_TIMER_HZ / 1000000 ) );
+	do {
+		elapsed = ( rdmsr ( HV_X64_MSR_TIME_REF_COUNT ) - start );
+	} while ( elapsed < threshold );
+}
+
+/** Hyper-V timer */
+struct timer hv_timer __timer ( TIMER_PREFERRED ) = {
+	.name = "Hyper-V",
+	.probe = hv_timer_probe,
+	.currticks = hv_currticks,
+	.udelay = hv_udelay,
 };
 
 /* Drag in objects via hv_root_device */
