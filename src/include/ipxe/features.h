@@ -55,6 +55,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define DHCP_EB_FEATURE_MENU		0x27 /**< Menu support */
 #define DHCP_EB_FEATURE_SDI		0x28 /**< SDI image support */
 #define DHCP_EB_FEATURE_NFS		0x29 /**< NFS protocol */
+#define DHCP_EB_FEATURE_MULTIBOOT2	0x2a /**< Multiboot2 format */
 
 /** @} */
 
