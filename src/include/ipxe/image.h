@@ -124,17 +124,26 @@ struct image_type {
 };
 
 /**
+ * Multiboot2 image probe priority
+ *
+ * Multiboot2 images are also valid executables in another format
+ * (e.g. ELF) AND might also have multiboot headers on them, so we
+ * must perform the multiboot2 probe first.
+ */
+#define PROBE_MULTIBOOT2 01
+
+/**
  * Multiboot image probe priority
  *
  * Multiboot images are also valid executables in another format
  * (e.g. ELF), so we must perform the multiboot probe first.
  */
-#define PROBE_MULTIBOOT	01
+#define PROBE_MULTIBOOT	02
 
 /**
  * Normal image probe priority
  */
-#define PROBE_NORMAL 02
+#define PROBE_NORMAL 03
 
 /**
  * PXE image probe priority
@@ -142,7 +151,7 @@ struct image_type {
  * PXE images have no signature checks, so will claim all image files.
  * They must therefore be tried last in the probe order list.
  */
-#define PROBE_PXE 03
+#define PROBE_PXE 04
 
 /** Executable image type table */
 #define IMAGE_TYPES __table ( struct image_type, "image_types" )
