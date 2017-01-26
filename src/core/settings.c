@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
+#include <time.h>
 #include <ipxe/in.h>
 #include <ipxe/ip.h>
 #include <ipxe/ipv6.h>
@@ -2550,6 +2551,38 @@ const struct setting version_setting __setting ( SETTING_MISC, version ) = {
 struct builtin_setting version_builtin_setting __builtin_setting = {
 	.setting = &version_setting,
 	.fetch = version_fetch,
+};
+
+/**
+ * Fetch current time setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int unixtime_fetch ( void *data, size_t len ) {
+	uint32_t content;
+
+	/* Return current time */
+	content = htonl ( time(NULL) );
+	if ( len > sizeof ( content ) )
+		len = sizeof ( content );
+	memcpy ( data, &content, len );
+	return sizeof ( content );
+}
+
+/** Current time setting */
+const struct setting unixtime_setting __setting ( SETTING_MISC, unixtime ) = {
+	.name = "unixtime",
+	.description = "Seconds since the Epoch",
+	.type = &setting_type_uint32,
+	.scope = &builtin_scope,
+};
+
+/** Current time built-in setting */
+struct builtin_setting unixtime_builtin_setting __builtin_setting = {
+	.setting = &unixtime_setting,
+	.fetch = unixtime_fetch,
 };
 
 /**
