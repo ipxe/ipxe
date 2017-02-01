@@ -24,7 +24,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
-#include <assert.h>
 #include <ipxe/process.h>
 #include <ipxe/console.h>
 #include <ipxe/keys.h>
@@ -42,7 +41,14 @@ static struct timer *timer;
  */
 unsigned long currticks ( void ) {
 
-	assert ( timer != NULL );
+	/* Guard against use during early initialisation */
+	if ( ! timer ) {
+		DBGC ( &timer, "TIMER currticks() called before initialisation "
+		       "from %p\n", __builtin_return_address ( 0 ) );
+		return 0;
+	}
+
+	/* Use selected timer */
 	return timer->currticks();
 }
 
@@ -53,7 +59,14 @@ unsigned long currticks ( void ) {
  */
 void udelay ( unsigned long usecs ) {
 
-	assert ( timer != NULL );
+	/* Guard against use during early initialisation */
+	if ( ! timer ) {
+		DBGC ( &timer, "TIMER udelay() called before initialisation "
+		       "from %p\n", __builtin_return_address ( 0 ) );
+		return;
+	}
+
+	/* Use selected timer */
 	timer->udelay ( usecs );
 }
 
@@ -63,6 +76,15 @@ void udelay ( unsigned long usecs ) {
  * @v msecs		Number of milliseconds for which to delay
  */
 void mdelay ( unsigned long msecs ) {
+
+	/* Guard against use during early initialisation */
+	if ( ! timer ) {
+		DBGC ( &timer, "TIMER mdelay() called before initialisation "
+		       "from %p\n", __builtin_return_address ( 0 ) );
+		return;
+	}
+
+	/* Delay for specified number of milliseconds */
 	while ( msecs-- )
 		udelay ( 1000 );
 }
