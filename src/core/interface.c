@@ -291,6 +291,41 @@ void intf_shutdown ( struct interface *intf, int rc ) {
 }
 
 /**
+ * Shut down multiple object interfaces
+ *
+ * @v intfs		Object interfaces
+ * @v rc		Reason for close
+ */
+void intfs_vshutdown ( va_list intfs, int rc ) {
+	struct interface *intf;
+	va_list tmp;
+
+	/* Nullify all interfaces to avoid potential loops */
+	va_copy ( tmp, intfs );
+	while ( ( intf = va_arg ( tmp, struct interface * ) ) )
+		intf_nullify ( intf );
+	va_end ( tmp );
+
+	/* Shut down all interfaces */
+	while ( ( intf = va_arg ( intfs, struct interface * ) ) )
+		intf_shutdown ( intf, rc );
+}
+
+/**
+ * Shut down multiple object interfaces
+ *
+ * @v rc		Reason for close
+ * @v ...		Object interfaces
+ */
+void intfs_shutdown ( int rc, ... ) {
+	va_list intfs;
+
+	va_start ( intfs, rc );
+	intfs_vshutdown ( intfs, rc );
+	va_end ( intfs );
+}
+
+/**
  * Shut down and restart an object interface
  *
  * @v intf		Object interface
@@ -314,6 +349,40 @@ void intf_restart ( struct interface *intf, int rc ) {
 	 * of the link call each other recursively.
 	 */
 	intf_reinit ( intf );
+}
+
+/**
+ * Shut down and restart multiple object interfaces
+ *
+ * @v intfs		Object interfaces
+ * @v rc		Reason for close
+ */
+void intfs_vrestart ( va_list intfs, int rc ) {
+	struct interface *intf;
+	va_list tmp;
+
+	/* Shut down all interfaces */
+	va_copy ( tmp, intfs );
+	intfs_vshutdown ( tmp, rc );
+	va_end ( tmp );
+
+	/* Reinitialise all interfaces */
+	while ( ( intf = va_arg ( intfs, struct interface * ) ) )
+		intf_reinit ( intf );
+}
+
+/**
+ * Shut down and restart multiple object interfaces
+ *
+ * @v rc		Reason for close
+ * @v ...		Object interfaces
+ */
+void intfs_restart ( int rc, ... ) {
+	va_list intfs;
+
+	va_start ( intfs, rc );
+	intfs_vrestart ( intfs, rc );
+	va_end ( intfs );
 }
 
 /**

@@ -10,6 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
+#include <stdarg.h>
 #include <ipxe/refcnt.h>
 
 /** An object interface operation */
@@ -148,7 +149,11 @@ extern void intf_close ( struct interface *intf, int rc );
 	typeof ( void ( object_type, int rc ) )
 
 extern void intf_shutdown ( struct interface *intf, int rc );
+extern void intfs_vshutdown ( va_list intfs, int rc );
+extern void intfs_shutdown ( int rc, ... ) __attribute__ (( sentinel ));
 extern void intf_restart ( struct interface *intf, int rc );
+extern void intfs_vrestart ( va_list intfs, int rc );
+extern void intfs_restart ( int rc, ... ) __attribute__ (( sentinel ));
 
 extern void intf_poke ( struct interface *intf,
 			void ( type ) ( struct interface *intf ) );
