@@ -275,15 +275,9 @@ static void http_close ( struct http_transaction *http, int rc ) {
 	/* Stop timer */
 	stop_timer ( &http->timer );
 
-	/* Close all interfaces, allowing for the fact that the
-	 * content-decoded and transfer-decoded interfaces may be
-	 * connected to the same object.
-	 */
-	intf_shutdown ( &http->conn, rc );
-	intf_nullify ( &http->transfer );
-	intf_shutdown ( &http->content, rc );
-	intf_shutdown ( &http->transfer, rc );
-	intf_shutdown ( &http->xfer, rc );
+	/* Close all interfaces */
+	intfs_shutdown ( rc, &http->conn, &http->transfer, &http->content,
+			 &http->xfer, NULL );
 }
 
 /**
@@ -784,12 +778,9 @@ static int http_transfer_complete ( struct http_transaction *http ) {
 		}
 	}
 
-	/* Restart content decoding interfaces (which may be attached
-	 * to the same object).
-	 */
-	intf_nullify ( &http->transfer ); /* avoid potential loops */
-	intf_restart ( &http->content, http->response.rc );
-	intf_restart ( &http->transfer, http->response.rc );
+	/* Restart content decoding interfaces */
+	intfs_restart ( http->response.rc, &http->content, &http->transfer,
+			NULL );
 	intf_plug_plug ( &http->transfer, &http->content );
 	http->len = 0;
 	assert ( http->remaining == 0 );
