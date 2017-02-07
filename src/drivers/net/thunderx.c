@@ -1146,9 +1146,16 @@ static int txnic_lmac_probe ( struct txnic_lmac *lmac ) {
  * @v lmac		Logical MAC
  */
 static void txnic_lmac_remove ( struct txnic_lmac *lmac ) {
+	uint64_t config;
 
 	/* Sanity check */
 	assert ( lmac->vnic != NULL );
+
+	/* Disable packet receive and transmit */
+	config = readq ( lmac->regs + BGX_CMR_CONFIG );
+	config &= ~( BGX_CMR_CONFIG_DATA_PKT_TX_EN |
+		     BGX_CMR_CONFIG_DATA_PKT_RX_EN );
+	writeq ( config, ( lmac->regs + BGX_CMR_CONFIG ) );
 
 	/* Unregister network device */
 	unregister_netdev ( lmac->vnic->netdev );
