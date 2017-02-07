@@ -1345,9 +1345,6 @@ static void txnic_pf_remove ( struct pci_device *pci ) {
 	/* Remove from list of physical functions */
 	list_del ( &pf->list );
 
-	/* Disable physical function */
-	writeq ( 0, ( pf->regs + TXNIC_PF_CFG ) );
-
 	/* Unmap registers */
 	iounmap ( pf->regs );
 
