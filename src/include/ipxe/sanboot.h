@@ -7,13 +7,6 @@
  *
  * The sanboot API provides methods for hooking, unhooking,
  * describing, and booting from SAN devices.
- *
- * The standard methods (readl()/writel() etc.) do not strictly check
- * the type of the address parameter; this is because traditional
- * usage does not necessarily provide the correct pointer type.  For
- * example, code written for ISA devices at fixed I/O addresses (such
- * as the keyboard controller) tend to use plain integer constants for
- * the address parameter.
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
