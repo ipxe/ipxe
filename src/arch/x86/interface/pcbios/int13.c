@@ -44,8 +44,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/pci.h>
 #include <ipxe/iso9660.h>
 #include <ipxe/eltorito.h>
-#include <ipxe/dhcp.h>
-#include <ipxe/settings.h>
 #include <realmode.h>
 #include <bios.h>
 #include <biosint.h>
@@ -1992,32 +1990,6 @@ static int int13_describe ( unsigned int drive ) {
 	return 0;
 }
 
-/** The "san-drive" setting */
-const struct setting san_drive_setting __setting ( SETTING_SANBOOT_EXTRA,
-						   san-drive ) = {
-	.name = "san-drive",
-	.description = "SAN drive number",
-	.tag = DHCP_EB_SAN_DRIVE,
-	.type = &setting_type_uint8,
-};
-
-/**
- * Get default SAN drive number
- *
- * @ret drive		Default drive number
- */
-static unsigned int int13_default_drive ( void ) {
-	unsigned long drive;
-
-	/* Use "san-drive" setting, if specified */
-	if ( fetch_uint_setting ( NULL, &san_drive_setting, &drive ) >= 0 )
-		return drive;
-
-	/* Otherwise, default to booting from first hard disk */
-	return 0x80;
-}
-
-PROVIDE_SANBOOT ( pcbios, san_default_drive, int13_default_drive );
 PROVIDE_SANBOOT ( pcbios, san_hook, int13_hook );
 PROVIDE_SANBOOT ( pcbios, san_unhook, int13_unhook );
 PROVIDE_SANBOOT ( pcbios, san_boot, int13_boot );

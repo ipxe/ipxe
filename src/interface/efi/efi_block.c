@@ -1055,7 +1055,6 @@ static int efi_block_boot ( unsigned int drive ) {
 	return rc;
 }
 
-PROVIDE_SANBOOT_INLINE ( efi, san_default_drive );
 PROVIDE_SANBOOT ( efi, san_hook, efi_block_hook );
 PROVIDE_SANBOOT ( efi, san_unhook, efi_block_unhook );
 PROVIDE_SANBOOT ( efi, san_describe, efi_block_describe );

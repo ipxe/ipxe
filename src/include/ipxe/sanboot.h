@@ -96,13 +96,6 @@ struct san_device {
 #include <bits/sanboot.h>
 
 /**
- * Get default SAN drive number
- *
- * @ret drive		Default drive number
- */
-unsigned int san_default_drive ( void );
-
-/**
  * Hook SAN device
  *
  * @v uri		URI
@@ -212,5 +205,6 @@ extern int sandev_rw ( struct san_device *sandev, uint64_t lba,
 extern struct san_device * alloc_sandev ( struct uri *uri, size_t priv_size );
 extern int register_sandev ( struct san_device *sandev );
 extern void unregister_sandev ( struct san_device *sandev );
+extern unsigned int san_default_drive ( void );
 
 #endif /* _IPXE_SANBOOT_H */

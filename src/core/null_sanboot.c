@@ -43,7 +43,6 @@ static int null_san_describe ( unsigned int drive __unused ) {
 	return -EOPNOTSUPP;
 }
 
-PROVIDE_SANBOOT_INLINE ( null, san_default_drive );
 PROVIDE_SANBOOT ( null, san_hook, null_san_hook );
 PROVIDE_SANBOOT ( null, san_unhook, null_san_unhook );
 PROVIDE_SANBOOT ( null, san_boot, null_san_boot );

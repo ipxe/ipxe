@@ -39,7 +39,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/timer.h>
 #include <ipxe/process.h>
 #include <ipxe/iso9660.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/settings.h>
 #include <ipxe/sanboot.h>
+
+/**
+ * Default SAN drive number
+ *
+ * The drive number is a meaningful concept only in a BIOS
+ * environment, where it represents the INT13 drive number (0x80 for
+ * the first hard disk).  We retain it in other environments to allow
+ * for a simple way for iPXE commands to refer to SAN drives.
+ */
+#define SAN_DEFAULT_DRIVE 0x80
 
 /**
  * Timeout for block device commands (in ticks)
@@ -541,6 +553,7 @@ int register_sandev ( struct san_device *sandev ) {
 
 	/* Add to list of SAN devices */
 	list_add_tail ( &sandev->list, &san_devices );
+	DBGC ( sandev, "SAN %#02x registered\n", sandev->drive );
 
 	return 0;
 }
@@ -560,4 +573,30 @@ void unregister_sandev ( struct san_device *sandev ) {
 
 	/* Remove from list of SAN devices */
 	list_del ( &sandev->list );
+	DBGC ( sandev, "SAN %#02x unregistered\n", sandev->drive );
+}
+
+/** The "san-drive" setting */
+const struct setting san_drive_setting __setting ( SETTING_SANBOOT_EXTRA,
+						   san-drive ) = {
+	.name = "san-drive",
+	.description = "SAN drive number",
+	.tag = DHCP_EB_SAN_DRIVE,
+	.type = &setting_type_uint8,
+};
+
+/**
+ * Get default SAN drive number
+ *
+ * @ret drive		Default drive number
+ */
+unsigned int san_default_drive ( void ) {
+	unsigned long drive;
+
+	/* Use "san-drive" setting, if specified */
+	if ( fetch_uint_setting ( NULL, &san_drive_setting, &drive ) >= 0 )
+		return drive;
+
+	/* Otherwise, default to booting from first hard disk */
+	return SAN_DEFAULT_DRIVE;
 }
