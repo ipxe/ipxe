@@ -64,6 +64,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define SAN_COMMAND_TIMEOUT ( 15 * TICKS_PER_SEC )
 
+/**
+ * Number of times to retry commands
+ *
+ * We may need to retry commands.  For example, the underlying
+ * connection may be closed by the SAN target due to an inactivity
+ * timeout, or the SAN target may return pointless "error" messages
+ * such as "SCSI power-on occurred".
+ */
+#define SAN_COMMAND_MAX_RETRIES 10
+
 /** List of SAN devices */
 LIST_HEAD ( san_devices );
 
@@ -331,36 +341,42 @@ sandev_command ( struct san_device *sandev,
 		 int ( * command ) ( struct san_device *sandev,
 				     const union san_command_params *params ),
 		 const union san_command_params *params ) {
+	unsigned int retries;
 	int rc;
 
 	/* Sanity check */
 	assert ( ! timer_running ( &sandev->timer ) );
 
-	/* Reopen block device if applicable */
-	if ( sandev_needs_reopen ( sandev ) &&
-	     ( ( rc = sandev_reopen ( sandev ) ) != 0 ) ) {
-	     goto err_reopen;
+	/* (Re)try command */
+	for ( retries = 0 ; retries < SAN_COMMAND_MAX_RETRIES ; retries++ ) {
+
+		/* Reopen block device if applicable */
+		if ( sandev_needs_reopen ( sandev ) &&
+		     ( ( rc = sandev_reopen ( sandev ) ) != 0 ) ) {
+			continue;
+		}
+
+		/* Start expiry timer */
+		start_timer_fixed ( &sandev->timer, SAN_COMMAND_TIMEOUT );
+
+		/* Initiate command */
+		if ( ( rc = command ( sandev, params ) ) != 0 ) {
+			stop_timer ( &sandev->timer );
+			continue;
+		}
+
+		/* Wait for command to complete */
+		while ( timer_running ( &sandev->timer ) )
+			step();
+
+		/* Exit on success */
+		if ( ( rc = sandev->command_rc ) == 0 )
+			return 0;
 	}
 
-	/* Start expiry timer */
-	start_timer_fixed ( &sandev->timer, SAN_COMMAND_TIMEOUT );
+	/* Sanity check */
+	assert ( ! timer_running ( &sandev->timer ) );
 
-	/* Initiate command */
-	if ( ( rc = command ( sandev, params ) ) != 0 )
-		goto err_op;
-
-	/* Wait for command to complete */
-	while ( timer_running ( &sandev->timer ) )
-		step();
-
-	/* Collect return status */
-	rc = sandev->command_rc;
-
-	return rc;
-
- err_op:
-	stop_timer ( &sandev->timer );
- err_reopen:
 	return rc;
 }
 
