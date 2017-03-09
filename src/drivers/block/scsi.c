@@ -371,8 +371,7 @@ static void scsicmd_free ( struct refcnt *refcnt ) {
 	struct scsi_command *scsicmd =
 		container_of ( refcnt, struct scsi_command, refcnt );
 
-	/* Remove from list of commands */
-	list_del ( &scsicmd->list );
+	/* Drop reference to SCSI device */
 	scsidev_put ( scsicmd->scsidev );
 
 	/* Free command */
@@ -395,6 +394,10 @@ static void scsicmd_close ( struct scsi_command *scsicmd, int rc ) {
 
 	/* Shut down interfaces */
 	intfs_shutdown ( rc, &scsicmd->scsi, &scsicmd->block, NULL );
+
+	/* Remove from list of commands and drop list's reference */
+	list_del ( &scsicmd->list );
+	scsicmd_put ( scsicmd );
 }
 
 /**
@@ -733,9 +736,8 @@ static int scsidev_command ( struct scsi_device *scsidev,
 	if ( ( rc = scsicmd_command ( scsicmd ) ) != 0 )
 		goto err_command;
 
-	/* Attach to parent interface, mortalise self, and return */
+	/* Attach to parent interface, transfer reference to list, and return */
 	intf_plug_plug ( &scsicmd->block, block );
-	ref_put ( &scsicmd->refcnt );
 	return 0;
 
  err_command:
@@ -843,11 +845,8 @@ static void scsidev_close ( struct scsi_device *scsidev, int rc ) {
 			 NULL );
 
 	/* Shut down any remaining commands */
-	list_for_each_entry_safe ( scsicmd, tmp, &scsidev->cmds, list ) {
-		scsicmd_get ( scsicmd );
+	list_for_each_entry_safe ( scsicmd, tmp, &scsidev->cmds, list )
 		scsicmd_close ( scsicmd, rc );
-		scsicmd_put ( scsicmd );
-	}
 }
 
 /** SCSI device block interface operations */
