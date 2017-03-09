@@ -394,8 +394,7 @@ static void scsicmd_close ( struct scsi_command *scsicmd, int rc ) {
 	}
 
 	/* Shut down interfaces */
-	intf_shutdown ( &scsicmd->scsi, rc );
-	intf_shutdown ( &scsicmd->block, rc );
+	intfs_shutdown ( rc, &scsicmd->scsi, &scsicmd->block, NULL );
 }
 
 /**
@@ -840,9 +839,8 @@ static void scsidev_close ( struct scsi_device *scsidev, int rc ) {
 	process_del ( &scsidev->process );
 
 	/* Shut down interfaces */
-	intf_shutdown ( &scsidev->block, rc );
-	intf_shutdown ( &scsidev->scsi, rc );
-	intf_shutdown ( &scsidev->ready, rc );
+	intfs_shutdown ( rc, &scsidev->block, &scsidev->scsi, &scsidev->ready,
+			 NULL );
 
 	/* Shut down any remaining commands */
 	list_for_each_entry_safe ( scsicmd, tmp, &scsidev->cmds, list ) {
