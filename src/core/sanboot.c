@@ -171,8 +171,7 @@ static void sandev_command_expired ( struct retry_timer *timer,
 static void sandev_restart ( struct san_device *sandev, int rc ) {
 
 	/* Restart block device interface */
-	intf_nullify ( &sandev->command ); /* avoid potential loops */
-	intf_restart ( &sandev->block, rc );
+	intfs_restart ( rc, &sandev->command, &sandev->block, NULL );
 
 	/* Close any outstanding command */
 	sandev_command_close ( sandev, rc );
