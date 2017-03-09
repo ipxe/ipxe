@@ -185,6 +185,9 @@ struct intel_descriptor {
 #define INTEL_xDCTL 0x28
 #define INTEL_xDCTL_ENABLE	0x02000000UL	/**< Queue enable */
 
+/** Maximum time to wait for queue disable, in milliseconds */
+#define INTEL_DISABLE_MAX_WAIT_MS 100
+
 /** Receive Address Low */
 #define INTEL_RAL0 0x05400UL
 
@@ -330,6 +333,7 @@ extern void intel_describe_tx_adv ( struct intel_descriptor *tx,
 				    physaddr_t addr, size_t len );
 extern void intel_describe_rx ( struct intel_descriptor *rx,
 				physaddr_t addr, size_t len );
+extern void intel_reset_ring ( struct intel_nic *intel, unsigned int reg );
 extern int intel_create_ring ( struct intel_nic *intel,
 			       struct intel_ring *ring );
 extern void intel_destroy_ring ( struct intel_nic *intel,

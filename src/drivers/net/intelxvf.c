@@ -216,6 +216,7 @@ static int intelxvf_open ( struct net_device *netdev ) {
 	uint32_t rxdctl;
 	uint32_t srrctl;
 	uint32_t dca_rxctrl;
+	unsigned int i;
 	int vlan_thing;
 	int rc;
 
@@ -252,6 +253,15 @@ static int intelxvf_open ( struct net_device *netdev ) {
 		goto err_mbox_set_mtu;
 	}
 
+	/* Reset all descriptor rings */
+	for ( i = 0 ; i < INTELXVF_NUM_RINGS ; i++ ) {
+		intel_reset_ring ( intel, INTELXVF_TD ( i ) );
+		intel_reset_ring ( intel, INTELXVF_RD ( i ) );
+	}
+
+	/* Reset packet split receive type register */
+	writel ( 0, intel->regs + INTELXVF_PSRTYPE );
+
 	/* Get queue configuration.  Ignore failures, since the host
 	 * may not support this message.
 	 */
@@ -260,9 +270,9 @@ static int intelxvf_open ( struct net_device *netdev ) {
 	if ( vlan_thing ) {
 		DBGC ( intel, "INTEL %p stripping VLAN tags (thing=%d)\n",
 		       intel, vlan_thing );
-		rxdctl = readl ( intel->regs + INTELXVF_RD + INTEL_xDCTL );
+		rxdctl = readl ( intel->regs + INTELXVF_RD(0) + INTEL_xDCTL );
 		rxdctl |= INTELX_RXDCTL_VME;
-		writel ( rxdctl, intel->regs + INTELXVF_RD + INTEL_xDCTL );
+		writel ( rxdctl, intel->regs + INTELXVF_RD(0) + INTEL_xDCTL );
 	}
 
 	/* Create transmit descriptor ring */
@@ -283,9 +293,12 @@ static int intelxvf_open ( struct net_device *netdev ) {
 	/* Configure receive buffer sizes and set receive descriptor type */
 	srrctl = readl ( intel->regs + INTELXVF_SRRCTL );
 	srrctl &= ~( INTELXVF_SRRCTL_BSIZE_MASK |
+		     INTELXVF_SRRCTL_BHDRSIZE_MASK |
 		     INTELXVF_SRRCTL_DESCTYPE_MASK );
 	srrctl |= ( INTELXVF_SRRCTL_BSIZE_DEFAULT |
-		    INTELXVF_SRRCTL_DESCTYPE_DEFAULT );
+		    INTELXVF_SRRCTL_BHDRSIZE_DEFAULT |
+		    INTELXVF_SRRCTL_DESCTYPE_DEFAULT |
+		    INTELXVF_SRRCTL_DROP_EN );
 	writel ( srrctl, intel->regs + INTELXVF_SRRCTL );
 
 	/* Clear "must-be-zero" bit for direct cache access (DCA).  We
@@ -434,9 +447,9 @@ static int intelxvf_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intel, 0, sizeof ( *intel ) );
 	intel_init_mbox ( &intel->mbox, INTELXVF_MBCTRL, INTELXVF_MBMEM );
-	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTELXVF_TD,
+	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTELXVF_TD(0),
 			  intel_describe_tx_adv );
-	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTELXVF_RD,
+	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTELXVF_RD(0),
 			  intel_describe_rx );
 
 	/* Fix up PCI device */

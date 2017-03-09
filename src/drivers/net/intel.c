@@ -425,6 +425,61 @@ void intel_describe_rx ( struct intel_descriptor *rx, physaddr_t addr,
  */
 
 /**
+ * Disable descriptor ring
+ *
+ * @v intel		Intel device
+ * @v reg		Register block
+ * @ret rc		Return status code
+ */
+static int intel_disable_ring ( struct intel_nic *intel, unsigned int reg ) {
+	uint32_t dctl;
+	unsigned int i;
+
+	/* Disable ring */
+	writel ( 0, ( intel->regs + reg + INTEL_xDCTL ) );
+
+	/* Wait for disable to complete */
+	for ( i = 0 ; i < INTEL_DISABLE_MAX_WAIT_MS ; i++ ) {
+
+		/* Check if ring is disabled */
+		dctl = readl ( intel->regs + reg + INTEL_xDCTL );
+		if ( ! ( dctl & INTEL_xDCTL_ENABLE ) )
+			return 0;
+
+		/* Delay */
+		mdelay ( 1 );
+	}
+
+	DBGC ( intel, "INTEL %p ring %05x timed out waiting for disable "
+	       "(dctl %08x)\n", intel, reg, dctl );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Reset descriptor ring
+ *
+ * @v intel		Intel device
+ * @v reg		Register block
+ * @ret rc		Return status code
+ */
+void intel_reset_ring ( struct intel_nic *intel, unsigned int reg ) {
+
+	/* Disable ring.  Ignore errors and continue to reset the ring anyway */
+	intel_disable_ring ( intel, reg );
+
+	/* Clear ring length */
+	writel ( 0, ( intel->regs + reg + INTEL_xDLEN ) );
+
+	/* Clear ring address */
+	writel ( 0, ( intel->regs + reg + INTEL_xDBAH ) );
+	writel ( 0, ( intel->regs + reg + INTEL_xDBAL ) );
+
+	/* Reset head and tail pointers */
+	writel ( 0, ( intel->regs + reg + INTEL_xDH ) );
+	writel ( 0, ( intel->regs + reg + INTEL_xDT ) );
+}
+
+/**
  * Create descriptor ring
  *
  * @v intel		Intel device
@@ -484,12 +539,8 @@ int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
  */
 void intel_destroy_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 
-	/* Clear ring length */
-	writel ( 0, ( intel->regs + ring->reg + INTEL_xDLEN ) );
-
-	/* Clear ring address */
-	writel ( 0, ( intel->regs + ring->reg + INTEL_xDBAL ) );
-	writel ( 0, ( intel->regs + ring->reg + INTEL_xDBAH ) );
+	/* Reset ring */
+	intel_reset_ring ( intel, ring->reg );
 
 	/* Free descriptor ring */
 	free_dma ( ring->desc, ring->len );
