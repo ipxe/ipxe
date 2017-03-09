@@ -109,10 +109,6 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_ENOTSUP_TARGET_STATUS )
 #define EINFO_ENOTSUP_TARGET_STATUS \
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x04, "Unsupported target status" )
-#define ENOTSUP_NOP_IN \
-	__einfo_error ( EINFO_ENOTSUP_NOP_IN )
-#define EINFO_ENOTSUP_NOP_IN \
-	__einfo_uniqify ( EINFO_ENOTSUP, 0x05, "Unsupported NOP-In received" )
 #define EPERM_INITIATOR_AUTHENTICATION \
 	__einfo_error ( EINFO_EPERM_INITIATOR_AUTHENTICATION )
 #define EINFO_EPERM_INITIATOR_AUTHENTICATION \
@@ -620,12 +616,15 @@ static int iscsi_rx_nop_in ( struct iscsi_session *iscsi,
 	 * sent as ping requests, but we can happily accept NOP-Ins
 	 * sent merely to update CmdSN.
 	 */
-	if ( nop_in->ttt != htonl ( ISCSI_TAG_RESERVED ) ) {
-		DBGC ( iscsi, "iSCSI %p received unsupported NOP-In with TTT "
-		       "%08x\n", iscsi, ntohl ( nop_in->ttt ) );
-		return -ENOTSUP_NOP_IN;
-	}
+	if ( nop_in->ttt == htonl ( ISCSI_TAG_RESERVED ) )
+		return 0;
 
+	/* Ignore any other NOP-Ins.  The target may eventually
+	 * disconnect us for failing to respond, but this minimises
+	 * unnecessary connection closures.
+	 */
+	DBGC ( iscsi, "iSCSI %p received unsupported NOP-In with TTT %08x\n",
+	       iscsi, ntohl ( nop_in->ttt ) );
 	return 0;
 }
 
