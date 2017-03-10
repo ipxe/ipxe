@@ -26,7 +26,6 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/net80211.h>
 
 /* This block of functions are from kernel.h v3.0.1 */
-#define ARRAY_SIZE(arr)		(sizeof(arr) / sizeof((arr)[0]))
 #define DIV_ROUND_UP(n,d)	(((n) + (d) - 1) / (d))
 #define BITS_PER_BYTE		8
 #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))

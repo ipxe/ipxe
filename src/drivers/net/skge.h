@@ -65,9 +65,6 @@ FILE_LICENCE ( GPL2_ONLY );
 #define SUPPORTED_TP			(1 << 7)
 #define SUPPORTED_FIBRE			(1 << 10)
 
-/* from kernel.h */
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-
 /* ----------------------------------- */
 
 #define PCI_STATUS_ERROR_BITS (PCI_STATUS_DETECTED_PARITY | \

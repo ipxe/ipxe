@@ -656,6 +656,13 @@ char __debug_disable(OBJECT) = ( DBGLVL_MAX & ~DBGLVL_DFLT );
 #endif /* ASSEMBLY */
 
 /**
+ * Array size
+ */
+#ifndef ASSEMBLY
+#define ARRAY_SIZE(array) ( sizeof (array) / sizeof ( (array)[0] ) )
+#endif /* ASSEMBLY */
+
+/**
  * @defgroup licences Licence declarations
  *
  * For reasons that are partly historical, various different files

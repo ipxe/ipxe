@@ -3284,8 +3284,6 @@ struct tg3 {
 	u16				subsystem_device;
 };
 
-#define ARRAY_SIZE(x) ( sizeof(x) / sizeof((x)[0]) )
-
 #define TG3_TX_RING_SIZE		512
 #define TG3_DEF_TX_RING_PENDING		(TG3_TX_RING_SIZE - 1)
 
