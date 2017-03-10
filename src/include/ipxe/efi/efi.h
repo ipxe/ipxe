@@ -157,6 +157,7 @@ struct efi_config_table {
 #define EEFI( efirc ) EPLATFORM ( EINFO_EPLATFORM, efirc )
 
 extern EFI_GUID efi_absolute_pointer_protocol_guid;
+extern EFI_GUID efi_acpi_table_protocol_guid;
 extern EFI_GUID efi_apple_net_boot_protocol_guid;
 extern EFI_GUID efi_arp_protocol_guid;
 extern EFI_GUID efi_arp_service_binding_protocol_guid;
