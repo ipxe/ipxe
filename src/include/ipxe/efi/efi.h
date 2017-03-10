@@ -26,6 +26,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* EFI headers rudely redefine NULL */
 #undef NULL
 
+/* EFI headers redefine ARRAY_SIZE */
+#undef ARRAY_SIZE
+
 /* EFI headers expect ICC to define __GNUC__ */
 #if defined ( __ICC ) && ! defined ( __GNUC__ )
 #define __GNUC__ 1

@@ -1,7 +1,7 @@
 /** @file
-  ACPI 6.0 definitions from the ACPI Specification Revision 6.0 April, 2015.
+  ACPI 6.0 definitions from the ACPI Specification Revision 6.0 Errata A January, 2016.
 
-  Copyright (c) 2015 - 2016, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2015 - 2017, Intel Corporation. All rights reserved.<BR>
   (C) Copyright 2015-2016 Hewlett Packard Enterprise Development LP<BR>
   This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
@@ -292,9 +292,9 @@ typedef struct {
 } EFI_ACPI_6_0_MULTIPLE_APIC_DESCRIPTION_TABLE_HEADER;
 
 ///
-/// MADT Revision (as defined in ACPI 6.0 spec.)
+/// MADT Revision (as defined in ACPI 6.0 Errata A spec.)
 ///
-#define EFI_ACPI_6_0_MULTIPLE_APIC_DESCRIPTION_TABLE_REVISION 0x03
+#define EFI_ACPI_6_0_MULTIPLE_APIC_DESCRIPTION_TABLE_REVISION 0x04
 
 ///
 /// Multiple APIC Flags
@@ -2254,9 +2254,9 @@ typedef struct {
 #define EFI_ACPI_6_0_ISCSI_BOOT_FIRMWARE_TABLE_SIGNATURE  SIGNATURE_32('i', 'B', 'F', 'T')
 
 ///
-/// "IORT" Interrupt Source Override
+/// "IORT" I/O Remapping Table
 ///
-#define EFI_ACPI_6_0_INTERRUPT_SOURCE_OVERRIDE_SIGNATURE  SIGNATURE_32('I', 'O', 'R', 'T')
+#define EFI_ACPI_6_0_IO_REMAPPING_TABLE_SIGNATURE  SIGNATURE_32('I', 'O', 'R', 'T')
 
 ///
 /// "IVRS" I/O Virtualization Reporting Structure

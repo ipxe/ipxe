@@ -6,7 +6,7 @@
   environment. There are a set of base libraries in the Mde Package that can
   be used to implement base modules.
 
-Copyright (c) 2006 - 2016, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2017, Intel Corporation. All rights reserved.<BR>
 Portions copyright (c) 2008 - 2009, Apple Inc. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
@@ -64,6 +64,29 @@ VERIFY_SIZE_OF (INT64, 8);
 VERIFY_SIZE_OF (UINT64, 8);
 VERIFY_SIZE_OF (CHAR8, 1);
 VERIFY_SIZE_OF (CHAR16, 2);
+
+//
+// The following three enum types are used to verify that the compiler
+// configuration for enum types is compliant with Section 2.3.1 of the
+// UEFI 2.3 Specification. These enum types and enum values are not
+// intended to be used. A prefix of '__' is used avoid conflicts with
+// other types.
+//
+typedef enum {
+  __VerifyUint8EnumValue = 0xff
+} __VERIFY_UINT8_ENUM_SIZE;
+
+typedef enum {
+  __VerifyUint16EnumValue = 0xffff
+} __VERIFY_UINT16_ENUM_SIZE;
+
+typedef enum {
+  __VerifyUint32EnumValue = 0xffffffff
+} __VERIFY_UINT32_ENUM_SIZE;
+
+VERIFY_SIZE_OF (__VERIFY_UINT8_ENUM_SIZE, 4);
+VERIFY_SIZE_OF (__VERIFY_UINT16_ENUM_SIZE, 4);
+VERIFY_SIZE_OF (__VERIFY_UINT32_ENUM_SIZE, 4);
 
 //
 // The Microsoft* C compiler can removed references to unreferenced data items
@@ -244,6 +267,20 @@ typedef struct {
   UINT8   Data4[8];
 } GUID;
 
+///
+/// 4-byte buffer. An IPv4 internet protocol address.
+///
+typedef struct {
+  UINT8 Addr[4];
+} IPv4_ADDRESS;
+
+///
+/// 16-byte buffer. An IPv6 internet protocol address.
+///
+typedef struct {
+  UINT8 Addr[16];
+} IPv6_ADDRESS;
+
 //
 // 8-bytes unsigned value that represents a physical system address.
 //
@@ -323,6 +360,11 @@ struct _LIST_ENTRY {
 /// NULL pointer (VOID *)
 ///
 #define NULL  ((VOID *) 0)
+
+//
+// Null character
+//
+#define CHAR_NULL             0x0000
 
 ///
 /// Maximum values for common UEFI Data Types
@@ -1212,6 +1254,19 @@ typedef UINTN RETURN_STATUS;
   **/
   #define RETURN_ADDRESS(L)     ((VOID *) 0)
 #endif
+
+/**
+  Return the number of elements in an array.
+
+  @param  Array  An object of array type. Array is only used as an argument to
+                 the sizeof operator, therefore Array is never evaluated. The
+                 caller is responsible for ensuring that Array's type is not
+                 incomplete; that is, Array must have known constant size.
+
+  @return The number of elements in Array. The result has type UINTN.
+
+**/
+#define ARRAY_SIZE(Array) (sizeof (Array) / sizeof ((Array)[0]))
 
 #endif
 
