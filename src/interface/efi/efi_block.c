@@ -46,14 +46,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/process.h>
 #include <ipxe/sanboot.h>
 #include <ipxe/iso9660.h>
+#include <ipxe/acpi.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
+#include <ipxe/efi/Protocol/AcpiTable.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/efi_block.h>
+
+/** ACPI table protocol protocol */
+static EFI_ACPI_TABLE_PROTOCOL *acpi;
+EFI_REQUEST_PROTOCOL ( EFI_ACPI_TABLE_PROTOCOL, &acpi );
 
 /** Boot filename */
 static wchar_t efi_block_boot_filename[] = EFI_REMOVABLE_MEDIA_FILE_NAME;
@@ -399,13 +405,76 @@ static void efi_block_unhook ( unsigned int drive ) {
  * @ret rc		Return status code
  */
 static int efi_block_describe ( unsigned int drive ) {
+	static union {
+		/** ACPI header */
+		struct acpi_description_header acpi;
+		/** Padding */
+		char pad[768];
+	} xbftab;
+	static UINTN key;
 	struct san_device *sandev;
+	size_t len;
+	EFI_STATUS efirc;
+	int rc;
 
 	/* Find SAN device */
 	sandev = sandev_find ( drive );
 	if ( ! sandev ) {
 		DBG ( "EFIBLK cannot find drive %#02x\n", drive );
 		return -ENODEV;
+	}
+
+	/* Sanity check */
+	if ( ! acpi ) {
+		DBGC ( sandev, "EFIBLK %#02x has no ACPI table protocol\n",
+		       sandev->drive );
+		return -ENOTSUP;
+	}
+
+	/* Remove existing table, if any */
+	if ( key ) {
+		if ( ( efirc = acpi->UninstallAcpiTable ( acpi, key ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( sandev, "EFIBLK %#02x could not uninstall ACPI "
+			       "table: %s\n", sandev->drive, strerror ( rc ) );
+			/* Continue anyway */
+		}
+		key = 0;
+	}
+
+	/* Reopen block device if necessary */
+	if ( sandev_needs_reopen ( sandev ) &&
+	     ( ( rc = sandev_reopen ( sandev ) ) != 0 ) )
+		return rc;
+
+	/* Clear table */
+	memset ( &xbftab, 0, sizeof ( xbftab ) );
+
+	/* Fill in common parameters */
+	strncpy ( xbftab.acpi.oem_id, "FENSYS",
+		  sizeof ( xbftab.acpi.oem_id ) );
+	strncpy ( xbftab.acpi.oem_table_id, "iPXE",
+		  sizeof ( xbftab.acpi.oem_table_id ) );
+
+	/* Fill in remaining parameters */
+	if ( ( rc = acpi_describe ( &sandev->block, &xbftab.acpi,
+				    sizeof ( xbftab ) ) ) != 0 ) {
+		DBGC ( sandev, "EFIBLK %#02x could not create ACPI "
+		       "description: %s\n", sandev->drive, strerror ( rc ) );
+		return rc;
+	}
+	len = le32_to_cpu ( xbftab.acpi.length );
+
+	/* Fix up ACPI checksum */
+	acpi_fix_checksum ( &xbftab.acpi );
+
+	/* Install table */
+	if ( ( efirc = acpi->InstallAcpiTable ( acpi, &xbftab, len,
+						&key ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( sandev, "EFIBLK %#02x could not install ACPI table: "
+		       "%s\n", sandev->drive, strerror ( rc ) );
+		return rc;
 	}
 
 	return 0;
