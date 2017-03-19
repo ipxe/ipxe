@@ -13,7 +13,6 @@ SRCDIRS		+= arch/x86/core
 SRCDIRS		+= arch/x86/image
 SRCDIRS		+= arch/x86/interface/pcbios
 SRCDIRS		+= arch/x86/interface/pxe
-SRCDIRS		+= arch/x86/interface/pxeparent
 SRCDIRS		+= arch/x86/interface/efi
 SRCDIRS		+= arch/x86/interface/vmware
 SRCDIRS		+= arch/x86/interface/syslinux
