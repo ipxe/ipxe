@@ -99,6 +99,12 @@ static uint8_t dhcp_request_options_data[] = {
 	DHCP_END
 };
 
+/** Settings copied in to all DHCP requests */
+static const struct setting * dhcp_request_settings[] = {
+	&user_class_setting,
+	&vendor_class_setting,
+};
+
 /** DHCP server address setting */
 const struct setting dhcp_server_setting __setting ( SETTING_MISC,
 						     dhcp-server ) = {
@@ -975,11 +981,13 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 	struct dhcp_netdev_desc dhcp_desc;
 	struct dhcp_client_id client_id;
 	struct dhcp_client_uuid client_uuid;
+	const struct setting *setting;
 	uint8_t *dhcp_features;
 	size_t dhcp_features_len;
 	size_t ll_addr_len;
-	void *user_class;
+	void *raw;
 	ssize_t len;
+	unsigned int i;
 	int rc;
 
 	/* Create DHCP packet */
@@ -1047,19 +1055,23 @@ int dhcp_create_request ( struct dhcp_packet *dhcppkt,
 		}
 	}
 
-	/* Add user class, if we have one. */
-	if ( ( len = fetch_raw_setting_copy ( NULL, &user_class_setting,
-					      &user_class ) ) >= 0 ) {
-		if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_USER_CLASS_ID,
-					    user_class, len ) ) != 0 ) {
-			DBG ( "DHCP could not set user class: %s\n",
-			      strerror ( rc ) );
-			goto err_store_user_class;
+	/* Add request settings, if applicable */
+	for ( i = 0 ; i < ( sizeof ( dhcp_request_settings ) /
+			    sizeof ( dhcp_request_settings[0] ) ) ; i++ ) {
+		setting = dhcp_request_settings[i];
+		if ( ( len = fetch_raw_setting_copy ( NULL, setting,
+						      &raw ) ) >= 0 ) {
+			rc = dhcppkt_store ( dhcppkt, setting->tag, raw, len );
+			free ( raw );
+			if ( rc != 0 ) {
+				DBG ( "DHCP could not set %s: %s\n",
+				      setting->name, strerror ( rc ) );
+				goto err_store_raw;
+			}
 		}
 	}
 
- err_store_user_class:
-	free ( user_class );
+ err_store_raw:
  err_store_client_uuid:
  err_store_client_id:
  err_store_busid:

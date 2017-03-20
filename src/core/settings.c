@@ -2429,6 +2429,15 @@ const struct setting user_class_setting __setting ( SETTING_HOST_EXTRA,
 	.type = &setting_type_string,
 };
 
+/** DHCP vendor class setting */
+const struct setting vendor_class_setting __setting ( SETTING_HOST_EXTRA,
+						      vendor-class ) = {
+	.name = "vendor-class",
+	.description = "DHCP vendor class",
+	.tag = DHCP_VENDOR_CLASS_ID,
+	.type = &setting_type_string,
+};
+
 /******************************************************************************
  *
  * Built-in settings block
