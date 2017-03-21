@@ -448,28 +448,31 @@ int vmbus_open ( struct vmbus_device *vmdev,
 	/* Post message */
 	if ( ( rc = vmbus_post_message ( hv, &open.header,
 					 sizeof ( open ) ) ) != 0 )
-		return rc;
+		goto err_post_message;
 
 	/* Wait for response */
 	if ( ( rc = vmbus_wait_for_message ( hv,
 					     VMBUS_OPEN_CHANNEL_RESULT ) ) != 0)
-		return rc;
+		goto err_wait_for_message;
 
 	/* Check response */
 	if ( opened->channel != cpu_to_le32 ( vmdev->channel ) ) {
 		DBGC ( vmdev, "VMBUS %s unexpected opened channel %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( opened->channel ) );
-		return -EPROTO;
+		rc = -EPROTO;
+		goto err_check_response;
 	}
 	if ( opened->id != open_id /* Non-endian */ ) {
 		DBGC ( vmdev, "VMBUS %s unexpected open ID %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( opened->id ) );
-		return -EPROTO;
+		rc = -EPROTO;
+		goto err_check_response;
 	}
 	if ( opened->status != 0 ) {
 		DBGC ( vmdev, "VMBUS %s open failed: %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( opened->status ) );
-		return -EPROTO;
+		rc = -EPROTO;
+		goto err_check_response;
 	}
 
 	/* Store channel parameters */
@@ -488,6 +491,9 @@ int vmbus_open ( struct vmbus_device *vmdev,
 		( virt_to_phys ( vmdev->out ) + len ) );
 	return 0;
 
+ err_check_response:
+ err_wait_for_message:
+ err_post_message:
 	vmbus_gpadl_teardown ( vmdev, vmdev->gpadl );
  err_establish:
 	free_dma ( ring, len );
