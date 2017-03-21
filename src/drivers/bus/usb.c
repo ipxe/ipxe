@@ -1022,7 +1022,8 @@ static int usb_describe ( struct usb_device *usb,
 	}
 
 	/* Describe function */
-	memcpy ( &desc->class, &interface->class, sizeof ( desc->class ) );
+	memcpy ( &desc->class.class, &interface->class,
+		 sizeof ( desc->class.class ) );
 	desc->count = 1;
 	interfaces[0] = first;
 
