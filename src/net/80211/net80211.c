@@ -1586,9 +1586,6 @@ struct list_head *net80211_probe_finish_all ( struct net80211_probe_ctx *ctx )
 {
 	struct list_head *beacons = ctx->beacons;
 
-	if ( ! ctx )
-		return NULL;
-
 	net80211_keep_mgmt ( ctx->dev, ctx->old_keep_mgmt );
 
 	if ( ctx->probe )
