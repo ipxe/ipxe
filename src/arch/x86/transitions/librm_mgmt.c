@@ -197,7 +197,8 @@ static void * ioremap_pages ( unsigned long bus_addr, size_t len ) {
 	DBGC ( &io_pages, "IO mapping %08lx+%zx\n", bus_addr, len );
 
 	/* Sanity check */
-	assert ( len != 0 );
+	if ( ! len )
+		return NULL;
 
 	/* Round down start address to a page boundary */
 	start = ( bus_addr & ~( IO_PAGE_SIZE - 1 ) );
