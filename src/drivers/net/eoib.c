@@ -870,8 +870,9 @@ static void eoib_duplicate ( struct eoib_device *eoib,
 
  err_post_send:
  err_path:
+	list_del ( &copy->list );
  err_alloc:
-	netdev_tx_complete_err ( netdev, copy, rc );
+	netdev_tx_err ( netdev, copy, rc );
 }
 
 /**
