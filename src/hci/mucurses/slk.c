@@ -83,7 +83,7 @@ static void _print_label ( struct _softlabel sl ) {
 	space_ch = ' ';
 
 	// protect against gaps in the soft label keys array
-	if ( sl.label == NULL ) {
+	if ( ! sl.label[0] ) {
 		memset( str, space_ch, (size_t)(slks->max_label_len) );
 	} else {
 		/* we need to pad the label with varying amounts of leading
