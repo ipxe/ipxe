@@ -1558,7 +1558,7 @@ static void xhci_transfer ( struct xhci_device *xhci,
 	}
 
 	/* Identify endpoint */
-	if ( ( trb->endpoint > XHCI_CTX_END ) ||
+	if ( ( trb->endpoint >= XHCI_CTX_END ) ||
 	     ( ( endpoint = slot->endpoint[trb->endpoint] ) == NULL ) ) {
 		DBGC ( xhci, "XHCI %s slot %d transfer event invalid epid "
 		       "%d:\n", xhci->name, slot->id, trb->endpoint );
