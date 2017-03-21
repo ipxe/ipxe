@@ -306,11 +306,11 @@ int xfer_vprintf ( struct interface *intf, const char *format,
 	/* Create temporary string */
 	va_copy ( args_tmp, args );
 	len = vasprintf ( &buf, format, args );
+	va_end ( args_tmp );
 	if ( len < 0 ) {
 		rc = len;
 		goto err_asprintf;
 	}
-	va_end ( args_tmp );
 
 	/* Transmit string */
 	if ( ( rc = xfer_deliver_raw ( intf, buf, len ) ) != 0 )
