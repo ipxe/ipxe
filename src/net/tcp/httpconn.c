@@ -277,6 +277,10 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 
 	/* Allocate and initialise structure */
 	conn = zalloc ( sizeof ( *conn ) );
+	if ( ! conn ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 	ref_init ( &conn->refcnt, http_conn_free );
 	conn->uri = uri_get ( uri );
 	conn->scheme = scheme;
@@ -310,5 +314,6 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 		conn->scheme->name, conn->uri->host, port, strerror ( rc ) );
 	http_conn_close ( conn, rc );
 	ref_put ( &conn->refcnt );
+ err_alloc:
 	return rc;
 }
