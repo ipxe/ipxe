@@ -400,12 +400,16 @@ static int slam_pull_value ( struct slam_request *slam,
 		return -EINVAL;
 	}
 
-	/* Read value */
+	/* Strip value */
 	iob_pull ( iobuf, len );
-	*value = ( *data & 0x1f );
-	while ( --len ) {
-		*value <<= 8;
-		*value |= *(++data);
+
+	/* Read value, if applicable */
+	if ( value ) {
+		*value = ( *data & 0x1f );
+		while ( --len ) {
+			*value <<= 8;
+			*value |= *(++data);
+		}
 	}
 
 	return 0;
