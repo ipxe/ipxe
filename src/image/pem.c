@@ -145,7 +145,7 @@ static int pem_asn1 ( struct image *image, size_t offset,
 	*cursor = malloc ( sizeof ( **cursor ) + decoded_max_len );
 	if ( ! *cursor ) {
 		rc = -ENOMEM;
-		goto err_alloc_decoded;
+		goto err_alloc_cursor;
 	}
 	decoded = ( ( ( void * ) *cursor ) + sizeof ( **cursor ) );
 
@@ -172,8 +172,9 @@ static int pem_asn1 ( struct image *image, size_t offset,
 	return offset;
 
  err_decode:
-	free ( decoded );
- err_alloc_decoded:
+	free ( *cursor );
+	*cursor = NULL;
+ err_alloc_cursor:
 	free ( encoded );
  err_alloc_encoded:
  err_end:
