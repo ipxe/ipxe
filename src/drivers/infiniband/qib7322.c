@@ -675,7 +675,7 @@ static int qib7322_init_send ( struct qib7322 *qib7322 ) {
 		rc = -ENOMEM;
 		goto err_alloc_sendbufavail;
 	}
-	memset ( qib7322->sendbufavail, 0, sizeof ( qib7322->sendbufavail ) );
+	memset ( qib7322->sendbufavail, 0, sizeof ( *qib7322->sendbufavail ) );
 
 	/* Program SendBufAvailAddr into the hardware */
 	memset ( &sendbufavailaddr, 0, sizeof ( sendbufavailaddr ) );
