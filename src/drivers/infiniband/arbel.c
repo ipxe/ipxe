@@ -1994,7 +1994,7 @@ static int arbel_map_vpm ( struct arbel *arbel,
 		if ( ( low - size ) >= start ) {
 			low -= size;
 			pa = low;
-		} else if ( ( high + size ) <= end ) {
+		} else if ( high <= ( end - size ) ) {
 			pa = high;
 			high += size;
 		} else {
