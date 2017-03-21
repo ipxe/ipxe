@@ -81,6 +81,7 @@ static void _print_label ( struct _softlabel sl ) {
 
 	assert ( slks->max_label_len <= SLK_MAX_LABEL_LEN );
 	space_ch = ' ';
+	memset ( str, 0, sizeof ( str ) );
 
 	// protect against gaps in the soft label keys array
 	if ( ! sl.label[0] ) {
