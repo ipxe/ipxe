@@ -68,8 +68,10 @@ struct pixel_buffer * alloc_pixbuf ( unsigned int width, unsigned int height ) {
 	pixbuf->len = ( width * height * sizeof ( uint32_t ) );
 
 	/* Check for multiplication overflow */
-	if ( ( ( pixbuf->len / sizeof ( uint32_t ) ) / width ) != height )
+	if ( ( width != 0 ) &&
+	     ( ( pixbuf->len / sizeof ( uint32_t ) ) / width ) != height ) {
 		goto err_overflow;
+	}
 
 	/* Allocate pixel data buffer */
 	pixbuf->data = umalloc ( pixbuf->len );
