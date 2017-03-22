@@ -697,7 +697,7 @@ static void tcp_xmit_sack ( struct tcp_connection *tcp, uint32_t sack_seq ) {
 		wsopt->wsopt.length = sizeof ( wsopt->wsopt );
 		wsopt->wsopt.scale = TCP_RX_WINDOW_SCALE;
 		spopt = iob_push ( iobuf, sizeof ( *spopt ) );
-		memset ( spopt->nop, TCP_OPTION_NOP, sizeof ( spopt ) );
+		memset ( spopt->nop, TCP_OPTION_NOP, sizeof ( spopt->nop ) );
 		spopt->spopt.kind = TCP_OPTION_SACK_PERMITTED;
 		spopt->spopt.length = sizeof ( spopt->spopt );
 	}
