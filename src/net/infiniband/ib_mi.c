@@ -341,18 +341,21 @@ void ib_destroy_madx ( struct ib_device *ibdev __unused,
  *
  * @v ibdev		Infiniband device
  * @v type		Queue pair type
- * @ret mi		Management agent, or NULL
+ * @v new_mi		New management interface to fill in
+ * @ret rc		Return status code
  */
-struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
-					 enum ib_queue_pair_type type ) {
+int ib_create_mi ( struct ib_device *ibdev, enum ib_queue_pair_type type,
+		   struct ib_mad_interface **new_mi ) {
 	struct ib_mad_interface *mi;
 	const char *name;
 	int rc;
 
 	/* Allocate and initialise fields */
 	mi = zalloc ( sizeof ( *mi ) );
-	if ( ! mi )
+	if ( ! mi ) {
+		rc = -ENOMEM;
 		goto err_alloc;
+	}
 	mi->ibdev = ibdev;
 	INIT_LIST_HEAD ( &mi->madx );
 
@@ -387,7 +390,8 @@ struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
 
 	/* Fill receive ring */
 	ib_refill_recv ( ibdev, mi->qp );
-	return mi;
+	*new_mi = mi;
+	return 0;
 
  err_modify_qp:
 	ib_destroy_qp ( ibdev, mi->qp );
@@ -396,7 +400,7 @@ struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
  err_create_cq:
 	free ( mi );
  err_alloc:
-	return NULL;
+	return rc;
 }
 
 /**

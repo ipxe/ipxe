@@ -666,10 +666,9 @@ int ib_open ( struct ib_device *ibdev ) {
 	}
 
 	/* Create subnet management interface */
-	ibdev->smi = ib_create_mi ( ibdev, IB_QPT_SMI );
-	if ( ! ibdev->smi ) {
-		DBGC ( ibdev, "IBDEV %s could not create SMI\n", ibdev->name );
-		rc = -ENOMEM;
+	if ( ( rc = ib_create_mi ( ibdev, IB_QPT_SMI, &ibdev->smi ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %s could not create SMI: %s\n",
+		       ibdev->name, strerror ( rc ) );
 		goto err_create_smi;
 	}
 
@@ -681,10 +680,9 @@ int ib_open ( struct ib_device *ibdev ) {
 	}
 
 	/* Create general services interface */
-	ibdev->gsi = ib_create_mi ( ibdev, IB_QPT_GSI );
-	if ( ! ibdev->gsi ) {
-		DBGC ( ibdev, "IBDEV %s could not create GSI\n", ibdev->name );
-		rc = -ENOMEM;
+	if ( ( rc = ib_create_mi ( ibdev, IB_QPT_GSI, &ibdev->gsi ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %s could not create GSI: %s\n",
+		       ibdev->name, strerror ( rc ) );
 		goto err_create_gsi;
 	}
 
