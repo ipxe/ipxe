@@ -466,7 +466,10 @@ static int sandev_parse_iso9660 ( struct san_device *sandev ) {
 		.type = ISO9660_TYPE_PRIMARY,
 		.id = ISO9660_ID,
 	};
-	struct iso9660_primary_descriptor *primary;
+	union {
+		struct iso9660_primary_descriptor primary;
+		char bytes[ISO9660_BLKSIZE];
+	} *scratch;
 	unsigned int blksize;
 	unsigned int blksize_shift;
 	unsigned int lba;
@@ -489,14 +492,14 @@ static int sandev_parse_iso9660 ( struct san_device *sandev ) {
 	count = ( 1 << blksize_shift );
 
 	/* Allocate scratch area */
-	primary = malloc ( ISO9660_BLKSIZE );
-	if ( ! primary ) {
+	scratch = malloc ( ISO9660_BLKSIZE );
+	if ( ! scratch ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
 
 	/* Read primary volume descriptor */
-	if ( ( rc = sandev_rw ( sandev, lba, count, virt_to_user ( primary ),
+	if ( ( rc = sandev_rw ( sandev, lba, count, virt_to_user ( scratch ),
 				block_read ) ) != 0 ) {
 		DBGC ( sandev, "SAN %#02x could not read ISO9660 primary"
 		       "volume descriptor: %s\n",
@@ -505,7 +508,8 @@ static int sandev_parse_iso9660 ( struct san_device *sandev ) {
 	}
 
 	/* Configure as CD-ROM if applicable */
-	if ( memcmp ( primary, &primary_check, sizeof ( primary_check ) ) == 0){
+	if ( memcmp ( &scratch->primary.fixed, &primary_check,
+		      sizeof ( primary_check ) ) == 0 ) {
 		DBGC ( sandev, "SAN %#02x contains an ISO9660 filesystem; "
 		       "treating as CD-ROM\n", sandev->drive );
 		sandev->blksize_shift = blksize_shift;
@@ -513,7 +517,7 @@ static int sandev_parse_iso9660 ( struct san_device *sandev ) {
 	}
 
  err_rw:
-	free ( primary );
+	free ( scratch );
  err_alloc:
  invalid_blksize:
 	return rc;
