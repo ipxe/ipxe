@@ -403,7 +403,7 @@ char __debug_disable(OBJECT) = ( DBGLVL_MAX & ~DBGLVL_DFLT );
  *
  * @v level		Debug level
  */
-#define DBG_PAUSE_IF( level ) do {				\
+#define DBG_PAUSE_IF( level, ... ) do {				\
 		if ( DBG_ ## level ) {				\
 			dbg_pause();				\
 		}						\
@@ -414,7 +414,7 @@ char __debug_disable(OBJECT) = ( DBGLVL_MAX & ~DBGLVL_DFLT );
  *
  * @v level		Debug level
  */
-#define DBG_MORE_IF( level ) do {				\
+#define DBG_MORE_IF( level, ... ) do {				\
 		if ( DBG_ ## level ) {				\
 			dbg_more();				\
 		}						\
