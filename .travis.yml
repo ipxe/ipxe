@@ -43,3 +43,5 @@ script:
   - make -C src bin-x86_64-linux/blib.a
   - make -C src bin-x86_64-linux/tap.linux
   - make -C src bin-x86_64-linux/af_packet.linux
+  - make -C src bin-x86_64-linux/tests.linux
+  - ./src/bin-x86_64-linux/tests.linux
