@@ -57,7 +57,7 @@ static void video_scroll(void)
 {
 	int i;
 
-	memcpy(vidmem, vidmem + COLS * 2, (LINES - 1) * COLS * 2);
+	memmove(vidmem, vidmem + COLS * 2, (LINES - 1) * COLS * 2);
 	for (i = (LINES - 1) * COLS * 2; i < LINES * COLS * 2; i += 2)
 		vidmem[i] = ' ';
 }
