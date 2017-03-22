@@ -860,6 +860,7 @@ static int flexboot_nodnic_eth_open ( struct net_device *netdev ) {
 	mlx_uint64	cq_size = 0;
 	mlx_uint32	qpn = 0;
 	nodnic_port_state state = nodnic_port_state_down;
+	int rc;
 
 	if ( port->port_priv.port_state & NODNIC_PORT_OPENED ) {
 		DBGC ( flexboot_nodnic, "%s: port %d is already opened\n",
@@ -877,11 +878,11 @@ static int flexboot_nodnic_eth_open ( struct net_device *netdev ) {
 	}
 	INIT_LIST_HEAD ( &dummy_cq->work_queues );
 
-	port->eth_qp = ib_create_qp ( ibdev, IB_QPT_ETH,
-					FLEXBOOT_NODNIC_ETH_NUM_SEND_WQES, dummy_cq,
-					FLEXBOOT_NODNIC_ETH_NUM_RECV_WQES, dummy_cq,
-					&flexboot_nodnic_eth_qp_op, netdev->name );
-	if ( !port->eth_qp ) {
+	if ( ( rc = ib_create_qp ( ibdev, IB_QPT_ETH,
+				   FLEXBOOT_NODNIC_ETH_NUM_SEND_WQES, dummy_cq,
+				   FLEXBOOT_NODNIC_ETH_NUM_RECV_WQES, dummy_cq,
+				   &flexboot_nodnic_eth_qp_op, netdev->name,
+				   &port->eth_qp ) ) != 0 ) {
 		DBGC ( flexboot_nodnic, "flexboot_nodnic %p port %d could not create queue pair\n",
 				 flexboot_nodnic, ibdev->port );
 		status = MLX_OUT_OF_RESOURCES;
@@ -894,9 +895,8 @@ static int flexboot_nodnic_eth_open ( struct net_device *netdev ) {
 	MLX_FATAL_CHECK_STATUS(status, get_cq_size_err,
 			"nodnic_port_get_cq_size failed");
 
-	port->eth_cq = ib_create_cq ( ibdev, cq_size,
-			&flexboot_nodnic_eth_cq_op );
-	if ( !port->eth_cq ) {
+	if ( ( rc = ib_create_cq ( ibdev, cq_size, &flexboot_nodnic_eth_cq_op,
+				   &port->eth_cq ) ) != 0 ) {
 		DBGC ( flexboot_nodnic,
 			"flexboot_nodnic %p port %d could not create completion queue\n",
 			flexboot_nodnic, ibdev->port );

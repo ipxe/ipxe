@@ -3261,24 +3261,20 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 		goto err_open;
 
 	/* Allocate completion queue */
-	port->eth_cq = ib_create_cq ( ibdev, HERMON_ETH_NUM_CQES,
-				      &hermon_eth_cq_op );
-	if ( ! port->eth_cq ) {
+	if ( ( rc = ib_create_cq ( ibdev, HERMON_ETH_NUM_CQES,
+				   &hermon_eth_cq_op, &port->eth_cq ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not create completion "
-		       "queue\n", hermon, ibdev->port );
-		rc = -ENOMEM;
+		       "queue: %s\n", hermon, ibdev->port, strerror ( rc ) );
 		goto err_create_cq;
 	}
 
 	/* Allocate queue pair */
-	port->eth_qp = ib_create_qp ( ibdev, IB_QPT_ETH,
-				      HERMON_ETH_NUM_SEND_WQES, port->eth_cq,
-				      HERMON_ETH_NUM_RECV_WQES, port->eth_cq,
-				      &hermon_eth_qp_op, netdev->name );
-	if ( ! port->eth_qp ) {
+	if ( ( rc = ib_create_qp ( ibdev, IB_QPT_ETH, HERMON_ETH_NUM_SEND_WQES,
+				   port->eth_cq, HERMON_ETH_NUM_RECV_WQES,
+				   port->eth_cq, &hermon_eth_qp_op,
+				   netdev->name, &port->eth_qp ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not create queue "
-		       "pair\n", hermon, ibdev->port );
-		rc = -ENOMEM;
+		       "pair: %s\n", hermon, ibdev->port, strerror ( rc ) );
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( port->eth_qp, netdev );

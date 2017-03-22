@@ -854,22 +854,20 @@ static int ipoib_open ( struct net_device *netdev ) {
 	}
 
 	/* Allocate completion queue */
-	ipoib->cq = ib_create_cq ( ibdev, IPOIB_NUM_CQES, &ipoib_cq_op );
-	if ( ! ipoib->cq ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate completion queue\n",
-		       ipoib );
-		rc = -ENOMEM;
+	if ( ( rc = ib_create_cq ( ibdev, IPOIB_NUM_CQES, &ipoib_cq_op,
+				   &ipoib->cq ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not create completion queue: "
+		       "%s\n", ipoib, strerror ( rc ) );
 		goto err_create_cq;
 	}
 
 	/* Allocate queue pair */
-	ipoib->qp = ib_create_qp ( ibdev, IB_QPT_UD, IPOIB_NUM_SEND_WQES,
+	if ( ( rc = ib_create_qp ( ibdev, IB_QPT_UD, IPOIB_NUM_SEND_WQES,
 				   ipoib->cq, IPOIB_NUM_RECV_WQES, ipoib->cq,
-				   &ipoib_qp_op, netdev->name );
-	if ( ! ipoib->qp ) {
-		DBGC ( ipoib, "IPoIB %p could not allocate queue pair\n",
-		       ipoib );
-		rc = -ENOMEM;
+				   &ipoib_qp_op, netdev->name,
+				   &ipoib->qp ) ) != 0 ) {
+		DBGC ( ipoib, "IPoIB %p could not create queue pair: %s\n",
+		       ipoib, strerror ( rc ) );
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( ipoib->qp, ipoib );

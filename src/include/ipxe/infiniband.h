@@ -493,18 +493,20 @@ struct ib_driver {
 /** Declare an Infiniband driver */
 #define __ib_driver __table_entry ( IB_DRIVERS, 01 )
 
-extern struct ib_completion_queue *
-ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
-	       struct ib_completion_queue_operations *op );
+extern int ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
+			  struct ib_completion_queue_operations *op,
+			  struct ib_completion_queue **new_cq );
 extern void ib_destroy_cq ( struct ib_device *ibdev,
 			    struct ib_completion_queue *cq );
 extern void ib_poll_cq ( struct ib_device *ibdev,
 			 struct ib_completion_queue *cq );
-extern struct ib_queue_pair *
-ib_create_qp ( struct ib_device *ibdev, enum ib_queue_pair_type type,
-	       unsigned int num_send_wqes, struct ib_completion_queue *send_cq,
-	       unsigned int num_recv_wqes, struct ib_completion_queue *recv_cq,
-	       struct ib_queue_pair_operations *op, const char *name );
+extern int ib_create_qp ( struct ib_device *ibdev, enum ib_queue_pair_type type,
+			  unsigned int num_send_wqes,
+			  struct ib_completion_queue *send_cq,
+			  unsigned int num_recv_wqes,
+			  struct ib_completion_queue *recv_cq,
+			  struct ib_queue_pair_operations *op,
+			  const char *name, struct ib_queue_pair **new_qp );
 extern int ib_modify_qp ( struct ib_device *ibdev, struct ib_queue_pair *qp );
 extern void ib_destroy_qp ( struct ib_device *ibdev,
 			    struct ib_queue_pair *qp );
