@@ -2113,6 +2113,7 @@ static int hermon_map_vpm ( struct hermon *hermon,
 	assert ( ( va & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( pa & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( len & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( len != 0 );
 
 	/* Calculate starting points */
 	start = pa;
