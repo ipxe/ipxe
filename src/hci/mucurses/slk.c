@@ -359,7 +359,7 @@ int slk_set ( int labnum, const char *label, int fmt ) {
 		return ERR;
 
 	strncpy(slks->fkeys[labnum].label, label,
-		sizeof(slks->fkeys[labnum].label));
+		(sizeof(slks->fkeys[labnum].label) - 1));
 	slks->fkeys[labnum].fmt = fmt;
 
 	return OK;
