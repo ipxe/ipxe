@@ -965,8 +965,8 @@ static int sis190_get_mac_addr_from_apc(struct pci_device *pdev,
 
 	list_for_each_entry(d, &(pdev->dev.siblings), siblings) {
 		unsigned int i;
-		isa_bridge = container_of(d, struct pci_device, dev);
 		for(i = 0; i < sis190_isa_bridge_driver.id_count; i++) {
+			isa_bridge = container_of(d, struct pci_device, dev);
 			if(isa_bridge->vendor ==
 			     sis190_isa_bridge_driver.ids[i].vendor
 			     && isa_bridge->device ==
