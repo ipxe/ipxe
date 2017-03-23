@@ -16,6 +16,13 @@ addons:
       - liblzma-dev
       - syslinux
       - genisoimage
+  coverity_scan:
+    project:
+      name: "ipxe/ipxe"
+      version: $TRAVIS_COMMIT
+    build_command_prepend: "make -C src bin/deps"
+    build_command: "make -C src bin/blib.a"
+    branch_pattern: coverity_scan
 
 env:
   global:
