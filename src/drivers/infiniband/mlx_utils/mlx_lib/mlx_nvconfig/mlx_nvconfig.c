@@ -39,7 +39,6 @@ struct nvconfig_tlv_mapping nvconfig_tlv_mapping[] = {
 		TlvMappingEntry(0x2001, 0x195, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2010, 0x210, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2011, 0x211, NVRAM_TLV_CLASS_GLOBAL, FALSE),
-		TlvMappingEntry(0x2020, 0x2020, NVRAM_TLV_CLASS_PHYSICAL_PORT, FALSE),
 		TlvMappingEntry(0x2021, 0x221, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2023, 0x223, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x2006, 0x206, NVRAM_TLV_CLASS_HOST, FALSE),
@@ -67,6 +66,7 @@ struct nvconfig_tlv_mapping nvconfig_tlv_mapping[] = {
 		TlvMappingEntry(0x110, 0x110, NVRAM_TLV_CLASS_HOST, FALSE),
 		TlvMappingEntry(0x192, 0x192, NVRAM_TLV_CLASS_GLOBAL, FALSE),
 		TlvMappingEntry(0x101, 0x101, NVRAM_TLV_CLASS_GLOBAL, TRUE),
+		TlvMappingEntry(0x194, 0x194, NVRAM_TLV_CLASS_GLOBAL, FALSE),
 		TlvMappingEntry(0, 0, 0, 0),
 };
 
@@ -239,6 +239,7 @@ nvconfig_nvdata_access(
 		IN REG_ACCESS_OPT opt,
 		IN mlx_size data_size,
 		IN NV_DEFAULT_OPT def_en,
+		IN NVDA_WRITER_ID writer_id,
 		IN OUT mlx_uint8 *version,
 		IN OUT mlx_void *data
 		)
@@ -263,10 +264,9 @@ nvconfig_nvdata_access(
 	data_size_align_to_dword = ((data_size + 3) / sizeof(mlx_uint32)) * sizeof(mlx_uint32);
 	mlx_memory_set(utils, &nvda, 0, sizeof(nvda));
 	nvda.nv_header.length = data_size_align_to_dword;
-	nvda.nv_header.rd_en = 0;
-	nvda.nv_header.def_en = def_en;
-	nvda.nv_header.over_en = 1;
+	nvda.nv_header.access_mode = def_en;
 	nvda.nv_header.version = *version;
+	nvda.nv_header.writer_id = writer_id;
 
 	nvconfig_fill_tlv_type(port, class_code, real_tlv_type, &nvda.nv_header.tlv_type);
 

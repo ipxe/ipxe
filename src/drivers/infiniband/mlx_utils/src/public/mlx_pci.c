@@ -107,7 +107,7 @@ mlx_pci_mem_read(
 		status = MLX_INVALID_PARAMETER;
 		goto bail;
 	}
-	status = mlx_pci_mem_read_priv(utils, bar_index, width, offset, count, buffer);
+	status = mlx_pci_mem_read_priv(utils, width,bar_index, offset, count, buffer);
 bail:
 	return status;
 }

@@ -31,6 +31,17 @@ typedef enum {
 	NVRAM_TLV_CLASS_HOST = 3,
 } NVRAM_CLASS_CODE;
 
+typedef enum {
+	NVDA_NV_HEADER_WRITER_ID_UEFI_HII  = 0x6,
+	NVDA_NV_HEADER_WRITER_ID_FLEXBOOT = 0x8,
+} NVDA_WRITER_ID;
+
+typedef enum {
+  TLV_ACCESS_DEFAULT_DIS = 0,
+  TLV_ACCESS_CURRENT = 1,
+  TLV_ACCESS_DEFAULT_EN = 2,
+} NV_DEFAULT_OPT;
+
 struct nvconfig_tlv_type_per_port {
 	 mlx_uint32 param_idx	:16;
 	 mlx_uint32 port		:8;
@@ -78,26 +89,24 @@ struct nvconfig_header {
 	 mlx_uint32 length		:9; /*Size of configuration item data in bytes between 0..256 */
 	 mlx_uint32 reserved0	:3;
 	 mlx_uint32 version		:4; /* Configuration item version */
-	 mlx_uint32 reserved1	:7;
+	 mlx_uint32 writer_id	:5;
+	 mlx_uint32 reserved1	:1;
 
-	 mlx_uint32 def_en		:1; /*Choose whether to access the default value or the user-defined value.
-									0x0 Read or write the user-defined value.
-									0x1 Read the default value (only valid for reads).*/
+	 mlx_uint32 access_mode	:2; /*Defines which value of the Configuration Item will be accessed.
+								0x0: NEXT - Next value to be applied
+								0x1: CURRENT - Currently set values (only valid for Query operation) Supported only if NVGC.nvda_read_current_settings==1.
+								0x2: FACTORY - Default factory values (only valid for Query operation). Supported only if NVGC.nvda_read_factory_settings==1.*/
 
-	 mlx_uint32 rd_en		:1; /*enables reading the TLV by lower priorities
-									0 - TLV can be read by the subsequent lifecycle priorities.
-									1 - TLV cannot be read by the subsequent lifecycle priorities. */
-	 mlx_uint32 over_en		:1; /*enables overwriting the TLV by lower priorities
-									0 - Can only be overwritten by the current lifecycle priority
-									1 - Allowed to be overwritten by subsequent lifecycle priorities */
+	 mlx_uint32 reserved2	:2;
 	 mlx_uint32 header_type	:2;
-	 mlx_uint32 priority		:2;
+	 mlx_uint32 reserved3	:2;
 	 mlx_uint32 valid	:2;
 /* -------------- */
 	 union nvconfig_tlv_type tlv_type;;
 /* -------------- */
 	mlx_uint32 crc			:16;
 	mlx_uint32 reserved		:16;
+
 };
 
 #define NVCONFIG_MAX_TLV_SIZE 256
@@ -149,6 +158,7 @@ nvconfig_nvdata_access(
 		IN REG_ACCESS_OPT opt,
 		IN mlx_size data_size,
 		IN NV_DEFAULT_OPT def_en,
+		IN NVDA_WRITER_ID writer_id,
 		IN OUT mlx_uint8 *version,
 		IN OUT mlx_void *data
 		);

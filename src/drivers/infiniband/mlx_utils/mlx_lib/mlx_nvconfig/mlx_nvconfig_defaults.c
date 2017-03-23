@@ -386,7 +386,8 @@ nvconfig_nvdata_default_access(
 	mlx_uint8 version = 0;
 
 	status = nvconfig_nvdata_access(utils, port, tlv_type, REG_ACCESS_READ,
-			data_size, TLV_ACCESS_DEFAULT_EN, &version, data);
+			data_size, TLV_ACCESS_DEFAULT_EN, 0,
+			&version, data);
 	MLX_CHECK_STATUS(NULL, status, nvdata_access_err,
 				"nvconfig_nvdata_access failed ");
 	for (index = 0; index * 4 < data_size; index++) {
@@ -493,6 +494,8 @@ nvconfig_read_rom_ini_values(
 		)
 {
 	mlx_status status = MLX_SUCCESS;
+	mlx_uint8 version = 0;
+	mlx_uint32 index;
 
 	if (utils == NULL || rom_ini == NULL) {
 		status = MLX_INVALID_PARAMETER;
@@ -501,8 +504,16 @@ nvconfig_read_rom_ini_values(
 	}
 	mlx_memory_set(utils, rom_ini, 0, sizeof(*rom_ini));
 
-	status = nvconfig_nvdata_default_access(utils, 0, GLOBAL_ROM_INI_TYPE,
-			sizeof(*rom_ini), rom_ini);
+	status = nvconfig_nvdata_access(utils, 0, GLOBAL_ROM_INI_TYPE, REG_ACCESS_READ,
+			sizeof(*rom_ini), TLV_ACCESS_DEFAULT_DIS, 0,
+			&version, rom_ini);
+	MLX_CHECK_STATUS(NULL, status, bad_param,
+				"nvconfig_nvdata_access failed ");
+	for (index = 0; index * 4 < sizeof(*rom_ini); index++) {
+		mlx_memory_be32_to_cpu(utils, (((mlx_uint32 *) rom_ini)[index]),
+				((mlx_uint32 *) rom_ini) + index);
+	}
+
 bad_param:
 	return status;
 }

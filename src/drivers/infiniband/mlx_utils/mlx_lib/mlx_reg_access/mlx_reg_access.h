@@ -31,11 +31,6 @@ typedef enum {
   REG_ACCESS_WRITE = 2,
 } REG_ACCESS_OPT;
 
-typedef enum {
-  TLV_ACCESS_DEFAULT_DIS = 0,
-  TLV_ACCESS_DEFAULT_EN = 1,
-} NV_DEFAULT_OPT;
-
 #define REG_ID_NVDA  0x9024
 #define REG_ID_NVDI  0x9025
 #define REG_ID_NVIA 0x9029

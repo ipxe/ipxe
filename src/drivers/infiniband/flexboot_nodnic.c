@@ -44,6 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include "mlx_utils/mlx_lib/mlx_nvconfig/mlx_nvconfig_defaults.h"
 #include "mlx_utils/include/public/mlx_pci_gw.h"
 #include "mlx_utils/mlx_lib/mlx_vmac/mlx_vmac.h"
+#include "mlx_utils/mlx_lib/mlx_mtu/mlx_mtu.h"
 
 /***************************************************************************
  *
@@ -823,6 +824,7 @@ static void flexboot_nodnic_eth_complete_recv ( struct ib_device *ibdev __unused
 		netdev_rx_err ( netdev, iobuf, -ENOTTY );
 		return;
 	}
+
 	netdev_rx ( netdev, iobuf );
 }
 
@@ -907,6 +909,7 @@ static int flexboot_nodnic_eth_open ( struct net_device *netdev ) {
 	list_del(&port->eth_qp->send.list);
 	list_add ( &port->eth_qp->send.list, &port->eth_cq->work_queues );
 	port->eth_qp->recv.cq = port->eth_cq;
+	port->cmdsn = 0;
 	list_del(&port->eth_qp->recv.list);
 	list_add ( &port->eth_qp->recv.list, &port->eth_cq->work_queues );
 
@@ -1445,12 +1448,6 @@ static int flexboot_nodnic_alloc_uar ( struct flexboot_nodnic *flexboot_nodnic )
 	struct pci_device *pci = flexboot_nodnic->pci;
 	nodnic_uar *uar = &flexboot_nodnic->port[0].port_priv.device->uar;
 
-	if ( ! flexboot_nodnic->device_priv.utils ) {
-		uar->virt = NULL;
-		DBGC ( flexboot_nodnic, "%s: mlx_utils is not initialized \n", __FUNCTION__ );
-		return -EINVAL;
-	}
-
 	if  ( ! flexboot_nodnic->device_priv.device_cap.support_uar_tx_db ) {
 		DBGC ( flexboot_nodnic, "%s: tx db using uar is not supported \n", __FUNCTION__ );
 		return -ENOTSUP;
@@ -1466,6 +1463,18 @@ static int flexboot_nodnic_alloc_uar ( struct flexboot_nodnic *flexboot_nodnic )
 
 	return status;
 }
+
+static int flexboot_nodnic_dealloc_uar ( struct flexboot_nodnic *flexboot_nodnic ) {
+       nodnic_uar *uar = &flexboot_nodnic->port[0].port_priv.device->uar;
+
+       if ( uar->virt ) {
+               iounmap( uar->virt );
+               uar->virt = NULL;
+       }
+
+       return MLX_SUCCESS;
+}
+
 
 int flexboot_nodnic_probe ( struct pci_device *pci,
 		struct flexboot_nodnic_callbacks *callbacks,
@@ -1508,6 +1517,10 @@ int flexboot_nodnic_probe ( struct pci_device *pci,
 	MLX_FATAL_CHECK_STATUS(status, get_cap_err,
 					"nodnic_device_get_cap failed");
 
+	if ( mlx_set_admin_mtu ( device_priv->utils, 1, EN_DEFAULT_ADMIN_MTU ) ) {
+                MLX_DEBUG_ERROR( device_priv->utils, "Failed to set admin mtu\n" );
+        }
+
 	status =  flexboot_nodnic_set_port_masking ( flexboot_nodnic_priv );
 	MLX_FATAL_CHECK_STATUS(status, err_set_masking,
 						"flexboot_nodnic_set_port_masking failed");
@@ -1522,7 +1535,7 @@ int flexboot_nodnic_probe ( struct pci_device *pci,
 						"flexboot_nodnic_thin_init_ports failed");
 
 	if ( ( status = flexboot_nodnic_alloc_uar ( flexboot_nodnic_priv ) ) ) {
-		DBGC(flexboot_nodnic_priv, "%s: flexboot_nodnic_pci_init failed"
+		DBGC(flexboot_nodnic_priv, "%s: flexboot_nodnic_alloc_uar failed"
 				" ( status = %d )\n",__FUNCTION__, status );
 	}
 
@@ -1550,6 +1563,7 @@ int flexboot_nodnic_probe ( struct pci_device *pci,
 	flexboot_nodnic_ports_unregister_dev ( flexboot_nodnic_priv );
 reg_err:
 err_set_ports_types:
+	flexboot_nodnic_dealloc_uar ( flexboot_nodnic_priv );
 err_thin_init_ports:
 err_alloc_ibdev:
 err_set_masking:
@@ -1568,6 +1582,7 @@ void flexboot_nodnic_remove ( struct pci_device *pci )
 	struct flexboot_nodnic *flexboot_nodnic_priv = pci_get_drvdata ( pci );
 	nodnic_device_priv *device_priv = & ( flexboot_nodnic_priv->device_priv );
 
+	flexboot_nodnic_dealloc_uar ( flexboot_nodnic_priv );
 	flexboot_nodnic_ports_unregister_dev ( flexboot_nodnic_priv );
 	nodnic_device_teardown( device_priv );
 	free_mlx_utils ( & device_priv->utils );

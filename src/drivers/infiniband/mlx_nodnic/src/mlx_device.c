@@ -169,13 +169,7 @@ nodnic_device_clear_int (
 	mlx_status 			status = MLX_SUCCESS;
 	mlx_uint32			disable = 1;
 #ifndef DEVICE_CX3
-#define NODNIC_CLEAR_INT_BAR_OFFSET 0x100C
-	if ( device_priv->device_cap.support_bar_cq_ctrl ) {
-		status = mlx_pci_mem_write ( device_priv->utils, MlxPciWidthUint32, 0,
-			( mlx_uint64 ) ( NODNIC_CLEAR_INT_BAR_OFFSET ), 1, &disable );
-	} else {
-		status = nodnic_cmd_write(device_priv, NODNIC_NIC_DISABLE_INT_OFFSET, disable);
-	}
+	status = nodnic_cmd_write(device_priv, NODNIC_NIC_DISABLE_INT_OFFSET, disable);
 	MLX_CHECK_STATUS(device_priv, status, clear_int_done, "failed writing to disable_bit");
 #else
 	mlx_utils *utils = device_priv->utils;

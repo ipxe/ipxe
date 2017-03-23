@@ -111,6 +111,18 @@ struct golan_uar {
     unsigned long	phys;
 };
 
+
+struct golan_firmware_area {
+	/* length of area in pages */
+	uint32_t npages;
+	/** Firmware area in external memory
+	 *
+	 * This is allocated when first needed, and freed only on
+	 * final teardown, in order to avoid memory map changes at
+	 * runtime.
+	 */
+	userptr_t area;
+};
 /* Queue Pair */
 #define GOLAN_SEND_WQE_BB_SIZE			64
 #define GOLAN_SEND_UD_WQE_SIZE			sizeof(struct golan_send_wqe_ud)
@@ -204,6 +216,8 @@ struct golan_completion_queue {
 #define GOLAN_EQE_SIZE				sizeof(struct golan_eqe)
 #define GOLAN_NUM_EQES 				8
 #define GOLAN_EQ_DOORBELL_OFFSET		0x40
+#define DB_BUFFER0_EVEN_OFFSET	0x800
+#define DB_BUFFER0_ODD_OFFSET	0x900
 
 #define GOLAN_EQ_MAP_ALL_EVENTS					\
 	((1 << GOLAN_EVENT_TYPE_PATH_MIG         	)|	\
@@ -323,6 +337,8 @@ struct golan {
 	mlx_utils		*utils;
 
 	struct golan_port		ports[GOLAN_MAX_PORTS];
+#define GOLAN_FW_AREAS_NUM 2
+	struct golan_firmware_area fw_areas[GOLAN_FW_AREAS_NUM];
 };
 
 #endif /* _GOLAN_H_*/

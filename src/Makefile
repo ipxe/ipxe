@@ -89,6 +89,7 @@ SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_nvconfig
 SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_vmac
 SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_blink_leds
 SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_link_speed
+SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_mtu
 SRCDIRS		+= drivers/infiniband/mlx_nodnic/src
 SRCDIRS		+= drivers/usb
 SRCDIRS		+= interface/pxe interface/efi interface/smbios
