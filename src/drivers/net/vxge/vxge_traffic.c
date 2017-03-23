@@ -667,6 +667,8 @@ enum vxge_hw_status vxge_hw_vpath_poll_rx(struct __vxge_hw_ring *ring)
 		vxge_debug(VXGE_INFO, "%s: rx frame received at offset %d\n",
 			hldev->ndev->name, ring->rxd_offset);
 
+		iobuf = (struct io_buffer *)(intptr_t)rxd->host_control;
+
 		if (tcode != VXGE_HW_RING_T_CODE_OK) {
 			netdev_rx_err(hldev->ndev, NULL, -EINVAL);
 			vxge_debug(VXGE_ERR, "%s:%d, rx error tcode %d\n",
@@ -674,8 +676,6 @@ enum vxge_hw_status vxge_hw_vpath_poll_rx(struct __vxge_hw_ring *ring)
 			status = VXGE_HW_FAIL;
 			goto err1;
 		}
-
-		iobuf = (struct io_buffer *)(intptr_t)rxd->host_control;
 
 		len = VXGE_HW_RING_RXD_1_BUFFER0_SIZE_GET(rxd->control_1);
 		len -= ETH_FCS_LEN;
