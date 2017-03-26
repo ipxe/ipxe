@@ -90,6 +90,7 @@ struct san_device {
 
 /* Include all architecture-independent sanboot API headers */
 #include <ipxe/null_sanboot.h>
+#include <ipxe/dummy_sanboot.h>
 #include <ipxe/efi/efi_block.h>
 
 /* Include all architecture-dependent sanboot API headers */
