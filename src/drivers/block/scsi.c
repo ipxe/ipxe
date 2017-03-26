@@ -392,11 +392,13 @@ static void scsicmd_close ( struct scsi_command *scsicmd, int rc ) {
 		       scsidev, scsicmd->tag, strerror ( rc ) );
 	}
 
+	/* Remove from list of commands */
+	list_del ( &scsicmd->list );
+
 	/* Shut down interfaces */
 	intfs_shutdown ( rc, &scsicmd->scsi, &scsicmd->block, NULL );
 
-	/* Remove from list of commands and drop list's reference */
-	list_del ( &scsicmd->list );
+	/* Drop list's reference */
 	scsicmd_put ( scsicmd );
 }
 
