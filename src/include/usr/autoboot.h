@@ -30,7 +30,8 @@ extern void set_autoboot_busloc ( unsigned int bus_type,
 				  unsigned int location );
 extern void set_autoboot_ll_addr ( const void *ll_addr, size_t len );
 
-extern int uriboot ( struct uri *filename, struct uri *root_path, int drive,
+extern int uriboot ( struct uri *filename, struct uri **root_paths,
+		     unsigned int root_path_count, int drive,
 		     unsigned int flags );
 extern struct uri *
 fetch_next_server_and_filename ( struct settings *settings );

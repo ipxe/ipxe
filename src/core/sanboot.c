@@ -101,9 +101,13 @@ struct san_device * sandev_find ( unsigned int drive ) {
 static void sandev_free ( struct refcnt *refcnt ) {
 	struct san_device *sandev =
 		container_of ( refcnt, struct san_device, refcnt );
+	struct san_path *sanpath;
 
 	assert ( ! timer_running ( &sandev->timer ) );
-	uri_put ( sandev->uri );
+	assert ( ! sandev->active );
+	assert ( list_empty ( &sandev->opened ) );
+	list_for_each_entry ( sanpath, &sandev->closed, list )
+		uri_put ( sanpath->uri );
 	free ( sandev );
 }
 
@@ -163,21 +167,162 @@ static void sandev_command_expired ( struct retry_timer *timer,
 }
 
 /**
+ * Open SAN path
+ *
+ * @v sanpath		SAN path
+ * @ret rc		Return status code
+ */
+static int sanpath_open ( struct san_path *sanpath ) {
+	struct san_device *sandev = sanpath->sandev;
+	int rc;
+
+	/* Sanity check */
+	list_check_contains_entry ( sanpath, &sandev->closed, list );
+
+	/* Open interface */
+	if ( ( rc = xfer_open_uri ( &sanpath->block, sanpath->uri ) ) != 0 ) {
+		DBGC ( sandev, "SAN %#02x.%d could not (re)open URI: "
+		       "%s\n", sandev->drive, sanpath->index, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Start process */
+	process_add ( &sanpath->process );
+
+	/* Mark as opened */
+	list_del ( &sanpath->list );
+	list_add_tail ( &sanpath->list, &sandev->opened );
+
+	/* Record as in progress */
+	sanpath->path_rc = -EINPROGRESS;
+
+	return 0;
+}
+
+/**
+ * Close SAN path
+ *
+ * @v sanpath		SAN path
+ * @v rc		Reason for close
+ */
+static void sanpath_close ( struct san_path *sanpath, int rc ) {
+	struct san_device *sandev = sanpath->sandev;
+
+	/* Record status */
+	sanpath->path_rc = rc;
+
+	/* Mark as closed */
+	list_del ( &sanpath->list );
+	list_add_tail ( &sanpath->list, &sandev->closed );
+
+	/* Stop process */
+	process_del ( &sanpath->process );
+
+	/* Restart interfaces, avoiding potential loops */
+	if ( sanpath == sandev->active ) {
+		intfs_restart ( rc, &sandev->command, &sanpath->block, NULL );
+		sandev->active = NULL;
+		sandev_command_close ( sandev, rc );
+	} else {
+		intf_restart ( &sanpath->block, rc );
+	}
+}
+
+/**
+ * Handle closure of underlying block device interface
+ *
+ * @v sanpath		SAN path
+ * @v rc		Reason for close
+ */
+static void sanpath_block_close ( struct san_path *sanpath, int rc ) {
+	struct san_device *sandev = sanpath->sandev;
+
+	/* Any closure is an error from our point of view */
+	if ( rc == 0 )
+		rc = -ENOTCONN;
+	DBGC ( sandev, "SAN %#02x.%d closed: %s\n",
+	       sandev->drive, sanpath->index, strerror ( rc ) );
+
+	/* Close path */
+	sanpath_close ( sanpath, rc );
+}
+
+/**
+ * Check flow control window
+ *
+ * @v sanpath		SAN path
+ */
+static size_t sanpath_block_window ( struct san_path *sanpath __unused ) {
+
+	/* We are never ready to receive data via this interface.
+	 * This prevents objects that support both block and stream
+	 * interfaces from attempting to send us stream data.
+	 */
+	return 0;
+}
+
+/**
+ * SAN path process
+ *
+ * @v sanpath		SAN path
+ */
+static void sanpath_step ( struct san_path *sanpath ) {
+	struct san_device *sandev = sanpath->sandev;
+
+	/* Wait until path has become available */
+	if ( ! xfer_window ( &sanpath->block ) )
+		return;
+
+	/* Record status */
+	sanpath->path_rc = 0;
+
+	/* Mark as active path or close as applicable */
+	if ( ! sandev->active ) {
+		DBGC ( sandev, "SAN %#02x.%d is active\n",
+		       sandev->drive, sanpath->index );
+		sandev->active = sanpath;
+	} else {
+		DBGC ( sandev, "SAN %#02x.%d is available\n",
+		       sandev->drive, sanpath->index );
+		sanpath_close ( sanpath, 0 );
+	}
+}
+
+/** SAN path block interface operations */
+static struct interface_operation sanpath_block_op[] = {
+	INTF_OP ( intf_close, struct san_path *, sanpath_block_close ),
+	INTF_OP ( xfer_window, struct san_path *, sanpath_block_window ),
+	INTF_OP ( xfer_window_changed, struct san_path *, sanpath_step ),
+};
+
+/** SAN path block interface descriptor */
+static struct interface_descriptor sanpath_block_desc =
+	INTF_DESC ( struct san_path, block, sanpath_block_op );
+
+/** SAN path process descriptor */
+static struct process_descriptor sanpath_process_desc =
+	PROC_DESC_ONCE ( struct san_path, process, sanpath_step );
+
+/**
  * Restart SAN device interface
  *
  * @v sandev		SAN device
  * @v rc		Reason for restart
  */
 static void sandev_restart ( struct san_device *sandev, int rc ) {
+	struct san_path *sanpath;
 
-	/* Restart block device interface */
-	intfs_restart ( rc, &sandev->command, &sandev->block, NULL );
+	/* Restart all block device interfaces */
+	while ( ( sanpath = list_first_entry ( &sandev->opened,
+					       struct san_path, list ) ) ) {
+		sanpath_close ( sanpath, rc );
+	}
+
+	/* Clear active path */
+	sandev->active = NULL;
 
 	/* Close any outstanding command */
 	sandev_command_close ( sandev, rc );
-
-	/* Record device error */
-	sandev->block_rc = rc;
 }
 
 /**
@@ -189,76 +334,52 @@ static void sandev_restart ( struct san_device *sandev, int rc ) {
  * This function will block until the device is available.
  */
 int sandev_reopen ( struct san_device *sandev ) {
+	struct san_path *sanpath;
 	int rc;
 
-	/* Close any outstanding command and restart interface */
+	/* Close any outstanding command and restart interfaces */
 	sandev_restart ( sandev, -ECONNRESET );
+	assert ( sandev->active == NULL );
+	assert ( list_empty ( &sandev->opened ) );
 
-	/* Mark device as being not yet open */
-	sandev->block_rc = -EINPROGRESS;
-
-	/* Open block device interface */
-	if ( ( rc = xfer_open_uri ( &sandev->block, sandev->uri ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x could not (re)open URI: %s\n",
-		       sandev->drive, strerror ( rc ) );
-		return rc;
+	/* Open all paths */
+	while ( ( sanpath = list_first_entry ( &sandev->closed,
+					       struct san_path, list ) ) ) {
+		if ( ( rc = sanpath_open ( sanpath ) ) != 0 )
+			goto err_open;
 	}
 
-	/* Wait for device to become available */
-	while ( sandev->block_rc == -EINPROGRESS ) {
+	/* Wait for any device to become available, or for all devices
+	 * to fail.
+	 */
+	while ( sandev->active == NULL ) {
 		step();
-		if ( xfer_window ( &sandev->block ) != 0 ) {
-			sandev->block_rc = 0;
-			return 0;
+		if ( list_empty ( &sandev->opened ) ) {
+			/* Get status of the first device to be
+			 * closed.  Do this on the basis that earlier
+			 * errors (e.g. "invalid IQN") are probably
+			 * more interesting than later errors
+			 * (e.g. "TCP timeout").
+			 */
+			rc = -ENODEV;
+			list_for_each_entry ( sanpath, &sandev->closed, list ) {
+				rc = sanpath->path_rc;
+				break;
+			}
+			DBGC ( sandev, "SAN %#02x never became available: %s\n",
+			       sandev->drive, strerror ( rc ) );
+			goto err_none;
 		}
 	}
 
-	DBGC ( sandev, "SAN %#02x never became available: %s\n",
-	       sandev->drive, strerror ( sandev->block_rc ) );
-	return sandev->block_rc;
-}
-
-/**
- * Handle closure of underlying block device interface
- *
- * @v sandev		SAN device
- * @ret rc		Reason for close
- */
-static void sandev_block_close ( struct san_device *sandev, int rc ) {
-
-	/* Any closure is an error from our point of view */
-	if ( rc == 0 )
-		rc = -ENOTCONN;
-	DBGC ( sandev, "SAN %#02x went away: %s\n",
-	       sandev->drive, strerror ( rc ) );
-
-	/* Close any outstanding command and restart interface */
-	sandev_restart ( sandev, rc );
-}
-
-/**
- * Check SAN device flow control window
- *
- * @v sandev		SAN device
- */
-static size_t sandev_block_window ( struct san_device *sandev __unused ) {
-
-	/* We are never ready to receive data via this interface.
-	 * This prevents objects that support both block and stream
-	 * interfaces from attempting to send us stream data.
-	 */
+	assert ( ! list_empty ( &sandev->opened ) );
 	return 0;
+
+ err_none:
+ err_open:
+	sandev_restart ( sandev, rc );
+	return rc;
 }
-
-/** SAN device block interface operations */
-static struct interface_operation sandev_block_op[] = {
-	INTF_OP ( intf_close, struct san_device *, sandev_block_close ),
-	INTF_OP ( xfer_window, struct san_device *, sandev_block_window ),
-};
-
-/** SAN device block interface descriptor */
-static struct interface_descriptor sandev_block_desc =
-	INTF_DESC ( struct san_device, block, sandev_block_op );
 
 /** SAN device read/write command parameters */
 struct san_command_rw_params {
@@ -289,15 +410,19 @@ union san_command_params {
  */
 static int sandev_command_rw ( struct san_device *sandev,
 			       const union san_command_params *params ) {
+	struct san_path *sanpath = sandev->active;
 	size_t len = ( params->rw.count * sandev->capacity.blksize );
 	int rc;
 
+	/* Sanity check */
+	assert ( sanpath != NULL );
+
 	/* Initiate read/write command */
-	if ( ( rc = params->rw.block_rw ( &sandev->block, &sandev->command,
+	if ( ( rc = params->rw.block_rw ( &sanpath->block, &sandev->command,
 					  params->rw.lba, params->rw.count,
 					  params->rw.buffer, len ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x could not initiate read/write: "
-		       "%s\n", sandev->drive, strerror ( rc ) );
+		DBGC ( sandev, "SAN %#02x.%d could not initiate read/write: "
+		       "%s\n", sandev->drive, sanpath->index, strerror ( rc ) );
 		return rc;
 	}
 
@@ -314,13 +439,17 @@ static int sandev_command_rw ( struct san_device *sandev,
 static int
 sandev_command_read_capacity ( struct san_device *sandev,
 			       const union san_command_params *params __unused){
+	struct san_path *sanpath = sandev->active;
 	int rc;
 
+	/* Sanity check */
+	assert ( sanpath != NULL );
+
 	/* Initiate read capacity command */
-	if ( ( rc = block_read_capacity ( &sandev->block,
+	if ( ( rc = block_read_capacity ( &sanpath->block,
 					  &sandev->command ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x could not initiate read capacity: "
-		       "%s\n", sandev->drive, strerror ( rc ) );
+		DBGC ( sandev, "SAN %#02x.%d could not initiate read capacity: "
+		       "%s\n", sandev->drive, sanpath->index, strerror ( rc ) );
 		return rc;
 	}
 
@@ -526,22 +655,41 @@ static int sandev_parse_iso9660 ( struct san_device *sandev ) {
 /**
  * Allocate SAN device
  *
+ * @v uris		List of URIs
+ * @v count		Number of URIs
+ * @v priv_size		Size of private data
  * @ret sandev		SAN device, or NULL
  */
-struct san_device * alloc_sandev ( struct uri *uri, size_t priv_size ) {
+struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
+				   size_t priv_size ) {
 	struct san_device *sandev;
+	struct san_path *sanpath;
+	size_t size;
+	unsigned int i;
 
 	/* Allocate and initialise structure */
-	sandev = zalloc ( sizeof ( *sandev ) + priv_size );
+	size = ( sizeof ( *sandev ) + ( count * sizeof ( sandev->path[0] ) ) );
+	sandev = zalloc ( size + priv_size );
 	if ( ! sandev )
 		return NULL;
 	ref_init ( &sandev->refcnt, sandev_free );
-	sandev->uri = uri_get ( uri );
-	intf_init ( &sandev->block, &sandev_block_desc, &sandev->refcnt );
-	sandev->block_rc = -EINPROGRESS;
 	intf_init ( &sandev->command, &sandev_command_desc, &sandev->refcnt );
 	timer_init ( &sandev->timer, sandev_command_expired, &sandev->refcnt );
-	sandev->priv = ( ( ( void * ) sandev ) + sizeof ( *sandev ) );
+	sandev->priv = ( ( ( void * ) sandev ) + size );
+	INIT_LIST_HEAD ( &sandev->opened );
+	INIT_LIST_HEAD ( &sandev->closed );
+	for ( i = 0 ; i < count ; i++ ) {
+		sanpath = &sandev->path[i];
+		sanpath->sandev = sandev;
+		sanpath->index = i;
+		sanpath->uri = uri_get ( uris[i] );
+		list_add_tail ( &sanpath->list, &sandev->closed );
+		intf_init ( &sanpath->block, &sanpath_block_desc,
+			    &sandev->refcnt );
+		process_init_stopped ( &sanpath->process, &sanpath_process_desc,
+				       &sandev->refcnt );
+		sanpath->path_rc = -EINPROGRESS;
+	}
 
 	return sandev;
 }
@@ -588,7 +736,7 @@ void unregister_sandev ( struct san_device *sandev ) {
 	assert ( ! timer_running ( &sandev->timer ) );
 
 	/* Shut down interfaces */
-	intfs_shutdown ( 0, &sandev->block, &sandev->command, NULL );
+	sandev_restart ( sandev, 0 );
 
 	/* Remove from list of SAN devices */
 	list_del ( &sandev->list );

@@ -833,6 +833,7 @@ static int int13_extended_seek ( struct san_device *sandev,
  */
 static int int13_device_path_info ( struct san_device *sandev,
 				    struct edd_device_path_information *dpi ) {
+	struct san_path *sanpath;
 	struct device *device;
 	struct device_description *desc;
 	unsigned int i;
@@ -843,9 +844,11 @@ static int int13_device_path_info ( struct san_device *sandev,
 	if ( sandev_needs_reopen ( sandev ) &&
 	     ( ( rc = sandev_reopen ( sandev ) ) != 0 ) )
 		return rc;
+	sanpath = sandev->active;
+	assert ( sanpath != NULL );
 
 	/* Get underlying hardware device */
-	device = identify_device ( &sandev->block );
+	device = identify_device ( &sanpath->block );
 	if ( ! device ) {
 		DBGC ( sandev, "INT13 drive %02x cannot identify hardware "
 		       "device\n", sandev->drive );
@@ -869,7 +872,7 @@ static int int13_device_path_info ( struct san_device *sandev,
 	}
 
 	/* Get EDD block device description */
-	if ( ( rc = edd_describe ( &sandev->block, &dpi->interface_type,
+	if ( ( rc = edd_describe ( &sanpath->block, &dpi->interface_type,
 				   &dpi->device_path ) ) != 0 ) {
 		DBGC ( sandev, "INT13 drive %02x cannot identify block device: "
 		       "%s\n", sandev->drive, strerror ( rc ) );
@@ -1199,14 +1202,16 @@ static void int13_unhook_vector ( void ) {
 /**
  * Hook INT 13 SAN device
  *
- * @v uri		URI
  * @v drive		Drive number
+ * @v uris		List of URIs
+ * @v count		Number of URIs
  * @ret drive		Drive number, or negative error
  *
  * Registers the drive with the INT 13 emulation subsystem, and hooks
  * the INT 13 interrupt vector (if not already hooked).
  */
-static int int13_hook ( struct uri *uri, unsigned int drive ) {
+static int int13_hook ( unsigned int drive, struct uri **uris,
+			unsigned int count ) {
 	struct san_device *sandev;
 	struct int13_data *int13;
 	unsigned int natural_drive;
@@ -1223,7 +1228,7 @@ static int int13_hook ( struct uri *uri, unsigned int drive ) {
 		drive = natural_drive;
 
 	/* Allocate SAN device */
-	sandev = alloc_sandev ( uri, sizeof ( *int13 ) );
+	sandev = alloc_sandev ( uris, count, sizeof ( *int13 ) );
 	if ( ! sandev ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -1525,6 +1530,7 @@ static union xbft_table __bss16 ( xbftab ) __attribute__ (( aligned ( 16 ) ));
  */
 static int int13_describe ( unsigned int drive ) {
 	struct san_device *sandev;
+	struct san_path *sanpath;
 	struct segoff xbft_address;
 	int rc;
 
@@ -1539,6 +1545,8 @@ static int int13_describe ( unsigned int drive ) {
 	if ( sandev_needs_reopen ( sandev ) &&
 	     ( ( rc = sandev_reopen ( sandev ) ) != 0 ) )
 		return rc;
+	sanpath = sandev->active;
+	assert ( sanpath != NULL );
 
 	/* Clear table */
 	memset ( &xbftab, 0, sizeof ( xbftab ) );
@@ -1550,7 +1558,7 @@ static int int13_describe ( unsigned int drive ) {
 		  sizeof ( xbftab.acpi.oem_table_id ) );
 
 	/* Fill in remaining parameters */
-	if ( ( rc = acpi_describe ( &sandev->block, &xbftab.acpi,
+	if ( ( rc = acpi_describe ( &sanpath->block, &xbftab.acpi,
 				    sizeof ( xbftab ) ) ) != 0 ) {
 		DBGC ( sandev, "INT13 drive %02x could not create ACPI "
 		       "description: %s\n", sandev->drive, strerror ( rc ) );

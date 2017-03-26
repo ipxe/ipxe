@@ -71,12 +71,12 @@ static union {
 
 /** "sanhook" command descriptor */
 static struct command_descriptor sanhook_cmd =
-	COMMAND_DESC ( struct sanboot_options, opts.sanhook, 1, 1,
+	COMMAND_DESC ( struct sanboot_options, opts.sanhook, 1, MAX_ARGUMENTS,
 		       "<root-path>" );
 
 /** "sanboot" command descriptor */
 static struct command_descriptor sanboot_cmd =
-	COMMAND_DESC ( struct sanboot_options, opts.sanboot, 0, 1,
+	COMMAND_DESC ( struct sanboot_options, opts.sanboot, 0, MAX_ARGUMENTS,
 		       "[<root-path>]" );
 
 /** "sanunhook" command descriptor */
@@ -96,9 +96,10 @@ static int sanboot_core_exec ( int argc, char **argv,
 			       struct command_descriptor *cmd,
 			       int default_flags, int no_root_path_flags ) {
 	struct sanboot_options opts;
-	const char *root_path;
-	struct uri *uri;
+	struct uri *uris[argc];
+	int count;
 	int flags;
+	int i;
 	int rc;
 
 	/* Initialise options */
@@ -109,17 +110,14 @@ static int sanboot_core_exec ( int argc, char **argv,
 	if ( ( rc = reparse_options ( argc, argv, cmd, &opts ) ) != 0 )
 		goto err_parse_options;
 
-	/* Parse root path, if present */
-	if ( argc > optind ) {
-		root_path = argv[optind];
-		uri = parse_uri ( root_path );
-		if ( ! uri ) {
+	/* Parse root paths, if present */
+	count = ( argc - optind );
+	for ( i = 0 ; i < count ; i++ ) {
+		uris[i] = parse_uri ( argv[ optind + i ] );
+		if ( ! uris[i] ) {
 			rc = -ENOMEM;
 			goto err_parse_uri;
 		}
-	} else {
-		root_path = NULL;
-		uri = NULL;
 	}
 
 	/* Construct flags */
@@ -128,16 +126,18 @@ static int sanboot_core_exec ( int argc, char **argv,
 		flags |= URIBOOT_NO_SAN_DESCRIBE;
 	if ( opts.keep )
 		flags |= URIBOOT_NO_SAN_UNHOOK;
-	if ( ! root_path )
+	if ( ! count )
 		flags |= no_root_path_flags;
 
 	/* Boot from root path */
-	if ( ( rc = uriboot ( NULL, uri, opts.drive, flags ) ) != 0 )
+	if ( ( rc = uriboot ( NULL, uris, count, opts.drive, flags ) ) != 0 )
 		goto err_uriboot;
 
  err_uriboot:
-	uri_put ( uri );
+	i = count;
  err_parse_uri:
+	for ( i-- ; i >= 0 ; i-- )
+		uri_put ( uris[i] );
  err_parse_options:
 	return rc;
 }

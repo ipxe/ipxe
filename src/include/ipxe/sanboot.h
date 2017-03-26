@@ -16,8 +16,28 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/list.h>
 #include <ipxe/uri.h>
 #include <ipxe/retry.h>
+#include <ipxe/process.h>
 #include <ipxe/blockdev.h>
 #include <config/sanboot.h>
+
+/** A SAN path */
+struct san_path {
+	/** Containing SAN device */
+	struct san_device *sandev;
+	/** Path index */
+	unsigned int index;
+	/** SAN device URI */
+	struct uri *uri;
+	/** List of open/closed paths */
+	struct list_head list;
+
+	/** Underlying block device interface */
+	struct interface block;
+	/** Process */
+	struct process process;
+	/** Path status */
+	int path_rc;
+};
 
 /** A SAN device */
 struct san_device {
@@ -26,15 +46,8 @@ struct san_device {
 	/** List of SAN devices */
 	struct list_head list;
 
-	/** SAN device URI */
-	struct uri *uri;
 	/** Drive number */
 	unsigned int drive;
-
-	/** Underlying block device interface */
-	struct interface block;
-	/** Current device status */
-	int block_rc;
 
 	/** Command interface */
 	struct interface command;
@@ -57,6 +70,15 @@ struct san_device {
 
 	/** Driver private data */
 	void *priv;
+
+	/** Current active path */
+	struct san_path *active;
+	/** List of opened SAN paths */
+	struct list_head opened;
+	/** List of closed SAN paths */
+	struct list_head closed;
+	/** SAN paths */
+	struct san_path path[0];
 };
 
 /**
@@ -99,11 +121,12 @@ struct san_device {
 /**
  * Hook SAN device
  *
- * @v uri		URI
  * @v drive		Drive number
+ * @v uris		List of URIs
+ * @v count		Number of URIs
  * @ret drive		Drive number, or negative error
  */
-int san_hook ( struct uri *uri, unsigned int drive );
+int san_hook ( unsigned int drive, struct uri **uris, unsigned int count );
 
 /**
  * Unhook SAN device
@@ -191,7 +214,7 @@ static inline uint64_t sandev_capacity ( struct san_device *sandev ) {
  * @ret needs_reopen	SAN device needs to be reopened
  */
 static inline int sandev_needs_reopen ( struct san_device *sandev ) {
-	return ( sandev->block_rc != 0 );
+	return ( sandev->active == NULL );
 }
 
 extern struct san_device * sandev_find ( unsigned int drive );
@@ -203,7 +226,8 @@ extern int sandev_rw ( struct san_device *sandev, uint64_t lba,
 					    struct interface *data,
 					    uint64_t lba, unsigned int count,
 					    userptr_t buffer, size_t len ) );
-extern struct san_device * alloc_sandev ( struct uri *uri, size_t priv_size );
+extern struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
+					  size_t priv_size );
 extern int register_sandev ( struct san_device *sandev );
 extern void unregister_sandev ( struct san_device *sandev );
 extern unsigned int san_default_drive ( void );

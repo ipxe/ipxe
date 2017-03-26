@@ -251,11 +251,13 @@ static void efi_block_connect ( struct san_device *sandev ) {
 /**
  * Hook EFI block device
  *
- * @v uri		URI
  * @v drive		Drive number
+ * @v uris		List of URIs
+ * @v count		Number of URIs
  * @ret drive		Drive number, or negative error
  */
-static int efi_block_hook ( struct uri *uri, unsigned int drive ) {
+static int efi_block_hook ( unsigned int drive, struct uri **uris,
+			    unsigned int count ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_DEVICE_PATH_PROTOCOL *end;
 	struct efi_block_vendor_path *vendor;
@@ -270,6 +272,13 @@ static int efi_block_hook ( struct uri *uri, unsigned int drive ) {
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Sanity check */
+	if ( ! count ) {
+		DBG ( "EFIBLK has no URIs\n" );
+		rc = -ENOTTY;
+		goto err_no_uris;
+	}
+
 	/* Find an appropriate parent device handle */
 	snpdev = last_opened_snpdev();
 	if ( ! snpdev ) {
@@ -280,14 +289,14 @@ static int efi_block_hook ( struct uri *uri, unsigned int drive ) {
 
 	/* Calculate length of private data */
 	prefix_len = efi_devpath_len ( snpdev->path );
-	uri_len = format_uri ( uri, NULL, 0 );
+	uri_len = format_uri ( uris[0], NULL, 0 );
 	vendor_len = ( sizeof ( *vendor ) +
 		       ( ( uri_len + 1 /* NUL */ ) * sizeof ( wchar_t ) ) );
 	len = ( sizeof ( *block ) + uri_len + 1 /* NUL */ + prefix_len +
 		vendor_len + sizeof ( *end ) );
 
 	/* Allocate and initialise structure */
-	sandev = alloc_sandev ( uri, len );
+	sandev = alloc_sandev ( uris, count, len );
 	if ( ! sandev ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -315,7 +324,7 @@ static int efi_block_hook ( struct uri *uri, unsigned int drive ) {
 	vendor->vendor.Header.Length[1] = ( vendor_len >> 8 );
 	memcpy ( &vendor->vendor.Guid, &ipxe_block_device_path_guid,
 		 sizeof ( vendor->vendor.Guid ) );
-	format_uri ( uri, uri_buf, ( uri_len + 1 /* NUL */ ) );
+	format_uri ( uris[0], uri_buf, ( uri_len + 1 /* NUL */ ) );
 	efi_snprintf ( vendor->uri, ( uri_len + 1 /* NUL */ ), "%s", uri_buf );
 	end = ( ( ( void * ) vendor ) + vendor_len );
 	end->Type = END_DEVICE_PATH_TYPE;
@@ -364,6 +373,7 @@ static int efi_block_hook ( struct uri *uri, unsigned int drive ) {
 	sandev_put ( sandev );
  err_alloc:
  err_no_snpdev:
+ err_no_uris:
 	return rc;
 }
 
@@ -413,6 +423,7 @@ static int efi_block_describe ( unsigned int drive ) {
 	} xbftab;
 	static UINTN key;
 	struct san_device *sandev;
+	struct san_path *sanpath;
 	size_t len;
 	EFI_STATUS efirc;
 	int rc;
@@ -446,6 +457,8 @@ static int efi_block_describe ( unsigned int drive ) {
 	if ( sandev_needs_reopen ( sandev ) &&
 	     ( ( rc = sandev_reopen ( sandev ) ) != 0 ) )
 		return rc;
+	sanpath = sandev->active;
+	assert ( sanpath != NULL );
 
 	/* Clear table */
 	memset ( &xbftab, 0, sizeof ( xbftab ) );
@@ -457,7 +470,7 @@ static int efi_block_describe ( unsigned int drive ) {
 		  sizeof ( xbftab.acpi.oem_table_id ) );
 
 	/* Fill in remaining parameters */
-	if ( ( rc = acpi_describe ( &sandev->block, &xbftab.acpi,
+	if ( ( rc = acpi_describe ( &sanpath->block, &xbftab.acpi,
 				    sizeof ( xbftab ) ) ) != 0 ) {
 		DBGC ( sandev, "EFIBLK %#02x could not create ACPI "
 		       "description: %s\n", sandev->drive, strerror ( rc ) );

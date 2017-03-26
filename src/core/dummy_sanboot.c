@@ -35,16 +35,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Hook dummy SAN device
  *
- * @v uri		URI
  * @v drive		Drive number
+ * @v uris		List of URIs
+ * @v count		Number of URIs
  * @ret drive		Drive number, or negative error
  */
-static int dummy_san_hook ( struct uri *uri, unsigned int drive ) {
+static int dummy_san_hook ( unsigned int drive, struct uri **uris,
+			    unsigned int count ) {
 	struct san_device *sandev;
 	int rc;
 
 	/* Allocate SAN device */
-	sandev = alloc_sandev ( uri, 0 );
+	sandev = alloc_sandev ( uris, count, 0 );
 	if ( ! sandev ) {
 		rc = -ENOMEM;
 		goto err_alloc;

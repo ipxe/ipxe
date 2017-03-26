@@ -26,8 +26,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/sanboot.h>
 
-static int null_san_hook ( struct uri *uri __unused,
-			   unsigned int drive __unused ) {
+static int null_san_hook ( unsigned int drive __unused,
+			   struct uri **uris __unused,
+			   unsigned int count __unused ) {
 	return -EOPNOTSUPP;
 }
 

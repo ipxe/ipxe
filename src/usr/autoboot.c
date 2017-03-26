@@ -109,7 +109,8 @@ const struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA,
  * Boot from filename and root-path URIs
  *
  * @v filename		Filename
- * @v root_path		Root path
+ * @v root_paths	Root path(s)
+ * @v root_path_count	Number of root paths
  * @v drive		SAN drive (if applicable)
  * @v flags		Boot action flags
  * @ret rc		Return status code
@@ -120,14 +121,14 @@ const struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA,
  * provide backwards compatibility for the "keep-san" and
  * "skip-san-boot" options.
  */
-int uriboot ( struct uri *filename, struct uri *root_path, int drive,
-	      unsigned int flags ) {
+int uriboot ( struct uri *filename, struct uri **root_paths,
+	      unsigned int root_path_count, int drive, unsigned int flags ) {
 	struct image *image;
 	int rc;
 
 	/* Hook SAN device, if applicable */
-	if ( root_path ) {
-		drive = san_hook ( root_path, drive );
+	if ( root_path_count ) {
+		drive = san_hook ( drive, root_paths, root_path_count );
 		if ( drive < 0 ) {
 			rc = drive;
 			printf ( "Could not open SAN device: %s\n",
@@ -396,7 +397,8 @@ int netboot ( struct net_device *netdev ) {
 	}
 
 	/* Boot using next server, filename and root path */
-	if ( ( rc = uriboot ( filename, root_path, san_default_drive(),
+	if ( ( rc = uriboot ( filename, &root_path, ( root_path ? 1 : 0 ),
+			      san_default_drive(),
 			      ( root_path ? 0 : URIBOOT_NO_SAN ) ) ) != 0 )
 		goto err_uriboot;
 
