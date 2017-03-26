@@ -219,13 +219,12 @@ static int int13_guess_geometry_hdd ( struct san_device *sandev, void *scratch,
 	struct master_boot_record *mbr = scratch;
 	struct partition_table_entry *partition;
 	unsigned int i;
+	unsigned int start_cylinder;
+	unsigned int start_head;
+	unsigned int start_sector;
 	unsigned int end_head;
 	unsigned int end_sector;
 	int rc;
-
-	/* Default guess is xx/255/63 */
-	*heads = 255;
-	*sectors = 63;
 
 	/* Read partition table */
 	if ( ( rc = sandev_rw ( sandev, 0, 1, virt_to_user ( mbr ),
@@ -244,18 +243,53 @@ static int int13_guess_geometry_hdd ( struct san_device *sandev, void *scratch,
 	 * heads and sectors_per_track if we find any used
 	 * partitions.
 	 */
+	*heads = 0;
+	*sectors = 0;
 	for ( i = 0 ; i < 4 ; i++ ) {
+
+		/* Skip empty partitions */
 		partition = &mbr->partitions[i];
+		if ( ! partition->type )
+			continue;
+
+		/* If partition starts on cylinder 0 then we can
+		 * unambiguously determine the number of sectors.
+		 */
+		start_cylinder = PART_CYLINDER ( partition->chs_start );
+		start_head = PART_HEAD ( partition->chs_start );
+		start_sector = PART_SECTOR ( partition->chs_start );
+		if ( ( start_cylinder == 0 ) && ( start_head != 0 ) ) {
+			*sectors = ( ( partition->start + 1 - start_sector ) /
+				     start_head );
+			DBGC ( sandev, "INT13 drive %02x guessing C/H/S "
+			       "xx/xx/%d based on partition %d\n",
+			       sandev->drive, *sectors, ( i + 1 ) );
+		}
+
+		/* If partition ends on a higher head or sector number
+		 * than our current guess, then increase the guess.
+		 */
 		end_head = PART_HEAD ( partition->chs_end );
 		end_sector = PART_SECTOR ( partition->chs_end );
-		if ( ! ( partition->type && end_head && end_sector ) )
-			continue;
-		*heads = ( end_head + 1 );
-		*sectors = end_sector;
-		DBGC ( sandev, "INT13 drive %02x guessing C/H/S xx/%d/%d based "
-		       "on partition %d\n",
-		       sandev->drive, *heads, *sectors, ( i + 1 ) );
+		if ( ( end_head + 1 ) > *heads ) {
+			*heads = ( end_head + 1 );
+			DBGC ( sandev, "INT13 drive %02x guessing C/H/S "
+			       "xx/%d/xx based on partition %d\n",
+			       sandev->drive, *heads, ( i + 1 ) );
+		}
+		if ( end_sector > *sectors ) {
+			*sectors = end_sector;
+			DBGC ( sandev, "INT13 drive %02x guessing C/H/S "
+			       "xx/xx/%d based on partition %d\n",
+			       sandev->drive, *sectors, ( i + 1 ) );
+		}
 	}
+
+	/* Default guess is xx/255/63 */
+	if ( ! *heads )
+		*heads = 255;
+	if ( ! *sectors )
+		*sectors = 63;
 
 	return 0;
 }
