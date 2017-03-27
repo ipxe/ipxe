@@ -90,19 +90,21 @@ void mdelay ( unsigned long msecs ) {
 }
 
 /**
- * Sleep (interruptibly) for a fixed number of seconds
+ * Sleep (possibly interruptibly) for a fixed number of seconds
  *
  * @v secs		Number of seconds for which to delay
+ * @v interrupted	Interrupt checking method, or NULL
  * @ret secs		Number of seconds remaining, if interrupted
  */
-unsigned int sleep ( unsigned int secs ) {
+static unsigned int sleep_interruptible ( unsigned int secs,
+					  int ( * interrupted ) ( void ) ) {
 	unsigned long start = currticks();
 	unsigned long now;
 
 	for ( ; secs ; secs-- ) {
 		while ( ( ( now = currticks() ) - start ) < TICKS_PER_SEC ) {
 			step();
-			if ( iskey() && ( getchar() == CTRL_C ) )
+			if ( interrupted && interrupted() )
 				return secs;
 			cpu_nap();
 		}
@@ -110,6 +112,37 @@ unsigned int sleep ( unsigned int secs ) {
 	}
 
 	return 0;
+}
+
+/**
+ * Check if sleep has been interrupted by keypress
+ *
+ * @ret interrupted	Sleep has been interrupted
+ */
+static int keypress_interrupted ( void ) {
+
+	return ( iskey() && ( getchar() == CTRL_C ) );
+}
+
+/**
+ * Sleep (interruptibly) for a fixed number of seconds
+ *
+ * @v secs		Number of seconds for which to delay
+ * @ret secs		Number of seconds remaining, if interrupted
+ */
+unsigned int sleep ( unsigned int secs ) {
+
+	return sleep_interruptible ( secs, keypress_interrupted );
+}
+
+/**
+ * Sleep (uninterruptibly) for a fixed number of seconds
+ *
+ * @v secs		Number of seconds for which to delay
+ */
+void sleep_fixed ( unsigned int secs ) {
+
+	sleep_interruptible ( secs, NULL );
 }
 
 /**

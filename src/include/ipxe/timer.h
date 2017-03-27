@@ -75,5 +75,6 @@ extern void udelay ( unsigned long usecs );
 extern void mdelay ( unsigned long msecs );
 extern unsigned long currticks ( void );
 extern unsigned int sleep ( unsigned int seconds );
+extern void sleep_fixed ( unsigned int secs );
 
 #endif /* _IPXE_TIMER_H */
