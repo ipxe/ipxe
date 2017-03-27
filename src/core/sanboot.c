@@ -119,8 +119,10 @@ static void sandev_free ( struct refcnt *refcnt ) {
 	assert ( ! timer_running ( &sandev->timer ) );
 	assert ( ! sandev->active );
 	assert ( list_empty ( &sandev->opened ) );
-	for ( i = 0 ; i < sandev->paths ; i++ )
+	for ( i = 0 ; i < sandev->paths ; i++ ) {
 		uri_put ( sandev->path[i].uri );
+		assert ( sandev->path[i].desc == NULL );
+	}
 	free ( sandev );
 }
 
@@ -197,6 +199,15 @@ static int sanpath_open ( struct san_path *sanpath ) {
 		DBGC ( sandev, "SAN %#02x.%d could not (re)open URI: "
 		       "%s\n", sandev->drive, sanpath->index, strerror ( rc ) );
 		return rc;
+	}
+
+	/* Update ACPI descriptor, if applicable */
+	if ( ! ( sandev->flags & SAN_NO_DESCRIBE ) ) {
+		if ( sanpath->desc )
+			acpi_del ( sanpath->desc );
+		sanpath->desc = acpi_describe ( &sanpath->block );
+		if ( sanpath->desc )
+			acpi_add ( sanpath->desc );
 	}
 
 	/* Start process */
@@ -607,6 +618,72 @@ int sandev_rw ( struct san_device *sandev, uint64_t lba,
 }
 
 /**
+ * Describe SAN device
+ *
+ * @v sandev		SAN device
+ * @ret rc		Return status code
+ *
+ * Allow connections to progress until all existent path descriptors
+ * are complete.
+ */
+static int sandev_describe ( struct san_device *sandev ) {
+	struct san_path *sanpath;
+	struct acpi_descriptor *desc;
+	int rc;
+
+	/* Wait for all paths to be either described or closed */
+	while ( 1 ) {
+
+		/* Allow connections to progress */
+		step();
+
+		/* Fail if any closed path has an incomplete descriptor */
+		list_for_each_entry ( sanpath, &sandev->closed, list ) {
+			desc = sanpath->desc;
+			if ( ! desc )
+				continue;
+			if ( ( rc = desc->model->complete ( desc ) ) != 0 ) {
+				DBGC ( sandev, "SAN %#02x.%d could not be "
+				       "described: %s\n", sandev->drive,
+				       sanpath->index, strerror ( rc ) );
+				return rc;
+			}
+		}
+
+		/* Succeed if no paths have an incomplete descriptor */
+		rc = 0;
+		list_for_each_entry ( sanpath, &sandev->opened, list ) {
+			desc = sanpath->desc;
+			if ( ! desc )
+				continue;
+			if ( ( rc = desc->model->complete ( desc ) ) != 0 )
+				break;
+		}
+		if ( rc == 0 )
+			return 0;
+	}
+}
+
+/**
+ * Remove SAN device descriptors
+ *
+ * @v sandev		SAN device
+ */
+static void sandev_undescribe ( struct san_device *sandev ) {
+	struct san_path *sanpath;
+	unsigned int i;
+
+	/* Remove all ACPI descriptors */
+	for ( i = 0 ; i < sandev->paths ; i++ ) {
+		sanpath = &sandev->path[i];
+		if ( sanpath->desc ) {
+			acpi_del ( sanpath->desc );
+			sanpath->desc = NULL;
+		}
+	}
+}
+
+/**
  * Configure SAN device as a CD-ROM, if applicable
  *
  * @v sandev		SAN device
@@ -729,17 +806,24 @@ struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
  * Register SAN device
  *
  * @v sandev		SAN device
+ * @v drive		Drive number
+ * @v flags		Flags
  * @ret rc		Return status code
  */
-int register_sandev ( struct san_device *sandev ) {
+int register_sandev ( struct san_device *sandev, unsigned int drive,
+		      unsigned int flags ) {
 	int rc;
 
 	/* Check that drive number is not in use */
-	if ( sandev_find ( sandev->drive ) != NULL ) {
-		DBGC ( sandev, "SAN %#02x is already in use\n", sandev->drive );
+	if ( sandev_find ( drive ) != NULL ) {
+		DBGC ( sandev, "SAN %#02x is already in use\n", drive );
 		rc = -EADDRINUSE;
 		goto err_in_use;
 	}
+
+	/* Record drive number and flags */
+	sandev->drive = drive;
+	sandev->flags = flags;
 
 	/* Check that device is capable of being opened (i.e. that all
 	 * URIs are well-formed and that at least one path is
@@ -747,6 +831,10 @@ int register_sandev ( struct san_device *sandev ) {
 	 */
 	if ( ( rc = sandev_reopen ( sandev ) ) != 0 )
 		goto err_reopen;
+
+	/* Describe device */
+	if ( ( rc = sandev_describe ( sandev ) ) != 0 )
+		goto err_describe;
 
 	/* Read device capacity */
 	if ( ( rc = sandev_command ( sandev, sandev_command_read_capacity,
@@ -766,8 +854,10 @@ int register_sandev ( struct san_device *sandev ) {
 	list_del ( &sandev->list );
  err_iso9660:
  err_capacity:
+ err_describe:
  err_reopen:
 	sandev_restart ( sandev, rc );
+	sandev_undescribe ( sandev );
  err_in_use:
 	return rc;
 }
@@ -787,6 +877,9 @@ void unregister_sandev ( struct san_device *sandev ) {
 
 	/* Shut down interfaces */
 	sandev_restart ( sandev, 0 );
+
+	/* Remove ACPI descriptors */
+	sandev_undescribe ( sandev );
 
 	DBGC ( sandev, "SAN %#02x unregistered\n", sandev->drive );
 }

@@ -60,12 +60,28 @@ FILE_LICENCE ( BSD2 );
 #define EINFO_EINVAL_RP_TOO_SHORT __einfo_uniqify \
 	( EINFO_EINVAL, 0x04, "Root path too short" )
 
+struct acpi_model ib_sbft_model __acpi_model;
+
 /******************************************************************************
  *
  * IB SRP devices
  *
  ******************************************************************************
  */
+
+/**
+ * An IB SRP sBFT created by iPXE
+ */
+struct ipxe_ib_sbft {
+	/** The table header */
+	struct sbft_table table;
+	/** The SCSI subtable */
+	struct sbft_scsi_subtable scsi;
+	/** The SRP subtable */
+	struct sbft_srp_subtable srp;
+	/** The Infiniband subtable */
+	struct sbft_ib_subtable ib;
+};
 
 /** An Infiniband SRP device */
 struct ib_srp_device {
@@ -80,10 +96,10 @@ struct ib_srp_device {
 	/** Infiniband device */
 	struct ib_device *ibdev;
 
-	/** Destination GID (for boot firmware table) */
-	union ib_gid dgid;
-	/** Service ID (for boot firmware table) */
-	union ib_guid service_id;
+	/** ACPI descriptor */
+	struct acpi_descriptor desc;
+	/** Boot firmware table parameters */
+	struct ipxe_ib_sbft sbft;
 };
 
 /**
@@ -113,43 +129,15 @@ static void ib_srp_close ( struct ib_srp_device *ib_srp, int rc ) {
 }
 
 /**
- * Describe IB SRP device in an ACPI table
+ * Get IB SRP ACPI descriptor
  *
- * @v srpdev		SRP device
- * @v acpi		ACPI table
- * @v len		Length of ACPI table
- * @ret rc		Return status code
+ * @v ib_srp		IB SRP device
+ * @ret desc		ACPI descriptor
  */
-static int ib_srp_describe ( struct ib_srp_device *ib_srp,
-			     struct acpi_description_header *acpi,
-			     size_t len ) {
-	struct ib_device *ibdev = ib_srp->ibdev;
-	struct sbft_table *sbft =
-		container_of ( acpi, struct sbft_table, acpi );
-	struct sbft_ib_subtable *ib_sbft;
-	size_t used;
+static struct acpi_descriptor *
+ib_srp_describe ( struct ib_srp_device *ib_srp ) {
 
-	/* Sanity check */
-	if ( acpi->signature != SBFT_SIG )
-		return -EINVAL;
-
-	/* Append IB subtable to existing table */
-	used = le32_to_cpu ( sbft->acpi.length );
-	sbft->ib_offset = cpu_to_le16 ( used );
-	ib_sbft = ( ( ( void * ) sbft ) + used );
-	used += sizeof ( *ib_sbft );
-	if ( used > len )
-		return -ENOBUFS;
-	sbft->acpi.length = cpu_to_le32 ( used );
-
-	/* Populate subtable */
-	memcpy ( &ib_sbft->sgid, &ibdev->gid, sizeof ( ib_sbft->sgid ) );
-	memcpy ( &ib_sbft->dgid, &ib_srp->dgid, sizeof ( ib_sbft->dgid ) );
-	memcpy ( &ib_sbft->service_id, &ib_srp->service_id,
-		 sizeof ( ib_sbft->service_id ) );
-	ib_sbft->pkey = cpu_to_le16 ( ibdev->pkey );
-
-	return 0;
+	return &ib_srp->desc;
 }
 
 /** IB SRP CMRC interface operations */
@@ -188,6 +176,7 @@ static int ib_srp_open ( struct interface *block, struct ib_device *ibdev,
 			 union srp_port_id *initiator,
 			 union srp_port_id *target, struct scsi_lun *lun ) {
 	struct ib_srp_device *ib_srp;
+	struct ipxe_ib_sbft *sbft;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -200,13 +189,19 @@ static int ib_srp_open ( struct interface *block, struct ib_device *ibdev,
 	intf_init ( &ib_srp->srp, &ib_srp_srp_desc, &ib_srp->refcnt );
 	intf_init ( &ib_srp->cmrc, &ib_srp_cmrc_desc, &ib_srp->refcnt );
 	ib_srp->ibdev = ibdev_get ( ibdev );
+	acpi_init ( &ib_srp->desc, &ib_sbft_model, &ib_srp->refcnt );
 	DBGC ( ib_srp, "IBSRP %p for " IB_GID_FMT " " IB_GUID_FMT "\n",
 	       ib_srp, IB_GID_ARGS ( dgid ), IB_GUID_ARGS ( service_id ) );
 
 	/* Preserve parameters required for boot firmware table */
-	memcpy ( &ib_srp->dgid, dgid, sizeof ( ib_srp->dgid ) );
-	memcpy ( &ib_srp->service_id, service_id,
-		 sizeof ( ib_srp->service_id ) );
+	sbft = &ib_srp->sbft;
+	memcpy ( &sbft->scsi.lun, lun, sizeof ( sbft->scsi.lun ) );
+	memcpy ( &sbft->srp.initiator, initiator,
+		 sizeof ( sbft->srp.initiator ) );
+	memcpy ( &sbft->srp.target, target, sizeof ( sbft->srp.target ) );
+	memcpy ( &sbft->ib.dgid, dgid, sizeof ( sbft->ib.dgid ) );
+	memcpy ( &sbft->ib.service_id, service_id,
+		 sizeof ( sbft->ib.service_id ) );
 
 	/* Open CMRC socket */
 	if ( ( rc = ib_cmrc_open ( &ib_srp->cmrc, ibdev, dgid,
@@ -578,4 +573,68 @@ static int ib_srp_open_uri ( struct interface *parent, struct uri *uri ) {
 struct uri_opener ib_srp_uri_opener __uri_opener = {
 	.scheme = "ib_srp",
 	.open = ib_srp_open_uri,
+};
+
+/******************************************************************************
+ *
+ * IB SRP boot firmware table (sBFT)
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Check if IB SRP boot firmware table descriptor is complete
+ *
+ * @v desc		ACPI descriptor
+ * @ret rc		Return status code
+ */
+static int ib_sbft_complete ( struct acpi_descriptor *desc __unused ) {
+	return 0;
+}
+
+/**
+ * Install IB SRP boot firmware table(s)
+ *
+ * @v install		Installation method
+ * @ret rc		Return status code
+ */
+static int ib_sbft_install ( int ( * install ) ( struct acpi_header *acpi ) ) {
+	struct ib_srp_device *ib_srp;
+	struct ipxe_ib_sbft *sbft;
+	struct ib_device *ibdev;
+	int rc;
+
+	list_for_each_entry ( ib_srp, &ib_sbft_model.descs, desc.list ) {
+
+		/* Complete table */
+		sbft = &ib_srp->sbft;
+		ibdev = ib_srp->ibdev;
+		sbft->table.acpi.signature = cpu_to_le32 ( SBFT_SIG );
+		sbft->table.acpi.length = cpu_to_le32 ( sizeof ( *sbft ) );
+		sbft->table.acpi.revision = 1;
+		sbft->table.scsi_offset =
+			cpu_to_le16 ( offsetof ( typeof ( *sbft ), scsi ) );
+		sbft->table.srp_offset =
+			cpu_to_le16 ( offsetof ( typeof ( *sbft ), srp ) );
+		sbft->table.ib_offset =
+			cpu_to_le16 ( offsetof ( typeof ( *sbft ), ib ) );
+		memcpy ( &sbft->ib.sgid, &ibdev->gid, sizeof ( sbft->ib.sgid ));
+		sbft->ib.pkey = cpu_to_le16 ( ibdev->pkey );
+
+		/* Install table */
+		if ( ( rc = install ( &sbft->table.acpi ) ) != 0 ) {
+			DBGC ( ib_srp, "IBSRP %p could not install sBFT: %s\n",
+			       ib_srp, strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/** IB sBFT model */
+struct acpi_model ib_sbft_model __acpi_model = {
+	.descs = LIST_HEAD_INIT ( ib_sbft_model.descs ),
+	.complete = ib_sbft_complete,
+	.install = ib_sbft_install,
 };

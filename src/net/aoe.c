@@ -53,6 +53,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FEATURE ( FEATURE_PROTOCOL, "AoE", DHCP_EB_FEATURE_AOE, 1 );
 
 struct net_protocol aoe_protocol __net_protocol;
+struct acpi_model abft_model __acpi_model;
 
 /******************************************************************************
  *
@@ -91,6 +92,9 @@ struct aoe_device {
 	struct interface config;
 	/** Device is configued */
 	int configured;
+
+	/** ACPI descriptor */
+	struct acpi_descriptor desc;
 };
 
 /** An AoE command */
@@ -790,32 +794,13 @@ static struct device * aoedev_identify_device ( struct aoe_device *aoedev ) {
 }
 
 /**
- * Describe AoE device in an ACPI table
+ * Get AoE ACPI descriptor
  *
  * @v aoedev		AoE device
- * @v acpi		ACPI table
- * @v len		Length of ACPI table
- * @ret rc		Return status code
+ * @ret desc		ACPI descriptor
  */
-static int aoedev_describe ( struct aoe_device *aoedev,
-			     struct acpi_description_header *acpi,
-			     size_t len ) {
-	struct abft_table *abft =
-		container_of ( acpi, struct abft_table, acpi );
-
-	/* Sanity check */
-	if ( len < sizeof ( *abft ) )
-		return -ENOBUFS;
-
-	/* Populate table */
-	abft->acpi.signature = cpu_to_le32 ( ABFT_SIG );
-	abft->acpi.length = cpu_to_le32 ( sizeof ( *abft ) );
-	abft->acpi.revision = 1;
-	abft->shelf = cpu_to_le16 ( aoedev->major );
-	abft->slot = aoedev->minor;
-	memcpy ( abft->mac, aoedev->netdev->ll_addr, sizeof ( abft->mac ) );
-
-	return 0;
+static struct acpi_descriptor * aoedev_describe ( struct aoe_device *aoedev ) {
+	return &aoedev->desc;
 }
 
 /** AoE device ATA interface operations */
@@ -869,6 +854,7 @@ static int aoedev_open ( struct interface *parent, struct net_device *netdev,
 	aoedev->minor = minor;
 	memcpy ( aoedev->target, netdev->ll_broadcast,
 		 netdev->ll_protocol->ll_addr_len );
+	acpi_init ( &aoedev->desc, &abft_model, &aoedev->refcnt );
 
 	/* Initiate configuration */
 	if ( ( rc = aoedev_cfg_command ( aoedev, &aoedev->config ) ) < 0 ) {
@@ -1058,4 +1044,62 @@ static int aoe_open ( struct interface *parent, struct uri *uri ) {
 struct uri_opener aoe_uri_opener __uri_opener = {
 	.scheme = "aoe",
 	.open = aoe_open,
+};
+
+/******************************************************************************
+ *
+ * AoE boot firmware table (aBFT)
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Check if AoE boot firmware table descriptor is complete
+ *
+ * @v desc		ACPI descriptor
+ * @ret rc		Return status code
+ */
+static int abft_complete ( struct acpi_descriptor *desc __unused ) {
+	return 0;
+}
+
+/**
+ * Install AoE boot firmware table(s)
+ *
+ * @v install		Installation method
+ * @ret rc		Return status code
+ */
+static int abft_install ( int ( * install ) ( struct acpi_header *acpi ) ) {
+	struct aoe_device *aoedev;
+	struct abft_table abft;
+	int rc;
+
+	list_for_each_entry ( aoedev, &abft_model.descs, desc.list ) {
+
+		/* Populate table */
+		memset ( &abft, 0, sizeof ( abft ) );
+		abft.acpi.signature = cpu_to_le32 ( ABFT_SIG );
+		abft.acpi.length = cpu_to_le32 ( sizeof ( abft ) );
+		abft.acpi.revision = 1;
+		abft.shelf = cpu_to_le16 ( aoedev->major );
+		abft.slot = aoedev->minor;
+		memcpy ( abft.mac, aoedev->netdev->ll_addr,
+			 sizeof ( abft.mac ) );
+
+		/* Install table */
+		if ( ( rc = install ( &abft.acpi ) ) != 0 ) {
+			DBGC ( aoedev, "AoE %s could not install aBFT: %s\n",
+			       aoedev_name ( aoedev ), strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/** aBFT model */
+struct acpi_model abft_model __acpi_model = {
+	.descs = LIST_HEAD_INIT ( abft_model.descs ),
+	.complete = abft_complete,
+	.install = abft_install,
 };

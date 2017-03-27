@@ -509,28 +509,11 @@ __weak int http_block_read_capacity ( struct http_transaction *http __unused,
 	return -ENOTSUP;
 }
 
-/**
- * Describe device in ACPI table (when HTTP block device support is not present)
- *
- * @v http		HTTP transaction
- * @v acpi		ACPI table
- * @v len		Length of ACPI table
- * @ret rc		Return status code
- */
-__weak int http_acpi_describe ( struct http_transaction *http __unused,
-				struct acpi_description_header *acpi __unused,
-				size_t len __unused ) {
-
-	return -ENOTSUP;
-}
-
 /** HTTP data transfer interface operations */
 static struct interface_operation http_xfer_operations[] = {
 	INTF_OP ( block_read, struct http_transaction *, http_block_read ),
 	INTF_OP ( block_read_capacity, struct http_transaction *,
 		  http_block_read_capacity ),
-	INTF_OP ( acpi_describe, struct http_transaction *,
-		  http_acpi_describe ),
 	INTF_OP ( xfer_window_changed, struct http_transaction *, http_step ),
 	INTF_OP ( intf_close, struct http_transaction *, http_close ),
 };

@@ -28,7 +28,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 static int null_san_hook ( unsigned int drive __unused,
 			   struct uri **uris __unused,
-			   unsigned int count __unused ) {
+			   unsigned int count __unused,
+			   unsigned int flags __unused ) {
 	return -EOPNOTSUPP;
 }
 
@@ -40,7 +41,7 @@ static int null_san_boot ( unsigned int drive __unused ) {
 	return -EOPNOTSUPP;
 }
 
-static int null_san_describe ( unsigned int drive __unused ) {
+static int null_san_describe ( void ) {
 	return -EOPNOTSUPP;
 }
 

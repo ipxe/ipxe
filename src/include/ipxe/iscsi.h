@@ -16,6 +16,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/refcnt.h>
 #include <ipxe/xfer.h>
 #include <ipxe/process.h>
+#include <ipxe/acpi.h>
+#include <ipxe/settings.h>
 
 /** Default iSCSI port */
 #define ISCSI_PORT 3260
@@ -647,6 +649,8 @@ struct iscsi_session {
 	struct sockaddr target_sockaddr;
 	/** SCSI LUN (for boot firmware table) */
 	struct scsi_lun lun;
+	/** ACPI descriptor */
+	struct acpi_descriptor desc;
 };
 
 /** iSCSI session is currently in the security negotiation phase */
@@ -696,5 +700,8 @@ struct iscsi_session {
 
 /** Default initiator IQN prefix */
 #define ISCSI_DEFAULT_IQN_PREFIX "iqn.2010-04.org.ipxe"
+
+extern const struct setting
+initiator_iqn_setting __setting ( SETTING_SANBOOT_EXTRA, initiator-iqn );
 
 #endif /* _IPXE_ISCSI_H */

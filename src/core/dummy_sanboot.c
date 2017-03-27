@@ -38,10 +38,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v drive		Drive number
  * @v uris		List of URIs
  * @v count		Number of URIs
+ * @v flags		Flags
  * @ret drive		Drive number, or negative error
  */
 static int dummy_san_hook ( unsigned int drive, struct uri **uris,
-			    unsigned int count ) {
+			    unsigned int count, unsigned int flags ) {
 	struct san_device *sandev;
 	int rc;
 
@@ -51,10 +52,9 @@ static int dummy_san_hook ( unsigned int drive, struct uri **uris,
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	sandev->drive = drive;
 
 	/* Register SAN device */
-	if ( ( rc = register_sandev ( sandev ) ) != 0 ) {
+	if ( ( rc = register_sandev ( sandev, drive, flags ) ) != 0 ) {
 		DBGC ( sandev, "SAN %#02x could not register: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		goto err_register;
@@ -102,13 +102,26 @@ static int dummy_san_boot ( unsigned int drive __unused ) {
 }
 
 /**
+ * Install ACPI table
+ *
+ * @v acpi		ACPI description header
+ * @ret rc		Return status code
+ */
+static int dummy_install ( struct acpi_header *acpi ) {
+
+	DBGC ( acpi, "ACPI table %s:\n", acpi_name ( acpi->signature ) );
+	DBGC_HDA ( acpi, 0, acpi, le32_to_cpu ( acpi->length ) );
+	return 0;
+}
+
+/**
  * Describe dummy SAN device
  *
- * @v drive		Drive number
+ * @ret rc		Return status code
  */
-static int dummy_san_describe ( unsigned int drive __unused ) {
+static int dummy_san_describe ( void ) {
 
-	return 0;
+	return acpi_install ( dummy_install );
 }
 
 PROVIDE_SANBOOT ( dummy, san_hook, dummy_san_hook );

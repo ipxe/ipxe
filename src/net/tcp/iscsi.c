@@ -1810,12 +1810,23 @@ static int iscsi_scsi_command ( struct iscsi_session *iscsi,
 	return iscsi->itt;
 }
 
+/**
+ * Get iSCSI ACPI descriptor
+ *
+ * @v iscsi		iSCSI session
+ * @ret desc		ACPI descriptor
+ */
+static struct acpi_descriptor * iscsi_describe ( struct iscsi_session *iscsi ) {
+
+	return &iscsi->desc;
+}
+
 /** iSCSI SCSI command-issuing interface operations */
 static struct interface_operation iscsi_control_op[] = {
 	INTF_OP ( scsi_command, struct iscsi_session *, iscsi_scsi_command ),
 	INTF_OP ( xfer_window, struct iscsi_session *, iscsi_scsi_window ),
 	INTF_OP ( intf_close, struct iscsi_session *, iscsi_close ),
-	INTF_OP ( acpi_describe, struct iscsi_session *, ibft_describe ),
+	INTF_OP ( acpi_describe, struct iscsi_session *, iscsi_describe ),
 };
 
 /** iSCSI SCSI command-issuing interface descriptor */
@@ -2064,6 +2075,7 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
 	intf_init ( &iscsi->socket, &iscsi_socket_desc, &iscsi->refcnt );
 	process_init_stopped ( &iscsi->process, &iscsi_process_desc,
 			       &iscsi->refcnt );
+	acpi_init ( &iscsi->desc, &ibft_model, &iscsi->refcnt );
 
 	/* Parse root path */
 	if ( ( rc = iscsi_parse_root_path ( iscsi, uri->opaque ) ) != 0 )

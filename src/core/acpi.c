@@ -43,27 +43,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Transcribe ACPI table signature (for debugging)
- *
- * @v signature		ACPI table signature
- * @ret name		ACPI table signature name
- */
-static const char * acpi_name ( uint32_t signature ) {
-	static union {
-		uint32_t signature;
-		char name[5];
-	} u;
-
-	u.signature = cpu_to_le32 ( signature );
-	return u.name;
-}
-
-/**
  * Fix up ACPI table checksum
  *
  * @v acpi		ACPI table header
  */
-void acpi_fix_checksum ( struct acpi_description_header *acpi ) {
+void acpi_fix_checksum ( struct acpi_header *acpi ) {
 	unsigned int i = 0;
 	uint8_t sum = 0;
 
@@ -147,7 +131,7 @@ userptr_t acpi_find_rsdt ( userptr_t ebda ) {
  * @ret table		Table, or UNULL if not found
  */
 userptr_t acpi_find ( userptr_t rsdt, uint32_t signature, unsigned int index ) {
-	struct acpi_description_header acpi;
+	struct acpi_header acpi;
 	struct acpi_rsdt *rsdtab;
 	typeof ( rsdtab->entry[0] ) entry;
 	userptr_t table;
@@ -227,7 +211,7 @@ userptr_t acpi_find ( userptr_t rsdt, uint32_t signature, unsigned int index ) {
  * the ACPI specification itself.
  */
 static int acpi_sx_zsdt ( userptr_t zsdt, uint32_t signature ) {
-	struct acpi_description_header acpi;
+	struct acpi_header acpi;
 	union {
 		uint32_t dword;
 		uint8_t byte[4];
@@ -331,34 +315,73 @@ int acpi_sx ( userptr_t rsdt, uint32_t signature ) {
 
 /******************************************************************************
  *
- * Interface methods
+ * Descriptors
  *
  ******************************************************************************
  */
 
 /**
- * Describe object in an ACPI table
+ * Add ACPI descriptor
+ *
+ * @v desc		ACPI descriptor
+ */
+void acpi_add ( struct acpi_descriptor *desc ) {
+
+	/* Add to list of descriptors */
+	ref_get ( desc->refcnt );
+	list_add_tail ( &desc->list, &desc->model->descs );
+}
+
+/**
+ * Remove ACPI descriptor
+ *
+ * @v desc		ACPI descriptor
+ */
+void acpi_del ( struct acpi_descriptor *desc ) {
+
+	/* Remove from list of descriptors */
+	list_check_contains_entry ( desc, &desc->model->descs, list );
+	list_del ( &desc->list );
+	ref_put ( desc->refcnt );
+}
+
+/**
+ * Get object's ACPI descriptor
  *
  * @v intf		Interface
- * @v acpi		ACPI table
- * @v len		Length of ACPI table
- * @ret rc		Return status code
+ * @ret desc		ACPI descriptor, or NULL
  */
-int acpi_describe ( struct interface *intf,
-		    struct acpi_description_header *acpi, size_t len ) {
+struct acpi_descriptor * acpi_describe ( struct interface *intf ) {
 	struct interface *dest;
 	acpi_describe_TYPE ( void * ) *op =
 		intf_get_dest_op ( intf, acpi_describe, &dest );
 	void *object = intf_object ( dest );
-	int rc;
+	struct acpi_descriptor *desc;
 
 	if ( op ) {
-		rc = op ( object, acpi, len );
+		desc = op ( object );
 	} else {
-		/* Default is to fail to describe */
-		rc = -EOPNOTSUPP;
+		desc = NULL;
 	}
 
 	intf_put ( dest );
-	return rc;
+	return desc;
+}
+
+/**
+ * Install ACPI tables
+ *
+ * @v install		Table installation method
+ * @ret rc		Return status code
+ */
+int acpi_install ( int ( * install ) ( struct acpi_header *acpi ) ){
+	struct acpi_model *model;
+	int rc;
+
+	for_each_table_entry ( model, ACPI_MODELS ) {
+		if ( ( rc = model->install ( install ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
 }

@@ -114,21 +114,3 @@ int http_block_read_capacity ( struct http_transaction *http,
  err_open:
 	return rc;
 }
-
-/**
- * Describe device in ACPI table
- *
- * @v http		HTTP transaction
- * @v acpi		ACPI table
- * @v len		Length of ACPI table
- * @ret rc		Return status code
- */
-int http_acpi_describe ( struct http_transaction *http,
-			 struct acpi_description_header *acpi, size_t len ) {
-
-	DBGC ( http, "HTTP %p cannot yet describe device in an ACPI table\n",
-	       http );
-	( void ) acpi;
-	( void ) len;
-	return 0;
-}

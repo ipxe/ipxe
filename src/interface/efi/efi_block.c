@@ -254,10 +254,11 @@ static void efi_block_connect ( struct san_device *sandev ) {
  * @v drive		Drive number
  * @v uris		List of URIs
  * @v count		Number of URIs
+ * @v flags		Flags
  * @ret drive		Drive number, or negative error
  */
 static int efi_block_hook ( unsigned int drive, struct uri **uris,
-			    unsigned int count ) {
+			    unsigned int count, unsigned int flags ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_DEVICE_PATH_PROTOCOL *end;
 	struct efi_block_vendor_path *vendor;
@@ -301,7 +302,6 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	sandev->drive = drive;
 	block = sandev->priv;
 	block->sandev = sandev;
 	block->media.MediaPresent = 1;
@@ -331,12 +331,12 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
 	end->Length[0] = sizeof ( *end );
 	DBGC ( sandev, "EFIBLK %#02x has device path %s\n",
-	       sandev->drive, efi_devpath_text ( block->path ) );
+	       drive, efi_devpath_text ( block->path ) );
 
 	/* Register SAN device */
-	if ( ( rc = register_sandev ( sandev ) ) != 0 ) {
+	if ( ( rc = register_sandev ( sandev, drive, flags ) ) != 0 ) {
 		DBGC ( sandev, "EFIBLK %#02x could not register: %s\n",
-		       sandev->drive, strerror ( rc ) );
+		       drive, strerror ( rc ) );
 		goto err_register;
 	}
 
@@ -408,85 +408,105 @@ static void efi_block_unhook ( unsigned int drive ) {
 	sandev_put ( sandev );
 }
 
+/** An installed ACPI table */
+struct efi_acpi_table {
+	/** List of installed tables */
+	struct list_head list;
+	/** Table key */
+	UINTN key;
+};
+
+/** List of installed ACPI tables */
+static LIST_HEAD ( efi_acpi_tables );
+
 /**
- * Describe EFI block device
+ * Install ACPI table
  *
- * @v drive		Drive number
+ * @v hdr		ACPI description header
  * @ret rc		Return status code
  */
-static int efi_block_describe ( unsigned int drive ) {
-	static union {
-		/** ACPI header */
-		struct acpi_description_header acpi;
-		/** Padding */
-		char pad[768];
-	} xbftab;
-	static UINTN key;
-	struct san_device *sandev;
-	struct san_path *sanpath;
-	size_t len;
+static int efi_block_install ( struct acpi_header *hdr ) {
+	size_t len = le32_to_cpu ( hdr->length );
+	struct efi_acpi_table *installed;
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Find SAN device */
-	sandev = sandev_find ( drive );
-	if ( ! sandev ) {
-		DBG ( "EFIBLK cannot find drive %#02x\n", drive );
-		return -ENODEV;
+	/* Allocate installed table record */
+	installed = zalloc ( sizeof ( *installed ) );
+	if ( ! installed ) {
+		rc = -ENOMEM;
+		goto err_alloc;
 	}
+
+	/* Fill in common parameters */
+	strncpy ( hdr->oem_id, "FENSYS", sizeof ( hdr->oem_id ) );
+	strncpy ( hdr->oem_table_id, "iPXE", sizeof ( hdr->oem_table_id ) );
+
+	/* Fix up ACPI checksum */
+	acpi_fix_checksum ( hdr );
+
+	/* Install table */
+	if ( ( efirc = acpi->InstallAcpiTable ( acpi, hdr, len,
+						&installed->key ) ) != 0 ){
+		rc = -EEFI ( efirc );
+		DBGC ( acpi, "EFIBLK could not install %s: %s\n",
+		       acpi_name ( hdr->signature ), strerror ( rc ) );
+		DBGC_HDA ( acpi, 0, hdr, len );
+		goto err_install;
+	}
+
+	/* Add to list of installed tables */
+	list_add_tail ( &installed->list, &efi_acpi_tables );
+
+	DBGC ( acpi, "EFIBLK installed %s as ACPI table %#lx:\n",
+	       acpi_name ( hdr->signature ),
+	       ( ( unsigned long ) installed->key ) );
+	DBGC_HDA ( acpi, 0, hdr, len );
+	return 0;
+
+	list_del ( &installed->list );
+ err_install:
+	free ( installed );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Describe EFI block devices
+ *
+ * @ret rc		Return status code
+ */
+static int efi_block_describe ( void ) {
+	struct efi_acpi_table *installed;
+	struct efi_acpi_table *tmp;
+	UINTN key;
+	EFI_STATUS efirc;
+	int rc;
 
 	/* Sanity check */
 	if ( ! acpi ) {
-		DBGC ( sandev, "EFIBLK %#02x has no ACPI table protocol\n",
-		       sandev->drive );
+		DBG ( "EFIBLK has no ACPI table protocol\n" );
 		return -ENOTSUP;
 	}
 
-	/* Remove existing table, if any */
-	if ( key ) {
+	/* Uninstall any existing ACPI tables */
+	list_for_each_entry_safe ( installed, tmp, &efi_acpi_tables, list ) {
+		key = installed->key;
 		if ( ( efirc = acpi->UninstallAcpiTable ( acpi, key ) ) != 0 ) {
 			rc = -EEFI ( efirc );
-			DBGC ( sandev, "EFIBLK %#02x could not uninstall ACPI "
-			       "table: %s\n", sandev->drive, strerror ( rc ) );
+			DBGC ( acpi, "EFIBLK could not uninstall ACPI table "
+			       "%#lx: %s\n", ( ( unsigned long ) key ),
+			       strerror ( rc ) );
 			/* Continue anyway */
 		}
-		key = 0;
+		list_del ( &installed->list );
+		free ( installed );
 	}
 
-	/* Reopen block device if necessary */
-	if ( sandev_needs_reopen ( sandev ) &&
-	     ( ( rc = sandev_reopen ( sandev ) ) != 0 ) )
-		return rc;
-	sanpath = sandev->active;
-	assert ( sanpath != NULL );
-
-	/* Clear table */
-	memset ( &xbftab, 0, sizeof ( xbftab ) );
-
-	/* Fill in common parameters */
-	strncpy ( xbftab.acpi.oem_id, "FENSYS",
-		  sizeof ( xbftab.acpi.oem_id ) );
-	strncpy ( xbftab.acpi.oem_table_id, "iPXE",
-		  sizeof ( xbftab.acpi.oem_table_id ) );
-
-	/* Fill in remaining parameters */
-	if ( ( rc = acpi_describe ( &sanpath->block, &xbftab.acpi,
-				    sizeof ( xbftab ) ) ) != 0 ) {
-		DBGC ( sandev, "EFIBLK %#02x could not create ACPI "
-		       "description: %s\n", sandev->drive, strerror ( rc ) );
-		return rc;
-	}
-	len = le32_to_cpu ( xbftab.acpi.length );
-
-	/* Fix up ACPI checksum */
-	acpi_fix_checksum ( &xbftab.acpi );
-
-	/* Install table */
-	if ( ( efirc = acpi->InstallAcpiTable ( acpi, &xbftab, len,
-						&key ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( sandev, "EFIBLK %#02x could not install ACPI table: "
-		       "%s\n", sandev->drive, strerror ( rc ) );
+	/* Install ACPI tables */
+	if ( ( rc = acpi_install ( efi_block_install ) ) != 0 )  {
+		DBGC ( acpi, "EFIBLK could not install ACPI tables: %s\n",
+		       strerror ( rc ) );
 		return rc;
 	}
 

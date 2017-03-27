@@ -128,7 +128,9 @@ int uriboot ( struct uri *filename, struct uri **root_paths,
 
 	/* Hook SAN device, if applicable */
 	if ( root_path_count ) {
-		drive = san_hook ( drive, root_paths, root_path_count );
+		drive = san_hook ( drive, root_paths, root_path_count,
+				   ( ( flags & URIBOOT_NO_SAN_DESCRIBE ) ?
+				     SAN_NO_DESCRIBE : 0 ) );
 		if ( drive < 0 ) {
 			rc = drive;
 			printf ( "Could not open SAN device: %s\n",
@@ -140,9 +142,9 @@ int uriboot ( struct uri *filename, struct uri **root_paths,
 
 	/* Describe SAN device, if applicable */
 	if ( ! ( flags & URIBOOT_NO_SAN_DESCRIBE ) ) {
-		if ( ( rc = san_describe ( drive ) ) != 0 ) {
-			printf ( "Could not describe SAN device %#02x: %s\n",
-				 drive, strerror ( rc ) );
+		if ( ( rc = san_describe() ) != 0 ) {
+			printf ( "Could not describe SAN devices: %s\n",
+				 strerror ( rc ) );
 			goto err_san_describe;
 		}
 	}

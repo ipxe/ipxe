@@ -18,6 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/retry.h>
 #include <ipxe/process.h>
 #include <ipxe/blockdev.h>
+#include <ipxe/acpi.h>
 #include <config/sanboot.h>
 
 /** A SAN path */
@@ -37,6 +38,9 @@ struct san_path {
 	struct process process;
 	/** Path status */
 	int path_rc;
+
+	/** ACPI descriptor (if applicable) */
+	struct acpi_descriptor *desc;
 };
 
 /** A SAN device */
@@ -48,6 +52,8 @@ struct san_device {
 
 	/** Drive number */
 	unsigned int drive;
+	/** Flags */
+	unsigned int flags;
 
 	/** Command interface */
 	struct interface command;
@@ -81,6 +87,12 @@ struct san_device {
 	struct list_head closed;
 	/** SAN paths */
 	struct san_path path[0];
+};
+
+/** SAN device flags */
+enum san_device_flags {
+	/** Device should not be included in description tables */
+	SAN_NO_DESCRIBE = 0x0001,
 };
 
 /**
@@ -126,9 +138,11 @@ struct san_device {
  * @v drive		Drive number
  * @v uris		List of URIs
  * @v count		Number of URIs
+ * @v flags		Flags
  * @ret drive		Drive number, or negative error
  */
-int san_hook ( unsigned int drive, struct uri **uris, unsigned int count );
+int san_hook ( unsigned int drive, struct uri **uris, unsigned int count,
+	       unsigned int flags );
 
 /**
  * Unhook SAN device
@@ -146,12 +160,11 @@ void san_unhook ( unsigned int drive );
 int san_boot ( unsigned int drive );
 
 /**
- * Describe SAN device for SAN-booted operating system
+ * Describe SAN devices for SAN-booted operating system
  *
- * @v drive		Drive number
  * @ret rc		Return status code
  */
-int san_describe ( unsigned int drive );
+int san_describe ( void );
 
 extern struct list_head san_devices;
 
@@ -230,7 +243,8 @@ extern int sandev_rw ( struct san_device *sandev, uint64_t lba,
 					    userptr_t buffer, size_t len ) );
 extern struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
 					  size_t priv_size );
-extern int register_sandev ( struct san_device *sandev );
+extern int register_sandev ( struct san_device *sandev, unsigned int drive,
+			     unsigned int flags );
 extern void unregister_sandev ( struct san_device *sandev );
 extern unsigned int san_default_drive ( void );
 
