@@ -74,6 +74,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define SAN_DEFAULT_RETRIES 10
 
+/**
+ * Delay between reopening attempts
+ *
+ * Some SAN targets will always accept connections instantly and
+ * report a temporary unavailability by e.g. failing the TEST UNIT
+ * READY command.  Avoid bombarding such targets by introducing a
+ * small delay between attempts.
+ */
+#define SAN_REOPEN_DELAY_SECS 5
+
 /** List of SAN devices */
 LIST_HEAD ( san_devices );
 
@@ -484,6 +494,10 @@ sandev_command ( struct san_device *sandev,
 		/* Reopen block device if applicable */
 		if ( sandev_needs_reopen ( sandev ) &&
 		     ( ( rc = sandev_reopen ( sandev ) ) != 0 ) ) {
+
+			/* Delay reopening attempts */
+			sleep_fixed ( SAN_REOPEN_DELAY_SECS );
+
 			continue;
 		}
 
