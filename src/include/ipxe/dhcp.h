@@ -433,6 +433,13 @@ struct dhcp_netdev_desc {
 /** Use cached network settings (obsolete; do not reuse this value) */
 #define DHCP_EB_USE_CACHED DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb2 )
 
+/** SAN retry count
+ *
+ * This is the maximum number of times that SAN operations will be
+ * retried.
+ */
+#define DHCP_EB_SAN_RETRY DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbb )
+
 /** SAN drive number
  *
  * This is the drive number for a SAN-hooked drive.  For BIOS, 0x80 is

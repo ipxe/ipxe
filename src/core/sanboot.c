@@ -65,17 +65,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SAN_COMMAND_TIMEOUT ( 15 * TICKS_PER_SEC )
 
 /**
- * Number of times to retry commands
+ * Default number of times to retry commands
  *
  * We may need to retry commands.  For example, the underlying
  * connection may be closed by the SAN target due to an inactivity
  * timeout, or the SAN target may return pointless "error" messages
  * such as "SCSI power-on occurred".
  */
-#define SAN_COMMAND_MAX_RETRIES 10
+#define SAN_DEFAULT_RETRIES 10
 
 /** List of SAN devices */
 LIST_HEAD ( san_devices );
+
+/** Number of times to retry commands */
+static unsigned long san_retries = SAN_DEFAULT_RETRIES;
 
 /**
  * Find SAN device by drive number
@@ -101,13 +104,13 @@ struct san_device * sandev_find ( unsigned int drive ) {
 static void sandev_free ( struct refcnt *refcnt ) {
 	struct san_device *sandev =
 		container_of ( refcnt, struct san_device, refcnt );
-	struct san_path *sanpath;
+	unsigned int i;
 
 	assert ( ! timer_running ( &sandev->timer ) );
 	assert ( ! sandev->active );
 	assert ( list_empty ( &sandev->opened ) );
-	list_for_each_entry ( sanpath, &sandev->closed, list )
-		uri_put ( sanpath->uri );
+	for ( i = 0 ; i < sandev->paths ; i++ )
+		uri_put ( sandev->path[i].uri );
 	free ( sandev );
 }
 
@@ -469,14 +472,14 @@ sandev_command ( struct san_device *sandev,
 		 int ( * command ) ( struct san_device *sandev,
 				     const union san_command_params *params ),
 		 const union san_command_params *params ) {
-	unsigned int retries;
+	unsigned int retries = 0;
 	int rc;
 
 	/* Sanity check */
 	assert ( ! timer_running ( &sandev->timer ) );
 
 	/* (Re)try command */
-	for ( retries = 0 ; retries < SAN_COMMAND_MAX_RETRIES ; retries++ ) {
+	do {
 
 		/* Reopen block device if applicable */
 		if ( sandev_needs_reopen ( sandev ) &&
@@ -484,23 +487,24 @@ sandev_command ( struct san_device *sandev,
 			continue;
 		}
 
+		/* Initiate command */
+		if ( ( rc = command ( sandev, params ) ) != 0 )
+			continue;
+
 		/* Start expiry timer */
 		start_timer_fixed ( &sandev->timer, SAN_COMMAND_TIMEOUT );
-
-		/* Initiate command */
-		if ( ( rc = command ( sandev, params ) ) != 0 ) {
-			stop_timer ( &sandev->timer );
-			continue;
-		}
 
 		/* Wait for command to complete */
 		while ( timer_running ( &sandev->timer ) )
 			step();
 
-		/* Exit on success */
-		if ( ( rc = sandev->command_rc ) == 0 )
-			return 0;
-	}
+		/* Check command status */
+		if ( ( rc = sandev->command_rc ) != 0 )
+			continue;
+
+		return 0;
+
+	} while ( ++retries <= san_retries );
 
 	/* Sanity check */
 	assert ( ! timer_running ( &sandev->timer ) );
@@ -676,6 +680,7 @@ struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
 	intf_init ( &sandev->command, &sandev_command_desc, &sandev->refcnt );
 	timer_init ( &sandev->timer, sandev_command_expired, &sandev->refcnt );
 	sandev->priv = ( ( ( void * ) sandev ) + size );
+	sandev->paths = count;
 	INIT_LIST_HEAD ( &sandev->opened );
 	INIT_LIST_HEAD ( &sandev->closed );
 	for ( i = 0 ; i < count ; i++ ) {
@@ -767,3 +772,33 @@ unsigned int san_default_drive ( void ) {
 	/* Otherwise, default to booting from first hard disk */
 	return SAN_DEFAULT_DRIVE;
 }
+
+/** The "san-retries" setting */
+const struct setting san_retries_setting __setting ( SETTING_SANBOOT_EXTRA,
+						     san-retries ) = {
+	.name = "san-retries",
+	.description = "SAN retry count",
+	.tag = DHCP_EB_SAN_RETRY,
+	.type = &setting_type_int8,
+};
+
+/**
+ * Apply SAN boot settings
+ *
+ * @ret rc		Return status code
+ */
+static int sandev_apply ( void ) {
+
+	/* Apply "san-retries" setting */
+	if ( fetch_uint_setting ( NULL, &san_retries_setting,
+				  &san_retries ) < 0 ) {
+		san_retries = SAN_DEFAULT_RETRIES;
+	}
+
+	return 0;
+}
+
+/** Settings applicator */
+struct settings_applicator sandev_applicator __settings_applicator = {
+	.apply = sandev_apply,
+};

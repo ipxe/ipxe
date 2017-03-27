@@ -71,6 +71,8 @@ struct san_device {
 	/** Driver private data */
 	void *priv;
 
+	/** Number of paths */
+	unsigned int paths;
 	/** Current active path */
 	struct san_path *active;
 	/** List of opened SAN paths */
