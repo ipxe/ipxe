@@ -733,7 +733,8 @@ int register_sandev ( struct san_device *sandev ) {
 	/* Check that drive number is not in use */
 	if ( sandev_find ( sandev->drive ) != NULL ) {
 		DBGC ( sandev, "SAN %#02x is already in use\n", sandev->drive );
-		return -EADDRINUSE;
+		rc = -EADDRINUSE;
+		goto err_in_use;
 	}
 
 	/* Check that device is capable of being opened (i.e. that all
@@ -741,22 +742,30 @@ int register_sandev ( struct san_device *sandev ) {
 	 * working).
 	 */
 	if ( ( rc = sandev_reopen ( sandev ) ) != 0 )
-		return rc;
+		goto err_reopen;
 
 	/* Read device capacity */
 	if ( ( rc = sandev_command ( sandev, sandev_command_read_capacity,
 				     NULL ) ) != 0 )
-		return rc;
+		goto err_capacity;
 
 	/* Configure as a CD-ROM, if applicable */
 	if ( ( rc = sandev_parse_iso9660 ( sandev ) ) != 0 )
-		return rc;
+		goto err_iso9660;
 
 	/* Add to list of SAN devices */
 	list_add_tail ( &sandev->list, &san_devices );
 	DBGC ( sandev, "SAN %#02x registered\n", sandev->drive );
 
 	return 0;
+
+	list_del ( &sandev->list );
+ err_iso9660:
+ err_capacity:
+ err_reopen:
+	sandev_restart ( sandev, rc );
+ err_in_use:
+	return rc;
 }
 
 /**
@@ -769,11 +778,12 @@ void unregister_sandev ( struct san_device *sandev ) {
 	/* Sanity check */
 	assert ( ! timer_running ( &sandev->timer ) );
 
+	/* Remove from list of SAN devices */
+	list_del ( &sandev->list );
+
 	/* Shut down interfaces */
 	sandev_restart ( sandev, 0 );
 
-	/* Remove from list of SAN devices */
-	list_del ( &sandev->list );
 	DBGC ( sandev, "SAN %#02x unregistered\n", sandev->drive );
 }
 
