@@ -534,6 +534,9 @@ struct iscsi_session {
 	/** Reference counter */
 	struct refcnt refcnt;
 
+	/** List of existing sessions */
+	struct list_head node;
+
 	/** SCSI command-issuing interface */
 	struct interface control;
 	/** SCSI command interface */
@@ -648,6 +651,9 @@ struct iscsi_session {
 	/** SCSI LUN (for boot firmware table) */
 	struct scsi_lun lun;
 };
+
+/** iSCSI session list */
+extern struct list_head iscsi_session_list;
 
 /** iSCSI session is currently in the security negotiation phase */
 #define ISCSI_STATUS_SECURITY_NEGOTIATION_PHASE		\

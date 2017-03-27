@@ -444,6 +444,8 @@ len6_setting __setting ( SETTING_IP6, len6 );
 extern const struct setting
 gateway6_setting __setting ( SETTING_IP6, gateway6 );
 extern const struct setting
+dns6_setting __setting ( SETTING_IP_EXTRA, dns6 );
+extern const struct setting
 hostname_setting __setting ( SETTING_HOST, hostname );
 extern const struct setting
 domain_setting __setting ( SETTING_IP_EXTRA, domain );
@@ -481,6 +483,8 @@ extern const struct setting
 board_serial_setting __setting ( SETTING_HOST_EXTRA, board-serial );
 extern const struct setting dhcp_server_setting __setting ( SETTING_MISC,
 							    dhcp-server );
+extern const struct setting dhcp6_server_setting __setting ( SETTING_MISC,
+							     dhcp6-server );
 
 /**
  * Initialise a settings block

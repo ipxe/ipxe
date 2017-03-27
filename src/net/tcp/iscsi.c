@@ -147,6 +147,8 @@ static void iscsi_start_login ( struct iscsi_session *iscsi );
 static void iscsi_start_data_out ( struct iscsi_session *iscsi,
 				   unsigned int datasn );
 
+LIST_HEAD( iscsi_session_list );
+
 /**
  * Finish receiving PDU data into buffer
  *
@@ -196,6 +198,7 @@ static void iscsi_free ( struct refcnt *refcnt ) {
 	struct iscsi_session *iscsi =
 		container_of ( refcnt, struct iscsi_session, refcnt );
 
+	list_del ( &iscsi->node );
 	free ( iscsi->initiator_iqn );
 	free ( iscsi->target_address );
 	free ( iscsi->target_iqn );
@@ -1910,14 +1913,24 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 	/* Split root path into component parts */
 	strcpy ( rp_copy, root_path );
 	while ( 1 ) {
+		int skip = 0;
+
+		if (*rp == '[') {
+			rp++;
+			skip = 1;
+		}
 		rp_comp[i++] = rp;
 		if ( i == NUM_RP_COMPONENTS )
 			break;
-		for ( ; *rp != ':' ; rp++ ) {
+		for ( ; *rp != ':' || skip; rp++ ) {
 			if ( ! *rp ) {
 				DBGC ( iscsi, "iSCSI %p root path \"%s\" "
 				       "too short\n", iscsi, root_path );
 				return -EINVAL_ROOT_PATH_TOO_SHORT;
+			}
+			if (*rp == ']') {
+				skip = 0;
+				*rp = '\0';
 			}
 		}
 		*(rp++) = '\0';
@@ -2058,6 +2071,8 @@ static int iscsi_open ( struct interface *parent, struct uri *uri ) {
 		rc = -ENOMEM;
 		goto err_zalloc;
 	}
+	INIT_LIST_HEAD( &iscsi->node);
+	list_add_tail ( &iscsi->node, &iscsi_session_list );
 	ref_init ( &iscsi->refcnt, iscsi_free );
 	intf_init ( &iscsi->control, &iscsi_control_desc, &iscsi->refcnt );
 	intf_init ( &iscsi->data, &iscsi_data_desc, &iscsi->refcnt );
