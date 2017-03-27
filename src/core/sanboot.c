@@ -498,12 +498,18 @@ sandev_command ( struct san_device *sandev,
 			/* Delay reopening attempts */
 			sleep_fixed ( SAN_REOPEN_DELAY_SECS );
 
+			/* Retry opening indefinitely for multipath devices */
+			if ( sandev->paths <= 1 )
+				retries++;
+
 			continue;
 		}
 
 		/* Initiate command */
-		if ( ( rc = command ( sandev, params ) ) != 0 )
+		if ( ( rc = command ( sandev, params ) ) != 0 ) {
+			retries++;
 			continue;
+		}
 
 		/* Start expiry timer */
 		start_timer_fixed ( &sandev->timer, SAN_COMMAND_TIMEOUT );
@@ -513,12 +519,14 @@ sandev_command ( struct san_device *sandev,
 			step();
 
 		/* Check command status */
-		if ( ( rc = sandev->command_rc ) != 0 )
+		if ( ( rc = sandev->command_rc ) != 0 ) {
+			retries++;
 			continue;
+		}
 
 		return 0;
 
-	} while ( ++retries <= san_retries );
+	} while ( retries <= san_retries );
 
 	/* Sanity check */
 	assert ( ! timer_running ( &sandev->timer ) );
@@ -727,6 +735,13 @@ int register_sandev ( struct san_device *sandev ) {
 		DBGC ( sandev, "SAN %#02x is already in use\n", sandev->drive );
 		return -EADDRINUSE;
 	}
+
+	/* Check that device is capable of being opened (i.e. that all
+	 * URIs are well-formed and that at least one path is
+	 * working).
+	 */
+	if ( ( rc = sandev_reopen ( sandev ) ) != 0 )
+		return rc;
 
 	/* Read device capacity */
 	if ( ( rc = sandev_command ( sandev, sandev_command_read_capacity,
