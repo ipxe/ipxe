@@ -352,6 +352,9 @@ static void http_step ( struct http_transaction *http ) {
 	if ( ! xfer_window ( &http->conn ) )
 		return;
 
+	/* Notify data transfer interface that window may have changed */
+	xfer_window_changed ( &http->xfer );
+
 	/* Do nothing until data transfer interface is ready */
 	if ( ! xfer_window ( &http->xfer ) )
 		return;
