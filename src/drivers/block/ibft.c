@@ -591,6 +591,12 @@ static int ibft_install ( int ( * install ) ( struct acpi_header *acpi ) ) {
 	strings.len = 0;
 	len = offset;
 
+	/* Do nothing if no targets exist */
+	if ( ! targets ) {
+		rc = 0;
+		goto no_targets;
+	}
+
 	/* Allocate table */
 	data = zalloc ( len );
 	if ( ! data ) {
@@ -668,6 +674,7 @@ static int ibft_install ( int ( * install ) ( struct acpi_header *acpi ) ) {
  err_initiator:
 	free ( data );
  err_alloc:
+ no_targets:
 	free ( strings.data );
 	return rc;
 }
