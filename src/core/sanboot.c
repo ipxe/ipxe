@@ -282,6 +282,10 @@ static size_t sanpath_block_window ( struct san_path *sanpath __unused ) {
 static void sanpath_step ( struct san_path *sanpath ) {
 	struct san_device *sandev = sanpath->sandev;
 
+	/* Ignore if we are already the active device */
+	if ( sanpath == sandev->active )
+		return;
+
 	/* Wait until path has become available */
 	if ( ! xfer_window ( &sanpath->block ) )
 		return;
