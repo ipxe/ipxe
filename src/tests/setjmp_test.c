@@ -111,8 +111,9 @@ static void setjmp_return_ok ( struct setjmp_test *test, int value ) {
  * @v file		Test code file
  * @v line		Test code line
  */
-static void longjmp_okx ( struct setjmp_test *test, int value,
-			  const char *file, unsigned int line ) {
+static void __attribute__ (( noreturn ))
+longjmp_okx ( struct setjmp_test *test, int value,
+	      const char *file, unsigned int line ) {
 
 	/* Record expected value.  A zero passed to longjmp() should
 	 * result in setjmp() returning a value of one.

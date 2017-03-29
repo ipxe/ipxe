@@ -1956,6 +1956,7 @@ static inline void golan_handle_port_event(struct golan *golan, struct golan_eqe
 	case GOLAN_PORT_CHANGE_SUBTYPE_CLIENT_REREG:
 	case GOLAN_PORT_CHANGE_SUBTYPE_ACTIVE:
 		golan_ib_update ( ibdev );
+		/* Fall through */
 	case GOLAN_PORT_CHANGE_SUBTYPE_DOWN:
 	case GOLAN_PORT_CHANGE_SUBTYPE_LID:
 	case GOLAN_PORT_CHANGE_SUBTYPE_PKEY:

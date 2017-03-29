@@ -282,9 +282,11 @@ static int bzimage_parse_cmdline ( struct image *image,
 		case 'G':
 		case 'g':
 			bzimg->mem_limit <<= 10;
+			/* Fall through */
 		case 'M':
 		case 'm':
 			bzimg->mem_limit <<= 10;
+			/* Fall through */
 		case 'K':
 		case 'k':
 			bzimg->mem_limit <<= 10;
