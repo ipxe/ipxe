@@ -1494,18 +1494,24 @@ static void txnic_bgx_init ( struct txnic_bgx *bgx, unsigned int type ) {
  */
 static void txnic_bgx_mac ( struct txnic_lmac *lmac ) {
 	struct txnic_bgx *bgx = lmac->bgx;
-	BOARD_CFG *boardcfg;
-	NODE_CFG *nodecfg;
-	BGX_CFG *bgxcfg;
-	LMAC_CFG *lmaccfg;
+	unsigned int lmac_idx = TXNIC_LMAC_IDX ( lmac->idx );
+	uint64_t mac;
+	EFI_STATUS efirc;
+	int rc;
 
 	/* Extract MAC from Board Configuration protocol, if available */
 	if ( txcfg ) {
-		boardcfg = txcfg->BoardConfig;
-		nodecfg = &boardcfg->Node[ bgx->node % MAX_NODES ];
-		bgxcfg = &nodecfg->BgxCfg[ bgx->idx % BGX_PER_NODE_COUNT ];
-		lmaccfg = &bgxcfg->Lmacs[ lmac->idx % LMAC_PER_BGX_COUNT ];
-		lmac->mac.be64 = cpu_to_be64 ( lmaccfg->MacAddress );
+		if ( ( efirc = txcfg->GetLmacProp ( txcfg, bgx->node, bgx->idx,
+						    lmac_idx, MAC_ADDRESS,
+						    sizeof ( mac ),
+						    &mac ) ) == 0 ) {
+			lmac->mac.be64 = cpu_to_be64 ( mac );
+		} else {
+			rc = -EEFI ( efirc );
+			DBGC ( TXNICCOL ( bgx ), "TXNIC %d/%d/%d could not get "
+			       "MAC address: %s\n", bgx->node, bgx->idx,
+			       lmac->idx, strerror ( rc ) );
+		}
 	} else {
 		DBGC ( TXNICCOL ( bgx ), "TXNIC %d/%d/%d has no board "
 		       "configuration protocol\n", bgx->node, bgx->idx,

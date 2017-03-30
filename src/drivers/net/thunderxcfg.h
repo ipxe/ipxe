@@ -63,104 +63,6 @@ FILE_LICENCE ( BSD2 );
 
 #define THUNDERX_CPU_ID(node, cluster, core) (((node) << 16) | ((cluster) << 8) | (core))
 
-//TODO: Put common type definitions in separate common include file
-typedef enum {
-    BGX_MODE_SGMII, /* 1 lane, 1.250 Gbaud */
-    BGX_MODE_XAUI,  /* 4 lanes, 3.125 Gbaud */
-    BGX_MODE_DXAUI, /* 4 lanes, 6.250 Gbaud */
-    BGX_MODE_RXAUI, /* 2 lanes, 6.250 Gbaud */
-    BGX_MODE_XFI,   /* 1 lane, 10.3125 Gbaud */
-    BGX_MODE_XLAUI, /* 4 lanes, 10.3125 Gbaud */
-    BGX_MODE_10G_KR,/* 1 lane, 10.3125 Gbaud */
-    BGX_MODE_40G_KR,/* 4 lanes, 10.3125 Gbaud */
-    BGX_MODE_UNKNOWN
-} BGX_MODE_T;
-
-typedef enum {
-    EBB8800,
-    EBB8804,
-    CRB_1S,
-    CRB_2S,
-    ASIANCAT,
-    GBT_MT60,
-    INVENTEC_P3E003,
-    BOARD_MAX
-} BOARD_TYPE;
-
-typedef struct {
-    BOOLEAN Enabled;
-    UINT64  LaneToSds;
-    UINT64  MacAddress;
-} LMAC_CFG;
-
-typedef struct {
-    BOOLEAN BgxEnabled;
-    BGX_MODE_T BgxMode;
-    UINTN    LmacCount; //Maximum number of LMAcs
-    UINT64   BaseAddress;
-    UINT64   LmacType;
-    /* Bit mask of QLMs connected to this BGX */
-    UINT64   QlmMask;
-    UINT64   QlmFreq;
-    BOOLEAN  UseTraining;
-    LMAC_CFG Lmacs[LMAC_PER_BGX_COUNT];
-} BGX_CFG;
-
-typedef struct {
-    BOOLEAN PemUsable;
-} PEM_CFG;
-
-typedef struct {
-    enum { NotPresent, Empty, Available } Status;
-    UINT8 Type;
-    UINT8 SubType;
-    UINT8 Rank;
-    UINT16 Mfg;
-    UINTN SizeMb;
-    UINTN Speed;
-    CHAR8 Serial[16];
-    CHAR8 PartNo[24];
-} DIMM_CFG;
-
-typedef struct {
-    DIMM_CFG DimmCfg[DIMM_PER_LMC_COUNT];
-} LMC_CFG;
-
-typedef struct {
-    BOOLEAN Core[CORE_COUNT];
-    BGX_CFG BgxCfg[BGX_PER_NODE_COUNT];
-    PEM_CFG PemCfg[PEM_PER_NODE_COUNT];
-    LMC_CFG LmcCfg[LMC_PER_NODE_COUNT];
-    UINT64 RamStart;
-    UINT64 RamReserve;
-    UINT64 RamSize;
-    UINTN CPUSpeed;
-    UINTN CPUVersion;
-} NODE_CFG;
-
-#define MAX_SERIAL 32
-#define MAX_REVISION 32
-typedef struct {
-    BOARD_TYPE BoardType;
-    CHAR8 Serial[MAX_SERIAL];
-    CHAR8 Revision[MAX_REVISION];
-    UINTN NumNodes;
-    UINTN BmcBootTwsiBus;
-    UINTN BmcBootTwsiAddr;
-    UINTN RtcTwsiBus;
-    UINTN RtcTwsiAddr;
-    /* IPMI support*/
-    UINTN BmcIpmiTwsiBus;
-    UINTN BmcIpmiTwsiAddr;
-    NODE_CFG Node[MAX_NODES];
-    UINT16 CpuClusterCount;
-    UINT16 CpuPerClusterCount;
-    UINT16 PcieSegmentCount;
-    UINT64 MacAddrRangeStart;
-    UINTN DdrSpeed;
-    UINT64 AcpiOemTableId;
-} BOARD_CFG;
-
 /******************************************************************************
  *
  * From ThunderConfigProtocol.h
@@ -183,12 +85,29 @@ typedef struct {
  */
 
 #define EFI_THUNDER_CONFIG_PROTOCOL_GUID \
-  {0xb75a0608, 0x99ff, 0x11e5, {0x9b, 0xeb, 0x00, 0x14, 0xd1, 0xfa, 0x23, 0x5c}}
+  {0xc12b1873, 0xac17, 0x4176, {0xac, 0x77, 0x7e, 0xcb, 0x4d, 0xef, 0xff, 0xec}}
 
 ///
 /// Forward declaration
 ///
 typedef struct _EFI_THUNDER_CONFIG_PROTOCOL EFI_THUNDER_CONFIG_PROTOCOL;
+
+typedef enum {
+  BGX_ENABLED,
+  BGX_MODE,
+  LMAC_COUNT,
+  BASE_ADDRESS,
+  LMAC_TYPE_BGX,
+  QLM_MASK,
+  QLM_FREQ,
+  USE_TRAINING
+} BGX_PROPERTY;
+
+typedef enum {
+  ENABLED,
+  LANE_TO_SDS,
+  MAC_ADDRESS
+} LMAC_PROPERTY;
 
 ///
 /// Function prototypes
@@ -197,7 +116,30 @@ typedef
 EFI_STATUS
 (EFIAPI *EFI_THUNDER_CONFIG_PROTOCOL_GET_CONFIG)(
   IN EFI_THUNDER_CONFIG_PROTOCOL  *This,
-  OUT BOARD_CFG** cfg
+  OUT VOID** cfg
+  );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_THUNDER_CONFIG_PROTOCOL_GET_BGX_PROP)(
+  IN EFI_THUNDER_CONFIG_PROTOCOL   *This,
+  IN UINTN                         NodeId,
+  IN UINTN                         BgxId,
+  IN BGX_PROPERTY                  BgxProp,
+  IN UINT64                        ValueSize,
+  OUT UINT64                       *Value
+  );
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_THUNDER_CONFIG_PROTOCOL_GET_LMAC_PROP)(
+  IN EFI_THUNDER_CONFIG_PROTOCOL   *This,
+  IN UINTN                         NodeId,
+  IN UINTN                         BgxId,
+  IN UINTN                         LmacId,
+  IN LMAC_PROPERTY                 LmacProp,
+  IN UINT64                        ValueSize,
+  OUT UINT64                       *Value
   );
 
 ///
@@ -205,7 +147,9 @@ EFI_STATUS
 ///
 struct _EFI_THUNDER_CONFIG_PROTOCOL {
   EFI_THUNDER_CONFIG_PROTOCOL_GET_CONFIG GetConfig;
-  BOARD_CFG* BoardConfig;
+  EFI_THUNDER_CONFIG_PROTOCOL_GET_BGX_PROP GetBgxProp;
+  EFI_THUNDER_CONFIG_PROTOCOL_GET_LMAC_PROP GetLmacProp;
+  VOID* BoardConfig;
 };
 
 #endif /* _THUNDERXCFG_H */
