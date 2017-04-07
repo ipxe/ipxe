@@ -197,6 +197,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_axge		     ( ERRFILE_DRIVER | 0x00c10000 )
 #define ERRFILE_thunderx	     ( ERRFILE_DRIVER | 0x00c20000 )
 #define ERRFILE_af_packet	     ( ERRFILE_DRIVER | 0x00c30000 )
+#define ERRFILE_sfc_hunt	     ( ERRFILE_DRIVER | 0x00c40000 )
+#define ERRFILE_efx_hunt	     ( ERRFILE_DRIVER | 0x00c50000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
