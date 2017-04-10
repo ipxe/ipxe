@@ -2,6 +2,7 @@
 #define CURSES_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdarg.h>
 #include <ipxe/console.h>
 
@@ -25,7 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #undef  TRUE
 #define TRUE	(1)
 
-typedef int bool;
 typedef uint32_t chtype;
 typedef uint32_t attr_t;
 
