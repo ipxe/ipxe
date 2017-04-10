@@ -88,7 +88,7 @@ EFI_GUID efi_absolute_pointer_protocol_guid
 	= EFI_ABSOLUTE_POINTER_PROTOCOL_GUID;
 
 /** ACPI table protocol GUID */
-EFI_GUID efi_acpi_table_protocl_guid
+EFI_GUID efi_acpi_table_protocol_guid
 	= EFI_ACPI_TABLE_PROTOCOL_GUID;
 
 /** Apple NetBoot protocol GUID */
