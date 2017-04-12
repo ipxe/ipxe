@@ -518,10 +518,12 @@ static int efi_block_describe ( void ) {
  *
  * @v sandev		SAN device
  * @v handle		EFI handle
+ * @v filename		Filename (or NULL to use default)
+ * @v image		Image handle to fill in
  * @ret rc		Return status code
  */
 static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
-				  EFI_HANDLE *image ) {
+				  const char *filename, EFI_HANDLE *image ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_block_data *block = sandev->priv;
 	union {
@@ -563,7 +565,10 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 	end = efi_devpath_end ( path.path );
 	prefix_len = ( ( ( void * ) end ) - ( ( void * ) path.path ) );
 	filepath_len = ( SIZE_OF_FILEPATH_DEVICE_PATH +
-			 sizeof ( efi_block_boot_filename ) );
+			 ( filename ?
+			   ( ( strlen ( filename ) + 1 /* NUL */ ) *
+			     sizeof ( filepath->PathName[0] ) ) :
+			   sizeof ( efi_block_boot_filename ) ) );
 	boot_path_len = ( prefix_len + filepath_len + sizeof ( *end ) );
 	boot_path = zalloc ( boot_path_len );
 	if ( ! boot_path ) {
@@ -576,8 +581,12 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 	filepath->Header.SubType = MEDIA_FILEPATH_DP;
 	filepath->Header.Length[0] = ( filepath_len & 0xff );
 	filepath->Header.Length[1] = ( filepath_len >> 8 );
-	memcpy ( filepath->PathName, efi_block_boot_filename,
-		 sizeof ( efi_block_boot_filename ) );
+	if ( filename ) {
+		efi_sprintf ( filepath->PathName, "%s", filename );
+	} else {
+		memcpy ( filepath->PathName, efi_block_boot_filename,
+			 sizeof ( efi_block_boot_filename ) );
+	}
 	end = ( ( ( void * ) filepath ) + filepath_len );
 	end->Type = END_DEVICE_PATH_TYPE;
 	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
@@ -609,9 +618,10 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
  * Boot from EFI block device
  *
  * @v drive		Drive number
+ * @v filename		Filename (or NULL to use default)
  * @ret rc		Return status code
  */
-static int efi_block_boot ( unsigned int drive ) {
+static int efi_block_boot ( unsigned int drive, const char *filename ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct san_device *sandev;
 	EFI_HANDLE *handles;
@@ -649,7 +659,7 @@ static int efi_block_boot ( unsigned int drive ) {
 	 */
 	rc = -ENOENT;
 	for ( i = 0 ; i < count ; i++ ) {
-		if ( ( rc = efi_block_boot_image ( sandev, handles[i],
+		if ( ( rc = efi_block_boot_image ( sandev, handles[i], filename,
 						   &image ) ) != 0 )
 			continue;
 		DBGC ( sandev, "EFIBLK %#02x found boot image\n",

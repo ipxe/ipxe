@@ -155,9 +155,10 @@ void san_unhook ( unsigned int drive );
  * Attempt to boot from a SAN device
  *
  * @v drive		Drive number
+ * @v filename		Filename (or NULL to use default)
  * @ret rc		Return status code
  */
-int san_boot ( unsigned int drive );
+int san_boot ( unsigned int drive, const char *filename );
 
 /**
  * Describe SAN devices for SAN-booted operating system

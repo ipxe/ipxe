@@ -440,6 +440,12 @@ struct dhcp_netdev_desc {
  */
 #define DHCP_EB_SAN_RETRY DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbb )
 
+/** SAN filename
+ *
+ * This is the path of the bootloader within the SAN device.
+ */
+#define DHCP_EB_SAN_FILENAME DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbc )
+
 /** SAN drive number
  *
  * This is the drive number for a SAN-hooked drive.  For BIOS, 0x80 is

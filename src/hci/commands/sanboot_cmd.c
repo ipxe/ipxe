@@ -47,12 +47,14 @@ struct sanboot_options {
 	int no_describe;
 	/** Keep SAN device */
 	int keep;
+	/** Filename */
+	char *filename;
 };
 
 /** "sanboot" option list */
 static union {
-	/* "sanboot" takes all three options */
-	struct option_descriptor sanboot[3];
+	/* "sanboot" takes all four options */
+	struct option_descriptor sanboot[4];
 	/* "sanhook" takes only --drive and --no-describe */
 	struct option_descriptor sanhook[2];
 	/* "sanunhook" takes only --drive */
@@ -65,6 +67,8 @@ static union {
 			      struct sanboot_options, no_describe, parse_flag ),
 		OPTION_DESC ( "keep", 'k', no_argument,
 			      struct sanboot_options, keep, parse_flag ),
+		OPTION_DESC ( "filename", 'f', required_argument,
+			      struct sanboot_options, filename, parse_string ),
 	},
 };
 
@@ -130,7 +134,8 @@ static int sanboot_core_exec ( int argc, char **argv,
 		flags |= no_root_path_flags;
 
 	/* Boot from root path */
-	if ( ( rc = uriboot ( NULL, uris, count, opts.drive, flags ) ) != 0 )
+	if ( ( rc = uriboot ( NULL, uris, count, opts.drive, opts.filename,
+			      flags ) ) != 0 )
 		goto err_uriboot;
 
  err_uriboot:

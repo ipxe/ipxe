@@ -95,8 +95,11 @@ static void dummy_san_unhook ( unsigned int drive ) {
  * Boot from dummy SAN device
  *
  * @v drive		Drive number
+ * @v filename		Filename (or NULL to use default)
+ * @ret rc		Return status code
  */
-static int dummy_san_boot ( unsigned int drive __unused ) {
+static int dummy_san_boot ( unsigned int drive __unused,
+			    const char *filename __unused ) {
 
 	return -EOPNOTSUPP;
 }

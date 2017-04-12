@@ -2396,6 +2396,15 @@ const struct setting root_path_setting __setting ( SETTING_SANBOOT, root-path)={
 	.type = &setting_type_string,
 };
 
+/** SAN filename setting */
+const struct setting san_filename_setting __setting ( SETTING_SANBOOT,
+						      san-filename ) = {
+	.name = "san-filename",
+	.description = "SAN filename",
+	.tag = DHCP_EB_SAN_FILENAME,
+	.type = &setting_type_string,
+};
+
 /** Username setting */
 const struct setting username_setting __setting ( SETTING_AUTH, username ) = {
 	.name = "username",
