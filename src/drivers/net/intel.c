@@ -268,6 +268,12 @@ static int intel_reset ( struct intel_nic *intel ) {
 	uint32_t pba;
 	uint32_t ctrl;
 	uint32_t status;
+	uint32_t orig_ctrl;
+	uint32_t orig_status;
+
+	/* Record initial control and status register values */
+	orig_ctrl = ctrl = readl ( intel->regs + INTEL_CTRL );
+	orig_status = readl ( intel->regs + INTEL_STATUS );
 
 	/* Force RX and TX packet buffer allocation, to work around an
 	 * errata in ICH devices.
@@ -285,7 +291,6 @@ static int intel_reset ( struct intel_nic *intel ) {
 	}
 
 	/* Always reset MAC.  Required to reset the TX and RX rings. */
-	ctrl = readl ( intel->regs + INTEL_CTRL );
 	writel ( ( ctrl | INTEL_CTRL_RST ), intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
 
@@ -309,9 +314,10 @@ static int intel_reset ( struct intel_nic *intel ) {
 	status = readl ( intel->regs + INTEL_STATUS );
 	if ( ( intel->flags & INTEL_NO_PHY_RST ) ||
 	     ( status & INTEL_STATUS_LU ) ) {
-		DBGC ( intel, "INTEL %p %sMAC reset (ctrl %08x)\n", intel,
+		DBGC ( intel, "INTEL %p %sMAC reset (%08x/%08x was "
+		       "%08x/%08x)\n", intel,
 		       ( ( intel->flags & INTEL_NO_PHY_RST ) ? "forced " : "" ),
-		       ctrl );
+		       ctrl, status, orig_ctrl, orig_status );
 		return 0;
 	}
 
@@ -323,8 +329,10 @@ static int intel_reset ( struct intel_nic *intel ) {
 	/* PHY reset is not self-clearing on all models */
 	writel ( ctrl, intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
+	status = readl ( intel->regs + INTEL_STATUS );
 
-	DBGC ( intel, "INTEL %p MAC+PHY reset (ctrl %08x)\n", intel, ctrl );
+	DBGC ( intel, "INTEL %p MAC+PHY reset (%08x/%08x was %08x/%08x)\n",
+	       intel, ctrl, status, orig_ctrl, orig_status );
 	return 0;
 }
 
