@@ -295,7 +295,9 @@ static int intel_reset ( struct intel_nic *intel ) {
 	mdelay ( INTEL_RESET_DELAY_MS );
 
 	/* Set a sensible default configuration */
-	ctrl |= ( INTEL_CTRL_SLU | INTEL_CTRL_ASDE );
+	if ( ! ( intel->flags & INTEL_NO_ASDE ) )
+		ctrl |= INTEL_CTRL_ASDE;
+	ctrl |= INTEL_CTRL_SLU;
 	ctrl &= ~( INTEL_CTRL_LRST | INTEL_CTRL_FRCSPD | INTEL_CTRL_FRCDPLX );
 	writel ( ctrl, intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
@@ -1110,7 +1112,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1518, "82576ns", "82576NS SerDes", 0 ),
 	PCI_ROM ( 0x8086, 0x1521, "i350", "I350", 0 ),
 	PCI_ROM ( 0x8086, 0x1522, "i350-f", "I350 Fiber", 0 ),
-	PCI_ROM ( 0x8086, 0x1523, "i350-b", "I350 Backplane", 0 ),
+	PCI_ROM ( 0x8086, 0x1523, "i350-b", "I350 Backplane", INTEL_NO_ASDE ),
 	PCI_ROM ( 0x8086, 0x1524, "i350-2", "I350", 0 ),
 	PCI_ROM ( 0x8086, 0x1525, "82567v-4", "82567V-4", 0 ),
 	PCI_ROM ( 0x8086, 0x1526, "82576-5", "82576", 0 ),

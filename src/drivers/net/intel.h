@@ -306,6 +306,8 @@ enum intel_flags {
 	INTEL_VMWARE = 0x0002,
 	/** PHY reset is broken */
 	INTEL_NO_PHY_RST = 0x0004,
+	/** ASDE is broken */
+	INTEL_NO_ASDE = 0x0008,
 };
 
 /**
