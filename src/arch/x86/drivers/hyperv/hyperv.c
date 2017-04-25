@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/malloc.h>
 #include <ipxe/device.h>
 #include <ipxe/timer.h>
+#include <ipxe/quiesce.h>
 #include <ipxe/cpuid.h>
 #include <ipxe/msr.h>
 #include <ipxe/hyperv.h>
@@ -299,6 +300,10 @@ static void hv_map_synic ( struct hv_hypervisor *hv ) {
 	uint64_t siefp;
 	uint64_t scontrol;
 
+	/* Zero SynIC message and event pages */
+	memset ( hv->synic.message, 0, PAGE_SIZE );
+	memset ( hv->synic.event, 0, PAGE_SIZE );
+
 	/* Map SynIC message page */
 	simp = rdmsr ( HV_X64_MSR_SIMP );
 	simp &= ( PAGE_SIZE - 1 );
@@ -321,20 +326,13 @@ static void hv_map_synic ( struct hv_hypervisor *hv ) {
 }
 
 /**
- * Unmap synthetic interrupt controller
+ * Unmap synthetic interrupt controller, leaving SCONTROL untouched
  *
  * @v hv		Hyper-V hypervisor
  */
-static void hv_unmap_synic ( struct hv_hypervisor *hv ) {
-	uint64_t scontrol;
+static void hv_unmap_synic_no_scontrol ( struct hv_hypervisor *hv ) {
 	uint64_t siefp;
 	uint64_t simp;
-
-	/* Disable SynIC */
-	scontrol = rdmsr ( HV_X64_MSR_SCONTROL );
-	scontrol &= ~HV_SCONTROL_ENABLE;
-	DBGC2 ( hv, "HV %p SCONTROL MSR is %#08llx\n", hv, scontrol );
-	wrmsr ( HV_X64_MSR_SCONTROL, scontrol );
 
 	/* Unmap SynIC event page */
 	siefp = rdmsr ( HV_X64_MSR_SIEFP );
@@ -347,6 +345,24 @@ static void hv_unmap_synic ( struct hv_hypervisor *hv ) {
 	simp &= ( ( PAGE_SIZE - 1 ) & ~HV_SIMP_ENABLE );
 	DBGC2 ( hv, "HV %p SIMP MSR is %#08llx\n", hv, simp );
 	wrmsr ( HV_X64_MSR_SIMP, simp );
+}
+
+/**
+ * Unmap synthetic interrupt controller
+ *
+ * @v hv		Hyper-V hypervisor
+ */
+static void hv_unmap_synic ( struct hv_hypervisor *hv ) {
+	uint64_t scontrol;
+
+	/* Disable SynIC */
+	scontrol = rdmsr ( HV_X64_MSR_SCONTROL );
+	scontrol &= ~HV_SCONTROL_ENABLE;
+	DBGC2 ( hv, "HV %p SCONTROL MSR is %#08llx\n", hv, scontrol );
+	wrmsr ( HV_X64_MSR_SCONTROL, scontrol );
+
+	/* Unmap SynIC event and message pages */
+	hv_unmap_synic_no_scontrol ( hv );
 }
 
 /**
@@ -385,8 +401,12 @@ void hv_disable_sint ( struct hv_hypervisor *hv, unsigned int sintx ) {
 	unsigned long msr = HV_X64_MSR_SINT ( sintx );
 	uint64_t sint;
 
-	/* Disable synthetic interrupt */
+	/* Do nothing if interrupt is already disabled */
 	sint = rdmsr ( msr );
+	if ( sint & HV_SINT_MASKED )
+		return;
+
+	/* Disable synthetic interrupt */
 	sint &= ~HV_SINT_AUTO_EOI;
 	sint |= HV_SINT_MASKED;
 	DBGC2 ( hv, "HV %p SINT%d MSR is %#08llx\n", hv, sintx, sint );
@@ -589,6 +609,7 @@ static void hv_remove ( struct root_device *rootdev ) {
 	hv_free_pages ( hv, hv->hypercall, hv->synic.message, hv->synic.event,
 			NULL );
 	free ( hv );
+	rootdev_set_drvdata ( rootdev, NULL );
 }
 
 /** Hyper-V root device driver */
@@ -601,6 +622,100 @@ static struct root_driver hv_root_driver = {
 struct root_device hv_root_device __root_device = {
 	.dev = { .name = "Hyper-V" },
 	.driver = &hv_root_driver,
+};
+
+/**
+ * Quiesce system
+ *
+ */
+static void hv_quiesce ( void ) {
+	struct hv_hypervisor *hv = rootdev_get_drvdata ( &hv_root_device );
+	unsigned int i;
+
+	/* Do nothing if we are not running in Hyper-V */
+	if ( ! hv )
+		return;
+
+	/* The "enlightened" portions of the Windows Server 2016 boot
+	 * process will not cleanly take ownership of an active
+	 * Hyper-V connection.  Experimentation shows that the minimum
+	 * requirement is that we disable the SynIC message page
+	 * (i.e. zero the SIMP MSR).
+	 *
+	 * We cannot perform a full shutdown of the Hyper-V
+	 * connection.  Experimentation shows that if we disable the
+	 * SynIC (i.e. zero the SCONTROL MSR) then Windows Server 2016
+	 * will enter an indefinite wait loop.
+	 *
+	 * Attempt to create a safe handover environment by resetting
+	 * all MSRs except for SCONTROL.
+	 *
+	 * Note that we do not shut down our VMBus devices, since we
+	 * may need to unquiesce the system and continue operation.
+	 */
+
+	/* Disable all synthetic interrupts */
+	for ( i = 0 ; i <= HV_SINT_MAX ; i++ )
+		hv_disable_sint ( hv, i );
+
+	/* Unmap synthetic interrupt controller, leaving SCONTROL
+	 * enabled (see above).
+	 */
+	hv_unmap_synic_no_scontrol ( hv );
+
+	/* Unmap hypercall page */
+	hv_unmap_hypercall ( hv );
+
+	DBGC ( hv, "HV %p quiesced\n", hv );
+}
+
+/**
+ * Unquiesce system
+ *
+ */
+static void hv_unquiesce ( void ) {
+	struct hv_hypervisor *hv = rootdev_get_drvdata ( &hv_root_device );
+	uint64_t simp;
+	int rc;
+
+	/* Do nothing if we are not running in Hyper-V */
+	if ( ! hv )
+		return;
+
+	/* Experimentation shows that the "enlightened" portions of
+	 * Windows Server 2016 will break our Hyper-V connection at
+	 * some point during a SAN boot.  Surprisingly it does not
+	 * change the guest OS ID MSR, but it does leave the SynIC
+	 * message page disabled.
+	 *
+	 * Our own explicit quiescing procedure will also disable the
+	 * SynIC message page.  We can therefore use the SynIC message
+	 * page enable bit as a heuristic to determine when we need to
+	 * reestablish our Hyper-V connection.
+	 */
+	simp = rdmsr ( HV_X64_MSR_SIMP );
+	if ( simp & HV_SIMP_ENABLE )
+		return;
+
+	/* Remap hypercall page */
+	hv_map_hypercall ( hv );
+
+	/* Remap synthetic interrupt controller */
+	hv_map_synic ( hv );
+
+	/* Reset Hyper-V devices */
+	if ( ( rc = vmbus_reset ( hv, &hv_root_device.dev ) ) != 0 ) {
+		DBGC ( hv, "HV %p could not unquiesce: %s\n",
+		       hv, strerror ( rc ) );
+		/* Nothing we can do */
+		return;
+	}
+}
+
+/** Hyper-V quiescer */
+struct quiescer hv_quiescer __quiescer = {
+	.quiesce = hv_quiesce,
+	.unquiesce = hv_unquiesce,
 };
 
 /**

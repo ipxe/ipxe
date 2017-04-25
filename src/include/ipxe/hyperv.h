@@ -61,6 +61,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Synthetic interrupt vector mask */
 #define HV_SINT_VECTOR_MASK HV_SINT_VECTOR ( 0xff )
 
+/** Maximum synthetic interrupt number */
+#define HV_SINT_MAX 15
+
 /** Post message */
 #define HV_POST_MESSAGE 0x005c
 
