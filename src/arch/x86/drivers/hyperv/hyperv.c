@@ -245,9 +245,8 @@ static int hv_map_hypercall ( struct hv_hypervisor *hv ) {
 	/* Report guest OS identity */
 	guest_os_id = rdmsr ( HV_X64_MSR_GUEST_OS_ID );
 	if ( guest_os_id != 0 ) {
-		DBGC ( hv, "HV %p guest OS ID MSR already set to %#08llx\n",
+		DBGC ( hv, "HV %p guest OS ID MSR was %#08llx\n",
 		       hv, guest_os_id );
-		return -EBUSY;
 	}
 	guest_os_id = HV_GUEST_OS_ID_IPXE;
 	DBGC2 ( hv, "HV %p guest OS ID MSR is %#08llx\n", hv, guest_os_id );
