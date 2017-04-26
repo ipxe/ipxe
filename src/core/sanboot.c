@@ -41,6 +41,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iso9660.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/settings.h>
+#include <ipxe/quiesce.h>
 #include <ipxe/sanboot.h>
 
 /**
@@ -365,6 +366,9 @@ int sandev_reopen ( struct san_device *sandev ) {
 	struct san_path *sanpath;
 	int rc;
 
+	/* Unquiesce system */
+	unquiesce();
+
 	/* Close any outstanding command and restart interfaces */
 	sandev_restart ( sandev, -ECONNRESET );
 	assert ( sandev->active == NULL );
@@ -502,6 +506,9 @@ sandev_command ( struct san_device *sandev,
 
 	/* Sanity check */
 	assert ( ! timer_running ( &sandev->timer ) );
+
+	/* Unquiesce system */
+	unquiesce();
 
 	/* (Re)try command */
 	do {
@@ -653,6 +660,14 @@ int sandev_write ( struct san_device *sandev, uint64_t lba,
 	/* Write to device */
 	if ( ( rc = sandev_rw ( sandev, lba, count, buffer, block_write ) ) != 0 )
 		return rc;
+
+	/* Quiesce system.  This is a heuristic designed to ensure
+	 * that the system is quiesced before Windows starts up, since
+	 * a Windows SAN boot will typically write a status flag to
+	 * the disk as its last action before transferring control to
+	 * the native drivers.
+	 */
+	quiesce();
 
 	return 0;
 }
