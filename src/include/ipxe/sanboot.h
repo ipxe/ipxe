@@ -236,12 +236,10 @@ static inline int sandev_needs_reopen ( struct san_device *sandev ) {
 extern struct san_device * sandev_find ( unsigned int drive );
 extern int sandev_reopen ( struct san_device *sandev );
 extern int sandev_reset ( struct san_device *sandev );
-extern int sandev_rw ( struct san_device *sandev, uint64_t lba,
-		       unsigned int count, userptr_t buffer,
-		       int ( * block_rw ) ( struct interface *control,
-					    struct interface *data,
-					    uint64_t lba, unsigned int count,
-					    userptr_t buffer, size_t len ) );
+extern int sandev_read ( struct san_device *sandev, uint64_t lba,
+			 unsigned int count, userptr_t buffer );
+extern int sandev_write ( struct san_device *sandev, uint64_t lba,
+			  unsigned int count, userptr_t buffer );
 extern struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
 					  size_t priv_size );
 extern int register_sandev ( struct san_device *sandev, unsigned int drive,

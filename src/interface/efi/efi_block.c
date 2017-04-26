@@ -102,15 +102,14 @@ struct efi_block_data {
  * @v lba		Starting LBA
  * @v data		Data buffer
  * @v len		Size of buffer
- * @v block_rw		Block read/write method
+ * @v sandev_rw		SAN device read/write method
  * @ret rc		Return status code
  */
 static int efi_block_rw ( struct san_device *sandev, uint64_t lba,
 			  void *data, size_t len,
-			  int ( * block_rw ) ( struct interface *control,
-					       struct interface *data,
-					       uint64_t lba, unsigned int count,
-					       userptr_t buffer, size_t len ) ){
+			  int ( * sandev_rw ) ( struct san_device *sandev,
+						uint64_t lba, unsigned int count,
+						userptr_t buffer ) ) {
 	struct efi_block_data *block = sandev->priv;
 	unsigned int count;
 	int rc;
@@ -124,8 +123,8 @@ static int efi_block_rw ( struct san_device *sandev, uint64_t lba,
 	}
 
 	/* Read from / write to block device */
-	if ( ( rc = sandev_rw ( sandev, lba, count, virt_to_user ( data ),
-				block_rw ) ) != 0 ) {
+	if ( ( rc = sandev_rw ( sandev, lba, count,
+				virt_to_user ( data ) ) ) != 0 ) {
 		DBGC ( sandev, "EFIBLK %#02x I/O failed: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		return rc;
@@ -176,7 +175,7 @@ efi_block_io_read ( EFI_BLOCK_IO_PROTOCOL *block_io, UINT32 media __unused,
 	DBGC2 ( sandev, "EFIBLK %#02x read LBA %#08llx to %p+%#08zx\n",
 		sandev->drive, lba, data, ( ( size_t ) len ) );
 	efi_snp_claim();
-	rc = efi_block_rw ( sandev, lba, data, len, block_read );
+	rc = efi_block_rw ( sandev, lba, data, len, sandev_read );
 	efi_snp_release();
 	return EFIRC ( rc );
 }
@@ -202,7 +201,7 @@ efi_block_io_write ( EFI_BLOCK_IO_PROTOCOL *block_io, UINT32 media __unused,
 	DBGC2 ( sandev, "EFIBLK %#02x write LBA %#08llx from %p+%#08zx\n",
 		sandev->drive, lba, data, ( ( size_t ) len ) );
 	efi_snp_claim();
-	rc = efi_block_rw ( sandev, lba, data, len, block_write );
+	rc = efi_block_rw ( sandev, lba, data, len, sandev_write );
 	efi_snp_release();
 	return EFIRC ( rc );
 }

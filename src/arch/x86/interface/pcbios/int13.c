@@ -181,8 +181,8 @@ static int int13_parse_eltorito ( struct san_device *sandev, void *scratch ) {
 	int rc;
 
 	/* Read boot record volume descriptor */
-	if ( ( rc = sandev_rw ( sandev, ELTORITO_LBA, 1,
-				virt_to_user ( boot ), block_read ) ) != 0 ) {
+	if ( ( rc = sandev_read ( sandev, ELTORITO_LBA, 1,
+				  virt_to_user ( boot ) ) ) != 0 ) {
 		DBGC ( sandev, "INT13 drive %02x could not read El Torito boot "
 		       "record volume descriptor: %s\n",
 		       sandev->drive, strerror ( rc ) );
@@ -227,8 +227,7 @@ static int int13_guess_geometry_hdd ( struct san_device *sandev, void *scratch,
 	int rc;
 
 	/* Read partition table */
-	if ( ( rc = sandev_rw ( sandev, 0, 1, virt_to_user ( mbr ),
-				block_read ) ) != 0 ) {
+	if ( ( rc = sandev_read ( sandev, 0, 1, virt_to_user ( mbr ) ) ) != 0 ) {
 		DBGC ( sandev, "INT13 drive %02x could not read "
 		       "partition table to guess geometry: %s\n",
 		       sandev->drive, strerror ( rc ) );
@@ -506,18 +505,16 @@ static int int13_get_last_status ( struct san_device *sandev,
  * @v cl (bits 5:0)	Sector number
  * @v dh		Head number
  * @v es:bx		Data buffer
- * @v block_rw		Block read/write method
+ * @v sandev_rw		SAN device read/write method
  * @ret status		Status code
  * @ret al		Number of sectors read or written
  */
 static int int13_rw_sectors ( struct san_device *sandev,
 			      struct i386_all_regs *ix86,
-			      int ( * block_rw ) ( struct interface *control,
-						   struct interface *data,
-						   uint64_t lba,
-						   unsigned int count,
-						   userptr_t buffer,
-						   size_t len ) ) {
+			      int ( * sandev_rw ) ( struct san_device *sandev,
+						    uint64_t lba,
+						    unsigned int count,
+						    userptr_t buffer ) ) {
 	struct int13_data *int13 = sandev->priv;
 	unsigned int cylinder, head, sector;
 	unsigned long lba;
@@ -555,7 +552,7 @@ static int int13_rw_sectors ( struct san_device *sandev,
 		count );
 
 	/* Read from / write to block device */
-	if ( ( rc = sandev_rw ( sandev, lba, count, buffer, block_rw ) ) != 0 ){
+	if ( ( rc = sandev_rw ( sandev, lba, count, buffer ) ) != 0 ){
 		DBGC ( sandev, "INT13 drive %02x I/O failed: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		return -INT13_STATUS_READ_ERROR;
@@ -581,7 +578,7 @@ static int int13_read_sectors ( struct san_device *sandev,
 				struct i386_all_regs *ix86 ) {
 
 	DBGC2 ( sandev, "Read: " );
-	return int13_rw_sectors ( sandev, ix86, block_read );
+	return int13_rw_sectors ( sandev, ix86, sandev_read );
 }
 
 /**
@@ -601,7 +598,7 @@ static int int13_write_sectors ( struct san_device *sandev,
 				 struct i386_all_regs *ix86 ) {
 
 	DBGC2 ( sandev, "Write: " );
-	return int13_rw_sectors ( sandev, ix86, block_write );
+	return int13_rw_sectors ( sandev, ix86, sandev_write );
 }
 
 /**
@@ -701,17 +698,15 @@ static int int13_extension_check ( struct san_device *sandev __unused,
  *
  * @v sandev		SAN device
  * @v ds:si		Disk address packet
- * @v block_rw		Block read/write method
+ * @v sandev_rw		SAN device read/write method
  * @ret status		Status code
  */
 static int int13_extended_rw ( struct san_device *sandev,
 			       struct i386_all_regs *ix86,
-			       int ( * block_rw ) ( struct interface *control,
-						    struct interface *data,
-						    uint64_t lba,
-						    unsigned int count,
-						    userptr_t buffer,
-						    size_t len ) ) {
+			       int ( * sandev_rw ) ( struct san_device *sandev,
+						     uint64_t lba,
+						     unsigned int count,
+						     userptr_t buffer ) ) {
 	struct int13_disk_address addr;
 	uint8_t bufsize;
 	uint64_t lba;
@@ -762,7 +757,7 @@ static int int13_extended_rw ( struct san_device *sandev,
 	DBGC2 ( sandev, " (count %ld)\n", count );
 
 	/* Read from / write to block device */
-	if ( ( rc = sandev_rw ( sandev, lba, count, buffer, block_rw ) ) != 0 ){
+	if ( ( rc = sandev_rw ( sandev, lba, count, buffer ) ) != 0 ) {
 		DBGC ( sandev, "INT13 drive %02x extended I/O failed: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		/* Record that no blocks were transferred successfully */
@@ -787,7 +782,7 @@ static int int13_extended_read ( struct san_device *sandev,
 				 struct i386_all_regs *ix86 ) {
 
 	DBGC2 ( sandev, "Extended read: " );
-	return int13_extended_rw ( sandev, ix86, block_read );
+	return int13_extended_rw ( sandev, ix86, sandev_read );
 }
 
 /**
@@ -801,7 +796,7 @@ static int int13_extended_write ( struct san_device *sandev,
 				  struct i386_all_regs *ix86 ) {
 
 	DBGC2 ( sandev, "Extended write: " );
-	return int13_extended_rw ( sandev, ix86, block_write );
+	return int13_extended_rw ( sandev, ix86, sandev_write );
 }
 
 /**
@@ -1038,6 +1033,7 @@ static int int13_cdrom_read_boot_catalog ( struct san_device *sandev,
 					   struct i386_all_regs *ix86 ) {
 	struct int13_data *int13 = sandev->priv;
 	struct int13_cdrom_boot_catalog_command command;
+	unsigned int start;
 	int rc;
 
 	/* Read parameters from command packet */
@@ -1051,11 +1047,11 @@ static int int13_cdrom_read_boot_catalog ( struct san_device *sandev,
 		       sandev->drive );
 		return -INT13_STATUS_INVALID;
 	}
+	start = ( int13->boot_catalog + command.start );
 
 	/* Read from boot catalog */
-	if ( ( rc = sandev_rw ( sandev, ( int13->boot_catalog + command.start ),
-				command.count, phys_to_user ( command.buffer ),
-				block_read ) ) != 0 ) {
+	if ( ( rc = sandev_read ( sandev, start, command.count,
+				  phys_to_user ( command.buffer ) ) ) != 0 ) {
 		DBGC ( sandev, "INT13 drive %02x could not read boot catalog: "
 		       "%s\n", sandev->drive, strerror ( rc ) );
 		return -INT13_STATUS_READ_ERROR;

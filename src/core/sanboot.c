@@ -577,12 +577,12 @@ int sandev_reset ( struct san_device *sandev ) {
  * @v block_rw		Block read/write method
  * @ret rc		Return status code
  */
-int sandev_rw ( struct san_device *sandev, uint64_t lba,
-		unsigned int count, userptr_t buffer,
-		int ( * block_rw ) ( struct interface *control,
-				     struct interface *data,
-				     uint64_t lba, unsigned int count,
-				     userptr_t buffer, size_t len ) ) {
+static int sandev_rw ( struct san_device *sandev, uint64_t lba,
+		       unsigned int count, userptr_t buffer,
+		       int ( * block_rw ) ( struct interface *control,
+					    struct interface *data,
+					    uint64_t lba, unsigned int count,
+					    userptr_t buffer, size_t len ) ) {
 	union san_command_params params;
 	unsigned int remaining;
 	size_t frag_len;
@@ -613,6 +613,46 @@ int sandev_rw ( struct san_device *sandev, uint64_t lba,
 		params.rw.lba += params.rw.count;
 		remaining -= params.rw.count;
 	}
+
+	return 0;
+}
+
+/**
+ * Read from SAN device
+ *
+ * @v sandev		SAN device
+ * @v lba		Starting logical block address
+ * @v count		Number of logical blocks
+ * @v buffer		Data buffer
+ * @ret rc		Return status code
+ */
+int sandev_read ( struct san_device *sandev, uint64_t lba,
+		  unsigned int count, userptr_t buffer ) {
+	int rc;
+
+	/* Read from device */
+	if ( ( rc = sandev_rw ( sandev, lba, count, buffer, block_read ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Write to SAN device
+ *
+ * @v sandev		SAN device
+ * @v lba		Starting logical block address
+ * @v count		Number of logical blocks
+ * @v buffer		Data buffer
+ * @ret rc		Return status code
+ */
+int sandev_write ( struct san_device *sandev, uint64_t lba,
+		   unsigned int count, userptr_t buffer ) {
+	int rc;
+
+	/* Write to device */
+	if ( ( rc = sandev_rw ( sandev, lba, count, buffer, block_write ) ) != 0 )
+		return rc;
 
 	return 0;
 }
@@ -735,8 +775,8 @@ static int sandev_parse_iso9660 ( struct san_device *sandev ) {
 	}
 
 	/* Read primary volume descriptor */
-	if ( ( rc = sandev_rw ( sandev, lba, count, virt_to_user ( scratch ),
-				block_read ) ) != 0 ) {
+	if ( ( rc = sandev_read ( sandev, lba, count,
+				  virt_to_user ( scratch ) ) ) != 0 ) {
 		DBGC ( sandev, "SAN %#02x could not read ISO9660 primary"
 		       "volume descriptor: %s\n",
 		       sandev->drive, strerror ( rc ) );
