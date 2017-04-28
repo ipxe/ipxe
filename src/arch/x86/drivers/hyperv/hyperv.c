@@ -223,9 +223,8 @@ static int hv_check_features ( struct hv_hypervisor *hv ) {
  * Map hypercall page
  *
  * @v hv		Hyper-V hypervisor
- * @ret rc		Return status code
  */
-static int hv_map_hypercall ( struct hv_hypervisor *hv ) {
+static void hv_map_hypercall ( struct hv_hypervisor *hv ) {
 	union {
 		struct {
 			uint32_t ebx;
@@ -267,8 +266,6 @@ static int hv_map_hypercall ( struct hv_hypervisor *hv ) {
 	hypercall |= ( virt_to_phys ( hv->hypercall ) | HV_HYPERCALL_ENABLE );
 	DBGC2 ( hv, "HV %p hypercall MSR is %#08llx\n", hv, hypercall );
 	wrmsr ( HV_X64_MSR_HYPERCALL, hypercall );
-
-	return 0;
 }
 
 /**
@@ -296,9 +293,8 @@ static void hv_unmap_hypercall ( struct hv_hypervisor *hv ) {
  * Map synthetic interrupt controller
  *
  * @v hv		Hyper-V hypervisor
- * @ret rc		Return status code
  */
-static int hv_map_synic ( struct hv_hypervisor *hv ) {
+static void hv_map_synic ( struct hv_hypervisor *hv ) {
 	uint64_t simp;
 	uint64_t siefp;
 	uint64_t scontrol;
@@ -322,8 +318,6 @@ static int hv_map_synic ( struct hv_hypervisor *hv ) {
 	scontrol |= HV_SCONTROL_ENABLE;
 	DBGC2 ( hv, "HV %p SCONTROL MSR is %#08llx\n", hv, scontrol );
 	wrmsr ( HV_X64_MSR_SCONTROL, scontrol );
-
-	return 0;
 }
 
 /**
@@ -552,12 +546,10 @@ static int hv_probe ( struct root_device *rootdev ) {
 		goto err_alloc_message;
 
 	/* Map hypercall page */
-	if ( ( rc = hv_map_hypercall ( hv ) ) != 0 )
-		goto err_map_hypercall;
+	hv_map_hypercall ( hv );
 
 	/* Map synthetic interrupt controller */
-	if ( ( rc = hv_map_synic ( hv ) ) != 0 )
-		goto err_map_synic;
+	hv_map_synic ( hv );
 
 	/* Probe Hyper-V devices */
 	if ( ( rc = vmbus_probe ( hv, &rootdev->dev ) ) != 0 )
@@ -569,9 +561,7 @@ static int hv_probe ( struct root_device *rootdev ) {
 	vmbus_remove ( hv, &rootdev->dev );
  err_vmbus_probe:
 	hv_unmap_synic ( hv );
- err_map_synic:
 	hv_unmap_hypercall ( hv );
- err_map_hypercall:
 	hv_free_message ( hv );
  err_alloc_message:
 	hv_free_pages ( hv, hv->hypercall, hv->synic.message, hv->synic.event,
