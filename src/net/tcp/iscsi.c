@@ -644,12 +644,12 @@ static int iscsi_rx_nop_in ( struct iscsi_session *iscsi,
  *
  *     HeaderDigest=None
  *     DataDigest=None
- *     MaxConnections is irrelevant; we make only one connection anyway [4]
+ *     MaxConnections=1 (irrelevant; we make only one connection anyway) [4]
  *     InitialR2T=Yes [1]
- *     ImmediateData is irrelevant; we never send immediate data [4]
+ *     ImmediateData=No (irrelevant; we never send immediate data) [4]
  *     MaxRecvDataSegmentLength=8192 (default; we don't care) [3]
  *     MaxBurstLength=262144 (default; we don't care) [3]
- *     FirstBurstLength=262144 (default; we don't care)
+ *     FirstBurstLength=65536 (irrelevant due to other settings) [5]
  *     DefaultTime2Wait=0 [2]
  *     DefaultTime2Retain=0 [2]
  *     MaxOutstandingR2T=1
@@ -674,6 +674,11 @@ static int iscsi_rx_nop_in ( struct iscsi_session *iscsi,
  * these parameters, but some targets (notably a QNAP TS-639Pro) fail
  * unless they are supplied, so we explicitly specify the default
  * values.
+ *
+ * [5] FirstBurstLength is defined to be irrelevant since we already
+ * force InitialR2T=Yes and ImmediateData=No, but some targets
+ * (notably LIO as of kernel 4.11) fail unless it is specified, so we
+ * explicitly specify the default value.
  */
 static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 					       void *data, size_t len ) {
@@ -732,13 +737,14 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 				    "ImmediateData=No%c"
 				    "MaxRecvDataSegmentLength=8192%c"
 				    "MaxBurstLength=262144%c"
+				    "FirstBurstLength=65536%c"
 				    "DefaultTime2Wait=0%c"
 				    "DefaultTime2Retain=0%c"
 				    "MaxOutstandingR2T=1%c"
 				    "DataPDUInOrder=Yes%c"
 				    "DataSequenceInOrder=Yes%c"
 				    "ErrorRecoveryLevel=0%c",
-				    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
+				    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
 	}
 
 	return used;
