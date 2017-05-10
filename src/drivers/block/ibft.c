@@ -338,10 +338,12 @@ static int ibft_fill_nic ( struct ibft_nic *nic,
  *
  * @v initiator		Initiator portion of iBFT
  * @v strings		iBFT string block descriptor
+ * @v initiator_iqn	Initiator IQN
  * @ret rc		Return status code
  */
 static int ibft_fill_initiator ( struct ibft_initiator *initiator,
-				 struct ibft_strings *strings ) {
+				 struct ibft_strings *strings,
+				 const char *initiator_iqn ) {
 	int rc;
 
 	/* Fill in common header */
@@ -352,9 +354,8 @@ static int ibft_fill_initiator ( struct ibft_initiator *initiator,
 				    IBFT_FL_INITIATOR_FIRMWARE_BOOT_SELECTED );
 
 	/* Fill in initiator name */
-	if ( ( rc = ibft_set_string_setting ( NULL, strings,
-					      &initiator->initiator_name,
-					      &initiator_iqn_setting ) ) != 0 )
+	if ( ( rc = ibft_set_string ( strings, &initiator->initiator_name,
+				      initiator_iqn ) ) != 0 )
 		return rc;
 	DBG ( "iBFT initiator name = %s\n",
 	      ibft_string ( strings, &initiator->initiator_name ) );
@@ -613,7 +614,10 @@ static int ibft_install ( int ( * install ) ( struct acpi_header *acpi ) ) {
 	/* Fill in Initiator block */
 	initiator = ( data + initiator_offset );
 	table->control.initiator = cpu_to_le16 ( initiator_offset );
-	if ( ( rc = ibft_fill_initiator ( initiator, &strings ) ) != 0 )
+	iscsi = list_first_entry ( &ibft_model.descs, struct iscsi_session,
+				   desc.list );
+	if ( ( rc = ibft_fill_initiator ( initiator, &strings,
+					  iscsi->initiator_iqn ) ) != 0 )
 		goto err_initiator;
 
 	/* Fill in NIC blocks */
