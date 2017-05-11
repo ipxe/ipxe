@@ -124,6 +124,11 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	DBGC ( systab, "EFI handle %p systab %p\n", image_handle, systab );
 	bs = systab->BootServices;
 
+	//
+	// disable watchdog timer (5 minute reboot while sitting in console)
+	//
+	bs->SetWatchdogTimer ( 0x0000, 0x0000, 0x0000, NULL );
+
 	/* Look up used protocols */
 	for_each_table_entry ( prot, EFI_PROTOCOLS ) {
 		if ( ( efirc = bs->LocateProtocol ( &prot->guid, NULL,
