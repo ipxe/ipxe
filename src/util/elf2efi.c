@@ -18,6 +18,7 @@
  */
 
 #define FILE_LICENCE(...) extern void __file_licence ( void )
+#define USING_LTO
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
