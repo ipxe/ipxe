@@ -826,6 +826,10 @@ static const struct undinet_irq_broken undinet_irq_broken_list[] = {
 	{ .pci_vendor = 0x8086, .pci_device = 0x1503 },
 	/* HP 745 G3 laptop */
 	{ .pci_vendor = 0x14e4, .pci_device = 0x1687 },
+	/* Broadcom Corporation NetXtreme BCM5717 Gigabit Ethernet PCIe */
+	{ .pci_vendor = 0x14e4, .pci_device = 0x1655 },
+	/* Intel Corporation 82574L Gigabit Network Connection */
+	{ .pci_vendor = 0x8086, .pci_device = 0x10d3 },
 };
 
 /**
