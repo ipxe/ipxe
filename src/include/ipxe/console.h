@@ -38,6 +38,10 @@ struct console_configuration {
 	unsigned int bottom;
 	/** Background picture, if any */
 	struct pixel_buffer *pixbuf;
+	/** Automatically choose optimal mode */
+	int automode;
+	/** Automatically choose widest mode */
+	int maxwidth;
 };
 
 /**
