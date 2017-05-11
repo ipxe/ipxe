@@ -46,8 +46,10 @@ static void efix86_cpu_nap ( void ) {
 	 * The EFI shell doesn't seem to bother sleeping the CPU; it
 	 * just sits there idly burning power.
 	 *
+	 * Originally we tried using the 'hlt' instruction, but it causes
+	 * us to lose interrupts.  So we'll just have to fake it, and run
+	 * the cpu at full power.
 	 */
-	__asm__ __volatile__ ( "hlt" );
 }
 
 PROVIDE_NAP ( efix86, cpu_nap, efix86_cpu_nap );
