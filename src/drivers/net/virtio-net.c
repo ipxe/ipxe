@@ -87,6 +87,9 @@ struct virtnet_nic {
 	/** 0 for legacy, 1 for virtio 1.0 */
 	int virtio_version;
 
+	/** Content of the command register before we initialized the device */
+	unsigned old_pci_command;
+
 	/** Virtio 1.0 device data */
 	struct virtio_pci_modern_device vdev;
 
@@ -476,7 +479,8 @@ static int virtnet_probe_legacy ( struct pci_device *pci ) {
 	       virtnet, pci->dev.name, ioaddr, pci->irq );
 
 	/* Enable PCI bus master and reset NIC */
-	adjust_pci_device ( pci );
+	virtnet->old_pci_command = pci_enable_device ( pci,
+		PCI_COMMAND_MASTER | PCI_COMMAND_IO, 0 );
 	vp_reset ( ioaddr );
 
 	/* Load MAC address and MTU */
@@ -506,9 +510,31 @@ static int virtnet_probe_legacy ( struct pci_device *pci ) {
 	unregister_netdev ( netdev );
  err_register_netdev:
 	vp_reset ( ioaddr );
+	pci_restore_device ( pci, virtnet->old_pci_command );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	return rc;
+}
+
+/**
+ * Determine if the device uses at least one region of the given type
+ *
+ * @v vdev	Virtio-net device data
+ * @v type	The region type to test
+ * @ret result	Non-zero if the type is used, zero otherwise
+ */
+static int virtnet_uses_region_type ( struct virtio_pci_modern_device *vdev,
+				      unsigned type ) {
+	if ( ( vdev->common.flags & VIRTIO_PCI_REGION_TYPE_MASK ) == type ) {
+		return 1;
+	}
+	if ( ( vdev->isr.flags & VIRTIO_PCI_REGION_TYPE_MASK ) == type ) {
+		return 1;
+	}
+	if ( ( vdev->device.flags & VIRTIO_PCI_REGION_TYPE_MASK ) == type ) {
+		return 1;
+	}
+	return 0;
 }
 
 /**
@@ -524,6 +550,7 @@ static int virtnet_probe_modern ( struct pci_device *pci, int *found_dev ) {
 	u64 features;
 	u16 mtu;
 	int rc, common, isr, notify, config, device;
+	unsigned pci_command;
 
 	common = virtio_pci_find_capability ( pci, VIRTIO_PCI_CAP_COMMON_CFG );
 	if ( ! common ) {
@@ -582,7 +609,14 @@ static int virtnet_probe_modern ( struct pci_device *pci, int *found_dev ) {
 	}
 
 	/* Enable the PCI device */
-	adjust_pci_device ( pci );
+	pci_command = PCI_COMMAND_MASTER;
+	if ( virtnet_uses_region_type ( &virtnet->vdev, VIRTIO_PCI_REGION_PORT ) ) {
+		pci_command |= PCI_COMMAND_IO;
+	}
+	if ( virtnet_uses_region_type ( &virtnet->vdev, VIRTIO_PCI_REGION_MEMORY ) ) {
+		pci_command |= PCI_COMMAND_MEM;
+	}
+	virtnet->old_pci_command = pci_enable_device ( pci, pci_command, 0 );
 
 	/* Reset the device and set initial status bits */
 	vpm_reset ( &virtnet->vdev );
@@ -629,6 +663,7 @@ static int virtnet_probe_modern ( struct pci_device *pci, int *found_dev ) {
 err_register_netdev:
 err_mac_address:
 	vpm_reset ( &virtnet->vdev );
+	pci_restore_device ( pci, virtnet->old_pci_command );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 
@@ -665,6 +700,8 @@ static int virtnet_probe ( struct pci_device *pci ) {
 static void virtnet_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
 	struct virtnet_nic *virtnet = netdev->priv;
+
+	pci_restore_device ( pci, virtnet->old_pci_command );
 
 	virtio_pci_unmap_capability ( &virtnet->vdev.device );
 	virtio_pci_unmap_capability ( &virtnet->vdev.isr );

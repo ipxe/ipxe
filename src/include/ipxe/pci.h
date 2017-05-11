@@ -281,6 +281,9 @@ struct pci_driver {
 	PCI_SLOT ( (pci)->busdevfn ), PCI_FUNC ( (pci)->busdevfn )
 
 extern void adjust_pci_device ( struct pci_device *pci );
+extern unsigned pci_enable_device ( struct pci_device *pci, unsigned flags,
+				    unsigned char latency );
+extern void pci_restore_device ( struct pci_device *pci, unsigned old_flags );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
 extern int pci_read_config ( struct pci_device *pci );
