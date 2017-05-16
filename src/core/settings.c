@@ -1478,9 +1478,9 @@ struct setting * find_setting ( const char *name ) {
  * @v name		Name
  * @ret tag		Tag number, or 0 if not a valid number
  */
-static unsigned long parse_setting_tag ( const char *name ) {
+static uint64_t parse_setting_tag ( const char *name ) {
 	char *tmp = ( ( char * ) name );
-	unsigned long tag = 0;
+	uint64_t tag = 0;
 
 	while ( 1 ) {
 		tag = ( ( tag << 8 ) | strtoul ( tmp, &tmp, 0 ) );
