@@ -36,7 +36,7 @@ struct usbnet_device {
  *
  * @v usbnet		USB network device
  * @v func		USB function
- * @v intr		Interrupt endpoint operations
+ * @v intr		Interrupt endpoint operations, or NULL
  * @v in		Bulk IN endpoint operations
  * @v out		Bulk OUT endpoint operations
  */
@@ -51,6 +51,18 @@ usbnet_init ( struct usbnet_device *usbnet, struct usb_function *func,
 	usb_endpoint_init ( &usbnet->intr, usb, intr );
 	usb_endpoint_init ( &usbnet->in, usb, in );
 	usb_endpoint_init ( &usbnet->out, usb, out );
+}
+
+/**
+ * Check if USB network device has an interrupt endpoint
+ *
+ * @v usbnet		USB network device
+ * @ret has_intr	Device has an interrupt endpoint
+ */
+static inline __attribute__ (( always_inline )) int
+usbnet_has_intr ( struct usbnet_device *usbnet ) {
+
+	return ( usbnet->intr.driver != NULL );
 }
 
 extern int usbnet_open ( struct usbnet_device *usbnet );
