@@ -511,15 +511,12 @@ static void netfront_refill_rx ( struct net_device *netdev ) {
 	struct xen_device *xendev = netfront->xendev;
 	struct io_buffer *iobuf;
 	struct netif_rx_request *request;
+	unsigned int refilled = 0;
 	int notify;
 	int rc;
 
-	/* Do nothing if ring is already full */
-	if ( netfront_ring_is_full ( &netfront->rx ) )
-		return;
-
 	/* Refill ring */
-	do {
+	while ( netfront_ring_fill ( &netfront->rx ) < NETFRONT_RX_FILL ) {
 
 		/* Allocate I/O buffer */
 		iobuf = alloc_iob ( PAGE_SIZE );
@@ -543,13 +540,17 @@ static void netfront_refill_rx ( struct net_device *netdev ) {
 
 		/* Move to next descriptor */
 		netfront->rx_fring.req_prod_pvt++;
+		refilled++;
 
-	} while ( ! netfront_ring_is_full ( &netfront->rx ) );
+	}
 
 	/* Push new descriptors and notify backend if applicable */
-	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY ( &netfront->rx_fring, notify );
-	if ( notify )
-		netfront_send_event ( netfront );
+	if ( refilled ) {
+		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY ( &netfront->rx_fring,
+						      notify );
+		if ( notify )
+			netfront_send_event ( netfront );
+	}
 }
 
 /**
