@@ -2329,6 +2329,21 @@ static int tls_newdata_process_data ( struct tls_session *tls ) {
 }
 
 /**
+ * Check flow control window
+ *
+ * @v tls		TLS session
+ * @ret len		Length of window
+ */
+static size_t tls_cipherstream_window ( struct tls_session *tls ) {
+
+	/* Open window until we are ready to accept data */
+	if ( ! tls_ready ( tls ) )
+		return -1UL;
+
+	return xfer_window ( &tls->plainstream );
+}
+
+/**
  * Receive new ciphertext
  *
  * @v tls		TLS session
@@ -2390,6 +2405,7 @@ static int tls_cipherstream_deliver ( struct tls_session *tls,
 static struct interface_operation tls_cipherstream_ops[] = {
 	INTF_OP ( xfer_deliver, struct tls_session *,
 		  tls_cipherstream_deliver ),
+	INTF_OP ( xfer_window, struct tls_session *, tls_cipherstream_window ),
 	INTF_OP ( xfer_window_changed, struct tls_session *, tls_tx_resume ),
 	INTF_OP ( intf_close, struct tls_session *, tls_close ),
 };
