@@ -16,6 +16,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/interface.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/tables.h>
+#include <ipxe/api.h>
+#include <config/general.h>
 
 /**
  * An ACPI description header
@@ -88,18 +90,6 @@ struct acpi_rsdp {
 	/** Physical address of RSDT */
 	uint32_t rsdt;
 } __attribute__ (( packed ));
-
-/** EBDA RSDP length */
-#define RSDP_EBDA_LEN 0x400
-
-/** Fixed BIOS area RSDP start address */
-#define RSDP_BIOS_START 0xe0000
-
-/** Fixed BIOS area RSDP length */
-#define RSDP_BIOS_LEN 0x20000
-
-/** Stride at which to search for RSDP */
-#define RSDP_STRIDE 16
 
 /** Root System Description Table (RSDT) signature */
 #define RSDT_SIGNATURE ACPI_SIGNATURE ( 'R', 'S', 'D', 'T' )
@@ -194,16 +184,56 @@ struct acpi_model {
 /** Declare an ACPI model */
 #define __acpi_model __table_entry ( ACPI_MODELS, 01 )
 
+/**
+ * Calculate static inline ACPI API function name
+ *
+ * @v _prefix		Subsystem prefix
+ * @v _api_func		API function
+ * @ret _subsys_func	Subsystem API function
+ */
+#define ACPI_INLINE( _subsys, _api_func ) \
+	SINGLE_API_INLINE ( ACPI_PREFIX_ ## _subsys, _api_func )
+
+/**
+ * Provide an ACPI API implementation
+ *
+ * @v _prefix		Subsystem prefix
+ * @v _api_func		API function
+ * @v _func		Implementing function
+ */
+#define PROVIDE_ACPI( _subsys, _api_func, _func ) \
+	PROVIDE_SINGLE_API ( ACPI_PREFIX_ ## _subsys, _api_func, _func )
+
+/**
+ * Provide a static inline ACPI API implementation
+ *
+ * @v _prefix		Subsystem prefix
+ * @v _api_func		API function
+ */
+#define PROVIDE_ACPI_INLINE( _subsys, _api_func ) \
+	PROVIDE_SINGLE_API_INLINE ( ACPI_PREFIX_ ## _subsys, _api_func )
+
+/* Include all architecture-independent ACPI API headers */
+#include <ipxe/null_acpi.h>
+
+/* Include all architecture-dependent ACPI API headers */
+#include <bits/acpi.h>
+
+/**
+ * Locate ACPI root system description table
+ *
+ * @ret rsdt		ACPI root system description table, or UNULL
+ */
+userptr_t acpi_find_rsdt ( void );
+
 extern struct acpi_descriptor *
 acpi_describe ( struct interface *interface );
 #define acpi_describe_TYPE( object_type )				\
 	typeof ( struct acpi_descriptor * ( object_type ) )
 
 extern void acpi_fix_checksum ( struct acpi_header *acpi );
-extern userptr_t acpi_find_rsdt ( userptr_t ebda );
-extern userptr_t acpi_find ( userptr_t rsdt, uint32_t signature,
-			     unsigned int index );
-extern int acpi_sx ( userptr_t rsdt, uint32_t signature );
+extern userptr_t acpi_find ( uint32_t signature, unsigned int index );
+extern int acpi_sx ( uint32_t signature );
 extern void acpi_add ( struct acpi_descriptor *desc );
 extern void acpi_del ( struct acpi_descriptor *desc );
 extern int acpi_install ( int ( * install ) ( struct acpi_header *acpi ) );

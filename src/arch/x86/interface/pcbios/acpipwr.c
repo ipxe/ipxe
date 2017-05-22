@@ -26,8 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <unistd.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <realmode.h>
-#include <bios.h>
 #include <ipxe/io.h>
 #include <ipxe/acpi.h>
 #include <ipxe/acpipwr.h>
@@ -51,8 +49,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 int acpi_poweroff ( void ) {
 	struct acpi_fadt fadtab;
-	uint16_t ebda;
-	userptr_t rsdt;
 	userptr_t fadt;
 	unsigned int pm1a_cnt_blk;
 	unsigned int pm1b_cnt_blk;
@@ -63,18 +59,8 @@ int acpi_poweroff ( void ) {
 	int s5;
 	int rc;
 
-	/* Locate EBDA */
-	get_real ( ebda, BDA_SEG, BDA_EBDA );
-
-	/* Locate RSDT */
-	rsdt = acpi_find_rsdt ( real_to_user ( ebda, 0 ) );
-	if ( ! rsdt ) {
-		DBGC ( colour, "ACPI could not find RSDT (EBDA %04x)\n", ebda );
-		return -ENOENT;
-	}
-
 	/* Locate FADT */
-	fadt = acpi_find ( rsdt, FADT_SIGNATURE, 0 );
+	fadt = acpi_find ( FADT_SIGNATURE, 0 );
 	if ( ! fadt ) {
 		DBGC ( colour, "ACPI could not find FADT\n" );
 		return -ENOENT;
@@ -88,7 +74,7 @@ int acpi_poweroff ( void ) {
 	pm1b_cnt = ( pm1b_cnt_blk + ACPI_PM1_CNT );
 
 	/* Extract \_S5 from DSDT or any SSDT */
-	s5 = acpi_sx ( rsdt, S5_SIGNATURE );
+	s5 = acpi_sx ( S5_SIGNATURE );
 	if ( s5 < 0 ) {
 		rc = s5;
 		DBGC ( colour, "ACPI could not extract \\_S5: %s\n",

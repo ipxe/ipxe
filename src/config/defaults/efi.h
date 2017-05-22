@@ -21,6 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ENTROPY_EFI
 #define TIME_EFI
 #define REBOOT_EFI
+#define ACPI_NULL
 
 #define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
 

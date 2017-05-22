@@ -58,86 +58,28 @@ void acpi_fix_checksum ( struct acpi_header *acpi ) {
 }
 
 /**
- * Locate ACPI root system description table within a memory range
- *
- * @v start		Start address to search
- * @v len		Length to search
- * @ret rsdt		ACPI root system description table, or UNULL
- */
-static userptr_t acpi_find_rsdt_range ( userptr_t start, size_t len ) {
-	static const char signature[8] = RSDP_SIGNATURE;
-	struct acpi_rsdp rsdp;
-	userptr_t rsdt;
-	size_t offset;
-	uint8_t sum;
-	unsigned int i;
-
-	/* Search for RSDP */
-	for ( offset = 0 ; ( ( offset + sizeof ( rsdp ) ) < len ) ;
-	      offset += RSDP_STRIDE ) {
-
-		/* Check signature and checksum */
-		copy_from_user ( &rsdp, start, offset, sizeof ( rsdp ) );
-		if ( memcmp ( rsdp.signature, signature,
-			      sizeof ( signature ) ) != 0 )
-			continue;
-		for ( sum = 0, i = 0 ; i < sizeof ( rsdp ) ; i++ )
-			sum += *( ( ( uint8_t * ) &rsdp ) + i );
-		if ( sum != 0 )
-			continue;
-
-		/* Extract RSDT */
-		rsdt = phys_to_user ( le32_to_cpu ( rsdp.rsdt ) );
-		DBGC ( rsdt, "RSDT %#08lx found via RSDP %#08lx\n",
-		       user_to_phys ( rsdt, 0 ),
-		       user_to_phys ( start, offset ) );
-		return rsdt;
-	}
-
-	return UNULL;
-}
-
-/**
- * Locate ACPI root system description table
- *
- * @v ebda		Extended BIOS data area, or UNULL
- * @ret rsdt		ACPI root system description table, or UNULL
- */
-userptr_t acpi_find_rsdt ( userptr_t ebda ) {
-	userptr_t rsdt;
-
-	/* Search EBDA, if applicable */
-	if ( ebda ) {
-		rsdt = acpi_find_rsdt_range ( ebda, RSDP_EBDA_LEN );
-		if ( rsdt )
-			return rsdt;
-	}
-
-	/* Search fixed BIOS area */
-	rsdt = acpi_find_rsdt_range ( phys_to_user ( RSDP_BIOS_START ),
-				      RSDP_BIOS_LEN );
-	if ( rsdt )
-		return rsdt;
-
-	return UNULL;
-}
-
-/**
  * Locate ACPI table
  *
- * @v rsdt		ACPI root system description table
  * @v signature		Requested table signature
  * @v index		Requested index of table with this signature
  * @ret table		Table, or UNULL if not found
  */
-userptr_t acpi_find ( userptr_t rsdt, uint32_t signature, unsigned int index ) {
+userptr_t acpi_find ( uint32_t signature, unsigned int index ) {
 	struct acpi_header acpi;
 	struct acpi_rsdt *rsdtab;
 	typeof ( rsdtab->entry[0] ) entry;
+	userptr_t rsdt;
 	userptr_t table;
 	size_t len;
 	unsigned int count;
 	unsigned int i;
+
+	/* Locate RSDT */
+	rsdt = acpi_find_rsdt();
+	if ( ! rsdt ) {
+		DBG ( "RSDT not found\n" );
+		return UNULL;
+	}
 
 	/* Read RSDT header */
 	copy_from_user ( &acpi, rsdt, 0, sizeof ( acpi ) );
@@ -278,20 +220,27 @@ static int acpi_sx_zsdt ( userptr_t zsdt, uint32_t signature ) {
 /**
  * Extract \_Sx value from DSDT/SSDT
  *
- * @v rsdt		ACPI root system description table
  * @v signature		Signature (e.g. "_S5_")
  * @ret sx		\_Sx value, or negative error
  */
-int acpi_sx ( userptr_t rsdt, uint32_t signature ) {
+int acpi_sx ( uint32_t signature ) {
 	struct acpi_fadt fadtab;
+	userptr_t rsdt;
 	userptr_t fadt;
 	userptr_t dsdt;
 	userptr_t ssdt;
 	unsigned int i;
 	int sx;
 
+	/* Locate RSDT */
+	rsdt = acpi_find_rsdt();
+	if ( ! rsdt ) {
+		DBG ( "RSDT not found\n" );
+		return -ENOENT;
+	}
+
 	/* Try DSDT first */
-	fadt = acpi_find ( rsdt, FADT_SIGNATURE, 0 );
+	fadt = acpi_find ( FADT_SIGNATURE, 0 );
 	if ( fadt ) {
 		copy_from_user ( &fadtab, fadt, 0, sizeof ( fadtab ) );
 		dsdt = phys_to_user ( fadtab.dsdt );
@@ -301,7 +250,7 @@ int acpi_sx ( userptr_t rsdt, uint32_t signature ) {
 
 	/* Try all SSDTs */
 	for ( i = 0 ; ; i++ ) {
-		ssdt = acpi_find ( rsdt, SSDT_SIGNATURE, i );
+		ssdt = acpi_find ( SSDT_SIGNATURE, i );
 		if ( ! ssdt )
 			break;
 		if ( ( sx = acpi_sx_zsdt ( ssdt, signature ) ) >= 0 )
