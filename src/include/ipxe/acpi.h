@@ -215,6 +215,7 @@ struct acpi_model {
 
 /* Include all architecture-independent ACPI API headers */
 #include <ipxe/null_acpi.h>
+#include <ipxe/efi/efi_acpi.h>
 
 /* Include all architecture-dependent ACPI API headers */
 #include <bits/acpi.h>
