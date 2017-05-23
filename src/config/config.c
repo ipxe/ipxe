@@ -337,6 +337,9 @@ REQUIRE_OBJECT ( memmap_settings );
 #ifdef VRAM_SETTINGS
 REQUIRE_OBJECT ( vram_settings );
 #endif
+#ifdef ACPI_SETTINGS
+REQUIRE_OBJECT ( acpi_settings );
+#endif
 
 /*
  * Drag in selected keyboard map

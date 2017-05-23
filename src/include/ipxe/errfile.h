@@ -366,6 +366,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_local	      ( ERRFILE_OTHER | 0x004d0000 )
 #define ERRFILE_efi_entropy	      ( ERRFILE_OTHER | 0x004e0000 )
 #define ERRFILE_cert_cmd	      ( ERRFILE_OTHER | 0x004f0000 )
+#define ERRFILE_acpi_settings	      ( ERRFILE_OTHER | 0x00500000 )
 
 /** @} */
 
