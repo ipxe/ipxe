@@ -942,12 +942,15 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		if ( ( rc = apply ( netdev, address, netaddr, netmask, zeroes_addr ) ) != 0 )
 			return rc;
 
-		/* Secondly, create route for default gateway address
+		/* Secondly, create route for default gateway address, *if and
+		 * only if* the interface *has* a default gateway address.
 		 *
 		 * netdev: 0.0.0.0/0.0.0.0 via gateway src address
 		 */
-		if ( ( rc = apply ( netdev, address, zeroes_addr, zeroes_addr, gateway ) ) != 0 )
-			return rc;
+		if ( gateway.s_addr ) {
+			if ( ( rc = apply ( netdev, address, zeroes_addr, zeroes_addr, gateway ) ) != 0 )
+				return rc;
+		}
 
 	}
 
