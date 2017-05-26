@@ -171,12 +171,16 @@ static struct ipv4_miniroute * ipv4_route ( unsigned int scope_id,
 
 		} else {
 
-			/* If destination is an on-link global
-			 * address, then use this route.
+			/* If the destination is global, and is within the
+			 * route's network (netaddr/netmask), then use this
+			 * route.
 			 */
 			if ( ( ( dest->s_addr ^ miniroute->netaddr.s_addr )
 			       & miniroute->netmask.s_addr ) == 0 )
-				// Is this via a gateway?
+				/* Is this via a gateway?
+				 *
+				 * If so, then set the next hop.
+				 */
 				if ( miniroute->gateway.s_addr ) {
 					*dest = miniroute->gateway;
 				}
@@ -929,14 +933,19 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		/* Calculate netaddr */
 		netaddr.s_addr = ( address.s_addr & netmask.s_addr );
 
-		/* Apply settings */
-		/* Create route for on-link traffic */
-		// netdev: netaddr/netmask via 0.0.0.0 (directly connected) src address
+		/* Apply settings
+		 *
+		 * Firstly, create route for directly connected network
+		 *
+		 * netdev: netaddr/netmask via 0.0.0.0 (directly connected) src address
+		 */
 		if ( ( rc = apply ( netdev, address, netaddr, netmask, zeroes_addr ) ) != 0 )
 			return rc;
 
-		/* Create route for off-link traffic */
-		// netdev: 0.0.0.0/0.0.0.0 via gateway src address
+		/* Secondly, create route for default gateway address
+		 *
+		 * netdev: 0.0.0.0/0.0.0.0 via gateway src address
+		 */
 		if ( ( rc = apply ( netdev, address, zeroes_addr, zeroes_addr, gateway ) ) != 0 )
 			return rc;
 
