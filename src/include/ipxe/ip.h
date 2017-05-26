@@ -62,8 +62,10 @@ struct ipv4_miniroute {
 	/** Network device */
 	struct net_device *netdev;
 
-	/** IPv4 address */
+	/** IPv4 src address */
 	struct in_addr address;
+	/** IPv4 network address */
+	struct in_addr netaddr;
 	/** Subnet mask */
 	struct in_addr netmask;
 	/** Gateway address */

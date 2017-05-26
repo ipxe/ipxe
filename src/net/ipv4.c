@@ -82,14 +82,15 @@ static struct profiler ipv4_rx_profiler __profiler = { .name = "ipv4.rx" };
  * @ret rc		Return status code
  */
 static int add_ipv4_miniroute ( struct net_device *netdev,
-				struct in_addr address, struct in_addr netmask,
-				struct in_addr gateway ) {
+				struct in_addr address, struct in_addr netaddr,
+				struct in_addr netmask, struct in_addr gateway ) {
 	struct ipv4_miniroute *miniroute;
 
-	DBGC ( netdev, "IPv4 add %s", inet_ntoa ( address ) );
+	DBGC ( netdev, "IPv4 add %s", inet_ntoa ( netaddr ) );
 	DBGC ( netdev, "/%s ", inet_ntoa ( netmask ) );
 	if ( gateway.s_addr )
 		DBGC ( netdev, "gw %s ", inet_ntoa ( gateway ) );
+	DBGC ( netdev, "src %s ", inet_ntoa ( address ) );
 	DBGC ( netdev, "via %s\n", netdev->name );
 
 	/* Allocate and populate miniroute structure */
@@ -102,6 +103,7 @@ static int add_ipv4_miniroute ( struct net_device *netdev,
 	/* Record routing information */
 	miniroute->netdev = netdev_get ( netdev );
 	miniroute->address = address;
+	miniroute->netaddr = netaddr;
 	miniroute->netmask = netmask;
 	miniroute->gateway = gateway;
 		
@@ -125,10 +127,11 @@ static int add_ipv4_miniroute ( struct net_device *netdev,
 static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 	struct net_device *netdev = miniroute->netdev;
 
-	DBGC ( netdev, "IPv4 del %s", inet_ntoa ( miniroute->address ) );
+	DBGC ( netdev, "IPv4 del %s", inet_ntoa ( miniroute->netaddr ) );
 	DBGC ( netdev, "/%s ", inet_ntoa ( miniroute->netmask ) );
 	if ( miniroute->gateway.s_addr )
 		DBGC ( netdev, "gw %s ", inet_ntoa ( miniroute->gateway ) );
+	DBGC ( netdev, "src %s ", inet_ntoa ( miniroute->address ) );
 	DBGC ( netdev, "via %s\n", miniroute->netdev->name );
 
 	netdev_put ( miniroute->netdev );
@@ -171,18 +174,14 @@ static struct ipv4_miniroute * ipv4_route ( unsigned int scope_id,
 			/* If destination is an on-link global
 			 * address, then use this route.
 			 */
-			if ( ( ( dest->s_addr ^ miniroute->address.s_addr )
+			if ( ( ( dest->s_addr ^ miniroute->netaddr.s_addr )
 			       & miniroute->netmask.s_addr ) == 0 )
+				// Is this via a gateway?
+				if ( miniroute->gateway.s_addr ) {
+					*dest = miniroute->gateway;
+				}
 				return miniroute;
 
-			/* If destination is an off-link global
-			 * address, and we have a default gateway,
-			 * then use this route.
-			 */
-			if ( miniroute->gateway.s_addr ) {
-				*dest = miniroute->gateway;
-				return miniroute;
-			}
 		}
 	}
 
@@ -823,9 +822,17 @@ const struct setting gateway_setting __setting ( SETTING_IP4, gateway ) = {
  */
 static int ipv4_gratuitous_arp ( struct net_device *netdev,
 				 struct in_addr address,
-				 struct in_addr netmask __unused,
+				 struct in_addr netaddr,
+				 struct in_addr netmask,
 				 struct in_addr gateway __unused ) {
 	int rc;
+	struct in_addr src_addr_truncated = { 0 };
+
+	/* Test if source address is outside destination network
+	   and do nothing if so  */
+	src_addr_truncated.s_addr = ( address.s_addr & netmask.s_addr );
+	if ( src_addr_truncated.s_addr != netaddr.s_addr )
+		return 0;
 
 	/* Do nothing if network device already has this IPv4 address */
 	if ( ipv4_has_addr ( netdev, address ) )
@@ -852,13 +859,22 @@ static int ipv4_gratuitous_arp ( struct net_device *netdev,
  */
 static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 					     struct in_addr address,
+					     struct in_addr netaddr,
 					     struct in_addr netmask,
 					     struct in_addr gateway ) ) {
 	struct net_device *netdev;
 	struct settings *settings;
 	struct in_addr address = { 0 };
+	struct in_addr netaddr = { 0 };
 	struct in_addr netmask = { 0 };
 	struct in_addr gateway = { 0 };
+	struct in_addr csr1_pixie_dest = { 0 };
+	struct in_addr csr1_pixie_mask = { 0 };
+	struct in_addr csr1_pixie_via = { 0 };
+	struct in_addr csr2_fae_dest = { 0 };
+	struct in_addr csr2_fae_mask = { 0 };
+	struct in_addr csr2_fae_via = { 0 };
+	struct in_addr zeroes_addr = { 0 }; // 0.0.0.0
 	int rc;
 
 	/* Process settings for each network device */
@@ -890,9 +906,40 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		/* Get default gateway, if present */
 		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
 
-		/* Apply settings */
-		if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
+		/* Add extra miniroute */
+		if ( inet_aton ( "143.210.16.202", &csr1_pixie_dest ) == 0 )
+			return -EINVAL;
+		if ( inet_aton ( "255.255.255.255", &csr1_pixie_mask ) == 0 )
+			return -EINVAL;
+		if ( inet_aton ( "172.20.0.10", &csr1_pixie_via ) == 0 )
+			return -EINVAL;
+		if ( inet_aton ( "143.210.16.168", &csr2_fae_dest ) == 0 )
+			return -EINVAL;
+		if ( inet_aton ( "255.255.255.255", &csr2_fae_mask ) == 0 )
+			return -EINVAL;
+		if ( inet_aton ( "172.20.0.11", &csr2_fae_via ) == 0 )
+			return -EINVAL;
+
+		if ( ( rc = apply ( netdev, address, csr1_pixie_dest, csr1_pixie_mask, csr1_pixie_via ) ) != 0 )
 			return rc;
+
+		if ( ( rc = apply ( netdev, address, csr2_fae_dest, csr2_fae_mask, csr2_fae_via ) ) != 0 )
+			return rc;
+
+		/* Calculate netaddr */
+		netaddr.s_addr = ( address.s_addr & netmask.s_addr );
+
+		/* Apply settings */
+		/* Create route for on-link traffic */
+		// netdev: netaddr/netmask via 0.0.0.0 (directly connected) src address
+		if ( ( rc = apply ( netdev, address, netaddr, netmask, zeroes_addr ) ) != 0 )
+			return rc;
+
+		/* Create route for off-link traffic */
+		// netdev: 0.0.0.0/0.0.0.0 via gateway src address
+		if ( ( rc = apply ( netdev, address, zeroes_addr, zeroes_addr, gateway ) ) != 0 )
+			return rc;
+
 	}
 
 	return 0;
