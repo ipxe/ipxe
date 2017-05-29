@@ -943,6 +943,8 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 
 		/* Thirdly, create Classless Static Routes if present */
 		if ( rfc3442_data ) {
+			DBGC ( netdev, "IPv4 got %d bytes of Option 121 data\n",
+			       rfc3442_data_len );
 			int remaining = rfc3442_data_len;
 			int offset = 0;
 			int mask_width;
@@ -953,26 +955,40 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 			struct in_addr csr_gateway = { 0 };
 
 			while ( remaining ) {
+				DBGC ( netdev, "%d bytes of Option 121 data remaining...\n",
+				       remaining );
 				/* Calculate number of significant octets in mask */
 				mask_width = ((char*)rfc3442_data)[offset];
 				mask_octets = (mask_width + 7) / 8;
+				DBGC ( netdev, "Got mask width %d... mask octets %d... ",
+				       mask_width, mask_octets );
 				/* Calculate length of entire route in octets*/
 				route_len = 1 + mask_octets + 4;
 				remaining -= route_len;
+				DBGC ( netdev, "route record length %d... ",
+				       route_len );
 				if ( remaining < 0 )
 					break;
 				/* Subnet mask */
 				csr_netmask.s_addr = (mask_width > 0) ?
 						      0xFFFFFFFF << (32 - mask_width) : 0;
+				DBGC ( netdev, "netmask %s... ",
+				       inet_ntoa ( csr_netmask ) );
 				/* Network address */
 				memcpy(&csr_netaddr.s_addr, ((char*)rfc3442_data +
 							     offset + 1),
 				       mask_octets);
+				DBGC ( netdev, "unmasked netaddr %s... ",
+				       inet_ntoa ( csr_netaddr ) );
 				csr_netaddr.s_addr &= csr_netmask.s_addr;
+				DBGC ( netdev, "masked netaddr %s... ",
+				       inet_ntoa ( csr_netaddr ) );
 				/* Router address */
 				memcpy(&csr_gateway.s_addr, ((char*)rfc3442_data +
 							     offset + 1 + mask_octets),
 				       sizeof ( csr_gateway.s_addr ));
+				DBGC ( netdev, "gw %s.\n",
+				       inet_ntoa ( csr_gateway ) );
 				/* Add route to routing table */
 				if ( ( rc = apply ( netdev, address, csr_netaddr,
 						    csr_netmask, csr_gateway ) ) != 0 )
