@@ -962,8 +962,8 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 				if ( remaining < 0 )
 					break;
 				/* Subnet mask */
-				csr_netmask.s_addr = 0xFFFFFFFF;
-				csr_netmask.s_addr <<= (32 - mask_width);
+				csr_netmask.s_addr = (mask_width > 0) ?
+						      0xFFFFFFFF << (32 - mask_width) : 0;
 				/* Network address */
 				memcpy(&csr_netaddr.s_addr, ((char*)rfc3442_data +
 							     offset + 1),
