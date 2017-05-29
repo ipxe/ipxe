@@ -883,7 +883,7 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 	struct in_addr zeroes_addr = { 0 }; // 0.0.0.0
 	static void *rfc3442_data = NULL;
 	int rfc3442_data_len;
-	int rc = 0;
+	int rc;
 
 	/* Process settings for each network device */
 	for_each_netdev ( netdev ) {
@@ -928,7 +928,7 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		 * netdev: netaddr/netmask via 0.0.0.0 (directly connected) src address
 		 */
 		if ( ( rc = apply ( netdev, address, netaddr, netmask, zeroes_addr ) ) != 0 )
-			goto done;
+			goto err;
 
 		/* Secondly, create route for default gateway address, *if and
 		 * only if* the interface *has* a default gateway address *and*
@@ -938,7 +938,7 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		 */
 		if ( ( gateway.s_addr ) && ( ! rfc3442_data ) ) {
 			if ( ( rc = apply ( netdev, address, zeroes_addr, zeroes_addr, gateway ) ) != 0 )
-				goto done;
+				goto err;
 		}
 
 		/* Thirdly, create Classless Static Routes if present */
@@ -993,12 +993,15 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 				/* Add route to routing table */
 				if ( ( rc = apply ( netdev, address, csr_netaddr,
 						    csr_netmask, csr_gateway ) ) != 0 )
-					goto done;
+					goto err;
 				offset += route_len;
 			}
+
+			free ( rfc3442_data );
 		}
 	}
- done:
+	return 0;
+ err:
 	free ( rfc3442_data );
 	return rc;
 }
