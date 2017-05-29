@@ -815,6 +815,14 @@ const struct setting gateway_setting __setting ( SETTING_IP4, gateway ) = {
 	.type = &setting_type_ipv4,
 };
 
+/** RFC 3442 Classless Static Routes option setting */
+const struct setting rfc3442_routes_setting __setting ( SETTING_IP4, rfc3442-routes ) = {
+	.name = "rfc3442-routes",
+	.description = "RFC 3442 Classless Static Routes",
+	.tag = DHCP_CLASSLESS_STATIC_ROUTES,
+	.type = &setting_type_hex,
+};
+
 /**
  * Send gratuitous ARP, if applicable
  *
