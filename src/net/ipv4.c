@@ -967,8 +967,11 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 				remaining -= route_len;
 				DBGC ( netdev, "route record length %d... ",
 				       route_len );
-				if ( remaining < 0 )
+				if ( remaining < 0 ) {
+					DBGC ( netdev, "\nError: Insufficient bytes of Option 121 data remaining, expected %d. Exiting loop.\n",
+					       route_len );
 					break;
+				}
 				/* Subnet mask */
 				csr_netmask.s_addr = htonl((mask_width > 0) ?
 							   0xFFFFFFFFU << (32 - mask_width) :
