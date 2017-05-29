@@ -970,8 +970,9 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 				if ( remaining < 0 )
 					break;
 				/* Subnet mask */
-				csr_netmask.s_addr = (mask_width > 0) ?
-						      0xFFFFFFFF << (32 - mask_width) : 0;
+				csr_netmask.s_addr = htonl((mask_width > 0) ?
+							   0xFFFFFFFFU << (32 - mask_width) :
+							   0);
 				DBGC ( netdev, "netmask %s... ",
 				       inet_ntoa ( csr_netmask ) );
 				/* Network address */
