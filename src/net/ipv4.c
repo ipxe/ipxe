@@ -880,14 +880,10 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 	struct in_addr netaddr = { 0 };
 	struct in_addr netmask = { 0 };
 	struct in_addr gateway = { 0 };
-	struct in_addr csr1_pixie_dest = { 0 };
-	struct in_addr csr1_pixie_mask = { 0 };
-	struct in_addr csr1_pixie_via = { 0 };
-	struct in_addr csr2_fae_dest = { 0 };
-	struct in_addr csr2_fae_mask = { 0 };
-	struct in_addr csr2_fae_via = { 0 };
 	struct in_addr zeroes_addr = { 0 }; // 0.0.0.0
-	int rc;
+	static void *rfc3442_data = NULL;
+	int rfc3442_data_len;
+	int rc = 0;
 
 	/* Process settings for each network device */
 	for_each_netdev ( netdev ) {
@@ -918,25 +914,9 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		/* Get default gateway, if present */
 		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
 
-		/* Add extra miniroute */
-		if ( inet_aton ( "143.210.16.202", &csr1_pixie_dest ) == 0 )
-			return -EINVAL;
-		if ( inet_aton ( "255.255.255.255", &csr1_pixie_mask ) == 0 )
-			return -EINVAL;
-		if ( inet_aton ( "172.20.0.10", &csr1_pixie_via ) == 0 )
-			return -EINVAL;
-		if ( inet_aton ( "143.210.16.168", &csr2_fae_dest ) == 0 )
-			return -EINVAL;
-		if ( inet_aton ( "255.255.255.255", &csr2_fae_mask ) == 0 )
-			return -EINVAL;
-		if ( inet_aton ( "172.20.0.11", &csr2_fae_via ) == 0 )
-			return -EINVAL;
-
-		if ( ( rc = apply ( netdev, address, csr1_pixie_dest, csr1_pixie_mask, csr1_pixie_via ) ) != 0 )
-			return rc;
-
-		if ( ( rc = apply ( netdev, address, csr2_fae_dest, csr2_fae_mask, csr2_fae_via ) ) != 0 )
-			return rc;
+		/* Get RFC 3442 Classless Static Routes, if present */
+		rfc3442_data_len = fetch_raw_setting_copy (
+				NULL, &rfc3442_routes_setting, &rfc3442_data );
 
 		/* Calculate netaddr */
 		netaddr.s_addr = ( address.s_addr & netmask.s_addr );
@@ -948,21 +928,62 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		 * netdev: netaddr/netmask via 0.0.0.0 (directly connected) src address
 		 */
 		if ( ( rc = apply ( netdev, address, netaddr, netmask, zeroes_addr ) ) != 0 )
-			return rc;
+			goto done;
 
 		/* Secondly, create route for default gateway address, *if and
-		 * only if* the interface *has* a default gateway address.
+		 * only if* the interface *has* a default gateway address *and*
+		 * no option 121 (RFC 3442 Classless Static Routes) data was received
 		 *
 		 * netdev: 0.0.0.0/0.0.0.0 via gateway src address
 		 */
-		if ( gateway.s_addr ) {
+		if ( ( gateway.s_addr ) && ( ! rfc3442_data ) ) {
 			if ( ( rc = apply ( netdev, address, zeroes_addr, zeroes_addr, gateway ) ) != 0 )
-				return rc;
+				goto done;
 		}
 
-	}
+		/* Thirdly, create Classless Static Routes if present */
+		if ( rfc3442_data ) {
+			int remaining = rfc3442_data_len;
+			int offset = 0;
+			int mask_width;
+			int mask_octets;
+			int route_len;
+			struct in_addr csr_netaddr = { 0 };
+			struct in_addr csr_netmask = { 0 };
+			struct in_addr csr_gateway = { 0 };
 
-	return 0;
+			while ( remaining ) {
+				/* Calculate number of significant octets in mask */
+				mask_width = ((char*)rfc3442_data)[offset];
+				mask_octets = (mask_width + 7) / 8;
+				/* Calculate length of entire route in octets*/
+				route_len = 1 + mask_octets + 4;
+				remaining -= route_len;
+				if ( remaining < 0 )
+					break;
+				/* Subnet mask */
+				csr_netmask.s_addr = 0xFFFFFFFF;
+				csr_netmask.s_addr <<= (32 - mask_width);
+				/* Network address */
+				memcpy(&csr_netaddr.s_addr, ((char*)rfc3442_data +
+							     offset + 1),
+				       mask_octets);
+				csr_netaddr.s_addr &= csr_netmask.s_addr;
+				/* Router address */
+				memcpy(&csr_gateway.s_addr, ((char*)rfc3442_data +
+							     offset + 1 + mask_octets),
+				       sizeof ( csr_gateway.s_addr ));
+				/* Add route to routing table */
+				if ( ( rc = apply ( netdev, address, csr_netaddr,
+						    csr_netmask, csr_gateway ) ) != 0 )
+					goto done;
+				offset += route_len;
+			}
+		}
+	}
+ done:
+	free ( rfc3442_data );
+	return rc;
 }
 
 /**
