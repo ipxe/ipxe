@@ -942,14 +942,14 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		}
 
 		/* Thirdly, create Classless Static Routes if present */
-		if ( rfc3442_data ) {
+		if ( rfc3442_data_len > 0 ) {
 			DBGC ( netdev, "IPv4 got %d bytes of Option 121 data\n",
 			       rfc3442_data_len );
 			int remaining = rfc3442_data_len;
 			int offset = 0;
-			int mask_width;
-			int mask_octets;
-			int route_len;
+			unsigned int mask_width;
+			unsigned int mask_octets;
+			unsigned int route_len;
 			struct in_addr csr_netaddr = { 0 };
 			struct in_addr csr_netmask = { 0 };
 			struct in_addr csr_gateway = { 0 };
@@ -958,18 +958,27 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 				DBGC ( netdev, "%d bytes of Option 121 data remaining...\n",
 				       remaining );
 				/* Calculate number of significant octets in mask */
-				mask_width = ((char*)rfc3442_data)[offset];
+				mask_width = ((unsigned char*)rfc3442_data)[offset];
 				mask_octets = (mask_width + 7) / 8;
 				DBGC ( netdev, "Got mask width %d... mask octets %d... ",
 				       mask_width, mask_octets );
-				/* Calculate length of entire route in octets*/
+				/* Calculate length of entire route in octets */
 				route_len = 1 + mask_octets + 4;
-				remaining -= route_len;
 				DBGC ( netdev, "route record length %d... ",
 				       route_len );
+				/* Check bytes remaining */
+				remaining -= route_len;
 				if ( remaining < 0 ) {
 					DBGC ( netdev, "\nError: Insufficient bytes of Option 121 data remaining, expected %d. Exiting loop.\n",
 					       route_len );
+					break;
+				}
+				/* Check subnet mask length and network address
+				 * stored length are sensible
+				 */
+				if ( ( mask_width > 32 ) || ( mask_octets > 4 ) ) {
+					DBGC ( netdev, "\nError: Invalid network address length (%d octets)/subnet mask (/%d). Exiting loop.\n",
+					       mask_octets, mask_width );
 					break;
 				}
 				/* Subnet mask */
@@ -979,11 +988,14 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 				DBGC ( netdev, "netmask %s... ",
 				       inet_ntoa ( csr_netmask ) );
 				/* Network address */
-				memcpy(&csr_netaddr.s_addr, ((char*)rfc3442_data +
-							     offset + 1),
-				       mask_octets);
+				csr_netaddr.s_addr = 0;
+				if ( mask_octets > 0 )
+					memcpy(&csr_netaddr.s_addr, ((char*)rfc3442_data +
+								     offset + 1),
+					       mask_octets);
 				DBGC ( netdev, "unmasked netaddr %s... ",
 				       inet_ntoa ( csr_netaddr ) );
+				/* Zero bits in host portion of network address */
 				csr_netaddr.s_addr &= csr_netmask.s_addr;
 				DBGC ( netdev, "masked netaddr %s... ",
 				       inet_ntoa ( csr_netaddr ) );
@@ -1000,7 +1012,11 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 				offset += route_len;
 			}
 
+		}
+
+		if ( rfc3442_data ) {
 			free ( rfc3442_data );
+			rfc3442_data = NULL;
 		}
 	}
 	return 0;
