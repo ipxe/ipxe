@@ -558,7 +558,7 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 	     ( iphdr->dest.s_addr != INADDR_BROADCAST ) &&
 	     ipv4_has_any_addr ( netdev ) &&
 	     ( ! ipv4_has_addr ( netdev, iphdr->dest ) ) ) {
-		DBGC2 ( iphdr->src, "IPv4 discarding non-local unicast packet "
+		DBGC ( iphdr->src, "IPv4 discarding non-local unicast packet "
 		       "for %s\n", inet_ntoa ( iphdr->dest ) );
 		ipv4_stats.in_addr_errors++;
 		goto err_other;
