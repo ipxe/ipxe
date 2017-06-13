@@ -69,14 +69,21 @@ CFLAGS		+= -fshort-wchar
 #
 CFLAGS			+= -Ui386
 
-# Some widespread patched versions of gcc include -fPIE -Wl,-pie by
-# default.  Note that gcc will exit *successfully* if it fails to
-# recognise an option that starts with "no", so we have to test for
-# output on stderr instead of checking the exit status.
+# Some widespread patched versions of gcc include -fPIE -Wl,-pie or
+# similar by default or enable hardening via toolchain.
+# First use the preprocessor to check whether or not a workaround
+# is required, then enable supported flags. Note that gcc will exit
+# *successfully* if it fails to recognise an option that starts
+# with "no", so we have to test for output on stderr instead of
+# checking the exit status.
 #
 ifeq ($(CCTYPE),gcc)
-PIE_TEST = [ -z "`$(CC) -fno-PIE -nopie -x c -c /dev/null -o /dev/null 2>&1`" ]
-PIE_FLAGS := $(shell $(PIE_TEST) && $(ECHO) '-fno-PIE -nopie')
+PIE_TEST0 = $(CC) -dM -E - < /dev/null | grep -q '__PIE__'
+PIE_TEST1 = [ -z "`$(CC) -fno-PIE -x c -c /dev/null -o /dev/null 2>&1`" ]
+PIE_TEST2 = [ -z "`$(CC) -nopie -x c -c /dev/null -o /dev/null 2>&1`" ]
+PIE_FLAGS := $(shell $(PIE_TEST0) && $(PIE_TEST1) && $(ECHO) '-fno-PIE')
+WORKAROUND_CFLAGS += $(PIE_FLAGS)
+PIE_FLAGS := $(shell $(PIE_TEST0) && $(PIE_TEST2) && $(ECHO) '-nopie')
 WORKAROUND_CFLAGS += $(PIE_FLAGS)
 endif
 
