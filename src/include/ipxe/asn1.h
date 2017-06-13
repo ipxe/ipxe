@@ -9,7 +9,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <stddef.h>
 #include <stdint.h>
+#include <assert.h>
 #include <time.h>
 #include <ipxe/tables.h>
 
@@ -335,6 +337,28 @@ asn1_type ( const struct asn1_cursor *cursor ) {
 	const uint8_t *type = cursor->data;
 
 	return ( ( cursor->len >= sizeof ( *type ) ) ? *type : ASN1_END );
+}
+
+/**
+ * Get cursor for built object
+ *
+ * @v builder		ASN.1 object builder
+ * @ret cursor		ASN.1 object cursor
+ */
+static inline __attribute__ (( always_inline )) struct asn1_cursor *
+asn1_built ( struct asn1_builder *builder ) {
+	union {
+		struct asn1_builder builder;
+		struct asn1_cursor cursor;
+	} *u = container_of ( builder, typeof ( *u ), builder );
+
+	/* Sanity check */
+	linker_assert ( ( ( const void * ) &u->builder.data ) ==
+			&u->cursor.data, asn1_builder_cursor_data_mismatch );
+	linker_assert ( &u->builder.len == &u->cursor.len,
+			asn1_builder_cursor_len_mismatch );
+
+	return &u->cursor;
 }
 
 extern int asn1_start ( struct asn1_cursor *cursor, unsigned int type,
