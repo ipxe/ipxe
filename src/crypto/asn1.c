@@ -739,7 +739,7 @@ static size_t asn1_header ( struct asn1_builder_header *header,
  * @v extra		Extra space to prepend
  * @ret rc		Return status code
  */
-static int asn1_grow ( struct asn1_builder *builder, size_t extra ) {
+int asn1_grow ( struct asn1_builder *builder, size_t extra ) {
 	size_t new_len;
 	void *new;
 
