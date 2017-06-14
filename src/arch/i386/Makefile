@@ -74,10 +74,15 @@ CFLAGS			+= -Ui386
 # recognise an option that starts with "no", so we have to test for
 # output on stderr instead of checking the exit status.
 #
+# Current versions of gcc require -no-pie; older versions require
+# -nopie.  We therefore test for both.
+#
 ifeq ($(CCTYPE),gcc)
-PIE_TEST = [ -z "`$(CC) -fno-PIE -nopie -x c -c /dev/null -o /dev/null 2>&1`" ]
-PIE_FLAGS := $(shell $(PIE_TEST) && $(ECHO) '-fno-PIE -nopie')
-WORKAROUND_CFLAGS += $(PIE_FLAGS)
+PIE_TEST = [ -z "`$(CC) -fno-PIE -no-pie -x c -c /dev/null -o /dev/null 2>&1`" ]
+PIE_FLAGS := $(shell $(PIE_TEST) && $(ECHO) '-fno-PIE -no-pie')
+PIE_TEST2 = [ -z "`$(CC) -fno-PIE -nopie -x c -c /dev/null -o /dev/null 2>&1`" ]
+PIE_FLAGS2 := $(shell $(PIE_TEST2) && $(ECHO) '-fno-PIE -nopie')
+WORKAROUND_CFLAGS += $(PIE_FLAGS) $(PIE_FLAGS2)
 endif
 
 # i386-specific directories containing source files
