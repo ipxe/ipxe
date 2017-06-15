@@ -132,7 +132,7 @@ static int rdtsc_probe ( void ) {
 		       strerror ( rc ) );
 		return rc;
 	}
-	cpuid ( CPUID_APM, &discard_a, &discard_b, &discard_c, &apm );
+	cpuid ( CPUID_APM, 0, &discard_a, &discard_b, &discard_c, &apm );
 	if ( ! ( apm & CPUID_APM_EDX_TSC_INVARIANT ) ) {
 		DBGC ( colour, "RDTSC has non-invariant TSC (%#08x)\n",
 		       apm );

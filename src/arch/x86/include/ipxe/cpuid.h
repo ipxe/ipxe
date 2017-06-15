@@ -66,19 +66,20 @@ struct x86_features {
 /**
  * Issue CPUID instruction
  *
- * @v function		CPUID function
+ * @v function		CPUID function (input via %eax)
+ * @v subfunction	CPUID subfunction (input via %ecx)
  * @v eax		Output via %eax
  * @v ebx		Output via %ebx
  * @v ecx		Output via %ecx
  * @v edx		Output via %edx
  */
 static inline __attribute__ (( always_inline )) void
-cpuid ( uint32_t function, uint32_t *eax, uint32_t *ebx, uint32_t *ecx,
-	uint32_t *edx ) {
+cpuid ( uint32_t function, uint32_t subfunction, uint32_t *eax, uint32_t *ebx,
+	uint32_t *ecx, uint32_t *edx ) {
 
 	__asm__ ( "cpuid"
 		  : "=a" ( *eax ), "=b" ( *ebx ), "=c" ( *ecx ), "=d" ( *edx )
-		  : "0" ( function ) );
+		  : "0" ( function ), "2" ( subfunction ) );
 }
 
 extern int cpuid_supported ( uint32_t function );

@@ -170,7 +170,7 @@ static int hv_check_hv ( void ) {
 	}
 
 	/* Check that hypervisor is Hyper-V */
-	cpuid ( HV_CPUID_INTERFACE_ID, &interface_id, &discard_ebx,
+	cpuid ( HV_CPUID_INTERFACE_ID, 0, &interface_id, &discard_ebx,
 		&discard_ecx, &discard_edx );
 	if ( interface_id != HV_INTERFACE_ID ) {
 		DBGC ( HV_INTERFACE_ID, "HV not running in Hyper-V (interface "
@@ -194,7 +194,7 @@ static int hv_check_features ( struct hv_hypervisor *hv ) {
 	uint32_t discard_edx;
 
 	/* Check that required features and privileges are available */
-	cpuid ( HV_CPUID_FEATURES, &available, &permissions, &discard_ecx,
+	cpuid ( HV_CPUID_FEATURES, 0, &available, &permissions, &discard_ecx,
 		&discard_edx );
 	if ( ! ( available & HV_FEATURES_AVAIL_HYPERCALL_MSR ) ) {
 		DBGC ( hv, "HV %p has no hypercall MSRs (features %08x:%08x)\n",
@@ -253,10 +253,10 @@ static void hv_map_hypercall ( struct hv_hypervisor *hv ) {
 	wrmsr ( HV_X64_MSR_GUEST_OS_ID, guest_os_id );
 
 	/* Get hypervisor system identity (for debugging) */
-	cpuid ( HV_CPUID_VENDOR_ID, &discard_eax, &vendor_id.ebx,
+	cpuid ( HV_CPUID_VENDOR_ID, 0, &discard_eax, &vendor_id.ebx,
 		&vendor_id.ecx, &vendor_id.edx );
 	vendor_id.text[ sizeof ( vendor_id.text ) - 1 ] = '\0';
-	cpuid ( HV_CPUID_HYPERVISOR_ID, &build, &version, &discard_ecx,
+	cpuid ( HV_CPUID_HYPERVISOR_ID, 0, &build, &version, &discard_ecx,
 		&discard_edx );
 	DBGC ( hv, "HV %p detected \"%s\" version %d.%d build %d\n", hv,
 	       vendor_id.text, ( version >> 16 ), ( version & 0xffff ), build );
@@ -735,7 +735,7 @@ static int hv_timer_probe ( void ) {
 		return rc;
 
 	/* Check for available reference counter */
-	cpuid ( HV_CPUID_FEATURES, &available, &discard_ebx, &discard_ecx,
+	cpuid ( HV_CPUID_FEATURES, 0, &available, &discard_ebx, &discard_ecx,
 		&discard_edx );
 	if ( ! ( available & HV_FEATURES_AVAIL_TIME_REF_COUNT_MSR ) ) {
 		DBGC ( HV_INTERFACE_ID, "HV has no time reference counter\n" );

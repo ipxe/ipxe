@@ -37,10 +37,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * CPUID settings are numerically encoded as:
  *
  *  Bit  31	Extended function
- *  Bits 30-28	Unused
- *  Bits 27-24	Number of consecutive functions to call, minus one
+ *  Bits 30-24	(bit 22 = 1) Subfunction number
+ *		(bit 22 = 0) Number of consecutive functions to call, minus one
  *  Bit  23	Return result as little-endian (used for strings)
- *  Bits 22-18	Unused
+ *  Bit  22	Interpret bits 30-24 as a subfunction number
+ *  Bits 21-18	Unused
  *  Bits 17-16	Number of registers in register array, minus one
  *  Bits 15-8	Array of register indices.  First entry in array is in
  *		bits 9-8.  Indices are 0-%eax, 1-%ebx, 2-%ecx, 3-%edx.
@@ -50,6 +51,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * extracting a single register from a single function to be encoded
  * using "cpuid/<register>.<function>", e.g. "cpuid/2.0x80000001" to
  * retrieve the value of %ecx from calling CPUID with %eax=0x80000001.
+ *
+ * A subfunction (i.e. an input value for %ecx) may be specified using
+ * "cpuid/<subfunction>.0x40.<register>.<function>".  This slightly
+ * cumbersome syntax is required in order to maintain backwards
+ * compatibility with older scripts.
  */
 
 /** CPUID setting tag register indices */
@@ -60,12 +66,18 @@ enum cpuid_registers {
 	CPUID_EDX = 3,
 };
 
+/** CPUID setting tag flags */
+enum cpuid_flags {
+	CPUID_LITTLE_ENDIAN = 0x00800000UL,
+	CPUID_USE_SUBFUNCTION = 0x00400000UL,
+};
+
 /**
  * Construct CPUID setting tag
  *
  * @v function		Starting function number
- * @v num_functions	Number of consecutive functions
- * @v little_endian	Return result as little-endian
+ * @v subfunction	Subfunction, or number of consecutive functions minus 1
+ * @v flags		Flags
  * @v num_registers	Number of registers in register array
  * @v register1		First register in register array (or zero, if empty)
  * @v register2		Second register in register array (or zero, if empty)
@@ -73,20 +85,12 @@ enum cpuid_registers {
  * @v register4		Fourth register in register array (or zero, if empty)
  * @ret tag		Setting tag
  */
-#define CPUID_TAG( function, num_functions, little_endian, num_registers, \
-		   register1, register2, register3, register4 )		  \
-	( (function) | ( ( (num_functions) - 1 ) << 24 ) |		  \
-	  ( (little_endian) << 23 ) | ( ( (num_registers) - 1) << 16 ) |  \
-	  ( (register1) << 8 ) | ( (register2) << 10 ) |		  \
+#define CPUID_TAG( function, subfunction, flags, num_registers,		\
+		   register1, register2, register3, register4 )		\
+	( (function) | ( (subfunction) << 24 ) | (flags) |		\
+	  ( ( (num_registers) - 1 ) << 16 ) |				\
+	  ( (register1) << 8 ) | ( (register2) << 10 ) |		\
 	  ( (register3) << 12 ) | ( (register4) << 14 ) )
-
-/**
- * Extract endianness from CPUID setting tag
- *
- * @v tag		Setting tag
- * @ret little_endian	Result should be returned as little-endian
- */
-#define CPUID_LITTLE_ENDIAN( tag ) ( (tag) & 0x00800000UL )
 
 /**
  * Extract starting function number from CPUID setting tag
@@ -97,12 +101,12 @@ enum cpuid_registers {
 #define CPUID_FUNCTION( tag ) ( (tag) & 0x800000ffUL )
 
 /**
- * Extract number of consecutive functions from CPUID setting tag
+ * Extract subfunction number from CPUID setting tag
  *
  * @v tag		Setting tag
- * @ret num_functions	Number of consecutive functions
+ * @ret subfunction	Subfunction number
  */
-#define CPUID_NUM_FUNCTIONS( tag ) ( ( ( (tag) >> 24 ) & 0xf ) + 1 )
+#define CPUID_SUBFUNCTION( tag ) ( ( (tag) >> 24 ) & 0x7f )
 
 /**
  * Extract register array from CPUID setting tag
@@ -149,6 +153,7 @@ static int cpuid_settings_fetch ( struct settings *settings,
 				  struct setting *setting,
 				  void *data, size_t len ) {
 	uint32_t function;
+	uint32_t subfunction;
 	uint32_t num_functions;
 	uint32_t registers;
 	uint32_t num_registers;
@@ -160,7 +165,13 @@ static int cpuid_settings_fetch ( struct settings *settings,
 
 	/* Call each function in turn */
 	function = CPUID_FUNCTION ( setting->tag );
-	num_functions = CPUID_NUM_FUNCTIONS ( setting->tag );
+	subfunction = CPUID_SUBFUNCTION ( setting->tag );
+	if ( setting->tag & CPUID_USE_SUBFUNCTION ) {
+		num_functions = 1;
+	} else {
+		num_functions = ( subfunction + 1 );
+		subfunction = 0;
+	}
 	for ( ; num_functions-- ; function++ ) {
 
 		/* Fail if this function is not supported */
@@ -171,17 +182,17 @@ static int cpuid_settings_fetch ( struct settings *settings,
 		}
 
 		/* Issue CPUID */
-		cpuid ( function, &buf[CPUID_EAX], &buf[CPUID_EBX],
-			&buf[CPUID_ECX], &buf[CPUID_EDX] );
-		DBGC ( settings, "CPUID %#08x => %#08x:%#08x:%#08x:%#08x\n",
-		       function, buf[0], buf[1], buf[2], buf[3] );
+		cpuid ( function, subfunction, &buf[CPUID_EAX],
+			&buf[CPUID_EBX], &buf[CPUID_ECX], &buf[CPUID_EDX] );
+		DBGC ( settings, "CPUID %#08x:%x => %#08x:%#08x:%#08x:%#08x\n",
+		       function, subfunction, buf[0], buf[1], buf[2], buf[3] );
 
 		/* Copy results to buffer */
 		registers = CPUID_REGISTERS ( setting->tag );
 		num_registers = CPUID_NUM_REGISTERS ( setting->tag );
 		for ( ; num_registers-- ; registers >>= 2 ) {
 			output = buf[ registers & 0x3 ];
-			if ( ! CPUID_LITTLE_ENDIAN ( setting->tag ) )
+			if ( ! ( setting->tag & CPUID_LITTLE_ENDIAN ) )
 				output = cpu_to_be32 ( output );
 			frag_len = sizeof ( output );
 			if ( frag_len > len )
@@ -237,7 +248,7 @@ const struct setting cpuvendor_setting __setting ( SETTING_HOST_EXTRA,
 						   cpuvendor ) = {
 	.name = "cpuvendor",
 	.description = "CPU vendor",
-	.tag = CPUID_TAG ( CPUID_VENDOR_ID, 1, 1, 3,
+	.tag = CPUID_TAG ( CPUID_VENDOR_ID, 0, CPUID_LITTLE_ENDIAN, 3,
 			   CPUID_EBX, CPUID_EDX, CPUID_ECX, 0 ),
 	.type = &setting_type_string,
 	.scope = &cpuid_settings_scope,
@@ -248,7 +259,7 @@ const struct setting cpumodel_setting __setting ( SETTING_HOST_EXTRA,
 						  cpumodel ) = {
 	.name = "cpumodel",
 	.description = "CPU model",
-	.tag = CPUID_TAG ( CPUID_MODEL, 3, 1, 4,
+	.tag = CPUID_TAG ( CPUID_MODEL, 2, CPUID_LITTLE_ENDIAN, 4,
 			   CPUID_EAX, CPUID_EBX, CPUID_ECX, CPUID_EDX ),
 	.type = &setting_type_string,
 	.scope = &cpuid_settings_scope,

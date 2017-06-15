@@ -84,7 +84,7 @@ int cpuid_supported ( uint32_t function ) {
 		return rc;
 
 	/* Find highest supported function number within this family */
-	cpuid ( ( function & CPUID_EXTENDED ), &max_function, &discard_b,
+	cpuid ( ( function & CPUID_EXTENDED ), 0, &max_function, &discard_b,
 		&discard_c, &discard_d );
 
 	/* Fail if maximum function number is meaningless (e.g. if we
@@ -125,7 +125,7 @@ static void x86_intel_features ( struct x86_features *features ) {
 	}
 
 	/* Get features */
-	cpuid ( CPUID_FEATURES, &discard_a, &discard_b,
+	cpuid ( CPUID_FEATURES, 0, &discard_a, &discard_b,
 		&features->intel.ecx, &features->intel.edx );
 	DBGC ( features, "CPUID Intel features: %%ecx=%08x, %%edx=%08x\n",
 	       features->intel.ecx, features->intel.edx );
@@ -149,7 +149,7 @@ static void x86_amd_features ( struct x86_features *features ) {
 	}
 
 	/* Get features */
-	cpuid ( CPUID_AMD_FEATURES, &discard_a, &discard_b,
+	cpuid ( CPUID_AMD_FEATURES, 0, &discard_a, &discard_b,
 		&features->amd.ecx, &features->amd.edx );
 	DBGC ( features, "CPUID AMD features: %%ecx=%08x, %%edx=%08x\n",
 	       features->amd.ecx, features->amd.edx );
