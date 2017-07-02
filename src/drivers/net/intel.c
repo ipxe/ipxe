@@ -1132,6 +1132,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x15a3, "i218v-3", "I218-V", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x15b7, "i219lm-2", "I219-LM (2)", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x15b8, "i219v-2", "I219-V (2)", 0 ),
+	PCI_ROM ( 0x8086, 0x15d8, "i219v-4", "I219-V (4)", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x294c, "82566dc-2", "82566DC-2", 0 ),
 	PCI_ROM ( 0x8086, 0x2e6e, "cemedia", "CE Media Processor", 0 ),
 };
