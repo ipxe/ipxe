@@ -133,7 +133,7 @@ static int aq_ring_alloc(const struct aq_nic* nic, struct aq_ring* ring, uint32_
     memset(ring->ring, 0, ring->length);
 
     // Write ring address (hi & low parts).
-    phy_addr = virt_to_bus(nic->tx_ring.ring);
+    phy_addr = virt_to_bus(ring->ring);
     writel((uint32_t)phy_addr, nic->regs + reg_base + 0);
     writel((uint32_t)(((uint64_t)phy_addr) >> 32), nic->regs + reg_base + 4);
     // Write ring length.
@@ -164,19 +164,24 @@ static void aq_ring_free(struct aq_ring* ring)
     ring->length = 0;
 }
 
-int aq_ring_full(const struct aq_ring* ring)
-{
-    if (ring->sw_tail >= ring->sw_head)
-        return ring->sw_tail - ring->sw_head + 1 == AQ_RING_SIZE;
-    else
-        return AQ_RING_SIZE - (ring->sw_head - ring->sw_tail + 1) == AQ_RING_SIZE;
-}
-static void aq_ring_next_dx(uint32_t* val)
+static void aq_ring_next_dx(unsigned int* val)
 {
     ++(*val);
     if (*val == AQ_RING_SIZE)
         *val = 0;
 }
+
+int aq_ring_full(const struct aq_ring* ring)
+{
+    unsigned int tail = ring->sw_tail;
+    aq_ring_next_dx(&tail);
+    return tail == ring->sw_head;
+    /*if (ring->sw_tail >= ring->sw_head)
+        return ring->sw_tail - ring->sw_head + 1 == AQ_RING_SIZE;
+    else
+        return AQ_RING_SIZE - (ring->sw_head - ring->sw_tail + 1) == AQ_RING_SIZE;*/
+}
+
 
 void aq_rx_ring_fill(struct aq_nic* nic)
 {
@@ -196,11 +201,12 @@ void aq_rx_ring_fill(struct aq_nic* nic)
         }
 
         /* Get next receive descriptor */
-        rx = &((struct aq_desc_rx*)nic->rx_ring.ring)[nic->rx_ring.sw_tail];
+        rx = (struct aq_desc_rx*)nic->rx_ring.ring + nic->rx_ring.sw_tail;
 
         /* Populate receive descriptor */
         address = virt_to_bus(iobuf->data);
-        rx->address = address;
+        rx->data_addr = address;
+        rx->hdr_addr = 0; //unused
         
         /* Record I/O buffer */
         assert(nic->iobufs[nic->rx_ring.sw_tail] == NULL);
@@ -238,10 +244,10 @@ static int aq_open (struct net_device *netdev)
     if (aq_ring_alloc(nic, &nic->rx_ring, sizeof(struct aq_desc_rx), 0x5b00) != 0)
         goto err_alloc;
 
-    aq_rx_ring_fill(nic);
+    
 
     /*RX data path*/
-    writel(AQ_IRQ_TX | AQ_IRQ_RX | AQ_IRQ_LINK, nic->regs + 0x2060);//enable tpo2
+    writel(AQ_IRQ_TX | AQ_IRQ_RX | AQ_IRQ_LINK, nic->regs + 0x2060);//itr mask
     writel((uint32_t)AQ_RX_MAX_LEN/1024U, nic->regs + 0x5b18);
     writel(0x11009, nic->regs + 0x5100);//filter global ctrl
     writel(0x2, nic->regs + 0x5280);//vlan promisc
@@ -255,13 +261,15 @@ static int aq_open (struct net_device *netdev)
     writel(0x10000, nic->regs + 0x7040);//enable tpo2
     writel(0xA0, nic->regs + 0x7910);//tpb global ctrl
     writel(0xE000600, nic->regs + 0x7914);//tpb global ctrl
-    writel(0x85, nic->regs + 0x7900);//tpb global ctrl
+    writel(0x105, nic->regs + 0x7900);//tpb global ctrl
 
     // Enable rings.
     writel(readl(nic->regs + 0x7c08) | 0x80000000, nic->regs + 0x7c08);
     writel(readl(nic->regs + 0x5b08) | 0x80000000, nic->regs + 0x5b08);
 
     writel(0xFFFF0002, nic->regs + 0x368);
+
+    aq_rx_ring_fill(nic);
 
     printf("AQUANTIA: code 0()\n");
     return 0;
@@ -319,18 +327,19 @@ int aq_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
     tx->address = address;
     len = iob_len(iobuf);
 
+    tx->flags = 0;
     tx->pay_len = tx->buf_len = len;
     tx->dx_type = 0x1;
     tx->eop = 0x1;
     tx->cmd = 0x22;
     wmb();
 
-    aq_ring_next_dx(&nic->tx_ring.sw_tail);
-    writel(nic->tx_ring.sw_tail, nic->regs + 0x7c10);
-
     printf("AQUANTIA %p TX[%d] is [%llx,%llx)\n", nic, nic->tx_ring.sw_tail,
         ((unsigned long long) address),
         ((unsigned long long) address + len));
+
+    aq_ring_next_dx(&nic->tx_ring.sw_tail);
+    writel(nic->tx_ring.sw_tail, nic->regs + 0x7c10);
 
     return 0;
 }
@@ -401,6 +410,7 @@ void aq_poll_rx ( struct net_device *netdev ) {
         rx = (struct aq_desc_rx_wb*)nic->rx_ring.ring + nic->rx_ring.sw_head;
 
         /* Stop if descriptor is still in use */
+        /*printf("AQUANTIA: rx poll: desc: %llx, %llx\n",*((uint64_t*)rx), *(((uint64_t*)rx) + 1));*/
         if (!rx->dd)
             return;
 
@@ -461,7 +471,7 @@ static void aq_irq ( struct net_device *netdev, int enable ) {
     struct aq_nic *nic = netdev->priv;
     uint32_t mask;
 
-    printf("AQUANTIA: aq_irq(): %d\n", enable);
+    //printf("AQUANTIA: aq_irq(): %d\n", enable);
 
     mask = (AQ_IRQ_TX | AQ_IRQ_RX | AQ_IRQ_LINK);
     if (enable) {

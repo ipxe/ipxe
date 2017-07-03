@@ -16,7 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define AQUANITA_BAR_SIZE 0xA000
 #define AQ_RING_SIZE    16
 #define AQ_RING_ALIGN   128
-#define AQ_RX_MAX_LEN   2044
+#define AQ_RX_MAX_LEN   2048
 
 #define AQ_IRQ_TX   0x1
 #define AQ_IRQ_RX   0x2
@@ -24,28 +24,34 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 struct aq_desc_tx {
     uint64_t address;
     
-    uint32_t dx_type : 3;
-    uint32_t rsvd2 : 1;
-    uint32_t buf_len : 16;
-    uint32_t dd : 1;
-    uint32_t eop : 1;
-    uint32_t cmd: 8;
-    uint32_t rsvd3 : 2;
-    uint32_t rsvd1 : 12;
-    uint32_t pay_len : 18;
+    union {
+        struct {
+            uint32_t dx_type : 3;
+            uint32_t rsvd1 : 1;
+            uint32_t buf_len : 16;
+            uint32_t dd : 1;
+            uint32_t eop : 1;
+            uint32_t cmd : 8;
+            uint32_t rsvd2 : 2;
+            uint32_t rsvd3 : 14;
+            uint32_t pay_len : 18;
+        };
+        uint64_t flags;
+    };
+    
 } __attribute__((packed));
 
 struct aq_desc_tx_wb {
-    uint64_t rsvd4;
-    uint32_t rsvd5 : 20;
+    uint64_t rsvd1;
+    uint32_t rsvd2 : 20;
     uint32_t dd : 1;
-    uint32_t rsvd6 : 11;
-    uint32_t rsvd7;
+    uint32_t rsvd3 : 11;
+    uint32_t rsvd4;
 } __attribute__((packed));
 
 struct aq_desc_rx {
-    uint64_t address;
-    uint64_t rsvd1;
+    uint64_t data_addr;
+    uint64_t hdr_addr;
 
 } __attribute__((packed));
 struct aq_desc_rx_wb {
