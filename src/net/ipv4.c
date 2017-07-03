@@ -881,7 +881,7 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 	struct in_addr netmask = { 0 };
 	struct in_addr gateway = { 0 };
 	struct in_addr zeroes_addr = { 0 }; // 0.0.0.0
-	static void *rfc3442_data = NULL;
+	void *rfc3442_data = NULL;
 	int rfc3442_data_len;
 	int rc;
 
