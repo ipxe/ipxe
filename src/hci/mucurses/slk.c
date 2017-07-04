@@ -269,8 +269,7 @@ int slk_init ( int fmt ) {
 		slks->spaces[0] = 3; slks->spaces[1] = 7;
 		break;
 	default:
-		nblocks = 0; nmaj = 0; nmin = 0;
-		break;
+		return ERR;
 	}
 
 	// determine maximum label length and major space size
