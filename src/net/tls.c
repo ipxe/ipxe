@@ -162,6 +162,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_EPERM_CLIENT_CERT						\
 	__einfo_uniqify ( EINFO_EPERM, 0x03,				\
 			  "No suitable client certificate available" )
+#define EPERM_RENEG_INSECURE __einfo_error ( EINFO_EPERM_RENEG_INSECURE )
+#define EINFO_EPERM_RENEG_INSECURE					\
+	__einfo_uniqify ( EINFO_EPERM, 0x04,				\
+			  "Secure renegotiation not supported" )
+#define EPERM_RENEG_VERIFY __einfo_error ( EINFO_EPERM_RENEG_VERIFY )
+#define EINFO_EPERM_RENEG_VERIFY					\
+	__einfo_uniqify ( EINFO_EPERM, 0x05,				\
+			  "Secure renegotiation verification failed" )
 #define EPROTO_VERSION __einfo_error ( EINFO_EPROTO_VERSION )
 #define EINFO_EPROTO_VERSION						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x01,				\
@@ -888,6 +896,30 @@ static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
  */
 
 /**
+ * Restart negotiation
+ *
+ * @v tls		TLS session
+ */
+static void tls_restart ( struct tls_session *tls ) {
+
+	/* Sanity check */
+	assert ( ! tls->tx_pending );
+	assert ( ! is_pending ( &tls->client_negotiation ) );
+	assert ( ! is_pending ( &tls->server_negotiation ) );
+
+	/* (Re)initialise handshake context */
+	digest_init ( &md5_sha1_algorithm, tls->handshake_md5_sha1_ctx );
+	digest_init ( &sha256_algorithm, tls->handshake_sha256_ctx );
+	tls->handshake_digest = &sha256_algorithm;
+	tls->handshake_ctx = tls->handshake_sha256_ctx;
+
+	/* (Re)start negotiation */
+	tls->tx_pending = TLS_TX_CLIENT_HELLO;
+	pending_get ( &tls->client_negotiation );
+	pending_get ( &tls->server_negotiation );
+}
+
+/**
  * Resume TX state machine
  *
  * @v tls		TLS session
@@ -954,6 +986,13 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 				struct tls_signature_hash_id
 					code[TLS_NUM_SIG_HASH_ALGORITHMS];
 			} __attribute__ (( packed )) signature_algorithms;
+			uint16_t renegotiation_info_type;
+			uint16_t renegotiation_info_len;
+			struct {
+				uint8_t len;
+				uint8_t data[ tls->secure_renegotiation ?
+					      sizeof ( tls->verify.client ) :0];
+			} __attribute__ (( packed )) renegotiation_info;
 		} __attribute__ (( packed )) extensions;
 	} __attribute__ (( packed )) hello;
 	struct tls_cipher_suite *suite;
@@ -995,6 +1034,14 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 		= htons ( sizeof ( hello.extensions.signature_algorithms.code));
 	i = 0 ; for_each_table_entry ( sighash, TLS_SIG_HASH_ALGORITHMS )
 		hello.extensions.signature_algorithms.code[i++] = sighash->code;
+	hello.extensions.renegotiation_info_type
+		= htons ( TLS_RENEGOTIATION_INFO );
+	hello.extensions.renegotiation_info_len
+		= htons ( sizeof ( hello.extensions.renegotiation_info ) );
+	hello.extensions.renegotiation_info.len
+		= sizeof ( hello.extensions.renegotiation_info.data );
+	memcpy ( hello.extensions.renegotiation_info.data, tls->verify.client,
+		 sizeof ( hello.extensions.renegotiation_info.data ) );
 
 	return tls_send_handshake ( tls, &hello, sizeof ( hello ) );
 }
@@ -1201,20 +1248,24 @@ static int tls_send_finished ( struct tls_session *tls ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
 	struct {
 		uint32_t type_length;
-		uint8_t verify_data[12];
+		uint8_t verify_data[ sizeof ( tls->verify.client ) ];
 	} __attribute__ (( packed )) finished;
 	uint8_t digest_out[ digest->digestsize ];
 	int rc;
+
+	/* Construct client verification data */
+	tls_verify_handshake ( tls, digest_out );
+	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
+			tls->verify.client, sizeof ( tls->verify.client ),
+			"client finished", digest_out, sizeof ( digest_out ) );
 
 	/* Construct record */
 	memset ( &finished, 0, sizeof ( finished ) );
 	finished.type_length = ( cpu_to_le32 ( TLS_FINISHED ) |
 				 htonl ( sizeof ( finished ) -
 					 sizeof ( finished.type_length ) ) );
-	tls_verify_handshake ( tls, digest_out );
-	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
-			finished.verify_data, sizeof ( finished.verify_data ),
-			"client finished", digest_out, sizeof ( digest_out ) );
+	memcpy ( finished.verify_data, tls->verify.client,
+		 sizeof ( finished.verify_data ) );
 
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, &finished,
@@ -1296,6 +1347,37 @@ static int tls_new_alert ( struct tls_session *tls, const void *data,
 }
 
 /**
+ * Receive new Hello Request handshake record
+ *
+ * @v tls		TLS session
+ * @v data		Plaintext handshake record
+ * @v len		Length of plaintext handshake record
+ * @ret rc		Return status code
+ */
+static int tls_new_hello_request ( struct tls_session *tls,
+				   const void *data __unused,
+				   size_t len __unused ) {
+
+	/* Ignore if a handshake is in progress */
+	if ( ! tls_ready ( tls ) ) {
+		DBGC ( tls, "TLS %p ignoring Hello Request\n", tls );
+		return 0;
+	}
+
+	/* Fail unless server supports secure renegotiation */
+	if ( ! tls->secure_renegotiation ) {
+		DBGC ( tls, "TLS %p refusing to renegotiate insecurely\n",
+		       tls );
+		return -EPERM_RENEG_INSECURE;
+	}
+
+	/* Restart negotiation */
+	tls_restart ( tls );
+
+	return 0;
+}
+
+/**
  * Receive new Server Hello handshake record
  *
  * @v tls		TLS session
@@ -1317,7 +1399,23 @@ static int tls_new_server_hello ( struct tls_session *tls,
 		uint8_t compression_method;
 		char next[0];
 	} __attribute__ (( packed )) *hello_b;
+	const struct {
+		uint16_t len;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *exts;
+	const struct {
+		uint16_t type;
+		uint16_t len;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *ext;
+	const struct {
+		uint8_t len;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *reneg = NULL;
 	uint16_t version;
+	size_t exts_len;
+	size_t ext_len;
+	size_t remaining;
 	int rc;
 
 	/* Parse header */
@@ -1331,6 +1429,56 @@ static int tls_new_server_hello ( struct tls_session *tls,
 	}
 	session_id = hello_a->session_id;
 	hello_b = ( ( void * ) ( session_id + hello_a->session_id_len ) );
+
+	/* Parse extensions, if present */
+	remaining = ( len - sizeof ( *hello_a ) - hello_a->session_id_len -
+		      sizeof ( *hello_b ) );
+	if ( remaining ) {
+
+		/* Parse extensions length */
+		exts = ( ( void * ) hello_b->next );
+		if ( ( sizeof ( *exts ) > remaining ) ||
+		     ( ( exts_len = ntohs ( exts->len ) ) >
+		       ( remaining - sizeof ( *exts ) ) ) ) {
+			DBGC ( tls, "TLS %p received underlength extensions\n",
+			       tls );
+			DBGC_HD ( tls, data, len );
+			return -EINVAL_HELLO;
+		}
+
+		/* Parse extensions */
+		for ( ext = ( ( void * ) exts->data ), remaining = exts_len ;
+		      remaining ;
+		      ext = ( ( ( void * ) ext ) + sizeof ( *ext ) + ext_len ),
+			      remaining -= ( sizeof ( *ext ) + ext_len ) ) {
+
+			/* Parse extension length */
+			if ( ( sizeof ( *ext ) > remaining ) ||
+			     ( ( ext_len = ntohs ( ext->len ) ) >
+			       ( remaining - sizeof ( *ext ) ) ) ) {
+				DBGC ( tls, "TLS %p received underlength "
+				       "extension\n", tls );
+				DBGC_HD ( tls, data, len );
+				return -EINVAL_HELLO;
+			}
+
+			/* Record known extensions */
+			switch ( ext->type ) {
+			case htons ( TLS_RENEGOTIATION_INFO ) :
+				reneg = ( ( void * ) ext->data );
+				if ( ( sizeof ( *reneg ) > ext_len ) ||
+				     ( reneg->len >
+				       ( ext_len - sizeof ( *reneg ) ) ) ) {
+					DBGC ( tls, "TLS %p received "
+					       "underlength renegotiation "
+					       "info\n", tls );
+					DBGC_HD ( tls, data, len );
+					return -EINVAL_HELLO;
+				}
+				break;
+			}
+		}
+	}
 
 	/* Check and store protocol version */
 	version = ntohs ( hello_a->version );
@@ -1369,6 +1517,30 @@ static int tls_new_server_hello ( struct tls_session *tls,
 	tls_generate_master_secret ( tls );
 	if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
 		return rc;
+
+	/* Handle secure renegotiation */
+	if ( tls->secure_renegotiation ) {
+
+		/* Secure renegotiation is expected; verify data */
+		if ( ( reneg == NULL ) ||
+		     ( reneg->len != sizeof ( tls->verify ) ) ||
+		     ( memcmp ( reneg->data, &tls->verify,
+				sizeof ( tls->verify ) ) != 0 ) ) {
+			DBGC ( tls, "TLS %p server failed secure "
+			       "renegotiation\n", tls );
+			return -EPERM_RENEG_VERIFY;
+		}
+
+	} else if ( reneg != NULL ) {
+
+		/* Secure renegotiation is being enabled */
+		if ( reneg->len != 0 ) {
+			DBGC ( tls, "TLS %p server provided non-empty initial "
+			       "renegotiation\n", tls );
+			return -EPERM_RENEG_VERIFY;
+		}
+		tls->secure_renegotiation = 1;
+	}
 
 	return 0;
 }
@@ -1569,11 +1741,10 @@ static int tls_new_finished ( struct tls_session *tls,
 			      const void *data, size_t len ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
 	const struct {
-		uint8_t verify_data[12];
+		uint8_t verify_data[ sizeof ( tls->verify.server ) ];
 		char next[0];
 	} __attribute__ (( packed )) *finished = data;
 	uint8_t digest_out[ digest->digestsize ];
-	uint8_t verify_data[ sizeof ( finished->verify_data ) ];
 
 	/* Sanity check */
 	if ( sizeof ( *finished ) != len ) {
@@ -1585,10 +1756,10 @@ static int tls_new_finished ( struct tls_session *tls,
 	/* Verify data */
 	tls_verify_handshake ( tls, digest_out );
 	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
-			verify_data, sizeof ( verify_data ), "server finished",
-			digest_out, sizeof ( digest_out ) );
-	if ( memcmp ( verify_data, finished->verify_data,
-		      sizeof ( verify_data ) ) != 0 ) {
+			tls->verify.server, sizeof ( tls->verify.server ),
+			"server finished", digest_out, sizeof ( digest_out ) );
+	if ( memcmp ( tls->verify.server, finished->verify_data,
+		      sizeof ( tls->verify.server ) ) != 0 ) {
 		DBGC ( tls, "TLS %p verification failed\n", tls );
 		return -EPERM_VERIFY;
 	}
@@ -1644,6 +1815,10 @@ static int tls_new_handshake ( struct tls_session *tls,
 
 		/* Handle payload */
 		switch ( handshake->type ) {
+		case TLS_HELLO_REQUEST:
+			rc = tls_new_hello_request ( tls, payload,
+						     payload_len );
+			break;
 		case TLS_SERVER_HELLO:
 			rc = tls_new_server_hello ( tls, payload, payload_len );
 			break;
@@ -2622,18 +2797,12 @@ int add_tls ( struct interface *xfer, const char *name,
 		      ( sizeof ( tls->pre_master_secret.random ) ) ) ) != 0 ) {
 		goto err_random;
 	}
-	digest_init ( &md5_sha1_algorithm, tls->handshake_md5_sha1_ctx );
-	digest_init ( &sha256_algorithm, tls->handshake_sha256_ctx );
-	tls->handshake_digest = &sha256_algorithm;
-	tls->handshake_ctx = tls->handshake_sha256_ctx;
-	tls->tx_pending = TLS_TX_CLIENT_HELLO;
 	iob_populate ( &tls->rx_header_iobuf, &tls->rx_header, 0,
 		       sizeof ( tls->rx_header ) );
 	INIT_LIST_HEAD ( &tls->rx_data );
 
-	/* Add pending operations for server and client Finished messages */
-	pending_get ( &tls->client_negotiation );
-	pending_get ( &tls->server_negotiation );
+	/* Start negotiation */
+	tls_restart ( tls );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &tls->plainstream, xfer );

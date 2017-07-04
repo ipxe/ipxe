@@ -108,6 +108,17 @@ struct tls_header {
 /* TLS signature algorithms extension */
 #define TLS_SIGNATURE_ALGORITHMS 13
 
+/* TLS renegotiation information extension */
+#define TLS_RENEGOTIATION_INFO 0xff01
+
+/** TLS verification data */
+struct tls_verify_data {
+	/** Client verification data */
+	uint8_t client[12];
+	/** Server verification data */
+	uint8_t server[12];
+} __attribute__ (( packed ));
+
 /** TLS RX state machine state */
 enum tls_rx_state {
 	TLS_RX_HEADER = 0,
@@ -271,6 +282,10 @@ struct tls_session {
 	uint8_t *handshake_ctx;
 	/** Client certificate (if used) */
 	struct x509_certificate *cert;
+	/** Secure renegotiation flag */
+	int secure_renegotiation;
+	/** Verification data */
+	struct tls_verify_data verify;
 
 	/** Server certificate chain */
 	struct x509_chain *chain;
