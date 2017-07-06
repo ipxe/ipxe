@@ -200,6 +200,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_sfc_hunt	     ( ERRFILE_DRIVER | 0x00c40000 )
 #define ERRFILE_efx_hunt	     ( ERRFILE_DRIVER | 0x00c50000 )
 #define ERRFILE_exanic		     ( ERRFILE_DRIVER | 0x00c60000 )
+#define ERRFILE_smscusb		     ( ERRFILE_DRIVER | 0x00c70000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
