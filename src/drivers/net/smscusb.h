@@ -50,6 +50,48 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Maximum time to wait for EEPROM (in milliseconds) */
 #define SMSCUSB_EEPROM_MAX_WAIT_MS 100
 
+/** OTP power register offset */
+#define SMSCUSB_OTP_POWER 0x000
+#define SMSCUSB_OTP_POWER_DOWN		0x00000001UL	/**< OTP power down */
+
+/** OTP address high byte register offset */
+#define SMSCUSB_OTP_ADDRH 0x004
+
+/** OTP address low byte register offset */
+#define SMSCUSB_OTP_ADDRL 0x008
+
+/** OTP data register offset */
+#define SMSCUSB_OTP_DATA 0x018
+#define SMSCUSB_OTP_DATA_GET(otp_data) \
+	( ( (otp_data) >> 0 ) & 0xff )			/**< OTP data */
+
+/** OTP command selection register offset */
+#define SMSCUSB_OTP_CMD 0x020
+#define SMSCUSB_OTP_CMD_READ		0x00000001UL	/**< Read command */
+
+/** OTP command initiation register offset */
+#define SMSCUSB_OTP_GO 0x028
+#define SMSCUSB_OTP_GO_GO		0x00000001UL	/**< Initiate command */
+
+/** OTP status register offset */
+#define SMSCUSB_OTP_STATUS 0x030
+#define SMSCUSB_OTP_STATUS_BUSY		0x00000001UL	/**< OTP busy */
+
+/** Maximum time to wait for OTP (in milliseconds) */
+#define SMSCUSB_OTP_MAX_WAIT_MS 100
+
+/** OTP layout 1 signature */
+#define SMSCUSB_OTP_1_SIG 0xf3
+
+/** OTP layout 1 MAC address offset */
+#define SMSCUSB_OTP_1_MAC 0x001
+
+/** OTP layout 2 signature */
+#define SMSCUSB_OTP_2_SIG 0xf7
+
+/** OTP layout 2 MAC address offset */
+#define SMSCUSB_OTP_2_MAC 0x101
+
 /** MII access register offset */
 #define SMSCUSB_MII_ACCESS 0x000
 #define SMSCUSB_MII_ACCESS_PHY_ADDRESS	0x00000800UL	/**< PHY address */
@@ -292,6 +334,8 @@ smscusb_mii_init ( struct smscusb_device *smscusb, unsigned int mii_base ) {
 
 extern int smscusb_eeprom_fetch_mac ( struct smscusb_device *smscusb,
 				      unsigned int e2p_base );
+extern int smscusb_otp_fetch_mac ( struct smscusb_device *smscusb,
+				   unsigned int otp_base );
 extern int smscusb_mii_check_link ( struct smscusb_device *smscusb );
 extern int smscusb_mii_open ( struct smscusb_device *smscusb );
 extern int smscusb_set_address ( struct smscusb_device *smscusb,

@@ -166,13 +166,219 @@ int smscusb_eeprom_fetch_mac ( struct smscusb_device *smscusb,
 
 	/* Check that EEPROM is physically present */
 	if ( ! is_valid_ether_addr ( netdev->hw_addr ) ) {
-		DBGC ( smscusb, "SMSCUSB %p has no EEPROM (%s)\n",
+		DBGC ( smscusb, "SMSCUSB %p has no EEPROM MAC (%s)\n",
 		       smscusb, eth_ntoa ( netdev->hw_addr ) );
 		return -ENODEV;
 	}
 
 	DBGC ( smscusb, "SMSCUSB %p using EEPROM MAC %s\n",
 	       smscusb, eth_ntoa ( netdev->hw_addr ) );
+	return 0;
+}
+
+/******************************************************************************
+ *
+ * OTP access
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Power up OTP
+ *
+ * @v smscusb		SMSC USB device
+ * @v otp_base		OTP register base
+ * @ret rc		Return status code
+ */
+static int smscusb_otp_power_up ( struct smscusb_device *smscusb,
+				  unsigned int otp_base ) {
+	uint32_t otp_power;
+	unsigned int i;
+	int rc;
+
+	/* Power up OTP */
+	if ( ( rc = smscusb_writel ( smscusb, ( otp_base + SMSCUSB_OTP_POWER ),
+				     0 ) ) != 0 )
+		return rc;
+
+	/* Wait for OTP_POWER_DOWN to become clear */
+	for ( i = 0 ; i < SMSCUSB_OTP_MAX_WAIT_MS ; i++ ) {
+
+		/* Read OTP_POWER and check OTP_POWER_DOWN */
+		if ( ( rc = smscusb_readl ( smscusb,
+					    ( otp_base + SMSCUSB_OTP_POWER ),
+					    &otp_power ) ) != 0 )
+			return rc;
+		if ( ! ( otp_power & SMSCUSB_OTP_POWER_DOWN ) )
+			return 0;
+
+		/* Delay */
+		mdelay ( 1 );
+	}
+
+	DBGC ( smscusb, "SMSCUSB %p timed out waiting for OTP power up\n",
+	       smscusb );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Wait for OTP to become idle
+ *
+ * @v smscusb		SMSC USB device
+ * @v otp_base		OTP register base
+ * @ret rc		Return status code
+ */
+static int smscusb_otp_wait ( struct smscusb_device *smscusb,
+			      unsigned int otp_base ) {
+	uint32_t otp_status;
+	unsigned int i;
+	int rc;
+
+	/* Wait for OTP_STATUS_BUSY to become clear */
+	for ( i = 0 ; i < SMSCUSB_OTP_MAX_WAIT_MS ; i++ ) {
+
+		/* Read OTP_STATUS and check OTP_STATUS_BUSY */
+		if ( ( rc = smscusb_readl ( smscusb,
+					    ( otp_base + SMSCUSB_OTP_STATUS ),
+					    &otp_status ) ) != 0 )
+			return rc;
+		if ( ! ( otp_status & SMSCUSB_OTP_STATUS_BUSY ) )
+			return 0;
+
+		/* Delay */
+		mdelay ( 1 );
+	}
+
+	DBGC ( smscusb, "SMSCUSB %p timed out waiting for OTP\n",
+	       smscusb );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Read byte from OTP
+ *
+ * @v smscusb		SMSC USB device
+ * @v otp_base		OTP register base
+ * @v address		OTP address
+ * @ret byte		Byte read, or negative error
+ */
+static int smscusb_otp_read_byte ( struct smscusb_device *smscusb,
+				   unsigned int otp_base,
+				   unsigned int address ) {
+	uint8_t addrh = ( address >> 8 );
+	uint8_t addrl = ( address >> 0 );
+	uint32_t otp_data;
+	int rc;
+
+	/* Wait for OTP to become idle */
+	if ( ( rc = smscusb_otp_wait ( smscusb, otp_base ) ) != 0 )
+		return rc;
+
+	/* Initiate read command */
+	if ( ( rc = smscusb_writel ( smscusb, ( otp_base + SMSCUSB_OTP_ADDRH ),
+				     addrh ) ) != 0 )
+		return rc;
+	if ( ( rc = smscusb_writel ( smscusb, ( otp_base + SMSCUSB_OTP_ADDRL ),
+				     addrl ) ) != 0 )
+		return rc;
+	if ( ( rc = smscusb_writel ( smscusb, ( otp_base + SMSCUSB_OTP_CMD ),
+				     SMSCUSB_OTP_CMD_READ ) ) != 0 )
+		return rc;
+	if ( ( rc = smscusb_writel ( smscusb, ( otp_base + SMSCUSB_OTP_GO ),
+				     SMSCUSB_OTP_GO_GO ) ) != 0 )
+		return rc;
+
+	/* Wait for command to complete */
+	if ( ( rc = smscusb_otp_wait ( smscusb, otp_base ) ) != 0 )
+		return rc;
+
+	/* Read OTP data */
+	if ( ( rc = smscusb_readl ( smscusb, ( otp_base + SMSCUSB_OTP_DATA ),
+				    &otp_data ) ) != 0 )
+		return rc;
+
+	return SMSCUSB_OTP_DATA_GET ( otp_data );
+}
+
+/**
+ * Read data from OTP
+ *
+ * @v smscusb		SMSC USB device
+ * @v otp_base		OTP register base
+ * @v address		OTP address
+ * @v data		Data buffer
+ * @v len		Length of data
+ * @ret rc		Return status code
+ */
+static int smscusb_otp_read ( struct smscusb_device *smscusb,
+			      unsigned int otp_base, unsigned int address,
+			      void *data, size_t len ) {
+	uint8_t *bytes;
+	int byte;
+	int rc;
+
+	/* Power up OTP */
+	if ( ( rc = smscusb_otp_power_up ( smscusb, otp_base ) ) != 0 )
+		return rc;
+
+	/* Read bytes */
+	for ( bytes = data ; len-- ; address++, bytes++ ) {
+		byte = smscusb_otp_read_byte ( smscusb, otp_base, address );
+		if ( byte < 0 )
+			return byte;
+		*bytes = byte;
+	}
+
+	return 0;
+}
+
+/**
+ * Fetch MAC address from OTP
+ *
+ * @v smscusb		SMSC USB device
+ * @v otp_base		OTP register base
+ * @ret rc		Return status code
+ */
+int smscusb_otp_fetch_mac ( struct smscusb_device *smscusb,
+			    unsigned int otp_base ) {
+	struct net_device *netdev = smscusb->netdev;
+	uint8_t signature;
+	unsigned int address;
+	int rc;
+
+	/* Read OTP signature byte */
+	if ( ( rc = smscusb_otp_read ( smscusb, otp_base, 0, &signature,
+				       sizeof ( signature ) ) ) != 0 )
+		return rc;
+
+	/* Determine location of MAC address */
+	switch ( signature ) {
+	case SMSCUSB_OTP_1_SIG:
+		address = SMSCUSB_OTP_1_MAC;
+		break;
+	case SMSCUSB_OTP_2_SIG:
+		address = SMSCUSB_OTP_2_MAC;
+		break;
+	default:
+		DBGC ( smscusb, "SMSCUSB %p unknown OTP signature %#02x\n",
+		       smscusb, signature );
+		return -ENOTSUP;
+	}
+
+	/* Read MAC address from OTP */
+	if ( ( rc = smscusb_otp_read ( smscusb, otp_base, address,
+				       netdev->hw_addr, ETH_ALEN ) ) != 0 )
+		return rc;
+
+	/* Check that OTP is valid */
+	if ( ! is_valid_ether_addr ( netdev->hw_addr ) ) {
+		DBGC ( smscusb, "SMSCUSB %p has no layout %#02x OTP MAC (%s)\n",
+		       smscusb, signature, eth_ntoa ( netdev->hw_addr ) );
+		return -ENODEV;
+	}
+
+	DBGC ( smscusb, "SMSCUSB %p using layout %#02x OTP MAC %s\n",
+	       smscusb, signature, eth_ntoa ( netdev->hw_addr ) );
 	return 0;
 }
 
