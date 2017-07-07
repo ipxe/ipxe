@@ -213,4 +213,11 @@ struct smsc75xx_statistics {
 	( sizeof ( struct smsc75xx_rx_header ) +		\
 	  ETH_FRAME_LEN + 4 /* possible VLAN header */ )
 
+extern struct usb_endpoint_driver_operations smsc75xx_in_operations;
+
+extern int smsc75xx_dump_statistics ( struct smscusb_device *smscusb );
+extern int smsc75xx_transmit ( struct net_device *netdev,
+			       struct io_buffer *iobuf );
+extern void smsc75xx_poll ( struct net_device *netdev );
+
 #endif /* _SMSC75XX_H */

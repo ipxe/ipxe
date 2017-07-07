@@ -60,7 +60,7 @@ static struct profiler smsc75xx_out_profiler __profiler =
  * @v smscusb		SMSC USB device
  * @ret rc		Return status code
  */
-static int smsc75xx_dump_statistics ( struct smscusb_device *smscusb ) {
+int smsc75xx_dump_statistics ( struct smscusb_device *smscusb ) {
 	struct smsc75xx_statistics stats;
 	int rc;
 
@@ -230,7 +230,7 @@ static void smsc75xx_in_complete ( struct usb_endpoint *ep,
 }
 
 /** Bulk IN endpoint operations */
-static struct usb_endpoint_driver_operations smsc75xx_in_operations = {
+struct usb_endpoint_driver_operations smsc75xx_in_operations = {
 	.complete = smsc75xx_in_complete,
 };
 
@@ -386,7 +386,8 @@ static void smsc75xx_close ( struct net_device *netdev ) {
 	usbnet_close ( &smscusb->usbnet );
 
 	/* Dump statistics (for debugging) */
-	smsc75xx_dump_statistics ( smscusb );
+	if ( DBG_LOG )
+		smsc75xx_dump_statistics ( smscusb );
 
 	/* Reset device */
 	smsc75xx_reset ( smscusb );
@@ -399,8 +400,7 @@ static void smsc75xx_close ( struct net_device *netdev ) {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int smsc75xx_transmit ( struct net_device *netdev,
-			       struct io_buffer *iobuf ) {
+int smsc75xx_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct smscusb_device *smscusb = netdev->priv;
 	int rc;
 
@@ -416,7 +416,7 @@ static int smsc75xx_transmit ( struct net_device *netdev,
  *
  * @v netdev		Network device
  */
-static void smsc75xx_poll ( struct net_device *netdev ) {
+void smsc75xx_poll ( struct net_device *netdev ) {
 	struct smscusb_device *smscusb = netdev->priv;
 	uint32_t int_sts;
 	int rc;
