@@ -462,7 +462,9 @@ static int smsc95xx_open ( struct net_device *netdev ) {
 		goto err_set_address;
 
 	/* Enable PHY interrupts and update link status */
-	if ( ( rc = smscusb_mii_open ( smscusb ) ) != 0 )
+	if ( ( rc = smscusb_mii_open ( smscusb, SMSC95XX_MII_PHY_INTR_MASK,
+				       ( SMSC95XX_PHY_INTR_ANEG_DONE |
+					 SMSC95XX_PHY_INTR_LINK_DOWN ) ) ) != 0)
 		goto err_mii_open;
 
 	return 0;
@@ -606,7 +608,8 @@ static int smsc95xx_probe ( struct usb_function *func,
 	smscusb = netdev->priv;
 	memset ( smscusb, 0, sizeof ( *smscusb ) );
 	smscusb_init ( smscusb, netdev, func, &smsc95xx_in_operations );
-	smscusb_mii_init ( smscusb, SMSC95XX_MII_BASE );
+	smscusb_mii_init ( smscusb, SMSC95XX_MII_BASE,
+			   SMSC95XX_MII_PHY_INTR_SOURCE );
 	usb_refill_init ( &smscusb->usbnet.in,
 			  ( sizeof ( struct smsc95xx_tx_header ) -
 			    sizeof ( struct smsc95xx_rx_header ) ),

@@ -105,18 +105,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMSCUSB_MII_DATA_GET(mii_data) \
 	( ( (mii_data) >> 0 ) & 0xffff )		/**< Get data */
 
-/** PHY interrupt source MII register */
-#define SMSCUSB_MII_PHY_INTR_SOURCE 29
-
-/** PHY interrupt mask MII register */
-#define SMSCUSB_MII_PHY_INTR_MASK 30
-
-/** PHY interrupt: auto-negotiation complete */
-#define SMSCUSB_PHY_INTR_ANEG_DONE 0x0040
-
-/** PHY interrupt: link down */
-#define SMSCUSB_PHY_INTR_LINK_DOWN 0x0010
-
 /** Maximum time to wait for MII (in milliseconds) */
 #define SMSCUSB_MII_MAX_WAIT_MS 100
 
@@ -166,6 +154,8 @@ struct smscusb_device {
 	struct mii_interface mii;
 	/** MII register base */
 	uint16_t mii_base;
+	/** PHY interrupt source register */
+	uint16_t phy_source;
 	/** Interrupt status */
 	uint32_t int_sts;
 };
@@ -279,12 +269,15 @@ smscusb_init ( struct smscusb_device *smscusb, struct net_device *netdev,
  *
  * @v smscusb		SMSC USB device
  * @v mii_base		MII register base
+ * @v phy_source	Interrupt source PHY register
  */
 static inline __attribute__ (( always_inline )) void
-smscusb_mii_init ( struct smscusb_device *smscusb, unsigned int mii_base ) {
+smscusb_mii_init ( struct smscusb_device *smscusb, unsigned int mii_base,
+		   unsigned int phy_source ) {
 
 	mii_init ( &smscusb->mii, &smscusb_mii_operations );
 	smscusb->mii_base = mii_base;
+	smscusb->phy_source = phy_source;
 }
 
 extern int smscusb_eeprom_fetch_mac ( struct smscusb_device *smscusb,
@@ -292,7 +285,8 @@ extern int smscusb_eeprom_fetch_mac ( struct smscusb_device *smscusb,
 extern int smscusb_otp_fetch_mac ( struct smscusb_device *smscusb,
 				   unsigned int otp_base );
 extern int smscusb_mii_check_link ( struct smscusb_device *smscusb );
-extern int smscusb_mii_open ( struct smscusb_device *smscusb );
+extern int smscusb_mii_open ( struct smscusb_device *smscusb,
+			      unsigned int phy_mask, unsigned int intrs );
 extern int smscusb_set_address ( struct smscusb_device *smscusb,
 				 unsigned int addr_base );
 extern int smscusb_set_filter ( struct smscusb_device *smscusb,

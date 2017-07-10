@@ -66,6 +66,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** MII register base */
 #define SMSC75XX_MII_BASE 0x120
 
+/** PHY interrupt source MII register */
+#define SMSC75XX_MII_PHY_INTR_SOURCE 29
+
+/** PHY interrupt mask MII register */
+#define SMSC75XX_MII_PHY_INTR_MASK 30
+
+/** PHY interrupt: auto-negotiation complete */
+#define SMSC75XX_PHY_INTR_ANEG_DONE 0x0040
+
+/** PHY interrupt: link down */
+#define SMSC75XX_PHY_INTR_LINK_DOWN 0x0010
+
 /** MAC address perfect filter register base */
 #define SMSC75XX_ADDR_FILT_BASE 0x300
 

@@ -350,7 +350,9 @@ static int smsc75xx_open ( struct net_device *netdev ) {
 		goto err_set_filter;
 
 	/* Enable PHY interrupts and update link status */
-	if ( ( rc = smscusb_mii_open ( smscusb ) ) != 0 )
+	if ( ( rc = smscusb_mii_open ( smscusb, SMSC75XX_MII_PHY_INTR_MASK,
+				       ( SMSC75XX_PHY_INTR_ANEG_DONE |
+					 SMSC75XX_PHY_INTR_LINK_DOWN ) ) ) != 0)
 		goto err_mii_open;
 
 	return 0;
@@ -497,7 +499,8 @@ static int smsc75xx_probe ( struct usb_function *func,
 	smscusb = netdev->priv;
 	memset ( smscusb, 0, sizeof ( *smscusb ) );
 	smscusb_init ( smscusb, netdev, func, &smsc75xx_in_operations );
-	smscusb_mii_init ( smscusb, SMSC75XX_MII_BASE );
+	smscusb_mii_init ( smscusb, SMSC75XX_MII_BASE,
+			   SMSC75XX_MII_PHY_INTR_SOURCE );
 	usb_refill_init ( &smscusb->usbnet.in, 0, SMSC75XX_IN_MTU,
 			  SMSC75XX_IN_MAX_FILL );
 	DBGC ( smscusb, "SMSC75XX %p on %s\n", smscusb, func->name );

@@ -65,6 +65,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** MII register base */
 #define SMSC95XX_MII_BASE 0x0114
 
+/** PHY interrupt source MII register */
+#define SMSC95XX_MII_PHY_INTR_SOURCE 29
+
+/** PHY interrupt mask MII register */
+#define SMSC95XX_MII_PHY_INTR_MASK 30
+
+/** PHY interrupt: auto-negotiation complete */
+#define SMSC95XX_PHY_INTR_ANEG_DONE 0x0040
+
+/** PHY interrupt: link down */
+#define SMSC95XX_PHY_INTR_LINK_DOWN 0x0010
+
 /** Receive packet header */
 struct smsc95xx_rx_header {
 	/** Command word */

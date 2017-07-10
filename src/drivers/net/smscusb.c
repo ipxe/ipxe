@@ -578,7 +578,7 @@ int smscusb_mii_check_link ( struct smscusb_device *smscusb ) {
 	int rc;
 
 	/* Read PHY interrupt source */
-	intr = mii_read ( &smscusb->mii, SMSCUSB_MII_PHY_INTR_SOURCE );
+	intr = mii_read ( &smscusb->mii, smscusb->phy_source );
 	if ( intr < 0 ) {
 		rc = intr;
 		DBGC ( smscusb, "SMSCUSB %p could not get PHY interrupt "
@@ -587,7 +587,7 @@ int smscusb_mii_check_link ( struct smscusb_device *smscusb ) {
 	}
 
 	/* Acknowledge PHY interrupt */
-	if ( ( rc = mii_write ( &smscusb->mii, SMSCUSB_MII_PHY_INTR_SOURCE,
+	if ( ( rc = mii_write ( &smscusb->mii, smscusb->phy_source,
 				intr ) ) != 0 ) {
 		DBGC ( smscusb, "SMSCUSB %p could not acknowledge PHY "
 		       "interrupt: %s\n", smscusb, strerror ( rc ) );
@@ -610,15 +610,16 @@ int smscusb_mii_check_link ( struct smscusb_device *smscusb ) {
  * Enable PHY interrupts and update link status
  *
  * @v smscusb		SMSC USB device
+ * @v phy_mask		PHY interrupt mask register
+ * @v intrs		PHY interrupts to enable
  * @ret rc		Return status code
  */
-int smscusb_mii_open ( struct smscusb_device *smscusb ) {
+int smscusb_mii_open ( struct smscusb_device *smscusb,
+		       unsigned int phy_mask, unsigned int intrs ) {
 	int rc;
 
 	/* Enable PHY interrupts */
-	if ( ( rc = mii_write ( &smscusb->mii, SMSCUSB_MII_PHY_INTR_MASK,
-				( SMSCUSB_PHY_INTR_ANEG_DONE |
-				  SMSCUSB_PHY_INTR_LINK_DOWN ) ) ) != 0 ) {
+	if ( ( rc = mii_write ( &smscusb->mii, phy_mask, intrs ) ) != 0 ) {
 		DBGC ( smscusb, "SMSCUSB %p could not set PHY interrupt "
 		       "mask: %s\n", smscusb, strerror ( rc ) );
 		return rc;
