@@ -170,30 +170,10 @@ struct smscusb_device {
 	uint32_t int_sts;
 };
 
-/**
- * Write register (without byte-swapping)
- *
- * @v smscusb		Smscusb device
- * @v address		Register address
- * @v value		Register value
- * @ret rc		Return status code
- */
-static int smscusb_raw_writel ( struct smscusb_device *smscusb,
-				unsigned int address, uint32_t value ) {
-	int rc;
-
-	/* Write register */
-	DBGCIO ( smscusb, "SMSCUSB %p [%03x] <= %08x\n",
-		 smscusb, address, le32_to_cpu ( value ) );
-	if ( ( rc = usb_control ( smscusb->usb, SMSCUSB_REGISTER_WRITE, 0,
-				  address, &value, sizeof ( value ) ) ) != 0 ) {
-		DBGC ( smscusb, "SMSCUSB %p could not write %03x: %s\n",
-		       smscusb, address, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
+extern int smscusb_raw_writel ( struct smscusb_device *smscusb,
+				unsigned int address, uint32_t value );
+extern int smscusb_raw_readl ( struct smscusb_device *smscusb,
+			       unsigned int address, uint32_t *value );
 
 /**
  * Write register
@@ -212,31 +192,6 @@ smscusb_writel ( struct smscusb_device *smscusb, unsigned int address,
 	if ( ( rc = smscusb_raw_writel ( smscusb, address,
 					 cpu_to_le32 ( value ) ) ) != 0 )
 		return rc;
-
-	return 0;
-}
-
-/**
- * Read register (without byte-swapping)
- *
- * @v smscusb		SMSC USB device
- * @v address		Register address
- * @ret value		Register value
- * @ret rc		Return status code
- */
-static int smscusb_raw_readl ( struct smscusb_device *smscusb,
-			       unsigned int address, uint32_t *value ) {
-	int rc;
-
-	/* Read register */
-	if ( ( rc = usb_control ( smscusb->usb, SMSCUSB_REGISTER_READ, 0,
-				  address, value, sizeof ( *value ) ) ) != 0 ) {
-		DBGC ( smscusb, "SMSCUSB %p could not read %03x: %s\n",
-		       smscusb, address, strerror ( rc ) );
-		return rc;
-	}
-	DBGCIO ( smscusb, "SMSCUSB %p [%03x] => %08x\n",
-		 smscusb, address, le32_to_cpu ( *value ) );
 
 	return 0;
 }

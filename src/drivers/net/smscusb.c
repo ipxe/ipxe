@@ -44,6 +44,63 @@ static struct profiler smscusb_intr_profiler __profiler =
 
 /******************************************************************************
  *
+ * Register access
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Write register (without byte-swapping)
+ *
+ * @v smscusb		Smscusb device
+ * @v address		Register address
+ * @v value		Register value
+ * @ret rc		Return status code
+ */
+int smscusb_raw_writel ( struct smscusb_device *smscusb, unsigned int address,
+			 uint32_t value ) {
+	int rc;
+
+	/* Write register */
+	DBGCIO ( smscusb, "SMSCUSB %p [%03x] <= %08x\n",
+		 smscusb, address, le32_to_cpu ( value ) );
+	if ( ( rc = usb_control ( smscusb->usb, SMSCUSB_REGISTER_WRITE, 0,
+				  address, &value, sizeof ( value ) ) ) != 0 ) {
+		DBGC ( smscusb, "SMSCUSB %p could not write %03x: %s\n",
+		       smscusb, address, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Read register (without byte-swapping)
+ *
+ * @v smscusb		SMSC USB device
+ * @v address		Register address
+ * @ret value		Register value
+ * @ret rc		Return status code
+ */
+int smscusb_raw_readl ( struct smscusb_device *smscusb, unsigned int address,
+			uint32_t *value ) {
+	int rc;
+
+	/* Read register */
+	if ( ( rc = usb_control ( smscusb->usb, SMSCUSB_REGISTER_READ, 0,
+				  address, value, sizeof ( *value ) ) ) != 0 ) {
+		DBGC ( smscusb, "SMSCUSB %p could not read %03x: %s\n",
+		       smscusb, address, strerror ( rc ) );
+		return rc;
+	}
+	DBGCIO ( smscusb, "SMSCUSB %p [%03x] => %08x\n",
+		 smscusb, address, le32_to_cpu ( *value ) );
+
+	return 0;
+}
+
+/******************************************************************************
+ *
  * EEPROM access
  *
  ******************************************************************************
