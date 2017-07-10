@@ -259,7 +259,8 @@ static int virtnet_open_modern ( struct net_device *netdev ) {
 		( 1ULL << VIRTIO_NET_F_MAC ) |
 		( 1ULL << VIRTIO_NET_F_MTU ) |
 		( 1ULL << VIRTIO_F_VERSION_1 ) |
-		( 1ULL << VIRTIO_F_ANY_LAYOUT ) ) );
+		( 1ULL << VIRTIO_F_ANY_LAYOUT ) |
+		( 1ULL << VIRTIO_F_IOMMU_PLATFORM ) ) );
 	vpm_add_status ( &virtnet->vdev, VIRTIO_CONFIG_S_FEATURES_OK );
 
 	status = vpm_get_status ( &virtnet->vdev );

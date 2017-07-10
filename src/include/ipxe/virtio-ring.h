@@ -20,6 +20,7 @@
 #define VIRTIO_F_ANY_LAYOUT             27
 /* v1.0 compliant. */
 #define VIRTIO_F_VERSION_1              32
+#define VIRTIO_F_IOMMU_PLATFORM         33
 
 #define MAX_QUEUE_NUM      (256)
 
