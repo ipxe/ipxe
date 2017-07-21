@@ -202,7 +202,7 @@ static int nii_pci_open ( struct nii_nic *nii ) {
 		EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR *acpi;
 		void *resource;
 	} desc;
-	unsigned int bar;
+	int bar;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -230,7 +230,7 @@ static int nii_pci_open ( struct nii_nic *nii ) {
 	/* Identify memory and I/O BARs */
 	nii->mem_bar = PCI_MAX_BAR;
 	nii->io_bar = PCI_MAX_BAR;
-	for ( bar = 0 ; bar < PCI_MAX_BAR ; bar++ ) {
+	for ( bar = ( PCI_MAX_BAR - 1 ) ; bar >= 0 ; bar-- ) {
 		efirc = nii->pci_io->GetBarAttributes ( nii->pci_io, bar, NULL,
 							&desc.resource );
 		if ( efirc == EFI_UNSUPPORTED ) {
