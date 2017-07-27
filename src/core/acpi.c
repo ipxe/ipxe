@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/uaccess.h>
 #include <ipxe/acpi.h>
 #include <ipxe/interface.h>
+#include <ipxe/malloc.h>
 
 /** @file
  *
@@ -55,6 +56,37 @@ void acpi_fix_checksum ( struct acpi_header *acpi ) {
 		sum += *( ( ( uint8_t * ) acpi ) + i );
 	}
 	acpi->checksum -= sum;
+}
+
+/**
+ * Check ACPI table checksum
+ *
+ * @v table		Any ACPI table
+ * @ret check		0 if checksum is good
+ */
+int acpi_table_check ( userptr_t table ) {
+	struct acpi_header acpi;
+	uint32_t i;
+	uint8_t *data;
+	uint8_t sum = 0;
+
+	/* Get header to get length and checksum values */
+	copy_from_user ( &acpi, table, 0, sizeof ( acpi ) );
+
+	/* Get whole table to compute checksum */
+	if ( ( data = malloc ( acpi.length ) ) == NULL ) {
+		DBG ( "Can't malloc\n" );
+		return 1;
+	}
+	copy_from_user ( data, table, 0, acpi.length );
+
+	/* Compute checksum */
+	for ( i = 0 ; i < acpi.length ; i++ )
+		sum += data[i];
+
+	free ( data );
+
+	return acpi.checksum == sum;
 }
 
 /**
@@ -122,6 +154,14 @@ userptr_t acpi_find ( uint32_t signature, unsigned int index ) {
 		/* Check index */
 		if ( index-- )
 			continue;
+
+		/* Check table integrity */
+		if ( acpi_table_check ( table ) ) {
+			DBGC ( rsdt, "RSDT %#08lx found a table (%s) with bad CRC at %08lx\n",
+			       user_to_phys ( rsdt, 0 ), acpi_name ( signature ),
+			       user_to_phys ( table, 0 ) );
+			return UNULL;
+		}
 
 		DBGC ( rsdt, "RSDT %#08lx found %s at %08lx\n",
 		       user_to_phys ( rsdt, 0 ), acpi_name ( signature ),
