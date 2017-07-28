@@ -48,13 +48,31 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v acpi		ACPI table header
  */
 void acpi_fix_checksum ( struct acpi_header *acpi ) {
-	unsigned int i = 0;
+	acpi->checksum -= acpi_checksum ( virt_to_user ( acpi ) );
+}
+
+/**
+ * Compute ACPI table checksum
+ *
+ * @v table		Any ACPI table
+ * @ret checksum	0 if checksum is good
+ */
+uint8_t acpi_checksum ( userptr_t table ) {
+	struct acpi_header acpi;
+	uint32_t i;
+	uint8_t data;
 	uint8_t sum = 0;
 
-	for ( i = 0 ; i < acpi->length ; i++ ) {
-		sum += *( ( ( uint8_t * ) acpi ) + i );
+	/* Get header to get length */
+	copy_from_user ( &acpi, table, 0, sizeof ( acpi ) );
+
+	/* Compute checksum */
+	for ( i = 0 ; i < acpi.length ; i++ ) {
+		copy_from_user ( &data, table, i, 1 );
+		sum += data;
 	}
-	acpi->checksum -= sum;
+
+	return sum;
 }
 
 /**
@@ -122,6 +140,14 @@ userptr_t acpi_find ( uint32_t signature, unsigned int index ) {
 		/* Check index */
 		if ( index-- )
 			continue;
+
+		/* Check table integrity */
+		if ( acpi_checksum ( table ) != 0 ) {
+			DBGC ( rsdt, "RSDT %#08lx found a table (%s) with bad checksum at %08lx\n",
+			       user_to_phys ( rsdt, 0 ), acpi_name ( signature ),
+			       user_to_phys ( table, 0 ) );
+			return UNULL;
+		}
 
 		DBGC ( rsdt, "RSDT %#08lx found %s at %08lx\n",
 		       user_to_phys ( rsdt, 0 ), acpi_name ( signature ),
