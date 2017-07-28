@@ -233,7 +233,7 @@ acpi_describe ( struct interface *interface );
 	typeof ( struct acpi_descriptor * ( object_type ) )
 
 extern void acpi_fix_checksum ( struct acpi_header *acpi );
-extern int acpi_table_check ( userptr_t table );
+extern uint8_t acpi_checksum ( userptr_t table );
 extern userptr_t acpi_find ( uint32_t signature, unsigned int index );
 extern int acpi_sx ( uint32_t signature );
 extern void acpi_add ( struct acpi_descriptor *desc );
