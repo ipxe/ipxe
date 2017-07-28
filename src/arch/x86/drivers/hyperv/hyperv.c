@@ -221,6 +221,29 @@ static int hv_check_features ( struct hv_hypervisor *hv ) {
 }
 
 /**
+ * Check that Gen 2 UEFI firmware is not running
+ *
+ * @v hv		Hyper-V hypervisor
+ * @ret rc		Return status code
+ *
+ * We must not steal ownership from the Gen 2 UEFI firmware, since
+ * doing so will cause an immediate crash.  Avoid this by checking for
+ * the guest OS identity known to be used by the Gen 2 UEFI firmware.
+ */
+static int hv_check_uefi ( struct hv_hypervisor *hv ) {
+	uint64_t guest_os_id;
+
+	/* Check for UEFI firmware's guest OS identity */
+	guest_os_id = rdmsr ( HV_X64_MSR_GUEST_OS_ID );
+	if ( guest_os_id == HV_GUEST_OS_ID_UEFI ) {
+		DBGC ( hv, "HV %p is owned by UEFI firmware\n", hv );
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+
+/**
  * Map hypercall page
  *
  * @v hv		Hyper-V hypervisor
@@ -556,6 +579,10 @@ static int hv_probe ( struct root_device *rootdev ) {
 	if ( ( rc = hv_check_features ( hv ) ) != 0 )
 		goto err_check_features;
 
+	/* Check that Gen 2 UEFI firmware is not running */
+	if ( ( rc = hv_check_uefi ( hv ) ) != 0 )
+		goto err_check_uefi;
+
 	/* Allocate pages */
 	if ( ( rc = hv_alloc_pages ( hv, &hv->hypercall, &hv->synic.message,
 				     &hv->synic.event, NULL ) ) != 0 )
@@ -587,6 +614,7 @@ static int hv_probe ( struct root_device *rootdev ) {
 	hv_free_pages ( hv, hv->hypercall, hv->synic.message, hv->synic.event,
 			NULL );
  err_alloc_pages:
+ err_check_uefi:
  err_check_features:
 	free ( hv );
  err_alloc:
