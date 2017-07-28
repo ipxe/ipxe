@@ -48,13 +48,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v acpi		ACPI table header
  */
 void acpi_fix_checksum ( struct acpi_header *acpi ) {
-	unsigned int i = 0;
-	uint8_t sum = 0;
-
-	for ( i = 0 ; i < acpi->length ; i++ ) {
-		sum += *( ( ( uint8_t * ) acpi ) + i );
-	}
-	acpi->checksum -= sum;
+	acpi->checksum -= acpi_checksum ( virt_to_user ( acpi ) );
 }
 
 /**
