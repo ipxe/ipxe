@@ -157,7 +157,7 @@ userptr_t acpi_find ( uint32_t signature, unsigned int index ) {
 
 		/* Check table integrity */
 		if ( acpi_table_check ( table ) ) {
-			DBGC ( rsdt, "RSDT %#08lx found a table (%s) with bad CRC at %08lx\n",
+			DBGC ( rsdt, "RSDT %#08lx found a table (%s) with bad checksum at %08lx\n",
 			       user_to_phys ( rsdt, 0 ), acpi_name ( signature ),
 			       user_to_phys ( table, 0 ) );
 			return UNULL;
