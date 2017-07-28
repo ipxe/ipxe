@@ -51,7 +51,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static uint8_t acpi_checksum ( userptr_t table ) {
 	struct acpi_header acpi;
 	uint8_t sum = 0;
-	uint8_t data;
+	uint8_t data = 0;
 	unsigned int i;
 
 	/* Read table length */
