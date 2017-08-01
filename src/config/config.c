@@ -248,6 +248,9 @@ REQUIRE_OBJECT ( cpuid_cmd );
 #ifdef SYNC_CMD
 REQUIRE_OBJECT ( sync_cmd );
 #endif
+#ifdef SHELL_CMD
+REQUIRE_OBJECT ( shell );
+#endif
 #ifdef NSLOOKUP_CMD
 REQUIRE_OBJECT ( nslookup_cmd );
 #endif
