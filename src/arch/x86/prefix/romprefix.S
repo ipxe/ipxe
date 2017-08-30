@@ -88,6 +88,7 @@ checksum:
 	.previous
 
 .ifeqs	BUSTYPE, "PCIR"
+	.align	4
 pciheader:
 	.ascii	"PCIR"			/* Signature */
 	.word	pci_vendor_id		/* Vendor identification */ 
@@ -183,6 +184,7 @@ prodstr_pci_id:
 
 	.globl	undiheader	
 	.weak	undiloader
+	.align	4
 undiheader:
 	.ascii	"UNDI"			/* Signature */
 	.byte	undiheader_len		/* Length of structure */
@@ -197,6 +199,7 @@ undiheader:
 	.equ undiheader_len, . - undiheader
 	.size undiheader, . - undiheader
 
+	.align	4
 ipxeheader:
 	.ascii	"iPXE"			/* Signature */
 	.byte	ipxeheader_len		/* Length of structure */

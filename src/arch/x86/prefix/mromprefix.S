@@ -492,6 +492,7 @@ mromheader:
 	.word	0
 	.size	mromheader, . - mromheader
 
+	.align	4
 mpciheader:
 	.ascii	"PCIR"			/* Signature */
 	.word	pci_vendor_id		/* Vendor identification */
