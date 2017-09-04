@@ -40,6 +40,7 @@
 #include <linux/if_tun.h>
 
 #define RX_BUF_SIZE 1536
+#define RX_QUOTA 4
 
 /** @file
  *
@@ -127,6 +128,7 @@ static void tap_poll(struct net_device *netdev)
 	struct tap_nic * nic = netdev->priv;
 	struct pollfd pfd;
 	struct io_buffer * iobuf;
+	unsigned int quota = RX_QUOTA;
 	int r;
 
 	pfd.fd = nic->fd;
@@ -144,7 +146,8 @@ static void tap_poll(struct net_device *netdev)
 	if (! iobuf)
 		goto allocfail;
 
-	while ((r = linux_read(nic->fd, iobuf->data, RX_BUF_SIZE)) > 0) {
+	while (quota-- &&
+	       ((r = linux_read(nic->fd, iobuf->data, RX_BUF_SIZE)) > 0)) {
 		DBGC2(nic, "tap %p read %d bytes\n", nic, r);
 
 		iob_put(iobuf, r);
