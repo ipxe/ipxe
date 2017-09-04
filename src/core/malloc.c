@@ -284,6 +284,7 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	size_t post_size;
 	struct memory_block *pre;
 	struct memory_block *post;
+	unsigned int discarded;
 	void *ptr;
 
 	/* Sanity checks */
@@ -371,7 +372,13 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 		}
 
 		/* Try discarding some cached data to free up memory */
-		if ( ! discard_cache() ) {
+		DBGC ( &heap, "Attempting discard for %#zx (aligned %#zx+%zx), "
+		       "used %zdkB\n", size, align, offset, ( usedmem >> 10 ) );
+		valgrind_make_blocks_noaccess();
+		discarded = discard_cache();
+		valgrind_make_blocks_defined();
+		check_blocks();
+		if ( ! discarded ) {
 			/* Nothing available to discard */
 			DBGC ( &heap, "Failed to allocate %#zx (aligned "
 			       "%#zx)\n", size, align );
