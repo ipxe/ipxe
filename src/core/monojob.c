@@ -64,7 +64,7 @@ struct interface monojob = INTF_INIT ( monojob_intf_desc );
  */
 int monojob_wait ( const char *string, unsigned long timeout ) {
 	struct job_progress progress;
-	unsigned long last_keycheck;
+	unsigned long last_check;
 	unsigned long last_progress;
 	unsigned long last_display;
 	unsigned long now;
@@ -81,26 +81,28 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 	if ( string )
 		printf ( "%s...", string );
 	monojob_rc = -EINPROGRESS;
-	last_keycheck = last_progress = last_display = currticks();
+	last_check = last_progress = last_display = currticks();
 	while ( monojob_rc == -EINPROGRESS ) {
 
 		/* Allow job to progress */
 		step();
 		now = currticks();
 
-		/* Check for keypresses.  This can be time-consuming,
-		 * so check only once per clock tick.
+		/* Continue until a timer tick occurs (to minimise
+		 * time wasted checking for progress and keypresses).
 		 */
-		elapsed = ( now - last_keycheck );
-		if ( elapsed ) {
-			if ( iskey() ) {
-				key = getchar();
-				if ( key == CTRL_C ) {
-					monojob_rc = -ECANCELED;
-					break;
-				}
+		elapsed = ( now - last_check );
+		if ( ! elapsed )
+			continue;
+		last_check = now;
+
+		/* Check for keypresses */
+		if ( iskey() ) {
+			key = getchar();
+			if ( key == CTRL_C ) {
+				monojob_rc = -ECANCELED;
+				break;
 			}
-			last_keycheck = now;
 		}
 
 		/* Monitor progress */
