@@ -812,6 +812,9 @@ static int exanic_probe ( struct pci_device *pci ) {
 	/* Read capabilities */
 	exanic->caps = readl ( exanic->regs + EXANIC_CAPS );
 
+	/* Power up PHYs */
+	writel ( EXANIC_POWER_ON, ( exanic->regs + EXANIC_POWER ) );
+
 	/* Fetch base MAC address */
 	if ( ( rc = exanic_fetch_mac ( exanic ) ) != 0 )
 		goto err_fetch_mac;
