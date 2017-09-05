@@ -78,6 +78,36 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 
 /******************************************************************************
  *
+ * Statistics reporting
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Report peer discovery statistics
+ *
+ * @v intf		Interface
+ * @v peer		Selected peer (or NULL)
+ * @v peers		List of available peers
+ */
+void peerdisc_stat ( struct interface *intf, struct peerdisc_peer *peer,
+		     struct list_head *peers ) {
+	struct interface *dest;
+	peerdisc_stat_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, peerdisc_stat, &dest );
+	void *object = intf_object ( dest );
+
+	if ( op ) {
+		op ( object, peer, peers );
+	} else {
+		/* Default is to do nothing */
+	}
+
+	intf_put ( dest );
+}
+
+/******************************************************************************
+ *
  * Discovery sockets
  *
  ******************************************************************************

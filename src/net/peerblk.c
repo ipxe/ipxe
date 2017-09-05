@@ -270,6 +270,9 @@ static int peerblk_deliver ( struct peerdist_block *peerblk,
  */
 static void peerblk_done ( struct peerdist_block *peerblk, int rc ) {
 	struct digest_algorithm *digest = peerblk->digest;
+	struct peerdisc_segment *segment = peerblk->discovery.segment;
+	struct peerdisc_peer *head;
+	struct peerdisc_peer *peer;
 	uint8_t hash[digest->digestsize];
 	unsigned long now = peerblk_timestamp();
 
@@ -295,6 +298,11 @@ static void peerblk_done ( struct peerdist_block *peerblk, int rc ) {
 	/* Profile successful attempt */
 	profile_custom ( &peerblk_attempt_success_profiler,
 			 ( now - peerblk->attempted ) );
+
+	/* Report peer statistics */
+	head = list_entry ( &segment->peers, struct peerdisc_peer, list );
+	peer = ( ( peerblk->peer == head ) ? NULL : peerblk->peer );
+	peerdisc_stat ( &peerblk->xfer, peer, &segment->peers );
 
 	/* Close download */
 	peerblk_close ( peerblk, 0 );
