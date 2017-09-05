@@ -56,6 +56,22 @@ static struct interface_descriptor monojob_intf_desc =
 struct interface monojob = INTF_INIT ( monojob_intf_desc );
 
 /**
+ * Clear previously displayed message
+ *
+ * @v len		Length of previously displayed message
+ */
+static void monojob_clear ( size_t len ) {
+	unsigned int i;
+
+	for ( i = 0 ; i < len ; i++ )
+		putchar ( '\b' );
+	for ( i = 0 ; i < len ; i++ )
+		putchar ( ' ' );
+	for ( i = 0 ; i < len ; i++ )
+		putchar ( '\b' );
+}
+
+/**
  * Wait for single foreground job to complete
  *
  * @v string		Job description to display, or NULL to be silent
@@ -73,7 +89,7 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 	unsigned long scaled_completed;
 	unsigned long scaled_total;
 	unsigned int percentage;
-	int shown_percentage = 0;
+	size_t clear_len = 0;
 	int ongoing_rc;
 	int key;
 	int rc;
@@ -123,19 +139,21 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 		/* Display progress, if applicable */
 		elapsed = ( now - last_display );
 		if ( string && ( elapsed >= TICKS_PER_SEC ) ) {
-			if ( shown_percentage )
-				printf ( "\b\b\b\b    \b\b\b\b" );
+			monojob_clear ( clear_len );
 			/* Normalise progress figures to avoid overflow */
 			scaled_completed = ( progress.completed / 128 );
 			scaled_total = ( progress.total / 128 );
 			if ( scaled_total ) {
 				percentage = ( ( 100 * scaled_completed ) /
 					       scaled_total );
-				printf ( "%3d%%", percentage );
-				shown_percentage = 1;
+				clear_len = printf ( "%3d%%", percentage );
 			} else {
 				printf ( "." );
-				shown_percentage = 0;
+				clear_len = 0;
+			}
+			if ( progress.message[0] ) {
+				clear_len += printf ( " [%s]",
+						      progress.message );
 			}
 			last_display = now;
 		}
@@ -143,9 +161,7 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 	rc = monojob_rc;
 	monojob_close ( &monojob, rc );
 
-	if ( shown_percentage )
-		printf ( "\b\b\b\b    \b\b\b\b" );
-
+	monojob_clear ( clear_len );
 	if ( string ) {
 		if ( rc ) {
 			printf ( " %s\n", strerror ( rc ) );
