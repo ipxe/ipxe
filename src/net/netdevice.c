@@ -402,11 +402,24 @@ void netdev_tx_complete_err ( struct net_device *netdev,
 	list_del ( &iobuf->list );
 	netdev_tx_err ( netdev, iobuf, rc );
 
-	/* Transmit first pending packet, if any */
-	if ( ( iobuf = list_first_entry ( &netdev->tx_deferred,
-					  struct io_buffer, list ) ) != NULL ) {
+	/* Handle pending transmit queue */
+	while ( ( iobuf = list_first_entry ( &netdev->tx_deferred,
+					     struct io_buffer, list ) ) ) {
+
+		/* Remove from pending transmit queue */
 		list_del ( &iobuf->list );
+
+		/* When any transmit completion fails, cancel all
+		 * pending transmissions.
+		 */
+		if ( rc != 0 ) {
+			netdev_tx_err ( netdev, iobuf, -ECANCELED );
+			continue;
+		}
+
+		/* Otherwise, attempt to transmit the first pending packet */
 		netdev_tx ( netdev, iobuf );
+		break;
 	}
 }
 
