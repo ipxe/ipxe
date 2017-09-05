@@ -402,7 +402,9 @@ static EFIAPI VOID nii_block ( UINT64 unique_id, UINT32 acquire ) {
  */
 static int nii_issue_cpb_db ( struct nii_nic *nii, unsigned int op, void *cpb,
 			      size_t cpb_len, void *db, size_t db_len ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	PXE_CDB cdb;
+	UINTN tpl;
 
 	/* Prepare command descriptor block */
 	memset ( &cdb, 0, sizeof ( cdb ) );
@@ -414,6 +416,9 @@ static int nii_issue_cpb_db ( struct nii_nic *nii, unsigned int op, void *cpb,
 	cdb.DBsize = db_len;
 	cdb.IFnum = nii->nii->IfNum;
 
+	/* Raise task priority level */
+	tpl = bs->RaiseTPL ( TPL_CALLBACK );
+
 	/* Issue command */
 	DBGC2 ( nii, "NII %s issuing %02x:%04x ifnum %d%s%s\n",
 		nii->dev.name, cdb.OpCode, cdb.OpFlags, cdb.IFnum,
@@ -423,6 +428,9 @@ static int nii_issue_cpb_db ( struct nii_nic *nii, unsigned int op, void *cpb,
 	if ( db )
 		DBGC2_HD ( nii, db, db_len );
 	nii->issue ( ( intptr_t ) &cdb );
+
+	/* Restore task priority level */
+	bs->RestoreTPL ( tpl );
 
 	/* Check completion status */
 	if ( cdb.StatCode != PXE_STATCODE_SUCCESS )
