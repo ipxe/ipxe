@@ -710,6 +710,7 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	const void *iob_ll_src;
 	uint16_t iob_net_proto;
 	unsigned int iob_flags;
+	size_t max_len;
 	int rc;
 
 	DBGC2 ( snpdev, "SNPDEV %p RECEIVE %p(+%lx)", snpdev, data,
@@ -722,19 +723,28 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	/* Poll the network device */
 	efi_snp_poll ( snpdev );
 
-	/* Dequeue a packet, if one is available */
+	/* Check for an available packet */
 	iobuf = list_first_entry ( &snpdev->rx, struct io_buffer, list );
 	if ( ! iobuf ) {
 		DBGC2 ( snpdev, "\n" );
 		rc = -EAGAIN;
 		goto out_no_packet;
 	}
-	list_del ( &iobuf->list );
 	DBGC2 ( snpdev, "+%zx\n", iob_len ( iobuf ) );
+
+	/* Check buffer length */
+	max_len = *len;
+	*len = iob_len ( iobuf );
+	if ( *len > max_len ) {
+		rc = -ERANGE;
+		goto out_too_long;
+	}
+
+	/* Dequeue packet */
+	list_del ( &iobuf->list );
 
 	/* Return packet to caller */
 	memcpy ( data, iobuf->data, iob_len ( iobuf ) );
-	*len = iob_len ( iobuf );
 
 	/* Attempt to decode link-layer header */
 	if ( ( rc = ll_protocol->pull ( snpdev->netdev, iobuf, &iob_ll_dest,
@@ -759,6 +769,7 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 
  out_bad_ll_header:
 	free_iob ( iobuf );
+ out_too_long:
  out_no_packet:
 	return EFIRC ( rc );
 }
