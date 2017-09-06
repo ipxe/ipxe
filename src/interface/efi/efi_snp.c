@@ -710,7 +710,7 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	const void *iob_ll_src;
 	uint16_t iob_net_proto;
 	unsigned int iob_flags;
-	size_t max_len;
+	size_t copy_len;
 	int rc;
 
 	DBGC2 ( snpdev, "SNPDEV %p RECEIVE %p(+%lx)", snpdev, data,
@@ -732,19 +732,15 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	}
 	DBGC2 ( snpdev, "+%zx\n", iob_len ( iobuf ) );
 
-	/* Check buffer length */
-	max_len = *len;
-	*len = iob_len ( iobuf );
-	if ( *len > max_len ) {
-		rc = -ERANGE;
-		goto out_too_long;
-	}
-
 	/* Dequeue packet */
 	list_del ( &iobuf->list );
 
-	/* Return packet to caller */
-	memcpy ( data, iobuf->data, iob_len ( iobuf ) );
+	/* Return packet to caller, truncating to buffer length */
+	copy_len = iob_len ( iobuf );
+	if ( copy_len > *len )
+		copy_len = *len;
+	memcpy ( data, iobuf->data, copy_len );
+	*len = iob_len ( iobuf );
 
 	/* Attempt to decode link-layer header */
 	if ( ( rc = ll_protocol->pull ( snpdev->netdev, iobuf, &iob_ll_dest,
@@ -765,11 +761,11 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	if ( net_proto )
 		*net_proto = ntohs ( iob_net_proto );
 
-	rc = 0;
+	/* Check buffer length */
+	rc = ( ( copy_len == *len ) ? 0 : -ERANGE );
 
  out_bad_ll_header:
 	free_iob ( iobuf );
- out_too_long:
  out_no_packet:
 	return EFIRC ( rc );
 }
