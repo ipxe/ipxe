@@ -417,7 +417,7 @@ static const char * dns_name ( struct dns_name *name ) {
 	static char buf[256];
 	int len;
 
-	len = dns_decode ( name, buf, sizeof ( buf ) );
+	len = dns_decode ( name, buf, ( sizeof ( buf ) - 1 /* NUL */ ) );
 	return ( ( len < 0 ) ? "<INVALID>" : buf );
 }
 
@@ -877,10 +877,16 @@ static void dns_xfer_close ( struct dns_request *dns, int rc ) {
  */
 static int dns_progress ( struct dns_request *dns,
 			  struct job_progress *progress ) {
+	int len;
 
 	/* Show current question as progress message */
-	dns_decode ( &dns->name, progress->message,
-		     sizeof ( progress->message ) );
+	len = dns_decode ( &dns->name, progress->message,
+			   ( sizeof ( progress->message ) - 1 /* NUL */ ) );
+	if ( len < 0 ) {
+		/* Ignore undecodable names */
+		progress->message[0] = '\0';
+	}
+
 	return 0;
 }
 
