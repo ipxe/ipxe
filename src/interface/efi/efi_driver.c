@@ -497,14 +497,16 @@ static int efi_driver_handles ( int ( * method ) ( EFI_HANDLE handle ) ) {
 
 	/* Connect/disconnect driver from all handles */
 	for ( i = 0 ; i < num_handles ; i++ ) {
-		if ( ( rc = method ( handles[i] ) ) != 0 )
-			goto err_method;
+		if ( ( rc = method ( handles[i] ) ) != 0 ) {
+			/* Ignore errors and continue to process
+			 * remaining handles.
+			 */
+		}
 	}
 
 	/* Success */
 	rc = 0;
 
- err_method:
 	bs->FreePool ( handles );
  err_locate:
 	return rc;
