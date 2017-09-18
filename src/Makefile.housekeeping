@@ -299,7 +299,7 @@ endif
 #
 # Select build architecture and platform based on $(BIN)
 #
-# BIN has the form bin[-[arch-]platform]
+# BIN has the form bin[-[<arch>-]<platform>[-sb]]
 
 ARCHS		:= $(patsubst arch/%,%,$(wildcard arch/*))
 PLATFORMS	:= $(patsubst config/defaults/%.h,%,\
@@ -312,17 +312,18 @@ platforms :
 
 ifdef BIN
 
-# Determine architecture portion of $(BIN), if present
-BIN_ARCH	:= $(strip $(foreach A,$(ARCHS),\
-			     $(patsubst bin-$(A)-%,$(A),\
-			       $(filter bin-$(A)-%,$(BIN)))))
-
-# Determine platform portion of $(BIN), if present
-ifeq ($(BIN_ARCH),)
-BIN_PLATFORM	:= $(patsubst bin-%,%,$(filter bin-%,$(BIN)))
+# Split $(BIN) into architecture, platform, and security flag (where present)
+BIN_ELEMENTS	:= $(subst -,$(SPACE),$(BIN))
+BIN_APS		:= $(wordlist 2,4,$(BIN_ELEMENTS))
+ifeq ($(lastword $(BIN_APS)),sb)
+BIN_AP		:= $(wordlist 2,$(words $(BIN_APS)),discard $(BIN_APS))
+BIN_SECUREBOOT	:= 1
 else
-BIN_PLATFORM	:= $(patsubst bin-$(BIN_ARCH)-%,%,$(BIN))
+BIN_AP		:= $(BIN_APS)
+BIN_SECUREBOOT	:= 0
 endif
+BIN_PLATFORM	:= $(lastword $(BIN_AP))
+BIN_ARCH	:= $(wordlist 2,$(words $(BIN_AP)),discard $(BIN_AP))
 
 # Determine build architecture
 DEFAULT_ARCH	:= i386
@@ -338,6 +339,13 @@ PLATFORM	:= $(firstword $(BIN_PLATFORM) $(DEFAULT_PLATFORM))
 CFLAGS		+= -DPLATFORM=$(PLATFORM)
 platform :
 	@$(ECHO) $(PLATFORM)
+
+# Determine security flag
+DEFAULT_SECUREBOOT := 0
+SECUREBOOT	:= $(firstword $(BIN_SECUREBOOT) $(DEFAULT_SECUREBOOT))
+CFLAGS		+= -DSECUREBOOT=$(SECUREBOOT)
+secureboot :
+	@$(ECHO) $(SECUREBOOT)
 
 endif # defined(BIN)
 
@@ -356,6 +364,11 @@ endif
 ###############################################################################
 #
 # Source file handling
+
+# Exclude known-insecure files from Secure Boot builds
+ifeq ($(SECUREBOOT),0)
+SRCDIRS		+= $(SRCDIRS_INSEC)
+endif
 
 # SRCDIRS lists all directories containing source files.
 srcdirs :
