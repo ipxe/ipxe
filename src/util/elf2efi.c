@@ -93,6 +93,9 @@
 #ifndef R_ARM_THM_JUMP24
 #define R_ARM_THM_JUMP24 30
 #endif
+#ifndef R_ARM_V4BX
+#define R_ARM_V4BX 40
+#endif
 
 /* Seems to be missing from elf.h */
 #ifndef R_AARCH64_NULL
