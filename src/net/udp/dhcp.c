@@ -554,9 +554,18 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 		DBGC ( dhcp, " for %s", inet_ntoa ( ip ) );
 	DBGC ( dhcp, "\n" );
 
-	/* Filter out unacceptable responses */
+	/* Filter out invalid port */
 	if ( peer->sin_port != htons ( BOOTPS_PORT ) )
 		return;
+
+	/* Handle DHCPNAK */
+	if ( msgtype /* BOOTP */ && ( msgtype == DHCPNAK ) ) {
+		/* Go back to discover */
+		dhcp_set_state ( dhcp, &dhcp_state_discover );
+		return;
+	}
+
+	/* Filter out unacceptable responses */
 	if ( msgtype /* BOOTP */ && ( msgtype != DHCPACK ) )
 		return;
 	if ( server_id.s_addr != dhcp->server.s_addr )
@@ -950,7 +959,7 @@ int dhcp_create_packet ( struct dhcp_packet *dhcppkt,
 	/* Initialise DHCP packet structure */
 	memset ( dhcppkt, 0, sizeof ( *dhcppkt ) );
 	dhcppkt_init ( dhcppkt, data, max_len );
-	
+
 	/* Set DHCP_MESSAGE_TYPE option */
 	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_MESSAGE_TYPE,
 				    &msgtype, sizeof ( msgtype ) ) ) != 0 )
