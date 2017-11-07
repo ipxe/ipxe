@@ -104,6 +104,7 @@ static struct http_www_authenticate_field http_www_auth_fields[] = {
 static int http_parse_www_authenticate ( struct http_transaction *http,
 					 char *line ) {
 	struct http_www_authenticate_field *field;
+	struct http_authentication *auth;
 	char *name;
 	char *key;
 	char *value;
@@ -118,12 +119,18 @@ static int http_parse_www_authenticate ( struct http_transaction *http,
 	}
 
 	/* Identify scheme */
-	http->response.auth.auth = http_authentication ( name );
-	if ( ! http->response.auth.auth ) {
+	auth = http_authentication ( name );
+	if ( ! auth ) {
 		DBGC ( http, "HTTP %p unrecognised authentication scheme "
 		       "\"%s\"\n", http, name );
-		return -ENOTSUP;
+		/* Ignore; the server may offer other schemes */
+		return 0;
 	}
+
+	/* Use first supported scheme */
+	if ( http->response.auth.auth )
+		return 0;
+	http->response.auth.auth = auth;
 
 	/* Process fields */
 	while ( ( key = http_token ( &line, &value ) ) ) {
