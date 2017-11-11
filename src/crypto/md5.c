@@ -213,7 +213,7 @@ static void md5_digest ( struct md5_context *context ) {
 			i, *a, *b, *c, *d );
 	}
 
-	/* Add chunk to hash and convert back to big-endian */
+	/* Add chunk to hash and convert back to little-endian */
 	for ( i = 0 ; i < 4 ; i++ ) {
 		context->ddd.dd.digest.h[i] =
 			cpu_to_le32 ( context->ddd.dd.digest.h[i] +
