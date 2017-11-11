@@ -18,6 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/linebuf.h>
 #include <ipxe/pool.h>
 #include <ipxe/tables.h>
+#include <ipxe/ntlm.h>
 
 struct http_transaction;
 
@@ -172,6 +173,18 @@ struct http_request_auth_digest {
 	char response[ HTTP_DIGEST_RESPONSE_LEN + 1 /* NUL */ ];
 };
 
+/** HTTP request NTLM authentication descriptor */
+struct http_request_auth_ntlm {
+	/** Username */
+	const char *username;
+	/** LAN Manager response */
+	struct ntlm_lm_response lm;
+	/** NT response */
+	struct ntlm_nt_response nt;
+	/** Authenticate message length */
+	size_t len;
+};
+
 /** HTTP request authentication descriptor */
 struct http_request_auth {
 	/** Authentication scheme (if any) */
@@ -182,6 +195,8 @@ struct http_request_auth {
 		struct http_request_auth_basic basic;
 		/** Digest authentication descriptor */
 		struct http_request_auth_digest digest;
+		/** NTLM authentication descriptor */
+		struct http_request_auth_ntlm ntlm;
 	};
 };
 
@@ -270,6 +285,14 @@ struct http_response_auth_digest {
 	const char *opaque;
 };
 
+/** HTTP response NTLM authorization descriptor */
+struct http_response_auth_ntlm {
+	/** Challenge message */
+	struct ntlm_challenge *challenge;
+	/** Challenge information */
+	struct ntlm_challenge_info info;
+};
+
 /** HTTP response authorization descriptor */
 struct http_response_auth {
 	/** Authentication scheme (if any) */
@@ -280,6 +303,8 @@ struct http_response_auth {
 		struct http_response_auth_basic basic;
 		/** Digest authorization descriptor */
 		struct http_response_auth_digest digest;
+		/** NTLM authorization descriptor */
+		struct http_response_auth_ntlm ntlm;
 	};
 };
 
