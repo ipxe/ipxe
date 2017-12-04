@@ -1,0 +1,5 @@
+#!ipxe
+dhcp
+
+#http://ipxe.org/cfg/vram
+chain http://boot.ipxe.org/memtest.501

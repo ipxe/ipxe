@@ -1,0 +1,7 @@
+#!ipxe
+# See http://ipxe.org/scripting for docs on scripting ipxe.
+
+echo HELLO from ipxe
+
+dhcp
+chain --autofree https://boot.netboot.xyz

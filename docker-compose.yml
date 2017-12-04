@@ -1,0 +1,11 @@
+version: '2.1'
+
+services:
+  ipxe:
+    image: nopush-ipxe
+    build: .
+    volumes:
+      - ./:/app
+    environment:
+      - IPXE_EMBED
+      - MAKE_CLEAN

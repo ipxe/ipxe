@@ -6,3 +6,10 @@ Quick start guide:
    make
 
 For any more detailed instructions, see http://ipxe.org
+
+# matti's additions:
+
+    MAKE_CLEAN=1 IPXE_EMBED=netbootxyz.ipxe kung rc ipxe
+
+    diskutil unmountDisk /dev/disk3
+    sudo dd if=src/bin/ipxe.usb of=/dev/rdisk3 bs=1m
