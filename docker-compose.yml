@@ -8,4 +8,5 @@ services:
       - ./:/app
     environment:
       - IPXE_EMBED
+      - IPXE_TARGET
       - MAKE_CLEAN

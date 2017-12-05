@@ -1,0 +1,10 @@
+#!ipxe
+
+dhcp
+
+echo Booting CoreOS Stable
+set base-url http://stable.release.core-os.net/amd64-usr/current
+kernel ${base-url}/coreos_production_pxe.vmlinuz console=tty0 coreos.autologin cloud-config-url=http://matchbox/cloud
+initrd ${base-url}/coreos_production_pxe_image.cpio.gz
+
+boot

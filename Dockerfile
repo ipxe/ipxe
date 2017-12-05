@@ -4,7 +4,7 @@ RUN apt-get -y update
 RUN apt-get -y upgrade
 
 RUN apt-get install -y \
-  gcc binutils make perl liblzma-dev mtools mkisofs syslinux
+  gcc binutils binutils-dev make perl liblzma-dev mtools mkisofs syslinux genisoimage isolinux
 
 WORKDIR /app
 

@@ -6,6 +6,11 @@ if [ "$IPXE_EMBED" = "" ]; then
   exit 1
 fi
 
+if [ "$IPXE_TARGET" = "" ]; then
+  echo "IPXE_TARGET missing"
+  exit 1
+fi
+
 cd /app/src
 
 if [ "MAKE_CLEAN" != "" ]; then
@@ -14,5 +19,5 @@ if [ "MAKE_CLEAN" != "" ]; then
 fi
 
 echo "build started.."
-make bin/ipxe.usb EMBED=../$IPXE_EMBED
+make bin/$IPXE_TARGET EMBED=../$IPXE_EMBED
 echo "done"
