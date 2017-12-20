@@ -473,6 +473,7 @@ static struct pci_device_id intelx_nics[] = {
 	PCI_ROM ( 0x8086, 0x154d, "82599-sfp-sf2", "82599 (SFI/SFP+)", 0 ),
 	PCI_ROM ( 0x8086, 0x1557, "82599en-sfp", "82599 (Single Port SFI Only)", 0 ),
 	PCI_ROM ( 0x8086, 0x1560, "x540t1", "X540-AT2/X540-BT2 (with single port NVM)", 0 ),
+	PCI_ROM ( 0x8086, 0x1563, "x550t2", "X550-T2", 0 ),
 };
 
 /** PCI driver */
