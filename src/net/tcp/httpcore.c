@@ -1163,6 +1163,8 @@ static int http_parse_status ( struct http_transaction *http, char *line ) {
 		response_rc = -EIO_OTHER;
 	}
 	http->response.rc = response_rc;
+	if ( response_rc )
+		DBGC ( http, "HTTP %p status %s\n", http, status );
 
 	return 0;
 }
