@@ -55,6 +55,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/params.h>
 #include <ipxe/profile.h>
 #include <ipxe/vsprintf.h>
+#include <ipxe/errortab.h>
 #include <ipxe/http.h>
 
 /* Disambiguate the various error causes */
@@ -109,6 +110,12 @@ static struct profiler http_rx_profiler __profiler = { .name = "http.rx" };
 
 /** Data transfer profiler */
 static struct profiler http_xfer_profiler __profiler = { .name = "http.xfer" };
+
+/** Human-readable error messages */
+struct errortab http_errors[] __errortab = {
+	__einfo_errortab ( EINFO_EIO_4XX ),
+	__einfo_errortab ( EINFO_EIO_5XX ),
+};
 
 static struct http_state http_request;
 static struct http_state http_headers;
