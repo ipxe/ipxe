@@ -6,6 +6,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 	.code16
 	.org 0
 
+	.globl mbr
 mbr:
 	movw	$exec_sector, %bp
 	jmp	find_active_partition

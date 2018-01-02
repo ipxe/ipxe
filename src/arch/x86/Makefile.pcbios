@@ -106,14 +106,14 @@ NON_AUTO_MEDIA	+= fd0
 	$(Q)sync
 
 # Special target for building Master Boot Record binary
-$(BIN)/mbr.bin : $(BIN)/mbr.o
+$(BIN)/mbr.tmp : $(BIN)/mbr.o
 	$(QM)$(ECHO) "  [LD] $@"
-	$(Q)$(LD) $(LDFLAGS) -o $@ --oformat binary -e 0 $<
+	$(Q)$(LD) $(LDFLAGS) -o $@ -e mbr $<
 
 # rule to make a USB disk image
-$(BIN)/usbdisk.bin : $(BIN)/usbdisk.o
+$(BIN)/usbdisk.tmp : $(BIN)/usbdisk.o
 	$(QM)$(ECHO) "  [LD] $@"
-	$(Q)$(LD) $(LDFLAGS) -o $@ --oformat binary -e 0 $<
+	$(Q)$(LD) $(LDFLAGS) -o $@ -e mbr $<
 
 NON_AUTO_MEDIA	+= usb
 %usb: $(BIN)/usbdisk.bin %hd
