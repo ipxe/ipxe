@@ -94,6 +94,7 @@ static uint8_t dhcp_request_options_data[] = {
 		      DHCP_ROOT_PATH, DHCP_MTU, DHCP_VENDOR_ENCAP,
 		      DHCP_VENDOR_CLASS_ID, DHCP_TFTP_SERVER_NAME,
 		      DHCP_BOOTFILE_NAME, DHCP_DOMAIN_SEARCH,
+		      DHCP_CLASSLESS_STATIC_ROUTE, DHCP_CLASSLESS_STATIC_ROUTE_MS,
 		      128, 129, 130, 131, 132, 133, 134, 135, /* for PXE */
 		      DHCP_EB_ENCAP, DHCP_ISCSI_INITIATOR_IQN ),
 	DHCP_END
@@ -566,6 +567,26 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 
 	/* Record assigned address */
 	dhcp->local.sin_addr = ip;
+
+	/* Looking for DHCP option 121 */
+	int offset_opt121 = 0;
+	if ( ( offset_opt121 = find_dhcp_option_with_encap( &dhcppkt->options,
+			DHCP_CLASSLESS_STATIC_ROUTE, NULL ) ) < 0 ) {
+		/* Option 121 not found. Looking for Microsoft's option 249 */
+		if ( ( offset_opt121 =
+				find_dhcp_option_with_encap( &dhcppkt->options,
+						DHCP_CLASSLESS_STATIC_ROUTE_MS, NULL ) ) < 0 ) {
+			/* Neither option 121 found nor 249 */
+			dhcp->netdev->static_routes_len = 0;
+		}
+	}
+	if ( offset_opt121 > 0 ) {
+		struct dhcp_option *d_option =
+				dhcp_option ( &dhcppkt->options, offset_opt121 );
+		DBGC ( dhcp, "DHCP option 121 length: %d\n", d_option->len );
+		dhcp->netdev->static_routes_len = d_option->len;
+		dhcp->netdev->static_routes = ( ( uint8_t * ) d_option->data );
+	}
 
 	/* Register settings */
 	parent = netdev_settings ( dhcp->netdev );
