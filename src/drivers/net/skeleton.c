@@ -34,7 +34,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iobuf.h>
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
-#include <ipxe/mii.h>
 #include "skeleton.h"
 
 /** @file
@@ -42,54 +41,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Skeleton network driver
  *
  */
-
-/******************************************************************************
- *
- * MII interface
- *
- ******************************************************************************
- */
-
-/**
- * Read from MII register
- *
- * @v mii		MII interface
- * @v reg		Register address
- * @ret value		Data read, or negative error
- */
-static int skeleton_mii_read ( struct mii_interface *mii, unsigned int reg ) {
-	struct skeleton_nic *skel =
-		container_of ( mii, struct skeleton_nic, mii );
-
-	DBGC ( skel, "SKELETON %p does not yet support MII read\n", skel );
-	( void ) reg;
-	return -ENOTSUP;
-}
-
-/**
- * Write to MII register
- *
- * @v mii		MII interface
- * @v reg		Register address
- * @v data		Data to write
- * @ret rc		Return status code
- */
-static int skeleton_mii_write ( struct mii_interface *mii, unsigned int reg,
-				unsigned int data) {
-	struct skeleton_nic *skel =
-		container_of ( mii, struct skeleton_nic, mii );
-
-	DBGC ( skel, "SKELETON %p does not yet support MII write\n", skel );
-	( void ) reg;
-	( void ) data;
-	return -ENOTSUP;
-}
-
-/** Skeleton MII operations */
-static struct mii_operations skeleton_mii_operations = {
-	.read = skeleton_mii_read,
-	.write = skeleton_mii_write,
-};
 
 /******************************************************************************
  *
@@ -254,14 +205,6 @@ static int skeleton_probe ( struct pci_device *pci ) {
 	if ( ( rc = skeleton_reset ( skel ) ) != 0 )
 		goto err_reset;
 
-	/* Initialise and reset MII interface */
-	mii_init ( &skel->mii, &skeleton_mii_operations );
-	if ( ( rc = mii_reset ( &skel->mii ) ) != 0 ) {
-		DBGC ( skel, "SKELETON %p could not reset MII: %s\n",
-		       skel, strerror ( rc ) );
-		goto err_mii_reset;
-	}
-
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
@@ -273,7 +216,6 @@ static int skeleton_probe ( struct pci_device *pci ) {
 
 	unregister_netdev ( netdev );
  err_register_netdev:
- err_mii_reset:
 	skeleton_reset ( skel );
  err_reset:
 	iounmap ( skel->regs );
