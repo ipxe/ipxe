@@ -540,35 +540,6 @@ static int ena_destroy_qp ( struct ena_nic *ena, struct ena_qp *qp ) {
 }
 
 /**
- * Get feature
- *
- * @v ena		ENA device
- * @v id		Feature identifier
- * @v feature		Feature to fill in
- * @ret rc		Return status code
- */
-static int ena_get_feature ( struct ena_nic *ena, unsigned int id,
-			     union ena_feature **feature ) {
-	union ena_aq_req *req;
-	union ena_acq_rsp *rsp;
-	int rc;
-
-	/* Construct request */
-	req = ena_admin_req ( ena );
-	req->header.opcode = ENA_GET_FEATURE;
-	req->get_feature.id = id;
-
-	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
-		return rc;
-
-	/* Parse response */
-	*feature = &rsp->get_feature.feature;
-
-	return 0;
-}
-
-/**
  * Get device attributes
  *
  * @v netdev		Network device
@@ -576,18 +547,23 @@ static int ena_get_feature ( struct ena_nic *ena, unsigned int id,
  */
 static int ena_get_device_attributes ( struct net_device *netdev ) {
 	struct ena_nic *ena = netdev->priv;
+	union ena_aq_req *req;
+	union ena_acq_rsp *rsp;
 	union ena_feature *feature;
 	int rc;
 
-	/* Get device attributes */
-	if ( ( rc = ena_get_feature ( ena, ENA_DEVICE_ATTRIBUTES,
-				      &feature ) ) != 0 )
+	/* Construct request */
+	req = ena_admin_req ( ena );
+	req->header.opcode = ENA_GET_FEATURE;
+	req->get_feature.id = ENA_DEVICE_ATTRIBUTES;
+
+	/* Issue request */
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
 		return rc;
 
-	/* Extract MAC address */
+	/* Parse response */
+	feature = &rsp->get_feature.feature;
 	memcpy ( netdev->hw_addr, feature->device.mac, ETH_ALEN );
-
-	/* Extract MTU */
 	netdev->max_pkt_len = le32_to_cpu ( feature->device.mtu );
 
 	DBGC ( ena, "ENA %p MAC %s MTU %zd\n",
