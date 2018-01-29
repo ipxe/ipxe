@@ -801,34 +801,41 @@ static int xhci_port_speed ( struct xhci_device *xhci, unsigned int port,
 	ports = readl ( xhci->cap + supported + XHCI_SUPPORTED_PORTS );
 	psic = XHCI_SUPPORTED_PORTS_PSIC ( ports );
 
-	/* Use the default mappings if applicable */
-	if ( ( psic == 0 ) || ( xhci->quirks & XHCI_BAD_PSIV ) ) {
-		switch ( psiv ) {
-		case XHCI_SPEED_LOW :	return USB_SPEED_LOW;
-		case XHCI_SPEED_FULL :	return USB_SPEED_FULL;
-		case XHCI_SPEED_HIGH :	return USB_SPEED_HIGH;
-		case XHCI_SPEED_SUPER :	return USB_SPEED_SUPER;
-		default:
-			DBGC ( xhci, "XHCI %s-%d non-standard PSI value %d\n",
+	/* Use protocol speed ID table unless device is known to be faulty */
+	if ( ! ( xhci->quirks & XHCI_BAD_PSIV ) ) {
+
+		/* Iterate over PSI dwords looking for a match */
+		for ( i = 0 ; i < psic ; i++ ) {
+			psi = readl ( xhci->cap + supported +
+				      XHCI_SUPPORTED_PSI ( i ) );
+			if ( psiv == XHCI_SUPPORTED_PSI_VALUE ( psi ) ) {
+				mantissa = XHCI_SUPPORTED_PSI_MANTISSA ( psi );
+				exponent = XHCI_SUPPORTED_PSI_EXPONENT ( psi );
+				speed = USB_SPEED ( mantissa, exponent );
+				return speed;
+			}
+		}
+
+		/* Record device as faulty if no match is found */
+		if ( psic != 0 ) {
+			DBGC ( xhci, "XHCI %s-%d spurious PSI value %d: "
+			       "assuming PSI table is invalid\n",
 			       xhci->name, port, psiv );
-			return -ENOTSUP;
+			xhci->quirks |= XHCI_BAD_PSIV;
 		}
 	}
 
-	/* Iterate over PSI dwords looking for a match */
-	for ( i = 0 ; i < psic ; i++ ) {
-		psi = readl ( xhci->cap + supported + XHCI_SUPPORTED_PSI ( i ));
-		if ( psiv == XHCI_SUPPORTED_PSI_VALUE ( psi ) ) {
-			mantissa = XHCI_SUPPORTED_PSI_MANTISSA ( psi );
-			exponent = XHCI_SUPPORTED_PSI_EXPONENT ( psi );
-			speed = USB_SPEED ( mantissa, exponent );
-			return speed;
-		}
+	/* Use the default mappings */
+	switch ( psiv ) {
+	case XHCI_SPEED_LOW :	return USB_SPEED_LOW;
+	case XHCI_SPEED_FULL :	return USB_SPEED_FULL;
+	case XHCI_SPEED_HIGH :	return USB_SPEED_HIGH;
+	case XHCI_SPEED_SUPER :	return USB_SPEED_SUPER;
+	default:
+		DBGC ( xhci, "XHCI %s-%d unrecognised PSI value %d\n",
+		       xhci->name, port, psiv );
+		return -ENOTSUP;
 	}
-
-	DBGC ( xhci, "XHCI %s-%d spurious PSI value %d\n",
-	       xhci->name, port, psiv );
-	return -ENOENT;
 }
 
 /**
