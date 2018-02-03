@@ -635,9 +635,22 @@ void intel_empty_rx ( struct intel_nic *intel ) {
 static int intel_open ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
 	union intel_receive_address mac;
+	uint32_t fextnvm11;
 	uint32_t tctl;
 	uint32_t rctl;
 	int rc;
+
+	/* Set undocumented bit in FEXTNVM11 to work around an errata
+	 * in i219 devices that will otherwise cause a complete
+	 * datapath hang at the next device reset.
+	 */
+	if ( intel->flags & INTEL_RST_HANG ) {
+		DBGC ( intel, "INTEL %p WARNING: applying reset hang "
+		       "workaround\n", intel );
+		fextnvm11 = readl ( intel->regs + INTEL_FEXTNVM11 );
+		fextnvm11 |= INTEL_FEXTNVM11_WTF;
+		writel ( fextnvm11, intel->regs + INTEL_FEXTNVM11 );
+	}
 
 	/* Create transmit descriptor ring */
 	if ( ( rc = intel_create_ring ( intel, &intel->tx ) ) != 0 )
@@ -1123,20 +1136,20 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x153b, "i217v", "I217-V", 0 ),
 	PCI_ROM ( 0x8086, 0x1559, "i218v", "I218-V", 0),
 	PCI_ROM ( 0x8086, 0x155a, "i218lm", "I218-LM", 0),
-	PCI_ROM ( 0x8086, 0x156f, "i219lm", "I219-LM", 0 ),
-	PCI_ROM ( 0x8086, 0x1570, "i219v", "I219-V", INTEL_NO_PHY_RST ),
+	PCI_ROM ( 0x8086, 0x156f, "i219lm", "I219-LM", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x1570, "i219v", "I219-V", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x157b, "i210-2", "I210", 0 ),
 	PCI_ROM ( 0x8086, 0x15a0, "i218lm-2", "I218-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x15a1, "i218v-2", "I218-V", 0 ),
 	PCI_ROM ( 0x8086, 0x15a2, "i218lm-3", "I218-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x15a3, "i218v-3", "I218-V", INTEL_NO_PHY_RST ),
-	PCI_ROM ( 0x8086, 0x15b7, "i219lm-2", "I219-LM (2)", INTEL_NO_PHY_RST ),
-	PCI_ROM ( 0x8086, 0x15b8, "i219v-2", "I219-V (2)", 0 ),
-	PCI_ROM ( 0x8086, 0x15b9, "i219lm-3", "I219-LM (3)", INTEL_NO_PHY_RST ),
-	PCI_ROM ( 0x8086, 0x15d6, "i219v-5", "I219-V (5)", INTEL_NO_PHY_RST ),
-	PCI_ROM ( 0x8086, 0x15d7, "i219lm-4", "I219-LM (4)", INTEL_NO_PHY_RST ),
-	PCI_ROM ( 0x8086, 0x15d8, "i219v-4", "I219-V (4)", INTEL_NO_PHY_RST ),
-	PCI_ROM ( 0x8086, 0x15e3, "i219lm-5", "I219-LM (5)", INTEL_NO_PHY_RST ),
+	PCI_ROM ( 0x8086, 0x15b7, "i219lm-2", "I219-LM (2)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15b8, "i219v-2", "I219-V (2)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15b9, "i219lm-3", "I219-LM (3)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15d6, "i219v-5", "I219-V (5)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15d7, "i219lm-4", "I219-LM (4)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15d8, "i219v-4", "I219-V (4)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15e3, "i219lm-5", "I219-LM (5)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x294c, "82566dc-2", "82566DC-2", 0 ),
 	PCI_ROM ( 0x8086, 0x2e6e, "cemedia", "CE Media Processor", 0 ),
 };
