@@ -1711,6 +1711,9 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
 			   ( event->cons >> shift ) ) & XHCI_TRB_C ) )
 			break;
 
+		/* Consume this TRB */
+		event->cons++;
+
 		/* Handle TRB */
 		type = ( trb->common.type & XHCI_TRB_TYPE_MASK );
 		switch ( type ) {
@@ -1733,14 +1736,11 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
 
 		default:
 			DBGC ( xhci, "XHCI %s unrecognised event %#x\n:",
-			       xhci->name, event->cons );
+			       xhci->name, ( event->cons - 1 ) );
 			DBGC_HDA ( xhci, virt_to_phys ( trb ),
 				   trb, sizeof ( *trb ) );
 			break;
 		}
-
-		/* Consume this TRB */
-		event->cons++;
 	}
 
 	/* Update dequeue pointer if applicable */
