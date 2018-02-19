@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/uri.h>
 #include <ipxe/base64.h>
 #include <ipxe/ntlm.h>
+#include <ipxe/netbios.h>
 #include <ipxe/http.h>
 
 struct http_authentication http_ntlm_auth __http_authentication;
@@ -113,6 +114,8 @@ static int http_ntlm_authenticate ( struct http_transaction *http ) {
 	struct http_request_auth_ntlm *req = &http->request.auth.ntlm;
 	struct http_response_auth_ntlm *rsp = &http->response.auth.ntlm;
 	struct ntlm_key key;
+	const char *domain;
+	char *username;
 	const char *password;
 
 	/* If we have no challenge yet, then just send a Negotiate message */
@@ -130,15 +133,22 @@ static int http_ntlm_authenticate ( struct http_transaction *http ) {
 	req->username = http->uri->user;
 	password = ( http->uri->password ? http->uri->password : "" );
 
+	/* Split NetBIOS [domain\]username */
+	username = ( ( char * ) req->username );
+	domain = netbios_domain ( &username );
+
 	/* Generate key */
-	ntlm_key ( NULL, req->username, password, &key );
+	ntlm_key ( domain, username, password, &key );
 
 	/* Generate responses */
 	ntlm_response ( &rsp->info, &key, NULL, &req->lm, &req->nt );
 
 	/* Calculate Authenticate message length */
-	req->len = ntlm_authenticate_len ( &rsp->info, NULL, req->username,
+	req->len = ntlm_authenticate_len ( &rsp->info, domain, username,
 					   http_ntlm_workstation );
+
+	/* Restore NetBIOS [domain\]username */
+	netbios_domain_undo ( domain, username );
 
 	return 0;
 }
@@ -156,6 +166,8 @@ static int http_format_ntlm_auth ( struct http_transaction *http,
 	struct http_request_auth_ntlm *req = &http->request.auth.ntlm;
 	struct http_response_auth_ntlm *rsp = &http->response.auth.ntlm;
 	struct ntlm_authenticate *auth;
+	const char *domain;
+	char *username;
 	size_t check;
 
 	/* If we have no challenge yet, then just send a Negotiate message */
@@ -173,11 +185,18 @@ static int http_format_ntlm_auth ( struct http_transaction *http,
 	if ( ! auth )
 		return -ENOMEM;
 
+	/* Split NetBIOS [domain\]username */
+	username = ( ( char * ) req->username );
+	domain = netbios_domain ( &username );
+
 	/* Construct raw Authenticate message */
-	check = ntlm_authenticate ( &rsp->info, NULL, req->username,
+	check = ntlm_authenticate ( &rsp->info, domain, username,
 				    http_ntlm_workstation, &req->lm,
 				    &req->nt, auth );
 	assert ( check == req->len );
+
+	/* Restore NetBIOS [domain\]username */
+	netbios_domain_undo ( domain, username );
 
 	/* Base64-encode Authenticate message */
 	len = base64_encode ( auth, req->len, buf, len );
