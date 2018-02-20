@@ -65,50 +65,6 @@ static const char * efi_usb_direction_name ( EFI_USB_DATA_DIRECTION direction ){
  */
 
 /**
- * Poll USB bus
- *
- * @v usbdev		EFI USB device
- */
-static void efi_usb_poll ( struct efi_usb_device *usbdev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	struct usb_bus *bus = usbdev->usb->port->hub->bus;
-	EFI_TPL tpl;
-
-	/* UEFI manages to ingeniously combine the worst aspects of
-	 * both polling and interrupt-driven designs.  There is no way
-	 * to support proper interrupt-driven operation, since there
-	 * is no way to hook in an interrupt service routine.  A
-	 * mockery of interrupts is provided by UEFI timers, which
-	 * trigger at a preset rate and can fire at any time.
-	 *
-	 * We therefore have all of the downsides of a polling design
-	 * (inefficiency and inability to sleep until something
-	 * interesting happens) combined with all of the downsides of
-	 * an interrupt-driven design (the complexity of code that
-	 * could be preempted at any time).
-	 *
-	 * The UEFI specification expects us to litter the entire
-	 * codebase with calls to RaiseTPL() as needed for sections of
-	 * code that are not reentrant.  Since this doesn't actually
-	 * gain us any substantive benefits (since even with such
-	 * calls we would still be suffering from the limitations of a
-	 * polling design), we instead choose to wrap only calls to
-	 * usb_poll().  This should be sufficient for most practical
-	 * purposes.
-	 *
-	 * A "proper" solution would involve rearchitecting the whole
-	 * codebase to support interrupt-driven operation.
-	 */
-	tpl = bs->RaiseTPL ( TPL_NOTIFY );
-
-	/* Poll bus */
-	usb_poll ( bus );
-
-	/* Restore task priority level */
-	bs->RestoreTPL ( tpl );
-}
-
-/**
  * Poll USB bus (from endpoint event timer)
  *
  * @v event		EFI event
@@ -216,7 +172,7 @@ static int efi_usb_open ( struct efi_usb_interface *usbintf,
 
 	/* Create event */
 	if ( ( efirc = bs->CreateEvent ( ( EVT_TIMER | EVT_NOTIFY_SIGNAL ),
-					 TPL_NOTIFY, efi_usb_timer, usbep,
+					 TPL_CALLBACK, efi_usb_timer, usbep,
 					 &usbep->event ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( usbdev, "USBDEV %s %s could not create event: %s\n",
@@ -363,7 +319,7 @@ static int efi_usb_sync_transfer ( struct efi_usb_interface *usbintf,
 	for ( i = 0 ; ( ( timeout == 0 ) || ( i < timeout ) ) ; i++ ) {
 
 		/* Poll bus */
-		efi_usb_poll ( usbdev );
+		usb_poll ( usbdev->usb->port->hub->bus );
 
 		/* Check for completion */
 		if ( usbep->rc != -EINPROGRESS ) {
