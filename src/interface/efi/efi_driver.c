@@ -95,7 +95,9 @@ struct efi_device * efidev_parent ( struct device *dev ) {
 static EFI_STATUS EFIAPI
 efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		       EFI_HANDLE device, EFI_DEVICE_PATH_PROTOCOL *child ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_driver *efidrv;
+	EFI_TPL saved_tpl;
 	int rc;
 
 	DBGCP ( device, "EFIDRV %s DRIVER_SUPPORTED",
@@ -111,17 +113,22 @@ efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		return EFI_ALREADY_STARTED;
 	}
 
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+
 	/* Look for a driver claiming to support this device */
 	for_each_table_entry ( efidrv, EFI_DRIVERS ) {
 		if ( ( rc = efidrv->supported ( device ) ) == 0 ) {
 			DBGC ( device, "EFIDRV %s has driver \"%s\"\n",
 			       efi_handle_name ( device ), efidrv->name );
+			bs->RestoreTPL ( saved_tpl );
 			return 0;
 		}
 	}
 	DBGCP ( device, "EFIDRV %s has no driver\n",
 		efi_handle_name ( device ) );
 
+	bs->RestoreTPL ( saved_tpl );
 	return EFI_UNSUPPORTED;
 }
 
@@ -145,6 +152,7 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	} path;
 	EFI_DEVICE_PATH_PROTOCOL *path_end;
 	size_t path_len;
+	EFI_TPL saved_tpl;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -161,6 +169,9 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		efirc = EFI_ALREADY_STARTED;
 		goto err_already_started;
 	}
+
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
 
 	/* Do nothing if we are currently disconnecting drivers */
 	if ( efi_driver_disconnecting ) {
@@ -215,6 +226,7 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 			DBGC ( device, "EFIDRV %s using driver \"%s\"\n",
 			       efi_handle_name ( device ),
 			       efidev->driver->name );
+			bs->RestoreTPL ( saved_tpl );
 			return 0;
 		}
 		DBGC ( device, "EFIDRV %s could not start driver \"%s\": %s\n",
@@ -232,6 +244,7 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	}
  err_open_path:
  err_disconnecting:
+	bs->RestoreTPL ( saved_tpl );
  err_already_started:
 	return efirc;
 }
@@ -250,8 +263,10 @@ static EFI_STATUS EFIAPI
 efi_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		  EFI_HANDLE device, UINTN num_children,
 		  EFI_HANDLE *children ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_driver *efidrv;
 	struct efi_device *efidev;
+	EFI_TPL saved_tpl;
 	UINTN i;
 
 	DBGC ( device, "EFIDRV %s DRIVER_STOP", efi_handle_name ( device ) );
@@ -269,6 +284,9 @@ efi_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		return EFI_DEVICE_ERROR;
 	}
 
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+
 	/* Stop this device */
 	efidrv = efidev->driver;
 	assert ( efidrv != NULL );
@@ -276,6 +294,7 @@ efi_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	list_del ( &efidev->dev.siblings );
 	free ( efidev );
 
+	bs->RestoreTPL ( saved_tpl );
 	return 0;
 }
 
