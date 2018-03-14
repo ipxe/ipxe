@@ -383,6 +383,7 @@ static int efipci_supported ( EFI_HANDLE device ) {
  * @ret rc		Return status code
  */
 static int efipci_start ( struct efi_device *efidev ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efidev->device;
 	struct pci_device *pci;
 	int rc;
@@ -416,7 +417,10 @@ static int efipci_start ( struct efi_device *efidev ) {
 	list_add ( &pci->dev.siblings, &efidev->dev.children );
 
 	/* Probe driver */
-	if ( ( rc = pci_probe ( pci ) ) != 0 ) {
+	EFI_TPL saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+	rc = pci_probe ( pci );
+	bs->RestoreTPL ( saved_tpl );
+	if ( rc != 0 ) {
 		DBGC ( device, "EFIPCI " PCI_FMT " could not probe driver "
 		       "\"%s\": %s\n", PCI_ARGS ( pci ), pci->id->name,
 		       strerror ( rc ) );
