@@ -1127,6 +1127,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1522, "i350-f", "I350 Fiber", 0 ),
 	PCI_ROM ( 0x8086, 0x1523, "i350-b", "I350 Backplane", INTEL_NO_ASDE ),
 	PCI_ROM ( 0x8086, 0x1524, "i350-2", "I350", 0 ),
+	PCI_ROM ( 0x8086, 0x1f41, "i354", "I354", INTEL_NO_ASDE ),
 	PCI_ROM ( 0x8086, 0x1525, "82567v-4", "82567V-4", 0 ),
 	PCI_ROM ( 0x8086, 0x1526, "82576-5", "82576", 0 ),
 	PCI_ROM ( 0x8086, 0x1527, "82580-f2", "82580 Fiber", 0 ),
