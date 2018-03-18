@@ -488,8 +488,7 @@ static void validator_step ( struct validator *validator ) {
 		/* The issuer is valid, but this certificate is not
 		 * yet valid.  If OCSP is applicable, start it.
 		 */
-		if ( cert->extensions.auth_info.ocsp.uri.len &&
-		     ( ! cert->extensions.auth_info.ocsp.good ) ) {
+		if ( ocsp_required ( cert ) ) {
 			/* Start OCSP */
 			if ( ( rc = validator_start_ocsp ( validator, cert,
 							   issuer ) ) != 0 ) {

@@ -111,6 +111,21 @@ ocsp_put ( struct ocsp_check *ocsp ) {
 	ref_put ( &ocsp->refcnt );
 }
 
+/**
+ * Check if X.509 certificate requires an OCSP check
+ *
+ * @v cert		X.509 certificate
+ * @ret ocsp_required	An OCSP check is required
+ */
+static inline int ocsp_required ( struct x509_certificate *cert ) {
+
+	/* An OCSP check is required if an OCSP URI exists but the
+	 * OCSP status is not (yet) good.
+	 */
+	return ( cert->extensions.auth_info.ocsp.uri.len &&
+		 ( ! cert->extensions.auth_info.ocsp.good ) );
+}
+
 extern int ocsp_check ( struct x509_certificate *cert,
 			struct x509_certificate *issuer,
 			struct ocsp_check **ocsp );
