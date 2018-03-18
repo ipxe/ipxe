@@ -92,7 +92,7 @@ eth_slow_marker_tlv_name ( uint8_t type ) {
  * @ret name		LACP state name
  */
 static const char * eth_slow_lacp_state_name ( uint8_t state ) {
-	static char state_chars[] = "AFGSRTLX";
+	static char state_chars[] = "AFGSCDLX";
 	unsigned int i;
 
 	for ( i = 0 ; i < 8 ; i++ ) {
