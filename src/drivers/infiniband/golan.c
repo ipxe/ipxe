@@ -2586,8 +2586,6 @@ struct flexboot_nodnic_callbacks shomron_nodnic_callbacks = {
 	.tx_uar_send_doorbell_fn = shomron_tx_uar_send_db,
 };
 
-static int shomron_nodnic_supported = 0;
-
 static int shomron_nodnic_is_supported ( struct pci_device *pci ) {
 	if ( DEVICE_IS_CIB ( pci->device ) )
 		return 0;
@@ -2607,8 +2605,7 @@ static int golan_probe ( struct pci_device *pci ) {
 		goto probe_done;
 	}
 
-	shomron_nodnic_supported = shomron_nodnic_is_supported ( pci );
-	if ( shomron_nodnic_supported ) {
+	if ( shomron_nodnic_is_supported ( pci ) ) {
 		DBG ( "%s: Using NODNIC driver\n", __FUNCTION__ );
 		rc = flexboot_nodnic_probe ( pci, &shomron_nodnic_callbacks, NULL );
 	} else {
@@ -2624,7 +2621,7 @@ probe_done:
 static void golan_remove ( struct pci_device *pci ) {
 	DBG ( "%s: start\n", __FUNCTION__ );
 
-	if ( ! shomron_nodnic_supported ) {
+	if ( ! shomron_nodnic_is_supported ( pci ) ) {
 		DBG ( "%s: Using normal driver remove\n", __FUNCTION__ );
 		golan_remove_normal ( pci );
 		return;
