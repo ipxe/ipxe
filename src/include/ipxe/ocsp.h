@@ -14,6 +14,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/asn1.h>
 #include <ipxe/x509.h>
 #include <ipxe/refcnt.h>
+#include <config/crypto.h>
+
+/* Allow OCSP to be disabled completely */
+#ifdef OCSP_CHECK
+#define OCSP_ENABLED 1
+#else
+#define OCSP_ENABLED 0
+#endif
 
 /** OCSP algorithm identifier */
 #define OCSP_ALGORITHM_IDENTIFIER( ... )				\
@@ -118,6 +126,10 @@ ocsp_put ( struct ocsp_check *ocsp ) {
  * @ret ocsp_required	An OCSP check is required
  */
 static inline int ocsp_required ( struct x509_certificate *cert ) {
+
+	/* An OCSP check is never required if OCSP checks are disabled */
+	if ( ! OCSP_ENABLED )
+		return 0;
 
 	/* An OCSP check is required if an OCSP URI exists but the
 	 * OCSP status is not (yet) good.
