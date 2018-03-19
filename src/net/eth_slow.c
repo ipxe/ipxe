@@ -157,11 +157,11 @@ static int eth_slow_lacp_rx ( struct io_buffer *iobuf,
 	 * then block the link until after the next expected LACP
 	 * packet.
 	 */
-	if ( ~lacp->partner.state & ( LACP_STATE_IN_SYNC |
-				      LACP_STATE_COLLECTING |
-				      LACP_STATE_DISTRIBUTING ) ) {
+	if ( ~lacp->actor.state & ( LACP_STATE_IN_SYNC |
+				    LACP_STATE_COLLECTING |
+				    LACP_STATE_DISTRIBUTING ) ) {
 		DBGC ( netdev, "SLOW %s LACP partner is down\n", netdev->name );
-		interval = ( ( lacp->partner.state & LACP_STATE_FAST ) ?
+		interval = ( ( lacp->actor.state & LACP_STATE_FAST ) ?
 			     ( ( LACP_INTERVAL_FAST + 1 ) * TICKS_PER_SEC ) :
 			     ( ( LACP_INTERVAL_SLOW + 1 ) * TICKS_PER_SEC ) );
 		netdev_link_block ( netdev, interval );
