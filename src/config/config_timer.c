@@ -46,3 +46,6 @@ REQUIRE_OBJECT ( efi_timer );
 #ifdef TIMER_LINUX
 REQUIRE_OBJECT ( linux_timer );
 #endif
+#ifdef TIMER_ACPI
+REQUIRE_OBJECT ( acpi_timer );
+#endif
