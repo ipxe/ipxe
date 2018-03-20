@@ -363,7 +363,7 @@ static inline int golan_set_hca_cap(struct golan *golan)
 	DBGC( golan , "%s caps.log_pg_sz = %d\n", __FUNCTION__, golan->caps.log_pg_sz);
 	DBGC( golan , "%s caps.log_uar_sz = %d\n", __FUNCTION__, be32_to_cpu(golan->caps.uar_page_sz));
 	golan->caps.uar_page_sz = 0;
-
+	golan->caps.log_max_qp = GOLAN_LOG_MAX_QP;
 
 	memcpy(((struct golan_hca_cap *)GET_INBOX(golan, GEN_MBOX)),
 		   &(golan->caps),

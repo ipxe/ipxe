@@ -33,7 +33,7 @@ typedef uint16_t		__be16;
 
 #define GOLAN_PCI_CMD_XPORT			7
 #define CMD_OWNER_HW				0x1
-
+#define GOLAN_LOG_MAX_QP			0x1
 #define IB_NUM_PKEYS		0x20
 
 struct health_buffer {
@@ -229,8 +229,7 @@ struct golan_hca_cap {
 	u8		rsvd1[16];
 	u8		log_max_srq_sz;
 	u8		log_max_qp_sz;
-	u8		rsvd2;
-	u8		log_max_qp;
+	__be16		log_max_qp;
 	u8		log_max_strq_sz;
 	u8		log_max_srqs;
 	u8		rsvd4[2];
