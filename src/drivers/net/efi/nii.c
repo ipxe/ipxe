@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <strings.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <ipxe/netdevice.h>
@@ -137,6 +138,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define PCI_MAX_BAR 6
 
+/** An NII memory mapping */
+struct nii_mapping {
+	/** List of mappings */
+	struct list_head list;
+	/** Mapped address */
+	UINT64 addr;
+	/** Mapping cookie created by PCI I/O protocol */
+	VOID *mapping;
+};
+
 /** An NII NIC */
 struct nii_nic {
 	/** EFI device */
@@ -179,6 +190,9 @@ struct nii_nic {
 	struct io_buffer *txbuf;
 	/** Current receive buffer */
 	struct io_buffer *rxbuf;
+
+	/** Mapping list */
+	struct list_head mappings;
 };
 
 /** Maximum number of received packets per poll */
@@ -280,7 +294,19 @@ static int nii_pci_open ( struct nii_nic *nii ) {
  */
 static void nii_pci_close ( struct nii_nic *nii ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct nii_mapping *map;
+	struct nii_mapping *tmp;
 
+	/* Remove any stale mappings */
+	list_for_each_entry_safe ( map, tmp, &nii->mappings, list ) {
+		DBGC ( nii, "NII %s removing stale mapping %#llx\n",
+		       nii->dev.name, ( ( unsigned long long ) map->addr ) );
+		nii->pci_io->Unmap ( nii->pci_io, map->mapping );
+		list_del ( &map->list );
+		free ( map );
+	}
+
+	/* Close protocols */
 	bs->CloseProtocol ( nii->pci_device, &efi_pci_io_protocol_guid,
 			    efi_image_handle, nii->efidev->device );
 }
@@ -329,6 +355,139 @@ static EFIAPI VOID nii_io ( UINT64 unique_id, UINT8 op, UINT8 len, UINT64 addr,
 		/* No way to report failure */
 		return;
 	}
+}
+
+/**
+ * Map callback
+ *
+ * @v unique_id		NII NIC
+ * @v addr		Address of memory to be mapped
+ * @v len		Length of memory to be mapped
+ * @v dir		Direction of data flow
+ * @v mapped		Device mapped address to fill in
+ */
+static EFIAPI VOID nii_map ( UINT64 unique_id, UINT64 addr, UINT32 len,
+			     UINT32 dir, UINT64 mapped ) {
+	struct nii_nic *nii = ( ( void * ) ( intptr_t ) unique_id );
+	EFI_PHYSICAL_ADDRESS *phys = ( ( void * ) ( intptr_t ) mapped );
+	EFI_PCI_IO_PROTOCOL_OPERATION op;
+	struct nii_mapping *map;
+	UINTN count = len;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Return a zero mapped address on failure */
+	*phys = 0;
+
+	/* Determine PCI mapping operation */
+	switch ( dir ) {
+	case TO_AND_FROM_DEVICE:
+		op = EfiPciIoOperationBusMasterCommonBuffer;
+		break;
+	case FROM_DEVICE:
+		op = EfiPciIoOperationBusMasterWrite;
+		break;
+	case TO_DEVICE:
+		op = EfiPciIoOperationBusMasterRead;
+		break;
+	default:
+		DBGC ( nii, "NII %s unsupported mapping direction %d\n",
+		       nii->dev.name, dir );
+		goto err_dir;
+	}
+
+	/* Allocate a mapping record */
+	map = zalloc ( sizeof ( *map ) );
+	if ( ! map )
+		goto err_alloc;
+	map->addr = addr;
+
+	/* Create map */
+	if ( ( efirc = nii->pci_io->Map ( nii->pci_io, op,
+					  ( ( void * ) ( intptr_t ) addr ),
+					  &count, phys, &map->mapping ) ) != 0){
+		rc = -EEFI ( efirc );
+		DBGC ( nii, "NII %s map operation failed: %s\n",
+		       nii->dev.name, strerror ( rc ) );
+		goto err_map;
+	}
+
+	/* Add to list of mappings */
+	list_add ( &map->list, &nii->mappings );
+	DBGC2 ( nii, "NII %s mapped %#llx+%#x->%#llx\n",
+		nii->dev.name, ( ( unsigned long long ) addr ),
+		len, ( ( unsigned long long ) *phys ) );
+	return;
+
+	list_del ( &map->list );
+ err_map:
+	free ( map );
+ err_alloc:
+ err_dir:
+	return;
+}
+
+/**
+ * Unmap callback
+ *
+ * @v unique_id		NII NIC
+ * @v addr		Address of mapped memory
+ * @v len		Length of mapped memory
+ * @v dir		Direction of data flow
+ * @v mapped		Device mapped address
+ */
+static EFIAPI VOID nii_unmap ( UINT64 unique_id, UINT64 addr, UINT32 len,
+			       UINT32 dir __unused, UINT64 mapped ) {
+	struct nii_nic *nii = ( ( void * ) ( intptr_t ) unique_id );
+	struct nii_mapping *map;
+
+	/* Locate mapping record */
+	list_for_each_entry ( map, &nii->mappings, list ) {
+		if ( map->addr == addr ) {
+			nii->pci_io->Unmap ( nii->pci_io, map->mapping );
+			list_del ( &map->list );
+			free ( map );
+			DBGC2 ( nii, "NII %s unmapped %#llx+%#x->%#llx\n",
+				nii->dev.name, ( ( unsigned long long ) addr ),
+				len, ( ( unsigned long long ) mapped ) );
+			return;
+		}
+	}
+
+	DBGC ( nii, "NII %s non-existent mapping %#llx+%#x->%#llx\n",
+	       nii->dev.name, ( ( unsigned long long ) addr ),
+	       len, ( ( unsigned long long ) mapped ) );
+}
+
+/**
+ * Sync callback
+ *
+ * @v unique_id		NII NIC
+ * @v addr		Address of mapped memory
+ * @v len		Length of mapped memory
+ * @v dir		Direction of data flow
+ * @v mapped		Device mapped address
+ */
+static EFIAPI VOID nii_sync ( UINT64 unique_id __unused, UINT64 addr,
+			      UINT32 len, UINT32 dir, UINT64 mapped ) {
+	const void *src;
+	void *dst;
+
+	/* Do nothing if this is an identity mapping */
+	if ( addr == mapped )
+		return;
+
+	/* Determine direction */
+	if ( dir == FROM_DEVICE ) {
+		src = ( ( void * ) ( intptr_t ) mapped );
+		dst = ( ( void * ) ( intptr_t ) addr );
+	} else {
+		src = ( ( void * ) ( intptr_t ) addr );
+		dst = ( ( void * ) ( intptr_t ) mapped );
+	}
+
+	/* Copy data */
+	memcpy ( dst, src, len );
 }
 
 /**
@@ -499,6 +658,9 @@ static int nii_start_undi ( struct nii_nic *nii ) {
 	cpb.Delay = ( ( intptr_t ) nii_delay );
 	cpb.Block = ( ( intptr_t ) nii_block );
 	cpb.Mem_IO = ( ( intptr_t ) nii_io );
+	cpb.Map_Mem = ( ( intptr_t ) nii_map );
+	cpb.UnMap_Mem = ( ( intptr_t ) nii_unmap );
+	cpb.Sync_Mem = ( ( intptr_t ) nii_sync );
 	cpb.Unique_ID = ( ( intptr_t ) nii );
 
 	/* Issue command */
@@ -1063,6 +1225,7 @@ int nii_start ( struct efi_device *efidev ) {
 	netdev_init ( netdev, &nii_operations );
 	nii = netdev->priv;
 	nii->efidev = efidev;
+	INIT_LIST_HEAD ( &nii->mappings );
 	netdev->ll_broadcast = nii->broadcast;
 	efidev_set_drvdata ( efidev, netdev );
 
