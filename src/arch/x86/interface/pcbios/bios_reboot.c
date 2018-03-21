@@ -48,7 +48,7 @@ static void bios_reboot ( int warm ) {
 	put_real ( flag, BDA_SEG, BDA_REBOOT );
 
 	/* Jump to system reset vector */
-	__asm__ __volatile__ ( REAL_CODE ( "ljmp $0xf000, $0xfff0" ) );
+	__asm__ __volatile__ ( REAL_CODE ( "ljmp $0xf000, $0xfff0" ) : );
 }
 
 /**

@@ -255,7 +255,7 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 #endif
 
 /* LINE_SYMBOL: declare a symbol for the current source code line */
-#define LINE_SYMBOL _S2 ( OBJECT ) "__line_" _S2 ( __LINE__ ) ":"
+#define LINE_SYMBOL _S2 ( OBJECT ) "__line_" _S2 ( __LINE__ ) "__%=:"
 
 /* TEXT16_CODE: declare a fragment of code that resides in .text16 */
 #define TEXT16_CODE( asm_code_str )			\
