@@ -254,9 +254,13 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 #define CODE_DEFAULT ".code32"
 #endif
 
+/* LINE_SYMBOL: declare a symbol for the current source code line */
+#define LINE_SYMBOL _S2 ( OBJECT ) "__line_" _S2 ( __LINE__ ) ":"
+
 /* TEXT16_CODE: declare a fragment of code that resides in .text16 */
 #define TEXT16_CODE( asm_code_str )			\
 	".section \".text16\", \"ax\", @progbits\n\t"	\
+	"\n" LINE_SYMBOL "\n\t"				\
 	".code16\n\t"					\
 	asm_code_str "\n\t"				\
 	CODE_DEFAULT "\n\t"				\
@@ -276,6 +280,7 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 	"push $1f\n\t"					\
 	"call phys_call\n\t"				\
 	".section \".text.phys\", \"ax\", @progbits\n\t"\
+	"\n" LINE_SYMBOL "\n\t"				\
 	".code32\n\t"					\
 	"\n1:\n\t"					\
 	asm_code_str					\
