@@ -938,10 +938,9 @@ int undinet_probe ( struct undi_device *undi, struct device *dev ) {
 	memcpy ( netdev->ll_addr, undi_info.CurrentNodeAddress, ETH_ALEN );
 	undinic->irq = undi_info.IntNumber;
 	if ( undinic->irq > IRQ_MAX ) {
-		DBGC ( undinic, "UNDINIC %p has invalid IRQ %d\n",
+		DBGC ( undinic, "UNDINIC %p ignoring invalid IRQ %d\n",
 		       undinic, undinic->irq );
-		rc = -EINVAL;
-		goto err_bad_irq;
+		undinic->irq = 0;
 	}
 	DBGC ( undinic, "UNDINIC %p has MAC address %s and IRQ %d\n",
 	       undinic, eth_ntoa ( netdev->hw_addr ), undinic->irq );
@@ -984,7 +983,6 @@ int undinet_probe ( struct undi_device *undi, struct device *dev ) {
 
  err_register:
  err_undi_get_iface_info:
- err_bad_irq:
  err_undi_get_information:
  err_undi_initialize:
 	/* Shut down UNDI stack */
