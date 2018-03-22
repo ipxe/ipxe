@@ -242,8 +242,8 @@ struct md5_sha1_digest {
 /** MD5+SHA1 digest size */
 #define MD5_SHA1_DIGEST_SIZE sizeof ( struct md5_sha1_digest )
 
-/** A TLS session */
-struct tls_session {
+/** A TLS connection */
+struct tls_connection {
 	/** Reference counter */
 	struct refcnt refcnt;
 
