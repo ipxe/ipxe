@@ -2788,6 +2788,9 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
 	tls->client_random.gmt_unix_time = time ( NULL );
+	iob_populate ( &tls->rx_header_iobuf, &tls->rx_header, 0,
+		       sizeof ( tls->rx_header ) );
+	INIT_LIST_HEAD ( &tls->rx_data );
 	if ( ( rc = tls_generate_random ( tls, &tls->client_random.random,
 			  ( sizeof ( tls->client_random.random ) ) ) ) != 0 ) {
 		goto err_random;
@@ -2797,9 +2800,6 @@ int add_tls ( struct interface *xfer, const char *name,
 		      ( sizeof ( tls->pre_master_secret.random ) ) ) ) != 0 ) {
 		goto err_random;
 	}
-	iob_populate ( &tls->rx_header_iobuf, &tls->rx_header, 0,
-		       sizeof ( tls->rx_header ) );
-	INIT_LIST_HEAD ( &tls->rx_data );
 
 	/* Start negotiation */
 	tls_restart ( tls );
