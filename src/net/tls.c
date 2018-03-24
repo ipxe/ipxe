@@ -2747,9 +2747,14 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 		tls->tx_pending &= ~TLS_TX_FINISHED;
 	}
 
-	/* Reschedule process if pending transmissions remain */
-	if ( tls->tx_pending )
+	/* Reschedule process if pending transmissions remain,
+	 * otherwise send notification of a window change.
+	 */
+	if ( tls->tx_pending ) {
 		tls_tx_resume ( tls );
+	} else {
+		xfer_window_changed ( &tls->plainstream );
+	}
 
 	return;
 
