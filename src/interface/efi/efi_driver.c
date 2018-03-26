@@ -95,9 +95,7 @@ struct efi_device * efidev_parent ( struct device *dev ) {
 static EFI_STATUS EFIAPI
 efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		       EFI_HANDLE device, EFI_DEVICE_PATH_PROTOCOL *child ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_driver *efidrv;
-	EFI_TPL saved_tpl;
 	int rc;
 
 	DBGCP ( device, "EFIDRV %s DRIVER_SUPPORTED",
@@ -113,22 +111,17 @@ efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		return EFI_ALREADY_STARTED;
 	}
 
-	/* Raise TPL */
-	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
-
 	/* Look for a driver claiming to support this device */
 	for_each_table_entry ( efidrv, EFI_DRIVERS ) {
 		if ( ( rc = efidrv->supported ( device ) ) == 0 ) {
 			DBGC ( device, "EFIDRV %s has driver \"%s\"\n",
 			       efi_handle_name ( device ), efidrv->name );
-			bs->RestoreTPL ( saved_tpl );
 			return 0;
 		}
 	}
 	DBGCP ( device, "EFIDRV %s has no driver\n",
 		efi_handle_name ( device ) );
 
-	bs->RestoreTPL ( saved_tpl );
 	return EFI_UNSUPPORTED;
 }
 
