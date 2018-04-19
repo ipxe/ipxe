@@ -481,13 +481,15 @@ static int smscusb_mii_wait ( struct smscusb_device *smscusb ) {
 /**
  * Read from MII register
  *
- * @v mii		MII interface
+ * @v mdio		MII interface
+ * @v phy		PHY address
  * @v reg		Register address
  * @ret value		Data read, or negative error
  */
-static int smscusb_mii_read ( struct mii_interface *mii, unsigned int reg ) {
+static int smscusb_mii_read ( struct mii_interface *mdio,
+			      unsigned int phy __unused, unsigned int reg ) {
 	struct smscusb_device *smscusb =
-		container_of ( mii, struct smscusb_device, mii );
+		container_of ( mdio, struct smscusb_device, mdio );
 	unsigned int base = smscusb->mii_base;
 	uint32_t mii_access;
 	uint32_t mii_data;
@@ -520,15 +522,17 @@ static int smscusb_mii_read ( struct mii_interface *mii, unsigned int reg ) {
 /**
  * Write to MII register
  *
- * @v mii		MII interface
+ * @v mdio		MII interface
+ * @v phy		PHY address
  * @v reg		Register address
  * @v data		Data to write
  * @ret rc		Return status code
  */
-static int smscusb_mii_write ( struct mii_interface *mii, unsigned int reg,
+static int smscusb_mii_write ( struct mii_interface *mdio,
+			       unsigned int phy __unused, unsigned int reg,
 			       unsigned int data ) {
 	struct smscusb_device *smscusb =
-		container_of ( mii, struct smscusb_device, mii );
+		container_of ( mdio, struct smscusb_device, mdio );
 	unsigned int base = smscusb->mii_base;
 	uint32_t mii_access;
 	uint32_t mii_data;

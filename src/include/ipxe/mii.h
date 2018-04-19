@@ -19,21 +19,24 @@ struct mii_operations {
 	/**
 	 * Read from MII register
 	 *
-	 * @v mii		MII interface
+	 * @v mdio		MII interface
+	 * @v phy		PHY address
 	 * @v reg		Register address
 	 * @ret data		Data read, or negative error
 	 */
-	int ( * read ) ( struct mii_interface *mii, unsigned int reg );
+	int ( * read ) ( struct mii_interface *mdio, unsigned int phy,
+			 unsigned int reg );
 	/**
 	 * Write to MII register
 	 *
-	 * @v mii		MII interface
+	 * @v mdio		MII interface
+	 * @v phy		PHY address
 	 * @v reg		Register address
 	 * @v data		Data to write
 	 * @ret rc		Return status code
 	 */
-	int ( * write ) ( struct mii_interface *mii, unsigned int reg,
-			  unsigned int data );
+	int ( * write ) ( struct mii_interface *mdio, unsigned int phy,
+			  unsigned int reg, unsigned int data );
 };
 
 /** An MII interface */
@@ -42,49 +45,75 @@ struct mii_interface {
 	struct mii_operations *op;
 };
 
+/** An MII device */
+struct mii_device {
+	/** MII interface */
+	struct mii_interface *mdio;
+	/** PHY address */
+	unsigned int address;
+};
+
 /**
  * Initialise MII interface
  *
- * @v mii		MII interface
+ * @v mdio		MII interface
  * @v op		MII interface operations
  */
 static inline __attribute__ (( always_inline )) void
-mii_init ( struct mii_interface *mii, struct mii_operations *op ) {
-	mii->op = op;
+mdio_init ( struct mii_interface *mdio, struct mii_operations *op ) {
+	mdio->op = op;
+}
+
+/**
+ * Initialise MII device
+ *
+ * @v mii		MII device
+ * @v mii		MII interface
+ * @v address		PHY address
+ */
+static inline __attribute__ (( always_inline )) void
+mii_init ( struct mii_device *mii, struct mii_interface *mdio,
+	   unsigned int address ) {
+	mii->mdio = mdio;
+	mii->address = address;
 }
 
 /**
  * Read from MII register
  *
- * @v mii		MII interface
+ * @v mii		MII device
  * @v reg		Register address
  * @ret data		Data read, or negative error
  */
 static inline __attribute__ (( always_inline )) int
-mii_read ( struct mii_interface *mii, unsigned int reg ) {
-	return mii->op->read ( mii, reg );
+mii_read ( struct mii_device *mii, unsigned int reg ) {
+	struct mii_interface *mdio = mii->mdio;
+
+	return mdio->op->read ( mdio, mii->address, reg );
 }
 
 /**
  * Write to MII register
  *
- * @v mii		MII interface
+ * @v mii		MII device
  * @v reg		Register address
  * @v data		Data to write
  * @ret rc		Return status code
  */
 static inline __attribute__ (( always_inline )) int
-mii_write ( struct mii_interface *mii, unsigned int reg, unsigned int data ) {
-	return mii->op->write ( mii, reg, data );
+mii_write ( struct mii_device *mii, unsigned int reg, unsigned int data ) {
+	struct mii_interface *mdio = mii->mdio;
+
+	return mdio->op->write ( mdio, mii->address, reg, data );
 }
 
 /**
  * Dump MII registers (for debugging)
  *
- * @v mii		MII interface
+ * @v mii		MII device
  */
 static inline void
-mii_dump ( struct mii_interface *mii ) {
+mii_dump ( struct mii_device *mii ) {
 	unsigned int i;
 	int data;
 
@@ -112,9 +141,9 @@ mii_dump ( struct mii_interface *mii ) {
 /** Maximum time to wait for a reset, in milliseconds */
 #define MII_RESET_MAX_WAIT_MS 500
 
-extern int mii_restart ( struct mii_interface *mii );
-extern int mii_reset ( struct mii_interface *mii );
-extern int mii_check_link ( struct mii_interface *mii,
+extern int mii_restart ( struct mii_device *mii );
+extern int mii_reset ( struct mii_device *mii );
+extern int mii_check_link ( struct mii_device *mii,
 			    struct net_device *netdev );
 
 #endif /* _IPXE_MII_H */

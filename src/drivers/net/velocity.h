@@ -326,7 +326,9 @@ struct velocity_nic {
 	/** Registers */
 	void *regs;
 	/** MII interface */
-	struct mii_interface mii;
+	struct mii_interface mdio;
+	/** MII device */
+	struct mii_device mii;
 	/** Netdev */
 	struct net_device *netdev;
 

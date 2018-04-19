@@ -237,7 +237,9 @@ struct rhine_nic {
 	uint8_t cr1;
 
 	/** MII interface */
-	struct mii_interface mii;
+	struct mii_interface mdio;
+	/** MII device */
+	struct mii_device mii;
 
 	/** Transmit descriptor ring */
 	struct rhine_ring tx;
