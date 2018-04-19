@@ -194,14 +194,14 @@ static void velocity_set_link ( struct velocity_nic *vlc ) {
 	int tmp;
 
 	/* Advertise 1000MBit */
-	tmp = velocity_mii_read ( &vlc->mii, MII_CTRL1000 );
+	tmp = mii_read ( &vlc->mii, MII_CTRL1000 );
 	tmp |= ADVERTISE_1000FULL | ADVERTISE_1000HALF;
-	velocity_mii_write ( &vlc->mii, MII_CTRL1000, tmp );
+	mii_write ( &vlc->mii, MII_CTRL1000, tmp );
 
 	/* Enable GBit operation in MII Control Register */
-	tmp = velocity_mii_read ( &vlc->mii, MII_BMCR );
+	tmp = mii_read ( &vlc->mii, MII_BMCR );
 	tmp |= BMCR_SPEED1000;
-	velocity_mii_write ( &vlc->mii, MII_BMCR, tmp );
+	mii_write ( &vlc->mii, MII_BMCR, tmp );
 }
 
 /******************************************************************************
