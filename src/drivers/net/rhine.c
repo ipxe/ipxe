@@ -726,8 +726,7 @@ static int rhine_probe ( struct pci_device *pci ) {
 		goto err_mii_reset;
 	}
 	DBGC ( rhn, "RHINE PHY vendor %04x device %04x\n",
-	       rhine_mii_read ( &rhn->mii, 0x02 ),
-	       rhine_mii_read ( &rhn->mii, 0x03 ) );
+	       mii_read ( &rhn->mii, 0x02 ), mii_read ( &rhn->mii, 0x03 ) );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
