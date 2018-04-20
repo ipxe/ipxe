@@ -147,3 +147,28 @@ int mii_check_link ( struct mii_device *mii, struct net_device *netdev ) {
 
 	return 0;
 }
+
+/**
+ * Find PHY address
+ *
+ * @v mii		MII device
+ * @ret rc		Return status code
+ */
+int mii_find ( struct mii_device *mii ) {
+	unsigned int address;
+	int id;
+
+	/* Try all possible PHY addresses */
+	for ( address = 0 ; address <= MII_MAX_PHY_ADDRESS ; address++ ) {
+		mii->address = address;
+		id = mii_read ( mii, MII_PHYSID1 );
+		if ( ( id > 0x0000 ) && ( id < 0xffff ) ) {
+			DBGC ( mii, "MII %p found PHY at address %d\n",
+			       mii, address );
+			return 0;
+		}
+	}
+
+	DBGC ( mii, "MII %p failed to find an address\n", mii );
+	return -ENOENT;
+}

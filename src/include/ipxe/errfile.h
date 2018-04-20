@@ -203,6 +203,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_smscusb		     ( ERRFILE_DRIVER | 0x00c70000 )
 #define ERRFILE_lan78xx		     ( ERRFILE_DRIVER | 0x00c80000 )
 #define ERRFILE_ena		     ( ERRFILE_DRIVER | 0x00c90000 )
+#define ERRFILE_icplus		     ( ERRFILE_DRIVER | 0x00ca0000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
