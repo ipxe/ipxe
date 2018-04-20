@@ -68,7 +68,7 @@ mdio_init ( struct mii_interface *mdio, struct mii_operations *op ) {
  * Initialise MII device
  *
  * @v mii		MII device
- * @v mii		MII interface
+ * @v mdio		MII interface
  * @v address		PHY address
  */
 static inline __attribute__ (( always_inline )) void
