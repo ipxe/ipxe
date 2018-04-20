@@ -141,9 +141,13 @@ mii_dump ( struct mii_device *mii ) {
 /** Maximum time to wait for a reset, in milliseconds */
 #define MII_RESET_MAX_WAIT_MS 500
 
+/** Maximum PHY address */
+#define MII_MAX_PHY_ADDRESS 31
+
 extern int mii_restart ( struct mii_device *mii );
 extern int mii_reset ( struct mii_device *mii );
 extern int mii_check_link ( struct mii_device *mii,
 			    struct net_device *netdev );
+extern int mii_find ( struct mii_device *mii );
 
 #endif /* _IPXE_MII_H */
