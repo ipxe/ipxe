@@ -177,6 +177,14 @@ ifeq ($(CCTYPE),gcc)
 WNA_TEST = $(CC) -Wno-address -x c -c /dev/null -o /dev/null >/dev/null 2>&1
 WNA_FLAGS := $(shell $(WNA_TEST) && $(ECHO) '-Wno-address')
 WORKAROUND_CFLAGS += $(WNA_FLAGS)
+
+# gcc 8.0 generates warnings for certain suspect string operations. Our
+# sources have been vetted for correct usage.  Turn off these warnings.
+#
+WNST_TEST = $(CC) -Wno-stringop-truncation -x c -c /dev/null -o /dev/null \
+		  >/dev/null 2>&1
+WNST_FLAGS := $(shell $(WNST_TEST) && $(ECHO) '-Wno-stringop-truncation')
+WORKAROUND_CFLAGS += $(WNST_FLAGS)
 endif
 
 # Some versions of gas choke on division operators, treating them as
@@ -437,7 +445,7 @@ endif
 CFLAGS		+= $(WORKAROUND_CFLAGS) $(EXTRA_CFLAGS)
 ASFLAGS		+= $(WORKAROUND_ASFLAGS) $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(WORKAROUND_LDFLAGS) $(EXTRA_LDFLAGS)
-HOST_CFLAGS	+= -O2 -g
+HOST_CFLAGS	+= $(WORKAROUND_CFLAGS) -O2 -g
 
 # Inhibit -Werror if NO_WERROR is specified on make command line
 #
