@@ -123,7 +123,7 @@ static void efi_snp_set_mode ( struct efi_snp_device *snpdev ) {
 
 	mode->HwAddressSize = ll_addr_len;
 	mode->MediaHeaderSize = ll_protocol->ll_header_len;
-	mode->MaxPacketSize = netdev->max_pkt_len;
+	mode->MaxPacketSize = netdev->max_pkt_len - ll_protocol->ll_header_len;
 	mode->ReceiveFilterMask = ( EFI_SIMPLE_NETWORK_RECEIVE_UNICAST |
 				    EFI_SIMPLE_NETWORK_RECEIVE_MULTICAST |
 				    EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST );
