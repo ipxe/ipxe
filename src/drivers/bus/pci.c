@@ -175,7 +175,7 @@ void adjust_pci_device ( struct pci_device *pci ) {
  * @ret rc		Return status code
  */
 int pci_read_config ( struct pci_device *pci ) {
-	uint16_t busdevfn;
+	uint32_t busdevfn;
 	uint8_t hdrtype;
 	uint32_t tmp;
 
@@ -203,8 +203,8 @@ int pci_read_config ( struct pci_device *pci ) {
 	pci_read_bases ( pci );
 
 	/* Initialise generic device component */
-	snprintf ( pci->dev.name, sizeof ( pci->dev.name ),
-		   "PCI%02x:%02x.%x", PCI_BUS ( pci->busdevfn ),
+	snprintf ( pci->dev.name, sizeof ( pci->dev.name ), "%04x:%02x:%02x.%x",
+		   PCI_SEG ( pci->busdevfn ), PCI_BUS ( pci->busdevfn ),
 		   PCI_SLOT ( pci->busdevfn ), PCI_FUNC ( pci->busdevfn ) );
 	pci->dev.desc.bus_type = BUS_TYPE_PCI;
 	pci->dev.desc.location = pci->busdevfn;
@@ -232,7 +232,7 @@ int pci_find_next ( struct pci_device *pci, unsigned int busdevfn ) {
 
 	/* Determine number of PCI buses */
 	if ( ! end )
-		end = PCI_BUSDEVFN ( pci_num_bus(), 0, 0 );
+		end = PCI_BUSDEVFN ( 0, pci_num_bus(), 0, 0 );
 
 	/* Find next PCI device, if any */
 	for ( ; busdevfn < end ; busdevfn++ ) {

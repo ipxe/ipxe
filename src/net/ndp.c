@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
@@ -38,8 +39,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+static struct ipv6conf * ipv6conf_demux ( struct net_device *netdev );
 static int
 ipv6conf_rx_router_advertisement ( struct net_device *netdev,
+				   struct in6_addr *router,
 				   struct ndp_router_advertisement_header *radv,
 				   size_t len );
 
@@ -339,10 +342,6 @@ ndp_rx_router_advertisement_prefix ( struct net_device *netdev,
 				     union ndp_option *option, size_t len ) {
 	struct ndp_router_advertisement_header *radv = &ndp->radv;
 	struct ndp_prefix_information_option *prefix_opt = &option->prefix;
-	struct in6_addr *router = &sin6_src->sin6_addr;
-	struct in6_addr address;
-	int prefix_len;
-	int rc;
 
 	/* Sanity check */
 	if ( sizeof ( *prefix_opt ) > len ) {
@@ -350,53 +349,14 @@ ndp_rx_router_advertisement_prefix ( struct net_device *netdev,
 		       "short at %zd bytes\n", netdev->name, len );
 		return -EINVAL;
 	}
+
 	DBGC ( netdev, "NDP %s found %sdefault router %s ",
 	       netdev->name, ( radv->lifetime ? "" : "non-" ),
 	       inet6_ntoa ( &sin6_src->sin6_addr ) );
 	DBGC ( netdev, "for %s-link %sautonomous prefix %s/%d\n",
 	       ( ( prefix_opt->flags & NDP_PREFIX_ON_LINK ) ? "on" : "off" ),
 	       ( ( prefix_opt->flags & NDP_PREFIX_AUTONOMOUS ) ? "" : "non-" ),
-	       inet6_ntoa ( &prefix_opt->prefix ),
-	       prefix_opt->prefix_len );
-
-	/* Ignore off-link prefixes */
-	if ( ! ( prefix_opt->flags & NDP_PREFIX_ON_LINK ) )
-		return 0;
-
-	/* Define prefix */
-	if ( ( rc = ipv6_set_prefix ( netdev, &prefix_opt->prefix,
-				      prefix_opt->prefix_len,
-				      ( radv->lifetime ?
-					router : NULL ) ) ) != 0 ) {
-		DBGC ( netdev, "NDP %s could not define prefix %s/%d: %s\n",
-		       netdev->name, inet6_ntoa ( &prefix_opt->prefix ),
-		       prefix_opt->prefix_len, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Perform stateless address autoconfiguration, if applicable */
-	if ( prefix_opt->flags & NDP_PREFIX_AUTONOMOUS ) {
-		memcpy ( &address, &prefix_opt->prefix, sizeof ( address ) );
-		prefix_len = ipv6_eui64 ( &address, netdev );
-		if ( prefix_len < 0 ) {
-			rc = prefix_len;
-			DBGC ( netdev, "NDP %s could not construct SLAAC "
-			       "address: %s\n", netdev->name, strerror ( rc ) );
-			return rc;
-		}
-		if ( prefix_len != prefix_opt->prefix_len ) {
-			DBGC ( netdev, "NDP %s incorrect SLAAC prefix length "
-			       "%d (expected %d)\n", netdev->name,
-			       prefix_opt->prefix_len, prefix_len );
-			return -EINVAL;
-		}
-		if ( ( rc = ipv6_set_address ( netdev, &address ) ) != 0 ) {
-			DBGC ( netdev, "NDP %s could not set address %s: %s\n",
-			       netdev->name, inet6_ntoa ( &address ),
-			       strerror ( rc ) );
-			return rc;
-		}
-	}
+	       inet6_ntoa ( &prefix_opt->prefix ), prefix_opt->prefix_len );
 
 	return 0;
 }
@@ -576,6 +536,7 @@ ndp_rx_router_advertisement ( struct io_buffer *iobuf,
 			      struct sockaddr_in6 *sin6_dest __unused ) {
 	union ndp_header *ndp = iobuf->data;
 	struct ndp_router_advertisement_header *radv = &ndp->radv;
+	struct in6_addr *router = &sin6_src->sin6_addr;
 	size_t len = iob_len ( iobuf );
 	int rc;
 
@@ -586,8 +547,8 @@ ndp_rx_router_advertisement ( struct io_buffer *iobuf,
 		goto err_options;
 
 	/* Pass to IPv6 autoconfiguration */
-	if ( ( rc = ipv6conf_rx_router_advertisement ( netdev, radv,
-						       len ) ) != 0 )
+	if ( ( rc = ipv6conf_rx_router_advertisement ( netdev, router,
+						       radv, len ) ) != 0 )
 		goto err_ipv6conf;
 
  err_ipv6conf:
@@ -618,16 +579,30 @@ struct icmpv6_handler ndp_handlers[] __icmpv6_handler = {
  *
  */
 
+/** An NDP prefix settings block */
+struct ndp_prefix_settings {
+	/** Settings interface */
+	struct settings settings;
+	/** Name */
+	char name[4];
+	/** Prefix information option */
+	struct ndp_prefix_information_option *prefix;
+};
+
 /** An NDP settings block */
 struct ndp_settings {
 	/** Reference counter */
 	struct refcnt refcnt;
 	/** Settings interface */
 	struct settings settings;
+	/** Router address */
+	struct in6_addr router;
+	/** Router lifetime */
+	unsigned int lifetime;
 	/** Length of NDP options */
 	size_t len;
 	/** NDP options */
-	union ndp_option option[0];
+	union ndp_option options[0];
 };
 
 /** NDP settings scope */
@@ -638,9 +613,11 @@ static const struct settings_scope ndp_settings_scope;
  *
  * @v type		NDP option type
  * @v offset		Starting offset of data
+ * @v len		Length of data (or 0 to use all remaining data)
  * @ret tag		NDP tag
  */
-#define NDP_TAG( type, offset )	( ( (offset) << 8 ) | (type) )
+#define NDP_TAG( type, offset, len ) \
+	( ( (len) << 16 ) | ( (offset) << 8 ) | (type) )
 
 /**
  * Extract NDP tag type
@@ -648,7 +625,7 @@ static const struct settings_scope ndp_settings_scope;
  * @v tag		NDP tag
  * @ret type		NDP option type
  */
-#define NDP_TAG_TYPE( tag ) ( (tag) & 0xff )
+#define NDP_TAG_TYPE( tag ) ( ( (tag) >> 0 ) & 0xff )
 
 /**
  * Extract NDP tag offset
@@ -656,7 +633,23 @@ static const struct settings_scope ndp_settings_scope;
  * @v tag		NDP tag
  * @ret offset		Starting offset of data
  */
-#define NDP_TAG_OFFSET( tag ) ( (tag) >> 8 )
+#define NDP_TAG_OFFSET( tag ) ( ( (tag) >> 8 ) & 0xff )
+
+/**
+ * Extract NDP tag length
+ *
+ * @v tag		NDP tag
+ * @ret len		Length of data (or 0 to use all remaining data)
+ */
+#define NDP_TAG_LEN( tag ) ( ( (tag) >> 16 ) & 0xff )
+
+/**
+ * Extract NDP tag instance
+ *
+ * @v tag		NDP tag
+ * @ret instance	Instance
+ */
+#define NDP_TAG_INSTANCE( tag ) ( ( (tag) >> 24 ) & 0xff )
 
 /**
  * Check applicability of NDP setting
@@ -689,44 +682,58 @@ static int ndp_fetch ( struct settings *settings,
 		container_of ( settings->parent, struct net_device,
 			       settings.settings );
 	union ndp_option *option;
-	unsigned int type = NDP_TAG_TYPE ( setting->tag );
-	unsigned int offset = NDP_TAG_OFFSET ( setting->tag );
-	size_t remaining;
+	unsigned int tag_type;
+	unsigned int tag_offset;
+	unsigned int tag_len;
+	unsigned int tag_instance;
+	size_t offset;
 	size_t option_len;
-	size_t payload_len;
+	void *option_data;
+
+	/* Parse setting tag */
+	tag_type = NDP_TAG_TYPE ( setting->tag );
+	tag_offset = NDP_TAG_OFFSET ( setting->tag );
+	tag_len = NDP_TAG_LEN ( setting->tag );
+	tag_instance = NDP_TAG_INSTANCE ( setting->tag );
 
 	/* Scan through NDP options for requested type.  We can assume
 	 * that the options are well-formed, otherwise they would have
 	 * been rejected prior to being stored.
 	 */
-	option = ndpset->option;
-	remaining = ndpset->len;
-	while ( remaining ) {
+	for ( offset = 0 ; offset < ndpset->len ; offset += option_len ) {
 
 		/* Calculate option length */
+		option = ( ( ( void * ) ndpset->options ) + offset );
 		option_len = ( option->header.blocks * NDP_OPTION_BLKSZ );
 
-		/* If this is the requested option, return it */
-		if ( option->header.type == type ) {
+		/* Skip options that do not match this tag */
+		if ( option->header.type != tag_type )
+			continue;
 
-			/* Sanity check */
-			if ( offset > option_len ) {
-				DBGC ( netdev, "NDP %s option %d too short\n",
-				       netdev->name, type );
-				return -EINVAL;
-			}
-			payload_len = ( option_len - offset );
+		/* Skip previous instances of this option */
+		if ( tag_instance-- != 0 )
+			continue;
 
-			/* Copy data to output buffer */
-			if ( len > payload_len )
-				len = payload_len;
-			memcpy ( data, ( ( ( void * ) option ) + offset ), len);
-			return payload_len;
+		/* Sanity check */
+		if ( ( tag_offset + tag_len ) > option_len ) {
+			DBGC ( netdev, "NDP %s option %d too short\n",
+			       netdev->name, tag_type );
+			return -EINVAL;
 		}
+		if ( ! tag_len )
+			tag_len = ( option_len - tag_offset );
+		option_data = ( ( ( void * ) option ) + tag_offset );
 
-		/* Move to next option */
-		option = ( ( ( void * ) option ) + option_len );
-		remaining -= option_len;
+		/* Copy data to output buffer */
+		if ( len > tag_len )
+			len = tag_len;
+		memcpy ( data, option_data, len );
+
+		/* Default to hex if no type is specified */
+		if ( ! setting->type )
+			setting->type = &setting_type_hex;
+
+		return tag_len;
 	}
 
 	return -ENOENT;
@@ -739,21 +746,217 @@ static struct settings_operations ndp_settings_operations = {
 };
 
 /**
+ * Check applicability of NDP per-prefix setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @ret applies		Setting applies within this settings block
+ */
+static int ndp_prefix_applies ( struct settings *settings __unused,
+				const struct setting *setting ) {
+
+	return ( setting->scope == &ipv6_settings_scope );
+}
+
+/**
+ * Fetch value of NDP IPv6 address setting
+ *
+ * @v settings		Settings block
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int ndp_prefix_fetch_ip6 ( struct settings *settings, void *data,
+				  size_t len ) {
+	struct ndp_prefix_settings *prefset =
+		container_of ( settings, struct ndp_prefix_settings, settings );
+	struct ndp_settings *ndpset =
+		container_of ( settings->parent, struct ndp_settings, settings);
+	struct net_device *netdev =
+		container_of ( ndpset->settings.parent, struct net_device,
+			       settings.settings );
+	struct ndp_prefix_information_option *prefix = prefset->prefix;
+	struct in6_addr ip6;
+	int prefix_len;
+
+	/* Skip dead prefixes */
+	if ( ! prefix->valid )
+		return -ENOENT;
+
+	/* Construct IPv6 address via SLAAC, if applicable */
+	memcpy ( &ip6, &prefix->prefix, sizeof ( ip6 ) );
+	if ( prefix->flags & NDP_PREFIX_AUTONOMOUS ) {
+		prefix_len = ipv6_eui64 ( &ip6, netdev );
+		if ( prefix_len < 0 )
+			return prefix_len;
+		if ( prefix_len != prefix->prefix_len )
+			return -EINVAL;
+	}
+
+	/* Fill in IPv6 address */
+	if ( len > sizeof ( ip6 ) )
+		len = sizeof ( ip6 );
+	memcpy ( data, &ip6, len );
+
+	return sizeof ( ip6 );
+}
+
+/**
+ * Fetch value of NDP prefix length setting
+ *
+ * @v settings		Settings block
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int ndp_prefix_fetch_len6 ( struct settings *settings, void *data,
+				   size_t len ) {
+	struct ndp_prefix_settings *prefset =
+		container_of ( settings, struct ndp_prefix_settings, settings );
+	struct ndp_prefix_information_option *prefix = prefset->prefix;
+	uint8_t *len6;
+
+	/* Fill in prefix length */
+	if ( len >= sizeof ( *len6 ) ) {
+		/* We treat an off-link prefix as having a prefix
+		 * length covering the entire IPv6 address.
+		 */
+		len6 = data;
+		*len6 = ( ( prefix->flags & NDP_PREFIX_ON_LINK ) ?
+			  prefix->prefix_len : -1UL );
+	}
+
+	return sizeof ( *len6 );
+}
+
+/**
+ * Fetch value of NDP router address setting
+ *
+ * @v settings		Settings block
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int ndp_prefix_fetch_gateway6 ( struct settings *settings,
+				       void *data, size_t len ) {
+	struct ndp_settings *ndpset =
+		container_of ( settings->parent, struct ndp_settings, settings);
+
+	/* Treat non-routing router as non-existent */
+	if ( ! ndpset->lifetime )
+		return -ENOENT;
+
+	/* Fill in router address */
+	if ( len > sizeof ( ndpset->router ) )
+		len = sizeof ( ndpset->router );
+	memcpy ( data, &ndpset->router, len );
+
+	return sizeof ( ndpset->router );
+}
+
+/** An NDP per-prefix setting operation */
+struct ndp_prefix_operation {
+	/** Generic setting */
+	const struct setting *setting;
+	/**
+	 * Fetch value of setting
+	 *
+	 * @v settings		Settings block
+	 * @v data		Buffer to fill with setting data
+	 * @v len		Length of buffer
+	 * @ret len		Length of setting data, or negative error
+	 */
+	int ( * fetch ) ( struct settings *settings, void *data, size_t len );
+};
+
+/** NDP per-prefix settings operations */
+static struct ndp_prefix_operation ndp_prefix_operations[] = {
+	{ &ip6_setting, ndp_prefix_fetch_ip6 },
+	{ &len6_setting, ndp_prefix_fetch_len6 },
+	{ &gateway6_setting, ndp_prefix_fetch_gateway6 },
+};
+
+/**
+ * Fetch value of NDP pre-prefix setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int ndp_prefix_fetch ( struct settings *settings,
+			      struct setting *setting,
+			      void *data, size_t len ) {
+	struct ndp_prefix_operation *op;
+	unsigned int i;
+
+	/* Handle per-prefix settings */
+	for ( i = 0 ; i < ( sizeof ( ndp_prefix_operations ) /
+			    sizeof ( ndp_prefix_operations[0] ) ) ; i++ ) {
+		op = &ndp_prefix_operations[i];
+		if ( setting_cmp ( setting, op->setting ) == 0 )
+			return op->fetch ( settings, data, len );
+	}
+
+	return -ENOENT;
+}
+
+/** NDP per-prefix settings operations */
+static struct settings_operations ndp_prefix_settings_operations = {
+	.applies = ndp_prefix_applies,
+	.fetch = ndp_prefix_fetch,
+};
+
+/**
  * Register NDP settings
  *
  * @v netdev		Network device
- * @v option		NDP options
+ * @v router		Router address
+ * @v lifetime		Router lifetime
+ * @v options		NDP options
  * @v len		Length of options
  * @ret rc		Return status code
  */
 static int ndp_register_settings ( struct net_device *netdev,
-				   union ndp_option *option, size_t len ) {
+				   struct in6_addr *router,
+				   unsigned int lifetime,
+				   union ndp_option *options, size_t len ) {
 	struct settings *parent = netdev_settings ( netdev );
+	union ndp_option *option;
 	struct ndp_settings *ndpset;
+	struct ndp_prefix_settings *prefset;
+	size_t offset;
+	size_t option_len;
+	unsigned int prefixes;
+	unsigned int instance;
+	int order;
 	int rc;
 
+	/* Count number of prefix options.  We can assume that the
+	 * options are well-formed, otherwise they would have been
+	 * rejected prior to being stored.
+	 */
+	order = IPV6_ORDER_PREFIX_ONLY;
+	for ( prefixes = 0, offset = 0 ; offset < len ; offset += option_len ) {
+
+		/* Skip non-prefix options */
+		option = ( ( ( void * ) options ) + offset );
+		option_len = ( option->header.blocks * NDP_OPTION_BLKSZ );
+		if ( option->header.type != NDP_OPT_PREFIX )
+			continue;
+
+		/* Count number of prefixes */
+		prefixes++;
+
+		/* Increase overall order if we have SLAAC addresses */
+		if ( option->prefix.flags & NDP_PREFIX_AUTONOMOUS )
+			order = IPV6_ORDER_SLAAC;
+	}
+
 	/* Allocate and initialise structure */
-	ndpset = zalloc ( sizeof ( *ndpset ) + len );
+	ndpset = zalloc ( sizeof ( *ndpset ) + len +
+			  ( prefixes * sizeof ( *prefset ) ) );
 	if ( ! ndpset ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -761,14 +964,54 @@ static int ndp_register_settings ( struct net_device *netdev,
 	ref_init ( &ndpset->refcnt, NULL );
 	settings_init ( &ndpset->settings, &ndp_settings_operations,
 			&ndpset->refcnt, &ndp_settings_scope );
+	ndpset->settings.order = order;
+	memcpy ( &ndpset->router, router, sizeof ( ndpset->router ) );
+	ndpset->lifetime = lifetime;
 	ndpset->len = len;
-	memcpy ( ndpset->option, option, len );
+	memcpy ( ndpset->options, options, len );
+	prefset = ( ( ( void * ) ndpset->options ) + len );
 
 	/* Register settings */
 	if ( ( rc = register_settings ( &ndpset->settings, parent,
 					NDP_SETTINGS_NAME ) ) != 0 )
 		goto err_register;
 
+	/* Construct and register per-prefix settings */
+	for ( instance = 0, offset = 0 ; offset < len ; offset += option_len ) {
+
+		/* Skip non-prefix options */
+		option = ( ( ( void * ) ndpset->options ) + offset );
+		option_len = ( option->header.blocks * NDP_OPTION_BLKSZ );
+		if ( option->header.type != NDP_OPT_PREFIX )
+			continue;
+
+		/* Initialise structure */
+		settings_init ( &prefset->settings,
+				&ndp_prefix_settings_operations,
+				&ndpset->refcnt, &ndp_settings_scope );
+		prefset->settings.order =
+			( ( option->prefix.flags & NDP_PREFIX_AUTONOMOUS ) ?
+			  IPV6_ORDER_SLAAC : IPV6_ORDER_PREFIX_ONLY );
+		prefset->prefix = &option->prefix;
+		snprintf ( prefset->name, sizeof ( prefset->name ), "%d",
+			   instance++ );
+
+		/* Register settings */
+		if ( ( rc = register_settings ( &prefset->settings,
+						&ndpset->settings,
+						prefset->name ) ) != 0 )
+			goto err_register_prefix;
+
+		/* Move to next per-prefix settings */
+		prefset++;
+	}
+	assert ( instance == prefixes );
+
+	ref_put ( &ndpset->refcnt );
+	return 0;
+
+ err_register_prefix:
+	unregister_settings ( &ndpset->settings );
  err_register:
 	ref_put ( &ndpset->refcnt );
  err_alloc:
@@ -776,11 +1019,11 @@ static int ndp_register_settings ( struct net_device *netdev,
 }
 
 /** DNS server setting */
-const struct setting ndp_dns6_setting __setting ( SETTING_IP_EXTRA, dns6 ) = {
+const struct setting ndp_dns6_setting __setting ( SETTING_IP6_EXTRA, dns6 ) = {
 	.name = "dns6",
 	.description = "DNS server",
 	.tag = NDP_TAG ( NDP_OPT_RDNSS,
-			 offsetof ( struct ndp_rdnss_option, addresses ) ),
+			 offsetof ( struct ndp_rdnss_option, addresses ), 0 ),
 	.type = &setting_type_ipv6,
 	.scope = &ndp_settings_scope,
 };
@@ -790,7 +1033,7 @@ const struct setting ndp_dnssl_setting __setting ( SETTING_IP_EXTRA, dnssl ) = {
 	.name = "dnssl",
 	.description = "DNS search list",
 	.tag = NDP_TAG ( NDP_OPT_DNSSL,
-			 offsetof ( struct ndp_dnssl_option, names ) ),
+			 offsetof ( struct ndp_dnssl_option, names ), 0 ),
 	.type = &setting_type_dnssl,
 	.scope = &ndp_settings_scope,
 };
@@ -897,6 +1140,7 @@ static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
  * Handle router advertisement during IPv6 autoconfiguration
  *
  * @v netdev		Network device
+ * @v router		Router address
  * @v radv		Router advertisement
  * @v len		Length of router advertisement
  * @ret rc		Return status code
@@ -906,6 +1150,7 @@ static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
  */
 static int
 ipv6conf_rx_router_advertisement ( struct net_device *netdev,
+				   struct in6_addr *router,
 				   struct ndp_router_advertisement_header *radv,
 				   size_t len ) {
 	struct ipv6conf *ipv6conf;
@@ -915,13 +1160,10 @@ ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 
 	/* Identify IPv6 configurator, if any */
 	ipv6conf = ipv6conf_demux ( netdev );
-	if ( ! ipv6conf ) {
-		/* Not an error; router advertisements are processed
-		 * as a background activity even when no explicit
-		 * autoconfiguration is taking place.
-		 */
+
+	/* Do nothing unless IPv6 autoconfiguration is in progress */
+	if ( ! ipv6conf )
 		return 0;
-	}
 
 	/* If this is not the first solicited router advertisement, ignore it */
 	if ( ! timer_running ( &ipv6conf->timer ) )
@@ -932,8 +1174,9 @@ ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 
 	/* Register NDP settings */
 	option_len = ( len - offsetof ( typeof ( *radv ), option ) );
-	if ( ( rc = ndp_register_settings ( netdev, radv->option,
-					    option_len ) ) != 0 )
+	if ( ( rc = ndp_register_settings ( netdev, router,
+					    ntohl ( radv->lifetime ),
+					    radv->option, option_len ) ) != 0 )
 		return rc;
 
 	/* Start DHCPv6 if required */

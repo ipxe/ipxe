@@ -144,8 +144,7 @@ size_t tcpip_mtu ( struct sockaddr_tcpip *st_dest ) {
 		return 0;
 
 	/* Calculate MTU */
-	mtu = ( netdev->max_pkt_len - netdev->ll_protocol->ll_header_len -
-		tcpip_net->header_len );
+	mtu = ( netdev->mtu - tcpip_net->header_len );
 
 	return mtu;
 }

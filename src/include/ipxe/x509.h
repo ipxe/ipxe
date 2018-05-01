@@ -16,6 +16,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/refcnt.h>
 #include <ipxe/list.h>
 
+struct image;
+
 /** An X.509 serial number */
 struct x509_serial {
 	/** Raw serial number */
@@ -187,8 +189,8 @@ struct x509_certificate {
 	/** Link in certificate store */
 	struct x509_link store;
 
-	/** Certificate has been validated */
-	int valid;
+	/** Flags */
+	unsigned int flags;
 	/** Maximum number of subsequent certificates in chain */
 	unsigned int path_remaining;
 
@@ -212,6 +214,16 @@ struct x509_certificate {
 	struct x509_signature signature;
 	/** Extensions */
 	struct x509_extensions extensions;
+};
+
+/** X.509 certificate flags */
+enum x509_flags {
+	/** Certificate has been validated */
+	X509_FL_VALIDATED = 0x0001,
+	/** Certificate was added at build time */
+	X509_FL_PERMANENT = 0x0002,
+	/** Certificate was added explicitly at run time */
+	X509_FL_EXPLICIT = 0x0004,
 };
 
 /**
@@ -358,6 +370,8 @@ extern int x509_auto_append ( struct x509_chain *chain,
 extern int x509_validate_chain ( struct x509_chain *chain, time_t time,
 				 struct x509_chain *store,
 				 struct x509_root *root );
+extern int image_x509 ( struct image *image, size_t offset,
+			struct x509_certificate **cert );
 
 /* Functions exposed only for unit testing */
 extern int x509_check_issuer ( struct x509_certificate *cert,
@@ -370,12 +384,21 @@ extern int x509_check_root ( struct x509_certificate *cert,
 extern int x509_check_time ( struct x509_certificate *cert, time_t time );
 
 /**
+ * Check if X.509 certificate is valid
+ *
+ * @v cert		X.509 certificate
+ */
+static inline int x509_is_valid ( struct x509_certificate *cert ) {
+	return ( cert->flags & X509_FL_VALIDATED );
+}
+
+/**
  * Invalidate X.509 certificate
  *
  * @v cert		X.509 certificate
  */
 static inline void x509_invalidate ( struct x509_certificate *cert ) {
-	cert->valid = 0;
+	cert->flags &= ~X509_FL_VALIDATED;
 	cert->path_remaining = 0;
 }
 

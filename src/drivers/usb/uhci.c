@@ -697,7 +697,7 @@ static int uhci_endpoint_open ( struct usb_endpoint *ep ) {
 		goto err_ring_alloc;
 	endpoint->ring.mtu = ep->mtu;
 	endpoint->ring.flags = UHCI_FL_CERR_MAX;
-	if ( usb->port->speed < USB_SPEED_FULL )
+	if ( usb->speed < USB_SPEED_FULL )
 		endpoint->ring.flags |= UHCI_FL_LS;
 	endpoint->ring.control = ( UHCI_CONTROL_DEVICE ( usb->address ) |
 				   UHCI_CONTROL_ENDPOINT ( ep->address ) );

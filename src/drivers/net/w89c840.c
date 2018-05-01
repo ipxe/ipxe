@@ -247,7 +247,7 @@ static struct winbond_private
     /* MII transceiver section. */
     int mii_cnt;                        /* MII device addresses. */
     u16 advertising;                    /* NWay media advertisement */
-    unsigned char phys[2];                /* MII device addresses. */
+    unsigned char phys[4];                /* MII device addresses. */
 } w840private __attribute__ ((aligned (PRIV_ALIGN_BYTES)));
 
 /* NIC specific static variables go here */

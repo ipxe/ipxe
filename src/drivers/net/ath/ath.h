@@ -26,7 +26,6 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/net80211.h>
 
 /* This block of functions are from kernel.h v3.0.1 */
-#define ARRAY_SIZE(arr)		(sizeof(arr) / sizeof((arr)[0]))
 #define DIV_ROUND_UP(n,d)	(((n) + (d) - 1) / (d))
 #define BITS_PER_BYTE		8
 #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
@@ -100,8 +99,6 @@ static inline u32 get_unaligned_le32(const void *p)
  * up to ATH_KEYMAX entries (could dynamically allocate state).
  */
 #define	ATH_KEYMAX	        128     /* max key cache size we handle */
-
-static const u8 ath_bcast_mac[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 struct ath_ani {
 	int caldone;
@@ -228,10 +225,6 @@ struct ath_common {
 
 	int btcoex_enabled;
 };
-
-struct io_buffer *ath_rxbuf_alloc(struct ath_common *common,
-				u32 len,
-				u32 *iob_addr);
 
 void ath_hw_setbssidmask(struct ath_common *common);
 int ath_hw_keyreset(struct ath_common *common, u16 entry);

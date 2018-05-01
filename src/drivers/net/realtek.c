@@ -242,12 +242,15 @@ static int realtek_init_eeprom ( struct net_device *netdev ) {
 /**
  * Read from MII register
  *
- * @v mii		MII interface
+ * @v mdio		MII interface
+ * @v phy		PHY address
  * @v reg		Register address
  * @ret value		Data read, or negative error
  */
-static int realtek_mii_read ( struct mii_interface *mii, unsigned int reg ) {
-	struct realtek_nic *rtl = container_of ( mii, struct realtek_nic, mii );
+static int realtek_mii_read ( struct mii_interface *mdio,
+			      unsigned int phy __unused, unsigned int reg ) {
+	struct realtek_nic *rtl =
+		container_of ( mdio, struct realtek_nic, mdio );
 	unsigned int i;
 	uint32_t value;
 
@@ -279,14 +282,17 @@ static int realtek_mii_read ( struct mii_interface *mii, unsigned int reg ) {
 /**
  * Write to MII register
  *
- * @v mii		MII interface
+ * @v mdio		MII interface
+ * @v phy		PHY address
  * @v reg		Register address
  * @v data		Data to write
  * @ret rc		Return status code
  */
-static int realtek_mii_write ( struct mii_interface *mii, unsigned int reg,
-			       unsigned int data) {
-	struct realtek_nic *rtl = container_of ( mii, struct realtek_nic, mii );
+static int realtek_mii_write ( struct mii_interface *mdio,
+			       unsigned int phy __unused, unsigned int reg,
+			       unsigned int data ) {
+	struct realtek_nic *rtl =
+		container_of ( mdio, struct realtek_nic, mdio );
 	unsigned int i;
 
 	/* Fail if PHYAR register is not present */
@@ -1158,7 +1164,8 @@ static int realtek_probe ( struct pci_device *pci ) {
 	}
 
 	/* Initialise and reset MII interface */
-	mii_init ( &rtl->mii, &realtek_mii_operations );
+	mdio_init ( &rtl->mdio, &realtek_mii_operations );
+	mii_init ( &rtl->mii, &rtl->mdio, 0 );
 	if ( ( rc = realtek_phy_reset ( rtl ) ) != 0 )
 		goto err_phy_reset;
 

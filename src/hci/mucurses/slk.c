@@ -81,9 +81,10 @@ static void _print_label ( struct _softlabel sl ) {
 
 	assert ( slks->max_label_len <= SLK_MAX_LABEL_LEN );
 	space_ch = ' ';
+	memset ( str, 0, sizeof ( str ) );
 
 	// protect against gaps in the soft label keys array
-	if ( sl.label == NULL ) {
+	if ( ! sl.label[0] ) {
 		memset( str, space_ch, (size_t)(slks->max_label_len) );
 	} else {
 		/* we need to pad the label with varying amounts of leading
@@ -268,8 +269,7 @@ int slk_init ( int fmt ) {
 		slks->spaces[0] = 3; slks->spaces[1] = 7;
 		break;
 	default:
-		nblocks = 0; nmaj = 0; nmin = 0;
-		break;
+		return ERR;
 	}
 
 	// determine maximum label length and major space size
@@ -358,7 +358,7 @@ int slk_set ( int labnum, const char *label, int fmt ) {
 		return ERR;
 
 	strncpy(slks->fkeys[labnum].label, label,
-		sizeof(slks->fkeys[labnum].label));
+		(sizeof(slks->fkeys[labnum].label) - 1));
 	slks->fkeys[labnum].fmt = fmt;
 
 	return OK;

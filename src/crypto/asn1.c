@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <time.h>
 #include <ipxe/tables.h>
+#include <ipxe/image.h>
 #include <ipxe/asn1.h>
 
 /** @file
@@ -82,22 +83,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_ENOTTY, 0x01, "Inappropriate algorithm" )
 
 /**
- * Invalidate ASN.1 object cursor
- *
- * @v cursor		ASN.1 object cursor
- */
-void asn1_invalidate_cursor ( struct asn1_cursor *cursor ) {
-	static uint8_t asn1_invalid_object[] = { ASN1_END, 0 };
-
-	cursor->data = asn1_invalid_object;
-	cursor->len = 0;
-}
-
-/**
  * Start parsing ASN.1 object
  *
  * @v cursor		ASN.1 object cursor
  * @v type		Expected type, or ASN1_ANY
+ * @v extra		Additional length not present within partial cursor
  * @ret len		Length of object body, or negative error
  *
  * The object cursor will be updated to point to the start of the
@@ -105,7 +95,7 @@ void asn1_invalidate_cursor ( struct asn1_cursor *cursor ) {
  * the length of the object body (i.e. the number of bytes until the
  * following object tag, if any) is returned.
  */
-static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
+int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
 	unsigned int len_len;
 	unsigned int len;
 
@@ -147,9 +137,9 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 		cursor->data++;
 		cursor->len--;
 	}
-	if ( cursor->len < len ) {
+	if ( ( cursor->len + extra ) < len ) {
 		DBGC ( cursor, "ASN1 %p bad length %d (max %zd)\n",
-		       cursor, len, cursor->len );
+		       cursor, len, ( cursor->len + extra ) );
 		return -EINVAL_ASN1_LEN;
 	}
 
@@ -170,7 +160,7 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
-	len = asn1_start ( cursor, type );
+	len = asn1_start ( cursor, type, 0 );
 	if ( len < 0 ) {
 		asn1_invalidate_cursor ( cursor );
 		return len;
@@ -197,7 +187,7 @@ int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
 int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
-	len = asn1_start ( cursor, type );
+	len = asn1_start ( cursor, type, 0 );
 	if ( len < 0 )
 		return len;
 
@@ -254,7 +244,7 @@ int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type ) {
 
 	/* Find end of object */
 	memcpy ( &temp, cursor, sizeof ( temp ) );
-	len = asn1_start ( &temp, type );
+	len = asn1_start ( &temp, type, 0 );
 	if ( len < 0 ) {
 		asn1_invalidate_cursor ( cursor );
 		return len;
@@ -749,7 +739,7 @@ static size_t asn1_header ( struct asn1_builder_header *header,
  * @v extra		Extra space to prepend
  * @ret rc		Return status code
  */
-static int asn1_grow ( struct asn1_builder *builder, size_t extra ) {
+int asn1_grow ( struct asn1_builder *builder, size_t extra ) {
 	size_t new_len;
 	void *new;
 
@@ -849,3 +839,44 @@ int asn1_wrap ( struct asn1_builder *builder, unsigned int type ) {
 
 	return 0;
 }
+
+/**
+ * Extract ASN.1 object from image
+ *
+ * @v image		Image
+ * @v offset		Offset within image
+ * @v cursor		ASN.1 cursor to fill in
+ * @ret next		Offset to next image, or negative error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated ASN.1 cursor.
+ */
+int image_asn1 ( struct image *image, size_t offset,
+		 struct asn1_cursor **cursor ) {
+	int next;
+	int rc;
+
+	/* Sanity check */
+	assert ( offset <= image->len );
+
+	/* Check that this image can be used to extract an ASN.1 object */
+	if ( ! ( image->type && image->type->asn1 ) )
+		return -ENOTSUP;
+
+	/* Try creating ASN.1 cursor */
+	next = image->type->asn1 ( image, offset, cursor );
+	if ( next < 0 ) {
+		rc = next;
+		DBGC ( image, "IMAGE %s could not extract ASN.1 object: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return next;
+}
+
+/* Drag in objects via image_asn1() */
+REQUIRING_SYMBOL ( image_asn1 );
+
+/* Drag in ASN.1 image formats */
+REQUIRE_OBJECT ( config_asn1 );

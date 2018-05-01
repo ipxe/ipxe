@@ -21,6 +21,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <config/general.h>
 #include <config/console.h>
 
 /** @file
@@ -44,4 +45,7 @@ REQUIRE_OBJECT ( efi_fbcon );
 #endif
 #ifdef CONSOLE_FRAMEBUFFER
 REQUIRE_OBJECT ( efi_fbcon );
+#endif
+#ifdef DOWNLOAD_PROTO_FILE
+REQUIRE_OBJECT ( efi_local );
 #endif

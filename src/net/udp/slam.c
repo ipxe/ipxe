@@ -266,7 +266,8 @@ static int slam_tx_nack ( struct slam_request *slam ) {
 	if ( ! iobuf ) {
 		DBGC ( slam, "SLAM %p could not allocate I/O buffer\n",
 		       slam );
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto err_alloc;
 	}
 
 	/* Construct NACK.  We always request only a single packet;
@@ -294,14 +295,19 @@ static int slam_tx_nack ( struct slam_request *slam ) {
 		       "0-%ld\n", slam, ( num_blocks - 1 ) );
 	}
 	if ( ( rc = slam_put_value ( slam, iobuf, first_block ) ) != 0 )
-		return rc;
+		goto err_put_value;
 	if ( ( rc = slam_put_value ( slam, iobuf, num_blocks ) ) != 0 )
-		return rc;
+		goto err_put_value;
 	nul = iob_put ( iobuf, 1 );
 	*nul = 0;
 
 	/* Transmit packet */
-	return xfer_deliver_iob ( &slam->socket, iobuf );
+	return xfer_deliver_iob ( &slam->socket, iob_disown ( iobuf ) );
+
+ err_put_value:
+	free_iob ( iobuf );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -394,12 +400,16 @@ static int slam_pull_value ( struct slam_request *slam,
 		return -EINVAL;
 	}
 
-	/* Read value */
+	/* Strip value */
 	iob_pull ( iobuf, len );
-	*value = ( *data & 0x1f );
-	while ( --len ) {
-		*value <<= 8;
-		*value |= *(++data);
+
+	/* Read value, if applicable */
+	if ( value ) {
+		*value = ( *data & 0x1f );
+		while ( --len ) {
+			*value <<= 8;
+			*value |= *(++data);
+		}
 	}
 
 	return 0;
@@ -415,6 +425,8 @@ static int slam_pull_value ( struct slam_request *slam,
 static int slam_pull_header ( struct slam_request *slam,
 			      struct io_buffer *iobuf ) {
 	void *header = iobuf->data;
+	unsigned long total_bytes;
+	unsigned long block_size;
 	int rc;
 
 	/* If header matches cached header, just pull it and return */
@@ -431,12 +443,16 @@ static int slam_pull_header ( struct slam_request *slam,
 	 */
 	if ( ( rc = slam_pull_value ( slam, iobuf, NULL ) ) != 0 )
 		return rc;
-	if ( ( rc = slam_pull_value ( slam, iobuf,
-				      &slam->total_bytes ) ) != 0 )
+	if ( ( rc = slam_pull_value ( slam, iobuf, &total_bytes ) ) != 0 )
 		return rc;
-	if ( ( rc = slam_pull_value ( slam, iobuf,
-				      &slam->block_size ) ) != 0 )
+	if ( ( rc = slam_pull_value ( slam, iobuf, &block_size ) ) != 0 )
 		return rc;
+
+	/* Sanity check */
+	if ( block_size == 0 ) {
+		DBGC ( slam, "SLAM %p ignoring zero block size\n", slam );
+		return -EINVAL;
+	}
 
 	/* Update the cached header */
 	slam->header_len = ( iobuf->data - header );
@@ -444,9 +460,9 @@ static int slam_pull_header ( struct slam_request *slam,
 	memcpy ( slam->header, header, slam->header_len );
 
 	/* Calculate number of blocks */
-	slam->num_blocks = ( ( slam->total_bytes + slam->block_size - 1 ) /
-			     slam->block_size );
-
+	slam->total_bytes = total_bytes;
+	slam->block_size = block_size;
+	slam->num_blocks = ( ( total_bytes + block_size - 1 ) / block_size );
 	DBGC ( slam, "SLAM %p has total bytes %ld, block size %ld, num "
 	       "blocks %ld\n", slam, slam->total_bytes, slam->block_size,
 	       slam->num_blocks );

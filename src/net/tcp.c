@@ -113,6 +113,8 @@ struct tcp_connection {
 	struct process process;
 	/** Retransmission timer */
 	struct retry_timer timer;
+	/** Keepalive timer */
+	struct retry_timer keepalive;
 	/** Shutdown (TIME_WAIT) timer */
 	struct retry_timer wait;
 
@@ -177,6 +179,7 @@ static struct profiler tcp_xfer_profiler __profiler = { .name = "tcp.xfer" };
 static struct process_descriptor tcp_process_desc;
 static struct interface_descriptor tcp_xfer_desc;
 static void tcp_expired ( struct retry_timer *timer, int over );
+static void tcp_keepalive_expired ( struct retry_timer *timer, int over );
 static void tcp_wait_expired ( struct retry_timer *timer, int over );
 static struct tcp_connection * tcp_demux ( unsigned int local_port );
 static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
@@ -284,6 +287,7 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	intf_init ( &tcp->xfer, &tcp_xfer_desc, &tcp->refcnt );
 	process_init_stopped ( &tcp->process, &tcp_process_desc, &tcp->refcnt );
 	timer_init ( &tcp->timer, tcp_expired, &tcp->refcnt );
+	timer_init ( &tcp->keepalive, tcp_keepalive_expired, &tcp->refcnt );
 	timer_init ( &tcp->wait, tcp_wait_expired, &tcp->refcnt );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
@@ -380,6 +384,7 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 		/* Remove from list and drop reference */
 		process_del ( &tcp->process );
 		stop_timer ( &tcp->timer );
+		stop_timer ( &tcp->keepalive );
 		stop_timer ( &tcp->wait );
 		list_del ( &tcp->list );
 		ref_put ( &tcp->refcnt );
@@ -393,6 +398,9 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 	 */
 	if ( ! ( tcp->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
 		tcp_rx_ack ( tcp, ( tcp->snd_seq + 1 ), 0 );
+
+	/* Stop keepalive timer */
+	stop_timer ( &tcp->keepalive );
 
 	/* If we have no data remaining to send, start sending FIN */
 	if ( list_empty ( &tcp->tx_queue ) &&
@@ -689,7 +697,7 @@ static void tcp_xmit_sack ( struct tcp_connection *tcp, uint32_t sack_seq ) {
 		wsopt->wsopt.length = sizeof ( wsopt->wsopt );
 		wsopt->wsopt.scale = TCP_RX_WINDOW_SCALE;
 		spopt = iob_push ( iobuf, sizeof ( *spopt ) );
-		memset ( spopt->nop, TCP_OPTION_NOP, sizeof ( spopt ) );
+		memset ( spopt->nop, TCP_OPTION_NOP, sizeof ( spopt->nop ) );
 		spopt->spopt.kind = TCP_OPTION_SACK_PERMITTED;
 		spopt->spopt.length = sizeof ( spopt->spopt );
 	}
@@ -802,6 +810,32 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 }
 
 /**
+ * Keepalive timer expired
+ *
+ * @v timer		Keepalive timer
+ * @v over		Failure indicator
+ */
+static void tcp_keepalive_expired ( struct retry_timer *timer,
+				    int over __unused ) {
+	struct tcp_connection *tcp =
+		container_of ( timer, struct tcp_connection, keepalive );
+
+	DBGC ( tcp, "TCP %p sending keepalive\n", tcp );
+
+	/* Reset keepalive timer */
+	start_timer_fixed ( &tcp->keepalive, TCP_KEEPALIVE_DELAY );
+
+	/* Send keepalive.  We do this only to preserve or restore
+	 * state in intermediate devices (e.g. firewall NAT tables);
+	 * we don't actually care about eliciting a response to verify
+	 * that the peer is still alive.  We therefore send just a
+	 * pure ACK, to keep our transmit path simple.
+	 */
+	tcp->flags |= TCP_ACK_PENDING;
+	tcp_xmit ( tcp );
+}
+
+/**
  * Shutdown timer expired
  *
  * @v timer		Shutdown timer
@@ -904,50 +938,86 @@ static struct tcp_connection * tcp_demux ( unsigned int local_port ) {
 /**
  * Parse TCP received options
  *
- * @v tcp		TCP connection
- * @v data		Raw options data
- * @v len		Raw options length
+ * @v tcp		TCP connection (may be NULL)
+ * @v tcphdr		TCP header
+ * @v hlen		TCP header length
  * @v options		Options structure to fill in
+ * @ret rc		Return status code
  */
-static void tcp_rx_opts ( struct tcp_connection *tcp, const void *data,
-			  size_t len, struct tcp_options *options ) {
-	const void *end = ( data + len );
+static int tcp_rx_opts ( struct tcp_connection *tcp,
+			 const struct tcp_header *tcphdr, size_t hlen,
+			 struct tcp_options *options ) {
+	const void *data = ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) );
+	const void *end = ( ( ( void * ) tcphdr ) + hlen );
 	const struct tcp_option *option;
 	unsigned int kind;
+	size_t remaining;
+	size_t min;
 
+	/* Sanity check */
+	assert ( hlen >= sizeof ( *tcphdr ) );
+
+	/* Parse options */
 	memset ( options, 0, sizeof ( *options ) );
-	while ( data < end ) {
+	while ( ( remaining = ( end - data ) ) ) {
+
+		/* Extract option code */
 		option = data;
 		kind = option->kind;
+
+		/* Handle single-byte options */
 		if ( kind == TCP_OPTION_END )
-			return;
+			break;
 		if ( kind == TCP_OPTION_NOP ) {
 			data++;
 			continue;
 		}
+
+		/* Handle multi-byte options */
+		min = sizeof ( *option );
 		switch ( kind ) {
 		case TCP_OPTION_MSS:
-			options->mssopt = data;
+			/* Ignore received MSS */
 			break;
 		case TCP_OPTION_WS:
 			options->wsopt = data;
+			min = sizeof ( *options->wsopt );
 			break;
 		case TCP_OPTION_SACK_PERMITTED:
 			options->spopt = data;
+			min = sizeof ( *options->spopt );
 			break;
 		case TCP_OPTION_SACK:
 			/* Ignore received SACKs */
 			break;
 		case TCP_OPTION_TS:
 			options->tsopt = data;
+			min = sizeof ( *options->tsopt );
 			break;
 		default:
 			DBGC ( tcp, "TCP %p received unknown option %d\n",
 			       tcp, kind );
 			break;
 		}
+		if ( remaining < min ) {
+			DBGC ( tcp, "TCP %p received truncated option %d\n",
+			       tcp, kind );
+			return -EINVAL;
+		}
+		if ( option->length < min ) {
+			DBGC ( tcp, "TCP %p received underlength option %d\n",
+			       tcp, kind );
+			return -EINVAL;
+		}
+		if ( option->length > remaining ) {
+			DBGC ( tcp, "TCP %p received overlength option %d\n",
+			       tcp, kind );
+			return -EINVAL;
+		}
 		data += option->length;
 	}
+
+	return 0;
 }
 
 /**
@@ -1011,6 +1081,12 @@ static int tcp_rx_syn ( struct tcp_connection *tcp, uint32_t seq,
 			tcp->snd_win_scale = options->wsopt->scale;
 			tcp->rcv_win_scale = TCP_RX_WINDOW_SCALE;
 		}
+		DBGC ( tcp, "TCP %p using %stimestamps, %sSACK, TX window "
+		       "x%d, RX window x%d\n", tcp,
+		       ( ( tcp->flags & TCP_TS_ENABLED ) ? "" : "no " ),
+		       ( ( tcp->flags & TCP_SACK_ENABLED ) ? "" : "no " ),
+		       ( 1 << tcp->snd_win_scale ),
+		       ( 1 << tcp->rcv_win_scale ) );
 	}
 
 	/* Ignore duplicate SYN */
@@ -1062,6 +1138,10 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 
 	/* Update window size */
 	tcp->snd_win = win;
+
+	/* Hold off (or start) the keepalive timer, if applicable */
+	if ( ! ( tcp->tcp_state & TCP_STATE_SENT ( TCP_FIN ) ) )
+		start_timer_fixed ( &tcp->keepalive, TCP_KEEPALIVE_DELAY );
 
 	/* Ignore ACKs that don't actually acknowledge any new data.
 	 * (In particular, do not stop the retransmission timer; this
@@ -1369,8 +1449,8 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	ack = ntohl ( tcphdr->ack );
 	raw_win = ntohs ( tcphdr->win );
 	flags = tcphdr->flags;
-	tcp_rx_opts ( tcp, ( ( ( void * ) tcphdr ) + sizeof ( *tcphdr ) ),
-		      ( hlen - sizeof ( *tcphdr ) ), &options );
+	if ( ( rc = tcp_rx_opts ( tcp, tcphdr, hlen, &options ) ) != 0 )
+		goto discard;
 	if ( tcp && options.tsopt )
 		tcp->ts_val = ntohl ( options.tsopt->tsval );
 	iob_pull ( iobuf, hlen );

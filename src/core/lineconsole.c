@@ -47,6 +47,13 @@ size_t line_putchar ( struct line_console *line, int character ) {
 	if ( character < 0 )
 		return 0;
 
+	/* Handle backspace characters */
+	if ( character == '\b' ) {
+		if ( line->index )
+			line->index--;
+		return 0;
+	}
+
 	/* Ignore carriage return */
 	if ( character == '\r' )
 		return 0;

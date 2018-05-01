@@ -26,8 +26,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/sanboot.h>
 
-static int null_san_hook ( struct uri *uri __unused,
-			   unsigned int drive __unused ) {
+static int null_san_hook ( unsigned int drive __unused,
+			   struct uri **uris __unused,
+			   unsigned int count __unused,
+			   unsigned int flags __unused ) {
 	return -EOPNOTSUPP;
 }
 
@@ -35,15 +37,15 @@ static void null_san_unhook ( unsigned int drive __unused ) {
 	/* Do nothing */
 }
 
-static int null_san_boot ( unsigned int drive __unused ) {
+static int null_san_boot ( unsigned int drive __unused,
+			   const char *filename __unused ) {
 	return -EOPNOTSUPP;
 }
 
-static int null_san_describe ( unsigned int drive __unused ) {
+static int null_san_describe ( void ) {
 	return -EOPNOTSUPP;
 }
 
-PROVIDE_SANBOOT_INLINE ( null, san_default_drive );
 PROVIDE_SANBOOT ( null, san_hook, null_san_hook );
 PROVIDE_SANBOOT ( null, san_unhook, null_san_unhook );
 PROVIDE_SANBOOT ( null, san_boot, null_san_boot );

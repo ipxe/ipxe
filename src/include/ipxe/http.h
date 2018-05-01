@@ -18,6 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/linebuf.h>
 #include <ipxe/pool.h>
 #include <ipxe/tables.h>
+#include <ipxe/ntlm.h>
 
 struct http_transaction;
 
@@ -150,14 +151,18 @@ struct http_request_content {
 	size_t len;
 };
 
-/** HTTP request authentication descriptor */
-struct http_request_auth {
-	/** Authentication scheme (if any) */
-	struct http_authentication *auth;
+/** HTTP request Basic authentication descriptor */
+struct http_request_auth_basic {
 	/** Username */
 	const char *username;
 	/** Password */
 	const char *password;
+};
+
+/** HTTP request Digest authentication descriptor */
+struct http_request_auth_digest {
+	/** Username */
+	const char *username;
 	/** Quality of protection */
 	const char *qop;
 	/** Algorithm */
@@ -166,6 +171,33 @@ struct http_request_auth {
 	char cnonce[ HTTP_DIGEST_CNONCE_LEN + 1 /* NUL */ ];
 	/** Response */
 	char response[ HTTP_DIGEST_RESPONSE_LEN + 1 /* NUL */ ];
+};
+
+/** HTTP request NTLM authentication descriptor */
+struct http_request_auth_ntlm {
+	/** Username */
+	const char *username;
+	/** LAN Manager response */
+	struct ntlm_lm_response lm;
+	/** NT response */
+	struct ntlm_nt_response nt;
+	/** Authenticate message length */
+	size_t len;
+};
+
+/** HTTP request authentication descriptor */
+struct http_request_auth {
+	/** Authentication scheme (if any) */
+	struct http_authentication *auth;
+	/** Per-scheme information */
+	union {
+		/** Basic authentication descriptor */
+		struct http_request_auth_basic basic;
+		/** Digest authentication descriptor */
+		struct http_request_auth_digest digest;
+		/** NTLM authentication descriptor */
+		struct http_request_auth_ntlm ntlm;
+	};
 };
 
 /** An HTTP request
@@ -235,10 +267,12 @@ struct http_response_content {
 	struct http_content_encoding *encoding;
 };
 
-/** HTTP response authorization descriptor */
-struct http_response_auth {
-	/** Authentication scheme (if any) */
-	struct http_authentication *auth;
+/** HTTP response Basic authorization descriptor */
+struct http_response_auth_basic {
+};
+
+/** HTTP response Digest authorization descriptor */
+struct http_response_auth_digest {
 	/** Realm */
 	const char *realm;
 	/** Quality of protection */
@@ -249,6 +283,29 @@ struct http_response_auth {
 	const char *nonce;
 	/** Opaque */
 	const char *opaque;
+};
+
+/** HTTP response NTLM authorization descriptor */
+struct http_response_auth_ntlm {
+	/** Challenge message */
+	struct ntlm_challenge *challenge;
+	/** Challenge information */
+	struct ntlm_challenge_info info;
+};
+
+/** HTTP response authorization descriptor */
+struct http_response_auth {
+	/** Authentication scheme (if any) */
+	struct http_authentication *auth;
+	/** Per-scheme information */
+	union {
+		/** Basic authorization descriptor */
+		struct http_response_auth_basic basic;
+		/** Digest authorization descriptor */
+		struct http_response_auth_digest digest;
+		/** NTLM authorization descriptor */
+		struct http_response_auth_ntlm ntlm;
+	};
 };
 
 /** An HTTP response
@@ -461,6 +518,13 @@ struct http_content_encoding {
 struct http_authentication {
 	/** Name (e.g. "Digest") */
 	const char *name;
+	/** Parse remaining "WWW-Authenticate" header line
+	 *
+	 * @v http		HTTP transaction
+	 * @v line		Remaining header line
+	 * @ret rc		Return status code
+	 */
+	int ( * parse ) ( struct http_transaction *http, char *line );
 	/** Perform authentication
 	 *
 	 * @v http		HTTP transaction

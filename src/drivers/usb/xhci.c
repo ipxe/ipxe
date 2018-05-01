@@ -801,34 +801,41 @@ static int xhci_port_speed ( struct xhci_device *xhci, unsigned int port,
 	ports = readl ( xhci->cap + supported + XHCI_SUPPORTED_PORTS );
 	psic = XHCI_SUPPORTED_PORTS_PSIC ( ports );
 
-	/* Use the default mappings if applicable */
-	if ( ( psic == 0 ) || ( xhci->quirks & XHCI_BAD_PSIV ) ) {
-		switch ( psiv ) {
-		case XHCI_SPEED_LOW :	return USB_SPEED_LOW;
-		case XHCI_SPEED_FULL :	return USB_SPEED_FULL;
-		case XHCI_SPEED_HIGH :	return USB_SPEED_HIGH;
-		case XHCI_SPEED_SUPER :	return USB_SPEED_SUPER;
-		default:
-			DBGC ( xhci, "XHCI %s-%d non-standard PSI value %d\n",
+	/* Use protocol speed ID table unless device is known to be faulty */
+	if ( ! ( xhci->quirks & XHCI_BAD_PSIV ) ) {
+
+		/* Iterate over PSI dwords looking for a match */
+		for ( i = 0 ; i < psic ; i++ ) {
+			psi = readl ( xhci->cap + supported +
+				      XHCI_SUPPORTED_PSI ( i ) );
+			if ( psiv == XHCI_SUPPORTED_PSI_VALUE ( psi ) ) {
+				mantissa = XHCI_SUPPORTED_PSI_MANTISSA ( psi );
+				exponent = XHCI_SUPPORTED_PSI_EXPONENT ( psi );
+				speed = USB_SPEED ( mantissa, exponent );
+				return speed;
+			}
+		}
+
+		/* Record device as faulty if no match is found */
+		if ( psic != 0 ) {
+			DBGC ( xhci, "XHCI %s-%d spurious PSI value %d: "
+			       "assuming PSI table is invalid\n",
 			       xhci->name, port, psiv );
-			return -ENOTSUP;
+			xhci->quirks |= XHCI_BAD_PSIV;
 		}
 	}
 
-	/* Iterate over PSI dwords looking for a match */
-	for ( i = 0 ; i < psic ; i++ ) {
-		psi = readl ( xhci->cap + supported + XHCI_SUPPORTED_PSI ( i ));
-		if ( psiv == XHCI_SUPPORTED_PSI_VALUE ( psi ) ) {
-			mantissa = XHCI_SUPPORTED_PSI_MANTISSA ( psi );
-			exponent = XHCI_SUPPORTED_PSI_EXPONENT ( psi );
-			speed = USB_SPEED ( mantissa, exponent );
-			return speed;
-		}
+	/* Use the default mappings */
+	switch ( psiv ) {
+	case XHCI_SPEED_LOW :	return USB_SPEED_LOW;
+	case XHCI_SPEED_FULL :	return USB_SPEED_FULL;
+	case XHCI_SPEED_HIGH :	return USB_SPEED_HIGH;
+	case XHCI_SPEED_SUPER :	return USB_SPEED_SUPER;
+	default:
+		DBGC ( xhci, "XHCI %s-%d unrecognised PSI value %d\n",
+		       xhci->name, port, psiv );
+		return -ENOTSUP;
 	}
-
-	DBGC ( xhci, "XHCI %s-%d spurious PSI value %d\n",
-	       xhci->name, port, psiv );
-	return -ENOENT;
 }
 
 /**
@@ -1558,7 +1565,7 @@ static void xhci_transfer ( struct xhci_device *xhci,
 	}
 
 	/* Identify endpoint */
-	if ( ( trb->endpoint > XHCI_CTX_END ) ||
+	if ( ( trb->endpoint >= XHCI_CTX_END ) ||
 	     ( ( endpoint = slot->endpoint[trb->endpoint] ) == NULL ) ) {
 		DBGC ( xhci, "XHCI %s slot %d transfer event invalid epid "
 		       "%d:\n", xhci->name, slot->id, trb->endpoint );
@@ -1704,6 +1711,9 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
 			   ( event->cons >> shift ) ) & XHCI_TRB_C ) )
 			break;
 
+		/* Consume this TRB */
+		event->cons++;
+
 		/* Handle TRB */
 		type = ( trb->common.type & XHCI_TRB_TYPE_MASK );
 		switch ( type ) {
@@ -1726,14 +1736,11 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
 
 		default:
 			DBGC ( xhci, "XHCI %s unrecognised event %#x\n:",
-			       xhci->name, event->cons );
+			       xhci->name, ( event->cons - 1 ) );
 			DBGC_HDA ( xhci, virt_to_phys ( trb ),
 				   trb, sizeof ( *trb ) );
 			break;
 		}
-
-		/* Consume this TRB */
-		event->cons++;
 	}
 
 	/* Update dequeue pointer if applicable */
@@ -2606,6 +2613,12 @@ static int xhci_endpoint_stream ( struct usb_endpoint *ep,
 		len -= trb_len;
 		trb++;
 	}
+
+	/* Mark zero-length packet (if present) as a separate transfer */
+	if ( zlp && ( count > 1 ) )
+		trb[-2].normal.flags = 0;
+
+	/* Generate completion for final TRB */
 	trb[-1].normal.flags = XHCI_TRB_IOC;
 
 	/* Enqueue TRBs */
@@ -2753,7 +2766,6 @@ static void xhci_device_close ( struct usb_device *usb ) {
 static int xhci_device_address ( struct usb_device *usb ) {
 	struct xhci_slot *slot = usb_get_hostdata ( usb );
 	struct xhci_device *xhci = slot->xhci;
-	struct usb_port *port = usb->port;
 	struct usb_port *root_port;
 	int psiv;
 	int rc;
@@ -2766,7 +2778,7 @@ static int xhci_device_address ( struct usb_device *usb ) {
 	slot->port = root_port->address;
 
 	/* Calculate protocol speed ID */
-	psiv = xhci_port_psiv ( xhci, slot->port, port->speed );
+	psiv = xhci_port_psiv ( xhci, slot->port, usb->speed );
 	if ( psiv < 0 ) {
 		rc = psiv;
 		return rc;

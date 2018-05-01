@@ -223,6 +223,9 @@ struct usb_string_descriptor {
 /** A USB string descriptor */
 #define USB_STRING_DESCRIPTOR 3
 
+/** Language ID for English */
+#define USB_LANG_ENGLISH 0x0409
+
 /** A USB interface descriptor */
 struct usb_interface_descriptor {
 	/** Descriptor header */
@@ -414,7 +417,9 @@ struct usb_endpoint {
 
 	/** Recycled I/O buffer list */
 	struct list_head recycled;
-	/** Refill buffer length */
+	/** Refill buffer reserved header length */
+	size_t reserve;
+	/** Refill buffer payload length */
 	size_t len;
 	/** Maximum fill level */
 	unsigned int max;
@@ -588,13 +593,16 @@ extern void usb_complete_err ( struct usb_endpoint *ep,
  * Initialise USB endpoint refill
  *
  * @v ep		USB endpoint
- * @v len		Refill buffer length (or zero to use endpoint's MTU)
+ * @v reserve		Refill buffer reserved header length
+ * @v len		Refill buffer payload length (zero for endpoint's MTU)
  * @v max		Maximum fill level
  */
 static inline __attribute__ (( always_inline )) void
-usb_refill_init ( struct usb_endpoint *ep, size_t len, unsigned int max ) {
+usb_refill_init ( struct usb_endpoint *ep, size_t reserve, size_t len,
+		  unsigned int max ) {
 
 	INIT_LIST_HEAD ( &ep->recycled );
+	ep->reserve = reserve;
 	ep->len = len;
 	ep->max = max;
 }
@@ -662,6 +670,8 @@ struct usb_function {
 	struct usb_driver *driver;
 	/** Driver private data */
 	void *priv;
+	/** Driver device ID */
+	struct usb_device_id *id;
 
 	/** List of interface numbers
 	 *
@@ -698,6 +708,8 @@ struct usb_device {
 	char name[32];
 	/** USB port */
 	struct usb_port *port;
+	/** Device speed */
+	unsigned int speed;
 	/** List of devices on this bus */
 	struct list_head list;
 	/** Device address, if assigned */
@@ -719,6 +731,9 @@ struct usb_device {
 	struct usb_endpoint control;
 	/** Completed control transfers */
 	struct list_head complete;
+
+	/** Default language ID (if known) */
+	unsigned int language;
 };
 
 /** USB device host controller operations */
@@ -1306,6 +1321,8 @@ struct usb_device_id {
 	uint16_t vendor;
 	/** Product ID */
 	uint16_t product;
+	/** Arbitrary driver data */
+	unsigned long driver_data;
 };
 
 /** Match-anything ID */

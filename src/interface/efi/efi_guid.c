@@ -25,8 +25,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/AbsolutePointer.h>
+#include <ipxe/efi/Protocol/AcpiTable.h>
+#include <ipxe/efi/Protocol/AppleNetBoot.h>
 #include <ipxe/efi/Protocol/Arp.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
+#include <ipxe/efi/Protocol/BlockIo2.h>
 #include <ipxe/efi/Protocol/BusSpecificDriverOverride.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
@@ -66,6 +69,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/Usb2HostController.h>
 #include <ipxe/efi/Protocol/UsbIo.h>
 #include <ipxe/efi/Protocol/VlanConfig.h>
+#include <ipxe/efi/Guid/FileInfo.h>
+#include <ipxe/efi/Guid/FileSystemInfo.h>
 
 /** @file
  *
@@ -82,6 +87,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 EFI_GUID efi_absolute_pointer_protocol_guid
 	= EFI_ABSOLUTE_POINTER_PROTOCOL_GUID;
 
+/** ACPI table protocol GUID */
+EFI_GUID efi_acpi_table_protocol_guid
+	= EFI_ACPI_TABLE_PROTOCOL_GUID;
+
+/** Apple NetBoot protocol GUID */
+EFI_GUID efi_apple_net_boot_protocol_guid
+	= EFI_APPLE_NET_BOOT_PROTOCOL_GUID;
+
 /** ARP protocol GUID */
 EFI_GUID efi_arp_protocol_guid
 	= EFI_ARP_PROTOCOL_GUID;
@@ -93,6 +106,10 @@ EFI_GUID efi_arp_service_binding_protocol_guid
 /** Block I/O protocol GUID */
 EFI_GUID efi_block_io_protocol_guid
 	= EFI_BLOCK_IO_PROTOCOL_GUID;
+
+/** Block I/O version 2 protocol GUID */
+EFI_GUID efi_block_io2_protocol_guid
+	= EFI_BLOCK_IO2_PROTOCOL_GUID;
 
 /** Bus specific driver override protocol GUID */
 EFI_GUID efi_bus_specific_driver_override_protocol_guid
@@ -281,3 +298,9 @@ EFI_GUID efi_usb_io_protocol_guid
 /** VLAN configuration protocol GUID */
 EFI_GUID efi_vlan_config_protocol_guid
 	= EFI_VLAN_CONFIG_PROTOCOL_GUID;
+
+/** File information GUID */
+EFI_GUID efi_file_info_id = EFI_FILE_INFO_ID;
+
+/** File system information GUID */
+EFI_GUID efi_file_system_info_id = EFI_FILE_SYSTEM_INFO_ID;

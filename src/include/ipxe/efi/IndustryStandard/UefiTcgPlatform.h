@@ -1,7 +1,7 @@
 /** @file
   TCG EFI Platform Definition in TCG_EFI_Platform_1_20_Final
 
-  Copyright (c) 2006 - 2015, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2006 - 2017, Intel Corporation. All rights reserved.<BR>
   This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
   which accompanies this distribution.  The full text of the license may be found at
@@ -153,6 +153,7 @@ typedef struct tdEFI_HANDOFF_TABLE_POINTERS {
 /// This structure serves as the header for measuring variables. The name of the
 /// variable (in Unicode format) should immediately follow, then the variable
 /// data.
+/// This is defined in TCG EFI Platform Spec for TPM1.1 or 1.2 V1.22
 ///
 typedef struct tdEFI_VARIABLE_DATA {
   EFI_GUID                          VariableName;
@@ -161,6 +162,22 @@ typedef struct tdEFI_VARIABLE_DATA {
   CHAR16                            UnicodeName[1];
   INT8                              VariableData[1];  ///< Driver or platform-specific data
 } EFI_VARIABLE_DATA;
+
+///
+/// UEFI_VARIABLE_DATA
+///
+/// This structure serves as the header for measuring variables. The name of the
+/// variable (in Unicode format) should immediately follow, then the variable
+/// data.
+/// This is defined in TCG PC Client Firmware Profile Spec 00.21
+///
+typedef struct tdUEFI_VARIABLE_DATA {
+  EFI_GUID                          VariableName;
+  UINT64                            UnicodeNameLength;
+  UINT64                            VariableDataLength;
+  CHAR16                            UnicodeName[1];
+  INT8                              VariableData[1];  ///< Driver or platform-specific data
+} UEFI_VARIABLE_DATA;
 
 //
 // For TrEE1.0 compatibility
@@ -189,6 +206,17 @@ typedef struct tdTCG_PCR_EVENT2 {
   UINT32              EventSize;
   UINT8               Event[1];
 } TCG_PCR_EVENT2;
+
+//
+// TCG PCR Event2 Header
+// Follow TCG EFI Protocol Spec 5.2 Crypto Agile Log Entry Format
+//
+typedef struct tdTCG_PCR_EVENT2_HDR{
+  TCG_PCRINDEX        PCRIndex;
+  TCG_EVENTTYPE       EventType;
+  TPML_DIGEST_VALUES  Digests;
+  UINT32              EventSize;
+} TCG_PCR_EVENT2_HDR;
 
 //
 // Log Header Entry Data
@@ -269,6 +297,33 @@ typedef struct {
   //
 //UINT8               vendorInfo[vendorInfoSize];
 } TCG_EfiSpecIDEventStruct;
+
+
+
+#define TCG_EfiStartupLocalityEvent_SIGNATURE      "StartupLocality"
+
+
+//
+// PC Client PTP spec Table 8 Relationship between Locality and Locality Attribute
+//
+#define LOCALITY_0_INDICATOR        0x01
+#define LOCALITY_1_INDICATOR        0x02
+#define LOCALITY_2_INDICATOR        0x03
+#define LOCALITY_3_INDICATOR        0x04
+#define LOCALITY_4_INDICATOR        0x05
+
+
+//
+// Startup Locality Event
+//
+typedef struct tdTCG_EfiStartupLocalityEvent{
+  UINT8       Signature[16];
+  //
+  // The Locality Indicator which sent the TPM2_Startup command
+  //
+  UINT8       StartupLocality;
+} TCG_EfiStartupLocalityEvent;
+
 
 //
 // Restore original structure alignment

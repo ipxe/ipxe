@@ -844,25 +844,6 @@ static size_t fcpdev_window ( struct fcp_device *fcpdev ) {
 }
 
 /**
- * Describe FCP device in an ACPI table
- *
- * @v fcpdev		FCP device
- * @v acpi		ACPI table
- * @v len		Length of ACPI table
- * @ret rc		Return status code
- */
-static int fcpdev_acpi_describe ( struct fcp_device *fcpdev,
-				  struct acpi_description_header *acpi,
-				  size_t len ) {
-
-	DBGC ( fcpdev, "FCP %p cannot yet describe device in an ACPI table\n",
-	       fcpdev );
-	( void ) acpi;
-	( void ) len;
-	return 0;
-}
-
-/**
  * Describe FCP device using EDD
  *
  * @v fcpdev		FCP device
@@ -917,7 +898,6 @@ static struct interface_operation fcpdev_scsi_op[] = {
 	INTF_OP ( scsi_command, struct fcp_device *, fcpdev_scsi_command ),
 	INTF_OP ( xfer_window, struct fcp_device *, fcpdev_window ),
 	INTF_OP ( intf_close, struct fcp_device *, fcpdev_close ),
-	INTF_OP ( acpi_describe, struct fcp_device *, fcpdev_acpi_describe ),
 	INTF_OP ( edd_describe, struct fcp_device *, fcpdev_edd_describe ),
 	INTF_OP ( identify_device, struct fcp_device *,
 		  fcpdev_identify_device ),

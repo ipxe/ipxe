@@ -122,6 +122,7 @@ static int ar9002_hw_set_channel(struct ath_hw *ah, struct ath9k_channel *chan)
 				aModeRefSel = 2;
 			if (aModeRefSel)
 				break;
+			/* Fall through */
 		case 1:
 		default:
 			aModeRefSel = 0;

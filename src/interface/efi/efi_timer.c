@@ -25,12 +25,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <errno.h>
-#include <limits.h>
-#include <assert.h>
 #include <unistd.h>
 #include <ipxe/timer.h>
+#include <ipxe/init.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/Protocol/Cpu.h>
 
 /** @file
  *
@@ -38,19 +36,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Scale factor to apply to CPU timer 0
+/**
+ * Number of jiffies per second
  *
- * The timer is scaled down in order to ensure that reasonable values
- * for "number of ticks" don't exceed the size of an unsigned long.
+ * This is a policy decision.
  */
-#define EFI_TIMER0_SHIFT 12
+#define EFI_JIFFIES_PER_SEC 32
 
-/** Calibration time */
-#define EFI_CALIBRATE_DELAY_MS 1
+/** Current tick count */
+static unsigned long efi_jiffies;
 
-/** CPU protocol */
-static EFI_CPU_ARCH_PROTOCOL *cpu_arch;
-EFI_REQUIRE_PROTOCOL ( EFI_CPU_ARCH_PROTOCOL, &cpu_arch );
+/** Timer tick event */
+static EFI_EVENT efi_tick_event;
+
+/** Colour for debug messages */
+#define colour &efi_jiffies
 
 /**
  * Delay for a fixed number of microseconds
@@ -64,8 +64,8 @@ static void efi_udelay ( unsigned long usecs ) {
 
 	if ( ( efirc = bs->Stall ( usecs ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBG ( "EFI could not delay for %ldus: %s\n",
-		      usecs, strerror ( rc ) );
+		DBGC ( colour, "EFI could not delay for %ldus: %s\n",
+		       usecs, strerror ( rc ) );
 		/* Probably screwed */
 	}
 }
@@ -76,53 +76,149 @@ static void efi_udelay ( unsigned long usecs ) {
  * @ret ticks		Current time, in ticks
  */
 static unsigned long efi_currticks ( void ) {
-	UINT64 time;
-	EFI_STATUS efirc;
-	int rc;
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
-	/* Read CPU timer 0 (TSC) */
-	if ( ( efirc = cpu_arch->GetTimerValue ( cpu_arch, 0, &time,
-						 NULL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBG ( "EFI could not read CPU timer: %s\n", strerror ( rc ) );
-		/* Probably screwed */
-		return -1UL;
+	/* UEFI manages to ingeniously combine the worst aspects of
+	 * both polling and interrupt-driven designs.  There is no way
+	 * to support proper interrupt-driven operation, since there
+	 * is no way to hook in an interrupt service routine.  A
+	 * mockery of interrupts is provided by UEFI timers, which
+	 * trigger at a preset rate and can fire at any time.
+	 *
+	 * We therefore have all of the downsides of a polling design
+	 * (inefficiency and inability to sleep until something
+	 * interesting happens) combined with all of the downsides of
+	 * an interrupt-driven design (the complexity of code that
+	 * could be preempted at any time).
+	 *
+	 * The UEFI specification expects us to litter the entire
+	 * codebase with calls to RaiseTPL() as needed for sections of
+	 * code that are not reentrant.  Since this doesn't actually
+	 * gain us any substantive benefits (since even with such
+	 * calls we would still be suffering from the limitations of a
+	 * polling design), we instead choose to run at TPL_CALLBACK
+	 * almost all of the time, dropping to TPL_APPLICATION to
+	 * allow timer ticks to occur.
+	 *
+	 *
+	 * For added excitement, UEFI provides no clean way for device
+	 * drivers to shut down in preparation for handover to a
+	 * booted operating system.  The platform firmware simply
+	 * doesn't bother to call the drivers' Stop() methods.
+	 * Instead, all non-trivial drivers must register an
+	 * EVT_SIGNAL_EXIT_BOOT_SERVICES event to be signalled when
+	 * ExitBootServices() is called, and clean up without any
+	 * reference to the EFI driver model.
+	 *
+	 * Unfortunately, all timers silently stop working when
+	 * ExitBootServices() is called.  Even more unfortunately, and
+	 * for no discernible reason, this happens before any
+	 * EVT_SIGNAL_EXIT_BOOT_SERVICES events are signalled.  The
+	 * net effect of this entertaining design choice is that any
+	 * timeout loops on the shutdown path (e.g. for gracefully
+	 * closing outstanding TCP connections) may wait indefinitely.
+	 *
+	 * There is no way to report failure from currticks(), since
+	 * the API lazily assumes that the host system continues to
+	 * travel through time in the usual direction.  Work around
+	 * EFI's violation of this assumption by falling back to a
+	 * simple free-running monotonic counter during shutdown.
+	 */
+	if ( efi_shutdown_in_progress ) {
+		efi_jiffies++;
+	} else {
+		bs->RestoreTPL ( TPL_APPLICATION );
+		bs->RaiseTPL ( TPL_CALLBACK );
 	}
 
-	return ( time >> EFI_TIMER0_SHIFT );
+	return ( efi_jiffies * ( TICKS_PER_SEC / EFI_JIFFIES_PER_SEC ) );
 }
 
 /**
- * Get number of ticks per second
+ * Timer tick
  *
- * @ret ticks_per_sec	Number of ticks per second
+ * @v event		Timer tick event
+ * @v context		Event context
  */
-static unsigned long efi_ticks_per_sec ( void ) {
-	static unsigned long ticks_per_sec = 0;
+static EFIAPI void efi_tick ( EFI_EVENT event __unused,
+			      void *context __unused ) {
 
-	/* Calibrate timer, if necessary.  EFI does nominally provide
-	 * the timer speed via the (optional) TimerPeriod parameter to
-	 * the GetTimerValue() call, but it gets the speed slightly
-	 * wrong.  By up to three orders of magnitude.  Not helpful.
-	 */
-	if ( ! ticks_per_sec ) {
-		unsigned long start;
-		unsigned long elapsed;
-
-		DBG ( "Calibrating EFI timer with a %d ms delay\n",
-		      EFI_CALIBRATE_DELAY_MS );
-		start = currticks();
-		mdelay ( EFI_CALIBRATE_DELAY_MS );
-		elapsed = ( currticks() - start );
-		ticks_per_sec = ( elapsed * ( 1000 / EFI_CALIBRATE_DELAY_MS ));
-		DBG ( "EFI CPU timer calibrated at %ld ticks in %d ms (%ld "
-		      "ticks/sec)\n", elapsed, EFI_CALIBRATE_DELAY_MS,
-		      ticks_per_sec );
-	}
-
-	return ticks_per_sec;
+	/* Increment tick count */
+	efi_jiffies++;
 }
 
-PROVIDE_TIMER ( efi, udelay, efi_udelay );
-PROVIDE_TIMER ( efi, currticks, efi_currticks );
-PROVIDE_TIMER ( efi, ticks_per_sec, efi_ticks_per_sec );
+/**
+ * Start timer tick
+ *
+ */
+static void efi_tick_startup ( void ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Create timer tick event */
+	if ( ( efirc = bs->CreateEvent ( ( EVT_TIMER | EVT_NOTIFY_SIGNAL ),
+					 TPL_CALLBACK, efi_tick, NULL,
+					 &efi_tick_event ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( colour, "EFI could not create timer tick: %s\n",
+		       strerror ( rc ) );
+		/* Nothing we can do about it */
+		return;
+	}
+
+	/* Start timer tick */
+	if ( ( efirc = bs->SetTimer ( efi_tick_event, TimerPeriodic,
+				      ( 10000000 / EFI_JIFFIES_PER_SEC ) ))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( colour, "EFI could not start timer tick: %s\n",
+		       strerror ( rc ) );
+		/* Nothing we can do about it */
+		return;
+	}
+	DBGC ( colour, "EFI timer started at %d ticks per second\n",
+	       EFI_JIFFIES_PER_SEC );
+}
+
+/**
+ * Stop timer tick
+ *
+ * @v booting		System is shutting down in order to boot
+ */
+static void efi_tick_shutdown ( int booting __unused ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Stop timer tick */
+	if ( ( efirc = bs->SetTimer ( efi_tick_event, TimerCancel, 0 ) ) != 0 ){
+		rc = -EEFI ( efirc );
+		DBGC ( colour, "EFI could not stop timer tick: %s\n",
+		       strerror ( rc ) );
+		/* Self-destruct initiated */
+		return;
+	}
+	DBGC ( colour, "EFI timer stopped\n" );
+
+	/* Destroy timer tick event */
+	if ( ( efirc = bs->CloseEvent ( efi_tick_event ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( colour, "EFI could not destroy timer tick: %s\n",
+		       strerror ( rc ) );
+		/* Probably non-fatal */
+		return;
+	}
+}
+
+/** Timer tick startup function */
+struct startup_fn efi_tick_startup_fn __startup_fn ( STARTUP_EARLY ) = {
+	.startup = efi_tick_startup,
+	.shutdown = efi_tick_shutdown,
+};
+
+/** EFI timer */
+struct timer efi_timer __timer ( TIMER_NORMAL ) = {
+	.name = "efi",
+	.currticks = efi_currticks,
+	.udelay = efi_udelay,
+};

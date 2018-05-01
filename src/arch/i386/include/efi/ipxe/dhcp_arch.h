@@ -33,14 +33,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/dhcp.h>
 
-#define DHCP_ARCH_VENDOR_CLASS_ID \
-	DHCP_STRING ( 'P', 'X', 'E', 'C', 'l', 'i', 'e', 'n', 't', ':',      \
-		      'A', 'r', 'c', 'h', ':', '0', '0', '0', '0', '6', ':', \
-		      'U', 'N', 'D', 'I', ':', '0', '0', '3', '0', '1', '0' )
+#define DHCP_ARCH_CLIENT_ARCHITECTURE DHCP_CLIENT_ARCHITECTURE_IA32
 
-#define DHCP_ARCH_CLIENT_ARCHITECTURE \
-	DHCP_WORD ( DHCP_CLIENT_ARCHITECTURE_IA32 )
-
-#define DHCP_ARCH_CLIENT_NDI DHCP_OPTION ( 1 /* UNDI */ , 3, 10 /* v3.10 */ )
+#define DHCP_ARCH_CLIENT_NDI 1 /* UNDI */ , 3, 10 /* v3.10 */
 
 #endif

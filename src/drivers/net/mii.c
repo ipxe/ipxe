@@ -37,10 +37,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Restart autonegotiation
  *
- * @v mii		MII interface
+ * @v mii		MII device
  * @ret rc		Return status code
  */
-int mii_restart ( struct mii_interface *mii ) {
+int mii_restart ( struct mii_device *mii ) {
 	int bmcr;
 	int rc;
 
@@ -66,12 +66,12 @@ int mii_restart ( struct mii_interface *mii ) {
 }
 
 /**
- * Reset MII interface
+ * Reset MII device
  *
- * @v mii		MII interface
+ * @v mii		MII device
  * @ret rc		Return status code
  */
-int mii_reset ( struct mii_interface *mii ) {
+int mii_reset ( struct mii_device *mii ) {
 	unsigned int i;
 	int bmcr;
 	int rc;
@@ -119,11 +119,11 @@ int mii_reset ( struct mii_interface *mii ) {
 /**
  * Update link status via MII
  *
- * @v mii		MII interface
+ * @v mii		MII device
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-int mii_check_link ( struct mii_interface *mii, struct net_device *netdev ) {
+int mii_check_link ( struct mii_device *mii, struct net_device *netdev ) {
 	int bmsr;
 	int link;
 	int rc;
@@ -146,4 +146,29 @@ int mii_check_link ( struct mii_interface *mii, struct net_device *netdev ) {
 	}
 
 	return 0;
+}
+
+/**
+ * Find PHY address
+ *
+ * @v mii		MII device
+ * @ret rc		Return status code
+ */
+int mii_find ( struct mii_device *mii ) {
+	unsigned int address;
+	int id;
+
+	/* Try all possible PHY addresses */
+	for ( address = 0 ; address <= MII_MAX_PHY_ADDRESS ; address++ ) {
+		mii->address = address;
+		id = mii_read ( mii, MII_PHYSID1 );
+		if ( ( id > 0x0000 ) && ( id < 0xffff ) ) {
+			DBGC ( mii, "MII %p found PHY at address %d\n",
+			       mii, address );
+			return 0;
+		}
+	}
+
+	DBGC ( mii, "MII %p failed to find an address\n", mii );
+	return -ENOENT;
 }

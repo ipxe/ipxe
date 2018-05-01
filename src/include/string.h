@@ -10,6 +10,14 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
+
+extern void * generic_memset ( void *dest, int character,
+			       size_t len ) __nonnull;
+extern void * generic_memcpy ( void *dest, const void *src,
+			       size_t len ) __nonnull;
+extern void * generic_memmove ( void *dest, const void *src,
+				size_t len ) __nonnull;
+
 #include <bits/string.h>
 
 /* Architecture-specific code is expected to provide these functions,
@@ -18,12 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 void * memset ( void *dest, int character, size_t len ) __nonnull;
 void * memcpy ( void *dest, const void *src, size_t len ) __nonnull;
 void * memmove ( void *dest, const void *src, size_t len ) __nonnull;
-extern void * generic_memset ( void *dest, int character,
-			       size_t len ) __nonnull;
-extern void * generic_memcpy ( void *dest, const void *src,
-			       size_t len ) __nonnull;
-extern void * generic_memmove ( void *dest, const void *src,
-				size_t len ) __nonnull;
 
 extern int __pure memcmp ( const void *first, const void *second,
 			   size_t len ) __nonnull;

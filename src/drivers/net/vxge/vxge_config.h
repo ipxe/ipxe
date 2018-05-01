@@ -27,10 +27,6 @@ FILE_LICENCE(GPL2_ONLY);
 
 #define WAIT_FACTOR          1
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(a)  (sizeof(a) / sizeof((a)[0]))
-#endif
-
 #define VXGE_HW_MAC_MAX_WIRE_PORTS      2
 #define VXGE_HW_MAC_MAX_AGGR_PORTS      2
 #define VXGE_HW_MAC_MAX_PORTS           3

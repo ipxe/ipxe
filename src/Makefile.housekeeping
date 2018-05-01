@@ -299,7 +299,7 @@ endif
 #
 # Select build architecture and platform based on $(BIN)
 #
-# BIN has the form bin[-[arch-]platform]
+# BIN has the form bin[-[<arch>-]<platform>[-sb]]
 
 ARCHS		:= $(patsubst arch/%,%,$(wildcard arch/*))
 PLATFORMS	:= $(patsubst config/defaults/%.h,%,\
@@ -312,17 +312,18 @@ platforms :
 
 ifdef BIN
 
-# Determine architecture portion of $(BIN), if present
-BIN_ARCH	:= $(strip $(foreach A,$(ARCHS),\
-			     $(patsubst bin-$(A)-%,$(A),\
-			       $(filter bin-$(A)-%,$(BIN)))))
-
-# Determine platform portion of $(BIN), if present
-ifeq ($(BIN_ARCH),)
-BIN_PLATFORM	:= $(patsubst bin-%,%,$(filter bin-%,$(BIN)))
+# Split $(BIN) into architecture, platform, and security flag (where present)
+BIN_ELEMENTS	:= $(subst -,$(SPACE),$(BIN))
+BIN_APS		:= $(wordlist 2,4,$(BIN_ELEMENTS))
+ifeq ($(lastword $(BIN_APS)),sb)
+BIN_AP		:= $(wordlist 2,$(words $(BIN_APS)),discard $(BIN_APS))
+BIN_SECUREBOOT	:= 1
 else
-BIN_PLATFORM	:= $(patsubst bin-$(BIN_ARCH)-%,%,$(BIN))
+BIN_AP		:= $(BIN_APS)
+BIN_SECUREBOOT	:= 0
 endif
+BIN_PLATFORM	:= $(lastword $(BIN_AP))
+BIN_ARCH	:= $(wordlist 2,$(words $(BIN_AP)),discard $(BIN_AP))
 
 # Determine build architecture
 DEFAULT_ARCH	:= i386
@@ -338,6 +339,13 @@ PLATFORM	:= $(firstword $(BIN_PLATFORM) $(DEFAULT_PLATFORM))
 CFLAGS		+= -DPLATFORM=$(PLATFORM)
 platform :
 	@$(ECHO) $(PLATFORM)
+
+# Determine security flag
+DEFAULT_SECUREBOOT := 0
+SECUREBOOT	:= $(firstword $(BIN_SECUREBOOT) $(DEFAULT_SECUREBOOT))
+CFLAGS		+= -DSECUREBOOT=$(SECUREBOOT)
+secureboot :
+	@$(ECHO) $(SECUREBOOT)
 
 endif # defined(BIN)
 
@@ -356,6 +364,11 @@ endif
 ###############################################################################
 #
 # Source file handling
+
+# Exclude known-insecure files from Secure Boot builds
+ifeq ($(SECUREBOOT),0)
+SRCDIRS		+= $(SRCDIRS_INSEC)
+endif
 
 # SRCDIRS lists all directories containing source files.
 srcdirs :
@@ -491,6 +504,11 @@ LDFLAGS		+= -static
 #
 CFLAGS		+= -include include/compiler.h
 
+# The section type character (e.g. "@" in "@progbits") varies by
+# architecture.
+#
+CFLAGS		+= -DASM_TCHAR='$(ASM_TCHAR)' -DASM_TCHAR_OPS='$(ASM_TCHAR_OPS)'
+
 # CFLAGS for specific object types
 #
 CFLAGS_c	+=
@@ -518,19 +536,25 @@ POST_O		:=
 POST_O_DEPS	:=
 endif
 
+# Debug level calculations
+#
+DBGLVL_MAX	= -DDBGLVL_MAX=$(firstword $(subst ., ,$(1)))
+DBGLVL_DFLT	= -DDBGLVL_DFLT=$(lastword $(subst ., ,$(1)))
+DBGLVL		= $(call DBGLVL_MAX,$(1)) $(call DBGLVL_DFLT,$(1))
+
 # Rules for specific object types.
 #
 COMPILE_c	= $(CC) $(CFLAGS) $(CFLAGS_c) $(OBJ_CFLAGS)
 RULE_c		= $(Q)$(COMPILE_c) -c $< -o $@ $(POST_O)
 RULE_c_to_ids.o = $(Q)$(ECHO_E) '$(OBJ_IDS_ASM_NL)' | $(ASSEMBLE_S) -o $@
-RULE_c_to_dbg%.o = $(Q)$(COMPILE_c) -DDBGLVL_MAX=$* -c $< -o $@ $(POST_O)
+RULE_c_to_dbg%.o= $(Q)$(COMPILE_c) $(call DBGLVL,$*) -c $< -o $@ $(POST_O)
 RULE_c_to_c	= $(Q)$(COMPILE_c) -E -c $< > $@
 RULE_c_to_s	= $(Q)$(COMPILE_c) -S -g0 -c $< -o $@
 
 PREPROCESS_S	= $(CPP) $(CFLAGS) $(CFLAGS_S) $(OBJ_CFLAGS)
 ASSEMBLE_S	= $(AS) $(ASFLAGS)
 RULE_S		= $(Q)$(PREPROCESS_S) $< | $(ASSEMBLE_S) -o $@
-RULE_S_to_dbg%.o = $(Q)$(PREPROCESS_S) -DDBGLVL_MAX=$* $< | $(ASSEMBLE_S) -o $@
+RULE_S_to_dbg%.o= $(Q)$(PREPROCESS_S) $(call DBGLVL,$*) $< | $(ASSEMBLE_S) -o $@
 RULE_S_to_s	= $(Q)$(PREPROCESS_S) $< > $@
 
 GENERIC_TARGETS	+= ids.o dbg%.o c s
@@ -709,6 +733,60 @@ config/named.h : $(CONFIG_LIST)
 
 .PRECIOUS : config/named.h
 
+# (Single-element) list of assertion configuration
+#
+ASSERT_LIST := $(BIN)/.assert.list
+ifeq ($(wildcard $(ASSERT_LIST)),)
+ASSERT_OLD := <invalid>
+else
+ASSERT_OLD := $(shell cat $(ASSERT_LIST))
+endif
+ifneq ($(ASSERT_OLD),$(ASSERT))
+$(shell $(ECHO) "$(ASSERT)" > $(ASSERT_LIST))
+endif
+
+$(ASSERT_LIST) : $(MAKEDEPS)
+
+VERYCLEANUP += $(ASSERT_LIST)
+
+# Assertion configuration
+#
+ifneq ($(ASSERT),)
+CFLAGS	+= -DASSERTING=$(ASSERT)
+endif
+
+include/assert.h : $(ASSERT_LIST)
+	$(Q)$(TOUCH) $@
+
+.PRECIOUS : include/assert.h
+
+# (Single-element) list of profiling configuration
+#
+PROFILE_LIST := $(BIN)/.profile.list
+ifeq ($(wildcard $(PROFILE_LIST)),)
+PROFILE_OLD := <invalid>
+else
+PROFILE_OLD := $(shell cat $(PROFILE_LIST))
+endif
+ifneq ($(PROFILE_OLD),$(PROFILE))
+$(shell $(ECHO) "$(PROFILE)" > $(PROFILE_LIST))
+endif
+
+$(PROFILE_LIST) : $(MAKEDEPS)
+
+VERYCLEANUP += $(PROFILE_LIST)
+
+# Profiling configuration
+#
+ifneq ($(PROFILE),)
+CFLAGS	+= -DPROFILING=$(PROFILE)
+endif
+
+include/ipxe/profile.h : $(PROFILE_LIST)
+	$(Q)$(TOUCH) $@
+
+.PRECIOUS : include/ipxe/profile.h
+
 # These files use .incbin inline assembly to include a binary file.
 # Unfortunately ccache does not detect this dependency and caches
 # builds even when the binary file has changed.
@@ -734,8 +812,8 @@ $(DBGCOL_LIST) : $(MAKEDEPS)
 VERYCLEANUP += $(DBGCOL_LIST)
 
 DBGCOL_COLOURS := $(subst -, ,$(DBGCOL))
-DBGCOL_MIN := $(word 1,$(DBGCOL_COLOURS))
-DBGCOL_MAX := $(word 2,$(DBGCOL_COLOURS))
+DBGCOL_MIN := $(firstword $(DBGCOL_COLOURS))
+DBGCOL_MAX := $(lastword $(DBGCOL_COLOURS))
 
 debug_DEPS += $(DBGCOL_LIST)
 
@@ -896,7 +974,7 @@ endif
 # Device ID tables (using IDs from ROM definition file)
 #
 define obj_pci_id_asm
-	.section ".pci_devlist.$(1)", "a", @progbits
+	.section ".pci_devlist.$(1)", "a", $(ASM_TCHAR)progbits
 	.globl pci_devlist_$(1)
 pci_devlist_$(1):
 	.short ( 0x$(1) & 0xffff )
@@ -960,13 +1038,13 @@ DRIVERS_ipxe	= $(DRIVERS_net) $(DRIVERS_infiniband) \
 # TGT_DRIVERS  : the driver for each element (e.g. "rtl8139 prism2_pci")
 # TGT_ROM_NAME : the ROM name (e.g. "dfe538")
 #
-CARD_DRIVER	= $(firstword $(DRIVER_$(1)) $(1))
 TGT_ELEMENTS	= $(subst --, ,$(firstword $(subst ., ,$(notdir $@))))
 TGT_ROM_NAME	= $(firstword $(TGT_ELEMENTS))
-TGT_DRIVERS	= $(strip $(if $(DRIVERS_$(TGT_ROM_NAME)), \
-			       $(DRIVERS_$(TGT_ROM_NAME)), \
-			       $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
-			         $(call CARD_DRIVER,$(TGT_ELEMENT))) ))
+TGT_DRIVERS	= $(strip $(foreach TGT_ELEMENT,$(TGT_ELEMENTS), \
+				    $(if $(DRIVERS_$(TGT_ELEMENT)), \
+					 $(DRIVERS_$(TGT_ELEMENT)), \
+					 $(firstword $(DRIVER_$(TGT_ELEMENT)) \
+						     $(TGT_ELEMENT)))))
 TGT_PREFIX_NAME	= $(word 2,$(subst ., ,$(notdir $@)))
 TGT_PREFIX	= $(strip $(if $(filter rom,$(TGT_PREFIX_NAME)), \
 			       $(ROM_TYPE_$(TGT_ROM_NAME))rom, \
@@ -1014,10 +1092,12 @@ TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_ENTRY) $(TGT_LD_DRIVERS) \
 # the target.
 #
 DEBUG_LIST	= $(subst $(COMMA), ,$(DEBUG))
-DEBUG_OBJ_LEVEL	= $(firstword $(word 2,$(subst :, ,$(1))) 1)
-DEBUG_OBJ_BASE	= $(word 1,$(subst :, ,$(1))).dbg$(call DEBUG_OBJ_LEVEL,$(1))
-DEBUG_OBJ	= $(BIN)/$(call DEBUG_OBJ_BASE,$(1)).o
-DEBUG_ORIG_OBJ	= $(BIN)/$(word 1,$(subst :, ,$(1))).o
+DEBUG_MAX	= $(firstword $(word 2,$(subst :, ,$(1))) 1)
+DEBUG_DFLT	= $(if $(word 3,$(subst :, ,$(1))),.$(word 3,$(subst :, ,$(1))))
+DEBUG_LEVEL	= $(call DEBUG_MAX,$(1))$(call DEBUG_DFLT,$(1))
+DEBUG_BASE	= $(firstword $(subst :, ,$(1))).dbg$(call DEBUG_LEVEL,$(1))
+DEBUG_OBJ	= $(BIN)/$(call DEBUG_BASE,$(1)).o
+DEBUG_ORIG_OBJ	= $(BIN)/$(firstword $(subst :, ,$(1))).o
 DEBUG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_OBJ,$(D)))
 DEBUG_ORIG_OBJS	= $(foreach D,$(DEBUG_LIST),$(call DEBUG_ORIG_OBJ,$(D)))
 BLIB_OBJS	= $(DEBUG_OBJS) $(filter-out $(DEBUG_ORIG_OBJS),$(BOBJS))
@@ -1298,21 +1378,15 @@ CLEANUP += $(ZBIN)
 #
 # The EFI image converter
 #
-ELF2EFI_CFLAGS	:= -I$(BINUTILS_DIR)/include -I$(BFD_DIR)/include \
-		   -I$(ZLIB_DIR)/include -idirafter include
-ELF2EFI_LDFLAGS	:= -L$(BINUTILS_DIR)/lib -L$(BFD_DIR)/lib -L$(ZLIB_DIR)/lib \
-		   -lbfd -ldl -lz -Wl,--no-warn-search-mismatch
 
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET_IA32 $< \
-		$(ELF2EFI_LDFLAGS) -o $@
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -DEFI_TARGET32 $< -o $@
 CLEANUP += $(ELF2EFI32)
 
 $(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(ELF2EFI_CFLAGS) -DEFI_TARGET_X64 $< \
-		$(ELF2EFI_LDFLAGS) -o $@
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -DEFI_TARGET64 $< -o $@
 CLEANUP += $(ELF2EFI64)
 
 $(EFIROM) : util/efirom.c $(MAKEDEPS)

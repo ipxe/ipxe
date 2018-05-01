@@ -4006,7 +4006,7 @@ efab_init_mac ( struct efab_nic *efab )
 		 * because we want to use it, or because we're about
 		 * to reset the mac anyway
 		 */
-		sleep ( 2 );
+		mdelay ( 2000 );
 
 		if ( ! efab->link_up ) {
 			EFAB_ERR ( "!\n" );

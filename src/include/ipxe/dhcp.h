@@ -83,6 +83,9 @@ struct dhcp_packet;
 /** Root path */
 #define DHCP_ROOT_PATH 17
 
+/** Maximum transmission unit */
+#define DHCP_MTU 26
+
 /** Vendor encapsulated options */
 #define DHCP_VENDOR_ENCAP 43
 
@@ -210,6 +213,29 @@ struct dhcp_pxe_boot_menu_item {
 /** Vendor class identifier */
 #define DHCP_VENDOR_CLASS_ID 60
 
+/** Vendor class identifier for PXE clients */
+#define DHCP_VENDOR_PXECLIENT( arch, ndi )				\
+	'P', 'X', 'E', 'C', 'l', 'i', 'e', 'n', 't', ':',		\
+	'A', 'r', 'c', 'h', ':', DHCP_VENDOR_PXECLIENT_ARCH ( arch ),	\
+	':', 'U', 'N', 'D', 'I', ':', DHCP_VENDOR_PXECLIENT_UNDI ( ndi )
+
+/** Vendor class identifier architecture for PXE clients */
+#define DHCP_VENDOR_PXECLIENT_ARCH( arch )				\
+	( '0' + ( ( (arch) / 10000 ) % 10 ) ),				\
+	( '0' + ( ( (arch) /  1000 ) % 10 ) ),				\
+	( '0' + ( ( (arch) /   100 ) % 10 ) ),				\
+	( '0' + ( ( (arch) /    10 ) % 10 ) ),				\
+	( '0' + ( ( (arch) /     1 ) % 10 ) )
+
+/** Vendor class identifier UNDI version for PXE clients */
+#define DHCP_VENDOR_PXECLIENT_UNDI( type, major, minor )		\
+	DHCP_VENDOR_PXECLIENT_UNDI_VERSION ( major ),			\
+	DHCP_VENDOR_PXECLIENT_UNDI_VERSION ( minor )
+#define DHCP_VENDOR_PXECLIENT_UNDI_VERSION( version )			\
+	( '0' + ( ( (version) /   100 ) % 10 ) ),			\
+	( '0' + ( ( (version) /    10 ) % 10 ) ),			\
+	( '0' + ( ( (version) /     1 ) % 10 ) )
+
 /** Client identifier */
 #define DHCP_CLIENT_ID 61
 
@@ -266,12 +292,16 @@ enum dhcp_client_architecture_values {
 	DHCP_CLIENT_ARCHITECTURE_LC = 0x0005,
 	/** EFI IA32 */
 	DHCP_CLIENT_ARCHITECTURE_IA32 = 0x0006,
-	/** EFI BC */
-	DHCP_CLIENT_ARCHITECTURE_EFI = 0x0007,
+	/** EFI x86-64 */
+	DHCP_CLIENT_ARCHITECTURE_X86_64 = 0x0007,
 	/** EFI Xscale */
 	DHCP_CLIENT_ARCHITECTURE_XSCALE = 0x0008,
-	/** EFI x86-64 */
-	DHCP_CLIENT_ARCHITECTURE_X86_64 = 0x0009,
+	/** EFI BC */
+	DHCP_CLIENT_ARCHITECTURE_EFI = 0x0009,
+	/** EFI 32-bit ARM */
+	DHCP_CLIENT_ARCHITECTURE_ARM32 = 0x000a,
+	/** EFI 64-bit ARM */
+	DHCP_CLIENT_ARCHITECTURE_ARM64 = 0x000b,
 };
 
 /** Client network device interface */
@@ -403,12 +433,25 @@ struct dhcp_netdev_desc {
 /** Use cached network settings (obsolete; do not reuse this value) */
 #define DHCP_EB_USE_CACHED DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xb2 )
 
-/** BIOS drive number
+/** SAN retry count
  *
- * This is the drive number for a drive emulated via INT 13.  0x80 is
+ * This is the maximum number of times that SAN operations will be
+ * retried.
+ */
+#define DHCP_EB_SAN_RETRY DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbb )
+
+/** SAN filename
+ *
+ * This is the path of the bootloader within the SAN device.
+ */
+#define DHCP_EB_SAN_FILENAME DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbc )
+
+/** SAN drive number
+ *
+ * This is the drive number for a SAN-hooked drive.  For BIOS, 0x80 is
  * the first hard disk, 0x81 is the second hard disk, etc.
  */
-#define DHCP_EB_BIOS_DRIVE DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbd )
+#define DHCP_EB_SAN_DRIVE DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0xbd )
 
 /** Username
  *

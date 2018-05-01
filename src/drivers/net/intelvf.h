@@ -37,6 +37,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Set MTU mailbox message */
 #define INTELVF_MSG_TYPE_SET_MTU 0x00000005UL
 
+/** Get queue configuration message */
+#define INTELVF_MSG_TYPE_GET_QUEUES 0x00000009UL
+
 /** Control ("ping") mailbox message */
 #define INTELVF_MSG_TYPE_CONTROL 0x00000100UL
 
@@ -78,6 +81,44 @@ struct intelvf_msg_mtu {
 	uint32_t mtu;
 } __attribute__ (( packed ));
 
+/** Queue configuration mailbox message (API v1.1+ only) */
+struct intelvf_msg_queues {
+	/** Message header */
+	uint32_t hdr;
+	/** Maximum number of transmit queues */
+	uint32_t tx;
+	/** Maximum number of receive queues */
+	uint32_t rx;
+	/** VLAN hand-waving thing
+	 *
+	 * This is labelled IXGBE_VF_TRANS_VLAN in the Linux driver.
+	 *
+	 * A comment in the Linux PF driver describes it as "notify VF
+	 * of need for VLAN tag stripping, and correct queue".  It
+	 * will be filled with a non-zero value if the PF is enforcing
+	 * the use of a single VLAN tag.  It will also be filled with
+	 * a non-zero value if the PF is using multiple traffic
+	 * classes.
+	 *
+	 * The Linux VF driver seems to treat this field as being
+	 * simply the number of traffic classes, and gives it no
+	 * VLAN-related interpretation.
+	 *
+	 * If the PF is enforcing the use of a single VLAN tag for the
+	 * VF, then the VLAN tag will be transparently inserted in
+	 * transmitted packets (via the PFVMVIR register) but will
+	 * still be visible in received packets.  The Linux VF driver
+	 * handles this unexpected VLAN tag by simply ignoring any
+	 * unrecognised VLAN tags.
+	 *
+	 * We choose to strip and ignore the VLAN tag if this field
+	 * has a non-zero value.
+	 */
+	uint32_t vlan_thing;
+	/** Default queue */
+	uint32_t dflt;
+} __attribute__ (( packed ));
+
 /** Mailbox message */
 union intelvf_msg {
 	/** Message header */
@@ -88,6 +129,8 @@ union intelvf_msg {
 	struct intelvf_msg_version version;
 	/** MTU message */
 	struct intelvf_msg_mtu mtu;
+	/** Queue configuration message */
+	struct intelvf_msg_queues queues;
 	/** Raw dwords */
 	uint32_t dword[0];
 };

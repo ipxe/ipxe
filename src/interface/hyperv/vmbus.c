@@ -39,6 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/nap.h>
 #include <ipxe/malloc.h>
 #include <ipxe/iobuf.h>
+#include <ipxe/bitops.h>
 #include <ipxe/hyperv.h>
 #include <ipxe/vmbus.h>
 
@@ -48,6 +49,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * 0xe1e10.
  */
 #define VMBUS_GPADL_MAGIC 0x18ae0000
+
+/** Current (i.e. most recently issued) GPADL ID */
+static unsigned int vmbus_gpadl = VMBUS_GPADL_MAGIC;
+
+/** Obsolete GPADL ID threshold
+ *
+ * When the Hyper-V connection is reset, any previous GPADLs are
+ * automatically rendered obsolete.
+ */
+unsigned int vmbus_obsolete_gpadl;
 
 /**
  * Post message
@@ -89,12 +100,12 @@ static int vmbus_post_empty_message ( struct hv_hypervisor *hv,
 }
 
 /**
- * Wait for received message
+ * Wait for received message of any type
  *
  * @v hv		Hyper-V hypervisor
  * @ret rc		Return status code
  */
-static int vmbus_wait_for_message ( struct hv_hypervisor *hv ) {
+static int vmbus_wait_for_any_message ( struct hv_hypervisor *hv ) {
 	struct vmbus *vmbus = hv->vmbus;
 	int rc;
 
@@ -113,6 +124,38 @@ static int vmbus_wait_for_message ( struct hv_hypervisor *hv ) {
 	}
 
 	return 0;
+}
+
+/**
+ * Wait for received message of a specified type, ignoring any others
+ *
+ * @v hv		Hyper-V hypervisor
+ * @v type		Message type
+ * @ret rc		Return status code
+ */
+static int vmbus_wait_for_message ( struct hv_hypervisor *hv,
+				    unsigned int type ) {
+	struct vmbus *vmbus = hv->vmbus;
+	const struct vmbus_message_header *header = &vmbus->message->header;
+	int rc;
+
+	/* Loop until specified message arrives, or until an error occurs */
+	while ( 1 ) {
+
+		/* Wait for message */
+		if ( ( rc = vmbus_wait_for_any_message ( hv ) ) != 0 )
+			return rc;
+
+		/* Check for requested message type */
+		if ( header->type == cpu_to_le32 ( type ) )
+			return 0;
+
+		/* Ignore any other messages (e.g. due to additional
+		 * channels being offered at runtime).
+		 */
+		DBGC ( vmbus, "VMBUS %p ignoring message type %d (expecting "
+		       "%d)\n", vmbus, le32_to_cpu ( header->type ), type );
+	}
 }
 
 /**
@@ -143,15 +186,10 @@ static int vmbus_initiate_contact ( struct hv_hypervisor *hv,
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv, VMBUS_VERSION_RESPONSE ) ) !=0)
 		return rc;
 
 	/* Check response */
-	if ( version->header.type != cpu_to_le32 ( VMBUS_VERSION_RESPONSE ) ) {
-		DBGC ( vmbus, "VMBUS %p unexpected version response type %d\n",
-		       vmbus, le32_to_cpu ( version->header.type ) );
-		return -EPROTO;
-	}
 	if ( ! version->supported ) {
 		DBGC ( vmbus, "VMBUS %p requested version not supported\n",
 		       vmbus );
@@ -177,8 +215,6 @@ static int vmbus_initiate_contact ( struct hv_hypervisor *hv,
  * @ret rc		Return status code
  */
 static int vmbus_unload ( struct hv_hypervisor *hv ) {
-	struct vmbus *vmbus = hv->vmbus;
-	const struct vmbus_message_header *header = &vmbus->message->header;
 	int rc;
 
 	/* Post message */
@@ -186,15 +222,8 @@ static int vmbus_unload ( struct hv_hypervisor *hv ) {
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv, VMBUS_UNLOAD_RESPONSE ) ) != 0)
 		return rc;
-
-	/* Check response */
-	if ( header->type != cpu_to_le32 ( VMBUS_UNLOAD_RESPONSE ) ) {
-		DBGC ( vmbus, "VMBUS %p unexpected unload response type %d\n",
-		       vmbus, le32_to_cpu ( header->type ) );
-		return -EPROTO;
-	}
 
 	return 0;
 }
@@ -262,12 +291,12 @@ int vmbus_establish_gpadl ( struct vmbus_device *vmdev, userptr_t data,
 		uint64_t pfn[pfn_count];
 	} __attribute__ (( packed )) gpadlhdr;
 	const struct vmbus_gpadl_created *created = &vmbus->message->created;
-	static unsigned int gpadl = VMBUS_GPADL_MAGIC;
+	unsigned int gpadl;
 	unsigned int i;
 	int rc;
 
 	/* Allocate GPADL ID */
-	gpadl++;
+	gpadl = ++vmbus_gpadl;
 
 	/* Construct message */
 	memset ( &gpadlhdr, 0, sizeof ( gpadlhdr ) );
@@ -289,15 +318,10 @@ int vmbus_establish_gpadl ( struct vmbus_device *vmdev, userptr_t data,
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv, VMBUS_GPADL_CREATED ) ) != 0 )
 		return rc;
 
 	/* Check response */
-	if ( created->header.type != cpu_to_le32 ( VMBUS_GPADL_CREATED ) ) {
-		DBGC ( vmdev, "VMBUS %s unexpected GPADL response type %d\n",
-		       vmdev->dev.name, le32_to_cpu ( created->header.type ) );
-		return -EPROTO;
-	}
 	if ( created->channel != cpu_to_le32 ( vmdev->channel ) ) {
 		DBGC ( vmdev, "VMBUS %s unexpected GPADL channel %d\n",
 		       vmdev->dev.name, le32_to_cpu ( created->channel ) );
@@ -333,6 +357,15 @@ int vmbus_gpadl_teardown ( struct vmbus_device *vmdev, unsigned int gpadl ) {
 	const struct vmbus_gpadl_torndown *torndown = &vmbus->message->torndown;
 	int rc;
 
+	/* If GPADL is obsolete (i.e. was created before the most
+	 * recent Hyper-V reset), then we will never receive a
+	 * response to the teardown message.  Since the GPADL is
+	 * already destroyed as far as the hypervisor is concerned, no
+	 * further action is required.
+	 */
+	if ( vmbus_gpadl_is_obsolete ( gpadl ) )
+		return 0;
+
 	/* Construct message */
 	memset ( &teardown, 0, sizeof ( teardown ) );
 	teardown.header.type = cpu_to_le32 ( VMBUS_GPADL_TEARDOWN );
@@ -345,15 +378,10 @@ int vmbus_gpadl_teardown ( struct vmbus_device *vmdev, unsigned int gpadl ) {
 		return rc;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
+	if ( ( rc = vmbus_wait_for_message ( hv, VMBUS_GPADL_TORNDOWN ) ) != 0 )
 		return rc;
 
 	/* Check response */
-	if ( torndown->header.type != cpu_to_le32 ( VMBUS_GPADL_TORNDOWN ) ) {
-		DBGC ( vmdev, "VMBUS %s unexpected GPADL response type %d\n",
-		       vmdev->dev.name, le32_to_cpu ( torndown->header.type ) );
-		return -EPROTO;
-	}
 	if ( torndown->gpadl != cpu_to_le32 ( gpadl ) ) {
 		DBGC ( vmdev, "VMBUS %s unexpected GPADL ID %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( torndown->gpadl ) );
@@ -439,32 +467,31 @@ int vmbus_open ( struct vmbus_device *vmdev,
 	/* Post message */
 	if ( ( rc = vmbus_post_message ( hv, &open.header,
 					 sizeof ( open ) ) ) != 0 )
-		return rc;
+		goto err_post_message;
 
 	/* Wait for response */
-	if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
-		return rc;
+	if ( ( rc = vmbus_wait_for_message ( hv,
+					     VMBUS_OPEN_CHANNEL_RESULT ) ) != 0)
+		goto err_wait_for_message;
 
 	/* Check response */
-	if ( opened->header.type != cpu_to_le32 ( VMBUS_OPEN_CHANNEL_RESULT ) ){
-		DBGC ( vmdev, "VMBUS %s unexpected open response type %d\n",
-		       vmdev->dev.name, le32_to_cpu ( opened->header.type ) );
-		return -EPROTO;
-	}
 	if ( opened->channel != cpu_to_le32 ( vmdev->channel ) ) {
 		DBGC ( vmdev, "VMBUS %s unexpected opened channel %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( opened->channel ) );
-		return -EPROTO;
+		rc = -EPROTO;
+		goto err_check_response;
 	}
 	if ( opened->id != open_id /* Non-endian */ ) {
 		DBGC ( vmdev, "VMBUS %s unexpected open ID %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( opened->id ) );
-		return -EPROTO;
+		rc = -EPROTO;
+		goto err_check_response;
 	}
 	if ( opened->status != 0 ) {
 		DBGC ( vmdev, "VMBUS %s open failed: %#08x\n",
 		       vmdev->dev.name, le32_to_cpu ( opened->status ) );
-		return -EPROTO;
+		rc = -EPROTO;
+		goto err_check_response;
 	}
 
 	/* Store channel parameters */
@@ -483,6 +510,9 @@ int vmbus_open ( struct vmbus_device *vmdev,
 		( virt_to_phys ( vmdev->out ) + len ) );
 	return 0;
 
+ err_check_response:
+ err_wait_for_message:
+ err_post_message:
 	vmbus_gpadl_teardown ( vmdev, vmdev->gpadl );
  err_establish:
 	free_dma ( ring, len );
@@ -519,8 +549,7 @@ void vmbus_close ( struct vmbus_device *vmdev ) {
 	}
 
 	/* Tear down GPADL */
-	if ( ( rc = vmbus_gpadl_teardown ( vmdev,
-					   vmdev->gpadl ) ) != 0 ) {
+	if ( ( rc = vmbus_gpadl_teardown ( vmdev, vmdev->gpadl ) ) != 0 ) {
 		DBGC ( vmdev, "VMBUS %s failed to tear down channel GPADL: "
 		       "%s\n", vmdev->dev.name, strerror ( rc ) );
 		/* We can't prevent the remote VM from continuing to
@@ -559,7 +588,7 @@ static void vmbus_signal_monitor ( struct vmbus_device *vmdev ) {
 	group = ( vmdev->monitor / ( 8 * sizeof ( trigger->pending ) ));
 	bit = ( vmdev->monitor % ( 8 * sizeof ( trigger->pending ) ) );
 	trigger = &vmbus->monitor_out->trigger[group];
-	hv_set_bit ( trigger, bit );
+	set_bit ( bit, trigger );
 }
 
 /**
@@ -720,7 +749,7 @@ static int vmbus_send ( struct vmbus_device *vmdev,
 		return 0;
 
 	/* Set channel bit in interrupt page */
-	hv_set_bit ( vmbus->intr->out, vmdev->channel );
+	set_bit ( vmdev->channel, vmbus->intr->out );
 
 	/* Signal the host */
 	vmdev->signal ( vmdev );
@@ -1120,6 +1149,7 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 	const struct vmbus_message_header *header = &vmbus->message->header;
 	const struct vmbus_offer_channel *offer = &vmbus->message->offer;
 	const union uuid *type;
+	union uuid instance;
 	struct vmbus_driver *driver;
 	struct vmbus_device *vmdev;
 	struct vmbus_device *tmp;
@@ -1134,8 +1164,8 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 	while ( 1 ) {
 
 		/* Wait for response */
-		if ( ( rc = vmbus_wait_for_message ( hv ) ) != 0 )
-			goto err_wait_for_message;
+		if ( ( rc = vmbus_wait_for_any_message ( hv ) ) != 0 )
+			goto err_wait_for_any_message;
 
 		/* Handle response */
 		if ( header->type == cpu_to_le32 ( VMBUS_OFFER_CHANNEL ) ) {
@@ -1164,14 +1194,19 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 				rc = -ENOMEM;
 				goto err_alloc_vmdev;
 			}
+			memcpy ( &instance, &offer->instance,
+				 sizeof ( instance ) );
+			uuid_mangle ( &instance );
 			snprintf ( vmdev->dev.name, sizeof ( vmdev->dev.name ),
-				   "vmbus:%02x", channel );
+				   "{%s}", uuid_ntoa ( &instance ) );
 			vmdev->dev.desc.bus_type = BUS_TYPE_HV;
 			INIT_LIST_HEAD ( &vmdev->dev.children );
 			list_add_tail ( &vmdev->dev.siblings,
 					&parent->children );
 			vmdev->dev.parent = parent;
 			vmdev->hv = hv;
+			memcpy ( &vmdev->instance, &offer->instance,
+				 sizeof ( vmdev->instance ) );
 			vmdev->channel = channel;
 			vmdev->monitor = offer->monitor;
 			vmdev->signal = ( offer->monitored ?
@@ -1186,6 +1221,7 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 		} else if ( header->type ==
 			    cpu_to_le32 ( VMBUS_ALL_OFFERS_DELIVERED ) ) {
 
+			/* End of offer list */
 			break;
 
 		} else {
@@ -1218,7 +1254,7 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 	}
  err_unexpected_offer:
  err_alloc_vmdev:
- err_wait_for_message:
+ err_wait_for_any_message:
 	/* Free any devices allocated (but potentially not yet probed) */
 	list_for_each_entry_safe ( vmdev, tmp, &parent->children,
 				   dev.siblings ) {
@@ -1227,6 +1263,77 @@ static int vmbus_probe_channels ( struct hv_hypervisor *hv,
 	}
  err_post_message:
 	return rc;
+}
+
+
+/**
+ * Reset channels
+ *
+ * @v hv		Hyper-V hypervisor
+ * @v parent		Parent device
+ * @ret rc		Return status code
+ */
+static int vmbus_reset_channels ( struct hv_hypervisor *hv,
+				  struct device *parent ) {
+	struct vmbus *vmbus = hv->vmbus;
+	const struct vmbus_message_header *header = &vmbus->message->header;
+	const struct vmbus_offer_channel *offer = &vmbus->message->offer;
+	const union uuid *type;
+	struct vmbus_device *vmdev;
+	unsigned int channel;
+	int rc;
+
+	/* Post message */
+	if ( ( rc = vmbus_post_empty_message ( hv, VMBUS_REQUEST_OFFERS ) ) !=0)
+		return rc;
+
+	/* Collect responses */
+	while ( 1 ) {
+
+		/* Wait for response */
+		if ( ( rc = vmbus_wait_for_any_message ( hv ) ) != 0 )
+			return rc;
+
+		/* Handle response */
+		if ( header->type == cpu_to_le32 ( VMBUS_OFFER_CHANNEL ) ) {
+
+			/* Parse offer */
+			type = &offer->type;
+			channel = le32_to_cpu ( offer->channel );
+			DBGC2 ( vmbus, "VMBUS %p offer %d type %s",
+				vmbus, channel, uuid_ntoa ( type ) );
+			if ( offer->monitored )
+				DBGC2 ( vmbus, " monitor %d", offer->monitor );
+			DBGC2 ( vmbus, "\n" );
+
+			/* Do nothing with the offer; we already have all
+			 * of the relevant state from the initial probe.
+			 */
+
+		} else if ( header->type ==
+			    cpu_to_le32 ( VMBUS_ALL_OFFERS_DELIVERED ) ) {
+
+			/* End of offer list */
+			break;
+
+		} else {
+			DBGC ( vmbus, "VMBUS %p unexpected offer response type "
+			       "%d\n", vmbus, le32_to_cpu ( header->type ) );
+			return -EPROTO;
+		}
+	}
+
+	/* Reset all devices */
+	list_for_each_entry ( vmdev, &parent->children, dev.siblings ) {
+		if ( ( rc = vmdev->driver->reset ( vmdev ) ) != 0 ) {
+			DBGC ( vmdev, "VMBUS %s could not reset: %s\n",
+			       vmdev->dev.name, strerror ( rc ) );
+			/* Continue attempting to reset other devices */
+			continue;
+		}
+	}
+
+	return 0;
 }
 
 /**
@@ -1313,6 +1420,39 @@ int vmbus_probe ( struct hv_hypervisor *hv, struct device *parent ) {
 	free ( vmbus );
  err_alloc:
 	return rc;
+}
+
+/**
+ * Reset Hyper-V virtual machine bus
+ *
+ * @v hv		Hyper-V hypervisor
+ * @v parent		Parent device
+ * @ret rc		Return status code
+ */
+int vmbus_reset ( struct hv_hypervisor *hv, struct device *parent ) {
+	struct vmbus *vmbus = hv->vmbus;
+	int rc;
+
+	/* Mark all existent GPADLs as obsolete */
+	vmbus_obsolete_gpadl = vmbus_gpadl;
+
+	/* Clear interrupt and monitor pages */
+	memset ( vmbus->intr, 0, PAGE_SIZE );
+	memset ( vmbus->monitor_in, 0, PAGE_SIZE );
+	memset ( vmbus->monitor_out, 0, PAGE_SIZE );
+
+	/* Enable message interrupt */
+	hv_enable_sint ( hv, VMBUS_MESSAGE_SINT );
+
+	/* Renegotiate protocol version */
+	if ( ( rc = vmbus_negotiate_version ( hv ) ) != 0 )
+		return rc;
+
+	/* Reenumerate channels */
+	if ( ( rc = vmbus_reset_channels ( hv, parent ) ) != 0 )
+		return rc;
+
+	return 0;
 }
 
 /**

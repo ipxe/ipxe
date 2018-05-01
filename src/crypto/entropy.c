@@ -70,7 +70,8 @@ repetition_count_cutoff ( void ) {
 	 * where W is set at 2^(-30) (in ANS X9.82 Part 2 (October
 	 * 2011 Draft) Section 8.5.2.1.3.1).
 	 */
-	max_repetitions = ( 1 + ( 30 / min_entropy_per_sample() ) );
+	max_repetitions = ( 1 + ( MIN_ENTROPY ( 30 ) /
+				  min_entropy_per_sample() ) );
 
 	/* Round up to a whole number of repetitions.  We don't have
 	 * the ceil() function available, so do the rounding by hand.
@@ -237,7 +238,7 @@ adaptive_proportion_cutoff ( void ) {
 
 	/* Look up cutoff value in cutoff table */
 	n = ADAPTIVE_PROPORTION_WINDOW_SIZE;
-	h = min_entropy_per_sample();
+	h = ( min_entropy_per_sample() / MIN_ENTROPY_SCALE );
 	cutoff = adaptive_proportion_cutoff_lookup ( n, h );
 
 	/* Fail unless cutoff value is a build-time constant */

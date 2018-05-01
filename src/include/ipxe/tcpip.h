@@ -13,6 +13,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/socket.h>
 #include <ipxe/in.h>
 #include <ipxe/tables.h>
+
+extern uint16_t generic_tcpip_continue_chksum ( uint16_t partial,
+						const void *data, size_t len );
+
 #include <bits/tcpip.h>
 
 struct io_buffer;
@@ -195,17 +199,8 @@ extern int tcpip_tx ( struct io_buffer *iobuf, struct tcpip_protocol *tcpip,
 extern struct tcpip_net_protocol * tcpip_net_protocol ( sa_family_t sa_family );
 extern struct net_device * tcpip_netdev ( struct sockaddr_tcpip *st_dest );
 extern size_t tcpip_mtu ( struct sockaddr_tcpip *st_dest );
-extern uint16_t generic_tcpip_continue_chksum ( uint16_t partial,
-						const void *data, size_t len );
 extern uint16_t tcpip_chksum ( const void *data, size_t len );
 extern int tcpip_bind ( struct sockaddr_tcpip *st_local,
 			int ( * available ) ( int port ) );
-
-/* Use generic_tcpip_continue_chksum() if no architecture-specific
- * version is available
- */
-#ifndef tcpip_continue_chksum
-#define tcpip_continue_chksum generic_tcpip_continue_chksum
-#endif
 
 #endif /* _IPXE_TCPIP_H */

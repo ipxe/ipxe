@@ -1,0 +1,8 @@
+#!ipxe
+
+echo Amazon EC2 - iPXE boot via user-data
+echo CPU: ${cpuvendor} ${cpumodel}
+ifstat ||
+dhcp ||
+route ||
+chain -ar http://169.254.169.254/latest/user-data

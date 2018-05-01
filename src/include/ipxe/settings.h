@@ -40,7 +40,7 @@ struct setting {
 	 * (such as a DHCP option number, or an SMBIOS structure and
 	 * field number).
 	 */
-	unsigned int tag;
+	uint64_t tag;
 	/** Setting scope (or NULL)
 	 *
 	 * For historic reasons, a NULL scope with a non-zero tag
@@ -62,18 +62,22 @@ struct setting {
 
 #define SETTING_NETDEV		01 /**< Network device settings */
 #define SETTING_NETDEV_EXTRA	02 /**< Network device additional settings */
-#define SETTING_IP		03 /**< IPv4 settings */
-#define SETTING_IP_EXTRA	04 /**< IPv4 additional settings */
-#define SETTING_BOOT		05 /**< Generic boot settings */
-#define SETTING_BOOT_EXTRA	06 /**< Generic boot additional settings */
-#define SETTING_SANBOOT		07 /**< SAN boot settings */
-#define SETTING_SANBOOT_EXTRA	08 /**< SAN boot additional settings */
-#define SETTING_HOST		09 /**< Host identity settings */
-#define SETTING_HOST_EXTRA	10 /**< Host identity additional settings */
-#define SETTING_AUTH		11 /**< Authentication settings */
-#define SETTING_AUTH_EXTRA	12 /**< Authentication additional settings */
-#define SETTING_CRYPTO		13 /**< Cryptography settings */
-#define SETTING_MISC		14 /**< Miscellaneous settings */
+#define SETTING_IP4		03 /**< IPv4 settings */
+#define SETTING_IP4_EXTRA	04 /**< IPv4 additional settings */
+#define SETTING_IP6		05 /**< IPv6 settings */
+#define SETTING_IP6_EXTRA	06 /**< IPv6 additional settings */
+#define SETTING_IP		07 /**< IPv4 settings */
+#define SETTING_IP_EXTRA	08 /**< IPv4 additional settings */
+#define SETTING_BOOT		09 /**< Generic boot settings */
+#define SETTING_BOOT_EXTRA	10 /**< Generic boot additional settings */
+#define SETTING_SANBOOT		11 /**< SAN boot settings */
+#define SETTING_SANBOOT_EXTRA	12 /**< SAN boot additional settings */
+#define SETTING_HOST		13 /**< Host identity settings */
+#define SETTING_HOST_EXTRA	14 /**< Host identity additional settings */
+#define SETTING_AUTH		15 /**< Authentication settings */
+#define SETTING_AUTH_EXTRA	16 /**< Authentication additional settings */
+#define SETTING_CRYPTO		17 /**< Cryptography settings */
+#define SETTING_MISC		18 /**< Miscellaneous settings */
 
 /** @} */
 
@@ -140,6 +144,8 @@ struct settings {
 	struct settings_operations *op;
 	/** Default scope for numerical settings constructed for this block */
 	const struct settings_scope *default_scope;
+	/** Sibling ordering */
+	int order;
 };
 
 /**
@@ -280,7 +286,10 @@ struct builtin_setting {
 extern const struct settings_scope builtin_scope;
 
 /** IPv6 setting scope */
-extern const struct settings_scope ipv6_scope;
+extern const struct settings_scope ipv6_settings_scope;
+
+/** DHCPv6 setting scope */
+extern const struct settings_scope dhcpv6_scope;
 
 /**
  * A generic settings block
@@ -421,13 +430,19 @@ extern const struct setting_type setting_type_busdevfn __setting_type;
 extern const struct setting_type setting_type_dnssl __setting_type;
 
 extern const struct setting
-ip_setting __setting ( SETTING_IP, ip );
+ip_setting __setting ( SETTING_IP4, ip );
 extern const struct setting
-netmask_setting __setting ( SETTING_IP, netmask );
+netmask_setting __setting ( SETTING_IP4, netmask );
 extern const struct setting
-gateway_setting __setting ( SETTING_IP, gateway );
+gateway_setting __setting ( SETTING_IP4, gateway );
 extern const struct setting
-dns_setting __setting ( SETTING_IP_EXTRA, dns );
+dns_setting __setting ( SETTING_IP4_EXTRA, dns );
+extern const struct setting
+ip6_setting __setting ( SETTING_IP6, ip6 );
+extern const struct setting
+len6_setting __setting ( SETTING_IP6, len6 );
+extern const struct setting
+gateway6_setting __setting ( SETTING_IP6, gateway6 );
 extern const struct setting
 hostname_setting __setting ( SETTING_HOST, hostname );
 extern const struct setting
@@ -436,6 +451,8 @@ extern const struct setting
 filename_setting __setting ( SETTING_BOOT, filename );
 extern const struct setting
 root_path_setting __setting ( SETTING_SANBOOT, root-path );
+extern const struct setting
+san_filename_setting __setting ( SETTING_SANBOOT, san-filename );
 extern const struct setting
 username_setting __setting ( SETTING_AUTH, username );
 extern const struct setting
@@ -452,6 +469,20 @@ extern const struct setting
 busid_setting __setting ( SETTING_NETDEV, busid );
 extern const struct setting
 user_class_setting __setting ( SETTING_HOST_EXTRA, user-class );
+extern const struct setting
+vendor_class_setting __setting ( SETTING_HOST_EXTRA, vendor-class );
+extern const struct setting
+manufacturer_setting __setting ( SETTING_HOST_EXTRA, manufacturer );
+extern const struct setting
+product_setting __setting ( SETTING_HOST_EXTRA, product );
+extern const struct setting
+serial_setting __setting ( SETTING_HOST_EXTRA, serial );
+extern const struct setting
+asset_setting __setting ( SETTING_HOST_EXTRA, asset );
+extern const struct setting
+board_serial_setting __setting ( SETTING_HOST_EXTRA, board-serial );
+extern const struct setting dhcp_server_setting __setting ( SETTING_MISC,
+							    dhcp-server );
 
 /**
  * Initialise a settings block

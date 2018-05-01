@@ -161,23 +161,4 @@ xen_hypercall_5 ( struct xen_hypervisor *xen, unsigned int hypercall,
 	return retval;
 }
 
-/**
- * Test and clear pending event
- *
- * @v xen		Xen hypervisor
- * @v port		Event channel port
- * @ret pending		Event was pending
- */
-static inline __attribute__ (( always_inline )) uint8_t
-xenevent_pending ( struct xen_hypervisor *xen, evtchn_port_t port ) {
-	uint8_t pending;
-
-	__asm__ __volatile__ ( "lock btr %2, %0\n\t"
-			       "setc %1\n\t"
-			       : "+m" ( xen->shared->evtchn_pending ),
-				 "=a"  ( pending )
-			       : "Ir" ( port ) );
-	return pending;
-}
-
 #endif /* _BITS_XEN_H */

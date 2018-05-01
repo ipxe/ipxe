@@ -88,7 +88,6 @@ static void free_image ( struct refcnt *refcnt ) {
  * @ret image		Executable image
  */
 struct image * alloc_image ( struct uri *uri ) {
-	const char *name;
 	struct image *image;
 	int rc;
 
@@ -99,21 +98,40 @@ struct image * alloc_image ( struct uri *uri ) {
 
 	/* Initialise image */
 	ref_init ( &image->refcnt, free_image );
-	if ( uri ) {
-		image->uri = uri_get ( uri );
-		if ( uri->path ) {
-			name = basename ( ( char * ) uri->path );
-			if ( ( rc = image_set_name ( image, name ) ) != 0 )
-				goto err_set_name;
-		}
-	}
+	if ( uri && ( ( rc = image_set_uri ( image, uri ) ) != 0 ) )
+		goto err_set_uri;
 
 	return image;
 
- err_set_name:
+ err_set_uri:
 	image_put ( image );
  err_alloc:
 	return NULL;
+}
+
+/**
+ * Set image URI
+ *
+ * @v image		Image
+ * @v uri		New image URI
+ * @ret rc		Return status code
+ */
+int image_set_uri ( struct image *image, struct uri *uri ) {
+	const char *name;
+	int rc;
+
+	/* Set name, if image does not already have one */
+	if ( uri->path && ( ! ( image->name && image->name[0] ) ) ) {
+		name = basename ( ( char * ) uri->path );
+		if ( ( rc = image_set_name ( image, name ) ) != 0 )
+			return rc;
+	}
+
+	/* Update image URI */
+	uri_put ( image->uri );
+	image->uri = uri_get ( uri );
+
+	return 0;
 }
 
 /**
@@ -173,7 +191,7 @@ static int image_probe ( struct image *image ) {
 			image->type = type;
 			DBGC ( image, "IMAGE %s is %s\n",
 			       image->name, type->name );
-			break;
+			return 0;
 		}
 		DBGC ( image, "IMAGE %s is not %s: %s\n", image->name,
 		       type->name, strerror ( rc ) );
@@ -460,30 +478,6 @@ int image_set_trust ( int require_trusted, int permanent ) {
 	 */
 	if ( require_trusted_images != require_trusted )
 		return -EACCES_PERMANENT;
-
-	return 0;
-}
-
-/**
- * Create pixel buffer from image
- *
- * @v image		Image
- * @v pixbuf		Pixel buffer to fill in
- * @ret rc		Return status code
- */
-int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf ) {
-	int rc;
-
-	/* Check that this image can be used to create a pixel buffer */
-	if ( ! ( image->type && image->type->pixbuf ) )
-		return -ENOTSUP;
-
-	/* Try creating pixel buffer */
-	if ( ( rc = image->type->pixbuf ( image, pixbuf ) ) != 0 ) {
-		DBGC ( image, "IMAGE %s could not create pixel buffer: %s\n",
-		       image->name, strerror ( rc ) );
-		return rc;
-	}
 
 	return 0;
 }

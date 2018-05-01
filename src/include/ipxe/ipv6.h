@@ -25,6 +25,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** IPv6 maximum hop limit */
 #define IPV6_HOP_LIMIT 0xff
 
+/** IPv6 default prefix length */
+#define IPV6_DEFAULT_PREFIX_LEN 64
+
+/** IPv6 maximum prefix length */
+#define IPV6_MAX_PREFIX_LEN 128
+
 /** IPv6 header */
 struct ipv6_header {
 	/** Version (4 bits), Traffic class (8 bits), Flow label (20 bits) */
@@ -152,6 +158,24 @@ struct ipv6_pseudo_header {
 	uint8_t next_header;
 } __attribute__ (( packed ));
 
+/** IPv6 address scopes */
+enum ipv6_address_scope {
+	/** Interface-local address scope */
+	IPV6_SCOPE_INTERFACE_LOCAL = 0x1,
+	/** Link-local address scope */
+	IPV6_SCOPE_LINK_LOCAL = 0x2,
+	/** Admin-local address scope */
+	INV6_SCOPE_ADMIN_LOCAL = 0x4,
+	/** Site-local address scope */
+	IPV6_SCOPE_SITE_LOCAL = 0x5,
+	/** Organisation-local address scope */
+	IPV6_SCOPE_ORGANISATION_LOCAL = 0x8,
+	/** Global address scope */
+	IPV6_SCOPE_GLOBAL = 0xe,
+	/** Maximum scope */
+	IPV6_SCOPE_MAX = 0xf,
+};
+
 /** An IPv6 address/routing table entry */
 struct ipv6_miniroute {
 	/** List of miniroutes */
@@ -168,6 +192,8 @@ struct ipv6_miniroute {
 	struct in6_addr prefix_mask;
 	/** Router address */
 	struct in6_addr router;
+	/** Scope */
+	unsigned int scope;
 	/** Flags */
 	unsigned int flags;
 };
@@ -238,15 +264,45 @@ static inline void ipv6_all_routers ( struct in6_addr *addr ) {
 	addr->s6_addr[15] = 2;
 }
 
+/**
+ * Get multicast address scope
+ *
+ * @v addr		Multicast address
+ * @ret scope		Address scope
+ */
+static inline unsigned int
+ipv6_multicast_scope ( const struct in6_addr *addr ) {
+
+	return ( addr->s6_addr[1] & 0x0f );
+}
+
+/** IPv6 settings sibling order */
+enum ipv6_settings_order {
+	/** No address */
+	IPV6_ORDER_PREFIX_ONLY = -4,
+	/** Link-local address */
+	IPV6_ORDER_LINK_LOCAL = -3,
+	/** Address assigned via SLAAC */
+	IPV6_ORDER_SLAAC = -2,
+	/** Address assigned via DHCPv6 */
+	IPV6_ORDER_DHCPV6 = -1,
+};
+
+/** IPv6 link-local address settings block name */
+#define IPV6_SETTINGS_NAME "link"
+
 extern struct list_head ipv6_miniroutes;
 
 extern struct net_protocol ipv6_protocol __net_protocol;
 
 extern int ipv6_has_addr ( struct net_device *netdev, struct in6_addr *addr );
-extern int ipv6_set_prefix ( struct net_device *netdev, struct in6_addr *prefix,
-			     unsigned int prefix_len, struct in6_addr *router );
-extern int ipv6_set_address ( struct net_device *netdev,
-			      struct in6_addr *address );
+extern int ipv6_add_miniroute ( struct net_device *netdev,
+				struct in6_addr *address,
+				unsigned int prefix_len,
+				struct in6_addr *router );
+extern void ipv6_del_miniroute ( struct ipv6_miniroute *miniroute );
+extern struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
+					    struct in6_addr **dest );
 extern int parse_ipv6_setting ( const struct setting_type *type,
 				const char *value, void *buf, size_t len );
 extern int format_ipv6_setting ( const struct setting_type *type,

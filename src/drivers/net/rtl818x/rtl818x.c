@@ -663,7 +663,8 @@ int rtl818x_probe(struct pci_device *pdev )
 	hwinfo = zalloc(sizeof(*hwinfo));
 	if (!hwinfo) {
 		DBG("rtl818x: hwinfo alloc failed\n");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_alloc_hwinfo;
 	}
 
 	adjust_pci_device(pdev);
@@ -671,7 +672,8 @@ int rtl818x_probe(struct pci_device *pdev )
 	dev = net80211_alloc(sizeof(*priv));
 	if (!dev) {
 		DBG("rtl818x: net80211 alloc failed\n");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_alloc_dev;
 	}
 
 	priv = dev->priv;
@@ -816,7 +818,9 @@ int rtl818x_probe(struct pci_device *pdev )
  err_free_dev:
 	pci_set_drvdata(pdev, NULL);
 	net80211_free(dev);
+ err_alloc_dev:
 	free(hwinfo);
+ err_alloc_hwinfo:
 	return err;
 }
 

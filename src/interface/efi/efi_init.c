@@ -32,8 +32,17 @@ EFI_HANDLE efi_image_handle;
 /** Loaded image protocol for this image */
 EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 
-/** System table passed to entry point */
-EFI_SYSTEM_TABLE *efi_systab;
+/** System table passed to entry point
+ *
+ * We construct the symbol name efi_systab via the PLATFORM macro.
+ * This ensures that the symbol is defined only in EFI builds, and so
+ * prevents EFI code from being incorrectly linked in to a non-EFI
+ * build.
+ */
+EFI_SYSTEM_TABLE * _C2 ( PLATFORM, _systab );
+
+/** EFI shutdown is in progress */
+int efi_shutdown_in_progress;
 
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
@@ -50,6 +59,13 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle );
  */
 static EFIAPI void efi_shutdown_hook ( EFI_EVENT event __unused,
 				       void *context __unused ) {
+
+	/* Mark shutdown as being in progress, to indicate that large
+	 * parts of the system (e.g. timers) are no longer functional.
+	 */
+	efi_shutdown_in_progress = 1;
+
+	/* Shut down iPXE */
 	shutdown_boot();
 }
 

@@ -103,7 +103,9 @@ int wgetnstr ( WINDOW *win, char *str, int n ) {
 			_wcursback( win );
 			wdelch( win );
 		} else {
-			if ( c >= KEY_MIN ) {
+			if ( c >= 32 && c <= 126 ) {
+				*(_str++) = c; n--;
+			} else {
 				switch(c) {
 				case KEY_LEFT :
 				case KEY_BACKSPACE :
@@ -117,9 +119,6 @@ int wgetnstr ( WINDOW *win, char *str, int n ) {
 					beep();
 					break;
 				}
-			}
-			if ( c >= 32 && c <= 126 ) {
-				*(_str++) = c; n--;
 			}
 		}
 	}

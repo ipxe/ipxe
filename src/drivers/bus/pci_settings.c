@@ -70,7 +70,7 @@ static int pci_settings_fetch ( struct settings *settings __unused,
 	unsigned int i;
 
 	/* Extract busdevfn, offset, and length from tag */
-	tag_busdevfn = ( ( setting->tag >> 16 ) & 0xffff );
+	tag_busdevfn = ( setting->tag >> 16 );
 	tag_offset = ( ( setting->tag >> 8 ) & 0xff );
 	tag_len = ( ( setting->tag >> 0 ) & 0xff );
 

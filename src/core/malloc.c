@@ -93,6 +93,12 @@ static LIST_HEAD ( free_blocks );
 /** Total amount of free memory */
 size_t freemem;
 
+/** Total amount of used memory */
+size_t usedmem;
+
+/** Maximum amount of used memory */
+size_t maxusedmem;
+
 /**
  * Heap size
  *
@@ -278,6 +284,7 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	size_t post_size;
 	struct memory_block *pre;
 	struct memory_block *post;
+	unsigned int discarded;
 	void *ptr;
 
 	/* Sanity checks */
@@ -291,9 +298,17 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	 */
 	actual_size = ( ( size + MIN_MEMBLOCK_SIZE - 1 ) &
 			~( MIN_MEMBLOCK_SIZE - 1 ) );
+	if ( ! actual_size ) {
+		/* The requested size is not permitted to be zero.  A
+		 * zero result at this point indicates that either the
+		 * original requested size was zero, or that unsigned
+		 * integer overflow has occurred.
+		 */
+		ptr = NULL;
+		goto done;
+	}
 	assert ( actual_size >= size );
 	align_mask = ( ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 ) );
-	assert ( ( actual_size + align_mask ) > actual_size );
 
 	DBGC2 ( &heap, "Allocating %#zx (aligned %#zx+%zx)\n",
 		size, align, offset );
@@ -302,7 +317,8 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 		list_for_each_entry ( block, &free_blocks, list ) {
 			pre_size = ( ( offset - virt_to_phys ( block ) )
 				     & align_mask );
-			if ( block->size < ( pre_size + actual_size ) )
+			if ( ( block->size < pre_size ) ||
+			     ( ( block->size - pre_size ) < actual_size ) )
 				continue;
 			post_size = ( block->size - pre_size - actual_size );
 			/* Split block into pre-block, block, and
@@ -342,8 +358,11 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 				VALGRIND_MAKE_MEM_NOACCESS ( pre,
 							     sizeof ( *pre ) );
 			}
-			/* Update total free memory */
+			/* Update memory usage statistics */
 			freemem -= actual_size;
+			usedmem += actual_size;
+			if ( usedmem > maxusedmem )
+				maxusedmem = usedmem;
 			/* Return allocated block */
 			DBGC2 ( &heap, "Allocated [%p,%p)\n", block,
 				( ( ( void * ) block ) + size ) );
@@ -353,7 +372,13 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 		}
 
 		/* Try discarding some cached data to free up memory */
-		if ( ! discard_cache() ) {
+		DBGC ( &heap, "Attempting discard for %#zx (aligned %#zx+%zx), "
+		       "used %zdkB\n", size, align, offset, ( usedmem >> 10 ) );
+		valgrind_make_blocks_noaccess();
+		discarded = discard_cache();
+		valgrind_make_blocks_defined();
+		check_blocks();
+		if ( ! discarded ) {
 			/* Nothing available to discard */
 			DBGC ( &heap, "Failed to allocate %#zx (aligned "
 			       "%#zx)\n", size, align );
@@ -465,8 +490,9 @@ void free_memblock ( void *ptr, size_t size ) {
 		VALGRIND_MAKE_MEM_NOACCESS ( block, sizeof ( *block ) );
 	}
 
-	/* Update free memory counter */
+	/* Update memory usage statistics */
 	freemem += actual_size;
+	usedmem -= actual_size;
 
 	check_blocks();
 	valgrind_make_blocks_noaccess();
@@ -506,6 +532,8 @@ void * realloc ( void *old_ptr, size_t new_size ) {
 	if ( new_size ) {
 		new_total_size = ( new_size +
 				   offsetof ( struct autosized_block, data ) );
+		if ( new_total_size < new_size )
+			return NULL;
 		new_block = alloc_memblock ( new_total_size, 1, 0 );
 		if ( ! new_block )
 			return NULL;
@@ -618,10 +646,17 @@ void * zalloc ( size_t size ) {
  * @c start must be aligned to at least a multiple of sizeof(void*).
  */
 void mpopulate ( void *start, size_t len ) {
+
 	/* Prevent free_memblock() from rounding up len beyond the end
 	 * of what we were actually given...
 	 */
-	free_memblock ( start, ( len & ~( MIN_MEMBLOCK_SIZE - 1 ) ) );
+	len &= ~( MIN_MEMBLOCK_SIZE - 1 );
+
+	/* Add to allocation pool */
+	free_memblock ( start, len );
+
+	/* Fix up memory usage statistics */
+	usedmem += len;
 }
 
 /**
@@ -645,6 +680,7 @@ struct init_fn heap_init_fn __init_fn ( INIT_EARLY ) = {
  */
 static void shutdown_cache ( int booting __unused ) {
 	discard_all_cache();
+	DBGC ( &heap, "Maximum heap usage %zdkB\n", ( maxusedmem >> 10 ) );
 }
 
 /** Memory allocator shutdown function */

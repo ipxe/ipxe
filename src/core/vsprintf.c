@@ -257,11 +257,13 @@ size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
 		} else if ( *fmt == 's' ) {
 			if ( length < &type_sizes[LONG_LEN] ) {
 				ptr = va_arg ( args, char * );
+				if ( ! ptr )
+					ptr = "<NULL>";
 			} else {
 				wptr = va_arg ( args, wchar_t * );
+				if ( ! wptr )
+					ptr = "<NULL>";
 			}
-			if ( ( ptr == NULL ) && ( wptr == NULL ) )
-				ptr = "<NULL>";
 		} else if ( *fmt == 'p' ) {
 			intptr_t ptrval;
 

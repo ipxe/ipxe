@@ -93,13 +93,14 @@ struct x509_root root_certificates = {
  * a rebuild.
  */
 static void rootcert_init ( void ) {
+	static int initialised;
 	void *external = NULL;
 	int len;
 
 	/* Allow trusted root certificates to be overridden only if
 	 * not explicitly specified at build time.
 	 */
-	if ( ALLOW_TRUST_OVERRIDE ) {
+	if ( ALLOW_TRUST_OVERRIDE && ( ! initialised ) ) {
 
 		/* Fetch copy of "trust" setting, if it exists.  This
 		 * memory will never be freed.
@@ -109,6 +110,9 @@ static void rootcert_init ( void ) {
 			root_certificates.fingerprints = external;
 			root_certificates.count = ( len / FINGERPRINT_LEN );
 		}
+
+		/* Prevent subsequent modifications */
+		initialised = 1;
 	}
 
 	DBGC ( &root_certificates, "ROOTCERT using %d %s certificate(s):\n",
@@ -118,6 +122,6 @@ static void rootcert_init ( void ) {
 }
 
 /** Root certificate initialiser */
-struct init_fn rootcert_init_fn __init_fn ( INIT_LATE ) = {
-	.initialise = rootcert_init,
+struct startup_fn rootcert_startup_fn __startup_fn ( STARTUP_LATE ) = {
+	.startup = rootcert_init,
 };

@@ -74,9 +74,6 @@ static __unused void i386_writeq ( uint64_t data, volatile uint64_t *io_addr ) {
 
 PROVIDE_IOAPI_INLINE ( x86, phys_to_bus );
 PROVIDE_IOAPI_INLINE ( x86, bus_to_phys );
-PROVIDE_IOAPI_INLINE ( x86, ioremap );
-PROVIDE_IOAPI_INLINE ( x86, iounmap );
-PROVIDE_IOAPI_INLINE ( x86, io_to_bus );
 PROVIDE_IOAPI_INLINE ( x86, readb );
 PROVIDE_IOAPI_INLINE ( x86, readw );
 PROVIDE_IOAPI_INLINE ( x86, readl );

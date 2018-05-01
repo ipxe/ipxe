@@ -43,3 +43,6 @@ REQUIRE_OBJECT ( fcoe );
 #ifdef NET_PROTO_STP
 REQUIRE_OBJECT ( stp );
 #endif
+#ifdef NET_PROTO_LACP
+REQUIRE_OBJECT ( eth_slow );
+#endif

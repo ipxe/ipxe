@@ -362,4 +362,19 @@ struct netvsc_device {
 	int wait_rc;
 };
 
+/**
+ * Check if NetVSC device is obsolete
+ *
+ * @v netvsc		NetVSC device
+ * @v is_obsolete	NetVSC device is obsolete
+ *
+ * Check if NetVSC device is obsolete (i.e. was opened before the most
+ * recent Hyper-V reset).
+ */
+static inline __attribute__ (( always_inline )) int
+netvsc_is_obsolete ( struct netvsc_device *netvsc ) {
+
+	return vmbus_gpadl_is_obsolete ( netvsc->rx.gpadl );
+}
+
 #endif /* _NETVSC_H */

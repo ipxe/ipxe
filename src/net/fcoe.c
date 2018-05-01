@@ -1094,7 +1094,7 @@ static void fcoe_expired ( struct retry_timer *timer, int over __unused ) {
 
 		/* Send keepalive */
 		start_timer_fixed ( &fcoe->timer,
-			      ( ( fcoe->keepalive * TICKS_PER_SEC ) / 1000 ) );
+				    ( fcoe->keepalive * TICKS_PER_MS ) );
 		fcoe_fip_tx_keepalive ( fcoe );
 
 		/* Abandon FCF if we have not seen its advertisements */

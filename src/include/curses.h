@@ -2,6 +2,7 @@
 #define CURSES_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdarg.h>
 #include <ipxe/console.h>
 
@@ -25,7 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #undef  TRUE
 #define TRUE	(1)
 
-typedef int bool;
 typedef uint32_t chtype;
 typedef uint32_t attr_t;
 
@@ -443,7 +443,8 @@ extern int wborder ( WINDOW *, chtype, chtype, chtype, chtype, chtype, chtype,
 extern int wclrtobot ( WINDOW * ) __nonnull;
 extern int wclrtoeol ( WINDOW * ) __nonnull;
 extern void wcursyncup ( WINDOW * );
-extern int wcolour_set ( WINDOW *, short, void * ) __nonnull;
+extern int wcolour_set ( WINDOW *, short, void * )
+	__attribute__ (( nonnull (1)));
 #define wcolor_set(w,s,v) wcolour_set((w),(s),(v))
 extern int wdelch ( WINDOW * ) __nonnull;
 extern int wdeleteln ( WINDOW * ) __nonnull;

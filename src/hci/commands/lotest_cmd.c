@@ -43,12 +43,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 struct lotest_options {
 	/** MTU */
 	unsigned int mtu;
+	/** Broadcast */
+	int broadcast;
 };
 
 /** "lotest" option list */
 static struct option_descriptor lotest_opts[] = {
 	OPTION_DESC ( "mtu", 'm', required_argument,
 		      struct lotest_options, mtu, parse_integer ),
+	OPTION_DESC ( "broadcast", 'b', no_argument,
+		      struct lotest_options, broadcast, parse_flag ),
 };
 
 /** "lotest" command descriptor */
@@ -86,7 +90,8 @@ static int lotest_exec ( int argc, char **argv ) {
 		opts.mtu = ETH_MAX_MTU;
 
 	/* Perform loopback test */
-	if ( ( rc = loopback_test ( sender, receiver, opts.mtu ) ) != 0 ) {
+	if ( ( rc = loopback_test ( sender, receiver, opts.mtu,
+				    opts.broadcast ) ) != 0 ) {
 		printf ( "Test failed: %s\n", strerror ( rc ) );
 		return rc;
 	}

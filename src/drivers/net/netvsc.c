@@ -259,6 +259,15 @@ static int netvsc_revoke_buffer ( struct netvsc_device *netvsc,
 	struct netvsc_revoke_buffer_message msg;
 	int rc;
 
+	/* If the buffer's GPADL is obsolete (i.e. was created before
+	 * the most recent Hyper-V reset), then we will never receive
+	 * a response to the revoke message.  Since the GPADL is
+	 * already destroyed as far as the hypervisor is concerned, no
+	 * further action is required.
+	 */
+	if ( netvsc_is_obsolete ( netvsc ) )
+		return 0;
+
 	/* Construct message */
 	memset ( &msg, 0, sizeof ( msg ) );
 	msg.header.type = cpu_to_le32 ( buffer->revoke_type );
@@ -473,6 +482,14 @@ static int netvsc_transmit ( struct rndis_device *rndis,
 	unsigned int xrid;
 	uint64_t xid;
 	int rc;
+
+	/* If the device is obsolete (i.e. was opened before the most
+	 * recent Hyper-V reset), then we will never receive transmit
+	 * completions.  Fail transmissions immediately to minimise
+	 * the delay in closing and reopening the device.
+	 */
+	if ( netvsc_is_obsolete ( netvsc ) )
+		return -EPIPE;
 
 	/* Sanity check */
 	assert ( iob_len ( iobuf ) >= sizeof ( *header ) );
@@ -824,6 +841,35 @@ static int netvsc_probe ( struct vmbus_device *vmdev ) {
 }
 
 /**
+ * Reset device
+ *
+ * @v vmdev		VMBus device
+ * @ret rc		Return status code
+ */
+static int netvsc_reset ( struct vmbus_device *vmdev ) {
+	struct rndis_device *rndis = vmbus_get_drvdata ( vmdev );
+	struct netvsc_device *netvsc = rndis->priv;
+	struct net_device *netdev = rndis->netdev;
+	int rc;
+
+	/* A closed device holds no NetVSC (or RNDIS) state, so there
+	 * is nothing to reset.
+	 */
+	if ( ! netdev_is_open ( netdev ) )
+		return 0;
+
+	/* Close and reopen device to reset any stale state */
+	netdev_close ( netdev );
+	if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not reopen: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Remove device
  *
  * @v vmdev		VMBus device
@@ -844,5 +890,6 @@ struct vmbus_driver netvsc_driver __vmbus_driver = {
 	.type = VMBUS_TYPE ( 0xf8615163, 0xdf3e, 0x46c5, 0x913f,
 			     0xf2, 0xd2, 0xf9, 0x65, 0xed, 0x0e ),
 	.probe = netvsc_probe,
+	.reset = netvsc_reset,
 	.remove = netvsc_remove,
 };

@@ -18,4 +18,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/X64/ProcessorBind.h>
 #endif
 
+#if __arm__
+#include <ipxe/efi/Arm/ProcessorBind.h>
+#endif
+
+#if __aarch64__
+#include <ipxe/efi/AArch64/ProcessorBind.h>
+#endif
+
 #endif /* _IPXE_EFI_PROCESSOR_BIND_H */

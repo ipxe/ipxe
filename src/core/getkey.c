@@ -76,9 +76,14 @@ int getkey ( unsigned long timeout ) {
 	if ( character != ESC )
 		return character;
 
+	character = getchar_timeout ( GETKEY_TIMEOUT );
+	if ( character < 0 )
+		return ESC;
+
+	if ( isalpha ( character ) )
+		return ( toupper ( character ) - 'A' + 1 );
+
 	while ( ( character = getchar_timeout ( GETKEY_TIMEOUT ) ) >= 0 ) {
-		if ( character == '[' )
-			continue;
 		if ( isdigit ( character ) ) {
 			n = ( ( n * 10 ) + ( character - '0' ) );
 			continue;

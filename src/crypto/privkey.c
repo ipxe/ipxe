@@ -54,7 +54,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Raw private key data */
 extern char private_key_data[];
 extern char private_key_len[];
-__asm__ ( ".section \".rodata\", \"a\", @progbits\n\t"
+__asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"
 	  "\nprivate_key_data:\n\t"
 #ifdef PRIVATE_KEY
 	  ".incbin \"" PRIVATE_KEY "\"\n\t"
@@ -65,6 +65,12 @@ __asm__ ( ".section \".rodata\", \"a\", @progbits\n\t"
 
 /** Private key */
 struct asn1_cursor private_key = {
+	.data = private_key_data,
+	.len = ( ( size_t ) private_key_len ),
+};
+
+/** Default private key */
+static struct asn1_cursor default_private_key = {
 	.data = private_key_data,
 	.len = ( ( size_t ) private_key_len ),
 };
@@ -92,8 +98,8 @@ static int privkey_apply_settings ( void ) {
 	if ( ALLOW_KEY_OVERRIDE ) {
 
 		/* Restore default private key */
-		private_key.data = private_key_data;
-		private_key.len = ( ( size_t ) private_key_len );
+		memcpy ( &private_key, &default_private_key,
+			 sizeof ( private_key ) );
 
 		/* Fetch new private key, if any */
 		free ( key_data );

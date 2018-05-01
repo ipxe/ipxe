@@ -22,6 +22,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <valgrind/memcheck.h>
 
 extern size_t freemem;
+extern size_t usedmem;
+extern size_t maxusedmem;
 
 extern void * __malloc alloc_memblock ( size_t size, size_t align,
 					size_t offset );

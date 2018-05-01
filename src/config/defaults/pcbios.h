@@ -21,6 +21,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ENTROPY_RTC
 #define TIME_RTC
 #define REBOOT_PCBIOS
+#define ACPI_RSDP
+
+#ifdef __x86_64__
+#define IOMAP_PAGES
+#else
+#define IOMAP_VIRT
+#endif
 
 #define	IMAGE_ELF		/* ELF image support */
 #define	IMAGE_MULTIBOOT		/* MultiBoot image support */

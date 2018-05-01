@@ -479,6 +479,8 @@ struct vmbus_device {
 	/** Hyper-V hypervisor */
 	struct hv_hypervisor *hv;
 
+	/** Channel instance */
+	union uuid instance;
 	/** Channel ID */
 	unsigned int channel;
 	/** Monitor ID */
@@ -527,6 +529,12 @@ struct vmbus_driver {
 	 * @ret rc		Return status code
 	 */
 	int ( * probe ) ( struct vmbus_device *vmdev );
+	/** Reset device
+	 *
+	 * @v vmdev		VMBus device
+	 * @ret rc		Return status code
+	 */
+	int ( * reset ) ( struct vmbus_device *vmdev );
 	/** Remove device
 	 *
 	 * @v vmdev		VMBus device
@@ -609,6 +617,23 @@ vmbus_unregister_pages ( struct vmbus_device *vmdev,
 	list_del ( &pages->list );
 }
 
+extern unsigned int vmbus_obsolete_gpadl;
+
+/**
+ * Check if GPADL is obsolete
+ *
+ * @v gpadl		GPADL ID
+ * @v is_obsolete	GPADL ID is obsolete
+ *
+ * Check if GPADL is obsolete (i.e. was created before the most recent
+ * Hyper-V reset).
+ */
+static inline __attribute__ (( always_inline )) int
+vmbus_gpadl_is_obsolete ( unsigned int gpadl ) {
+
+	return ( gpadl <= vmbus_obsolete_gpadl );
+}
+
 extern int vmbus_establish_gpadl ( struct vmbus_device *vmdev, userptr_t data,
 				   size_t len );
 extern int vmbus_gpadl_teardown ( struct vmbus_device *vmdev,
@@ -629,6 +654,7 @@ extern int vmbus_poll ( struct vmbus_device *vmdev );
 extern void vmbus_dump_channel ( struct vmbus_device *vmdev );
 
 extern int vmbus_probe ( struct hv_hypervisor *hv, struct device *parent );
+extern int vmbus_reset ( struct hv_hypervisor *hv, struct device *parent );
 extern void vmbus_remove ( struct hv_hypervisor *hv, struct device *parent );
 
 #endif /* _IPXE_VMBUS_H */

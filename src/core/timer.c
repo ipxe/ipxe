@@ -23,7 +23,52 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <unistd.h>
+#include <string.h>
+#include <ipxe/process.h>
+#include <ipxe/console.h>
+#include <ipxe/keys.h>
+#include <ipxe/nap.h>
+#include <ipxe/init.h>
+#include <ipxe/timer.h>
+
+/** Current timer */
+static struct timer *timer;
+
+/**
+ * Get current system time in ticks
+ *
+ * @ret ticks		Current time, in ticks
+ */
+unsigned long currticks ( void ) {
+
+	/* Guard against use during early initialisation */
+	if ( ! timer ) {
+		DBGC ( &timer, "TIMER currticks() called before initialisation "
+		       "from %p\n", __builtin_return_address ( 0 ) );
+		return 0;
+	}
+
+	/* Use selected timer */
+	return timer->currticks();
+}
+
+/**
+ * Delay for a fixed number of microseconds
+ *
+ * @v usecs		Number of microseconds for which to delay
+ */
+void udelay ( unsigned long usecs ) {
+
+	/* Guard against use during early initialisation */
+	if ( ! timer ) {
+		DBGC ( &timer, "TIMER udelay() called before initialisation "
+		       "from %p\n", __builtin_return_address ( 0 ) );
+		return;
+	}
+
+	/* Use selected timer */
+	timer->udelay ( usecs );
+}
 
 /**
  * Delay for a fixed number of milliseconds
@@ -31,17 +76,103 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v msecs		Number of milliseconds for which to delay
  */
 void mdelay ( unsigned long msecs ) {
+
+	/* Guard against use during early initialisation */
+	if ( ! timer ) {
+		DBGC ( &timer, "TIMER mdelay() called before initialisation "
+		       "from %p\n", __builtin_return_address ( 0 ) );
+		return;
+	}
+
+	/* Delay for specified number of milliseconds */
 	while ( msecs-- )
 		udelay ( 1000 );
 }
 
 /**
- * Delay for a fixed number of seconds
+ * Sleep (possibly interruptibly) for a fixed number of seconds
+ *
+ * @v secs		Number of seconds for which to delay
+ * @v interrupted	Interrupt checking method, or NULL
+ * @ret secs		Number of seconds remaining, if interrupted
+ */
+static unsigned int sleep_interruptible ( unsigned int secs,
+					  int ( * interrupted ) ( void ) ) {
+	unsigned long start = currticks();
+	unsigned long now;
+
+	for ( ; secs ; secs-- ) {
+		while ( ( ( now = currticks() ) - start ) < TICKS_PER_SEC ) {
+			step();
+			if ( interrupted && interrupted() )
+				return secs;
+			cpu_nap();
+		}
+		start = now;
+	}
+
+	return 0;
+}
+
+/**
+ * Check if sleep has been interrupted by keypress
+ *
+ * @ret interrupted	Sleep has been interrupted
+ */
+static int keypress_interrupted ( void ) {
+
+	return ( iskey() && ( getchar() == CTRL_C ) );
+}
+
+/**
+ * Sleep (interruptibly) for a fixed number of seconds
+ *
+ * @v secs		Number of seconds for which to delay
+ * @ret secs		Number of seconds remaining, if interrupted
+ */
+unsigned int sleep ( unsigned int secs ) {
+
+	return sleep_interruptible ( secs, keypress_interrupted );
+}
+
+/**
+ * Sleep (uninterruptibly) for a fixed number of seconds
  *
  * @v secs		Number of seconds for which to delay
  */
-unsigned int sleep ( unsigned int secs ) {
-	while ( secs-- )
-		mdelay ( 1000 );
-	return 0;
+void sleep_fixed ( unsigned int secs ) {
+
+	sleep_interruptible ( secs, NULL );
 }
+
+/**
+ * Find a working timer
+ *
+ */
+static void timer_probe ( void ) {
+	int rc;
+
+	/* Use first working timer */
+	for_each_table_entry ( timer, TIMERS ) {
+		if ( ( timer->probe == NULL ) ||
+		     ( ( rc = timer->probe() ) == 0 ) ) {
+			DBGC ( &timer, "TIMER using %s\n", timer->name );
+			return;
+		}
+		DBGC ( &timer, "TIMER could not initialise %s: %s\n",
+		       timer->name, strerror ( rc ) );
+	}
+
+	/* This is a fatal error */
+	DBGC ( &timer, "TIMER found no working timers!\n" );
+	while ( 1 ) {}
+}
+
+/** Timer initialisation function */
+struct init_fn timer_init_fn __init_fn ( INIT_EARLY ) = {
+	.initialise = timer_probe,
+};
+
+/* Drag in timer configuration */
+REQUIRING_SYMBOL ( timer_init_fn );
+REQUIRE_OBJECT ( config_timer );

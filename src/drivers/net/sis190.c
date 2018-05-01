@@ -72,12 +72,6 @@ struct pci_driver sis190_isa_bridge_driver __pci_driver = {
 static const u32 sis190_intr_mask =
 	RxQEmpty | RxQInt | TxQ1Int | TxQ0Int | RxHalt | TxHalt | LinkChange;
 
-/*
- * Maximum number of multicast addresses to filter (vs. Rx-all-multicast).
- * The chips use a 64 element hash table based on the Ethernet CRC.
- */
-static const int multicast_filter_limit = 32;
-
 static void __mdio_cmd(void *ioaddr, u32 ctl)
 {
 	unsigned int i;
@@ -971,8 +965,8 @@ static int sis190_get_mac_addr_from_apc(struct pci_device *pdev,
 
 	list_for_each_entry(d, &(pdev->dev.siblings), siblings) {
 		unsigned int i;
-		isa_bridge = container_of(d, struct pci_device, dev);
 		for(i = 0; i < sis190_isa_bridge_driver.id_count; i++) {
+			isa_bridge = container_of(d, struct pci_device, dev);
 			if(isa_bridge->vendor ==
 			     sis190_isa_bridge_driver.ids[i].vendor
 			     && isa_bridge->device ==

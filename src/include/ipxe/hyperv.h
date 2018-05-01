@@ -37,6 +37,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define HV_GUEST_OS_ID_IPXE ( ( 1ULL << 63 ) | ( 0x18aeULL << 48 ) )
 
+/** Guest OS identity for Gen 2 UEFI firmware
+ *
+ * This does not conform to the documented structure for guest OS
+ * identities.
+ */
+#define HV_GUEST_OS_ID_UEFI ( 1ULL << 40 )
+
 /** Enable hypercall page */
 #define HV_HYPERCALL_ENABLE 0x00000001UL
 
@@ -60,6 +67,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Synthetic interrupt vector mask */
 #define HV_SINT_VECTOR_MASK HV_SINT_VECTOR ( 0xff )
+
+/** Maximum synthetic interrupt number */
+#define HV_SINT_MAX 15
 
 /** Post message */
 #define HV_POST_MESSAGE 0x005c

@@ -55,8 +55,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Mailbox Control Register */
 #define INTELXVF_MBCTRL 0x02fcUL
 
+/** Packet Split Receive Type */
+#define INTELXVF_PSRTYPE 0x0300UL
+
 /** Receive Descriptor register block */
-#define INTELXVF_RD 0x1000UL
+#define INTELXVF_RD(n) ( 0x1000UL + ( 0x40 * (n) ) )
 
 /** RX DCA Control Register */
 #define INTELXVF_DCA_RXCTRL 0x100cUL
@@ -67,9 +70,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define INTELXVF_SRRCTL_BSIZE(kb) ( (kb) << 0 )	/**< Receive buffer size */
 #define INTELXVF_SRRCTL_BSIZE_DEFAULT INTELXVF_SRRCTL_BSIZE ( 0x02 )
 #define INTELXVF_SRRCTL_BSIZE_MASK INTELXVF_SRRCTL_BSIZE ( 0x1f )
+#define INTELXVF_SRRCTL_BHDRSIZE(kb) ( (kb) << 8 ) /**< Header size */
+#define INTELXVF_SRRCTL_BHDRSIZE_DEFAULT INTELXVF_SRRCTL_BHDRSIZE ( 0x04 )
+#define INTELXVF_SRRCTL_BHDRSIZE_MASK INTELXVF_SRRCTL_BHDRSIZE ( 0x0f )
 #define INTELXVF_SRRCTL_DESCTYPE(typ) ( (typ) << 25 ) /**< Descriptor type */
 #define INTELXVF_SRRCTL_DESCTYPE_DEFAULT INTELXVF_SRRCTL_DESCTYPE ( 0x00 )
 #define INTELXVF_SRRCTL_DESCTYPE_MASK INTELXVF_SRRCTL_DESCTYPE ( 0x07 )
+#define INTELXVF_SRRCTL_DROP_EN 0x10000000UL
 
 /** Good Packets Received Count */
 #define INTELXVF_GPRC 0x101c
@@ -84,7 +91,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define INTELXVF_MPRC 0x1034
 
 /** Transmit Descriptor register block */
-#define INTELXVF_TD 0x2000UL
+#define INTELXVF_TD(n) ( 0x2000UL + ( 0x40 * (n) ) )
 
 /** Good Packets Transmitted Count */
 #define INTELXVF_GPTC 0x201c
@@ -100,5 +107,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** API version 1.1 */
 #define INTELXVF_MSG_VERSION_1_1 0x00000002UL
+
+/** Number of queues */
+#define INTELXVF_NUM_RINGS 8
 
 #endif /* _INTELXVF_H */

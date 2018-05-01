@@ -46,27 +46,4 @@ hv_call ( struct hv_hypervisor *hv, unsigned int code, const void *in,
 	return result;
 }
 
-/**
- * Set bit atomically
- *
- * @v bits		Bit field
- * @v bit		Bit to set
- */
-static inline __attribute__ (( always_inline )) void
-hv_set_bit ( void *bits, unsigned int bit ) {
-	struct {
-		uint32_t dword[ ( bit / 32 ) + 1 ];
-	} *dwords = bits;
-
-	/* Set bit using "lock bts".  Inform compiler that any memory
-	 * from the start of the bit field up to and including the
-	 * dword containing this bit may be modified.  (This is
-	 * overkill but shouldn't matter in practice since we're
-	 * unlikely to subsequently read other bits from the same bit
-	 * field.)
-	 */
-	__asm__ __volatile__ ( "lock bts %1, %0"
-			       : "+m" ( *dwords ) : "Ir" ( bit ) );
-}
-
 #endif /* _BITS_HYPERV_H */

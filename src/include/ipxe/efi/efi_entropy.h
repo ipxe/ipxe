@@ -22,14 +22,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @ret min_entropy	min-entropy of each sample
  */
-static inline __always_inline double
+static inline __always_inline min_entropy_t
 ENTROPY_INLINE ( efi, min_entropy_per_sample ) ( void ) {
 
 	/* We use essentially the same mechanism as for the BIOS
 	 * RTC-based entropy source, and so assume the same
 	 * min-entropy per sample.
 	 */
-	return 1.3;
+	return MIN_ENTROPY ( 1.3 );
 }
 
 #endif /* _IPXE_EFI_ENTROPY_H */

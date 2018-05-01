@@ -145,6 +145,21 @@ struct dhcpv6_user_class_option {
 /** DHCPv6 user class option */
 #define DHCPV6_USER_CLASS 15
 
+/** DHCPv6 vendor class option */
+#define DHCPV6_VENDOR_CLASS 16
+
+/** DHCPv6 PXE vendor class
+ *
+ * The DHCPv6 vendor class includes a field for an IANA enterprise
+ * number.  The EDK2 codebase uses the value 343, with the comment:
+ *
+ *     TODO: IANA TBD: temporarily using Intel's
+ *
+ * Since this "temporarily" has applied since at least 2010, we assume
+ * that it has become a de facto standard.
+ */
+#define DHCPV6_VENDOR_CLASS_PXE 343
+
 /** DHCPv6 DNS recursive name server option */
 #define DHCPV6_DNS_SERVERS 23
 
@@ -157,12 +172,51 @@ struct dhcpv6_user_class_option {
 /** DHCPv6 bootfile parameters option */
 #define DHCPV6_BOOTFILE_PARAM 60
 
+/** DHCPv6 client system architecture option */
+#define DHCPV6_CLIENT_ARCHITECTURE 61
+
+/** DHCPv6 client network interface identifier option */
+#define DHCPV6_CLIENT_NDI 62
+
 /** DHCPv6 syslog server option
  *
  * This option code has not yet been assigned by IANA.  Please update
  * this definition once an option code has been assigned.
  */
 #define DHCPV6_LOG_SERVERS 0xffffffffUL
+
+/** Construct a DHCPv6 byte value */
+#define DHCPV6_BYTE_VALUE( value ) ( (value) & 0xff )
+
+/** Construct a DHCPv6 word value */
+#define DHCPV6_WORD_VALUE( value ) \
+	DHCPV6_BYTE_VALUE ( (value) >> 8 ), DHCPV6_BYTE_VALUE ( (value) >> 0 )
+
+/** Construct a DHCPv6 dword value */
+#define DHCPV6_DWORD_VALUE( value ) \
+	DHCPV6_WORD_VALUE ( (value) >> 16 ), DHCPV6_WORD_VALUE ( (value) >> 0 )
+
+/** Construct a DHCPv6 option code */
+#define DHCPV6_CODE( code ) DHCPV6_WORD_VALUE ( code )
+
+/** Construct a DHCPv6 option length */
+#define DHCPV6_LEN( len ) DHCPV6_WORD_VALUE ( len )
+
+/** Construct a DHCPv6 option from a list of bytes */
+#define DHCPV6_OPTION( ... ) \
+	DHCPV6_LEN ( VA_ARG_COUNT ( __VA_ARGS__ ) ), __VA_ARGS__
+
+/** Construct a DHCPv6 option from a list of characters */
+#define DHCPV6_STRING( ... ) DHCPV6_OPTION ( __VA_ARGS__ )
+
+/** Construct a byte-valued DHCPv6 option */
+#define DHCPV6_BYTE( value ) DHCPV6_OPTION ( DHCPV6_BYTE_VALUE ( value ) )
+
+/** Construct a word-valued DHCPv6 option */
+#define DHCPV6_WORD( value ) DHCPV6_OPTION ( DHCPV6_WORD_VALUE ( value ) )
+
+/** Construct a dword-valued DHCPv6 option */
+#define DHCPV6_DWORD( value ) DHCPV6_OPTION ( DHCPV6_DWORD_VALUE ( value ) )
 
 /**
  * Any DHCPv6 option

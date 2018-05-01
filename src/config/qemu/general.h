@@ -8,3 +8,8 @@
 
 /* Work around missing EFI_PXE_BASE_CODE_PROTOCOL */
 #define EFI_DOWNGRADE_UX
+
+/* The Tivoli VMM workaround causes a KVM emulation failure on hosts
+ * without unrestricted_guest support
+ */
+#undef TIVOLI_VMM_WORKAROUND

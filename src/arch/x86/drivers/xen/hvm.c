@@ -66,12 +66,12 @@ static int hvm_cpuid_base ( struct hvm_device *hvm ) {
 	/* Scan for magic signature */
 	for ( base = HVM_CPUID_MIN ; base <= HVM_CPUID_MAX ;
 	      base += HVM_CPUID_STEP ) {
-		cpuid ( base, &discard_eax, &signature.ebx, &signature.ecx,
+		cpuid ( base, 0, &discard_eax, &signature.ebx, &signature.ecx,
 			&signature.edx );
 		if ( memcmp ( &signature, HVM_CPUID_MAGIC,
 			      sizeof ( signature ) ) == 0 ) {
 			hvm->cpuid_base = base;
-			cpuid ( ( base + HVM_CPUID_VERSION ), &version,
+			cpuid ( ( base + HVM_CPUID_VERSION ), 0, &version,
 				&discard_ebx, &discard_ecx, &discard_edx );
 			DBGC2 ( hvm, "HVM using CPUID base %#08x (v%d.%d)\n",
 				base, ( version >> 16 ), ( version & 0xffff ) );
@@ -101,7 +101,7 @@ static int hvm_map_hypercall ( struct hvm_device *hvm ) {
 	int rc;
 
 	/* Get number of hypercall pages and MSR to use */
-	cpuid ( ( hvm->cpuid_base + HVM_CPUID_PAGES ), &pages, &msr,
+	cpuid ( ( hvm->cpuid_base + HVM_CPUID_PAGES ), 0, &pages, &msr,
 		&discard_ecx, &discard_edx );
 
 	/* Allocate pages */

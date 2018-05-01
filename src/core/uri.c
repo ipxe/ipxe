@@ -157,7 +157,7 @@ static int uri_character_escaped ( char c, unsigned int field ) {
 		 * the reparsing of the URI, allowing everything else
 		 * (e.g. ':', which will appear in iSCSI URIs).
 		 */
-		[URI_OPAQUE]	= "/#",
+		[URI_OPAQUE]	= "#",
 		/* User name: escape everything */
 		[URI_USER]	= "/#:@?",
 		/* Password: escape everything */
@@ -368,7 +368,7 @@ struct uri * parse_uri ( const char *uri_string ) {
 		goto done;
 
 	/* Identify net/absolute/relative path */
-	if ( strncmp ( path, "//", 2 ) == 0 ) {
+	if ( uri->scheme && ( strncmp ( path, "//", 2 ) == 0 ) ) {
 		/* Net path.  If this is terminated by the first '/'
 		 * of an absolute path, then we have no space for a
 		 * terminator after the authority field, so shuffle
@@ -419,11 +419,11 @@ struct uri * parse_uri ( const char *uri_string ) {
 		uri->port = tmp;
 	}
 
+ done:
 	/* Decode fields in-place */
 	for ( field = 0 ; field < URI_FIELDS ; field++ )
 		uri_decode_inplace ( uri, field );
 
- done:
 	DBGC ( uri, "URI parsed \"%s\" to", uri_string );
 	uri_dump ( uri );
 	DBGC ( uri, "\n" );
@@ -456,10 +456,8 @@ unsigned int uri_port ( const struct uri *uri, unsigned int default_port ) {
  */
 size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 	static const char prefixes[URI_FIELDS] = {
-		[URI_OPAQUE] = ':',
 		[URI_PASSWORD] = ':',
 		[URI_PORT] = ':',
-		[URI_PATH] = '/',
 		[URI_QUERY] = '?',
 		[URI_FRAGMENT] = '#',
 	};
@@ -486,8 +484,6 @@ size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 		prefix = prefixes[field];
 		if ( ( field == URI_HOST ) && ( uri->user != NULL ) )
 			prefix = '@';
-		if ( ( field == URI_PATH ) && ( uri->path[0] == '/' ) )
-			prefix = '\0';
 		if ( prefix ) {
 			used += ssnprintf ( ( buf + used ), ( len - used ),
 					    "%c", prefix );
@@ -498,9 +494,9 @@ size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 					    ( buf + used ), ( len - used ) );
 
 		/* Suffix this field, if applicable */
-		if ( ( field == URI_SCHEME ) && ( ! uri->opaque ) ) {
+		if ( field == URI_SCHEME ) {
 			used += ssnprintf ( ( buf + used ), ( len - used ),
-					    "://" );
+					    ":%s", ( uri->host ? "//" : "" ) );
 		}
 	}
 
@@ -606,7 +602,7 @@ struct uri * uri_dup ( const struct uri *uri ) {
  *
  * @v base_uri		Base path
  * @v relative_uri	Relative path
- * @ret resolved_uri	Resolved path
+ * @ret resolved_uri	Resolved path, or NULL on failure
  *
  * Takes a base path (e.g. "/var/lib/tftpboot/vmlinuz" and a relative
  * path (e.g. "initrd.gz") and produces a new path
@@ -617,9 +613,8 @@ struct uri * uri_dup ( const struct uri *uri ) {
  */
 char * resolve_path ( const char *base_path,
 		      const char *relative_path ) {
-	size_t base_len = ( strlen ( base_path ) + 1 );
-	char base_path_copy[base_len];
-	char *base_tmp = base_path_copy;
+	char *base_copy;
+	char *base_tmp;
 	char *resolved;
 
 	/* If relative path is absolute, just re-use it */
@@ -627,8 +622,12 @@ char * resolve_path ( const char *base_path,
 		return strdup ( relative_path );
 
 	/* Create modifiable copy of path for dirname() */
-	memcpy ( base_tmp, base_path, base_len );
-	base_tmp = dirname ( base_tmp );
+	base_copy = strdup ( base_path );
+	if ( ! base_copy )
+		return NULL;
+
+	/* Strip filename portion of base path */
+	base_tmp = dirname ( base_copy );
 
 	/* Process "./" and "../" elements */
 	while ( *relative_path == '.' ) {
@@ -658,8 +657,8 @@ char * resolve_path ( const char *base_path,
 	if ( asprintf ( &resolved, "%s%s%s", base_tmp,
 			( ( base_tmp[ strlen ( base_tmp ) - 1 ] == '/' ) ?
 			  "" : "/" ), relative_path ) < 0 )
-		return NULL;
-
+		resolved = NULL;
+	free ( base_copy );
 	return resolved;
 }
 
@@ -668,7 +667,7 @@ char * resolve_path ( const char *base_path,
  *
  * @v base_uri		Base URI, or NULL
  * @v relative_uri	Relative URI
- * @ret resolved_uri	Resolved URI
+ * @ret resolved_uri	Resolved URI, or NULL on failure
  *
  * Takes a base URI (e.g. "http://ipxe.org/kernels/vmlinuz" and a
  * relative URI (e.g. "../initrds/initrd.gz") and produces a new URI
@@ -712,6 +711,55 @@ struct uri * resolve_uri ( const struct uri *base_uri,
 }
 
 /**
+ * Construct TFTP URI from server address and filename
+ *
+ * @v sa_server		Server address
+ * @v filename		Filename
+ * @ret uri		URI, or NULL on failure
+ */
+static struct uri * tftp_uri ( struct sockaddr *sa_server,
+			       const char *filename ) {
+	struct sockaddr_tcpip *st_server =
+		( ( struct sockaddr_tcpip * ) sa_server );
+	char buf[ 6 /* "65535" + NUL */ ];
+	char *path;
+	struct uri tmp;
+	struct uri *uri = NULL;
+
+	/* Initialise TFTP URI */
+	memset ( &tmp, 0, sizeof ( tmp ) );
+	tmp.scheme = "tftp";
+
+	/* Construct TFTP server address */
+	tmp.host = sock_ntoa ( sa_server );
+	if ( ! tmp.host )
+		goto err_host;
+
+	/* Construct TFTP server port, if applicable */
+	if ( st_server->st_port ) {
+		snprintf ( buf, sizeof ( buf ), "%d",
+			   ntohs ( st_server->st_port ) );
+		tmp.port = buf;
+	}
+
+	/* Construct TFTP path */
+	if ( asprintf ( &path, "/%s", filename ) < 0 )
+		goto err_path;
+	tmp.path = path;
+
+	/* Demangle URI */
+	uri = uri_dup ( &tmp );
+	if ( ! uri )
+		goto err_uri;
+
+ err_uri:
+	free ( path );
+ err_path:
+ err_host:
+	return uri;
+}
+
+/**
  * Construct URI from server address and filename
  *
  * @v sa_server		Server address
@@ -724,10 +772,6 @@ struct uri * resolve_uri ( const struct uri *base_uri,
  * constructing a TFTP URI from the next-server and filename.
  */
 struct uri * pxe_uri ( struct sockaddr *sa_server, const char *filename ) {
-	char buf[ 6 /* "65535" + NUL */ ];
-	struct sockaddr_tcpip *st_server =
-		( ( struct sockaddr_tcpip * ) sa_server );
-	struct uri tmp;
 	struct uri *uri;
 
 	/* Fail if filename is empty */
@@ -745,17 +789,5 @@ struct uri * pxe_uri ( struct sockaddr *sa_server, const char *filename ) {
 	uri_put ( uri );
 
 	/* Otherwise, construct a TFTP URI directly */
-	memset ( &tmp, 0, sizeof ( tmp ) );
-	tmp.scheme = "tftp";
-	tmp.host = sock_ntoa ( sa_server );
-	if ( ! tmp.host )
-		return NULL;
-	if ( st_server->st_port ) {
-		snprintf ( buf, sizeof ( buf ), "%d",
-			   ntohs ( st_server->st_port ) );
-		tmp.port = buf;
-	}
-	tmp.path = filename;
-	uri = uri_dup ( &tmp );
-	return uri;
+	return tftp_uri ( sa_server, filename );
 }

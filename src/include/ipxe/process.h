@@ -29,6 +29,8 @@ struct process {
 
 /** A process descriptor */
 struct process_descriptor {
+	/** Process name */
+	const char *name;
 	/** Offset of process within containing object */
 	size_t offset;
 	/**
@@ -78,6 +80,7 @@ struct process_descriptor {
  * @ret desc		Object interface descriptor
  */
 #define PROC_DESC( object_type, process, _step ) {			      \
+		.name = #_step,						      \
 		.offset = process_offset ( object_type, process ),	      \
 		.step = PROC_STEP ( object_type, _step ),		      \
 		.reschedule = 1,					      \
@@ -92,6 +95,7 @@ struct process_descriptor {
  * @ret desc		Object interface descriptor
  */
 #define PROC_DESC_ONCE( object_type, process, _step ) {			      \
+		.name = #_step,						      \
 		.offset = process_offset ( object_type, process ),	      \
 		.step = PROC_STEP ( object_type, _step ),		      \
 		.reschedule = 0,					      \
@@ -106,6 +110,7 @@ struct process_descriptor {
  * @ret desc		Object interface descriptor
  */
 #define PROC_DESC_PURE( _step ) {					      \
+		.name = #_step,						      \
 		.offset = 0,						      \
 		.step = PROC_STEP ( struct process, _step ),		      \
 		.reschedule = 1,					      \
@@ -192,7 +197,7 @@ struct process name __permanent_process = {				      \
 #define PROC_COL( process ) process_object ( process )
 
 /** printf() format string for PROC_DBG() */
-#define PROC_FMT "%p+%zx"
+#define PROC_FMT "%p %s()"
 
 /**
  * printf() arguments for representing a process
@@ -200,6 +205,6 @@ struct process name __permanent_process = {				      \
  * @v process		Process
  * @ret args		printf() argument list corresponding to PROC_FMT
  */
-#define PROC_DBG( process ) process_object ( process ), (process)->desc->offset
+#define PROC_DBG( process ) process_object ( process ), (process)->desc->name
 
 #endif /* _IPXE_PROCESS_H */

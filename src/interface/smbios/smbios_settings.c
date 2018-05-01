@@ -248,7 +248,7 @@ const struct setting asset_setting __setting ( SETTING_HOST_EXTRA, asset ) = {
 
 /** Board serial number setting (may differ from chassis serial number) */
 const struct setting board_serial_setting __setting ( SETTING_HOST_EXTRA,
-						      board_serial ) = {
+						      board-serial ) = {
 	.name = "board-serial",
 	.description = "Base board serial",
 	.tag = SMBIOS_STRING_TAG ( SMBIOS_TYPE_BASE_BOARD_INFORMATION,

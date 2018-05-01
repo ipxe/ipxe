@@ -36,8 +36,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #ifndef _FORCEDETH_H_
 #define _FORCEDETH_H_
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
 struct ring_desc {
 	u32 buf;
 	u32 flaglen;

@@ -9,25 +9,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <ipxe/usb.h>
-#include <ipxe/usbnet.h>
-#include <ipxe/if_ether.h>
-#include <ipxe/mii.h>
-
-/** Register write command */
-#define SMSC75XX_REGISTER_WRITE					\
-	( USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE |	\
-	  USB_REQUEST_TYPE ( 0xa0 ) )
-
-/** Register read command */
-#define SMSC75XX_REGISTER_READ					\
-	( USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE |	\
-	  USB_REQUEST_TYPE ( 0xa1 ) )
-
-/** Get statistics command */
-#define SMSC75XX_GET_STATISTICS					\
-	( USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE |	\
-	  USB_REQUEST_TYPE ( 0xa2 ) )
+#include "smscusb.h"
 
 /** Interrupt status register */
 #define SMSC75XX_INT_STS 0x00c
@@ -48,19 +30,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMSC75XX_BULK_IN_DLY 0x03c
 #define SMSC75XX_BULK_IN_DLY_SET(ticks)	( (ticks) << 0 ) /**< Delay / 16.7ns */
 
-/** EEPROM command register */
-#define SMSC75XX_E2P_CMD 0x040
-#define SMSC75XX_E2P_CMD_EPC_BSY	0x80000000UL	/**< EPC busy */
-#define SMSC75XX_E2P_CMD_EPC_CMD_READ	0x00000000UL	/**< READ command */
-#define SMSC75XX_E2P_CMD_EPC_ADDR(addr) ( (addr) << 0 )	/**< EPC address */
-
-/** EEPROM data register */
-#define SMSC75XX_E2P_DATA 0x044
-#define SMSC75XX_E2P_DATA_GET(e2p_data) \
-	( ( (e2p_data) >> 0 ) & 0xff )			/**< EEPROM data */
-
-/** MAC address EEPROM address */
-#define SMSC75XX_EEPROM_MAC 0x01
+/** EEPROM register base */
+#define SMSC75XX_E2P_BASE 0x040
 
 /** Receive filtering engine control register */
 #define SMSC75XX_RFE_CTL 0x060
@@ -89,24 +60,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMSC75XX_MAC_TX 0x108
 #define SMSC75XX_MAC_TX_EN		0x00000001UL	/**< TX enable */
 
-/** MAC receive address high register */
-#define SMSC75XX_RX_ADDRH 0x118
+/** MAC receive address register base */
+#define SMSC75XX_RX_ADDR_BASE 0x118
 
-/** MAC receive address low register */
-#define SMSC75XX_RX_ADDRL 0x11c
-
-/** MII access register */
-#define SMSC75XX_MII_ACCESS 0x120
-#define SMSC75XX_MII_ACCESS_PHY_ADDRESS	0x00000800UL	/**< PHY address */
-#define SMSC75XX_MII_ACCESS_MIIRINDA(addr) ( (addr) << 6 ) /**< MII register */
-#define SMSC75XX_MII_ACCESS_MIIWNR	0x00000002UL	/**< MII write */
-#define SMSC75XX_MII_ACCESS_MIIBZY	0x00000001UL	/**< MII busy */
-
-/** MII data register */
-#define SMSC75XX_MII_DATA 0x124
-#define SMSC75XX_MII_DATA_SET(data)	( (data) << 0 )	/**< Set data */
-#define SMSC75XX_MII_DATA_GET(mii_data) \
-	( ( (mii_data) >> 0 ) & 0xffff )		/**< Get data */
+/** MII register base */
+#define SMSC75XX_MII_BASE 0x120
 
 /** PHY interrupt source MII register */
 #define SMSC75XX_MII_PHY_INTR_SOURCE 29
@@ -115,30 +73,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMSC75XX_MII_PHY_INTR_MASK 30
 
 /** PHY interrupt: auto-negotiation complete */
-#define SMSC75XX_PHY_INTR_ANEG_DONE	0x0040
+#define SMSC75XX_PHY_INTR_ANEG_DONE 0x0040
 
 /** PHY interrupt: link down */
-#define SMSC75XX_PHY_INTR_LINK_DOWN	0x0010
+#define SMSC75XX_PHY_INTR_LINK_DOWN 0x0010
 
-/** MAC address perfect filter N high register */
-#define SMSC75XX_ADDR_FILTH(n) ( 0x300 + ( 8 * (n) ) )
-#define SMSC75XX_ADDR_FILTH_VALID	0x80000000UL	/**< Address valid */
-
-/** MAC address perfect filter N low register */
-#define SMSC75XX_ADDR_FILTL(n) ( 0x304 + ( 8 * (n) ) )
-
-/** MAC address */
-union smsc75xx_mac {
-	/** MAC receive address registers */
-	struct {
-		/** MAC receive address low register */
-		uint32_t l;
-		/** MAC receive address high register */
-		uint32_t h;
-	} __attribute__ (( packed )) addr;
-	/** Raw MAC address */
-	uint8_t raw[ETH_ALEN];
-};
+/** MAC address perfect filter register base */
+#define SMSC75XX_ADDR_FILT_BASE 0x300
 
 /** Receive packet header */
 struct smsc75xx_rx_header {
@@ -167,12 +108,6 @@ struct smsc75xx_tx_header {
 
 /** Insert frame checksum and pad */
 #define SMSC75XX_TX_FCS 0x00400000UL
-
-/** Interrupt packet format */
-struct smsc75xx_interrupt {
-	/** Current value of INT_STS register */
-	uint32_t int_sts;
-} __attribute__ (( packed ));
 
 /** Byte count statistics */
 struct smsc75xx_byte_statistics {
@@ -264,36 +199,8 @@ struct smsc75xx_statistics {
 	struct smsc75xx_tx_statistics tx;
 } __attribute__ (( packed ));
 
-/** A SMSC75xx network device */
-struct smsc75xx_device {
-	/** USB device */
-	struct usb_device *usb;
-	/** USB bus */
-	struct usb_bus *bus;
-	/** Network device */
-	struct net_device *netdev;
-	/** USB network device */
-	struct usbnet_device usbnet;
-	/** MII interface */
-	struct mii_interface mii;
-	/** Interrupt status */
-	uint32_t int_sts;
-};
-
-/** Reset delay (in microseconds) */
-#define SMSC75XX_RESET_DELAY_US 2
-
-/** Maximum time to wait for EEPROM (in milliseconds) */
-#define SMSC75XX_EEPROM_MAX_WAIT_MS 100
-
-/** Maximum time to wait for MII (in milliseconds) */
-#define SMSC75XX_MII_MAX_WAIT_MS 100
-
-/** Interrupt maximum fill level
- *
- * This is a policy decision.
- */
-#define SMSC75XX_INTR_MAX_FILL 2
+/** Maximum time to wait for reset (in milliseconds) */
+#define SMSC75XX_RESET_MAX_WAIT_MS 100
 
 /** Bulk IN maximum fill level
  *
@@ -305,5 +212,12 @@ struct smsc75xx_device {
 #define SMSC75XX_IN_MTU						\
 	( sizeof ( struct smsc75xx_rx_header ) +		\
 	  ETH_FRAME_LEN + 4 /* possible VLAN header */ )
+
+extern struct usb_endpoint_driver_operations smsc75xx_in_operations;
+
+extern int smsc75xx_dump_statistics ( struct smscusb_device *smscusb );
+extern int smsc75xx_transmit ( struct net_device *netdev,
+			       struct io_buffer *iobuf );
+extern void smsc75xx_poll ( struct net_device *netdev );
 
 #endif /* _SMSC75XX_H */

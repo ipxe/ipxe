@@ -4,6 +4,7 @@
 /* The feature bitmap for virtio net */
 #define VIRTIO_NET_F_CSUM       0       /* Host handles pkts w/ partial csum */
 #define VIRTIO_NET_F_GUEST_CSUM 1       /* Guest handles pkts w/ partial csum */
+#define VIRTIO_NET_F_MTU        3       /* Initial MTU advice */
 #define VIRTIO_NET_F_MAC        5       /* Host has given MAC address. */
 #define VIRTIO_NET_F_GSO        6       /* Host handles pkts w/ any GSO type */
 #define VIRTIO_NET_F_GUEST_TSO4 7       /* Guest can handle TSOv4 in. */
@@ -14,11 +15,26 @@
 #define VIRTIO_NET_F_HOST_TSO6  12      /* Host can handle TSOv6 in. */
 #define VIRTIO_NET_F_HOST_ECN   13      /* Host can handle TSO[6] w/ ECN in. */
 #define VIRTIO_NET_F_HOST_UFO   14      /* Host can handle UFO in. */
+#define VIRTIO_NET_F_MRG_RXBUF  15      /* Driver can merge receive buffers. */
+#define VIRTIO_NET_F_STATUS     16      /* Configuration status field is available. */
+#define VIRTIO_NET_F_CTRL_VQ    17      /* Control channel is available. */
+#define VIRTIO_NET_F_CTRL_RX    18      /* Control channel RX mode support. */
+#define VIRTIO_NET_F_CTRL_VLAN  19      /* Control channel VLAN filtering. */
+#define VIRTIO_NET_F_GUEST_ANNOUNCE 21  /* Driver can send gratuitous packets. */
 
 struct virtio_net_config
 {
    /* The config defining mac address (if VIRTIO_NET_F_MAC) */
    u8 mac[6];
+   /* See VIRTIO_NET_F_STATUS and VIRTIO_NET_S_* above */
+   u16 status;
+   /* Maximum number of each of transmit and receive queues;
+    * see VIRTIO_NET_F_MQ and VIRTIO_NET_CTRL_MQ.
+    * Legal values are between 1 and 0x8000
+    */
+   u16 max_virtqueue_pairs;
+   /* Default maximum transmit unit advice */
+   u16 mtu;
 } __attribute__((packed));
 
 /* This is the first element of the scatter-gather list.  If you don't
@@ -41,4 +57,14 @@ struct virtio_net_hdr
    uint16_t csum_start;
    uint16_t csum_offset;
 };
+
+/* Virtio 1.0 version of the first element of the scatter-gather list. */
+struct virtio_net_hdr_modern
+{
+   struct virtio_net_hdr legacy;
+
+   /* Used only if VIRTIO_NET_F_MRG_RXBUF: */
+   uint16_t num_buffers;
+};
+
 #endif /* _VIRTIO_NET_H_ */

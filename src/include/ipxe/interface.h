@@ -10,6 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
+#include <stdarg.h>
 #include <ipxe/refcnt.h>
 
 /** An object interface operation */
@@ -123,6 +124,11 @@ struct interface {
 	struct refcnt *refcnt;
 	/** Interface descriptor */
 	struct interface_descriptor *desc;
+	/** Original interface descriptor
+	 *
+	 * Used by intf_reinit().
+	 */
+	struct interface_descriptor *original;
 };
 
 extern void intf_plug ( struct interface *intf, struct interface *dest );
@@ -143,7 +149,11 @@ extern void intf_close ( struct interface *intf, int rc );
 	typeof ( void ( object_type, int rc ) )
 
 extern void intf_shutdown ( struct interface *intf, int rc );
+extern void intfs_vshutdown ( va_list intfs, int rc );
+extern void intfs_shutdown ( int rc, ... ) __attribute__ (( sentinel ));
 extern void intf_restart ( struct interface *intf, int rc );
+extern void intfs_vrestart ( va_list intfs, int rc );
+extern void intfs_restart ( int rc, ... ) __attribute__ (( sentinel ));
 
 extern void intf_poke ( struct interface *intf,
 			void ( type ) ( struct interface *intf ) );
@@ -166,6 +176,7 @@ static inline void intf_init ( struct interface *intf,
 	intf->dest = &null_intf;
 	intf->refcnt = refcnt;
 	intf->desc = desc;
+	intf->original = desc;
 }
 
 /**
@@ -177,6 +188,7 @@ static inline void intf_init ( struct interface *intf,
 		.dest = &null_intf,		\
 		.refcnt = NULL,			\
 		.desc = &(descriptor),		\
+		.original = &(descriptor),	\
 	}
 
 /**
@@ -235,5 +247,16 @@ static inline void intf_init ( struct interface *intf,
  * @ret args		printf() argument list corresponding to INTF_INTF_FMT
  */
 #define INTF_INTF_DBG( intf, dest ) INTF_DBG ( intf ), INTF_DBG ( dest )
+
+/**
+ * Reinitialise an object interface
+ *
+ * @v intf		Object interface
+ */
+static inline void intf_reinit ( struct interface *intf ) {
+
+	/* Restore original interface descriptor */
+	intf->desc = intf->original;
+}
 
 #endif /* _IPXE_INTERFACE_H */

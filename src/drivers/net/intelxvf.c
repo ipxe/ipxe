@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/pci.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include "intelx.h"
 #include "intelxvf.h"
 
 /** @file
@@ -156,6 +157,47 @@ static int intelxvf_mbox_version ( struct intel_nic *intel,
 	return 0;
 }
 
+/**
+ * Get queue configuration
+ *
+ * @v intel		Intel device
+ * @v vlan_thing	VLAN hand-waving thing to fill in
+ * @ret rc		Return status code
+ */
+static int intelxvf_mbox_queues ( struct intel_nic *intel, int *vlan_thing ) {
+	union intelvf_msg msg;
+	int rc;
+
+	/* Send queue configuration message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.hdr = INTELVF_MSG_TYPE_GET_QUEUES;
+	if ( ( rc = intelvf_mbox_msg ( intel, &msg ) ) != 0 ) {
+		DBGC ( intel, "INTEL %p get queue configuration failed: %s\n",
+		       intel, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Check response */
+	if ( ( msg.hdr & INTELVF_MSG_TYPE_MASK ) !=INTELVF_MSG_TYPE_GET_QUEUES){
+		DBGC ( intel, "INTEL %p get queue configuration unexpected "
+		       "response:\n", intel );
+		DBGC_HDA ( intel, 0, &msg, sizeof ( msg ) );
+		return -EPROTO;
+	}
+
+	/* Check that we were allowed to get the queue configuration */
+	if ( ! ( msg.hdr & INTELVF_MSG_ACK ) ) {
+		DBGC ( intel, "INTEL %p get queue configuration refused\n",
+		       intel );
+		return -EPERM;
+	}
+
+	/* Extract VLAN hand-waving thing */
+	*vlan_thing = msg.queues.vlan_thing;
+
+	return 0;
+}
+
 /******************************************************************************
  *
  * Network device interface
@@ -171,8 +213,11 @@ static int intelxvf_mbox_version ( struct intel_nic *intel,
  */
 static int intelxvf_open ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
+	uint32_t rxdctl;
 	uint32_t srrctl;
 	uint32_t dca_rxctrl;
+	unsigned int i;
+	int vlan_thing;
 	int rc;
 
 	/* Reset the function */
@@ -208,6 +253,28 @@ static int intelxvf_open ( struct net_device *netdev ) {
 		goto err_mbox_set_mtu;
 	}
 
+	/* Reset all descriptor rings */
+	for ( i = 0 ; i < INTELXVF_NUM_RINGS ; i++ ) {
+		intel_reset_ring ( intel, INTELXVF_TD ( i ) );
+		intel_reset_ring ( intel, INTELXVF_RD ( i ) );
+	}
+
+	/* Reset packet split receive type register */
+	writel ( 0, intel->regs + INTELXVF_PSRTYPE );
+
+	/* Get queue configuration.  Ignore failures, since the host
+	 * may not support this message.
+	 */
+	vlan_thing = 0;
+	intelxvf_mbox_queues ( intel, &vlan_thing );
+	if ( vlan_thing ) {
+		DBGC ( intel, "INTEL %p stripping VLAN tags (thing=%d)\n",
+		       intel, vlan_thing );
+		rxdctl = readl ( intel->regs + INTELXVF_RD(0) + INTEL_xDCTL );
+		rxdctl |= INTELX_RXDCTL_VME;
+		writel ( rxdctl, intel->regs + INTELXVF_RD(0) + INTEL_xDCTL );
+	}
+
 	/* Create transmit descriptor ring */
 	if ( ( rc = intel_create_ring ( intel, &intel->tx ) ) != 0 )
 		goto err_create_tx;
@@ -226,9 +293,12 @@ static int intelxvf_open ( struct net_device *netdev ) {
 	/* Configure receive buffer sizes and set receive descriptor type */
 	srrctl = readl ( intel->regs + INTELXVF_SRRCTL );
 	srrctl &= ~( INTELXVF_SRRCTL_BSIZE_MASK |
+		     INTELXVF_SRRCTL_BHDRSIZE_MASK |
 		     INTELXVF_SRRCTL_DESCTYPE_MASK );
 	srrctl |= ( INTELXVF_SRRCTL_BSIZE_DEFAULT |
-		    INTELXVF_SRRCTL_DESCTYPE_DEFAULT );
+		    INTELXVF_SRRCTL_BHDRSIZE_DEFAULT |
+		    INTELXVF_SRRCTL_DESCTYPE_DEFAULT |
+		    INTELXVF_SRRCTL_DROP_EN );
 	writel ( srrctl, intel->regs + INTELXVF_SRRCTL );
 
 	/* Clear "must-be-zero" bit for direct cache access (DCA).  We
@@ -377,9 +447,9 @@ static int intelxvf_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intel, 0, sizeof ( *intel ) );
 	intel_init_mbox ( &intel->mbox, INTELXVF_MBCTRL, INTELXVF_MBMEM );
-	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTELXVF_TD,
+	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTELXVF_TD(0),
 			  intel_describe_tx_adv );
-	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTELXVF_RD,
+	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTELXVF_RD(0),
 			  intel_describe_rx );
 
 	/* Fix up PCI device */

@@ -63,6 +63,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi_hii.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_strings.h>
+#include <ipxe/efi/efi_utils.h>
 #include <config/branding.h>
 
 /** EFI platform setup formset GUID */
@@ -546,6 +547,13 @@ efi_snp_hii_extract_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
 	/* Initialise results */
 	*results = NULL;
 
+	/* Work around apparently broken UEFI specification */
+	if ( ! ( request && request[0] ) ) {
+		DBGC ( snpdev, "SNPDEV %p ExtractConfig ignoring malformed "
+		       "request\n", snpdev );
+		return EFI_INVALID_PARAMETER;
+	}
+
 	/* Process all request fragments */
 	for ( pos = *progress = request ; *progress && **progress ;
 	      pos = *progress + 1 ) {
@@ -646,6 +654,9 @@ static EFI_HII_CONFIG_ACCESS_PROTOCOL efi_snp_device_hii = {
  */
 int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	VENDOR_DEVICE_PATH *vendor_path;
+	EFI_DEVICE_PATH_PROTOCOL *path_end;
+	size_t path_prefix_len;
 	int efirc;
 	int rc;
 
@@ -667,9 +678,46 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 		goto err_build_package_list;
 	}
 
+	/* Allocate the new device path */
+	path_prefix_len = efi_devpath_len ( snpdev->path );
+	snpdev->hii_child_path = zalloc ( path_prefix_len +
+					  sizeof ( *vendor_path ) +
+					  sizeof ( *path_end ) );
+	if ( ! snpdev->hii_child_path ) {
+		DBGC ( snpdev,
+		       "SNPDEV %p could not allocate HII child device path\n",
+		       snpdev );
+		rc = -ENOMEM;
+		goto err_alloc_child_path;
+	}
+
+	/* Populate the device path */
+	memcpy ( snpdev->hii_child_path, snpdev->path, path_prefix_len );
+	vendor_path = ( ( ( void * ) snpdev->hii_child_path ) +
+			path_prefix_len );
+	vendor_path->Header.Type = HARDWARE_DEVICE_PATH;
+	vendor_path->Header.SubType = HW_VENDOR_DP;
+	vendor_path->Header.Length[0] = sizeof ( *vendor_path );
+	efi_snp_hii_random_guid ( &vendor_path->Guid );
+	path_end = ( ( void * ) ( vendor_path + 1 ) );
+	path_end->Type = END_DEVICE_PATH_TYPE;
+	path_end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	path_end->Length[0] = sizeof ( *path_end );
+
+	/* Create device path and child handle for HII association */
+	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
+			&snpdev->hii_child_handle,
+			&efi_device_path_protocol_guid, snpdev->hii_child_path,
+			NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( snpdev, "SNPDEV %p could not create HII child handle: "
+		       "%s\n", snpdev, strerror ( rc ) );
+		goto err_hii_child_handle;
+	}
+
 	/* Add HII packages */
 	if ( ( efirc = efihii->NewPackageList ( efihii, snpdev->package_list,
-						snpdev->handle,
+						snpdev->hii_child_handle,
 						&snpdev->hii_handle ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( snpdev, "SNPDEV %p could not add HII packages: %s\n",
@@ -679,7 +727,7 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 
 	/* Install HII protocol */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
-			 &snpdev->handle,
+			 &snpdev->hii_child_handle,
 			 &efi_hii_config_access_protocol_guid, &snpdev->hii,
 			 NULL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
@@ -688,15 +736,34 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 		goto err_install_protocol;
 	}
 
+	/* Add as child of handle with SNP instance */
+	if ( ( rc = efi_child_add ( snpdev->handle,
+				    snpdev->hii_child_handle ) ) != 0 ) {
+		DBGC ( snpdev,
+		       "SNPDEV %p could not adopt HII child handle: %s\n",
+		       snpdev, strerror ( rc ) );
+		goto err_efi_child_add;
+	}
+
 	return 0;
 
+	efi_child_del ( snpdev->handle, snpdev->hii_child_handle );
+ err_efi_child_add:
 	bs->UninstallMultipleProtocolInterfaces (
-			snpdev->handle,
+			snpdev->hii_child_handle,
 			&efi_hii_config_access_protocol_guid, &snpdev->hii,
 			NULL );
  err_install_protocol:
 	efihii->RemovePackageList ( efihii, snpdev->hii_handle );
  err_new_package_list:
+	bs->UninstallMultipleProtocolInterfaces (
+			snpdev->hii_child_handle,
+			&efi_device_path_protocol_guid, snpdev->hii_child_path,
+			NULL );
+ err_hii_child_handle:
+	free ( snpdev->hii_child_path );
+	snpdev->hii_child_path = NULL;
+ err_alloc_child_path:
 	free ( snpdev->package_list );
 	snpdev->package_list = NULL;
  err_build_package_list:
@@ -717,11 +784,18 @@ void efi_snp_hii_uninstall ( struct efi_snp_device *snpdev ) {
 		return;
 
 	/* Uninstall protocols and remove package list */
+	efi_child_del ( snpdev->handle, snpdev->hii_child_handle );
 	bs->UninstallMultipleProtocolInterfaces (
-			snpdev->handle,
+			snpdev->hii_child_handle,
 			&efi_hii_config_access_protocol_guid, &snpdev->hii,
 			NULL );
 	efihii->RemovePackageList ( efihii, snpdev->hii_handle );
+	bs->UninstallMultipleProtocolInterfaces (
+			snpdev->hii_child_handle,
+			&efi_device_path_protocol_guid, snpdev->hii_child_path,
+			NULL );
+	free ( snpdev->hii_child_path );
+	snpdev->hii_child_path = NULL;
 	free ( snpdev->package_list );
 	snpdev->package_list = NULL;
 }

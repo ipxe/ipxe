@@ -20,7 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * necessary.  This is used on behalf of hardware that is not capable
  * of auto-padding.
  */
-#define IOB_ZLEN 64
+#define IOB_ZLEN 128
 
 /**
  * A persistent I/O buffer

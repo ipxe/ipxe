@@ -29,6 +29,19 @@ FILE_LICENCE ( BSD3 );
 #pragma pack()
 #endif
 
+#if defined(__GNUC__) && defined(__pic__) && !defined(USING_LTO)
+//
+// Mark all symbol declarations and references as hidden, meaning they will
+// not be subject to symbol preemption. This allows the compiler to refer to
+// symbols directly using relative references rather than via the GOT, which
+// contains absolute symbol addresses that are subject to runtime relocation.
+//
+// The LTO linker will not emit GOT based relocations when all symbol
+// references can be resolved locally, and so there is no need to set the
+// pragma in that case (and doing so will cause other issues).
+//
+#pragma GCC visibility push (hidden)
+#endif
 
 #if defined(__INTEL_COMPILER)
 //
@@ -82,7 +95,7 @@ FILE_LICENCE ( BSD3 );
 #pragma warning ( disable : 4057 )
 
 //
-// ASSERT(FALSE) or while (TRUE) are legal constructes so supress this warning
+// ASSERT(FALSE) or while (TRUE) are legal constructs so suppress this warning
 //
 #pragma warning ( disable : 4127 )
 
@@ -96,7 +109,7 @@ FILE_LICENCE ( BSD3 );
 //
 #pragma warning ( disable : 4206 )
 
-#if _MSC_VER == 1800
+#if _MSC_VER == 1800 || _MSC_VER == 1900
 
 //
 // Disable these warnings for VS2013.
@@ -104,13 +117,13 @@ FILE_LICENCE ( BSD3 );
 
 //
 // This warning is for potentially uninitialized local variable, and it may cause false
-// positive issues in VS2013 build
+// positive issues in VS2013 and VS2015 build
 //
 #pragma warning ( disable : 4701 )
 
 //
 // This warning is for potentially uninitialized local pointer variable, and it may cause
-// false positive issues in VS2013 build
+// false positive issues in VS2013 and VS2015 build
 //
 #pragma warning ( disable : 4703 )
 
@@ -121,7 +134,7 @@ FILE_LICENCE ( BSD3 );
 
 #if defined(_MSC_EXTENSIONS)
   //
-  // use Microsoft C complier dependent integer width types
+  // use Microsoft C compiler dependent integer width types
   //
 
   ///
@@ -259,6 +272,12 @@ typedef INT64   INTN;
 /// The stack alignment required for x64
 ///
 #define CPU_STACK_ALIGNMENT   16
+
+///
+/// Page allocation granularity for x64
+///
+#define DEFAULT_PAGE_ALLOCATION_GRANULARITY   (0x1000)
+#define RUNTIME_PAGE_ALLOCATION_GRANULARITY   (0x1000)
 
 //
 // Modifier to ensure that all protocol member functions and EFI intrinsics

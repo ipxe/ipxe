@@ -206,13 +206,14 @@ static struct xen_driver * xenbus_find_driver ( const char *type ) {
  *
  * @v xen		Xen hypervisor
  * @v parent		Parent device
- * @v type		Device type
  * @v instance		Device instance
+ * @v driver		Device driver
  * @ret rc		Return status code
  */
 static int xenbus_probe_device ( struct xen_hypervisor *xen,
-				 struct device *parent, const char *type,
-				 const char *instance ) {
+				 struct device *parent, const char *instance,
+				 struct xen_driver *driver ) {
+	const char *type = driver->type;
 	struct xen_device *xendev;
 	size_t key_len;
 	int rc;
@@ -234,6 +235,10 @@ static int xenbus_probe_device ( struct xen_hypervisor *xen,
 	xendev->xen = xen;
 	xendev->key = ( ( void * ) ( xendev + 1 ) );
 	snprintf ( xendev->key, key_len, "device/%s/%s", type, instance );
+	xendev->driver = driver;
+	xendev->dev.driver_name = driver->name;
+	DBGC ( xendev, "XENBUS %s has driver \"%s\"\n", xendev->key,
+	       xendev->driver->name );
 
 	/* Read backend key */
 	if ( ( rc = xenstore_read ( xen, &xendev->backend, xendev->key,
@@ -253,18 +258,6 @@ static int xenbus_probe_device ( struct xen_hypervisor *xen,
 	DBGC ( xendev, "XENBUS %s backend=\"%s\" in domain %ld\n",
 	       xendev->key, xendev->backend, xendev->backend_id );
 
-	/* Look for a driver */
-	xendev->driver = xenbus_find_driver ( type );
-	if ( ! xendev->driver ) {
-		DBGC ( xendev, "XENBUS %s has no driver\n", xendev->key );
-		/* Not a fatal error */
-		rc = 0;
-		goto err_no_driver;
-	}
-	xendev->dev.driver_name = xendev->driver->name;
-	DBGC ( xendev, "XENBUS %s has driver \"%s\"\n", xendev->key,
-	       xendev->driver->name );
-
 	/* Probe driver */
 	if ( ( rc = xendev->driver->probe ( xendev ) ) != 0 ) {
 		DBGC ( xendev, "XENBUS could not probe %s: %s\n",
@@ -276,7 +269,6 @@ static int xenbus_probe_device ( struct xen_hypervisor *xen,
 
 	xendev->driver->remove ( xendev );
  err_probe:
- err_no_driver:
  err_read_backend_id:
 	free ( xendev->backend );
  err_read_backend:
@@ -310,10 +302,20 @@ static void xenbus_remove_device ( struct xen_device *xendev ) {
  */
 static int xenbus_probe_type ( struct xen_hypervisor *xen,
 			       struct device *parent, const char *type ) {
+	struct xen_driver *driver;
 	char *children;
 	char *child;
 	size_t len;
 	int rc;
+
+	/* Look for a driver */
+	driver = xenbus_find_driver ( type );
+	if ( ! driver ) {
+		DBGC ( xen, "XENBUS has no driver for \"%s\" devices\n", type );
+		/* Not a fatal error */
+		rc = 0;
+		goto err_no_driver;
+	}
 
 	/* Get children of this key */
 	if ( ( rc = xenstore_directory ( xen, &children, &len, "device",
@@ -326,8 +328,8 @@ static int xenbus_probe_type ( struct xen_hypervisor *xen,
 	/* Probe each child */
 	for ( child = children ; child < ( children + len ) ;
 	      child += ( strlen ( child ) + 1 /* NUL */ ) ) {
-		if ( ( rc = xenbus_probe_device ( xen, parent, type,
-						  child ) ) != 0 )
+		if ( ( rc = xenbus_probe_device ( xen, parent, child,
+						  driver ) ) != 0 )
 			goto err_probe_device;
 	}
 
@@ -337,6 +339,7 @@ static int xenbus_probe_type ( struct xen_hypervisor *xen,
  err_probe_device:
 	free ( children );
  err_directory:
+ err_no_driver:
 	return rc;
 }
 

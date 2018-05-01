@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <stdio.h>
 #include <strings.h>
+#include <limits.h>
 #include <assert.h>
 #include <ipxe/isqrt.h>
 #include <ipxe/profile.h>
@@ -122,8 +123,9 @@ void profile_update ( struct profiler *profiler, unsigned long sample ) {
 	 */
 	assert ( ( ( signed ) sample ) >= 0 );
 
-	/* Update sample count */
-	profiler->count++;
+	/* Update sample count, limiting to avoid signed overflow */
+	if ( profiler->count < INT_MAX )
+		profiler->count++;
 
 	/* Adjust mean sample value scale if necessary.  Skip if
 	 * sample is zero (in which case flsl(sample)-1 would
