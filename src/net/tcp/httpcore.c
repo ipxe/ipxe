@@ -778,6 +778,18 @@ static int http_transfer_complete ( struct http_transaction *http ) {
 	http->len = 0;
 	assert ( http->remaining == 0 );
 
+	/* Retry immediately if applicable.  We cannot rely on an
+	 * immediate timer expiry, since certain Microsoft-designed
+	 * HTTP extensions such as NTLM break the fundamentally
+	 * stateless nature of HTTP and rely on the same connection
+	 * being reused for authentication.  See RFC7230 section 2.3
+	 * for further details.
+	 */
+	if ( ! http->response.retry_after ) {
+		http_reopen ( http );
+		return 0;
+	}
+
 	/* Start timer to initiate retry */
 	DBGC2 ( http, "HTTP %p retrying after %d seconds\n",
 		http, http->response.retry_after );

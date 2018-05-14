@@ -252,8 +252,13 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 	/* Identify port */
 	port = uri_port ( uri, scheme->port );
 
-	/* Look for a reusable connection in the pool */
-	list_for_each_entry ( conn, &http_connection_pool, pool.list ) {
+	/* Look for a reusable connection in the pool.  Reuse the most
+	 * recent connection in order to accommodate authentication
+	 * schemes that break the stateless nature of HTTP and rely on
+	 * the same connection being reused for authentication
+	 * responses.
+	 */
+	list_for_each_entry_reverse ( conn, &http_connection_pool, pool.list ) {
 
 		/* Sanity checks */
 		assert ( conn->uri != NULL );
