@@ -973,13 +973,6 @@ int register_rndis ( struct rndis_device *rndis ) {
 	/* Assign device name (for debugging) */
 	rndis->name = netdev->dev->name;
 
-	/* Register network device */
-	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
-		DBGC ( rndis, "RNDIS %s could not register: %s\n",
-		       rndis->name, strerror ( rc ) );
-		goto err_register;
-	}
-
 	/* Open RNDIS device to read MAC addresses */
 	if ( ( rc = rndis->op->open ( rndis ) ) != 0 ) {
 		DBGC ( rndis, "RNDIS %s could not open: %s\n",
@@ -1012,8 +1005,17 @@ int register_rndis ( struct rndis_device *rndis ) {
 	/* Close RNDIS device */
 	rndis->op->close ( rndis );
 
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
+		DBGC ( rndis, "RNDIS %s could not register: %s\n",
+		       rndis->name, strerror ( rc ) );
+		goto err_register;
+	}
+
 	return 0;
 
+	unregister_netdev ( netdev );
+ err_register:
  err_query_link:
  err_query_current:
  err_query_permanent:
@@ -1021,8 +1023,6 @@ int register_rndis ( struct rndis_device *rndis ) {
  err_initialise:
 	rndis->op->close ( rndis );
  err_open:
-	unregister_netdev ( netdev );
- err_register:
 	return rc;
 }
 
