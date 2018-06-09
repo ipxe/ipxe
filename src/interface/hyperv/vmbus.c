@@ -195,16 +195,10 @@ static int vmbus_initiate_contact ( struct hv_hypervisor *hv,
 		       vmbus );
 		return -ENOTSUP;
 	}
-	if ( version->version.raw != cpu_to_le32 ( raw ) ) {
-		DBGC ( vmbus, "VMBUS %p unexpected version %d.%d\n",
-		       vmbus, le16_to_cpu ( version->version.major ),
-		       le16_to_cpu ( version->version.minor ) );
-		return -EPROTO;
-	}
 
 	DBGC ( vmbus, "VMBUS %p initiated contact using version %d.%d\n",
-	       vmbus, le16_to_cpu ( version->version.major ),
-	       le16_to_cpu ( version->version.minor ) );
+	       vmbus, le16_to_cpu ( initiate.version.major ),
+	       le16_to_cpu ( initiate.version.minor ) );
 	return 0;
 }
 
