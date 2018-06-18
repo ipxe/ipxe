@@ -142,6 +142,7 @@ static void hunt_mcdi_copyin(struct hunt_nic *hunt,
 	hdr_len = sizeof(hdr);
 
 	memcpy(pdu, &hdr, hdr_len);
+	assert(inlen <= MCDI_CTL_SDU_LEN_MAX_V2);
 	memcpy(pdu + hdr_len, inbuf, inlen);
 
 	wmb();	/* Sync the data before ringing the doorbell */
@@ -1314,6 +1315,7 @@ const struct efx_nic_type hunt_nic_type = {
 
 static struct pci_device_id hunt_nics[] = {
 	PCI_ROM(0x1924, 0x0a03, "SFC9220", "Solarflare SFN8xxx Adapter", 0),
+	PCI_ROM(0x1924, 0x0b03, "SFC9250", "Solarflare X25xx Adapter", 0),
 };
 
 struct pci_driver hunt_driver __pci_driver = {
