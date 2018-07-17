@@ -493,6 +493,7 @@ static int virtnet_probe_legacy ( struct pci_device *pci ) {
 			 &mtu, sizeof ( mtu ) );
 		DBGC ( virtnet, "VIRTIO-NET %p mtu=%d\n", virtnet, mtu );
 		netdev->max_pkt_len = ( mtu + ETH_HLEN );
+		netdev->mtu = mtu;
 	}
 
 	/* Register network device */

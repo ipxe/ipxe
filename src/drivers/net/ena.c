@@ -565,6 +565,7 @@ static int ena_get_device_attributes ( struct net_device *netdev ) {
 	feature = &rsp->get_feature.feature;
 	memcpy ( netdev->hw_addr, feature->device.mac, ETH_ALEN );
 	netdev->max_pkt_len = le32_to_cpu ( feature->device.mtu );
+	netdev->mtu = ( netdev->max_pkt_len - ETH_HLEN );
 
 	DBGC ( ena, "ENA %p MAC %s MTU %zd\n",
 	       ena, eth_ntoa ( netdev->hw_addr ), netdev->max_pkt_len );
