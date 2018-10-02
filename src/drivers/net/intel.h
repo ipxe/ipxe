@@ -314,6 +314,10 @@ enum intel_flags {
 	INTEL_NO_ASDE = 0x0008,
 	/** Reset may cause a complete device hang */
 	INTEL_RST_HANG = 0x0010,
+	/** Some registers for this family are at different offsets */
+	INTELX_X550EM_A = 0x0020,
+	/** Force link up through manageability interface */
+	INTELX_SW_LINK_UP = 0x0040
 };
 
 /** The i219 has a seriously broken reset mechanism */
