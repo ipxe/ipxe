@@ -7,6 +7,8 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <ipxe/list.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/efi/efi.h>

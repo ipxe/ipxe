@@ -28,6 +28,8 @@ struct job_progress {
 	 * account before calculating @c completed/total.
 	 */
 	unsigned long total;
+	/** Message (optional) */
+	char message[32];
 };
 
 extern int job_progress ( struct interface *intf,

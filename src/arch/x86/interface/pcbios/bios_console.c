@@ -521,12 +521,12 @@ static void bios_inject_startup ( void ) {
 	__asm__ __volatile__ (
 		TEXT16_CODE ( "\nint16_wrapper:\n\t"
 			      "pushfw\n\t"
-			      "cmpb $0, %cs:bios_inject_lock\n\t"
+			      "cmpb $0, %%cs:bios_inject_lock\n\t"
 			      "jnz 1f\n\t"
 			      VIRT_CALL ( bios_inject )
 			      "\n1:\n\t"
 			      "popfw\n\t"
-			      "ljmp *%cs:int16_vector\n\t" ) );
+			      "ljmp *%%cs:int16_vector\n\t" ) : );
 
 	/* Hook INT 16 */
 	hook_bios_interrupt ( 0x16, ( ( intptr_t ) int16_wrapper ),

@@ -663,7 +663,7 @@ void hook_comboot_interrupts ( ) {
 			      VIRT_CALL ( int20 )
 			      "clc\n\t"
 			      "call patch_cf\n\t"
-		              "iret\n\t" ) );
+		              "iret\n\t" ) : );
 
 	hook_bios_interrupt ( 0x20, ( intptr_t ) int20_wrapper, &int20_vector );
 
@@ -672,7 +672,7 @@ void hook_comboot_interrupts ( ) {
 			      VIRT_CALL ( int21 )
 			      "clc\n\t"
 			      "call patch_cf\n\t"
-		              "iret\n\t" ) );
+		              "iret\n\t" ) : );
 
 	hook_bios_interrupt ( 0x21, ( intptr_t ) int21_wrapper, &int21_vector );
 
@@ -681,7 +681,7 @@ void hook_comboot_interrupts ( ) {
 			      VIRT_CALL ( int22 )
 			      "clc\n\t"
 			      "call patch_cf\n\t"
-		              "iret\n\t" ) );
+		              "iret\n\t" ) : );
 
 	hook_bios_interrupt ( 0x22, ( intptr_t ) int22_wrapper, &int22_vector );
 }

@@ -22,7 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @ret min_entropy	min-entropy of each sample
  */
-static inline __always_inline double
+static inline __always_inline min_entropy_t
 ENTROPY_INLINE ( rtc, min_entropy_per_sample ) ( void ) {
 
 	/* The min-entropy has been measured on several platforms
@@ -38,7 +38,7 @@ ENTROPY_INLINE ( rtc, min_entropy_per_sample ) ( void ) {
 	 * safety margin to allow for some potential non-independence
 	 * of samples.
 	 */
-	return 1.3;
+	return MIN_ENTROPY ( 1.3 );
 }
 
 extern uint8_t rtc_sample ( void );

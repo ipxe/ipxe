@@ -1363,20 +1363,19 @@ flatten_dummy:
 	.code32
 	.globl interrupt_wrapper
 interrupt_wrapper:
-	/* Preserve registers (excluding already-saved %eax and
-	 * otherwise unused registers which are callee-save for both
-	 * 32-bit and 64-bit ABIs).
-	 */
+	/* Preserve registers (excluding already-saved %eax) */
 	pushl	%ebx
 	pushl	%ecx
 	pushl	%edx
 	pushl	%esi
 	pushl	%edi
+	pushl	%ebp
 
 	/* Expand IRQ number to whole %eax register */
 	movzbl	%al, %eax
 
 .if64 ; /* Skip transition to long mode, if applicable */
+	xorl	%edx, %edx
 	movw	%cs, %bx
 	cmpw	$LONG_CS, %bx
 	je	1f
@@ -1391,24 +1390,45 @@ interrupt_wrapper:
 
 	/* Switch to virtual addressing */
 	call	intr_to_prot
+
+	/* Pass 32-bit interrupt frame pointer in %edx */
+	movl	%esp, %edx
+	xorl	%ecx, %ecx
 .if64
 	/* Switch to long mode */
 	call	prot_to_long
 	.code64
 
-1:	/* Preserve long-mode caller-save registers */
+1:	/* Preserve long-mode registers */
 	pushq	%r8
 	pushq	%r9
 	pushq	%r10
 	pushq	%r11
+	pushq	%r12
+	pushq	%r13
+	pushq	%r14
+	pushq	%r15
 
 	/* Expand IRQ number to whole %rdi register */
 	movl	%eax, %edi
+
+	/* Pass 32-bit interrupt frame pointer (if applicable) in %rsi */
+	testl	%edx, %edx
+	je	1f
+	movl	%edx, %esi
+	addl	virt_offset, %esi
+1:
+	/* Pass 64-bit interrupt frame pointer in %rdx */
+	movq	%rsp, %rdx
 .endif
 	/* Call interrupt handler */
 	call	interrupt
 .if64
-	/* Restore long-mode caller-save registers */
+	/* Restore long-mode registers */
+	popq	%r15
+	popq	%r14
+	popq	%r13
+	popq	%r12
 	popq	%r11
 	popq	%r10
 	popq	%r9
@@ -1432,6 +1452,7 @@ interrupt_wrapper:
 	popl	%ds
 
 1:	/* Restore registers */
+	popl	%ebp
 	popl	%edi
 	popl	%esi
 	popl	%edx

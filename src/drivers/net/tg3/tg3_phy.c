@@ -1287,6 +1287,970 @@ static void tg3_link_report(struct tg3 *tp)
 }
 #endif
 
+struct tg3_fiber_aneginfo {
+	int state;
+#define ANEG_STATE_UNKNOWN		0
+#define ANEG_STATE_AN_ENABLE		1
+#define ANEG_STATE_RESTART_INIT		2
+#define ANEG_STATE_RESTART		3
+#define ANEG_STATE_DISABLE_LINK_OK	4
+#define ANEG_STATE_ABILITY_DETECT_INIT	5
+#define ANEG_STATE_ABILITY_DETECT	6
+#define ANEG_STATE_ACK_DETECT_INIT	7
+#define ANEG_STATE_ACK_DETECT		8
+#define ANEG_STATE_COMPLETE_ACK_INIT	9
+#define ANEG_STATE_COMPLETE_ACK		10
+#define ANEG_STATE_IDLE_DETECT_INIT	11
+#define ANEG_STATE_IDLE_DETECT		12
+#define ANEG_STATE_LINK_OK		13
+#define ANEG_STATE_NEXT_PAGE_WAIT_INIT	14
+#define ANEG_STATE_NEXT_PAGE_WAIT	15
+
+	u32 flags;
+#define MR_AN_ENABLE		0x00000001
+#define MR_RESTART_AN		0x00000002
+#define MR_AN_COMPLETE		0x00000004
+#define MR_PAGE_RX		0x00000008
+#define MR_NP_LOADED		0x00000010
+#define MR_TOGGLE_TX		0x00000020
+#define MR_LP_ADV_FULL_DUPLEX	0x00000040
+#define MR_LP_ADV_HALF_DUPLEX	0x00000080
+#define MR_LP_ADV_SYM_PAUSE	0x00000100
+#define MR_LP_ADV_ASYM_PAUSE	0x00000200
+#define MR_LP_ADV_REMOTE_FAULT1	0x00000400
+#define MR_LP_ADV_REMOTE_FAULT2	0x00000800
+#define MR_LP_ADV_NEXT_PAGE	0x00001000
+#define MR_TOGGLE_RX		0x00002000
+#define MR_NP_RX		0x00004000
+
+#define MR_LINK_OK		0x80000000
+
+	unsigned long link_time, cur_time;
+
+	u32 ability_match_cfg;
+	int ability_match_count;
+
+	char ability_match, idle_match, ack_match;
+
+	u32 txconfig, rxconfig;
+#define ANEG_CFG_NP		0x00000080
+#define ANEG_CFG_ACK		0x00000040
+#define ANEG_CFG_RF2		0x00000020
+#define ANEG_CFG_RF1		0x00000010
+#define ANEG_CFG_PS2		0x00000001
+#define ANEG_CFG_PS1		0x00008000
+#define ANEG_CFG_HD		0x00004000
+#define ANEG_CFG_FD		0x00002000
+#define ANEG_CFG_INVAL		0x00001f06
+
+};
+#define ANEG_OK		0
+#define ANEG_DONE	1
+#define ANEG_TIMER_ENAB	2
+#define ANEG_FAILED	-1
+
+#define ANEG_STATE_SETTLE_TIME	10000
+
+static u16 tg3_advert_flowctrl_1000X(u8 flow_ctrl)
+{
+	u16 miireg;
+
+	if ((flow_ctrl & FLOW_CTRL_TX) && (flow_ctrl & FLOW_CTRL_RX))
+		miireg = ADVERTISE_1000XPAUSE;
+	else if (flow_ctrl & FLOW_CTRL_TX)
+		miireg = ADVERTISE_1000XPSE_ASYM;
+	else if (flow_ctrl & FLOW_CTRL_RX)
+		miireg = ADVERTISE_1000XPAUSE | ADVERTISE_1000XPSE_ASYM;
+	else
+		miireg = 0;
+
+	return miireg;
+}
+
+static void tg3_init_bcm8002(struct tg3 *tp)
+{
+	u32 mac_status = tr32(MAC_STATUS);
+	int i;
+
+	/* Reset when initting first time or we have a link. */
+	if (tg3_flag(tp, INIT_COMPLETE) &&
+	    !(mac_status & MAC_STATUS_PCS_SYNCED))
+		return;
+
+	/* Set PLL lock range. */
+	tg3_writephy(tp, 0x16, 0x8007);
+
+	/* SW reset */
+	tg3_writephy(tp, MII_BMCR, BMCR_RESET);
+
+	/* Wait for reset to complete. */
+	/* XXX schedule_timeout() ... */
+	for (i = 0; i < 500; i++)
+		udelay(10);
+
+	/* Config mode; select PMA/Ch 1 regs. */
+	tg3_writephy(tp, 0x10, 0x8411);
+
+	/* Enable auto-lock and comdet, select txclk for tx. */
+	tg3_writephy(tp, 0x11, 0x0a10);
+
+	tg3_writephy(tp, 0x18, 0x00a0);
+	tg3_writephy(tp, 0x16, 0x41ff);
+
+	/* Assert and deassert POR. */
+	tg3_writephy(tp, 0x13, 0x0400);
+	udelay(40);
+	tg3_writephy(tp, 0x13, 0x0000);
+
+	tg3_writephy(tp, 0x11, 0x0a50);
+	udelay(40);
+	tg3_writephy(tp, 0x11, 0x0a10);
+
+	/* Wait for signal to stabilize */
+	/* XXX schedule_timeout() ... */
+	for (i = 0; i < 15000; i++)
+		udelay(10);
+
+	/* Deselect the channel register so we can read the PHYID
+	 * later.
+	 */
+	tg3_writephy(tp, 0x10, 0x8011);
+}
+
+static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
+{
+	u16 flowctrl;
+	int current_link_up;
+	u32 sg_dig_ctrl, sg_dig_status;
+	u32 serdes_cfg, expected_sg_dig_ctrl;
+	int workaround, port_a;
+
+	serdes_cfg = 0;
+	expected_sg_dig_ctrl = 0;
+	workaround = 0;
+	port_a = 1;
+	current_link_up = 0;
+
+	if (tp->pci_chip_rev_id != CHIPREV_ID_5704_A0 &&
+	    tp->pci_chip_rev_id != CHIPREV_ID_5704_A1) {
+		workaround = 1;
+		if (tr32(TG3PCI_DUAL_MAC_CTRL) & DUAL_MAC_CTRL_ID)
+			port_a = 0;
+
+		/* preserve bits 0-11,13,14 for signal pre-emphasis */
+		/* preserve bits 20-23 for voltage regulator */
+		serdes_cfg = tr32(MAC_SERDES_CFG) & 0x00f06fff;
+	}
+
+	sg_dig_ctrl = tr32(SG_DIG_CTRL);
+
+	if (tp->link_config.autoneg != AUTONEG_ENABLE) {
+		if (sg_dig_ctrl & SG_DIG_USING_HW_AUTONEG) {
+			if (workaround) {
+				u32 val = serdes_cfg;
+
+				if (port_a)
+					val |= 0xc010000;
+				else
+					val |= 0x4010000;
+				tw32_f(MAC_SERDES_CFG, val);
+			}
+
+			tw32_f(SG_DIG_CTRL, SG_DIG_COMMON_SETUP);
+		}
+		if (mac_status & MAC_STATUS_PCS_SYNCED) {
+			tg3_setup_flow_control(tp, 0, 0);
+			current_link_up = 1;
+		}
+		goto out;
+	}
+
+	/* Want auto-negotiation.  */
+	expected_sg_dig_ctrl = SG_DIG_USING_HW_AUTONEG | SG_DIG_COMMON_SETUP;
+
+	flowctrl = tg3_advert_flowctrl_1000X(tp->link_config.flowctrl);
+	if (flowctrl & ADVERTISE_1000XPAUSE)
+		expected_sg_dig_ctrl |= SG_DIG_PAUSE_CAP;
+	if (flowctrl & ADVERTISE_1000XPSE_ASYM)
+		expected_sg_dig_ctrl |= SG_DIG_ASYM_PAUSE;
+
+	if (sg_dig_ctrl != expected_sg_dig_ctrl) {
+		if ((tp->phy_flags & TG3_PHYFLG_PARALLEL_DETECT) &&
+		    tp->serdes_counter &&
+		    ((mac_status & (MAC_STATUS_PCS_SYNCED |
+				    MAC_STATUS_RCVD_CFG)) ==
+		     MAC_STATUS_PCS_SYNCED)) {
+			tp->serdes_counter--;
+			current_link_up = 1;
+			goto out;
+		}
+restart_autoneg:
+		if (workaround)
+			tw32_f(MAC_SERDES_CFG, serdes_cfg | 0xc011000);
+		tw32_f(SG_DIG_CTRL, expected_sg_dig_ctrl | SG_DIG_SOFT_RESET);
+		udelay(5);
+		tw32_f(SG_DIG_CTRL, expected_sg_dig_ctrl);
+
+		tp->serdes_counter = SERDES_AN_TIMEOUT_5704S;
+		tp->phy_flags &= ~TG3_PHYFLG_PARALLEL_DETECT;
+	} else if (mac_status & (MAC_STATUS_PCS_SYNCED |
+				 MAC_STATUS_SIGNAL_DET)) {
+		sg_dig_status = tr32(SG_DIG_STATUS);
+		mac_status = tr32(MAC_STATUS);
+
+		if ((sg_dig_status & SG_DIG_AUTONEG_COMPLETE) &&
+		    (mac_status & MAC_STATUS_PCS_SYNCED)) {
+			u32 local_adv = 0, remote_adv = 0;
+
+			if (sg_dig_ctrl & SG_DIG_PAUSE_CAP)
+				local_adv |= ADVERTISE_1000XPAUSE;
+			if (sg_dig_ctrl & SG_DIG_ASYM_PAUSE)
+				local_adv |= ADVERTISE_1000XPSE_ASYM;
+
+			if (sg_dig_status & SG_DIG_PARTNER_PAUSE_CAPABLE)
+				remote_adv |= LPA_1000XPAUSE;
+			if (sg_dig_status & SG_DIG_PARTNER_ASYM_PAUSE)
+				remote_adv |= LPA_1000XPAUSE_ASYM;
+
+			tp->link_config.rmt_adv =
+					   mii_adv_to_ethtool_adv_x(remote_adv);
+
+			tg3_setup_flow_control(tp, local_adv, remote_adv);
+			current_link_up = 1;
+			tp->serdes_counter = 0;
+			tp->phy_flags &= ~TG3_PHYFLG_PARALLEL_DETECT;
+		} else if (!(sg_dig_status & SG_DIG_AUTONEG_COMPLETE)) {
+			if (tp->serdes_counter)
+				tp->serdes_counter--;
+			else {
+				if (workaround) {
+					u32 val = serdes_cfg;
+
+					if (port_a)
+						val |= 0xc010000;
+					else
+						val |= 0x4010000;
+
+					tw32_f(MAC_SERDES_CFG, val);
+				}
+
+				tw32_f(SG_DIG_CTRL, SG_DIG_COMMON_SETUP);
+				udelay(40);
+
+				/* Link parallel detection - link is up */
+				/* only if we have PCS_SYNC and not */
+				/* receiving config code words */
+				mac_status = tr32(MAC_STATUS);
+				if ((mac_status & MAC_STATUS_PCS_SYNCED) &&
+				    !(mac_status & MAC_STATUS_RCVD_CFG)) {
+					tg3_setup_flow_control(tp, 0, 0);
+					current_link_up = 1;
+					tp->phy_flags |=
+						TG3_PHYFLG_PARALLEL_DETECT;
+					tp->serdes_counter =
+						SERDES_PARALLEL_DET_TIMEOUT;
+				} else
+					goto restart_autoneg;
+			}
+		}
+	} else {
+		tp->serdes_counter = SERDES_AN_TIMEOUT_5704S;
+		tp->phy_flags &= ~TG3_PHYFLG_PARALLEL_DETECT;
+	}
+
+out:
+	return current_link_up;
+}
+
+static int tg3_fiber_aneg_smachine(struct tg3 *tp,
+				   struct tg3_fiber_aneginfo *ap)
+{
+	u16 flowctrl;
+	unsigned long delta;
+	u32 rx_cfg_reg;
+	int ret;
+
+	if (ap->state == ANEG_STATE_UNKNOWN) {
+		ap->rxconfig = 0;
+		ap->link_time = 0;
+		ap->cur_time = 0;
+		ap->ability_match_cfg = 0;
+		ap->ability_match_count = 0;
+		ap->ability_match = 0;
+		ap->idle_match = 0;
+		ap->ack_match = 0;
+	}
+	ap->cur_time++;
+
+	if (tr32(MAC_STATUS) & MAC_STATUS_RCVD_CFG) {
+		rx_cfg_reg = tr32(MAC_RX_AUTO_NEG);
+
+		if (rx_cfg_reg != ap->ability_match_cfg) {
+			ap->ability_match_cfg = rx_cfg_reg;
+			ap->ability_match = 0;
+			ap->ability_match_count = 0;
+		} else {
+			if (++ap->ability_match_count > 1) {
+				ap->ability_match = 1;
+				ap->ability_match_cfg = rx_cfg_reg;
+			}
+		}
+		if (rx_cfg_reg & ANEG_CFG_ACK)
+			ap->ack_match = 1;
+		else
+			ap->ack_match = 0;
+
+		ap->idle_match = 0;
+	} else {
+		ap->idle_match = 1;
+		ap->ability_match_cfg = 0;
+		ap->ability_match_count = 0;
+		ap->ability_match = 0;
+		ap->ack_match = 0;
+
+		rx_cfg_reg = 0;
+	}
+
+	ap->rxconfig = rx_cfg_reg;
+	ret = ANEG_OK;
+
+	switch (ap->state) {
+	case ANEG_STATE_UNKNOWN:
+		if (ap->flags & (MR_AN_ENABLE | MR_RESTART_AN))
+			ap->state = ANEG_STATE_AN_ENABLE;
+
+		/* fallthru */
+	case ANEG_STATE_AN_ENABLE:
+		ap->flags &= ~(MR_AN_COMPLETE | MR_PAGE_RX);
+		if (ap->flags & MR_AN_ENABLE) {
+			ap->link_time = 0;
+			ap->cur_time = 0;
+			ap->ability_match_cfg = 0;
+			ap->ability_match_count = 0;
+			ap->ability_match = 0;
+			ap->idle_match = 0;
+			ap->ack_match = 0;
+
+			ap->state = ANEG_STATE_RESTART_INIT;
+		} else {
+			ap->state = ANEG_STATE_DISABLE_LINK_OK;
+		}
+		break;
+
+	case ANEG_STATE_RESTART_INIT:
+		ap->link_time = ap->cur_time;
+		ap->flags &= ~(MR_NP_LOADED);
+		ap->txconfig = 0;
+		tw32(MAC_TX_AUTO_NEG, 0);
+		tp->mac_mode |= MAC_MODE_SEND_CONFIGS;
+		tw32_f(MAC_MODE, tp->mac_mode);
+		udelay(40);
+
+		ret = ANEG_TIMER_ENAB;
+		ap->state = ANEG_STATE_RESTART;
+
+		/* fallthru */
+	case ANEG_STATE_RESTART:
+		delta = ap->cur_time - ap->link_time;
+		if (delta > ANEG_STATE_SETTLE_TIME)
+			ap->state = ANEG_STATE_ABILITY_DETECT_INIT;
+		else
+			ret = ANEG_TIMER_ENAB;
+		break;
+
+	case ANEG_STATE_DISABLE_LINK_OK:
+		ret = ANEG_DONE;
+		break;
+
+	case ANEG_STATE_ABILITY_DETECT_INIT:
+		ap->flags &= ~(MR_TOGGLE_TX);
+		ap->txconfig = ANEG_CFG_FD;
+		flowctrl = tg3_advert_flowctrl_1000X(tp->link_config.flowctrl);
+		if (flowctrl & ADVERTISE_1000XPAUSE)
+			ap->txconfig |= ANEG_CFG_PS1;
+		if (flowctrl & ADVERTISE_1000XPSE_ASYM)
+			ap->txconfig |= ANEG_CFG_PS2;
+		tw32(MAC_TX_AUTO_NEG, ap->txconfig);
+		tp->mac_mode |= MAC_MODE_SEND_CONFIGS;
+		tw32_f(MAC_MODE, tp->mac_mode);
+		udelay(40);
+
+		ap->state = ANEG_STATE_ABILITY_DETECT;
+		break;
+
+	case ANEG_STATE_ABILITY_DETECT:
+		if (ap->ability_match != 0 && ap->rxconfig != 0)
+			ap->state = ANEG_STATE_ACK_DETECT_INIT;
+		break;
+
+	case ANEG_STATE_ACK_DETECT_INIT:
+		ap->txconfig |= ANEG_CFG_ACK;
+		tw32(MAC_TX_AUTO_NEG, ap->txconfig);
+		tp->mac_mode |= MAC_MODE_SEND_CONFIGS;
+		tw32_f(MAC_MODE, tp->mac_mode);
+		udelay(40);
+
+		ap->state = ANEG_STATE_ACK_DETECT;
+
+		/* fallthru */
+	case ANEG_STATE_ACK_DETECT:
+		if (ap->ack_match != 0) {
+			if ((ap->rxconfig & ~ANEG_CFG_ACK) ==
+			    (ap->ability_match_cfg & ~ANEG_CFG_ACK)) {
+				ap->state = ANEG_STATE_COMPLETE_ACK_INIT;
+			} else {
+				ap->state = ANEG_STATE_AN_ENABLE;
+			}
+		} else if (ap->ability_match != 0 &&
+			   ap->rxconfig == 0) {
+			ap->state = ANEG_STATE_AN_ENABLE;
+		}
+		break;
+
+	case ANEG_STATE_COMPLETE_ACK_INIT:
+		if (ap->rxconfig & ANEG_CFG_INVAL) {
+			ret = ANEG_FAILED;
+			break;
+		}
+		ap->flags &= ~(MR_LP_ADV_FULL_DUPLEX |
+			       MR_LP_ADV_HALF_DUPLEX |
+			       MR_LP_ADV_SYM_PAUSE |
+			       MR_LP_ADV_ASYM_PAUSE |
+			       MR_LP_ADV_REMOTE_FAULT1 |
+			       MR_LP_ADV_REMOTE_FAULT2 |
+			       MR_LP_ADV_NEXT_PAGE |
+			       MR_TOGGLE_RX |
+			       MR_NP_RX);
+		if (ap->rxconfig & ANEG_CFG_FD)
+			ap->flags |= MR_LP_ADV_FULL_DUPLEX;
+		if (ap->rxconfig & ANEG_CFG_HD)
+			ap->flags |= MR_LP_ADV_HALF_DUPLEX;
+		if (ap->rxconfig & ANEG_CFG_PS1)
+			ap->flags |= MR_LP_ADV_SYM_PAUSE;
+		if (ap->rxconfig & ANEG_CFG_PS2)
+			ap->flags |= MR_LP_ADV_ASYM_PAUSE;
+		if (ap->rxconfig & ANEG_CFG_RF1)
+			ap->flags |= MR_LP_ADV_REMOTE_FAULT1;
+		if (ap->rxconfig & ANEG_CFG_RF2)
+			ap->flags |= MR_LP_ADV_REMOTE_FAULT2;
+		if (ap->rxconfig & ANEG_CFG_NP)
+			ap->flags |= MR_LP_ADV_NEXT_PAGE;
+
+		ap->link_time = ap->cur_time;
+
+		ap->flags ^= (MR_TOGGLE_TX);
+		if (ap->rxconfig & 0x0008)
+			ap->flags |= MR_TOGGLE_RX;
+		if (ap->rxconfig & ANEG_CFG_NP)
+			ap->flags |= MR_NP_RX;
+		ap->flags |= MR_PAGE_RX;
+
+		ap->state = ANEG_STATE_COMPLETE_ACK;
+		ret = ANEG_TIMER_ENAB;
+		break;
+
+	case ANEG_STATE_COMPLETE_ACK:
+		if (ap->ability_match != 0 &&
+		    ap->rxconfig == 0) {
+			ap->state = ANEG_STATE_AN_ENABLE;
+			break;
+		}
+		delta = ap->cur_time - ap->link_time;
+		if (delta > ANEG_STATE_SETTLE_TIME) {
+			if (!(ap->flags & (MR_LP_ADV_NEXT_PAGE))) {
+				ap->state = ANEG_STATE_IDLE_DETECT_INIT;
+			} else {
+				if ((ap->txconfig & ANEG_CFG_NP) == 0 &&
+				    !(ap->flags & MR_NP_RX)) {
+					ap->state = ANEG_STATE_IDLE_DETECT_INIT;
+				} else {
+					ret = ANEG_FAILED;
+				}
+			}
+		}
+		break;
+
+	case ANEG_STATE_IDLE_DETECT_INIT:
+		ap->link_time = ap->cur_time;
+		tp->mac_mode &= ~MAC_MODE_SEND_CONFIGS;
+		tw32_f(MAC_MODE, tp->mac_mode);
+		udelay(40);
+
+		ap->state = ANEG_STATE_IDLE_DETECT;
+		ret = ANEG_TIMER_ENAB;
+		break;
+
+	case ANEG_STATE_IDLE_DETECT:
+		if (ap->ability_match != 0 &&
+		    ap->rxconfig == 0) {
+			ap->state = ANEG_STATE_AN_ENABLE;
+			break;
+		}
+		delta = ap->cur_time - ap->link_time;
+		if (delta > ANEG_STATE_SETTLE_TIME) {
+			/* XXX another gem from the Broadcom driver :( */
+			ap->state = ANEG_STATE_LINK_OK;
+		}
+		break;
+
+	case ANEG_STATE_LINK_OK:
+		ap->flags |= (MR_AN_COMPLETE | MR_LINK_OK);
+		ret = ANEG_DONE;
+		break;
+
+	case ANEG_STATE_NEXT_PAGE_WAIT_INIT:
+		/* ??? unimplemented */
+		break;
+
+	case ANEG_STATE_NEXT_PAGE_WAIT:
+		/* ??? unimplemented */
+		break;
+
+	default:
+		ret = ANEG_FAILED;
+		break;
+	}
+
+	return ret;
+}
+
+static int fiber_autoneg(struct tg3 *tp, u32 *txflags, u32 *rxflags)
+{
+	int res = 0;
+	struct tg3_fiber_aneginfo aninfo;
+	int status = ANEG_FAILED;
+	unsigned int tick;
+	u32 tmp;
+
+	tw32_f(MAC_TX_AUTO_NEG, 0);
+
+	tmp = tp->mac_mode & ~MAC_MODE_PORT_MODE_MASK;
+	tw32_f(MAC_MODE, tmp | MAC_MODE_PORT_MODE_GMII);
+	udelay(40);
+
+	tw32_f(MAC_MODE, tp->mac_mode | MAC_MODE_SEND_CONFIGS);
+	udelay(40);
+
+	memset(&aninfo, 0, sizeof(aninfo));
+	aninfo.flags |= MR_AN_ENABLE;
+	aninfo.state = ANEG_STATE_UNKNOWN;
+	aninfo.cur_time = 0;
+	tick = 0;
+	while (++tick < 195000) {
+		status = tg3_fiber_aneg_smachine(tp, &aninfo);
+		if (status == ANEG_DONE || status == ANEG_FAILED)
+			break;
+
+		udelay(1);
+	}
+
+	tp->mac_mode &= ~MAC_MODE_SEND_CONFIGS;
+	tw32_f(MAC_MODE, tp->mac_mode);
+	udelay(40);
+
+	*txflags = aninfo.txconfig;
+	*rxflags = aninfo.flags;
+
+	if (status == ANEG_DONE &&
+	    (aninfo.flags & (MR_AN_COMPLETE | MR_LINK_OK |
+			     MR_LP_ADV_FULL_DUPLEX)))
+		res = 1;
+
+	return res;
+}
+
+static int tg3_setup_fiber_by_hand(struct tg3 *tp, u32 mac_status)
+{
+	int current_link_up = 0;
+
+	if (!(mac_status & MAC_STATUS_PCS_SYNCED))
+		goto out;
+
+	if (tp->link_config.autoneg == AUTONEG_ENABLE) {
+		u32 txflags, rxflags;
+		int i;
+
+		if (fiber_autoneg(tp, &txflags, &rxflags)) {
+			u32 local_adv = 0, remote_adv = 0;
+
+			if (txflags & ANEG_CFG_PS1)
+				local_adv |= ADVERTISE_1000XPAUSE;
+			if (txflags & ANEG_CFG_PS2)
+				local_adv |= ADVERTISE_1000XPSE_ASYM;
+
+			if (rxflags & MR_LP_ADV_SYM_PAUSE)
+				remote_adv |= LPA_1000XPAUSE;
+			if (rxflags & MR_LP_ADV_ASYM_PAUSE)
+				remote_adv |= LPA_1000XPAUSE_ASYM;
+
+			tp->link_config.rmt_adv =
+					   mii_adv_to_ethtool_adv_x(remote_adv);
+
+			tg3_setup_flow_control(tp, local_adv, remote_adv);
+
+			current_link_up = 1;
+		}
+		for (i = 0; i < 30; i++) {
+			udelay(20);
+			tw32_f(MAC_STATUS,
+			       (MAC_STATUS_SYNC_CHANGED |
+				MAC_STATUS_CFG_CHANGED));
+			udelay(40);
+			if ((tr32(MAC_STATUS) &
+			     (MAC_STATUS_SYNC_CHANGED |
+			      MAC_STATUS_CFG_CHANGED)) == 0)
+				break;
+		}
+
+		mac_status = tr32(MAC_STATUS);
+		if (!current_link_up &&
+		    (mac_status & MAC_STATUS_PCS_SYNCED) &&
+		    !(mac_status & MAC_STATUS_RCVD_CFG))
+			current_link_up = 1;
+	} else {
+		tg3_setup_flow_control(tp, 0, 0);
+
+		/* Forcing 1000FD link up. */
+		current_link_up = 1;
+
+		tw32_f(MAC_MODE, (tp->mac_mode | MAC_MODE_SEND_CONFIGS));
+		udelay(40);
+
+		tw32_f(MAC_MODE, tp->mac_mode);
+		udelay(40);
+	}
+
+out:
+	return current_link_up;
+}
+
+static int tg3_test_and_report_link_chg(struct tg3 *tp, int curr_link_up)
+{
+	if (curr_link_up != tp->link_up) {
+		if (curr_link_up) {
+	                netdev_link_up(tp->dev);
+		} else {
+	                netdev_link_down(tp->dev);
+			if (tp->phy_flags & TG3_PHYFLG_MII_SERDES)
+				tp->phy_flags &= ~TG3_PHYFLG_PARALLEL_DETECT;
+		}
+
+		tg3_link_report(tp);
+		return 1;
+	}
+
+	return 0;
+}
+
+static void tg3_clear_mac_status(struct tg3 *tp)
+{
+	tw32(MAC_EVENT, 0);
+
+	tw32_f(MAC_STATUS,
+	       MAC_STATUS_SYNC_CHANGED |
+	       MAC_STATUS_CFG_CHANGED |
+	       MAC_STATUS_MI_COMPLETION |
+	       MAC_STATUS_LNKSTATE_CHANGED);
+	udelay(40);
+}
+
+static int tg3_setup_fiber_phy(struct tg3 *tp, int force_reset)
+{
+	u32 orig_pause_cfg;
+	u16 orig_active_speed;
+	u8 orig_active_duplex;
+	u32 mac_status;
+	int current_link_up = force_reset;
+	int i;
+
+	orig_pause_cfg = tp->link_config.active_flowctrl;
+	orig_active_speed = tp->link_config.active_speed;
+	orig_active_duplex = tp->link_config.active_duplex;
+
+	if (!tg3_flag(tp, HW_AUTONEG) &&
+	    tp->link_up &&
+	    tg3_flag(tp, INIT_COMPLETE)) {
+		mac_status = tr32(MAC_STATUS);
+		mac_status &= (MAC_STATUS_PCS_SYNCED |
+			       MAC_STATUS_SIGNAL_DET |
+			       MAC_STATUS_CFG_CHANGED |
+			       MAC_STATUS_RCVD_CFG);
+		if (mac_status == (MAC_STATUS_PCS_SYNCED |
+				   MAC_STATUS_SIGNAL_DET)) {
+			tw32_f(MAC_STATUS, (MAC_STATUS_SYNC_CHANGED |
+					    MAC_STATUS_CFG_CHANGED));
+			return 0;
+		}
+	}
+
+	tw32_f(MAC_TX_AUTO_NEG, 0);
+
+	tp->mac_mode &= ~(MAC_MODE_PORT_MODE_MASK | MAC_MODE_HALF_DUPLEX);
+	tp->mac_mode |= MAC_MODE_PORT_MODE_TBI;
+	tw32_f(MAC_MODE, tp->mac_mode);
+	udelay(40);
+
+	if (tp->phy_id == TG3_PHY_ID_BCM8002)
+		tg3_init_bcm8002(tp);
+
+	/* Enable link change event even when serdes polling.  */
+	tw32_f(MAC_EVENT, MAC_EVENT_LNKSTATE_CHANGED);
+	udelay(40);
+
+	current_link_up = 0;
+	tp->link_config.rmt_adv = 0;
+	mac_status = tr32(MAC_STATUS);
+
+	if (tg3_flag(tp, HW_AUTONEG))
+		current_link_up = tg3_setup_fiber_hw_autoneg(tp, mac_status);
+	else
+		current_link_up = tg3_setup_fiber_by_hand(tp, mac_status);
+
+	tp->hw_status->status =
+		(SD_STATUS_UPDATED |
+		 (tp->hw_status->status & ~SD_STATUS_LINK_CHG));
+
+	for (i = 0; i < 100; i++) {
+		tw32_f(MAC_STATUS, (MAC_STATUS_SYNC_CHANGED |
+				    MAC_STATUS_CFG_CHANGED));
+		udelay(5);
+		if ((tr32(MAC_STATUS) & (MAC_STATUS_SYNC_CHANGED |
+					 MAC_STATUS_CFG_CHANGED |
+					 MAC_STATUS_LNKSTATE_CHANGED)) == 0)
+			break;
+	}
+
+	mac_status = tr32(MAC_STATUS);
+	if ((mac_status & MAC_STATUS_PCS_SYNCED) == 0) {
+		current_link_up = 0;
+		if (tp->link_config.autoneg == AUTONEG_ENABLE &&
+		    tp->serdes_counter == 0) {
+			tw32_f(MAC_MODE, (tp->mac_mode |
+					  MAC_MODE_SEND_CONFIGS));
+			udelay(1);
+			tw32_f(MAC_MODE, tp->mac_mode);
+		}
+	}
+
+	if (current_link_up) {
+		tp->link_config.active_speed = SPEED_1000;
+		tp->link_config.active_duplex = DUPLEX_FULL;
+		tw32(MAC_LED_CTRL, (tp->led_ctrl |
+				    LED_CTRL_LNKLED_OVERRIDE |
+				    LED_CTRL_1000MBPS_ON));
+	} else {
+		tp->link_config.active_speed = SPEED_UNKNOWN;
+		tp->link_config.active_duplex = DUPLEX_UNKNOWN;
+		tw32(MAC_LED_CTRL, (tp->led_ctrl |
+				    LED_CTRL_LNKLED_OVERRIDE |
+				    LED_CTRL_TRAFFIC_OVERRIDE));
+	}
+
+	if (!tg3_test_and_report_link_chg(tp, current_link_up)) {
+		u32 now_pause_cfg = tp->link_config.active_flowctrl;
+		if (orig_pause_cfg != now_pause_cfg ||
+		    orig_active_speed != tp->link_config.active_speed ||
+		    orig_active_duplex != tp->link_config.active_duplex)
+			tg3_link_report(tp);
+	}
+
+	return 0;
+}
+
+static int tg3_setup_fiber_mii_phy(struct tg3 *tp, int force_reset)
+{
+	int err = 0;
+	u32 bmsr, bmcr;
+	u16 current_speed = SPEED_UNKNOWN;
+	u8 current_duplex = DUPLEX_UNKNOWN;
+	int current_link_up = 0;
+	u32 local_adv, remote_adv, sgsr;
+
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5719 ||
+	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5720) &&
+	     !tg3_readphy(tp, SERDES_TG3_1000X_STATUS, &sgsr) &&
+	     (sgsr & SERDES_TG3_SGMII_MODE)) {
+
+		if (force_reset)
+			tg3_phy_reset(tp);
+
+		tp->mac_mode &= ~MAC_MODE_PORT_MODE_MASK;
+
+		if (!(sgsr & SERDES_TG3_LINK_UP)) {
+			tp->mac_mode |= MAC_MODE_PORT_MODE_GMII;
+		} else {
+			current_link_up = 1;
+			if (sgsr & SERDES_TG3_SPEED_1000) {
+				current_speed = SPEED_1000;
+				tp->mac_mode |= MAC_MODE_PORT_MODE_GMII;
+			} else if (sgsr & SERDES_TG3_SPEED_100) {
+				current_speed = SPEED_100;
+				tp->mac_mode |= MAC_MODE_PORT_MODE_MII;
+			} else {
+				current_speed = SPEED_10;
+				tp->mac_mode |= MAC_MODE_PORT_MODE_MII;
+			}
+
+			if (sgsr & SERDES_TG3_FULL_DUPLEX)
+				current_duplex = DUPLEX_FULL;
+			else
+				current_duplex = DUPLEX_HALF;
+		}
+
+		tw32_f(MAC_MODE, tp->mac_mode);
+		udelay(40);
+
+		tg3_clear_mac_status(tp);
+
+		goto fiber_setup_done;
+	}
+
+	tp->mac_mode |= MAC_MODE_PORT_MODE_GMII;
+	tw32_f(MAC_MODE, tp->mac_mode);
+	udelay(40);
+
+	tg3_clear_mac_status(tp);
+
+	if (force_reset)
+		tg3_phy_reset(tp);
+
+	tp->link_config.rmt_adv = 0;
+
+	err |= tg3_readphy(tp, MII_BMSR, &bmsr);
+	err |= tg3_readphy(tp, MII_BMSR, &bmsr);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5714) {
+		if (tr32(MAC_TX_STATUS) & TX_STATUS_LINK_UP)
+			bmsr |= BMSR_LSTATUS;
+		else
+			bmsr &= ~BMSR_LSTATUS;
+	}
+
+	err |= tg3_readphy(tp, MII_BMCR, &bmcr);
+
+	if ((tp->link_config.autoneg == AUTONEG_ENABLE) && !force_reset &&
+	    (tp->phy_flags & TG3_PHYFLG_PARALLEL_DETECT)) {
+		/* do nothing, just check for link up at the end */
+	} else if (tp->link_config.autoneg == AUTONEG_ENABLE) {
+		u32 adv, newadv;
+
+		err |= tg3_readphy(tp, MII_ADVERTISE, &adv);
+		newadv = adv & ~(ADVERTISE_1000XFULL | ADVERTISE_1000XHALF |
+				 ADVERTISE_1000XPAUSE |
+				 ADVERTISE_1000XPSE_ASYM |
+				 ADVERTISE_SLCT);
+
+		newadv |= tg3_advert_flowctrl_1000X(tp->link_config.flowctrl);
+		newadv |= ethtool_adv_to_mii_adv_x(tp->link_config.advertising);
+
+		if ((newadv != adv) || !(bmcr & BMCR_ANENABLE)) {
+			tg3_writephy(tp, MII_ADVERTISE, newadv);
+			bmcr |= BMCR_ANENABLE | BMCR_ANRESTART;
+			tg3_writephy(tp, MII_BMCR, bmcr);
+
+			tw32_f(MAC_EVENT, MAC_EVENT_LNKSTATE_CHANGED);
+			tp->serdes_counter = SERDES_AN_TIMEOUT_5714S;
+			tp->phy_flags &= ~TG3_PHYFLG_PARALLEL_DETECT;
+
+			return err;
+		}
+	} else {
+		u32 new_bmcr;
+
+		bmcr &= ~BMCR_SPEED1000;
+		new_bmcr = bmcr & ~(BMCR_ANENABLE | BMCR_FULLDPLX);
+
+		if (tp->link_config.duplex == DUPLEX_FULL)
+			new_bmcr |= BMCR_FULLDPLX;
+
+		if (new_bmcr != bmcr) {
+			/* BMCR_SPEED1000 is a reserved bit that needs
+			 * to be set on write.
+			 */
+			new_bmcr |= BMCR_SPEED1000;
+
+			/* Force a linkdown */
+			if (tp->link_up) {
+				u32 adv;
+
+				err |= tg3_readphy(tp, MII_ADVERTISE, &adv);
+				adv &= ~(ADVERTISE_1000XFULL |
+					 ADVERTISE_1000XHALF |
+					 ADVERTISE_SLCT);
+				tg3_writephy(tp, MII_ADVERTISE, adv);
+				tg3_writephy(tp, MII_BMCR, bmcr |
+							   BMCR_ANRESTART |
+							   BMCR_ANENABLE);
+				udelay(10);
+	                        netdev_link_down(tp->dev);
+			}
+			tg3_writephy(tp, MII_BMCR, new_bmcr);
+			bmcr = new_bmcr;
+			err |= tg3_readphy(tp, MII_BMSR, &bmsr);
+			err |= tg3_readphy(tp, MII_BMSR, &bmsr);
+			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5714) {
+				if (tr32(MAC_TX_STATUS) & TX_STATUS_LINK_UP)
+					bmsr |= BMSR_LSTATUS;
+				else
+					bmsr &= ~BMSR_LSTATUS;
+			}
+			tp->phy_flags &= ~TG3_PHYFLG_PARALLEL_DETECT;
+		}
+	}
+
+	if (bmsr & BMSR_LSTATUS) {
+		current_speed = SPEED_1000;
+		current_link_up = 1;
+		if (bmcr & BMCR_FULLDPLX)
+			current_duplex = DUPLEX_FULL;
+		else
+			current_duplex = DUPLEX_HALF;
+
+		local_adv = 0;
+		remote_adv = 0;
+
+		if (bmcr & BMCR_ANENABLE) {
+			u32 common;
+
+			err |= tg3_readphy(tp, MII_ADVERTISE, &local_adv);
+			err |= tg3_readphy(tp, MII_LPA, &remote_adv);
+			common = local_adv & remote_adv;
+			if (common & (ADVERTISE_1000XHALF |
+				      ADVERTISE_1000XFULL)) {
+				if (common & ADVERTISE_1000XFULL)
+					current_duplex = DUPLEX_FULL;
+				else
+					current_duplex = DUPLEX_HALF;
+
+				tp->link_config.rmt_adv =
+					   mii_adv_to_ethtool_adv_x(remote_adv);
+			} else if (!tg3_flag(tp, 5780_CLASS)) {
+				/* Link is up via parallel detect */
+			} else {
+				current_link_up = 0;
+			}
+		}
+	}
+
+fiber_setup_done:
+	if (current_link_up && current_duplex == DUPLEX_FULL)
+		tg3_setup_flow_control(tp, local_adv, remote_adv);
+
+	tp->mac_mode &= ~MAC_MODE_HALF_DUPLEX;
+	if (tp->link_config.active_duplex == DUPLEX_HALF)
+		tp->mac_mode |= MAC_MODE_HALF_DUPLEX;
+
+	tw32_f(MAC_MODE, tp->mac_mode);
+	udelay(40);
+
+	tw32_f(MAC_EVENT, MAC_EVENT_LNKSTATE_CHANGED);
+
+	tp->link_config.active_speed = current_speed;
+	tp->link_config.active_duplex = current_duplex;
+
+	tg3_test_and_report_link_chg(tp, current_link_up);
+	return err;
+}
+
 static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 {	DBGP("%s\n", __func__);
 
@@ -1559,15 +2523,12 @@ int tg3_setup_phy(struct tg3 *tp, int force_reset)
 	u32 val;
 	int err;
 
-#if 0
 	if (tp->phy_flags & TG3_PHYFLG_PHY_SERDES)
 		err = tg3_setup_fiber_phy(tp, force_reset);
 	else if (tp->phy_flags & TG3_PHYFLG_MII_SERDES)
 		err = tg3_setup_fiber_mii_phy(tp, force_reset);
 	else
-#endif
-	/* FIXME: add only copper phy variants for now */
-	err = tg3_setup_copper_phy(tp, force_reset);
+		err = tg3_setup_copper_phy(tp, force_reset);
 
 	val = (2 << TX_LENGTHS_IPG_CRS_SHIFT) |
 	      (6 << TX_LENGTHS_IPG_SHIFT);

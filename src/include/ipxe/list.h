@@ -377,6 +377,28 @@ extern void extern_list_splice_tail_init ( struct list_head *list,
 	( ( &prev->member == (head) ) ? NULL : prev ); } )
 
 /**
+ * Test if entry is first in a list
+ *
+ * @v entry		List entry
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ * @ret is_first	Entry is first in the list
+ */
+#define list_is_first_entry( entry, head, member )		\
+	( (head)->next == &(entry)->member )
+
+/**
+ * Test if entry is last in a list
+ *
+ * @v entry		List entry
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ * @ret is_last		Entry is last in the list
+ */
+#define list_is_last_entry( entry, head, member )		\
+	( (head)->prev == &(entry)->member )
+
+/**
  * Iterate over a list
  *
  * @v pos		Iterator

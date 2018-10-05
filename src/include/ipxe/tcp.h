@@ -26,7 +26,7 @@ struct tcp_header {
 	uint16_t win;		/* Advertised window */
 	uint16_t csum;		/* Checksum */
 	uint16_t urg;		/* Urgent pointer */
-};
+} __attribute__ (( packed ));
 
 /** @defgroup tcpopts TCP options
  * @{

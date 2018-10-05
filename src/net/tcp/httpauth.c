@@ -54,46 +54,6 @@ static struct http_authentication * http_authentication ( const char *name ) {
 	return NULL;
 }
 
-/** An HTTP "WWW-Authenticate" response field */
-struct http_www_authenticate_field {
-	/** Name */
-	const char *name;
-	/** Offset */
-	size_t offset;
-};
-
-/** Define an HTTP "WWW-Authenticate" response field */
-#define HTTP_WWW_AUTHENTICATE_FIELD( _name ) {				\
-		.name = #_name,						\
-		.offset = offsetof ( struct http_transaction,		\
-				     response.auth._name ),		\
-	}
-
-/**
- * Set HTTP "WWW-Authenticate" response field value
- *
- * @v http		HTTP transaction
- * @v field		Response field
- * @v value		Field value
- */
-static inline void
-http_www_auth_field ( struct http_transaction *http,
-		      struct http_www_authenticate_field *field, char *value ) {
-	char **ptr;
-
-	ptr = ( ( ( void * ) http ) + field->offset );
-	*ptr = value;
-}
-
-/** HTTP "WWW-Authenticate" fields */
-static struct http_www_authenticate_field http_www_auth_fields[] = {
-	HTTP_WWW_AUTHENTICATE_FIELD ( realm ),
-	HTTP_WWW_AUTHENTICATE_FIELD ( qop ),
-	HTTP_WWW_AUTHENTICATE_FIELD ( algorithm ),
-	HTTP_WWW_AUTHENTICATE_FIELD ( nonce ),
-	HTTP_WWW_AUTHENTICATE_FIELD ( opaque ),
-};
-
 /**
  * Parse HTTP "WWW-Authenticate" header
  *
@@ -103,43 +63,38 @@ static struct http_www_authenticate_field http_www_auth_fields[] = {
  */
 static int http_parse_www_authenticate ( struct http_transaction *http,
 					 char *line ) {
-	struct http_www_authenticate_field *field;
+	struct http_authentication *auth;
 	char *name;
-	char *key;
-	char *value;
-	unsigned int i;
+	int rc;
 
 	/* Get scheme name */
 	name = http_token ( &line, NULL );
 	if ( ! name ) {
 		DBGC ( http, "HTTP %p malformed WWW-Authenticate \"%s\"\n",
-		       http, value );
+		       http, line );
 		return -EPROTO;
 	}
 
 	/* Identify scheme */
-	http->response.auth.auth = http_authentication ( name );
-	if ( ! http->response.auth.auth ) {
+	auth = http_authentication ( name );
+	if ( ! auth ) {
 		DBGC ( http, "HTTP %p unrecognised authentication scheme "
 		       "\"%s\"\n", http, name );
-		return -ENOTSUP;
+		/* Ignore; the server may offer other schemes */
+		return 0;
 	}
 
-	/* Process fields */
-	while ( ( key = http_token ( &line, &value ) ) ) {
-		for ( i = 0 ; i < ( sizeof ( http_www_auth_fields ) /
-				    sizeof ( http_www_auth_fields[0] ) ) ; i++){
-			field = &http_www_auth_fields[i];
-			if ( strcasecmp ( key, field->name ) == 0 )
-				http_www_auth_field ( http, field, value );
-		}
-	}
+	/* Use first supported scheme */
+	if ( http->response.auth.auth )
+		return 0;
+	http->response.auth.auth = auth;
 
-	/* Allow HTTP request to be retried if the request had not
-	 * already tried authentication.
-	 */
-	if ( ! http->request.auth.auth )
-		http->response.flags |= HTTP_RESPONSE_RETRY;
+	/* Parse remaining header line */
+	if ( ( rc = auth->parse ( http, line ) ) != 0 ) {
+		DBGC ( http, "HTTP %p could not parse %s WWW-Authenticate "
+		       "\"%s\": %s\n", http, name, line, strerror ( rc ) );
+		return rc;
+	}
 
 	return 0;
 }

@@ -45,6 +45,11 @@ const struct setting mac_setting __setting ( SETTING_NETDEV, mac ) = {
 	.description = "MAC address",
 	.type = &setting_type_hex,
 };
+const struct setting hwaddr_setting __setting ( SETTING_NETDEV, hwaddr ) = {
+	.name = "hwaddr",
+	.description = "Hardware address",
+	.type = &setting_type_hex,
+};
 const struct setting bustype_setting __setting ( SETTING_NETDEV, bustype ) = {
 	.name = "bustype",
 	.description = "Bus type",
@@ -78,7 +83,7 @@ const struct setting mtu_setting __setting ( SETTING_NETDEV, mtu ) = {
 };
 
 /**
- * Store MAC address setting
+ * Store link-layer address setting
  *
  * @v netdev		Network device
  * @v data		Setting data, or NULL to clear setting
@@ -103,7 +108,7 @@ static int netdev_store_mac ( struct net_device *netdev,
 }
 
 /**
- * Fetch MAC address setting
+ * Fetch link-layer address setting
  *
  * @v netdev		Network device
  * @v data		Buffer to fill with setting data
@@ -112,11 +117,30 @@ static int netdev_store_mac ( struct net_device *netdev,
  */
 static int netdev_fetch_mac ( struct net_device *netdev, void *data,
 			      size_t len ) {
+	size_t max_len = netdev->ll_protocol->ll_addr_len;
 
-	if ( len > netdev->ll_protocol->ll_addr_len )
-		len = netdev->ll_protocol->ll_addr_len;
+	if ( len > max_len )
+		len = max_len;
 	memcpy ( data, netdev->ll_addr, len );
-	return netdev->ll_protocol->ll_addr_len;
+	return max_len;
+}
+
+/**
+ * Fetch hardware address setting
+ *
+ * @v netdev		Network device
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int netdev_fetch_hwaddr ( struct net_device *netdev, void *data,
+				 size_t len ) {
+	size_t max_len = netdev->ll_protocol->hw_addr_len;
+
+	if ( len > max_len )
+		len = max_len;
+	memcpy ( data, netdev->hw_addr, len );
+	return max_len;
 }
 
 /**
@@ -253,6 +277,7 @@ struct netdev_setting_operation {
 /** Network device settings */
 static struct netdev_setting_operation netdev_setting_operations[] = {
 	{ &mac_setting, netdev_store_mac, netdev_fetch_mac },
+	{ &hwaddr_setting, NULL, netdev_fetch_hwaddr },
 	{ &bustype_setting, NULL, netdev_fetch_bustype },
 	{ &busloc_setting, NULL, netdev_fetch_busloc },
 	{ &busid_setting, NULL, netdev_fetch_busid },

@@ -45,6 +45,9 @@ static LIST_HEAD ( efi_snp_devices );
 /** Network devices are currently claimed for use by iPXE */
 static int efi_snp_claimed;
 
+/** TPL prior to network devices being claimed */
+static EFI_TPL efi_snp_old_tpl;
+
 /* Downgrade user experience if configured to do so
  *
  * The default UEFI user experience for network boot is somewhat
@@ -120,7 +123,7 @@ static void efi_snp_set_mode ( struct efi_snp_device *snpdev ) {
 
 	mode->HwAddressSize = ll_addr_len;
 	mode->MediaHeaderSize = ll_protocol->ll_header_len;
-	mode->MaxPacketSize = netdev->max_pkt_len;
+	mode->MaxPacketSize = netdev->mtu;
 	mode->ReceiveFilterMask = ( EFI_SIMPLE_NETWORK_RECEIVE_UNICAST |
 				    EFI_SIMPLE_NETWORK_RECEIVE_MULTICAST |
 				    EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST );
@@ -230,8 +233,10 @@ efi_snp_stop ( EFI_SIMPLE_NETWORK_PROTOCOL *snp ) {
 static EFI_STATUS EFIAPI
 efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		     UINTN extra_rx_bufsize, UINTN extra_tx_bufsize ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev =
 		container_of ( snp, struct efi_snp_device, snp );
+	EFI_TPL saved_tpl;
 	int rc;
 
 	DBGC ( snpdev, "SNPDEV %p INITIALIZE (%ld extra RX, %ld extra TX)\n",
@@ -239,17 +244,26 @@ efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	       ( ( unsigned long ) extra_tx_bufsize ) );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( efi_snp_claimed )
-		return EFI_NOT_READY;
+	if ( efi_snp_claimed ) {
+		rc = -EAGAIN;
+		goto err_claimed;
+	}
 
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+
+	/* Open network device */
 	if ( ( rc = netdev_open ( snpdev->netdev ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not open %s: %s\n",
 		       snpdev, snpdev->netdev->name, strerror ( rc ) );
-		return EFIRC ( rc );
+		goto err_open;
 	}
 	efi_snp_set_state ( snpdev );
 
-	return 0;
+ err_open:
+	bs->RestoreTPL ( saved_tpl );
+ err_claimed:
+	return EFIRC ( rc );
 }
 
 /**
@@ -261,29 +275,41 @@ efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
  */
 static EFI_STATUS EFIAPI
 efi_snp_reset ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN ext_verify ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev =
 		container_of ( snp, struct efi_snp_device, snp );
+	EFI_TPL saved_tpl;
 	int rc;
 
 	DBGC ( snpdev, "SNPDEV %p RESET (%s extended verification)\n",
 	       snpdev, ( ext_verify ? "with" : "without" ) );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( efi_snp_claimed )
-		return EFI_NOT_READY;
+	if ( efi_snp_claimed ) {
+		rc = -EAGAIN;
+		goto err_claimed;
+	}
 
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+
+	/* Close network device */
 	netdev_close ( snpdev->netdev );
 	efi_snp_set_state ( snpdev );
 	efi_snp_flush ( snpdev );
 
+	/* Reopen network device */
 	if ( ( rc = netdev_open ( snpdev->netdev ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not reopen %s: %s\n",
 		       snpdev, snpdev->netdev->name, strerror ( rc ) );
-		return EFIRC ( rc );
+		goto err_open;
 	}
 	efi_snp_set_state ( snpdev );
 
-	return 0;
+ err_open:
+	bs->RestoreTPL ( saved_tpl );
+ err_claimed:
+	return EFIRC ( rc );
 }
 
 /**
@@ -294,8 +320,10 @@ efi_snp_reset ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN ext_verify ) {
  */
 static EFI_STATUS EFIAPI
 efi_snp_shutdown ( EFI_SIMPLE_NETWORK_PROTOCOL *snp ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev =
 		container_of ( snp, struct efi_snp_device, snp );
+	EFI_TPL saved_tpl;
 
 	DBGC ( snpdev, "SNPDEV %p SHUTDOWN\n", snpdev );
 
@@ -303,9 +331,16 @@ efi_snp_shutdown ( EFI_SIMPLE_NETWORK_PROTOCOL *snp ) {
 	if ( efi_snp_claimed )
 		return EFI_NOT_READY;
 
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+
+	/* Close network device */
 	netdev_close ( snpdev->netdev );
 	efi_snp_set_state ( snpdev );
 	efi_snp_flush ( snpdev );
+
+	/* Restore TPL */
+	bs->RestoreTPL ( saved_tpl );
 
 	return 0;
 }
@@ -509,8 +544,10 @@ efi_snp_nvdata ( EFI_SIMPLE_NETWORK_PROTOCOL *snp, BOOLEAN read,
 static EFI_STATUS EFIAPI
 efi_snp_get_status ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		     UINT32 *interrupts, VOID **txbuf ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev =
 		container_of ( snp, struct efi_snp_device, snp );
+	EFI_TPL saved_tpl;
 
 	DBGC2 ( snpdev, "SNPDEV %p GET_STATUS", snpdev );
 
@@ -519,6 +556,9 @@ efi_snp_get_status ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		DBGC2 ( snpdev, "\n" );
 		return EFI_NOT_READY;
 	}
+
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
 
 	/* Poll the network device */
 	efi_snp_poll ( snpdev );
@@ -542,6 +582,9 @@ efi_snp_get_status ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		DBGC2 ( snpdev, " TX:%p", *txbuf );
 	}
 
+	/* Restore TPL */
+	bs->RestoreTPL ( saved_tpl );
+
 	DBGC2 ( snpdev, "\n" );
 	return 0;
 }
@@ -563,12 +606,14 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		   UINTN ll_header_len, UINTN len, VOID *data,
 		   EFI_MAC_ADDRESS *ll_src, EFI_MAC_ADDRESS *ll_dest,
 		   UINT16 *net_proto ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev =
 		container_of ( snp, struct efi_snp_device, snp );
 	struct ll_protocol *ll_protocol = snpdev->netdev->ll_protocol;
 	struct io_buffer *iobuf;
 	size_t payload_len;
 	unsigned int tx_fill;
+	EFI_TPL saved_tpl;
 	int rc;
 
 	DBGC2 ( snpdev, "SNPDEV %p TRANSMIT %p+%lx", snpdev, data,
@@ -589,8 +634,13 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	DBGC2 ( snpdev, "\n" );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( efi_snp_claimed )
-		return EFI_NOT_READY;
+	if ( efi_snp_claimed ) {
+		rc = -EAGAIN;
+		goto err_claimed;
+	}
+
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
 
 	/* Sanity checks */
 	if ( ll_header_len ) {
@@ -674,6 +724,9 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	snpdev->tx[ snpdev->tx_prod++ % EFI_SNP_NUM_TX ] = data;
 	snpdev->interrupts |= EFI_SIMPLE_NETWORK_TRANSMIT_INTERRUPT;
 
+	/* Restore TPL */
+	bs->RestoreTPL ( saved_tpl );
+
 	return 0;
 
  err_ring_full:
@@ -682,6 +735,8 @@ efi_snp_transmit ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	free_iob ( iobuf );
  err_alloc_iob:
  err_sanity:
+	bs->RestoreTPL ( saved_tpl );
+ err_claimed:
 	return EFIRC ( rc );
 }
 
@@ -702,6 +757,7 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 		  UINTN *ll_header_len, UINTN *len, VOID *data,
 		  EFI_MAC_ADDRESS *ll_src, EFI_MAC_ADDRESS *ll_dest,
 		  UINT16 *net_proto ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev =
 		container_of ( snp, struct efi_snp_device, snp );
 	struct ll_protocol *ll_protocol = snpdev->netdev->ll_protocol;
@@ -710,30 +766,42 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	const void *iob_ll_src;
 	uint16_t iob_net_proto;
 	unsigned int iob_flags;
+	size_t copy_len;
+	EFI_TPL saved_tpl;
 	int rc;
 
 	DBGC2 ( snpdev, "SNPDEV %p RECEIVE %p(+%lx)", snpdev, data,
 		( ( unsigned long ) *len ) );
 
 	/* Fail if net device is currently claimed for use by iPXE */
-	if ( efi_snp_claimed )
-		return EFI_NOT_READY;
+	if ( efi_snp_claimed ) {
+		rc = -EAGAIN;
+		goto err_claimed;
+	}
+
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
 
 	/* Poll the network device */
 	efi_snp_poll ( snpdev );
 
-	/* Dequeue a packet, if one is available */
+	/* Check for an available packet */
 	iobuf = list_first_entry ( &snpdev->rx, struct io_buffer, list );
 	if ( ! iobuf ) {
 		DBGC2 ( snpdev, "\n" );
 		rc = -EAGAIN;
 		goto out_no_packet;
 	}
-	list_del ( &iobuf->list );
 	DBGC2 ( snpdev, "+%zx\n", iob_len ( iobuf ) );
 
-	/* Return packet to caller */
-	memcpy ( data, iobuf->data, iob_len ( iobuf ) );
+	/* Dequeue packet */
+	list_del ( &iobuf->list );
+
+	/* Return packet to caller, truncating to buffer length */
+	copy_len = iob_len ( iobuf );
+	if ( copy_len > *len )
+		copy_len = *len;
+	memcpy ( data, iobuf->data, copy_len );
 	*len = iob_len ( iobuf );
 
 	/* Attempt to decode link-layer header */
@@ -755,11 +823,14 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	if ( net_proto )
 		*net_proto = ntohs ( iob_net_proto );
 
-	rc = 0;
+	/* Check buffer length */
+	rc = ( ( copy_len == *len ) ? 0 : -ERANGE );
 
  out_bad_ll_header:
 	free_iob ( iobuf );
  out_no_packet:
+	bs->RestoreTPL ( saved_tpl );
+ err_claimed:
 	return EFIRC ( rc );
 }
 
@@ -771,7 +842,9 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
  */
 static VOID EFIAPI efi_snp_wait_for_packet ( EFI_EVENT event __unused,
 					     VOID *context ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev = context;
+	EFI_TPL saved_tpl;
 
 	DBGCP ( snpdev, "SNPDEV %p WAIT_FOR_PACKET\n", snpdev );
 
@@ -783,8 +856,14 @@ static VOID EFIAPI efi_snp_wait_for_packet ( EFI_EVENT event __unused,
 	if ( efi_snp_claimed )
 		return;
 
+	/* Raise TPL */
+	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+
 	/* Poll the network device */
 	efi_snp_poll ( snpdev );
+
+	/* Restore TPL */
+	bs->RestoreTPL ( saved_tpl );
 }
 
 /** SNP interface */
@@ -1888,7 +1967,12 @@ struct efi_snp_device * last_opened_snpdev ( void ) {
  * @v delta		Claim count change
  */
 void efi_snp_add_claim ( int delta ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev;
+
+	/* Raise TPL if we are about to claim devices */
+	if ( ! efi_snp_claimed )
+		efi_snp_old_tpl = bs->RaiseTPL ( TPL_CALLBACK );
 
 	/* Claim SNP devices */
 	efi_snp_claimed += delta;
@@ -1897,4 +1981,8 @@ void efi_snp_add_claim ( int delta ) {
 	/* Update SNP mode state for each interface */
 	list_for_each_entry ( snpdev, &efi_snp_devices, list )
 		efi_snp_set_state ( snpdev );
+
+	/* Restore TPL if we have released devices */
+	if ( ! efi_snp_claimed )
+		bs->RestoreTPL ( efi_snp_old_tpl );
 }

@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/socket.h>
 #include <ipxe/in.h>
 #include <ipxe/image.h>
+#include <ipxe/ocsp.h>
 #include <ipxe/x509.h>
 #include <config/crypto.h>
 
@@ -1362,8 +1363,7 @@ int x509_validate ( struct x509_certificate *cert,
 	}
 
 	/* Fail if OCSP is required */
-	if ( cert->extensions.auth_info.ocsp.uri.len &&
-	     ( ! cert->extensions.auth_info.ocsp.good ) ) {
+	if ( ocsp_required ( cert ) ) {
 		DBGC ( cert, "X509 %p \"%s\" requires an OCSP check\n",
 		       cert, x509_name ( cert ) );
 		return -EACCES_OCSP_REQUIRED;

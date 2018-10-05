@@ -638,6 +638,9 @@ static int efi_block_boot ( unsigned int drive, const char *filename ) {
 		goto err_sandev_find;
 	}
 
+	/* Release SNP devices */
+	efi_snp_release();
+
 	/* Connect all possible protocols */
 	efi_block_connect ( sandev );
 
@@ -673,6 +676,7 @@ static int efi_block_boot ( unsigned int drive, const char *filename ) {
 
 	bs->FreePool ( handles );
  err_locate_file_systems:
+	efi_snp_claim();
  err_sandev_find:
 	return rc;
 }

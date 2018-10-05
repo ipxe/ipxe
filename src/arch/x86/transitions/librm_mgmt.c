@@ -13,6 +13,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/profile.h>
 #include <realmode.h>
 #include <pic8259.h>
+#include <ipxe/shell.h>
 
 /*
  * This file provides functions for managing librm.
@@ -42,6 +43,9 @@ idt64[NUM_INT] __attribute__ (( aligned ( 16 ) ));
 struct idtr64 idtr64 = {
 	.limit = ( sizeof ( idt64 ) - 1 ),
 };
+
+/** Length of stack dump */
+#define STACK_DUMP_LEN 128
 
 /** Timer interrupt profiler */
 static struct profiler timer_irq_profiler __profiler = { .name = "irq.timer" };
@@ -160,13 +164,99 @@ static struct profiler * interrupt_profiler ( int intr ) {
 }
 
 /**
+ * Display interrupt stack dump (for debugging)
+ *
+ * @v intr		Interrupt number
+ * @v frame32		32-bit interrupt wrapper stack frame (or NULL)
+ * @v frame64		64-bit interrupt wrapper stack frame (or NULL)
+ */
+static __attribute__ (( unused )) void
+interrupt_dump ( int intr, struct interrupt_frame32 *frame32,
+		 struct interrupt_frame64 *frame64 ) {
+	unsigned long sp;
+	void *stack;
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Print register dump */
+	if ( ( sizeof ( physaddr_t ) <= sizeof ( uint32_t ) ) || frame32 ) {
+		sp = ( frame32->esp + sizeof ( *frame32 ) -
+		       offsetof ( typeof ( *frame32 ), esp ) );
+		DBGC ( &intr, "INT%d at %04x:%08x (stack %04x:%08lx):\n",
+		       intr, frame32->cs, frame32->eip, frame32->ss, sp );
+		DBGC ( &intr, "cs = %04x  ds = %04x  es = %04x  fs = %04x  "
+		       "gs = %04x  ss = %04x\n", frame32->cs, frame32->ds,
+		       frame32->es, frame32->fs, frame32->gs, frame32->ss );
+		DBGC ( &intr, "eax = %08x  ebx = %08x  ecx = %08x  "
+		       "edx = %08x  flg = %08x\n", frame32->eax, frame32->ebx,
+		       frame32->ecx, frame32->edx, frame32->eflags );
+		DBGC ( &intr, "esi = %08x  edi = %08x  ebp = %08x  "
+		       "esp = %08lx  eip = %08x\n", frame32->esi, frame32->edi,
+		       frame32->ebp, sp, frame32->eip );
+		stack = ( ( ( void * ) frame32 ) + sizeof ( *frame32 ) );
+	} else {
+		DBGC ( &intr, "INT%d at %04llx:%016llx (stack "
+		       "%04llx:%016llx):\n", intr,
+		       ( ( unsigned long long ) frame64->cs ),
+		       ( ( unsigned long long ) frame64->rip ),
+		       ( ( unsigned long long ) frame64->ss ),
+		       ( ( unsigned long long ) frame64->rsp ) );
+		DBGC ( &intr, "rax = %016llx  rbx = %016llx  rcx = %016llx\n",
+		       ( ( unsigned long long ) frame64->rax ),
+		       ( ( unsigned long long ) frame64->rbx ),
+		       ( ( unsigned long long ) frame64->rcx ) );
+		DBGC ( &intr, "rdx = %016llx  rsi = %016llx  rdi = %016llx\n",
+		       ( ( unsigned long long ) frame64->rdx ),
+		       ( ( unsigned long long ) frame64->rsi ),
+		       ( ( unsigned long long ) frame64->rdi ) );
+		DBGC ( &intr, "rbp = %016llx  rsp = %016llx  flg = %016llx\n",
+		       ( ( unsigned long long ) frame64->rbp ),
+		       ( ( unsigned long long ) frame64->rsp ),
+		       ( ( unsigned long long ) frame64->rflags ) );
+		DBGC ( &intr, "r8  = %016llx  r9  = %016llx  r10 = %016llx\n",
+		       ( ( unsigned long long ) frame64->r8 ),
+		       ( ( unsigned long long ) frame64->r9 ),
+		       ( ( unsigned long long ) frame64->r10 ) );
+		DBGC ( &intr, "r11 = %016llx  r12 = %016llx  r13 = %016llx\n",
+		       ( ( unsigned long long ) frame64->r11 ),
+		       ( ( unsigned long long ) frame64->r12 ),
+		       ( ( unsigned long long ) frame64->r13 ) );
+		DBGC ( &intr, "r14 = %016llx  r15 = %016llx\n",
+		       ( ( unsigned long long ) frame64->r14 ),
+		       ( ( unsigned long long ) frame64->r15 ) );
+		sp = frame64->rsp;
+		stack = phys_to_virt ( sp );
+	}
+
+	/* Print stack dump */
+	DBGC_HDA ( &intr, sp, stack, STACK_DUMP_LEN );
+}
+
+/**
  * Interrupt handler
  *
  * @v intr		Interrupt number
+ * @v frame32		32-bit interrupt wrapper stack frame (or NULL)
+ * @v frame64		64-bit interrupt wrapper stack frame (or NULL)
+ * @v frame		Interrupt wrapper stack frame
  */
-void __attribute__ (( regparm ( 1 ) )) interrupt ( int intr ) {
+void __attribute__ (( regparm ( 3 ) ))
+interrupt ( int intr, struct interrupt_frame32 *frame32,
+	    struct interrupt_frame64 *frame64 ) {
 	struct profiler *profiler = interrupt_profiler ( intr );
 	uint32_t discard_eax;
+
+	/* Trap CPU exceptions if debugging is enabled.  Note that we
+	 * cannot treat INT8+ as exceptions, since we are not
+	 * permitted to rebase the PIC.
+	 */
+	if ( DBG_LOG && ( intr < IRQ_INT ( 0 ) ) ) {
+		interrupt_dump ( intr, frame32, frame64 );
+		DBG ( "CPU exception: dropping to emergency shell\n" );
+		shell();
+	}
 
 	/* Reissue interrupt in real mode */
 	profile_start ( profiler );

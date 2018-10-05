@@ -111,13 +111,20 @@ static void downloader_finished ( struct downloader *downloader, int rc ) {
  */
 static int downloader_progress ( struct downloader *downloader,
 				 struct job_progress *progress ) {
+	int rc;
+
+	/* Allow data transfer to provide an accurate description */
+	if ( ( rc = job_progress ( &downloader->xfer, progress ) ) != 0 )
+		return rc;
 
 	/* This is not entirely accurate, since downloaded data may
 	 * arrive out of order (e.g. with multicast protocols), but
 	 * it's a reasonable first approximation.
 	 */
-	progress->completed = downloader->buffer.pos;
-	progress->total = downloader->buffer.len;
+	if ( ! progress->total ) {
+		progress->completed = downloader->buffer.pos;
+		progress->total = downloader->buffer.len;
+	}
 
 	return 0;
 }

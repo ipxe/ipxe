@@ -363,7 +363,7 @@ static inline int golan_set_hca_cap(struct golan *golan)
 	DBGC( golan , "%s caps.log_pg_sz = %d\n", __FUNCTION__, golan->caps.log_pg_sz);
 	DBGC( golan , "%s caps.log_uar_sz = %d\n", __FUNCTION__, be32_to_cpu(golan->caps.uar_page_sz));
 	golan->caps.uar_page_sz = 0;
-
+	golan->caps.log_max_qp = GOLAN_LOG_MAX_QP;
 
 	memcpy(((struct golan_hca_cap *)GET_INBOX(golan, GEN_MBOX)),
 		   &(golan->caps),
@@ -2586,8 +2586,6 @@ struct flexboot_nodnic_callbacks shomron_nodnic_callbacks = {
 	.tx_uar_send_doorbell_fn = shomron_tx_uar_send_db,
 };
 
-static int shomron_nodnic_supported = 0;
-
 static int shomron_nodnic_is_supported ( struct pci_device *pci ) {
 	if ( DEVICE_IS_CIB ( pci->device ) )
 		return 0;
@@ -2607,8 +2605,7 @@ static int golan_probe ( struct pci_device *pci ) {
 		goto probe_done;
 	}
 
-	shomron_nodnic_supported = shomron_nodnic_is_supported ( pci );
-	if ( shomron_nodnic_supported ) {
+	if ( shomron_nodnic_is_supported ( pci ) ) {
 		DBG ( "%s: Using NODNIC driver\n", __FUNCTION__ );
 		rc = flexboot_nodnic_probe ( pci, &shomron_nodnic_callbacks, NULL );
 	} else {
@@ -2624,7 +2621,7 @@ probe_done:
 static void golan_remove ( struct pci_device *pci ) {
 	DBG ( "%s: start\n", __FUNCTION__ );
 
-	if ( ! shomron_nodnic_supported ) {
+	if ( ! shomron_nodnic_is_supported ( pci ) ) {
 		DBG ( "%s: Using normal driver remove\n", __FUNCTION__ );
 		golan_remove_normal ( pci );
 		return;

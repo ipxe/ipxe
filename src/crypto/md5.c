@@ -66,11 +66,11 @@ static const uint32_t k[64] = {
 };
 
 /** MD5 shift amounts */
-static const uint8_t r[64] = {
-	7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-	5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
-	4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-	6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+static const uint8_t r[4][4] = {
+	{  7, 12, 17, 22 },
+	{  5,  9, 14, 20 },
+	{  4, 11, 16, 23 },
+	{  6, 10, 15, 21 },
 };
 
 /**
@@ -174,6 +174,7 @@ static void md5_digest ( struct md5_context *context ) {
 	uint32_t g;
 	uint32_t temp;
 	struct md5_step *step;
+	unsigned int round;
 	unsigned int i;
 
 	/* Sanity checks */
@@ -201,19 +202,21 @@ static void md5_digest ( struct md5_context *context ) {
 
 	/* Main loop */
 	for ( i = 0 ; i < 64 ; i++ ) {
-		step = &md5_steps[ i / 16 ];
+		round = ( i / 16 );
+		step = &md5_steps[round];
 		f = step->f ( &u.v );
 		g = ( ( ( step->coefficient * i ) + step->constant ) % 16 );
 		temp = *d;
 		*d = *c;
 		*c = *b;
-		*b = ( *b + rol32 ( ( *a + f + k[i] + w[g] ), r[i] ) );
+		*b = ( *b + rol32 ( ( *a + f + k[i] + w[g] ),
+				    r[round][ i % 4 ] ) );
 		*a = temp;
 		DBGC2 ( context, "%2d : %08x %08x %08x %08x\n",
 			i, *a, *b, *c, *d );
 	}
 
-	/* Add chunk to hash and convert back to big-endian */
+	/* Add chunk to hash and convert back to little-endian */
 	for ( i = 0 ; i < 4 ; i++ ) {
 		context->ddd.dd.digest.h[i] =
 			cpu_to_le32 ( context->ddd.dd.digest.h[i] +

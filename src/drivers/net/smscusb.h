@@ -151,7 +151,9 @@ struct smscusb_device {
 	/** USB network device */
 	struct usbnet_device usbnet;
 	/** MII interface */
-	struct mii_interface mii;
+	struct mii_interface mdio;
+	/** MII device */
+	struct mii_device mii;
 	/** MII register base */
 	uint16_t mii_base;
 	/** PHY interrupt source register */
@@ -275,7 +277,8 @@ static inline __attribute__ (( always_inline )) void
 smscusb_mii_init ( struct smscusb_device *smscusb, unsigned int mii_base,
 		   unsigned int phy_source ) {
 
-	mii_init ( &smscusb->mii, &smscusb_mii_operations );
+	mdio_init ( &smscusb->mdio, &smscusb_mii_operations );
+	mii_init ( &smscusb->mii, &smscusb->mdio, 0 );
 	smscusb->mii_base = mii_base;
 	smscusb->phy_source = phy_source;
 }

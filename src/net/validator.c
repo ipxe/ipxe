@@ -239,6 +239,10 @@ static int validator_start_download ( struct validator *validator,
 	/* Determine cross-signed certificate source */
 	fetch_string_setting_copy ( NULL, &crosscert_setting, &crosscert_copy );
 	crosscert = ( crosscert_copy ? crosscert_copy : crosscert_default );
+	if ( ! crosscert[0] ) {
+		rc = -EINVAL;
+		goto err_check_uri_string;
+	}
 
 	/* Allocate URI string */
 	uri_string_len = ( strlen ( crosscert ) + 22 /* "/%08x.der?subject=" */
@@ -277,6 +281,7 @@ static int validator_start_download ( struct validator *validator,
  err_open_uri_string:
 	free ( uri_string );
  err_alloc_uri_string:
+ err_check_uri_string:
 	free ( crosscert_copy );
 	return rc;
 }
@@ -483,8 +488,7 @@ static void validator_step ( struct validator *validator ) {
 		/* The issuer is valid, but this certificate is not
 		 * yet valid.  If OCSP is applicable, start it.
 		 */
-		if ( cert->extensions.auth_info.ocsp.uri.len &&
-		     ( ! cert->extensions.auth_info.ocsp.good ) ) {
+		if ( ocsp_required ( cert ) ) {
 			/* Start OCSP */
 			if ( ( rc = validator_start_ocsp ( validator, cert,
 							   issuer ) ) != 0 ) {

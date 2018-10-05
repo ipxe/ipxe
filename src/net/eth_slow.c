@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <byteswap.h>
 #include <errno.h>
+#include <ipxe/timer.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/if_ether.h>
@@ -91,7 +92,7 @@ eth_slow_marker_tlv_name ( uint8_t type ) {
  * @ret name		LACP state name
  */
 static const char * eth_slow_lacp_state_name ( uint8_t state ) {
-	static char state_chars[] = "AFGSRTLX";
+	static char state_chars[] = "AFGSCDLX";
 	unsigned int i;
 
 	for ( i = 0 ; i < 8 ; i++ ) {
@@ -148,8 +149,29 @@ static int eth_slow_lacp_rx ( struct io_buffer *iobuf,
 			      struct net_device *netdev ) {
 	union eth_slow_packet *eth_slow = iobuf->data;
 	struct eth_slow_lacp *lacp = &eth_slow->lacp;
+	unsigned int interval;
 
 	eth_slow_lacp_dump ( iobuf, netdev, "RX" );
+
+	/* If partner is not in sync, collecting, and distributing,
+	 * then block the link until after the next expected LACP
+	 * packet.
+	 */
+	if ( ~lacp->actor.state & ( LACP_STATE_IN_SYNC |
+				    LACP_STATE_COLLECTING |
+				    LACP_STATE_DISTRIBUTING ) ) {
+		DBGC ( netdev, "SLOW %s LACP partner is down\n", netdev->name );
+		interval = ( ( lacp->actor.state & LACP_STATE_FAST ) ?
+			     ( ( LACP_INTERVAL_FAST + 1 ) * TICKS_PER_SEC ) :
+			     ( ( LACP_INTERVAL_SLOW + 1 ) * TICKS_PER_SEC ) );
+		netdev_link_block ( netdev, interval );
+	} else {
+		if ( netdev_link_blocked ( netdev ) ) {
+			DBGC ( netdev, "SLOW %s LACP partner is up\n",
+			       netdev->name );
+		}
+		netdev_link_unblock ( netdev );
+	}
 
 	/* Build response */
 	memset ( lacp->reserved, 0, sizeof ( lacp->reserved ) );

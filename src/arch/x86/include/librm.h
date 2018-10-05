@@ -254,9 +254,13 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 #define CODE_DEFAULT ".code32"
 #endif
 
+/* LINE_SYMBOL: declare a symbol for the current source code line */
+#define LINE_SYMBOL _S2 ( OBJECT ) "__line_" _S2 ( __LINE__ ) "__%=:"
+
 /* TEXT16_CODE: declare a fragment of code that resides in .text16 */
 #define TEXT16_CODE( asm_code_str )			\
 	".section \".text16\", \"ax\", @progbits\n\t"	\
+	"\n" LINE_SYMBOL "\n\t"				\
 	".code16\n\t"					\
 	asm_code_str "\n\t"				\
 	CODE_DEFAULT "\n\t"				\
@@ -276,6 +280,7 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 	"push $1f\n\t"					\
 	"call phys_call\n\t"				\
 	".section \".text.phys\", \"ax\", @progbits\n\t"\
+	"\n" LINE_SYMBOL "\n\t"				\
 	".code32\n\t"					\
 	"\n1:\n\t"					\
 	asm_code_str					\
@@ -375,6 +380,50 @@ struct interrupt_vector {
 
 /** "jmp" instruction */
 #define JMP_INSN 0xe9
+
+/** 32-bit interrupt wrapper stack frame */
+struct interrupt_frame32 {
+	uint32_t esp;
+	uint32_t ss;
+	uint32_t gs;
+	uint32_t fs;
+	uint32_t es;
+	uint32_t ds;
+	uint32_t ebp;
+	uint32_t edi;
+	uint32_t esi;
+	uint32_t edx;
+	uint32_t ecx;
+	uint32_t ebx;
+	uint32_t eax;
+	uint32_t eip;
+	uint32_t cs;
+	uint32_t eflags;
+} __attribute__ (( packed ));
+
+/** 64-bit interrupt wrapper stack frame */
+struct interrupt_frame64 {
+	uint64_t r15;
+	uint64_t r14;
+	uint64_t r13;
+	uint64_t r12;
+	uint64_t r11;
+	uint64_t r10;
+	uint64_t r9;
+	uint64_t r8;
+	uint64_t rbp;
+	uint64_t rdi;
+	uint64_t rsi;
+	uint64_t rdx;
+	uint64_t rcx;
+	uint64_t rbx;
+	uint64_t rax;
+	uint64_t rip;
+	uint64_t cs;
+	uint64_t rflags;
+	uint64_t rsp;
+	uint64_t ss;
+} __attribute__ (( packed ));
 
 extern void set_interrupt_vector ( unsigned int intr, void *vector );
 

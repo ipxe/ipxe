@@ -175,9 +175,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 	__einfo_uniqify ( EINFO_EPROTO, 0x01,				\
 			  "Illegal protocol version upgrade" )
 
-static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
+static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				const void *data, size_t len );
-static void tls_clear_cipher ( struct tls_session *tls,
+static void tls_clear_cipher ( struct tls_connection *tls,
 			       struct tls_cipherspec *cipherspec );
 
 /******************************************************************************
@@ -225,12 +225,12 @@ static void tls_set_uint24 ( tls24_t *field24, unsigned long value ) {
 }
 
 /**
- * Determine if TLS session is ready for application data
+ * Determine if TLS connection is ready for application data
  *
- * @v tls		TLS session
- * @ret is_ready	TLS session is ready
+ * @v tls		TLS connection
+ * @ret is_ready	TLS connection is ready
  */
-static int tls_ready ( struct tls_session *tls ) {
+static int tls_ready ( struct tls_connection *tls ) {
 	return ( ( ! is_pending ( &tls->client_negotiation ) ) &&
 		 ( ! is_pending ( &tls->server_negotiation ) ) );
 }
@@ -308,13 +308,13 @@ struct rsa_digestinfo_prefix rsa_md5_sha1_prefix __rsa_digestinfo_prefix = {
  */
 
 /**
- * Free TLS session
+ * Free TLS connection
  *
  * @v refcnt		Reference counter
  */
 static void free_tls ( struct refcnt *refcnt ) {
-	struct tls_session *tls =
-		container_of ( refcnt, struct tls_session, refcnt );
+	struct tls_connection *tls =
+		container_of ( refcnt, struct tls_connection, refcnt );
 	struct io_buffer *iobuf;
 	struct io_buffer *tmp;
 
@@ -335,12 +335,12 @@ static void free_tls ( struct refcnt *refcnt ) {
 }
 
 /**
- * Finish with TLS session
+ * Finish with TLS connection
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v rc		Status code
  */
-static void tls_close ( struct tls_session *tls, int rc ) {
+static void tls_close ( struct tls_connection *tls, int rc ) {
 
 	/* Remove pending operations, if applicable */
 	pending_put ( &tls->client_negotiation );
@@ -365,12 +365,12 @@ static void tls_close ( struct tls_session *tls, int rc ) {
 /**
  * Generate random data
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Buffer to fill
  * @v len		Length of buffer
  * @ret rc		Return status code
  */
-static int tls_generate_random ( struct tls_session *tls,
+static int tls_generate_random ( struct tls_connection *tls,
 				 void *data, size_t len ) {
 	int rc;
 
@@ -407,7 +407,7 @@ static void tls_hmac_update_va ( struct digest_algorithm *digest,
 /**
  * Generate secure pseudo-random data using a single hash function
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v digest		Hash function to use
  * @v secret		Secret
  * @v secret_len	Length of secret
@@ -415,7 +415,7 @@ static void tls_hmac_update_va ( struct digest_algorithm *digest,
  * @v out_len		Length of output buffer
  * @v seeds		( data, len ) pairs of seed data, terminated by NULL
  */
-static void tls_p_hash_va ( struct tls_session *tls,
+static void tls_p_hash_va ( struct tls_connection *tls,
 			    struct digest_algorithm *digest,
 			    void *secret, size_t secret_len,
 			    void *out, size_t out_len,
@@ -476,15 +476,15 @@ static void tls_p_hash_va ( struct tls_session *tls,
 /**
  * Generate secure pseudo-random data
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v secret		Secret
  * @v secret_len	Length of secret
  * @v out		Output buffer
  * @v out_len		Length of output buffer
  * @v ...		( data, len ) pairs of seed data, terminated by NULL
  */
-static void tls_prf ( struct tls_session *tls, void *secret, size_t secret_len,
-		      void *out, size_t out_len, ... ) {
+static void tls_prf ( struct tls_connection *tls, void *secret,
+		      size_t secret_len, void *out, size_t out_len, ... ) {
 	va_list seeds;
 	va_list tmp;
 	size_t subsecret_len;
@@ -553,12 +553,12 @@ static void tls_prf ( struct tls_session *tls, void *secret, size_t secret_len,
 /**
  * Generate master secret
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  *
  * The pre-master secret and the client and server random values must
  * already be known.
  */
-static void tls_generate_master_secret ( struct tls_session *tls ) {
+static void tls_generate_master_secret ( struct tls_connection *tls ) {
 	DBGC ( tls, "TLS %p pre-master-secret:\n", tls );
 	DBGC_HD ( tls, &tls->pre_master_secret,
 		  sizeof ( tls->pre_master_secret ) );
@@ -581,11 +581,11 @@ static void tls_generate_master_secret ( struct tls_session *tls ) {
 /**
  * Generate key material
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  *
  * The master secret must already be known.
  */
-static int tls_generate_keys ( struct tls_session *tls ) {
+static int tls_generate_keys ( struct tls_connection *tls ) {
 	struct tls_cipherspec *tx_cipherspec = &tls->tx_cipherspec_pending;
 	struct tls_cipherspec *rx_cipherspec = &tls->rx_cipherspec_pending;
 	size_t hash_size = tx_cipherspec->suite->digest->digestsize;
@@ -701,7 +701,7 @@ tls_find_cipher_suite ( unsigned int cipher_suite ) {
  *
  * @v cipherspec	TLS cipher specification
  */
-static void tls_clear_cipher ( struct tls_session *tls __unused,
+static void tls_clear_cipher ( struct tls_connection *tls __unused,
 			       struct tls_cipherspec *cipherspec ) {
 
 	if ( cipherspec->suite ) {
@@ -716,12 +716,12 @@ static void tls_clear_cipher ( struct tls_session *tls __unused,
 /**
  * Set cipher suite
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v cipherspec	TLS cipher specification
  * @v suite		Cipher suite
  * @ret rc		Return status code
  */
-static int tls_set_cipher ( struct tls_session *tls,
+static int tls_set_cipher ( struct tls_connection *tls,
 			    struct tls_cipherspec *cipherspec,
 			    struct tls_cipher_suite *suite ) {
 	struct pubkey_algorithm *pubkey = suite->pubkey;
@@ -759,11 +759,11 @@ static int tls_set_cipher ( struct tls_session *tls,
 /**
  * Select next cipher suite
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v cipher_suite	Cipher suite specification
  * @ret rc		Return status code
  */
-static int tls_select_cipher ( struct tls_session *tls,
+static int tls_select_cipher ( struct tls_connection *tls,
 			       unsigned int cipher_suite ) {
 	struct tls_cipher_suite *suite;
 	int rc;
@@ -794,12 +794,12 @@ static int tls_select_cipher ( struct tls_session *tls,
 /**
  * Activate next cipher suite
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v pending		Pending cipher specification
  * @v active		Active cipher specification to replace
  * @ret rc		Return status code
  */
-static int tls_change_cipher ( struct tls_session *tls,
+static int tls_change_cipher ( struct tls_connection *tls,
 			       struct tls_cipherspec *pending,
 			       struct tls_cipherspec *active ) {
 
@@ -858,11 +858,11 @@ tls_signature_hash_algorithm ( struct pubkey_algorithm *pubkey,
 /**
  * Add handshake record to verification hash
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Handshake record
  * @v len		Length of handshake record
  */
-static void tls_add_handshake ( struct tls_session *tls,
+static void tls_add_handshake ( struct tls_connection *tls,
 				const void *data, size_t len ) {
 
 	digest_update ( &md5_sha1_algorithm, tls->handshake_md5_sha1_ctx,
@@ -874,13 +874,13 @@ static void tls_add_handshake ( struct tls_session *tls,
 /**
  * Calculate handshake verification hash
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v out		Output buffer
  *
  * Calculates the MD5+SHA1 or SHA256 digest over all handshake
  * messages seen so far.
  */
-static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
+static void tls_verify_handshake ( struct tls_connection *tls, void *out ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
 	uint8_t ctx[ digest->ctxsize ];
 
@@ -898,9 +898,9 @@ static void tls_verify_handshake ( struct tls_session *tls, void *out ) {
 /**
  * Restart negotiation
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  */
-static void tls_restart ( struct tls_session *tls ) {
+static void tls_restart ( struct tls_connection *tls ) {
 
 	/* Sanity check */
 	assert ( ! tls->tx_pending );
@@ -922,21 +922,21 @@ static void tls_restart ( struct tls_session *tls ) {
 /**
  * Resume TX state machine
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  */
-static void tls_tx_resume ( struct tls_session *tls ) {
+static void tls_tx_resume ( struct tls_connection *tls ) {
 	process_add ( &tls->process );
 }
 
 /**
  * Transmit Handshake record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext record
  * @v len		Length of plaintext record
  * @ret rc		Return status code
  */
-static int tls_send_handshake ( struct tls_session *tls,
+static int tls_send_handshake ( struct tls_connection *tls,
 				void *data, size_t len ) {
 
 	/* Add to handshake digest */
@@ -949,10 +949,10 @@ static int tls_send_handshake ( struct tls_session *tls,
 /**
  * Transmit Client Hello record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret rc		Return status code
  */
-static int tls_send_client_hello ( struct tls_session *tls ) {
+static int tls_send_client_hello ( struct tls_connection *tls ) {
 	struct {
 		uint32_t type_length;
 		uint16_t version;
@@ -1049,10 +1049,10 @@ static int tls_send_client_hello ( struct tls_session *tls ) {
 /**
  * Transmit Certificate record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret rc		Return status code
  */
-static int tls_send_certificate ( struct tls_session *tls ) {
+static int tls_send_certificate ( struct tls_connection *tls ) {
 	struct {
 		uint32_t type_length;
 		tls24_t length;
@@ -1095,10 +1095,10 @@ static int tls_send_certificate ( struct tls_session *tls ) {
 /**
  * Transmit Client Key Exchange record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret rc		Return status code
  */
-static int tls_send_client_key_exchange ( struct tls_session *tls ) {
+static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	size_t max_len = pubkey_max_len ( pubkey, cipherspec->pubkey_ctx );
@@ -1139,10 +1139,10 @@ static int tls_send_client_key_exchange ( struct tls_session *tls ) {
 /**
  * Transmit Certificate Verify record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret rc		Return status code
  */
-static int tls_send_certificate_verify ( struct tls_session *tls ) {
+static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
 	struct x509_certificate *cert = tls->cert;
 	struct pubkey_algorithm *pubkey = cert->signature_algorithm->pubkey;
@@ -1229,10 +1229,10 @@ static int tls_send_certificate_verify ( struct tls_session *tls ) {
 /**
  * Transmit Change Cipher record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret rc		Return status code
  */
-static int tls_send_change_cipher ( struct tls_session *tls ) {
+static int tls_send_change_cipher ( struct tls_connection *tls ) {
 	static const uint8_t change_cipher[1] = { 1 };
 	return tls_send_plaintext ( tls, TLS_TYPE_CHANGE_CIPHER,
 				    change_cipher, sizeof ( change_cipher ) );
@@ -1241,10 +1241,10 @@ static int tls_send_change_cipher ( struct tls_session *tls ) {
 /**
  * Transmit Finished record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret rc		Return status code
  */
-static int tls_send_finished ( struct tls_session *tls ) {
+static int tls_send_finished ( struct tls_connection *tls ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
 	struct {
 		uint32_t type_length;
@@ -1281,12 +1281,12 @@ static int tls_send_finished ( struct tls_session *tls ) {
 /**
  * Receive new Change Cipher record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext record
  * @v len		Length of plaintext record
  * @ret rc		Return status code
  */
-static int tls_new_change_cipher ( struct tls_session *tls,
+static int tls_new_change_cipher ( struct tls_connection *tls,
 				   const void *data, size_t len ) {
 	int rc;
 
@@ -1310,12 +1310,12 @@ static int tls_new_change_cipher ( struct tls_session *tls,
 /**
  * Receive new Alert record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext record
  * @v len		Length of plaintext record
  * @ret rc		Return status code
  */
-static int tls_new_alert ( struct tls_session *tls, const void *data,
+static int tls_new_alert ( struct tls_connection *tls, const void *data,
 			   size_t len ) {
 	const struct {
 		uint8_t level;
@@ -1349,12 +1349,12 @@ static int tls_new_alert ( struct tls_session *tls, const void *data,
 /**
  * Receive new Hello Request handshake record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext handshake record
  * @v len		Length of plaintext handshake record
  * @ret rc		Return status code
  */
-static int tls_new_hello_request ( struct tls_session *tls,
+static int tls_new_hello_request ( struct tls_connection *tls,
 				   const void *data __unused,
 				   size_t len __unused ) {
 
@@ -1380,12 +1380,12 @@ static int tls_new_hello_request ( struct tls_session *tls,
 /**
  * Receive new Server Hello handshake record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext handshake record
  * @v len		Length of plaintext handshake record
  * @ret rc		Return status code
  */
-static int tls_new_server_hello ( struct tls_session *tls,
+static int tls_new_server_hello ( struct tls_connection *tls,
 				  const void *data, size_t len ) {
 	const struct {
 		uint16_t version;
@@ -1548,12 +1548,12 @@ static int tls_new_server_hello ( struct tls_session *tls,
 /**
  * Parse certificate chain
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Certificate chain
  * @v len		Length of certificate chain
  * @ret rc		Return status code
  */
-static int tls_parse_chain ( struct tls_session *tls,
+static int tls_parse_chain ( struct tls_connection *tls,
 			     const void *data, size_t len ) {
 	size_t remaining = len;
 	int rc;
@@ -1626,12 +1626,12 @@ static int tls_parse_chain ( struct tls_session *tls,
 /**
  * Receive new Certificate handshake record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext handshake record
  * @v len		Length of plaintext handshake record
  * @ret rc		Return status code
  */
-static int tls_new_certificate ( struct tls_session *tls,
+static int tls_new_certificate ( struct tls_connection *tls,
 				 const void *data, size_t len ) {
 	const struct {
 		tls24_t length;
@@ -1666,12 +1666,12 @@ static int tls_new_certificate ( struct tls_session *tls,
 /**
  * Receive new Certificate Request handshake record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext handshake record
  * @v len		Length of plaintext handshake record
  * @ret rc		Return status code
  */
-static int tls_new_certificate_request ( struct tls_session *tls,
+static int tls_new_certificate_request ( struct tls_connection *tls,
 					 const void *data __unused,
 					 size_t len __unused ) {
 
@@ -1699,12 +1699,12 @@ static int tls_new_certificate_request ( struct tls_session *tls,
 /**
  * Receive new Server Hello Done handshake record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext handshake record
  * @v len		Length of plaintext handshake record
  * @ret rc		Return status code
  */
-static int tls_new_server_hello_done ( struct tls_session *tls,
+static int tls_new_server_hello_done ( struct tls_connection *tls,
 				       const void *data, size_t len ) {
 	const struct {
 		char next[0];
@@ -1732,12 +1732,12 @@ static int tls_new_server_hello_done ( struct tls_session *tls,
 /**
  * Receive new Finished handshake record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext handshake record
  * @v len		Length of plaintext handshake record
  * @ret rc		Return status code
  */
-static int tls_new_finished ( struct tls_session *tls,
+static int tls_new_finished ( struct tls_connection *tls,
 			      const void *data, size_t len ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
 	const struct {
@@ -1776,12 +1776,12 @@ static int tls_new_finished ( struct tls_session *tls,
 /**
  * Receive new Handshake record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v data		Plaintext record
  * @v len		Length of plaintext record
  * @ret rc		Return status code
  */
-static int tls_new_handshake ( struct tls_session *tls,
+static int tls_new_handshake ( struct tls_connection *tls,
 			       const void *data, size_t len ) {
 	size_t remaining = len;
 	int rc;
@@ -1864,15 +1864,15 @@ static int tls_new_handshake ( struct tls_session *tls,
 /**
  * Receive new record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v type		Record type
  * @v rx_data		List of received data buffers
  * @ret rc		Return status code
  */
-static int tls_new_record ( struct tls_session *tls, unsigned int type,
+static int tls_new_record ( struct tls_connection *tls, unsigned int type,
 			    struct list_head *rx_data ) {
 	struct io_buffer *iobuf;
-	int ( * handler ) ( struct tls_session *tls, const void *data,
+	int ( * handler ) ( struct tls_connection *tls, const void *data,
 			    size_t len );
 	int rc;
 
@@ -2010,16 +2010,16 @@ static void tls_hmac ( struct tls_cipherspec *cipherspec,
 /**
  * Allocate and assemble stream-ciphered record from data and MAC portions
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret data		Data
  * @ret len		Length of data
  * @ret digest		MAC digest
  * @ret plaintext_len	Length of plaintext record
  * @ret plaintext	Allocated plaintext record
  */
-static void * __malloc tls_assemble_stream ( struct tls_session *tls,
-				    const void *data, size_t len,
-				    void *digest, size_t *plaintext_len ) {
+static void * __malloc
+tls_assemble_stream ( struct tls_connection *tls, const void *data, size_t len,
+		      void *digest, size_t *plaintext_len ) {
 	size_t mac_len = tls->tx_cipherspec.suite->digest->digestsize;
 	void *plaintext;
 	void *content;
@@ -2045,14 +2045,14 @@ static void * __malloc tls_assemble_stream ( struct tls_session *tls,
 /**
  * Allocate and assemble block-ciphered record from data and MAC portions
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret data		Data
  * @ret len		Length of data
  * @ret digest		MAC digest
  * @ret plaintext_len	Length of plaintext record
  * @ret plaintext	Allocated plaintext record
  */
-static void * tls_assemble_block ( struct tls_session *tls,
+static void * tls_assemble_block ( struct tls_connection *tls,
 				   const void *data, size_t len,
 				   void *digest, size_t *plaintext_len ) {
 	size_t blocksize = tls->tx_cipherspec.suite->cipher->blocksize;
@@ -2093,13 +2093,13 @@ static void * tls_assemble_block ( struct tls_session *tls,
 /**
  * Send plaintext record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v type		Record type
  * @v data		Plaintext record
  * @v len		Length of plaintext record
  * @ret rc		Return status code
  */
-static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
+static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				const void *data, size_t len ) {
 	struct tls_header plaintext_tlshdr;
 	struct tls_header *tlshdr;
@@ -2185,12 +2185,12 @@ static int tls_send_plaintext ( struct tls_session *tls, unsigned int type,
 /**
  * Split stream-ciphered record into data and MAC portions
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v rx_data		List of received data buffers
  * @v mac		MAC to fill in
  * @ret rc		Return status code
  */
-static int tls_split_stream ( struct tls_session *tls,
+static int tls_split_stream ( struct tls_connection *tls,
 			      struct list_head *rx_data, void **mac ) {
 	size_t mac_len = tls->rx_cipherspec.suite->digest->digestsize;
 	struct io_buffer *iobuf;
@@ -2212,12 +2212,12 @@ static int tls_split_stream ( struct tls_session *tls,
 /**
  * Split block-ciphered record into data and MAC portions
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v rx_data		List of received data buffers
  * @v mac		MAC to fill in
  * @ret rc		Return status code
  */
-static int tls_split_block ( struct tls_session *tls,
+static int tls_split_block ( struct tls_connection *tls,
 			     struct list_head *rx_data, void **mac ) {
 	size_t mac_len = tls->rx_cipherspec.suite->digest->digestsize;
 	struct io_buffer *iobuf;
@@ -2270,12 +2270,12 @@ static int tls_split_block ( struct tls_session *tls,
 /**
  * Receive new ciphertext record
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v tlshdr		Record header
  * @v rx_data		List of received data buffers
  * @ret rc		Return status code
  */
-static int tls_new_ciphertext ( struct tls_session *tls,
+static int tls_new_ciphertext ( struct tls_connection *tls,
 				struct tls_header *tlshdr,
 				struct list_head *rx_data ) {
 	struct tls_header plaintext_tlshdr;
@@ -2343,10 +2343,10 @@ static int tls_new_ciphertext ( struct tls_session *tls,
 /**
  * Check flow control window
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret len		Length of window
  */
-static size_t tls_plainstream_window ( struct tls_session *tls ) {
+static size_t tls_plainstream_window ( struct tls_connection *tls ) {
 
 	/* Block window unless we are ready to accept data */
 	if ( ! tls_ready ( tls ) )
@@ -2358,12 +2358,12 @@ static size_t tls_plainstream_window ( struct tls_session *tls ) {
 /**
  * Deliver datagram as raw data
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v iobuf		I/O buffer
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int tls_plainstream_deliver ( struct tls_session *tls,
+static int tls_plainstream_deliver ( struct tls_connection *tls,
 				     struct io_buffer *iobuf,
 				     struct xfer_metadata *meta __unused ) {
 	int rc;
@@ -2385,14 +2385,16 @@ static int tls_plainstream_deliver ( struct tls_session *tls,
 
 /** TLS plaintext stream interface operations */
 static struct interface_operation tls_plainstream_ops[] = {
-	INTF_OP ( xfer_deliver, struct tls_session *, tls_plainstream_deliver ),
-	INTF_OP ( xfer_window, struct tls_session *, tls_plainstream_window ),
-	INTF_OP ( intf_close, struct tls_session *, tls_close ),
+	INTF_OP ( xfer_deliver, struct tls_connection *,
+		  tls_plainstream_deliver ),
+	INTF_OP ( xfer_window, struct tls_connection *,
+		  tls_plainstream_window ),
+	INTF_OP ( intf_close, struct tls_connection *, tls_close ),
 };
 
 /** TLS plaintext stream interface descriptor */
 static struct interface_descriptor tls_plainstream_desc =
-	INTF_DESC_PASSTHRU ( struct tls_session, plainstream,
+	INTF_DESC_PASSTHRU ( struct tls_connection, plainstream,
 			     tls_plainstream_ops, cipherstream );
 
 /******************************************************************************
@@ -2405,10 +2407,10 @@ static struct interface_descriptor tls_plainstream_desc =
 /**
  * Handle received TLS header
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret rc		Returned status code
  */
-static int tls_newdata_process_header ( struct tls_session *tls ) {
+static int tls_newdata_process_header ( struct tls_connection *tls ) {
 	size_t data_len = ntohs ( tls->rx_header.length );
 	size_t remaining = data_len;
 	size_t frag_len;
@@ -2470,10 +2472,10 @@ static int tls_newdata_process_header ( struct tls_session *tls ) {
 /**
  * Handle received TLS data payload
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret rc		Returned status code
  */
-static int tls_newdata_process_data ( struct tls_session *tls ) {
+static int tls_newdata_process_data ( struct tls_connection *tls ) {
 	struct io_buffer *iobuf;
 	int rc;
 
@@ -2506,10 +2508,10 @@ static int tls_newdata_process_data ( struct tls_session *tls ) {
 /**
  * Check flow control window
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @ret len		Length of window
  */
-static size_t tls_cipherstream_window ( struct tls_session *tls ) {
+static size_t tls_cipherstream_window ( struct tls_connection *tls ) {
 
 	/* Open window until we are ready to accept data */
 	if ( ! tls_ready ( tls ) )
@@ -2521,16 +2523,16 @@ static size_t tls_cipherstream_window ( struct tls_session *tls ) {
 /**
  * Receive new ciphertext
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v iobuf		I/O buffer
  * @v meta		Data transfer metadat
  * @ret rc		Return status code
  */
-static int tls_cipherstream_deliver ( struct tls_session *tls,
+static int tls_cipherstream_deliver ( struct tls_connection *tls,
 				      struct io_buffer *iobuf,
 				      struct xfer_metadata *xfer __unused ) {
 	size_t frag_len;
-	int ( * process ) ( struct tls_session *tls );
+	int ( * process ) ( struct tls_connection *tls );
 	struct io_buffer *dest;
 	int rc;
 
@@ -2578,16 +2580,18 @@ static int tls_cipherstream_deliver ( struct tls_session *tls,
 
 /** TLS ciphertext stream interface operations */
 static struct interface_operation tls_cipherstream_ops[] = {
-	INTF_OP ( xfer_deliver, struct tls_session *,
+	INTF_OP ( xfer_deliver, struct tls_connection *,
 		  tls_cipherstream_deliver ),
-	INTF_OP ( xfer_window, struct tls_session *, tls_cipherstream_window ),
-	INTF_OP ( xfer_window_changed, struct tls_session *, tls_tx_resume ),
-	INTF_OP ( intf_close, struct tls_session *, tls_close ),
+	INTF_OP ( xfer_window, struct tls_connection *,
+		  tls_cipherstream_window ),
+	INTF_OP ( xfer_window_changed, struct tls_connection *,
+		  tls_tx_resume ),
+	INTF_OP ( intf_close, struct tls_connection *, tls_close ),
 };
 
 /** TLS ciphertext stream interface descriptor */
 static struct interface_descriptor tls_cipherstream_desc =
-	INTF_DESC_PASSTHRU ( struct tls_session, cipherstream,
+	INTF_DESC_PASSTHRU ( struct tls_connection, cipherstream,
 			     tls_cipherstream_ops, plainstream );
 
 /******************************************************************************
@@ -2600,10 +2604,10 @@ static struct interface_descriptor tls_cipherstream_desc =
 /**
  * Handle certificate validation completion
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  * @v rc		Reason for completion
  */
-static void tls_validator_done ( struct tls_session *tls, int rc ) {
+static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	struct x509_certificate *cert;
@@ -2658,12 +2662,12 @@ static void tls_validator_done ( struct tls_session *tls, int rc ) {
 
 /** TLS certificate validator interface operations */
 static struct interface_operation tls_validator_ops[] = {
-	INTF_OP ( intf_close, struct tls_session *, tls_validator_done ),
+	INTF_OP ( intf_close, struct tls_connection *, tls_validator_done ),
 };
 
 /** TLS certificate validator interface descriptor */
 static struct interface_descriptor tls_validator_desc =
-	INTF_DESC ( struct tls_session, validator, tls_validator_ops );
+	INTF_DESC ( struct tls_connection, validator, tls_validator_ops );
 
 /******************************************************************************
  *
@@ -2675,9 +2679,9 @@ static struct interface_descriptor tls_validator_desc =
 /**
  * TLS TX state machine
  *
- * @v tls		TLS session
+ * @v tls		TLS connection
  */
-static void tls_tx_step ( struct tls_session *tls ) {
+static void tls_tx_step ( struct tls_connection *tls ) {
 	int rc;
 
 	/* Wait for cipherstream to become ready */
@@ -2743,9 +2747,14 @@ static void tls_tx_step ( struct tls_session *tls ) {
 		tls->tx_pending &= ~TLS_TX_FINISHED;
 	}
 
-	/* Reschedule process if pending transmissions remain */
-	if ( tls->tx_pending )
+	/* Reschedule process if pending transmissions remain,
+	 * otherwise send notification of a window change.
+	 */
+	if ( tls->tx_pending ) {
 		tls_tx_resume ( tls );
+	} else {
+		xfer_window_changed ( &tls->plainstream );
+	}
 
 	return;
 
@@ -2755,7 +2764,7 @@ static void tls_tx_step ( struct tls_session *tls ) {
 
 /** TLS TX process descriptor */
 static struct process_descriptor tls_process_desc =
-	PROC_DESC_ONCE ( struct tls_session, process, tls_tx_step );
+	PROC_DESC_ONCE ( struct tls_connection, process, tls_tx_step );
 
 /******************************************************************************
  *
@@ -2766,7 +2775,7 @@ static struct process_descriptor tls_process_desc =
 
 int add_tls ( struct interface *xfer, const char *name,
 	      struct interface **next ) {
-	struct tls_session *tls;
+	struct tls_connection *tls;
 	int rc;
 
 	/* Allocate and initialise TLS structure */
@@ -2788,6 +2797,9 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
 	tls->client_random.gmt_unix_time = time ( NULL );
+	iob_populate ( &tls->rx_header_iobuf, &tls->rx_header, 0,
+		       sizeof ( tls->rx_header ) );
+	INIT_LIST_HEAD ( &tls->rx_data );
 	if ( ( rc = tls_generate_random ( tls, &tls->client_random.random,
 			  ( sizeof ( tls->client_random.random ) ) ) ) != 0 ) {
 		goto err_random;
@@ -2797,9 +2809,6 @@ int add_tls ( struct interface *xfer, const char *name,
 		      ( sizeof ( tls->pre_master_secret.random ) ) ) ) != 0 ) {
 		goto err_random;
 	}
-	iob_populate ( &tls->rx_header_iobuf, &tls->rx_header, 0,
-		       sizeof ( tls->rx_header ) );
-	INIT_LIST_HEAD ( &tls->rx_data );
 
 	/* Start negotiation */
 	tls_restart ( tls );

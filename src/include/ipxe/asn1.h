@@ -161,6 +161,12 @@ struct asn1_builder_header {
 	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
 	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 14 )
 
+/** ASN.1 OID for id-md4 (1.2.840.113549.2.4) */
+#define ASN1_OID_MD4						\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 2 ),	\
+	ASN1_OID_SINGLE ( 4 )
+
 /** ASN.1 OID for id-md5 (1.2.840.113549.2.5) */
 #define ASN1_OID_MD5						\
 	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\

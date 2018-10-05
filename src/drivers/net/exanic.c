@@ -812,6 +812,9 @@ static int exanic_probe ( struct pci_device *pci ) {
 	/* Read capabilities */
 	exanic->caps = readl ( exanic->regs + EXANIC_CAPS );
 
+	/* Power up PHYs */
+	writel ( EXANIC_POWER_ON, ( exanic->regs + EXANIC_POWER ) );
+
 	/* Fetch base MAC address */
 	if ( ( rc = exanic_fetch_mac ( exanic ) ) != 0 )
 		goto err_fetch_mac;
@@ -900,6 +903,7 @@ static struct pci_device_id exanic_ids[] = {
 	PCI_ROM ( 0x1ce4, 0x0004, "exanic-x10gm", "ExaNIC X10 GM", 0 ),
 	PCI_ROM ( 0x1ce4, 0x0005, "exanic-x40", "ExaNIC X40", 0 ),
 	PCI_ROM ( 0x1ce4, 0x0006, "exanic-x10hpt", "ExaNIC X10 HPT", 0 ),
+	PCI_ROM ( 0x1ce4, 0x0007, "exanic-x40g", "ExaNIC X40", 0 ),
 };
 
 /** ExaNIC PCI driver */

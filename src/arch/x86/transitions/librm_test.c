@@ -97,7 +97,7 @@ static void librm_test_exec ( void ) {
 	/* Profile complete real-mode call cycle */
 	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
 		profile_start ( &real_call_profiler );
-		__asm__ __volatile__ ( REAL_CODE ( "" ) );
+		__asm__ __volatile__ ( REAL_CODE ( "" ) : );
 		profile_stop ( &real_call_profiler );
 	}
 

@@ -283,7 +283,9 @@ struct realtek_nic {
 	/** Non-volatile options */
 	struct nvo_block nvo;
 	/** MII interface */
-	struct mii_interface mii;
+	struct mii_interface mdio;
+	/** MII device */
+	struct mii_device mii;
 
 	/** Legacy datapath mode */
 	int legacy;

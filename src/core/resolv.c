@@ -180,19 +180,16 @@ static int resmux_try ( struct resolv_mux *mux ) {
 }
 
 /**
- * Child resolved name
+ * Close name resolution multiplexer
  *
  * @v mux		Name resolution multiplexer
- * @v sa		Completed socket address
+ * @v rc		Reason for close
  */
-static void resmux_child_resolv_done ( struct resolv_mux *mux,
-				       struct sockaddr *sa ) {
+static void resmux_close ( struct resolv_mux *mux, int rc ) {
 
-	DBGC ( mux, "RESOLV %p resolved \"%s\" to %s using method %s\n",
-	       mux, mux->name, sock_ntoa ( sa ), mux->resolver->name );
-
-	/* Pass resolution to parent */
-	resolv_done ( &mux->parent, sa );
+	/* Shut down all interfaces */
+	intf_shutdown ( &mux->child, rc );
+	intf_shutdown ( &mux->parent, rc );
 }
 
 /**
@@ -226,18 +223,28 @@ static void resmux_child_close ( struct resolv_mux *mux, int rc ) {
 	return;
 
  finished:
-	intf_shutdown ( &mux->parent, rc );
+	resmux_close ( mux, rc );
 }
 
 /** Name resolution multiplexer child interface operations */
 static struct interface_operation resmux_child_op[] = {
-	INTF_OP ( resolv_done, struct resolv_mux *, resmux_child_resolv_done ),
 	INTF_OP ( intf_close, struct resolv_mux *, resmux_child_close ),
 };
 
 /** Name resolution multiplexer child interface descriptor */
 static struct interface_descriptor resmux_child_desc =
-	INTF_DESC ( struct resolv_mux, child, resmux_child_op );
+	INTF_DESC_PASSTHRU ( struct resolv_mux, child, resmux_child_op,
+			     parent );
+
+/** Name resolution multiplexer parent interface operations */
+static struct interface_operation resmux_parent_op[] = {
+	INTF_OP ( intf_close, struct resolv_mux *, resmux_close ),
+};
+
+/** Name resolution multiplexer parent interface descriptor */
+static struct interface_descriptor resmux_parent_desc =
+	INTF_DESC_PASSTHRU ( struct resolv_mux, parent, resmux_parent_op,
+			     child );
 
 /**
  * Start name resolution
@@ -258,7 +265,7 @@ int resolv ( struct interface *resolv, const char *name,
 	if ( ! mux )
 		return -ENOMEM;
 	ref_init ( &mux->refcnt, NULL );
-	intf_init ( &mux->parent, &null_intf_desc, &mux->refcnt );
+	intf_init ( &mux->parent, &resmux_parent_desc, &mux->refcnt );
 	intf_init ( &mux->child, &resmux_child_desc, &mux->refcnt );
 	mux->resolver = table_start ( RESOLVERS );
 	if ( sa )
@@ -338,7 +345,8 @@ static struct interface_operation named_xfer_ops[] = {
 
 /** Named socket opener data transfer interface descriptor */
 static struct interface_descriptor named_xfer_desc =
-	INTF_DESC ( struct named_socket, xfer, named_xfer_ops );
+	INTF_DESC_PASSTHRU ( struct named_socket, xfer, named_xfer_ops,
+			     resolv );
 
 /**
  * Name resolved
@@ -379,7 +387,8 @@ static struct interface_operation named_resolv_op[] = {
 
 /** Named socket opener resolver interface descriptor */
 static struct interface_descriptor named_resolv_desc =
-	INTF_DESC ( struct named_socket, resolv, named_resolv_op );
+	INTF_DESC_PASSTHRU ( struct named_socket, resolv, named_resolv_op,
+			     xfer );
 
 /**
  * Open named socket

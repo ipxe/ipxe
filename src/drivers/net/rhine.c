@@ -49,12 +49,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /**
  * Read from MII register
  *
- * @v mii		MII interface
+ * @v mdio		MII interface
+ * @v phy		PHY address
  * @v reg		Register address
  * @ret value		Data read, or negative error
  */
-static int rhine_mii_read ( struct mii_interface *mii, unsigned int reg ) {
-	struct rhine_nic *rhn = container_of ( mii, struct rhine_nic, mii );
+static int rhine_mii_read ( struct mii_interface *mdio,
+			    unsigned int phy __unused, unsigned int reg ) {
+	struct rhine_nic *rhn = container_of ( mdio, struct rhine_nic, mdio );
 	unsigned int timeout = RHINE_TIMEOUT_US;
 	uint8_t cr;
 
@@ -80,14 +82,16 @@ static int rhine_mii_read ( struct mii_interface *mii, unsigned int reg ) {
 /**
  * Write to MII register
  *
- * @v mii		MII interface
+ * @v mdio		MII interface
+ * @v phy		PHY address
  * @v reg		Register address
  * @v data		Data to write
  * @ret rc		Return status code
  */
-static int rhine_mii_write ( struct mii_interface *mii, unsigned int reg,
+static int rhine_mii_write ( struct mii_interface *mdio,
+			     unsigned int phy __unused, unsigned int reg,
                              unsigned int data ) {
-	struct rhine_nic *rhn = container_of ( mii, struct rhine_nic, mii );
+	struct rhine_nic *rhn = container_of ( mdio, struct rhine_nic, mdio );
 	unsigned int timeout = RHINE_TIMEOUT_US;
 	uint8_t cr;
 
@@ -719,15 +723,15 @@ static int rhine_probe ( struct pci_device *pci ) {
 		netdev->hw_addr[i] = readb ( rhn->regs + RHINE_MAC + i );
 
 	/* Initialise and reset MII interface */
-	mii_init ( &rhn->mii, &rhine_mii_operations );
+	mdio_init ( &rhn->mdio, &rhine_mii_operations );
+	mii_init ( &rhn->mii, &rhn->mdio, 0 );
 	if ( ( rc = mii_reset ( &rhn->mii ) ) != 0 ) {
 		DBGC ( rhn, "RHINE %p could not reset MII: %s\n",
 		       rhn, strerror ( rc ) );
 		goto err_mii_reset;
 	}
 	DBGC ( rhn, "RHINE PHY vendor %04x device %04x\n",
-	       rhine_mii_read ( &rhn->mii, 0x02 ),
-	       rhine_mii_read ( &rhn->mii, 0x03 ) );
+	       mii_read ( &rhn->mii, 0x02 ), mii_read ( &rhn->mii, 0x03 ) );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )

@@ -20,7 +20,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @ret min_entropy	min-entropy of each sample
  */
-static inline __always_inline double
+static inline __always_inline min_entropy_t
 ENTROPY_INLINE ( linux, min_entropy_per_sample ) ( void ) {
 
 	/* linux_get_noise() reads a single byte from /dev/random,
@@ -28,7 +28,7 @@ ENTROPY_INLINE ( linux, min_entropy_per_sample ) ( void ) {
 	 * entropy is available.  We therefore assume that each sample
 	 * contains exactly 8 bits of entropy.
 	 */
-	return 8.0;
+	return MIN_ENTROPY ( 8.0 );
 }
 
 #endif /* _IPXE_LINUX_ENTROPY_H */

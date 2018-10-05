@@ -77,6 +77,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define HTTP_AUTH_BASIC		/* Basic authentication */
 #define HTTP_AUTH_DIGEST	/* Digest authentication */
+//#define HTTP_AUTH_NTLM	/* NTLM authentication */
 //#define HTTP_ENC_PEERDIST	/* PeerDist content encoding */
 //#define HTTP_HACK_GCE		/* Google Compute Engine hacks */
 
@@ -134,6 +135,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define MENU_CMD		/* Menu commands */
 #define LOGIN_CMD		/* Login command */
 #define SYNC_CMD		/* Sync command */
+#define SHELL_CMD		/* Shell command */
 //#define NSLOOKUP_CMD		/* DNS resolving command */
 //#define TIME_CMD		/* Time commands */
 //#define DIGEST_CMD		/* Image crypto digest commands */

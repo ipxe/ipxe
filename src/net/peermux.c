@@ -24,9 +24,11 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <ipxe/uri.h>
 #include <ipxe/xferbuf.h>
+#include <ipxe/job.h>
 #include <ipxe/peerblk.h>
 #include <ipxe/peermux.h>
 
@@ -72,6 +74,28 @@ static void peermux_close ( struct peerdist_multiplexer *peermux, int rc ) {
 	intf_nullify ( &peermux->info ); /* avoid potential loops */
 	intf_shutdown ( &peermux->xfer, rc );
 	intf_shutdown ( &peermux->info, rc );
+}
+
+/**
+ * Report progress of PeerDist download
+ *
+ * @v peermux		PeerDist download multiplexer
+ * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int peermux_progress ( struct peerdist_multiplexer *peermux,
+			      struct job_progress *progress ) {
+	struct peerdist_statistics *stats = &peermux->stats;
+	unsigned int percentage;
+
+	/* Construct PeerDist status message */
+	if ( stats->total ) {
+		percentage = ( ( 100 * stats->local ) / stats->total );
+		snprintf ( progress->message, sizeof ( progress->message ),
+			   "%3d%% from %d peers", percentage, stats->peers );
+	}
+
+	return 0;
 }
 
 /**
@@ -275,6 +299,35 @@ peermux_block_buffer ( struct peerdist_multiplexed_block *peermblk ) {
 }
 
 /**
+ * Record peer discovery statistics
+ *
+ * @v peermblk		PeerDist multiplexed block download
+ * @v peer		Selected peer (or NULL)
+ * @v peers		List of available peers
+ */
+static void peermux_block_stat ( struct peerdist_multiplexed_block *peermblk,
+				 struct peerdisc_peer *peer,
+				 struct list_head *peers ) {
+	struct peerdist_multiplexer *peermux = peermblk->peermux;
+	struct peerdist_statistics *stats = &peermux->stats;
+	struct peerdisc_peer *tmp;
+	unsigned int count = 0;
+
+	/* Record maximum number of available peers */
+	list_for_each_entry ( tmp, peers, list )
+		count++;
+	if ( count > stats->peers )
+		stats->peers = count;
+
+	/* Update block counts */
+	if ( peer )
+		stats->local++;
+	stats->total++;
+	DBGC2 ( peermux, "PEERMUX %p downloaded %d/%d from %d peers\n",
+		peermux, stats->local, stats->total, stats->peers );
+}
+
+/**
  * Close multiplexed block download
  *
  * @v peermblk		PeerDist multiplexed block download
@@ -303,6 +356,8 @@ static void peermux_block_close ( struct peerdist_multiplexed_block *peermblk,
 
 /** Data transfer interface operations */
 static struct interface_operation peermux_xfer_operations[] = {
+	INTF_OP ( job_progress, struct peerdist_multiplexer *,
+		  peermux_progress ),
 	INTF_OP ( intf_close, struct peerdist_multiplexer *, peermux_close ),
 };
 
@@ -330,6 +385,8 @@ static struct interface_operation peermux_block_operations[] = {
 		  peermux_block_deliver ),
 	INTF_OP ( xfer_buffer, struct peerdist_multiplexed_block *,
 		  peermux_block_buffer ),
+	INTF_OP ( peerdisc_stat, struct peerdist_multiplexed_block *,
+		  peermux_block_stat ),
 	INTF_OP ( intf_close, struct peerdist_multiplexed_block *,
 		  peermux_block_close ),
 };

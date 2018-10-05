@@ -62,6 +62,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** I2C GPIO register */
 #define EXANIC_I2C 0x012c
 
+/** Power control register */
+#define EXANIC_POWER 0x0138
+#define EXANIC_POWER_ON 0x000000f0UL		/**< Power on PHYs */
+
 /** Port register offset */
 #define EXANIC_PORT_REGS( index ) ( 0x0200 + ( 0x40 * (index) ) )
 

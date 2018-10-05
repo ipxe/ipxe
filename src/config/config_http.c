@@ -40,6 +40,9 @@ REQUIRE_OBJECT ( httpbasic );
 #ifdef HTTP_AUTH_DIGEST
 REQUIRE_OBJECT ( httpdigest );
 #endif
+#ifdef HTTP_AUTH_NTLM
+REQUIRE_OBJECT ( httpntlm );
+#endif
 #ifdef HTTP_ENC_PEERDIST
 REQUIRE_OBJECT ( peerdist );
 #endif

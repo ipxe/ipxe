@@ -1921,6 +1921,7 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 	char rp_copy[ strlen ( root_path ) + 1 ];
 	char *rp_comp[NUM_RP_COMPONENTS];
 	char *rp = rp_copy;
+	int skip = 0;
 	int i = 0;
 	int rc;
 
@@ -1930,11 +1931,15 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 		rp_comp[i++] = rp;
 		if ( i == NUM_RP_COMPONENTS )
 			break;
-		for ( ; *rp != ':' ; rp++ ) {
+		for ( ; ( ( *rp != ':' ) || skip ) ; rp++ ) {
 			if ( ! *rp ) {
 				DBGC ( iscsi, "iSCSI %p root path \"%s\" "
 				       "too short\n", iscsi, root_path );
 				return -EINVAL_ROOT_PATH_TOO_SHORT;
+			} else if ( *rp == '[' ) {
+				skip = 1;
+			} else if ( *rp == ']' ) {
+				skip = 0;
 			}
 		}
 		*(rp++) = '\0';

@@ -7,7 +7,7 @@ void __asmcall _dump_regs ( struct i386_all_regs *ix86 ) {
 		TEXT16_CODE ( ".globl dump_regs\n\t"
 			      "\ndump_regs:\n\t"
 			      VIRT_CALL ( _dump_regs )
-			      "ret\n\t" ) );
+			      "ret\n\t" ) : );
 
 	printf ( "EAX=%08x EBX=%08x ECX=%08x EDX=%08x\n"
 		 "ESI=%08x EDI=%08x EBP=%08x ESP=%08x\n"

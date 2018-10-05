@@ -93,6 +93,9 @@
 #ifndef R_ARM_THM_JUMP24
 #define R_ARM_THM_JUMP24 30
 #endif
+#ifndef R_ARM_V4BX
+#define R_ARM_V4BX 40
+#endif
 
 /* Seems to be missing from elf.h */
 #ifndef R_AARCH64_NULL
@@ -628,9 +631,12 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 			break;
 		case ELF_MREL ( EM_386, R_386_PC32 ) :
 		case ELF_MREL ( EM_ARM, R_ARM_CALL ) :
+		case ELF_MREL ( EM_ARM, R_ARM_REL32 ) :
 		case ELF_MREL ( EM_ARM, R_ARM_THM_PC22 ) :
 		case ELF_MREL ( EM_ARM, R_ARM_THM_JUMP24 ) :
+		case ELF_MREL ( EM_ARM, R_ARM_V4BX ):
 		case ELF_MREL ( EM_X86_64, R_X86_64_PC32 ) :
+		case ELF_MREL ( EM_X86_64, R_X86_64_PLT32 ) :
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_CALL26 ) :
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_JUMP26 ) :
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_ADR_PREL_LO21 ) :

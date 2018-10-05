@@ -50,16 +50,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 int imgdownload ( struct uri *uri, unsigned long timeout,
 		  struct image **image ) {
-	const char *password;
+	struct uri uri_redacted;
 	char *uri_string_redacted;
 	int rc;
 
 	/* Construct redacted URI */
-	password = uri->password;
-	if ( password )
-		uri->password = "***";
-	uri_string_redacted = format_uri_alloc ( uri );
-	uri->password = password;
+	memcpy ( &uri_redacted, uri, sizeof ( uri_redacted ) );
+	uri_redacted.user = NULL;
+	uri_redacted.password = NULL;
+	uri_redacted.query = NULL;
+	uri_redacted.fragment = NULL;
+	uri_string_redacted = format_uri_alloc ( &uri_redacted );
 	if ( ! uri_string_redacted ) {
 		rc = -ENOMEM;
 		goto err_uri_string;

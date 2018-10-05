@@ -119,12 +119,19 @@ struct acpi_fadt {
 	uint32_t pm1a_cnt_blk;
 	/** PM1b Control Register Block */
 	uint32_t pm1b_cnt_blk;
+	/** PM2 Control Register Block */
+	uint32_t pm2_cnt_blk;
+	/** PM Timer Control Register Block */
+	uint32_t pm_tmr_blk;
 } __attribute__ (( packed ));
 
 /** ACPI PM1 Control Register (within PM1a_CNT_BLK or PM1A_CNT_BLK) */
 #define ACPI_PM1_CNT 0
 #define ACPI_PM1_CNT_SLP_TYP(x) ( (x) << 10 )	/**< Sleep type */
 #define ACPI_PM1_CNT_SLP_EN ( 1 << 13 )		/**< Sleep enable */
+
+/** ACPI PM Timer Register (within PM_TMR_BLK) */
+#define ACPI_PM_TMR 0
 
 /** Differentiated System Description Table (DSDT) signature */
 #define DSDT_SIGNATURE ACPI_SIGNATURE ( 'D', 'S', 'D', 'T' )

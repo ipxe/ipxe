@@ -30,14 +30,14 @@ ENTROPY_INLINE ( null, entropy_disable ) ( void ) {
 	/* Do nothing */
 }
 
-static inline __always_inline double
+static inline __always_inline min_entropy_t
 ENTROPY_INLINE ( null, min_entropy_per_sample ) ( void ) {
 	/* Actual amount of min-entropy is zero.  To avoid
 	 * division-by-zero errors and to allow compilation of
 	 * entropy-consuming code, pretend to have 1 bit of entropy in
 	 * each sample.
 	 */
-	return 1.0;
+	return MIN_ENTROPY ( 1.0 );
 }
 
 static inline __always_inline int

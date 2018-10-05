@@ -202,6 +202,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_exanic		     ( ERRFILE_DRIVER | 0x00c60000 )
 #define ERRFILE_smscusb		     ( ERRFILE_DRIVER | 0x00c70000 )
 #define ERRFILE_lan78xx		     ( ERRFILE_DRIVER | 0x00c80000 )
+#define ERRFILE_ena		     ( ERRFILE_DRIVER | 0x00c90000 )
+#define ERRFILE_icplus		     ( ERRFILE_DRIVER | 0x00ca0000 )
+#define ERRFILE_intelxl		     ( ERRFILE_DRIVER | 0x00cb0000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
@@ -277,6 +280,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_peermux			( ERRFILE_NET | 0x00470000 )
 #define ERRFILE_xsigo			( ERRFILE_NET | 0x00480000 )
 #define ERRFILE_ntp			( ERRFILE_NET | 0x00490000 )
+#define ERRFILE_httpntlm		( ERRFILE_NET | 0x004a0000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
@@ -370,6 +374,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_entropy	      ( ERRFILE_OTHER | 0x004e0000 )
 #define ERRFILE_cert_cmd	      ( ERRFILE_OTHER | 0x004f0000 )
 #define ERRFILE_acpi_settings	      ( ERRFILE_OTHER | 0x00500000 )
+#define ERRFILE_ntlm		      ( ERRFILE_OTHER | 0x00510000 )
 
 /** @} */
 
