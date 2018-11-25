@@ -850,7 +850,7 @@ define deps_template_parts
 	@$(MKDIR) -p $(BIN)/deps/$(dir $(1))
 	$(Q)$(CPP) $(CFLAGS) $(CFLAGS_$(2)) $(CFLAGS_$(3)) -DOBJECT=$(3) \
 		-Wno-error -M $(1) -MG -MP | \
-		sed 's/\.o\s*:/_DEPS +=/' > $(BIN)/deps/$(1).d
+		sed 's/\.o[[:blank:]]*:/_DEPS +=/' > $(BIN)/deps/$(1).d
 endef
 
 # rules_template : generate rules for a given source file
