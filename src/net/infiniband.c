@@ -568,10 +568,11 @@ void ib_refill_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 		}
 
 		/* Post I/O buffer */
-		if ( ( rc = ib_post_recv ( ibdev, qp, iobuf ) ) != 0 ) {
+		rc = ib_post_recv ( ibdev, qp, iobuf );
+		free_iob ( iobuf );
+		if ( rc != 0 ) {
 			DBGC ( ibdev, "IBDEV %s could not refill: %s\n",
 			       ibdev->name, strerror ( rc ) );
-			free_iob ( iobuf );
 			/* Give up */
 			return;
 		}
