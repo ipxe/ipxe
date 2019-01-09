@@ -173,7 +173,7 @@ int strncmp ( const char *first, const char *second, size_t max ) {
 	int diff;
 
 	for ( ; max-- ; first_bytes++, second_bytes++ ) {
-		diff = ( *second_bytes - *first_bytes );
+		diff = ( *first_bytes - *second_bytes );
 		if ( diff )
 			return diff;
 		if ( ! *first_bytes )
@@ -195,8 +195,8 @@ int strcasecmp ( const char *first, const char *second ) {
 	int diff;
 
 	for ( ; ; first_bytes++, second_bytes++ ) {
-		diff = ( toupper ( *second_bytes ) -
-			 toupper ( *first_bytes ) );
+		diff = ( toupper ( *first_bytes ) -
+			 toupper ( *second_bytes ) );
 		if ( diff )
 			return diff;
 		if ( ! *first_bytes )

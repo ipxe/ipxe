@@ -88,6 +88,7 @@ static void string_test_exec ( void ) {
 	ok ( strcmp ( "Hello", "hello" ) != 0 );
 	ok ( strcmp ( "Hello", "Hello world!" ) != 0 );
 	ok ( strcmp ( "Hello world!", "Hello" ) != 0 );
+	ok ( strcmp ( "abc", "def" ) < 0 );
 
 	/* Test strncmp() */
 	ok ( strncmp ( "", "", 0 ) == 0 );
