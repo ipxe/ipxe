@@ -149,7 +149,7 @@ static void make_efi_rom ( FILE *pe, FILE *rom, struct options *opts ) {
 	headers->pci.VendorId = opts->vendor;
 	headers->pci.DeviceId = opts->device;
 	headers->pci.Length = sizeof ( headers->pci );
-	headers->pci.ClassCode[0] = PCI_CLASS_NETWORK;
+	headers->pci.ClassCode[2] = PCI_CLASS_NETWORK;
 	headers->pci.ImageLength = ( rom_size / 512 );
 	headers->pci.CodeType = 0x03; /* No constant in EFI headers? */
 	headers->pci.Indicator = 0x80; /* No constant in EFI headers? */

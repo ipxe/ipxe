@@ -96,7 +96,7 @@ pciheader:
 	.word	( pci_devlist - pciheader ) /* Device list pointer */
 	.word	pciheader_len		/* PCI data structure length */
 	.byte	0x03			/* PCI data structure revision */
-	.byte	0x02, 0x00, 0x00	/* Class code */
+	.byte	0x00, 0x00, 0x02	/* Class code */
 pciheader_image_length:
 	.word	0			/* Image length */
 	.word	0x0001			/* Revision level */
