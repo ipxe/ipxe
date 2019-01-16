@@ -176,9 +176,10 @@ use constant PCI_LAST_IMAGE => 0x80;
 use constant PNP_SIGNATURE => '$PnP';
 use constant UNDI_SIGNATURE => 'UNDI';
 use constant IPXE_SIGNATURE => 'iPXE';
+use constant EFI_SIGNATURE => 0x00000ef1;
 
 our @EXPORT_OK = qw ( ROM_SIGNATURE PCI_SIGNATURE PCI_LAST_IMAGE
-		      PNP_SIGNATURE UNDI_SIGNATURE IPXE_SIGNATURE );
+		      PNP_SIGNATURE UNDI_SIGNATURE IPXE_SIGNATURE EFI_SIGNATURE );
 our %EXPORT_TAGS = ( all => [ @EXPORT_OK ] );
 
 use constant JMP_SHORT => 0xeb;
@@ -454,6 +455,25 @@ sub ipxe_header {
   return undef unless $offset;
 
   return Option::ROM::iPXE->new ( $self, $offset );
+}
+
+=pod
+
+=item C<< efi_header () >>
+
+Return a C<Option::ROM::EFI> object representing the ROM's EFI header,
+if present.
+
+=cut
+
+sub efi_header {
+  my $hash = shift;
+  my $self = tied(%$hash);
+
+  my $pci = $hash->pci_header ();
+  return undef unless defined $pci;
+
+  return Option::ROM::EFI->new ( $self, $pci );
 }
 
 =pod
@@ -811,6 +831,50 @@ sub fix_checksum {
   my $self = tied(%$hash);
 
   $hash->{checksum} = ( ( $hash->{checksum} - $hash->checksum() ) & 0xff );
+}
+
+##############################################################################
+#
+# Option::ROM::EFI
+#
+##############################################################################
+
+package Option::ROM::EFI;
+
+use strict;
+use warnings;
+use Carp;
+use bytes;
+
+sub new {
+  my $class = shift;
+  my $rom = shift;
+  my $pci = shift;
+
+  my $hash = {};
+  tie %$hash, "Option::ROM::Fields", {
+    rom => $rom,
+    data => $rom->{data},
+    offset => 0x00,
+    length => 0x18,
+    fields => {
+      signature =>		{ offset => 0x00, length => 0x02, pack => "S" },
+      init_size =>		{ offset => 0x02, length => 0x02, pack => "S" },
+      efi_signature =>		{ offset => 0x04, length => 0x04, pack => "L" },
+      efi_subsystem =>		{ offset => 0x08, length => 0x02, pack => "S" },
+      efi_machine_type =>	{ offset => 0x0a, length => 0x02, pack => "S" },
+      compression_type =>	{ offset => 0x0c, length => 0x02, pack => "S" },
+      efi_image_offset =>	{ offset => 0x16, length => 0x02, pack => "S" },
+    },
+  };
+  bless $hash, $class;
+
+  my $self = tied ( %$hash );
+
+  return undef unless ( $hash->{efi_signature} == Option::ROM::EFI_SIGNATURE &&
+			$pci->{code_type} == 0x03 );
+
+  return $hash;
 }
 
 1;

@@ -51,6 +51,19 @@ do {
   printf "  %-16s 0x%04x\n", "PnP header:", $rom->{pnp_header} if ( exists $rom->{pnp_header} );
   printf "\n";
 
+  my $efi = $rom->efi_header();
+  if ( $efi ) {
+    printf "EFI header:\n\n";
+    printf "  %-16s 0x%04x (%d)\n", "Init size:",
+	   $efi->{init_size}, ( $efi->{init_size} * 512 );
+    printf "  %-16s 0x%08x\n", "EFI Signature:", $efi->{efi_signature};
+    printf "  %-16s 0x%04x\n", "EFI Subsystem:", $efi->{efi_subsystem};
+    printf "  %-16s 0x%04x\n", "EFI Machine type:", $efi->{efi_machine_type};
+    printf "  %-16s 0x%04x\n", "Compression type:", $efi->{compression_type};
+    printf "  %-16s 0x%04x\n", "EFI Image offset:", $efi->{efi_image_offset};
+    printf "\n";
+  }
+
   my $pci = $rom->pci_header();
   if ( $pci ) {
     printf "PCI header:\n\n";
