@@ -28,8 +28,9 @@ my $romfile = shift || "-";
 my $rom = new Option::ROM;
 $rom->load ( $romfile );
 
-do {
+my $index = 0;
 
+do {
   die "Not an option ROM image\n"
       unless $rom->{signature} == ROM_SIGNATURE;
 
@@ -38,15 +39,16 @@ do {
   die "ROM image truncated (is $filelength, should be $romlength)\n"
       if $filelength < $romlength;
 
+  printf "Index: %d, offset: 0x%08x\n\n", $index++, $rom->file_offset;
   printf "ROM header:\n\n";
   printf "  %-16s 0x%02x (%d)\n", "Length:",
 	 $rom->{length}, ( $rom->{length} * 512 );
   printf "  %-16s 0x%02x (%s0x%02x)\n", "Checksum:", $rom->{checksum},
-	 ( ( $rom->checksum == 0 ) ? "" : "INCORRECT: " ), $rom->checksum;
-  printf "  %-16s 0x%04x\n", "Init:", $rom->{init};
-  printf "  %-16s 0x%04x\n", "UNDI header:", $rom->{undi_header};
+	 ( ( $rom->checksum () == 0 ) ? "" : "INCORRECT: " ), $rom->checksum () if ( exists $rom->{checksum} );
+  printf "  %-16s 0x%04x\n", "Init:", $rom->{init} if ( defined $rom->{init} );
+  printf "  %-16s 0x%04x\n", "UNDI header:", $rom->{undi_header} if ( exists $rom->{undi_header} );
   printf "  %-16s 0x%04x\n", "PCI header:", $rom->{pci_header};
-  printf "  %-16s 0x%04x\n", "PnP header:", $rom->{pnp_header};
+  printf "  %-16s 0x%04x\n", "PnP header:", $rom->{pnp_header} if ( exists $rom->{pnp_header} );
   printf "\n";
 
   my $pci = $rom->pci_header();
