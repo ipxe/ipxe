@@ -141,5 +141,6 @@ static void undionly_shutdown ( int booting ) {
 }
 
 struct startup_fn startup_undionly __startup_fn ( STARTUP_LATE ) = {
+	.name = "undionly",
 	.shutdown = undionly_shutdown,
 };

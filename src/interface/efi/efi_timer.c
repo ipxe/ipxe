@@ -212,6 +212,7 @@ static void efi_tick_shutdown ( int booting __unused ) {
 
 /** Timer tick startup function */
 struct startup_fn efi_tick_startup_fn __startup_fn ( STARTUP_EARLY ) = {
+	.name = "efi_tick",
 	.startup = efi_tick_startup,
 	.shutdown = efi_tick_shutdown,
 };

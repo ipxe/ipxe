@@ -685,6 +685,7 @@ static void shutdown_cache ( int booting __unused ) {
 
 /** Memory allocator shutdown function */
 struct startup_fn heap_startup_fn __startup_fn ( STARTUP_EARLY ) = {
+	.name = "heap",
 	.shutdown = shutdown_cache,
 };
 

@@ -265,5 +265,6 @@ static void runtime_init ( void ) {
 
 /** Command line and initrd initialisation function */
 struct startup_fn runtime_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "runtime",
 	.startup = runtime_init,
 };

@@ -1654,6 +1654,7 @@ static void tcp_shutdown ( int booting __unused ) {
 
 /** TCP shutdown function */
 struct startup_fn tcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
+	.name = "tcp",
 	.shutdown = tcp_shutdown,
 };
 

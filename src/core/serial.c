@@ -181,5 +181,6 @@ struct init_fn serial_console_init_fn __init_fn ( INIT_CONSOLE ) = {
 
 /** Serial console startup function */
 struct startup_fn serial_startup_fn __startup_fn ( STARTUP_EARLY ) = {
+	.name = "serial",
 	.shutdown = serial_shutdown,
 };

@@ -127,6 +127,7 @@ struct init_fn cachedhcp_init_fn __init_fn ( INIT_NORMAL ) = {
 
 /** Cached DHCPACK startup function */
 struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
+	.name = "cachedhcp",
 	.startup = cachedhcp_startup,
 };
 

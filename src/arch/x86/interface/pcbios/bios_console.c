@@ -547,6 +547,7 @@ static void bios_inject_shutdown ( int booting __unused ) {
 
 /** Keypress injection startup function */
 struct startup_fn bios_inject_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "bios_inject",
 	.startup = bios_inject_startup,
 	.shutdown = bios_inject_shutdown,
 };

@@ -3363,5 +3363,6 @@ static void xhci_shutdown ( int booting ) {
 
 /** Startup/shutdown function */
 struct startup_fn xhci_startup __startup_fn ( STARTUP_LATE ) = {
+	.name = "xhci",
 	.shutdown = xhci_shutdown,
 };

@@ -111,6 +111,7 @@ static void remove_devices ( int booting __unused ) {
 }
 
 struct startup_fn startup_devices __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "devices",
 	.startup = probe_devices,
 	.shutdown = remove_devices,
 };
