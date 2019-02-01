@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ctype.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/deflate.h>
+#include <ipxe/crc32.h>
 
 /** @file
  *
@@ -386,6 +387,40 @@ static int deflate_extract ( struct deflate *deflate, struct deflate_chunk *in,
 }
 
 /**
+ * Attempt to get and extract a fixed number of bytes from input stream
+ *
+ * @v deflate		Decompressor
+ * @v in		Compressed input data
+ * @v len		Number of bytes to extract
+ * @ret data		Pointer to extracted data (or NULL if not available)
+ *
+ * No accumulated bits are allowed
+ */
+static void * deflate_extract_buffer ( struct deflate *deflate, struct deflate_chunk *in,
+				       unsigned int len ) {
+	size_t offset, remaining;
+
+	/* Sanity check */
+	assert ( deflate->bits == 0 );
+
+	/* Return immediately if we are attempting to extract zero bytes */
+	if ( len == 0 )
+		return NULL;
+
+	/* Attempt to get len bytes */
+	offset = in->offset;
+	remaining = ( in->len - offset );
+	if ( len > remaining )
+		return NULL;
+
+	in->offset += len;
+
+	DBGCP ( deflate, "DEFLATE %p extracted %d bytes\n", deflate, len );
+
+	return user_to_virt ( in->data, offset );
+}
+
+/**
  * Attempt to decode a Huffman-coded symbol from input stream
  *
  * @v deflate		Decompressor
@@ -453,9 +488,9 @@ static void deflate_discard_to_byte ( struct deflate *deflate ) {
  * @v offset		Starting offset within source data
  * @v len		Length to copy
  */
-static void deflate_copy ( struct deflate_chunk *out,
+static void deflate_copy ( struct deflate *deflate, struct deflate_chunk *out,
 			   userptr_t start, size_t offset, size_t len ) {
-	size_t out_offset = out->offset;
+	size_t in_offset = offset, out_offset = out->offset;
 	size_t copy_len;
 
 	/* Copy data one byte at a time, to allow for overlap */
@@ -465,10 +500,15 @@ static void deflate_copy ( struct deflate_chunk *out,
 			copy_len = len;
 		while ( copy_len-- ) {
 			memcpy_user ( out->data, out_offset++,
-				      start, offset++, 1 );
+				      start, in_offset++, 1 );
 		}
 	}
 	out->offset += len;
+	deflate->total_length += len;
+
+	if ( deflate->format == DEFLATE_GZIP ) {
+		deflate->checksum = crc32_le( deflate->checksum, user_to_virt ( start, offset ), len );
+	}
 }
 
 /**
@@ -501,6 +541,9 @@ int deflate_inflate ( struct deflate *deflate,
 	} else switch ( deflate->format ) {
 		case DEFLATE_RAW:	goto block_header;
 		case DEFLATE_ZLIB:	goto zlib_header;
+		case DEFLATE_GZIP:
+			deflate->checksum = 0xffffffff;
+			goto gzip_header;
 		default:		assert ( 0 );
 	}
 
@@ -530,6 +573,123 @@ int deflate_inflate ( struct deflate *deflate,
 
 		/* Process first block header */
 		goto block_header;
+	}
+
+ gzip_header: {
+		uint8_t * header;
+
+		/* Extract header */
+		header = deflate_extract_buffer( deflate, in, GZIP_HEADER_BYTES );
+		if ( header == NULL ) {
+			deflate->resume = &&gzip_header;
+			return 0;
+		}
+
+		if ( header [0] != 0x1f || header [1] != 0x8b ) {
+			DBGC ( deflate, "DEFLATE %p invalid GZIP format\n", deflate );
+			return -EINVAL;
+		}
+
+		if ( header [2] != GZIP_HEADER_CM_DEFLATE ) {
+			DBGC ( deflate, "DEFLATE %p unsupported GZIP "
+			       "compression method %d\n", deflate, header [2] );
+			return -ENOTSUP;
+		}
+
+		/* Save flags */
+		deflate->header = header [3];
+
+		/* Process GZIP members */
+		goto gzip_fextra_xlen;
+	}
+
+ gzip_fextra_xlen: {
+		if ( deflate->header & GZIP_HEADER_FLG_FEXTRA ) {
+			uint8_t * xlen;
+
+			/* Extract XLEN field */
+			xlen = deflate_extract_buffer( deflate, in, GZIP_HEADER_XLEN_BYTES );
+			if ( xlen == NULL ) {
+				deflate->resume = &&gzip_fextra_xlen;
+				return 0;
+			}
+
+			deflate->remaining = xlen [0] | ( xlen [1] << 8 );
+		} else {
+			/* Process FNAME */
+			goto gzip_fname;
+		}
+	}
+
+ gzip_fextra_data: {
+		size_t in_remaining;
+		size_t len;
+
+		/* Calculate available amount of FEXTRA data */
+		in_remaining = ( in->len - in->offset );
+		len = deflate->remaining;
+		if ( len > in_remaining )
+			len = in_remaining;
+
+		/* Discard data from input buffer */
+		in->offset += len;
+		deflate->remaining -= len;
+
+		/* Finish processing if we are blocked */
+		if ( deflate->remaining ) {
+			deflate->resume = &&gzip_fextra_data;
+			return 0;
+		}
+
+		/* Otherwise, finish FEXTRA member */
+	}
+
+
+ gzip_fname: {
+		if ( deflate->header & GZIP_HEADER_FLG_FNAME ) {
+			char * name;
+
+			/* Extract FNAME member */
+			do {
+				/* Extract one char of FNAME */
+				name = deflate_extract_buffer( deflate, in, 1 );
+				if ( name == NULL ) {
+					deflate->resume = &&gzip_fname;
+					return 0;
+				}
+			} while ( * name != '\0' );
+		}
+	}
+
+ gzip_fcomment: {
+		if ( deflate->header & GZIP_HEADER_FLG_FCOMMENT ) {
+			char * comment;
+
+			/* Extract FCOMMENT member */
+			do {
+				/* Extract char of FNAME */
+				comment = deflate_extract_buffer( deflate, in, 1 );
+				if ( comment == NULL ) {
+					deflate->resume = &&gzip_fcomment;
+					return 0;
+				}
+			} while ( * comment != '\0' );
+		}
+	}
+
+ gzip_fhcrc: {
+		if ( deflate->header & GZIP_HEADER_FLG_FHCRC ) {
+			uint8_t * fhcrc;
+
+			/* Extract FHCRC member */
+			fhcrc = deflate_extract_buffer( deflate, in, GZIP_HEADER_FHCRC_BYTES );
+			if ( fhcrc == NULL ) {
+				deflate->resume = &&gzip_fhcrc;
+				return 0;
+			}
+		}
+
+		/* Process first block header */
 	}
 
  block_header: {
@@ -617,7 +777,7 @@ int deflate_inflate ( struct deflate *deflate,
 			len = in_remaining;
 
 		/* Copy data to output buffer */
-		deflate_copy ( out, in->data, in->offset, len );
+		deflate_copy ( deflate, out, in->data, in->offset, len );
 
 		/* Consume data from input buffer */
 		in->offset += len;
@@ -844,7 +1004,7 @@ int deflate_inflate ( struct deflate *deflate,
 				DBGCP ( deflate, "DEFLATE %p literal %#02x "
 					"('%c')\n", deflate, byte,
 					( isprint ( byte ) ? byte : '.' ) );
-				deflate_copy ( out, virt_to_user ( &byte ), 0,
+				deflate_copy ( deflate, out, virt_to_user ( &byte ), 0,
 					       sizeof ( byte ) );
 
 			} else if ( code == DEFLATE_LITLEN_END ) {
@@ -934,8 +1094,8 @@ int deflate_inflate ( struct deflate *deflate,
 		}
 
 		/* Copy data, allowing for overlap */
-		deflate_copy ( out, out->data, ( out->offset - dup_distance ),
-			       dup_len );
+		deflate_copy ( deflate, out, out->data,
+			       ( out->offset - dup_distance ), dup_len );
 
 		/* Process next literal/length symbol */
 		goto lzhuf_litlen;
@@ -953,6 +1113,7 @@ int deflate_inflate ( struct deflate *deflate,
 		switch ( deflate->format ) {
 		case DEFLATE_RAW:	goto finished;
 		case DEFLATE_ZLIB:	goto zlib_footer;
+		case DEFLATE_GZIP:	goto gzip_footer;
 		default:		assert ( 0 );
 		}
 	}
@@ -976,6 +1137,48 @@ int deflate_inflate ( struct deflate *deflate,
 		if ( excess < 0 ) {
 			deflate->resume = &&zlib_adler32;
 			return 0;
+		}
+
+		/* Finish processing */
+		goto finished;
+	}
+
+ gzip_footer: {
+
+		/* Discard any bits up to the next byte boundary */
+		deflate_discard_to_byte ( deflate );
+
+		/* Return any remaining bytes to the input */
+		in->offset -= deflate->bits / 8;
+
+		deflate->bits = 0;
+		deflate->checksum ^= 0xffffffff;
+	}
+
+ gzip_crc32_isize: {
+		uint8_t * footer;
+		uint32_t crc32, isize;
+
+		/* Extract footer */
+		footer = deflate_extract_buffer( deflate, in,
+						 GZIP_FOOTER_CRC32_BYTES + GZIP_FOOTER_ISIZE_BYTES );
+		if ( footer == NULL ) {
+			deflate->resume = &&gzip_crc32_isize;
+			return 0;
+		}
+
+		crc32 = footer [0] | ( footer [1] << 8 ) | ( footer [2] << 16 ) | ( footer [3] << 24 );
+		if ( deflate->checksum != crc32 ) {
+			DBGCP ( deflate, "DEFLATE %p invalid GZIP CRC 0x%08x/0x%08x\n",
+				deflate, deflate->checksum, crc32 );
+			return -EINVAL;
+		}
+
+		isize = footer [4] | ( footer [5] << 8 ) | ( footer [6] << 16 ) | ( footer [7] << 24 );
+		if ( deflate->total_length != isize ) {
+			DBGCP ( deflate, "DEFLATE %p invalid GZIP ISIZE 0x%08x/0x%08x\n",
+				deflate, deflate->checksum, crc32 );
+			return -EINVAL;
 		}
 
 		/* Finish processing */
