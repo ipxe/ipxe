@@ -282,7 +282,7 @@ sub set {
   my $hash = shift;
   my $self = tied(%$hash);
   my $data = shift;
-  my $file_offset = shift // 0x0;
+  my $file_offset = scalar @_ ? shift : 0x0;
 
   # Store data
   $self->{data} = \$data;
