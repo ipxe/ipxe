@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_autoboot.h>
 #include <ipxe/efi/efi_watchdog.h>
+#include <ipxe/efi/efi_blacklist.h>
 
 /**
  * EFI entry point
@@ -75,6 +76,10 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
  */
 static int efi_probe ( struct root_device *rootdev __unused ) {
 
+	/* Unloaded any blacklisted drivers */
+	efi_unload_blacklist();
+
+	/* Connect our drivers */
 	return efi_driver_connect_all();
 }
 
@@ -85,6 +90,7 @@ static int efi_probe ( struct root_device *rootdev __unused ) {
  */
 static void efi_remove ( struct root_device *rootdev __unused ) {
 
+	/* Disconnect our drivers */
 	efi_driver_disconnect_all();
 }
 
