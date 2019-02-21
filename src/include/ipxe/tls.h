@@ -242,13 +242,40 @@ struct md5_sha1_digest {
 /** MD5+SHA1 digest size */
 #define MD5_SHA1_DIGEST_SIZE sizeof ( struct md5_sha1_digest )
 
+/** A TLS session */
+struct tls_session {
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** List of sessions */
+	struct list_head list;
+
+	/** Server name */
+	const char *name;
+	/** Session ID */
+	uint8_t id[32];
+	/** Length of session ID */
+	size_t id_len;
+	/** Master secret */
+	uint8_t master_secret[48];
+
+	/** List of connections */
+	struct list_head conn;
+};
+
 /** A TLS connection */
 struct tls_connection {
 	/** Reference counter */
 	struct refcnt refcnt;
 
-	/** Server name */
-	const char *name;
+	/** Session */
+	struct tls_session *session;
+	/** List of connections within the same session */
+	struct list_head list;
+	/** Session ID */
+	uint8_t session_id[32];
+	/** Length of session ID */
+	size_t session_id_len;
+
 	/** Plaintext stream */
 	struct interface plainstream;
 	/** Ciphertext stream */
