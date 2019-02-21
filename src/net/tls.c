@@ -104,7 +104,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 			  "Invalid MAC" )
 #define EIO_ALERT __einfo_error ( EINFO_EIO_ALERT )
 #define EINFO_EIO_ALERT							\
-	__einfo_uniqify ( EINFO_EINVAL, 0x01,				\
+	__einfo_uniqify ( EINFO_EIO, 0x01,				\
 			  "Unknown alert level" )
 #define ENOMEM_CONTEXT __einfo_error ( EINFO_ENOMEM_CONTEXT )
 #define EINFO_ENOMEM_CONTEXT						\
