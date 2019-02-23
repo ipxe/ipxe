@@ -474,18 +474,43 @@ static int ocsp_parse_responder_id ( struct ocsp_check *ocsp,
  */
 static int ocsp_parse_cert_id ( struct ocsp_check *ocsp,
 				const struct asn1_cursor *raw ) {
+	struct asn1_cursor req;
 	struct asn1_cursor cursor;
+	int rc;
+	struct asn1_algorithm *algo_req, *algo_resp;
 
-	/* Check certID matches request */
+	memcpy ( &req, &ocsp->request.cert_id, sizeof ( req ) );
 	memcpy ( &cursor, raw, sizeof ( cursor ) );
-	asn1_shrink_any ( &cursor );
-	if ( asn1_compare ( &cursor, &ocsp->request.cert_id ) != 0 ) {
-		DBGC ( ocsp, "OCSP %p \"%s\" certID mismatch:\n",
+
+	/* enter CertID */
+	asn1_enter ( &req, ASN1_SEQUENCE );
+	asn1_enter ( &cursor, ASN1_SEQUENCE );
+
+	/* compare hashAlgorithm */
+	if ( ( rc = asn1_digest_algorithm ( &req , &algo_req ) ) != 0 )
+		return rc;
+	if ( ( rc = asn1_digest_algorithm ( &cursor , &algo_resp ) ) != 0 )
+		return rc;
+
+	if ( ( rc = asn1_compare ( &algo_req->oid, &algo_resp->oid ) != 0 ) ) {
+		DBGC ( ocsp, "OCSP %p \"%s\" certID hashAlgorithm mismatch:\n",
+				ocsp, x509_name ( ocsp->cert ) );
+		DBGC_HDA ( ocsp, 0, algo_req->oid.data, algo_req->oid.len );
+		DBGC_HDA ( ocsp, 0, algo_resp->oid.data, algo_resp->oid.len );
+		return rc;
+	}
+
+	asn1_skip_any ( &req );
+	asn1_skip_any ( &cursor );
+
+	/* compare issuerName, issuerKey, serialNumber */
+	if ( ( rc = asn1_compare ( &req, &cursor ) != 0 ) ) {
+		DBGC ( ocsp, "OCSP %p \"%s\""
+               "certID issuerName, issuerKey, or serialNumber mismatch:\n",
 		       ocsp, x509_name ( ocsp->cert ) );
-		DBGC_HDA ( ocsp, 0, ocsp->request.cert_id.data,
-			   ocsp->request.cert_id.len );
+		DBGC_HDA ( ocsp, 0, req.data, req.len );
 		DBGC_HDA ( ocsp, 0, cursor.data, cursor.len );
-		return -EACCES_CERT_MISMATCH;
+		return rc;
 	}
 
 	return 0;
