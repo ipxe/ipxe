@@ -102,6 +102,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_EINVAL_MAC						\
 	__einfo_uniqify ( EINFO_EINVAL, 0x0d,				\
 			  "Invalid MAC" )
+#define EINVAL_TICKET __einfo_error ( EINFO_EINVAL_TICKET )
+#define EINFO_EINVAL_TICKET						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x0e,				\
+			  "Invalid New Session Ticket record")
 #define EIO_ALERT __einfo_error ( EINFO_EIO_ALERT )
 #define EINFO_EIO_ALERT							\
 	__einfo_uniqify ( EINFO_EIO, 0x01,				\
@@ -326,6 +330,9 @@ static void free_tls_session ( struct refcnt *refcnt ) {
 	/* Remove from list of sessions */
 	list_del ( &session->list );
 
+	/* Free session ticket */
+	free ( session->ticket );
+
 	/* Free session */
 	free ( session );
 }
@@ -343,6 +350,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	struct io_buffer *tmp;
 
 	/* Free dynamically-allocated resources */
+	free ( tls->new_session_ticket );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
@@ -1007,7 +1015,7 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
 		uint16_t version;
 		uint8_t random[32];
 		uint8_t session_id_len;
-		uint8_t session_id[session->id_len];
+		uint8_t session_id[tls->session_id_len];
 		uint16_t cipher_suite_len;
 		uint16_t cipher_suites[TLS_NUM_CIPHER_SUITES];
 		uint8_t compression_methods_len;
@@ -1043,17 +1051,16 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
 				uint8_t data[ tls->secure_renegotiation ?
 					      sizeof ( tls->verify.client ) :0];
 			} __attribute__ (( packed )) renegotiation_info;
+			uint16_t session_ticket_type;
+			uint16_t session_ticket_len;
+			struct {
+				uint8_t data[session->ticket_len];
+			} __attribute__ (( packed )) session_ticket;
 		} __attribute__ (( packed )) extensions;
 	} __attribute__ (( packed )) hello;
 	struct tls_cipher_suite *suite;
 	struct tls_signature_hash_algorithm *sighash;
 	unsigned int i;
-
-	/* Record requested session ID and associated master secret */
-	memcpy ( tls->session_id, session->id, sizeof ( tls->session_id ) );
-	tls->session_id_len = session->id_len;
-	memcpy ( tls->master_secret, session->master_secret,
-		 sizeof ( tls->master_secret ) );
 
 	/* Construct record */
 	memset ( &hello, 0, sizeof ( hello ) );
@@ -1102,6 +1109,11 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
 		= sizeof ( hello.extensions.renegotiation_info.data );
 	memcpy ( hello.extensions.renegotiation_info.data, tls->verify.client,
 		 sizeof ( hello.extensions.renegotiation_info.data ) );
+	hello.extensions.session_ticket_type = htons ( TLS_SESSION_TICKET );
+	hello.extensions.session_ticket_len
+		= htons ( sizeof ( hello.extensions.session_ticket ) );
+	memcpy ( hello.extensions.session_ticket.data, session->ticket,
+		 sizeof ( hello.extensions.session_ticket.data ) );
 
 	return tls_send_handshake ( tls, &hello, sizeof ( hello ) );
 }
@@ -1632,6 +1644,57 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 }
 
 /**
+ * Receive New Session Ticket handshake record
+ *
+ * @v tls		TLS connection
+ * @v data		Plaintext handshake record
+ * @v len		Length of plaintext handshake record
+ * @ret rc		Return status code
+ */
+static int tls_new_session_ticket ( struct tls_connection *tls,
+				    const void *data, size_t len ) {
+	const struct {
+		uint32_t lifetime;
+		uint16_t len;
+		uint8_t ticket[0];
+	} __attribute__ (( packed )) *new_session_ticket = data;
+	size_t ticket_len;
+
+	/* Parse header */
+	if ( sizeof ( *new_session_ticket ) > len ) {
+		DBGC ( tls, "TLS %p received underlength New Session Ticket\n",
+		       tls );
+		DBGC_HD ( tls, data, len );
+		return -EINVAL_TICKET;
+	}
+	ticket_len = ntohs ( new_session_ticket->len );
+	if ( ticket_len > ( len - sizeof ( *new_session_ticket ) ) ) {
+		DBGC ( tls, "TLS %p received overlength New Session Ticket\n",
+		       tls );
+		DBGC_HD ( tls, data, len );
+		return -EINVAL_TICKET;
+	}
+
+	/* Free any unapplied new session ticket */
+	free ( tls->new_session_ticket );
+	tls->new_session_ticket = NULL;
+	tls->new_session_ticket_len = 0;
+
+	/* Record ticket */
+	tls->new_session_ticket = malloc ( ticket_len );
+	if ( ! tls->new_session_ticket )
+		return -ENOMEM;
+	memcpy ( tls->new_session_ticket, new_session_ticket->ticket,
+		 ticket_len );
+	tls->new_session_ticket_len = ticket_len;
+	DBGC ( tls, "TLS %p new session ticket:\n", tls );
+	DBGC_HDA ( tls, 0, tls->new_session_ticket,
+		   tls->new_session_ticket_len );
+
+	return 0;
+}
+
+/**
  * Parse certificate chain
  *
  * @v tls		TLS connection
@@ -1863,12 +1926,21 @@ static int tls_new_finished ( struct tls_connection *tls,
 		tls_tx_resume ( tls );
 	}
 
-	/* Record session ID and master secret, if applicable */
+	/* Record session ID, ticket, and master secret, if applicable */
+	if ( tls->session_id_len || tls->new_session_ticket_len ) {
+		memcpy ( session->master_secret, tls->master_secret,
+			 sizeof ( session->master_secret ) );
+	}
 	if ( tls->session_id_len ) {
 		session->id_len = tls->session_id_len;
 		memcpy ( session->id, tls->session_id, sizeof ( session->id ) );
-		memcpy ( session->master_secret, tls->master_secret,
-			 sizeof ( session->master_secret ) );
+	}
+	if ( tls->new_session_ticket_len ) {
+		free ( session->ticket );
+		session->ticket = tls->new_session_ticket;
+		session->ticket_len = tls->new_session_ticket_len;
+		tls->new_session_ticket = NULL;
+		tls->new_session_ticket_len = 0;
 	}
 
 	/* Move to end of session's connection list and allow other
@@ -1932,6 +2004,10 @@ static int tls_new_handshake ( struct tls_connection *tls,
 			break;
 		case TLS_SERVER_HELLO:
 			rc = tls_new_server_hello ( tls, payload, payload_len );
+			break;
+		case TLS_NEW_SESSION_TICKET:
+			rc = tls_new_session_ticket ( tls, payload,
+						      payload_len );
 			break;
 		case TLS_CERTIFICATE:
 			rc = tls_new_certificate ( tls, payload, payload_len );
@@ -2804,16 +2880,31 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 
 	/* Send first pending transmission */
 	if ( tls->tx_pending & TLS_TX_CLIENT_HELLO ) {
-		/* Wait for session ID to become available unless we
-		 * are the lead connection within the session.
+		/* Serialise server negotiations within a session, to
+		 * provide a consistent view of session IDs and
+		 * session tickets.
 		 */
-		if ( session->id_len == 0 ) {
-			list_for_each_entry ( conn, &session->conn, list ) {
-				if ( conn == tls )
-					break;
-				if ( is_pending ( &conn->server_negotiation ) )
-					return;
-			}
+		list_for_each_entry ( conn, &session->conn, list ) {
+			if ( conn == tls )
+				break;
+			if ( is_pending ( &conn->server_negotiation ) )
+				return;
+		}
+		/* Record or generate session ID and associated master secret */
+		if ( session->id_len ) {
+			/* Attempt to resume an existing session */
+			memcpy ( tls->session_id, session->id,
+				 sizeof ( tls->session_id ) );
+			tls->session_id_len = session->id_len;
+			memcpy ( tls->master_secret, session->master_secret,
+				 sizeof ( tls->master_secret ) );
+		} else {
+			/* No existing session: use a random session ID */
+			assert ( sizeof ( tls->session_id ) ==
+				 sizeof ( tls->client_random ) );
+			memcpy ( tls->session_id, &tls->client_random,
+				 sizeof ( tls->session_id ) );
+			tls->session_id_len = sizeof ( tls->session_id );
 		}
 		/* Send Client Hello */
 		if ( ( rc = tls_send_client_hello ( tls ) ) != 0 ) {
