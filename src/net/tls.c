@@ -47,6 +47,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/certstore.h>
 #include <ipxe/rbg.h>
 #include <ipxe/validator.h>
+#include <ipxe/job.h>
 #include <ipxe/tls.h>
 
 /* Disambiguate the various error causes */
@@ -2570,12 +2571,31 @@ static int tls_plainstream_deliver ( struct tls_connection *tls,
 	return rc;
 }
 
+/**
+ * Report job progress
+ *
+ * @v tls		TLS connection
+ * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int tls_progress ( struct tls_connection *tls,
+			  struct job_progress *progress ) {
+
+	/* Return cipherstream or validator progress as applicable */
+	if ( tls_ready ( tls ) ) {
+		return job_progress ( &tls->cipherstream, progress );
+	} else {
+		return job_progress ( &tls->validator, progress );
+	}
+}
+
 /** TLS plaintext stream interface operations */
 static struct interface_operation tls_plainstream_ops[] = {
 	INTF_OP ( xfer_deliver, struct tls_connection *,
 		  tls_plainstream_deliver ),
 	INTF_OP ( xfer_window, struct tls_connection *,
 		  tls_plainstream_window ),
+	INTF_OP ( job_progress, struct tls_connection *, tls_progress ),
 	INTF_OP ( intf_close, struct tls_connection *, tls_close ),
 };
 

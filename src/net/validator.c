@@ -40,6 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/base64.h>
 #include <ipxe/crc32.h>
 #include <ipxe/ocsp.h>
+#include <ipxe/job.h>
 #include <ipxe/validator.h>
 #include <config/crypto.h>
 
@@ -48,6 +49,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Certificate validator
  *
  */
+
+struct validator;
+
+/** A certificate validator action */
+struct validator_action {
+	/** Name */
+	const char *name;
+	/** Action to take upon completed transfer */
+	int ( * done ) ( struct validator *validator, const void *data,
+			 size_t len );
+};
 
 /** A certificate validator */
 struct validator {
@@ -67,9 +79,16 @@ struct validator {
 	struct ocsp_check *ocsp;
 	/** Data buffer */
 	struct xfer_buffer buffer;
-	/** Action to take upon completed transfer */
-	int ( * done ) ( struct validator *validator, const void *data,
-			 size_t len );
+
+	/** Current action */
+	const struct validator_action *action;
+	/** Current certificate
+	 *
+	 * This will always be present within the certificate chain
+	 * and so this pointer does not hold a reference to the
+	 * certificate.
+	 */
+	struct x509_certificate *cert;
 };
 
 /**
@@ -123,8 +142,29 @@ static void validator_finished ( struct validator *validator, int rc ) {
  *
  */
 
+/**
+ * Report job progress
+ *
+ * @v validator		Certificate validator
+ * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int validator_progress ( struct validator *validator,
+				struct job_progress *progress ) {
+
+	/* Report current action, if applicable */
+	if ( validator->action ) {
+		snprintf ( progress->message, sizeof ( progress->message ),
+			   "%s %s", validator->action->name,
+			   x509_name ( validator->cert ) );
+	}
+
+	return 0;
+}
+
 /** Certificate validator job control interface operations */
 static struct interface_operation validator_job_operations[] = {
+	INTF_OP ( job_progress, struct validator *, validator_progress ),
 	INTF_OP ( intf_close, struct validator *, validator_finished ),
 };
 
@@ -236,6 +276,12 @@ static int validator_append ( struct validator *validator,
 	return rc;
 }
 
+/** Cross-signing certificate download validator action */
+static const struct validator_action validator_crosscert = {
+	.name = "XCRT",
+	.done = validator_append,
+};
+
 /**
  * Start download of cross-signing certificate
  *
@@ -285,7 +331,8 @@ static int validator_start_download ( struct validator *validator,
 	       x509_name ( cert ), uri_string );
 
 	/* Set completion handler */
-	validator->done = validator_append;
+	validator->action = &validator_crosscert;
+	validator->cert = cert;
 
 	/* Open URI */
 	if ( ( rc = xfer_open_uri_string ( &validator->xfer,
@@ -350,6 +397,12 @@ static int validator_ocsp_validate ( struct validator *validator,
 	return 0;
 }
 
+/** OCSP validator action */
+static const struct validator_action validator_ocsp = {
+	.name = "OCSP",
+	.done = validator_ocsp_validate,
+};
+
 /**
  * Start OCSP check
  *
@@ -374,7 +427,8 @@ static int validator_start_ocsp ( struct validator *validator,
 	}
 
 	/* Set completion handler */
-	validator->done = validator_ocsp_validate;
+	validator->action = &validator_ocsp;
+	validator->cert = cert;
 
 	/* Open URI */
 	uri_string = validator->ocsp->uri_string;
@@ -421,9 +475,9 @@ static void validator_xfer_close ( struct validator *validator, int rc ) {
 		validator, validator_name ( validator ) );
 
 	/* Process completed download */
-	assert ( validator->done != NULL );
-	if ( ( rc = validator->done ( validator, validator->buffer.data,
-				       validator->buffer.len ) ) != 0 )
+	assert ( validator->action != NULL );
+	if ( ( rc = validator->action->done ( validator, validator->buffer.data,
+					      validator->buffer.len ) ) != 0 )
 		goto err_append;
 
 	/* Free downloaded data */
