@@ -17,6 +17,7 @@
 #include <ipxe/netdevice.h>
 #include <ipxe/profile.h>
 #include <ipxe/process.h>
+#include <ipxe/job.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/tcp.h>
 
@@ -1704,10 +1705,30 @@ static int tcp_xfer_deliver ( struct tcp_connection *tcp,
 	return 0;
 }
 
+/**
+ * Report job progress
+ *
+ * @v tcp		TCP connection
+ * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int tcp_progress ( struct tcp_connection *tcp,
+			  struct job_progress *progress ) {
+
+	/* Report connection in progress if applicable */
+	if ( ! TCP_HAS_BEEN_ESTABLISHED ( tcp->tcp_state ) ) {
+		snprintf ( progress->message, sizeof ( progress->message ),
+			   "connecting" );
+	}
+
+	return 0;
+}
+
 /** TCP data transfer interface operations */
 static struct interface_operation tcp_xfer_operations[] = {
 	INTF_OP ( xfer_deliver, struct tcp_connection *, tcp_xfer_deliver ),
 	INTF_OP ( xfer_window, struct tcp_connection *, tcp_xfer_window ),
+	INTF_OP ( job_progress, struct tcp_connection *, tcp_progress ),
 	INTF_OP ( intf_close, struct tcp_connection *, tcp_xfer_close ),
 };
 
