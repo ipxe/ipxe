@@ -335,6 +335,8 @@ struct tls_connection {
 	struct pending_operation client_negotiation;
 	/** Server security negotiation pending operation */
 	struct pending_operation server_negotiation;
+	/** Certificate validation pending operation */
+	struct pending_operation validation;
 
 	/** TX sequence number */
 	uint64_t tx_seq;

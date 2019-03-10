@@ -382,6 +382,7 @@ static void tls_close ( struct tls_connection *tls, int rc ) {
 	/* Remove pending operations, if applicable */
 	pending_put ( &tls->client_negotiation );
 	pending_put ( &tls->server_negotiation );
+	pending_put ( &tls->validation );
 
 	/* Remove process */
 	process_del ( &tls->process );
@@ -950,6 +951,7 @@ static void tls_restart ( struct tls_connection *tls ) {
 	assert ( ! tls->tx_pending );
 	assert ( ! is_pending ( &tls->client_negotiation ) );
 	assert ( ! is_pending ( &tls->server_negotiation ) );
+	assert ( ! is_pending ( &tls->validation ) );
 
 	/* (Re)initialise handshake context */
 	digest_init ( &md5_sha1_algorithm, tls->handshake_md5_sha1_ctx );
@@ -1875,6 +1877,7 @@ static int tls_new_server_hello_done ( struct tls_connection *tls,
 		       "%s\n", tls, strerror ( rc ) );
 		return rc;
 	}
+	pending_get ( &tls->validation );
 
 	return 0;
 }
@@ -2582,10 +2585,10 @@ static int tls_progress ( struct tls_connection *tls,
 			  struct job_progress *progress ) {
 
 	/* Return cipherstream or validator progress as applicable */
-	if ( tls_ready ( tls ) ) {
-		return job_progress ( &tls->cipherstream, progress );
-	} else {
+	if ( is_pending ( &tls->validation ) ) {
 		return job_progress ( &tls->validator, progress );
+	} else {
+		return job_progress ( &tls->cipherstream, progress );
 	}
 }
 
@@ -2819,6 +2822,9 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	struct x509_certificate *cert;
+
+	/* Mark validation as complete */
+	pending_put ( &tls->validation );
 
 	/* Close validator interface */
 	intf_restart ( &tls->validator, rc );
