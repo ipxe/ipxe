@@ -42,8 +42,8 @@ struct ocsp_check;
 struct ocsp_request {
 	/** Request builder */
 	struct asn1_builder builder;
-	/** Certificate ID */
-	struct asn1_cursor cert_id;
+	/** Certificate ID (excluding hashAlgorithm) */
+	struct asn1_cursor cert_id_tail;
 };
 
 /** An OCSP responder */
