@@ -123,6 +123,15 @@ static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
  ******************************************************************************
  */
 
+/** Admin queue register offsets */
+static const struct intelxl_admin_offsets intelxl_admin_offsets = {
+	.bal = INTELXL_ADMIN_BAL,
+	.bah = INTELXL_ADMIN_BAH,
+	.len = INTELXL_ADMIN_LEN,
+	.head = INTELXL_ADMIN_HEAD,
+	.tail = INTELXL_ADMIN_TAIL,
+};
+
 /**
  * Create admin queue
  *
@@ -133,7 +142,8 @@ static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
 static int intelxl_create_admin ( struct intelxl_nic *intelxl,
 				  struct intelxl_admin *admin ) {
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
-	void *admin_regs = ( intelxl->regs + admin->reg );
+	const struct intelxl_admin_offsets *regs = admin->regs;
+	void *admin_regs = ( intelxl->regs + admin->base );
 	physaddr_t address;
 
 	/* Allocate admin queue */
@@ -147,30 +157,30 @@ static int intelxl_create_admin ( struct intelxl_nic *intelxl,
 	memset ( admin->desc, 0, len );
 
 	/* Reset head and tail registers */
-	writel ( 0, admin_regs + INTELXL_ADMIN_HEAD );
-	writel ( 0, admin_regs + INTELXL_ADMIN_TAIL );
+	writel ( 0, admin_regs + regs->head );
+	writel ( 0, admin_regs + regs->tail );
 
 	/* Reset queue index */
 	admin->index = 0;
 
 	/* Program queue address */
 	address = virt_to_bus ( admin->desc );
-	writel ( ( address & 0xffffffffUL ), admin_regs + INTELXL_ADMIN_BAL );
+	writel ( ( address & 0xffffffffUL ), admin_regs + regs->bal );
 	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {
 		writel ( ( ( ( uint64_t ) address ) >> 32 ),
-			 admin_regs + INTELXL_ADMIN_BAH );
+			 admin_regs + regs->bah );
 	} else {
-		writel ( 0, admin_regs + INTELXL_ADMIN_BAH );
+		writel ( 0, admin_regs + regs->bah );
 	}
 
 	/* Program queue length and enable queue */
 	writel ( ( INTELXL_ADMIN_LEN_LEN ( INTELXL_ADMIN_NUM_DESC ) |
 		   INTELXL_ADMIN_LEN_ENABLE ),
-		 admin_regs + INTELXL_ADMIN_LEN );
+		 admin_regs + regs->len );
 
 	DBGC ( intelxl, "INTELXL %p A%cQ is at [%08llx,%08llx) buf "
 	       "[%08llx,%08llx)\n", intelxl,
-	       ( ( admin->reg == INTELXL_ADMIN_CMD ) ? 'T' : 'R' ),
+	       ( ( admin == &intelxl->command ) ? 'T' : 'R' ),
 	       ( ( unsigned long long ) address ),
 	       ( ( unsigned long long ) address + len ),
 	       ( ( unsigned long long ) virt_to_bus ( admin->buffer ) ),
@@ -188,10 +198,11 @@ static int intelxl_create_admin ( struct intelxl_nic *intelxl,
 static void intelxl_destroy_admin ( struct intelxl_nic *intelxl,
 				    struct intelxl_admin *admin ) {
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
-	void *admin_regs = ( intelxl->regs + admin->reg );
+	const struct intelxl_admin_offsets *regs = admin->regs;
+	void *admin_regs = ( intelxl->regs + admin->base );
 
 	/* Disable queue */
-	writel ( 0, admin_regs + INTELXL_ADMIN_LEN );
+	writel ( 0, admin_regs + regs->len );
 
 	/* Free queue */
 	free_dma ( admin->desc, ( len + sizeof ( *admin->buffer ) ) );
@@ -207,7 +218,8 @@ static void intelxl_destroy_admin ( struct intelxl_nic *intelxl,
 static int intelxl_admin_command ( struct intelxl_nic *intelxl,
 				   struct intelxl_admin_descriptor *cmd ) {
 	struct intelxl_admin *admin = &intelxl->command;
-	void *admin_regs = ( intelxl->regs + admin->reg );
+	const struct intelxl_admin_offsets *regs = admin->regs;
+	void *admin_regs = ( intelxl->regs + admin->base );
 	struct intelxl_admin_descriptor *desc;
 	uint64_t buffer;
 	unsigned int index;
@@ -245,7 +257,7 @@ static int intelxl_admin_command ( struct intelxl_nic *intelxl,
 
 	/* Post command descriptor */
 	wmb();
-	writel ( tail, admin_regs + INTELXL_ADMIN_TAIL );
+	writel ( tail, admin_regs + regs->tail );
 
 	/* Wait for completion */
 	for ( i = 0 ; i < INTELXL_ADMIN_MAX_WAIT_MS ; i++ ) {
@@ -558,13 +570,14 @@ static int intelxl_admin_link ( struct net_device *netdev ) {
  */
 static void intelxl_refill_admin ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin *admin = &intelxl->event;
-	void *admin_regs = ( intelxl->regs + admin->reg );
+	const struct intelxl_admin_offsets *regs = admin->regs;
+	void *admin_regs = ( intelxl->regs + admin->base );
 	unsigned int tail;
 
 	/* Update tail pointer */
 	tail = ( ( admin->index + INTELXL_ADMIN_NUM_DESC - 1 ) %
 		 INTELXL_ADMIN_NUM_DESC );
-	writel ( tail, admin_regs + INTELXL_ADMIN_TAIL );
+	writel ( tail, admin_regs + regs->tail );
 }
 
 /**
@@ -1383,8 +1396,10 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
 	intelxl->pf = PCI_FUNC ( pci->busdevfn );
-	intelxl_init_admin ( &intelxl->command, INTELXL_ADMIN_CMD );
-	intelxl_init_admin ( &intelxl->event, INTELXL_ADMIN_EVT );
+	intelxl_init_admin ( &intelxl->command, INTELXL_ADMIN_CMD,
+			     &intelxl_admin_offsets );
+	intelxl_init_admin ( &intelxl->event, INTELXL_ADMIN_EVT,
+			     &intelxl_admin_offsets );
 	intelxl_init_ring ( &intelxl->tx, INTELXL_TX_NUM_DESC,
 			    intelxl_context_tx );
 	intelxl_init_ring ( &intelxl->rx, INTELXL_RX_NUM_DESC,

@@ -53,6 +53,24 @@ struct intelxl_nic;
 /** Admin Queue Tail Register (offset) */
 #define INTELXL_ADMIN_TAIL 0x400
 
+/** Admin queue register offsets
+ *
+ * The physical and virtual function register maps have no discernible
+ * relationship.
+ */
+struct intelxl_admin_offsets {
+	/** Base Address Low Register offset */
+	unsigned int bal;
+	/** Base Address High Register offset */
+	unsigned int bah;
+	/** Length Register offset */
+	unsigned int len;
+	/** Head Register offset */
+	unsigned int head;
+	/** Tail Register offset */
+	unsigned int tail;
+};
+
 /** Admin queue data buffer command parameters */
 struct intelxl_admin_buffer_params {
 	/** Reserved */
@@ -343,8 +361,10 @@ struct intelxl_admin {
 	/** Queue index */
 	unsigned int index;
 
-	/** Register block */
-	unsigned int reg;
+	/** Register block base */
+	unsigned int base;
+	/** Register offsets */
+	const struct intelxl_admin_offsets *regs;
 	/** Data buffer */
 	union intelxl_admin_buffer *buffer;
 };
@@ -353,12 +373,15 @@ struct intelxl_admin {
  * Initialise admin queue
  *
  * @v admin		Admin queue
- * @v reg		Register block
+ * @v base		Register block base
+ * @v regs		Register offsets
  */
 static inline __attribute__ (( always_inline )) void
-intelxl_init_admin ( struct intelxl_admin *admin, unsigned int reg ) {
+intelxl_init_admin ( struct intelxl_admin *admin, unsigned int base,
+		     const struct intelxl_admin_offsets *regs ) {
 
-	admin->reg = reg;
+	admin->base = base;
+	admin->regs = regs;
 }
 
 /** Number of admin queue descriptors */
