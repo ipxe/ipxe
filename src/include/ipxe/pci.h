@@ -94,6 +94,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CAP_ID_VPD			0x03	/**< Vital product data */
 #define PCI_CAP_ID_VNDR			0x09	/**< Vendor-specific */
 #define PCI_CAP_ID_EXP			0x10	/**< PCI Express */
+#define PCI_CAP_ID_MSIX			0x11	/**< MSI-X */
 #define PCI_CAP_ID_EA			0x14	/**< Enhanced Allocation */
 
 /** Next capability */
@@ -108,6 +109,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** PCI Express */
 #define PCI_EXP_DEVCTL		0x08
 #define PCI_EXP_DEVCTL_FLR		0x8000	/**< Function level reset */
+
+/** MSI-X interrupts */
+#define PCI_MSIX_CTRL		0x02
+#define PCI_MSIX_CTRL_ENABLE		0x8000	/**< Enable MSI-X */
+#define PCI_MSIX_CTRL_MASK		0x4000	/**< Mask all interrupts */
+#define PCI_MSIX_CTRL_SIZE(x)	( (x) & 0x07ff ) /**< Table size */
+#define PCI_MSIX_DESC_TABLE	0x04
+#define PCI_MSIX_DESC_PBA	0x08
+#define PCI_MSIX_DESC_BIR(x)	( (x) & 0x00000007 ) /**< BAR index */
+#define PCI_MSIX_DESC_OFFSET(x)	( (x) & 0xfffffff8 ) /**< BAR offset */
 
 /** Uncorrectable error status */
 #define PCI_ERR_UNCOR_STATUS	0x04
