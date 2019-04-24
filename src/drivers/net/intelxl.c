@@ -313,8 +313,11 @@ static int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 	tail = ( admin->index % INTELXL_ADMIN_NUM_DESC );
 	cmd = &admin->desc[ index % INTELXL_ADMIN_NUM_DESC ];
 	buf = &admin->buf[ index % INTELXL_ADMIN_NUM_DESC ];
-	DBGC2 ( intelxl, "INTELXL %p admin command %#x opcode %#04x:\n",
+	DBGC2 ( intelxl, "INTELXL %p admin command %#x opcode %#04x",
 		intelxl, index, le16_to_cpu ( cmd->opcode ) );
+	if ( cmd->vopcode )
+		DBGC2 ( intelxl, "/%#08x", le32_to_cpu ( cmd->vopcode ) );
+	DBGC2 ( intelxl, ":\n" );
 
 	/* Sanity checks */
 	assert ( ! ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_DD ) ) );
@@ -329,8 +332,9 @@ static int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 		cmd->params.buffer.low = cpu_to_le32 ( address & 0xffffffffUL );
 	}
 
-	/* Populate cookie */
-	cmd->cookie = cpu_to_le32 ( index );
+	/* Populate cookie, if not being (ab)used for VF opcode */
+	if ( ! cmd->vopcode )
+		cmd->cookie = cpu_to_le32 ( index );
 
 	/* Record cookie */
 	cookie = cmd->cookie;

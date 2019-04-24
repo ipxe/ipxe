@@ -333,10 +333,15 @@ struct intelxl_admin_descriptor {
 	uint16_t len;
 	/** Return value */
 	uint16_t ret;
-	/** Cookie */
-	uint32_t cookie;
-	/** Reserved */
-	uint32_t reserved;
+	/** Opaque cookie / VF opcode */
+	union {
+		/** Cookie */
+		uint32_t cookie;
+		/** VF opcode */
+		uint32_t vopcode;
+	};
+	/** VF return value */
+	int32_t vret;
 	/** Parameters */
 	union intelxl_admin_params params;
 } __attribute__ (( packed ));
