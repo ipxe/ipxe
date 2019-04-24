@@ -502,6 +502,9 @@ struct intelxl_context_rx {
 /** Receive queue data buffer length */
 #define INTELXL_CTX_RX_LEN( len ) ( (len) >> 1 )
 
+/** Use 32-byte receive descriptors */
+#define INTELXL_CTX_RX_FL_DSIZE 0x10
+
 /** Strip CRC from received packets */
 #define INTELXL_CTX_RX_FL_CRCSTRIP 0x20
 
@@ -605,6 +608,14 @@ struct intelxl_tx_writeback_descriptor {
 /** Transmit writeback descriptor complete */
 #define INTELXL_TX_WB_FL_DD 0x01
 
+/** Transmit descriptor */
+union intelxl_tx_descriptor {
+	/** Transmit data descriptor */
+	struct intelxl_tx_data_descriptor data;
+	/** Transmit writeback descriptor */
+	struct intelxl_tx_writeback_descriptor wb;
+};
+
 /** Receive data descriptor */
 struct intelxl_rx_data_descriptor {
 	/** Buffer address */
@@ -612,7 +623,7 @@ struct intelxl_rx_data_descriptor {
 	/** Flags */
 	uint32_t flags;
 	/** Reserved */
-	uint8_t reserved[4];
+	uint8_t reserved[20];
 } __attribute__ (( packed ));
 
 /** Receive writeback descriptor */
@@ -627,6 +638,8 @@ struct intelxl_rx_writeback_descriptor {
 	uint32_t flags;
 	/** Length */
 	uint32_t len;
+	/** Reserved */
+	uint8_t reserved_c[16];
 } __attribute__ (( packed ));
 
 /** Receive writeback descriptor complete */
@@ -642,21 +655,24 @@ struct intelxl_rx_writeback_descriptor {
 #define INTELXL_RX_WB_LEN(len) ( ( (len) >> 6 ) & 0x3fff )
 
 /** Packet descriptor */
-union intelxl_descriptor {
-	/** Transmit data descriptor */
-	struct intelxl_tx_data_descriptor tx;
-	/** Transmit writeback descriptor */
-	struct intelxl_tx_writeback_descriptor tx_wb;
+union intelxl_rx_descriptor {
 	/** Receive data descriptor */
-	struct intelxl_rx_data_descriptor rx;
+	struct intelxl_rx_data_descriptor data;
 	/** Receive writeback descriptor */
-	struct intelxl_rx_writeback_descriptor rx_wb;
+	struct intelxl_rx_writeback_descriptor wb;
 };
 
 /** Descriptor ring */
 struct intelxl_ring {
 	/** Descriptors */
-	union intelxl_descriptor *desc;
+	union {
+		/** Transmit descriptors */
+		union intelxl_tx_descriptor *tx;
+		/** Receive descriptors */
+		union intelxl_rx_descriptor *rx;
+		/** Raw data */
+		void *raw;
+	} desc;
 	/** Producer index */
 	unsigned int prod;
 	/** Consumer index */
@@ -679,14 +695,15 @@ struct intelxl_ring {
  *
  * @v ring		Descriptor ring
  * @v count		Number of descriptors
+ * @v len		Length of a single descriptor
  * @v context		Method to program queue context
  */
 static inline __attribute__ (( always_inline)) void
-intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count,
+intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 		    int ( * context ) ( struct intelxl_nic *intelxl,
 					physaddr_t address ) ) {
 
-	ring->len = ( count * sizeof ( ring->desc[0] ) );
+	ring->len = ( count * len );
 	ring->context = context;
 }
 

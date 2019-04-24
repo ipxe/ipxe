@@ -1018,7 +1018,7 @@ static int intelxl_context_rx ( struct intelxl_nic *intelxl,
 	base_count = INTELXL_CTX_RX_BASE_COUNT ( address, INTELXL_RX_NUM_DESC );
 	ctx.rx.base_count = cpu_to_le64 ( base_count );
 	ctx.rx.len = cpu_to_le16 ( INTELXL_CTX_RX_LEN ( intelxl->mfs ) );
-	ctx.rx.flags = INTELXL_CTX_RX_FL_CRCSTRIP;
+	ctx.rx.flags = ( INTELXL_CTX_RX_FL_DSIZE | INTELXL_CTX_RX_FL_CRCSTRIP );
 	ctx.rx.mfs = cpu_to_le16 ( INTELXL_CTX_RX_MFS ( intelxl->mfs ) );
 
 	/* Program context */
@@ -1101,20 +1101,20 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 	int rc;
 
 	/* Allocate descriptor ring */
-	ring->desc = malloc_dma ( ring->len, INTELXL_ALIGN );
-	if ( ! ring->desc ) {
+	ring->desc.raw = malloc_dma ( ring->len, INTELXL_ALIGN );
+	if ( ! ring->desc.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
 
 	/* Initialise descriptor ring */
-	memset ( ring->desc, 0, ring->len );
+	memset ( ring->desc.raw, 0, ring->len );
 
 	/* Reset tail pointer */
 	writel ( 0, ( ring_regs + INTELXL_QXX_TAIL ) );
 
 	/* Program queue context */
-	address = virt_to_bus ( ring->desc );
+	address = virt_to_bus ( ring->desc.raw );
 	if ( ( rc = ring->context ( intelxl, address ) ) != 0 )
 		goto err_context;
 
@@ -1135,7 +1135,7 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 	intelxl_disable_ring ( intelxl, ring );
  err_enable:
  err_context:
-	free_dma ( ring->desc, ring->len );
+	free_dma ( ring->desc.raw, ring->len );
  err_alloc:
 	return rc;
 }
@@ -1157,8 +1157,8 @@ static void intelxl_destroy_ring ( struct intelxl_nic *intelxl,
 	}
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc, ring->len );
-	ring->desc = NULL;
+	free_dma ( ring->desc.raw, ring->len );
+	ring->desc.raw = NULL;
 }
 
 /**
@@ -1186,7 +1186,7 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 
 		/* Get next receive descriptor */
 		rx_idx = ( intelxl->rx.prod++ % INTELXL_RX_NUM_DESC );
-		rx = &intelxl->rx.desc[rx_idx].rx;
+		rx = &intelxl->rx.desc.rx[rx_idx].data;
 
 		/* Populate receive descriptor */
 		address = virt_to_bus ( iobuf->data );
@@ -1351,7 +1351,7 @@ static int intelxl_transmit ( struct net_device *netdev,
 	}
 	tx_idx = ( intelxl->tx.prod++ % INTELXL_TX_NUM_DESC );
 	tx_tail = ( intelxl->tx.prod % INTELXL_TX_NUM_DESC );
-	tx = &intelxl->tx.desc[tx_idx].tx;
+	tx = &intelxl->tx.desc.tx[tx_idx].data;
 
 	/* Populate transmit descriptor */
 	address = virt_to_bus ( iobuf->data );
@@ -1387,7 +1387,7 @@ static void intelxl_poll_tx ( struct net_device *netdev ) {
 
 		/* Get next transmit descriptor */
 		tx_idx = ( intelxl->tx.cons % INTELXL_TX_NUM_DESC );
-		tx_wb = &intelxl->tx.desc[tx_idx].tx_wb;
+		tx_wb = &intelxl->tx.desc.tx[tx_idx].wb;
 
 		/* Stop if descriptor is still in use */
 		if ( ! ( tx_wb->flags & INTELXL_TX_WB_FL_DD ) )
@@ -1419,7 +1419,7 @@ static void intelxl_poll_rx ( struct net_device *netdev ) {
 
 		/* Get next receive descriptor */
 		rx_idx = ( intelxl->rx.cons % INTELXL_RX_NUM_DESC );
-		rx_wb = &intelxl->rx.desc[rx_idx].rx_wb;
+		rx_wb = &intelxl->rx.desc.rx[rx_idx].wb;
 
 		/* Stop if descriptor is still in use */
 		if ( ! ( rx_wb->flags & cpu_to_le32 ( INTELXL_RX_WB_FL_DD ) ) )
@@ -1544,8 +1544,10 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	intelxl_init_admin ( &intelxl->event, INTELXL_ADMIN_EVT,
 			     &intelxl_admin_offsets );
 	intelxl_init_ring ( &intelxl->tx, INTELXL_TX_NUM_DESC,
+			    sizeof ( intelxl->tx.desc.tx[0] ),
 			    intelxl_context_tx );
 	intelxl_init_ring ( &intelxl->rx, INTELXL_RX_NUM_DESC,
+			    sizeof ( intelxl->rx.desc.rx[0] ),
 			    intelxl_context_rx );
 
 	/* Fix up PCI device */
