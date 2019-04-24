@@ -45,6 +45,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+static void intelxl_reopen_admin ( struct intelxl_nic *intelxl );
+
 /******************************************************************************
  *
  * Device reset
@@ -133,25 +135,46 @@ static const struct intelxl_admin_offsets intelxl_admin_offsets = {
 };
 
 /**
- * Create admin queue
+ * Allocate admin queue
  *
  * @v intelxl		Intel device
  * @v admin		Admin queue
  * @ret rc		Return status code
  */
-static int intelxl_create_admin ( struct intelxl_nic *intelxl,
-				  struct intelxl_admin *admin ) {
+static int intelxl_alloc_admin ( struct intelxl_nic *intelxl,
+				 struct intelxl_admin *admin ) {
 	size_t buf_len = ( sizeof ( admin->buf[0] ) * INTELXL_ADMIN_NUM_DESC );
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
-	const struct intelxl_admin_offsets *regs = admin->regs;
-	void *admin_regs = ( intelxl->regs + admin->base );
-	physaddr_t address;
 
 	/* Allocate admin queue */
 	admin->buf = malloc_dma ( ( buf_len + len ), INTELXL_ALIGN );
 	if ( ! admin->buf )
 		return -ENOMEM;
 	admin->desc = ( ( ( void * ) admin->buf ) + buf_len );
+
+	DBGC ( intelxl, "INTELXL %p A%cQ is at [%08llx,%08llx) buf "
+	       "[%08llx,%08llx)\n", intelxl,
+	       ( ( admin == &intelxl->command ) ? 'T' : 'R' ),
+	       ( ( unsigned long long ) virt_to_bus ( admin->desc ) ),
+	       ( ( unsigned long long ) ( virt_to_bus ( admin->desc ) + len ) ),
+	       ( ( unsigned long long ) virt_to_bus ( admin->buf ) ),
+	       ( ( unsigned long long ) ( virt_to_bus ( admin->buf ) +
+					  buf_len ) ) );
+	return 0;
+}
+
+/**
+ * Enable admin queue
+ *
+ * @v intelxl		Intel device
+ * @v admin		Admin queue
+ */
+static void intelxl_enable_admin ( struct intelxl_nic *intelxl,
+				   struct intelxl_admin *admin ) {
+	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
+	const struct intelxl_admin_offsets *regs = admin->regs;
+	void *admin_regs = ( intelxl->regs + admin->base );
+	physaddr_t address;
 
 	/* Initialise admin queue */
 	memset ( admin->desc, 0, len );
@@ -177,33 +200,33 @@ static int intelxl_create_admin ( struct intelxl_nic *intelxl,
 	writel ( ( INTELXL_ADMIN_LEN_LEN ( INTELXL_ADMIN_NUM_DESC ) |
 		   INTELXL_ADMIN_LEN_ENABLE ),
 		 admin_regs + regs->len );
-
-	DBGC ( intelxl, "INTELXL %p A%cQ is at [%08llx,%08llx) buf "
-	       "[%08llx,%08llx)\n", intelxl,
-	       ( ( admin == &intelxl->command ) ? 'T' : 'R' ),
-	       ( ( unsigned long long ) address ),
-	       ( ( unsigned long long ) address + len ),
-	       ( ( unsigned long long ) virt_to_bus ( admin->buf ) ),
-	       ( ( unsigned long long ) ( virt_to_bus ( admin->buf ) +
-					  buf_len ) ) );
-	return 0;
 }
 
 /**
- * Destroy admin queue
+ * Disable admin queue
  *
  * @v intelxl		Intel device
  * @v admin		Admin queue
  */
-static void intelxl_destroy_admin ( struct intelxl_nic *intelxl,
+static void intelxl_disable_admin ( struct intelxl_nic *intelxl,
 				    struct intelxl_admin *admin ) {
-	size_t buf_len = ( sizeof ( admin->buf[0] ) * INTELXL_ADMIN_NUM_DESC );
-	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 	const struct intelxl_admin_offsets *regs = admin->regs;
 	void *admin_regs = ( intelxl->regs + admin->base );
 
 	/* Disable queue */
 	writel ( 0, admin_regs + regs->len );
+}
+
+/**
+ * Free admin queue
+ *
+ * @v intelxl		Intel device
+ * @v admin		Admin queue
+ */
+static void intelxl_free_admin ( struct intelxl_nic *intelxl __unused,
+				 struct intelxl_admin *admin ) {
+	size_t buf_len = ( sizeof ( admin->buf[0] ) * INTELXL_ADMIN_NUM_DESC );
+	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 
 	/* Free queue */
 	free_dma ( admin->buf, ( buf_len + len ) );
@@ -705,23 +728,18 @@ static void intelxl_poll_admin ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int intelxl_open_admin ( struct intelxl_nic *intelxl ) {
-	unsigned int i;
 	int rc;
 
-	/* Create admin event queue */
-	if ( ( rc = intelxl_create_admin ( intelxl, &intelxl->event ) ) != 0 )
-		goto err_create_event;
+	/* Allocate admin event queue */
+	if ( ( rc = intelxl_alloc_admin ( intelxl, &intelxl->event ) ) != 0 )
+		goto err_alloc_event;
 
-	/* Create admin command queue */
-	if ( ( rc = intelxl_create_admin ( intelxl, &intelxl->command ) ) != 0 )
-		goto err_create_command;
+	/* Allocate admin command queue */
+	if ( ( rc = intelxl_alloc_admin ( intelxl, &intelxl->command ) ) != 0 )
+		goto err_alloc_command;
 
-	/* Initialise all admin event queue descriptors */
-	for ( i = 0 ; i < INTELXL_ADMIN_NUM_DESC ; i++ )
-		intelxl_admin_event_init ( intelxl, i );
-
-	/* Post all descriptors to event queue */
-	intelxl_refill_admin ( intelxl );
+	/* (Re)open admin queues */
+	intelxl_reopen_admin ( intelxl );
 
 	/* Get firmware version */
 	if ( ( rc = intelxl_admin_version ( intelxl ) ) != 0 )
@@ -735,11 +753,35 @@ static int intelxl_open_admin ( struct intelxl_nic *intelxl ) {
 
  err_driver:
  err_version:
-	intelxl_destroy_admin ( intelxl, &intelxl->command );
- err_create_command:
-	intelxl_destroy_admin ( intelxl, &intelxl->event );
- err_create_event:
+	intelxl_disable_admin ( intelxl, &intelxl->command );
+	intelxl_disable_admin ( intelxl, &intelxl->event );
+	intelxl_free_admin ( intelxl, &intelxl->command );
+ err_alloc_command:
+	intelxl_free_admin ( intelxl, &intelxl->event );
+ err_alloc_event:
 	return rc;
+}
+
+/**
+ * Reopen admin queues (after virtual function reset)
+ *
+ * @v intelxl		Intel device
+ */
+static void intelxl_reopen_admin ( struct intelxl_nic *intelxl ) {
+	unsigned int i;
+
+	/* Enable admin event queue */
+	intelxl_enable_admin ( intelxl, &intelxl->event );
+
+	/* Enable admin command queue */
+	intelxl_enable_admin ( intelxl, &intelxl->command );
+
+	/* Initialise all admin event queue descriptors */
+	for ( i = 0 ; i < INTELXL_ADMIN_NUM_DESC ; i++ )
+		intelxl_admin_event_init ( intelxl, i );
+
+	/* Post all descriptors to event queue */
+	intelxl_refill_admin ( intelxl );
 }
 
 /**
@@ -752,11 +794,13 @@ static void intelxl_close_admin ( struct intelxl_nic *intelxl ) {
 	/* Shut down admin queues */
 	intelxl_admin_shutdown ( intelxl );
 
-	/* Destroy admin command queue */
-	intelxl_destroy_admin ( intelxl, &intelxl->command );
+	/* Disable admin queues */
+	intelxl_disable_admin ( intelxl, &intelxl->command );
+	intelxl_disable_admin ( intelxl, &intelxl->event );
 
-	/* Destroy admin event queue */
-	intelxl_destroy_admin ( intelxl, &intelxl->event );
+	/* Free admin queues */
+	intelxl_free_admin ( intelxl, &intelxl->command );
+	intelxl_free_admin ( intelxl, &intelxl->event );
 }
 
 /******************************************************************************
