@@ -289,6 +289,12 @@ struct intelxl_admin_link_params {
 /** Link is up */
 #define INTELXL_ADMIN_LINK_UP 0x01
 
+/** Admin queue Send Message to PF command */
+#define INTELXL_ADMIN_SEND_TO_PF 0x0801
+
+/** Admin queue Send Message to VF command */
+#define INTELXL_ADMIN_SEND_TO_VF 0x0802
+
 /** Admin queue command parameters */
 union intelxl_admin_params {
 	/** Additional data buffer command parameters */
@@ -823,5 +829,9 @@ struct intelxl_nic {
 	/** Receive I/O buffers */
 	struct io_buffer *rx_iobuf[INTELXL_RX_NUM_DESC];
 };
+
+extern void intelxlvf_admin_event ( struct net_device *netdev,
+				    struct intelxl_admin_descriptor *evt,
+				    union intelxl_admin_buffer *buf );
 
 #endif /* _INTELXL_H */

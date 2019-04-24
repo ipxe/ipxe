@@ -659,6 +659,21 @@ static int intelxl_admin_link ( struct net_device *netdev ) {
 }
 
 /**
+ * Handle virtual function event (when VF driver is not present)
+ *
+ * @v netdev		Network device
+ * @v evt		Admin queue event descriptor
+ * @v buf		Admin queue event data buffer
+ */
+__weak void
+intelxlvf_admin_event ( struct net_device *netdev __unused,
+			struct intelxl_admin_descriptor *evt __unused,
+			union intelxl_admin_buffer *buf __unused ) {
+
+	/* Nothing to do */
+}
+
+/**
  * Refill admin event queue
  *
  * @v intelxl		Intel device
@@ -710,6 +725,9 @@ static void intelxl_poll_admin ( struct net_device *netdev ) {
 		switch ( evt->opcode ) {
 		case cpu_to_le16 ( INTELXL_ADMIN_LINK ):
 			intelxl_admin_link ( netdev );
+			break;
+		case cpu_to_le16 ( INTELXL_ADMIN_SEND_TO_VF ):
+			intelxlvf_admin_event ( netdev, evt, buf );
 			break;
 		default:
 			DBGC ( intelxl, "INTELXL %p admin event %#x "
