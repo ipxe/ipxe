@@ -206,6 +206,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_icplus		     ( ERRFILE_DRIVER | 0x00ca0000 )
 #define ERRFILE_intelxl		     ( ERRFILE_DRIVER | 0x00cb0000 )
 #define ERRFILE_pcimsix		     ( ERRFILE_DRIVER | 0x00cc0000 )
+#define ERRFILE_intelxlvf	     ( ERRFILE_DRIVER | 0x00cd0000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
