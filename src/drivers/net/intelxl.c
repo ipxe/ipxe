@@ -141,17 +141,17 @@ static const struct intelxl_admin_offsets intelxl_admin_offsets = {
  */
 static int intelxl_create_admin ( struct intelxl_nic *intelxl,
 				  struct intelxl_admin *admin ) {
+	size_t buf_len = ( sizeof ( admin->buf[0] ) * INTELXL_ADMIN_NUM_DESC );
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 	const struct intelxl_admin_offsets *regs = admin->regs;
 	void *admin_regs = ( intelxl->regs + admin->base );
 	physaddr_t address;
 
 	/* Allocate admin queue */
-	admin->desc = malloc_dma ( ( len + sizeof ( *admin->buffer ) ),
-				   INTELXL_ALIGN );
-	if ( ! admin->desc )
+	admin->buf = malloc_dma ( ( buf_len + len ), INTELXL_ALIGN );
+	if ( ! admin->buf )
 		return -ENOMEM;
-	admin->buffer = ( ( ( void * ) admin->desc ) + len );
+	admin->desc = ( ( ( void * ) admin->buf ) + buf_len );
 
 	/* Initialise admin queue */
 	memset ( admin->desc, 0, len );
@@ -183,9 +183,9 @@ static int intelxl_create_admin ( struct intelxl_nic *intelxl,
 	       ( ( admin == &intelxl->command ) ? 'T' : 'R' ),
 	       ( ( unsigned long long ) address ),
 	       ( ( unsigned long long ) address + len ),
-	       ( ( unsigned long long ) virt_to_bus ( admin->buffer ) ),
-	       ( ( unsigned long long ) ( virt_to_bus ( admin->buffer ) +
-					  sizeof ( admin->buffer[0] ) ) ) );
+	       ( ( unsigned long long ) virt_to_bus ( admin->buf ) ),
+	       ( ( unsigned long long ) ( virt_to_bus ( admin->buf ) +
+					  buf_len ) ) );
 	return 0;
 }
 
@@ -197,6 +197,7 @@ static int intelxl_create_admin ( struct intelxl_nic *intelxl,
  */
 static void intelxl_destroy_admin ( struct intelxl_nic *intelxl,
 				    struct intelxl_admin *admin ) {
+	size_t buf_len = ( sizeof ( admin->buf[0] ) * INTELXL_ADMIN_NUM_DESC );
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 	const struct intelxl_admin_offsets *regs = admin->regs;
 	void *admin_regs = ( intelxl->regs + admin->base );
@@ -205,23 +206,80 @@ static void intelxl_destroy_admin ( struct intelxl_nic *intelxl,
 	writel ( 0, admin_regs + regs->len );
 
 	/* Free queue */
-	free_dma ( admin->desc, ( len + sizeof ( *admin->buffer ) ) );
+	free_dma ( admin->buf, ( buf_len + len ) );
+}
+
+/**
+ * Get next admin command queue descriptor
+ *
+ * @v intelxl		Intel device
+ * @ret cmd		Command descriptor
+ */
+static struct intelxl_admin_descriptor *
+intelxl_admin_command_descriptor ( struct intelxl_nic *intelxl ) {
+	struct intelxl_admin *admin = &intelxl->command;
+	struct intelxl_admin_descriptor *cmd;
+
+	/* Get and initialise next descriptor */
+	cmd = &admin->desc[ admin->index % INTELXL_ADMIN_NUM_DESC ];
+	memset ( cmd, 0, sizeof ( *cmd ) );
+	return cmd;
+}
+
+/**
+ * Get next admin command queue data buffer
+ *
+ * @v intelxl		Intel device
+ * @ret buf		Data buffer
+ */
+static union intelxl_admin_buffer *
+intelxl_admin_command_buffer ( struct intelxl_nic *intelxl ) {
+	struct intelxl_admin *admin = &intelxl->command;
+	union intelxl_admin_buffer *buf;
+
+	/* Get next data buffer */
+	buf = &admin->buf[ admin->index % INTELXL_ADMIN_NUM_DESC ];
+	memset ( buf, 0, sizeof ( *buf ) );
+	return buf;
+}
+
+/**
+ * Initialise admin event queue descriptor
+ *
+ * @v intelxl		Intel device
+ * @v index		Event queue index
+ */
+static void intelxl_admin_event_init ( struct intelxl_nic *intelxl,
+				       unsigned int index ) {
+	struct intelxl_admin *admin = &intelxl->event;
+	struct intelxl_admin_descriptor *evt;
+	union intelxl_admin_buffer *buf;
+	uint64_t address;
+
+	/* Initialise descriptor */
+	evt = &admin->desc[ index % INTELXL_ADMIN_NUM_DESC ];
+	buf = &admin->buf[ index % INTELXL_ADMIN_NUM_DESC ];
+	address = virt_to_bus ( buf );
+	evt->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
+	evt->len = cpu_to_le16 ( sizeof ( *buf ) );
+	evt->params.buffer.high = cpu_to_le32 ( address >> 32 );
+	evt->params.buffer.low = cpu_to_le32 ( address & 0xffffffffUL );
 }
 
 /**
  * Issue admin queue command
  *
  * @v intelxl		Intel device
- * @v cmd		Command descriptor
  * @ret rc		Return status code
  */
-static int intelxl_admin_command ( struct intelxl_nic *intelxl,
-				   struct intelxl_admin_descriptor *cmd ) {
+static int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin *admin = &intelxl->command;
 	const struct intelxl_admin_offsets *regs = admin->regs;
 	void *admin_regs = ( intelxl->regs + admin->base );
-	struct intelxl_admin_descriptor *desc;
-	uint64_t buffer;
+	struct intelxl_admin_descriptor *cmd;
+	union intelxl_admin_buffer *buf;
+	uint64_t address;
+	uint32_t cookie;
 	unsigned int index;
 	unsigned int tail;
 	unsigned int i;
@@ -230,32 +288,36 @@ static int intelxl_admin_command ( struct intelxl_nic *intelxl,
 	/* Get next queue entry */
 	index = admin->index++;
 	tail = ( admin->index % INTELXL_ADMIN_NUM_DESC );
-	desc = &admin->desc[index % INTELXL_ADMIN_NUM_DESC];
+	cmd = &admin->desc[ index % INTELXL_ADMIN_NUM_DESC ];
+	buf = &admin->buf[ index % INTELXL_ADMIN_NUM_DESC ];
+	DBGC2 ( intelxl, "INTELXL %p admin command %#x opcode %#04x:\n",
+		intelxl, index, le16_to_cpu ( cmd->opcode ) );
 
-	/* Clear must-be-zero flags */
-	cmd->flags &= ~cpu_to_le16 ( INTELXL_ADMIN_FL_DD |
-				     INTELXL_ADMIN_FL_CMP |
-				     INTELXL_ADMIN_FL_ERR );
+	/* Sanity checks */
+	assert ( ! ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_DD ) ) );
+	assert ( ! ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_CMP ) ) );
+	assert ( ! ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_ERR ) ) );
+	assert ( cmd->ret == 0 );
 
-	/* Clear return value */
-	cmd->ret = 0;
+	/* Populate data buffer address if applicable */
+	if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
+		address = virt_to_bus ( buf );
+		cmd->params.buffer.high = cpu_to_le32 ( address >> 32 );
+		cmd->params.buffer.low = cpu_to_le32 ( address & 0xffffffffUL );
+	}
 
 	/* Populate cookie */
 	cmd->cookie = cpu_to_le32 ( index );
 
-	/* Populate data buffer address if applicable */
-	if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
-		buffer = virt_to_bus ( admin->buffer );
-		cmd->params.buffer.high = cpu_to_le32 ( buffer >> 32 );
-		cmd->params.buffer.low = cpu_to_le32 ( buffer & 0xffffffffUL );
-	}
-
-	/* Copy command descriptor to queue entry */
-	memcpy ( desc, cmd, sizeof ( *desc ) );
-	DBGC2 ( intelxl, "INTELXL %p admin command %#x:\n", intelxl, index );
-	DBGC2_HDA ( intelxl, virt_to_phys ( desc ), desc, sizeof ( *desc ) );
+	/* Record cookie */
+	cookie = cmd->cookie;
 
 	/* Post command descriptor */
+	DBGC2_HDA ( intelxl, virt_to_phys ( cmd ), cmd, sizeof ( *cmd ) );
+	if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
+		DBGC2_HDA ( intelxl, virt_to_phys ( buf ), buf,
+			    le16_to_cpu ( cmd->len ) );
+	}
 	wmb();
 	writel ( tail, admin_regs + regs->tail );
 
@@ -263,35 +325,32 @@ static int intelxl_admin_command ( struct intelxl_nic *intelxl,
 	for ( i = 0 ; i < INTELXL_ADMIN_MAX_WAIT_MS ; i++ ) {
 
 		/* If response is not complete, delay 1ms and retry */
-		if ( ! ( desc->flags & INTELXL_ADMIN_FL_DD ) ) {
+		if ( ! ( cmd->flags & INTELXL_ADMIN_FL_DD ) ) {
 			mdelay ( 1 );
 			continue;
 		}
 		DBGC2 ( intelxl, "INTELXL %p admin command %#x response:\n",
 			intelxl, index );
-		DBGC2_HDA ( intelxl, virt_to_phys ( desc ), desc,
-			    sizeof ( *desc ) );
+		DBGC2_HDA ( intelxl, virt_to_phys ( cmd ), cmd,
+			    sizeof ( *cmd ) );
 
 		/* Check for cookie mismatch */
-		if ( desc->cookie != cmd->cookie ) {
+		if ( cmd->cookie != cookie ) {
 			DBGC ( intelxl, "INTELXL %p admin command %#x bad "
 			       "cookie %#x\n", intelxl, index,
-			       le32_to_cpu ( desc->cookie ) );
+			       le32_to_cpu ( cmd->cookie ) );
 			rc = -EPROTO;
 			goto err;
 		}
 
 		/* Check for errors */
-		if ( desc->ret != 0 ) {
+		if ( cmd->ret != 0 ) {
 			DBGC ( intelxl, "INTELXL %p admin command %#x error "
 			       "%d\n", intelxl, index,
-			       le16_to_cpu ( desc->ret ) );
+			       le16_to_cpu ( cmd->ret ) );
 			rc = -EIO;
 			goto err;
 		}
-
-		/* Copy response back to command descriptor */
-		memcpy ( cmd, desc, sizeof ( *cmd ) );
 
 		/* Success */
 		return 0;
@@ -301,8 +360,7 @@ static int intelxl_admin_command ( struct intelxl_nic *intelxl,
 	DBGC ( intelxl, "INTELXL %p timed out waiting for admin command %#x:\n",
 	       intelxl, index );
  err:
-	DBGC_HDA ( intelxl, virt_to_phys ( desc ), cmd, sizeof ( *cmd ) );
-	DBGC_HDA ( intelxl, virt_to_phys ( desc ), desc, sizeof ( *desc ) );
+	DBGC_HDA ( intelxl, virt_to_phys ( cmd ), cmd, sizeof ( *cmd ) );
 	return rc;
 }
 
@@ -313,17 +371,18 @@ static int intelxl_admin_command ( struct intelxl_nic *intelxl,
  * @ret rc		Return status code
  */
 static int intelxl_admin_version ( struct intelxl_nic *intelxl ) {
-	struct intelxl_admin_descriptor cmd;
-	struct intelxl_admin_version_params *version = &cmd.params.version;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_version_params *version;
 	unsigned int api;
 	int rc;
 
 	/* Populate descriptor */
-	memset ( &cmd, 0, sizeof ( cmd ) );
-	cmd.opcode = cpu_to_le16 ( INTELXL_ADMIN_VERSION );
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_VERSION );
+	version = &cmd->params.version;
 
 	/* Issue command */
-	if ( ( rc = intelxl_admin_command ( intelxl, &cmd ) ) != 0 )
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 		return rc;
 	api = le16_to_cpu ( version->api.major );
 	DBGC ( intelxl, "INTELXL %p firmware v%d.%d API v%d.%d\n",
@@ -348,24 +407,25 @@ static int intelxl_admin_version ( struct intelxl_nic *intelxl ) {
  * @ret rc		Return status code
  */
 static int intelxl_admin_driver ( struct intelxl_nic *intelxl ) {
-	struct intelxl_admin_descriptor cmd;
-	struct intelxl_admin_driver_params *driver = &cmd.params.driver;
-	struct intelxl_admin_driver_buffer *buf =
-		&intelxl->command.buffer->driver;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_driver_params *driver;
+	union intelxl_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
-	memset ( &cmd, 0, sizeof ( cmd ) );
-	cmd.opcode = cpu_to_le16 ( INTELXL_ADMIN_DRIVER );
-	cmd.flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
-	cmd.len = cpu_to_le16 ( sizeof ( *buf ) );
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_DRIVER );
+	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
+	cmd->len = cpu_to_le16 ( sizeof ( buf->driver ) );
+	driver = &cmd->params.driver;
 	driver->major = product_major_version;
 	driver->minor = product_minor_version;
-	snprintf ( buf->name, sizeof ( buf->name ), "%s",
+	buf = intelxl_admin_command_buffer ( intelxl );
+	snprintf ( buf->driver.name, sizeof ( buf->driver.name ), "%s",
 		   ( product_name[0] ? product_name : product_short_name ) );
 
 	/* Issue command */
-	if ( ( rc = intelxl_admin_command ( intelxl, &cmd ) ) != 0 )
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -378,17 +438,18 @@ static int intelxl_admin_driver ( struct intelxl_nic *intelxl ) {
  * @ret rc		Return status code
  */
 static int intelxl_admin_shutdown ( struct intelxl_nic *intelxl ) {
-	struct intelxl_admin_descriptor cmd;
-	struct intelxl_admin_shutdown_params *shutdown = &cmd.params.shutdown;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_shutdown_params *shutdown;
 	int rc;
 
 	/* Populate descriptor */
-	memset ( &cmd, 0, sizeof ( cmd ) );
-	cmd.opcode = cpu_to_le16 ( INTELXL_ADMIN_SHUTDOWN );
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_SHUTDOWN );
+	shutdown = &cmd->params.shutdown;
 	shutdown->unloading = INTELXL_ADMIN_SHUTDOWN_UNLOADING;
 
 	/* Issue command */
-	if ( ( rc = intelxl_admin_command ( intelxl, &cmd ) ) != 0 )
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -401,36 +462,38 @@ static int intelxl_admin_shutdown ( struct intelxl_nic *intelxl ) {
  * @ret rc		Return status code
  */
 static int intelxl_admin_switch ( struct intelxl_nic *intelxl ) {
-	struct intelxl_admin_descriptor cmd;
-	struct intelxl_admin_switch_params *sw = &cmd.params.sw;
-	struct intelxl_admin_switch_buffer *buf = &intelxl->command.buffer->sw;
-	struct intelxl_admin_switch_config *cfg = &buf->cfg;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_switch_params *sw;
+	union intelxl_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
-	memset ( &cmd, 0, sizeof ( cmd ) );
-	cmd.opcode = cpu_to_le16 ( INTELXL_ADMIN_SWITCH );
-	cmd.flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
-	cmd.len = cpu_to_le16 ( sizeof ( *buf ) );
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_SWITCH );
+	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
+	cmd->len = cpu_to_le16 ( sizeof ( buf->sw ) );
+	sw = &cmd->params.sw;
+	buf = intelxl_admin_command_buffer ( intelxl );
 
 	/* Get each configuration in turn */
 	do {
 		/* Issue command */
-		if ( ( rc = intelxl_admin_command ( intelxl, &cmd ) ) != 0 )
+		if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 			return rc;
 
 		/* Dump raw configuration */
 		DBGC2 ( intelxl, "INTELXL %p SEID %#04x:\n",
-			intelxl, le16_to_cpu ( cfg->seid ) );
-		DBGC2_HDA ( intelxl, 0, cfg, sizeof ( *cfg ) );
+			intelxl, le16_to_cpu ( buf->sw.cfg.seid ) );
+		DBGC2_HDA ( intelxl, 0, &buf->sw.cfg, sizeof ( buf->sw.cfg ) );
 
 		/* Parse response */
-		if ( cfg->type == INTELXL_ADMIN_SWITCH_TYPE_VSI ) {
-			intelxl->vsi = le16_to_cpu ( cfg->seid );
+		if ( buf->sw.cfg.type == INTELXL_ADMIN_SWITCH_TYPE_VSI ) {
+			intelxl->vsi = le16_to_cpu ( buf->sw.cfg.seid );
 			DBGC ( intelxl, "INTELXL %p VSI %#04x uplink %#04x "
 			       "downlink %#04x conn %#02x\n", intelxl,
-			       intelxl->vsi, le16_to_cpu ( cfg->uplink ),
-			       le16_to_cpu ( cfg->downlink ), cfg->connection );
+			       intelxl->vsi, le16_to_cpu ( buf->sw.cfg.uplink ),
+			       le16_to_cpu ( buf->sw.cfg.downlink ),
+			       buf->sw.cfg.connection );
 		}
 
 	} while ( sw->next );
@@ -451,25 +514,27 @@ static int intelxl_admin_switch ( struct intelxl_nic *intelxl ) {
  * @ret rc		Return status code
  */
 static int intelxl_admin_vsi ( struct intelxl_nic *intelxl ) {
-	struct intelxl_admin_descriptor cmd;
-	struct intelxl_admin_vsi_params *vsi = &cmd.params.vsi;
-	struct intelxl_admin_vsi_buffer *buf = &intelxl->command.buffer->vsi;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_vsi_params *vsi;
+	union intelxl_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
-	memset ( &cmd, 0, sizeof ( cmd ) );
-	cmd.opcode = cpu_to_le16 ( INTELXL_ADMIN_VSI );
-	cmd.flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
-	cmd.len = cpu_to_le16 ( sizeof ( *buf ) );
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_VSI );
+	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
+	cmd->len = cpu_to_le16 ( sizeof ( buf->vsi ) );
+	vsi = &cmd->params.vsi;
 	vsi->vsi = cpu_to_le16 ( intelxl->vsi );
+	buf = intelxl_admin_command_buffer ( intelxl );
 
 	/* Issue command */
-	if ( ( rc = intelxl_admin_command ( intelxl, &cmd ) ) != 0 )
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 		return rc;
 
 	/* Parse response */
-	intelxl->queue = le16_to_cpu ( buf->queue[0] );
-	intelxl->qset = le16_to_cpu ( buf->qset[0] );
+	intelxl->queue = le16_to_cpu ( buf->vsi.queue[0] );
+	intelxl->qset = le16_to_cpu ( buf->vsi.qset[0] );
 	DBGC ( intelxl, "INTELXL %p VSI %#04x queue %#04x qset %#04x\n",
 	       intelxl, intelxl->vsi, intelxl->queue, intelxl->qset );
 
@@ -483,24 +548,25 @@ static int intelxl_admin_vsi ( struct intelxl_nic *intelxl ) {
  * @ret rc		Return status code
  */
 static int intelxl_admin_promisc ( struct intelxl_nic *intelxl ) {
-	struct intelxl_admin_descriptor cmd;
-	struct intelxl_admin_promisc_params *promisc = &cmd.params.promisc;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_promisc_params *promisc;
 	uint16_t flags;
 	int rc;
 
 	/* Populate descriptor */
-	memset ( &cmd, 0, sizeof ( cmd ) );
-	cmd.opcode = cpu_to_le16 ( INTELXL_ADMIN_PROMISC );
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_PROMISC );
 	flags = ( INTELXL_ADMIN_PROMISC_FL_UNICAST |
 		  INTELXL_ADMIN_PROMISC_FL_MULTICAST |
 		  INTELXL_ADMIN_PROMISC_FL_BROADCAST |
 		  INTELXL_ADMIN_PROMISC_FL_VLAN );
+	promisc = &cmd->params.promisc;
 	promisc->flags = cpu_to_le16 ( flags );
 	promisc->valid = cpu_to_le16 ( flags );
 	promisc->vsi = cpu_to_le16 ( intelxl->vsi );
 
 	/* Issue command */
-	if ( ( rc = intelxl_admin_command ( intelxl, &cmd ) ) != 0 )
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -513,18 +579,19 @@ static int intelxl_admin_promisc ( struct intelxl_nic *intelxl ) {
  * @ret rc		Return status code
  */
 static int intelxl_admin_autoneg ( struct intelxl_nic *intelxl ) {
-	struct intelxl_admin_descriptor cmd;
-	struct intelxl_admin_autoneg_params *autoneg = &cmd.params.autoneg;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_autoneg_params *autoneg;
 	int rc;
 
 	/* Populate descriptor */
-	memset ( &cmd, 0, sizeof ( cmd ) );
-	cmd.opcode = cpu_to_le16 ( INTELXL_ADMIN_AUTONEG );
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_AUTONEG );
+	autoneg = &cmd->params.autoneg;
 	autoneg->flags = ( INTELXL_ADMIN_AUTONEG_FL_RESTART |
 			   INTELXL_ADMIN_AUTONEG_FL_ENABLE );
 
 	/* Issue command */
-	if ( ( rc = intelxl_admin_command ( intelxl, &cmd ) ) != 0 )
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -538,17 +605,18 @@ static int intelxl_admin_autoneg ( struct intelxl_nic *intelxl ) {
  */
 static int intelxl_admin_link ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	struct intelxl_admin_descriptor cmd;
-	struct intelxl_admin_link_params *link = &cmd.params.link;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_link_params *link;
 	int rc;
 
 	/* Populate descriptor */
-	memset ( &cmd, 0, sizeof ( cmd ) );
-	cmd.opcode = cpu_to_le16 ( INTELXL_ADMIN_LINK );
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_LINK );
+	link = &cmd->params.link;
 	link->notify = INTELXL_ADMIN_LINK_NOTIFY;
 
 	/* Issue command */
-	if ( ( rc = intelxl_admin_command ( intelxl, &cmd ) ) != 0 )
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 		return rc;
 	DBGC ( intelxl, "INTELXL %p PHY %#02x speed %#02x status %#02x\n",
 	       intelxl, link->phy, link->speed, link->status );
@@ -577,6 +645,7 @@ static void intelxl_refill_admin ( struct intelxl_nic *intelxl ) {
 	/* Update tail pointer */
 	tail = ( ( admin->index + INTELXL_ADMIN_NUM_DESC - 1 ) %
 		 INTELXL_ADMIN_NUM_DESC );
+	wmb();
 	writel ( tail, admin_regs + regs->tail );
 }
 
@@ -588,39 +657,42 @@ static void intelxl_refill_admin ( struct intelxl_nic *intelxl ) {
 static void intelxl_poll_admin ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	struct intelxl_admin *admin = &intelxl->event;
-	struct intelxl_admin_descriptor *desc;
+	struct intelxl_admin_descriptor *evt;
+	union intelxl_admin_buffer *buf;
 
 	/* Check for events */
 	while ( 1 ) {
 
-		/* Get next event descriptor */
-		desc = &admin->desc[admin->index % INTELXL_ADMIN_NUM_DESC];
+		/* Get next event descriptor and data buffer */
+		evt = &admin->desc[ admin->index % INTELXL_ADMIN_NUM_DESC ];
+		buf = &admin->buf[ admin->index % INTELXL_ADMIN_NUM_DESC ];
 
 		/* Stop if descriptor is not yet completed */
-		if ( ! ( desc->flags & INTELXL_ADMIN_FL_DD ) )
+		if ( ! ( evt->flags & INTELXL_ADMIN_FL_DD ) )
 			return;
 		DBGC2 ( intelxl, "INTELXL %p admin event %#x:\n",
 			intelxl, admin->index );
-		DBGC2_HDA ( intelxl, virt_to_phys ( desc ), desc,
-			    sizeof ( *desc ) );
+		DBGC2_HDA ( intelxl, virt_to_phys ( evt ), evt,
+			    sizeof ( *evt ) );
+		if ( evt->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
+			DBGC2_HDA ( intelxl, virt_to_phys ( buf ), buf,
+				    le16_to_cpu ( evt->len ) );
+		}
 
 		/* Handle event */
-		switch ( desc->opcode ) {
+		switch ( evt->opcode ) {
 		case cpu_to_le16 ( INTELXL_ADMIN_LINK ):
 			intelxl_admin_link ( netdev );
 			break;
 		default:
 			DBGC ( intelxl, "INTELXL %p admin event %#x "
 			       "unrecognised opcode %#04x\n", intelxl,
-			       admin->index, le16_to_cpu ( desc->opcode ) );
+			       admin->index, le16_to_cpu ( evt->opcode ) );
 			break;
 		}
 
-		/* Clear event completion flag */
-		desc->flags = 0;
-		wmb();
-
-		/* Update index and refill queue */
+		/* Reset descriptor and refill queue */
+		intelxl_admin_event_init ( intelxl, admin->index );
 		admin->index++;
 		intelxl_refill_admin ( intelxl );
 	}
@@ -633,6 +705,7 @@ static void intelxl_poll_admin ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int intelxl_open_admin ( struct intelxl_nic *intelxl ) {
+	unsigned int i;
 	int rc;
 
 	/* Create admin event queue */
@@ -642,6 +715,10 @@ static int intelxl_open_admin ( struct intelxl_nic *intelxl ) {
 	/* Create admin command queue */
 	if ( ( rc = intelxl_create_admin ( intelxl, &intelxl->command ) ) != 0 )
 		goto err_create_command;
+
+	/* Initialise all admin event queue descriptors */
+	for ( i = 0 ; i < INTELXL_ADMIN_NUM_DESC ; i++ )
+		intelxl_admin_event_init ( intelxl, i );
 
 	/* Post all descriptors to event queue */
 	intelxl_refill_admin ( intelxl );

@@ -319,6 +319,8 @@ union intelxl_admin_buffer {
 	struct intelxl_admin_switch_buffer sw;
 	/** Get VSI Parameters data buffer */
 	struct intelxl_admin_vsi_buffer vsi;
+	/** Alignment padding */
+	uint8_t pad[INTELXL_ALIGN];
 } __attribute__ (( packed ));
 
 /** Admin queue descriptor */
@@ -358,6 +360,8 @@ struct intelxl_admin_descriptor {
 struct intelxl_admin {
 	/** Descriptors */
 	struct intelxl_admin_descriptor *desc;
+	/** Data buffers */
+	union intelxl_admin_buffer *buf;
 	/** Queue index */
 	unsigned int index;
 
@@ -365,8 +369,6 @@ struct intelxl_admin {
 	unsigned int base;
 	/** Register offsets */
 	const struct intelxl_admin_offsets *regs;
-	/** Data buffer */
-	union intelxl_admin_buffer *buffer;
 };
 
 /**
