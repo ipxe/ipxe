@@ -118,6 +118,56 @@ static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
 
 /******************************************************************************
  *
+ * MSI-X interrupts
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Enable MSI-X dummy interrupt
+ *
+ * @v intelxl		Intel device
+ * @v pci		PCI device
+ * @ret rc		Return status code
+ */
+int intelxl_msix_enable ( struct intelxl_nic *intelxl,
+			  struct pci_device *pci ) {
+	int rc;
+
+	/* Enable MSI-X capability */
+	if ( ( rc = pci_msix_enable ( pci, &intelxl->msix ) ) != 0 ) {
+		DBGC ( intelxl, "INTELXL %p could not enable MSI-X: %s\n",
+		       intelxl, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Configure interrupt zero to write to dummy location */
+	pci_msix_map ( &intelxl->msix, 0, virt_to_bus ( &intelxl->msg ), 0 );
+
+	/* Enable dummy interrupt zero */
+	pci_msix_unmask ( &intelxl->msix, 0 );
+
+	return 0;
+}
+
+/**
+ * Disable MSI-X dummy interrupt
+ *
+ * @v intelxl		Intel device
+ * @v pci		PCI device
+ */
+void intelxl_msix_disable ( struct intelxl_nic *intelxl,
+			    struct pci_device *pci ) {
+
+	/* Disable dummy interrupt zero */
+	pci_msix_mask ( &intelxl->msix, 0 );
+
+	/* Disable MSI-X capability */
+	pci_msix_disable ( pci, &intelxl->msix );
+}
+
+/******************************************************************************
+ *
  * Admin queue
  *
  ******************************************************************************
@@ -472,6 +522,39 @@ static int intelxl_admin_shutdown ( struct intelxl_nic *intelxl ) {
 	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_SHUTDOWN );
 	shutdown = &cmd->params.shutdown;
 	shutdown->unloading = INTELXL_ADMIN_SHUTDOWN_UNLOADING;
+
+	/* Issue command */
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Clear PXE mode
+ *
+ * @v intelxl		Intel device
+ * @ret rc		Return status code
+ */
+static int intelxl_admin_clear_pxe ( struct intelxl_nic *intelxl ) {
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_clear_pxe_params *pxe;
+	uint32_t gllan_rctl_0;
+	int rc;
+
+	/* Do nothing if device is already out of PXE mode */
+	gllan_rctl_0 = readl ( intelxl->regs + INTELXL_GLLAN_RCTL_0 );
+	if ( ! ( gllan_rctl_0 & INTELXL_GLLAN_RCTL_0_PXE_MODE ) ) {
+		DBGC2 ( intelxl, "INTELXL %p already in non-PXE mode\n",
+			intelxl );
+		return 0;
+	}
+
+	/* Populate descriptor */
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_CLEAR_PXE );
+	pxe = &cmd->params.pxe;
+	pxe->magic = INTELXL_ADMIN_CLEAR_PXE_MAGIC;
 
 	/* Issue command */
 	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
@@ -1504,13 +1587,6 @@ static void intelxl_poll_rx ( struct net_device *netdev ) {
 void intelxl_poll ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 
-	/* Acknowledge interrupts, if applicable */
-	if ( netdev_irq_enabled ( netdev ) ) {
-		writel ( ( INTELXL_INT_DYN_CTL_CLEARPBA |
-			   INTELXL_INT_DYN_CTL_INTENA_MASK ),
-			 ( intelxl->regs + intelxl->intr ) );
-	}
-
 	/* Poll for completed packets */
 	intelxl_poll_tx ( netdev );
 
@@ -1522,19 +1598,23 @@ void intelxl_poll ( struct net_device *netdev ) {
 
 	/* Refill RX ring */
 	intelxl_refill_rx ( intelxl );
-}
 
-/**
- * Enable or disable interrupts
- *
- * @v netdev		Network device
- * @v enable		Interrupts should be enabled
- */
-static void intelxl_irq ( struct net_device *netdev, int enable ) {
-	struct intelxl_nic *intelxl = netdev->priv;
-
-	writel ( ( enable ? INTELXL_INT_DYN_CTL_INTENA : 0 ),
-		 ( intelxl->regs + intelxl->intr ) );
+	/* Rearm interrupt, since otherwise receive descriptors will
+	 * be written back only after a complete cacheline (four
+	 * packets) have been received.
+	 *
+	 * There is unfortunately no efficient way to determine
+	 * whether or not rearming the interrupt is necessary.  If we
+	 * are running inside a hypervisor (e.g. using a VF or PF as a
+	 * passed-through PCI device), then the MSI-X write is
+	 * redirected by the hypervisor to the real host APIC and the
+	 * host ISR then raises an interrupt within the guest.  We
+	 * therefore cannot poll the nominal MSI-X target location to
+	 * watch for the value being written.  We could read from the
+	 * INT_DYN_CTL register, but this is even less efficient than
+	 * just unconditionally rearming the interrupt.
+	 */
+	writel ( INTELXL_INT_DYN_CTL_INTENA, intelxl->regs + intelxl->intr );
 }
 
 /** Network device operations */
@@ -1543,7 +1623,6 @@ static struct net_device_operations intelxl_operations = {
 	.close		= intelxl_close,
 	.transmit	= intelxl_transmit,
 	.poll		= intelxl_poll,
-	.irq		= intelxl_irq,
 };
 
 /******************************************************************************
@@ -1617,9 +1696,17 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	if ( ( rc = intelxl_fetch_mac ( intelxl, netdev ) ) != 0 )
 		goto err_fetch_mac;
 
+	/* Enable MSI-X dummy interrupt */
+	if ( ( rc = intelxl_msix_enable ( intelxl, pci ) ) != 0 )
+		goto err_msix;
+
 	/* Open admin queues */
 	if ( ( rc = intelxl_open_admin ( intelxl ) ) != 0 )
 		goto err_open_admin;
+
+	/* Clear PXE mode */
+	if ( ( rc = intelxl_admin_clear_pxe ( intelxl ) ) != 0 )
+		goto err_admin_clear_pxe;
 
 	/* Get switch configuration */
 	if ( ( rc = intelxl_admin_switch ( intelxl ) ) != 0 )
@@ -1667,8 +1754,11 @@ static int intelxl_probe ( struct pci_device *pci ) {
  err_admin_promisc:
  err_admin_vsi:
  err_admin_switch:
+ err_admin_clear_pxe:
 	intelxl_close_admin ( intelxl );
  err_open_admin:
+	intelxl_msix_disable ( intelxl, pci );
+ err_msix:
  err_fetch_mac:
 	intelxl_reset ( intelxl );
  err_reset:
@@ -1694,6 +1784,9 @@ static void intelxl_remove ( struct pci_device *pci ) {
 
 	/* Close admin queues */
 	intelxl_close_admin ( intelxl );
+
+	/* Disable MSI-X dummy interrupt */
+	intelxl_msix_disable ( intelxl, pci );
 
 	/* Reset the NIC */
 	intelxl_reset ( intelxl );

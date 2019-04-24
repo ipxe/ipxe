@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/if_ether.h>
+#include <ipxe/pcimsix.h>
 
 struct intelxl_nic;
 
@@ -142,6 +143,20 @@ struct intelxl_admin_shutdown_params {
 
 /** Driver is unloading */
 #define INTELXL_ADMIN_SHUTDOWN_UNLOADING 0x01
+
+/** Admin queue Clear PXE Mode command */
+#define INTELXL_ADMIN_CLEAR_PXE 0x0110
+
+/** Admin queue Clear PXE Mode command parameters */
+struct intelxl_admin_clear_pxe_params {
+	/** Magic value */
+	uint8_t magic;
+	/** Reserved */
+	uint8_t reserved[15];
+} __attribute__ (( packed ));
+
+/** Clear PXE Mode magic value */
+#define INTELXL_ADMIN_CLEAR_PXE_MAGIC 0x02
 
 /** Admin queue Get Switch Configuration command */
 #define INTELXL_ADMIN_SWITCH 0x0200
@@ -305,6 +320,8 @@ union intelxl_admin_params {
 	struct intelxl_admin_driver_params driver;
 	/** Shutdown command parameters */
 	struct intelxl_admin_shutdown_params shutdown;
+	/** Clear PXE Mode command parameters */
+	struct intelxl_admin_clear_pxe_params pxe;
 	/** Get Switch Configuration command parameters */
 	struct intelxl_admin_switch_params sw;
 	/** Get VSI Parameters command parameters */
@@ -563,6 +580,10 @@ struct intelxl_context_rx {
 /** Queue Tail Pointer Register (offset) */
 #define INTELXL_QXX_TAIL 0x8000
 
+/** Global RLAN Control 0 register */
+#define INTELXL_GLLAN_RCTL_0 0x12a500
+#define INTELXL_GLLAN_RCTL_0_PXE_MODE	0x00000001UL	/**< PXE mode */
+
 /** Transmit data descriptor */
 struct intelxl_tx_data_descriptor {
 	/** Buffer address */
@@ -709,22 +730,27 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 	ring->context = context;
 }
 
-/** Number of transmit descriptors */
-#define INTELXL_TX_NUM_DESC 16
+/** Number of transmit descriptors
+ *
+ * Chosen to exceed the receive ring fill level, in order to avoid
+ * running out of transmit descriptors when sending TCP ACKs.
+ */
+#define INTELXL_TX_NUM_DESC 64
 
 /** Transmit descriptor ring maximum fill level */
 #define INTELXL_TX_FILL ( INTELXL_TX_NUM_DESC - 1 )
 
 /** Number of receive descriptors
  *
- * In PXE mode (i.e. able to post single receive descriptors), 8
- * descriptors is the only permitted value covering all possible
- * numbers of PFs.
+ * Must be a multiple of 32.
  */
-#define INTELXL_RX_NUM_DESC 8
+#define INTELXL_RX_NUM_DESC 32
 
-/** Receive descriptor ring fill level */
-#define INTELXL_RX_FILL ( INTELXL_RX_NUM_DESC - 1 )
+/** Receive descriptor ring fill level
+ *
+ * Must be a multiple of 8 and greater than 8.
+ */
+#define INTELXL_RX_FILL 16
 
 /******************************************************************************
  *
@@ -837,6 +863,10 @@ struct intelxl_nic {
 	unsigned int qset;
 	/** Interrupt control register */
 	unsigned int intr;
+	/** MSI-X capability */
+	struct pci_msix msix;
+	/** MSI-X dummy interrupt target */
+	uint32_t msg;
 
 	/** Admin command queue */
 	struct intelxl_admin command;
@@ -851,6 +881,10 @@ struct intelxl_nic {
 	struct io_buffer *rx_iobuf[INTELXL_RX_NUM_DESC];
 };
 
+extern int intelxl_msix_enable ( struct intelxl_nic *intelxl,
+				 struct pci_device *pci );
+extern void intelxl_msix_disable ( struct intelxl_nic *intelxl,
+				   struct pci_device *pci );
 extern struct intelxl_admin_descriptor *
 intelxl_admin_command_descriptor ( struct intelxl_nic *intelxl );
 extern union intelxl_admin_buffer *
