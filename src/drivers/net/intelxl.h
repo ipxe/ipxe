@@ -735,9 +735,9 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 
 /** PF Interrupt Zero Dynamic Control Register */
 #define INTELXL_PFINT_DYN_CTL0 0x038480
-#define INTELXL_PFINT_DYN_CTL0_INTENA	0x00000001UL	/**< Enable */
-#define INTELXL_PFINT_DYN_CTL0_CLEARPBA	0x00000002UL	/**< Acknowledge */
-#define INTELXL_PFINT_DYN_CTL0_INTENA_MASK 0x80000000UL	/**< Ignore enable */
+#define INTELXL_INT_DYN_CTL_INTENA	0x00000001UL	/**< Enable */
+#define INTELXL_INT_DYN_CTL_CLEARPBA	0x00000002UL	/**< Acknowledge */
+#define INTELXL_INT_DYN_CTL_INTENA_MASK 0x80000000UL	/**< Ignore enable */
 
 /** PF Interrupt Zero Linked List Register */
 #define INTELXL_PFINT_LNKLST0 0x038500
@@ -835,6 +835,8 @@ struct intelxl_nic {
 	unsigned int vsi;
 	/** Queue set handle */
 	unsigned int qset;
+	/** Interrupt control register */
+	unsigned int intr;
 
 	/** Admin command queue */
 	struct intelxl_admin command;

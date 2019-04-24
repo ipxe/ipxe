@@ -1509,9 +1509,9 @@ static void intelxl_poll ( struct net_device *netdev ) {
 
 	/* Acknowledge interrupts, if applicable */
 	if ( netdev_irq_enabled ( netdev ) ) {
-		writel ( ( INTELXL_PFINT_DYN_CTL0_CLEARPBA |
-			   INTELXL_PFINT_DYN_CTL0_INTENA_MASK ),
-			 intelxl->regs + INTELXL_PFINT_DYN_CTL0 );
+		writel ( ( INTELXL_INT_DYN_CTL_CLEARPBA |
+			   INTELXL_INT_DYN_CTL_INTENA_MASK ),
+			 ( intelxl->regs + intelxl->intr ) );
 	}
 
 	/* Poll for completed packets */
@@ -1536,12 +1536,8 @@ static void intelxl_poll ( struct net_device *netdev ) {
 static void intelxl_irq ( struct net_device *netdev, int enable ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 
-	if ( enable ) {
-		writel ( INTELXL_PFINT_DYN_CTL0_INTENA,
-			 intelxl->regs + INTELXL_PFINT_DYN_CTL0 );
-	} else {
-		writel ( 0, intelxl->regs + INTELXL_PFINT_DYN_CTL0 );
-	}
+	writel ( ( enable ? INTELXL_INT_DYN_CTL_INTENA : 0 ),
+		 ( intelxl->regs + intelxl->intr ) );
 }
 
 /** Network device operations */
@@ -1585,6 +1581,7 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
 	intelxl->pf = PCI_FUNC ( pci->busdevfn );
+	intelxl->intr = INTELXL_PFINT_DYN_CTL0;
 	intelxl_init_admin ( &intelxl->command, INTELXL_ADMIN_CMD,
 			     &intelxl_admin_offsets );
 	intelxl_init_admin ( &intelxl->event, INTELXL_ADMIN_EVT,
