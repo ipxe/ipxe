@@ -680,6 +680,8 @@ struct intelxl_ring {
 
 	/** Register block */
 	unsigned int reg;
+	/** Tail register */
+	unsigned int tail;
 	/** Length (in bytes) */
 	size_t len;
 	/** Program queue context

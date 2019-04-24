@@ -1096,7 +1096,6 @@ static int intelxl_disable_ring ( struct intelxl_nic *intelxl,
  */
 static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 				 struct intelxl_ring *ring ) {
-	void *ring_regs = ( intelxl->regs + ring->reg );
 	physaddr_t address;
 	int rc;
 
@@ -1111,7 +1110,7 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 	memset ( ring->desc.raw, 0, ring->len );
 
 	/* Reset tail pointer */
-	writel ( 0, ( ring_regs + INTELXL_QXX_TAIL ) );
+	writel ( 0, ( intelxl->regs + ring->tail ) );
 
 	/* Program queue context */
 	address = virt_to_bus ( ring->desc.raw );
@@ -1127,7 +1126,8 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 	ring->cons = 0;
 
 	DBGC ( intelxl, "INTELXL %p ring %06x is at [%08llx,%08llx)\n",
-	       intelxl, ring->reg, ( ( unsigned long long ) address ),
+	       intelxl, ( ring->reg + ring->tail ),
+	       ( ( unsigned long long ) address ),
 	       ( ( unsigned long long ) address + ring->len ) );
 
 	return 0;
@@ -1207,8 +1207,7 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 	if ( refilled ) {
 		wmb();
 		rx_tail = ( intelxl->rx.prod % INTELXL_RX_NUM_DESC );
-		writel ( rx_tail,
-			 ( intelxl->regs + intelxl->rx.reg + INTELXL_QXX_TAIL));
+		writel ( rx_tail, ( intelxl->regs + intelxl->rx.tail ) );
 	}
 }
 
@@ -1363,8 +1362,7 @@ static int intelxl_transmit ( struct net_device *netdev,
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */
-	writel ( tx_tail,
-		 ( intelxl->regs + intelxl->tx.reg + INTELXL_QXX_TAIL ) );
+	writel ( tx_tail, ( intelxl->regs + intelxl->tx.tail ) );
 
 	DBGC2 ( intelxl, "INTELXL %p TX %d is [%llx,%llx)\n", intelxl, tx_idx,
 		( ( unsigned long long ) address ),
@@ -1595,7 +1593,9 @@ static int intelxl_probe ( struct pci_device *pci ) {
 
 	/* Configure queue register addresses */
 	intelxl->tx.reg = INTELXL_QTX ( intelxl->queue );
+	intelxl->tx.tail = ( intelxl->tx.reg + INTELXL_QXX_TAIL );
 	intelxl->rx.reg = INTELXL_QRX ( intelxl->queue );
+	intelxl->rx.tail = ( intelxl->rx.reg + INTELXL_QXX_TAIL );
 
 	/* Configure interrupt causes */
 	writel ( ( INTELXL_QINT_TQCTL_NEXTQ_INDX_NONE |
