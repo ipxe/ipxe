@@ -833,6 +833,62 @@ static void intelxl_close_admin ( struct intelxl_nic *intelxl ) {
  */
 
 /**
+ * Allocate descriptor ring
+ *
+ * @v intelxl		Intel device
+ * @v ring		Descriptor ring
+ * @ret rc		Return status code
+ */
+static int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
+				struct intelxl_ring *ring ) {
+	physaddr_t address;
+	int rc;
+
+	/* Allocate descriptor ring */
+	ring->desc.raw = malloc_dma ( ring->len, INTELXL_ALIGN );
+	if ( ! ring->desc.raw ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	address = virt_to_bus ( ring->desc.raw );
+
+	/* Initialise descriptor ring */
+	memset ( ring->desc.raw, 0, ring->len );
+
+	/* Reset tail pointer */
+	writel ( 0, ( intelxl->regs + ring->tail ) );
+
+	/* Reset counters */
+	ring->prod = 0;
+	ring->cons = 0;
+
+	DBGC ( intelxl, "INTELXL %p ring %06x is at [%08llx,%08llx)\n",
+	       intelxl, ( ring->reg + ring->tail ),
+	       ( ( unsigned long long ) address ),
+	       ( ( unsigned long long ) address + ring->len ) );
+
+	return 0;
+
+	free_dma ( ring->desc.raw, ring->len );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Free descriptor ring
+ *
+ * @v intelxl		Intel device
+ * @v ring		Descriptor ring
+ */
+static void intelxl_free_ring ( struct intelxl_nic *intelxl __unused,
+				struct intelxl_ring *ring ) {
+
+	/* Free descriptor ring */
+	free_dma ( ring->desc.raw, ring->len );
+	ring->desc.raw = NULL;
+}
+
+/**
  * Dump queue context (for debugging)
  *
  * @v intelxl		Intel device
@@ -1100,17 +1156,8 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 	int rc;
 
 	/* Allocate descriptor ring */
-	ring->desc.raw = malloc_dma ( ring->len, INTELXL_ALIGN );
-	if ( ! ring->desc.raw ) {
-		rc = -ENOMEM;
+	if ( ( rc = intelxl_alloc_ring ( intelxl, ring ) ) != 0 )
 		goto err_alloc;
-	}
-
-	/* Initialise descriptor ring */
-	memset ( ring->desc.raw, 0, ring->len );
-
-	/* Reset tail pointer */
-	writel ( 0, ( intelxl->regs + ring->tail ) );
 
 	/* Program queue context */
 	address = virt_to_bus ( ring->desc.raw );
@@ -1121,21 +1168,12 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 	if ( ( rc = intelxl_enable_ring ( intelxl, ring ) ) != 0 )
 		goto err_enable;
 
-	/* Reset counters */
-	ring->prod = 0;
-	ring->cons = 0;
-
-	DBGC ( intelxl, "INTELXL %p ring %06x is at [%08llx,%08llx)\n",
-	       intelxl, ( ring->reg + ring->tail ),
-	       ( ( unsigned long long ) address ),
-	       ( ( unsigned long long ) address + ring->len ) );
-
 	return 0;
 
 	intelxl_disable_ring ( intelxl, ring );
  err_enable:
  err_context:
-	free_dma ( ring->desc.raw, ring->len );
+	intelxl_free_ring ( intelxl, ring );
  err_alloc:
 	return rc;
 }
@@ -1157,8 +1195,7 @@ static void intelxl_destroy_ring ( struct intelxl_nic *intelxl,
 	}
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc.raw, ring->len );
-	ring->desc.raw = NULL;
+	intelxl_free_ring ( intelxl, ring );
 }
 
 /**
@@ -1208,6 +1245,22 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 		wmb();
 		rx_tail = ( intelxl->rx.prod % INTELXL_RX_NUM_DESC );
 		writel ( rx_tail, ( intelxl->regs + intelxl->rx.tail ) );
+	}
+}
+
+/**
+ * Discard unused receive I/O buffers
+ *
+ * @v intelxl		Intel device
+ */
+static void intelxl_empty_rx ( struct intelxl_nic *intelxl ) {
+	unsigned int i;
+
+	/* Discard any unused receive buffers */
+	for ( i = 0 ; i < INTELXL_RX_NUM_DESC ; i++ ) {
+		if ( intelxl->rx_iobuf[i] )
+			free_iob ( intelxl->rx_iobuf[i] );
+		intelxl->rx_iobuf[i] = NULL;
 	}
 }
 
@@ -1297,7 +1350,6 @@ static int intelxl_open ( struct net_device *netdev ) {
 static void intelxl_close ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	unsigned int queue;
-	unsigned int i;
 
 	/* Dump contexts (for debugging) */
 	intelxl_context_dump ( intelxl, INTELXL_PFCM_LANCTXCTL_TYPE_TX,
@@ -1319,11 +1371,7 @@ static void intelxl_close ( struct net_device *netdev ) {
 	intelxl_destroy_ring ( intelxl, &intelxl->rx );
 
 	/* Discard any unused receive buffers */
-	for ( i = 0 ; i < INTELXL_RX_NUM_DESC ; i++ ) {
-		if ( intelxl->rx_iobuf[i] )
-			free_iob ( intelxl->rx_iobuf[i] );
-		intelxl->rx_iobuf[i] = NULL;
-	}
+	intelxl_empty_rx ( intelxl );
 }
 
 /**
