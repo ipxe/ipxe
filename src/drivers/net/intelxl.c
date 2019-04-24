@@ -45,8 +45,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-static void intelxl_reopen_admin ( struct intelxl_nic *intelxl );
-
 /******************************************************************************
  *
  * Device reset
@@ -238,7 +236,7 @@ static void intelxl_free_admin ( struct intelxl_nic *intelxl __unused,
  * @v intelxl		Intel device
  * @ret cmd		Command descriptor
  */
-static struct intelxl_admin_descriptor *
+struct intelxl_admin_descriptor *
 intelxl_admin_command_descriptor ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin *admin = &intelxl->command;
 	struct intelxl_admin_descriptor *cmd;
@@ -255,7 +253,7 @@ intelxl_admin_command_descriptor ( struct intelxl_nic *intelxl ) {
  * @v intelxl		Intel device
  * @ret buf		Data buffer
  */
-static union intelxl_admin_buffer *
+union intelxl_admin_buffer *
 intelxl_admin_command_buffer ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin *admin = &intelxl->command;
 	union intelxl_admin_buffer *buf;
@@ -295,7 +293,7 @@ static void intelxl_admin_event_init ( struct intelxl_nic *intelxl,
  * @v intelxl		Intel device
  * @ret rc		Return status code
  */
-static int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
+int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin *admin = &intelxl->command;
 	const struct intelxl_admin_offsets *regs = admin->regs;
 	void *admin_regs = ( intelxl->regs + admin->base );
@@ -696,7 +694,7 @@ static void intelxl_refill_admin ( struct intelxl_nic *intelxl ) {
  *
  * @v netdev		Network device
  */
-static void intelxl_poll_admin ( struct net_device *netdev ) {
+void intelxl_poll_admin ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	struct intelxl_admin *admin = &intelxl->event;
 	struct intelxl_admin_descriptor *evt;
@@ -749,7 +747,7 @@ static void intelxl_poll_admin ( struct net_device *netdev ) {
  * @v intelxl		Intel device
  * @ret rc		Return status code
  */
-static int intelxl_open_admin ( struct intelxl_nic *intelxl ) {
+int intelxl_open_admin ( struct intelxl_nic *intelxl ) {
 	int rc;
 
 	/* Allocate admin event queue */
@@ -789,7 +787,7 @@ static int intelxl_open_admin ( struct intelxl_nic *intelxl ) {
  *
  * @v intelxl		Intel device
  */
-static void intelxl_reopen_admin ( struct intelxl_nic *intelxl ) {
+void intelxl_reopen_admin ( struct intelxl_nic *intelxl ) {
 	unsigned int i;
 
 	/* Enable admin event queue */
@@ -811,7 +809,7 @@ static void intelxl_reopen_admin ( struct intelxl_nic *intelxl ) {
  *
  * @v intelxl		Intel device
  */
-static void intelxl_close_admin ( struct intelxl_nic *intelxl ) {
+void intelxl_close_admin ( struct intelxl_nic *intelxl ) {
 
 	/* Shut down admin queues */
 	intelxl_admin_shutdown ( intelxl );
@@ -839,8 +837,8 @@ static void intelxl_close_admin ( struct intelxl_nic *intelxl ) {
  * @v ring		Descriptor ring
  * @ret rc		Return status code
  */
-static int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
-				struct intelxl_ring *ring ) {
+int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
+			 struct intelxl_ring *ring ) {
 	physaddr_t address;
 	int rc;
 
@@ -880,8 +878,8 @@ static int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
  * @v intelxl		Intel device
  * @v ring		Descriptor ring
  */
-static void intelxl_free_ring ( struct intelxl_nic *intelxl __unused,
-				struct intelxl_ring *ring ) {
+void intelxl_free_ring ( struct intelxl_nic *intelxl __unused,
+			 struct intelxl_ring *ring ) {
 
 	/* Free descriptor ring */
 	free_dma ( ring->desc.raw, ring->len );
@@ -1253,7 +1251,7 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
  *
  * @v intelxl		Intel device
  */
-static void intelxl_empty_rx ( struct intelxl_nic *intelxl ) {
+void intelxl_empty_rx ( struct intelxl_nic *intelxl ) {
 	unsigned int i;
 
 	/* Discard any unused receive buffers */
@@ -1381,8 +1379,7 @@ static void intelxl_close ( struct net_device *netdev ) {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int intelxl_transmit ( struct net_device *netdev,
-			      struct io_buffer *iobuf ) {
+int intelxl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	struct intelxl_tx_data_descriptor *tx;
 	unsigned int tx_idx;
@@ -1504,7 +1501,7 @@ static void intelxl_poll_rx ( struct net_device *netdev ) {
  *
  * @v netdev		Network device
  */
-static void intelxl_poll ( struct net_device *netdev ) {
+void intelxl_poll ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 
 	/* Acknowledge interrupts, if applicable */

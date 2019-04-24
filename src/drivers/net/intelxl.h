@@ -851,6 +851,24 @@ struct intelxl_nic {
 	struct io_buffer *rx_iobuf[INTELXL_RX_NUM_DESC];
 };
 
+extern struct intelxl_admin_descriptor *
+intelxl_admin_command_descriptor ( struct intelxl_nic *intelxl );
+extern union intelxl_admin_buffer *
+intelxl_admin_command_buffer ( struct intelxl_nic *intelxl );
+extern int intelxl_admin_command ( struct intelxl_nic *intelxl );
+extern void intelxl_poll_admin ( struct net_device *netdev );
+extern int intelxl_open_admin ( struct intelxl_nic *intelxl );
+extern void intelxl_reopen_admin ( struct intelxl_nic *intelxl );
+extern void intelxl_close_admin ( struct intelxl_nic *intelxl );
+extern int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
+				struct intelxl_ring *ring );
+extern void intelxl_free_ring ( struct intelxl_nic *intelxl,
+				struct intelxl_ring *ring );
+extern void intelxl_empty_rx ( struct intelxl_nic *intelxl );
+extern int intelxl_transmit ( struct net_device *netdev,
+			      struct io_buffer *iobuf );
+extern void intelxl_poll ( struct net_device *netdev );
+
 extern void intelxlvf_admin_event ( struct net_device *netdev,
 				    struct intelxl_admin_descriptor *evt,
 				    union intelxl_admin_buffer *buf );
