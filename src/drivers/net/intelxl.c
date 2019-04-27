@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
 #include <ipxe/if_ether.h>
+#include <ipxe/vlan.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
@@ -1254,6 +1255,7 @@ static void intelxl_poll_rx ( struct net_device *netdev ) {
 	struct intelxl_rx_writeback_descriptor *rx_wb;
 	struct io_buffer *iobuf;
 	unsigned int rx_idx;
+	unsigned int tag;
 	size_t len;
 
 	/* Check for received packets */
@@ -1273,16 +1275,23 @@ static void intelxl_poll_rx ( struct net_device *netdev ) {
 		len = INTELXL_RX_WB_LEN ( le32_to_cpu ( rx_wb->len ) );
 		iob_put ( iobuf, len );
 
+		/* Find VLAN device, if applicable */
+		if ( rx_wb->flags & cpu_to_le32 ( INTELXL_RX_WB_FL_VLAN ) ) {
+			tag = VLAN_TAG ( le16_to_cpu ( rx_wb->vlan ) );
+		} else {
+			tag = 0;
+		}
+
 		/* Hand off to network stack */
 		if ( rx_wb->flags & cpu_to_le32 ( INTELXL_RX_WB_FL_RXE ) ) {
 			DBGC ( intelxl, "INTELXL %p RX %d error (length %zd, "
 			       "flags %08x)\n", intelxl, rx_idx, len,
 			       le32_to_cpu ( rx_wb->flags ) );
-			netdev_rx_err ( netdev, iobuf, -EIO );
+			vlan_netdev_rx_err ( netdev, tag, iobuf, -EIO );
 		} else {
 			DBGC2 ( intelxl, "INTELXL %p RX %d complete (length "
 				"%zd)\n", intelxl, rx_idx, len );
-			netdev_rx ( netdev, iobuf );
+			vlan_netdev_rx ( netdev, tag, iobuf );
 		}
 		intelxl->rx.cons++;
 	}

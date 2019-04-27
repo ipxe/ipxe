@@ -582,7 +582,11 @@ struct intelxl_rx_data_descriptor {
 /** Receive writeback descriptor */
 struct intelxl_rx_writeback_descriptor {
 	/** Reserved */
-	uint8_t reserved[8];
+	uint8_t reserved_a[2];
+	/** VLAN tag */
+	uint16_t vlan;
+	/** Reserved */
+	uint8_t reserved_b[4];
 	/** Flags */
 	uint32_t flags;
 	/** Length */
@@ -591,6 +595,9 @@ struct intelxl_rx_writeback_descriptor {
 
 /** Receive writeback descriptor complete */
 #define INTELXL_RX_WB_FL_DD 0x00000001UL
+
+/** Receive writeback descriptor VLAN tag present */
+#define INTELXL_RX_WB_FL_VLAN 0x00000004UL
 
 /** Receive writeback descriptor error */
 #define INTELXL_RX_WB_FL_RXE 0x00080000UL
