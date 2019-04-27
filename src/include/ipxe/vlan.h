@@ -10,6 +10,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <ipxe/netdevice.h>
+
 /** A VLAN header */
 struct vlan_header {
 	/** Tag control information */
@@ -59,12 +61,14 @@ struct vlan_header {
  */
 #define VLAN_PRIORITY_IS_VALID( priority ) ( (priority) <= 7 )
 
-extern struct net_device * vlan_find ( struct net_device *trunk,
-				       unsigned int tag );
 extern unsigned int vlan_tag ( struct net_device *netdev );
 extern int vlan_can_be_trunk ( struct net_device *trunk );
 extern int vlan_create ( struct net_device *trunk, unsigned int tag,
 			 unsigned int priority );
 extern int vlan_destroy ( struct net_device *netdev );
+extern void vlan_netdev_rx ( struct net_device *netdev, unsigned int tag,
+			     struct io_buffer *iobuf );
+extern void vlan_netdev_rx_err ( struct net_device *netdev, unsigned int tag,
+				 struct io_buffer *iobuf, int rc );
 
 #endif /* _IPXE_VLAN_H */

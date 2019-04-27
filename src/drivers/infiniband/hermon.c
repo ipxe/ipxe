@@ -3207,22 +3207,16 @@ static void hermon_eth_complete_recv ( struct ib_device *ibdev __unused,
 				       struct ib_address_vector *source,
 				       struct io_buffer *iobuf, int rc ) {
 	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
-	struct net_device *vlan;
+	unsigned int tag;
 
-	/* Find VLAN device, if applicable */
-	if ( source->vlan_present ) {
-		if ( ( vlan = vlan_find ( netdev, source->vlan ) ) != NULL ) {
-			netdev = vlan;
-		} else if ( rc == 0 ) {
-			rc = -ENODEV;
-		}
-	}
+	/* Identify VLAN tag, if applicable */
+	tag = ( source->vlan_present ? source->vlan : 0 );
 
 	/* Hand off to network layer */
 	if ( rc == 0 ) {
-		netdev_rx ( netdev, iobuf );
+		vlan_netdev_rx ( netdev, tag, iobuf );
 	} else {
-		netdev_rx_err ( netdev, iobuf, rc );
+		vlan_netdev_rx_err ( netdev, tag, iobuf, rc );
 	}
 }
 

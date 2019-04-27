@@ -1126,15 +1126,35 @@ __weak unsigned int vlan_tag ( struct net_device *netdev __unused ) {
 }
 
 /**
- * Identify VLAN device (when VLAN support is not present)
+ * Add VLAN tag-stripped packet to queue (when VLAN support is not present)
  *
- * @v trunk		Trunk network device
- * @v tag		VLAN tag
- * @ret netdev		VLAN device, if any
+ * @v netdev		Network device
+ * @v tag		VLAN tag, or zero
+ * @v iobuf		I/O buffer
  */
-__weak struct net_device * vlan_find ( struct net_device *trunk __unused,
-				       unsigned int tag __unused ) {
-	return NULL;
+__weak void vlan_netdev_rx ( struct net_device *netdev, unsigned int tag,
+			     struct io_buffer *iobuf ) {
+
+	if ( tag == 0 ) {
+		netdev_rx ( netdev, iobuf );
+	} else {
+		netdev_rx_err ( netdev, iobuf, -ENODEV );
+	}
+}
+
+/**
+ * Discard received VLAN tag-stripped packet (when VLAN support is not present)
+ *
+ * @v netdev		Network device
+ * @v tag		VLAN tag, or zero
+ * @v iobuf		I/O buffer, or NULL
+ * @v rc		Packet status code
+ */
+__weak void vlan_netdev_rx_err ( struct net_device *netdev,
+				 unsigned int tag __unused,
+				 struct io_buffer *iobuf, int rc ) {
+
+	netdev_rx_err ( netdev, iobuf, rc );
 }
 
 /** Networking stack process */
