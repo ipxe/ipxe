@@ -2640,6 +2640,9 @@ static struct pci_device_id golan_nics[] = {
 	PCI_ROM ( 0x15b3, 0x1015, "ConnectX-4Lx", "ConnectX-4Lx HCA driver, DevID 4117", 0 ),
 	PCI_ROM ( 0x15b3, 0x1017, "ConnectX-5", "ConnectX-5 HCA driver, DevID 4119", 0 ),
 	PCI_ROM ( 0x15b3, 0x1019, "ConnectX-5EX", "ConnectX-5EX HCA driver, DevID 4121", 0 ),
+	PCI_ROM ( 0x15b3, 0x101b, "ConnectX-6", "ConnectX-6 HCA driver, DevID 4123", 0 ),
+	PCI_ROM ( 0x15b3, 0x101d, "ConnectX-6DX", "ConnectX-6DX HCA driver, DevID 4125", 0 ),
+	PCI_ROM ( 0x15b3, 0xa2d2, "BlueField", "BlueField integrated ConnectX-5 network controller HCA driver, DevID 41682", 0 ),
 };
 
 struct pci_driver golan_driver __pci_driver = {
