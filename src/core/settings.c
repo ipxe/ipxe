@@ -45,6 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/init.h>
 #include <ipxe/version.h>
 #include <ipxe/settings.h>
+#include <ipxe/parseopt.h>
 
 /** @file
  *
@@ -1231,6 +1232,8 @@ int fetchf_setting ( struct settings *settings, const struct setting *setting,
 	struct setting tmp_fetched;
 	void *raw;
 	int raw_len;
+	void *tmp_buf;
+	size_t tmp_len;
 	int ret;
 
 	/* Use local buffers if necessary */
@@ -1248,12 +1251,45 @@ int fetchf_setting ( struct settings *settings, const struct setting *setting,
 	/* Sanity check */
 	assert ( fetched->type != NULL );
 
-	/* Format setting */
-	if ( ( ret = setting_format ( fetched->type, raw, raw_len, buf,
-				      len ) ) < 0 )
-		goto err_format;
+	/* User-specified length */
+	if ( setting->length > 0 ) {
+		/* Calculate correct tmp_buf size */
+		tmp_len = setting->offset + setting->length + 1; /* NUL */
+		tmp_buf = zalloc ( tmp_len );
+
+		/* Format setting */
+		if ( ( ret = setting_format ( fetched->type, raw, raw_len, tmp_buf,
+						  tmp_len ) ) < 0 )
+			goto err_format;
+
+		/* Copy the substring into the output buffer */
+		if ( buf )
+			memcpy ( buf, tmp_buf + setting->offset, setting->length );
+
+		/* Calculate correct rc for trimmed return value
+		 * in case that specified length > strlen(buf) */
+		ret = ( ret - setting->offset < setting->length
+                ? ret - setting->offset : setting->length);
+
+	/* String-defined length */
+	} else {
+		tmp_buf = zalloc ( len );
+
+		/* Format setting */
+		if ( ( ret = setting_format ( fetched->type, raw, raw_len, tmp_buf,
+						  len ) ) < 0 )
+			goto err_format;
+
+		/* Copy the substring into the output buffer */
+		if ( buf )
+			memcpy ( buf, tmp_buf + setting->offset, len - setting->offset );
+
+		/* Remove chars at the start */
+		ret -= setting->offset;
+	}
 
  err_format:
+	free ( tmp_buf );
 	free ( raw );
  err_fetch_copy:
 	return ret;
@@ -1518,8 +1554,8 @@ static const struct setting_type * find_setting_type ( const char *name ) {
  * @ret rc		Return status code
  *
  * Interprets a name of the form
- * "[settings_name/]tag_name[:type_name]" and fills in the appropriate
- * fields.
+ * "[settings_name/]tag_name[:type_name[:offset[:length]]]" and fills in the
+ *  appropriate fields.
  *
  * Note that on success, this function will have modified the original
  * setting @c name.
@@ -1529,6 +1565,10 @@ int parse_setting_name ( char *name, get_child_settings_t get_child,
 	char *settings_name;
 	char *setting_name;
 	char *type_name;
+	char *offset_str = NULL;
+	char *length_str = NULL;
+	uint32_t offset = 0;
+	uint32_t length = 0;
 	struct setting *predefined;
 	int rc;
 
@@ -1537,7 +1577,7 @@ int parse_setting_name ( char *name, get_child_settings_t get_child,
 	memset ( setting, 0, sizeof ( *setting ) );
 	setting->name = "";
 
-	/* Split name into "[settings_name/]setting_name[:type_name]" */
+	/* Split name into "[settings_name/]setting_name[:type_name[:offset[:length]]]" */
 	if ( ( setting_name = strchr ( name, '/' ) ) != NULL ) {
 		*(setting_name++) = 0;
 		settings_name = name;
@@ -1545,8 +1585,17 @@ int parse_setting_name ( char *name, get_child_settings_t get_child,
 		setting_name = name;
 		settings_name = NULL;
 	}
-	if ( ( type_name = strchr ( setting_name, ':' ) ) != NULL )
+	if ( ( type_name = strchr ( setting_name, ':' ) ) != NULL ) {
 		*(type_name++) = 0;
+
+		/* Split offset/length_str if they're provided */
+		if ( ( offset_str = strchr ( type_name, ':' ) ) != NULL ) {
+			*(offset_str++) = 0;
+			if ( ( length_str = strchr ( offset_str, ':' ) ) != NULL ) {
+				*(length_str++) = 0;
+			}
+		}
+	}
 
 	/* Identify settings block, if specified */
 	if ( settings_name ) {
@@ -1556,6 +1605,21 @@ int parse_setting_name ( char *name, get_child_settings_t get_child,
 			      settings_name, name );
 			rc = -ENODEV;
 			goto err;
+		}
+	}
+
+	if ( offset_str ) {
+		if ( ( rc = parse_integer( offset_str, &offset ) ) != 0 ) {
+			DBG ( "Parse failure on settings offset_str \"%s\": \"%s\"\n",
+				  name, offset_str );
+			goto err;
+		}
+		if ( length_str ) {
+			if ( ( rc = parse_integer( length_str, &length ) ) != 0 ) {
+				DBG ( "Parse failure on settings length_str \"%s\": \"%s\"\n",
+				  name, length_str );
+				goto err;
+			}
 		}
 	}
 
@@ -1571,8 +1635,12 @@ int parse_setting_name ( char *name, get_child_settings_t get_child,
 		}
 	}
 
+	/* Set offset & length in memcpy'd setting */
+	setting->offset = offset;
+	setting->length = length;
+
 	/* Identify setting type, if specified */
-	if ( type_name ) {
+	if ( type_name && strlen ( type_name ) > 0 ) {
 		setting->type = find_setting_type ( type_name );
 		if ( setting->type == NULL ) {
 			DBG ( "Invalid setting type \"%s\" in \"%s\"\n",
@@ -1590,6 +1658,11 @@ int parse_setting_name ( char *name, get_child_settings_t get_child,
 		*( setting_name - 1 ) = '/';
 	if ( type_name )
 		*( type_name - 1 ) = ':';
+	if ( offset_str ) {
+		*( offset_str - 1 ) = ':';
+	if ( type_name )
+		*( type_name - 1 ) = ':';
+	}
 	return rc;
 }
 
@@ -1605,11 +1678,29 @@ int parse_setting_name ( char *name, get_child_settings_t get_child,
 int setting_name ( struct settings *settings, const struct setting *setting,
 		   char *buf, size_t len ) {
 	const char *name;
+	char indices[32];
+	int rc;
 
 	settings = settings_target ( settings );
 	name = settings_name ( settings );
-	return snprintf ( buf, len, "%s%s%s:%s", name, ( name[0] ? "/" : "" ),
-			  setting->name, setting->type->name );
+
+	if ( setting->offset ) {
+		if ( setting->length )
+			rc = snprintf ( indices, 32, ":%zd:%zd", setting->offset,
+					setting->length );
+		else
+			rc = snprintf ( indices, 32, ":%zd", setting->offset );
+	}
+	else {
+		rc = 0;
+		indices[0] = 0;
+	}
+
+	if ( rc < 0 )
+		return rc;
+
+	return snprintf ( buf, len, "%s%s%s:%s%s", name, ( name[0] ? "/" : "" ),
+			  setting->name, setting->type->name,indices );
 }
 
 /******************************************************************************

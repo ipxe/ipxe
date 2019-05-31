@@ -47,6 +47,12 @@ struct setting {
 	 * indicates a DHCPv4 option setting.
 	 */
 	const struct settings_scope *scope;
+	/**
+	 * Offset and length for substring-ing a setting
+	 * When length is 0, assume to the end of the buffer
+	 */
+	size_t offset;
+	size_t length;
 };
 
 /** Configuration setting table */
