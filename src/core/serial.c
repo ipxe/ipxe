@@ -30,8 +30,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <ipxe/init.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/settings.h>
 #include <ipxe/uart.h>
 #include <ipxe/console.h>
 #include <ipxe/serial.h>
@@ -49,20 +53,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define CONSOLE_PORT COMCONSOLE
 #else
 #define CONSOLE_PORT 0
-#endif
-
-/* UART baud rate */
-#ifdef COMPRESERVE
-#define CONSOLE_BAUD 0
-#else
-#define CONSOLE_BAUD COMSPEED
-#endif
-
-/* UART line control register value */
-#ifdef COMPRESERVE
-#define CONSOLE_LCR 0
-#else
-#define CONSOLE_LCR UART_LCR_WPS ( COMDATA, COMPARITY, COMSTOP )
 #endif
 
 /** Serial console UART */
@@ -133,30 +123,6 @@ struct console_driver serial_console_driver __console_driver = {
 	.usage = CONSOLE_SERIAL,
 };
 
-/** Initialise serial console */
-static void serial_init ( void ) {
-	int rc;
-
-	/* Do nothing if we have no default port */
-	if ( ! CONSOLE_PORT )
-		return;
-
-	/* Select UART */
-	if ( ( rc = uart_select ( &serial_console, CONSOLE_PORT ) ) != 0 ) {
-		DBG ( "Could not select UART %d: %s\n",
-		      CONSOLE_PORT, strerror ( rc ) );
-		return;
-	}
-
-	/* Initialise UART */
-	if ( ( rc = uart_init ( &serial_console, CONSOLE_BAUD,
-				CONSOLE_LCR ) ) != 0 ) {
-		DBG ( "Could not initialise UART %d baud %d LCR %#02x: %s\n",
-		      CONSOLE_PORT, CONSOLE_BAUD, CONSOLE_LCR, strerror ( rc ));
-		return;
-	}
-}
-
 /**
  * Shut down serial console
  *
@@ -174,13 +140,175 @@ static void serial_shutdown ( int flags __unused ) {
 	/* Leave console enabled; it's still usable */
 }
 
-/** Serial console initialisation function */
-struct init_fn serial_console_init_fn __init_fn ( INIT_CONSOLE ) = {
-	.initialise = serial_init,
-};
-
 /** Serial console startup function */
 struct startup_fn serial_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 	.name = "serial",
 	.shutdown = serial_shutdown,
+};
+
+/** Serial console port setting */
+const struct setting serial_port_setting __setting ( SETTING_MISC, serial-port ) = {
+	.name = "serial-port",
+	.description = "Serial port",
+	.tag = DHCP_EB_SERIAL_PORT,
+	.type = &setting_type_uint8,
+};
+const struct setting serial_options_setting __setting ( SETTING_MISC, serial-options ) = {
+	.name = "serial-options",
+	.description = "Serial port options",
+	.tag = DHCP_EB_SERIAL_OPTIONS,
+	.type = &setting_type_string,
+};
+
+/**
+ * Parse a string with options in the format of BBBBPDS where:
+ * - BBBB is the baud rate
+ * - P is parity ("n" for none, "o" for odd, "e" for even)
+ * - D is data bits
+ * - S is stop bits
+ *
+ * @c rc 		Return status code
+ * @v baud		Pointer to an integer for baud rate
+ * @v lcr		Pointer to an integer for the line control register
+ */
+static int serial_parse_options ( const char *options,
+				   uint32_t *baud, uint8_t *lcr ) {
+	int rc = 0;
+	char *endp;
+	uint32_t speed;
+	uint8_t data, parity, stop, preserve;
+
+	/* Initialise to default values; any of these can be overriden later */
+	speed = COMSPEED;
+	data = COMDATA;
+	parity = COMPARITY;
+	stop = COMSTOP;
+	preserve = COMPRESERVE;
+
+	if ( !options || strlen ( options ) == 0 )
+		goto out;
+
+	if ( strcmp ( options, "preserve" ) == 0 ) {
+		preserve = 1;
+		goto out;
+	}
+
+	speed = strtoul( options, &endp, 10 );
+
+	/* No baud rate found */
+	if ( endp == options ) {
+		rc = -EINVAL;
+		goto out;
+	}
+
+	/* Next character is parity */
+	if ( *endp ) {
+		switch( *endp++ ) {
+		case 'n':
+			parity = 0;
+			break;
+		case 'o':
+			parity = 1;
+			break;
+		case 'e':
+			parity = 3;
+			break;
+		default:
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+
+	/* Data & stop bits follow, single numbers in ASCII */
+	if ( *endp )
+		data = *endp++ - '0';
+	if ( *endp )
+		stop = *endp++ - '0';
+
+ out:
+	if ( !preserve ) {
+		/* UART line control register */
+		*baud = speed;
+		*lcr = UART_LCR_WPS ( data, parity, stop );
+	} else {
+		/* Preserve the settings set by e.g. a previous bootloader */
+		*baud = 0;
+		*lcr = 0;
+	}
+	return rc;
+}
+
+/**
+ * Apply serial console settings
+ *
+ * @ret rc	      Return status code
+ */
+static int apply_serial_settings ( void ) {
+	int rc = 0;
+	char *options;
+	unsigned long port;
+	uint32_t baud;
+	uint8_t lcr;
+
+	static unsigned long old_port;
+	static uint32_t old_baud;
+	static uint8_t old_lcr;
+
+	if ( fetch_uint_setting ( NULL, &serial_port_setting, &port ) < 0 )
+		port = CONSOLE_PORT;
+
+	fetch_string_setting_copy ( NULL, &serial_options_setting, &options );
+	if ( ( rc = serial_parse_options ( options, &baud, &lcr ) ) != 0 ) {
+		goto err_parse_options;
+	}
+
+	/* Avoid reconfiguring the port if no changes are being made */
+	if ( port == old_port && baud == old_baud && lcr == old_lcr )
+		goto out_no_change;
+
+	/* Flush the old port, if configured */
+	if ( serial_console.base )
+		uart_flush ( &serial_console );
+
+	/* Disable port if we are not about to configure a new one */
+	if ( ! port ) {
+		serial_console.base = NULL;
+		goto out_no_port;
+	}
+
+	/* Select UART */
+	if ( ( rc = uart_select ( &serial_console, port ) ) != 0 ) {
+		DBG ( "Could not select UART %ld: %s\n", port, strerror ( rc ) );
+		goto err_port_select;
+	}
+
+	/* Initialise UART */
+	if ( ( rc = uart_init ( &serial_console, baud, lcr ) ) != 0 ) {
+		DBG ( "Could not initialise UART %ld baud %u LCR %#02x: %s\n",
+		      port, baud, lcr, strerror ( rc ));
+		goto err_port_init;
+	}
+
+	DBG ( "Serial config using port %ld\n", port );
+
+	/* Record settings */
+	old_port = port;
+	old_baud = baud;
+	old_lcr = lcr;
+
+	/* Success */
+	rc = 0;
+
+ err_parse_options:
+ err_port_select:
+ err_port_init:
+ out_no_port:
+ out_no_change:
+	free ( options );
+	return rc;
+}
+
+/** Serial console port settings applicator */
+struct settings_applicator serial_port_applicator __settings_applicator = {
+	.apply = apply_serial_settings,
 };
