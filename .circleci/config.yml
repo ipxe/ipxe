@@ -49,4 +49,6 @@ workflows:
 
   publish:
     jobs:
-      - github_release
+      - github_release:
+          requires:
+            - make
