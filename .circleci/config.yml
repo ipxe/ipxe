@@ -6,12 +6,15 @@ jobs:
 
     parameters:
       # iPXE Configuration can be defined as variables here
-
       binary_name:
         type: string
 
     steps:
       - checkout
+      
+      - run:
+          name: Disable PIE
+          command: sed -i 's/^CFLAGS.*/CFLAGS := -fno-pie/g' /ipxe/src/Makefile
 
       - run:
           name: Make binary
