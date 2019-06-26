@@ -19,9 +19,10 @@ jobs:
           name: Make binary
           command: "cd ./src && make << parameters.binary_name >>"
 
-      - store_artifacts:
-          path: "./src/<< parameters.binary_name >>"
-          destination: "<< parameters.artifact_name >>"
+      - persist_to_workspace:
+          root: "./src/"
+          paths:
+            - "<< parameters.binary_name >>"
 
   github_release:
     docker:
@@ -29,7 +30,11 @@ jobs:
 
     steps:
       - attach_workspace:
-          at: ./artifacts
+          at: ./src/
+
+      - run:
+          name: Dump
+          command: find .
 
       - run:
           name: "Publish Release on GitHub"
