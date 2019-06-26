@@ -35,7 +35,7 @@ jobs:
 
       - run:
           name: Create artifacts directory
-          command: mv ./artifacts
+          command: mkdir ./artifacts
 
       - run:
           name: Flatten artifacts
