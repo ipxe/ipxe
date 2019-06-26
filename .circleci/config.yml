@@ -50,14 +50,23 @@ workflows:
       - make:
           name: make_x86_64_efi
           binary_name: bin-x86_64-efi/ipxe.efi
+          filters:
+            tags:
+              only: /.*/
 
       - make:
           name: make_x86_64_bios_undinoly_kpxe
           binary_name: bin-x86_64-pcbios/undionly.kpxe
+          filters:
+            tags:
+              only: /.*/
 
       - make:
           name: make_x86_64_bios_undinoly_kkpxe
           binary_name: bin-x86_64-pcbios/undionly.kkpxe
+          filters:
+            tags:
+              only: /.*/
       
       - github_release:
           requires:
@@ -68,4 +77,4 @@ workflows:
             branches:
               ignore: /.*/
             tags:
-              only: /^pixey\-\d+\.\d+\.\d+$/ 
+              only: /^pixey\-.*$/
