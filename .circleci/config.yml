@@ -1,27 +1,31 @@
-version: 2
+version: 2.1
 jobs:
-  build_x86_64_efi:
+  make:
     docker:
       - image: pixey/ipxe-build
+
+    parameters:
+      binary_name:
+        type: string
 
     steps:
       - checkout
 
       - run:
-          name: Build x86_64 EFI
-          command: cd ./src && make bin-x86_64-efi/ipxe.efi
+          name: Make binary
+          command: "cd ./src && make << parameters.binary_name >>"
 
       - run:
           name: Dump files
           command: find .
 
-      - persist_to_workspace:
-          root: src/
-          paths:
-            - "bin-*/**"
+      # - persist_to_workspace:
+      #     root: src/
+      #     paths:
+      #       - "bin-*/**"
 
 workflows:
-  version: 2
   build_and_deploy:
     jobs:
-      - build_x86_64_efi
+      - make:
+          binary_name: bin-x86_64-efi/ipxe.efi
