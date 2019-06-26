@@ -39,7 +39,7 @@ jobs:
 
       - run:
           name: Flatten artifacts
-          command: mv ./src/bin-x86_64-pcbios/* ./artifacts/ && mv ./src/bin-x86_64-efi/* ./artifacts/
+          command: mv ./src/bin-x86_64-pcbios/* ./artifacts && mv ./src/bin-x86_64-efi/* ./artifacts
 
       - run:
           name: Dump
