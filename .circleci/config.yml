@@ -9,7 +9,7 @@ jobs:
 
       - run:
           name: Build x86_64 EFI
-          command: make bin-x86_64-efi/ipxe.efi
+          command: cd /src && make bin-x86_64-efi/ipxe.efi
 
       - run:
           name: Dump files
