@@ -7,8 +7,6 @@ jobs:
     parameters:
       # iPXE Configuration can be defined as variables here
 
-      artifact_name:
-        type: string
       binary_name:
         type: string
 
@@ -39,19 +37,27 @@ jobs:
       - run:
           name: "Publish Release on GitHub"
 
-          #TODO: Replace hardcoded tag value
           command: |
             go get github.com/tcnksm/ghr
-            VERSION=0.0.1-alpha
-            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} ./src/
+            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} ./src/
 
 workflows:
   build_and_deploy:
     jobs:
       - make:
           binary_name: bin-x86_64-efi/ipxe.efi
-          artifact_name: x86_64_ipxe.efi
+
+      - make:
+          binary_name: bin-x86_64-pcbios/undionly.kpxe
+
+      - make:
+          binary_name: bin-x86_64-pcbios/undionly.kkpxe
       
       - github_release:
           requires:
             - make
+          filters: # Release only tags
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
