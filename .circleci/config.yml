@@ -68,4 +68,4 @@ workflows:
             branches:
               ignore: /.*/
             tags:
-              only: /^pixey\-\d+\.\d+\.\d+$/
+              only: /^pixey\-\d+\.\d+\.\d+$/ 
