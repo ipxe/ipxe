@@ -13,7 +13,7 @@ jobs:
 
       - run:
           name: Dump files
-          command: find . name
+          command: find .
 
       - persist_to_workspace:
           root: src/
