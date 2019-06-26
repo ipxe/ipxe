@@ -46,9 +46,7 @@ workflows:
       - make:
           binary_name: bin-x86_64-efi/ipxe.efi
           artifact_name: x86_64_ipxe.efi
-
-  publish:
-    jobs:
+      
       - github_release:
           requires:
             - make
