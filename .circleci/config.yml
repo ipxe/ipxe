@@ -1,0 +1,27 @@
+version: 2
+jobs:
+  build_x86_64_efi:
+    docker:
+      - image: pixey/ipxe-build
+
+    steps:
+      - checkout
+
+      - run:
+          name: Build x86_64 EFI
+          command: make bin-x86_64-efi/ipxe.efi
+
+      - run:
+          name: Dump files
+          command: find . name
+
+      - persist_to_workspace:
+          root: src/
+          paths:
+            - "bin-*/**"
+
+workflows:
+  version: 2
+  build_and_deploy:
+    jobs:
+      - build_x86_64_efi
