@@ -45,17 +45,22 @@ workflows:
   build_and_deploy:
     jobs:
       - make:
+          name: make_x86_64_efi
           binary_name: bin-x86_64-efi/ipxe.efi
 
       - make:
+          name: make_x86_64_bios_undinoly_kpxe
           binary_name: bin-x86_64-pcbios/undionly.kpxe
 
       - make:
+          name: make_x86_64_bios_undinoly_kkpxe
           binary_name: bin-x86_64-pcbios/undionly.kkpxe
       
       - github_release:
           requires:
-            - make
+            - make_x86_64_efi
+            - make_x86_64_bios_undinoly_kpxe
+            - make_x86_64_bios_undinoly_kkpxe
           filters: # Release only tags
             branches:
               ignore: /.*/
