@@ -94,6 +94,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CAP_ID_VPD			0x03	/**< Vital product data */
 #define PCI_CAP_ID_VNDR			0x09	/**< Vendor-specific */
 #define PCI_CAP_ID_EXP			0x10	/**< PCI Express */
+#define PCI_CAP_ID_MSIX			0x11	/**< MSI-X */
+#define PCI_CAP_ID_EA			0x14	/**< Enhanced Allocation */
 
 /** Next capability */
 #define PCI_CAP_NEXT		0x01
@@ -107,6 +109,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** PCI Express */
 #define PCI_EXP_DEVCTL		0x08
 #define PCI_EXP_DEVCTL_FLR		0x8000	/**< Function level reset */
+
+/** MSI-X interrupts */
+#define PCI_MSIX_CTRL		0x02
+#define PCI_MSIX_CTRL_ENABLE		0x8000	/**< Enable MSI-X */
+#define PCI_MSIX_CTRL_MASK		0x4000	/**< Mask all interrupts */
+#define PCI_MSIX_CTRL_SIZE(x)	( (x) & 0x07ff ) /**< Table size */
+#define PCI_MSIX_DESC_TABLE	0x04
+#define PCI_MSIX_DESC_PBA	0x08
+#define PCI_MSIX_DESC_BIR(x)	( (x) & 0x00000007 ) /**< BAR index */
+#define PCI_MSIX_DESC_OFFSET(x)	( (x) & 0xfffffff8 ) /**< BAR offset */
 
 /** Uncorrectable error status */
 #define PCI_ERR_UNCOR_STATUS	0x04
@@ -194,8 +206,8 @@ struct pci_device {
 	uint32_t class;
 	/** Interrupt number */
 	uint8_t irq;
-	/** Bus, device, and function (bus:dev.fn) number */
-	uint16_t busdevfn;
+	/** Segment, bus, device, and function (bus:dev.fn) number */
+	uint32_t busdevfn;
 	/** Driver for this device */
 	struct pci_driver *driver;
 	/** Driver-private data
@@ -240,11 +252,13 @@ struct pci_driver {
 /** Declare a fallback PCI driver */
 #define __pci_driver_fallback __table_entry ( PCI_DRIVERS, 02 )
 
+#define PCI_SEG( busdevfn )		( ( (busdevfn) >> 16 ) & 0xffff )
 #define PCI_BUS( busdevfn )		( ( (busdevfn) >> 8 ) & 0xff )
 #define PCI_SLOT( busdevfn )		( ( (busdevfn) >> 3 ) & 0x1f )
 #define PCI_FUNC( busdevfn )		( ( (busdevfn) >> 0 ) & 0x07 )
-#define PCI_BUSDEVFN( bus, slot, func )	\
-	( ( (bus) << 8 ) | ( (slot) << 3 ) | ( (func) << 0 ) )
+#define PCI_BUSDEVFN( segment, bus, slot, func )			\
+	( ( (segment) << 16 ) | ( (bus) << 8 ) |			\
+	  ( (slot) << 3 ) | ( (func) << 0 ) )
 #define PCI_FIRST_FUNC( busdevfn )	( (busdevfn) & ~0x07 )
 #define PCI_LAST_FUNC( busdevfn )	( (busdevfn) | 0x07 )
 
@@ -270,12 +284,12 @@ struct pci_driver {
 	PCI_ID( _vendor, _device, _name, _description, _data )
 
 /** PCI device debug message format */
-#define PCI_FMT "PCI %02x:%02x.%x"
+#define PCI_FMT "%04x:%02x:%02x.%x"
 
 /** PCI device debug message arguments */
 #define PCI_ARGS( pci )							\
-	PCI_BUS ( (pci)->busdevfn ), PCI_SLOT ( (pci)->busdevfn ),	\
-	PCI_FUNC ( (pci)->busdevfn )
+	PCI_SEG ( (pci)->busdevfn ), PCI_BUS ( (pci)->busdevfn ),	\
+	PCI_SLOT ( (pci)->busdevfn ), PCI_FUNC ( (pci)->busdevfn )
 
 extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,

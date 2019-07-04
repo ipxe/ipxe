@@ -7,6 +7,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+/* Drag in general configuration */
+#include <config/general.h>
+
 /* Drag in local definitions */
 #include "librm.h"
 
@@ -180,16 +183,51 @@ gdt_end:
  * to us.
  ****************************************************************************
  */
-	.section ".bss.rm_sp", "aw", @nobits
+	.section ".bss.rm_ss_sp", "aw", @nobits
 	.globl rm_sp
 rm_sp:	.word 0
-
-	.section ".bss.rm_ss", "aw", @nobits
 	.globl rm_ss
 rm_ss:	.word 0
 
 	.section ".data.pm_esp", "aw", @progbits
 pm_esp:	.long VIRTUAL(_estack)
+
+/****************************************************************************
+ * Temporary static data buffer
+ *
+ * This is used to reduce the amount of real-mode stack space consumed
+ * during mode transitions, since we are sometimes called with very
+ * little real-mode stack space available.
+ ****************************************************************************
+ */
+	/* Temporary static buffer usage by virt_call */
+	.struct	0
+VC_TMP_GDT:		.space	6
+VC_TMP_IDT:		.space	6
+VC_TMP_PAD:		.space	4 /* for alignment */
+.if64
+VC_TMP_CR3:		.space	4
+VC_TMP_CR4:		.space	4
+VC_TMP_EMER:		.space	8
+.endif
+#ifdef TIVOLI_VMM_WORKAROUND
+VC_TMP_FXSAVE:		.space	512
+#endif
+VC_TMP_END:
+	.previous
+
+	/* Temporary static buffer usage by real_call */
+	.struct 0
+RC_TMP_FUNCTION:	.space	4
+RC_TMP_END:
+	.previous
+
+	/* Shared temporary static buffer */
+	.section ".bss16.rm_tmpbuf", "aw", @nobits
+	.align 16
+rm_tmpbuf:
+	.space	VC_TMP_END
+	.size	rm_tmpbuf, . - rm_tmpbuf
 
 /****************************************************************************
  * Virtual address offsets
@@ -341,6 +379,7 @@ set_seg_base:
  *
  * Parameters: 
  *   %ecx : number of bytes to move from RM stack to PM stack
+ *   %edx : number of bytes to copy from RM temporary buffer to PM stack
  *
  ****************************************************************************
  */
@@ -361,14 +400,19 @@ real_to_prot:
 	/* Add protected-mode return address to length of data to be copied */
 	addw	$4, %cx /* %ecx must be less than 64kB anyway */
 
-	/* Real-mode %ss:%sp => %ebp:%edx and virtual address => %esi */
-	xorl	%ebp, %ebp
-	movw	%ss, %bp
-	movzwl	%sp, %edx
-	movl	%ebp, %eax
+	/* Real-mode %ss:%sp => %ebp and virtual address => %esi */
+	xorl	%eax, %eax
+	movw	%ss, %ax
 	shll	$4, %eax
-	addr32 leal (%eax,%edx), %esi
+	movzwl	%sp, %ebp
+	addr32 leal (%eax,%ebp), %esi
 	subl	rm_virt_offset, %esi
+	shll	$12, %eax
+	orl	%eax, %ebp
+
+	/* Real-mode data segment virtual address => %ebx */
+	movl	rm_data16, %ebx
+.if64 ; subl	rm_virt_offset, %ebx ; .endif
 
 	/* Load protected-mode global descriptor table */
 	data32 lgdt gdtr
@@ -407,13 +451,18 @@ r2p_pmode:
 	lidt	VIRTUAL(idtr32)
 
 	/* Record real-mode %ss:sp (after removal of data) */
-	movw	%bp, VIRTUAL(rm_ss)
-	addl	%ecx, %edx
-	movw	%dx, VIRTUAL(rm_sp)
+	addl	%ecx, %ebp
+	movl	%ebp, VIRTUAL(rm_sp)
 
 	/* Move data from RM stack to PM stack */
+	subl	%edx, %esp
 	subl	%ecx, %esp
 	movl	%esp, %edi
+	rep movsb
+
+	/* Copy data from RM temporary buffer to PM stack */
+	leal	rm_tmpbuf(%ebx), %esi
+	movl	%edx, %ecx
 	rep movsb
 
 	/* Return to virtual address */
@@ -435,6 +484,7 @@ r2p_pmode:
  *
  * Parameters: 
  *   %ecx : number of bytes to move from PM stack to RM stack
+ *   %edx : number of bytes to move from PM stack to RM temporary buffer
  *   %esi : real-mode global and interrupt descriptor table registers
  *
  ****************************************************************************
@@ -455,17 +505,24 @@ prot_to_real:
 	/* Add return address to data to be moved to RM stack */
 	addl	$4, %ecx
 
-	/* Real-mode %ss:sp => %ebp:edx and virtual address => %edi */
-	movzwl	VIRTUAL(rm_ss), %ebp
-	movzwl	VIRTUAL(rm_sp), %edx
-	subl	%ecx, %edx
-	movl	%ebp, %eax
+	/* Real-mode %ss:sp => %ebp and virtual address => %edi */
+	movl	VIRTUAL(rm_sp), %ebp
+	subl	%ecx, %ebp
+	movzwl	VIRTUAL(rm_ss), %eax
 	shll	$4, %eax
-	leal	(%eax,%edx), %edi
+	movzwl	%bp, %edi
+	addl	%eax, %edi
 	subl	VIRTUAL(virt_offset), %edi
 
 	/* Move data from PM stack to RM stack */
 	movl	%esp, %esi
+	rep movsb
+
+	/* Move data from PM stack to RM temporary buffer */
+	movl	VIRTUAL(data16), %edi
+.if64 ;	subl	VIRTUAL(virt_offset), %edi ; .endif
+	addl	$rm_tmpbuf, %edi
+	movl	%edx, %ecx
 	rep movsb
 
 	/* Record protected-mode %esp (after removal of data) */
@@ -497,8 +554,10 @@ p2r_ljmp_rm_cs:
 	movw	%ax, %es
 	movw	%ax, %fs
 	movw	%ax, %gs
-	movw	%bp, %ss
-	movl	%edx, %esp
+	movl	%ebp, %eax
+	shrl	$16, %eax
+	movw	%ax, %ss
+	movzwl	%bp, %esp
 
 	/* Return to real-mode address */
 	data32 ret
@@ -921,14 +980,6 @@ long_restore_regs:
  ****************************************************************************
  */
 	.struct	0
-VC_OFFSET_GDT:		.space	6
-VC_OFFSET_IDT:		.space	6
-.if64
-VC_OFFSET_PADDING64:	.space	4 /* for alignment */
-VC_OFFSET_CR3:		.space	4
-VC_OFFSET_CR4:		.space	4
-VC_OFFSET_EMER:		.space	8
-.endif
 VC_OFFSET_IX86:		.space	SIZEOF_I386_ALL_REGS
 VC_OFFSET_PADDING:	.space	2 /* for alignment */
 VC_OFFSET_RETADDR:	.space	2
@@ -941,7 +992,7 @@ VC_OFFSET_END:
 	.code16
 	.globl virt_call
 virt_call:
-	/* Preserve registers, flags and GDT on external RM stack */
+	/* Preserve registers and flags on external RM stack */
 	pushw	%ss /* padding */
 	pushfl
 	pushal
@@ -951,34 +1002,42 @@ virt_call:
 	pushw	%ds
 	pushw	%ss
 	pushw	%cs
-	subw	$VC_OFFSET_IX86, %sp
-	movw	%sp, %bp
-	sidt	VC_OFFSET_IDT(%bp)
-	sgdt	VC_OFFSET_GDT(%bp)
+
+	/* Claim ownership of temporary static buffer */
+	cli
+	movw	%cs:rm_ds, %ds
+
+#ifdef TIVOLI_VMM_WORKAROUND
+	/* Preserve FPU, MMX and SSE state in temporary static buffer */
+	fxsave	( rm_tmpbuf + VC_TMP_FXSAVE )
+#endif
+	/* Preserve GDT and IDT in temporary static buffer */
+	sidt	( rm_tmpbuf + VC_TMP_IDT )
+	sgdt	( rm_tmpbuf + VC_TMP_GDT )
 
 .if64 ;	/* Preserve control registers, if applicable */
 	movl	$MSR_EFER, %ecx
 	rdmsr
-	movl	%eax, (VC_OFFSET_EMER+0)(%bp)
-	movl	%edx, (VC_OFFSET_EMER+4)(%bp)
+	movl	%eax, ( rm_tmpbuf + VC_TMP_EMER + 0 )
+	movl	%edx, ( rm_tmpbuf + VC_TMP_EMER + 4 )
 	movl	%cr4, %eax
-	movl	%eax, VC_OFFSET_CR4(%bp)
+	movl	%eax, ( rm_tmpbuf + VC_TMP_CR4 )
 	movl	%cr3, %eax
-	movl	%eax, VC_OFFSET_CR3(%bp)
+	movl	%eax, ( rm_tmpbuf + VC_TMP_CR3 )
 .endif
 	/* For sanity's sake, clear the direction flag as soon as possible */
 	cld
 
 	/* Switch to protected mode and move register dump to PM stack */
 	movl	$VC_OFFSET_END, %ecx
+	movl	$VC_TMP_END, %edx
 	pushl	$VIRTUAL(vc_pmode)
 vc_jmp:	jmp	real_to_prot
 	.section ".text.virt_call", "ax", @progbits
 	.code32
 vc_pmode:
 	/* Call function (in protected mode) */
-	leal	VC_OFFSET_IX86(%esp), %eax
-	pushl	%eax
+	pushl	%esp
 	call	*(VC_OFFSET_FUNCTION+4)(%esp)
 	popl	%eax /* discard */
 
@@ -989,11 +1048,9 @@ vc_lmode:
 	.code64
 
 	/* Call function (in long mode) */
-	leaq	VC_OFFSET_IX86(%rsp), %rdi
-	pushq	%rdi
-	movslq	(VC_OFFSET_FUNCTION+8)(%rsp), %rax
+	movq	%rsp, %rdi
+	movslq	VC_OFFSET_FUNCTION(%rsp), %rax
 	callq	*%rax
-	popq	%rdi /* discard */
 
 	/* Switch to protected mode */
 	call	long_to_prot
@@ -1001,7 +1058,8 @@ vc_lmode:
 .endif
 	/* Switch to real mode and move register dump back to RM stack */
 	movl	$VC_OFFSET_END, %ecx
-	movl	%esp, %esi
+	movl	$VC_TMP_END, %edx
+	leal	VC_TMP_GDT(%esp, %ecx), %esi
 	pushl	$vc_rmode
 	jmp	prot_to_real
 	.section ".text16.virt_call", "ax", @progbits
@@ -1009,17 +1067,22 @@ vc_lmode:
 vc_rmode:
 .if64 ;	/* Restore control registers, if applicable */
 	movw	%sp, %bp
-	movl	VC_OFFSET_CR3(%bp), %eax
+	movl	( rm_tmpbuf + VC_TMP_CR3 ), %eax
 	movl	%eax, %cr3
-	movl	VC_OFFSET_CR4(%bp), %eax
+	movl	( rm_tmpbuf + VC_TMP_CR4 ), %eax
 	movl	%eax, %cr4
-	movl	(VC_OFFSET_EMER+0)(%bp), %eax
-	movl	(VC_OFFSET_EMER+4)(%bp), %edx
+	movl	( rm_tmpbuf + VC_TMP_EMER + 0 ), %eax
+	movl	( rm_tmpbuf + VC_TMP_EMER + 4 ), %edx
 	movl	$MSR_EFER, %ecx
 	wrmsr
 .endif
+
+#ifdef TIVOLI_VMM_WORKAROUND
+	/* Restore FPU, MMX and SSE state from temporary static buffer */
+	fxrstor	( rm_tmpbuf + VC_TMP_FXSAVE )
+#endif
 	/* Restore registers and flags and return */
-	addw	$( VC_OFFSET_IX86 + 4 /* also skip %cs and %ss */ ), %sp
+	popl	%eax /* skip %cs and %ss */
 	popw	%ds
 	popw	%es
 	popw	%fs
@@ -1067,6 +1130,7 @@ vc_rmode:
 	.struct	0
 RC_OFFSET_REGS:		.space	SIZEOF_I386_REGS
 RC_OFFSET_REGS_END:
+RC_OFFSET_FUNCTION_COPY:.space	4
 .if64
 RC_OFFSET_LREGS:	.space	SIZEOF_X86_64_REGS
 RC_OFFSET_LREG_RETADDR:	.space	SIZEOF_ADDR
@@ -1087,11 +1151,12 @@ real_call:
 	.code32
 .endif
 	/* Create register dump and function pointer copy on PM stack */
+	pushl	( RC_OFFSET_FUNCTION - RC_OFFSET_FUNCTION_COPY - 4 )(%esp)
 	pushal
-	pushl	RC_OFFSET_FUNCTION(%esp)
 
 	/* Switch to real mode and move register dump to RM stack  */
-	movl	$( RC_OFFSET_REGS_END + 4 /* function pointer copy */ ), %ecx
+	movl	$RC_OFFSET_REGS_END, %ecx
+	movl	$RC_TMP_END, %edx
 	pushl	$rc_rmode
 	movl	$VIRTUAL(rm_default_gdtr_idtr), %esi
 	jmp	prot_to_real
@@ -1099,9 +1164,8 @@ real_call:
 	.code16
 rc_rmode:
 	/* Call real-mode function */
-	popl	rc_function
 	popal
-	call	*rc_function
+	call	*( rm_tmpbuf + RC_TMP_FUNCTION )
 	pushal
 
 	/* For sanity's sake, clear the direction flag as soon as possible */
@@ -1109,6 +1173,7 @@ rc_rmode:
 
 	/* Switch to protected mode and move register dump back to PM stack */
 	movl	$RC_OFFSET_REGS_END, %ecx
+	xorl	%edx, %edx
 	pushl	$VIRTUAL(rc_pmode)
 	jmp	real_to_prot
 	.section ".text.real_call", "ax", @progbits
@@ -1125,12 +1190,6 @@ rc_pmode:
 	/* Return and discard function parameters */
 	ret	$( RC_OFFSET_END - RC_OFFSET_PARAMS )
 
-
-	/* Function vector, used because "call xx(%sp)" is not a valid
-	 * 16-bit expression.
-	 */
-	.section ".bss16.rc_function", "aw", @nobits
-rc_function:	.word 0, 0
 
 	/* Default real-mode global and interrupt descriptor table registers */
 	.section ".data.rm_default_gdtr_idtr", "aw", @progbits
@@ -1304,20 +1363,19 @@ flatten_dummy:
 	.code32
 	.globl interrupt_wrapper
 interrupt_wrapper:
-	/* Preserve registers (excluding already-saved %eax and
-	 * otherwise unused registers which are callee-save for both
-	 * 32-bit and 64-bit ABIs).
-	 */
+	/* Preserve registers (excluding already-saved %eax) */
 	pushl	%ebx
 	pushl	%ecx
 	pushl	%edx
 	pushl	%esi
 	pushl	%edi
+	pushl	%ebp
 
 	/* Expand IRQ number to whole %eax register */
 	movzbl	%al, %eax
 
 .if64 ; /* Skip transition to long mode, if applicable */
+	xorl	%edx, %edx
 	movw	%cs, %bx
 	cmpw	$LONG_CS, %bx
 	je	1f
@@ -1332,24 +1390,45 @@ interrupt_wrapper:
 
 	/* Switch to virtual addressing */
 	call	intr_to_prot
+
+	/* Pass 32-bit interrupt frame pointer in %edx */
+	movl	%esp, %edx
+	xorl	%ecx, %ecx
 .if64
 	/* Switch to long mode */
 	call	prot_to_long
 	.code64
 
-1:	/* Preserve long-mode caller-save registers */
+1:	/* Preserve long-mode registers */
 	pushq	%r8
 	pushq	%r9
 	pushq	%r10
 	pushq	%r11
+	pushq	%r12
+	pushq	%r13
+	pushq	%r14
+	pushq	%r15
 
 	/* Expand IRQ number to whole %rdi register */
 	movl	%eax, %edi
+
+	/* Pass 32-bit interrupt frame pointer (if applicable) in %rsi */
+	testl	%edx, %edx
+	je	1f
+	movl	%edx, %esi
+	addl	virt_offset, %esi
+1:
+	/* Pass 64-bit interrupt frame pointer in %rdx */
+	movq	%rsp, %rdx
 .endif
 	/* Call interrupt handler */
 	call	interrupt
 .if64
-	/* Restore long-mode caller-save registers */
+	/* Restore long-mode registers */
+	popq	%r15
+	popq	%r14
+	popq	%r13
+	popq	%r12
 	popq	%r11
 	popq	%r10
 	popq	%r9
@@ -1373,6 +1452,7 @@ interrupt_wrapper:
 	popl	%ds
 
 1:	/* Restore registers */
+	popl	%ebp
 	popl	%edi
 	popl	%esi
 	popl	%edx

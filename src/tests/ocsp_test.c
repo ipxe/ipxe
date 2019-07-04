@@ -110,7 +110,7 @@ static void ocsp_prepare_test ( struct ocsp_test *test ) {
 	x509_invalidate ( cert );
 
 	/* Force-validate issuer certificate */
-	issuer->valid = 1;
+	issuer->flags |= X509_FL_VALIDATED;
 	issuer->path_remaining = ( issuer->extensions.basic.path_len + 1 );
 }
 

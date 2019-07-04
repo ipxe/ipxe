@@ -341,35 +341,39 @@ void ib_destroy_madx ( struct ib_device *ibdev __unused,
  *
  * @v ibdev		Infiniband device
  * @v type		Queue pair type
- * @ret mi		Management agent, or NULL
+ * @v new_mi		New management interface to fill in
+ * @ret rc		Return status code
  */
-struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
-					 enum ib_queue_pair_type type ) {
+int ib_create_mi ( struct ib_device *ibdev, enum ib_queue_pair_type type,
+		   struct ib_mad_interface **new_mi ) {
 	struct ib_mad_interface *mi;
 	const char *name;
 	int rc;
 
 	/* Allocate and initialise fields */
 	mi = zalloc ( sizeof ( *mi ) );
-	if ( ! mi )
+	if ( ! mi ) {
+		rc = -ENOMEM;
 		goto err_alloc;
+	}
 	mi->ibdev = ibdev;
 	INIT_LIST_HEAD ( &mi->madx );
 
 	/* Create completion queue */
-	mi->cq = ib_create_cq ( ibdev, IB_MI_NUM_CQES, &ib_mi_completion_ops );
-	if ( ! mi->cq ) {
-		DBGC ( mi, "MI %p could not allocate completion queue\n", mi );
+	if ( ( rc = ib_create_cq ( ibdev, IB_MI_NUM_CQES, &ib_mi_completion_ops,
+				   &mi->cq ) ) != 0 ) {
+		DBGC ( mi, "MI %p could not create completion queue: %s\n",
+		       mi, strerror ( rc ) );
 		goto err_create_cq;
 	}
 
 	/* Create queue pair */
 	name = ( ( type == IB_QPT_SMI ) ? "SMI" : "GSI" );
-	mi->qp = ib_create_qp ( ibdev, type, IB_MI_NUM_SEND_WQES, mi->cq,
-				IB_MI_NUM_RECV_WQES, mi->cq,
-				&ib_mi_queue_pair_ops, name );
-	if ( ! mi->qp ) {
-		DBGC ( mi, "MI %p could not allocate queue pair\n", mi );
+	if ( ( rc = ib_create_qp ( ibdev, type, IB_MI_NUM_SEND_WQES, mi->cq,
+				   IB_MI_NUM_RECV_WQES, mi->cq,
+				   &ib_mi_queue_pair_ops, name, &mi->qp ) )!=0){
+		DBGC ( mi, "MI %p could not create queue pair: %s\n",
+		       mi, strerror ( rc ) );
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( mi->qp, mi );
@@ -386,7 +390,8 @@ struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
 
 	/* Fill receive ring */
 	ib_refill_recv ( ibdev, mi->qp );
-	return mi;
+	*new_mi = mi;
+	return 0;
 
  err_modify_qp:
 	ib_destroy_qp ( ibdev, mi->qp );
@@ -395,7 +400,7 @@ struct ib_mad_interface * ib_create_mi ( struct ib_device *ibdev,
  err_create_cq:
 	free ( mi );
  err_alloc:
-	return NULL;
+	return rc;
 }
 
 /**

@@ -844,11 +844,39 @@ int usb_control ( struct usb_device *usb, unsigned int request,
 }
 
 /**
+ * Get default language ID
+ *
+ * @v usb		USB device
+ * @ret language	Language ID
+ */
+static unsigned int usb_get_default_language ( struct usb_device *usb ) {
+	struct {
+		struct usb_descriptor_header header;
+		uint16_t language[1];
+	} __attribute__ (( packed )) desc;
+	unsigned int language;
+	int rc;
+
+	/* Get descriptor */
+	if ( ( rc = usb_get_descriptor ( usb, 0, USB_STRING_DESCRIPTOR, 0, 0,
+					 &desc.header, sizeof ( desc ) ) ) !=0){
+		DBGC ( usb, "USB %s has no default language: %s\n",
+		       usb->name, strerror ( rc ) );
+		return USB_LANG_ENGLISH;
+	}
+
+	/* Use first language ID */
+	language = le16_to_cpu ( desc.language[0] );
+	DBGC2 ( usb, "USB %s default language %#04x\n", usb->name, language );
+	return language;
+}
+
+/**
  * Get USB string descriptor
  *
  * @v usb		USB device
  * @v index		String index
- * @v language		Language ID
+ * @v language		Language ID, or 0 to use default
  * @v buf		Data buffer
  * @v len		Length of buffer
  * @ret len		String length (excluding NUL), or negative error
@@ -863,6 +891,13 @@ int usb_get_string_descriptor ( struct usb_device *usb, unsigned int index,
 	unsigned int actual;
 	unsigned int i;
 	int rc;
+
+	/* Use default language ID, if applicable */
+	if ( ( language == 0 ) && ( index != 0 ) ) {
+		if ( ! usb->language )
+			usb->language = usb_get_default_language ( usb );
+		language = usb->language;
+	}
 
 	/* Allocate buffer for string */
 	desc = malloc ( sizeof ( *desc ) );
@@ -1005,8 +1040,8 @@ static int usb_describe ( struct usb_device *usb,
 		}
 
 		/* Describe function */
-		memcpy ( &desc->class, &association->class,
-			 sizeof ( desc->class ) );
+		memcpy ( &desc->class.class, &association->class,
+			 sizeof ( desc->class.class ) );
 		desc->count = association->count;
 		for ( i = 0 ; i < association->count ; i++ )
 			interfaces[i] = ( first + i );
@@ -1022,7 +1057,8 @@ static int usb_describe ( struct usb_device *usb,
 	}
 
 	/* Describe function */
-	memcpy ( &desc->class, &interface->class, sizeof ( desc->class ) );
+	memcpy ( &desc->class.class, &interface->class,
+		 sizeof ( desc->class.class ) );
 	desc->count = 1;
 	interfaces[0] = first;
 

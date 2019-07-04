@@ -17,6 +17,7 @@
 #include <ipxe/netdevice.h>
 #include <ipxe/profile.h>
 #include <ipxe/process.h>
+#include <ipxe/job.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/tcp.h>
 
@@ -113,6 +114,8 @@ struct tcp_connection {
 	struct process process;
 	/** Retransmission timer */
 	struct retry_timer timer;
+	/** Keepalive timer */
+	struct retry_timer keepalive;
 	/** Shutdown (TIME_WAIT) timer */
 	struct retry_timer wait;
 
@@ -177,6 +180,7 @@ static struct profiler tcp_xfer_profiler __profiler = { .name = "tcp.xfer" };
 static struct process_descriptor tcp_process_desc;
 static struct interface_descriptor tcp_xfer_desc;
 static void tcp_expired ( struct retry_timer *timer, int over );
+static void tcp_keepalive_expired ( struct retry_timer *timer, int over );
 static void tcp_wait_expired ( struct retry_timer *timer, int over );
 static struct tcp_connection * tcp_demux ( unsigned int local_port );
 static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
@@ -284,6 +288,7 @@ static int tcp_open ( struct interface *xfer, struct sockaddr *peer,
 	intf_init ( &tcp->xfer, &tcp_xfer_desc, &tcp->refcnt );
 	process_init_stopped ( &tcp->process, &tcp_process_desc, &tcp->refcnt );
 	timer_init ( &tcp->timer, tcp_expired, &tcp->refcnt );
+	timer_init ( &tcp->keepalive, tcp_keepalive_expired, &tcp->refcnt );
 	timer_init ( &tcp->wait, tcp_wait_expired, &tcp->refcnt );
 	tcp->prev_tcp_state = TCP_CLOSED;
 	tcp->tcp_state = TCP_STATE_SENT ( TCP_SYN );
@@ -380,6 +385,7 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 		/* Remove from list and drop reference */
 		process_del ( &tcp->process );
 		stop_timer ( &tcp->timer );
+		stop_timer ( &tcp->keepalive );
 		stop_timer ( &tcp->wait );
 		list_del ( &tcp->list );
 		ref_put ( &tcp->refcnt );
@@ -393,6 +399,9 @@ static void tcp_close ( struct tcp_connection *tcp, int rc ) {
 	 */
 	if ( ! ( tcp->tcp_state & TCP_STATE_ACKED ( TCP_SYN ) ) )
 		tcp_rx_ack ( tcp, ( tcp->snd_seq + 1 ), 0 );
+
+	/* Stop keepalive timer */
+	stop_timer ( &tcp->keepalive );
 
 	/* If we have no data remaining to send, start sending FIN */
 	if ( list_empty ( &tcp->tx_queue ) &&
@@ -689,7 +698,7 @@ static void tcp_xmit_sack ( struct tcp_connection *tcp, uint32_t sack_seq ) {
 		wsopt->wsopt.length = sizeof ( wsopt->wsopt );
 		wsopt->wsopt.scale = TCP_RX_WINDOW_SCALE;
 		spopt = iob_push ( iobuf, sizeof ( *spopt ) );
-		memset ( spopt->nop, TCP_OPTION_NOP, sizeof ( spopt ) );
+		memset ( spopt->nop, TCP_OPTION_NOP, sizeof ( spopt->nop ) );
 		spopt->spopt.kind = TCP_OPTION_SACK_PERMITTED;
 		spopt->spopt.length = sizeof ( spopt->spopt );
 	}
@@ -799,6 +808,32 @@ static void tcp_expired ( struct retry_timer *timer, int over ) {
 		/* Otherwise, retransmit the packet */
 		tcp_xmit ( tcp );
 	}
+}
+
+/**
+ * Keepalive timer expired
+ *
+ * @v timer		Keepalive timer
+ * @v over		Failure indicator
+ */
+static void tcp_keepalive_expired ( struct retry_timer *timer,
+				    int over __unused ) {
+	struct tcp_connection *tcp =
+		container_of ( timer, struct tcp_connection, keepalive );
+
+	DBGC ( tcp, "TCP %p sending keepalive\n", tcp );
+
+	/* Reset keepalive timer */
+	start_timer_fixed ( &tcp->keepalive, TCP_KEEPALIVE_DELAY );
+
+	/* Send keepalive.  We do this only to preserve or restore
+	 * state in intermediate devices (e.g. firewall NAT tables);
+	 * we don't actually care about eliciting a response to verify
+	 * that the peer is still alive.  We therefore send just a
+	 * pure ACK, to keep our transmit path simple.
+	 */
+	tcp->flags |= TCP_ACK_PENDING;
+	tcp_xmit ( tcp );
 }
 
 /**
@@ -1104,6 +1139,10 @@ static int tcp_rx_ack ( struct tcp_connection *tcp, uint32_t ack,
 
 	/* Update window size */
 	tcp->snd_win = win;
+
+	/* Hold off (or start) the keepalive timer, if applicable */
+	if ( ! ( tcp->tcp_state & TCP_STATE_SENT ( TCP_FIN ) ) )
+		start_timer_fixed ( &tcp->keepalive, TCP_KEEPALIVE_DELAY );
 
 	/* Ignore ACKs that don't actually acknowledge any new data.
 	 * (In particular, do not stop the retransmission timer; this
@@ -1616,6 +1655,7 @@ static void tcp_shutdown ( int booting __unused ) {
 
 /** TCP shutdown function */
 struct startup_fn tcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
+	.name = "tcp",
 	.shutdown = tcp_shutdown,
 };
 
@@ -1665,10 +1705,30 @@ static int tcp_xfer_deliver ( struct tcp_connection *tcp,
 	return 0;
 }
 
+/**
+ * Report job progress
+ *
+ * @v tcp		TCP connection
+ * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int tcp_progress ( struct tcp_connection *tcp,
+			  struct job_progress *progress ) {
+
+	/* Report connection in progress if applicable */
+	if ( ! TCP_HAS_BEEN_ESTABLISHED ( tcp->tcp_state ) ) {
+		snprintf ( progress->message, sizeof ( progress->message ),
+			   "connecting" );
+	}
+
+	return 0;
+}
+
 /** TCP data transfer interface operations */
 static struct interface_operation tcp_xfer_operations[] = {
 	INTF_OP ( xfer_deliver, struct tcp_connection *, tcp_xfer_deliver ),
 	INTF_OP ( xfer_window, struct tcp_connection *, tcp_xfer_window ),
+	INTF_OP ( job_progress, struct tcp_connection *, tcp_progress ),
 	INTF_OP ( intf_close, struct tcp_connection *, tcp_xfer_close ),
 };
 

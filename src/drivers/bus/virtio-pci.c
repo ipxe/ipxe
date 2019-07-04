@@ -21,11 +21,37 @@
 #include "ipxe/virtio-pci.h"
 #include "ipxe/virtio-ring.h"
 
+static int vp_alloc_vq(struct vring_virtqueue *vq, u16 num)
+{
+    size_t queue_size = PAGE_MASK + vring_size(num);
+    size_t vdata_size = num * sizeof(void *);
+
+    vq->queue = zalloc(queue_size + vdata_size);
+    if (!vq->queue) {
+        return -ENOMEM;
+    }
+
+    /* vdata immediately follows the ring */
+    vq->vdata = (void **)(vq->queue + queue_size);
+
+    return 0;
+}
+
+void vp_free_vq(struct vring_virtqueue *vq)
+{
+    if (vq->queue) {
+        free(vq->queue);
+        vq->queue = NULL;
+        vq->vdata = NULL;
+    }
+}
+
 int vp_find_vq(unsigned int ioaddr, int queue_index,
                struct vring_virtqueue *vq)
 {
    struct vring * vr = &vq->vring;
    u16 num;
+   int rc;
 
    /* select the queue */
 
@@ -39,11 +65,6 @@ int vp_find_vq(unsigned int ioaddr, int queue_index,
            return -1;
    }
 
-   if (num > MAX_QUEUE_NUM) {
-           DBG("VIRTIO-PCI ERROR: queue size %d > %d\n", num, MAX_QUEUE_NUM);
-           return -1;
-   }
-
    /* check if the queue is already active */
 
    if (inl(ioaddr + VIRTIO_PCI_QUEUE_PFN)) {
@@ -54,8 +75,12 @@ int vp_find_vq(unsigned int ioaddr, int queue_index,
    vq->queue_index = queue_index;
 
    /* initialize the queue */
-
-   vring_init(vr, num, (unsigned char*)&vq->queue);
+   rc = vp_alloc_vq(vq, num);
+   if (rc) {
+           DBG("VIRTIO-PCI ERROR: failed to allocate queue memory\n");
+           return rc;
+   }
+   vring_init(vr, num, vq->queue);
 
    /* activate the queue
     *
@@ -253,21 +278,21 @@ int virtio_pci_map_capability(struct pci_device *pci, int cap, size_t minlen,
                           &length);
 
     if (length <= start) {
-        DBG("VIRTIO-PCI bad capability len %u (>%u expected)\n", length, start);
+        DBG("VIRTIO-PCI bad capability len %d (>%d expected)\n", length, start);
         return -EINVAL;
     }
     if (length - start < minlen) {
-        DBG("VIRTIO-PCI bad capability len %u (>=%zu expected)\n", length, minlen);
+        DBG("VIRTIO-PCI bad capability len %d (>=%zd expected)\n", length, minlen);
         return -EINVAL;
     }
     length -= start;
     if (start + offset < offset) {
-        DBG("VIRTIO-PCI map wrap-around %u+%u\n", start, offset);
+        DBG("VIRTIO-PCI map wrap-around %d+%d\n", start, offset);
         return -EINVAL;
     }
     offset += start;
     if (offset & (align - 1)) {
-        DBG("VIRTIO-PCI offset %u not aligned to %u\n", offset, align);
+        DBG("VIRTIO-PCI offset %d not aligned to %d\n", offset, align);
         return -EINVAL;
     }
     if (length > size) {
@@ -276,9 +301,9 @@ int virtio_pci_map_capability(struct pci_device *pci, int cap, size_t minlen,
 
     if (minlen + offset < minlen ||
         minlen + offset > pci_bar_size(pci, PCI_BASE_ADDRESS(bar))) {
-        DBG("VIRTIO-PCI map virtio %zu@%u out of range on bar %i length %lu\n",
+        DBG("VIRTIO-PCI map virtio %zd@%d out of range on bar %i length %ld\n",
             minlen, offset,
-            bar, (unsigned long)pci_bar_size(pci, PCI_BASE_ADDRESS(bar)));
+            bar, pci_bar_size(pci, PCI_BASE_ADDRESS(bar)));
         return -EINVAL;
     }
 
@@ -354,8 +379,15 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
             return -ENOENT;
 
         if (size & (size - 1)) {
-            DBG("VIRTIO-PCI %p: bad queue size %u", vdev, size);
+            DBG("VIRTIO-PCI %p: bad queue size %d\n", vdev, size);
             return -EINVAL;
+        }
+
+        if (size > MAX_QUEUE_NUM) {
+            /* iPXE networking tends to be not perf critical so there's no
+             * need to accept large queue sizes.
+             */
+            size = MAX_QUEUE_NUM;
         }
 
         vq = &vqs[i];
@@ -363,9 +395,13 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
 
         /* get offset of notification word for this vq */
         off = vpm_ioread16(vdev, &vdev->common, COMMON_OFFSET(queue_notify_off));
-        vq->vring.num = size;
 
-        vring_init(&vq->vring, size, (unsigned char *)vq->queue);
+        err = vp_alloc_vq(vq, size);
+        if (err) {
+            DBG("VIRTIO-PCI %p: failed to allocate queue memory\n", vdev);
+            return err;
+        }
+        vring_init(&vq->vring, size, vq->queue);
 
         /* activate the queue */
         vpm_iowrite16(vdev, &vdev->common, size, COMMON_OFFSET(queue_size));
@@ -385,7 +421,7 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
             off * notify_offset_multiplier, 2,
             &vq->notification);
         if (err) {
-            goto err_map_notify;
+            return err;
         }
     }
 
@@ -399,11 +435,4 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
         vpm_iowrite16(vdev, &vdev->common, 1, COMMON_OFFSET(queue_enable));
     }
     return 0;
-
-err_map_notify:
-    /* Undo the virtio_pci_map_capability calls. */
-    while (i-- > 0) {
-        virtio_pci_unmap_capability(&vqs[i].notification);
-    }
-    return err;
 }

@@ -50,11 +50,24 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Include all architecture-dependent time API headers */
 #include <bits/time.h>
 
+extern signed long time_offset;
+
 /**
- * Get current time in seconds
+ * Get current time in seconds (ignoring system clock offset)
  *
  * @ret time		Time, in seconds
  */
 time_t time_now ( void );
+
+/**
+ * Adjust system clock
+ *
+ * @v delta		Clock adjustment, in seconds
+ */
+static inline __attribute__ (( always_inline )) void
+time_adjust ( signed long delta ) {
+
+	time_offset += delta;
+}
 
 #endif /* _IPXE_TIME_H */

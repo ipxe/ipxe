@@ -92,11 +92,12 @@ struct errortab infiniband_errors[] __errortab = {
  * @v ibdev		Infiniband device
  * @v num_cqes		Number of completion queue entries
  * @v op		Completion queue operations
- * @ret cq		New completion queue
+ * @v new_cq		New completion queue to fill in
+ * @ret rc		Return status code
  */
-struct ib_completion_queue *
-ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
-	       struct ib_completion_queue_operations *op ) {
+int ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
+		   struct ib_completion_queue_operations *op,
+		   struct ib_completion_queue **new_cq ) {
 	struct ib_completion_queue *cq;
 	int rc;
 
@@ -104,8 +105,10 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 
 	/* Allocate and initialise data structure */
 	cq = zalloc ( sizeof ( *cq ) );
-	if ( ! cq )
+	if ( ! cq ) {
+		rc = -ENOMEM;
 		goto err_alloc_cq;
+	}
 	cq->ibdev = ibdev;
 	list_add_tail ( &cq->list, &ibdev->cqs );
 	cq->num_cqes = num_cqes;
@@ -122,14 +125,15 @@ ib_create_cq ( struct ib_device *ibdev, unsigned int num_cqes,
 	DBGC ( ibdev, "IBDEV %s created %d-entry completion queue %p (%p) "
 	       "with CQN %#lx\n", ibdev->name, num_cqes, cq,
 	       ib_cq_get_drvdata ( cq ), cq->cqn );
-	return cq;
+	*new_cq = cq;
+	return 0;
 
 	ibdev->op->destroy_cq ( ibdev, cq );
  err_dev_create_cq:
 	list_del ( &cq->list );
 	free ( cq );
  err_alloc_cq:
-	return NULL;
+	return rc;
 }
 
 /**
@@ -186,19 +190,19 @@ void ib_poll_cq ( struct ib_device *ibdev,
  * @v recv_cq		Receive completion queue
  * @v op		Queue pair operations
  * @v name		Queue pair name
- * @ret qp		Queue pair
+ * @v new_qp		New queue pair to fill in
+ * @ret rc		Return status code
  *
  * The queue pair will be left in the INIT state; you must call
  * ib_modify_qp() before it is ready to use for sending and receiving.
  */
-struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
-				      enum ib_queue_pair_type type,
-				      unsigned int num_send_wqes,
-				      struct ib_completion_queue *send_cq,
-				      unsigned int num_recv_wqes,
-				      struct ib_completion_queue *recv_cq,
-				      struct ib_queue_pair_operations *op,
-				      const char *name ) {
+int ib_create_qp ( struct ib_device *ibdev, enum ib_queue_pair_type type,
+		   unsigned int num_send_wqes,
+		   struct ib_completion_queue *send_cq,
+		   unsigned int num_recv_wqes,
+		   struct ib_completion_queue *recv_cq,
+		   struct ib_queue_pair_operations *op, const char *name,
+		   struct ib_queue_pair **new_qp ) {
 	struct ib_queue_pair *qp;
 	size_t total_size;
 	int rc;
@@ -210,8 +214,10 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 		       ( num_send_wqes * sizeof ( qp->send.iobufs[0] ) ) +
 		       ( num_recv_wqes * sizeof ( qp->recv.iobufs[0] ) ) );
 	qp = zalloc ( total_size );
-	if ( ! qp )
+	if ( ! qp ) {
+		rc = -ENOMEM;
 		goto err_alloc_qp;
+	}
 	qp->ibdev = ibdev;
 	list_add_tail ( &qp->list, &ibdev->qps );
 	qp->type = type;
@@ -265,7 +271,8 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 		       ibdev->name, qp->qpn, qp->ext_qpn );
 	}
 
-	return qp;
+	*new_qp = qp;
+	return 0;
 
 	ibdev->op->destroy_qp ( ibdev, qp );
  err_dev_create_qp:
@@ -274,7 +281,7 @@ struct ib_queue_pair * ib_create_qp ( struct ib_device *ibdev,
 	list_del ( &qp->list );
 	free ( qp );
  err_alloc_qp:
-	return NULL;
+	return rc;
 }
 
 /**
@@ -659,10 +666,9 @@ int ib_open ( struct ib_device *ibdev ) {
 	}
 
 	/* Create subnet management interface */
-	ibdev->smi = ib_create_mi ( ibdev, IB_QPT_SMI );
-	if ( ! ibdev->smi ) {
-		DBGC ( ibdev, "IBDEV %s could not create SMI\n", ibdev->name );
-		rc = -ENOMEM;
+	if ( ( rc = ib_create_mi ( ibdev, IB_QPT_SMI, &ibdev->smi ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %s could not create SMI: %s\n",
+		       ibdev->name, strerror ( rc ) );
 		goto err_create_smi;
 	}
 
@@ -674,10 +680,9 @@ int ib_open ( struct ib_device *ibdev ) {
 	}
 
 	/* Create general services interface */
-	ibdev->gsi = ib_create_mi ( ibdev, IB_QPT_GSI );
-	if ( ! ibdev->gsi ) {
-		DBGC ( ibdev, "IBDEV %s could not create GSI\n", ibdev->name );
-		rc = -ENOMEM;
+	if ( ( rc = ib_create_mi ( ibdev, IB_QPT_GSI, &ibdev->gsi ) ) != 0 ) {
+		DBGC ( ibdev, "IBDEV %s could not create GSI: %s\n",
+		       ibdev->name, strerror ( rc ) );
 		goto err_create_gsi;
 	}
 

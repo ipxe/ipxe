@@ -32,9 +32,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define DEFAULT_BOOT_VLAN 1
 #define DEFAULT_ISCSI_DHCP_PARAM_EN 1
 #define DEFAULT_ISCSI_IPV4_DHCP_EN 1
+#define DEFAULT_ISCSI_DRIVE_NUM 0x80
 #define DEFAULT_OCSD_OCBB_EN 1
 #define DEFAULT_BOOT_IP_VER 0
 #define DEFAULT_BOOT_LINK_UP_TO 0
+#define DEFAULT_BOOT_UNDI_NETWORK_WAIT_TO 30
+#define DEFAULT_BOOT_IP_VERSION_EN 1
 
 struct mlx_nvconfig_port_conf_defaults {
 	mlx_uint8 pptx;
@@ -56,11 +59,13 @@ struct mlx_nvconfig_port_conf_defaults {
 	mlx_boolean iscsi_ipv4_dhcp_en;
 	mlx_uint8 iscsi_lun_busy_retry_count;
 	mlx_uint8 iscsi_link_up_delay_time;
+	mlx_uint8 iscsi_drive_num;
 	mlx_uint8 client_identifier;
 	mlx_uint8 mac_admin_bit;
 	mlx_uint8 default_link_type;
 	mlx_uint8 linkup_timeout;
 	mlx_uint8 ip_ver;
+	mlx_uint8 undi_network_wait_to;
 };
 
 struct mlx_nvconfig_conf_defaults  {
@@ -71,6 +76,7 @@ struct mlx_nvconfig_conf_defaults  {
 	mlx_uint8 uar_bar_size;
 	mlx_uint8 flexboot_menu_to;
 	mlx_boolean ocsd_ocbb_en;
+	mlx_boolean boot_ip_ver_en;
 };
 
 mlx_status

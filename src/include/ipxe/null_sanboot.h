@@ -15,9 +15,4 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SANBOOT_PREFIX_null __null_
 #endif
 
-static inline __always_inline unsigned int
-SANBOOT_INLINE ( null, san_default_drive ) ( void ) {
-	return 0;
-}
-
 #endif /* _IPXE_NULL_SANBOOT_H */

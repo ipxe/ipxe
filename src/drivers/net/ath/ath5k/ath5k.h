@@ -34,8 +34,6 @@ FILE_LICENCE ( MIT );
 #undef ERRFILE
 #define ERRFILE ERRFILE_ath5k
 
-#define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
-
 /* RX/TX descriptor hw structs */
 #include "desc.h"
 

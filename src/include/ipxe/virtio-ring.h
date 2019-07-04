@@ -20,6 +20,7 @@
 #define VIRTIO_F_ANY_LAYOUT             27
 /* v1.0 compliant. */
 #define VIRTIO_F_VERSION_1              32
+#define VIRTIO_F_IOMMU_PLATFORM         33
 
 #define MAX_QUEUE_NUM      (256)
 
@@ -71,14 +72,12 @@ struct vring {
          + PAGE_MASK) & ~PAGE_MASK) + \
          (sizeof(struct vring_used) + sizeof(struct vring_used_elem) * num))
 
-typedef unsigned char virtio_queue_t[PAGE_MASK + vring_size(MAX_QUEUE_NUM)];
-
 struct vring_virtqueue {
-   virtio_queue_t queue;
+   unsigned char *queue;
    struct vring vring;
    u16 free_head;
    u16 last_used_idx;
-   void *vdata[MAX_QUEUE_NUM];
+   void **vdata;
    /* PCI */
    int queue_index;
    struct virtio_pci_region notification;
@@ -95,7 +94,7 @@ static inline void vring_init(struct vring *vr,
    unsigned int i;
    unsigned long pa;
 
-        vr->num = num;
+   vr->num = num;
 
    /* physical address of desc must be page aligned */
 
@@ -103,13 +102,13 @@ static inline void vring_init(struct vring *vr,
    pa = (pa + PAGE_MASK) & ~PAGE_MASK;
    vr->desc = phys_to_virt(pa);
 
-        vr->avail = (struct vring_avail *)&vr->desc[num];
+   vr->avail = (struct vring_avail *)&vr->desc[num];
 
    /* physical address of used must be page aligned */
 
    pa = virt_to_phys(&vr->avail->ring[num]);
    pa = (pa + PAGE_MASK) & ~PAGE_MASK;
-        vr->used = phys_to_virt(pa);
+   vr->used = phys_to_virt(pa);
 
    for (i = 0; i < num - 1; i++)
            vr->desc[i].next = i + 1;

@@ -6,6 +6,7 @@
  */
 
 #include <ipxe/pci.h>
+
 #include "../../mlx_utils/include/private/mlx_pci_priv.h"
 
 
@@ -116,6 +117,18 @@ mlx_pci_init_priv(
 #ifdef DEVICE_CX3
 	utils->config = ioremap ( pci_bar_start ( utils->pci, PCI_BASE_ADDRESS_0),
 			0x100000 );
+#endif
+	return status;
+}
+
+mlx_status
+mlx_pci_teardown_priv(
+			IN mlx_utils *utils __attribute__ ((unused))
+			)
+{
+	mlx_status status = MLX_SUCCESS;
+#ifdef DEVICE_CX3
+	iounmap( utils->config );
 #endif
 	return status;
 }

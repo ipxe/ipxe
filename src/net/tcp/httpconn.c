@@ -252,8 +252,13 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 	/* Identify port */
 	port = uri_port ( uri, scheme->port );
 
-	/* Look for a reusable connection in the pool */
-	list_for_each_entry ( conn, &http_connection_pool, pool.list ) {
+	/* Look for a reusable connection in the pool.  Reuse the most
+	 * recent connection in order to accommodate authentication
+	 * schemes that break the stateless nature of HTTP and rely on
+	 * the same connection being reused for authentication
+	 * responses.
+	 */
+	list_for_each_entry_reverse ( conn, &http_connection_pool, pool.list ) {
 
 		/* Sanity checks */
 		assert ( conn->uri != NULL );
@@ -277,6 +282,10 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 
 	/* Allocate and initialise structure */
 	conn = zalloc ( sizeof ( *conn ) );
+	if ( ! conn ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 	ref_init ( &conn->refcnt, http_conn_free );
 	conn->uri = uri_get ( uri );
 	conn->scheme = scheme;
@@ -310,5 +319,6 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 		conn->scheme->name, conn->uri->host, port, strerror ( rc ) );
 	http_conn_close ( conn, rc );
 	ref_put ( &conn->refcnt );
+ err_alloc:
 	return rc;
 }

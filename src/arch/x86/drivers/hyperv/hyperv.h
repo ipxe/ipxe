@@ -21,6 +21,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Get hypervisor features */
 #define HV_CPUID_FEATURES 0x40000003UL
 
+/** Time reference counter MSR is available */
+#define HV_FEATURES_AVAIL_TIME_REF_COUNT_MSR 0x00000002UL
+
 /** SynIC MSRs are available */
 #define HV_FEATURES_AVAIL_SYNIC_MSR 0x00000004UL
 
@@ -38,6 +41,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Hypercall page MSR */
 #define HV_X64_MSR_HYPERCALL 0x40000001UL
+
+/** Time reference MSR */
+#define HV_X64_MSR_TIME_REF_COUNT 0x40000020UL
 
 /** SynIC control MSR */
 #define HV_X64_MSR_SCONTROL 0x40000080UL

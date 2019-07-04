@@ -42,6 +42,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/tcpip.h>
 #include <ipxe/settings.h>
 #include <ipxe/features.h>
+#include <ipxe/job.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/dhcpv6.h>
 #include <ipxe/dns.h>
@@ -416,7 +417,7 @@ static const char * dns_name ( struct dns_name *name ) {
 	static char buf[256];
 	int len;
 
-	len = dns_decode ( name, buf, sizeof ( buf ) );
+	len = dns_decode ( name, buf, ( sizeof ( buf ) - 1 /* NUL */ ) );
 	return ( ( len < 0 ) ? "<INVALID>" : buf );
 }
 
@@ -867,6 +868,28 @@ static void dns_xfer_close ( struct dns_request *dns, int rc ) {
 	dns_done ( dns, rc );
 }
 
+/**
+ * Report job progress
+ *
+ * @v dns		DNS request
+ * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int dns_progress ( struct dns_request *dns,
+			  struct job_progress *progress ) {
+	int len;
+
+	/* Show current question as progress message */
+	len = dns_decode ( &dns->name, progress->message,
+			   ( sizeof ( progress->message ) - 1 /* NUL */ ) );
+	if ( len < 0 ) {
+		/* Ignore undecodable names */
+		progress->message[0] = '\0';
+	}
+
+	return 0;
+}
+
 /** DNS socket interface operations */
 static struct interface_operation dns_socket_operations[] = {
 	INTF_OP ( xfer_deliver, struct dns_request *, dns_xfer_deliver ),
@@ -879,6 +902,7 @@ static struct interface_descriptor dns_socket_desc =
 
 /** DNS resolver interface operations */
 static struct interface_operation dns_resolv_op[] = {
+	INTF_OP ( job_progress, struct dns_request *, dns_progress ),
 	INTF_OP ( intf_close, struct dns_request *, dns_done ),
 };
 
@@ -1048,7 +1072,7 @@ const struct setting_type setting_type_dnssl __setting_type = {
 };
 
 /** IPv4 DNS server setting */
-const struct setting dns_setting __setting ( SETTING_IP_EXTRA, dns ) = {
+const struct setting dns_setting __setting ( SETTING_IP4_EXTRA, dns ) = {
 	.name = "dns",
 	.description = "DNS server",
 	.tag = DHCP_DNS_SERVERS,
@@ -1056,12 +1080,12 @@ const struct setting dns_setting __setting ( SETTING_IP_EXTRA, dns ) = {
 };
 
 /** IPv6 DNS server setting */
-const struct setting dns6_setting __setting ( SETTING_IP_EXTRA, dns6 ) = {
+const struct setting dns6_setting __setting ( SETTING_IP6_EXTRA, dns6 ) = {
 	.name = "dns6",
 	.description = "DNS server",
 	.tag = DHCPV6_DNS_SERVERS,
 	.type = &setting_type_ipv6,
-	.scope = &ipv6_scope,
+	.scope = &dhcpv6_scope,
 };
 
 /** DNS search list */

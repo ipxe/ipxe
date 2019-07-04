@@ -12,10 +12,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <bits/profile.h>
 #include <ipxe/tables.h>
 
+#ifndef PROFILING
 #ifdef NDEBUG
 #define PROFILING 0
 #else
 #define PROFILING 1
+#endif
 #endif
 
 /**

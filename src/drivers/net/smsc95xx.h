@@ -9,25 +9,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <ipxe/usb.h>
-#include <ipxe/usbnet.h>
-#include <ipxe/if_ether.h>
-#include <ipxe/mii.h>
-
-/** Register write command */
-#define SMSC95XX_REGISTER_WRITE					\
-	( USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE |	\
-	  USB_REQUEST_TYPE ( 0xa0 ) )
-
-/** Register read command */
-#define SMSC95XX_REGISTER_READ					\
-	( USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE |	\
-	  USB_REQUEST_TYPE ( 0xa1 ) )
-
-/** Get statistics command */
-#define SMSC95XX_GET_STATISTICS					\
-	( USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE |	\
-	  USB_REQUEST_TYPE ( 0xa2 ) )
+#include "smscusb.h"
 
 /** Interrupt status register */
 #define SMSC95XX_INT_STS 0x008
@@ -55,19 +37,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMSC95XX_LED_GPIO_CFG_GPCTL0_NFDX_LED \
 	SMSC95XX_LED_GPIO_CFG_GPCTL0 ( 1 )		/**< Full-duplex LED */
 
-/** EEPROM command register */
-#define SMSC95XX_E2P_CMD 0x030
-#define SMSC95XX_E2P_CMD_EPC_BSY	0x80000000UL	/**< EPC busy */
-#define SMSC95XX_E2P_CMD_EPC_CMD_READ	0x00000000UL	/**< READ command */
-#define SMSC95XX_E2P_CMD_EPC_ADDR(addr) ( (addr) << 0 )	/**< EPC address */
-
-/** EEPROM data register */
-#define SMSC95XX_E2P_DATA 0x034
-#define SMSC95XX_E2P_DATA_GET(e2p_data) \
-	( ( (e2p_data) >> 0 ) & 0xff )			/**< EEPROM data */
-
-/** MAC address EEPROM address */
-#define SMSC95XX_EEPROM_MAC 0x01
+/** EEPROM register base */
+#define SMSC95XX_E2P_BASE 0x030
 
 /** Interrupt endpoint control register */
 #define SMSC95XX_INT_EP_CTL 0x068
@@ -88,24 +59,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMSC95XX_MAC_CR_TXEN		0x00000008UL	/**< TX enabled */
 #define SMSC95XX_MAC_CR_RXEN		0x00000004UL	/**< RX enabled */
 
-/** MAC address high register */
-#define SMSC95XX_ADDRH 0x104
+/** MAC address register base */
+#define SMSC95XX_ADDR_BASE 0x104
 
-/** MAC address low register */
-#define SMSC95XX_ADDRL 0x108
-
-/** MII access register */
-#define SMSC95XX_MII_ACCESS 0x114
-#define SMSC95XX_MII_ACCESS_PHY_ADDRESS	0x00000800UL	/**< PHY address */
-#define SMSC95XX_MII_ACCESS_MIIRINDA(addr) ( (addr) << 6 ) /**< MII register */
-#define SMSC95XX_MII_ACCESS_MIIWNR	0x00000002UL	/**< MII write */
-#define SMSC95XX_MII_ACCESS_MIIBZY	0x00000001UL	/**< MII busy */
-
-/** MII data register */
-#define SMSC95XX_MII_DATA 0x118
-#define SMSC95XX_MII_DATA_SET(data)	( (data) << 0 )	/**< Set data */
-#define SMSC95XX_MII_DATA_GET(mii_data) \
-	( ( (mii_data) >> 0 ) & 0xffff )		/**< Get data */
+/** MII register base */
+#define SMSC95XX_MII_BASE 0x0114
 
 /** PHY interrupt source MII register */
 #define SMSC95XX_MII_PHY_INTR_SOURCE 29
@@ -114,23 +72,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMSC95XX_MII_PHY_INTR_MASK 30
 
 /** PHY interrupt: auto-negotiation complete */
-#define SMSC95XX_PHY_INTR_ANEG_DONE	0x0040
+#define SMSC95XX_PHY_INTR_ANEG_DONE 0x0040
 
 /** PHY interrupt: link down */
-#define SMSC95XX_PHY_INTR_LINK_DOWN	0x0010
-
-/** MAC address */
-union smsc95xx_mac {
-	/** MAC receive address registers */
-	struct {
-		/** MAC receive address low register */
-		uint32_t l;
-		/** MAC receive address high register */
-		uint32_t h;
-	} __attribute__ (( packed )) addr;
-	/** Raw MAC address */
-	uint8_t raw[ETH_ALEN];
-};
+#define SMSC95XX_PHY_INTR_LINK_DOWN 0x0010
 
 /** Receive packet header */
 struct smsc95xx_rx_header {
@@ -163,12 +108,6 @@ struct smsc95xx_tx_header {
 
 /** Buffer size */
 #define SMSC95XX_TX_LEN(len) ( (len) << 0 )
-
-/** Interrupt packet format */
-struct smsc95xx_interrupt {
-	/** Current value of INT_STS register */
-	uint32_t int_sts;
-} __attribute__ (( packed ));
 
 /** Receive statistics */
 struct smsc95xx_rx_statistics {
@@ -220,36 +159,8 @@ struct smsc95xx_tx_statistics {
 /** Transmit statistics */
 #define SMSC95XX_TX_STATISTICS 1
 
-/** A SMSC95xx network device */
-struct smsc95xx_device {
-	/** USB device */
-	struct usb_device *usb;
-	/** USB bus */
-	struct usb_bus *bus;
-	/** Network device */
-	struct net_device *netdev;
-	/** USB network device */
-	struct usbnet_device usbnet;
-	/** MII interface */
-	struct mii_interface mii;
-	/** Interrupt status */
-	uint32_t int_sts;
-};
-
 /** Reset delay (in microseconds) */
 #define SMSC95XX_RESET_DELAY_US 2
-
-/** Maximum time to wait for EEPROM (in milliseconds) */
-#define SMSC95XX_EEPROM_MAX_WAIT_MS 100
-
-/** Maximum time to wait for MII (in milliseconds) */
-#define SMSC95XX_MII_MAX_WAIT_MS 100
-
-/** Interrupt maximum fill level
- *
- * This is a policy decision.
- */
-#define SMSC95XX_INTR_MAX_FILL 2
 
 /** Bulk IN maximum fill level
  *

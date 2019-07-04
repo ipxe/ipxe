@@ -77,13 +77,8 @@ enum {
 	QUEUE_NB
 };
 
-enum {
-	/** Max number of pending rx packets */
-	NUM_RX_BUF = 8,
-
-	/** Max Ethernet frame length, including FCS and VLAN tag */
-	RX_BUF_SIZE = 1522,
-};
+/** Max number of pending rx packets */
+#define NUM_RX_BUF 8
 
 struct virtnet_nic {
 	/** Base pio register address */
@@ -104,8 +99,8 @@ struct virtnet_nic {
 	/** Pending rx packet count */
 	unsigned int rx_num_iobufs;
 
-	/** Virtio net packet header, we only need one */
-	struct virtio_net_hdr_modern empty_header;
+	/** Virtio net dummy packet headers */
+	struct virtio_net_hdr_modern empty_header[QUEUE_NB];
 };
 
 /** Add an iobuf to a virtqueue
@@ -120,19 +115,24 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
 				  int vq_idx, struct io_buffer *iobuf ) {
 	struct virtnet_nic *virtnet = netdev->priv;
 	struct vring_virtqueue *vq = &virtnet->virtqueue[vq_idx];
+	struct virtio_net_hdr_modern *header = &virtnet->empty_header[vq_idx];
 	unsigned int out = ( vq_idx == TX_INDEX ) ? 2 : 0;
 	unsigned int in = ( vq_idx == TX_INDEX ) ? 0 : 2;
-	size_t header_len = virtnet->virtio_version
-		? sizeof ( virtnet->empty_header )
-		: sizeof ( virtnet->empty_header.legacy );
+	size_t header_len = ( virtnet->virtio_version ?
+			      sizeof ( *header ) : sizeof ( header->legacy ) );
 	struct vring_list list[] = {
 		{
 			/* Share a single zeroed virtio net header between all
-			 * rx and tx packets.  This works because this driver
+			 * packets in a ring.  This works because this driver
 			 * does not use any advanced features so none of the
 			 * header fields get used.
+			 *
+			 * Some host implementations (notably Google Compute
+			 * Platform) are known to unconditionally write back
+			 * to header->flags for received packets.  Work around
+			 * this by using separate RX and TX headers.
 			 */
-			.addr = ( char* ) &virtnet->empty_header,
+			.addr = ( char* ) header,
 			.length = header_len,
 		},
 		{
@@ -155,12 +155,13 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
  */
 static void virtnet_refill_rx_virtqueue ( struct net_device *netdev ) {
 	struct virtnet_nic *virtnet = netdev->priv;
+	size_t len = ( netdev->max_pkt_len + 4 /* VLAN */ );
 
 	while ( virtnet->rx_num_iobufs < NUM_RX_BUF ) {
 		struct io_buffer *iobuf;
 
 		/* Try to allocate a buffer, stop for now if out of memory */
-		iobuf = alloc_iob ( RX_BUF_SIZE );
+		iobuf = alloc_iob ( len );
 		if ( ! iobuf )
 			break;
 
@@ -168,11 +169,28 @@ static void virtnet_refill_rx_virtqueue ( struct net_device *netdev ) {
 		list_add ( &iobuf->list, &virtnet->rx_iobufs );
 
 		/* Mark packet length until we know the actual size */
-		iob_put ( iobuf, RX_BUF_SIZE );
+		iob_put ( iobuf, len );
 
 		virtnet_enqueue_iob ( netdev, RX_INDEX, iobuf );
 		virtnet->rx_num_iobufs++;
 	}
+}
+
+/** Helper to free all virtqueue memory
+ *
+ * @v netdev		Network device
+ */
+static void virtnet_free_virtqueues ( struct net_device *netdev ) {
+	struct virtnet_nic *virtnet = netdev->priv;
+	int i;
+
+	for ( i = 0; i < QUEUE_NB; i++ ) {
+		virtio_pci_unmap_capability ( &virtnet->virtqueue[i].notification );
+		vp_free_vq ( &virtnet->virtqueue[i] );
+	}
+
+	free ( virtnet->virtqueue );
+	virtnet->virtqueue = NULL;
 }
 
 /** Open network device, legacy virtio 0.9.5
@@ -200,8 +218,7 @@ static int virtnet_open_legacy ( struct net_device *netdev ) {
 		if ( vp_find_vq ( ioaddr, i, &virtnet->virtqueue[i] ) == -1 ) {
 			DBGC ( virtnet, "VIRTIO-NET %p cannot register queue %d\n",
 			       virtnet, i );
-			free ( virtnet->virtqueue );
-			virtnet->virtqueue = NULL;
+			virtnet_free_virtqueues ( netdev );
 			return -ENOENT;
 		}
 	}
@@ -216,7 +233,8 @@ static int virtnet_open_legacy ( struct net_device *netdev ) {
 
 	/* Driver is ready */
 	features = vp_get_features ( ioaddr );
-	vp_set_features ( ioaddr, features & ( 1 << VIRTIO_NET_F_MAC ) );
+	vp_set_features ( ioaddr, features & ( ( 1 << VIRTIO_NET_F_MAC ) |
+					       ( 1 << VIRTIO_NET_F_MTU ) ) );
 	vp_set_status ( ioaddr, VIRTIO_CONFIG_S_DRIVER | VIRTIO_CONFIG_S_DRIVER_OK );
 	return 0;
 }
@@ -239,8 +257,10 @@ static int virtnet_open_modern ( struct net_device *netdev ) {
 	}
 	vpm_set_features ( &virtnet->vdev, features & (
 		( 1ULL << VIRTIO_NET_F_MAC ) |
+		( 1ULL << VIRTIO_NET_F_MTU ) |
 		( 1ULL << VIRTIO_F_VERSION_1 ) |
-		( 1ULL << VIRTIO_F_ANY_LAYOUT ) ) );
+		( 1ULL << VIRTIO_F_ANY_LAYOUT ) |
+		( 1ULL << VIRTIO_F_IOMMU_PLATFORM ) ) );
 	vpm_add_status ( &virtnet->vdev, VIRTIO_CONFIG_S_FEATURES_OK );
 
 	status = vpm_get_status ( &virtnet->vdev );
@@ -263,8 +283,7 @@ static int virtnet_open_modern ( struct net_device *netdev ) {
 	if ( vpm_find_vqs ( &virtnet->vdev, QUEUE_NB, virtnet->virtqueue ) ) {
 		DBGC ( virtnet, "VIRTIO-NET %p cannot register queues\n",
 		       virtnet );
-		free ( virtnet->virtqueue );
-		virtnet->virtqueue = NULL;
+		virtnet_free_virtqueues ( netdev );
 		vpm_add_status ( &virtnet->vdev, VIRTIO_CONFIG_S_FAILED );
 		return -ENOENT;
 	}
@@ -304,7 +323,6 @@ static void virtnet_close ( struct net_device *netdev ) {
 	struct virtnet_nic *virtnet = netdev->priv;
 	struct io_buffer *iobuf;
 	struct io_buffer *next_iobuf;
-	int i;
 
 	if ( virtnet->virtio_version ) {
 		vpm_reset ( &virtnet->vdev );
@@ -313,12 +331,7 @@ static void virtnet_close ( struct net_device *netdev ) {
 	}
 
 	/* Virtqueues can be freed now that NIC is reset */
-	for ( i = 0 ; i < QUEUE_NB ; i++ ) {
-		virtio_pci_unmap_capability ( &virtnet->virtqueue[i].notification );
-	}
-
-	free ( virtnet->virtqueue );
-	virtnet->virtqueue = NULL;
+	virtnet_free_virtqueues ( netdev );
 
 	/* Free rx iobufs */
 	list_for_each_entry_safe ( iobuf, next_iobuf, &virtnet->rx_iobufs, list ) {
@@ -375,7 +388,7 @@ static void virtnet_process_rx_packets ( struct net_device *netdev ) {
 		virtnet->rx_num_iobufs--;
 
 		/* Update iobuf length */
-		iob_unput ( iobuf, RX_BUF_SIZE );
+		iob_unput ( iobuf, iob_len ( iobuf ) );
 		iob_put ( iobuf, len - sizeof ( struct virtio_net_hdr ) );
 
 		DBGC2 ( virtnet, "VIRTIO-NET %p rx complete iobuf %p len %zd\n",
@@ -447,6 +460,7 @@ static int virtnet_probe_legacy ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct virtnet_nic *virtnet;
 	u32 features;
+	u16 mtu;
 	int rc;
 
 	/* Allocate and hook up net device */
@@ -466,13 +480,20 @@ static int virtnet_probe_legacy ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 	vp_reset ( ioaddr );
 
-	/* Load MAC address */
+	/* Load MAC address and MTU */
 	features = vp_get_features ( ioaddr );
 	if ( features & ( 1 << VIRTIO_NET_F_MAC ) ) {
 		vp_get ( ioaddr, offsetof ( struct virtio_net_config, mac ),
 			 netdev->hw_addr, ETH_ALEN );
 		DBGC ( virtnet, "VIRTIO-NET %p mac=%s\n", virtnet,
 		       eth_ntoa ( netdev->hw_addr ) );
+	}
+	if ( features & ( 1ULL << VIRTIO_NET_F_MTU ) ) {
+		vp_get ( ioaddr, offsetof ( struct virtio_net_config, mtu ),
+			 &mtu, sizeof ( mtu ) );
+		DBGC ( virtnet, "VIRTIO-NET %p mtu=%d\n", virtnet, mtu );
+		netdev->max_pkt_len = ( mtu + ETH_HLEN );
+		netdev->mtu = mtu;
 	}
 
 	/* Register network device */
@@ -503,6 +524,7 @@ static int virtnet_probe_modern ( struct pci_device *pci, int *found_dev ) {
 	struct net_device *netdev;
 	struct virtnet_nic *virtnet;
 	u64 features;
+	u16 mtu;
 	int rc, common, isr, notify, config, device;
 
 	common = virtio_pci_find_capability ( pci, VIRTIO_PCI_CAP_COMMON_CFG );
@@ -569,7 +591,7 @@ static int virtnet_probe_modern ( struct pci_device *pci, int *found_dev ) {
 	vpm_add_status ( &virtnet->vdev, VIRTIO_CONFIG_S_ACKNOWLEDGE );
 	vpm_add_status ( &virtnet->vdev, VIRTIO_CONFIG_S_DRIVER );
 
-	/* Load MAC address */
+	/* Load MAC address and MTU */
 	if ( device ) {
 		features = vpm_get_features ( &virtnet->vdev );
 		if ( features & ( 1ULL << VIRTIO_NET_F_MAC ) ) {
@@ -578,6 +600,14 @@ static int virtnet_probe_modern ( struct pci_device *pci, int *found_dev ) {
 				  netdev->hw_addr, ETH_ALEN );
 			DBGC ( virtnet, "VIRTIO-NET %p mac=%s\n", virtnet,
 			       eth_ntoa ( netdev->hw_addr ) );
+		}
+		if ( features & ( 1ULL << VIRTIO_NET_F_MTU ) ) {
+			vpm_get ( &virtnet->vdev,
+				  offsetof ( struct virtio_net_config, mtu ),
+				  &mtu, sizeof ( mtu ) );
+			DBGC ( virtnet, "VIRTIO-NET %p mtu=%d\n", virtnet,
+			       mtu );
+			netdev->max_pkt_len = ( mtu + ETH_HLEN );
 		}
 	}
 

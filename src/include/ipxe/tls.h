@@ -63,6 +63,7 @@ struct tls_header {
 #define TLS_HELLO_REQUEST 0
 #define TLS_CLIENT_HELLO 1
 #define TLS_SERVER_HELLO 2
+#define TLS_NEW_SESSION_TICKET 4
 #define TLS_CERTIFICATE 11
 #define TLS_SERVER_KEY_EXCHANGE 12
 #define TLS_CERTIFICATE_REQUEST 13
@@ -107,6 +108,20 @@ struct tls_header {
 
 /* TLS signature algorithms extension */
 #define TLS_SIGNATURE_ALGORITHMS 13
+
+/* TLS session ticket extension */
+#define TLS_SESSION_TICKET 35
+
+/* TLS renegotiation information extension */
+#define TLS_RENEGOTIATION_INFO 0xff01
+
+/** TLS verification data */
+struct tls_verify_data {
+	/** Client verification data */
+	uint8_t client[12];
+	/** Server verification data */
+	uint8_t server[12];
+} __attribute__ (( packed ));
 
 /** TLS RX state machine state */
 enum tls_rx_state {
@@ -235,9 +250,44 @@ struct md5_sha1_digest {
 struct tls_session {
 	/** Reference counter */
 	struct refcnt refcnt;
+	/** List of sessions */
+	struct list_head list;
 
 	/** Server name */
 	const char *name;
+	/** Session ID */
+	uint8_t id[32];
+	/** Length of session ID */
+	size_t id_len;
+	/** Session ticket */
+	void *ticket;
+	/** Length of session ticket */
+	size_t ticket_len;
+	/** Master secret */
+	uint8_t master_secret[48];
+
+	/** List of connections */
+	struct list_head conn;
+};
+
+/** A TLS connection */
+struct tls_connection {
+	/** Reference counter */
+	struct refcnt refcnt;
+
+	/** Session */
+	struct tls_session *session;
+	/** List of connections within the same session */
+	struct list_head list;
+	/** Session ID */
+	uint8_t session_id[32];
+	/** Length of session ID */
+	size_t session_id_len;
+	/** New session ticket */
+	void *new_session_ticket;
+	/** Length of new session ticket */
+	size_t new_session_ticket_len;
+
 	/** Plaintext stream */
 	struct interface plainstream;
 	/** Ciphertext stream */
@@ -271,6 +321,10 @@ struct tls_session {
 	uint8_t *handshake_ctx;
 	/** Client certificate (if used) */
 	struct x509_certificate *cert;
+	/** Secure renegotiation flag */
+	int secure_renegotiation;
+	/** Verification data */
+	struct tls_verify_data verify;
 
 	/** Server certificate chain */
 	struct x509_chain *chain;
@@ -281,6 +335,8 @@ struct tls_session {
 	struct pending_operation client_negotiation;
 	/** Server security negotiation pending operation */
 	struct pending_operation server_negotiation;
+	/** Certificate validation pending operation */
+	struct pending_operation validation;
 
 	/** TX sequence number */
 	uint64_t tx_seq;

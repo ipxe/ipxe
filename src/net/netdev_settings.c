@@ -45,6 +45,11 @@ const struct setting mac_setting __setting ( SETTING_NETDEV, mac ) = {
 	.description = "MAC address",
 	.type = &setting_type_hex,
 };
+const struct setting hwaddr_setting __setting ( SETTING_NETDEV, hwaddr ) = {
+	.name = "hwaddr",
+	.description = "Hardware address",
+	.type = &setting_type_hex,
+};
 const struct setting bustype_setting __setting ( SETTING_NETDEV, bustype ) = {
 	.name = "bustype",
 	.description = "Bus type",
@@ -70,9 +75,15 @@ const struct setting ifname_setting __setting ( SETTING_NETDEV, ifname ) = {
 	.description = "Interface name",
 	.type = &setting_type_string,
 };
+const struct setting mtu_setting __setting ( SETTING_NETDEV, mtu ) = {
+	.name = "mtu",
+	.description = "MTU",
+	.type = &setting_type_int16,
+	.tag = DHCP_MTU,
+};
 
 /**
- * Store MAC address setting
+ * Store link-layer address setting
  *
  * @v netdev		Network device
  * @v data		Setting data, or NULL to clear setting
@@ -97,7 +108,7 @@ static int netdev_store_mac ( struct net_device *netdev,
 }
 
 /**
- * Fetch MAC address setting
+ * Fetch link-layer address setting
  *
  * @v netdev		Network device
  * @v data		Buffer to fill with setting data
@@ -106,11 +117,30 @@ static int netdev_store_mac ( struct net_device *netdev,
  */
 static int netdev_fetch_mac ( struct net_device *netdev, void *data,
 			      size_t len ) {
+	size_t max_len = netdev->ll_protocol->ll_addr_len;
 
-	if ( len > netdev->ll_protocol->ll_addr_len )
-		len = netdev->ll_protocol->ll_addr_len;
+	if ( len > max_len )
+		len = max_len;
 	memcpy ( data, netdev->ll_addr, len );
-	return netdev->ll_protocol->ll_addr_len;
+	return max_len;
+}
+
+/**
+ * Fetch hardware address setting
+ *
+ * @v netdev		Network device
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int netdev_fetch_hwaddr ( struct net_device *netdev, void *data,
+				 size_t len ) {
+	size_t max_len = netdev->ll_protocol->hw_addr_len;
+
+	if ( len > max_len )
+		len = max_len;
+	memcpy ( data, netdev->hw_addr, len );
+	return max_len;
 }
 
 /**
@@ -247,6 +277,7 @@ struct netdev_setting_operation {
 /** Network device settings */
 static struct netdev_setting_operation netdev_setting_operations[] = {
 	{ &mac_setting, netdev_store_mac, netdev_fetch_mac },
+	{ &hwaddr_setting, NULL, netdev_fetch_hwaddr },
 	{ &bustype_setting, NULL, netdev_fetch_bustype },
 	{ &busloc_setting, NULL, netdev_fetch_busloc },
 	{ &busid_setting, NULL, netdev_fetch_busid },
@@ -376,4 +407,67 @@ static void netdev_redirect_settings_init ( void ) {
 /** "netX" settings initialiser */
 struct init_fn netdev_redirect_settings_init_fn __init_fn ( INIT_LATE ) = {
 	.initialise = netdev_redirect_settings_init,
+};
+
+/**
+ * Apply network device settings
+ *
+ * @ret rc		Return status code
+ */
+static int apply_netdev_settings ( void ) {
+	struct net_device *netdev;
+	struct settings *settings;
+	struct ll_protocol *ll_protocol;
+	size_t max_mtu;
+	size_t old_mtu;
+	size_t mtu;
+	int rc;
+
+	/* Process settings for each network device */
+	for_each_netdev ( netdev ) {
+
+		/* Get network device settings */
+		settings = netdev_settings ( netdev );
+
+		/* Get MTU */
+		mtu = fetch_uintz_setting ( settings, &mtu_setting );
+
+		/* Do nothing unless MTU is specified */
+		if ( ! mtu )
+			continue;
+
+		/* Limit MTU to maximum supported by hardware */
+		ll_protocol = netdev->ll_protocol;
+		max_mtu = ( netdev->max_pkt_len - ll_protocol->ll_header_len );
+		if ( mtu > max_mtu ) {
+			DBGC ( netdev, "NETDEV %s cannot support MTU %zd (max "
+			       "%zd)\n", netdev->name, mtu, max_mtu );
+			mtu = max_mtu;
+		}
+
+		/* Update maximum packet length */
+		old_mtu = netdev->mtu;
+		netdev->mtu = mtu;
+		if ( mtu != old_mtu ) {
+			DBGC ( netdev, "NETDEV %s MTU is %zd\n",
+			       netdev->name, mtu );
+		}
+
+		/* Close and reopen network device if MTU has increased */
+		if ( netdev_is_open ( netdev ) && ( mtu > old_mtu ) ) {
+			netdev_close ( netdev );
+			if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
+				DBGC ( netdev, "NETDEV %s could not reopen: "
+				       "%s\n", netdev->name, strerror ( rc ) );
+				return rc;
+			}
+		}
+	}
+
+	return 0;
+}
+
+/** Network device settings applicator */
+struct settings_applicator netdev_applicator __settings_applicator = {
+	.apply = apply_netdev_settings,
 };

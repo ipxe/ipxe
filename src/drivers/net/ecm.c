@@ -101,13 +101,18 @@ int ecm_fetch_mac ( struct usb_device *usb,
 	}
 
 	/* Sanity check */
-	if ( len != ( ( int ) ( sizeof ( buf ) - 1 /* NUL */ ) ) )
+	if ( len != ( ( int ) ( sizeof ( buf ) - 1 /* NUL */ ) ) ) {
+		DBGC ( usb, "USB %s has invalid ECM MAC \"%s\"\n",
+		       usb->name, buf );
 		return -EINVAL;
+	}
 
 	/* Decode MAC address */
 	len = base16_decode ( buf, hw_addr, ETH_ALEN );
 	if ( len < 0 ) {
 		rc = len;
+		DBGC ( usb, "USB %s could not decode ECM MAC \"%s\": %s\n",
+		       usb->name, buf, strerror ( rc ) );
 		return rc;
 	}
 

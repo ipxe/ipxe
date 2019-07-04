@@ -107,11 +107,11 @@ struct virtio_pci_region {
 /* How to interpret the base field */
 #define VIRTIO_PCI_REGION_TYPE_MASK  0x00000003
 /* The base field is a memory address */
-#define VIRTIO_PCI_REGION_MEMORY     0x00000000
+#define VIRTIO_PCI_REGION_MEMORY     0x00000001
 /* The base field is a port address */
-#define VIRTIO_PCI_REGION_PORT       0x00000001
+#define VIRTIO_PCI_REGION_PORT       0x00000002
 /* The base field is an offset within the PCI bar */
-#define VIRTIO_PCI_REGION_PCI_CONFIG 0x00000002
+#define VIRTIO_PCI_REGION_PCI_CONFIG 0x00000003
     unsigned flags;
 };
 
@@ -196,8 +196,10 @@ static inline void vp_del_vq(unsigned int ioaddr, int queue_index)
 
 struct vring_virtqueue;
 
+void vp_free_vq(struct vring_virtqueue *vq);
 int vp_find_vq(unsigned int ioaddr, int queue_index,
                struct vring_virtqueue *vq);
+
 
 /* Virtio 1.0 I/O routines abstract away the three possible HW access
  * mechanisms - memory, port I/O, and PCI cfg space access. Also built-in

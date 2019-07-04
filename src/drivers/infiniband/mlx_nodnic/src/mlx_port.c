@@ -55,11 +55,18 @@ struct nodnic_port_data_entry nodnic_port_data_table[] = {
 		PortDataEntry(nodnic_port_option_cq_addr_high, 0x68, 0, 0xFFFFFFFF),
 		PortDataEntry(nodnic_port_option_port_management_change_event, 0x0, 30, 0x1),
 		PortDataEntry(nodnic_port_option_port_promisc_en, 0x4, 29, 0x1),
+#ifndef DEVICE_CX3
+		PortDataEntry(nodnic_port_option_arm_cq, 0x78, 8, 0xffffff),
+#else
 		PortDataEntry(nodnic_port_option_arm_cq, 0x78, 8, 0xffff),
+#endif
 		PortDataEntry(nodnic_port_option_port_promisc_multicast_en, 0x4, 28, 0x1),
 #ifdef DEVICE_CX3
 		PortDataEntry(nodnic_port_option_crspace_en, 0x4, 27, 0x1),
 #endif
+		PortDataEntry(nodnic_port_option_send_ring0_uar_index, 0x108, 0, 0xFFFFFFFF),
+		PortDataEntry(nodnic_port_option_send_ring1_uar_index, 0x10c, 0, 0xFFFFFFFF),
+		PortDataEntry(nodnic_port_option_cq_n_index, 0x118, 0, 0xFFFFFF),
 };
 
 #define MAX_QP_DATA_ENTRIES 5
@@ -187,6 +194,30 @@ invalid_parm:
 }
 
 mlx_status
+nodnic_port_set_send_uar_offset(
+		IN  nodnic_port_priv	*port_priv
+		)
+{
+	mlx_status status = MLX_SUCCESS;
+	mlx_uint32 out = 0;
+
+	if  ( ! port_priv->device->device_cap.support_uar_tx_db ) {
+		MLX_DEBUG_INFO1 ( port_priv, "nodnic_port_set_send_uar_offset: tx db using uar is not supported \n");
+		status = MLX_UNSUPPORTED;
+		goto uar_not_supported;
+   }
+
+	status = nodnic_port_query(port_priv,
+			nodnic_port_option_send_ring0_uar_index, &out);
+	MLX_CHECK_STATUS(port_priv->device, status, query_err,
+			"nodnic_port_query failed");
+	port_priv->device->uar.offset = out << port_priv->device->device_cap.log_uar_page_size;
+uar_not_supported:
+query_err:
+	return status;
+}
+
+mlx_status
 nodnic_port_read_reset_needed(
 						IN nodnic_port_priv		*port_priv,
 						OUT mlx_boolean			*reset_needed
@@ -217,6 +248,111 @@ nodnic_port_read_port_management_change_event(
 			"nodnic_port_query failed");
 	*change_event = (mlx_boolean)out;
 query_err:
+	return status;
+}
+
+static
+mlx_status
+nodnic_port_allocate_dbr_dma (
+		IN nodnic_port_priv	*port_priv,
+		IN struct nodnic_doorbell	*nodnic_db,
+		IN mlx_uint32	dbr_addr_low_ofst,
+		IN mlx_uint32	dbr_addr_high_ofst,
+		IN void	**dbr_addr,
+		IN mlx_size	size,
+		IN void	**map
+		)
+{
+	mlx_status status = MLX_SUCCESS;
+	mlx_uint64 address = 0;
+	nodnic_device_priv *device_priv = NULL;
+
+	if( port_priv == NULL || nodnic_db == NULL ){
+			status = MLX_INVALID_PARAMETER;
+			goto invalid_parm;
+	}
+
+	device_priv = port_priv->device;
+	status = mlx_memory_alloc_dma(device_priv->utils,
+					size,
+					NODNIC_MEMORY_ALIGN,
+					(void **)dbr_addr
+					);
+	MLX_FATAL_CHECK_STATUS(status, alloc_db_record_err,
+				"doorbell record dma allocation error");
+
+	status = mlx_memory_map_dma(device_priv->utils,
+					(void *)(*dbr_addr),
+					size,
+					&nodnic_db->doorbell_physical,
+					map//nodnic_ring->map
+					);
+	MLX_FATAL_CHECK_STATUS(status, map_db_record_err,
+				"doorbell record map dma error");
+
+	address = (mlx_uint64)nodnic_db->doorbell_physical;
+	status = nodnic_cmd_write(device_priv,
+				dbr_addr_low_ofst,
+				(mlx_uint32)address);
+	MLX_FATAL_CHECK_STATUS(status, set_err,
+			"failed to set doorbell addr low");
+
+	address = address >> 32;
+	status = nodnic_cmd_write(device_priv,
+				dbr_addr_high_ofst,
+				(mlx_uint32)address);
+	MLX_FATAL_CHECK_STATUS(status, set_err,
+			"failed to set doorbell addr high");
+
+	return status;
+
+set_err:
+	mlx_memory_ummap_dma(device_priv->utils, *map);
+map_db_record_err:
+	mlx_memory_free_dma(device_priv->utils, size,
+		(void **)dbr_addr);
+alloc_db_record_err:
+invalid_parm:
+	return status;
+}
+
+static
+mlx_status
+nodnic_port_cq_dbr_dma_init(
+		IN nodnic_port_priv	*port_priv,
+		OUT nodnic_cq	**cq
+		)
+{
+	mlx_status status = MLX_SUCCESS;
+	nodnic_device_priv *device_priv = NULL;
+
+	if( port_priv == NULL ){
+		status = MLX_INVALID_PARAMETER;
+		goto invalid_parm;
+	}
+
+	device_priv =  port_priv->device;
+	if ( ! device_priv->device_cap.support_bar_cq_ctrl ) {
+		status = MLX_UNSUPPORTED;
+		goto uar_arm_cq_db_unsupported;
+	}
+
+#define NODNIC_PORT_ARM_CQ_DBR_ADDR_LOW_OFFSET 0x114
+#define NODNIC_PORT_ARM_CQ_DBR_ADDR_HIGH_OFFSET 0x110
+
+	status = nodnic_port_allocate_dbr_dma ( port_priv,&(*cq)->arm_cq_doorbell,
+			port_priv->port_offset + NODNIC_PORT_ARM_CQ_DBR_ADDR_LOW_OFFSET,
+			port_priv->port_offset + NODNIC_PORT_ARM_CQ_DBR_ADDR_HIGH_OFFSET,
+			(void **)&port_priv->arm_cq_doorbell_record ,
+			sizeof(nodnic_arm_cq_db),
+			(void **)&((*cq)->arm_cq_doorbell.map));
+	MLX_FATAL_CHECK_STATUS(status, alloc_dbr_dma_err,
+				"failed to allocate doorbell record dma");
+	return status;
+
+alloc_dbr_dma_err:
+uar_arm_cq_db_unsupported:
+invalid_parm:
 	return status;
 }
 
@@ -257,17 +393,24 @@ nodnic_port_create_cq(
 	MLX_FATAL_CHECK_STATUS(status, cq_map_err,
 				"cq map error");
 
+	status = nodnic_port_cq_dbr_dma_init(port_priv,cq);
+
 	/* update cq address */
 #define NODIC_CQ_ADDR_HIGH 0x68
 #define NODIC_CQ_ADDR_LOW 0x6c
 	address = (mlx_uint64)(*cq)->cq_physical;
-	nodnic_port_set(port_priv, nodnic_port_option_cq_addr_low,
-			(mlx_uint32)(address >> 12));
+	status = nodnic_port_set(port_priv, nodnic_port_option_cq_addr_low,
+			(mlx_uint32)(address) >> 12);
+	MLX_FATAL_CHECK_STATUS(status, dma_set_addr_low_err,
+					"cq set addr low error");
 	address = address >> 32;
-	nodnic_port_set(port_priv, nodnic_port_option_cq_addr_high,
+	status = nodnic_port_set(port_priv, nodnic_port_option_cq_addr_high,
 				(mlx_uint32)address);
-
+	MLX_FATAL_CHECK_STATUS(status, dma_set_addr_high_err,
+						"cq set addr high error");
 	return status;
+dma_set_addr_high_err:
+dma_set_addr_low_err:
 	mlx_memory_ummap_dma(device_priv->utils, (*cq)->map);
 cq_map_err:
 	mlx_memory_free_dma(device_priv->utils, (*cq)->cq_size,
@@ -294,6 +437,21 @@ nodnic_port_destroy_cq(
 	}
 	device_priv =  port_priv->device;
 
+	if ( device_priv->device_cap.support_bar_cq_ctrl ){
+			status = mlx_memory_ummap_dma(device_priv->utils,
+					cq->arm_cq_doorbell.map);
+			if( status != MLX_SUCCESS){
+				MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
+			}
+
+			status = mlx_memory_free_dma(device_priv->utils,
+					sizeof(nodnic_arm_cq_db),
+					(void **)&(port_priv->arm_cq_doorbell_record));
+			if( status != MLX_SUCCESS){
+				MLX_DEBUG_ERROR(device_priv, "mlx_memory_free_dma failed (Status = %d)\n", status);
+			}
+		}
+
 	mlx_memory_ummap_dma(device_priv->utils, cq->map);
 
 	mlx_memory_free_dma(device_priv->utils, cq->cq_size,
@@ -303,6 +461,126 @@ nodnic_port_destroy_cq(
 invalid_parm:
 	return status;
 }
+
+static
+mlx_status
+nodnic_port_allocate_ring_db_dma (
+		IN nodnic_port_priv	*port_priv,
+		IN struct nodnic_ring *nodnic_ring,
+		IN struct nodnic_doorbell *nodnic_db
+		)
+{
+	mlx_status status = MLX_SUCCESS;
+
+	if( port_priv == NULL || nodnic_ring == NULL || nodnic_db == NULL ){
+			status = MLX_INVALID_PARAMETER;
+			goto invalid_parm;
+	}
+#define NODNIC_RING_DBR_ADDR_LOW_OFFSET 0x1C
+#define NODNIC_RING_DBR_ADDR_HIGH_OFFSET 0x18
+	status = nodnic_port_allocate_dbr_dma ( port_priv,nodnic_db,
+			nodnic_ring->offset + NODNIC_RING_DBR_ADDR_LOW_OFFSET,
+			nodnic_ring->offset + NODNIC_RING_DBR_ADDR_HIGH_OFFSET,
+			(void **)&nodnic_db->qp_doorbell_record,
+			sizeof(nodnic_qp_db),
+			(void **)&nodnic_ring->map );
+	MLX_FATAL_CHECK_STATUS(status, alloc_dbr_dma_err,
+			"failed to allocate doorbell record dma");
+
+	return status;
+alloc_dbr_dma_err:
+invalid_parm:
+	return status;
+}
+
+static
+mlx_status
+nodnic_port_rx_pi_dma_alloc(
+		IN nodnic_port_priv	*port_priv,
+		OUT nodnic_qp	**qp
+		)
+{
+	mlx_status status = MLX_SUCCESS;
+	nodnic_device_priv *device_priv = NULL;
+
+	if( port_priv == NULL || qp == NULL){
+		status = MLX_INVALID_PARAMETER;
+		goto invalid_parm;
+	}
+
+	device_priv =  port_priv->device;
+
+	if ( ! device_priv->device_cap.support_rx_pi_dma ) {
+		goto rx_pi_dma_unsupported;
+	}
+
+	if ( device_priv->device_cap.support_rx_pi_dma ) {
+		status = nodnic_port_allocate_ring_db_dma(port_priv,
+				&(*qp)->receive.nodnic_ring,&(*qp)->receive.nodnic_ring.recv_doorbell);
+		MLX_FATAL_CHECK_STATUS(status, dma_alloc_err,
+				"rx doorbell dma allocation error");
+	}
+
+	return status;
+
+dma_alloc_err:
+rx_pi_dma_unsupported:
+invalid_parm:
+	return status;
+}
+
+static
+mlx_status
+nodnic_port_send_db_dma(
+		IN nodnic_port_priv	*port_priv,
+		IN struct nodnic_ring *ring,
+		IN mlx_uint16 index
+		)
+{
+	mlx_uint32 swapped = 0;
+	mlx_uint32 index32 = index;
+	mlx_memory_cpu_to_be32(port_priv->device->utils, index32, &swapped);
+	ring->send_doorbell.qp_doorbell_record->send_db =  swapped;
+
+	return MLX_SUCCESS;
+}
+
+static
+mlx_status
+nodnic_port_tx_dbr_dma_init(
+		IN nodnic_port_priv	*port_priv,
+		OUT nodnic_qp	**qp
+		)
+{
+	mlx_status status = MLX_SUCCESS;
+	nodnic_device_priv *device_priv = NULL;
+
+	if( port_priv == NULL || qp == NULL){
+		status = MLX_INVALID_PARAMETER;
+		goto invalid_parm;
+	}
+
+	device_priv =  port_priv->device;
+
+	if ( ! device_priv->device_cap.support_uar_tx_db || ! device_priv->uar.offset ) {
+		status = MLX_UNSUPPORTED;
+		goto uar_tx_db_unsupported;
+	}
+	status = nodnic_port_allocate_ring_db_dma(port_priv,
+			&(*qp)->send.nodnic_ring,&(*qp)->send.nodnic_ring.send_doorbell);
+	MLX_FATAL_CHECK_STATUS(status, dma_alloc_err,
+			"tx doorbell dma allocation error");
+	port_priv->send_doorbell = nodnic_port_send_db_dma;
+
+	return status;
+
+dma_alloc_err:
+uar_tx_db_unsupported:
+invalid_parm:
+
+	return status;
+}
+
 mlx_status
 nodnic_port_create_qp(
 					IN nodnic_port_priv	*port_priv,
@@ -376,6 +654,13 @@ nodnic_port_create_qp(
 	MLX_FATAL_CHECK_STATUS(status, receive_map_err,
 				"receive wq map error");
 
+	status = nodnic_port_rx_pi_dma_alloc(port_priv,qp);
+	MLX_FATAL_CHECK_STATUS(status, rx_pi_dma_alloc_err,
+				"receive db dma error");
+
+	status = nodnic_port_tx_dbr_dma_init(port_priv,qp);
+
+
 	(*qp)->send.nodnic_ring.wq_size = send_wq_size;
 	(*qp)->send.nodnic_ring.num_wqes = send_wqe_num;
 	(*qp)->receive.nodnic_ring.wq_size = receive_wq_size;
@@ -420,6 +705,7 @@ nodnic_port_create_qp(
 write_recv_addr_err:
 write_send_addr_err:
 	mlx_memory_ummap_dma(device_priv->utils, (*qp)->receive.nodnic_ring.map);
+rx_pi_dma_alloc_err:
 receive_map_err:
 	mlx_memory_ummap_dma(device_priv->utils, (*qp)->send.nodnic_ring.map);
 send_map_err:
@@ -455,6 +741,36 @@ nodnic_port_destroy_qp(
 	status = mlx_memory_ummap_dma(device_priv->utils, qp->send.nodnic_ring.map);
 	if( status != MLX_SUCCESS){
 		MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
+	}
+
+	if ( device_priv->device_cap.support_rx_pi_dma ){
+		status = mlx_memory_ummap_dma(device_priv->utils,
+					qp->receive.nodnic_ring.recv_doorbell.map);
+		if( status != MLX_SUCCESS){
+			MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
+		}
+
+		status = mlx_memory_free_dma(device_priv->utils,
+				sizeof(nodnic_qp_db),
+				(void **)&(qp->receive.nodnic_ring.recv_doorbell.qp_doorbell_record));
+		if( status != MLX_SUCCESS){
+			MLX_DEBUG_ERROR(device_priv, "mlx_memory_free_dma failed (Status = %d)\n", status);
+		}
+	}
+
+	if ( device_priv->device_cap.support_uar_tx_db || ! device_priv->uar.offset){
+		status = mlx_memory_ummap_dma(device_priv->utils,
+					qp->send.nodnic_ring.send_doorbell.map);
+		if( status != MLX_SUCCESS){
+			MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
+		}
+
+		status = mlx_memory_free_dma(device_priv->utils,
+				sizeof(nodnic_qp_db),
+				(void **)&(qp->send.nodnic_ring.send_doorbell.qp_doorbell_record));
+		if( status != MLX_SUCCESS){
+			MLX_DEBUG_ERROR(device_priv, "mlx_memory_free_dma failed (Status = %d)\n", status);
+		}
 	}
 
 	status = mlx_memory_free_dma(device_priv->utils,
@@ -520,7 +836,7 @@ nodnic_port_send_db_connectx3(
 	nodnic_port_data_flow_gw *ptr = port_priv->data_flow_gw;
 	mlx_uint32 index32 = index;
 	mlx_pci_mem_write(port_priv->device->utils, MlxPciWidthUint32, 0,
-			(mlx_uint64)&(ptr->send_doorbell), 1, &index32);
+			(mlx_uintn)&(ptr->send_doorbell), 1, &index32);
 	return MLX_SUCCESS;
 }
 
@@ -535,10 +851,24 @@ nodnic_port_recv_db_connectx3(
 	nodnic_port_data_flow_gw *ptr = port_priv->data_flow_gw;
 	mlx_uint32 index32 = index;
 	mlx_pci_mem_write(port_priv->device->utils, MlxPciWidthUint32, 0,
-			(mlx_uint64)&(ptr->recv_doorbell), 1, &index32);
+			(mlx_uintn)&(ptr->recv_doorbell), 1, &index32);
 	return MLX_SUCCESS;
 }
 #endif
+static
+mlx_status
+nodnic_port_recv_db_dma(
+		IN nodnic_port_priv	*port_priv __attribute__((unused)),
+		IN struct nodnic_ring *ring,
+		IN mlx_uint16 index
+		)
+{
+	mlx_uint32 swapped = 0;
+	mlx_uint32 index32 = index;
+	mlx_memory_cpu_to_be32(port_priv->device->utils, index32, &swapped);
+	ring->recv_doorbell.qp_doorbell_record->recv_db =  swapped;
+	return MLX_SUCCESS;
+}
 
 mlx_status
 nodnic_port_update_ring_doorbell(
@@ -678,11 +1008,10 @@ nodnic_port_add_mac_filter(
 		goto bad_param;
 	}
 
-	memset(&zero_mac, 0, sizeof(zero_mac));
-
 	device = port_priv->device;
 	utils = device->utils;
 
+	mlx_memory_set(utils, &zero_mac, 0, sizeof(zero_mac));
 	/* check if mac already exists */
 	for( ; index < NODNIC_MAX_MAC_FILTERS ; index ++) {
 		mlx_memory_cmp(utils, &port_priv->mac_filters[index], &mac,
@@ -759,11 +1088,10 @@ nodnic_port_remove_mac_filter(
 		goto bad_param;
 	}
 
-	memset(&zero_mac, 0, sizeof(zero_mac));
-
 	device = port_priv->device;
 	utils = device->utils;
 
+	mlx_memory_set(utils, &zero_mac, 0, sizeof(zero_mac));
 	/* serch for mac filter */
 	for( ; index < NODNIC_MAX_MAC_FILTERS ; index ++) {
 		mlx_memory_cmp(utils, &port_priv->mac_filters[index], &mac,
@@ -832,7 +1160,7 @@ nodnic_port_set_dma_connectx3(
 	nodnic_port_data_flow_gw *ptr = port_priv->data_flow_gw;
 	mlx_uint32 data = (value ? 0xffffffff : 0x0);
 	mlx_pci_mem_write(utils, MlxPciWidthUint32, 0,
-			(mlx_uint64)&(ptr->dma_en), 1, &data);
+			(mlx_uintn)&(ptr->dma_en), 1, &data);
 	return MLX_SUCCESS;
 }
 #endif
@@ -1029,6 +1357,10 @@ nodnic_port_thin_init(
 		port_priv->set_dma = nodnic_port_set_dma_connectx3;
 	}
 #endif
+	if ( device_priv->device_cap.support_rx_pi_dma ) {
+		port_priv->recv_doorbell = nodnic_port_recv_db_dma;
+	}
+
 	/* clear reset_needed */
 	nodnic_port_read_reset_needed(port_priv, &reset_needed);
 

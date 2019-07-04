@@ -70,6 +70,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_ansicoldef	       ( ERRFILE_CORE | 0x001e0000 )
 #define ERRFILE_fault		       ( ERRFILE_CORE | 0x001f0000 )
 #define ERRFILE_blocktrans	       ( ERRFILE_CORE | 0x00200000 )
+#define ERRFILE_pixbuf		       ( ERRFILE_CORE | 0x00210000 )
+#define ERRFILE_efi_block	       ( ERRFILE_CORE | 0x00220000 )
+#define ERRFILE_sanboot		       ( ERRFILE_CORE | 0x00230000 )
+#define ERRFILE_dummy_sanboot	       ( ERRFILE_CORE | 0x00240000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
@@ -189,6 +193,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_golan		     ( ERRFILE_DRIVER | 0x007d0000 )
 #define ERRFILE_flexboot_nodnic	     ( ERRFILE_DRIVER | 0x007e0000 )
 #define ERRFILE_virtio_pci	     ( ERRFILE_DRIVER | 0x007f0000 )
+#define ERRFILE_pciea		     ( ERRFILE_DRIVER | 0x00c00000 )
+#define ERRFILE_axge		     ( ERRFILE_DRIVER | 0x00c10000 )
+#define ERRFILE_thunderx	     ( ERRFILE_DRIVER | 0x00c20000 )
+#define ERRFILE_af_packet	     ( ERRFILE_DRIVER | 0x00c30000 )
+#define ERRFILE_sfc_hunt	     ( ERRFILE_DRIVER | 0x00c40000 )
+#define ERRFILE_efx_hunt	     ( ERRFILE_DRIVER | 0x00c50000 )
+#define ERRFILE_exanic		     ( ERRFILE_DRIVER | 0x00c60000 )
+#define ERRFILE_smscusb		     ( ERRFILE_DRIVER | 0x00c70000 )
+#define ERRFILE_lan78xx		     ( ERRFILE_DRIVER | 0x00c80000 )
+#define ERRFILE_ena		     ( ERRFILE_DRIVER | 0x00c90000 )
+#define ERRFILE_icplus		     ( ERRFILE_DRIVER | 0x00ca0000 )
+#define ERRFILE_intelxl		     ( ERRFILE_DRIVER | 0x00cb0000 )
+#define ERRFILE_pcimsix		     ( ERRFILE_DRIVER | 0x00cc0000 )
+#define ERRFILE_intelxlvf	     ( ERRFILE_DRIVER | 0x00cd0000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
@@ -263,6 +281,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_peerblk			( ERRFILE_NET | 0x00460000 )
 #define ERRFILE_peermux			( ERRFILE_NET | 0x00470000 )
 #define ERRFILE_xsigo			( ERRFILE_NET | 0x00480000 )
+#define ERRFILE_ntp			( ERRFILE_NET | 0x00490000 )
+#define ERRFILE_httpntlm		( ERRFILE_NET | 0x004a0000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
@@ -272,6 +292,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_embedded	      ( ERRFILE_IMAGE | 0x00050000 )
 #define ERRFILE_pnm		      ( ERRFILE_IMAGE | 0x00060000 )
 #define ERRFILE_png		      ( ERRFILE_IMAGE | 0x00070000 )
+#define ERRFILE_der		      ( ERRFILE_IMAGE | 0x00080000 )
+#define ERRFILE_pem		      ( ERRFILE_IMAGE | 0x00090000 )
 
 #define ERRFILE_asn1		      ( ERRFILE_OTHER | 0x00000000 )
 #define ERRFILE_chap		      ( ERRFILE_OTHER | 0x00010000 )
@@ -351,6 +373,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_usb		      ( ERRFILE_OTHER | 0x004b0000 )
 #define ERRFILE_efi_fbcon	      ( ERRFILE_OTHER | 0x004c0000 )
 #define ERRFILE_efi_local	      ( ERRFILE_OTHER | 0x004d0000 )
+#define ERRFILE_efi_entropy	      ( ERRFILE_OTHER | 0x004e0000 )
+#define ERRFILE_cert_cmd	      ( ERRFILE_OTHER | 0x004f0000 )
+#define ERRFILE_acpi_settings	      ( ERRFILE_OTHER | 0x00500000 )
+#define ERRFILE_ntlm		      ( ERRFILE_OTHER | 0x00510000 )
+#define ERRFILE_efi_blacklist	      ( ERRFILE_OTHER | 0x00520000 )
 
 /** @} */
 

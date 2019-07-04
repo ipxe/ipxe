@@ -182,12 +182,6 @@ REQUIRE_OBJECT ( efi_image );
 #ifdef IMAGE_SDI
 REQUIRE_OBJECT ( sdi );
 #endif
-#ifdef IMAGE_PNM
-REQUIRE_OBJECT ( pnm );
-#endif
-#ifdef IMAGE_PNG
-REQUIRE_OBJECT ( png );
-#endif
 
 /*
  * Drag in all requested commands
@@ -254,6 +248,9 @@ REQUIRE_OBJECT ( cpuid_cmd );
 #ifdef SYNC_CMD
 REQUIRE_OBJECT ( sync_cmd );
 #endif
+#ifdef SHELL_CMD
+REQUIRE_OBJECT ( shell );
+#endif
 #ifdef NSLOOKUP_CMD
 REQUIRE_OBJECT ( nslookup_cmd );
 #endif
@@ -277,6 +274,12 @@ REQUIRE_OBJECT ( ipstat_cmd );
 #endif
 #ifdef PROFSTAT_CMD
 REQUIRE_OBJECT ( profstat_cmd );
+#endif
+#ifdef NTP_CMD
+REQUIRE_OBJECT ( ntp_cmd );
+#endif
+#ifdef CERT_CMD
+REQUIRE_OBJECT ( cert_cmd );
 #endif
 
 /*
@@ -336,6 +339,9 @@ REQUIRE_OBJECT ( memmap_settings );
 #endif
 #ifdef VRAM_SETTINGS
 REQUIRE_OBJECT ( vram_settings );
+#endif
+#ifdef ACPI_SETTINGS
+REQUIRE_OBJECT ( acpi_settings );
 #endif
 
 /*

@@ -17,6 +17,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 struct uri;
 struct pixel_buffer;
+struct asn1_cursor;
 struct image_type;
 
 /** An executable image */
@@ -99,6 +100,19 @@ struct image_type {
 	 * @ret rc		Return status code
 	 */
 	int ( * pixbuf ) ( struct image *image, struct pixel_buffer **pixbuf );
+	/**
+	 * Extract ASN.1 object from image
+	 *
+	 * @v image		Image
+	 * @v offset		Offset within image
+	 * @v cursor		ASN.1 cursor to fill in
+	 * @ret next		Offset to next image, or negative error
+	 *
+	 * The caller is responsible for eventually calling free() on
+	 * the allocated ASN.1 cursor.
+	 */
+	int ( * asn1 ) ( struct image *image, size_t offset,
+			 struct asn1_cursor **cursor );
 };
 
 /**
@@ -170,6 +184,8 @@ extern int image_select ( struct image *image );
 extern struct image * image_find_selected ( void );
 extern int image_set_trust ( int require_trusted, int permanent );
 extern int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf );
+extern int image_asn1 ( struct image *image, size_t offset,
+			struct asn1_cursor **cursor );
 
 /**
  * Increment reference count on an image

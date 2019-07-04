@@ -31,16 +31,25 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <string.h>
+#include <errno.h>
+#include <unistd.h>
 #include <biosint.h>
 #include <pic8259.h>
 #include <rtc.h>
 #include <ipxe/entropy.h>
+
+/** Maximum time to wait for an RTC interrupt, in milliseconds */
+#define RTC_MAX_WAIT_MS 100
 
 /** RTC interrupt handler */
 extern void rtc_isr ( void );
 
 /** Previous RTC interrupt handler */
 static struct segoff rtc_old_handler;
+
+/** Flag set by RTC interrupt handler */
+extern volatile uint8_t __text16 ( rtc_flag );
+#define rtc_flag __use_text16 ( rtc_flag )
 
 /**
  * Hook RTC interrupt handler
@@ -96,6 +105,10 @@ static void rtc_unhook_isr ( void ) {
 static void rtc_enable_int ( void ) {
 	uint8_t status_b;
 
+	/* Clear any stale pending interrupts via status register C */
+	outb ( ( RTC_STATUS_C | CMOS_DISABLE_NMI ), CMOS_ADDRESS );
+	inb ( CMOS_DATA );
+
 	/* Set Periodic Interrupt Enable bit in status register B */
 	outb ( ( RTC_STATUS_B | CMOS_DISABLE_NMI ), CMOS_ADDRESS );
 	status_b = inb ( CMOS_DATA );
@@ -126,17 +139,59 @@ static void rtc_disable_int ( void ) {
 }
 
 /**
+ * Check that entropy gathering is functional
+ *
+ * @ret rc		Return status code
+ */
+static int rtc_entropy_check ( void ) {
+	unsigned int i;
+
+	/* Check that RTC interrupts are working */
+	rtc_flag = 0;
+	for ( i = 0 ; i < RTC_MAX_WAIT_MS ; i++ ) {
+
+		/* Allow interrupts to occur */
+		__asm__ __volatile__ ( "sti\n\t"
+				       "nop\n\t"
+				       "nop\n\t"
+				       "cli\n\t" );
+
+		/* Check for RTC interrupt flag */
+		if ( rtc_flag )
+			return 0;
+
+		/* Delay */
+		mdelay ( 1 );
+	}
+
+	DBGC ( &rtc_flag, "RTC timed out waiting for interrupt\n" );
+	return -ETIMEDOUT;
+}
+
+/**
  * Enable entropy gathering
  *
  * @ret rc		Return status code
  */
 static int rtc_entropy_enable ( void ) {
+	int rc;
 
+	/* Hook ISR and enable RTC interrupts */
 	rtc_hook_isr();
 	enable_irq ( RTC_IRQ );
 	rtc_enable_int();
 
+	/* Check that RTC interrupts are working */
+	if ( ( rc = rtc_entropy_check() ) != 0 )
+		goto err_check;
+
 	return 0;
+
+ err_check:
+	rtc_disable_int();
+	disable_irq ( RTC_IRQ );
+	rtc_unhook_isr();
+	return rc;
 }
 
 /**
@@ -145,6 +200,7 @@ static int rtc_entropy_enable ( void ) {
  */
 static void rtc_entropy_disable ( void ) {
 
+	/* Disable RTC interrupts and unhook ISR */
 	rtc_disable_int();
 	disable_irq ( RTC_IRQ );
 	rtc_unhook_isr();

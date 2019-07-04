@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "../../../mlx_utils_flexboot/include/mlx_logging_priv.h"
 
+#define MLX_PRINT(...)				MLX_PRINT_PRIVATE(__VA_ARGS__)
 #define MLX_DEBUG_FATAL_ERROR(...)	MLX_DEBUG_FATAL_ERROR_PRIVATE(__VA_ARGS__)
 #define MLX_DEBUG_ERROR(...)		MLX_DEBUG_ERROR_PRIVATE(__VA_ARGS__)
 #define MLX_DEBUG_WARN(...)			MLX_DEBUG_WARN_PRIVATE(__VA_ARGS__)

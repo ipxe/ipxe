@@ -1,0 +1,54 @@
+dist: trusty
+
+sudo: false
+
+language: c
+
+cache: ccache
+
+compiler:
+  - gcc
+
+addons:
+  apt:
+    packages:
+      - binutils-dev
+      - liblzma-dev
+      - syslinux
+      - genisoimage
+  coverity_scan:
+    project:
+      name: "ipxe/ipxe"
+      version: $TRAVIS_COMMIT
+    build_command_prepend: "make -C src bin/deps"
+    build_command: "make -C src bin/blib.a"
+    branch_pattern: coverity_scan
+
+env:
+  global:
+    - MAKEFLAGS="-j 4"
+
+script:
+  - make -C src bin/blib.a
+  - make -C src bin/ipxe.pxe
+  - make -C src bin/ipxe.usb
+  - make -C src bin/ipxe.iso
+  - make -C src bin/8086100e.mrom
+  - make -C src bin-x86_64-pcbios/blib.a
+  - make -C src bin-x86_64-pcbios/ipxe.pxe
+  - make -C src bin-x86_64-pcbios/ipxe.usb
+  - make -C src bin-x86_64-pcbios/ipxe.iso
+  - make -C src bin-x86_64-pcbios/8086100e.mrom
+  - make -C src bin-x86_64-efi/blib.a
+  - make -C src bin-x86_64-efi/ipxe.efi
+  - make -C src bin-x86_64-efi/intel.efidrv
+  - make -C src bin-x86_64-efi/intel.efirom
+  - make -C src bin-i386-efi/blib.a
+  - make -C src bin-i386-efi/ipxe.efi
+  - make -C src bin-i386-efi/intel.efidrv
+  - make -C src bin-i386-efi/intel.efirom
+  - make -C src bin-x86_64-linux/blib.a
+  - make -C src bin-x86_64-linux/tap.linux
+  - make -C src bin-x86_64-linux/af_packet.linux
+  - make -C src bin-x86_64-linux/tests.linux
+  - ./src/bin-x86_64-linux/tests.linux

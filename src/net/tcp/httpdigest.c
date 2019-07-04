@@ -45,6 +45,79 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_EACCES, 0x01,				\
 			  "No username available for Digest authentication" )
 
+/** An HTTP Digest "WWW-Authenticate" response field */
+struct http_digest_field {
+	/** Name */
+	const char *name;
+	/** Offset */
+	size_t offset;
+};
+
+/** Define an HTTP Digest "WWW-Authenticate" response field */
+#define HTTP_DIGEST_FIELD( _name ) {					\
+		.name = #_name,						\
+		.offset = offsetof ( struct http_transaction,		\
+				     response.auth.digest._name ),	\
+	}
+
+/**
+ * Set HTTP Digest "WWW-Authenticate" response field value
+ *
+ * @v http		HTTP transaction
+ * @v field		Response field
+ * @v value		Field value
+ */
+static inline void
+http_digest_field ( struct http_transaction *http,
+		    struct http_digest_field *field, char *value ) {
+	char **ptr;
+
+	ptr = ( ( ( void * ) http ) + field->offset );
+	*ptr = value;
+}
+
+/** HTTP Digest "WWW-Authenticate" fields */
+static struct http_digest_field http_digest_fields[] = {
+	HTTP_DIGEST_FIELD ( realm ),
+	HTTP_DIGEST_FIELD ( qop ),
+	HTTP_DIGEST_FIELD ( algorithm ),
+	HTTP_DIGEST_FIELD ( nonce ),
+	HTTP_DIGEST_FIELD ( opaque ),
+};
+
+/**
+ * Parse HTTP "WWW-Authenticate" header for Digest authentication
+ *
+ * @v http		HTTP transaction
+ * @v line		Remaining header line
+ * @ret rc		Return status code
+ */
+static int http_parse_digest_auth ( struct http_transaction *http,
+				    char *line ) {
+	struct http_digest_field *field;
+	char *key;
+	char *value;
+	unsigned int i;
+
+	/* Process fields */
+	while ( ( key = http_token ( &line, &value ) ) ) {
+		for ( i = 0 ; i < ( sizeof ( http_digest_fields ) /
+				    sizeof ( http_digest_fields[0] ) ) ; i++){
+			field = &http_digest_fields[i];
+			if ( strcasecmp ( key, field->name ) == 0 )
+				http_digest_field ( http, field, value );
+		}
+	}
+
+	/* Allow HTTP request to be retried if the request had not
+	 * already tried authentication.
+	 */
+	if ( ! http->request.auth.auth )
+		http->response.flags |= HTTP_RESPONSE_RETRY;
+
+	return 0;
+}
+
 /**
  * Initialise HTTP Digest
  *
@@ -95,13 +168,14 @@ static void http_digest_final ( struct md5_context *ctx, char *out,
  * @ret rc		Return status code
  */
 static int http_digest_authenticate ( struct http_transaction *http ) {
-	struct http_request_auth *req = &http->request.auth;
-	struct http_response_auth *rsp = &http->response.auth;
+	struct http_request_auth_digest *req = &http->request.auth.digest;
+	struct http_response_auth_digest *rsp = &http->response.auth.digest;
 	char ha1[ base16_encoded_len ( MD5_DIGEST_SIZE ) + 1 /* NUL */ ];
 	char ha2[ base16_encoded_len ( MD5_DIGEST_SIZE ) + 1 /* NUL */ ];
 	static const char md5sess[] = "MD5-sess";
 	static const char md5[] = "MD5";
 	struct md5_context ctx;
+	const char *password;
 
 	/* Check for required response parameters */
 	if ( ! rsp->realm ) {
@@ -122,7 +196,7 @@ static int http_digest_authenticate ( struct http_transaction *http ) {
 		return -EACCES_USERNAME;
 	}
 	req->username = http->uri->user;
-	req->password = ( http->uri->password ? http->uri->password : "" );
+	password = ( http->uri->password ? http->uri->password : "" );
 
 	/* Handle quality of protection */
 	if ( rsp->qop ) {
@@ -146,7 +220,7 @@ static int http_digest_authenticate ( struct http_transaction *http ) {
 	http_digest_init ( &ctx );
 	http_digest_update ( &ctx, req->username );
 	http_digest_update ( &ctx, rsp->realm );
-	http_digest_update ( &ctx, req->password );
+	http_digest_update ( &ctx, password );
 	http_digest_final ( &ctx, ha1, sizeof ( ha1 ) );
 	if ( req->algorithm == md5sess ) {
 		http_digest_init ( &ctx );
@@ -187,8 +261,8 @@ static int http_digest_authenticate ( struct http_transaction *http ) {
  */
 static int http_format_digest_auth ( struct http_transaction *http,
 				     char *buf, size_t len ) {
-	struct http_request_auth *req = &http->request.auth;
-	struct http_response_auth *rsp = &http->response.auth;
+	struct http_request_auth_digest *req = &http->request.auth.digest;
+	struct http_response_auth_digest *rsp = &http->response.auth.digest;
 	size_t used = 0;
 
 	/* Sanity checks */
@@ -225,6 +299,7 @@ static int http_format_digest_auth ( struct http_transaction *http,
 /** HTTP Digest authentication scheme */
 struct http_authentication http_digest_auth __http_authentication = {
 	.name = "Digest",
+	.parse = http_parse_digest_auth,
 	.authenticate = http_digest_authenticate,
 	.format = http_format_digest_auth,
 };

@@ -88,6 +88,7 @@ checksum:
 	.previous
 
 .ifeqs	BUSTYPE, "PCIR"
+	.align	4
 pciheader:
 	.ascii	"PCIR"			/* Signature */
 	.word	pci_vendor_id		/* Vendor identification */ 
@@ -95,7 +96,7 @@ pciheader:
 	.word	( pci_devlist - pciheader ) /* Device list pointer */
 	.word	pciheader_len		/* PCI data structure length */
 	.byte	0x03			/* PCI data structure revision */
-	.byte	0x02, 0x00, 0x00	/* Class code */
+	.byte	0x00, 0x00, 0x02	/* Class code */
 pciheader_image_length:
 	.word	0			/* Image length */
 	.word	0x0001			/* Revision level */
@@ -183,6 +184,7 @@ prodstr_pci_id:
 
 	.globl	undiheader	
 	.weak	undiloader
+	.align	4
 undiheader:
 	.ascii	"UNDI"			/* Signature */
 	.byte	undiheader_len		/* Length of structure */
@@ -197,6 +199,7 @@ undiheader:
 	.equ undiheader_len, . - undiheader
 	.size undiheader, . - undiheader
 
+	.align	4
 ipxeheader:
 	.ascii	"iPXE"			/* Signature */
 	.byte	ipxeheader_len		/* Length of structure */

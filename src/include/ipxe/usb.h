@@ -223,6 +223,9 @@ struct usb_string_descriptor {
 /** A USB string descriptor */
 #define USB_STRING_DESCRIPTOR 3
 
+/** Language ID for English */
+#define USB_LANG_ENGLISH 0x0409
+
 /** A USB interface descriptor */
 struct usb_interface_descriptor {
 	/** Descriptor header */
@@ -728,6 +731,9 @@ struct usb_device {
 	struct usb_endpoint control;
 	/** Completed control transfers */
 	struct list_head complete;
+
+	/** Default language ID (if known) */
+	unsigned int language;
 };
 
 /** USB device host controller operations */

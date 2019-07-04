@@ -402,11 +402,24 @@ void netdev_tx_complete_err ( struct net_device *netdev,
 	list_del ( &iobuf->list );
 	netdev_tx_err ( netdev, iobuf, rc );
 
-	/* Transmit first pending packet, if any */
-	if ( ( iobuf = list_first_entry ( &netdev->tx_deferred,
-					  struct io_buffer, list ) ) != NULL ) {
+	/* Handle pending transmit queue */
+	while ( ( iobuf = list_first_entry ( &netdev->tx_deferred,
+					     struct io_buffer, list ) ) ) {
+
+		/* Remove from pending transmit queue */
 		list_del ( &iobuf->list );
+
+		/* When any transmit completion fails, cancel all
+		 * pending transmissions.
+		 */
+		if ( rc != 0 ) {
+			netdev_tx_err ( netdev, iobuf, -ECANCELED );
+			continue;
+		}
+
+		/* Otherwise, attempt to transmit the first pending packet */
 		netdev_tx ( netdev, iobuf );
+		break;
 	}
 }
 
@@ -663,6 +676,12 @@ int register_netdev ( struct net_device *netdev ) {
 		ll_protocol->init_addr ( netdev->hw_addr, netdev->ll_addr );
 	}
 
+	/* Set MTU, if not already set */
+	if ( ! netdev->mtu ) {
+		netdev->mtu = ( netdev->max_pkt_len -
+				ll_protocol->ll_header_len );
+	}
+
 	/* Reject network devices that are already available via a
 	 * different hardware device.
 	 */
@@ -733,6 +752,8 @@ int register_netdev ( struct net_device *netdev ) {
 	clear_settings ( netdev_settings ( netdev ) );
 	unregister_settings ( netdev_settings ( netdev ) );
  err_register_settings:
+	list_del ( &netdev->list );
+	netdev_put ( netdev );
  err_duplicate:
 	return rc;
 }
@@ -853,12 +874,9 @@ void unregister_netdev ( struct net_device *netdev ) {
  */
 void netdev_irq ( struct net_device *netdev, int enable ) {
 
-	/* Do nothing if device does not support interrupts */
-	if ( ! netdev_irq_supported ( netdev ) )
-		return;
-
-	/* Enable or disable device interrupts */
-	netdev->op->irq ( netdev, enable );
+	/* Enable or disable device interrupts, if applicable */
+	if ( netdev_irq_supported ( netdev ) )
+		netdev->op->irq ( netdev, enable );
 
 	/* Record interrupt enabled state */
 	netdev->state &= ~NETDEV_IRQ_ENABLED;
@@ -1108,15 +1126,35 @@ __weak unsigned int vlan_tag ( struct net_device *netdev __unused ) {
 }
 
 /**
- * Identify VLAN device (when VLAN support is not present)
+ * Add VLAN tag-stripped packet to queue (when VLAN support is not present)
  *
- * @v trunk		Trunk network device
- * @v tag		VLAN tag
- * @ret netdev		VLAN device, if any
+ * @v netdev		Network device
+ * @v tag		VLAN tag, or zero
+ * @v iobuf		I/O buffer
  */
-__weak struct net_device * vlan_find ( struct net_device *trunk __unused,
-				       unsigned int tag __unused ) {
-	return NULL;
+__weak void vlan_netdev_rx ( struct net_device *netdev, unsigned int tag,
+			     struct io_buffer *iobuf ) {
+
+	if ( tag == 0 ) {
+		netdev_rx ( netdev, iobuf );
+	} else {
+		netdev_rx_err ( netdev, iobuf, -ENODEV );
+	}
+}
+
+/**
+ * Discard received VLAN tag-stripped packet (when VLAN support is not present)
+ *
+ * @v netdev		Network device
+ * @v tag		VLAN tag, or zero
+ * @v iobuf		I/O buffer, or NULL
+ * @v rc		Packet status code
+ */
+__weak void vlan_netdev_rx_err ( struct net_device *netdev,
+				 unsigned int tag __unused,
+				 struct io_buffer *iobuf, int rc ) {
+
+	netdev_rx_err ( netdev, iobuf, rc );
 }
 
 /** Networking stack process */

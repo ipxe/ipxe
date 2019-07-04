@@ -651,6 +651,63 @@ static int rndis_oid ( struct rndis_device *rndis, unsigned int oid,
 }
 
 /**
+ * Describe RNDIS device
+ *
+ * @v rndis		RNDIS device
+ * @ret rc		Return status code
+ */
+static int rndis_describe ( struct rndis_device *rndis ) {
+	struct net_device *netdev = rndis->netdev;
+	int rc;
+
+	/* Assign device name (for debugging) */
+	rndis->name = netdev->dev->name;
+
+	/* Open RNDIS device to read MAC addresses */
+	if ( ( rc = rndis->op->open ( rndis ) ) != 0 ) {
+		DBGC ( rndis, "RNDIS %s could not open: %s\n",
+		       rndis->name, strerror ( rc ) );
+		goto err_open;
+	}
+
+	/* Initialise RNDIS */
+	if ( ( rc = rndis_initialise ( rndis ) ) != 0 )
+		goto err_initialise;
+
+	/* Query permanent MAC address */
+	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_802_3_PERMANENT_ADDRESS,
+				NULL, 0 ) ) != 0 )
+		goto err_query_permanent;
+
+	/* Query current MAC address */
+	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_802_3_CURRENT_ADDRESS,
+				NULL, 0 ) ) != 0 )
+		goto err_query_current;
+
+	/* Get link status */
+	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_GEN_MEDIA_CONNECT_STATUS,
+				NULL, 0 ) ) != 0 )
+		goto err_query_link;
+
+	/* Halt RNDIS device */
+	rndis_halt ( rndis );
+
+	/* Close RNDIS device */
+	rndis->op->close ( rndis );
+
+	return 0;
+
+ err_query_link:
+ err_query_current:
+ err_query_permanent:
+	rndis_halt ( rndis );
+ err_initialise:
+	rndis->op->close ( rndis );
+ err_open:
+	return rc;
+}
+
+/**
  * Receive indicate status message
  *
  * @v rndis		RNDIS device
@@ -970,8 +1027,9 @@ int register_rndis ( struct rndis_device *rndis ) {
 	struct net_device *netdev = rndis->netdev;
 	int rc;
 
-	/* Assign device name (for debugging) */
-	rndis->name = netdev->dev->name;
+	/* Describe RNDIS device */
+	if ( ( rc = rndis_describe ( rndis ) ) != 0 )
+		goto err_describe;
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
@@ -980,49 +1038,11 @@ int register_rndis ( struct rndis_device *rndis ) {
 		goto err_register;
 	}
 
-	/* Open RNDIS device to read MAC addresses */
-	if ( ( rc = rndis->op->open ( rndis ) ) != 0 ) {
-		DBGC ( rndis, "RNDIS %s could not open: %s\n",
-		       rndis->name, strerror ( rc ) );
-		goto err_open;
-	}
-
-	/* Initialise RNDIS */
-	if ( ( rc = rndis_initialise ( rndis ) ) != 0 )
-		goto err_initialise;
-
-	/* Query permanent MAC address */
-	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_802_3_PERMANENT_ADDRESS,
-				NULL, 0 ) ) != 0 )
-		goto err_query_permanent;
-
-	/* Query current MAC address */
-	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_802_3_CURRENT_ADDRESS,
-				NULL, 0 ) ) != 0 )
-		goto err_query_current;
-
-	/* Get link status */
-	if ( ( rc = rndis_oid ( rndis, RNDIS_OID_GEN_MEDIA_CONNECT_STATUS,
-				NULL, 0 ) ) != 0 )
-		goto err_query_link;
-
-	/* Halt RNDIS device */
-	rndis_halt ( rndis );
-
-	/* Close RNDIS device */
-	rndis->op->close ( rndis );
-
 	return 0;
 
- err_query_link:
- err_query_current:
- err_query_permanent:
-	rndis_halt ( rndis );
- err_initialise:
-	rndis->op->close ( rndis );
- err_open:
 	unregister_netdev ( netdev );
  err_register:
+ err_describe:
 	return rc;
 }
 

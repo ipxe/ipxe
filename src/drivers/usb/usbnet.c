@@ -35,11 +35,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * USB network devices use a variety of packet formats and interface
  * descriptors, but tend to have several features in common:
  *
- *  - a single interrupt endpoint using the generic refill mechanism
+ *  - a single bulk OUT endpoint
  *
  *  - a single bulk IN endpoint using the generic refill mechanism
  *
- *  - a single bulk OUT endpoint
+ *  - an optional interrupt endpoint using the generic refill mechanism
  *
  *  - optional use of an alternate setting to enable the data interface
  *
@@ -55,15 +55,17 @@ int usbnet_open ( struct usbnet_device *usbnet ) {
 	struct usb_device *usb = usbnet->func->usb;
 	int rc;
 
-	/* Open interrupt endpoint */
-	if ( ( rc = usb_endpoint_open ( &usbnet->intr ) ) != 0 ) {
+	/* Open interrupt endpoint, if applicable */
+	if ( usbnet_has_intr ( usbnet ) &&
+	     ( rc = usb_endpoint_open ( &usbnet->intr ) ) != 0 ) {
 		DBGC ( usbnet, "USBNET %s could not open interrupt: %s\n",
 		       usbnet->func->name, strerror ( rc ) );
 		goto err_open_intr;
 	}
 
-	/* Refill interrupt endpoint */
-	if ( ( rc = usb_refill ( &usbnet->intr ) ) != 0 ) {
+	/* Refill interrupt endpoint, if applicable */
+	if ( usbnet_has_intr ( usbnet ) &&
+	     ( rc = usb_refill ( &usbnet->intr ) ) != 0 ) {
 		DBGC ( usbnet, "USBNET %s could not refill interrupt: %s\n",
 		       usbnet->func->name, strerror ( rc ) );
 		goto err_refill_intr;
@@ -111,7 +113,8 @@ int usbnet_open ( struct usbnet_device *usbnet ) {
 		usb_set_interface ( usb, usbnet->data, 0 );
  err_set_interface:
  err_refill_intr:
-	usb_endpoint_close ( &usbnet->intr );
+	if ( usbnet_has_intr ( usbnet ) )
+		usb_endpoint_close ( &usbnet->intr );
  err_open_intr:
 	return rc;
 }
@@ -134,8 +137,9 @@ void usbnet_close ( struct usbnet_device *usbnet ) {
 	if ( usbnet->alternate )
 		usb_set_interface ( usb, usbnet->data, 0 );
 
-	/* Close interrupt endpoint */
-	usb_endpoint_close ( &usbnet->intr );
+	/* Close interrupt endpoint, if applicable */
+	if ( usbnet_has_intr ( usbnet ) )
+		usb_endpoint_close ( &usbnet->intr );
 }
 
 /**
@@ -151,9 +155,11 @@ int usbnet_refill ( struct usbnet_device *usbnet ) {
 	if ( ( rc = usb_refill ( &usbnet->in ) ) != 0 )
 		return rc;
 
-	/* Refill interrupt endpoint */
-	if ( ( rc = usb_refill ( &usbnet->intr ) ) != 0 )
+	/* Refill interrupt endpoint, if applicable */
+	if ( usbnet_has_intr ( usbnet ) &&
+	     ( rc = usb_refill ( &usbnet->intr ) ) != 0 ) {
 		return rc;
+	}
 
 	return 0;
 }
@@ -272,9 +278,11 @@ int usbnet_describe ( struct usbnet_device *usbnet,
 		      struct usb_configuration_descriptor *config ) {
 	int rc;
 
-	/* Describe communications interface */
-	if ( ( rc = usbnet_comms_describe ( usbnet, config ) ) != 0 )
+	/* Describe communications interface, if applicable */
+	if ( usbnet_has_intr ( usbnet ) &&
+	     ( rc = usbnet_comms_describe ( usbnet, config ) ) != 0 ) {
 		return rc;
+	}
 
 	/* Describe data interface */
 	if ( ( rc = usbnet_data_describe ( usbnet, config ) ) != 0 )

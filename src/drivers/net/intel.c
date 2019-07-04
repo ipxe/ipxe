@@ -268,6 +268,12 @@ static int intel_reset ( struct intel_nic *intel ) {
 	uint32_t pba;
 	uint32_t ctrl;
 	uint32_t status;
+	uint32_t orig_ctrl;
+	uint32_t orig_status;
+
+	/* Record initial control and status register values */
+	orig_ctrl = ctrl = readl ( intel->regs + INTEL_CTRL );
+	orig_status = readl ( intel->regs + INTEL_STATUS );
 
 	/* Force RX and TX packet buffer allocation, to work around an
 	 * errata in ICH devices.
@@ -285,17 +291,13 @@ static int intel_reset ( struct intel_nic *intel ) {
 	}
 
 	/* Always reset MAC.  Required to reset the TX and RX rings. */
-	ctrl = readl ( intel->regs + INTEL_CTRL );
 	writel ( ( ctrl | INTEL_CTRL_RST ), intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
 
 	/* Set a sensible default configuration */
-    ctrl |= ( INTEL_CTRL_SLU | INTEL_CTRL_ASDE );
-    if(intel->flags & INTEL_NO_CTRL_ASDE)
-    {
-        /* Oliver Nie: CTRL_ASDE is reserved bit and must be set to 0b according intel 82576EB datasheet. */
-        ctrl &= ~(INTEL_CTRL_ASDE);
-    }
+	if ( ! ( intel->flags & INTEL_NO_ASDE ) )
+		ctrl |= INTEL_CTRL_ASDE;
+	ctrl |= INTEL_CTRL_SLU;
 	ctrl &= ~( INTEL_CTRL_LRST | INTEL_CTRL_FRCSPD | INTEL_CTRL_FRCDPLX );
 	writel ( ctrl, intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
@@ -314,9 +316,10 @@ static int intel_reset ( struct intel_nic *intel ) {
 	status = readl ( intel->regs + INTEL_STATUS );
 	if ( ( intel->flags & INTEL_NO_PHY_RST ) ||
 	     ( status & INTEL_STATUS_LU ) ) {
-		DBGC ( intel, "INTEL %p %sMAC reset (ctrl %08x)\n", intel,
+		DBGC ( intel, "INTEL %p %sMAC reset (%08x/%08x was "
+		       "%08x/%08x)\n", intel,
 		       ( ( intel->flags & INTEL_NO_PHY_RST ) ? "forced " : "" ),
-		       ctrl );
+		       ctrl, status, orig_ctrl, orig_status );
 		return 0;
 	}
 
@@ -328,8 +331,10 @@ static int intel_reset ( struct intel_nic *intel ) {
 	/* PHY reset is not self-clearing on all models */
 	writel ( ctrl, intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
+	status = readl ( intel->regs + INTEL_STATUS );
 
-	DBGC ( intel, "INTEL %p MAC+PHY reset (ctrl %08x)\n", intel, ctrl );
+	DBGC ( intel, "INTEL %p MAC+PHY reset (%08x/%08x was %08x/%08x)\n",
+	       intel, ctrl, status, orig_ctrl, orig_status );
 	return 0;
 }
 
@@ -430,6 +435,61 @@ void intel_describe_rx ( struct intel_descriptor *rx, physaddr_t addr,
  */
 
 /**
+ * Disable descriptor ring
+ *
+ * @v intel		Intel device
+ * @v reg		Register block
+ * @ret rc		Return status code
+ */
+static int intel_disable_ring ( struct intel_nic *intel, unsigned int reg ) {
+	uint32_t dctl;
+	unsigned int i;
+
+	/* Disable ring */
+	writel ( 0, ( intel->regs + reg + INTEL_xDCTL ) );
+
+	/* Wait for disable to complete */
+	for ( i = 0 ; i < INTEL_DISABLE_MAX_WAIT_MS ; i++ ) {
+
+		/* Check if ring is disabled */
+		dctl = readl ( intel->regs + reg + INTEL_xDCTL );
+		if ( ! ( dctl & INTEL_xDCTL_ENABLE ) )
+			return 0;
+
+		/* Delay */
+		mdelay ( 1 );
+	}
+
+	DBGC ( intel, "INTEL %p ring %05x timed out waiting for disable "
+	       "(dctl %08x)\n", intel, reg, dctl );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Reset descriptor ring
+ *
+ * @v intel		Intel device
+ * @v reg		Register block
+ * @ret rc		Return status code
+ */
+void intel_reset_ring ( struct intel_nic *intel, unsigned int reg ) {
+
+	/* Disable ring.  Ignore errors and continue to reset the ring anyway */
+	intel_disable_ring ( intel, reg );
+
+	/* Clear ring length */
+	writel ( 0, ( intel->regs + reg + INTEL_xDLEN ) );
+
+	/* Clear ring address */
+	writel ( 0, ( intel->regs + reg + INTEL_xDBAH ) );
+	writel ( 0, ( intel->regs + reg + INTEL_xDBAL ) );
+
+	/* Reset head and tail pointers */
+	writel ( 0, ( intel->regs + reg + INTEL_xDH ) );
+	writel ( 0, ( intel->regs + reg + INTEL_xDT ) );
+}
+
+/**
  * Create descriptor ring
  *
  * @v intel		Intel device
@@ -489,12 +549,8 @@ int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
  */
 void intel_destroy_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 
-	/* Clear ring length */
-	writel ( 0, ( intel->regs + ring->reg + INTEL_xDLEN ) );
-
-	/* Clear ring address */
-	writel ( 0, ( intel->regs + ring->reg + INTEL_xDBAL ) );
-	writel ( 0, ( intel->regs + ring->reg + INTEL_xDBAH ) );
+	/* Reset ring */
+	intel_reset_ring ( intel, ring->reg );
 
 	/* Free descriptor ring */
 	free_dma ( ring->desc, ring->len );
@@ -579,9 +635,22 @@ void intel_empty_rx ( struct intel_nic *intel ) {
 static int intel_open ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
 	union intel_receive_address mac;
+	uint32_t fextnvm11;
 	uint32_t tctl;
 	uint32_t rctl;
 	int rc;
+
+	/* Set undocumented bit in FEXTNVM11 to work around an errata
+	 * in i219 devices that will otherwise cause a complete
+	 * datapath hang at the next device reset.
+	 */
+	if ( intel->flags & INTEL_RST_HANG ) {
+		DBGC ( intel, "INTEL %p WARNING: applying reset hang "
+		       "workaround\n", intel );
+		fextnvm11 = readl ( intel->regs + INTEL_FEXTNVM11 );
+		fextnvm11 |= INTEL_FEXTNVM11_WTF;
+		writel ( fextnvm11, intel->regs + INTEL_FEXTNVM11 );
+	}
 
 	/* Create transmit descriptor ring */
 	if ( ( rc = intel_create_ring ( intel, &intel->tx ) ) != 0 )
@@ -1056,7 +1125,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1518, "82576ns", "82576NS SerDes", 0 ),
 	PCI_ROM ( 0x8086, 0x1521, "i350", "I350", 0 ),
 	PCI_ROM ( 0x8086, 0x1522, "i350-f", "I350 Fiber", 0 ),
-	PCI_ROM ( 0x8086, 0x1523, "i350-b", "I350 Backplane", 0 ),
+	PCI_ROM ( 0x8086, 0x1523, "i350-b", "I350 Backplane", INTEL_NO_ASDE ),
 	PCI_ROM ( 0x8086, 0x1524, "i350-2", "I350", 0 ),
 	PCI_ROM ( 0x8086, 0x1525, "82567v-4", "82567V-4", 0 ),
 	PCI_ROM ( 0x8086, 0x1526, "82576-5", "82576", 0 ),
@@ -1067,12 +1136,29 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x153b, "i217v", "I217-V", 0 ),
 	PCI_ROM ( 0x8086, 0x1559, "i218v", "I218-V", 0),
 	PCI_ROM ( 0x8086, 0x155a, "i218lm", "I218-LM", 0),
+	PCI_ROM ( 0x8086, 0x156f, "i219lm", "I219-LM", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x1570, "i219v", "I219-V", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x157b, "i210-2", "I210", 0 ),
 	PCI_ROM ( 0x8086, 0x15a0, "i218lm-2", "I218-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x15a1, "i218v-2", "I218-V", 0 ),
 	PCI_ROM ( 0x8086, 0x15a2, "i218lm-3", "I218-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x15a3, "i218v-3", "I218-V", INTEL_NO_PHY_RST ),
-	PCI_ROM ( 0x8086, 0x15b8, "i219v-2", "I219-V (2)", 0 ),
+	PCI_ROM ( 0x8086, 0x15b7, "i219lm-2", "I219-LM (2)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15b8, "i219v-2", "I219-V (2)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15b9, "i219lm-3", "I219-LM (3)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15bb, "i219lm-7", "I219-LM (7)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15bc, "i219v-7", "I219-V (7)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15bd, "i219lm-6", "I219-LM (6)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15be, "i219v-6", "I219-V (6)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15d6, "i219v-5", "I219-V (5)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15d7, "i219lm-4", "I219-LM (4)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15d8, "i219v-4", "I219-V (4)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15df, "i219lm-8", "I219-LM (8)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15e0, "i219v-8", "I219-V (8)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15e1, "i219lm-9", "I219-LM (9)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15e2, "i219v-9", "I219-V (9)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15e3, "i219lm-5", "I219-LM (5)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x1f41, "i354", "I354", INTEL_NO_ASDE ),
 	PCI_ROM ( 0x8086, 0x294c, "82566dc-2", "82566DC-2", 0 ),
 	PCI_ROM ( 0x8086, 0x2e6e, "cemedia", "CE Media Processor", 0 ),
 };

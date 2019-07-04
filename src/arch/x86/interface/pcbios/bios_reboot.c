@@ -32,6 +32,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/reboot.h>
 #include <realmode.h>
 #include <bios.h>
+#include <ipxe/apm.h>
+#include <ipxe/acpipwr.h>
 
 /**
  * Reboot system
@@ -46,7 +48,27 @@ static void bios_reboot ( int warm ) {
 	put_real ( flag, BDA_SEG, BDA_REBOOT );
 
 	/* Jump to system reset vector */
-	__asm__ __volatile__ ( REAL_CODE ( "ljmp $0xf000, $0xfff0" ) );
+	__asm__ __volatile__ ( REAL_CODE ( "ljmp $0xf000, $0xfff0" ) : );
+}
+
+/**
+ * Power off system
+ *
+ * @ret rc		Return status code
+ */
+static int bios_poweroff ( void ) {
+	int rc;
+
+	/* Try APM */
+	if ( ( rc = apm_poweroff() ) != 0 )
+		DBG ( "APM power off failed: %s\n", strerror ( rc ) );
+
+	/* Try ACPI */
+	if ( ( rc = acpi_poweroff() ) != 0 )
+		DBG ( "ACPI power off failed: %s\n", strerror ( rc ) );
+
+	return rc;
 }
 
 PROVIDE_REBOOT ( pcbios, reboot, bios_reboot );
+PROVIDE_REBOOT ( pcbios, poweroff, bios_poweroff );

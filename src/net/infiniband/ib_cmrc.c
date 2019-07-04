@@ -423,23 +423,20 @@ int ib_cmrc_open ( struct interface *xfer, struct ib_device *ibdev,
 	}
 
 	/* Create completion queue */
-	cmrc->cq = ib_create_cq ( ibdev, IB_CMRC_NUM_CQES,
-				  &ib_cmrc_completion_ops );
-	if ( ! cmrc->cq ) {
-		DBGC ( cmrc, "CMRC %s %s could not create completion queue\n",
-		       ibdev->name, cmrc->name );
-		rc = -ENOMEM;
+	if ( ( rc = ib_create_cq ( ibdev, IB_CMRC_NUM_CQES,
+				   &ib_cmrc_completion_ops, &cmrc->cq ) ) != 0){
+		DBGC ( cmrc, "CMRC %s %s could not create completion queue: "
+		       "%s\n", ibdev->name, cmrc->name, strerror ( rc ) );
 		goto err_create_cq;
 	}
 
 	/* Create queue pair */
-	cmrc->qp = ib_create_qp ( ibdev, IB_QPT_RC, IB_CMRC_NUM_SEND_WQES,
-				  cmrc->cq, IB_CMRC_NUM_RECV_WQES, cmrc->cq,
-				  &ib_cmrc_queue_pair_ops, name );
-	if ( ! cmrc->qp ) {
-		DBGC ( cmrc, "CMRC %s %s could not create queue pair\n",
-		       ibdev->name, cmrc->name );
-		rc = -ENOMEM;
+	if ( ( rc = ib_create_qp ( ibdev, IB_QPT_RC, IB_CMRC_NUM_SEND_WQES,
+				   cmrc->cq, IB_CMRC_NUM_RECV_WQES, cmrc->cq,
+				   &ib_cmrc_queue_pair_ops, name,
+				   &cmrc->qp ) ) != 0 ) {
+		DBGC ( cmrc, "CMRC %s %s could not create queue pair: %s\n",
+		       ibdev->name, cmrc->name, strerror ( rc ) );
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( cmrc->qp, cmrc );

@@ -126,6 +126,7 @@ static void rbg_shutdown_fn ( int booting __unused ) {
 
 /** RBG startup table entry */
 struct startup_fn startup_rbg __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "rbg",
 	.startup = rbg_startup_fn,
 	.shutdown = rbg_shutdown_fn,
 };

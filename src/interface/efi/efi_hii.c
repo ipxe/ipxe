@@ -117,6 +117,7 @@ static void * efi_ifr_op ( struct efi_ifr_builder *ifr, unsigned int opcode,
 	ifr->ops_len = new_ops_len;
 
 	/* Fill in opcode header */
+	memset ( op, 0, len );
 	op->OpCode = opcode;
 	op->Length = len;
 

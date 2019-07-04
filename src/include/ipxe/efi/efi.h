@@ -26,6 +26,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* EFI headers rudely redefine NULL */
 #undef NULL
 
+/* EFI headers redefine ARRAY_SIZE */
+#undef ARRAY_SIZE
+
 /* EFI headers expect ICC to define __GNUC__ */
 #if defined ( __ICC ) && ! defined ( __GNUC__ )
 #define __GNUC__ 1
@@ -154,9 +157,12 @@ struct efi_config_table {
 #define EEFI( efirc ) EPLATFORM ( EINFO_EPLATFORM, efirc )
 
 extern EFI_GUID efi_absolute_pointer_protocol_guid;
+extern EFI_GUID efi_acpi_table_protocol_guid;
+extern EFI_GUID efi_apple_net_boot_protocol_guid;
 extern EFI_GUID efi_arp_protocol_guid;
 extern EFI_GUID efi_arp_service_binding_protocol_guid;
 extern EFI_GUID efi_block_io_protocol_guid;
+extern EFI_GUID efi_block_io2_protocol_guid;
 extern EFI_GUID efi_bus_specific_driver_override_protocol_guid;
 extern EFI_GUID efi_component_name_protocol_guid;
 extern EFI_GUID efi_component_name2_protocol_guid;
@@ -212,6 +218,7 @@ extern EFI_HANDLE efi_image_handle;
 extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 extern EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
 extern EFI_SYSTEM_TABLE *efi_systab;
+extern int efi_shutdown_in_progress;
 
 extern const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid );
 extern const __attribute__ (( pure )) char *

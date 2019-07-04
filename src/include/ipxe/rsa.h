@@ -77,6 +77,9 @@ struct rsa_context {
 	void *tmp;
 };
 
+/** RSA context size */
+#define RSA_CTX_SIZE sizeof ( struct rsa_context )
+
 extern struct pubkey_algorithm rsa_algorithm;
 
 #endif /* _IPXE_RSA_H */

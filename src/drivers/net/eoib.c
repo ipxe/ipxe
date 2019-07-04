@@ -538,22 +538,19 @@ static int eoib_open ( struct net_device *netdev ) {
 	}
 
 	/* Allocate completion queue */
-	eoib->cq = ib_create_cq ( ibdev, EOIB_NUM_CQES, &eoib_cq_op );
-	if ( ! eoib->cq ) {
-		DBGC ( eoib, "EoIB %s could not allocate completion queue\n",
-		       eoib->name );
-		rc = -ENOMEM;
+	if ( ( rc = ib_create_cq ( ibdev, EOIB_NUM_CQES, &eoib_cq_op,
+				   &eoib->cq ) ) != 0 ) {
+		DBGC ( eoib, "EoIB %s could not create completion queue: %s\n",
+		       eoib->name, strerror ( rc ) );
 		goto err_create_cq;
 	}
 
 	/* Allocate queue pair */
-	eoib->qp = ib_create_qp ( ibdev, IB_QPT_UD, EOIB_NUM_SEND_WQES,
+	if ( ( rc = ib_create_qp ( ibdev, IB_QPT_UD, EOIB_NUM_SEND_WQES,
 				   eoib->cq, EOIB_NUM_RECV_WQES, eoib->cq,
-				  &eoib_qp_op, netdev->name );
-	if ( ! eoib->qp ) {
-		DBGC ( eoib, "EoIB %s could not allocate queue pair\n",
-		       eoib->name );
-		rc = -ENOMEM;
+				   &eoib_qp_op, netdev->name, &eoib->qp ) )!=0){
+		DBGC ( eoib, "EoIB %s could not create queue pair: %s\n",
+		       eoib->name, strerror ( rc ) );
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( eoib->qp, eoib );
@@ -870,8 +867,9 @@ static void eoib_duplicate ( struct eoib_device *eoib,
 
  err_post_send:
  err_path:
+	list_del ( &copy->list );
  err_alloc:
-	netdev_tx_complete_err ( netdev, copy, rc );
+	netdev_tx_err ( netdev, copy, rc );
 }
 
 /**

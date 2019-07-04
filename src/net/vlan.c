@@ -199,7 +199,8 @@ static void vlan_sync ( struct net_device *netdev ) {
  * @v tag		VLAN tag
  * @ret netdev		VLAN device, if any
  */
-struct net_device * vlan_find ( struct net_device *trunk, unsigned int tag ) {
+static struct net_device * vlan_find ( struct net_device *trunk,
+				       unsigned int tag ) {
 	struct net_device *netdev;
 	struct vlan_device *vlan;
 
@@ -506,3 +507,47 @@ struct net_driver vlan_driver __net_driver = {
 	.notify = vlan_notify,
 	.remove = vlan_remove,
 };
+
+/**
+ * Add VLAN tag-stripped packet to receive queue
+ *
+ * @v netdev		Network device
+ * @v tag		VLAN tag, or zero
+ * @v iobuf		I/O buffer
+ */
+void vlan_netdev_rx ( struct net_device *netdev, unsigned int tag,
+		      struct io_buffer *iobuf ) {
+	struct net_device *vlan;
+
+	/* Identify VLAN device, if applicable */
+	if ( tag ) {
+		if ( ( vlan = vlan_find ( netdev, tag ) ) == NULL ) {
+			netdev_rx_err ( netdev, iobuf, -ENODEV );
+			return;
+		}
+		netdev = vlan;
+	}
+
+	/* Hand off to network device */
+	netdev_rx ( netdev, iobuf );
+}
+
+/**
+ * Discard received VLAN tag-stripped packet
+ *
+ * @v netdev		Network device
+ * @v tag		VLAN tag, or zero
+ * @v iobuf		I/O buffer, or NULL
+ * @v rc		Packet status code
+ */
+void vlan_netdev_rx_err ( struct net_device *netdev, unsigned int tag,
+			  struct io_buffer *iobuf, int rc ) {
+	struct net_device *vlan;
+
+	/* Identify VLAN device, if applicable */
+	if ( tag && ( ( vlan = vlan_find ( netdev, tag ) ) != NULL ) )
+		netdev = vlan;
+
+	/* Hand off to network device */
+	netdev_rx_err ( netdev, iobuf, rc );
+}

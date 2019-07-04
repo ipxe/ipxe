@@ -124,6 +124,11 @@ struct mlx_link_speed {
 	/* -------------- */
 	mlx_uint32 ib_proto_oper	:16;
 	mlx_uint32 ib_link_width_oper	:16;
+	/* -------------- */
+	mlx_uint32 reserved7	:32;
+	/* -------------- */
+	mlx_uint32 eth_proto_lp_advertise	:32;
+	mlx_uint32 reserved[3];
 };
 
 mlx_status

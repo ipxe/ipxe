@@ -270,6 +270,10 @@ PROVIDE_SYMBOL ( OBJECT_SYMBOL );
 #define DBGLVL_MAX 0
 #endif
 
+#ifndef DBGLVL_DFLT
+#define DBGLVL_DFLT DBGLVL_MAX
+#endif
+
 #ifndef ASSEMBLY
 
 /** printf() for debugging */
@@ -285,14 +289,23 @@ extern void dbg_pause ( void );
 extern void dbg_more ( void );
 
 /* Allow for selective disabling of enabled debug levels */
+#define __debug_disable( object ) _C2 ( __debug_disable_, object )
+char __debug_disable(OBJECT) = ( DBGLVL_MAX & ~DBGLVL_DFLT );
+#define DBG_DISABLE_OBJECT( object, level ) do {		\
+	extern char __debug_disable(object);			\
+	__debug_disable(object) |= (level);			\
+	} while ( 0 )
+#define DBG_ENABLE_OBJECT( object, level ) do {			\
+	extern char __debug_disable(object);			\
+	__debug_disable(object) &= ~(level);			\
+	} while ( 0 )
 #if DBGLVL_MAX
-int __debug_disable;
-#define DBGLVL ( DBGLVL_MAX & ~__debug_disable )
+#define DBGLVL ( DBGLVL_MAX & ~__debug_disable(OBJECT) )
 #define DBG_DISABLE( level ) do {				\
-	__debug_disable |= (level);				\
+	__debug_disable(OBJECT) |= ( (level) & DBGLVL_MAX );	\
 	} while ( 0 )
 #define DBG_ENABLE( level ) do {				\
-	__debug_disable &= ~(level);				\
+	__debug_disable(OBJECT) &= ~( (level) & DBGLVL_MAX );	\
 	} while ( 0 )
 #else
 #define DBGLVL 0
@@ -390,7 +403,7 @@ int __debug_disable;
  *
  * @v level		Debug level
  */
-#define DBG_PAUSE_IF( level ) do {				\
+#define DBG_PAUSE_IF( level, ... ) do {				\
 		if ( DBG_ ## level ) {				\
 			dbg_pause();				\
 		}						\
@@ -401,7 +414,7 @@ int __debug_disable;
  *
  * @v level		Debug level
  */
-#define DBG_MORE_IF( level ) do {				\
+#define DBG_MORE_IF( level, ... ) do {				\
 		if ( DBG_ ## level ) {				\
 			dbg_more();				\
 		}						\
@@ -640,6 +653,13 @@ int __debug_disable;
  */
 #ifndef ASSEMBLY
 #define barrier() __asm__ __volatile__ ( "" : : : "memory" )
+#endif /* ASSEMBLY */
+
+/**
+ * Array size
+ */
+#ifndef ASSEMBLY
+#define ARRAY_SIZE(array) ( sizeof (array) / sizeof ( (array)[0] ) )
 #endif /* ASSEMBLY */
 
 /**

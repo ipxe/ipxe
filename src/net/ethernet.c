@@ -269,6 +269,7 @@ struct net_device * alloc_etherdev ( size_t priv_size ) {
 		netdev->ll_protocol = &ethernet_protocol;
 		netdev->ll_broadcast = eth_broadcast;
 		netdev->max_pkt_len = ETH_FRAME_LEN;
+		netdev->mtu = ETH_MAX_MTU;
 	}
 	return netdev;
 }

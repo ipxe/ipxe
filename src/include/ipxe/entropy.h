@@ -52,6 +52,25 @@ typedef uint8_t noise_sample_t;
 /** An entropy sample */
 typedef uint8_t entropy_sample_t;
 
+/** An amount of min-entropy
+ *
+ * Expressed as a fixed-point quantity in order to avoid floating
+ * point calculations.
+ */
+typedef unsigned int min_entropy_t;
+
+/** Fixed-point scale for min-entropy amounts */
+#define MIN_ENTROPY_SCALE ( 1 << 16 )
+
+/**
+ * Construct a min-entropy fixed-point value
+ *
+ * @v bits		min-entropy in bits
+ * @ret min_entropy	min-entropy as a fixed-point value
+ */
+#define MIN_ENTROPY( bits ) \
+	( ( min_entropy_t ) ( (bits) * MIN_ENTROPY_SCALE ) )
+
 /* Include all architecture-independent entropy API headers */
 #include <ipxe/null_entropy.h>
 #include <ipxe/efi/efi_entropy.h>
@@ -87,7 +106,7 @@ void entropy_disable ( void );
  *
  * This must be a compile-time constant.
  */
-double min_entropy_per_sample ( void );
+min_entropy_t min_entropy_per_sample ( void );
 
 /**
  * Get noise sample
@@ -142,7 +161,7 @@ get_entropy_input ( unsigned int min_entropy_bits, void *data, size_t min_len,
 
 	/* Sanity checks */
 	linker_assert ( ( min_entropy_per_sample() <=
-			  ( 8 * sizeof ( noise_sample_t ) ) ),
+			  MIN_ENTROPY ( 8 * sizeof ( noise_sample_t ) ) ),
 			min_entropy_per_sample_is_impossibly_high );
 	linker_assert ( ( min_entropy_bits <= ( 8 * max_len ) ),
 			entropy_buffer_too_small );
@@ -151,7 +170,8 @@ get_entropy_input ( unsigned int min_entropy_bits, void *data, size_t min_len,
 	min_entropy_bits = ( ( min_entropy_bits + 7 ) & ~7 );
 
 	/* Calculate number of samples required to contain sufficient entropy */
-	min_samples = ( ( min_entropy_bits * 1.0 ) / min_entropy_per_sample() );
+	min_samples = ( MIN_ENTROPY ( min_entropy_bits ) /
+			min_entropy_per_sample() );
 
 	/* Round up to a whole number of samples.  We don't have the
 	 * ceil() function available, so do the rounding by hand.

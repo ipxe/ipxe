@@ -16,8 +16,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 struct skeleton_nic {
 	/** Registers */
 	void *regs;
-	/** MII interface */
-	struct mii_interface mii;
 };
 
 #endif /* _SKELETON_H */

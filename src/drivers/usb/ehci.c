@@ -2098,5 +2098,6 @@ static void ehci_shutdown ( int booting ) {
 
 /** Startup/shutdown function */
 struct startup_fn ehci_startup __startup_fn ( STARTUP_LATE ) = {
+	.name = "ehci",
 	.shutdown = ehci_shutdown,
 };

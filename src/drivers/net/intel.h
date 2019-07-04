@@ -185,12 +185,19 @@ struct intel_descriptor {
 #define INTEL_xDCTL 0x28
 #define INTEL_xDCTL_ENABLE	0x02000000UL	/**< Queue enable */
 
+/** Maximum time to wait for queue disable, in milliseconds */
+#define INTEL_DISABLE_MAX_WAIT_MS 100
+
 /** Receive Address Low */
 #define INTEL_RAL0 0x05400UL
 
 /** Receive Address High */
 #define INTEL_RAH0 0x05404UL
 #define INTEL_RAH0_AV		0x80000000UL	/**< Address valid */
+
+/** Future Extended NVM register 11 */
+#define INTEL_FEXTNVM11 0x05bbcUL
+#define INTEL_FEXTNVM11_WTF	0x00002000UL	/**< Don't ask */
 
 /** Receive address */
 union intel_receive_address {
@@ -303,9 +310,14 @@ enum intel_flags {
 	INTEL_VMWARE = 0x0002,
 	/** PHY reset is broken */
 	INTEL_NO_PHY_RST = 0x0004,
-    /** no CTRL.ASDE bit */
-    INTEL_NO_CTRL_ASDE = 0x0005,
+	/** ASDE is broken */
+	INTEL_NO_ASDE = 0x0008,
+	/** Reset may cause a complete device hang */
+	INTEL_RST_HANG = 0x0010,
 };
+
+/** The i219 has a seriously broken reset mechanism */
+#define INTEL_I219 ( INTEL_NO_PHY_RST | INTEL_RST_HANG )
 
 /**
  * Dump diagnostic information
@@ -332,6 +344,7 @@ extern void intel_describe_tx_adv ( struct intel_descriptor *tx,
 				    physaddr_t addr, size_t len );
 extern void intel_describe_rx ( struct intel_descriptor *rx,
 				physaddr_t addr, size_t len );
+extern void intel_reset_ring ( struct intel_nic *intel, unsigned int reg );
 extern int intel_create_ring ( struct intel_nic *intel,
 			       struct intel_ring *ring );
 extern void intel_destroy_ring ( struct intel_nic *intel,

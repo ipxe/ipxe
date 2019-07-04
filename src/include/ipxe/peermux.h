@@ -41,6 +41,16 @@ struct peerdist_multiplexed_block {
 	struct interface xfer;
 };
 
+/** PeerDist statistics */
+struct peerdist_statistics {
+	/** Maximum observed number of peers */
+	unsigned int peers;
+	/** Number of blocks downloaded in total */
+	unsigned int total;
+	/** Number of blocks downloaded from peers */
+	unsigned int local;
+};
+
 /** A PeerDist download multiplexer */
 struct peerdist_multiplexer {
 	/** Reference count */
@@ -65,6 +75,9 @@ struct peerdist_multiplexer {
 	struct list_head idle;
 	/** Block downloads */
 	struct peerdist_multiplexed_block block[PEERMUX_MAX_BLOCKS];
+
+	/** Statistics */
+	struct peerdist_statistics stats;
 };
 
 extern int peermux_filter ( struct interface *xfer, struct interface *info,

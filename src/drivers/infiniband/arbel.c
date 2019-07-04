@@ -1972,6 +1972,7 @@ static int arbel_map_vpm ( struct arbel *arbel,
 	assert ( ( va & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( pa & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( len & ( ARBEL_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( len != 0 );
 
 	/* Calculate starting points */
 	start = pa;
@@ -1994,7 +1995,7 @@ static int arbel_map_vpm ( struct arbel *arbel,
 		if ( ( low - size ) >= start ) {
 			low -= size;
 			pa = low;
-		} else if ( ( high + size ) <= end ) {
+		} else if ( high <= ( end - size ) ) {
 			pa = high;
 			high += size;
 		} else {

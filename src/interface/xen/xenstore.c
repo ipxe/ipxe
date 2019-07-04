@@ -538,8 +538,7 @@ void xenstore_dump ( struct xen_hypervisor *xen, const char *key ) {
 		      child += ( strlen ( child ) + 1 /* NUL */ ) ) {
 
 			/* Construct child key */
-			asprintf ( &child_key, "%s/%s", key, child );
-			if ( ! child_key ) {
+			if ( asprintf ( &child_key, "%s/%s", key, child ) < 0 ){
 				DBGC ( xen, "XENSTORE could not allocate child "
 				       "key \"%s/%s\"\n", key, child );
 				rc = -ENOMEM;

@@ -22,14 +22,15 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include <byteswap.h>
-#include <errno.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <ipxe/io.h>
 #include <ipxe/pci.h>
 #include <ipxe/pcibackup.h>
+#include <byteswap.h>
+#include <errno.h>
+#include <ipxe/io.h>
+#include <stdio.h>
+#include <unistd.h>
 #include "CIB_PRM.h"
+#include "mlx_utils/include/public/mlx_utils.h"
 
 #define GOLAN_PCI_CONFIG_BAR_SIZE	0x100000//HERMON_PCI_CONFIG_BAR_SIZE //TODO: What is the BAR size?
 
@@ -74,6 +75,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define GET_INBOX(golan, idx)		(&(((struct mbox *)(golan->mboxes.inbox))[idx]))
 #define GET_OUTBOX(golan, idx)		(&(((struct mbox *)(golan->mboxes.outbox))[idx]))
 
+#define GOLAN_MBOX_IN( cmd_ptr, in_ptr ) ( {				  \
+	union {								  \
+		__be32 raw[4];						  \
+		typeof ( *(in_ptr) ) cooked;				  \
+	} *u = container_of ( &(cmd_ptr)->in[0], typeof ( *u ), raw[0] ); \
+	&u->cooked; } )
+
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
 /* Fw status fields */
@@ -103,6 +111,18 @@ struct golan_uar {
     unsigned long	phys;
 };
 
+
+struct golan_firmware_area {
+	/* length of area in pages */
+	uint32_t npages;
+	/** Firmware area in external memory
+	 *
+	 * This is allocated when first needed, and freed only on
+	 * final teardown, in order to avoid memory map changes at
+	 * runtime.
+	 */
+	userptr_t area;
+};
 /* Queue Pair */
 #define GOLAN_SEND_WQE_BB_SIZE			64
 #define GOLAN_SEND_UD_WQE_SIZE			sizeof(struct golan_send_wqe_ud)
@@ -196,6 +216,8 @@ struct golan_completion_queue {
 #define GOLAN_EQE_SIZE				sizeof(struct golan_eqe)
 #define GOLAN_NUM_EQES 				8
 #define GOLAN_EQ_DOORBELL_OFFSET		0x40
+#define DB_BUFFER0_EVEN_OFFSET	0x800
+#define DB_BUFFER0_ODD_OFFSET	0x900
 
 #define GOLAN_EQ_MAP_ALL_EVENTS					\
 	((1 << GOLAN_EVENT_TYPE_PATH_MIG         	)|	\
@@ -312,8 +334,11 @@ struct golan {
 	uint32_t			pdn;
 	u32				mkey;
 	u32				flags;
+	mlx_utils		*utils;
 
 	struct golan_port		ports[GOLAN_MAX_PORTS];
+#define GOLAN_FW_AREAS_NUM 2
+	struct golan_firmware_area fw_areas[GOLAN_FW_AREAS_NUM];
 };
 
 #endif /* _GOLAN_H_*/

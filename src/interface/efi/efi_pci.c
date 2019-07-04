@@ -61,58 +61,158 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  ******************************************************************************
  */
 
-/** PCI root bridge I/O protocol */
-static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *efipci;
-EFI_REQUEST_PROTOCOL ( EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL, &efipci );
+/**
+ * Locate EFI PCI root bridge I/O protocol
+ *
+ * @v pci		PCI device
+ * @ret handle		EFI PCI root bridge handle
+ * @ret root		EFI PCI root bridge I/O protocol, or NULL if not found
+ * @ret rc		Return status code
+ */
+static int efipci_root ( struct pci_device *pci, EFI_HANDLE *handle,
+			 EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL **root ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE *handles;
+	UINTN num_handles;
+	union {
+		void *interface;
+		EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
+	} u;
+	EFI_STATUS efirc;
+	UINTN i;
+	int rc;
 
+	/* Enumerate all handles */
+	if ( ( efirc = bs->LocateHandleBuffer ( ByProtocol,
+			&efi_pci_root_bridge_io_protocol_guid,
+			NULL, &num_handles, &handles ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot locate root bridges: "
+		       "%s\n", PCI_ARGS ( pci ), strerror ( rc ) );
+		goto err_locate;
+	}
+
+	/* Look for matching root bridge I/O protocol */
+	for ( i = 0 ; i < num_handles ; i++ ) {
+		*handle = handles[i];
+		if ( ( efirc = bs->OpenProtocol ( *handle,
+				&efi_pci_root_bridge_io_protocol_guid,
+				&u.interface, efi_image_handle, *handle,
+				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( pci, "EFIPCI " PCI_FMT " cannot open %s: %s\n",
+			       PCI_ARGS ( pci ), efi_handle_name ( *handle ),
+			       strerror ( rc ) );
+			continue;
+		}
+		if ( u.root->SegmentNumber == PCI_SEG ( pci->busdevfn ) ) {
+			*root = u.root;
+			bs->FreePool ( handles );
+			return 0;
+		}
+		bs->CloseProtocol ( *handle,
+				    &efi_pci_root_bridge_io_protocol_guid,
+				    efi_image_handle, *handle );
+	}
+	DBGC ( pci, "EFIPCI " PCI_FMT " found no root bridge\n",
+	       PCI_ARGS ( pci ) );
+	rc = -ENOENT;
+
+	bs->FreePool ( handles );
+ err_locate:
+	return rc;
+}
+
+/**
+ * Calculate EFI PCI configuration space address
+ *
+ * @v pci		PCI device
+ * @v location		Encoded offset and width
+ * @ret address		EFI PCI address
+ */
 static unsigned long efipci_address ( struct pci_device *pci,
 				      unsigned long location ) {
+
 	return EFI_PCI_ADDRESS ( PCI_BUS ( pci->busdevfn ),
 				 PCI_SLOT ( pci->busdevfn ),
 				 PCI_FUNC ( pci->busdevfn ),
 				 EFIPCI_OFFSET ( location ) );
 }
 
+/**
+ * Read from PCI configuration space
+ *
+ * @v pci		PCI device
+ * @v location		Encoded offset and width
+ * @ret value		Value
+ * @ret rc		Return status code
+ */
 int efipci_read ( struct pci_device *pci, unsigned long location,
 		  void *value ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
+	EFI_HANDLE handle;
 	EFI_STATUS efirc;
 	int rc;
 
-	if ( ! efipci )
-		return -ENOTSUP;
+	/* Identify root bridge */
+	if ( ( rc = efipci_root ( pci, &handle, &root ) ) != 0 )
+		goto err_root;
 
-	if ( ( efirc = efipci->Pci.Read ( efipci, EFIPCI_WIDTH ( location ),
-					  efipci_address ( pci, location ), 1,
-					  value ) ) != 0 ) {
+	/* Read from configuration space */
+	if ( ( efirc = root->Pci.Read ( root, EFIPCI_WIDTH ( location ),
+					efipci_address ( pci, location ), 1,
+					value ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBG ( "EFIPCI config read from " PCI_FMT " offset %02lx "
-		      "failed: %s\n", PCI_ARGS ( pci ),
-		      EFIPCI_OFFSET ( location ), strerror ( rc ) );
-		return -EIO;
+		DBGC ( pci, "EFIPCI " PCI_FMT " config read from offset %02lx "
+		       "failed: %s\n", PCI_ARGS ( pci ),
+		       EFIPCI_OFFSET ( location ), strerror ( rc ) );
+		goto err_read;
 	}
 
-	return 0;
+ err_read:
+	bs->CloseProtocol ( handle, &efi_pci_root_bridge_io_protocol_guid,
+			    efi_image_handle, handle );
+ err_root:
+	return rc;
 }
 
+/**
+ * Write to PCI configuration space
+ *
+ * @v pci		PCI device
+ * @v location		Encoded offset and width
+ * @v value		Value
+ * @ret rc		Return status code
+ */
 int efipci_write ( struct pci_device *pci, unsigned long location,
 		   unsigned long value ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
+	EFI_HANDLE handle;
 	EFI_STATUS efirc;
 	int rc;
 
-	if ( ! efipci )
-		return -ENOTSUP;
+	/* Identify root bridge */
+	if ( ( rc = efipci_root ( pci, &handle, &root ) ) != 0 )
+		goto err_root;
 
-	if ( ( efirc = efipci->Pci.Write ( efipci, EFIPCI_WIDTH ( location ),
-					   efipci_address ( pci, location ), 1,
-					   &value ) ) != 0 ) {
+	/* Read from configuration space */
+	if ( ( efirc = root->Pci.Write ( root, EFIPCI_WIDTH ( location ),
+					 efipci_address ( pci, location ), 1,
+					 &value ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBG ( "EFIPCI config write to " PCI_FMT " offset %02lx "
-		      "failed: %s\n", PCI_ARGS ( pci ),
-		      EFIPCI_OFFSET ( location ), strerror ( rc ) );
-		return -EIO;
+		DBGC ( pci, "EFIPCI " PCI_FMT " config write to offset %02lx "
+		       "failed: %s\n", PCI_ARGS ( pci ),
+		       EFIPCI_OFFSET ( location ), strerror ( rc ) );
+		goto err_write;
 	}
 
-	return 0;
+ err_write:
+	bs->CloseProtocol ( handle, &efi_pci_root_bridge_io_protocol_guid,
+			    efi_image_handle, handle );
+ err_root:
+	return rc;
 }
 
 PROVIDE_PCIAPI_INLINE ( efi, pci_num_bus );
@@ -146,6 +246,7 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 		void *interface;
 	} pci_io;
 	UINTN pci_segment, pci_bus, pci_dev, pci_fn;
+	unsigned int busdevfn;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -168,10 +269,10 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_get_location;
 	}
-	DBGC2 ( device, "EFIPCI %s is PCI %04lx:%02lx:%02lx.%lx\n",
-		efi_handle_name ( device ), ( ( unsigned long ) pci_segment ),
-		( ( unsigned long ) pci_bus ), ( ( unsigned long ) pci_dev ),
-		( ( unsigned long ) pci_fn ) );
+	busdevfn = PCI_BUSDEVFN ( pci_segment, pci_bus, pci_dev, pci_fn );
+	pci_init ( pci, busdevfn );
+	DBGCP ( device, "EFIPCI " PCI_FMT " is %s\n",
+		PCI_ARGS ( pci ), efi_handle_name ( device ) );
 
 	/* Try to enable I/O cycles, memory cycles, and bus mastering.
 	 * Some platforms will 'helpfully' report errors if these bits
@@ -190,10 +291,10 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 				    EFI_PCI_IO_ATTRIBUTE_BUS_MASTER, NULL );
 
 	/* Populate PCI device */
-	pci_init ( pci, PCI_BUSDEVFN ( pci_bus, pci_dev, pci_fn ) );
 	if ( ( rc = pci_read_config ( pci ) ) != 0 ) {
-		DBGC ( device, "EFIPCI %s cannot read PCI configuration: %s\n",
-		       efi_handle_name ( device ), strerror ( rc ) );
+		DBGC ( device, "EFIPCI " PCI_FMT " cannot read PCI "
+		       "configuration: %s\n",
+		       PCI_ARGS ( pci ), strerror ( rc ) );
 		goto err_pci_read_config;
 	}
 
@@ -263,12 +364,14 @@ static int efipci_supported ( EFI_HANDLE device ) {
 
 	/* Look for a driver */
 	if ( ( rc = pci_find_driver ( &pci ) ) != 0 ) {
-		DBGCP ( device, "EFIPCI %s has no driver\n",
-			efi_handle_name ( device ) );
+		DBGC ( device, "EFIPCI " PCI_FMT " (%04x:%04x class %06x) "
+		       "has no driver\n", PCI_ARGS ( &pci ), pci.vendor,
+		       pci.device, pci.class );
 		return rc;
 	}
-	DBGC ( device, "EFIPCI %s has driver \"%s\"\n",
-	       efi_handle_name ( device ), pci.id->name );
+	DBGC ( device, "EFIPCI " PCI_FMT " (%04x:%04x class %06x) has driver "
+	       "\"%s\"\n", PCI_ARGS ( &pci ), pci.vendor, pci.device,
+	       pci.class, pci.id->name );
 
 	return 0;
 }
@@ -303,8 +406,8 @@ static int efipci_start ( struct efi_device *efidev ) {
 
 	/* Find driver */
 	if ( ( rc = pci_find_driver ( pci ) ) != 0 ) {
-		DBGC ( device, "EFIPCI %s has no driver\n",
-		       efi_handle_name ( device ) );
+		DBGC ( device, "EFIPCI " PCI_FMT " has no driver\n",
+		       PCI_ARGS ( pci ) );
 		goto err_find_driver;
 	}
 
@@ -314,13 +417,13 @@ static int efipci_start ( struct efi_device *efidev ) {
 
 	/* Probe driver */
 	if ( ( rc = pci_probe ( pci ) ) != 0 ) {
-		DBGC ( device, "EFIPCI %s could not probe driver \"%s\": %s\n",
-		       efi_handle_name ( device ), pci->id->name,
+		DBGC ( device, "EFIPCI " PCI_FMT " could not probe driver "
+		       "\"%s\": %s\n", PCI_ARGS ( pci ), pci->id->name,
 		       strerror ( rc ) );
 		goto err_probe;
 	}
-	DBGC ( device, "EFIPCI %s using driver \"%s\"\n",
-	       efi_handle_name ( device ), pci->id->name );
+	DBGC ( device, "EFIPCI " PCI_FMT " using driver \"%s\"\n",
+	       PCI_ARGS ( pci ), pci->id->name );
 
 	efidev_set_drvdata ( efidev, pci );
 	return 0;

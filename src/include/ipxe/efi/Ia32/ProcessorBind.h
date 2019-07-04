@@ -81,7 +81,7 @@ FILE_LICENCE ( BSD3 );
 #pragma warning ( disable : 4057 )
 
 //
-// ASSERT(FALSE) or while (TRUE) are legal constructes so supress this warning
+// ASSERT(FALSE) or while (TRUE) are legal constructs so suppress this warning
 //
 #pragma warning ( disable : 4127 )
 
@@ -121,7 +121,7 @@ FILE_LICENCE ( BSD3 );
 #if defined(_MSC_EXTENSIONS)
 
   //
-  // use Microsoft C complier dependent integer width types
+  // use Microsoft C compiler dependent integer width types
   //
 
   ///
@@ -258,6 +258,12 @@ typedef INT32   INTN;
 /// The stack alignment required for IA-32.
 ///
 #define CPU_STACK_ALIGNMENT   sizeof(UINTN)
+
+///
+/// Page allocation granularity for IA-32.
+///
+#define DEFAULT_PAGE_ALLOCATION_GRANULARITY   (0x1000)
+#define RUNTIME_PAGE_ALLOCATION_GRANULARITY   (0x1000)
 
 //
 // Modifier to ensure that all protocol member functions and EFI intrinsics

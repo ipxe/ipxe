@@ -42,8 +42,8 @@ extern char x86_tcpip_loop_end[];
  * @v len		Length of data buffer
  * @ret cksum		Updated checksum, in network byte order
  */
-uint16_t x86_tcpip_continue_chksum ( uint16_t partial,
-				     const void *data, size_t len ) {
+uint16_t tcpip_continue_chksum ( uint16_t partial, const void *data,
+				 size_t len ) {
 	unsigned long sum = ( ( ~partial ) & 0xffff );
 	unsigned long initial_word_count;
 	unsigned long loop_count;

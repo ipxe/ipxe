@@ -72,7 +72,7 @@ struct device_description {
 /** A hardware device */
 struct device {
 	/** Name */
-	char name[32];
+	char name[40];
 	/** Driver name */
 	const char *driver_name;
 	/** Device description */

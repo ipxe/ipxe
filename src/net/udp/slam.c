@@ -266,7 +266,8 @@ static int slam_tx_nack ( struct slam_request *slam ) {
 	if ( ! iobuf ) {
 		DBGC ( slam, "SLAM %p could not allocate I/O buffer\n",
 		       slam );
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto err_alloc;
 	}
 
 	/* Construct NACK.  We always request only a single packet;
@@ -294,14 +295,19 @@ static int slam_tx_nack ( struct slam_request *slam ) {
 		       "0-%ld\n", slam, ( num_blocks - 1 ) );
 	}
 	if ( ( rc = slam_put_value ( slam, iobuf, first_block ) ) != 0 )
-		return rc;
+		goto err_put_value;
 	if ( ( rc = slam_put_value ( slam, iobuf, num_blocks ) ) != 0 )
-		return rc;
+		goto err_put_value;
 	nul = iob_put ( iobuf, 1 );
 	*nul = 0;
 
 	/* Transmit packet */
-	return xfer_deliver_iob ( &slam->socket, iobuf );
+	return xfer_deliver_iob ( &slam->socket, iob_disown ( iobuf ) );
+
+ err_put_value:
+	free_iob ( iobuf );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -394,12 +400,16 @@ static int slam_pull_value ( struct slam_request *slam,
 		return -EINVAL;
 	}
 
-	/* Read value */
+	/* Strip value */
 	iob_pull ( iobuf, len );
-	*value = ( *data & 0x1f );
-	while ( --len ) {
-		*value <<= 8;
-		*value |= *(++data);
+
+	/* Read value, if applicable */
+	if ( value ) {
+		*value = ( *data & 0x1f );
+		while ( --len ) {
+			*value <<= 8;
+			*value |= *(++data);
+		}
 	}
 
 	return 0;

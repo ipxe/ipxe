@@ -190,6 +190,12 @@ struct eth_slow_lacp_entity_tlv {
  */
 #define LACP_STATE_EXPIRED 0x80
 
+/** LACP fast interval (1 second) */
+#define LACP_INTERVAL_FAST 1
+
+/** LACP slow interval (30 seconds) */
+#define LACP_INTERVAL_SLOW 30
+
 /** LACP collector TLV */
 struct eth_slow_lacp_collector_tlv {
 	/** TLV header */

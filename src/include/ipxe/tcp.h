@@ -26,7 +26,7 @@ struct tcp_header {
 	uint16_t win;		/* Advertised window */
 	uint16_t csum;		/* Checksum */
 	uint16_t urg;		/* Urgent pointer */
-};
+} __attribute__ (( packed ));
 
 /** @defgroup tcpopts TCP options
  * @{
@@ -377,6 +377,14 @@ struct tcp_options {
  * Currently set to 2 minutes, as per RFC 793.
  */
 #define TCP_MSL ( 2 * 60 * TICKS_PER_SEC )
+
+/**
+ * TCP keepalive period
+ *
+ * We send keepalive ACKs after this period of inactivity has elapsed
+ * on an established connection.
+ */
+#define TCP_KEEPALIVE_DELAY ( 15 * TICKS_PER_SEC )
 
 /**
  * TCP maximum header length

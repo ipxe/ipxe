@@ -27,14 +27,18 @@ load_image:
 	popw	%es
 	popal
 	
-1:	/* Read to end of current track */
+1:	/* Read to end of current track (or end of image) */
 	movb	%cl, %al
 	negb	%al
 	addb	max_sector, %al
 	incb	%al
 	andb	$0x3f, %al
 	movzbl	%al, %eax
-	call	*read_sectors
+	movl	load_length, %ebx
+	cmpl	%eax, %ebx
+	ja	2f
+	movl	%ebx, %eax
+2:	call	*read_sectors
 	jc	load_failed
 	
 	/* Update %es */
@@ -53,12 +57,12 @@ load_image:
 	orb	$0x01, %cl
 	incb	%dh
 	cmpb	max_head, %dh
-	jbe	2f
+	jbe	3f
 	xorb	%dh, %dh
 	incb	%ch
-	jnc	2f
+	jnc	3f
 	addb	$0xc0, %cl
-2:
+3:
 	/* Loop until whole image is read */
 	subl	%eax, load_length
 	ja	1b

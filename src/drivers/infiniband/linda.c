@@ -537,7 +537,7 @@ static int linda_init_send ( struct linda *linda ) {
 		rc = -ENOMEM;
 		goto err_alloc_sendbufavail;
 	}
-	memset ( linda->sendbufavail, 0, sizeof ( linda->sendbufavail ) );
+	memset ( linda->sendbufavail, 0, sizeof ( *linda->sendbufavail ) );
 
 	/* Program SendBufAvailAddr into the hardware */
 	memset ( &sendbufavailaddr, 0, sizeof ( sendbufavailaddr ) );

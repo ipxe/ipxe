@@ -396,6 +396,50 @@ static void list_test_exec ( void ) {
 	ok ( list_first_entry ( list, struct list_test, list ) == NULL );
 	ok ( list_last_entry ( list, struct list_test, list ) == NULL );
 
+	/* Test list_next_entry() and list_prev_entry() */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[5].list, list );
+	list_add_tail ( &list_tests[3].list, list );
+	list_add_tail ( &list_tests[1].list, list );
+	list_add_tail ( &list_tests[7].list, list );
+	ok ( list_prev_entry ( &list_tests[5], list, list ) == NULL );
+	ok ( list_next_entry ( &list_tests[5], list, list ) == &list_tests[3] );
+	ok ( list_prev_entry ( &list_tests[3], list, list ) == &list_tests[5] );
+	ok ( list_next_entry ( &list_tests[3], list, list ) == &list_tests[1] );
+	ok ( list_prev_entry ( &list_tests[1], list, list ) == &list_tests[3] );
+	ok ( list_next_entry ( &list_tests[1], list, list ) == &list_tests[7] );
+	ok ( list_prev_entry ( &list_tests[7], list, list ) == &list_tests[1] );
+	ok ( list_next_entry ( &list_tests[7], list, list ) == NULL );
+	list_del ( &list_tests[7].list );
+	ok ( list_prev_entry ( &list_tests[1], list, list ) == &list_tests[3] );
+	ok ( list_next_entry ( &list_tests[1], list, list ) == NULL );
+	list_del ( &list_tests[3].list );
+	ok ( list_prev_entry ( &list_tests[5], list, list ) == NULL );
+	ok ( list_next_entry ( &list_tests[5], list, list ) == &list_tests[1] );
+	ok ( list_prev_entry ( &list_tests[1], list, list ) == &list_tests[5] );
+	ok ( list_next_entry ( &list_tests[1], list, list ) == NULL );
+
+	/* Test list_is_first_entry() and list_is_last_entry() */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[4].list, list );
+	list_add_tail ( &list_tests[8].list, list );
+	list_add_tail ( &list_tests[3].list, list );
+	list_add_tail ( &list_tests[6].list, list );
+	ok ( list_is_first_entry ( &list_tests[4], list, list ) );
+	ok ( ! list_is_first_entry ( &list_tests[8], list, list ) );
+	ok ( ! list_is_first_entry ( &list_tests[3], list, list ) );
+	ok ( ! list_is_first_entry ( &list_tests[6], list, list ) );
+	ok ( ! list_is_last_entry ( &list_tests[4], list, list ) );
+	ok ( ! list_is_last_entry ( &list_tests[8], list, list ) );
+	ok ( ! list_is_last_entry ( &list_tests[3], list, list ) );
+	ok ( list_is_last_entry ( &list_tests[6], list, list ) );
+	list_del ( &list_tests[4].list );
+	ok ( list_is_first_entry ( &list_tests[8], list, list ) );
+	list_del ( &list_tests[8].list );
+	list_del ( &list_tests[6].list );
+	ok ( list_is_first_entry ( &list_tests[3], list, list ) );
+	ok ( list_is_last_entry ( &list_tests[3], list, list ) );
+
 	/* Test list_for_each() */
 	INIT_LIST_HEAD ( list );
 	list_add_tail ( &list_tests[6].list, list );

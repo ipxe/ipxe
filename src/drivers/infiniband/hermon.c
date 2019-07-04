@@ -2113,6 +2113,7 @@ static int hermon_map_vpm ( struct hermon *hermon,
 	assert ( ( va & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( pa & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
 	assert ( ( len & ( HERMON_PAGE_SIZE - 1 ) ) == 0 );
+	assert ( len != 0 );
 
 	/* Calculate starting points */
 	start = pa;
@@ -2135,7 +2136,7 @@ static int hermon_map_vpm ( struct hermon *hermon,
 		if ( ( low - size ) >= start ) {
 			low -= size;
 			pa = low;
-		} else if ( ( high + size ) <= end ) {
+		} else if ( high <= ( end - size ) ) {
 			pa = high;
 			high += size;
 		} else {
@@ -3206,22 +3207,16 @@ static void hermon_eth_complete_recv ( struct ib_device *ibdev __unused,
 				       struct ib_address_vector *source,
 				       struct io_buffer *iobuf, int rc ) {
 	struct net_device *netdev = ib_qp_get_ownerdata ( qp );
-	struct net_device *vlan;
+	unsigned int tag;
 
-	/* Find VLAN device, if applicable */
-	if ( source->vlan_present ) {
-		if ( ( vlan = vlan_find ( netdev, source->vlan ) ) != NULL ) {
-			netdev = vlan;
-		} else if ( rc == 0 ) {
-			rc = -ENODEV;
-		}
-	}
+	/* Identify VLAN tag, if applicable */
+	tag = ( source->vlan_present ? source->vlan : 0 );
 
 	/* Hand off to network layer */
 	if ( rc == 0 ) {
-		netdev_rx ( netdev, iobuf );
+		vlan_netdev_rx ( netdev, tag, iobuf );
 	} else {
-		netdev_rx_err ( netdev, iobuf, rc );
+		vlan_netdev_rx_err ( netdev, tag, iobuf, rc );
 	}
 }
 
@@ -3261,24 +3256,20 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 		goto err_open;
 
 	/* Allocate completion queue */
-	port->eth_cq = ib_create_cq ( ibdev, HERMON_ETH_NUM_CQES,
-				      &hermon_eth_cq_op );
-	if ( ! port->eth_cq ) {
+	if ( ( rc = ib_create_cq ( ibdev, HERMON_ETH_NUM_CQES,
+				   &hermon_eth_cq_op, &port->eth_cq ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not create completion "
-		       "queue\n", hermon, ibdev->port );
-		rc = -ENOMEM;
+		       "queue: %s\n", hermon, ibdev->port, strerror ( rc ) );
 		goto err_create_cq;
 	}
 
 	/* Allocate queue pair */
-	port->eth_qp = ib_create_qp ( ibdev, IB_QPT_ETH,
-				      HERMON_ETH_NUM_SEND_WQES, port->eth_cq,
-				      HERMON_ETH_NUM_RECV_WQES, port->eth_cq,
-				      &hermon_eth_qp_op, netdev->name );
-	if ( ! port->eth_qp ) {
+	if ( ( rc = ib_create_qp ( ibdev, IB_QPT_ETH, HERMON_ETH_NUM_SEND_WQES,
+				   port->eth_cq, HERMON_ETH_NUM_RECV_WQES,
+				   port->eth_cq, &hermon_eth_qp_op,
+				   netdev->name, &port->eth_qp ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not create queue "
-		       "pair\n", hermon, ibdev->port );
-		rc = -ENOMEM;
+		       "pair: %s\n", hermon, ibdev->port, strerror ( rc ) );
 		goto err_create_qp;
 	}
 	ib_qp_set_ownerdata ( port->eth_qp, netdev );

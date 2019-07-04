@@ -300,5 +300,6 @@ static void initrd_startup ( void ) {
 
 /** initrd startup function */
 struct startup_fn startup_initrd __startup_fn ( STARTUP_LATE ) = {
+	.name = "initrd",
 	.startup = initrd_startup,
 };

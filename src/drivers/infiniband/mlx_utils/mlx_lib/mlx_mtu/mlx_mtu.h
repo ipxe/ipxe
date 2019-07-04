@@ -22,8 +22,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
-#include "mlx_reg_access.h"
-#include "mlx_utils.h"
+#include "../../include/public/mlx_utils.h"
+#include "../../mlx_lib/mlx_reg_access/mlx_reg_access.h"
 
 #define BYTE_TO_BIT	0x8
 
@@ -49,4 +49,10 @@ mlx_get_max_mtu(
 		OUT mlx_uint32 	*max_mtu
 		);
 
+mlx_status
+mlx_set_admin_mtu(
+		IN mlx_utils 	*utils,
+		IN mlx_uint8 	port_num,
+		IN mlx_uint32 	admin_mtu
+		);
 #endif /* MLX_MTU_H_ */

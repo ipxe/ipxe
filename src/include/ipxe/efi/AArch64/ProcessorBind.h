@@ -34,7 +34,7 @@ FILE_LICENCE ( BSD3 );
 
 #if _MSC_EXTENSIONS
   //
-  // use Microsoft* C complier dependent integer width types
+  // use Microsoft* C compiler dependent integer width types
   //
   typedef unsigned __int64    UINT64;
   typedef __int64             INT64;
@@ -105,6 +105,12 @@ typedef INT64   INTN;
 /// The stack alignment required for AARCH64
 ///
 #define CPU_STACK_ALIGNMENT  16
+
+///
+/// Page allocation granularity for AARCH64
+///
+#define DEFAULT_PAGE_ALLOCATION_GRANULARITY   (0x1000)
+#define RUNTIME_PAGE_ALLOCATION_GRANULARITY   (0x10000)
 
 //
 // Modifier to ensure that all protocol member functions and EFI intrinsics

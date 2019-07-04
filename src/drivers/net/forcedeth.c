@@ -1176,7 +1176,7 @@ nv_mgmt_get_version ( struct forcedeth_private *priv )
 		ioaddr + NvRegTransmitterControl );
 	start = currticks();
 
-	while ( currticks() > start + 5 * ticks_per_sec() ) {
+	while ( currticks() > start + 5 * TICKS_PER_SEC ) {
 		data_ready2 = readl ( ioaddr + NvRegTransmitterControl );
 		if ( ( data_ready & NVREG_XMITCTL_DATA_READY ) !=
 		     ( data_ready2 & NVREG_XMITCTL_DATA_READY ) ) {

@@ -456,6 +456,24 @@ pci_set_mem_access:
 	ret
 	.size	pci_set_mem_access, . - pci_set_mem_access
 
+/* Update image source address for UNDI loader
+ *
+ * Parameters:
+ *   %esi : Image source address
+ * Returns:
+ *   %esi : Image source address
+ */
+	.section ".prefix", "ax", @progbits
+	.globl	undiloader_source
+undiloader_source:
+	/* Always use expansion ROM BAR directly when installing via
+	 * the UNDI loader entry point, since the PMM-allocated block
+	 * may collide with whatever is calling the UNDI loader entry
+	 * point.
+	 */
+	xorl	%esi, %esi
+	ret
+
 /* Payload prefix
  *
  * We include a dummy ROM header to cover the "hidden" portion of the
@@ -474,6 +492,7 @@ mromheader:
 	.word	0
 	.size	mromheader, . - mromheader
 
+	.align	4
 mpciheader:
 	.ascii	"PCIR"			/* Signature */
 	.word	pci_vendor_id		/* Vendor identification */
@@ -481,7 +500,7 @@ mpciheader:
 	.word	0x0000			/* Device list pointer */
 	.word	mpciheader_len		/* PCI data structure length */
 	.byte	0x03			/* PCI data structure revision */
-	.byte	0x02, 0x00, 0x00	/* Class code */
+	.byte	0x00, 0x00, 0x02	/* Class code */
 mpciheader_image_length:
 	.word	0			/* Image length */
 	.word	0x0001			/* Revision level */

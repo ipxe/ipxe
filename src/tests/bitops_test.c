@@ -60,7 +60,7 @@ static void bitops_test_exec ( void ) {
 
 	/* Test clear_bit() */
 	clear_bit ( 0, bits );
-	ok ( bits[5] == 0x00 );
+	ok ( bits[0] == 0x00 );
 	bits[5] = 0xff;
 	clear_bit ( 42, bits );
 	ok ( bits[5] == 0xfb );

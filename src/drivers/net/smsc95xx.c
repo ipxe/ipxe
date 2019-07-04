@@ -41,10 +41,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Interrupt completion profiler */
-static struct profiler smsc95xx_intr_profiler __profiler =
-	{ .name = "smsc95xx.intr" };
-
 /** Bulk IN completion profiler */
 static struct profiler smsc95xx_in_profiler __profiler =
 	{ .name = "smsc95xx.in" };
@@ -55,246 +51,19 @@ static struct profiler smsc95xx_out_profiler __profiler =
 
 /******************************************************************************
  *
- * Register access
- *
- ******************************************************************************
- */
-
-/**
- * Write register (without byte-swapping)
- *
- * @v smsc95xx		SMSC95xx device
- * @v address		Register address
- * @v value		Register value
- * @ret rc		Return status code
- */
-static int smsc95xx_raw_writel ( struct smsc95xx_device *smsc95xx,
-				 unsigned int address, uint32_t value ) {
-	int rc;
-
-	/* Write register */
-	DBGCIO ( smsc95xx, "SMSC95XX %p [%03x] <= %08x\n",
-		 smsc95xx, address, le32_to_cpu ( value ) );
-	if ( ( rc = usb_control ( smsc95xx->usb, SMSC95XX_REGISTER_WRITE, 0,
-				  address, &value, sizeof ( value ) ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not write %03x: %s\n",
-		       smsc95xx, address, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Write register
- *
- * @v smsc95xx		SMSC95xx device
- * @v address		Register address
- * @v value		Register value
- * @ret rc		Return status code
- */
-static inline __attribute__ (( always_inline )) int
-smsc95xx_writel ( struct smsc95xx_device *smsc95xx, unsigned int address,
-		  uint32_t value ) {
-	int rc;
-
-	/* Write register */
-	if ( ( rc = smsc95xx_raw_writel ( smsc95xx, address,
-					  cpu_to_le32 ( value ) ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
-/**
- * Read register (without byte-swapping)
- *
- * @v smsc95xx		SMSC95xx device
- * @v address		Register address
- * @ret value		Register value
- * @ret rc		Return status code
- */
-static int smsc95xx_raw_readl ( struct smsc95xx_device *smsc95xx,
-				unsigned int address, uint32_t *value ) {
-	int rc;
-
-	/* Read register */
-	if ( ( rc = usb_control ( smsc95xx->usb, SMSC95XX_REGISTER_READ, 0,
-				  address, value, sizeof ( *value ) ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not read %03x: %s\n",
-		       smsc95xx, address, strerror ( rc ) );
-		return rc;
-	}
-	DBGCIO ( smsc95xx, "SMSC95XX %p [%03x] => %08x\n",
-		 smsc95xx, address, le32_to_cpu ( *value ) );
-
-	return 0;
-}
-
-/**
- * Read register
- *
- * @v smsc95xx		SMSC95xx device
- * @v address		Register address
- * @ret value		Register value
- * @ret rc		Return status code
- */
-static inline __attribute__ (( always_inline )) int
-smsc95xx_readl ( struct smsc95xx_device *smsc95xx, unsigned int address,
-		 uint32_t *value ) {
-	int rc;
-
-	/* Read register */
-	if ( ( rc = smsc95xx_raw_readl ( smsc95xx, address, value ) ) != 0 )
-		return rc;
-	le32_to_cpus ( value );
-
-	return 0;
-}
-
-/******************************************************************************
- *
- * EEPROM access
- *
- ******************************************************************************
- */
-
-/**
- * Wait for EEPROM to become idle
- *
- * @v smsc95xx		SMSC95xx device
- * @ret rc		Return status code
- */
-static int smsc95xx_eeprom_wait ( struct smsc95xx_device *smsc95xx ) {
-	uint32_t e2p_cmd;
-	unsigned int i;
-	int rc;
-
-	/* Wait for EPC_BSY to become clear */
-	for ( i = 0 ; i < SMSC95XX_EEPROM_MAX_WAIT_MS ; i++ ) {
-
-		/* Read E2P_CMD and check EPC_BSY */
-		if ( ( rc = smsc95xx_readl ( smsc95xx, SMSC95XX_E2P_CMD,
-					     &e2p_cmd ) ) != 0 )
-			return rc;
-		if ( ! ( e2p_cmd & SMSC95XX_E2P_CMD_EPC_BSY ) )
-			return 0;
-
-		/* Delay */
-		mdelay ( 1 );
-	}
-
-	DBGC ( smsc95xx, "SMSC95XX %p timed out waiting for EEPROM\n",
-	       smsc95xx );
-	return -ETIMEDOUT;
-}
-
-/**
- * Read byte from EEPROM
- *
- * @v smsc95xx		SMSC95xx device
- * @v address		EEPROM address
- * @ret byte		Byte read, or negative error
- */
-static int smsc95xx_eeprom_read_byte ( struct smsc95xx_device *smsc95xx,
-				       unsigned int address ) {
-	uint32_t e2p_cmd;
-	uint32_t e2p_data;
-	int rc;
-
-	/* Wait for EEPROM to become idle */
-	if ( ( rc = smsc95xx_eeprom_wait ( smsc95xx ) ) != 0 )
-		return rc;
-
-	/* Initiate read command */
-	e2p_cmd = ( SMSC95XX_E2P_CMD_EPC_BSY | SMSC95XX_E2P_CMD_EPC_CMD_READ |
-		    SMSC95XX_E2P_CMD_EPC_ADDR ( address ) );
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_E2P_CMD,
-				      e2p_cmd ) ) != 0 )
-		return rc;
-
-	/* Wait for command to complete */
-	if ( ( rc = smsc95xx_eeprom_wait ( smsc95xx ) ) != 0 )
-		return rc;
-
-	/* Read EEPROM data */
-	if ( ( rc = smsc95xx_readl ( smsc95xx, SMSC95XX_E2P_DATA,
-				     &e2p_data ) ) != 0 )
-		return rc;
-
-	return SMSC95XX_E2P_DATA_GET ( e2p_data );
-}
-
-/**
- * Read data from EEPROM
- *
- * @v smsc95xx		SMSC95xx device
- * @v address		EEPROM address
- * @v data		Data buffer
- * @v len		Length of data
- * @ret rc		Return status code
- */
-static int smsc95xx_eeprom_read ( struct smsc95xx_device *smsc95xx,
-				  unsigned int address, void *data,
-				  size_t len ) {
-	uint8_t *bytes;
-	int byte;
-
-	/* Read bytes */
-	for ( bytes = data ; len-- ; address++, bytes++ ) {
-		byte = smsc95xx_eeprom_read_byte ( smsc95xx, address );
-		if ( byte < 0 )
-			return byte;
-		*bytes = byte;
-	}
-
-	return 0;
-}
-
-/******************************************************************************
- *
  * MAC address
  *
  ******************************************************************************
  */
 
 /**
- * Fetch MAC address from EEPROM
- *
- * @v smsc95xx		SMSC95xx device
- * @v hw_addr		Hardware address to fill in
- * @ret rc		Return status code
- */
-static int smsc95xx_fetch_mac_eeprom ( struct smsc95xx_device *smsc95xx,
-				       uint8_t *hw_addr ) {
-	int rc;
-
-	/* Read MAC address from EEPROM */
-	if ( ( rc = smsc95xx_eeprom_read ( smsc95xx, SMSC95XX_EEPROM_MAC,
-					   hw_addr, ETH_ALEN ) ) != 0 )
-		return rc;
-
-	/* Check that EEPROM is physically present */
-	if ( ! is_valid_ether_addr ( hw_addr ) ) {
-		DBGC ( smsc95xx, "SMSC95XX %p has no EEPROM (%s)\n",
-		       smsc95xx, eth_ntoa ( hw_addr ) );
-		return -ENODEV;
-	}
-
-	DBGC ( smsc95xx, "SMSC95XX %p using EEPROM MAC %s\n",
-	       smsc95xx, eth_ntoa ( hw_addr ) );
-	return 0;
-}
-
-/**
  * Construct MAC address for Honeywell VM3
  *
- * @v smsc95xx		SMSC95xx device
- * @v hw_addr		Hardware address to fill in
+ * @v smscusb		SMSC USB device
  * @ret rc		Return status code
  */
-static int smsc95xx_fetch_mac_vm3 ( struct smsc95xx_device *smsc95xx,
-				    uint8_t *hw_addr ) {
+static int smsc95xx_vm3_fetch_mac ( struct smscusb_device *smscusb ) {
+	struct net_device *netdev = smscusb->netdev;
 	struct smbios_structure structure;
 	struct smbios_system_information system;
 	struct {
@@ -308,16 +77,16 @@ static int smsc95xx_fetch_mac_vm3 ( struct smsc95xx_device *smsc95xx,
 	/* Find system information */
 	if ( ( rc = find_smbios_structure ( SMBIOS_TYPE_SYSTEM_INFORMATION, 0,
 					    &structure ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not find system "
-		       "information: %s\n", smsc95xx, strerror ( rc ) );
+		DBGC ( smscusb, "SMSC95XX %p could not find system "
+		       "information: %s\n", smscusb, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Read system information */
 	if ( ( rc = read_smbios_structure ( &structure, &system,
 					    sizeof ( system ) ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not read system "
-		       "information: %s\n", smsc95xx, strerror ( rc ) );
+		DBGC ( smscusb, "SMSC95XX %p could not read system "
+		       "information: %s\n", smscusb, strerror ( rc ) );
 		return rc;
 	}
 
@@ -330,8 +99,8 @@ static int smsc95xx_fetch_mac_vm3 ( struct smsc95xx_device *smsc95xx,
 				   ( sizeof ( strings.manufacturer ) - 1 ) );
 	if ( len < 0 ) {
 		rc = len;
-		DBGC ( smsc95xx, "SMSC95XX %p could not read manufacturer "
-		       "name: %s\n", smsc95xx, strerror ( rc ) );
+		DBGC ( smscusb, "SMSC95XX %p could not read manufacturer "
+		       "name: %s\n", smscusb, strerror ( rc ) );
 		return rc;
 	}
 
@@ -340,8 +109,8 @@ static int smsc95xx_fetch_mac_vm3 ( struct smsc95xx_device *smsc95xx,
 				   ( sizeof ( strings.product ) - 1 ) );
 	if ( len < 0 ) {
 		rc = len;
-		DBGC ( smsc95xx, "SMSC95XX %p could not read product name: "
-		       "%s\n", smsc95xx, strerror ( rc ) );
+		DBGC ( smscusb, "SMSC95XX %p could not read product name: "
+		       "%s\n", smscusb, strerror ( rc ) );
 		return rc;
 	}
 
@@ -353,8 +122,8 @@ static int smsc95xx_fetch_mac_vm3 ( struct smsc95xx_device *smsc95xx,
 	/* Find OEM strings */
 	if ( ( rc = find_smbios_structure ( SMBIOS_TYPE_OEM_STRINGS, 0,
 					    &structure ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not find OEM strings: %s\n",
-		       smsc95xx, strerror ( rc ) );
+		DBGC ( smscusb, "SMSC95XX %p could not find OEM strings: %s\n",
+		       smscusb, strerror ( rc ) );
 		return rc;
 	}
 
@@ -363,218 +132,55 @@ static int smsc95xx_fetch_mac_vm3 ( struct smsc95xx_device *smsc95xx,
 				   strings.mac, ( sizeof ( strings.mac ) - 1 ));
 	if ( len < 0 ) {
 		rc = len;
-		DBGC ( smsc95xx, "SMSC95XX %p could not read OEM string: %s\n",
-		       smsc95xx, strerror ( rc ) );
+		DBGC ( smscusb, "SMSC95XX %p could not read OEM string: %s\n",
+		       smscusb, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Sanity check */
 	if ( len != ( ( int ) ( sizeof ( strings.mac ) - 1 ) ) ) {
-		DBGC ( smsc95xx, "SMSC95XX %p invalid MAC address \"%s\"\n",
-		       smsc95xx, strings.mac );
+		DBGC ( smscusb, "SMSC95XX %p invalid MAC address \"%s\"\n",
+		       smscusb, strings.mac );
 		return -EINVAL;
 	}
 
 	/* Decode MAC address */
-	len = base16_decode ( strings.mac, hw_addr, ETH_ALEN );
+	len = base16_decode ( strings.mac, netdev->hw_addr, ETH_ALEN );
 	if ( len < 0 ) {
 		rc = len;
-		DBGC ( smsc95xx, "SMSC95XX %p invalid MAC address \"%s\"\n",
-		       smsc95xx, strings.mac );
+		DBGC ( smscusb, "SMSC95XX %p invalid MAC address \"%s\"\n",
+		       smscusb, strings.mac );
 		return rc;
 	}
 
-	DBGC ( smsc95xx, "SMSC95XX %p using VM3 MAC %s\n",
-	       smsc95xx, eth_ntoa ( hw_addr ) );
+	DBGC ( smscusb, "SMSC95XX %p using VM3 MAC %s\n",
+	       smscusb, eth_ntoa ( netdev->hw_addr ) );
 	return 0;
 }
 
 /**
  * Fetch MAC address
  *
- * @v smsc95xx		SMSC95xx device
- * @v hw_addr		Hardware address to fill in
+ * @v smscusb		SMSC USB device
  * @ret rc		Return status code
  */
-static int smsc95xx_fetch_mac ( struct smsc95xx_device *smsc95xx,
-				uint8_t *hw_addr ) {
+static int smsc95xx_fetch_mac ( struct smscusb_device *smscusb ) {
+	struct net_device *netdev = smscusb->netdev;
 	int rc;
 
 	/* Read MAC address from EEPROM, if present */
-	if ( ( rc = smsc95xx_fetch_mac_eeprom ( smsc95xx, hw_addr ) ) == 0 )
+	if ( ( rc = smscusb_eeprom_fetch_mac ( smscusb,
+					       SMSC95XX_E2P_BASE ) ) == 0 )
 		return 0;
 
 	/* Construct MAC address for Honeywell VM3, if applicable */
-	if ( ( rc = smsc95xx_fetch_mac_vm3 ( smsc95xx, hw_addr ) ) == 0 )
+	if ( ( rc = smsc95xx_vm3_fetch_mac ( smscusb ) ) == 0 )
 		return 0;
 
 	/* Otherwise, generate a random MAC address */
-	eth_random_addr ( hw_addr );
-	DBGC ( smsc95xx, "SMSC95XX %p using random MAC %s\n",
-	       smsc95xx, eth_ntoa ( hw_addr ) );
-	return 0;
-}
-
-/******************************************************************************
- *
- * MII access
- *
- ******************************************************************************
- */
-
-/**
- * Wait for MII to become idle
- *
- * @v smsc95xx		SMSC95xx device
- * @ret rc		Return status code
- */
-static int smsc95xx_mii_wait ( struct smsc95xx_device *smsc95xx ) {
-	uint32_t mii_access;
-	unsigned int i;
-	int rc;
-
-	/* Wait for MIIBZY to become clear */
-	for ( i = 0 ; i < SMSC95XX_MII_MAX_WAIT_MS ; i++ ) {
-
-		/* Read MII_ACCESS and check MIIBZY */
-		if ( ( rc = smsc95xx_readl ( smsc95xx, SMSC95XX_MII_ACCESS,
-					     &mii_access ) ) != 0 )
-			return rc;
-		if ( ! ( mii_access & SMSC95XX_MII_ACCESS_MIIBZY ) )
-			return 0;
-
-		/* Delay */
-		mdelay ( 1 );
-	}
-
-	DBGC ( smsc95xx, "SMSC95XX %p timed out waiting for MII\n",
-	       smsc95xx );
-	return -ETIMEDOUT;
-}
-
-/**
- * Read from MII register
- *
- * @v mii		MII interface
- * @v reg		Register address
- * @ret value		Data read, or negative error
- */
-static int smsc95xx_mii_read ( struct mii_interface *mii, unsigned int reg ) {
-	struct smsc95xx_device *smsc95xx =
-		container_of ( mii, struct smsc95xx_device, mii );
-	uint32_t mii_access;
-	uint32_t mii_data;
-	int rc;
-
-	/* Wait for MII to become idle */
-	if ( ( rc = smsc95xx_mii_wait ( smsc95xx ) ) != 0 )
-		return rc;
-
-	/* Initiate read command */
-	mii_access = ( SMSC95XX_MII_ACCESS_PHY_ADDRESS |
-		       SMSC95XX_MII_ACCESS_MIIRINDA ( reg ) |
-		       SMSC95XX_MII_ACCESS_MIIBZY );
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_MII_ACCESS,
-				      mii_access ) ) != 0 )
-		return rc;
-
-	/* Wait for command to complete */
-	if ( ( rc = smsc95xx_mii_wait ( smsc95xx ) ) != 0 )
-		return rc;
-
-	/* Read MII data */
-	if ( ( rc = smsc95xx_readl ( smsc95xx, SMSC95XX_MII_DATA,
-				     &mii_data ) ) != 0 )
-		return rc;
-
-	return SMSC95XX_MII_DATA_GET ( mii_data );
-}
-
-/**
- * Write to MII register
- *
- * @v mii		MII interface
- * @v reg		Register address
- * @v data		Data to write
- * @ret rc		Return status code
- */
-static int smsc95xx_mii_write ( struct mii_interface *mii, unsigned int reg,
-				unsigned int data ) {
-	struct smsc95xx_device *smsc95xx =
-		container_of ( mii, struct smsc95xx_device, mii );
-	uint32_t mii_access;
-	uint32_t mii_data;
-	int rc;
-
-	/* Wait for MII to become idle */
-	if ( ( rc = smsc95xx_mii_wait ( smsc95xx ) ) != 0 )
-		return rc;
-
-	/* Write MII data */
-	mii_data = SMSC95XX_MII_DATA_SET ( data );
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_MII_DATA,
-				      mii_data ) ) != 0 )
-		return rc;
-
-	/* Initiate write command */
-	mii_access = ( SMSC95XX_MII_ACCESS_PHY_ADDRESS |
-		       SMSC95XX_MII_ACCESS_MIIRINDA ( reg ) |
-		       SMSC95XX_MII_ACCESS_MIIWNR |
-		       SMSC95XX_MII_ACCESS_MIIBZY );
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_MII_ACCESS,
-				      mii_access ) ) != 0 )
-		return rc;
-
-	/* Wait for command to complete */
-	if ( ( rc = smsc95xx_mii_wait ( smsc95xx ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
-/** MII operations */
-static struct mii_operations smsc95xx_mii_operations = {
-	.read = smsc95xx_mii_read,
-	.write = smsc95xx_mii_write,
-};
-
-/**
- * Check link status
- *
- * @v smsc95xx		SMSC95xx device
- * @ret rc		Return status code
- */
-static int smsc95xx_check_link ( struct smsc95xx_device *smsc95xx ) {
-	struct net_device *netdev = smsc95xx->netdev;
-	int intr;
-	int rc;
-
-	/* Read PHY interrupt source */
-	intr = mii_read ( &smsc95xx->mii, SMSC95XX_MII_PHY_INTR_SOURCE );
-	if ( intr < 0 ) {
-		rc = intr;
-		DBGC ( smsc95xx, "SMSC95XX %p could not get PHY interrupt "
-		       "source: %s\n", smsc95xx, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Acknowledge PHY interrupt */
-	if ( ( rc = mii_write ( &smsc95xx->mii, SMSC95XX_MII_PHY_INTR_SOURCE,
-				intr ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not acknowledge PHY "
-		       "interrupt: %s\n", smsc95xx, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Check link status */
-	if ( ( rc = mii_check_link ( &smsc95xx->mii, netdev ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not check link: %s\n",
-		       smsc95xx, strerror ( rc ) );
-		return rc;
-	}
-
-	DBGC ( smsc95xx, "SMSC95XX %p link %s (intr %#04x)\n",
-	       smsc95xx, ( netdev_link_ok ( netdev ) ? "up" : "down" ), intr );
+	eth_random_addr ( netdev->hw_addr );
+	DBGC ( smscusb, "SMSC95XX %p using random MAC %s\n",
+	       smscusb, eth_ntoa ( netdev->hw_addr ) );
 	return 0;
 }
 
@@ -586,58 +192,12 @@ static int smsc95xx_check_link ( struct smsc95xx_device *smsc95xx ) {
  */
 
 /**
- * Get RX statistics
- *
- * @v smsc95xx		SMSC95xx device
- * @v stats		Statistics to fill in
- * @ret rc		Return status code
- */
-static int smsc95xx_get_rx_statistics ( struct smsc95xx_device *smsc95xx,
-					struct smsc95xx_rx_statistics *stats ) {
-	int rc;
-
-	/* Get statistics */
-	if ( ( rc = usb_control ( smsc95xx->usb, SMSC95XX_GET_STATISTICS, 0,
-				  SMSC95XX_RX_STATISTICS, stats,
-				  sizeof ( *stats ) ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not get RX statistics: "
-		       "%s\n", smsc95xx, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Get TX statistics
- *
- * @v smsc95xx		SMSC95xx device
- * @v stats		Statistics to fill in
- * @ret rc		Return status code
- */
-static int smsc95xx_get_tx_statistics ( struct smsc95xx_device *smsc95xx,
-					struct smsc95xx_tx_statistics *stats ) {
-	int rc;
-
-	/* Get statistics */
-	if ( ( rc = usb_control ( smsc95xx->usb, SMSC95XX_GET_STATISTICS, 0,
-				  SMSC95XX_TX_STATISTICS, stats,
-				  sizeof ( *stats ) ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not get TX statistics: "
-		       "%s\n", smsc95xx, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
  * Dump statistics (for debugging)
  *
- * @v smsc95xx		SMSC95xx device
+ * @v smscusb		SMSC USB device
  * @ret rc		Return status code
  */
-static int smsc95xx_dump_statistics ( struct smsc95xx_device *smsc95xx ) {
+static int smsc95xx_dump_statistics ( struct smscusb_device *smscusb ) {
 	struct smsc95xx_rx_statistics rx;
 	struct smsc95xx_tx_statistics tx;
 	int rc;
@@ -647,22 +207,30 @@ static int smsc95xx_dump_statistics ( struct smsc95xx_device *smsc95xx ) {
 		return 0;
 
 	/* Get RX statistics */
-	if ( ( rc = smsc95xx_get_rx_statistics ( smsc95xx, &rx ) ) != 0 )
+	if ( ( rc = smscusb_get_statistics ( smscusb, SMSC95XX_RX_STATISTICS,
+					     &rx, sizeof ( rx ) ) ) != 0 ) {
+		DBGC ( smscusb, "SMSC95XX %p could not get RX statistics: "
+		       "%s\n", smscusb, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Get TX statistics */
-	if ( ( rc = smsc95xx_get_tx_statistics ( smsc95xx, &tx ) ) != 0 )
+	if ( ( rc = smscusb_get_statistics ( smscusb, SMSC95XX_TX_STATISTICS,
+					     &tx, sizeof ( tx ) ) ) != 0 ) {
+		DBGC ( smscusb, "SMSC95XX %p could not get TX statistics: "
+		       "%s\n", smscusb, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Dump statistics */
-	DBGC ( smsc95xx, "SMSC95XX %p RX good %d bad %d crc %d und %d aln %d "
-	       "ovr %d lat %d drp %d\n", smsc95xx, le32_to_cpu ( rx.good ),
+	DBGC ( smscusb, "SMSC95XX %p RX good %d bad %d crc %d und %d aln %d "
+	       "ovr %d lat %d drp %d\n", smscusb, le32_to_cpu ( rx.good ),
 	       le32_to_cpu ( rx.bad ), le32_to_cpu ( rx.crc ),
 	       le32_to_cpu ( rx.undersize ), le32_to_cpu ( rx.alignment ),
 	       le32_to_cpu ( rx.oversize ), le32_to_cpu ( rx.late ),
 	       le32_to_cpu ( rx.dropped ) );
-	DBGC ( smsc95xx, "SMSC95XX %p TX good %d bad %d pau %d sgl %d mul %d "
-	       "exc %d lat %d und %d def %d car %d\n", smsc95xx,
+	DBGC ( smscusb, "SMSC95XX %p TX good %d bad %d pau %d sgl %d mul %d "
+	       "exc %d lat %d und %d def %d car %d\n", smscusb,
 	       le32_to_cpu ( tx.good ), le32_to_cpu ( tx.bad ),
 	       le32_to_cpu ( tx.pause ), le32_to_cpu ( tx.single ),
 	       le32_to_cpu ( tx.multiple ), le32_to_cpu ( tx.excessive ),
@@ -682,28 +250,27 @@ static int smsc95xx_dump_statistics ( struct smsc95xx_device *smsc95xx ) {
 /**
  * Reset device
  *
- * @v smsc95xx		SMSC95xx device
+ * @v smscusb		SMSC USB device
  * @ret rc		Return status code
  */
-static int smsc95xx_reset ( struct smsc95xx_device *smsc95xx ) {
+static int smsc95xx_reset ( struct smscusb_device *smscusb ) {
 	uint32_t hw_cfg;
 	uint32_t led_gpio_cfg;
 	int rc;
 
 	/* Reset device */
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_HW_CFG,
-				      SMSC95XX_HW_CFG_LRST ) ) != 0 )
+	if ( ( rc = smscusb_writel ( smscusb, SMSC95XX_HW_CFG,
+				     SMSC95XX_HW_CFG_LRST ) ) != 0 )
 		return rc;
 
 	/* Wait for reset to complete */
 	udelay ( SMSC95XX_RESET_DELAY_US );
 
 	/* Check that reset has completed */
-	if ( ( rc = smsc95xx_readl ( smsc95xx, SMSC95XX_HW_CFG,
-				     &hw_cfg ) ) != 0 )
+	if ( ( rc = smscusb_readl ( smscusb, SMSC95XX_HW_CFG, &hw_cfg ) ) != 0 )
 		return rc;
 	if ( hw_cfg & SMSC95XX_HW_CFG_LRST ) {
-		DBGC ( smsc95xx, "SMSC95XX %p failed to reset\n", smsc95xx );
+		DBGC ( smscusb, "SMSC95XX %p failed to reset\n", smscusb );
 		return -ETIMEDOUT;
 	}
 
@@ -711,10 +278,10 @@ static int smsc95xx_reset ( struct smsc95xx_device *smsc95xx ) {
 	led_gpio_cfg = ( SMSC95XX_LED_GPIO_CFG_GPCTL2_NSPD_LED |
 			 SMSC95XX_LED_GPIO_CFG_GPCTL1_NLNKA_LED |
 			 SMSC95XX_LED_GPIO_CFG_GPCTL0_NFDX_LED );
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_LED_GPIO_CFG,
-				      led_gpio_cfg ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not configure LEDs: %s\n",
-		       smsc95xx, strerror ( rc ) );
+	if ( ( rc = smscusb_writel ( smscusb, SMSC95XX_LED_GPIO_CFG,
+				     led_gpio_cfg ) ) != 0 ) {
+		DBGC ( smscusb, "SMSC95XX %p could not configure LEDs: %s\n",
+		       smscusb, strerror ( rc ) );
 		/* Ignore error and continue */
 	}
 
@@ -729,60 +296,6 @@ static int smsc95xx_reset ( struct smsc95xx_device *smsc95xx ) {
  */
 
 /**
- * Complete interrupt transfer
- *
- * @v ep		USB endpoint
- * @v iobuf		I/O buffer
- * @v rc		Completion status code
- */
-static void smsc95xx_intr_complete ( struct usb_endpoint *ep,
-				     struct io_buffer *iobuf, int rc ) {
-	struct smsc95xx_device *smsc95xx =
-		container_of ( ep, struct smsc95xx_device, usbnet.intr );
-	struct net_device *netdev = smsc95xx->netdev;
-	struct smsc95xx_interrupt *intr;
-
-	/* Profile completions */
-	profile_start ( &smsc95xx_intr_profiler );
-
-	/* Ignore packets cancelled when the endpoint closes */
-	if ( ! ep->open )
-		goto done;
-
-	/* Record USB errors against the network device */
-	if ( rc != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p interrupt failed: %s\n",
-		       smsc95xx, strerror ( rc ) );
-		DBGC_HDA ( smsc95xx, 0, iobuf->data, iob_len ( iobuf ) );
-		netdev_rx_err ( netdev, NULL, rc );
-		goto done;
-	}
-
-	/* Extract interrupt data */
-	if ( iob_len ( iobuf ) != sizeof ( *intr ) ) {
-		DBGC ( smsc95xx, "SMSC95XX %p malformed interrupt\n",
-		       smsc95xx );
-		DBGC_HDA ( smsc95xx, 0, iobuf->data, iob_len ( iobuf ) );
-		netdev_rx_err ( netdev, NULL, rc );
-		goto done;
-	}
-	intr = iobuf->data;
-
-	/* Record interrupt status */
-	smsc95xx->int_sts = le32_to_cpu ( intr->int_sts );
-	profile_stop ( &smsc95xx_intr_profiler );
-
- done:
-	/* Free I/O buffer */
-	free_iob ( iobuf );
-}
-
-/** Interrupt endpoint operations */
-static struct usb_endpoint_driver_operations smsc95xx_intr_operations = {
-	.complete = smsc95xx_intr_complete,
-};
-
-/**
  * Complete bulk IN transfer
  *
  * @v ep		USB endpoint
@@ -791,9 +304,9 @@ static struct usb_endpoint_driver_operations smsc95xx_intr_operations = {
  */
 static void smsc95xx_in_complete ( struct usb_endpoint *ep,
 				   struct io_buffer *iobuf, int rc ) {
-	struct smsc95xx_device *smsc95xx =
-		container_of ( ep, struct smsc95xx_device, usbnet.in );
-	struct net_device *netdev = smsc95xx->netdev;
+	struct smscusb_device *smscusb =
+		container_of ( ep, struct smscusb_device, usbnet.in );
+	struct net_device *netdev = smscusb->netdev;
 	struct smsc95xx_rx_header *header;
 
 	/* Profile completions */
@@ -807,16 +320,16 @@ static void smsc95xx_in_complete ( struct usb_endpoint *ep,
 
 	/* Record USB errors against the network device */
 	if ( rc != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p bulk IN failed: %s\n",
-		       smsc95xx, strerror ( rc ) );
+		DBGC ( smscusb, "SMSC95XX %p bulk IN failed: %s\n",
+		       smscusb, strerror ( rc ) );
 		goto err;
 	}
 
 	/* Sanity check */
 	if ( iob_len ( iobuf ) < ( sizeof ( *header ) + 4 /* CRC */ ) ) {
-		DBGC ( smsc95xx, "SMSC95XX %p underlength bulk IN\n",
-		       smsc95xx );
-		DBGC_HDA ( smsc95xx, 0, iobuf->data, iob_len ( iobuf ) );
+		DBGC ( smscusb, "SMSC95XX %p underlength bulk IN\n",
+		       smscusb );
+		DBGC_HDA ( smscusb, 0, iobuf->data, iob_len ( iobuf ) );
 		rc = -EINVAL;
 		goto err;
 	}
@@ -830,9 +343,9 @@ static void smsc95xx_in_complete ( struct usb_endpoint *ep,
 	if ( header->command & cpu_to_le32 ( SMSC95XX_RX_RUNT |
 					     SMSC95XX_RX_LATE |
 					     SMSC95XX_RX_CRC ) ) {
-		DBGC ( smsc95xx, "SMSC95XX %p receive error (%08x):\n",
-		       smsc95xx, le32_to_cpu ( header->command ) );
-		DBGC_HDA ( smsc95xx, 0, iobuf->data, iob_len ( iobuf ) );
+		DBGC ( smscusb, "SMSC95XX %p receive error (%08x):\n",
+		       smscusb, le32_to_cpu ( header->command ) );
+		DBGC_HDA ( smscusb, 0, iobuf->data, iob_len ( iobuf ) );
 		rc = -EIO;
 		goto err;
 	}
@@ -856,11 +369,11 @@ static struct usb_endpoint_driver_operations smsc95xx_in_operations = {
 /**
  * Transmit packet
  *
- * @v smsc95xx		SMSC95xx device
+ * @v smscusb		SMSC USB device
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int smsc95xx_out_transmit ( struct smsc95xx_device *smsc95xx,
+static int smsc95xx_out_transmit ( struct smscusb_device *smscusb,
 				   struct io_buffer *iobuf ) {
 	struct smsc95xx_tx_header *header;
 	size_t len = iob_len ( iobuf );
@@ -878,34 +391,12 @@ static int smsc95xx_out_transmit ( struct smsc95xx_device *smsc95xx,
 	header->len = cpu_to_le32 ( len );
 
 	/* Enqueue I/O buffer */
-	if ( ( rc = usb_stream ( &smsc95xx->usbnet.out, iobuf, 0 ) ) != 0 )
+	if ( ( rc = usb_stream ( &smscusb->usbnet.out, iobuf, 0 ) ) != 0 )
 		return rc;
 
 	profile_stop ( &smsc95xx_out_profiler );
 	return 0;
 }
-
-/**
- * Complete bulk OUT transfer
- *
- * @v ep		USB endpoint
- * @v iobuf		I/O buffer
- * @v rc		Completion status code
- */
-static void smsc95xx_out_complete ( struct usb_endpoint *ep,
-				    struct io_buffer *iobuf, int rc ) {
-	struct smsc95xx_device *smsc95xx =
-		container_of ( ep, struct smsc95xx_device, usbnet.out );
-	struct net_device *netdev = smsc95xx->netdev;
-
-	/* Report TX completion */
-	netdev_tx_complete_err ( netdev, iobuf, rc );
-}
-
-/** Bulk OUT endpoint operations */
-static struct usb_endpoint_driver_operations smsc95xx_out_operations = {
-	.complete = smsc95xx_out_complete,
-};
 
 /******************************************************************************
  *
@@ -921,91 +412,73 @@ static struct usb_endpoint_driver_operations smsc95xx_out_operations = {
  * @ret rc		Return status code
  */
 static int smsc95xx_open ( struct net_device *netdev ) {
-	struct smsc95xx_device *smsc95xx = netdev->priv;
-	union smsc95xx_mac mac;
+	struct smscusb_device *smscusb = netdev->priv;
 	int rc;
 
 	/* Clear stored interrupt status */
-	smsc95xx->int_sts = 0;
-
-	/* Copy MAC address */
-	memset ( &mac, 0, sizeof ( mac ) );
-	memcpy ( mac.raw, netdev->ll_addr, ETH_ALEN );
+	smscusb->int_sts = 0;
 
 	/* Configure bulk IN empty response */
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_HW_CFG,
-				      SMSC95XX_HW_CFG_BIR ) ) != 0 )
+	if ( ( rc = smscusb_writel ( smscusb, SMSC95XX_HW_CFG,
+				     SMSC95XX_HW_CFG_BIR ) ) != 0 )
 		goto err_hw_cfg;
 
 	/* Open USB network device */
-	if ( ( rc = usbnet_open ( &smsc95xx->usbnet ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not open: %s\n",
-		       smsc95xx, strerror ( rc ) );
+	if ( ( rc = usbnet_open ( &smscusb->usbnet ) ) != 0 ) {
+		DBGC ( smscusb, "SMSC95XX %p could not open: %s\n",
+		       smscusb, strerror ( rc ) );
 		goto err_open;
 	}
 
 	/* Configure interrupt endpoint */
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_INT_EP_CTL,
-				      ( SMSC95XX_INT_EP_CTL_RXDF_EN |
-					SMSC95XX_INT_EP_CTL_PHY_EN ) ) ) != 0 )
+	if ( ( rc = smscusb_writel ( smscusb, SMSC95XX_INT_EP_CTL,
+				     ( SMSC95XX_INT_EP_CTL_RXDF_EN |
+				       SMSC95XX_INT_EP_CTL_PHY_EN ) ) ) != 0 )
 		goto err_int_ep_ctl;
 
 	/* Configure bulk IN delay */
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_BULK_IN_DLY,
-				      SMSC95XX_BULK_IN_DLY_SET ( 0 ) ) ) != 0 )
+	if ( ( rc = smscusb_writel ( smscusb, SMSC95XX_BULK_IN_DLY,
+				     SMSC95XX_BULK_IN_DLY_SET ( 0 ) ) ) != 0 )
 		goto err_bulk_in_dly;
 
 	/* Configure MAC */
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_MAC_CR,
-				      ( SMSC95XX_MAC_CR_RXALL |
-					SMSC95XX_MAC_CR_FDPX |
-					SMSC95XX_MAC_CR_MCPAS |
-					SMSC95XX_MAC_CR_PRMS |
-					SMSC95XX_MAC_CR_PASSBAD |
-					SMSC95XX_MAC_CR_TXEN |
-					SMSC95XX_MAC_CR_RXEN ) ) ) != 0 )
+	if ( ( rc = smscusb_writel ( smscusb, SMSC95XX_MAC_CR,
+				     ( SMSC95XX_MAC_CR_RXALL |
+				       SMSC95XX_MAC_CR_FDPX |
+				       SMSC95XX_MAC_CR_MCPAS |
+				       SMSC95XX_MAC_CR_PRMS |
+				       SMSC95XX_MAC_CR_PASSBAD |
+				       SMSC95XX_MAC_CR_TXEN |
+				       SMSC95XX_MAC_CR_RXEN ) ) ) != 0 )
 		goto err_mac_cr;
 
 	/* Configure transmit datapath */
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_TX_CFG,
-				      SMSC95XX_TX_CFG_ON ) ) != 0 )
+	if ( ( rc = smscusb_writel ( smscusb, SMSC95XX_TX_CFG,
+				     SMSC95XX_TX_CFG_ON ) ) != 0 )
 		goto err_tx_cfg;
 
-	/* Write MAC address high register */
-	if ( ( rc = smsc95xx_raw_writel ( smsc95xx, SMSC95XX_ADDRH,
-					  mac.addr.h ) ) != 0 )
-		goto err_addrh;
+	/* Set MAC address */
+	if ( ( rc = smscusb_set_address ( smscusb, SMSC95XX_ADDR_BASE ) ) != 0 )
+		goto err_set_address;
 
-	/* Write MAC address low register */
-	if ( ( rc = smsc95xx_raw_writel ( smsc95xx, SMSC95XX_ADDRL,
-					  mac.addr.l ) ) != 0 )
-		goto err_addrl;
-
-	/* Enable PHY interrupts */
-	if ( ( rc = mii_write ( &smsc95xx->mii, SMSC95XX_MII_PHY_INTR_MASK,
-				( SMSC95XX_PHY_INTR_ANEG_DONE |
-				  SMSC95XX_PHY_INTR_LINK_DOWN ) ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not set PHY interrupt "
-		       "mask: %s\n", smsc95xx, strerror ( rc ) );
-		goto err_phy_intr_mask;
-	}
-
-	/* Update link status */
-	smsc95xx_check_link ( smsc95xx );
+	/* Enable PHY interrupts and update link status */
+	if ( ( rc = smscusb_mii_open ( smscusb, SMSC95XX_MII_PHY_INTR_MASK,
+				       ( SMSC95XX_PHY_INTR_ANEG_DONE |
+					 SMSC95XX_PHY_INTR_LINK_DOWN ) ) ) != 0)
+		goto err_mii_open;
 
 	return 0;
 
- err_phy_intr_mask:
- err_addrl:
- err_addrh:
+ err_mii_open:
+ err_set_address:
  err_tx_cfg:
  err_mac_cr:
  err_bulk_in_dly:
  err_int_ep_ctl:
-	usbnet_close ( &smsc95xx->usbnet );
+	usbnet_close ( &smscusb->usbnet );
  err_open:
  err_hw_cfg:
-	smsc95xx_reset ( smsc95xx );
+	smsc95xx_reset ( smscusb );
 	return rc;
 }
 
@@ -1015,16 +488,16 @@ static int smsc95xx_open ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void smsc95xx_close ( struct net_device *netdev ) {
-	struct smsc95xx_device *smsc95xx = netdev->priv;
+	struct smscusb_device *smscusb = netdev->priv;
 
 	/* Close USB network device */
-	usbnet_close ( &smsc95xx->usbnet );
+	usbnet_close ( &smscusb->usbnet );
 
 	/* Dump statistics (for debugging) */
-	smsc95xx_dump_statistics ( smsc95xx );
+	smsc95xx_dump_statistics ( smscusb );
 
 	/* Reset device */
-	smsc95xx_reset ( smsc95xx );
+	smsc95xx_reset ( smscusb );
 }
 
 /**
@@ -1036,11 +509,11 @@ static void smsc95xx_close ( struct net_device *netdev ) {
  */
 static int smsc95xx_transmit ( struct net_device *netdev,
 			       struct io_buffer *iobuf ) {
-	struct smsc95xx_device *smsc95xx = netdev->priv;
+	struct smscusb_device *smscusb = netdev->priv;
 	int rc;
 
 	/* Transmit packet */
-	if ( ( rc = smsc95xx_out_transmit ( smsc95xx, iobuf ) ) != 0 )
+	if ( ( rc = smsc95xx_out_transmit ( smscusb, iobuf ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -1052,48 +525,48 @@ static int smsc95xx_transmit ( struct net_device *netdev,
  * @v netdev		Network device
  */
 static void smsc95xx_poll ( struct net_device *netdev ) {
-	struct smsc95xx_device *smsc95xx = netdev->priv;
+	struct smscusb_device *smscusb = netdev->priv;
 	uint32_t int_sts;
 	int rc;
 
 	/* Poll USB bus */
-	usb_poll ( smsc95xx->bus );
+	usb_poll ( smscusb->bus );
 
 	/* Refill endpoints */
-	if ( ( rc = usbnet_refill ( &smsc95xx->usbnet ) ) != 0 )
+	if ( ( rc = usbnet_refill ( &smscusb->usbnet ) ) != 0 )
 		netdev_rx_err ( netdev, NULL, rc );
 
 	/* Do nothing more unless there are interrupts to handle */
-	int_sts = smsc95xx->int_sts;
+	int_sts = smscusb->int_sts;
 	if ( ! int_sts )
 		return;
 
 	/* Check link status if applicable */
 	if ( int_sts & SMSC95XX_INT_STS_PHY_INT ) {
-		smsc95xx_check_link ( smsc95xx );
+		smscusb_mii_check_link ( smscusb );
 		int_sts &= ~SMSC95XX_INT_STS_PHY_INT;
 	}
 
 	/* Record RX FIFO overflow if applicable */
 	if ( int_sts & SMSC95XX_INT_STS_RXDF_INT ) {
-		DBGC2 ( smsc95xx, "SMSC95XX %p RX FIFO overflowed\n",
-			smsc95xx );
+		DBGC2 ( smscusb, "SMSC95XX %p RX FIFO overflowed\n",
+			smscusb );
 		netdev_rx_err ( netdev, NULL, -ENOBUFS );
 		int_sts &= ~SMSC95XX_INT_STS_RXDF_INT;
 	}
 
 	/* Check for unexpected interrupts */
 	if ( int_sts ) {
-		DBGC ( smsc95xx, "SMSC95XX %p unexpected interrupt %#08x\n",
-		       smsc95xx, int_sts );
+		DBGC ( smscusb, "SMSC95XX %p unexpected interrupt %#08x\n",
+		       smscusb, int_sts );
 		netdev_rx_err ( netdev, NULL, -ENOTTY );
 	}
 
 	/* Clear interrupts */
-	if ( ( rc = smsc95xx_writel ( smsc95xx, SMSC95XX_INT_STS,
-				      smsc95xx->int_sts ) ) != 0 )
+	if ( ( rc = smscusb_writel ( smscusb, SMSC95XX_INT_STS,
+				     smscusb->int_sts ) ) != 0 )
 		netdev_rx_err ( netdev, NULL, rc );
-	smsc95xx->int_sts = 0;
+	smscusb->int_sts = 0;
 }
 
 /** SMSC95xx network device operations */
@@ -1120,48 +593,42 @@ static struct net_device_operations smsc95xx_operations = {
  */
 static int smsc95xx_probe ( struct usb_function *func,
 			    struct usb_configuration_descriptor *config ) {
-	struct usb_device *usb = func->usb;
 	struct net_device *netdev;
-	struct smsc95xx_device *smsc95xx;
+	struct smscusb_device *smscusb;
 	int rc;
 
 	/* Allocate and initialise structure */
-	netdev = alloc_etherdev ( sizeof ( *smsc95xx ) );
+	netdev = alloc_etherdev ( sizeof ( *smscusb ) );
 	if ( ! netdev ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
 	netdev_init ( netdev, &smsc95xx_operations );
 	netdev->dev = &func->dev;
-	smsc95xx = netdev->priv;
-	memset ( smsc95xx, 0, sizeof ( *smsc95xx ) );
-	smsc95xx->usb = usb;
-	smsc95xx->bus = usb->port->hub->bus;
-	smsc95xx->netdev = netdev;
-	usbnet_init ( &smsc95xx->usbnet, func, &smsc95xx_intr_operations,
-		      &smsc95xx_in_operations, &smsc95xx_out_operations );
-	usb_refill_init ( &smsc95xx->usbnet.intr, 0, 0,
-			  SMSC95XX_INTR_MAX_FILL );
-	usb_refill_init ( &smsc95xx->usbnet.in,
+	smscusb = netdev->priv;
+	memset ( smscusb, 0, sizeof ( *smscusb ) );
+	smscusb_init ( smscusb, netdev, func, &smsc95xx_in_operations );
+	smscusb_mii_init ( smscusb, SMSC95XX_MII_BASE,
+			   SMSC95XX_MII_PHY_INTR_SOURCE );
+	usb_refill_init ( &smscusb->usbnet.in,
 			  ( sizeof ( struct smsc95xx_tx_header ) -
 			    sizeof ( struct smsc95xx_rx_header ) ),
 			  SMSC95XX_IN_MTU, SMSC95XX_IN_MAX_FILL );
-	mii_init ( &smsc95xx->mii, &smsc95xx_mii_operations );
-	DBGC ( smsc95xx, "SMSC95XX %p on %s\n", smsc95xx, func->name );
+	DBGC ( smscusb, "SMSC95XX %p on %s\n", smscusb, func->name );
 
 	/* Describe USB network device */
-	if ( ( rc = usbnet_describe ( &smsc95xx->usbnet, config ) ) != 0 ) {
-		DBGC ( smsc95xx, "SMSC95XX %p could not describe: %s\n",
-		       smsc95xx, strerror ( rc ) );
+	if ( ( rc = usbnet_describe ( &smscusb->usbnet, config ) ) != 0 ) {
+		DBGC ( smscusb, "SMSC95XX %p could not describe: %s\n",
+		       smscusb, strerror ( rc ) );
 		goto err_describe;
 	}
 
 	/* Reset device */
-	if ( ( rc = smsc95xx_reset ( smsc95xx ) ) != 0 )
+	if ( ( rc = smsc95xx_reset ( smscusb ) ) != 0 )
 		goto err_reset;
 
 	/* Read MAC address */
-	if ( ( rc = smsc95xx_fetch_mac ( smsc95xx, netdev->hw_addr ) ) != 0 )
+	if ( ( rc = smsc95xx_fetch_mac ( smscusb ) ) != 0 )
 		goto err_fetch_mac;
 
 	/* Register network device */

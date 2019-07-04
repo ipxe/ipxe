@@ -19,7 +19,7 @@ use Getopt::Long qw(GetOptions);
 GetOptions(
     'help'       => \( my $help     = 0      ),
     'format=s'   => \( my $format   = 'text' ),
-    'sort=s'     => \( my $sort     = 'bus,ipxe_driver,ipxe_name' ),
+    'sort=s'     => \( my $sort     = 'bus-,ipxe_driver,ipxe_name' ),
     'columns=s'  => \( my $columns  = 'bus,vendor_id,device_id,'
                                     . 'vendor_name,device_name,ipxe_driver,'
                                     . 'ipxe_name,ipxe_description,file,legacy_api'
@@ -47,26 +47,26 @@ Output formats:
 Column names (default order):
     bus, vendor_id, device_id, vendor_name, device_name,
     ipxe_driver, ipxe_name, ipxe_description, file, legacy_api
+
+Default sort order (minus at the end means reverse sort):
+    bus-, ipxe_driver, ipxe_name
 EOM
 
 # Only load runtime requirements if actually in use
-given($format) {
-    when( /csv/  ) {
-                       eval { require Text::CSV; };
-                       die("Please install Text::CSV CPAN module to use this feature.\n")
-                           if $@;
-                   }
-    when( /json/ ) {
-                       eval { require JSON; };
-                       die("Please install JSON CPAN module to use this feature.\n")
-                           if $@;
-                   }
-    when( /html/ ) {
-                       eval { require HTML::Entities; };
-                       die("Please install HTML::Entities CPAN module to use this feature.\n")
-                           if $@;
-                   }
-    default        { }
+if ( $format =~ /csv/ ) {
+    eval { require Text::CSV; };
+    die("Please install Text::CSV CPAN module to use this feature.\n")
+        if $@;
+}
+if ( $format =~ /json/ ) {
+    eval { require JSON; };
+    die("Please install JSON CPAN module to use this feature.\n")
+        if $@;
+}
+if ( $format =~ /html/ ) {
+    eval { require HTML::Entities; };
+    die("Please install HTML::Entities CPAN module to use this feature.\n")
+        if $@;
 }
 
 # Scan source dir and build NIC list
@@ -339,8 +339,16 @@ sub sort_ipxe_nic_list {
     my @sorted_list = @{ $ipxe_nic_list };
     while(@sort_column_names) {
         my $column_name = pop @sort_column_names;
-        @sorted_list = sort { ( $a->{$column_name} || "" ) cmp ( $b->{$column_name} || "" ) }
-                       @sorted_list;
+        my $reverse = substr($column_name, -1) eq '-' ? 1 : 0;  # use reverse order if last character is minus
+        $column_name = substr($column_name, 0, -1) if $reverse; # chop of the minus
+        if ( $reverse ) {
+            @sorted_list = sort { ( $b->{$column_name} || "" ) cmp ( $a->{$column_name} || "" ) }
+                           @sorted_list;
+        }
+        else {
+            @sorted_list = sort { ( $a->{$column_name} || "" ) cmp ( $b->{$column_name} || "" ) }
+                           @sorted_list;
+        }
     }
     return \@sorted_list;
 }
@@ -359,7 +367,7 @@ sub parse_columns_param {
 sub is_valid_column {
     my ($name) = @_;
     my $valid_column_map = {
-        map { $_ => 1 }
+        map { $_ => 1, $_ . "-" => 1 } # also supports keyword with a - suffix
         qw(
            bus file legacy_api
            ipxe_driver ipxe_name ipxe_description

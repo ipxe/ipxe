@@ -53,9 +53,7 @@ EINFO		:= ./util/einfo
 GENKEYMAP	:= ./util/genkeymap.pl
 DOXYGEN		:= doxygen
 LCAB		:= lcab
-BINUTILS_DIR	:= /usr
-BFD_DIR		:= $(BINUTILS_DIR)
-ZLIB_DIR	:= /usr
+QEMUIMG		:= qemu-img
 
 ###############################################################################
 #
@@ -64,7 +62,7 @@ ZLIB_DIR	:= /usr
 SRCDIRS		:=
 SRCDIRS		+= libgcc
 SRCDIRS		+= core
-SRCDIRS		+= net net/oncrpc net/tcp net/udp net/infiniband net/80211
+SRCDIRS		+= net net/tcp net/udp net/infiniband
 SRCDIRS		+= image
 SRCDIRS		+= drivers/bus
 SRCDIRS		+= drivers/net
@@ -73,13 +71,10 @@ SRCDIRS		+= drivers/net/e1000e
 SRCDIRS		+= drivers/net/igb
 SRCDIRS		+= drivers/net/igbvf
 SRCDIRS		+= drivers/net/phantom
-SRCDIRS		+= drivers/net/rtl818x
-SRCDIRS		+= drivers/net/ath
-SRCDIRS		+= drivers/net/ath/ath5k
-SRCDIRS		+= drivers/net/ath/ath9k
 SRCDIRS		+= drivers/net/vxge
 SRCDIRS		+= drivers/net/efi
 SRCDIRS		+= drivers/net/tg3
+SRCDIRS		+= drivers/net/sfc
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
@@ -91,6 +86,7 @@ SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_nvconfig
 SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_vmac
 SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_blink_leds
 SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_link_speed
+SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_mtu
 SRCDIRS		+= drivers/infiniband/mlx_nodnic/src
 SRCDIRS		+= drivers/usb
 SRCDIRS		+= interface/pxe interface/efi interface/smbios
@@ -104,6 +100,16 @@ SRCDIRS		+= hci/mucurses hci/mucurses/widgets
 SRCDIRS		+= hci/keymap
 SRCDIRS		+= usr
 SRCDIRS		+= config
+
+# These directories contain code that is not eligible for UEFI Secure
+# Boot signing.
+#
+SRCDIRS_INSEC	+= net/oncrpc
+SRCDIRS_INSEC	+= net/80211
+SRCDIRS_INSEC	+= drivers/net/rtl818x
+SRCDIRS_INSEC	+= drivers/net/ath
+SRCDIRS_INSEC	+= drivers/net/ath/ath5k
+SRCDIRS_INSEC	+= drivers/net/ath/ath9k
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.

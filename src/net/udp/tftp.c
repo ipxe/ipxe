@@ -279,6 +279,8 @@ static int tftp_presize ( struct tftp_request *tftp, size_t filesize ) {
 	 * length is an exact multiple of the blocksize will have a
 	 * trailing zero-length block, which must be included.
 	 */
+	if ( tftp->blksize == 0 )
+		return -EINVAL;
 	num_blocks = ( ( filesize / tftp->blksize ) + 1 );
 	if ( ( rc = bitmap_resize ( &tftp->bitmap, num_blocks ) ) != 0 ) {
 		DBGC ( tftp, "TFTP %p could not resize bitmap to %d blocks: "

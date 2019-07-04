@@ -625,7 +625,7 @@ static int rsa_match ( const void *private_key, size_t private_key_len,
 /** RSA public-key algorithm */
 struct pubkey_algorithm rsa_algorithm = {
 	.name		= "rsa",
-	.ctxsize	= sizeof ( struct rsa_context ),
+	.ctxsize	= RSA_CTX_SIZE,
 	.init		= rsa_init,
 	.max_len	= rsa_max_len,
 	.encrypt	= rsa_encrypt,

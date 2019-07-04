@@ -44,8 +44,7 @@ hv_call ( struct hv_hypervisor *hv, unsigned int code, const void *in,
 			       : "=a" ( result ), "+r" ( rcx ), "+r" ( rdx ),
 				 "+r" ( r8 )
 			       : "m" ( hypercall )
-			       : "r9", "r10", "r11", "xmm0", "xmm1", "xmm2",
-				 "xmm3", "xmm4", "xmm5" );
+			       : "r9", "r10", "r11" );
 	return result;
 }
 

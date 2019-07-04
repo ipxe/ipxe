@@ -62,6 +62,10 @@ struct int13con_header {
 /** Log partition magic signature */
 #define INT13CON_MAGIC "iPXE LOG\n\n"
 
+/** Original INT13 vector */
+static struct segoff __bss16 ( int13con_vector );
+#define int13con_vector __use_data16 ( int13con_vector )
+
 /** Sector buffer */
 static uint8_t __bss16_array ( int13con_buffer, [INT13_BLKSIZE] );
 #define int13con_buffer __use_data16 ( int13con_buffer )
@@ -101,8 +105,13 @@ static int int13con_rw ( unsigned int op, uint64_t lba ) {
 	int13con_address.buffer.offset = __from_data16 ( int13con_buffer );
 	int13con_address.lba = lba;
 
-	/* Issue INT13 */
-	__asm__ ( REAL_CODE ( "int $0x13\n\t" )
+	/* Emulate INT13 via original vector.  We do this since iPXE
+	 * (or another subsequent bootloader) may hook INT13 and remap
+	 * drive numbers.
+	 */
+	__asm__ ( REAL_CODE ( "pushfw\n\t"
+			      "cli\n\t"
+			      "lcall *int13con_vector\n\t" )
 		  : "=a" ( error )
 		  : "0" ( op << 8 ), "d" ( INT13CON_DRIVE ),
 		    "S" ( __from_data16 ( &int13con_address ) ) );
@@ -260,6 +269,12 @@ static void int13con_init ( void ) {
 		      error, check );
 		return;
 	}
+
+	/* Store original INT13 vector */
+	copy_from_real ( &int13con_vector, 0, ( 0x13 * 4 ),
+			 sizeof ( int13con_vector ) );
+	DBG ( "INT13CON using original INT13 vector %04x:%04x\n",
+	      int13con_vector.segment, int13con_vector.offset );
 
 	/* Locate log partition */
 	if ( ( rc = int13con_find() ) != 0)

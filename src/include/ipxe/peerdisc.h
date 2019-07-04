@@ -109,6 +109,12 @@ peerdisc_init ( struct peerdisc_client *peerdisc,
 
 extern unsigned int peerdisc_timeout_secs;
 
+extern void peerdisc_stat ( struct interface *intf, struct peerdisc_peer *peer,
+			    struct list_head *peers );
+#define peerdisc_stat_TYPE( object_type )				\
+	typeof ( void ( object_type, struct peerdisc_peer *peer,	\
+			struct list_head *peers ) )
+
 extern int peerdisc_open ( struct peerdisc_client *peerdisc, const void *id,
 			   size_t len );
 extern void peerdisc_close ( struct peerdisc_client *peerdisc );

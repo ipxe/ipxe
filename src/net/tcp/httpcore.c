@@ -55,6 +55,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/params.h>
 #include <ipxe/profile.h>
 #include <ipxe/vsprintf.h>
+#include <ipxe/errortab.h>
 #include <ipxe/http.h>
 
 /* Disambiguate the various error causes */
@@ -109,6 +110,12 @@ static struct profiler http_rx_profiler __profiler = { .name = "http.rx" };
 
 /** Data transfer profiler */
 static struct profiler http_xfer_profiler __profiler = { .name = "http.xfer" };
+
+/** Human-readable error messages */
+struct errortab http_errors[] __errortab = {
+	__einfo_errortab ( EINFO_EIO_4XX ),
+	__einfo_errortab ( EINFO_EIO_5XX ),
+};
 
 static struct http_state http_request;
 static struct http_state http_headers;
@@ -189,8 +196,8 @@ char * http_token ( char **line, char **value ) {
 	if ( value )
 		*value = NULL;
 
-	/* Skip any initial whitespace */
-	while ( isspace ( **line ) )
+	/* Skip any initial whitespace or commas */
+	while ( ( isspace ( **line ) ) || ( **line == ',' ) )
 		(*line)++;
 
 	/* Check for end of line and record token position */
@@ -201,8 +208,8 @@ char * http_token ( char **line, char **value ) {
 	/* Scan for end of token */
 	while ( ( c = **line ) ) {
 
-		/* Terminate if we hit an unquoted whitespace */
-		if ( isspace ( c ) && ! quote )
+		/* Terminate if we hit an unquoted whitespace or comma */
+		if ( ( isspace ( c ) || ( c == ',' ) ) && ! quote )
 			break;
 
 		/* Terminate if we hit a closing quote */
@@ -275,15 +282,9 @@ static void http_close ( struct http_transaction *http, int rc ) {
 	/* Stop timer */
 	stop_timer ( &http->timer );
 
-	/* Close all interfaces, allowing for the fact that the
-	 * content-decoded and transfer-decoded interfaces may be
-	 * connected to the same object.
-	 */
-	intf_shutdown ( &http->conn, rc );
-	intf_nullify ( &http->transfer );
-	intf_shutdown ( &http->content, rc );
-	intf_shutdown ( &http->transfer, rc );
-	intf_shutdown ( &http->xfer, rc );
+	/* Close all interfaces */
+	intfs_shutdown ( rc, &http->conn, &http->transfer, &http->content,
+			 &http->xfer, NULL );
 }
 
 /**
@@ -357,6 +358,9 @@ static void http_step ( struct http_transaction *http ) {
 	/* Do nothing until connection is ready */
 	if ( ! xfer_window ( &http->conn ) )
 		return;
+
+	/* Notify data transfer interface that window may have changed */
+	xfer_window_changed ( &http->xfer );
 
 	/* Do nothing until data transfer interface is ready */
 	if ( ! xfer_window ( &http->xfer ) )
@@ -515,28 +519,11 @@ __weak int http_block_read_capacity ( struct http_transaction *http __unused,
 	return -ENOTSUP;
 }
 
-/**
- * Describe device in ACPI table (when HTTP block device support is not present)
- *
- * @v http		HTTP transaction
- * @v acpi		ACPI table
- * @v len		Length of ACPI table
- * @ret rc		Return status code
- */
-__weak int http_acpi_describe ( struct http_transaction *http __unused,
-				struct acpi_description_header *acpi __unused,
-				size_t len __unused ) {
-
-	return -ENOTSUP;
-}
-
 /** HTTP data transfer interface operations */
 static struct interface_operation http_xfer_operations[] = {
 	INTF_OP ( block_read, struct http_transaction *, http_block_read ),
 	INTF_OP ( block_read_capacity, struct http_transaction *,
 		  http_block_read_capacity ),
-	INTF_OP ( acpi_describe, struct http_transaction *,
-		  http_acpi_describe ),
 	INTF_OP ( xfer_window_changed, struct http_transaction *, http_step ),
 	INTF_OP ( intf_close, struct http_transaction *, http_close ),
 };
@@ -784,18 +771,24 @@ static int http_transfer_complete ( struct http_transaction *http ) {
 		}
 	}
 
-	/* Restart content decoding interfaces (which may be attached
-	 * to the same object).
-	 */
-	intf_nullify ( &http->content );
-	intf_nullify ( &http->transfer );
-	intf_restart ( &http->content, http->response.rc );
-	intf_restart ( &http->transfer, http->response.rc );
-	http->content.desc = &http_content_desc;
-	http->transfer.desc = &http_transfer_desc;
+	/* Restart content decoding interfaces */
+	intfs_restart ( http->response.rc, &http->content, &http->transfer,
+			NULL );
 	intf_plug_plug ( &http->transfer, &http->content );
 	http->len = 0;
 	assert ( http->remaining == 0 );
+
+	/* Retry immediately if applicable.  We cannot rely on an
+	 * immediate timer expiry, since certain Microsoft-designed
+	 * HTTP extensions such as NTLM break the fundamentally
+	 * stateless nature of HTTP and rely on the same connection
+	 * being reused for authentication.  See RFC7230 section 2.3
+	 * for further details.
+	 */
+	if ( ! http->response.retry_after ) {
+		http_reopen ( http );
+		return 0;
+	}
 
 	/* Start timer to initiate retry */
 	DBGC2 ( http, "HTTP %p retrying after %d seconds\n",
@@ -1182,6 +1175,8 @@ static int http_parse_status ( struct http_transaction *http, char *line ) {
 		response_rc = -EIO_OTHER;
 	}
 	http->response.rc = response_rc;
+	if ( response_rc )
+		DBGC ( http, "HTTP %p status %s\n", http, status );
 
 	return 0;
 }
@@ -1201,13 +1196,17 @@ static int http_parse_header ( struct http_transaction *http, char *line ) {
 	DBGC2 ( http, "HTTP %p RX %s\n", http, line );
 
 	/* Extract header name */
-	sep = strstr ( line, ": " );
+	sep = strchr ( line, ':' );
 	if ( ! sep ) {
 		DBGC ( http, "HTTP %p malformed header \"%s\"\n", http, line );
 		return -EINVAL_HEADER;
 	}
 	*sep = '\0';
-	line = ( sep + 2 /* ": " */ );
+
+	/* Extract remainder of line */
+	line = ( sep + 1 );
+	while ( isspace ( *line ) )
+		line++;
 
 	/* Process header, if recognised */
 	for_each_table_entry ( header, HTTP_RESPONSE_HEADERS ) {
@@ -1315,19 +1314,17 @@ http_response_transfer_encoding __http_response_header = {
  * @ret rc		Return status code
  */
 static int http_parse_connection ( struct http_transaction *http, char *line ) {
+	char *token;
 
 	/* Check for known connection intentions */
-	if ( strcasecmp ( line, "keep-alive" ) == 0 ) {
-		http->response.flags |= HTTP_RESPONSE_KEEPALIVE;
-		return 0;
-	}
-	if ( strcasecmp ( line, "close" ) == 0 ) {
-		http->response.flags &= ~HTTP_RESPONSE_KEEPALIVE;
-		return 0;
+	while ( ( token = http_token ( &line, NULL ) ) ) {
+		if ( strcasecmp ( token, "keep-alive" ) == 0 )
+			http->response.flags |= HTTP_RESPONSE_KEEPALIVE;
+		if ( strcasecmp ( token, "close" ) == 0 )
+			http->response.flags &= ~HTTP_RESPONSE_KEEPALIVE;
 	}
 
-	DBGC ( http, "HTTP %p unrecognised Connection \"%s\"\n", http, line );
-	return -ENOTSUP_CONNECTION;
+	return 0;
 }
 
 /** HTTP "Connection" header */

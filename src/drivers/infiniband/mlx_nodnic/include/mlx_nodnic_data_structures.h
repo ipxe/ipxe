@@ -36,6 +36,8 @@ typedef struct _nodnic_device_capabilites 		nodnic_device_capabilites;
 typedef struct _nodnic_qp 						nodnic_qp;
 typedef struct _nodnic_cq 						nodnic_cq;
 typedef struct _nodnic_eq						nodnic_eq;
+typedef struct _nodnic_qp_db					nodnic_qp_db;
+typedef struct _nodnic_arm_cq_db				nodnic_arm_cq_db;
 
 /* NODNIC Port states
  * Bit 0 - port open/close
@@ -73,6 +75,12 @@ typedef enum {
 struct nodnic_send_wqbb {
 	mlx_uint8 force_align[NODNIC_WQBB_SIZE];
 };
+
+struct nodnic_doorbell {
+	mlx_physical_address doorbell_physical;
+	mlx_void *map;
+	nodnic_qp_db *qp_doorbell_record;
+};
 struct nodnic_ring {
 	mlx_uint32 offset;
 	/** Work queue entries */
@@ -91,7 +99,8 @@ struct nodnic_ring {
 	mlx_uint32 num_wqes;
 	mlx_uint32 qpn;
 	mlx_uint32 next_idx;
-	mlx_uint32	ring_pi;
+	struct nodnic_doorbell recv_doorbell;
+	struct nodnic_doorbell send_doorbell;
 };
 
 struct nodnic_send_ring{
@@ -117,6 +126,7 @@ struct _nodnic_cq{
 	mlx_void *map;
 	/** cq */
 	mlx_size cq_size;
+	struct nodnic_doorbell arm_cq_doorbell;
 };
 
 struct _nodnic_eq{
@@ -136,6 +146,10 @@ struct _nodnic_device_capabilites{
 #ifdef DEVICE_CX3
 	mlx_uint8					crspace_doorbells;
 #endif
+	mlx_uint8					support_rx_pi_dma;
+	mlx_uint8					support_uar_tx_db;
+	mlx_uint8					support_bar_cq_ctrl;
+	mlx_uint8					log_uar_page_size;
 };
 
 #ifdef DEVICE_CX3
@@ -150,6 +164,13 @@ struct _nodnic_port_data_flow_gw {
 	mlx_uint32	dma_en;
 } __attribute__ ((packed));
 #endif
+
+typedef struct _nodnic_uar_priv{
+	mlx_uint8 inited;
+	mlx_uint64	offset;
+	void	*virt;
+	unsigned long	phys;
+} nodnic_uar;
 
 struct _nodnic_device_priv{
 	mlx_boolean					is_initiailzied;
@@ -169,6 +190,7 @@ struct _nodnic_device_priv{
 #ifdef DEVICE_CX3
 	mlx_void					*crspace_clear_int;
 #endif
+	nodnic_uar uar;
 };
 
 struct _nodnic_port_priv{
@@ -181,6 +203,7 @@ struct _nodnic_port_priv{
 	mlx_uint8				port_num;
 	nodnic_eq				eq;
 	mlx_mac_address			mac_filters[5];
+	nodnic_arm_cq_db		*arm_cq_doorbell_record;
 	mlx_status (*send_doorbell)(
 			IN nodnic_port_priv		*port_priv,
 			IN struct nodnic_ring	*ring,
@@ -197,5 +220,12 @@ struct _nodnic_port_priv{
 #endif
 };
 
+struct _nodnic_qp_db {
+	mlx_uint32	recv_db;
+	mlx_uint32	send_db;
+} __attribute ( ( packed ) );
 
+struct _nodnic_arm_cq_db {
+	mlx_uint32	dword[2];
+} __attribute ( ( packed ) );
 #endif /* STUB_NODNIC_NODNICDATASTRUCTURES_H_ */

@@ -23,8 +23,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #ifndef _PCNET32_H_
 #define _PCNET32_H_
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
 /*
  * Set the number of Tx and Rx buffers, using Log_2(# buffers).
  * Set default values to 16 Tx buffers and 32 Rx buffers.

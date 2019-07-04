@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <byteswap.h>
 #include <errno.h>
 #include <assert.h>
+#include <time.h>
 #include <ipxe/in.h>
 #include <ipxe/ip.h>
 #include <ipxe/ipv6.h>
@@ -331,6 +332,7 @@ struct settings * autovivify_child_settings ( struct settings *parent,
 				&new_child->autovivified.refcnt );
 	settings = &new_child->autovivified.generic.settings;
 	register_settings ( settings, parent, new_child->name );
+	ref_put ( settings->refcnt );
 	return settings;
 }
 
@@ -450,6 +452,8 @@ static void reprioritise_settings ( struct settings *settings ) {
 	list_for_each_entry ( tmp, &parent->children, siblings ) {
 		tmp_priority = fetch_intz_setting ( tmp, &priority_setting );
 		if ( priority > tmp_priority )
+			break;
+		if ( settings->order > tmp->order )
 			break;
 	}
 	list_add_tail ( &settings->siblings, &tmp->siblings );
@@ -1474,9 +1478,9 @@ struct setting * find_setting ( const char *name ) {
  * @v name		Name
  * @ret tag		Tag number, or 0 if not a valid number
  */
-static unsigned int parse_setting_tag ( const char *name ) {
+static uint64_t parse_setting_tag ( const char *name ) {
 	char *tmp = ( ( char * ) name );
-	unsigned int tag = 0;
+	uint64_t tag = 0;
 
 	while ( 1 ) {
 		tag = ( ( tag << 8 ) | strtoul ( tmp, &tmp, 0 ) );
@@ -1784,7 +1788,7 @@ const struct setting_type setting_type_ipv6 __setting_type = {
 };
 
 /** IPv6 settings scope */
-const struct settings_scope ipv6_scope;
+const struct settings_scope dhcpv6_scope;
 
 /**
  * Integer setting type indices
@@ -2232,6 +2236,10 @@ static int format_busdevfn_setting ( const struct setting_type *type __unused,
 				     const void *raw, size_t raw_len, char *buf,
 				     size_t len ) {
 	unsigned long busdevfn;
+	unsigned int seg;
+	unsigned int bus;
+	unsigned int slot;
+	unsigned int func;
 	int check_len;
 
 	/* Extract numeric value */
@@ -2240,9 +2248,14 @@ static int format_busdevfn_setting ( const struct setting_type *type __unused,
 		return check_len;
 	assert ( check_len == ( int ) raw_len );
 
+	/* Extract PCI address components */
+	seg = PCI_SEG ( busdevfn );
+	bus = PCI_BUS ( busdevfn );
+	slot = PCI_SLOT ( busdevfn );
+	func = PCI_FUNC ( busdevfn );
+
 	/* Format value */
-	return snprintf ( buf, len, "%02lx:%02lx.%lx", PCI_BUS ( busdevfn ),
-			  PCI_SLOT ( busdevfn ), PCI_FUNC ( busdevfn ) );
+	return snprintf ( buf, len, "%04x:%02x:%02x.%x", seg, bus, slot, func );
 }
 
 /** PCI bus:dev.fn setting type */
@@ -2383,6 +2396,15 @@ const struct setting root_path_setting __setting ( SETTING_SANBOOT, root-path)={
 	.type = &setting_type_string,
 };
 
+/** SAN filename setting */
+const struct setting san_filename_setting __setting ( SETTING_SANBOOT,
+						      san-filename ) = {
+	.name = "san-filename",
+	.description = "SAN filename",
+	.tag = DHCP_EB_SAN_FILENAME,
+	.type = &setting_type_string,
+};
+
 /** Username setting */
 const struct setting username_setting __setting ( SETTING_AUTH, username ) = {
 	.name = "username",
@@ -2413,6 +2435,15 @@ const struct setting user_class_setting __setting ( SETTING_HOST_EXTRA,
 	.name = "user-class",
 	.description = "DHCP user class",
 	.tag = DHCP_USER_CLASS_ID,
+	.type = &setting_type_string,
+};
+
+/** DHCP vendor class setting */
+const struct setting vendor_class_setting __setting ( SETTING_HOST_EXTRA,
+						      vendor-class ) = {
+	.name = "vendor-class",
+	.description = "DHCP vendor class",
+	.tag = DHCP_VENDOR_CLASS_ID,
 	.type = &setting_type_string,
 };
 
@@ -2538,6 +2569,38 @@ const struct setting version_setting __setting ( SETTING_MISC, version ) = {
 struct builtin_setting version_builtin_setting __builtin_setting = {
 	.setting = &version_setting,
 	.fetch = version_fetch,
+};
+
+/**
+ * Fetch current time setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int unixtime_fetch ( void *data, size_t len ) {
+	uint32_t content;
+
+	/* Return current time */
+	content = htonl ( time(NULL) );
+	if ( len > sizeof ( content ) )
+		len = sizeof ( content );
+	memcpy ( data, &content, len );
+	return sizeof ( content );
+}
+
+/** Current time setting */
+const struct setting unixtime_setting __setting ( SETTING_MISC, unixtime ) = {
+	.name = "unixtime",
+	.description = "Seconds since the Epoch",
+	.type = &setting_type_uint32,
+	.scope = &builtin_scope,
+};
+
+/** Current time built-in setting */
+struct builtin_setting unixtime_builtin_setting __builtin_setting = {
+	.setting = &unixtime_setting,
+	.fetch = unixtime_fetch,
 };
 
 /**

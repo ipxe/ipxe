@@ -30,9 +30,16 @@ FILE_LICENCE ( BSD3 );
 #pragma pack()
 #endif
 
+//
+// RVCT does not support the __builtin_unreachable() macro
+//
+#ifdef __ARMCC_VERSION
+#define UNREACHABLE()
+#endif
+
 #if _MSC_EXTENSIONS
   //
-  // use Microsoft* C complier dependent integer width types
+  // use Microsoft* C compiler dependent integer width types
   //
   typedef unsigned __int64    UINT64;
   typedef __int64             INT64;
@@ -104,6 +111,12 @@ typedef INT32   INTN;
 /// The stack alignment required for ARM
 ///
 #define CPU_STACK_ALIGNMENT  sizeof(UINT64)
+
+///
+/// Page allocation granularity for ARM
+///
+#define DEFAULT_PAGE_ALLOCATION_GRANULARITY   (0x1000)
+#define RUNTIME_PAGE_ALLOCATION_GRANULARITY   (0x1000)
 
 //
 // Modifier to ensure that all protocol member functions and EFI intrinsics

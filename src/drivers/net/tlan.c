@@ -808,6 +808,8 @@ static int tlan_probe ( struct nic *nic, struct pci_device *pci ) {
 		}
 		i++;
 	}
+	if (chip_idx == -1)
+		return 0;
 
 	priv->vendor_id = pci->vendor;
 	priv->dev_id = pci->device;

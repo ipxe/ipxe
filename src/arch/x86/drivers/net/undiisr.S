@@ -31,7 +31,7 @@ undiisr:
 	movw	%ax, %ds
 
 	/* Check that we have an UNDI entry point */
-	cmpw	$0, pxeparent_entry_point
+	cmpw	$0, undinet_entry_point
 	je	chain
 	
 	/* Issue UNDI API call */
@@ -42,7 +42,7 @@ undiisr:
 	pushw	%es
 	pushw	%di
 	pushw	%bx
-	lcall	*pxeparent_entry_point
+	lcall	*undinet_entry_point
 	cli	/* Just in case */
 	addw	$6, %sp
 	cmpw	$PXENV_UNDI_ISR_OUT_OURS, funcflag
