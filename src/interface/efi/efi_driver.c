@@ -73,11 +73,14 @@ static struct efi_device * efidev_find ( EFI_HANDLE device ) {
  */
 struct efi_device * efidev_parent ( struct device *dev ) {
 	struct device *parent;
+	struct efi_device *efidev;
 
-	/* Walk upwards until we find an EFI device */
+	/* Walk upwards until we find a registered EFI device */
 	while ( ( parent = dev->parent ) ) {
-		if ( parent->desc.bus_type == BUS_TYPE_EFI )
-			return container_of ( parent, struct efi_device, dev );
+		list_for_each_entry ( efidev, &efi_devices, dev.siblings ) {
+			if ( parent == &efidev->dev )
+				return efidev;
+		}
 		dev = parent;
 	}
 
