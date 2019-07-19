@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/profile.h>
 #include <ipxe/base16.h>
 #include <ipxe/smbios.h>
+#include <ipxe/fdt.h>
 #include "smsc95xx.h"
 
 /** @file
@@ -159,6 +160,32 @@ static int smsc95xx_vm3_fetch_mac ( struct smscusb_device *smscusb ) {
 }
 
 /**
+ * Fetch MAC address from device tree
+ *
+ * @v smscusb		SMSC USB device
+ * @ret rc		Return status code
+ */
+static int smsc95xx_fdt_fetch_mac ( struct smscusb_device *smscusb ) {
+	struct net_device *netdev = smscusb->netdev;
+	unsigned int offset;
+	int rc;
+
+	/* Look for "ethernet[0]" alias */
+	if ( ( rc = fdt_alias ( "ethernet", &offset ) != 0 ) &&
+	     ( rc = fdt_alias ( "ethernet0", &offset ) != 0 ) ) {
+		return rc;
+	}
+
+	/* Fetch MAC address */
+	if ( ( rc = fdt_mac ( offset, netdev ) ) != 0 )
+		return rc;
+
+	DBGC ( smscusb, "SMSC95XX %p using FDT MAC %s\n",
+	       smscusb, eth_ntoa ( netdev->hw_addr ) );
+	return 0;
+}
+
+/**
  * Fetch MAC address
  *
  * @v smscusb		SMSC USB device
@@ -171,6 +198,10 @@ static int smsc95xx_fetch_mac ( struct smscusb_device *smscusb ) {
 	/* Read MAC address from EEPROM, if present */
 	if ( ( rc = smscusb_eeprom_fetch_mac ( smscusb,
 					       SMSC95XX_E2P_BASE ) ) == 0 )
+		return 0;
+
+	/* Read MAC address from device tree */
+	if ( ( rc = smsc95xx_fdt_fetch_mac ( smscusb ) ) == 0 )
 		return 0;
 
 	/* Construct MAC address for Honeywell VM3, if applicable */
