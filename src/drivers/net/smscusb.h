@@ -287,6 +287,7 @@ extern int smscusb_eeprom_fetch_mac ( struct smscusb_device *smscusb,
 				      unsigned int e2p_base );
 extern int smscusb_otp_fetch_mac ( struct smscusb_device *smscusb,
 				   unsigned int otp_base );
+extern int smscusb_fdt_fetch_mac ( struct smscusb_device *smscusb );
 extern int smscusb_mii_check_link ( struct smscusb_device *smscusb );
 extern int smscusb_mii_open ( struct smscusb_device *smscusb,
 			      unsigned int phy_mask, unsigned int intrs );

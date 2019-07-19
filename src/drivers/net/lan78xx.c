@@ -97,6 +97,10 @@ static int lan78xx_fetch_mac ( struct smscusb_device *smscusb ) {
 	if ( ( rc = smscusb_otp_fetch_mac ( smscusb, LAN78XX_OTP_BASE ) ) == 0 )
 		return 0;
 
+	/* Read MAC address from device tree, if present */
+	if ( ( rc = smscusb_fdt_fetch_mac ( smscusb ) ) == 0 )
+		return 0;
+
 	/* Otherwise, generate a random MAC address */
 	eth_random_addr ( netdev->hw_addr );
 	DBGC ( smscusb, "LAN78XX %p using random MAC %s\n",
