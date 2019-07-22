@@ -185,6 +185,15 @@ WNST_TEST = $(CC) -Wstringop-truncation -x c -c /dev/null -o /dev/null \
 		  >/dev/null 2>&1
 WNST_FLAGS := $(shell $(WNST_TEST) && $(ECHO) '-Wno-stringop-truncation')
 WORKAROUND_CFLAGS += $(WNST_FLAGS)
+
+# gcc 9.1 generates warnings for taking address of packed member which
+# may result in an unaligned pointer value.  Inhibit the warnings.
+#
+WNAPM_TEST = $(CC) -Wno-address-of-packed-member -x c -c /dev/null \
+		   -o /dev/null >/dev/null 2>&1
+WNAPM_FLAGS := $(shell $(WNAPM_TEST) && \
+		 $(ECHO) '-Wno-address-of-packed-member')
+WORKAROUND_CFLAGS += $(WNAPM_FLAGS)
 endif
 
 # Some versions of gas choke on division operators, treating them as
