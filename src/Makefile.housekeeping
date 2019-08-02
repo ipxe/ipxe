@@ -1042,11 +1042,6 @@ $(BIN)/NIC : $(AUTO_DEPS)
 	@perl -ne 'chomp; print "$$1\n" if /\# NIC\t(.*)$$/' $^ >> $@
 CLEANUP		+= $(BIN)/NIC	# Doesn't match the $(BIN)/*.* pattern
 
-# Select drivers to be included in the all-drivers build
-#
-DRIVERS_ipxe	= $(DRIVERS_net) $(DRIVERS_infiniband) \
-		  $(DRIVERS_xen) $(DRIVERS_hyperv)
-
 # Analyse a target name (e.g. "bin/dfe538--prism2_pci.rom.tmp") and
 # derive the variables:
 # 
