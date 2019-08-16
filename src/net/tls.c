@@ -941,6 +941,27 @@ static void tls_verify_handshake ( struct tls_connection *tls, void *out ) {
  */
 
 /**
+ * Resume TX state machine
+ *
+ * @v tls		TLS connection
+ */
+static void tls_tx_resume ( struct tls_connection *tls ) {
+	process_add ( &tls->process );
+}
+
+/**
+ * Resume TX state machine for all connections within a session
+ *
+ * @v session		TLS session
+ */
+static void tls_tx_resume_all ( struct tls_session *session ) {
+	struct tls_connection *tls;
+
+	list_for_each_entry ( tls, &session->conn, list )
+		tls_tx_resume ( tls );
+}
+
+/**
  * Restart negotiation
  *
  * @v tls		TLS connection
@@ -961,29 +982,9 @@ static void tls_restart ( struct tls_connection *tls ) {
 
 	/* (Re)start negotiation */
 	tls->tx_pending = TLS_TX_CLIENT_HELLO;
+	tls_tx_resume ( tls );
 	pending_get ( &tls->client_negotiation );
 	pending_get ( &tls->server_negotiation );
-}
-
-/**
- * Resume TX state machine
- *
- * @v tls		TLS connection
- */
-static void tls_tx_resume ( struct tls_connection *tls ) {
-	process_add ( &tls->process );
-}
-
-/**
- * Resume TX state machine for all connections within a session
- *
- * @v session		TLS session
- */
-static void tls_tx_resume_all ( struct tls_session *session ) {
-	struct tls_connection *tls;
-
-	list_for_each_entry ( tls, &session->conn, list )
-		tls_tx_resume ( tls );
 }
 
 /**
@@ -3086,7 +3087,8 @@ int add_tls ( struct interface *xfer, const char *name,
 	intf_init ( &tls->plainstream, &tls_plainstream_desc, &tls->refcnt );
 	intf_init ( &tls->cipherstream, &tls_cipherstream_desc, &tls->refcnt );
 	intf_init ( &tls->validator, &tls_validator_desc, &tls->refcnt );
-	process_init ( &tls->process, &tls_process_desc, &tls->refcnt );
+	process_init_stopped ( &tls->process, &tls_process_desc,
+			       &tls->refcnt );
 	tls->version = TLS_VERSION_TLS_1_2;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
