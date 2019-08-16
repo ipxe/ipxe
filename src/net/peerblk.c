@@ -358,6 +358,10 @@ static int peerblk_raw_open ( struct peerdist_block *peerblk ) {
 	if ( inject_fault ( PEERBLK_ANNUL_RATE ) )
 		intf_restart ( &peerblk->raw, 0 );
 
+	/* Start download attempt timer */
+	peerblk->rc = -ETIMEDOUT;
+	start_timer_fixed ( &peerblk->timer, PEERBLK_RAW_OPEN_TIMEOUT );
+
 	return 0;
 }
 
@@ -521,6 +525,10 @@ static int peerblk_retrieval_open ( struct peerdist_block *peerblk,
 	 */
 	if ( inject_fault ( PEERBLK_ANNUL_RATE ) )
 		intf_restart ( &peerblk->retrieval, 0 );
+
+	/* Start download attempt timer */
+	peerblk->rc = -ETIMEDOUT;
+	start_timer_fixed ( &peerblk->timer, PEERBLK_RETRIEVAL_OPEN_TIMEOUT );
 
  err_open:
 	uri_put ( uri );
@@ -1201,10 +1209,7 @@ static void peerblk_expired ( struct retry_timer *timer, int over __unused ) {
 			continue;
 		}
 
-		/* Start download attempt timer */
-		peerblk->rc = -ETIMEDOUT;
-		start_timer_fixed ( &peerblk->timer,
-				    PEERBLK_RETRIEVAL_OPEN_TIMEOUT );
+		/* Peer download started */
 		return;
 	}
 
@@ -1212,9 +1217,6 @@ static void peerblk_expired ( struct retry_timer *timer, int over __unused ) {
 	if ( ( rc = peerblk_raw_open ( peerblk ) ) != 0 )
 		goto err;
 
-	/* Start download attempt timer */
-	peerblk->rc = -ETIMEDOUT;
-	start_timer_fixed ( &peerblk->timer, PEERBLK_RAW_OPEN_TIMEOUT );
 	return;
 
  err:
