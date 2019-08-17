@@ -635,3 +635,9 @@ struct pubkey_algorithm rsa_algorithm = {
 	.final		= rsa_final,
 	.match		= rsa_match,
 };
+
+/* Drag in objects via rsa_algorithm */
+REQUIRING_SYMBOL ( rsa_algorithm );
+
+/* Drag in crypto configuration */
+REQUIRE_OBJECT ( config_crypto );
