@@ -599,7 +599,7 @@ static int flexboot_nodnic_mcast_attach ( struct ib_device *ibdev,
 
 	switch (qp->type) {
 	case IB_QPT_ETH:
-		memcpy(&mac, &gid, sizeof(mac));
+		memcpy(&mac, gid, sizeof(mac));
 		status = nodnic_port_add_mac_filter(&port->port_priv, mac);
 		MLX_CHECK_STATUS(flexboot_nodnic->device_priv, status, mac_err,
 				"nodnic_port_add_mac_filter failed");
@@ -620,7 +620,7 @@ static void flexboot_nodnic_mcast_detach ( struct ib_device *ibdev,
 
 	switch (qp->type) {
 	case IB_QPT_ETH:
-		memcpy(&mac, &gid, sizeof(mac));
+		memcpy(&mac, gid, sizeof(mac));
 		status = nodnic_port_remove_mac_filter(&port->port_priv, mac);
 		MLX_CHECK_STATUS(flexboot_nodnic->device_priv, status, mac_err,
 				"nodnic_port_remove_mac_filter failed");
