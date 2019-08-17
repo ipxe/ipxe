@@ -134,7 +134,7 @@ int eth_pull ( struct net_device *netdev __unused, struct io_buffer *iobuf,
 	 * frames, without requiring a full LLC protocol layer.
 	 */
 	if ( eth_is_llc_packet ( ethhdr ) ) {
-		llc_proto = ( &ethhdr->h_protocol + 1 );
+		llc_proto = iobuf->data;
 		*net_proto = *llc_proto;
 	}
 
