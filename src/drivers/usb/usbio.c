@@ -351,8 +351,7 @@ static void usbio_control_poll ( struct usbio_endpoint *endpoint ) {
 	}
 
 	/* Construct transfer */
-	assert ( iob_len ( iobuf ) >= sizeof ( *msg ) );
-	msg = iobuf->data;
+	msg = iob_push ( iobuf, sizeof ( *msg ) );
 	iob_pull ( iobuf, sizeof ( *msg ) );
 	request = le16_to_cpu ( msg->setup.request );
 	len = iob_len ( iobuf );
@@ -995,6 +994,11 @@ static int usbio_endpoint_enqueue ( struct usb_endpoint *ep,
  */
 static int usbio_endpoint_message ( struct usb_endpoint *ep,
 				    struct io_buffer *iobuf ) {
+	struct usb_setup_packet *setup;
+
+	/* Adjust I/O buffer to start of data payload */
+	assert ( iob_len ( iobuf ) >= sizeof ( *setup ) );
+	iob_pull ( iobuf, sizeof ( *setup ) );
 
 	/* Enqueue transfer */
 	return usbio_endpoint_enqueue ( ep, iobuf, USBIO_MESSAGE );
