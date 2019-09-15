@@ -972,6 +972,10 @@ static int usbio_endpoint_enqueue ( struct usb_endpoint *ep,
 	unsigned int fill;
 	unsigned int index;
 
+	/* Fail if shutdown is in progress */
+	if ( efi_shutdown_in_progress )
+		return -ECANCELED;
+
 	/* Fail if transfer ring is full */
 	fill = ( endpoint->prod - endpoint->cons );
 	if ( fill >= USBIO_RING_COUNT )
@@ -1025,6 +1029,10 @@ static int usbio_endpoint_stream ( struct usb_endpoint *ep,
  * @v endpoint		Endpoint
  */
 static void usbio_endpoint_poll ( struct usbio_endpoint *endpoint ) {
+
+	/* Do nothing if shutdown is in progress */
+	if ( efi_shutdown_in_progress )
+		return;
 
 	/* Poll endpoint */
 	endpoint->op->poll ( endpoint );
