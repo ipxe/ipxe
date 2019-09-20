@@ -14,7 +14,8 @@ struct net_device_configurator;
 
 extern int ifopen ( struct net_device *netdev );
 extern int ifconf ( struct net_device *netdev,
-		    struct net_device_configurator *configurator );
+		    struct net_device_configurator *configurator,
+		    unsigned long timeout );
 extern void ifclose ( struct net_device *netdev );
 extern void ifstat ( struct net_device *netdev );
 extern int iflinkwait ( struct net_device *netdev, unsigned long timeout );

@@ -267,7 +267,8 @@ static int ifconf_progress ( struct ifpoller *ifpoller ) {
  * @ret rc		Return status code
  */
 int ifconf ( struct net_device *netdev,
-	     struct net_device_configurator *configurator ) {
+	     struct net_device_configurator *configurator,
+	     unsigned long timeout ) {
 	int rc;
 
 	/* Ensure device is open and link is up */
@@ -296,5 +297,5 @@ int ifconf ( struct net_device *netdev,
 		 ( configurator ? configurator->name : "" ),
 		 ( configurator ? "] " : "" ),
 		 netdev->name, netdev->ll_protocol->ntoa ( netdev->ll_addr ) );
-	return ifpoller_wait ( netdev, configurator, 0, ifconf_progress );
+	return ifpoller_wait ( netdev, configurator, timeout, ifconf_progress );
 }
