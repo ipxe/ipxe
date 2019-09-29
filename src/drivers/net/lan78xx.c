@@ -198,6 +198,13 @@ static int lan78xx_open ( struct net_device *netdev ) {
 				     LAN78XX_BULK_IN_DLY_SET ( 0 ) ) ) != 0 )
 		goto err_bulk_in_dly;
 
+	/* Enable automatic speed and duplex detection */
+	if ( ( rc = smscusb_writel ( smscusb, LAN78XX_MAC_CR,
+				     ( LAN78XX_MAC_CR_ADP |
+				       LAN78XX_MAC_CR_ADD |
+				       LAN78XX_MAC_CR_ASD ) ) ) != 0 )
+		goto err_mac_cr;
+
 	/* Configure receive filters */
 	if ( ( rc = smscusb_writel ( smscusb, LAN78XX_RFE_CTL,
 				     ( LAN78XX_RFE_CTL_AB |
@@ -256,6 +263,7 @@ static int lan78xx_open ( struct net_device *netdev ) {
  err_fct_tx_ctl:
  err_fct_rx_ctl:
  err_rfe_ctl:
+ err_mac_cr:
  err_bulk_in_dly:
  err_int_ep_ctl:
 	usbnet_close ( &smscusb->usbnet );
