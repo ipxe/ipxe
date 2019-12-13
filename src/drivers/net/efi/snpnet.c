@@ -313,7 +313,8 @@ static int snpnet_rx_filters ( struct net_device *netdev ) {
 	/* Try possible receive filters in turn */
 	for ( i = 0; i < ( sizeof ( filters ) / sizeof ( filters[0] ) ); i++ ) {
 		efirc = snp->snp->ReceiveFilters ( snp->snp, filters[i],
-						   0, TRUE, 0, NULL );
+				EFI_SIMPLE_NETWORK_RECEIVE_MULTICAST, TRUE,
+				0, NULL );
 		if ( efirc == 0 )
 			return 0;
 		rc = -EEFI ( efirc );
