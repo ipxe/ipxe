@@ -79,16 +79,18 @@ static int efi_entropy_enable ( void ) {
 	DBGC ( &tick, "ENTROPY %s RNG protocol\n",
 	       ( efirng ? "has" : "has no" ) );
 
-	/* Drop to TPL_APPLICATION to allow timer tick event to take place */
-	bs->RestoreTPL ( TPL_APPLICATION );
+	if ( ! efirng ) {
+		/* Drop to TPL_APPLICATION to allow timer tick event to take place */
+		bs->RestoreTPL ( TPL_APPLICATION );
 
-	/* Create timer tick event */
-	if ( ( efirc = bs->CreateEvent ( EVT_TIMER, TPL_NOTIFY, NULL, NULL,
-					 &tick ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( &tick, "ENTROPY could not create event: %s\n",
-		       strerror ( rc ) );
-		return rc;
+		/* Create timer tick event */
+		if ( ( efirc = bs->CreateEvent ( EVT_TIMER, TPL_NOTIFY, NULL, NULL,
+						&tick ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( &tick, "ENTROPY could not create event: %s\n",
+					strerror ( rc ) );
+			return rc;
+		}
 	}
 
 	return 0;
@@ -101,11 +103,13 @@ static int efi_entropy_enable ( void ) {
 static void efi_entropy_disable ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
-	/* Close timer tick event */
-	bs->CloseEvent ( tick );
+	if ( ! efirng ) {
+		/* Close timer tick event */
+		bs->CloseEvent ( tick );
 
-	/* Return to TPL_CALLBACK */
-	bs->RaiseTPL ( TPL_CALLBACK );
+		/* Return to TPL_CALLBACK */
+		bs->RaiseTPL ( TPL_CALLBACK );
+	}
 }
 
 /**
@@ -213,14 +217,8 @@ static int efi_get_noise_rng ( noise_sample_t *noise ) {
  * @ret rc		Return status code
  */
 static int efi_get_noise ( noise_sample_t *noise ) {
-	int rc;
-
-	/* Try RNG first, falling back to timer ticks */
-	if ( ( ( rc = efi_get_noise_rng ( noise ) ) != 0 ) &&
-	     ( ( rc = efi_get_noise_ticks ( noise ) ) != 0 ) )
-		return rc;
-
-	return 0;
+	/* Use EFI_RNG_PROTOCOL if available and fall back to timer ticks if not */
+	return ( efirng ? efi_get_noise_rng ( noise ) : efi_get_noise_ticks ( noise ) );
 }
 
 PROVIDE_ENTROPY_INLINE ( efi, min_entropy_per_sample );
