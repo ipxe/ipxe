@@ -2,6 +2,9 @@ dist: trusty
 
 sudo: false
 
+git:
+  depth: false
+
 language: c
 
 cache: ccache
