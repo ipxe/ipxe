@@ -70,6 +70,13 @@ struct ipv4_miniroute {
 	struct in_addr gateway;
 };
 
+/** An IPv4 address octets/int union */
+union ipv4_conversion {
+
+	uint32_t address;
+	uint8_t octets[4];
+};
+
 extern struct list_head ipv4_miniroutes;
 
 extern struct net_protocol ipv4_protocol __net_protocol;

@@ -847,33 +847,23 @@ static int ipv4_gratuitous_arp ( struct net_device *netdev,
 }
 
 /**
- * Convert netmask from CIDR notation to the common x.x.x.x notation
+ * Convert netmask from prefix length to IPv4
+ *
+ * @v prefix_len   Prefix length 
+ * @ret rc	  Return IPv4 netmask
  */
-static inline uint8_t cidr_to_mask ( uint8_t cidr, char * buf ) {
-    uint8_t addr_len = 0;
-    uint8_t n_octet = ( cidr % 8 == 0 ? 255 :
-            ( 255 - ( ( 256 >> ( cidr % 8 ) ) - 1 ) ) );
+static inline uint32_t prefix_len_to_mask ( uint8_t prefix_len ) {
 
-    if (cidr > 24 && cidr <= 32) {
-        sprintf(buf, "255.255.255.%d", n_octet);
-        addr_len = 4;
-    } else if (cidr > 16) {
-        sprintf(buf, "255.255.%d.0", n_octet);
-        addr_len = 3;
-    } else if (cidr > 8) {
-        sprintf(buf, "255.%d.0.0", n_octet);
-        addr_len = 2;
-    } else if (cidr > 0) {
-        sprintf(buf, "%d.0.0.0", n_octet);
-        addr_len = 1;
-    } else if (cidr == 0) {
-        sprintf(buf, "0.0.0.0");
-        addr_len = 0;
-    } else {
-        DBGC(cidr, "Unknown netmask descriptor /%d.\n", cidr);
-    }
-
-    return addr_len;
+	/* Check if prefix_len is in the right range. While the prefix_len is unsigned,
+	   we don't have to check for negative numbers */
+	if(prefix_len > 32)
+	{
+		DBGC( prefix_len, "Invalid prefix_len /%u. Must fullfill 0<=prefix_len<=32\n",
+			  prefix_len );
+		return 0;
+	}
+	
+	return htonl ( ( prefix_len > 0 ) ? 0xFFFFFFFF << ( 32 - prefix_len ) : 0 );
 }
 
 /**
@@ -923,52 +913,51 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
 
 		/* Configure route (-s) */
-        uint8_t * raw_data = netdev->static_routes;
+		uint8_t * raw_data = netdev->static_routes;
 		uint8_t option_len = netdev->static_routes_len;
 
 
-        /* Check if static routes available
-         * The minimum length for DHCP option 121 is 5 bytes */
-        if ( option_len >= 5 ) {
-            char buf[16];
-            uint8_t uaddr[4];
-            uint8_t i = 0, j, addr_octets_len;
+		/* Check if static routes available
+		 * The minimum length for DHCP option 121 is 5 bytes */
+		if ( option_len >= 5 ) {
+			uint8_t i = 0;
+			uint8_t j;
+			uint8_t addr_octets_len;
+			uint8_t prefix_len;
 
-            /* Extract routes and add them to routing table */
-            while ( i < option_len ) {
-                uint8_t c = raw_data[i];
-                i++;
+			union ipv4_conversion address_conversion = {0};
+			union ipv4_conversion gateway_conversion = {0};
 
-                /* Netmask */
-                addr_octets_len = cidr_to_mask ( c, buf );
-                inet_aton( buf, &netmask );
+			/* Extract routes and add them to routing table */
+			while ( i < option_len ) {
+				prefix_len = raw_data[i];
+				i++;
 
-                /* Address */
-                memset ( uaddr, 0, 4 * sizeof ( uint8_t ) );
-                for ( j = 0; j < addr_octets_len; j++ )
-                    uaddr[j] = raw_data[i + j];
+				/* Netmask */
+				addr_octets_len = prefix_len / 8;
+				netmask.s_addr = prefix_len_to_mask ( prefix_len );
 
-                sprintf( buf, "%d.%d.%d.%d", uaddr[0], uaddr[1], uaddr[2], uaddr[3] );
-                inet_aton( buf, &address );
+				/* Address */
+				for ( j = 0; j < addr_octets_len; j++ )
+					address_conversion.octets[j] = raw_data[i + j];
 
+				address.s_addr = address_conversion.address;
 
-                /* Gateway */
-                i += j;
-                for ( j = 0; j < 4; j++ )
-                    uaddr[j] = raw_data[i + j];
+				/* Gateway */
+				i += j;
+				for ( j = 0; j < 4; j++ )
+					gateway_conversion.octets[j] = raw_data[i + j];
 
-                sprintf( buf, "%d.%d.%d.%d", uaddr[0], uaddr[1], uaddr[2], uaddr[3] );
-                inet_aton( buf, &gateway );
+				gateway.s_addr = gateway_conversion.address;
+				i += j;
 
-                i += j;
-
-                if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
-                    return rc;
-            }
-        } else {
-            if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
-                return rc;
-        }
+				if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
+					return rc;
+			}
+		} else {
+			if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
+				return rc;
+		}
 	}
 
 	return 0;
