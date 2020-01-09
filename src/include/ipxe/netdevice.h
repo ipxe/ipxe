@@ -426,6 +426,12 @@ struct net_device {
 
 	/** Network device configurations (variable length) */
 	struct net_device_configuration configs[0];
+
+	/** Static routes from DHCP option 121 */
+	uint8_t * static_routes;
+
+	/** DHCP option 121 length */
+	uint8_t static_routes_len;
 };
 
 /** Network device is open */
