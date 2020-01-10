@@ -4,7 +4,7 @@
 #
 
 CLEANUP		:=
-CFLAGS		:=
+CFLAGS		:= -DHAVE_CONFIG_H
 ASFLAGS		:=
 LDFLAGS		:=
 HOST_CFLAGS	:=
@@ -100,6 +100,7 @@ SRCDIRS		+= hci/mucurses hci/mucurses/widgets
 SRCDIRS		+= hci/keymap
 SRCDIRS		+= usr
 SRCDIRS		+= config
+SRCDIRS		+= libqrencode
 
 # These directories contain code that is not eligible for UEFI Secure
 # Boot signing.
@@ -117,6 +118,7 @@ SRCDIRS_INSEC	+= drivers/net/ath/ath9k
 NON_AUTO_SRCS	:=
 NON_AUTO_SRCS	+= core/version.c
 NON_AUTO_SRCS	+= drivers/net/prism2.c
+NON_AUTO_SRCS	+= libqrencode/qrenc.c
 
 # INCDIRS lists the include path
 #
