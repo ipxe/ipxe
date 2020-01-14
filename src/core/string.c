@@ -116,7 +116,7 @@ int memcmp ( const void *first, const void *second, size_t len ) {
 	int diff;
 
 	while ( len-- ) {
-		diff = ( *(second_bytes++) - *(first_bytes++) );
+		diff = ( *(first_bytes++) - *(second_bytes++) );
 		if ( diff )
 			return diff;
 	}

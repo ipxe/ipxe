@@ -109,6 +109,7 @@ static void string_test_exec ( void ) {
 	ok ( memcmp ( "", "", 0 ) == 0 );
 	ok ( memcmp ( "Foo", "Foo", 3 ) == 0 );
 	ok ( memcmp ( "Foo", "Bar", 3 ) != 0 );
+	ok ( memcmp ( "abc", "def", 3 ) < 0 );
 
 	/* Test strstr() */
 	{
