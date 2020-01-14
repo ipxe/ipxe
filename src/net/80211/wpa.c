@@ -304,8 +304,13 @@ static void wpa_derive_ptk ( struct wpa_common_ctx *ctx )
 		memcpy ( ptk_data.nonce2, ctx->Anonce, WPA_NONCE_LEN );
 	}
 
-	DBGC2 ( ctx, "WPA %p A1 %s, A2 %s\n", ctx, eth_ntoa ( ptk_data.mac1 ),
-	       eth_ntoa ( ptk_data.mac2 ) );
+	{ /* need a spare buffer since we call eth_ntoa() twice */
+		char buf[18];
+		strcpy(buf, eth_ntoa ( ptk_data.mac1 ));
+		DBGC2 ( ctx, "WPA %p A1 %s, A2 %s\n", ctx, buf,
+		       eth_ntoa ( ptk_data.mac2 ) );
+	}
+
 	DBGC2 ( ctx, "WPA %p Nonce1, Nonce2:\n", ctx );
 	DBGC2_HD ( ctx, ptk_data.nonce1, WPA_NONCE_LEN );
 	DBGC2_HD ( ctx, ptk_data.nonce2, WPA_NONCE_LEN );
