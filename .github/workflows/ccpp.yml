@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: make
-      run: cd src && make V=1
+      run: cd src && make -d V=1
     - name: make check
       run: make check
     - name: make distcheck
