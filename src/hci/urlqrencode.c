@@ -1,6 +1,6 @@
 /* Based on code example from libqrencode and modified to use IBM CP 437 chars */
 
-#include <qrencode.h>
+#include "libqrencode/qrencode.h"
 #include <stdio.h>
 #include <stdlib.h>
 
