@@ -1948,15 +1948,22 @@ const struct setting reverse_password_setting __setting ( SETTING_AUTH_EXTRA,
  */
 static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 				   const char *root_path ) {
-	char rp_copy[ strlen ( root_path ) + 1 ];
+	char *rp_copy;
 	char *rp_comp[NUM_RP_COMPONENTS];
-	char *rp = rp_copy;
+	char *rp;
 	int skip = 0;
 	int i = 0;
 	int rc;
 
+	/* Create modifiable copy of root path */
+	rp_copy = strdup ( root_path );
+	if ( ! rp_copy ) {
+		rc = -ENOMEM;
+		goto err_strdup;
+	}
+	rp = rp_copy;
+
 	/* Split root path into component parts */
-	strcpy ( rp_copy, root_path );
 	while ( 1 ) {
 		rp_comp[i++] = rp;
 		if ( i == NUM_RP_COMPONENTS )
@@ -1965,7 +1972,8 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 			if ( ! *rp ) {
 				DBGC ( iscsi, "iSCSI %p root path \"%s\" "
 				       "too short\n", iscsi, root_path );
-				return -EINVAL_ROOT_PATH_TOO_SHORT;
+				rc = -EINVAL_ROOT_PATH_TOO_SHORT;
+				goto err_split;
 			} else if ( *rp == '[' ) {
 				skip = 1;
 			} else if ( *rp == ']' ) {
@@ -1977,21 +1985,31 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 
 	/* Use root path components to configure iSCSI session */
 	iscsi->target_address = strdup ( rp_comp[RP_SERVERNAME] );
-	if ( ! iscsi->target_address )
-		return -ENOMEM;
+	if ( ! iscsi->target_address ) {
+		rc = -ENOMEM;
+		goto err_servername;
+	}
 	iscsi->target_port = strtoul ( rp_comp[RP_PORT], NULL, 10 );
 	if ( ! iscsi->target_port )
 		iscsi->target_port = ISCSI_PORT;
 	if ( ( rc = scsi_parse_lun ( rp_comp[RP_LUN], &iscsi->lun ) ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p invalid LUN \"%s\"\n",
 		       iscsi, rp_comp[RP_LUN] );
-		return rc;
+		goto err_lun;
 	}
 	iscsi->target_iqn = strdup ( rp_comp[RP_TARGETNAME] );
-	if ( ! iscsi->target_iqn )
-		return -ENOMEM;
+	if ( ! iscsi->target_iqn ) {
+		rc = -ENOMEM;
+		goto err_targetname;
+	}
 
-	return 0;
+ err_targetname:
+ err_lun:
+ err_servername:
+ err_split:
+	free ( rp_copy );
+ err_strdup:
+	return rc;
 }
 
 /**
