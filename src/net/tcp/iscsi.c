@@ -980,18 +980,26 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	uint8_t buf[ strlen ( value ) ]; /* Decoding never expands data */
+	uint8_t *buf;
 	unsigned int i;
 	int len;
 	int rc;
 
+	/* Allocate decoding buffer */
+	len = strlen ( value ); /* Decoding never expands data */
+	buf = malloc ( len );
+	if ( ! buf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
 	/* Process challenge */
-	len = iscsi_large_binary_decode ( value, buf, sizeof ( buf ) );
+	len = iscsi_large_binary_decode ( value, buf, len );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( iscsi, "iSCSI %p invalid CHAP challenge \"%s\": %s\n",
 		       iscsi, value, strerror ( rc ) );
-		return rc;
+		goto err_decode;
 	}
 	chap_update ( &iscsi->chap, buf, len );
 
@@ -1009,7 +1017,13 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 		}
 	}
 
-	return 0;
+	/* Success */
+	rc = 0;
+
+ err_decode:
+	free ( buf );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -1050,7 +1064,7 @@ static int iscsi_handle_chap_n_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	uint8_t buf[ strlen ( value ) ]; /* Decoding never expands data */
+	uint8_t *buf;
 	int len;
 	int rc;
 
@@ -1059,7 +1073,7 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p could not initialise CHAP: %s\n",
 		       iscsi, strerror ( rc ) );
-		return rc;
+		goto err_chap_init;
 	}
 	chap_set_identifier ( &iscsi->chap, iscsi->chap_challenge[0] );
 	if ( iscsi->target_password ) {
@@ -1070,31 +1084,47 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 		      ( sizeof ( iscsi->chap_challenge ) - 1 ) );
 	chap_respond ( &iscsi->chap );
 
+	/* Allocate decoding buffer */
+	len = strlen ( value ); /* Decoding never expands data */
+	buf = malloc ( len );
+	if ( ! buf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
 	/* Process response */
-	len = iscsi_large_binary_decode ( value, buf, sizeof ( buf ) );
+	len = iscsi_large_binary_decode ( value, buf, len );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( iscsi, "iSCSI %p invalid CHAP response \"%s\": %s\n",
 		       iscsi, value, strerror ( rc ) );
-		return rc;
+		goto err_decode;
 	}
 
 	/* Check CHAP response */
 	if ( len != ( int ) iscsi->chap.response_len ) {
 		DBGC ( iscsi, "iSCSI %p invalid CHAP response length\n",
 		       iscsi );
-		return -EPROTO_INVALID_CHAP_RESPONSE;
+		rc = -EPROTO_INVALID_CHAP_RESPONSE;
+		goto err_response_len;
 	}
 	if ( memcmp ( buf, iscsi->chap.response, len ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p incorrect CHAP response \"%s\"\n",
 		       iscsi, value );
-		return -EACCES_INCORRECT_TARGET_PASSWORD;
+		rc = -EACCES_INCORRECT_TARGET_PASSWORD;
+		goto err_response;
 	}
 
 	/* Mark session as authenticated */
 	iscsi->status |= ISCSI_STATUS_AUTH_REVERSE_OK;
 
-	return 0;
+ err_response:
+ err_response_len:
+ err_decode:
+	free ( buf );
+ err_alloc:
+ err_chap_init:
+	return rc;
 }
 
 /** An iSCSI text string that we want to handle */
