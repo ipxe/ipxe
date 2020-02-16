@@ -655,7 +655,7 @@ static struct interface_descriptor slam_xfer_desc =
  */
 static int slam_parse_multicast_address ( struct slam_request *slam,
 					  const char *path,
-					  struct sockaddr_in *address ) {
+					  struct sockaddr_tcpip *address ) {
 	char *path_dup;
 	char *sep;
 	char *end;
@@ -673,7 +673,7 @@ static int slam_parse_multicast_address ( struct slam_request *slam,
 	sep = strchr ( path_dup, ':' );
 	if ( sep ) {
 		*(sep++) = '\0';
-		address->sin_port = htons ( strtoul ( sep, &end, 0 ) );
+		address->st_port = htons ( strtoul ( sep, &end, 0 ) );
 		if ( *end != '\0' ) {
 			DBGC ( slam, "SLAM %p invalid multicast port "
 			       "\"%s\"\n", slam, sep );
@@ -683,7 +683,7 @@ static int slam_parse_multicast_address ( struct slam_request *slam,
 	}
 
 	/* Parse address */
-	if ( inet_aton ( path_dup, &address->sin_addr ) == 0 ) {
+	if ( sock_aton ( path_dup, ( ( struct sockaddr * ) address ) ) == 0 ) {
 		DBGC ( slam, "SLAM %p invalid multicast address \"%s\"\n",
 		       slam, path_dup );
 		rc = -EINVAL;
@@ -715,7 +715,7 @@ static int slam_open ( struct interface *xfer, struct uri *uri ) {
 	};
 	struct slam_request *slam;
 	struct sockaddr_tcpip server;
-	struct sockaddr_in multicast;
+	struct sockaddr_tcpip multicast;
 	int rc;
 
 	/* Sanity checks */
