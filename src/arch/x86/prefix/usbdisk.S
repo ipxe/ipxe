@@ -1,5 +1,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <config/console.h>
+
 	.text
 	.arch i386
 	.section ".prefix", "awx", @progbits
@@ -7,6 +9,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 	.org 0
 
 #include "mbr.S"
+
+#ifdef CONSOLE_INT13
 
 /* Partition table: 64 heads, 32 sectors/track (ZIP-drive compatible) */
 	.org 446
@@ -32,3 +36,23 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 /* Skip to start of boot partition */
 	.org 2048 * 512
+
+#else /* CONSOLE_INT13 */
+
+/* Partition table: 64 heads, 32 sectors/track (ZIP-drive compatible) */
+	.org 446
+	.space 16
+	.space 16
+	.space 16
+	.byte 0x80, 0x01, 0x01, 0x00
+	.byte 0xeb, 0x3f, 0x20, 0x01
+	.long 0x00000020
+	.long 0x00000fe0
+
+	.org 510
+	.byte 0x55, 0xaa
+
+/* Skip to start of partition */
+	.org 32 * 512
+
+#endif
