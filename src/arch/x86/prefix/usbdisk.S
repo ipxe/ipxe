@@ -1,5 +1,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+#include <config/console.h>
+
 	.text
 	.arch i386
 	.section ".prefix", "awx", @progbits
@@ -13,10 +15,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define SECTORS 32
 #define CYLADDR(cyl) ((((cyl) * HEADS + (((cyl) == 0) & 1)) * SECTORS) * 512)
 
+#ifdef CONSOLE_INT13
+#define LOGPART 1
 #define LOGSTART 0
 #define LOGCOUNT 1
 #define BOOTSTART 1
 #define BOOTCOUNT 2
+#else /* CONSOLE_INT13 */
+#define LOGPART 0
+#define BOOTSTART 0
+#define BOOTCOUNT 2
+#endif /* CONSOLE_INT13 */
 
 	/* Construct a C/H/S address */
 	.macro	chs cylinder, head, sector
@@ -44,8 +53,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 	.org 446
 	.space 16
 	.space 16
+
 	/* Partition 3: log partition (for CONSOLE_INT13) */
+	.if LOGPART
 	partition 0x00, 0xe0, LOGSTART, LOGCOUNT
+	.else
+	.space 16
+	.endif
+
 	/* Partition 4: boot partition */
 	partition 0x80, 0xeb, BOOTSTART, BOOTCOUNT
 
@@ -54,8 +69,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 	.byte 0x55, 0xaa
 
 /* Skip to start of log partition */
+	.if LOGPART
 	.org CYLADDR(LOGSTART)
 	.ascii "iPXE LOG\n\n"
+	.endif
 
 /* Skip to start of boot partition */
 	.org CYLADDR(BOOTSTART)
