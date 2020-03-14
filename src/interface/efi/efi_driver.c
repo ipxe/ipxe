@@ -39,6 +39,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/* Disambiguate the various error causes */
+#define EINFO_EEFI_CONNECT						\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x01,			\
+			  "Could not connect controllers" )
+#define EINFO_EEFI_CONNECT_PROHIBITED					\
+	__einfo_platformify ( EINFO_EEFI_CONNECT,			\
+			      EFI_SECURITY_VIOLATION,			\
+			      "Connecting controllers prohibited by "	\
+			      "security policy" )
+#define EEFI_CONNECT_PROHIBITED						\
+	__einfo_error ( EINFO_EEFI_CONNECT_PROHIBITED )
+#define EEFI_CONNECT( efirc ) EPLATFORM ( EINFO_EEFI_CONNECT, efirc,	\
+					  EEFI_CONNECT_PROHIBITED )
+
 static EFI_DRIVER_BINDING_PROTOCOL efi_driver_binding;
 
 /** List of controlled EFI devices */
@@ -457,7 +471,7 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 	       efi_handle_name ( device ) );
 	if ( ( efirc = bs->ConnectController ( device, drivers, NULL,
 					       FALSE ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+		rc = -EEFI_CONNECT ( efirc );
 		DBGC ( device, "EFIDRV %s could not connect new drivers: "
 		       "%s\n", efi_handle_name ( device ), strerror ( rc ) );
 		return rc;
