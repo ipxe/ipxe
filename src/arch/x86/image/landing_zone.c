@@ -18,8 +18,8 @@ struct sl_header {
 
 struct lz_header {
 	u8  uuid[16];
-	u32 slaunch_loader_size;
-	u32 zero_page_addr;
+	u32 boot_protocol;
+	u32 proto_struct;
 	u32 event_log_addr;
 	u32 event_log_size;
 	u8  msb_key_hash[20];
@@ -52,7 +52,7 @@ static physaddr_t target;
  * @v image		LZ file
  * @v zeropage	Address of zero page
  */
-int lz_set_bzimage ( struct image *image, userptr_t zeropage, userptr_t tgt ) {
+int lz_set ( struct image *image, userptr_t zeropage, userptr_t tgt, int proto ) {
 	target = user_to_phys ( tgt, 0 );
 	int rc;
 
@@ -73,7 +73,8 @@ int lz_set_bzimage ( struct image *image, userptr_t zeropage, userptr_t tgt ) {
 	DBGC ( image, "LZ %p writing zeropage address: 0x%lx\n", image,
 	       user_to_phys ( zeropage, 0 ) );
 
-	hdr->zero_page_addr = user_to_phys ( zeropage, 0 );
+	hdr->boot_protocol = proto;
+	hdr->proto_struct = user_to_phys ( zeropage, 0 );
 
 	struct drtm_t *drtm = ( struct drtm_t *)
 	                      acpi_find ( ACPI_SIGNATURE ('D', 'R', 'T', 'M'), 0 );
