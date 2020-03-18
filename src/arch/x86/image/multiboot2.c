@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <assert.h>
 #include <multiboot2.h>
+#include <landing_zone.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
@@ -378,7 +379,11 @@ static int multiboot2_load ( struct image *image, struct multiboot2_tags *tags,
 		DBGC ( image, "MULTIBOOT2 %p could not load elf image\n", image );
 		return rc;
 	}
+#ifdef EFIAPI
 	*entry = tags->entry_addr_efi64;
+#else
+	(void)tags;
+#endif
 
 	return rc;
 }
@@ -420,8 +425,8 @@ static size_t multiboot2_add_modules ( struct image *image, size_t offset ) {
 		module = (struct multiboot_tag_module *)&mb2_bib.bib[offset];
 		module->type = MULTIBOOT_TAG_TYPE_MODULE;
 		module->size = sizeof(*module);
-		module->mod_start = memory;
-		module->mod_end = ( memory + module_image->len );
+		module->mod_start = user_to_phys ( memory, 0 );
+		module->mod_end = user_to_phys ( memory, module_image->len );
 
 		buf = module->cmdline;
 		remaining = MB_MAX_BOOTINFO_SIZE - offset - sizeof(*module);
@@ -457,6 +462,7 @@ static size_t multiboot2_add_modules ( struct image *image, size_t offset ) {
 }
 
 void multiboot2_boot(uint32_t *bib, uint32_t entry) {
+/* This should probably test for x64 directly instead of UEFI */
 #ifdef EFIAPI
 	__asm__ __volatile__ ( "push %%rbp\n\t"
 						   "call *%%rdi\n\t"
@@ -466,8 +472,13 @@ void multiboot2_boot(uint32_t *bib, uint32_t entry) {
 						   "D" ( entry )
 						 : "rcx", "rdx", "rsi", "memory" );
 #else
-	(void)bib;
-	(void)entry;
+	__asm__ __volatile__ ( "push %%ebp\n\t"
+						   "call *%%edi\n\t"
+						   "pop %%ebp\n\t"
+					   : : "a" ( MULTIBOOT2_BOOTLOADER_MAGIC ),
+						   "b" ( bib ),
+						   "D" ( entry )
+						 : "ecx", "edx", "esi", "memory" );
 #endif
 }
 
@@ -485,6 +496,7 @@ static int multiboot2_exec ( struct image *image ) {
 #ifdef EFIAPI
 	struct multiboot_tag_efi64 *tag_efi64;
 #endif
+	struct image *lz;
 	uint32_t *total_size;
 	uint32_t *reserved;
 	physaddr_t load;
@@ -511,6 +523,19 @@ static int multiboot2_exec ( struct image *image ) {
 	if ( ( rc = multiboot2_load ( image, &mb_tags, &load, &entry, &max ) ) != 0) {
 		DBGC ( image, "MULTIBOOT2 %p could not load\n", image );
 		return rc;
+	}
+
+	if ( ( lz = find_image ( "landing_zone" ) ) != NULL ) {
+		unregister_image ( image_get ( lz ) );
+
+		max = ( max + LZ_ALIGN - 1 ) & ~( LZ_ALIGN - 1 );
+
+		lz_set ( lz, ( userptr_t ) mb2_bib.bib, phys_to_user ( max ),
+		         LZ_PROTO_MULTIBOOT2 );
+		/* Doesn't seem that max is used anywhere... Can LZ and kernel be
+		 * overwritten by modules?
+		 */
+		max += SLB_SIZE;
 	}
 
 	/* Populate multiboot information structure */
@@ -570,6 +595,8 @@ static int multiboot2_exec ( struct image *image ) {
 	offset = multiboot2_add_modules ( image, offset );
 	offset = adjust_tag_offset(offset);
 
+	/* TODO: provide memory information */
+
 	/* Terminate the tags */
 	tag = (struct multiboot_tag *)&mb2_bib.bib[offset];
 	tag->type = 0;
@@ -584,6 +611,13 @@ static int multiboot2_exec ( struct image *image ) {
 	 * interface, so shut everything down prior to booting the OS.
 	 */
 	shutdown_boot();
+
+	if ( lz != NULL ) {
+		register_image ( lz );
+		image_put ( lz );
+
+		return image_replace ( lz );
+	}
 
 	/* Jump to OS with flat physical addressing */
 	DBGC ( image, "MULTIBOOT2 %p starting execution at %lx\n", image, entry );

@@ -16,7 +16,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define LZ_ALIGN ( 64 * 1024 )
 #define SLB_SIZE ( 64 * 1024 )
 
-int lz_set_bzimage ( struct image *image, userptr_t zeropage, physaddr_t tgt );
+#define LZ_PROTO_LINUX_BOOT	0
+#define LZ_PROTO_MULTIBOOT2	2
+
+int lz_set ( struct image *image, userptr_t zeropage, physaddr_t tgt, int proto );
 
 #endif /* _LANDING_ZONE_H */
 

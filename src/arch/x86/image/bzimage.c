@@ -673,7 +673,8 @@ static int bzimage_exec ( struct image *image ) {
 		 */
 		bzimg.pm_sz = ( bzimg.pm_sz + LZ_ALIGN - 1 ) & ~( LZ_ALIGN - 1 );
 
-		lz_set_bzimage ( lz, bzimg.rm_kernel, bzimg.pm_kernel + bzimg.pm_sz );
+		lz_set ( lz, bzimg.rm_kernel, bzimg.pm_kernel + bzimg.pm_sz,
+		         LZ_PROTO_LINUX_BOOT );
 		bzimg.pm_sz += SLB_SIZE;
 	}
 

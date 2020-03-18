@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define	IMAGE_ELF		/* ELF image support */
 #define	IMAGE_MULTIBOOT		/* MultiBoot image support */
+#define	IMAGE_MULTIBOOT2		/* MultiBoot image support */
 #define	IMAGE_PXE		/* PXE image support */
 #define IMAGE_SCRIPT		/* iPXE script image support */
 #define IMAGE_BZIMAGE		/* Linux bzImage image support */
