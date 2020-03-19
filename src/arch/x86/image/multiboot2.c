@@ -526,11 +526,16 @@ static int multiboot2_exec ( struct image *image ) {
 	}
 
 	if ( ( lz = find_image ( "landing_zone" ) ) != NULL ) {
+		physaddr_t *args = (physaddr_t *) &mb2_bib;
 		unregister_image ( image_get ( lz ) );
 
 		max = ( max + LZ_ALIGN - 1 ) & ~( LZ_ALIGN - 1 );
 
-		lz_set ( lz, ( userptr_t ) mb2_bib.bib, phys_to_user ( max ),
+		args[0] = entry;
+		Elf_Ehdr *Ehdr = (Elf_Ehdr *) image->data;
+		Elf_Phdr *Phdr = (Elf_Phdr *) ( image->data + Ehdr->e_phoff );
+		args[1] = Phdr->p_filesz;
+		lz_set ( lz, ( userptr_t ) &mb2_bib, phys_to_user ( max ),
 		         LZ_PROTO_MULTIBOOT2 );
 		/* Doesn't seem that max is used anywhere... Can LZ and kernel be
 		 * overwritten by modules?

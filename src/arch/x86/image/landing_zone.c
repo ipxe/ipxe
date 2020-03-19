@@ -81,6 +81,7 @@ struct lz_tag_boot_linux {
 struct lz_tag_boot_mb2 {
 	struct lz_tag_hdr hdr;
 	u32 mbi;
+	u32 kernel_entry;
 	u32 kernel_size;
 } __attribute__ (( packed ));
 
@@ -170,10 +171,12 @@ int lz_set ( struct image *image, userptr_t zeropage, userptr_t tgt, int proto )
 		case LZ_PROTO_MULTIBOOT2:
 		{
 			struct lz_tag_boot_mb2 *b = ((void *)tags) + tags->size;
+			physaddr_t *args = (physaddr_t *)zeropage;
 			b->hdr.type = LZ_TAG_BOOT_MB2;
 			b->hdr.len = sizeof(struct lz_tag_boot_mb2);
 			b->mbi = user_to_phys ( zeropage, 0 );
-			b->kernel_size = 0;
+			b->kernel_entry = args[0];
+			b->kernel_size = args[1];
 			tags->size += b->hdr.len;
 			break;
 
