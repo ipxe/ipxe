@@ -116,6 +116,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	IMAGE_PNG		/* PNG image support */
 #define	IMAGE_DER		/* DER image support */
 #define	IMAGE_PEM		/* PEM image support */
+#define	IMAGE_GZIP		/* GZIP image support */
 
 /*
  * Command-line commands to include

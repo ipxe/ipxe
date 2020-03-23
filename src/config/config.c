@@ -182,6 +182,9 @@ REQUIRE_OBJECT ( efi_image );
 #ifdef IMAGE_SDI
 REQUIRE_OBJECT ( sdi );
 #endif
+#ifdef IMAGE_GZIP
+REQUIRE_OBJECT ( gzip );
+#endif
 
 /*
  * Drag in all requested commands

@@ -295,6 +295,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_png		      ( ERRFILE_IMAGE | 0x00070000 )
 #define ERRFILE_der		      ( ERRFILE_IMAGE | 0x00080000 )
 #define ERRFILE_pem		      ( ERRFILE_IMAGE | 0x00090000 )
+#define ERRFILE_gzip		      ( ERRFILE_IMAGE | 0x000a0000 )
 
 #define ERRFILE_asn1		      ( ERRFILE_OTHER | 0x00000000 )
 #define ERRFILE_chap		      ( ERRFILE_OTHER | 0x00010000 )
