@@ -500,15 +500,33 @@ static void deflate_copy ( struct deflate *deflate, struct deflate_chunk *out,
 			copy_len = len;
 		while ( copy_len-- ) {
 			memcpy_user ( out->data, out_offset++,
-				      start, in_offset++, 1 );
+			              start, in_offset++, 1 );
+		}
+	}
+	
+	/* Copy data within gzip window */
+	if ( deflate->window ) {
+		copy_len = len;
+		in_offset = offset;
+		out_offset = out->offset;
+		if ( out->data != start ){
+			while ( copy_len --> 0 ) {
+				memcpy_user ( deflate->window, ( out_offset++ ) % GZIP_WSIZE,
+				              start, in_offset++, 1 );
+			}
+			deflate->checksum = crc32_le( deflate->checksum, 
+			                              user_to_virt ( start, offset ), len );
+		} else {
+			while ( copy_len --> 0 ) {
+				deflate->checksum = crc32_le( deflate->checksum, 
+			          user_to_virt ( deflate->window, in_offset % GZIP_WSIZE ), 1 );
+				memcpy_user ( deflate->window, ( out_offset++ ) % GZIP_WSIZE,
+				              deflate->window, ( in_offset++  ) % GZIP_WSIZE, 1 );
+			}
 		}
 	}
 	out->offset += len;
 	deflate->total_length += len;
-
-	if ( deflate->format == DEFLATE_GZIP ) {
-		deflate->checksum = crc32_le( deflate->checksum, user_to_virt ( start, offset ), len );
-	}
 }
 
 /**
@@ -542,6 +560,10 @@ int deflate_inflate ( struct deflate *deflate,
 		case DEFLATE_RAW:	goto block_header;
 		case DEFLATE_ZLIB:	goto zlib_header;
 		case DEFLATE_GZIP:
+			if ( deflate->window == UNULL ) {
+				DBGC ( deflate, "DEFLATE %p window buffer not available", deflate );
+				return -EINVAL;
+			}
 			deflate->checksum = 0xffffffff;
 			goto gzip_header;
 		default:		assert ( 0 );

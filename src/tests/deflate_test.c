@@ -178,9 +178,11 @@ static void deflate_okx ( struct deflate *deflate,
 	size_t offset = 0;
 	size_t remaining = test->compressed_len;
 	unsigned int i;
+	uint8_t gzip_window[ GZIP_WSIZE ];
 
 	/* Initialise decompressor */
 	deflate_init ( deflate, test->format );
+	deflate->window = virt_to_user ( gzip_window );
 
 	/* Initialise output chunk */
 	deflate_chunk_init ( &out, virt_to_user ( data ), 0, sizeof ( data ) );

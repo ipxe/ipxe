@@ -138,6 +138,9 @@ enum deflate_format {
 /** GZIP footer ISIZE bytes */
 #define GZIP_FOOTER_ISIZE_BYTES 4
 
+/** GZIP Window size--must be a power of two, and at least 32K */
+#define GZIP_WSIZE 0x8000  
+
 /** A Huffman-coded set of symbols of a given length */
 struct deflate_huf_symbols {
 	/** Length of Huffman-coded symbols */
@@ -268,6 +271,13 @@ struct deflate {
 
 	/** Total inflated length */
 	unsigned int total_length;
+	
+	/** Window buffer needed for gzip
+	 * This should be allocated by the caller in the length of 
+	 * GZIP_WSIZE before calling deflate_inflate () when 
+	 * decompressing GZIP streams.
+	 */
+	userptr_t window;
 };
 
 /** A chunk of data */
