@@ -49,6 +49,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/validator.h>
 #include <ipxe/job.h>
 #include <ipxe/tls.h>
+#include <config/tls.h>
 
 /* Disambiguate the various error causes */
 #define EINVAL_CHANGE_CIPHER __einfo_error ( EINFO_EINVAL_CHANGE_CIPHER )
@@ -1036,11 +1037,13 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
 					uint8_t name[name_len];
 				} __attribute__ (( packed )) list[1];
 			} __attribute__ (( packed )) server_name;
+#ifdef TLS_FRAGMENTATION_ENABLED
 			uint16_t max_fragment_length_type;
 			uint16_t max_fragment_length_len;
 			struct {
 				uint8_t max;
 			} __attribute__ (( packed )) max_fragment_length;
+#endif
 			uint16_t signature_algorithms_type;
 			uint16_t signature_algorithms_len;
 			struct {
@@ -1091,12 +1094,14 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
 		= htons ( sizeof ( hello.extensions.server_name.list[0].name ));
 	memcpy ( hello.extensions.server_name.list[0].name, session->name,
 		 sizeof ( hello.extensions.server_name.list[0].name ) );
+#ifdef TLS_FRAGMENTATION_ENABLED
 	hello.extensions.max_fragment_length_type
 		= htons ( TLS_MAX_FRAGMENT_LENGTH );
 	hello.extensions.max_fragment_length_len
 		= htons ( sizeof ( hello.extensions.max_fragment_length ) );
 	hello.extensions.max_fragment_length.max
-		= TLS_MAX_FRAGMENT_LENGTH_4096;
+		= TLS_REQUESTED_MAX_FRAGMENT_LENGTH;
+#endif
 	hello.extensions.signature_algorithms_type
 		= htons ( TLS_SIGNATURE_ALGORITHMS );
 	hello.extensions.signature_algorithms_len
