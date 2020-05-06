@@ -418,6 +418,7 @@ CFLAGS		+= -Os
 CFLAGS		+= -g
 ifeq ($(CCTYPE),gcc)
 CFLAGS		+= -ffreestanding
+CFLAGS		+= -fcommon
 CFLAGS		+= -Wall -W -Wformat-nonliteral
 HOST_CFLAGS	+= -Wall -W -Wformat-nonliteral
 endif
