@@ -215,6 +215,66 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 	return rc;
 }
 
+/**
+ * retrieve Host Address corresponding to pci bus address
+ *
+ * @v pci		PCI device
+ * @v bus_addr		PCI Bus address
+ * @v len		Length of region
+ * @ret io_addr		Host address
+ */
+static uint64_t efi_pci_ioremap ( struct pci_device *pci, uint64_t bus_addr,
+				  size_t  len ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
+	EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR *config;
+	EFI_HANDLE handle;
+	EFI_STATUS efirc;
+	uint64_t bus_addr_start;
+	int rc;
+
+	/* Identify root bridge */
+	if ( ( rc = efipci_root ( pci, &handle, &root ) ) != 0 )
+		goto err_root;
+
+	/* Retrieves the current resource settings of this PCI root bridge */
+	efirc = root->Configuration ( root, (void **) &config);
+	if (efirc != 0) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT "Retrieval of current resource "
+		       "settings of PCI root bridge failed: %s\n",
+		       PCI_ARGS ( pci ), strerror ( rc ) );
+		goto err_configuration;
+	}
+
+	/* According to UEFI 2.7,
+	 * EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL::Configuration()
+	 * returns host address instead of device address,
+	 * while AddrTranslationOffset is not zero, and
+	 * device address = host address + AddrTranslationOffset, so
+	 * we convert host address to device address for range compare.
+	 */
+	while ( config->Desc == ACPI_ADDRESS_SPACE_DESCRIPTOR ) {
+		bus_addr_start = config->AddrRangeMin +
+				 config->AddrTranslationOffset;
+		if ( ( config->ResType == ACPI_ADDRESS_SPACE_TYPE_MEM ) &&
+		     ( bus_addr_start <= bus_addr ) &&
+		     ( bus_addr_start + config->AddrLen >= bus_addr + len ) ) {
+			return ( bus_addr - config->AddrTranslationOffset );
+		}
+		config++;
+	}
+
+	return bus_addr;
+
+err_configuration:
+	bs->CloseProtocol ( handle, &efi_pci_root_bridge_io_protocol_guid,
+			    efi_image_handle, handle );
+err_root:
+	return rc;
+}
+
+PROVIDE_PCIAPI (efi, pci_ioremap, efi_pci_ioremap);
 PROVIDE_PCIAPI_INLINE ( efi, pci_num_bus );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );

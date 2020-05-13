@@ -122,4 +122,14 @@ int pci_write_config_word ( struct pci_device *pci, unsigned int where,
 int pci_write_config_dword ( struct pci_device *pci, unsigned int where,
 			     uint32_t value );
 
+/**
+ * retrieve Host Address corresponding to pci bus address
+ *
+ * @v pci		PCI device
+ * @v bus_addr		PCI Bus address
+ * @v len		Length of region
+ * @ret io_addr		Host address
+ */
+uint64_t pci_ioremap ( struct pci_device *pci, uint64_t bus_addr, size_t len );
+
 #endif /* _IPXE_PCI_IO_H */
