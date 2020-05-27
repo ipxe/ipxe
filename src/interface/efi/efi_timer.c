@@ -124,11 +124,18 @@ static unsigned long efi_currticks ( void ) {
 	 * EFI's violation of this assumption by falling back to a
 	 * simple free-running monotonic counter during shutdown.
 	 */
+	 EFI_TPL Efi_OldTPL;
+	 Efi_OldTPL=0;
 	if ( efi_shutdown_in_progress ) {
 		efi_jiffies++;
 	} else {
-		bs->RestoreTPL ( TPL_APPLICATION );
-		bs->RaiseTPL ( TPL_CALLBACK );
+			Efi_OldTPL = bs->RaiseTPL( TPL_CALLBACK);
+			bs->RestoreTPL ( TPL_APPLICATION );
+            bs->RaiseTPL ( TPL_CALLBACK );
+            if ( Efi_OldTPL != 0 ) {
+				bs->RestoreTPL(Efi_OldTPL);
+			}
+
 	}
 
 	return ( efi_jiffies * ( TICKS_PER_SEC / EFI_JIFFIES_PER_SEC ) );
