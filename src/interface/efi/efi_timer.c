@@ -131,8 +131,8 @@ static unsigned long efi_currticks ( void ) {
 	} else {
 			Efi_OldTPL = bs->RaiseTPL( TPL_CALLBACK);
 			bs->RestoreTPL ( TPL_APPLICATION );
-            bs->RaiseTPL ( TPL_CALLBACK );
-            if ( Efi_OldTPL != 0 ) {
+			bs->RaiseTPL ( TPL_CALLBACK );
+			if ( Efi_OldTPL != 0 ) {
 				bs->RestoreTPL(Efi_OldTPL);
 			}
 
