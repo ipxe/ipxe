@@ -129,13 +129,12 @@ static unsigned long efi_currticks ( void ) {
 	if ( efi_shutdown_in_progress ) {
 		efi_jiffies++;
 	} else {
-			Efi_OldTPL = bs->RaiseTPL( TPL_CALLBACK);
-			bs->RestoreTPL ( TPL_APPLICATION );
-			bs->RaiseTPL ( TPL_CALLBACK );
-			if ( Efi_OldTPL != 0 ) {
-				bs->RestoreTPL(Efi_OldTPL);
-			}
-
+		Efi_OldTPL = bs->RaiseTPL( TPL_CALLBACK);
+		bs->RestoreTPL ( TPL_APPLICATION );
+		bs->RaiseTPL ( TPL_CALLBACK );
+		if ( Efi_OldTPL != 0 ) {
+			bs->RestoreTPL(Efi_OldTPL);
+		}
 	}
 
 	return ( efi_jiffies * ( TICKS_PER_SEC / EFI_JIFFIES_PER_SEC ) );
