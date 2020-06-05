@@ -594,11 +594,14 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 	       sandev->drive, efi_devpath_text ( boot_path ) );
 
 	/* Try loading boot image from this device */
+	*image = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, boot_path,
 				       NULL, 0, image ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( sandev, "EFIBLK %#02x could not load image: %s\n",
 		       sandev->drive, strerror ( rc ) );
+		if ( efirc == EFI_SECURITY_VIOLATION )
+			bs->UnloadImage ( *image );
 		goto err_load_image;
 	}
 
