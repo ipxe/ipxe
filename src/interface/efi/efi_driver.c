@@ -474,7 +474,16 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 		rc = -EEFI_CONNECT ( efirc );
 		DBGC ( device, "EFIDRV %s could not connect new drivers: "
 		       "%s\n", efi_handle_name ( device ), strerror ( rc ) );
-		return rc;
+		DBGC ( device, "EFIDRV %s connecting driver directly\n",
+		       efi_handle_name ( device ) );
+		if ( ( efirc = efi_driver_start ( &efi_driver_binding, device,
+						  NULL ) ) != 0 ) {
+			rc = -EEFI_CONNECT ( efirc );
+			DBGC ( device, "EFIDRV %s could not connect driver "
+			       "directly: %s\n", efi_handle_name ( device ),
+			       strerror ( rc ) );
+			return rc;
+		}
 	}
 	DBGC2 ( device, "EFIDRV %s after connecting:\n",
 		efi_handle_name ( device ) );
