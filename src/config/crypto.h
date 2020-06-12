@@ -9,6 +9,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+/** Minimum TLS version */
+#define TLS_VERSION_MIN TLS_VERSION_TLS_1_0
+
 /** RSA public-key algorithm */
 #define CRYPTO_PUBKEY_RSA
 

@@ -49,6 +49,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/validator.h>
 #include <ipxe/job.h>
 #include <ipxe/tls.h>
+#include <config/crypto.h>
 
 /* Disambiguate the various error causes */
 #define EINVAL_CHANGE_CIPHER __einfo_error ( EINFO_EINVAL_CHANGE_CIPHER )
@@ -242,6 +243,23 @@ static void tls_set_uint24 ( tls24_t *field24, unsigned long value ) {
 static int tls_ready ( struct tls_connection *tls ) {
 	return ( ( ! is_pending ( &tls->client_negotiation ) ) &&
 		 ( ! is_pending ( &tls->server_negotiation ) ) );
+}
+
+/**
+ * Check for TLS version
+ *
+ * @v tls		TLS connection
+ * @v version		TLS version
+ * @ret at_least	TLS connection is using at least the specified version
+ *
+ * Check that TLS connection uses at least the specified protocol
+ * version.  Optimise down to a compile-time constant true result if
+ * this is already guaranteed by the minimum supported version check.
+ */
+static inline __attribute__ (( always_inline )) int
+tls_version ( struct tls_connection *tls, unsigned int version ) {
+	return ( ( TLS_VERSION_MIN >= version ) ||
+		 ( tls->version >= version ) );
 }
 
 /******************************************************************************
@@ -540,7 +558,7 @@ static void tls_prf ( struct tls_connection *tls, void *secret,
 
 	va_start ( seeds, out_len );
 
-	if ( tls->version >= TLS_VERSION_TLS_1_2 ) {
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 		/* Use P_SHA256 for TLSv1.2 and later */
 		tls_p_hash_va ( tls, &sha256_algorithm, secret, secret_len,
 				out, out_len, seeds );
@@ -1239,7 +1257,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	}
 
 	/* TLSv1.2 and later use explicit algorithm identifiers */
-	if ( tls->version >= TLS_VERSION_TLS_1_2 ) {
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 		sig_hash = tls_signature_hash_algorithm ( pubkey, digest );
 		if ( ! sig_hash ) {
 			DBGC ( tls, "TLS %p could not identify (%s,%s) "
@@ -1558,7 +1576,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 
 	/* Check and store protocol version */
 	version = ntohs ( hello_a->version );
-	if ( version < TLS_VERSION_TLS_1_0 ) {
+	if ( version < TLS_VERSION_MIN ) {
 		DBGC ( tls, "TLS %p does not support protocol version %d.%d\n",
 		       tls, ( version >> 8 ), ( version & 0xff ) );
 		return -ENOTSUP_VERSION;
@@ -1576,7 +1594,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	/* Use MD5+SHA1 digest algorithm for handshake verification
 	 * for versions earlier than TLSv1.2.
 	 */
-	if ( tls->version < TLS_VERSION_TLS_1_2 ) {
+	if ( ! tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 		tls->handshake_digest = &md5_sha1_algorithm;
 		tls->handshake_ctx = tls->handshake_md5_sha1_ctx;
 	}
@@ -2258,7 +2276,7 @@ static void * tls_assemble_block ( struct tls_connection *tls,
 	void *padding;
 
 	/* TLSv1.1 and later use an explicit IV */
-	iv_len = ( ( tls->version >= TLS_VERSION_TLS_1_1 ) ? blocksize : 0 );
+	iv_len = ( tls_version ( tls, TLS_VERSION_TLS_1_1 ) ? blocksize : 0 );
 
 	/* Calculate block-ciphered struct length */
 	padding_len = ( ( blocksize - 1 ) & -( iv_len + len + mac_len + 1 ) );
@@ -2420,7 +2438,7 @@ static int tls_split_block ( struct tls_connection *tls,
 
 	/* TLSv1.1 and later use an explicit IV */
 	iobuf = list_first_entry ( rx_data, struct io_buffer, list );
-	iv_len = ( ( tls->version >= TLS_VERSION_TLS_1_1 ) ?
+	iv_len = ( tls_version ( tls, TLS_VERSION_TLS_1_1 ) ?
 		   tls->rx_cipherspec.suite->cipher->blocksize : 0 );
 	if ( iob_len ( iobuf ) < iv_len ) {
 		DBGC ( tls, "TLS %p received underlength IV\n", tls );
