@@ -22,7 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define CRYPTO_DIGEST_MD4
 
 /** MD5 digest algorithm */
-#define CRYPTO_DIGEST_MD5
+//#define CRYPTO_DIGEST_MD5
 
 /** SHA-1 digest algorithm */
 #define CRYPTO_DIGEST_SHA1
