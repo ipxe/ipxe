@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
-#include <ipxe/asn1.h>
 #include <ipxe/sha256.h>
 
 /** SHA-256 variables */
@@ -270,14 +269,4 @@ struct digest_algorithm sha256_algorithm = {
 	.init		= sha256_init,
 	.update		= sha256_update,
 	.final		= sha256_final,
-};
-
-/** "sha256" object identifier */
-static uint8_t oid_sha256[] = { ASN1_OID_SHA256 };
-
-/** "sha256" OID-identified algorithm */
-struct asn1_algorithm oid_sha256_algorithm __asn1_algorithm = {
-	.name = "sha256",
-	.digest = &sha256_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_sha256 ),
 };

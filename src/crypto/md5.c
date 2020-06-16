@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
-#include <ipxe/asn1.h>
 #include <ipxe/md5.h>
 
 /** MD5 variables */
@@ -292,14 +291,4 @@ struct digest_algorithm md5_algorithm = {
 	.init		= md5_init,
 	.update		= md5_update,
 	.final		= md5_final,
-};
-
-/** "md5" object identifier */
-static uint8_t oid_md5[] = { ASN1_OID_MD5 };
-
-/** "md5" OID-identified algorithm */
-struct asn1_algorithm oid_md5_algorithm __asn1_algorithm = {
-	.name = "md5",
-	.digest = &md5_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_md5 ),
 };
