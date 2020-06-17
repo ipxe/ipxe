@@ -580,7 +580,7 @@ GENERIC_TARGETS	+= ids.o dbg%.o c s
 # This is needed in order to correctly rebuild embedded.o whenever the
 # list of objects changes.
 #
-EMBED		:= $(EMBEDDED_IMAGE) # Maintain backwards compatibility
+EMBED		?= $(EMBEDDED_IMAGE) # Maintain backwards compatibility
 EMBEDDED_LIST	:= $(BIN)/.embedded.list
 ifeq ($(wildcard $(EMBEDDED_LIST)),)
 EMBED_OLD := <invalid>
