@@ -63,6 +63,36 @@ size_t efi_devpath_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 }
 
 /**
+ * Find device path node provided Type and SubType identifiers
+ *
+ * @v path		Path to device
+ * @v node		Device path node if found
+ * @ret efirc		EFI return status code
+ */
+EFI_STATUS efi_devpath_find_node ( EFI_DEVICE_PATH_PROTOCOL *path,
+				   UINT8 type, UINT8 sub_type,
+				   EFI_DEVICE_PATH_PROTOCOL **node )
+{
+	UINT16 length;
+
+	DBGC2 ( path, "EFI devpath looking for Type: %x, SubType: %x\n",
+		type, sub_type );
+
+	while ( path->Type != END_DEVICE_PATH_TYPE ) {
+		if ( path->Type == type && path->SubType == sub_type ) {
+			*node = path;
+			return EFI_SUCCESS;
+		}
+
+		length = path->Length[0] | ( path->Length[1] << 8 );
+		path = ( EFI_DEVICE_PATH_PROTOCOL * )
+			( ( void * ) path + length );
+	}
+
+	return EFI_NOT_FOUND;
+}
+
+/**
  * Locate parent device supporting a given protocol
  *
  * @v device		EFI device handle

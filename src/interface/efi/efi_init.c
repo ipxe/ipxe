@@ -22,7 +22,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/init.h>
+#include <ipxe/settings.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 
@@ -46,6 +48,9 @@ int efi_shutdown_in_progress;
 
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
+
+/** EFI loaded image VLAN **/
+static UINT16 efi_boot_vlan = 0;
 
 /* Forward declarations */
 static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle );
@@ -88,6 +93,30 @@ static void * efi_find_table ( EFI_GUID *guid ) {
 }
 
 /**
+ * Retrieve loaded image VLAN
+ *
+ * @ret efirc		EFI return status code
+ */
+static EFI_STATUS efi_get_boot_vlan ( EFI_DEVICE_PATH_PROTOCOL *device_path,
+				      UINT16 *vlan ) {
+	EFI_STATUS efirc;
+	VLAN_DEVICE_PATH *vlan_path;
+
+	if ( ( efirc = efi_devpath_find_node (
+		device_path,
+		MESSAGING_DEVICE_PATH, MSG_VLAN_DP,
+		( EFI_DEVICE_PATH_PROTOCOL ** ) &vlan_path ) ) != 0 ) {
+		return efirc;
+	}
+
+	*vlan = vlan_path->VlanId;
+
+	DBGC2 ( device_path, "EFI found boot-vlan: %d\n", vlan_path->VlanId );
+
+	return EFI_SUCCESS;
+}
+
+/**
  * Initialise EFI environment
  *
  * @v image_handle	Image handle
@@ -100,6 +129,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	struct efi_protocol *prot;
 	struct efi_config_table *tab;
 	void *loaded_image;
+	EFI_DEVICE_PATH_PROTOCOL *device_path;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -175,6 +205,29 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	DBGC ( systab, "EFI image base address %p\n",
 	       efi_loaded_image->ImageBase );
 
+	/* Get loaded image device path */
+	if ( ( efirc = bs->HandleProtocol (
+		efi_loaded_image->DeviceHandle,
+		&efi_device_path_protocol_guid,
+		( void ** ) &device_path ) ) != 0 ) {
+
+		rc = -EEFI ( efirc );
+		DBGC ( systab, "EFI failed to retrieve image device path: %s",
+		       strerror ( rc ) );
+		goto err_no_device_path;
+	}
+
+	DBGC ( systab, "EFI image device path: %s\n",
+	       efi_devpath_text ( device_path ) );
+
+	/* Get loaded image VLAN*/
+	if ( ( efirc = efi_get_boot_vlan ( device_path,
+					   &efi_boot_vlan ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( systab, "EFI failed to retrieve loaded image VLAN: %s\n",
+		       strerror ( rc ) );
+	}
+
 	/* EFI is perfectly capable of gracefully shutting down any
 	 * loaded devices if it decides to fall back to a legacy boot.
 	 * For no particularly comprehensible reason, it doesn't
@@ -207,6 +260,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	bs->CloseEvent ( efi_shutdown_event );
  err_create_event:
  err_no_loaded_image:
+ err_no_device_path:
  err_missing_table:
  err_missing_protocol:
  err_sanity:
@@ -240,3 +294,34 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 
 	return 0;
 }
+
+/**
+ * Fetch boot VLAN setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int efi_boot_vlan_fetch ( void *data, size_t len ) {
+	uint16_t content;
+
+	content = htons ( efi_boot_vlan );
+	if ( len > sizeof ( content ) )
+		len = sizeof ( content );
+	memcpy ( data, &content, len );
+	return sizeof ( content );
+}
+
+/** EFI boot VLAN setting */
+const struct setting efi_boot_vlan_setting __setting ( SETTING_BOOT, boot-vlan ) = {
+	.name = "boot-vlan",
+	.description = "EFI boot VLAN",
+	.type = &setting_type_int16,
+	.scope = &builtin_scope,
+};
+
+/** EFI boot VLAN built-in setting */
+struct builtin_setting efi_boot_vlan_builtin_setting __builtin_setting = {
+	.setting = &efi_boot_vlan_setting,
+	.fetch = efi_boot_vlan_fetch,
+};
