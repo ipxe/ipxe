@@ -65,6 +65,8 @@ typedef struct {} *EFI_HANDLE;
 
 #include <ipxe/tables.h>
 #include <ipxe/uuid.h>
+#include <ipxe/version.h>
+#include <ipxe/profile.h>
 
 /** An EFI protocol used by iPXE */
 struct efi_protocol {
@@ -271,6 +273,36 @@ extern void dbg_efi_protocols ( EFI_HANDLE handle );
 	DBGC_EFI_OPENERS_IF ( PROFILE, ##__VA_ARGS__ )
 #define DBGCP_EFI_PROTOCOLS( ... )				\
 	DBGC_EFI_PROTOCOLS_IF ( PROFILE, ##__VA_ARGS__ )
+
+extern unsigned long __stack_chk_guard;
+extern unsigned long efi_stack_cookie ( EFI_HANDLE handle );
+extern void __stack_chk_fail ( void );
+
+/**
+ * Initialise stack cookie
+ *
+ * @v handle		Image handle
+ */
+static inline __attribute__ (( always_inline )) void
+efi_init_stack_guard ( EFI_HANDLE handle ) {
+
+	/* The calling function must not itself use stack protection,
+	 * since the change in the stack guard value would trigger a
+	 * false positive.
+	 *
+	 * There is unfortunately no way to annotate a function to
+	 * exclude the use of stack protection.  We must therefore
+	 * rely on correctly anticipating the compiler's decision on
+	 * the use of stack protection.
+	 *
+	 * The calculation of the stack cookie value deliberately
+	 * takes the address of a stack variable (to provide an
+	 * additional source of entropy).  This operation would
+	 * trigger the application of stack protection to the calling
+	 * function, and so must be externalised.
+	 */
+	__stack_chk_guard = efi_stack_cookie ( handle );
+}
 
 extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );

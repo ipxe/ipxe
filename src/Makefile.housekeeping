@@ -146,17 +146,6 @@ define NEWLINE
 
 endef
 
-# Some widespread patched versions of gcc include -fstack-protector by
-# default, even when -ffreestanding is specified.  We therefore need
-# to disable -fstack-protector if the compiler supports it.
-#
-ifeq ($(CCTYPE),gcc)
-SP_TEST = $(CC) -fno-stack-protector -x c -c /dev/null \
-		-o /dev/null >/dev/null 2>&1
-SP_FLAGS := $(shell $(SP_TEST) && $(ECHO) '-fno-stack-protector')
-WORKAROUND_CFLAGS += $(SP_FLAGS)
-endif
-
 # gcc 4.4 generates .eh_frame sections by default, which distort the
 # output of "size".  Inhibit this.
 #
@@ -414,6 +403,13 @@ ifdef BIN
 # INCDIRS lists the include path
 incdirs :
 	@$(ECHO) $(INCDIRS)
+
+# Inhibit -fstack-protector (which is implicitly enabled in some
+# patched gcc versions) unless explicitly mentioned in CFLAGS.
+#
+ifeq ($(findstring -fstack-protector,$(CFLAGS)),)
+CFLAGS		+= -fno-stack-protector
+endif
 
 # Common flags
 #

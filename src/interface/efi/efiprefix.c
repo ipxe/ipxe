@@ -41,6 +41,9 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Initialise stack cookie */
+	efi_init_stack_guard ( image_handle );
+
 	/* Initialise EFI environment */
 	if ( ( efirc = efi_init ( image_handle, systab ) ) != 0 )
 		goto err_init;

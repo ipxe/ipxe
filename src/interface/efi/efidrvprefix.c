@@ -36,6 +36,9 @@ EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
 				  EFI_SYSTEM_TABLE *systab ) {
 	EFI_STATUS efirc;
 
+	/* Initialise stack cookie */
+	efi_init_stack_guard ( image_handle );
+
 	/* Initialise EFI environment */
 	if ( ( efirc = efi_init ( image_handle, systab ) ) != 0 )
 		return efirc;
