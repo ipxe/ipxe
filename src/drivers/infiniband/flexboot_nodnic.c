@@ -365,7 +365,8 @@ static int flexboot_nodnic_create_qp ( struct ib_device *ibdev,
 		goto qp_alloc_err;
 	}
 
-	status = nodnic_port_create_qp(&port->port_priv, qp->type,
+	status = nodnic_port_create_qp(&port->port_priv,
+			(nodnic_queue_pair_type) qp->type,
 			qp->send.num_wqes * sizeof(struct nodnic_send_wqbb),
 			qp->send.num_wqes,
 			qp->recv.num_wqes * sizeof(struct nodnic_recv_wqe),
@@ -406,7 +407,8 @@ static void flexboot_nodnic_destroy_qp ( struct ib_device *ibdev,
 	struct flexboot_nodnic_port *port = &flexboot_nodnic->port[ibdev->port - 1];
 	struct flexboot_nodnic_queue_pair *flexboot_nodnic_qp = ib_qp_get_drvdata ( qp );
 
-	nodnic_port_destroy_qp(&port->port_priv, qp->type,
+	nodnic_port_destroy_qp(&port->port_priv,
+			(nodnic_queue_pair_type) qp->type,
 			flexboot_nodnic_qp->nodnic_queue_pair);
 
 	free(flexboot_nodnic_qp);
