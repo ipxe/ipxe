@@ -374,6 +374,246 @@ static struct net_device_operations intelx_operations = {
  */
 
 /**
+ * Set driver loaded in CTRL_EXT
+ *
+ * @v intel		Intel device
+ */
+static void intelx_driver_loaded ( struct intel_nic *intel ) {
+	uint32_t ctrl_ext;
+
+	ctrl_ext = readl ( intel->regs + INTELX_CTRL_EXT );
+	ctrl_ext |= INTELX_CTRL_EXT_DRV_LOAD;
+	writel ( ctrl_ext, intel->regs + INTELX_CTRL_EXT );
+}
+
+/**
+ * Clear firmware reset bit in FWSTS
+ *
+ * @v intel		Intel device
+ */
+static void intelx_clear_firmware_reset ( struct intel_nic *intel ) {
+	uint32_t fwsts;
+
+	fwsts = readl ( intel->regs + INTELX_FWSTS );
+	fwsts |= INTELX_FWSTS_FWRI;
+	writel ( fwsts, intel->regs + INTELX_FWSTS );
+}
+
+/**
+ * Acquire software driver semaphore (SWSM)
+ *
+ * @v intel		Intel device
+ * @ret rc		Return status code
+ */
+static int intelx_acquire_software_semaphore ( struct intel_nic *intel ) {
+	uint32_t i, swsm;
+
+	for ( i = 0; i < INTELX_SEMAPHORE_ATTEMPTS; i++) {
+		swsm = readl ( intel->regs + INTELX_SWSM ( intel->flags ) );
+		/* SMBI is 0 if we got the semaphore */
+		if ( ! ( swsm & INTELX_SWSM_SMBI ) ) {
+			return 0;
+		}
+		udelay(INTELX_SEMAPHORE_DELAY);
+	}
+	DBGC ( intel, "INTEL %p acquire SWSM timed out\n", intel );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Release software driver semaphore (SWSM)
+ *
+ * @v intel		Intel device
+ */
+static void intelx_release_software_semaphore ( struct intel_nic *intel ) {
+	uint32_t swsm;
+
+	swsm = readl ( intel->regs + INTELX_SWSM ( intel->flags ) );
+	swsm &= ~INTELX_SWSM_SMBI;
+	writel ( swsm, intel->regs + INTELX_SWSM ( intel->flags ) );
+}
+
+/**
+ * Acquire software/firmware semaphore (SW_FW_SYNC)
+ *
+ * @v intel		Intel device
+ * @ret rc		Return status code
+ */
+static int intelx_acquire_sync_register_semaphore ( struct intel_nic *intel ) {
+	uint32_t i, sw_fw_sync;
+
+	for ( i = 0; i < INTELX_SEMAPHORE_ATTEMPTS; i++) {
+		sw_fw_sync = readl ( intel->regs + INTELX_SW_FW_SYNC ( intel->flags ) );
+		/* REGSMP is 0 if we got the semaphore */
+		if ( ! ( sw_fw_sync & INTELX_SW_FW_SYNC_SW_MNG_SM ) ) {
+			return 0;
+		}
+		udelay(INTELX_SEMAPHORE_DELAY);
+	}
+	DBGC ( intel, "INTEL %p acquire SW_FW_SYNC timed out\n", intel );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Release software/firmware semaphore (SW_FW_SYNC)
+ *
+ * @v intel		Intel device
+ */
+static void intelx_release_sync_register_semaphore ( struct intel_nic * intel ) {
+	uint32_t sw_fw_sync;
+
+	sw_fw_sync = readl ( intel->regs + INTELX_SW_FW_SYNC ( intel->flags ) );
+	sw_fw_sync &= ~INTELX_SW_FW_SYNC_SW_MNG_SM;
+	writel ( sw_fw_sync, intel->regs + INTELX_SW_FW_SYNC ( intel->flags ) );
+}
+
+/**
+ * Acquire resources that are shared by software and firmware
+ *
+ * @v intel		Intel device
+ * @v res		Resource bitmask to acquire
+ * @ret rc		Return status code
+ */
+static int intelx_acquire_shared_resources ( struct intel_nic *intel,
+		uint32_t res ) {
+	uint32_t sw_fw_sync;
+	int rc;
+
+	/* Gain control of SW_FW_SYNC */
+	rc = intelx_acquire_software_semaphore ( intel );
+	if ( rc ) {
+		return rc;
+	}
+	rc = intelx_acquire_sync_register_semaphore ( intel );
+	if ( rc ) {
+		goto err_acquire_sync_register_semaphore;
+	}
+
+	/* Make sure firmware doesn't own the requested resource */
+	sw_fw_sync = readl ( intel->regs + INTELX_SW_FW_SYNC ( intel->flags ) );
+	if ( ( res & INTELX_SW_FW_SYNC_SW_PHY0_SM ) &&
+			( sw_fw_sync & INTELX_SW_FW_SYNC_FW_PHY0_SM ) ) {
+		rc = -EBUSY;
+		goto err_firmware_owns_resource;
+	} else if ( ( res & INTELX_SW_FW_SYNC_SW_PHY1_SM ) &&
+			( sw_fw_sync & INTELX_SW_FW_SYNC_FW_PHY1_SM ) ) {
+		rc = -EBUSY;
+		goto err_firmware_owns_resource;
+	} else if ( ( res & INTELX_SW_FW_SYNC_SW_MAC_CSR_SM ) &&
+			( sw_fw_sync & INTELX_SW_FW_SYNC_FW_MAC_CSR_SM ) ) {
+		rc = -EBUSY;
+		goto err_firmware_owns_resource;
+	}
+
+	/* Mark resources as owned */
+	sw_fw_sync |= res;
+	writel ( sw_fw_sync, intel->regs + INTELX_SW_FW_SYNC ( intel->flags ) );
+
+	/* Release SW_FW_SYNC */
+err_firmware_owns_resource:
+	intelx_release_sync_register_semaphore ( intel );
+err_acquire_sync_register_semaphore:
+	intelx_release_software_semaphore ( intel );
+	return rc;
+}
+
+/**
+ * Release resources that are shared by software and firmware
+ *
+ * @v intel		Intel device
+ * @v res		Resource bitmask to acquire
+ */
+static int intelx_release_shared_resources ( struct intel_nic *intel,
+		uint32_t res ) {
+	uint32_t sw_fw_sync;
+	int rc;
+
+	/* Gain control of SW_FW_SYNC */
+	rc = intelx_acquire_software_semaphore ( intel );
+	if ( rc ) {
+		return rc;
+	}
+	rc = intelx_acquire_sync_register_semaphore ( intel );
+	if ( rc ) {
+		goto err_acquire_sync_register_semaphore;
+	}
+
+	/* Clear resource ownership */
+	sw_fw_sync = readl ( intel->regs + INTELX_SW_FW_SYNC ( intel->flags ) );
+	sw_fw_sync &= ~res;
+	writel ( sw_fw_sync, intel->regs + INTELX_SW_FW_SYNC ( intel->flags ) );
+
+	/* Release SW_FW_SYNC */
+	intelx_release_sync_register_semaphore ( intel );
+err_acquire_sync_register_semaphore:
+	intelx_release_software_semaphore ( intel );
+	return rc;
+}
+
+/**
+ * Send a CSR command block to the host manageability interface
+ *
+ * @v intel		Intel device
+ * @v buffer	Buffer containing CSR command block
+ * @v num_words	Number of 32-bit words in buffer
+ * @ret rc		Return status code
+ */
+static int intelx_write_host_interface_command ( struct intel_nic *intel,
+		uint32_t *buffer, uint32_t num_words ) {
+	uint32_t i, hicr;
+
+	/* Clear any previous firmware resets */
+	intelx_clear_firmware_reset( intel );
+
+	/* Make sure host interface is enabled */
+	hicr = readl ( intel->regs + INTELX_HICR );
+	if ( ! ( hicr & INTELX_HICR_EN ) ) {
+		return -ENOTSUP;
+	}
+
+	/* Write the command words to ARC Data RAM */
+	for (i = 0; i < num_words; i++) {
+		writel ( buffer[i], intel->regs + INTELX_ARCRAM + 
+			sizeof(uint32_t) * i );
+	}
+
+	/* Wait for command to complete */
+	hicr |= INTELX_HICR_C;
+	writel ( hicr, intel->regs + INTELX_HICR );
+
+	for (i = 0; i < INTELX_SEMAPHORE_ATTEMPTS; i++) {
+		hicr = readl ( intel->regs + INTELX_HICR );
+		if ( ! ( hicr & INTELX_HICR_C ) ) {
+			return 0;
+		}
+		udelay(INTELX_SEMAPHORE_DELAY);
+	}
+	DBGC ( intel, "INTEL %p host interface command timed out\n", intel );
+	return -ETIMEDOUT;
+}
+
+/**
+ * Read a response to a command from the host manageability interface
+ *
+ * @v intel		Intel device
+ * @v buffer	Buffer to read into
+ * @v num_words	Size of buffer in 32-bit words
+ * @ret rc		Return status code
+ */
+static int intelx_read_host_interface_response ( struct intel_nic *intel,
+		uint32_t *buffer, uint32_t num_words ) {
+	uint32_t i, reg;
+
+	for (i = 0; i < num_words; i++) {
+		reg = readl ( intel->regs + INTELX_ARCRAM + sizeof(uint32_t) * i );
+		if ( buffer ) {
+			buffer[i] = reg;
+		}
+	}
+	return 0;
+}
+
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -382,6 +622,8 @@ static struct net_device_operations intelx_operations = {
 static int intelx_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct intel_nic *intel;
+	struct intelx_hic_req hic_req;
+	uint32_t res = 0;
 	int rc;
 
 	/* Allocate and initialise net device */
@@ -396,6 +638,7 @@ static int intelx_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intel, 0, sizeof ( *intel ) );
 	intel->port = PCI_FUNC ( pci->busdevfn );
+	intel->flags = pci->id->driver_data;
 	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTELX_TD,
 			  intel_describe_tx );
 	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTELX_RD,
@@ -415,6 +658,86 @@ static int intelx_probe ( struct pci_device *pci ) {
 	if ( ( rc = intelx_reset ( intel ) ) != 0 )
 		goto err_reset;
 
+	/* 
+	 * Some chipsets need the physical interface to be brought up
+	 * through the manageability interface.
+	 *
+	 * This is typically configured to be done by the BMC or ME.
+	 * Doing it here ensures that the link always comes up.
+	 */
+	if ( intel->flags & INTELX_SW_LINK_UP ) {
+		DBGC ( intel, "INTEL %p setting up link\n", intel );
+
+		/* Set up driver for firmware interaction */
+		intelx_driver_loaded ( intel );
+
+		/* Gain access to the physical interfaces */
+		res = INTELX_SW_FW_SYNC_SW_PHY0_SM |
+			INTELX_SW_FW_SYNC_SW_PHY1_SM |
+			INTELX_SW_FW_SYNC_SW_MAC_CSR_SM |
+			INTELX_SW_FW_SYNC_SW_MNG_SM;
+		rc = intelx_acquire_shared_resources ( intel, res );
+		if ( rc ) {
+			goto err_acquire_shared_resources;
+		}
+
+		/* Set up command block */
+		memset ( &hic_req, 0, sizeof ( struct intelx_hic_req ) );
+		hic_req.hdr.cmd = INTELX_HIC_HDR_CMD_REQ;
+		hic_req.hdr.buf_len = sizeof ( struct intelx_hic_req ) - 
+			sizeof( struct intelx_hic_hdr );
+		hic_req.hdr.checksum = 0xFF;
+
+		if ( readl ( intel->regs + INTELX_STATUS ) & INTELX_STATUS_LAN_ID ) {
+			hic_req.port_number = 1;
+		} else {
+			hic_req.port_number = 0;
+		}
+
+		/* Probe PHY */
+		hic_req.activity_id = INTELX_HIC_REQ_ACT_PHY_GET_INFO;
+		rc = intelx_write_host_interface_command ( intel,
+			( uint32_t* ) ( &hic_req ), 6 );
+		if ( rc ) {
+			goto err_csr;
+		}
+		intelx_read_host_interface_response ( intel, NULL, 5 );
+
+		/* Reset PHY */
+		hic_req.activity_id = INTELX_HIC_REQ_ACT_PHY_SW_RESET;
+		rc = intelx_write_host_interface_command ( intel,
+			( uint32_t* ) ( &hic_req ), 6 );
+		if ( rc ) {
+			goto err_csr;
+		}
+		intelx_read_host_interface_response ( intel, NULL, 5 );
+
+		/* Delay after reset for PHY to be responsive */
+		mdelay ( 1000 );
+
+		/* Init PHY */
+		hic_req.activity_id = INTELX_HIC_REQ_ACT_PHY_INIT;
+		rc = intelx_write_host_interface_command ( intel,
+			( uint32_t* ) ( &hic_req ), 6 );
+		if ( rc ) {
+			goto err_csr;
+		}
+		intelx_read_host_interface_response ( intel, NULL, 5 );
+
+		/* Setup Link */
+		hic_req.activity_id = INTELX_HIC_REQ_ACT_PHY_SETUP_LINK;
+		hic_req.data[0] = INTELX_HIC_REQ_SETUP_LINK_DATA0;
+		rc = intelx_write_host_interface_command ( intel,
+			( uint32_t* ) ( &hic_req ), 6 );
+		if ( rc ) {
+			goto err_csr;
+		}
+		intelx_read_host_interface_response ( intel, NULL, 5 );
+
+		/* Release access to the physical interfaces */
+		intelx_release_shared_resources ( intel, res );
+	}
+
 	/* Fetch MAC address */
 	if ( ( rc = intelx_fetch_mac ( intel, netdev->hw_addr ) ) != 0 )
 		goto err_fetch_mac;
@@ -432,6 +755,10 @@ static int intelx_probe ( struct pci_device *pci ) {
  err_register_netdev:
  err_fetch_mac:
 	intelx_reset ( intel );
+ err_csr:
+ 	if ( intel->flags & INTELX_SW_LINK_UP )
+ 		intelx_release_shared_resources ( intel, res );
+ err_acquire_shared_resources:
  err_reset:
 	iounmap ( intel->regs );
  err_ioremap:
@@ -475,7 +802,7 @@ static struct pci_device_id intelx_nics[] = {
 	PCI_ROM ( 0x8086, 0x1560, "x540t1", "X540-AT2/X540-BT2 (with single port NVM)", 0 ),
 	PCI_ROM ( 0x8086, 0x1563, "x550t2", "X550-T2", 0 ),
 	PCI_ROM ( 0x8086, 0x15ab, "x552", "X552", 0 ),
-	PCI_ROM ( 0x8086, 0x15e5, "x553", "X553", 0 ),
+	PCI_ROM ( 0x8086, 0x15e5, "x553", "X553", INTELX_X550EM_A | INTELX_SW_LINK_UP ),
 };
 
 /** PCI driver */

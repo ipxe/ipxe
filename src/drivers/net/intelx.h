@@ -18,6 +18,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define INTELX_CTRL_LRST	0x00000008UL	/**< Link reset */
 #define INTELX_CTRL_RST		0x04000000UL	/**< Device reset */
 
+/** Device Status Register */
+#define INTELX_STATUS 0x00008UL
+#define INTELX_STATUS_LAN_ID	0x0000000CUL	/**< LAN ID */
+
+/** Extended Device Control Register */
+#define INTELX_CTRL_EXT	0x00018UL
+#define INTELX_CTRL_EXT_DRV_LOAD	0x10000000	/**< Driver loaded */
+
 /** Time to delay for device reset, in milliseconds */
 #define INTELX_RESET_DELAY_MS 20
 
@@ -113,5 +121,72 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Link Status Register */
 #define INTELX_LINKS 0x042a4UL
 #define INTELX_LINKS_UP		0x40000000UL	/**< Link up */
+
+/** Firmware Status Register */
+#define INTELX_FWSTS	0x015F0CUL
+#define INTELX_FWSTS_FWRI	0x00000200UL	/**< Firmware reset indication */
+
+/** Software Semaphore Register */
+#define INTELX_SWSM(flags) ( flags & INTELX_X550EM_A ? \
+	0x015F74UL : 0x010140UL )
+#define INTELX_SWSM_SMBI	0x00000001UL	/**< Driver semaphore bit */
+
+/** Software-Firmware Synchronization Register */
+#define INTELX_SW_FW_SYNC(flags) ( flags & INTELX_X550EM_A ? \
+	0x015F78UL : 0x010160UL )
+#define INTELX_SW_FW_SYNC_SW_PHY0_SM 0x02UL	/**< Software PHY 0 access */
+#define INTELX_SW_FW_SYNC_SW_PHY1_SM 0x04UL	/**< Software PHY 1 access */
+#define INTELX_SW_FW_SYNC_SW_MAC_CSR_SM 0x08UL	/**< Software MAC CSR access */
+#define INTELX_SW_FW_SYNC_FW_PHY0_SM ( 1 << 6 )	/**< Firmware PHY 0 access */
+#define INTELX_SW_FW_SYNC_FW_PHY1_SM ( 1 << 7 ) /**< Firmware PHY 1 access */
+#define INTELX_SW_FW_SYNC_FW_MAC_CSR_SM ( 1 << 8 )	/**< Firmware MAC CSR access */
+#define INTELX_SW_FW_SYNC_SW_MNG_SM ( 1 << 10 )	/**< Software manageability
+													 host interface access */
+#define INTELX_SW_FW_SYNC_REGSMP (1 << 32)	/**< Register Semaphore */
+
+#define INTELX_SEMAPHORE_DELAY 50	/**< How long to wait between attempts */
+#define INTELX_SEMAPHORE_ATTEMPTS 2000	/**< Number of times to try 
+										     acquiring a semaphore */
+
+/** Host Interface Control Register */
+#define INTELX_HICR	0x015F00UL
+#define INTELX_HICR_EN 0x01UL	/**< Register enabled */
+#define INTELX_HICR_C 0x02UL	/**< Set bit for command to be processed */
+#define INTELX_HICR_SV 0x04UL	/**< Indicates a valid status in response */
+
+/** Host ARC Data RAM */
+#define INTELX_ARCRAM	0x015800UL
+
+/** Host Interface Command Header */
+struct intelx_hic_hdr {
+	uint8_t cmd;
+	uint8_t buf_len;
+	union {
+		uint8_t cmd_resv;
+		uint8_t ret_status;
+	} cmd_or_resp;
+	uint8_t checksum;
+};
+
+/** Host Interface Command Type */
+#define INTELX_HIC_HDR_CMD_REQ	5	/**< Request command */
+
+/** Host Interface Command Request */
+struct intelx_hic_req {
+	struct intelx_hic_hdr hdr;
+	uint8_t port_number;
+	uint8_t pad;
+	uint16_t activity_id;
+	uint32_t data[4];
+};
+
+/** Host Interface Command Request Activity Ids */
+#define INTELX_HIC_REQ_ACT_PHY_INIT	1
+#define INTELX_HIC_REQ_ACT_PHY_SETUP_LINK 2
+#define INTELX_HIC_REQ_ACT_PHY_SW_RESET	5
+#define INTELX_HIC_REQ_ACT_PHY_GET_INFO 7
+
+/** Host Interface Command Request Setup Link Data */
+#define INTELX_HIC_REQ_SETUP_LINK_DATA0 0x07005b00
 
 #endif /* _INTELX_H */
