@@ -8,6 +8,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/segment.h>
 #include <ipxe/cpuid.h>
+#include <ipxe/acpi.h>
 #include <landing_zone.h>
 
 struct sl_header {
@@ -19,12 +20,29 @@ struct lz_header {
 	u8  uuid[16];
 	u32 slaunch_loader_size;
 	u32 zero_page_addr;
+	u32 event_log_addr;
+	u32 event_log_size;
 	u8  msb_key_hash[20];
+	u8 lz_hashes[];
 } __attribute__ (( packed ));
 
 const unsigned char
 lz_header_uuid[16] = { 0x78, 0xf1, 0x26, 0x8e, 0x04, 0x92, 0x11, 0xe9,
                        0x83, 0x2a, 0xc8, 0x5b, 0x76, 0xc4, 0xcc, 0x02 };
+
+struct drtm_t {
+	struct acpi_header hdr;
+	u64 DL_Entry_Base;
+	u64 DL_Entry_Length;
+	u32 DL_Entry32;
+	u64 DL_Entry64;
+	u64 DLME_Exit;
+	u64 Log_Area_Start;
+	u32 Log_Area_Length;
+	u64 Architecture_Dependent;
+	u32 DRT_Flags;
+	u8  var_len_fields[];
+} __attribute__ (( packed ));
 
 static physaddr_t target;
 
@@ -56,6 +74,17 @@ int lz_set_bzimage ( struct image *image, userptr_t zeropage, userptr_t tgt ) {
 	       user_to_phys ( zeropage, 0 ) );
 
 	hdr->zero_page_addr = user_to_phys ( zeropage, 0 );
+
+	struct drtm_t *drtm = ( struct drtm_t *)
+	                      acpi_find ( ACPI_SIGNATURE ('D', 'R', 'T', 'M'), 0 );
+
+	if ( drtm != UNULL ) {
+		DBGC ( image, "ACPI DRTM table at %p (0x%lx physical)\n",
+		       drtm, user_to_phys ( ( userptr_t ) drtm, 0 ) );
+		hdr->event_log_addr = drtm->Log_Area_Start;
+		hdr->event_log_size = drtm->Log_Area_Length;
+	}
+
 	return 0;
 }
 
