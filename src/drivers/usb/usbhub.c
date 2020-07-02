@@ -247,8 +247,10 @@ static int hub_disable ( struct usb_hub *hub, struct usb_port *port ) {
 	int rc;
 
 	/* Disable port */
-	if ( ( rc = usb_hub_clear_port_feature ( usb, port->address,
-						 USB_HUB_PORT_ENABLE, 0 ) )!=0){
+	if ( ( hub->protocol < USB_PROTO_3_0 ) &&
+	     ( ( rc = usb_hub_clear_port_feature ( usb, port->address,
+						   USB_HUB_PORT_ENABLE,
+						   0 ) ) != 0 ) ) {
 		DBGC ( hubdev, "HUB %s port %d could not disable: %s\n",
 		       hubdev->name, port->address, strerror ( rc ) );
 		return rc;
