@@ -405,13 +405,6 @@ static int usb_endpoint_reset ( struct usb_endpoint *ep ) {
 	/* Sanity check */
 	assert ( ! list_empty ( &ep->halted ) );
 
-	/* Reset endpoint */
-	if ( ( rc = ep->host->reset ( ep ) ) != 0 ) {
-		DBGC ( usb, "USB %s %s could not reset: %s\n",
-		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
-		return rc;
-	}
-
 	/* Clear transaction translator, if applicable */
 	if ( ( rc = usb_endpoint_clear_tt ( ep ) ) != 0 )
 		return rc;
@@ -423,6 +416,13 @@ static int usb_endpoint_reset ( struct usb_endpoint *ep ) {
 					  USB_ENDPOINT_HALT,
 					  ep->address ) ) != 0 ) ) {
 		DBGC ( usb, "USB %s %s could not clear endpoint halt: %s\n",
+		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Reset endpoint */
+	if ( ( rc = ep->host->reset ( ep ) ) != 0 ) {
+		DBGC ( usb, "USB %s %s could not reset: %s\n",
 		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		return rc;
 	}
