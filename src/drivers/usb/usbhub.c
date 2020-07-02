@@ -110,6 +110,10 @@ static void hub_complete ( struct usb_endpoint *ep,
 	}
 
  done:
+
+	/* Recycle I/O buffer */
+	usb_recycle ( &hubdev->intr, iobuf );
+
 	/* Start refill process */
 	process_add ( &hubdev->refill );
 }
