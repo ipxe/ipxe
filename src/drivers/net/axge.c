@@ -531,6 +531,13 @@ static int axge_open ( struct net_device *netdev ) {
 	uint16_t rcr;
 	int rc;
 
+	/* Reapply device configuration to avoid transaction errors */
+	if ( ( rc = usb_set_configuration ( axge->usb, axge->config ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not set configuration: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_set_configuration;
+	}
+
 	/* Open USB network device */
 	if ( ( rc = usbnet_open ( &axge->usbnet ) ) != 0 ) {
 		DBGC ( axge, "AXGE %p could not open: %s\n",
@@ -567,6 +574,7 @@ static int axge_open ( struct net_device *netdev ) {
  err_write_mac:
 	usbnet_close ( &axge->usbnet );
  err_open:
+ err_set_configuration:
 	return rc;
 }
 
@@ -674,6 +682,7 @@ static int axge_probe ( struct usb_function *func,
 	axge->usb = usb;
 	axge->bus = usb->port->hub->bus;
 	axge->netdev = netdev;
+	axge->config = config->config;
 	usbnet_init ( &axge->usbnet, func, &axge_intr_operations,
 		      &axge_in_operations, &axge_out_operations );
 	usb_refill_init ( &axge->usbnet.intr, 0, 0, AXGE_INTR_MAX_FILL );

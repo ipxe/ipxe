@@ -145,6 +145,8 @@ struct axge_device {
 	struct net_device *netdev;
 	/** USB network device */
 	struct usbnet_device usbnet;
+	/** Device configuration */
+	unsigned int config;
 	/** Link state has changed */
 	int check_link;
 };
