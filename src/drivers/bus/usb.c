@@ -1615,7 +1615,9 @@ static int register_usb ( struct usb_device *usb ) {
 	usb->host->close ( usb );
  err_open:
  err_speed:
-	hub->driver->disable ( hub, port );
+	/* Leave port enabled on failure, to avoid an endless loop of
+	 * failed device registrations.
+	 */
  err_enable:
 	list_del ( &usb->list );
 	port->usb = NULL;
