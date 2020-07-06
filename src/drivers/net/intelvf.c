@@ -52,14 +52,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 static void intelvf_mbox_write ( struct intel_nic *intel,
 				 const union intelvf_msg *msg ) {
+	const struct intelvf_msg_raw *raw = &msg->raw;
 	unsigned int i;
 
 	/* Write message */
 	DBGC2 ( intel, "INTEL %p sending message", intel );
-	for ( i = 0 ; i < ( sizeof ( *msg ) / sizeof ( msg->dword[0] ) ) ; i++){
-		DBGC2 ( intel, "%c%08x", ( i ? ':' : ' ' ), msg->dword[i] );
-		writel ( msg->dword[i], ( intel->regs + intel->mbox.mem +
-					  ( i * sizeof ( msg->dword[0] ) ) ) );
+	for ( i = 0 ; i < ( sizeof ( *msg ) / sizeof ( raw->dword[0] ) ) ; i++){
+		DBGC2 ( intel, "%c%08x", ( i ? ':' : ' ' ), raw->dword[i] );
+		writel ( raw->dword[i], ( intel->regs + intel->mbox.mem +
+					  ( i * sizeof ( raw->dword[0] ) ) ) );
 	}
 	DBGC2 ( intel, "\n" );
 }
@@ -72,14 +73,15 @@ static void intelvf_mbox_write ( struct intel_nic *intel,
  */
 static void intelvf_mbox_read ( struct intel_nic *intel,
 				union intelvf_msg *msg ) {
+	struct intelvf_msg_raw *raw = &msg->raw;
 	unsigned int i;
 
 	/* Read message */
 	DBGC2 ( intel, "INTEL %p received message", intel );
-	for ( i = 0 ; i < ( sizeof ( *msg ) / sizeof ( msg->dword[0] ) ) ; i++){
-		msg->dword[i] = readl ( intel->regs + intel->mbox.mem +
-					( i * sizeof ( msg->dword[0] ) ) );
-		DBGC2 ( intel, "%c%08x", ( i ? ':' : ' ' ), msg->dword[i] );
+	for ( i = 0 ; i < ( sizeof ( *msg ) / sizeof ( raw->dword[0] ) ) ; i++){
+		raw->dword[i] = readl ( intel->regs + intel->mbox.mem +
+					( i * sizeof ( raw->dword[0] ) ) );
+		DBGC2 ( intel, "%c%08x", ( i ? ':' : ' ' ), raw->dword[i] );
 	}
 	DBGC2 ( intel, "\n" );
 }

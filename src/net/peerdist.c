@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <ipxe/http.h>
+#include <ipxe/settings.h>
 #include <ipxe/peermux.h>
 
 /** @file
@@ -35,6 +36,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * misfortune to encounter, and I've encountered multicast TFTP.
  */
 
+/** PeerDist is globally enabled */
+static long peerdist_enabled = 1;
+
 /**
  * Check whether or not to support PeerDist encoding for this request
  *
@@ -42,6 +46,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret supported	PeerDist encoding is supported for this request
  */
 static int http_peerdist_supported ( struct http_transaction *http ) {
+
+	/* Allow PeerDist to be globally enabled/disabled */
+	if ( ! peerdist_enabled )
+		return 0;
 
 	/* Support PeerDist encoding only if we can directly access an
 	 * underlying data transfer buffer.  Direct access is required
@@ -142,4 +150,34 @@ struct http_content_encoding peerdist_encoding __http_content_encoding = {
 	.name = "peerdist",
 	.supported = http_peerdist_supported,
 	.init = http_peerdist_init,
+};
+
+/** PeerDist enabled setting */
+const struct setting peerdist_setting __setting ( SETTING_MISC, peerdist ) = {
+	.name = "peerdist",
+	.description = "PeerDist enabled",
+	.type = &setting_type_int8,
+};
+
+/**
+ * Apply PeerDist settings
+ *
+ * @ret rc		Return status code
+ */
+static int apply_peerdist_settings ( void ) {
+
+	/* Fetch global PeerDist enabled setting */
+	if ( fetch_int_setting ( NULL, &peerdist_setting,
+				 &peerdist_enabled ) < 0 ) {
+		peerdist_enabled = 1;
+	}
+	DBGC ( &peerdist_enabled, "PEERDIST is %s\n",
+	       ( peerdist_enabled ? "enabled" : "disabled" ) );
+
+	return 0;
+}
+
+/** PeerDist settings applicator */
+struct settings_applicator peerdist_applicator __settings_applicator = {
+	.apply = apply_peerdist_settings,
 };

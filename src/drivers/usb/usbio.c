@@ -351,8 +351,7 @@ static void usbio_control_poll ( struct usbio_endpoint *endpoint ) {
 	}
 
 	/* Construct transfer */
-	assert ( iob_len ( iobuf ) >= sizeof ( *msg ) );
-	msg = iobuf->data;
+	msg = iob_push ( iobuf, sizeof ( *msg ) );
 	iob_pull ( iobuf, sizeof ( *msg ) );
 	request = le16_to_cpu ( msg->setup.request );
 	len = iob_len ( iobuf );
@@ -973,6 +972,10 @@ static int usbio_endpoint_enqueue ( struct usb_endpoint *ep,
 	unsigned int fill;
 	unsigned int index;
 
+	/* Fail if shutdown is in progress */
+	if ( efi_shutdown_in_progress )
+		return -ECANCELED;
+
 	/* Fail if transfer ring is full */
 	fill = ( endpoint->prod - endpoint->cons );
 	if ( fill >= USBIO_RING_COUNT )
@@ -995,6 +998,11 @@ static int usbio_endpoint_enqueue ( struct usb_endpoint *ep,
  */
 static int usbio_endpoint_message ( struct usb_endpoint *ep,
 				    struct io_buffer *iobuf ) {
+	struct usb_setup_packet *setup;
+
+	/* Adjust I/O buffer to start of data payload */
+	assert ( iob_len ( iobuf ) >= sizeof ( *setup ) );
+	iob_pull ( iobuf, sizeof ( *setup ) );
 
 	/* Enqueue transfer */
 	return usbio_endpoint_enqueue ( ep, iobuf, USBIO_MESSAGE );
@@ -1021,6 +1029,10 @@ static int usbio_endpoint_stream ( struct usb_endpoint *ep,
  * @v endpoint		Endpoint
  */
 static void usbio_endpoint_poll ( struct usbio_endpoint *endpoint ) {
+
+	/* Do nothing if shutdown is in progress */
+	if ( efi_shutdown_in_progress )
+		return;
 
 	/* Poll endpoint */
 	endpoint->op->poll ( endpoint );

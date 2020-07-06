@@ -173,6 +173,10 @@ static int smsc95xx_fetch_mac ( struct smscusb_device *smscusb ) {
 					       SMSC95XX_E2P_BASE ) ) == 0 )
 		return 0;
 
+	/* Read MAC address from device tree, if present */
+	if ( ( rc = smscusb_fdt_fetch_mac ( smscusb ) ) == 0 )
+		return 0;
+
 	/* Construct MAC address for Honeywell VM3, if applicable */
 	if ( ( rc = smsc95xx_vm3_fetch_mac ( smscusb ) ) == 0 )
 		return 0;

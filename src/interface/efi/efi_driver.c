@@ -39,6 +39,20 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/* Disambiguate the various error causes */
+#define EINFO_EEFI_CONNECT						\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x01,			\
+			  "Could not connect controllers" )
+#define EINFO_EEFI_CONNECT_PROHIBITED					\
+	__einfo_platformify ( EINFO_EEFI_CONNECT,			\
+			      EFI_SECURITY_VIOLATION,			\
+			      "Connecting controllers prohibited by "	\
+			      "security policy" )
+#define EEFI_CONNECT_PROHIBITED						\
+	__einfo_error ( EINFO_EEFI_CONNECT_PROHIBITED )
+#define EEFI_CONNECT( efirc ) EPLATFORM ( EINFO_EEFI_CONNECT, efirc,	\
+					  EEFI_CONNECT_PROHIBITED )
+
 static EFI_DRIVER_BINDING_PROTOCOL efi_driver_binding;
 
 /** List of controlled EFI devices */
@@ -73,11 +87,14 @@ static struct efi_device * efidev_find ( EFI_HANDLE device ) {
  */
 struct efi_device * efidev_parent ( struct device *dev ) {
 	struct device *parent;
+	struct efi_device *efidev;
 
-	/* Walk upwards until we find an EFI device */
+	/* Walk upwards until we find a registered EFI device */
 	while ( ( parent = dev->parent ) ) {
-		if ( parent->desc.bus_type == BUS_TYPE_EFI )
-			return container_of ( parent, struct efi_device, dev );
+		list_for_each_entry ( efidev, &efi_devices, dev.siblings ) {
+			if ( parent == &efidev->dev )
+				return efidev;
+		}
 		dev = parent;
 	}
 
@@ -454,10 +471,19 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 	       efi_handle_name ( device ) );
 	if ( ( efirc = bs->ConnectController ( device, drivers, NULL,
 					       FALSE ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+		rc = -EEFI_CONNECT ( efirc );
 		DBGC ( device, "EFIDRV %s could not connect new drivers: "
 		       "%s\n", efi_handle_name ( device ), strerror ( rc ) );
-		return rc;
+		DBGC ( device, "EFIDRV %s connecting driver directly\n",
+		       efi_handle_name ( device ) );
+		if ( ( efirc = efi_driver_start ( &efi_driver_binding, device,
+						  NULL ) ) != 0 ) {
+			rc = -EEFI_CONNECT ( efirc );
+			DBGC ( device, "EFIDRV %s could not connect driver "
+			       "directly: %s\n", efi_handle_name ( device ),
+			       strerror ( rc ) );
+			return rc;
+		}
 	}
 	DBGC2 ( device, "EFIDRV %s after connecting:\n",
 		efi_handle_name ( device ) );

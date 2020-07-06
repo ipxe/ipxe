@@ -924,9 +924,9 @@ static int png_pixbuf ( struct image *image, struct pixel_buffer **pixbuf ) {
 
 		/* Extract chunk header */
 		remaining = ( image->len - png->offset );
-		if ( remaining < sizeof ( header ) ) {
-			DBGC ( image, "PNG %s truncated chunk header at offset "
-			       "%zd\n", image->name, png->offset );
+		if ( remaining < ( sizeof ( header ) + sizeof ( footer ) ) ) {
+			DBGC ( image, "PNG %s truncated chunk header/footer "
+			       "at offset %zd\n", image->name, png->offset );
 			rc = -EINVAL;
 			goto err_truncated;
 		}
@@ -936,10 +936,10 @@ static int png_pixbuf ( struct image *image, struct pixel_buffer **pixbuf ) {
 
 		/* Validate chunk length */
 		chunk_len = ntohl ( header.len );
-		if ( remaining < ( sizeof ( header ) + chunk_len +
+		if ( chunk_len > ( remaining - sizeof ( header ) -
 				   sizeof ( footer ) ) ) {
-			DBGC ( image, "PNG %s truncated chunk data/footer at "
-			       "offset %zd\n", image->name, png->offset );
+			DBGC ( image, "PNG %s truncated chunk data at offset "
+			       "%zd\n", image->name, png->offset );
 			rc = -EINVAL;
 			goto err_truncated;
 		}

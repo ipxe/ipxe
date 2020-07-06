@@ -1,5 +1,13 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
+# Enable stack protection if available
+#
+SPG_TEST = $(CC) -fstack-protector-strong -mstack-protector-guard=global \
+		 -x c -c /dev/null -o /dev/null >/dev/null 2>&1
+SPG_FLAGS := $(shell $(SPG_TEST) && $(ECHO) '-fstack-protector-strong ' \
+					    '-mstack-protector-guard=global')
+CFLAGS += $(SPG_FLAGS)
+
 # The EFI linker script
 #
 LDSCRIPT	= scripts/efi.lds

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2018 Broadcom. All Rights Reserved.
+ * Copyright Â© 2018 Broadcom. All Rights Reserved.
  * The term Broadcom refers to Broadcom Inc. and/or its subsidiaries.
 
  * This program is free software; you can redistribute it and/or modify it under
@@ -935,7 +935,6 @@ struct bnxt {
 #define DID_57414_RDMA_MF   0x16ED
 #define DID_57416_MF        0x16EE
 #define DID_57416_RDMA_MF   0x16EF
-
 
 #define DID_NXT_5720		0x165F
 #define DID_SR2_58812		0xd812

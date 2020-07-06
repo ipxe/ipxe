@@ -43,41 +43,82 @@ IOAPI_INLINE ( arm, bus_to_phys ) ( unsigned long bus_addr ) {
  *
  */
 
-#define ARM_READX( _api_func, _type, _insn_suffix, _reg_prefix )	      \
+#define ARM_READX( _suffix, _type, _insn_suffix, _reg_prefix )		      \
 static inline __always_inline _type					      \
-IOAPI_INLINE ( arm, _api_func ) ( volatile _type *io_addr ) {		      \
+IOAPI_INLINE ( arm, read ## _suffix ) ( volatile _type *io_addr ) {	      \
 	_type data;							      \
 	__asm__ __volatile__ ( "ldr" _insn_suffix " %" _reg_prefix "0, %1"    \
 			       : "=r" ( data ) : "Qo" ( *io_addr ) );	      \
 	return data;							      \
 }
 #ifdef __aarch64__
-ARM_READX ( readb, uint8_t, "b", "w" );
-ARM_READX ( readw, uint16_t, "h", "w" );
-ARM_READX ( readl, uint32_t, "", "w" );
-ARM_READX ( readq, uint64_t, "", "" );
+ARM_READX ( b, uint8_t, "b", "w" );
+ARM_READX ( w, uint16_t, "h", "w" );
+ARM_READX ( l, uint32_t, "", "w" );
+ARM_READX ( q, uint64_t, "", "" );
 #else
-ARM_READX ( readb, uint8_t, "b", "" );
-ARM_READX ( readw, uint16_t, "h", "" );
-ARM_READX ( readl, uint32_t, "", "" );
+ARM_READX ( b, uint8_t, "b", "" );
+ARM_READX ( w, uint16_t, "h", "" );
+ARM_READX ( l, uint32_t, "", "" );
 #endif
 
-#define ARM_WRITEX( _api_func, _type, _insn_suffix, _reg_prefix )			\
+#define ARM_WRITEX( _suffix, _type, _insn_suffix, _reg_prefix )		      \
 static inline __always_inline void					      \
-IOAPI_INLINE ( arm, _api_func ) ( _type data, volatile _type *io_addr ) {     \
+IOAPI_INLINE ( arm, write ## _suffix ) ( _type data,			      \
+					 volatile _type *io_addr ) {	      \
 	__asm__ __volatile__ ( "str" _insn_suffix " %" _reg_prefix "0, %1"    \
 			       : : "r" ( data ), "Qo" ( *io_addr ) );	      \
 }
 #ifdef __aarch64__
-ARM_WRITEX ( writeb, uint8_t, "b", "w" );
-ARM_WRITEX ( writew, uint16_t, "h", "w" );
-ARM_WRITEX ( writel, uint32_t, "", "w" );
-ARM_WRITEX ( writeq, uint64_t, "", "" );
+ARM_WRITEX ( b, uint8_t, "b", "w" );
+ARM_WRITEX ( w, uint16_t, "h", "w" );
+ARM_WRITEX ( l, uint32_t, "", "w" );
+ARM_WRITEX ( q, uint64_t, "", "" );
 #else
-ARM_WRITEX ( writeb, uint8_t, "b", "" );
-ARM_WRITEX ( writew, uint16_t, "h", "" );
-ARM_WRITEX ( writel, uint32_t, "", "" );
+ARM_WRITEX ( b, uint8_t, "b", "" );
+ARM_WRITEX ( w, uint16_t, "h", "" );
+ARM_WRITEX ( l, uint32_t, "", "" );
 #endif
+
+/*
+ * Dummy PIO reads and writes up to 32 bits
+ *
+ * There is no common standard for I/O-space access for ARM, and
+ * non-MMIO peripherals are vanishingly rare.  Provide dummy
+ * implementations that will allow code to link and should cause
+ * drivers to simply fail to detect hardware at runtime.
+ *
+ */
+
+#define ARM_INX( _suffix, _type )					      \
+static inline __always_inline _type					      \
+IOAPI_INLINE ( arm, in ## _suffix ) ( volatile _type *io_addr __unused) {     \
+	return ~( (_type) 0 );						      \
+}									      \
+static inline __always_inline void					      \
+IOAPI_INLINE ( arm, ins ## _suffix ) ( volatile _type *io_addr __unused,      \
+				       _type *data, unsigned int count ) {    \
+	memset ( data, 0xff, count * sizeof ( *data ) );		      \
+}
+ARM_INX ( b, uint8_t );
+ARM_INX ( w, uint16_t );
+ARM_INX ( l, uint32_t );
+
+#define ARM_OUTX( _suffix, _type )					      \
+static inline __always_inline void					      \
+IOAPI_INLINE ( arm, out ## _suffix ) ( _type data __unused,		      \
+				       volatile _type *io_addr __unused ) {   \
+	/* Do nothing */						      \
+}									      \
+static inline __always_inline void					      \
+IOAPI_INLINE ( arm, outs ## _suffix ) ( volatile _type *io_addr __unused,     \
+					const _type *data __unused,	      \
+					unsigned int count __unused ) {	      \
+	/* Do nothing */						      \
+}
+ARM_OUTX ( b, uint8_t );
+ARM_OUTX ( w, uint16_t );
+ARM_OUTX ( l, uint32_t );
 
 /*
  * Slow down I/O

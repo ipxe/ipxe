@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/usbnet.h>
 #include <ipxe/ethernet.h>
 #include <ipxe/profile.h>
+#include <ipxe/fdt.h>
 #include "smscusb.h"
 
 /** @file
@@ -436,6 +437,39 @@ int smscusb_otp_fetch_mac ( struct smscusb_device *smscusb,
 
 	DBGC ( smscusb, "SMSCUSB %p using layout %#02x OTP MAC %s\n",
 	       smscusb, signature, eth_ntoa ( netdev->hw_addr ) );
+	return 0;
+}
+
+/******************************************************************************
+ *
+ * Device tree
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Fetch MAC address from device tree
+ *
+ * @v smscusb		SMSC USB device
+ * @ret rc		Return status code
+ */
+int smscusb_fdt_fetch_mac ( struct smscusb_device *smscusb ) {
+	struct net_device *netdev = smscusb->netdev;
+	unsigned int offset;
+	int rc;
+
+	/* Look for "ethernet[0]" alias */
+	if ( ( rc = fdt_alias ( "ethernet", &offset ) != 0 ) &&
+	     ( rc = fdt_alias ( "ethernet0", &offset ) != 0 ) ) {
+		return rc;
+	}
+
+	/* Fetch MAC address */
+	if ( ( rc = fdt_mac ( offset, netdev ) ) != 0 )
+		return rc;
+
+	DBGC ( smscusb, "SMSCUSB %p using FDT MAC %s\n",
+	       smscusb, eth_ntoa ( netdev->hw_addr ) );
 	return 0;
 }
 

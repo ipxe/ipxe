@@ -111,6 +111,10 @@ struct peerdist_block {
 	struct peerdisc_client discovery;
 	/** Current position in discovered peer list */
 	struct peerdisc_peer *peer;
+	/** Block download queue */
+	struct peerdist_block_queue *queue;
+	/** List of queued block downloads */
+	struct list_head queued;
 	/** Retry timer */
 	struct retry_timer timer;
 	/** Number of full attempt cycles completed */
@@ -122,6 +126,26 @@ struct peerdist_block {
 	unsigned long started;
 	/** Time at which most recent attempt was started */
 	unsigned long attempted;
+};
+
+/** PeerDist block download queue */
+struct peerdist_block_queue {
+	/** Download opening process */
+	struct process process;
+	/** List of queued downloads */
+	struct list_head list;
+
+	/** Number of open downloads */
+	unsigned int count;
+	/** Maximum number of open downloads */
+	unsigned int max;
+
+	/** Open block download
+	 *
+	 * @v peerblk		PeerDist block download
+	 * @ret rc		Return status code
+	 */
+	int ( * open ) ( struct peerdist_block *peerblk );
 };
 
 /** Retrieval protocol block fetch response (including transport header)

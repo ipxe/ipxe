@@ -413,8 +413,8 @@ struct uri * parse_uri ( const char *uri_string ) {
 	}
 
 	/* Split host into host[:port] */
-	if ( ( uri->host[ strlen ( uri->host ) - 1 ] != ']' ) &&
-	     ( tmp = strrchr ( uri->host, ':' ) ) ) {
+	if ( ( tmp = strrchr ( uri->host, ':' ) ) &&
+	     ( uri->host[ strlen ( uri->host ) - 1 ] != ']' ) ) {
 		*(tmp++) = '\0';
 		uri->port = tmp;
 	}

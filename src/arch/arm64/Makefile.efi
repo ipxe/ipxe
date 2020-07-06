@@ -1,5 +1,9 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
+# Avoid untranslatable relocations
+#
+CFLAGS		+= -fno-pic
+
 # Specify EFI image builder
 #
 ELF2EFI		= $(ELF2EFI64)

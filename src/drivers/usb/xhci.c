@@ -2944,8 +2944,7 @@ static void xhci_hub_close ( struct usb_hub *hub __unused ) {
  * @ret rc		Return status code
  */
 static int xhci_root_open ( struct usb_hub *hub ) {
-	struct usb_bus *bus = hub->bus;
-	struct xhci_device *xhci = usb_bus_get_hostdata ( bus );
+	struct xhci_device *xhci = usb_hub_get_drvdata ( hub );
 	struct usb_port *port;
 	uint32_t portsc;
 	unsigned int i;
@@ -2982,9 +2981,6 @@ static int xhci_root_open ( struct usb_hub *hub ) {
 	 */
 	mdelay ( XHCI_LINK_STATE_DELAY_MS );
 
-	/* Record hub driver private data */
-	usb_hub_set_drvdata ( hub, xhci );
-
 	return 0;
 }
 
@@ -2993,10 +2989,9 @@ static int xhci_root_open ( struct usb_hub *hub ) {
  *
  * @v hub		USB hub
  */
-static void xhci_root_close ( struct usb_hub *hub ) {
+static void xhci_root_close ( struct usb_hub *hub __unused ) {
 
-	/* Clear hub driver private data */
-	usb_hub_set_drvdata ( hub, NULL );
+	/* Nothing to do */
 }
 
 /**
@@ -3050,6 +3045,19 @@ static int xhci_root_disable ( struct usb_hub *hub, struct usb_port *port ) {
 	portsc &= XHCI_PORTSC_PRESERVE;
 	portsc |= XHCI_PORTSC_PED;
 	writel ( portsc, xhci->op + XHCI_OP_PORTSC ( port->address ) );
+
+	/* Allow time for link state to stabilise */
+	mdelay ( XHCI_LINK_STATE_DELAY_MS );
+
+	/* Set link state to RxDetect for USB3 ports */
+	if ( port->protocol >= USB_PROTO_3_0 ) {
+		portsc &= XHCI_PORTSC_PRESERVE;
+		portsc |= ( XHCI_PORTSC_PLS_RXDETECT | XHCI_PORTSC_LWS );
+		writel ( portsc, xhci->op + XHCI_OP_PORTSC ( port->address ) );
+	}
+
+	/* Allow time for link state to stabilise */
+	mdelay ( XHCI_LINK_STATE_DELAY_MS );
 
 	return 0;
 }

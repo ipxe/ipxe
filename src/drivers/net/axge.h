@@ -49,6 +49,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define AXGE_MSR_RFC			0x0010	/**< RX flow control enable */
 #define AXGE_MSR_TFC			0x0020	/**< TX flow control enable */
 #define AXGE_MSR_RE			0x0100	/**< Receive enable */
+#define AXGE_MSR_PS			0x0200	/**< 100Mbps port speed */
 
 /** Ethernet PHY Power and Reset Control Register */
 #define AXGE_EPPRCR 0x26
@@ -144,6 +145,10 @@ struct axge_device {
 	struct net_device *netdev;
 	/** USB network device */
 	struct usbnet_device usbnet;
+	/** Device configuration */
+	unsigned int config;
+	/** Link state has changed */
+	int check_link;
 };
 
 /** Interrupt maximum fill level

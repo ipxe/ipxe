@@ -193,6 +193,7 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Attempt loading image */
+	handle = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, path,
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
@@ -200,7 +201,11 @@ static int efi_image_exec ( struct image *image ) {
 		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
 		       image, strerror ( rc ) );
-		goto err_load_image;
+		if ( efirc == EFI_SECURITY_VIOLATION ) {
+			goto err_load_image_security_violation;
+		} else {
+			goto err_load_image;
+		}
 	}
 
 	/* Get the loaded image protocol for the newly loaded image */
@@ -268,6 +273,7 @@ static int efi_image_exec ( struct image *image ) {
 	 * call UnloadImage()).  We therefore ignore any failures from
 	 * the UnloadImage() call itself.
 	 */
+ err_load_image_security_violation:
 	if ( rc != 0 )
 		bs->UnloadImage ( handle );
  err_load_image:
@@ -303,6 +309,7 @@ static int efi_image_probe ( struct image *image ) {
 	int rc;
 
 	/* Attempt loading image */
+	handle = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, &empty_path,
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
@@ -310,7 +317,11 @@ static int efi_image_probe ( struct image *image ) {
 		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
 		       image, strerror ( rc ) );
-		return rc;
+		if ( efirc == EFI_SECURITY_VIOLATION ) {
+			goto err_load_image_security_violation;
+		} else {
+			goto err_load_image;
+		}
 	}
 
 	/* Unload the image.  We can't leave it loaded, because we
@@ -319,6 +330,11 @@ static int efi_image_probe ( struct image *image ) {
 	bs->UnloadImage ( handle );
 
 	return 0;
+
+ err_load_image_security_violation:
+	bs->UnloadImage ( handle );
+ err_load_image:
+	return rc;
 }
 
 /** EFI image type */

@@ -123,6 +123,18 @@ extern void process_del ( struct process *process );
 extern void step ( void );
 
 /**
+ * Initialise a static process
+ *
+ * @v process		Process
+ * @v desc		Process descriptor
+ */
+#define PROC_INIT( _process, _desc ) {					      \
+		.list = LIST_HEAD_INIT ( (_process).list ),		      \
+		.desc = (_desc),					      \
+		.refcnt = NULL,						      \
+	}
+
+/**
  * Initialise process without adding to process list
  *
  * @v process		Process
@@ -180,11 +192,7 @@ process_running ( struct process *process ) {
  */
 #define PERMANENT_PROCESS( name, step )					      \
 static struct process_descriptor name ## _desc = PROC_DESC_PURE ( step );     \
-struct process name __permanent_process = {				      \
-	.list = LIST_HEAD_INIT ( name.list ),				      \
-	.desc = & name ## _desc,					      \
-	.refcnt = NULL,							      \
-};
+struct process name __permanent_process = PROC_INIT ( name, & name ## _desc );
 
 /**
  * Find debugging colourisation for a process

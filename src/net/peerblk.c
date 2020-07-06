@@ -48,6 +48,25 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define PEERBLK_DECRYPT_CHUNKSIZE 2048
 
+/** PeerDist maximum number of concurrent raw block downloads
+ *
+ * Raw block downloads are expensive if the origin server uses HTTPS,
+ * since each concurrent download will require local TLS resources
+ * (including potentially large received encrypted data buffers).
+ *
+ * Raw block downloads may also be prohibitively slow to initiate when
+ * the origin server is using HTTPS and client certificates.  Origin
+ * servers for PeerDist downloads are likely to be running IIS, which
+ * has a bug that breaks session resumption and requires each
+ * connection to go through the full client certificate verification.
+ *
+ * Limit the total number of concurrent raw block downloads to
+ * ameliorate these problems.
+ *
+ * This is a policy decision.
+ */
+#define PEERBLK_RAW_MAX 2
+
 /** PeerDist raw block download attempt initial progress timeout
  *
  * This is a policy decision.
@@ -107,6 +126,8 @@ static struct profiler peerblk_discovery_success_profiler __profiler =
 static struct profiler peerblk_discovery_timeout_profiler __profiler =
 	{ .name = "peerblk.discovery.timeout" };
 
+static void peerblk_dequeue ( struct peerdist_block *peerblk );
+
 /**
  * Get profiling timestamp
  *
@@ -153,6 +174,10 @@ static void peerblk_reset ( struct peerdist_block *peerblk, int rc ) {
 	/* Abort any current download attempt */
 	intf_restart ( &peerblk->raw, rc );
 	intf_restart ( &peerblk->retrieval, rc );
+
+	/* Remove from download queue, if applicable */
+	if ( peerblk->queue )
+		peerblk_dequeue ( peerblk );
 
 	/* Empty received data buffer */
 	xferbuf_free ( &peerblk->buffer );
@@ -358,6 +383,10 @@ static int peerblk_raw_open ( struct peerdist_block *peerblk ) {
 	if ( inject_fault ( PEERBLK_ANNUL_RATE ) )
 		intf_restart ( &peerblk->raw, 0 );
 
+	/* Start download attempt timer */
+	peerblk->rc = -ETIMEDOUT;
+	start_timer_fixed ( &peerblk->timer, PEERBLK_RAW_OPEN_TIMEOUT );
+
 	return 0;
 }
 
@@ -434,6 +463,109 @@ static void peerblk_raw_close ( struct peerdist_block *peerblk, int rc ) {
 	/* Complete download attempt */
 	peerblk_done ( peerblk, rc );
 }
+
+/******************************************************************************
+ *
+ * Block download queue
+ *
+ ******************************************************************************
+ */
+
+/**
+ * PeerDist block download queue process
+ *
+ * @v queue		Block download queue
+ */
+static void peerblk_step ( struct peerdist_block_queue *queue ) {
+	struct peerdist_block *peerblk;
+	int rc;
+
+	/* Do nothing yet if we have too many open block downloads */
+	if ( queue->count >= queue->max )
+		return;
+
+	/* Do nothing unless there are queued block downloads */
+	peerblk = list_first_entry ( &queue->list, struct peerdist_block,
+				     queued );
+	if ( ! peerblk )
+		return;
+
+	/* Reschedule queue process */
+	process_add ( &queue->process );
+
+	/* Remove block from queue */
+	list_del ( &peerblk->queued );
+	INIT_LIST_HEAD ( &peerblk->queued );
+
+	/* Attempt download */
+	if ( ( rc = queue->open ( peerblk ) ) != 0 ) {
+		peerblk_close ( peerblk, rc );
+		return;
+	}
+
+	/* Increment open block download count */
+	queue->count++;
+}
+
+/**
+ * Add block to download queue
+ *
+ * @v peerblk		PeerDist block download
+ * @v queue		Block download queue
+ */
+static void peerblk_enqueue ( struct peerdist_block *peerblk,
+			      struct peerdist_block_queue *queue ) {
+
+	/* Sanity checks */
+	assert ( peerblk->queue == NULL );
+	assert ( list_empty ( &peerblk->queued ) );
+
+	/* Add block to queue */
+	peerblk->queue = queue;
+	list_add_tail ( &peerblk->queued, &queue->list );
+
+	/* Schedule queue process */
+	process_add ( &queue->process );
+}
+
+/**
+ * Remove block from download queue
+ *
+ * @v peerblk		PeerDist block download
+ */
+static void peerblk_dequeue ( struct peerdist_block *peerblk ) {
+	struct peerdist_block_queue *queue = peerblk->queue;
+
+	/* Sanity checks */
+	assert ( queue != NULL );
+
+	/* Remove block from queue */
+	peerblk->queue = NULL;
+	if ( list_empty ( &peerblk->queued ) ) {
+
+		/* Open download: decrement count and reschedule queue */
+		queue->count--;
+		process_add ( &queue->process );
+
+	} else {
+
+		/* Queued download: remove from queue */
+		list_del ( &peerblk->queued );
+		INIT_LIST_HEAD ( &peerblk->queued );
+	}
+}
+
+/** PeerDist block download queue process descriptor */
+static struct process_descriptor peerblk_queue_desc =
+	PROC_DESC_ONCE ( struct peerdist_block_queue, process, peerblk_step );
+
+/** Raw block download queue */
+static struct peerdist_block_queue peerblk_raw_queue = {
+	.process = PROC_INIT ( peerblk_raw_queue.process, &peerblk_queue_desc ),
+	.list = LIST_HEAD_INIT ( peerblk_raw_queue.list ),
+	.max = PEERBLK_RAW_MAX,
+	.open = peerblk_raw_open,
+};
 
 /******************************************************************************
  *
@@ -521,6 +653,10 @@ static int peerblk_retrieval_open ( struct peerdist_block *peerblk,
 	 */
 	if ( inject_fault ( PEERBLK_ANNUL_RATE ) )
 		intf_restart ( &peerblk->retrieval, 0 );
+
+	/* Start download attempt timer */
+	peerblk->rc = -ETIMEDOUT;
+	start_timer_fixed ( &peerblk->timer, PEERBLK_RETRIEVAL_OPEN_TIMEOUT );
 
  err_open:
 	uri_put ( uri );
@@ -1201,20 +1337,13 @@ static void peerblk_expired ( struct retry_timer *timer, int over __unused ) {
 			continue;
 		}
 
-		/* Start download attempt timer */
-		peerblk->rc = -ETIMEDOUT;
-		start_timer_fixed ( &peerblk->timer,
-				    PEERBLK_RETRIEVAL_OPEN_TIMEOUT );
+		/* Peer download started */
 		return;
 	}
 
-	/* Attempt raw download */
-	if ( ( rc = peerblk_raw_open ( peerblk ) ) != 0 )
-		goto err;
+	/* Add to raw download queue */
+	peerblk_enqueue ( peerblk, &peerblk_raw_queue );
 
-	/* Start download attempt timer */
-	peerblk->rc = -ETIMEDOUT;
-	start_timer_fixed ( &peerblk->timer, PEERBLK_RAW_OPEN_TIMEOUT );
 	return;
 
  err:
@@ -1336,6 +1465,7 @@ int peerblk_open ( struct interface *xfer, struct uri *uri,
 	process_init_stopped ( &peerblk->process, &peerblk_process_desc,
 			       &peerblk->refcnt );
 	peerdisc_init ( &peerblk->discovery, &peerblk_discovery_operations );
+	INIT_LIST_HEAD ( &peerblk->queued );
 	timer_init ( &peerblk->timer, peerblk_expired, &peerblk->refcnt );
 	DBGC2 ( peerblk, "PEERBLK %p %d.%d id %02x%02x%02x%02x%02x..."
 		"%02x%02x%02x [%08zx,%08zx)", peerblk, peerblk->segment,

@@ -243,7 +243,7 @@ enum xhci_default_psi_value {
 #define XHCI_PORTSC_LWS 0x00010000UL
 
 /** Time to delay after writing the port link state */
-#define XHCI_LINK_STATE_DELAY_MS 20
+#define XHCI_LINK_STATE_DELAY_MS 100
 
 /** Connect status change */
 #define XHCI_PORTSC_CSC 0x00020000UL

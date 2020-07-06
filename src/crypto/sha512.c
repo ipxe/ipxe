@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
-#include <ipxe/asn1.h>
 #include <ipxe/sha512.h>
 
 /** SHA-512 variables */
@@ -290,14 +289,4 @@ struct digest_algorithm sha512_algorithm = {
 	.init		= sha512_init,
 	.update		= sha512_update,
 	.final		= sha512_final,
-};
-
-/** "sha512" object identifier */
-static uint8_t oid_sha512[] = { ASN1_OID_SHA512 };
-
-/** "sha512" OID-identified algorithm */
-struct asn1_algorithm oid_sha512_algorithm __asn1_algorithm = {
-	.name = "sha512",
-	.digest = &sha512_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_sha512 ),
 };

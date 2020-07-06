@@ -331,8 +331,7 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 
 	/* Sanity check */
 	if ( ! handle ) {
-		printf ( "HANDLE %s could not retrieve protocols\n",
-			 efi_handle_name ( handle ) );
+		printf ( "HANDLE %p could not retrieve protocols\n", handle );
 		return;
 	}
 

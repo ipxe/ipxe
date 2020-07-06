@@ -74,6 +74,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_block	       ( ERRFILE_CORE | 0x00220000 )
 #define ERRFILE_sanboot		       ( ERRFILE_CORE | 0x00230000 )
 #define ERRFILE_dummy_sanboot	       ( ERRFILE_CORE | 0x00240000 )
+#define ERRFILE_fdt		       ( ERRFILE_CORE | 0x00250000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )

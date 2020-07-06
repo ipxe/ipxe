@@ -26,12 +26,29 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <ipxe/profile.h>
 #include <ipxe/bigint.h>
 
 /** @file
  *
  * Big integer support
  */
+
+/** Modular multiplication overall profiler */
+static struct profiler bigint_mod_multiply_profiler __profiler =
+	{ .name = "bigint_mod_multiply" };
+
+/** Modular multiplication multiply step profiler */
+static struct profiler bigint_mod_multiply_multiply_profiler __profiler =
+	{ .name = "bigint_mod_multiply.multiply" };
+
+/** Modular multiplication rescale step profiler */
+static struct profiler bigint_mod_multiply_rescale_profiler __profiler =
+	{ .name = "bigint_mod_multiply.rescale" };
+
+/** Modular multiplication subtract step profiler */
+static struct profiler bigint_mod_multiply_subtract_profiler __profiler =
+	{ .name = "bigint_mod_multiply.subtract" };
 
 /**
  * Perform modular multiplication of big integers
@@ -63,31 +80,43 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 	int rotation;
 	int i;
 
+	/* Start profiling */
+	profile_start ( &bigint_mod_multiply_profiler );
+
 	/* Sanity check */
 	assert ( sizeof ( *temp ) == bigint_mod_multiply_tmp_len ( modulus ) );
 
 	/* Perform multiplication */
+	profile_start ( &bigint_mod_multiply_multiply_profiler );
 	bigint_multiply ( multiplicand, multiplier, &temp->result );
+	profile_stop ( &bigint_mod_multiply_multiply_profiler );
 
 	/* Rescale modulus to match result */
+	profile_start ( &bigint_mod_multiply_rescale_profiler );
 	bigint_grow ( modulus, &temp->modulus );
 	rotation = ( bigint_max_set_bit ( &temp->result ) -
 		     bigint_max_set_bit ( &temp->modulus ) );
 	for ( i = 0 ; i < rotation ; i++ )
 		bigint_rol ( &temp->modulus );
+	profile_stop ( &bigint_mod_multiply_rescale_profiler );
 
 	/* Subtract multiples of modulus */
+	profile_start ( &bigint_mod_multiply_subtract_profiler );
 	for ( i = 0 ; i <= rotation ; i++ ) {
 		if ( bigint_is_geq ( &temp->result, &temp->modulus ) )
 			bigint_subtract ( &temp->modulus, &temp->result );
 		bigint_ror ( &temp->modulus );
 	}
+	profile_stop ( &bigint_mod_multiply_subtract_profiler );
 
 	/* Resize result */
 	bigint_shrink ( &temp->result, result );
 
 	/* Sanity check */
 	assert ( bigint_is_geq ( modulus, result ) );
+
+	/* Stop profiling */
+	profile_stop ( &bigint_mod_multiply_profiler );
 }
 
 /**

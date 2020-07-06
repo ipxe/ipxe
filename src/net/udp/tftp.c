@@ -545,8 +545,7 @@ static void tftp_timer_expired ( struct retry_timer *timer, int fail ) {
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_blksize ( struct tftp_request *tftp,
-				  const char *value ) {
+static int tftp_process_blksize ( struct tftp_request *tftp, char *value ) {
 	char *end;
 
 	tftp->blksize = strtoul ( value, &end, 10 );
@@ -567,8 +566,7 @@ static int tftp_process_blksize ( struct tftp_request *tftp,
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_tsize ( struct tftp_request *tftp,
-				const char *value ) {
+static int tftp_process_tsize ( struct tftp_request *tftp, char *value ) {
 	char *end;
 
 	tftp->tsize = strtoul ( value, &end, 10 );
@@ -589,13 +587,11 @@ static int tftp_process_tsize ( struct tftp_request *tftp,
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_multicast ( struct tftp_request *tftp,
-				    const char *value ) {
+static int tftp_process_multicast ( struct tftp_request *tftp, char *value ) {
 	union {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
 	} socket;
-	char buf[ strlen ( value ) + 1 ];
 	char *addr;
 	char *port;
 	char *port_end;
@@ -604,8 +600,7 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 	int rc;
 
 	/* Split value into "addr,port,mc" fields */
-	memcpy ( buf, value, sizeof ( buf ) );
-	addr = buf;
+	addr = value;
 	port = strchr ( addr, ',' );
 	if ( ! port ) {
 		DBGC ( tftp, "TFTP %p multicast missing port,mc\n", tftp );
@@ -662,7 +657,7 @@ struct tftp_option {
 	 * @v value	Option value
 	 * @ret rc	Return status code
 	 */
-	int ( * process ) ( struct tftp_request *tftp, const char *value );
+	int ( * process ) ( struct tftp_request *tftp, char *value );
 };
 
 /** Recognised TFTP options */
@@ -682,7 +677,7 @@ static struct tftp_option tftp_options[] = {
  * @ret rc		Return status code
  */
 static int tftp_process_option ( struct tftp_request *tftp,
-				 const char *name, const char *value ) {
+				 const char *name, char *value ) {
 	struct tftp_option *option;
 
 	for ( option = tftp_options ; option->name ; option++ ) {

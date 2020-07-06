@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
 #include <ipxe/vsprintf.h>
+#include <ipxe/timer.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi_driver.h>
@@ -63,6 +64,12 @@ struct snp_nic {
 
 /** Maximum number of received packets per poll */
 #define SNP_RX_QUOTA 4
+
+/** Maximum initialisation retry count */
+#define SNP_INITIALIZE_RETRY_MAX 10
+
+/** Delay between each initialisation retry */
+#define SNP_INITIALIZE_RETRY_DELAY_MS 10
 
 /**
  * Format SNP MAC address (for debugging)
@@ -300,6 +307,9 @@ static int snpnet_rx_filters ( struct net_device *netdev ) {
 		  EFI_SIMPLE_NETWORK_RECEIVE_MULTICAST |
 		  EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST ),
 		( EFI_SIMPLE_NETWORK_RECEIVE_UNICAST |
+		  EFI_SIMPLE_NETWORK_RECEIVE_PROMISCUOUS_MULTICAST |
+		  EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST ),
+		( EFI_SIMPLE_NETWORK_RECEIVE_UNICAST |
 		  EFI_SIMPLE_NETWORK_RECEIVE_BROADCAST ),
 		( EFI_SIMPLE_NETWORK_RECEIVE_UNICAST ),
 	};
@@ -310,7 +320,8 @@ static int snpnet_rx_filters ( struct net_device *netdev ) {
 	/* Try possible receive filters in turn */
 	for ( i = 0; i < ( sizeof ( filters ) / sizeof ( filters[0] ) ); i++ ) {
 		efirc = snp->snp->ReceiveFilters ( snp->snp, filters[i],
-						   0, TRUE, 0, NULL );
+				EFI_SIMPLE_NETWORK_RECEIVE_MULTICAST, TRUE,
+				0, NULL );
 		if ( efirc == 0 )
 			return 0;
 		rc = -EEFI ( efirc );
@@ -331,7 +342,9 @@ static int snpnet_rx_filters ( struct net_device *netdev ) {
 static int snpnet_open ( struct net_device *netdev ) {
 	struct snp_nic *snp = netdev->priv;
 	EFI_MAC_ADDRESS *mac = ( ( void * ) netdev->ll_addr );
+	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
 	EFI_STATUS efirc;
+	unsigned int retry;
 	int rc;
 
 	/* Try setting MAC address (before initialising) */
@@ -342,13 +355,46 @@ static int snpnet_open ( struct net_device *netdev ) {
 		/* Ignore error */
 	}
 
-	/* Initialise NIC */
-	if ( ( efirc = snp->snp->Initialize ( snp->snp, 0, 0 ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		snpnet_dump_mode ( netdev );
-		DBGC ( snp, "SNP %s could not initialise: %s\n",
-		       netdev->name, strerror ( rc ) );
-		return rc;
+	/* Initialise NIC, retrying multiple times if link stays down */
+	for ( retry = 0 ; ; ) {
+
+		/* Initialise NIC */
+		if ( ( efirc = snp->snp->Initialize ( snp->snp,
+						      0, 0 ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			snpnet_dump_mode ( netdev );
+			DBGC ( snp, "SNP %s could not initialise: %s\n",
+			       netdev->name, strerror ( rc ) );
+			return rc;
+		}
+
+		/* Stop if we have link up (or no link detection capability) */
+		if ( ( ! mode->MediaPresentSupported ) || mode->MediaPresent )
+			break;
+
+		/* Stop if we have exceeded our retry count.  This is
+		 * not a failure; it is plausible that we genuinely do
+		 * not have link up.
+		 */
+		if ( ++retry >= SNP_INITIALIZE_RETRY_MAX )
+			break;
+		DBGC ( snp, "SNP %s retrying initialisation (retry %d)\n",
+		       netdev->name, retry );
+
+		/* Delay to allow time for link to establish */
+		mdelay ( SNP_INITIALIZE_RETRY_DELAY_MS );
+
+		/* Shut down and retry; this is sometimes necessary in
+		 * order to persuade the underlying SNP driver to
+		 * actually update the link state.
+		 */
+		if ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			snpnet_dump_mode ( netdev );
+			DBGC ( snp, "SNP %s could not shut down: %s\n",
+			       netdev->name, strerror ( rc ) );
+			return rc;
+		}
 	}
 
 	/* Try setting MAC address (after initialising) */

@@ -47,6 +47,16 @@ int efi_shutdown_in_progress;
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
 
+/** Stack cookie */
+unsigned long __stack_chk_guard;
+
+/** Exit function
+ *
+ * Cached to minimise external dependencies when a stack check
+ * failure is triggered.
+ */
+static EFI_EXIT efi_exit;
+
 /* Forward declarations */
 static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle );
 
@@ -85,6 +95,29 @@ static void * efi_find_table ( EFI_GUID *guid ) {
 	}
 
 	return NULL;
+}
+
+/**
+ * Construct a stack cookie value
+ *
+ * @v handle		Image handle
+ * @ret cookie		Stack cookie
+ */
+__attribute__ (( noinline )) unsigned long
+efi_stack_cookie ( EFI_HANDLE handle ) {
+
+	/* There is no viable source of entropy available at this
+	 * point.  Construct a value that is at least likely to vary
+	 * between platforms and invocations.
+	 *
+	 * Ensure that the value contains a NUL byte, to act as a
+	 * runaway string terminator.  Construct the NUL using a shift
+	 * rather than a mask, to avoid losing valuable entropy in the
+	 * low-order bits.
+	 */
+	return ( ( ( ( unsigned long ) handle ) ^
+		   ( ( unsigned long ) &handle ) ^
+		   profile_timestamp() ^ build_id ) << 8 );
 }
 
 /**
@@ -129,6 +162,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	}
 	DBGC ( systab, "EFI handle %p systab %p\n", image_handle, systab );
 	bs = systab->BootServices;
+
+	/* Store abort function pointer */
+	efi_exit = bs->Exit;
 
 	/* Look up used protocols */
 	for_each_table_entry ( prot, EFI_PROTOCOLS ) {
@@ -239,4 +275,30 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 	DBGC ( systab, "EFI image unloaded\n" );
 
 	return 0;
+}
+
+/**
+ * Abort on stack check failure
+ *
+ */
+__attribute__ (( noreturn )) void __stack_chk_fail ( void ) {
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Report failure (when debugging) */
+	DBGC ( efi_systab, "EFI stack check failed (cookie %#lx); aborting\n",
+	       __stack_chk_guard );
+
+	/* Attempt to exit cleanly with an error status */
+	if ( efi_exit ) {
+		efirc = efi_exit ( efi_image_handle, EFI_COMPROMISED_DATA,
+				   0, NULL );
+		rc = -EEFI ( efirc );
+		DBGC ( efi_systab, "EFI stack check exit failed: %s\n",
+		       strerror ( rc ) );
+	}
+
+	/* If the exit fails for any reason, lock the system */
+	while ( 1 ) {}
+
 }

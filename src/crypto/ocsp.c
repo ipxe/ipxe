@@ -476,33 +476,43 @@ static int ocsp_parse_responder_id ( struct ocsp_check *ocsp,
  */
 static int ocsp_parse_cert_id ( struct ocsp_check *ocsp,
 				const struct asn1_cursor *raw ) {
+	static struct asn1_cursor algorithm = {
+		.data = ocsp_algorithm_id,
+		.len = sizeof ( ocsp_algorithm_id ),
+	};
+	struct asn1_cursor cert_id;
 	struct asn1_cursor cursor;
-	struct asn1_algorithm *algorithm;
 	int rc;
 
-	/* Check certID algorithm */
-	memcpy ( &cursor, raw, sizeof ( cursor ) );
-	asn1_enter ( &cursor, ASN1_SEQUENCE );
-	if ( ( rc = asn1_digest_algorithm ( &cursor, &algorithm ) ) != 0 ) {
-		DBGC ( ocsp, "OCSP %p \"%s\" certID unknown algorithm: %s\n",
-		       ocsp, x509_name ( ocsp->cert ), strerror ( rc ) );
-		return rc;
+	/* Enter cert ID */
+	memcpy ( &cert_id, raw, sizeof ( cert_id ) );
+	asn1_enter ( &cert_id, ASN1_SEQUENCE );
+
+	/* Check certID algorithm (but not parameters) */
+	memcpy ( &cursor, &cert_id, sizeof ( cursor ) );
+	if ( ( rc = ( asn1_enter ( &cursor, ASN1_SEQUENCE ),
+		      asn1_shrink ( &cursor, ASN1_OID ),
+		      asn1_shrink ( &algorithm, ASN1_OID ) ) ) != 0 ) {
+		DBGC ( ocsp, "OCSP %p \"%s\" certID missing algorithm:\n",
+		       ocsp, x509_name ( ocsp->cert ) );
+		DBGC_HDA ( ocsp, 0, cursor.data, cursor.len );
+		return -EACCES_CERT_MISMATCH;
 	}
-	if ( algorithm->digest != &ocsp_digest_algorithm ) {
-		DBGC ( ocsp, "OCSP %p \"%s\" certID wrong algorithm %s\n",
-		       ocsp, x509_name ( ocsp->cert ),
-		       algorithm->digest->name );
+	if ( asn1_compare ( &cursor, &algorithm ) != 0 ) {
+		DBGC ( ocsp, "OCSP %p \"%s\" certID wrong algorithm:\n",
+		       ocsp, x509_name ( ocsp->cert ) );
+		DBGC_HDA ( ocsp, 0, cursor.data, cursor.len );
 		return -EACCES_CERT_MISMATCH;
 	}
 
 	/* Check remaining certID fields */
-	asn1_skip ( &cursor, ASN1_SEQUENCE );
-	if ( asn1_compare ( &cursor, &ocsp->request.cert_id_tail ) != 0 ) {
+	asn1_skip ( &cert_id, ASN1_SEQUENCE );
+	if ( asn1_compare ( &cert_id, &ocsp->request.cert_id_tail ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" certID mismatch:\n",
 		       ocsp, x509_name ( ocsp->cert ) );
 		DBGC_HDA ( ocsp, 0, ocsp->request.cert_id_tail.data,
 			   ocsp->request.cert_id_tail.len );
-		DBGC_HDA ( ocsp, 0, cursor.data, cursor.len );
+		DBGC_HDA ( ocsp, 0, cert_id.data, cert_id.len );
 		return -EACCES_CERT_MISMATCH;
 	}
 

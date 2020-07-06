@@ -1352,6 +1352,7 @@ static int bnxt_hwrm_backing_store_qcfg ( struct bnxt *bp )
 	struct hwrm_func_backing_store_qcfg_input *req;
 
 	DBGP ( "%s\n", __func__ );
+
 	if ( ( !bp->thor ) || ( bp->vf ) )
 		return STATUS_SUCCESS;
 
@@ -1367,6 +1368,7 @@ static int bnxt_hwrm_backing_store_cfg ( struct bnxt *bp )
 	struct hwrm_func_backing_store_cfg_input *req;
 
 	DBGP ( "%s\n", __func__ );
+
 	if ( ( !bp->thor ) || ( bp->vf ) )
 		return STATUS_SUCCESS;
 
@@ -1394,6 +1396,7 @@ static int bnxt_hwrm_queue_qportcfg ( struct bnxt *bp )
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_QUEUE_QPORTCFG, cmd_len );
 	req->flags   = 0;
 	req->port_id = bp->port_idx;
+
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 	if ( rc ) {
 		DBGP ( "- %s (  ): Failed\n", __func__ );

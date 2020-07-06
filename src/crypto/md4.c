@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
-#include <ipxe/asn1.h>
 #include <ipxe/md4.h>
 
 /** MD4 variables */
@@ -267,14 +266,4 @@ struct digest_algorithm md4_algorithm = {
 	.init		= md4_init,
 	.update		= md4_update,
 	.final		= md4_final,
-};
-
-/** "md4" object identifier */
-static uint8_t oid_md4[] = { ASN1_OID_MD4 };
-
-/** "md4" OID-identified algorithm */
-struct asn1_algorithm oid_md4_algorithm __asn1_algorithm = {
-	.name = "md4",
-	.digest = &md4_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_md4 ),
 };
