@@ -167,28 +167,19 @@ bigint_is_zero_raw ( const uint32_t *value0, unsigned int size ) {
 static inline __attribute__ (( always_inline, pure )) int
 bigint_is_geq_raw ( const uint32_t *value0, const uint32_t *reference0,
 		    unsigned int size ) {
-	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
-		( ( const void * ) value0 );
-	const bigint_t ( size ) __attribute__ (( may_alias )) *reference =
-		( ( const void * ) reference0 );
-	void *discard_S;
-	void *discard_D;
 	long discard_c;
+	long discard_tmp;
 	int result;
 
-	__asm__ __volatile__ ( "std\n\t"
-			       "\n1:\n\t"
-			       "lodsl\n\t"
-			       "scasl\n\t"
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "movl -4(%3, %1, 4), %k2\n\t"
+			       "cmpl -4(%4, %1, 4), %k2\n\t"
 			       "loope 1b\n\t"
 			       "setae %b0\n\t"
-			       "cld\n\t"
-			       : "=q" ( result ), "=&S" ( discard_S ),
-				 "=&D" ( discard_D ), "=&c" ( discard_c )
-			       : "0" ( 0 ), "1" ( &value->element[ size - 1 ] ),
-				 "2" ( &reference->element[ size - 1 ] ),
-				 "3" ( size )
-			       : "eax" );
+			       : "=q" ( result ), "=&c" ( discard_c ),
+				 "=&r" ( discard_tmp )
+			       : "r" ( value0 ), "r" ( reference0 ),
+				 "0" ( 0 ), "1" ( size ) );
 	return result;
 }
 
