@@ -46,6 +46,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define IOAPI_X86
 #define NAP_EFIX86
 #define	CPUID_CMD		/* x86 CPU feature detection command */
+#define	UNSAFE_STD		/* Avoid setting direction flag */
 #endif
 
 #if defined ( __arm__ ) || defined ( __aarch64__ )
