@@ -15,6 +15,8 @@ extern void * generic_memset ( void *dest, int character,
 			       size_t len ) __nonnull;
 extern void * generic_memcpy ( void *dest, const void *src,
 			       size_t len ) __nonnull;
+extern void * generic_memcpy_reverse ( void *dest, const void *src,
+				       size_t len ) __nonnull;
 extern void * generic_memmove ( void *dest, const void *src,
 				size_t len ) __nonnull;
 
