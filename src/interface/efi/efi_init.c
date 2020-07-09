@@ -21,6 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <errno.h>
+#include <endian.h>
 #include <ipxe/init.h>
 #include <ipxe/rotate.h>
 #include <ipxe/efi/efi.h>
@@ -127,6 +128,13 @@ efi_stack_cookie ( EFI_HANDLE handle ) {
 	 * lower-order bits.
 	 */
 	cookie <<= 8;
+
+	/* Ensure that the NUL byte is placed at the bottom of the
+	 * stack cookie, to avoid potential disclosure via an
+	 * unterminated string.
+	 */
+	if ( __BYTE_ORDER == __BIG_ENDIAN )
+		cookie >>= 8;
 
 	return cookie;
 }
