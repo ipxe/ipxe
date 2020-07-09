@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/init.h>
+#include <ipxe/rotate.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
@@ -105,19 +106,29 @@ static void * efi_find_table ( EFI_GUID *guid ) {
  */
 __attribute__ (( noinline )) unsigned long
 efi_stack_cookie ( EFI_HANDLE handle ) {
+	unsigned long cookie = 0;
+	unsigned int rotation = ( 8 * sizeof ( cookie ) / 4 );
 
 	/* There is no viable source of entropy available at this
 	 * point.  Construct a value that is at least likely to vary
 	 * between platforms and invocations.
-	 *
-	 * Ensure that the value contains a NUL byte, to act as a
+	 */
+	cookie ^= ( ( unsigned long ) handle );
+	cookie = roll ( cookie, rotation );
+	cookie ^= ( ( unsigned long ) &handle );
+	cookie = roll ( cookie, rotation );
+	cookie ^= profile_timestamp();
+	cookie = roll ( cookie, rotation );
+	cookie ^= build_id;
+
+	/* Ensure that the value contains a NUL byte, to act as a
 	 * runaway string terminator.  Construct the NUL using a shift
 	 * rather than a mask, to avoid losing valuable entropy in the
-	 * low-order bits.
+	 * lower-order bits.
 	 */
-	return ( ( ( ( unsigned long ) handle ) ^
-		   ( ( unsigned long ) &handle ) ^
-		   profile_timestamp() ^ build_id ) << 8 );
+	cookie <<= 8;
+
+	return cookie;
 }
 
 /**
