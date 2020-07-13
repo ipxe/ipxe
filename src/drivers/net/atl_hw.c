@@ -212,7 +212,7 @@ int atl_hw_get_link(struct atl_nic *nic)
 int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer, uint32_t size)
 {
 	uint32_t i;
-	printf("AQUANTIA: download_dwords\n");
+	printf("AQUANTIA: atl_hw_read_mem\n");
 
 	for (i = 0; i < 100; ++i) {
 		if (ATL_READ_REG(ATL_SEM_RAM))
@@ -228,7 +228,7 @@ int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer, uint32
 		uint32_t j;
 
 		ATL_WRITE_REG(0x8000, ATL_MBOX_CTRL1);
-		for (j = 0; j < 10000; ++i) {
+		for (j = 0; j < 10000; ++j) {
 			if (ATL_READ_REG(ATL_MBOX_CTRL3) != addr)
 				break;
 			udelay(10);
