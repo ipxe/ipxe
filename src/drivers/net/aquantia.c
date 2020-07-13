@@ -1,5 +1,6 @@
 /*
-* Copyright (C) 2017 Aquantia Corp. <noreply@aquantia.com>.
+* Copyright (C) 2017-2019 Aquantia Corp. <noreply@aquantia.com>
+* Copyright (C) 2019-2020 Marvell  <support@marvell.com>
 *
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License as
@@ -38,89 +39,13 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/profile.h>
 #include "aquantia.h"
 
-#define ATL_WRITE_REG(VAL, REG)	writel(VAL, nic->regs + (REG)) /*write register*/
-#define ATL_READ_REG(REG)	readl(nic->regs + (REG)) /*read register*/
+extern struct atl_hw_ops atl_hw;
 
 /** @file
 *
-* aQuantia AQC network card driver
+* Marvell AQC network card driver
 *
 */
-static int atl_download_dwords_(struct atl_nic * nic, uint32_t addr, void* buffer, uint32_t dword_count)
-{
-	uint32_t i;
-	uint32_t* ptr = (uint32_t*)buffer;
-	printf("AQUANTIA: download_dwords\n");
-	for (i = 0; i < 100; ++i) {
-		if (ATL_READ_REG(ATL_SEM_RAM))
-			break;
-		mdelay(100);
-	}
-
-	if (i == 100)
-		goto err;
-
-	ATL_WRITE_REG(addr, ATL_MBOX_CTRL3);
-	for (i = 0; i < dword_count; ++i, ++ptr) {
-		uint32_t j = 0U;
-		ATL_WRITE_REG(0x8000, ATL_MBOX_CTRL1);
-		for (j = 1024; (0x100U & ATL_READ_REG(ATL_MBOX_CTRL1)) && --j;);
-		*ptr = ATL_READ_REG(ATL_MBOX_CTRL5);
-	}
-
-	ATL_WRITE_REG(1, ATL_SEM_RAM);
-
-	return 0;
-err:
-	printf("AQUANTIA: download_dwords error\n");
-	return -1;
-}
-
-static int atl_reset(struct atl_nic * nic)
-{
-	uint32_t i;
-	struct atl_hw_stats stats = { 0 };
-	uint32_t tid;
-	printf("AQUANTIA: atl_reset\n");
-	for (i = 0; i < 50 && nic->mbox_addr == 0; i++) {
-		nic->mbox_addr = ATL_READ_REG(ATL_MBOX_ADDR);
-		mdelay(100);
-	}
-	if (nic->mbox_addr == 0) {
-		printf("AQUANTIA: atl_reset wait mbox_addr error\n");
-		goto err_wait_fw;
-	}
-
-	ATL_WRITE_REG(ATL_READ_REG(ATL_PCI_CTRL) & ~ATL_PCI_CTRL_RST_DIS, ATL_PCI_CTRL); // PCI register reset disable
-	ATL_WRITE_REG(ATL_READ_REG(ATL_RX_CTRL) & ~ATL_RX_CTRL_RST_DIS, ATL_RX_CTRL); // Rx register reset disable
-	ATL_WRITE_REG(ATL_READ_REG(ATL_TX_CTRL) & ~ATL_TX_CTRL_RST_DIS, ATL_TX_CTRL); // Tx register reset disable
-
-	ATL_WRITE_REG(0xC000, 0);
-	mdelay(100);
-
-	if (atl_download_dwords_(nic, nic->mbox_addr, &stats, sizeof stats / sizeof(uint32_t)) != 0) {
-		printf("AQUANTIA: atl_reset first download error\n");
-		goto err_wait_fw;
-	}
-	tid = stats.tid;
-
-	for (i = 0; i < 50; i++) {
-		if (atl_download_dwords_(nic, nic->mbox_addr, &stats, sizeof stats / sizeof(uint32_t)) != 0)
-			goto err_wait_fw;
-		if (stats.tid != tid)
-			break;
-
-		mdelay(100);
-	}
-	if (stats.tid == tid)
-		goto err_wait_fw;
-	printf("AQUANTIA: atl_reset success\n");
-	return 0;
-
-err_wait_fw:
-	printf("AQUANTIA: atl_reset error\n");
-	return -1;
-}
 
 static int atl_ring_alloc(const struct atl_nic* nic, struct atl_ring* ring, uint32_t desc_size, uint32_t reg_base)
 {
@@ -301,11 +226,10 @@ static int atl_open(struct net_device *netdev)
 	/*Enable rings*/
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RING_TX_CTRL) | ATL_RING_TX_CTRL_EN, ATL_RING_TX_CTRL);
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RING_RX_CTRL) | ATL_RING_RX_CTRL_EN, ATL_RING_RX_CTRL);
-
-	ATL_WRITE_REG(ATL_LINK_ADV_DOWNSHIFT | ATL_LINK_ADV_CMD | ATL_LINK_ADV_AUTONEG, ATL_LINK_ADV);
 	
 	atl_rx_ring_fill(nic);
 
+	nic->hw_ops->start(nic);
 	printf("AQUANTIA: code 0()\n");
 	return 0;
 err_alloc:
@@ -323,6 +247,7 @@ err_alloc:
 static void atl_close(struct net_device *netdev) {
 	struct atl_nic* nic = netdev->priv;
 
+	nic->hw_ops->stop(nic);
 	ATL_WRITE_REG(0x0, ATL_RPB_CTRL);//rpb global ctrl
 
 	ATL_WRITE_REG(0x0, ATL_TPB_CTRL);//tpb global ctrl
@@ -331,8 +256,6 @@ static void atl_close(struct net_device *netdev) {
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RING_RX_CTRL) | (~ATL_RING_RX_CTRL_EN), ATL_RING_RX_CTRL);
 
 	ATL_WRITE_REG(0x0, ATL_ITR_MSKS);//clear itr mask
-
-	ATL_WRITE_REG(0x0, ATL_LINK_ADV);
 
 	atl_ring_free(&nic->tx_ring);
 	atl_ring_free(&nic->rx_ring);
@@ -384,23 +307,19 @@ int atl_transmit(struct net_device *netdev, struct io_buffer *iobuf)
 void atl_check_link(struct net_device* netdev)
 {
 	struct atl_nic *nic = netdev->priv;
-	static int iteration = 0;
 
-	uint32_t link_state = ATL_READ_REG(ATL_LINK_ST);
-	//printf("AQUANTIA: atl_check_link: state = %X\n", link_state);
-	mdelay(500);
-	if ((link_state & 0xf) == 2 && (link_state & 0xff0000)) {
-		netdev_link_up(netdev);
-	   //if (iteration % 100 == 0)
-			//printf("AQUANTIA: %p link UP\n", nic);
+	uint32_t link_state = nic->hw_ops->get_link(nic);
+	
+	if (link_state != nic->link_state) {
+		if (link_state) {
+			printf("AQUANTIA: link up");
+			netdev_link_up(netdev);
+		} else {
+			printf("AQUANTIA: link lost");
+			netdev_link_down(netdev);
+		}
+		nic->link_state = link_state;
 	}
-	else {
-		netdev_link_down(netdev);
-		//if (iteration % 100 == 0)
-			printf("AQUANTIA: %p link DOWN\n", nic);
-	}
-
-	++iteration;
 }
 
 /**
@@ -525,7 +444,7 @@ static void atl_irq(struct net_device *netdev, int enable) {
 	}
 }
 
-/** Intel network device operations */
+/** Marvell network device operations */
 static struct net_device_operations atl_operations = {
 	.open = atl_open,
 	.close = atl_close,
@@ -550,7 +469,8 @@ static struct net_device_operations atl_operations = {
 static int atl_probe(struct pci_device *pci) {
 	struct net_device *netdev;
 	struct atl_nic *nic;
-	int rc;
+	int rc = ENOERR;
+
 	printf("\nAQUANTIA: atl_probe()\n");
 	/* Allocate and initialise net device */
 	netdev = alloc_etherdev(sizeof(*nic));
@@ -566,7 +486,7 @@ static int atl_probe(struct pci_device *pci) {
 	nic->port = PCI_FUNC(pci->busdevfn);
 	nic->flags = pci->id->driver_data;
 
-		/* Fix up PCI device */
+	/* Fix up PCI device */
 	adjust_pci_device(pci);
 
 	/* Map registers */
@@ -575,17 +495,33 @@ static int atl_probe(struct pci_device *pci) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
-	
 	printf("AQUANTIA: atl_probe fw ver =  %#x\n", ATL_READ_REG(0x18));
 	/* Register network device */
-	if ((rc = register_netdev(netdev)) != 0)
-		goto err_register_netdev;
+	
 
-	if (atl_reset(nic) != 0) {
+	switch (nic->flags) {
+		case ATL_FLAG_A1:
+			nic->hw_ops = &atl_hw;
+			break;
+		case ATL_FLAG_A2:
+			//nic->hw_ops = atl2_hw;
+			break;
+		default:
+			goto err_unsupported;
+			break;
+	}
+
+	if (nic->hw_ops->reset(nic) != 0) {
 		printf("AQUANTIA: atl_probe reset error 0\n");
 		goto err_reset;
 	}
 
+	if (nic->hw_ops->get_mac(nic, netdev->hw_addr) != 0) {
+		goto err_mac;
+	}
+
+	if ((rc = register_netdev(netdev)) != 0)
+		goto err_register_netdev;
 	/* Set initial link state */
 	atl_check_link(netdev);
 
@@ -594,7 +530,9 @@ static int atl_probe(struct pci_device *pci) {
 
 	unregister_netdev(netdev);
 err_register_netdev:
+err_mac:
 err_reset:
+err_unsupported:
 	iounmap(nic->regs);
 err_ioremap:
 	netdev_nullify(netdev);
@@ -617,7 +555,7 @@ static void atl_remove(struct pci_device *pci) {
 	unregister_netdev(netdev);
 
 	/* Reset the NIC */
-	atl_reset(nic);
+	nic->hw_ops->reset(nic);
 
 	/* Free network device */
 	iounmap(nic->regs);
@@ -625,15 +563,44 @@ static void atl_remove(struct pci_device *pci) {
 	netdev_put(netdev);
 }
 
-/** Intel PCI device IDs */
+/** Marvell PCI device IDs */
 static struct pci_device_id atl_nics[] = {
-	PCI_ROM(0x1D6A, 0x0001, "AQC07", "Aquantia AQtion 10Gbit Network Adapter", 0),
-	PCI_ROM(0x1D6A, 0xD107, "AQC07", "Aquantia AQtion 10Gbit Network Adapter", 0),
-	PCI_ROM(0x1D6A, 0xD108, "AQC07", "Aquantia AQtion 5Gbit Network Adapter", 0),
-	PCI_ROM(0x1D6A, 0xD109, "AQC07", "Aquantia AQtion 2.5Gbit Network Adapter", 0),
+	/* Atlantic 1 */
+	/* 10G */
+	PCI_ROM(0x1D6A, 0x0001, "AQC07", "Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0xD107, "AQC07", "Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x07B1, "AQC07", "Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x87B1, "AQC07", "Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
+
+	/* SFP */
+	PCI_ROM(0x1D6A, 0xD100, "AQC00", "Felicity Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x00B1, "AQC00", "Felicity Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x80B1, "AQC00", "Felicity Network Adapter", ATL_FLAG_A1),
+
+	/* 5G */
+	PCI_ROM(0x1D6A, 0xD108, "AQC08", "Marvell AQtion 5Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x08B1, "AQC08", "Marvell AQtion 5Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x88B1, "AQC08", "Marvell AQtion 5Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x11B1, "AQC11", "Marvell AQtion 5Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x91B1, "AQC11", "Marvell AQtion 5Gbit Network Adapter", ATL_FLAG_A1),
+
+	/* 2.5G */
+	PCI_ROM(0x1D6A, 0xD109, "AQC09", "Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x09B1, "AQC09", "Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x89B1, "AQC09", "Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x12B1, "AQC12", "Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+	PCI_ROM(0x1D6A, 0x92B1, "AQC12", "Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+
+	/* Atlantic 2 */
+	PCI_ROM(0x1D6A, 0x00C0, "AQC13", "Marvell Antigua Engineering Sample", ATL_FLAG_A2),
+	PCI_ROM(0x1D6A, 0x94C0, "AQC13", "Marvell Antigua Sample", ATL_FLAG_A2),
+	PCI_ROM(0x1D6A, 0x93C0, "AQC13", "Marvell Antigua Sample", ATL_FLAG_A2),
+	PCI_ROM(0x1D6A, 0x04C0, "AQC13", "Marvell Antigua Sample", ATL_FLAG_A2),
+	PCI_ROM(0x1D6A, 0x14C0, "AQC13", "Marvell Antigua Sample", ATL_FLAG_A2),
+	PCI_ROM(0x1D6A, 0x12C0, "AQC13", "Marvell Antigua Sample", ATL_FLAG_A2),
 };
 
-/** Intel PCI driver */
+/** Marvell PCI driver */
 struct pci_driver atl_driver __pci_driver = {
 	.ids = atl_nics,
 	.id_count = (sizeof(atl_nics) / sizeof(atl_nics[0])),

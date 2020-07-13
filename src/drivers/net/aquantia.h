@@ -123,12 +123,12 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /*Link advertising*/
 #define ATL_LINK_ADV		   0x00000368U
-#define ATL_LINK_ADV_AUTONEG   0x003B0000U
-#define ATL_LINK_ADV_DOWNSHIFT 0xC0000000U
-#define ATL_LINK_ADV_CMD	   0x00000002U
+#define ATL_LINK_ADV_AUTONEG   0xF20U
+/*#define ATL_LINK_ADV_DOWNSHIFT 0xC0000000U
+#define ATL_LINK_ADV_CMD	   0x00000002U*/
 
-#define ATL_LINK_ADV_EN 0xFFFF0002U /*??????????????*/
-#define ATL_LINK_ST	 0x0000036CU
+//#define ATL_LINK_ADV_EN 0xFFFF0002U /*??????????????*/
+#define ATL_LINK_ST	 0x00000370U
 
 /*Semaphores*/
 #define ATL_SEM_RAM 0x000003a8U
@@ -138,6 +138,12 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define ATL_MBOX_CTRL1 0x00000200U
 #define ATL_MBOX_CTRL3 0x00000208U
 #define ATL_MBOX_CTRL5 0x0000020cU
+
+#define ATL_FLAG_A1 0x1
+#define ATL_FLAG_A2 0x2
+
+#define ATL_WRITE_REG(VAL, REG)	writel(VAL, nic->regs + (REG)) /*write register*/
+#define ATL_READ_REG(REG)	readl(nic->regs + (REG)) /*read register*/
 
 struct atl_desc_tx {
 	uint64_t address;
@@ -187,6 +193,16 @@ struct atl_ring {
 	unsigned int length;
 };
 
+struct atl_nic;
+
+struct atl_hw_ops {
+	int (*reset) (struct atl_nic *nic);
+	int (*start) (struct atl_nic *nic);
+	int (*stop) (struct atl_nic *nic);
+	int (*get_link) (struct atl_nic *nic);
+	int (*get_mac) (struct atl_nic *, uint8_t *mac);
+};
+
 /** An aQuanita network card */
 struct atl_nic {
 	/** Registers */
@@ -198,7 +214,9 @@ struct atl_nic {
 	struct atl_ring tx_ring;
 	struct atl_ring rx_ring;
 	struct io_buffer *iobufs[ATL_RING_SIZE];
-	unsigned int mbox_addr;
+	uint32_t link_state;
+	uint32_t mbox_addr;
+	struct atl_hw_ops *hw_ops;
 };
 
 struct atl_hw_stats
