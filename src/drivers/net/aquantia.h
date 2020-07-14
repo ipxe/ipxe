@@ -13,15 +13,15 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/if_ether.h>
 #include <ipxe/nvs.h>
 
-#define ATL_BAR_SIZE   0xA000
-#define ATL_RING_SIZE  16
+#define ATL_BAR_SIZE   0x10000
+#define ATL_RING_SIZE  64
 #define ATL_RING_ALIGN 128
 #define ATL_RX_MAX_LEN 2048
 
 #define ATL_IRQ_TX   0x00000001U
 #define ATL_IRQ_RX   0x00000002U
 
-/*IRQ Statur Register*/
+/*IRQ Status Register*/
 #define ATL_IRQ_STAT_REG 0x00002000U
 
 /* Interrupt Vector Allocation Register */

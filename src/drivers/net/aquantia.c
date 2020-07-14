@@ -138,9 +138,9 @@ void atl_rx_ring_fill(struct atl_nic* nic)
 		assert(nic->iobufs[nic->rx_ring.sw_tail] == NULL);
 		nic->iobufs[nic->rx_ring.sw_tail] = iobuf;
 
-		printf("AQUANTIA RX[%d] is [%llx,%llx)\n", nic->rx_ring.sw_tail,
+		/*printf("AQUANTIA RX[%d] is [%llx,%llx)\n", nic->rx_ring.sw_tail,
 			((unsigned long long) address),
-			((unsigned long long) address + ATL_RX_MAX_LEN));
+			((unsigned long long) address + ATL_RX_MAX_LEN));*/
 		atl_ring_next_dx(&nic->rx_ring.sw_tail);
 		refilled++;
 	}
@@ -295,9 +295,9 @@ int atl_transmit(struct net_device *netdev, struct io_buffer *iobuf)
 	tx->cmd = 0x22;
 	wmb();
 
-	printf("AQUANTIA: %p TX[%d] is [%llx, %llx]\n", nic, nic->tx_ring.sw_tail,
+	/*printf("AQUANTIA: %p TX[%d] is [%llx, %llx]\n", nic, nic->tx_ring.sw_tail,
 		((unsigned long long) address),
-		((unsigned long long) address + len));
+		((unsigned long long) address + len));*/
 
 	atl_ring_next_dx(&nic->tx_ring.sw_tail);
 	ATL_WRITE_REG(nic->tx_ring.sw_tail, ATL_RING_TAIL);
@@ -346,8 +346,8 @@ void atl_poll_tx(struct net_device *netdev)
 		//printf("AQUANTIA %p: TX[%d] complete\n", nic, nic->tx_ring.sw_head);
 
 		/* Complete TX descriptor */
-		netdev_tx_complete_next(netdev);
 		atl_ring_next_dx(&nic->tx_ring.sw_head);
+		netdev_tx_complete_next(netdev);
 	}
 }
 
@@ -381,7 +381,7 @@ void atl_poll_rx(struct net_device *netdev) {
 
 		/* Hand off to network stack */
 		/*to do: process error*/
-		/* printf("AQUANTIA: %p RX[%d] complete (length %zd)\n",
+		/*printf("AQUANTIA: %p RX[%d] complete (length %zd)\n",
 			nic, nic->rx_ring.sw_head, len);*/
 		netdev_rx(netdev, iobuf);
 		//printf("AQUANTIA %p: RX[%d] complete\n", nic, nic->rx_ring.sw_head);
@@ -396,13 +396,13 @@ void atl_poll_rx(struct net_device *netdev) {
 */
 static void atl_poll(struct net_device *netdev) {
 	struct atl_nic *nic = netdev->priv;
-	uint32_t icr;
+	//uint32_t icr;
 	
 	/* Check link state */
 	atl_check_link(netdev);
 	
 	/* Check for and acknowledge interrupts */
-	icr = ATL_READ_REG(ATL_IRQ_STAT_REG);
+	//icr = ATL_READ_REG(ATL_IRQ_STAT_REG);
 	
 	/*if(!icr)
 		return;
@@ -410,11 +410,11 @@ static void atl_poll(struct net_device *netdev) {
 		//printf("AQUANTIA: %p ICR 0x%X\n", nic, icr);
 	
 	/* Poll for TX completions, if applicable */
-	if (icr & ATL_IRQ_TX)
+	//if (icr & ATL_IRQ_TX)
 		atl_poll_tx(netdev);
 
 	/* Poll for RX completions, if applicable */
-	if (icr & ATL_IRQ_RX)
+	//if (icr & ATL_IRQ_RX)
 		atl_poll_rx(netdev);
 
 	
@@ -495,9 +495,6 @@ static int atl_probe(struct pci_device *pci) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
-	printf("AQUANTIA: atl_probe fw ver =  %#x\n", ATL_READ_REG(0x18));
-	/* Register network device */
-	
 
 	switch (nic->flags) {
 		case ATL_FLAG_A1:
@@ -516,14 +513,15 @@ static int atl_probe(struct pci_device *pci) {
 		goto err_reset;
 	}
 
-	if (nic->hw_ops->get_mac(nic, netdev->hw_addr) != 0) {
+	if (nic->hw_ops->get_mac(nic, netdev->hw_addr) != 0)
 		goto err_mac;
-	}
 
+	/* Register network device */
 	if ((rc = register_netdev(netdev)) != 0)
 		goto err_register_netdev;
+
 	/* Set initial link state */
-	atl_check_link(netdev);
+	netdev_link_down(netdev);
 
 	printf("AQUANTIA: atl_probe code 0\n");
 	return 0;
