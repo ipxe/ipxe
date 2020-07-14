@@ -313,10 +313,10 @@ void atl_check_link(struct net_device* netdev)
 	
 	if (link_state != nic->link_state) {
 		if (link_state) {
-			printf("AQUANTIA: link up");
+			printf("AQUANTIA: link up\n");
 			netdev_link_up(netdev);
 		} else {
-			printf("AQUANTIA: link lost");
+			printf("AQUANTIA: link lost\n");
 			netdev_link_down(netdev);
 		}
 		nic->link_state = link_state;
@@ -343,7 +343,7 @@ void atl_poll_tx(struct net_device *netdev)
 		if (!tx->dd)
 			return;
 
-		printf("AQUANTIA %p: TX[%d] complete\n", nic, nic->tx_ring.sw_head);
+		//printf("AQUANTIA %p: TX[%d] complete\n", nic, nic->tx_ring.sw_head);
 
 		/* Complete TX descriptor */
 		netdev_tx_complete_next(netdev);
@@ -369,7 +369,7 @@ void atl_poll_rx(struct net_device *netdev) {
 		rx = (struct atl_desc_rx_wb*)nic->rx_ring.ring + nic->rx_ring.sw_head;
 		
 		/* Stop if descriptor is still in use */
-		printf("AQUANTIA: rx poll: desc: %llx, %llx\n",*((uint64_t*)rx), *(((uint64_t*)rx) + 1));
+		//printf("AQUANTIA: rx poll: desc: %llx, %llx\n",*((uint64_t*)rx), *(((uint64_t*)rx) + 1));
 		if (!rx->dd)
 			return;
 
@@ -381,12 +381,11 @@ void atl_poll_rx(struct net_device *netdev) {
 
 		/* Hand off to network stack */
 		/*to do: process error*/
-		printf("AQUANTIA: %p RX[%d] complete (length %zd)\n",
-			nic, nic->rx_ring.sw_head, len);
+		/* printf("AQUANTIA: %p RX[%d] complete (length %zd)\n",
+			nic, nic->rx_ring.sw_head, len);*/
 		netdev_rx(netdev, iobuf);
-		printf("AQUANTIA %p: RX[%d] complete\n", nic, nic->rx_ring.sw_head);
+		//printf("AQUANTIA %p: RX[%d] complete\n", nic, nic->rx_ring.sw_head);
 		atl_ring_next_dx(&nic->rx_ring.sw_head);
-		mdelay(250);
 	}
 }
 
