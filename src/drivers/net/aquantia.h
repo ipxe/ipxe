@@ -45,7 +45,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /*RX interrupt ctrl reg*/
 #define ATL_RX_IRQ_CTRL	   0x00005A30U
-#define ATL_RX_IRQ_CTRL_WB_EN 0x00000002U
+#define ATL_RX_IRQ_CTRL_WB_EN 0x00000004U
 //#define ATL_RX_IRQ_CTRL_PCKT_TRANSM_EN 0x00000008U
 
 #define ATL_GLB_CTRL  0x00000000U
@@ -84,8 +84,8 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define ATL_RPB0_CTRL2_HIGH_TSH 0x1C000000U /*Buffer High Threshold(30% of RPB size in unit 32B)*/
 #define ATL_RPB0_CTRL2_FC_EN	0x80000000U /*Flow control Enable*/
 
-#define ATL_RPB_CTRL_SIZE 0x00005b18U
-#define ATL_RPB_CTRL_ADDR 0x00005b00U
+#define ATL_RX_DMA_DESC_BUF_SIZE 0x00005b18U
+#define ATL_RX_DMA_DESC_ADDR 0x00005b00U
 
 /*TX data path  control registers*/
 #define ATL_TPO2_CTRL 0x00007040U
@@ -100,10 +100,10 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define ATL_TPB0_CTRL1_SIZE 0x000000A0U /*TPB Size (in unit 1KB)*/
 
 #define ATL_TPB0_CTRL2		  0x00007914U
-#define ATL_TPB0_CTRL2_LOW_TSH  0x00000600U /*Buffer Low Threshold (70% of RPB size in unit 32B)*/
-#define ATL_TPB0_CTRL2_HIGH_TSH 0x0E000000U /*Buffer High Threshold(30% of RPB size in unit 32B)*/
+#define ATL_TPB0_CTRL2_LOW_TSH  0x00000600U /*Buffer High Threshold(30% of RPB size in unit 32B)*/
+#define ATL_TPB0_CTRL2_HIGH_TSH 0x0E000000U /*Buffer Low Threshold (70% of RPB size in unit 32B)*/
 
-#define ATL_TPB_CTRL_ADDR 0x00007c00U
+#define ATL_TX_DMA_DESC_ADDR 0x00007c00U
 
 /*Rings control registers*/
 #define ATL_RING_TX_CTRL	0x00007c08U

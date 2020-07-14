@@ -165,11 +165,11 @@ static int atl_open(struct net_device *netdev)
 	printf("AQUANTIA: atl_open()\n");
 	
 	// Tx ring
-	if (atl_ring_alloc(nic, &nic->tx_ring, sizeof(struct atl_desc_tx), ATL_TPB_CTRL_ADDR) != 0)
+	if (atl_ring_alloc(nic, &nic->tx_ring, sizeof(struct atl_desc_tx), ATL_TX_DMA_DESC_ADDR) != 0)
 		goto err_alloc;
 
 	// Rx ring
-	if (atl_ring_alloc(nic, &nic->rx_ring, sizeof(struct atl_desc_rx), ATL_RPB_CTRL_ADDR) != 0)
+	if (atl_ring_alloc(nic, &nic->rx_ring, sizeof(struct atl_desc_rx), ATL_RX_DMA_DESC_ADDR) != 0)
 		goto err_alloc;
 
 	/* Allocate interrupt vectors */
@@ -186,18 +186,16 @@ static int atl_open(struct net_device *netdev)
 	/*RX interrupt ctrl reg*/
 	ATL_WRITE_REG(ATL_RX_IRQ_CTRL_WB_EN, ATL_RX_IRQ_CTRL);
 
-	
-	
 	/*RX data path*/
-	//ctrl = ATL_IRQ_TX | ATL_IRQ_RX | ATL_IRQ_LINK;
 	ctrl = ATL_IRQ_TX | ATL_IRQ_RX;
-	ATL_WRITE_REG(ctrl,  ATL_ITR_MSKS);//itr mask
-	ATL_WRITE_REG((uint32_t)ATL_RX_MAX_LEN / 1024U, ATL_RPB_CTRL_SIZE);
+	/* itr mask */
+	ATL_WRITE_REG(ctrl,  ATL_ITR_MSKS);
+	ATL_WRITE_REG((uint32_t)ATL_RX_MAX_LEN / 1024U, ATL_RX_DMA_DESC_BUF_SIZE);
 	
 	/*filter global ctrl */
 	ctrl = ATL_RPF_CTRL1_BRC_EN | ATL_RPF_CTRL1_L2_PROMISC |
-		   ATL_RPF_CTRL1_ACTION | ATL_RPF_CTRL1_BRC_TSH;
-	ATL_WRITE_REG(ctrl,ATL_RPF_CTRL1);
+		ATL_RPF_CTRL1_ACTION | ATL_RPF_CTRL1_BRC_TSH;
+	ATL_WRITE_REG(ctrl, ATL_RPF_CTRL1);
 
 	ATL_WRITE_REG(ATL_RPF_CTRL2_VLAN_PROMISC, ATL_RPF_CTRL2);//vlan promisc
 	ATL_WRITE_REG(ATL_RPF2_CTRL_EN, ATL_RPF2_CTRL);//enable rpf2
@@ -210,17 +208,19 @@ static int atl_open(struct net_device *netdev)
 	ATL_WRITE_REG(ctrl, ATL_RPB0_CTRL2);
 
 	/*RPB global ctrl*/
-	ctrl = ATL_RPB_CTRL_EN | ATL_RPB_CTRL_FC | ATL_RPB_CTRL_TC_MODE;
+	ctrl = ATL_READ_REG(ATL_RPB_CTRL);
+	ctrl |= (ATL_RPB_CTRL_EN | ATL_RPB_CTRL_FC);
 	ATL_WRITE_REG(ctrl, ATL_RPB_CTRL);
 
 	/*TX data path*/
 	ATL_WRITE_REG(ATL_TPO2_EN, ATL_TPO2_CTRL);//enable tpo2
-	ATL_WRITE_REG(ATL_TPB0_CTRL1, ATL_TPB0_CTRL1);//tpb global ctrl ***
+	ATL_WRITE_REG(ATL_TPB0_CTRL1_SIZE, ATL_TPB0_CTRL1);//tpb global ctrl ***
 
 	ctrl = ATL_TPB0_CTRL2_LOW_TSH | ATL_TPB0_CTRL2_HIGH_TSH;
 	ATL_WRITE_REG(ctrl, ATL_TPB0_CTRL2);//tpb global ctrl ***
 
-	ctrl = ATL_TPB_CTRL_EN | ATL_TPB_CTRL_PAD_EN | ATL_TPB_CTRL_TC_MODE;
+	ctrl = ATL_READ_REG(ATL_TPB_CTRL);
+	ctrl|= (ATL_TPB_CTRL_EN | ATL_TPB_CTRL_PAD_EN);
 	ATL_WRITE_REG(ctrl, ATL_TPB_CTRL);//tpb global ctrl ***
 
 	/*Enable rings*/
@@ -231,6 +231,7 @@ static int atl_open(struct net_device *netdev)
 
 	nic->hw_ops->start(nic);
 	printf("AQUANTIA: code 0()\n");
+
 	return 0;
 err_alloc:
 	atl_ring_free(&nic->tx_ring);
