@@ -63,17 +63,32 @@ FEATURE ( FEATURE_PROTOCOL, "DNS", DHCP_EB_FEATURE_DNS, 1 );
 #define EINFO_ENXIO_NO_NAMESERVER \
 	__einfo_uniqify ( EINFO_ENXIO, 0x02, "No DNS servers available" )
 
-/** The DNS server */
-static union {
-	struct sockaddr sa;
-	struct sockaddr_tcpip st;
-	struct sockaddr_in sin;
-	struct sockaddr_in6 sin6;
-} nameserver = {
-	.st = {
-		.st_port = htons ( DNS_PORT ),
-	},
+/** A DNS server list */
+struct dns_server {
+	/** Server list */
+	union {
+		/** IPv4 addresses */
+		struct in_addr *in;
+		/** IPv6 addresses */
+		struct in6_addr *in6;
+		/** Raw data */
+		void *data;
+	};
+	/** Number of servers */
+	unsigned int count;
 };
+
+/** IPv4 DNS server list */
+static struct dns_server dns4;
+
+/** IPv6 DNS server list */
+static struct dns_server dns6;
+
+/** Total number of DNS servers */
+static unsigned int dns_count;
+
+/** Current DNS server index */
+static unsigned int dns_index;
 
 /** The DNS search list */
 static struct dns_name dns_search;
@@ -555,6 +570,9 @@ static int dns_question ( struct dns_request *dns ) {
 	/* Restore name */
 	dns->name.offset = offsetof ( typeof ( dns->buf ), name );
 
+	/* Reset query ID */
+	dns->buf.query.id = 0;
+
 	DBGC2 ( dns, "DNS %p question is %s type %s\n", dns,
 		dns_name ( &dns->name ), dns_type ( dns->question->qtype ) );
 
@@ -569,24 +587,54 @@ static int dns_question ( struct dns_request *dns ) {
  */
 static int dns_send_packet ( struct dns_request *dns ) {
 	struct dns_header *query = &dns->buf.query;
+	union {
+		struct sockaddr sa;
+		struct sockaddr_tcpip st;
+		struct sockaddr_in sin;
+		struct sockaddr_in6 sin6;
+	} nameserver;
+	struct xfer_metadata meta;
+	unsigned int index;
 
 	/* Start retransmission timer */
 	start_timer ( &dns->timer );
 
-	/* Generate query identifier */
-	query->id = random();
+	/* Construct DNS server address */
+	memset ( &nameserver, 0, sizeof ( nameserver ) );
+	nameserver.st.st_port = htons ( DNS_PORT );
+	if ( ! dns_count ) {
+		DBGC ( dns, "DNS %p lost DNS servers mid query\n", dns );
+		return -EINVAL;
+	}
+	index = ( dns_index % dns_count );
+	if ( index < dns6.count ) {
+		nameserver.sin6.sin6_family = AF_INET6;
+		memcpy ( &nameserver.sin6.sin6_addr, &dns6.in6[index],
+			 sizeof ( nameserver.sin6.sin6_addr ) );
+	} else {
+		nameserver.sin.sin_family = AF_INET;
+		nameserver.sin.sin_addr = dns4.in[index - dns6.count];
+	}
+
+	/* Construct metadata */
+	memset ( &meta, 0, sizeof ( meta ) );
+	meta.dest = &nameserver.sa;
+
+	/* Generate query identifier if applicable */
+	if ( ! query->id )
+		query->id = random();
 
 	/* Send query */
-	DBGC ( dns, "DNS %p sending query ID %#04x for %s type %s\n", dns,
-	       ntohs ( query->id ), dns_name ( &dns->name ),
-	       dns_type ( dns->question->qtype ) );
+	DBGC ( dns, "DNS %p sending %s query ID %#04x for %s type %s\n", dns,
+	       sock_ntoa ( &nameserver.sa ), ntohs ( query->id ),
+	       dns_name ( &dns->name ), dns_type ( dns->question->qtype ) );
 
 	/* Send the data */
-	return xfer_deliver_raw ( &dns->socket, query, dns->len );
+	return xfer_deliver_raw_meta ( &dns->socket, query, dns->len, &meta );
 }
 
 /**
- * Handle DNS retransmission timer expiry
+ * Handle DNS (re)transmission timer expiry
  *
  * @v timer		Retry timer
  * @v fail		Failure indicator
@@ -595,11 +643,18 @@ static void dns_timer_expired ( struct retry_timer *timer, int fail ) {
 	struct dns_request *dns =
 		container_of ( timer, struct dns_request, timer );
 
+	/* Terminate DNS request on failure */
 	if ( fail ) {
 		dns_done ( dns, -ETIMEDOUT );
-	} else {
-		dns_send_packet ( dns );
+		return;
 	}
+
+	/* Move to next DNS server if this is a retransmission */
+	if ( dns->buf.query.id )
+		dns_index++;
+
+	/* Send DNS query */
+	dns_send_packet ( dns );
 }
 
 /**
@@ -927,7 +982,7 @@ static int dns_resolv ( struct interface *resolv,
 	int rc;
 
 	/* Fail immediately if no DNS servers */
-	if ( ! nameserver.sa.sa_family ) {
+	if ( dns_count == 0 ) {
 		DBG ( "DNS not attempting to resolve \"%s\": "
 		      "no DNS servers\n", name );
 		rc = -ENXIO_NO_NAMESERVER;
@@ -953,17 +1008,8 @@ static int dns_resolv ( struct interface *resolv,
 	memcpy ( dns->search.data, dns_search.data, search_len );
 
 	/* Determine initial query type */
-	switch ( nameserver.sa.sa_family ) {
-	case AF_INET:
-		dns->qtype = htons ( DNS_TYPE_A );
-		break;
-	case AF_INET6:
-		dns->qtype = htons ( DNS_TYPE_AAAA );
-		break;
-	default:
-		rc = -ENOTSUP;
-		goto err_type;
-	}
+	dns->qtype = ( ( dns6.count != 0 ) ?
+		       htons ( DNS_TYPE_AAAA ) : htons ( DNS_TYPE_A ) );
 
 	/* Construct query */
 	query = &dns->buf.query;
@@ -984,7 +1030,7 @@ static int dns_resolv ( struct interface *resolv,
 
 	/* Open UDP connection */
 	if ( ( rc = xfer_open_socket ( &dns->socket, SOCK_DGRAM,
-				       &nameserver.sa, NULL ) ) != 0 ) {
+				       NULL, NULL ) ) != 0 ) {
 		DBGC ( dns, "DNS %p could not open socket: %s\n",
 		       dns, strerror ( rc ) );
 		goto err_open_socket;
@@ -1001,7 +1047,6 @@ static int dns_resolv ( struct interface *resolv,
  err_open_socket:
  err_question:
  err_encode:
- err_type:
 	ref_put ( &dns->refcnt );
  err_alloc_dns:
  err_no_nameserver:
@@ -1097,6 +1142,31 @@ const struct setting dnssl_setting __setting ( SETTING_IP_EXTRA, dnssl ) = {
 };
 
 /**
+ * Apply DNS server addresses
+ *
+ */
+static void apply_dns_servers ( void ) {
+	int len;
+
+	/* Free existing server addresses */
+	free ( dns4.data );
+	free ( dns6.data );
+	dns4.data = NULL;
+	dns6.data = NULL;
+	dns4.count = 0;
+	dns6.count = 0;
+
+	/* Fetch DNS server addresses */
+	len = fetch_raw_setting_copy ( NULL, &dns_setting, &dns4.data );
+	if ( len >= 0 )
+		dns4.count = ( len / sizeof ( dns4.in[0] ) );
+	len = fetch_raw_setting_copy ( NULL, &dns6_setting, &dns6.data );
+	if ( len >= 0 )
+		dns6.count = ( len / sizeof ( dns6.in6[0] ) );
+	dns_count = ( dns4.count + dns6.count );
+}
+
+/**
  * Apply DNS search list
  *
  */
@@ -1109,8 +1179,7 @@ static void apply_dns_search ( void ) {
 	memset ( &dns_search, 0, sizeof ( dns_search ) );
 
 	/* Fetch DNS search list */
-	len = fetch_setting_copy ( NULL, &dnssl_setting, NULL, NULL,
-				   &dns_search.data );
+	len = fetch_raw_setting_copy ( NULL, &dnssl_setting, &dns_search.data );
 	if ( len >= 0 ) {
 		dns_search.len = len;
 		return;
@@ -1138,19 +1207,31 @@ static void apply_dns_search ( void ) {
  * @ret rc		Return status code
  */
 static int apply_dns_settings ( void ) {
+	void *dbgcol = &dns_count;
 
 	/* Fetch DNS server address */
-	nameserver.sa.sa_family = 0;
-	if ( fetch_ipv6_setting ( NULL, &dns6_setting,
-				  &nameserver.sin6.sin6_addr ) >= 0 ) {
-		nameserver.sin6.sin6_family = AF_INET6;
-	} else if ( fetch_ipv4_setting ( NULL, &dns_setting,
-					 &nameserver.sin.sin_addr ) >= 0 ) {
-		nameserver.sin.sin_family = AF_INET;
-	}
-	if ( nameserver.sa.sa_family ) {
-		DBG ( "DNS using nameserver %s\n",
-		      sock_ntoa ( &nameserver.sa ) );
+	apply_dns_servers();
+	if ( DBG_LOG && ( dns_count != 0 ) ) {
+		union {
+			struct sockaddr sa;
+			struct sockaddr_in sin;
+			struct sockaddr_in6 sin6;
+		} u;
+		unsigned int i;
+
+		DBGC ( dbgcol, "DNS servers:" );
+		for ( i = 0 ; i < dns6.count ; i++ ) {
+			u.sin6.sin6_family = AF_INET6;
+			memcpy ( &u.sin6.sin6_addr, &dns6.in6[i],
+				 sizeof ( u.sin6.sin6_addr ) );
+			DBGC ( dbgcol, " %s", sock_ntoa ( &u.sa ) );
+		}
+		for ( i = 0 ; i < dns4.count ; i++ ) {
+			u.sin.sin_family = AF_INET;
+			u.sin.sin_addr = dns4.in[i];
+			DBGC ( dbgcol, " %s", sock_ntoa ( &u.sa ) );
+		}
+		DBGC ( dbgcol, "\n" );
 	}
 
 	/* Fetch DNS search list */
@@ -1159,16 +1240,16 @@ static int apply_dns_settings ( void ) {
 		struct dns_name name;
 		int offset;
 
-		DBG ( "DNS search list:" );
+		DBGC ( dbgcol, "DNS search list:" );
 		memcpy ( &name, &dns_search, sizeof ( name ) );
 		while ( name.offset != name.len ) {
-			DBG ( " %s", dns_name ( &name ) );
+			DBGC ( dbgcol, " %s", dns_name ( &name ) );
 			offset = dns_skip_search ( &name );
 			if ( offset < 0 )
 				break;
 			name.offset = offset;
 		}
-		DBG ( "\n" );
+		DBGC ( dbgcol, "\n" );
 	}
 
 	return 0;
