@@ -147,10 +147,8 @@ int xfer_open_socket ( struct interface *intf, int semantics,
 	       socket_family_name ( peer->sa_family ) );
 
 	for_each_table_entry ( opener, SOCKET_OPENERS ) {
-		if ( ( opener->semantics == semantics ) &&
-		     ( opener->family == peer->sa_family ) ) {
+		if ( opener->semantics == semantics )
 			return opener->open ( intf, peer, local );
-		}
 	}
 
 	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " attempted to open "

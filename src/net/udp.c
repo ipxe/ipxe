@@ -396,17 +396,9 @@ static struct interface_descriptor udp_xfer_desc =
  ***************************************************************************
  */
 
-/** UDP IPv4 socket opener */
-struct socket_opener udp_ipv4_socket_opener __socket_opener = {
+/** UDP socket opener */
+struct socket_opener udp_socket_opener __socket_opener = {
 	.semantics	= UDP_SOCK_DGRAM,
-	.family		= AF_INET,
-	.open		= udp_open,
-};
-
-/** UDP IPv6 socket opener */
-struct socket_opener udp_ipv6_socket_opener __socket_opener = {
-	.semantics	= UDP_SOCK_DGRAM,
-	.family		= AF_INET6,
 	.open		= udp_open,
 };
 
