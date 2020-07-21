@@ -56,7 +56,7 @@ static uint8_t deflate_reverse[256];
  * does not fit the pattern (it represents a length of 258; following
  * the pattern from the earlier codes would give a length of 259), and
  * has no extra bits.  Codes 286-287 are invalid, but can occur.  We
- * treat any code greater than 284 as meaning "length 285, no extra
+ * treat any code greater than 284 as meaning "length 258, no extra
  * bits".
  */
 static uint8_t deflate_litlen_base[28];
