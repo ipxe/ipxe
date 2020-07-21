@@ -247,16 +247,17 @@ static int efi_snp_hii_append ( struct efi_snp_device *snpdev __unused,
 				const char *key, const char *value,
 				wchar_t **results ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
 	size_t len;
 	void *new;
 
 	/* Allocate new string */
 	len = ( ( *results ? ( wcslen ( *results ) + 1 /* "&" */ ) : 0 ) +
 		strlen ( key ) + 1 /* "=" */ + strlen ( value ) + 1 /* NUL */ );
-	bs->AllocatePool ( EfiBootServicesData, ( len * sizeof ( wchar_t ) ),
-			   &new );
-	if ( ! new )
-		return -ENOMEM;
+	if ( ( efirc = bs->AllocatePool ( EfiBootServicesData,
+					  ( len * sizeof ( wchar_t ) ),
+					  &new ) ) != 0 )
+		return -EEFI ( efirc );
 
 	/* Populate string */
 	efi_snprintf ( new, len, "%ls%s%s=%s", ( *results ? *results : L"" ),
