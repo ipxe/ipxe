@@ -24,9 +24,6 @@
 FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <errno.h>
-#include <ipxe/efi/Protocol/ManagedNetwork.h>
-#include <ipxe/efi/Protocol/ServiceBinding.h>
-#include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_utils.h>
@@ -36,6 +33,9 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <ipxe/efi/Protocol/ManagedNetwork.h>
+#include <ipxe/efi/Protocol/ServiceBinding.h>
 
 // An MNP NIC
 struct mnp_nic {
