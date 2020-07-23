@@ -45,7 +45,8 @@ static void efi_unload_apple_images_for_protocol(EFI_HANDLE handle,
     return;
   }
 
-  for (unsigned int i = 0; i < count; ++i) {
+  unsigned int i;
+  for (i = 0; i < count; ++i) {
     EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener = &openers[i];
     const char *name = efi_handle_name(opener->AgentHandle);
     if (strstr(name, "Apple") != NULL) {
