@@ -77,7 +77,8 @@ void efi_unload_apple_images(EFI_HANDLE handle) {
     return;
   }
 
-  for (unsigned int i = 0; i < count; ++i) {
+  unsigned int i;
+  for (i = 0; i < count; ++i) {
     efi_unload_apple_images_for_protocol(handle, protocols[i]);
   }
 
