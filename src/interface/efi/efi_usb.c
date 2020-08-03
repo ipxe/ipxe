@@ -1100,7 +1100,7 @@ static int efi_usb_install ( struct efi_usb_device *usbdev,
 		usbpath->Header.Type = MESSAGING_DEVICE_PATH;
 		usbpath->Header.SubType = MSG_USB_DP;
 		usbpath->Header.Length[0] = sizeof ( *usbpath );
-		usbpath->ParentPortNumber = usb->port->address;
+		usbpath->ParentPortNumber = ( usb->port->address - 1 );
 	}
 
 	/* Add to list of interfaces */
