@@ -307,6 +307,7 @@ static int efi_local_open_volume ( struct efi_local *local,
 	EFI_GUID *protocol = &efi_simple_file_system_protocol_guid;
 	int ( * check ) ( struct efi_local *local, EFI_HANDLE device,
 			  EFI_FILE_PROTOCOL *root, const char *volume );
+	EFI_DEVICE_PATH_PROTOCOL *path;
 	EFI_FILE_PROTOCOL *root;
 	EFI_HANDLE *handles;
 	EFI_HANDLE device;
@@ -328,8 +329,18 @@ static int efi_local_open_volume ( struct efi_local *local,
 		}
 		check = efi_local_check_volume_name;
 	} else {
-		/* Use our loaded image's device handle */
-		handles = &efi_loaded_image->DeviceHandle;
+		/* Locate filesystem from which we were loaded */
+		path = efi_loaded_image_path;
+		if ( ( efirc = bs->LocateDevicePath ( protocol, &path,
+						      &device ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( local, "LOCAL %p could not locate file system "
+			       "on %s: %s\n", local,
+			       efi_devpath_text ( efi_loaded_image_path ),
+			       strerror ( rc ) );
+			return rc;
+		}
+		handles = &device;
 		num_handles = 1;
 		check = NULL;
 	}
