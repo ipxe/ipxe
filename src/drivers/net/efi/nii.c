@@ -789,6 +789,20 @@ static int nii_initialise_flags ( struct nii_nic *nii, unsigned int flags ) {
 }
 
 /**
+ * Initialise UNDI with cable detection
+ *
+ * @v nii		NII NIC
+ * @ret rc		Return status code
+ */
+static int nii_initialise_cable ( struct nii_nic *nii ) {
+	unsigned int flags;
+
+	/* Initialise UNDI */
+	flags = PXE_OPFLAGS_INITIALIZE_DETECT_CABLE;
+	return nii_initialise_flags ( nii, flags );
+}
+
+/**
  * Initialise UNDI
  *
  * @v nii		NII NIC
@@ -1122,7 +1136,6 @@ static void nii_poll ( struct net_device *netdev ) {
  */
 static int nii_open ( struct net_device *netdev ) {
 	struct nii_nic *nii = netdev->priv;
-	unsigned int flags;
 	int rc;
 
 	/* Initialise NIC
@@ -1140,15 +1153,21 @@ static int nii_open ( struct net_device *netdev ) {
 	 * presence during initialisation on links that are physically
 	 * slow to reach link-up.
 	 *
-	 * Attempt to work around both of these problems by requesting
-	 * cable detection at this point if any only if the driver is
-	 * not capable of reporting link status changes at runtime via
-	 * PXE_OPCODE_GET_STATUS.
+	 * Attempt to work around both of these problems by first
+	 * attempting to initialise with cable presence detection,
+	 * then falling back to initialising without cable presence
+	 * detection.
 	 */
-	flags = ( nii->media ? PXE_OPFLAGS_INITIALIZE_DO_NOT_DETECT_CABLE
-		  : PXE_OPFLAGS_INITIALIZE_DETECT_CABLE );
-	if ( ( rc = nii_initialise_flags ( nii, flags ) ) != 0 )
-		goto err_initialise;
+	if ( ( rc = nii_initialise_cable ( nii ) ) != 0 ) {
+		DBGC ( nii, "NII %s could not initialise with cable "
+		       "detection: %s\n", nii->dev.name, strerror ( rc ) );
+		if ( ( rc = nii_initialise ( nii ) ) != 0 ) {
+			DBGC ( nii, "NII %s could not initialise without "
+			       "cable detection: %s\n",
+			       nii->dev.name, strerror ( rc ) );
+			goto err_initialise;
+		}
+	}
 
 	/* Attempt to set station address */
 	if ( ( rc = nii_set_station_address ( nii, netdev ) ) != 0 ) {
