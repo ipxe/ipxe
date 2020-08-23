@@ -313,22 +313,27 @@ struct asn1_algorithm {
 #define __asn1_algorithm __table_entry ( ASN1_ALGORITHMS, 01 )
 
 /* ASN.1 OID-identified algorithms */
-extern struct asn1_algorithm rsa_encryption_algorithm;
-extern struct asn1_algorithm md5_with_rsa_encryption_algorithm;
-extern struct asn1_algorithm sha1_with_rsa_encryption_algorithm;
-extern struct asn1_algorithm sha256_with_rsa_encryption_algorithm;
-extern struct asn1_algorithm sha384_with_rsa_encryption_algorithm;
-extern struct asn1_algorithm sha512_with_rsa_encryption_algorithm;
-extern struct asn1_algorithm sha224_with_rsa_encryption_algorithm;
-extern struct asn1_algorithm oid_md4_algorithm;
-extern struct asn1_algorithm oid_md5_algorithm;
-extern struct asn1_algorithm oid_sha1_algorithm;
-extern struct asn1_algorithm oid_sha256_algorithm;
-extern struct asn1_algorithm oid_sha384_algorithm;
-extern struct asn1_algorithm oid_sha512_algorithm;
-extern struct asn1_algorithm oid_sha224_algorithm;
-extern struct asn1_algorithm oid_sha512_224_algorithm;
-extern struct asn1_algorithm oid_sha512_256_algorithm;
+extern struct asn1_algorithm rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm md5_with_rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm
+sha1_with_rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm
+sha256_with_rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm
+sha384_with_rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm
+sha512_with_rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm
+sha224_with_rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_md4_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_md5_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_sha1_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_sha256_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_sha384_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_sha512_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_sha224_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_sha512_224_algorithm __asn1_algorithm;
+extern struct asn1_algorithm oid_sha512_256_algorithm __asn1_algorithm;
 
 /** An ASN.1 bit string */
 struct asn1_bit_string {
