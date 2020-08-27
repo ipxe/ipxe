@@ -9,21 +9,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/segment.h>
 #include <ipxe/cpuid.h>
 #include <ipxe/acpi.h>
+#include <ipxe/hash_df.h>
+#include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
 #include <landing_zone.h>
 
 struct sl_header {
-	u16 lz_offet;
-	u16 lz_length;
+	u16 lz_entry_point;
+	u16 bootloader_data_offset;
+	u16 lz_info_offset;
 } __attribute__ (( packed ));
 
-struct lz_header {
+struct lz_info {
 	u8  uuid[16];
-	u32 boot_protocol;
-	u32 proto_struct;
-	u32 event_log_addr;
-	u32 event_log_size;
-	u8  msb_key_hash[20];
-	u8 lz_hashes[];
+	u32 version;
+	u16 msb_key_algo;
+	u8  msb_key_hash[];
 } __attribute__ (( packed ));
 
 const unsigned char
@@ -43,6 +44,58 @@ struct drtm_t {
 	u32 DRT_Flags;
 	u8  var_len_fields[];
 } __attribute__ (( packed ));
+
+#define LZ_TAG_CLASS_MASK		0xF0
+
+/* Tags with no particular class */
+#define LZ_TAG_NO_CLASS			0x00
+#define LZ_TAG_END				0x00
+#define LZ_TAG_UNAWARE_OS		0x01
+#define LZ_TAG_TAGS_SIZE		0x0F	/* Always first */
+
+/* Tags specifying kernel type */
+#define LZ_TAG_BOOT_CLASS		0x10
+#define LZ_TAG_BOOT_LINUX		0x10
+#define LZ_TAG_BOOT_MB2			0x11
+
+/* Tags specific to TPM event log */
+#define LZ_TAG_EVENT_LOG_CLASS	0x20
+#define LZ_TAG_EVENT_LOG		0x20
+#define LZ_TAG_HASH				0x21
+
+struct lz_tag_hdr {
+	u8 type;
+	u8 len;
+} __attribute__ (( packed ));
+
+struct lz_tag_tags_size {
+	struct lz_tag_hdr hdr;
+	u16 size;
+} __attribute__ (( packed ));
+
+struct lz_tag_boot_linux {
+	struct lz_tag_hdr hdr;
+	u32 zero_page;
+} __attribute__ (( packed ));
+
+struct lz_tag_boot_mb2 {
+	struct lz_tag_hdr hdr;
+	u32 mbi;
+	u32 kernel_size;
+} __attribute__ (( packed ));
+
+struct lz_tag_evtlog {
+	struct lz_tag_hdr hdr;
+	u32 address;
+	u32 size;
+} __attribute__ (( packed ));
+
+struct lz_tag_hash {
+	struct lz_tag_hdr hdr;
+	u16 algo_id;
+	u8 digest[];
+} __attribute__ (( packed ));
+
 
 static physaddr_t target;
 
@@ -68,23 +121,88 @@ int lz_set ( struct image *image, userptr_t zeropage, userptr_t tgt, int proto )
 	memcpy_user ( tgt, 0, image->data, 0, image->len );
 
 	struct sl_header *sl_hdr = ( struct sl_header *) tgt;
-	struct lz_header *hdr = ( struct lz_header *) ( tgt + sl_hdr->lz_length );
+	struct lz_tag_tags_size *tags = ( struct lz_tag_tags_size *)
+	                                ( tgt + sl_hdr->bootloader_data_offset );
 
+	/* Tags header */
+	tags->hdr.type = LZ_TAG_TAGS_SIZE;
+	tags->hdr.len = sizeof(struct lz_tag_tags_size);
+	tags->size = sizeof(struct lz_tag_tags_size);
+
+	/* Hashes of LZ */
+	{
+		u8 buff[SHA256_CTX_SIZE];  /* SHA1_CTX_SIZE is smaller */
+		struct lz_tag_hash *h = ((void *)tags) + tags->size;
+		h->hdr.type = LZ_TAG_HASH;
+		h->hdr.len = sizeof(struct lz_tag_hash) + SHA256_DIGEST_SIZE;
+		h->algo_id = 0x000B;
+		sha256_algorithm.init ( buff );
+		sha256_algorithm.update ( buff, (void *) tgt,
+		                          sl_hdr->bootloader_data_offset );
+		sha256_algorithm.final ( buff, h->digest );
+		tags->size += h->hdr.len;
+
+		h = ((void *)tags) + tags->size;
+		h->hdr.type = LZ_TAG_HASH;
+		h->hdr.len = sizeof(struct lz_tag_hash) + SHA1_DIGEST_SIZE;
+		h->algo_id = 0x0004;
+		sha1_algorithm.init ( buff );
+		sha1_algorithm.update ( buff, (void *) tgt,
+		                        sl_hdr->bootloader_data_offset );
+		sha1_algorithm.final ( buff, h->digest );
+		tags->size += h->hdr.len;
+	}
+
+	/* Boot protocol data */
 	DBGC ( image, "LZ %p writing zeropage address: 0x%lx\n", image,
 	       user_to_phys ( zeropage, 0 ) );
 
-	hdr->boot_protocol = proto;
-	hdr->proto_struct = user_to_phys ( zeropage, 0 );
+	switch (proto) {
+		case LZ_PROTO_LINUX_BOOT:
+		{
+			struct lz_tag_boot_linux *b = ((void *)tags) + tags->size;
+			b->hdr.type = LZ_TAG_BOOT_LINUX;
+			b->hdr.len = sizeof(struct lz_tag_boot_linux);
+			b->zero_page = user_to_phys ( zeropage, 0 );
+			tags->size += b->hdr.len;
+			break;
+		}
+		case LZ_PROTO_MULTIBOOT2:
+		{
+			struct lz_tag_boot_mb2 *b = ((void *)tags) + tags->size;
+			b->hdr.type = LZ_TAG_BOOT_MB2;
+			b->hdr.len = sizeof(struct lz_tag_boot_mb2);
+			b->mbi = user_to_phys ( zeropage, 0 );
+			b->kernel_size = 0;
+			tags->size += b->hdr.len;
+			break;
 
+		}
+		default:
+			return 1;
+	}
+
+	/* DRTM Event log address and size */
 	struct drtm_t *drtm = ( struct drtm_t *)
 	                      acpi_find ( ACPI_SIGNATURE ('D', 'R', 'T', 'M'), 0 );
 
 	if ( drtm != UNULL ) {
 		DBGC ( image, "ACPI DRTM table at %p (0x%lx physical)\n",
 		       drtm, user_to_phys ( ( userptr_t ) drtm, 0 ) );
-		hdr->event_log_addr = drtm->Log_Area_Start;
-		hdr->event_log_size = drtm->Log_Area_Length;
+
+		struct lz_tag_evtlog *e = ((void *)tags) + tags->size;
+		e->hdr.type = LZ_TAG_EVENT_LOG;
+		e->hdr.len = sizeof(struct lz_tag_evtlog);
+		e->address = drtm->Log_Area_Start;
+		e->size = drtm->Log_Area_Length;
+		tags->size += e->hdr.len;
 	}
+
+	/* Mark end of tags */
+	struct lz_tag_hdr *end = ((void *)tags) + tags->size;
+	end->type = LZ_TAG_END;
+	end->len = sizeof(struct lz_tag_hdr);
+	tags->size += end->len;
 
 	return 0;
 }
@@ -151,6 +269,7 @@ static int lz_exec ( struct image *image ) {
 	/* There is no way for the image to return, since we provide
 	 * no return address.
 	 */
+	DBGC ( image, "LZ %p SKINIT returned\n", image );
 	assert ( 0 );
 
 	return -ECANCELED; /* -EIMPOSSIBLE */
@@ -165,7 +284,7 @@ static int lz_exec ( struct image *image ) {
 static int lz_probe ( struct image *image ) {
 	int rc;
 	struct sl_header sl_hdr;
-	struct lz_header hdr;
+	struct lz_info lzi;
 	uint32_t eax, ebx, ecx, edx;
 
 	cpuid ( CPUID_AMD_CHECK, 0, &eax, &ebx, &ecx, &edx );
@@ -187,9 +306,9 @@ static int lz_probe ( struct image *image ) {
 		return -ENOEXEC;
 	}
 	copy_from_user ( &sl_hdr, image->data, 0, sizeof ( sl_hdr ) );
-	copy_from_user ( &hdr, image->data, sl_hdr.lz_length, sizeof ( hdr ) );
+	copy_from_user ( &lzi, image->data, sl_hdr.lz_info_offset, sizeof ( lzi ) );
 
-	rc = memcmp ( hdr.uuid, lz_header_uuid, sizeof ( lz_header_uuid ) );
+	rc = memcmp ( lzi.uuid, lz_header_uuid, sizeof ( lz_header_uuid ) );
 
 	if ( rc == 0 ) {
 		image_set_name ( image, "landing_zone" );
