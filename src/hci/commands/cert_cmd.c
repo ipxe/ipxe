@@ -46,12 +46,14 @@ struct cert_options {
 	char *name;
 	/** Keep certificate file after parsing */
 	int keep;
+	/** Trust this certificate (sets the VALIDATED flag) */
+	int trust;
 };
 
 /** "cert<xxx>" option list */
 static union {
 	/* "certstore" takes both options */
-	struct option_descriptor certstore[2];
+	struct option_descriptor certstore[3];
 	/* "certstat" takes only --subject */
 	struct option_descriptor certstat[1];
 	/* "certfree" takes only --subject */
@@ -62,6 +64,8 @@ static union {
 			      struct cert_options, name, parse_string ),
 		OPTION_DESC ( "keep", 'k', no_argument,
 			      struct cert_options, keep, parse_flag ),
+		OPTION_DESC ( "trust", 't', no_argument,
+			      struct cert_options, trust, parse_flag ),
 	},
 };
 
@@ -74,7 +78,7 @@ struct cert_command_descriptor {
 	 * @v cert		X.509 certificate
 	 * @ret rc		Return status code
 	 */
-	int ( * payload ) ( struct x509_certificate *cert );
+	int ( * payload ) ( struct x509_certificate *cert, struct cert_options *opts );
 };
 
 /**
@@ -165,7 +169,7 @@ static int cert_exec ( int argc, char **argv,
 		}
 
 		/* Execute payload */
-		if ( ( rc = certcmd->payload ( cert ) ) != 0 ) {
+		if ( ( rc = certcmd->payload ( cert, &opts ) ) != 0 ) {
 			x509_put ( cert );
 			goto err_payload;
 		}
@@ -202,7 +206,7 @@ static int cert_exec ( int argc, char **argv,
  * @v cert		X.509 certificate
  * @ret rc		Return status code
  */
-static int certstat_payload ( struct x509_certificate *cert ) {
+static int certstat_payload ( struct x509_certificate *cert, __attribute__ ((unused)) struct cert_options *opts ) {
 
 	certstat ( cert );
 	return 0;
@@ -231,10 +235,20 @@ static int certstat_exec ( int argc, char **argv ) {
  * @v cert		X.509 certificate
  * @ret rc		Return status code
  */
-static int certstore_payload ( struct x509_certificate *cert ) {
+static int certstore_payload ( struct x509_certificate *cert, struct cert_options *opts ) {
 
 	/* Mark certificate as having been added explicitly */
 	cert->flags |= X509_FL_EXPLICIT;
+
+	/* Mark certificate as trusted */
+	if ( opts->trust ) {
+		if ( image_get_require_trust ( ) ) {
+			printf ( "Could not add trusted (root) certificate because image trust requirement is enabled\n" );
+			return EACCES;
+		}
+		cert->flags |= X509_FL_VALIDATED;
+		cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
+	}
 
 	return 0;
 }
@@ -262,7 +276,7 @@ static int certstore_exec ( int argc, char **argv ) {
  * @v cert		X.509 certificate
  * @ret rc		Return status code
  */
-static int certfree_payload ( struct x509_certificate *cert ) {
+static int certfree_payload ( struct x509_certificate *cert, __attribute__ ((unused)) struct cert_options *opts ) {
 
 	/* Remove from certificate store */
 	certstore_del ( cert );
