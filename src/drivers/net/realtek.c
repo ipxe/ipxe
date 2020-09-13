@@ -531,6 +531,7 @@ static int realtek_create_buffer ( struct realtek_nic *rtl ) {
 
 	/* Program buffer address */
 	writel ( address, rtl->regs + RTL_RBSTART );
+	udelay ( 1 );
 	DBGC ( rtl, "REALTEK %p receive buffer is at [%08llx,%08llx,%08llx)\n",
 	       rtl, ( ( unsigned long long ) address ),
 	       ( ( unsigned long long ) address + RTL_RXBUF_LEN ),
