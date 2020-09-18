@@ -222,7 +222,8 @@ extern EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
 extern EFI_SYSTEM_TABLE *efi_systab;
 extern int efi_shutdown_in_progress;
 
-extern const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid );
+extern const __attribute__ (( pure )) char *
+efi_guid_ntoa ( CONST EFI_GUID *guid );
 extern const __attribute__ (( pure )) char *
 efi_locate_search_type_name ( EFI_LOCATE_SEARCH_TYPE search_type );
 extern const __attribute__ (( pure )) char *

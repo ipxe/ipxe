@@ -189,7 +189,7 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
  * @v guid		GUID
  * @ret string		Printable string
  */
-const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid ) {
+const __attribute__ (( pure )) char * efi_guid_ntoa ( CONST EFI_GUID *guid ) {
 	union {
 		union uuid uuid;
 		EFI_GUID guid;
