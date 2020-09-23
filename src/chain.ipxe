@@ -1,0 +1,9 @@
+#!ipxe
+
+dhcp
+echo Hello world
+set idx:int32 0
+:loop isset ${net${idx}/mac} || goto loop_done
+    echo net${idx} is a ${net${idx}/chip} with MAC ${net${idx}/mac}
+    chain http://172.102.1.1/${net${idx}/mac}.ipxe || inc idx && goto loop
+:loop_done 
