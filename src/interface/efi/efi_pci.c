@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdlib.h>
 #include <errno.h>
 #include <ipxe/pci.h>
+#include <ipxe/acpi.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_pci.h>
 #include <ipxe/efi/efi_driver.h>
@@ -224,6 +225,78 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 	return rc;
 }
 
+/**
+ * Map PCI bus address as an I/O address
+ *
+ * @v bus_addr		PCI bus address
+ * @v len		Length of region
+ * @ret io_addr		I/O address, or NULL on error
+ */
+void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
+			size_t len ) {
+	union {
+		union acpi_resource *res;
+		void *raw;
+	} u;
+	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
+	EFI_HANDLE handle;
+	unsigned int tag;
+	uint64_t offset;
+	uint64_t start;
+	uint64_t end;
+	void *io_addr = NULL;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Open root bridge */
+	if ( ( rc = efipci_root_open ( pci, &handle, &root ) ) != 0 )
+		goto err_root;
+
+	/* Get ACPI resource descriptors */
+	if ( ( efirc = root->Configuration ( root, &u.raw ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot get configuration: "
+		       "%s\n", PCI_ARGS ( pci ), strerror ( rc ) );
+		goto err_config;
+	}
+
+	/* Parse resource descriptors */
+	for ( ; ( ( tag = acpi_resource_tag ( u.res ) ) != ACPI_END_RESOURCE ) ;
+	      u.res = acpi_resource_next ( u.res ) ) {
+
+		/* Ignore anything other than an address space descriptor */
+		if ( tag != ACPI_QWORD_ADDRESS_SPACE_RESOURCE )
+			continue;
+
+		/* Ignore descriptors that do not cover this memory range */
+		if ( u.res->qword.type != ACPI_ADDRESS_TYPE_MEM )
+			continue;
+		offset = le64_to_cpu ( u.res->qword.offset );
+		start = ( offset + le64_to_cpu ( u.res->qword.min ) );
+		end = ( start + le64_to_cpu ( u.res->qword.len ) );
+		if ( ( bus_addr < start ) || ( ( bus_addr + len ) > end ) )
+			continue;
+
+		/* Use this address space descriptor */
+		DBGC2 ( pci, "EFIPCI " PCI_FMT " %08lx+%zx -> ",
+			PCI_ARGS ( pci ), bus_addr, len );
+		bus_addr -= offset;
+		DBGC2 ( pci, "%08lx\n", bus_addr );
+		io_addr = ioremap ( bus_addr, len );
+		break;
+	}
+	if ( ! io_addr ) {
+		DBGC ( pci, "EFIPCI " PCI_FMT " %08lx+%zx is not within "
+		       "root bridge address space\n",
+		       PCI_ARGS ( pci ), bus_addr, len );
+	}
+
+ err_config:
+	efipci_root_close ( handle );
+ err_root:
+	return io_addr;
+}
+
 PROVIDE_PCIAPI_INLINE ( efi, pci_num_bus );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );
@@ -231,7 +304,7 @@ PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_dword );
 PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_word );
 PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_dword );
-PROVIDE_PCIAPI_INLINE ( efi, pci_ioremap );
+PROVIDE_PCIAPI ( efi, pci_ioremap, efipci_ioremap );
 
 /******************************************************************************
  *

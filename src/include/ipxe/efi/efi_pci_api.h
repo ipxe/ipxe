@@ -148,17 +148,4 @@ PCIAPI_INLINE ( efi, pci_write_config_dword ) ( struct pci_device *pci,
 			      value );
 }
 
-/**
- * Map PCI bus address as an I/O address
- *
- * @v bus_addr		PCI bus address
- * @v len		Length of region
- * @ret io_addr		I/O address, or NULL on error
- */
-static inline __always_inline void *
-PCIAPI_INLINE ( efi, pci_ioremap ) ( struct pci_device *pci __unused,
-				     unsigned long bus_addr, size_t len ) {
-	return ioremap ( bus_addr, len );
-}
-
 #endif /* _IPXE_EFI_PCI_API_H */
