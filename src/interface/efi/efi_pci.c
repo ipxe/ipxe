@@ -231,6 +231,7 @@ PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_dword );
 PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_word );
 PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_dword );
+PROVIDE_PCIAPI_INLINE ( efi, pci_ioremap );
 
 /******************************************************************************
  *
