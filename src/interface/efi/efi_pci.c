@@ -62,15 +62,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Locate EFI PCI root bridge I/O protocol
+ * Open EFI PCI root bridge I/O protocol
  *
  * @v pci		PCI device
  * @ret handle		EFI PCI root bridge handle
  * @ret root		EFI PCI root bridge I/O protocol, or NULL if not found
  * @ret rc		Return status code
  */
-static int efipci_root ( struct pci_device *pci, EFI_HANDLE *handle,
-			 EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL **root ) {
+static int efipci_root_open ( struct pci_device *pci, EFI_HANDLE *handle,
+			      EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL **root ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE *handles;
 	UINTN num_handles;
@@ -124,6 +124,19 @@ static int efipci_root ( struct pci_device *pci, EFI_HANDLE *handle,
 }
 
 /**
+ * Close EFI PCI root bridge I/O protocol
+ *
+ * @v handle		EFI PCI root bridge handle
+ */
+static void efipci_root_close ( EFI_HANDLE handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Close protocol */
+	bs->CloseProtocol ( handle, &efi_pci_root_bridge_io_protocol_guid,
+			    efi_image_handle, handle );
+}
+
+/**
  * Calculate EFI PCI configuration space address
  *
  * @v pci		PCI device
@@ -149,14 +162,13 @@ static unsigned long efipci_address ( struct pci_device *pci,
  */
 int efipci_read ( struct pci_device *pci, unsigned long location,
 		  void *value ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
 	EFI_HANDLE handle;
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Identify root bridge */
-	if ( ( rc = efipci_root ( pci, &handle, &root ) ) != 0 )
+	/* Open root bridge */
+	if ( ( rc = efipci_root_open ( pci, &handle, &root ) ) != 0 )
 		goto err_root;
 
 	/* Read from configuration space */
@@ -171,8 +183,7 @@ int efipci_read ( struct pci_device *pci, unsigned long location,
 	}
 
  err_read:
-	bs->CloseProtocol ( handle, &efi_pci_root_bridge_io_protocol_guid,
-			    efi_image_handle, handle );
+	efipci_root_close ( handle );
  err_root:
 	return rc;
 }
@@ -187,14 +198,13 @@ int efipci_read ( struct pci_device *pci, unsigned long location,
  */
 int efipci_write ( struct pci_device *pci, unsigned long location,
 		   unsigned long value ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
 	EFI_HANDLE handle;
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Identify root bridge */
-	if ( ( rc = efipci_root ( pci, &handle, &root ) ) != 0 )
+	/* Open root bridge */
+	if ( ( rc = efipci_root_open ( pci, &handle, &root ) ) != 0 )
 		goto err_root;
 
 	/* Read from configuration space */
@@ -209,8 +219,7 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 	}
 
  err_write:
-	bs->CloseProtocol ( handle, &efi_pci_root_bridge_io_protocol_guid,
-			    efi_image_handle, handle );
+	efipci_root_close ( handle );
  err_root:
 	return rc;
 }
