@@ -853,7 +853,7 @@ static int natsemi_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	natsemi->regs = ioremap ( pci->membase, NATSEMI_BAR_SIZE );
+	natsemi->regs = pci_ioremap ( pci, pci->membase, NATSEMI_BAR_SIZE );
 	if ( ! natsemi->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

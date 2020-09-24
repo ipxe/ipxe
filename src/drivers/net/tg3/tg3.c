@@ -771,7 +771,7 @@ static int tg3_init_one(struct pci_device *pdev)
 	reg_base = pci_bar_start(pdev, PCI_BASE_ADDRESS_0);
 	reg_size = pci_bar_size(pdev, PCI_BASE_ADDRESS_0);
 
-	tp->regs = ioremap(reg_base, reg_size);
+	tp->regs = pci_ioremap(pdev, reg_base, reg_size);
 	if (!tp->regs) {
 		DBGC(&pdev->dev, "Failed to remap device registers\n");
 		errno = -ENOENT;

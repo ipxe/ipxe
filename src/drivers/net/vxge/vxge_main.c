@@ -520,7 +520,7 @@ vxge_probe(struct pci_device *pdev)
 	/* sets the bus master */
 	adjust_pci_device(pdev);
 
-	bar0 = ioremap(mmio_start, mmio_len);
+	bar0 = pci_ioremap(pdev, mmio_start, mmio_len);
 	if (!bar0) {
 		vxge_debug(VXGE_ERR,
 			"%s : cannot remap io memory bar0\n", __func__);

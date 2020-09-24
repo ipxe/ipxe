@@ -664,7 +664,7 @@ static int amd8111e_probe(struct nic *nic, struct pci_device *pdev)
 	memset(lp, 0, sizeof(*lp));
 	lp->pdev = pdev;
 	lp->nic = nic;
-	lp->mmio = ioremap(mmio_start, mmio_len);
+	lp->mmio = pci_ioremap(pdev, mmio_start, mmio_len);
 	lp->opened = 1;
 	adjust_pci_device(pdev);
 

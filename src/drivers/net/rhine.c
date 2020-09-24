@@ -700,7 +700,7 @@ static int rhine_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	rhn->regs = ioremap ( pci->membase, RHINE_BAR_SIZE );
+	rhn->regs = pci_ioremap ( pci, pci->membase, RHINE_BAR_SIZE );
 	rhn->ioaddr = pci->ioaddr;
 	DBGC ( rhn, "RHINE %p regs at %08lx, I/O at %04lx\n", rhn,
 	       pci->membase, pci->ioaddr );

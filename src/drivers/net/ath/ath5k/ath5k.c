@@ -280,7 +280,7 @@ static int ath5k_probe(struct pci_device *pdev)
 	 */
 	pci_write_config_byte(pdev, 0x41, 0);
 
-	mem = ioremap(pdev->membase, 0x10000);
+	mem = pci_ioremap(pdev, pdev->membase, 0x10000);
 	if (!mem) {
 		DBG("ath5k: cannot remap PCI memory region\n");
 		ret = -EIO;

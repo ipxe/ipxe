@@ -606,7 +606,7 @@ static int myson_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	myson->regs = ioremap ( pci->membase, MYSON_BAR_SIZE );
+	myson->regs = pci_ioremap ( pci, pci->membase, MYSON_BAR_SIZE );
 	if ( ! myson->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

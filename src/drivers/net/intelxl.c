@@ -1673,7 +1673,7 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	intelxl->regs = ioremap ( pci->membase, INTELXL_BAR_SIZE );
+	intelxl->regs = pci_ioremap ( pci, pci->membase, INTELXL_BAR_SIZE );
 	if ( ! intelxl->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

@@ -3261,7 +3261,7 @@ static int xhci_probe ( struct pci_device *pci ) {
 	/* Map registers */
 	bar_start = pci_bar_start ( pci, XHCI_BAR );
 	bar_size = pci_bar_size ( pci, XHCI_BAR );
-	xhci->regs = ioremap ( bar_start, bar_size );
+	xhci->regs = pci_ioremap ( pci, bar_start, bar_size );
 	if ( ! xhci->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

@@ -1837,7 +1837,7 @@ static int phantom_map_crb ( struct phantom_nic *phantom,
 		return -EINVAL;
 	}
 
-	phantom->bar0 = ioremap ( bar0_start, bar0_size );
+	phantom->bar0 = pci_ioremap ( pci, bar0_start, bar0_size );
 	if ( ! phantom->bar0 ) {
 		DBGC ( phantom, "Phantom %p could not map BAR0\n", phantom );
 		return -EIO;

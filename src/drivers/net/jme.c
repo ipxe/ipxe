@@ -1191,7 +1191,7 @@ jme_probe(struct pci_device *pci)
 	jme = netdev->priv;
 	pci_set_drvdata(pci, netdev);
 	netdev->dev = &pci->dev;
-	jme->regs = ioremap(pci->membase, JME_REGS_SIZE);
+	jme->regs = pci_ioremap(pci, pci->membase, JME_REGS_SIZE);
 	if (!(jme->regs)) {
 		DBG("Mapping PCI resource region error.\n");
 		rc = -ENOMEM;

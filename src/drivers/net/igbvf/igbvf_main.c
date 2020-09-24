@@ -843,7 +843,7 @@ int igbvf_probe ( struct pci_device *pdev )
 	DBG ( "mmio_start: %#08lx\n", mmio_start );
 	DBG ( "mmio_len: %#08lx\n", mmio_len );
 
-	adapter->hw.hw_addr = ioremap ( mmio_start, mmio_len );
+	adapter->hw.hw_addr = pci_ioremap ( pdev, mmio_start, mmio_len );
 	DBG ( "adapter->hw.hw_addr: %p\n", adapter->hw.hw_addr );
 
 	if ( ! adapter->hw.hw_addr ) {

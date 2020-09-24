@@ -2335,7 +2335,7 @@ static int linda_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map PCI BARs */
-	linda->regs = ioremap ( pci->membase, LINDA_BAR0_SIZE );
+	linda->regs = pci_ioremap ( pci, pci->membase, LINDA_BAR0_SIZE );
 	DBGC2 ( linda, "Linda %p has BAR at %08lx\n", linda, pci->membase );
 
 	/* Print some general data */

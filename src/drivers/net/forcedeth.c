@@ -1762,7 +1762,7 @@ forcedeth_map_regs ( struct forcedeth_private *priv )
 	}
 
 	rc = -ENOMEM;
-	ioaddr = ioremap ( addr, register_size );
+	ioaddr = pci_ioremap ( priv->pci_dev, addr, register_size );
 	if ( ! ioaddr ) {
 		DBG ( "Cannot remap MMIO\n" );
 		goto err_ioremap;

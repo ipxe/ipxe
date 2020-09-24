@@ -85,7 +85,7 @@ void efx_probe(struct net_device *netdev, enum efx_revision revision)
 
 	efx->mmio_start = pci_bar_start(pci, reg);
 	efx->mmio_len = pci_bar_size(pci, reg);
-	efx->membase = ioremap(efx->mmio_start, efx->mmio_len);
+	efx->membase = pci_ioremap(pci, efx->mmio_start, efx->mmio_len);
 
 	DBGCP(efx, "BAR of %lx bytes at phys %lx mapped at %p\n",
 	      efx->mmio_len, efx->mmio_start, efx->membase);

@@ -731,7 +731,7 @@ static int velocity_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	vlc->regs = ioremap ( pci->membase, VELOCITY_BAR_SIZE );
+	vlc->regs = pci_ioremap ( pci, pci->membase, VELOCITY_BAR_SIZE );
 	vlc->netdev = netdev;
 
 	/* Reset the NIC */

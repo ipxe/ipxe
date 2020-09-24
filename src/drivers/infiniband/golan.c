@@ -693,7 +693,7 @@ static inline int golan_alloc_uar(struct golan *golan)
 	uar->index	= be32_to_cpu(out->uarn) & 0xffffff;
 
 	uar->phys = (pci_bar_start(golan->pci, GOLAN_HCA_BAR) + (uar->index << GOLAN_PAGE_SHIFT));
-	uar->virt = (void *)(ioremap(uar->phys, GOLAN_PAGE_SIZE));
+	uar->virt = (void *)(pci_ioremap(golan->pci, uar->phys, GOLAN_PAGE_SIZE));
 
 	DBGC( golan , "%s: UAR allocated with index 0x%x\n", __FUNCTION__, uar->index);
 	return 0;
@@ -922,8 +922,8 @@ static inline void golan_pci_init(struct golan *golan)
 	adjust_pci_device ( pci );
 
 	/* Get HCA BAR */
-	golan->iseg	= ioremap ( pci_bar_start ( pci, GOLAN_HCA_BAR),
-					GOLAN_PCI_CONFIG_BAR_SIZE );
+	golan->iseg = pci_ioremap ( pci, pci_bar_start ( pci, GOLAN_HCA_BAR),
+				    GOLAN_PCI_CONFIG_BAR_SIZE );
 }
 
 static inline struct golan *golan_alloc()

@@ -673,7 +673,7 @@ static int b44_probe(struct pci_device *pci)
 	bp->pci = pci;
 
 	/* Map device registers */
-	bp->regs = ioremap(pci->membase, B44_REGS_SIZE);
+	bp->regs = pci_ioremap(pci, pci->membase, B44_REGS_SIZE);
 	if (!bp->regs) {
 		netdev_put(netdev);
 		return -ENOMEM;

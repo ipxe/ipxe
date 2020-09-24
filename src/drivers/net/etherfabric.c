@@ -4150,7 +4150,7 @@ efab_probe ( struct pci_device *pci )
 	/* Get iobase/membase */
 	mmio_start = pci_bar_start ( pci, PCI_BASE_ADDRESS_2 );
 	mmio_len = pci_bar_size ( pci, PCI_BASE_ADDRESS_2 );
-	efab->membase = ioremap ( mmio_start, mmio_len );
+	efab->membase = pci_ioremap ( pci, mmio_start, mmio_len );
 	EFAB_TRACE ( "BAR of %lx bytes at phys %lx mapped at %p\n",
 		     mmio_len, mmio_start, efab->membase );
 

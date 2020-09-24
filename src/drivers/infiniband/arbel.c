@@ -2059,7 +2059,8 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 	eq_set_ci_base_addr =
 		( ( (uint64_t) MLX_GET ( &fw, eq_set_ci_base_addr_h ) << 32 ) |
 		  ( (uint64_t) MLX_GET ( &fw, eq_set_ci_base_addr_l ) ) );
-	arbel->eq_ci_doorbells = ioremap ( eq_set_ci_base_addr, 0x200 );
+	arbel->eq_ci_doorbells = pci_ioremap ( arbel->pci, eq_set_ci_base_addr,
+					       0x200 );
 
 	/* Enable locally-attached memory.  Ignore failure; there may
 	 * be no attached memory.
@@ -3025,6 +3026,8 @@ static void arbel_free ( struct arbel *arbel ) {
 static int arbel_probe ( struct pci_device *pci ) {
 	struct arbel *arbel;
 	struct ib_device *ibdev;
+	unsigned long config;
+	unsigned long uar;
 	int i;
 	int rc;
 
@@ -3041,11 +3044,11 @@ static int arbel_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map PCI BARs */
-	arbel->config = ioremap ( pci_bar_start ( pci, ARBEL_PCI_CONFIG_BAR ),
-				  ARBEL_PCI_CONFIG_BAR_SIZE );
-	arbel->uar = ioremap ( ( pci_bar_start ( pci, ARBEL_PCI_UAR_BAR ) +
-				 ARBEL_PCI_UAR_IDX * ARBEL_PCI_UAR_SIZE ),
-			       ARBEL_PCI_UAR_SIZE );
+	config = pci_bar_start ( pci, ARBEL_PCI_CONFIG_BAR );
+	arbel->config = pci_ioremap ( pci, config, ARBEL_PCI_CONFIG_BAR_SIZE );
+	uar = ( pci_bar_start ( pci, ARBEL_PCI_UAR_BAR ) +
+		ARBEL_PCI_UAR_IDX * ARBEL_PCI_UAR_SIZE );
+	arbel->uar = pci_ioremap ( pci, uar, ARBEL_PCI_UAR_SIZE );
 
 	/* Allocate Infiniband devices */
 	for ( i = 0 ; i < ARBEL_NUM_PORTS ; i++ ) {

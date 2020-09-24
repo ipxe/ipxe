@@ -641,14 +641,14 @@ static int vmxnet3_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map PCI BARs */
-	vmxnet->pt = ioremap ( pci_bar_start ( pci, VMXNET3_PT_BAR ),
-			       VMXNET3_PT_LEN );
+	vmxnet->pt = pci_ioremap ( pci, pci_bar_start ( pci, VMXNET3_PT_BAR ),
+				   VMXNET3_PT_LEN );
 	if ( ! vmxnet->pt ) {
 		rc = -ENODEV;
 		goto err_ioremap_pt;
 	}
-	vmxnet->vd = ioremap ( pci_bar_start ( pci, VMXNET3_VD_BAR ),
-			       VMXNET3_VD_LEN );
+	vmxnet->vd = pci_ioremap ( pci, pci_bar_start ( pci, VMXNET3_VD_BAR ),
+				   VMXNET3_VD_LEN );
 	if ( ! vmxnet->vd ) {
 		rc = -ENODEV;
 		goto err_ioremap_vd;

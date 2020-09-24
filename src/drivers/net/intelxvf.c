@@ -456,7 +456,7 @@ static int intelxvf_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	intel->regs = ioremap ( pci->membase, INTELVF_BAR_SIZE );
+	intel->regs = pci_ioremap ( pci, pci->membase, INTELVF_BAR_SIZE );
 	if ( ! intel->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

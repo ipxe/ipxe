@@ -1461,7 +1461,7 @@ static int flexboot_nodnic_alloc_uar ( struct flexboot_nodnic *flexboot_nodnic )
 		return -EINVAL;
 	}
 	uar->phys = ( pci_bar_start ( pci, FLEXBOOT_NODNIC_HCA_BAR ) + (mlx_uint32)uar->offset );
-	uar->virt = ( void * )( ioremap ( uar->phys, FLEXBOOT_NODNIC_PAGE_SIZE ) );
+	uar->virt = ( void * )( pci_ioremap ( pci, uar->phys, FLEXBOOT_NODNIC_PAGE_SIZE ) );
 
 	return status;
 }

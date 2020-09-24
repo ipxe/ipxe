@@ -2297,7 +2297,7 @@ static int qib7322_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map PCI BARs */
-	qib7322->regs = ioremap ( pci->membase, QIB7322_BAR0_SIZE );
+	qib7322->regs = pci_ioremap ( pci, pci->membase, QIB7322_BAR0_SIZE );
 	DBGC2 ( qib7322, "QIB7322 %p has BAR at %08lx\n",
 		qib7322, pci->membase );
 

@@ -60,7 +60,7 @@ static void *bnxt_pci_base ( struct pci_device *pdev, unsigned int reg )
 
 	reg_base = pci_bar_start ( pdev, reg );
 	reg_size = pci_bar_size ( pdev, reg );
-	return ioremap ( reg_base, reg_size );
+	return pci_ioremap ( pdev, reg_base, reg_size );
 }
 
 static int bnxt_get_pci_info ( struct bnxt *bp )

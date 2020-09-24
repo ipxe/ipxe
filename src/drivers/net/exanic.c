@@ -800,7 +800,7 @@ static int exanic_probe ( struct pci_device *pci ) {
 
 	/* Map registers */
 	regs_bar_start = pci_bar_start ( pci, EXANIC_REGS_BAR );
-	exanic->regs = ioremap ( regs_bar_start, EXANIC_REGS_LEN );
+	exanic->regs = pci_ioremap ( pci, regs_bar_start, EXANIC_REGS_LEN );
 	if ( ! exanic->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap_regs;
@@ -824,7 +824,7 @@ static int exanic_probe ( struct pci_device *pci ) {
 	/* Map transmit region */
 	tx_bar_start = pci_bar_start ( pci, EXANIC_TX_BAR );
 	tx_bar_len = pci_bar_size ( pci, EXANIC_TX_BAR );
-	exanic->tx = ioremap ( tx_bar_start, tx_bar_len );
+	exanic->tx = pci_ioremap ( pci, tx_bar_start, tx_bar_len );
 	if ( ! exanic->tx ) {
 		rc = -ENODEV;
 		goto err_ioremap_tx;

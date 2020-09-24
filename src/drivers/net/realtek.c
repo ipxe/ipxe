@@ -1128,7 +1128,7 @@ static int realtek_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	rtl->regs = ioremap ( pci->membase, RTL_BAR_SIZE );
+	rtl->regs = pci_ioremap ( pci, pci->membase, RTL_BAR_SIZE );
 	if ( ! rtl->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

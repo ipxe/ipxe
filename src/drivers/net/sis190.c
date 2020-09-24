@@ -886,7 +886,7 @@ static int sis190_init_board(struct pci_device *pdev, struct net_device **netdev
 
 	adjust_pci_device(pdev);
 
-	ioaddr = ioremap(pdev->membase, SIS190_REGS_SIZE);
+	ioaddr = pci_ioremap(pdev, pdev->membase, SIS190_REGS_SIZE);
 	if (!ioaddr) {
 		DBG("sis190: cannot remap MMIO, aborting\n");
 		rc = -EIO;

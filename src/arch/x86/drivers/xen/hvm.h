@@ -39,6 +39,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 struct hvm_device {
 	/** Xen hypervisor */
 	struct xen_hypervisor xen;
+	/** PCI device */
+	struct pci_device *pci;
 	/** CPUID base */
 	uint32_t cpuid_base;
 	/** Length of hypercall table */

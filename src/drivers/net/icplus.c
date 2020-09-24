@@ -726,7 +726,7 @@ static int icplus_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	icp->regs = ioremap ( pci->membase, ICP_BAR_SIZE );
+	icp->regs = pci_ioremap ( pci, pci->membase, ICP_BAR_SIZE );
 	if ( ! icp->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

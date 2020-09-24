@@ -2346,8 +2346,9 @@ static int skge_probe(struct pci_device *pdev)
 
 	hw->pdev = pdev;
 
-	hw->regs = (unsigned long)ioremap(pci_bar_start(pdev, PCI_BASE_ADDRESS_0),
-				SKGE_REG_SIZE);
+	hw->regs = (unsigned long)pci_ioremap(pdev,
+					      pci_bar_start(pdev, PCI_BASE_ADDRESS_0),
+					      SKGE_REG_SIZE);
 	if (!hw->regs) {
 		DBG(PFX "cannot map device registers\n");
 		goto err_out_free_hw;

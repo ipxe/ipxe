@@ -933,7 +933,7 @@ static int ena_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	ena->regs = ioremap ( pci->membase, ENA_BAR_SIZE );
+	ena->regs = pci_ioremap ( pci, pci->membase, ENA_BAR_SIZE );
 	if ( ! ena->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

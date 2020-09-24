@@ -3782,6 +3782,8 @@ static int hermon_probe ( struct pci_device *pci ) {
 	struct ib_device *ibdev;
 	struct net_device *netdev;
 	struct hermon_port *port;
+	unsigned long config;
+	unsigned long uar;
 	unsigned int i;
 	int rc;
 
@@ -3798,10 +3800,12 @@ static int hermon_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map PCI BARs */
-	hermon->config = ioremap ( pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR ),
-				   HERMON_PCI_CONFIG_BAR_SIZE );
-	hermon->uar = ioremap ( pci_bar_start ( pci, HERMON_PCI_UAR_BAR ),
-				HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
+	config = pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR );
+	hermon->config = pci_ioremap ( pci, config,
+				       HERMON_PCI_CONFIG_BAR_SIZE );
+	uar = pci_bar_start ( pci, HERMON_PCI_UAR_BAR );
+	hermon->uar = pci_ioremap ( pci, uar,
+				    HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
 
 	/* Reset device */
 	hermon_reset ( hermon );
@@ -3937,6 +3941,7 @@ static void hermon_remove ( struct pci_device *pci ) {
  */
 static int hermon_bofm_probe ( struct pci_device *pci ) {
 	struct hermon *hermon;
+	unsigned long config;
 	int rc;
 
 	/* Allocate Hermon device */
@@ -3952,8 +3957,9 @@ static int hermon_bofm_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map PCI BAR */
-	hermon->config = ioremap ( pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR ),
-				   HERMON_PCI_CONFIG_BAR_SIZE );
+	config = pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR );
+	hermon->config = pci_ioremap ( pci, config,
+				       HERMON_PCI_CONFIG_BAR_SIZE );
 
 	/* Initialise BOFM device */
 	bofm_init ( &hermon->bofm, pci, &hermon_bofm_operations );

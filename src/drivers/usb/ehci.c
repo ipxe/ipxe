@@ -1989,7 +1989,7 @@ static int ehci_probe ( struct pci_device *pci ) {
 	/* Map registers */
 	bar_start = pci_bar_start ( pci, EHCI_BAR );
 	bar_size = pci_bar_size ( pci, EHCI_BAR );
-	ehci->regs = ioremap ( bar_start, bar_size );
+	ehci->regs = pci_ioremap ( pci, bar_start, bar_size );
 	if ( ! ehci->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;
