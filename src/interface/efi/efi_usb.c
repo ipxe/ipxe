@@ -1193,6 +1193,12 @@ static void efi_usb_uninstall ( struct efi_usb_interface *usbintf ) {
 	DBGC ( usbdev, "USBDEV %s uninstalling %s\n",
 	       usbintf->name, efi_handle_name ( usbintf->handle ) );
 
+	/* Disconnect controllers.  This should not be necessary, but
+	 * seems to be required on some platforms to avoid failures
+	 * when uninstalling protocols.
+	 */
+	bs->DisconnectController ( usbintf->handle, NULL, NULL );
+
 	/* Uninstall protocols */
 	bs->UninstallMultipleProtocolInterfaces (
 			usbintf->handle,
