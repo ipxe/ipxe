@@ -79,7 +79,8 @@ static VOID EFIAPI efi_usb_timer ( EFI_EVENT event __unused,
 	usb_poll ( bus );
 
 	/* Refill endpoint */
-	usb_refill ( &usbep->ep );
+	if ( usbep->ep.open )
+		usb_refill ( &usbep->ep );
 }
 
 /**
@@ -118,6 +119,21 @@ static int efi_usb_mtu ( struct efi_usb_interface *usbintf,
 }
 
 /**
+ * Check if endpoint is open
+ *
+ * @v usbintf		EFI USB interface
+ * @v endpoint		Endpoint address
+ * @ret is_open		Endpoint is open
+ */
+static int efi_usb_is_open ( struct efi_usb_interface *usbintf,
+			     unsigned int endpoint ) {
+	unsigned int index = USB_ENDPOINT_IDX ( endpoint );
+	struct efi_usb_endpoint *usbep = usbintf->endpoint[index];
+
+	return ( usbep && usbep->ep.open );
+}
+
+/**
  * Open endpoint
  *
  * @v usbintf		EFI USB interface
@@ -139,6 +155,22 @@ static int efi_usb_open ( struct efi_usb_interface *usbintf,
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Allocate structure, if needed.  Once allocated, we leave
+	 * the endpoint structure in place until the device is
+	 * removed, to work around external UEFI code that closes the
+	 * endpoint at illegal times.
+	 */
+	usbep = usbintf->endpoint[index];
+	if ( ! usbep ) {
+		usbep = zalloc ( sizeof ( *usbep ) );
+		if ( ! usbep ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+		usbep->usbintf = usbintf;
+		usbintf->endpoint[index] = usbep;
+	}
+
 	/* Get endpoint MTU */
 	mtu = efi_usb_mtu ( usbintf, endpoint );
 	if ( mtu < 0 ) {
@@ -147,12 +179,6 @@ static int efi_usb_open ( struct efi_usb_interface *usbintf,
 	}
 
 	/* Allocate and initialise structure */
-	usbep = zalloc ( sizeof ( *usbep ) );
-	if ( ! usbep ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-	usbep->usbintf = usbintf;
 	usb_endpoint_init ( &usbep->ep, usbdev->usb, driver );
 	usb_endpoint_describe ( &usbep->ep, endpoint, attributes, mtu, 0,
 				( interval << 3 /* microframes */ ) );
@@ -164,9 +190,6 @@ static int efi_usb_open ( struct efi_usb_interface *usbintf,
 		       strerror ( rc ) );
 		goto err_open;
 	}
-
-	/* Record opened endpoint */
-	usbintf->endpoint[index] = usbep;
 	DBGC ( usbdev, "USBDEV %s %s opened\n",
 	       usbintf->name, usb_endpoint_name ( &usbep->ep ) );
 
@@ -185,12 +208,10 @@ static int efi_usb_open ( struct efi_usb_interface *usbintf,
 
 	bs->CloseEvent ( usbep->event );
  err_event:
-	usbintf->endpoint[index] = usbep;
 	usb_endpoint_close ( &usbep->ep );
  err_open:
-	free ( usbep );
- err_alloc:
  err_mtu:
+ err_alloc:
 	return rc;
 }
 
@@ -216,12 +237,6 @@ static void efi_usb_close ( struct efi_usb_endpoint *usbep ) {
 	usb_endpoint_close ( &usbep->ep );
 	DBGC ( usbdev, "USBDEV %s %s closed\n",
 	       usbintf->name, usb_endpoint_name ( &usbep->ep ) );
-
-	/* Free endpoint */
-	free ( usbep );
-
-	/* Record closed endpoint */
-	usbintf->endpoint[index] = NULL;
 }
 
 /**
@@ -236,8 +251,28 @@ static void efi_usb_close_all ( struct efi_usb_interface *usbintf ) {
 	for ( i = 0 ; i < ( sizeof ( usbintf->endpoint ) /
 			    sizeof ( usbintf->endpoint[0] ) ) ; i++ ) {
 		usbep = usbintf->endpoint[i];
-		if ( usbep )
+		if ( usbep && usbep->ep.open )
 			efi_usb_close ( usbep );
+	}
+}
+
+/**
+ * Free all endpoints
+ *
+ * @v usbintf		EFI USB interface
+ */
+static void efi_usb_free_all ( struct efi_usb_interface *usbintf ) {
+	struct efi_usb_endpoint *usbep;
+	unsigned int i;
+
+	for ( i = 0 ; i < ( sizeof ( usbintf->endpoint ) /
+			    sizeof ( usbintf->endpoint[0] ) ) ; i++ ) {
+		usbep = usbintf->endpoint[i];
+		if ( usbep ) {
+			assert ( ! usbep->ep.open );
+			free ( usbep );
+			usbintf->endpoint[i] = NULL;
+		}
 	}
 }
 
@@ -286,7 +321,7 @@ static int efi_usb_sync_transfer ( struct efi_usb_interface *usbintf,
 	int rc;
 
 	/* Open endpoint, if applicable */
-	if ( ( ! usbintf->endpoint[index] ) &&
+	if ( ( ! efi_usb_is_open ( usbintf, endpoint ) ) &&
 	     ( ( rc = efi_usb_open ( usbintf, endpoint, attributes, 0,
 				     &efi_usb_sync_driver ) ) != 0 ) ) {
 		goto err_open;
@@ -384,8 +419,12 @@ static void efi_usb_async_complete ( struct usb_endpoint *ep,
 			  status );
 
  drop:
-	/* Recycle I/O buffer */
-	usb_recycle ( &usbep->ep, iobuf );
+	/* Recycle or free I/O buffer */
+	if ( usbep->ep.open ) {
+		usb_recycle ( &usbep->ep, iobuf );
+	} else {
+		free_iob ( iobuf );
+	}
 }
 
 /** Asynchronous endpoint operations */
@@ -415,6 +454,12 @@ static int efi_usb_async_start ( struct efi_usb_interface *usbintf,
 	unsigned int index = USB_ENDPOINT_IDX ( endpoint );
 	EFI_STATUS efirc;
 	int rc;
+
+	/* Fail if endpoint is already open */
+	if ( efi_usb_is_open ( usbintf, endpoint ) ) {
+		rc = -EINVAL;
+		goto err_already_open;
+	}
 
 	/* Open endpoint */
 	if ( ( rc = efi_usb_open ( usbintf, endpoint,
@@ -453,6 +498,7 @@ static int efi_usb_async_start ( struct efi_usb_interface *usbintf,
  err_prefill:
 	efi_usb_close ( usbep );
  err_open:
+ err_already_open:
 	return rc;
 }
 
@@ -469,9 +515,9 @@ static void efi_usb_async_stop ( struct efi_usb_interface *usbintf,
 	unsigned int index = USB_ENDPOINT_IDX ( endpoint );
 
 	/* Do nothing if endpoint is already closed */
-	usbep = usbintf->endpoint[index];
-	if ( ! usbep )
+	if ( ! efi_usb_is_open ( usbintf, endpoint ) )
 		return;
+	usbep = usbintf->endpoint[index];
 
 	/* Stop timer */
 	bs->SetTimer ( usbep->event, TimerCancel, 0 );
@@ -1122,13 +1168,14 @@ static int efi_usb_install ( struct efi_usb_device *usbdev,
 	       usbintf->name, efi_handle_name ( usbintf->handle ) );
 	return 0;
 
-	efi_usb_close_all ( usbintf );
 	bs->UninstallMultipleProtocolInterfaces (
 			usbintf->handle,
 			&efi_usb_io_protocol_guid, &usbintf->usbio,
 			&efi_device_path_protocol_guid, usbintf->path,
 			NULL );
  err_install_protocol:
+	efi_usb_close_all ( usbintf );
+	efi_usb_free_all ( usbintf );
 	list_del ( &usbintf->list );
 	free ( usbintf );
  err_alloc:
@@ -1142,9 +1189,10 @@ static int efi_usb_install ( struct efi_usb_device *usbdev,
  */
 static void efi_usb_uninstall ( struct efi_usb_interface *usbintf ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_usb_device *usbdev = usbintf->usbdev;
 
-	/* Close all endpoints */
-	efi_usb_close_all ( usbintf );
+	DBGC ( usbdev, "USBDEV %s uninstalling %s\n",
+	       usbintf->name, efi_handle_name ( usbintf->handle ) );
 
 	/* Uninstall protocols */
 	bs->UninstallMultipleProtocolInterfaces (
@@ -1152,6 +1200,10 @@ static void efi_usb_uninstall ( struct efi_usb_interface *usbintf ) {
 			&efi_usb_io_protocol_guid, &usbintf->usbio,
 			&efi_device_path_protocol_guid, usbintf->path,
 			NULL );
+
+	/* Close and free all endpoints */
+	efi_usb_close_all ( usbintf );
+	efi_usb_free_all ( usbintf );
 
 	/* Remove from list of interfaces */
 	list_del ( &usbintf->list );
