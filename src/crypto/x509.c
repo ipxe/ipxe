@@ -1392,7 +1392,7 @@ int x509_validate ( struct x509_certificate *cert,
 
 	/* Fail unless we have an issuer */
 	if ( ! issuer ) {
-		DBGC2 ( cert, "X509 %p \"%s\" has no issuer\n",
+		DBGC2 ( cert, "X509 %p \"%s\" has no trusted issuer\n",
 			cert, x509_name ( cert ) );
 		return -EACCES_UNTRUSTED;
 	}
