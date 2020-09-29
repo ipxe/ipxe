@@ -818,6 +818,7 @@ int usb_control ( struct usb_device *usb, unsigned int request,
 				       "failed: %s\n", usb->name, request,
 				       value, index, strerror ( rc ) );
 				free_iob ( cmplt );
+				usb_endpoint_reset ( ep );
 				return rc;
 			}
 
