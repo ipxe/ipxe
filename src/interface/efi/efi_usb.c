@@ -412,7 +412,7 @@ static void efi_usb_async_complete ( struct usb_endpoint *ep,
 		goto drop;
 
 	/* Construct status */
-	status = ( ( rc == 0 ) ? 0 : EFI_USB_ERR_STALL );
+	status = ( ( rc == 0 ) ? 0 : EFI_USB_ERR_SYSTEM );
 
 	/* Report completion */
 	usbep->callback ( iobuf->data, iob_len ( iobuf ), usbep->context,
@@ -600,8 +600,7 @@ efi_usb_control_transfer ( EFI_USB_IO_PROTOCOL *usbio,
 		       "failed: %s\n", usbintf->name, request, value, index,
 		       le16_to_cpu ( packet->Length ), data, ( ( size_t ) len ),
 		       strerror ( rc ) );
-		/* Assume that any error represents a stall */
-		*status = EFI_USB_ERR_STALL;
+		*status = EFI_USB_ERR_SYSTEM;
 		goto err_control;
 	}
 
