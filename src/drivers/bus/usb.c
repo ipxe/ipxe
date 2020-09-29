@@ -1637,6 +1637,11 @@ static void unregister_usb ( struct usb_device *usb ) {
 	struct io_buffer *iobuf;
 	struct io_buffer *tmp;
 
+	DBGC ( usb, "USB %s addr %d %04x:%04x class %d:%d:%d removed\n",
+	       usb->name, usb->address, le16_to_cpu ( usb->device.vendor ),
+	       le16_to_cpu ( usb->device.product ), usb->device.class.class,
+	       usb->device.class.subclass, usb->device.class.protocol );
+
 	/* Sanity checks */
 	assert ( port->usb == usb );
 
