@@ -24,7 +24,9 @@ struct efi_usb_device {
 	/** Configuration descriptor */
 	struct usb_configuration_descriptor *config;
 	/** Supported languages */
-	struct usb_descriptor_header *languages;
+	uint16_t *lang;
+	/** Length of supported languages */
+	size_t lang_len;
 	/** List of interfaces */
 	struct list_head interfaces;
 };

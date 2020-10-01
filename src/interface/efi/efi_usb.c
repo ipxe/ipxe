@@ -1044,9 +1044,8 @@ efi_usb_get_supported_languages ( EFI_USB_IO_PROTOCOL *usbio,
 	DBGC2 ( usbdev, "USBDEV %s get supported languages\n", usbintf->name );
 
 	/* Return cached supported languages */
-	*languages = ( ( ( void * ) usbdev->languages ) +
-		       sizeof ( *(usbdev->languages) ) );
-	*len = usbdev->languages->len;
+	*languages = usbdev->lang;
+	*len = usbdev->lang_len;
 
 	return 0;
 }
@@ -1255,7 +1254,9 @@ static int efi_usb_probe ( struct usb_function *func,
 	struct efi_usb_interface *usbintf;
 	struct efi_device *efidev;
 	struct usb_descriptor_header header;
+	struct usb_descriptor_header *lang;
 	size_t config_len;
+	size_t lang_len;
 	unsigned int i;
 	int rc;
 
@@ -1275,9 +1276,12 @@ static int efi_usb_probe ( struct usb_function *func,
 		/* Assume no strings are present */
 		header.len = 0;
 	}
+	lang_len = ( ( header.len >= sizeof ( header ) ) ?
+		     ( header.len - sizeof ( header ) ) : 0 );
 
 	/* Allocate and initialise structure */
-	usbdev = zalloc ( sizeof ( *usbdev ) + config_len + header.len );
+	usbdev = zalloc ( sizeof ( *usbdev ) + config_len +
+			  sizeof ( *lang ) + lang_len );
 	if ( ! usbdev ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -1288,14 +1292,15 @@ static int efi_usb_probe ( struct usb_function *func,
 	usbdev->efidev = efidev;
 	usbdev->config = ( ( ( void * ) usbdev ) + sizeof ( *usbdev ) );
 	memcpy ( usbdev->config, config, config_len );
-	usbdev->languages = ( ( ( void * ) usbdev->config ) + config_len );
+	lang = ( ( ( void * ) usbdev->config ) + config_len );
+	usbdev->lang = ( ( ( void * ) lang ) + sizeof ( *lang ) );
+	usbdev->lang_len = lang_len;
 	INIT_LIST_HEAD ( &usbdev->interfaces );
 
-	/* Get supported languages descriptor */
-	if ( header.len &&
-	     ( rc = usb_get_descriptor ( usb, 0, USB_STRING_DESCRIPTOR, 0, 0,
-					 usbdev->languages,
-					 header.len ) ) != 0 ) {
+	/* Get supported languages descriptor, if applicable */
+	if ( lang_len &&
+	     ( ( rc = usb_get_descriptor ( usb, 0, USB_STRING_DESCRIPTOR,
+					   0, 0, lang, header.len ) ) != 0 ) ) {
 		DBGC ( usbdev, "USBDEV %s could not get supported languages: "
 		       "%s\n", usbdev->name, strerror ( rc ) );
 		goto err_get_languages;
