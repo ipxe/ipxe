@@ -981,6 +981,12 @@ efi_usb_get_string_descriptor ( EFI_USB_IO_PROTOCOL *usbio, UINT16 language,
 		goto err_get_header;
 	}
 	len = header.len;
+	if ( len < sizeof ( header ) ) {
+		DBGC ( usbdev, "USBDEV %s underlength string %d:%d\n",
+		       usbintf->name, language, index );
+		rc = -EINVAL;
+		goto err_len;
+	}
 
 	/* Allocate buffer */
 	if ( ( efirc = bs->AllocatePool ( EfiBootServicesData, len,
@@ -1014,6 +1020,7 @@ efi_usb_get_string_descriptor ( EFI_USB_IO_PROTOCOL *usbio, UINT16 language,
  err_get_descriptor:
 	bs->FreePool ( buffer );
  err_alloc:
+ err_len:
  err_get_header:
 	bs->RestoreTPL ( saved_tpl );
 	return EFIRC ( rc );
