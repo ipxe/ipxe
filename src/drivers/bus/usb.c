@@ -913,9 +913,15 @@ int usb_get_string_descriptor ( struct usb_device *usb, unsigned int index,
 					 sizeof ( *desc ) ) ) != 0 )
 		goto err_get_descriptor;
 
-	/* Copy to buffer */
+	/* Calculate string length */
+	if ( desc->header.len < sizeof ( desc->header ) ) {
+		rc = -EINVAL;
+		goto err_len;
+	}
 	actual = ( ( desc->header.len - sizeof ( desc->header ) ) /
 		   sizeof ( desc->character[0] ) );
+
+	/* Copy to buffer */
 	for ( i = 0 ; ( ( i < actual ) && ( i < max ) ) ; i++ )
 		buf[i] = le16_to_cpu ( desc->character[i] );
 	if ( len )
@@ -926,6 +932,7 @@ int usb_get_string_descriptor ( struct usb_device *usb, unsigned int index,
 
 	return actual;
 
+ err_len:
  err_get_descriptor:
 	free ( desc );
  err_alloc:
