@@ -237,7 +237,7 @@ static void efi_block_connect ( struct san_device *sandev ) {
 
 	/* Try to connect all possible drivers to this block device */
 	if ( ( efirc = bs->ConnectController ( block->handle, NULL,
-					       NULL, 1 ) ) != 0 ) {
+					       NULL, TRUE ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( sandev, "EFIBLK %#02x could not connect drivers: %s\n",
 		       sandev->drive, strerror ( rc ) );

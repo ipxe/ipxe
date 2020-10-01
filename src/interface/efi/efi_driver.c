@@ -470,7 +470,7 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 	DBGC ( device, "EFIDRV %s connecting new drivers\n",
 	       efi_handle_name ( device ) );
 	if ( ( efirc = bs->ConnectController ( device, drivers, NULL,
-					       FALSE ) ) != 0 ) {
+					       TRUE ) ) != 0 ) {
 		rc = -EEFI_CONNECT ( efirc );
 		DBGC ( device, "EFIDRV %s could not connect new drivers: "
 		       "%s\n", efi_handle_name ( device ), strerror ( rc ) );
@@ -520,7 +520,7 @@ static int efi_driver_reconnect ( EFI_HANDLE device ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
 	/* Reconnect any available driver */
-	bs->ConnectController ( device, NULL, NULL, FALSE );
+	bs->ConnectController ( device, NULL, NULL, TRUE );
 
 	return 0;
 }
