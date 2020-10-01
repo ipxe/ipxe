@@ -37,14 +37,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/efi/efi_wrap.h>
 
-/** EFI system table wrapper */
-static EFI_SYSTEM_TABLE efi_systab_wrapper;
-
-/** EFI boot services table wrapper */
-static EFI_BOOT_SERVICES efi_bs_wrapper;
-
 /** Colour for debug messages */
-#define colour &efi_systab_wrapper
+#define colour &efi_systab
 
 /**
  * Convert EFI status code to text
@@ -1135,28 +1129,17 @@ efi_create_event_ex_wrapper ( UINT32 type, EFI_TPL notify_tpl,
 }
 
 /**
- * Wrap the calls made by a loaded image
+ * Build table wrappers
  *
- * @v handle		Image handle
+ * @ret systab		Wrapped system table
  */
- void efi_wrap ( EFI_HANDLE handle ) {
+EFI_SYSTEM_TABLE * efi_wrap_systab ( void ) {
+	static EFI_SYSTEM_TABLE efi_systab_wrapper;
+	static EFI_BOOT_SERVICES efi_bs_wrapper;
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_LOADED_IMAGE_PROTOCOL *image;
-		void *intf;
-	} loaded;
-	EFI_STATUS efirc;
-	int rc;
 
-	/* Do nothing unless debugging is enabled */
-	if ( ! DBG_LOG )
-		return;
-
-	/* Populate table wrappers */
-	memcpy ( &efi_systab_wrapper, efi_systab,
-		 sizeof ( efi_systab_wrapper ) );
+	/* Build boot services table wrapper */
 	memcpy ( &efi_bs_wrapper, bs, sizeof ( efi_bs_wrapper ) );
-	efi_systab_wrapper.BootServices	= &efi_bs_wrapper;
 	efi_bs_wrapper.RaiseTPL		= efi_raise_tpl_wrapper;
 	efi_bs_wrapper.RestoreTPL	= efi_restore_tpl_wrapper;
 	efi_bs_wrapper.AllocatePages	= efi_allocate_pages_wrapper;
@@ -1211,6 +1194,32 @@ efi_create_event_ex_wrapper ( UINT32 type, EFI_TPL notify_tpl,
 		= efi_uninstall_multiple_protocol_interfaces_wrapper;
 	efi_bs_wrapper.CreateEventEx	= efi_create_event_ex_wrapper;
 
+	/* Build system table wrapper */
+	memcpy ( &efi_systab_wrapper, efi_systab,
+		 sizeof ( efi_systab_wrapper ) );
+	efi_systab_wrapper.BootServices	= &efi_bs_wrapper;
+
+	return &efi_systab_wrapper;
+}
+
+/**
+ * Wrap the calls made by a loaded image
+ *
+ * @v handle		Image handle
+ */
+void efi_wrap ( EFI_HANDLE handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_LOADED_IMAGE_PROTOCOL *image;
+		void *intf;
+	} loaded;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return;
+
 	/* Open loaded image protocol */
 	if ( ( efirc = bs->OpenProtocol ( handle,
 					  &efi_loaded_image_protocol_guid,
@@ -1223,7 +1232,7 @@ efi_create_event_ex_wrapper ( UINT32 type, EFI_TPL notify_tpl,
 	}
 
 	/* Provide system table wrapper to image */
-	loaded.image->SystemTable = &efi_systab_wrapper;
+	loaded.image->SystemTable = efi_wrap_systab();
 	DBGC ( colour, "WRAP %s at base %p has protocols:\n",
 	       efi_handle_name ( handle ), loaded.image->ImageBase );
 	DBGC_EFI_PROTOCOLS ( colour, handle );
