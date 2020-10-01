@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_wrap.h>
 #include <ipxe/efi/efi_pxe.h>
+#include <ipxe/efi/efi_driver.h>
 #include <ipxe/image.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -140,6 +141,7 @@ static int efi_image_exec ( struct image *image ) {
 		void *interface;
 	} loaded;
 	EFI_HANDLE handle;
+	EFI_MEMORY_TYPE type;
 	wchar_t *cmdline;
 	EFI_STATUS efirc;
 	int rc;
@@ -231,6 +233,9 @@ static int efi_image_exec ( struct image *image ) {
 	assert ( loaded.image->LoadOptionsSize == 0 );
 	assert ( loaded.image->LoadOptions == NULL );
 
+	/* Record image code type */
+	type = loaded.image->ImageCodeType;
+
 	/* Set command line */
 	loaded.image->LoadOptions = cmdline;
 	loaded.image->LoadOptionsSize =
@@ -251,6 +256,12 @@ static int efi_image_exec ( struct image *image ) {
 		DBGC ( image, "EFIIMAGE %p could not start (or returned with "
 		       "error): %s\n", image, strerror ( rc ) );
 		goto err_start_image;
+	}
+
+	/* If image was a driver, connect it up to anything available */
+	if ( type == EfiBootServicesCode ) {
+		DBGC ( image, "EFIIMAGE %p connecting drivers\n", image );
+		efi_driver_reconnect_all();
 	}
 
 	/* Success */
