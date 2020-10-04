@@ -588,13 +588,12 @@ static void validator_step ( struct validator *validator ) {
 		return;
 	}
 
-	/* If chain ends with a self-issued certificate, then there is
-	 * nothing more to do.
-	 */
 	last = x509_last ( validator->chain );
 	if ( asn1_compare ( &last->issuer.raw, &last->subject.raw ) == 0 ) {
-		validator_finished ( validator, rc );
-		return;
+		DBGC ( validator,
+		       "VALIDATOR %p \"%s\" is self-signed. Searching for "
+		       "cross-signed alternative.\n",
+		       validator, x509_name ( last ));
 	}
 
 	/* Otherwise, try to download a suitable cross-signing
