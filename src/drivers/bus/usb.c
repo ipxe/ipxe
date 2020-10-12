@@ -651,12 +651,13 @@ int usb_prefill ( struct usb_endpoint *ep ) {
 }
 
 /**
- * Refill endpoint
+ * Refill endpoint up to specified limit
  *
  * @v ep		USB endpoint
+ * @v max		Fill limit
  * @ret rc		Return status code
  */
-int usb_refill ( struct usb_endpoint *ep ) {
+int usb_refill_limit ( struct usb_endpoint *ep, unsigned int max ) {
 	struct io_buffer *iobuf;
 	size_t reserve = ep->reserve;
 	size_t len = ( ep->len ? ep->len : ep->mtu );
@@ -667,7 +668,9 @@ int usb_refill ( struct usb_endpoint *ep ) {
 	assert ( ep->max > 0 );
 
 	/* Refill endpoint */
-	while ( ep->fill < ep->max ) {
+	if ( max > ep->max )
+		max = ep->max;
+	while ( ep->fill < max ) {
 
 		/* Get or allocate buffer */
 		if ( list_empty ( &ep->recycled ) ) {
@@ -696,6 +699,16 @@ int usb_refill ( struct usb_endpoint *ep ) {
 	}
 
 	return 0;
+}
+
+/**
+ * Refill endpoint
+ *
+ * @v ep		USB endpoint
+ * @ret rc		Return status code
+ */
+int usb_refill ( struct usb_endpoint *ep ) {
+	return usb_refill_limit ( ep, ep->max );
 }
 
 /**

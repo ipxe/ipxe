@@ -621,6 +621,7 @@ usb_recycle ( struct usb_endpoint *ep, struct io_buffer *iobuf ) {
 }
 
 extern int usb_prefill ( struct usb_endpoint *ep );
+extern int usb_refill_limit ( struct usb_endpoint *ep, unsigned int max );
 extern int usb_refill ( struct usb_endpoint *ep );
 extern void usb_flush ( struct usb_endpoint *ep );
 
