@@ -580,6 +580,7 @@ usb_endpoint_described ( struct usb_endpoint *ep,
 			 struct usb_interface_descriptor *interface,
 			 unsigned int type, unsigned int index );
 extern int usb_endpoint_open ( struct usb_endpoint *ep );
+extern int usb_endpoint_clear_halt ( struct usb_endpoint *ep );
 extern void usb_endpoint_close ( struct usb_endpoint *ep );
 extern int usb_message ( struct usb_endpoint *ep, unsigned int request,
 			 unsigned int value, unsigned int index,

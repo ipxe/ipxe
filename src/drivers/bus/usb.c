@@ -363,6 +363,35 @@ static int usb_endpoint_clear_tt ( struct usb_endpoint *ep ) {
 }
 
 /**
+ * Clear endpoint halt (if applicable)
+ *
+ * @v ep		USB endpoint
+ * @ret rc		Return status code
+ */
+int usb_endpoint_clear_halt ( struct usb_endpoint *ep ) {
+	struct usb_device *usb = ep->usb;
+	unsigned int type;
+	int rc;
+
+	/* Clear transaction translator, if applicable */
+	if ( ( rc = usb_endpoint_clear_tt ( ep ) ) != 0 )
+		return rc;
+
+	/* Clear endpoint halt (if applicable) */
+	type = ( ep->attributes & USB_ENDPOINT_ATTR_TYPE_MASK );
+	if ( ( type != USB_ENDPOINT_ATTR_CONTROL ) &&
+	     ( ( rc = usb_clear_feature ( usb, USB_RECIP_ENDPOINT,
+					  USB_ENDPOINT_HALT,
+					  ep->address ) ) != 0 ) ) {
+		DBGC ( usb, "USB %s %s could not clear endpoint halt: %s\n",
+		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Close USB endpoint
  *
  * @v ep		USB endpoint
@@ -399,26 +428,14 @@ void usb_endpoint_close ( struct usb_endpoint *ep ) {
  */
 static int usb_endpoint_reset ( struct usb_endpoint *ep ) {
 	struct usb_device *usb = ep->usb;
-	unsigned int type;
 	int rc;
 
 	/* Sanity check */
 	assert ( ! list_empty ( &ep->halted ) );
 
-	/* Clear transaction translator, if applicable */
-	if ( ( rc = usb_endpoint_clear_tt ( ep ) ) != 0 )
+	/* Clear device halt, if applicable */
+	if ( ( rc = usb_endpoint_clear_halt ( ep ) ) != 0 )
 		return rc;
-
-	/* Clear endpoint halt, if applicable */
-	type = ( ep->attributes & USB_ENDPOINT_ATTR_TYPE_MASK );
-	if ( ( type != USB_ENDPOINT_ATTR_CONTROL ) &&
-	     ( ( rc = usb_clear_feature ( usb, USB_RECIP_ENDPOINT,
-					  USB_ENDPOINT_HALT,
-					  ep->address ) ) != 0 ) ) {
-		DBGC ( usb, "USB %s %s could not clear endpoint halt: %s\n",
-		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
-		return rc;
-	}
 
 	/* Reset endpoint */
 	if ( ( rc = ep->host->reset ( ep ) ) != 0 ) {
