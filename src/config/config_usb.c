@@ -53,6 +53,9 @@ REQUIRE_OBJECT ( usbio );
 #ifdef USB_KEYBOARD
 REQUIRE_OBJECT ( usbkbd );
 #endif
+#ifdef USB_BLOCK
+REQUIRE_OBJECT ( usbblk );
+#endif
 
 /*
  * Drag in USB external interfaces
