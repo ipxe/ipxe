@@ -548,8 +548,8 @@ static int efi_local_open ( struct interface *xfer, struct uri *uri ) {
 	}
 	ref_init ( &local->refcnt, NULL );
 	intf_init ( &local->xfer, &efi_local_xfer_desc, &local->refcnt );
-	process_init ( &local->process, &efi_local_process_desc,
-		       &local->refcnt );
+	process_init_stopped ( &local->process, &efi_local_process_desc,
+			       &local->refcnt );
 
 	/* Open specified volume */
 	if ( ( rc = efi_local_open_volume ( local, volume ) ) != 0 )
@@ -562,6 +562,9 @@ static int efi_local_open ( struct interface *xfer, struct uri *uri ) {
 	/* Get length of file */
 	if ( ( rc = efi_local_len ( local ) ) != 0 )
 		goto err_len;
+
+	/* Start download process */
+	process_add ( &local->process );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &local->xfer, xfer );
