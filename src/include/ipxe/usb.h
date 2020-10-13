@@ -1398,6 +1398,9 @@ struct usb_driver {
 /** Declare a USB driver */
 #define __usb_driver __table_entry ( USB_DRIVERS, 01 )
 
+/** Declare a USB fallback driver */
+#define __usb_fallback_driver __table_entry ( USB_DRIVERS, 02 )
+
 /** USB driver scores */
 enum usb_driver_score {
 	/** Fallback driver (has no effect on overall score) */

@@ -1355,7 +1355,7 @@ static struct usb_device_id efi_usb_ids[] = {
 };
 
 /** USB I/O protocol driver */
-struct usb_driver usbio_driver __usb_driver = {
+struct usb_driver usbio_driver __usb_fallback_driver = {
 	.ids = efi_usb_ids,
 	.id_count = ( sizeof ( efi_usb_ids ) / sizeof ( efi_usb_ids[0] ) ),
 	.class = USB_CLASS_ID ( USB_ANY_ID, USB_ANY_ID, USB_ANY_ID ),
