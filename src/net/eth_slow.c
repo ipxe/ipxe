@@ -286,6 +286,9 @@ static int eth_slow_rx ( struct io_buffer *iobuf,
 		return -EINVAL;
 	}
 
+	/* Strip any trailing padding */
+	iob_unput ( iobuf, ( sizeof ( *eth_slow ) - iob_len ( iobuf ) ) );
+
 	/* Handle according to subtype */
 	switch ( eth_slow->header.subtype ) {
 	case ETH_SLOW_SUBTYPE_LACP:
