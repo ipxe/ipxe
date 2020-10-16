@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/xfer.h>
 #include <ipxe/uri.h>
 #include <ipxe/open.h>
+#include <ipxe/efi/efi_path.h>
 #include "usbblk.h"
 
 /** @file
@@ -702,11 +703,25 @@ static void usbblk_scsi_close ( struct usbblk_device *usbblk, int rc ) {
 	usbblk->opened = 0;
 }
 
+/**
+ * Describe as an EFI device path
+ *
+ * @v usbblk		USB block device
+ * @ret path		EFI device path, or NULL on error
+ */
+static EFI_DEVICE_PATH_PROTOCOL *
+usbblk_efi_describe ( struct usbblk_device *usbblk ) {
+
+	return efi_usb_path ( usbblk->func );
+}
+
 /** SCSI command interface operations */
 static struct interface_operation usbblk_scsi_operations[] = {
 	INTF_OP ( scsi_command, struct usbblk_device *, usbblk_scsi_command ),
 	INTF_OP ( xfer_window, struct usbblk_device *, usbblk_scsi_window ),
 	INTF_OP ( intf_close, struct usbblk_device *, usbblk_scsi_close ),
+	EFI_INTF_OP ( efi_describe, struct usbblk_device *,
+		      usbblk_efi_describe ),
 };
 
 /** SCSI command interface descriptor */
