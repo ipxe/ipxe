@@ -64,23 +64,6 @@ EFI_REQUEST_PROTOCOL ( EFI_ACPI_TABLE_PROTOCOL, &acpi );
 /** Boot filename */
 static wchar_t efi_block_boot_filename[] = EFI_REMOVABLE_MEDIA_FILE_NAME;
 
-/** iPXE EFI block device vendor device path GUID */
-#define IPXE_BLOCK_DEVICE_PATH_GUID					\
-	{ 0x8998b594, 0xf531, 0x4e87,					\
-	  { 0x8b, 0xdf, 0x8f, 0x88, 0x54, 0x3e, 0x99, 0xd4 } }
-
-/** iPXE EFI block device vendor device path GUID */
-static EFI_GUID ipxe_block_device_path_guid
-	= IPXE_BLOCK_DEVICE_PATH_GUID;
-
-/** An iPXE EFI block device vendor device path */
-struct efi_block_vendor_path {
-	/** Generic vendor device path */
-	VENDOR_DEVICE_PATH vendor;
-	/** Block device URI */
-	CHAR16 uri[0];
-} __attribute__ (( packed ));
-
 /** EFI SAN device private data */
 struct efi_block_data {
 	/** SAN device */
@@ -259,16 +242,8 @@ static void efi_block_connect ( struct san_device *sandev ) {
 static int efi_block_hook ( unsigned int drive, struct uri **uris,
 			    unsigned int count, unsigned int flags ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_DEVICE_PATH_PROTOCOL *end;
-	struct efi_block_vendor_path *vendor;
-	struct efi_snp_device *snpdev;
 	struct san_device *sandev;
 	struct efi_block_data *block;
-	size_t prefix_len;
-	size_t uri_len;
-	size_t vendor_len;
-	size_t len;
-	char *uri_buf;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -279,24 +254,8 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 		goto err_no_uris;
 	}
 
-	/* Find an appropriate parent device handle */
-	snpdev = last_opened_snpdev();
-	if ( ! snpdev ) {
-		DBG ( "EFIBLK could not identify SNP device\n" );
-		rc = -ENODEV;
-		goto err_no_snpdev;
-	}
-
-	/* Calculate length of private data */
-	prefix_len = efi_path_len ( snpdev->path );
-	uri_len = format_uri ( uris[0], NULL, 0 );
-	vendor_len = ( sizeof ( *vendor ) +
-		       ( ( uri_len + 1 /* NUL */ ) * sizeof ( wchar_t ) ) );
-	len = ( sizeof ( *block ) + uri_len + 1 /* NUL */ + prefix_len +
-		vendor_len + sizeof ( *end ) );
-
 	/* Allocate and initialise structure */
-	sandev = alloc_sandev ( uris, count, len );
+	sandev = alloc_sandev ( uris, count, sizeof ( *block ) );
 	if ( ! sandev ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -311,26 +270,6 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 	block->block_io.ReadBlocks = efi_block_io_read;
 	block->block_io.WriteBlocks = efi_block_io_write;
 	block->block_io.FlushBlocks = efi_block_io_flush;
-	uri_buf = ( ( ( void * ) block ) + sizeof ( *block ) );
-	block->path = ( ( ( void * ) uri_buf ) + uri_len + 1 /* NUL */ );
-
-	/* Construct device path */
-	memcpy ( block->path, snpdev->path, prefix_len );
-	vendor = ( ( ( void * ) block->path ) + prefix_len );
-	vendor->vendor.Header.Type = HARDWARE_DEVICE_PATH;
-	vendor->vendor.Header.SubType = HW_VENDOR_DP;
-	vendor->vendor.Header.Length[0] = ( vendor_len & 0xff );
-	vendor->vendor.Header.Length[1] = ( vendor_len >> 8 );
-	memcpy ( &vendor->vendor.Guid, &ipxe_block_device_path_guid,
-		 sizeof ( vendor->vendor.Guid ) );
-	format_uri ( uris[0], uri_buf, ( uri_len + 1 /* NUL */ ) );
-	efi_snprintf ( vendor->uri, ( uri_len + 1 /* NUL */ ), "%s", uri_buf );
-	end = ( ( ( void * ) vendor ) + vendor_len );
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
-	DBGC ( sandev, "EFIBLK %#02x has device path %s\n",
-	       drive, efi_devpath_text ( block->path ) );
 
 	/* Register SAN device */
 	if ( ( rc = register_sandev ( sandev, drive, flags ) ) != 0 ) {
@@ -344,6 +283,22 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 		( sandev->capacity.blksize << sandev->blksize_shift );
 	block->media.LastBlock =
 		( ( sandev->capacity.blocks >> sandev->blksize_shift ) - 1 );
+
+	/* Construct device path */
+	if ( ! sandev->active ) {
+		rc = -ENODEV;
+		DBGC ( sandev, "EFIBLK %#02x not active after registration\n",
+		       drive );
+		goto err_active;
+	}
+	block->path = efi_describe ( &sandev->active->block );
+	if ( ! block->path ) {
+		rc = -ENODEV;
+		DBGC ( sandev, "EFIBLK %#02x has no device path\n", drive );
+		goto err_describe;
+	}
+	DBGC ( sandev, "EFIBLK %#02x has device path %s\n",
+	       drive, efi_devpath_text ( block->path ) );
 
 	/* Install protocols */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
@@ -367,11 +322,14 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 			&efi_block_io_protocol_guid, &block->block_io,
 			&efi_device_path_protocol_guid, block->path, NULL );
  err_install:
+	free ( block->path );
+	block->path = NULL;
+ err_describe:
+ err_active:
 	unregister_sandev ( sandev );
  err_register:
 	sandev_put ( sandev );
  err_alloc:
- err_no_snpdev:
  err_no_uris:
 	return rc;
 }
@@ -399,6 +357,10 @@ static void efi_block_unhook ( unsigned int drive ) {
 			block->handle,
 			&efi_block_io_protocol_guid, &block->block_io,
 			&efi_device_path_protocol_guid, block->path, NULL );
+
+	/* Free device path */
+	free ( block->path );
+	block->path = NULL;
 
 	/* Unregister SAN device */
 	unregister_sandev ( sandev );
