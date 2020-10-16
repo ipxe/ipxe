@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/efi_watchdog.h>
 #include <ipxe/efi/efi_snp.h>
@@ -1714,7 +1715,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 		       "%s", netdev->name );
 
 	/* Allocate the new device path */
-	path_prefix_len = efi_devpath_len ( efidev->path );
+	path_prefix_len = efi_path_len ( efidev->path );
 	snpdev->path = zalloc ( path_prefix_len + sizeof ( *macpath ) +
 				sizeof ( *vlanpath ) + sizeof ( *path_end ) );
 	if ( ! snpdev->path ) {

@@ -33,36 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /**
- * Find end of device path
- *
- * @v path		Path to device
- * @ret path_end	End of device path
- */
-EFI_DEVICE_PATH_PROTOCOL * efi_devpath_end ( EFI_DEVICE_PATH_PROTOCOL *path ) {
-
-	while ( path->Type != END_DEVICE_PATH_TYPE ) {
-		path = ( ( ( void * ) path ) +
-			 /* There's this amazing new-fangled thing known as
-			  * a UINT16, but who wants to use one of those? */
-			 ( ( path->Length[1] << 8 ) | path->Length[0] ) );
-	}
-
-	return path;
-}
-
-/**
- * Find length of device path (excluding terminator)
- *
- * @v path		Path to device
- * @ret path_len	Length of device path
- */
-size_t efi_devpath_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
-	EFI_DEVICE_PATH_PROTOCOL *end = efi_devpath_end ( path );
-
-	return ( ( ( void * ) end ) - ( ( void * ) path ) );
-}
-
-/**
  * Locate parent device supporting a given protocol
  *
  * @v device		EFI device handle

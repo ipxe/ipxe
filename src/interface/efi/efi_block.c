@@ -54,7 +54,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
-#include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_block.h>
 
 /** ACPI table protocol protocol */
@@ -288,7 +288,7 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 	}
 
 	/* Calculate length of private data */
-	prefix_len = efi_devpath_len ( snpdev->path );
+	prefix_len = efi_path_len ( snpdev->path );
 	uri_len = format_uri ( uris[0], NULL, 0 );
 	vendor_len = ( sizeof ( *vendor ) +
 		       ( ( uri_len + 1 /* NUL */ ) * sizeof ( wchar_t ) ) );
@@ -551,7 +551,7 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 	}
 
 	/* Check if this device is a child of our block device */
-	prefix_len = efi_devpath_len ( block->path );
+	prefix_len = efi_path_len ( block->path );
 	if ( memcmp ( path.path, block->path, prefix_len ) != 0 ) {
 		/* Not a child device */
 		rc = -ENOTTY;
@@ -561,7 +561,7 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 	       sandev->drive, efi_devpath_text ( path.path ) );
 
 	/* Construct device path for boot image */
-	end = efi_devpath_end ( path.path );
+	end = efi_path_end ( path.path );
 	prefix_len = ( ( ( void * ) end ) - ( ( void * ) path.path ) );
 	filepath_len = ( SIZE_OF_FILEPATH_DEVICE_PATH +
 			 ( filename ?

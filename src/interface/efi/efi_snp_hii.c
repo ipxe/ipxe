@@ -63,6 +63,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi_hii.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_strings.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_utils.h>
 #include <config/branding.h>
 
@@ -680,7 +681,7 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 	}
 
 	/* Allocate the new device path */
-	path_prefix_len = efi_devpath_len ( snpdev->path );
+	path_prefix_len = efi_path_len ( snpdev->path );
 	snpdev->hii_child_path = zalloc ( path_prefix_len +
 					  sizeof ( *vendor_path ) +
 					  sizeof ( *path_end ) );

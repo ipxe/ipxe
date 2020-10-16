@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/base16.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
@@ -378,7 +378,7 @@ efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	/* If we have no DevicePathToText protocol then use a raw hex string */
 	if ( ! efidpt ) {
 		DBG ( "[No DevicePathToText]" );
-		len = efi_devpath_len ( path );
+		len = efi_path_len ( path );
 		base16_encode ( path, len, text, sizeof ( text ) );
 		return text;
 	}

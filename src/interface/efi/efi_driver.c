@@ -30,7 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/efi_strings.h>
-#include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_driver.h>
 
 /** @file
@@ -202,7 +202,7 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open_path;
 	}
-	path_len = ( efi_devpath_len ( path.path ) + sizeof ( *path_end ) );
+	path_len = ( efi_path_len ( path.path ) + sizeof ( *path_end ) );
 
 	/* Allocate and initialise structure */
 	efidev = zalloc ( sizeof ( *efidev ) + path_len );

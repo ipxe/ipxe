@@ -30,7 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_usb.h>
 #include <ipxe/usb.h>
@@ -1120,7 +1120,7 @@ static int efi_usb_install ( struct efi_usb_device *usbdev,
 
 	/* Calculate device path length */
 	path_count = ( usb_depth ( usbdev->usb ) + 1 );
-	path_prefix_len = efi_devpath_len ( efidev->path );
+	path_prefix_len = efi_path_len ( efidev->path );
 	path_len = ( path_prefix_len + ( path_count * sizeof ( *usbpath ) ) +
 		     sizeof ( *path_end ) );
 

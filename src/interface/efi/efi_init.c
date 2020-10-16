@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/rotate.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
-#include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 
 /** Image handle passed to entry point */
@@ -252,7 +252,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	 * path, since the device handle itself may become invalidated
 	 * when we load our own drivers.
 	 */
-	device_path_len = ( efi_devpath_len ( device_path ) +
+	device_path_len = ( efi_path_len ( device_path ) +
 			    sizeof ( EFI_DEVICE_PATH_PROTOCOL ) );
 	if ( ( efirc = bs->AllocatePool ( EfiBootServicesData, device_path_len,
 					  &device_path_copy ) ) != 0 ) {
