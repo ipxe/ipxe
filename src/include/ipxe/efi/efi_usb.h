@@ -17,10 +17,8 @@
 struct efi_usb_device {
 	/** Name */
 	const char *name;
-	/** The underlying USB device */
-	struct usb_device *usb;
-	/** The underlying EFI device */
-	struct efi_device *efidev;
+	/** The underlying USB function */
+	struct usb_function *func;
 	/** Configuration descriptor */
 	struct usb_configuration_descriptor *config;
 	/** Supported languages */

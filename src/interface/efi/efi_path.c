@@ -17,7 +17,11 @@
  * 02110-1301, USA.
  */
 
+#include <stdlib.h>
+#include <string.h>
+#include <ipxe/usb.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_path.h>
 
 /** @file
@@ -54,6 +58,62 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_DEVICE_PATH_PROTOCOL *end = efi_path_end ( path );
 
 	return ( ( ( void * ) end ) - ( ( void * ) path ) );
+}
+
+/**
+ * Construct EFI device path for USB function
+ *
+ * @v func		USB function
+ * @ret path		EFI device path, or NULL on error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated device path.
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func ) {
+	struct usb_device *usb = func->usb;
+	struct efi_device *efidev;
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	USB_DEVICE_PATH *usbpath;
+	unsigned int count;
+	size_t prefix_len;
+	size_t len;
+
+	/* Sanity check */
+	assert ( func->desc.count >= 1 );
+
+	/* Find parent EFI device */
+	efidev = efidev_parent ( &func->dev );
+	if ( ! efidev )
+		return NULL;
+
+	/* Calculate device path length */
+	count = ( usb_depth ( usb ) + 1 );
+	prefix_len = efi_path_len ( efidev->path );
+	len = ( prefix_len + ( count * sizeof ( *usbpath ) ) +
+		sizeof ( *end ) );
+
+	/* Allocate device path */
+	path = zalloc ( len );
+	if ( ! path )
+		return NULL;
+
+	/* Construct device path */
+	memcpy ( path, efidev->path, prefix_len );
+	end = ( ( ( void * ) path ) + len - sizeof ( *end ) );
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+	usbpath = ( ( ( void * ) end ) - sizeof ( *usbpath ) );
+	usbpath->InterfaceNumber = func->interface[0];
+	for ( ; usb ; usbpath--, usb = usb->port->hub->usb ) {
+		usbpath->Header.Type = MESSAGING_DEVICE_PATH;
+		usbpath->Header.SubType = MSG_USB_DP;
+		usbpath->Header.Length[0] = sizeof ( *usbpath );
+		usbpath->ParentPortNumber = ( usb->port->address - 1 );
+	}
+
+	return path;
 }
 
 /**
