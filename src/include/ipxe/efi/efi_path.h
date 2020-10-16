@@ -13,11 +13,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/DevicePath.h>
 
+struct uri;
 struct usb_function;
 
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern EFI_DEVICE_PATH_PROTOCOL * efi_uri_path ( struct uri *uri );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func );
 
 extern EFI_DEVICE_PATH_PROTOCOL * efi_describe ( struct interface *interface );

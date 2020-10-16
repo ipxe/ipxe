@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <ipxe/uri.h>
 #include <ipxe/usb.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
@@ -58,6 +59,48 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_DEVICE_PATH_PROTOCOL *end = efi_path_end ( path );
 
 	return ( ( ( void * ) end ) - ( ( void * ) path ) );
+}
+
+/**
+ * Construct EFI device path for URI
+ *
+ * @v uri		URI
+ * @ret path		EFI device path, or NULL on error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated device path.
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_uri_path ( struct uri *uri ) {
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	URI_DEVICE_PATH *uripath;
+	size_t uri_len;
+	size_t uripath_len;
+	size_t len;
+
+	/* Calculate device path length */
+	uri_len = ( format_uri ( uri, NULL, 0 ) + 1 /* NUL */ );
+	uripath_len = ( sizeof ( *uripath ) + uri_len );
+	len = ( uripath_len + sizeof ( *end ) );
+
+	/* Allocate device path */
+	path = zalloc ( len );
+	if ( ! path )
+		return NULL;
+
+	/* Construct device path */
+	uripath = ( ( void * ) path );
+	uripath->Header.Type = MESSAGING_DEVICE_PATH;
+	uripath->Header.SubType = MSG_URI_DP;
+	uripath->Header.Length[0] = ( uripath_len & 0xff );
+	uripath->Header.Length[1] = ( uripath_len >> 8 );
+	format_uri ( uri, uripath->Uri, uri_len );
+	end = ( ( ( void * ) path ) + uripath_len );
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+
+	return path;
 }
 
 /**
