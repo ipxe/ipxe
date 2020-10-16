@@ -275,6 +275,13 @@ extern void dbg_efi_protocols ( EFI_HANDLE handle );
 #define DBGCP_EFI_PROTOCOLS( ... )				\
 	DBGC_EFI_PROTOCOLS_IF ( PROFILE, ##__VA_ARGS__ )
 
+/* Allow for EFI-only interface operations */
+#ifdef PLATFORM_efi
+#define EFI_INTF_OP INTF_OP
+#else
+#define EFI_INTF_OP UNUSED_INTF_OP
+#endif
+
 extern unsigned long __stack_chk_guard;
 extern unsigned long efi_stack_cookie ( EFI_HANDLE handle );
 extern void __stack_chk_fail ( void );
