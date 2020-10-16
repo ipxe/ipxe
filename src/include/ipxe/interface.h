@@ -36,6 +36,21 @@ struct interface_operation {
 			  ? op_func : op_func ),			      \
 	}
 
+/**
+ * Define an unused object interface operation
+ *
+ * @v op_type		Operation type
+ * @v object_type	Implementing method's expected object type
+ * @v op_func		Implementing method
+ * @ret op		Object interface operation
+ */
+#define UNUSED_INTF_OP( op_type, object_type, op_func ) {		      \
+		.type = NULL,						      \
+		.func = ( ( ( ( typeof ( op_func ) * ) NULL ) ==	      \
+			    ( ( op_type ## _TYPE ( object_type ) * ) NULL ) ) \
+			  ? NULL : NULL ),				      \
+	}
+
 /** An object interface descriptor */
 struct interface_descriptor {
 	/** Offset of interface within containing object */
