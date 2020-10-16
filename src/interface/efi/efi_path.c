@@ -55,3 +55,29 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 
 	return ( ( ( void * ) end ) - ( ( void * ) path ) );
 }
+
+/**
+ * Describe object as an EFI device path
+ *
+ * @v intf		Interface
+ * @ret path		EFI device path, or NULL
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated device path.
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_describe ( struct interface *intf ) {
+	struct interface *dest;
+	efi_describe_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, efi_describe, &dest );
+	void *object = intf_object ( dest );
+	EFI_DEVICE_PATH_PROTOCOL *path;
+
+	if ( op ) {
+		path = op ( object );
+	} else {
+		path = NULL;
+	}
+
+	intf_put ( dest );
+	return path;
+}
