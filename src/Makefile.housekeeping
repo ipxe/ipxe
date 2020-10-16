@@ -342,7 +342,7 @@ arch :
 # Determine build platform
 DEFAULT_PLATFORM := pcbios
 PLATFORM	:= $(firstword $(BIN_PLATFORM) $(DEFAULT_PLATFORM))
-CFLAGS		+= -DPLATFORM=$(PLATFORM)
+CFLAGS		+= -DPLATFORM=$(PLATFORM) -DPLATFORM_$(PLATFORM)
 platform :
 	@$(ECHO) $(PLATFORM)
 
