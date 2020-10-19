@@ -19,6 +19,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <byteswap.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/vlan.h>
 #include <ipxe/uri.h>
 #include <ipxe/usb.h>
 #include <ipxe/efi/efi.h>
@@ -59,6 +62,68 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_DEVICE_PATH_PROTOCOL *end = efi_path_end ( path );
 
 	return ( ( ( void * ) end ) - ( ( void * ) path ) );
+}
+
+/**
+ * Construct EFI device path for network device
+ *
+ * @v netdev		Network device
+ * @ret path		EFI device path, or NULL on error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated device path.
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev ) {
+	struct efi_device *efidev;
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	MAC_ADDR_DEVICE_PATH *macpath;
+	VLAN_DEVICE_PATH *vlanpath;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	unsigned int tag;
+	size_t prefix_len;
+	size_t len;
+
+	/* Find parent EFI device */
+	efidev = efidev_parent ( netdev->dev );
+	if ( ! efidev )
+		return NULL;
+
+	/* Calculate device path length */
+	prefix_len = efi_path_len ( efidev->path );
+	len = ( prefix_len + sizeof ( *macpath ) + sizeof ( *vlanpath ) +
+		sizeof ( *end ) );
+
+	/* Allocate device path */
+	path = zalloc ( len );
+	if ( ! path )
+		return NULL;
+
+	/* Construct device path */
+	memcpy ( path, efidev->path, prefix_len );
+	macpath = ( ( ( void * ) path ) + prefix_len );
+	macpath->Header.Type = MESSAGING_DEVICE_PATH;
+	macpath->Header.SubType = MSG_MAC_ADDR_DP;
+	macpath->Header.Length[0] = sizeof ( *macpath );
+	assert ( netdev->ll_protocol->ll_addr_len <
+		 sizeof ( macpath->MacAddress ) );
+	memcpy ( &macpath->MacAddress, netdev->ll_addr,
+		 netdev->ll_protocol->ll_addr_len );
+	macpath->IfType = ntohs ( netdev->ll_protocol->ll_proto );
+	if ( ( tag = vlan_tag ( netdev ) ) ) {
+		vlanpath = ( ( ( void * ) macpath ) + sizeof ( *macpath ) );
+		vlanpath->Header.Type = MESSAGING_DEVICE_PATH;
+		vlanpath->Header.SubType = MSG_VLAN_DP;
+		vlanpath->Header.Length[0] = sizeof ( *vlanpath );
+		vlanpath->VlanId = tag;
+		end = ( ( ( void * ) vlanpath ) + sizeof ( *vlanpath ) );
+	} else {
+		end = ( ( ( void * ) macpath ) + sizeof ( *macpath ) );
+	}
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+
+	return path;
 }
 
 /**

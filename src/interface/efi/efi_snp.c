@@ -1624,12 +1624,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_device *efidev;
 	struct efi_snp_device *snpdev;
-	EFI_DEVICE_PATH_PROTOCOL *path_end;
-	MAC_ADDR_DEVICE_PATH *macpath;
-	VLAN_DEVICE_PATH *vlanpath;
-	size_t path_prefix_len = 0;
 	unsigned int ifcnt;
-	unsigned int tag;
 	void *interface;
 	EFI_STATUS efirc;
 	int rc;
@@ -1714,40 +1709,12 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 				       sizeof ( snpdev->name[0] ) ),
 		       "%s", netdev->name );
 
-	/* Allocate the new device path */
-	path_prefix_len = efi_path_len ( efidev->path );
-	snpdev->path = zalloc ( path_prefix_len + sizeof ( *macpath ) +
-				sizeof ( *vlanpath ) + sizeof ( *path_end ) );
+	/* Construct device path */
+	snpdev->path = efi_netdev_path ( netdev );
 	if ( ! snpdev->path ) {
 		rc = -ENOMEM;
-		goto err_alloc_device_path;
+		goto err_path;
 	}
-
-	/* Populate the device path */
-	memcpy ( snpdev->path, efidev->path, path_prefix_len );
-	macpath = ( ( ( void * ) snpdev->path ) + path_prefix_len );
-	memset ( macpath, 0, sizeof ( *macpath ) );
-	macpath->Header.Type = MESSAGING_DEVICE_PATH;
-	macpath->Header.SubType = MSG_MAC_ADDR_DP;
-	macpath->Header.Length[0] = sizeof ( *macpath );
-	memcpy ( &macpath->MacAddress, netdev->ll_addr,
-		 netdev->ll_protocol->ll_addr_len );
-	macpath->IfType = ntohs ( netdev->ll_protocol->ll_proto );
-	if ( ( tag = vlan_tag ( netdev ) ) ) {
-		vlanpath = ( ( ( void * ) macpath ) + sizeof ( *macpath ) );
-		memset ( vlanpath, 0, sizeof ( *vlanpath ) );
-		vlanpath->Header.Type = MESSAGING_DEVICE_PATH;
-		vlanpath->Header.SubType = MSG_VLAN_DP;
-		vlanpath->Header.Length[0] = sizeof ( *vlanpath );
-		vlanpath->VlanId = tag;
-		path_end = ( ( ( void * ) vlanpath ) + sizeof ( *vlanpath ) );
-	} else {
-		path_end = ( ( ( void * ) macpath ) + sizeof ( *macpath ) );
-	}
-	memset ( path_end, 0, sizeof ( *path_end ) );
-	path_end->Type = END_DEVICE_PATH_TYPE;
-	path_end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	path_end->Length[0] = sizeof ( *path_end );
 
 	/* Install the SNP */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
@@ -1847,7 +1814,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			NULL );
  err_install_protocol_interface:
 	free ( snpdev->path );
- err_alloc_device_path:
+ err_path:
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
  err_create_event:
  err_ll_addr_len:
