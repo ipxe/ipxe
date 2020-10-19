@@ -18,6 +18,7 @@
  */
 
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <byteswap.h>
 #include <ipxe/netdevice.h>
@@ -62,6 +63,57 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_DEVICE_PATH_PROTOCOL *end = efi_path_end ( path );
 
 	return ( ( ( void * ) end ) - ( ( void * ) path ) );
+}
+
+/**
+ * Concatenate EFI device paths
+ *
+ * @v ...		List of device paths (NULL terminated)
+ * @ret path		Concatenated device path, or NULL on error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated device path.
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first, ... ) {
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	EFI_DEVICE_PATH_PROTOCOL *src;
+	EFI_DEVICE_PATH_PROTOCOL *dst;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	va_list args;
+	size_t len;
+
+	/* Calculate device path length */
+	va_start ( args, first );
+	len = 0;
+	src = first;
+	while ( src ) {
+		len += efi_path_len ( src );
+		src = va_arg ( args, EFI_DEVICE_PATH_PROTOCOL * );
+	}
+	va_end ( args );
+
+	/* Allocate device path */
+	path = zalloc ( len + sizeof ( *end ) );
+	if ( ! path )
+		return NULL;
+
+	/* Populate device path */
+	va_start ( args, first );
+	dst = path;
+	src = first;
+	while ( src ) {
+		len = efi_path_len ( src );
+		memcpy ( dst, src, len );
+		dst = ( ( ( void * ) dst ) + len );
+		src = va_arg ( args, EFI_DEVICE_PATH_PROTOCOL * );
+	}
+	va_end ( args );
+	end = dst;
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+
+	return path;
 }
 
 /**
