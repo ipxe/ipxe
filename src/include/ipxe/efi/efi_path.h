@@ -15,6 +15,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 struct net_device;
 struct uri;
+struct aoe_device;
 struct usb_function;
 
 extern EFI_DEVICE_PATH_PROTOCOL *
@@ -24,6 +25,7 @@ extern EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first,
 					      ... );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_uri_path ( struct uri *uri );
+extern EFI_DEVICE_PATH_PROTOCOL * efi_aoe_path ( struct aoe_device *aoedev );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func );
 
 extern EFI_DEVICE_PATH_PROTOCOL * efi_describe ( struct interface *interface );

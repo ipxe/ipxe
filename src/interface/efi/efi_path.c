@@ -24,6 +24,7 @@
 #include <ipxe/netdevice.h>
 #include <ipxe/vlan.h>
 #include <ipxe/uri.h>
+#include <ipxe/aoe.h>
 #include <ipxe/usb.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
@@ -218,6 +219,52 @@ EFI_DEVICE_PATH_PROTOCOL * efi_uri_path ( struct uri *uri ) {
 	end->Length[0] = sizeof ( *end );
 
 	return path;
+}
+
+/**
+ * Construct EFI device path for AoE device
+ *
+ * @v aoedev		AoE device
+ * @ret path		EFI device path, or NULL on error
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_aoe_path ( struct aoe_device *aoedev ) {
+	struct {
+		SATA_DEVICE_PATH sata;
+		EFI_DEVICE_PATH_PROTOCOL end;
+	} satapath;
+	EFI_DEVICE_PATH_PROTOCOL *netpath;
+	EFI_DEVICE_PATH_PROTOCOL *path;
+
+	/* Get network device path */
+	netpath = efi_netdev_path ( aoedev->netdev );
+	if ( ! netpath )
+		goto err_netdev;
+
+	/* Construct SATA path */
+	memset ( &satapath, 0, sizeof ( satapath ) );
+	satapath.sata.Header.Type = MESSAGING_DEVICE_PATH;
+	satapath.sata.Header.SubType = MSG_SATA_DP;
+	satapath.sata.Header.Length[0] = sizeof ( satapath.sata );
+	satapath.sata.HBAPortNumber = aoedev->major;
+	satapath.sata.PortMultiplierPortNumber = aoedev->minor;
+	satapath.end.Type = END_DEVICE_PATH_TYPE;
+	satapath.end.SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	satapath.end.Length[0] = sizeof ( satapath.end );
+
+	/* Construct overall device path */
+	path = efi_paths ( netpath, &satapath, NULL );
+	if ( ! path )
+		goto err_paths;
+
+	/* Free temporary paths */
+	free ( netpath );
+
+	return path;
+
+ err_paths:
+	free ( netpath );
+ err_netdev:
+	return NULL;
 }
 
 /**
