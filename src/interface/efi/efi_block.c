@@ -450,17 +450,17 @@ static int efi_block_install ( struct acpi_header *hdr ) {
 		rc = -EEFI ( efirc );
 		DBGC ( acpi, "EFIBLK could not install %s: %s\n",
 		       acpi_name ( hdr->signature ), strerror ( rc ) );
-		DBGC_HDA ( acpi, 0, hdr, len );
+		DBGC2_HDA ( acpi, 0, hdr, len );
 		goto err_install;
 	}
 
 	/* Add to list of installed tables */
 	list_add_tail ( &installed->list, &efi_acpi_tables );
 
-	DBGC ( acpi, "EFIBLK installed %s as ACPI table %#lx:\n",
+	DBGC ( acpi, "EFIBLK installed %s as ACPI table %#lx\n",
 	       acpi_name ( hdr->signature ),
 	       ( ( unsigned long ) installed->key ) );
-	DBGC_HDA ( acpi, 0, hdr, len );
+	DBGC2_HDA ( acpi, 0, hdr, len );
 	return 0;
 
 	list_del ( &installed->list );
