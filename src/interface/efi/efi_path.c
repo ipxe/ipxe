@@ -23,7 +23,9 @@
 #include <byteswap.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/vlan.h>
+#include <ipxe/tcpip.h>
 #include <ipxe/uri.h>
+#include <ipxe/iscsi.h>
 #include <ipxe/aoe.h>
 #include <ipxe/usb.h>
 #include <ipxe/efi/efi.h>
@@ -219,6 +221,74 @@ EFI_DEVICE_PATH_PROTOCOL * efi_uri_path ( struct uri *uri ) {
 	end->Length[0] = sizeof ( *end );
 
 	return path;
+}
+
+/**
+ * Construct EFI device path for iSCSI device
+ *
+ * @v iscsi		iSCSI session
+ * @ret path		EFI device path, or NULL on error
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_iscsi_path ( struct iscsi_session *iscsi ) {
+	struct sockaddr_tcpip *st_target;
+	struct net_device *netdev;
+	EFI_DEVICE_PATH_PROTOCOL *netpath;
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	ISCSI_DEVICE_PATH *iscsipath;
+	char *name;
+	size_t prefix_len;
+	size_t name_len;
+	size_t iscsi_len;
+	size_t len;
+
+	/* Get network device associated with target address */
+	st_target = ( ( struct sockaddr_tcpip * ) &iscsi->target_sockaddr );
+	netdev = tcpip_netdev ( st_target );
+	if ( ! netdev )
+		goto err_netdev;
+
+	/* Get network device path */
+	netpath = efi_netdev_path ( netdev );
+	if ( ! netpath )
+		goto err_netpath;
+
+	/* Calculate device path length */
+	prefix_len = efi_path_len ( netpath );
+	name_len = ( strlen ( iscsi->target_iqn ) + 1 /* NUL */ );
+	iscsi_len = ( sizeof ( *iscsipath ) + name_len );
+	len = ( prefix_len + iscsi_len + sizeof ( *end ) );
+
+	/* Allocate device path */
+	path = zalloc ( len );
+	if ( ! path )
+		goto err_alloc;
+
+	/* Construct device path */
+	memcpy ( path, netpath, prefix_len );
+	iscsipath = ( ( ( void * ) path ) + prefix_len );
+	iscsipath->Header.Type = MESSAGING_DEVICE_PATH;
+	iscsipath->Header.SubType = MSG_ISCSI_DP;
+	iscsipath->Header.Length[0] = iscsi_len;
+	iscsipath->LoginOption = ISCSI_LOGIN_OPTION_AUTHMETHOD_NON;
+	memcpy ( &iscsipath->Lun, &iscsi->lun, sizeof ( iscsipath->Lun ) );
+	name = ( ( ( void * ) iscsipath ) + sizeof ( *iscsipath ) );
+	memcpy ( name, iscsi->target_iqn, name_len );
+	end = ( ( ( void * ) name ) + name_len );
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+
+	/* Free temporary paths */
+	free ( netpath );
+
+	return path;
+
+ err_alloc:
+	free ( netpath );
+ err_netpath:
+ err_netdev:
+	return NULL;
 }
 
 /**

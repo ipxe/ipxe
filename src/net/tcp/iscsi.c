@@ -46,6 +46,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/base16.h>
 #include <ipxe/base64.h>
 #include <ipxe/ibft.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/iscsi.h>
 
 /** @file
@@ -1863,6 +1864,7 @@ static struct interface_operation iscsi_control_op[] = {
 	INTF_OP ( xfer_window, struct iscsi_session *, iscsi_scsi_window ),
 	INTF_OP ( intf_close, struct iscsi_session *, iscsi_close ),
 	INTF_OP ( acpi_describe, struct iscsi_session *, iscsi_describe ),
+	EFI_INTF_OP ( efi_describe, struct iscsi_session *, efi_iscsi_path ),
 };
 
 /** iSCSI SCSI command-issuing interface descriptor */
