@@ -153,8 +153,10 @@ int atl_hw_reset_rbl_(struct atl_nic *nic)
 int atl_hw_reset(struct atl_nic *nic)
 {
 	uint32_t boot_exit_code = 0;
-	int k;
+	uint32_t k;
 	int rbl_enabled;
+	uint32_t fw_ver;
+	uint32_t sem_timeout;
 
 	for (k = 0; k < 1000; ++k) {
 		uint32_t flb_status = ATL_READ_REG(ATL_MPI_DAISY_CHAIN_STS);
@@ -170,21 +172,26 @@ int atl_hw_reset(struct atl_nic *nic)
 
 	rbl_enabled = (boot_exit_code != 0);
 
-	/* FW 1.x may bootup in an invalid POWER state (WOL feature).
-	 * We should work around this by forcing its state back to DEINIT
-	 */
-	/*if (ver & 0xff000000)) {
-		int err = 0;
+	fw_ver = ATL_READ_REG(ATL_FW_VER);
+	if (((fw_ver >> 24) & 0xFF) >= 4) {
+		sem_timeout = ATL_READ_REG(ATL_SEM_TIMEOUT);
+		if (sem_timeout > 3000)
+			sem_timeout = 3000;
+		
+		for (k = 0; k < sem_timeout; ++k) {
+			if (ATL_READ_REG(ATL_GLB_MCP_SEM4))
+				break;
 
-		hw_atl_utils_mpi_set_state(self, MPI_DEINIT);
-		err = readx_poll_timeout_atomic(hw_atl_utils_mpi_get_state,
-						self, val,
-						(val & HW_ATL_MPI_STATE_MSK) ==
-						 MPI_DEINIT,
-						10, 100000U);
-		if (err)
-			return err;
-	}*/
+			mdelay(1);
+		}
+		for (k = 0; k < sem_timeout; ++k) {
+			if (ATL_READ_REG(ATL_GLB_MCP_SEM5))
+				break;
+
+			mdelay(1);
+		}
+	}
+
 
 	if (rbl_enabled)
 		return atl_hw_reset_rbl_(nic);
