@@ -68,8 +68,8 @@ static int atl_ring_alloc(const struct atl_nic* nic, struct atl_ring* ring, uint
 	ATL_WRITE_REG(ATL_RING_SIZE, reg_base + 8);
 
 	// #todo: reset head and tail pointers
-	printf("ATLANTIC %p ring is at [%08llx,%08llx), reg base %#x\n", nic, ((unsigned long long)phy_addr),
-		((unsigned long long) phy_addr + ring->length), reg_base);
+	/*printf("ATLANTIC %p ring is at [%08llx,%08llx), reg base %#x\n", nic, ((unsigned long long)phy_addr),
+		((unsigned long long) phy_addr + ring->length), reg_base);*/
 
 	return 0;
 
@@ -103,10 +103,6 @@ int atl_ring_full(const struct atl_ring* ring)
 	unsigned int tail = ring->sw_tail;
 	atl_ring_next_dx(&tail);
 	return tail == ring->sw_head;
-	/*if (ring->sw_tail >= ring->sw_head)
-	return ring->sw_tail - ring->sw_head + 1 == ATL_RING_SIZE;
-	else
-	return ATL_RING_SIZE - (ring->sw_head - ring->sw_tail + 1) == ATL_RING_SIZE;*/
 }
 
 void atl_rx_ring_fill(struct atl_nic* nic)
@@ -162,7 +158,7 @@ static int atl_open(struct net_device *netdev)
 {
 	struct atl_nic* nic = netdev->priv;
 	uint32_t ctrl = 0;
-	printf("AQUANTIA: atl_open()\n");
+	//printf("AQUANTIA: atl_open()\n");
 	
 	// Tx ring
 	if (atl_ring_alloc(nic, &nic->tx_ring, sizeof(struct atl_desc_tx), ATL_TX_DMA_DESC_ADDR) != 0)
@@ -230,13 +226,13 @@ static int atl_open(struct net_device *netdev)
 	atl_rx_ring_fill(nic);
 
 	nic->hw_ops->start(nic);
-	printf("AQUANTIA: code 0()\n");
+	//printf("AQUANTIA: code 0()\n");
 
 	return 0;
 err_alloc:
 	atl_ring_free(&nic->tx_ring);
 	atl_ring_free(&nic->rx_ring);
-	printf("AQUANTIA: code NOMEM()\n");
+	//printf("AQUANTIA: code NOMEM()\n");
 	return -ENOMEM;
 }
 
@@ -313,10 +309,10 @@ void atl_check_link(struct net_device* netdev)
 	
 	if (link_state != nic->link_state) {
 		if (link_state) {
-			printf("AQUANTIA: link up\n");
+			//printf("AQUANTIA: link up\n");
 			netdev_link_up(netdev);
 		} else {
-			printf("AQUANTIA: link lost\n");
+			//printf("AQUANTIA: link lost\n");
 			netdev_link_down(netdev);
 		}
 		nic->link_state = link_state;
@@ -433,7 +429,7 @@ static void atl_irq(struct net_device *netdev, int enable) {
 	struct atl_nic *nic = netdev->priv;
 	uint32_t mask;
 	
-	printf("AQUANTIA: irq: %d\n", enable);
+	//printf("AQUANTIA: irq: %d\n", enable);
 
 	mask = (ATL_IRQ_TX | ATL_IRQ_RX);
 	if (enable) {
@@ -471,7 +467,7 @@ static int atl_probe(struct pci_device *pci) {
 	struct atl_nic *nic;
 	int rc = ENOERR;
 
-	printf("\nAQUANTIA: atl_probe()\n");
+	//printf("\nAQUANTIA: atl_probe()\n");
 	/* Allocate and initialise net device */
 	netdev = alloc_etherdev(sizeof(*nic));
 	if (!netdev) {
@@ -523,7 +519,7 @@ static int atl_probe(struct pci_device *pci) {
 	/* Set initial link state */
 	netdev_link_down(netdev);
 
-	printf("AQUANTIA: atl_probe code 0\n");
+	//printf("AQUANTIA: atl_probe code 0\n");
 	return 0;
 
 	unregister_netdev(netdev);
@@ -536,7 +532,7 @@ err_ioremap:
 	netdev_nullify(netdev);
 	netdev_put(netdev);
 err_alloc:
-	printf("AQUANTIA: error %#x()\n", rc);
+	//printf("AQUANTIA: error %#x()\n", rc);
 	return rc;
 }
 

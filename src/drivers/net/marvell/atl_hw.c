@@ -212,7 +212,7 @@ int atl_hw_get_link(struct atl_nic *nic)
 int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer, uint32_t size)
 {
 	uint32_t i;
-	printf("AQUANTIA: atl_hw_read_mem\n");
+	//printf("AQUANTIA: atl_hw_read_mem\n");
 
 	for (i = 0; i < 100; ++i) {
 		if (ATL_READ_REG(ATL_SEM_RAM))
