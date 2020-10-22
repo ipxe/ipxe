@@ -27,6 +27,7 @@
 #include <ipxe/uri.h>
 #include <ipxe/iscsi.h>
 #include <ipxe/aoe.h>
+#include <ipxe/fcp.h>
 #include <ipxe/usb.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
@@ -335,6 +336,36 @@ EFI_DEVICE_PATH_PROTOCOL * efi_aoe_path ( struct aoe_device *aoedev ) {
 	free ( netpath );
  err_netdev:
 	return NULL;
+}
+
+/**
+ * Construct EFI device path for Fibre Channel device
+ *
+ * @v desc		FCP device description
+ * @ret path		EFI device path, or NULL on error
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_fcp_path ( struct fcp_description *desc ) {
+	struct {
+		FIBRECHANNELEX_DEVICE_PATH fc;
+		EFI_DEVICE_PATH_PROTOCOL end;
+	} __attribute__ (( packed )) *path;
+
+	/* Allocate device path */
+	path = zalloc ( sizeof ( *path ) );
+	if ( ! path )
+		return NULL;
+
+	/* Construct device path */
+	path->fc.Header.Type = MESSAGING_DEVICE_PATH;
+	path->fc.Header.SubType = MSG_FIBRECHANNELEX_DP;
+	path->fc.Header.Length[0] = sizeof ( path->fc );
+	memcpy ( path->fc.WWN, &desc->wwn, sizeof ( path->fc.WWN ) );
+	memcpy ( path->fc.Lun, &desc->lun, sizeof ( path->fc.Lun ) );
+	path->end.Type = END_DEVICE_PATH_TYPE;
+	path->end.SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	path->end.Length[0] = sizeof ( path->end );
+
+	return &path->fc.Header;
 }
 
 /**

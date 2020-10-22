@@ -17,6 +17,7 @@ struct net_device;
 struct uri;
 struct iscsi_session;
 struct aoe_device;
+struct fcp_description;
 struct usb_function;
 
 extern EFI_DEVICE_PATH_PROTOCOL *
@@ -29,6 +30,7 @@ extern EFI_DEVICE_PATH_PROTOCOL * efi_uri_path ( struct uri *uri );
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_iscsi_path ( struct iscsi_session *iscsi );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_aoe_path ( struct aoe_device *aoedev );
+extern EFI_DEVICE_PATH_PROTOCOL * efi_fcp_path ( struct fcp_description *desc );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func );
 
 extern EFI_DEVICE_PATH_PROTOCOL * efi_describe ( struct interface *interface );
