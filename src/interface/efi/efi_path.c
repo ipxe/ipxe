@@ -28,6 +28,7 @@
 #include <ipxe/iscsi.h>
 #include <ipxe/aoe.h>
 #include <ipxe/fcp.h>
+#include <ipxe/ib_srp.h>
 #include <ipxe/usb.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
@@ -366,6 +367,60 @@ EFI_DEVICE_PATH_PROTOCOL * efi_fcp_path ( struct fcp_description *desc ) {
 	path->end.Length[0] = sizeof ( path->end );
 
 	return &path->fc.Header;
+}
+
+/**
+ * Construct EFI device path for Infiniband SRP device
+ *
+ * @v ib_srp		Infiniband SRP device
+ * @ret path		EFI device path, or NULL on error
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_ib_srp_path ( struct ib_srp_device *ib_srp ) {
+	const struct ipxe_ib_sbft *sbft = &ib_srp->sbft;
+	union ib_srp_target_port_id *id =
+		container_of ( &sbft->srp.target, union ib_srp_target_port_id,
+			       srp );
+	struct efi_device *efidev;
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	INFINIBAND_DEVICE_PATH *ibpath;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	size_t prefix_len;
+	size_t len;
+
+	/* Find parent EFI device */
+	efidev = efidev_parent ( ib_srp->ibdev->dev );
+	if ( ! efidev )
+		return NULL;
+
+	/* Calculate device path length */
+	prefix_len = efi_path_len ( efidev->path );
+	len = ( prefix_len + sizeof ( *ibpath ) + sizeof ( *end ) );
+
+	/* Allocate device path */
+	path = zalloc ( len );
+	if ( ! path )
+		return NULL;
+
+	/* Construct device path */
+	memcpy ( path, efidev->path, prefix_len );
+	ibpath = ( ( ( void * ) path ) + prefix_len );
+	ibpath->Header.Type = MESSAGING_DEVICE_PATH;
+	ibpath->Header.SubType = MSG_INFINIBAND_DP;
+	ibpath->Header.Length[0] = sizeof ( *ibpath );
+	ibpath->ResourceFlags = INFINIBAND_RESOURCE_FLAG_STORAGE_PROTOCOL;
+	memcpy ( ibpath->PortGid, &sbft->ib.dgid, sizeof ( ibpath->PortGid ) );
+	memcpy ( &ibpath->ServiceId, &sbft->ib.service_id,
+		 sizeof ( ibpath->ServiceId ) );
+	memcpy ( &ibpath->TargetPortId, &id->ib.ioc_guid,
+		 sizeof ( ibpath->TargetPortId ) );
+	memcpy ( &ibpath->DeviceId, &id->ib.id_ext,
+		 sizeof ( ibpath->DeviceId ) );
+	end = ( ( ( void * ) ibpath ) + sizeof ( *ibpath ) );
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+
+	return path;
 }
 
 /**

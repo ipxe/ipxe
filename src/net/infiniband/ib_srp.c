@@ -37,6 +37,7 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/open.h>
 #include <ipxe/base16.h>
 #include <ipxe/acpi.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/srp.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_cmrc.h>
@@ -68,39 +69,6 @@ struct acpi_model ib_sbft_model __acpi_model;
  *
  ******************************************************************************
  */
-
-/**
- * An IB SRP sBFT created by iPXE
- */
-struct ipxe_ib_sbft {
-	/** The table header */
-	struct sbft_table table;
-	/** The SCSI subtable */
-	struct sbft_scsi_subtable scsi;
-	/** The SRP subtable */
-	struct sbft_srp_subtable srp;
-	/** The Infiniband subtable */
-	struct sbft_ib_subtable ib;
-};
-
-/** An Infiniband SRP device */
-struct ib_srp_device {
-	/** Reference count */
-	struct refcnt refcnt;
-
-	/** SRP transport interface */
-	struct interface srp;
-	/** CMRC interface */
-	struct interface cmrc;
-
-	/** Infiniband device */
-	struct ib_device *ibdev;
-
-	/** ACPI descriptor */
-	struct acpi_descriptor desc;
-	/** Boot firmware table parameters */
-	struct ipxe_ib_sbft sbft;
-};
 
 /**
  * Free IB SRP device
@@ -153,6 +121,7 @@ static struct interface_descriptor ib_srp_cmrc_desc =
 static struct interface_operation ib_srp_srp_op[] = {
 	INTF_OP ( acpi_describe, struct ib_srp_device *, ib_srp_describe ),
 	INTF_OP ( intf_close, struct ib_srp_device *, ib_srp_close ),
+	EFI_INTF_OP ( efi_describe, struct ib_srp_device *, efi_ib_srp_path ),
 };
 
 /** IB SRP SRP interface descriptor */

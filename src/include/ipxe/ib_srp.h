@@ -10,6 +10,8 @@
 FILE_LICENCE ( BSD2 );
 
 #include <stdint.h>
+#include <ipxe/acpi.h>
+#include <ipxe/interface.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/srp.h>
 
@@ -54,5 +56,38 @@ struct sbft_ib_subtable {
 	/** Reserved */
 	uint8_t reserved[6];
 } __attribute__ (( packed ));
+
+/**
+ * An Infiniband SRP sBFT created by iPXE
+ */
+struct ipxe_ib_sbft {
+	/** The table header */
+	struct sbft_table table;
+	/** The SCSI subtable */
+	struct sbft_scsi_subtable scsi;
+	/** The SRP subtable */
+	struct sbft_srp_subtable srp;
+	/** The Infiniband subtable */
+	struct sbft_ib_subtable ib;
+};
+
+/** An Infiniband SRP device */
+struct ib_srp_device {
+	/** Reference count */
+	struct refcnt refcnt;
+
+	/** SRP transport interface */
+	struct interface srp;
+	/** CMRC interface */
+	struct interface cmrc;
+
+	/** Infiniband device */
+	struct ib_device *ibdev;
+
+	/** ACPI descriptor */
+	struct acpi_descriptor desc;
+	/** Boot firmware table parameters */
+	struct ipxe_ib_sbft sbft;
+};
 
 #endif /* _IPXE_IB_SRP_H */
