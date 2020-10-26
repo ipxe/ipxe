@@ -55,6 +55,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_path.h>
+#include <ipxe/efi/efi_null.h>
 #include <ipxe/efi/efi_block.h>
 
 /** ACPI table protocol protocol */
@@ -244,6 +245,7 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct san_device *sandev;
 	struct efi_block_data *block;
+	int leak = 0;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -317,20 +319,33 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 
 	return drive;
 
-	bs->UninstallMultipleProtocolInterfaces (
+	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			block->handle,
 			&efi_block_io_protocol_guid, &block->block_io,
-			&efi_device_path_protocol_guid, block->path, NULL );
+			&efi_device_path_protocol_guid, block->path,
+			NULL ) ) != 0 ) {
+		DBGC ( sandev, "EFIBLK %#02x could not uninstall protocols: "
+		       "%s\n", sandev->drive, strerror ( -EEFI ( efirc ) ) );
+		efi_nullify_block ( &block->block_io );
+		leak = 1;
+	}
  err_install:
-	free ( block->path );
-	block->path = NULL;
+	if ( ! leak )  {
+		free ( block->path );
+		block->path = NULL;
+	}
  err_describe:
  err_active:
 	unregister_sandev ( sandev );
  err_register:
-	sandev_put ( sandev );
+	if ( ! leak )
+		sandev_put ( sandev );
  err_alloc:
  err_no_uris:
+	if ( leak ) {
+		DBGC ( sandev, "EFIBLK %#02x nullified and leaked\n",
+		       sandev->drive );
+	}
 	return rc;
 }
 
@@ -343,6 +358,8 @@ static void efi_block_unhook ( unsigned int drive ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct san_device *sandev;
 	struct efi_block_data *block;
+	int leak = 0;
+	EFI_STATUS efirc;
 
 	/* Find SAN device */
 	sandev = sandev_find ( drive );
@@ -353,20 +370,35 @@ static void efi_block_unhook ( unsigned int drive ) {
 	block = sandev->priv;
 
 	/* Uninstall protocols */
-	bs->UninstallMultipleProtocolInterfaces (
+	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			block->handle,
 			&efi_block_io_protocol_guid, &block->block_io,
-			&efi_device_path_protocol_guid, block->path, NULL );
+			&efi_device_path_protocol_guid, block->path,
+			NULL ) ) != 0 ) {
+		DBGC ( sandev, "EFIBLK %#02x could not uninstall protocols: "
+		       "%s\n", sandev->drive, strerror ( -EEFI ( efirc ) ) );
+		efi_nullify_block ( &block->block_io );
+		leak = 1;
+	}
 
 	/* Free device path */
-	free ( block->path );
-	block->path = NULL;
+	if ( ! leak ) {
+		free ( block->path );
+		block->path = NULL;
+	}
 
 	/* Unregister SAN device */
 	unregister_sandev ( sandev );
 
 	/* Drop reference to drive */
-	sandev_put ( sandev );
+	if ( ! leak )
+		sandev_put ( sandev );
+
+	/* Report leakage, if applicable */
+	if ( leak ) {
+		DBGC ( sandev, "EFIBLK %#02x nullified and leaked\n",
+		       sandev->drive );
+	}
 }
 
 /** An installed ACPI table */
