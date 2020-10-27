@@ -229,7 +229,7 @@ static EFI_COMPONENT_NAME2_PROTOCOL efi_null_name2 = {
  */
 void efi_nullify_name2 ( EFI_COMPONENT_NAME2_PROTOCOL *name2 ) {
 
-	memcpy ( name2, &efi_null_name2, sizeof ( name2 ) );
+	memcpy ( name2, &efi_null_name2, sizeof ( *name2 ) );
 }
 
 /******************************************************************************
