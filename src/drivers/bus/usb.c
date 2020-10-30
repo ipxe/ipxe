@@ -2278,23 +2278,6 @@ unsigned int usb_route_string ( struct usb_device *usb ) {
 }
 
 /**
- * Get USB depth
- *
- * @v usb		USB device
- * @ret depth		Hub depth
- */
-unsigned int usb_depth ( struct usb_device *usb ) {
-	struct usb_device *parent;
-	unsigned int depth;
-
-	/* Navigate up to root hub, constructing depth as we go */
-	for ( depth = 0 ; ( parent = usb->port->hub->usb ) ; usb = parent )
-		depth++;
-
-	return depth;
-}
-
-/**
  * Get USB root hub port
  *
  * @v usb		USB device

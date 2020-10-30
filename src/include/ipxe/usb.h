@@ -1239,6 +1239,23 @@ usb_set_interface ( struct usb_device *usb, unsigned int interface,
 			     NULL, 0 );
 }
 
+/**
+ * Get USB depth
+ *
+ * @v usb		USB device
+ * @ret depth		Hub depth
+ */
+static inline unsigned int usb_depth ( struct usb_device *usb ) {
+	struct usb_device *parent;
+	unsigned int depth;
+
+	/* Navigate up to root hub, constructing depth as we go */
+	for ( depth = 0 ; ( parent = usb->port->hub->usb ) ; usb = parent )
+		depth++;
+
+	return depth;
+}
+
 extern struct list_head usb_buses;
 
 extern struct usb_interface_descriptor *
@@ -1274,7 +1291,6 @@ extern struct usb_bus * find_usb_bus_by_location ( unsigned int bus_type,
 extern int usb_alloc_address ( struct usb_bus *bus );
 extern void usb_free_address ( struct usb_bus *bus, unsigned int address );
 extern unsigned int usb_route_string ( struct usb_device *usb );
-extern unsigned int usb_depth ( struct usb_device *usb );
 extern struct usb_port * usb_root_hub_port ( struct usb_device *usb );
 extern struct usb_port * usb_transaction_translator ( struct usb_device *usb );
 
