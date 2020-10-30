@@ -244,7 +244,6 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	uint64_t offset;
 	uint64_t start;
 	uint64_t end;
-	void *io_addr = NULL;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -282,10 +281,9 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 			PCI_ARGS ( pci ), bus_addr, len );
 		bus_addr -= offset;
 		DBGC2 ( pci, "%08lx\n", bus_addr );
-		io_addr = ioremap ( bus_addr, len );
 		break;
 	}
-	if ( ! io_addr ) {
+	if ( tag == ACPI_END_RESOURCE ) {
 		DBGC ( pci, "EFIPCI " PCI_FMT " %08lx+%zx is not within "
 		       "root bridge address space\n",
 		       PCI_ARGS ( pci ), bus_addr, len );
@@ -294,7 +292,7 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
  err_config:
 	efipci_root_close ( handle );
  err_root:
-	return io_addr;
+	return ioremap ( bus_addr, len );
 }
 
 PROVIDE_PCIAPI_INLINE ( efi, pci_num_bus );
