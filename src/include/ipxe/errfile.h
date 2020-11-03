@@ -1,6 +1,10 @@
 #ifndef _IPXE_ERRFILE_H
 #define _IPXE_ERRFILE_H
 
+/*
+ * Copyright C 2020, Oracle and/or its affiliates.
+ */
+
 /** @file
  *
  * Error file identifiers
@@ -75,6 +79,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_sanboot		       ( ERRFILE_CORE | 0x00230000 )
 #define ERRFILE_dummy_sanboot	       ( ERRFILE_CORE | 0x00240000 )
 #define ERRFILE_fdt		       ( ERRFILE_CORE | 0x00250000 )
+#define ERRFILE_efi_measure	       ( ERRFILE_CORE | 0x00260000 )
+#define ERRFILE_null_measure	       ( ERRFILE_CORE | 0x00270000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )

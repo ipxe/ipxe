@@ -1,6 +1,10 @@
 #ifndef CONFIG_DEFAULTS_EFI_H
 #define CONFIG_DEFAULTS_EFI_H
 
+/*
+ * Copyright C 2020, Oracle and/or its affiliates.
+ */
+
 /** @file
  *
  * Configuration defaults for EFI
@@ -23,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define REBOOT_EFI
 #define ACPI_EFI
 #define FDT_EFI
+#define MEASURE_EFI
 
 #define	NET_PROTO_IPV6		/* IPv6 protocol */
 

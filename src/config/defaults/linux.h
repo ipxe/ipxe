@@ -1,6 +1,11 @@
 #ifndef CONFIG_DEFAULTS_LINUX_H
 #define CONFIG_DEFAULTS_LINUX_H
 
+/*
+ * Copyright C 2020, Oracle and/or its affiliates.
+ */
+
+
 /** @file
  *
  * Configuration defaults for linux
@@ -20,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define TIME_LINUX
 #define REBOOT_NULL
 #define PCIAPI_LINUX
+#define MEASURE_NULL
 
 #define DRIVERS_LINUX
 

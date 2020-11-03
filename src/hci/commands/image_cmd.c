@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright C 2020, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -30,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <getopt.h>
 #include <ipxe/image.h>
 #include <ipxe/command.h>
+#include <ipxe/measure.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/shell.h>
 #include <usr/imgmgmt.h>
@@ -50,16 +52,18 @@ struct imgsingle_options {
 	int replace;
 	/** Free image after execution */
 	int autofree;
+	/** measure image prior to execution */
+	int measure;
 };
 
 /** "img{single}" option list */
 static union {
-	/* "imgexec" takes all three options */
-	struct option_descriptor imgexec[4];
+	/* "imgexec" takes all five options */
+	struct option_descriptor imgexec[5];
 	/* Other "img{single}" commands take only --name, --timeout,
-	 * and --autofree
+	 * --autofree and --measure
 	 */
-	struct option_descriptor imgsingle[3];
+	struct option_descriptor imgsingle[4];
 } opts = {
 	.imgexec = {
 		OPTION_DESC ( "name", 'n', required_argument,
@@ -68,6 +72,8 @@ static union {
 			      struct imgsingle_options, timeout, parse_timeout),
 		OPTION_DESC ( "autofree", 'a', no_argument,
 			      struct imgsingle_options, autofree, parse_flag ),
+		OPTION_DESC ( "measure", 'm', no_argument,
+			      struct imgsingle_options, measure, parse_flag ),
 		OPTION_DESC ( "replace", 'r', no_argument,
 			      struct imgsingle_options, replace, parse_flag ),
 	},
@@ -162,6 +168,10 @@ static int imgsingle_exec ( int argc, char **argv,
 	if ( opts.autofree )
 		image->flags |= IMAGE_AUTO_UNREGISTER;
 
+	/* Measure the image, if applicable */
+	if ( opts.measure && ( rc = measure_image ( image ) ) != 0 )
+			goto err_measure;
+
 	/* Carry out command action, if applicable */
 	if ( desc->action ) {
 		if ( ( rc = desc->action ( image, &opts ) ) != 0 ) {
@@ -175,6 +185,7 @@ static int imgsingle_exec ( int argc, char **argv,
 	rc = 0;
 
  err_action:
+ err_measure:
  err_set_cmdline:
  err_set_name:
  err_acquire:

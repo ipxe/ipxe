@@ -1,6 +1,10 @@
 #ifndef CONFIG_DEFAULTS_PCBIOS_H
 #define CONFIG_DEFAULTS_PCBIOS_H
 
+/*
+ * Copyright C 2020, Oracle and/or its affiliates.
+ */
+
 /** @file
  *
  * Configuration defaults for PCBIOS
@@ -22,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define TIME_RTC
 #define REBOOT_PCBIOS
 #define ACPI_RSDP
+#define MEASURE_NULL
 
 #ifdef __x86_64__
 #define IOMAP_PAGES
