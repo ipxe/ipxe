@@ -768,6 +768,10 @@ static void realtek_close ( struct net_device *netdev ) {
 
 	/* Destroy transmit descriptor ring */
 	realtek_destroy_ring ( rtl, &rtl->tx );
+
+	/* Reset legacy transmit descriptor index, if applicable */
+	if ( rtl->legacy )
+		realtek_reset ( rtl );
 }
 
 /**
