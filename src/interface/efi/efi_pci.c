@@ -306,6 +306,240 @@ PROVIDE_PCIAPI ( efi, pci_ioremap, efipci_ioremap );
 
 /******************************************************************************
  *
+ * EFI PCI DMA mappings
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Map buffer for DMA
+ *
+ * @v dma		DMA device
+ * @v addr		Buffer address
+ * @v len		Length of buffer
+ * @v flags		Mapping flags
+ * @v map		DMA mapping to fill in
+ * @ret rc		Return status code
+ */
+static int efipci_dma_map ( struct dma_device *dma, physaddr_t addr, size_t len,
+			    int flags, struct dma_mapping *map ) {
+	struct efi_pci_device *efipci =
+		container_of ( dma, struct efi_pci_device, pci.dma );
+	struct pci_device *pci = &efipci->pci;
+	EFI_PCI_IO_PROTOCOL *pci_io = efipci->io;
+	EFI_PCI_IO_PROTOCOL_OPERATION op;
+	EFI_PHYSICAL_ADDRESS bus;
+	UINTN count;
+	VOID *mapping;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Sanity check */
+	assert ( map->addr == 0 );
+	assert ( map->token == NULL );
+
+	/* Determine operation */
+	switch ( flags ) {
+	case DMA_TX:
+		op = EfiPciIoOperationBusMasterRead;
+		break;
+	case DMA_RX:
+		op = EfiPciIoOperationBusMasterWrite;
+		break;
+	default:
+		op = EfiPciIoOperationBusMasterCommonBuffer;
+		break;
+	}
+
+	/* Map buffer */
+	count = len;
+	if ( ( efirc = pci_io->Map ( pci_io, op, phys_to_virt ( addr ), &count,
+				     &bus, &mapping ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot map %08lx+%zx: %s\n",
+		       PCI_ARGS ( pci ), addr, len, strerror ( rc ) );
+		goto err_map;
+	}
+
+	/* Check that full length was mapped.  The UEFI specification
+	 * allows for multiple mappings to be required, but even the
+	 * EDK2 PCI device drivers will fail if a platform ever
+	 * requires this.
+	 */
+	if ( count != len ) {
+		DBGC ( pci, "EFIPCI " PCI_FMT " attempted split mapping for "
+		       "%08lx+%zx\n", PCI_ARGS ( pci ), addr, len );
+		rc = -ENOTSUP;
+		goto err_len;
+	}
+
+	/* Populate mapping */
+	map->addr = bus;
+	map->token = mapping;
+
+	/* Increment mapping count (for debugging) */
+	if ( DBG_LOG )
+		dma->mapped++;
+
+	return 0;
+
+ err_len:
+	pci_io->Unmap ( pci_io, mapping );
+ err_map:
+	return rc;
+}
+
+/**
+ * Unmap buffer
+ *
+ * @v dma		DMA device
+ * @v map		DMA mapping
+ */
+static void efipci_dma_unmap ( struct dma_device *dma,
+			       struct dma_mapping *map ) {
+	struct efi_pci_device *efipci =
+		container_of ( dma, struct efi_pci_device, pci.dma );
+	EFI_PCI_IO_PROTOCOL *pci_io = efipci->io;
+
+	/* Sanity check */
+	assert ( map->token != NULL );
+
+	/* Unmap buffer */
+	pci_io->Unmap ( pci_io, map->token );
+
+	/* Clear mapping */
+	map->addr = 0;
+	map->token = NULL;
+
+	/* Decrement mapping count (for debugging) */
+	if ( DBG_LOG )
+		dma->mapped--;
+}
+
+/**
+ * Allocate and map DMA-coherent buffer
+ *
+ * @v dma		DMA device
+ * @v len		Length of buffer
+ * @v align		Physical alignment
+ * @v map		DMA mapping to fill in
+ * @ret addr		Buffer address, or NULL on error
+ */
+static void * efipci_dma_alloc ( struct dma_device *dma, size_t len,
+				 size_t align __unused,
+				 struct dma_mapping *map ) {
+	struct efi_pci_device *efipci =
+		container_of ( dma, struct efi_pci_device, pci.dma );
+	struct pci_device *pci = &efipci->pci;
+	EFI_PCI_IO_PROTOCOL *pci_io = efipci->io;
+	unsigned int pages;
+	VOID *addr;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Calculate number of pages */
+	pages = ( ( len + EFI_PAGE_SIZE - 1 ) / EFI_PAGE_SIZE );
+
+	/* Allocate (page-aligned) buffer */
+	if ( ( efirc = pci_io->AllocateBuffer ( pci_io, AllocateAnyPages,
+						EfiBootServicesData, pages,
+						&addr, 0 ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " could not allocate %zd bytes: "
+		       "%s\n", PCI_ARGS ( pci ), len, strerror ( rc ) );
+		goto err_alloc;
+	}
+
+	/* Map buffer */
+	if ( ( rc = efipci_dma_map ( dma, virt_to_phys ( addr ), len, DMA_BI,
+				     map ) ) != 0 )
+		goto err_map;
+
+	/* Increment allocation count (for debugging) */
+	if ( DBG_LOG )
+		dma->allocated++;
+
+	return addr;
+
+	efipci_dma_unmap ( dma, map );
+ err_map:
+	pci_io->FreeBuffer ( pci_io, pages, addr );
+ err_alloc:
+	return NULL;
+}
+
+/**
+ * Unmap and free DMA-coherent buffer
+ *
+ * @v dma		DMA device
+ * @v addr		Buffer address
+ * @v len		Length of buffer
+ * @v map		DMA mapping
+ */
+static void efipci_dma_free ( struct dma_device *dma, void *addr, size_t len,
+			      struct dma_mapping *map ) {
+	struct efi_pci_device *efipci =
+		container_of ( dma, struct efi_pci_device, pci.dma );
+	EFI_PCI_IO_PROTOCOL *pci_io = efipci->io;
+	unsigned int pages;
+
+	/* Calculate number of pages */
+	pages = ( ( len + EFI_PAGE_SIZE - 1 ) / EFI_PAGE_SIZE );
+
+	/* Unmap buffer */
+	efipci_dma_unmap ( dma, map );
+
+	/* Free buffer */
+	pci_io->FreeBuffer ( pci_io, pages, addr );
+
+	/* Decrement allocation count (for debugging) */
+	if ( DBG_LOG )
+		dma->allocated--;
+}
+
+/**
+ * Set addressable space mask
+ *
+ * @v dma		DMA device
+ * @v mask		Addressable space mask
+ */
+static void efipci_dma_set_mask ( struct dma_device *dma, physaddr_t mask ) {
+	struct efi_pci_device *efipci =
+		container_of ( dma, struct efi_pci_device, pci.dma );
+	struct pci_device *pci = &efipci->pci;
+	EFI_PCI_IO_PROTOCOL *pci_io = efipci->io;
+	EFI_PCI_IO_PROTOCOL_ATTRIBUTE_OPERATION op;
+	UINT64 attrs;
+	int is64;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Set dual address cycle attribute for 64-bit capable devices */
+	is64 = ( ( ( ( uint64_t ) mask ) + 1 ) == 0 );
+	op = ( is64 ? EfiPciIoAttributeOperationEnable :
+	       EfiPciIoAttributeOperationDisable );
+	attrs = EFI_PCI_IO_ATTRIBUTE_DUAL_ADDRESS_CYCLE;
+	if ( ( efirc = pci_io->Attributes ( pci_io, op, attrs, NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " could not %sable DAC: %s\n",
+		       PCI_ARGS ( pci ), ( is64 ? "en" : "dis" ),
+		       strerror ( rc ) );
+		/* Ignore failure: errors will manifest in mapping attempts */
+		return;
+	}
+}
+
+/** EFI PCI DMA operations */
+static struct dma_operations efipci_dma_operations = {
+	.map = efipci_dma_map,
+	.unmap = efipci_dma_unmap,
+	.alloc = efipci_dma_alloc,
+	.free = efipci_dma_free,
+	.set_mask = efipci_dma_set_mask,
+};
+
+/******************************************************************************
+ *
  * EFI PCI device instantiation
  *
  ******************************************************************************
@@ -353,6 +587,7 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 	}
 	busdevfn = PCI_BUSDEVFN ( pci_segment, pci_bus, pci_dev, pci_fn );
 	pci_init ( &efipci->pci, busdevfn );
+	dma_init ( &efipci->pci.dma, &efipci_dma_operations );
 	DBGCP ( device, "EFIPCI " PCI_FMT " is %s\n",
 		PCI_ARGS ( &efipci->pci ), efi_handle_name ( device ) );
 
@@ -533,6 +768,8 @@ static void efipci_stop ( struct efi_device *efidev ) {
 
 	pci_remove ( &efipci->pci );
 	list_del ( &efipci->pci.dev.siblings );
+	assert ( efipci->pci.dma.mapped == 0 );
+	assert ( efipci->pci.dma.allocated == 0 );
 	efipci_close ( device );
 	free ( efipci );
 }

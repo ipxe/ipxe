@@ -32,6 +32,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 struct dma_mapping {
 	/** Device-side address */
 	physaddr_t addr;
+	/** Platform mapping token */
+	void *token;
 };
 
 /** A DMA-capable device */
