@@ -17,9 +17,17 @@ static inline EFIAPI uint64_t LShiftU64 ( UINT64 value, UINTN shift ) {
 	return ( value << shift );
 }
 
+/** An EFI PCI device */
+struct efi_pci_device {
+	/** PCI device */
+	struct pci_device pci;
+	/** PCI I/O protocol */
+	EFI_PCI_IO_PROTOCOL *io;
+};
+
 extern int efipci_open ( EFI_HANDLE device, UINT32 attributes,
-			 struct pci_device *pci );
+			 struct efi_pci_device *efipci );
 extern void efipci_close ( EFI_HANDLE device );
-extern int efipci_info ( EFI_HANDLE device, struct pci_device *pci );
+extern int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci );
 
 #endif /* _IPXE_EFI_PCI_H */
