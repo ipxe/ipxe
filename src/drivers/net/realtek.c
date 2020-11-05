@@ -514,7 +514,7 @@ static int realtek_create_buffer ( struct realtek_nic *rtl ) {
 		return 0;
 
 	/* Allocate buffer */
-	rtl->rx_buffer = malloc_dma ( len, RTL_RXBUF_ALIGN );
+	rtl->rx_buffer = malloc_phys ( len, RTL_RXBUF_ALIGN );
 	if ( ! rtl->rx_buffer ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -539,7 +539,7 @@ static int realtek_create_buffer ( struct realtek_nic *rtl ) {
 	return 0;
 
  err_64bit:
-	free_dma ( rtl->rx_buffer, len );
+	free_phys ( rtl->rx_buffer, len );
 	rtl->rx_buffer = NULL;
  err_alloc:
 	return rc;
@@ -561,7 +561,7 @@ static void realtek_destroy_buffer ( struct realtek_nic *rtl ) {
 	writel ( 0, rtl->regs + RTL_RBSTART );
 
 	/* Free buffer */
-	free_dma ( rtl->rx_buffer, len );
+	free_phys ( rtl->rx_buffer, len );
 	rtl->rx_buffer = NULL;
 	rtl->rx_offset = 0;
 }
@@ -582,7 +582,7 @@ static int realtek_create_ring ( struct realtek_nic *rtl,
 		return 0;
 
 	/* Allocate descriptor ring */
-	ring->desc = malloc_dma ( ring->len, RTL_RING_ALIGN );
+	ring->desc = malloc_phys ( ring->len, RTL_RING_ALIGN );
 	if ( ! ring->desc )
 		return -ENOMEM;
 
@@ -623,7 +623,7 @@ static void realtek_destroy_ring ( struct realtek_nic *rtl,
 	writel ( 0, rtl->regs + ring->reg + 4 );
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc, ring->len );
+	free_phys ( ring->desc, ring->len );
 	ring->desc = NULL;
 }
 

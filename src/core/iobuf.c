@@ -88,8 +88,8 @@ struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
 		len += ( ( - len - offset ) & ( __alignof__ ( *iobuf ) - 1 ) );
 
 		/* Allocate memory for buffer plus descriptor */
-		data = malloc_dma_offset ( len + sizeof ( *iobuf ), align,
-					   offset );
+		data = malloc_phys_offset ( len + sizeof ( *iobuf ), align,
+					    offset );
 		if ( ! data )
 			return NULL;
 		iobuf = ( data + len );
@@ -97,14 +97,14 @@ struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
 	} else {
 
 		/* Allocate memory for buffer */
-		data = malloc_dma_offset ( len, align, offset );
+		data = malloc_phys_offset ( len, align, offset );
 		if ( ! data )
 			return NULL;
 
 		/* Allocate memory for descriptor */
 		iobuf = malloc ( sizeof ( *iobuf ) );
 		if ( ! iobuf ) {
-			free_dma ( data, len );
+			free_phys ( data, len );
 			return NULL;
 		}
 	}
@@ -159,12 +159,12 @@ void free_iob ( struct io_buffer *iobuf ) {
 	if ( iobuf->end == iobuf ) {
 
 		/* Descriptor is inline */
-		free_dma ( iobuf->head, ( len + sizeof ( *iobuf ) ) );
+		free_phys ( iobuf->head, ( len + sizeof ( *iobuf ) ) );
 
 	} else {
 
 		/* Descriptor is detached */
-		free_dma ( iobuf->head, len );
+		free_phys ( iobuf->head, len );
 		free ( iobuf );
 	}
 }

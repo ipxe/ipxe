@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 void efx_hunt_free_special_buffer(void *buf, int bytes)
 {
-	free_dma(buf, bytes);
+	free_phys(buf, bytes);
 }
 
 static void *efx_hunt_alloc_special_buffer(int bytes,
@@ -50,7 +50,7 @@ static void *efx_hunt_alloc_special_buffer(int bytes,
 	 * buffer will be passed into an MC_CMD_INIT_*Q command to setup the
 	 * appropriate type of queue via MCDI.
 	 */
-	buffer = malloc_dma(bytes, EFX_BUF_ALIGN);
+	buffer = malloc_phys(bytes, EFX_BUF_ALIGN);
 	if (!buffer)
 		return NULL;
 

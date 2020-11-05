@@ -61,7 +61,7 @@ mlx_memory_alloc_dma_priv(
 					)
 {
 	mlx_status status = MLX_SUCCESS;
-	*ptr = malloc_dma(size, align);
+	*ptr = malloc_phys(size, align);
 	if (*ptr == NULL) {
 		status = MLX_OUT_OF_RESOURCES;
 	} else {
@@ -78,7 +78,7 @@ mlx_memory_free_dma_priv(
 					)
 {
 	mlx_status status = MLX_SUCCESS;
-	free_dma(ptr, size);
+	free_phys(ptr, size);
 	return status;
 }
 mlx_status

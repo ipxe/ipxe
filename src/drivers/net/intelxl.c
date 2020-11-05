@@ -195,7 +195,7 @@ static int intelxl_alloc_admin ( struct intelxl_nic *intelxl,
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 
 	/* Allocate admin queue */
-	admin->buf = malloc_dma ( ( buf_len + len ), INTELXL_ALIGN );
+	admin->buf = malloc_phys ( ( buf_len + len ), INTELXL_ALIGN );
 	if ( ! admin->buf )
 		return -ENOMEM;
 	admin->desc = ( ( ( void * ) admin->buf ) + buf_len );
@@ -277,7 +277,7 @@ static void intelxl_free_admin ( struct intelxl_nic *intelxl __unused,
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 
 	/* Free queue */
-	free_dma ( admin->buf, ( buf_len + len ) );
+	free_phys ( admin->buf, ( buf_len + len ) );
 }
 
 /**
@@ -926,7 +926,7 @@ int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 	int rc;
 
 	/* Allocate descriptor ring */
-	ring->desc.raw = malloc_dma ( ring->len, INTELXL_ALIGN );
+	ring->desc.raw = malloc_phys ( ring->len, INTELXL_ALIGN );
 	if ( ! ring->desc.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -950,7 +950,7 @@ int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 
 	return 0;
 
-	free_dma ( ring->desc.raw, ring->len );
+	free_phys ( ring->desc.raw, ring->len );
  err_alloc:
 	return rc;
 }
@@ -965,7 +965,7 @@ void intelxl_free_ring ( struct intelxl_nic *intelxl __unused,
 			 struct intelxl_ring *ring ) {
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc.raw, ring->len );
+	free_phys ( ring->desc.raw, ring->len );
 	ring->desc.raw = NULL;
 }
 

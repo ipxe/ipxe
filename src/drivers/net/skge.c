@@ -1699,7 +1699,7 @@ void skge_free(struct net_device *dev)
 	free(skge->tx_ring.start);
 	skge->tx_ring.start = NULL;
 
-	free_dma(skge->mem, RING_SIZE);
+	free_phys(skge->mem, RING_SIZE);
 	skge->mem = NULL;
 	skge->dma = 0;
 }
@@ -1714,7 +1714,7 @@ static int skge_up(struct net_device *dev)
 
 	DBG2(PFX "%s: enabling interface\n", dev->name);
 
-	skge->mem = malloc_dma(RING_SIZE, SKGE_RING_ALIGN);
+	skge->mem = malloc_phys(RING_SIZE, SKGE_RING_ALIGN);
 	skge->dma = virt_to_bus(skge->mem);
 	if (!skge->mem)
 		return -ENOMEM;

@@ -565,8 +565,8 @@ static int ehci_ring_alloc ( struct ehci_device *ehci,
 	}
 
 	/* Allocate queue head */
-	ring->head = malloc_dma ( sizeof ( *ring->head ),
-				  ehci_align ( sizeof ( *ring->head ) ) );
+	ring->head = malloc_phys ( sizeof ( *ring->head ),
+				   ehci_align ( sizeof ( *ring->head ) ) );
 	if ( ! ring->head ) {
 		rc = -ENOMEM;
 		goto err_alloc_queue;
@@ -579,7 +579,7 @@ static int ehci_ring_alloc ( struct ehci_device *ehci,
 
 	/* Allocate transfer descriptors */
 	len = ( EHCI_RING_COUNT * sizeof ( ring->desc[0] ) );
-	ring->desc = malloc_dma ( len, sizeof ( ring->desc[0] ) );
+	ring->desc = malloc_phys ( len, sizeof ( ring->desc[0] ) );
 	if ( ! ring->desc ) {
 		rc = -ENOMEM;
 		goto err_alloc_desc;
@@ -607,10 +607,10 @@ static int ehci_ring_alloc ( struct ehci_device *ehci,
 	return 0;
 
  err_unreachable_desc:
-	free_dma ( ring->desc, len );
+	free_phys ( ring->desc, len );
  err_alloc_desc:
  err_unreachable_queue:
-	free_dma ( ring->head, sizeof ( *ring->head ) );
+	free_phys ( ring->head, sizeof ( *ring->head ) );
  err_alloc_queue:
 	free ( ring->iobuf );
  err_alloc_iobuf:
@@ -631,10 +631,11 @@ static void ehci_ring_free ( struct ehci_ring *ring ) {
 		assert ( ring->iobuf[i] == NULL );
 
 	/* Free transfer descriptors */
-	free_dma ( ring->desc, ( EHCI_RING_COUNT * sizeof ( ring->desc[0] ) ) );
+	free_phys ( ring->desc, ( EHCI_RING_COUNT *
+				  sizeof ( ring->desc[0] ) ) );
 
 	/* Free queue head */
-	free_dma ( ring->head, sizeof ( *ring->head ) );
+	free_phys ( ring->head, sizeof ( *ring->head ) );
 
 	/* Free I/O buffers */
 	free ( ring->iobuf );
@@ -1787,8 +1788,8 @@ static int ehci_bus_open ( struct usb_bus *bus ) {
 	assert ( list_empty ( &ehci->periodic ) );
 
 	/* Allocate and initialise asynchronous queue head */
-	ehci->head = malloc_dma ( sizeof ( *ehci->head ),
-				  ehci_align ( sizeof ( *ehci->head ) ) );
+	ehci->head = malloc_phys ( sizeof ( *ehci->head ),
+				   ehci_align ( sizeof ( *ehci->head ) ) );
 	if ( ! ehci->head ) {
 		rc = -ENOMEM;
 		goto err_alloc_head;
@@ -1816,7 +1817,7 @@ static int ehci_bus_open ( struct usb_bus *bus ) {
 	/* Allocate periodic frame list */
 	frames = EHCI_PERIODIC_FRAMES ( ehci->flsize );
 	len = ( frames * sizeof ( ehci->frame[0] ) );
-	ehci->frame = malloc_dma ( len, EHCI_PAGE_ALIGN );
+	ehci->frame = malloc_phys ( len, EHCI_PAGE_ALIGN );
 	if ( ! ehci->frame ) {
 		rc = -ENOMEM;
 		goto err_alloc_frame;
@@ -1836,10 +1837,10 @@ static int ehci_bus_open ( struct usb_bus *bus ) {
 
 	ehci_stop ( ehci );
  err_unreachable_frame:
-	free_dma ( ehci->frame, len );
+	free_phys ( ehci->frame, len );
  err_alloc_frame:
  err_ctrldssegment:
-	free_dma ( ehci->head, sizeof ( *ehci->head ) );
+	free_phys ( ehci->head, sizeof ( *ehci->head ) );
  err_alloc_head:
 	return rc;
 }
@@ -1861,10 +1862,10 @@ static void ehci_bus_close ( struct usb_bus *bus ) {
 	ehci_stop ( ehci );
 
 	/* Free periodic frame list */
-	free_dma ( ehci->frame, ( frames * sizeof ( ehci->frame[0] ) ) );
+	free_phys ( ehci->frame, ( frames * sizeof ( ehci->frame[0] ) ) );
 
 	/* Free asynchronous schedule */
-	free_dma ( ehci->head, sizeof ( *ehci->head ) );
+	free_phys ( ehci->head, sizeof ( *ehci->head ) );
 }
 
 /**

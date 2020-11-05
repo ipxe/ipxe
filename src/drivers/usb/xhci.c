@@ -919,7 +919,7 @@ static int xhci_dcbaa_alloc ( struct xhci_device *xhci ) {
 	 * with a minimum of 64 bytes).
 	 */
 	len = ( ( xhci->slots + 1 ) * sizeof ( xhci->dcbaa[0] ) );
-	xhci->dcbaa = malloc_dma ( len, xhci_align ( len ) );
+	xhci->dcbaa = malloc_phys ( len, xhci_align ( len ) );
 	if ( ! xhci->dcbaa ) {
 		DBGC ( xhci, "XHCI %s could not allocate DCBAA\n", xhci->name );
 		rc = -ENOMEM;
@@ -938,7 +938,7 @@ static int xhci_dcbaa_alloc ( struct xhci_device *xhci ) {
 	return 0;
 
  err_writeq:
-	free_dma ( xhci->dcbaa, len );
+	free_phys ( xhci->dcbaa, len );
  err_alloc:
 	return rc;
 }
@@ -961,7 +961,7 @@ static void xhci_dcbaa_free ( struct xhci_device *xhci ) {
 
 	/* Free DCBAA */
 	len = ( ( xhci->slots + 1 ) * sizeof ( xhci->dcbaa[0] ) );
-	free_dma ( xhci->dcbaa, len );
+	free_phys ( xhci->dcbaa, len );
 }
 
 /******************************************************************************
@@ -1002,7 +1002,7 @@ static int xhci_scratchpad_alloc ( struct xhci_device *xhci ) {
 	/* Allocate scratchpad array */
 	array_len = ( xhci->scratchpads * sizeof ( xhci->scratchpad_array[0] ));
 	xhci->scratchpad_array =
-		malloc_dma ( array_len, xhci_align ( array_len ) );
+		malloc_phys ( array_len, xhci_align ( array_len ) );
 	if ( ! xhci->scratchpad_array ) {
 		DBGC ( xhci, "XHCI %s could not allocate scratchpad buffer "
 		       "array\n", xhci->name );
@@ -1027,7 +1027,7 @@ static int xhci_scratchpad_alloc ( struct xhci_device *xhci ) {
 		( virt_to_phys ( xhci->scratchpad_array ) + array_len ) );
 	return 0;
 
-	free_dma ( xhci->scratchpad_array, array_len );
+	free_phys ( xhci->scratchpad_array, array_len );
  err_alloc_array:
 	ufree ( xhci->scratchpad );
  err_alloc:
@@ -1052,7 +1052,7 @@ static void xhci_scratchpad_free ( struct xhci_device *xhci ) {
 
 	/* Free scratchpad array */
 	array_len = ( xhci->scratchpads * sizeof ( xhci->scratchpad_array[0] ));
-	free_dma ( xhci->scratchpad_array, array_len );
+	free_phys ( xhci->scratchpad_array, array_len );
 
 	/* Free scratchpads */
 	ufree ( xhci->scratchpad );
@@ -1202,7 +1202,7 @@ static int xhci_ring_alloc ( struct xhci_device *xhci,
 	}
 
 	/* Allocate TRBs */
-	ring->trb = malloc_dma ( ring->len, xhci_align ( ring->len ) );
+	ring->trb = malloc_phys ( ring->len, xhci_align ( ring->len ) );
 	if ( ! ring->trb ) {
 		rc = -ENOMEM;
 		goto err_alloc_trb;
@@ -1218,7 +1218,7 @@ static int xhci_ring_alloc ( struct xhci_device *xhci,
 
 	return 0;
 
-	free_dma ( ring->trb, ring->len );
+	free_phys ( ring->trb, ring->len );
  err_alloc_trb:
 	free ( ring->iobuf );
  err_alloc_iobuf:
@@ -1256,7 +1256,7 @@ static void xhci_ring_free ( struct xhci_trb_ring *ring ) {
 		assert ( ring->iobuf[i] == NULL );
 
 	/* Free TRBs */
-	free_dma ( ring->trb, ring->len );
+	free_phys ( ring->trb, ring->len );
 
 	/* Free I/O buffers */
 	free ( ring->iobuf );
@@ -1469,7 +1469,7 @@ static int xhci_event_alloc ( struct xhci_device *xhci ) {
 	/* Allocate event ring */
 	count = ( 1 << XHCI_EVENT_TRBS_LOG2 );
 	len = ( count * sizeof ( event->trb[0] ) );
-	event->trb = malloc_dma ( len, xhci_align ( len ) );
+	event->trb = malloc_phys ( len, xhci_align ( len ) );
 	if ( ! event->trb ) {
 		rc = -ENOMEM;
 		goto err_alloc_trb;
@@ -1477,8 +1477,8 @@ static int xhci_event_alloc ( struct xhci_device *xhci ) {
 	memset ( event->trb, 0, len );
 
 	/* Allocate event ring segment table */
-	event->segment = malloc_dma ( sizeof ( event->segment[0] ),
-				      xhci_align ( sizeof (event->segment[0])));
+	event->segment = malloc_phys ( sizeof ( event->segment[0] ),
+				       xhci_align ( sizeof(event->segment[0])));
 	if ( ! event->segment ) {
 		rc = -ENOMEM;
 		goto err_alloc_segment;
@@ -1508,9 +1508,9 @@ static int xhci_event_alloc ( struct xhci_device *xhci ) {
  err_writeq_erstba:
 	xhci_writeq ( xhci, 0, xhci->run + XHCI_RUN_ERDP ( 0 ) );
  err_writeq_erdp:
-	free_dma ( event->trb, len );
+	free_phys ( event->trb, len );
  err_alloc_segment:
-	free_dma ( event->segment, sizeof ( event->segment[0] ) );
+	free_phys ( event->segment, sizeof ( event->segment[0] ) );
  err_alloc_trb:
 	return rc;
 }
@@ -1531,12 +1531,12 @@ static void xhci_event_free ( struct xhci_device *xhci ) {
 	xhci_writeq ( xhci, 0, xhci->run + XHCI_RUN_ERDP ( 0 ) );
 
 	/* Free event ring segment table */
-	free_dma ( event->segment, sizeof ( event->segment[0] ) );
+	free_phys ( event->segment, sizeof ( event->segment[0] ) );
 
 	/* Free event ring */
 	count = ( 1 << XHCI_EVENT_TRBS_LOG2 );
 	len = ( count * sizeof ( event->trb[0] ) );
-	free_dma ( event->trb, len );
+	free_phys ( event->trb, len );
 }
 
 /**
@@ -1948,7 +1948,7 @@ static int xhci_context ( struct xhci_device *xhci, struct xhci_slot *slot,
 
 	/* Allocate an input context */
 	len = xhci_input_context_offset ( xhci, XHCI_CTX_END );
-	input = malloc_dma ( len, xhci_align ( len ) );
+	input = malloc_phys ( len, xhci_align ( len ) );
 	if ( ! input ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -1969,7 +1969,7 @@ static int xhci_context ( struct xhci_device *xhci, struct xhci_slot *slot,
 		goto err_command;
 
  err_command:
-	free_dma ( input, len );
+	free_phys ( input, len );
  err_alloc:
 	return rc;
 }
@@ -2693,7 +2693,7 @@ static int xhci_device_open ( struct usb_device *usb ) {
 
 	/* Allocate a device context */
 	len = xhci_device_context_offset ( xhci, XHCI_CTX_END );
-	slot->context = malloc_dma ( len, xhci_align ( len ) );
+	slot->context = malloc_phys ( len, xhci_align ( len ) );
 	if ( ! slot->context ) {
 		rc = -ENOMEM;
 		goto err_alloc_context;
@@ -2710,7 +2710,7 @@ static int xhci_device_open ( struct usb_device *usb ) {
 	return 0;
 
 	xhci->dcbaa[id] = 0;
-	free_dma ( slot->context, len );
+	free_phys ( slot->context, len );
  err_alloc_context:
 	xhci->slot[id] = NULL;
 	free ( slot );
@@ -2750,7 +2750,7 @@ static void xhci_device_close ( struct usb_device *usb ) {
 
 	/* Free slot */
 	if ( slot->context ) {
-		free_dma ( slot->context, len );
+		free_phys ( slot->context, len );
 		xhci->dcbaa[id] = 0;
 	}
 	xhci->slot[id] = NULL;

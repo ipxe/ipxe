@@ -106,7 +106,7 @@ static int hvm_map_hypercall ( struct hvm_device *hvm ) {
 
 	/* Allocate pages */
 	hvm->hypercall_len = ( pages * PAGE_SIZE );
-	hvm->xen.hypercall = malloc_dma ( hvm->hypercall_len, PAGE_SIZE );
+	hvm->xen.hypercall = malloc_phys ( hvm->hypercall_len, PAGE_SIZE );
 	if ( ! hvm->xen.hypercall ) {
 		DBGC ( hvm, "HVM could not allocate %d hypercall page(s)\n",
 		       pages );
@@ -141,7 +141,7 @@ static int hvm_map_hypercall ( struct hvm_device *hvm ) {
 static void hvm_unmap_hypercall ( struct hvm_device *hvm ) {
 
 	/* Free pages */
-	free_dma ( hvm->xen.hypercall, hvm->hypercall_len );
+	free_phys ( hvm->xen.hypercall, hvm->hypercall_len );
 }
 
 /**

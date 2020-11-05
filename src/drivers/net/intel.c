@@ -504,7 +504,7 @@ int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	 * prevent any possible page-crossing errors due to hardware
 	 * errata.
 	 */
-	ring->desc = malloc_dma ( ring->len, ring->len );
+	ring->desc = malloc_phys ( ring->len, ring->len );
 	if ( ! ring->desc )
 		return -ENOMEM;
 
@@ -553,7 +553,7 @@ void intel_destroy_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	intel_reset_ring ( intel, ring->reg );
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc, ring->len );
+	free_phys ( ring->desc, ring->len );
 	ring->desc = NULL;
 	ring->prod = 0;
 	ring->cons = 0;

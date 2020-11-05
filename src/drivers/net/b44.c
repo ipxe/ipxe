@@ -436,7 +436,7 @@ static void b44_free_rx_ring(struct b44_private *bp)
 			free_iob(bp->rx_iobuf[i]);
 			bp->rx_iobuf[i] = NULL;
 		}
-		free_dma(bp->rx, B44_RX_RING_LEN_BYTES);
+		free_phys(bp->rx, B44_RX_RING_LEN_BYTES);
 		bp->rx = NULL;
 	}
 }
@@ -446,11 +446,11 @@ static int b44_init_rx_ring(struct b44_private *bp)
 {
 	b44_free_rx_ring(bp);
 
-	bp->rx = malloc_dma(B44_RX_RING_LEN_BYTES, B44_DMA_ALIGNMENT);
+	bp->rx = malloc_phys(B44_RX_RING_LEN_BYTES, B44_DMA_ALIGNMENT);
 	if (!bp->rx)
 		return -ENOMEM;
 	if (!b44_address_ok(bp->rx)) {
-		free_dma(bp->rx, B44_RX_RING_LEN_BYTES);
+		free_phys(bp->rx, B44_RX_RING_LEN_BYTES);
 		return -ENOTSUP;
 	}
 
@@ -468,7 +468,7 @@ static int b44_init_rx_ring(struct b44_private *bp)
 static void b44_free_tx_ring(struct b44_private *bp)
 {
 	if (bp->tx) {
-		free_dma(bp->tx, B44_TX_RING_LEN_BYTES);
+		free_phys(bp->tx, B44_TX_RING_LEN_BYTES);
 		bp->tx = NULL;
 	}
 }
@@ -478,11 +478,11 @@ static int b44_init_tx_ring(struct b44_private *bp)
 {
 	b44_free_tx_ring(bp);
 
-	bp->tx = malloc_dma(B44_TX_RING_LEN_BYTES, B44_DMA_ALIGNMENT);
+	bp->tx = malloc_phys(B44_TX_RING_LEN_BYTES, B44_DMA_ALIGNMENT);
 	if (!bp->tx)
 		return -ENOMEM;
 	if (!b44_address_ok(bp->tx)) {
-		free_dma(bp->tx, B44_TX_RING_LEN_BYTES);
+		free_phys(bp->tx, B44_TX_RING_LEN_BYTES);
 		return -ENOTSUP;
 	}
 

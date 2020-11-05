@@ -864,8 +864,8 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	}
 
 	/* Allocate doorbell */
-	hermon_cq->doorbell = malloc_dma ( sizeof ( hermon_cq->doorbell[0] ),
-					   sizeof ( hermon_cq->doorbell[0] ) );
+	hermon_cq->doorbell = malloc_phys ( sizeof ( hermon_cq->doorbell[0] ),
+					    sizeof ( hermon_cq->doorbell[0] ) );
 	if ( ! hermon_cq->doorbell ) {
 		rc = -ENOMEM;
 		goto err_doorbell;
@@ -874,8 +874,8 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 
 	/* Allocate completion queue itself */
 	hermon_cq->cqe_size = ( cq->num_cqes * sizeof ( hermon_cq->cqe[0] ) );
-	hermon_cq->cqe = malloc_dma ( hermon_cq->cqe_size,
-				      sizeof ( hermon_cq->cqe[0] ) );
+	hermon_cq->cqe = malloc_phys ( hermon_cq->cqe_size,
+				       sizeof ( hermon_cq->cqe[0] ) );
 	if ( ! hermon_cq->cqe ) {
 		rc = -ENOMEM;
 		goto err_cqe;
@@ -925,9 +925,9 @@ static int hermon_create_cq ( struct ib_device *ibdev,
  err_sw2hw_cq:
 	hermon_free_mtt ( hermon, &hermon_cq->mtt );
  err_alloc_mtt:
-	free_dma ( hermon_cq->cqe, hermon_cq->cqe_size );
+	free_phys ( hermon_cq->cqe, hermon_cq->cqe_size );
  err_cqe:
-	free_dma ( hermon_cq->doorbell, sizeof ( hermon_cq->doorbell[0] ) );
+	free_phys ( hermon_cq->doorbell, sizeof ( hermon_cq->doorbell[0] ) );
  err_doorbell:
 	free ( hermon_cq );
  err_hermon_cq:
@@ -962,8 +962,8 @@ static void hermon_destroy_cq ( struct ib_device *ibdev,
 	hermon_free_mtt ( hermon, &hermon_cq->mtt );
 
 	/* Free memory */
-	free_dma ( hermon_cq->cqe, hermon_cq->cqe_size );
-	free_dma ( hermon_cq->doorbell, sizeof ( hermon_cq->doorbell[0] ) );
+	free_phys ( hermon_cq->cqe, hermon_cq->cqe_size );
+	free_phys ( hermon_cq->doorbell, sizeof ( hermon_cq->doorbell[0] ) );
 	free ( hermon_cq );
 
 	/* Mark queue number as free */
@@ -1128,8 +1128,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 
 	/* Allocate doorbells */
 	hermon_qp->recv.doorbell =
-		malloc_dma ( sizeof ( hermon_qp->recv.doorbell[0] ),
-			     sizeof ( hermon_qp->recv.doorbell[0] ) );
+		malloc_phys ( sizeof ( hermon_qp->recv.doorbell[0] ),
+			      sizeof ( hermon_qp->recv.doorbell[0] ) );
 	if ( ! hermon_qp->recv.doorbell ) {
 		rc = -ENOMEM;
 		goto err_recv_doorbell;
@@ -1157,8 +1157,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	hermon_qp->wqe_size = ( hermon_qp->send.wqe_size +
 				hermon_qp->recv.wqe_size +
 				hermon_qp->recv.grh_size );
-	hermon_qp->wqe = malloc_dma ( hermon_qp->wqe_size,
-				      sizeof ( hermon_qp->send.wqe[0] ) );
+	hermon_qp->wqe = malloc_phys ( hermon_qp->wqe_size,
+				       sizeof ( hermon_qp->send.wqe[0] ) );
 	if ( ! hermon_qp->wqe ) {
 		rc = -ENOMEM;
 		goto err_alloc_wqe;
@@ -1248,10 +1248,10 @@ static int hermon_create_qp ( struct ib_device *ibdev,
  err_rst2init_qp:
 	hermon_free_mtt ( hermon, &hermon_qp->mtt );
  err_alloc_mtt:
-	free_dma ( hermon_qp->wqe, hermon_qp->wqe_size );
+	free_phys ( hermon_qp->wqe, hermon_qp->wqe_size );
  err_alloc_wqe:
-	free_dma ( hermon_qp->recv.doorbell,
-		   sizeof ( hermon_qp->recv.doorbell[0] ) );
+	free_phys ( hermon_qp->recv.doorbell,
+		    sizeof ( hermon_qp->recv.doorbell[0] ) );
  err_recv_doorbell:
 	free ( hermon_qp );
  err_hermon_qp:
@@ -1363,9 +1363,9 @@ static void hermon_destroy_qp ( struct ib_device *ibdev,
 	hermon_free_mtt ( hermon, &hermon_qp->mtt );
 
 	/* Free memory */
-	free_dma ( hermon_qp->wqe, hermon_qp->wqe_size );
-	free_dma ( hermon_qp->recv.doorbell,
-		   sizeof ( hermon_qp->recv.doorbell[0] ) );
+	free_phys ( hermon_qp->wqe, hermon_qp->wqe_size );
+	free_phys ( hermon_qp->recv.doorbell,
+		    sizeof ( hermon_qp->recv.doorbell[0] ) );
 	free ( hermon_qp );
 
 	/* Mark queue number as free */
@@ -1887,8 +1887,8 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	/* Allocate event queue itself */
 	hermon_eq->eqe_size =
 		( HERMON_NUM_EQES * sizeof ( hermon_eq->eqe[0] ) );
-	hermon_eq->eqe = malloc_dma ( hermon_eq->eqe_size,
-				      sizeof ( hermon_eq->eqe[0] ) );
+	hermon_eq->eqe = malloc_phys ( hermon_eq->eqe_size,
+				       sizeof ( hermon_eq->eqe[0] ) );
 	if ( ! hermon_eq->eqe ) {
 		rc = -ENOMEM;
 		goto err_eqe;
@@ -1946,7 +1946,7 @@ static int hermon_create_eq ( struct hermon *hermon ) {
  err_sw2hw_eq:
 	hermon_free_mtt ( hermon, &hermon_eq->mtt );
  err_alloc_mtt:
-	free_dma ( hermon_eq->eqe, hermon_eq->eqe_size );
+	free_phys ( hermon_eq->eqe, hermon_eq->eqe_size );
  err_eqe:
 	memset ( hermon_eq, 0, sizeof ( *hermon_eq ) );
 	return rc;
@@ -1986,7 +1986,7 @@ static void hermon_destroy_eq ( struct hermon *hermon ) {
 	hermon_free_mtt ( hermon, &hermon_eq->mtt );
 
 	/* Free memory */
-	free_dma ( hermon_eq->eqe, hermon_eq->eqe_size );
+	free_phys ( hermon_eq->eqe, hermon_eq->eqe_size );
 	memset ( hermon_eq, 0, sizeof ( *hermon_eq ) );
 }
 
@@ -3736,20 +3736,20 @@ static struct hermon * hermon_alloc ( void ) {
 		goto err_hermon;
 
 	/* Allocate space for mailboxes */
-	hermon->mailbox_in = malloc_dma ( HERMON_MBOX_SIZE,
-					  HERMON_MBOX_ALIGN );
+	hermon->mailbox_in = malloc_phys ( HERMON_MBOX_SIZE,
+					   HERMON_MBOX_ALIGN );
 	if ( ! hermon->mailbox_in )
 		goto err_mailbox_in;
-	hermon->mailbox_out = malloc_dma ( HERMON_MBOX_SIZE,
-					   HERMON_MBOX_ALIGN );
+	hermon->mailbox_out = malloc_phys ( HERMON_MBOX_SIZE,
+					    HERMON_MBOX_ALIGN );
 	if ( ! hermon->mailbox_out )
 		goto err_mailbox_out;
 
 	return hermon;
 
-	free_dma ( hermon->mailbox_out, HERMON_MBOX_SIZE );
+	free_phys ( hermon->mailbox_out, HERMON_MBOX_SIZE );
  err_mailbox_out:
-	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
+	free_phys ( hermon->mailbox_in, HERMON_MBOX_SIZE );
  err_mailbox_in:
 	free ( hermon );
  err_hermon:
@@ -3765,8 +3765,8 @@ static void hermon_free ( struct hermon *hermon ) {
 
 	ufree ( hermon->icm );
 	ufree ( hermon->firmware_area );
-	free_dma ( hermon->mailbox_out, HERMON_MBOX_SIZE );
-	free_dma ( hermon->mailbox_in, HERMON_MBOX_SIZE );
+	free_phys ( hermon->mailbox_out, HERMON_MBOX_SIZE );
+	free_phys ( hermon->mailbox_in, HERMON_MBOX_SIZE );
 	free ( hermon );
 }
 

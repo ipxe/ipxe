@@ -495,39 +495,39 @@ void bnxt_free_mem ( struct bnxt *bp )
 {
 	DBGP ( "%s\n", __func__ );
 	if ( bp->nq.bd_virt ) {
-		free_dma ( bp->nq.bd_virt, NQ_RING_BUFFER_SIZE );
+		free_phys ( bp->nq.bd_virt, NQ_RING_BUFFER_SIZE );
 		bp->nq.bd_virt = NULL;
 	}
 
 	if ( bp->cq.bd_virt ) {
-		free_dma ( bp->cq.bd_virt, CQ_RING_BUFFER_SIZE );
+		free_phys ( bp->cq.bd_virt, CQ_RING_BUFFER_SIZE );
 		bp->cq.bd_virt = NULL;
 	}
 
 	if ( bp->rx.bd_virt ) {
-		free_dma ( bp->rx.bd_virt, RX_RING_BUFFER_SIZE );
+		free_phys ( bp->rx.bd_virt, RX_RING_BUFFER_SIZE );
 		bp->rx.bd_virt = NULL;
 	}
 
 	if ( bp->tx.bd_virt ) {
-		free_dma ( bp->tx.bd_virt, TX_RING_BUFFER_SIZE );
+		free_phys ( bp->tx.bd_virt, TX_RING_BUFFER_SIZE );
 		bp->tx.bd_virt = NULL;
 	}
 
 	if ( bp->hwrm_addr_dma ) {
-		free_dma ( bp->hwrm_addr_dma, DMA_BUFFER_SIZE );
+		free_phys ( bp->hwrm_addr_dma, DMA_BUFFER_SIZE );
 		bp->dma_addr_mapping = 0;
 		bp->hwrm_addr_dma = NULL;
 	}
 
 	if ( bp->hwrm_addr_resp ) {
-		free_dma ( bp->hwrm_addr_resp, RESP_BUFFER_SIZE );
+		free_phys ( bp->hwrm_addr_resp, RESP_BUFFER_SIZE );
 		bp->resp_addr_mapping = 0;
 		bp->hwrm_addr_resp = NULL;
 	}
 
 	if ( bp->hwrm_addr_req ) {
-		free_dma ( bp->hwrm_addr_req, REQ_BUFFER_SIZE );
+		free_phys ( bp->hwrm_addr_req, REQ_BUFFER_SIZE );
 		bp->req_addr_mapping = 0;
 		bp->hwrm_addr_req = NULL;
 	}
@@ -537,14 +537,14 @@ void bnxt_free_mem ( struct bnxt *bp )
 int bnxt_alloc_mem ( struct bnxt *bp )
 {
 	DBGP ( "%s\n", __func__ );
-	bp->hwrm_addr_req  = malloc_dma ( REQ_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
-	bp->hwrm_addr_resp = malloc_dma ( RESP_BUFFER_SIZE,
-					BNXT_DMA_ALIGNMENT );
-	bp->hwrm_addr_dma  = malloc_dma ( DMA_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
-	bp->tx.bd_virt = malloc_dma ( TX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
-	bp->rx.bd_virt = malloc_dma ( RX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
-	bp->cq.bd_virt = malloc_dma ( CQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
-	bp->nq.bd_virt = malloc_dma ( NQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
+	bp->hwrm_addr_req  = malloc_phys ( REQ_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
+	bp->hwrm_addr_resp = malloc_phys ( RESP_BUFFER_SIZE,
+					   BNXT_DMA_ALIGNMENT );
+	bp->hwrm_addr_dma  = malloc_phys ( DMA_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
+	bp->tx.bd_virt = malloc_phys ( TX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
+	bp->rx.bd_virt = malloc_phys ( RX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
+	bp->cq.bd_virt = malloc_phys ( CQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
+	bp->nq.bd_virt = malloc_phys ( NQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
 	test_if ( bp->hwrm_addr_req &&
 		bp->hwrm_addr_resp &&
 		bp->hwrm_addr_dma &&

@@ -249,7 +249,7 @@ static int a3c90x_setup_tx_ring(struct INF_3C90X *p)
 {
 	DBGP("a3c90x_setup_tx_ring\n");
 	p->tx_ring =
-	    malloc_dma(TX_RING_SIZE * sizeof(struct TXD), TX_RING_ALIGN);
+	    malloc_phys(TX_RING_SIZE * sizeof(struct TXD), TX_RING_ALIGN);
 
 	if (!p->tx_ring) {
 		DBG("Could not allocate TX-ring\n");
@@ -304,7 +304,7 @@ static void a3c90x_free_tx_ring(struct INF_3C90X *p)
 {
 	DBGP("a3c90x_free_tx_ring\n");
 
-	free_dma(p->tx_ring, TX_RING_SIZE * sizeof(struct TXD));
+	free_phys(p->tx_ring, TX_RING_SIZE * sizeof(struct TXD));
 	p->tx_ring = NULL;
 	/* io_buffers are free()ed by netdev_tx_complete[,_err]() */
 }
@@ -461,7 +461,7 @@ static int a3c90x_setup_rx_ring(struct INF_3C90X *p)
 	DBGP("a3c90x_setup_rx_ring\n");
 
 	p->rx_ring =
-	    malloc_dma(RX_RING_SIZE * sizeof(struct RXD), RX_RING_ALIGN);
+	    malloc_phys(RX_RING_SIZE * sizeof(struct RXD), RX_RING_ALIGN);
 
 	if (!p->rx_ring) {
 		DBG("Could not allocate RX-ring\n");
@@ -491,7 +491,7 @@ static void a3c90x_free_rx_ring(struct INF_3C90X *p)
 {
 	DBGP("a3c90x_free_rx_ring\n");
 
-	free_dma(p->rx_ring, RX_RING_SIZE * sizeof(struct RXD));
+	free_phys(p->rx_ring, RX_RING_SIZE * sizeof(struct RXD));
 	p->rx_ring = NULL;
 }
 
