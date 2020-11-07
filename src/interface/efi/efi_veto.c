@@ -27,43 +27,43 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
-#include <ipxe/efi/efi_blacklist.h>
+#include <ipxe/efi/efi_veto.h>
 
 /** @file
  *
- * EFI driver blacklist
+ * EFI driver vetoes
  *
  */
 
-/** A blacklisted driver */
-struct efi_blacklist {
-	/** Name */
+/** A driver veto */
+struct efi_veto {
+	/** Veto name (for debugging) */
 	const char *name;
 	/**
-	 * Check if driver is blacklisted
+	 * Check if driver is vetoed
 	 *
 	 * @v binding		Driver binding protocol
 	 * @v loaded		Loaded image protocol
 	 * @v wtf		Component name protocol, if present
-	 * @ret blacklisted	Driver is the blacklisted driver
+	 * @ret vetoed		Driver is to be vetoed
 	 */
-	int ( * blacklist ) ( EFI_DRIVER_BINDING_PROTOCOL *binding,
-			      EFI_LOADED_IMAGE_PROTOCOL *loaded,
-			      EFI_COMPONENT_NAME_PROTOCOL *wtf );
+	int ( * veto ) ( EFI_DRIVER_BINDING_PROTOCOL *binding,
+			 EFI_LOADED_IMAGE_PROTOCOL *loaded,
+			 EFI_COMPONENT_NAME_PROTOCOL *wtf );
 };
 
 /**
- * Blacklist Dell Ip4ConfigDxe driver
+ * Veto Dell Ip4ConfigDxe driver
  *
  * @v binding		Driver binding protocol
  * @v loaded		Loaded image protocol
  * @v wtf		Component name protocol, if present
- * @ret blacklisted	Driver is the blacklisted driver
+ * @ret vetoed		Driver is to be vetoed
  */
 static int
-efi_blacklist_dell_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
-			       EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
-			       EFI_COMPONENT_NAME_PROTOCOL *wtf ) {
+efi_veto_dell_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
+			  EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
+			  EFI_COMPONENT_NAME_PROTOCOL *wtf ) {
 	static const CHAR16 ip4cfg[] = L"IP4 CONFIG Network Service Driver";
 	static const char dell[] = "Dell Inc.";
 	char manufacturer[ sizeof ( dell ) ];
@@ -86,23 +86,22 @@ efi_blacklist_dell_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 	return 1;
 }
 
-/** Blacklisted drivers */
-static struct efi_blacklist efi_blacklists[] = {
+/** Driver vetoes */
+static struct efi_veto efi_vetoes[] = {
 	{
 		.name = "Dell Ip4Config",
-		.blacklist = efi_blacklist_dell_ip4config,
+		.veto = efi_veto_dell_ip4config,
 	},
 };
 
 /**
- * Find driver blacklisting, if any
+ * Find driver veto, if any
  *
  * @v driver		Driver binding handle
- * @ret blacklist	Driver blacklisting, or NULL
+ * @ret veto		Driver veto, or NULL
  * @ret rc		Return status code
  */
-static int efi_blacklist ( EFI_HANDLE driver,
-			   struct efi_blacklist **blacklist ) {
+static int efi_veto ( EFI_HANDLE driver, struct efi_veto **veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_DRIVER_BINDING_PROTOCOL *binding;
@@ -121,11 +120,11 @@ static int efi_blacklist ( EFI_HANDLE driver,
 	EFI_STATUS efirc;
 	int rc;
 
-	DBGC2 ( &efi_blacklists, "EFIBL checking %s\n",
+	DBGC2 ( &efi_vetoes, "EFIVETO checking %s\n",
 		efi_handle_name ( driver ) );
 
-	/* Mark as not blacklisted */
-	*blacklist = NULL;
+	/* Mark as not vetoed */
+	*veto = NULL;
 
 	/* Open driver binding protocol */
 	if ( ( efirc = bs->OpenProtocol (
@@ -133,7 +132,7 @@ static int efi_blacklist ( EFI_HANDLE driver,
 			&binding.interface, efi_image_handle, driver,
 			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( driver, "EFIBL %s could not open driver binding "
+		DBGC ( driver, "EFIVETO %s could not open driver binding "
 		       "protocol: %s\n", efi_handle_name ( driver ),
 		       strerror ( rc ) );
 		goto err_binding;
@@ -146,7 +145,7 @@ static int efi_blacklist ( EFI_HANDLE driver,
 			&loaded.interface, efi_image_handle, image,
 			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( driver, "EFIBL %s could not open",
+		DBGC ( driver, "EFIVETO %s could not open",
 		       efi_handle_name ( driver ) );
 		DBGC ( driver, " %s loaded image protocol: %s\n",
 		       efi_handle_name ( image ), strerror ( rc ) );
@@ -162,12 +161,12 @@ static int efi_blacklist ( EFI_HANDLE driver,
 		wtf.interface = NULL;
 	}
 
-	/* Check blacklistings */
-	for ( i = 0 ; i < ( sizeof ( efi_blacklists ) /
-			    sizeof ( efi_blacklists[0] ) ) ; i++ ) {
-		if ( efi_blacklists[i].blacklist ( binding.binding,
-						   loaded.loaded, wtf.wtf ) ) {
-			*blacklist = &efi_blacklists[i];
+	/* Check vetoes */
+	for ( i = 0 ; i < ( sizeof ( efi_vetoes ) /
+			    sizeof ( efi_vetoes[0] ) ) ; i++ ) {
+		if ( efi_vetoes[i].veto ( binding.binding, loaded.loaded,
+					  wtf.wtf ) ) {
+			*veto = &efi_vetoes[i];
 			break;
 		}
 	}
@@ -190,12 +189,12 @@ static int efi_blacklist ( EFI_HANDLE driver,
 }
 
 /**
- * Unload any blacklisted drivers
+ * Unload any vetoed drivers
  *
  */
-void efi_unload_blacklist ( void ) {
+void efi_veto_unload ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	struct efi_blacklist *blacklist;
+	struct efi_veto *veto;
 	EFI_HANDLE *drivers;
 	EFI_HANDLE driver;
 	UINTN num_drivers;
@@ -208,26 +207,26 @@ void efi_unload_blacklist ( void ) {
 			ByProtocol, &efi_driver_binding_protocol_guid,
 			NULL, &num_drivers, &drivers ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( &efi_blacklists, "EFIBL could not list all drivers: "
+		DBGC ( &efi_vetoes, "EFIVETO could not list all drivers: "
 		       "%s\n", strerror ( rc ) );
 		return;
 	}
 
-	/* Unload any blacklisted drivers */
+	/* Unload any vetoed drivers */
 	for ( i = 0 ; i < num_drivers ; i++ ) {
 		driver = drivers[i];
-		if ( ( rc = efi_blacklist ( driver, &blacklist ) ) != 0 ) {
-			DBGC ( driver, "EFIBL could not determine "
-			       "blacklisting for %s: %s\n",
+		if ( ( rc = efi_veto ( driver, &veto ) ) != 0 ) {
+			DBGC ( driver, "EFIVETO could not determine "
+			       "vetoing for %s: %s\n",
 			       efi_handle_name ( driver ), strerror ( rc ) );
 			continue;
 		}
-		if ( ! blacklist )
+		if ( ! veto )
 			continue;
-		DBGC ( driver, "EFIBL unloading %s (%s)\n",
-		       efi_handle_name ( driver ), blacklist->name );
+		DBGC ( driver, "EFIVETO unloading %s (%s)\n",
+		       efi_handle_name ( driver ), veto->name );
 		if ( ( efirc = bs->UnloadImage ( driver ) ) != 0 ) {
-			DBGC ( driver, "EFIBL could not unload %s: %s\n",
+			DBGC ( driver, "EFIVETO could not unload %s: %s\n",
 			       efi_handle_name ( driver ), strerror ( rc ) );
 		}
 	}
