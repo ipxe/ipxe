@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/ethernet.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/iobuf.h>
-#include <ipxe/malloc.h>
+#include <ipxe/dma.h>
 #include <ipxe/pci.h>
 #include <ipxe/profile.h>
 #include "intel.h"
@@ -504,7 +504,8 @@ int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	 * prevent any possible page-crossing errors due to hardware
 	 * errata.
 	 */
-	ring->desc = malloc_phys ( ring->len, ring->len );
+	ring->desc = dma_alloc ( intel->dma, ring->len, ring->len,
+				 &ring->map );
 	if ( ! ring->desc )
 		return -ENOMEM;
 
@@ -512,7 +513,7 @@ int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	memset ( ring->desc, 0, ring->len );
 
 	/* Program ring address */
-	address = virt_to_bus ( ring->desc );
+	address = ring->map.addr;
 	writel ( ( address & 0xffffffffUL ),
 		 ( intel->regs + ring->reg + INTEL_xDBAL ) );
 	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {
@@ -553,7 +554,7 @@ void intel_destroy_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	intel_reset_ring ( intel, ring->reg );
 
 	/* Free descriptor ring */
-	free_phys ( ring->desc, ring->len );
+	dma_free ( intel->dma, ring->desc, ring->len, &ring->map );
 	ring->desc = NULL;
 	ring->prod = 0;
 	ring->cons = 0;
@@ -567,32 +568,36 @@ void intel_destroy_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 void intel_refill_rx ( struct intel_nic *intel ) {
 	struct intel_descriptor *rx;
 	struct io_buffer *iobuf;
+	struct dma_mapping *map;
 	unsigned int rx_idx;
 	unsigned int rx_tail;
 	physaddr_t address;
 	unsigned int refilled = 0;
 
 	/* Refill ring */
-	while ( ( intel->rx.prod - intel->rx.cons ) < INTEL_RX_FILL ) {
+	while ( ( intel->rx.ring.prod -
+		  intel->rx.ring.cons ) < INTEL_RX_FILL ) {
+
+		/* Get next receive descriptor */
+		rx_idx = ( intel->rx.ring.prod % INTEL_NUM_RX_DESC );
+		rx = &intel->rx.ring.desc[rx_idx];
+		map = &intel->rx.map[rx_idx];
+		assert ( intel->rx.iobuf[rx_idx] == NULL );
 
 		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( INTEL_RX_MAX_LEN );
+		iobuf = dma_alloc_rx_iob ( intel->dma, INTEL_RX_MAX_LEN, map );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
 			break;
 		}
+		intel->rx.iobuf[rx_idx] = iobuf;
 
-		/* Get next receive descriptor */
-		rx_idx = ( intel->rx.prod++ % INTEL_NUM_RX_DESC );
-		rx = &intel->rx.desc[rx_idx];
+		/* Update producer index */
+		intel->rx.ring.prod++;
 
 		/* Populate receive descriptor */
-		address = virt_to_bus ( iobuf->data );
-		intel->rx.describe ( rx, address, 0 );
-
-		/* Record I/O buffer */
-		assert ( intel->rx_iobuf[rx_idx] == NULL );
-		intel->rx_iobuf[rx_idx] = iobuf;
+		address = map->addr;
+		intel->rx.ring.describe ( rx, address, 0 );
 
 		DBGC2 ( intel, "INTEL %p RX %d is [%llx,%llx)\n", intel, rx_idx,
 			( ( unsigned long long ) address ),
@@ -603,26 +608,40 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 	/* Push descriptors to card, if applicable */
 	if ( refilled ) {
 		wmb();
-		rx_tail = ( intel->rx.prod % INTEL_NUM_RX_DESC );
+		rx_tail = ( intel->rx.ring.prod % INTEL_NUM_RX_DESC );
 		profile_start ( &intel_vm_refill_profiler );
-		writel ( rx_tail, intel->regs + intel->rx.reg + INTEL_xDT );
+		writel ( rx_tail,
+			 intel->regs + intel->rx.ring.reg + INTEL_xDT );
 		profile_stop ( &intel_vm_refill_profiler );
 		profile_exclude ( &intel_vm_refill_profiler );
 	}
 }
 
 /**
- * Discard unused receive I/O buffers
+ * Flush unused I/O buffers
  *
  * @v intel		Intel device
+ *
+ * Discard any unused receive I/O buffers and unmap any incomplete
+ * transmit I/O buffers.
  */
-void intel_empty_rx ( struct intel_nic *intel ) {
+void intel_flush ( struct intel_nic *intel ) {
 	unsigned int i;
+	unsigned int tx_idx;
 
+	/* Discard unused receive buffers */
 	for ( i = 0 ; i < INTEL_NUM_RX_DESC ; i++ ) {
-		if ( intel->rx_iobuf[i] )
-			free_iob ( intel->rx_iobuf[i] );
-		intel->rx_iobuf[i] = NULL;
+		if ( intel->rx.iobuf[i] ) {
+			dma_unmap ( intel->dma, &intel->rx.map[i] );
+			free_iob ( intel->rx.iobuf[i] );
+		}
+		intel->rx.iobuf[i] = NULL;
+	}
+
+	/* Unmap incomplete transmit buffers */
+	for ( i = intel->tx.ring.cons ; i != intel->tx.ring.prod ; i++ ) {
+		tx_idx = ( i % INTEL_NUM_TX_DESC );
+		dma_unmap ( intel->dma, &intel->tx.map[tx_idx] );
 	}
 }
 
@@ -653,11 +672,11 @@ static int intel_open ( struct net_device *netdev ) {
 	}
 
 	/* Create transmit descriptor ring */
-	if ( ( rc = intel_create_ring ( intel, &intel->tx ) ) != 0 )
+	if ( ( rc = intel_create_ring ( intel, &intel->tx.ring ) ) != 0 )
 		goto err_create_tx;
 
 	/* Create receive descriptor ring */
-	if ( ( rc = intel_create_ring ( intel, &intel->rx ) ) != 0 )
+	if ( ( rc = intel_create_ring ( intel, &intel->rx.ring ) ) != 0 )
 		goto err_create_rx;
 
 	/* Program MAC address */
@@ -696,9 +715,9 @@ static int intel_open ( struct net_device *netdev ) {
 
 	return 0;
 
-	intel_destroy_ring ( intel, &intel->rx );
+	intel_destroy_ring ( intel, &intel->rx.ring );
  err_create_rx:
-	intel_destroy_ring ( intel, &intel->tx );
+	intel_destroy_ring ( intel, &intel->tx.ring );
  err_create_tx:
 	return rc;
 }
@@ -718,13 +737,13 @@ static void intel_close ( struct net_device *netdev ) {
 	writel ( 0, intel->regs + INTEL_TCTL );
 
 	/* Destroy receive descriptor ring */
-	intel_destroy_ring ( intel, &intel->rx );
+	intel_destroy_ring ( intel, &intel->rx.ring );
 
-	/* Discard any unused receive buffers */
-	intel_empty_rx ( intel );
+	/* Flush unused buffers */
+	intel_flush ( intel );
 
 	/* Destroy transmit descriptor ring */
-	intel_destroy_ring ( intel, &intel->tx );
+	intel_destroy_ring ( intel, &intel->tx.ring );
 
 	/* Reset the NIC, to flush the transmit and receive FIFOs */
 	intel_reset ( intel );
@@ -740,29 +759,39 @@ static void intel_close ( struct net_device *netdev ) {
 int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct intel_nic *intel = netdev->priv;
 	struct intel_descriptor *tx;
+	struct dma_mapping *map;
 	unsigned int tx_idx;
 	unsigned int tx_tail;
 	physaddr_t address;
 	size_t len;
+	int rc;
 
 	/* Get next transmit descriptor */
-	if ( ( intel->tx.prod - intel->tx.cons ) >= INTEL_TX_FILL ) {
+	if ( ( intel->tx.ring.prod - intel->tx.ring.cons ) >= INTEL_TX_FILL ) {
 		DBGC ( intel, "INTEL %p out of transmit descriptors\n", intel );
 		return -ENOBUFS;
 	}
-	tx_idx = ( intel->tx.prod++ % INTEL_NUM_TX_DESC );
-	tx_tail = ( intel->tx.prod % INTEL_NUM_TX_DESC );
-	tx = &intel->tx.desc[tx_idx];
+	tx_idx = ( intel->tx.ring.prod % INTEL_NUM_TX_DESC );
+	tx = &intel->tx.ring.desc[tx_idx];
+	map = &intel->tx.map[tx_idx];
+
+	/* Map I/O buffer */
+	if ( ( rc = dma_map_tx_iob ( intel->dma, iobuf, map ) ) != 0 )
+		return rc;
+
+	/* Update producer index */
+	intel->tx.ring.prod++;
 
 	/* Populate transmit descriptor */
-	address = virt_to_bus ( iobuf->data );
+	address = map->addr;
 	len = iob_len ( iobuf );
-	intel->tx.describe ( tx, address, len );
+	intel->tx.ring.describe ( tx, address, len );
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */
 	profile_start ( &intel_vm_tx_profiler );
-	writel ( tx_tail, intel->regs + intel->tx.reg + INTEL_xDT );
+	tx_tail = ( intel->tx.ring.prod % INTEL_NUM_TX_DESC );
+	writel ( tx_tail, intel->regs + intel->tx.ring.reg + INTEL_xDT );
 	profile_stop ( &intel_vm_tx_profiler );
 	profile_exclude ( &intel_vm_tx_profiler );
 
@@ -784,11 +813,11 @@ void intel_poll_tx ( struct net_device *netdev ) {
 	unsigned int tx_idx;
 
 	/* Check for completed packets */
-	while ( intel->tx.cons != intel->tx.prod ) {
+	while ( intel->tx.ring.cons != intel->tx.ring.prod ) {
 
 		/* Get next transmit descriptor */
-		tx_idx = ( intel->tx.cons % INTEL_NUM_TX_DESC );
-		tx = &intel->tx.desc[tx_idx];
+		tx_idx = ( intel->tx.ring.cons % INTEL_NUM_TX_DESC );
+		tx = &intel->tx.ring.desc[tx_idx];
 
 		/* Stop if descriptor is still in use */
 		if ( ! ( tx->status & cpu_to_le32 ( INTEL_DESC_STATUS_DD ) ) )
@@ -796,9 +825,12 @@ void intel_poll_tx ( struct net_device *netdev ) {
 
 		DBGC2 ( intel, "INTEL %p TX %d complete\n", intel, tx_idx );
 
+		/* Unmap I/O buffer */
+		dma_unmap ( intel->dma, &intel->tx.map[tx_idx] );
+
 		/* Complete TX descriptor */
 		netdev_tx_complete_next ( netdev );
-		intel->tx.cons++;
+		intel->tx.ring.cons++;
 	}
 }
 
@@ -815,19 +847,22 @@ void intel_poll_rx ( struct net_device *netdev ) {
 	size_t len;
 
 	/* Check for received packets */
-	while ( intel->rx.cons != intel->rx.prod ) {
+	while ( intel->rx.ring.cons != intel->rx.ring.prod ) {
 
 		/* Get next receive descriptor */
-		rx_idx = ( intel->rx.cons % INTEL_NUM_RX_DESC );
-		rx = &intel->rx.desc[rx_idx];
+		rx_idx = ( intel->rx.ring.cons % INTEL_NUM_RX_DESC );
+		rx = &intel->rx.ring.desc[rx_idx];
 
 		/* Stop if descriptor is still in use */
 		if ( ! ( rx->status & cpu_to_le32 ( INTEL_DESC_STATUS_DD ) ) )
 			return;
 
+		/* Unmap I/O buffer */
+		dma_unmap ( intel->dma, &intel->rx.map[rx_idx] );
+
 		/* Populate I/O buffer */
-		iobuf = intel->rx_iobuf[rx_idx];
-		intel->rx_iobuf[rx_idx] = NULL;
+		iobuf = intel->rx.iobuf[rx_idx];
+		intel->rx.iobuf[rx_idx] = NULL;
 		len = le16_to_cpu ( rx->length );
 		iob_put ( iobuf, len );
 
@@ -842,7 +877,7 @@ void intel_poll_rx ( struct net_device *netdev ) {
 				intel, rx_idx, len );
 			netdev_rx ( netdev, iobuf );
 		}
-		intel->rx.cons++;
+		intel->rx.ring.cons++;
 	}
 }
 
@@ -948,11 +983,12 @@ static int intel_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( intel, 0, sizeof ( *intel ) );
+	intel->dma = &pci->dma;
 	intel->port = PCI_FUNC ( pci->busdevfn );
 	intel->flags = pci->id->driver_data;
-	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTEL_TD,
+	intel_init_ring ( &intel->tx.ring, INTEL_NUM_TX_DESC, INTEL_TD,
 			  intel_describe_tx );
-	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTEL_RD,
+	intel_init_ring ( &intel->rx.ring, INTEL_NUM_RX_DESC, INTEL_RD,
 			  intel_describe_rx );
 
 	/* Fix up PCI device */
