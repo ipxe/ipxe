@@ -977,7 +977,6 @@ static int nii_transmit ( struct net_device *netdev,
 	memset ( &cpb, 0, sizeof ( cpb ) );
 	cpb.FrameAddr = virt_to_bus ( iobuf->data );
 	cpb.DataLen = iob_len ( iobuf );
-	cpb.MediaheaderLen = netdev->ll_protocol->ll_header_len;
 
 	/* Transmit packet */
 	op = NII_OP ( PXE_OPCODE_TRANSMIT,
