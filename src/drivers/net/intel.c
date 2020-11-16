@@ -535,9 +535,9 @@ int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	dctl |= INTEL_xDCTL_ENABLE;
 	writel ( dctl, intel->regs + ring->reg + INTEL_xDCTL );
 
-	DBGC ( intel, "INTEL %p ring %05x is at [%08llx,%08llx)\n",
-	       intel, ring->reg, ( ( unsigned long long ) address ),
-	       ( ( unsigned long long ) address + ring->len ) );
+	DBGC ( intel, "INTEL %p ring %05x is at [%08lx,%08lx)\n",
+	       intel, ring->reg, virt_to_phys ( ring->desc ),
+	       ( virt_to_phys ( ring->desc ) + ring->len ) );
 
 	return 0;
 }
@@ -599,9 +599,9 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 		address = map->addr;
 		intel->rx.ring.describe ( rx, address, 0 );
 
-		DBGC2 ( intel, "INTEL %p RX %d is [%llx,%llx)\n", intel, rx_idx,
-			( ( unsigned long long ) address ),
-			( ( unsigned long long ) address + INTEL_RX_MAX_LEN ) );
+		DBGC2 ( intel, "INTEL %p RX %d is [%lx,%lx)\n",
+			intel, rx_idx, virt_to_phys ( iobuf->data ),
+			( virt_to_phys ( iobuf->data ) + INTEL_RX_MAX_LEN ) );
 		refilled++;
 	}
 
@@ -795,9 +795,9 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	profile_stop ( &intel_vm_tx_profiler );
 	profile_exclude ( &intel_vm_tx_profiler );
 
-	DBGC2 ( intel, "INTEL %p TX %d is [%llx,%llx)\n", intel, tx_idx,
-		( ( unsigned long long ) address ),
-		( ( unsigned long long ) address + len ) );
+	DBGC2 ( intel, "INTEL %p TX %d is [%lx,%lx)\n",
+		intel, tx_idx, virt_to_phys ( iobuf->data ),
+		( virt_to_phys ( iobuf->data ) + len ) );
 
 	return 0;
 }
