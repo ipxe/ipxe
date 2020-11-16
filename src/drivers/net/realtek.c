@@ -507,7 +507,6 @@ static void realtek_check_link ( struct net_device *netdev ) {
  */
 static int realtek_create_buffer ( struct realtek_nic *rtl ) {
 	size_t len = ( RTL_RXBUF_LEN + RTL_RXBUF_PAD );
-	physaddr_t address;
 
 	/* Do nothing unless in legacy mode */
 	if ( ! rtl->legacy )
@@ -518,14 +517,13 @@ static int realtek_create_buffer ( struct realtek_nic *rtl ) {
 				      &rtl->rxbuf.map );
 	if ( ! rtl->rxbuf.data )
 		return -ENOMEM;
-	address = rtl->rxbuf.map.addr;
 
 	/* Program buffer address */
-	writel ( address, rtl->regs + RTL_RBSTART );
-	DBGC ( rtl, "REALTEK %p receive buffer is at [%08llx,%08llx,%08llx)\n",
-	       rtl, ( ( unsigned long long ) address ),
-	       ( ( unsigned long long ) address + RTL_RXBUF_LEN ),
-	       ( ( unsigned long long ) address + len ) );
+	writel ( rtl->rxbuf.map.addr, rtl->regs + RTL_RBSTART );
+	DBGC ( rtl, "REALTEK %p receive buffer is at [%08lx,%08lx,%08lx)\n",
+	       rtl, virt_to_phys ( rtl->rxbuf.data ),
+	       ( virt_to_phys ( rtl->rxbuf.data ) + RTL_RXBUF_LEN ),
+	       ( virt_to_phys ( rtl->rxbuf.data ) + len ) );
 
 	return 0;
 }
@@ -580,9 +578,9 @@ static int realtek_create_ring ( struct realtek_nic *rtl,
 	writel ( ( ( ( uint64_t ) address ) >> 32 ),
 		 rtl->regs + ring->reg + 4 );
 	writel ( ( address & 0xffffffffUL ), rtl->regs + ring->reg );
-	DBGC ( rtl, "REALTEK %p ring %02x is at [%08llx,%08llx)\n",
-	       rtl, ring->reg, ( ( unsigned long long ) address ),
-	       ( ( unsigned long long ) address + ring->len ) );
+	DBGC ( rtl, "REALTEK %p ring %02x is at [%08lx,%08lx)\n",
+	       rtl, ring->reg, virt_to_phys ( ring->desc ),
+	       ( virt_to_phys ( ring->desc ) + ring->len ) );
 
 	return 0;
 }
@@ -657,9 +655,9 @@ static void realtek_refill_rx ( struct realtek_nic *rtl ) {
 			      ( is_last ? cpu_to_le16 ( RTL_DESC_EOR ) : 0 ) );
 		wmb();
 
-		DBGC2 ( rtl, "REALTEK %p RX %d is [%llx,%llx)\n", rtl, rx_idx,
-			( ( unsigned long long ) map->addr ),
-			( ( unsigned long long ) map->addr + RTL_RX_MAX_LEN ) );
+		DBGC2 ( rtl, "REALTEK %p RX %d is [%lx,%lx)\n",
+			rtl, rx_idx, virt_to_phys ( iobuf->data ),
+			( virt_to_phys ( iobuf->data ) + RTL_RX_MAX_LEN ) );
 	}
 }
 
@@ -829,9 +827,9 @@ static int realtek_transmit ( struct net_device *netdev,
 		writeb ( RTL_TPPOLL_NPQ, rtl->regs + rtl->tppoll );
 	}
 
-	DBGC2 ( rtl, "REALTEK %p TX %d is [%llx,%llx)\n", rtl, tx_idx,
-		( ( unsigned long long ) address ),
-		( ( ( unsigned long long ) address ) + iob_len ( iobuf ) ) );
+	DBGC2 ( rtl, "REALTEK %p TX %d is [%lx,%lx)\n",
+		rtl, tx_idx, virt_to_phys ( iobuf->data ),
+		virt_to_phys ( iobuf->data ) + iob_len ( iobuf ) );
 
 	return 0;
 }
