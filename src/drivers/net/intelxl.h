@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/pcimsix.h>
+#include <ipxe/dma.h>
 
 struct intelxl_nic;
 
@@ -562,6 +563,8 @@ struct intelxl_admin {
 	struct intelxl_admin_descriptor *desc;
 	/** Data buffers */
 	union intelxl_admin_buffer *buf;
+	/** DMA mapping */
+	struct dma_mapping map;
 	/** Queue index */
 	unsigned int index;
 
@@ -866,6 +869,8 @@ struct intelxl_ring {
 		/** Raw data */
 		void *raw;
 	} desc;
+	/** Descriptor ring DMA mapping */
+	struct dma_mapping map;
 	/** Producer index */
 	unsigned int prod;
 	/** Consumer index */
@@ -1025,10 +1030,40 @@ union intelxl_receive_address {
 	uint8_t raw[ETH_ALEN];
 };
 
+/** Transmit ring */
+struct intelxl_tx_ring {
+	/** Descriptor ring */
+	struct intelxl_ring ring;
+	/** DMA mappings */
+	struct dma_mapping map[INTELXL_TX_NUM_DESC];
+};
+
+/** Receive ring */
+struct intelxl_rx_ring {
+	/** Descriptor ring */
+	struct intelxl_ring ring;
+	/** I/O buffers */
+	struct io_buffer *iobuf[INTELXL_RX_NUM_DESC];
+	/** DMA mappings */
+	struct dma_mapping map[INTELXL_RX_NUM_DESC];
+};
+
+/** MSI-X interrupt */
+struct intelxl_msix {
+	/** PCI capability */
+	struct pci_msix cap;
+	/** MSI-X dummy interrupt target */
+	uint32_t msg;
+	/** DMA mapping for dummy interrupt target */
+	struct dma_mapping map;
+};
+
 /** An Intel 40Gigabit network card */
 struct intelxl_nic {
 	/** Registers */
 	void *regs;
+	/** DMA device */
+	struct dma_device *dma;
 	/** Maximum frame size */
 	size_t mfs;
 
@@ -1046,12 +1081,10 @@ struct intelxl_nic {
 	unsigned int qset;
 	/** Interrupt control register */
 	unsigned int intr;
-	/** MSI-X capability */
-	struct pci_msix msix;
-	/** MSI-X dummy interrupt target */
-	uint32_t msg;
 	/** PCI Express capability offset */
 	unsigned int exp;
+	/** MSI-X interrupt */
+	struct intelxl_msix msix;
 
 	/** Admin command queue */
 	struct intelxl_admin command;
@@ -1065,12 +1098,10 @@ struct intelxl_nic {
 	/** Current VF event data buffer */
 	union intelxl_admin_buffer vbuf;
 
-	/** Transmit descriptor ring */
-	struct intelxl_ring tx;
-	/** Receive descriptor ring */
-	struct intelxl_ring rx;
-	/** Receive I/O buffers */
-	struct io_buffer *rx_iobuf[INTELXL_RX_NUM_DESC];
+	/** Transmit ring */
+	struct intelxl_tx_ring tx;
+	/** Receive ring */
+	struct intelxl_rx_ring rx;
 };
 
 extern int intelxl_msix_enable ( struct intelxl_nic *intelxl,
@@ -1090,7 +1121,7 @@ extern int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 				struct intelxl_ring *ring );
 extern void intelxl_free_ring ( struct intelxl_nic *intelxl,
 				struct intelxl_ring *ring );
-extern void intelxl_empty_rx ( struct intelxl_nic *intelxl );
+extern void intelxl_flush ( struct intelxl_nic *intelxl );
 extern int intelxl_transmit ( struct net_device *netdev,
 			      struct io_buffer *iobuf );
 extern void intelxl_poll ( struct net_device *netdev );

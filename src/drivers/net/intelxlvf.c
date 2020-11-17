@@ -298,9 +298,9 @@ void intelxlvf_admin_event ( struct net_device *netdev,
 		if ( intelxl->vret != 0 ) {
 			DBGC ( intelxl, "INTELXL %p admin VF command %#x "
 			       "error %d\n", intelxl, vopcode, intelxl->vret );
-			DBGC_HDA ( intelxl, virt_to_bus ( evt ), evt,
+			DBGC_HDA ( intelxl, virt_to_phys ( evt ), evt,
 				   sizeof ( *evt ) );
-			DBGC_HDA ( intelxl, virt_to_bus ( buf ), buf,
+			DBGC_HDA ( intelxl, virt_to_phys ( buf ), buf,
 				   le16_to_cpu ( evt->len ) );
 		}
 		return;
@@ -314,8 +314,10 @@ void intelxlvf_admin_event ( struct net_device *netdev,
 	default:
 		DBGC ( intelxl, "INTELXL %p unrecognised VF event %#x:\n",
 		       intelxl, vopcode );
-		DBGC_HDA ( intelxl, 0, evt, sizeof ( *evt ) );
-		DBGC_HDA ( intelxl, 0, buf, le16_to_cpu ( evt->len ) );
+		DBGC_HDA ( intelxl, virt_to_phys ( evt ), evt,
+			   sizeof ( *evt ) );
+		DBGC_HDA ( intelxl, virt_to_phys ( buf ), buf,
+			   le16_to_cpu ( evt->len ) );
 		break;
 	}
 }
@@ -378,12 +380,12 @@ static int intelxlvf_admin_configure ( struct net_device *netdev ) {
 	buf->cfg.count = cpu_to_le16 ( 1 );
 	buf->cfg.tx.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.tx.count = cpu_to_le16 ( INTELXL_TX_NUM_DESC );
-	buf->cfg.tx.base = cpu_to_le64 ( virt_to_bus ( intelxl->tx.desc.raw ) );
+	buf->cfg.tx.base = cpu_to_le64 ( intelxl->tx.ring.map.addr );
 	buf->cfg.rx.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.rx.count = cpu_to_le32 ( INTELXL_RX_NUM_DESC );
 	buf->cfg.rx.len = cpu_to_le32 ( intelxl->mfs );
 	buf->cfg.rx.mfs = cpu_to_le32 ( intelxl->mfs );
-	buf->cfg.rx.base = cpu_to_le64 ( virt_to_bus ( intelxl->rx.desc.raw ) );
+	buf->cfg.rx.base = cpu_to_le64 ( intelxl->rx.ring.map.addr );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
@@ -497,11 +499,11 @@ static int intelxlvf_open ( struct net_device *netdev ) {
 			   INTELXL_ALIGN - 1 ) & ~( INTELXL_ALIGN - 1 ) );
 
 	/* Allocate transmit descriptor ring */
-	if ( ( rc = intelxl_alloc_ring ( intelxl, &intelxl->tx ) ) != 0 )
+	if ( ( rc = intelxl_alloc_ring ( intelxl, &intelxl->tx.ring ) ) != 0 )
 		goto err_alloc_tx;
 
 	/* Allocate receive descriptor ring */
-	if ( ( rc = intelxl_alloc_ring ( intelxl, &intelxl->rx ) ) != 0 )
+	if ( ( rc = intelxl_alloc_ring ( intelxl, &intelxl->rx.ring ) ) != 0 )
 		goto err_alloc_rx;
 
 	/* Configure queues */
@@ -527,9 +529,9 @@ static int intelxlvf_open ( struct net_device *netdev ) {
  err_enable:
  err_irq_map:
  err_configure:
-	intelxl_free_ring ( intelxl, &intelxl->rx );
+	intelxl_free_ring ( intelxl, &intelxl->rx.ring );
  err_alloc_rx:
-	intelxl_free_ring ( intelxl, &intelxl->tx );
+	intelxl_free_ring ( intelxl, &intelxl->tx.ring );
  err_alloc_tx:
 	return rc;
 }
@@ -550,13 +552,13 @@ static void intelxlvf_close ( struct net_device *netdev ) {
 	}
 
 	/* Free receive descriptor ring */
-	intelxl_free_ring ( intelxl, &intelxl->rx );
+	intelxl_free_ring ( intelxl, &intelxl->rx.ring );
 
 	/* Free transmit descriptor ring */
-	intelxl_free_ring ( intelxl, &intelxl->tx );
+	intelxl_free_ring ( intelxl, &intelxl->tx.ring );
 
-	/* Discard any unused receive buffers */
-	intelxl_empty_rx ( intelxl );
+	/* Flush unused buffers */
+	intelxl_flush ( intelxl );
 }
 
 /** Network device operations */
@@ -596,16 +598,17 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
+	intelxl->dma = &pci->dma;
 	intelxl->intr = INTELXLVF_VFINT_DYN_CTL0;
 	intelxl_init_admin ( &intelxl->command, INTELXLVF_ADMIN,
 			     &intelxlvf_admin_command_offsets );
 	intelxl_init_admin ( &intelxl->event, INTELXLVF_ADMIN,
 			     &intelxlvf_admin_event_offsets );
-	intelxlvf_init_ring ( &intelxl->tx, INTELXL_TX_NUM_DESC,
-			      sizeof ( intelxl->tx.desc.tx[0] ),
+	intelxlvf_init_ring ( &intelxl->tx.ring, INTELXL_TX_NUM_DESC,
+			      sizeof ( intelxl->tx.ring.desc.tx[0] ),
 			      INTELXLVF_QTX_TAIL );
-	intelxlvf_init_ring ( &intelxl->rx, INTELXL_RX_NUM_DESC,
-			      sizeof ( intelxl->rx.desc.rx[0] ),
+	intelxlvf_init_ring ( &intelxl->rx.ring, INTELXL_RX_NUM_DESC,
+			      sizeof ( intelxl->rx.ring.desc.rx[0] ),
 			      INTELXLVF_QRX_TAIL );
 
 	/* Fix up PCI device */
