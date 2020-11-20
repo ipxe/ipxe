@@ -34,8 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
 				  EFI_SYSTEM_TABLE *systab ) {
-	EFI_BOOT_SERVICES *bs;
-	EFI_TPL saved_tpl;
+	static struct efi_saved_tpl tpl; /* avoid triggering stack protector */
 	EFI_STATUS efirc;
 
 	/* Initialise stack cookie */
@@ -46,15 +45,14 @@ EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
 		return efirc;
 
 	/* Raise TPL */
-	bs = efi_systab->BootServices;
-	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_raise_tpl ( &tpl );
 
 	/* Initialise iPXE environment */
 	initialise();
 	startup();
 
 	/* Restore TPL */
-	bs->RestoreTPL ( saved_tpl );
+	efi_restore_tpl ( &tpl );
 
 	return 0;
 }

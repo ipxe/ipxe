@@ -47,6 +47,9 @@ EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
  */
 EFI_SYSTEM_TABLE * _C2 ( PLATFORM, _systab );
 
+/** External task priority level */
+EFI_TPL efi_external_tpl = TPL_APPLICATION;
+
 /** EFI shutdown is in progress */
 int efi_shutdown_in_progress;
 
@@ -360,4 +363,35 @@ __attribute__ (( noreturn )) void __stack_chk_fail ( void ) {
 	/* If the exit fails for any reason, lock the system */
 	while ( 1 ) {}
 
+}
+
+/**
+ * Raise task priority level to TPL_CALLBACK
+ *
+ * @v tpl		Saved TPL
+ */
+void efi_raise_tpl ( struct efi_saved_tpl *tpl ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Record current external TPL */
+	tpl->previous = efi_external_tpl;
+
+	/* Raise TPL and record previous TPL as new external TPL */
+	tpl->current = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_external_tpl = tpl->current;
+}
+
+/**
+ * Restore task priority level
+ *
+ * @v tpl		Saved TPL
+ */
+void efi_restore_tpl ( struct efi_saved_tpl *tpl ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Restore external TPL */
+	efi_external_tpl = tpl->previous;
+
+	/* Restore TPL */
+	bs->RestoreTPL ( tpl->current );
 }

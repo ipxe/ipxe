@@ -97,8 +97,17 @@ static unsigned long efi_currticks ( void ) {
 	 * gain us any substantive benefits (since even with such
 	 * calls we would still be suffering from the limitations of a
 	 * polling design), we instead choose to run at TPL_CALLBACK
-	 * almost all of the time, dropping to TPL_APPLICATION to
-	 * allow timer ticks to occur.
+	 * almost all of the time, dropping to a lower TPL to allow
+	 * timer ticks to occur.
+	 *
+	 * We record the external TPL at the point of entry into iPXE,
+	 * and drop back only as far as this external TPL.  This
+	 * avoids the unexpected behaviour that may arise from having
+	 * iPXE temporarily drop to TPL_APPLICATION in the middle of
+	 * an entry point invoked at TPL_CALLBACK.  The side effect is
+	 * that iPXE's view of the system time is effectively frozen
+	 * for the duration of any call made in to iPXE at
+	 * TPL_CALLBACK or higher.
 	 *
 	 *
 	 * For added excitement, UEFI provides no clean way for device
@@ -127,7 +136,7 @@ static unsigned long efi_currticks ( void ) {
 	if ( efi_shutdown_in_progress ) {
 		efi_jiffies++;
 	} else {
-		bs->RestoreTPL ( TPL_APPLICATION );
+		bs->RestoreTPL ( efi_external_tpl );
 		bs->RaiseTPL ( TPL_CALLBACK );
 	}
 

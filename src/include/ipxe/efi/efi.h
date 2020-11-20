@@ -68,6 +68,14 @@ typedef struct {} *EFI_HANDLE;
 #include <ipxe/version.h>
 #include <ipxe/profile.h>
 
+/** An EFI saved task priority level */
+struct efi_saved_tpl {
+	/** Current external TPL */
+	EFI_TPL current;
+	/** Previous external TPL */
+	EFI_TPL previous;
+};
+
 /** An EFI protocol used by iPXE */
 struct efi_protocol {
 	/** GUID */
@@ -220,6 +228,7 @@ extern EFI_HANDLE efi_image_handle;
 extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 extern EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
 extern EFI_SYSTEM_TABLE *efi_systab;
+extern EFI_TPL efi_external_tpl;
 extern int efi_shutdown_in_progress;
 
 extern const __attribute__ (( pure )) char *
@@ -314,5 +323,7 @@ efi_init_stack_guard ( EFI_HANDLE handle ) {
 
 extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
+extern void efi_raise_tpl ( struct efi_saved_tpl *tpl );
+extern void efi_restore_tpl ( struct efi_saved_tpl *tpl );
 
 #endif /* _IPXE_EFI_H */

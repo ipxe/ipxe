@@ -551,7 +551,6 @@ efi_usb_control_transfer ( EFI_USB_IO_PROTOCOL *usbio,
 			   EFI_USB_DATA_DIRECTION direction,
 			   UINT32 timeout, VOID *data, UINTN len,
 			   UINT32 *status ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_usb_interface *usbintf =
 		container_of ( usbio, struct efi_usb_interface, usbio );
 	struct efi_usb_device *usbdev = usbintf->usbdev;
@@ -559,7 +558,7 @@ efi_usb_control_transfer ( EFI_USB_IO_PROTOCOL *usbio,
 				 USB_REQUEST_TYPE ( packet->Request ) );
 	unsigned int value = le16_to_cpu ( packet->Value );
 	unsigned int index = le16_to_cpu ( packet->Index );
-	EFI_TPL saved_tpl;
+	struct efi_saved_tpl tpl;
 	int rc;
 
 	DBGC2 ( usbdev, "USBDEV %s control %04x:%04x:%04x:%04x %s %dms "
@@ -569,7 +568,7 @@ efi_usb_control_transfer ( EFI_USB_IO_PROTOCOL *usbio,
 		( ( size_t ) len ) );
 
 	/* Raise TPL */
-	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_raise_tpl ( &tpl );
 
 	/* Clear status */
 	*status = 0;
@@ -613,7 +612,7 @@ efi_usb_control_transfer ( EFI_USB_IO_PROTOCOL *usbio,
 
  err_control:
  err_change_config:
-	bs->RestoreTPL ( saved_tpl );
+	efi_restore_tpl ( &tpl );
 	return EFIRC ( rc );
 }
 
@@ -631,12 +630,11 @@ efi_usb_control_transfer ( EFI_USB_IO_PROTOCOL *usbio,
 static EFI_STATUS EFIAPI
 efi_usb_bulk_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint, VOID *data,
 			UINTN *len, UINTN timeout, UINT32 *status ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_usb_interface *usbintf =
 		container_of ( usbio, struct efi_usb_interface, usbio );
 	struct efi_usb_device *usbdev = usbintf->usbdev;
 	size_t actual = *len;
-	EFI_TPL saved_tpl;
+	struct efi_saved_tpl tpl;
 	int rc;
 
 	DBGC2 ( usbdev, "USBDEV %s bulk %s %p+%zx %dms\n", usbintf->name,
@@ -644,7 +642,7 @@ efi_usb_bulk_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint, VOID *data,
 		( ( size_t ) *len ), ( ( unsigned int ) timeout ) );
 
 	/* Raise TPL */
-	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_raise_tpl ( &tpl );
 
 	/* Clear status */
 	*status = 0;
@@ -659,7 +657,7 @@ efi_usb_bulk_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint, VOID *data,
 	}
 
  err_transfer:
-	bs->RestoreTPL ( saved_tpl );
+	efi_restore_tpl ( &tpl );
 	return EFIRC ( rc );
 }
 
@@ -678,12 +676,11 @@ static EFI_STATUS EFIAPI
 efi_usb_sync_interrupt_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint,
 				  VOID *data, UINTN *len, UINTN timeout,
 				  UINT32 *status ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_usb_interface *usbintf =
 		container_of ( usbio, struct efi_usb_interface, usbio );
 	struct efi_usb_device *usbdev = usbintf->usbdev;
 	size_t actual = *len;
-	EFI_TPL saved_tpl;
+	struct efi_saved_tpl tpl;
 	int rc;
 
 	DBGC2 ( usbdev, "USBDEV %s sync intr %s %p+%zx %dms\n", usbintf->name,
@@ -691,7 +688,7 @@ efi_usb_sync_interrupt_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint,
 		( ( size_t ) *len ), ( ( unsigned int ) timeout ) );
 
 	/* Raise TPL */
-	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_raise_tpl ( &tpl );
 
 	/* Clear status */
 	*status = 0;
@@ -706,7 +703,7 @@ efi_usb_sync_interrupt_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint,
 	}
 
  err_transfer:
-	bs->RestoreTPL ( saved_tpl );
+	efi_restore_tpl ( &tpl );
 	return EFIRC ( rc );
 }
 
@@ -727,11 +724,10 @@ efi_usb_async_interrupt_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint,
 				   BOOLEAN start, UINTN interval, UINTN len,
 				   EFI_ASYNC_USB_TRANSFER_CALLBACK callback,
 				   VOID *context ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_usb_interface *usbintf =
 		container_of ( usbio, struct efi_usb_interface, usbio );
 	struct efi_usb_device *usbdev = usbintf->usbdev;
-	EFI_TPL saved_tpl;
+	struct efi_saved_tpl tpl;
 	int rc;
 
 	DBGC2 ( usbdev, "USBDEV %s async intr %s len %#zx int %d %p/%p\n",
@@ -741,7 +737,7 @@ efi_usb_async_interrupt_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint,
 		callback, context );
 
 	/* Raise TPL */
-	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_raise_tpl ( &tpl );
 
 	/* Start/stop transfer as applicable */
 	if ( start ) {
@@ -763,7 +759,7 @@ efi_usb_async_interrupt_transfer ( EFI_USB_IO_PROTOCOL *usbio, UINT8 endpoint,
 	}
 
  err_start:
-	bs->RestoreTPL ( saved_tpl );
+	efi_restore_tpl ( &tpl );
 	return EFIRC ( rc );
 }
 
@@ -959,9 +955,9 @@ efi_usb_get_string_descriptor ( EFI_USB_IO_PROTOCOL *usbio, UINT16 language,
 		container_of ( usbio, struct efi_usb_interface, usbio );
 	struct efi_usb_device *usbdev = usbintf->usbdev;
 	struct usb_descriptor_header header;
+	struct efi_saved_tpl tpl;
 	VOID *buffer;
 	size_t len;
-	EFI_TPL saved_tpl;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -969,7 +965,7 @@ efi_usb_get_string_descriptor ( EFI_USB_IO_PROTOCOL *usbio, UINT16 language,
 		usbintf->name, language, index );
 
 	/* Raise TPL */
-	saved_tpl = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_raise_tpl ( &tpl );
 
 	/* Read descriptor header */
 	if ( ( rc = usb_get_descriptor ( usbdev->func->usb, 0,
@@ -1012,7 +1008,7 @@ efi_usb_get_string_descriptor ( EFI_USB_IO_PROTOCOL *usbio, UINT16 language,
 	memset ( ( buffer + len - sizeof ( header ) ), 0, sizeof ( **string ) );
 
 	/* Restore TPL */
-	bs->RestoreTPL ( saved_tpl );
+	efi_restore_tpl ( &tpl );
 
 	/* Return allocated string */
 	*string = buffer;
@@ -1023,7 +1019,7 @@ efi_usb_get_string_descriptor ( EFI_USB_IO_PROTOCOL *usbio, UINT16 language,
  err_alloc:
  err_len:
  err_get_header:
-	bs->RestoreTPL ( saved_tpl );
+	efi_restore_tpl ( &tpl );
 	return EFIRC ( rc );
 }
 

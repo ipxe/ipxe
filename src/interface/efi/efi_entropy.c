@@ -79,8 +79,8 @@ static int efi_entropy_enable ( void ) {
 	DBGC ( &tick, "ENTROPY %s RNG protocol\n",
 	       ( efirng ? "has" : "has no" ) );
 
-	/* Drop to TPL_APPLICATION to allow timer tick event to take place */
-	bs->RestoreTPL ( TPL_APPLICATION );
+	/* Drop to external TPL to allow timer tick event to take place */
+	bs->RestoreTPL ( efi_external_tpl );
 
 	/* Create timer tick event */
 	if ( ( efirc = bs->CreateEvent ( EVT_TIMER, TPL_NOTIFY, NULL, NULL,
