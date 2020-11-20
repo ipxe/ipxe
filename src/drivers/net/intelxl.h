@@ -1005,6 +1005,12 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 #define INTELXL_PRTGL_SAH_MFS_GET(x)	( (x) >> 16 )	/**< Max frame size */
 #define INTELXL_PRTGL_SAH_MFS_SET(x)	( (x) << 16 )	/**< Max frame size */
 
+/** Physical Function MAC Address Low Register */
+#define INTELXL_PRTPM_SAL 0x1e4440
+
+/** Physical Function MAC Address High Register */
+#define INTELXL_PRTPM_SAH 0x1e44c0
+
 /** Receive address */
 union intelxl_receive_address {
 	struct {

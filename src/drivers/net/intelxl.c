@@ -87,15 +87,16 @@ static int intelxl_reset ( struct intelxl_nic *intelxl ) {
 static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
 			       struct net_device *netdev ) {
 	union intelxl_receive_address mac;
-	uint32_t prtgl_sal;
+	uint32_t prtpm_sal;
+	uint32_t prtpm_sah;
 	uint32_t prtgl_sah;
 	size_t mfs;
 
 	/* Read NVM-loaded address */
-	prtgl_sal = readl ( intelxl->regs + INTELXL_PRTGL_SAL );
-	prtgl_sah = readl ( intelxl->regs + INTELXL_PRTGL_SAH );
-	mac.reg.low = cpu_to_le32 ( prtgl_sal );
-	mac.reg.high = cpu_to_le32 ( prtgl_sah );
+	prtpm_sal = readl ( intelxl->regs + INTELXL_PRTPM_SAL );
+	prtpm_sah = readl ( intelxl->regs + INTELXL_PRTPM_SAH );
+	mac.reg.low = cpu_to_le32 ( prtpm_sal );
+	mac.reg.high = cpu_to_le32 ( prtpm_sah );
 
 	/* Check that address is valid */
 	if ( ! is_valid_ether_addr ( mac.raw ) ) {
@@ -110,6 +111,7 @@ static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
 	memcpy ( netdev->hw_addr, mac.raw, ETH_ALEN );
 
 	/* Get maximum frame size */
+	prtgl_sah = readl ( intelxl->regs + INTELXL_PRTGL_SAH );
 	mfs = INTELXL_PRTGL_SAH_MFS_GET ( prtgl_sah );
 	netdev->max_pkt_len = ( mfs - 4 /* CRC */ );
 
