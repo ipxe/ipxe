@@ -1643,6 +1643,7 @@ static struct net_device_operations intelxl_operations = {
 static int intelxl_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct intelxl_nic *intelxl;
+	uint32_t pffunc_rid;
 	uint32_t pfgen_portnum;
 	uint32_t pflan_qalloc;
 	int rc;
@@ -1658,7 +1659,6 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
-	intelxl->pf = PCI_FUNC ( pci->busdevfn );
 	intelxl->intr = INTELXL_PFINT_DYN_CTL0;
 	intelxl_init_admin ( &intelxl->command, INTELXL_ADMIN_CMD,
 			     &intelxl_admin_offsets );
@@ -1685,7 +1685,9 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	if ( ( rc = intelxl_reset ( intelxl ) ) != 0 )
 		goto err_reset;
 
-	/* Get port number and base queue number */
+	/* Get function number, port number and base queue number */
+	pffunc_rid = readl ( intelxl->regs + INTELXL_PFFUNC_RID );
+	intelxl->pf = INTELXL_PFFUNC_RID_FUNC_NUM ( pffunc_rid );
 	pfgen_portnum = readl ( intelxl->regs + INTELXL_PFGEN_PORTNUM );
 	intelxl->port = INTELXL_PFGEN_PORTNUM_PORT_NUM ( pfgen_portnum );
 	pflan_qalloc = readl ( intelxl->regs + INTELXL_PFLAN_QALLOC );

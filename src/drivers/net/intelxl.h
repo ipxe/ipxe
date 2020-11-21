@@ -985,6 +985,11 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 /** Time to delay for device reset, in milliseconds */
 #define INTELXL_RESET_DELAY_MS 100
 
+/** Function Requester ID Information Register */
+#define INTELXL_PFFUNC_RID 0x09c000
+#define INTELXL_PFFUNC_RID_FUNC_NUM(x) \
+	( ( (x) >> 0 ) & 0x3 )				/**< Function number */
+
 /** PF Queue Allocation Register */
 #define INTELXL_PFLAN_QALLOC 0x1c0400
 #define INTELXL_PFLAN_QALLOC_FIRSTQ(x) \
