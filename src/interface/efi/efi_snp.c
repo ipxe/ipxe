@@ -192,9 +192,11 @@ efi_snp_start ( EFI_SIMPLE_NETWORK_PROTOCOL *snp ) {
 
 	DBGC ( snpdev, "SNPDEV %p START\n", snpdev );
 
-	/* Fail if net device is currently claimed for use by iPXE */
-	if ( efi_snp_claimed )
-		return EFI_NOT_READY;
+	/* Allow start even if net device is currently claimed by iPXE */
+	if ( efi_snp_claimed ) {
+		DBGC ( snpdev, "SNPDEV %p allowing start while claimed\n",
+		       snpdev );
+	}
 
 	snpdev->started = 1;
 	efi_snp_set_state ( snpdev );
@@ -244,10 +246,16 @@ efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 	       snpdev, ( ( unsigned long ) extra_rx_bufsize ),
 	       ( ( unsigned long ) extra_tx_bufsize ) );
 
-	/* Fail if net device is currently claimed for use by iPXE */
+	/* Do nothing if net device is currently claimed for use by
+	 * iPXE.  Do not return an error, because this will cause
+	 * MnpDxe et al to fail to install the relevant child handles
+	 * and to leave behind a partially initialised device handle
+	 * that can cause a later system crash.
+	 */
 	if ( efi_snp_claimed ) {
-		rc = -EAGAIN;
-		goto err_claimed;
+		DBGC ( snpdev, "SNPDEV %p ignoring initialization while "
+		       "claimed\n", snpdev );
+		return 0;
 	}
 
 	/* Raise TPL */
@@ -263,7 +271,6 @@ efi_snp_initialize ( EFI_SIMPLE_NETWORK_PROTOCOL *snp,
 
  err_open:
 	efi_restore_tpl ( &tpl );
- err_claimed:
 	return EFIRC ( rc );
 }
 
