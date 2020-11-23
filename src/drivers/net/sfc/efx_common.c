@@ -2,11 +2,12 @@
  *
  * Driver datapath common code for Solarflare network cards
  *
- * Written by Shradha Shah <sshah@solarflare.com>
+ * Written by Shradha Shah, maintained by <pre-boot-drivers@xilinx.com>
  *
  * Copyright Fen Systems Ltd. 2005
  * Copyright Level 5 Networks Inc. 2005
- * Copyright 2006-2017 Solarflare Communications Inc.
+ * Copyright 2006-2019 Solarflare Communications Inc.
+ * Copyright 2019-2020 Xilinx Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
