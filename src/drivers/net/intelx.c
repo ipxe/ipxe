@@ -394,7 +394,6 @@ static int intelx_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( intel, 0, sizeof ( *intel ) );
-	intel->dma = &pci->dma;
 	intel->port = PCI_FUNC ( pci->busdevfn );
 	intel_init_ring ( &intel->tx.ring, INTEL_NUM_TX_DESC, INTELX_TD,
 			  intel_describe_tx );
@@ -410,6 +409,10 @@ static int intelx_probe ( struct pci_device *pci ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
+
+	/* Configure DMA */
+	intel->dma = &pci->dma;
+	dma_set_mask_64bit ( intel->dma );
 
 	/* Reset the NIC */
 	if ( ( rc = intelx_reset ( intel ) ) != 0 )
