@@ -1718,7 +1718,6 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
-	intelxl->dma = &pci->dma;
 	intelxl->intr = INTELXL_PFINT_DYN_CTL0;
 	intelxl_init_admin ( &intelxl->command, INTELXL_ADMIN_CMD,
 			     &intelxl_admin_offsets );
@@ -1740,6 +1739,10 @@ static int intelxl_probe ( struct pci_device *pci ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
+
+	/* Configure DMA */
+	intelxl->dma = &pci->dma;
+	dma_set_mask_64bit ( intelxl->dma );
 
 	/* Reset the NIC */
 	if ( ( rc = intelxl_reset ( intelxl ) ) != 0 )

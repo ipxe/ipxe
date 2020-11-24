@@ -598,7 +598,6 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
-	intelxl->dma = &pci->dma;
 	intelxl->intr = INTELXLVF_VFINT_DYN_CTL0;
 	intelxl_init_admin ( &intelxl->command, INTELXLVF_ADMIN,
 			     &intelxlvf_admin_command_offsets );
@@ -620,6 +619,10 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
+
+	/* Configure DMA */
+	intelxl->dma = &pci->dma;
+	dma_set_mask_64bit ( intelxl->dma );
 
 	/* Locate PCI Express capability */
 	intelxl->exp = pci_find_capability ( pci, PCI_CAP_ID_EXP );
