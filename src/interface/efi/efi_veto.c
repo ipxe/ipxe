@@ -226,6 +226,7 @@ void efi_veto_unload ( void ) {
 		DBGC ( driver, "EFIVETO unloading %s (%s)\n",
 		       efi_handle_name ( driver ), veto->name );
 		if ( ( efirc = bs->UnloadImage ( driver ) ) != 0 ) {
+			rc = -EEFI ( efirc );
 			DBGC ( driver, "EFIVETO could not unload %s: %s\n",
 			       efi_handle_name ( driver ), strerror ( rc ) );
 		}
