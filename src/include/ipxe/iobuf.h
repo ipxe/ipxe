@@ -215,6 +215,22 @@ static inline void iob_populate ( struct io_buffer *iobuf,
 	__iobuf; } )
 
 /**
+ * Map I/O buffer for DMA
+ *
+ * @v iobuf		I/O buffer
+ * @v dma		DMA device
+ * @v len		Length to map
+ * @v flags		Mapping flags
+ * @ret rc		Return status code
+ */
+static inline __always_inline int iob_map ( struct io_buffer *iobuf,
+					    struct dma_device *dma,
+					    size_t len, int flags ) {
+	return dma_map ( dma, &iobuf->map, virt_to_phys ( iobuf->data ),
+			 len, flags );
+}
+
+/**
  * Map I/O buffer for transmit DMA
  *
  * @v iobuf		I/O buffer
@@ -223,8 +239,7 @@ static inline void iob_populate ( struct io_buffer *iobuf,
  */
 static inline __always_inline int iob_map_tx ( struct io_buffer *iobuf,
 					       struct dma_device *dma ) {
-	return dma_map ( dma, &iobuf->map, virt_to_phys ( iobuf->data ),
-			 iob_len ( iobuf ), DMA_TX );
+	return iob_map ( iobuf, dma, iob_len ( iobuf ), DMA_TX );
 }
 
 /**
@@ -237,8 +252,7 @@ static inline __always_inline int iob_map_tx ( struct io_buffer *iobuf,
 static inline __always_inline int iob_map_rx ( struct io_buffer *iobuf,
 					       struct dma_device *dma ) {
 	assert ( iob_len ( iobuf ) == 0 );
-	return dma_map ( dma, &iobuf->map, virt_to_phys ( iobuf->data ),
-			 iob_tailroom ( iobuf ), DMA_RX );
+	return iob_map ( iobuf, dma, iob_tailroom ( iobuf ), DMA_RX );
 }
 
 /**
