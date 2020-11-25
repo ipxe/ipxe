@@ -380,12 +380,14 @@ static int intelxlvf_admin_configure ( struct net_device *netdev ) {
 	buf->cfg.count = cpu_to_le16 ( 1 );
 	buf->cfg.tx.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.tx.count = cpu_to_le16 ( INTELXL_TX_NUM_DESC );
-	buf->cfg.tx.base = cpu_to_le64 ( intelxl->tx.ring.map.addr );
+	buf->cfg.tx.base = cpu_to_le64 ( dma ( &intelxl->tx.ring.map,
+					       intelxl->tx.ring.desc.raw ) );
 	buf->cfg.rx.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.rx.count = cpu_to_le32 ( INTELXL_RX_NUM_DESC );
 	buf->cfg.rx.len = cpu_to_le32 ( intelxl->mfs );
 	buf->cfg.rx.mfs = cpu_to_le32 ( intelxl->mfs );
-	buf->cfg.rx.base = cpu_to_le64 ( intelxl->rx.ring.map.addr );
+	buf->cfg.rx.base = cpu_to_le64 ( dma ( &intelxl->rx.ring.map,
+					       intelxl->rx.ring.desc.raw ) );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )

@@ -506,6 +506,7 @@ static void realtek_check_link ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int realtek_create_buffer ( struct realtek_nic *rtl ) {
+	struct realtek_rx_buffer *rxbuf = &rtl->rxbuf;
 	size_t len = ( RTL_RXBUF_LEN + RTL_RXBUF_PAD );
 
 	/* Do nothing unless in legacy mode */
@@ -513,17 +514,16 @@ static int realtek_create_buffer ( struct realtek_nic *rtl ) {
 		return 0;
 
 	/* Allocate buffer */
-	rtl->rxbuf.data = dma_alloc ( rtl->dma, len, RTL_RXBUF_ALIGN,
-				      &rtl->rxbuf.map );
-	if ( ! rtl->rxbuf.data )
+	rxbuf->data = dma_alloc ( rtl->dma, len, RTL_RXBUF_ALIGN, &rxbuf->map );
+	if ( ! rxbuf->data )
 		return -ENOMEM;
 
 	/* Program buffer address */
-	writel ( rtl->rxbuf.map.addr, rtl->regs + RTL_RBSTART );
+	writel ( dma ( &rxbuf->map, rxbuf->data ), rtl->regs + RTL_RBSTART );
 	DBGC ( rtl, "REALTEK %p receive buffer is at [%08lx,%08lx,%08lx)\n",
-	       rtl, virt_to_phys ( rtl->rxbuf.data ),
-	       ( virt_to_phys ( rtl->rxbuf.data ) + RTL_RXBUF_LEN ),
-	       ( virt_to_phys ( rtl->rxbuf.data ) + len ) );
+	       rtl, virt_to_phys ( rxbuf->data ),
+	       ( virt_to_phys ( rxbuf->data ) + RTL_RXBUF_LEN ),
+	       ( virt_to_phys ( rxbuf->data ) + len ) );
 
 	return 0;
 }
@@ -534,6 +534,7 @@ static int realtek_create_buffer ( struct realtek_nic *rtl ) {
  * @v rtl		Realtek device
  */
 static void realtek_destroy_buffer ( struct realtek_nic *rtl ) {
+	struct realtek_rx_buffer *rxbuf = &rtl->rxbuf;
 	size_t len = ( RTL_RXBUF_LEN + RTL_RXBUF_PAD );
 
 	/* Do nothing unless in legacy mode */
@@ -544,9 +545,9 @@ static void realtek_destroy_buffer ( struct realtek_nic *rtl ) {
 	writel ( 0, rtl->regs + RTL_RBSTART );
 
 	/* Free buffer */
-	dma_free ( rtl->dma, rtl->rxbuf.data, len, &rtl->rxbuf.map );
-	rtl->rxbuf.data = NULL;
-	rtl->rxbuf.offset = 0;
+	dma_free ( rtl->dma, rxbuf->data, len, &rxbuf->map );
+	rxbuf->data = NULL;
+	rxbuf->offset = 0;
 }
 
 /**
@@ -574,7 +575,7 @@ static int realtek_create_ring ( struct realtek_nic *rtl,
 	memset ( ring->desc, 0, ring->len );
 
 	/* Program ring address */
-	address = ring->map.addr;
+	address = dma ( &ring->map, ring->desc );
 	writel ( ( ( ( uint64_t ) address ) >> 32 ),
 		 rtl->regs + ring->reg + 4 );
 	writel ( ( address & 0xffffffffUL ), rtl->regs + ring->reg );
@@ -648,7 +649,7 @@ static void realtek_refill_rx ( struct realtek_nic *rtl ) {
 		rtl->rx.ring.prod++;
 
 		/* Populate receive descriptor */
-		rx->address = cpu_to_le64 ( map->addr );
+		rx->address = cpu_to_le64 ( dma ( map, iobuf->data ) );
 		rx->length = cpu_to_le16 ( RTL_RX_MAX_LEN );
 		wmb();
 		rx->flags = ( cpu_to_le16 ( RTL_DESC_OWN ) |
@@ -797,7 +798,7 @@ static int realtek_transmit ( struct net_device *netdev,
 	/* Map I/O buffer */
 	if ( ( rc = dma_map_tx_iob ( rtl->dma, iobuf, map ) ) != 0 )
 		return rc;
-	address = map->addr;
+	address = dma ( map, iobuf->data );
 
 	/* Update producer index */
 	rtl->tx.ring.prod++;

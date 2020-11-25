@@ -335,7 +335,7 @@ static int efipci_dma_map ( struct dma_device *dma, physaddr_t addr, size_t len,
 	int rc;
 
 	/* Sanity check */
-	assert ( map->addr == 0 );
+	assert ( map->offset == 0 );
 	assert ( map->token == NULL );
 
 	/* Determine operation */
@@ -374,7 +374,7 @@ static int efipci_dma_map ( struct dma_device *dma, physaddr_t addr, size_t len,
 	}
 
 	/* Populate mapping */
-	map->addr = bus;
+	map->offset = ( bus - addr );
 	map->token = mapping;
 
 	/* Increment mapping count (for debugging) */
@@ -408,7 +408,7 @@ static void efipci_dma_unmap ( struct dma_device *dma,
 	pci_io->Unmap ( pci_io, map->token );
 
 	/* Clear mapping */
-	map->addr = 0;
+	map->offset = 0;
 	map->token = NULL;
 
 	/* Decrement mapping count (for debugging) */

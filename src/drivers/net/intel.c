@@ -513,7 +513,7 @@ int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	memset ( ring->desc, 0, ring->len );
 
 	/* Program ring address */
-	address = ring->map.addr;
+	address = dma ( &ring->map, ring->desc );
 	writel ( ( address & 0xffffffffUL ),
 		 ( intel->regs + ring->reg + INTEL_xDBAL ) );
 	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {
@@ -571,7 +571,6 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 	struct dma_mapping *map;
 	unsigned int rx_idx;
 	unsigned int rx_tail;
-	physaddr_t address;
 	unsigned int refilled = 0;
 
 	/* Refill ring */
@@ -596,8 +595,7 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 		intel->rx.ring.prod++;
 
 		/* Populate receive descriptor */
-		address = map->addr;
-		intel->rx.ring.describe ( rx, address, 0 );
+		intel->rx.ring.describe ( rx, dma ( map, iobuf->data ), 0 );
 
 		DBGC2 ( intel, "INTEL %p RX %d is [%lx,%lx)\n",
 			intel, rx_idx, virt_to_phys ( iobuf->data ),
@@ -762,7 +760,6 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct dma_mapping *map;
 	unsigned int tx_idx;
 	unsigned int tx_tail;
-	physaddr_t address;
 	size_t len;
 	int rc;
 
@@ -783,9 +780,8 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	intel->tx.ring.prod++;
 
 	/* Populate transmit descriptor */
-	address = map->addr;
 	len = iob_len ( iobuf );
-	intel->tx.ring.describe ( tx, address, len );
+	intel->tx.ring.describe ( tx, dma ( map, iobuf->data ), len );
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */

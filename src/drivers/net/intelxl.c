@@ -152,7 +152,8 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
 	}
 
 	/* Configure interrupt zero to write to dummy location */
-	pci_msix_map ( &intelxl->msix.cap, 0, intelxl->msix.map.addr, 0 );
+	pci_msix_map ( &intelxl->msix.cap, 0,
+		       dma ( &intelxl->msix.map, &intelxl->msix.msg ), 0 );
 
 	/* Enable dummy interrupt zero */
 	pci_msix_unmask ( &intelxl->msix.cap, 0 );
@@ -231,22 +232,6 @@ static int intelxl_alloc_admin ( struct intelxl_nic *intelxl,
 }
 
 /**
- * Get DMA address for admin descriptor or buffer entry
- *
- * @v admin		Admin queue
- * @v addr		Virtual address
- * @ret addr		DMA address
- */
-static physaddr_t intelxl_admin_address ( struct intelxl_admin *admin,
-					  void *addr ) {
-	size_t offset;
-
-	/* Calculate offset within mapped area */
-	offset = ( addr - ( ( void * ) admin->buf ) );
-	return ( admin->map.addr + offset );
-}
-
-/**
  * Enable admin queue
  *
  * @v intelxl		Intel device
@@ -270,7 +255,7 @@ static void intelxl_enable_admin ( struct intelxl_nic *intelxl,
 	admin->index = 0;
 
 	/* Program queue address */
-	address = intelxl_admin_address ( admin, admin->desc );
+	address = dma ( &admin->map, admin->desc );
 	writel ( ( address & 0xffffffffUL ), admin_regs + regs->bal );
 	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {
 		writel ( ( ( ( uint64_t ) address ) >> 32 ),
@@ -365,7 +350,7 @@ static void intelxl_admin_event_init ( struct intelxl_nic *intelxl,
 	/* Initialise descriptor */
 	evt = &admin->desc[ index % INTELXL_ADMIN_NUM_DESC ];
 	buf = &admin->buf[ index % INTELXL_ADMIN_NUM_DESC ];
-	address = intelxl_admin_address ( admin, buf );
+	address = dma ( &admin->map, buf );
 	evt->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
 	evt->len = cpu_to_le16 ( sizeof ( *buf ) );
 	evt->params.buffer.high = cpu_to_le32 ( address >> 32 );
@@ -410,7 +395,7 @@ int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 
 	/* Populate data buffer address if applicable */
 	if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
-		address = intelxl_admin_address ( admin, buf );
+		address = dma ( &admin->map, buf );
 		cmd->params.buffer.high = cpu_to_le32 ( address >> 32 );
 		cmd->params.buffer.low = cpu_to_le32 ( address & 0xffffffffUL );
 	}
@@ -1267,6 +1252,7 @@ static int intelxl_disable_ring ( struct intelxl_nic *intelxl,
  */
 static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 				 struct intelxl_ring *ring ) {
+	physaddr_t address;
 	int rc;
 
 	/* Allocate descriptor ring */
@@ -1274,7 +1260,8 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 		goto err_alloc;
 
 	/* Program queue context */
-	if ( ( rc = ring->context ( intelxl, ring->map.addr ) ) != 0 )
+	address = dma ( &ring->map, ring->desc.raw );
+	if ( ( rc = ring->context ( intelxl, address ) ) != 0 )
 		goto err_context;
 
 	/* Enable ring */
@@ -1346,7 +1333,7 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 		intelxl->rx.ring.prod++;
 
 		/* Populate receive descriptor */
-		rx->address = cpu_to_le64 ( map->addr );
+		rx->address = cpu_to_le64 ( dma ( map, iobuf->data ) );
 		rx->flags = 0;
 
 		DBGC2 ( intelxl, "INTELXL %p RX %d is [%08lx,%08lx)\n",
@@ -1537,7 +1524,7 @@ int intelxl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
 	/* Populate transmit descriptor */
 	len = iob_len ( iobuf );
-	tx->address = cpu_to_le64 ( map->addr );
+	tx->address = cpu_to_le64 ( dma ( map, iobuf->data ) );
 	tx->len = cpu_to_le32 ( INTELXL_TX_DATA_LEN ( len ) );
 	tx->flags = cpu_to_le32 ( INTELXL_TX_DATA_DTYP | INTELXL_TX_DATA_EOP |
 				  INTELXL_TX_DATA_RS | INTELXL_TX_DATA_JFDI );

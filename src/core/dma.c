@@ -46,6 +46,7 @@ PROVIDE_DMAAPI_INLINE ( flat, dma_unmap );
 PROVIDE_DMAAPI_INLINE ( flat, dma_alloc );
 PROVIDE_DMAAPI_INLINE ( flat, dma_free );
 PROVIDE_DMAAPI_INLINE ( flat, dma_set_mask );
+PROVIDE_DMAAPI_INLINE ( flat, dma_phys );
 
 /******************************************************************************
  *
@@ -138,6 +139,7 @@ PROVIDE_DMAAPI ( op, dma_unmap, dma_op_unmap );
 PROVIDE_DMAAPI ( op, dma_alloc, dma_op_alloc );
 PROVIDE_DMAAPI ( op, dma_free, dma_op_free );
 PROVIDE_DMAAPI ( op, dma_set_mask, dma_op_set_mask );
+PROVIDE_DMAAPI_INLINE ( op, dma_phys );
 
 /******************************************************************************
  *
