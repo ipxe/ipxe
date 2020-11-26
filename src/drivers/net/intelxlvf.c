@@ -380,14 +380,14 @@ static int intelxlvf_admin_configure ( struct net_device *netdev ) {
 	buf->cfg.count = cpu_to_le16 ( 1 );
 	buf->cfg.tx.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.tx.count = cpu_to_le16 ( INTELXL_TX_NUM_DESC );
-	buf->cfg.tx.base = cpu_to_le64 ( dma ( &intelxl->tx.ring.map,
-					       intelxl->tx.ring.desc.raw ) );
+	buf->cfg.tx.base = cpu_to_le64 ( dma ( &intelxl->tx.map,
+					       intelxl->tx.desc.raw ) );
 	buf->cfg.rx.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.rx.count = cpu_to_le32 ( INTELXL_RX_NUM_DESC );
 	buf->cfg.rx.len = cpu_to_le32 ( intelxl->mfs );
 	buf->cfg.rx.mfs = cpu_to_le32 ( intelxl->mfs );
-	buf->cfg.rx.base = cpu_to_le64 ( dma ( &intelxl->rx.ring.map,
-					       intelxl->rx.ring.desc.raw ) );
+	buf->cfg.rx.base = cpu_to_le64 ( dma ( &intelxl->rx.map,
+					       intelxl->rx.desc.raw ) );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
@@ -501,11 +501,11 @@ static int intelxlvf_open ( struct net_device *netdev ) {
 			   INTELXL_ALIGN - 1 ) & ~( INTELXL_ALIGN - 1 ) );
 
 	/* Allocate transmit descriptor ring */
-	if ( ( rc = intelxl_alloc_ring ( intelxl, &intelxl->tx.ring ) ) != 0 )
+	if ( ( rc = intelxl_alloc_ring ( intelxl, &intelxl->tx ) ) != 0 )
 		goto err_alloc_tx;
 
 	/* Allocate receive descriptor ring */
-	if ( ( rc = intelxl_alloc_ring ( intelxl, &intelxl->rx.ring ) ) != 0 )
+	if ( ( rc = intelxl_alloc_ring ( intelxl, &intelxl->rx ) ) != 0 )
 		goto err_alloc_rx;
 
 	/* Configure queues */
@@ -531,9 +531,9 @@ static int intelxlvf_open ( struct net_device *netdev ) {
  err_enable:
  err_irq_map:
  err_configure:
-	intelxl_free_ring ( intelxl, &intelxl->rx.ring );
+	intelxl_free_ring ( intelxl, &intelxl->rx );
  err_alloc_rx:
-	intelxl_free_ring ( intelxl, &intelxl->tx.ring );
+	intelxl_free_ring ( intelxl, &intelxl->tx );
  err_alloc_tx:
 	return rc;
 }
@@ -554,13 +554,13 @@ static void intelxlvf_close ( struct net_device *netdev ) {
 	}
 
 	/* Free receive descriptor ring */
-	intelxl_free_ring ( intelxl, &intelxl->rx.ring );
+	intelxl_free_ring ( intelxl, &intelxl->rx );
 
 	/* Free transmit descriptor ring */
-	intelxl_free_ring ( intelxl, &intelxl->tx.ring );
+	intelxl_free_ring ( intelxl, &intelxl->tx );
 
-	/* Flush unused buffers */
-	intelxl_flush ( intelxl );
+	/* Discard any unused receive buffers */
+	intelxl_empty_rx ( intelxl );
 }
 
 /** Network device operations */
@@ -605,11 +605,11 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 			     &intelxlvf_admin_command_offsets );
 	intelxl_init_admin ( &intelxl->event, INTELXLVF_ADMIN,
 			     &intelxlvf_admin_event_offsets );
-	intelxlvf_init_ring ( &intelxl->tx.ring, INTELXL_TX_NUM_DESC,
-			      sizeof ( intelxl->tx.ring.desc.tx[0] ),
+	intelxlvf_init_ring ( &intelxl->tx, INTELXL_TX_NUM_DESC,
+			      sizeof ( intelxl->tx.desc.tx[0] ),
 			      INTELXLVF_QTX_TAIL );
-	intelxlvf_init_ring ( &intelxl->rx.ring, INTELXL_RX_NUM_DESC,
-			      sizeof ( intelxl->rx.ring.desc.rx[0] ),
+	intelxlvf_init_ring ( &intelxl->rx, INTELXL_RX_NUM_DESC,
+			      sizeof ( intelxl->rx.desc.rx[0] ),
 			      INTELXLVF_QRX_TAIL );
 
 	/* Fix up PCI device */
@@ -625,6 +625,7 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	/* Configure DMA */
 	intelxl->dma = &pci->dma;
 	dma_set_mask_64bit ( intelxl->dma );
+	netdev->dma = intelxl->dma;
 
 	/* Locate PCI Express capability */
 	intelxl->exp = pci_find_capability ( pci, PCI_CAP_ID_EXP );

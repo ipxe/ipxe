@@ -25,7 +25,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <assert.h>
 #include <errno.h>
-#include <ipxe/iobuf.h>
 #include <ipxe/dma.h>
 
 /** @file
@@ -139,43 +138,3 @@ PROVIDE_DMAAPI ( op, dma_alloc, dma_op_alloc );
 PROVIDE_DMAAPI ( op, dma_free, dma_op_free );
 PROVIDE_DMAAPI ( op, dma_set_mask, dma_op_set_mask );
 PROVIDE_DMAAPI_INLINE ( op, dma_phys );
-
-/******************************************************************************
- *
- * Utility functions
- *
- ******************************************************************************
- */
-
-/**
- * Allocate and map I/O buffer for receiving data from device
- *
- * @v dma		DMA device
- * @v map		DMA mapping to fill in
- * @v len		Length of I/O buffer
- * @ret iobuf		I/O buffer, or NULL on error
- */
-struct io_buffer * dma_alloc_rx_iob ( struct dma_device *dma,
-				      struct dma_mapping *map,
-				      size_t len ) {
-	struct io_buffer *iobuf;
-	int rc;
-
-	/* Allocate I/O buffer */
-	iobuf = alloc_iob ( len );
-	if ( ! iobuf )
-		goto err_alloc;
-
-	/* Map I/O buffer */
-	if ( ( rc = dma_map ( dma, map, virt_to_phys ( iobuf->data ),
-			      len, DMA_RX ) ) != 0 )
-		goto err_map;
-
-	return iobuf;
-
-	dma_unmap ( map );
- err_map:
-	free_iob ( iobuf );
- err_alloc:
-	return NULL;
-}

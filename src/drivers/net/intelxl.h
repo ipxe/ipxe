@@ -1030,24 +1030,6 @@ union intelxl_receive_address {
 	uint8_t raw[ETH_ALEN];
 };
 
-/** Transmit ring */
-struct intelxl_tx_ring {
-	/** Descriptor ring */
-	struct intelxl_ring ring;
-	/** DMA mappings */
-	struct dma_mapping map[INTELXL_TX_NUM_DESC];
-};
-
-/** Receive ring */
-struct intelxl_rx_ring {
-	/** Descriptor ring */
-	struct intelxl_ring ring;
-	/** I/O buffers */
-	struct io_buffer *iobuf[INTELXL_RX_NUM_DESC];
-	/** DMA mappings */
-	struct dma_mapping map[INTELXL_RX_NUM_DESC];
-};
-
 /** MSI-X interrupt */
 struct intelxl_msix {
 	/** PCI capability */
@@ -1098,10 +1080,12 @@ struct intelxl_nic {
 	/** Current VF event data buffer */
 	union intelxl_admin_buffer vbuf;
 
-	/** Transmit ring */
-	struct intelxl_tx_ring tx;
-	/** Receive ring */
-	struct intelxl_rx_ring rx;
+	/** Transmit descriptor ring */
+	struct intelxl_ring tx;
+	/** Receive descriptor ring */
+	struct intelxl_ring rx;
+	/** Receive I/O buffers */
+	struct io_buffer *rx_iobuf[INTELXL_RX_NUM_DESC];
 };
 
 extern int intelxl_msix_enable ( struct intelxl_nic *intelxl,
@@ -1121,7 +1105,7 @@ extern int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 				struct intelxl_ring *ring );
 extern void intelxl_free_ring ( struct intelxl_nic *intelxl,
 				struct intelxl_ring *ring );
-extern void intelxl_flush ( struct intelxl_nic *intelxl );
+extern void intelxl_empty_rx ( struct intelxl_nic *intelxl );
 extern int intelxl_transmit ( struct net_device *netdev,
 			      struct io_buffer *iobuf );
 extern void intelxl_poll ( struct net_device *netdev );

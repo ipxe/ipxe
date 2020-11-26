@@ -274,24 +274,6 @@ realtek_init_ring ( struct realtek_ring *ring, unsigned int count,
 	ring->reg = reg;
 }
 
-/** Transmit ring */
-struct realtek_tx_ring {
-	/** Descriptor ring */
-	struct realtek_ring ring;
-	/** DMA mappings */
-	struct dma_mapping map[RTL_NUM_TX_DESC];
-};
-
-/** Receive ring */
-struct realtek_rx_ring {
-	/** Descriptor ring */
-	struct realtek_ring ring;
-	/** I/O buffers */
-	struct io_buffer *iobuf[RTL_NUM_RX_DESC];
-	/** DMA mappings */
-	struct dma_mapping map[RTL_NUM_RX_DESC];
-};
-
 /** Receive buffer (legacy mode *) */
 struct realtek_rx_buffer {
 	/** Buffer */
@@ -327,9 +309,11 @@ struct realtek_nic {
 	unsigned int tppoll;
 
 	/** Transmit descriptor ring */
-	struct realtek_tx_ring tx;
+	struct realtek_ring tx;
 	/** Receive descriptor ring */
-	struct realtek_rx_ring rx;
+	struct realtek_ring rx;
+	/** Receive I/O buffers */
+	struct io_buffer *rx_iobuf[RTL_NUM_RX_DESC];
 	/** Receive buffer (legacy mode) */
 	struct realtek_rx_buffer rxbuf;
 };

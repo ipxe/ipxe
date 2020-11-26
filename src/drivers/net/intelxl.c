@@ -1306,35 +1306,31 @@ static void intelxl_destroy_ring ( struct intelxl_nic *intelxl,
 static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 	struct intelxl_rx_data_descriptor *rx;
 	struct io_buffer *iobuf;
-	struct dma_mapping *map;
 	unsigned int rx_idx;
 	unsigned int rx_tail;
 	unsigned int refilled = 0;
 
 	/* Refill ring */
-	while ( ( intelxl->rx.ring.prod -
-		  intelxl->rx.ring.cons ) < INTELXL_RX_FILL ) {
-
-		/* Get next receive descriptor */
-		rx_idx = ( intelxl->rx.ring.prod % INTELXL_RX_NUM_DESC );
-		rx = &intelxl->rx.ring.desc.rx[rx_idx].data;
-		map = &intelxl->rx.map[rx_idx];
-		assert ( intelxl->rx.iobuf[rx_idx] == NULL );
+	while ( ( intelxl->rx.prod - intelxl->rx.cons ) < INTELXL_RX_FILL ) {
 
 		/* Allocate I/O buffer */
-		iobuf = dma_alloc_rx_iob ( intelxl->dma, map, intelxl->mfs );
+		iobuf = alloc_rx_iob ( intelxl->mfs, intelxl->dma );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
 			break;
 		}
-		intelxl->rx.iobuf[rx_idx] = iobuf;
 
-		/* Update producer index */
-		intelxl->rx.ring.prod++;
+		/* Get next receive descriptor */
+		rx_idx = ( intelxl->rx.prod++ % INTELXL_RX_NUM_DESC );
+		rx = &intelxl->rx.desc.rx[rx_idx].data;
 
 		/* Populate receive descriptor */
-		rx->address = cpu_to_le64 ( dma ( map, iobuf->data ) );
+		rx->address = cpu_to_le64 ( iob_dma ( iobuf ) );
 		rx->flags = 0;
+
+		/* Record I/O buffer */
+		assert ( intelxl->rx_iobuf[rx_idx] == NULL );
+		intelxl->rx_iobuf[rx_idx] = iobuf;
 
 		DBGC2 ( intelxl, "INTELXL %p RX %d is [%08lx,%08lx)\n",
 			intelxl, rx_idx, virt_to_phys ( iobuf->data ),
@@ -1345,36 +1341,24 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 	/* Push descriptors to card, if applicable */
 	if ( refilled ) {
 		wmb();
-		rx_tail = ( intelxl->rx.ring.prod % INTELXL_RX_NUM_DESC );
-		writel ( rx_tail, ( intelxl->regs + intelxl->rx.ring.tail ) );
+		rx_tail = ( intelxl->rx.prod % INTELXL_RX_NUM_DESC );
+		writel ( rx_tail, ( intelxl->regs + intelxl->rx.tail ) );
 	}
 }
 
 /**
- * Flush unused I/O buffers
+ * Discard unused receive I/O buffers
  *
  * @v intelxl		Intel device
- *
- * Discard any unused receive I/O buffers and unmap any incomplete
- * transmit I/O buffers.
  */
-void intelxl_flush ( struct intelxl_nic *intelxl ) {
+void intelxl_empty_rx ( struct intelxl_nic *intelxl ) {
 	unsigned int i;
-	unsigned int tx_idx;
 
 	/* Discard any unused receive buffers */
 	for ( i = 0 ; i < INTELXL_RX_NUM_DESC ; i++ ) {
-		if ( intelxl->rx.iobuf[i] ) {
-			dma_unmap ( &intelxl->rx.map[i] );
-			free_iob ( intelxl->rx.iobuf[i] );
-		}
-		intelxl->rx.iobuf[i] = NULL;
-	}
-
-	/* Unmap incomplete transmit buffers */
-	for ( i = intelxl->tx.ring.cons ; i != intelxl->tx.ring.prod ; i++ ) {
-		tx_idx = ( i % INTELXL_TX_NUM_DESC );
-		dma_unmap ( &intelxl->tx.map[tx_idx] );
+		if ( intelxl->rx_iobuf[i] )
+			free_rx_iob ( intelxl->rx_iobuf[i] );
+		intelxl->rx_iobuf[i] = NULL;
 	}
 }
 
@@ -1415,7 +1399,7 @@ static int intelxl_open ( struct net_device *netdev ) {
 	/* Associate transmit queue to PF */
 	writel ( ( INTELXL_QXX_CTL_PFVF_Q_PF |
 		   INTELXL_QXX_CTL_PFVF_PF_INDX ( intelxl->pf ) ),
-		 ( intelxl->regs + intelxl->tx.ring.reg + INTELXL_QXX_CTL ) );
+		 ( intelxl->regs + intelxl->tx.reg + INTELXL_QXX_CTL ) );
 
 	/* Clear transmit pre queue disable */
 	queue = ( intelxl->base + intelxl->queue );
@@ -1427,11 +1411,11 @@ static int intelxl_open ( struct net_device *netdev ) {
 	writel ( 0, ( intelxl->regs + INTELXL_QTX_HEAD ( intelxl->queue ) ) );
 
 	/* Create receive descriptor ring */
-	if ( ( rc = intelxl_create_ring ( intelxl, &intelxl->rx.ring ) ) != 0 )
+	if ( ( rc = intelxl_create_ring ( intelxl, &intelxl->rx ) ) != 0 )
 		goto err_create_rx;
 
 	/* Create transmit descriptor ring */
-	if ( ( rc = intelxl_create_ring ( intelxl, &intelxl->tx.ring ) ) != 0 )
+	if ( ( rc = intelxl_create_ring ( intelxl, &intelxl->tx ) ) != 0 )
 		goto err_create_tx;
 
 	/* Fill receive ring */
@@ -1449,9 +1433,9 @@ static int intelxl_open ( struct net_device *netdev ) {
 		   INTELXL_GLLAN_TXPRE_QDIS_QINDX ( queue ) ),
 		 ( intelxl->regs + INTELXL_GLLAN_TXPRE_QDIS ( queue ) ) );
 	udelay ( INTELXL_QUEUE_PRE_DISABLE_DELAY_US );
-	intelxl_destroy_ring ( intelxl, &intelxl->tx.ring );
+	intelxl_destroy_ring ( intelxl, &intelxl->tx );
  err_create_tx:
-	intelxl_destroy_ring ( intelxl, &intelxl->rx.ring );
+	intelxl_destroy_ring ( intelxl, &intelxl->rx );
  err_create_rx:
 	return rc;
 }
@@ -1479,13 +1463,13 @@ static void intelxl_close ( struct net_device *netdev ) {
 	udelay ( INTELXL_QUEUE_PRE_DISABLE_DELAY_US );
 
 	/* Destroy transmit descriptor ring */
-	intelxl_destroy_ring ( intelxl, &intelxl->tx.ring );
+	intelxl_destroy_ring ( intelxl, &intelxl->tx );
 
 	/* Destroy receive descriptor ring */
-	intelxl_destroy_ring ( intelxl, &intelxl->rx.ring );
+	intelxl_destroy_ring ( intelxl, &intelxl->rx );
 
-	/* Flush unused buffers */
-	intelxl_flush ( intelxl );
+	/* Discard any unused receive buffers */
+	intelxl_empty_rx ( intelxl );
 }
 
 /**
@@ -1498,41 +1482,30 @@ static void intelxl_close ( struct net_device *netdev ) {
 int intelxl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	struct intelxl_tx_data_descriptor *tx;
-	struct dma_mapping *map;
 	unsigned int tx_idx;
 	unsigned int tx_tail;
 	size_t len;
-	int rc;
 
 	/* Get next transmit descriptor */
-	if ( ( intelxl->tx.ring.prod -
-	       intelxl->tx.ring.cons ) >= INTELXL_TX_FILL ) {
+	if ( ( intelxl->tx.prod - intelxl->tx.cons ) >= INTELXL_TX_FILL ) {
 		DBGC ( intelxl, "INTELXL %p out of transmit descriptors\n",
 		       intelxl );
 		return -ENOBUFS;
 	}
-	tx_idx = ( intelxl->tx.ring.prod % INTELXL_TX_NUM_DESC );
-	tx = &intelxl->tx.ring.desc.tx[tx_idx].data;
-	map = &intelxl->tx.map[tx_idx];
-
-	/* Map I/O buffer */
-	if ( ( rc = dma_map_tx_iob ( intelxl->dma, map, iobuf ) ) != 0 )
-		return rc;
-
-	/* Update producer index */
-	intelxl->tx.ring.prod++;
+	tx_idx = ( intelxl->tx.prod++ % INTELXL_TX_NUM_DESC );
+	tx_tail = ( intelxl->tx.prod % INTELXL_TX_NUM_DESC );
+	tx = &intelxl->tx.desc.tx[tx_idx].data;
 
 	/* Populate transmit descriptor */
 	len = iob_len ( iobuf );
-	tx->address = cpu_to_le64 ( dma ( map, iobuf->data ) );
+	tx->address = cpu_to_le64 ( iob_dma ( iobuf ) );
 	tx->len = cpu_to_le32 ( INTELXL_TX_DATA_LEN ( len ) );
 	tx->flags = cpu_to_le32 ( INTELXL_TX_DATA_DTYP | INTELXL_TX_DATA_EOP |
 				  INTELXL_TX_DATA_RS | INTELXL_TX_DATA_JFDI );
 	wmb();
 
 	/* Notify card that there are packets ready to transmit */
-	tx_tail = ( intelxl->tx.ring.prod % INTELXL_TX_NUM_DESC );
-	writel ( tx_tail, ( intelxl->regs + intelxl->tx.ring.tail ) );
+	writel ( tx_tail, ( intelxl->regs + intelxl->tx.tail ) );
 
 	DBGC2 ( intelxl, "INTELXL %p TX %d is [%08lx,%08lx)\n",
 		intelxl, tx_idx, virt_to_phys ( iobuf->data ),
@@ -1551,11 +1524,11 @@ static void intelxl_poll_tx ( struct net_device *netdev ) {
 	unsigned int tx_idx;
 
 	/* Check for completed packets */
-	while ( intelxl->tx.ring.cons != intelxl->tx.ring.prod ) {
+	while ( intelxl->tx.cons != intelxl->tx.prod ) {
 
 		/* Get next transmit descriptor */
-		tx_idx = ( intelxl->tx.ring.cons % INTELXL_TX_NUM_DESC );
-		tx_wb = &intelxl->tx.ring.desc.tx[tx_idx].wb;
+		tx_idx = ( intelxl->tx.cons % INTELXL_TX_NUM_DESC );
+		tx_wb = &intelxl->tx.desc.tx[tx_idx].wb;
 
 		/* Stop if descriptor is still in use */
 		if ( ! ( tx_wb->flags & INTELXL_TX_WB_FL_DD ) )
@@ -1563,12 +1536,9 @@ static void intelxl_poll_tx ( struct net_device *netdev ) {
 		DBGC2 ( intelxl, "INTELXL %p TX %d complete\n",
 			intelxl, tx_idx );
 
-		/* Unmap I/O buffer */
-		dma_unmap ( &intelxl->tx.map[tx_idx] );
-
 		/* Complete TX descriptor */
 		netdev_tx_complete_next ( netdev );
-		intelxl->tx.ring.cons++;
+		intelxl->tx.cons++;
 	}
 }
 
@@ -1586,22 +1556,19 @@ static void intelxl_poll_rx ( struct net_device *netdev ) {
 	size_t len;
 
 	/* Check for received packets */
-	while ( intelxl->rx.ring.cons != intelxl->rx.ring.prod ) {
+	while ( intelxl->rx.cons != intelxl->rx.prod ) {
 
 		/* Get next receive descriptor */
-		rx_idx = ( intelxl->rx.ring.cons % INTELXL_RX_NUM_DESC );
-		rx_wb = &intelxl->rx.ring.desc.rx[rx_idx].wb;
+		rx_idx = ( intelxl->rx.cons % INTELXL_RX_NUM_DESC );
+		rx_wb = &intelxl->rx.desc.rx[rx_idx].wb;
 
 		/* Stop if descriptor is still in use */
 		if ( ! ( rx_wb->flags & cpu_to_le32 ( INTELXL_RX_WB_FL_DD ) ) )
 			return;
 
-		/* Unmap I/O buffer */
-		dma_unmap ( &intelxl->rx.map[rx_idx] );
-
 		/* Populate I/O buffer */
-		iobuf = intelxl->rx.iobuf[rx_idx];
-		intelxl->rx.iobuf[rx_idx] = NULL;
+		iobuf = intelxl->rx_iobuf[rx_idx];
+		intelxl->rx_iobuf[rx_idx] = NULL;
 		len = INTELXL_RX_WB_LEN ( le32_to_cpu ( rx_wb->len ) );
 		iob_put ( iobuf, len );
 
@@ -1623,7 +1590,7 @@ static void intelxl_poll_rx ( struct net_device *netdev ) {
 				"%zd)\n", intelxl, rx_idx, len );
 			vlan_netdev_rx ( netdev, tag, iobuf );
 		}
-		intelxl->rx.ring.cons++;
+		intelxl->rx.cons++;
 	}
 }
 
@@ -1710,11 +1677,11 @@ static int intelxl_probe ( struct pci_device *pci ) {
 			     &intelxl_admin_offsets );
 	intelxl_init_admin ( &intelxl->event, INTELXL_ADMIN_EVT,
 			     &intelxl_admin_offsets );
-	intelxl_init_ring ( &intelxl->tx.ring, INTELXL_TX_NUM_DESC,
-			    sizeof ( intelxl->tx.ring.desc.tx[0] ),
+	intelxl_init_ring ( &intelxl->tx, INTELXL_TX_NUM_DESC,
+			    sizeof ( intelxl->tx.desc.tx[0] ),
 			    intelxl_context_tx );
-	intelxl_init_ring ( &intelxl->rx.ring, INTELXL_RX_NUM_DESC,
-			    sizeof ( intelxl->rx.ring.desc.rx[0] ),
+	intelxl_init_ring ( &intelxl->rx, INTELXL_RX_NUM_DESC,
+			    sizeof ( intelxl->rx.desc.rx[0] ),
 			    intelxl_context_rx );
 
 	/* Fix up PCI device */
@@ -1730,6 +1697,7 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	/* Configure DMA */
 	intelxl->dma = &pci->dma;
 	dma_set_mask_64bit ( intelxl->dma );
+	netdev->dma = intelxl->dma;
 
 	/* Reset the NIC */
 	if ( ( rc = intelxl_reset ( intelxl ) ) != 0 )
@@ -1775,10 +1743,10 @@ static int intelxl_probe ( struct pci_device *pci ) {
 		goto err_admin_promisc;
 
 	/* Configure queue register addresses */
-	intelxl->tx.ring.reg = INTELXL_QTX ( intelxl->queue );
-	intelxl->tx.ring.tail = ( intelxl->tx.ring.reg + INTELXL_QXX_TAIL );
-	intelxl->rx.ring.reg = INTELXL_QRX ( intelxl->queue );
-	intelxl->rx.ring.tail = ( intelxl->rx.ring.reg + INTELXL_QXX_TAIL );
+	intelxl->tx.reg = INTELXL_QTX ( intelxl->queue );
+	intelxl->tx.tail = ( intelxl->tx.reg + INTELXL_QXX_TAIL );
+	intelxl->rx.reg = INTELXL_QRX ( intelxl->queue );
+	intelxl->rx.tail = ( intelxl->rx.reg + INTELXL_QXX_TAIL );
 
 	/* Configure interrupt causes */
 	writel ( ( INTELXL_QINT_TQCTL_NEXTQ_INDX_NONE |

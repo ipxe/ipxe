@@ -621,7 +621,6 @@ static void realtek_destroy_ring ( struct realtek_nic *rtl,
 static void realtek_refill_rx ( struct realtek_nic *rtl ) {
 	struct realtek_descriptor *rx;
 	struct io_buffer *iobuf;
-	struct dma_mapping *map;
 	unsigned int rx_idx;
 	int is_last;
 
@@ -629,33 +628,31 @@ static void realtek_refill_rx ( struct realtek_nic *rtl ) {
 	if ( rtl->legacy )
 		return;
 
-	while ( ( rtl->rx.ring.prod - rtl->rx.ring.cons ) < RTL_NUM_RX_DESC ) {
-
-		/* Get next receive descriptor */
-		rx_idx = ( rtl->rx.ring.prod % RTL_NUM_RX_DESC );
-		is_last = ( rx_idx == ( RTL_NUM_RX_DESC - 1 ) );
-		rx = &rtl->rx.ring.desc[rx_idx];
-		map = &rtl->rx.map[rx_idx];
-		assert ( rtl->rx.iobuf[rx_idx] == NULL );
+	while ( ( rtl->rx.prod - rtl->rx.cons ) < RTL_NUM_RX_DESC ) {
 
 		/* Allocate I/O buffer */
-		iobuf = dma_alloc_rx_iob ( rtl->dma, map, RTL_RX_MAX_LEN );
+		iobuf = alloc_rx_iob ( RTL_RX_MAX_LEN, rtl->dma );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
 			return;
 		}
-		rtl->rx.iobuf[rx_idx] = iobuf;
 
-		/* Update producer index */
-		rtl->rx.ring.prod++;
+		/* Get next receive descriptor */
+		rx_idx = ( rtl->rx.prod++ % RTL_NUM_RX_DESC );
+		is_last = ( rx_idx == ( RTL_NUM_RX_DESC - 1 ) );
+		rx = &rtl->rx.desc[rx_idx];
 
 		/* Populate receive descriptor */
-		rx->address = cpu_to_le64 ( dma ( map, iobuf->data ) );
+		rx->address = cpu_to_le64 ( iob_dma ( iobuf ) );
 		rx->length = cpu_to_le16 ( RTL_RX_MAX_LEN );
 		wmb();
 		rx->flags = ( cpu_to_le16 ( RTL_DESC_OWN ) |
 			      ( is_last ? cpu_to_le16 ( RTL_DESC_EOR ) : 0 ) );
 		wmb();
+
+		/* Record I/O buffer */
+		assert ( rtl->rx_iobuf[rx_idx] == NULL );
+		rtl->rx_iobuf[rx_idx] = iobuf;
 
 		DBGC2 ( rtl, "REALTEK %p RX %d is [%lx,%lx)\n",
 			rtl, rx_idx, virt_to_phys ( iobuf->data ),
@@ -676,11 +673,11 @@ static int realtek_open ( struct net_device *netdev ) {
 	int rc;
 
 	/* Create transmit descriptor ring */
-	if ( ( rc = realtek_create_ring ( rtl, &rtl->tx.ring ) ) != 0 )
+	if ( ( rc = realtek_create_ring ( rtl, &rtl->tx ) ) != 0 )
 		goto err_create_tx;
 
 	/* Create receive descriptor ring */
-	if ( ( rc = realtek_create_ring ( rtl, &rtl->rx.ring ) ) != 0 )
+	if ( ( rc = realtek_create_ring ( rtl, &rtl->rx ) ) != 0 )
 		goto err_create_rx;
 
 	/* Create receive buffer */
@@ -721,9 +718,9 @@ static int realtek_open ( struct net_device *netdev ) {
 
 	realtek_destroy_buffer ( rtl );
  err_create_buffer:
-	realtek_destroy_ring ( rtl, &rtl->rx.ring );
+	realtek_destroy_ring ( rtl, &rtl->rx );
  err_create_rx:
-	realtek_destroy_ring ( rtl, &rtl->tx.ring );
+	realtek_destroy_ring ( rtl, &rtl->tx );
  err_create_tx:
 	return rc;
 }
@@ -744,23 +741,17 @@ static void realtek_close ( struct net_device *netdev ) {
 	realtek_destroy_buffer ( rtl );
 
 	/* Destroy receive descriptor ring */
-	realtek_destroy_ring ( rtl, &rtl->rx.ring );
+	realtek_destroy_ring ( rtl, &rtl->rx );
 
 	/* Discard any unused receive buffers */
 	for ( i = 0 ; i < RTL_NUM_RX_DESC ; i++ ) {
-		if ( rtl->rx.iobuf[i] ) {
-			dma_unmap ( &rtl->rx.map[i] );
-			free_iob ( rtl->rx.iobuf[i] );
-		}
-		rtl->rx.iobuf[i] = NULL;
+		if ( rtl->rx_iobuf[i] )
+			free_rx_iob ( rtl->rx_iobuf[i] );
+		rtl->rx_iobuf[i] = NULL;
 	}
 
-	/* Unmap any incomplete transmit buffers */
-	for ( i = rtl->tx.ring.cons ; i != rtl->tx.ring.prod ; i++ )
-		dma_unmap ( &rtl->tx.map[ i % RTL_NUM_TX_DESC ] );
-
 	/* Destroy transmit descriptor ring */
-	realtek_destroy_ring ( rtl, &rtl->tx.ring );
+	realtek_destroy_ring ( rtl, &rtl->tx );
 
 	/* Reset legacy transmit descriptor index, if applicable */
 	if ( rtl->legacy )
@@ -778,37 +769,33 @@ static int realtek_transmit ( struct net_device *netdev,
 			      struct io_buffer *iobuf ) {
 	struct realtek_nic *rtl = netdev->priv;
 	struct realtek_descriptor *tx;
-	struct dma_mapping *map;
 	unsigned int tx_idx;
-	physaddr_t address;
 	int is_last;
 	int rc;
 
 	/* Get next transmit descriptor */
-	if ( ( rtl->tx.ring.prod - rtl->tx.ring.cons ) >= RTL_NUM_TX_DESC ) {
+	if ( ( rtl->tx.prod - rtl->tx.cons ) >= RTL_NUM_TX_DESC ) {
 		netdev_tx_defer ( netdev, iobuf );
 		return 0;
 	}
-	tx_idx = ( rtl->tx.ring.prod % RTL_NUM_TX_DESC );
-	map = &rtl->tx.map[tx_idx];
+	tx_idx = ( rtl->tx.prod % RTL_NUM_TX_DESC );
 
 	/* Pad and align packet, if needed */
 	if ( rtl->legacy )
 		iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Map I/O buffer */
-	if ( ( rc = dma_map_tx_iob ( rtl->dma, map, iobuf ) ) != 0 )
+	if ( ( rc = iob_map_tx ( iobuf, rtl->dma ) ) != 0 )
 		return rc;
-	address = dma ( map, iobuf->data );
 
 	/* Update producer index */
-	rtl->tx.ring.prod++;
+	rtl->tx.prod++;
 
 	/* Transmit packet */
 	if ( rtl->legacy ) {
 
 		/* Add to transmit ring */
-		writel ( address, rtl->regs + RTL_TSAD ( tx_idx ) );
+		writel ( iob_dma ( iobuf ), rtl->regs + RTL_TSAD ( tx_idx ) );
 		writel ( ( RTL_TSD_ERTXTH_DEFAULT | iob_len ( iobuf ) ),
 			 rtl->regs + RTL_TSD ( tx_idx ) );
 
@@ -816,8 +803,8 @@ static int realtek_transmit ( struct net_device *netdev,
 
 		/* Populate transmit descriptor */
 		is_last = ( tx_idx == ( RTL_NUM_TX_DESC - 1 ) );
-		tx = &rtl->tx.ring.desc[tx_idx];
-		tx->address = cpu_to_le64 ( address );
+		tx = &rtl->tx.desc[tx_idx];
+		tx->address = cpu_to_le64 ( iob_dma ( iobuf ) );
 		tx->length = cpu_to_le16 ( iob_len ( iobuf ) );
 		wmb();
 		tx->flags = ( cpu_to_le16 ( RTL_DESC_OWN | RTL_DESC_FS |
@@ -847,10 +834,10 @@ static void realtek_poll_tx ( struct net_device *netdev ) {
 	unsigned int tx_idx;
 
 	/* Check for completed packets */
-	while ( rtl->tx.ring.cons != rtl->tx.ring.prod ) {
+	while ( rtl->tx.cons != rtl->tx.prod ) {
 
 		/* Get next transmit descriptor */
-		tx_idx = ( rtl->tx.ring.cons % RTL_NUM_TX_DESC );
+		tx_idx = ( rtl->tx.cons % RTL_NUM_TX_DESC );
 
 		/* Stop if descriptor is still in use */
 		if ( rtl->legacy ) {
@@ -863,18 +850,15 @@ static void realtek_poll_tx ( struct net_device *netdev ) {
 		} else {
 
 			/* Check ownership bit in descriptor */
-			tx = &rtl->tx.ring.desc[tx_idx];
+			tx = &rtl->tx.desc[tx_idx];
 			if ( tx->flags & cpu_to_le16 ( RTL_DESC_OWN ) )
 				return;
 		}
 
 		DBGC2 ( rtl, "REALTEK %p TX %d complete\n", rtl, tx_idx );
 
-		/* Unmap I/O buffer */
-		dma_unmap ( &rtl->tx.map[tx_idx] );
-
 		/* Complete TX descriptor */
-		rtl->tx.ring.cons++;
+		rtl->tx.cons++;
 		netdev_tx_complete_next ( netdev );
 	}
 }
@@ -954,22 +938,19 @@ static void realtek_poll_rx ( struct net_device *netdev ) {
 	}
 
 	/* Check for received packets */
-	while ( rtl->rx.ring.cons != rtl->rx.ring.prod ) {
+	while ( rtl->rx.cons != rtl->rx.prod ) {
 
 		/* Get next receive descriptor */
-		rx_idx = ( rtl->rx.ring.cons % RTL_NUM_RX_DESC );
-		rx = &rtl->rx.ring.desc[rx_idx];
+		rx_idx = ( rtl->rx.cons % RTL_NUM_RX_DESC );
+		rx = &rtl->rx.desc[rx_idx];
 
 		/* Stop if descriptor is still in use */
 		if ( rx->flags & cpu_to_le16 ( RTL_DESC_OWN ) )
 			return;
 
-		/* Unmap buffer */
-		dma_unmap ( &rtl->rx.map[rx_idx] );
-
 		/* Populate I/O buffer */
-		iobuf = rtl->rx.iobuf[rx_idx];
-		rtl->rx.iobuf[rx_idx] = NULL;
+		iobuf = rtl->rx_iobuf[rx_idx];
+		rtl->rx_iobuf[rx_idx] = NULL;
 		len = ( le16_to_cpu ( rx->length ) & RTL_DESC_SIZE_MASK );
 		iob_put ( iobuf, ( len - 4 /* strip CRC */ ) );
 
@@ -984,7 +965,7 @@ static void realtek_poll_rx ( struct net_device *netdev ) {
 				"%zd)\n", rtl, rx_idx, len );
 			netdev_rx ( netdev, iobuf );
 		}
-		rtl->rx.ring.cons++;
+		rtl->rx.cons++;
 	}
 }
 
@@ -1128,9 +1109,8 @@ static int realtek_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( rtl, 0, sizeof ( *rtl ) );
-	rtl->dma = &pci->dma;
-	realtek_init_ring ( &rtl->tx.ring, RTL_NUM_TX_DESC, RTL_TNPDS );
-	realtek_init_ring ( &rtl->rx.ring, RTL_NUM_RX_DESC, RTL_RDSAR );
+	realtek_init_ring ( &rtl->tx, RTL_NUM_TX_DESC, RTL_TNPDS );
+	realtek_init_ring ( &rtl->rx, RTL_NUM_RX_DESC, RTL_RDSAR );
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
@@ -1141,6 +1121,9 @@ static int realtek_probe ( struct pci_device *pci ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
+
+	/* Configure DMA */
+	rtl->dma = &pci->dma;
 
 	/* Reset the NIC */
 	if ( ( rc = realtek_reset ( rtl ) ) != 0 )

@@ -335,6 +335,7 @@ static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
 	int rc;
 
 	/* Sanity check */
+	assert ( map->dma == NULL );
 	assert ( map->offset == 0 );
 	assert ( map->token == NULL );
 
@@ -409,6 +410,7 @@ static void efipci_dma_unmap ( struct dma_device *dma,
 	pci_io->Unmap ( pci_io, map->token );
 
 	/* Clear mapping */
+	map->dma = NULL;
 	map->offset = 0;
 	map->token = NULL;
 

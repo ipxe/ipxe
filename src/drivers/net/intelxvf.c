@@ -276,11 +276,11 @@ static int intelxvf_open ( struct net_device *netdev ) {
 	}
 
 	/* Create transmit descriptor ring */
-	if ( ( rc = intel_create_ring ( intel, &intel->tx.ring ) ) != 0 )
+	if ( ( rc = intel_create_ring ( intel, &intel->tx ) ) != 0 )
 		goto err_create_tx;
 
 	/* Create receive descriptor ring */
-	if ( ( rc = intel_create_ring ( intel, &intel->rx.ring ) ) != 0 )
+	if ( ( rc = intel_create_ring ( intel, &intel->rx ) ) != 0 )
 		goto err_create_rx;
 
 	/* Allocate interrupt vectors */
@@ -317,9 +317,9 @@ static int intelxvf_open ( struct net_device *netdev ) {
 
 	return 0;
 
-	intel_destroy_ring ( intel, &intel->rx.ring );
+	intel_destroy_ring ( intel, &intel->rx );
  err_create_rx:
-	intel_destroy_ring ( intel, &intel->tx.ring );
+	intel_destroy_ring ( intel, &intel->tx );
  err_create_tx:
  err_mbox_set_mtu:
  err_mbox_set_mac:
@@ -337,13 +337,13 @@ static void intelxvf_close ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
 
 	/* Destroy receive descriptor ring */
-	intel_destroy_ring ( intel, &intel->rx.ring );
+	intel_destroy_ring ( intel, &intel->rx );
 
-	/* Flush unused buffers */
-	intel_flush ( intel );
+	/* Discard any unused receive buffers */
+	intel_empty_rx ( intel );
 
 	/* Destroy transmit descriptor ring */
-	intel_destroy_ring ( intel, &intel->tx.ring );
+	intel_destroy_ring ( intel, &intel->tx );
 
 	/* Reset the function */
 	intelxvf_reset ( intel );
@@ -447,9 +447,9 @@ static int intelxvf_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intel, 0, sizeof ( *intel ) );
 	intel_init_mbox ( &intel->mbox, INTELXVF_MBCTRL, INTELXVF_MBMEM );
-	intel_init_ring ( &intel->tx.ring, INTEL_NUM_TX_DESC, INTELXVF_TD(0),
+	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTELXVF_TD(0),
 			  intel_describe_tx_adv );
-	intel_init_ring ( &intel->rx.ring, INTEL_NUM_RX_DESC, INTELXVF_RD(0),
+	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTELXVF_RD(0),
 			  intel_describe_rx );
 
 	/* Fix up PCI device */
@@ -465,6 +465,7 @@ static int intelxvf_probe ( struct pci_device *pci ) {
 	/* Configure DMA */
 	intel->dma = &pci->dma;
 	dma_set_mask_64bit ( intel->dma );
+	netdev->dma = intel->dma;
 
 	/* Reset the function */
 	intelxvf_reset ( intel );

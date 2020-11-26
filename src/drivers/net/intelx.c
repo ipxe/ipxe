@@ -185,11 +185,11 @@ static int intelx_open ( struct net_device *netdev ) {
 	int rc;
 
 	/* Create transmit descriptor ring */
-	if ( ( rc = intel_create_ring ( intel, &intel->tx.ring ) ) != 0 )
+	if ( ( rc = intel_create_ring ( intel, &intel->tx ) ) != 0 )
 		goto err_create_tx;
 
 	/* Create receive descriptor ring */
-	if ( ( rc = intel_create_ring ( intel, &intel->rx.ring ) ) != 0 )
+	if ( ( rc = intel_create_ring ( intel, &intel->rx ) ) != 0 )
 		goto err_create_rx;
 
 	/* Program MAC address */
@@ -263,9 +263,9 @@ static int intelx_open ( struct net_device *netdev ) {
 
 	return 0;
 
-	intel_destroy_ring ( intel, &intel->rx.ring );
+	intel_destroy_ring ( intel, &intel->rx );
  err_create_rx:
-	intel_destroy_ring ( intel, &intel->tx.ring );
+	intel_destroy_ring ( intel, &intel->tx );
  err_create_tx:
 	return rc;
 }
@@ -291,13 +291,13 @@ static void intelx_close ( struct net_device *netdev ) {
 	writel ( dmatxctl, intel->regs + INTELX_DMATXCTL );
 
 	/* Destroy receive descriptor ring */
-	intel_destroy_ring ( intel, &intel->rx.ring );
+	intel_destroy_ring ( intel, &intel->rx );
 
-	/* Flush unused buffers */
-	intel_flush ( intel );
+	/* Discard any unused receive buffers */
+	intel_empty_rx ( intel );
 
 	/* Destroy transmit descriptor ring */
-	intel_destroy_ring ( intel, &intel->tx.ring );
+	intel_destroy_ring ( intel, &intel->tx );
 
 	/* Reset the NIC, to flush the transmit and receive FIFOs */
 	intelx_reset ( intel );
@@ -395,9 +395,9 @@ static int intelx_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intel, 0, sizeof ( *intel ) );
 	intel->port = PCI_FUNC ( pci->busdevfn );
-	intel_init_ring ( &intel->tx.ring, INTEL_NUM_TX_DESC, INTELX_TD,
+	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTELX_TD,
 			  intel_describe_tx );
-	intel_init_ring ( &intel->rx.ring, INTEL_NUM_RX_DESC, INTELX_RD,
+	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTELX_RD,
 			  intel_describe_rx );
 
 	/* Fix up PCI device */
@@ -413,6 +413,7 @@ static int intelx_probe ( struct pci_device *pci ) {
 	/* Configure DMA */
 	intel->dma = &pci->dma;
 	dma_set_mask_64bit ( intel->dma );
+	netdev->dma = intel->dma;
 
 	/* Reset the NIC */
 	if ( ( rc = intelx_reset ( intel ) ) != 0 )

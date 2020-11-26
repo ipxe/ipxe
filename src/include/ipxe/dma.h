@@ -12,7 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/api.h>
 #include <ipxe/io.h>
-#include <ipxe/iobuf.h>
 #include <ipxe/malloc.h>
 #include <config/ioapi.h>
 
@@ -384,26 +383,5 @@ dma_set_mask_64bit ( struct dma_device *dma ) {
 	/* Set mask to maximum physical address */
 	dma_set_mask ( dma, ~( ( physaddr_t ) 0 ) );
 }
-
-/**
- * Map I/O buffer for transmitting data to device
- *
- * @v dma		DMA device
- * @v map		DMA mapping to fill in
- * @v iobuf		I/O buffer
- * @ret rc		Return status code
- */
-static inline __always_inline int
-dma_map_tx_iob ( struct dma_device *dma, struct dma_mapping *map,
-		 struct io_buffer *iobuf ) {
-
-	/* Map I/O buffer */
-	return dma_map ( dma, map, virt_to_phys ( iobuf->data ),
-			 iob_len ( iobuf ), DMA_TX );
-}
-
-extern struct io_buffer * dma_alloc_rx_iob ( struct dma_device *dma,
-					     struct dma_mapping *map,
-					     size_t len );
 
 #endif /* _IPXE_DMA_H */

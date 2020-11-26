@@ -276,24 +276,6 @@ intel_init_mbox ( struct intel_mailbox *mbox, unsigned int ctrl,
 	mbox->mem = mem;
 }
 
-/** Transmit ring */
-struct intel_tx_ring {
-	/** Descriptor ring */
-	struct intel_ring ring;
-	/** DMA mappings */
-	struct dma_mapping map[INTEL_NUM_TX_DESC];
-};
-
-/** Receive ring */
-struct intel_rx_ring {
-	/** Descriptor ring */
-	struct intel_ring ring;
-	/** I/O buffers */
-	struct io_buffer *iobuf[INTEL_NUM_RX_DESC];
-	/** DMA mappings */
-	struct dma_mapping map[INTEL_NUM_RX_DESC];
-};
-
 /** An Intel network card */
 struct intel_nic {
 	/** Registers */
@@ -317,10 +299,12 @@ struct intel_nic {
 	/** Mailbox */
 	struct intel_mailbox mbox;
 
-	/** Transmit ring */
-	struct intel_tx_ring tx;
-	/** Receive ring */
-	struct intel_rx_ring rx;
+	/** Transmit descriptor ring */
+	struct intel_ring tx;
+	/** Receive descriptor ring */
+	struct intel_ring rx;
+	/** Receive I/O buffers */
+	struct io_buffer *rx_iobuf[INTEL_NUM_RX_DESC];
 };
 
 /** Driver flags */
@@ -349,14 +333,14 @@ static inline void intel_diag ( struct intel_nic *intel ) {
 
 	DBGC ( intel, "INTEL %p TX %04x(%02x)/%04x(%02x) "
 	       "RX %04x(%02x)/%04x(%02x)\n", intel,
-	       ( intel->tx.ring.cons & 0xffff ),
-	       readl ( intel->regs + intel->tx.ring.reg + INTEL_xDH ),
-	       ( intel->tx.ring.prod & 0xffff ),
-	       readl ( intel->regs + intel->tx.ring.reg + INTEL_xDT ),
-	       ( intel->rx.ring.cons & 0xffff ),
-	       readl ( intel->regs + intel->rx.ring.reg + INTEL_xDH ),
-	       ( intel->rx.ring.prod & 0xffff ),
-	       readl ( intel->regs + intel->rx.ring.reg + INTEL_xDT ) );
+	       ( intel->tx.cons & 0xffff ),
+	       readl ( intel->regs + intel->tx.reg + INTEL_xDH ),
+	       ( intel->tx.prod & 0xffff ),
+	       readl ( intel->regs + intel->tx.reg + INTEL_xDT ),
+	       ( intel->rx.cons & 0xffff ),
+	       readl ( intel->regs + intel->rx.reg + INTEL_xDH ),
+	       ( intel->rx.prod & 0xffff ),
+	       readl ( intel->regs + intel->rx.reg + INTEL_xDT ) );
 }
 
 extern void intel_describe_tx ( struct intel_descriptor *tx,
@@ -371,7 +355,7 @@ extern int intel_create_ring ( struct intel_nic *intel,
 extern void intel_destroy_ring ( struct intel_nic *intel,
 				 struct intel_ring *ring );
 extern void intel_refill_rx ( struct intel_nic *intel );
-extern void intel_flush ( struct intel_nic *intel );
+extern void intel_empty_rx ( struct intel_nic *intel );
 extern int intel_transmit ( struct net_device *netdev,
 			    struct io_buffer *iobuf );
 extern void intel_poll_tx ( struct net_device *netdev );
