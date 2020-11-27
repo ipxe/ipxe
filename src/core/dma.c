@@ -59,66 +59,65 @@ PROVIDE_DMAAPI_INLINE ( flat, dma_phys );
  * Map buffer for DMA
  *
  * @v dma		DMA device
+ * @v map		DMA mapping to fill in
  * @v addr		Buffer address
  * @v len		Length of buffer
  * @v flags		Mapping flags
- * @v map		DMA mapping to fill in
  * @ret rc		Return status code
  */
-static int dma_op_map ( struct dma_device *dma, physaddr_t addr, size_t len,
-			int flags, struct dma_mapping *map ) {
+static int dma_op_map ( struct dma_device *dma, struct dma_mapping *map,
+			physaddr_t addr, size_t len, int flags ) {
 	struct dma_operations *op = dma->op;
 
 	if ( ! op )
 		return -ENODEV;
-	return op->map ( dma, addr, len, flags, map );
+	return op->map ( dma, map, addr, len, flags );
 }
 
 /**
  * Unmap buffer
  *
- * @v dma		DMA device
  * @v map		DMA mapping
  */
-static void dma_op_unmap ( struct dma_device *dma, struct dma_mapping *map ) {
-	struct dma_operations *op = dma->op;
+static void dma_op_unmap ( struct dma_mapping *map ) {
+	struct dma_device *dma = map->dma;
 
-	assert ( op != NULL );
-	op->unmap ( dma, map );
+	assert ( dma != NULL );
+	assert ( dma->op != NULL );
+	dma->op->unmap ( dma, map );
 }
 
 /**
  * Allocate and map DMA-coherent buffer
  *
  * @v dma		DMA device
+ * @v map		DMA mapping to fill in
  * @v len		Length of buffer
  * @v align		Physical alignment
- * @v map		DMA mapping to fill in
  * @ret addr		Buffer address, or NULL on error
  */
-static void * dma_op_alloc ( struct dma_device *dma, size_t len, size_t align,
-			     struct dma_mapping *map ) {
+static void * dma_op_alloc ( struct dma_device *dma, struct dma_mapping *map,
+			     size_t len, size_t align ) {
 	struct dma_operations *op = dma->op;
 
 	if ( ! op )
 		return NULL;
-	return op->alloc ( dma, len, align, map );
+	return op->alloc ( dma, map, len, align );
 }
 
 /**
  * Unmap and free DMA-coherent buffer
  *
- * @v dma		DMA device
+ * @v map		DMA mapping
  * @v addr		Buffer address
  * @v len		Length of buffer
- * @v map		DMA mapping
  */
-static void dma_op_free ( struct dma_device *dma, void *addr, size_t len,
-			  struct dma_mapping *map ) {
-	struct dma_operations *op = dma->op;
+static void dma_op_free ( struct dma_mapping *map, void *addr, size_t len ) {
+	struct dma_device *dma = map->dma;
 
-	assert ( op != NULL );
-	op->free ( dma, addr, len, map );
+	assert ( dma != NULL );
+	assert ( dma->op != NULL );
+	dma->op->free ( dma, map, addr, len );
 }
 
 /**
@@ -152,12 +151,13 @@ PROVIDE_DMAAPI_INLINE ( op, dma_phys );
  * Allocate and map I/O buffer for receiving data from device
  *
  * @v dma		DMA device
- * @v len		Length of I/O buffer
  * @v map		DMA mapping to fill in
+ * @v len		Length of I/O buffer
  * @ret iobuf		I/O buffer, or NULL on error
  */
-struct io_buffer * dma_alloc_rx_iob ( struct dma_device *dma, size_t len,
-				      struct dma_mapping *map ) {
+struct io_buffer * dma_alloc_rx_iob ( struct dma_device *dma,
+				      struct dma_mapping *map,
+				      size_t len ) {
 	struct io_buffer *iobuf;
 	int rc;
 
@@ -167,13 +167,13 @@ struct io_buffer * dma_alloc_rx_iob ( struct dma_device *dma, size_t len,
 		goto err_alloc;
 
 	/* Map I/O buffer */
-	if ( ( rc = dma_map ( dma, virt_to_phys ( iobuf->data ), len,
-			      DMA_RX, map ) ) != 0 )
+	if ( ( rc = dma_map ( dma, map, virt_to_phys ( iobuf->data ),
+			      len, DMA_RX ) ) != 0 )
 		goto err_map;
 
 	return iobuf;
 
-	dma_unmap ( dma, map );
+	dma_unmap ( map );
  err_map:
 	free_iob ( iobuf );
  err_alloc:

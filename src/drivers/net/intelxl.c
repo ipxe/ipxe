@@ -136,9 +136,9 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
 	int rc;
 
 	/* Map dummy target location */
-	if ( ( rc = dma_map ( intelxl->dma, virt_to_phys ( &intelxl->msix.msg ),
-			      sizeof ( intelxl->msix.msg ), DMA_RX,
-			      &intelxl->msix.map ) ) != 0 ) {
+	if ( ( rc = dma_map ( intelxl->dma, &intelxl->msix.map,
+			      virt_to_phys ( &intelxl->msix.msg ),
+			      sizeof ( intelxl->msix.msg ), DMA_RX ) ) != 0 ) {
 		DBGC ( intelxl, "INTELXL %p could not map MSI-X target: %s\n",
 		       intelxl, strerror ( rc ) );
 		goto err_map;
@@ -162,7 +162,7 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
 
 	pci_msix_disable ( pci, &intelxl->msix.cap );
  err_enable:
-	dma_unmap ( intelxl->dma, &intelxl->msix.map );
+	dma_unmap ( &intelxl->msix.map );
  err_map:
 	return rc;
 }
@@ -183,7 +183,7 @@ void intelxl_msix_disable ( struct intelxl_nic *intelxl,
 	pci_msix_disable ( pci, &intelxl->msix.cap );
 
 	/* Unmap dummy target location */
-	dma_unmap ( intelxl->dma, &intelxl->msix.map );
+	dma_unmap ( &intelxl->msix.map );
 }
 
 /******************************************************************************
@@ -215,8 +215,8 @@ static int intelxl_alloc_admin ( struct intelxl_nic *intelxl,
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 
 	/* Allocate admin queue */
-	admin->buf = dma_alloc ( intelxl->dma, ( buf_len + len ),
-				 INTELXL_ALIGN, &admin->map );
+	admin->buf = dma_alloc ( intelxl->dma, &admin->map, ( buf_len + len ),
+				 INTELXL_ALIGN );
 	if ( ! admin->buf )
 		return -ENOMEM;
 	admin->desc = ( ( ( void * ) admin->buf ) + buf_len );
@@ -291,13 +291,13 @@ static void intelxl_disable_admin ( struct intelxl_nic *intelxl,
  * @v intelxl		Intel device
  * @v admin		Admin queue
  */
-static void intelxl_free_admin ( struct intelxl_nic *intelxl,
+static void intelxl_free_admin ( struct intelxl_nic *intelxl __unused,
 				 struct intelxl_admin *admin ) {
 	size_t buf_len = ( sizeof ( admin->buf[0] ) * INTELXL_ADMIN_NUM_DESC );
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 
 	/* Free queue */
-	dma_free ( intelxl->dma, admin->buf, ( buf_len + len ), &admin->map );
+	dma_free ( &admin->map, admin->buf, ( buf_len + len ) );
 }
 
 /**
@@ -945,8 +945,8 @@ int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 	int rc;
 
 	/* Allocate descriptor ring */
-	ring->desc.raw = dma_alloc ( intelxl->dma, ring->len, INTELXL_ALIGN,
-				     &ring->map );
+	ring->desc.raw = dma_alloc ( intelxl->dma, &ring->map, ring->len,
+				     INTELXL_ALIGN );
 	if ( ! ring->desc.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -969,7 +969,7 @@ int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 
 	return 0;
 
-	dma_free ( intelxl->dma, ring->desc.raw, ring->len, &ring->map );
+	dma_free ( &ring->map, ring->desc.raw, ring->len );
  err_alloc:
 	return rc;
 }
@@ -980,11 +980,11 @@ int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
  * @v intelxl		Intel device
  * @v ring		Descriptor ring
  */
-void intelxl_free_ring ( struct intelxl_nic *intelxl,
+void intelxl_free_ring ( struct intelxl_nic *intelxl __unused,
 			 struct intelxl_ring *ring ) {
 
 	/* Free descriptor ring */
-	dma_free ( intelxl->dma, ring->desc.raw, ring->len, &ring->map );
+	dma_free ( &ring->map, ring->desc.raw, ring->len );
 	ring->desc.raw = NULL;
 }
 
@@ -1322,7 +1322,7 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 		assert ( intelxl->rx.iobuf[rx_idx] == NULL );
 
 		/* Allocate I/O buffer */
-		iobuf = dma_alloc_rx_iob ( intelxl->dma, intelxl->mfs, map );
+		iobuf = dma_alloc_rx_iob ( intelxl->dma, map, intelxl->mfs );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
 			break;
@@ -1365,7 +1365,7 @@ void intelxl_flush ( struct intelxl_nic *intelxl ) {
 	/* Discard any unused receive buffers */
 	for ( i = 0 ; i < INTELXL_RX_NUM_DESC ; i++ ) {
 		if ( intelxl->rx.iobuf[i] ) {
-			dma_unmap ( intelxl->dma, &intelxl->rx.map[i] );
+			dma_unmap ( &intelxl->rx.map[i] );
 			free_iob ( intelxl->rx.iobuf[i] );
 		}
 		intelxl->rx.iobuf[i] = NULL;
@@ -1374,7 +1374,7 @@ void intelxl_flush ( struct intelxl_nic *intelxl ) {
 	/* Unmap incomplete transmit buffers */
 	for ( i = intelxl->tx.ring.cons ; i != intelxl->tx.ring.prod ; i++ ) {
 		tx_idx = ( i % INTELXL_TX_NUM_DESC );
-		dma_unmap ( intelxl->dma, &intelxl->tx.map[tx_idx] );
+		dma_unmap ( &intelxl->tx.map[tx_idx] );
 	}
 }
 
@@ -1516,7 +1516,7 @@ int intelxl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	map = &intelxl->tx.map[tx_idx];
 
 	/* Map I/O buffer */
-	if ( ( rc = dma_map_tx_iob ( intelxl->dma, iobuf, map ) ) != 0 )
+	if ( ( rc = dma_map_tx_iob ( intelxl->dma, map, iobuf ) ) != 0 )
 		return rc;
 
 	/* Update producer index */
@@ -1564,7 +1564,7 @@ static void intelxl_poll_tx ( struct net_device *netdev ) {
 			intelxl, tx_idx );
 
 		/* Unmap I/O buffer */
-		dma_unmap ( intelxl->dma, &intelxl->tx.map[tx_idx] );
+		dma_unmap ( &intelxl->tx.map[tx_idx] );
 
 		/* Complete TX descriptor */
 		netdev_tx_complete_next ( netdev );
@@ -1597,7 +1597,7 @@ static void intelxl_poll_rx ( struct net_device *netdev ) {
 			return;
 
 		/* Unmap I/O buffer */
-		dma_unmap ( intelxl->dma, &intelxl->rx.map[rx_idx] );
+		dma_unmap ( &intelxl->rx.map[rx_idx] );
 
 		/* Populate I/O buffer */
 		iobuf = intelxl->rx.iobuf[rx_idx];

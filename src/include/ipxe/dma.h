@@ -37,6 +37,8 @@ struct dma_mapping {
 	 * device-side DMA address.
 	 */
 	physaddr_t offset;
+	/** DMA device (if unmapping is required) */
+	struct dma_device *dma;
 	/** Platform mapping token */
 	void *token;
 };
@@ -59,14 +61,14 @@ struct dma_operations {
 	 * Map buffer for DMA
 	 *
 	 * @v dma		DMA device
+	 * @v map		DMA mapping to fill in
 	 * @v addr		Buffer address
 	 * @v len		Length of buffer
 	 * @v flags		Mapping flags
-	 * @v map		DMA mapping to fill in
 	 * @ret rc		Return status code
 	 */
-	int ( * map ) ( struct dma_device *dma, physaddr_t addr, size_t len,
-			int flags, struct dma_mapping *map );
+	int ( * map ) ( struct dma_device *dma, struct dma_mapping *map,
+			physaddr_t addr, size_t len, int flags );
 	/**
 	 * Unmap buffer
 	 *
@@ -78,23 +80,23 @@ struct dma_operations {
 	 * Allocate and map DMA-coherent buffer
 	 *
 	 * @v dma		DMA device
+	 * @v map		DMA mapping to fill in
 	 * @v len		Length of buffer
 	 * @v align		Physical alignment
-	 * @v map		DMA mapping to fill in
 	 * @ret addr		Buffer address, or NULL on error
 	 */
-	void * ( * alloc ) ( struct dma_device *dma, size_t len, size_t align,
-			     struct dma_mapping *map );
+	void * ( * alloc ) ( struct dma_device *dma, struct dma_mapping *map,
+			     size_t len, size_t align );
 	/**
 	 * Unmap and free DMA-coherent buffer
 	 *
 	 * @v dma		DMA device
+	 * @v map		DMA mapping
 	 * @v addr		Buffer address
 	 * @v len		Length of buffer
-	 * @v map		DMA mapping
 	 */
-	void ( * free ) ( struct dma_device *dma, void *addr, size_t len,
-			  struct dma_mapping *map );
+	void ( * free ) ( struct dma_device *dma, struct dma_mapping *map,
+			  void *addr, size_t len );
 	/**
 	 * Set addressable space mask
 	 *
@@ -146,21 +148,23 @@ struct dma_operations {
  * Map buffer for DMA
  *
  * @v dma		DMA device
+ * @v map		DMA mapping to fill in
  * @v addr		Buffer address
  * @v len		Length of buffer
  * @v flags		Mapping flags
- * @v map		DMA mapping to fill in
  * @ret rc		Return status code
  */
 static inline __always_inline int
 DMAAPI_INLINE ( flat, dma_map ) ( struct dma_device *dma,
+				  struct dma_mapping *map,
 				  physaddr_t addr __unused,
-				  size_t len __unused, int flags __unused,
-				  struct dma_mapping *map __unused ) {
+				  size_t len __unused, int flags __unused ) {
 
 	/* Increment mapping count (for debugging) */
-	if ( DBG_LOG )
+	if ( DBG_LOG ) {
+		map->dma = dma;
 		dma->mapped++;
+	}
 
 	return 0;
 }
@@ -168,39 +172,42 @@ DMAAPI_INLINE ( flat, dma_map ) ( struct dma_device *dma,
 /**
  * Unmap buffer
  *
- * @v dma		DMA device
  * @v map		DMA mapping
  */
 static inline __always_inline void
-DMAAPI_INLINE ( flat, dma_unmap ) ( struct dma_device *dma,
-				    struct dma_mapping *map __unused ) {
+DMAAPI_INLINE ( flat, dma_unmap ) ( struct dma_mapping *map ) {
 
 	/* Decrement mapping count (for debugging) */
-	if ( DBG_LOG )
-		dma->mapped--;
+	if ( DBG_LOG ) {
+		assert ( map->dma != NULL );
+		map->dma->mapped--;
+		map->dma = NULL;
+	}
 }
 
 /**
  * Allocate and map DMA-coherent buffer
  *
  * @v dma		DMA device
+ * @v map		DMA mapping to fill in
  * @v len		Length of buffer
  * @v align		Physical alignment
- * @v map		DMA mapping to fill in
  * @ret addr		Buffer address, or NULL on error
  */
 static inline __always_inline void *
 DMAAPI_INLINE ( flat, dma_alloc ) ( struct dma_device *dma,
-				    size_t len, size_t align,
-				    struct dma_mapping *map __unused ) {
+				    struct dma_mapping *map,
+				    size_t len, size_t align ) {
 	void *addr;
 
 	/* Allocate buffer */
 	addr = malloc_phys ( len, align );
 
-	/* Increment allocation count (for debugging) */
-	if ( DBG_LOG && addr )
-		dma->allocated++;
+	/* Increment mapping count (for debugging) */
+	if ( DBG_LOG && addr ) {
+		map->dma = dma;
+		dma->mapped++;
+	}
 
 	return addr;
 }
@@ -208,22 +215,23 @@ DMAAPI_INLINE ( flat, dma_alloc ) ( struct dma_device *dma,
 /**
  * Unmap and free DMA-coherent buffer
  *
- * @v dma		DMA device
+ * @v map		DMA mapping
  * @v addr		Buffer address
  * @v len		Length of buffer
- * @v map		DMA mapping
  */
 static inline __always_inline void
-DMAAPI_INLINE ( flat, dma_free ) ( struct dma_device *dma,
-				   void *addr, size_t len,
-				   struct dma_mapping *map __unused ) {
+DMAAPI_INLINE ( flat, dma_free ) ( struct dma_mapping *map,
+				   void *addr, size_t len ) {
 
 	/* Free buffer */
 	free_phys ( addr, len );
 
-	/* Decrement allocation count (for debugging) */
-	if ( DBG_LOG )
-		dma->allocated--;
+	/* Decrement mapping count (for debugging) */
+	if ( DBG_LOG ) {
+		assert ( map->dma != NULL );
+		map->dma->mapped--;
+		map->dma = NULL;
+	}
 }
 
 /**
@@ -272,45 +280,42 @@ DMAAPI_INLINE ( op, dma_phys ) ( struct dma_mapping *map, physaddr_t addr ) {
  * Map buffer for DMA
  *
  * @v dma		DMA device
+ * @v map		DMA mapping to fill in
  * @v addr		Buffer address
  * @v len		Length of buffer
  * @v flags		Mapping flags
- * @v map		DMA mapping to fill in
  * @ret rc		Return status code
  */
-int dma_map ( struct dma_device *dma, physaddr_t addr, size_t len,
-	      int flags, struct dma_mapping *map );
+int dma_map ( struct dma_device *dma, struct dma_mapping *map,
+	      physaddr_t addr, size_t len, int flags );
 
 /**
  * Unmap buffer
  *
- * @v dma		DMA device
  * @v map		DMA mapping
  */
-void dma_unmap ( struct dma_device *dma, struct dma_mapping *map );
+void dma_unmap ( struct dma_mapping *map );
 
 /**
  * Allocate and map DMA-coherent buffer
  *
  * @v dma		DMA device
+ * @v map		DMA mapping to fill in
  * @v len		Length of buffer
  * @v align		Physical alignment
- * @v map		DMA mapping to fill in
  * @ret addr		Buffer address, or NULL on error
  */
-void * dma_alloc ( struct dma_device *dma, size_t len, size_t align,
-		   struct dma_mapping *map );
+void * dma_alloc ( struct dma_device *dma, struct dma_mapping *map,
+		   size_t len, size_t align );
 
 /**
  * Unmap and free DMA-coherent buffer
  *
- * @v dma		DMA device
+ * @v map		DMA mapping
  * @v addr		Buffer address
  * @v len		Length of buffer
- * @v map		DMA mapping
  */
-void dma_free ( struct dma_device *dma, void *addr, size_t len,
-		struct dma_mapping *map );
+void dma_free ( struct dma_mapping *map, void *addr, size_t len );
 
 /**
  * Set addressable space mask
@@ -339,7 +344,20 @@ physaddr_t dma_phys ( struct dma_mapping *map, physaddr_t addr );
 static inline __always_inline physaddr_t dma ( struct dma_mapping *map,
 					       void *addr ) {
 
+	/* Get DMA address from corresponding physical address */
 	return dma_phys ( map, virt_to_phys ( addr ) );
+}
+
+/**
+ * Check if DMA unmapping is required
+ *
+ * @v map		DMA mapping
+ * @v unmap		Unmapping is required
+ */
+static inline __always_inline int dma_mapped ( struct dma_mapping *map ) {
+
+	/* Unmapping is required if a DMA device was recorded */
+	return ( map->dma != NULL );
 }
 
 /**
@@ -371,20 +389,21 @@ dma_set_mask_64bit ( struct dma_device *dma ) {
  * Map I/O buffer for transmitting data to device
  *
  * @v dma		DMA device
- * @v iobuf		I/O buffer
  * @v map		DMA mapping to fill in
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
 static inline __always_inline int
-dma_map_tx_iob ( struct dma_device *dma, struct io_buffer *iobuf,
-		 struct dma_mapping *map ) {
+dma_map_tx_iob ( struct dma_device *dma, struct dma_mapping *map,
+		 struct io_buffer *iobuf ) {
 
 	/* Map I/O buffer */
-	return dma_map ( dma, virt_to_phys ( iobuf->data ), iob_len ( iobuf ),
-			 DMA_TX, map );
+	return dma_map ( dma, map, virt_to_phys ( iobuf->data ),
+			 iob_len ( iobuf ), DMA_TX );
 }
 
-extern struct io_buffer * dma_alloc_rx_iob ( struct dma_device *dma, size_t len,
-					     struct dma_mapping *map );
+extern struct io_buffer * dma_alloc_rx_iob ( struct dma_device *dma,
+					     struct dma_mapping *map,
+					     size_t len );
 
 #endif /* _IPXE_DMA_H */

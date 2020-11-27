@@ -315,14 +315,14 @@ PROVIDE_PCIAPI ( efi, pci_ioremap, efipci_ioremap );
  * Map buffer for DMA
  *
  * @v dma		DMA device
+ * @v map		DMA mapping to fill in
  * @v addr		Buffer address
  * @v len		Length of buffer
  * @v flags		Mapping flags
- * @v map		DMA mapping to fill in
  * @ret rc		Return status code
  */
-static int efipci_dma_map ( struct dma_device *dma, physaddr_t addr, size_t len,
-			    int flags, struct dma_mapping *map ) {
+static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
+			    physaddr_t addr, size_t len, int flags ) {
 	struct efi_pci_device *efipci =
 		container_of ( dma, struct efi_pci_device, pci.dma );
 	struct pci_device *pci = &efipci->pci;
@@ -374,6 +374,7 @@ static int efipci_dma_map ( struct dma_device *dma, physaddr_t addr, size_t len,
 	}
 
 	/* Populate mapping */
+	map->dma = dma;
 	map->offset = ( bus - addr );
 	map->token = mapping;
 
@@ -420,14 +421,14 @@ static void efipci_dma_unmap ( struct dma_device *dma,
  * Allocate and map DMA-coherent buffer
  *
  * @v dma		DMA device
+ * @v map		DMA mapping to fill in
  * @v len		Length of buffer
  * @v align		Physical alignment
- * @v map		DMA mapping to fill in
  * @ret addr		Buffer address, or NULL on error
  */
-static void * efipci_dma_alloc ( struct dma_device *dma, size_t len,
-				 size_t align __unused,
-				 struct dma_mapping *map ) {
+static void * efipci_dma_alloc ( struct dma_device *dma,
+				 struct dma_mapping *map,
+				 size_t len, size_t align __unused ) {
 	struct efi_pci_device *efipci =
 		container_of ( dma, struct efi_pci_device, pci.dma );
 	struct pci_device *pci = &efipci->pci;
@@ -451,8 +452,8 @@ static void * efipci_dma_alloc ( struct dma_device *dma, size_t len,
 	}
 
 	/* Map buffer */
-	if ( ( rc = efipci_dma_map ( dma, virt_to_phys ( addr ), len, DMA_BI,
-				     map ) ) != 0 )
+	if ( ( rc = efipci_dma_map ( dma, map, virt_to_phys ( addr ),
+				     len, DMA_BI ) ) != 0 )
 		goto err_map;
 
 	/* Increment allocation count (for debugging) */
@@ -472,12 +473,12 @@ static void * efipci_dma_alloc ( struct dma_device *dma, size_t len,
  * Unmap and free DMA-coherent buffer
  *
  * @v dma		DMA device
+ * @v map		DMA mapping
  * @v addr		Buffer address
  * @v len		Length of buffer
- * @v map		DMA mapping
  */
-static void efipci_dma_free ( struct dma_device *dma, void *addr, size_t len,
-			      struct dma_mapping *map ) {
+static void efipci_dma_free ( struct dma_device *dma, struct dma_mapping *map,
+			      void *addr, size_t len ) {
 	struct efi_pci_device *efipci =
 		container_of ( dma, struct efi_pci_device, pci.dma );
 	EFI_PCI_IO_PROTOCOL *pci_io = efipci->io;

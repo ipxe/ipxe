@@ -514,7 +514,8 @@ static int realtek_create_buffer ( struct realtek_nic *rtl ) {
 		return 0;
 
 	/* Allocate buffer */
-	rxbuf->data = dma_alloc ( rtl->dma, len, RTL_RXBUF_ALIGN, &rxbuf->map );
+	rxbuf->data = dma_alloc ( rtl->dma, &rxbuf->map, len,
+				  RTL_RXBUF_ALIGN );
 	if ( ! rxbuf->data )
 		return -ENOMEM;
 
@@ -545,7 +546,7 @@ static void realtek_destroy_buffer ( struct realtek_nic *rtl ) {
 	writel ( 0, rtl->regs + RTL_RBSTART );
 
 	/* Free buffer */
-	dma_free ( rtl->dma, rxbuf->data, len, &rxbuf->map );
+	dma_free ( &rxbuf->map, rxbuf->data, len );
 	rxbuf->data = NULL;
 	rxbuf->offset = 0;
 }
@@ -566,8 +567,8 @@ static int realtek_create_ring ( struct realtek_nic *rtl,
 		return 0;
 
 	/* Allocate descriptor ring */
-	ring->desc = dma_alloc ( rtl->dma, ring->len, RTL_RING_ALIGN,
-				 &ring->map );
+	ring->desc = dma_alloc ( rtl->dma, &ring->map, ring->len,
+				 RTL_RING_ALIGN );
 	if ( ! ring->desc )
 		return -ENOMEM;
 
@@ -608,7 +609,7 @@ static void realtek_destroy_ring ( struct realtek_nic *rtl,
 	writel ( 0, rtl->regs + ring->reg + 4 );
 
 	/* Free descriptor ring */
-	dma_free ( rtl->dma, ring->desc, ring->len, &ring->map );
+	dma_free ( &ring->map, ring->desc, ring->len );
 	ring->desc = NULL;
 }
 
@@ -638,7 +639,7 @@ static void realtek_refill_rx ( struct realtek_nic *rtl ) {
 		assert ( rtl->rx.iobuf[rx_idx] == NULL );
 
 		/* Allocate I/O buffer */
-		iobuf = dma_alloc_rx_iob ( rtl->dma, RTL_RX_MAX_LEN, map );
+		iobuf = dma_alloc_rx_iob ( rtl->dma, map, RTL_RX_MAX_LEN );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
 			return;
@@ -748,7 +749,7 @@ static void realtek_close ( struct net_device *netdev ) {
 	/* Discard any unused receive buffers */
 	for ( i = 0 ; i < RTL_NUM_RX_DESC ; i++ ) {
 		if ( rtl->rx.iobuf[i] ) {
-			dma_unmap ( rtl->dma, &rtl->rx.map[i] );
+			dma_unmap ( &rtl->rx.map[i] );
 			free_iob ( rtl->rx.iobuf[i] );
 		}
 		rtl->rx.iobuf[i] = NULL;
@@ -756,7 +757,7 @@ static void realtek_close ( struct net_device *netdev ) {
 
 	/* Unmap any incomplete transmit buffers */
 	for ( i = rtl->tx.ring.cons ; i != rtl->tx.ring.prod ; i++ )
-		dma_unmap ( rtl->dma, &rtl->tx.map[ i % RTL_NUM_TX_DESC ] );
+		dma_unmap ( &rtl->tx.map[ i % RTL_NUM_TX_DESC ] );
 
 	/* Destroy transmit descriptor ring */
 	realtek_destroy_ring ( rtl, &rtl->tx.ring );
@@ -796,7 +797,7 @@ static int realtek_transmit ( struct net_device *netdev,
 		iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Map I/O buffer */
-	if ( ( rc = dma_map_tx_iob ( rtl->dma, iobuf, map ) ) != 0 )
+	if ( ( rc = dma_map_tx_iob ( rtl->dma, map, iobuf ) ) != 0 )
 		return rc;
 	address = dma ( map, iobuf->data );
 
@@ -870,7 +871,7 @@ static void realtek_poll_tx ( struct net_device *netdev ) {
 		DBGC2 ( rtl, "REALTEK %p TX %d complete\n", rtl, tx_idx );
 
 		/* Unmap I/O buffer */
-		dma_unmap ( rtl->dma, &rtl->tx.map[tx_idx] );
+		dma_unmap ( &rtl->tx.map[tx_idx] );
 
 		/* Complete TX descriptor */
 		rtl->tx.ring.cons++;
@@ -964,7 +965,7 @@ static void realtek_poll_rx ( struct net_device *netdev ) {
 			return;
 
 		/* Unmap buffer */
-		dma_unmap ( rtl->dma, &rtl->rx.map[rx_idx] );
+		dma_unmap ( &rtl->rx.map[rx_idx] );
 
 		/* Populate I/O buffer */
 		iobuf = rtl->rx.iobuf[rx_idx];

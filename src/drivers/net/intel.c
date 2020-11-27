@@ -504,8 +504,8 @@ int intel_create_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	 * prevent any possible page-crossing errors due to hardware
 	 * errata.
 	 */
-	ring->desc = dma_alloc ( intel->dma, ring->len, ring->len,
-				 &ring->map );
+	ring->desc = dma_alloc ( intel->dma, &ring->map, ring->len,
+				 ring->len );
 	if ( ! ring->desc )
 		return -ENOMEM;
 
@@ -554,7 +554,7 @@ void intel_destroy_ring ( struct intel_nic *intel, struct intel_ring *ring ) {
 	intel_reset_ring ( intel, ring->reg );
 
 	/* Free descriptor ring */
-	dma_free ( intel->dma, ring->desc, ring->len, &ring->map );
+	dma_free ( &ring->map, ring->desc, ring->len );
 	ring->desc = NULL;
 	ring->prod = 0;
 	ring->cons = 0;
@@ -584,7 +584,7 @@ void intel_refill_rx ( struct intel_nic *intel ) {
 		assert ( intel->rx.iobuf[rx_idx] == NULL );
 
 		/* Allocate I/O buffer */
-		iobuf = dma_alloc_rx_iob ( intel->dma, INTEL_RX_MAX_LEN, map );
+		iobuf = dma_alloc_rx_iob ( intel->dma, map, INTEL_RX_MAX_LEN );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
 			break;
@@ -630,7 +630,7 @@ void intel_flush ( struct intel_nic *intel ) {
 	/* Discard unused receive buffers */
 	for ( i = 0 ; i < INTEL_NUM_RX_DESC ; i++ ) {
 		if ( intel->rx.iobuf[i] ) {
-			dma_unmap ( intel->dma, &intel->rx.map[i] );
+			dma_unmap ( &intel->rx.map[i] );
 			free_iob ( intel->rx.iobuf[i] );
 		}
 		intel->rx.iobuf[i] = NULL;
@@ -639,7 +639,7 @@ void intel_flush ( struct intel_nic *intel ) {
 	/* Unmap incomplete transmit buffers */
 	for ( i = intel->tx.ring.cons ; i != intel->tx.ring.prod ; i++ ) {
 		tx_idx = ( i % INTEL_NUM_TX_DESC );
-		dma_unmap ( intel->dma, &intel->tx.map[tx_idx] );
+		dma_unmap ( &intel->tx.map[tx_idx] );
 	}
 }
 
@@ -773,7 +773,7 @@ int intel_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	map = &intel->tx.map[tx_idx];
 
 	/* Map I/O buffer */
-	if ( ( rc = dma_map_tx_iob ( intel->dma, iobuf, map ) ) != 0 )
+	if ( ( rc = dma_map_tx_iob ( intel->dma, map, iobuf ) ) != 0 )
 		return rc;
 
 	/* Update producer index */
@@ -822,7 +822,7 @@ void intel_poll_tx ( struct net_device *netdev ) {
 		DBGC2 ( intel, "INTEL %p TX %d complete\n", intel, tx_idx );
 
 		/* Unmap I/O buffer */
-		dma_unmap ( intel->dma, &intel->tx.map[tx_idx] );
+		dma_unmap ( &intel->tx.map[tx_idx] );
 
 		/* Complete TX descriptor */
 		netdev_tx_complete_next ( netdev );
@@ -854,7 +854,7 @@ void intel_poll_rx ( struct net_device *netdev ) {
 			return;
 
 		/* Unmap I/O buffer */
-		dma_unmap ( intel->dma, &intel->rx.map[rx_idx] );
+		dma_unmap ( &intel->rx.map[rx_idx] );
 
 		/* Populate I/O buffer */
 		iobuf = intel->rx.iobuf[rx_idx];
