@@ -352,14 +352,20 @@ static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
 		break;
 	}
 
-	/* Map buffer */
+	/* Map buffer (if non-zero length) */
 	count = len;
-	if ( ( efirc = pci_io->Map ( pci_io, op, phys_to_virt ( addr ), &count,
-				     &bus, &mapping ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( pci, "EFIPCI " PCI_FMT " cannot map %08lx+%zx: %s\n",
-		       PCI_ARGS ( pci ), addr, len, strerror ( rc ) );
-		goto err_map;
+	if ( len ) {
+		if ( ( efirc = pci_io->Map ( pci_io, op, phys_to_virt ( addr ),
+					     &count, &bus, &mapping ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( pci, "EFIPCI " PCI_FMT " cannot map %08lx+%zx: "
+			       "%s\n", PCI_ARGS ( pci ), addr, len,
+			       strerror ( rc ) );
+			goto err_map;
+		}
+	} else {
+		bus = addr;
+		mapping = NULL;
 	}
 
 	/* Check that full length was mapped.  The UEFI specification
@@ -403,11 +409,9 @@ static void efipci_dma_unmap ( struct dma_device *dma,
 		container_of ( dma, struct efi_pci_device, pci.dma );
 	EFI_PCI_IO_PROTOCOL *pci_io = efipci->io;
 
-	/* Sanity check */
-	assert ( map->token != NULL );
-
-	/* Unmap buffer */
-	pci_io->Unmap ( pci_io, map->token );
+	/* Unmap buffer (if non-zero length) */
+	if ( map->token )
+		pci_io->Unmap ( pci_io, map->token );
 
 	/* Clear mapping */
 	map->dma = NULL;
