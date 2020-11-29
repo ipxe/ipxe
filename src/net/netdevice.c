@@ -478,7 +478,7 @@ static void netdev_tx_flush ( struct net_device *netdev ) {
  * Add packet to receive queue
  *
  * @v netdev		Network device
- * @v iobuf		I/O buffer, or NULL
+ * @v iobuf		I/O buffer
  *
  * The packet is added to the network device's RX queue.  This
  * function takes ownership of the I/O buffer.
