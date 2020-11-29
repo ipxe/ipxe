@@ -392,7 +392,7 @@ void netdev_tx_err ( struct net_device *netdev,
 	}
 
 	/* Unmap I/O buffer, if required */
-	if ( dma_mapped ( &iobuf->map ) )
+	if ( iobuf && dma_mapped ( &iobuf->map ) )
 		iob_unmap ( iobuf );
 
 	/* Discard packet */
