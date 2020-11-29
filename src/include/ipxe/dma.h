@@ -13,6 +13,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/api.h>
 #include <ipxe/io.h>
 #include <ipxe/malloc.h>
+#include <ipxe/umalloc.h>
 #include <config/ioapi.h>
 
 #ifdef DMAAPI_OP
@@ -96,6 +97,28 @@ struct dma_operations {
 	 */
 	void ( * free ) ( struct dma_device *dma, struct dma_mapping *map,
 			  void *addr, size_t len );
+	/**
+	 * Allocate and map DMA-coherent buffer from external (user) memory
+	 *
+	 * @v dma		DMA device
+	 * @v map		DMA mapping to fill in
+	 * @v len		Length of buffer
+	 * @v align		Physical alignment
+	 * @ret addr		Buffer address, or NULL on error
+	 */
+	userptr_t ( * umalloc ) ( struct dma_device *dma,
+				  struct dma_mapping *map,
+				  size_t len, size_t align );
+	/**
+	 * Unmap and free DMA-coherent buffer from external (user) memory
+	 *
+	 * @v dma		DMA device
+	 * @v map		DMA mapping
+	 * @v addr		Buffer address
+	 * @v len		Length of buffer
+	 */
+	void ( * ufree ) ( struct dma_device *dma, struct dma_mapping *map,
+			   userptr_t addr, size_t len );
 	/**
 	 * Set addressable space mask
 	 *
@@ -234,6 +257,55 @@ DMAAPI_INLINE ( flat, dma_free ) ( struct dma_mapping *map,
 }
 
 /**
+ * Allocate and map DMA-coherent buffer from external (user) memory
+ *
+ * @v dma		DMA device
+ * @v map		DMA mapping to fill in
+ * @v len		Length of buffer
+ * @v align		Physical alignment
+ * @ret addr		Buffer address, or NULL on error
+ */
+static inline __always_inline userptr_t
+DMAAPI_INLINE ( flat, dma_umalloc ) ( struct dma_device *dma,
+				      struct dma_mapping *map,
+				      size_t len, size_t align __unused ) {
+	userptr_t addr;
+
+	/* Allocate buffer */
+	addr = umalloc ( len );
+
+	/* Increment mapping count (for debugging) */
+	if ( DBG_LOG && addr ) {
+		map->dma = dma;
+		dma->mapped++;
+	}
+
+	return addr;
+}
+
+/**
+ * Unmap and free DMA-coherent buffer from external (user) memory
+ *
+ * @v map		DMA mapping
+ * @v addr		Buffer address
+ * @v len		Length of buffer
+ */
+static inline __always_inline void
+DMAAPI_INLINE ( flat, dma_ufree ) ( struct dma_mapping *map,
+				    userptr_t addr, size_t len __unused ) {
+
+	/* Free buffer */
+	ufree ( addr );
+
+	/* Decrement mapping count (for debugging) */
+	if ( DBG_LOG ) {
+		assert ( map->dma != NULL );
+		map->dma->mapped--;
+		map->dma = NULL;
+	}
+}
+
+/**
  * Set addressable space mask
  *
  * @v dma		DMA device
@@ -315,6 +387,27 @@ void * dma_alloc ( struct dma_device *dma, struct dma_mapping *map,
  * @v len		Length of buffer
  */
 void dma_free ( struct dma_mapping *map, void *addr, size_t len );
+
+/**
+ * Allocate and map DMA-coherent buffer from external (user) memory
+ *
+ * @v dma		DMA device
+ * @v map		DMA mapping to fill in
+ * @v len		Length of buffer
+ * @v align		Physical alignment
+ * @ret addr		Buffer address, or NULL on error
+ */
+userptr_t dma_umalloc ( struct dma_device *dma, struct dma_mapping *map,
+			size_t len, size_t align );
+
+/**
+ * Unmap and free DMA-coherent buffer from external (user) memory
+ *
+ * @v map		DMA mapping
+ * @v addr		Buffer address
+ * @v len		Length of buffer
+ */
+void dma_ufree ( struct dma_mapping *map, userptr_t addr, size_t len );
 
 /**
  * Set addressable space mask

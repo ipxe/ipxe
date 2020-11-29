@@ -44,6 +44,8 @@ PROVIDE_DMAAPI_INLINE ( flat, dma_map );
 PROVIDE_DMAAPI_INLINE ( flat, dma_unmap );
 PROVIDE_DMAAPI_INLINE ( flat, dma_alloc );
 PROVIDE_DMAAPI_INLINE ( flat, dma_free );
+PROVIDE_DMAAPI_INLINE ( flat, dma_umalloc );
+PROVIDE_DMAAPI_INLINE ( flat, dma_ufree );
 PROVIDE_DMAAPI_INLINE ( flat, dma_set_mask );
 PROVIDE_DMAAPI_INLINE ( flat, dma_phys );
 
@@ -120,6 +122,41 @@ static void dma_op_free ( struct dma_mapping *map, void *addr, size_t len ) {
 }
 
 /**
+ * Allocate and map DMA-coherent buffer from external (user) memory
+ *
+ * @v dma		DMA device
+ * @v map		DMA mapping to fill in
+ * @v len		Length of buffer
+ * @v align		Physical alignment
+ * @ret addr		Buffer address, or NULL on error
+ */
+static userptr_t dma_op_umalloc ( struct dma_device *dma,
+				  struct dma_mapping *map,
+				  size_t len, size_t align ) {
+	struct dma_operations *op = dma->op;
+
+	if ( ! op )
+		return UNULL;
+	return op->umalloc ( dma, map, len, align );
+}
+
+/**
+ * Unmap and free DMA-coherent buffer from external (user) memory
+ *
+ * @v map		DMA mapping
+ * @v addr		Buffer address
+ * @v len		Length of buffer
+ */
+static void dma_op_ufree ( struct dma_mapping *map, userptr_t addr,
+			   size_t len ) {
+	struct dma_device *dma = map->dma;
+
+	assert ( dma != NULL );
+	assert ( dma->op != NULL );
+	dma->op->ufree ( dma, map, addr, len );
+}
+
+/**
  * Set addressable space mask
  *
  * @v dma		DMA device
@@ -136,5 +173,7 @@ PROVIDE_DMAAPI ( op, dma_map, dma_op_map );
 PROVIDE_DMAAPI ( op, dma_unmap, dma_op_unmap );
 PROVIDE_DMAAPI ( op, dma_alloc, dma_op_alloc );
 PROVIDE_DMAAPI ( op, dma_free, dma_op_free );
+PROVIDE_DMAAPI ( op, dma_umalloc, dma_op_umalloc );
+PROVIDE_DMAAPI ( op, dma_ufree, dma_op_ufree );
 PROVIDE_DMAAPI ( op, dma_set_mask, dma_op_set_mask );
 PROVIDE_DMAAPI_INLINE ( op, dma_phys );
