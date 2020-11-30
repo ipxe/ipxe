@@ -57,6 +57,310 @@ struct efi_veto {
 };
 
 /**
+ * Unload an EFI driver
+ *
+ * @v driver		Driver binding handle
+ * @ret rc		Return status code
+ */
+static int efi_veto_unload ( EFI_HANDLE driver ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Unload the driver */
+	if ( ( efirc = bs->UnloadImage ( driver ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( driver, "EFIVETO %s could not unload: %s\n",
+		       efi_handle_name ( driver ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Disconnect an EFI driver from all handles
+ *
+ * @v driver		Driver binding handle
+ * @ret rc		Return status code
+ */
+static int efi_veto_disconnect ( EFI_HANDLE driver ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE *handles;
+	EFI_HANDLE handle;
+	UINTN count;
+	unsigned int i;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Enumerate all handles */
+	if ( ( efirc = bs->LocateHandleBuffer ( AllHandles, NULL, NULL,
+						&count, &handles ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( driver, "EFIVETO %s could not enumerate handles: %s\n",
+		       efi_handle_name ( driver ), strerror ( rc ) );
+		goto err_list;
+	}
+
+	/* Disconnect driver from all handles, in reverse order */
+	for ( i = 0 ; i < count ; i++ ) {
+		handle = handles[ count - i - 1 ];
+		efirc = bs->DisconnectController ( handle, driver, NULL );
+		if ( ( efirc != 0 ) && ( efirc != EFI_NOT_FOUND ) ) {
+			rc = -EEFI ( efirc );
+			DBGC ( driver, "EFIVETO %s could not disconnect",
+			       efi_handle_name ( driver ) );
+			DBGC ( driver, " %s: %s\n",
+			       efi_handle_name ( handle ), strerror ( rc ) );
+			goto err_disconnect;
+		}
+	}
+
+	/* Success */
+	rc = 0;
+	DBGC2 ( driver, "EFIVETO %s disconnected all handles\n",
+		efi_handle_name ( driver ) );
+
+ err_disconnect:
+	bs->FreePool ( handles );
+ err_list:
+	return rc;
+}
+
+/**
+ * Uninstall an EFI driver binding protocol
+ *
+ * @v driver		Driver binding handle
+ * @ret rc		Return status code
+ */
+static int efi_veto_uninstall ( EFI_HANDLE driver ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_DRIVER_BINDING_PROTOCOL *binding;
+		void *interface;
+	} binding;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Open driver binding protocol */
+	if ( ( efirc = bs->OpenProtocol (
+			driver, &efi_driver_binding_protocol_guid,
+			&binding.interface, efi_image_handle, driver,
+			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( driver, "EFIVETO %s could not open driver binding "
+		       "protocol: %s\n", efi_handle_name ( driver ),
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Close driver binding protocol */
+	bs->CloseProtocol ( driver, &efi_driver_binding_protocol_guid,
+			    efi_image_handle, driver );
+
+	/* Uninstall driver binding protocol */
+	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+			driver, &efi_driver_binding_protocol_guid,
+			binding.binding, NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( driver, "EFIVETO %s could not uninstall driver "
+		       "binding protocol: %s\n",
+		       efi_handle_name ( driver ), strerror ( rc ) );
+		return rc;
+	}
+
+	DBGC2 ( driver, "EFIVETO %s uninstalled driver binding protocol\n",
+		efi_handle_name ( driver ) );
+	return 0;
+}
+
+/**
+ * Close protocol on handle potentially opened by an EFI driver
+ *
+ * @v driver		Driver binding handle
+ * @v handle		Potentially opened handle
+ * @v protocol		Opened protocol
+ * @ret rc		Return status code
+ */
+static int efi_veto_close_protocol ( EFI_HANDLE driver, EFI_HANDLE handle,
+				     EFI_GUID *protocol ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *openers;
+	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener;
+	EFI_HANDLE controller;
+	UINTN count;
+	unsigned int i;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Retrieve list of openers */
+	if ( ( efirc = bs->OpenProtocolInformation ( handle, protocol, &openers,
+						     &count ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( driver, "EFIVETO %s could not retrieve openers",
+		       efi_handle_name ( driver ) );
+		DBGC ( driver, " of %s %s: %s", efi_handle_name ( handle ),
+		       efi_guid_ntoa ( protocol ), strerror ( rc ) );
+		goto err_list;
+	}
+
+	/* Close anything opened by this driver */
+	for ( i = 0 ; i < count ; i++ ) {
+		opener = &openers[i];
+		if ( opener->AgentHandle != driver )
+			continue;
+		controller = opener->ControllerHandle;
+		DBGC_EFI_OPENER ( driver, handle, protocol, opener );
+		if ( ( efirc = bs->CloseProtocol ( handle, protocol, driver,
+						   controller ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( driver, "EFIVETO %s could not close stray open",
+			       efi_handle_name ( driver ) );
+			DBGC ( driver, " of %s: %s\n",
+			       efi_handle_name ( handle ), strerror ( rc ) );
+			goto err_close;
+		}
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_close:
+	bs->FreePool ( openers );
+ err_list:
+	return rc;
+}
+
+/**
+ * Close handle potentially opened by an EFI driver
+ *
+ * @v driver		Driver binding handle
+ * @v handle		Potentially opened handle
+ * @ret rc		Return status code
+ */
+static int efi_veto_close_handle ( EFI_HANDLE driver, EFI_HANDLE handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_GUID **protocols;
+	UINTN count;
+	unsigned int i;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Retrieve list of protocols */
+	if ( ( efirc = bs->ProtocolsPerHandle ( handle, &protocols,
+						&count ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( driver, "EFIVETO %s could not retrieve protocols",
+		       efi_handle_name ( driver ) );
+		DBGC ( driver, " for %s: %s\n",
+		       efi_handle_name ( handle ), strerror ( rc ) );
+		goto err_list;
+	}
+
+	/* Close each protocol */
+	for ( i = 0 ; i < count ; i++ ) {
+		if ( ( rc = efi_veto_close_protocol ( driver, handle,
+						      protocols[i] ) ) != 0 )
+			goto err_close;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_close:
+	bs->FreePool ( protocols );
+ err_list:
+	return rc;
+}
+
+/**
+ * Close all remaining handles opened by an EFI driver
+ *
+ * @v driver		Driver binding handle
+ * @ret rc		Return status code
+ */
+static int efi_veto_close ( EFI_HANDLE driver ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE *handles;
+	UINTN count;
+	unsigned int i;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Enumerate all handles */
+	if ( ( efirc = bs->LocateHandleBuffer ( AllHandles, NULL, NULL,
+						&count, &handles ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( driver, "EFIVETO %s could not enumerate handles: %s\n",
+		       efi_handle_name ( driver ), strerror ( rc ) );
+		goto err_list;
+	}
+
+	/* Close each handle */
+	for ( i = 0 ; i < count ; i++ ) {
+		if ( ( rc = efi_veto_close_handle ( driver,
+						    handles[i] ) ) != 0 )
+			goto err_close;
+	}
+
+	/* Success */
+	rc = 0;
+	DBGC2 ( driver, "EFIVETO %s closed all remaining handles\n",
+		efi_handle_name ( driver ) );
+
+ err_close:
+	bs->FreePool ( handles );
+ err_list:
+	return rc;
+}
+
+/**
+ * Terminate an EFI driver with extreme prejudice
+ *
+ * @v driver		Driver binding handle
+ * @ret rc		Return status code
+ */
+static int efi_veto_destroy ( EFI_HANDLE driver ) {
+	int rc;
+
+	/* Disconnect driver from all handles */
+	if ( ( rc = efi_veto_disconnect ( driver ) ) != 0 )
+		return rc;
+
+	/* Uninstall driver binding protocol */
+	if ( ( rc = efi_veto_uninstall ( driver ) ) != 0 )
+		return rc;
+
+	/* Close any remaining opened handles */
+	if ( ( rc = efi_veto_close ( driver ) ) != 0 )
+		return rc;
+
+	DBGC ( driver, "EFIVETO %s forcibly removed\n",
+	       efi_handle_name ( driver ) );
+	return 0;
+}
+
+/**
+ * Veto an EFI driver
+ *
+ * @v driver		Driver binding handle
+ * @ret rc		Return status code
+ */
+static int efi_veto_driver ( EFI_HANDLE driver ) {
+	int rc;
+
+	/* Try gracefully unloading the driver */
+	if ( ( rc = efi_veto_unload ( driver ) ) == 0 )
+		return 0;
+
+	/* If that fails, use a hammer */
+	if ( ( rc = efi_veto_destroy ( driver ) ) == 0 )
+		return 0;
+
+	return rc;
+}
+
+/**
  * Veto Dell Ip4ConfigDxe driver
  *
  * @v binding		Driver binding protocol
@@ -201,10 +505,10 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 }
 
 /**
- * Unload any vetoed drivers
+ * Remove any vetoed drivers
  *
  */
-void efi_veto_unload ( void ) {
+void efi_veto ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_veto *veto;
 	EFI_HANDLE *drivers;
@@ -241,11 +545,10 @@ void efi_veto_unload ( void ) {
 		}
 		if ( ! veto )
 			continue;
-		DBGC ( driver, "EFIVETO unloading %s (%s)\n",
+		DBGC ( driver, "EFIVETO %s is vetoed (%s)\n",
 		       efi_handle_name ( driver ), veto->name );
-		if ( ( efirc = bs->UnloadImage ( driver ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( driver, "EFIVETO could not unload %s: %s\n",
+		if ( ( rc = efi_veto_driver ( driver ) ) != 0 ) {
+			DBGC ( driver, "EFIVETO %s could not veto: %s\n",
 			       efi_handle_name ( driver ), strerror ( rc ) );
 		}
 	}

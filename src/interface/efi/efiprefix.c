@@ -79,8 +79,8 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
  */
 static int efi_probe ( struct root_device *rootdev __unused ) {
 
-	/* Unloaded any vetoed drivers */
-	efi_veto_unload();
+	/* Remove any vetoed drivers */
+	efi_veto();
 
 	/* Connect our drivers */
 	return efi_driver_connect_all();
