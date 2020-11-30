@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <ipxe/settings.h>
@@ -45,11 +46,14 @@ struct efi_veto {
 	 * @v binding		Driver binding protocol
 	 * @v loaded		Loaded image protocol
 	 * @v wtf		Component name protocol, if present
+	 * @v manufacturer	Manufacturer name, if present
+	 * @v name		Driver name (in "eng" language), if present
 	 * @ret vetoed		Driver is to be vetoed
 	 */
 	int ( * veto ) ( EFI_DRIVER_BINDING_PROTOCOL *binding,
 			 EFI_LOADED_IMAGE_PROTOCOL *loaded,
-			 EFI_COMPONENT_NAME_PROTOCOL *wtf );
+			 EFI_COMPONENT_NAME_PROTOCOL *wtf,
+			 const char *manufacturer, const CHAR16 *name );
 };
 
 /**
@@ -58,29 +62,26 @@ struct efi_veto {
  * @v binding		Driver binding protocol
  * @v loaded		Loaded image protocol
  * @v wtf		Component name protocol, if present
+ * @v manufacturer	Manufacturer name, if present
+ * @v name		Driver name, if present
  * @ret vetoed		Driver is to be vetoed
  */
 static int
 efi_veto_dell_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 			  EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
-			  EFI_COMPONENT_NAME_PROTOCOL *wtf ) {
+			  EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
+			  const char *manufacturer, const CHAR16 *name ) {
 	static const CHAR16 ip4cfg[] = L"IP4 CONFIG Network Service Driver";
-	static const char dell[] = "Dell Inc.";
-	char manufacturer[ sizeof ( dell ) ];
-	CHAR16 *name;
+	static const char *dell = "Dell Inc.";
 
-	/* Check driver name */
-	if ( ! wtf )
+	/* Check manufacturer and driver name */
+	if ( ! manufacturer )
 		return 0;
-	if ( wtf->GetDriverName ( wtf, "eng", &name ) != 0 )
+	if ( ! name )
+		return 0;
+	if ( strcmp ( manufacturer, dell ) != 0 )
 		return 0;
 	if ( memcmp ( name, ip4cfg, sizeof ( ip4cfg ) ) != 0 )
-		return 0;
-
-	/* Check manufacturer */
-	fetch_string_setting ( NULL, &manufacturer_setting, manufacturer,
-			       sizeof ( manufacturer ) );
-	if ( strcmp ( manufacturer, dell ) != 0 )
 		return 0;
 
 	return 1;
@@ -98,10 +99,12 @@ static struct efi_veto efi_vetoes[] = {
  * Find driver veto, if any
  *
  * @v driver		Driver binding handle
+ * @v manufacturer	Manufacturer name, if present
  * @ret veto		Driver veto, or NULL
  * @ret rc		Return status code
  */
-static int efi_veto ( EFI_HANDLE driver, struct efi_veto **veto ) {
+static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
+			   struct efi_veto **veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_DRIVER_BINDING_PROTOCOL *binding;
@@ -115,6 +118,7 @@ static int efi_veto ( EFI_HANDLE driver, struct efi_veto **veto ) {
 		EFI_COMPONENT_NAME_PROTOCOL *wtf;
 		void *interface;
 	} wtf;
+	CHAR16 *name;
 	unsigned int i;
 	EFI_HANDLE image;
 	EFI_STATUS efirc;
@@ -161,11 +165,19 @@ static int efi_veto ( EFI_HANDLE driver, struct efi_veto **veto ) {
 		wtf.interface = NULL;
 	}
 
+	/* Get driver name, if available */
+	if ( wtf.wtf &&
+	     ( ( efirc = wtf.wtf->GetDriverName ( wtf.wtf, "eng",
+						  &name ) != 0 ) ) ) {
+		/* Ignore failure; is not required to be present */
+		name = NULL;
+	}
+
 	/* Check vetoes */
 	for ( i = 0 ; i < ( sizeof ( efi_vetoes ) /
 			    sizeof ( efi_vetoes[0] ) ) ; i++ ) {
 		if ( efi_vetoes[i].veto ( binding.binding, loaded.loaded,
-					  wtf.wtf ) ) {
+					  wtf.wtf, manufacturer, name ) ) {
 			*veto = &efi_vetoes[i];
 			break;
 		}
@@ -199,6 +211,7 @@ void efi_veto_unload ( void ) {
 	EFI_HANDLE driver;
 	UINTN num_drivers;
 	unsigned int i;
+	char *manufacturer;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -212,12 +225,17 @@ void efi_veto_unload ( void ) {
 		return;
 	}
 
+	/* Get manufacturer name */
+	fetch_string_setting_copy ( NULL, &manufacturer_setting,
+				    &manufacturer );
+
 	/* Unload any vetoed drivers */
 	for ( i = 0 ; i < num_drivers ; i++ ) {
 		driver = drivers[i];
-		if ( ( rc = efi_veto ( driver, &veto ) ) != 0 ) {
-			DBGC ( driver, "EFIVETO could not determine "
-			       "vetoing for %s: %s\n",
+		if ( ( rc = efi_veto_find ( driver, manufacturer,
+					    &veto ) ) != 0 ) {
+			DBGC ( driver, "EFIVETO %s could not determine "
+			       "vetoing: %s\n",
 			       efi_handle_name ( driver ), strerror ( rc ) );
 			continue;
 		}
@@ -231,6 +249,9 @@ void efi_veto_unload ( void ) {
 			       efi_handle_name ( driver ), strerror ( rc ) );
 		}
 	}
+
+	/* Free manufacturer name */
+	free ( manufacturer );
 
 	/* Free handle list */
 	bs->FreePool ( drivers );
