@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/settings.h>
+#include <ipxe/pci.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
@@ -391,11 +392,56 @@ efi_veto_dell_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 	return 1;
 }
 
+/**
+ * Veto HP XhciDxe driver
+ *
+ * @v binding		Driver binding protocol
+ * @v loaded		Loaded image protocol
+ * @v wtf		Component name protocol, if present
+ * @v manufacturer	Manufacturer name, if present
+ * @v name		Driver name, if present
+ * @ret vetoed		Driver is to be vetoed
+ */
+static int
+efi_veto_hp_xhci ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
+		   EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
+		   EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
+		   const char *manufacturer, const CHAR16 *name ) {
+	static const CHAR16 xhci[] = L"Usb Xhci Driver";
+	static const char *hp = "HP";
+	struct pci_driver *driver;
+
+	/* Check manufacturer and driver name */
+	if ( ! manufacturer )
+		return 0;
+	if ( ! name )
+		return 0;
+	if ( strcmp ( manufacturer, hp ) != 0 )
+		return 0;
+	if ( memcmp ( name, xhci, sizeof ( xhci ) ) != 0 )
+		return 0;
+
+	/* Veto driver only if we have our own xHCI driver */
+	for_each_table_entry ( driver, PCI_DRIVERS ) {
+		if ( driver->class.class ==
+		     PCI_CLASS ( PCI_CLASS_SERIAL, PCI_CLASS_SERIAL_USB,
+				 PCI_CLASS_SERIAL_USB_XHCI ) ) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 /** Driver vetoes */
 static struct efi_veto efi_vetoes[] = {
 	{
 		.name = "Dell Ip4Config",
 		.veto = efi_veto_dell_ip4config,
+	},
+	{
+		.name = "HP Xhci",
+		.veto = efi_veto_hp_xhci,
 	},
 };
 
