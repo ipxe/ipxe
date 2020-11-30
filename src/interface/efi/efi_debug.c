@@ -263,6 +263,28 @@ efi_open_attributes_name ( unsigned int attributes ) {
 }
 
 /**
+ * Print opened protocol information
+ *
+ * @v handle		EFI handle
+ * @V protocol		Protocol GUID
+ * @v opener		Opened protocol information
+ */
+void dbg_efi_opener ( EFI_HANDLE handle, EFI_GUID *protocol,
+		      EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener ) {
+
+	printf ( "HANDLE %s %s opened %dx (%s)", efi_handle_name ( handle ),
+		 efi_guid_ntoa ( protocol ), opener->OpenCount,
+		 efi_open_attributes_name ( opener->Attributes ) );
+	printf ( " by %s", efi_handle_name ( opener->AgentHandle ) );
+	if ( opener->ControllerHandle == handle ) {
+		printf ( "\n" );
+	} else {
+		printf ( " for %s\n",
+			 efi_handle_name ( opener->ControllerHandle ) );
+	}
+}
+
+/**
  * Print list of openers of a given protocol on a given handle
  *
  * @v handle		EFI handle
@@ -271,7 +293,6 @@ efi_open_attributes_name ( unsigned int attributes ) {
 void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *openers;
-	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener;
 	UINTN count;
 	unsigned int i;
 	EFI_STATUS efirc;
@@ -296,20 +317,8 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 	}
 
 	/* Dump list of openers */
-	for ( i = 0 ; i < count ; i++ ) {
-		opener = &openers[i];
-		printf ( "HANDLE %s %s opened %dx (%s)",
-			 efi_handle_name ( handle ),
-			 efi_guid_ntoa ( protocol ), opener->OpenCount,
-			 efi_open_attributes_name ( opener->Attributes ) );
-		printf ( " by %s", efi_handle_name ( opener->AgentHandle ) );
-		if ( opener->ControllerHandle == handle ) {
-			printf ( "\n" );
-		} else {
-			printf ( " for %s\n",
-				 efi_handle_name ( opener->ControllerHandle ) );
-		}
-	}
+	for ( i = 0 ; i < count ; i++ )
+		dbg_efi_opener ( handle, protocol, &openers[i] );
 
 	/* Free list */
 	bs->FreePool ( openers );
