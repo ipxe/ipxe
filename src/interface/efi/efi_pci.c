@@ -138,22 +138,6 @@ static void efipci_root_close ( EFI_HANDLE handle ) {
 }
 
 /**
- * Calculate EFI PCI configuration space address
- *
- * @v pci		PCI device
- * @v location		Encoded offset and width
- * @ret address		EFI PCI address
- */
-static unsigned long efipci_address ( struct pci_device *pci,
-				      unsigned long location ) {
-
-	return EFI_PCI_ADDRESS ( PCI_BUS ( pci->busdevfn ),
-				 PCI_SLOT ( pci->busdevfn ),
-				 PCI_FUNC ( pci->busdevfn ),
-				 EFIPCI_OFFSET ( location ) );
-}
-
-/**
  * Read from PCI configuration space
  *
  * @v pci		PCI device
@@ -163,29 +147,20 @@ static unsigned long efipci_address ( struct pci_device *pci,
  */
 int efipci_read ( struct pci_device *pci, unsigned long location,
 		  void *value ) {
-	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
-	EFI_HANDLE handle;
+	struct efi_pci_device *efipci = container_of ( pci, struct efi_pci_device, pci );
 	EFI_STATUS efirc;
-	int rc;
-
-	/* Open root bridge */
-	if ( ( rc = efipci_root_open ( pci, &handle, &root ) ) != 0 )
-		goto err_root;
+	int rc = 0;
 
 	/* Read from configuration space */
-	if ( ( efirc = root->Pci.Read ( root, EFIPCI_WIDTH ( location ),
-					efipci_address ( pci, location ), 1,
+	if ( ( efirc = efipci->io->Pci.Read ( efipci->io, EFIPCI_WIDTH ( location ),
+					EFIPCI_OFFSET ( location ), 1,
 					value ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( pci, "EFIPCI " PCI_FMT " config read from offset %02lx "
 		       "failed: %s\n", PCI_ARGS ( pci ),
 		       EFIPCI_OFFSET ( location ), strerror ( rc ) );
-		goto err_read;
 	}
 
- err_read:
-	efipci_root_close ( handle );
- err_root:
 	return rc;
 }
 
@@ -199,29 +174,20 @@ int efipci_read ( struct pci_device *pci, unsigned long location,
  */
 int efipci_write ( struct pci_device *pci, unsigned long location,
 		   unsigned long value ) {
-	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
-	EFI_HANDLE handle;
+	struct efi_pci_device *efipci = container_of ( pci, struct efi_pci_device, pci );
 	EFI_STATUS efirc;
-	int rc;
+	int rc = 0;
 
-	/* Open root bridge */
-	if ( ( rc = efipci_root_open ( pci, &handle, &root ) ) != 0 )
-		goto err_root;
-
-	/* Read from configuration space */
-	if ( ( efirc = root->Pci.Write ( root, EFIPCI_WIDTH ( location ),
-					 efipci_address ( pci, location ), 1,
-					 &value ) ) != 0 ) {
+	/* Write tofrom configuration space */
+	if ( ( efirc = efipci->io->Pci.Write ( efipci->io, EFIPCI_WIDTH ( location ),
+					EFIPCI_OFFSET ( location ), 1,
+					&value ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( pci, "EFIPCI " PCI_FMT " config write to offset %02lx "
 		       "failed: %s\n", PCI_ARGS ( pci ),
 		       EFIPCI_OFFSET ( location ), strerror ( rc ) );
-		goto err_write;
 	}
 
- err_write:
-	efipci_root_close ( handle );
- err_root:
 	return rc;
 }
 
