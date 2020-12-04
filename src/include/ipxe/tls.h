@@ -319,8 +319,8 @@ struct tls_connection {
 	struct digest_algorithm *handshake_digest;
 	/** Digest algorithm context used for handshake verification */
 	uint8_t *handshake_ctx;
-	/** Client certificate (if used) */
-	struct x509_certificate *cert;
+	/** Client certificate chain (if used) */
+	struct x509_chain *certs;
 	/** Secure renegotiation flag */
 	int secure_renegotiation;
 	/** Verification data */

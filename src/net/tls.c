@@ -378,7 +378,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
-	x509_put ( tls->cert );
+	x509_chain_put ( tls->certs );
 	x509_chain_put ( tls->chain );
 
 	/* Drop reference to session */
@@ -1148,40 +1148,56 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
  */
 static int tls_send_certificate ( struct tls_connection *tls ) {
 	struct {
+		tls24_t length;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *certificate;
+	struct {
 		uint32_t type_length;
 		tls24_t length;
-		struct {
-			tls24_t length;
-			uint8_t data[ tls->cert->raw.len ];
-		} __attribute__ (( packed )) certificates[1];
-	} __attribute__ (( packed )) *certificate;
+		typeof ( *certificate ) certificates[0];
+	} __attribute__ (( packed )) *certificates;
+	struct x509_link *link;
+	struct x509_certificate *cert;
+	size_t len;
 	int rc;
+
+	/* Calculate length of client certificates */
+	len = 0;
+	list_for_each_entry ( link, &tls->certs->links, list ) {
+		cert = link->cert;
+		len += ( sizeof ( *certificate ) + cert->raw.len );
+		DBGC ( tls, "TLS %p sending client certificate %s\n",
+		       tls, x509_name ( cert ) );
+	}
 
 	/* Allocate storage for Certificate record (which may be too
 	 * large for the stack).
 	 */
-	certificate = zalloc ( sizeof ( *certificate ) );
-	if ( ! certificate )
+	certificates = zalloc ( sizeof ( *certificates ) + len );
+	if ( ! certificates )
 		return -ENOMEM_CERTIFICATE;
 
 	/* Populate record */
-	certificate->type_length =
+	certificates->type_length =
 		( cpu_to_le32 ( TLS_CERTIFICATE ) |
-		  htonl ( sizeof ( *certificate ) -
-			  sizeof ( certificate->type_length ) ) );
-	tls_set_uint24 ( &certificate->length,
-			 sizeof ( certificate->certificates ) );
-	tls_set_uint24 ( &certificate->certificates[0].length,
-			 sizeof ( certificate->certificates[0].data ) );
-	memcpy ( certificate->certificates[0].data,
-		 tls->cert->raw.data,
-		 sizeof ( certificate->certificates[0].data ) );
+		  htonl ( sizeof ( *certificates ) + len -
+			  sizeof ( certificates->type_length ) ) );
+	tls_set_uint24 ( &certificates->length, len );
+	certificate = &certificates->certificates[0];
+	list_for_each_entry ( link, &tls->certs->links, list ) {
+		cert = link->cert;
+		tls_set_uint24 ( &certificate->length, cert->raw.len );
+		memcpy ( certificate->data, cert->raw.data, cert->raw.len );
+		certificate = ( ( ( void * ) certificate->data ) +
+				cert->raw.len );
+	}
 
 	/* Transmit record */
-	rc = tls_send_handshake ( tls, certificate, sizeof ( *certificate ) );
+	rc = tls_send_handshake ( tls, certificates,
+				  ( sizeof ( *certificates ) + len ) );
 
 	/* Free record */
-	free ( certificate );
+	free ( certificates );
 
 	return rc;
 }
@@ -1238,7 +1254,7 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
  */
 static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
-	struct x509_certificate *cert = tls->cert;
+	struct x509_certificate *cert = x509_first ( tls->certs );
 	struct pubkey_algorithm *pubkey = cert->signature_algorithm->pubkey;
 	uint8_t digest_out[ digest->digestsize ];
 	uint8_t ctx[ pubkey->ctxsize ];
@@ -1845,26 +1861,57 @@ static int tls_new_certificate ( struct tls_connection *tls,
 static int tls_new_certificate_request ( struct tls_connection *tls,
 					 const void *data __unused,
 					 size_t len __unused ) {
+	struct x509_certificate *cert;
+	int rc;
 
 	/* We can only send a single certificate, so there is no point
 	 * in parsing the Certificate Request.
 	 */
 
-	/* Free any existing client certificate */
-	x509_put ( tls->cert );
+	/* Free any existing client certificate chain */
+	x509_chain_put ( tls->certs );
+	tls->certs = NULL;
 
 	/* Determine client certificate to be sent */
-	tls->cert = certstore_find_key ( &private_key );
-	if ( ! tls->cert ) {
+	cert = certstore_find_key ( &private_key );
+	if ( ! cert ) {
 		DBGC ( tls, "TLS %p could not find certificate corresponding "
 		       "to private key\n", tls );
-		return -EPERM_CLIENT_CERT;
+		rc = -EPERM_CLIENT_CERT;
+		goto err_find;
 	}
-	x509_get ( tls->cert );
-	DBGC ( tls, "TLS %p sending client certificate %s\n",
-	       tls, x509_name ( tls->cert ) );
+	x509_get ( cert );
+	DBGC ( tls, "TLS %p selected client certificate %s\n",
+	       tls, x509_name ( cert ) );
+
+	/* Create client certificate chain */
+	tls->certs = x509_alloc_chain();
+	if ( ! tls->certs ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Append client certificate to chain */
+	if ( ( rc = x509_append ( tls->certs, cert ) ) != 0 )
+		goto err_append;
+
+	/* Append any relevant issuer certificates */
+	if ( ( rc = x509_auto_append ( tls->certs, &certstore ) ) != 0 )
+		goto err_auto_append;
+
+	/* Drop local reference to client certificate */
+	x509_put ( cert );
 
 	return 0;
+
+ err_auto_append:
+ err_append:
+	x509_chain_put ( tls->certs );
+	tls->certs = NULL;
+ err_alloc:
+	x509_put ( cert );
+ err_find:
+	return rc;
 }
 
 /**
@@ -2880,7 +2927,7 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	tls->tx_pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
 			     TLS_TX_CHANGE_CIPHER |
 			     TLS_TX_FINISHED );
-	if ( tls->cert ) {
+	if ( tls->certs ) {
 		tls->tx_pending |= ( TLS_TX_CERTIFICATE |
 				     TLS_TX_CERTIFICATE_VERIFY );
 	}
