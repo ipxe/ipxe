@@ -378,7 +378,6 @@ struct tls_connection {
 /** RX I/O buffer alignment */
 #define TLS_RX_ALIGN 16
 
-extern int add_tls ( struct interface *xfer, const char *name,
-		     struct interface **next );
+extern int add_tls ( struct interface *xfer, const char *name );
 
 #endif /* _IPXE_TLS_H */

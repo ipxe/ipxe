@@ -45,11 +45,9 @@ struct http_scheme {
 	 *
 	 * @v xfer		Data transfer interface
 	 * @v name		Host name
-	 * @v next		Next interface
 	 * @ret rc		Return status code
 	 */
-	int ( * filter ) ( struct interface *xfer, const char *name,
-			   struct interface **next );
+	int ( * filter ) ( struct interface *xfer, const char *name );
 };
 
 /** HTTP scheme table */

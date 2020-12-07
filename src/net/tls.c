@@ -3088,8 +3088,14 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
  ******************************************************************************
  */
 
-int add_tls ( struct interface *xfer, const char *name,
-	      struct interface **next ) {
+/**
+ * Add TLS on an interface
+ *
+ * @v xfer		Data transfer interface
+ * @v name		Host name
+ * @ret rc		Return status code
+ */
+int add_tls ( struct interface *xfer, const char *name ) {
 	struct tls_connection *tls;
 	int rc;
 
@@ -3133,8 +3139,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls_restart ( tls );
 
 	/* Attach to parent interface, mortalise self, and return */
-	intf_plug_plug ( &tls->plainstream, xfer );
-	*next = &tls->cipherstream;
+	intf_insert ( xfer, &tls->plainstream, &tls->cipherstream );
 	ref_put ( &tls->refcnt );
 	return 0;
 
