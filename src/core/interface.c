@@ -81,9 +81,14 @@ struct interface null_intf = INTF_INIT ( null_intf_desc );
  * interface is updated to point to the new destination interface.
  */
 void intf_plug ( struct interface *intf, struct interface *dest ) {
+
+	if ( intf == &null_intf )
+		return;
+
 	DBGC ( INTF_COL ( intf ),
 	       "INTF " INTF_INTF_FMT " replug to " INTF_FMT "\n",
 	       INTF_INTF_DBG ( intf, intf->dest ), INTF_DBG ( dest ) );
+
 	intf_get ( dest );
 	intf_put ( intf->dest );
 	intf->dest = dest;
