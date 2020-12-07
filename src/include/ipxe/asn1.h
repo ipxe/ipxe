@@ -75,6 +75,9 @@ struct asn1_builder_header {
 /** ASN.1 enumeration */
 #define ASN1_ENUMERATED 0x0a
 
+/** ASN.1 UTF-8 string */
+#define ASN1_UTF8_STRING 0x0c
+
 /** ASN.1 UTC time */
 #define ASN1_UTC_TIME 0x17
 
