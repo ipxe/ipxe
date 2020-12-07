@@ -391,6 +391,23 @@ void intfs_restart ( int rc, ... ) {
 }
 
 /**
+ * Insert a filter interface
+ *
+ * @v intf		Object interface
+ * @v upper		Upper end of filter
+ * @v lower		Lower end of filter
+ */
+void intf_insert ( struct interface *intf, struct interface *upper,
+		   struct interface *lower ) {
+	struct interface *dest = intf->dest;
+
+	intf_get ( dest );
+	intf_plug_plug ( intf, upper );
+	intf_plug_plug ( lower, dest );
+	intf_put ( dest );
+}
+
+/**
  * Poke an object interface
  *
  * @v intf		Object interface

@@ -169,6 +169,8 @@ extern void intfs_shutdown ( int rc, ... ) __attribute__ (( sentinel ));
 extern void intf_restart ( struct interface *intf, int rc );
 extern void intfs_vrestart ( va_list intfs, int rc );
 extern void intfs_restart ( int rc, ... ) __attribute__ (( sentinel ));
+extern void intf_insert ( struct interface *intf, struct interface *upper,
+			  struct interface *lower );
 
 extern void intf_poke ( struct interface *intf,
 			void ( type ) ( struct interface *intf ) );
