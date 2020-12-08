@@ -943,6 +943,10 @@ static void x509_validate_chain_okx ( struct x509_test_chain *chn, time_t time,
 	x509_invalidate_chain ( chn->chain );
 	okx ( x509_validate_chain ( chn->chain, time, store, root ) == 0,
 	      file, line );
+	okx ( x509_is_valid ( chn->certs[0]->cert, root ),
+	      file, line );
+	okx ( ! x509_is_valid ( chn->certs[0]->cert, &dummy_root ),
+	      file, line );
 }
 #define x509_validate_chain_ok( chn, time, store, root ) \
 	x509_validate_chain_okx ( chn, time, store, root, __FILE__, __LINE__ )

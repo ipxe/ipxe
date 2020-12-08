@@ -1938,7 +1938,8 @@ static int tls_new_server_hello_done ( struct tls_connection *tls,
 	}
 
 	/* Begin certificate validation */
-	if ( ( rc = create_validator ( &tls->validator, tls->chain ) ) != 0 ) {
+	if ( ( rc = create_validator ( &tls->validator, tls->chain,
+				       tls->root ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not start certificate validation: "
 		       "%s\n", tls, strerror ( rc ) );
 		return rc;
@@ -3140,9 +3141,11 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
  *
  * @v xfer		Data transfer interface
  * @v name		Host name
+ * @v root		Root of trust (or NULL to use default)
  * @ret rc		Return status code
  */
-int add_tls ( struct interface *xfer, const char *name ) {
+int add_tls ( struct interface *xfer, const char *name,
+	      struct x509_root *root ) {
 	struct tls_connection *tls;
 	int rc;
 
@@ -3160,6 +3163,7 @@ int add_tls ( struct interface *xfer, const char *name ) {
 	intf_init ( &tls->validator, &tls_validator_desc, &tls->refcnt );
 	process_init_stopped ( &tls->process, &tls_process_desc,
 			       &tls->refcnt );
+	tls->root = root;
 	tls->version = TLS_VERSION_TLS_1_2;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );

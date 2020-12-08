@@ -42,6 +42,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdlib.h>
 #include <string.h>
 #include <ipxe/x509.h>
+#include <ipxe/rootcert.h>
 #include <ipxe/ocsp.h>
 #include <ipxe/test.h>
 
@@ -110,7 +111,7 @@ static void ocsp_prepare_test ( struct ocsp_test *test ) {
 	x509_invalidate ( cert );
 
 	/* Force-validate issuer certificate */
-	issuer->flags |= X509_FL_VALIDATED;
+	issuer->root = &root_certificates;
 	issuer->path_remaining = ( issuer->extensions.basic.path_len + 1 );
 }
 

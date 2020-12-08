@@ -284,7 +284,7 @@ int ocsp_check ( struct x509_certificate *cert,
 	/* Sanity checks */
 	assert ( cert != NULL );
 	assert ( issuer != NULL );
-	assert ( x509_is_valid ( issuer ) );
+	assert ( issuer->root != NULL );
 
 	/* Allocate and initialise check */
 	*ocsp = zalloc ( sizeof ( **ocsp ) );
@@ -915,7 +915,7 @@ int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 		 */
 		x509_invalidate ( signer );
 		if ( ( rc = x509_validate ( signer, ocsp->issuer, time,
-					    NULL ) ) != 0 ) {
+					    ocsp->issuer->root ) ) != 0 ) {
 			DBGC ( ocsp, "OCSP %p \"%s\" could not validate ",
 			       ocsp, x509_name ( ocsp->cert ) );
 			DBGC ( ocsp, "signer \"%s\": %s\n",
@@ -961,7 +961,7 @@ int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 
 	/* Validate certificate against issuer */
 	if ( ( rc = x509_validate ( ocsp->cert, ocsp->issuer, time,
-				    NULL ) ) != 0 ) {
+				    ocsp->issuer->root ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" could not validate certificate: "
 		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
 		return rc;

@@ -326,6 +326,8 @@ struct tls_connection {
 	/** Verification data */
 	struct tls_verify_data verify;
 
+	/** Root of trust (or NULL to use default) */
+	struct x509_root *root;
 	/** Server certificate chain */
 	struct x509_chain *chain;
 	/** Certificate validator */
@@ -378,6 +380,7 @@ struct tls_connection {
 /** RX I/O buffer alignment */
 #define TLS_RX_ALIGN 16
 
-extern int add_tls ( struct interface *xfer, const char *name );
+extern int add_tls ( struct interface *xfer, const char *name,
+		     struct x509_root *root );
 
 #endif /* _IPXE_TLS_H */

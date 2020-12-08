@@ -191,6 +191,8 @@ struct x509_certificate {
 
 	/** Flags */
 	unsigned int flags;
+	/** Root against which certificate has been validated (if any) */
+	struct x509_root *root;
 	/** Maximum number of subsequent certificates in chain */
 	unsigned int path_remaining;
 
@@ -218,12 +220,10 @@ struct x509_certificate {
 
 /** X.509 certificate flags */
 enum x509_flags {
-	/** Certificate has been validated */
-	X509_FL_VALIDATED = 0x0001,
 	/** Certificate was added at build time */
-	X509_FL_PERMANENT = 0x0002,
+	X509_FL_PERMANENT = 0x0001,
 	/** Certificate was added explicitly at run time */
-	X509_FL_EXPLICIT = 0x0004,
+	X509_FL_EXPLICIT = 0x0002,
 };
 
 /**
@@ -355,6 +355,8 @@ extern int x509_parse ( struct x509_certificate *cert,
 			const struct asn1_cursor *raw );
 extern int x509_certificate ( const void *data, size_t len,
 			      struct x509_certificate **cert );
+extern int x509_is_valid ( struct x509_certificate *cert,
+			   struct x509_root *root );
 extern int x509_validate ( struct x509_certificate *cert,
 			   struct x509_certificate *issuer,
 			   time_t time, struct x509_root *root );
@@ -384,21 +386,12 @@ extern int x509_check_root ( struct x509_certificate *cert,
 extern int x509_check_time ( struct x509_certificate *cert, time_t time );
 
 /**
- * Check if X.509 certificate is valid
- *
- * @v cert		X.509 certificate
- */
-static inline int x509_is_valid ( struct x509_certificate *cert ) {
-	return ( cert->flags & X509_FL_VALIDATED );
-}
-
-/**
  * Invalidate X.509 certificate
  *
  * @v cert		X.509 certificate
  */
 static inline void x509_invalidate ( struct x509_certificate *cert ) {
-	cert->flags &= ~X509_FL_VALIDATED;
+	cert->root = NULL;
 	cert->path_remaining = 0;
 }
 
