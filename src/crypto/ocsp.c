@@ -116,7 +116,7 @@ static const uint8_t oid_basic_response_type[] = { ASN1_OID_OCSP_BASIC };
 
 /** OCSP basic response type cursor */
 static struct asn1_cursor oid_basic_response_type_cursor =
-	ASN1_OID_CURSOR ( oid_basic_response_type );
+	ASN1_CURSOR ( oid_basic_response_type );
 
 /**
  * Free OCSP check

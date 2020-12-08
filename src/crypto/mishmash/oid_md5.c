@@ -33,5 +33,5 @@ static uint8_t oid_md5[] = { ASN1_OID_MD5 };
 struct asn1_algorithm oid_md5_algorithm __asn1_algorithm = {
 	.name = "md5",
 	.digest = &md5_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_md5 ),
+	.oid = ASN1_CURSOR ( oid_md5 ),
 };

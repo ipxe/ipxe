@@ -291,10 +291,10 @@ struct asn1_builder_header {
 	ASN1_OID_INITIAL ( 2, 5 ), ASN1_OID_SINGLE ( 29 ),	\
 	ASN1_OID_SINGLE ( 17 )
 
-/** Define an ASN.1 cursor containing an OID */
-#define ASN1_OID_CURSOR( oid_value ) {				\
-		.data = oid_value,				\
-		.len = sizeof ( oid_value ),			\
+/** Define an ASN.1 cursor for a static value */
+#define ASN1_CURSOR( value ) {					\
+		.data = value,					\
+		.len = sizeof ( value ),			\
 	}
 
 /** An ASN.1 OID-identified algorithm */

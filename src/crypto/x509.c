@@ -156,7 +156,7 @@ static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
 
 /** "commonName" object identifier cursor */
 static struct asn1_cursor oid_common_name_cursor =
-	ASN1_OID_CURSOR ( oid_common_name );
+	ASN1_CURSOR ( oid_common_name );
 
 /**
  * Parse X.509 certificate version
@@ -523,12 +523,12 @@ static struct x509_key_purpose x509_key_purposes[] = {
 	{
 		.name = "codeSigning",
 		.bits = X509_CODE_SIGNING,
-		.oid = ASN1_OID_CURSOR ( oid_code_signing ),
+		.oid = ASN1_CURSOR ( oid_code_signing ),
 	},
 	{
 		.name = "ocspSigning",
 		.bits = X509_OCSP_SIGNING,
-		.oid = ASN1_OID_CURSOR ( oid_ocsp_signing ),
+		.oid = ASN1_CURSOR ( oid_ocsp_signing ),
 	},
 };
 
@@ -631,7 +631,7 @@ static uint8_t oid_ad_ocsp[] = { ASN1_OID_OCSP };
 static struct x509_access_method x509_access_methods[] = {
 	{
 		.name = "OCSP",
-		.oid = ASN1_OID_CURSOR ( oid_ad_ocsp ),
+		.oid = ASN1_CURSOR ( oid_ad_ocsp ),
 		.parse = x509_parse_ocsp,
 	},
 };
@@ -768,27 +768,27 @@ static uint8_t oid_ce_subject_alt_name[] =
 static struct x509_extension x509_extensions[] = {
 	{
 		.name = "basicConstraints",
-		.oid = ASN1_OID_CURSOR ( oid_ce_basic_constraints ),
+		.oid = ASN1_CURSOR ( oid_ce_basic_constraints ),
 		.parse = x509_parse_basic_constraints,
 	},
 	{
 		.name = "keyUsage",
-		.oid = ASN1_OID_CURSOR ( oid_ce_key_usage ),
+		.oid = ASN1_CURSOR ( oid_ce_key_usage ),
 		.parse = x509_parse_key_usage,
 	},
 	{
 		.name = "extKeyUsage",
-		.oid = ASN1_OID_CURSOR ( oid_ce_ext_key_usage ),
+		.oid = ASN1_CURSOR ( oid_ce_ext_key_usage ),
 		.parse = x509_parse_extended_key_usage,
 	},
 	{
 		.name = "authorityInfoAccess",
-		.oid = ASN1_OID_CURSOR ( oid_pe_authority_info_access ),
+		.oid = ASN1_CURSOR ( oid_pe_authority_info_access ),
 		.parse = x509_parse_authority_info_access,
 	},
 	{
 		.name = "subjectAltName",
-		.oid = ASN1_OID_CURSOR ( oid_ce_subject_alt_name ),
+		.oid = ASN1_CURSOR ( oid_ce_subject_alt_name ),
 		.parse = x509_parse_subject_alt_name,
 	},
 };
