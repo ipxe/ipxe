@@ -833,18 +833,6 @@ int ocsp_response ( struct ocsp_check *ocsp, const void *data, size_t len ) {
 }
 
 /**
- * OCSP dummy root certificate store
- *
- * OCSP validation uses no root certificates, since it takes place
- * only when there already exists a validated issuer certificate.
- */
-static struct x509_root ocsp_root = {
-	.digest = &ocsp_digest_algorithm,
-	.count = 0,
-	.fingerprints = NULL,
-};
-
-/**
  * Check OCSP response signature
  *
  * @v ocsp		OCSP check
@@ -927,7 +915,7 @@ int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 		 */
 		x509_invalidate ( signer );
 		if ( ( rc = x509_validate ( signer, ocsp->issuer, time,
-					    &ocsp_root ) ) != 0 ) {
+					    NULL ) ) != 0 ) {
 			DBGC ( ocsp, "OCSP %p \"%s\" could not validate ",
 			       ocsp, x509_name ( ocsp->cert ) );
 			DBGC ( ocsp, "signer \"%s\": %s\n",
@@ -973,7 +961,7 @@ int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 
 	/* Validate certificate against issuer */
 	if ( ( rc = x509_validate ( ocsp->cert, ocsp->issuer, time,
-				    &ocsp_root ) ) != 0 ) {
+				    NULL ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" could not validate certificate: "
 		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
 		return rc;
