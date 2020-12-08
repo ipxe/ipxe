@@ -518,8 +518,10 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 	/* Get driver name, if available */
 	if ( wtf.wtf &&
 	     ( ( efirc = wtf.wtf->GetDriverName ( wtf.wtf, "eng",
-						  &name ) != 0 ) ) ) {
-		/* Ignore failure; is not required to be present */
+						  &name ) == 0 ) ) ) {
+		/* Driver has a name */
+	} else {
+		/* Ignore failure; name is not required to be present */
 		name = NULL;
 	}
 
