@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <assert.h>
 #include <time.h>
 #include <ipxe/tables.h>
@@ -98,6 +99,10 @@ struct asn1_builder_header {
 
 /** ASN.1 "any tag" magic value */
 #define ASN1_ANY -1U
+
+/** Construct a short ASN.1 value */
+#define ASN1_SHORT( tag, ... ) \
+	(tag), VA_ARG_COUNT ( __VA_ARGS__ ), __VA_ARGS__
 
 /** Initial OID byte */
 #define ASN1_OID_INITIAL( first, second ) ( ( (first) * 40 ) + (second) )
