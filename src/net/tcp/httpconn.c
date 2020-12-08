@@ -301,8 +301,7 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 		goto err_open;
 
 	/* Add filter, if any */
-	if ( scheme->filter &&
-	     ( ( rc = scheme->filter ( &conn->socket, uri->host ) ) != 0 ) )
+	if ( scheme->filter && ( ( rc = scheme->filter ( conn ) ) != 0 ) )
 		goto err_filter;
 
 	/* Attach to parent interface, mortalise self, and return */
