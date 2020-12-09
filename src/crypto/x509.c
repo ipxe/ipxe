@@ -123,6 +123,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_EACCES, 0x0b, "No usable certificates" )
 
 /**
+ * Free X.509 certificate
+ *
+ * @v refcnt		Reference count
+ */
+static void x509_free ( struct refcnt *refcnt ) {
+	struct x509_certificate *cert =
+		container_of ( refcnt, struct x509_certificate, refcnt );
+
+	x509_root_put ( cert->root );
+	free ( cert );
+}
+
+/**
  * Get X.509 certificate display name
  *
  * @v cert		X.509 certificate
@@ -1075,7 +1088,7 @@ int x509_certificate ( const void *data, size_t len,
 	*cert = zalloc ( sizeof ( **cert ) + cursor.len );
 	if ( ! *cert )
 		return -ENOMEM;
-	ref_init ( &(*cert)->refcnt, NULL );
+	ref_init ( &(*cert)->refcnt, x509_free );
 	raw = ( *cert + 1 );
 
 	/* Copy raw data */
@@ -1311,6 +1324,35 @@ int x509_is_valid ( struct x509_certificate *cert, struct x509_root *root ) {
 }
 
 /**
+ * Set X.509 certificate as validated
+ *
+ * @v cert		X.509 certificate
+ * @v issuer		Issuing X.509 certificate (or NULL)
+ * @v root		Root certificate list
+ */
+static void x509_set_valid ( struct x509_certificate *cert,
+			     struct x509_certificate *issuer,
+			     struct x509_root *root ) {
+	unsigned int max_path_remaining;
+
+	/* Sanity checks */
+	assert ( root != NULL );
+	assert ( ( issuer == NULL ) || ( issuer->path_remaining >= 1 ) );
+
+	/* Record validation root */
+	x509_root_put ( cert->root );
+	cert->root = x509_root_get ( root );
+
+	/* Calculate effective path length */
+	cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
+	if ( issuer ) {
+		max_path_remaining = ( issuer->path_remaining - 1 );
+		if ( cert->path_remaining > max_path_remaining )
+			cert->path_remaining = max_path_remaining;
+	}
+}
+
+/**
  * Validate X.509 certificate
  *
  * @v cert		X.509 certificate
@@ -1328,7 +1370,6 @@ int x509_is_valid ( struct x509_certificate *cert, struct x509_root *root ) {
 int x509_validate ( struct x509_certificate *cert,
 		    struct x509_certificate *issuer,
 		    time_t time, struct x509_root *root ) {
-	unsigned int max_path_remaining;
 	int rc;
 
 	/* Use default root certificate store if none specified */
@@ -1345,8 +1386,7 @@ int x509_validate ( struct x509_certificate *cert,
 
 	/* Succeed if certificate is a trusted root certificate */
 	if ( x509_check_root ( cert, root ) == 0 ) {
-		cert->root = root;
-		cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
+		x509_set_valid ( cert, NULL, root );
 		return 0;
 	}
 
@@ -1384,14 +1424,8 @@ int x509_validate ( struct x509_certificate *cert,
 		return -EACCES_OCSP_REQUIRED;
 	}
 
-	/* Calculate effective path length */
-	cert->path_remaining = ( issuer->path_remaining - 1 );
-	max_path_remaining = ( cert->extensions.basic.path_len + 1 );
-	if ( cert->path_remaining > max_path_remaining )
-		cert->path_remaining = max_path_remaining;
-
 	/* Mark certificate as valid */
-	cert->root = root;
+	x509_set_valid ( cert, issuer, root );
 
 	DBGC ( cert, "X509 %p \"%s\" successfully validated using ",
 	       cert, x509_name ( cert ) );

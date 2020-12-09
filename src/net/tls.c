@@ -380,6 +380,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	}
 	x509_chain_put ( tls->certs );
 	x509_chain_put ( tls->chain );
+	x509_root_put ( tls->root );
 
 	/* Drop reference to session */
 	assert ( list_empty ( &tls->list ) );
@@ -3163,7 +3164,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	intf_init ( &tls->validator, &tls_validator_desc, &tls->refcnt );
 	process_init_stopped ( &tls->process, &tls_process_desc,
 			       &tls->refcnt );
-	tls->root = root;
+	tls->root = x509_root_get ( root );
 	tls->version = TLS_VERSION_TLS_1_2;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );

@@ -116,6 +116,7 @@ static void validator_free ( struct refcnt *refcnt ) {
 
 	DBGC2 ( validator, "VALIDATOR %p \"%s\" freed\n",
 		validator, validator_name ( validator ) );
+	x509_root_put ( validator->root );
 	x509_chain_put ( validator->chain );
 	ocsp_put ( validator->ocsp );
 	xferbuf_free ( &validator->buffer );
@@ -650,7 +651,7 @@ int create_validator ( struct interface *job, struct x509_chain *chain,
 		    &validator->refcnt );
 	process_init ( &validator->process, &validator_process_desc,
 		       &validator->refcnt );
-	validator->root = root;
+	validator->root = x509_root_get ( root );
 	validator->chain = x509_chain_get ( chain );
 	xferbuf_malloc_init ( &validator->buffer );
 
