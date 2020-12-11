@@ -6,3 +6,6 @@ Quick start guide:
    make
 
 For any more detailed instructions, see http://ipxe.org
+
+make bin/undionly.kpxe EMBED=boot.ipxe
+make bin-x86_64-efi/ipxe.efi EMBED=boot.ipxe
