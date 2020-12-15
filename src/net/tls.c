@@ -45,6 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/x509.h>
 #include <ipxe/privkey.h>
 #include <ipxe/certstore.h>
+#include <ipxe/rootcert.h>
 #include <ipxe/rbg.h>
 #include <ipxe/validator.h>
 #include <ipxe/job.h>
@@ -349,7 +350,8 @@ static void free_tls_session ( struct refcnt *refcnt ) {
 	/* Remove from list of sessions */
 	list_del ( &session->list );
 
-	/* Free session ticket */
+	/* Free dynamically-allocated resources */
+	x509_root_put ( session->root );
 	free ( session->ticket );
 
 	/* Free session */
@@ -3097,7 +3099,8 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 
 	/* Find existing matching session, if any */
 	list_for_each_entry ( session, &tls_sessions, list ) {
-		if ( strcmp ( name, session->name ) == 0 ) {
+		if ( ( strcmp ( name, session->name ) == 0 ) &&
+		     ( tls->root == session->root ) ) {
 			ref_get ( &session->refcnt );
 			tls->session = session;
 			DBGC ( tls, "TLS %p joining session %s\n", tls, name );
@@ -3116,6 +3119,7 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 	name_copy = ( ( ( void * ) session ) + sizeof ( *session ) );
 	strcpy ( name_copy, name );
 	session->name = name_copy;
+	session->root = x509_root_get ( tls->root );
 	INIT_LIST_HEAD ( &session->conn );
 	list_add ( &session->list, &tls_sessions );
 
@@ -3164,7 +3168,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	intf_init ( &tls->validator, &tls_validator_desc, &tls->refcnt );
 	process_init_stopped ( &tls->process, &tls_process_desc,
 			       &tls->refcnt );
-	tls->root = x509_root_get ( root );
+	tls->root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_TLS_1_2;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );

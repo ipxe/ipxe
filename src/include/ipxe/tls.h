@@ -255,6 +255,9 @@ struct tls_session {
 
 	/** Server name */
 	const char *name;
+	/** Root of trust */
+	struct x509_root *root;
+
 	/** Session ID */
 	uint8_t id[32];
 	/** Length of session ID */
@@ -326,7 +329,7 @@ struct tls_connection {
 	/** Verification data */
 	struct tls_verify_data verify;
 
-	/** Root of trust (or NULL to use default) */
+	/** Root of trust */
 	struct x509_root *root;
 	/** Server certificate chain */
 	struct x509_chain *chain;
