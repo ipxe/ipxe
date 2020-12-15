@@ -46,7 +46,7 @@ FEATURE ( FEATURE_PROTOCOL, "HTTPS", DHCP_EB_FEATURE_HTTPS, 1 );
  */
 static int https_filter ( struct http_connection *conn ) {
 
-	return add_tls ( &conn->socket, conn->uri->host, NULL );
+	return add_tls ( &conn->socket, conn->uri->host, NULL, NULL );
 }
 
 /** HTTPS URI opener */

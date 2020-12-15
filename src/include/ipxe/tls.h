@@ -18,6 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/sha1.h>
 #include <ipxe/sha256.h>
 #include <ipxe/x509.h>
+#include <ipxe/privkey.h>
 #include <ipxe/pending.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/tables.h>
@@ -257,6 +258,8 @@ struct tls_session {
 	const char *name;
 	/** Root of trust */
 	struct x509_root *root;
+	/** Private key */
+	struct private_key *key;
 
 	/** Session ID */
 	uint8_t id[32];
@@ -322,6 +325,8 @@ struct tls_connection {
 	struct digest_algorithm *handshake_digest;
 	/** Digest algorithm context used for handshake verification */
 	uint8_t *handshake_ctx;
+	/** Private key */
+	struct private_key *key;
 	/** Client certificate chain (if used) */
 	struct x509_chain *certs;
 	/** Secure renegotiation flag */
@@ -384,6 +389,6 @@ struct tls_connection {
 #define TLS_RX_ALIGN 16
 
 extern int add_tls ( struct interface *xfer, const char *name,
-		     struct x509_root *root );
+		     struct x509_root *root, struct private_key *key );
 
 #endif /* _IPXE_TLS_H */

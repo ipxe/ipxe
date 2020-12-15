@@ -246,7 +246,7 @@ static int apply_syslogs_settings ( void ) {
 	}
 
 	/* Add TLS filter */
-	if ( ( rc = add_tls ( &syslogs, server, NULL ) ) != 0 ) {
+	if ( ( rc = add_tls ( &syslogs, server, NULL, NULL ) ) != 0 ) {
 		DBG ( "SYSLOGS cannot create TLS filter: %s\n",
 		      strerror ( rc ) );
 		goto err_add_tls;
