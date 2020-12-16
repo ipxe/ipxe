@@ -1,0 +1,8 @@
+#!ipxe
+# See http://ipxe.org/scripting for docs on scripting ipxe.
+
+:retry
+echo trying to get dhcp
+dhcp || goto retry
+
+chain --autofree https://boot.netboot.xyz

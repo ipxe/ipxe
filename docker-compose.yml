@@ -1,0 +1,7 @@
+version: '3.7'
+services:
+  ipxe:
+    build: .
+    volumes:
+      - ./src:/src
+      - ./matti:/matti

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+docker-compose build
+docker-compose run ipxe /matti/tools/make.sh $1 $2 $3
+
+diskutil list
+
+echo "
+  sure about /dev/$3 ?"
+
+read
+diskutil unmountDisk /dev/$3
+sudo dd if=matti/output/ipxe.usb of=/dev/r$3 bs=1m
