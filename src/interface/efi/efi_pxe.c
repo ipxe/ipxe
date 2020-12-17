@@ -1652,10 +1652,10 @@ int efi_pxe_install ( EFI_HANDLE handle, struct net_device *netdev ) {
 			NULL ) ) != 0 ) {
 		DBGC ( pxe, "PXE %s could not uninstall: %s\n",
 		       pxe->name, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_pxe ( &pxe->base );
-		efi_nullify_apple ( &pxe->apple );
 		leak = 1;
 	}
+	efi_nullify_pxe ( &pxe->base );
+	efi_nullify_apple ( &pxe->apple );
  err_install_protocol:
 	if ( ! leak )
 		ref_put ( &pxe->refcnt );
@@ -1695,10 +1695,10 @@ void efi_pxe_uninstall ( EFI_HANDLE handle ) {
 			NULL ) ) != 0 ) {
 		DBGC ( pxe, "PXE %s could not uninstall: %s\n",
 		       pxe->name, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_pxe ( &pxe->base );
-		efi_nullify_apple ( &pxe->apple );
 		leak = 1;
 	}
+	efi_nullify_pxe ( &pxe->base );
+	efi_nullify_apple ( &pxe->apple );
 
 	/* Remove from list and drop list's reference */
 	list_del ( &pxe->list );

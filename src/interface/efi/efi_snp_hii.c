@@ -759,9 +759,9 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall HII protocol: "
 		       "%s\n", snpdev, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_hii ( &snpdev->hii );
 		leak = 1;
 	}
+	efi_nullify_hii ( &snpdev->hii );
  err_install_protocol:
 	if ( ! leak )
 		efihii->RemovePackageList ( efihii, snpdev->hii_handle );
@@ -812,9 +812,9 @@ int efi_snp_hii_uninstall ( struct efi_snp_device *snpdev ) {
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall HII protocol: "
 		       "%s\n", snpdev, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_hii ( &snpdev->hii );
 		leak = 1;
 	}
+	efi_nullify_hii ( &snpdev->hii );
 	if ( ! leak )
 		efihii->RemovePackageList ( efihii, snpdev->hii_handle );
 	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (

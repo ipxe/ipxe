@@ -326,9 +326,9 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 			NULL ) ) != 0 ) {
 		DBGC ( sandev, "EFIBLK %#02x could not uninstall protocols: "
 		       "%s\n", sandev->drive, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_block ( &block->block_io );
 		leak = 1;
 	}
+	efi_nullify_block ( &block->block_io );
  err_install:
 	if ( ! leak )  {
 		free ( block->path );
@@ -377,9 +377,9 @@ static void efi_block_unhook ( unsigned int drive ) {
 			NULL ) ) != 0 ) {
 		DBGC ( sandev, "EFIBLK %#02x could not uninstall protocols: "
 		       "%s\n", sandev->drive, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_block ( &block->block_io );
 		leak = 1;
 	}
+	efi_nullify_block ( &block->block_io );
 
 	/* Free device path */
 	if ( ! leak ) {

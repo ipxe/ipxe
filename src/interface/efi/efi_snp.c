@@ -1816,12 +1816,12 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall: %s\n",
 		       snpdev, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_snp ( &snpdev->snp );
-		efi_nullify_nii ( &snpdev->nii );
-		efi_nullify_name2 ( &snpdev->name2 );
-		efi_nullify_load_file ( &snpdev->load_file );
 		leak = 1;
 	}
+	efi_nullify_snp ( &snpdev->snp );
+	efi_nullify_nii ( &snpdev->nii );
+	efi_nullify_name2 ( &snpdev->name2 );
+	efi_nullify_load_file ( &snpdev->load_file );
  err_install_protocol_interface:
 	if ( ! leak )
 		free ( snpdev->path );
@@ -1903,12 +1903,12 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall: %s\n",
 		       snpdev, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_snp ( &snpdev->snp );
-		efi_nullify_nii ( &snpdev->nii );
-		efi_nullify_name2 ( &snpdev->name2 );
-		efi_nullify_load_file ( &snpdev->load_file );
 		leak = 1;
 	}
+	efi_nullify_snp ( &snpdev->snp );
+	efi_nullify_nii ( &snpdev->nii );
+	efi_nullify_name2 ( &snpdev->name2 );
+	efi_nullify_load_file ( &snpdev->load_file );
 	if ( ! leak )
 		free ( snpdev->path );
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
