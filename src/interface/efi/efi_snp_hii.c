@@ -797,7 +797,7 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
  */
 int efi_snp_hii_uninstall ( struct efi_snp_device *snpdev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	int leak = 0;
+	int leak = efi_shutdown_in_progress;
 	EFI_STATUS efirc;
 
 	/* Do nothing if HII database protocol is not supported */
@@ -806,10 +806,11 @@ int efi_snp_hii_uninstall ( struct efi_snp_device *snpdev ) {
 
 	/* Uninstall protocols and remove package list */
 	efi_child_del ( snpdev->handle, snpdev->hii_child_handle );
-	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			snpdev->hii_child_handle,
 			&efi_hii_config_access_protocol_guid, &snpdev->hii,
-			NULL ) ) != 0 ) {
+			NULL ) ) != 0 ) ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall HII protocol: "
 		       "%s\n", snpdev, strerror ( -EEFI ( efirc ) ) );
 		leak = 1;
@@ -817,10 +818,11 @@ int efi_snp_hii_uninstall ( struct efi_snp_device *snpdev ) {
 	efi_nullify_hii ( &snpdev->hii );
 	if ( ! leak )
 		efihii->RemovePackageList ( efihii, snpdev->hii_handle );
-	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			snpdev->hii_child_handle,
 			&efi_device_path_protocol_guid, snpdev->hii_child_path,
-			NULL ) ) != 0 ) {
+			NULL ) ) != 0 ) ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall HII path: %s\n",
 		       snpdev, strerror ( -EEFI ( efirc ) ) );
 		leak = 1;
@@ -833,7 +835,7 @@ int efi_snp_hii_uninstall ( struct efi_snp_device *snpdev ) {
 	}
 
 	/* Report leakage, if applicable */
-	if ( leak )
+	if ( leak && ( ! efi_shutdown_in_progress ) )
 		DBGC ( snpdev, "SNPDEV %p HII nullified and leaked\n", snpdev );
 	return leak;
 }

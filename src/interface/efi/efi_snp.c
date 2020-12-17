@@ -1873,7 +1873,7 @@ static void efi_snp_notify ( struct net_device *netdev ) {
 static void efi_snp_remove ( struct net_device *netdev ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev;
-	int leak = 0;
+	int leak = efi_shutdown_in_progress;
 	EFI_STATUS efirc;
 
 	/* Locate SNP device */
@@ -1892,7 +1892,8 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 			    efi_image_handle, snpdev->handle );
 	bs->CloseProtocol ( snpdev->handle, &efi_nii31_protocol_guid,
 			    efi_image_handle, snpdev->handle );
-	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
 			&efi_device_path_protocol_guid, snpdev->path,
@@ -1900,7 +1901,7 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 			&efi_nii31_protocol_guid, &snpdev->nii,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
 			&efi_load_file_protocol_guid, &snpdev->load_file,
-			NULL ) ) != 0 ) {
+			NULL ) ) != 0 ) ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall: %s\n",
 		       snpdev, strerror ( -EEFI ( efirc ) ) );
 		leak = 1;
@@ -1918,7 +1919,7 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 	}
 
 	/* Report leakage, if applicable */
-	if ( leak )
+	if ( leak && ( ! efi_shutdown_in_progress ) )
 		DBGC ( snpdev, "SNPDEV %p nullified and leaked\n", snpdev );
 }
 

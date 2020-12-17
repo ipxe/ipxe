@@ -358,7 +358,7 @@ static void efi_block_unhook ( unsigned int drive ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct san_device *sandev;
 	struct efi_block_data *block;
-	int leak = 0;
+	int leak = efi_shutdown_in_progress;
 	EFI_STATUS efirc;
 
 	/* Find SAN device */
@@ -370,11 +370,12 @@ static void efi_block_unhook ( unsigned int drive ) {
 	block = sandev->priv;
 
 	/* Uninstall protocols */
-	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			block->handle,
 			&efi_block_io_protocol_guid, &block->block_io,
 			&efi_device_path_protocol_guid, block->path,
-			NULL ) ) != 0 ) {
+			NULL ) ) != 0 ) ) {
 		DBGC ( sandev, "EFIBLK %#02x could not uninstall protocols: "
 		       "%s\n", sandev->drive, strerror ( -EEFI ( efirc ) ) );
 		leak = 1;
@@ -395,7 +396,7 @@ static void efi_block_unhook ( unsigned int drive ) {
 		sandev_put ( sandev );
 
 	/* Report leakage, if applicable */
-	if ( leak ) {
+	if ( leak && ( ! efi_shutdown_in_progress ) ) {
 		DBGC ( sandev, "EFIBLK %#02x nullified and leaked\n",
 		       sandev->drive );
 	}
