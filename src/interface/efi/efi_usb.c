@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_null.h>
 #include <ipxe/efi/efi_usb.h>
 #include <ipxe/usb.h>
 
@@ -1106,6 +1107,7 @@ static int efi_usb_install ( struct efi_usb_device *usbdev,
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct usb_function *func = usbdev->func;
 	struct efi_usb_interface *usbintf;
+	int leak = 0;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -1148,19 +1150,30 @@ static int efi_usb_install ( struct efi_usb_device *usbdev,
 	       usbintf->name, efi_handle_name ( usbintf->handle ) );
 	return 0;
 
-	bs->UninstallMultipleProtocolInterfaces (
+	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			usbintf->handle,
 			&efi_usb_io_protocol_guid, &usbintf->usbio,
 			&efi_device_path_protocol_guid, usbintf->path,
-			NULL );
+			NULL ) ) != 0 ) {
+		DBGC ( usbdev, "USBDEV %s could not uninstall: %s\n",
+		       usbintf->name, strerror ( -EEFI ( efirc ) ) );
+		leak = 1;
+	}
+	efi_nullify_usbio ( &usbintf->usbio );
  err_install_protocol:
 	efi_usb_close_all ( usbintf );
 	efi_usb_free_all ( usbintf );
 	list_del ( &usbintf->list );
-	free ( usbintf->path );
+	if ( ! leak )
+		free ( usbintf->path );
  err_path:
-	free ( usbintf );
+	if ( ! leak )
+		free ( usbintf );
  err_alloc:
+	if ( leak ) {
+		DBGC ( usbdev, "USBDEV %s nullified and leaked\n",
+		       usbintf->name );
+	}
 	return rc;
 }
 
@@ -1172,6 +1185,8 @@ static int efi_usb_install ( struct efi_usb_device *usbdev,
 static void efi_usb_uninstall ( struct efi_usb_interface *usbintf ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_usb_device *usbdev = usbintf->usbdev;
+	int leak = efi_shutdown_in_progress;
+	EFI_STATUS efirc;
 
 	DBGC ( usbdev, "USBDEV %s uninstalling %s\n",
 	       usbintf->name, efi_handle_name ( usbintf->handle ) );
@@ -1180,14 +1195,21 @@ static void efi_usb_uninstall ( struct efi_usb_interface *usbintf ) {
 	 * seems to be required on some platforms to avoid failures
 	 * when uninstalling protocols.
 	 */
-	bs->DisconnectController ( usbintf->handle, NULL, NULL );
+	if ( ! efi_shutdown_in_progress )
+		bs->DisconnectController ( usbintf->handle, NULL, NULL );
 
 	/* Uninstall protocols */
-	bs->UninstallMultipleProtocolInterfaces (
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			usbintf->handle,
 			&efi_usb_io_protocol_guid, &usbintf->usbio,
 			&efi_device_path_protocol_guid, usbintf->path,
-			NULL );
+			NULL ) ) != 0 ) ) {
+		DBGC ( usbdev, "USBDEV %s could not uninstall: %s\n",
+		       usbintf->name, strerror ( -EEFI ( efirc ) ) );
+		leak = 1;
+	}
+	efi_nullify_usbio ( &usbintf->usbio );
 
 	/* Close and free all endpoints */
 	efi_usb_close_all ( usbintf );
@@ -1197,10 +1219,18 @@ static void efi_usb_uninstall ( struct efi_usb_interface *usbintf ) {
 	list_del ( &usbintf->list );
 
 	/* Free device path */
-	free ( usbintf->path );
+	if ( ! leak )
+		free ( usbintf->path );
 
 	/* Free interface */
-	free ( usbintf );
+	if ( ! leak )
+		free ( usbintf );
+
+	/* Report leakage, if applicable */
+	if ( leak && ( ! efi_shutdown_in_progress ) ) {
+		DBGC ( usbdev, "USBDEV %s nullified and leaked\n",
+		       usbintf->name );
+	}
 }
 
 /**

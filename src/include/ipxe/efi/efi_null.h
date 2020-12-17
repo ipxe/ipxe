@@ -18,6 +18,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
 #include <ipxe/efi/Protocol/PxeBaseCode.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
+#include <ipxe/efi/Protocol/UsbIo.h>
 
 extern void efi_nullify_snp ( EFI_SIMPLE_NETWORK_PROTOCOL *snp );
 extern void efi_nullify_nii ( EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL *nii );
@@ -27,5 +28,6 @@ extern void efi_nullify_hii ( EFI_HII_CONFIG_ACCESS_PROTOCOL *hii );
 extern void efi_nullify_block ( EFI_BLOCK_IO_PROTOCOL *block );
 extern void efi_nullify_pxe ( EFI_PXE_BASE_CODE_PROTOCOL *pxe );
 extern void efi_nullify_apple ( EFI_APPLE_NET_BOOT_PROTOCOL *apple );
+extern void efi_nullify_usbio ( EFI_USB_IO_PROTOCOL *usbio );
 
 #endif /* _IPXE_EFI_NULL_H */

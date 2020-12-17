@@ -530,3 +530,143 @@ void efi_nullify_apple ( EFI_APPLE_NET_BOOT_PROTOCOL *apple ) {
 
 	memcpy ( apple, &efi_null_apple, sizeof ( *apple ) );
 }
+
+/******************************************************************************
+ *
+ * USB I/O Protocol
+ *
+ ******************************************************************************
+ */
+
+static EFI_STATUS EFIAPI
+efi_null_usb_control_transfer ( EFI_USB_IO_PROTOCOL *usbio __unused,
+				EFI_USB_DEVICE_REQUEST *packet __unused,
+				EFI_USB_DATA_DIRECTION direction __unused,
+				UINT32 timeout __unused, VOID *data __unused,
+				UINTN len __unused, UINT32 *status __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_bulk_transfer ( EFI_USB_IO_PROTOCOL *usbio __unused,
+			     UINT8 endpoint __unused, VOID *data __unused,
+			     UINTN *len __unused, UINTN timeout __unused,
+			     UINT32 *status __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_sync_interrupt_transfer ( EFI_USB_IO_PROTOCOL *usbio __unused,
+				       UINT8 endpoint __unused,
+				       VOID *data __unused,
+				       UINTN *len __unused,
+				       UINTN timeout __unused,
+				       UINT32 *status __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_async_interrupt_transfer ( EFI_USB_IO_PROTOCOL *usbio __unused,
+					UINT8 endpoint __unused,
+					BOOLEAN start __unused,
+					UINTN interval __unused,
+					UINTN len __unused,
+					EFI_ASYNC_USB_TRANSFER_CALLBACK
+					callback __unused,
+					VOID *context __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_isochronous_transfer ( EFI_USB_IO_PROTOCOL *usbio __unused,
+				    UINT8 endpoint __unused,
+				    VOID *data __unused, UINTN len __unused,
+				    UINT32 *status __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_async_isochronous_transfer ( EFI_USB_IO_PROTOCOL *usbio __unused,
+					  UINT8 endpoint __unused,
+					  VOID *data __unused,
+					  UINTN len __unused,
+					  EFI_ASYNC_USB_TRANSFER_CALLBACK
+					  callback __unused,
+					  VOID *context __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_get_device_descriptor ( EFI_USB_IO_PROTOCOL *usbio __unused,
+				     EFI_USB_DEVICE_DESCRIPTOR
+				     *efidesc __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_get_config_descriptor ( EFI_USB_IO_PROTOCOL *usbio __unused,
+				     EFI_USB_CONFIG_DESCRIPTOR
+				     *efidesc __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_get_interface_descriptor ( EFI_USB_IO_PROTOCOL *usbio __unused,
+					EFI_USB_INTERFACE_DESCRIPTOR
+					*efidesc __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_get_endpoint_descriptor ( EFI_USB_IO_PROTOCOL *usbio __unused,
+				       UINT8 index __unused,
+				       EFI_USB_ENDPOINT_DESCRIPTOR
+				       *efidesc __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_get_string_descriptor ( EFI_USB_IO_PROTOCOL *usbio __unused,
+				     UINT16 language __unused,
+				     UINT8 index __unused,
+				     CHAR16 **string __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_get_supported_languages ( EFI_USB_IO_PROTOCOL *usbio __unused,
+				       UINT16 **languages __unused,
+				       UINT16 *len __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_usb_port_reset ( EFI_USB_IO_PROTOCOL *usbio __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_USB_IO_PROTOCOL efi_null_usbio = {
+	.UsbControlTransfer	     = efi_null_usb_control_transfer,
+	.UsbBulkTransfer	     = efi_null_usb_bulk_transfer,
+	.UsbAsyncInterruptTransfer   = efi_null_usb_async_interrupt_transfer,
+	.UsbSyncInterruptTransfer    = efi_null_usb_sync_interrupt_transfer,
+	.UsbIsochronousTransfer	     = efi_null_usb_isochronous_transfer,
+	.UsbAsyncIsochronousTransfer = efi_null_usb_async_isochronous_transfer,
+	.UsbGetDeviceDescriptor	     = efi_null_usb_get_device_descriptor,
+	.UsbGetConfigDescriptor	     = efi_null_usb_get_config_descriptor,
+	.UsbGetInterfaceDescriptor   = efi_null_usb_get_interface_descriptor,
+	.UsbGetEndpointDescriptor    = efi_null_usb_get_endpoint_descriptor,
+	.UsbGetStringDescriptor	     = efi_null_usb_get_string_descriptor,
+	.UsbGetSupportedLanguages    = efi_null_usb_get_supported_languages,
+	.UsbPortReset		     = efi_null_usb_port_reset,
+};
+
+/**
+ * Nullify USB I/O protocol
+ *
+ * @v usbio		USB I/O protocol
+ */
+void efi_nullify_usbio ( EFI_USB_IO_PROTOCOL *usbio ) {
+
+	memcpy ( usbio, &efi_null_usbio, sizeof ( *usbio ) );
+}
