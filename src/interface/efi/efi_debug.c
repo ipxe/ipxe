@@ -374,7 +374,7 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 const __attribute__ (( pure )) char *
 efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	static char text[256];
+	static char text[512];
 	size_t len;
 	CHAR16 *wtext;
 
