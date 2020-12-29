@@ -34,6 +34,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static struct smbios_entry *smbios_entry;
 EFI_USE_TABLE ( SMBIOS_TABLE, &smbios_entry, 0 );
 
+/** SMBIOS configuration table */
+static struct smbios3_entry *smbios3_entry;
+EFI_USE_TABLE ( SMBIOS3_TABLE, &smbios3_entry, 0 );
+
 /**
  * Find SMBIOS
  *
@@ -42,26 +46,34 @@ EFI_USE_TABLE ( SMBIOS_TABLE, &smbios_entry, 0 );
  */
 static int efi_find_smbios ( struct smbios *smbios ) {
 
-	if ( ! smbios_entry ) {
-		DBG ( "No SMBIOS table provided\n" );
-		return -ENODEV;
+	/* Use 64-bit table if present */
+	if ( smbios3_entry && ( smbios3_entry->signature == SMBIOS3_SIGNATURE ) ) {
+		smbios->address = phys_to_user ( smbios3_entry->smbios_address );
+		smbios->len = smbios3_entry->smbios_len;
+		smbios->count = 0;
+		smbios->version =
+			SMBIOS_VERSION ( smbios3_entry->major, smbios3_entry->minor );
+		DBG ( "Found 64-bit SMBIOS v%d.%d entry point at %p (%lx+%zx)\n",
+		      smbios3_entry->major, smbios3_entry->minor, smbios3_entry,
+		      user_to_phys ( smbios->address, 0 ), smbios->len );
+		return 0;
 	}
 
-	if ( smbios_entry->signature != SMBIOS_SIGNATURE ) {
-		DBG ( "Invalid SMBIOS signature\n" );
-		return -ENODEV;
+	/* Otherwise, use 32-bit table if present */
+	if ( smbios_entry && ( smbios_entry->signature == SMBIOS_SIGNATURE ) ) {
+		smbios->address = phys_to_user ( smbios_entry->smbios_address );
+		smbios->len = smbios_entry->smbios_len;
+		smbios->count = smbios_entry->smbios_count;
+		smbios->version =
+			SMBIOS_VERSION ( smbios_entry->major, smbios_entry->minor );
+		DBG ( "Found 32-bit SMBIOS v%d.%d entry point at %p (%lx+%zx)\n",
+		      smbios_entry->major, smbios_entry->minor, smbios_entry,
+		      user_to_phys ( smbios->address, 0 ), smbios->len );
+		return 0;
 	}
 
-	smbios->address = phys_to_user ( smbios_entry->smbios_address );
-	smbios->len = smbios_entry->smbios_len;
-	smbios->count = smbios_entry->smbios_count;
-	smbios->version =
-		SMBIOS_VERSION ( smbios_entry->major, smbios_entry->minor );
-	DBG ( "Found SMBIOS v%d.%d entry point at %p (%x+%zx)\n",
-	      smbios_entry->major, smbios_entry->minor, smbios_entry,
-	      smbios_entry->smbios_address, smbios->len );
-
-	return 0;
+	DBG ( "No SMBIOS table provided\n" );
+	return -ENODEV;
 }
 
 PROVIDE_SMBIOS ( efi, find_smbios, efi_find_smbios );

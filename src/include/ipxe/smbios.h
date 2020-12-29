@@ -31,15 +31,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Include all architecture-dependent SMBIOS API headers */
 #include <bits/smbios.h>
 
-/** Signature for SMBIOS entry point */
+/** Signature for 32-bit SMBIOS entry point */
 #define SMBIOS_SIGNATURE \
         ( ( '_' << 0 ) + ( 'S' << 8 ) + ( 'M' << 16 ) + ( '_' << 24 ) )
 
+/** Signature for 64-bit SMBIOS entry point */
+#define SMBIOS3_SIGNATURE \
+        ( ( '_' << 0 ) + ( 'S' << 8 ) + ( 'M' << 16 ) + ( '3' << 24 ) )
+
 /**
- * SMBIOS entry point
+ * SMBIOS 32-bit entry point
  *
- * This is the single table which describes the list of SMBIOS
- * structures.  It is located by scanning through the BIOS segment.
+ * This is the 32-bit version of the table which describes the list of
+ * SMBIOS structures.  It may be located by scanning through the BIOS
+ * segment or via an EFI configuration table.
  */
 struct smbios_entry {
 	/** Signature
@@ -73,6 +78,41 @@ struct smbios_entry {
 	uint16_t smbios_count;
 	/** BCD revision */
 	uint8_t bcd_revision;
+} __attribute__ (( packed ));
+
+/**
+ * SMBIOS 64-bit entry point
+ *
+ * This is the 64-bit version of the table which describes the list of
+ * SMBIOS structures.  It may be located by scanning through the BIOS
+ * segment or via an EFI configuration table.
+ */
+struct smbios3_entry {
+	/** Signature
+	 *
+	 * Must be equal to SMBIOS3_SIGNATURE
+	 */
+	uint32_t signature;
+	/** Signature extra byte */
+	uint8_t extra;
+	/** Checksum */
+	uint8_t checksum;
+	/** Length */
+	uint8_t len;
+	/** Major version */
+	uint8_t major;
+	/** Minor version */
+	uint8_t minor;
+	/** Documentation revision */
+	uint8_t docrev;
+	/** Entry point revision */
+	uint8_t revision;
+	/** Reserved */
+	uint8_t reserved;
+	/** Structure table length */
+	uint32_t smbios_len;
+	/** Structure table address */
+	uint64_t smbios_address;
 } __attribute__ (( packed ));
 
 /** An SMBIOS structure header */
@@ -154,6 +194,9 @@ struct smbios_enclosure_information {
 
 /** SMBIOS OEM strings structure type */
 #define SMBIOS_TYPE_OEM_STRINGS 11
+
+/** SMBIOS end of table type */
+#define SMBIOS_TYPE_END 127
 
 /**
  * SMBIOS entry point descriptor

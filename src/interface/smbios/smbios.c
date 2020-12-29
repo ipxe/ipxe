@@ -130,8 +130,8 @@ int find_smbios_structure ( unsigned int type, unsigned int instance,
 	assert ( smbios.address != UNULL );
 
 	/* Scan through list of structures */
-	while ( ( ( offset + sizeof ( structure->header ) ) < smbios.len )
-		&& ( count < smbios.count ) ) {
+	while ( ( ( offset + sizeof ( structure->header ) ) < smbios.len ) &&
+		( ( smbios.count == 0 ) || ( count < smbios.count ) ) ) {
 
 		/* Read next SMBIOS structure header */
 		copy_from_user ( &structure->header, smbios.address, offset,
@@ -156,6 +156,11 @@ int find_smbios_structure ( unsigned int type, unsigned int instance,
 		DBG ( "SMBIOS structure at offset %zx has type %d, length %x, "
 		      "strings length %zx\n", offset, structure->header.type,
 		      structure->header.len, structure->strings_len );
+
+		/* Stop if we have reached an end-of-table marker */
+		if ( ( smbios.count == 0 ) &&
+		     ( structure->header.type == SMBIOS_TYPE_END ) )
+			break;
 
 		/* If this is the structure we want, return */
 		if ( ( structure->header.type == type ) &&
