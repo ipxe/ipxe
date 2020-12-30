@@ -262,7 +262,7 @@ jme_free_tx_resources(struct jme_adapter *jme)
 				sizeof(struct io_buffer *) * jme->tx_ring_size);
 			free(txring->bufinf);
 		}
-		free_dma(txring->desc, jme->tx_ring_size * TX_DESC_SIZE);
+		free_phys(txring->desc, jme->tx_ring_size * TX_DESC_SIZE);
 		txring->desc		= NULL;
 		txring->dma		= 0;
 		txring->bufinf		= NULL;
@@ -277,7 +277,7 @@ jme_alloc_tx_resources(struct jme_adapter *jme)
 {
 	struct jme_ring *txring = &jme->txring;
 
-	txring->desc = malloc_dma(jme->tx_ring_size * TX_DESC_SIZE,
+	txring->desc = malloc_phys(jme->tx_ring_size * TX_DESC_SIZE,
 					RING_DESC_ALIGN);
 	if (!txring->desc) {
 		DBG("Can not allocate transmit ring descriptors.\n");
@@ -442,7 +442,7 @@ jme_free_rx_resources(struct jme_adapter *jme)
 			free(rxring->bufinf);
 		}
 
-		free_dma(rxring->desc, jme->rx_ring_size * RX_DESC_SIZE);
+		free_phys(rxring->desc, jme->rx_ring_size * RX_DESC_SIZE);
 		rxring->desc     = NULL;
 		rxring->dma      = 0;
 		rxring->bufinf   = NULL;
@@ -458,7 +458,7 @@ jme_alloc_rx_resources(struct jme_adapter *jme)
 	struct jme_ring *rxring = &jme->rxring;
 	struct io_buffer **bufinf;
 
-	rxring->desc = malloc_dma(jme->rx_ring_size * RX_DESC_SIZE,
+	rxring->desc = malloc_phys(jme->rx_ring_size * RX_DESC_SIZE,
 			RING_DESC_ALIGN);
 	if (!rxring->desc) {
 		DBG("Can not allocate receive ring descriptors.\n");
@@ -1191,7 +1191,7 @@ jme_probe(struct pci_device *pci)
 	jme = netdev->priv;
 	pci_set_drvdata(pci, netdev);
 	netdev->dev = &pci->dev;
-	jme->regs = ioremap(pci->membase, JME_REGS_SIZE);
+	jme->regs = pci_ioremap(pci, pci->membase, JME_REGS_SIZE);
 	if (!(jme->regs)) {
 		DBG("Mapping PCI resource region error.\n");
 		rc = -ENOMEM;

@@ -32,7 +32,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <byteswap.h>
 #include <ipxe/crypto.h>
-#include <ipxe/asn1.h>
 #include <ipxe/sha512.h>
 
 /** SHA-512/256 initial digest values */
@@ -70,14 +69,4 @@ struct digest_algorithm sha512_256_algorithm = {
 	.init		= sha512_256_init,
 	.update		= sha512_update,
 	.final		= sha512_final,
-};
-
-/** "sha512_256" object identifier */
-static uint8_t oid_sha512_256[] = { ASN1_OID_SHA512_256 };
-
-/** "sha512_256" OID-identified algorithm */
-struct asn1_algorithm oid_sha512_256_algorithm __asn1_algorithm = {
-	.name = "sha512/256",
-	.digest = &sha512_256_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_sha512_256 ),
 };

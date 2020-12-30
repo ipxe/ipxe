@@ -223,7 +223,7 @@ int ath_descdma_setup(struct ath_softc *sc, struct ath_descdma *dd,
 	}
 
 	/* allocate descriptors */
-	dd->dd_desc = malloc_dma(dd->dd_desc_len, 16);
+	dd->dd_desc = malloc_phys(dd->dd_desc_len, 16);
 	if (dd->dd_desc == NULL) {
 		error = -ENOMEM;
 		goto fail;
@@ -264,7 +264,7 @@ int ath_descdma_setup(struct ath_softc *sc, struct ath_descdma *dd,
 	}
 	return 0;
 fail2:
-	free_dma(dd->dd_desc, dd->dd_desc_len);
+	free_phys(dd->dd_desc, dd->dd_desc_len);
 fail:
 	memset(dd, 0, sizeof(*dd));
 	return error;
@@ -588,7 +588,7 @@ void ath_descdma_cleanup(struct ath_softc *sc __unused,
 			 struct ath_descdma *dd,
 			 struct list_head *head)
 {
-	free_dma(dd->dd_desc, dd->dd_desc_len);
+	free_phys(dd->dd_desc, dd->dd_desc_len);
 
 	INIT_LIST_HEAD(head);
 	free(dd->dd_bufptr);

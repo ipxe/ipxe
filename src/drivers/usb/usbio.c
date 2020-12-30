@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/Protocol/UsbIo.h>
 #include <ipxe/usb.h>
@@ -206,7 +207,7 @@ static int usbio_open ( struct usbio_device *usbio, unsigned int interface ) {
 	path = usbio->path;
 	usbpath = usbio->usbpath;
 	usbpath->InterfaceNumber = interface;
-	end = efi_devpath_end ( path );
+	end = efi_path_end ( path );
 
 	/* Locate handle for this endpoint's interface */
 	if ( ( efirc = bs->LocateDevicePath ( &efi_usb_io_protocol_guid, &path,
@@ -1503,7 +1504,7 @@ static int usbio_path ( struct usbio_device *usbio ) {
 	path = u.interface;
 
 	/* Locate end of device path and sanity check */
-	len = efi_devpath_len ( path );
+	len = efi_path_len ( path );
 	if ( len < sizeof ( *usbpath ) ) {
 		DBGC ( usbio, "USBIO %s underlength device path\n",
 		       efi_handle_name ( handle ) );

@@ -800,7 +800,7 @@ static int exanic_probe ( struct pci_device *pci ) {
 
 	/* Map registers */
 	regs_bar_start = pci_bar_start ( pci, EXANIC_REGS_BAR );
-	exanic->regs = ioremap ( regs_bar_start, EXANIC_REGS_LEN );
+	exanic->regs = pci_ioremap ( pci, regs_bar_start, EXANIC_REGS_LEN );
 	if ( ! exanic->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap_regs;
@@ -824,14 +824,14 @@ static int exanic_probe ( struct pci_device *pci ) {
 	/* Map transmit region */
 	tx_bar_start = pci_bar_start ( pci, EXANIC_TX_BAR );
 	tx_bar_len = pci_bar_size ( pci, EXANIC_TX_BAR );
-	exanic->tx = ioremap ( tx_bar_start, tx_bar_len );
+	exanic->tx = pci_ioremap ( pci, tx_bar_start, tx_bar_len );
 	if ( ! exanic->tx ) {
 		rc = -ENODEV;
 		goto err_ioremap_tx;
 	}
 
 	/* Allocate transmit feedback region (shared between all ports) */
-	exanic->txf = malloc_dma ( EXANIC_TXF_LEN, EXANIC_ALIGN );
+	exanic->txf = malloc_phys ( EXANIC_TXF_LEN, EXANIC_ALIGN );
 	if ( ! exanic->txf ) {
 		rc = -ENOMEM;
 		goto err_alloc_txf;
@@ -853,7 +853,7 @@ static int exanic_probe ( struct pci_device *pci ) {
 	for ( i-- ; i >= 0 ; i-- )
 		exanic_remove_port ( exanic, i );
 	exanic_reset ( exanic );
-	free_dma ( exanic->txf, EXANIC_TXF_LEN );
+	free_phys ( exanic->txf, EXANIC_TXF_LEN );
  err_alloc_txf:
 	iounmap ( exanic->tx );
  err_ioremap_tx:
@@ -882,7 +882,7 @@ static void exanic_remove ( struct pci_device *pci ) {
 	exanic_reset ( exanic );
 
 	/* Free transmit feedback region */
-	free_dma ( exanic->txf, EXANIC_TXF_LEN );
+	free_phys ( exanic->txf, EXANIC_TXF_LEN );
 
 	/* Unmap transmit region */
 	iounmap ( exanic->tx );

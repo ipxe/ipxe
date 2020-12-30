@@ -343,7 +343,7 @@ static int icplus_create_ring ( struct icplus_nic *icp, struct icplus_ring *ring
 	struct icplus_descriptor *next;
 
 	/* Allocate descriptor ring */
-	ring->entry = malloc_dma ( len, ICP_ALIGN );
+	ring->entry = malloc_phys ( len, ICP_ALIGN );
 	if ( ! ring->entry ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -369,7 +369,7 @@ static int icplus_create_ring ( struct icplus_nic *icp, struct icplus_ring *ring
 	       ( virt_to_bus ( ring->entry ) + len ) );
 	return 0;
 
-	free_dma ( ring->entry, len );
+	free_phys ( ring->entry, len );
 	ring->entry = NULL;
  err_alloc:
 	return rc;
@@ -386,7 +386,7 @@ static void icplus_destroy_ring ( struct icplus_nic *icp __unused,
 	size_t len = ( sizeof ( ring->entry[0] ) * ICP_NUM_DESC );
 
 	/* Free descriptor ring */
-	free_dma ( ring->entry, len );
+	free_phys ( ring->entry, len );
 	ring->entry = NULL;
 }
 
@@ -726,7 +726,7 @@ static int icplus_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	icp->regs = ioremap ( pci->membase, ICP_BAR_SIZE );
+	icp->regs = pci_ioremap ( pci, pci->membase, ICP_BAR_SIZE );
 	if ( ! icp->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

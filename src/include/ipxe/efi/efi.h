@@ -65,6 +65,16 @@ typedef struct {} *EFI_HANDLE;
 
 #include <ipxe/tables.h>
 #include <ipxe/uuid.h>
+#include <ipxe/version.h>
+#include <ipxe/profile.h>
+
+/** An EFI saved task priority level */
+struct efi_saved_tpl {
+	/** Current external TPL */
+	EFI_TPL current;
+	/** Previous external TPL */
+	EFI_TPL previous;
+};
 
 /** An EFI protocol used by iPXE */
 struct efi_protocol {
@@ -218,9 +228,11 @@ extern EFI_HANDLE efi_image_handle;
 extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 extern EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
 extern EFI_SYSTEM_TABLE *efi_systab;
+extern EFI_TPL efi_external_tpl;
 extern int efi_shutdown_in_progress;
 
-extern const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid );
+extern const __attribute__ (( pure )) char *
+efi_guid_ntoa ( CONST EFI_GUID *guid );
 extern const __attribute__ (( pure )) char *
 efi_locate_search_type_name ( EFI_LOCATE_SEARCH_TYPE search_type );
 extern const __attribute__ (( pure )) char *
@@ -230,8 +242,18 @@ efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern const __attribute__ (( pure )) char *
 efi_handle_name ( EFI_HANDLE handle );
 
+extern void dbg_efi_opener ( EFI_HANDLE handle, EFI_GUID *protocol,
+			     EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener );
 extern void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol );
 extern void dbg_efi_protocols ( EFI_HANDLE handle );
+
+#define DBG_EFI_OPENER_IF( level, handle, protocol,		\
+			   opener ) do {			\
+		if ( DBG_ ## level ) {				\
+			dbg_efi_opener ( handle, protocol,	\
+					 opener );		\
+		}						\
+	} while ( 0 )
 
 #define DBG_EFI_OPENERS_IF( level, handle, protocol ) do {	\
 		if ( DBG_ ## level ) {				\
@@ -243,6 +265,12 @@ extern void dbg_efi_protocols ( EFI_HANDLE handle );
 		if ( DBG_ ## level ) {				\
 			dbg_efi_protocols ( handle );		\
 		}						\
+	} while ( 0 )
+
+#define DBGC_EFI_OPENER_IF( level, id, ... ) do {		\
+		DBG_AC_IF ( level, id );			\
+		DBG_EFI_OPENER_IF ( level, __VA_ARGS__ );	\
+		DBG_DC_IF ( level );				\
 	} while ( 0 )
 
 #define DBGC_EFI_OPENERS_IF( level, id, ... ) do {		\
@@ -257,22 +285,67 @@ extern void dbg_efi_protocols ( EFI_HANDLE handle );
 		DBG_DC_IF ( level );				\
 	} while ( 0 )
 
+#define DBGC_EFI_OPENER( ... )					\
+	DBGC_EFI_OPENER_IF ( LOG, ##__VA_ARGS__ )
 #define DBGC_EFI_OPENERS( ... )					\
 	DBGC_EFI_OPENERS_IF ( LOG, ##__VA_ARGS__ )
 #define DBGC_EFI_PROTOCOLS( ... )				\
 	DBGC_EFI_PROTOCOLS_IF ( LOG, ##__VA_ARGS__ )
 
+#define DBGC2_EFI_OPENER( ... )					\
+	DBGC_EFI_OPENER_IF ( EXTRA, ##__VA_ARGS__ )
 #define DBGC2_EFI_OPENERS( ... )				\
 	DBGC_EFI_OPENERS_IF ( EXTRA, ##__VA_ARGS__ )
 #define DBGC2_EFI_PROTOCOLS( ... )				\
 	DBGC_EFI_PROTOCOLS_IF ( EXTRA, ##__VA_ARGS__ )
 
+#define DBGCP_EFI_OPENER( ... )					\
+	DBGC_EFI_OPENER_IF ( PROFILE, ##__VA_ARGS__ )
 #define DBGCP_EFI_OPENERS( ... )				\
 	DBGC_EFI_OPENERS_IF ( PROFILE, ##__VA_ARGS__ )
 #define DBGCP_EFI_PROTOCOLS( ... )				\
 	DBGC_EFI_PROTOCOLS_IF ( PROFILE, ##__VA_ARGS__ )
 
+/* Allow for EFI-only interface operations */
+#ifdef PLATFORM_efi
+#define EFI_INTF_OP INTF_OP
+#else
+#define EFI_INTF_OP UNUSED_INTF_OP
+#endif
+
+extern unsigned long __stack_chk_guard;
+extern unsigned long efi_stack_cookie ( EFI_HANDLE handle );
+extern void __stack_chk_fail ( void );
+
+/**
+ * Initialise stack cookie
+ *
+ * @v handle		Image handle
+ */
+static inline __attribute__ (( always_inline )) void
+efi_init_stack_guard ( EFI_HANDLE handle ) {
+
+	/* The calling function must not itself use stack protection,
+	 * since the change in the stack guard value would trigger a
+	 * false positive.
+	 *
+	 * There is unfortunately no way to annotate a function to
+	 * exclude the use of stack protection.  We must therefore
+	 * rely on correctly anticipating the compiler's decision on
+	 * the use of stack protection.
+	 *
+	 * The calculation of the stack cookie value deliberately
+	 * takes the address of a stack variable (to provide an
+	 * additional source of entropy).  This operation would
+	 * trigger the application of stack protection to the calling
+	 * function, and so must be externalised.
+	 */
+	__stack_chk_guard = efi_stack_cookie ( handle );
+}
+
 extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
+extern void efi_raise_tpl ( struct efi_saved_tpl *tpl );
+extern void efi_restore_tpl ( struct efi_saved_tpl *tpl );
 
 #endif /* _IPXE_EFI_H */

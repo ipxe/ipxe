@@ -195,7 +195,7 @@ static int skeleton_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	skel->regs = ioremap ( pci->membase, SKELETON_BAR_SIZE );
+	skel->regs = pci_ioremap ( pci, pci->membase, SKELETON_BAR_SIZE );
 	if ( ! skel->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

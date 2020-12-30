@@ -48,7 +48,7 @@ do
 	g=${g:0:8}.krn
 	case "$first" in
 	"")
-		echo DEFAULT $g
+		echo DEFAULT $b
 		;;
 	esac
 	first=$g

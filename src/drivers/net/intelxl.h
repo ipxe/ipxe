@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/pcimsix.h>
+#include <ipxe/dma.h>
 
 struct intelxl_nic;
 
@@ -562,6 +563,8 @@ struct intelxl_admin {
 	struct intelxl_admin_descriptor *desc;
 	/** Data buffers */
 	union intelxl_admin_buffer *buf;
+	/** DMA mapping */
+	struct dma_mapping map;
 	/** Queue index */
 	unsigned int index;
 
@@ -866,6 +869,8 @@ struct intelxl_ring {
 		/** Raw data */
 		void *raw;
 	} desc;
+	/** Descriptor ring DMA mapping */
+	struct dma_mapping map;
 	/** Producer index */
 	unsigned int prod;
 	/** Consumer index */
@@ -985,6 +990,11 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 /** Time to delay for device reset, in milliseconds */
 #define INTELXL_RESET_DELAY_MS 100
 
+/** Function Requester ID Information Register */
+#define INTELXL_PFFUNC_RID 0x09c000
+#define INTELXL_PFFUNC_RID_FUNC_NUM(x) \
+	( ( (x) >> 0 ) & 0x3 )				/**< Function number */
+
 /** PF Queue Allocation Register */
 #define INTELXL_PFLAN_QALLOC 0x1c0400
 #define INTELXL_PFLAN_QALLOC_FIRSTQ(x) \
@@ -1005,6 +1015,12 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 #define INTELXL_PRTGL_SAH_MFS_GET(x)	( (x) >> 16 )	/**< Max frame size */
 #define INTELXL_PRTGL_SAH_MFS_SET(x)	( (x) << 16 )	/**< Max frame size */
 
+/** Physical Function MAC Address Low Register */
+#define INTELXL_PRTPM_SAL 0x1e4440
+
+/** Physical Function MAC Address High Register */
+#define INTELXL_PRTPM_SAH 0x1e44c0
+
 /** Receive address */
 union intelxl_receive_address {
 	struct {
@@ -1014,10 +1030,22 @@ union intelxl_receive_address {
 	uint8_t raw[ETH_ALEN];
 };
 
+/** MSI-X interrupt */
+struct intelxl_msix {
+	/** PCI capability */
+	struct pci_msix cap;
+	/** MSI-X dummy interrupt target */
+	uint32_t msg;
+	/** DMA mapping for dummy interrupt target */
+	struct dma_mapping map;
+};
+
 /** An Intel 40Gigabit network card */
 struct intelxl_nic {
 	/** Registers */
 	void *regs;
+	/** DMA device */
+	struct dma_device *dma;
 	/** Maximum frame size */
 	size_t mfs;
 
@@ -1035,12 +1063,10 @@ struct intelxl_nic {
 	unsigned int qset;
 	/** Interrupt control register */
 	unsigned int intr;
-	/** MSI-X capability */
-	struct pci_msix msix;
-	/** MSI-X dummy interrupt target */
-	uint32_t msg;
 	/** PCI Express capability offset */
 	unsigned int exp;
+	/** MSI-X interrupt */
+	struct intelxl_msix msix;
 
 	/** Admin command queue */
 	struct intelxl_admin command;

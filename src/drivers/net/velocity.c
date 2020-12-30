@@ -320,7 +320,8 @@ static int velocity_alloc_rings ( struct velocity_nic *vlc ) {
 	vlc->rx_prod = 0;
 	vlc->rx_cons = 0;
 	vlc->rx_commit = 0;
-	vlc->rx_ring = malloc_dma ( VELOCITY_RXDESC_SIZE, VELOCITY_RING_ALIGN );
+	vlc->rx_ring = malloc_phys ( VELOCITY_RXDESC_SIZE,
+				     VELOCITY_RING_ALIGN );
 	if ( ! vlc->rx_ring )
 		return -ENOMEM;
 
@@ -332,7 +333,8 @@ static int velocity_alloc_rings ( struct velocity_nic *vlc ) {
 	/* Allocate TX descriptor ring */
 	vlc->tx_prod = 0;
 	vlc->tx_cons = 0;
-	vlc->tx_ring = malloc_dma ( VELOCITY_TXDESC_SIZE, VELOCITY_RING_ALIGN );
+	vlc->tx_ring = malloc_phys ( VELOCITY_TXDESC_SIZE,
+				     VELOCITY_RING_ALIGN );
 	if ( ! vlc->tx_ring ) {
 		rc = -ENOMEM;
 		goto err_tx_alloc;
@@ -356,7 +358,7 @@ static int velocity_alloc_rings ( struct velocity_nic *vlc ) {
 	return 0;
 
 err_tx_alloc:
-	free_dma ( vlc->rx_ring, VELOCITY_RXDESC_SIZE );
+	free_phys ( vlc->rx_ring, VELOCITY_RXDESC_SIZE );
 	return rc;
 }
 
@@ -482,7 +484,7 @@ static void velocity_close ( struct net_device *netdev ) {
 	writew ( 0, vlc->regs + VELOCITY_RXDESCNUM );
 
 	/* Destroy RX ring */
-	free_dma ( vlc->rx_ring, VELOCITY_RXDESC_SIZE );
+	free_phys ( vlc->rx_ring, VELOCITY_RXDESC_SIZE );
 	vlc->rx_ring = NULL;
 	vlc->rx_prod = 0;
 	vlc->rx_cons = 0;
@@ -499,7 +501,7 @@ static void velocity_close ( struct net_device *netdev ) {
 	writew ( 0, vlc->regs + VELOCITY_TXDESCNUM );
 
 	/* Destroy TX ring */
-	free_dma ( vlc->tx_ring, VELOCITY_TXDESC_SIZE );
+	free_phys ( vlc->tx_ring, VELOCITY_TXDESC_SIZE );
 	vlc->tx_ring = NULL;
 	vlc->tx_prod = 0;
 	vlc->tx_cons = 0;
@@ -731,7 +733,7 @@ static int velocity_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	vlc->regs = ioremap ( pci->membase, VELOCITY_BAR_SIZE );
+	vlc->regs = pci_ioremap ( pci, pci->membase, VELOCITY_BAR_SIZE );
 	vlc->netdev = netdev;
 
 	/* Reset the NIC */

@@ -88,8 +88,8 @@ struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
 		len += ( ( - len - offset ) & ( __alignof__ ( *iobuf ) - 1 ) );
 
 		/* Allocate memory for buffer plus descriptor */
-		data = malloc_dma_offset ( len + sizeof ( *iobuf ), align,
-					   offset );
+		data = malloc_phys_offset ( len + sizeof ( *iobuf ), align,
+					    offset );
 		if ( ! data )
 			return NULL;
 		iobuf = ( data + len );
@@ -97,19 +97,20 @@ struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
 	} else {
 
 		/* Allocate memory for buffer */
-		data = malloc_dma_offset ( len, align, offset );
+		data = malloc_phys_offset ( len, align, offset );
 		if ( ! data )
 			return NULL;
 
 		/* Allocate memory for descriptor */
 		iobuf = malloc ( sizeof ( *iobuf ) );
 		if ( ! iobuf ) {
-			free_dma ( data, len );
+			free_phys ( data, len );
 			return NULL;
 		}
 	}
 
 	/* Populate descriptor */
+	memset ( &iobuf->map, 0, sizeof ( iobuf->map ) );
 	iobuf->head = iobuf->data = iobuf->tail = data;
 	iobuf->end = ( data + len );
 
@@ -153,20 +154,64 @@ void free_iob ( struct io_buffer *iobuf ) {
 	assert ( iobuf->head <= iobuf->data );
 	assert ( iobuf->data <= iobuf->tail );
 	assert ( iobuf->tail <= iobuf->end );
+	assert ( ! dma_mapped ( &iobuf->map ) );
 
 	/* Free buffer */
 	len = ( iobuf->end - iobuf->head );
 	if ( iobuf->end == iobuf ) {
 
 		/* Descriptor is inline */
-		free_dma ( iobuf->head, ( len + sizeof ( *iobuf ) ) );
+		free_phys ( iobuf->head, ( len + sizeof ( *iobuf ) ) );
 
 	} else {
 
 		/* Descriptor is detached */
-		free_dma ( iobuf->head, len );
+		free_phys ( iobuf->head, len );
 		free ( iobuf );
 	}
+}
+
+/**
+ * Allocate and map I/O buffer for receive DMA
+ *
+ * @v len		Length of I/O buffer
+ * @v dma		DMA device
+ * @ret iobuf		I/O buffer, or NULL on error
+ */
+struct io_buffer * alloc_rx_iob ( size_t len, struct dma_device *dma ) {
+	struct io_buffer *iobuf;
+	int rc;
+
+	/* Allocate I/O buffer */
+	iobuf = alloc_iob ( len );
+	if ( ! iobuf )
+		goto err_alloc;
+
+	/* Map I/O buffer */
+	if ( ( rc = iob_map_rx ( iobuf, dma ) ) != 0 )
+		goto err_map;
+
+	return iobuf;
+
+	iob_unmap ( iobuf );
+ err_map:
+	free_iob ( iobuf );
+ err_alloc:
+	return NULL;
+}
+
+/**
+ * Unmap and free I/O buffer for receive DMA
+ *
+ * @v iobuf	I/O buffer
+ */
+void free_rx_iob ( struct io_buffer *iobuf ) {
+
+	/* Unmap I/O buffer */
+	iob_unmap ( iobuf );
+
+	/* Free I/O buffer */
+	free_iob ( iobuf );
 }
 
 /**

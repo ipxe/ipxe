@@ -370,7 +370,7 @@ static void atl1e_free_ring_resources(struct atl1e_adapter *adapter)
 	atl1e_clean_rx_ring(adapter);
 
 	if (adapter->ring_vir_addr) {
-		free_dma(adapter->ring_vir_addr, adapter->ring_size);
+		free_phys(adapter->ring_vir_addr, adapter->ring_size);
 		adapter->ring_vir_addr = NULL;
 		adapter->ring_dma = 0;
 	}
@@ -405,7 +405,7 @@ static int atl1e_setup_ring_resources(struct atl1e_adapter *adapter)
 	/* real ring DMA buffer */
 
 	size = adapter->ring_size;
-	adapter->ring_vir_addr = malloc_dma(adapter->ring_size, 32);
+	adapter->ring_vir_addr = malloc_phys(adapter->ring_size, 32);
 
 	if (adapter->ring_vir_addr == NULL) {
 		DBG("atl1e: out of memory allocating %d bytes for %s ring\n",

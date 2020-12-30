@@ -21,9 +21,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <errno.h>
+#include <endian.h>
 #include <ipxe/init.h>
+#include <ipxe/rotate.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 
 /** Image handle passed to entry point */
@@ -31,6 +34,9 @@ EFI_HANDLE efi_image_handle;
 
 /** Loaded image protocol for this image */
 EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
+
+/** Device path for the loaded image's device handle */
+EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
 
 /** System table passed to entry point
  *
@@ -41,11 +47,24 @@ EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
  */
 EFI_SYSTEM_TABLE * _C2 ( PLATFORM, _systab );
 
+/** External task priority level */
+EFI_TPL efi_external_tpl = TPL_APPLICATION;
+
 /** EFI shutdown is in progress */
 int efi_shutdown_in_progress;
 
 /** Event used to signal shutdown */
 static EFI_EVENT efi_shutdown_event;
+
+/** Stack cookie */
+unsigned long __stack_chk_guard;
+
+/** Exit function
+ *
+ * Cached to minimise external dependencies when a stack check
+ * failure is triggered.
+ */
+static EFI_EXIT efi_exit;
 
 /* Forward declarations */
 static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle );
@@ -88,6 +107,46 @@ static void * efi_find_table ( EFI_GUID *guid ) {
 }
 
 /**
+ * Construct a stack cookie value
+ *
+ * @v handle		Image handle
+ * @ret cookie		Stack cookie
+ */
+__attribute__ (( noinline )) unsigned long
+efi_stack_cookie ( EFI_HANDLE handle ) {
+	unsigned long cookie = 0;
+	unsigned int rotation = ( 8 * sizeof ( cookie ) / 4 );
+
+	/* There is no viable source of entropy available at this
+	 * point.  Construct a value that is at least likely to vary
+	 * between platforms and invocations.
+	 */
+	cookie ^= ( ( unsigned long ) handle );
+	cookie = roll ( cookie, rotation );
+	cookie ^= ( ( unsigned long ) &handle );
+	cookie = roll ( cookie, rotation );
+	cookie ^= profile_timestamp();
+	cookie = roll ( cookie, rotation );
+	cookie ^= build_id;
+
+	/* Ensure that the value contains a NUL byte, to act as a
+	 * runaway string terminator.  Construct the NUL using a shift
+	 * rather than a mask, to avoid losing valuable entropy in the
+	 * lower-order bits.
+	 */
+	cookie <<= 8;
+
+	/* Ensure that the NUL byte is placed at the bottom of the
+	 * stack cookie, to avoid potential disclosure via an
+	 * unterminated string.
+	 */
+	if ( __BYTE_ORDER == __BIG_ENDIAN )
+		cookie >>= 8;
+
+	return cookie;
+}
+
+/**
  * Initialise EFI environment
  *
  * @v image_handle	Image handle
@@ -100,6 +159,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	struct efi_protocol *prot;
 	struct efi_config_table *tab;
 	void *loaded_image;
+	void *device_path;
+	void *device_path_copy;
+	size_t device_path_len;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -129,6 +191,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	}
 	DBGC ( systab, "EFI handle %p systab %p\n", image_handle, systab );
 	bs = systab->BootServices;
+
+	/* Store abort function pointer */
+	efi_exit = bs->Exit;
 
 	/* Look up used protocols */
 	for_each_table_entry ( prot, EFI_PROTOCOLS ) {
@@ -175,6 +240,33 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	DBGC ( systab, "EFI image base address %p\n",
 	       efi_loaded_image->ImageBase );
 
+	/* Get loaded image's device handle's device path */
+	if ( ( efirc = bs->OpenProtocol ( efi_loaded_image->DeviceHandle,
+				&efi_device_path_protocol_guid,
+				&device_path, image_handle, NULL,
+				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( systab, "EFI could not get loaded image's device path: "
+		       "%s", strerror ( rc ) );
+		goto err_no_device_path;
+	}
+
+	/* Make a copy of the loaded image's device handle's device
+	 * path, since the device handle itself may become invalidated
+	 * when we load our own drivers.
+	 */
+	device_path_len = ( efi_path_len ( device_path ) +
+			    sizeof ( EFI_DEVICE_PATH_PROTOCOL ) );
+	if ( ( efirc = bs->AllocatePool ( EfiBootServicesData, device_path_len,
+					  &device_path_copy ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		goto err_alloc_device_path;
+	}
+	memcpy ( device_path_copy, device_path, device_path_len );
+	efi_loaded_image_path = device_path_copy;
+	DBGC ( systab, "EFI image device path %s\n",
+	       efi_devpath_text ( efi_loaded_image_path ) );
+
 	/* EFI is perfectly capable of gracefully shutting down any
 	 * loaded devices if it decides to fall back to a legacy boot.
 	 * For no particularly comprehensible reason, it doesn't
@@ -206,6 +298,9 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
  err_driver_install:
 	bs->CloseEvent ( efi_shutdown_event );
  err_create_event:
+	bs->FreePool ( efi_loaded_image_path );
+ err_alloc_device_path:
+ err_no_device_path:
  err_no_loaded_image:
  err_missing_table:
  err_missing_protocol:
@@ -236,7 +331,67 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 	/* Uninstall exit boot services event */
 	bs->CloseEvent ( efi_shutdown_event );
 
+	/* Free copy of loaded image's device handle's device path */
+	bs->FreePool ( efi_loaded_image_path );
+
 	DBGC ( systab, "EFI image unloaded\n" );
 
 	return 0;
+}
+
+/**
+ * Abort on stack check failure
+ *
+ */
+__attribute__ (( noreturn )) void __stack_chk_fail ( void ) {
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Report failure (when debugging) */
+	DBGC ( efi_systab, "EFI stack check failed (cookie %#lx); aborting\n",
+	       __stack_chk_guard );
+
+	/* Attempt to exit cleanly with an error status */
+	if ( efi_exit ) {
+		efirc = efi_exit ( efi_image_handle, EFI_COMPROMISED_DATA,
+				   0, NULL );
+		rc = -EEFI ( efirc );
+		DBGC ( efi_systab, "EFI stack check exit failed: %s\n",
+		       strerror ( rc ) );
+	}
+
+	/* If the exit fails for any reason, lock the system */
+	while ( 1 ) {}
+
+}
+
+/**
+ * Raise task priority level to TPL_CALLBACK
+ *
+ * @v tpl		Saved TPL
+ */
+void efi_raise_tpl ( struct efi_saved_tpl *tpl ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Record current external TPL */
+	tpl->previous = efi_external_tpl;
+
+	/* Raise TPL and record previous TPL as new external TPL */
+	tpl->current = bs->RaiseTPL ( TPL_CALLBACK );
+	efi_external_tpl = tpl->current;
+}
+
+/**
+ * Restore task priority level
+ *
+ * @v tpl		Saved TPL
+ */
+void efi_restore_tpl ( struct efi_saved_tpl *tpl ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Restore external TPL */
+	efi_external_tpl = tpl->previous;
+
+	/* Restore TPL */
+	bs->RestoreTPL ( tpl->current );
 }

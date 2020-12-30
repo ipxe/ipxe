@@ -669,8 +669,8 @@ static int qib7322_init_send ( struct qib7322 *qib7322 ) {
 	}
 
 	/* Allocate space for the SendBufAvail array */
-	qib7322->sendbufavail = malloc_dma ( sizeof ( *qib7322->sendbufavail ),
-					     QIB7322_SENDBUFAVAIL_ALIGN );
+	qib7322->sendbufavail = malloc_phys ( sizeof ( *qib7322->sendbufavail ),
+					      QIB7322_SENDBUFAVAIL_ALIGN );
 	if ( ! qib7322->sendbufavail ) {
 		rc = -ENOMEM;
 		goto err_alloc_sendbufavail;
@@ -697,7 +697,7 @@ static int qib7322_init_send ( struct qib7322 *qib7322 ) {
 
 	return 0;
 
-	free_dma ( qib7322->sendbufavail, sizeof ( *qib7322->sendbufavail ) );
+	free_phys ( qib7322->sendbufavail, sizeof ( *qib7322->sendbufavail ) );
  err_alloc_sendbufavail:
 	qib7322_destroy_send_bufs ( qib7322, qib7322->send_bufs_vl15_port1 );
  err_create_send_bufs_vl15_port1:
@@ -724,7 +724,7 @@ static void qib7322_fini_send ( struct qib7322 *qib7322 ) {
 	/* Ensure hardware has seen this disable */
 	qib7322_readq ( qib7322, &sendctrl, QIB_7322_SendCtrl_offset );
 
-	free_dma ( qib7322->sendbufavail, sizeof ( *qib7322->sendbufavail ) );
+	free_phys ( qib7322->sendbufavail, sizeof ( *qib7322->sendbufavail ) );
 	qib7322_destroy_send_bufs ( qib7322, qib7322->send_bufs_vl15_port1 );
 	qib7322_destroy_send_bufs ( qib7322, qib7322->send_bufs_vl15_port0 );
 	qib7322_destroy_send_bufs ( qib7322, qib7322->send_bufs_small );
@@ -767,8 +767,8 @@ static int qib7322_create_recv_wq ( struct ib_device *ibdev,
 	qib7322_wq->eager_cons = 0;
 
 	/* Allocate receive header buffer */
-	qib7322_wq->header = malloc_dma ( QIB7322_RECV_HEADERS_SIZE,
-					  QIB7322_RECV_HEADERS_ALIGN );
+	qib7322_wq->header = malloc_phys ( QIB7322_RECV_HEADERS_SIZE,
+					   QIB7322_RECV_HEADERS_ALIGN );
 	if ( ! qib7322_wq->header ) {
 		rc = -ENOMEM;
 		goto err_alloc_header;
@@ -810,7 +810,7 @@ static int qib7322_create_recv_wq ( struct ib_device *ibdev,
 	       virt_to_bus ( &qib7322_wq->header_prod ) );
 	return 0;
 
-	free_dma ( qib7322_wq->header, QIB7322_RECV_HEADERS_SIZE );
+	free_phys ( qib7322_wq->header, QIB7322_RECV_HEADERS_SIZE );
  err_alloc_header:
 	return rc;
 }
@@ -846,7 +846,7 @@ static void qib7322_destroy_recv_wq ( struct ib_device *ibdev,
 	mb();
 
 	/* Free headers ring */
-	free_dma ( qib7322_wq->header, QIB7322_RECV_HEADERS_SIZE );
+	free_phys ( qib7322_wq->header, QIB7322_RECV_HEADERS_SIZE );
 }
 
 /**
@@ -2297,7 +2297,7 @@ static int qib7322_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map PCI BARs */
-	qib7322->regs = ioremap ( pci->membase, QIB7322_BAR0_SIZE );
+	qib7322->regs = pci_ioremap ( pci, pci->membase, QIB7322_BAR0_SIZE );
 	DBGC2 ( qib7322, "QIB7322 %p has BAR at %08lx\n",
 		qib7322, pci->membase );
 

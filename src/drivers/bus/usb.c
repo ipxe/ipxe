@@ -363,6 +363,35 @@ static int usb_endpoint_clear_tt ( struct usb_endpoint *ep ) {
 }
 
 /**
+ * Clear endpoint halt (if applicable)
+ *
+ * @v ep		USB endpoint
+ * @ret rc		Return status code
+ */
+int usb_endpoint_clear_halt ( struct usb_endpoint *ep ) {
+	struct usb_device *usb = ep->usb;
+	unsigned int type;
+	int rc;
+
+	/* Clear transaction translator, if applicable */
+	if ( ( rc = usb_endpoint_clear_tt ( ep ) ) != 0 )
+		return rc;
+
+	/* Clear endpoint halt (if applicable) */
+	type = ( ep->attributes & USB_ENDPOINT_ATTR_TYPE_MASK );
+	if ( ( type != USB_ENDPOINT_ATTR_CONTROL ) &&
+	     ( ( rc = usb_clear_feature ( usb, USB_RECIP_ENDPOINT,
+					  USB_ENDPOINT_HALT,
+					  ep->address ) ) != 0 ) ) {
+		DBGC ( usb, "USB %s %s could not clear endpoint halt: %s\n",
+		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Close USB endpoint
  *
  * @v ep		USB endpoint
@@ -399,30 +428,18 @@ void usb_endpoint_close ( struct usb_endpoint *ep ) {
  */
 static int usb_endpoint_reset ( struct usb_endpoint *ep ) {
 	struct usb_device *usb = ep->usb;
-	unsigned int type;
 	int rc;
 
 	/* Sanity check */
 	assert ( ! list_empty ( &ep->halted ) );
 
+	/* Clear device halt, if applicable */
+	if ( ( rc = usb_endpoint_clear_halt ( ep ) ) != 0 )
+		return rc;
+
 	/* Reset endpoint */
 	if ( ( rc = ep->host->reset ( ep ) ) != 0 ) {
 		DBGC ( usb, "USB %s %s could not reset: %s\n",
-		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
-		return rc;
-	}
-
-	/* Clear transaction translator, if applicable */
-	if ( ( rc = usb_endpoint_clear_tt ( ep ) ) != 0 )
-		return rc;
-
-	/* Clear endpoint halt, if applicable */
-	type = ( ep->attributes & USB_ENDPOINT_ATTR_TYPE_MASK );
-	if ( ( type != USB_ENDPOINT_ATTR_CONTROL ) &&
-	     ( ( rc = usb_clear_feature ( usb, USB_RECIP_ENDPOINT,
-					  USB_ENDPOINT_HALT,
-					  ep->address ) ) != 0 ) ) {
-		DBGC ( usb, "USB %s %s could not clear endpoint halt: %s\n",
 		       usb->name, usb_endpoint_name ( ep ), strerror ( rc ) );
 		return rc;
 	}
@@ -634,12 +651,13 @@ int usb_prefill ( struct usb_endpoint *ep ) {
 }
 
 /**
- * Refill endpoint
+ * Refill endpoint up to specified limit
  *
  * @v ep		USB endpoint
+ * @v max		Fill limit
  * @ret rc		Return status code
  */
-int usb_refill ( struct usb_endpoint *ep ) {
+int usb_refill_limit ( struct usb_endpoint *ep, unsigned int max ) {
 	struct io_buffer *iobuf;
 	size_t reserve = ep->reserve;
 	size_t len = ( ep->len ? ep->len : ep->mtu );
@@ -650,7 +668,9 @@ int usb_refill ( struct usb_endpoint *ep ) {
 	assert ( ep->max > 0 );
 
 	/* Refill endpoint */
-	while ( ep->fill < ep->max ) {
+	if ( max > ep->max )
+		max = ep->max;
+	while ( ep->fill < max ) {
 
 		/* Get or allocate buffer */
 		if ( list_empty ( &ep->recycled ) ) {
@@ -679,6 +699,16 @@ int usb_refill ( struct usb_endpoint *ep ) {
 	}
 
 	return 0;
+}
+
+/**
+ * Refill endpoint
+ *
+ * @v ep		USB endpoint
+ * @ret rc		Return status code
+ */
+int usb_refill ( struct usb_endpoint *ep ) {
+	return usb_refill_limit ( ep, ep->max );
 }
 
 /**
@@ -818,6 +848,7 @@ int usb_control ( struct usb_device *usb, unsigned int request,
 				       "failed: %s\n", usb->name, request,
 				       value, index, strerror ( rc ) );
 				free_iob ( cmplt );
+				usb_endpoint_reset ( ep );
 				return rc;
 			}
 
@@ -912,9 +943,15 @@ int usb_get_string_descriptor ( struct usb_device *usb, unsigned int index,
 					 sizeof ( *desc ) ) ) != 0 )
 		goto err_get_descriptor;
 
-	/* Copy to buffer */
+	/* Calculate string length */
+	if ( desc->header.len < sizeof ( desc->header ) ) {
+		rc = -EINVAL;
+		goto err_len;
+	}
 	actual = ( ( desc->header.len - sizeof ( desc->header ) ) /
 		   sizeof ( desc->character[0] ) );
+
+	/* Copy to buffer */
 	for ( i = 0 ; ( ( i < actual ) && ( i < max ) ) ; i++ )
 		buf[i] = le16_to_cpu ( desc->character[i] );
 	if ( len )
@@ -925,6 +962,7 @@ int usb_get_string_descriptor ( struct usb_device *usb, unsigned int index,
 
 	return actual;
 
+ err_len:
  err_get_descriptor:
 	free ( desc );
  err_alloc:
@@ -1615,7 +1653,9 @@ static int register_usb ( struct usb_device *usb ) {
 	usb->host->close ( usb );
  err_open:
  err_speed:
-	hub->driver->disable ( hub, port );
+	/* Leave port enabled on failure, to avoid an endless loop of
+	 * failed device registrations.
+	 */
  err_enable:
 	list_del ( &usb->list );
 	port->usb = NULL;
@@ -1633,6 +1673,11 @@ static void unregister_usb ( struct usb_device *usb ) {
 	struct usb_hub *hub = port->hub;
 	struct io_buffer *iobuf;
 	struct io_buffer *tmp;
+
+	DBGC ( usb, "USB %s addr %d %04x:%04x class %d:%d:%d removed\n",
+	       usb->name, usb->address, le16_to_cpu ( usb->device.vendor ),
+	       le16_to_cpu ( usb->device.product ), usb->device.class.class,
+	       usb->device.class.subclass, usb->device.class.protocol );
 
 	/* Sanity checks */
 	assert ( port->usb == usb );
@@ -2230,23 +2275,6 @@ unsigned int usb_route_string ( struct usb_device *usb ) {
 	}
 
 	return route;
-}
-
-/**
- * Get USB depth
- *
- * @v usb		USB device
- * @ret depth		Hub depth
- */
-unsigned int usb_depth ( struct usb_device *usb ) {
-	struct usb_device *parent;
-	unsigned int depth;
-
-	/* Navigate up to root hub, constructing depth as we go */
-	for ( depth = 0 ; ( parent = usb->port->hub->usb ) ; usb = parent )
-		depth++;
-
-	return depth;
 }
 
 /**

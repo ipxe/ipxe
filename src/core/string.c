@@ -52,7 +52,7 @@ void * generic_memset ( void *dest, int character, size_t len ) {
 }
 
 /**
- * Copy memory region
+ * Copy memory region (forwards)
  *
  * @v dest		Destination region
  * @v src		Source region
@@ -69,6 +69,23 @@ void * generic_memcpy ( void *dest, const void *src, size_t len ) {
 }
 
 /**
+ * Copy memory region (backwards)
+ *
+ * @v dest		Destination region
+ * @v src		Source region
+ * @v len		Length
+ * @ret dest		Destination region
+ */
+void * generic_memcpy_reverse ( void *dest, const void *src, size_t len ) {
+	const uint8_t *src_bytes = ( src + len );
+	uint8_t *dest_bytes = ( dest + len );
+
+	while ( len-- )
+		*(--dest_bytes) = *(--src_bytes);
+	return dest;
+}
+
+/**
  * Copy (possibly overlapping) memory region
  *
  * @v dest		Destination region
@@ -77,14 +94,12 @@ void * generic_memcpy ( void *dest, const void *src, size_t len ) {
  * @ret dest		Destination region
  */
 void * generic_memmove ( void *dest, const void *src, size_t len ) {
-	const uint8_t *src_bytes = ( src + len );
-	uint8_t *dest_bytes = ( dest + len );
 
-	if ( dest < src )
+	if ( dest < src ) {
 		return generic_memcpy ( dest, src, len );
-	while ( len-- )
-		*(--dest_bytes) = *(--src_bytes);
-	return dest;
+	} else {
+		return generic_memcpy_reverse ( dest, src, len );
+	}
 }
 
 /**
@@ -101,7 +116,7 @@ int memcmp ( const void *first, const void *second, size_t len ) {
 	int diff;
 
 	while ( len-- ) {
-		diff = ( *(second_bytes++) - *(first_bytes++) );
+		diff = ( *(first_bytes++) - *(second_bytes++) );
 		if ( diff )
 			return diff;
 	}

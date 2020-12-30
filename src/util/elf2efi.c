@@ -996,7 +996,7 @@ static int parse_options ( const int argc, char **argv,
 		switch ( c ) {
 		case 's':
 			opts->subsystem = strtoul ( optarg, &end, 0 );
-			if ( *end ) {
+			if ( *end || ( ! *optarg ) ) {
 				eprintf ( "Invalid subsytem \"%s\"\n",
 					  optarg );
 				exit ( 2 );

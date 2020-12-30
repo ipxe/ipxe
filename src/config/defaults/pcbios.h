@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define UACCESS_LIBRM
 #define IOAPI_X86
 #define PCIAPI_PCBIOS
+#define DMAAPI_FLAT
 #define TIMER_PCBIOS
 #define CONSOLE_PCBIOS
 #define NAP_PCBIOS
@@ -48,6 +49,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	USB_HCD_EHCI		/* EHCI USB host controller */
 #define	USB_HCD_UHCI		/* UHCI USB host controller */
 #define	USB_KEYBOARD		/* USB keyboards */
+#define USB_BLOCK		/* USB block devices */
 
 #define	REBOOT_CMD		/* Reboot command */
 #define	CPUID_CMD		/* x86 CPU feature detection command */

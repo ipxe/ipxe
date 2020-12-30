@@ -338,7 +338,7 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
 	ring->id_cons = 0;
 
 	/* Allocate and initialise shared ring */
-	ring->sring.raw = malloc_dma ( PAGE_SIZE, PAGE_SIZE );
+	ring->sring.raw = malloc_phys ( PAGE_SIZE, PAGE_SIZE );
 	if ( ! ring->sring.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -368,7 +368,7 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
  err_write_num:
 	xengrant_invalidate ( xen, ring->ref );
  err_permit_access:
-	free_dma ( ring->sring.raw, PAGE_SIZE );
+	free_phys ( ring->sring.raw, PAGE_SIZE );
  err_alloc:
 	return rc;
 }
@@ -490,7 +490,7 @@ static void netfront_destroy_ring ( struct netfront_nic *netfront,
 	xengrant_invalidate ( xen, ring->ref );
 
 	/* Free page */
-	free_dma ( ring->sring.raw, PAGE_SIZE );
+	free_phys ( ring->sring.raw, PAGE_SIZE );
 	ring->sring.raw = NULL;
 }
 

@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/icmpv6.h>
 #include <ipxe/neighbour.h>
 #include <ipxe/dhcpv6.h>
+#include <ipxe/timer.h>
 #include <ipxe/ndp.h>
 
 /** @file
@@ -38,6 +39,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * IPv6 neighbour discovery protocol
  *
  */
+
+/** Router discovery minimum timeout */
+#define IPV6CONF_MIN_TIMEOUT ( TICKS_PER_SEC / 8 )
+
+/** Router discovery maximum timeout */
+#define IPV6CONF_MAX_TIMEOUT ( TICKS_PER_SEC * 3 )
 
 static struct ipv6conf * ipv6conf_demux ( struct net_device *netdev );
 static int
@@ -1235,6 +1242,8 @@ int start_ipv6conf ( struct interface *job, struct net_device *netdev ) {
 	intf_init ( &ipv6conf->job, &ipv6conf_job_desc, &ipv6conf->refcnt );
 	intf_init ( &ipv6conf->dhcp, &ipv6conf_dhcp_desc, &ipv6conf->refcnt );
 	timer_init ( &ipv6conf->timer, ipv6conf_expired, &ipv6conf->refcnt );
+	set_timer_limits ( &ipv6conf->timer, IPV6CONF_MIN_TIMEOUT,
+			   IPV6CONF_MAX_TIMEOUT );
 	ipv6conf->netdev = netdev_get ( netdev );
 
 	/* Start timer to initiate router solicitation */

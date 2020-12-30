@@ -408,7 +408,7 @@ static int natsemi_create_ring ( struct natsemi_nic *natsemi,
 	 * ensure that it can't possibly cross the boundary of 32-bit
 	 * address space.
 	 */
-	ring->desc = malloc_dma ( len, len );
+	ring->desc = malloc_phys ( len, len );
 	if ( ! ring->desc ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -454,7 +454,7 @@ static int natsemi_create_ring ( struct natsemi_nic *natsemi,
 	return 0;
 
  err_64bit:
-	free_dma ( ring->desc, len );
+	free_phys ( ring->desc, len );
 	ring->desc = NULL;
  err_alloc:
 	return rc;
@@ -476,7 +476,7 @@ static void natsemi_destroy_ring ( struct natsemi_nic *natsemi,
 		writel ( 0, natsemi->regs + ring->reg + 4 );
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc, len );
+	free_phys ( ring->desc, len );
 	ring->desc = NULL;
 	ring->prod = 0;
 	ring->cons = 0;
@@ -853,7 +853,7 @@ static int natsemi_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	natsemi->regs = ioremap ( pci->membase, NATSEMI_BAR_SIZE );
+	natsemi->regs = pci_ioremap ( pci, pci->membase, NATSEMI_BAR_SIZE );
 	if ( ! natsemi->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

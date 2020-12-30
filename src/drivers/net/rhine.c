@@ -292,7 +292,7 @@ static int rhine_create_ring ( struct rhine_nic *rhn,
 	unsigned int i;
 
 	/* Allocate descriptors */
-	ring->desc = malloc_dma ( len, RHINE_RING_ALIGN );
+	ring->desc = malloc_phys ( len, RHINE_RING_ALIGN );
 	if ( ! ring->desc )
 		return -ENOMEM;
 
@@ -328,7 +328,7 @@ static void rhine_destroy_ring ( struct rhine_nic *rhn,
 	writel ( 0, rhn->regs + ring->reg );
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc, len );
+	free_phys ( ring->desc, len );
 	ring->desc = NULL;
 	ring->prod = 0;
 	ring->cons = 0;
@@ -700,7 +700,7 @@ static int rhine_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	rhn->regs = ioremap ( pci->membase, RHINE_BAR_SIZE );
+	rhn->regs = pci_ioremap ( pci, pci->membase, RHINE_BAR_SIZE );
 	rhn->ioaddr = pci->ioaddr;
 	DBGC ( rhn, "RHINE %p regs at %08lx, I/O at %04lx\n", rhn,
 	       pci->membase, pci->ioaddr );

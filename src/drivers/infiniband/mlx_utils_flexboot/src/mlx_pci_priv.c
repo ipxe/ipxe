@@ -115,7 +115,7 @@ mlx_pci_init_priv(
 	mlx_status status = MLX_SUCCESS;
 	adjust_pci_device ( utils->pci );
 #ifdef DEVICE_CX3
-	utils->config = ioremap ( pci_bar_start ( utils->pci, PCI_BASE_ADDRESS_0),
+	utils->config = pci_ioremap ( utils->pci, pci_bar_start ( utils->pci, PCI_BASE_ADDRESS_0),
 			0x100000 );
 #endif
 	return status;

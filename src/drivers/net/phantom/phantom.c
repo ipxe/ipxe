@@ -640,7 +640,7 @@ static int phantom_create_rx_ctx ( struct phantom_nic *phantom ) {
 	int rc;
 
 	/* Allocate context creation buffer */
-	buf = malloc_dma ( sizeof ( *buf ), UNM_DMA_BUFFER_ALIGN );
+	buf = malloc_phys ( sizeof ( *buf ), UNM_DMA_BUFFER_ALIGN );
 	if ( ! buf ) {
 		rc = -ENOMEM;
 		goto out;
@@ -716,7 +716,7 @@ static int phantom_create_rx_ctx ( struct phantom_nic *phantom ) {
 	       phantom, phantom->sds_irq_mask_crb );
 
  out:
-	free_dma ( buf, sizeof ( *buf ) );
+	free_phys ( buf, sizeof ( *buf ) );
 	return rc;
 }
 
@@ -765,7 +765,7 @@ static int phantom_create_tx_ctx ( struct phantom_nic *phantom ) {
 	int rc;
 
 	/* Allocate context creation buffer */
-	buf = malloc_dma ( sizeof ( *buf ), UNM_DMA_BUFFER_ALIGN );
+	buf = malloc_phys ( sizeof ( *buf ), UNM_DMA_BUFFER_ALIGN );
 	if ( ! buf ) {
 		rc = -ENOMEM;
 		goto out;
@@ -821,7 +821,7 @@ static int phantom_create_tx_ctx ( struct phantom_nic *phantom ) {
 	       phantom, phantom->cds_producer_crb );
 
  out:
-	free_dma ( buf, sizeof ( *buf ) );
+	free_phys ( buf, sizeof ( *buf ) );
 	return rc;
 }
 
@@ -1164,8 +1164,8 @@ static int phantom_open ( struct net_device *netdev ) {
 	int rc;
 
 	/* Allocate and zero descriptor rings */
-	phantom->desc = malloc_dma ( sizeof ( *(phantom->desc) ),
-					  UNM_DMA_BUFFER_ALIGN );
+	phantom->desc = malloc_phys ( sizeof ( *(phantom->desc) ),
+				      UNM_DMA_BUFFER_ALIGN );
 	if ( ! phantom->desc ) {
 		rc = -ENOMEM;
 		goto err_alloc_desc;
@@ -1208,7 +1208,7 @@ static int phantom_open ( struct net_device *netdev ) {
  err_create_tx_ctx:
 	phantom_destroy_rx_ctx ( phantom );
  err_create_rx_ctx:
-	free_dma ( phantom->desc, sizeof ( *(phantom->desc) ) );
+	free_phys ( phantom->desc, sizeof ( *(phantom->desc) ) );
 	phantom->desc = NULL;
  err_alloc_desc:
 	return rc;
@@ -1229,7 +1229,7 @@ static void phantom_close ( struct net_device *netdev ) {
 	phantom_del_macaddr ( phantom, netdev->ll_broadcast );
 	phantom_destroy_tx_ctx ( phantom );
 	phantom_destroy_rx_ctx ( phantom );
-	free_dma ( phantom->desc, sizeof ( *(phantom->desc) ) );
+	free_phys ( phantom->desc, sizeof ( *(phantom->desc) ) );
 	phantom->desc = NULL;
 
 	/* Flush any uncompleted descriptors */
@@ -1837,7 +1837,7 @@ static int phantom_map_crb ( struct phantom_nic *phantom,
 		return -EINVAL;
 	}
 
-	phantom->bar0 = ioremap ( bar0_start, bar0_size );
+	phantom->bar0 = pci_ioremap ( pci, bar0_start, bar0_size );
 	if ( ! phantom->bar0 ) {
 		DBGC ( phantom, "Phantom %p could not map BAR0\n", phantom );
 		return -EIO;

@@ -46,6 +46,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/base16.h>
 #include <ipxe/base64.h>
 #include <ipxe/ibft.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/iscsi.h>
 
 /** @file
@@ -980,18 +981,26 @@ static int iscsi_handle_chap_i_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	uint8_t buf[ strlen ( value ) ]; /* Decoding never expands data */
+	uint8_t *buf;
 	unsigned int i;
 	int len;
 	int rc;
 
+	/* Allocate decoding buffer */
+	len = strlen ( value ); /* Decoding never expands data */
+	buf = malloc ( len );
+	if ( ! buf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
 	/* Process challenge */
-	len = iscsi_large_binary_decode ( value, buf, sizeof ( buf ) );
+	len = iscsi_large_binary_decode ( value, buf, len );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( iscsi, "iSCSI %p invalid CHAP challenge \"%s\": %s\n",
 		       iscsi, value, strerror ( rc ) );
-		return rc;
+		goto err_decode;
 	}
 	chap_update ( &iscsi->chap, buf, len );
 
@@ -1009,7 +1018,13 @@ static int iscsi_handle_chap_c_value ( struct iscsi_session *iscsi,
 		}
 	}
 
-	return 0;
+	/* Success */
+	rc = 0;
+
+ err_decode:
+	free ( buf );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -1050,7 +1065,7 @@ static int iscsi_handle_chap_n_value ( struct iscsi_session *iscsi,
  */
 static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 				       const char *value ) {
-	uint8_t buf[ strlen ( value ) ]; /* Decoding never expands data */
+	uint8_t *buf;
 	int len;
 	int rc;
 
@@ -1059,7 +1074,7 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 	if ( ( rc = chap_init ( &iscsi->chap, &md5_algorithm ) ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p could not initialise CHAP: %s\n",
 		       iscsi, strerror ( rc ) );
-		return rc;
+		goto err_chap_init;
 	}
 	chap_set_identifier ( &iscsi->chap, iscsi->chap_challenge[0] );
 	if ( iscsi->target_password ) {
@@ -1070,31 +1085,47 @@ static int iscsi_handle_chap_r_value ( struct iscsi_session *iscsi,
 		      ( sizeof ( iscsi->chap_challenge ) - 1 ) );
 	chap_respond ( &iscsi->chap );
 
+	/* Allocate decoding buffer */
+	len = strlen ( value ); /* Decoding never expands data */
+	buf = malloc ( len );
+	if ( ! buf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
 	/* Process response */
-	len = iscsi_large_binary_decode ( value, buf, sizeof ( buf ) );
+	len = iscsi_large_binary_decode ( value, buf, len );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( iscsi, "iSCSI %p invalid CHAP response \"%s\": %s\n",
 		       iscsi, value, strerror ( rc ) );
-		return rc;
+		goto err_decode;
 	}
 
 	/* Check CHAP response */
 	if ( len != ( int ) iscsi->chap.response_len ) {
 		DBGC ( iscsi, "iSCSI %p invalid CHAP response length\n",
 		       iscsi );
-		return -EPROTO_INVALID_CHAP_RESPONSE;
+		rc = -EPROTO_INVALID_CHAP_RESPONSE;
+		goto err_response_len;
 	}
 	if ( memcmp ( buf, iscsi->chap.response, len ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p incorrect CHAP response \"%s\"\n",
 		       iscsi, value );
-		return -EACCES_INCORRECT_TARGET_PASSWORD;
+		rc = -EACCES_INCORRECT_TARGET_PASSWORD;
+		goto err_response;
 	}
 
 	/* Mark session as authenticated */
 	iscsi->status |= ISCSI_STATUS_AUTH_REVERSE_OK;
 
-	return 0;
+ err_response:
+ err_response_len:
+ err_decode:
+	free ( buf );
+ err_alloc:
+ err_chap_init:
+	return rc;
 }
 
 /** An iSCSI text string that we want to handle */
@@ -1833,6 +1864,7 @@ static struct interface_operation iscsi_control_op[] = {
 	INTF_OP ( xfer_window, struct iscsi_session *, iscsi_scsi_window ),
 	INTF_OP ( intf_close, struct iscsi_session *, iscsi_close ),
 	INTF_OP ( acpi_describe, struct iscsi_session *, iscsi_describe ),
+	EFI_INTF_OP ( efi_describe, struct iscsi_session *, efi_iscsi_path ),
 };
 
 /** iSCSI SCSI command-issuing interface descriptor */
@@ -1918,15 +1950,22 @@ const struct setting reverse_password_setting __setting ( SETTING_AUTH_EXTRA,
  */
 static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 				   const char *root_path ) {
-	char rp_copy[ strlen ( root_path ) + 1 ];
+	char *rp_copy;
 	char *rp_comp[NUM_RP_COMPONENTS];
-	char *rp = rp_copy;
+	char *rp;
 	int skip = 0;
 	int i = 0;
 	int rc;
 
+	/* Create modifiable copy of root path */
+	rp_copy = strdup ( root_path );
+	if ( ! rp_copy ) {
+		rc = -ENOMEM;
+		goto err_strdup;
+	}
+	rp = rp_copy;
+
 	/* Split root path into component parts */
-	strcpy ( rp_copy, root_path );
 	while ( 1 ) {
 		rp_comp[i++] = rp;
 		if ( i == NUM_RP_COMPONENTS )
@@ -1935,7 +1974,8 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 			if ( ! *rp ) {
 				DBGC ( iscsi, "iSCSI %p root path \"%s\" "
 				       "too short\n", iscsi, root_path );
-				return -EINVAL_ROOT_PATH_TOO_SHORT;
+				rc = -EINVAL_ROOT_PATH_TOO_SHORT;
+				goto err_split;
 			} else if ( *rp == '[' ) {
 				skip = 1;
 			} else if ( *rp == ']' ) {
@@ -1947,21 +1987,31 @@ static int iscsi_parse_root_path ( struct iscsi_session *iscsi,
 
 	/* Use root path components to configure iSCSI session */
 	iscsi->target_address = strdup ( rp_comp[RP_SERVERNAME] );
-	if ( ! iscsi->target_address )
-		return -ENOMEM;
+	if ( ! iscsi->target_address ) {
+		rc = -ENOMEM;
+		goto err_servername;
+	}
 	iscsi->target_port = strtoul ( rp_comp[RP_PORT], NULL, 10 );
 	if ( ! iscsi->target_port )
 		iscsi->target_port = ISCSI_PORT;
 	if ( ( rc = scsi_parse_lun ( rp_comp[RP_LUN], &iscsi->lun ) ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p invalid LUN \"%s\"\n",
 		       iscsi, rp_comp[RP_LUN] );
-		return rc;
+		goto err_lun;
 	}
 	iscsi->target_iqn = strdup ( rp_comp[RP_TARGETNAME] );
-	if ( ! iscsi->target_iqn )
-		return -ENOMEM;
+	if ( ! iscsi->target_iqn ) {
+		rc = -ENOMEM;
+		goto err_targetname;
+	}
 
-	return 0;
+ err_targetname:
+ err_lun:
+ err_servername:
+ err_split:
+	free ( rp_copy );
+ err_strdup:
+	return rc;
 }
 
 /**

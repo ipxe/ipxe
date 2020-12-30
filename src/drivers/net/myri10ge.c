@@ -66,7 +66,7 @@ FILE_LICENCE ( GPL2_ONLY );
 
 /*
  * Debugging levels:
- *	- DBG() is for any errors, i.e. failed alloc_iob(), malloc_dma(),
+ *	- DBG() is for any errors, i.e. failed alloc_iob(), malloc_phys(),
  *	  TX overflow, corrupted packets, ...
  *	- DBG2() is for successful events, like packet received,
  *	  packet transmitted, and other general notifications.
@@ -918,7 +918,7 @@ static void myri10ge_net_close ( struct net_device *netdev )
 
 	/* Release DMAable memory. */
 
-	free_dma ( priv->dma, sizeof ( *priv->dma ) );
+	free_phys ( priv->dma, sizeof ( *priv->dma ) );
 
 	/* Erase all state from the open. */
 
@@ -988,7 +988,7 @@ static int myri10ge_net_open ( struct net_device *netdev )
 
 	/* Allocate cleared DMAable buffers. */
 
-	priv->dma = malloc_dma ( sizeof ( *priv->dma ) , 128 );
+	priv->dma = malloc_phys ( sizeof ( *priv->dma ) , 128 );
 	if ( !priv->dma ) {
 		rc = -ENOMEM;
 		dbg = "DMA";
@@ -1152,7 +1152,7 @@ abort_with_receives_posted:
 		free_iob ( priv->receive_iob[priv->receives_posted] );
 abort_with_dma:
 	/* Because the link is not up, we don't have to reset the NIC here. */
-	free_dma ( priv->dma, sizeof ( *priv->dma ) );
+	free_phys ( priv->dma, sizeof ( *priv->dma ) );
 abort_with_nothing:
 	/* Erase all signs of the failed open. */
 	memset ( priv, 0, sizeof ( *priv ) );

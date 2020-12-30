@@ -3025,7 +3025,7 @@ falcon_free_special_buffer ( void *p )
 {
 	/* We don't bother cleaning up the buffer table entries -
 	 * we're hardly limited */
-	free_dma ( p, EFAB_BUF_ALIGN );
+	free_phys ( p, EFAB_BUF_ALIGN );
 }
 
 static void*
@@ -3038,7 +3038,7 @@ falcon_alloc_special_buffer ( struct efab_nic *efab, int bytes,
 	unsigned long dma_addr;
 
 	/* Allocate the buffer, aligned on a buffer address boundary */
-	buffer = malloc_dma ( bytes, EFAB_BUF_ALIGN );
+	buffer = malloc_phys ( bytes, EFAB_BUF_ALIGN );
 	if ( ! buffer )
 		return NULL;
 
@@ -4150,7 +4150,7 @@ efab_probe ( struct pci_device *pci )
 	/* Get iobase/membase */
 	mmio_start = pci_bar_start ( pci, PCI_BASE_ADDRESS_2 );
 	mmio_len = pci_bar_size ( pci, PCI_BASE_ADDRESS_2 );
-	efab->membase = ioremap ( mmio_start, mmio_len );
+	efab->membase = pci_ioremap ( pci, mmio_start, mmio_len );
 	EFAB_TRACE ( "BAR of %lx bytes at phys %lx mapped at %p\n",
 		     mmio_len, mmio_start, efab->membase );
 

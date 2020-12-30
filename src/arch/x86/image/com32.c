@@ -110,7 +110,7 @@ static int com32_exec_loop ( struct image *image ) {
 			/* Disable interrupts */
 			"cli\n\t"
 			/* Restore stack pointer */
-			"movl 24(%%esp), %%esp\n\t"
+			"movl 28(%%esp), %%esp\n\t"
 			/* Restore registers */
 			"popal\n\t" )
 			:

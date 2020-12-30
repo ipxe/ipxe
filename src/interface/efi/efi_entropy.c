@@ -79,8 +79,8 @@ static int efi_entropy_enable ( void ) {
 	DBGC ( &tick, "ENTROPY %s RNG protocol\n",
 	       ( efirng ? "has" : "has no" ) );
 
-	/* Drop to TPL_APPLICATION to allow timer tick event to take place */
-	bs->RestoreTPL ( TPL_APPLICATION );
+	/* Drop to external TPL to allow timer tick event to take place */
+	bs->RestoreTPL ( efi_external_tpl );
 
 	/* Create timer tick event */
 	if ( ( efirc = bs->CreateEvent ( EVT_TIMER, TPL_NOTIFY, NULL, NULL,
@@ -179,6 +179,7 @@ static int efi_get_noise_ticks ( noise_sample_t *noise ) {
  * @ret rc		Return status code
  */
 static int efi_get_noise_rng ( noise_sample_t *noise ) {
+	static uint8_t prev[EFI_ENTROPY_RNG_LEN];
 	uint8_t buf[EFI_ENTROPY_RNG_LEN];
 	EFI_STATUS efirc;
 	int rc;
@@ -195,6 +196,17 @@ static int efi_get_noise_rng ( noise_sample_t *noise ) {
 		       strerror ( rc ) );
 		return rc;
 	}
+
+	/* Fail (and permanently disable the EFI RNG) if we get
+	 * consecutive identical results.
+	 */
+	if ( memcmp ( buf, prev, sizeof ( buf ) ) == 0 ) {
+		DBGC ( &tick, "ENTROPY detected broken EFI RNG:\n" );
+		DBGC_HDA ( &tick, 0, buf, sizeof ( buf ) );
+		efirng = NULL;
+		return -EIO;
+	}
+	memcpy ( prev, buf, sizeof ( prev ) );
 
 	/* Reduce random bytes to a single noise sample.  This seems
 	 * like overkill, but we have no way of knowing how much

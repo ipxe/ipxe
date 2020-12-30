@@ -83,7 +83,7 @@ hv_alloc_pages ( struct hv_hypervisor *hv, ... ) {
 	/* Allocate and zero pages */
 	va_start ( args, hv );
 	for ( i = 0 ; ( ( page = va_arg ( args, void ** ) ) != NULL ); i++ ) {
-		*page = malloc_dma ( PAGE_SIZE, PAGE_SIZE );
+		*page = malloc_phys ( PAGE_SIZE, PAGE_SIZE );
 		if ( ! *page )
 			goto err_alloc;
 		memset ( *page, 0, PAGE_SIZE );
@@ -97,7 +97,7 @@ hv_alloc_pages ( struct hv_hypervisor *hv, ... ) {
 	va_start ( args, hv );
 	for ( ; i >= 0 ; i-- ) {
 		page = va_arg ( args, void ** );
-		free_dma ( *page, PAGE_SIZE );
+		free_phys ( *page, PAGE_SIZE );
 	}
 	va_end ( args );
 	return -ENOMEM;
@@ -116,7 +116,7 @@ hv_free_pages ( struct hv_hypervisor *hv, ... ) {
 
 	va_start ( args, hv );
 	while ( ( page = va_arg ( args, void * ) ) != NULL )
-		free_dma ( page, PAGE_SIZE );
+		free_phys ( page, PAGE_SIZE );
 	va_end ( args );
 }
 
@@ -131,8 +131,8 @@ static int hv_alloc_message ( struct hv_hypervisor *hv ) {
 	/* Allocate buffer.  Must be aligned to at least 8 bytes and
 	 * must not cross a page boundary, so align on its own size.
 	 */
-	hv->message = malloc_dma ( sizeof ( *hv->message ),
-				   sizeof ( *hv->message ) );
+	hv->message = malloc_phys ( sizeof ( *hv->message ),
+				    sizeof ( *hv->message ) );
 	if ( ! hv->message )
 		return -ENOMEM;
 
@@ -147,7 +147,7 @@ static int hv_alloc_message ( struct hv_hypervisor *hv ) {
 static void hv_free_message ( struct hv_hypervisor *hv ) {
 
 	/* Free buffer */
-	free_dma ( hv->message, sizeof ( *hv->message ) );
+	free_phys ( hv->message, sizeof ( *hv->message ) );
 }
 
 /**

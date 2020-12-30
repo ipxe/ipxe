@@ -207,14 +207,14 @@ static int parse_options ( const int argc, char **argv,
 		switch ( c ) {
 		case 'v':
 			opts->vendor = strtoul ( optarg, &end, 16 );
-			if ( *end ) {
+			if ( *end || ( ! *optarg ) ) {
 				eprintf ( "Invalid vendor \"%s\"\n", optarg );
 				exit ( 2 );
 			}
 			break;
 		case 'd':
 			opts->device = strtoul ( optarg, &end, 16 );
-			if ( *end ) {
+			if ( *end || ( ! *optarg ) ) {
 				eprintf ( "Invalid device \"%s\"\n", optarg );
 				exit ( 2 );
 			}

@@ -37,6 +37,7 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/open.h>
 #include <ipxe/base16.h>
 #include <ipxe/acpi.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/srp.h>
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_cmrc.h>
@@ -68,39 +69,6 @@ struct acpi_model ib_sbft_model __acpi_model;
  *
  ******************************************************************************
  */
-
-/**
- * An IB SRP sBFT created by iPXE
- */
-struct ipxe_ib_sbft {
-	/** The table header */
-	struct sbft_table table;
-	/** The SCSI subtable */
-	struct sbft_scsi_subtable scsi;
-	/** The SRP subtable */
-	struct sbft_srp_subtable srp;
-	/** The Infiniband subtable */
-	struct sbft_ib_subtable ib;
-};
-
-/** An Infiniband SRP device */
-struct ib_srp_device {
-	/** Reference count */
-	struct refcnt refcnt;
-
-	/** SRP transport interface */
-	struct interface srp;
-	/** CMRC interface */
-	struct interface cmrc;
-
-	/** Infiniband device */
-	struct ib_device *ibdev;
-
-	/** ACPI descriptor */
-	struct acpi_descriptor desc;
-	/** Boot firmware table parameters */
-	struct ipxe_ib_sbft sbft;
-};
 
 /**
  * Free IB SRP device
@@ -153,6 +121,7 @@ static struct interface_descriptor ib_srp_cmrc_desc =
 static struct interface_operation ib_srp_srp_op[] = {
 	INTF_OP ( acpi_describe, struct ib_srp_device *, ib_srp_describe ),
 	INTF_OP ( intf_close, struct ib_srp_device *, ib_srp_close ),
+	EFI_INTF_OP ( efi_describe, struct ib_srp_device *, efi_ib_srp_path ),
 };
 
 /** IB SRP SRP interface descriptor */
@@ -498,14 +467,21 @@ static struct ib_srp_root_path_parser ib_srp_rp_parser[] = {
 static int ib_srp_parse_root_path ( const char *rp_string,
 				    struct ib_srp_root_path *rp ) {
 	struct ib_srp_root_path_parser *parser;
-	char rp_string_copy[ strlen ( rp_string ) + 1 ];
 	char *rp_comp[IB_SRP_NUM_RP_COMPONENTS];
-	char *rp_string_tmp = rp_string_copy;
+	char *rp_string_copy;
+	char *rp_string_tmp;
 	unsigned int i = 0;
 	int rc;
 
+	/* Create modifiable copy of root path */
+	rp_string_copy = strdup ( rp_string );
+	if ( ! rp_string_copy ) {
+		rc = -ENOMEM;
+		goto err_strdup;
+	}
+	rp_string_tmp = rp_string_copy;
+
 	/* Split root path into component parts */
-	strcpy ( rp_string_copy, rp_string );
 	while ( 1 ) {
 		rp_comp[i++] = rp_string_tmp;
 		if ( i == IB_SRP_NUM_RP_COMPONENTS )
@@ -514,7 +490,8 @@ static int ib_srp_parse_root_path ( const char *rp_string,
 			if ( ! *rp_string_tmp ) {
 				DBG ( "IBSRP root path \"%s\" too short\n",
 				      rp_string );
-				return -EINVAL_RP_TOO_SHORT;
+				rc = -EINVAL_RP_TOO_SHORT;
+				goto err_split;
 			}
 		}
 		*(rp_string_tmp++) = '\0';
@@ -527,11 +504,15 @@ static int ib_srp_parse_root_path ( const char *rp_string,
 			DBG ( "IBSRP could not parse \"%s\" in root path "
 			      "\"%s\": %s\n", rp_comp[i], rp_string,
 			      strerror ( rc ) );
-			return rc;
+			goto err_parse;
 		}
 	}
 
-	return 0;
+ err_parse:
+ err_split:
+	free ( rp_string_copy );
+ err_strdup:
+	return rc;
 }
 
 /**

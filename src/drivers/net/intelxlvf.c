@@ -298,9 +298,9 @@ void intelxlvf_admin_event ( struct net_device *netdev,
 		if ( intelxl->vret != 0 ) {
 			DBGC ( intelxl, "INTELXL %p admin VF command %#x "
 			       "error %d\n", intelxl, vopcode, intelxl->vret );
-			DBGC_HDA ( intelxl, virt_to_bus ( evt ), evt,
+			DBGC_HDA ( intelxl, virt_to_phys ( evt ), evt,
 				   sizeof ( *evt ) );
-			DBGC_HDA ( intelxl, virt_to_bus ( buf ), buf,
+			DBGC_HDA ( intelxl, virt_to_phys ( buf ), buf,
 				   le16_to_cpu ( evt->len ) );
 		}
 		return;
@@ -314,8 +314,10 @@ void intelxlvf_admin_event ( struct net_device *netdev,
 	default:
 		DBGC ( intelxl, "INTELXL %p unrecognised VF event %#x:\n",
 		       intelxl, vopcode );
-		DBGC_HDA ( intelxl, 0, evt, sizeof ( *evt ) );
-		DBGC_HDA ( intelxl, 0, buf, le16_to_cpu ( evt->len ) );
+		DBGC_HDA ( intelxl, virt_to_phys ( evt ), evt,
+			   sizeof ( *evt ) );
+		DBGC_HDA ( intelxl, virt_to_phys ( buf ), buf,
+			   le16_to_cpu ( evt->len ) );
 		break;
 	}
 }
@@ -378,12 +380,14 @@ static int intelxlvf_admin_configure ( struct net_device *netdev ) {
 	buf->cfg.count = cpu_to_le16 ( 1 );
 	buf->cfg.tx.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.tx.count = cpu_to_le16 ( INTELXL_TX_NUM_DESC );
-	buf->cfg.tx.base = cpu_to_le64 ( virt_to_bus ( intelxl->tx.desc.raw ) );
+	buf->cfg.tx.base = cpu_to_le64 ( dma ( &intelxl->tx.map,
+					       intelxl->tx.desc.raw ) );
 	buf->cfg.rx.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.rx.count = cpu_to_le32 ( INTELXL_RX_NUM_DESC );
 	buf->cfg.rx.len = cpu_to_le32 ( intelxl->mfs );
 	buf->cfg.rx.mfs = cpu_to_le32 ( intelxl->mfs );
-	buf->cfg.rx.base = cpu_to_le64 ( virt_to_bus ( intelxl->rx.desc.raw ) );
+	buf->cfg.rx.base = cpu_to_le64 ( dma ( &intelxl->rx.map,
+					       intelxl->rx.desc.raw ) );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
@@ -612,11 +616,16 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	intelxl->regs = ioremap ( pci->membase, INTELXLVF_BAR_SIZE );
+	intelxl->regs = pci_ioremap ( pci, pci->membase, INTELXLVF_BAR_SIZE );
 	if ( ! intelxl->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
+
+	/* Configure DMA */
+	intelxl->dma = &pci->dma;
+	dma_set_mask_64bit ( intelxl->dma );
+	netdev->dma = intelxl->dma;
 
 	/* Locate PCI Express capability */
 	intelxl->exp = pci_find_capability ( pci, PCI_CAP_ID_EXP );

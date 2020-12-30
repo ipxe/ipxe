@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/process.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_strings.h>
-#include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Guid/FileInfo.h>
 #include <ipxe/efi/Guid/FileSystemInfo.h>
@@ -307,6 +307,7 @@ static int efi_local_open_volume ( struct efi_local *local,
 	EFI_GUID *protocol = &efi_simple_file_system_protocol_guid;
 	int ( * check ) ( struct efi_local *local, EFI_HANDLE device,
 			  EFI_FILE_PROTOCOL *root, const char *volume );
+	EFI_DEVICE_PATH_PROTOCOL *path;
 	EFI_FILE_PROTOCOL *root;
 	EFI_HANDLE *handles;
 	EFI_HANDLE device;
@@ -328,8 +329,18 @@ static int efi_local_open_volume ( struct efi_local *local,
 		}
 		check = efi_local_check_volume_name;
 	} else {
-		/* Use our loaded image's device handle */
-		handles = &efi_loaded_image->DeviceHandle;
+		/* Locate filesystem from which we were loaded */
+		path = efi_loaded_image_path;
+		if ( ( efirc = bs->LocateDevicePath ( protocol, &path,
+						      &device ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( local, "LOCAL %p could not locate file system "
+			       "on %s: %s\n", local,
+			       efi_devpath_text ( efi_loaded_image_path ),
+			       strerror ( rc ) );
+			return rc;
+		}
+		handles = &device;
 		num_handles = 1;
 		check = NULL;
 	}
@@ -414,7 +425,7 @@ static int efi_local_open_resolved ( struct efi_local *local,
 static int efi_local_open_path ( struct efi_local *local, const char *path ) {
 	FILEPATH_DEVICE_PATH *fp = container_of ( efi_loaded_image->FilePath,
 						  FILEPATH_DEVICE_PATH, Header);
-	size_t fp_len = ( fp ? efi_devpath_len ( &fp->Header ) : 0 );
+	size_t fp_len = ( fp ? efi_path_len ( &fp->Header ) : 0 );
 	char base[ fp_len / 2 /* Cannot exceed this length */ ];
 	size_t remaining = sizeof ( base );
 	size_t len;
@@ -537,8 +548,8 @@ static int efi_local_open ( struct interface *xfer, struct uri *uri ) {
 	}
 	ref_init ( &local->refcnt, NULL );
 	intf_init ( &local->xfer, &efi_local_xfer_desc, &local->refcnt );
-	process_init ( &local->process, &efi_local_process_desc,
-		       &local->refcnt );
+	process_init_stopped ( &local->process, &efi_local_process_desc,
+			       &local->refcnt );
 
 	/* Open specified volume */
 	if ( ( rc = efi_local_open_volume ( local, volume ) ) != 0 )
@@ -551,6 +562,9 @@ static int efi_local_open ( struct interface *xfer, struct uri *uri ) {
 	/* Get length of file */
 	if ( ( rc = efi_local_len ( local ) ) != 0 )
 		goto err_len;
+
+	/* Start download process */
+	process_add ( &local->process );
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &local->xfer, xfer );

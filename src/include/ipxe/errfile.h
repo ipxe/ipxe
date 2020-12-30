@@ -75,6 +75,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_sanboot		       ( ERRFILE_CORE | 0x00230000 )
 #define ERRFILE_dummy_sanboot	       ( ERRFILE_CORE | 0x00240000 )
 #define ERRFILE_fdt		       ( ERRFILE_CORE | 0x00250000 )
+#define ERRFILE_dma		       ( ERRFILE_CORE | 0x00260000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
@@ -208,6 +209,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_intelxl		     ( ERRFILE_DRIVER | 0x00cb0000 )
 #define ERRFILE_pcimsix		     ( ERRFILE_DRIVER | 0x00cc0000 )
 #define ERRFILE_intelxlvf	     ( ERRFILE_DRIVER | 0x00cd0000 )
+#define ERRFILE_usbblk		     ( ERRFILE_DRIVER | 0x00ce0000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
@@ -378,7 +380,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_cert_cmd	      ( ERRFILE_OTHER | 0x004f0000 )
 #define ERRFILE_acpi_settings	      ( ERRFILE_OTHER | 0x00500000 )
 #define ERRFILE_ntlm		      ( ERRFILE_OTHER | 0x00510000 )
-#define ERRFILE_efi_blacklist	      ( ERRFILE_OTHER | 0x00520000 )
+#define ERRFILE_efi_veto	      ( ERRFILE_OTHER | 0x00520000 )
 
 /** @} */
 

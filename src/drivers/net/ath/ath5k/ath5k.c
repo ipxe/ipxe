@@ -280,7 +280,7 @@ static int ath5k_probe(struct pci_device *pdev)
 	 */
 	pci_write_config_byte(pdev, 0x41, 0);
 
-	mem = ioremap(pdev->membase, 0x10000);
+	mem = pci_ioremap(pdev, pdev->membase, 0x10000);
 	if (!mem) {
 		DBG("ath5k: cannot remap PCI memory region\n");
 		ret = -EIO;
@@ -877,7 +877,7 @@ ath5k_desc_alloc(struct ath5k_softc *sc)
 
 	/* allocate descriptors */
 	sc->desc_len = sizeof(struct ath5k_desc) * (ATH_TXBUF + ATH_RXBUF + 1);
-	sc->desc = malloc_dma(sc->desc_len, ATH5K_DESC_ALIGN);
+	sc->desc = malloc_phys(sc->desc_len, ATH5K_DESC_ALIGN);
 	if (sc->desc == NULL) {
 		DBG("ath5k: can't allocate descriptors\n");
 		ret = -ENOMEM;
@@ -915,7 +915,7 @@ ath5k_desc_alloc(struct ath5k_softc *sc)
 	return 0;
 
 err_free:
-	free_dma(sc->desc, sc->desc_len);
+	free_phys(sc->desc, sc->desc_len);
 err:
 	sc->desc = NULL;
 	return ret;
@@ -932,7 +932,7 @@ ath5k_desc_free(struct ath5k_softc *sc)
 		ath5k_rxbuf_free(sc, bf);
 
 	/* Free memory associated with all descriptors */
-	free_dma(sc->desc, sc->desc_len);
+	free_phys(sc->desc, sc->desc_len);
 
 	free(sc->bufptr);
 	sc->bufptr = NULL;

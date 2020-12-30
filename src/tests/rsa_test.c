@@ -124,8 +124,8 @@ struct rsa_signature_test {
 	const void *plaintext;
 	/** Plaintext length */
 	size_t plaintext_len;
-	/** Digest algorithm */
-	struct digest_algorithm *digest;
+	/** Signature algorithm */
+	struct asn1_algorithm *algorithm;
 	/** Signature */
 	const void *signature;
 	/** Signature length */
@@ -139,12 +139,12 @@ struct rsa_signature_test {
  * @v PRIVATE		Private key
  * @v PUBLIC		Public key
  * @v PLAINTEXT		Plaintext
- * @v DIGEST		Digest algorithm
+ * @v ALGORITHM		Signature algorithm
  * @v SIGNATURE		Signature
  * @ret test		Signature test
  */
-#define RSA_SIGNATURE_TEST( name, PRIVATE, PUBLIC, PLAINTEXT, DIGEST,	\
-			    SIGNATURE )					\
+#define RSA_SIGNATURE_TEST( name, PRIVATE, PUBLIC, PLAINTEXT,		\
+			    ALGORITHM, SIGNATURE )			\
 	static const uint8_t name ## _private[] = PRIVATE;		\
 	static const uint8_t name ## _public[] = PUBLIC;		\
 	static const uint8_t name ## _plaintext[] = PLAINTEXT;		\
@@ -156,7 +156,7 @@ struct rsa_signature_test {
 		.public_len = sizeof ( name ## _public ),		\
 		.plaintext = name ## _plaintext,			\
 		.plaintext_len = sizeof ( name ## _plaintext ),		\
-		.digest = DIGEST,					\
+		.algorithm = ALGORITHM,					\
 		.signature = name ## _signature,			\
 		.signature_len = sizeof ( name ## _signature ),		\
 	}
@@ -188,18 +188,19 @@ struct rsa_signature_test {
  * @v test		RSA signature test
  */
 #define rsa_signature_ok( test ) do {					\
+	struct digest_algorithm *digest = (test)->algorithm->digest;	\
 	uint8_t bad_signature[ (test)->signature_len ];			\
 	pubkey_sign_ok ( &rsa_algorithm, (test)->private,		\
-			 (test)->private_len, (test)->digest,		\
+			 (test)->private_len, digest,			\
 			 (test)->plaintext, (test)->plaintext_len,	\
 			 (test)->signature, (test)->signature_len );	\
 	pubkey_verify_ok ( &rsa_algorithm, (test)->public,		\
-			   (test)->public_len, (test)->digest,		\
+			   (test)->public_len, digest,			\
 			   (test)->plaintext, (test)->plaintext_len,	\
 			   (test)->signature, (test)->signature_len );	\
 	memset ( bad_signature, 0, sizeof ( bad_signature ) );		\
 	pubkey_verify_fail_ok ( &rsa_algorithm, (test)->public,		\
-				(test)->public_len, (test)->digest,	\
+				(test)->public_len, digest,		\
 				(test)->plaintext,			\
 				(test)->plaintext_len, bad_signature,	\
 				sizeof ( bad_signature ) );		\
@@ -323,7 +324,7 @@ RSA_SIGNATURE_TEST ( md5_test,
 		    0xf2, 0x8d, 0xfc, 0xfc, 0x37, 0xf7, 0xc7, 0x6d, 0x6c, 0xd8,
 		    0x24, 0x0c, 0x6a, 0xec, 0x82, 0x5c, 0x72, 0xf1, 0xfc, 0x05,
 		    0xed, 0x8e, 0xe8, 0xd9, 0x8b, 0x8b, 0x67, 0x02, 0x95 ),
-	&md5_algorithm,
+	&md5_with_rsa_encryption_algorithm,
 	SIGNATURE ( 0xdb, 0x56, 0x3d, 0xea, 0xae, 0x81, 0x4b, 0x3b, 0x2e, 0x8e,
 		    0xb8, 0xee, 0x13, 0x61, 0xc6, 0xe7, 0xd7, 0x50, 0xcd, 0x0d,
 		    0x34, 0x3a, 0xfe, 0x9a, 0x8d, 0xf8, 0xfb, 0xd6, 0x7e, 0xbd,
@@ -396,7 +397,7 @@ RSA_SIGNATURE_TEST ( sha1_test,
 		    0x30, 0x91, 0x1c, 0xaa, 0x6c, 0x24, 0x42, 0x1b, 0x1a, 0xba,
 		    0x30, 0x40, 0x49, 0x83, 0xd9, 0xd7, 0x66, 0x7e, 0x5c, 0x1a,
 		    0x4b, 0x7f, 0xa6, 0x8e, 0x8a, 0xd6, 0x0c, 0x65, 0x75 ),
-	&sha1_algorithm,
+	&sha1_with_rsa_encryption_algorithm,
 	SIGNATURE ( 0xa5, 0x5a, 0x8a, 0x67, 0x81, 0x76, 0x7e, 0xad, 0x99, 0x22,
 		    0xf1, 0x47, 0x64, 0xd2, 0xfb, 0x81, 0x45, 0xeb, 0x85, 0x56,
 		    0xf8, 0x7d, 0xb8, 0xec, 0x41, 0x17, 0x84, 0xf7, 0x2b, 0xbb,
@@ -469,7 +470,7 @@ RSA_SIGNATURE_TEST ( sha256_test,
 		    0x91, 0x71, 0xd6, 0x2d, 0xa1, 0xae, 0x81, 0x0c, 0xed, 0x54,
 		    0x48, 0x79, 0x8a, 0x78, 0x05, 0x74, 0x4d, 0x4f, 0xf0, 0xe0,
 		    0x3c, 0x41, 0x5c, 0x04, 0x0b, 0x68, 0x57, 0xc5, 0xd6 ),
-	&sha256_algorithm,
+	&sha256_with_rsa_encryption_algorithm,
 	SIGNATURE ( 0x02, 0x2e, 0xc5, 0x2a, 0x2b, 0x7f, 0xb4, 0x80, 0xca, 0x9d,
 		    0x96, 0x5b, 0xaf, 0x1f, 0x72, 0x5b, 0x6e, 0xf1, 0x69, 0x7f,
 		    0x4d, 0x41, 0xd5, 0x9f, 0x00, 0xdc, 0x47, 0xf4, 0x68, 0x8f,
