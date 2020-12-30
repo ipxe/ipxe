@@ -1,0 +1,6 @@
+#!ipxe
+dhcp
+shell
+echo pxelinux.cfg/01-${mac}
+chain pxelinux.cfg/01-${mac}
+#shell

@@ -43,7 +43,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 const struct setting mac_setting __setting ( SETTING_NETDEV, mac ) = {
 	.name = "mac",
 	.description = "MAC address",
-	.type = &setting_type_hex,
+	//.type = &setting_type_hex,
+	.type = &setting_type_hexhyp
 };
 const struct setting hwaddr_setting __setting ( SETTING_NETDEV, hwaddr ) = {
 	.name = "hwaddr",
