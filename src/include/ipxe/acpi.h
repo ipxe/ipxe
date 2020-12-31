@@ -78,6 +78,9 @@ struct acpi_qword_address_space_resource {
 /** A memory address space type */
 #define ACPI_ADDRESS_TYPE_MEM 0x00
 
+/** A bus number address space type */
+#define ACPI_ADDRESS_TYPE_BUS 0x02
+
 /** An ACPI resource descriptor */
 union acpi_resource {
 	/** Tag byte */

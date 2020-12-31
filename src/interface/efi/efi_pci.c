@@ -63,6 +63,70 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
+ * Check for a matching PCI root bridge I/O protocol
+ *
+ * @v pci		PCI device
+ * @v handle		EFI PCI root bridge handle
+ * @v root		EFI PCI root bridge I/O protocol
+ * @ret rc		Return status code
+ */
+static int efipci_root_match ( struct pci_device *pci, EFI_HANDLE handle,
+			       EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root ) {
+	union {
+		union acpi_resource *res;
+		void *raw;
+	} u;
+	unsigned int segment = PCI_SEG ( pci->busdevfn );
+	unsigned int bus = PCI_BUS ( pci->busdevfn );
+	unsigned int start;
+	unsigned int end;
+	unsigned int tag;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Check segment number */
+	if ( root->SegmentNumber != segment )
+		return -ENOENT;
+
+	/* Get ACPI resource descriptors */
+	if ( ( efirc = root->Configuration ( root, &u.raw ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot get configuration for "
+		       "%s: %s\n", PCI_ARGS ( pci ),
+		       efi_handle_name ( handle ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Assume success if no bus number range descriptors are found */
+	rc = 0;
+
+	/* Parse resource descriptors */
+	for ( ; ( ( tag = acpi_resource_tag ( u.res ) ) != ACPI_END_RESOURCE ) ;
+	      u.res = acpi_resource_next ( u.res ) ) {
+
+		/* Ignore anything other than a bus number range descriptor */
+		if ( tag != ACPI_QWORD_ADDRESS_SPACE_RESOURCE )
+			continue;
+		if ( u.res->qword.type != ACPI_ADDRESS_TYPE_BUS )
+			continue;
+
+		/* Check for a matching bus number */
+		start = le64_to_cpu ( u.res->qword.min );
+		end = ( start + le64_to_cpu ( u.res->qword.len ) );
+		if ( ( bus >= start ) && ( bus < end ) )
+			return 0;
+
+		/* We have seen at least one non-matching range
+		 * descriptor, so assume failure unless we find a
+		 * subsequent match.
+		 */
+		rc = -ENOENT;
+	}
+
+	return rc;
+}
+
+/**
  * Open EFI PCI root bridge I/O protocol
  *
  * @v pci		PCI device
@@ -106,7 +170,7 @@ static int efipci_root_open ( struct pci_device *pci, EFI_HANDLE *handle,
 			       strerror ( rc ) );
 			continue;
 		}
-		if ( u.root->SegmentNumber == PCI_SEG ( pci->busdevfn ) ) {
+		if ( efipci_root_match ( pci, *handle, u.root ) == 0 ) {
 			*root = u.root;
 			bs->FreePool ( handles );
 			return 0;
@@ -263,13 +327,13 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	for ( ; ( ( tag = acpi_resource_tag ( u.res ) ) != ACPI_END_RESOURCE ) ;
 	      u.res = acpi_resource_next ( u.res ) ) {
 
-		/* Ignore anything other than an address space descriptor */
+		/* Ignore anything other than a memory range descriptor */
 		if ( tag != ACPI_QWORD_ADDRESS_SPACE_RESOURCE )
+			continue;
+		if ( u.res->qword.type != ACPI_ADDRESS_TYPE_MEM )
 			continue;
 
 		/* Ignore descriptors that do not cover this memory range */
-		if ( u.res->qword.type != ACPI_ADDRESS_TYPE_MEM )
-			continue;
 		offset = le64_to_cpu ( u.res->qword.offset );
 		start = ( offset + le64_to_cpu ( u.res->qword.min ) );
 		end = ( start + le64_to_cpu ( u.res->qword.len ) );
