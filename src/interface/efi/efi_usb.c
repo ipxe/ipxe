@@ -415,9 +415,11 @@ static void efi_usb_async_complete ( struct usb_endpoint *ep,
 	/* Construct status */
 	status = ( ( rc == 0 ) ? 0 : EFI_USB_ERR_SYSTEM );
 
-	/* Report completion */
-	usbep->callback ( iobuf->data, iob_len ( iobuf ), usbep->context,
-			  status );
+	/* Report completion, if applicable */
+	if ( usbep->callback ) {
+		usbep->callback ( iobuf->data, iob_len ( iobuf ),
+				  usbep->context, status );
+	}
 
  drop:
 	/* Recycle or free I/O buffer */
@@ -456,11 +458,9 @@ static int efi_usb_async_start ( struct efi_usb_interface *usbintf,
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Fail if endpoint is already open */
-	if ( efi_usb_is_open ( usbintf, endpoint ) ) {
-		rc = -EINVAL;
-		goto err_already_open;
-	}
+	/* Close endpoint, if applicable */
+	if ( efi_usb_is_open ( usbintf, endpoint ) )
+		efi_usb_close ( usbintf->endpoint[index] );
 
 	/* Open endpoint */
 	if ( ( rc = efi_usb_open ( usbintf, endpoint,
@@ -497,9 +497,10 @@ static int efi_usb_async_start ( struct efi_usb_interface *usbintf,
 	bs->SetTimer ( usbep->event, TimerCancel, 0 );
  err_timer:
  err_prefill:
+	usbep->callback = NULL;
+	usbep->context = NULL;
 	efi_usb_close ( usbep );
  err_open:
- err_already_open:
 	return rc;
 }
 
@@ -523,8 +524,9 @@ static void efi_usb_async_stop ( struct efi_usb_interface *usbintf,
 	/* Stop timer */
 	bs->SetTimer ( usbep->event, TimerCancel, 0 );
 
-	/* Close endpoint */
-	efi_usb_close ( usbep );
+	/* Clear callback parameters */
+	usbep->callback = NULL;
+	usbep->context = NULL;
 }
 
 /******************************************************************************
