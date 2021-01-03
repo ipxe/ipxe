@@ -1883,9 +1883,13 @@ static inline int xhci_nop ( struct xhci_device *xhci ) {
 	nop->type = XHCI_TRB_NOP_CMD;
 
 	/* Issue command and wait for completion */
-	if ( ( rc = xhci_command ( xhci, &trb ) ) != 0 )
+	if ( ( rc = xhci_command ( xhci, &trb ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s NOP failed: %s\n",
+		       xhci->name, strerror ( rc ) );
 		return rc;
+	}
 
+	DBGC2 ( xhci, "XHCI %s NOP completed successfully\n", xhci->name );
 	return 0;
 }
 
@@ -2063,15 +2067,18 @@ static inline int xhci_address_device ( struct xhci_device *xhci,
 	/* Assign device address */
 	if ( ( rc = xhci_context ( xhci, slot, slot->endpoint[XHCI_CTX_EP0],
 				   XHCI_TRB_ADDRESS_DEVICE,
-				   xhci_address_device_input ) ) != 0 )
+				   xhci_address_device_input ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s slot %d could not assign address: %s\n",
+		       xhci->name, slot->id, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Get assigned address */
 	slot_ctx = ( slot->context +
 		     xhci_device_context_offset ( xhci, XHCI_CTX_SLOT ) );
 	usb->address = slot_ctx->address;
-	DBGC2 ( xhci, "XHCI %s assigned address %d to %s\n",
-		xhci->name, usb->address, usb->name );
+	DBGC2 ( xhci, "XHCI %s slot %d assigned address %d to %s\n",
+		xhci->name, slot->id, usb->address, usb->name );
 
 	return 0;
 }
@@ -2132,8 +2139,11 @@ static inline int xhci_configure_endpoint ( struct xhci_device *xhci,
 	/* Configure endpoint */
 	if ( ( rc = xhci_context ( xhci, slot, endpoint,
 				   XHCI_TRB_CONFIGURE_ENDPOINT,
-				   xhci_configure_endpoint_input ) ) != 0 )
+				   xhci_configure_endpoint_input ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s slot %d ctx %d could not configure: %s\n",
+		       xhci->name, slot->id, endpoint->ctx, strerror ( rc ) );
 		return rc;
+	}
 
 	DBGC2 ( xhci, "XHCI %s slot %d ctx %d configured\n",
 		xhci->name, slot->id, endpoint->ctx );
@@ -2183,8 +2193,12 @@ static inline int xhci_deconfigure_endpoint ( struct xhci_device *xhci,
 	/* Deconfigure endpoint */
 	if ( ( rc = xhci_context ( xhci, slot, endpoint,
 				   XHCI_TRB_CONFIGURE_ENDPOINT,
-				   xhci_deconfigure_endpoint_input ) ) != 0 )
+				   xhci_deconfigure_endpoint_input ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s slot %d ctx %d could not deconfigure: "
+		       "%s\n", xhci->name, slot->id, endpoint->ctx,
+		       strerror ( rc ) );
 		return rc;
+	}
 
 	DBGC2 ( xhci, "XHCI %s slot %d ctx %d deconfigured\n",
 		xhci->name, slot->id, endpoint->ctx );
@@ -2238,8 +2252,12 @@ static inline int xhci_evaluate_context ( struct xhci_device *xhci,
 	/* Configure endpoint */
 	if ( ( rc = xhci_context ( xhci, slot, endpoint,
 				   XHCI_TRB_EVALUATE_CONTEXT,
-				   xhci_evaluate_context_input ) ) != 0 )
+				   xhci_evaluate_context_input ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s slot %d ctx %d could not (re-)evaluate: "
+		       "%s\n", xhci->name, slot->id, endpoint->ctx,
+		       strerror ( rc ) );
 		return rc;
+	}
 
 	DBGC2 ( xhci, "XHCI %s slot %d ctx %d (re-)evaluated\n",
 		xhci->name, slot->id, endpoint->ctx );
