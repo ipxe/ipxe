@@ -1813,6 +1813,13 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 	unsigned int i;
 	int rc;
 
+	/* Sanity check */
+	if ( xhci->pending != NULL ) {
+		DBGC ( xhci, "XHCI %s command ring busy\n", xhci->name );
+		rc = -EBUSY;
+		goto err_pending;
+	}
+
 	/* Record the pending command */
 	xhci->pending = trb;
 
@@ -1855,6 +1862,7 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 
  err_enqueue:
 	xhci->pending = NULL;
+ err_pending:
 	return rc;
 }
 
