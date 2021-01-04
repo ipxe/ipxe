@@ -1814,7 +1814,7 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 	int rc;
 
 	/* Sanity check */
-	if ( xhci->pending != NULL ) {
+	if ( xhci->pending ) {
 		DBGC ( xhci, "XHCI %s command ring busy\n", xhci->name );
 		rc = -EBUSY;
 		goto err_pending;
