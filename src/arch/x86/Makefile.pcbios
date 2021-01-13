@@ -57,46 +57,11 @@ LIST_NAME_mrom := ROMS
 LIST_NAME_pcirom := ROMS
 LIST_NAME_isarom := ROMS
 
-# Locations of isolinux files
-#
-SYSLINUX_DIR_LIST	:= \
-	/usr/lib/syslinux \
-	/usr/lib/syslinux/bios \
-	/usr/lib/syslinux/modules/bios \
-	/usr/share/syslinux \
-	/usr/share/syslinux/bios \
-	/usr/share/syslinux/modules/bios \
-	/usr/local/share/syslinux \
-	/usr/local/share/syslinux/bios \
-	/usr/local/share/syslinux/modules/bios \
-	/usr/lib/ISOLINUX
-ISOLINUX_BIN_LIST	:= \
-	$(ISOLINUX_BIN) \
-	$(patsubst %,%/isolinux.bin,$(SYSLINUX_DIR_LIST))
-LDLINUX_C32_LIST	:= \
-	$(LDLINUX_C32) \
-	$(patsubst %,%/ldlinux.c32,$(SYSLINUX_DIR_LIST))
-ISOLINUX_BIN	= $(firstword $(wildcard $(ISOLINUX_BIN_LIST)))
-LDLINUX_C32	= $(firstword $(wildcard $(LDLINUX_C32_LIST)))
-
-# rule to make a non-emulation ISO boot image
+# ISO or FAT filesystem images
 NON_AUTO_MEDIA	+= iso
-%iso:	%lkrn util/geniso
-	$(QM)$(ECHO) "  [GENISO] $@"
-	$(Q)ISOLINUX_BIN=$(ISOLINUX_BIN) LDLINUX_C32=$(LDLINUX_C32) \
-	    VERSION="$(VERSION)" bash util/geniso -o $@ $<
-
-# rule to make a floppy emulation ISO boot image
-NON_AUTO_MEDIA	+= liso
-%liso:	%lkrn util/geniso
-	$(QM)$(ECHO) "  [GENISO] $@"
-	$(Q)VERSION="$(VERSION)" bash util/geniso -l -o $@ $<
-
-# rule to make a syslinux floppy image (mountable, bootable)
-NON_AUTO_MEDIA	+= sdsk
-%sdsk:	%lkrn util/gensdsk
-	$(QM)$(ECHO) "  [GENSDSK] $@"
-	$(Q)bash util/gensdsk $@ $<
+$(BIN)/%.iso $(BIN)/%.sdsk: $(BIN)/%.lkrn util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<
 
 # rule to write disk images to /dev/fd0
 NON_AUTO_MEDIA	+= fd0

@@ -49,6 +49,6 @@ $(BIN)/efidrv.cab : $(BIN)/alldrv.efis # $(ALL_drv.efi) is not yet defined
 	$(QM)$(ECHO) "  [CAB] $@"
 	$(Q)$(LCAB) -n -q $(ALL_drv.efi) $@
 
-$(BIN)/%.usb : $(BIN)/%.efi
-	$(QM)$(ECHO) "  [GENEFIDSK] $@"
-	$(Q)bash util/genefidsk -o $@ -b $(EFI_BOOT_FILE) $<
+$(BIN)/%.iso $(BIN)/%.usb : $(BIN)/%.efi util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<
