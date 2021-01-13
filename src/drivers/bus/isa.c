@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <ipxe/io.h>
 #include <ipxe/isa.h>
+#include <config/isa.h>
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
