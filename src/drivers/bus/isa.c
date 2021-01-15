@@ -95,7 +95,7 @@ static void isa_remove ( struct isa_device *isa ) {
 static int isabus_probe ( struct root_device *rootdev ) {
 	struct isa_device *isa = NULL;
 	struct isa_driver *driver;
-	int ioidx;
+	long ioidx;
 	int rc;
 
 	for_each_table_entry ( driver, ISA_DRIVERS ) {
