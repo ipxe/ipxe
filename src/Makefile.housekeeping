@@ -1167,7 +1167,17 @@ BUILD_ID_CMD	:= perl -e 'printf "0x%08x", int ( rand ( 0xffffffff ) );'
 
 # Build timestamp
 #
+# Used only as a means to automatically select the newest version of iPXE if
+# multiple iPXE drivers are loaded concurrently in a UEFI system.
+#
+# It gets rounded down to the nearest minute when used for this purpose.
+ifdef SOURCE_DATE_EPOCH
+BUILD_TIMESTAMP := $(SOURCE_DATE_EPOCH)
+else ifdef GITVERSION
+BUILD_TIMESTAMP := $(git log -1 --pretty=%ct)
+else
 BUILD_TIMESTAMP := $(shell date +%s)
+endif
 
 # Build version
 #
