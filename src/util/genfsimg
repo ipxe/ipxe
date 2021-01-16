@@ -149,7 +149,7 @@ ISOARGS=
 #
 if [ -n "${ISOIMG}" ] ; then
     MKISOFS=
-    for CMD in genisoimage mkisofs ; do
+    for CMD in genisoimage mkisofs xorrisofs ; do
 	if ${CMD} --version >/dev/null 2>/dev/null ; then
 	    MKISOFS="${CMD}"
 	    break
@@ -211,7 +211,7 @@ if [ -n "${ISOIMG}" ] ; then
     ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
     ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
     if [ -n "${EFI}" ] ; then
-	ISOARGS="${ISOARGS} -eltorito-alt-boot -no-emul-boot -efi-boot esp.img"
+	ISOARGS="${ISOARGS} -eltorito-alt-boot -no-emul-boot -e esp.img"
     else
 	FATIMG=
     fi
