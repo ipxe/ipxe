@@ -46,6 +46,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Router discovery maximum timeout */
 #define IPV6CONF_MAX_TIMEOUT ( TICKS_PER_SEC * 3 )
 
+/** Router discovery blocked link retry timeout */
+#define IPV6CONF_BLOCK_TIMEOUT ( TICKS_PER_SEC )
+
+/** Router discovery maximum number of deferrals */
+#define IPV6CONF_MAX_DEFERRALS 180
+
 static struct ipv6conf * ipv6conf_demux ( struct net_device *netdev );
 static int
 ipv6conf_rx_router_advertisement ( struct net_device *netdev,
@@ -1068,6 +1074,9 @@ struct ipv6conf {
 
 	/** Retransmission timer */
 	struct retry_timer timer;
+
+	/** Deferred discovery counter */
+	unsigned int deferred;
 };
 
 /** List of IPv6 configurators */
@@ -1131,6 +1140,7 @@ static void ipv6conf_done ( struct ipv6conf *ipv6conf, int rc ) {
 static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
 	struct ipv6conf *ipv6conf =
 		container_of ( timer, struct ipv6conf, timer );
+	struct net_device *netdev = ipv6conf->netdev;
 
 	/* If we have failed, terminate autoconfiguration */
 	if ( fail ) {
@@ -1140,7 +1150,15 @@ static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
 
 	/* Otherwise, transmit router solicitation and restart timer */
 	start_timer ( &ipv6conf->timer );
-	ndp_tx_router_solicitation ( ipv6conf->netdev );
+	ndp_tx_router_solicitation ( netdev );
+
+	/* If link is blocked, defer router discovery timeout */
+	if ( netdev_link_blocked ( netdev ) &&
+	     ( ipv6conf->deferred++ <= IPV6CONF_MAX_DEFERRALS ) ) {
+		DBGC ( netdev, "NDP %s deferring discovery timeout\n",
+		       netdev->name );
+		start_timer_fixed ( &ipv6conf->timer, IPV6CONF_BLOCK_TIMEOUT );
+	}
 }
 
 /**
