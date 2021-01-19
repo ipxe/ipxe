@@ -26,6 +26,9 @@ struct eapol_header {
 /** 802.1X-2001 */
 #define EAPOL_VERSION_2001 1
 
+/** EAPoL-encapsulated EAP packets */
+#define EAPOL_TYPE_EAP 0
+
 /** EAPoL key */
 #define EAPOL_TYPE_KEY 5
 

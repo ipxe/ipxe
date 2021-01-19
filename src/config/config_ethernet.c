@@ -46,3 +46,6 @@ REQUIRE_OBJECT ( stp );
 #ifdef NET_PROTO_LACP
 REQUIRE_OBJECT ( eth_slow );
 #endif
+#ifdef NET_PROTO_EAPOL
+REQUIRE_OBJECT ( eapol );
+#endif
