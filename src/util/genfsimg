@@ -16,6 +16,18 @@ help() {
     echo " -p PAD   pad filesystem (in kB)"
 }
 
+# Get hex byte from binary file
+#
+get_byte() {
+    local FILENAME
+    local OFFSET
+
+    FILENAME="${1}"
+    OFFSET="${2}"
+
+    od -j "${OFFSET}" -N 1 -A n -t x1 -- "${FILENAME}" | tr -d " "
+}
+
 # Get hex word from binary file
 #
 get_word() {
@@ -37,12 +49,18 @@ efi_boot_name() {
 
     FILENAME="${1}"
 
-    PESIG=$(get_word "${FILENAME}" 192)
-    if [ "${PESIG}" != "5045" ] ; then
-	echo "${FILENAME}: not an EFI executable" >&2
+    MZSIG=$(get_word "${FILENAME}" 0)
+    if [ "${MZSIG}" != "4d5a" ] ; then
+	echo "${FILENAME}: invalid MZ header" >&2
 	exit 1
     fi
-    ARCH=$(get_word "${FILENAME}" 196)
+    PEOFF=$(get_byte "${FILENAME}" 0x3c)
+    PESIG=$(get_word "${FILENAME}" "0x${PEOFF}")
+    if [ "${PESIG}" != "5045" ] ; then
+	echo "${FILENAME}: invalid PE header" >&2
+	exit 1
+    fi
+    ARCH=$(get_word "${FILENAME}" $(( "0x${PEOFF}" + 4 )) )
     case "${ARCH}" in
 	"4c01" )
 	    echo "BOOTIA32.EFI"
