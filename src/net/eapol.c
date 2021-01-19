@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iobuf.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/eap.h>
 #include <ipxe/eapol.h>
 
 /** @file
@@ -101,4 +102,40 @@ struct net_protocol eapol_protocol __net_protocol = {
 	.name = "EAPOL",
 	.net_proto = htons ( ETH_P_EAPOL ),
 	.rx = eapol_rx,
+};
+
+/**
+ * Process EAPoL-encapsulated EAP packet
+ *
+ * @v netdev		Network device
+ * @v ll_source		Link-layer source address
+ * @ret rc		Return status code
+ */
+static int eapol_eap_rx ( struct io_buffer *iobuf, struct net_device *netdev,
+			  const void *ll_source __unused ) {
+	struct eapol_header *eapol;
+	int rc;
+
+	/* Sanity check */
+	assert ( iob_len ( iobuf ) >= sizeof ( *eapol ) );
+
+	/* Strip EAPoL header */
+	eapol = iob_pull ( iobuf, sizeof ( *eapol ) );
+
+	/* Process EAP packet */
+	if ( ( rc = eap_rx ( netdev, iobuf->data, iob_len ( iobuf ) ) ) != 0 ) {
+		DBGC ( netdev, "EAPOL %s v%d EAP failed: %s\n",
+		       netdev->name, eapol->version, strerror ( rc ) );
+		goto drop;
+	}
+
+ drop:
+	free_iob ( iobuf );
+	return rc;
+}
+
+/** EAPoL handler for EAP packets */
+struct eapol_handler eapol_eap __eapol_handler = {
+	.type = EAPOL_TYPE_EAP,
+	.rx = eapol_eap_rx,
 };
