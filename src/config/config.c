@@ -281,6 +281,9 @@ REQUIRE_OBJECT ( ntp_cmd );
 #ifdef CERT_CMD
 REQUIRE_OBJECT ( cert_cmd );
 #endif
+#ifdef IMAGE_MEM_CMD
+REQUIRE_OBJECT ( image_mem_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

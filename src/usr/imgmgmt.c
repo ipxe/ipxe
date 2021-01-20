@@ -169,3 +169,47 @@ void imgstat ( struct image *image ) {
 		printf ( " \"%s\"", image->cmdline );
 	printf ( "\n" );
 }
+
+/**
+ * Create image from block of memory
+ *
+ * @v data		Image data
+ * @v len		Length
+ * @v name		Name
+ * @v image		Image to fill in
+ * @ret rc		Return status code
+ */
+int imgmem ( userptr_t data, size_t len, const char *name,
+	     struct image **image ) {
+	int rc;
+
+	/* Allocate image */
+	*image = alloc_image ( NULL );
+	if ( ! *image ) {
+		rc = -ENOMEM;
+		goto err_alloc_image;
+	}
+
+	/* Set name */
+	if ( ( rc = image_set_name ( *image, name ) ) != 0 )
+		goto err_set_name;
+
+	/* Set data */
+	if ( ( rc = image_set_data ( *image, data, len ) ) != 0 ) {
+		printf ( "Could not set image data: %s\n", strerror ( rc ) );
+		goto err_set_data;
+	}
+
+	/* Register image */
+	if ( ( rc = register_image ( *image ) ) != 0 ) {
+		printf ( "Could not register image: %s\n", strerror ( rc ) );
+		goto err_register_image;
+	}
+
+ err_register_image:
+ err_set_data:
+ err_set_name:
+	image_put ( *image );
+ err_alloc_image:
+	return rc;
+}

@@ -18,5 +18,7 @@ extern int imgdownload_string ( const char *uri_string, unsigned long timeout,
 extern int imgacquire ( const char *name, unsigned long timeout,
 			struct image **image );
 extern void imgstat ( struct image *image );
+extern int imgmem ( userptr_t data, size_t len, const char *name,
+		    struct image **image );
 
 #endif /* _USR_IMGMGMT_H */
