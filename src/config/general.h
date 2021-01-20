@@ -155,6 +155,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define PROFSTAT_CMD		/* Profiling commands */
 //#define NTP_CMD		/* NTP commands */
 //#define CERT_CMD		/* Certificate management commands */
+//#define IMAGE_MEM_CMD		/* Read memory command */
 
 /*
  * ROM-specific options
