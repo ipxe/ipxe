@@ -38,7 +38,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/init.h>
 #include <ipxe/image.h>
 #include <ipxe/script.h>
-#include <ipxe/umalloc.h>
 #include <realmode.h>
 
 /** Command line physical address
@@ -202,23 +201,21 @@ static int initrd_init ( void ) {
 		rc = -ENOMEM;
 		goto err_alloc_image;
 	}
+
+	/* Set image name */
 	if ( ( rc = image_set_name ( image, "<INITRD>" ) ) != 0 ) {
 		DBGC ( colour, "RUNTIME could not set image name: %s\n",
 		       strerror ( rc ) );
 		goto err_set_name;
 	}
 
-	/* Allocate and copy initrd content */
-	image->data = umalloc ( initrd_len );
-	if ( ! image->data ) {
-		DBGC ( colour, "RUNTIME could not allocate %d bytes for "
-		       "initrd\n", initrd_len );
-		rc = -ENOMEM;
-		goto err_umalloc;
+	/* Set image content */
+	if ( ( rc = image_set_data ( image, phys_to_user ( initrd_phys ),
+				     initrd_len ) ) != 0 ) {
+		DBGC ( colour, "RUNTIME could not set image data: %s\n",
+		       strerror ( rc ) );
+		goto err_set_data;
 	}
-	image->len = initrd_len;
-	memcpy_user ( image->data, 0, phys_to_user ( initrd_phys ), 0,
-		      initrd_len );
 
 	/* Mark initrd as consumed */
 	initrd_phys = 0;
@@ -236,7 +233,7 @@ static int initrd_init ( void ) {
 	return 0;
 
  err_register_image:
- err_umalloc:
+ err_set_data:
  err_set_name:
 	image_put ( image );
  err_alloc_image:

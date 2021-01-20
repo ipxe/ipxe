@@ -176,6 +176,30 @@ int image_set_cmdline ( struct image *image, const char *cmdline ) {
 }
 
 /**
+ * Set image data
+ *
+ * @v image		Image
+ * @v data		Image data
+ * @v len		Length of image data
+ * @ret rc		Return status code
+ */
+int image_set_data ( struct image *image, userptr_t data, size_t len ) {
+	userptr_t new;
+
+	/* (Re)allocate image data */
+	new = urealloc ( image->data, len );
+	if ( ! new )
+		return -ENOMEM;
+	image->data = new;
+
+	/* Copy in new image data */
+	memcpy_user ( image->data, 0, data, 0, len );
+	image->len = len;
+
+	return 0;
+}
+
+/**
  * Determine image type
  *
  * @v image		Executable image
