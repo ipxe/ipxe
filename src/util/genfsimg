@@ -243,10 +243,10 @@ if [ -n "${FATIMG}" ] ; then
     touch "${FATIMG}"
     if [ "${FATSIZE}" -le "1440" ] ; then
 	truncate -s 1440K "${FATIMG}"
-	mformat -f 1440 -i "${FATIMG}" ::
+	mformat -v iPXE -i "${FATIMG}" -f 1440 ::
     else
 	truncate -s "${FATSIZE}K" "${FATIMG}"
-	mformat -i "${FATIMG}" ::
+	mformat -v iPXE -i "${FATIMG}" ::
     fi
     mcopy -i "${FATIMG}" -s "${FATDIR}"/* ::
     if [ "${BIOSDIR}" = "${FATDIR}" ] ; then
