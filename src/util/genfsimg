@@ -137,6 +137,11 @@ if [ -z "${OUTFILE}" ]; then
     exit 1
 fi
 shift $(( OPTIND - 1 ))
+if [ $# -eq 0 ] ; then
+    echo "${0}: no input files given" >&2
+    help
+    exit 1
+fi
 
 # Create temporary working directory
 #
