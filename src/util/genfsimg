@@ -11,9 +11,10 @@ help() {
     echo "usage: ${0} [OPTIONS] foo.lkrn|foo.efi [bar.lkrn|bar.efi,...]"
     echo
     echo "where OPTIONS are:"
-    echo " -h       show this help"
-    echo " -o FILE  save image to file"
-    echo " -p PAD   pad filesystem (in kB)"
+    echo " -h         show this help"
+    echo " -o FILE    save image to file"
+    echo " -p PAD     pad filesystem (in kB)"
+    echo " -s SCRIPT  use executable script"
 }
 
 # Get hex byte from binary file
@@ -113,7 +114,8 @@ copy_syslinux_file() {
 #
 OUTFILE=
 PAD=0
-while getopts "hlo:p:" OPTION ; do
+SCRIPT=
+while getopts "hlo:p:s:" OPTION ; do
     case "${OPTION}" in
 	h)
 	    help
@@ -124,6 +126,9 @@ while getopts "hlo:p:" OPTION ; do
 	    ;;
 	p)
 	    PAD="${OPTARG}"
+	    ;;
+	s)
+	    SCRIPT="${OPTARG}"
 	    ;;
 	*)
 	    help
@@ -197,9 +202,15 @@ for FILENAME ; do
 		echo "SAY iPXE boot image" > "${SYSLINUXCFG}"
 		echo "TIMEOUT 30" >> "${SYSLINUXCFG}"
 		echo "DEFAULT ${DESTFILE}" >> "${SYSLINUXCFG}"
+		if [ -n "${SCRIPT}" ] ; then
+		    cp "${SCRIPT}" "${BIOSDIR}/autoexec.ipxe"
+		fi
 	    fi
 	    echo "LABEL ${DESTFILE}" >> "${SYSLINUXCFG}"
 	    echo " KERNEL ${DESTFILE}" >> "${SYSLINUXCFG}"
+	    if [ -n "${SCRIPT}" ] ; then
+		echo " APPEND initrd=autoexec.ipxe" >> "${SYSLINUXCFG}"
+	    fi
 	    LKRN=1
 	    ;;
 	*.efi)
