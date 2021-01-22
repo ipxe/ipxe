@@ -481,3 +481,13 @@ int image_set_trust ( int require_trusted, int permanent ) {
 
 	return 0;
 }
+
+/**
+ * Get image trust requirement
+ *
+ * @ret require_trusted		Whether images are required to be trusted
+ */
+int image_get_require_trust ( ) {
+
+	return require_trusted_images;
+}
