@@ -242,12 +242,15 @@ if [ -n "${FATIMG}" ] ; then
     FATSIZE=$(( FATSIZE + PAD + 256 ))
     touch "${FATIMG}"
     if [ "${FATSIZE}" -le "1440" ] ; then
-	truncate -s 1440K "${FATIMG}"
-	mformat -v iPXE -i "${FATIMG}" -f 1440 ::
+	FATSIZE=1440
+	FATARGS="-f 1440"
     else
-	truncate -s "${FATSIZE}K" "${FATIMG}"
-	mformat -v iPXE -i "${FATIMG}" ::
+	FATCYLS=$(( ( FATSIZE + 503 ) / 504 ))
+	FATSIZE=$(( FATCYLS * 504 ))
+	FATARGS="-s 63 -h 16 -t ${FATCYLS}"
     fi
+    truncate -s "${FATSIZE}K" "${FATIMG}"
+    mformat -v iPXE -i "${FATIMG}" ${FATARGS} ::
     mcopy -i "${FATIMG}" -s "${FATDIR}"/* ::
     if [ "${BIOSDIR}" = "${FATDIR}" ] ; then
 	syslinux "${FATIMG}"
