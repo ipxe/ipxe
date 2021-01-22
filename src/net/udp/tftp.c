@@ -43,6 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/settings.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/uri.h>
+#include <ipxe/profile.h>
 #include <ipxe/tftp.h>
 
 /** @file
@@ -157,6 +158,14 @@ enum {
 
 /** Maximum number of MTFTP open requests before falling back to TFTP */
 #define MTFTP_MAX_TIMEOUTS 3
+
+/** Client profiler */
+static struct profiler tftp_client_profiler __profiler =
+	{ .name = "tftp.client" };
+
+/** Server profiler */
+static struct profiler tftp_server_profiler __profiler =
+	{ .name = "tftp.server" };
 
 /**
  * Free TFTP request
@@ -802,6 +811,10 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	}
 	block += ( ntohs ( data->block ) - 1 );
 
+	/* Stop profiling server turnaround if applicable */
+	if ( block )
+		profile_stop ( &tftp_server_profiler );
+
 	/* Extract data */
 	offset = ( block * tftp->blksize );
 	iob_pull ( iobuf, sizeof ( *data ) );
@@ -833,6 +846,12 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 
 	/* Acknowledge block */
 	tftp_send_packet ( tftp );
+
+	/* Stop profiling client turnaround */
+	profile_stop ( &tftp_client_profiler );
+
+	/* Start profiling server turnaround */
+	profile_start ( &tftp_server_profiler );
 
 	/* If all blocks have been received, finish. */
 	if ( bitmap_full ( &tftp->bitmap ) )
@@ -906,7 +925,10 @@ static int tftp_rx ( struct tftp_request *tftp,
 	struct tftp_common *common = iobuf->data;
 	size_t len = iob_len ( iobuf );
 	int rc = -EINVAL;
-	
+
+	/* Start profiling client turnaround */
+	profile_start ( &tftp_client_profiler );
+
 	/* Sanity checks */
 	if ( len < sizeof ( *common ) ) {
 		DBGC ( tftp, "TFTP %p received underlength packet length "
