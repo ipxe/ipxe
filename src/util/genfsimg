@@ -55,12 +55,12 @@ efi_boot_name() {
 	exit 1
     fi
     PEOFF=$(get_byte "${FILENAME}" 0x3c)
-    PESIG=$(get_word "${FILENAME}" "0x${PEOFF}")
+    PESIG=$(get_word "${FILENAME}" 0x${PEOFF})
     if [ "${PESIG}" != "5045" ] ; then
 	echo "${FILENAME}: invalid PE header" >&2
 	exit 1
     fi
-    ARCH=$(get_word "${FILENAME}" $(( "0x${PEOFF}" + 4 )) )
+    ARCH=$(get_word "${FILENAME}" $(( 0x${PEOFF} + 4 )) )
     case "${ARCH}" in
 	"4c01" )
 	    echo "BOOTIA32.EFI"
