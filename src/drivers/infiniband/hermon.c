@@ -1219,6 +1219,11 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		     hermon_qp->mtt.mtt_base_addr );
 	MLX_FILL_1 ( &qpctx, 53, qpc_eec_data.mtt_base_addr_l,
 		     ( hermon_qp->mtt.mtt_base_addr >> 3 ) );
+
+	DBGC ( hermon, "Hermon %p QPN %#lx send ring [%08lx,%08lx), doorbell "
+		       "%08lx\n", hermon, qp->qpn,     virt_to_phys ( hermon_qp->send.wqe ),
+		       ( virt_to_phys ( hermon_qp->send.wqe ) + hermon_qp->send.wqe_size ),
+		       virt_to_phys ( hermon_qp->send.doorbell ) );
 	if ( ( rc = hermon_cmd_rst2init_qp ( hermon, qp->qpn,
 					     &qpctx ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p QPN %#lx RST2INIT_QP failed: %s\n",
@@ -1891,6 +1896,8 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 				       sizeof ( hermon_eq->eqe[0] ) );
 	if ( ! hermon_eq->eqe ) {
 		rc = -ENOMEM;
+		DBGC ( hermon, "Hermon %p could not allocate EQEs %s\n",
+			hermon, strerror ( rc ) );
 		goto err_eqe;
 	}
 	memset ( hermon_eq->eqe, 0, hermon_eq->eqe_size );
@@ -1902,8 +1909,11 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	/* Allocate MTT entries */
 	if ( ( rc = hermon_alloc_mtt ( hermon, hermon_eq->eqe,
 				       hermon_eq->eqe_size,
-				       &hermon_eq->mtt ) ) != 0 )
+				       &hermon_eq->mtt ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not allocate MTTs for EQ%s\n",
+			hermon, strerror ( rc ) );
 		goto err_alloc_mtt;
+	}
 
 	/* Hand queue over to hardware */
 	memset ( &eqctx, 0, sizeof ( eqctx ) );
@@ -2203,6 +2213,8 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 		hermon->firmware_area = umalloc ( hermon->firmware_len );
 		if ( ! hermon->firmware_area ) {
 			rc = -ENOMEM;
+			DBGC ( hermon, "Hermon %p could not allocate firmware area %s\n",
+				hermon, strerror ( rc ) );
 			goto err_alloc_fa;
 		}
 	} else {
@@ -2570,6 +2582,8 @@ static int hermon_map_icm ( struct hermon *hermon,
 		hermon->icm = umalloc ( hermon->icm_aux_len + hermon->icm_len );
 		if ( ! hermon->icm ) {
 			rc = -ENOMEM;
+			DBGC ( hermon, "Hermon %p could not allocate ICM %s\n",
+			       hermon, strerror ( rc ) );
 			goto err_alloc;
 		}
 	} else {
@@ -2751,14 +2765,20 @@ static int hermon_start ( struct hermon *hermon, int running ) {
 
 	/* Start firmware if not already running */
 	if ( ! running ) {
-		if ( ( rc = hermon_start_firmware ( hermon ) ) != 0 )
+		if ( ( rc = hermon_start_firmware ( hermon ) ) != 0 ) {
+			DBGC ( hermon, "Hermon %p could not start firmware %s\n",
+			       hermon, strerror ( rc ) );
 			goto err_start_firmware;
+		}
 	}
 
 	/* Allocate and map ICM */
 	memset ( &init_hca, 0, sizeof ( init_hca ) );
-	if ( ( rc = hermon_map_icm ( hermon, &init_hca ) ) != 0 )
+	if ( ( rc = hermon_map_icm ( hermon, &init_hca ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not map ICM %s\n",
+			hermon, strerror ( rc ) );
 		goto err_map_icm;
+	}
 
 	/* Initialise HCA */
 	MLX_FILL_1 ( &init_hca, 0, version, 0x02 /* "Must be 0x02" */ );
@@ -2771,18 +2791,27 @@ static int hermon_start ( struct hermon *hermon, int running ) {
 	}
 
 	/* Set up memory protection */
-	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 )
+	if ( ( rc = hermon_setup_mpt ( hermon ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not setup MPT %s\n",
+			hermon, strerror ( rc ) );
 		goto err_setup_mpt;
+	}
 	for ( i = 0 ; i < hermon->cap.num_ports ; i++ )
 		hermon->port[i].ibdev->rdma_key = hermon->lkey;
 
 	/* Set up event queue */
-	if ( ( rc = hermon_create_eq ( hermon ) ) != 0 )
+	if ( ( rc = hermon_create_eq ( hermon ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not create EQ %s\n",
+			hermon, strerror ( rc ) );
 		goto err_create_eq;
+	}
 
 	/* Configure special QPs */
-	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 )
+	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not configure SQPs %s\n",
+			hermon, strerror ( rc ) );
 		goto err_conf_special_qps;
+	}
 
 	return 0;
 
