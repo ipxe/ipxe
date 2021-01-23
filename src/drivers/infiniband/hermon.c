@@ -214,8 +214,8 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 		     opcode_modifier, op_mod,
 		     go, 1,
 		     t, hermon->toggle );
-	DBGC ( hermon, "Hermon %p issuing command %04x\n",
-	       hermon, opcode );
+	DBGC2 ( hermon, "Hermon %p issuing command %04x\n",
+		hermon, opcode );
 	DBGC2_HDA ( hermon, virt_to_phys ( hermon->config + HERMON_HCR_BASE ),
 		    &hcr, sizeof ( hcr ) );
 	if ( in_len && ( command & HERMON_HCR_IN_MBOX ) ) {
