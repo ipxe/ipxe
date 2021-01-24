@@ -171,23 +171,6 @@ case "${OUTFILE}" in
 	SYSLINUXCFG="${FATDIR}/syslinux.cfg"
 	;;
 esac
-ISOARGS=
-
-# Locate required tools
-#
-if [ -n "${ISOIMG}" ] ; then
-    MKISOFS=
-    for CMD in genisoimage mkisofs xorrisofs ; do
-	if ${CMD} --version >/dev/null 2>/dev/null ; then
-	    MKISOFS="${CMD}"
-	    break
-	fi
-    done
-    if [ -z "${MKISOFS}" ] ; then
-	echo "${0}: cannot find mkisofs or equivalent" >&2
-	exit 1
-    fi
-fi
 
 # Copy files to temporary working directory
 #
@@ -240,6 +223,7 @@ done
 # since isohybrid will refuse to work without them.
 #
 if [ -n "${ISOIMG}" ] ; then
+    ISOARGS="-J -R"
     copy_syslinux_file "isolinux.bin" "${ISODIR}"
     copy_syslinux_file "ldlinux.c32" "${ISODIR}" || true
     ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
@@ -276,11 +260,22 @@ fi
 # Create ISO filesystem image, if applicable
 #
 if [ -n "${ISOIMG}" ] ; then
+    MKISOFS=
+    for CMD in genisoimage mkisofs xorrisofs ; do
+	if "${CMD}" ${ISOARGS} --version "${ISODIR}" >/dev/null 2>&1 ; then
+	    MKISOFS="${CMD}"
+	    break
+	fi
+    done
+    if [ -z "${MKISOFS}" ] ; then
+	echo "${0}: cannot find a suitable mkisofs or equivalent" >&2
+	exit 1
+    fi
     "${MKISOFS}" -quiet -volid "iPXE" -preparer "iPXE build system" \
 	    -appid "iPXE - Open Source Network Boot Firmware" \
-	    -publisher "ipxe.org" -sysid "iPXE" -J -R -o "${ISOIMG}" \
+	    -publisher "ipxe.org" -sysid "iPXE" -o "${ISOIMG}" \
 	    ${ISOARGS} "${ISODIR}"
-    if isohybrid --version >/dev/null 2>/dev/null ; then
+    if isohybrid --version >/dev/null 2>&1 ; then
 	isohybrid "${ISOIMG}"
     fi
 fi
