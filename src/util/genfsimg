@@ -105,9 +105,11 @@ copy_syslinux_file() {
 	; do
 	if [ -e "${SRCDIR}/${FILENAME}" ] ; then
 	    cp "${SRCDIR}/${FILENAME}" "${DESTDIR}/"
-	    break
+	    return 0
 	fi
     done
+    echo "${0}: could not find ${FILENAME}" >&2
+    return 1
 }
 
 # Parse command-line options
@@ -225,7 +227,7 @@ done
 if [ -n "${ISOIMG}" ] ; then
     ISOARGS="-J -R"
     copy_syslinux_file "isolinux.bin" "${ISODIR}"
-    copy_syslinux_file "ldlinux.c32" "${ISODIR}" || true
+    copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
     ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
     ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
     if [ -n "${EFI}" ] ; then
