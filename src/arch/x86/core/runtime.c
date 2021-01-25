@@ -179,7 +179,6 @@ static int cmdline_init ( void ) {
  */
 static int initrd_init ( void ) {
 	struct image *image;
-	int rc;
 
 	/* Do nothing if no initrd was specified */
 	if ( ! initrd_phys ) {
@@ -193,51 +192,18 @@ static int initrd_init ( void ) {
 	DBGC ( colour, "RUNTIME found initrd at [%x,%x)\n",
 	       initrd_phys, ( initrd_phys + initrd_len ) );
 
-	/* Allocate image */
-	image = alloc_image ( NULL );
+	/* Create initrd image */
+	image = image_memory ( "<INITRD>", phys_to_user ( initrd_phys ),
+			       initrd_len );
 	if ( ! image ) {
-		DBGC ( colour, "RUNTIME could not allocate image for "
-		       "initrd\n" );
-		rc = -ENOMEM;
-		goto err_alloc_image;
-	}
-
-	/* Set image name */
-	if ( ( rc = image_set_name ( image, "<INITRD>" ) ) != 0 ) {
-		DBGC ( colour, "RUNTIME could not set image name: %s\n",
-		       strerror ( rc ) );
-		goto err_set_name;
-	}
-
-	/* Set image content */
-	if ( ( rc = image_set_data ( image, phys_to_user ( initrd_phys ),
-				     initrd_len ) ) != 0 ) {
-		DBGC ( colour, "RUNTIME could not set image data: %s\n",
-		       strerror ( rc ) );
-		goto err_set_data;
+		DBGC ( colour, "RUNTIME could not create initrd image\n" );
+		return -ENOMEM;
 	}
 
 	/* Mark initrd as consumed */
 	initrd_phys = 0;
 
-	/* Register image */
-	if ( ( rc = register_image ( image ) ) != 0 ) {
-		DBGC ( colour, "RUNTIME could not register initrd: %s\n",
-		       strerror ( rc ) );
-		goto err_register_image;
-	}
-
-	/* Drop our reference to the image */
-	image_put ( image );
-
 	return 0;
-
- err_register_image:
- err_set_data:
- err_set_name:
-	image_put ( image );
- err_alloc_image:
-	return rc;
 }
 
 /**
