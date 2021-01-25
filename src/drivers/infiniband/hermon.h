@@ -46,12 +46,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* HCA command register opcodes */
 #define HERMON_HCR_QUERY_DEV_CAP	0x0003
 #define HERMON_HCR_QUERY_FW		0x0004
+#define HERMON_HCR_QUERY_ADAPTER	0x0006
 #define HERMON_HCR_INIT_HCA		0x0007
 #define HERMON_HCR_CLOSE_HCA		0x0008
 #define HERMON_HCR_INIT_PORT		0x0009
 #define HERMON_HCR_CLOSE_PORT		0x000a
 #define HERMON_HCR_SET_PORT		0x000c
 #define HERMON_HCR_SW2HW_MPT		0x000d
+#define HERMON_HCR_HW2SW_MPT		0x000f
 #define HERMON_HCR_WRITE_MTT		0x0011
 #define HERMON_HCR_MAP_EQ		0x0012
 #define HERMON_HCR_SW2HW_EQ		0x0013
@@ -71,9 +73,17 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_HCR_READ_MCG		0x0025
 #define HERMON_HCR_WRITE_MCG		0x0026
 #define HERMON_HCR_MGID_HASH		0x0027
+#define HERMON_HCR_NOP			0x0031
 #define HERMON_HCR_MOD_STAT_CFG		0x0034
+#define HERMON_HCR_REGISTER_ACCESS	0x003b
 #define HERMON_HCR_QUERY_PORT		0x0043
 #define HERMON_HCR_SENSE_PORT		0x004d
+#define HERMON_GET_OP_REQ		0x0059
+#define HERMON_HCR_INIT_DIAG_BUFFER	0x005f
+#define HERMON_HCR_POST_DOORBELL	0x0062
+#define HERMON_HCR_MAILBOX_READ		0x0071
+#define HERMON_HCR_QUERY_ROMINI		0x0072
+#define HERMON_HCR_QUERY_DEFPARAMS	0x0073
 #define HERMON_HCR_RUN_FW		0x0ff6
 #define HERMON_HCR_DISABLE_LAM		0x0ff7
 #define HERMON_HCR_ENABLE_LAM		0x0ff8
@@ -94,6 +104,13 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_PORT_TYPE_UNKNOWN	0
 #define HERMON_PORT_TYPE_IB		1
 #define HERMON_PORT_TYPE_ETH		2
+
+/* Steering types */
+enum hermon_steer_type {
+	MLX4_MC_STEER = 0,
+	MLX4_UC_STEER,
+	MLX4_NUM_STEERS
+};
 
 /* MTUs */
 #define HERMON_MTU_2048			0x04
@@ -121,7 +138,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_SET_PORT_PRIORITY_TABLE	0x0400
 #define HERMON_SET_PORT_GID_TABLE	0x0500
 
+/* Hermon event types */
+#define HERMON_EV_CQ_COMPLETION		0x00
+#define HERMON_EV_CQ_ERROR		0x04
+#define HERMON_EV_WQ_CATAS_ERROR	0x05
 #define HERMON_EV_PORT_STATE_CHANGE	0x09
+#define HERMON_EV_CMD_COMPLETION	0x0a
+#define HERMON_EV_TYPE_OP_REQUIRED	0x1a
+#define HERMON_EV_PORT_MGMNT_CHANGE	0x1d
+
 
 #define HERMON_SCHED_QP0		0x3f
 #define HERMON_SCHED_DEFAULT		0x83
@@ -136,6 +161,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define HERMON_MOD_STAT_CFG_SET		0x01
 #define HERMON_MOD_STAT_CFG_QUERY	0x03
+
+enum hermon_mod_stat_cfg_setup_mode {
+	HERMON_SETUP_MODE_LANE_SETUP = 0,
+	HERMON_SETUP_MODE_PORT_SETUP = 1,
+	HERMON_SETUP_MODE_VEP = 2,
+	HERMON_SETUP_MODE_PORT_PRIORITY = 3,
+	HERMON_SETUP_MODE_PORT_PRIORITY_GROUP = 4,
+	HERMON_SETUP_MODE_RATE_LIMITER = 5,
+	HERMON_SETUP_MODE_SENSOR_SETUP = 6,
+};
 
 #define HERMON_VPD_FIELD( port ) \
 	PCI_VPD_FIELD ( PCI_VPD_TAG_RW, 'V', ( '5' + (port) - 1 ) )
@@ -214,6 +249,13 @@ struct hermonprm_port_state_change_event_st {
 	pseudo_bit_t reserved[0x00020];
 /* -------------- */
 	struct hermonprm_port_state_change_st data;
+} __attribute__ (( packed ));
+
+struct hermonprm_port_mgmt_change_event_st {
+	pseudo_bit_t reserved[0x00020];
+/* -------------- */
+	pseudo_bit_t       port[0x00008];
+	pseudo_bit_t       reserved0[0x00018];
 } __attribute__ (( packed ));
 
 struct hermonprm_sense_port_st {
@@ -411,7 +453,8 @@ struct hermonprm_set_port_rqp_calc_st {
 
 struct hermonprm_set_port_mac_table_st {
 	pseudo_bit_t mac_h[0x00010];
-	pseudo_bit_t reserved0[0x0000f];
+	pseudo_bit_t mac_vep[0x00008];
+	pseudo_bit_t reserved0[0x00007];
 	pseudo_bit_t v[0x00001];
 /* -------------- */
 	pseudo_bit_t mac_l[0x00020];
@@ -429,12 +472,30 @@ struct hermonprm_set_port_vlan_st {
 struct hermonprm_mod_stat_cfg_input_mod_st {
 	pseudo_bit_t offset[0x00008];
 	pseudo_bit_t portnum[0x00008];
-	pseudo_bit_t xnum[0x00004];
+	pseudo_bit_t physical_function[0x00004];
 	pseudo_bit_t linkspeed[0x00003];
 	pseudo_bit_t autoneg[0x00001];
 	pseudo_bit_t reserved[0x00004];
 	pseudo_bit_t setup_mode[0x00004];
 } __attribute__ (( packed ));
+
+struct hermonprm_eth_mgi_st {
+	pseudo_bit_t	reserved0[0x00020];
+/* -------------- */
+	pseudo_bit_t	vlan_present[0x00001];
+	pseudo_bit_t	unicast[0x00001];
+	pseudo_bit_t	reserved1[0x0000e];
+	pseudo_bit_t	portnum[0x00008];
+	pseudo_bit_t	vep_num[0x00008];
+/* -------------- */
+	pseudo_bit_t	mac_h[0x00010];
+	pseudo_bit_t	vlan_id[0x0000c];
+	pseudo_bit_t	reserved2[0x00003];
+	pseudo_bit_t	vlan_check[0x00001];
+/* -------------- */
+	pseudo_bit_t	mac_l[0x00020];
+/* -------------- */
+} 	__attribute__ (( packed ));
 
 /*
  * Wrapper structures for hardware datatypes
@@ -459,6 +520,7 @@ struct MLX_DECLARE_STRUCT ( hermonprm_mod_stat_cfg_input_mod );
 struct MLX_DECLARE_STRUCT ( hermonprm_mpt );
 struct MLX_DECLARE_STRUCT ( hermonprm_mtt );
 struct MLX_DECLARE_STRUCT ( hermonprm_port_state_change_event );
+struct MLX_DECLARE_STRUCT ( hermonprm_port_mgmt_change_event );
 struct MLX_DECLARE_STRUCT ( hermonprm_qp_db_record );
 struct MLX_DECLARE_STRUCT ( hermonprm_qp_ee_state_transitions );
 struct MLX_DECLARE_STRUCT ( hermonprm_query_dev_cap );
@@ -479,6 +541,7 @@ struct MLX_DECLARE_STRUCT ( hermonprm_wqe_segment_ctrl_mlx );
 struct MLX_DECLARE_STRUCT ( hermonprm_wqe_segment_ctrl_send );
 struct MLX_DECLARE_STRUCT ( hermonprm_wqe_segment_data_ptr );
 struct MLX_DECLARE_STRUCT ( hermonprm_wqe_segment_ud );
+struct MLX_DECLARE_STRUCT ( hermonprm_eth_mgi );
 
 /*
  * Composite hardware datatypes
@@ -529,6 +592,7 @@ union hermonprm_completion_entry {
 union hermonprm_event_entry {
 	struct hermonprm_event_queue_entry generic;
 	struct hermonprm_port_state_change_event port_state_change;
+	struct hermonprm_port_mgmt_change_event port_mgmt_change;
 } __attribute__ (( packed ));
 
 union hermonprm_doorbell_register {
@@ -593,6 +657,8 @@ struct hermon_dev_cap {
 	unsigned int num_ports;
 	/** Dual-port different protocol */
 	int dpdp;
+	/** Unicast steering */
+	unsigned int vep_uc_steering;
 };
 
 /** Number of cMPT entries of each type */
@@ -832,6 +898,11 @@ struct hermon_port {
 	struct ib_completion_queue *eth_cq;
 	/** Ethernet queue pair */
 	struct ib_queue_pair *eth_qp;
+	/** VEP number */
+	u8 vep_number;
+	/** Ethernet MAC */
+	unsigned long eth_mac_l;
+	u16 eth_mac_h;
 	/** Port type */
 	struct hermon_port_type *type;
 	/** Non-volatile option storage */
@@ -910,6 +981,9 @@ struct hermon {
 
 	/** BOFM device */
 	struct bofm_device bofm;
+
+	/** PCI physical function */
+	u8 physical_function;
 };
 
 /** Global protection domain */
