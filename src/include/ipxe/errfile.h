@@ -383,6 +383,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_acpi_settings	      ( ERRFILE_OTHER | 0x00500000 )
 #define ERRFILE_ntlm		      ( ERRFILE_OTHER | 0x00510000 )
 #define ERRFILE_efi_veto	      ( ERRFILE_OTHER | 0x00520000 )
+#define ERRFILE_efi_autoboot	      ( ERRFILE_OTHER | 0x00530000 )
 
 /** @} */
 
