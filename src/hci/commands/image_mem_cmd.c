@@ -60,7 +60,6 @@ static struct command_descriptor imgmem_cmd =
  */
 static int imgmem_exec ( int argc, char **argv ) {
 	struct imgmem_options opts;
-	struct image *image;
 	unsigned int data;
 	unsigned int len;
 	int rc;
@@ -82,8 +81,7 @@ static int imgmem_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Create image */
-	if ( ( rc = imgmem ( phys_to_user ( data ), len, opts.name,
-			     &image ) ) != 0 )
+	if ( ( rc = imgmem ( opts.name, phys_to_user ( data ), len ) ) != 0 )
 		return rc;
 
 	return 0;

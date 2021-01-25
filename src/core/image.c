@@ -505,3 +505,47 @@ int image_set_trust ( int require_trusted, int permanent ) {
 
 	return 0;
 }
+
+/**
+ * Create registered image from block of memory
+ *
+ * @v name		Name
+ * @v data		Image data
+ * @v len		Length
+ * @ret image		Image, or NULL on error
+ */
+struct image * image_memory ( const char *name, userptr_t data, size_t len ) {
+	struct image *image;
+	int rc;
+
+	/* Allocate image */
+	image = alloc_image ( NULL );
+	if ( ! image ) {
+		rc = -ENOMEM;
+		goto err_alloc_image;
+	}
+
+	/* Set name */
+	if ( ( rc = image_set_name ( image, name ) ) != 0 )
+		goto err_set_name;
+
+	/* Set data */
+	if ( ( rc = image_set_data ( image, data, len ) ) != 0 )
+		goto err_set_data;
+
+	/* Register image */
+	if ( ( rc = register_image ( image ) ) != 0 )
+		goto err_register;
+
+	/* Drop local reference to image */
+	image_put ( image );
+
+	return image;
+
+ err_register:
+ err_set_data:
+ err_set_name:
+	image_put ( image );
+ err_alloc_image:
+	return NULL;
+}
