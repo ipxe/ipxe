@@ -445,6 +445,8 @@ struct ib_device {
 	uint8_t sm_sl;
 	/** Partition key */
 	uint16_t pkey;
+	/** Partition key table index */
+	uint16_t pkey_index;
 
 	/** RDMA key
 	 *

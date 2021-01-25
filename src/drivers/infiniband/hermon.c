@@ -44,7 +44,28 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/bofm.h>
 #include <ipxe/nvsvpd.h>
 #include <ipxe/nvo.h>
+#include <ipxe/ipoib.h>
+#include <ipxe/settings.h>
+#include <usr/ifmgmt.h>
 #include "hermon.h"
+
+#define TR(fmt, ...) DBG ( "[%s/%s:%d] " fmt "\n", __FILE__, __FUNCTION__, __LINE__, ## __VA_ARGS__);
+
+static struct hermon_port* hermon_get_port_from_ibdev(struct ib_device *ibdev)
+{
+	struct hermon *hermon = (struct hermon *)(ib_get_drvdata(ibdev));
+	int i ;
+
+	for (i = 0; i < HERMON_MAX_PORTS; ++i) {
+		if (hermon->port[i].ibdev == ibdev) {
+			return &(hermon->port[i]);
+		}
+	}
+	/* Should not be here */
+	printf("hermon_get_port_from_ibdev: Bad pointer\n");
+	assert(0);
+	return NULL;
+}
 
 /**
  * @file
@@ -137,15 +158,39 @@ static int hermon_cmd_wait ( struct hermon *hermon,
 			     struct hermonprm_hca_command_register *hcr ) {
 	unsigned int wait;
 
-	for ( wait = HERMON_HCR_MAX_WAIT_MS ; wait ; wait-- ) {
+	for ( wait = 100 * HERMON_HCR_MAX_WAIT_MS ; wait ; wait-- ) {
 		hcr->u.dwords[6] =
 			readl ( hermon->config + HERMON_HCR_REG ( 6 ) );
 		if ( ( MLX_GET ( hcr, go ) == 0 ) &&
 		     ( MLX_GET ( hcr, t ) == hermon->toggle ) )
 			return 0;
-		mdelay ( 1 );
+		udelay ( 10 );
 	}
 	return -EBUSY;
+}
+
+/**
+ * Return physical function for specific commands
+ *
+ * @v hermon		Hermon device
+ * @v opcode		HCA command opcode
+ */
+static u8 hermon_cmd_get_function ( struct hermon *hermon,
+				    int opcode ) {
+	switch ( opcode ) {
+	case HERMON_HCR_SW2HW_EQ:
+	case HERMON_HCR_SW2HW_CQ:
+	case HERMON_HCR_RST2INIT_QP:
+	case HERMON_HCR_INIT2RTR_QP:
+	case HERMON_HCR_RTR2RTS_QP:
+	case HERMON_HCR_SW2HW_MPT:
+	case HERMON_HCR_2RST_QP:
+	case HERMON_HCR_HW2SW_CQ:
+	case HERMON_HCR_HW2SW_EQ:
+		return hermon->physical_function;
+	default:
+		return 0;
+	}
 }
 
 /**
@@ -166,6 +211,7 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 	unsigned int opcode = HERMON_HCR_OPCODE ( command );
 	size_t in_len = HERMON_HCR_IN_LEN ( command );
 	size_t out_len = HERMON_HCR_OUT_LEN ( command );
+	u8 physical_function;
 	void *in_buffer;
 	void *out_buffer;
 	unsigned int status;
@@ -190,6 +236,9 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 	/* Flip HCR toggle */
 	hermon->toggle = ( 1 - hermon->toggle );
 
+	/* Get physical function */
+	physical_function = hermon_cmd_get_function ( hermon, opcode );
+
 	/* Prepare HCR */
 	memset ( &hcr, 0, sizeof ( hcr ) );
 	in_buffer = &hcr.u.dwords[0];
@@ -197,8 +246,10 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 		memset ( hermon->mailbox_in, 0, HERMON_MBOX_SIZE );
 		in_buffer = hermon->mailbox_in;
 		MLX_FILL_H ( &hcr, 0, in_param_h, virt_to_bus ( in_buffer ) );
-		MLX_FILL_1 ( &hcr, 1, in_param_l, virt_to_bus ( in_buffer ) );
-	}
+		MLX_FILL_1 ( &hcr, 1, in_param_l, virt_to_bus ( in_buffer ) |
+			     physical_function );
+	} else
+		MLX_FILL_1 ( &hcr, 1, in_param_l, physical_function );
 	memcpy ( in_buffer, in, in_len );
 	MLX_FILL_1 ( &hcr, 2, input_modifier, in_mod );
 	out_buffer = &hcr.u.dwords[3];
@@ -245,8 +296,19 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 	/* Check command status */
 	status = MLX_GET ( &hcr, status );
 	if ( status != 0 ) {
-		DBGC ( hermon, "Hermon %p command failed with status %02x:\n",
-		       hermon, status );
+		if ( ( ( opcode == HERMON_HCR_MOD_STAT_CFG ) && ( op_mod == 0xe ) ) ||
+		     ( opcode == HERMON_HCR_INIT_DIAG_BUFFER ) ) {
+			/* Could be as a result of missing TLV - print it as debug */
+			DBGC ( hermon, "Hermon %p command 0x%x failed with status %02x:\n",
+				hermon, opcode, status );
+		} else if ( opcode == HERMON_HCR_SENSE_PORT ) {
+			DBGC ( hermon, "Hermon %p command 0x%x failed with status %02x:\n",
+				hermon, opcode, status );
+			return status;
+		} else {
+			DBGC ( hermon, "Hermon %p command 0x%x failed with status %02x:\n",
+				hermon, opcode, status );
+		}
 		DBGC_HDA ( hermon,
 			   virt_to_phys ( hermon->config + HERMON_HCR_BASE ),
 			   &hcr, sizeof ( hcr ) );
@@ -331,6 +393,13 @@ hermon_cmd_sw2hw_mpt ( struct hermon *hermon, unsigned int index,
 			    HERMON_HCR_IN_CMD ( HERMON_HCR_SW2HW_MPT,
 						1, sizeof ( *mpt ) ),
 			    0, mpt, index, NULL );
+}
+
+static inline int
+hermon_cmd_hw2sw_mpt ( struct hermon *hermon, unsigned int index ) {
+	return hermon_cmd ( hermon,
+			    HERMON_HCR_VOID_CMD ( HERMON_HCR_HW2SW_MPT ),
+			    0, NULL, index, NULL );
 }
 
 static inline int
@@ -485,12 +554,12 @@ hermon_cmd_read_mcg ( struct hermon *hermon, unsigned int index,
 }
 
 static inline int
-hermon_cmd_write_mcg ( struct hermon *hermon, unsigned int index,
+hermon_cmd_write_mcg ( struct hermon *hermon, uint8_t op_mod, unsigned int in_mod,
 		       const struct hermonprm_mcg_entry *mcg ) {
 	return hermon_cmd ( hermon,
 			    HERMON_HCR_IN_CMD ( HERMON_HCR_WRITE_MCG,
 						1, sizeof ( *mcg ) ),
-			    0, mcg, index, NULL );
+			    op_mod, mcg, in_mod, NULL );
 }
 
 static inline int
@@ -728,8 +797,9 @@ static void hermon_free_mtt ( struct hermon *hermon,
  * @v stat_cfg		Static configuration
  * @ret rc		Return status code
  */
-static int hermon_mod_stat_cfg ( struct hermon *hermon, unsigned int port,
+static int hermon_mod_stat_cfg ( struct hermon *hermon, unsigned int mport,
 				 unsigned int mode, unsigned int offset,
+				 unsigned int physical_function, unsigned int setup_mode,
 				 struct hermonprm_mod_stat_cfg *stat_cfg ) {
 	struct hermonprm_scalar_parameter *portion =
 		( ( void * ) &stat_cfg->u.bytes[offset] );
@@ -741,9 +811,11 @@ static int hermon_mod_stat_cfg ( struct hermon *hermon, unsigned int port,
 
 	/* Construct input modifier */
 	memset ( &mod, 0, sizeof ( mod ) );
-	MLX_FILL_2 ( &mod, 0,
-		     portnum, port,
-		     offset, offset );
+	MLX_FILL_4 ( &mod, 0,
+		     portnum, mport,
+		     offset, offset,
+		     physical_function, physical_function,
+		     setup_mode, setup_mode );
 
 	/* Issue command */
 	if ( ( rc = hermon_cmd_mod_stat_cfg ( hermon, mode,
@@ -1282,6 +1354,8 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 	/* Transition queue to RTR state, if applicable */
 	if ( hermon_qp->state < HERMON_QP_ST_RTR ) {
 		memset ( &qpctx, 0, sizeof ( qpctx ) );
+		MLX_FILL_1 ( &qpctx, 0,
+			     opt_param_mask, 0x10 );
 		MLX_FILL_2 ( &qpctx, 4,
 			     qpc_eec_data.mtu,
 			     ( ( qp->type == IB_QPT_ETH ) ?
@@ -1289,6 +1363,9 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 			     qpc_eec_data.msg_max, 31 );
 		MLX_FILL_1 ( &qpctx, 7,
 			     qpc_eec_data.remote_qpn_een, qp->av.qpn );
+		MLX_FILL_1 ( &qpctx, 8,
+			     qpc_eec_data.primary_address_path.pkey_index,
+			     ibdev->pkey_index );
 		MLX_FILL_1 ( &qpctx, 9,
 			     qpc_eec_data.primary_address_path.rlid,
 			     qp->av.lid );
@@ -1300,6 +1377,9 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 		MLX_FILL_1 ( &qpctx, 16,
 			     qpc_eec_data.primary_address_path.sched_queue,
 			     hermon_sched_queue ( ibdev, qp ) );
+		MLX_FILL_1 ( &qpctx, 38,
+			     qpc_eec_data.physical_function,
+			     hermon->physical_function );
 		MLX_FILL_1 ( &qpctx, 39,
 			     qpc_eec_data.next_rcv_psn, qp->recv.psn );
 		if ( ( rc = hermon_cmd_init2rtr_qp ( hermon, qp->qpn,
@@ -1322,6 +1402,9 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 			     qpc_eec_data.rnr_retry, HERMON_RETRY_MAX );
 		MLX_FILL_1 ( &qpctx, 32,
 			     qpc_eec_data.next_send_psn, qp->send.psn );
+		MLX_FILL_1 ( &qpctx, 38,
+			     qpc_eec_data.physical_function,
+			     hermon->physical_function );
 		if ( ( rc = hermon_cmd_rtr2rts_qp ( hermon, qp->qpn,
 						    &qpctx ) ) != 0 ) {
 			DBGC ( hermon, "Hermon %p QPN %#lx RTR2RTS_QP failed: "
@@ -1334,6 +1417,9 @@ static int hermon_modify_qp ( struct ib_device *ibdev,
 	/* Update parameters in RTS state */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	MLX_FILL_1 ( &qpctx, 0, opt_param_mask, HERMON_QP_OPT_PARAM_QKEY );
+	MLX_FILL_1 ( &qpctx, 38,
+			     qpc_eec_data.physical_function,
+			     hermon->physical_function );
 	MLX_FILL_1 ( &qpctx, 44, qpc_eec_data.q_key, qp->qkey );
 	if ( ( rc = hermon_cmd_rts2rts_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ){
 		DBGC ( hermon, "Hermon %p QPN %#lx RTS2RTS_QP failed: %s\n",
@@ -1718,6 +1804,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 	struct ib_address_vector recv_source;
 	struct ib_global_route_header *grh;
 	struct ib_address_vector *source;
+	struct hermonprm_qp_ee_state_transitions qp_ctx;
 	unsigned int opcode;
 	unsigned long qpn;
 	int is_send;
@@ -1771,6 +1858,16 @@ static int hermon_complete ( struct ib_device *ibdev,
 	if ( is_send ) {
 		/* Hand off to completion handler */
 		ib_complete_send ( ibdev, qp, iobuf, rc );
+	} else if ( rc ) {
+		/* Query the QP state */
+		memset ( &qp_ctx, 0, sizeof ( qp_ctx ) );
+		if ( 0 == hermon_cmd_query_qp ( hermon, qp->qpn, &qp_ctx ) ) {
+			hermon_qp->state = MLX_GET( &qp_ctx, qpc_eec_data.state );
+			DBGC ( hermon, "Hermon %p QPN %#lx state is %d\n",
+					hermon, qp->qpn, hermon_qp->state );
+		}
+		/* Propogate error to receive completion handler */
+		ib_complete_recv ( ibdev, qp, NULL, NULL, iobuf, rc );
 	} else {
 		/* Set received length */
 		len = MLX_GET ( &cqe->normal, byte_cnt );
@@ -1858,6 +1955,39 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
 		MLX_FILL_1 ( hermon_cq->doorbell, 0, update_ci,
 			     ( cq->next_idx & 0x00ffffffUL ) );
 	}
+}
+
+
+static int hermon_default_mcast_attach ( struct ib_device *ibdev,
+					 struct ib_queue_pair *qp,
+					 uint32_t in_mod ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermonprm_mcg_entry mcg;
+	int rc;
+
+	memset ( &mcg, 0, sizeof ( mcg ) );
+	MLX_FILL_1 ( &mcg, 1, hdr.members_count, 1 );
+	MLX_FILL_1 ( &mcg, 8, qp[0].qpn, qp->qpn );
+	if ( ( rc = hermon_cmd_write_mcg ( hermon, 1, in_mod, &mcg ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not write default MCG: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+static void hermon_default_mcast_detach ( struct ib_device *ibdev,
+					  struct ib_queue_pair *qp __unused,
+					  uint32_t in_mod ) {
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermonprm_mcg_entry mcg;
+	int rc;
+
+	memset ( &mcg, 0, sizeof ( mcg ) );
+	if ( ( rc = hermon_cmd_write_mcg ( hermon, 1, in_mod, &mcg ) ) != 0 )
+		DBGC ( hermon, "Hermon %p could not write default MCG: %s\n",
+		       hermon, strerror ( rc ) );
 }
 
 /***************************************************************************
@@ -2029,6 +2159,20 @@ static void hermon_event_port_state_change ( struct hermon *hermon,
 						link_up );
 }
 
+static void hermon_event_port_mgmt_change ( struct hermon *hermon,
+					union hermonprm_event_entry *eqe ) {
+	uint8_t port = ( MLX_GET ( &eqe->port_mgmt_change, port ) - 1 );
+
+	/* Sanity check */
+	if ( port >= hermon->cap.num_ports ) {
+		DBGC ( hermon, "Hermon %p port %d does not exist!\n",
+		       hermon, ( port + 1 ) );
+		return;
+	}
+
+	ib_smc_update ( hermon->port[port].ibdev, hermon_mad );
+}
+
 /**
  * Poll event queue
  *
@@ -2068,8 +2212,24 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 		/* Handle event */
 		event_type = MLX_GET ( &eqe->generic, event_type );
 		switch ( event_type ) {
+		case HERMON_EV_CMD_COMPLETION:
+			/* currently only NOP uses event and it does not need further processing.
+			 * If the command needs further processing it needs to be done here
+			 */
+			break;
 		case HERMON_EV_PORT_STATE_CHANGE:
 			hermon_event_port_state_change ( hermon, eqe );
+			break;
+		case HERMON_EV_PORT_MGMNT_CHANGE:
+			hermon_event_port_mgmt_change ( hermon, eqe );
+			break;
+		case HERMON_EV_CQ_ERROR:
+			DBGC ( hermon, "Hermon %p EQN %#lx CQ ERROR\n",
+			       hermon, hermon_eq->eqn );
+			break;
+		case HERMON_EV_WQ_CATAS_ERROR:
+			DBGC ( hermon, "Hermon %p EQN %#lx WQ CATAS ERROR\n",
+			       hermon, hermon_eq->eqn );
 			break;
 		default:
 			DBGC ( hermon, "Hermon %p EQN %#lx unrecognised event "
@@ -2533,9 +2693,12 @@ static int hermon_map_icm ( struct hermon *hermon,
 		     multicast_parameters.log_mc_table_entry_sz,
 		     fls ( sizeof ( struct hermonprm_mcg_entry ) - 1 ) );
 	MLX_FILL_1 ( init_hca, 53,
-		     multicast_parameters.log_mc_table_hash_sz, log_num_mcs );
-	MLX_FILL_1 ( init_hca, 54,
-		     multicast_parameters.log_mc_table_sz, log_num_mcs );
+		     multicast_parameters.log_mc_table_hash_sz,
+		     log_num_mcs - 1 );
+	MLX_FILL_2 ( init_hca, 54,
+		     multicast_parameters.log_mc_table_sz, log_num_mcs,
+		     multicast_parameters.uc_group_steering,
+		     ( hermon->cap.vep_uc_steering ? 1 : 0 ) );
 	DBGC ( hermon, "Hermon %p ICM MC is %d x %#zx at [%08llx,%08llx)\n",
 	       hermon, ( 1 << log_num_mcs ),
 	       sizeof ( struct hermonprm_mcg_entry ),
@@ -2722,6 +2885,17 @@ static int hermon_setup_mpt ( struct hermon *hermon ) {
 	return 0;
 }
 
+static int hermon_unmap_mpt ( struct hermon *hermon )
+{
+	int rc;
+
+	if ( ( rc = hermon_cmd_hw2sw_mpt ( hermon, hermon->cap.reserved_mrws ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p could not unmap the MPT: %s\n", hermon, strerror ( rc ) );
+		return rc;
+	}
+	return 0;
+}
+
 /**
  * Configure special queue pairs
  *
@@ -2765,6 +2939,7 @@ static int hermon_start ( struct hermon *hermon, int running ) {
 
 	/* Start firmware if not already running */
 	if ( ! running ) {
+		hermon_reset ( hermon );
 		if ( ( rc = hermon_start_firmware ( hermon ) ) != 0 ) {
 			DBGC ( hermon, "Hermon %p could not start firmware %s\n",
 			       hermon, strerror ( rc ) );
@@ -2813,11 +2988,14 @@ static int hermon_start ( struct hermon *hermon, int running ) {
 		goto err_conf_special_qps;
 	}
 
+	DBGC ( hermon, "Hermon init done\n" );
+
 	return 0;
 
  err_conf_special_qps:
 	hermon_destroy_eq ( hermon );
  err_create_eq:
+	hermon_unmap_mpt ( hermon );
  err_setup_mpt:
 	hermon_cmd_close_hca ( hermon );
  err_init_hca:
@@ -2835,10 +3013,13 @@ static int hermon_start ( struct hermon *hermon, int running ) {
  */
 static void hermon_stop ( struct hermon *hermon ) {
 	hermon_destroy_eq ( hermon );
+	hermon_unmap_mpt ( hermon );
 	hermon_cmd_close_hca ( hermon );
 	hermon_unmap_icm ( hermon );
 	hermon_stop_firmware ( hermon );
-	hermon_reset ( hermon );
+
+	/* Reset command interface toggle */
+	hermon->toggle = 0;
 }
 
 /**
@@ -2912,7 +3093,7 @@ static int hermon_ib_open ( struct ib_device *ibdev ) {
 		     rcm, 1,
 		     lss, 1 );
 	MLX_FILL_2 ( &set_port.ib, 10,
-		     max_pkey, 1,
+		     max_pkey, 32,
 		     max_gid, 1 );
 	MLX_FILL_1 ( &set_port.ib, 28,
 		     link_speed_supported, 1 );
@@ -3009,7 +3190,7 @@ static int hermon_mcast_attach ( struct ib_device *ibdev,
 
 	/* Generate hash table index */
 	if ( ( rc = hermon_cmd_mgid_hash ( hermon, gid, &hash ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p could not hash GID: %s\n",
+               DBGC ( hermon, "Hermon %p could not hash GID: %s\n",
 		       hermon, strerror ( rc ) );
 		return rc;
 	}
@@ -3036,7 +3217,7 @@ static int hermon_mcast_attach ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &mcg, 1, hdr.members_count, 1 );
 	MLX_FILL_1 ( &mcg, 8, qp[0].qpn, qp->qpn );
 	memcpy ( &mcg.u.dwords[4], gid, sizeof ( *gid ) );
-	if ( ( rc = hermon_cmd_write_mcg ( hermon, index, &mcg ) ) != 0 ) {
+	if ( ( rc = hermon_cmd_write_mcg ( hermon, 0, index, &mcg ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p could not write MCG %#x: %s\n",
 		       hermon, index, strerror ( rc ) );
 		return rc;
@@ -3071,7 +3252,7 @@ static void hermon_mcast_detach ( struct ib_device *ibdev,
 
 	/* Clear hash table entry */
 	memset ( &mcg, 0, sizeof ( mcg ) );
-	if ( ( rc = hermon_cmd_write_mcg ( hermon, index, &mcg ) ) != 0 ) {
+	if ( ( rc = hermon_cmd_write_mcg ( hermon, 0, index, &mcg ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p could not write MCG %#x: %s\n",
 		       hermon, index, strerror ( rc ) );
 		return;
@@ -3109,6 +3290,12 @@ static int hermon_register_ibdev ( struct hermon *hermon,
 	struct ib_device *ibdev = port->ibdev;
 	int rc;
 
+        /* Use hardware MAC from firmware as local ethernet mac for Infiniband
+           ports. This ensures that we don't see a MAC collision when trying to
+           register an infiniband port, in a mixed-port scenario. */
+	*(uint16_t *) &ibdev->lemac[0] = cpu_to_be16( port->eth_mac_h );
+	*(uint32_t *) &ibdev->lemac[2] = cpu_to_be32( port->eth_mac_l );
+
 	/* Initialise parameters using SMC */
 	ib_smc_init ( ibdev, hermon_mad );
 
@@ -3118,6 +3305,8 @@ static int hermon_register_ibdev ( struct hermon *hermon,
 		       "device: %s\n", hermon, ibdev->port, strerror ( rc ) );
 		return rc;
 	}
+
+	port->netdev = ipoib_netdev ( ibdev );
 
 	return 0;
 }
@@ -3166,13 +3355,103 @@ static struct hermon_port_type hermon_port_type_ib = {
  */
 
 /** Number of Hermon Ethernet send work queue entries */
-#define HERMON_ETH_NUM_SEND_WQES 2
+#define HERMON_ETH_NUM_SEND_WQES 16
 
 /** Number of Hermon Ethernet receive work queue entries */
-#define HERMON_ETH_NUM_RECV_WQES 4
+#define HERMON_ETH_NUM_RECV_WQES 8
 
 /** Number of Hermon Ethernet completion entries */
-#define HERMON_ETH_NUM_CQES 8
+#define HERMON_ETH_NUM_CQES 32
+
+
+int hermon_eth_add_steer ( struct ib_device *ibdev,
+			   struct ib_queue_pair *eth_qp )
+{
+	struct hermon *hermon = ib_get_drvdata ( ibdev );
+	struct hermonprm_eth_mgi mgi;
+	uint32_t in_mod;
+	int rc;
+
+	/* Join broadcast mutlicast group */
+	memset ( &mgi, 0, sizeof ( mgi ) );
+	MLX_FILL_3 ( &mgi, 1, vep_num, hermon_get_port_from_ibdev(ibdev)->vep_number,
+		     portnum, ibdev->port,
+		     unicast, MLX4_MC_STEER );
+	MLX_FILL_1 ( &mgi, 2, mac_h, 0xffff );
+	MLX_FILL_1 ( &mgi, 3, mac_l, 0xffffffffUL );
+	if ( ( rc = ib_mcast_attach
+			  ( ibdev, eth_qp, ( union ib_gid * ) &mgi ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p QPN %lx could not attach to "
+		       "broadcast MCG: %s\n", hermon, eth_qp->qpn,
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Add MAC to unicast group */
+	memset ( &mgi, 0, sizeof ( mgi ) );
+	MLX_FILL_3 ( &mgi, 1, vep_num, hermon_get_port_from_ibdev(ibdev)->vep_number,
+		     portnum, ibdev->port,
+		     unicast, MLX4_UC_STEER );
+	MLX_FILL_1 ( &mgi, 2, mac_h, hermon_get_port_from_ibdev(ibdev)->eth_mac_h );
+	MLX_FILL_1 ( &mgi, 3, mac_l, hermon_get_port_from_ibdev(ibdev)->eth_mac_l );
+	if ( ( rc = ib_mcast_attach
+			  ( ibdev, eth_qp, ( union ib_gid * ) &mgi ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p QPN %lx could not attach to "
+		       "unicast MCG: %s\n", hermon, eth_qp->qpn,
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Add default UC MCG */
+	in_mod = ( ( MLX4_UC_STEER << 1 ) |
+		   ( ibdev->port << 16 ) |
+		   ( hermon_get_port_from_ibdev(ibdev)->vep_number << 24 ) );
+	if ( ( rc = hermon_default_mcast_attach
+			  ( ibdev, eth_qp, in_mod ) != 0 ) ) {
+		DBGC ( hermon, "Hermon %p QPN %lx could not attach to "
+		       "unicast default MCG: %s\n", hermon, eth_qp->qpn,
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Add default MC MCG */
+	in_mod = ( ( MLX4_MC_STEER << 1 ) |
+		   ( ibdev->port << 16 ) |
+		   ( hermon_get_port_from_ibdev(ibdev)->vep_number << 24 ) );
+	if ( ( rc = hermon_default_mcast_attach
+			  ( ibdev, eth_qp, in_mod ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p QPN %lx could not attach to "
+		       "multicast default MCG: %s\n", hermon, eth_qp->qpn,
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+void hermon_eth_release_steer ( struct ib_device *ibdev,
+				struct ib_queue_pair *eth_qp )
+{
+	union ib_gid gid;
+	struct ib_multicast_gid *mgid;
+	struct ib_multicast_gid *tmp;
+	uint32_t in_mod;
+
+	list_for_each_entry_safe ( mgid, tmp, &eth_qp->mgids, list ) {
+		memcpy ( &gid, &mgid->gid, sizeof ( union ib_gid ) );
+		ib_mcast_detach ( ibdev, eth_qp, &gid );
+	}
+
+	in_mod = ( ( MLX4_MC_STEER << 1 ) |
+		   ( ibdev->port << 16 ) |
+		   ( hermon_get_port_from_ibdev(ibdev)->vep_number << 24 ) );
+	hermon_default_mcast_detach ( ibdev, eth_qp, in_mod );
+
+	in_mod = ( ( MLX4_UC_STEER << 1 ) |
+		   ( ibdev->port << 16 ) |
+		   ( hermon_get_port_from_ibdev(ibdev)->vep_number << 24 ) );
+	hermon_default_mcast_detach ( ibdev, eth_qp, in_mod );
+}
 
 /**
  * Transmit packet via Hermon Ethernet device
@@ -3310,6 +3589,13 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 		goto err_modify_qp;
 	}
 
+	/* Add steering */
+	if ( ( rc = hermon_eth_add_steer ( ibdev, port->eth_qp ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d failed to add steering:"
+		       " %s\n", hermon, ibdev->port, strerror ( rc ) );
+		goto err_add_steer;
+	}
+
 	/* Fill receive rings */
 	ib_refill_recv ( ibdev, port->eth_qp );
 
@@ -3358,6 +3644,24 @@ static int hermon_eth_open ( struct net_device *netdev ) {
 		goto err_set_port_receive_qp;
 	}
 
+	/* Set port mac table */
+	memset ( &set_port, 0, sizeof ( set_port ) );
+	MLX_FILL_3 ( set_port.mac_table, 0,
+		     mac_vep, hermon_get_port_from_ibdev(ibdev)->vep_number,
+		     v, 1,
+		     mac_h, hermon_get_port_from_ibdev(ibdev)->eth_mac_h );
+	MLX_FILL_1 ( set_port.mac_table, 1,
+		     mac_l, hermon_get_port_from_ibdev(ibdev)->eth_mac_l );
+	if ( ( rc = hermon_cmd_set_port ( hermon, 1,
+					  ( HERMON_SET_PORT_MAC_TABLE |
+					    ibdev->port ),
+					  &set_port ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p port %d could not set port mac "
+		       "table: %s\n",
+		       hermon, ibdev->port, strerror ( rc ) );
+		goto err_set_port_mac_table;
+	}
+
 	/* Initialise port */
 	if ( ( rc = hermon_cmd_init_port ( hermon, ibdev->port ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not initialise port: "
@@ -3370,6 +3674,9 @@ static int hermon_eth_open ( struct net_device *netdev ) {
  err_init_port:
  err_set_port_receive_qp:
  err_set_port_general_params:
+ err_set_port_mac_table:
+ err_add_steer:
+	hermon_eth_release_steer ( ibdev, port->eth_qp );
  err_modify_qp:
 	ib_destroy_qp ( ibdev, port->eth_qp );
  err_create_qp:
@@ -3398,6 +3705,9 @@ static void hermon_eth_close ( struct net_device *netdev ) {
 		/* Nothing we can do about this */
 	}
 
+	/* Release steering */
+	hermon_eth_release_steer ( ibdev, port->eth_qp );
+
 	/* Tear down the queues */
 	ib_destroy_qp ( ibdev, port->eth_qp );
 	ib_destroy_cq ( ibdev, port->eth_cq );
@@ -3425,24 +3735,10 @@ static int hermon_register_netdev ( struct hermon *hermon,
 				    struct hermon_port *port ) {
 	struct net_device *netdev = port->netdev;
 	struct ib_device *ibdev = port->ibdev;
-	struct hermonprm_query_port_cap query_port;
-	union {
-		uint8_t bytes[8];
-		uint32_t dwords[2];
-	} mac;
 	int rc;
 
-	/* Retrieve MAC address */
-	if ( ( rc = hermon_cmd_query_port ( hermon, ibdev->port,
-					    &query_port ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p port %d could not query port: %s\n",
-		       hermon, ibdev->port, strerror ( rc ) );
-		goto err_query_port;
-	}
-	mac.dwords[0] = htonl ( MLX_GET ( &query_port, mac_47_32 ) );
-	mac.dwords[1] = htonl ( MLX_GET ( &query_port, mac_31_0 ) );
-	memcpy ( netdev->hw_addr,
-		 &mac.bytes[ sizeof ( mac.bytes ) - ETH_ALEN ], ETH_ALEN );
+	*(uint16_t *) &netdev->hw_addr[0] = cpu_to_be16( port->eth_mac_h );
+	*(uint32_t *) &netdev->hw_addr[2] = cpu_to_be32( port->eth_mac_l );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
@@ -3466,7 +3762,6 @@ static int hermon_register_netdev ( struct hermon *hermon,
  err_register_nvo:
 	unregister_netdev ( netdev );
  err_register_netdev:
- err_query_port:
 	return rc;
 }
 
@@ -3616,6 +3911,8 @@ static int hermon_set_port_type ( struct hermon *hermon,
 				rc = port_type;
 				return rc;
 			}
+			/* Avoid spamming debug output */
+			mdelay ( 50 );
 		} while ( ( port_type == HERMON_PORT_TYPE_UNKNOWN ) &&
 			  ( ( elapsed = ( currticks() - start ) ) <
 			    HERMON_SENSE_PORT_TIMEOUT ) );
@@ -3674,6 +3971,8 @@ static int hermon_bofm_harvest ( struct bofm_device *bofm, unsigned int mport,
 	if ( ( rc = hermon_mod_stat_cfg ( hermon, mport,
 					  HERMON_MOD_STAT_CFG_QUERY,
 					  HERMON_MOD_STAT_CFG_OFFSET ( mac_m ),
+					  hermon->physical_function,
+					  HERMON_SETUP_MODE_LANE_SETUP,
 					  &stat_cfg ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not query "
 		       "configuration: %s\n", hermon, mport, strerror ( rc ) );
@@ -3724,6 +4023,8 @@ static int hermon_bofm_update ( struct bofm_device *bofm, unsigned int mport,
 	if ( ( rc = hermon_mod_stat_cfg ( hermon, mport,
 					  HERMON_MOD_STAT_CFG_SET,
 					  HERMON_MOD_STAT_CFG_OFFSET ( mac_m ),
+					  hermon->physical_function,
+					  HERMON_SETUP_MODE_LANE_SETUP,
 					  &stat_cfg ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p port %d could not modify "
 		       "configuration: %s\n", hermon, mport, strerror ( rc ) );
@@ -3811,6 +4112,7 @@ static int hermon_probe ( struct pci_device *pci ) {
 	struct ib_device *ibdev;
 	struct net_device *netdev;
 	struct hermon_port *port;
+	struct hermonprm_query_port_cap query_port;
 	unsigned long config;
 	unsigned long uar;
 	unsigned int i;
@@ -3836,6 +4138,8 @@ static int hermon_probe ( struct pci_device *pci ) {
 	hermon->uar = pci_ioremap ( pci, uar,
 				    HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
 
+	hermon->physical_function = pci->busdevfn & 0x7;
+
 	/* Reset device */
 	hermon_reset ( hermon );
 
@@ -3847,9 +4151,24 @@ static int hermon_probe ( struct pci_device *pci ) {
 	if ( ( rc = hermon_get_cap ( hermon ) ) != 0 )
 		goto err_get_cap;
 
+	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
+		port = &hermon->port[i];
+
+		/* Retrieve MAC address */
+		if ( ( rc = hermon_cmd_query_port ( hermon, HERMON_PORT_BASE + i,
+						    &query_port ) ) != 0 ) {
+			DBGC ( hermon, "Hermon %p port %d could not query port: %s\n",
+			       hermon, ibdev->port, strerror ( rc ) );
+			goto err_query_port;
+		}
+
+		port->eth_mac_l = MLX_GET ( &query_port, mac_31_0 );
+		port->eth_mac_h = MLX_GET ( &query_port, mac_47_32 );
+	}
+
 	/* Allocate Infiniband devices */
 	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
-	        ibdev = alloc_ibdev ( 0 );
+		ibdev = alloc_ibdev ( 0 );
 		if ( ! ibdev ) {
 			rc = -ENOMEM;
 			goto err_alloc_ibdev;
@@ -3927,6 +4246,7 @@ static int hermon_probe ( struct pci_device *pci ) {
 	for ( i-- ; ( signed int ) i >= 0 ; i-- )
 		ibdev_put ( hermon->port[i].ibdev );
  err_get_cap:
+ err_query_port:
 	hermon_stop_firmware ( hermon );
  err_start_firmware:
 	iounmap ( hermon->uar );
@@ -4042,6 +4362,10 @@ static struct pci_device_id hermon_nics[] = {
 	PCI_ROM ( 0x15b3, 0x675a, "mt26458", "MT26458 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x6764, "mt26468", "MT26468 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x676e, "mt26478", "MT26478 HCA driver", 0 ),
+
+	/* Mellanox ConnectX-3 VPI (ethernet + infiniband) */
+	PCI_ROM ( 0x15b3, 0x1003, "mt4099", "ConnectX-3 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x1007, "mt4103", "ConnectX-3 Pro HCA driver", 0 ),
 };
 
 struct pci_driver hermon_driver __pci_driver = {

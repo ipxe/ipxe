@@ -34,8 +34,30 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /* Device reset */
 #define HERMON_RESET_OFFSET		0x0f0010
-#define HERMON_RESET_MAGIC		0x01000000UL
-#define HERMON_RESET_WAIT_TIME_MS	1000
+
+/*
+  The Mellanox documentation specifies that the value
+
+     "0x00000001 (Big Endian)"
+
+  is the way to reset a Hermon device.  However, this does not seem to
+  work. Curiously, the same value in little endian seems to work perfectly. This
+  has been tested many times on a ConnectX-3 card. Each time, the little-endian
+  version works, and the big-endian version fails most of the time. This is
+  likely because the reset failed, and the card may or may not be in a good
+  state at this point.
+
+  It's also worth noting that the FlexBoot fork uses two different reset values,
+  with ambiguous naming and semantics, neither of which match HERMON_RESET_MAGIC
+  in either little- or big-endian. One of the FlexBoot values (HERMON_RESET_END)
+  has the top and bottom bit set, which suggests there is confusion surrounding
+  the reset procedures, even inside Mellanox.
+
+  Best guess at this point, is that there is an error in the documentation, and
+  the value is supposed to be little-endian.
+*/
+#define HERMON_RESET_MAGIC		0x00000001UL
+#define HERMON_RESET_WAIT_TIME_MS	500
 
 /* Work queue entry and completion queue entry opcodes */
 #define HERMON_OPCODE_NOP		0x00
@@ -1001,8 +1023,7 @@ struct hermon {
 #define HERMON_HCR_REG(x)		( HERMON_HCR_BASE + 4 * (x) )
 #define HERMON_HCR_MAX_WAIT_MS		10000
 #define HERMON_MBOX_ALIGN		(1 << 12)
-/* MELLANOX-FIXME: HERMON_MBOX_SIZE is 1<<12 in flexboot upstream */
-#define HERMON_MBOX_SIZE		(1 << 10)
+#define HERMON_MBOX_SIZE		(1 << 12)
 
 /* HCA command is split into
  *
