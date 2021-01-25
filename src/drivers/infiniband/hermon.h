@@ -999,7 +999,7 @@ struct hermon {
 
 #define HERMON_HCR_BASE			0x80680
 #define HERMON_HCR_REG(x)		( HERMON_HCR_BASE + 4 * (x) )
-#define HERMON_HCR_MAX_WAIT_MS		2000
+#define HERMON_HCR_MAX_WAIT_MS		10000
 #define HERMON_MBOX_ALIGN		(1 << 12)
 /* MELLANOX-FIXME: HERMON_MBOX_SIZE is 1<<12 in flexboot upstream */
 #define HERMON_MBOX_SIZE		(1 << 10)
