@@ -203,6 +203,9 @@ for FILENAME ; do
 	    DESTFILE=$(efi_boot_name "${FILENAME}")
 	    if [ -z "${EFI}" ] ; then
 		mkdir -p "${DESTDIR}"
+		if [ -n "${SCRIPT}" ] ; then
+		    cp "${SCRIPT}" "${FATDIR}/autoexec.ipxe"
+		fi
 	    fi
 	    EFI=1
 	    ;;
