@@ -3061,6 +3061,7 @@ static int arbel_probe ( struct pci_device *pci ) {
 		ibdev->op = &arbel_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = ( ARBEL_PORT_BASE + i );
+		ibdev->ports = ARBEL_NUM_PORTS;
 		ib_set_drvdata ( ibdev, arbel );
 	}
 

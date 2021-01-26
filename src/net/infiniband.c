@@ -814,26 +814,6 @@ void ib_mcast_detach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
  */
 
 /**
- * Count Infiniband HCA ports
- *
- * @v ibdev		Infiniband device
- * @ret num_ports	Number of ports
- */
-int ib_count_ports ( struct ib_device *ibdev ) {
-	struct ib_device *tmp;
-	int num_ports = 0;
-
-	/* Search for IB devices with the same physical device to
-	 * identify port count.
-	 */
-	for_each_ibdev ( tmp ) {
-		if ( tmp->dev == ibdev->dev )
-			num_ports++;
-	}
-	return num_ports;
-}
-
-/**
  * Set port information
  *
  * @v ibdev		Infiniband device

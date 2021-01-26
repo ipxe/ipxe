@@ -2330,6 +2330,7 @@ static int linda_probe ( struct pci_device *pci ) {
 	ibdev->op = &linda_ib_operations;
 	ibdev->dev = &pci->dev;
 	ibdev->port = 1;
+	ibdev->ports = 1;
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
