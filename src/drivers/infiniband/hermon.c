@@ -3946,7 +3946,7 @@ static int hermon_probe ( struct pci_device *pci ) {
 
 	/* Allocate Infiniband devices */
 	for ( i = 0 ; i < hermon->cap.num_ports ; i++ ) {
-	        ibdev = alloc_ibdev ( 0 );
+		ibdev = alloc_ibdev ( 0 );
 		if ( ! ibdev ) {
 			rc = -ENOMEM;
 			goto err_alloc_ibdev;
