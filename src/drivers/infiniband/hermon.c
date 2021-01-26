@@ -332,6 +332,13 @@ hermon_cmd_sw2hw_mpt ( struct hermon *hermon, unsigned int index,
 }
 
 static inline int
+hermon_cmd_hw2sw_mpt ( struct hermon *hermon, unsigned int index ) {
+	return hermon_cmd ( hermon,
+			    HERMON_HCR_VOID_CMD ( HERMON_HCR_HW2SW_MPT ),
+			    0, NULL, index, NULL );
+}
+
+static inline int
 hermon_cmd_write_mtt ( struct hermon *hermon,
 		       const struct hermonprm_write_mtt *write_mtt ) {
 	return hermon_cmd ( hermon,
@@ -2808,6 +2815,25 @@ static int hermon_setup_mpt ( struct hermon *hermon ) {
 }
 
 /**
+ * Unmap memory protection table
+ *
+ * @v hermon		Hermon device
+ * @ret rc		Return status code
+ */
+static int hermon_unmap_mpt ( struct hermon *hermon ) {
+	int rc;
+
+	if ( ( rc = hermon_cmd_hw2sw_mpt ( hermon,
+					   hermon->cap.reserved_mrws ) ) != 0 ){
+		DBGC ( hermon, "Hermon %p could not unmap MPT: %s\n",
+		       hermon, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Configure special queue pairs
  *
  * @v hermon		Hermon device
@@ -2888,6 +2914,7 @@ static int hermon_start ( struct hermon *hermon, int running ) {
  err_conf_special_qps:
 	hermon_destroy_eq ( hermon );
  err_create_eq:
+	hermon_unmap_mpt ( hermon );
  err_setup_mpt:
 	hermon_cmd_close_hca ( hermon );
  err_init_hca:
@@ -2905,6 +2932,7 @@ static int hermon_start ( struct hermon *hermon, int running ) {
  */
 static void hermon_stop ( struct hermon *hermon ) {
 	hermon_destroy_eq ( hermon );
+	hermon_unmap_mpt ( hermon );
 	hermon_cmd_close_hca ( hermon );
 	hermon_unmap_icm ( hermon );
 	hermon_stop_firmware ( hermon );
