@@ -4232,6 +4232,10 @@ static struct pci_device_id hermon_nics[] = {
 	PCI_ROM ( 0x15b3, 0x675a, "mt26458", "MT26458 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x6764, "mt26468", "MT26468 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x676e, "mt26478", "MT26478 HCA driver", 0 ),
+
+	/* Mellanox ConnectX-3 VPI (ethernet + infiniband) */
+	PCI_ROM ( 0x15b3, 0x1003, "mt4099", "ConnectX-3 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x1007, "mt4103", "ConnectX-3 Pro HCA driver", 0 ),
 };
 
 struct pci_driver hermon_driver __pci_driver = {
