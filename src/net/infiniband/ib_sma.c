@@ -63,7 +63,7 @@ static void ib_sma_node_info ( struct ib_device *ibdev,
 	node_info->base_version = IB_MGMT_BASE_VERSION;
 	node_info->class_version = IB_SMP_CLASS_VERSION;
 	node_info->node_type = IB_NODE_TYPE_HCA;
-	node_info->num_ports = ib_count_ports ( ibdev );
+	node_info->num_ports = ibdev->ports;
 	memcpy ( &node_info->sys_guid, &ibdev->node_guid,
 		 sizeof ( node_info->sys_guid ) );
 	memcpy ( &node_info->node_guid, &ibdev->node_guid,
