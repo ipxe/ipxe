@@ -250,6 +250,58 @@ int ifconf_exec ( int argc, char **argv ) {
 	return ifcommon_exec ( argc, argv, &ifconf_cmd );
 }
 
+/** "iflinkwait" option list */
+struct iflinkwait_options {
+	/** Link timeout */
+	unsigned long timeout;
+};
+
+/** "iflinkwait" option list */
+static struct option_descriptor iflinkwait_opts[] = {
+	OPTION_DESC ( "timeout", 't', required_argument,
+		      struct iflinkwait_options, timeout, parse_timeout ),
+};
+
+/**
+ * "iflinkwait" payload
+ *
+ * @v netdev		Network device
+ * @v opts		Command options
+ * @ret rc		Return status code
+ */
+static int iflinkwait_payload ( struct net_device *netdev,
+				struct iflinkwait_options *opts ) {
+	int rc;
+
+	/* Wait for link-up */
+	if ( ( rc = iflinkwait ( netdev, opts->timeout, 1 ) ) != 0 ) {
+
+		/* Close device on failure, to avoid memory exhaustion */
+		netdev_close ( netdev );
+
+		return rc;
+	}
+
+	return 0;
+}
+
+/** "iflinkwait" command descriptor */
+static struct ifcommon_command_descriptor iflinkwait_cmd =
+	IFCOMMON_COMMAND_DESC ( struct iflinkwait_options, iflinkwait_opts,
+				0, MAX_ARGUMENTS, "[<interface>...]",
+				iflinkwait_payload, 1 );
+
+/**
+ * The "iflinkwait" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int iflinkwait_exec ( int argc, char **argv ) {
+	return ifcommon_exec ( argc, argv, &iflinkwait_cmd );
+}
+
 /** Interface management commands */
 struct command ifmgmt_commands[] __command = {
 	{
@@ -267,5 +319,9 @@ struct command ifmgmt_commands[] __command = {
 	{
 		.name = "ifconf",
 		.exec = ifconf_exec,
+	},
+	{
+		.name = "iflinkwait",
+		.exec = iflinkwait_exec,
 	},
 };
