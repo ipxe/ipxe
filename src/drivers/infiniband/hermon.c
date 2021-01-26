@@ -137,13 +137,13 @@ static int hermon_cmd_wait ( struct hermon *hermon,
 			     struct hermonprm_hca_command_register *hcr ) {
 	unsigned int wait;
 
-	for ( wait = HERMON_HCR_MAX_WAIT_MS ; wait ; wait-- ) {
+	for ( wait = ( 100 * HERMON_HCR_MAX_WAIT_MS ) ; wait ; wait-- ) {
 		hcr->u.dwords[6] =
 			readl ( hermon->config + HERMON_HCR_REG ( 6 ) );
 		if ( ( MLX_GET ( hcr, go ) == 0 ) &&
 		     ( MLX_GET ( hcr, t ) == hermon->toggle ) )
 			return 0;
-		mdelay ( 1 );
+		udelay ( 10 );
 	}
 	return -EBUSY;
 }
