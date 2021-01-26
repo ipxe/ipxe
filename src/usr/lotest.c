@@ -208,9 +208,9 @@ int loopback_test ( struct net_device *sender, struct net_device *receiver,
 		return rc;
 
 	/* Wait for link-up */
-	if ( ( rc = iflinkwait ( sender, 0 ) ) != 0 )
+	if ( ( rc = iflinkwait ( sender, 0, 0 ) ) != 0 )
 		return rc;
-	if ( ( rc = iflinkwait ( receiver, 0 ) ) != 0 )
+	if ( ( rc = iflinkwait ( receiver, 0, 0 ) ) != 0 )
 		return rc;
 
 	/* Allocate data buffer */

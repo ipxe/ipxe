@@ -18,6 +18,7 @@ extern int ifconf ( struct net_device *netdev,
 		    unsigned long timeout );
 extern void ifclose ( struct net_device *netdev );
 extern void ifstat ( struct net_device *netdev );
-extern int iflinkwait ( struct net_device *netdev, unsigned long timeout );
+extern int iflinkwait ( struct net_device *netdev, unsigned long timeout,
+			int verbose );
 
 #endif /* _USR_IFMGMT_H */
