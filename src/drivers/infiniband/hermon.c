@@ -3274,13 +3274,13 @@ static struct hermon_port_type hermon_port_type_ib = {
  */
 
 /** Number of Hermon Ethernet send work queue entries */
-#define HERMON_ETH_NUM_SEND_WQES 2
+#define HERMON_ETH_NUM_SEND_WQES 16
 
 /** Number of Hermon Ethernet receive work queue entries */
-#define HERMON_ETH_NUM_RECV_WQES 4
+#define HERMON_ETH_NUM_RECV_WQES 8
 
 /** Number of Hermon Ethernet completion entries */
-#define HERMON_ETH_NUM_CQES 8
+#define HERMON_ETH_NUM_CQES 32
 
 /**
  * Transmit packet via Hermon Ethernet device
