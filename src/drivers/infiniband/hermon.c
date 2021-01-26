@@ -3179,6 +3179,9 @@ static int hermon_register_ibdev ( struct hermon *hermon,
 	struct ib_device *ibdev = port->ibdev;
 	int rc;
 
+	/* Use Ethernet MAC as eIPoIB local EMAC */
+	memcpy ( ibdev->lemac, port->eth_mac.raw, ETH_ALEN );
+
 	/* Initialise parameters using SMC */
 	ib_smc_init ( ibdev, hermon_mad );
 
@@ -3495,24 +3498,10 @@ static int hermon_register_netdev ( struct hermon *hermon,
 				    struct hermon_port *port ) {
 	struct net_device *netdev = port->netdev;
 	struct ib_device *ibdev = port->ibdev;
-	struct hermonprm_query_port_cap query_port;
-	union {
-		uint8_t bytes[8];
-		uint32_t dwords[2];
-	} mac;
 	int rc;
 
-	/* Retrieve MAC address */
-	if ( ( rc = hermon_cmd_query_port ( hermon, ibdev->port,
-					    &query_port ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p port %d could not query port: %s\n",
-		       hermon, ibdev->port, strerror ( rc ) );
-		goto err_query_port;
-	}
-	mac.dwords[0] = htonl ( MLX_GET ( &query_port, mac_47_32 ) );
-	mac.dwords[1] = htonl ( MLX_GET ( &query_port, mac_31_0 ) );
-	memcpy ( netdev->hw_addr,
-		 &mac.bytes[ sizeof ( mac.bytes ) - ETH_ALEN ], ETH_ALEN );
+	/* Set MAC address */
+	memcpy ( netdev->hw_addr, port->eth_mac.raw, ETH_ALEN );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
@@ -3536,7 +3525,6 @@ static int hermon_register_netdev ( struct hermon *hermon,
  err_register_nvo:
 	unregister_netdev ( netdev );
  err_register_netdev:
- err_query_port:
 	return rc;
 }
 
@@ -3673,6 +3661,10 @@ static int hermon_set_port_type ( struct hermon *hermon,
 	       hermon, ibdev->port, ( ib_supported ? " Infiniband" : "" ),
 	       ( ( ib_supported && eth_supported ) ? " and" : "" ),
 	       ( eth_supported ? " Ethernet" : "" ) );
+
+	/* Record Ethernet MAC address */
+	port->eth_mac.part.h = htons ( MLX_GET ( &query_port, mac_47_32 ) );
+	port->eth_mac.part.l = htonl ( MLX_GET ( &query_port, mac_31_0 ) );
 
 	/* Sense network, if applicable */
 	if ( ib_supported && eth_supported ) {

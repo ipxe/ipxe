@@ -822,6 +822,15 @@ struct hermon_port_type {
 				    struct hermon_port *port );
 };
 
+/** A Hermon port Ethernet MAC address */
+union hermon_port_mac {
+	struct {
+		uint16_t h;
+		uint32_t l;
+	} __attribute__ (( packed )) part;
+	uint8_t raw[ETH_ALEN];
+};
+
 /** A Hermon port */
 struct hermon_port {
 	/** Infiniband device */
@@ -832,6 +841,8 @@ struct hermon_port {
 	struct ib_completion_queue *eth_cq;
 	/** Ethernet queue pair */
 	struct ib_queue_pair *eth_qp;
+	/** Ethernet MAC */
+	union hermon_port_mac eth_mac;
 	/** Port type */
 	struct hermon_port_type *type;
 	/** Non-volatile option storage */
