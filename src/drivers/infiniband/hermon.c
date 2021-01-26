@@ -2945,6 +2945,7 @@ static int hermon_start ( struct hermon *hermon, int running ) {
 	if ( ( rc = hermon_configure_special_qps ( hermon ) ) != 0 )
 		goto err_conf_special_qps;
 
+	DBGC ( hermon, "Hermon %p device started\n", hermon );
 	return 0;
 
  err_conf_special_qps:
