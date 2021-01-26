@@ -54,6 +54,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define ATTR_DEFAULT		ATTR_FCOL_WHITE
 
+#define CTRL_MASK		0x1f
+
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_EFI ) && CONSOLE_EXPLICIT ( CONSOLE_EFI ) )
 #undef CONSOLE_EFI
@@ -66,6 +68,9 @@ static unsigned int efi_attr = ATTR_DEFAULT;
 /** Console control protocol */
 static EFI_CONSOLE_CONTROL_PROTOCOL *conctrl;
 EFI_REQUEST_PROTOCOL ( EFI_CONSOLE_CONTROL_PROTOCOL, &conctrl );
+
+/** Extended simple text input protocol, if present */
+static EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *efi_conin_ex;
 
 /**
  * Handle ANSI CUP (cursor position)
@@ -278,8 +283,9 @@ static const char * scancode_to_ansi_seq ( unsigned int scancode ) {
  */
 static int efi_getchar ( void ) {
 	EFI_SIMPLE_TEXT_INPUT_PROTOCOL *conin = efi_systab->ConIn;
+	EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *conin_ex = efi_conin_ex;
 	const char *ansi_seq;
-	EFI_INPUT_KEY key;
+	EFI_KEY_DATA key;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -288,20 +294,42 @@ static int efi_getchar ( void ) {
 		return *(ansi_input++);
 
 	/* Read key from real EFI console */
-	if ( ( efirc = conin->ReadKeyStroke ( conin, &key ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBG ( "EFI could not read keystroke: %s\n", strerror ( rc ) );
-		return 0;
+	memset ( &key, 0, sizeof ( key ) );
+	if ( conin_ex ) {
+		if ( ( efirc = conin_ex->ReadKeyStrokeEx ( conin_ex,
+							   &key ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBG ( "EFI could not read extended keystroke: %s\n",
+			      strerror ( rc ) );
+			return 0;
+		}
+	} else {
+		if ( ( efirc = conin->ReadKeyStroke ( conin,
+						      &key.Key ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBG ( "EFI could not read keystroke: %s\n",
+			      strerror ( rc ) );
+			return 0;
+		}
 	}
-	DBG2 ( "EFI read key stroke with unicode %04x scancode %04x\n",
-	       key.UnicodeChar, key.ScanCode );
+	DBG2 ( "EFI read key stroke shift %08x toggle %02x unicode %04x "
+	       "scancode %04x\n", key.KeyState.KeyShiftState,
+	       key.KeyState.KeyToggleState, key.Key.UnicodeChar,
+	       key.Key.ScanCode );
+
+	/* Translate Ctrl-<key> */
+	if ( ( key.KeyState.KeyShiftState & EFI_SHIFT_STATE_VALID ) &&
+	     ( key.KeyState.KeyShiftState & ( EFI_LEFT_CONTROL_PRESSED |
+					      EFI_RIGHT_CONTROL_PRESSED ) ) ) {
+		key.Key.UnicodeChar &= CTRL_MASK;
+	}
 
 	/* If key has a Unicode representation, return it */
-	if ( key.UnicodeChar )
-		return key.UnicodeChar;
+	if ( key.Key.UnicodeChar )
+		return key.Key.UnicodeChar;
 
 	/* Otherwise, check for a special key that we know about */
-	if ( ( ansi_seq = scancode_to_ansi_seq ( key.ScanCode ) ) ) {
+	if ( ( ansi_seq = scancode_to_ansi_seq ( key.Key.ScanCode ) ) ) {
 		/* Start of escape sequence: return ESC (0x1b) */
 		ansi_input = ansi_seq;
 		return 0x1b;
@@ -319,6 +347,8 @@ static int efi_getchar ( void ) {
 static int efi_iskey ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_SIMPLE_TEXT_INPUT_PROTOCOL *conin = efi_systab->ConIn;
+	EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *conin_ex = efi_conin_ex;
+	EFI_EVENT *event;
 	EFI_STATUS efirc;
 
 	/* If we are mid-sequence, we are always ready */
@@ -326,7 +356,8 @@ static int efi_iskey ( void ) {
 		return 1;
 
 	/* Check to see if the WaitForKey event has fired */
-	if ( ( efirc = bs->CheckEvent ( conin->WaitForKey ) ) == 0 )
+	event = ( conin_ex ? conin_ex->WaitForKeyEx : conin->WaitForKey );
+	if ( ( efirc = bs->CheckEvent ( event ) ) == 0 )
 		return 1;
 
 	return 0;
@@ -345,7 +376,14 @@ struct console_driver efi_console __console_driver = {
  *
  */
 static void efi_console_init ( void ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_CONSOLE_CONTROL_SCREEN_MODE mode;
+	union {
+		void *interface;
+		EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *wtf;
+	} u;
+	EFI_STATUS efirc;
+	int rc;
 
 	/* On some older EFI 1.10 implementations, we must use the
 	 * (now obsolete) EFI_CONSOLE_CONTROL_PROTOCOL to switch the
@@ -357,6 +395,23 @@ static void efi_console_init ( void ) {
 			conctrl->SetMode ( conctrl,
 					   EfiConsoleControlScreenText );
 		}
+	}
+
+	/* Attempt to open the Simple Text Input Ex protocol on the
+	 * console input handle.  This is provably unsafe, but is
+	 * apparently the expected behaviour for all UEFI
+	 * applications.  Don't ask.
+	 */
+	if ( ( efirc = bs->OpenProtocol ( efi_systab->ConsoleInHandle,
+				&efi_simple_text_input_ex_protocol_guid,
+				&u.interface, efi_image_handle,
+				efi_systab->ConsoleInHandle,
+				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) == 0 ) {
+		efi_conin_ex = u.wtf;
+		DBG ( "EFI using SimpleTextInputEx\n" );
+	} else {
+		rc = -EEFI ( efirc );
+		DBG ( "EFI has no SimpleTextInputEx: %s\n", strerror ( rc ) );
 	}
 }
 
