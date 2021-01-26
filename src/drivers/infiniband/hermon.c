@@ -3829,6 +3829,7 @@ static int hermon_probe ( struct pci_device *pci ) {
 		ibdev->op = &hermon_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = ( HERMON_PORT_BASE + i );
+		ibdev->ports = hermon->cap.num_ports;
 		ib_set_drvdata ( ibdev, hermon );
 	}
 

@@ -2348,6 +2348,7 @@ static int qib7322_probe ( struct pci_device *pci ) {
 		ibdev->dev = &pci->dev;
 		ibdev->op = &qib7322_ib_operations;
 		ibdev->port = ( QIB7322_PORT_BASE + i );
+		ibdev->ports = QIB7322_MAX_PORTS;
 		ibdev->link_width_enabled = ibdev->link_width_supported =
 			IB_LINK_WIDTH_4X; /* 1x does not work */
 		ibdev->link_speed_enabled = ibdev->link_speed_supported =

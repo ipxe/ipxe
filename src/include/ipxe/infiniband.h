@@ -416,6 +416,8 @@ struct ib_device {
 	struct ib_device_operations *op;
 	/** Port number */
 	unsigned int port;
+	/** Total ports on device */
+	unsigned int ports;
 	/** Port open request counter */
 	unsigned int open_count;
 
@@ -538,7 +540,6 @@ extern int ib_mcast_attach ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 			     union ib_gid *gid );
 extern void ib_mcast_detach ( struct ib_device *ibdev,
 			      struct ib_queue_pair *qp, union ib_gid *gid );
-extern int ib_count_ports ( struct ib_device *ibdev );
 extern int ib_set_port_info ( struct ib_device *ibdev, union ib_mad *mad );
 extern int ib_set_pkey_table ( struct ib_device *ibdev, union ib_mad *mad );
 extern struct ib_device * alloc_ibdev ( size_t priv_size );

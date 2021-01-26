@@ -2386,6 +2386,7 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 		ibdev->op = &golan_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = (GOLAN_PORT_BASE + i);
+		ibdev->ports = golan->caps.num_ports;
 		ib_set_drvdata( ibdev, golan );
 	}
 
