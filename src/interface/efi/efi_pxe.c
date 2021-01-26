@@ -756,7 +756,8 @@ static EFI_STATUS EFIAPI efi_pxe_start ( EFI_PXE_BASE_CODE_PROTOCOL *base,
 	sa_family_t family = ( use_ipv6 ? AF_INET6 : AF_INET );
 	int rc;
 
-	DBGC ( pxe, "PXE %s START %s\n", pxe->name, ( ipv6 ? "IPv6" : "IPv4" ));
+	DBGC ( pxe, "PXE %s START %s\n",
+	       pxe->name, ( use_ipv6 ? "IPv6" : "IPv4" ) );
 
 	/* Initialise mode structure */
 	memset ( mode, 0, sizeof ( *mode ) );
