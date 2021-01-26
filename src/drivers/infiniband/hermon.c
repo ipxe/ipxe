@@ -3743,6 +3743,9 @@ static int hermon_set_port_type ( struct hermon *hermon,
 				rc = port_type;
 				return rc;
 			}
+
+			/* Avoid spamming debug output */
+			mdelay ( 50 );
 		} while ( ( port_type == HERMON_PORT_TYPE_UNKNOWN ) &&
 			  ( ( elapsed = ( currticks() - start ) ) <
 			    HERMON_SENSE_PORT_TIMEOUT ) );
