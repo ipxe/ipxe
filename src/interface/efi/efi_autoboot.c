@@ -194,6 +194,9 @@ static int efi_load_autoexec ( EFI_HANDLE device ) {
 	DBGC ( device, "EFI %s found %ls\n",
 	       efi_handle_name ( device ), name );
 
+	/* Success */
+	rc = 0;
+
  err_read:
 	if ( data )
 		bs->FreePool ( data );
