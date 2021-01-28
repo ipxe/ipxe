@@ -1879,6 +1879,79 @@ static void hermon_poll_cq ( struct ib_device *ibdev,
  */
 
 /**
+ * Dump event queue context (for debugging only)
+ *
+ * @v hermon		Hermon device
+ * @v hermon_eq		Event queue
+ * @ret rc		Return status code
+ */
+static __attribute__ (( unused )) int
+hermon_dump_eqctx ( struct hermon *hermon,
+		    struct hermon_event_queue *hermon_eq ) {
+	struct hermonprm_eqc eqctx;
+	int rc;
+
+	memset ( &eqctx, 0, sizeof ( eqctx ) );
+	if ( ( rc = hermon_cmd_query_eq ( hermon, hermon_eq->eqn,
+					  &eqctx ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p EQN %#lx QUERY_EQ failed: %s\n",
+		       hermon, hermon_eq->eqn, strerror ( rc ) );
+		return rc;
+	}
+	DBGC ( hermon, "Hermon %p EQN %#lx context:\n",
+	       hermon, hermon_eq->eqn );
+	DBGC_HDA ( hermon, 0, &eqctx, sizeof ( eqctx ) );
+
+	return 0;
+}
+
+/**
+ * Dump unconsumed event queue entries (for debugging only)
+ *
+ * @v hermon		Hermon device
+ * @v hermon_eq		Event queue
+ * @ret rc		Return status code
+ */
+static __attribute__ (( unused )) int
+hermon_dump_eqes ( struct hermon *hermon,
+		   struct hermon_event_queue *hermon_eq ) {
+	struct hermonprm_eqc eqctx;
+	union hermonprm_event_entry *eqe;
+	unsigned int mask;
+	unsigned int prod;
+	unsigned int cons;
+	unsigned int idx;
+	int rc;
+
+	memset ( &eqctx, 0, sizeof ( eqctx ) );
+	if ( ( rc = hermon_cmd_query_eq ( hermon, hermon_eq->eqn,
+					  &eqctx ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p EQN %#lx QUERY_EQ failed: %s\n",
+		       hermon, hermon_eq->eqn, strerror ( rc ) );
+		return rc;
+	}
+	mask = ( HERMON_NUM_EQES - 1 );
+	prod = MLX_GET ( &eqctx, producer_counter ) & mask;
+	cons = MLX_GET ( &eqctx, consumer_counter ) & mask;
+	idx = hermon_eq->next_idx;
+	if ( ( idx & mask ) != ( cons & mask ) ) {
+		DBGC ( hermon, "Hermon %p EQN %#lx mismatch: SW %#x != HW "
+		       "%#x\n", hermon, hermon_eq->eqn, idx, cons );
+	}
+	for ( ; ( idx & mask ) != ( prod & mask ) ; idx++ ) {
+		eqe = &hermon_eq->eqe[idx & mask];
+		DBGC ( hermon, "Hermon %p EQN %#lx event %#x owner %d type "
+		       "%#02x:%#02x\n", hermon, hermon_eq->eqn, idx,
+		       MLX_GET ( &eqe->generic, owner ),
+		       MLX_GET ( &eqe->generic, event_type ),
+		       MLX_GET ( &eqe->generic, event_sub_type ) );
+		DBGC_HDA ( hermon, 0, eqe, sizeof ( *eqe ) );
+	}
+
+	return 0;
+}
+
+/**
  * Create event queue
  *
  * @v hermon		Hermon device
@@ -2084,8 +2157,9 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 			break;
 		default:
 			DBGC ( hermon, "Hermon %p EQN %#lx unrecognised event "
-			       "type %#x:\n",
-			       hermon, hermon_eq->eqn, event_type );
+			       "type %#02x:%#02x\n",
+			       hermon, hermon_eq->eqn, event_type,
+			       MLX_GET ( &eqe->generic, event_sub_type ) );
 			DBGC_HDA ( hermon, virt_to_phys ( eqe ),
 				   eqe, sizeof ( *eqe ) );
 			break;
