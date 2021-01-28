@@ -123,6 +123,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_SET_PORT_GID_TABLE	0x0500
 
 #define HERMON_EV_PORT_STATE_CHANGE	0x09
+#define HERMON_EV_PORT_MGMNT_CHANGE	0x1d
 
 #define HERMON_SCHED_QP0		0x3f
 #define HERMON_SCHED_DEFAULT		0x83
@@ -215,6 +216,13 @@ struct hermonprm_port_state_change_event_st {
 	pseudo_bit_t reserved[0x00020];
 /* -------------- */
 	struct hermonprm_port_state_change_st data;
+} __attribute__ (( packed ));
+
+struct hermonprm_port_mgmnt_change_event_st {
+	pseudo_bit_t reserved[0x00020];
+/* -------------- */
+	pseudo_bit_t port[0x00008];
+	pseudo_bit_t reserved0[0x00018];
 } __attribute__ (( packed ));
 
 struct hermonprm_sense_port_st {
@@ -460,6 +468,7 @@ struct MLX_DECLARE_STRUCT ( hermonprm_mod_stat_cfg_input_mod );
 struct MLX_DECLARE_STRUCT ( hermonprm_mpt );
 struct MLX_DECLARE_STRUCT ( hermonprm_mtt );
 struct MLX_DECLARE_STRUCT ( hermonprm_port_state_change_event );
+struct MLX_DECLARE_STRUCT ( hermonprm_port_mgmnt_change_event );
 struct MLX_DECLARE_STRUCT ( hermonprm_qp_db_record );
 struct MLX_DECLARE_STRUCT ( hermonprm_qp_ee_state_transitions );
 struct MLX_DECLARE_STRUCT ( hermonprm_query_dev_cap );
@@ -530,6 +539,7 @@ union hermonprm_completion_entry {
 union hermonprm_event_entry {
 	struct hermonprm_event_queue_entry generic;
 	struct hermonprm_port_state_change_event port_state_change;
+	struct hermonprm_port_mgmnt_change_event port_mgmnt_change;
 } __attribute__ (( packed ));
 
 union hermonprm_doorbell_register {
