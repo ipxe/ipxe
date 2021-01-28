@@ -1163,7 +1163,13 @@ blib : $(BLIB)
 # Command to generate build ID.  Must be unique for each $(BIN)/%.tmp,
 # even within the same build run.
 #
-BUILD_ID_CMD	:= perl -e 'printf "0x%08x", int ( rand ( 0xffffffff ) );'
+# The build ID is supposed to be collision-free across all ROMs that
+# might ever end up installed in the same system.  It doesn't just
+# disambiguate targets within a single build; it also disambiguates
+# different builds (such as builds for multiple ROMs all built from
+# the same blib.a).
+#
+BUILD_ID_CMD = sha1sum $^ | sort | cksum | awk '{printf "0x%08x", $$1}'
 
 # Build timestamp
 #
