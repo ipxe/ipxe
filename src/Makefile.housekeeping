@@ -1160,10 +1160,15 @@ $(BLIB) : $(BLIB_OBJS) $(BLIB_LIST) $(MAKEDEPS)
 	$(Q)$(RANLIB) -D $@
 blib : $(BLIB)
 
-# Command to generate build ID.  Must be unique for each $(BIN)/%.tmp,
-# even within the same build run.
+# Build ID
 #
-BUILD_ID_CMD	:= perl -e 'printf "0x%08x", int ( rand ( 0xffffffff ) );'
+# Must be unique for each $(BIN)/%.tmp, even within the same build run.
+#
+# The build ID is supposed to be collision-free across all ROMs that might ever
+# end up installed in the same system. It doesn't just disambiguate targets
+# within a single build; it also disambiguates different builds (such as
+# builds for multiple roms, which are all built from the same blib.a).
+BUILD_ID_CMD = sha1sum $^ | sort | cksum | awk '{printf "0x%08x", $$1}'
 
 # Build timestamp
 #
@@ -1173,8 +1178,8 @@ BUILD_ID_CMD	:= perl -e 'printf "0x%08x", int ( rand ( 0xffffffff ) );'
 # It gets rounded down to the nearest minute when used for this purpose.
 ifdef SOURCE_DATE_EPOCH
 BUILD_TIMESTAMP := $(SOURCE_DATE_EPOCH)
-else ifdef GITVERSION
-BUILD_TIMESTAMP := $(git log -1 --pretty=%ct)
+else ifneq ($(GITVERSION),)
+BUILD_TIMESTAMP := $(shell git log -1 --pretty=%ct)
 else
 BUILD_TIMESTAMP := $(shell date +%s)
 endif
