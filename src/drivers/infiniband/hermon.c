@@ -2121,6 +2121,32 @@ static void hermon_event_port_state_change ( struct hermon *hermon,
 }
 
 /**
+ * Handle port management event
+ *
+ * @v hermon		Hermon device
+ * @v eqe		Port management change event queue entry
+ */
+static void hermon_event_port_mgmnt_change ( struct hermon *hermon,
+					     union hermonprm_event_entry *eqe){
+	unsigned int port;
+
+	/* Get port */
+	port = ( MLX_GET ( &eqe->port_mgmnt_change, port ) - 1 );
+	DBGC ( hermon, "Hermon %p port %d management change\n",
+	       hermon, ( port + 1 ) );
+
+	/* Sanity check */
+	if ( port >= hermon->cap.num_ports ) {
+		DBGC ( hermon, "Hermon %p port %d does not exist!\n",
+		       hermon, ( port + 1 ) );
+		return;
+	}
+
+	/* Update MAD parameters */
+	ib_smc_update ( hermon->port[port].ibdev, hermon_mad );
+}
+
+/**
  * Poll event queue
  *
  * @v ibdev		Infiniband device
@@ -2168,6 +2194,9 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 		switch ( event_type ) {
 		case HERMON_EV_PORT_STATE_CHANGE:
 			hermon_event_port_state_change ( hermon, eqe );
+			break;
+		case HERMON_EV_PORT_MGMNT_CHANGE:
+			hermon_event_port_mgmnt_change ( hermon, eqe );
 			break;
 		default:
 			DBGC ( hermon, "Hermon %p EQN %#lx unrecognised event "
