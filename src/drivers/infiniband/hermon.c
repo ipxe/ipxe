@@ -175,7 +175,7 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 	assert ( in_len <= HERMON_MBOX_SIZE );
 	assert ( out_len <= HERMON_MBOX_SIZE );
 
-	DBGC2 ( hermon, "Hermon %p command %02x in %zx%s out %zx%s\n",
+	DBGC2 ( hermon, "Hermon %p command %04x in %zx%s out %zx%s\n",
 		hermon, opcode, in_len,
 		( ( command & HERMON_HCR_IN_MBOX ) ? "(mbox)" : "" ), out_len,
 		( ( command & HERMON_HCR_OUT_MBOX ) ? "(mbox)" : "" ) );
@@ -214,8 +214,6 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 		     opcode_modifier, op_mod,
 		     go, 1,
 		     t, hermon->toggle );
-	DBGC ( hermon, "Hermon %p issuing command %04x\n",
-	       hermon, opcode );
 	DBGC2_HDA ( hermon, virt_to_phys ( hermon->config + HERMON_HCR_BASE ),
 		    &hcr, sizeof ( hcr ) );
 	if ( in_len && ( command & HERMON_HCR_IN_MBOX ) ) {
@@ -234,8 +232,8 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 
 	/* Wait for command completion */
 	if ( ( rc = hermon_cmd_wait ( hermon, &hcr ) ) != 0 ) {
-		DBGC ( hermon, "Hermon %p timed out waiting for command:\n",
-		       hermon );
+		DBGC ( hermon, "Hermon %p timed out waiting for command "
+		       "%04x:\n", hermon, opcode );
 		DBGC_HDA ( hermon,
 			   virt_to_phys ( hermon->config + HERMON_HCR_BASE ),
 			   &hcr, sizeof ( hcr ) );
@@ -245,8 +243,8 @@ static int hermon_cmd ( struct hermon *hermon, unsigned long command,
 	/* Check command status */
 	status = MLX_GET ( &hcr, status );
 	if ( status != 0 ) {
-		DBGC ( hermon, "Hermon %p command failed with status %02x:\n",
-		       hermon, status );
+		DBGC ( hermon, "Hermon %p command %04x failed with status "
+		       "%02x:\n", hermon, opcode, status );
 		DBGC_HDA ( hermon,
 			   virt_to_phys ( hermon->config + HERMON_HCR_BASE ),
 			   &hcr, sizeof ( hcr ) );
