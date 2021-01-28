@@ -636,9 +636,9 @@ static int hermon_alloc_mtt ( struct hermon *hermon,
 	mtt_offset = hermon_bitmask_alloc ( hermon->mtt_inuse, HERMON_MAX_MTTS,
 					    num_pages );
 	if ( mtt_offset < 0 ) {
-		DBGC ( hermon, "Hermon %p could not allocate %d MTT entries\n",
-		       hermon, num_pages );
 		rc = mtt_offset;
+		DBGC ( hermon, "Hermon %p could not allocate %d MTT entries: "
+		       "%s\n", hermon, num_pages, strerror ( rc ) );
 		goto err_mtt_offset;
 	}
 	mtt_base_addr = ( ( hermon->cap.reserved_mtts + mtt_offset ) *
@@ -662,8 +662,9 @@ static int hermon_alloc_mtt ( struct hermon *hermon,
 			     ptag_l, ( addr >> 3 ) );
 		if ( ( rc = hermon_cmd_write_mtt ( hermon,
 						   &write_mtt ) ) != 0 ) {
-			DBGC ( hermon, "Hermon %p could not write MTT at %x\n",
-			       hermon, mtt_base_addr );
+			DBGC ( hermon, "Hermon %p could not write MTT at %x: "
+			       "%s\n", hermon, mtt_base_addr,
+			       strerror ( rc ) );
 			goto err_write_mtt;
 		}
 		addr += HERMON_PAGE_SIZE;
@@ -857,6 +858,8 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	/* Allocate control structures */
 	hermon_cq = zalloc ( sizeof ( *hermon_cq ) );
 	if ( ! hermon_cq ) {
+		DBGC ( hermon, "Hermon %p CQN %#lx could not allocate CQ\n",
+		       hermon, cq->cqn );
 		rc = -ENOMEM;
 		goto err_hermon_cq;
 	}
@@ -865,6 +868,8 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	hermon_cq->doorbell = malloc_phys ( sizeof ( hermon_cq->doorbell[0] ),
 					    sizeof ( hermon_cq->doorbell[0] ) );
 	if ( ! hermon_cq->doorbell ) {
+		DBGC ( hermon, "Hermon %p CQN %#lx could not allocate "
+		       "doorbell\n", hermon, cq->cqn );
 		rc = -ENOMEM;
 		goto err_doorbell;
 	}
@@ -875,6 +880,8 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	hermon_cq->cqe = malloc_phys ( hermon_cq->cqe_size,
 				       sizeof ( hermon_cq->cqe[0] ) );
 	if ( ! hermon_cq->cqe ) {
+		DBGC ( hermon, "Hermon %p CQN %#lx could not allocate CQEs\n",
+		       hermon, cq->cqn );
 		rc = -ENOMEM;
 		goto err_cqe;
 	}
@@ -887,8 +894,11 @@ static int hermon_create_cq ( struct ib_device *ibdev,
 	/* Allocate MTT entries */
 	if ( ( rc = hermon_alloc_mtt ( hermon, hermon_cq->cqe,
 				       hermon_cq->cqe_size,
-				       &hermon_cq->mtt ) ) != 0 )
+				       &hermon_cq->mtt ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p CQN %#lx could not allocate MTTs: "
+		       "%s\n", hermon, cq->cqn, strerror ( rc ) );
 		goto err_alloc_mtt;
+	}
 
 	/* Hand queue over to hardware */
 	memset ( &cqctx, 0, sizeof ( cqctx ) );
@@ -1120,6 +1130,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	/* Allocate control structures */
 	hermon_qp = zalloc ( sizeof ( *hermon_qp ) );
 	if ( ! hermon_qp ) {
+		DBGC ( hermon, "Hermon %p QPN %#lx could not allocate QP\n",
+		       hermon, qp->qpn );
 		rc = -ENOMEM;
 		goto err_hermon_qp;
 	}
@@ -1129,6 +1141,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 		malloc_phys ( sizeof ( hermon_qp->recv.doorbell[0] ),
 			      sizeof ( hermon_qp->recv.doorbell[0] ) );
 	if ( ! hermon_qp->recv.doorbell ) {
+		DBGC ( hermon, "Hermon %p QPN %#lx could not allocate "
+		       "doorbell\n", hermon, qp->qpn );
 		rc = -ENOMEM;
 		goto err_recv_doorbell;
 	}
@@ -1158,6 +1172,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	hermon_qp->wqe = malloc_phys ( hermon_qp->wqe_size,
 				       sizeof ( hermon_qp->send.wqe[0] ) );
 	if ( ! hermon_qp->wqe ) {
+		DBGC ( hermon, "Hermon %p QPN %#lx could not allocate WQEs\n",
+		       hermon, qp->qpn );
 		rc = -ENOMEM;
 		goto err_alloc_wqe;
 	}
@@ -1182,6 +1198,8 @@ static int hermon_create_qp ( struct ib_device *ibdev,
 	if ( ( rc = hermon_alloc_mtt ( hermon, hermon_qp->wqe,
 				       hermon_qp->wqe_size,
 				       &hermon_qp->mtt ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p QPN %#lx could not allocate MTTs: "
+		       "%s\n", hermon, qp->qpn, strerror ( rc ) );
 		goto err_alloc_mtt;
 	}
 
@@ -1888,6 +1906,8 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	hermon_eq->eqe = malloc_phys ( hermon_eq->eqe_size,
 				       sizeof ( hermon_eq->eqe[0] ) );
 	if ( ! hermon_eq->eqe ) {
+		DBGC ( hermon, "Hermon %p EQN %#lx could not allocate EQEs\n",
+		       hermon, hermon_eq->eqn );
 		rc = -ENOMEM;
 		goto err_eqe;
 	}
@@ -1900,8 +1920,11 @@ static int hermon_create_eq ( struct hermon *hermon ) {
 	/* Allocate MTT entries */
 	if ( ( rc = hermon_alloc_mtt ( hermon, hermon_eq->eqe,
 				       hermon_eq->eqe_size,
-				       &hermon_eq->mtt ) ) != 0 )
+				       &hermon_eq->mtt ) ) != 0 ) {
+		DBGC ( hermon, "Hermon %p EQN %#lx could not allocate MTTs: "
+		       "%s\n", hermon, hermon_eq->eqn, strerror ( rc ) );
 		goto err_alloc_mtt;
+	}
 
 	/* Hand queue over to hardware */
 	memset ( &eqctx, 0, sizeof ( eqctx ) );
@@ -2200,6 +2223,8 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 		hermon->firmware_len = fw_len;
 		hermon->firmware_area = umalloc ( hermon->firmware_len );
 		if ( ! hermon->firmware_area ) {
+			DBGC ( hermon, "Hermon %p could not allocate firmware "
+			       "area\n", hermon );
 			rc = -ENOMEM;
 			goto err_alloc_fa;
 		}
@@ -2567,6 +2592,8 @@ static int hermon_map_icm ( struct hermon *hermon,
 		hermon->icm_aux_len = icm_aux_len;
 		hermon->icm = umalloc ( hermon->icm_aux_len + hermon->icm_len );
 		if ( ! hermon->icm ) {
+			DBGC ( hermon, "Hermon %p could not allocate ICM\n",
+			       hermon );
 			rc = -ENOMEM;
 			goto err_alloc;
 		}
