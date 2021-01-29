@@ -1156,8 +1156,8 @@ BLIB		= $(BIN)/blib.a
 $(BLIB) : $(BLIB_OBJS) $(BLIB_LIST) $(MAKEDEPS)
 	$(Q)$(RM) $(BLIB)
 	$(QM)$(ECHO) "  [AR] $@"
-	$(Q)$(AR) r $@ $(sort $(BLIB_OBJS))
-	$(Q)$(RANLIB) $@
+	$(Q)$(AR) rD $@ $(sort $(BLIB_OBJS))
+	$(Q)$(RANLIB) -D $@
 blib : $(BLIB)
 
 # Command to generate build ID.  Must be unique for each $(BIN)/%.tmp,
