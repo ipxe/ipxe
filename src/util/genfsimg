@@ -106,7 +106,7 @@ copy_syslinux_file() {
 	/usr/lib/ISOLINUX \
 	; do
 	if [ -e "${SRCDIR}/${FILENAME}" ] ; then
-	    cp "${SRCDIR}/${FILENAME}" "${DESTDIR}/"
+	    install -m 644 "${SRCDIR}/${FILENAME}" "${DESTDIR}/"
 	    return 0
 	fi
     done
