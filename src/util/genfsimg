@@ -100,6 +100,8 @@ copy_syslinux_file() {
 	/usr/share/syslinux/modules/bios \
 	/usr/local/share/syslinux \
 	/usr/local/share/syslinux/bios \
+	/usr/local/share/syslinux/bios/core \
+	/usr/local/share/syslinux/bios/com32/elflink/ldlinux \
 	/usr/local/share/syslinux/modules/bios \
 	/usr/lib/ISOLINUX \
 	; do
