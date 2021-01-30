@@ -113,6 +113,13 @@ $(warning Use GNU ld instead)
 $(error Unsuitable build environment found)
 endif
 
+OBJCOPY_ETC_BANNER := $(shell $(OBJCOPY) --version | grep 'elftoolchain')
+ifneq ($(OBJCOPY_ETC_BANNER),)
+$(warning The elftoolchain objcopy is unsuitable for building iPXE)
+$(warning Use binutils objcopy instead)
+$(error Unsuitable build environment found)
+endif
+
 ###############################################################################
 #
 # Check if $(eval ...) is available to use
