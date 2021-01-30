@@ -241,30 +241,30 @@ SECTIONS {
 
     .			= ALIGN ( _max_align );
     _prefix_lma		= .;
-    .			+= _prefix_filesz;
+    .			+= ABSOLUTE ( _prefix_filesz );
 
     .			= ALIGN ( _max_align );
     _text16_early_lma	= .;
-    .			+= _text16_early_filesz;
+    .			+= ABSOLUTE ( _text16_early_filesz );
 
     .			= ALIGN ( _max_align );
     .			= ALIGN ( _payload_align );
     _pprefix_lma	= .;
-    .			+= _pprefix_filesz;
+    .			+= ABSOLUTE ( _pprefix_filesz );
 
     .			= ALIGN ( _max_align );
     _payload_lma	= .;
     _pprefix_skip	= ABSOLUTE ( _payload_lma ) - ABSOLUTE ( _pprefix_lma );
     _text16_late_lma	= .;
-    .			+= _text16_late_filesz;
+    .			+= ABSOLUTE ( _text16_late_filesz );
 
     .			= ALIGN ( _max_align );
     _data16_lma		= .;
-    .			+= _data16_filesz;
+    .			+= ABSOLUTE ( _data16_filesz );
 
     .			= ALIGN ( _max_align );
     _textdata_lma	= .;
-    .			+= _textdata_filesz;
+    .			+= ABSOLUTE ( _textdata_filesz );
 
     _filesz		= .; /* Do not include .bss.* or .zinfo in file size */
 
@@ -275,31 +275,31 @@ SECTIONS {
 
     .			= ALIGN ( _max_align );
     _bss_prefix_lma	= .;
-    .			+=  _prefix_padsz;
+    .			+= ABSOLUTE ( _prefix_padsz );
 
     .			= ALIGN ( _max_align );
     _bss_text16_lma	= .;
-    .			+= _text16_padsz;
+    .			+= ABSOLUTE ( _text16_padsz );
 
     .			= ALIGN ( _max_align );
     _bss_data16_lma	= .;
-    .			+= _data16_padsz;
+    .			+= ABSOLUTE ( _data16_padsz );
 
     .			= ALIGN ( _max_align );
     _bss_textdata_lma	= .;
-    .			+= _textdata_padsz;
+    .			+= ABSOLUTE ( _textdata_padsz );
 
     .			= ALIGN ( _max_align );
     _bss_pprefix_lma	= .;
-    .			+= _pprefix_padsz;
+    .			+= ABSOLUTE ( _pprefix_padsz );
 
     .			= ALIGN ( _max_align );
     _bss_zinfo_lma	= .;
-    .			+= _zinfo_padsz;
+    .			+= ABSOLUTE ( _zinfo_padsz );
 
     .			= ALIGN ( _max_align );
     _zinfo_lma		= .;
-    .			+= _zinfo_filesz;
+    .			+= ABSOLUTE ( _zinfo_filesz );
 
     .			= ALIGN ( _max_align );
     _end_lma		= .;
