@@ -1563,7 +1563,7 @@ VERYCLEANUP	:= $(foreach V,$(VERYCLEANUP),$(call ALLBIN,$(V)))
 endif
 
 clean :
-	$(RM) $(CLEANUP)
+	$(RM) -r $(CLEANUP)
 
 veryclean : clean
 	$(RM) -r $(VERYCLEANUP)
