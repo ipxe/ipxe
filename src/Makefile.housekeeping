@@ -1556,9 +1556,10 @@ hci/keymap/keymap_%.c :
 #
 
 ifeq ($(NUM_BINS),0)
-ALLBINS		:= bin{,-*}
-CLEANUP		:= $(patsubst $(BIN)/%,$(ALLBINS)/%,$(CLEANUP))
-VERYCLEANUP	:= $(patsubst $(BIN)/%,$(ALLBINS)/%,$(VERYCLEANUP))
+ALLBINS		:= bin bin-*
+ALLBIN		= $(foreach B,$(ALLBINS),$(patsubst $(BIN)/%,$(B)/%,$(1)))
+CLEANUP		:= $(foreach C,$(CLEANUP),$(call ALLBIN,$(C)))
+VERYCLEANUP	:= $(foreach V,$(VERYCLEANUP),$(call ALLBIN,$(V)))
 endif
 
 clean :
