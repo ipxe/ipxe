@@ -38,6 +38,9 @@
 
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 
+#undef ELF_R_TYPE
+#undef ELF_R_SYM
+
 #ifdef EFI_TARGET32
 
 #define EFI_IMAGE_NT_HEADERS		EFI_IMAGE_NT_HEADERS32
@@ -72,21 +75,46 @@
 
 #define ELF_MREL( mach, type ) ( (mach) | ( (type) << 16 ) )
 
-/* Allow for building with older versions of elf.h */
+/* Provide constants missing on some platforms */
 #ifndef EM_AARCH64
 #define EM_AARCH64 183
+#endif
+#ifndef R_AARCH64_NONE
 #define R_AARCH64_NONE 0
+#endif
+#ifndef R_AARCH64_NULL
+#define R_AARCH64_NULL 256
+#endif
+#ifndef R_AARCH64_ABS64
 #define R_AARCH64_ABS64 257
+#endif
+#ifndef R_AARCH64_CALL26
 #define R_AARCH64_CALL26 283
+#endif
+#ifndef R_AARCH64_JUMP26
 #define R_AARCH64_JUMP26 282
+#endif
+#ifndef R_AARCH64_ADR_PREL_LO21
 #define R_AARCH64_ADR_PREL_LO21 274
+#endif
+#ifndef R_AARCH64_ADR_PREL_PG_HI21
 #define R_AARCH64_ADR_PREL_PG_HI21 275
+#endif
+#ifndef R_AARCH64_ADD_ABS_LO12_NC
 #define R_AARCH64_ADD_ABS_LO12_NC 277
+#endif
+#ifndef R_AARCH64_LDST8_ABS_LO12_NC
 #define R_AARCH64_LDST8_ABS_LO12_NC 278
+#endif
+#ifndef R_AARCH64_LDST16_ABS_LO12_NC
 #define R_AARCH64_LDST16_ABS_LO12_NC 284
+#endif
+#ifndef R_AARCH64_LDST32_ABS_LO12_NC
 #define R_AARCH64_LDST32_ABS_LO12_NC 285
+#endif
+#ifndef R_AARCH64_LDST64_ABS_LO12_NC
 #define R_AARCH64_LDST64_ABS_LO12_NC 286
-#endif /* EM_AARCH64 */
+#endif
 #ifndef R_ARM_CALL
 #define R_ARM_CALL 28
 #endif
@@ -95,11 +123,6 @@
 #endif
 #ifndef R_ARM_V4BX
 #define R_ARM_V4BX 40
-#endif
-
-/* Seems to be missing from elf.h */
-#ifndef R_AARCH64_NULL
-#define R_AARCH64_NULL 256
 #endif
 
 #define EFI_FILE_ALIGN 0x20
