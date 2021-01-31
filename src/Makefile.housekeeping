@@ -1176,7 +1176,7 @@ blib : $(BLIB)
 # different builds (such as builds for multiple ROMs all built from
 # the same blib.a).
 #
-BUILD_ID_CMD = cat $^ | cksum | awk '{printf "0x%08x", $$1}'
+BUILD_ID_CMD = cat $^ | cksum | awk '{print $$1}'
 
 # Build timestamp
 #
