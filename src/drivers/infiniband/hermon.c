@@ -2130,6 +2130,8 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 	struct hermon_event_queue *hermon_eq = &hermon->eq;
 	union hermonprm_event_entry *eqe;
 	union hermonprm_doorbell_register db_reg;
+	unsigned long now;
+	unsigned long elapsed;
 	unsigned int eqe_idx_mask;
 	unsigned int event_type;
 
@@ -2138,7 +2140,12 @@ static void hermon_poll_eq ( struct ib_device *ibdev ) {
 	 */
 	if ( ib_is_open ( ibdev ) &&
 	     ( ibdev->port_state == IB_PORT_STATE_DOWN ) ) {
-		ib_smc_update ( ibdev, hermon_mad );
+		now = currticks();
+		elapsed = ( now - hermon->last_poll );
+		if ( elapsed >= HERMON_LINK_POLL_INTERVAL ) {
+			hermon->last_poll = now;
+			ib_smc_update ( ibdev, hermon_mad );
+		}
 	}
 
 	/* Poll event queue */

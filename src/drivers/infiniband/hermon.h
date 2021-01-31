@@ -894,6 +894,8 @@ struct hermon {
 
 	/** Event queue */
 	struct hermon_event_queue eq;
+	/** Last unsolicited link state poll */
+	unsigned long last_poll;
 	/** Unrestricted LKey
 	 *
 	 * Used to get unrestricted memory access.
@@ -929,6 +931,13 @@ struct hermon {
 
 /** Memory key prefix */
 #define HERMON_MKEY_PREFIX		0x77000000UL
+
+/** Link poll interval
+ *
+ * Used when we need to poll for link state (rather than relying upon
+ * receiving an event).
+ */
+#define HERMON_LINK_POLL_INTERVAL	( TICKS_PER_SEC / 2 )
 
 /*
  * HCA commands
