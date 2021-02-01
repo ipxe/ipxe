@@ -1104,7 +1104,9 @@ static uint8_t hermon_qp_st[] = {
  */
 static __attribute__ (( unused )) int
 hermon_dump_qpctx ( struct hermon *hermon, struct ib_queue_pair *qp ) {
+	struct hermon_queue_pair *hermon_qp = ib_qp_get_drvdata ( qp );
 	struct hermonprm_qp_ee_state_transitions qpctx;
+	unsigned int state;
 	int rc;
 
 	/* Do nothing unless debugging is enabled */
@@ -1118,7 +1120,14 @@ hermon_dump_qpctx ( struct hermon *hermon, struct ib_queue_pair *qp ) {
 		       hermon, qp->qpn, strerror ( rc ) );
 		return rc;
 	}
-	DBGC ( hermon, "Hermon %p QPN %#lx context:\n", hermon, qp->qpn );
+	state = MLX_GET ( &qpctx, qpc_eec_data.state );
+	if ( state != hermon_qp->state ) {
+		DBGC ( hermon, "Hermon %p QPN %#lx state %d unexpected "
+		       "(should be %d)\n",
+		       hermon, qp->qpn, state, hermon_qp->state );
+	}
+	DBGC ( hermon, "Hermon %p QPN %#lx state %d context:\n",
+	       hermon, qp->qpn, state );
 	DBGC_HDA ( hermon, 0, &qpctx.u.dwords[2], ( sizeof ( qpctx ) - 8 ) );
 
 	return 0;
@@ -1799,6 +1808,11 @@ static int hermon_complete ( struct ib_device *ibdev,
 	if ( is_send ) {
 		/* Hand off to completion handler */
 		ib_complete_send ( ibdev, qp, iobuf, rc );
+	} else if ( rc != 0 ) {
+		/* Dump queue state (for debugging) */
+		hermon_dump_qpctx ( hermon, qp );
+		/* Hand off to completion handler */
+		ib_complete_recv ( ibdev, qp, NULL, NULL, iobuf, rc );
 	} else {
 		/* Set received length */
 		len = MLX_GET ( &cqe->normal, byte_cnt );
@@ -1841,7 +1855,7 @@ static int hermon_complete ( struct ib_device *ibdev,
 		assert ( len <= iob_tailroom ( iobuf ) );
 		iob_put ( iobuf, len );
 		/* Hand off to completion handler */
-		ib_complete_recv ( ibdev, qp, &recv_dest, source, iobuf, rc );
+		ib_complete_recv ( ibdev, qp, &recv_dest, source, iobuf, 0 );
 	}
 
 	return rc;
