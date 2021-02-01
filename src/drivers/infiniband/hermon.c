@@ -2792,22 +2792,45 @@ static void hermon_unmap_icm ( struct hermon *hermon ) {
  * Reset device
  *
  * @v hermon		Hermon device
+ * @ret rc		Return status code
  */
-static void hermon_reset ( struct hermon *hermon ) {
+static int hermon_reset ( struct hermon *hermon ) {
 	struct pci_device *pci = hermon->pci;
 	struct pci_config_backup backup;
 	static const uint8_t backup_exclude[] =
 		PCI_CONFIG_BACKUP_EXCLUDE ( 0x58, 0x5c );
+	uint16_t vendor;
+	unsigned int i;
+
+	/* Reset command interface toggle */
+	hermon->toggle = 0;
 
 	/* Perform device reset and preserve PCI configuration */
 	pci_backup ( pci, &backup, backup_exclude );
 	writel ( HERMON_RESET_MAGIC,
 		 ( hermon->config + HERMON_RESET_OFFSET ) );
-	mdelay ( HERMON_RESET_WAIT_TIME_MS );
-	pci_restore ( pci, &backup, backup_exclude );
 
-	/* Reset command interface toggle */
-	hermon->toggle = 0;
+	/* Wait until device starts responding to configuration cycles */
+	for ( i = 0 ; i < HERMON_RESET_MAX_WAIT_MS ; i++ ) {
+
+		/* Read PCI vendor ID */
+		pci_read_config_word ( pci, PCI_VENDOR_ID, &vendor );
+		if ( vendor == pci->vendor ) {
+
+			/* Restore PCI configuration */
+			pci_restore ( pci, &backup, backup_exclude );
+
+			DBGC ( hermon, "Hermon %p reset after %dms\n",
+			       hermon, i );
+			return 0;
+		}
+
+		/* Delay */
+		mdelay ( 1 );
+	}
+
+	DBGC ( hermon, "Hermon %p timed out waiting for reset\n", hermon );
+	return -ETIMEDOUT;
 }
 
 /**
@@ -3967,7 +3990,8 @@ static int hermon_probe ( struct pci_device *pci ) {
 				    HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
 
 	/* Reset device */
-	hermon_reset ( hermon );
+	if ( ( rc = hermon_reset ( hermon ) ) != 0 )
+		goto err_reset;
 
 	/* Start firmware */
 	if ( ( rc = hermon_start_firmware ( hermon ) ) != 0 )
@@ -4060,6 +4084,7 @@ static int hermon_probe ( struct pci_device *pci ) {
  err_get_cap:
 	hermon_stop_firmware ( hermon );
  err_start_firmware:
+ err_reset:
 	iounmap ( hermon->uar );
 	iounmap ( hermon->config );
 	hermon_free ( hermon );
