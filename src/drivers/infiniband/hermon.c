@@ -823,6 +823,11 @@ hermon_dump_cqctx ( struct hermon *hermon, struct ib_completion_queue *cq ) {
 	struct hermonprm_completion_queue_context cqctx;
 	int rc;
 
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return 0;
+
+	/* Dump completion queue context */
 	memset ( &cqctx, 0, sizeof ( cqctx ) );
 	if ( ( rc = hermon_cmd_query_cq ( hermon, cq->cqn, &cqctx ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p CQN %#lx QUERY_CQ failed: %s\n",
@@ -1102,6 +1107,11 @@ hermon_dump_qpctx ( struct hermon *hermon, struct ib_queue_pair *qp ) {
 	struct hermonprm_qp_ee_state_transitions qpctx;
 	int rc;
 
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return 0;
+
+	/* Dump queue pair context */
 	memset ( &qpctx, 0, sizeof ( qpctx ) );
 	if ( ( rc = hermon_cmd_query_qp ( hermon, qp->qpn, &qpctx ) ) != 0 ) {
 		DBGC ( hermon, "Hermon %p QPN %#lx QUERY_QP failed: %s\n",
@@ -1898,6 +1908,11 @@ hermon_dump_eqctx ( struct hermon *hermon,
 	struct hermonprm_eqc eqctx;
 	int rc;
 
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return 0;
+
+	/* Dump event queue context */
 	memset ( &eqctx, 0, sizeof ( eqctx ) );
 	if ( ( rc = hermon_cmd_query_eq ( hermon, hermon_eq->eqn,
 					  &eqctx ) ) != 0 ) {
@@ -1930,6 +1945,11 @@ hermon_dump_eqes ( struct hermon *hermon,
 	unsigned int idx;
 	int rc;
 
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return 0;
+
+	/* Dump event queue entries */
 	memset ( &eqctx, 0, sizeof ( eqctx ) );
 	if ( ( rc = hermon_cmd_query_eq ( hermon, hermon_eq->eqn,
 					  &eqctx ) ) != 0 ) {
