@@ -35,7 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* Device reset */
 #define HERMON_RESET_OFFSET		0x0f0010
 #define HERMON_RESET_MAGIC		0x01000001UL
-#define HERMON_RESET_WAIT_TIME_MS	1000
+#define HERMON_RESET_MAX_WAIT_MS	1000
 
 /* Work queue entry and completion queue entry opcodes */
 #define HERMON_OPCODE_NOP		0x00
