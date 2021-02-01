@@ -48,10 +48,14 @@ FILE_LICENCE ( BSD2 );
  *
  * iSCSI boot firmware table
  *
- * The information in this file is derived from the document "iSCSI
- * Boot Firmware Table (iBFT)" as published by IBM at
+ * The information in this file is originally derived from the document "iSCSI
+ * Boot Firmware Table (iBFT)" as published by IBM at:
  *
  * ftp://ftp.software.ibm.com/systems/support/system_x_pdf/ibm_iscsi_boot_firmware_table_v1.02.pdf
+ *
+ * That file is no longer available, but a more recent version is available:
+ *
+ * ftp://ftp.software.ibm.com/systems/support/bladecenter/iscsi_boot_firmware_table_v1.03.pdf
  *
  */
 
