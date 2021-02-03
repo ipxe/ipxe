@@ -119,7 +119,7 @@ static int efi_load_autoexec ( EFI_HANDLE device ) {
 	int rc;
 
 	/* Sanity check */
-	assert ( efi_autoexec == UNULL );
+	assert ( efi_autoexec == NULL );
 	assert ( efi_autoexec_len == 0 );
 
 	/* Open simple file system protocol */
