@@ -401,6 +401,16 @@ WORKAROUND_CFLAGS += $(PIE_FLAGS) $(PIE_FLAGS2)
 endif
 endif
 
+# Some widespread patched versions of gcc include -fcf-protection=full
+# by default.
+#
+ifeq ($(CCTYPE),gcc)
+CFP_TEST = $(CC) -fcf-protection=none -x c -c /dev/null -o /dev/null \
+		 >/dev/null 2>&1
+CFP_FLAGS := $(shell $(CFP_TEST) && $(ECHO) '-fcf-protection=none')
+WORKAROUND_CFLAGS += $(CFP_FLAGS)
+endif
+
 ###############################################################################
 #
 # Source file handling
