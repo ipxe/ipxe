@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - coverity_scan
-  schedule:
-    - cron: '30 0 * * *'
 
 jobs:
   submit:
