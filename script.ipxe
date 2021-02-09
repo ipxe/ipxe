@@ -1,0 +1,169 @@
+#!ipxe
+
+# Vars:
+set mgmt_vid0 15b3
+set mgmt_vid1 1077
+set hsn_did0 1017
+set ignore ffff
+
+set base-url http://pit/${hostname}
+set image-name filesystem.squashfs
+isset ${netX.dhcp/root-path} && set xname-param xname=${netX.dhcp/root-path} || set xname-param ''
+
+# Non-Compute Node OverlayFS and Persistence.
+set bootstrap metal.server=${base-url} metal.no-wipe=0
+set cloud-init ds=nocloud-net;s=http://${dhcp-server}:8888/
+set boot-opts rootfallback=LABEL=BOOTRAID initrd=initrd.img.xz
+set live-sqfs-opts root=live:LABEL=SQFSRAID rd.live.ram=0 rd.writable.fsimg=0 rd.skipfsck rd.live.squashimg=${image-name}
+set live-oval-opts rd.live.overlay=LABEL=ROOTRAID rd.live.overlay.thin=1 rd.live.overlay.overlayfs=1 rd.live.overlay.size=307200
+set disk-opts rd.lvm.conf=0 rd.luks.key=/pki/etcd.key:LABEL=ROOTRAID rd.lvm=1 rd.auto=0 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=1 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1 rd.luks.allow-discards
+
+# Matching NCN boot parameters:
+set ncn-params pcie_ports=native transparent_hugepage=never console=tty0 console=ttyS0,115200 iommu=pt ${bootstrap} ${cloud-init} ${boot-opts} ${live-sqfs-opts} ${live-oval-opts} ${disk-opts}
+
+# NCN DHCP parameters:
+# Help for replacing bootdev:
+# sed -i '/bootdev=.*/bootdev=lan0' /var/www/boot/script.ipxe
+set net-ip-params ip=vlan007:dhcp ip=vlan004:dhcp ip=vlan002:dhcp bootdev=vlan002 rd.net.timeout.carrier=120 rd.net.timeout.ifup=120 rd.net.timeout.iflink=120 rd.net.dhcp.retry=3 rd.net.timeout.ipv6auto=0 rd.net.timeout.ipv6dad=0
+
+# VLAN Parameters:
+set net-vlan-params vlan=vlan007:bond0 vlan=vlan004:bond0 vlan=vlan002:bond0
+
+# Networking parameters:
+set net-params rd.bootif=0 hostname=${hostname} ${net-vlan-params} ${net-ip-params}
+
+# Parameters for CI/CD to ad-hoc replace (null by default):
+# Good for "always-on" params for automation.
+# sed -i '/robot-params .*/robot-params parm1 param2 param3' /var/www/boot/script.ipxe
+set robot-params append
+
+# Parameters for debugging kernel and initrd startup. These should
+# only be enabled (uncommented) in developer environments.
+set debug-params log_buf_len=1 rd.retry=10 rd.shell #rd.debug=1 metal.debug=1
+
+# Custom parameters:
+# Good for one-off changes/tests.
+# example for a user or automation-toggle runs to replace on-the-fly:
+# sed -i '/custom-params .*/custom-params parm1 param2 param3' /var/www/boot/script.ipxe
+set custom-params nosplash quiet crashkernel=360M
+
+# Emulate real world, and boot over VLANs.
+# Note: This will also boot without VLAN, you'll be able to know by the IPs leased
+:nic_naming
+echo ====DEVICE NAMING=======================================================
+set print-niics 0
+set idx:int8 0
+set idx_hsn:int8 0
+set idx_mgmt:int8 0
+set idx_lan:int8 0
+set net-udev-params biosdevname=1
+set dual-bond 0
+## This is an early 1.4 shim for naming interfaces
+## This will move out of iPXE, now that more infrastructure (cloud-init) is ready.
+## For now this may need munging to get desired results.
+:loop isset ${net${idx}/mac} || goto loop_done
+  echo net${idx} MAC ${net${idx}/mac}
+  set vendor_id ${pci/${net${idx}/busloc}.0.2}
+  set device_id ${pci/${net${idx}/busloc}.2.2}
+  iseq ${device_id} ${ignore} && inc idx && goto loop ||
+  iseq ${device_id} ${hsn_did0} && goto hsn ||
+  iseq ${vendor_id} ${mgmt_vid0} && goto mgmt ||
+  iseq ${vendor_id} ${mgmt_vid1} && goto mgmt ||
+  goto lan ||
+  inc idx && goto loop
+
+:hsn
+  echo net${idx} is hsn${idx_hsn}
+  set net-udev-params ifname=hsn${idx_hsn}:${net${idx}/mac} ip=hsn${idx_hsn}:auto6 ${net-udev-params}
+  inc idx && inc idx_hsn && goto loop
+
+:mgmt
+  echo net${idx} is mgmt${idx_mgmt}
+  set net-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:dhcp ${net-udev-params}
+  iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
+  inc idx && inc idx_mgmt && goto loop
+
+:lan
+  echo net${idx} is lan${idx_lan}
+  set net-udev-params ifname=lan${idx_lan}:${net${idx}/mac} ip=lan${idx_lan}:auto6 ${net-udev-params}
+  inc idx && inc idx_lan && goto loop
+
+:loop_done
+iseq ${print-nics} 1 && prompt Press any key to continue || sleep 2
+
+# Assign bonds.
+# FIXME: CASMINST-715 force bond0 only no matter what; never make bond1.
+iseq ${dual-bond} 1 && set net-bond-params bond=bond0:mgmt2:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 || set net-bond-params bond=bond0:mgmt1:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0
+# FIXME: CASMINST-715 when ready to enable bond1, comment out the above line and uncomment the line below.
+#iseq ${dual-bond} 1 && set net-bond-params bond=bond0:mgmt2:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0 bond=bond1:mgmt1,mgmt3:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond1 ip=bond1:auto6 || set net-bond-params bond=bond0:mgmt1:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0
+
+#echo ====NTP=================================================================
+#ntp ${3:ipv4} || echo Ignoring...
+#echo ========================================================================
+
+# Figure out if client is 64-bit capable
+cpuid --ext 29 && set arch x86_64 || set arch x86
+cpuid --ext 29 && set archb 64 || set archb 32
+cpuid --ext 29 && set archl x86_64 || set archl i386
+colour --basic 0 4
+cpair --background 4 0
+set menu-timeout 2000
+:start
+menu Metal Boot :: ${manufacturer} ${product} (${archb}bit)
+item --gap -- ---------------- Boot Choices  ----------------
+item --key b linux    (B)oot HPC Node
+item --key r reboot   (R)eboot
+item --key e exit     (E)xit to BIOS Menu
+item
+item --gap -- ---------------- Advanced configuration  ----------------
+item --key a kedit    (A)ppend kernel parameters
+item --key u nics     Print (u)dev rules for NIC naming
+item --key i config   Configure / View (i)PXE settings
+item --key s shell    (E)nter iPXE shell
+item
+choose --default linux --timeout ${menu-timeout} target || goto cancel ||
+set menu-timeout 0
+goto ${target}
+
+:nics
+set print-nics 1
+goto nic_naming
+
+:failed
+echo Booting failed, dropping to shell
+goto shell
+
+:config
+config
+goto start
+
+:kedit
+echo Appending rd.cmdline=ask
+set custom-params ${custom-params} rd.cmdline=ask
+goto linux
+
+:linux
+initrd ${base-url}/initrd.img.xz
+kernel --name kernel ${base-url}/kernel ${net-udev-params} ${ncn-params} ${net-params} ${robot-params} ${custom-params} ${debug-params} ${net-bond-params} ${xname-param}
+imgstat
+
+echo
+echo initramFS and kernel succesfully downloaded.
+echo
+echo Starting up...
+boot || goto failed
+goto start
+
+:shell
+echo Type 'exit' to get the back to the menu
+shell
+set menu-timeout 0
+goto start
+
+:exit
+echo Exiting iPXE, loading BIOS...
+exit
+
+:cancel
+echo Menu cancelled, dropping to iPXE shell..
+goto shell
