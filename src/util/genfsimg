@@ -278,6 +278,11 @@ if [ -n "${ISOIMG}" ] ; then
 	echo "${0}: cannot find a suitable mkisofs or equivalent" >&2
 	exit 1
     fi
+    if [ "${MKISOFS}" = "xorrisofs" -a -n "${SOURCE_DATE_EPOCH:-}" ] ; then
+        DATE_FMT="+%Y%m%d%H%M%S00"
+        BUILD_DATE=$(date -u -d "@$SOURCE_DATE_EPOCH" "$DATE_FMT" 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH" "$DATE_FMT" 2>/dev/null || date -u "$DATE_FMT")
+	ISOARGS+=" --set_all_file_dates $BUILD_DATE --modification-date=$BUILD_DATE "
+    fi
     "${MKISOFS}" -quiet -volid "iPXE" -preparer "iPXE build system" \
 	    -appid "iPXE - Open Source Network Boot Firmware" \
 	    -publisher "ipxe.org" -sysid "iPXE" -o "${ISOIMG}" \
