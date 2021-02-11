@@ -37,6 +37,8 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
 #include <ipxe/profile.h>
+#include <compiler.h>
+
 #include "aquantia.h"
 
 extern struct atl_hw_ops atl_hw;
@@ -68,8 +70,8 @@ static int atl_ring_alloc(const struct atl_nic* nic, struct atl_ring* ring, uint
 	ATL_WRITE_REG(ATL_RING_SIZE, reg_base + 8);
 
 	// #todo: reset head and tail pointers
-	/*printf("ATLANTIC %p ring is at [%08llx,%08llx), reg base %#x\n", nic, ((unsigned long long)phy_addr),
-		((unsigned long long) phy_addr + ring->length), reg_base);*/
+	DBG("ATLANTIC %p ring is at [%08llx,%08llx), reg base %#x\n", nic, ((unsigned long long)phy_addr),
+		((unsigned long long) phy_addr + ring->length), reg_base);
 
 	return 0;
 
@@ -134,9 +136,9 @@ void atl_rx_ring_fill(struct atl_nic* nic)
 		assert(nic->iobufs[nic->rx_ring.sw_tail] == NULL);
 		nic->iobufs[nic->rx_ring.sw_tail] = iobuf;
 
-		/*printf("AQUANTIA RX[%d] is [%llx,%llx)\n", nic->rx_ring.sw_tail,
+		DBG("AQUANTIA RX[%d] is [%llx,%llx)\n", nic->rx_ring.sw_tail,
 			((unsigned long long) address),
-			((unsigned long long) address + ATL_RX_MAX_LEN));*/
+			((unsigned long long) address + ATL_RX_MAX_LEN));
 		atl_ring_next_dx(&nic->rx_ring.sw_tail);
 		refilled++;
 	}
@@ -158,7 +160,7 @@ static int atl_open(struct net_device *netdev)
 {
 	struct atl_nic* nic = netdev->priv;
 	uint32_t ctrl = 0;
-	//printf("AQUANTIA: atl_open()\n");
+	DBG("AQUANTIA: atl_open()\n");
 	
 	// Tx ring
 	if (atl_ring_alloc(nic, &nic->tx_ring, sizeof(struct atl_desc_tx), ATL_TX_DMA_DESC_ADDR) != 0)
@@ -226,13 +228,13 @@ static int atl_open(struct net_device *netdev)
 	atl_rx_ring_fill(nic);
 
 	nic->hw_ops->start(nic);
-	//printf("AQUANTIA: code 0()\n");
+	DBG("AQUANTIA: code 0()\n");
 
 	return 0;
 err_alloc:
 	atl_ring_free(&nic->tx_ring);
 	atl_ring_free(&nic->rx_ring);
-	//printf("AQUANTIA: code NOMEM()\n");
+	DBG("AQUANTIA: code NOMEM()\n");
 	return -ENOMEM;
 }
 
@@ -274,7 +276,7 @@ int atl_transmit(struct net_device *netdev, struct io_buffer *iobuf)
 
 	/* Get next transmit descriptor */
 	if (atl_ring_full(&nic->tx_ring)) {
-		printf("AQUANTIA: %p out of transmit descriptors\n", nic);
+		DBG("AQUANTIA: %p out of transmit descriptors\n", nic);
 		return -ENOBUFS;
 	}
 	tx = (struct atl_desc_tx*)nic->tx_ring.ring + nic->tx_ring.sw_tail;
@@ -291,9 +293,9 @@ int atl_transmit(struct net_device *netdev, struct io_buffer *iobuf)
 	tx->cmd = 0x22;
 	wmb();
 
-	/*printf("AQUANTIA: %p TX[%d] is [%llx, %llx]\n", nic, nic->tx_ring.sw_tail,
+	DBG("AQUANTIA: %p TX[%d] is [%llx, %llx]\n", nic, nic->tx_ring.sw_tail,
 		((unsigned long long) address),
-		((unsigned long long) address + len));*/
+		((unsigned long long) address + len));
 
 	atl_ring_next_dx(&nic->tx_ring.sw_tail);
 	ATL_WRITE_REG(nic->tx_ring.sw_tail, ATL_RING_TAIL);
@@ -309,10 +311,10 @@ void atl_check_link(struct net_device* netdev)
 	
 	if (link_state != nic->link_state) {
 		if (link_state) {
-			//printf("AQUANTIA: link up\n");
+			DBG("AQUANTIA: link up\n");
 			netdev_link_up(netdev);
 		} else {
-			//printf("AQUANTIA: link lost\n");
+			DBG("AQUANTIA: link lost\n");
 			netdev_link_down(netdev);
 		}
 		nic->link_state = link_state;
@@ -339,7 +341,7 @@ void atl_poll_tx(struct net_device *netdev)
 		if (!tx->dd)
 			return;
 
-		//printf("AQUANTIA %p: TX[%d] complete\n", nic, nic->tx_ring.sw_head);
+		DBG("AQUANTIA %p: TX[%d] complete\n", nic, nic->tx_ring.sw_head);
 
 		/* Complete TX descriptor */
 		atl_ring_next_dx(&nic->tx_ring.sw_head);
@@ -365,7 +367,7 @@ void atl_poll_rx(struct net_device *netdev) {
 		rx = (struct atl_desc_rx_wb*)nic->rx_ring.ring + nic->rx_ring.sw_head;
 		
 		/* Stop if descriptor is still in use */
-		//printf("AQUANTIA: rx poll: desc: %llx, %llx\n",*((uint64_t*)rx), *(((uint64_t*)rx) + 1));
+		DBG("AQUANTIA: rx poll: desc: %llx, %llx\n",*((uint64_t*)rx), *(((uint64_t*)rx) + 1));
 		if (!rx->dd)
 			return;
 
@@ -377,10 +379,10 @@ void atl_poll_rx(struct net_device *netdev) {
 
 		/* Hand off to network stack */
 		/*to do: process error*/
-		/*printf("AQUANTIA: %p RX[%d] complete (length %zd)\n",
-			nic, nic->rx_ring.sw_head, len);*/
+		DBG("AQUANTIA: %p RX[%d] complete (length %zd)\n",
+			nic, nic->rx_ring.sw_head, len);
 		netdev_rx(netdev, iobuf);
-		//printf("AQUANTIA %p: RX[%d] complete\n", nic, nic->rx_ring.sw_head);
+		DBG("AQUANTIA %p: RX[%d] complete\n", nic, nic->rx_ring.sw_head);
 		atl_ring_next_dx(&nic->rx_ring.sw_head);
 	}
 }
@@ -403,7 +405,7 @@ static void atl_poll(struct net_device *netdev) {
 	/*if(!icr)
 		return;
 	else*/ 
-		//printf("AQUANTIA: %p ICR 0x%X\n", nic, icr);
+		//DBG("AQUANTIA: %p ICR 0x%X\n", nic, icr);
 	
 	/* Poll for TX completions, if applicable */
 	//if (icr & ATL_IRQ_TX)
@@ -429,13 +431,12 @@ static void atl_irq(struct net_device *netdev, int enable) {
 	struct atl_nic *nic = netdev->priv;
 	uint32_t mask;
 	
-	//printf("AQUANTIA: irq: %d\n", enable);
+	DBG("AQUANTIA: irq: %d\n", enable);
 
 	mask = (ATL_IRQ_TX | ATL_IRQ_RX);
 	if (enable) {
 		ATL_WRITE_REG(mask, ATL_ITR_MSKS);
-	}
-	else {
+	} else {
 		ATL_WRITE_REG(mask, ATL_ITR_MSKC);
 	}
 }
@@ -467,8 +468,9 @@ static int atl_probe(struct pci_device *pci) {
 	struct atl_nic *nic;
 	int rc = ENOERR;
 
-	//printf("\nAQUANTIA: atl_probe()\n");
-	/* Allocate and initialise net device */
+	DBG("\nAQUANTIA: atl_probe()\n");
+
+	/* Allocate and initialize net device */
 	netdev = alloc_etherdev(sizeof(*nic));
 	if (!netdev) {
 		rc = -ENOMEM;
@@ -505,7 +507,7 @@ static int atl_probe(struct pci_device *pci) {
 	}
 
 	if (nic->hw_ops->reset(nic) != 0) {
-		printf("AQUANTIA: atl_probe reset error 0\n");
+		DBG("AQUANTIA: atl_probe reset error 0\n");
 		goto err_reset;
 	}
 
@@ -519,7 +521,7 @@ static int atl_probe(struct pci_device *pci) {
 	/* Set initial link state */
 	netdev_link_down(netdev);
 
-	//printf("AQUANTIA: atl_probe code 0\n");
+	DBG("AQUANTIA: atl_probe code 0\n");
 	return 0;
 
 	unregister_netdev(netdev);
@@ -532,7 +534,7 @@ err_ioremap:
 	netdev_nullify(netdev);
 	netdev_put(netdev);
 err_alloc:
-	//printf("AQUANTIA: error %#x()\n", rc);
+	DBG("AQUANTIA: error %#x()\n", rc);
 	return rc;
 }
 

@@ -5,6 +5,8 @@
 #include <ipxe/pci.h>
 #include "aquantia.h"
 #include "atl_hw.h"
+#include <compiler.h>
+
 
 int atl_hw_reset_flb_(struct atl_nic *nic)
 {
@@ -46,7 +48,7 @@ int atl_hw_reset_flb_(struct atl_nic *nic)
 		mdelay(10);
 	}
 	if (k == 1000) {
-		printf("MAC kickstart failed\n");
+		DBG("MAC kickstart failed\n");
 		return -EIO;
 	}
 
@@ -78,7 +80,7 @@ int atl_hw_reset_flb_(struct atl_nic *nic)
 		mdelay(10);
 	}
 	if (k == 1000) {
-		printf("FW kickstart failed\n");
+		DBG("FW kickstart failed\n");
 		return -EIO;
 	}
 	/* Old FW requires fixed delay after init */
@@ -125,7 +127,7 @@ int atl_hw_reset_rbl_(struct atl_nic *nic)
 		mdelay(10);
 	}
 	if (!rbl_status || rbl_status == 0xDEAD) {
-		printf("RBL Restart failed");
+		DBG("RBL Restart failed");
 		return -EIO;
 	}
 
@@ -141,7 +143,7 @@ int atl_hw_reset_rbl_(struct atl_nic *nic)
 		mdelay(10);
 	}
 	if (k == 1000) {
-		printf("FW kickstart failed\n");
+		DBG("FW kickstart failed\n");
 		return -EIO;
 	}
 	/* Old FW requires fixed delay after init */
@@ -166,7 +168,7 @@ int atl_hw_reset(struct atl_nic *nic)
 	}
 
 	if (k == 1000) {
-		printf("Neither RBL nor FLB firmware started\n");
+		DBG("Neither RBL nor FLB firmware started\n");
 		return -ENOTSUP;
 	}
 
@@ -219,7 +221,7 @@ int atl_hw_get_link(struct atl_nic *nic)
 int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer, uint32_t size)
 {
 	uint32_t i;
-	//printf("AQUANTIA: atl_hw_read_mem\n");
+	DBG("AQUANTIA: atl_hw_read_mem\n");
 
 	for (i = 0; i < 100; ++i) {
 		if (ATL_READ_REG(ATL_SEM_RAM))
@@ -250,7 +252,7 @@ int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer, uint32
 
 	return 0;
 err:
-	printf("AQUANTIA: download_dwords error\n");
+	DBG("AQUANTIA: download_dwords error\n");
 	return -1;
 }
 
