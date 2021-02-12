@@ -29,11 +29,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /* EFI headers redefine ARRAY_SIZE */
 #undef ARRAY_SIZE
 
-/* EFI headers expect ICC to define __GNUC__ */
-#if defined ( __ICC ) && ! defined ( __GNUC__ )
-#define __GNUC__ 1
-#endif
-
 /* EFI headers think your compiler uses the MS ABI by default on X64 */
 #if __x86_64__
 #define EFIAPI __attribute__((ms_abi))
