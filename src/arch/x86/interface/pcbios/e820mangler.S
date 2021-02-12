@@ -67,7 +67,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  ****************************************************************************
  */
 	.section ".data16", "aw", @progbits
-	.align 16
+	.balign 16
 	.globl hidemem_base
 	.globl hidemem_umalloc
 	.globl hidemem_textdata

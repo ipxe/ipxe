@@ -259,7 +259,7 @@ static inline void eplatform_discard ( int dummy __unused, ... ) {}
  */
 #define __einfo_error( einfo ) ( {					\
 	__asm__ ( ".section \".einfo\", \"\", " PROGBITS_OPS "\n\t"	\
-		  ".align 8\n\t"					\
+		  ".balign 8\n\t"					\
 		  "\n1:\n\t"						\
 		  ".long ( 4f - 1b )\n\t"				\
 		  ".long %c0\n\t"					\
@@ -268,7 +268,7 @@ static inline void eplatform_discard ( int dummy __unused, ... ) {}
 		  ".long %c1\n\t"					\
 		  "\n2:\t.asciz \"" __einfo_desc ( einfo ) "\"\n\t"	\
 		  "\n3:\t.asciz \"" __FILE__ "\"\n\t"			\
-		  ".align 8\n\t"					\
+		  ".balign 8\n\t"					\
 		  "\n4:\n\t"						\
 		  ".previous\n\t" : :					\
 		  "i" ( __einfo_errno ( einfo ) ),			\

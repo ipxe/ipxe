@@ -99,7 +99,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  ****************************************************************************
  */
 	.section ".data16.gdt", "aw", @progbits
-	.align 16
+	.balign 16
 gdt:
 gdtr:		/* The first GDT entry is unused, the GDTR can fit here. */
 gdt_limit:		.word gdt_length - 1
@@ -224,7 +224,7 @@ RC_TMP_END:
 
 	/* Shared temporary static buffer */
 	.section ".bss16.rm_tmpbuf", "aw", @nobits
-	.align 16
+	.balign 16
 rm_tmpbuf:
 	.space	VC_TMP_END
 	.size	rm_tmpbuf, . - rm_tmpbuf
@@ -1470,7 +1470,7 @@ interrupt_wrapper:
  ****************************************************************************
  */
 	.section ".pages", "aw", @nobits
-	.align	SIZEOF_PT
+	.balign	SIZEOF_PT
 
 	/* Page map level 4 entries (PML4Es)
 	 *
