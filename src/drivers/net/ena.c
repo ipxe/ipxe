@@ -65,33 +65,57 @@ static const char * ena_direction ( unsigned int direction ) {
  */
 
 /**
- * Reset hardware
+ * Wait for reset operation to be acknowledged
  *
  * @v ena		ENA device
+ * @v expected		Expected reset state
  * @ret rc		Return status code
  */
-static int ena_reset ( struct ena_nic *ena ) {
+static int ena_reset_wait ( struct ena_nic *ena, uint32_t expected ) {
 	uint32_t stat;
 	unsigned int i;
-
-	/* Trigger reset */
-	writel ( ENA_CTRL_RESET, ( ena->regs + ENA_CTRL ) );
 
 	/* Wait for reset to complete */
 	for ( i = 0 ; i < ENA_RESET_MAX_WAIT_MS ; i++ ) {
 
 		/* Check if device is ready */
 		stat = readl ( ena->regs + ENA_STAT );
-		if ( stat & ENA_STAT_READY )
+		if ( ( stat & ENA_STAT_RESET ) == expected )
 			return 0;
 
 		/* Delay */
 		mdelay ( 1 );
 	}
 
-	DBGC ( ena, "ENA %p timed out waiting for reset (status %#08x)\n",
-	       ena, stat );
+	DBGC ( ena, "ENA %p timed out waiting for reset status %#08x "
+	       "(got %#08x)\n", ena, expected, stat );
 	return -ETIMEDOUT;
+}
+
+/**
+ * Reset hardware
+ *
+ * @v ena		ENA device
+ * @ret rc		Return status code
+ */
+static int ena_reset ( struct ena_nic *ena ) {
+	int rc;
+
+	/* Trigger reset */
+	writel ( ENA_CTRL_RESET, ( ena->regs + ENA_CTRL ) );
+
+	/* Wait for reset to take effect */
+	if ( ( rc = ena_reset_wait ( ena, ENA_STAT_RESET ) ) != 0 )
+		return rc;
+
+	/* Clear reset */
+	writel ( 0, ( ena->regs + ENA_CTRL ) );
+
+	/* Wait for reset to clear */
+	if ( ( rc = ena_reset_wait ( ena, 0 ) ) != 0 )
+		return rc;
+
+	return 0;
 }
 
 /******************************************************************************
