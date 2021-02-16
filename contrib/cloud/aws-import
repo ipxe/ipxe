@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+
+import argparse
+from base64 import b64encode
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from hashlib import sha256
+from itertools import count
+
+import boto3
+
+BLOCKSIZE = 512 * 1024
+
+
+def create_snapshot(region, description, image):
+    """Create an EBS snapshot"""
+    client = boto3.client('ebs', region_name=region)
+    snapshot = client.start_snapshot(VolumeSize=1,
+                                     Description=description)
+    snapshot_id = snapshot['SnapshotId']
+    with open(image, 'rb') as fh:
+        for block in count():
+            data = fh.read(BLOCKSIZE)
+            if not data:
+                break
+            data = data.ljust(BLOCKSIZE, b'\0')
+            checksum = b64encode(sha256(data).digest()).decode()
+            client.put_snapshot_block(SnapshotId=snapshot_id,
+                                      BlockIndex=block,
+                                      BlockData=data,
+                                      DataLength=BLOCKSIZE,
+                                      Checksum=checksum,
+                                      ChecksumAlgorithm='SHA256')
+    client.complete_snapshot(SnapshotId=snapshot_id,
+                             ChangedBlocksCount=block)
+    return snapshot_id
+
+
+def import_image(region, name, architecture, image, public):
+    """Import an AMI image"""
+    client = boto3.client('ec2', region_name=region)
+    resource = boto3.resource('ec2', region_name=region)
+    description = '%s (%s)' % (name, architecture)
+    snapshot_id = create_snapshot(region=region, description=description,
+                                  image=image)
+    client.get_waiter('snapshot_completed').wait(SnapshotIds=[snapshot_id])
+    image = client.register_image(Architecture=architecture,
+                                  BlockDeviceMappings=[{
+                                      'DeviceName': '/dev/sda1',
+                                      'Ebs': {
+                                          'SnapshotId': snapshot_id,
+                                          'VolumeType': 'standard',
+                                      },
+                                  }],
+                                  EnaSupport=True,
+                                  Name=description,
+                                  RootDeviceName='/dev/sda1',
+                                  SriovNetSupport='simple',
+                                  VirtualizationType='hvm')
+    image_id = image['ImageId']
+    client.get_waiter('image_available').wait(ImageIds=[image_id])
+    if public:
+        resource.Image(image_id).modify_attribute(Attribute='launchPermission',
+                                                  OperationType='add',
+                                                  UserGroups=['all'])
+    return image_id
+
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Import AWS EC2 image (AMI)")
+parser.add_argument('--architecture', '-a', default='x86_64',
+                    help="CPU architecture")
+parser.add_argument('--name', '-n', required=True,
+                    help="Image name")
+parser.add_argument('--public', '-p', action='store_true',
+                    help="Make image public")
+parser.add_argument('--region', '-r', action='append',
+                    help="AWS region(s)")
+parser.add_argument('image', help="iPXE disk image")
+args = parser.parse_args()
+
+# Use all regions if none specified
+if not args.region:
+    args.region = sorted(x['RegionName'] for x in
+                         boto3.client('ec2').describe_regions()['Regions'])
+
+# Use one thread per region to maximise parallelism
+with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
+    futures = {executor.submit(import_image,
+                               region=region,
+                               name=args.name,
+                               architecture=args.architecture,
+                               image=args.image,
+                               public=args.public): region
+               for region in args.region}
+    results = {futures[future]: future.result()
+               for future in as_completed(futures)}
+
+# Show created images
+for region in args.region:
+    print("%s: %s" % (region, results[region]))
