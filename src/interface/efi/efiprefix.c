@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_autoboot.h>
+#include <ipxe/efi/efi_autoexec.h>
 #include <ipxe/efi/efi_watchdog.h>
 #include <ipxe/efi/efi_veto.h>
 
@@ -48,8 +49,11 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 	if ( ( efirc = efi_init ( image_handle, systab ) ) != 0 )
 		goto err_init;
 
-	/* Record autoboot device (if any) */
-	efi_set_autoboot();
+	/* Identify autoboot device, if any */
+	efi_set_autoboot_ll_addr ( efi_loaded_image->DeviceHandle );
+
+	/* Load autoexec script, if any */
+	efi_autoexec_load ( efi_loaded_image->DeviceHandle );
 
 	/* Claim SNP devices for use by iPXE */
 	efi_snp_claim();
