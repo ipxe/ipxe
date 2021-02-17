@@ -386,6 +386,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_veto	      ( ERRFILE_OTHER | 0x00520000 )
 #define ERRFILE_efi_autoboot	      ( ERRFILE_OTHER | 0x00530000 )
 #define ERRFILE_efi_autoexec	      ( ERRFILE_OTHER | 0x00540000 )
+#define ERRFILE_efi_cachedhcp	      ( ERRFILE_OTHER | 0x00550000 )
 
 /** @} */
 
