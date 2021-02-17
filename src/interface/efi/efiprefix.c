@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_autoboot.h>
 #include <ipxe/efi/efi_autoexec.h>
+#include <ipxe/efi/efi_cachedhcp.h>
 #include <ipxe/efi/efi_watchdog.h>
 #include <ipxe/efi/efi_veto.h>
 
@@ -80,6 +81,9 @@ static void efi_init_application ( void ) {
 
 	/* Identify autoboot device, if any */
 	efi_set_autoboot_ll_addr ( device );
+
+	/* Store cached DHCP packet, if any */
+	efi_cachedhcp_record ( device );
 
 	/* Load autoexec script, if any */
 	efi_autoexec_load ( device );
