@@ -25,11 +25,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <ipxe/dhcppkt.h>
 #include <ipxe/init.h>
 #include <ipxe/netdevice.h>
-#include <realmode.h>
-#include <pxe_api.h>
+#include <ipxe/cachedhcp.h>
 
 /** @file
  *
@@ -37,50 +37,33 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Cached DHCPACK physical address
- *
- * This can be set by the prefix.
- */
-uint32_t __bss16 ( cached_dhcpack_phys );
-#define cached_dhcpack_phys __use_data16 ( cached_dhcpack_phys )
-
-/** Colour for debug messages */
-#define colour &cached_dhcpack_phys
-
 /** Cached DHCPACK */
 static struct dhcp_packet *cached_dhcpack;
 
+/** Colour for debug messages */
+#define colour &cached_dhcpack
+
 /**
- * Cached DHCPACK startup function
+ * Record cached DHCPACK
  *
+ * @v data		DHCPACK packet buffer
+ * @v max_len		Maximum possible length
+ * @ret rc		Return status code
  */
-static void cachedhcp_init ( void ) {
+int cachedhcp_record ( userptr_t data, size_t max_len ) {
 	struct dhcp_packet *dhcppkt;
 	struct dhcp_packet *tmp;
 	struct dhcphdr *dhcphdr;
-	size_t max_len;
 	size_t len;
-
-	/* Do nothing if no cached DHCPACK is present */
-	if ( ! cached_dhcpack_phys ) {
-		DBGC ( colour, "CACHEDHCP found no cached DHCPACK\n" );
-		return;
-	}
-
-	/* No reliable way to determine length before parsing packet;
-	 * start by assuming maximum length permitted by PXE.
-	 */
-	max_len = sizeof ( BOOTPLAYER_t );
 
 	/* Allocate and populate DHCP packet */
 	dhcppkt = zalloc ( sizeof ( *dhcppkt ) + max_len );
 	if ( ! dhcppkt ) {
 		DBGC ( colour, "CACHEDHCP could not allocate copy\n" );
-		return;
+		return -ENOMEM;
 	}
 	dhcphdr = ( ( ( void * ) dhcppkt ) + sizeof ( *dhcppkt ) );
-	copy_from_user ( dhcphdr, phys_to_user ( cached_dhcpack_phys ), 0,
-			 max_len );
+	copy_from_user ( dhcphdr, data, 0, max_len );
 	dhcppkt_init ( dhcppkt, dhcphdr, max_len );
 
 	/* Shrink packet to required length.  If reallocation fails,
@@ -98,10 +81,11 @@ static void cachedhcp_init ( void ) {
 	dhcppkt_init ( dhcppkt, dhcphdr, len );
 
 	/* Store as cached DHCPACK, and mark original copy as consumed */
-	DBGC ( colour, "CACHEDHCP found cached DHCPACK at %08x+%zx\n",
-	       cached_dhcpack_phys, len );
+	DBGC ( colour, "CACHEDHCP found cached DHCPACK at %#08lx+%#zx/%#zx\n",
+	       user_to_phys ( data, 0 ), len, max_len );
 	cached_dhcpack = dhcppkt;
-	cached_dhcpack_phys = 0;
+
+	return 0;
 }
 
 /**
@@ -119,11 +103,6 @@ static void cachedhcp_startup ( void ) {
 		cached_dhcpack = NULL;
 	}
 }
-
-/** Cached DHCPACK initialisation function */
-struct init_fn cachedhcp_init_fn __init_fn ( INIT_NORMAL ) = {
-	.initialise = cachedhcp_init,
-};
 
 /** Cached DHCPACK startup function */
 struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
