@@ -210,9 +210,7 @@ VC_TMP_CR3:		.space	4
 VC_TMP_CR4:		.space	4
 VC_TMP_EMER:		.space	8
 .endif
-#ifdef TIVOLI_VMM_WORKAROUND
 VC_TMP_FXSAVE:		.space	512
-#endif
 VC_TMP_END:
 	.previous
 
@@ -350,6 +348,13 @@ init_librm_rmode:
 	/* Initialise IDT */
 	virtcall init_idt
 
+#ifdef TIVOLI_VMM_WORKAROUND
+	/* Check for FXSAVE/FXRSTOR */
+	clc
+	virtcall check_fxsr
+	setnc	fxsr_supported
+#endif
+
 	/* Restore registers */
 	popl	%edi
 	popl	%ebx
@@ -365,6 +370,10 @@ set_seg_base:
 	movb	%ah, 7(%bx)
 	roll	$16, %eax
 	ret
+
+	.section ".data16.fxsr_supported", "awx", @progbits
+fxsr_supported:		/* FXSAVE/FXRSTOR instructions supported */
+	.byte	0
 
 /****************************************************************************
  * real_to_prot (real-mode near call, 32-bit virtual return address)
@@ -1007,10 +1016,11 @@ virt_call:
 	cli
 	movw	%cs:rm_ds, %ds
 
-#ifdef TIVOLI_VMM_WORKAROUND
 	/* Preserve FPU, MMX and SSE state in temporary static buffer */
+	testb	$0xff, fxsr_supported
+	jz	1f
 	fxsave	( rm_tmpbuf + VC_TMP_FXSAVE )
-#endif
+1:
 	/* Preserve GDT and IDT in temporary static buffer */
 	sidt	( rm_tmpbuf + VC_TMP_IDT )
 	sgdt	( rm_tmpbuf + VC_TMP_GDT )
@@ -1077,10 +1087,11 @@ vc_rmode:
 	wrmsr
 .endif
 
-#ifdef TIVOLI_VMM_WORKAROUND
 	/* Restore FPU, MMX and SSE state from temporary static buffer */
+	testb	$0xff, fxsr_supported
+	jz	1f
 	fxrstor	( rm_tmpbuf + VC_TMP_FXSAVE )
-#endif
+1:
 	/* Restore registers and flags and return */
 	popl	%eax /* skip %cs and %ss */
 	popw	%ds
