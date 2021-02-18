@@ -175,18 +175,18 @@ static int initrd_swap_any ( userptr_t free, size_t free_len ) {
 		/* Search for adjacent image */
 		for_each_image ( high ) {
 
-			/* If we have found the adjacent image, swap and exit */
-			if ( high->data == adjacent ) {
-				initrd_swap ( low, high, free, free_len );
-				return 1;
-			}
-
 			/* Stop search if all remaining potential
 			 * adjacent images are already in the correct
 			 * order.
 			 */
 			if ( high == low )
 				break;
+
+			/* If we have found the adjacent image, swap and exit */
+			if ( high->data == adjacent ) {
+				initrd_swap ( low, high, free, free_len );
+				return 1;
+			}
 		}
 	}
 
