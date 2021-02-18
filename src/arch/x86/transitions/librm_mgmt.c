@@ -118,7 +118,7 @@ void set_interrupt_vector ( unsigned int intr, void *vector ) {
  * Initialise interrupt descriptor table
  *
  */
-void init_idt ( void ) {
+__asmcall void init_idt ( void ) {
 	struct interrupt_vector *vec;
 	unsigned int intr;
 
