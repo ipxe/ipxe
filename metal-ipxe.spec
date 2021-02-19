@@ -45,7 +45,6 @@ rm -f %{ipxesrc}%{srcscript}
 %license COPYING.GPLv2
 %doc README.metal.md
 %config(noreplace) %{wwwbootdir}%{bootscript}
-%attr(-,dnsmasq,tftp)
-%{wwwbootdir}%(basename %{binx86_64})
+%attr(-,dnsmasq,tftp) %{wwwbootdir}%(basename %{binx86_64})
 
 %changelog
