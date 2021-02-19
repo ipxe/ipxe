@@ -1425,7 +1425,7 @@ $(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -DEFI_TARGET64 $< -o $@
 CLEANUP += $(ELF2EFI64)
 
-$(EFIROM) : util/efirom.c $(MAKEDEPS)
+$(EFIROM) : util/efirom.c util/eficompress.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
 	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -o $@ $<
 CLEANUP += $(EFIROM)

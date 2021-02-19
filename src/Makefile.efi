@@ -43,7 +43,7 @@ $(BIN)/%.drv.efi : $(BIN)/%.efidrv
 
 $(BIN)/%.efirom : $(BIN)/%.efidrv $(EFIROM)
 	$(QM)$(ECHO) "  [FINISH] $@"
-	$(Q)$(EFIROM) -v $(TGT_PCI_VENDOR) -d $(TGT_PCI_DEVICE) $< $@
+	$(Q)$(EFIROM) -v $(TGT_PCI_VENDOR) -d $(TGT_PCI_DEVICE) -c $< $@
 
 $(BIN)/efidrv.cab : $(BIN)/alldrv.efis # $(ALL_drv.efi) is not yet defined
 	$(QM)$(ECHO) "  [CAB] $@"
