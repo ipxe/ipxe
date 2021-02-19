@@ -16,6 +16,10 @@ echo Enable PCI_CMD command: https://ipxe.org/buildcfg/pci_cmd
 sed -i -E 's://#define([[:space:]]+)PCI_CMD:#define\1PCI_CMD:' src/config/general.h
 grep PCI_CMD src/config/general.h
 
+echo Enable REBOOT_CMD command: https://ipxe.org/buildcfg/REBOOT_CMD
+sed -i -E 's://#define([[:space:]]+)REBOOT_CMD:#define\1REBOOT_CMD:' src/config/general.h
+grep REBOOT_CMD src/config/general.h
+
 echo Enable NEIGHBOUR command: https://ipxe.org/buildcfg/neighbour_cmd
 sed -i -E 's://#define([[:space:]]+)NEIGHBOUR_CMD:#define\1NEIGHBOUR_CMD:' src/config/general.h
 grep NEIGHBOUR_CMD src/config/general.h
