@@ -79,7 +79,7 @@ set dual-bond 0
 
 :mgmt
   echo net${idx} is mgmt${idx_mgmt}
-  set net-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:dhcp ${net-udev-params}
+  set net-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:auto6 ${net-udev-params}
   iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
   inc idx && inc idx_mgmt && goto loop
 
