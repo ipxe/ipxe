@@ -1,5 +1,7 @@
-@Library("dst-shared@release/shasta-1.4") _
+@Library("dst-shared@master") _
 rpmBuild (
+    githubPushRepo : "Cray-HPE/metal-ipxe",
+    githubPushBranches : "release/.*|main",
     specfile : "metal-ipxe.spec",
     masterBranch : "main",
     product : "csm",
