@@ -1,14 +1,21 @@
 #!ipxe
+set vtag:int8 2
 echo ====NIC DISCOVERY===================================
 # Must start at 0; uint does not start at 0.
 set idx:int8 0
-:check isset ${net${idx}/mac} || goto retry
+:check isset ${net${idx}/mac} || goto checked
   echo net${idx} MAC ${net${idx}/mac} PCI.DeviceID ${pci/${net${idx}/busloc}.2.2} PCI.VendorID ${pci/${net${idx}/busloc}.0.2}
   inc idx && goto check
-:retry
-echo ====DHCP ===========================================
-dhcp || goto retry
+:checked
 
+echo ====DHCP ===========================================
+set vidx:int8 0
+:vcheck isset ${net${vidx}/mac} || goto done
+  vcreate --tag ${vtag} net${vidx}
+  dhcp net${vidx}-${vtag} || inc vidx && goto vcheck
+:done
+
+echo ====Loading ...=====================================
 # This should be coded to always point to our LiveCD alias and nothing else.
 # Figure out if client is 64-bit capable
 cpuid --ext 29 && set arch x86_64 || set arch x86

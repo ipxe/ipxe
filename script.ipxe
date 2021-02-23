@@ -51,7 +51,7 @@ set custom-params nosplash quiet crashkernel=360M
 # Note: This will also boot without VLAN, you'll be able to know by the IPs leased
 :nic_naming
 echo ====DEVICE NAMING=======================================================
-set print-niics 0
+set print-nics 0
 set idx:int8 0
 set idx_hsn:int8 0
 set idx_mgmt:int8 0
