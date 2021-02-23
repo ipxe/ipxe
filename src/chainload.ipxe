@@ -12,7 +12,8 @@ echo ====DHCP ===========================================
 set vidx:int8 0
 :vcheck isset ${net${vidx}/mac} || goto done
   vcreate --tag ${vtag} net${vidx}
-  dhcp net${vidx}-${vtag} || inc vidx && goto vcheck
+  dhcp net${vidx}-${vtag} && goto done ||
+  inc vidx && goto vcheck
 :done
 
 echo ====Loading ...=====================================
