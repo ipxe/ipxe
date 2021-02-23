@@ -16,7 +16,7 @@ set cloud-init ds=nocloud-net;s=http://${dhcp-server}:8888/
 set boot-opts rootfallback=LABEL=BOOTRAID initrd=initrd.img.xz
 set live-sqfs-opts root=live:LABEL=SQFSRAID rd.live.ram=0 rd.writable.fsimg=0 rd.skipfsck rd.live.squashimg=${image-name}
 set live-oval-opts rd.live.overlay=LABEL=ROOTRAID rd.live.overlay.thin=1 rd.live.overlay.overlayfs=1 rd.live.overlay.size=307200
-set disk-opts rd.lvm.conf=0 rd.luks.key=/pki/etcd.key:LABEL=ROOTRAID rd.lvm=1 rd.auto=0 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=1 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1 rd.luks.allow-discards
+set disk-opts rd.lvm.conf=0 rd.luks.key=/pki/etcd.key:LABEL=ROOTRAID:LABEL=ETCDLVM rd.lvm=1 rd.auto=0 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=1 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1 rd.luks.allow-discards
 
 # Matching NCN boot parameters:
 set ncn-params pcie_ports=native transparent_hugepage=never console=tty0 console=ttyS0,115200 iommu=pt ${bootstrap} ${cloud-init} ${boot-opts} ${live-sqfs-opts} ${live-oval-opts} ${disk-opts}
@@ -93,7 +93,7 @@ iseq ${print-nics} 1 && prompt Press any key to continue || sleep 2
 
 # Assign bonds.
 # FIXME: CASMINST-715 force bond0 only no matter what; never make bond1.
-iseq ${dual-bond} 1 && set net-bond-params bond=bond0:mgmt2:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 || set net-bond-params bond=bond0:mgmt1:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0
+iseq ${dual-bond} 1 && set net-bond-params bond=bond0:mgmt0,mgmt2:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 || set net-bond-params bond=bond0:mgmt0,mgmt1:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0
 # FIXME: CASMINST-715 when ready to enable bond1, comment out the above line and uncomment the line below.
 #iseq ${dual-bond} 1 && set net-bond-params bond=bond0:mgmt2:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0 bond=bond1:mgmt1,mgmt3:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond1 ip=bond1:auto6 || set net-bond-params bond=bond0:mgmt1:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0
 

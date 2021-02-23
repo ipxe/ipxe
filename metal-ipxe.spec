@@ -43,7 +43,7 @@ rm -f %{ipxesrc}%{srcscript}
 %files
 %defattr(-,root,root)
 %license COPYING.GPLv2
-%doc README.metal.md
+%doc README.asc
 %config(noreplace) %{wwwbootdir}%{bootscript}
 %attr(-,dnsmasq,tftp) %{wwwbootdir}%(basename %{binx86_64})
 
