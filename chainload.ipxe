@@ -1,5 +1,5 @@
 #!ipxe
-set vtag 2
+set vtag:int8 2
 echo ====NIC DISCOVERY===================================
 # Must start at 0; uint does not start at 0.
 set idx:int8 0
