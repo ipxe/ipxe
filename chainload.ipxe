@@ -9,11 +9,11 @@ set idx:int8 0
 :checked
 
 echo ====DHCP ===========================================
-set idx:int8 0
 
-:vcheck isset ${net${idx}/mac} || goto done
-  vcreate --tag ${vtag} net${idx}
-  dhcp net${idx}-${vtag} || inc idx && goto vcheck
+set vidx:int8 0
+:vcheck isset ${net${vidx}/mac} || goto done
+  vcreate --tag ${vtag} net${vidx}
+  dhcp net${vidx}-${vtag} || inc vidx && goto vcheck
 :done
 
 # This should be coded to always point to our LiveCD alias and nothing else.
