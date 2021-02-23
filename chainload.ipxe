@@ -7,11 +7,13 @@ set idx:int8 0
   echo net${idx} MAC ${net${idx}/mac} PCI.DeviceID ${pci/${net${idx}/busloc}.2.2} PCI.VendorID ${pci/${net${idx}/busloc}.0.2}
   inc idx && goto check
 :checked
+
 echo ====DHCP ===========================================
 set idx:int8 0
+
 :vcheck isset ${net${idx}/mac} || goto done
-  vcreate --tag ${vtag} --priority 0 net${idx}
-  dhcp net${idx}-2 || inc idx && goto vcheck
+  vcreate --tag ${vtag} net${idx}
+  dhcp net${idx}-${vtag} || inc idx && goto vcheck
 :done
 
 # This should be coded to always point to our LiveCD alias and nothing else.
