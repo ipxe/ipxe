@@ -16,7 +16,7 @@ set cloud-init ds=nocloud-net;s=http://${dhcp-server}:8888/
 set boot-opts rootfallback=LABEL=BOOTRAID initrd=initrd.img.xz
 set live-sqfs-opts root=live:LABEL=SQFSRAID rd.live.ram=0 rd.writable.fsimg=0 rd.skipfsck rd.live.squashimg=${image-name}
 set live-oval-opts rd.live.overlay=LABEL=ROOTRAID rd.live.overlay.thin=1 rd.live.overlay.overlayfs=1 rd.live.overlay.size=307200
-set disk-opts rd.lvm.conf=0 rd.luks.key=/pki/etcd.key:LABEL=ROOTRAID:LABEL=ETCDLVM rd.lvm=1 rd.auto=0 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=1 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1 rd.luks.allow-discards
+set disk-opts rd.luks rd.luks.crypttab=0 rd.lvm.conf=0 rd.lvm=1 rd.auto=1 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=1 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1
 
 # Matching NCN boot parameters:
 set ncn-params pcie_ports=native transparent_hugepage=never console=tty0 console=ttyS0,115200 iommu=pt ${bootstrap} ${cloud-init} ${boot-opts} ${live-sqfs-opts} ${live-oval-opts} ${disk-opts}
