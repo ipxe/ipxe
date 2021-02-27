@@ -3,6 +3,8 @@ MEDIA = linux
 # enable valgrind
 CFLAGS += -UNVALGRIND
 
+SYMBOL_PREFIX = _ipxe__
+
 INCDIRS += arch/x86/include/linux
 SRCDIRS += interface/linux
 SRCDIRS += drivers/linux

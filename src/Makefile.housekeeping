@@ -1102,9 +1102,10 @@ TGT_LD_ENTRY	= _$(TGT_PREFIX)_start
 #
 TGT_LD_FLAGS	= $(foreach SYM,$(TGT_LD_ENTRY) $(TGT_LD_DRIVERS) \
 		    $(TGT_LD_DEVLIST) obj_config obj_config_$(PLATFORM),\
-		    -u $(SYM) --defsym check_$(SYM)=$(SYM) ) \
+		    -u $(SYMBOL_PREFIX)$(SYM) \
+		    --defsym check_$(SYM)=$(SYMBOL_PREFIX)$(SYM) ) \
 		  $(patsubst %,--defsym %,$(TGT_LD_IDS)) \
-		  -e $(TGT_LD_ENTRY)
+		  -e $(SYMBOL_PREFIX)$(TGT_LD_ENTRY)
 
 # Calculate list of debugging versions of objects to be included in
 # the target.
@@ -1166,6 +1167,7 @@ $(BLIB) : $(BLIB_OBJS) $(BLIB_LIST) $(MAKEDEPS)
 	$(Q)$(RM) $(BLIB)
 	$(QM)$(ECHO) "  [AR] $@"
 	$(Q)$(AR) rD $@ $(sort $(BLIB_OBJS))
+	$(Q)$(OBJCOPY) --prefix-symbols=$(SYMBOL_PREFIX) $@
 	$(Q)$(RANLIB) -D $@
 blib : $(BLIB)
 
@@ -1207,6 +1209,7 @@ $(BIN)/version.%.o : core/version.c $(MAKEDEPS) $(GIT_INDEX)
 		-DVERSION_PATCH=$(VERSION_PATCH) \
 		-DVERSION="\"$(VERSION)\"" \
 		-c $< -o $@
+	$(Q)$(OBJCOPY) --prefix-symbols=$(SYMBOL_PREFIX) $@
 
 # Build an intermediate object file from the objects required for the
 # specified target.
