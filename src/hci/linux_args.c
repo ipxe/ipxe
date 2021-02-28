@@ -18,7 +18,6 @@
 
 FILE_LICENCE(GPL2_OR_LATER);
 
-#include <hci/linux_args.h>
 #include <getopt.h>
 #include <string.h>
 #include <stdio.h>
@@ -27,21 +26,8 @@ FILE_LICENCE(GPL2_OR_LATER);
 #include <ipxe/malloc.h>
 #include <ipxe/init.h>
 
-/** Saved argc */
-static int saved_argc = 0;
-/** Saved argv */
-static char ** saved_argv;
-
-/**
- * Save argc and argv for later access.
- *
- * To be called by linuxprefix
- */
-__asmcall void save_args(int argc, char **argv)
-{
-	saved_argc = argc;
-	saved_argv = argv;
-}
+int linux_argc;
+char **linux_argv;
 
 /** Supported command-line options */
 static struct option options[] = {
@@ -138,7 +124,7 @@ void linux_args_parse()
 	while (1) {
 		int option_index = 0;
 
-		c = getopt_long(saved_argc, saved_argv, "", options, &option_index);
+		c = getopt_long(linux_argc, linux_argv, "", options, &option_index);
 		if (c == -1)
 			break;
 

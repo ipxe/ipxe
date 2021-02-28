@@ -29,7 +29,7 @@ FILE_LICENCE(GPL2_OR_LATER);
 #include <assert.h>
 #include <ipxe/umalloc.h>
 
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 
 /** Special address returned for empty allocations */
 #define NOWHERE ((void *)-1)

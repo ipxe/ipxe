@@ -1,6 +1,10 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Linker script
+#
 LDSCRIPT = arch/x86_64/scripts/linux.lds
 
-SRCDIRS += arch/x86_64/core/linux
-
+# Include generic Linux Makefile
+#
 MAKEDEPS += arch/x86/Makefile.linux
 include arch/x86/Makefile.linux

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Piotr Jaroszyński <p.jaroszynski@gmail.com>
+ * Copyright (C) 2021 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -13,19 +13,26 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
  */
 
-#ifndef _HCI_LINUX_ARGS_H
-#define _HCI_LINUX_ARGS_H
-
-FILE_LICENCE(GPL2_OR_LATER);
+#include <stdlib.h>
+#include <ipxe/linux_api.h>
 
 /**
- * Save argc and argv for later access.
+ * Linux entry point
  *
- * To be called by linuxprefix
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
  */
-extern __asmcall void save_args(int argc, char **argv);
+int __asmcall _linux_start ( int argc, char **argv ) {
 
-#endif /* _HCI_LINUX_ARGS_H */
+	/* Store command-line arguments */
+	linux_argc = argc;
+	linux_argv = argv;
+
+	/* Run iPXE */
+	return main();
+}

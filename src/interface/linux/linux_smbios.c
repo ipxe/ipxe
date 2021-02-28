@@ -20,7 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 #include <ipxe/linux.h>
 #include <ipxe/smbios.h>
 
