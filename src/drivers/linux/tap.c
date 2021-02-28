@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 #include <ipxe/list.h>
 #include <ipxe/linux.h>
 #include <ipxe/malloc.h>

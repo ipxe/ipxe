@@ -1,0 +1,39 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Prefix all iPXE symbols to avoid collisions with platform libraries
+#
+SYMBOL_PREFIX	= _ipxe__
+
+# Enable valgrind
+#
+CFLAGS		+= -UNVALGRIND
+
+# Use a two-stage link
+#
+LDFLAGS		+= -r -d
+
+# Source directories
+#
+SRCDIRS		+= drivers/linux
+SRCDIRS		+= interface/linux
+NON_AUTO_SRCS	+= interface/linux/linux_api.c
+
+# Media types
+#
+NON_AUTO_MEDIA = linux
+
+# Compiler flags for building host API wrapper
+#
+LINUX_CFLAGS	+= -Os -idirafter include -DSYMBOL_PREFIX=$(SYMBOL_PREFIX)
+
+# Host API wrapper
+#
+$(BIN)/linux_api.o : interface/linux/linux_api.c $(MAKEDEPS)
+	$(QM)$(ECHO) "  [BUILD] $@"
+	$(Q)$(CC) $(LINUX_CFLAGS) $(WORKAROUND_CFLAGS) -o $@ -c $<
+
+# Rule to generate final binary
+#
+$(BIN)/%.linux : $(BIN)/%.linux.tmp $(BIN)/linux_api.o
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(CC) $(LINUX_CFLAGS) $(WORKAROUND_CFLAGS) -o $@ $^
