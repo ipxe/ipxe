@@ -259,19 +259,11 @@ static int acpi_sx_zsdt ( userptr_t zsdt, uint32_t signature ) {
  */
 int acpi_sx ( uint32_t signature ) {
 	struct acpi_fadt fadtab;
-	userptr_t rsdt;
 	userptr_t fadt;
 	userptr_t dsdt;
 	userptr_t ssdt;
 	unsigned int i;
 	int sx;
-
-	/* Locate RSDT */
-	rsdt = acpi_find_rsdt();
-	if ( ! rsdt ) {
-		DBG ( "RSDT not found\n" );
-		return -ENOENT;
-	}
 
 	/* Try DSDT first */
 	fadt = acpi_find ( FADT_SIGNATURE, 0 );
@@ -291,8 +283,8 @@ int acpi_sx ( uint32_t signature ) {
 			return sx;
 	}
 
-	DBGC ( colour, "RSDT %#08lx could not find \\_Sx \"%s\"\n",
-	       user_to_phys ( rsdt, 0 ), acpi_name ( signature ) );
+	DBGC ( colour, "ACPI could not find \\_Sx \"%s\"\n",
+	       acpi_name ( signature ) );
 	return -ENOENT;
 }
 
