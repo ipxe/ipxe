@@ -123,3 +123,4 @@ static userptr_t rsdp_find_rsdt ( void ) {
 }
 
 PROVIDE_ACPI ( rsdp, acpi_find_rsdt, rsdp_find_rsdt );
+PROVIDE_ACPI_INLINE ( rsdp, acpi_find );
