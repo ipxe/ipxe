@@ -83,13 +83,13 @@ void acpi_fix_checksum ( struct acpi_header *acpi ) {
 }
 
 /**
- * Locate ACPI table
+ * Locate ACPI table via RSDT
  *
  * @v signature		Requested table signature
  * @v index		Requested index of table with this signature
  * @ret table		Table, or UNULL if not found
  */
-userptr_t acpi_find ( uint32_t signature, unsigned int index ) {
+userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
 	struct acpi_header acpi;
 	struct acpi_rsdt *rsdtab;
 	typeof ( rsdtab->entry[0] ) entry;

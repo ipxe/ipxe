@@ -15,8 +15,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ACPI_PREFIX_null __null_
 #endif
 
-static inline __always_inline userptr_t
-ACPI_INLINE ( null, acpi_find_rsdt ) ( void ) {
+static inline __attribute__ (( always_inline )) userptr_t
+ACPI_INLINE ( null, acpi_find ) ( uint32_t signature __unused,
+				  unsigned int index __unused ) {
+
 	return UNULL;
 }
 

@@ -355,6 +355,8 @@ struct acpi_model {
 #define PROVIDE_ACPI_INLINE( _subsys, _api_func ) \
 	PROVIDE_SINGLE_API_INLINE ( ACPI_PREFIX_ ## _subsys, _api_func )
 
+extern userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index );
+
 /* Include all architecture-independent ACPI API headers */
 #include <ipxe/null_acpi.h>
 #include <ipxe/efi/efi_acpi.h>
@@ -369,13 +371,21 @@ struct acpi_model {
  */
 userptr_t acpi_find_rsdt ( void );
 
+/**
+ * Locate ACPI table
+ *
+ * @v signature		Requested table signature
+ * @v index		Requested index of table with this signature
+ * @ret table		Table, or UNULL if not found
+ */
+userptr_t acpi_find ( uint32_t signature, unsigned int index );
+
 extern struct acpi_descriptor *
 acpi_describe ( struct interface *interface );
 #define acpi_describe_TYPE( object_type )				\
 	typeof ( struct acpi_descriptor * ( object_type ) )
 
 extern void acpi_fix_checksum ( struct acpi_header *acpi );
-extern userptr_t acpi_find ( uint32_t signature, unsigned int index );
 extern int acpi_sx ( uint32_t signature );
 extern void acpi_add ( struct acpi_descriptor *desc );
 extern void acpi_del ( struct acpi_descriptor *desc );
