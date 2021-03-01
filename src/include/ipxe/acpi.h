@@ -360,6 +360,7 @@ extern userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index );
 /* Include all architecture-independent ACPI API headers */
 #include <ipxe/null_acpi.h>
 #include <ipxe/efi/efi_acpi.h>
+#include <ipxe/linux/linux_acpi.h>
 
 /* Include all architecture-dependent ACPI API headers */
 #include <bits/acpi.h>
