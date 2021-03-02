@@ -58,7 +58,8 @@ static struct profiler virt_call_profiler __profiler = { .name = "virt_call" };
 /**
  * Dummy function for profiling tests
  */
-static __asmcall void librm_test_call ( struct i386_all_regs *ix86 __unused ) {
+static __asmcall __used void
+librm_test_call ( struct i386_all_regs *ix86 __unused ) {
 	/* Do nothing */
 }
 

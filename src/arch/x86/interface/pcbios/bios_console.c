@@ -443,7 +443,7 @@ struct console_driver bios_console __console_driver = {
  *
  * @v ix86		Registers as passed to INT 16
  */
-static __asmcall void bios_inject ( struct i386_all_regs *ix86 ) {
+static __asmcall __used void bios_inject ( struct i386_all_regs *ix86 ) {
 	unsigned int discard_a;
 	unsigned int scancode;
 	unsigned int i;
