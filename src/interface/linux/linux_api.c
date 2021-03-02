@@ -40,6 +40,9 @@
 #include <slirp/libslirp.h>
 #endif
 
+#undef static_assert
+#define static_assert(x) _Static_assert(x, #x)
+
 /** @file
  *
  * Linux host API
