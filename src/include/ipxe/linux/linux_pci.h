@@ -23,6 +23,17 @@ extern int linux_pci_write ( struct pci_device *pci, unsigned long where,
 			     unsigned long value, size_t len );
 
 /**
+ * Determine number of PCI buses within system
+ *
+ * @ret num_bus		Number of buses
+ */
+static inline __always_inline int
+PCIAPI_INLINE ( linux, pci_num_bus ) ( void ) {
+	/* Assume all buses may exist */
+	return 0x100;
+}
+
+/**
  * Read byte from PCI configuration space
  *
  * @v pci	PCI device
