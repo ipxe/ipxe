@@ -50,6 +50,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #endif
 
 struct sockaddr;
+struct slirp_config;
+struct slirp_callbacks;
+struct Slirp;
 
 extern int linux_errno;
 extern int linux_argc;
@@ -82,5 +85,21 @@ extern ssize_t __asmcall linux_sendto ( int sockfd, const void *buf,
 					const struct sockaddr *dest_addr,
 					size_t addrlen );
 extern const char * __asmcall linux_strerror ( int linux_errno );
+extern struct Slirp * __asmcall
+linux_slirp_new ( const struct slirp_config *config,
+		  const struct slirp_callbacks *callbacks, void *opaque );
+extern void __asmcall linux_slirp_cleanup ( struct Slirp *slirp );
+extern void __asmcall linux_slirp_input ( struct Slirp *slirp,
+					  const uint8_t *pkt, int pkt_len );
+extern void __asmcall
+linux_slirp_pollfds_fill ( struct Slirp *slirp, uint32_t *timeout,
+			   int ( __asmcall * add_poll ) ( int fd, int events,
+							  void *opaque ),
+			   void *opaque );
+extern void __asmcall
+linux_slirp_pollfds_poll ( struct Slirp *slirp, int select_error,
+			   int ( __asmcall * get_revents ) ( int idx,
+							     void *opaque ),
+			   void *opaque );
 
 #endif /* _IPXE_LINUX_API_H */
