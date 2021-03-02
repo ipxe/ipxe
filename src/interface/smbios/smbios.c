@@ -255,3 +255,13 @@ int smbios_version ( void ) {
 
 	return smbios.version;
 }
+
+/**
+ * Clear SMBIOS entry point descriptor
+ *
+ */
+void smbios_clear ( void ) {
+
+	/* Clear address */
+	smbios.address = UNULL;
+}
