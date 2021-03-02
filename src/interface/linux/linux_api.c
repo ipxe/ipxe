@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 #include <fcntl.h>
 #include <time.h>
 #include <poll.h>
@@ -31,7 +32,13 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <netinet/in.h>
 #include <ipxe/linux_api.h>
+#include <ipxe/slirp.h>
+
+#ifdef HAVE_LIBSLIRP
+#include <slirp/libslirp.h>
+#endif
 
 /** @file
  *
@@ -347,6 +354,152 @@ const char * __asmcall linux_strerror ( int linux_errno ) {
 
 /******************************************************************************
  *
+ * libslirp wrappers
+ *
+ ******************************************************************************
+ */
+
+#ifdef HAVE_LIBSLIRP
+
+/**
+ * Wrap slirp_new()
+ *
+ */
+struct Slirp * __asmcall
+linux_slirp_new ( const struct slirp_config *config,
+		  const struct slirp_callbacks *callbacks, void *opaque ) {
+	const union {
+		struct slirp_callbacks callbacks;
+		SlirpCb cb;
+	} *u = ( ( typeof ( u ) ) callbacks );
+	SlirpConfig cfg;
+	Slirp *slirp;
+
+	/* Translate configuration */
+	memset ( &cfg, 0, sizeof ( cfg ) );
+	cfg.version = config->version;
+	cfg.restricted = config->restricted;
+	cfg.in_enabled = config->in_enabled;
+	cfg.vnetwork = config->vnetwork;
+	cfg.vnetmask = config->vnetmask;
+	cfg.vhost = config->vhost;
+	cfg.in6_enabled = config->in6_enabled;
+	memcpy ( &cfg.vprefix_addr6, &config->vprefix_addr6,
+		 sizeof ( cfg.vprefix_addr6 ) );
+	cfg.vprefix_len = config->vprefix_len;
+	memcpy ( &cfg.vhost6, &config->vhost6, sizeof ( cfg.vhost6 ) );
+	cfg.vhostname = config->vhostname;
+	cfg.tftp_server_name = config->tftp_server_name;
+	cfg.tftp_path = config->tftp_path;
+	cfg.bootfile = config->bootfile;
+	cfg.vdhcp_start = config->vdhcp_start;
+	cfg.vnameserver = config->vnameserver;
+	memcpy ( &cfg.vnameserver6, &config->vnameserver6,
+		 sizeof ( cfg.vnameserver6 ) );
+	cfg.vdnssearch = config->vdnssearch;
+	cfg.vdomainname = config->vdomainname;
+	cfg.if_mtu = config->if_mtu;
+	cfg.if_mru = config->if_mru;
+	cfg.disable_host_loopback = config->disable_host_loopback;
+	cfg.enable_emu = config->enable_emu;
+
+	/* Validate callback structure */
+	static_assert ( &u->cb.send_packet == &u->callbacks.send_packet );
+	static_assert ( &u->cb.guest_error == &u->callbacks.guest_error );
+	static_assert ( &u->cb.clock_get_ns == &u->callbacks.clock_get_ns );
+	static_assert ( &u->cb.timer_new == &u->callbacks.timer_new );
+	static_assert ( &u->cb.timer_free == &u->callbacks.timer_free );
+	static_assert ( &u->cb.timer_mod == &u->callbacks.timer_mod );
+	static_assert ( &u->cb.register_poll_fd ==
+			&u->callbacks.register_poll_fd );
+	static_assert ( &u->cb.unregister_poll_fd ==
+			&u->callbacks.unregister_poll_fd );
+	static_assert ( &u->cb.notify == &u->callbacks.notify );
+
+	/* Create device */
+	slirp = slirp_new ( &cfg, &u->cb, opaque );
+
+	return slirp;
+}
+
+/**
+ * Wrap slirp_cleanup()
+ *
+ */
+void __asmcall linux_slirp_cleanup ( struct Slirp *slirp ) {
+
+	slirp_cleanup ( slirp );
+}
+
+/**
+ * Wrap slirp_input()
+ *
+ */
+void __asmcall linux_slirp_input ( struct Slirp *slirp, const uint8_t *pkt,
+				   int pkt_len ) {
+
+	slirp_input ( slirp, pkt, pkt_len );
+}
+
+/**
+ * Wrap slirp_pollfds_fill()
+ *
+ */
+void __asmcall
+linux_slirp_pollfds_fill ( struct Slirp *slirp, uint32_t *timeout,
+			   int ( __asmcall * add_poll ) ( int fd, int events,
+							  void *opaque ),
+			   void *opaque ) {
+
+	slirp_pollfds_fill ( slirp, timeout, add_poll, opaque );
+}
+
+/**
+ * Wrap slirp_pollfds_poll()
+ *
+ */
+void __asmcall
+linux_slirp_pollfds_poll ( struct Slirp *slirp, int select_error,
+			   int ( __asmcall * get_revents ) ( int idx,
+							     void *opaque ),
+			   void *opaque ) {
+
+	slirp_pollfds_poll ( slirp, select_error, get_revents, opaque );
+}
+
+#else /* HAVE_LIBSLIRP */
+
+struct Slirp * __asmcall
+linux_slirp_new ( const struct slirp_config *config,
+		  const struct slirp_callbacks *callbacks, void *opaque ) {
+	return NULL;
+}
+
+void __asmcall linux_slirp_cleanup ( struct Slirp *slirp ) {
+}
+
+void __asmcall linux_slirp_input ( struct Slirp *slirp, const uint8_t *pkt,
+				   int pkt_len ) {
+}
+
+void __asmcall
+linux_slirp_pollfds_fill ( struct Slirp *slirp, uint32_t *timeout,
+			   int ( __asmcall * add_poll ) ( int fd, int events,
+							  void *opaque ),
+			   void *opaque ) {
+}
+
+void __asmcall
+linux_slirp_pollfds_poll ( struct Slirp *slirp, int select_error,
+			   int ( __asmcall * get_revents ) ( int idx,
+							     void *opaque ),
+			   void *opaque ) {
+}
+
+#endif /* HAVE_LIBSLIRP */
+
+/******************************************************************************
+ *
  * Symbol aliases
  *
  ******************************************************************************
@@ -371,3 +524,8 @@ PROVIDE_IPXE_SYM ( linux_socket );
 PROVIDE_IPXE_SYM ( linux_bind );
 PROVIDE_IPXE_SYM ( linux_sendto );
 PROVIDE_IPXE_SYM ( linux_strerror );
+PROVIDE_IPXE_SYM ( linux_slirp_new );
+PROVIDE_IPXE_SYM ( linux_slirp_cleanup );
+PROVIDE_IPXE_SYM ( linux_slirp_input );
+PROVIDE_IPXE_SYM ( linux_slirp_pollfds_fill );
+PROVIDE_IPXE_SYM ( linux_slirp_pollfds_poll );
