@@ -235,5 +235,6 @@ extern int read_smbios_string ( struct smbios_structure *structure,
 				unsigned int index,
 				void *data, size_t len );
 extern int smbios_version ( void );
+extern void smbios_clear ( void );
 
 #endif /* _IPXE_SMBIOS_H */
