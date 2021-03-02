@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/linux_api.h>
 #include <ipxe/linux.h>
 #include <ipxe/list.h>
+#include <ipxe/init.h>
 #include <ipxe/acpi.h>
 
 /** ACPI sysfs directory */
@@ -169,5 +170,26 @@ static userptr_t linux_acpi_find ( uint32_t signature, unsigned int index ) {
  err_alloc:
 	return UNULL;
 }
+
+/**
+ * Free cached ACPI data
+ *
+ */
+static void linux_acpi_shutdown ( int booting __unused ) {
+	struct linux_acpi_table *table;
+	struct linux_acpi_table *tmp;
+
+	list_for_each_entry_safe ( table, tmp, &linux_acpi_tables, list ) {
+		list_del ( &table->list );
+		free ( table->data );
+		free ( table );
+	}
+}
+
+/** ACPI shutdown function */
+struct startup_fn linux_acpi_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "linux_acpi",
+	.shutdown = linux_acpi_shutdown,
+};
 
 PROVIDE_ACPI ( linux, acpi_find, linux_acpi_find );
