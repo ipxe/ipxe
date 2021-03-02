@@ -32,6 +32,7 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <ipxe/linux_api.h>
 #include <ipxe/slirp.h>
@@ -193,6 +194,20 @@ int __asmcall linux_ioctl ( int fd, unsigned long request, ... ) {
 	arg = va_arg ( args, void * );
 	va_end ( args );
 	ret = ioctl ( fd, request, arg );
+	if ( ret == -1 )
+		linux_errno = errno;
+	return ret;
+}
+
+/**
+ * Wrap statx()
+ *
+ */
+int __asmcall linux_statx ( int dirfd, const char *pathname, int flags,
+			    unsigned int mask, struct statx *statxbuf ) {
+	int ret;
+
+	ret = statx ( dirfd, pathname, flags, mask, statxbuf );
 	if ( ret == -1 )
 		linux_errno = errno;
 	return ret;
@@ -516,6 +531,7 @@ PROVIDE_IPXE_SYM ( linux_read );
 PROVIDE_IPXE_SYM ( linux_write );
 PROVIDE_IPXE_SYM ( linux_fcntl );
 PROVIDE_IPXE_SYM ( linux_ioctl );
+PROVIDE_IPXE_SYM ( linux_statx );
 PROVIDE_IPXE_SYM ( linux_poll );
 PROVIDE_IPXE_SYM ( linux_nanosleep );
 PROVIDE_IPXE_SYM ( linux_usleep );
