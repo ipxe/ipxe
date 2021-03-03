@@ -32,6 +32,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** Read blocksize */
+#define LINUX_SYSFS_BLKSIZE 4096
+
 /**
  * Read file from sysfs
  *
@@ -40,9 +43,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret len		Length read, or negative error
  */
 int linux_sysfs_read ( const char *filename, userptr_t *data ) {
-	size_t offset;
-	size_t len;
+	userptr_t tmp;
 	ssize_t read;
+	size_t len;
 	int fd;
 	int rc;
 
@@ -55,36 +58,26 @@ int linux_sysfs_read ( const char *filename, userptr_t *data ) {
 		goto err_open;
 	}
 
-	/* Get file length */
-	if ( linux_fstat_size ( fd, &len ) == -1 ) {
-		rc = -ELINUX ( linux_errno );
-		DBGC ( filename, "LINUX could not stat %s: %s\n",
-		       filename, linux_strerror ( linux_errno ) );
-		goto err_stat;
-	}
-
-	/* Allocate buffer */
-	*data = umalloc ( len );
-	if ( ! *data ) {
-		rc = -ENOMEM;
-		DBGC ( filename, "LINUX could not allocate %zd bytes for %s\n",
-		       len, filename );
-		goto err_alloc;
-	}
-
 	/* Read file */
-	for ( offset = 0 ; offset < len ; offset += read ) {
-		read = linux_read ( fd, user_to_virt ( *data, offset ), len );
+	for ( *data = UNULL, len = 0 ; ; len += read ) {
+
+		/* (Re)allocate space */
+		tmp = urealloc ( *data, ( len + LINUX_SYSFS_BLKSIZE ) );
+		if ( ! tmp ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+		*data = tmp;
+
+		/* Read from file */
+		read = linux_read ( fd, user_to_virt ( *data, len ),
+				    LINUX_SYSFS_BLKSIZE );
+		if ( read == 0 )
+			break;
 		if ( read < 0 ) {
 			DBGC ( filename, "LINUX could not read %s: %s\n",
 			       filename, linux_strerror ( linux_errno ) );
 			goto err_read;
-		}
-		if ( read == 0 ) {
-			rc = -EIO;
-			DBGC ( filename, "LINUX read underlength %s\n",
-			       filename );
-			goto err_eof;
 		}
 	}
 
@@ -94,11 +87,9 @@ int linux_sysfs_read ( const char *filename, userptr_t *data ) {
 	DBGC ( filename, "LINUX read %s\n", filename );
 	return len;
 
- err_eof:
  err_read:
-	ufree ( *data );
  err_alloc:
- err_stat:
+	ufree ( *data );
 	linux_close ( fd );
  err_open:
 	return rc;
