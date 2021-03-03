@@ -34,7 +34,7 @@ LIBSLIRP_TEST = $(CC) $(LINUX_CFLAGS) -x c /dev/null -nostartfiles \
 WITH_LIBSLIRP	:= $(shell $(LIBSLIRP_TEST) && $(ECHO) yes)
 ifneq ($(WITH_LIBSLIRP),)
 LINUX_CFLAGS	+= -DHAVE_LIBSLIRP
-LINUX_LDFLAGS	+= -lslirp
+LINUX_LIBS	+= -lslirp
 endif
 
 # Host API wrapper
@@ -48,5 +48,4 @@ $(BIN)/linux_api.o : interface/linux/linux_api.c include/ipxe/linux_api.h \
 #
 $(BIN)/%.linux : $(BIN)/%.linux.tmp $(BIN)/linux_api.o
 	$(QM)$(ECHO) "  [FINISH] $@"
-	$(Q)$(CC) $(LINUX_CFLAGS) $(WORKAROUND_CFLAGS) $(LINUX_LDFLAGS) \
-		-o $@ $^
+	$(Q)$(CC) $(LINUX_CFLAGS) $(WORKAROUND_CFLAGS) -o $@ $^ $(LINUX_LIBS)
