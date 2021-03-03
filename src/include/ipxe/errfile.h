@@ -394,6 +394,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_autoexec	      ( ERRFILE_OTHER | 0x00540000 )
 #define ERRFILE_efi_cachedhcp	      ( ERRFILE_OTHER | 0x00550000 )
 #define ERRFILE_linux_sysfs	      ( ERRFILE_OTHER | 0x00560000 )
+#define ERRFILE_linux_acpi	      ( ERRFILE_OTHER | 0x00570000 )
 
 /** @} */
 
