@@ -200,14 +200,15 @@ int __asmcall linux_ioctl ( int fd, unsigned long request, ... ) {
 }
 
 /**
- * Wrap statx()
+ * Wrap part of fstat()
  *
  */
-int __asmcall linux_statx ( int dirfd, const char *pathname, int flags,
-			    unsigned int mask, struct statx *statxbuf ) {
+int __asmcall linux_fstat_size ( int fd, size_t *size ) {
+	struct stat stat;
 	int ret;
 
-	ret = statx ( dirfd, pathname, flags, mask, statxbuf );
+	ret = fstat ( fd, &stat );
+	*size = stat.st_size;
 	if ( ret == -1 )
 		linux_errno = errno;
 	return ret;
@@ -531,7 +532,7 @@ PROVIDE_IPXE_SYM ( linux_read );
 PROVIDE_IPXE_SYM ( linux_write );
 PROVIDE_IPXE_SYM ( linux_fcntl );
 PROVIDE_IPXE_SYM ( linux_ioctl );
-PROVIDE_IPXE_SYM ( linux_statx );
+PROVIDE_IPXE_SYM ( linux_fstat_size );
 PROVIDE_IPXE_SYM ( linux_poll );
 PROVIDE_IPXE_SYM ( linux_nanosleep );
 PROVIDE_IPXE_SYM ( linux_usleep );

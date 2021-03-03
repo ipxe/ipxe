@@ -46,7 +46,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <linux/ioctl.h>
 #include <linux/poll.h>
 #include <linux/fs.h>
-#include <linux/stat.h>
 #define MAP_FAILED ( ( void * ) -1 )
 #endif
 
@@ -66,8 +65,7 @@ extern ssize_t __asmcall linux_read ( int fd, void *buf, size_t count );
 extern ssize_t __asmcall linux_write ( int fd, const void *buf, size_t count );
 extern int __asmcall linux_fcntl ( int fd, int cmd, ... );
 extern int __asmcall linux_ioctl ( int fd, unsigned long request, ... );
-extern int __asmcall linux_statx ( int dirfd, const char *pathname, int flags,
-				   unsigned int mask, struct statx *statxbuf );
+extern int __asmcall linux_fstat_size ( int fd, size_t *size );
 extern int __asmcall linux_poll ( struct pollfd *fds, unsigned int nfds,
 				  int timeout );
 extern int __asmcall linux_nanosleep ( const struct timespec *req,

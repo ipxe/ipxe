@@ -40,7 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret len		Length read, or negative error
  */
 int linux_sysfs_read ( const char *filename, userptr_t *data ) {
-	struct statx statx;
 	size_t offset;
 	size_t len;
 	ssize_t read;
@@ -57,13 +56,12 @@ int linux_sysfs_read ( const char *filename, userptr_t *data ) {
 	}
 
 	/* Get file length */
-	if ( linux_statx ( fd, "", AT_EMPTY_PATH, STATX_SIZE, &statx ) == -1 ) {
+	if ( linux_fstat_size ( fd, &len ) == -1 ) {
 		rc = -ELINUX ( linux_errno );
 		DBGC ( filename, "LINUX could not stat %s: %s\n",
 		       filename, linux_strerror ( linux_errno ) );
 		goto err_stat;
 	}
-	len = statx.stx_size;
 
 	/* Allocate buffer */
 	*data = umalloc ( len );
