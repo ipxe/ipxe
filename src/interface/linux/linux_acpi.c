@@ -57,6 +57,7 @@ static LIST_HEAD ( linux_acpi_tables );
  */
 static userptr_t linux_acpi_find ( uint32_t signature, unsigned int index ) {
 	struct linux_acpi_table *table;
+	struct acpi_header *header;
 	union {
 		uint32_t signature;
 		char filename[5];
@@ -100,6 +101,14 @@ static userptr_t linux_acpi_find ( uint32_t signature, unsigned int index ) {
 		       filename, strerror ( rc ) );
 		goto err_read;
 	}
+	header = user_to_virt ( table->data, 0 );
+	if ( ( ( ( size_t ) len ) < sizeof ( *header ) ) ||
+	     ( ( ( size_t ) len ) < le32_to_cpu ( header->length ) ) ) {
+		rc = -ENOENT;
+		DBGC ( &linux_acpi_tables, "ACPI underlength %s (%d bytes)\n",
+		       filename, len );
+		goto err_len;
+	}
 
 	/* Add to list of tables */
 	list_add ( &table->list, &linux_acpi_tables );
@@ -107,6 +116,7 @@ static userptr_t linux_acpi_find ( uint32_t signature, unsigned int index ) {
 
 	return table->data;
 
+ err_len:
 	ufree ( table->data );
  err_read:
 	free ( table );
