@@ -55,7 +55,7 @@ goto default
 
 :default
 echo querying ${script-url}
-chain ${script-url} || goto start
+chain ${script-url} || echo goto start
 
 :config
 config
