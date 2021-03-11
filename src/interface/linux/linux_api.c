@@ -486,35 +486,6 @@ linux_slirp_pollfds_poll ( struct Slirp *slirp, int select_error,
 	slirp_pollfds_poll ( slirp, select_error, get_revents, opaque );
 }
 
-#else /* HAVE_LIBSLIRP */
-
-struct Slirp * __asmcall
-linux_slirp_new ( const struct slirp_config *config,
-		  const struct slirp_callbacks *callbacks, void *opaque ) {
-	return NULL;
-}
-
-void __asmcall linux_slirp_cleanup ( struct Slirp *slirp ) {
-}
-
-void __asmcall linux_slirp_input ( struct Slirp *slirp, const uint8_t *pkt,
-				   int pkt_len ) {
-}
-
-void __asmcall
-linux_slirp_pollfds_fill ( struct Slirp *slirp, uint32_t *timeout,
-			   int ( __asmcall * add_poll ) ( int fd, int events,
-							  void *opaque ),
-			   void *opaque ) {
-}
-
-void __asmcall
-linux_slirp_pollfds_poll ( struct Slirp *slirp, int select_error,
-			   int ( __asmcall * get_revents ) ( int idx,
-							     void *opaque ),
-			   void *opaque ) {
-}
-
 #endif /* HAVE_LIBSLIRP */
 
 /******************************************************************************
@@ -544,8 +515,11 @@ PROVIDE_IPXE_SYM ( linux_socket );
 PROVIDE_IPXE_SYM ( linux_bind );
 PROVIDE_IPXE_SYM ( linux_sendto );
 PROVIDE_IPXE_SYM ( linux_strerror );
+
+#ifdef HAVE_LIBSLIRP
 PROVIDE_IPXE_SYM ( linux_slirp_new );
 PROVIDE_IPXE_SYM ( linux_slirp_cleanup );
 PROVIDE_IPXE_SYM ( linux_slirp_input );
 PROVIDE_IPXE_SYM ( linux_slirp_pollfds_fill );
 PROVIDE_IPXE_SYM ( linux_slirp_pollfds_poll );
+#endif /* HAVE_LIBSLIRP */
