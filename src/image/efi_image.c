@@ -113,15 +113,12 @@ static wchar_t * efi_image_cmdline ( struct image *image ) {
 	wchar_t *cmdline;
 	size_t len;
 
-	len = ( strlen ( image->name ) +
-		( image->cmdline ?
-		  ( 1 /* " " */ + strlen ( image->cmdline ) ) : 0 ) );
+	len = ( image->cmdline ?
+		  ( strlen ( image->cmdline ) ) : 0 );
 	cmdline = zalloc ( ( len + 1 /* NUL */ ) * sizeof ( wchar_t ) );
 	if ( ! cmdline )
 		return NULL;
-	efi_snprintf ( cmdline, ( len + 1 /* NUL */ ), "%s%s%s",
-		       image->name,
-		       ( image->cmdline ? " " : "" ),
+	efi_snprintf ( cmdline, ( len + 1 /* NUL */ ), "%s",
 		       ( image->cmdline ? image->cmdline : "" ) );
 	return cmdline;
 }
