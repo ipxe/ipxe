@@ -530,6 +530,7 @@ static struct pci_device_id intelxvf_nics[] = {
 	PCI_ROM ( 0x8086, 0x1515, "x540-vf", "X540 VF", 0 ),
 	PCI_ROM ( 0x8086, 0x1565, "x550-vf", "X550 VF", 0 ),
 	PCI_ROM ( 0x8086, 0x15a8, "x552-vf", "X552 VF", 0 ),
+	PCI_ROM ( 0x8086, 0x15c5, "x557-vf", "X557-AT2 VF", 0 ),
 };
 
 /** PCI driver */
