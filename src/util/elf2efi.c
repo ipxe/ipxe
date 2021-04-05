@@ -758,6 +758,7 @@ create_reloc_section ( struct pe_header *pe_header,
 	reloc->hdr.VirtualAddress = pe_header->nt.OptionalHeader.SizeOfImage;
 	reloc->hdr.SizeOfRawData = section_filesz;
 	reloc->hdr.Characteristics = ( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
+				       EFI_IMAGE_SCN_MEM_DISCARDABLE |
 				       EFI_IMAGE_SCN_MEM_NOT_PAGED |
 				       EFI_IMAGE_SCN_MEM_READ );
 
@@ -822,6 +823,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	debug->hdr.VirtualAddress = pe_header->nt.OptionalHeader.SizeOfImage;
 	debug->hdr.SizeOfRawData = section_filesz;
 	debug->hdr.Characteristics = ( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
+				       EFI_IMAGE_SCN_MEM_DISCARDABLE |
 				       EFI_IMAGE_SCN_MEM_NOT_PAGED |
 				       EFI_IMAGE_SCN_MEM_READ );
 	debug->fixup = fixup_debug_section;
