@@ -435,14 +435,6 @@ static void atl_poll(struct net_device *netdev)
 	/* Check link state */
 	atl_check_link(netdev);
 
-	/* Check for and acknowledge interrupts */
-	/* icr = ATL_READ_REG(ATL_IRQ_STAT_REG); */
-
-	/*if(!icr)
-		return;
-	else
-		//DBG("AQUANTIA: %p ICR 0x%X\n", nic, icr);*/
-
 	/* Poll for TX completions, if applicable */
 	/* if (icr & ATL_IRQ_TX) */
 	atl_poll_tx(netdev);
