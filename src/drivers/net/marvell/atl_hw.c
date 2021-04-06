@@ -21,7 +21,7 @@ int atl_hw_reset_flb_(struct atl_nic *nic)
 	ATL_WRITE_REG(val | 0x10, ATL_GLB_NVR_PROV4);
 
 	ATL_WRITE_REG((ATL_READ_REG(ATL_GLB_STD_CTRL) &
-		~ATL_GLB_CTRL_RST_DIS) | 0x8000, ATL_GLB_STD_CTRL);
+		      ~ATL_GLB_CTRL_RST_DIS) | 0x8000, ATL_GLB_STD_CTRL);
 
 	/* Kickstart MAC */
 	ATL_WRITE_REG(0x80e0, ATL_GLB_CTRL2);
@@ -62,9 +62,9 @@ int atl_hw_reset_flb_(struct atl_nic *nic)
 
 	/* Global software reset*/
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RX_CTRL) & ~ATL_RX_CTRL_RST_DIS,
-		ATL_RX_CTRL);
+		      ATL_RX_CTRL);
 	ATL_WRITE_REG(ATL_READ_REG(ATL_TX_CTRL) & ~ATL_TX_CTRL_RST_DIS,
-		ATL_TX_CTRL);
+		      ATL_TX_CTRL);
 
 	ATL_WRITE_REG(ATL_READ_REG(ATL_MAC_PHY_CTRL) &
 		~ATL_MAC_PHY_CTRL_RST_DIS, ATL_MAC_PHY_CTRL);
@@ -107,14 +107,14 @@ int atl_hw_reset_rbl_(struct atl_nic *nic)
 
 	/* Global software reset*/
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RX_CTRL) & ~ATL_RX_CTRL_RST_DIS,
-		ATL_RX_CTRL);
+		      ATL_RX_CTRL);
 	ATL_WRITE_REG(ATL_READ_REG(ATL_TX_CTRL) & ~ATL_TX_CTRL_RST_DIS,
-		ATL_TX_CTRL);
+		      ATL_TX_CTRL);
 	ATL_WRITE_REG(ATL_READ_REG(ATL_MAC_PHY_CTRL) &
-		~ATL_MAC_PHY_CTRL_RST_DIS, ATL_MAC_PHY_CTRL);
+		      ~ATL_MAC_PHY_CTRL_RST_DIS, ATL_MAC_PHY_CTRL);
 
 	ATL_WRITE_REG((ATL_READ_REG(ATL_GLB_STD_CTRL) &
-		~ATL_GLB_CTRL_RST_DIS) | 0x8000, ATL_GLB_STD_CTRL);
+		      ~ATL_GLB_CTRL_RST_DIS) | 0x8000, ATL_GLB_STD_CTRL);
 
 	ATL_WRITE_REG(0x40e0, ATL_GLB_CTRL2);
 
@@ -217,7 +217,7 @@ int atl_hw_get_link(struct atl_nic *nic)
 }
 
 int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer,
-uint32_t size)
+		    uint32_t size)
 {
 	uint32_t i;
 	DBG("AQUANTIA: atl_hw_read_mem\n");

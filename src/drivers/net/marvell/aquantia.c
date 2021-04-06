@@ -56,7 +56,7 @@ FILE_LICENCE(BSD2);
 */
 
 static int atl_ring_alloc(const struct atl_nic *nic, struct atl_ring *ring,
-	uint32_t desc_size, uint32_t reg_base)
+			  uint32_t desc_size, uint32_t reg_base)
 {
 	physaddr_t phy_addr;
 
@@ -78,8 +78,8 @@ static int atl_ring_alloc(const struct atl_nic *nic, struct atl_ring *ring,
 
 	/* #todo: reset head and tail pointers */
 	DBG("ATLANTIC %p ring is at [%08llx,%08llx), reg base %#x\n",
-	nic, ((unsigned long long)phy_addr),
-	((unsigned long long) phy_addr + ring->length), reg_base);
+	    nic, ((unsigned long long)phy_addr),
+	    ((unsigned long long) phy_addr + ring->length), reg_base);
 
 	return 0;
 
@@ -146,8 +146,8 @@ void atl_rx_ring_fill(struct atl_nic *nic)
 		nic->iobufs[nic->rx_ring.sw_tail] = iobuf;
 
 		DBG("AQUANTIA RX[%d] is [%llx,%llx)\n", nic->rx_ring.sw_tail,
-			((unsigned long long) address),
-			((unsigned long long) address + ATL_RX_MAX_LEN));
+		    ((unsigned long long) address),
+		    ((unsigned long long) address + ATL_RX_MAX_LEN));
 		atl_ring_next_dx(&nic->rx_ring.sw_tail);
 		refilled++;
 	}
@@ -173,17 +173,17 @@ static int atl_open(struct net_device *netdev)
 
 	/* Tx ring */
 	if (atl_ring_alloc(nic, &nic->tx_ring, sizeof(struct atl_desc_tx),
-		ATL_TX_DMA_DESC_ADDR) != 0)
+	    ATL_TX_DMA_DESC_ADDR) != 0)
 		goto err_alloc;
 
 	/* Rx ring */
 	if (atl_ring_alloc(nic, &nic->rx_ring, sizeof(struct atl_desc_rx),
-		ATL_RX_DMA_DESC_ADDR) != 0)
+	    ATL_RX_DMA_DESC_ADDR) != 0)
 		goto err_alloc;
 
 	/* Allocate interrupt vectors */
 	ATL_WRITE_REG((ATL_IRQ_CTRL_COR_EN | ATL_IRQ_CTRL_REG_RST_DIS),
-	ATL_IRQ_CTRL);
+		      ATL_IRQ_CTRL);
 
 	/*TX & RX Interruprt Mapping*/
 	ctrl = ATL_IRQ_MAP_REG1_RX0 | ATL_IRQ_MAP_REG1_RX0_EN |
@@ -201,7 +201,7 @@ static int atl_open(struct net_device *netdev)
 	/* itr mask */
 	ATL_WRITE_REG(ctrl,  ATL_ITR_MSKS);
 	ATL_WRITE_REG((uint32_t)ATL_RX_MAX_LEN / 1024U,
-	ATL_RX_DMA_DESC_BUF_SIZE);
+		      ATL_RX_DMA_DESC_BUF_SIZE);
 
 	/*filter global ctrl */
 	ctrl = ATL_RPF_CTRL1_BRC_EN | ATL_RPF_CTRL1_L2_PROMISC |
@@ -243,9 +243,9 @@ static int atl_open(struct net_device *netdev)
 
 	/*Enable rings*/
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RING_TX_CTRL) | ATL_RING_TX_CTRL_EN,
-	ATL_RING_TX_CTRL);
+		      ATL_RING_TX_CTRL);
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RING_RX_CTRL) | ATL_RING_RX_CTRL_EN,
-	ATL_RING_RX_CTRL);
+		      ATL_RING_RX_CTRL);
 
 	atl_rx_ring_fill(nic);
 
@@ -277,9 +277,9 @@ static void atl_close(struct net_device *netdev)
 	ATL_WRITE_REG(0x0, ATL_TPB_CTRL);
 
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RING_TX_CTRL) | (~ATL_RING_TX_CTRL_EN),
-	ATL_RING_TX_CTRL);
+		      ATL_RING_TX_CTRL);
 	ATL_WRITE_REG(ATL_READ_REG(ATL_RING_RX_CTRL) | (~ATL_RING_RX_CTRL_EN),
-	ATL_RING_RX_CTRL);
+		      ATL_RING_RX_CTRL);
 
 	/* clear itr mask */
 	ATL_WRITE_REG(0x0, ATL_ITR_MSKS);
@@ -325,8 +325,8 @@ int atl_transmit(struct net_device *netdev, struct io_buffer *iobuf)
 	wmb();
 
 	DBG("AQUANTIA: %p TX[%d] is [%llx, %llx]\n", nic, nic->tx_ring.sw_tail,
-		((unsigned long long) address),
-		((unsigned long long) address + len));
+	    ((unsigned long long) address),
+	    ((unsigned long long) address + len));
 
 	atl_ring_next_dx(&nic->tx_ring.sw_tail);
 	ATL_WRITE_REG(nic->tx_ring.sw_tail, ATL_RING_TAIL);
@@ -402,7 +402,7 @@ void atl_poll_rx(struct net_device *netdev)
 
 		/* Stop if descriptor is still in use */
 		DBG("AQUANTIA: rx poll: desc: %llx, %llx\n", *((uint64_t *)rx),
-		*(((uint64_t *)rx) + 1));
+		    *(((uint64_t *)rx) + 1));
 		if (!rx->dd)
 			return;
 
@@ -415,10 +415,10 @@ void atl_poll_rx(struct net_device *netdev)
 		/* Hand off to network stack */
 		/*to do: process error*/
 		DBG("AQUANTIA: %p RX[%d] complete (length %zd)\n",
-			nic, nic->rx_ring.sw_head, len);
+		    nic, nic->rx_ring.sw_head, len);
 		netdev_rx(netdev, iobuf);
 		DBG("AQUANTIA %p: RX[%d] complete\n",
-		nic, nic->rx_ring.sw_head);
+		    nic, nic->rx_ring.sw_head);
 		atl_ring_next_dx(&nic->rx_ring.sw_head);
 	}
 }
@@ -601,59 +601,59 @@ static struct pci_device_id atl_nics[] = {
 	/* Atlantic 1 */
 	/* 10G */
 	PCI_ROM(0x1D6A, 0x0001, "AQC07",
-	"Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0xD107, "AQC07",
-	"Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x07B1, "AQC07",
-	"Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x87B1, "AQC07",
-	"Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 10Gbit Network Adapter", ATL_FLAG_A1),
 
 	/* SFP */
 	PCI_ROM(0x1D6A, 0xD100, "AQC00", "Felicity Network Adapter",
-	ATL_FLAG_A1),
+		ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x00B1, "AQC00", "Felicity Network Adapter",
-	ATL_FLAG_A1),
+		ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x80B1, "AQC00", "Felicity Network Adapter",
-	ATL_FLAG_A1),
+		ATL_FLAG_A1),
 
 	/* 5G */
 	PCI_ROM(0x1D6A, 0xD108, "AQC08", "Marvell AQtion 5Gbit Network Adapter",
-	ATL_FLAG_A1),
+		ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x08B1, "AQC08", "Marvell AQtion 5Gbit Network Adapter",
-	ATL_FLAG_A1),
+		ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x88B1, "AQC08", "Marvell AQtion 5Gbit Network Adapter",
-	ATL_FLAG_A1),
+		ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x11B1, "AQC11", "Marvell AQtion 5Gbit Network Adapter",
-	ATL_FLAG_A1),
+		ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x91B1, "AQC11", "Marvell AQtion 5Gbit Network Adapter",
-	ATL_FLAG_A1),
+		ATL_FLAG_A1),
 
 	/* 2.5G */
 	PCI_ROM(0x1D6A, 0xD109, "AQC09",
-	"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x09B1, "AQC09",
-	"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x89B1, "AQC09",
-	"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x12B1, "AQC12",
-	"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
 	PCI_ROM(0x1D6A, 0x92B1, "AQC12",
-	"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
+		"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
 
 	/* Atlantic 2 */
 	PCI_ROM(0x1D6A, 0x00C0, "AQC13", "Marvell Antigua Engineering Sample",
-	ATL_FLAG_A2),
+		ATL_FLAG_A2),
 	PCI_ROM(0x1D6A, 0x94C0, "AQC13", "Marvell Antigua Sample",
-	ATL_FLAG_A2),
+		ATL_FLAG_A2),
 	PCI_ROM(0x1D6A, 0x93C0, "AQC13", "Marvell Antigua Sample",
-	ATL_FLAG_A2),
+		ATL_FLAG_A2),
 	PCI_ROM(0x1D6A, 0x04C0, "AQC13", "Marvell Antigua Sample",
-	ATL_FLAG_A2),
+		ATL_FLAG_A2),
 	PCI_ROM(0x1D6A, 0x14C0, "AQC13", "Marvell Antigua Sample",
-	ATL_FLAG_A2),
+		ATL_FLAG_A2),
 	PCI_ROM(0x1D6A, 0x12C0, "AQC13", "Marvell Antigua Sample",
-	ATL_FLAG_A2),
+		ATL_FLAG_A2),
 };
 
 /** Marvell PCI driver */
