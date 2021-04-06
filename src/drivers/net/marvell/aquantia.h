@@ -140,7 +140,6 @@ FILE_LICENCE(BSD2);
 #define ATL_MBOX_CTRL5 0x0000020cU
 
 #define ATL_FLAG_A1 0x1
-#define ATL_FLAG_A2 0x2
 
 /*write register*/
 #define ATL_WRITE_REG(VAL, REG)	writel(VAL, nic->regs + (REG))

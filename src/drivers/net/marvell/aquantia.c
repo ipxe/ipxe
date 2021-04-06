@@ -526,9 +526,6 @@ static int atl_probe(struct pci_device *pci)
 	case ATL_FLAG_A1:
 		nic->hw_ops = &atl_hw;
 		break;
-	case ATL_FLAG_A2:
-		/* nic->hw_ops = atl2_hw;*/
-		break;
 	default:
 		goto err_unsupported;
 		break;
@@ -633,19 +630,6 @@ static struct pci_device_id atl_nics[] = {
 	PCI_ROM(0x1D6A, 0x92B1, "AQC12",
 		"Marvell AQtion 2.5Gbit Network Adapter", ATL_FLAG_A1),
 
-	/* Atlantic 2 */
-	PCI_ROM(0x1D6A, 0x00C0, "AQC13", "Marvell Antigua Engineering Sample",
-		ATL_FLAG_A2),
-	PCI_ROM(0x1D6A, 0x94C0, "AQC13", "Marvell Antigua Sample",
-		ATL_FLAG_A2),
-	PCI_ROM(0x1D6A, 0x93C0, "AQC13", "Marvell Antigua Sample",
-		ATL_FLAG_A2),
-	PCI_ROM(0x1D6A, 0x04C0, "AQC13", "Marvell Antigua Sample",
-		ATL_FLAG_A2),
-	PCI_ROM(0x1D6A, 0x14C0, "AQC13", "Marvell Antigua Sample",
-		ATL_FLAG_A2),
-	PCI_ROM(0x1D6A, 0x12C0, "AQC13", "Marvell Antigua Sample",
-		ATL_FLAG_A2),
 };
 
 /** Marvell PCI driver */
