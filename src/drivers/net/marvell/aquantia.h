@@ -7,7 +7,7 @@
 *
 */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE(BSD2);
 
 #include <stdint.h>
 #include <ipxe/if_ether.h>
@@ -41,12 +41,10 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 /*TX interrupt ctrl reg*/
 #define ATL_TX_IRQ_CTRL	   0x00007B40U
 #define ATL_TX_IRQ_CTRL_WB_EN 0x00000002U
-//#define ATL_TX_IRQ_CTRL_PCKT_TRANSM_EN 0x00000008U
 
 /*RX interrupt ctrl reg*/
 #define ATL_RX_IRQ_CTRL	   0x00005A30U
 #define ATL_RX_IRQ_CTRL_WB_EN 0x00000004U
-//#define ATL_RX_IRQ_CTRL_PCKT_TRANSM_EN 0x00000008U
 
 #define ATL_GLB_CTRL  0x00000000U
 
@@ -66,7 +64,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define ATL_RPF_CTRL1_BRC_EN	 0x00000001U /*Allow broadcast receive*/
 #define ATL_RPF_CTRL1_L2_PROMISC 0x00000008U /*L2 promiscious*/
 #define ATL_RPF_CTRL1_ACTION	 0x00001000U /*Action to host*/
-#define ATL_RPF_CTRL1_BRC_TSH	0x00010000U /*Broadcast threshold in 256 units per sec*/
+#define ATL_RPF_CTRL1_BRC_TSH	0x00010000U /*Brc threshold 256 units per sec*/
 
 #define ATL_RPF_CTRL2			  0x00005280U
 #define ATL_RPF_CTRL2_VLAN_PROMISC 0x00000002U /*VLAN promisc*/
@@ -80,8 +78,11 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define ATL_RPB0_CTRL1_SIZE 0x00000140U /*RPB size (in unit 1KB) \*/
 
 #define ATL_RPB0_CTRL2		  0x00005714U
-#define ATL_RPB0_CTRL2_LOW_TSH  0x00000C00U /*Buffer Low Threshold (70% of RPB size in unit 32B)*/
-#define ATL_RPB0_CTRL2_HIGH_TSH 0x1C000000U /*Buffer High Threshold(30% of RPB size in unit 32B)*/
+
+/*Buffer Low Threshold (70% of RPB size in unit 32B)*/
+#define ATL_RPB0_CTRL2_LOW_TSH  0x00000C00U
+/*Buffer High Threshold(30% of RPB size in unit 32B)*/
+#define ATL_RPB0_CTRL2_HIGH_TSH 0x1C000000U
 #define ATL_RPB0_CTRL2_FC_EN	0x80000000U /*Flow control Enable*/
 
 #define ATL_RX_DMA_DESC_BUF_SIZE 0x00005b18U
@@ -100,8 +101,10 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define ATL_TPB0_CTRL1_SIZE 0x000000A0U /*TPB Size (in unit 1KB)*/
 
 #define ATL_TPB0_CTRL2		  0x00007914U
-#define ATL_TPB0_CTRL2_LOW_TSH  0x00000600U /*Buffer High Threshold(30% of RPB size in unit 32B)*/
-#define ATL_TPB0_CTRL2_HIGH_TSH 0x0E000000U /*Buffer Low Threshold (70% of RPB size in unit 32B)*/
+/*Buffer Low  Threshold(30% of RPB size in unit 32B)*/
+#define ATL_TPB0_CTRL2_LOW_TSH  0x00000600U
+/*Buffer High  Threshold(30% of RPB size in unit 32B)*/
+#define ATL_TPB0_CTRL2_HIGH_TSH 0x0E000000U
 
 #define ATL_TX_DMA_DESC_ADDR 0x00007c00U
 
@@ -124,10 +127,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 /*Link advertising*/
 #define ATL_LINK_ADV		   0x00000368U
 #define ATL_LINK_ADV_AUTONEG   0xF20U
-/*#define ATL_LINK_ADV_DOWNSHIFT 0xC0000000U
-#define ATL_LINK_ADV_CMD	   0x00000002U*/
 
-//#define ATL_LINK_ADV_EN 0xFFFF0002U /*??????????????*/
 #define ATL_LINK_ST	 0x00000370U
 
 /*Semaphores*/
@@ -142,22 +142,23 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define ATL_FLAG_A1 0x1
 #define ATL_FLAG_A2 0x2
 
-#define ATL_WRITE_REG(VAL, REG)	writel(VAL, nic->regs + (REG)) /*write register*/
+/*write register*/
+#define ATL_WRITE_REG(VAL, REG)	writel(VAL, nic->regs + (REG))
 #define ATL_READ_REG(REG)	readl(nic->regs + (REG)) /*read register*/
 
 struct atl_desc_tx {
 	uint64_t address;
 	union {
 		struct {
-			uint32_t dx_type : 3;
-			uint32_t rsvd1 : 1;
-			uint32_t buf_len : 16;
-			uint32_t dd : 1;
-			uint32_t eop : 1;
-			uint32_t cmd : 8;
-			uint32_t rsvd2 : 2;
-			uint32_t rsvd3 : 14;
-			uint32_t pay_len : 18;
+			uint32_t dx_type:3;
+			uint32_t rsvd1:1;
+			uint32_t buf_len:16;
+			uint32_t dd:1;
+			uint32_t eop:1;
+			uint32_t cmd:8;
+			uint32_t rsvd2:2;
+			uint32_t rsvd3:14;
+			uint32_t pay_len:18;
 		};
 		uint64_t flags;
 	};
@@ -165,9 +166,9 @@ struct atl_desc_tx {
 
 struct atl_desc_tx_wb {
 	uint64_t rsvd1;
-	uint32_t rsvd2 : 20;
-	uint32_t dd : 1;
-	uint32_t rsvd3 : 11;
+	uint32_t rsvd2:20;
+	uint32_t dd:1;
+	uint32_t rsvd3:11;
 	uint32_t rsvd4;
 } __attribute__((packed));
 
@@ -179,9 +180,9 @@ struct atl_desc_rx {
 
 struct atl_desc_rx_wb {
 	uint64_t rsvd2;
-	uint16_t dd : 1;
-	uint16_t eop : 1;
-	uint16_t rsvd3 : 14;
+	uint16_t dd:1;
+	uint16_t eop:1;
+	uint16_t rsvd3:14;
 	uint16_t pkt_len;
 	uint32_t rsvd4;
 } __attribute__((packed));
@@ -189,7 +190,7 @@ struct atl_desc_rx_wb {
 struct atl_ring {
 	unsigned int sw_tail;
 	unsigned int sw_head;
-	void * ring;
+	void *ring;
 	unsigned int length;
 };
 
@@ -219,10 +220,11 @@ struct atl_nic {
 	struct atl_hw_ops *hw_ops;
 };
 
-struct atl_hw_stats
-{
+struct atl_hw_stats {
 	uint32_t version;
 	uint32_t tid;
 };
 
+
+extern struct atl_hw_ops atl_hw;
 #endif /* _AQUANTIA_H */

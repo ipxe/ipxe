@@ -20,4 +20,4 @@
 #define ATL_MAC_PHY_CTRL 0x00004000U
 #define ATL_MAC_PHY_CTRL_RST_DIS 0x20000000U
 
-#endif 
+#endif

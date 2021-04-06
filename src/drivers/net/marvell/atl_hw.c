@@ -110,13 +110,12 @@ int atl_hw_reset_rbl_(struct atl_nic *nic)
 		ATL_RX_CTRL);
 	ATL_WRITE_REG(ATL_READ_REG(ATL_TX_CTRL) & ~ATL_TX_CTRL_RST_DIS,
 		ATL_TX_CTRL);
-	
 	ATL_WRITE_REG(ATL_READ_REG(ATL_MAC_PHY_CTRL) &
 		~ATL_MAC_PHY_CTRL_RST_DIS, ATL_MAC_PHY_CTRL);
 
 	ATL_WRITE_REG((ATL_READ_REG(ATL_GLB_STD_CTRL) &
 		~ATL_GLB_CTRL_RST_DIS) | 0x8000, ATL_GLB_STD_CTRL);
-	
+
 	ATL_WRITE_REG(0x40e0, ATL_GLB_CTRL2);
 
 	/* Wait for RBL boot */
@@ -131,9 +130,8 @@ int atl_hw_reset_rbl_(struct atl_nic *nic)
 		return -EIO;
 	}
 
-	if (rbl_status == 0xF1A7) {
+	if (rbl_status == 0xF1A7)
 		return -ENOTSUP;
-	}
 
 	for (k = 0; k < 1000; k++) {
 		u32 fw_state = ATL_READ_REG(ATL_FW_VER);
@@ -179,7 +177,7 @@ int atl_hw_reset(struct atl_nic *nic)
 		sem_timeout = ATL_READ_REG(ATL_SEM_TIMEOUT);
 		if (sem_timeout > 3000)
 			sem_timeout = 3000;
-		
+
 		for (k = 0; k < sem_timeout; ++k) {
 			if (ATL_READ_REG(ATL_GLB_MCP_SEM4))
 				break;
@@ -218,7 +216,8 @@ int atl_hw_get_link(struct atl_nic *nic)
 	return (ATL_READ_REG(ATL_LINK_ST) & ATL_LINK_ADV_AUTONEG) != 0;
 }
 
-int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer, uint32_t size)
+int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer,
+uint32_t size)
 {
 	uint32_t i;
 	DBG("AQUANTIA: atl_hw_read_mem\n");
@@ -230,7 +229,7 @@ int atl_hw_read_mem(struct atl_nic *nic, uint32_t addr, uint32_t *buffer, uint32
 	}
 	if (i == 100)
 		goto err;
-	
+
 	ATL_WRITE_REG(addr, ATL_MBOX_CTRL3);
 
 	for (i = 0; i < size; ++i, addr += 4) {
@@ -265,12 +264,12 @@ int atl_hw_get_mac(struct atl_nic *nic, uint8_t *mac)
 	if (efuse_addr != 0) {
 		uint32_t mac_efuse_addr = efuse_addr + 40 * sizeof(uint32_t);
 		err = atl_hw_read_mem(nic, mac_efuse_addr, mac_addr, 2);
-		if (err != 0) 
+		if (err != 0)
 			return err;
-		
+
 		mac_addr[0] = __bswap_32(mac_addr[0]);
 		mac_addr[1] = __bswap_32(mac_addr[1]);
-		
+
 		memcpy(mac, (uint8_t *)mac_addr, 6);
 	}
 	return 0;
