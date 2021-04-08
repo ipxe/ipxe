@@ -106,5 +106,6 @@ SECTIONS {
 	*(.einfo.*)
 	*(.discard)
 	*(.discard.*)
+	*(.pci_devlist.*)
     }
 }
