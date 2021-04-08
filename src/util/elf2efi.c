@@ -125,7 +125,8 @@
 #define R_ARM_V4BX 40
 #endif
 
-#define EFI_FILE_ALIGN 0x20
+#define EFI_FILE_ALIGN  0x20
+#define EFI_IMAGE_ALIGN 0x1000
 
 struct elf_file {
 	void *data;
@@ -173,9 +174,9 @@ static struct pe_header efi_pe_header = {
 			.Magic = EFI_IMAGE_NT_OPTIONAL_HDR_MAGIC,
 			.MajorLinkerVersion = 42,
 			.MinorLinkerVersion = 42,
-			.SectionAlignment = EFI_FILE_ALIGN,
+			.SectionAlignment = EFI_IMAGE_ALIGN,
 			.FileAlignment = EFI_FILE_ALIGN,
-			.SizeOfImage = sizeof ( efi_pe_header ),
+			.SizeOfImage = EFI_IMAGE_ALIGN,
 			.SizeOfHeaders = sizeof ( efi_pe_header ),
 			.NumberOfRvaAndSizes =
 				EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES,
@@ -214,6 +215,16 @@ static void * xmalloc ( size_t len ) {
  */
 static unsigned long efi_file_align ( unsigned long offset ) {
 	return ( ( offset + EFI_FILE_ALIGN - 1 ) & ~( EFI_FILE_ALIGN - 1 ) );
+}
+
+/**
+ * Align section within PE image
+ *
+ * @v offset		Unaligned offset
+ * @ret aligned_offset	Aligned offset
+ */
+static unsigned long efi_image_align ( unsigned long offset ) {
+	return ( ( offset + EFI_IMAGE_ALIGN - 1 ) & ~( EFI_IMAGE_ALIGN - 1 ) );
 }
 
 /**
@@ -605,7 +616,7 @@ static struct pe_section * process_section ( struct elf_file *elf,
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( new->hdr );
 	pe_header->nt.OptionalHeader.SizeOfImage =
-		efi_file_align ( data_end );
+		efi_image_align ( data_end );
 
 	return new;
 }
@@ -728,13 +739,15 @@ static struct pe_section *
 create_reloc_section ( struct pe_header *pe_header,
 		       struct pe_relocs *pe_reltab ) {
 	struct pe_section *reloc;
+	size_t section_rawsz;
 	size_t section_memsz;
 	size_t section_filesz;
 	EFI_IMAGE_DATA_DIRECTORY *relocdir;
 
 	/* Allocate PE section */
-	section_memsz = output_pe_reltab ( pe_reltab, NULL );
-	section_filesz = efi_file_align ( section_memsz );
+	section_rawsz = output_pe_reltab ( pe_reltab, NULL );
+	section_filesz = efi_file_align ( section_rawsz );
+	section_memsz = efi_image_align ( section_rawsz );
 	reloc = xmalloc ( sizeof ( *reloc ) + section_filesz );
 	memset ( reloc, 0, sizeof ( *reloc ) + section_filesz );
 
@@ -754,11 +767,11 @@ create_reloc_section ( struct pe_header *pe_header,
 	/* Update file header details */
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( reloc->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage += section_filesz;
+	pe_header->nt.OptionalHeader.SizeOfImage += section_memsz;
 	relocdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC]);
 	relocdir->VirtualAddress = reloc->hdr.VirtualAddress;
-	relocdir->Size = reloc->hdr.Misc.VirtualSize;
+	relocdir->Size = section_rawsz;
 
 	return reloc;
 }
@@ -796,8 +809,8 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	} *contents;
 
 	/* Allocate PE section */
-	section_memsz = sizeof ( *contents );
-	section_filesz = efi_file_align ( section_memsz );
+	section_memsz = efi_image_align ( sizeof ( *contents ) );
+	section_filesz = efi_file_align ( sizeof ( *contents ) );
 	debug = xmalloc ( sizeof ( *debug ) + section_filesz );
 	memset ( debug, 0, sizeof ( *debug ) + section_filesz );
 	contents = ( void * ) debug->contents;
@@ -828,7 +841,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	/* Update file header details */
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( debug->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage += section_filesz;
+	pe_header->nt.OptionalHeader.SizeOfImage += section_memsz;
 	debugdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]);
 	debugdir->VirtualAddress = debug->hdr.VirtualAddress;
