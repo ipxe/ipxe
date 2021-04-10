@@ -6,3 +6,8 @@
  * Google Compute Engine metadata server.
  */
 #define HTTP_HACK_GCE
+
+/* Allow scripts to handle errors by powering down the VM to avoid
+ * incurring unnecessary costs.
+ */
+#define POWEROFF_CMD
