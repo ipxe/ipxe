@@ -451,6 +451,12 @@ struct net_device {
  */
 #define NETDEV_IRQ_UNSUPPORTED 0x0008
 
+/** Network device transmission is in progress */
+#define NETDEV_TX_IN_PROGRESS 0x0010
+
+/** Network device poll is in progress */
+#define NETDEV_POLL_IN_PROGRESS 0x0020
+
 /** Link-layer protocol table */
 #define LL_PROTOCOLS __table ( struct ll_protocol, "ll_protocols" )
 

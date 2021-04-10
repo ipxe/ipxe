@@ -297,30 +297,45 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->tx_queue );
 
+	/* Guard against re-entry */
+	if ( netdev->state & NETDEV_TX_IN_PROGRESS ) {
+		rc = -EBUSY;
+		goto err_busy;
+	}
+	netdev->state |= NETDEV_TX_IN_PROGRESS;
+
 	/* Avoid calling transmit() on unopened network devices */
 	if ( ! netdev_is_open ( netdev ) ) {
 		rc = -ENETUNREACH;
-		goto err;
+		goto err_closed;
 	}
 
 	/* Discard packet (for test purposes) if applicable */
 	if ( ( rc = inject_fault ( NETDEV_DISCARD_RATE ) ) != 0 )
-		goto err;
+		goto err_fault;
 
 	/* Map for DMA, if required */
 	if ( netdev->dma && ( ! dma_mapped ( &iobuf->map ) ) ) {
 		if ( ( rc = iob_map_tx ( iobuf, netdev->dma ) ) != 0 )
-			goto err;
+			goto err_map;
 	}
 
 	/* Transmit packet */
 	if ( ( rc = netdev->op->transmit ( netdev, iobuf ) ) != 0 )
-		goto err;
+		goto err_transmit;
+
+	/* Clear in-progress flag */
+	netdev->state &= ~NETDEV_TX_IN_PROGRESS;
 
 	profile_stop ( &net_tx_profiler );
 	return 0;
 
- err:
+ err_transmit:
+ err_map:
+ err_fault:
+ err_closed:
+	netdev->state &= ~NETDEV_TX_IN_PROGRESS;
+ err_busy:
 	netdev_tx_complete_err ( netdev, iobuf, rc );
 	return rc;
 }
@@ -552,8 +567,18 @@ void netdev_rx_err ( struct net_device *netdev,
  */
 void netdev_poll ( struct net_device *netdev ) {
 
-	if ( netdev_is_open ( netdev ) )
-		netdev->op->poll ( netdev );
+	/* Avoid calling poll() on unopened network devices */
+	if ( ! netdev_is_open ( netdev ) )
+		return;
+
+	/* Guard against re-entry */
+	if ( netdev->state & NETDEV_POLL_IN_PROGRESS )
+		return;
+
+	/* Poll device */
+	netdev->state |= NETDEV_POLL_IN_PROGRESS;
+	netdev->op->poll ( netdev );
+	netdev->state &= ~NETDEV_POLL_IN_PROGRESS;
 }
 
 /**
