@@ -135,6 +135,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CLASS_SERIAL_USB_EHCI	 0x20	/**< ECHI USB controller */
 #define PCI_CLASS_SERIAL_USB_XHCI	 0x30	/**< xHCI USB controller */
 
+/** Subordinate bus number */
+#define PCI_SUBORDINATE		0x1a
+
 /** Construct PCI class
  *
  * @v base		Base class (or PCI_ANY_ID)
