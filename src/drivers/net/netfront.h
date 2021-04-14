@@ -65,7 +65,7 @@ struct netfront_ring {
 	size_t count;
 	/** I/O buffers, indexed by buffer ID */
 	struct io_buffer **iobufs;
-	/** I/O buffer grant references, indexed by buffer ID */
+	/** Grant references, indexed by buffer ID */
 	grant_ref_t *refs;
 
 	/** Buffer ID ring */
@@ -117,6 +117,18 @@ netfront_ring_fill ( struct netfront_ring *ring ) {
 }
 
 /**
+ * Calculate descriptor ring remaining space
+ *
+ * @v ring		Descriptor ring
+ * @v space		Number of unused entries
+ */
+static inline __attribute__ (( always_inline )) unsigned int
+netfront_ring_space ( struct netfront_ring *ring ) {
+
+	return ( ring->count - netfront_ring_fill ( ring ) );
+}
+
+/**
  * Check whether or not descriptor ring is full
  *
  * @v ring		Descriptor ring
@@ -164,6 +176,8 @@ struct netfront_nic {
 	struct io_buffer *rx_iobufs[NETFRONT_NUM_RX_DESC];
 	/** Receive I/O buffer IDs */
 	uint8_t rx_ids[NETFRONT_NUM_RX_DESC];
+	/** Partial receive I/O buffer list */
+	struct list_head rx_partial;
 
 	/** Event channel */
 	struct evtchn_send event;

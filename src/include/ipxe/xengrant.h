@@ -166,16 +166,17 @@ xengrant_invalidate ( struct xen_hypervisor *xen, grant_ref_t ref ) {
  * @v ref		Grant reference
  * @v domid		Domain ID
  * @v subflags		Additional flags
- * @v page		Page start
+ * @v addr		Physical address within page
  * @ret rc		Return status code
  */
 static inline __attribute__ (( always_inline )) int
 xengrant_permit_access ( struct xen_hypervisor *xen, grant_ref_t ref,
-			 domid_t domid, unsigned int subflags, void *page ) {
+			 domid_t domid, unsigned int subflags,
+			 physaddr_t addr ) {
 	struct grant_entry_header *hdr = xengrant_header ( xen, ref );
 	struct grant_entry_v1 *v1 = xengrant_v1 ( hdr );
 	union grant_entry_v2 *v2 = xengrant_v2 ( hdr );
-	unsigned long frame = ( virt_to_phys ( page ) / PAGE_SIZE );
+	unsigned long frame = ( addr / PAGE_SIZE );
 
 	/* Fail (for test purposes) if applicable */
 	if ( ( XENGRANT_FAIL_RATE > 0 ) &&
