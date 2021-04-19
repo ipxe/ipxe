@@ -215,7 +215,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_slirp		     ( ERRFILE_DRIVER | 0x00d00000 )
 #define ERRFILE_aqc1xx		     ( ERRFILE_DRIVER | 0x00d00000 )
 #define ERRFILE_atl_hw		     ( ERRFILE_DRIVER | 0x00d10000 )
-#define ERRFILE_atl2_hw		     ( ERRFILE_DRIVER | 0x00d20000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
