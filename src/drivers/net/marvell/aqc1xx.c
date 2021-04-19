@@ -46,7 +46,7 @@ FILE_LICENCE(BSD2);
 #include <ipxe/profile.h>
 #include <compiler.h>
 
-#include "aquantia.h"
+#include "aqc1xx.h"
 
 
 /** @file

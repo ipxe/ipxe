@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <byteswap.h>
 #include <ipxe/pci.h>
-#include "aquantia.h"
+#include "aqc1xx.h"
 #include "atl_hw.h"
 #include <compiler.h>
 
