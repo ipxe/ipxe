@@ -523,7 +523,8 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 
 	/* Map buffer */
 	if ( ( rc = efipci_dma_map ( dma, map, virt_to_phys ( addr ),
-				     len, DMA_BI ) ) != 0 )
+				     ( pages * EFI_PAGE_SIZE ),
+				     DMA_BI ) ) != 0 )
 		goto err_map;
 
 	/* Increment allocation count (for debugging) */
