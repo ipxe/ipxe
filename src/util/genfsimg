@@ -230,7 +230,7 @@ done
 # since isohybrid will refuse to work without them.
 #
 if [ -n "${ISOIMG}" ] ; then
-    ISOARGS="-J -R"
+    ISOARGS="-J -R -l"
     copy_syslinux_file "isolinux.bin" "${ISODIR}"
     copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
     ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
