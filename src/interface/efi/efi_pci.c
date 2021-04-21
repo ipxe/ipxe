@@ -337,6 +337,9 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 		offset = le64_to_cpu ( u.res->qword.offset );
 		start = ( offset + le64_to_cpu ( u.res->qword.min ) );
 		end = ( start + le64_to_cpu ( u.res->qword.len ) );
+		DBGC2 ( pci, "EFIPCI " PCI_FMT " found range [%08llx,%08llx) "
+			"-> [%08llx,%08llx)\n", PCI_ARGS ( pci ), start, end,
+			( start - offset ), ( end - offset ) );
 		if ( ( bus_addr < start ) || ( ( bus_addr + len ) > end ) )
 			continue;
 
