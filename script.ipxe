@@ -11,11 +11,11 @@ set image-name filesystem.squashfs
 isset ${netX.dhcp/root-path} && set xname-param xname=${netX.dhcp/root-path} || set xname-param ''
 
 # Non-Compute Node OverlayFS and Persistence.
-set bootstrap metal.server=${base-url} metal.no-wipe=0
-set cloud-init ds=nocloud-net;s=http://${dhcp-server}:8888/
+set bootstrap metal.server=${base-url} metal.no-wipe=0 # TODO: Remove metal.no-wipe completely after MTL-1288 is fixed; apply ignorance.
+set cloud-init ds=nocloud-net;s=http://${dhcp-server}:8888/;h=${hostname}
 set boot-opts rootfallback=LABEL=BOOTRAID initrd=initrd.img.xz
 set live-sqfs-opts root=live:LABEL=SQFSRAID rd.live.ram=0 rd.writable.fsimg=0 rd.skipfsck rd.live.squashimg=${image-name}
-set live-oval-opts rd.live.overlay=LABEL=ROOTRAID rd.live.overlay.thin=1 rd.live.overlay.overlayfs=1 rd.live.overlay.size=307200
+set live-oval-opts rd.live.overlay=LABEL=ROOTRAID rd.live.overlay.thin=1 rd.live.overlay.overlayfs=1
 set disk-opts rd.luks rd.luks.crypttab=0 rd.lvm.conf=0 rd.lvm=1 rd.auto=1 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=1 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1
 
 # Matching NCN boot parameters:
