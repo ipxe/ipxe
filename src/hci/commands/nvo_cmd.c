@@ -241,7 +241,7 @@ static int read_value ( struct named_setting *setting, char **args __unused,
 			      NULL, &setting->setting, &existing );
 
 	/* Read new value */
-	if ( ( rc = readline_history ( NULL, existing, NULL, value ) ) != 0 )
+	if ( ( rc = readline_history ( NULL, existing, NULL, 0, value ) ) != 0 )
 		goto err_readline;
 
  err_readline:
