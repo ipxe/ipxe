@@ -23,16 +23,74 @@ static void bnxt_adv_cq_index ( struct bnxt *bp, u16 cnt );
 static int bnxt_rx_complete ( struct net_device *dev, struct rx_pkt_cmpl *rx );
 void bnxt_link_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt );
 
+static struct pci_device_id bnxt_nics[] = {
+	PCI_ROM( 0x14e4, 0x16c0, "14e4-16C0", "14e4-16C0", 0 ),
+	PCI_ROM( 0x14e4, 0x16c1, "14e4-16C1", "14e4-16C1", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x16c8, "14e4-16C8", "14e4-16C8", 0 ),
+	PCI_ROM( 0x14e4, 0x16c9, "14e4-16C9", "14e4-16C9", 0 ),
+	PCI_ROM( 0x14e4, 0x16ca, "14e4-16CA", "14e4-16CA", 0 ),
+	PCI_ROM( 0x14e4, 0x16cc, "14e4-16CC", "14e4-16CC", 0 ),
+	PCI_ROM( 0x14e4, 0x16cd, "14e4-16CD", "14e4-16CD", 0 ),
+	PCI_ROM( 0x14e4, 0x16ce, "14e4-16CE", "14e4-16CE", 0 ),
+	PCI_ROM( 0x14e4, 0x16cf, "14e4-16CF", "14e4-16CF", 0 ),
+	PCI_ROM( 0x14e4, 0x16d0, "14e4-16D0", "14e4-16D0", 0 ),
+	PCI_ROM( 0x14e4, 0x16d1, "14e4-16D1", "14e4-16D1", 0 ),
+	PCI_ROM( 0x14e4, 0x16d2, "14e4-16D2", "14e4-16D2", 0 ),
+	PCI_ROM( 0x14e4, 0x16d4, "14e4-16D4", "14e4-16D4", 0 ),
+	PCI_ROM( 0x14e4, 0x16d5, "14e4-16D5", "14e4-16D5", 0 ),
+	PCI_ROM( 0x14e4, 0x16d6, "14e4-16D6", "14e4-16D6", 0 ),
+	PCI_ROM( 0x14e4, 0x16d7, "14e4-16D7", "14e4-16D7", 0 ),
+	PCI_ROM( 0x14e4, 0x16d8, "14e4-16D8", "14e4-16D8", 0 ),
+	PCI_ROM( 0x14e4, 0x16d9, "14e4-16D9", "14e4-16D9", 0 ),
+	PCI_ROM( 0x14e4, 0x16da, "14e4-16DA", "14e4-16DA", 0 ),
+	PCI_ROM( 0x14e4, 0x16db, "14e4-16DB", "14e4-16DB", 0 ),
+	PCI_ROM( 0x14e4, 0x16dc, "14e4-16DC", "14e4-16DC", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x16de, "14e4-16DE", "14e4-16DE", 0 ),
+	PCI_ROM( 0x14e4, 0x16df, "14e4-16DF", "14e4-16DF", 0 ),
+	PCI_ROM( 0x14e4, 0x16e0, "14e4-16E0", "14e4-16E0", 0 ),
+	PCI_ROM( 0x14e4, 0x16e2, "14e4-16E2", "14e4-16E2", 0 ),
+	PCI_ROM( 0x14e4, 0x16e3, "14e4-16E3", "14e4-16E3", 0 ),
+	PCI_ROM( 0x14e4, 0x16e4, "14e4-16E4", "14e4-16E4", 0 ),
+	PCI_ROM( 0x14e4, 0x16e7, "14e4-16E7", "14e4-16E7", 0 ),
+	PCI_ROM( 0x14e4, 0x16e8, "14e4-16E8", "14e4-16E8", 0 ),
+	PCI_ROM( 0x14e4, 0x16e9, "14e4-16E9", "14e4-16E9", 0 ),
+	PCI_ROM( 0x14e4, 0x16ea, "14e4-16EA", "14e4-16EA", 0 ),
+	PCI_ROM( 0x14e4, 0x16eb, "14e4-16EB", "14e4-16EB", 0 ),
+	PCI_ROM( 0x14e4, 0x16ec, "14e4-16EC", "14e4-16EC", 0 ),
+	PCI_ROM( 0x14e4, 0x16ed, "14e4-16ED", "14e4-16ED", 0 ),
+	PCI_ROM( 0x14e4, 0x16ee, "14e4-16EE", "14e4-16EE", 0 ),
+	PCI_ROM( 0x14e4, 0x16ef, "14e4-16EF", "14e4-16EF", 0 ),
+	PCI_ROM( 0x14e4, 0x16f0, "14e4-16F0", "14e4-16F0", 0 ),
+	PCI_ROM( 0x14e4, 0x16f1, "14e4-16F1", "14e4-16F1", 0 ),
+	PCI_ROM( 0x14e4, 0x1604, "14e4-1604", "14e4-1604", 0 ),
+	PCI_ROM( 0x14e4, 0x1605, "14e4-1605", "14e4-1605", 0 ),
+	PCI_ROM( 0x14e4, 0x1606, "14e4-1606", "14e4-1606", 0 ),
+	PCI_ROM( 0x14e4, 0x1609, "14e4-1609", "14e4-1609", 0 ),
+	PCI_ROM( 0x14e4, 0x1614, "14e4-1614", "14e4-1614", 0 ),
+	PCI_ROM( 0x14e4, 0xd802, "14e4-D802", "14e4-D802", 0 ),
+	PCI_ROM( 0x14e4, 0xd804, "14e4-D804", "14e4-D804", 0 ),
+	PCI_ROM( 0x14e4, 0x1750, "14e4-1750", "14e4-1750", 0 ),
+	PCI_ROM( 0x14e4, 0x1802, "14e4-1802", "14e4-1802", 0 ),
+	PCI_ROM( 0x14e4, 0x1805, "14e4-1805", "14e4-1805", 0 ),
+	PCI_ROM( 0x14e4, 0x1751, "14e4-1751", "14e4-1751", 0 ),
+	PCI_ROM( 0x14e4, 0x1801, "14e4-1801", "14e4-1801", 0 ),
+	PCI_ROM( 0x14e4, 0x1804, "14e4-1804", "14e4-1804", 0 ),
+	PCI_ROM( 0x14e4, 0x1752, "14e4-1752", "14e4-1752", 0 ),
+	PCI_ROM( 0x14e4, 0x1800, "14e4-1800", "14e4-1800", 0 ),
+	PCI_ROM( 0x14e4, 0x1803, "14e4-1803", "14e4-1803", 0 ),
+	PCI_ROM( 0x14e4, 0x1806, "14e4-1806", "14e4-1806", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x1807, "14e4-1807", "14e4-1807", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x1808, "14e4-1808", "14e4-1808", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x1809, "14e4-1809", "14e4-1809", BNXT_FLAG_PCI_VF ),
+};
+
 /**
  * Check if Virtual Function
  */
 u8 bnxt_is_pci_vf ( struct pci_device *pdev )
 {
-	u16 i;
-
-	for ( i = 0; i < ARRAY_SIZE ( bnxt_vf_nics ); i++ ) {
-		if ( pdev->device == bnxt_vf_nics[i] )
-			return 1;
+	if ( FLAG_TEST ( pdev->id->driver_data, BNXT_FLAG_PCI_VF ) ) {
+		return 1;
 	}
 	return 0;
 }
