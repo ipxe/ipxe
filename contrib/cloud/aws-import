@@ -65,6 +65,12 @@ def import_image(region, name, architecture, image, public):
     return image_id
 
 
+def launch_link(region, image_id):
+    """Construct a web console launch link"""
+    return ("https://console.aws.amazon.com/ec2/v2/home?"
+            "region=%s#LaunchInstanceWizard:ami=%s" % (region, image_id))
+
+
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Import AWS EC2 image (AMI)")
 parser.add_argument('--architecture', '-a', default='x86_64',
@@ -75,6 +81,8 @@ parser.add_argument('--public', '-p', action='store_true',
                     help="Make image public")
 parser.add_argument('--region', '-r', action='append',
                     help="AWS region(s)")
+parser.add_argument('--wiki', '-w', metavar='FILE',
+                    help="Generate Dokuwiki table")
 parser.add_argument('image', help="iPXE disk image")
 args = parser.parse_args()
 
@@ -94,6 +102,18 @@ with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
                for region in args.region}
     results = {futures[future]: future.result()
                for future in as_completed(futures)}
+
+# Construct Dokuwiki table
+wikitab = ["^ AWS region  ^ CPU architecture  ^ AMI ID  ^\n"] + list(
+    "| ''%s''  | ''%s''  | ''[[%s|%s]]''  |\n" % (
+        region,
+        args.architecture,
+        launch_link(region, results[region]),
+        results[region],
+    ) for region in args.region)
+if args.wiki:
+    with open(args.wiki, 'wt') as fh:
+        fh.writelines(wikitab)
 
 # Show created images
 for region in args.region:
