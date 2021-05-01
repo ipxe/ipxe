@@ -3,6 +3,7 @@
 import argparse
 from base64 import b64encode
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date
 from hashlib import sha256
 from itertools import count
 
@@ -75,7 +76,7 @@ def launch_link(region, image_id):
 parser = argparse.ArgumentParser(description="Import AWS EC2 image (AMI)")
 parser.add_argument('--architecture', '-a', default='x86_64',
                     help="CPU architecture")
-parser.add_argument('--name', '-n', required=True,
+parser.add_argument('--name', '-n',
                     help="Image name")
 parser.add_argument('--public', '-p', action='store_true',
                     help="Make image public")
@@ -85,6 +86,13 @@ parser.add_argument('--wiki', '-w', metavar='FILE',
                     help="Generate Dokuwiki table")
 parser.add_argument('image', help="iPXE disk image")
 args = parser.parse_args()
+
+# Use default name if none specified
+if not args.name:
+    args.name = 'iPXE (%s %s)' % (
+        date.today().strftime('%Y-%m-%d'),
+        args.architecture,
+    )
 
 # Use all regions if none specified
 if not args.region:
