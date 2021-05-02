@@ -6,10 +6,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from hashlib import sha256
 from itertools import count
+import subprocess
 
 import boto3
 
 BLOCKSIZE = 512 * 1024
+
+
+def detect_architecture(image):
+    """Detect CPU architecture"""
+    mdir = subprocess.run(['mdir', '-b', '-i', image, '::/EFI/BOOT'],
+                          capture_output=True)
+    if any(b'BOOTAA64.EFI' in x for x in mdir.stdout.splitlines()):
+        return 'arm64'
+    return 'x86_64'
 
 
 def create_snapshot(region, description, image):
@@ -74,8 +84,6 @@ def launch_link(region, image_id):
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Import AWS EC2 image (AMI)")
-parser.add_argument('--architecture', '-a', default='x86_64',
-                    help="CPU architecture")
 parser.add_argument('--name', '-n',
                     help="Image name")
 parser.add_argument('--public', '-p', action='store_true',
@@ -87,11 +95,14 @@ parser.add_argument('--wiki', '-w', metavar='FILE',
 parser.add_argument('image', help="iPXE disk image")
 args = parser.parse_args()
 
+# Detect CPU architecture
+architecture = detect_architecture(args.image)
+
 # Use default name if none specified
 if not args.name:
     args.name = 'iPXE (%s %s)' % (
         date.today().strftime('%Y-%m-%d'),
-        args.architecture,
+        architecture,
     )
 
 # Use all regions if none specified
@@ -104,7 +115,7 @@ with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
     futures = {executor.submit(import_image,
                                region=region,
                                name=args.name,
-                               architecture=args.architecture,
+                               architecture=architecture,
                                image=args.image,
                                public=args.public): region
                for region in args.region}
@@ -115,7 +126,7 @@ with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
 wikitab = ["^ AWS region  ^ CPU architecture  ^ AMI ID  ^\n"] + list(
     "| ''%s''  | ''%s''  | ''[[%s|%s]]''  |\n" % (
         region,
-        args.architecture,
+        architecture,
         launch_link(region, results[region]),
         results[region],
     ) for region in args.region)
@@ -125,4 +136,4 @@ if args.wiki:
 
 # Show created images
 for region in args.region:
-    print("%s: %s" % (region, results[region]))
+    print("%s %s %s" % (region, architecture, results[region]))
