@@ -92,33 +92,31 @@ parser.add_argument('--region', '-r', action='append',
                     help="AWS region(s)")
 parser.add_argument('--wiki', '-w', metavar='FILE',
                     help="Generate Dokuwiki table")
-parser.add_argument('image', help="iPXE disk image")
+parser.add_argument('image', nargs='+', help="iPXE disk image")
 args = parser.parse_args()
 
-# Detect CPU architecture
-architecture = detect_architecture(args.image)
+# Detect CPU architectures
+architectures = {image: detect_architecture(image) for image in args.image}
 
 # Use default name if none specified
 if not args.name:
-    args.name = 'iPXE (%s %s)' % (
-        date.today().strftime('%Y-%m-%d'),
-        architecture,
-    )
+    args.name = 'iPXE (%s)' % date.today().strftime('%Y-%m-%d')
 
 # Use all regions if none specified
 if not args.region:
     args.region = sorted(x['RegionName'] for x in
                          boto3.client('ec2').describe_regions()['Regions'])
 
-# Use one thread per region to maximise parallelism
-with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
+# Use one thread per import to maximise parallelism
+imports = [(region, image) for region in args.region for image in args.image]
+with ThreadPoolExecutor(max_workers=len(imports)) as executor:
     futures = {executor.submit(import_image,
                                region=region,
                                name=args.name,
-                               architecture=architecture,
-                               image=args.image,
-                               public=args.public): region
-               for region in args.region}
+                               architecture=architectures[image],
+                               image=image,
+                               public=args.public): (region, image)
+               for region, image in imports}
     results = {futures[future]: future.result()
                for future in as_completed(futures)}
 
@@ -126,14 +124,16 @@ with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
 wikitab = ["^ AWS region  ^ CPU architecture  ^ AMI ID  ^\n"] + list(
     "| ''%s''  | ''%s''  | ''[[%s|%s]]''  |\n" % (
         region,
-        architecture,
-        launch_link(region, results[region]),
-        results[region],
-    ) for region in args.region)
+        architectures[image],
+        launch_link(region, results[(region, image)]),
+        results[(region, image)],
+    ) for region, image in imports)
 if args.wiki:
     with open(args.wiki, 'wt') as fh:
         fh.writelines(wikitab)
 
 # Show created images
-for region in args.region:
-    print("%s %s %s" % (region, architecture, results[region]))
+for region, image in imports:
+    print("%s %s %s %s" % (
+        region, image, architectures[image], results[(region, image)]
+    ))
