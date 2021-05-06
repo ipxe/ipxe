@@ -175,6 +175,7 @@ extern struct image * alloc_image ( struct uri *uri );
 extern int image_set_uri ( struct image *image, struct uri *uri );
 extern int image_set_name ( struct image *image, const char *name );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );
+extern int image_set_len ( struct image *image, size_t len );
 extern int image_set_data ( struct image *image, userptr_t data, size_t len );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
