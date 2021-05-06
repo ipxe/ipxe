@@ -34,3 +34,6 @@ PROVIDE_REQUIRING_SYMBOL();
 #ifdef IMAGE_ZLIB
 REQUIRE_OBJECT ( zlib );
 #endif
+#ifdef IMAGE_GZIP
+REQUIRE_OBJECT ( gzip );
+#endif
