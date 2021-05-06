@@ -176,6 +176,26 @@ int image_set_cmdline ( struct image *image, const char *cmdline ) {
 }
 
 /**
+ * Set image length
+ *
+ * @v image		Image
+ * @v len		Length of image data
+ * @ret rc		Return status code
+ */
+int image_set_len ( struct image *image, size_t len ) {
+	userptr_t new;
+
+	/* (Re)allocate image data */
+	new = urealloc ( image->data, len );
+	if ( ! new )
+		return -ENOMEM;
+	image->data = new;
+	image->len = len;
+
+	return 0;
+}
+
+/**
  * Set image data
  *
  * @v image		Image
@@ -184,17 +204,14 @@ int image_set_cmdline ( struct image *image, const char *cmdline ) {
  * @ret rc		Return status code
  */
 int image_set_data ( struct image *image, userptr_t data, size_t len ) {
-	userptr_t new;
+	int rc;
 
-	/* (Re)allocate image data */
-	new = urealloc ( image->data, len );
-	if ( ! new )
-		return -ENOMEM;
-	image->data = new;
+	/* Set image length */
+	if ( ( rc = image_set_len ( image, len ) ) != 0 )
+		return rc;
 
 	/* Copy in new image data */
 	memcpy_user ( image->data, 0, data, 0, len );
-	image->len = len;
 
 	return 0;
 }
