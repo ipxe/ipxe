@@ -113,6 +113,14 @@ struct image_type {
 	 */
 	int ( * asn1 ) ( struct image *image, size_t offset,
 			 struct asn1_cursor **cursor );
+	/**
+	 * Extract archive image
+	 *
+	 * @v image		Image
+	 * @v extracted		Extracted image
+	 * @ret rc		Return status code
+	 */
+	int ( * extract ) ( struct image *image, struct image *extracted );
 };
 
 /**
@@ -190,6 +198,8 @@ extern struct image * image_memory ( const char *name, userptr_t data,
 extern int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf );
 extern int image_asn1 ( struct image *image, size_t offset,
 			struct asn1_cursor **cursor );
+extern int image_extract ( struct image *image, const char *name,
+			   struct image **extracted );
 
 /**
  * Increment reference count on an image
