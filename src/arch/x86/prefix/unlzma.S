@@ -44,7 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 	.text
-	.arch i586
+	.arch i486
 	.section ".prefix.lib", "ax", @progbits
 
 #ifdef CODE16
