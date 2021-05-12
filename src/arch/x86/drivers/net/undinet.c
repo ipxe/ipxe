@@ -104,6 +104,13 @@ static union u_PXENV_ANY __bss16 ( undinet_params );
 SEGOFF16_t __bss16 ( undinet_entry_point );
 #define undinet_entry_point __use_data16 ( undinet_entry_point )
 
+/* Read TSC in real mode only when profiling */
+#if PROFILING
+#define RDTSC_IF_PROFILING "rdtsc\n\t"
+#else
+#define RDTSC_IF_PROFILING ""
+#endif
+
 /** IRQ profiler */
 static struct profiler undinet_irq_profiler __profiler =
 	{ .name = "undinet.irq" };
@@ -288,14 +295,14 @@ static int undinet_call ( struct undi_nic *undinic, unsigned int function,
 	 */
 	profile_start ( &profiler->total );
 	__asm__ __volatile__ ( REAL_CODE ( "pushl %%ebp\n\t" /* gcc bug */
-					   "rdtsc\n\t"
+					   RDTSC_IF_PROFILING
 					   "pushl %%eax\n\t"
 					   "pushw %%es\n\t"
 					   "pushw %%di\n\t"
 					   "pushw %%bx\n\t"
 					   "lcall *undinet_entry_point\n\t"
 					   "movw %%ax, %%bx\n\t"
-					   "rdtsc\n\t"
+					   RDTSC_IF_PROFILING
 					   "addw $6, %%sp\n\t"
 					   "popl %%edx\n\t"
 					   "popl %%ebp\n\t" /* gcc bug */ )
