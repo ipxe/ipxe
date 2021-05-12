@@ -159,4 +159,5 @@ struct image_type zlib_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "zlib",
 	.probe = zlib_probe,
 	.extract = zlib_extract,
+	.exec = image_extract_exec,
 };

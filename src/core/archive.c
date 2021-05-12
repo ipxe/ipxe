@@ -97,6 +97,36 @@ int image_extract ( struct image *image, const char *name,
 	return rc;
 }
 
+/**
+ * Extract and execute image
+ *
+ * @v image		Image
+ * @ret rc		Return status code
+ */
+int image_extract_exec ( struct image *image ) {
+	struct image *extracted;
+	int rc;
+
+	/* Extract image */
+	if ( ( rc = image_extract ( image, NULL, &extracted ) ) != 0 )
+		goto err_extract;
+
+	/* Set image command line */
+	if ( ( rc = image_set_cmdline ( extracted, image->cmdline ) ) != 0 )
+		goto err_set_cmdline;
+
+	/* Set auto-unregister flag */
+	extracted->flags |= IMAGE_AUTO_UNREGISTER;
+
+	/* Tail-recurse into extracted image */
+	return image_exec ( extracted );
+
+ err_set_cmdline:
+	unregister_image ( extracted );
+ err_extract:
+	return rc;
+}
+
 /* Drag in objects via image_extract() */
 REQUIRING_SYMBOL ( image_extract );
 

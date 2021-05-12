@@ -200,6 +200,7 @@ extern int image_asn1 ( struct image *image, size_t offset,
 			struct asn1_cursor **cursor );
 extern int image_extract ( struct image *image, const char *name,
 			   struct image **extracted );
+extern int image_extract_exec ( struct image *image );
 
 /**
  * Increment reference count on an image
