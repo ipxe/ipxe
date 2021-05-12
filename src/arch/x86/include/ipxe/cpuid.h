@@ -42,6 +42,9 @@ struct x86_features {
 /** Hypervisor is present */
 #define CPUID_FEATURES_INTEL_ECX_HYPERVISOR 0x80000000UL
 
+/** TSC is present */
+#define CPUID_FEATURES_INTEL_EDX_TSC 0x00000010UL
+
 /** FXSAVE and FXRSTOR are supported */
 #define CPUID_FEATURES_INTEL_EDX_FXSR 0x01000000UL
 

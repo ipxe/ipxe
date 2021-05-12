@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <biosint.h>
 #include <pic8259.h>
 #include <rtc.h>
+#include <ipxe/cpuid.h>
 #include <ipxe/entropy.h>
 
 /** Maximum time to wait for an RTC interrupt, in milliseconds */
@@ -174,7 +175,16 @@ static int rtc_entropy_check ( void ) {
  * @ret rc		Return status code
  */
 static int rtc_entropy_enable ( void ) {
+	struct x86_features features;
 	int rc;
+
+	/* Check that TSC is supported */
+	x86_features ( &features );
+	if ( ! ( features.intel.edx & CPUID_FEATURES_INTEL_EDX_TSC ) ) {
+		DBGC ( &rtc_flag, "RTC has no TSC\n" );
+		rc = -ENOTSUP;
+		goto err_no_tsc;
+	}
 
 	/* Hook ISR and enable RTC interrupts */
 	rtc_hook_isr();
@@ -191,6 +201,7 @@ static int rtc_entropy_enable ( void ) {
 	rtc_disable_int();
 	disable_irq ( RTC_IRQ );
 	rtc_unhook_isr();
+ err_no_tsc:
 	return rc;
 }
 
