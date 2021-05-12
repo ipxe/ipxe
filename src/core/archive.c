@@ -82,6 +82,10 @@ int image_extract ( struct image *image, const char *name,
 	if ( ( rc = register_image ( *extracted ) ) != 0 )
 		goto err_register;
 
+	/* Propagate trust flag */
+	if ( image->flags & IMAGE_TRUSTED )
+		image_trust ( *extracted );
+
 	/* Drop local reference to image */
 	image_put ( *extracted );
 
