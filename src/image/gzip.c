@@ -163,4 +163,5 @@ struct image_type gzip_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "gzip",
 	.probe = gzip_probe,
 	.extract = gzip_extract,
+	.exec = image_extract_exec,
 };
