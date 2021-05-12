@@ -117,8 +117,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	IMAGE_PNG		/* PNG image support */
 #define	IMAGE_DER		/* DER image support */
 #define	IMAGE_PEM		/* PEM image support */
-#define	IMAGE_ZLIB		/* ZLIB image support */
-#define	IMAGE_GZIP		/* GZIP image support */
+//#define	IMAGE_ZLIB		/* ZLIB image support */
+//#define	IMAGE_GZIP		/* GZIP image support */
 
 /*
  * Command-line commands to include
@@ -158,7 +158,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define NTP_CMD		/* NTP commands */
 //#define CERT_CMD		/* Certificate management commands */
 //#define IMAGE_MEM_CMD		/* Read memory command */
-//#define IMAGE_ARCHIVE_CMD	/* Archive image management commands */
+#define IMAGE_ARCHIVE_CMD	/* Archive image management commands */
 
 /*
  * ROM-specific options
