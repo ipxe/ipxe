@@ -31,9 +31,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 PROVIDE_REQUIRING_SYMBOL();
 
-#ifdef IMAGE_ZLIB
-REQUIRE_OBJECT ( zlib );
-#endif
-#ifdef IMAGE_GZIP
-REQUIRE_OBJECT ( gzip );
+#ifdef IMAGE_ARCHIVE_CMD
+REQUIRE_OBJECT ( image_archive_cmd );
 #endif
