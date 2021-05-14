@@ -19,9 +19,118 @@ FILE_LICENCE ( GPL2_ONLY );
 static void bnxt_service_cq ( struct net_device *dev );
 static void bnxt_tx_complete ( struct net_device *dev, u16 hw_idx );
 static void bnxt_adv_cq_index ( struct bnxt *bp, u16 cnt );
-static void bnxt_adv_cq_index ( struct bnxt *bp, u16 cnt );
+static void bnxt_adv_nq_index ( struct bnxt *bp, u16 cnt );
 static int bnxt_rx_complete ( struct net_device *dev, struct rx_pkt_cmpl *rx );
 void bnxt_link_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt );
+
+static struct pci_device_id bnxt_nics[] = {
+	PCI_ROM(0x14e4, 0x16c0, "14e4-16C0", "14e4-16C0", 0),
+	PCI_ROM(0x14e4, 0x16c1, "14e4-16C1", "14e4-16C1", 0),
+	PCI_ROM(0x14e4, 0x16c8, "14e4-16C8", "14e4-16C8", 0),
+	PCI_ROM(0x14e4, 0x16c9, "14e4-16C9", "14e4-16C9", 0),
+	PCI_ROM(0x14e4, 0x16ca, "14e4-16CA", "14e4-16CA", 0),
+	PCI_ROM(0x14e4, 0x16cc, "14e4-16CC", "14e4-16CC", 0),
+	PCI_ROM(0x14e4, 0x16cd, "14e4-16CD", "14e4-16CD", 0),
+	PCI_ROM(0x14e4, 0x16ce, "14e4-16CE", "14e4-16CE", 0),
+	PCI_ROM(0x14e4, 0x16cf, "14e4-16CF", "14e4-16CF", 0),
+	PCI_ROM(0x14e4, 0x16d0, "14e4-16D0", "14e4-16D0", 0),
+	PCI_ROM(0x14e4, 0x16d1, "14e4-16D1", "14e4-16D1", 0),
+	PCI_ROM(0x14e4, 0x16d2, "14e4-16D2", "14e4-16D2", 0),
+	PCI_ROM(0x14e4, 0x16d4, "14e4-16D4", "14e4-16D4", 0),
+	PCI_ROM(0x14e4, 0x16d5, "14e4-16D5", "14e4-16D5", 0),
+	PCI_ROM(0x14e4, 0x16d6, "14e4-16D6", "14e4-16D6", 0),
+	PCI_ROM(0x14e4, 0x16d7, "14e4-16D7", "14e4-16D7", 0),
+	PCI_ROM(0x14e4, 0x16d8, "14e4-16D8", "14e4-16D8", 0),
+	PCI_ROM(0x14e4, 0x16d9, "14e4-16D9", "14e4-16D9", 0),
+	PCI_ROM(0x14e4, 0x16da, "14e4-16DA", "14e4-16DA", 0),
+	PCI_ROM(0x14e4, 0x16db, "14e4-16DB", "14e4-16DB", 0),
+	PCI_ROM(0x14e4, 0x16dc, "14e4-16DC", "14e4-16DC", 0),
+	PCI_ROM(0x14e4, 0x16de, "14e4-16DE", "14e4-16DE", 0),
+	PCI_ROM(0x14e4, 0x16df, "14e4-16DF", "14e4-16DF", 0),
+	PCI_ROM(0x14e4, 0x16e0, "14e4-16E0", "14e4-16E0", 0),
+	PCI_ROM(0x14e4, 0x16e2, "14e4-16E2", "14e4-16E2", 0),
+	PCI_ROM(0x14e4, 0x16e3, "14e4-16E3", "14e4-16E3", 0),
+	PCI_ROM(0x14e4, 0x16e4, "14e4-16E4", "14e4-16E4", 0),
+	PCI_ROM(0x14e4, 0x16e7, "14e4-16E7", "14e4-16E7", 0),
+	PCI_ROM(0x14e4, 0x16e8, "14e4-16E8", "14e4-16E8", 0),
+	PCI_ROM(0x14e4, 0x16e9, "14e4-16E9", "14e4-16E9", 0),
+	PCI_ROM(0x14e4, 0x16ea, "14e4-16EA", "14e4-16EA", 0),
+	PCI_ROM(0x14e4, 0x16eb, "14e4-16EB", "14e4-16EB", 0),
+	PCI_ROM(0x14e4, 0x16ec, "14e4-16EC", "14e4-16EC", 0),
+	PCI_ROM(0x14e4, 0x16ed, "14e4-16ED", "14e4-16ED", 0),
+	PCI_ROM(0x14e4, 0x16ee, "14e4-16EE", "14e4-16EE", 0),
+	PCI_ROM(0x14e4, 0x16ef, "14e4-16EF", "14e4-16EF", 0),
+	PCI_ROM(0x14e4, 0x16f0, "14e4-16F0", "14e4-16F0", 0),
+	PCI_ROM(0x14e4, 0x16f1, "14e4-16F1", "14e4-16F1", 0),
+	PCI_ROM(0x14e4, 0x1604, "14e4-1604", "14e4-1604", 0),
+	PCI_ROM(0x14e4, 0x1605, "14e4-1605", "14e4-1605", 0),
+	PCI_ROM(0x14e4, 0x1606, "14e4-1606", "14e4-1606", 0),
+	PCI_ROM(0x14e4, 0x1609, "14e4-1609", "14e4-1609", 0),
+	PCI_ROM(0x14e4, 0x1614, "14e4-1614", "14e4-1614", 0),
+	PCI_ROM(0x14e4, 0xd802, "14e4-D802", "14e4-D802", 0),
+	PCI_ROM(0x14e4, 0xd804, "14e4-D804", "14e4-D804", 0),
+	PCI_ROM(0x14e4, 0x1750, "14e4-1750", "14e4-1750", 0),
+	PCI_ROM(0x14e4, 0x1802, "14e4-1802", "14e4-1802", 0),
+	PCI_ROM(0x14e4, 0x1805, "14e4-1805", "14e4-1805", 0),
+	PCI_ROM(0x14e4, 0x1751, "14e4-1751", "14e4-1751", 0),
+	PCI_ROM(0x14e4, 0x1801, "14e4-1801", "14e4-1801", 0),
+	PCI_ROM(0x14e4, 0x1804, "14e4-1804", "14e4-1804", 0),
+	PCI_ROM(0x14e4, 0x1752, "14e4-1752", "14e4-1752", 0),
+	PCI_ROM(0x14e4, 0x1800, "14e4-1800", "14e4-1800", 0),
+	PCI_ROM(0x14e4, 0x1803, "14e4-1803", "14e4-1803", 0),
+	PCI_ROM(0x14e4, 0x1806, "14e4-1806", "14e4-1806", 0),
+	PCI_ROM(0x14e4, 0x1807, "14e4-1807", "14e4-1807", 0),
+	PCI_ROM(0x14e4, 0x1808, "14e4-1808", "14e4-1808", 0),
+	PCI_ROM(0x14e4, 0x1809, "14e4-1809", "14e4-1809", 0),
+	PCI_ROM(0x14e4, 0xd812, "14e4-D812", "14e4-D812", 0),
+	PCI_ROM(0x14e4, 0xd814, "14e4-D814", "14e4-D814", 0),
+	PCI_ROM(0x14e4, 0xd818, "14e4-D818", "14e4-D818", 0),
+	PCI_ROM(0x14e4, 0x1799, "14e4-1799", "14e4-1799", 0),
+	PCI_ROM(0x14e4, 0xd82a, "14e4-D82A", "14e4-D82A", 0),
+	PCI_ROM(0x14e4, 0xd82c, "14e4-D82C", "14e4-D82C", 0),
+	PCI_ROM(0x14e4, 0xd82e, "14e4-D82E", "14e4-D82E", 0),
+	PCI_ROM(0x14e4, 0xd82d, "14e4-D82D", "14e4-D82D", 0),
+	PCI_ROM(0x14e4, 0xd82b, "14e4-D82B", "14e4-D82B", 0),
+	PCI_ROM(0x14e4, 0xd82f, "14e4-D82F", "14e4-D82F", 0),
+	PCI_ROM(0x14e4, 0x1902, "14e4-1902", "14e4-1902", 0),
+	PCI_ROM(0x14e4, 0x1906, "14e4-1906", "14e4-1906", 0),
+	PCI_ROM(0x14e4, 0x190a, "14e4-190A", "14e4-190A", 0),
+	PCI_ROM(0x14e4, 0x1903, "14e4-1903", "14e4-1903", 0),
+	PCI_ROM(0x14e4, 0x1907, "14e4-1907", "14e4-1907", 0),
+	PCI_ROM(0x14e4, 0x190b, "14e4-190B", "14e4-190B", 0),
+	PCI_ROM(0x14e4, 0x1041, "14e4-1041", "14e4-1041", 0),
+	PCI_ROM(0x14e4, 0x1042, "14e4-1042", "14e4-1042", 0),
+	PCI_ROM(0x14e4, 0x1043, "14e4-1043", "14e4-1043", 0),
+	PCI_ROM(0x14e4, 0x1607, "14e4-1607", "14e4-1607", 0),
+	PCI_ROM(0x14e4, 0x1608, "14e4-1608", "14e4-1608", 0),
+	PCI_ROM(0x14e4, 0x16c5, "14e4-16C5", "14e4-16C5", 0),
+	PCI_ROM(0x14e4, 0x16bd, "14e4-16BD", "14e4-16BD", 0),
+};
+
+static u16 bnxt_vf_nics[] = {
+	DID_57508_VF,
+	DID_57508_VF_RDMA,
+	DID_57508_VF_HV,
+	DID_57508_VF_RDMA_HV,
+	DID_57417_VF,
+	DID_57417_VF_RDMA,
+	DID_SR2_58812_VF,
+	DID_SR2_58812_RDMA,
+	DID_SR2_58814_VF,
+	DID_SR2_58814_RDMA,
+	DID_SR2_58818_VF,
+	DID_SR2_58818_RDMA,
+	DID_SR2_58812_HV,
+	DID_SR2_58812_HV_RDMA,
+	DID_SR2_58814_HV,
+	DID_SR2_58814_HV_RDMA,
+	DID_SR2_58818_HV,
+	DID_SR2_58818_HV_RDMA,
+	DID_57454_VF_HV,
+	DID_57454_VF_HV_RDMA,
+	DID_57412_VF_HV,
+	DID_57412_VF_HV_RDMA,
+};
 
 /**
  * Check if Virtual Function
@@ -265,8 +374,6 @@ int bnxt_free_rx_iob ( struct bnxt *bp )
 	unsigned int i;
 
 	DBGP ( "%s\n", __func__ );
-	if ( ! ( FLAG_TEST ( bp->flag_hwrm, VALID_RX_IOB ) ) )
-		return STATUS_SUCCESS;
 
 	for ( i = 0; i < bp->rx.buf_cnt; i++ ) {
 		if ( bp->rx.iob[i] ) {
@@ -379,9 +486,10 @@ u8 bnxt_rx_drop ( struct bnxt *bp, struct io_buffer *iob,
 	}
 	iob_put ( iob, rx_len );
 
-	if ( rx_vlan )
-		bnxt_add_vlan ( iob, rx_vlan );
-
+	if ( rx_vlan ) {
+		if ( ( bp->vlan_tx )  || ( bp->tx.cnt_req == 0 ) )
+			bnxt_add_vlan ( iob, rx_vlan );
+	}
 	bp->rx.good++;
 	return 0;
 }
@@ -407,20 +515,23 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 	u8 drop;
 
 	dump_rx_bd ( rx_cmp, rx_cmp_hi, desc_idx );
-	assert ( !iob );
-	drop = bnxt_rx_drop ( bp, iob, rx_cmp_hi, rx_cmp->len );
-	dbg_rxp ( iob->data, rx_cmp->len, drop );
-	if ( drop )
-		netdev_rx_err ( dev, iob, -EINVAL );
-	else
-		netdev_rx ( dev, iob );
-
-	bp->rx.cnt++;
-	bp->rx.iob[desc_idx] = NULL;
-	bp->rx.iob_cnt--;
-	bnxt_post_rx_buffers ( bp );
-	bnxt_adv_cq_index ( bp, 2 ); /* Rx completion is 2 entries. */
-	dbg_rx_stat ( bp );
+	if ( iob ) {
+		drop = bnxt_rx_drop ( bp, iob, rx_cmp_hi, rx_cmp->len );
+		dbg_rxp ( iob->data, rx_cmp->len, drop );
+		if ( drop )
+			netdev_rx_err ( dev, iob, -EINVAL );
+		else
+			netdev_rx ( dev, iob );
+		bp->rx.cnt++;
+		bp->rx.iob[desc_idx] = NULL;
+		bp->rx.iob_cnt--;
+		bnxt_post_rx_buffers ( bp );
+		bnxt_adv_cq_index ( bp, 2 ); /* Rx completion is 2 entries. */
+		dbg_rx_stat ( bp );
+	} else {
+		bp->rx.iob[desc_idx] = NULL;
+		bp->rx.iob_cnt--;
+	}
 }
 
 static int bnxt_rx_complete ( struct net_device *dev,
@@ -607,7 +718,8 @@ static int wait_resp ( struct bnxt *bp, u32 tmo, u16 len, const char *func )
 	u16 resp_len = 0;
 	u16 ret = STATUS_TIMEOUT;
 
-	if ( len > bp->hwrm_max_req_len )
+	if ( ( len > bp->hwrm_max_req_len ) ||
+         ( FLAG_TEST (bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_REQ ) ) )
 		short_hwrm_cmd_req ( bp, len );
 	else
 		hwrm_write_req ( bp, req, ( u32 ) ( len / 4 ) );
@@ -660,12 +772,14 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 		resp->chip_bond_id << 8 |
 		resp->chip_platform_type;
 	bp->chip_num = resp->chip_num;
-	test_if ( ( resp->dev_caps_cfg & SHORT_CMD_SUPPORTED ) &&
-		 ( resp->dev_caps_cfg & SHORT_CMD_REQUIRED ) )
+	test_if (resp->dev_caps_cfg & SHORT_CMD_SUPPORTED )
 		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_SUPP );
+	test_if (resp->dev_caps_cfg & SHORT_CMD_REQUIRED )
+		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_REQ );
 	bp->hwrm_max_ext_req_len = resp->max_ext_req_len;
-	if ( bp->chip_num == CHIP_NUM_57500 )
+	if (IS_CHIP_P5 ( bp ) ) {
 		bp->thor = 1;
+	}
 	dbg_fw_ver ( resp, bp->hwrm_cmd_timeout );
 	return STATUS_SUCCESS;
 }
@@ -1238,7 +1352,8 @@ static int bnxt_hwrm_backing_store_qcfg ( struct bnxt *bp )
 	struct hwrm_func_backing_store_qcfg_input *req;
 
 	DBGP ( "%s\n", __func__ );
-	if ( !bp->thor )
+
+	if ( ( !bp->thor ) || ( bp->vf ) )
 		return STATUS_SUCCESS;
 
 	req = ( struct hwrm_func_backing_store_qcfg_input * )bp->hwrm_addr_req;
@@ -1253,7 +1368,8 @@ static int bnxt_hwrm_backing_store_cfg ( struct bnxt *bp )
 	struct hwrm_func_backing_store_cfg_input *req;
 
 	DBGP ( "%s\n", __func__ );
-	if ( !bp->thor )
+
+	if ( ( !bp->thor ) || ( bp->vf ) )
 		return STATUS_SUCCESS;
 
 	req = ( struct hwrm_func_backing_store_cfg_input * )bp->hwrm_addr_req;
@@ -1279,7 +1395,8 @@ static int bnxt_hwrm_queue_qportcfg ( struct bnxt *bp )
 	resp = ( struct hwrm_queue_qportcfg_output * )bp->hwrm_addr_resp;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_QUEUE_QPORTCFG, cmd_len );
 	req->flags   = 0;
-	req->port_id = 0;
+	req->port_id = bp->port_idx;
+
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 	if ( rc ) {
 		DBGP ( "- %s (  ): Failed\n", __func__ );
@@ -1378,7 +1495,7 @@ static int bnxt_query_phy_link ( struct bnxt *bp )
 	DBGP ( "%s\n", __func__ );
 	/* Query Link Status */
 	if ( bnxt_hwrm_port_phy_qcfg ( bp, QCFG_PHY_ALL ) != STATUS_SUCCESS ) {
-			return STATUS_FAILURE;
+		return STATUS_FAILURE;
 	}
 
 	if ( bp->link_status == STATUS_LINK_ACTIVE )
@@ -1815,6 +1932,7 @@ hwrm_func_t bring_up_chip[] = {
 	bnxt_hwrm_func_reset_req,	/* HWRM_FUNC_RESET		*/
 	bnxt_hwrm_func_drv_rgtr,	/* HWRM_FUNC_DRV_RGTR		*/
 	bnxt_hwrm_func_qcaps_req,	/* HWRM_FUNC_QCAPS		*/
+	bnxt_hwrm_queue_qportcfg,	/* HWRM_QUEUE_QPORTCFG		*/
 	bnxt_hwrm_backing_store_cfg,	/* HWRM_FUNC_BACKING_STORE_CFG  */
 	bnxt_hwrm_backing_store_qcfg,	/* HWRM_FUNC_BACKING_STORE_QCFG	*/
 	bnxt_hwrm_func_resource_qcaps,	/* HWRM_FUNC_RESOURCE_QCAPS	*/
@@ -1829,7 +1947,6 @@ hwrm_func_t bring_up_chip[] = {
 
 hwrm_func_t bring_up_nic[] = {
 	bnxt_hwrm_stat_ctx_alloc,	/* HWRM_STAT_CTX_ALLOC		*/
-	bnxt_hwrm_queue_qportcfg,	/* HWRM_QUEUE_QPORTCFG		*/
 	bnxt_hwrm_ring_alloc_nq,	/* HWRM_RING_ALLOC - NQ Ring	*/
 	bnxt_hwrm_ring_alloc_cq,	/* HWRM_RING_ALLOC - CQ Ring	*/
 	bnxt_hwrm_ring_alloc_tx,	/* HWRM_RING_ALLOC - TX Ring	*/
@@ -1845,10 +1962,11 @@ hwrm_func_t bring_up_nic[] = {
 	NULL,
 };
 
-int bnxt_hwrm_run ( hwrm_func_t cmds[], struct bnxt *bp )
+int bnxt_hwrm_run ( hwrm_func_t cmds[], struct bnxt *bp, int flag )
 {
 	hwrm_func_t *ptr;
 	int ret;
+	u8 Status = 0;
 
 	for ( ptr = cmds; *ptr; ++ptr ) {
 		memset ( bp->hwrm_addr_req,  0, REQ_BUFFER_SIZE );
@@ -1856,16 +1974,22 @@ int bnxt_hwrm_run ( hwrm_func_t cmds[], struct bnxt *bp )
 		ret = ( *ptr ) ( bp );
 		if ( ret ) {
 			DBGP ( "- %s (  ): Failed\n", __func__ );
-			return STATUS_FAILURE;
+			Status = STATUS_FAILURE;
+
+			// Initialization path failure,
+			// return failure immediately
+			// else cleanup the resources
+			if ( flag )
+				return STATUS_FAILURE;
 		}
 	}
-	return STATUS_SUCCESS;
+	return Status;
 }
 
-#define bnxt_down_chip( bp )	bnxt_hwrm_run ( bring_down_chip, bp )
-#define bnxt_up_chip( bp )	bnxt_hwrm_run ( bring_up_chip, bp )
-#define bnxt_down_nic( bp )	bnxt_hwrm_run ( bring_down_nic, bp )
-#define bnxt_up_nic( bp )	bnxt_hwrm_run ( bring_up_nic, bp )
+#define bnxt_down_chip( bp )	bnxt_hwrm_run ( bring_down_chip, bp, 0 )
+#define bnxt_up_chip( bp )	bnxt_hwrm_run ( bring_up_chip, bp, 1 )
+#define bnxt_down_nic( bp )	bnxt_hwrm_run ( bring_down_nic, bp, 0 )
+#define bnxt_up_nic( bp )	bnxt_hwrm_run ( bring_up_nic, bp, 1 )
 
 static int bnxt_open ( struct net_device *dev )
 {
@@ -2047,16 +2171,7 @@ static void bnxt_close ( struct net_device *dev )
 	struct bnxt *bp = netdev_priv ( dev );
 
 	DBGP ( "%s\n", __func__ );
-	bnxt_down_nic (bp);
-
-	/* iounmap PCI BAR ( s ) */
-	bnxt_down_pci(bp);
-
-	/* Get Bar Address */
-	bp->bar0 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_0 );
-	bp->bar1 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_2 );
-	bp->bar2 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_4 );
-
+	bnxt_down_nic ( bp );
 }
 
 static struct net_device_operations bnxt_netdev_ops = {
@@ -2073,6 +2188,7 @@ static int bnxt_init_one ( struct pci_device *pci )
 	int err = 0;
 
 	DBGP ( "%s\n", __func__ );
+
 	/* Allocate network device */
 	netdev = alloc_etherdev ( sizeof ( *bp ) );
 	if ( !netdev ) {
@@ -2096,11 +2212,11 @@ static int bnxt_init_one ( struct pci_device *pci )
 	bp->dev  = netdev;
 	netdev->dev = &pci->dev;
 
-	/* Enable PCI device */
-	adjust_pci_device ( pci );
-
 	/* Get PCI Information */
 	bnxt_get_pci_info ( bp );
+
+	/* Enable PCI device */
+	adjust_pci_device ( pci );
 
 	/* Allocate and Initialise device specific parameters */
 	if ( bnxt_alloc_mem ( bp ) != 0 ) {
@@ -2123,7 +2239,7 @@ static int bnxt_init_one ( struct pci_device *pci )
 	return 0;
 
 err_down_chip:
-	bnxt_down_chip (bp);
+	bnxt_down_chip ( bp );
 	bnxt_free_mem ( bp );
 
 err_down_pci:
@@ -2142,11 +2258,13 @@ static void bnxt_remove_one ( struct pci_device *pci )
 	struct bnxt *bp = netdev_priv ( netdev );
 
 	DBGP ( "%s\n", __func__ );
+	bnxt_free_rx_iob ( bp );
+
 	/* Unregister network device */
 	unregister_netdev ( netdev );
 
 	/* Bring down Chip */
-	bnxt_down_chip(bp);
+	bnxt_down_chip ( bp );
 
 	/* Free Allocated resource */
 	bnxt_free_mem ( bp );
