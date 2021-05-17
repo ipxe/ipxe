@@ -327,32 +327,6 @@ static void bzimage_set_cmdline ( struct image *image,
 }
 
 /**
- * Parse standalone image command line for cpio parameters
- *
- * @v image		bzImage file
- * @v cpio		CPIO header
- * @v cmdline		Command line
- */
-static void bzimage_parse_cpio_cmdline ( struct image *image,
-					 struct cpio_header *cpio,
-					 const char *cmdline ) {
-	char *arg;
-	char *end;
-	unsigned int mode;
-
-	/* Look for "mode=" */
-	if ( ( arg = strstr ( cmdline, "mode=" ) ) ) {
-		arg += 5;
-		mode = strtoul ( arg, &end, 8 /* Octal for file mode */ );
-		if ( *end && ( *end != ' ' ) ) {
-			DBGC ( image, "bzImage %p strange \"mode=\""
-			       "terminator '%c'\n", image, *end );
-		}
-		cpio_set_field ( cpio->c_mode, ( 0100000 | mode ) );
-	}
-}
-
-/**
  * Align initrd length
  *
  * @v len		Length
@@ -374,11 +348,9 @@ static inline size_t bzimage_align ( size_t len ) {
 static size_t bzimage_load_initrd ( struct image *image,
 				    struct image *initrd,
 				    userptr_t address ) {
-	char *filename = initrd->cmdline;
-	char *cmdline;
+	const char *filename = cpio_name ( initrd );
 	struct cpio_header cpio;
 	size_t offset;
-	size_t name_len;
 	size_t pad_len;
 
 	/* Do not include kernel image itself as an initrd */
@@ -386,25 +358,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 		return 0;
 
 	/* Create cpio header for non-prebuilt images */
-	if ( filename && filename[0] ) {
-		cmdline = strchr ( filename, ' ' );
-		name_len = ( ( cmdline ? ( ( size_t ) ( cmdline - filename ) )
-			       : strlen ( filename ) ) + 1 /* NUL */ );
-		memset ( &cpio, '0', sizeof ( cpio ) );
-		memcpy ( cpio.c_magic, CPIO_MAGIC, sizeof ( cpio.c_magic ) );
-		cpio_set_field ( cpio.c_mode, 0100644 );
-		cpio_set_field ( cpio.c_nlink, 1 );
-		cpio_set_field ( cpio.c_filesize, initrd->len );
-		cpio_set_field ( cpio.c_namesize, name_len );
-		if ( cmdline ) {
-			bzimage_parse_cpio_cmdline ( image, &cpio,
-						     ( cmdline + 1 /* ' ' */ ));
-		}
-		offset = ( ( sizeof ( cpio ) + name_len + 0x03 ) & ~0x03 );
-	} else {
-		offset = 0;
-		name_len = 0;
-	}
+	offset = cpio_header ( initrd, &cpio );
 
 	/* Copy in initrd image body (and cpio header if applicable) */
 	if ( address ) {
@@ -413,7 +367,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 			memset_user ( address, 0, 0, offset );
 			copy_to_user ( address, 0, &cpio, sizeof ( cpio ) );
 			copy_to_user ( address, sizeof ( cpio ), filename,
-				       ( name_len - 1 /* NUL (or space) */ ) );
+				       cpio_name_len ( initrd ) );
 		}
 		DBGC ( image, "bzImage %p initrd %p [%#08lx,%#08lx,%#08lx)"
 		       "%s%s\n", image, initrd, user_to_phys ( address, 0 ),

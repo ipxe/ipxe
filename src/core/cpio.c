@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ipxe/cpio.h>
 
@@ -44,4 +45,88 @@ void cpio_set_field ( char *field, unsigned long value ) {
 
 	snprintf ( buf, sizeof ( buf ), "%08lx", value );
 	memcpy ( field, buf, 8 );
+}
+
+/**
+ * Get CPIO image filename
+ *
+ * @v image		Image
+ * @ret len		CPIO filename length (0 for no filename)
+ */
+size_t cpio_name_len ( struct image *image ) {
+	const char *name = cpio_name ( image );
+	char *sep;
+	size_t len;
+
+	/* Check for existence of CPIO filename */
+	if ( ! name )
+		return 0;
+
+	/* Locate separator (if any) */
+	sep = strchr ( name, ' ' );
+	len = ( sep ? ( ( size_t ) ( sep - name ) ) : strlen ( name ) );
+
+	return len;
+}
+
+/**
+ * Parse CPIO image parameters
+ *
+ * @v image		Image
+ * @v cpio		CPIO header to fill in
+ */
+static void cpio_parse_cmdline ( struct image *image,
+				 struct cpio_header *cpio ) {
+	const char *cmdline;
+	char *arg;
+	char *end;
+	unsigned int mode;
+
+	/* Skip image filename */
+	cmdline = ( cpio_name ( image ) + cpio_name_len ( image ) );
+
+	/* Look for "mode=" */
+	if ( ( arg = strstr ( cmdline, "mode=" ) ) ) {
+		arg += 5;
+		mode = strtoul ( arg, &end, 8 /* Octal for file mode */ );
+		if ( *end && ( *end != ' ' ) ) {
+			DBGC ( image, "CPIO %p strange \"mode=\" "
+			       "terminator '%c'\n", image, *end );
+		}
+		cpio_set_field ( cpio->c_mode, ( 0100000 | mode ) );
+	}
+}
+
+/**
+ * Construct CPIO header for image, if applicable
+ *
+ * @v image		Image
+ * @v cpio		CPIO header to fill in
+ * @ret len		Length of magic CPIO header (including filename)
+ */
+size_t cpio_header ( struct image *image, struct cpio_header *cpio ) {
+	size_t name_len;
+	size_t len;
+
+	/* Get filename length */
+	name_len = cpio_name_len ( image );
+
+	/* Images with no filename are assumed to already be CPIO archives */
+	if ( ! name_len )
+		return 0;
+
+	/* Construct CPIO header */
+	memset ( cpio, '0', sizeof ( *cpio ) );
+	memcpy ( cpio->c_magic, CPIO_MAGIC, sizeof ( cpio->c_magic ) );
+	cpio_set_field ( cpio->c_mode, 0100644 );
+	cpio_set_field ( cpio->c_nlink, 1 );
+	cpio_set_field ( cpio->c_filesize, image->len );
+	cpio_set_field ( cpio->c_namesize, ( name_len + 1 /* NUL */ ) );
+	cpio_parse_cmdline ( image, cpio );
+
+	/* Calculate total length */
+	len = ( ( sizeof ( *cpio ) + name_len + 1 /* NUL */ + CPIO_ALIGN - 1 )
+		& ~( CPIO_ALIGN - 1 ) );
+
+	return len;
 }
