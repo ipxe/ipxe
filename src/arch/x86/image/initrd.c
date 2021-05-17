@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/uaccess.h>
 #include <ipxe/init.h>
 #include <ipxe/memblock.h>
+#include <ipxe/cpio.h>
 
 /** @file
  *
