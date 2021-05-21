@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <wchar.h>
 #include <ipxe/image.h>
+#include <ipxe/cpio.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
@@ -84,6 +85,7 @@ struct efi_file {
 };
 
 static struct efi_file efi_file_root;
+static struct efi_file efi_file_initrd;
 
 /**
  * Free EFI file
@@ -210,6 +212,67 @@ static size_t efi_file_read_image ( struct efi_file_reader *reader ) {
 }
 
 /**
+ * Read from magic initrd file
+ *
+ * @v reader		EFI file reader
+ * @ret len		Length read
+ */
+static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
+	struct efi_file *file = reader->file;
+	struct cpio_header cpio;
+	struct image *image;
+	const char *name;
+	size_t pad_len;
+	size_t cpio_len;
+	size_t name_len;
+	size_t len;
+
+	/* Read from file */
+	len = 0;
+	for_each_image ( image ) {
+
+		/* Ignore currently executing image */
+		if ( image == current_image )
+			continue;
+
+		/* Pad to alignment boundary */
+		pad_len = ( ( -reader->pos ) & ( INITRD_ALIGN - 1 ) );
+		if ( pad_len ) {
+			DBGC ( file, "EFIFILE %s [%#08zx,%#08zx) pad\n",
+			       efi_file_name ( file ), reader->pos,
+			       ( reader->pos + pad_len ) );
+		}
+		len += efi_file_read_chunk ( reader, UNULL, pad_len );
+
+		/* Read CPIO header, if applicable */
+		cpio_len = cpio_header ( image, &cpio );
+		if ( cpio_len ) {
+			name = cpio_name ( image );
+			name_len = cpio_name_len ( image );
+			pad_len = ( cpio_len - sizeof ( cpio ) - name_len );
+			DBGC ( file, "EFIFILE %s [%#08zx,%#08zx) %s header\n",
+			       efi_file_name ( file ), reader->pos,
+			       ( reader->pos + cpio_len ), image->name );
+			len += efi_file_read_chunk ( reader,
+						     virt_to_user ( &cpio ),
+						     sizeof ( cpio ) );
+			len += efi_file_read_chunk ( reader,
+						     virt_to_user ( name ),
+						     name_len );
+			len += efi_file_read_chunk ( reader, UNULL, pad_len );
+		}
+
+		/* Read file data */
+		DBGC ( file, "EFIFILE %s [%#08zx,%#08zx) %s\n",
+		       efi_file_name ( file ), reader->pos,
+		       ( reader->pos + image->len ), image->name );
+		len += efi_file_read_chunk ( reader, image->data, image->len );
+	}
+
+	return len;
+}
+
+/**
  * Open fixed file
  *
  * @v file		EFI file
@@ -288,6 +351,10 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 		       name, mode );
 		return EFI_WRITE_PROTECTED;
 	}
+
+	/* Allow magic initrd to be opened */
+	if ( strcasecmp ( name, efi_file_initrd.name ) == 0 )
+		return efi_file_open_fixed ( &efi_file_initrd, new );
 
 	/* Identify image */
 	image = efi_file_find ( name );
@@ -635,6 +702,27 @@ static struct efi_file efi_file_root = {
 	},
 	.image = NULL,
 	.name = "",
+};
+
+/** Magic initrd file */
+static struct efi_file efi_file_initrd = {
+	.refcnt = REF_INIT ( ref_no_free ),
+	.file = {
+		.Revision = EFI_FILE_PROTOCOL_REVISION,
+		.Open = efi_file_open,
+		.Close = efi_file_close,
+		.Delete = efi_file_delete,
+		.Read = efi_file_read,
+		.Write = efi_file_write,
+		.GetPosition = efi_file_get_position,
+		.SetPosition = efi_file_set_position,
+		.GetInfo = efi_file_get_info,
+		.SetInfo = efi_file_set_info,
+		.Flush = efi_file_flush,
+	},
+	.image = NULL,
+	.name = "initrd.magic",
+	.read = efi_file_read_initrd,
 };
 
 /**
