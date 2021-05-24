@@ -240,6 +240,16 @@ if [ -n "${ISOIMG}" ] ; then
     else
 	FATIMG=
     fi
+    if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
+	DATE_FMT="+%Y%m%d%H%M%S00"
+	BUILD_DATE=$(date -u -d "@${SOURCE_DATE_EPOCH}" "${DATE_FMT}" \
+			  2>/dev/null || \
+		     date -u -r "${SOURCE_DATE_EPOCH}" "${DATE_FMT}" \
+			  2>/dev/null || \
+		     date -u "${DATE_FMT}")
+	ISOARGS="${ISOARGS} --set_all_file_dates ${BUILD_DATE}"
+	ISOARGS="${ISOARGS} --modification-date=${BUILD_DATE}"
+    fi
 fi
 
 # Create FAT filesystem image, if applicable
