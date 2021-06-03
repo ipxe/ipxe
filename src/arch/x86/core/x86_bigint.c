@@ -75,17 +75,18 @@ void bigint_multiply_raw ( const uint32_t *multiplicand0,
 			 *
 			 *     a < 2^{n}, b < 2^{n} => ab < 2^{2n}
 			 */
-			__asm__ __volatile__ ( "mull %4\n\t"
-					       "addl %%eax, (%5,%2,4)\n\t"
-					       "adcl %%edx, 4(%5,%2,4)\n\t"
+			__asm__ __volatile__ ( "mull %5\n\t"
+					       "addl %%eax, (%6,%2,4)\n\t"
+					       "adcl %%edx, 4(%6,%2,4)\n\t"
 					       "\n1:\n\t"
-					       "adcl $0, 8(%5,%2,4)\n\t"
+					       "adcl $0, 8(%6,%2,4)\n\t"
 					       "inc %2\n\t"
 						       /* Does not affect CF */
 					       "jc 1b\n\t"
 					       : "=&a" ( discard_a ),
 						 "=&d" ( discard_d ),
-						 "=&r" ( index )
+						 "=&r" ( index ),
+						 "+m" ( *result )
 					       : "0" ( multiplicand_element ),
 						 "g" ( multiplier_element ),
 						 "r" ( result_elements ),
