@@ -227,6 +227,7 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
 	bigint_add ( &addend_temp, &value_temp );			\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
+	memset( result_raw, 0, sizeof ( result_raw ) );                 \
 	bigint_done ( &value_temp, result_raw, sizeof ( result_raw ) );	\
 									\
 	ok ( memcmp ( result_raw, expected_raw,				\

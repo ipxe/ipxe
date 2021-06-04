@@ -410,7 +410,7 @@ ath5k_eeprom_read_turbo_modes(struct ath5k_hw *ah,
 {
 	struct ath5k_eeprom_info *ee = &ah->ah_capabilities.cap_eeprom;
 	u32 o = *offset;
-	u16 val;
+	u16 val = 0;
 	int ret;
 
 	if (ee->ee_version < AR5K_EEPROM_VERSION_5_0)
