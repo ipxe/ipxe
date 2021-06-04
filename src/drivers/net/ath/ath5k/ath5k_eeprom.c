@@ -39,6 +39,9 @@ static int ath5k_hw_eeprom_read(struct ath5k_hw *ah, u32 offset, u16 *data)
 {
 	u32 status, timeout;
 
+	/* Avoid returning uninitialised data on error */
+	*data = 0xffff;
+
 	/*
 	 * Initialize EEPROM access
 	 */
