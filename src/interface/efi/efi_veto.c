@@ -362,7 +362,7 @@ static int efi_veto_driver ( EFI_HANDLE driver ) {
 }
 
 /**
- * Veto Dell Ip4ConfigDxe driver
+ * Veto Ip4ConfigDxe driver on some platforms
  *
  * @v binding		Driver binding protocol
  * @v loaded		Loaded image protocol
@@ -372,19 +372,21 @@ static int efi_veto_driver ( EFI_HANDLE driver ) {
  * @ret vetoed		Driver is to be vetoed
  */
 static int
-efi_veto_dell_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
-			  EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
-			  EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
-			  const char *manufacturer, const CHAR16 *name ) {
+efi_veto_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
+		     EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
+		     EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
+		     const char *manufacturer, const CHAR16 *name ) {
 	static const CHAR16 ip4cfg[] = L"IP4 CONFIG Network Service Driver";
 	static const char *dell = "Dell Inc.";
+	static const char *itautec = "Itautec S.A.";
 
 	/* Check manufacturer and driver name */
 	if ( ! manufacturer )
 		return 0;
 	if ( ! name )
 		return 0;
-	if ( strcmp ( manufacturer, dell ) != 0 )
+	if ( ( strcmp ( manufacturer, dell ) != 0 ) &&
+	     ( strcmp ( manufacturer, itautec ) != 0 ) )
 		return 0;
 	if ( memcmp ( name, ip4cfg, sizeof ( ip4cfg ) ) != 0 )
 		return 0;
@@ -436,8 +438,8 @@ efi_veto_hp_xhci ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 /** Driver vetoes */
 static struct efi_veto efi_vetoes[] = {
 	{
-		.name = "Dell Ip4Config",
-		.veto = efi_veto_dell_ip4config,
+		.name = "Ip4Config",
+		.veto = efi_veto_ip4config,
 	},
 	{
 		.name = "HP Xhci",
