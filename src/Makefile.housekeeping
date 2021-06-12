@@ -1167,7 +1167,7 @@ $(BLIB) : $(BLIB_OBJS) $(BLIB_LIST) $(MAKEDEPS)
 	$(Q)$(RM) $(BLIB)
 	$(QM)$(ECHO) "  [AR] $@"
 	$(Q)$(AR) rD $@ $(sort $(BLIB_OBJS))
-	$(Q)$(OBJCOPY) --prefix-symbols=$(SYMBOL_PREFIX) $@
+	$(Q)$(OBJCOPY) -D --prefix-symbols=$(SYMBOL_PREFIX) $@
 	$(Q)$(RANLIB) -D $@
 blib : $(BLIB)
 
