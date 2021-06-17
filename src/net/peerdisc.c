@@ -73,6 +73,9 @@ static LIST_HEAD ( peerdisc_segments );
  */
 unsigned int peerdisc_timeout_secs = PEERDISC_DEFAULT_TIMEOUT_SECS;
 
+/** Most recently discovered peer (for any block) */
+static char *peerdisc_recent;
+
 /** Hosted cache server */
 static char *peerhost;
 
@@ -383,6 +386,7 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 	struct peerdisc_peer *peer;
 	struct peerdisc_client *peerdisc;
 	struct peerdisc_client *tmp;
+	char *recent;
 
 	/* Ignore duplicate peers */
 	list_for_each_entry ( peer, &segment->peers, list ) {
@@ -402,6 +406,15 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 
 	/* Add to end of list of peers */
 	list_add_tail ( &peer->list, &segment->peers );
+
+	/* Record as most recently discovered peer */
+	if ( location != peerdisc_recent ) {
+		recent = strdup ( location );
+		if ( recent ) {
+			free ( peerdisc_recent );
+			peerdisc_recent = recent;
+		}
+	}
 
 	/* Notify all clients */
 	list_for_each_entry_safe ( peerdisc, tmp, &segment->clients, list )
@@ -483,6 +496,16 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 			goto err_peerhost;
 
 	} else {
+
+		/* Add most recently discovered peer to list of peers
+		 *
+		 * This is a performance optimisation: we assume that
+		 * the most recently discovered peer for any block has
+		 * a high probability of also having a copy of the
+		 * next block that we attempt to discover.
+		 */
+		if ( peerdisc_recent )
+			peerdisc_discovered ( segment, peerdisc_recent );
 
 		/* Start discovery timer */
 		start_timer_nodelay ( &segment->timer );
