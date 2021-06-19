@@ -307,6 +307,8 @@ struct realtek_nic {
 	int have_phy_regs;
 	/** TPPoll register offset */
 	unsigned int tppoll;
+	/** PHY id */
+	uint32_t phy_id;
 
 	/** Transmit descriptor ring */
 	struct realtek_ring tx;

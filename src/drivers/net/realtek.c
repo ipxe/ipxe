@@ -684,6 +684,12 @@ static int realtek_open ( struct net_device *netdev ) {
 	if ( ( rc = realtek_create_buffer ( rtl ) ) != 0 )
 		goto err_create_buffer;
 
+	/* Wakeup interface */
+	if ( rtl->phy_id == 0x001cc912 )
+	{
+		realtek_mii_write ( &rtl->mdio, 0, MII_MMD_DATA, 0 );
+	}
+
 	/* Accept all packets */
 	writel ( 0xffffffffUL, rtl->regs + RTL_MAR0 );
 	writel ( 0xffffffffUL, rtl->regs + RTL_MAR4 );
@@ -733,6 +739,12 @@ static int realtek_open ( struct net_device *netdev ) {
 static void realtek_close ( struct net_device *netdev ) {
 	struct realtek_nic *rtl = netdev->priv;
 	unsigned int i;
+
+	/* Suspend interface */
+	if ( rtl->phy_id == 0x001cc912 )
+	{
+		realtek_mii_write ( &rtl->mdio, 0, MII_MMD_DATA, 1 << 9 );
+	}
 
 	/* Disable receiver and transmitter */
 	writeb ( 0, rtl->regs + RTL_CR );
@@ -1087,6 +1099,33 @@ static void realtek_detect ( struct realtek_nic *rtl ) {
 }
 
 /**
+ * Get PHY id
+ *
+ * @v rtl		Realtek device
+ */
+static void realtek_get_phy_id ( struct realtek_nic *rtl ) {
+	int rc;
+	uint32_t phy_id;
+
+	if ( ( rc = realtek_mii_read ( &rtl->mdio, 0, MII_PHYSID1 ) ) < 0 )
+		goto mii_read_err;
+
+	phy_id = rc << 16;
+
+	if ( ( rc = realtek_mii_read ( &rtl->mdio, 0, MII_PHYSID2 ) ) < 0 )
+		goto mii_read_err;
+
+	rtl->phy_id = phy_id | rc;
+
+	DBGC ( rtl, "REALTEK %p PHY id: %08x\n", rtl, rtl->phy_id );
+
+	return;
+
+ mii_read_err:
+	DBGC ( rtl, "REALTEK %p could not read PHY id\n", rtl );
+}
+
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -1163,6 +1202,9 @@ static int realtek_probe ( struct pci_device *pci ) {
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
+
+	/* Get PHY id */
+	realtek_get_phy_id ( rtl );
 
 	/* Set initial link state */
 	realtek_check_link ( netdev );
