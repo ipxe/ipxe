@@ -44,6 +44,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define NBD_BLOCK_SIZE 512
 
+/** Maximum number of blocks per request
+ *
+ * This is a policy decision.
+ */
+#define NBD_MAX_BLOCK_COUNT ( 16 * 1024 / NBD_BLOCK_SIZE )
+
 FEATURE ( FEATURE_PROTOCOL, "NBD", DHCP_EB_FEATURE_NBD, 1 );
 
 enum nbd_command_type {
@@ -61,6 +67,9 @@ struct nbd_command {
 
 	/** Block data interface */
 	struct interface block;
+
+	/** Request handle (tag), in network order */
+	uint64_t handle;
 
 	/** Command type */
 	enum nbd_command_type type;
@@ -123,6 +132,17 @@ static void nbdcmd_close ( struct nbd_command *nbdcmd, int rc ) {
 	nbd->command = NULL;
 }
 
+/**
+ * Assign new NBD request handle
+ *
+ * @v nbdcmd		NBD command
+ */
+static void nbdcmd_new_handle ( struct nbd_command *nbdcmd ) {
+	static uint32_t handle_idx;
+
+	nbdcmd->handle = htonl ( ++handle_idx );
+}
+
 /** NBD command block interface operations */
 static struct interface_operation nbdcmd_block_op[] = {
 	INTF_OP ( intf_close, struct nbd_command *, nbdcmd_close ),
@@ -131,6 +151,7 @@ static struct interface_operation nbdcmd_block_op[] = {
 /** NBD command block interface descriptor */
 static struct interface_descriptor nbdcmd_block_desc =
 	INTF_DESC ( struct nbd_command, block, nbdcmd_block_op );
+
 
 /**
  * Create NBD command
@@ -164,6 +185,8 @@ static int nbd_command ( struct nbd_session *nbd, struct interface *block,
 	nbdcmd->nbd = nbd;
 	nbd->command = nbdcmd;
 	ref_get ( &nbdcmd->nbd->refcnt );
+
+	nbdcmd_new_handle ( nbdcmd );
 
 	nbdcmd->type = type;
 	nbdcmd->lba = lba;
@@ -230,14 +253,14 @@ static void nbd_close ( struct nbd_session *nbd, int rc ) {
  * @ret len		Length of window
  */
 static size_t nbd_block_window ( struct nbd_session *nbd ) {
-	DBGC ( nbd, "NBD %p block window\n", nbd );
 
 	if ( nbd->rx_state >= NBD_RX_TRANS_REP_CMD &&
-	     nbd->command == NULL )
+	     nbd->command == NULL ) {
 		/* We cannot handle concurrent commands */
 		return 1;
-	else
+	} else {
 		return 0;
+	}
 }
 
 /**
@@ -250,7 +273,6 @@ static size_t nbd_block_window ( struct nbd_session *nbd ) {
  * @v buffer		Data buffer
  * @v len		Length of data buffer
  * @ret rc		Return status code
-
  */
 static int nbd_block_read ( struct nbd_session *nbd,
 			    struct interface *block,
@@ -258,12 +280,11 @@ static int nbd_block_read ( struct nbd_session *nbd,
 			    userptr_t buffer, size_t len ) {
 	int rc;
 
-	DBGCP ( nbd, "NBD %p block %p read LBA 0x%08llx count 0x%04x\n",
+	DBGC2 ( nbd, "NBD %p block %p read LBA 0x%08llx count 0x%04x\n",
 		nbd, block, lba, count );
 
-	rc = nbd_command ( nbd, block, NBD_BLOCK_READ,
-			   lba, count, buffer, len );
-	if ( rc != 0 )
+	if ( ( rc = nbd_command ( nbd, block, NBD_BLOCK_READ,
+				  lba, count, buffer, len ) ) != 0 )
 		return rc;
 
 	/* Start command processing */
@@ -288,7 +309,7 @@ static int nbd_block_write ( struct nbd_session *nbd,
 			     userptr_t buffer, size_t len ) {
 	int rc;
 
-	DBGCP ( nbd, "NBD %p block %p write LBA 0x%08llx count 0x%04x\n",
+	DBGC2 ( nbd, "NBD %p block %p write LBA 0x%08llx count 0x%04x\n",
 		nbd, block, lba, count );
 
 	if ( nbd->trans_flags & NBD_FLAG_READ_ONLY ) {
@@ -296,9 +317,8 @@ static int nbd_block_write ( struct nbd_session *nbd,
 		return -EROFS;
 	}
 
-	rc = nbd_command ( nbd, block, NBD_BLOCK_WRITE,
-			   lba, count, buffer, len );
-	if ( rc != 0 )
+	if ( ( rc = nbd_command ( nbd, block, NBD_BLOCK_WRITE,
+				  lba, count, buffer, len ) ) != 0 )
 		return rc;
 
 	/* Start command processing */
@@ -317,11 +337,10 @@ static int nbd_block_read_capacity ( struct nbd_session *nbd,
 				     struct interface *block ) {
 	int rc;
 
-	DBGCP ( nbd, "NBD %p block read capacity %p\n", nbd, block );
+	DBGC2 ( nbd, "NBD %p block read capacity %p\n", nbd, block );
 
-	rc = nbd_command ( nbd, block, NBD_BLOCK_READ_CAPACITY,
-			   0, 0, UNULL, 0 );
-	if ( rc != 0 )
+	if ( ( rc = nbd_command ( nbd, block, NBD_BLOCK_READ_CAPACITY,
+				  0, 0, UNULL, 0 ) ) != 0 )
 		return rc;
 
 	/* Start command processing */
@@ -336,7 +355,7 @@ static int nbd_block_read_capacity ( struct nbd_session *nbd,
  * @ret path		EFI device path, or NULL on error
  */
 static EFI_DEVICE_PATH_PROTOCOL * nbd_efi_describe ( struct nbd_session *nbd ) {
-	DBGCP ( nbd, "NBD %p EFI describe\n", nbd );
+	DBGC2 ( nbd, "NBD %p EFI describe\n", nbd );
 	return efi_uri_path ( nbd->uri );
 }
 
@@ -355,16 +374,6 @@ static struct interface_operation nbd_block_op[] = {
 /** NBD block interface descriptor */
 static struct interface_descriptor nbd_block_desc =
 	INTF_DESC ( struct nbd_session, block, nbd_block_op );
-
-
-static inline void nbd_neg_done ( struct nbd_session *nbd ) {
-	DBGC2 ( nbd, "NBD %p negotiation done, enter transmission\n", nbd );
-	DBGC2 ( nbd, "NBD %p export size: %lld MiB, flags: 0x%04x\n", nbd,
-		nbd->export_size / 1048576, nbd->trans_flags );
-
-	nbd->rx_state = NBD_RX_TRANS_REP_CMD;
-	xfer_window_changed ( &nbd->block );
-}
 
 
 /****************************************************************************
@@ -429,15 +438,16 @@ int nbd_tx_neg_opt ( struct nbd_session *nbd ) {
 	int rc;
 
 	name_len = strlen ( nbd->export_name );
-	if ( nbd->use_opt_go )
+	if ( nbd->use_opt_go ) {
 		opt_len = offsetof ( typeof ( *opt ),
 				     opt_go.export_name ) +
 				     name_len +
 				     sizeof ( uint16_t );
-	else
+	} else {
 		opt_len = offsetof ( typeof ( *opt ),
 				     opt_export_name.export_name ) +
 				     name_len;
+	}
 
 	iobuf = xfer_alloc_iob ( &nbd->socket, opt_len );
 	if ( ! iobuf )
@@ -459,7 +469,7 @@ int nbd_tx_neg_opt ( struct nbd_session *nbd ) {
 		opt->opt_go.request.length = htonl ( opt_len -
 			offsetof ( typeof ( *opt ), opt_go.name_length ) );
 		opt->opt_go.name_length = htonl ( name_len );
-		strcpy ( opt->opt_go.export_name, nbd->export_name );
+		memcpy ( opt->opt_go.export_name, nbd->export_name, name_len );
 	} else {
 		/* Construct NBD_OPT_EXPORT_NAME option */
 		opt->opt_export_name.request.request_magic =
@@ -467,11 +477,11 @@ int nbd_tx_neg_opt ( struct nbd_session *nbd ) {
 		opt->opt_export_name.request.option =
 			htonl ( NBD_OPT_EXPORT_NAME );
 		opt->opt_export_name.request.length = htonl ( name_len );
-		strcpy ( opt->opt_export_name.export_name, nbd->export_name );
+		memcpy ( opt->opt_export_name.export_name, nbd->export_name, name_len );
 	}
 
-	DBGCIO ( nbd, "transmit:\n" );
-	DBGCIO_HD ( nbd, opt, opt_len );
+	DBGCP ( nbd, "transmit:\n" );
+	DBGCP_HD ( nbd, opt, opt_len );
 
 	/* Deliver packet */
 	if ( ( rc = xfer_deliver_iob ( &nbd->socket,
@@ -502,7 +512,7 @@ void nbd_tx_cmd_brc ( struct nbd_session *nbd ) {
 	capacity.blocks = nbd->export_size / NBD_BLOCK_SIZE;
 	capacity.blksize = NBD_BLOCK_SIZE;
 	/* Use reasonable amount of data */
-	capacity.max_count = 16 * 1024 / NBD_BLOCK_SIZE;
+	capacity.max_count = NBD_MAX_BLOCK_COUNT;
 
 	/* Report block device capacity */
 	block_capacity ( &nbdcmd->block, &capacity );
@@ -529,11 +539,12 @@ int nbd_tx_cmd_header ( struct nbd_session *nbd ) {
 
 	request.request_magic = htonl ( NBD_REQUEST_MAGIC );
 	request.flags = 0;
-	if ( nbdcmd->type == NBD_BLOCK_READ )
+	if ( nbdcmd->type == NBD_BLOCK_READ ) {
 		request.type = htons ( NBD_CMD_READ );
-	else
+	} else {
 		request.type = htons ( NBD_CMD_WRITE );
-	request.handle = (uint64_t) (intptr_t) nbdcmd;
+	}
+	request.handle = nbdcmd->handle;
 	request.offset = htonll ( nbdcmd->lba * NBD_BLOCK_SIZE );
 	request.length = htonl ( nbdcmd->count * NBD_BLOCK_SIZE );
 
@@ -545,10 +556,12 @@ int nbd_tx_cmd_header ( struct nbd_session *nbd ) {
 		return rc;
 	}
 
-	if ( nbdcmd->type == NBD_BLOCK_READ )
+	if ( nbdcmd->type == NBD_BLOCK_READ ) {
 		nbd->tx_state = NBD_TX_IDLE;
-	else
+	} else {
 		nbd->tx_state = NBD_TX_CMD_DATA;
+	}
+
 	return 0;
 }
 
@@ -569,8 +582,8 @@ int nbd_tx_cmd_data ( struct nbd_session *nbd ) {
 
 	len = nbdcmd->data_len - nbdcmd->data_offset;
 	/* Always send 512-byte data chunks */
-	if ( len > 512 )
-		len = 512;
+	if ( len > NBD_BLOCK_SIZE )
+		len = NBD_BLOCK_SIZE;
 
 	/* Deliver data */
 	iobuf = xfer_alloc_iob ( &nbd->socket, len );
@@ -603,8 +616,8 @@ static void nbd_tx_step ( struct nbd_session *nbd ) {
 	int rc;
 
 	while ( 1 ) {
-		DBGCIO ( nbd, "NBD %p try to transmit from state %d\n",
-			 nbd, nbd->tx_state );
+		DBGCP ( nbd, "NBD %p try to transmit from state %d\n",
+			nbd, nbd->tx_state );
 
 		switch ( nbd->tx_state ) {
 		case NBD_TX_IDLE:
@@ -661,6 +674,20 @@ static struct process_descriptor nbd_process_desc =
 
 
 /**
+ * Negotiation is done, enter transmission phase
+ *
+ * @v nbd		NBD session
+ */
+static inline void nbd_neg_done ( struct nbd_session *nbd ) {
+	DBGC2 ( nbd, "NBD %p negotiation done, enter transmission\n", nbd );
+	DBGC2 ( nbd, "NBD %p export size: %lld MiB, flags: 0x%04x\n", nbd,
+		nbd->export_size / 1048576, nbd->trans_flags );
+
+	nbd->rx_state = NBD_RX_TRANS_REP_CMD;
+	xfer_window_changed ( &nbd->block );
+}
+
+/**
  * Process initial negotiation
  *
  * @v nbd		NBD session
@@ -670,10 +697,10 @@ static struct process_descriptor nbd_process_desc =
  */
 static int nbd_rx_neg_init ( struct nbd_session *nbd ) {
 	DBGC2 ( nbd, "NBD %p initial handshake:\n", nbd );
-        DBGC2_HD ( nbd, &nbd->rx_neg_init, sizeof ( nbd->rx_neg_init ) );
+	DBGC2_HD ( nbd, &nbd->rx_neg_init, sizeof ( nbd->rx_neg_init ) );
 
-	if ( ntohll ( nbd->rx_neg_init.init_magic ) != NBD_INIT_PASSWD ||
-	     ntohll ( nbd->rx_neg_init.opt_magic ) != NBD_OPT_REQ_MAGIC ) {
+	if ( nbd->rx_neg_init.init_magic != htonll ( NBD_INIT_PASSWD ) ||
+	     nbd->rx_neg_init.opt_magic != htonll ( NBD_OPT_REQ_MAGIC ) ) {
 		DBGC ( nbd, "NBD %p initial handshake failed (1)\n", nbd );
 		return -EPROTO;
 	}
@@ -699,15 +726,15 @@ static int nbd_rx_neg_init ( struct nbd_session *nbd ) {
  */
 static int nbd_rx_neg_exp_name ( struct nbd_session *nbd ) {
 	DBGC2 ( nbd, "NBD %p export name reply:\n", nbd );
-        DBGC2_HD ( nbd, &nbd->rx_exp_name_reply,
+	DBGC2_HD ( nbd, &nbd->rx_exp_name_reply,
 		   sizeof ( nbd->rx_exp_name_reply ) );
 
 	nbd->export_size = ntohll ( nbd->rx_exp_name_reply.export_size );
 	nbd->trans_flags = ntohs ( nbd->rx_exp_name_reply.trans_flags );
 
-	/* Discard 124 bytes if applicable */
+	/* Discard NBD_ZERO_PAD_LEN bytes if applicable */
 	if ( ! ( nbd->handshake_flags & NBD_FLAG_NO_ZEROES ) )
-		nbd->discard_len = 124;
+		nbd->discard_len = NBD_ZERO_PAD_LEN;
 
 	nbd_neg_done ( nbd );
 	return 0;
@@ -725,10 +752,10 @@ static int nbd_rx_neg_opt_info ( struct nbd_session *nbd ) {
 	uint32_t opt_type, opt_len;
 
 	DBGC2 ( nbd, "NBD %p option reply:\n", nbd );
-        DBGC2_HD ( nbd, &nbd->rx_opt_reply, sizeof ( nbd->rx_opt_reply ) );
+	DBGC2_HD ( nbd, &nbd->rx_opt_reply, sizeof ( nbd->rx_opt_reply ) );
 
-	if ( ntohll ( nbd->rx_opt_reply.reply_magic ) != NBD_OPT_REPLY_MAGIC ||
-	     ntohl ( nbd->rx_opt_reply.option ) != NBD_OPT_GO ) {
+	if ( nbd->rx_opt_reply.reply_magic != htonll ( NBD_OPT_REPLY_MAGIC ) ||
+	     nbd->rx_opt_reply.option != htonl ( NBD_OPT_GO ) ) {
 		DBGC ( nbd, "NBD %p option info failed (1)\n", nbd );
 		return -EPROTO;
 	}
@@ -792,9 +819,9 @@ static int nbd_rx_neg_opt_info ( struct nbd_session *nbd ) {
  */
 static int nbd_rx_neg_rep_info ( struct nbd_session *nbd ) {
 	DBGC2 ( nbd, "NBD %p rep info:\n", nbd );
-        DBGC2_HD ( nbd, &nbd->rx_rep_info_export, nbd->reply_info_length );
+	DBGC2_HD ( nbd, &nbd->rx_rep_info_export, nbd->reply_info_length );
 
-	if ( ntohs ( nbd->rx_rep_info_export.type ) == NBD_INFO_EXPORT ) {
+	if ( nbd->rx_rep_info_export.type == htons ( NBD_INFO_EXPORT ) ) {
 		nbd->export_size =
 			ntohll ( nbd->rx_rep_info_export.export_size );
 		nbd->trans_flags =
@@ -816,16 +843,16 @@ static int nbd_rx_neg_rep_info ( struct nbd_session *nbd ) {
 static int nbd_rx_trans_rep_cmd ( struct nbd_session *nbd ) {
 	struct nbd_command *nbdcmd = nbd->command;
 	uint32_t errno;
-	DBGCIO ( nbd, "NBD %p cmd %p reply:\n", nbd, nbdcmd );
-        DBGCIO_HD ( nbd, &nbd->rx_trans_reply, sizeof ( nbd->rx_trans_reply ) );
+	DBGCP ( nbd, "NBD %p cmd %p reply:\n", nbd, nbdcmd );
+	DBGCP_HD ( nbd, &nbd->rx_trans_reply, sizeof ( nbd->rx_trans_reply ) );
 
 	if ( nbdcmd == NULL ) {
 		DBGC ( nbd, "NBD %p no cmd to process\n", nbd );
 		return -EPROTO;
 	}
 
-	if ( ntohl ( nbd->rx_trans_reply.reply_magic ) != NBD_REPLY_MAGIC  ||
-	     nbd->rx_trans_reply.handle != (uint64_t) (intptr_t) nbdcmd ) {
+	if ( nbd->rx_trans_reply.reply_magic != htonl ( NBD_REPLY_MAGIC ) ||
+	     nbd->rx_trans_reply.handle != nbdcmd->handle ) {
 		DBGC ( nbd, "NBD %p cmd reply invalid\n", nbd );
 		return -EPROTO;
 	}
@@ -902,20 +929,20 @@ static int nbd_socket_deliver ( struct nbd_session *nbd,
 	size_t req_len, part_len;
 	int rc;
 
-	DBGCIO ( nbd, "NBD %p deliver %zd bytes\n", nbd, iob_len ( iobuf ) );
+	DBGCP ( nbd, "NBD %p deliver %zd bytes\n", nbd, iob_len ( iobuf ) );
 	while ( 1 ) {
 		/* Discard some data, if applicable */
 		if ( nbd->discard_len ) {
-			DBGCIO ( nbd, "NBD %p discard:\n", nbd );
+			DBGCP ( nbd, "NBD %p discard:\n", nbd );
 			if ( nbd->discard_len >= iob_len ( iobuf ) ) {
-				DBGCIO_HD ( nbd, iobuf->data,
-					    iob_len ( iobuf ) );
+				DBGCP_HD ( nbd, iobuf->data,
+					   iob_len ( iobuf ) );
 				nbd->discard_len -= iob_len ( iobuf );
 				rc = 0;
 				goto done;
 			} else {
-				DBGCIO_HD ( nbd, iobuf->data,
-					    nbd->discard_len );
+				DBGCP_HD ( nbd, iobuf->data,
+					   nbd->discard_len );
 				iob_pull ( iobuf, nbd->discard_len );
 				nbd->discard_len = 0;
 			}
@@ -957,8 +984,8 @@ static int nbd_socket_deliver ( struct nbd_session *nbd,
 			goto done;
 		}
 
-		DBGCIO ( nbd, "NBD %p state %d req %zd, off %zd, \n",
-			 nbd, nbd->rx_state, req_len, nbd->rx_offset );
+		DBGCP ( nbd, "NBD %p state %d req %zd, off %zd, \n",
+			nbd, nbd->rx_state, req_len, nbd->rx_offset );
 
 		part_len = req_len - nbd->rx_offset;
 		if ( part_len > iob_len ( iobuf ) )
@@ -1030,14 +1057,11 @@ static struct interface_descriptor nbd_socket_desc =
  */
 static int nbd_open ( struct interface *parent, struct uri *uri ) {
 	struct nbd_session *nbd;
-	char *name;
 	struct sockaddr_tcpip server;
 	int rc;
 
 	/* Sanity check */
 	if ( ! uri->host )
-		return -EINVAL;
-	if ( ! uri->path )
 		return -EINVAL;
 
 	/* Allocate and initialise structure */
@@ -1050,11 +1074,13 @@ static int nbd_open ( struct interface *parent, struct uri *uri ) {
 	intf_init ( &nbd->socket, &nbd_socket_desc, &nbd->refcnt );
 
 	nbd->uri = uri_get ( uri );
-	name = strchr ( uri->path, '/' );
-	if ( name )
-		nbd->export_name = name + 1;
-	else
+	if ( uri->path ) {
+		/* Remove first '/' from the path */
+		nbd->export_name = uri->path + 1;
+	} else {
+		/* Use empty name */
 		nbd->export_name = "";
+	}
 
 	DBGC ( nbd, "NBD %p open %s (%s)\n", nbd, uri->host, nbd->export_name );
 
@@ -1082,7 +1108,7 @@ static int nbd_open ( struct interface *parent, struct uri *uri ) {
 	ref_put ( &nbd->refcnt );
 	return 0;
 
-err_connect:
+ err_connect:
 	nbd_close ( nbd, rc );
 	ref_put ( &nbd->refcnt );
 	return rc;
