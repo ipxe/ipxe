@@ -4,6 +4,7 @@
 #undef SANBOOT_PROTO_AOE
 #undef SANBOOT_PROTO_IB_SRP
 #undef SANBOOT_PROTO_FCP
+#undef SANBOOT_PROTO_NBD
 
 /* Disabled from config/general.h */
 

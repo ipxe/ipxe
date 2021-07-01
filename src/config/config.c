@@ -134,6 +134,9 @@ REQUIRE_OBJECT ( iscsi );
 #ifdef SANBOOT_PROTO_HTTP
 REQUIRE_OBJECT ( httpblock );
 #endif
+#ifdef SANBOOT_PROTO_NBD
+REQUIRE_OBJECT ( nbd );
+#endif
 
 /*
  * Drag in all requested resolvers
