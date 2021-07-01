@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <ipxe/tcpip.h>
@@ -63,7 +64,7 @@ static struct http_scheme * http_scheme ( struct uri *uri ) {
 
 	/* Identify scheme */
 	for_each_table_entry ( scheme, HTTP_SCHEMES ) {
-		if ( strcmp ( uri->scheme, scheme->name ) == 0 )
+		if ( strcasecmp ( uri->scheme, scheme->name ) == 0 )
 			return scheme;
 	}
 
