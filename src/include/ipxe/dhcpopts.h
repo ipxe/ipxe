@@ -39,5 +39,9 @@ extern void dhcpopt_init ( struct dhcp_options *options,
 					       size_t len ) );
 extern void dhcpopt_update_used_len ( struct dhcp_options *options );
 extern int dhcpopt_no_realloc ( struct dhcp_options *options, size_t len );
+extern int find_dhcp_option_with_encap ( struct dhcp_options *options,
+				unsigned int tag, int *encap_offset );
+extern struct dhcp_option * dhcp_option ( struct dhcp_options *options,
+				unsigned int offset );
 
 #endif /* _IPXE_DHCPOPTS_H */
