@@ -337,9 +337,12 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	if ( ( next_hop.s_addr != INADDR_BROADCAST ) &&
 	     ( ( miniroute = ipv4_route ( sin_dest->sin_scope_id,
 					  &next_hop ) ) != NULL ) ) {
-		iphdr->src = miniroute->address;
 		netmask = miniroute->netmask;
 		netdev = miniroute->netdev;
+
+        struct settings *settings = netdev_settings ( netdev );
+        fetch_ipv4_setting ( settings, &ip_setting, &iphdr->src );
+        next_hop = miniroute->gateway;
 	}
 	if ( ! netdev ) {
 		DBGC ( sin_dest->sin_addr, "IPv4 has no route to %s\n",
@@ -448,16 +451,15 @@ int ipv4_has_any_addr ( struct net_device *netdev ) {
  * @ret has_addr	Network device has this IPv4 address
  */
 static int ipv4_has_addr ( struct net_device *netdev, struct in_addr addr ) {
-	struct ipv4_miniroute *miniroute;
 
-	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
-		if ( ( miniroute->netdev == netdev ) &&
-		     ( miniroute->address.s_addr == addr.s_addr ) ) {
-			/* Found matching address */
-			return 1;
-		}
-	}
-	return 0;
+    struct in_addr address;
+    struct settings *settings = netdev_settings ( netdev );
+    fetch_ipv4_setting ( settings, &ip_setting, &address );
+
+    if ( address.s_addr == addr.s_addr )
+         return 1;
+
+    return 0;
 }
 
 /**
@@ -845,6 +847,26 @@ static int ipv4_gratuitous_arp ( struct net_device *netdev,
 }
 
 /**
+ * Convert netmask from prefix length to IPv4
+ *
+ * @v prefix_len   Prefix length 
+ * @ret rc	  Return IPv4 netmask
+ */
+static inline uint32_t prefix_len_to_mask ( uint8_t prefix_len ) {
+
+	/* Check if prefix_len is in the right range. While the prefix_len is unsigned,
+	   we don't have to check for negative numbers */
+	if(prefix_len > 32)
+	{
+		DBGC( prefix_len, "Invalid prefix_len /%u. Must fullfill 0<=prefix_len<=32\n",
+			  prefix_len );
+		return 0;
+	}
+	
+	return htonl ( ( prefix_len > 0 ) ? 0xFFFFFFFF << ( 32 - prefix_len ) : 0 );
+}
+
+/**
  * Process IPv4 network device settings
  *
  * @v apply		Application method
@@ -890,9 +912,52 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		/* Get default gateway, if present */
 		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
 
-		/* Apply settings */
-		if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
-			return rc;
+		/* Configure route (-s) */
+		uint8_t * raw_data = netdev->static_routes;
+		uint8_t option_len = netdev->static_routes_len;
+
+
+		/* Check if static routes available
+		 * The minimum length for DHCP option 121 is 5 bytes */
+		if ( option_len >= 5 ) {
+			uint8_t i = 0;
+			uint8_t j;
+			uint8_t addr_octets_len;
+			uint8_t prefix_len;
+
+			union ipv4_conversion address_conversion = {0};
+			union ipv4_conversion gateway_conversion = {0};
+
+			/* Extract routes and add them to routing table */
+			while ( i < option_len ) {
+				prefix_len = raw_data[i];
+				i++;
+
+				/* Netmask */
+				addr_octets_len = prefix_len / 8;
+				netmask.s_addr = prefix_len_to_mask ( prefix_len );
+
+				/* Address */
+				for ( j = 0; j < addr_octets_len; j++ )
+					address_conversion.octets[j] = raw_data[i + j];
+
+				address.s_addr = address_conversion.address;
+
+				/* Gateway */
+				i += j;
+				for ( j = 0; j < 4; j++ )
+					gateway_conversion.octets[j] = raw_data[i + j];
+
+				gateway.s_addr = gateway_conversion.address;
+				i += j;
+
+				if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
+					return rc;
+			}
+		} else {
+			if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
+				return rc;
+		}
 	}
 
 	return 0;

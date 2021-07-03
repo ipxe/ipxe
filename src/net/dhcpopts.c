@@ -64,8 +64,8 @@ static inline char * dhcp_tag_name ( unsigned int tag ) {
  * @v offset		Offset within options block
  * @ret option		DHCP option
  */
-static inline __attribute__ (( always_inline )) struct dhcp_option *
-dhcp_option ( struct dhcp_options *options, unsigned int offset ) {
+struct dhcp_option * dhcp_option ( struct dhcp_options *options,
+                      unsigned int offset ) {
 	return ( ( struct dhcp_option * ) ( options->data + offset ) );
 }
 
@@ -116,7 +116,7 @@ static unsigned int dhcp_option_len ( struct dhcp_option *option ) {
  * such as options missing a @c DHCP_END terminator, or options whose
  * length would take them beyond the end of the data block.
  */
-static int find_dhcp_option_with_encap ( struct dhcp_options *options,
+int find_dhcp_option_with_encap ( struct dhcp_options *options,
 					 unsigned int tag,
 					 int *encap_offset ) {
 	unsigned int original_tag __attribute__ (( unused )) = tag;
