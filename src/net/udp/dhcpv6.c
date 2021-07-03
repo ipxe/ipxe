@@ -1015,3 +1015,33 @@ const struct setting dnssl6_setting __setting ( SETTING_IP_EXTRA, dnssl ) = {
 	.type = &setting_type_dnssl,
 	.scope = &dhcpv6_scope,
 };
+
+/** Server ID setting */
+const struct setting server6_id_setting __setting ( SETTING_IP6_EXTRA,
+                                                    server_duid ) = {
+	.name = "server-id",
+	.description = "DHCPv6 Server identifier",
+	.tag = DHCPV6_SERVER_ID,
+	.type = &setting_type_hex,
+	.scope = &dhcpv6_scope,
+};
+
+/** Client ID setting */
+const struct setting client6_id_setting __setting ( SETTING_IP6_EXTRA,
+                                                    client_duid ) = {
+	.name = "client-id",
+	.description = "DHCPv6 Client identifier",
+	.tag = DHCPV6_CLIENT_ID,
+	.type = &setting_type_hex,
+	.scope = &dhcpv6_scope,
+};
+
+/** Identity association identifier (IAID) setting */
+const struct setting client6_iana_setting __setting ( SETTING_IP6_EXTRA,
+                                                      client_iana ) = {
+	.name = "iana",
+	.description = "Identity association for non-temporary address (IA_NA)",
+	.tag = DHCPV6_IA_NA,
+	.type = &setting_type_hex,
+	.scope = &dhcpv6_scope,
+};
