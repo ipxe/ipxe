@@ -156,6 +156,9 @@ REQUIRE_OBJECT ( elfboot );
 #ifdef IMAGE_MULTIBOOT
 REQUIRE_OBJECT ( multiboot );
 #endif
+#ifdef IMAGE_MULTIBOOT2
+REQUIRE_OBJECT ( multiboot2 );
+#endif
 #ifdef IMAGE_PXE
 REQUIRE_OBJECT ( pxe_image );
 #endif

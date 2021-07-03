@@ -38,10 +38,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <realmode.h>
 #include <bzimage.h>
 #include <initrd.h>
+#include <landing_zone.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
 #include <ipxe/init.h>
+#include <ipxe/io.h>
 #include <ipxe/cpio.h>
 #include <ipxe/features.h>
 
@@ -514,6 +516,51 @@ static void bzimage_load_initrds ( struct image *image,
 	       ( bzimg->ramdisk_image + bzimg->ramdisk_size ) );
 }
 
+/** An INT 15,e820 memory map entry */
+struct e820_entry {
+	/** Start of region */
+	uint64_t start;
+	/** Length of region */
+	uint64_t len;
+	/** Type of region */
+	uint32_t type;
+} __attribute__ (( packed ));
+
+#define E820_TYPE_RAM					1 /**< Normal memory */
+
+#define BZI_E820_MAX_ENTRIES_ZEROPAGE	128
+
+/**
+ * Update bzImage e820 info in loaded kernel
+ *
+ * @v image		bzImage file
+ * @v bzimg		bzImage context
+ * @v dst		bzImage to update
+ */
+static void bzimage_fill_e820 ( struct image *image, userptr_t dst ) {
+	struct e820_entry *e820_map = (void *) ( dst + BZI_E820_OFFSET );
+	uint8_t *e820_count = (void *) ( dst + BZI_E820_SIZE_OFFSET );
+	struct memory_map memmap;
+	unsigned int i;
+
+	/* Get memory map */
+	get_memmap ( &memmap );
+
+	/* Translate into multiboot format */
+	for ( i = 0 ; i < memmap.count ; i++ ) {
+		if ( i > BZI_E820_MAX_ENTRIES_ZEROPAGE ) {
+			DBGC ( image, "MULTIBOOT %p limit of %d memmap entries reached\n",
+			       image, BZI_E820_MAX_ENTRIES_ZEROPAGE );
+			break;
+		}
+		e820_map[i].start = memmap.regions[i].start;
+		e820_map[i].len = ( memmap.regions[i].end - memmap.regions[i].start );
+		e820_map[i].type = E820_TYPE_RAM;
+	}
+
+	*e820_count = memmap.count;
+}
+
 /**
  * Execute bzImage image
  *
@@ -524,6 +571,7 @@ static int bzimage_exec ( struct image *image ) {
 	struct bzimage_context bzimg;
 	const char *cmdline = ( image->cmdline ? image->cmdline : "" );
 	int rc;
+	struct image *lz = NULL;
 
 	/* Read and parse header from image */
 	if ( ( rc = bzimage_parse_header ( image, &bzimg,
@@ -564,6 +612,26 @@ static int bzimage_exec ( struct image *image ) {
 	/* Store command line */
 	bzimage_set_cmdline ( image, &bzimg, cmdline );
 
+	/* bzimg.pm_sz is only used by bzimage_load_initrds() to calculate bottom
+	 * of available memory. It can be safely changed here.
+	 */
+	if ( bzimg.version >= 0x020f &&
+	     ( lz = find_image ( "landing_zone" ) ) != NULL ) {
+		unregister_image ( image_get ( lz ) );
+
+		/* Kernel may be compressed. Should it be considered as an iPXE bug? */
+		bzimg.pm_sz *= 3;
+
+		/* Kernel is loaded either to BZI_LOAD_HIGH_ADDR or BZI_LOAD_LOW_ADDR.
+		 * It is already at least 64K-aligned.
+		 */
+		bzimg.pm_sz = ( bzimg.pm_sz + LZ_ALIGN - 1 ) & ~( LZ_ALIGN - 1 );
+
+		lz_set ( lz, bzimg.rm_kernel, bzimg.pm_kernel + bzimg.pm_sz,
+		         LZ_PROTO_LINUX_BOOT );
+		bzimg.pm_sz += SLB_SIZE;
+	}
+
 	/* Prepare for exiting.  Must do this before loading initrds,
 	 * since loading the initrds will corrupt the external heap.
 	 */
@@ -574,6 +642,19 @@ static int bzimage_exec ( struct image *image ) {
 
 	/* Update kernel header */
 	bzimage_update_header ( image, &bzimg, bzimg.rm_kernel );
+
+	if ( lz != NULL ) {
+		register_image ( lz );
+		image_put ( lz );
+
+		/* We are jumping directly into the protected mode part of the kernel,
+		 * so we need to do what real mode part would do - fill the zero page:
+		 * https://www.kernel.org/doc/html/latest/x86/zero-page.html.
+		 * Memory map is the absolute minimum.
+		 */
+		bzimage_fill_e820( image, bzimg.rm_kernel );
+		return image_replace ( lz );
+	}
 
 	DBGC ( image, "bzImage %p jumping to RM kernel at %04x:0000 "
 	       "(stack %04x:%04zx)\n", image, ( bzimg.rm_kernel_seg + 0x20 ),

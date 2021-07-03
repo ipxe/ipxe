@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/io.h>
@@ -49,6 +50,53 @@ struct errortab segment_errors[] __errortab = {
 	__einfo_errortab ( EINFO_ERANGE_SEGMENT ),
 };
 
+#ifdef EFIAPI
+/**
+ * Prepare segment for loading
+ *
+ * @v segment		Segment start
+ * @v filesz		Size of the "allocated bytes" portion of the segment
+ * @v memsz		Size of the segment
+ * @ret rc		Return status code
+ */
+int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	unsigned int pages;
+    EFI_PHYSICAL_ADDRESS phys_addr;
+	physaddr_t start = user_to_phys ( segment, 0 );
+	physaddr_t mid = user_to_phys ( segment, filesz );
+	physaddr_t end = user_to_phys ( segment, memsz );
+
+	DBG ( "Preparing segment [%lx,%lx,%lx)\n", start, mid, end );
+
+	/* Sanity check */
+	if ( filesz > memsz ) {
+		DBG ( "Insane segment [%lx,%lx,%lx)\n", start, mid, end );
+		return -EINVAL;
+	}
+
+	/* Start address of the segment so that we know where to allocate from */
+	phys_addr = start;
+	/* Size of the segment in pages */
+	pages = EFI_SIZE_TO_PAGES ( memsz );
+	/* Allocate the memory via EFI to ensure its reserved */
+	if ( bs->AllocatePages ( AllocateAddress,
+				EfiLoaderData,
+				pages,
+				&phys_addr ) != 0 ) {
+		/* No suitable memory region found */
+		DBG ( "Segment [%lx,%lx,%lx) does not fit into available memory\n",
+				start, mid, end );
+		return -ERANGE_SEGMENT;
+	}
+
+	assert ( phys_to_user ( phys_addr ) == segment );
+
+	/* Found valid region: zero bss and return */
+	memset_user ( segment, filesz, 0, ( memsz - filesz ) );
+	return 0;
+}
+#else
 /**
  * Prepare segment for loading
  *
@@ -93,3 +141,4 @@ int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
 	      start, mid, end );
 	return -ERANGE_SEGMENT;
 }
+#endif /* EFIAPI */
