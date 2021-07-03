@@ -413,6 +413,7 @@ extern char * expand_settings ( const char *string );
 
 extern const struct setting_type setting_type_string __setting_type;
 extern const struct setting_type setting_type_uristring __setting_type;
+extern const struct setting_type setting_type_uribase __setting_type;
 extern const struct setting_type setting_type_ipv4 __setting_type;
 extern const struct setting_type setting_type_ipv6 __setting_type;
 extern const struct setting_type setting_type_int8 __setting_type;
