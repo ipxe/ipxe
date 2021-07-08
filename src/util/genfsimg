@@ -255,7 +255,7 @@ fi
 # Create FAT filesystem image, if applicable
 #
 if [ -n "${FATIMG}" ] ; then
-    FATSIZE=$(du -s -k ${FATDIR} | cut -f1)
+    FATSIZE=$(du -s -k "${FATDIR}" | cut -f1)
     FATSIZE=$(( FATSIZE + PAD + 256 ))
     touch "${FATIMG}"
     if [ "${FATSIZE}" -le "1440" ] ; then
