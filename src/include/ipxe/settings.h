@@ -78,6 +78,7 @@ struct setting {
 #define SETTING_AUTH_EXTRA	16 /**< Authentication additional settings */
 #define SETTING_CRYPTO		17 /**< Cryptography settings */
 #define SETTING_MISC		18 /**< Miscellaneous settings */
+#define SETTING_LLDP		15 /**< LLDP settings */
 
 /** @} */
 
