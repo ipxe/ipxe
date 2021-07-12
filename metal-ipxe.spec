@@ -17,7 +17,7 @@ Requires: dnsmasq
 # The "-sb" denotes SecureBoot signing capability during compile-time.
 %define binx86_64 bin-x86_64-efi-sb/ipxe.efi
 %define ipxesrc src/
-%define srcscript chainload.ipxe
+%define srcscript config/metal/metal.ipxe
 %define bootscript script.ipxe
 %define wwwbootdir /var/www/boot/
 
@@ -27,9 +27,8 @@ Requires: dnsmasq
 %setup -q
 
 %build
-./toggle_ipxe_features.sh
 pushd %{ipxesrc}
-make -j 4  %{binx86_64} EMBED=%{srcscript}
+make -j 4 %{binx86_64} EMBED=%{srcscript} CONFIG=metal
 
 %install
 install -m 755 -d %{buildroot}%{wwwbootdir}
