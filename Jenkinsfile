@@ -3,7 +3,6 @@ rpmBuild (
     githubPushRepo : "Cray-HPE/metal-ipxe",
     githubPushBranches : "release/.*|main",
     specfile : "metal-ipxe.spec",
-    masterBranch : "main",
     product : "csm",
     target_node : "ncn",
     fanout_params : ["sle15sp2"],
