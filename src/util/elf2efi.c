@@ -125,7 +125,21 @@
 #define R_ARM_V4BX 40
 #endif
 
-#define EFI_FILE_ALIGN  0x20
+/**
+ * Alignment of raw data of sections in the image file
+ *
+ * Some versions of signtool.exe will spuriously complain if this
+ * value is less than 512.
+ */
+#define EFI_FILE_ALIGN  0x200
+
+/**
+ * Alignment of sections when loaded into memory
+ *
+ * This must equal the architecture page size, in order to allow for
+ * the possibility of the firmware using page-level protection to
+ * enforce section attributes at runtime.
+ */
 #define EFI_IMAGE_ALIGN 0x1000
 
 struct elf_file {
