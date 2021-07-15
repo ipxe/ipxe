@@ -1,0 +1,42 @@
+@Library('csm-shared-library') _
+
+pipeline {
+  agent {
+    label "metal-gcp-builder"
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: "10"))
+    timestamps()
+  }
+
+  environment {
+    NAME = "metal-ipxe"
+    DESCRIPTION = "iPXE for booting bare metal in HPCaaS environments"
+    IS_STABLE = getBuildIsStable()
+    BUILD_METADATA = getRpmRevision(isStable: env.IS_STABLE)
+  }
+
+  stages {
+    stage('Prepare') {
+      steps {
+        sh "make prepare"
+      }
+    }
+
+    stage('Rpm') {
+      steps {
+        sh "make rpm"
+      }
+    }
+
+    stage('Publish ') {
+      steps {
+        script {
+          publishCsmRpms(component: env.NAME, pattern: "dist/rpmbuild/RPMS/noarch/*.rpm", arch: "x86_64", isStable: env.IS_STABLE)
+          publishCsmRpms(component: env.NAME, pattern: "dist/rpmbuild/SRPMS/*.rpm", arch: "src", isStable: env.IS_STABLE)
+        }
+      }
+    }
+  }
+}
