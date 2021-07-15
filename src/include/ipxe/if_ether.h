@@ -23,6 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ETH_P_SLOW	0x8809	/* Ethernet slow protocols */
 #define ETH_P_EAPOL	0x888E	/* 802.1X EAP over LANs */
 #define ETH_P_AOE	0x88A2	/* ATA over Ethernet */
+#define ETH_P_LLDP	0x88CC	/* Link Layer Discovery Protocol */
 #define ETH_P_FCOE	0x8906	/* Fibre Channel over Ethernet */
 #define ETH_P_FIP	0x8914	/* FCoE Initialization Protocol */
 

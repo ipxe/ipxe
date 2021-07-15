@@ -1,0 +1,76 @@
+#!ipxe
+# Author: Marin Hannache <ipxe@mareo.fr>
+# Basic LLDP TLV parsing to list management addresses and VLAN ID
+
+ifopen
+
+:start
+set intf netX
+set timeout 60
+
+set tab:int8 9
+set src ${${intf}.lldp/lldpsource}
+echo -- Waiting for an LLDP packet to arrive...
+set count:int32 0
+:retry_poll_lldp
+iseq ${${intf}.lldp/lldpsource} ${src} || goto mgmtaddr
+sleep 1
+inc count
+iseq ${count} ${timeout} || goto retry_poll_lldp
+clear count
+
+# You may handle timeout here
+echo -- Timed out waiting for an LLDP packet
+exit 1
+
+:mgmtaddr
+echo -- Got an LLDP packet from ${${intf}.lldp/lldpsource}
+echo --
+echo -- -- Start of Management addresses list --
+
+set count:int32 -1
+:next_mgmtaddr
+inc count
+set type hex
+isset ${${intf}.lldp/1.1.${count}.8:hex} || goto end_mgmtaddr
+iseq ${${intf}.lldp/1.1.${count}.8:hex} 01 && set type ipv4 ||
+iseq ${${intf}.lldp/1.1.${count}.8:hex} 02 && set type ipv6 ||
+
+set size:int32 ${${intf}.lldp/0.1.${count}.8:int32}
+inc size -1
+
+echo -- LLDP Management address (${type})
+echo -- ${tab:string} Address: ${tab:string} ${${intf}.lldp/2.${size}.${count}.8:${type}}
+set offset:int32 3
+inc offset ${size}
+echo -- ${tab:string} Iface number: ${tab:string} ${${intf}.lldp/${offset}.4.${count}.8:uint32}
+inc offset 4
+set size:int32 ${${intf}.lldp/${offset}.1.${count}.8:int32}
+inc offset
+iseq ${size} 0 || echo -- ${tab:string} Object ID: ${tab:string} ${${intf}.lldp/${offset}.${size}.${count}.8:hex}
+
+goto next_mgmtaddr
+
+:end_mgmtaddr
+echo -- -- End of Management addresses list (${count} found) --
+echo --
+
+:vlanid
+set count:int32 -1
+:next_vlanid
+inc count
+isset ${${intf}.lldp/1.1.${count}.127:hex} || goto end_vlanid
+iseq ${${intf}.lldp/0.4.${count}.127:hex} 00:80:c2:01 || goto next_vlanid
+
+echo -- -- LLDP VLAN ID: ${${intf}.lldp/4.2.${count}.127:int32} --
+
+:end_vlanid
+clear type
+clear count
+clear offset
+clear size
+clear tab
+clear timeout
+clear intf
+
+goto start
