@@ -2042,18 +2042,51 @@ static int tls_new_finished ( struct tls_connection *tls,
  */
 static int tls_new_handshake ( struct tls_connection *tls,
 			       const void *data, size_t len ) {
-	size_t remaining = len;
+	size_t remaining;
 	int rc;
+	struct io_buffer *iobuf;
+	uint8_t fragment_finished = 0;
+
+	iobuf = alloc_iob_raw ( len, TLS_RX_ALIGN, 0 );
+	memcpy ( iob_put ( iobuf, len ), data, len );
+
+	if ( tls->handshake_fragment_remaining ) {
+		list_add_tail ( &iobuf->list, &tls->handshake_fragments );
+		if ( tls->handshake_fragment_remaining > len)
+		{
+			tls->handshake_fragment_remaining -= len;
+			return 0;
+		}
+		else {
+			tls->handshake_fragment_remaining = 0;
+			fragment_finished = 1;
+			iobuf = iob_concatenate ( &tls->handshake_fragments );
+			len = iob_len ( iobuf );
+		}
+	}
+
+	remaining = len;
 
 	while ( remaining ) {
 		const struct {
 			uint8_t type;
 			tls24_t length;
 			uint8_t payload[0];
-		} __attribute__ (( packed )) *handshake = data;
+		} __attribute__ (( packed )) *handshake = iobuf->data;
 		const void *payload;
 		size_t payload_len;
 		size_t record_len;
+		size_t frag_len;
+
+		/* Check for fragmentation */
+		payload_len = tls_uint24 ( &handshake->length );
+		frag_len = ( len - sizeof ( *handshake ) );
+
+		if ( payload_len > len && fragment_finished == 0 ) {
+				list_add_tail ( &iobuf->list, &tls->handshake_fragments );
+				tls->handshake_fragment_remaining = payload_len - frag_len;
+				return 0;
+		}
 
 		/* Parse header */
 		if ( sizeof ( *handshake ) > remaining ) {
@@ -2062,13 +2095,7 @@ static int tls_new_handshake ( struct tls_connection *tls,
 			DBGC_HD ( tls, data, remaining );
 			return -EINVAL_HANDSHAKE;
 		}
-		payload_len = tls_uint24 ( &handshake->length );
-		if ( payload_len > ( remaining - sizeof ( *handshake ) ) ) {
-			DBGC ( tls, "TLS %p received overlength Handshake\n",
-			       tls );
-			DBGC_HD ( tls, data, len );
-			return -EINVAL_HANDSHAKE;
-		}
+
 		payload = &handshake->payload;
 		record_len = ( sizeof ( *handshake ) + payload_len );
 
@@ -2110,15 +2137,20 @@ static int tls_new_handshake ( struct tls_connection *tls,
 		 * which are explicitly excluded).
 		 */
 		if ( handshake->type != TLS_HELLO_REQUEST )
-			tls_add_handshake ( tls, data, record_len );
+			tls_add_handshake ( tls, iobuf->data, record_len );
 
 		/* Abort on failure */
 		if ( rc != 0 )
 			return rc;
 
 		/* Move to next handshake record */
-		data += record_len;
+		iobuf->data += record_len;
 		remaining -= record_len;
+	}
+
+	if ( tls->handshake_fragment_remaining == 0 )
+	{
+		free_iob ( iobuf );
 	}
 
 	return 0;
@@ -3184,6 +3216,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	iob_populate ( &tls->rx_header_iobuf, &tls->rx_header, 0,
 		       sizeof ( tls->rx_header ) );
 	INIT_LIST_HEAD ( &tls->rx_data );
+	INIT_LIST_HEAD ( &tls->handshake_fragments );
 	if ( ( rc = tls_generate_random ( tls, &tls->client_random.random,
 			  ( sizeof ( tls->client_random.random ) ) ) ) != 0 ) {
 		goto err_random;

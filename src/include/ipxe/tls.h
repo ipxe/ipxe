@@ -365,6 +365,11 @@ struct tls_connection {
 	struct io_buffer rx_header_iobuf;
 	/** List of received data buffers */
 	struct list_head rx_data;
+
+	/** Bytes remaining for current handshake record */
+	size_t handshake_fragment_remaining;
+	/** List of fragments of current handshake record */
+	struct list_head handshake_fragments;
 };
 
 /** RX I/O buffer size
