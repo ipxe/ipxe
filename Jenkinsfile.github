@@ -11,10 +11,9 @@ pipeline {
   }
 
   environment {
-    NAME = "metal-ipxe"
-    DESCRIPTION = "iPXE for booting bare metal in HPCaaS environments"
     IS_STABLE = getBuildIsStable()
     BUILD_METADATA = getRpmRevision(isStable: env.IS_STABLE)
+    GIT_REPO_NAME = sh(returnStdout: true, script: "basename -s .git ${GIT_URL}").trim()
   }
 
   stages {
@@ -24,17 +23,17 @@ pipeline {
       }
     }
 
-    stage('Rpm') {
+    stage('Build: RPM') {
       steps {
         sh "make rpm"
       }
     }
 
-    stage('Publish ') {
+    stage('Publish') {
       steps {
         script {
-          publishCsmRpms(component: env.NAME, pattern: "dist/rpmbuild/RPMS/noarch/*.rpm", arch: "x86_64", isStable: env.IS_STABLE)
-          publishCsmRpms(component: env.NAME, pattern: "dist/rpmbuild/SRPMS/*.rpm", arch: "src", isStable: env.IS_STABLE)
+          publishCsmRpms(component: env.GIT_REPO_NAME, pattern: "dist/rpmbuild/RPMS/noarch/*.rpm", arch: "x86_64", isStable: env.IS_STABLE)
+          publishCsmRpms(component: env.GIT_REPO_NAME, pattern: "dist/rpmbuild/SRPMS/*.rpm", arch: "src", isStable: env.IS_STABLE)
         }
       }
     }
