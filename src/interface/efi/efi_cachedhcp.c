@@ -75,17 +75,40 @@ int efi_cachedhcp_record ( EFI_HANDLE device ) {
 
 	/* Record DHCPACK, if present */
 	if ( mode->DhcpAckReceived &&
-	     ( ( rc = cachedhcp_record ( virt_to_user ( &mode->DhcpAck ),
+	     ( ( rc = cachedhcp_record ( &cached_dhcpack,
+					 virt_to_user ( &mode->DhcpAck ),
 					 sizeof ( mode->DhcpAck ) ) ) != 0 ) ) {
 		DBGC ( device, "EFI %s could not record DHCPACK: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
-		goto err_record;
+		goto err_dhcpack;
+	}
+
+	/* Record ProxyDHCPOFFER, if present */
+	if ( mode->ProxyOfferReceived &&
+	     ( ( rc = cachedhcp_record ( &cached_proxydhcp,
+					 virt_to_user ( &mode->ProxyOffer ),
+					 sizeof ( mode->ProxyOffer ) ) ) != 0)){
+		DBGC ( device, "EFI %s could not record ProxyDHCPOFFER: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		goto err_proxydhcp;
+	}
+
+	/* Record PxeBSACK, if present */
+	if ( mode->PxeReplyReceived &&
+	     ( ( rc = cachedhcp_record ( &cached_pxebs,
+					 virt_to_user ( &mode->PxeReply ),
+					 sizeof ( mode->PxeReply ) ) ) != 0)){
+		DBGC ( device, "EFI %s could not record PXEBSACK: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		goto err_pxebs;
 	}
 
 	/* Success */
 	rc = 0;
 
- err_record:
+ err_pxebs:
+ err_proxydhcp:
+ err_dhcpack:
  err_ipv6:
 	bs->CloseProtocol ( device, &efi_pxe_base_code_protocol_guid,
 			    efi_image_handle, NULL );
