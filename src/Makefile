@@ -10,6 +10,7 @@ LDFLAGS		:=
 HOST_CFLAGS	:=
 MAKEDEPS	:= Makefile
 CROSS_COMPILE	?= $(CROSS)
+SYMBOL_PREFIX	:=
 
 ###############################################################################
 #
@@ -48,7 +49,6 @@ ELF2EFI32	:= ./util/elf2efi32
 ELF2EFI64	:= ./util/elf2efi64
 EFIROM		:= ./util/efirom
 EFIFATBIN	:= ./util/efifatbin
-ICCFIX		:= ./util/iccfix
 EINFO		:= ./util/einfo
 GENKEYMAP	:= ./util/genkeymap.pl
 DOXYGEN		:= doxygen
@@ -74,6 +74,7 @@ SRCDIRS		+= drivers/net/phantom
 SRCDIRS		+= drivers/net/vxge
 SRCDIRS		+= drivers/net/efi
 SRCDIRS		+= drivers/net/tg3
+SRCDIRS		+= drivers/net/bnxt
 SRCDIRS		+= drivers/net/sfc
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/nvs

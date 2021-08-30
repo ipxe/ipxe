@@ -106,7 +106,7 @@ static int hvm_map_hypercall ( struct hvm_device *hvm ) {
 
 	/* Allocate pages */
 	hvm->hypercall_len = ( pages * PAGE_SIZE );
-	hvm->xen.hypercall = malloc_dma ( hvm->hypercall_len, PAGE_SIZE );
+	hvm->xen.hypercall = malloc_phys ( hvm->hypercall_len, PAGE_SIZE );
 	if ( ! hvm->xen.hypercall ) {
 		DBGC ( hvm, "HVM could not allocate %d hypercall page(s)\n",
 		       pages );
@@ -141,7 +141,7 @@ static int hvm_map_hypercall ( struct hvm_device *hvm ) {
 static void hvm_unmap_hypercall ( struct hvm_device *hvm ) {
 
 	/* Free pages */
-	free_dma ( hvm->xen.hypercall, hvm->hypercall_len );
+	free_phys ( hvm->xen.hypercall, hvm->hypercall_len );
 }
 
 /**
@@ -175,7 +175,7 @@ static void * hvm_ioremap ( struct hvm_device *hvm, unsigned int space,
 	}
 
 	/* Map this space */
-	mmio = ioremap ( ( hvm->mmio + hvm->mmio_offset ), len );
+	mmio = pci_ioremap ( hvm->pci, ( hvm->mmio + hvm->mmio_offset ), len );
 	if ( ! mmio ) {
 		DBGC ( hvm, "HVM could not map MMIO space [%08lx,%08lx)\n",
 		       ( hvm->mmio + hvm->mmio_offset ),
@@ -371,7 +371,8 @@ static int hvm_map_xenstore ( struct hvm_device *hvm ) {
 	xenstore_phys = ( xenstore_pfn * PAGE_SIZE );
 
 	/* Map XenStore */
-	hvm->xen.store.intf = ioremap ( xenstore_phys, PAGE_SIZE );
+	hvm->xen.store.intf = pci_ioremap ( hvm->pci, xenstore_phys,
+					    PAGE_SIZE );
 	if ( ! hvm->xen.store.intf ) {
 		DBGC ( hvm, "HVM could not map XenStore at [%08lx,%08lx)\n",
 		       xenstore_phys, ( xenstore_phys + PAGE_SIZE ) );
@@ -420,6 +421,7 @@ static int hvm_probe ( struct pci_device *pci ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
+	hvm->pci = pci;
 	hvm->mmio = pci_bar_start ( pci, HVM_MMIO_BAR );
 	hvm->mmio_len = pci_bar_size ( pci, HVM_MMIO_BAR );
 	DBGC2 ( hvm, "HVM has MMIO space [%08lx,%08lx)\n",

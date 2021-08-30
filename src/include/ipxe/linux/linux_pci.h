@@ -23,6 +23,17 @@ extern int linux_pci_write ( struct pci_device *pci, unsigned long where,
 			     unsigned long value, size_t len );
 
 /**
+ * Determine number of PCI buses within system
+ *
+ * @ret num_bus		Number of buses
+ */
+static inline __always_inline int
+PCIAPI_INLINE ( linux, pci_num_bus ) ( void ) {
+	/* Assume all buses may exist */
+	return 0x100;
+}
+
+/**
  * Read byte from PCI configuration space
  *
  * @v pci	PCI device
@@ -125,6 +136,19 @@ PCIAPI_INLINE ( linux, pci_write_config_dword ) ( struct pci_device *pci,
 						  unsigned int where,
 						  uint32_t value ) {
 	return linux_pci_write ( pci, where, value, sizeof ( value ) );
+}
+
+/**
+ * Map PCI bus address as an I/O address
+ *
+ * @v bus_addr		PCI bus address
+ * @v len		Length of region
+ * @ret io_addr		I/O address, or NULL on error
+ */
+static inline __always_inline void *
+PCIAPI_INLINE ( linux, pci_ioremap ) ( struct pci_device *pci __unused,
+				       unsigned long bus_addr, size_t len ) {
+	return ioremap ( bus_addr, len );
 }
 
 #endif /* _IPXE_LINUX_PCI_H */

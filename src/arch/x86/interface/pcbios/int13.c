@@ -678,10 +678,10 @@ static int int13_get_disk_type ( struct san_device *sandev,
  * @ret cx		Extensions API support bitmap
  * @ret status		Status code / API version
  */
-static int int13_extension_check ( struct san_device *sandev __unused,
+static int int13_extension_check ( struct san_device *sandev,
 				   struct i386_all_regs *ix86 ) {
 
-	if ( ix86->regs.bx == 0x55aa ) {
+	if ( ( ix86->regs.bx == 0x55aa ) && ! int13_is_fdd ( sandev ) ) {
 		DBGC2 ( sandev, "INT13 extensions installation check\n" );
 		ix86->regs.bx = 0xaa55;
 		ix86->regs.cx = ( INT13_EXTENSION_LINEAR |
@@ -1064,7 +1064,7 @@ static int int13_cdrom_read_boot_catalog ( struct san_device *sandev,
  * INT 13 handler
  *
  */
-static __asmcall void int13 ( struct i386_all_regs *ix86 ) {
+static __asmcall __used void int13 ( struct i386_all_regs *ix86 ) {
 	int command = ix86->regs.ah;
 	unsigned int bios_drive = ix86->regs.dl;
 	struct san_device *sandev;

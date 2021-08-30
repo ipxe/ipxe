@@ -585,9 +585,9 @@ static inline int golan_set_access_reg ( struct golan *golan __attribute__ (( un
 
 static inline void golan_cmd_uninit ( struct golan *golan )
 {
-	free_dma(golan->mboxes.outbox, GOLAN_PAGE_SIZE);
-	free_dma(golan->mboxes.inbox, GOLAN_PAGE_SIZE);
-	free_dma(golan->cmd.addr, GOLAN_PAGE_SIZE);
+	free_phys(golan->mboxes.outbox, GOLAN_PAGE_SIZE);
+	free_phys(golan->mboxes.inbox, GOLAN_PAGE_SIZE);
+	free_phys(golan->cmd.addr, GOLAN_PAGE_SIZE);
 }
 
 /**
@@ -602,17 +602,17 @@ static inline int golan_cmd_init ( struct golan *golan )
 	int rc = 0;
 	uint32_t addr_l_sz;
 
-	if (!(golan->cmd.addr = malloc_dma(GOLAN_PAGE_SIZE , GOLAN_PAGE_SIZE))) {
+	if (!(golan->cmd.addr = malloc_phys(GOLAN_PAGE_SIZE , GOLAN_PAGE_SIZE))) {
 		rc = -ENOMEM;
-		goto malloc_dma_failed;
+		goto malloc_phys_failed;
 	}
-	if (!(golan->mboxes.inbox = malloc_dma(GOLAN_PAGE_SIZE , GOLAN_PAGE_SIZE))) {
+	if (!(golan->mboxes.inbox = malloc_phys(GOLAN_PAGE_SIZE , GOLAN_PAGE_SIZE))) {
 		rc = -ENOMEM;
-		goto malloc_dma_inbox_failed;
+		goto malloc_phys_inbox_failed;
 	}
-	if (!(golan->mboxes.outbox = malloc_dma(GOLAN_PAGE_SIZE , GOLAN_PAGE_SIZE))) {
+	if (!(golan->mboxes.outbox = malloc_phys(GOLAN_PAGE_SIZE , GOLAN_PAGE_SIZE))) {
 		rc = -ENOMEM;
-		goto malloc_dma_outbox_failed;
+		goto malloc_phys_outbox_failed;
 	}
 	addr_l_sz	= be32_to_cpu(readl(&golan->iseg->cmdq_addr_l_sz));
 
@@ -629,11 +629,11 @@ static inline int golan_cmd_init ( struct golan *golan )
 	DBGC( golan , "%s Command interface was initialized\n", __FUNCTION__);
 	return 0;
 
-malloc_dma_outbox_failed:
-	free_dma(golan->mboxes.inbox, GOLAN_PAGE_SIZE);
-malloc_dma_inbox_failed:
-	free_dma(golan->cmd.addr, GOLAN_PAGE_SIZE);
-malloc_dma_failed:
+malloc_phys_outbox_failed:
+	free_phys(golan->mboxes.inbox, GOLAN_PAGE_SIZE);
+malloc_phys_inbox_failed:
+	free_phys(golan->cmd.addr, GOLAN_PAGE_SIZE);
+malloc_phys_failed:
 	DBGC (golan ,"%s Failed to initialize command interface (rc = 0x%x)\n",
 		   __FUNCTION__, rc);
 	return rc;
@@ -693,7 +693,7 @@ static inline int golan_alloc_uar(struct golan *golan)
 	uar->index	= be32_to_cpu(out->uarn) & 0xffffff;
 
 	uar->phys = (pci_bar_start(golan->pci, GOLAN_HCA_BAR) + (uar->index << GOLAN_PAGE_SHIFT));
-	uar->virt = (void *)(ioremap(uar->phys, GOLAN_PAGE_SIZE));
+	uar->virt = (void *)(pci_ioremap(golan->pci, uar->phys, GOLAN_PAGE_SIZE));
 
 	DBGC( golan , "%s: UAR allocated with index 0x%x\n", __FUNCTION__, uar->index);
 	return 0;
@@ -743,7 +743,7 @@ static int golan_create_eq(struct golan *golan)
 
 	eq->cons_index	= 0;
 	eq->size	= GOLAN_NUM_EQES * sizeof(eq->eqes[0]);
-	eq->eqes	= malloc_dma ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	eq->eqes	= malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
 	if (!eq->eqes) {
 		rc = -ENOMEM;
 		goto err_create_eq_eqe_alloc;
@@ -781,7 +781,7 @@ static int golan_create_eq(struct golan *golan)
 	return 0;
 
 err_create_eq_cmd:
-	free_dma ( eq->eqes , GOLAN_PAGE_SIZE );
+	free_phys ( eq->eqes , GOLAN_PAGE_SIZE );
 err_create_eq_eqe_alloc:
 	DBGC (golan ,"%s [%d] out\n", __FUNCTION__, rc);
 	return rc;
@@ -806,7 +806,7 @@ static void golan_destory_eq(struct golan *golan)
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX, __FUNCTION__);
 	GOLAN_PRINT_RC_AND_CMD_STATUS;
 
-	free_dma ( golan->eq.eqes , GOLAN_PAGE_SIZE );
+	free_phys ( golan->eq.eqes , GOLAN_PAGE_SIZE );
 	golan->eq.eqn = 0;
 
 	DBGC( golan, "%s Event queue (0x%x) was destroyed\n", __FUNCTION__, eqn);
@@ -922,8 +922,8 @@ static inline void golan_pci_init(struct golan *golan)
 	adjust_pci_device ( pci );
 
 	/* Get HCA BAR */
-	golan->iseg	= ioremap ( pci_bar_start ( pci, GOLAN_HCA_BAR),
-					GOLAN_PCI_CONFIG_BAR_SIZE );
+	golan->iseg = pci_ioremap ( pci, pci_bar_start ( pci, GOLAN_HCA_BAR),
+				    GOLAN_PCI_CONFIG_BAR_SIZE );
 }
 
 static inline struct golan *golan_alloc()
@@ -962,14 +962,14 @@ static int golan_create_cq(struct ib_device *ibdev,
 		goto err_create_cq;
 	}
 	golan_cq->size 			= sizeof(golan_cq->cqes[0]) * cq->num_cqes;
-	golan_cq->doorbell_record 	= malloc_dma(GOLAN_CQ_DB_RECORD_SIZE,
+	golan_cq->doorbell_record 	= malloc_phys(GOLAN_CQ_DB_RECORD_SIZE,
 							GOLAN_CQ_DB_RECORD_SIZE);
 	if (!golan_cq->doorbell_record) {
 		rc = -ENOMEM;
 		goto err_create_cq_db_alloc;
 	}
 
-	golan_cq->cqes = malloc_dma ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	golan_cq->cqes = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
 	if (!golan_cq->cqes) {
 		rc = -ENOMEM;
 		goto err_create_cq_cqe_alloc;
@@ -1008,9 +1008,9 @@ static int golan_create_cq(struct ib_device *ibdev,
 	return 0;
 
 err_create_cq_cmd:
-	free_dma( golan_cq->cqes , GOLAN_PAGE_SIZE );
+	free_phys( golan_cq->cqes , GOLAN_PAGE_SIZE );
 err_create_cq_cqe_alloc:
-	free_dma(golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE);
+	free_phys(golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE);
 err_create_cq_db_alloc:
 	free ( golan_cq );
 err_create_cq:
@@ -1045,8 +1045,8 @@ static void golan_destroy_cq(struct ib_device *ibdev,
 	cq->cqn = 0;
 
 	ib_cq_set_drvdata(cq, NULL);
-	free_dma ( golan_cq->cqes , GOLAN_PAGE_SIZE );
-	free_dma(golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE);
+	free_phys ( golan_cq->cqes , GOLAN_PAGE_SIZE );
+	free_phys(golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE);
 	free(golan_cq);
 
 	DBGC (golan, "%s CQ number 0x%x was destroyed\n", __FUNCTION__, cqn);
@@ -1138,7 +1138,7 @@ static int golan_create_qp_aux(struct ib_device *ibdev,
 	golan_qp->size = golan_qp->sq.size + golan_qp->rq.size;
 
 	/* allocate dma memory for WQEs (1 page is enough) - should change it */
-	golan_qp->wqes = malloc_dma ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	golan_qp->wqes = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
 	if (!golan_qp->wqes) {
 		rc = -ENOMEM;
 		goto err_create_qp_wqe_alloc;
@@ -1160,7 +1160,7 @@ static int golan_create_qp_aux(struct ib_device *ibdev,
 		data++;
 	}
 
-	golan_qp->doorbell_record = malloc_dma(sizeof(struct golan_qp_db),
+	golan_qp->doorbell_record = malloc_phys(sizeof(struct golan_qp_db),
 						sizeof(struct golan_qp_db));
 	if (!golan_qp->doorbell_record) {
 		rc = -ENOMEM;
@@ -1213,9 +1213,9 @@ static int golan_create_qp_aux(struct ib_device *ibdev,
 	return 0;
 
 err_create_qp_cmd:
-	free_dma(golan_qp->doorbell_record, sizeof(struct golan_qp_db));
+	free_phys(golan_qp->doorbell_record, sizeof(struct golan_qp_db));
 err_create_qp_db_alloc:
-	free_dma ( golan_qp->wqes, GOLAN_PAGE_SIZE );
+	free_phys ( golan_qp->wqes, GOLAN_PAGE_SIZE );
 err_create_qp_wqe_alloc:
 err_create_qp_sq_size:
 err_create_qp_sq_wqe_size:
@@ -1422,8 +1422,8 @@ static void golan_destroy_qp(struct ib_device *ibdev,
 	qp->qpn = 0;
 
 	ib_qp_set_drvdata(qp, NULL);
-	free_dma(golan_qp->doorbell_record, sizeof(struct golan_qp_db));
-	free_dma ( golan_qp->wqes, GOLAN_PAGE_SIZE );
+	free_phys(golan_qp->doorbell_record, sizeof(struct golan_qp_db));
+	free_phys ( golan_qp->wqes, GOLAN_PAGE_SIZE );
 	free(golan_qp);
 
 	DBGC( golan ,"%s QP 0x%lx was destroyed\n", __FUNCTION__, qpn);
@@ -2386,6 +2386,7 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 		ibdev->op = &golan_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = (GOLAN_PORT_BASE + i);
+		ibdev->ports = golan->caps.num_ports;
 		ib_set_drvdata( ibdev, golan );
 	}
 
@@ -2642,7 +2643,10 @@ static struct pci_device_id golan_nics[] = {
 	PCI_ROM ( 0x15b3, 0x1019, "ConnectX-5EX", "ConnectX-5EX HCA driver, DevID 4121", 0 ),
 	PCI_ROM ( 0x15b3, 0x101b, "ConnectX-6", "ConnectX-6 HCA driver, DevID 4123", 0 ),
 	PCI_ROM ( 0x15b3, 0x101d, "ConnectX-6DX", "ConnectX-6DX HCA driver, DevID 4125", 0 ),
+	PCI_ROM ( 0x15b3, 0x101f, "ConnectX-6Lx", "ConnectX-6LX HCA driver, DevID 4127", 0 ),
+	PCI_ROM ( 0x15b3, 0x1021, "ConnectX-7", "ConnectX-7 HCA driver, DevID 4129", 0 ),
 	PCI_ROM ( 0x15b3, 0xa2d2, "BlueField", "BlueField integrated ConnectX-5 network controller HCA driver, DevID 41682", 0 ),
+	PCI_ROM ( 0x15b3, 0xa2d6, "BlueField-2", "BlueField-2 network controller HCA driver, DevID 41686", 0 ),
 };
 
 struct pci_driver golan_driver __pci_driver = {

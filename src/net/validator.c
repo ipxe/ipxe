@@ -73,6 +73,8 @@ struct validator {
 	/** Process */
 	struct process process;
 
+	/** Root of trust (or NULL to use default) */
+	struct x509_root *root;
 	/** X.509 certificate chain */
 	struct x509_chain *chain;
 	/** OCSP check */
@@ -114,6 +116,7 @@ static void validator_free ( struct refcnt *refcnt ) {
 
 	DBGC2 ( validator, "VALIDATOR %p \"%s\" freed\n",
 		validator, validator_name ( validator ) );
+	x509_root_put ( validator->root );
 	x509_chain_put ( validator->chain );
 	ocsp_put ( validator->ocsp );
 	xferbuf_free ( &validator->buffer );
@@ -554,7 +557,7 @@ static void validator_step ( struct validator *validator ) {
 	 */
 	now = time ( NULL );
 	if ( ( rc = x509_validate_chain ( validator->chain, now, NULL,
-					  NULL ) ) == 0 ) {
+					  validator->root ) ) == 0 ) {
 		DBGC ( validator, "VALIDATOR %p \"%s\" validated\n",
 		       validator, validator_name ( validator ) );
 		validator_finished ( validator, 0 );
@@ -569,7 +572,7 @@ static void validator_step ( struct validator *validator ) {
 		issuer = link->cert;
 		if ( ! cert )
 			continue;
-		if ( ! x509_is_valid ( issuer ) )
+		if ( ! x509_is_valid ( issuer, validator->root ) )
 			continue;
 		/* The issuer is valid, but this certificate is not
 		 * yet valid.  If OCSP is applicable, start it.
@@ -621,9 +624,11 @@ static struct process_descriptor validator_process_desc =
  *
  * @v job		Job control interface
  * @v chain		X.509 certificate chain
+ * @v root		Root of trust, or NULL to use default
  * @ret rc		Return status code
  */
-int create_validator ( struct interface *job, struct x509_chain *chain ) {
+int create_validator ( struct interface *job, struct x509_chain *chain,
+		       struct x509_root *root ) {
 	struct validator *validator;
 	int rc;
 
@@ -646,6 +651,7 @@ int create_validator ( struct interface *job, struct x509_chain *chain ) {
 		    &validator->refcnt );
 	process_init ( &validator->process, &validator_process_desc,
 		       &validator->refcnt );
+	validator->root = x509_root_get ( root );
 	validator->chain = x509_chain_get ( chain );
 	xferbuf_malloc_init ( &validator->buffer );
 

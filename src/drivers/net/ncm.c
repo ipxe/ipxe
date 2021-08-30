@@ -558,6 +558,8 @@ static int ncm_probe ( struct usb_function *func,
 	struct usb_interface_descriptor *comms;
 	struct ecm_ethernet_descriptor *ethernet;
 	struct ncm_ntb_parameters params;
+	unsigned int remainder;
+	unsigned int divisor;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -616,14 +618,15 @@ static int ncm_probe ( struct usb_function *func,
 	DBGC2 ( ncm, "NCM %p maximum IN size is %zd bytes\n", ncm, ncm->mtu );
 
 	/* Calculate transmit padding */
-	ncm->padding = ( ( le16_to_cpu ( params.out.remainder ) -
-			   sizeof ( struct ncm_ntb_header ) - ETH_HLEN ) &
-			 ( le16_to_cpu ( params.out.divisor ) - 1 ) );
+	divisor = ( params.out.divisor ?
+		    le16_to_cpu ( params.out.divisor ) : 1 );
+	remainder = le16_to_cpu ( params.out.remainder );
+	ncm->padding = ( ( remainder - sizeof ( struct ncm_ntb_header ) -
+			   ETH_HLEN ) & ( divisor - 1 ) );
 	DBGC2 ( ncm, "NCM %p using %zd-byte transmit padding\n",
 		ncm, ncm->padding );
 	assert ( ( ( sizeof ( struct ncm_ntb_header ) + ncm->padding +
-		     ETH_HLEN ) % le16_to_cpu ( params.out.divisor ) ) ==
-		 le16_to_cpu ( params.out.remainder ) );
+		     ETH_HLEN ) % divisor ) == remainder );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )

@@ -84,7 +84,7 @@ static void * pci_msix_ioremap ( struct pci_device *pci, struct pci_msix *msix,
 	       msix, pci_msix_name ( cfg ), base, bar, offset );
 
 	/* Map BAR portion */
-	io = ioremap ( ( start + offset ), PCI_MSIX_LEN );
+	io = pci_ioremap ( pci, ( start + offset ), PCI_MSIX_LEN );
 	if ( ! io ) {
 		DBGC ( msix, "MSI-X %p %s could not map %#08lx\n",
 		       msix, pci_msix_name ( cfg ), base );

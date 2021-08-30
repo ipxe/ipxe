@@ -321,7 +321,7 @@ int virtio_pci_map_capability(struct pci_device *pci, int cap, size_t minlen,
             region->flags = VIRTIO_PCI_REGION_PORT;
         } else {
             /* Region mapped into memory space */
-            region->base = ioremap(base + offset, length);
+            region->base = pci_ioremap(pci, base + offset, length);
             region->flags = VIRTIO_PCI_REGION_MEMORY;
         }
     }

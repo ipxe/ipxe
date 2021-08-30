@@ -38,7 +38,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/init.h>
 #include <ipxe/image.h>
 #include <ipxe/script.h>
-#include <ipxe/umalloc.h>
 #include <realmode.h>
 
 /** Command line physical address
@@ -180,7 +179,6 @@ static int cmdline_init ( void ) {
  */
 static int initrd_init ( void ) {
 	struct image *image;
-	int rc;
 
 	/* Do nothing if no initrd was specified */
 	if ( ! initrd_phys ) {
@@ -194,53 +192,18 @@ static int initrd_init ( void ) {
 	DBGC ( colour, "RUNTIME found initrd at [%x,%x)\n",
 	       initrd_phys, ( initrd_phys + initrd_len ) );
 
-	/* Allocate image */
-	image = alloc_image ( NULL );
+	/* Create initrd image */
+	image = image_memory ( "<INITRD>", phys_to_user ( initrd_phys ),
+			       initrd_len );
 	if ( ! image ) {
-		DBGC ( colour, "RUNTIME could not allocate image for "
-		       "initrd\n" );
-		rc = -ENOMEM;
-		goto err_alloc_image;
+		DBGC ( colour, "RUNTIME could not create initrd image\n" );
+		return -ENOMEM;
 	}
-	if ( ( rc = image_set_name ( image, "<INITRD>" ) ) != 0 ) {
-		DBGC ( colour, "RUNTIME could not set image name: %s\n",
-		       strerror ( rc ) );
-		goto err_set_name;
-	}
-
-	/* Allocate and copy initrd content */
-	image->data = umalloc ( initrd_len );
-	if ( ! image->data ) {
-		DBGC ( colour, "RUNTIME could not allocate %d bytes for "
-		       "initrd\n", initrd_len );
-		rc = -ENOMEM;
-		goto err_umalloc;
-	}
-	image->len = initrd_len;
-	memcpy_user ( image->data, 0, phys_to_user ( initrd_phys ), 0,
-		      initrd_len );
 
 	/* Mark initrd as consumed */
 	initrd_phys = 0;
 
-	/* Register image */
-	if ( ( rc = register_image ( image ) ) != 0 ) {
-		DBGC ( colour, "RUNTIME could not register initrd: %s\n",
-		       strerror ( rc ) );
-		goto err_register_image;
-	}
-
-	/* Drop our reference to the image */
-	image_put ( image );
-
 	return 0;
-
- err_register_image:
- err_umalloc:
- err_set_name:
-	image_put ( image );
- err_alloc_image:
-	return rc;
 }
 
 /**

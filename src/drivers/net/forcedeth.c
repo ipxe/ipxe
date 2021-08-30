@@ -267,7 +267,7 @@ nv_init_rings ( struct forcedeth_private *priv )
 
 	/* Allocate ring for both TX and RX */
 	priv->rx_ring =
-		malloc_dma ( sizeof(struct ring_desc) * RXTX_RING_SIZE, 32 );
+		malloc_phys ( sizeof(struct ring_desc) * RXTX_RING_SIZE, 32 );
 	if ( ! priv->rx_ring )
 		goto err_malloc;
 	priv->tx_ring = &priv->rx_ring[RX_RING_SIZE];
@@ -308,7 +308,7 @@ nv_free_rxtx_resources ( struct forcedeth_private *priv )
 
 	DBGP ( "nv_free_rxtx_resources\n" );
 
-	free_dma ( priv->rx_ring, sizeof(struct ring_desc) * RXTX_RING_SIZE );
+	free_phys ( priv->rx_ring, sizeof(struct ring_desc) * RXTX_RING_SIZE );
 
 	for ( i = 0; i < RX_RING_SIZE; i++ ) {
 		free_iob ( priv->rx_iobuf[i] );
@@ -1762,7 +1762,7 @@ forcedeth_map_regs ( struct forcedeth_private *priv )
 	}
 
 	rc = -ENOMEM;
-	ioaddr = ioremap ( addr, register_size );
+	ioaddr = pci_ioremap ( priv->pci_dev, addr, register_size );
 	if ( ! ioaddr ) {
 		DBG ( "Cannot remap MMIO\n" );
 		goto err_ioremap;

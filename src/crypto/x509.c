@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/list.h>
@@ -123,6 +124,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_EACCES, 0x0b, "No usable certificates" )
 
 /**
+ * Free X.509 certificate
+ *
+ * @v refcnt		Reference count
+ */
+static void x509_free ( struct refcnt *refcnt ) {
+	struct x509_certificate *cert =
+		container_of ( refcnt, struct x509_certificate, refcnt );
+
+	x509_root_put ( cert->root );
+	free ( cert );
+}
+
+/**
  * Get X.509 certificate display name
  *
  * @v cert		X.509 certificate
@@ -156,7 +170,7 @@ static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
 
 /** "commonName" object identifier cursor */
 static struct asn1_cursor oid_common_name_cursor =
-	ASN1_OID_CURSOR ( oid_common_name );
+	ASN1_CURSOR ( oid_common_name );
 
 /**
  * Parse X.509 certificate version
@@ -523,12 +537,12 @@ static struct x509_key_purpose x509_key_purposes[] = {
 	{
 		.name = "codeSigning",
 		.bits = X509_CODE_SIGNING,
-		.oid = ASN1_OID_CURSOR ( oid_code_signing ),
+		.oid = ASN1_CURSOR ( oid_code_signing ),
 	},
 	{
 		.name = "ocspSigning",
 		.bits = X509_OCSP_SIGNING,
-		.oid = ASN1_OID_CURSOR ( oid_ocsp_signing ),
+		.oid = ASN1_CURSOR ( oid_ocsp_signing ),
 	},
 };
 
@@ -631,7 +645,7 @@ static uint8_t oid_ad_ocsp[] = { ASN1_OID_OCSP };
 static struct x509_access_method x509_access_methods[] = {
 	{
 		.name = "OCSP",
-		.oid = ASN1_OID_CURSOR ( oid_ad_ocsp ),
+		.oid = ASN1_CURSOR ( oid_ad_ocsp ),
 		.parse = x509_parse_ocsp,
 	},
 };
@@ -768,27 +782,27 @@ static uint8_t oid_ce_subject_alt_name[] =
 static struct x509_extension x509_extensions[] = {
 	{
 		.name = "basicConstraints",
-		.oid = ASN1_OID_CURSOR ( oid_ce_basic_constraints ),
+		.oid = ASN1_CURSOR ( oid_ce_basic_constraints ),
 		.parse = x509_parse_basic_constraints,
 	},
 	{
 		.name = "keyUsage",
-		.oid = ASN1_OID_CURSOR ( oid_ce_key_usage ),
+		.oid = ASN1_CURSOR ( oid_ce_key_usage ),
 		.parse = x509_parse_key_usage,
 	},
 	{
 		.name = "extKeyUsage",
-		.oid = ASN1_OID_CURSOR ( oid_ce_ext_key_usage ),
+		.oid = ASN1_CURSOR ( oid_ce_ext_key_usage ),
 		.parse = x509_parse_extended_key_usage,
 	},
 	{
 		.name = "authorityInfoAccess",
-		.oid = ASN1_OID_CURSOR ( oid_pe_authority_info_access ),
+		.oid = ASN1_CURSOR ( oid_pe_authority_info_access ),
 		.parse = x509_parse_authority_info_access,
 	},
 	{
 		.name = "subjectAltName",
-		.oid = ASN1_OID_CURSOR ( oid_ce_subject_alt_name ),
+		.oid = ASN1_CURSOR ( oid_ce_subject_alt_name ),
 		.parse = x509_parse_subject_alt_name,
 	},
 };
@@ -1075,7 +1089,7 @@ int x509_certificate ( const void *data, size_t len,
 	*cert = zalloc ( sizeof ( **cert ) + cursor.len );
 	if ( ! *cert )
 		return -ENOMEM;
-	ref_init ( &(*cert)->refcnt, NULL );
+	ref_init ( &(*cert)->refcnt, x509_free );
 	raw = ( *cert + 1 );
 
 	/* Copy raw data */
@@ -1296,6 +1310,50 @@ int x509_check_time ( struct x509_certificate *cert, time_t time ) {
 }
 
 /**
+ * Check if X.509 certificate is valid
+ *
+ * @v cert		X.509 certificate
+ * @v root		Root certificate list, or NULL to use default
+ */
+int x509_is_valid ( struct x509_certificate *cert, struct x509_root *root ) {
+
+	/* Use default root certificate store if none specified */
+	if ( ! root )
+		root = &root_certificates;
+
+	return ( cert->root == root );
+}
+
+/**
+ * Set X.509 certificate as validated
+ *
+ * @v cert		X.509 certificate
+ * @v issuer		Issuing X.509 certificate (or NULL)
+ * @v root		Root certificate list
+ */
+static void x509_set_valid ( struct x509_certificate *cert,
+			     struct x509_certificate *issuer,
+			     struct x509_root *root ) {
+	unsigned int max_path_remaining;
+
+	/* Sanity checks */
+	assert ( root != NULL );
+	assert ( ( issuer == NULL ) || ( issuer->path_remaining >= 1 ) );
+
+	/* Record validation root */
+	x509_root_put ( cert->root );
+	cert->root = x509_root_get ( root );
+
+	/* Calculate effective path length */
+	cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
+	if ( issuer ) {
+		max_path_remaining = ( issuer->path_remaining - 1 );
+		if ( cert->path_remaining > max_path_remaining )
+			cert->path_remaining = max_path_remaining;
+	}
+}
+
+/**
  * Validate X.509 certificate
  *
  * @v cert		X.509 certificate
@@ -1313,7 +1371,6 @@ int x509_check_time ( struct x509_certificate *cert, time_t time ) {
 int x509_validate ( struct x509_certificate *cert,
 		    struct x509_certificate *issuer,
 		    time_t time, struct x509_root *root ) {
-	unsigned int max_path_remaining;
 	int rc;
 
 	/* Use default root certificate store if none specified */
@@ -1321,7 +1378,7 @@ int x509_validate ( struct x509_certificate *cert,
 		root = &root_certificates;
 
 	/* Return success if certificate has already been validated */
-	if ( x509_is_valid ( cert ) )
+	if ( x509_is_valid ( cert, root ) )
 		return 0;
 
 	/* Fail if certificate is invalid at specified time */
@@ -1330,20 +1387,19 @@ int x509_validate ( struct x509_certificate *cert,
 
 	/* Succeed if certificate is a trusted root certificate */
 	if ( x509_check_root ( cert, root ) == 0 ) {
-		cert->flags |= X509_FL_VALIDATED;
-		cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
+		x509_set_valid ( cert, NULL, root );
 		return 0;
 	}
 
 	/* Fail unless we have an issuer */
 	if ( ! issuer ) {
-		DBGC2 ( cert, "X509 %p \"%s\" has no issuer\n",
+		DBGC2 ( cert, "X509 %p \"%s\" has no trusted issuer\n",
 			cert, x509_name ( cert ) );
 		return -EACCES_UNTRUSTED;
 	}
 
 	/* Fail unless issuer has already been validated */
-	if ( ! x509_is_valid ( issuer ) ) {
+	if ( ! x509_is_valid ( issuer, root ) ) {
 		DBGC ( cert, "X509 %p \"%s\" ", cert, x509_name ( cert ) );
 		DBGC ( cert, "issuer %p \"%s\" has not yet been validated\n",
 		       issuer, x509_name ( issuer ) );
@@ -1369,14 +1425,8 @@ int x509_validate ( struct x509_certificate *cert,
 		return -EACCES_OCSP_REQUIRED;
 	}
 
-	/* Calculate effective path length */
-	cert->path_remaining = ( issuer->path_remaining - 1 );
-	max_path_remaining = ( cert->extensions.basic.path_len + 1 );
-	if ( cert->path_remaining > max_path_remaining )
-		cert->path_remaining = max_path_remaining;
-
 	/* Mark certificate as valid */
-	cert->flags |= X509_FL_VALIDATED;
+	x509_set_valid ( cert, issuer, root );
 
 	DBGC ( cert, "X509 %p \"%s\" successfully validated using ",
 	       cert, x509_name ( cert ) );
@@ -1415,7 +1465,7 @@ static int x509_check_dnsname ( struct x509_certificate *cert,
 
 	/* Compare names */
 	if ( ! ( ( strlen ( name ) == len ) &&
-		 ( memcmp ( name, dnsname, len ) == 0 ) ) )
+		 ( strncasecmp ( name, dnsname, len ) == 0 ) ) )
 		return -ENOENT;
 
 	if ( name != fullname ) {

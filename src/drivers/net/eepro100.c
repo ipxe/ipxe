@@ -93,7 +93,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /*
  * Debugging levels:
- *	- DBG() is for any errors, i.e. failed alloc_iob(), malloc_dma(),
+ *	- DBG() is for any errors, i.e. failed alloc_iob(), malloc_phys(),
  *	  TX overflow, corrupted packets, ...
  *	- DBG2() is for successful events, like packet received,
  *	  packet transmitted, and other general notifications.
@@ -335,7 +335,7 @@ static int ifec_net_open ( struct net_device *netdev )
 	ifec_mdio_setup ( netdev, options );
 
 	/* Prepare MAC address w/ Individual Address Setup (ias) command.*/
-	ias = malloc_dma ( sizeof ( *ias ), CB_ALIGN );
+	ias = malloc_phys ( sizeof ( *ias ), CB_ALIGN );
 	if ( !ias ) {
 		rc = -ENOMEM;
 		goto error;
@@ -345,7 +345,7 @@ static int ifec_net_open ( struct net_device *netdev )
 	memcpy ( ias->ia, netdev->ll_addr, ETH_ALEN );
 
 	/* Prepare operating parameters w/ a configure command. */
-	cfg = malloc_dma ( sizeof ( *cfg ), CB_ALIGN );
+	cfg = malloc_phys ( sizeof ( *cfg ), CB_ALIGN );
 	if ( !cfg ) {
 		rc = -ENOMEM;
 		goto error;
@@ -367,8 +367,8 @@ static int ifec_net_open ( struct net_device *netdev )
 		DBG ( "Failed to initiate!\n" );
 		goto error;
 	}
-	free_dma ( ias, sizeof ( *ias ) );
-	free_dma ( cfg, sizeof ( *cfg ) );
+	free_phys ( ias, sizeof ( *ias ) );
+	free_phys ( cfg, sizeof ( *cfg ) );
 	DBG2 ( "cfg " );
 
 	/* Enable rx by sending ring address to card */
@@ -381,8 +381,8 @@ static int ifec_net_open ( struct net_device *netdev )
 	return 0;
 
 error:
-	free_dma ( cfg, sizeof ( *cfg ) );
-	free_dma ( ias, sizeof ( *ias ) );
+	free_phys ( cfg, sizeof ( *cfg ) );
+	free_phys ( ias, sizeof ( *ias ) );
 	ifec_free ( netdev );
 	ifec_reset ( netdev );
 	return rc;
@@ -703,7 +703,7 @@ static void ifec_free ( struct net_device *netdev )
 	}
 
 	/* free TX ring buffer */
-	free_dma ( priv->tcbs, TX_RING_BYTES );
+	free_phys ( priv->tcbs, TX_RING_BYTES );
 
 	priv->tcbs = NULL;
 }
@@ -1025,7 +1025,7 @@ static int ifec_tx_setup ( struct net_device *netdev )
 	DBGP ( "ifec_tx_setup\n" );
 
 	/* allocate tx ring */
-	priv->tcbs = malloc_dma ( TX_RING_BYTES, CB_ALIGN );
+	priv->tcbs = malloc_phys ( TX_RING_BYTES, CB_ALIGN );
 	if ( !priv->tcbs ) {
 		DBG ( "TX-ring allocation failed\n" );
 		return -ENOMEM;

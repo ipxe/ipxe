@@ -54,3 +54,4 @@ static userptr_t efi_find_rsdt ( void ) {
 }
 
 PROVIDE_ACPI ( efi, acpi_find_rsdt, efi_find_rsdt );
+PROVIDE_ACPI_INLINE ( efi, acpi_find );

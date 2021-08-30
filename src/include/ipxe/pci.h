@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/device.h>
 #include <ipxe/tables.h>
+#include <ipxe/dma.h>
 #include <ipxe/pci_io.h>
 
 /** PCI vendor ID */
@@ -134,6 +135,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CLASS_SERIAL_USB_EHCI	 0x20	/**< ECHI USB controller */
 #define PCI_CLASS_SERIAL_USB_XHCI	 0x30	/**< xHCI USB controller */
 
+/** Subordinate bus number */
+#define PCI_SUBORDINATE		0x1a
+
 /** Construct PCI class
  *
  * @v base		Base class (or PCI_ANY_ID)
@@ -187,6 +191,8 @@ struct pci_class_id {
 struct pci_device {
 	/** Generic device */
 	struct device dev;
+	/** DMA device */
+	struct dma_device dma;
 	/** Memory base
 	 *
 	 * This is the physical address of the first valid memory BAR.

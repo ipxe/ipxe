@@ -38,6 +38,9 @@
 
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 
+#undef ELF_R_TYPE
+#undef ELF_R_SYM
+
 #ifdef EFI_TARGET32
 
 #define EFI_IMAGE_NT_HEADERS		EFI_IMAGE_NT_HEADERS32
@@ -72,21 +75,46 @@
 
 #define ELF_MREL( mach, type ) ( (mach) | ( (type) << 16 ) )
 
-/* Allow for building with older versions of elf.h */
+/* Provide constants missing on some platforms */
 #ifndef EM_AARCH64
 #define EM_AARCH64 183
+#endif
+#ifndef R_AARCH64_NONE
 #define R_AARCH64_NONE 0
+#endif
+#ifndef R_AARCH64_NULL
+#define R_AARCH64_NULL 256
+#endif
+#ifndef R_AARCH64_ABS64
 #define R_AARCH64_ABS64 257
+#endif
+#ifndef R_AARCH64_CALL26
 #define R_AARCH64_CALL26 283
+#endif
+#ifndef R_AARCH64_JUMP26
 #define R_AARCH64_JUMP26 282
+#endif
+#ifndef R_AARCH64_ADR_PREL_LO21
 #define R_AARCH64_ADR_PREL_LO21 274
+#endif
+#ifndef R_AARCH64_ADR_PREL_PG_HI21
 #define R_AARCH64_ADR_PREL_PG_HI21 275
+#endif
+#ifndef R_AARCH64_ADD_ABS_LO12_NC
 #define R_AARCH64_ADD_ABS_LO12_NC 277
+#endif
+#ifndef R_AARCH64_LDST8_ABS_LO12_NC
 #define R_AARCH64_LDST8_ABS_LO12_NC 278
+#endif
+#ifndef R_AARCH64_LDST16_ABS_LO12_NC
 #define R_AARCH64_LDST16_ABS_LO12_NC 284
+#endif
+#ifndef R_AARCH64_LDST32_ABS_LO12_NC
 #define R_AARCH64_LDST32_ABS_LO12_NC 285
+#endif
+#ifndef R_AARCH64_LDST64_ABS_LO12_NC
 #define R_AARCH64_LDST64_ABS_LO12_NC 286
-#endif /* EM_AARCH64 */
+#endif
 #ifndef R_ARM_CALL
 #define R_ARM_CALL 28
 #endif
@@ -97,12 +125,22 @@
 #define R_ARM_V4BX 40
 #endif
 
-/* Seems to be missing from elf.h */
-#ifndef R_AARCH64_NULL
-#define R_AARCH64_NULL 256
-#endif
+/**
+ * Alignment of raw data of sections in the image file
+ *
+ * Some versions of signtool.exe will spuriously complain if this
+ * value is less than 512.
+ */
+#define EFI_FILE_ALIGN  0x200
 
-#define EFI_FILE_ALIGN 0x20
+/**
+ * Alignment of sections when loaded into memory
+ *
+ * This must equal the architecture page size, in order to allow for
+ * the possibility of the firmware using page-level protection to
+ * enforce section attributes at runtime.
+ */
+#define EFI_IMAGE_ALIGN 0x1000
 
 struct elf_file {
 	void *data;
@@ -150,9 +188,9 @@ static struct pe_header efi_pe_header = {
 			.Magic = EFI_IMAGE_NT_OPTIONAL_HDR_MAGIC,
 			.MajorLinkerVersion = 42,
 			.MinorLinkerVersion = 42,
-			.SectionAlignment = EFI_FILE_ALIGN,
+			.SectionAlignment = EFI_IMAGE_ALIGN,
 			.FileAlignment = EFI_FILE_ALIGN,
-			.SizeOfImage = sizeof ( efi_pe_header ),
+			.SizeOfImage = EFI_IMAGE_ALIGN,
 			.SizeOfHeaders = sizeof ( efi_pe_header ),
 			.NumberOfRvaAndSizes =
 				EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES,
@@ -191,6 +229,16 @@ static void * xmalloc ( size_t len ) {
  */
 static unsigned long efi_file_align ( unsigned long offset ) {
 	return ( ( offset + EFI_FILE_ALIGN - 1 ) & ~( EFI_FILE_ALIGN - 1 ) );
+}
+
+/**
+ * Align section within PE image
+ *
+ * @v offset		Unaligned offset
+ * @ret aligned_offset	Aligned offset
+ */
+static unsigned long efi_image_align ( unsigned long offset ) {
+	return ( ( offset + EFI_IMAGE_ALIGN - 1 ) & ~( EFI_IMAGE_ALIGN - 1 ) );
 }
 
 /**
@@ -582,7 +630,7 @@ static struct pe_section * process_section ( struct elf_file *elf,
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( new->hdr );
 	pe_header->nt.OptionalHeader.SizeOfImage =
-		efi_file_align ( data_end );
+		efi_image_align ( data_end );
 
 	return new;
 }
@@ -705,13 +753,15 @@ static struct pe_section *
 create_reloc_section ( struct pe_header *pe_header,
 		       struct pe_relocs *pe_reltab ) {
 	struct pe_section *reloc;
+	size_t section_rawsz;
 	size_t section_memsz;
 	size_t section_filesz;
 	EFI_IMAGE_DATA_DIRECTORY *relocdir;
 
 	/* Allocate PE section */
-	section_memsz = output_pe_reltab ( pe_reltab, NULL );
-	section_filesz = efi_file_align ( section_memsz );
+	section_rawsz = output_pe_reltab ( pe_reltab, NULL );
+	section_filesz = efi_file_align ( section_rawsz );
+	section_memsz = efi_image_align ( section_rawsz );
 	reloc = xmalloc ( sizeof ( *reloc ) + section_filesz );
 	memset ( reloc, 0, sizeof ( *reloc ) + section_filesz );
 
@@ -722,6 +772,7 @@ create_reloc_section ( struct pe_header *pe_header,
 	reloc->hdr.VirtualAddress = pe_header->nt.OptionalHeader.SizeOfImage;
 	reloc->hdr.SizeOfRawData = section_filesz;
 	reloc->hdr.Characteristics = ( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
+				       EFI_IMAGE_SCN_MEM_DISCARDABLE |
 				       EFI_IMAGE_SCN_MEM_NOT_PAGED |
 				       EFI_IMAGE_SCN_MEM_READ );
 
@@ -731,11 +782,11 @@ create_reloc_section ( struct pe_header *pe_header,
 	/* Update file header details */
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( reloc->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage += section_filesz;
+	pe_header->nt.OptionalHeader.SizeOfImage += section_memsz;
 	relocdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC]);
 	relocdir->VirtualAddress = reloc->hdr.VirtualAddress;
-	relocdir->Size = reloc->hdr.Misc.VirtualSize;
+	relocdir->Size = section_rawsz;
 
 	return reloc;
 }
@@ -773,8 +824,8 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	} *contents;
 
 	/* Allocate PE section */
-	section_memsz = sizeof ( *contents );
-	section_filesz = efi_file_align ( section_memsz );
+	section_memsz = efi_image_align ( sizeof ( *contents ) );
+	section_filesz = efi_file_align ( sizeof ( *contents ) );
 	debug = xmalloc ( sizeof ( *debug ) + section_filesz );
 	memset ( debug, 0, sizeof ( *debug ) + section_filesz );
 	contents = ( void * ) debug->contents;
@@ -786,6 +837,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	debug->hdr.VirtualAddress = pe_header->nt.OptionalHeader.SizeOfImage;
 	debug->hdr.SizeOfRawData = section_filesz;
 	debug->hdr.Characteristics = ( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
+				       EFI_IMAGE_SCN_MEM_DISCARDABLE |
 				       EFI_IMAGE_SCN_MEM_NOT_PAGED |
 				       EFI_IMAGE_SCN_MEM_READ );
 	debug->fixup = fixup_debug_section;
@@ -805,7 +857,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	/* Update file header details */
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( debug->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage += section_filesz;
+	pe_header->nt.OptionalHeader.SizeOfImage += section_memsz;
 	debugdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]);
 	debugdir->VirtualAddress = debug->hdr.VirtualAddress;
@@ -996,7 +1048,7 @@ static int parse_options ( const int argc, char **argv,
 		switch ( c ) {
 		case 's':
 			opts->subsystem = strtoul ( optarg, &end, 0 );
-			if ( *end ) {
+			if ( *end || ( ! *optarg ) ) {
 				eprintf ( "Invalid subsytem \"%s\"\n",
 					  optarg );
 				exit ( 2 );

@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <stddef.h>
 #include <errno.h>
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 #include <ipxe/time.h>
 
 /**

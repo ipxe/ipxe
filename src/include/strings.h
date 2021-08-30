@@ -189,5 +189,7 @@ bzero ( void *dest, size_t len ) {
 }
 
 int __pure strcasecmp ( const char *first, const char *second ) __nonnull;
+int __pure strncasecmp ( const char *first, const char *second,
+			 size_t max ) __nonnull;
 
 #endif /* _STRINGS_H */

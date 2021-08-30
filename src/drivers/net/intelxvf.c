@@ -456,11 +456,16 @@ static int intelxvf_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	intel->regs = ioremap ( pci->membase, INTELVF_BAR_SIZE );
+	intel->regs = pci_ioremap ( pci, pci->membase, INTELVF_BAR_SIZE );
 	if ( ! intel->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
+
+	/* Configure DMA */
+	intel->dma = &pci->dma;
+	dma_set_mask_64bit ( intel->dma );
+	netdev->dma = intel->dma;
 
 	/* Reset the function */
 	intelxvf_reset ( intel );
@@ -525,6 +530,7 @@ static struct pci_device_id intelxvf_nics[] = {
 	PCI_ROM ( 0x8086, 0x1515, "x540-vf", "X540 VF", 0 ),
 	PCI_ROM ( 0x8086, 0x1565, "x550-vf", "X550 VF", 0 ),
 	PCI_ROM ( 0x8086, 0x15a8, "x552-vf", "X552 VF", 0 ),
+	PCI_ROM ( 0x8086, 0x15c5, "x557-vf", "X557-AT2 VF", 0 ),
 };
 
 /** PCI driver */

@@ -39,6 +39,9 @@ static int ath5k_hw_eeprom_read(struct ath5k_hw *ah, u32 offset, u16 *data)
 {
 	u32 status, timeout;
 
+	/* Avoid returning uninitialised data on error */
+	*data = 0xffff;
+
 	/*
 	 * Initialize EEPROM access
 	 */
@@ -416,6 +419,7 @@ ath5k_eeprom_read_turbo_modes(struct ath5k_hw *ah,
 	if (ee->ee_version < AR5K_EEPROM_VERSION_5_0)
 		return 0;
 
+	AR5K_EEPROM_READ(o++, val);
 	switch (mode){
 	case AR5K_EEPROM_MODE_11A:
 		ee->ee_switch_settling_turbo[mode] = (val >> 6) & 0x7f;

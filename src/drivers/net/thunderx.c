@@ -645,11 +645,11 @@ static void txnic_poll ( struct txnic *vnic ) {
 /**
  * Allocate virtual NIC
  *
- * @v dev		Underlying device
+ * @v pci		Underlying PCI device
  * @v membase		Register base address
  * @ret vnic		Virtual NIC, or NULL on failure
  */
-static struct txnic * txnic_alloc ( struct device *dev,
+static struct txnic * txnic_alloc ( struct pci_device *pci,
 				    unsigned long membase ) {
 	struct net_device *netdev;
 	struct txnic *vnic;
@@ -658,10 +658,10 @@ static struct txnic * txnic_alloc ( struct device *dev,
 	netdev = alloc_etherdev ( sizeof ( *vnic ) );
 	if ( ! netdev )
 		goto err_alloc_netdev;
-	netdev->dev = dev;
+	netdev->dev = &pci->dev;
 	vnic = netdev->priv;
 	vnic->netdev = netdev;
-	vnic->name = dev->name;
+	vnic->name = pci->dev.name;
 
 	/* Allow caller to reuse netdev->priv.  (The generic virtual
 	 * NIC code never assumes that netdev->priv==vnic.)
@@ -684,7 +684,7 @@ static struct txnic * txnic_alloc ( struct device *dev,
 		goto err_alloc_rq;
 
 	/* Map registers */
-	vnic->regs = ioremap ( membase, TXNIC_VF_BAR_SIZE );
+	vnic->regs = pci_ioremap ( pci, membase, TXNIC_VF_BAR_SIZE );
 	if ( ! vnic->regs )
 		goto err_ioremap;
 
@@ -1103,7 +1103,7 @@ static int txnic_lmac_probe ( struct txnic_lmac *lmac ) {
 	membase = ( pf->vf_membase + ( lmac->idx * pf->vf_stride ) );
 
 	/* Allocate and initialise network device */
-	vnic = txnic_alloc ( &bgx->pci->dev, membase );
+	vnic = txnic_alloc ( bgx->pci, membase );
 	if ( ! vnic ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -1275,7 +1275,7 @@ static int txnic_pf_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	pf->regs = ioremap ( membase, TXNIC_PF_BAR_SIZE );
+	pf->regs = pci_ioremap ( pci, membase, TXNIC_PF_BAR_SIZE );
 	if ( ! pf->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;
@@ -1633,7 +1633,7 @@ static int txnic_bgx_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	bgx->regs = ioremap ( membase, TXNIC_BGX_BAR_SIZE );
+	bgx->regs = pci_ioremap ( pci, membase, TXNIC_BGX_BAR_SIZE );
 	if ( ! bgx->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

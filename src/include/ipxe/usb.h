@@ -580,6 +580,7 @@ usb_endpoint_described ( struct usb_endpoint *ep,
 			 struct usb_interface_descriptor *interface,
 			 unsigned int type, unsigned int index );
 extern int usb_endpoint_open ( struct usb_endpoint *ep );
+extern int usb_endpoint_clear_halt ( struct usb_endpoint *ep );
 extern void usb_endpoint_close ( struct usb_endpoint *ep );
 extern int usb_message ( struct usb_endpoint *ep, unsigned int request,
 			 unsigned int value, unsigned int index,
@@ -620,6 +621,7 @@ usb_recycle ( struct usb_endpoint *ep, struct io_buffer *iobuf ) {
 }
 
 extern int usb_prefill ( struct usb_endpoint *ep );
+extern int usb_refill_limit ( struct usb_endpoint *ep, unsigned int max );
 extern int usb_refill ( struct usb_endpoint *ep );
 extern void usb_flush ( struct usb_endpoint *ep );
 
@@ -1237,6 +1239,23 @@ usb_set_interface ( struct usb_device *usb, unsigned int interface,
 			     NULL, 0 );
 }
 
+/**
+ * Get USB depth
+ *
+ * @v usb		USB device
+ * @ret depth		Hub depth
+ */
+static inline unsigned int usb_depth ( struct usb_device *usb ) {
+	struct usb_device *parent;
+	unsigned int depth;
+
+	/* Navigate up to root hub, constructing depth as we go */
+	for ( depth = 0 ; ( parent = usb->port->hub->usb ) ; usb = parent )
+		depth++;
+
+	return depth;
+}
+
 extern struct list_head usb_buses;
 
 extern struct usb_interface_descriptor *
@@ -1272,7 +1291,6 @@ extern struct usb_bus * find_usb_bus_by_location ( unsigned int bus_type,
 extern int usb_alloc_address ( struct usb_bus *bus );
 extern void usb_free_address ( struct usb_bus *bus, unsigned int address );
 extern unsigned int usb_route_string ( struct usb_device *usb );
-extern unsigned int usb_depth ( struct usb_device *usb );
 extern struct usb_port * usb_root_hub_port ( struct usb_device *usb );
 extern struct usb_port * usb_transaction_translator ( struct usb_device *usb );
 
@@ -1395,6 +1413,9 @@ struct usb_driver {
 
 /** Declare a USB driver */
 #define __usb_driver __table_entry ( USB_DRIVERS, 01 )
+
+/** Declare a USB fallback driver */
+#define __usb_fallback_driver __table_entry ( USB_DRIVERS, 02 )
 
 /** USB driver scores */
 enum usb_driver_score {

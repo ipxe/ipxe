@@ -624,10 +624,10 @@ __vxge_hw_ring_create(struct __vxge_hw_virtualpath *vpath,
 	hldev = vpath->hldev;
 	vp_id = vpath->vp_id;
 
-	ring->rxdl = malloc_dma(sizeof(struct __vxge_hw_ring_block),
+	ring->rxdl = malloc_phys(sizeof(struct __vxge_hw_ring_block),
 			sizeof(struct __vxge_hw_ring_block));
 	if (!ring->rxdl) {
-		vxge_debug(VXGE_ERR, "%s:%d malloc_dma error\n",
+		vxge_debug(VXGE_ERR, "%s:%d malloc_phys error\n",
 				__func__, __LINE__);
 		status = VXGE_HW_ERR_OUT_OF_MEMORY;
 		goto exit;
@@ -667,7 +667,7 @@ enum vxge_hw_status __vxge_hw_ring_delete(struct __vxge_hw_ring *ring)
 	}
 
 	if (ring->rxdl) {
-		free_dma(ring->rxdl, sizeof(struct __vxge_hw_ring_block));
+		free_phys(ring->rxdl, sizeof(struct __vxge_hw_ring_block));
 		ring->rxdl = NULL;
 	}
 	ring->rxd_offset = 0;
@@ -826,10 +826,10 @@ __vxge_hw_fifo_create(struct __vxge_hw_virtualpath *vpath,
 	fifo->tx_intr_num = (vpath->vp_id * VXGE_HW_MAX_INTR_PER_VP)
 				+ VXGE_HW_VPATH_INTR_TX;
 
-	fifo->txdl = malloc_dma(sizeof(struct vxge_hw_fifo_txd)
+	fifo->txdl = malloc_phys(sizeof(struct vxge_hw_fifo_txd)
 				* fifo->depth, fifo->depth);
 	if (!fifo->txdl) {
-		vxge_debug(VXGE_ERR, "%s:%d malloc_dma error\n",
+		vxge_debug(VXGE_ERR, "%s:%d malloc_phys error\n",
 				__func__, __LINE__);
 		return VXGE_HW_ERR_OUT_OF_MEMORY;
 	}
@@ -846,7 +846,7 @@ enum vxge_hw_status __vxge_hw_fifo_delete(struct __vxge_hw_fifo *fifo)
 	vxge_trace();
 
 	if (fifo->txdl)
-		free_dma(fifo->txdl,
+		free_phys(fifo->txdl,
 			sizeof(struct vxge_hw_fifo_txd) * fifo->depth);
 
 	fifo->txdl = NULL;

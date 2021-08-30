@@ -32,8 +32,8 @@ extern void pcidirect_prepare ( struct pci_device *pci, int where );
  */
 static inline __always_inline int
 PCIAPI_INLINE ( direct, pci_num_bus ) ( void ) {
-	/* No way to work this out via Type 1 accesses */
-	return 0x100;
+	/* Scan first bus and rely on bridge detection to find higher buses */
+	return 1;
 }
 
 /**
@@ -136,6 +136,19 @@ PCIAPI_INLINE ( direct, pci_write_config_dword ) ( struct pci_device *pci,
 	pcidirect_prepare ( pci, where );
 	outl ( value, PCIDIRECT_CONFIG_DATA );
 	return 0;
+}
+
+/**
+ * Map PCI bus address as an I/O address
+ *
+ * @v bus_addr		PCI bus address
+ * @v len		Length of region
+ * @ret io_addr		I/O address, or NULL on error
+ */
+static inline __always_inline void *
+PCIAPI_INLINE ( direct, pci_ioremap ) ( struct pci_device *pci __unused,
+					unsigned long bus_addr, size_t len ) {
+	return ioremap ( bus_addr, len );
 }
 
 #endif /* _PCIDIRECT_H */

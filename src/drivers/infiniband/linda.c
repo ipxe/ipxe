@@ -531,8 +531,8 @@ static int linda_init_send ( struct linda *linda ) {
 		linda->send_buf[i] = i;
 
 	/* Allocate space for the SendBufAvail array */
-	linda->sendbufavail = malloc_dma ( sizeof ( *linda->sendbufavail ),
-					   LINDA_SENDBUFAVAIL_ALIGN );
+	linda->sendbufavail = malloc_phys ( sizeof ( *linda->sendbufavail ),
+					    LINDA_SENDBUFAVAIL_ALIGN );
 	if ( ! linda->sendbufavail ) {
 		rc = -ENOMEM;
 		goto err_alloc_sendbufavail;
@@ -555,7 +555,7 @@ static int linda_init_send ( struct linda *linda ) {
 
 	return 0;
 
-	free_dma ( linda->sendbufavail, sizeof ( *linda->sendbufavail ) );
+	free_phys ( linda->sendbufavail, sizeof ( *linda->sendbufavail ) );
  err_alloc_sendbufavail:
 	return rc;
 }
@@ -576,7 +576,7 @@ static void linda_fini_send ( struct linda *linda ) {
 	/* Ensure hardware has seen this disable */
 	linda_readq ( linda, &sendctrl, QIB_7220_SendCtrl_offset );
 
-	free_dma ( linda->sendbufavail, sizeof ( *linda->sendbufavail ) );
+	free_phys ( linda->sendbufavail, sizeof ( *linda->sendbufavail ) );
 }
 
 /***************************************************************************
@@ -613,8 +613,8 @@ static int linda_create_recv_wq ( struct linda *linda,
 	linda_wq->eager_cons = 0;
 
 	/* Allocate receive header buffer */
-	linda_wq->header = malloc_dma ( LINDA_RECV_HEADERS_SIZE,
-					LINDA_RECV_HEADERS_ALIGN );
+	linda_wq->header = malloc_phys ( LINDA_RECV_HEADERS_SIZE,
+					 LINDA_RECV_HEADERS_ALIGN );
 	if ( ! linda_wq->header ) {
 		rc = -ENOMEM;
 		goto err_alloc_header;
@@ -650,7 +650,7 @@ static int linda_create_recv_wq ( struct linda *linda,
 	       virt_to_bus ( &linda_wq->header_prod ) );
 	return 0;
 
-	free_dma ( linda_wq->header, LINDA_RECV_HEADERS_SIZE );
+	free_phys ( linda_wq->header, LINDA_RECV_HEADERS_SIZE );
  err_alloc_header:
 	return rc;
 }
@@ -679,7 +679,7 @@ static void linda_destroy_recv_wq ( struct linda *linda,
 	mb();
 
 	/* Free headers ring */
-	free_dma ( linda_wq->header, LINDA_RECV_HEADERS_SIZE );
+	free_phys ( linda_wq->header, LINDA_RECV_HEADERS_SIZE );
 
 	/* Free context */
 	linda_free_ctx ( linda, ctx );
@@ -2330,12 +2330,13 @@ static int linda_probe ( struct pci_device *pci ) {
 	ibdev->op = &linda_ib_operations;
 	ibdev->dev = &pci->dev;
 	ibdev->port = 1;
+	ibdev->ports = 1;
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
 
 	/* Map PCI BARs */
-	linda->regs = ioremap ( pci->membase, LINDA_BAR0_SIZE );
+	linda->regs = pci_ioremap ( pci, pci->membase, LINDA_BAR0_SIZE );
 	DBGC2 ( linda, "Linda %p has BAR at %08lx\n", linda, pci->membase );
 
 	/* Print some general data */

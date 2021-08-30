@@ -56,6 +56,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/profile.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/errortab.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/http.h>
 
 /* Disambiguate the various error causes */
@@ -519,6 +520,18 @@ __weak int http_block_read_capacity ( struct http_transaction *http __unused,
 	return -ENOTSUP;
 }
 
+/**
+ * Describe as an EFI device path
+ *
+ * @v http		HTTP transaction
+ * @ret path		EFI device path, or NULL on error
+ */
+static EFI_DEVICE_PATH_PROTOCOL *
+http_efi_describe ( struct http_transaction *http ) {
+
+	return efi_uri_path ( http->uri );
+}
+
 /** HTTP data transfer interface operations */
 static struct interface_operation http_xfer_operations[] = {
 	INTF_OP ( block_read, struct http_transaction *, http_block_read ),
@@ -526,6 +539,8 @@ static struct interface_operation http_xfer_operations[] = {
 		  http_block_read_capacity ),
 	INTF_OP ( xfer_window_changed, struct http_transaction *, http_step ),
 	INTF_OP ( intf_close, struct http_transaction *, http_close ),
+	EFI_INTF_OP ( efi_describe, struct http_transaction *,
+		      http_efi_describe ),
 };
 
 /** HTTP data transfer interface descriptor */

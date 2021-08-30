@@ -169,3 +169,24 @@ void imgstat ( struct image *image ) {
 		printf ( " \"%s\"", image->cmdline );
 	printf ( "\n" );
 }
+
+/**
+ * Create image from block of memory
+ *
+ * @v name		Name
+ * @v data		Image data
+ * @v len		Length
+ * @ret rc		Return status code
+ */
+int imgmem ( const char *name, userptr_t data, size_t len ) {
+	struct image *image;
+
+	/* Create image */
+	image = image_memory ( name, data, len );
+	if ( ! image ) {
+		printf ( "Could not create image\n" );
+		return -ENOMEM;
+	}
+
+	return 0;
+}

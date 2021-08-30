@@ -116,13 +116,13 @@ struct x509_certificate * certstore_find ( struct asn1_cursor *raw ) {
  * @v key		Private key
  * @ret cert		X.509 certificate, or NULL if not found
  */
-struct x509_certificate * certstore_find_key ( struct asn1_cursor *key ) {
+struct x509_certificate * certstore_find_key ( struct private_key *key ) {
 	struct x509_certificate *cert;
 
 	/* Search for certificate within store */
 	list_for_each_entry ( cert, &certstore.links, store.list ) {
 		if ( pubkey_match ( cert->signature_algorithm->pubkey,
-				    key->data, key->len,
+				    key->builder.data, key->builder.len,
 				    cert->subject.public_key.raw.data,
 				    cert->subject.public_key.raw.len ) == 0 )
 			return certstore_found ( cert );

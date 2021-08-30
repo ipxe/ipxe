@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 //#undef	USB_KEYBOARD	/* USB keyboards */
+//#undef	USB_BLOCK	/* USB block devices */
 
 /*
  * USB external interfaces

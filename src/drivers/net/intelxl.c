@@ -34,7 +34,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/if_ether.h>
 #include <ipxe/vlan.h>
 #include <ipxe/iobuf.h>
-#include <ipxe/malloc.h>
 #include <ipxe/pci.h>
 #include <ipxe/version.h>
 #include "intelxl.h"
@@ -87,15 +86,16 @@ static int intelxl_reset ( struct intelxl_nic *intelxl ) {
 static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
 			       struct net_device *netdev ) {
 	union intelxl_receive_address mac;
-	uint32_t prtgl_sal;
+	uint32_t prtpm_sal;
+	uint32_t prtpm_sah;
 	uint32_t prtgl_sah;
 	size_t mfs;
 
 	/* Read NVM-loaded address */
-	prtgl_sal = readl ( intelxl->regs + INTELXL_PRTGL_SAL );
-	prtgl_sah = readl ( intelxl->regs + INTELXL_PRTGL_SAH );
-	mac.reg.low = cpu_to_le32 ( prtgl_sal );
-	mac.reg.high = cpu_to_le32 ( prtgl_sah );
+	prtpm_sal = readl ( intelxl->regs + INTELXL_PRTPM_SAL );
+	prtpm_sah = readl ( intelxl->regs + INTELXL_PRTPM_SAH );
+	mac.reg.low = cpu_to_le32 ( prtpm_sal );
+	mac.reg.high = cpu_to_le32 ( prtpm_sah );
 
 	/* Check that address is valid */
 	if ( ! is_valid_ether_addr ( mac.raw ) ) {
@@ -110,6 +110,7 @@ static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
 	memcpy ( netdev->hw_addr, mac.raw, ETH_ALEN );
 
 	/* Get maximum frame size */
+	prtgl_sah = readl ( intelxl->regs + INTELXL_PRTGL_SAH );
 	mfs = INTELXL_PRTGL_SAH_MFS_GET ( prtgl_sah );
 	netdev->max_pkt_len = ( mfs - 4 /* CRC */ );
 
@@ -134,20 +135,36 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
 			  struct pci_device *pci ) {
 	int rc;
 
+	/* Map dummy target location */
+	if ( ( rc = dma_map ( intelxl->dma, &intelxl->msix.map,
+			      virt_to_phys ( &intelxl->msix.msg ),
+			      sizeof ( intelxl->msix.msg ), DMA_RX ) ) != 0 ) {
+		DBGC ( intelxl, "INTELXL %p could not map MSI-X target: %s\n",
+		       intelxl, strerror ( rc ) );
+		goto err_map;
+	}
+
 	/* Enable MSI-X capability */
-	if ( ( rc = pci_msix_enable ( pci, &intelxl->msix ) ) != 0 ) {
+	if ( ( rc = pci_msix_enable ( pci, &intelxl->msix.cap ) ) != 0 ) {
 		DBGC ( intelxl, "INTELXL %p could not enable MSI-X: %s\n",
 		       intelxl, strerror ( rc ) );
-		return rc;
+		goto err_enable;
 	}
 
 	/* Configure interrupt zero to write to dummy location */
-	pci_msix_map ( &intelxl->msix, 0, virt_to_bus ( &intelxl->msg ), 0 );
+	pci_msix_map ( &intelxl->msix.cap, 0,
+		       dma ( &intelxl->msix.map, &intelxl->msix.msg ), 0 );
 
 	/* Enable dummy interrupt zero */
-	pci_msix_unmask ( &intelxl->msix, 0 );
+	pci_msix_unmask ( &intelxl->msix.cap, 0 );
 
 	return 0;
+
+	pci_msix_disable ( pci, &intelxl->msix.cap );
+ err_enable:
+	dma_unmap ( &intelxl->msix.map );
+ err_map:
+	return rc;
 }
 
 /**
@@ -160,10 +177,13 @@ void intelxl_msix_disable ( struct intelxl_nic *intelxl,
 			    struct pci_device *pci ) {
 
 	/* Disable dummy interrupt zero */
-	pci_msix_mask ( &intelxl->msix, 0 );
+	pci_msix_mask ( &intelxl->msix.cap, 0 );
 
 	/* Disable MSI-X capability */
-	pci_msix_disable ( pci, &intelxl->msix );
+	pci_msix_disable ( pci, &intelxl->msix.cap );
+
+	/* Unmap dummy target location */
+	dma_unmap ( &intelxl->msix.map );
 }
 
 /******************************************************************************
@@ -195,19 +215,19 @@ static int intelxl_alloc_admin ( struct intelxl_nic *intelxl,
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 
 	/* Allocate admin queue */
-	admin->buf = malloc_dma ( ( buf_len + len ), INTELXL_ALIGN );
+	admin->buf = dma_alloc ( intelxl->dma, &admin->map, ( buf_len + len ),
+				 INTELXL_ALIGN );
 	if ( ! admin->buf )
 		return -ENOMEM;
 	admin->desc = ( ( ( void * ) admin->buf ) + buf_len );
 
-	DBGC ( intelxl, "INTELXL %p A%cQ is at [%08llx,%08llx) buf "
-	       "[%08llx,%08llx)\n", intelxl,
+	DBGC ( intelxl, "INTELXL %p A%cQ is at [%08lx,%08lx) buf "
+	       "[%08lx,%08lx)\n", intelxl,
 	       ( ( admin == &intelxl->command ) ? 'T' : 'R' ),
-	       ( ( unsigned long long ) virt_to_bus ( admin->desc ) ),
-	       ( ( unsigned long long ) ( virt_to_bus ( admin->desc ) + len ) ),
-	       ( ( unsigned long long ) virt_to_bus ( admin->buf ) ),
-	       ( ( unsigned long long ) ( virt_to_bus ( admin->buf ) +
-					  buf_len ) ) );
+	       virt_to_phys ( admin->desc ),
+	       ( virt_to_phys ( admin->desc ) + len ),
+	       virt_to_phys ( admin->buf ),
+	       ( virt_to_phys ( admin->buf ) + buf_len ) );
 	return 0;
 }
 
@@ -235,7 +255,7 @@ static void intelxl_enable_admin ( struct intelxl_nic *intelxl,
 	admin->index = 0;
 
 	/* Program queue address */
-	address = virt_to_bus ( admin->desc );
+	address = dma ( &admin->map, admin->desc );
 	writel ( ( address & 0xffffffffUL ), admin_regs + regs->bal );
 	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) {
 		writel ( ( ( ( uint64_t ) address ) >> 32 ),
@@ -277,7 +297,7 @@ static void intelxl_free_admin ( struct intelxl_nic *intelxl __unused,
 	size_t len = ( sizeof ( admin->desc[0] ) * INTELXL_ADMIN_NUM_DESC );
 
 	/* Free queue */
-	free_dma ( admin->buf, ( buf_len + len ) );
+	dma_free ( &admin->map, admin->buf, ( buf_len + len ) );
 }
 
 /**
@@ -330,7 +350,7 @@ static void intelxl_admin_event_init ( struct intelxl_nic *intelxl,
 	/* Initialise descriptor */
 	evt = &admin->desc[ index % INTELXL_ADMIN_NUM_DESC ];
 	buf = &admin->buf[ index % INTELXL_ADMIN_NUM_DESC ];
-	address = virt_to_bus ( buf );
+	address = dma ( &admin->map, buf );
 	evt->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
 	evt->len = cpu_to_le16 ( sizeof ( *buf ) );
 	evt->params.buffer.high = cpu_to_le32 ( address >> 32 );
@@ -375,7 +395,7 @@ int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 
 	/* Populate data buffer address if applicable */
 	if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
-		address = virt_to_bus ( buf );
+		address = dma ( &admin->map, buf );
 		cmd->params.buffer.high = cpu_to_le32 ( address >> 32 );
 		cmd->params.buffer.low = cpu_to_le32 ( address & 0xffffffffUL );
 	}
@@ -922,16 +942,15 @@ void intelxl_close_admin ( struct intelxl_nic *intelxl ) {
  */
 int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 			 struct intelxl_ring *ring ) {
-	physaddr_t address;
 	int rc;
 
 	/* Allocate descriptor ring */
-	ring->desc.raw = malloc_dma ( ring->len, INTELXL_ALIGN );
+	ring->desc.raw = dma_alloc ( intelxl->dma, &ring->map, ring->len,
+				     INTELXL_ALIGN );
 	if ( ! ring->desc.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	address = virt_to_bus ( ring->desc.raw );
 
 	/* Initialise descriptor ring */
 	memset ( ring->desc.raw, 0, ring->len );
@@ -943,14 +962,14 @@ int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 	ring->prod = 0;
 	ring->cons = 0;
 
-	DBGC ( intelxl, "INTELXL %p ring %06x is at [%08llx,%08llx)\n",
+	DBGC ( intelxl, "INTELXL %p ring %06x is at [%08lx,%08lx)\n",
 	       intelxl, ( ring->reg + ring->tail ),
-	       ( ( unsigned long long ) address ),
-	       ( ( unsigned long long ) address + ring->len ) );
+	       virt_to_phys ( ring->desc.raw ),
+	       ( virt_to_phys ( ring->desc.raw ) + ring->len ) );
 
 	return 0;
 
-	free_dma ( ring->desc.raw, ring->len );
+	dma_free ( &ring->map, ring->desc.raw, ring->len );
  err_alloc:
 	return rc;
 }
@@ -965,7 +984,7 @@ void intelxl_free_ring ( struct intelxl_nic *intelxl __unused,
 			 struct intelxl_ring *ring ) {
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc.raw, ring->len );
+	dma_free ( &ring->map, ring->desc.raw, ring->len );
 	ring->desc.raw = NULL;
 }
 
@@ -1241,7 +1260,7 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
 		goto err_alloc;
 
 	/* Program queue context */
-	address = virt_to_bus ( ring->desc.raw );
+	address = dma ( &ring->map, ring->desc.raw );
 	if ( ( rc = ring->context ( intelxl, address ) ) != 0 )
 		goto err_context;
 
@@ -1289,14 +1308,13 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 	struct io_buffer *iobuf;
 	unsigned int rx_idx;
 	unsigned int rx_tail;
-	physaddr_t address;
 	unsigned int refilled = 0;
 
 	/* Refill ring */
 	while ( ( intelxl->rx.prod - intelxl->rx.cons ) < INTELXL_RX_FILL ) {
 
 		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( intelxl->mfs );
+		iobuf = alloc_rx_iob ( intelxl->mfs, intelxl->dma );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
 			break;
@@ -1307,17 +1325,16 @@ static void intelxl_refill_rx ( struct intelxl_nic *intelxl ) {
 		rx = &intelxl->rx.desc.rx[rx_idx].data;
 
 		/* Populate receive descriptor */
-		address = virt_to_bus ( iobuf->data );
-		rx->address = cpu_to_le64 ( address );
+		rx->address = cpu_to_le64 ( iob_dma ( iobuf ) );
 		rx->flags = 0;
 
 		/* Record I/O buffer */
 		assert ( intelxl->rx_iobuf[rx_idx] == NULL );
 		intelxl->rx_iobuf[rx_idx] = iobuf;
 
-		DBGC2 ( intelxl, "INTELXL %p RX %d is [%llx,%llx)\n", intelxl,
-			rx_idx, ( ( unsigned long long ) address ),
-			( ( unsigned long long ) address + intelxl->mfs ) );
+		DBGC2 ( intelxl, "INTELXL %p RX %d is [%08lx,%08lx)\n",
+			intelxl, rx_idx, virt_to_phys ( iobuf->data ),
+			( virt_to_phys ( iobuf->data ) +  intelxl->mfs ) );
 		refilled++;
 	}
 
@@ -1340,7 +1357,7 @@ void intelxl_empty_rx ( struct intelxl_nic *intelxl ) {
 	/* Discard any unused receive buffers */
 	for ( i = 0 ; i < INTELXL_RX_NUM_DESC ; i++ ) {
 		if ( intelxl->rx_iobuf[i] )
-			free_iob ( intelxl->rx_iobuf[i] );
+			free_rx_iob ( intelxl->rx_iobuf[i] );
 		intelxl->rx_iobuf[i] = NULL;
 	}
 }
@@ -1467,7 +1484,6 @@ int intelxl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct intelxl_tx_data_descriptor *tx;
 	unsigned int tx_idx;
 	unsigned int tx_tail;
-	physaddr_t address;
 	size_t len;
 
 	/* Get next transmit descriptor */
@@ -1481,9 +1497,8 @@ int intelxl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	tx = &intelxl->tx.desc.tx[tx_idx].data;
 
 	/* Populate transmit descriptor */
-	address = virt_to_bus ( iobuf->data );
 	len = iob_len ( iobuf );
-	tx->address = cpu_to_le64 ( address );
+	tx->address = cpu_to_le64 ( iob_dma ( iobuf ) );
 	tx->len = cpu_to_le32 ( INTELXL_TX_DATA_LEN ( len ) );
 	tx->flags = cpu_to_le32 ( INTELXL_TX_DATA_DTYP | INTELXL_TX_DATA_EOP |
 				  INTELXL_TX_DATA_RS | INTELXL_TX_DATA_JFDI );
@@ -1492,9 +1507,9 @@ int intelxl_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	/* Notify card that there are packets ready to transmit */
 	writel ( tx_tail, ( intelxl->regs + intelxl->tx.tail ) );
 
-	DBGC2 ( intelxl, "INTELXL %p TX %d is [%llx,%llx)\n", intelxl, tx_idx,
-		( ( unsigned long long ) address ),
-		( ( unsigned long long ) address + len ) );
+	DBGC2 ( intelxl, "INTELXL %p TX %d is [%08lx,%08lx)\n",
+		intelxl, tx_idx, virt_to_phys ( iobuf->data ),
+		( virt_to_phys ( iobuf->data ) + len ) );
 	return 0;
 }
 
@@ -1641,6 +1656,7 @@ static struct net_device_operations intelxl_operations = {
 static int intelxl_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct intelxl_nic *intelxl;
+	uint32_t pffunc_rid;
 	uint32_t pfgen_portnum;
 	uint32_t pflan_qalloc;
 	int rc;
@@ -1656,7 +1672,6 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
-	intelxl->pf = PCI_FUNC ( pci->busdevfn );
 	intelxl->intr = INTELXL_PFINT_DYN_CTL0;
 	intelxl_init_admin ( &intelxl->command, INTELXL_ADMIN_CMD,
 			     &intelxl_admin_offsets );
@@ -1673,17 +1688,24 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	intelxl->regs = ioremap ( pci->membase, INTELXL_BAR_SIZE );
+	intelxl->regs = pci_ioremap ( pci, pci->membase, INTELXL_BAR_SIZE );
 	if ( ! intelxl->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
 
+	/* Configure DMA */
+	intelxl->dma = &pci->dma;
+	dma_set_mask_64bit ( intelxl->dma );
+	netdev->dma = intelxl->dma;
+
 	/* Reset the NIC */
 	if ( ( rc = intelxl_reset ( intelxl ) ) != 0 )
 		goto err_reset;
 
-	/* Get port number and base queue number */
+	/* Get function number, port number and base queue number */
+	pffunc_rid = readl ( intelxl->regs + INTELXL_PFFUNC_RID );
+	intelxl->pf = INTELXL_PFFUNC_RID_FUNC_NUM ( pffunc_rid );
 	pfgen_portnum = readl ( intelxl->regs + INTELXL_PFGEN_PORTNUM );
 	intelxl->port = INTELXL_PFGEN_PORTNUM_PORT_NUM ( pfgen_portnum );
 	pflan_qalloc = readl ( intelxl->regs + INTELXL_PFLAN_QALLOC );

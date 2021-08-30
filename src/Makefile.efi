@@ -1,5 +1,13 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
+# Enable stack protection if available
+#
+SPG_TEST = $(CC) -fstack-protector-strong -mstack-protector-guard=global \
+		 -x c -c /dev/null -o /dev/null >/dev/null 2>&1
+SPG_FLAGS := $(shell $(SPG_TEST) && $(ECHO) '-fstack-protector-strong ' \
+					    '-mstack-protector-guard=global')
+CFLAGS += $(SPG_FLAGS)
+
 # The EFI linker script
 #
 LDSCRIPT	= scripts/efi.lds
@@ -35,12 +43,13 @@ $(BIN)/%.drv.efi : $(BIN)/%.efidrv
 
 $(BIN)/%.efirom : $(BIN)/%.efidrv $(EFIROM)
 	$(QM)$(ECHO) "  [FINISH] $@"
-	$(Q)$(EFIROM) -v $(TGT_PCI_VENDOR) -d $(TGT_PCI_DEVICE) $< $@
+	$(Q)$(EFIROM) -v $(firstword $(TGT_PCI_VENDOR) 0) \
+		      -d $(firstword $(TGT_PCI_DEVICE) 0) -c $< $@
 
 $(BIN)/efidrv.cab : $(BIN)/alldrv.efis # $(ALL_drv.efi) is not yet defined
 	$(QM)$(ECHO) "  [CAB] $@"
 	$(Q)$(LCAB) -n -q $(ALL_drv.efi) $@
 
-$(BIN)/%.usb : $(BIN)/%.efi
-	$(QM)$(ECHO) "  [GENEFIDSK] $@"
-	$(Q)bash util/genefidsk -o $@ -b $(EFI_BOOT_FILE) $<
+$(BIN)/%.iso $(BIN)/%.usb : $(BIN)/%.efi util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<

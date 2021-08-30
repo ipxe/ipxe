@@ -35,6 +35,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+/** Colour for debug messages */
+#define colour FADT_SIGNATURE
+
 /******************************************************************************
  *
  * Utility functions
@@ -80,13 +83,13 @@ void acpi_fix_checksum ( struct acpi_header *acpi ) {
 }
 
 /**
- * Locate ACPI table
+ * Locate ACPI table via RSDT
  *
  * @v signature		Requested table signature
  * @v index		Requested index of table with this signature
  * @ret table		Table, or UNULL if not found
  */
-userptr_t acpi_find ( uint32_t signature, unsigned int index ) {
+userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
 	struct acpi_header acpi;
 	struct acpi_rsdt *rsdtab;
 	typeof ( rsdtab->entry[0] ) entry;
@@ -106,17 +109,17 @@ userptr_t acpi_find ( uint32_t signature, unsigned int index ) {
 	/* Read RSDT header */
 	copy_from_user ( &acpi, rsdt, 0, sizeof ( acpi ) );
 	if ( acpi.signature != cpu_to_le32 ( RSDT_SIGNATURE ) ) {
-		DBGC ( rsdt, "RSDT %#08lx has invalid signature:\n",
+		DBGC ( colour, "RSDT %#08lx has invalid signature:\n",
 		       user_to_phys ( rsdt, 0 ) );
-		DBGC_HDA ( rsdt, user_to_phys ( rsdt, 0 ), &acpi,
+		DBGC_HDA ( colour, user_to_phys ( rsdt, 0 ), &acpi,
 			   sizeof ( acpi ) );
 		return UNULL;
 	}
 	len = le32_to_cpu ( acpi.length );
 	if ( len < sizeof ( rsdtab->acpi ) ) {
-		DBGC ( rsdt, "RSDT %#08lx has invalid length:\n",
+		DBGC ( colour, "RSDT %#08lx has invalid length:\n",
 		       user_to_phys ( rsdt, 0 ) );
-		DBGC_HDA ( rsdt, user_to_phys ( rsdt, 0 ), &acpi,
+		DBGC_HDA ( colour, user_to_phys ( rsdt, 0 ), &acpi,
 			   sizeof ( acpi ) );
 		return UNULL;
 	}
@@ -147,20 +150,20 @@ userptr_t acpi_find ( uint32_t signature, unsigned int index ) {
 
 		/* Check table integrity */
 		if ( acpi_checksum ( table ) != 0 ) {
-			DBGC ( rsdt, "RSDT %#08lx found %s with bad checksum "
-			       "at %08lx\n", user_to_phys ( rsdt, 0 ),
+			DBGC ( colour, "RSDT %#08lx found %s with bad "
+			       "checksum at %08lx\n", user_to_phys ( rsdt, 0 ),
 			       acpi_name ( signature ),
 			       user_to_phys ( table, 0 ) );
 			break;
 		}
 
-		DBGC ( rsdt, "RSDT %#08lx found %s at %08lx\n",
+		DBGC ( colour, "RSDT %#08lx found %s at %08lx\n",
 		       user_to_phys ( rsdt, 0 ), acpi_name ( signature ),
 		       user_to_phys ( table, 0 ) );
 		return table;
 	}
 
-	DBGC ( rsdt, "RSDT %#08lx could not find %s\n",
+	DBGC ( colour, "RSDT %#08lx could not find %s\n",
 	       user_to_phys ( rsdt, 0 ), acpi_name ( signature ) );
 	return UNULL;
 }
@@ -256,19 +259,11 @@ static int acpi_sx_zsdt ( userptr_t zsdt, uint32_t signature ) {
  */
 int acpi_sx ( uint32_t signature ) {
 	struct acpi_fadt fadtab;
-	userptr_t rsdt;
 	userptr_t fadt;
 	userptr_t dsdt;
 	userptr_t ssdt;
 	unsigned int i;
 	int sx;
-
-	/* Locate RSDT */
-	rsdt = acpi_find_rsdt();
-	if ( ! rsdt ) {
-		DBG ( "RSDT not found\n" );
-		return -ENOENT;
-	}
 
 	/* Try DSDT first */
 	fadt = acpi_find ( FADT_SIGNATURE, 0 );
@@ -288,8 +283,8 @@ int acpi_sx ( uint32_t signature ) {
 			return sx;
 	}
 
-	DBGC ( rsdt, "RSDT %#08lx could not find \\_Sx \"%s\"\n",
-	       user_to_phys ( rsdt, 0 ), acpi_name ( signature ) );
+	DBGC ( colour, "ACPI could not find \\_Sx \"%s\"\n",
+	       acpi_name ( signature ) );
 	return -ENOENT;
 }
 

@@ -247,6 +247,8 @@ enum realtek_legacy_status {
 struct realtek_ring {
 	/** Descriptors */
 	struct realtek_descriptor *desc;
+	/** Descriptor ring DMA mapping */
+	struct dma_mapping map;
 	/** Producer index */
 	unsigned int prod;
 	/** Consumer index */
@@ -272,10 +274,22 @@ realtek_init_ring ( struct realtek_ring *ring, unsigned int count,
 	ring->reg = reg;
 }
 
+/** Receive buffer (legacy mode *) */
+struct realtek_rx_buffer {
+	/** Buffer */
+	void *data;
+	/** Buffer DMA mapping */
+	struct dma_mapping map;
+	/** Offset within buffer */
+	unsigned int offset;
+};
+
 /** A Realtek network card */
 struct realtek_nic {
 	/** Registers */
 	void *regs;
+	/** DMA device */
+	struct dma_device *dma;
 	/** SPI bit-bashing interface */
 	struct spi_bit_basher spibit;
 	/** EEPROM */
@@ -301,9 +315,7 @@ struct realtek_nic {
 	/** Receive I/O buffers */
 	struct io_buffer *rx_iobuf[RTL_NUM_RX_DESC];
 	/** Receive buffer (legacy mode) */
-	void *rx_buffer;
-	/** Offset within receive buffer (legacy mode) */
-	unsigned int rx_offset;
+	struct realtek_rx_buffer rxbuf;
 };
 
 #endif /* _REALTEK_H */

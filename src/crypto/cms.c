@@ -76,7 +76,7 @@ static uint8_t oid_signeddata[] = { ASN1_OID_SIGNEDDATA };
 
 /** "pkcs7-signedData" object identifier cursor */
 static struct asn1_cursor oid_signeddata_cursor =
-	ASN1_OID_CURSOR ( oid_signeddata );
+	ASN1_CURSOR ( oid_signeddata );
 
 /**
  * Parse CMS signature content type

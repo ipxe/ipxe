@@ -20,6 +20,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define TIME_LINUX
 #define REBOOT_NULL
 #define PCIAPI_LINUX
+#define DMAAPI_FLAT
+#define ACPI_LINUX
 
 #define DRIVERS_LINUX
 

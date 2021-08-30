@@ -19,6 +19,141 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/api.h>
 #include <config/general.h>
 
+/** An ACPI small resource descriptor header */
+struct acpi_small_resource {
+	/** Tag byte */
+	uint8_t tag;
+} __attribute__ (( packed ));
+
+/** ACPI small resource length mask */
+#define ACPI_SMALL_LEN_MASK 0x03
+
+/** An ACPI end resource descriptor */
+#define ACPI_END_RESOURCE 0x78
+
+/** An ACPI end resource descriptor */
+struct acpi_end_resource {
+	/** Header */
+	struct acpi_small_resource hdr;
+	/** Checksum */
+	uint8_t checksum;
+} __attribute__ (( packed ));
+
+/** An ACPI large resource descriptor header */
+struct acpi_large_resource {
+	/** Tag byte */
+	uint8_t tag;
+	/** Length of data items */
+	uint16_t len;
+} __attribute__ (( packed ));
+
+/** ACPI large resource flag */
+#define ACPI_LARGE 0x80
+
+/** An ACPI QWORD address space resource descriptor */
+#define ACPI_QWORD_ADDRESS_SPACE_RESOURCE 0x8a
+
+/** An ACPI QWORD address space resource descriptor */
+struct acpi_qword_address_space_resource {
+	/** Header */
+	struct acpi_large_resource hdr;
+	/** Resource type */
+	uint8_t type;
+	/** General flags */
+	uint8_t general;
+	/** Type-specific flags */
+	uint8_t specific;
+	/** Granularity */
+	uint64_t granularity;
+	/** Minimum address */
+	uint64_t min;
+	/** Maximum address */
+	uint64_t max;
+	/** Translation offset */
+	uint64_t offset;
+	/** Length */
+	uint64_t len;
+} __attribute__ (( packed ));
+
+/** A memory address space type */
+#define ACPI_ADDRESS_TYPE_MEM 0x00
+
+/** A bus number address space type */
+#define ACPI_ADDRESS_TYPE_BUS 0x02
+
+/** An ACPI resource descriptor */
+union acpi_resource {
+	/** Tag byte */
+	uint8_t tag;
+	/** Small resource descriptor */
+	struct acpi_small_resource small;
+	/** End resource descriptor */
+	struct acpi_end_resource end;
+	/** Large resource descriptor */
+	struct acpi_large_resource large;
+	/** QWORD address space resource descriptor */
+	struct acpi_qword_address_space_resource qword;
+};
+
+/**
+ * Get ACPI resource tag
+ *
+ * @v res		ACPI resource descriptor
+ * @ret tag		Resource tag
+ */
+static inline unsigned int acpi_resource_tag ( union acpi_resource *res ) {
+
+	return ( ( res->tag & ACPI_LARGE ) ?
+		 res->tag : ( res->tag & ~ACPI_SMALL_LEN_MASK ) );
+}
+
+/**
+ * Get length of ACPI small resource descriptor
+ *
+ * @v res		Small resource descriptor
+ * @ret len		Length of descriptor
+ */
+static inline size_t acpi_small_len ( struct acpi_small_resource *res ) {
+
+	return ( sizeof ( *res ) + ( res->tag & ACPI_SMALL_LEN_MASK ) );
+}
+
+/**
+ * Get length of ACPI large resource descriptor
+ *
+ * @v res		Large resource descriptor
+ * @ret len		Length of descriptor
+ */
+static inline size_t acpi_large_len ( struct acpi_large_resource *res ) {
+
+	return ( sizeof ( *res ) + le16_to_cpu ( res->len ) );
+}
+
+/**
+ * Get length of ACPI resource descriptor
+ *
+ * @v res		ACPI resource descriptor
+ * @ret len		Length of descriptor
+ */
+static inline size_t acpi_resource_len ( union acpi_resource *res ) {
+
+	return ( ( res->tag & ACPI_LARGE ) ?
+		 acpi_large_len ( &res->large ) :
+		 acpi_small_len ( &res->small ) );
+}
+
+/**
+ * Get next ACPI resource descriptor
+ *
+ * @v res		ACPI resource descriptor
+ * @ret next		Next ACPI resource descriptor
+ */
+static inline union acpi_resource *
+acpi_resource_next ( union acpi_resource *res ) {
+
+	return ( ( ( void * ) res ) + acpi_resource_len ( res ) );
+}
+
 /**
  * An ACPI description header
  *
@@ -220,9 +355,12 @@ struct acpi_model {
 #define PROVIDE_ACPI_INLINE( _subsys, _api_func ) \
 	PROVIDE_SINGLE_API_INLINE ( ACPI_PREFIX_ ## _subsys, _api_func )
 
+extern userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index );
+
 /* Include all architecture-independent ACPI API headers */
 #include <ipxe/null_acpi.h>
 #include <ipxe/efi/efi_acpi.h>
+#include <ipxe/linux/linux_acpi.h>
 
 /* Include all architecture-dependent ACPI API headers */
 #include <bits/acpi.h>
@@ -234,13 +372,21 @@ struct acpi_model {
  */
 userptr_t acpi_find_rsdt ( void );
 
+/**
+ * Locate ACPI table
+ *
+ * @v signature		Requested table signature
+ * @v index		Requested index of table with this signature
+ * @ret table		Table, or UNULL if not found
+ */
+userptr_t acpi_find ( uint32_t signature, unsigned int index );
+
 extern struct acpi_descriptor *
 acpi_describe ( struct interface *interface );
 #define acpi_describe_TYPE( object_type )				\
 	typeof ( struct acpi_descriptor * ( object_type ) )
 
 extern void acpi_fix_checksum ( struct acpi_header *acpi );
-extern userptr_t acpi_find ( uint32_t signature, unsigned int index );
 extern int acpi_sx ( uint32_t signature );
 extern void acpi_add ( struct acpi_descriptor *desc );
 extern void acpi_del ( struct acpi_descriptor *desc );

@@ -2,9 +2,10 @@
  *
  * GPL net driver for Solarflare network cards
  *
- * Written by Shradha Shah <sshah@solarflare.com>
+ * Written by Shradha Shah, maintained by <pre-boot-drivers@xilinx.com>
  *
- * Copyright 2012-2017 Solarflare Communications Inc.
+ * Copyright 2012-2019 Solarflare Communications Inc.
+ * Copyright 2019-2020 Xilinx Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as

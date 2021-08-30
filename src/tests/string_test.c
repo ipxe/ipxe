@@ -105,10 +105,19 @@ static void string_test_exec ( void ) {
 	ok ( strcasecmp ( "Uncle", "Uncle Jack" ) != 0 );
 	ok ( strcasecmp ( "not", "equal" ) != 0 );
 
+	/* Test strncasecmp() */
+	ok ( strncasecmp ( "", "", 0 ) == 0 );
+	ok ( strncasecmp ( "", "", 73 ) == 0 );
+	ok ( strncasecmp ( "Uncle Jack", "Uncle jack", 47 ) == 0 );
+	ok ( strncasecmp ( "Uncle Jack", "Uncle jake", 47 ) != 0 );
+	ok ( strncasecmp ( "Uncle Jack", "Uncle jake", 9 ) != 0 );
+	ok ( strncasecmp ( "Uncle Jack", "Uncle jake", 8 ) == 0 );
+
 	/* Test memcmp() */
 	ok ( memcmp ( "", "", 0 ) == 0 );
 	ok ( memcmp ( "Foo", "Foo", 3 ) == 0 );
 	ok ( memcmp ( "Foo", "Bar", 3 ) != 0 );
+	ok ( memcmp ( "abc", "def", 3 ) < 0 );
 
 	/* Test strstr() */
 	{

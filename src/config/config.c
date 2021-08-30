@@ -182,6 +182,12 @@ REQUIRE_OBJECT ( efi_image );
 #ifdef IMAGE_SDI
 REQUIRE_OBJECT ( sdi );
 #endif
+#ifdef IMAGE_ZLIB
+REQUIRE_OBJECT ( zlib );
+#endif
+#ifdef IMAGE_GZIP
+REQUIRE_OBJECT ( gzip );
+#endif
 
 /*
  * Drag in all requested commands
@@ -280,6 +286,9 @@ REQUIRE_OBJECT ( ntp_cmd );
 #endif
 #ifdef CERT_CMD
 REQUIRE_OBJECT ( cert_cmd );
+#endif
+#ifdef IMAGE_MEM_CMD
+REQUIRE_OBJECT ( image_mem_cmd );
 #endif
 
 /*

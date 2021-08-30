@@ -434,7 +434,7 @@ int vmbus_open ( struct vmbus_device *vmdev,
 	len = ( sizeof ( *vmdev->out ) + out_len +
 		sizeof ( *vmdev->in ) + in_len );
 	assert ( ( len % PAGE_SIZE ) == 0 );
-	ring = malloc_dma ( len, PAGE_SIZE );
+	ring = malloc_phys ( len, PAGE_SIZE );
 	if ( ! ring ) {
 		rc = -ENOMEM;
 		goto err_alloc_ring;
@@ -509,7 +509,7 @@ int vmbus_open ( struct vmbus_device *vmdev,
  err_post_message:
 	vmbus_gpadl_teardown ( vmdev, vmdev->gpadl );
  err_establish:
-	free_dma ( ring, len );
+	free_phys ( ring, len );
  err_alloc_ring:
 	free ( packet );
  err_alloc_packet:
@@ -555,7 +555,7 @@ void vmbus_close ( struct vmbus_device *vmdev ) {
 	/* Free ring buffer */
 	len = ( sizeof ( *vmdev->out ) + vmdev->out_len +
 		sizeof ( *vmdev->in ) + vmdev->in_len );
-	free_dma ( vmdev->out, len );
+	free_phys ( vmdev->out, len );
 	vmdev->out = NULL;
 	vmdev->in = NULL;
 

@@ -21,7 +21,7 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 #include <ipxe/nap.h>
 
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 
 /** @file
  *

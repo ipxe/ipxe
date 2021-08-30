@@ -45,10 +45,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/x509.h>
 #include <ipxe/privkey.h>
 #include <ipxe/certstore.h>
+#include <ipxe/rootcert.h>
 #include <ipxe/rbg.h>
 #include <ipxe/validator.h>
 #include <ipxe/job.h>
 #include <ipxe/tls.h>
+#include <config/crypto.h>
 
 /* Disambiguate the various error causes */
 #define EINVAL_CHANGE_CIPHER __einfo_error ( EINFO_EINVAL_CHANGE_CIPHER )
@@ -244,6 +246,23 @@ static int tls_ready ( struct tls_connection *tls ) {
 		 ( ! is_pending ( &tls->server_negotiation ) ) );
 }
 
+/**
+ * Check for TLS version
+ *
+ * @v tls		TLS connection
+ * @v version		TLS version
+ * @ret at_least	TLS connection is using at least the specified version
+ *
+ * Check that TLS connection uses at least the specified protocol
+ * version.  Optimise down to a compile-time constant true result if
+ * this is already guaranteed by the minimum supported version check.
+ */
+static inline __attribute__ (( always_inline )) int
+tls_version ( struct tls_connection *tls, unsigned int version ) {
+	return ( ( TLS_VERSION_MIN >= version ) ||
+		 ( tls->version >= version ) );
+}
+
 /******************************************************************************
  *
  * Hybrid MD5+SHA1 hash as used by TLSv1.1 and earlier
@@ -331,7 +350,9 @@ static void free_tls_session ( struct refcnt *refcnt ) {
 	/* Remove from list of sessions */
 	list_del ( &session->list );
 
-	/* Free session ticket */
+	/* Free dynamically-allocated resources */
+	x509_root_put ( session->root );
+	privkey_put ( session->key );
 	free ( session->ticket );
 
 	/* Free session */
@@ -360,8 +381,10 @@ static void free_tls ( struct refcnt *refcnt ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
-	x509_put ( tls->cert );
+	x509_chain_put ( tls->certs );
 	x509_chain_put ( tls->chain );
+	x509_root_put ( tls->root );
+	privkey_put ( tls->key );
 
 	/* Drop reference to session */
 	assert ( list_empty ( &tls->list ) );
@@ -540,7 +563,7 @@ static void tls_prf ( struct tls_connection *tls, void *secret,
 
 	va_start ( seeds, out_len );
 
-	if ( tls->version >= TLS_VERSION_TLS_1_2 ) {
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 		/* Use P_SHA256 for TLSv1.2 and later */
 		tls_p_hash_va ( tls, &sha256_algorithm, secret, secret_len,
 				out, out_len, seeds );
@@ -1130,40 +1153,56 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
  */
 static int tls_send_certificate ( struct tls_connection *tls ) {
 	struct {
+		tls24_t length;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *certificate;
+	struct {
 		uint32_t type_length;
 		tls24_t length;
-		struct {
-			tls24_t length;
-			uint8_t data[ tls->cert->raw.len ];
-		} __attribute__ (( packed )) certificates[1];
-	} __attribute__ (( packed )) *certificate;
+		typeof ( *certificate ) certificates[0];
+	} __attribute__ (( packed )) *certificates;
+	struct x509_link *link;
+	struct x509_certificate *cert;
+	size_t len;
 	int rc;
+
+	/* Calculate length of client certificates */
+	len = 0;
+	list_for_each_entry ( link, &tls->certs->links, list ) {
+		cert = link->cert;
+		len += ( sizeof ( *certificate ) + cert->raw.len );
+		DBGC ( tls, "TLS %p sending client certificate %s\n",
+		       tls, x509_name ( cert ) );
+	}
 
 	/* Allocate storage for Certificate record (which may be too
 	 * large for the stack).
 	 */
-	certificate = zalloc ( sizeof ( *certificate ) );
-	if ( ! certificate )
+	certificates = zalloc ( sizeof ( *certificates ) + len );
+	if ( ! certificates )
 		return -ENOMEM_CERTIFICATE;
 
 	/* Populate record */
-	certificate->type_length =
+	certificates->type_length =
 		( cpu_to_le32 ( TLS_CERTIFICATE ) |
-		  htonl ( sizeof ( *certificate ) -
-			  sizeof ( certificate->type_length ) ) );
-	tls_set_uint24 ( &certificate->length,
-			 sizeof ( certificate->certificates ) );
-	tls_set_uint24 ( &certificate->certificates[0].length,
-			 sizeof ( certificate->certificates[0].data ) );
-	memcpy ( certificate->certificates[0].data,
-		 tls->cert->raw.data,
-		 sizeof ( certificate->certificates[0].data ) );
+		  htonl ( sizeof ( *certificates ) + len -
+			  sizeof ( certificates->type_length ) ) );
+	tls_set_uint24 ( &certificates->length, len );
+	certificate = &certificates->certificates[0];
+	list_for_each_entry ( link, &tls->certs->links, list ) {
+		cert = link->cert;
+		tls_set_uint24 ( &certificate->length, cert->raw.len );
+		memcpy ( certificate->data, cert->raw.data, cert->raw.len );
+		certificate = ( ( ( void * ) certificate->data ) +
+				cert->raw.len );
+	}
 
 	/* Transmit record */
-	rc = tls_send_handshake ( tls, certificate, sizeof ( *certificate ) );
+	rc = tls_send_handshake ( tls, certificates,
+				  ( sizeof ( *certificates ) + len ) );
 
 	/* Free record */
-	free ( certificate );
+	free ( certificates );
 
 	return rc;
 }
@@ -1220,8 +1259,9 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
  */
 static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	struct digest_algorithm *digest = tls->handshake_digest;
-	struct x509_certificate *cert = tls->cert;
+	struct x509_certificate *cert = x509_first ( tls->certs );
 	struct pubkey_algorithm *pubkey = cert->signature_algorithm->pubkey;
+	struct asn1_cursor *key = privkey_cursor ( tls->key );
 	uint8_t digest_out[ digest->digestsize ];
 	uint8_t ctx[ pubkey->ctxsize ];
 	struct tls_signature_hash_algorithm *sig_hash = NULL;
@@ -1231,15 +1271,14 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	tls_verify_handshake ( tls, digest_out );
 
 	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, ctx, private_key.data,
-				  private_key.len ) ) != 0 ) {
+	if ( ( rc = pubkey_init ( pubkey, ctx, key->data, key->len ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not initialise %s client private "
 		       "key: %s\n", tls, pubkey->name, strerror ( rc ) );
 		goto err_pubkey_init;
 	}
 
 	/* TLSv1.2 and later use explicit algorithm identifiers */
-	if ( tls->version >= TLS_VERSION_TLS_1_2 ) {
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 		sig_hash = tls_signature_hash_algorithm ( pubkey, digest );
 		if ( ! sig_hash ) {
 			DBGC ( tls, "TLS %p could not identify (%s,%s) "
@@ -1558,7 +1597,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 
 	/* Check and store protocol version */
 	version = ntohs ( hello_a->version );
-	if ( version < TLS_VERSION_TLS_1_0 ) {
+	if ( version < TLS_VERSION_MIN ) {
 		DBGC ( tls, "TLS %p does not support protocol version %d.%d\n",
 		       tls, ( version >> 8 ), ( version & 0xff ) );
 		return -ENOTSUP_VERSION;
@@ -1576,7 +1615,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	/* Use MD5+SHA1 digest algorithm for handshake verification
 	 * for versions earlier than TLSv1.2.
 	 */
-	if ( tls->version < TLS_VERSION_TLS_1_2 ) {
+	if ( ! tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 		tls->handshake_digest = &md5_sha1_algorithm;
 		tls->handshake_ctx = tls->handshake_md5_sha1_ctx;
 	}
@@ -1827,26 +1866,57 @@ static int tls_new_certificate ( struct tls_connection *tls,
 static int tls_new_certificate_request ( struct tls_connection *tls,
 					 const void *data __unused,
 					 size_t len __unused ) {
+	struct x509_certificate *cert;
+	int rc;
 
 	/* We can only send a single certificate, so there is no point
 	 * in parsing the Certificate Request.
 	 */
 
-	/* Free any existing client certificate */
-	x509_put ( tls->cert );
+	/* Free any existing client certificate chain */
+	x509_chain_put ( tls->certs );
+	tls->certs = NULL;
 
 	/* Determine client certificate to be sent */
-	tls->cert = certstore_find_key ( &private_key );
-	if ( ! tls->cert ) {
+	cert = certstore_find_key ( tls->key );
+	if ( ! cert ) {
 		DBGC ( tls, "TLS %p could not find certificate corresponding "
 		       "to private key\n", tls );
-		return -EPERM_CLIENT_CERT;
+		rc = -EPERM_CLIENT_CERT;
+		goto err_find;
 	}
-	x509_get ( tls->cert );
-	DBGC ( tls, "TLS %p sending client certificate %s\n",
-	       tls, x509_name ( tls->cert ) );
+	x509_get ( cert );
+	DBGC ( tls, "TLS %p selected client certificate %s\n",
+	       tls, x509_name ( cert ) );
+
+	/* Create client certificate chain */
+	tls->certs = x509_alloc_chain();
+	if ( ! tls->certs ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Append client certificate to chain */
+	if ( ( rc = x509_append ( tls->certs, cert ) ) != 0 )
+		goto err_append;
+
+	/* Append any relevant issuer certificates */
+	if ( ( rc = x509_auto_append ( tls->certs, &certstore ) ) != 0 )
+		goto err_auto_append;
+
+	/* Drop local reference to client certificate */
+	x509_put ( cert );
 
 	return 0;
+
+ err_auto_append:
+ err_append:
+	x509_chain_put ( tls->certs );
+	tls->certs = NULL;
+ err_alloc:
+	x509_put ( cert );
+ err_find:
+	return rc;
 }
 
 /**
@@ -1873,7 +1943,8 @@ static int tls_new_server_hello_done ( struct tls_connection *tls,
 	}
 
 	/* Begin certificate validation */
-	if ( ( rc = create_validator ( &tls->validator, tls->chain ) ) != 0 ) {
+	if ( ( rc = create_validator ( &tls->validator, tls->chain,
+				       tls->root ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not start certificate validation: "
 		       "%s\n", tls, strerror ( rc ) );
 		return rc;
@@ -2258,7 +2329,7 @@ static void * tls_assemble_block ( struct tls_connection *tls,
 	void *padding;
 
 	/* TLSv1.1 and later use an explicit IV */
-	iv_len = ( ( tls->version >= TLS_VERSION_TLS_1_1 ) ? blocksize : 0 );
+	iv_len = ( tls_version ( tls, TLS_VERSION_TLS_1_1 ) ? blocksize : 0 );
 
 	/* Calculate block-ciphered struct length */
 	padding_len = ( ( blocksize - 1 ) & -( iv_len + len + mac_len + 1 ) );
@@ -2420,7 +2491,7 @@ static int tls_split_block ( struct tls_connection *tls,
 
 	/* TLSv1.1 and later use an explicit IV */
 	iobuf = list_first_entry ( rx_data, struct io_buffer, list );
-	iv_len = ( ( tls->version >= TLS_VERSION_TLS_1_1 ) ?
+	iv_len = ( tls_version ( tls, TLS_VERSION_TLS_1_1 ) ?
 		   tls->rx_cipherspec.suite->cipher->blocksize : 0 );
 	if ( iob_len ( iobuf ) < iv_len ) {
 		DBGC ( tls, "TLS %p received underlength IV\n", tls );
@@ -2862,7 +2933,7 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	tls->tx_pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
 			     TLS_TX_CHANGE_CIPHER |
 			     TLS_TX_FINISHED );
-	if ( tls->cert ) {
+	if ( tls->certs ) {
 		tls->tx_pending |= ( TLS_TX_CERTIFICATE |
 				     TLS_TX_CERTIFICATE_VERIFY );
 	}
@@ -3030,7 +3101,9 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 
 	/* Find existing matching session, if any */
 	list_for_each_entry ( session, &tls_sessions, list ) {
-		if ( strcmp ( name, session->name ) == 0 ) {
+		if ( ( strcmp ( name, session->name ) == 0 ) &&
+		     ( tls->root == session->root ) &&
+		     ( tls->key == session->key ) ) {
 			ref_get ( &session->refcnt );
 			tls->session = session;
 			DBGC ( tls, "TLS %p joining session %s\n", tls, name );
@@ -3049,6 +3122,8 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 	name_copy = ( ( ( void * ) session ) + sizeof ( *session ) );
 	strcpy ( name_copy, name );
 	session->name = name_copy;
+	session->root = x509_root_get ( tls->root );
+	session->key = privkey_get ( tls->key );
 	INIT_LIST_HEAD ( &session->conn );
 	list_add ( &session->list, &tls_sessions );
 
@@ -3070,8 +3145,17 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
  ******************************************************************************
  */
 
+/**
+ * Add TLS on an interface
+ *
+ * @v xfer		Data transfer interface
+ * @v name		Host name
+ * @v root		Root of trust (or NULL to use default)
+ * @v key		Private key (or NULL to use default)
+ * @ret rc		Return status code
+ */
 int add_tls ( struct interface *xfer, const char *name,
-	      struct interface **next ) {
+	      struct x509_root *root, struct private_key *key ) {
 	struct tls_connection *tls;
 	int rc;
 
@@ -3089,6 +3173,8 @@ int add_tls ( struct interface *xfer, const char *name,
 	intf_init ( &tls->validator, &tls_validator_desc, &tls->refcnt );
 	process_init_stopped ( &tls->process, &tls_process_desc,
 			       &tls->refcnt );
+	tls->key = privkey_get ( key ? key : &private_key );
+	tls->root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_TLS_1_2;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
@@ -3115,8 +3201,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls_restart ( tls );
 
 	/* Attach to parent interface, mortalise self, and return */
-	intf_plug_plug ( &tls->plainstream, xfer );
-	*next = &tls->cipherstream;
+	intf_insert ( xfer, &tls->plainstream, &tls->cipherstream );
 	ref_put ( &tls->refcnt );
 	return 0;
 

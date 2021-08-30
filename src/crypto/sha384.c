@@ -32,7 +32,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <byteswap.h>
 #include <ipxe/crypto.h>
-#include <ipxe/asn1.h>
 #include <ipxe/sha512.h>
 
 /** SHA-384 initial digest values */
@@ -69,14 +68,4 @@ struct digest_algorithm sha384_algorithm = {
 	.init		= sha384_init,
 	.update		= sha512_update,
 	.final		= sha512_final,
-};
-
-/** "sha384" object identifier */
-static uint8_t oid_sha384[] = { ASN1_OID_SHA384 };
-
-/** "sha384" OID-identified algorithm */
-struct asn1_algorithm oid_sha384_algorithm __asn1_algorithm = {
-	.name = "sha384",
-	.digest = &sha384_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_sha384 ),
 };

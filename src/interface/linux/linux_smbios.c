@@ -20,21 +20,22 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
+#include <ipxe/linux_sysfs.h>
 #include <ipxe/linux.h>
+#include <ipxe/umalloc.h>
+#include <ipxe/init.h>
 #include <ipxe/smbios.h>
 
+/** SMBIOS entry point filename */
+static const char smbios_entry_filename[] =
+	"/sys/firmware/dmi/tables/smbios_entry_point";
+
 /** SMBIOS filename */
-static const char smbios_filename[] = "/dev/mem";
+static const char smbios_filename[] = "/sys/firmware/dmi/tables/DMI";
 
-/** SMBIOS entry point scan region start address */
-#define SMBIOS_ENTRY_START 0xf0000
-
-/** SMBIOS entry point scan region length */
-#define SMBIOS_ENTRY_LEN 0x10000
-
-/** SMBIOS mapping alignment */
-#define SMBIOS_ALIGN 0x1000
+/** Cache SMBIOS data */
+static userptr_t smbios_data;
 
 /**
  * Find SMBIOS
@@ -43,73 +44,84 @@ static const char smbios_filename[] = "/dev/mem";
  * @ret rc		Return status code
  */
 static int linux_find_smbios ( struct smbios *smbios ) {
-	struct smbios_entry entry;
-	void *entry_mem;
-	void *smbios_mem;
-	size_t smbios_offset;
-	size_t smbios_indent;
-	size_t smbios_len;
-	int fd;
+	struct smbios3_entry *smbios3_entry;
+	struct smbios_entry *smbios_entry;
+	userptr_t entry;
+	void *data;
+	int len;
 	int rc;
 
-	/* Open SMBIOS file */
-	fd = linux_open ( smbios_filename, O_RDONLY );
-	if ( fd < 0 ) {
-		rc = -ELINUX ( linux_errno );
-		DBGC ( smbios, "SMBIOS could not open %s: %s\n",
-		       smbios_filename, linux_strerror ( linux_errno ) );
-		goto err_open;
+	/* Read entry point file */
+	len = linux_sysfs_read ( smbios_entry_filename, &entry );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( smbios, "SMBIOS could not read %s: %s\n",
+		       smbios_entry_filename, strerror ( rc ) );
+		goto err_entry;
+	}
+	data = user_to_virt ( entry, 0 );
+	smbios3_entry = data;
+	smbios_entry = data;
+	if ( ( len >= ( ( int ) sizeof ( *smbios3_entry ) ) ) &&
+	     ( smbios3_entry->signature == SMBIOS3_SIGNATURE ) ) {
+		smbios->version = SMBIOS_VERSION ( smbios3_entry->major,
+						   smbios3_entry->minor );
+	} else if ( ( len >= ( ( int ) sizeof ( *smbios_entry ) ) ) &&
+		    ( smbios_entry->signature == SMBIOS_SIGNATURE ) ) {
+		smbios->version = SMBIOS_VERSION ( smbios_entry->major,
+						   smbios_entry->minor );
+	} else {
+		DBGC ( smbios, "SMBIOS invalid entry point %s:\n",
+		       smbios_entry_filename );
+		DBGC_HDA ( smbios, 0, data, len );
+		rc = -EINVAL;
+		goto err_version;
 	}
 
-	/* Map the region potentially containing the SMBIOS entry point */
-	entry_mem = linux_mmap ( NULL, SMBIOS_ENTRY_LEN, PROT_READ, MAP_SHARED,
-				 fd, SMBIOS_ENTRY_START );
-	if ( entry_mem == MAP_FAILED ) {
-		rc = -ELINUX ( linux_errno );
-		DBGC ( smbios, "SMBIOS could not mmap %s (%#x+%#x): %s\n",
-		       smbios_filename, SMBIOS_ENTRY_START, SMBIOS_ENTRY_LEN,
-		       linux_strerror ( linux_errno ) );
-		goto err_mmap_entry;
+	/* Read SMBIOS file */
+	len = linux_sysfs_read ( smbios_filename, &smbios_data );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( smbios, "SMBIOS could not read %s: %s\n",
+		       smbios_filename, strerror ( rc ) );
+		goto err_read;
 	}
 
-	/* Scan for the SMBIOS entry point */
-	if ( ( rc = find_smbios_entry ( virt_to_user ( entry_mem ),
-					SMBIOS_ENTRY_LEN, &entry ) ) != 0 )
-		goto err_find_entry;
+	/* Populate SMBIOS descriptor */
+	smbios->address = smbios_data;
+	smbios->len = len;
+	smbios->count = 0;
 
-	/* Map the region containing the SMBIOS structures */
-	smbios_indent = ( entry.smbios_address & ( SMBIOS_ALIGN - 1 ) );
-	smbios_offset = ( entry.smbios_address - smbios_indent );
-	smbios_len = ( entry.smbios_len + smbios_indent );
-	smbios_mem = linux_mmap ( NULL, smbios_len, PROT_READ, MAP_SHARED,
-				  fd, smbios_offset );
-	if ( smbios_mem == MAP_FAILED ) {
-		rc = -ELINUX ( linux_errno );
-		DBGC ( smbios, "SMBIOS could not mmap %s (%#zx+%#zx): %s\n",
-		       smbios_filename, smbios_offset, smbios_len,
-		       linux_strerror ( linux_errno ) );
-		goto err_mmap_smbios;
-	}
-
-	/* Fill in entry point descriptor structure */
-	smbios->address = virt_to_user ( smbios_mem + smbios_indent );
-	smbios->len = entry.smbios_len;
-	smbios->count = entry.smbios_count;
-	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );
-
-	/* Unmap the entry point region (no longer required) */
-	linux_munmap ( entry_mem, SMBIOS_ENTRY_LEN );
+	/* Free entry point */
+	ufree ( entry );
 
 	return 0;
 
-	linux_munmap ( smbios_mem, smbios_len );
- err_mmap_smbios:
- err_find_entry:
-	linux_munmap ( entry_mem, SMBIOS_ENTRY_LEN );
- err_mmap_entry:
-	linux_close ( fd );
- err_open:
+	ufree ( smbios_data );
+ err_read:
+ err_version:
+	ufree ( entry );
+ err_entry:
 	return rc;
 }
+
+/**
+ * Free cached SMBIOS data
+ *
+ */
+static void linux_smbios_shutdown ( int booting __unused ) {
+
+	/* Clear SMBIOS data pointer */
+	smbios_clear();
+
+	/* Free SMBIOS data */
+	ufree ( smbios_data );
+}
+
+/** SMBIOS shutdown function */
+struct startup_fn linux_smbios_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "linux_smbios",
+	.shutdown = linux_smbios_shutdown,
+};
 
 PROVIDE_SMBIOS ( linux, find_smbios, linux_find_smbios );

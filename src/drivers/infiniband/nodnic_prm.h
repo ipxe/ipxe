@@ -38,10 +38,10 @@ struct nodnic_wqe_segment_data_ptr_st {	/* Little Endian */
 
 struct MLX_DECLARE_STRUCT ( nodnic_wqe_segment_data_ptr );
 
-#define HERMON_MAX_SCATTER 1
+#define NODNIC_MAX_SCATTER 1
 
 struct nodnic_recv_wqe {
-	struct nodnic_wqe_segment_data_ptr data[HERMON_MAX_SCATTER];
+	struct nodnic_wqe_segment_data_ptr data[NODNIC_MAX_SCATTER];
 } __attribute__ (( packed ));
 
 #endif /* SRC_DRIVERS_INFINIBAND_MLX_NODNIC_INCLUDE_PRM_NODNIC_PRM_H_ */

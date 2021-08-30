@@ -36,7 +36,7 @@ static int prism2_pci_probe ( struct nic *nic, struct pci_device *pci ) {
   hfa384x_t *hw = &hw_global;
 
   printf ( "Prism2.5 has registers at %#lx\n", pci->membase );
-  hw->membase = ioremap ( pci->membase, 0x100 );
+  hw->membase = pci_ioremap ( pci, pci->membase, 0x100 );
 
   nic->ioaddr = pci->membase;
   nic->irqno = 0;

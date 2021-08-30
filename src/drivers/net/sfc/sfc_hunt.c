@@ -2,9 +2,10 @@
  *
  * Device driver for Solarflare Communications EF10 devices
  *
- * Written by Shradha Shah <sshah@solarflare.com>
+ * Written by Shradha Shah, maintained by <pre-boot-drivers@xilinx.com>
  *
- * Copyright 2012-2017 Solarflare Communications Inc.
+ * Copyright 2012-2019 Solarflare Communications Inc.
+ * Copyright 2019-2020 Xilinx Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -1314,6 +1315,8 @@ const struct efx_nic_type hunt_nic_type = {
 };
 
 static struct pci_device_id hunt_nics[] = {
+	PCI_ROM(0x1924, 0x0903, "SFC9120", "Solarflare SFC9120 Adapter", 0),
+	PCI_ROM(0x1924, 0x0923, "SFC9140", "Solarflare SFC9140 Adapter", 0),
 	PCI_ROM(0x1924, 0x0a03, "SFC9220", "Solarflare SFN8xxx Adapter", 0),
 	PCI_ROM(0x1924, 0x0b03, "SFC9250", "Solarflare X25xx Adapter", 0),
 };

@@ -2152,7 +2152,7 @@ bnx2_init_board(struct pci_device *pdev, struct nic *nic)
 	bnx2reg_base = pci_bar_start(pdev, PCI_BASE_ADDRESS_0);
 	bnx2reg_len = MB_GET_CID_ADDR(17);
 
-	bp->regview = ioremap(bnx2reg_base, bnx2reg_len);
+	bp->regview = pci_ioremap(pdev, bnx2reg_base, bnx2reg_len);
 
 	if (!bp->regview) {
 		printf("Cannot map register space, aborting.\n");

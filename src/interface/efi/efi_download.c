@@ -138,8 +138,11 @@ efi_download_start ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
 	struct efi_download_file *file;
 	int rc;
 
+	efi_snp_claim();
+
 	file = malloc ( sizeof ( struct efi_download_file ) );
 	if ( file == NULL ) {
+		efi_snp_release();
 		return EFI_OUT_OF_RESOURCES;
 	}
 
@@ -147,10 +150,10 @@ efi_download_start ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
 	rc = xfer_open ( &file->xfer, LOCATION_URI_STRING, Url );
 	if ( rc ) {
 		free ( file );
+		efi_snp_release();
 		return EFIRC ( rc );
 	}
 
-	efi_snp_claim();
 	file->pos = 0;
 	file->data_callback = DataCallback;
 	file->finish_callback = FinishCallback;

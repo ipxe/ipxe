@@ -113,6 +113,14 @@ struct image_type {
 	 */
 	int ( * asn1 ) ( struct image *image, size_t offset,
 			 struct asn1_cursor **cursor );
+	/**
+	 * Extract archive image
+	 *
+	 * @v image		Image
+	 * @v extracted		Extracted image
+	 * @ret rc		Return status code
+	 */
+	int ( * extract ) ( struct image *image, struct image *extracted );
 };
 
 /**
@@ -175,6 +183,8 @@ extern struct image * alloc_image ( struct uri *uri );
 extern int image_set_uri ( struct image *image, struct uri *uri );
 extern int image_set_name ( struct image *image, const char *name );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );
+extern int image_set_len ( struct image *image, size_t len );
+extern int image_set_data ( struct image *image, userptr_t data, size_t len );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
 struct image * find_image ( const char *name );
@@ -183,9 +193,14 @@ extern int image_replace ( struct image *replacement );
 extern int image_select ( struct image *image );
 extern struct image * image_find_selected ( void );
 extern int image_set_trust ( int require_trusted, int permanent );
+extern struct image * image_memory ( const char *name, userptr_t data,
+				     size_t len );
 extern int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf );
 extern int image_asn1 ( struct image *image, size_t offset,
 			struct asn1_cursor **cursor );
+extern int image_extract ( struct image *image, const char *name,
+			   struct image **extracted );
+extern int image_extract_exec ( struct image *image );
 
 /**
  * Increment reference count on an image

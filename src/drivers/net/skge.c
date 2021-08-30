@@ -1699,7 +1699,7 @@ void skge_free(struct net_device *dev)
 	free(skge->tx_ring.start);
 	skge->tx_ring.start = NULL;
 
-	free_dma(skge->mem, RING_SIZE);
+	free_phys(skge->mem, RING_SIZE);
 	skge->mem = NULL;
 	skge->dma = 0;
 }
@@ -1714,7 +1714,7 @@ static int skge_up(struct net_device *dev)
 
 	DBG2(PFX "%s: enabling interface\n", dev->name);
 
-	skge->mem = malloc_dma(RING_SIZE, SKGE_RING_ALIGN);
+	skge->mem = malloc_phys(RING_SIZE, SKGE_RING_ALIGN);
 	skge->dma = virt_to_bus(skge->mem);
 	if (!skge->mem)
 		return -ENOMEM;
@@ -2346,8 +2346,9 @@ static int skge_probe(struct pci_device *pdev)
 
 	hw->pdev = pdev;
 
-	hw->regs = (unsigned long)ioremap(pci_bar_start(pdev, PCI_BASE_ADDRESS_0),
-				SKGE_REG_SIZE);
+	hw->regs = (unsigned long)pci_ioremap(pdev,
+					      pci_bar_start(pdev, PCI_BASE_ADDRESS_0),
+					      SKGE_REG_SIZE);
 	if (!hw->regs) {
 		DBG(PFX "cannot map device registers\n");
 		goto err_out_free_hw;

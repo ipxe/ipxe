@@ -68,14 +68,14 @@ static void xenstore_send ( struct xen_hypervisor *xen, const void *data,
 	XENSTORE_RING_IDX cons;
 	XENSTORE_RING_IDX idx;
 	const char *bytes = data;
-	size_t offset = 0;
+	size_t offset;
 	size_t fill;
 
 	DBGCP ( intf, "XENSTORE raw request:\n" );
 	DBGCP_HDA ( intf, MASK_XENSTORE_IDX ( prod ), data, len );
 
 	/* Write one byte at a time */
-	while ( offset < len ) {
+	for ( offset = 0 ; offset < len ; offset++ ) {
 
 		/* Wait for space to become available */
 		while ( 1 ) {
@@ -90,7 +90,7 @@ static void xenstore_send ( struct xen_hypervisor *xen, const void *data,
 
 		/* Write byte */
 		idx = MASK_XENSTORE_IDX ( prod++ );
-		writeb ( bytes[offset++], &intf->req[idx] );
+		writeb ( bytes[offset], &intf->req[idx] );
 	}
 
 	/* Update producer counter */
@@ -125,13 +125,13 @@ static void xenstore_recv ( struct xen_hypervisor *xen, void *data,
 	XENSTORE_RING_IDX prod;
 	XENSTORE_RING_IDX idx;
 	char *bytes = data;
-	size_t offset = 0;
+	size_t offset;
 	size_t fill;
 
 	DBGCP ( intf, "XENSTORE raw response:\n" );
 
 	/* Read one byte at a time */
-	while ( offset < len ) {
+	for ( offset = 0 ; offset < len ; offset++ ) {
 
 		/* Wait for data to be ready */
 		while ( 1 ) {
@@ -147,7 +147,7 @@ static void xenstore_recv ( struct xen_hypervisor *xen, void *data,
 		/* Read byte */
 		idx = MASK_XENSTORE_IDX ( cons++ );
 		if ( data )
-			bytes[offset++] = readb ( &intf->rsp[idx] );
+			bytes[offset] = readb ( &intf->rsp[idx] );
 	}
 	if ( data )
 		DBGCP_HDA ( intf, MASK_XENSTORE_IDX ( cons - len ), data, len );

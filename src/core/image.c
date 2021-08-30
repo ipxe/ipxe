@@ -176,6 +176,47 @@ int image_set_cmdline ( struct image *image, const char *cmdline ) {
 }
 
 /**
+ * Set image length
+ *
+ * @v image		Image
+ * @v len		Length of image data
+ * @ret rc		Return status code
+ */
+int image_set_len ( struct image *image, size_t len ) {
+	userptr_t new;
+
+	/* (Re)allocate image data */
+	new = urealloc ( image->data, len );
+	if ( ! new )
+		return -ENOMEM;
+	image->data = new;
+	image->len = len;
+
+	return 0;
+}
+
+/**
+ * Set image data
+ *
+ * @v image		Image
+ * @v data		Image data
+ * @v len		Length of image data
+ * @ret rc		Return status code
+ */
+int image_set_data ( struct image *image, userptr_t data, size_t len ) {
+	int rc;
+
+	/* Set image length */
+	if ( ( rc = image_set_len ( image, len ) ) != 0 )
+		return rc;
+
+	/* Copy in new image data */
+	memcpy_user ( image->data, 0, data, 0, len );
+
+	return 0;
+}
+
+/**
  * Determine image type
  *
  * @v image		Executable image
@@ -480,4 +521,48 @@ int image_set_trust ( int require_trusted, int permanent ) {
 		return -EACCES_PERMANENT;
 
 	return 0;
+}
+
+/**
+ * Create registered image from block of memory
+ *
+ * @v name		Name
+ * @v data		Image data
+ * @v len		Length
+ * @ret image		Image, or NULL on error
+ */
+struct image * image_memory ( const char *name, userptr_t data, size_t len ) {
+	struct image *image;
+	int rc;
+
+	/* Allocate image */
+	image = alloc_image ( NULL );
+	if ( ! image ) {
+		rc = -ENOMEM;
+		goto err_alloc_image;
+	}
+
+	/* Set name */
+	if ( ( rc = image_set_name ( image, name ) ) != 0 )
+		goto err_set_name;
+
+	/* Set data */
+	if ( ( rc = image_set_data ( image, data, len ) ) != 0 )
+		goto err_set_data;
+
+	/* Register image */
+	if ( ( rc = register_image ( image ) ) != 0 )
+		goto err_register;
+
+	/* Drop local reference to image */
+	image_put ( image );
+
+	return image;
+
+ err_register:
+ err_set_data:
+ err_set_name:
+	image_put ( image );
+ err_alloc_image:
+	return NULL;
 }

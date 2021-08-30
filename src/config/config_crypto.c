@@ -33,6 +33,56 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 PROVIDE_REQUIRING_SYMBOL();
 
+/* RSA */
+#if defined ( CRYPTO_PUBKEY_RSA )
+REQUIRE_OBJECT ( oid_rsa );
+#endif
+
+/* MD4 */
+#if defined ( CRYPTO_DIGEST_MD4 )
+REQUIRE_OBJECT ( oid_md4 );
+#endif
+
+/* MD5 */
+#if defined ( CRYPTO_DIGEST_MD5 )
+REQUIRE_OBJECT ( oid_md5 );
+#endif
+
+/* SHA-1 */
+#if defined ( CRYPTO_DIGEST_SHA1 )
+REQUIRE_OBJECT ( oid_sha1 );
+#endif
+
+/* SHA-224 */
+#if defined ( CRYPTO_DIGEST_SHA224 )
+REQUIRE_OBJECT ( oid_sha224 );
+#endif
+
+/* SHA-256 */
+#if defined ( CRYPTO_DIGEST_SHA256 )
+REQUIRE_OBJECT ( oid_sha256 );
+#endif
+
+/* SHA-384 */
+#if defined ( CRYPTO_DIGEST_SHA384 )
+REQUIRE_OBJECT ( oid_sha384 );
+#endif
+
+/* SHA-512 */
+#if defined ( CRYPTO_DIGEST_SHA512 )
+REQUIRE_OBJECT ( oid_sha512 );
+#endif
+
+/* SHA-512/224 */
+#if defined ( CRYPTO_DIGEST_SHA512_224 )
+REQUIRE_OBJECT ( oid_sha512_224 );
+#endif
+
+/* SHA-512/256 */
+#if defined ( CRYPTO_DIGEST_SHA512_256 )
+REQUIRE_OBJECT ( oid_sha512_256 );
+#endif
+
 /* RSA and MD5 */
 #if defined ( CRYPTO_PUBKEY_RSA ) && defined ( CRYPTO_DIGEST_MD5 )
 REQUIRE_OBJECT ( rsa_md5 );

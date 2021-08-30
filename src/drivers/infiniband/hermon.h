@@ -34,8 +34,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 /* Device reset */
 #define HERMON_RESET_OFFSET		0x0f0010
-#define HERMON_RESET_MAGIC		0x01000000UL
-#define HERMON_RESET_WAIT_TIME_MS	1000
+#define HERMON_RESET_MAGIC		0x01000001UL
+#define HERMON_RESET_MAX_WAIT_MS	1000
 
 /* Work queue entry and completion queue entry opcodes */
 #define HERMON_OPCODE_NOP		0x00
@@ -52,6 +52,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_HCR_CLOSE_PORT		0x000a
 #define HERMON_HCR_SET_PORT		0x000c
 #define HERMON_HCR_SW2HW_MPT		0x000d
+#define HERMON_HCR_HW2SW_MPT		0x000f
 #define HERMON_HCR_WRITE_MTT		0x0011
 #define HERMON_HCR_MAP_EQ		0x0012
 #define HERMON_HCR_SW2HW_EQ		0x0013
@@ -122,6 +123,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define HERMON_SET_PORT_GID_TABLE	0x0500
 
 #define HERMON_EV_PORT_STATE_CHANGE	0x09
+#define HERMON_EV_PORT_MGMNT_CHANGE	0x1d
 
 #define HERMON_SCHED_QP0		0x3f
 #define HERMON_SCHED_DEFAULT		0x83
@@ -214,6 +216,13 @@ struct hermonprm_port_state_change_event_st {
 	pseudo_bit_t reserved[0x00020];
 /* -------------- */
 	struct hermonprm_port_state_change_st data;
+} __attribute__ (( packed ));
+
+struct hermonprm_port_mgmnt_change_event_st {
+	pseudo_bit_t reserved[0x00020];
+/* -------------- */
+	pseudo_bit_t port[0x00008];
+	pseudo_bit_t reserved0[0x00018];
 } __attribute__ (( packed ));
 
 struct hermonprm_sense_port_st {
@@ -459,6 +468,7 @@ struct MLX_DECLARE_STRUCT ( hermonprm_mod_stat_cfg_input_mod );
 struct MLX_DECLARE_STRUCT ( hermonprm_mpt );
 struct MLX_DECLARE_STRUCT ( hermonprm_mtt );
 struct MLX_DECLARE_STRUCT ( hermonprm_port_state_change_event );
+struct MLX_DECLARE_STRUCT ( hermonprm_port_mgmnt_change_event );
 struct MLX_DECLARE_STRUCT ( hermonprm_qp_db_record );
 struct MLX_DECLARE_STRUCT ( hermonprm_qp_ee_state_transitions );
 struct MLX_DECLARE_STRUCT ( hermonprm_query_dev_cap );
@@ -529,6 +539,7 @@ union hermonprm_completion_entry {
 union hermonprm_event_entry {
 	struct hermonprm_event_queue_entry generic;
 	struct hermonprm_port_state_change_event port_state_change;
+	struct hermonprm_port_mgmnt_change_event port_mgmnt_change;
 } __attribute__ (( packed ));
 
 union hermonprm_doorbell_register {
@@ -822,6 +833,15 @@ struct hermon_port_type {
 				    struct hermon_port *port );
 };
 
+/** A Hermon port Ethernet MAC address */
+union hermon_port_mac {
+	struct {
+		uint16_t h;
+		uint32_t l;
+	} __attribute__ (( packed )) part;
+	uint8_t raw[ETH_ALEN];
+};
+
 /** A Hermon port */
 struct hermon_port {
 	/** Infiniband device */
@@ -832,6 +852,8 @@ struct hermon_port {
 	struct ib_completion_queue *eth_cq;
 	/** Ethernet queue pair */
 	struct ib_queue_pair *eth_qp;
+	/** Ethernet MAC */
+	union hermon_port_mac eth_mac;
 	/** Port type */
 	struct hermon_port_type *type;
 	/** Non-volatile option storage */
@@ -882,6 +904,8 @@ struct hermon {
 
 	/** Event queue */
 	struct hermon_event_queue eq;
+	/** Last unsolicited link state poll */
+	unsigned long last_poll;
 	/** Unrestricted LKey
 	 *
 	 * Used to get unrestricted memory access.
@@ -918,6 +942,13 @@ struct hermon {
 /** Memory key prefix */
 #define HERMON_MKEY_PREFIX		0x77000000UL
 
+/** Link poll interval
+ *
+ * Used when we need to poll for link state (rather than relying upon
+ * receiving an event).
+ */
+#define HERMON_LINK_POLL_INTERVAL	( TICKS_PER_SEC / 2 )
+
 /*
  * HCA commands
  *
@@ -925,7 +956,7 @@ struct hermon {
 
 #define HERMON_HCR_BASE			0x80680
 #define HERMON_HCR_REG(x)		( HERMON_HCR_BASE + 4 * (x) )
-#define HERMON_HCR_MAX_WAIT_MS		2000
+#define HERMON_HCR_MAX_WAIT_MS		10000
 #define HERMON_MBOX_ALIGN		4096
 #define HERMON_MBOX_SIZE		1024
 

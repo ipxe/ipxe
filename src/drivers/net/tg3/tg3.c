@@ -42,7 +42,7 @@ void tg3_rx_prodring_fini(struct tg3_rx_prodring_set *tpr)
 {	DBGP("%s\n", __func__);
 
 	if (tpr->rx_std) {
-		free_dma(tpr->rx_std, TG3_RX_STD_RING_BYTES(tp));
+		free_phys(tpr->rx_std, TG3_RX_STD_RING_BYTES(tp));
 		tpr->rx_std = NULL;
 	}
 }
@@ -55,7 +55,7 @@ static void tg3_free_consistent(struct tg3 *tp)
 {	DBGP("%s\n", __func__);
 
 	if (tp->tx_ring) {
-		free_dma(tp->tx_ring, TG3_TX_RING_BYTES);
+		free_phys(tp->tx_ring, TG3_TX_RING_BYTES);
 		tp->tx_ring = NULL;
 	}
 
@@ -63,7 +63,7 @@ static void tg3_free_consistent(struct tg3 *tp)
 	tp->tx_buffers = NULL;
 
 	if (tp->rx_rcb) {
-		free_dma(tp->rx_rcb, TG3_RX_RCB_RING_BYTES(tp));
+		free_phys(tp->rx_rcb, TG3_RX_RCB_RING_BYTES(tp));
 		tp->rx_rcb_mapping = 0;
 		tp->rx_rcb = NULL;
 	}
@@ -71,7 +71,7 @@ static void tg3_free_consistent(struct tg3 *tp)
 	tg3_rx_prodring_fini(&tp->prodring);
 
 	if (tp->hw_status) {
-		free_dma(tp->hw_status, TG3_HW_STATUS_SIZE);
+		free_phys(tp->hw_status, TG3_HW_STATUS_SIZE);
 		tp->status_mapping = 0;
 		tp->hw_status = NULL;
 	}
@@ -87,7 +87,7 @@ int tg3_alloc_consistent(struct tg3 *tp)
 	struct tg3_hw_status *sblk;
 	struct tg3_rx_prodring_set *tpr = &tp->prodring;
 
-	tp->hw_status = malloc_dma(TG3_HW_STATUS_SIZE, TG3_DMA_ALIGNMENT);
+	tp->hw_status = malloc_phys(TG3_HW_STATUS_SIZE, TG3_DMA_ALIGNMENT);
 	if (!tp->hw_status) {
 		DBGC(tp->dev, "hw_status alloc failed\n");
 		goto err_out;
@@ -97,7 +97,7 @@ int tg3_alloc_consistent(struct tg3 *tp)
 	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
 	sblk = tp->hw_status;
 
-	tpr->rx_std = malloc_dma(TG3_RX_STD_RING_BYTES(tp), TG3_DMA_ALIGNMENT);
+	tpr->rx_std = malloc_phys(TG3_RX_STD_RING_BYTES(tp), TG3_DMA_ALIGNMENT);
 	if (!tpr->rx_std) {
 		DBGC(tp->dev, "rx prodring alloc failed\n");
 		goto err_out;
@@ -109,7 +109,7 @@ int tg3_alloc_consistent(struct tg3 *tp)
 	if (!tp->tx_buffers)
 		goto err_out;
 
-	tp->tx_ring = malloc_dma(TG3_TX_RING_BYTES, TG3_DMA_ALIGNMENT);
+	tp->tx_ring = malloc_phys(TG3_TX_RING_BYTES, TG3_DMA_ALIGNMENT);
 	if (!tp->tx_ring)
 		goto err_out;
 	tp->tx_desc_mapping = virt_to_bus(tp->tx_ring);
@@ -123,7 +123,7 @@ int tg3_alloc_consistent(struct tg3 *tp)
 
 	tp->rx_rcb_prod_idx = &sblk->idx[0].rx_producer;
 
-	tp->rx_rcb = malloc_dma(TG3_RX_RCB_RING_BYTES(tp), TG3_DMA_ALIGNMENT);
+	tp->rx_rcb = malloc_phys(TG3_RX_RCB_RING_BYTES(tp), TG3_DMA_ALIGNMENT);
 	if (!tp->rx_rcb)
 		goto err_out;
 	tp->rx_rcb_mapping = virt_to_bus(tp->rx_rcb);
@@ -541,7 +541,7 @@ static int tg3_test_dma(struct tg3 *tp)
 	u32 *buf;
 	int ret = 0;
 
-	buf = malloc_dma(TEST_BUFFER_SIZE, TG3_DMA_ALIGNMENT);
+	buf = malloc_phys(TEST_BUFFER_SIZE, TG3_DMA_ALIGNMENT);
 	if (!buf) {
 		ret = -ENOMEM;
 		goto out_nofree;
@@ -708,7 +708,7 @@ static int tg3_test_dma(struct tg3 *tp)
 	}
 
 out:
-	free_dma(buf, TEST_BUFFER_SIZE);
+	free_phys(buf, TEST_BUFFER_SIZE);
 out_nofree:
 	return ret;
 }
@@ -771,7 +771,7 @@ static int tg3_init_one(struct pci_device *pdev)
 	reg_base = pci_bar_start(pdev, PCI_BASE_ADDRESS_0);
 	reg_size = pci_bar_size(pdev, PCI_BASE_ADDRESS_0);
 
-	tp->regs = ioremap(reg_base, reg_size);
+	tp->regs = pci_ioremap(pdev, reg_base, reg_size);
 	if (!tp->regs) {
 		DBGC(&pdev->dev, "Failed to remap device registers\n");
 		errno = -ENOENT;

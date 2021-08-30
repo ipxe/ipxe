@@ -14,7 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /*
  * Prototypes for the standard functions (malloc() et al) are in
  * stdlib.h.  Include <ipxe/malloc.h> only if you need the
- * non-standard functions, such as malloc_dma().
+ * non-standard functions, such as malloc_phys().
  *
  */
 #include <stdlib.h>
@@ -32,20 +32,18 @@ extern void mpopulate ( void *start, size_t len );
 extern void mdumpfree ( void );
 
 /**
- * Allocate memory for DMA
+ * Allocate memory with specified physical alignment and offset
  *
  * @v size		Requested size
  * @v align		Physical alignment
  * @v offset		Offset from physical alignment
  * @ret ptr		Memory, or NULL
  *
- * Allocates physically-aligned memory for DMA.
- *
  * @c align must be a power of two.  @c size may not be zero.
  */
-static inline void * __malloc malloc_dma_offset ( size_t size,
-						  size_t phys_align,
-						  size_t offset ) {
+static inline void * __malloc malloc_phys_offset ( size_t size,
+						   size_t phys_align,
+						   size_t offset ) {
 	void * ptr = alloc_memblock ( size, phys_align, offset );
 	if ( ptr && size )
 		VALGRIND_MALLOCLIKE_BLOCK ( ptr, size, 0, 0 );
@@ -53,32 +51,30 @@ static inline void * __malloc malloc_dma_offset ( size_t size,
 }
 
 /**
- * Allocate memory for DMA
+ * Allocate memory with specified physical alignment
  *
  * @v size		Requested size
  * @v align		Physical alignment
  * @ret ptr		Memory, or NULL
  *
- * Allocates physically-aligned memory for DMA.
- *
  * @c align must be a power of two.  @c size may not be zero.
  */
-static inline void * __malloc malloc_dma ( size_t size, size_t phys_align ) {
-	return malloc_dma_offset ( size, phys_align, 0 );
+static inline void * __malloc malloc_phys ( size_t size, size_t phys_align ) {
+	return malloc_phys_offset ( size, phys_align, 0 );
 }
 
 /**
- * Free memory allocated with malloc_dma()
+ * Free memory allocated with malloc_phys()
  *
- * @v ptr		Memory allocated by malloc_dma(), or NULL
- * @v size		Size of memory, as passed to malloc_dma()
+ * @v ptr		Memory allocated by malloc_phys(), or NULL
+ * @v size		Size of memory, as passed to malloc_phys()
  *
- * Memory allocated with malloc_dma() can only be freed with
- * free_dma(); it cannot be freed with the standard free().
+ * Memory allocated with malloc_phys() can only be freed with
+ * free_phys(); it cannot be freed with the standard free().
  *
  * If @c ptr is NULL, no action is taken.
  */
-static inline void free_dma ( void *ptr, size_t size ) {
+static inline void free_phys ( void *ptr, size_t size ) {
 	VALGRIND_FREELIKE_BLOCK ( ptr, 0 );
 	free_memblock ( ptr, size );
 }

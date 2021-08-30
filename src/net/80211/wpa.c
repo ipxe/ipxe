@@ -304,8 +304,9 @@ static void wpa_derive_ptk ( struct wpa_common_ctx *ctx )
 		memcpy ( ptk_data.nonce2, ctx->Anonce, WPA_NONCE_LEN );
 	}
 
-	DBGC2 ( ctx, "WPA %p A1 %s, A2 %s\n", ctx, eth_ntoa ( ptk_data.mac1 ),
-	       eth_ntoa ( ptk_data.mac2 ) );
+	DBGC2 ( ctx, "WPA %p A1 %s", ctx, eth_ntoa ( ptk_data.mac1 ) );
+	DBGC2 ( ctx, ", A2 %s\n", eth_ntoa ( ptk_data.mac2 ) );
+
 	DBGC2 ( ctx, "WPA %p Nonce1, Nonce2:\n", ctx );
 	DBGC2_HD ( ctx, ptk_data.nonce1, WPA_NONCE_LEN );
 	DBGC2_HD ( ctx, ptk_data.nonce2, WPA_NONCE_LEN );
@@ -413,12 +414,13 @@ static int wpa_maybe_install_gtk ( struct wpa_common_ctx *ctx,
 static struct io_buffer * wpa_alloc_frame ( int kdlen )
 {
 	struct io_buffer *ret = alloc_iob ( sizeof ( struct eapol_key_pkt ) +
-					    kdlen + EAPOL_HDR_LEN +
+					    kdlen +
+					    sizeof ( struct eapol_header ) +
 					    MAX_LL_HEADER_LEN );
 	if ( ! ret )
 		return NULL;
 
-	iob_reserve ( ret, MAX_LL_HEADER_LEN + EAPOL_HDR_LEN );
+	iob_reserve ( ret, MAX_LL_HEADER_LEN + sizeof ( struct eapol_header ) );
 	memset ( iob_put ( ret, sizeof ( struct eapol_key_pkt ) ), 0,
 		 sizeof ( struct eapol_key_pkt ) );
 
@@ -441,19 +443,19 @@ static int wpa_send_eapol ( struct io_buffer *iob, struct wpa_common_ctx *ctx,
 			    struct wpa_kie *kie )
 {
 	struct eapol_key_pkt *pkt = iob->data;
-	struct eapol_frame *eapol = iob_push ( iob, EAPOL_HDR_LEN );
+	struct eapol_header *eapol = iob_push ( iob, sizeof ( *eapol ) );
 
 	pkt->info = htons ( pkt->info );
 	pkt->keysize = htons ( pkt->keysize );
 	pkt->datalen = htons ( pkt->datalen );
 	pkt->replay = cpu_to_be64 ( pkt->replay );
-	eapol->version = EAPOL_THIS_VERSION;
+	eapol->version = EAPOL_VERSION_2001;
 	eapol->type = EAPOL_TYPE_KEY;
-	eapol->length = htons ( iob->tail - iob->data - sizeof ( *eapol ) );
+	eapol->len = htons ( iob->tail - iob->data - sizeof ( *eapol ) );
 
 	memset ( pkt->mic, 0, sizeof ( pkt->mic ) );
 	if ( kie )
-		kie->mic ( &ctx->ptk.kck, eapol, EAPOL_HDR_LEN +
+		kie->mic ( &ctx->ptk.kck, eapol, sizeof ( *eapol ) +
 			   sizeof ( *pkt ) + ntohs ( pkt->datalen ),
 			   pkt->mic );
 
@@ -761,20 +763,22 @@ static int wpa_handle_1_of_2 ( struct wpa_common_ctx *ctx,
  *
  * @v iob	I/O buffer
  * @v netdev	Network device
- * @v ll_dest	Link-layer destination address
  * @v ll_source	Source link-layer address
  */
 static int eapol_key_rx ( struct io_buffer *iob, struct net_device *netdev,
-			  const void *ll_dest __unused,
 			  const void *ll_source )
 {
 	struct net80211_device *dev = net80211_get ( netdev );
-	struct eapol_key_pkt *pkt = iob->data;
+	struct eapol_header *eapol;
+	struct eapol_key_pkt *pkt;
 	int is_rsn, found_ctx;
 	struct wpa_common_ctx *ctx;
 	int rc = 0;
 	struct wpa_kie *kie;
 	u8 their_mic[16], our_mic[16];
+
+	eapol = iob->data;
+	pkt = ( ( ( void * ) eapol ) + sizeof ( *eapol ) );
 
 	if ( pkt->type != EAPOL_KEY_TYPE_WPA &&
 	     pkt->type != EAPOL_KEY_TYPE_RSN ) {
@@ -839,8 +843,8 @@ static int eapol_key_rx ( struct io_buffer *iob, struct net_device *netdev,
 	if ( ntohs ( pkt->info ) & EAPOL_KEY_INFO_KEY_MIC ) {
 		memcpy ( their_mic, pkt->mic, sizeof ( pkt->mic ) );
 		memset ( pkt->mic, 0, sizeof ( pkt->mic ) );
-		kie->mic ( &ctx->ptk.kck, ( void * ) pkt - EAPOL_HDR_LEN,
-			   EAPOL_HDR_LEN + sizeof ( *pkt ) +
+		kie->mic ( &ctx->ptk.kck, eapol,
+			   sizeof ( *eapol ) + sizeof ( *pkt ) +
 			   ntohs ( pkt->datalen ), our_mic );
 		DBGC2 ( ctx, "WPA %p MIC comparison (theirs, ours):\n", ctx );
 		DBGC2_HD ( ctx, their_mic, 16 );

@@ -76,7 +76,7 @@ struct efi_snp_device {
 };
 
 extern int efi_snp_hii_install ( struct efi_snp_device *snpdev );
-extern void efi_snp_hii_uninstall ( struct efi_snp_device *snpdev );
+extern int efi_snp_hii_uninstall ( struct efi_snp_device *snpdev );
 extern struct efi_snp_device * find_snpdev ( EFI_HANDLE handle );
 extern struct efi_snp_device * last_opened_snpdev ( void );
 extern void efi_snp_add_claim ( int delta );

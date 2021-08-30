@@ -246,6 +246,10 @@ struct net_device_operations {
 	 *
 	 * This method is guaranteed to be called only when the device
 	 * is open.
+	 *
+	 * If the network device has an associated DMA device, then
+	 * the I/O buffer will be automatically mapped for transmit
+	 * DMA.
 	 */
 	int ( * transmit ) ( struct net_device *netdev,
 			     struct io_buffer *iobuf );
@@ -358,6 +362,8 @@ struct net_device {
 	char name[NETDEV_NAME_LEN];
 	/** Underlying hardware device */
 	struct device *dev;
+	/** DMA device */
+	struct dma_device *dma;
 
 	/** Network device operations */
 	struct net_device_operations *op;
@@ -444,6 +450,12 @@ struct net_device {
  * method.
  */
 #define NETDEV_IRQ_UNSUPPORTED 0x0008
+
+/** Network device transmission is in progress */
+#define NETDEV_TX_IN_PROGRESS 0x0010
+
+/** Network device poll is in progress */
+#define NETDEV_POLL_IN_PROGRESS 0x0020
 
 /** Link-layer protocol table */
 #define LL_PROTOCOLS __table ( struct ll_protocol, "ll_protocols" )

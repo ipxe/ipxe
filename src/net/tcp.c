@@ -1743,17 +1743,9 @@ static struct interface_descriptor tcp_xfer_desc =
  ***************************************************************************
  */
 
-/** TCP IPv4 socket opener */
-struct socket_opener tcp_ipv4_socket_opener __socket_opener = {
+/** TCP socket opener */
+struct socket_opener tcp_socket_opener __socket_opener = {
 	.semantics	= TCP_SOCK_STREAM,
-	.family		= AF_INET,
-	.open		= tcp_open,
-};
-
-/** TCP IPv6 socket opener */
-struct socket_opener tcp_ipv6_socket_opener __socket_opener = {
-	.semantics	= TCP_SOCK_STREAM,
-	.family		= AF_INET6,
 	.open		= tcp_open,
 };
 

@@ -138,7 +138,7 @@ static int ath_pci_probe(struct pci_device *pdev)
 	if ((val & 0x0000ff00) != 0)
 		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
 
-	mem = ioremap(pdev->membase, 0x10000);
+	mem = pci_ioremap(pdev, pdev->membase, 0x10000);
 	if (!mem) {
 		DBG("ath9K: PCI memory map error\n") ;
 		ret = -EIO;

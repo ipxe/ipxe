@@ -165,7 +165,7 @@ static int myson_create_ring ( struct myson_nic *myson,
 	int rc;
 
 	/* Allocate descriptor ring */
-	ring->desc = malloc_dma ( len, MYSON_RING_ALIGN );
+	ring->desc = malloc_phys ( len, MYSON_RING_ALIGN );
 	if ( ! ring->desc ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -197,7 +197,7 @@ static int myson_create_ring ( struct myson_nic *myson,
 	return 0;
 
  err_64bit:
-	free_dma ( ring->desc, len );
+	free_phys ( ring->desc, len );
 	ring->desc = NULL;
  err_alloc:
 	return rc;
@@ -217,7 +217,7 @@ static void myson_destroy_ring ( struct myson_nic *myson,
 	writel ( 0, myson->regs + ring->reg );
 
 	/* Free descriptor ring */
-	free_dma ( ring->desc, len );
+	free_phys ( ring->desc, len );
 	ring->desc = NULL;
 	ring->prod = 0;
 	ring->cons = 0;
@@ -606,7 +606,7 @@ static int myson_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	myson->regs = ioremap ( pci->membase, MYSON_BAR_SIZE );
+	myson->regs = pci_ioremap ( pci, pci->membase, MYSON_BAR_SIZE );
 	if ( ! myson->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

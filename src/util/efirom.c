@@ -34,10 +34,17 @@
 
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 
+/* Round up ROM size */
+#define ROM_SIZE( len ) ( ( (len) + 511 ) & ~511 )
+
+/* Include the EDK2 compression code */
+#include "eficompress.c"
+
 /** Command-line options */
 struct options {
 	uint16_t vendor;
 	uint16_t device;
+	int compress;
 };
 
 /**
@@ -95,6 +102,35 @@ static void read_pe_info ( void *pe, uint16_t *machine,
 }
 
 /**
+ * Attempt to compress EFI data in-place
+ *
+ * @v data		Data to be compressed
+ * @v max_len		Length of data
+ * @ret len		Length after attempted compression
+ */
+static size_t efi_compress ( void *data, size_t max_len ) {
+	void *tmp;
+	UINT32 len;
+
+	/* Allocate temporary buffer for compressed data */
+	tmp = xmalloc ( max_len );
+
+	/* Attempt compression */
+	len = max_len;
+	if ( ( EfiCompress ( data, max_len, tmp, &len ) == 0 ) &&
+	     ( len < max_len ) ) {
+		memcpy ( data, tmp, len );
+	} else {
+		len = max_len;
+	}
+
+	/* Free temporary buffer */
+	free ( tmp );
+
+	return len;
+}
+
+/**
  * Convert EFI image to ROM image
  *
  * @v pe		EFI file
@@ -109,10 +145,14 @@ static void make_efi_rom ( FILE *pe, FILE *rom, struct options *opts ) {
 	struct stat pe_stat;
 	size_t pe_size;
 	size_t rom_size;
+	size_t compressed_size;
 	void *buf;
 	void *payload;
 	unsigned int i;
+	uint16_t machine;
+	uint16_t subsystem;
 	uint8_t checksum;
+	int compressed;
 
 	/* Determine PE file size */
 	if ( fstat ( fileno ( pe ), &pe_stat ) != 0 ) {
@@ -123,7 +163,7 @@ static void make_efi_rom ( FILE *pe, FILE *rom, struct options *opts ) {
 	pe_size = pe_stat.st_size;
 
 	/* Determine ROM file size */
-	rom_size = ( ( pe_size + sizeof ( *headers ) + 511 ) & ~511 );
+	rom_size = ROM_SIZE ( sizeof ( *headers ) + pe_size );
 
 	/* Allocate ROM buffer and read in PE file */
 	buf = xmalloc ( rom_size );
@@ -136,12 +176,26 @@ static void make_efi_rom ( FILE *pe, FILE *rom, struct options *opts ) {
 		exit ( 1 );
 	}
 
+	/* Parse PE headers */
+	read_pe_info ( payload, &machine, &subsystem );
+
+	/* Compress the image, if requested */
+	if ( opts->compress ) {
+		compressed_size = efi_compress ( payload, pe_size );
+		rom_size = ROM_SIZE ( sizeof ( *headers ) + compressed_size );
+		compressed = ( compressed_size < pe_size );
+	} else {
+		compressed = 0;
+	}
+
 	/* Construct ROM header */
 	headers->rom.Signature = PCI_EXPANSION_ROM_HEADER_SIGNATURE;
 	headers->rom.InitializationSize = ( rom_size / 512 );
 	headers->rom.EfiSignature = EFI_PCI_EXPANSION_ROM_HEADER_EFISIGNATURE;
-	read_pe_info ( payload, &headers->rom.EfiMachineType,
-		       &headers->rom.EfiSubsystem );
+	headers->rom.EfiSubsystem = subsystem;
+	headers->rom.EfiMachineType = machine;
+	headers->rom.CompressionType =
+		( compressed ? EFI_PCI_EXPANSION_ROM_HEADER_COMPRESSED : 0 );
 	headers->rom.EfiImageHeaderOffset = sizeof ( *headers );
 	headers->rom.PcirOffset =
 		offsetof ( typeof ( *headers ), pci );
@@ -194,11 +248,12 @@ static int parse_options ( const int argc, char **argv,
 		static struct option long_options[] = {
 			{ "vendor", required_argument, NULL, 'v' },
 			{ "device", required_argument, NULL, 'd' },
+			{ "compress", 0, NULL, 'c' },
 			{ "help", 0, NULL, 'h' },
 			{ 0, 0, 0, 0 }
 		};
 
-		if ( ( c = getopt_long ( argc, argv, "v:d:h",
+		if ( ( c = getopt_long ( argc, argv, "v:d:ch",
 					 long_options,
 					 &option_index ) ) == -1 ) {
 			break;
@@ -207,17 +262,20 @@ static int parse_options ( const int argc, char **argv,
 		switch ( c ) {
 		case 'v':
 			opts->vendor = strtoul ( optarg, &end, 16 );
-			if ( *end ) {
+			if ( *end || ( ! *optarg ) ) {
 				eprintf ( "Invalid vendor \"%s\"\n", optarg );
 				exit ( 2 );
 			}
 			break;
 		case 'd':
 			opts->device = strtoul ( optarg, &end, 16 );
-			if ( *end ) {
+			if ( *end || ( ! *optarg ) ) {
 				eprintf ( "Invalid device \"%s\"\n", optarg );
 				exit ( 2 );
 			}
+			break;
+		case 'c':
+			opts->compress = 1;
 			break;
 		case 'h':
 			print_help ( argv[0] );

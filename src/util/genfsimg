@@ -1,0 +1,320 @@
+#!/bin/sh
+#
+# Generate a filesystem-based image
+
+set -e
+set -u
+
+# Print usage message
+#
+help() {
+    echo "usage: ${0} [OPTIONS] foo.lkrn|foo.efi [bar.lkrn|bar.efi,...]"
+    echo
+    echo "where OPTIONS are:"
+    echo " -h         show this help"
+    echo " -o FILE    save image to file"
+    echo " -p PAD     pad filesystem (in kB)"
+    echo " -s SCRIPT  use executable script"
+}
+
+# Get hex byte from binary file
+#
+get_byte() {
+    local FILENAME
+    local OFFSET
+
+    FILENAME="${1}"
+    OFFSET="${2}"
+
+    od -j "${OFFSET}" -N 1 -A n -t x1 -- "${FILENAME}" | tr -d " "
+}
+
+# Get hex word from binary file
+#
+get_word() {
+    local FILENAME
+    local OFFSET
+
+    FILENAME="${1}"
+    OFFSET="${2}"
+
+    od -j "${OFFSET}" -N 2 -A n -t x1 -- "${FILENAME}" | tr -d " "
+}
+
+# Get appropriate EFI boot filename for CPU architecture
+#
+efi_boot_name() {
+    local FILENAME
+    local PESIG
+    local ARCH
+
+    FILENAME="${1}"
+
+    MZSIG=$(get_word "${FILENAME}" 0)
+    if [ "${MZSIG}" != "4d5a" ] ; then
+	echo "${FILENAME}: invalid MZ header" >&2
+	exit 1
+    fi
+    PEOFF=$(get_byte "${FILENAME}" 0x3c)
+    PESIG=$(get_word "${FILENAME}" 0x${PEOFF})
+    if [ "${PESIG}" != "5045" ] ; then
+	echo "${FILENAME}: invalid PE header" >&2
+	exit 1
+    fi
+    ARCH=$(get_word "${FILENAME}" $(( 0x${PEOFF} + 4 )) )
+    case "${ARCH}" in
+	"4c01" )
+	    echo "BOOTIA32.EFI"
+	    ;;
+	"6486" )
+	    echo "BOOTX64.EFI"
+	    ;;
+	"c201" )
+	    echo "BOOTARM.EFI"
+	    ;;
+	"64aa" )
+	    echo "BOOTAA64.EFI"
+	    ;;
+	* )
+	    echo "${FILENAME}: unrecognised EFI architecture ${ARCH}" >&2
+	    exit 1
+    esac
+}
+
+# Copy syslinux file
+#
+copy_syslinux_file() {
+    local FILENAME
+    local DESTDIR
+    local SRCDIR
+
+    FILENAME="${1}"
+    DESTDIR="${2}"
+
+    for SRCDIR in \
+	/usr/lib/syslinux \
+	/usr/lib/syslinux/bios \
+	/usr/lib/syslinux/modules/bios \
+	/usr/share/syslinux \
+	/usr/share/syslinux/bios \
+	/usr/share/syslinux/modules/bios \
+	/usr/local/share/syslinux \
+	/usr/local/share/syslinux/bios \
+	/usr/local/share/syslinux/bios/core \
+	/usr/local/share/syslinux/bios/com32/elflink/ldlinux \
+	/usr/local/share/syslinux/modules/bios \
+	/usr/lib/ISOLINUX \
+	; do
+	if [ -e "${SRCDIR}/${FILENAME}" ] ; then
+	    install -m 644 "${SRCDIR}/${FILENAME}" "${DESTDIR}/"
+	    return 0
+	fi
+    done
+    echo "${0}: could not find ${FILENAME}" >&2
+    return 1
+}
+
+# Parse command-line options
+#
+OUTFILE=
+PAD=0
+SCRIPT=
+while getopts "hlo:p:s:" OPTION ; do
+    case "${OPTION}" in
+	h)
+	    help
+	    exit 0
+	    ;;
+	o)
+	    OUTFILE="${OPTARG}"
+	    ;;
+	p)
+	    PAD="${OPTARG}"
+	    ;;
+	s)
+	    SCRIPT="${OPTARG}"
+	    ;;
+	*)
+	    help
+	    exit 1
+	    ;;
+    esac
+done
+if [ -z "${OUTFILE}" ]; then
+    echo "${0}: no output file given" >&2
+    help
+    exit 1
+fi
+shift $(( OPTIND - 1 ))
+if [ $# -eq 0 ] ; then
+    echo "${0}: no input files given" >&2
+    help
+    exit 1
+fi
+
+# Create temporary working directory
+#
+WORKDIR=$(mktemp -d "${OUTFILE}.XXXXXX")
+ISODIR="${WORKDIR}/iso"
+FATDIR="${WORKDIR}/fat"
+mkdir -p "${ISODIR}" "${FATDIR}"
+
+# Configure output
+#
+case "${OUTFILE}" in
+    *.iso)
+	ISOIMG="${OUTFILE}"
+	FATIMG="${ISODIR}/esp.img"
+	BIOSDIR="${ISODIR}"
+	SYSLINUXCFG="${ISODIR}/isolinux.cfg"
+	;;
+    *)
+	ISOIMG=
+	FATIMG="${OUTFILE}"
+	BIOSDIR="${FATDIR}"
+	SYSLINUXCFG="${FATDIR}/syslinux.cfg"
+	;;
+esac
+
+# Copy files to temporary working directory
+#
+LKRN=
+EFI=
+for FILENAME ; do
+    case "${FILENAME}" in
+	*.lkrn)
+	    DESTDIR="${BIOSDIR}"
+	    DESTFILE=$(basename "${FILENAME}")
+	    if [ -z "${LKRN}" ] ; then
+		echo "SAY iPXE boot image" > "${SYSLINUXCFG}"
+		echo "TIMEOUT 30" >> "${SYSLINUXCFG}"
+		echo "DEFAULT ${DESTFILE}" >> "${SYSLINUXCFG}"
+		if [ -n "${SCRIPT}" ] ; then
+		    cp "${SCRIPT}" "${BIOSDIR}/autoexec.ipxe"
+		fi
+	    fi
+	    echo "LABEL ${DESTFILE}" >> "${SYSLINUXCFG}"
+	    echo " KERNEL ${DESTFILE}" >> "${SYSLINUXCFG}"
+	    if [ -n "${SCRIPT}" ] ; then
+		echo " APPEND initrd=autoexec.ipxe" >> "${SYSLINUXCFG}"
+	    fi
+	    LKRN=1
+	    ;;
+	*.efi)
+	    DESTDIR="${FATDIR}/EFI/BOOT"
+	    DESTFILE=$(efi_boot_name "${FILENAME}")
+	    if [ -z "${EFI}" ] ; then
+		mkdir -p "${DESTDIR}"
+		if [ -n "${SCRIPT}" ] ; then
+		    cp "${SCRIPT}" "${FATDIR}/autoexec.ipxe"
+		fi
+	    fi
+	    EFI=1
+	    ;;
+	*)
+	    echo "${0}: unrecognised input filename ${FILENAME}" >&2
+	    help
+	    exit 1
+	    ;;
+    esac
+    if [ -e "${DESTDIR}/${DESTFILE}" ] ; then
+	echo "${0}: duplicate ${DESTFILE} from ${FILENAME}" >&2
+	exit 1
+    fi
+    cp "${FILENAME}" "${DESTDIR}/${DESTFILE}"
+done
+
+# Configure ISO image, if applicable
+#
+# Note that the BIOS boot files are required even for an EFI-only ISO,
+# since isohybrid will refuse to work without them.
+#
+if [ -n "${ISOIMG}" ] ; then
+    ISOARGS="-J -R -l"
+    copy_syslinux_file "isolinux.bin" "${ISODIR}"
+    copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
+    ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
+    ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
+    if [ -n "${EFI}" ] ; then
+	ISOARGS="${ISOARGS} -eltorito-alt-boot -no-emul-boot -e esp.img"
+    else
+	FATIMG=
+    fi
+    if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
+	DATE_FMT="+%Y%m%d%H%M%S00"
+	BUILD_DATE=$(date -u -d "@${SOURCE_DATE_EPOCH}" "${DATE_FMT}" \
+			  2>/dev/null || \
+		     date -u -r "${SOURCE_DATE_EPOCH}" "${DATE_FMT}" \
+			  2>/dev/null || \
+		     date -u "${DATE_FMT}")
+	ISOARGS="${ISOARGS} --set_all_file_dates ${BUILD_DATE}"
+	ISOARGS="${ISOARGS} --modification-date=${BUILD_DATE}"
+    fi
+fi
+
+# Create FAT filesystem image, if applicable
+#
+if [ -n "${FATIMG}" ] ; then
+    FATSIZE=$(du -s -k "${FATDIR}" | cut -f1)
+    FATSIZE=$(( FATSIZE + PAD + 256 ))
+    touch "${FATIMG}"
+    if [ "${FATSIZE}" -le "1440" ] ; then
+	FATSIZE=1440
+	FATARGS="-f 1440"
+    else
+	FATCYLS=$(( ( FATSIZE + 503 ) / 504 ))
+	FATSIZE=$(( FATCYLS * 504 ))
+	FATARGS="-s 63 -h 16 -t ${FATCYLS}"
+    fi
+    truncate -s "${FATSIZE}K" "${FATIMG}"
+    mformat -v iPXE -i "${FATIMG}" ${FATARGS} ::
+    mcopy -i "${FATIMG}" -s "${FATDIR}"/* ::
+    if [ "${BIOSDIR}" = "${FATDIR}" ] ; then
+	syslinux "${FATIMG}"
+    fi
+fi
+
+# Create ISO filesystem image, if applicable
+#
+if [ -n "${ISOIMG}" ] ; then
+    MKISOFS=
+    MKISOFS_MISSING=
+    MKISOFS_NOTSUP=
+    for CMD in genisoimage mkisofs xorrisofs ; do
+	if ! "${CMD}" --version >/dev/null 2>&1 ; then
+	    MKISOFS_MISSING="${MKISOFS_MISSING} ${CMD}"
+	    continue
+	fi
+	if ! "${CMD}" ${ISOARGS} --version "${ISODIR}" >/dev/null 2>&1 ; then
+	    MKISOFS_NOTSUP="${MKISOFS_NOTSUP} ${CMD}"
+	    continue
+	fi
+	MKISOFS="${CMD}"
+	break
+    done
+    if [ -z "${MKISOFS}" ] ; then
+	if [ -n "${MKISOFS_MISSING}" ] ; then
+	    echo "${0}:${MKISOFS_MISSING}: not installed" >&2
+	fi
+	if [ -n "${MKISOFS_NOTSUP}" ] ; then
+	    echo "${0}:${MKISOFS_NOTSUP}: cannot handle ${ISOARGS}" >&2
+	fi
+	echo "${0}: cannot find a suitable mkisofs or equivalent" >&2
+	exit 1
+    fi
+    "${MKISOFS}" -quiet -volid "iPXE" -preparer "iPXE build system" \
+	    -appid "iPXE - Open Source Network Boot Firmware" \
+	    -publisher "ipxe.org" -sysid "iPXE" -o "${ISOIMG}" \
+	    ${ISOARGS} "${ISODIR}"
+    if isohybrid --version >/dev/null 2>&1 ; then
+	ISOHYBRIDARGS=
+	if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
+	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --id ${SOURCE_DATE_EPOCH}"
+	fi
+	isohybrid ${ISOHYBRIDARGS} "${ISOIMG}"
+    fi
+fi
+
+# Clean up temporary working directory
+#
+rm -rf "${WORKDIR}"

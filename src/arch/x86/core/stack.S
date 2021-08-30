@@ -13,7 +13,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  ****************************************************************************
  */
 	.section ".stack", "aw", @nobits
-	.align 8
+	.balign 8
 	.globl _stack
 _stack:
 	.space STACK_SIZE

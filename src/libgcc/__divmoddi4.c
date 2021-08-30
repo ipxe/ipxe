@@ -1,6 +1,6 @@
 #include "libgcc.h"
 
-__libgcc int64_t __divmoddi4(int64_t num, int64_t den, int64 *rem_p)
+__libgcc int64_t __divmoddi4(int64_t num, int64_t den, int64_t *rem_p)
 {
   int minus = 0;
   int64_t v;

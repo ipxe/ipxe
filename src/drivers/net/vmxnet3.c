@@ -465,7 +465,8 @@ static int vmxnet3_open ( struct net_device *netdev ) {
 	int rc;
 
 	/* Allocate DMA areas */
-	vmxnet->dma = malloc_dma ( sizeof ( *vmxnet->dma ), VMXNET3_DMA_ALIGN );
+	vmxnet->dma = malloc_phys ( sizeof ( *vmxnet->dma ),
+				    VMXNET3_DMA_ALIGN );
 	if ( ! vmxnet->dma ) {
 		DBGC ( vmxnet, "VMXNET3 %p could not allocate DMA area\n",
 		       vmxnet );
@@ -542,7 +543,7 @@ static int vmxnet3_open ( struct net_device *netdev ) {
  err_activate:
 	vmxnet3_flush_tx ( netdev );
 	vmxnet3_flush_rx ( netdev );
-	free_dma ( vmxnet->dma, sizeof ( *vmxnet->dma ) );
+	free_phys ( vmxnet->dma, sizeof ( *vmxnet->dma ) );
  err_alloc_dma:
 	return rc;
 }
@@ -559,7 +560,7 @@ static void vmxnet3_close ( struct net_device *netdev ) {
 	vmxnet3_command ( vmxnet, VMXNET3_CMD_RESET_DEV );
 	vmxnet3_flush_tx ( netdev );
 	vmxnet3_flush_rx ( netdev );
-	free_dma ( vmxnet->dma, sizeof ( *vmxnet->dma ) );
+	free_phys ( vmxnet->dma, sizeof ( *vmxnet->dma ) );
 }
 
 /** vmxnet3 net device operations */
@@ -641,14 +642,14 @@ static int vmxnet3_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map PCI BARs */
-	vmxnet->pt = ioremap ( pci_bar_start ( pci, VMXNET3_PT_BAR ),
-			       VMXNET3_PT_LEN );
+	vmxnet->pt = pci_ioremap ( pci, pci_bar_start ( pci, VMXNET3_PT_BAR ),
+				   VMXNET3_PT_LEN );
 	if ( ! vmxnet->pt ) {
 		rc = -ENODEV;
 		goto err_ioremap_pt;
 	}
-	vmxnet->vd = ioremap ( pci_bar_start ( pci, VMXNET3_VD_BAR ),
-			       VMXNET3_VD_LEN );
+	vmxnet->vd = pci_ioremap ( pci, pci_bar_start ( pci, VMXNET3_VD_BAR ),
+				   VMXNET3_VD_LEN );
 	if ( ! vmxnet->vd ) {
 		rc = -ENODEV;
 		goto err_ioremap_vd;

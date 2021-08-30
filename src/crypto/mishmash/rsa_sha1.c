@@ -37,7 +37,7 @@ struct asn1_algorithm sha1_with_rsa_encryption_algorithm __asn1_algorithm = {
 	.name = "sha1WithRSAEncryption",
 	.pubkey = &rsa_algorithm,
 	.digest = &sha1_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_sha1_with_rsa_encryption ),
+	.oid = ASN1_CURSOR ( oid_sha1_with_rsa_encryption ),
 };
 
 /** SHA-1 digestInfo prefix */

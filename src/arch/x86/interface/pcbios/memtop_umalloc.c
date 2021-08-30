@@ -190,14 +190,14 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 	/* Expand/shrink block if possible */
 	if ( ptr == bottom ) {
 		/* Update block */
-		if ( new_size > ( heap_size - extmem.size ) ) {
-			DBG ( "EXTMEM out of space\n" );
-			return UNULL;
-		}
 		new = userptr_add ( ptr, - ( new_size - extmem.size ) );
 		align = ( user_to_phys ( new, 0 ) & ( EM_ALIGN - 1 ) );
 		new_size += align;
 		new = userptr_add ( new, -align );
+		if ( new_size > ( heap_size + extmem.size ) ) {
+			DBG ( "EXTMEM out of space\n" );
+			return UNULL;
+		}
 		DBG ( "EXTMEM expanding [%lx,%lx) to [%lx,%lx)\n",
 		      user_to_phys ( ptr, 0 ),
 		      user_to_phys ( ptr, extmem.size ),

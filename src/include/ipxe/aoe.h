@@ -15,6 +15,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/retry.h>
 #include <ipxe/ata.h>
 #include <ipxe/acpi.h>
+#include <ipxe/netdevice.h>
+#include <ipxe/interface.h>
 
 /** An AoE config command */
 struct aoecfg {
@@ -108,6 +110,35 @@ struct aoehdr {
 
 /** Maximum number of sectors per packet */
 #define AOE_MAX_COUNT 2
+
+/** An AoE device */
+struct aoe_device {
+	/** Reference counter */
+	struct refcnt refcnt;
+
+	/** Network device */
+	struct net_device *netdev;
+	/** ATA command issuing interface */
+	struct interface ata;
+
+	/** Major number */
+	uint16_t major;
+	/** Minor number */
+	uint8_t minor;
+	/** Target MAC address */
+	uint8_t target[MAX_LL_ADDR_LEN];
+
+	/** Saved timeout value */
+	unsigned long timeout;
+
+	/** Configuration command interface */
+	struct interface config;
+	/** Device is configued */
+	int configured;
+
+	/** ACPI descriptor */
+	struct acpi_descriptor desc;
+};
 
 /** AoE boot firmware table signature */
 #define ABFT_SIG ACPI_SIGNATURE ( 'a', 'B', 'F', 'T' )

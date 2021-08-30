@@ -153,6 +153,14 @@ static int eth_slow_lacp_rx ( struct io_buffer *iobuf,
 
 	eth_slow_lacp_dump ( iobuf, netdev, "RX" );
 
+	/* Check for looped-back packets */
+	if ( memcmp ( lacp->actor.system, netdev->ll_addr,
+		      sizeof ( lacp->actor.system ) ) == 0 ) {
+		DBGC ( netdev, "SLOW %s RX loopback detected\n",
+		       netdev->name );
+		return -ELOOP;
+	}
+
 	/* If partner is not in sync, collecting, and distributing,
 	 * then block the link until after the next expected LACP
 	 * packet.
@@ -277,6 +285,9 @@ static int eth_slow_rx ( struct io_buffer *iobuf,
 		free_iob ( iobuf );
 		return -EINVAL;
 	}
+
+	/* Strip any trailing padding */
+	iob_unput ( iobuf, ( sizeof ( *eth_slow ) - iob_len ( iobuf ) ) );
 
 	/* Handle according to subtype */
 	switch ( eth_slow->header.subtype ) {

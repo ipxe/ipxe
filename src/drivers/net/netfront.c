@@ -56,7 +56,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_EIO, -NETIF_RSP_DROPPED,		\
 			  "Packet dropped" )
 #define EIO_NETIF_RSP( status )						\
-	EUNIQ ( EINFO_EIO, -(status),					\
+	EUNIQ ( EINFO_EIO, ( -(status) & 0x1f ),			\
 		EIO_NETIF_RSP_ERROR, EIO_NETIF_RSP_DROPPED )
 
 /******************************************************************************
@@ -326,6 +326,7 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
 				  struct netfront_ring *ring ) {
 	struct xen_device *xendev = netfront->xendev;
 	struct xen_hypervisor *xen = xendev->xen;
+	physaddr_t addr;
 	unsigned int i;
 	int rc;
 
@@ -338,18 +339,18 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
 	ring->id_cons = 0;
 
 	/* Allocate and initialise shared ring */
-	ring->sring.raw = malloc_dma ( PAGE_SIZE, PAGE_SIZE );
+	ring->sring.raw = malloc_phys ( PAGE_SIZE, PAGE_SIZE );
 	if ( ! ring->sring.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
 
 	/* Grant access to shared ring */
+	addr = virt_to_phys ( ring->sring.raw );
 	if ( ( rc = xengrant_permit_access ( xen, ring->ref, xendev->backend_id,
-					     0, ring->sring.raw ) ) != 0 ) {
+					     0, addr ) ) != 0 ) {
 		DBGC ( netfront, "NETFRONT %s could not permit access to "
-		       "%#08lx: %s\n", xendev->key,
-		       virt_to_phys ( ring->sring.raw ), strerror ( rc ) );
+		       "%#08lx: %s\n", xendev->key, addr, strerror ( rc ) );
 		goto err_permit_access;
 	}
 
@@ -358,17 +359,15 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
 					 ring->ref ) ) != 0 )
 		goto err_write_num;
 
-	DBGC ( netfront, "NETFRONT %s %s=\"%d\" [%08lx,%08lx)\n",
-	       xendev->key, ring->ref_key, ring->ref,
-	       virt_to_phys ( ring->sring.raw ),
-	       ( virt_to_phys ( ring->sring.raw ) + PAGE_SIZE ) );
+	DBGC ( netfront, "NETFRONT %s %s=\"%d\" [%08lx,%08lx)\n", xendev->key,
+	       ring->ref_key, ring->ref, addr, ( addr + PAGE_SIZE ) );
 	return 0;
 
 	netfront_rm ( netfront, ring->ref_key );
  err_write_num:
 	xengrant_invalidate ( xen, ring->ref );
  err_permit_access:
-	free_dma ( ring->sring.raw, PAGE_SIZE );
+	free_phys ( ring->sring.raw, PAGE_SIZE );
  err_alloc:
 	return rc;
 }
@@ -378,7 +377,8 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
  *
  * @v netfront		Netfront device
  * @v ring		Descriptor ring
- * @v iobuf		I/O buffer
+ * @v addr		Physical address
+ * @v iobuf		Associated I/O buffer, or NULL
  * @v id		Buffer ID to fill in
  * @v ref		Grant reference to fill in
  * @ret rc		Return status code
@@ -387,8 +387,9 @@ static int netfront_create_ring ( struct netfront_nic *netfront,
  * ring.
  */
 static int netfront_push ( struct netfront_nic *netfront,
-			   struct netfront_ring *ring, struct io_buffer *iobuf,
-			   uint16_t *id, grant_ref_t *ref ) {
+			   struct netfront_ring *ring, physaddr_t addr,
+			   struct io_buffer *iobuf, uint16_t *id,
+			   grant_ref_t *ref ) {
 	struct xen_device *xendev = netfront->xendev;
 	struct xen_hypervisor *xen = xendev->xen;
 	unsigned int next_id;
@@ -402,19 +403,15 @@ static int netfront_push ( struct netfront_nic *netfront,
 	next_id = ring->ids[ ring->id_prod & ( ring->count - 1 ) ];
 	next_ref = ring->refs[next_id];
 
-	/* Grant access to I/O buffer page.  I/O buffers are naturally
-	 * aligned, so we never need to worry about crossing a page
-	 * boundary.
-	 */
+	/* Grant access to page containing address */
 	if ( ( rc = xengrant_permit_access ( xen, next_ref, xendev->backend_id,
-					     0, iobuf->data ) ) != 0 ) {
+					     0, addr ) ) != 0 ) {
 		DBGC ( netfront, "NETFRONT %s could not permit access to "
-		       "%#08lx: %s\n", xendev->key,
-		       virt_to_phys ( iobuf->data ), strerror ( rc ) );
+		       "%#08lx: %s\n", xendev->key, addr, strerror ( rc ) );
 		return rc;
 	}
 
-	/* Store I/O buffer */
+	/* Store associated I/O buffer, if any */
 	assert ( ring->iobufs[next_id] == NULL );
 	ring->iobufs[next_id] = iobuf;
 
@@ -434,7 +431,7 @@ static int netfront_push ( struct netfront_nic *netfront,
  * @v netfront		Netfront device
  * @v ring		Descriptor ring
  * @v id		Buffer ID
- * @ret iobuf		I/O buffer
+ * @ret iobuf		Associated I/O buffer, if any
  */
 static struct io_buffer * netfront_pull ( struct netfront_nic *netfront,
 					  struct netfront_ring *ring,
@@ -451,7 +448,6 @@ static struct io_buffer * netfront_pull ( struct netfront_nic *netfront,
 
 	/* Retrieve I/O buffer */
 	iobuf = ring->iobufs[id];
-	assert ( iobuf != NULL );
 	ring->iobufs[id] = NULL;
 
 	/* Free buffer ID */
@@ -490,8 +486,24 @@ static void netfront_destroy_ring ( struct netfront_nic *netfront,
 	xengrant_invalidate ( xen, ring->ref );
 
 	/* Free page */
-	free_dma ( ring->sring.raw, PAGE_SIZE );
+	free_phys ( ring->sring.raw, PAGE_SIZE );
 	ring->sring.raw = NULL;
+}
+
+/**
+ * Discard partially received I/O buffers
+ *
+ * @v netfront		Netfront device
+ */
+static void netfront_discard ( struct netfront_nic *netfront ) {
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
+
+	/* Discard all buffers in the list */
+	list_for_each_entry_safe ( iobuf, tmp, &netfront->rx_partial, list ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+	}
 }
 
 /******************************************************************************
@@ -512,6 +524,7 @@ static void netfront_refill_rx ( struct net_device *netdev ) {
 	struct io_buffer *iobuf;
 	struct netif_rx_request *request;
 	unsigned int refilled = 0;
+	physaddr_t addr;
 	int notify;
 	int rc;
 
@@ -524,24 +537,24 @@ static void netfront_refill_rx ( struct net_device *netdev ) {
 			/* Wait for next refill */
 			break;
 		}
+		addr = virt_to_phys ( iobuf->data );
 
 		/* Add to descriptor ring */
 		request = RING_GET_REQUEST ( &netfront->rx_fring,
 					     netfront->rx_fring.req_prod_pvt );
-		if ( ( rc = netfront_push ( netfront, &netfront->rx,
+		if ( ( rc = netfront_push ( netfront, &netfront->rx, addr,
 					    iobuf, &request->id,
 					    &request->gref ) ) != 0 ) {
 			netdev_rx_err ( netdev, iobuf, rc );
 			break;
 		}
 		DBGC2 ( netfront, "NETFRONT %s RX id %d ref %d is %#08lx+%zx\n",
-			xendev->key, request->id, request->gref,
-			virt_to_phys ( iobuf->data ), iob_tailroom ( iobuf ) );
+			xendev->key, request->id, request->gref, addr,
+			iob_tailroom ( iobuf ) );
 
 		/* Move to next descriptor */
 		netfront->rx_fring.req_prod_pvt++;
 		refilled++;
-
 	}
 
 	/* Push new descriptors and notify backend if applicable */
@@ -593,6 +606,10 @@ static int netfront_open ( struct net_device *netdev ) {
 	if ( ( rc = netfront_write_flag ( netfront, "request-rx-copy" ) ) != 0 )
 		goto err_request_rx_copy;
 
+	/* Inform backend that we can support scatter-gather */
+	if ( ( rc = netfront_write_flag ( netfront, "feature-sg" ) ) != 0 )
+		goto err_feature_sg;
+
 	/* Disable checksum offload, since we will always do the work anyway */
 	if ( ( rc = netfront_write_flag ( netfront,
 					  "feature-no-csum-offload" ) ) != 0 )
@@ -632,6 +649,8 @@ static int netfront_open ( struct net_device *netdev ) {
  err_feature_rx_notify:
 	netfront_rm ( netfront, "feature-no-csum-offload" );
  err_feature_no_csum_offload:
+	netfront_rm ( netfront, "feature-sg" );
+ err_feature_sg:
 	netfront_rm ( netfront, "request-rx-copy" );
  err_request_rx_copy:
 	netfront_destroy_event ( netfront );
@@ -675,10 +694,14 @@ static void netfront_close ( struct net_device *netdev ) {
 	/* Delete flags */
 	netfront_rm ( netfront, "feature-rx-notify" );
 	netfront_rm ( netfront, "feature-no-csum-offload" );
+	netfront_rm ( netfront, "feature-sg" );
 	netfront_rm ( netfront, "request-rx-copy" );
 
 	/* Destroy event channel */
 	netfront_destroy_event ( netfront );
+
+	/* Discard any partially received I/O buffers */
+	netfront_discard ( netfront );
 
 	/* Destroy receive descriptor ring, freeing any outstanding
 	 * I/O buffers.
@@ -703,34 +726,66 @@ static int netfront_transmit ( struct net_device *netdev,
 	struct netfront_nic *netfront = netdev->priv;
 	struct xen_device *xendev = netfront->xendev;
 	struct netif_tx_request *request;
+	physaddr_t addr;
+	size_t len;
+	size_t remaining;
+	size_t frag_len;
+	unsigned int offset;
+	unsigned int count;
+	unsigned int more;
 	int notify;
 	int rc;
 
+	/* Calculate number of page buffers required */
+	addr = virt_to_phys ( iobuf->data );
+	len = iob_len ( iobuf );
+	offset = ( addr & ( PAGE_SIZE - 1 ) );
+	count = ( ( offset + len + PAGE_SIZE - 1 ) / PAGE_SIZE );
+
 	/* Check that we have space in the ring */
-	if ( netfront_ring_is_full ( &netfront->tx ) ) {
+	if ( netfront_ring_space ( &netfront->tx ) < count ) {
 		DBGC ( netfront, "NETFRONT %s out of transmit descriptors\n",
 		       xendev->key );
 		return -ENOBUFS;
 	}
 
 	/* Add to descriptor ring */
-	request = RING_GET_REQUEST ( &netfront->tx_fring,
-				     netfront->tx_fring.req_prod_pvt );
-	if ( ( rc = netfront_push ( netfront, &netfront->tx, iobuf,
-				    &request->id, &request->gref ) ) != 0 ) {
-		return rc;
+	remaining = len;
+	while ( remaining ) {
+
+		/* Calculate length of this fragment */
+		frag_len = ( PAGE_SIZE - offset );
+		if ( frag_len >= remaining ) {
+			frag_len = remaining;
+			more = 0;
+		} else {
+			more = NETTXF_more_data;
+		}
+
+		/* Populate request */
+		request = RING_GET_REQUEST ( &netfront->tx_fring,
+					     netfront->tx_fring.req_prod_pvt );
+		if ( ( rc = netfront_push ( netfront, &netfront->tx, addr,
+					    ( more ? NULL : iobuf ),
+					    &request->id,
+					    &request->gref ) ) != 0 ) {
+			return rc;
+		}
+		request->flags = ( NETTXF_data_validated | more );
+		request->offset = offset;
+		request->size = ( ( remaining == len ) ? len : frag_len );
+		DBGC2 ( netfront, "NETFRONT %s TX id %d ref %d is "
+			"%#08lx+%zx%s\n", xendev->key, request->id,
+			request->gref, addr, frag_len, ( more ? "..." : "" ) );
+
+		/* Move to next descriptor */
+		netfront->tx_fring.req_prod_pvt++;
+		addr += frag_len;
+		remaining -= frag_len;
+		offset = 0;
 	}
-	request->offset = ( virt_to_phys ( iobuf->data ) & ( PAGE_SIZE - 1 ) );
-	request->flags = NETTXF_data_validated;
-	request->size = iob_len ( iobuf );
-	DBGC2 ( netfront, "NETFRONT %s TX id %d ref %d is %#08lx+%zx\n",
-		xendev->key, request->id, request->gref,
-		virt_to_phys ( iobuf->data ), iob_len ( iobuf ) );
 
-	/* Consume descriptor */
-	netfront->tx_fring.req_prod_pvt++;
-
-	/* Push new descriptor and notify backend if applicable */
+	/* Push new descriptors and notify backend if applicable */
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY ( &netfront->tx_fring, notify );
 	if ( notify )
 		netfront_send_event ( netfront );
@@ -748,7 +803,7 @@ static void netfront_poll_tx ( struct net_device *netdev ) {
 	struct xen_device *xendev = netfront->xendev;
 	struct netif_tx_response *response;
 	struct io_buffer *iobuf;
-	unsigned int status;
+	int status;
 	int rc;
 
 	/* Consume any unconsumed responses */
@@ -761,10 +816,11 @@ static void netfront_poll_tx ( struct net_device *netdev ) {
 		/* Retrieve from descriptor ring */
 		iobuf = netfront_pull ( netfront, &netfront->tx, response->id );
 		status = response->status;
-		if ( status == NETIF_RSP_OKAY ) {
+		if ( status >= NETIF_RSP_OKAY ) {
 			DBGC2 ( netfront, "NETFRONT %s TX id %d complete\n",
 				xendev->key, response->id );
-			netdev_tx_complete ( netdev, iobuf );
+			if ( iobuf )
+				netdev_tx_complete ( netdev, iobuf );
 		} else {
 			rc = -EIO_NETIF_RSP ( status );
 			DBGC2 ( netfront, "NETFRONT %s TX id %d error %d: %s\n",
@@ -786,6 +842,7 @@ static void netfront_poll_rx ( struct net_device *netdev ) {
 	struct netif_rx_response *response;
 	struct io_buffer *iobuf;
 	int status;
+	int more;
 	size_t len;
 	int rc;
 
@@ -799,21 +856,45 @@ static void netfront_poll_rx ( struct net_device *netdev ) {
 		/* Retrieve from descriptor ring */
 		iobuf = netfront_pull ( netfront, &netfront->rx, response->id );
 		status = response->status;
-		if ( status >= 0 ) {
-			len = status;
-			iob_reserve ( iobuf, response->offset );
-			iob_put ( iobuf, len );
-			DBGC2 ( netfront, "NETFRONT %s RX id %d complete "
-				"%#08lx+%zx\n", xendev->key, response->id,
-				virt_to_phys ( iobuf->data ), len );
-			netdev_rx ( netdev, iobuf );
-		} else {
+		more = ( response->flags & NETRXF_more_data );
+
+		/* Report errors */
+		if ( status < 0 ) {
 			rc = -EIO_NETIF_RSP ( status );
 			DBGC2 ( netfront, "NETFRONT %s RX id %d error %d: %s\n",
 				xendev->key, response->id, status,
 				strerror ( rc ) );
+			netfront_discard ( netfront );
 			netdev_rx_err ( netdev, iobuf, rc );
+			continue;
 		}
+
+		/* Add to partial receive list */
+		len = status;
+		iob_reserve ( iobuf, response->offset );
+		iob_put ( iobuf, len );
+		DBGC2 ( netfront, "NETFRONT %s RX id %d complete "
+			"%#08lx+%zx%s\n", xendev->key, response->id,
+			virt_to_phys ( iobuf->data ), len,
+			( more ? "..." : "" ) );
+		list_add_tail ( &iobuf->list, &netfront->rx_partial );
+
+		/* Wait until complete packet has been received */
+		if ( more )
+			continue;
+
+		/* Reassemble complete packet */
+		iobuf = iob_concatenate ( &netfront->rx_partial );
+		if ( ! iobuf ) {
+			DBGC2 ( netfront, "NETFRONT %s RX reassembly failed\n",
+				xendev->key );
+			netfront_discard ( netfront );
+			netdev_rx_err ( netdev, NULL, -ENOMEM );
+			continue;
+		}
+
+		/* Hand off to network stack */
+		netdev_rx ( netdev, iobuf );
 	}
 }
 
@@ -871,6 +952,7 @@ static int netfront_probe ( struct xen_device *xendev ) {
 	netdev->dev = &xendev->dev;
 	netfront = netdev->priv;
 	netfront->xendev = xendev;
+	INIT_LIST_HEAD ( &netfront->rx_partial );
 	DBGC ( netfront, "NETFRONT %s backend=\"%s\" in domain %ld\n",
 	       xendev->key, xendev->backend, xendev->backend_id );
 

@@ -65,33 +65,57 @@ static const char * ena_direction ( unsigned int direction ) {
  */
 
 /**
- * Reset hardware
+ * Wait for reset operation to be acknowledged
  *
  * @v ena		ENA device
+ * @v expected		Expected reset state
  * @ret rc		Return status code
  */
-static int ena_reset ( struct ena_nic *ena ) {
+static int ena_reset_wait ( struct ena_nic *ena, uint32_t expected ) {
 	uint32_t stat;
 	unsigned int i;
-
-	/* Trigger reset */
-	writel ( ENA_CTRL_RESET, ( ena->regs + ENA_CTRL ) );
 
 	/* Wait for reset to complete */
 	for ( i = 0 ; i < ENA_RESET_MAX_WAIT_MS ; i++ ) {
 
 		/* Check if device is ready */
 		stat = readl ( ena->regs + ENA_STAT );
-		if ( stat & ENA_STAT_READY )
+		if ( ( stat & ENA_STAT_RESET ) == expected )
 			return 0;
 
 		/* Delay */
 		mdelay ( 1 );
 	}
 
-	DBGC ( ena, "ENA %p timed out waiting for reset (status %#08x)\n",
-	       ena, stat );
+	DBGC ( ena, "ENA %p timed out waiting for reset status %#08x "
+	       "(got %#08x)\n", ena, expected, stat );
 	return -ETIMEDOUT;
+}
+
+/**
+ * Reset hardware
+ *
+ * @v ena		ENA device
+ * @ret rc		Return status code
+ */
+static int ena_reset ( struct ena_nic *ena ) {
+	int rc;
+
+	/* Trigger reset */
+	writel ( ENA_CTRL_RESET, ( ena->regs + ENA_CTRL ) );
+
+	/* Wait for reset to take effect */
+	if ( ( rc = ena_reset_wait ( ena, ENA_STAT_RESET ) ) != 0 )
+		return rc;
+
+	/* Clear reset */
+	writel ( 0, ( ena->regs + ENA_CTRL ) );
+
+	/* Wait for reset to clear */
+	if ( ( rc = ena_reset_wait ( ena, 0 ) ) != 0 )
+		return rc;
+
+	return 0;
 }
 
 /******************************************************************************
@@ -164,7 +188,7 @@ static int ena_create_admin ( struct ena_nic *ena ) {
 	int rc;
 
 	/* Allocate admin completion queue */
-	ena->acq.rsp = malloc_dma ( acq_len, acq_len );
+	ena->acq.rsp = malloc_phys ( acq_len, acq_len );
 	if ( ! ena->acq.rsp ) {
 		rc = -ENOMEM;
 		goto err_alloc_acq;
@@ -172,7 +196,7 @@ static int ena_create_admin ( struct ena_nic *ena ) {
 	memset ( ena->acq.rsp, 0, acq_len );
 
 	/* Allocate admin queue */
-	ena->aq.req = malloc_dma ( aq_len, aq_len );
+	ena->aq.req = malloc_phys ( aq_len, aq_len );
 	if ( ! ena->aq.req ) {
 		rc = -ENOMEM;
 		goto err_alloc_aq;
@@ -196,9 +220,9 @@ static int ena_create_admin ( struct ena_nic *ena ) {
 
 	ena_clear_caps ( ena, ENA_AQ_CAPS );
 	ena_clear_caps ( ena, ENA_ACQ_CAPS );
-	free_dma ( ena->aq.req, aq_len );
+	free_phys ( ena->aq.req, aq_len );
  err_alloc_aq:
-	free_dma ( ena->acq.rsp, acq_len );
+	free_phys ( ena->acq.rsp, acq_len );
  err_alloc_acq:
 	return rc;
 }
@@ -218,8 +242,8 @@ static void ena_destroy_admin ( struct ena_nic *ena ) {
 	wmb();
 
 	/* Free queues */
-	free_dma ( ena->aq.req, aq_len );
-	free_dma ( ena->acq.rsp, acq_len );
+	free_phys ( ena->aq.req, aq_len );
+	free_phys ( ena->acq.rsp, acq_len );
 	DBGC ( ena, "ENA %p AQ and ACQ destroyed\n", ena );
 }
 
@@ -338,7 +362,7 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	int rc;
 
 	/* Allocate submission queue entries */
-	sq->sqe.raw = malloc_dma ( sq->len, ENA_ALIGN );
+	sq->sqe.raw = malloc_phys ( sq->len, ENA_ALIGN );
 	if ( ! sq->sqe.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -375,7 +399,7 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	return 0;
 
  err_admin:
-	free_dma ( sq->sqe.raw, sq->len );
+	free_phys ( sq->sqe.raw, sq->len );
  err_alloc:
 	return rc;
 }
@@ -403,7 +427,7 @@ static int ena_destroy_sq ( struct ena_nic *ena, struct ena_sq *sq ) {
 		return rc;
 
 	/* Free submission queue entries */
-	free_dma ( sq->sqe.raw, sq->len );
+	free_phys ( sq->sqe.raw, sq->len );
 
 	DBGC ( ena, "ENA %p %s SQ%d destroyed\n",
 	       ena, ena_direction ( sq->direction ), sq->id );
@@ -423,7 +447,7 @@ static int ena_create_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	int rc;
 
 	/* Allocate completion queue entries */
-	cq->cqe.raw = malloc_dma ( cq->len, ENA_ALIGN );
+	cq->cqe.raw = malloc_phys ( cq->len, ENA_ALIGN );
 	if ( ! cq->cqe.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -461,7 +485,7 @@ static int ena_create_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	return 0;
 
  err_admin:
-	free_dma ( cq->cqe.raw, cq->len );
+	free_phys ( cq->cqe.raw, cq->len );
  err_alloc:
 	return rc;
 }
@@ -488,7 +512,7 @@ static int ena_destroy_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 		return rc;
 
 	/* Free completion queue entries */
-	free_dma ( cq->cqe.raw, cq->len );
+	free_phys ( cq->cqe.raw, cq->len );
 
 	DBGC ( ena, "ENA %p CQ%d destroyed\n", ena, cq->id );
 	return 0;
@@ -933,7 +957,7 @@ static int ena_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Map registers */
-	ena->regs = ioremap ( pci->membase, ENA_BAR_SIZE );
+	ena->regs = pci_ioremap ( pci, pci->membase, ENA_BAR_SIZE );
 	if ( ! ena->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;

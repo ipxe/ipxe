@@ -42,6 +42,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/open.h>
 #include <ipxe/ata.h>
 #include <ipxe/device.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/aoe.h>
 
 /** @file
@@ -67,35 +68,6 @@ static LIST_HEAD ( aoe_devices );
 
 /** List of active AoE commands */
 static LIST_HEAD ( aoe_commands );
-
-/** An AoE device */
-struct aoe_device {
-	/** Reference counter */
-	struct refcnt refcnt;
-
-	/** Network device */
-	struct net_device *netdev;
-	/** ATA command issuing interface */
-	struct interface ata;
-
-	/** Major number */
-	uint16_t major;
-	/** Minor number */
-	uint8_t minor;
-	/** Target MAC address */
-	uint8_t target[MAX_LL_ADDR_LEN];
-
-	/** Saved timeout value */
-	unsigned long timeout;
-
-	/** Configuration command interface */
-	struct interface config;
-	/** Device is configued */
-	int configured;
-
-	/** ACPI descriptor */
-	struct acpi_descriptor desc;
-};
 
 /** An AoE command */
 struct aoe_command {
@@ -811,6 +783,7 @@ static struct interface_operation aoedev_ata_op[] = {
 	INTF_OP ( acpi_describe, struct aoe_device *, aoedev_describe ),
 	INTF_OP ( identify_device, struct aoe_device *,
 		  aoedev_identify_device ),
+	EFI_INTF_OP ( efi_describe, struct aoe_device *, efi_aoe_path ),
 };
 
 /** AoE device ATA interface descriptor */

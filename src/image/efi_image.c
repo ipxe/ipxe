@@ -26,10 +26,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_download.h>
 #include <ipxe/efi/efi_file.h>
-#include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_wrap.h>
 #include <ipxe/efi/efi_pxe.h>
+#include <ipxe/efi/efi_driver.h>
 #include <ipxe/image.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -74,7 +75,7 @@ efi_image_path ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
 	size_t len;
 
 	/* Calculate device path lengths */
-	prefix_len = efi_devpath_len ( parent );
+	prefix_len = efi_path_len ( parent );
 	name_len = strlen ( image->name );
 	filepath_len = ( SIZE_OF_FILEPATH_DEVICE_PATH +
 			 ( name_len + 1 /* NUL */ ) * sizeof ( wchar_t ) );
@@ -140,6 +141,7 @@ static int efi_image_exec ( struct image *image ) {
 		void *interface;
 	} loaded;
 	EFI_HANDLE handle;
+	EFI_MEMORY_TYPE type;
 	wchar_t *cmdline;
 	EFI_STATUS efirc;
 	int rc;
@@ -193,6 +195,7 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Attempt loading image */
+	handle = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, path,
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
@@ -200,7 +203,11 @@ static int efi_image_exec ( struct image *image ) {
 		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
 		       image, strerror ( rc ) );
-		goto err_load_image;
+		if ( efirc == EFI_SECURITY_VIOLATION ) {
+			goto err_load_image_security_violation;
+		} else {
+			goto err_load_image;
+		}
 	}
 
 	/* Get the loaded image protocol for the newly loaded image */
@@ -226,6 +233,9 @@ static int efi_image_exec ( struct image *image ) {
 	assert ( loaded.image->LoadOptionsSize == 0 );
 	assert ( loaded.image->LoadOptions == NULL );
 
+	/* Record image code type */
+	type = loaded.image->ImageCodeType;
+
 	/* Set command line */
 	loaded.image->LoadOptions = cmdline;
 	loaded.image->LoadOptionsSize =
@@ -248,6 +258,12 @@ static int efi_image_exec ( struct image *image ) {
 		goto err_start_image;
 	}
 
+	/* If image was a driver, connect it up to anything available */
+	if ( type == EfiBootServicesCode ) {
+		DBGC ( image, "EFIIMAGE %p connecting drivers\n", image );
+		efi_driver_reconnect_all();
+	}
+
 	/* Success */
 	rc = 0;
 
@@ -268,6 +284,7 @@ static int efi_image_exec ( struct image *image ) {
 	 * call UnloadImage()).  We therefore ignore any failures from
 	 * the UnloadImage() call itself.
 	 */
+ err_load_image_security_violation:
 	if ( rc != 0 )
 		bs->UnloadImage ( handle );
  err_load_image:
@@ -303,6 +320,7 @@ static int efi_image_probe ( struct image *image ) {
 	int rc;
 
 	/* Attempt loading image */
+	handle = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, &empty_path,
 				       user_to_virt ( image->data, 0 ),
 				       image->len, &handle ) ) != 0 ) {
@@ -310,7 +328,11 @@ static int efi_image_probe ( struct image *image ) {
 		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
 		       image, strerror ( rc ) );
-		return rc;
+		if ( efirc == EFI_SECURITY_VIOLATION ) {
+			goto err_load_image_security_violation;
+		} else {
+			goto err_load_image;
+		}
 	}
 
 	/* Unload the image.  We can't leave it loaded, because we
@@ -319,6 +341,11 @@ static int efi_image_probe ( struct image *image ) {
 	bs->UnloadImage ( handle );
 
 	return 0;
+
+ err_load_image_security_violation:
+	bs->UnloadImage ( handle );
+ err_load_image:
+	return rc;
 }
 
 /** EFI image type */

@@ -164,7 +164,7 @@ static EFI_GUID bofm2_protocol_guid =
  */
 static int efi_bofm_supported ( EFI_HANDLE device ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	struct pci_device pci;
+	struct efi_pci_device efipci;
 	union {
 		IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL *bofm1;
 		void *interface;
@@ -173,11 +173,11 @@ static int efi_bofm_supported ( EFI_HANDLE device ) {
 	int rc;
 
 	/* Get PCI device information */
-	if ( ( rc = efipci_info ( device, &pci ) ) != 0 )
+	if ( ( rc = efipci_info ( device, &efipci ) ) != 0 )
 		return rc;
 
 	/* Look for a BOFM driver */
-	if ( ( rc = bofm_find_driver ( &pci ) ) != 0 ) {
+	if ( ( rc = bofm_find_driver ( &efipci.pci ) ) != 0 ) {
 		DBGCP ( device, "EFIBOFM %s has no driver\n",
 			efi_handle_name ( device ) );
 		return rc;
@@ -204,7 +204,7 @@ static int efi_bofm_supported ( EFI_HANDLE device ) {
 	}
 
 	DBGC ( device, "EFIBOFM %s has driver \"%s\"\n",
-	       efi_handle_name ( device ), pci.id->name );
+	       efi_handle_name ( device ), efipci.pci.id->name );
 	return 0;
 }
 
@@ -225,7 +225,7 @@ static int efi_bofm_start ( struct efi_device *efidev ) {
 		IBM_BOFM_DRIVER_CONFIGURATION_PROTOCOL2 *bofm2;
 		void *interface;
 	} bofm2;
-	struct pci_device pci;
+	struct efi_pci_device efipci;
 	IBM_BOFM_TABLE *bofmtab;
 	IBM_BOFM_TABLE *bofmtab2;
 	int bofmrc;
@@ -234,7 +234,7 @@ static int efi_bofm_start ( struct efi_device *efidev ) {
 
 	/* Open PCI device, if possible */
 	if ( ( rc = efipci_open ( device, EFI_OPEN_PROTOCOL_GET_PROTOCOL,
-				  &pci ) ) != 0 )
+				  &efipci ) ) != 0 )
 		goto err_open;
 
 	/* Locate BOFM protocol */
@@ -274,7 +274,8 @@ static int efi_bofm_start ( struct efi_device *efidev ) {
 			efi_handle_name ( device ) );
 		DBGC2_HD ( device, bofmtab2, bofmtab2->Parameters.Length );
 	}
-	bofmrc = bofm ( virt_to_user ( bofmtab2 ? bofmtab2 : bofmtab ), &pci );
+	bofmrc = bofm ( virt_to_user ( bofmtab2 ? bofmtab2 : bofmtab ),
+			&efipci.pci );
 	DBGC ( device, "EFIBOFM %s status %08x\n",
 	       efi_handle_name ( device ), bofmrc );
 	DBGC2 ( device, "EFIBOFM %s version 1 after processing:\n",

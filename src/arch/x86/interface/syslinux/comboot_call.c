@@ -220,7 +220,7 @@ static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
 /**
  * Terminate program interrupt handler
  */
-static __asmcall void int20 ( struct i386_all_regs *ix86 __unused ) {
+static __asmcall __used void int20 ( struct i386_all_regs *ix86 __unused ) {
 	rmlongjmp ( comboot_return, COMBOOT_EXIT );
 }
 
@@ -228,7 +228,7 @@ static __asmcall void int20 ( struct i386_all_regs *ix86 __unused ) {
 /**
  * DOS-compatible API
  */
-static __asmcall void int21 ( struct i386_all_regs *ix86 ) {
+static __asmcall __used void int21 ( struct i386_all_regs *ix86 ) {
 	ix86->flags |= CF;
 
 	switch ( ix86->regs.ah ) {
@@ -311,7 +311,7 @@ __weak int pxe_api_call_weak ( struct i386_all_regs *ix86 __unused ) {
 /**
  * SYSLINUX API
  */
-static __asmcall void int22 ( struct i386_all_regs *ix86 ) {
+static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 	ix86->flags |= CF;
 
 	switch ( ix86->regs.ax ) {

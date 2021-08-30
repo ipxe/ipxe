@@ -47,17 +47,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EINFO_EACCES_VERIFY \
 	__einfo_uniqify ( EINFO_EACCES, 0x01, "RSA signature incorrect" )
 
-/** "rsaEncryption" object identifier */
-static uint8_t oid_rsa_encryption[] = { ASN1_OID_RSAENCRYPTION };
-
-/** "rsaEncryption" OID-identified algorithm */
-struct asn1_algorithm rsa_encryption_algorithm __asn1_algorithm = {
-	.name = "rsaEncryption",
-	.pubkey = &rsa_algorithm,
-	.digest = NULL,
-	.oid = ASN1_OID_CURSOR ( oid_rsa_encryption ),
-};
-
 /**
  * Identify RSA prefix
  *

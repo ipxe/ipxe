@@ -259,17 +259,9 @@ static int ping_open ( struct interface *xfer, struct sockaddr *peer,
 	return rc;
 }
 
-/** Ping IPv4 socket opener */
-struct socket_opener ping_ipv4_socket_opener __socket_opener = {
+/** Ping socket opener */
+struct socket_opener ping_socket_opener __socket_opener = {
 	.semantics	= PING_SOCK_ECHO,
-	.family		= AF_INET,
-	.open		= ping_open,
-};
-
-/** Ping IPv6 socket opener */
-struct socket_opener ping_ipv6_socket_opener __socket_opener = {
-	.semantics	= PING_SOCK_ECHO,
-	.family		= AF_INET6,
 	.open		= ping_open,
 };
 

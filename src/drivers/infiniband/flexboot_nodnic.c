@@ -365,7 +365,8 @@ static int flexboot_nodnic_create_qp ( struct ib_device *ibdev,
 		goto qp_alloc_err;
 	}
 
-	status = nodnic_port_create_qp(&port->port_priv, qp->type,
+	status = nodnic_port_create_qp(&port->port_priv,
+			(nodnic_queue_pair_type) qp->type,
 			qp->send.num_wqes * sizeof(struct nodnic_send_wqbb),
 			qp->send.num_wqes,
 			qp->recv.num_wqes * sizeof(struct nodnic_recv_wqe),
@@ -406,7 +407,8 @@ static void flexboot_nodnic_destroy_qp ( struct ib_device *ibdev,
 	struct flexboot_nodnic_port *port = &flexboot_nodnic->port[ibdev->port - 1];
 	struct flexboot_nodnic_queue_pair *flexboot_nodnic_qp = ib_qp_get_drvdata ( qp );
 
-	nodnic_port_destroy_qp(&port->port_priv, qp->type,
+	nodnic_port_destroy_qp(&port->port_priv,
+			(nodnic_queue_pair_type) qp->type,
 			flexboot_nodnic_qp->nodnic_queue_pair);
 
 	free(flexboot_nodnic_qp);
@@ -1163,6 +1165,7 @@ flexboot_nodnic_allocate_infiniband_devices( struct flexboot_nodnic *flexboot_no
 		ibdev->op = &flexboot_nodnic_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = ( FLEXBOOT_NODNIC_PORT_BASE + i);
+		ibdev->ports = device_priv->device_cap.num_ports;
 		ib_set_drvdata(ibdev, flexboot_nodnic_priv);
 	}
 	return status;
@@ -1459,7 +1462,7 @@ static int flexboot_nodnic_alloc_uar ( struct flexboot_nodnic *flexboot_nodnic )
 		return -EINVAL;
 	}
 	uar->phys = ( pci_bar_start ( pci, FLEXBOOT_NODNIC_HCA_BAR ) + (mlx_uint32)uar->offset );
-	uar->virt = ( void * )( ioremap ( uar->phys, FLEXBOOT_NODNIC_PAGE_SIZE ) );
+	uar->virt = ( void * )( pci_ioremap ( pci, uar->phys, FLEXBOOT_NODNIC_PAGE_SIZE ) );
 
 	return status;
 }

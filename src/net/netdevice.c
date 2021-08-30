@@ -297,24 +297,45 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->tx_queue );
 
+	/* Guard against re-entry */
+	if ( netdev->state & NETDEV_TX_IN_PROGRESS ) {
+		rc = -EBUSY;
+		goto err_busy;
+	}
+	netdev->state |= NETDEV_TX_IN_PROGRESS;
+
 	/* Avoid calling transmit() on unopened network devices */
 	if ( ! netdev_is_open ( netdev ) ) {
 		rc = -ENETUNREACH;
-		goto err;
+		goto err_closed;
 	}
 
 	/* Discard packet (for test purposes) if applicable */
 	if ( ( rc = inject_fault ( NETDEV_DISCARD_RATE ) ) != 0 )
-		goto err;
+		goto err_fault;
+
+	/* Map for DMA, if required */
+	if ( netdev->dma && ( ! dma_mapped ( &iobuf->map ) ) ) {
+		if ( ( rc = iob_map_tx ( iobuf, netdev->dma ) ) != 0 )
+			goto err_map;
+	}
 
 	/* Transmit packet */
 	if ( ( rc = netdev->op->transmit ( netdev, iobuf ) ) != 0 )
-		goto err;
+		goto err_transmit;
+
+	/* Clear in-progress flag */
+	netdev->state &= ~NETDEV_TX_IN_PROGRESS;
 
 	profile_stop ( &net_tx_profiler );
 	return 0;
 
- err:
+ err_transmit:
+ err_map:
+ err_fault:
+ err_closed:
+	netdev->state &= ~NETDEV_TX_IN_PROGRESS;
+ err_busy:
 	netdev_tx_complete_err ( netdev, iobuf, rc );
 	return rc;
 }
@@ -340,6 +361,9 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
  * Failure to do this will cause the retransmitted packet to be
  * immediately redeferred (which will result in out-of-order
  * transmissions and other nastiness).
+ *
+ * I/O buffers that have been mapped for DMA will remain mapped while
+ * present in the deferred transmit queue.
  */
 void netdev_tx_defer ( struct net_device *netdev, struct io_buffer *iobuf ) {
 
@@ -365,6 +389,9 @@ void netdev_tx_defer ( struct net_device *netdev, struct io_buffer *iobuf ) {
  *
  * The packet is discarded and a TX error is recorded.  This function
  * takes ownership of the I/O buffer.
+ *
+ * The I/O buffer will be automatically unmapped for DMA, if
+ * applicable.
  */
 void netdev_tx_err ( struct net_device *netdev,
 		     struct io_buffer *iobuf, int rc ) {
@@ -378,6 +405,10 @@ void netdev_tx_err ( struct net_device *netdev,
 		DBGC ( netdev, "NETDEV %s transmission %p failed: %s\n",
 		       netdev->name, iobuf, strerror ( rc ) );
 	}
+
+	/* Unmap I/O buffer, if required */
+	if ( iobuf && dma_mapped ( &iobuf->map ) )
+		iob_unmap ( iobuf );
 
 	/* Discard packet */
 	free_iob ( iobuf );
@@ -462,10 +493,13 @@ static void netdev_tx_flush ( struct net_device *netdev ) {
  * Add packet to receive queue
  *
  * @v netdev		Network device
- * @v iobuf		I/O buffer, or NULL
+ * @v iobuf		I/O buffer
  *
  * The packet is added to the network device's RX queue.  This
  * function takes ownership of the I/O buffer.
+ *
+ * The I/O buffer will be automatically unmapped for DMA, if
+ * applicable.
  */
 void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	int rc;
@@ -478,6 +512,10 @@ void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 		netdev_rx_err ( netdev, iobuf, rc );
 		return;
 	}
+
+	/* Unmap I/O buffer, if required */
+	if ( dma_mapped ( &iobuf->map ) )
+		iob_unmap ( iobuf );
 
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->rx_queue );
@@ -497,12 +535,19 @@ void netdev_rx ( struct net_device *netdev, struct io_buffer *iobuf ) {
  * takes ownership of the I/O buffer.  @c iobuf may be NULL if, for
  * example, the net device wishes to report an error due to being
  * unable to allocate an I/O buffer.
+ *
+ * The I/O buffer will be automatically unmapped for DMA, if
+ * applicable.
  */
 void netdev_rx_err ( struct net_device *netdev,
 		     struct io_buffer *iobuf, int rc ) {
 
 	DBGC ( netdev, "NETDEV %s failed to receive %p: %s\n",
 	       netdev->name, iobuf, strerror ( rc ) );
+
+	/* Unmap I/O buffer, if required */
+	if ( iobuf && dma_mapped ( &iobuf->map ) )
+		iob_unmap ( iobuf );
 
 	/* Discard packet */
 	free_iob ( iobuf );
@@ -522,8 +567,18 @@ void netdev_rx_err ( struct net_device *netdev,
  */
 void netdev_poll ( struct net_device *netdev ) {
 
-	if ( netdev_is_open ( netdev ) )
-		netdev->op->poll ( netdev );
+	/* Avoid calling poll() on unopened network devices */
+	if ( ! netdev_is_open ( netdev ) )
+		return;
+
+	/* Guard against re-entry */
+	if ( netdev->state & NETDEV_POLL_IN_PROGRESS )
+		return;
+
+	/* Poll device */
+	netdev->state |= NETDEV_POLL_IN_PROGRESS;
+	netdev->op->poll ( netdev );
+	netdev->state &= ~NETDEV_POLL_IN_PROGRESS;
 }
 
 /**
@@ -1178,6 +1233,8 @@ static unsigned int net_discard ( void ) {
 
 			/* Discard first deferred packet */
 			list_del ( &iobuf->list );
+			if ( dma_mapped ( &iobuf->map ) )
+				iob_unmap ( iobuf );
 			free_iob ( iobuf );
 
 			/* Report discard */

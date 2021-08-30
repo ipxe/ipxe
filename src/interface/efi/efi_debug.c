@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/base16.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
@@ -189,7 +189,7 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
  * @v guid		GUID
  * @ret string		Printable string
  */
-const __attribute__ (( pure )) char * efi_guid_ntoa ( EFI_GUID *guid ) {
+const __attribute__ (( pure )) char * efi_guid_ntoa ( CONST EFI_GUID *guid ) {
 	union {
 		union uuid uuid;
 		EFI_GUID guid;
@@ -263,6 +263,28 @@ efi_open_attributes_name ( unsigned int attributes ) {
 }
 
 /**
+ * Print opened protocol information
+ *
+ * @v handle		EFI handle
+ * @V protocol		Protocol GUID
+ * @v opener		Opened protocol information
+ */
+void dbg_efi_opener ( EFI_HANDLE handle, EFI_GUID *protocol,
+		      EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener ) {
+
+	printf ( "HANDLE %s %s opened %dx (%s)", efi_handle_name ( handle ),
+		 efi_guid_ntoa ( protocol ), opener->OpenCount,
+		 efi_open_attributes_name ( opener->Attributes ) );
+	printf ( " by %s", efi_handle_name ( opener->AgentHandle ) );
+	if ( opener->ControllerHandle == handle ) {
+		printf ( "\n" );
+	} else {
+		printf ( " for %s\n",
+			 efi_handle_name ( opener->ControllerHandle ) );
+	}
+}
+
+/**
  * Print list of openers of a given protocol on a given handle
  *
  * @v handle		EFI handle
@@ -271,7 +293,6 @@ efi_open_attributes_name ( unsigned int attributes ) {
 void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *openers;
-	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener;
 	UINTN count;
 	unsigned int i;
 	EFI_STATUS efirc;
@@ -296,20 +317,8 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 	}
 
 	/* Dump list of openers */
-	for ( i = 0 ; i < count ; i++ ) {
-		opener = &openers[i];
-		printf ( "HANDLE %s %s opened %dx (%s)",
-			 efi_handle_name ( handle ),
-			 efi_guid_ntoa ( protocol ), opener->OpenCount,
-			 efi_open_attributes_name ( opener->Attributes ) );
-		printf ( " by %s", efi_handle_name ( opener->AgentHandle ) );
-		if ( opener->ControllerHandle == handle ) {
-			printf ( "\n" );
-		} else {
-			printf ( " for %s\n",
-				 efi_handle_name ( opener->ControllerHandle ) );
-		}
-	}
+	for ( i = 0 ; i < count ; i++ )
+		dbg_efi_opener ( handle, protocol, &openers[i] );
 
 	/* Free list */
 	bs->FreePool ( openers );
@@ -365,7 +374,7 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 const __attribute__ (( pure )) char *
 efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	static char text[256];
+	static char text[512];
 	size_t len;
 	CHAR16 *wtext;
 
@@ -378,7 +387,7 @@ efi_devpath_text ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	/* If we have no DevicePathToText protocol then use a raw hex string */
 	if ( ! efidpt ) {
 		DBG ( "[No DevicePathToText]" );
-		len = efi_devpath_len ( path );
+		len = efi_path_len ( path );
 		base16_encode ( path, len, text, sizeof ( text ) );
 		return text;
 	}

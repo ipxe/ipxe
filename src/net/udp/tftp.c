@@ -43,6 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/settings.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/uri.h>
+#include <ipxe/profile.h>
 #include <ipxe/tftp.h>
 
 /** @file
@@ -157,6 +158,14 @@ enum {
 
 /** Maximum number of MTFTP open requests before falling back to TFTP */
 #define MTFTP_MAX_TIMEOUTS 3
+
+/** Client profiler */
+static struct profiler tftp_client_profiler __profiler =
+	{ .name = "tftp.client" };
+
+/** Server profiler */
+static struct profiler tftp_server_profiler __profiler =
+	{ .name = "tftp.server" };
 
 /**
  * Free TFTP request
@@ -545,8 +554,7 @@ static void tftp_timer_expired ( struct retry_timer *timer, int fail ) {
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_blksize ( struct tftp_request *tftp,
-				  const char *value ) {
+static int tftp_process_blksize ( struct tftp_request *tftp, char *value ) {
 	char *end;
 
 	tftp->blksize = strtoul ( value, &end, 10 );
@@ -567,8 +575,7 @@ static int tftp_process_blksize ( struct tftp_request *tftp,
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_tsize ( struct tftp_request *tftp,
-				const char *value ) {
+static int tftp_process_tsize ( struct tftp_request *tftp, char *value ) {
 	char *end;
 
 	tftp->tsize = strtoul ( value, &end, 10 );
@@ -589,13 +596,11 @@ static int tftp_process_tsize ( struct tftp_request *tftp,
  * @v value		Option value
  * @ret rc		Return status code
  */
-static int tftp_process_multicast ( struct tftp_request *tftp,
-				    const char *value ) {
+static int tftp_process_multicast ( struct tftp_request *tftp, char *value ) {
 	union {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
 	} socket;
-	char buf[ strlen ( value ) + 1 ];
 	char *addr;
 	char *port;
 	char *port_end;
@@ -604,8 +609,7 @@ static int tftp_process_multicast ( struct tftp_request *tftp,
 	int rc;
 
 	/* Split value into "addr,port,mc" fields */
-	memcpy ( buf, value, sizeof ( buf ) );
-	addr = buf;
+	addr = value;
 	port = strchr ( addr, ',' );
 	if ( ! port ) {
 		DBGC ( tftp, "TFTP %p multicast missing port,mc\n", tftp );
@@ -662,7 +666,7 @@ struct tftp_option {
 	 * @v value	Option value
 	 * @ret rc	Return status code
 	 */
-	int ( * process ) ( struct tftp_request *tftp, const char *value );
+	int ( * process ) ( struct tftp_request *tftp, char *value );
 };
 
 /** Recognised TFTP options */
@@ -682,7 +686,7 @@ static struct tftp_option tftp_options[] = {
  * @ret rc		Return status code
  */
 static int tftp_process_option ( struct tftp_request *tftp,
-				 const char *name, const char *value ) {
+				 const char *name, char *value ) {
 	struct tftp_option *option;
 
 	for ( option = tftp_options ; option->name ; option++ ) {
@@ -807,6 +811,10 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	}
 	block += ( ntohs ( data->block ) - 1 );
 
+	/* Stop profiling server turnaround if applicable */
+	if ( block )
+		profile_stop ( &tftp_server_profiler );
+
 	/* Extract data */
 	offset = ( block * tftp->blksize );
 	iob_pull ( iobuf, sizeof ( *data ) );
@@ -838,6 +846,12 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 
 	/* Acknowledge block */
 	tftp_send_packet ( tftp );
+
+	/* Stop profiling client turnaround */
+	profile_stop ( &tftp_client_profiler );
+
+	/* Start profiling server turnaround */
+	profile_start ( &tftp_server_profiler );
 
 	/* If all blocks have been received, finish. */
 	if ( bitmap_full ( &tftp->bitmap ) )
@@ -911,7 +925,10 @@ static int tftp_rx ( struct tftp_request *tftp,
 	struct tftp_common *common = iobuf->data;
 	size_t len = iob_len ( iobuf );
 	int rc = -EINVAL;
-	
+
+	/* Start profiling client turnaround */
+	profile_start ( &tftp_client_profiler );
+
 	/* Sanity checks */
 	if ( len < sizeof ( *common ) ) {
 		DBGC ( tftp, "TFTP %p received underlength packet length "

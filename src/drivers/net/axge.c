@@ -213,6 +213,7 @@ static inline int axge_write_dword ( struct axge_device *axge,
 static int axge_check_link ( struct axge_device *axge ) {
 	struct net_device *netdev = axge->netdev;
 	uint8_t plsr;
+	uint16_t msr;
 	int rc;
 
 	/* Read physical link status register */
@@ -222,12 +223,28 @@ static int axge_check_link ( struct axge_device *axge ) {
 		return rc;
 	}
 
+	/* Write medium status register */
+	msr = cpu_to_le16 ( AXGE_MSR_FD | AXGE_MSR_RFC | AXGE_MSR_TFC |
+			    AXGE_MSR_RE );
+	if ( plsr & AXGE_PLSR_EPHY_1000 ) {
+		msr |= cpu_to_le16 ( AXGE_MSR_GM );
+	} else if ( plsr & AXGE_PLSR_EPHY_100 ) {
+		msr |= cpu_to_le16 ( AXGE_MSR_PS );
+	}
+	if ( ( rc = axge_write_word ( axge, AXGE_MSR, msr ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not write MSR: %s\n",
+		       axge, strerror ( rc ) );
+		return rc;
+	}
+
 	/* Update link status */
 	if ( plsr & AXGE_PLSR_EPHY_ANY ) {
-		DBGC ( axge, "AXGE %p link up (PLSR %02x)\n", axge, plsr );
+		DBGC ( axge, "AXGE %p link up (PLSR %02x MSR %04x)\n",
+		       axge, plsr, msr );
 		netdev_link_up ( netdev );
 	} else {
-		DBGC ( axge, "AXGE %p link down (PLSR %02x)\n", axge, plsr );
+		DBGC ( axge, "AXGE %p link down (PLSR %02x MSR %04x)\n",
+		       axge, plsr, msr );
 		netdev_link_down ( netdev );
 	}
 
@@ -291,13 +308,8 @@ static void axge_intr_complete ( struct usb_endpoint *ep,
 
 	/* Extract link status */
 	link_ok = ( intr->link & cpu_to_le16 ( AXGE_INTR_LINK_PPLS ) );
-	if ( link_ok && ! netdev_link_ok ( netdev ) ) {
-		DBGC ( axge, "AXGE %p link up\n", axge );
-		netdev_link_up ( netdev );
-	} else if ( netdev_link_ok ( netdev ) && ! link_ok ) {
-		DBGC ( axge, "AXGE %p link down\n", axge );
-		netdev_link_down ( netdev );
-	}
+	if ( ( !! link_ok ) ^ ( !! netdev_link_ok ( netdev ) ) )
+		axge->check_link = 1;
 
 	/* Free I/O buffer */
 	free_iob ( iobuf );
@@ -519,6 +531,13 @@ static int axge_open ( struct net_device *netdev ) {
 	uint16_t rcr;
 	int rc;
 
+	/* Reapply device configuration to avoid transaction errors */
+	if ( ( rc = usb_set_configuration ( axge->usb, axge->config ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not set configuration: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_set_configuration;
+	}
+
 	/* Open USB network device */
 	if ( ( rc = usbnet_open ( &axge->usbnet ) ) != 0 ) {
 		DBGC ( axge, "AXGE %p could not open: %s\n",
@@ -544,15 +563,18 @@ static int axge_open ( struct net_device *netdev ) {
 	}
 
 	/* Update link status */
-	axge_check_link ( axge );
+	if ( ( rc = axge_check_link ( axge ) ) != 0 )
+		goto err_check_link;
 
 	return 0;
 
+ err_check_link:
 	axge_write_word ( axge, AXGE_RCR, 0 );
  err_write_rcr:
  err_write_mac:
 	usbnet_close ( &axge->usbnet );
  err_open:
+ err_set_configuration:
 	return rc;
 }
 
@@ -605,6 +627,15 @@ static void axge_poll ( struct net_device *netdev ) {
 	/* Refill endpoints */
 	if ( ( rc = usbnet_refill ( &axge->usbnet ) ) != 0 )
 		netdev_rx_err ( netdev, NULL, rc );
+
+	/* Update link state, if applicable */
+	if ( axge->check_link ) {
+		if ( ( rc = axge_check_link ( axge ) ) == 0 ) {
+			axge->check_link = 0;
+		} else {
+			netdev_rx_err ( netdev, NULL, rc );
+		}
+	}
 }
 
 /** AXGE network device operations */
@@ -635,7 +666,6 @@ static int axge_probe ( struct usb_function *func,
 	struct net_device *netdev;
 	struct axge_device *axge;
 	uint16_t epprcr;
-	uint16_t msr;
 	uint8_t csr;
 	int rc;
 
@@ -652,6 +682,7 @@ static int axge_probe ( struct usb_function *func,
 	axge->usb = usb;
 	axge->bus = usb->port->hub->bus;
 	axge->netdev = netdev;
+	axge->config = config->config;
 	usbnet_init ( &axge->usbnet, func, &axge_intr_operations,
 		      &axge_in_operations, &axge_out_operations );
 	usb_refill_init ( &axge->usbnet.intr, 0, 0, AXGE_INTR_MAX_FILL );
@@ -705,28 +736,20 @@ static int axge_probe ( struct usb_function *func,
 		goto err_write_bicr;
 	}
 
-	/* Set medium status */
-	msr = cpu_to_le16 ( AXGE_MSR_GM | AXGE_MSR_FD | AXGE_MSR_RFC |
-			    AXGE_MSR_TFC | AXGE_MSR_RE );
-	if ( ( rc = axge_write_word ( axge, AXGE_MSR, msr ) ) != 0 ) {
-		DBGC ( axge, "AXGE %p could not write MSR: %s\n",
-		       axge, strerror ( rc ) );
-		goto err_write_msr;
-	}
-
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register;
 
 	/* Update link status */
-	axge_check_link ( axge );
+	if ( ( rc = axge_check_link ( axge ) ) != 0 )
+		goto err_check_link;
 
 	usb_func_set_drvdata ( func, axge );
 	return 0;
 
+ err_check_link:
 	unregister_netdev ( netdev );
  err_register:
- err_write_msr:
  err_write_bicr:
  err_write_csr:
  err_write_epprcr_on:

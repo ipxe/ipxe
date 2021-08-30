@@ -228,6 +228,9 @@ int pci_read_config ( struct pci_device *pci ) {
  */
 int pci_find_next ( struct pci_device *pci, unsigned int busdevfn ) {
 	static unsigned int end;
+	unsigned int sub_end;
+	uint8_t hdrtype;
+	uint8_t sub;
 	int rc;
 
 	/* Determine number of PCI buses */
@@ -236,10 +239,30 @@ int pci_find_next ( struct pci_device *pci, unsigned int busdevfn ) {
 
 	/* Find next PCI device, if any */
 	for ( ; busdevfn < end ; busdevfn++ ) {
+
+		/* Check for PCI device existence */
 		memset ( pci, 0, sizeof ( *pci ) );
 		pci_init ( pci, busdevfn );
-		if ( ( rc = pci_read_config ( pci ) ) == 0 )
-			return busdevfn;
+		if ( ( rc = pci_read_config ( pci ) ) != 0 )
+			continue;
+
+		/* If device is a bridge, expand the number of PCI
+		 * buses as needed.
+		 */
+		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdrtype );
+		hdrtype &= PCI_HEADER_TYPE_MASK;
+		if ( hdrtype == PCI_HEADER_TYPE_BRIDGE ) {
+			pci_read_config_byte ( pci, PCI_SUBORDINATE, &sub );
+			sub_end = PCI_BUSDEVFN ( 0, ( sub + 1 ), 0, 0 );
+			if ( end < sub_end ) {
+				DBGC ( pci, PCI_FMT " found subordinate bus "
+				       "%#02x\n", PCI_ARGS ( pci ), sub );
+				end = sub_end;
+			}
+		}
+
+		/* Return this device */
+		return busdevfn;
 	}
 
 	return -ENODEV;

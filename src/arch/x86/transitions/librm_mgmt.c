@@ -14,6 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <realmode.h>
 #include <pic8259.h>
 #include <ipxe/shell.h>
+#include <ipxe/cpuid.h>
 
 /*
  * This file provides functions for managing librm.
@@ -118,7 +119,7 @@ void set_interrupt_vector ( unsigned int intr, void *vector ) {
  * Initialise interrupt descriptor table
  *
  */
-void init_idt ( void ) {
+__asmcall void init_idt ( void ) {
 	struct interrupt_vector *vec;
 	unsigned int intr;
 
@@ -384,6 +385,21 @@ static void iounmap_pages ( volatile const void *io_addr ) {
 
 	DBGC ( &io_pages, "IO unmapped %p using PTEs [%d-%d]\n",
 	       io_addr, first, i );
+}
+
+/**
+ * Check for FXSAVE/FXRSTOR instruction support
+ *
+ */
+__asmcall void check_fxsr ( struct i386_all_regs *regs ) {
+	struct x86_features features;
+
+	/* Check for FXSR bit */
+	x86_features ( &features );
+	if ( ! ( features.intel.edx & CPUID_FEATURES_INTEL_EDX_FXSR ) )
+		regs->flags |= CF;
+	DBGC ( &features, "FXSAVE/FXRSTOR is%s supported\n",
+	       ( ( regs->flags & CF ) ? " not" : "" ) );
 }
 
 PROVIDE_UACCESS_INLINE ( librm, phys_to_user );

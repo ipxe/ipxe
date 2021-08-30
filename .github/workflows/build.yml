@@ -1,0 +1,71 @@
+name: Build
+
+on: push
+
+jobs:
+
+  x86:
+    name: x86
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install packages
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                           mtools syslinux isolinux \
+                           libc6-dev-i386 libc6-dbg:i386 valgrind
+      - name: Build (BIOS)
+        run: |
+          make -j 4 -C src
+      - name: Build (Everything)
+        run: |
+          make -j 4 -C src everything
+      - name: Test
+        run: |
+          valgrind ./src/bin-i386-linux/tests.linux
+          valgrind ./src/bin-x86_64-linux/tests.linux
+
+  arm32:
+    name: ARM32
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                           mtools syslinux isolinux gcc-arm-none-eabi
+      - name: Build
+        run: |
+          make -j 4 -C src CROSS=arm-none-eabi- \
+               bin-arm32-efi/intel.efi \
+               bin-arm32-efi/intel.usb \
+               bin-arm32-efi/intel.iso
+
+  arm64:
+    name: ARM64
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                           mtools syslinux isolinux gcc-aarch64-linux-gnu
+      - name: Build
+        run: |
+          make -j 4 -C src CROSS=aarch64-linux-gnu- \
+               bin-arm64-efi/ipxe.efi \
+               bin-arm64-efi/ipxe.usb \
+               bin-arm64-efi/ipxe.iso

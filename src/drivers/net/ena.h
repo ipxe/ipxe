@@ -66,7 +66,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Device status register */
 #define ENA_STAT 0x58
-#define ENA_STAT_READY 0x00000001UL	/**< Ready */
+#define ENA_STAT_RESET 0x00000008UL	/**< Reset in progress */
 
 /** Admin queue entry header */
 struct ena_aq_header {

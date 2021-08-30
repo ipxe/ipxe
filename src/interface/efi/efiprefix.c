@@ -22,12 +22,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <errno.h>
 #include <ipxe/device.h>
+#include <ipxe/init.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_autoboot.h>
+#include <ipxe/efi/efi_autoexec.h>
+#include <ipxe/efi/efi_cachedhcp.h>
 #include <ipxe/efi/efi_watchdog.h>
-#include <ipxe/efi/efi_blacklist.h>
+#include <ipxe/efi/efi_veto.h>
 
 /**
  * EFI entry point
@@ -41,12 +44,12 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Initialise stack cookie */
+	efi_init_stack_guard ( image_handle );
+
 	/* Initialise EFI environment */
 	if ( ( efirc = efi_init ( image_handle, systab ) ) != 0 )
 		goto err_init;
-
-	/* Record autoboot device (if any) */
-	efi_set_autoboot();
 
 	/* Claim SNP devices for use by iPXE */
 	efi_snp_claim();
@@ -70,14 +73,36 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 }
 
 /**
+ * Initialise EFI application
+ *
+ */
+static void efi_init_application ( void ) {
+	EFI_HANDLE device = efi_loaded_image->DeviceHandle;
+
+	/* Identify autoboot device, if any */
+	efi_set_autoboot_ll_addr ( device );
+
+	/* Store cached DHCP packet, if any */
+	efi_cachedhcp_record ( device );
+
+	/* Load autoexec script, if any */
+	efi_autoexec_load ( device );
+}
+
+/** EFI application initialisation function */
+struct init_fn efi_init_application_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = efi_init_application,
+};
+
+/**
  * Probe EFI root bus
  *
  * @v rootdev		EFI root device
  */
 static int efi_probe ( struct root_device *rootdev __unused ) {
 
-	/* Unloaded any blacklisted drivers */
-	efi_unload_blacklist();
+	/* Remove any vetoed drivers */
+	efi_veto();
 
 	/* Connect our drivers */
 	return efi_driver_connect_all();
