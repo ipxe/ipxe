@@ -1,5 +1,4 @@
 #!ipxe
-set vtag:int8 2
 echo ====NIC DISCOVERY===================================
 # Must start at 0; uint does not start at 0.
 set idx:int8 0
@@ -11,8 +10,7 @@ set idx:int8 0
 echo ====DHCP ===========================================
 set vidx:int8 0
 :vcheck isset ${net${vidx}/mac} || goto done
-  vcreate --tag ${vtag} net${vidx}
-  dhcp net${vidx}-${vtag} && goto done ||
+  dhcp net${vidx} && goto done ||
   inc vidx && goto vcheck
 :done
 

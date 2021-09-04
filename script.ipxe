@@ -1,9 +1,14 @@
 #!ipxe
 
 # Vars:
-set mgmt_vid0 15b3
-set mgmt_vid1 1077
-set hsn_did0 1017
+# These are PCI-SIG Device and Vendor IDs that define udev rules on-the-fly.
+# The early udev rules allow developers and users to set expectations
+# for a nodes state (e.g. interface names, and available hardware such as HSN).
+set mgmt_vid0 15b3 # Mellanox
+set mgmt_vid1 1077 # QLogic
+#set mgmt_vid2 8086 # Intel
+set hsn_did0 1017 # Mellanox CX-5
+#set hsn_did1 1015 # Mellanox CX-4
 set ignore ffff
 
 set base-url http://pit/${hostname}
@@ -16,21 +21,11 @@ set cloud-init ds=nocloud-net;s=http://${dhcp-server}:8888/;h=${hostname}
 set boot-opts rootfallback=LABEL=BOOTRAID initrd=initrd.img.xz
 set live-sqfs-opts root=live:LABEL=SQFSRAID rd.live.ram=0 rd.writable.fsimg=0 rd.skipfsck rd.live.squashimg=${image-name}
 set live-oval-opts rd.live.overlay=LABEL=ROOTRAID rd.live.overlay.thin=1 rd.live.overlay.overlayfs=1
-set disk-opts rd.luks rd.luks.crypttab=0 rd.lvm.conf=0 rd.lvm=1 rd.auto=1 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=1 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1
+set disk-opts rd.luks rd.luks.crypttab=0 rd.lvm.conf=0 rd.lvm=1 rd.auto=1 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=0 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1
 
-# Matching NCN boot parameters:
 set ncn-params pcie_ports=native transparent_hugepage=never console=tty0 console=ttyS0,115200 iommu=pt ${bootstrap} ${cloud-init} ${boot-opts} ${live-sqfs-opts} ${live-oval-opts} ${disk-opts}
-
-# NCN DHCP parameters:
-# Help for replacing bootdev:
-# sed -i '/bootdev=.*/bootdev=lan0' /var/www/boot/script.ipxe
-set net-ip-params ip=vlan007:dhcp ip=vlan004:dhcp ip=vlan002:dhcp bootdev=vlan002 rd.net.timeout.carrier=120 rd.net.timeout.ifup=120 rd.net.timeout.iflink=120 rd.net.dhcp.retry=3 rd.net.timeout.ipv6auto=0 rd.net.timeout.ipv6dad=0
-
-# VLAN Parameters:
-set net-vlan-params vlan=vlan007:bond0 vlan=vlan004:bond0 vlan=vlan002:bond0
-
-# Networking parameters:
-set net-params rd.bootif=0 hostname=${hostname} ${net-vlan-params} ${net-ip-params}
+set net-ip-params rd.net.timeout.carrier=120 rd.net.timeout.ifup=120 rd.net.timeout.iflink=120 rd.net.dhcp.retry=3 rd.net.timeout.ipv6auto=0 rd.net.timeout.ipv6dad=0
+set net-params ip=dhcp rd.bootif=0 hostname=${hostname} ${net-ip-params}
 
 # Parameters for CI/CD to ad-hoc replace (null by default):
 # Good for "always-on" params for automation.
@@ -47,59 +42,94 @@ set debug-params log_buf_len=1 rd.retry=10 rd.shell #rd.debug=1 metal.debug=1
 # sed -i '/custom-params .*/custom-params parm1 param2 param3' /var/www/boot/script.ipxe
 set custom-params nosplash quiet crashkernel=360M
 
-# Emulate real world, and boot over VLANs.
-# Note: This will also boot without VLAN, you'll be able to know by the IPs leased
 :nic_naming
 echo ====DEVICE NAMING=======================================================
+## This creates udev rules for our bare minimum interfaces:
+# - bond (LACP redundant bond)
+# - hsn  (high-speed)
+# - lan  (external/no-op)
+# - mgmt (untagged/default-vlan)
+# - sun  (storage vlan)
+# ALL CONFIGURATION IS HANDLED BY CLOUD-INIT
 set print-nics 0
 set idx:int8 0
 set idx_hsn:int8 0
 set idx_mgmt:int8 0
+set idx_sun:int8 0
 set idx_lan:int8 0
 set net-udev-params biosdevname=1
 set dual-bond 0
-## This is an early 1.4 shim for naming interfaces
-## This will move out of iPXE, now that more infrastructure (cloud-init) is ready.
-## For now this may need munging to get desired results.
+set odd 0
+
+# main-loop
 :loop isset ${net${idx}/mac} || goto loop_done
+
+  # announce ...
   echo net${idx} MAC ${net${idx}/mac}
-  set vendor_id ${pci/${net${idx}/busloc}.0.2}
+
+  # read PCI-SIG
   set device_id ${pci/${net${idx}/busloc}.2.2}
+  set vendor_id ${pci/${net${idx}/busloc}.0.2}
+
+  # bail if signature is unreadable (ffff)
   iseq ${device_id} ${ignore} && inc idx && goto loop ||
-  iseq ${device_id} ${hsn_did0} && goto hsn ||
-  iseq ${vendor_id} ${mgmt_vid0} && goto mgmt ||
-  iseq ${vendor_id} ${mgmt_vid1} && goto mgmt ||
+
+  # set indexes for scanning name preferences
+  set mgmt_vididx:int8 0
+  set hsn_dididx:int8 0
+
+  # high-speed network interfaces
+  :hsnloop isset ${hsn_did${hsn_dididx}} || goto hsnloop_done
+    iseq ${device_id} ${hsn_did${hsn_dididx}} && goto hsn || inc hsn_dididx && goto hsnloop
+  :hsnloop_done
+
+  # mgmt and sun interfaces
+  :mgmtloop isset ${mgmt_vid${mgmt_vididx}} || goto mgmtloop_done
+    iseq ${vendor_id} ${mgmt_vid${mgmt_vididx}} && goto mgmt || inc mgmt_vididx && goto mgmtloop
+  :mgmtloop_done
+
+  # if not hsn nor mgmt/sun then classify as a lan and return to the top of loop
   goto lan ||
   inc idx && goto loop
 
+# High-speed connections; provide the udev rules but no configuration
+# HSN-config is handled up the stack.
 :hsn
   echo net${idx} is hsn${idx_hsn}
-  set net-udev-params ifname=hsn${idx_hsn}:${net${idx}/mac} ip=hsn${idx_hsn}:auto6 ${net-udev-params}
+  set net-hsn-udev-params ifname=hsn${idx_hsn}:${net${idx}/mac} ip=hsn${idx_hsn}:auto6 ${net-hsn-udev-params}
   inc idx && inc idx_hsn && goto loop
 
+# bare interfaces used for bonds or stand-alones
 :mgmt
-  echo net${idx} is mgmt${idx_mgmt}
-  set net-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:auto6 ${net-udev-params}
-  iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
-  inc idx && inc idx_mgmt && goto loop
 
+  # Logic to setup redundant PCIe connections (Port1 of PCIe1 with Port1 of PCIe2 and so on and so forth)
+  iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
+
+  # Tell the kernel which MACs get sun or mgmt names.
+  iseq ${odd} 1 && iseq ${dual-bond} 1 && set net-sun-udev-params ifname=sun${idx_sun}:${net${idx}/mac} ip=sun${idx_sun}:auto6 ${net-sun-udev-params} && echo net${idx} is sun${idx_sun} ||
+  iseq ${odd} 1 && inc idx_sun ||
+  iseq ${odd} 1 && iseq ${dual-bond} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:auto6 ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
+  iseq ${odd} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:auto6 ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
+  iseq ${odd} 0 && inc idx_mgmt ||
+
+  # even or odd?
+  iseq ${odd} 1 && set odd 0 || set odd 1
+
+  # return
+  inc idx && goto loop
+
+# Stub connections that should be for external or site links.
 :lan
   echo net${idx} is lan${idx_lan}
-  set net-udev-params ifname=lan${idx_lan}:${net${idx}/mac} ip=lan${idx_lan}:auto6 ${net-udev-params}
+  # ip=:auto6 is necessary for dracut to invoke the interface, otherwise udev rules are not created.
+  set net-lan-udev-params ifname=lan${idx_lan}:${net${idx}/mac} ip=lan${idx_lan}:auto6 ${net-lan-udev-params}
   inc idx && inc idx_lan && goto loop
 
 :loop_done
-iseq ${print-nics} 1 && prompt Press any key to continue || sleep 2
+iseq ${print-nics} 1 && prompt Press any key to continue || sleep 10
 
 # Assign bonds.
-# FIXME: CASMINST-715 force bond0 only no matter what; never make bond1.
-iseq ${dual-bond} 1 && set net-bond-params bond=bond0:mgmt0,mgmt2:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 || set net-bond-params bond=bond0:mgmt0,mgmt1:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0
-# FIXME: CASMINST-715 when ready to enable bond1, comment out the above line and uncomment the line below.
-#iseq ${dual-bond} 1 && set net-bond-params bond=bond0:mgmt2:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0 bond=bond1:mgmt1,mgmt3:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond1 ip=bond1:auto6 || set net-bond-params bond=bond0:mgmt1:mode=802.3ad,miimon=100,lacp_rate=fast,xmit_hash_policy=layer2+3:9000 hwprobe=+200:*:*:bond0
-
-#echo ====NTP=================================================================
-#ntp ${3:ipv4} || echo Ignoring...
-#echo ========================================================================
+iseq ${dual-bond} 1 && set net-udev-params ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params} ${net-sun-udev-params} || set net-udev-params ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params}
 
 # Figure out if client is 64-bit capable
 cpuid --ext 29 && set arch x86_64 || set arch x86
@@ -127,6 +157,10 @@ goto ${target}
 
 :nics
 set print-nics 1
+clear net-udev-params
+clear net-udev-hsn-params
+clear net-udev-mgmt-params
+clear net-udef-sun-params
 goto nic_naming
 
 :failed
@@ -144,7 +178,7 @@ goto linux
 
 :linux
 initrd ${base-url}/initrd.img.xz
-kernel --name kernel ${base-url}/kernel ${net-udev-params} ${ncn-params} ${net-params} ${robot-params} ${custom-params} ${debug-params} ${net-bond-params} ${xname-param}
+kernel --name kernel ${base-url}/kernel ${net-udev-params} ${ncn-params} ${net-params} ${robot-params} ${custom-params} ${debug-params} ${xname-param}
 imgstat
 
 echo
