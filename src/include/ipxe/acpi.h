@@ -387,7 +387,9 @@ acpi_describe ( struct interface *interface );
 	typeof ( struct acpi_descriptor * ( object_type ) )
 
 extern void acpi_fix_checksum ( struct acpi_header *acpi );
-extern int acpi_sx ( uint32_t signature );
+extern int acpi_extract ( uint32_t signature, void *data,
+			  int ( * extract ) ( userptr_t zsdt, size_t len,
+					      size_t offset, void *data ) );
 extern void acpi_add ( struct acpi_descriptor *desc );
 extern void acpi_del ( struct acpi_descriptor *desc );
 extern int acpi_install ( int ( * install ) ( struct acpi_header *acpi ) );
