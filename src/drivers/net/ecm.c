@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/if_ether.h>
 #include <ipxe/base16.h>
 #include <ipxe/profile.h>
+#include <ipxe/acpimac.h>
 #include <ipxe/usb.h>
 #include "ecm.h"
 
@@ -92,6 +93,14 @@ int ecm_fetch_mac ( struct usb_function *func,
 	char buf[ base16_encoded_len ( ETH_ALEN ) + 1 /* NUL */ ];
 	int len;
 	int rc;
+
+	/* Use system-specific MAC address, if present and not already used */
+	if ( ( ( rc = acpi_mac ( hw_addr ) ) == 0 ) &&
+	     ! find_netdev_by_ll_addr ( &ethernet_protocol, hw_addr ) ) {
+		DBGC ( usb, "USB %s using system-specific MAC %s\n",
+		       func->name, eth_ntoa ( hw_addr ) );
+		return 0;
+	}
 
 	/* Fetch MAC address string */
 	len = usb_get_string_descriptor ( usb, desc->mac, 0, buf,
