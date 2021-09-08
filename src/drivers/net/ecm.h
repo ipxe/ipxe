@@ -86,7 +86,7 @@ struct ecm_device {
 extern struct ecm_ethernet_descriptor *
 ecm_ethernet_descriptor ( struct usb_configuration_descriptor *config,
 			  struct usb_interface_descriptor *interface );
-extern int ecm_fetch_mac ( struct usb_device *usb,
+extern int ecm_fetch_mac ( struct usb_function *func,
 			   struct ecm_ethernet_descriptor *desc,
 			   uint8_t *hw_addr );
 
