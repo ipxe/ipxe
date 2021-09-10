@@ -38,7 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-#define READLINE_MAX 256
+#define READLINE_MAX 1024
 
 /**
  * Synchronise console with edited string
@@ -258,8 +258,8 @@ void history_free ( struct readline_history *history ) {
 int readline_history ( const char *prompt, const char *prefill,
 		       struct readline_history *history, unsigned long timeout,
 		       char **line ) {
-	char buf[READLINE_MAX];
 	struct edit_string string;
+	char *buf;
 	int key;
 	int move_by;
 	const char *new_string;
@@ -275,10 +275,14 @@ int readline_history ( const char *prompt, const char *prefill,
 	/* Ensure cursor is visible */
 	printf ( "\033[?25h" );
 
-	/* Initialise editable string */
+	/* Allocate buffer and initialise editable string */
+	buf = zalloc ( READLINE_MAX );
+	if ( ! buf ) {
+		rc = -ENOMEM;
+		goto done;
+	}
 	memset ( &string, 0, sizeof ( string ) );
-	init_editstring ( &string, buf, sizeof ( buf ) );
-	buf[0] = '\0';
+	init_editstring ( &string, buf, READLINE_MAX );
 
 	/* Prefill string, if applicable */
 	if ( prefill ) {
@@ -303,8 +307,13 @@ int readline_history ( const char *prompt, const char *prefill,
 		switch ( key ) {
 		case CR:
 		case LF:
-			*line = strdup ( buf );
-			rc = ( ( *line ) ? 0 : -ENOMEM );
+			/* Shrink string (ignoring failures) */
+			*line = realloc ( buf,
+					  ( strlen ( buf ) + 1 /* NUL */ ) );
+			if ( ! *line )
+				*line = buf;
+			buf = NULL;
+			rc = 0;
 			goto done;
 		case CTRL_C:
 			rc = -ECANCELED;
@@ -332,6 +341,7 @@ int readline_history ( const char *prompt, const char *prefill,
 
  done:
 	putchar ( '\n' );
+	free ( buf );
 	if ( history ) {
 		if ( *line && (*line)[0] )
 			history_append ( history, *line );
