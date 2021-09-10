@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/xenstore.h>
 #include <ipxe/xenbus.h>
 #include <ipxe/xengrant.h>
+#include <interface/xen/xencon.h>
 #include "hvm.h"
 
 /** @file
@@ -406,6 +407,69 @@ static void hvm_unmap_xenstore ( struct hvm_device *hvm ) {
 }
 
 /**
+ * Map Xen Console
+ *
+ * @v hvm		HVM device
+ * @ret rc		Return status code
+ */
+static int hvm_map_console ( struct hvm_device *hvm ) {
+	uint64_t console_evtchn=0;
+	uint64_t console_pfn=0;
+	physaddr_t console_phys;
+	int xenrc;
+	int rc;
+
+	/* Get Console event channel */
+	if ( ( xenrc = xen_hvm_get_param ( &hvm->xen, HVM_PARAM_CONSOLE_EVTCHN,
+					   &console_evtchn ) ) != 0 ) {
+		rc = -EXEN ( xenrc );
+		DBGC ( hvm, "HVM could not get Console event channel: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+	hvm->xen.console.port = console_evtchn;
+
+	/* Get Console PFN */
+	if ( ( xenrc = xen_hvm_get_param ( &hvm->xen, HVM_PARAM_CONSOLE_PFN,
+					   &console_pfn ) ) != 0 ) {
+		rc = -EXEN ( xenrc );
+		DBGC ( hvm, "HVM could not get Console PFN: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+	console_phys = ( console_pfn * PAGE_SIZE );
+
+	/* Map Xen Console */
+	hvm->xen.console.intf = pci_ioremap ( hvm->pci, console_phys, PAGE_SIZE );
+	if ( ! hvm->xen.console.intf ) {
+		DBGC ( hvm, "HVM could not map Xen Console at [%08lx,%08lx)\n",
+		       console_phys, ( console_phys + PAGE_SIZE ) );
+		return -ENODEV;
+	}
+	DBGC2 ( hvm,  "HVM mapped Xen Console at [%08lx,%08lx) with event port "
+		"%d\n", console_phys, ( console_phys + PAGE_SIZE ),
+		hvm->xen.console.port );
+
+    xencon_late_init(&hvm->xen);
+
+	return 0;
+}
+
+/**
+ * Unmap Xen Console
+ *
+ * @v hvm		HVM device
+ */
+static void hvm_unmap_console ( struct hvm_device *hvm ) {
+
+    xencon_uninit();
+
+	/* Unmap Xen Console */
+	iounmap ( hvm->xen.console.intf );
+}
+
+
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -439,6 +503,8 @@ static int hvm_probe ( struct pci_device *pci ) {
 		goto err_map_shared_info;
 	if ( ( rc = hvm_map_grant ( hvm ) ) != 0 )
 		goto err_map_grant;
+	if ( ( rc = hvm_map_console ( hvm ) ) != 0 )
+		goto err_map_console;
 	if ( ( rc = hvm_map_xenstore ( hvm ) ) != 0 )
 		goto err_map_xenstore;
 
@@ -455,6 +521,8 @@ static int hvm_probe ( struct pci_device *pci ) {
 	xenbus_remove ( &hvm->xen, &pci->dev );
  err_xenbus_probe:
 	hvm_unmap_xenstore ( hvm );
+ err_map_console:
+	hvm_unmap_console ( hvm );
  err_map_xenstore:
 	hvm_unmap_grant ( hvm );
  err_map_grant:
@@ -478,6 +546,7 @@ static void hvm_remove ( struct pci_device *pci ) {
 
 	xenbus_remove ( &hvm->xen, &pci->dev );
 	hvm_unmap_xenstore ( hvm );
+	hvm_unmap_console ( hvm );
 	hvm_unmap_grant ( hvm );
 	hvm_unmap_shared_info ( hvm );
 	hvm_unmap_hypercall ( hvm );
