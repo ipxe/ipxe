@@ -25,7 +25,7 @@ set disk-opts rd.luks rd.luks.crypttab=0 rd.lvm.conf=0 rd.lvm=1 rd.auto=1 rd.md=
 
 set ncn-params pcie_ports=native transparent_hugepage=never console=tty0 console=ttyS0,115200 iommu=pt ${bootstrap} ${cloud-init} ${boot-opts} ${live-sqfs-opts} ${live-oval-opts} ${disk-opts}
 set net-ip-params rd.net.timeout.carrier=120 rd.net.timeout.ifup=120 rd.net.timeout.iflink=120 rd.net.dhcp.retry=3 rd.net.timeout.ipv6auto=0 rd.net.timeout.ipv6dad=0
-set net-params ip=dhcp rd.bootif=0 hostname=${hostname} ${net-ip-params}
+set net-params rd.bootif=0 hostname=${hostname} ${net-ip-params}
 
 # Parameters for CI/CD to ad-hoc replace (null by default):
 # Good for "always-on" params for automation.
@@ -103,13 +103,14 @@ set odd 0
 :mgmt
 
   # Logic to setup redundant PCIe connections (Port1 of PCIe1 with Port1 of PCIe2 and so on and so forth)
+  iseq mgmt0 mgmt${idx_mgmt} && set ipsrc dhcp || set ipsrc auto6
   iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
 
   # Tell the kernel which MACs get sun or mgmt names.
   iseq ${odd} 1 && iseq ${dual-bond} 1 && set net-sun-udev-params ifname=sun${idx_sun}:${net${idx}/mac} ip=sun${idx_sun}:auto6 ${net-sun-udev-params} && echo net${idx} is sun${idx_sun} ||
   iseq ${odd} 1 && inc idx_sun ||
-  iseq ${odd} 1 && iseq ${dual-bond} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:auto6 ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
-  iseq ${odd} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:auto6 ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
+  iseq ${odd} 1 && iseq ${dual-bond} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
+  iseq ${odd} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
   iseq ${odd} 0 && inc idx_mgmt ||
 
   # even or odd?
