@@ -61,8 +61,9 @@ set net-udev-params biosdevname=1
 set net-hsn-udev-params
 set net-lan-udev-params
 set net-mgmt-udev-params
-set net-udev-sun-params
+set net-sun-udev-params
 set single-bond-udev-params
+set notice
 set dual-bond 0
 set odd 0
 
@@ -111,11 +112,12 @@ set odd 0
   iseq mgmt0 mgmt${idx_mgmt} && set ipsrc dhcp || set ipsrc auto6
   # Set dual-bond now that we've maybe incremented idx_mgmt to 2.
   iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
+  iseq mgmt2 mgmt${idx_mgmt} && clear notice || set notice (or mgmt1 on single-bond servers) 
 
   # Tell the kernel which MACs get sun or mgmt names.
-  iseq ${odd} 1 && set net-sun-udev-params ifname=sun${idx_sun}:${net${idx}/mac} ip=sun${idx_sun}:auto6 ${net-sun-udev-params} && echo net${idx} is sun${idx_sun} or mgmt${idx_mgmt} ||
+  iseq ${odd} 1 && set net-sun-udev-params ifname=sun${idx_sun}:${net${idx}/mac} ip=sun${idx_sun}:auto6 ${net-sun-udev-params} && echo net${idx} is sun${idx_sun} ${notice} ||
   iseq ${odd} 1 && inc idx_sun ||
-  iseq ${odd} 1 && iseq ${dual-bond} 0 && set net-mgmt-single-bond-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-single-bond-udev-params} && echo net${idx} is mgmt${idx_mgmt} or sun${idx_sun} ||
+  iseq ${odd} 1 && iseq ${dual-bond} 0 && set net-mgmt-single-bond-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-single-bond-udev-params} ||
   iseq ${odd} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
   iseq ${odd} 0 && inc idx_mgmt || 
 
