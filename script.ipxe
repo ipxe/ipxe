@@ -58,6 +58,11 @@ set idx_mgmt:int8 0
 set idx_sun:int8 0
 set idx_lan:int8 0
 set net-udev-params biosdevname=1
+set net-hsn-udev-params
+set net-lan-udev-params
+set net-mgmt-udev-params
+set net-udev-sun-params
+set single-bond-udev-params
 set dual-bond 0
 set odd 0
 
@@ -104,14 +109,15 @@ set odd 0
 
   # Logic to setup redundant PCIe connections (Port1 of PCIe1 with Port1 of PCIe2 and so on and so forth)
   iseq mgmt0 mgmt${idx_mgmt} && set ipsrc dhcp || set ipsrc auto6
+  # Set dual-bond now that we've maybe incremented idx_mgmt to 2.
   iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
 
   # Tell the kernel which MACs get sun or mgmt names.
-  iseq ${odd} 1 && iseq ${dual-bond} 1 && set net-sun-udev-params ifname=sun${idx_sun}:${net${idx}/mac} ip=sun${idx_sun}:auto6 ${net-sun-udev-params} && echo net${idx} is sun${idx_sun} ||
+  iseq ${odd} 1 && set net-sun-udev-params ifname=sun${idx_sun}:${net${idx}/mac} ip=sun${idx_sun}:auto6 ${net-sun-udev-params} && echo net${idx} is sun${idx_sun} or mgmt${idx_mgmt} ||
   iseq ${odd} 1 && inc idx_sun ||
-  iseq ${odd} 1 && iseq ${dual-bond} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
+  iseq ${odd} 1 && iseq ${dual-bond} 0 && set net-mgmt-single-bond-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-single-bond-udev-params} && echo net${idx} is mgmt${idx_mgmt} or sun${idx_sun} ||
   iseq ${odd} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
-  iseq ${odd} 0 && inc idx_mgmt ||
+  iseq ${odd} 0 && inc idx_mgmt || 
 
   # even or odd?
   iseq ${odd} 1 && set odd 0 || set odd 1
@@ -127,10 +133,10 @@ set odd 0
   inc idx && inc idx_lan && goto loop
 
 :loop_done
-iseq ${print-nics} 1 && prompt Press any key to continue || sleep 10
-
 # Assign bonds.
-iseq ${dual-bond} 1 && set net-udev-params ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params} ${net-sun-udev-params} || set net-udev-params ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params}
+iseq ${dual-bond} 1 && set net-udev-params ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params} ${net-sun-udev-params} || set net-udev-params ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params} ${net-mgmt-single-bond-udev-params}
+iseq ${dual-bond} 1 && echo Dual-Bond mode: Enabled (mgmt and sun NICs) || echo Dual-Bond mode: Disabled (mgmt NICs only)
+iseq ${print-nics} 1 && prompt Press any key to continue || sleep 10
 
 # Figure out if client is 64-bit capable
 cpuid --ext 29 && set arch x86_64 || set arch x86
@@ -159,9 +165,10 @@ goto ${target}
 :nics
 set print-nics 1
 clear net-udev-params
-clear net-udev-hsn-params
-clear net-udev-mgmt-params
-clear net-udef-sun-params
+clear net-hsn-udev-params
+clear net-mgmt-udev-params
+clear net-sun-udev-params
+clear net-mgmt-single-bond-udev-params
 goto nic_naming
 
 :failed
