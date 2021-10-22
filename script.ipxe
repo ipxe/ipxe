@@ -51,6 +51,7 @@ echo ====DEVICE NAMING=======================================================
 # - mgmt (untagged/default-vlan)
 # - sun  (storage vlan)
 # ALL CONFIGURATION IS HANDLED BY CLOUD-INIT
+# The values below must be set to their  defaults to allow the script to re-run on re-attempts.
 set print-nics 0
 set idx:int8 0
 set idx_hsn:int8 0
@@ -62,7 +63,7 @@ set net-hsn-udev-params
 set net-lan-udev-params
 set net-mgmt-udev-params
 set net-sun-udev-params
-set single-bond-udev-params
+set net-mgmt-single-bond-udev-params
 set notice
 set dual-bond 0
 set odd 0
@@ -119,7 +120,7 @@ set odd 0
   iseq ${odd} 1 && inc idx_sun ||
   iseq ${odd} 1 && iseq ${dual-bond} 0 && set net-mgmt-single-bond-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-single-bond-udev-params} ||
   iseq ${odd} 0 && set net-mgmt-udev-params ifname=mgmt${idx_mgmt}:${net${idx}/mac} ip=mgmt${idx_mgmt}:${ipsrc} ${net-mgmt-udev-params} && echo net${idx} is mgmt${idx_mgmt} ||
-  iseq ${odd} 0 && inc idx_mgmt || 
+  iseq ${odd} 0 && inc idx_mgmt ||
 
   # even or odd?
   iseq ${odd} 1 && set odd 0 || set odd 1
@@ -165,9 +166,11 @@ set menu-timeout 0
 goto ${target}
 
 :nics
+# Clear everything; reset net-params, this will recalculate all the params anyway.
 set print-nics 1
-clear net-udev-params
+set net-udev-params biosdevname=1
 clear net-hsn-udev-params
+clear net-lan-udev-params
 clear net-mgmt-udev-params
 clear net-sun-udev-params
 clear net-mgmt-single-bond-udev-params
