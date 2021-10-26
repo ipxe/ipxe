@@ -70,8 +70,9 @@ struct intel_descriptor {
 #define INTEL_RESET_DELAY_MS 20
 
 /** Device Status Register */
-#define INTEL_STATUS 0x00008UL
-#define INTEL_STATUS_LU		0x00000002UL	/**< Link up */
+#define INTEL_STATUS 				0x00008UL
+#define INTEL_STATUS_LU				0x00000002UL	/**< Link up */
+#define INTEL_STATUS_PF_RST_DONE 	0x00200000UL	/**< Software/Device reset completed */
 
 /** EEPROM Read Register */
 #define INTEL_EERD 0x00014UL
@@ -81,6 +82,10 @@ struct intel_descriptor {
 #define INTEL_EERD_ADDR_SHIFT_SMALL 8		/**< Address shift (small) */
 #define INTEL_EERD_ADDR_SHIFT_LARGE 2		/**< Address shift (large) */
 #define INTEL_EERD_DATA(value)	( (value) >> 16 ) /**< Read data */
+
+/** EEPROM-Mode Control Register **/
+#define INTEL_EEC 			0x12010UL
+#define INTEL_EEC_AUTO_RD 	0x00000200UL	/**< Flash Auto-Read Done */
 
 /** Maximum time to wait for EEPROM read, in milliseconds */
 #define INTEL_EEPROM_MAX_WAIT_MS 100
