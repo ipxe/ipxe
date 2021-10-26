@@ -17,37 +17,47 @@
 #include "ipxe/io.h"
 #include "ipxe/iomap.h"
 #include "ipxe/pci.h"
+#include "ipxe/dma.h"
 #include "ipxe/reboot.h"
 #include "ipxe/virtio-pci.h"
 #include "ipxe/virtio-ring.h"
 
-static int vp_alloc_vq(struct vring_virtqueue *vq, u16 num)
+static int vp_alloc_vq(struct vring_virtqueue *vq, u16 num, size_t header_size)
 {
-    size_t queue_size = PAGE_MASK + vring_size(num);
+    size_t ring_size = PAGE_MASK + vring_size(num);
     size_t vdata_size = num * sizeof(void *);
+    size_t queue_size = ring_size + vdata_size + header_size;
 
-    vq->queue = zalloc(queue_size + vdata_size);
+    vq->queue = dma_alloc(vq->dma, &vq->map, queue_size, queue_size);
     if (!vq->queue) {
         return -ENOMEM;
     }
 
+    memset ( vq->queue, 0, queue_size );
+    vq->queue_size = queue_size;
+
     /* vdata immediately follows the ring */
-    vq->vdata = (void **)(vq->queue + queue_size);
+    vq->vdata = (void **)(vq->queue + ring_size);
+
+    /* empty header immediately follows vdata */
+    vq->empty_header = (char *)(vq->queue + ring_size + vdata_size);
 
     return 0;
 }
 
 void vp_free_vq(struct vring_virtqueue *vq)
 {
-    if (vq->queue) {
-        free(vq->queue);
+    if (vq->queue && vq->queue_size) {
+        dma_free(&vq->map, vq->queue, vq->queue_size);
         vq->queue = NULL;
         vq->vdata = NULL;
+        vq->queue_size = 0;
     }
 }
 
 int vp_find_vq(unsigned int ioaddr, int queue_index,
-               struct vring_virtqueue *vq)
+               struct vring_virtqueue *vq, struct dma_device *dma,
+               size_t header_size)
 {
    struct vring * vr = &vq->vring;
    u16 num;
@@ -73,9 +83,10 @@ int vp_find_vq(unsigned int ioaddr, int queue_index,
    }
 
    vq->queue_index = queue_index;
+   vq->dma = dma;
 
    /* initialize the queue */
-   rc = vp_alloc_vq(vq, num);
+   rc = vp_alloc_vq(vq, num, header_size);
    if (rc) {
            DBG("VIRTIO-PCI ERROR: failed to allocate queue memory\n");
            return rc;
@@ -87,7 +98,7 @@ int vp_find_vq(unsigned int ioaddr, int queue_index,
     * NOTE: vr->desc is initialized by vring_init()
     */
 
-   outl((unsigned long)virt_to_phys(vr->desc) >> PAGE_SHIFT,
+   outl((unsigned long)dma_phys(&vq->map, virt_to_phys(vr->desc)) >> PAGE_SHIFT,
         ioaddr + VIRTIO_PCI_QUEUE_PFN);
 
    return num;
@@ -348,7 +359,8 @@ void vpm_notify(struct virtio_pci_modern_device *vdev,
 }
 
 int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
-                 unsigned nvqs, struct vring_virtqueue *vqs)
+                 unsigned nvqs, struct vring_virtqueue *vqs,
+                 struct dma_device *dma, size_t header_size)
 {
     unsigned i;
     struct vring_virtqueue *vq;
@@ -392,11 +404,12 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
 
         vq = &vqs[i];
         vq->queue_index = i;
+        vq->dma = dma;
 
         /* get offset of notification word for this vq */
         off = vpm_ioread16(vdev, &vdev->common, COMMON_OFFSET(queue_notify_off));
 
-        err = vp_alloc_vq(vq, size);
+        err = vp_alloc_vq(vq, size, header_size);
         if (err) {
             DBG("VIRTIO-PCI %p: failed to allocate queue memory\n", vdev);
             return err;
@@ -406,13 +419,16 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
         /* activate the queue */
         vpm_iowrite16(vdev, &vdev->common, size, COMMON_OFFSET(queue_size));
 
-        vpm_iowrite64(vdev, &vdev->common, virt_to_phys(vq->vring.desc),
+        vpm_iowrite64(vdev, &vdev->common,
+                      dma_phys(&vq->map, virt_to_phys(vq->vring.desc)),
                       COMMON_OFFSET(queue_desc_lo),
                       COMMON_OFFSET(queue_desc_hi));
-        vpm_iowrite64(vdev, &vdev->common, virt_to_phys(vq->vring.avail),
+        vpm_iowrite64(vdev, &vdev->common,
+                      dma_phys(&vq->map, virt_to_phys(vq->vring.avail)),
                       COMMON_OFFSET(queue_avail_lo),
                       COMMON_OFFSET(queue_avail_hi));
-        vpm_iowrite64(vdev, &vdev->common, virt_to_phys(vq->vring.used),
+        vpm_iowrite64(vdev, &vdev->common,
+                      dma_phys(&vq->map, virt_to_phys(vq->vring.used)),
                       COMMON_OFFSET(queue_used_lo),
                       COMMON_OFFSET(queue_used_hi));
 
