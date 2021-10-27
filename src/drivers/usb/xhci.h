@@ -1115,6 +1115,8 @@ struct xhci_device {
 	struct xhci_event_ring event;
 	/** Current command (if any) */
 	union xhci_trb *pending;
+	/** Command mechanism has permanently failed */
+	int failed;
 
 	/** Device slots, indexed by slot ID */
 	struct xhci_slot **slot;
