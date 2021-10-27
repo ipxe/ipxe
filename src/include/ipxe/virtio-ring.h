@@ -82,14 +82,14 @@ struct vring_virtqueue {
    u16 free_head;
    u16 last_used_idx;
    void **vdata;
-   char *empty_header;
+   struct virtio_net_hdr_modern *empty_header;
    /* PCI */
    int queue_index;
    struct virtio_pci_region notification;
 };
 
 struct vring_list {
-  char *addr;
+  physaddr_t addr;
   unsigned int length;
 };
 

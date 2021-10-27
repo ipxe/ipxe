@@ -40,7 +40,7 @@ static int vp_alloc_vq(struct vring_virtqueue *vq, u16 num, size_t header_size)
     vq->vdata = (void **)(vq->queue + ring_size);
 
     /* empty header immediately follows vdata */
-    vq->empty_header = (char *)(vq->queue + ring_size + vdata_size);
+    vq->empty_header = (struct virtio_net_hdr_modern *)(vq->queue + ring_size + vdata_size);
 
     return 0;
 }
@@ -56,7 +56,7 @@ void vp_free_vq(struct vring_virtqueue *vq)
 }
 
 int vp_find_vq(unsigned int ioaddr, int queue_index,
-               struct vring_virtqueue *vq, struct dma_device *dma,
+               struct vring_virtqueue *vq, struct dma_device *dma_dev,
                size_t header_size)
 {
    struct vring * vr = &vq->vring;
@@ -83,7 +83,7 @@ int vp_find_vq(unsigned int ioaddr, int queue_index,
    }
 
    vq->queue_index = queue_index;
-   vq->dma = dma;
+   vq->dma = dma_dev;
 
    /* initialize the queue */
    rc = vp_alloc_vq(vq, num, header_size);
@@ -98,8 +98,7 @@ int vp_find_vq(unsigned int ioaddr, int queue_index,
     * NOTE: vr->desc is initialized by vring_init()
     */
 
-   outl((unsigned long)dma_phys(&vq->map, virt_to_phys(vr->desc)) >> PAGE_SHIFT,
-        ioaddr + VIRTIO_PCI_QUEUE_PFN);
+   outl(dma(&vq->map, vr->desc) >> PAGE_SHIFT, ioaddr + VIRTIO_PCI_QUEUE_PFN);
 
    return num;
 }
@@ -360,7 +359,7 @@ void vpm_notify(struct virtio_pci_modern_device *vdev,
 
 int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
                  unsigned nvqs, struct vring_virtqueue *vqs,
-                 struct dma_device *dma, size_t header_size)
+                 struct dma_device *dma_dev, size_t header_size)
 {
     unsigned i;
     struct vring_virtqueue *vq;
@@ -404,7 +403,7 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
 
         vq = &vqs[i];
         vq->queue_index = i;
-        vq->dma = dma;
+        vq->dma = dma_dev;
 
         /* get offset of notification word for this vq */
         off = vpm_ioread16(vdev, &vdev->common, COMMON_OFFSET(queue_notify_off));
@@ -420,15 +419,15 @@ int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
         vpm_iowrite16(vdev, &vdev->common, size, COMMON_OFFSET(queue_size));
 
         vpm_iowrite64(vdev, &vdev->common,
-                      dma_phys(&vq->map, virt_to_phys(vq->vring.desc)),
+                      dma(&vq->map, vq->vring.desc),
                       COMMON_OFFSET(queue_desc_lo),
                       COMMON_OFFSET(queue_desc_hi));
         vpm_iowrite64(vdev, &vdev->common,
-                      dma_phys(&vq->map, virt_to_phys(vq->vring.avail)),
+                      dma(&vq->map, vq->vring.avail),
                       COMMON_OFFSET(queue_avail_lo),
                       COMMON_OFFSET(queue_avail_hi));
         vpm_iowrite64(vdev, &vdev->common,
-                      dma_phys(&vq->map, virt_to_phys(vq->vring.used)),
+                      dma(&vq->map, vq->vring.used),
                       COMMON_OFFSET(queue_used_lo),
                       COMMON_OFFSET(queue_used_hi));
 

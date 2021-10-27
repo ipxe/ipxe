@@ -200,7 +200,7 @@ struct vring_virtqueue;
 
 void vp_free_vq(struct vring_virtqueue *vq);
 int vp_find_vq(unsigned int ioaddr, int queue_index,
-               struct vring_virtqueue *vq, struct dma_device *dma,
+               struct vring_virtqueue *vq, struct dma_device *dma_dev,
                size_t header_size);
 
 
@@ -302,7 +302,7 @@ void vpm_notify(struct virtio_pci_modern_device *vdev,
 
 int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
                  unsigned nvqs, struct vring_virtqueue *vqs,
-                 struct dma_device *dma, size_t header_size);
+                 struct dma_device *dma_dev, size_t header_size);
 
 int virtio_pci_find_capability(struct pci_device *pci, uint8_t cfg_type);
 

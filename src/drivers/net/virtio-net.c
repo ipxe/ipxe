@@ -117,7 +117,7 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
 				  int vq_idx, struct io_buffer *iobuf ) {
 	struct virtnet_nic *virtnet = netdev->priv;
 	struct vring_virtqueue *vq = &virtnet->virtqueue[vq_idx];
-	struct virtio_net_hdr_modern *header = (struct virtio_net_hdr_modern *) vq->empty_header;
+	struct virtio_net_hdr_modern *header = vq->empty_header;
 	unsigned int out = ( vq_idx == TX_INDEX ) ? 2 : 0;
 	unsigned int in = ( vq_idx == TX_INDEX ) ? 0 : 2;
 	size_t header_len = ( virtnet->virtio_version ?
@@ -134,11 +134,11 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
 			 * to header->flags for received packets.  Work around
 			 * this by using separate RX and TX headers.
 			 */
-			.addr = ( char* ) dma ( &vq->map, header ),
+			.addr = dma ( &vq->map, header ),
 			.length = header_len,
 		},
 		{
-			.addr = ( char* ) iob_dma ( iobuf ),
+			.addr = iob_dma ( iobuf ),
 			.length = iob_len ( iobuf ),
 		},
 	};
@@ -485,7 +485,7 @@ static int virtnet_probe_legacy ( struct pci_device *pci ) {
 
 	/* Configure DMA */
 	virtnet->dma =  &pci->dma;
-	dma_set_mask_64bit ( virtnet->dma ); // Needed?
+	dma_set_mask_64bit ( virtnet->dma );
 	netdev->dma = virtnet->dma;
 
 	vp_reset ( ioaddr );
@@ -598,7 +598,7 @@ static int virtnet_probe_modern ( struct pci_device *pci, int *found_dev ) {
 
 	/* Configure DMA */
 	virtnet->dma =  &pci->dma;
-	dma_set_mask_64bit ( virtnet->dma ); // Needed?
+	dma_set_mask_64bit ( virtnet->dma );
 	netdev->dma = virtnet->dma;
 
 	/* Reset the device and set initial status bits */
