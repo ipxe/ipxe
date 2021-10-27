@@ -2,6 +2,7 @@
 # define _VIRTIO_RING_H_
 
 #include <ipxe/virtio-pci.h>
+#include <ipxe/dma.h>
 
 /* Status byte for guest to report progress, and synchronize features. */
 /* We have seen device and processed generic fields (VIRTIO_CONFIG_F_VIRTIO) */
@@ -74,17 +75,21 @@ struct vring {
 
 struct vring_virtqueue {
    unsigned char *queue;
+   size_t queue_size;
+   struct dma_mapping map;
+   struct dma_device *dma;
    struct vring vring;
    u16 free_head;
    u16 last_used_idx;
    void **vdata;
+   struct virtio_net_hdr_modern *empty_header;
    /* PCI */
    int queue_index;
    struct virtio_pci_region notification;
 };
 
 struct vring_list {
-  char *addr;
+  physaddr_t addr;
   unsigned int length;
 };
 
