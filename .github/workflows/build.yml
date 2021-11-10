@@ -1,71 +1,96 @@
 name: Build
 
 on: push
-
+env:
+  arch: noarch
+  org: hpe
+  repo: csm-rpms
+  stable: unstable
+  target_os: sle-15sp3
 jobs:
 
   x86:
-    name: x86
-    runs-on: ubuntu-20.04
+    name: x86 (testing C code in full)
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
       - name: Install packages
         run: |
           sudo dpkg --add-architecture i386
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
+          sudo apt update -q
+          sudo apt install -y -qq -o Acquire::Retries=50 \
                            mtools syslinux isolinux \
-                           libc6-dev-i386 libc6-dbg:i386 valgrind
+                           libc6-dev-i386 libc6-dbg:i386 valgrind 
       - name: Build (BIOS)
         run: |
           make -j 4 -C src
+
       - name: Build (Everything)
         run: |
           make -j 4 -C src everything
+
       - name: Test
         run: |
           valgrind ./src/bin-i386-linux/tests.linux
           valgrind ./src/bin-x86_64-linux/tests.linux
 
-  arm32:
-    name: ARM32
-    runs-on: ubuntu-20.04
+  arch64:
+    name: aarch64 (verifying EFI builds)
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Install packages
-        run: |
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux gcc-arm-none-eabi
-      - name: Build
-        run: |
-          make -j 4 -C src CROSS=arm-none-eabi- \
-               bin-arm32-efi/intel.efi \
-               bin-arm32-efi/intel.usb \
-               bin-arm32-efi/intel.iso
 
-  arm64:
-    name: ARM64
-    runs-on: ubuntu-20.04
+      - name: Build (EFI)
+        run: |
+          make -j 4 -C src \
+               bin-x86_64-efi-sb/ipxe.efi \
+               CONFIG=metal EMBED=config/metal/metal.ipxe
+
+  rpm:
+    name: RPM Distribution
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
       - name: Install packages
         run: |
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux gcc-aarch64-linux-gnu
-      - name: Build
+          sudo apt update -q
+          sudo apt-get install -qq -y -o Acquire::Retries=50 \
+               binutils gcc make liblzma-dev git-buildpackage-rpm
+
+      - name: Build (RPM)
         run: |
-          make -j 4 -C src CROSS=aarch64-linux-gnu- \
-               bin-arm64-efi/ipxe.efi \
-               bin-arm64-efi/ipxe.usb \
-               bin-arm64-efi/ipxe.iso
+          make rpm
+
+      - id: get-name
+        run: |
+          repo_name=$(echo $GITHUB_REPOSITORY | cut -d/ -f2)
+          echo "::set-output name=repo_name::$repo_name"
+
+      - name: Publish RPM(s)
+        uses: advancedcsg-open/action-jfrog-cli@master
+        with:
+          url: ${{ secrets.ARTIFACTORY_URL }}
+          credentials type: 'accesstoken'
+          user: ${{ secrets.ARTIFACTORY_ALGOL60_USERNAME }}
+          access token: ${{ secrets.ARTIFACTORY_ALGOL60_TOKEN }}
+          args: u "dist/rpmbuild/RPMS/${{ env.arch }}/" "/${{ env.repo }}/${{ env.org }}/${{ env.stable }}/${{ env.target_os }}/${{steps.get-name.outputs.repo_name}}/${{ env.arch }}/" --recursive=true
+
+      - name: Publish SRPM(s)
+        uses: advancedcsg-open/action-jfrog-cli@master
+        with:
+          url: ${{ secrets.ARTIFACTORY_URL }}
+          credentials type: 'accesstoken'
+          user: ${{ secrets.ARTIFACTORY_ALGOL60_USERNAME }}
+          access token: ${{ secrets.ARTIFACTORY_ALGOL60_TOKEN }}
+          args: u "dist/rpmbuild/SRPMS/" "/${{ env.repo }}/${{ env.org }}/${{ env.stable }}/${{ env.target_os }}/${{steps.get-name.outputs.repo_name}}/src/" --recursive=true

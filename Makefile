@@ -1,4 +1,4 @@
-NAME ?= ${GIT_REPO_NAME}
+NAME ?= metal-ipxe
 VERSION ?= $(shell cat .version)
 # FIXME: When does this switch to release or when it is omitted?
 BUILD_METADATA ?= 1~development~$(shell git rev-parse --short HEAD)

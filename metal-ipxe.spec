@@ -12,7 +12,6 @@ BuildRequires: gcc
 BuildRequires: make
 BuildRequires: libgcc_s1
 BuildRequires: xz-devel
-Requires: dnsmasq
 
 # The "-sb" denotes SecureBoot signing capability during compile-time.
 %define binx86_64 bin-x86_64-efi-sb/ipxe.efi
@@ -27,7 +26,7 @@ Requires: dnsmasq
 %setup -q
 
 %build
-pushd %{ipxesrc}
+cd %{ipxesrc}
 make -j 4 %{binx86_64} EMBED=%{srcscript} CONFIG=metal
 
 %install
