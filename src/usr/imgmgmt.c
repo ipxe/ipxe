@@ -58,8 +58,8 @@ int imgdownload ( struct uri *uri, unsigned long timeout,
 	memcpy ( &uri_redacted, uri, sizeof ( uri_redacted ) );
 	uri_redacted.user = NULL;
 	uri_redacted.password = NULL;
-	uri_redacted.query = NULL;
-	uri_redacted.fragment = NULL;
+	uri_redacted.equery = NULL;
+	uri_redacted.efragment = NULL;
 	uri_string_redacted = format_uri_alloc ( &uri_redacted );
 	if ( ! uri_string_redacted ) {
 		rc = -ENOMEM;
