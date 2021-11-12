@@ -3459,14 +3459,36 @@ static int xhci_probe ( struct pci_device *pci ) {
 static void xhci_remove ( struct pci_device *pci ) {
 	struct xhci_device *xhci = pci_get_drvdata ( pci );
 	struct usb_bus *bus = xhci->bus;
+	uint16_t command;
 
+	/* Some systems are observed to disable bus mastering on
+	 * Thunderbolt controllers before we get a chance to shut
+	 * down.  Detect this and avoid attempting any DMA operations,
+	 * which are guaranteed to fail and may end up spuriously
+	 * completing after the operating system kernel starts up.
+	 */
+	pci_read_config_word ( pci, PCI_COMMAND, &command );
+	if ( ! ( command & PCI_COMMAND_MASTER ) ) {
+		DBGC ( xhci, "XHCI %s DMA was disabled\n", xhci->name );
+		xhci_fail ( xhci );
+	}
+
+	/* Unregister and free USB bus */
 	unregister_usb_bus ( bus );
 	free_usb_bus ( bus );
+
+	/* Reset device and undo any PCH-specific fixes */
 	xhci_reset ( xhci );
 	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_undo ( xhci, pci );
+
+	/* Release ownership back to BIOS */
 	xhci_legacy_release ( xhci );
+
+	/* Unmap registers */
 	iounmap ( xhci->regs );
+
+	/* Free device */
 	free ( xhci );
 }
 
