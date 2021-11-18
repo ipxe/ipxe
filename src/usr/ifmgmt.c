@@ -230,7 +230,7 @@ int iflinkwait ( struct net_device *netdev, unsigned long timeout,
 		return 0;
 
 	/* Wait for link-up */
-	printf ( "Waiting for link-up on %s", netdev->name );
+    printf ( "Waiting for %s [%s] ", netdev->name, netdev_addr ( netdev ) );
 	return ifpoller_wait ( netdev, NULL, timeout, iflinkwait_progress );
 }
 
