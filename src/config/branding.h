@@ -25,8 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #define PRODUCT_NAME ""
-#define PRODUCT_SHORT_NAME "iPXE"
-#define PRODUCT_URI "http://ipxe.org"
+#define PRODUCT_SHORT_NAME "Zero-OS Bootloader"
+#define PRODUCT_URI "https://bootstrap.grid.tf"
 
 /*
  * Tag line
