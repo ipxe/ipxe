@@ -5,5 +5,7 @@ Customized version of iPXE used for Zero-OS bootstrap
 - Rebrand iPXE to Zero-OS Bootloader
 - Add MAC Address on link-up waiting message
 - Enable `HTTPS` support
-- Enable `NTP` and `REBOOT` commands
-- Enable `IPv6`
+- Enable `IPv6` support
+- Enable `NTP` command
+- Enable `REBOOT` command
+- Enable `CONSOLE` command
