@@ -566,7 +566,6 @@ static int shell_banner ( void ) {
  * @ret rc		Return status code
  */
 int ipxe ( struct net_device *netdev ) {
-	struct feature *feature;
 	struct image *image;
 	char *scriptlet;
 	int rc;
