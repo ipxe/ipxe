@@ -735,11 +735,14 @@ efi_exit_boot_services_wrapper ( EFI_HANDLE image_handle, UINTN map_key ) {
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_STATUS efirc;
 
-	DBGC ( colour, "ExitBootServices ( %s, %#llx ) ",
+	DBGC ( colour, "ExitBootServices ( %s, %#llx ) -> %p\n",
 	       efi_handle_name ( image_handle ),
-	       ( ( unsigned long long ) map_key ) );
+	       ( ( unsigned long long ) map_key ), retaddr );
 	efirc = bs->ExitBootServices ( image_handle, map_key );
-	DBGC ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
+	if ( efirc != 0 ) {
+		DBGC ( colour, "ExitBootServices ( ... ) = %s -> %p\n",
+		       efi_status ( efirc ), retaddr );
+	}
 	return efirc;
 }
 
