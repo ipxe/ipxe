@@ -316,8 +316,12 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_SYSTEM_TABLE *systab = efi_systab;
+	struct efi_saved_tpl tpl;
 
 	DBGC ( systab, "EFI image unloading\n" );
+
+	/* Raise TPL */
+	efi_raise_tpl ( &tpl );
 
 	/* Shut down */
 	shutdown_exit();
@@ -335,6 +339,9 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 	bs->FreePool ( efi_loaded_image_path );
 
 	DBGC ( systab, "EFI image unloaded\n" );
+
+	/* Restore TPL */
+	efi_restore_tpl ( &tpl );
 
 	return 0;
 }
