@@ -308,6 +308,9 @@ if [ -n "${ISOIMG}" ] ; then
 	    ${ISOARGS} "${ISODIR}"
     if isohybrid --version >/dev/null 2>&1 ; then
 	ISOHYBRIDARGS=
+	if [ -n "${EFI}" ] ; then
+	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --uefi"
+	fi
 	if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
 	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --id ${SOURCE_DATE_EPOCH}"
 	fi
