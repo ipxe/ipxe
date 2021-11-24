@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <ipxe/retry.h>
 #include <ipxe/timer.h>
+#include <ipxe/init.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_watchdog.h>
 
@@ -80,3 +81,36 @@ static void efi_watchdog_expired ( struct retry_timer *timer,
 
 /** Watchdog holdoff timer */
 struct retry_timer efi_watchdog = TIMER_INIT ( efi_watchdog_expired );
+
+/**
+ * Disable watching when shutting down to boot an operating system
+ *
+ * @v booting		System is shutting down for OS boot
+ */
+static void efi_watchdog_shutdown ( int booting ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* If we are shutting down to boot an operating system, then
+	 * disable the boot services watchdog timer.  The UEFI
+	 * specification mandates that the platform firmware does this
+	 * as part of the ExitBootServices() call, but some platforms
+	 * (e.g. Hyper-V) are observed to occasionally forget to do
+	 * so, resulting in a reboot approximately five minutes after
+	 * starting the operating system.
+	 */
+	if ( booting &&
+	     ( ( efirc = bs->SetWatchdogTimer ( 0, 0, 0, NULL ) ) != 0 ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( &efi_watchdog, "EFI could not disable watchdog timer: "
+		       "%s\n", strerror ( rc ) );
+		/* Nothing we can do */
+	}
+}
+
+/** Watchdog startup/shutdown function */
+struct startup_fn efi_watchdog_startup_fn __startup_fn ( STARTUP_EARLY ) = {
+	.name = "efi_watchdog",
+	.shutdown = efi_watchdog_shutdown,
+};
