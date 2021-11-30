@@ -56,7 +56,7 @@ dhcppkt_put ( struct dhcp_packet *dhcppkt ) {
  * @v dhcppkt		DHCP packet
  * @ret len		Used length
  */
-static inline int dhcppkt_len ( struct dhcp_packet *dhcppkt ) {
+static inline size_t dhcppkt_len ( struct dhcp_packet *dhcppkt ) {
 	return ( offsetof ( struct dhcphdr, options ) +
 		 dhcppkt->options.used_len );
 }

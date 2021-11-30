@@ -223,6 +223,7 @@ extern EFI_HANDLE efi_image_handle;
 extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;
 extern EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
 extern EFI_SYSTEM_TABLE *efi_systab;
+extern EFI_TPL efi_internal_tpl;
 extern EFI_TPL efi_external_tpl;
 extern int efi_shutdown_in_progress;
 

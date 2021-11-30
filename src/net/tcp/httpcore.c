@@ -614,8 +614,8 @@ int http_open ( struct interface *xfer, struct http_method *method,
 
 	/* Calculate request URI length */
 	memset ( &request_uri, 0, sizeof ( request_uri ) );
-	request_uri.path = ( uri->path ? uri->path : "/" );
-	request_uri.query = uri->query;
+	request_uri.epath = ( uri->epath ? uri->epath : "/" );
+	request_uri.equery = uri->equery;
 	request_uri_len =
 		( format_uri ( &request_uri, NULL, 0 ) + 1 /* NUL */);
 

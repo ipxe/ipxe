@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/if_ether.h>
 #include <ipxe/base16.h>
 #include <ipxe/profile.h>
+#include <ipxe/acpimac.h>
 #include <ipxe/usb.h>
 #include "ecm.h"
 
@@ -81,16 +82,25 @@ ecm_ethernet_descriptor ( struct usb_configuration_descriptor *config,
 /**
  * Get hardware MAC address
  *
- * @v usb		USB device
+ * @v func		USB function
  * @v desc		Ethernet functional descriptor
  * @v hw_addr		Hardware address to fill in
  * @ret rc		Return status code
  */
-int ecm_fetch_mac ( struct usb_device *usb,
+int ecm_fetch_mac ( struct usb_function *func,
 		    struct ecm_ethernet_descriptor *desc, uint8_t *hw_addr ) {
+	struct usb_device *usb = func->usb;
 	char buf[ base16_encoded_len ( ETH_ALEN ) + 1 /* NUL */ ];
 	int len;
 	int rc;
+
+	/* Use system-specific MAC address, if present and not already used */
+	if ( ( ( rc = acpi_mac ( hw_addr ) ) == 0 ) &&
+	     ! find_netdev_by_ll_addr ( &ethernet_protocol, hw_addr ) ) {
+		DBGC ( usb, "USB %s using system-specific MAC %s\n",
+		       func->name, eth_ntoa ( hw_addr ) );
+		return 0;
+	}
 
 	/* Fetch MAC address string */
 	len = usb_get_string_descriptor ( usb, desc->mac, 0, buf,
@@ -103,7 +113,7 @@ int ecm_fetch_mac ( struct usb_device *usb,
 	/* Sanity check */
 	if ( len != ( ( int ) ( sizeof ( buf ) - 1 /* NUL */ ) ) ) {
 		DBGC ( usb, "USB %s has invalid ECM MAC \"%s\"\n",
-		       usb->name, buf );
+		       func->name, buf );
 		return -EINVAL;
 	}
 
@@ -112,7 +122,7 @@ int ecm_fetch_mac ( struct usb_device *usb,
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( usb, "USB %s could not decode ECM MAC \"%s\": %s\n",
-		       usb->name, buf, strerror ( rc ) );
+		       func->name, buf, strerror ( rc ) );
 		return rc;
 	}
 
@@ -464,7 +474,7 @@ static int ecm_probe ( struct usb_function *func,
 	}
 
 	/* Fetch MAC address */
-	if ( ( rc = ecm_fetch_mac ( usb, ethernet, netdev->hw_addr ) ) != 0 ) {
+	if ( ( rc = ecm_fetch_mac ( func, ethernet, netdev->hw_addr ) ) != 0 ) {
 		DBGC ( ecm, "ECM %p could not fetch MAC address: %s\n",
 		       ecm, strerror ( rc ) );
 		goto err_fetch_mac;

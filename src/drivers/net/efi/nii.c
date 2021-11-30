@@ -576,7 +576,7 @@ static int nii_issue_cpb_db ( struct nii_nic *nii, unsigned int op, void *cpb,
 	cdb.IFnum = nii->nii->IfNum;
 
 	/* Raise task priority level */
-	tpl = bs->RaiseTPL ( TPL_CALLBACK );
+	tpl = bs->RaiseTPL ( efi_internal_tpl );
 
 	/* Issue command */
 	DBGC2 ( nii, "NII %s issuing %02x:%04x ifnum %d%s%s\n",

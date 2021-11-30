@@ -104,8 +104,8 @@ static void efi_entropy_disable ( void ) {
 	/* Close timer tick event */
 	bs->CloseEvent ( tick );
 
-	/* Return to TPL_CALLBACK */
-	bs->RaiseTPL ( TPL_CALLBACK );
+	/* Return to internal TPL */
+	bs->RaiseTPL ( efi_internal_tpl );
 }
 
 /**
