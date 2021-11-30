@@ -15,9 +15,13 @@ set base-url http://pit/${hostname}
 set image-name filesystem.squashfs
 isset ${netX.dhcp/root-path} && set xname-param xname=${netX.dhcp/root-path} || set xname-param ''
 
+# Grab the dhcp-server IP and store it in a variable to prevent the value from vanishing if the pull fails.
+# We want the IP to stick here so the menu is consistent, letting a user retry by hand from the menu if they'd like.
+isset ${dhcp-server} && set pit-ip ${dhcp-server} || # this is a retry; this is not the first pass.
+
 # Non-Compute Node OverlayFS and Persistence.
 set bootstrap metal.server=${base-url} metal.no-wipe=0 # TODO: Remove metal.no-wipe completely after MTL-1288 is fixed; apply ignorance.
-set cloud-init ds=nocloud-net;s=http://${dhcp-server}:8888/;h=${hostname}
+set cloud-init ds=nocloud-net;s=http://${pit-ip}:8888/;h=${hostname}
 set boot-opts rootfallback=LABEL=BOOTRAID initrd=initrd.img.xz
 set live-sqfs-opts root=live:LABEL=SQFSRAID rd.live.ram=0 rd.writable.fsimg=0 rd.skipfsck rd.live.squashimg=${image-name}
 set live-oval-opts rd.live.overlay=LABEL=ROOTRAID rd.live.overlay.thin=1 rd.live.overlay.overlayfs=1
@@ -113,7 +117,7 @@ set odd 0
   iseq mgmt0 mgmt${idx_mgmt} && set ipsrc dhcp || set ipsrc auto6
   # Set dual-bond now that we've maybe incremented idx_mgmt to 2.
   iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
-  iseq mgmt2 mgmt${idx_mgmt} && clear notice || set notice (or mgmt1 on single-bond servers) 
+  iseq mgmt2 mgmt${idx_mgmt} && clear notice || set notice (or mgmt1 on single-bond servers)
 
   # Tell the kernel which MACs get sun or mgmt names.
   iseq ${odd} 1 && set net-sun-udev-params ifname=sun${idx_sun}:${net${idx}/mac} ip=sun${idx_sun}:auto6 ${net-sun-udev-params} && echo net${idx} is sun${idx_sun} ${notice} ||
@@ -153,7 +157,7 @@ menu Metal Boot :: ${manufacturer} ${product} (${archb}bit)
 item --gap -- ---------------- Boot Choices  ----------------
 item --key b linux    (B)oot HPC Node
 item --key r reboot   (R)eboot
-item --key e exit     (E)xit to BIOS Menu
+item --key e bios     (E)xit to BIOS Menu
 item
 item --gap -- ---------------- Advanced configuration  ----------------
 item --key a kedit    (A)ppend kernel parameters
@@ -176,9 +180,17 @@ clear net-sun-udev-params
 clear net-mgmt-single-bond-udev-params
 goto nic_naming
 
-:failed
-echo Booting failed, dropping to shell
-goto shell
+:failed_ping
+echo Failed to call home! ${pit-ip} was not reachable.
+goto failed
+
+:failed_initrd
+echo Failed to download the initrd!
+goto failed
+
+:failed_kernel
+echo Failed to download the kernel!
+goto failed
 
 :config
 config
@@ -190,15 +202,16 @@ set custom-params ${custom-params} rd.cmdline=ask
 goto linux
 
 :linux
-initrd ${base-url}/initrd.img.xz
-kernel --name kernel ${base-url}/kernel ${net-udev-params} ${ncn-params} ${net-params} ${robot-params} ${custom-params} ${debug-params} ${xname-param}
+ping --count 1 ${pit-ip} && echo Successfully called home; deployment server is reachable || goto failed_ping
+initrd ${base-url}/initrd.img.xz || goto failed_initrd
+kernel --name kernel ${base-url}/kernel ${net-udev-params} ${ncn-params} ${net-params} ${robot-params} ${custom-params} ${debug-params} ${xname-param} || goto failed_kernel
 imgstat
 
 echo
 echo initramFS and kernel succesfully downloaded.
 echo
 echo Starting up...
-boot || goto failed
+boot --autofree --replace || goto failed
 goto start
 
 :shell
@@ -207,10 +220,17 @@ shell
 set menu-timeout 0
 goto start
 
-:exit
-echo Exiting iPXE, loading BIOS...
-exit
-
 :cancel
 echo Menu cancelled, dropping to iPXE shell..
 goto shell
+
+:bios
+echo Exiting PXE ROM, dropping into BIOS ...
+exit 0
+
+:failed
+set error-timeout:int8 5
+echo Network boot failed! See above error(s)
+echo Falling to next boot option in ${error-timeout} seconds
+sleep ${error-timeout}
+exit 1

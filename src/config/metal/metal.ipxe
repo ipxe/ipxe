@@ -33,7 +33,7 @@ item --gap -- ---------------- Boot Choices ----------------
 item --key d default    (D)efault next (${script-url})
 item --key c change         (C)hange next to ...
 item --key r reboot         (R)eboot
-item --key e exit           (E)xit to BIOS Menu
+item --key e bios           (E)xit to BIOS Menu
 item
 item --gap -- ---------------- Advanced configuration ----------------
 item --key i config   Configure / View (i)PXE settings
@@ -43,17 +43,13 @@ choose --default default --timeout ${menu-timeout} target || goto cancel ||
 set menu-timeout 0
 goto ${target}
 
-:failed
-echo Booting failed, dropping to shell
-goto shell
+:bios
+echo Exiting PXE ROM, dropping into BIOS ...
+exit 0
 
 :change
 read script-url
 goto default
-
-:default
-echo querying ${script-url}
-chain ${script-url} || goto start
 
 :config
 config
@@ -65,10 +61,15 @@ shell
 set menu-timeout 0
 goto start
 
-:exit
-echo Exiting iPXE, loading BIOS Menu
-exit
-
 :cancel
-echo Menu cancelled, dropping to iPXE shell..
+echo Menu cancelled, dropping to iPXE shell ...
 goto shell
+
+:default
+echo querying ${script-url}
+chain --autofree --replace ${script-url} || goto failed
+
+:failed
+echo Exiting iPXE; depending on vendor this will drop to the next PXE interface or to BIOS.
+echo If BIOS appears next, select either of the DISK entries.
+exit 1
