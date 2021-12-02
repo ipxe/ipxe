@@ -1,8 +1,25 @@
-iPXE README File
-
-Quick start guide:
-
-   cd src
-   make
+# iPXE
 
 For any more detailed instructions, see http://ipxe.org
+
+## Quick start guide
+
+```sh
+   cd src
+   make
+```
+
+## Build using Docker
+
+```
+docker build -t ipxe-build docker
+docker run -it -v $(pwd)/src:/src ipxe-build
+```
+
+You can specify additional arguments to `make`, such as:
+
+```sh
+docker run -it -v $(pwd)/src:/src ipxe-build everything
+```
+
+Outputs will be available in `src/bin*`.
