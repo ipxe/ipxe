@@ -5,4 +5,7 @@ Quick start guide:
    cd src
    make
 
+On Ubuntu 20.04 get all depends with:
+apt install build-essential liblzma-dev mkisofs mtools syslinux isolinux libc6-dev-i386 libc6-dbg:i386
+
 For any more detailed instructions, see http://ipxe.org
