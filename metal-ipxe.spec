@@ -1,7 +1,7 @@
 # Copyright 2020 Hewlett Packard Enterprise Development LP
 Name: metal-ipxe
 License: GPLv2
-Summary: Metal iPXE for booting baremetal in HPCaaS environments
+Summary: iPXE for booting bare metal in HPCaaS environments
 BuildArch: noarch
 Version: %(cat .version)
 Release: %(echo ${BUILD_METADATA})
@@ -12,6 +12,7 @@ BuildRequires: gcc
 BuildRequires: make
 BuildRequires: libgcc_s1
 BuildRequires: xz-devel
+Requires: dnsmasq
 
 # The "-sb" denotes SecureBoot signing capability during compile-time.
 %define binx86_64 bin-x86_64-efi-sb/ipxe.efi
@@ -30,7 +31,6 @@ cd %{ipxesrc}
 make -j 4 %{binx86_64} EMBED=%{srcscript} CONFIG=metal
 
 %install
-# FIXME: install into /opt and then symlink
 install -m 755 -d %{buildroot}%{wwwbootdir}
 install -m 644 %{ipxesrc}%{binx86_64} %{buildroot}%{wwwbootdir}
 install -m 644 %{bootscript} %{buildroot}%{wwwbootdir}
