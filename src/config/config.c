@@ -153,6 +153,9 @@ REQUIRE_OBJECT ( nbi );
 #ifdef IMAGE_ELF
 REQUIRE_OBJECT ( elfboot );
 #endif
+#ifdef IMAGE_MULTIBOOTV2
+REQUIRE_OBJECT ( multibootv2 );
+#endif
 #ifdef IMAGE_MULTIBOOT
 REQUIRE_OBJECT ( multiboot );
 #endif

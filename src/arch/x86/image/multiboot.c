@@ -277,11 +277,11 @@ static int multiboot_find_header ( struct image *image,
 	unsigned int buf_idx;
 	uint32_t checksum;
 
-	/* Scan through first 8kB of image file 256 bytes at a time.
+	/* Scan through first 8.5kB of image file 256 bytes at a time.
 	 * (Use the buffering to avoid the overhead of a
 	 * copy_from_user() for every dword.)
 	 */
-	for ( offset = 0 ; offset < 8192 ; offset += sizeof ( buf[0] ) ) {
+	for ( offset = 0 ; offset < 0x2200 ; offset += sizeof ( buf[0] ) ) {
 		/* Check for end of image */
 		if ( offset > image->len )
 			break;
