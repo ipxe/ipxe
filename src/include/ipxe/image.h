@@ -132,9 +132,15 @@ struct image_type {
 #define PROBE_MULTIBOOT	01
 
 /**
+ * Next is Multiboot V2
+ * https://www.gnu.org/software/grub/manual/multiboot2/multiboot.html
+ */
+#define PROBE_MULTIBOOTV2 02
+
+/**
  * Normal image probe priority
  */
-#define PROBE_NORMAL 02
+#define PROBE_NORMAL 03
 
 /**
  * PXE image probe priority
@@ -142,7 +148,7 @@ struct image_type {
  * PXE images have no signature checks, so will claim all image files.
  * They must therefore be tried last in the probe order list.
  */
-#define PROBE_PXE 03
+#define PROBE_PXE 04
 
 /** Executable image type table */
 #define IMAGE_TYPES __table ( struct image_type, "image_types" )
