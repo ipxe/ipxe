@@ -135,7 +135,7 @@ static wchar_t * efi_image_cmdline ( struct image *image ) {
 static int efi_image_exec ( struct image *image ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev;
-	EFI_DEVICE_PATH_PROTOCOL *path;
+	EFI_DEVICE_PATH_PROTOCOL *path = NULL;
 	union {
 		EFI_LOADED_IMAGE_PROTOCOL *image;
 		void *interface;
@@ -151,34 +151,31 @@ static int efi_image_exec ( struct image *image ) {
 	if ( ! snpdev ) {
 		DBGC ( image, "EFIIMAGE %p could not identify SNP device\n",
 		       image );
-		rc = -ENODEV;
-		goto err_no_snpdev;
 	}
 
 	/* Install file I/O protocols */
-	if ( ( rc = efi_file_install ( snpdev->handle ) ) != 0 ) {
+	if ( snpdev && ( rc = efi_file_install ( snpdev->handle ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %p could not install file protocol: "
 		       "%s\n", image, strerror ( rc ) );
 		goto err_file_install;
 	}
 
 	/* Install PXE base code protocol */
-	if ( ( rc = efi_pxe_install ( snpdev->handle, snpdev->netdev ) ) != 0 ){
+	if ( snpdev && ( rc = efi_pxe_install ( snpdev->handle, snpdev->netdev ) ) != 0 ){
 		DBGC ( image, "EFIIMAGE %p could not install PXE protocol: "
 		       "%s\n", image, strerror ( rc ) );
 		goto err_pxe_install;
 	}
 
 	/* Install iPXE download protocol */
-	if ( ( rc = efi_download_install ( snpdev->handle ) ) != 0 ) {
+	if ( snpdev && ( rc = efi_download_install ( snpdev->handle ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %p could not install iPXE download "
 		       "protocol: %s\n", image, strerror ( rc ) );
 		goto err_download_install;
 	}
 
 	/* Create device path for image */
-	path = efi_image_path ( image, snpdev->path );
-	if ( ! path ) {
+	if ( snpdev && ( path = efi_image_path ( image, snpdev->path ) ) == NULL ) {
 		DBGC ( image, "EFIIMAGE %p could not create device path\n",
 		       image );
 		rc = -ENOMEM;
@@ -221,7 +218,7 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Some EFI 1.10 implementations seem not to fill in DeviceHandle */
-	if ( loaded.image->DeviceHandle == NULL ) {
+	if ( snpdev && loaded.image->DeviceHandle == NULL ) {
 		DBGC ( image, "EFIIMAGE %p filling in missing DeviceHandle\n",
 		       image );
 		loaded.image->DeviceHandle = snpdev->handle;
@@ -229,7 +226,6 @@ static int efi_image_exec ( struct image *image ) {
 
 	/* Sanity checks */
 	assert ( loaded.image->ParentHandle == efi_image_handle );
-	assert ( loaded.image->DeviceHandle == snpdev->handle );
 	assert ( loaded.image->LoadOptionsSize == 0 );
 	assert ( loaded.image->LoadOptions == NULL );
 
@@ -292,13 +288,15 @@ static int efi_image_exec ( struct image *image ) {
  err_cmdline:
 	free ( path );
  err_image_path:
-	efi_download_uninstall ( snpdev->handle );
+	if ( snpdev )
+		efi_download_uninstall ( snpdev->handle );
  err_download_install:
-	efi_pxe_uninstall ( snpdev->handle );
+	if ( snpdev )
+		efi_pxe_uninstall ( snpdev->handle );
  err_pxe_install:
-	efi_file_uninstall ( snpdev->handle );
+	if ( snpdev )
+		efi_file_uninstall ( snpdev->handle );
  err_file_install:
- err_no_snpdev:
 	return rc;
 }
 
