@@ -28,8 +28,8 @@ set live-oval-opts rd.live.overlay=LABEL=ROOTRAID rd.live.overlay.thin=1 rd.live
 set disk-opts rd.luks rd.luks.crypttab=0 rd.lvm.conf=0 rd.lvm=1 rd.auto=1 rd.md=1 rd.dm=0 rd.neednet=0 rd.peerdns=0 rd.md.waitclean=1 rd.multipath=0 rd.md.conf=1
 
 set ncn-params pcie_ports=native transparent_hugepage=never console=tty0 console=ttyS0,115200 iommu=pt ${bootstrap} ${cloud-init} ${boot-opts} ${live-sqfs-opts} ${live-oval-opts} ${disk-opts}
-set net-ip-params rd.net.timeout.carrier=120 rd.net.timeout.ifup=120 rd.net.timeout.iflink=120 rd.net.dhcp.retry=3 rd.net.timeout.ipv6auto=0 rd.net.timeout.ipv6dad=0
-set net-params rd.bootif=0 hostname=${hostname} ${net-ip-params}
+set net-ip-params rd.net.timeout.carrier=120 rd.net.timeout.ifup=120 rd.net.timeout.iflink=120 rd.net.dhcp.retry=5 rd.net.timeout.ipv6auto=0 rd.net.timeout.ipv6dad=0
+set net-params rd.bootif=0 hostname=${hostname} ${net-ip-params} ip=bond0:dhcp
 
 # Parameters for CI/CD to ad-hoc replace (null by default):
 # Good for "always-on" params for automation.
@@ -47,7 +47,7 @@ set debug-params log_buf_len=1 rd.retry=10 rd.shell #rd.debug=1 metal.debug=1
 set custom-params nosplash quiet crashkernel=360M
 
 :nic_naming
-echo ====DEVICE NAMING=======================================================
+echo === DEVICE NAMING ==================================
 ## This creates udev rules for our bare minimum interfaces:
 # - bond (LACP redundant bond)
 # - hsn  (high-speed)
@@ -71,6 +71,7 @@ set net-mgmt-single-bond-udev-params
 set notice
 set dual-bond 0
 set odd 0
+set ipsrc auto6 # This ensures all NICs attempt to UP, otherwise they will not receive UDEV rules.
 
 # main-loop
 :loop isset ${net${idx}/mac} || goto loop_done
@@ -114,7 +115,6 @@ set odd 0
 :mgmt
 
   # Logic to setup redundant PCIe connections (Port1 of PCIe1 with Port1 of PCIe2 and so on and so forth)
-  iseq mgmt0 mgmt${idx_mgmt} && set ipsrc dhcp || set ipsrc auto6
   # Set dual-bond now that we've maybe incremented idx_mgmt to 2.
   iseq mgmt2 mgmt${idx_mgmt} && set dual-bond 1 ||
   iseq mgmt2 mgmt${idx_mgmt} && clear notice || set notice (or mgmt1 on single-bond servers)
@@ -141,10 +141,11 @@ set odd 0
 
 :loop_done
 # Assign bonds.
-iseq ${dual-bond} 1 && set net-udev-params ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params} ${net-sun-udev-params} || set net-udev-params ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params} ${net-mgmt-single-bond-udev-params}
+iseq ${dual-bond} 1 && set net-udev-params bond=bond0:mgmt0,mgmt1:mode=802.3ad,xmit_hash_policy=layer2+3,lacp_rate=slow ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params} ${net-sun-udev-params} || set net-udev-params bond=bond0:mgmt0,mgmt1:mode=802.3ad,xmit_hash_policy=layer2+3,lacp_rate=slow ${net-udev-params} ${net-hsn-udev-params} ${net-lan-udev-params} ${net-mgmt-udev-params} ${net-mgmt-single-bond-udev-params}
 iseq ${dual-bond} 1 && echo Dual-Bond mode: Enabled (mgmt and sun NICs) || echo Dual-Bond mode: Disabled (mgmt NICs only)
-iseq ${print-nics} 1 && prompt Press any key to continue || sleep 10
+iseq ${print-nics} 1 && prompt Press any key to continue ||
 
+echo === Loading Menu ... ===============================
 # Figure out if client is 64-bit capable
 cpuid --ext 29 && set arch x86_64 || set arch x86
 cpuid --ext 29 && set archb 64 || set archb 32
@@ -180,10 +181,6 @@ clear net-sun-udev-params
 clear net-mgmt-single-bond-udev-params
 goto nic_naming
 
-:failed_ping
-echo Failed to call home! ${pit-ip} was not reachable.
-goto failed
-
 :failed_initrd
 echo Failed to download the initrd!
 goto failed
@@ -202,7 +199,7 @@ set custom-params ${custom-params} rd.cmdline=ask
 goto linux
 
 :linux
-ping --count 1 ${pit-ip} && echo Successfully called home; deployment server is reachable || goto failed_ping
+echo === BOOT ===========================================
 initrd ${base-url}/initrd.img.xz || goto failed_initrd
 kernel --name kernel ${base-url}/kernel ${net-udev-params} ${ncn-params} ${net-params} ${robot-params} ${custom-params} ${debug-params} ${xname-param} || goto failed_kernel
 imgstat

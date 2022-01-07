@@ -42,21 +42,31 @@ usage: Used for triaging TCP/IP routing and general connectivity.
 */
 #define PING_CMD
 
-/* Try for less time on metal because of the numerous network interfaces in use */
-#undef DHCP_REQ_END_TIMEOUT_SEC
-#define DHCP_REQ_END_TIMEOUT_SEC	4
+/*
+    802.3ad : LACP Version 4
+*/
+#ifdef ETH_SLOW_LACP_VERSION
+#undef ETH_SLOW_LACP_VERSION
+#define ETH_SLOW_LACP_VERSION 4
+#endif
 
-#undef DHCP_DISC_START_TIMEOUT_SEC
-#define DHCP_DISC_START_TIMEOUT_SEC	4
+/* Enable Protocols:
+    - STP
+    - LACP Protocols
+   NOTE: These are enabled by default, these
+ */
+#ifndef NET_PROTO_STP
+#define NET_PROTO_STP
+#endif
+#ifndef NET_PROTO_LACP
+#define NET_PROTO_LACP
+#endif
 
-#undef DHCP_DISC_END_TIMEOUT_SEC
-#define DHCP_DISC_END_TIMEOUT_SEC	32
-
-#undef DHCP_DISC_MAX_DEFERRALS
-#define DHCP_DISC_MAX_DEFERRALS		180
-
+// Iterate through unplugged links faster
+#ifdef LINK_WAIT_TIMEOUT
 #undef LINK_WAIT_TIMEOUT
-#define LINK_WAIT_TIMEOUT ( 45 * TICKS_PER_SEC )
+#define LINK_WAIT_TIMEOUT ( 5 * TICKS_PER_SEC )
+#endif
 
 /* Work around missing EFI_PXE_BASE_CODE_PROTOCOL */
 #ifndef EFI_DOWNGRADE_UX

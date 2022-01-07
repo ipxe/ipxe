@@ -1,5 +1,5 @@
 #!ipxe
-echo ====NIC DISCOVERY===================================
+echo === NIC DISCOVERY ==================================
 # Must start at 0; uint does not start at 0.
 set idx:int8 0
 :check isset ${net${idx}/mac} || goto checked
@@ -7,14 +7,21 @@ set idx:int8 0
   inc idx && goto check
 :checked
 
-echo ====DHCP ===========================================
+echo === LINK ===========================================
 set vidx:int8 0
-:vcheck isset ${net${vidx}/mac} || goto done
-  dhcp net${vidx} && goto done ||
-  inc vidx && goto vcheck
-:done
+:linkcheck isset ${net${vidx}/mac} || goto opened
+  ifopen net${vidx} && ifstat net${vidx}
+  inc vidx && goto linkcheck
+:opened
 
-echo ====Loading ...=====================================
+echo === DHCP ===========================================
+set vidx:int8 0
+:dhcpcheck isset ${net${vidx}/mac} || goto configured
+  ifconf -c dhcp --timeout 20000 net${vidx} && goto configured || ifclose net${vidx}
+  inc vidx && goto dhcpcheck
+:configured
+
+echo === Loading Menu ... ===============================
 # This should be coded to always point to our LiveCD alias and nothing else.
 # Figure out if client is 64-bit capable
 cpuid --ext 29 && set arch x86_64 || set arch x86
@@ -24,6 +31,7 @@ colour --basic 0 4
 cpair --background 4 0
 set menu-timeout 2000
 # Assume the DNS server is the same server PXE booting us.
+set server-ip ${dhcp-server}
 set script-url http://${dhcp-server}
 # If the hostname is set in the DHCPOFFER use that for a personalized script.
 isset ${hostname} && set script-url ${script-url}/${hostname}/script.ipxe || set script-url ${script-url}/boot/script.ipxe
@@ -66,8 +74,24 @@ echo Menu cancelled, dropping to iPXE shell ...
 goto shell
 
 :default
+echo Calling home ...
+set pingidx:int8 0
+:call_home
+  # Only use --count=1, otherwise a successful ping will continue needlessly.
+  # This loop will ensure an unsuccessful ping retries without holding up a successful ping.
+  ping --count 1 ${server-ip} && goto called_home ||
+  iseq ${pingidx} 20 || inc pingidx && goto call_home
+:called_home
+echo Successfully called home; deployment server is reachable
+goto boot
+
+:boot
 echo querying ${script-url}
 chain --autofree --replace ${script-url} || goto failed
+
+:failed_ping
+echo Failed to call home! ${server-ip} was not reachable.
+goto failed
 
 :failed
 echo Exiting iPXE; depending on vendor this will drop to the next PXE interface or to BIOS.

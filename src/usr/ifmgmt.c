@@ -276,8 +276,8 @@ int ifconf ( struct net_device *netdev,
 	     unsigned long timeout ) {
 	int rc;
 
-	/* Ensure device is open and link is up */
-	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_TIMEOUT, 0 ) ) != 0 )
+	/* Ensure device is open and link is up and be verbose. */
+	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_TIMEOUT, 1 ) ) != 0 )
 		return rc;
 
 	/* Start configuration */

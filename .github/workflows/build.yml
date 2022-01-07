@@ -10,7 +10,7 @@ env:
 jobs:
 
   x86:
-    name: x86 (testing C code in full)
+    name: x86
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -29,29 +29,16 @@ jobs:
         run: |
           make -j 4 -C src
 
-      - name: Build (Everything)
-        run: |
-          make -j 4 -C src everything
-
-      - name: Test
-        run: |
-          valgrind ./src/bin-i386-linux/tests.linux
-          valgrind ./src/bin-x86_64-linux/tests.linux
-
-  arch64:
-    name: aarch64 (verifying EFI builds)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
       - name: Build (EFI)
         run: |
           make -j 4 -C src \
-               bin-x86_64-efi-sb/ipxe.efi \
-               CONFIG=metal EMBED=config/metal/metal.ipxe
+                bin-x86_64-efi/ipxe.efirom \
+                bin-x86_64-linux/tests.linux
+                CONFIG=metal EMBED=config/metal/metal.ipxe
+
+      - name: Test
+        run: |
+          valgrind ./src/bin-x86_64-linux/tests.linux
 
   rpm:
     name: RPM Distribution
