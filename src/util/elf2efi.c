@@ -753,15 +753,13 @@ static struct pe_section *
 create_reloc_section ( struct pe_header *pe_header,
 		       struct pe_relocs *pe_reltab ) {
 	struct pe_section *reloc;
-	size_t section_rawsz;
 	size_t section_memsz;
 	size_t section_filesz;
 	EFI_IMAGE_DATA_DIRECTORY *relocdir;
 
 	/* Allocate PE section */
-	section_rawsz = output_pe_reltab ( pe_reltab, NULL );
-	section_filesz = efi_file_align ( section_rawsz );
-	section_memsz = efi_image_align ( section_rawsz );
+	section_memsz = output_pe_reltab ( pe_reltab, NULL );
+	section_filesz = efi_file_align ( section_memsz );
 	reloc = xmalloc ( sizeof ( *reloc ) + section_filesz );
 	memset ( reloc, 0, sizeof ( *reloc ) + section_filesz );
 
@@ -782,11 +780,12 @@ create_reloc_section ( struct pe_header *pe_header,
 	/* Update file header details */
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( reloc->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage += section_memsz;
+	pe_header->nt.OptionalHeader.SizeOfImage +=
+		efi_image_align ( section_memsz );
 	relocdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC]);
 	relocdir->VirtualAddress = reloc->hdr.VirtualAddress;
-	relocdir->Size = section_rawsz;
+	relocdir->Size = section_memsz;
 
 	return reloc;
 }
@@ -824,8 +823,8 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	} *contents;
 
 	/* Allocate PE section */
-	section_memsz = efi_image_align ( sizeof ( *contents ) );
-	section_filesz = efi_file_align ( sizeof ( *contents ) );
+	section_memsz = sizeof ( *contents );
+	section_filesz = efi_file_align ( section_memsz );
 	debug = xmalloc ( sizeof ( *debug ) + section_filesz );
 	memset ( debug, 0, sizeof ( *debug ) + section_filesz );
 	contents = ( void * ) debug->contents;
@@ -857,7 +856,8 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	/* Update file header details */
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( debug->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage += section_memsz;
+	pe_header->nt.OptionalHeader.SizeOfImage +=
+		efi_image_align ( section_memsz );
 	debugdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]);
 	debugdir->VirtualAddress = debug->hdr.VirtualAddress;
