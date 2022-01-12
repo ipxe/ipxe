@@ -593,6 +593,8 @@ int ipxe ( struct net_device *netdev ) {
 	/* Boot system */
 	if ( ( image = first_image() ) != NULL ) {
 		/* We have an embedded image; execute it */
+		if ( cwuri )
+			image_set_uri ( image, cwuri );
 		return image_exec ( image );
 	} else if ( shell_banner() ) {
 		/* User wants shell; just give them a shell */
