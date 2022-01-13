@@ -169,6 +169,24 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define PRODUCT_SETTING_URI "https://ipxe.org/cfg/%s"
 
+/*
+ * Product security name suffix
+ *
+ * Vendors creating signed iPXE binaries must set this to a non-empty
+ * value (e.g. "2pint").
+ */
+#define PRODUCT_SBAT_NAME ""
+
+/*
+ * Product security generation
+ *
+ * Vendors creating signed iPXE binaries must set this to a non-zero
+ * value, and must increment the value whenever a Secure Boot exploit
+ * is fixed (unless the upstream IPXE_SBAT_GENERATION has already been
+ * incremented as part of that fix).
+ */
+#define PRODUCT_SBAT_GENERATION 0
+
 #include <config/local/branding.h>
 
 #endif /* CONFIG_BRANDING_H */

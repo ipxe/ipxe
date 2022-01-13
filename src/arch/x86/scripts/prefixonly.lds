@@ -24,6 +24,8 @@ SECTIONS {
 	*(.einfo.*)
 	*(.discard)
 	*(.discard.*)
+	*(.sbat)
+	*(.sbat.*)
     }
 
 }

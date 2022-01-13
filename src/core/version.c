@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <wchar.h>
 #include <ipxe/features.h>
 #include <ipxe/version.h>
+#include <ipxe/sbat.h>
 #include <config/general.h>
 #include <config/branding.h>
 
@@ -92,3 +93,32 @@ const wchar_t build_wname[] = WSTRING ( BUILD_NAME );
 /** Copy of build name string within ".prefix" */
 const char build_name_prefix[] __attribute__ (( section ( ".prefix.name" ) ))
 	= BUILD_NAME;
+
+/** SBAT upstream iPXE line
+ *
+ * This line represents the security generation of the upstream
+ * codebase from which this build is derived.
+ */
+#define SBAT_IPXE							\
+	SBAT_LINE ( "ipxe", IPXE_SBAT_GENERATION,			\
+		    "iPXE", BUILD_NAME, VERSION, "https://ipxe.org" )
+
+/** SBAT local build line
+ *
+ * This line states the security generation of the local build, which
+ * may include non-default features or non-upstreamed modifications.
+ */
+#if PRODUCT_SBAT_GENERATION
+#define SBAT_PRODUCT							\
+	SBAT_LINE ( "ipxe." PRODUCT_SBAT_NAME, PRODUCT_SBAT_GENERATION,	\
+		    PRODUCT_SHORT_NAME, BUILD_NAME, VERSION,		\
+		    PRODUCT_URI )
+#else
+#define SBAT_PRODUCT ""
+#endif
+
+/** SBAT data */
+#define SBAT_DATA SBAT_HEADER "" SBAT_IPXE "" SBAT_PRODUCT
+
+/** SBAT data (without any NUL terminator) */
+const char sbat[ sizeof ( SBAT_DATA ) - 1 ] __sbat = SBAT_DATA;

@@ -100,5 +100,7 @@ SECTIONS {
 		*(.rel.*)
 		*(.discard)
 		*(.discard.*)
+		*(.sbat)
+		*(.sbat.*)
 	}
 }
