@@ -657,6 +657,15 @@ static struct uri_test uri_file_volume = {
 	},
 };
 
+/** Relative URI with colons in path */
+static struct uri_test uri_colons = {
+	"/boot/52:54:00:12:34:56/boot.ipxe",
+	{
+		.path = "/boot/52:54:00:12:34:56/boot.ipxe",
+		.epath = "/boot/52:54:00:12:34:56/boot.ipxe",
+	},
+};
+
 /** URI with port number */
 static struct uri_port_test uri_explicit_port = {
 	"http://192.168.0.1:8080/boot.php",
@@ -957,6 +966,7 @@ static void uri_test_exec ( void ) {
 	uri_parse_format_dup_ok ( &uri_file_relative );
 	uri_parse_format_dup_ok ( &uri_file_absolute );
 	uri_parse_format_dup_ok ( &uri_file_volume );
+	uri_parse_format_dup_ok ( &uri_colons );
 
 	/** URI port number tests */
 	uri_port_ok ( &uri_explicit_port );

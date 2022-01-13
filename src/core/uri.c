@@ -334,8 +334,15 @@ struct uri * parse_uri ( const char *uri_string ) {
 		uri->efragment = tmp;
 	}
 
-	/* Identify absolute/relative URI */
-	if ( ( tmp = strchr ( raw, ':' ) ) ) {
+	/* Identify absolute URIs */
+	epath = raw;
+	for ( tmp = raw ; ; tmp++ ) {
+		/* Possible scheme character (for our URI schemes) */
+		if ( isalpha ( *tmp ) || ( *tmp == '-' ) || ( *tmp == '_' ) )
+			continue;
+		/* Invalid scheme character or NUL: is a relative URI */
+		if ( *tmp != ':' )
+			break;
 		/* Absolute URI: identify hierarchical/opaque */
 		uri->scheme = raw;
 		*(tmp++) = '\0';
@@ -347,9 +354,7 @@ struct uri * parse_uri ( const char *uri_string ) {
 			uri->opaque = tmp;
 			epath = NULL;
 		}
-	} else {
-		/* Relative URI */
-		epath = raw;
+		break;
 	}
 
 	/* If we don't have a path (i.e. we have an absolute URI with
