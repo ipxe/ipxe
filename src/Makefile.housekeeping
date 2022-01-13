@@ -918,7 +918,7 @@ $(BIN)/deps/%.d : % $(MAKEDEPS)
 
 # Calculate list of dependency files
 #
-AUTO_DEPS	= $(patsubst %,$(BIN)/deps/%.d,$(AUTO_SRCS))
+AUTO_DEPS	= $(patsubst %,$(BIN)/deps/%.d,$(AUTO_SRCS) core/version.c)
 autodeps :
 	@$(ECHO) $(AUTO_DEPS)
 VERYCLEANUP	+= $(BIN)/deps
@@ -1202,7 +1202,7 @@ endif
 # Build version
 #
 GIT_INDEX := $(if $(GITVERSION),$(if $(wildcard ../.git/index),../.git/index))
-$(BIN)/version.%.o : core/version.c $(MAKEDEPS) $(GIT_INDEX)
+$(BIN)/version.%.o : core/version.c $(MAKEDEPS) $(version_DEPS) $(GIT_INDEX)
 	$(QM)$(ECHO) "  [VERSION] $@"
 	$(Q)$(COMPILE_c) -DBUILD_NAME="\"$*\"" \
 		-DVERSION_MAJOR=$(VERSION_MAJOR) \
