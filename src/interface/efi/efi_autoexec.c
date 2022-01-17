@@ -39,10 +39,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** Autoexec script filename */
-#define AUTOEXEC_FILENAME L"autoexec.ipxe"
+static wchar_t efi_autoexec_wname[] = L"autoexec.ipxe";
 
 /** Autoexec script image name */
-#define AUTOEXEC_NAME "autoexec.ipxe"
+static char efi_autoexec_name[] = "autoexec.ipxe";
 
 /** Autoexec script (if any) */
 static void *efi_autoexec;
@@ -51,21 +51,21 @@ static void *efi_autoexec;
 static size_t efi_autoexec_len;
 
 /**
- * Load autoexec script
+ * Load autoexec script from filesystem
  *
  * @v device		Device handle
  * @ret rc		Return status code
  */
-int efi_autoexec_load ( EFI_HANDLE device ) {
+static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	static wchar_t name[] = AUTOEXEC_FILENAME;
 	union {
 		void *interface;
 		EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs;
 	} u;
 	struct {
 		EFI_FILE_INFO info;
-		CHAR16 name[ sizeof ( name ) / sizeof ( name[0] ) ];
+		CHAR16 name[ sizeof ( efi_autoexec_wname ) /
+			     sizeof ( efi_autoexec_wname[0] ) ];
 	} info;
 	EFI_FILE_PROTOCOL *root;
 	EFI_FILE_PROTOCOL *file;
@@ -73,10 +73,6 @@ int efi_autoexec_load ( EFI_HANDLE device ) {
 	VOID *data;
 	EFI_STATUS efirc;
 	int rc;
-
-	/* Sanity check */
-	assert ( efi_autoexec == NULL );
-	assert ( efi_autoexec_len == 0 );
 
 	/* Open simple file system protocol */
 	if ( ( efirc = bs->OpenProtocol ( device,
@@ -99,11 +95,12 @@ int efi_autoexec_load ( EFI_HANDLE device ) {
 	}
 
 	/* Open autoexec script */
-	if ( ( efirc = root->Open ( root, &file, name,
+	if ( ( efirc = root->Open ( root, &file, efi_autoexec_wname,
 				    EFI_FILE_MODE_READ, 0 ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s has no %ls: %s\n",
-		       efi_handle_name ( device ), name, strerror ( rc ) );
+		       efi_handle_name ( device ), efi_autoexec_wname,
+		       strerror ( rc ) );
 		goto err_open;
 	}
 
@@ -113,7 +110,8 @@ int efi_autoexec_load ( EFI_HANDLE device ) {
 				       &info ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s could not get %ls info: %s\n",
-		       efi_handle_name ( device ), name, strerror ( rc ) );
+		       efi_handle_name ( device ), efi_autoexec_wname,
+		       strerror ( rc ) );
 		goto err_getinfo;
 	}
 	size = info.info.FileSize;
@@ -122,7 +120,7 @@ int efi_autoexec_load ( EFI_HANDLE device ) {
 	if ( ! size ) {
 		rc = -EINVAL;
 		DBGC ( device, "EFI %s has zero-length %ls\n",
-		       efi_handle_name ( device ), name );
+		       efi_handle_name ( device ), efi_autoexec_wname );
 		goto err_empty;
 	}
 
@@ -131,7 +129,8 @@ int efi_autoexec_load ( EFI_HANDLE device ) {
 					  &data ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s could not allocate %ls: %s\n",
-		       efi_handle_name ( device ), name, strerror ( rc ) );
+		       efi_handle_name ( device ), efi_autoexec_wname,
+		       strerror ( rc ) );
 		goto err_alloc;
 	}
 
@@ -139,7 +138,8 @@ int efi_autoexec_load ( EFI_HANDLE device ) {
 	if ( ( efirc = file->Read ( file, &size, data ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s could not read %ls: %s\n",
-		       efi_handle_name ( device ), name, strerror ( rc ) );
+		       efi_handle_name ( device ), efi_autoexec_wname,
+		       strerror ( rc ) );
 		goto err_read;
 	}
 
@@ -148,7 +148,7 @@ int efi_autoexec_load ( EFI_HANDLE device ) {
 	efi_autoexec_len = size;
 	data = NULL;
 	DBGC ( device, "EFI %s found %ls\n",
-	       efi_handle_name ( device ), name );
+	       efi_handle_name ( device ), efi_autoexec_wname );
 
 	/* Success */
 	rc = 0;
@@ -170,13 +170,32 @@ int efi_autoexec_load ( EFI_HANDLE device ) {
 }
 
 /**
+ * Load autoexec script
+ *
+ * @v device		Device handle
+ * @ret rc		Return status code
+ */
+int efi_autoexec_load ( EFI_HANDLE device ) {
+	int rc;
+
+	/* Sanity check */
+	assert ( efi_autoexec == NULL );
+	assert ( efi_autoexec_len == 0 );
+
+	/* Try loading from file system, if supported */
+	if ( ( rc = efi_autoexec_filesystem ( device ) ) == 0 )
+		return 0;
+
+	return -ENOENT;
+}
+
+/**
  * Register autoexec script
  *
  */
 static void efi_autoexec_startup ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efi_loaded_image->DeviceHandle;
-	const char *name = AUTOEXEC_NAME;
 	struct image *image;
 
 	/* Do nothing if we have no autoexec script */
@@ -184,15 +203,16 @@ static void efi_autoexec_startup ( void ) {
 		return;
 
 	/* Create autoexec image */
-	image = image_memory ( name, virt_to_user ( efi_autoexec ),
+	image = image_memory ( efi_autoexec_name,
+			       virt_to_user ( efi_autoexec ),
 			       efi_autoexec_len );
 	if ( ! image ) {
 		DBGC ( device, "EFI %s could not create %s\n",
-		       efi_handle_name ( device ), name );
+		       efi_handle_name ( device ), efi_autoexec_name );
 		return;
 	}
 	DBGC ( device, "EFI %s registered %s\n",
-	       efi_handle_name ( device ), name );
+	       efi_handle_name ( device ), efi_autoexec_name );
 
 	/* Free temporary copy */
 	bs->FreePool ( efi_autoexec );
