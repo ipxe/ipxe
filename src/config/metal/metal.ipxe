@@ -17,7 +17,7 @@ set vidx:int8 0
 echo === DHCP ===========================================
 set vidx:int8 0
 :dhcpcheck isset ${net${vidx}/mac} || goto configured
-  ifconf -c dhcp --timeout 20000 net${vidx} && goto configured || ifclose net${vidx}
+  ifconf -c dhcp --timeout 20000 net${vidx} || ifclose net${vidx}
   inc vidx && goto dhcpcheck
 :configured
 
