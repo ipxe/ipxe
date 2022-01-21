@@ -215,25 +215,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_iphone		     ( ERRFILE_DRIVER | 0x00cf0000 )
 #define ERRFILE_slirp		     ( ERRFILE_DRIVER | 0x00d00000 )
 #define ERRFILE_rdc		     ( ERRFILE_DRIVER | 0x00d10000 )
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 #define ERRFILE_aqc1xx		     ( ERRFILE_DRIVER | 0x00d20000 )
 #define ERRFILE_atl_hw		     ( ERRFILE_DRIVER | 0x00d30000 )
-
-
-=======
->>>>>>> 4aa03758 ([rdc] Add driver for RDC R6040 embedded NIC)
-=======
-=======
-#define ERRFILE_aqc1xx		     ( ERRFILE_DRIVER | 0x00d20000 )
-#define ERRFILE_atl_hw		     ( ERRFILE_DRIVER | 0x00d30000 )
->>>>>>> 7cfd66c3 (Added Marvell AQtion network driver.)
->>>>>>> 90927fdd (Added Marvell AQtion network driver.)
-=======
-#define ERRFILE_aqc1xx		     ( ERRFILE_DRIVER | 0x00d20000 )
-#define ERRFILE_atl_hw		     ( ERRFILE_DRIVER | 0x00d30000 )
->>>>>>> 4d852cc3 (fixed the errfile)
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )
