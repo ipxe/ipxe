@@ -47,6 +47,9 @@ EFI_DEVICE_PATH_PROTOCOL *efi_loaded_image_path;
  */
 EFI_SYSTEM_TABLE * _C2 ( PLATFORM, _systab );
 
+/** Internal task priority level */
+EFI_TPL efi_internal_tpl = TPL_CALLBACK;
+
 /** External task priority level */
 EFI_TPL efi_external_tpl = TPL_APPLICATION;
 
@@ -78,6 +81,17 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle );
  */
 static EFIAPI void efi_shutdown_hook ( EFI_EVENT event __unused,
 				       void *context __unused ) {
+
+	/* This callback is invoked at TPL_NOTIFY in order to ensure
+	 * that we have an opportunity to shut down cleanly before
+	 * other shutdown hooks perform destructive operations such as
+	 * disabling the IOMMU.
+	 *
+	 * Modify the internal task priority level so that no code
+	 * attempts to raise from TPL_NOTIFY to TPL_CALLBACK (which
+	 * would trigger a fatal exception).
+	 */
+	efi_internal_tpl = TPL_NOTIFY;
 
 	/* Mark shutdown as being in progress, to indicate that large
 	 * parts of the system (e.g. timers) are no longer functional.
@@ -273,7 +287,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	 * bother doing so when ExitBootServices() is called.
 	 */
 	if ( ( efirc = bs->CreateEvent ( EVT_SIGNAL_EXIT_BOOT_SERVICES,
-					 TPL_CALLBACK, efi_shutdown_hook,
+					 TPL_NOTIFY, efi_shutdown_hook,
 					 NULL, &efi_shutdown_event ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( systab, "EFI could not create ExitBootServices event: "
@@ -316,8 +330,12 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_SYSTEM_TABLE *systab = efi_systab;
+	struct efi_saved_tpl tpl;
 
 	DBGC ( systab, "EFI image unloading\n" );
+
+	/* Raise TPL */
+	efi_raise_tpl ( &tpl );
 
 	/* Shut down */
 	shutdown_exit();
@@ -335,6 +353,9 @@ static EFI_STATUS EFIAPI efi_unload ( EFI_HANDLE image_handle __unused ) {
 	bs->FreePool ( efi_loaded_image_path );
 
 	DBGC ( systab, "EFI image unloaded\n" );
+
+	/* Restore TPL */
+	efi_restore_tpl ( &tpl );
 
 	return 0;
 }
@@ -366,7 +387,7 @@ __attribute__ (( noreturn )) void __stack_chk_fail ( void ) {
 }
 
 /**
- * Raise task priority level to TPL_CALLBACK
+ * Raise task priority level to internal level
  *
  * @v tpl		Saved TPL
  */
@@ -377,7 +398,7 @@ void efi_raise_tpl ( struct efi_saved_tpl *tpl ) {
 	tpl->previous = efi_external_tpl;
 
 	/* Raise TPL and record previous TPL as new external TPL */
-	tpl->current = bs->RaiseTPL ( TPL_CALLBACK );
+	tpl->current = bs->RaiseTPL ( efi_internal_tpl );
 	efi_external_tpl = tpl->current;
 }
 

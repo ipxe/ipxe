@@ -1165,6 +1165,31 @@ static int xhci_reset ( struct xhci_device *xhci ) {
 	return -ETIMEDOUT;
 }
 
+/**
+ * Mark xHCI device as permanently failed
+ *
+ * @v xhci		xHCI device
+ * @ret rc		Return status code
+ */
+static int xhci_fail ( struct xhci_device *xhci ) {
+	size_t len;
+	int rc;
+
+	/* Mark command mechanism as permanently failed */
+	xhci->failed = 1;
+
+	/* Reset device */
+	if ( ( rc = xhci_reset ( xhci ) ) != 0 )
+		return rc;
+
+	/* Discard DCBAA entries since DCBAAP has been cleared */
+	assert ( xhci->dcbaa.context != NULL );
+	len = ( ( xhci->slots + 1 ) * sizeof ( xhci->dcbaa.context[0] ) );
+	memset ( xhci->dcbaa.context, 0, len );
+
+	return 0;
+}
+
 /******************************************************************************
  *
  * Transfer request blocks
@@ -1720,6 +1745,10 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
 	unsigned int consumed;
 	unsigned int type;
 
+	/* Do nothing if device has permanently failed */
+	if ( xhci->failed )
+		return;
+
 	/* Poll for events */
 	profile_start ( &xhci_event_profiler );
 	for ( consumed = 0 ; ; consumed++ ) {
@@ -1778,6 +1807,7 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
  */
 static void xhci_abort ( struct xhci_device *xhci ) {
 	physaddr_t crp;
+	uint32_t crcr;
 
 	/* Abort the command */
 	DBGC2 ( xhci, "XHCI %s aborting command\n", xhci->name );
@@ -1786,8 +1816,18 @@ static void xhci_abort ( struct xhci_device *xhci ) {
 	/* Allow time for command to abort */
 	mdelay ( XHCI_COMMAND_ABORT_DELAY_MS );
 
-	/* Sanity check */
-	assert ( ( readl ( xhci->op + XHCI_OP_CRCR ) & XHCI_CRCR_CRR ) == 0 );
+	/* Check for failure to abort */
+	crcr = readl ( xhci->op + XHCI_OP_CRCR );
+	if ( crcr & XHCI_CRCR_CRR ) {
+
+		/* Device has failed to abort a command and is almost
+		 * certainly beyond repair.  Reset device, abandoning
+		 * all state, and mark device as failed to avoid
+		 * delays on any future command attempts.
+		 */
+		DBGC ( xhci, "XHCI %s failed to abort command\n", xhci->name );
+		xhci_fail ( xhci );
+	}
 
 	/* Consume (and ignore) any final command status */
 	xhci_event_poll ( xhci );
@@ -1812,6 +1852,12 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 	struct xhci_trb_complete *complete = &trb->complete;
 	unsigned int i;
 	int rc;
+
+	/* Immediately fail all commands if command mechanism has failed */
+	if ( xhci->failed ) {
+		rc = -EPIPE;
+		goto err_failed;
+	}
 
 	/* Sanity check */
 	if ( xhci->pending ) {
@@ -1863,6 +1909,7 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
  err_enqueue:
 	xhci->pending = NULL;
  err_pending:
+ err_failed:
 	return rc;
 }
 
@@ -3412,14 +3459,36 @@ static int xhci_probe ( struct pci_device *pci ) {
 static void xhci_remove ( struct pci_device *pci ) {
 	struct xhci_device *xhci = pci_get_drvdata ( pci );
 	struct usb_bus *bus = xhci->bus;
+	uint16_t command;
 
+	/* Some systems are observed to disable bus mastering on
+	 * Thunderbolt controllers before we get a chance to shut
+	 * down.  Detect this and avoid attempting any DMA operations,
+	 * which are guaranteed to fail and may end up spuriously
+	 * completing after the operating system kernel starts up.
+	 */
+	pci_read_config_word ( pci, PCI_COMMAND, &command );
+	if ( ! ( command & PCI_COMMAND_MASTER ) ) {
+		DBGC ( xhci, "XHCI %s DMA was disabled\n", xhci->name );
+		xhci_fail ( xhci );
+	}
+
+	/* Unregister and free USB bus */
 	unregister_usb_bus ( bus );
 	free_usb_bus ( bus );
+
+	/* Reset device and undo any PCH-specific fixes */
 	xhci_reset ( xhci );
 	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_undo ( xhci, pci );
+
+	/* Release ownership back to BIOS */
 	xhci_legacy_release ( xhci );
+
+	/* Unmap registers */
 	iounmap ( xhci->regs );
+
+	/* Free device */
 	free ( xhci );
 }
 

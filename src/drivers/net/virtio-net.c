@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/pci.h>
+#include <ipxe/dma.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/ethernet.h>
 #include <ipxe/virtio-pci.h>
@@ -99,8 +100,9 @@ struct virtnet_nic {
 	/** Pending rx packet count */
 	unsigned int rx_num_iobufs;
 
-	/** Virtio net dummy packet headers */
-	struct virtio_net_hdr_modern empty_header[QUEUE_NB];
+	/** DMA device */
+	struct dma_device *dma;
+
 };
 
 /** Add an iobuf to a virtqueue
@@ -115,7 +117,7 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
 				  int vq_idx, struct io_buffer *iobuf ) {
 	struct virtnet_nic *virtnet = netdev->priv;
 	struct vring_virtqueue *vq = &virtnet->virtqueue[vq_idx];
-	struct virtio_net_hdr_modern *header = &virtnet->empty_header[vq_idx];
+	struct virtio_net_hdr_modern *header = vq->empty_header;
 	unsigned int out = ( vq_idx == TX_INDEX ) ? 2 : 0;
 	unsigned int in = ( vq_idx == TX_INDEX ) ? 0 : 2;
 	size_t header_len = ( virtnet->virtio_version ?
@@ -132,11 +134,11 @@ static void virtnet_enqueue_iob ( struct net_device *netdev,
 			 * to header->flags for received packets.  Work around
 			 * this by using separate RX and TX headers.
 			 */
-			.addr = ( char* ) header,
+			.addr = dma ( &vq->map, header ),
 			.length = header_len,
 		},
 		{
-			.addr = ( char* ) iobuf->data,
+			.addr = iob_dma ( iobuf ),
 			.length = iob_len ( iobuf ),
 		},
 	};
@@ -161,7 +163,7 @@ static void virtnet_refill_rx_virtqueue ( struct net_device *netdev ) {
 		struct io_buffer *iobuf;
 
 		/* Try to allocate a buffer, stop for now if out of memory */
-		iobuf = alloc_iob ( len );
+		iobuf = alloc_rx_iob ( len, virtnet->dma );
 		if ( ! iobuf )
 			break;
 
@@ -215,7 +217,8 @@ static int virtnet_open_legacy ( struct net_device *netdev ) {
 
 	/* Initialize rx/tx virtqueues */
 	for ( i = 0; i < QUEUE_NB; i++ ) {
-		if ( vp_find_vq ( ioaddr, i, &virtnet->virtqueue[i] ) == -1 ) {
+		if ( vp_find_vq ( ioaddr, i, &virtnet->virtqueue[i], virtnet->dma,
+                                  sizeof ( struct virtio_net_hdr_modern ) ) == -1 ) {
 			DBGC ( virtnet, "VIRTIO-NET %p cannot register queue %d\n",
 			       virtnet, i );
 			virtnet_free_virtqueues ( netdev );
@@ -280,7 +283,8 @@ static int virtnet_open_modern ( struct net_device *netdev ) {
 	}
 
 	/* Initialize rx/tx virtqueues */
-	if ( vpm_find_vqs ( &virtnet->vdev, QUEUE_NB, virtnet->virtqueue ) ) {
+	if ( vpm_find_vqs ( &virtnet->vdev, QUEUE_NB, virtnet->virtqueue,
+                            virtnet->dma, sizeof ( struct virtio_net_hdr_modern ) ) ) {
 		DBGC ( virtnet, "VIRTIO-NET %p cannot register queues\n",
 		       virtnet );
 		virtnet_free_virtqueues ( netdev );
@@ -335,7 +339,7 @@ static void virtnet_close ( struct net_device *netdev ) {
 
 	/* Free rx iobufs */
 	list_for_each_entry_safe ( iobuf, next_iobuf, &virtnet->rx_iobufs, list ) {
-		free_iob ( iobuf );
+		free_rx_iob ( iobuf );
 	}
 	INIT_LIST_HEAD ( &virtnet->rx_iobufs );
 	virtnet->rx_num_iobufs = 0;
@@ -478,6 +482,12 @@ static int virtnet_probe_legacy ( struct pci_device *pci ) {
 
 	/* Enable PCI bus master and reset NIC */
 	adjust_pci_device ( pci );
+
+	/* Configure DMA */
+	virtnet->dma =  &pci->dma;
+	dma_set_mask_64bit ( virtnet->dma );
+	netdev->dma = virtnet->dma;
+
 	vp_reset ( ioaddr );
 
 	/* Load MAC address and MTU */
@@ -506,7 +516,7 @@ static int virtnet_probe_legacy ( struct pci_device *pci ) {
 	return 0;
 
 	unregister_netdev ( netdev );
- err_register_netdev:
+err_register_netdev:
 	vp_reset ( ioaddr );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
@@ -586,6 +596,11 @@ static int virtnet_probe_modern ( struct pci_device *pci, int *found_dev ) {
 	/* Enable the PCI device */
 	adjust_pci_device ( pci );
 
+	/* Configure DMA */
+	virtnet->dma =  &pci->dma;
+	dma_set_mask_64bit ( virtnet->dma );
+	netdev->dma = virtnet->dma;
+
 	/* Reset the device and set initial status bits */
 	vpm_reset ( &virtnet->vdev );
 	vpm_add_status ( &virtnet->vdev, VIRTIO_CONFIG_S_ACKNOWLEDGE );
@@ -633,7 +648,6 @@ err_mac_address:
 	vpm_reset ( &virtnet->vdev );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
-
 	virtio_pci_unmap_capability ( &virtnet->vdev.device );
 err_map_device:
 	virtio_pci_unmap_capability ( &virtnet->vdev.isr );

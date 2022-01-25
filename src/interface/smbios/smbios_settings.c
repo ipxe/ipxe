@@ -140,7 +140,8 @@ static int smbios_fetch ( struct settings *settings __unused,
 		 * is 2.6 or higher; we match this behaviour.
 		 */
 		raw = &buf[tag_offset];
-		if ( ( setting->type == &setting_type_uuid ) &&
+		if ( ( ( setting->type == &setting_type_uuid ) ||
+		       ( setting->type == &setting_type_guid ) ) &&
 		     ( tag_len == sizeof ( uuid ) ) &&
 		     ( smbios_version() >= SMBIOS_VERSION ( 2, 6 ) ) ) {
 			DBG ( "SMBIOS detected mangled UUID\n" );

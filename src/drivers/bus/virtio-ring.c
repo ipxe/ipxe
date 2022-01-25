@@ -98,7 +98,7 @@ void vring_add_buf(struct vring_virtqueue *vq,
    for (i = head; out; i = vr->desc[i].next, out--) {
 
            vr->desc[i].flags = VRING_DESC_F_NEXT;
-           vr->desc[i].addr = (u64)virt_to_phys(list->addr);
+           vr->desc[i].addr = list->addr;
            vr->desc[i].len = list->length;
            prev = i;
            list++;
@@ -106,7 +106,7 @@ void vring_add_buf(struct vring_virtqueue *vq,
    for ( ; in; i = vr->desc[i].next, in--) {
 
            vr->desc[i].flags = VRING_DESC_F_NEXT|VRING_DESC_F_WRITE;
-           vr->desc[i].addr = (u64)virt_to_phys(list->addr);
+           vr->desc[i].addr = list->addr;
            vr->desc[i].len = list->length;
            prev = i;
            list++;

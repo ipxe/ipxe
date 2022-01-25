@@ -481,6 +481,7 @@ static struct pci_device_id intelx_nics[] = {
 	PCI_ROM ( 0x8086, 0x15ab, "x552", "X552", 0 ),
 	PCI_ROM ( 0x8086, 0x15c8, "x553t", "X553/X557-AT", 0 ),
 	PCI_ROM ( 0x8086, 0x15ce, "x553-sfp", "X553 (SFP+)", 0 ),
+	PCI_ROM ( 0x8086, 0x15e4, "x553a", "X553", 0 ),
 	PCI_ROM ( 0x8086, 0x15e5, "x553", "X553", 0 ),
 };
 

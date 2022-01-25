@@ -47,7 +47,7 @@ static char __bss16_array ( syslinux_version, [32] );
 #define syslinux_version __use_data16 ( syslinux_version )
 
 /** The "SYSLINUX" copyright string */
-static char __data16_array ( syslinux_copyright, [] ) = " http://ipxe.org";
+static char __data16_array ( syslinux_copyright, [] ) = " https://ipxe.org";
 #define syslinux_copyright __use_data16 ( syslinux_copyright )
 
 static char __data16_array ( syslinux_configuration_file, [] ) = "";

@@ -196,6 +196,47 @@ static const char * efi_timer_delay ( EFI_TIMER_DELAY type ) {
 }
 
 /**
+ * Dump information about a loaded image
+ *
+ * @v handle		Image handle
+ */
+static void efi_dump_image ( EFI_HANDLE handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_LOADED_IMAGE_PROTOCOL *image;
+		void *intf;
+	} loaded;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Open loaded image protocol */
+	if ( ( efirc = bs->OpenProtocol ( handle,
+					  &efi_loaded_image_protocol_guid,
+					  &loaded.intf, efi_image_handle, NULL,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( colour, "WRAP %s could not get loaded image protocol: "
+		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
+		return;
+	}
+
+	/* Dump image information */
+	DBGC ( colour, "WRAP %s at base %p has protocols:\n",
+	       efi_handle_name ( handle ), loaded.image->ImageBase );
+	DBGC_EFI_PROTOCOLS ( colour, handle );
+	DBGC ( colour, "WRAP %s parent", efi_handle_name ( handle ) );
+	DBGC ( colour, " %s\n", efi_handle_name ( loaded.image->ParentHandle ));
+	DBGC ( colour, "WRAP %s device", efi_handle_name ( handle ) );
+	DBGC ( colour, " %s\n", efi_handle_name ( loaded.image->DeviceHandle ));
+	DBGC ( colour, "WRAP %s file", efi_handle_name ( handle ) );
+	DBGC ( colour, " %s\n", efi_devpath_text ( loaded.image->FilePath ) );
+
+	/* Close loaded image protocol */
+	bs->CloseProtocol ( handle, &efi_loaded_image_protocol_guid,
+			    efi_image_handle, NULL );
+}
+
+/**
  * Wrap RaiseTPL()
  *
  */
@@ -655,9 +696,9 @@ efi_load_image_wrapper ( BOOLEAN boot_policy, EFI_HANDLE parent_image_handle,
 		DBGC ( colour, "%s ", efi_handle_name ( *image_handle ) );
 	DBGC ( colour, ") -> %p\n", retaddr );
 
-	/* Wrap the new image */
+	/* Dump information about loaded image */
 	if ( efirc == 0 )
-		efi_wrap ( *image_handle );
+		efi_dump_image ( *image_handle );
 
 	return efirc;
 }
@@ -735,11 +776,14 @@ efi_exit_boot_services_wrapper ( EFI_HANDLE image_handle, UINTN map_key ) {
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_STATUS efirc;
 
-	DBGC ( colour, "ExitBootServices ( %s, %#llx ) ",
+	DBGC ( colour, "ExitBootServices ( %s, %#llx ) -> %p\n",
 	       efi_handle_name ( image_handle ),
-	       ( ( unsigned long long ) map_key ) );
+	       ( ( unsigned long long ) map_key ), retaddr );
 	efirc = bs->ExitBootServices ( image_handle, map_key );
-	DBGC ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
+	if ( efirc != 0 ) {
+		DBGC ( colour, "ExitBootServices ( ... ) = %s -> %p\n",
+		       efi_status ( efirc ), retaddr );
+	}
 	return efirc;
 }
 
@@ -1129,12 +1173,11 @@ efi_create_event_ex_wrapper ( UINT32 type, EFI_TPL notify_tpl,
 }
 
 /**
- * Build table wrappers
+ * Build boot services table wrapper
  *
- * @ret systab		Wrapped system table
+ * @ret bs		Wrapped boot services table
  */
-EFI_SYSTEM_TABLE * efi_wrap_systab ( void ) {
-	static EFI_SYSTEM_TABLE efi_systab_wrapper;
+EFI_BOOT_SERVICES * efi_wrap_bs ( void ) {
 	static EFI_BOOT_SERVICES efi_bs_wrapper;
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
@@ -1194,12 +1237,7 @@ EFI_SYSTEM_TABLE * efi_wrap_systab ( void ) {
 		= efi_uninstall_multiple_protocol_interfaces_wrapper;
 	efi_bs_wrapper.CreateEventEx	= efi_create_event_ex_wrapper;
 
-	/* Build system table wrapper */
-	memcpy ( &efi_systab_wrapper, efi_systab,
-		 sizeof ( efi_systab_wrapper ) );
-	efi_systab_wrapper.BootServices	= &efi_bs_wrapper;
-
-	return &efi_systab_wrapper;
+	return &efi_bs_wrapper;
 }
 
 /**
@@ -1208,42 +1246,20 @@ EFI_SYSTEM_TABLE * efi_wrap_systab ( void ) {
  * @v handle		Image handle
  */
 void efi_wrap ( EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_LOADED_IMAGE_PROTOCOL *image;
-		void *intf;
-	} loaded;
-	EFI_STATUS efirc;
-	int rc;
+	static EFI_SYSTEM_TABLE efi_systab_copy;
 
 	/* Do nothing unless debugging is enabled */
 	if ( ! DBG_LOG )
 		return;
 
-	/* Open loaded image protocol */
-	if ( ( efirc = bs->OpenProtocol ( handle,
-					  &efi_loaded_image_protocol_guid,
-					  &loaded.intf, efi_image_handle, NULL,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
-		DBGC ( colour, "WRAP %s could not get loaded image protocol: "
-		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
-		return;
+	/* Construct modified system table */
+	if ( efi_systab != &efi_systab_copy ) {
+		memcpy ( &efi_systab_copy, efi_systab,
+			 sizeof ( efi_systab_copy ) );
+		efi_systab->BootServices = efi_wrap_bs();
+		efi_systab = &efi_systab_copy;
 	}
 
-	/* Provide system table wrapper to image */
-	loaded.image->SystemTable = efi_wrap_systab();
-	DBGC ( colour, "WRAP %s at base %p has protocols:\n",
-	       efi_handle_name ( handle ), loaded.image->ImageBase );
-	DBGC_EFI_PROTOCOLS ( colour, handle );
-	DBGC ( colour, "WRAP %s parent", efi_handle_name ( handle ) );
-	DBGC ( colour, " %s\n", efi_handle_name ( loaded.image->ParentHandle ));
-	DBGC ( colour, "WRAP %s device", efi_handle_name ( handle ) );
-	DBGC ( colour, " %s\n", efi_handle_name ( loaded.image->DeviceHandle ));
-	DBGC ( colour, "WRAP %s file", efi_handle_name ( handle ) );
-	DBGC ( colour, " %s\n", efi_devpath_text ( loaded.image->FilePath ) );
-
-	/* Close loaded image protocol */
-	bs->CloseProtocol ( handle, &efi_loaded_image_protocol_guid,
-			    efi_image_handle, NULL );
+	/* Dump image information */
+	efi_dump_image ( handle );
 }

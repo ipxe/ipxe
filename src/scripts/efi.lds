@@ -75,6 +75,19 @@ SECTIONS {
     }
 
     /*
+     * The SBAT section
+     *
+     */
+
+    . = ALIGN ( _page_align );
+    .sbat : {
+	_sbat = .;
+	KEEP(*(.sbat))
+	KEEP(*(.sbat.*))
+	_esbat = .;
+    }
+
+    /*
      * Weak symbols that need zero values if not otherwise defined
      *
      */

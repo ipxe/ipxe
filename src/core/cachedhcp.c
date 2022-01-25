@@ -37,29 +37,121 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+/** A cached DHCP packet */
+struct cached_dhcp_packet {
+	/** Settings block name */
+	const char *name;
+	/** DHCP packet (if any) */
+	struct dhcp_packet *dhcppkt;
+};
+
 /** Cached DHCPACK */
-static struct dhcp_packet *cached_dhcpack;
+struct cached_dhcp_packet cached_dhcpack = {
+	.name = DHCP_SETTINGS_NAME,
+};
+
+/** Cached ProxyDHCPOFFER */
+struct cached_dhcp_packet cached_proxydhcp = {
+	.name = PROXYDHCP_SETTINGS_NAME,
+};
+
+/** Cached PXEBSACK */
+struct cached_dhcp_packet cached_pxebs = {
+	.name = PXEBS_SETTINGS_NAME,
+};
+
+/** List of cached DHCP packets */
+static struct cached_dhcp_packet *cached_packets[] = {
+	&cached_dhcpack,
+	&cached_proxydhcp,
+	&cached_pxebs,
+};
 
 /** Colour for debug messages */
 #define colour &cached_dhcpack
 
 /**
- * Record cached DHCPACK
+ * Free cached DHCP packet
  *
+ * @v cache		Cached DHCP packet
+ */
+static void cachedhcp_free ( struct cached_dhcp_packet *cache ) {
+
+	dhcppkt_put ( cache->dhcppkt );
+	cache->dhcppkt = NULL;
+}
+
+/**
+ * Apply cached DHCP packet settings
+ *
+ * @v cache		Cached DHCP packet
+ * @v netdev		Network device, or NULL
+ * @ret rc		Return status code
+ */
+static int cachedhcp_apply ( struct cached_dhcp_packet *cache,
+			     struct net_device *netdev ) {
+	struct settings *settings;
+	int rc;
+
+	/* Do nothing if cache is empty */
+	if ( ! cache->dhcppkt )
+		return 0;
+
+	/* Do nothing unless cached packet's MAC address matches this
+	 * network device, if specified.
+	 */
+	if ( netdev ) {
+		if ( memcmp ( netdev->ll_addr, cache->dhcppkt->dhcphdr->chaddr,
+			      netdev->ll_protocol->ll_addr_len ) != 0 ) {
+			DBGC ( colour, "CACHEDHCP %s does not match %s\n",
+			       cache->name, netdev->name );
+			return 0;
+		}
+		DBGC ( colour, "CACHEDHCP %s is for %s\n",
+		       cache->name, netdev->name );
+	}
+
+	/* Select appropriate parent settings block */
+	settings = ( netdev ? netdev_settings ( netdev ) : NULL );
+
+	/* Register settings */
+	if ( ( rc = register_settings ( &cache->dhcppkt->settings, settings,
+					cache->name ) ) != 0 ) {
+		DBGC ( colour, "CACHEDHCP %s could not register settings: %s\n",
+		       cache->name, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Free cached DHCP packet */
+	cachedhcp_free ( cache );
+
+	return 0;
+}
+
+/**
+ * Record cached DHCP packet
+ *
+ * @v cache		Cached DHCP packet
  * @v data		DHCPACK packet buffer
  * @v max_len		Maximum possible length
  * @ret rc		Return status code
  */
-int cachedhcp_record ( userptr_t data, size_t max_len ) {
+int cachedhcp_record ( struct cached_dhcp_packet *cache, userptr_t data,
+		       size_t max_len ) {
 	struct dhcp_packet *dhcppkt;
 	struct dhcp_packet *tmp;
 	struct dhcphdr *dhcphdr;
+	unsigned int i;
 	size_t len;
+
+	/* Free any existing cached packet */
+	cachedhcp_free ( cache );
 
 	/* Allocate and populate DHCP packet */
 	dhcppkt = zalloc ( sizeof ( *dhcppkt ) + max_len );
 	if ( ! dhcppkt ) {
-		DBGC ( colour, "CACHEDHCP could not allocate copy\n" );
+		DBGC ( colour, "CACHEDHCP %s could not allocate copy\n",
+		       cache->name );
 		return -ENOMEM;
 	}
 	dhcphdr = ( ( ( void * ) dhcppkt ) + sizeof ( *dhcppkt ) );
@@ -80,10 +172,26 @@ int cachedhcp_record ( userptr_t data, size_t max_len ) {
 	dhcphdr = ( ( ( void * ) dhcppkt ) + sizeof ( *dhcppkt ) );
 	dhcppkt_init ( dhcppkt, dhcphdr, len );
 
-	/* Store as cached DHCPACK, and mark original copy as consumed */
-	DBGC ( colour, "CACHEDHCP found cached DHCPACK at %#08lx+%#zx/%#zx\n",
+	/* Discard duplicate packets, since some PXE stacks (including
+	 * iPXE itself) will report the DHCPACK packet as the PXEBSACK
+	 * if no separate PXEBSACK exists.
+	 */
+	for ( i = 0 ; i < ( sizeof ( cached_packets ) /
+			    sizeof ( cached_packets[0] ) ) ; i++ ) {
+		tmp = cached_packets[i]->dhcppkt;
+		if ( tmp && ( dhcppkt_len ( tmp ) == len ) &&
+		     ( memcmp ( tmp->dhcphdr, dhcppkt->dhcphdr, len ) == 0 ) ) {
+			DBGC ( colour, "CACHEDHCP %s duplicates %s\n",
+			       cache->name, cached_packets[i]->name );
+			dhcppkt_put ( dhcppkt );
+			return -EEXIST;
+		}
+	}
+
+	/* Store as cached packet */
+	DBGC ( colour, "CACHEDHCP %s at %#08lx+%#zx/%#zx\n", cache->name,
 	       user_to_phys ( data, 0 ), len, max_len );
-	cached_dhcpack = dhcppkt;
+	cache->dhcppkt = dhcppkt;
 
 	return 0;
 }
@@ -94,14 +202,20 @@ int cachedhcp_record ( userptr_t data, size_t max_len ) {
  */
 static void cachedhcp_startup ( void ) {
 
-	/* If cached DHCP packet was not claimed by any network device
-	 * during startup, then free it.
-	 */
-	if ( cached_dhcpack ) {
-		DBGC ( colour, "CACHEDHCP freeing unclaimed cached DHCPACK\n" );
-		dhcppkt_put ( cached_dhcpack );
-		cached_dhcpack = NULL;
+	/* Apply cached ProxyDHCPOFFER, if any */
+	cachedhcp_apply ( &cached_proxydhcp, NULL );
+
+	/* Apply cached PXEBSACK, if any */
+	cachedhcp_apply ( &cached_pxebs, NULL );
+
+	/* Free any remaining cached packets */
+	if ( cached_dhcpack.dhcppkt ) {
+		DBGC ( colour, "CACHEDHCP %s unclaimed\n",
+		       cached_dhcpack.name );
 	}
+	cachedhcp_free ( &cached_dhcpack );
+	cachedhcp_free ( &cached_proxydhcp );
+	cachedhcp_free ( &cached_pxebs );
 }
 
 /** Cached DHCPACK startup function */
@@ -117,38 +231,9 @@ struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
  * @ret rc		Return status code
  */
 static int cachedhcp_probe ( struct net_device *netdev ) {
-	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	int rc;
 
-	/* Do nothing unless we have a cached DHCPACK */
-	if ( ! cached_dhcpack )
-		return 0;
-
-	/* Do nothing unless cached DHCPACK's MAC address matches this
-	 * network device.
-	 */
-	if ( memcmp ( netdev->ll_addr, cached_dhcpack->dhcphdr->chaddr,
-		      ll_protocol->ll_addr_len ) != 0 ) {
-		DBGC ( colour, "CACHEDHCP cached DHCPACK does not match %s\n",
-		       netdev->name );
-		return 0;
-	}
-	DBGC ( colour, "CACHEDHCP cached DHCPACK is for %s\n", netdev->name );
-
-	/* Register as DHCP settings for this network device */
-	if ( ( rc = register_settings ( &cached_dhcpack->settings,
-					netdev_settings ( netdev ),
-					DHCP_SETTINGS_NAME ) ) != 0 ) {
-		DBGC ( colour, "CACHEDHCP could not register settings: %s\n",
-		       strerror ( rc ) );
-		return rc;
-	}
-
-	/* Claim cached DHCPACK */
-	dhcppkt_put ( cached_dhcpack );
-	cached_dhcpack = NULL;
-
-	return 0;
+	/* Apply cached DHCPACK to network device, if applicable */
+	return cachedhcp_apply ( &cached_dhcpack, netdev );
 }
 
 /** Cached DHCP packet network device driver */

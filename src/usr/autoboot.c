@@ -579,8 +579,8 @@ int ipxe ( struct net_device *netdev ) {
 	 * defining the string PRODUCT_NAME in config/branding.h.
 	 *
 	 * While nothing in the GPL prevents you from removing all
-	 * references to iPXE or http://ipxe.org, we prefer you not to
-	 * do so.
+	 * references to iPXE or https://ipxe.org, we prefer you not
+	 * to do so.
 	 *
 	 */
 	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD PRODUCT_SHORT_NAME " %s"

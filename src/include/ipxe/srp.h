@@ -774,7 +774,7 @@ struct srp_aer_rsp {
  * The working draft specification for the SRP boot firmware table can
  * be found at
  *
- *   http://ipxe.org/wiki/srp/sbft
+ *   https://ipxe.org/wiki/srp/sbft
  *
  *****************************************************************************
  */
