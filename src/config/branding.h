@@ -187,6 +187,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define PRODUCT_SBAT_GENERATION 0
 
+#include <config/named.h>
+#include NAMED_CONFIG(branding.h)
 #include <config/local/branding.h>
+#include LOCAL_NAMED_CONFIG(branding.h)
 
 #endif /* CONFIG_BRANDING_H */
