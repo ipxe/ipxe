@@ -26,5 +26,4 @@ struct key_mapping et_mapping[] __keymap = {
 	{ 0x5e, 0x26 },	/* '^' => '&' */
 	{ 0x5f, 0x3f },	/* '_' => '?' */
 	{ 0x7c, 0x2a },	/* '|' => '*' */
-	{ 0x7f, 0x1b },	/* 0x7f => 0x1b */
 };

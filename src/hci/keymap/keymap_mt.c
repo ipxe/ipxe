@@ -12,8 +12,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 /** "mt" keyboard mapping */
 struct key_mapping mt_mapping[] __keymap = {
+	{ 0x1c, 0x1e },	/* 0x1c => 0x1e */
 	{ 0x22, 0x40 },	/* '"' => '@' */
-	{ 0x23, 0x04 },	/* '#' => Ctrl-D */
 	{ 0x40, 0x22 },	/* '@' => '"' */
 	{ 0x5c, 0x23 },	/* '\\' => '#' */
 	{ 0x7c, 0x7e },	/* '|' => '~' */

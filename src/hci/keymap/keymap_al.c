@@ -14,6 +14,7 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 struct key_mapping al_mapping[] __keymap = {
 	{ 0x19, 0x1a },	/* Ctrl-Y => Ctrl-Z */
 	{ 0x1a, 0x19 },	/* Ctrl-Z => Ctrl-Y */
+	{ 0x1c, 0x1d },	/* 0x1c => 0x1d */
 	{ 0x22, 0x7b },	/* '"' => '{' */
 	{ 0x27, 0x5b },	/* '\'' => '[' */
 	{ 0x3c, 0x3b },	/* '<' => ';' */

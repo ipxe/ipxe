@@ -12,7 +12,7 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 /** "az" keyboard mapping */
 struct key_mapping az_mapping[] __keymap = {
-	{ 0x23, 0x27 },	/* '#' => '\'' */
+	{ 0x1e, 0x36 },	/* 0x1e => '6' */
 	{ 0x24, 0x3b },	/* '$' => ';' */
 	{ 0x26, 0x3f },	/* '&' => '?' */
 	{ 0x2f, 0x2e },	/* '/' => '.' */

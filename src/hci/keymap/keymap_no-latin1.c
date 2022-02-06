@@ -12,6 +12,7 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 /** "no-latin1" keyboard mapping */
 struct key_mapping no_latin1_mapping[] __keymap = {
+	{ 0x1d, 0x1e },	/* 0x1d => 0x1e */
 	{ 0x26, 0x2f },	/* '&' => '/' */
 	{ 0x28, 0x29 },	/* '(' => ')' */
 	{ 0x29, 0x3d },	/* ')' => '=' */

@@ -12,6 +12,7 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 /** "it" keyboard mapping */
 struct key_mapping it_mapping[] __keymap = {
+	{ 0x1e, 0x36 },	/* 0x1e => '6' */
 	{ 0x26, 0x2f },	/* '&' => '/' */
 	{ 0x28, 0x29 },	/* '(' => ')' */
 	{ 0x29, 0x3d },	/* ')' => '=' */

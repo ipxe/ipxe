@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+#
+# Copyright (C) 2022 Michael Brown <mbrown@fensystems.co.uk>.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of the
+# License, or any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+
+"""Generate iPXE keymaps"""
+
+from __future__ import annotations
+
+import argparse
+from collections import UserDict
+from collections.abc import Sequence, Mapping, MutableMapping
+from dataclasses import dataclass
+from enum import Flag, IntEnum
+import re
+import subprocess
+from struct import Struct
+import textwrap
+from typing import ClassVar, Optional
+
+
+class KeyType(IntEnum):
+    """Key types"""
+
+    LATIN = 0
+    FN = 1
+    SPEC = 2
+    PAD = 3
+    DEAD = 4
+    CONS = 5
+    CUR = 6
+    SHIFT = 7
+    META = 8
+    ASCII = 9
+    LOCK = 10
+    LETTER = 11
+    SLOCK = 12
+    DEAD2 = 13
+    BRL = 14
+    UNKNOWN = 0xf0
+
+
+class KeyModifiers(Flag):
+    """Key modifiers"""
+
+    NONE = 0
+    SHIFT = 1
+    ALTGR = 2
+    CTRL = 4
+    ALT = 8
+    SHIFTL = 16
+    SHIFTR = 32
+    CTRLL = 64
+    CTRLR = 128
+
+    @property
+    def complexity(self) -> int:
+        """Get complexity value of applied modifiers"""
+        if self == self.NONE:
+            return 0
+        if self == self.SHIFT:
+            return 1
+        if self == self.CTRL:
+            return 2
+        return 3 + bin(self.value).count('1')
+
+
+@dataclass
+class Key:
+    """A single key definition"""
+
+    keycode: int
+    """Opaque keycode"""
+
+    keysym: int
+    """Key symbol"""
+
+    modifiers: KeyModifiers
+    """Applied modifiers"""
+
+    ASCII_TYPES: ClassVar[set[KeyType]] = {KeyType.LATIN, KeyType.ASCII,
+                                           KeyType.LETTER}
+    """Key types with direct ASCII values"""
+
+    @property
+    def keytype(self) -> Optional[KeyType]:
+        """Key type"""
+        try:
+            return KeyType(self.keysym >> 8)
+        except ValueError:
+            return None
+
+    @property
+    def value(self) -> int:
+        """Key value"""
+        return self.keysym & 0xff
+
+    @property
+    def ascii(self) -> Optional[str]:
+        """ASCII character"""
+        if self.keytype in self.ASCII_TYPES:
+            value = self.value
+            char = chr(value)
+            if value and char.isascii():
+                return char
+        return None
+
+
+class KeyMapping(UserDict[KeyModifiers, Sequence[Key]]):
+    """A keyboard mapping"""
+
+    BKEYMAP_MAGIC: ClassVar[bytes] = b'bkeymap'
+    """Magic signature for output produced by 'loadkeys -b'"""
+
+    MAX_NR_KEYMAPS: ClassVar[int] = 256
+    """Maximum number of keymaps produced by 'loadkeys -b'"""
+
+    NR_KEYS: ClassVar[int] = 128
+    """Number of keys in each keymap produced by 'loadkeys -b'"""
+
+    KEY_BACKSPACE: ClassVar[int] = 14
+    """Key code for backspace
+
+    Keyboard maps seem to somewhat arbitrarily pick an interpretation
+    for the backspace key and its various modifiers, according to the
+    personal preference of the keyboard map transcriber.
+    """
+
+    KEY_NON_US: ClassVar[int] = 86
+    """Key code 86
+
+    Key code 86 is somewhat bizarre.  It doesn't physically exist on
+    most US keyboards.  The database used by "loadkeys" defines it as
+    "<>", while most other databases either define it as a duplicate
+    "\\|" or omit it entirely.
+    """
+
+    FIXUPS: ClassVar[Mapping[str, Mapping[KeyModifiers,
+                                          Sequence[tuple[int, int]]]]] = {
+        'us': {
+            # Redefine erroneous key 86 as generating "\\|"
+            KeyModifiers.NONE: [(KEY_NON_US, ord('\\'))],
+            KeyModifiers.SHIFT: [(KEY_NON_US, ord('|'))],
+            # Treat Ctrl-Backspace as producing Backspace rather than Ctrl-H
+            KeyModifiers.CTRL: [(KEY_BACKSPACE, 0x7f)],
+        },
+    }
+    """Fixups for erroneous keymappings produced by 'loadkeys -b'"""
+
+    @property
+    def unshifted(self):
+        """Basic unshifted key mapping"""
+        return self[KeyModifiers.NONE]
+
+    @property
+    def shifted(self):
+        """Basic shifted key mapping"""
+        return self[KeyModifiers.SHIFT]
+
+    @classmethod
+    def load(cls, name: str) -> KeyMapping:
+        """Load keymap using 'loadkeys -b'"""
+        bkeymap = subprocess.check_output(["loadkeys", "-u", "-b", name])
+        if not bkeymap.startswith(cls.BKEYMAP_MAGIC):
+            raise ValueError("Invalid bkeymap magic signature")
+        bkeymap = bkeymap[len(cls.BKEYMAP_MAGIC):]
+        included = bkeymap[:cls.MAX_NR_KEYMAPS]
+        if len(included) != cls.MAX_NR_KEYMAPS:
+            raise ValueError("Invalid bkeymap inclusion list")
+        keymaps = bkeymap[cls.MAX_NR_KEYMAPS:]
+        keys = {}
+        for modifiers in map(KeyModifiers, range(cls.MAX_NR_KEYMAPS)):
+            if included[modifiers.value]:
+                fmt = Struct('<%dH' % cls.NR_KEYS)
+                keymap = keymaps[:fmt.size]
+                if len(keymap) != fmt.size:
+                    raise ValueError("Invalid bkeymap map %#x" %
+                                     modifiers.value)
+                keys[modifiers] = [
+                    Key(modifiers=modifiers, keycode=keycode, keysym=keysym)
+                    for keycode, keysym in enumerate(fmt.unpack(keymap))
+                ]
+                keymaps = keymaps[len(keymap):]
+        if keymaps:
+            raise ValueError("Trailing bkeymap data")
+        for modifiers, fixups in cls.FIXUPS.get(name, {}).items():
+            for keycode, keysym in fixups:
+                keys[modifiers][keycode] = Key(modifiers=modifiers,
+                                               keycode=keycode, keysym=keysym)
+        return cls(keys)
+
+    @property
+    def inverse(self) -> MutableMapping[str, Key]:
+        """Construct inverse mapping from ASCII value to key"""
+        return {
+            key.ascii: key
+            # Give priority to simplest modifier for a given ASCII code
+            for modifiers in sorted(self.keys(), reverse=True,
+                                    key=lambda x: (x.complexity, x.value))
+            # Give priority to lowest keycode for a given ASCII code
+            for key in reversed(self[modifiers])
+            # Ignore keys with no ASCII value
+            if key.ascii
+        }
+
+
+class BiosKeyMapping(KeyMapping):
+    """Keyboard mapping as used by the BIOS"""
+
+    @property
+    def inverse(self) -> MutableMapping[str, Key]:
+        inverse = super().inverse
+        assert len(inverse) == 0x7f
+        assert all(x.modifiers in {KeyModifiers.NONE, KeyModifiers.SHIFT,
+                                   KeyModifiers.CTRL}
+                   for x in inverse.values())
+        return inverse
+
+
+@dataclass
+class KeyRemapping:
+    """A keyboard remapping"""
+
+    name: str
+    """Mapping name"""
+
+    source: KeyMapping
+    """Source keyboard mapping"""
+
+    target: KeyMapping
+    """Target keyboard mapping"""
+
+    @property
+    def ascii(self) -> MutableMapping[str, str]:
+        """Remapped ASCII key table"""
+        # Construct raw mapping from source ASCII to target ASCII
+        raw = {source: self.target[key.modifiers][key.keycode].ascii
+               for source, key in self.source.inverse.items()}
+        # Eliminate any null mappings, mappings that attempt to remap
+        # the backspace key, or identity mappings
+        table = {source: target for source, target in raw.items()
+                 if target
+                 and ord(source) != 0x7f
+                 and ord(target) != 0x7f
+                 and ord(source) != ord(target)}
+        # Recursively delete any mappings that would produce
+        # unreachable alphanumerics (e.g. the "il" keymap, which maps
+        # away the whole lower-case alphabet)
+        while True:
+            unreachable = set(table.keys()) - set(table.values())
+            delete = {x for x in unreachable if x.isascii() and x.isalnum()}
+            if not delete:
+                break
+            table = {k: v for k, v in table.items() if k not in delete}
+        # Sanity check: ensure that all numerics are reachable using
+        # the same shift state
+        digits = '1234567890'
+        unshifted = ''.join(table.get(x, x) for x in '1234567890')
+        shifted = ''.join(table.get(x, x) for x in '!@#$%^&*()')
+        if digits not in (shifted, unshifted):
+            raise ValueError("Inconsistent numeric remapping %s / %s" %
+                             (unshifted, shifted))
+        return dict(sorted(table.items()))
+
+    @property
+    def cname(self) -> str:
+        """C variable name"""
+        return re.sub(r'\W', '_', self.name) + "_mapping"
+
+    @staticmethod
+    def ascii_name(char: str) -> str:
+        """ASCII character name"""
+        if char == '\\':
+            name = "'\\\\'"
+        elif char == '\'':
+            name = "'\\\''"
+        elif char.isprintable():
+            name = "'%s'" % char
+        elif ord(char) <= 0x1a:
+            name = "Ctrl-%c" % (ord(char) + 0x40)
+        else:
+            name = "0x%02x" % ord(char)
+        return name
+
+    @property
+    def code(self) -> str:
+        """Generated source code"""
+        code = textwrap.dedent(f"""
+        /** @file
+         *
+         * "{self.name}" keyboard mapping
+         *
+         * This file is automatically generated; do not edit
+         *
+         */
+
+        FILE_LICENCE ( PUBLIC_DOMAIN );
+
+        #include <ipxe/keymap.h>
+
+        /** "{self.name}" keyboard mapping */
+        struct key_mapping {self.cname}[] __keymap = {{
+        """).lstrip() + ''.join(
+            '\t{ 0x%02x, 0x%02x },\t/* %s => %s */\n' % (
+                ord(source), ord(target),
+                self.ascii_name(source), self.ascii_name(target)
+            )
+            for source, target in self.ascii.items()
+        ) + textwrap.dedent("""
+        };
+        """).strip()
+        return code
+
+
+if __name__ == '__main__':
+
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Generate iPXE keymaps")
+    parser.add_argument('--verbose', '-v', action='count', default=0,
+                        help="Increase verbosity")
+    parser.add_argument('layout', help="Target keyboard layout")
+    args = parser.parse_args()
+
+    # Load source and target keymaps
+    source = BiosKeyMapping.load('us')
+    target = KeyMapping.load(args.layout)
+
+    # Construct remapping
+    remap = KeyRemapping(name=args.layout, source=source, target=target)
+
+    # Output generated code
+    print(remap.code)

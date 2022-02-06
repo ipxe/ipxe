@@ -14,6 +14,7 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 struct key_mapping hu_mapping[] __keymap = {
 	{ 0x19, 0x1a },	/* Ctrl-Y => Ctrl-Z */
 	{ 0x1a, 0x19 },	/* Ctrl-Z => Ctrl-Y */
+	{ 0x1e, 0x36 },	/* 0x1e => '6' */
 	{ 0x21, 0x27 },	/* '!' => '\'' */
 	{ 0x23, 0x2b },	/* '#' => '+' */
 	{ 0x24, 0x21 },	/* '$' => '!' */
