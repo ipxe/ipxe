@@ -13,7 +13,7 @@ set ignore ffff
 
 set base-url http://pit/${hostname}
 set image-name filesystem.squashfs
-isset ${netX.dhcp/root-path} && set xname-param xname=${netX.dhcp/root-path} || set xname-param ''
+isset ${net${vidx}.dhcp/root-path} && set xname-param xname=${net${vidx}.dhcp/root-path} || # this is a retry; this is not the first pass.
 
 # Grab the dhcp-server IP and store it in a variable to prevent the value from vanishing if the pull fails.
 # We want the IP to stick here so the menu is consistent, letting a user retry by hand from the menu if they'd like.
