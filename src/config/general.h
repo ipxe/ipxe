@@ -120,6 +120,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define	IMAGE_ZLIB		/* ZLIB image support */
 //#define	IMAGE_GZIP		/* GZIP image support */
 
+// Enable IMAGE_GZIP on aarch64 by default
+#ifdef __aarch64__
+#define	IMAGE_GZIP		/* GZIP image support */
+#endif
+
 /*
  * Command-line commands to include
  *
