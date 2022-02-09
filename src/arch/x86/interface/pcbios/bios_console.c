@@ -340,22 +340,6 @@ static const char * bios_ansi_seq ( unsigned int scancode ) {
 }
 
 /**
- * Map a key
- *
- * @v character		Character read from console
- * @ret character	Mapped character
- */
-static int bios_keymap ( unsigned int character ) {
-	struct key_mapping *mapping;
-
-	for_each_table_entry ( mapping, KEYMAP ) {
-		if ( mapping->from == character )
-			return mapping->to;
-	}
-	return character;
-}
-
-/**
  * Get character from BIOS console
  *
  * @ret character	Character read from console
@@ -387,7 +371,7 @@ static int bios_getchar ( void ) {
 
 	/* If it's a normal character, just map and return it */
 	if ( character && ( character < 0x80 ) )
-		return bios_keymap ( character );
+		return key_remap ( character );
 
 	/* Otherwise, check for a special key that we know about */
 	if ( ( ansi_seq = bios_ansi_seq ( keypress >> 8 ) ) ) {

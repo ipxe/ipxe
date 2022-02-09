@@ -27,4 +27,6 @@ struct key_mapping {
 /** Define a keyboard mapping */
 #define __keymap __table_entry ( KEYMAP, 01 )
 
+extern unsigned int key_remap ( unsigned int character );
+
 #endif /* _IPXE_KEYMAP_H */
