@@ -32,4 +32,6 @@ struct key_mapping no_latin1_mapping[] __keymap = {
 	{ 0x60, 0x7c },	/* '`' => '|' */
 	{ 0x7c, 0x2a },	/* '|' => '*' */
 	{ 0x7d, 0x5e },	/* '}' => '^' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

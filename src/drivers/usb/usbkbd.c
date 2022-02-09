@@ -114,13 +114,19 @@ static unsigned int usbkbd_map ( unsigned int keycode, unsigned int modifiers,
 			};
 			key = keypad[ keycode - USBKBD_KEY_PAD_1 ];
 		};
+	} else if ( keycode == USBKBD_KEY_NON_US ) {
+		/* Non-US \ and | */
+		key = ( ( modifiers & USBKBD_SHIFT ) ?
+			( KEYMAP_PSEUDO | '|' ) : ( KEYMAP_PSEUDO | '\\' ) );
 	} else {
 		key = 0;
 	}
 
 	/* Remap key if applicable */
-	if ( keycode < USBKBD_KEY_CAPS_LOCK )
+	if ( ( keycode < USBKBD_KEY_CAPS_LOCK ) ||
+	     ( keycode == USBKBD_KEY_NON_US ) ) {
 		key = key_remap ( key );
+	}
 
 	/* Handle upper/lower case and Ctrl-<key> */
 	if ( islower ( key ) ) {

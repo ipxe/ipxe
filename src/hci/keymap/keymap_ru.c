@@ -13,4 +13,6 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 /** "ru" keyboard mapping */
 struct key_mapping ru_mapping[] __keymap = {
 	{ 0x0d, 0x0a },	/* Ctrl-M => Ctrl-J */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

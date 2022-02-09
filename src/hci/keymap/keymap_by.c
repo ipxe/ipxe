@@ -12,4 +12,6 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 /** "by" keyboard mapping */
 struct key_mapping by_mapping[] __keymap = {
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

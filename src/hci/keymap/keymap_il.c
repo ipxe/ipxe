@@ -24,4 +24,6 @@ struct key_mapping il_mapping[] __keymap = {
 	{ 0x60, 0x3b },	/* '`' => ';' */
 	{ 0x7b, 0x7d },	/* '{' => '}' */
 	{ 0x7d, 0x7b },	/* '}' => '{' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

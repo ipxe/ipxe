@@ -30,4 +30,6 @@ struct key_mapping al_mapping[] __keymap = {
 	{ 0x7c, 0x7d },	/* '|' => '}' */
 	{ 0x7d, 0x27 },	/* '}' => '\'' */
 	{ 0x7e, 0x7c },	/* '~' => '|' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

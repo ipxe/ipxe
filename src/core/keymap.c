@@ -48,5 +48,8 @@ unsigned int key_remap ( unsigned int character ) {
 		}
 	}
 
+	/* Clear pseudo key flag */
+	character &= ~KEYMAP_PSEUDO;
+
 	return character;
 }

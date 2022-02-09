@@ -33,4 +33,6 @@ struct key_mapping nl_mapping[] __keymap = {
 	{ 0x60, 0x40 },	/* '`' => '@' */
 	{ 0x7c, 0x3e },	/* '|' => '>' */
 	{ 0x7d, 0x7c },	/* '}' => '|' */
+	{ 0xdc, 0x5d },	/* Pseudo-'\\' => ']' */
+	{ 0xfc, 0x5b },	/* Pseudo-'|' => '[' */
 };

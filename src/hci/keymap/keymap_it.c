@@ -30,4 +30,6 @@ struct key_mapping it_mapping[] __keymap = {
 	{ 0x60, 0x5c },	/* '`' => '\\' */
 	{ 0x7d, 0x2a },	/* '}' => '*' */
 	{ 0x7e, 0x7c },	/* '~' => '|' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

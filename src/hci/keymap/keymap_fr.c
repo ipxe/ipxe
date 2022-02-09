@@ -57,4 +57,6 @@ struct key_mapping fr_mapping[] __keymap = {
 	{ 0x71, 0x61 },	/* 'q' => 'a' */
 	{ 0x77, 0x7a },	/* 'w' => 'z' */
 	{ 0x7a, 0x77 },	/* 'z' => 'w' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

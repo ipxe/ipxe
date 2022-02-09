@@ -219,12 +219,28 @@ class KeyMapping(UserDict[KeyModifiers, Sequence[Key]]):
 
 
 class BiosKeyMapping(KeyMapping):
-    """Keyboard mapping as used by the BIOS"""
+    """Keyboard mapping as used by the BIOS
+
+    To allow for remappings of the somewhat interesting key 86, we
+    arrange for our keyboard drivers to generate this key as "\\|"
+    with the high bit set.
+    """
+
+    KEY_PSEUDO: ClassVar[int] = 0x80
+    """Flag used to indicate a fake ASCII value"""
+
+    KEY_NON_US_UNSHIFTED: ClassVar[str] = chr(KEY_PSEUDO | ord('\\'))
+    """Fake ASCII value generated for unshifted key code 86"""
+
+    KEY_NON_US_SHIFTED: ClassVar[str] = chr(KEY_PSEUDO | ord('|'))
+    """Fake ASCII value generated for shifted key code 86"""
 
     @property
     def inverse(self) -> MutableMapping[str, Key]:
         inverse = super().inverse
         assert len(inverse) == 0x7f
+        inverse[self.KEY_NON_US_UNSHIFTED] = self.unshifted[self.KEY_NON_US]
+        inverse[self.KEY_NON_US_SHIFTED] = self.shifted[self.KEY_NON_US]
         assert all(x.modifiers in {KeyModifiers.NONE, KeyModifiers.SHIFT,
                                    KeyModifiers.CTRL}
                    for x in inverse.values())
@@ -251,12 +267,13 @@ class KeyRemapping:
         raw = {source: self.target[key.modifiers][key.keycode].ascii
                for source, key in self.source.inverse.items()}
         # Eliminate any null mappings, mappings that attempt to remap
-        # the backspace key, or identity mappings
+        # the backspace key, or mappings that would become identity
+        # mappings after clearing the high bit
         table = {source: target for source, target in raw.items()
                  if target
                  and ord(source) != 0x7f
                  and ord(target) != 0x7f
-                 and ord(source) != ord(target)}
+                 and ord(source) & ~BiosKeyMapping.KEY_PSEUDO != ord(target)}
         # Recursively delete any mappings that would produce
         # unreachable alphanumerics (e.g. the "il" keymap, which maps
         # away the whole lower-case alphabet)
@@ -281,13 +298,17 @@ class KeyRemapping:
         """C variable name"""
         return re.sub(r'\W', '_', self.name) + "_mapping"
 
-    @staticmethod
-    def ascii_name(char: str) -> str:
+    @classmethod
+    def ascii_name(cls, char: str) -> str:
         """ASCII character name"""
         if char == '\\':
             name = "'\\\\'"
         elif char == '\'':
             name = "'\\\''"
+        elif ord(char) & BiosKeyMapping.KEY_PSEUDO:
+            name = "Pseudo-%s" % cls.ascii_name(
+                chr(ord(char) & ~BiosKeyMapping.KEY_PSEUDO)
+            )
         elif char.isprintable():
             name = "'%s'" % char
         elif ord(char) <= 0x1a:

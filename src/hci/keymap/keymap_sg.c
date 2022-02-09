@@ -38,4 +38,6 @@ struct key_mapping sg_mapping[] __keymap = {
 	{ 0x7a, 0x79 },	/* 'z' => 'y' */
 	{ 0x7c, 0x24 },	/* '|' => '$' */
 	{ 0x7d, 0x21 },	/* '}' => '!' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

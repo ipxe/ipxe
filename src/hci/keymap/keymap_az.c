@@ -21,4 +21,6 @@ struct key_mapping az_mapping[] __keymap = {
 	{ 0x40, 0x22 },	/* '@' => '"' */
 	{ 0x5e, 0x3a },	/* '^' => ':' */
 	{ 0x7c, 0x2f },	/* '|' => '/' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

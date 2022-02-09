@@ -28,4 +28,6 @@ struct key_mapping es_mapping[] __keymap = {
 	{ 0x5e, 0x26 },	/* '^' => '&' */
 	{ 0x5f, 0x3f },	/* '_' => '?' */
 	{ 0x7d, 0x2a },	/* '}' => '*' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 };

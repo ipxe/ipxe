@@ -68,6 +68,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define SCANCODE_RSHIFT		0x36
 
+/** Scancode for the "non-US \ and |" key
+ *
+ * This is the key that appears between Left Shift and Z on non-US
+ * keyboards.
+ */
+#define SCANCODE_NON_US		0x56
+
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_PCBIOS ) && CONSOLE_EXPLICIT ( CONSOLE_PCBIOS ) )
 #undef CONSOLE_PCBIOS
@@ -383,6 +390,8 @@ static int bios_getchar ( void ) {
 	if ( character && ( character < 0x80 ) ) {
 		if ( scancode < SCANCODE_RSHIFT ) {
 			return key_remap ( character );
+		} else if ( scancode == SCANCODE_NON_US ) {
+			return key_remap ( character | KEYMAP_PSEUDO );
 		} else {
 			return character;
 		}
