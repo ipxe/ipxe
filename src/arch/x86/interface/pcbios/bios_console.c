@@ -60,6 +60,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define ATTR_DEFAULT		ATTR_FCOL_WHITE
 
+/** Maximum keycode subject to remapping
+ *
+ * This allows us to avoid remapping the numeric keypad, which is
+ * necessary for keyboard layouts such as "fr" that swap the shifted
+ * and unshifted digit keys.
+ */
+#define SCANCODE_RSHIFT		0x36
+
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_PCBIOS ) && CONSOLE_EXPLICIT ( CONSOLE_PCBIOS ) )
 #undef CONSOLE_PCBIOS
@@ -346,6 +354,7 @@ static const char * bios_ansi_seq ( unsigned int scancode ) {
  */
 static int bios_getchar ( void ) {
 	uint16_t keypress;
+	unsigned int scancode;
 	unsigned int character;
 	const char *ansi_seq;
 
@@ -367,11 +376,17 @@ static int bios_getchar ( void ) {
 			       : "=a" ( keypress )
 			       : "a" ( 0x1000 ), "m" ( bios_inject_lock ) );
 	bios_inject_lock--;
+	scancode = ( keypress >> 8 );
 	character = ( keypress & 0xff );
 
-	/* If it's a normal character, just map and return it */
-	if ( character && ( character < 0x80 ) )
-		return key_remap ( character );
+	/* If it's a normal character, map (if applicable) and return it */
+	if ( character && ( character < 0x80 ) ) {
+		if ( scancode < SCANCODE_RSHIFT ) {
+			return key_remap ( character );
+		} else {
+			return character;
+		}
+	}
 
 	/* Otherwise, check for a special key that we know about */
 	if ( ( ansi_seq = bios_ansi_seq ( keypress >> 8 ) ) ) {
