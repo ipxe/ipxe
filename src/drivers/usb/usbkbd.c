@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/console.h>
 #include <ipxe/keys.h>
+#include <ipxe/keymap.h>
 #include <ipxe/usb.h>
 #include "usbkbd.h"
 
@@ -121,6 +122,10 @@ static unsigned int usbkbd_map ( unsigned int keycode, unsigned int modifiers,
 	} else {
 		key = 0;
 	}
+
+	/* Remap key if applicable */
+	if ( keycode < USBKBD_KEY_CAPS_LOCK )
+		key = key_remap ( key );
 
 	return key;
 }
