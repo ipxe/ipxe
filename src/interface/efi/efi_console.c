@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/Protocol/ConsoleControl/ConsoleControl.h>
 #include <ipxe/ansiesc.h>
 #include <ipxe/console.h>
+#include <ipxe/keymap.h>
 #include <ipxe/init.h>
 #include <config/console.h>
 
@@ -316,6 +317,13 @@ static int efi_getchar ( void ) {
 	       "scancode %04x\n", key.KeyState.KeyShiftState,
 	       key.KeyState.KeyToggleState, key.Key.UnicodeChar,
 	       key.Key.ScanCode );
+
+	/* Remap key.  There is unfortunately no way to avoid
+	 * remapping the numeric keypad, since EFI destroys the scan
+	 * code information that would allow us to differentiate
+	 * between main keyboard and numeric keypad.
+	 */
+	key.Key.UnicodeChar = key_remap ( key.Key.UnicodeChar );
 
 	/* Translate Ctrl-<key> */
 	if ( ( key.KeyState.KeyShiftState & EFI_SHIFT_STATE_VALID ) &&
