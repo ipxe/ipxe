@@ -58,4 +58,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define NAP_EFIARM
 #endif
 
+#if defined ( __aarch64__ )
+#define	IMAGE_GZIP		/* GZIP image support */
+#endif
+
 #endif /* CONFIG_DEFAULTS_EFI_H */
