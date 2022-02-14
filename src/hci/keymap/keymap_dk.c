@@ -33,8 +33,17 @@ static struct keymap_key dk_basic[] = {
 	{ 0, 0 }
 };
 
+/** "dk" AltGr remapping */
+static struct keymap_key dk_altgr[] = {
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x3d, 0x7c },	/* '=' => '|' */
+	{ 0x71, 0x40 },	/* 'q' => '@' */
+	{ 0, 0 }
+};
+
 /** "dk" keyboard map */
 struct keymap dk_keymap __keymap = {
 	.name = "dk",
 	.basic = dk_basic,
+	.altgr = dk_altgr,
 };

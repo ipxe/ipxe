@@ -15,8 +15,14 @@ static struct keymap_key lt_basic[] = {
 	{ 0, 0 }
 };
 
+/** "lt" AltGr remapping */
+static struct keymap_key lt_altgr[] = {
+	{ 0, 0 }
+};
+
 /** "lt" keyboard map */
 struct keymap lt_keymap __keymap = {
 	.name = "lt",
 	.basic = lt_basic,
+	.altgr = lt_altgr,
 };

@@ -35,8 +35,20 @@ static struct keymap_key it_basic[] = {
 	{ 0, 0 }
 };
 
+/** "it" AltGr remapping */
+static struct keymap_key it_altgr[] = {
+	{ 0x2d, 0x60 },	/* '-' => '`' */
+	{ 0x30, 0x7d },	/* '0' => '}' */
+	{ 0x39, 0x5d },	/* '9' => ']' */
+	{ 0x3b, 0x40 },	/* ';' => '@' */
+	{ 0x3d, 0x7e },	/* '=' => '~' */
+	{ 0x71, 0x40 },	/* 'q' => '@' */
+	{ 0, 0 }
+};
+
 /** "it" keyboard map */
 struct keymap it_keymap __keymap = {
 	.name = "it",
 	.basic = it_basic,
+	.altgr = it_altgr,
 };

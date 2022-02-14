@@ -37,8 +37,18 @@ static struct keymap_key no_latin1_basic[] = {
 	{ 0, 0 }
 };
 
+/** "no-latin1" AltGr remapping */
+static struct keymap_key no_latin1_altgr[] = {
+	{ 0x30, 0x7d },	/* '0' => '}' */
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x39, 0x5d },	/* '9' => ']' */
+	{ 0x5b, 0x7d },	/* '[' => '}' */
+	{ 0, 0 }
+};
+
 /** "no-latin1" keyboard map */
 struct keymap no_latin1_keymap __keymap = {
 	.name = "no-latin1",
 	.basic = no_latin1_basic,
+	.altgr = no_latin1_altgr,
 };

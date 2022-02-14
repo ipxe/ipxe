@@ -334,6 +334,9 @@ static int efi_getchar ( void ) {
 				       EFI_RIGHT_CONTROL_PRESSED ) ) {
 				character |= KEYMAP_CTRL;
 			}
+			if ( shift & EFI_RIGHT_ALT_PRESSED ) {
+				character |= KEYMAP_ALTGR;
+			}
 		}
 
 		/* Apply toggle state */

@@ -41,8 +41,19 @@ static struct keymap_key de_basic[] = {
 	{ 0, 0 }
 };
 
+/** "de" AltGr remapping */
+static struct keymap_key de_altgr[] = {
+	{ 0x2d, 0x5c },	/* '-' => '\\' */
+	{ 0x30, 0x7d },	/* '0' => '}' */
+	{ 0x39, 0x5d },	/* '9' => ']' */
+	{ 0x71, 0x40 },	/* 'q' => '@' */
+	{ 0xdc, 0x7c },	/* Pseudo-'\\' => '|' */
+	{ 0, 0 }
+};
+
 /** "de" keyboard map */
 struct keymap de_keymap __keymap = {
 	.name = "de",
 	.basic = de_basic,
+	.altgr = de_altgr,
 };

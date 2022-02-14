@@ -24,8 +24,17 @@ static struct keymap_key cf_basic[] = {
 	{ 0, 0 }
 };
 
+/** "cf" AltGr remapping */
+static struct keymap_key cf_altgr[] = {
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x3b, 0x7e },	/* ';' => '~' */
+	{ 0x60, 0x5c },	/* '`' => '\\' */
+	{ 0, 0 }
+};
+
 /** "cf" keyboard map */
 struct keymap cf_keymap __keymap = {
 	.name = "cf",
 	.basic = cf_basic,
+	.altgr = cf_altgr,
 };

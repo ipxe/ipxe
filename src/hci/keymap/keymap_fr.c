@@ -62,8 +62,20 @@ static struct keymap_key fr_basic[] = {
 	{ 0, 0 }
 };
 
+/** "fr" AltGr remapping */
+static struct keymap_key fr_altgr[] = {
+	{ 0x2d, 0x5d },	/* '-' => ']' */
+	{ 0x30, 0x40 },	/* '0' => '@' */
+	{ 0x33, 0x23 },	/* '3' => '#' */
+	{ 0x38, 0x5c },	/* '8' => '\\' */
+	{ 0x39, 0x5e },	/* '9' => '^' */
+	{ 0x61, 0x40 },	/* 'a' => '@' */
+	{ 0, 0 }
+};
+
 /** "fr" keyboard map */
 struct keymap fr_keymap __keymap = {
 	.name = "fr",
 	.basic = fr_basic,
+	.altgr = fr_altgr,
 };

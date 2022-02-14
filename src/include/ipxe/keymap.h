@@ -32,6 +32,8 @@ struct keymap {
 	const char *name;
 	/** Basic remapping table (zero-terminated) */
 	struct keymap_key *basic;
+	/** AltGr remapping table (zero-terminated) */
+	struct keymap_key *altgr;
 };
 
 /** Keyboard mapping table */
@@ -63,6 +65,9 @@ struct keymap {
 
 /** Undo and redo CapsLock key flags */
 #define KEYMAP_CAPSLOCK_REDO ( KEYMAP_CAPSLOCK | KEYMAP_CAPSLOCK_UNDO )
+
+/** AltGr key flag */
+#define KEYMAP_ALTGR 0x0800
 
 extern unsigned int key_remap ( unsigned int character );
 

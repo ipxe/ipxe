@@ -35,8 +35,25 @@ static struct keymap_key hu_basic[] = {
 	{ 0, 0 }
 };
 
+/** "hu" AltGr remapping */
+static struct keymap_key hu_altgr[] = {
+	{ 0x2e, 0x3e },	/* '.' => '>' */
+	{ 0x2f, 0x2a },	/* '/' => '*' */
+	{ 0x33, 0x5e },	/* '3' => '^' */
+	{ 0x37, 0x60 },	/* '7' => '`' */
+	{ 0x3b, 0x24 },	/* ';' => '$' */
+	{ 0x63, 0x26 },	/* 'c' => '&' */
+	{ 0x6d, 0x3c },	/* 'm' => '<' */
+	{ 0x76, 0x40 },	/* 'v' => '@' */
+	{ 0x78, 0x23 },	/* 'x' => '#' */
+	{ 0x7a, 0x3e },	/* 'z' => '>' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0, 0 }
+};
+
 /** "hu" keyboard map */
 struct keymap hu_keymap __keymap = {
 	.name = "hu",
 	.basic = hu_basic,
+	.altgr = hu_altgr,
 };

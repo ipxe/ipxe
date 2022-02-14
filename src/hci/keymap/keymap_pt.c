@@ -34,8 +34,18 @@ static struct keymap_key pt_basic[] = {
 	{ 0, 0 }
 };
 
+/** "pt" AltGr remapping */
+static struct keymap_key pt_altgr[] = {
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x37, 0x7b },	/* '7' => '{' */
+	{ 0x38, 0x5b },	/* '8' => '[' */
+	{ 0x71, 0x40 },	/* 'q' => '@' */
+	{ 0, 0 }
+};
+
 /** "pt" keyboard map */
 struct keymap pt_keymap __keymap = {
 	.name = "pt",
 	.basic = pt_basic,
+	.altgr = pt_altgr,
 };

@@ -18,8 +18,14 @@ static struct keymap_key ru_basic[] = {
 	{ 0, 0 }
 };
 
+/** "ru" AltGr remapping */
+static struct keymap_key ru_altgr[] = {
+	{ 0, 0 }
+};
+
 /** "ru" keyboard map */
 struct keymap ru_keymap __keymap = {
 	.name = "ru",
 	.basic = ru_basic,
+	.altgr = ru_altgr,
 };

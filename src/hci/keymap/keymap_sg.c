@@ -43,8 +43,18 @@ static struct keymap_key sg_basic[] = {
 	{ 0, 0 }
 };
 
+/** "sg" AltGr remapping */
+static struct keymap_key sg_altgr[] = {
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x33, 0x23 },	/* '3' => '#' */
+	{ 0x37, 0x7c },	/* '7' => '|' */
+	{ 0x5c, 0x7d },	/* '\\' => '}' */
+	{ 0, 0 }
+};
+
 /** "sg" keyboard map */
 struct keymap sg_keymap __keymap = {
 	.name = "sg",
 	.basic = sg_basic,
+	.altgr = sg_altgr,
 };

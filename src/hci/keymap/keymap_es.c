@@ -33,8 +33,19 @@ static struct keymap_key es_basic[] = {
 	{ 0, 0 }
 };
 
+/** "es" AltGr remapping */
+static struct keymap_key es_altgr[] = {
+	{ 0x30, 0x7d },	/* '0' => '}' */
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x39, 0x5d },	/* '9' => ']' */
+	{ 0x5c, 0x7d },	/* '\\' => '}' */
+	{ 0x71, 0x40 },	/* 'q' => '@' */
+	{ 0, 0 }
+};
+
 /** "es" keyboard map */
 struct keymap es_keymap __keymap = {
 	.name = "es",
 	.basic = es_basic,
+	.altgr = es_altgr,
 };
