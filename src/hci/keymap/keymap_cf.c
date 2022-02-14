@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "cf" keyboard mapping */
-struct key_mapping cf_mapping[] __keymap = {
+/** "cf" basic remapping */
+static struct keymap_key cf_basic[] = {
 	{ 0x23, 0x2f },	/* '#' => '/' */
 	{ 0x3c, 0x27 },	/* '<' => '\'' */
 	{ 0x3e, 0x2e },	/* '>' => '.' */
@@ -21,4 +21,11 @@ struct key_mapping cf_mapping[] __keymap = {
 	{ 0x60, 0x23 },	/* '`' => '#' */
 	{ 0x7c, 0x3e },	/* '|' => '>' */
 	{ 0x7e, 0x7c },	/* '~' => '|' */
+	{ 0, 0 }
+};
+
+/** "cf" keyboard map */
+struct keymap cf_keymap __keymap = {
+	.name = "cf",
+	.basic = cf_basic,
 };

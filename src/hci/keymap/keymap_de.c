@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "de" keyboard mapping */
-struct key_mapping de_mapping[] __keymap = {
+/** "de" basic remapping */
+static struct keymap_key de_basic[] = {
 	{ 0x19, 0x1a },	/* Ctrl-Y => Ctrl-Z */
 	{ 0x1a, 0x19 },	/* Ctrl-Z => Ctrl-Y */
 	{ 0x1c, 0x23 },	/* 0x1c => '#' */
@@ -38,4 +38,11 @@ struct key_mapping de_mapping[] __keymap = {
 	{ 0x7d, 0x2a },	/* '}' => '*' */
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "de" keyboard map */
+struct keymap de_keymap __keymap = {
+	.name = "de",
+	.basic = de_basic,
 };

@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "sg" keyboard mapping */
-struct key_mapping sg_mapping[] __keymap = {
+/** "sg" basic remapping */
+static struct keymap_key sg_basic[] = {
 	{ 0x19, 0x1a },	/* Ctrl-Y => Ctrl-Z */
 	{ 0x1a, 0x19 },	/* Ctrl-Z => Ctrl-Y */
 	{ 0x21, 0x2b },	/* '!' => '+' */
@@ -40,4 +40,11 @@ struct key_mapping sg_mapping[] __keymap = {
 	{ 0x7d, 0x21 },	/* '}' => '!' */
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "sg" keyboard map */
+struct keymap sg_keymap __keymap = {
+	.name = "sg",
+	.basic = sg_basic,
 };

@@ -10,6 +10,13 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "lt" keyboard mapping */
-struct key_mapping lt_mapping[] __keymap = {
+/** "lt" basic remapping */
+static struct keymap_key lt_basic[] = {
+	{ 0, 0 }
+};
+
+/** "lt" keyboard map */
+struct keymap lt_keymap __keymap = {
+	.name = "lt",
+	.basic = lt_basic,
 };

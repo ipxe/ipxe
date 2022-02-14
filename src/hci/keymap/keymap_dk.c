@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "dk" keyboard mapping */
-struct key_mapping dk_mapping[] __keymap = {
+/** "dk" basic remapping */
+static struct keymap_key dk_basic[] = {
 	{ 0x1c, 0x27 },	/* 0x1c => '\'' */
 	{ 0x1e, 0x36 },	/* 0x1e => '6' */
 	{ 0x26, 0x2f },	/* '&' => '/' */
@@ -30,4 +30,11 @@ struct key_mapping dk_mapping[] __keymap = {
 	{ 0x7c, 0x2a },	/* '|' => '*' */
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "dk" keyboard map */
+struct keymap dk_keymap __keymap = {
+	.name = "dk",
+	.basic = dk_basic,
 };

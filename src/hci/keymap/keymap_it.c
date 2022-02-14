@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "it" keyboard mapping */
-struct key_mapping it_mapping[] __keymap = {
+/** "it" basic remapping */
+static struct keymap_key it_basic[] = {
 	{ 0x1e, 0x36 },	/* 0x1e => '6' */
 	{ 0x26, 0x2f },	/* '&' => '/' */
 	{ 0x28, 0x29 },	/* '(' => ')' */
@@ -32,4 +32,11 @@ struct key_mapping it_mapping[] __keymap = {
 	{ 0x7e, 0x7c },	/* '~' => '|' */
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "it" keyboard map */
+struct keymap it_keymap __keymap = {
+	.name = "it",
+	.basic = it_basic,
 };

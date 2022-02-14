@@ -10,6 +10,13 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "us" keyboard mapping */
-struct key_mapping us_mapping[] __keymap = {
+/** "us" basic remapping */
+static struct keymap_key us_basic[] = {
+	{ 0, 0 }
+};
+
+/** "us" keyboard map */
+struct keymap us_keymap __keymap = {
+	.name = "us",
+	.basic = us_basic,
 };

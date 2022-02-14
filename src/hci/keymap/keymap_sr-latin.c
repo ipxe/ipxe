@@ -10,8 +10,15 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "sr-latin" keyboard mapping */
-struct key_mapping sr_latin_mapping[] __keymap = {
+/** "sr-latin" basic remapping */
+static struct keymap_key sr_latin_basic[] = {
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "sr-latin" keyboard map */
+struct keymap sr_latin_keymap __keymap = {
+	.name = "sr-latin",
+	.basic = sr_latin_basic,
 };
