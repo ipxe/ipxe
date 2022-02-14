@@ -42,26 +42,6 @@ usage: Used for triaging TCP/IP routing and general connectivity.
 */
 #define PING_CMD
 
-/*
-    802.3ad : LACP Version 4
-*/
-#ifdef ETH_SLOW_LACP_VERSION
-#undef ETH_SLOW_LACP_VERSION
-#define ETH_SLOW_LACP_VERSION 4
-#endif
-
-/* Enable Protocols:
-    - STP
-    - LACP Protocols
-   NOTE: These are enabled by default, these
- */
-#ifndef NET_PROTO_STP
-#define NET_PROTO_STP
-#endif
-#ifndef NET_PROTO_LACP
-#define NET_PROTO_LACP
-#endif
-
 // Iterate through unplugged links faster
 #ifdef LINK_WAIT_TIMEOUT
 #undef LINK_WAIT_TIMEOUT
