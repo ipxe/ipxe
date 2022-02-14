@@ -253,6 +253,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__table_entries; } )
 
 /**
+ * Declare start of linker table entries
+ *
+ * @v entries		Start of entries
+ * @v table		Linker table
+ * @v idx		Sub-table index
+ */
+#define __TABLE_ENTRIES( entries, table, idx )				\
+	__table_type ( table ) entries[0]				\
+		__table_entry ( table, idx )
+
+/**
  * Get start of linker table
  *
  * @v table		Linker table
@@ -271,6 +282,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define table_start( table ) __table_entries ( table, 00 )
 
 /**
+ * Declare start of linker table
+ *
+ * @v start		Start of linker table
+ * @v table		Linker table
+ */
+#define TABLE_START( start, table ) __TABLE_ENTRIES ( start, table, 00 )
+
+/**
  * Get end of linker table
  *
  * @v table		Linker table
@@ -287,6 +306,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @endcode
  */
 #define table_end( table ) __table_entries ( table, 99 )
+
+/**
+ * Declare end of linker table
+ *
+ * @v end		End of linker table
+ * @v table		Linker table
+ */
+#define TABLE_END( end, table ) __TABLE_ENTRIES ( end, table, 99 )
 
 /**
  * Get number of entries in linker table
