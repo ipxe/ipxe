@@ -20,8 +20,15 @@ static struct keymap_key mt_basic[] = {
 	{ 0, 0 }
 };
 
+/** "mt" AltGr remapping */
+static struct keymap_key mt_altgr[] = {
+	{ 0x2d, 0x5c },	/* '-' => '\\' */
+	{ 0, 0 }
+};
+
 /** "mt" keyboard map */
 struct keymap mt_keymap __keymap = {
 	.name = "mt",
 	.basic = mt_basic,
+	.altgr = mt_altgr,
 };

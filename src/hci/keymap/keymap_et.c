@@ -31,8 +31,18 @@ static struct keymap_key et_basic[] = {
 	{ 0, 0 }
 };
 
+/** "et" AltGr remapping */
+static struct keymap_key et_altgr[] = {
+	{ 0x27, 0x5e },	/* '\'' => '^' */
+	{ 0x2d, 0x5c },	/* '-' => '\\' */
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0xdc, 0x7c },	/* Pseudo-'\\' => '|' */
+	{ 0, 0 }
+};
+
 /** "et" keyboard map */
 struct keymap et_keymap __keymap = {
 	.name = "et",
 	.basic = et_basic,
+	.altgr = et_altgr,
 };

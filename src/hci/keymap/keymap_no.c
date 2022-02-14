@@ -35,8 +35,16 @@ static struct keymap_key no_basic[] = {
 	{ 0, 0 }
 };
 
+/** "no" AltGr remapping */
+static struct keymap_key no_altgr[] = {
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x71, 0x40 },	/* 'q' => '@' */
+	{ 0, 0 }
+};
+
 /** "no" keyboard map */
 struct keymap no_keymap __keymap = {
 	.name = "no",
 	.basic = no_basic,
+	.altgr = no_altgr,
 };

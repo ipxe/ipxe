@@ -17,8 +17,14 @@ static struct keymap_key sr_latin_basic[] = {
 	{ 0, 0 }
 };
 
+/** "sr-latin" AltGr remapping */
+static struct keymap_key sr_latin_altgr[] = {
+	{ 0, 0 }
+};
+
 /** "sr-latin" keyboard map */
 struct keymap sr_latin_keymap __keymap = {
 	.name = "sr-latin",
 	.basic = sr_latin_basic,
+	.altgr = sr_latin_altgr,
 };

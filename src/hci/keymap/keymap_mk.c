@@ -17,8 +17,14 @@ static struct keymap_key mk_basic[] = {
 	{ 0, 0 }
 };
 
+/** "mk" AltGr remapping */
+static struct keymap_key mk_altgr[] = {
+	{ 0, 0 }
+};
+
 /** "mk" keyboard map */
 struct keymap mk_keymap __keymap = {
 	.name = "mk",
 	.basic = mk_basic,
+	.altgr = mk_altgr,
 };

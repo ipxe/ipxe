@@ -362,6 +362,7 @@ static const char * bios_ansi_seq ( unsigned int scancode ) {
 static int bios_getchar ( void ) {
 	uint16_t keypress;
 	uint8_t kb0;
+	uint8_t kb2;
 	unsigned int scancode;
 	unsigned int character;
 	const char *ansi_seq;
@@ -387,6 +388,7 @@ static int bios_getchar ( void ) {
 	scancode = ( keypress >> 8 );
 	character = ( keypress & 0xff );
 	get_real ( kb0, BDA_SEG, BDA_KB0 );
+	get_real ( kb2, BDA_SEG, BDA_KB2 );
 
 	/* If it's a normal character, map (if applicable) and return it */
 	if ( character && ( character < 0x80 ) ) {
@@ -405,6 +407,16 @@ static int bios_getchar ( void ) {
 			character |= KEYMAP_CTRL;
 		if ( kb0 & BDA_KB0_CAPSLOCK )
 			character |= KEYMAP_CAPSLOCK_REDO;
+		if ( kb2 & BDA_KB2_RALT )
+			character |= KEYMAP_ALTGR;
+
+		/* Treat LShift+RShift as AltGr since many BIOSes will
+		 * not return ASCII characters when AltGr is pressed.
+		 */
+		if ( ( kb0 & ( BDA_KB0_LSHIFT | BDA_KB0_RSHIFT ) ) ==
+		     ( BDA_KB0_LSHIFT | BDA_KB0_RSHIFT ) ) {
+			character |= KEYMAP_ALTGR;
+		}
 
 		/* Map and return */
 		return key_remap ( character );

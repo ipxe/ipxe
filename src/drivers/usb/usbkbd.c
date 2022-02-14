@@ -132,6 +132,8 @@ static unsigned int usbkbd_map ( unsigned int keycode, unsigned int modifiers,
 		/* Apply modifiers */
 		if ( modifiers & USBKBD_CTRL )
 			key |= KEYMAP_CTRL;
+		if ( modifiers & USBKBD_ALT_RIGHT )
+			key |= KEYMAP_ALTGR;
 		if ( leds & USBKBD_LED_CAPS_LOCK )
 			key |= KEYMAP_CAPSLOCK;
 

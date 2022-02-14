@@ -35,8 +35,16 @@ static struct keymap_key al_basic[] = {
 	{ 0, 0 }
 };
 
+/** "al" AltGr remapping */
+static struct keymap_key al_altgr[] = {
+	{ 0x31, 0x7e },	/* '1' => '~' */
+	{ 0x37, 0x60 },	/* '7' => '`' */
+	{ 0, 0 }
+};
+
 /** "al" keyboard map */
 struct keymap al_keymap __keymap = {
 	.name = "al",
 	.basic = al_basic,
+	.altgr = al_altgr,
 };

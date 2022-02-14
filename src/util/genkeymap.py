@@ -171,6 +171,11 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
         """Basic shifted keyboard layout"""
         return self[KeyModifiers.SHIFT]
 
+    @property
+    def altgr(self):
+        """AltGr keyboard layout"""
+        return self.get(KeyModifiers.ALTGR, self.unshifted)
+
     @classmethod
     def load(cls, name: str) -> KeyLayout:
         """Load keymap using 'loadkeys -b'"""
@@ -278,6 +283,7 @@ class KeymapKeys(UserDict[str, str]):
                 self.ascii_name(source), self.ascii_name(target)
             )
             for source, target in self.items()
+            if ord(source) & ~BiosKeyLayout.KEY_PSEUDO != ord(target)
         ) + '\t{ 0, 0 }\n}'
 
 
@@ -301,13 +307,12 @@ class Keymap:
         raw = {source: self.target[key.modifiers][key.keycode].ascii
                for source, key in self.source.inverse.items()}
         # Eliminate any null mappings, mappings that attempt to remap
-        # the backspace key, or mappings that would become identity
-        # mappings after clearing the high bit
+        # the backspace key, or identity mappings
         table = {source: target for source, target in raw.items()
                  if target
                  and ord(source) != 0x7f
                  and ord(target) != 0x7f
-                 and ord(source) & ~BiosKeyLayout.KEY_PSEUDO != ord(target)}
+                 and source != target}
         # Recursively delete any mappings that would produce
         # unreachable alphanumerics (e.g. the "il" keymap, which maps
         # away the whole lower-case alphabet)
@@ -327,6 +332,28 @@ class Keymap:
                              (unshifted, shifted))
         return KeymapKeys(dict(sorted(table.items())))
 
+    @property
+    def altgr(self) -> KeymapKeys:
+        """AltGr remapping table"""
+        # Construct raw mapping from source ASCII to target ASCII
+        raw = {source: self.target.altgr[key.keycode].ascii
+               for source, key in self.source.inverse.items()
+               if key.modifiers == KeyModifiers.NONE}
+        # Identify printable keys that are unreachable via the basic map
+        basic = self.basic
+        unmapped = set(x for x in basic.keys()
+                       if x.isascii() and x.isprintable())
+        remapped = set(basic.values())
+        unreachable = unmapped - remapped
+        # Eliminate any null mappings, mappings for unprintable
+        # characters, or mappings for characters that are reachable
+        # via the basic map
+        table = {source: target for source, target in raw.items()
+                 if source.isprintable()
+                 and target
+                 and target in unreachable}
+        return KeymapKeys(dict(sorted(table.items())))
+
     def cname(self, suffix: str) -> str:
         """C variable name"""
         return re.sub(r'\W', '_', (self.name + '_' + suffix))
@@ -336,6 +363,7 @@ class Keymap:
         """Generated source code"""
         keymap_name = self.cname("keymap")
         basic_name = self.cname("basic")
+        altgr_name = self.cname("altgr")
         code = textwrap.dedent(f"""
         /** @file
          *
@@ -352,12 +380,16 @@ class Keymap:
         /** "{self.name}" basic remapping */
         static struct keymap_key {basic_name}[] = %s;
 
+        /** "{self.name}" AltGr remapping */
+        static struct keymap_key {altgr_name}[] = %s;
+
         /** "{self.name}" keyboard map */
         struct keymap {keymap_name} __keymap = {{
         \t.name = "{self.name}",
         \t.basic = {basic_name},
+        \t.altgr = {altgr_name},
         }};
-        """).strip() % self.basic.code
+        """).strip() % (self.basic.code, self.altgr.code)
         return code
 
 

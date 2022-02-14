@@ -65,8 +65,11 @@ unsigned int key_remap ( unsigned int character ) {
 	if ( ( character & KEYMAP_CAPSLOCK_UNDO ) && isalpha ( mapped ) )
 		mapped ^= CASE_TOGGLE;
 
+	/* Select remapping table */
+	key = ( ( character & KEYMAP_ALTGR ) ? keymap->altgr : keymap->basic );
+
 	/* Remap via table */
-	for ( key = keymap->basic ; key->from ; key++ ) {
+	for ( ; key->from ; key++ ) {
 		if ( mapped == key->from ) {
 			mapped = key->to;
 			break;

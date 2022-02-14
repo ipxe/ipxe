@@ -26,8 +26,15 @@ static struct keymap_key az_basic[] = {
 	{ 0, 0 }
 };
 
+/** "az" AltGr remapping */
+static struct keymap_key az_altgr[] = {
+	{ 0xdc, 0x7c },	/* Pseudo-'\\' => '|' */
+	{ 0, 0 }
+};
+
 /** "az" keyboard map */
 struct keymap az_keymap __keymap = {
 	.name = "az",
 	.basic = az_basic,
+	.altgr = az_altgr,
 };

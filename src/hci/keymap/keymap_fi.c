@@ -31,8 +31,17 @@ static struct keymap_key fi_basic[] = {
 	{ 0, 0 }
 };
 
+/** "fi" AltGr remapping */
+static struct keymap_key fi_altgr[] = {
+	{ 0x2d, 0x5c },	/* '-' => '\\' */
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0xdc, 0x7c },	/* Pseudo-'\\' => '|' */
+	{ 0, 0 }
+};
+
 /** "fi" keyboard map */
 struct keymap fi_keymap __keymap = {
 	.name = "fi",
 	.basic = fi_basic,
+	.altgr = fi_altgr,
 };

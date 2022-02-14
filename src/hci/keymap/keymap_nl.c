@@ -38,8 +38,16 @@ static struct keymap_key nl_basic[] = {
 	{ 0, 0 }
 };
 
+/** "nl" AltGr remapping */
+static struct keymap_key nl_altgr[] = {
+	{ 0x2d, 0x5c },	/* '-' => '\\' */
+	{ 0x39, 0x7d },	/* '9' => '}' */
+	{ 0, 0 }
+};
+
 /** "nl" keyboard map */
 struct keymap nl_keymap __keymap = {
 	.name = "nl",
 	.basic = nl_basic,
+	.altgr = nl_altgr,
 };

@@ -29,8 +29,14 @@ static struct keymap_key il_basic[] = {
 	{ 0, 0 }
 };
 
+/** "il" AltGr remapping */
+static struct keymap_key il_altgr[] = {
+	{ 0, 0 }
+};
+
 /** "il" keyboard map */
 struct keymap il_keymap __keymap = {
 	.name = "il",
 	.basic = il_basic,
+	.altgr = il_altgr,
 };
