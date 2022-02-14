@@ -23,6 +23,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <ctype.h>
+#include <ipxe/keys.h>
 #include <ipxe/keymap.h>
 
 /** @file
@@ -30,6 +32,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Keyboard mappings
  *
  */
+
+/** ASCII character mask */
+#define ASCII_MASK 0x7f
+
+/** Control character mask */
+#define CTRL_MASK 0x1f
+
+/** Upper case character mask */
+#define UPPER_MASK 0x5f
+
+/** Case toggle bit */
+#define CASE_TOGGLE ( ASCII_MASK & ~UPPER_MASK )
 
 /** Default keyboard mapping */
 static TABLE_START ( keymap_start, KEYMAP );
@@ -41,21 +55,36 @@ static struct keymap *keymap = keymap_start;
  * Remap a key
  *
  * @v character		Character read from console
- * @ret character	Mapped character
+ * @ret mapped		Mapped character
  */
 unsigned int key_remap ( unsigned int character ) {
+	unsigned int mapped = ( character & KEYMAP_MASK );
 	struct keymap_key *key;
+
+	/* Invert case before remapping if applicable */
+	if ( ( character & KEYMAP_CAPSLOCK_UNDO ) && isalpha ( mapped ) )
+		mapped ^= CASE_TOGGLE;
 
 	/* Remap via table */
 	for ( key = keymap->basic ; key->from ; key++ ) {
-		if ( key->from == character ) {
-			character = key->to;
+		if ( mapped == key->from ) {
+			mapped = key->to;
 			break;
 		}
 	}
 
-	/* Clear pseudo key flag */
-	character &= ~KEYMAP_PSEUDO;
+	/* Handle Ctrl-<key> and CapsLock */
+	if ( isalpha ( mapped ) ) {
+		if ( character & KEYMAP_CTRL ) {
+			mapped &= CTRL_MASK;
+		} else if ( character & KEYMAP_CAPSLOCK ) {
+			mapped ^= CASE_TOGGLE;
+		}
+	}
 
-	return character;
+	/* Clear flags */
+	mapped &= ASCII_MASK;
+
+	DBGC2 ( &keymap, "KEYMAP mapped %04x => %02x\n", character, mapped );
+	return mapped;
 }
