@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "no-latin1" keyboard mapping */
-struct key_mapping no_latin1_mapping[] __keymap = {
+/** "no-latin1" basic remapping */
+static struct keymap_key no_latin1_basic[] = {
 	{ 0x1d, 0x1e },	/* 0x1d => 0x1e */
 	{ 0x26, 0x2f },	/* '&' => '/' */
 	{ 0x28, 0x29 },	/* '(' => ')' */
@@ -34,4 +34,11 @@ struct key_mapping no_latin1_mapping[] __keymap = {
 	{ 0x7d, 0x5e },	/* '}' => '^' */
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "no-latin1" keyboard map */
+struct keymap no_latin1_keymap __keymap = {
+	.name = "no-latin1",
+	.basic = no_latin1_basic,
 };

@@ -31,6 +31,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+/** Default keyboard mapping */
+static TABLE_START ( keymap_start, KEYMAP );
+
+/** Current keyboard mapping */
+static struct keymap *keymap = keymap_start;
+
 /**
  * Remap a key
  *
@@ -38,12 +44,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret character	Mapped character
  */
 unsigned int key_remap ( unsigned int character ) {
-	struct key_mapping *mapping;
+	struct keymap_key *key;
 
 	/* Remap via table */
-	for_each_table_entry ( mapping, KEYMAP ) {
-		if ( mapping->from == character ) {
-			character = mapping->to;
+	for ( key = keymap->basic ; key->from ; key++ ) {
+		if ( key->from == character ) {
+			character = key->to;
 			break;
 		}
 	}

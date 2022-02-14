@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "fr" keyboard mapping */
-struct key_mapping fr_mapping[] __keymap = {
+/** "fr" basic remapping */
+static struct keymap_key fr_basic[] = {
 	{ 0x01, 0x11 },	/* Ctrl-A => Ctrl-Q */
 	{ 0x11, 0x01 },	/* Ctrl-Q => Ctrl-A */
 	{ 0x17, 0x1a },	/* Ctrl-W => Ctrl-Z */
@@ -59,4 +59,11 @@ struct key_mapping fr_mapping[] __keymap = {
 	{ 0x7a, 0x77 },	/* 'z' => 'w' */
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "fr" keyboard map */
+struct keymap fr_keymap __keymap = {
+	.name = "fr",
+	.basic = fr_basic,
 };

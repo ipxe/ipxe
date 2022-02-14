@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "cz" keyboard mapping */
-struct key_mapping cz_mapping[] __keymap = {
+/** "cz" basic remapping */
+static struct keymap_key cz_basic[] = {
 	{ 0x19, 0x1a },	/* Ctrl-Y => Ctrl-Z */
 	{ 0x1a, 0x19 },	/* Ctrl-Z => Ctrl-Y */
 	{ 0x1f, 0x1c },	/* 0x1f => 0x1c */
@@ -43,4 +43,11 @@ struct key_mapping cz_mapping[] __keymap = {
 	{ 0x7b, 0x2f },	/* '{' => '/' */
 	{ 0x7c, 0x27 },	/* '|' => '\'' */
 	{ 0x7d, 0x28 },	/* '}' => '(' */
+	{ 0, 0 }
+};
+
+/** "cz" keyboard map */
+struct keymap cz_keymap __keymap = {
+	.name = "cz",
+	.basic = cz_basic,
 };

@@ -10,8 +10,8 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "nl" keyboard mapping */
-struct key_mapping nl_mapping[] __keymap = {
+/** "nl" basic remapping */
+static struct keymap_key nl_basic[] = {
 	{ 0x1c, 0x3c },	/* 0x1c => '<' */
 	{ 0x1d, 0x1c },	/* 0x1d => 0x1c */
 	{ 0x1e, 0x36 },	/* 0x1e => '6' */
@@ -35,4 +35,11 @@ struct key_mapping nl_mapping[] __keymap = {
 	{ 0x7d, 0x7c },	/* '}' => '|' */
 	{ 0xdc, 0x5d },	/* Pseudo-'\\' => ']' */
 	{ 0xfc, 0x5b },	/* Pseudo-'|' => '[' */
+	{ 0, 0 }
+};
+
+/** "nl" keyboard map */
+struct keymap nl_keymap __keymap = {
+	.name = "nl",
+	.basic = nl_basic,
 };
