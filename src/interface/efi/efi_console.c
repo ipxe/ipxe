@@ -55,8 +55,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define ATTR_DEFAULT		ATTR_FCOL_WHITE
 
-#define CTRL_MASK		0x1f
-
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_EFI ) && CONSOLE_EXPLICIT ( CONSOLE_EFI ) )
 #undef CONSOLE_EFI
@@ -286,6 +284,9 @@ static int efi_getchar ( void ) {
 	EFI_SIMPLE_TEXT_INPUT_PROTOCOL *conin = efi_systab->ConIn;
 	EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *conin_ex = efi_conin_ex;
 	const char *ansi_seq;
+	unsigned int character;
+	unsigned int shift;
+	unsigned int toggle;
 	EFI_KEY_DATA key;
 	EFI_STATUS efirc;
 	int rc;
@@ -318,23 +319,34 @@ static int efi_getchar ( void ) {
 	       key.KeyState.KeyToggleState, key.Key.UnicodeChar,
 	       key.Key.ScanCode );
 
-	/* Remap key.  There is unfortunately no way to avoid
-	 * remapping the numeric keypad, since EFI destroys the scan
-	 * code information that would allow us to differentiate
-	 * between main keyboard and numeric keypad.
+	/* If key has a Unicode representation, remap and return it.
+	 * There is unfortunately no way to avoid remapping the
+	 * numeric keypad, since EFI destroys the scan code
+	 * information that would allow us to differentiate between
+	 * main keyboard and numeric keypad.
 	 */
-	key.Key.UnicodeChar = key_remap ( key.Key.UnicodeChar );
+	if ( ( character = key.Key.UnicodeChar ) != 0 ) {
 
-	/* Translate Ctrl-<key> */
-	if ( ( key.KeyState.KeyShiftState & EFI_SHIFT_STATE_VALID ) &&
-	     ( key.KeyState.KeyShiftState & ( EFI_LEFT_CONTROL_PRESSED |
-					      EFI_RIGHT_CONTROL_PRESSED ) ) ) {
-		key.Key.UnicodeChar &= CTRL_MASK;
+		/* Apply shift state */
+		shift = key.KeyState.KeyShiftState;
+		if ( shift & EFI_SHIFT_STATE_VALID ) {
+			if ( shift & ( EFI_LEFT_CONTROL_PRESSED |
+				       EFI_RIGHT_CONTROL_PRESSED ) ) {
+				character |= KEYMAP_CTRL;
+			}
+		}
+
+		/* Apply toggle state */
+		toggle = key.KeyState.KeyToggleState;
+		if ( toggle & EFI_TOGGLE_STATE_VALID ) {
+			if ( toggle & EFI_CAPS_LOCK_ACTIVE ) {
+				character |= KEYMAP_CAPSLOCK_REDO;
+			}
+		}
+
+		/* Remap and return key */
+		return key_remap ( character );
 	}
-
-	/* If key has a Unicode representation, return it */
-	if ( key.Key.UnicodeChar )
-		return key.Key.UnicodeChar;
 
 	/* Otherwise, check for a special key that we know about */
 	if ( ( ansi_seq = scancode_to_ansi_seq ( key.Key.ScanCode ) ) ) {

@@ -71,6 +71,9 @@ static unsigned int usbkbd_map ( unsigned int keycode, unsigned int modifiers,
 	} else if ( keycode <= USBKBD_KEY_Z ) {
 		/* Alphabetic keys */
 		key = ( keycode - USBKBD_KEY_A + 'a' );
+		if ( modifiers & USBKBD_SHIFT ) {
+			key -= ( 'a' - 'A' );
+		}
 	} else if ( keycode <= USBKBD_KEY_0 ) {
 		/* Numeric key row */
 		if ( modifiers & USBKBD_SHIFT ) {
@@ -125,17 +128,15 @@ static unsigned int usbkbd_map ( unsigned int keycode, unsigned int modifiers,
 	/* Remap key if applicable */
 	if ( ( keycode < USBKBD_KEY_CAPS_LOCK ) ||
 	     ( keycode == USBKBD_KEY_NON_US ) ) {
-		key = key_remap ( key );
-	}
 
-	/* Handle upper/lower case and Ctrl-<key> */
-	if ( islower ( key ) ) {
-		if ( modifiers & USBKBD_CTRL ) {
-			key -= ( 'a' - CTRL_A );
-		} else if ( ( modifiers & USBKBD_SHIFT ) ||
-			    ( leds & USBKBD_LED_CAPS_LOCK ) ) {
-			key -= ( 'a' - 'A' );
-		}
+		/* Apply modifiers */
+		if ( modifiers & USBKBD_CTRL )
+			key |= KEYMAP_CTRL;
+		if ( leds & USBKBD_LED_CAPS_LOCK )
+			key |= KEYMAP_CAPSLOCK;
+
+		/* Remap key */
+		key = key_remap ( key );
 	}
 
 	return key;

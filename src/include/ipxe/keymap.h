@@ -40,8 +40,29 @@ struct keymap {
 /** Define a keyboard mapping */
 #define __keymap __table_entry ( KEYMAP, 01 )
 
+/** Mappable character mask */
+#define KEYMAP_MASK 0xff
+
 /** Pseudo key flag */
 #define KEYMAP_PSEUDO 0x80
+
+/** Ctrl key flag */
+#define KEYMAP_CTRL 0x0100
+
+/** CapsLock key flag */
+#define KEYMAP_CAPSLOCK 0x0200
+
+/** Undo CapsLock key flag
+ *
+ * Used when the keyboard driver has already interpreted the CapsLock
+ * key, in which case the effect needs to be undone before remapping
+ * in order to correctly handle keyboard mappings that swap alphabetic
+ * and non-alphabetic keys.
+ */
+#define KEYMAP_CAPSLOCK_UNDO 0x0400
+
+/** Undo and redo CapsLock key flags */
+#define KEYMAP_CAPSLOCK_REDO ( KEYMAP_CAPSLOCK | KEYMAP_CAPSLOCK_UNDO )
 
 extern unsigned int key_remap ( unsigned int character );
 
