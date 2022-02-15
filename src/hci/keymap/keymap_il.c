@@ -31,6 +31,7 @@ static struct keymap_key il_basic[] = {
 
 /** "il" AltGr remapping */
 static struct keymap_key il_altgr[] = {
+	{ 0x5c, 0x60 },	/* '\\' => '`' */
 	{ 0, 0 }
 };
 
