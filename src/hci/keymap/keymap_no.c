@@ -18,6 +18,7 @@ static struct keymap_key no_basic[] = {
 	{ 0x28, 0x29 },	/* '(' => ')' */
 	{ 0x29, 0x3d },	/* ')' => '=' */
 	{ 0x2a, 0x28 },	/* '*' => '(' */
+	{ 0x2b, 0x60 },	/* '+' => '`' */
 	{ 0x2d, 0x2b },	/* '-' => '+' */
 	{ 0x2f, 0x2d },	/* '/' => '-' */
 	{ 0x3c, 0x3b },	/* '<' => ';' */
@@ -30,6 +31,7 @@ static struct keymap_key no_basic[] = {
 	{ 0x5f, 0x3f },	/* '_' => '?' */
 	{ 0x60, 0x7c },	/* '`' => '|' */
 	{ 0x7c, 0x2a },	/* '|' => '*' */
+	{ 0x7d, 0x5e },	/* '}' => '^' */
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
 	{ 0, 0 }
@@ -37,6 +39,7 @@ static struct keymap_key no_basic[] = {
 
 /** "no" AltGr remapping */
 static struct keymap_key no_altgr[] = {
+	{ 0x30, 0x7d },	/* '0' => '}' */
 	{ 0x32, 0x40 },	/* '2' => '@' */
 	{ 0x71, 0x40 },	/* 'q' => '@' */
 	{ 0, 0 }

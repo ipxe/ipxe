@@ -39,6 +39,7 @@ static struct keymap_key hu_basic[] = {
 static struct keymap_key hu_altgr[] = {
 	{ 0x2e, 0x3e },	/* '.' => '>' */
 	{ 0x2f, 0x2a },	/* '/' => '*' */
+	{ 0x32, 0x5e },	/* '2' => '^' */
 	{ 0x33, 0x5e },	/* '3' => '^' */
 	{ 0x37, 0x60 },	/* '7' => '`' */
 	{ 0x3b, 0x24 },	/* ';' => '$' */
