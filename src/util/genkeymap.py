@@ -182,6 +182,11 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
             KeyModifiers.ALTGR: [(0x28, ord('\'')), (0x2b, ord('`')),
                                  (0x35, ord('/'))],
         },
+        'mt': {
+            # Redefine erroneous key 86 as generating "\\|"
+            KeyModifiers.NONE: [(KEY_NON_US, ord('\\'))],
+            KeyModifiers.SHIFT: [(KEY_NON_US, ord('|'))],
+        },
     }
     """Fixups for erroneous keymappings produced by 'loadkeys -b'"""
 
