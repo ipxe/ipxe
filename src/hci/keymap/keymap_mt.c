@@ -22,7 +22,6 @@ static struct keymap_key mt_basic[] = {
 
 /** "mt" AltGr remapping */
 static struct keymap_key mt_altgr[] = {
-	{ 0x2d, 0x5c },	/* '-' => '\\' */
 	{ 0, 0 }
 };
 
