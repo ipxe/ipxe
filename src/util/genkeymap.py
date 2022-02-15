@@ -381,6 +381,12 @@ class Keymap:
                  if source.isprintable()
                  and target
                  and target in unreachable}
+        # Check that all characters are now reachable
+        unreachable -= set(table.values())
+        if unreachable:
+            raise ValueError("Unreachable characters: %s" % ', '.join(
+                KeymapKeys.ascii_name(x) for x in sorted(unreachable)
+            ))
         return KeymapKeys(dict(sorted(table.items())))
 
     def cname(self, suffix: str) -> str:
