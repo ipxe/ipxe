@@ -338,9 +338,12 @@ int image_exec ( struct image *image ) {
 	/* Sanity check */
 	assert ( image->flags & IMAGE_REGISTERED );
 
-	/* Switch current working directory to be that of the image itself */
+	/* Switch current working directory to be that of the image
+	 * itself, if applicable
+	 */
 	old_cwuri = uri_get ( cwuri );
-	churi ( image->uri );
+	if ( image->uri )
+		churi ( image->uri );
 
 	/* Preserve record of any currently-running image */
 	saved_current_image = current_image;
