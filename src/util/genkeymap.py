@@ -176,6 +176,12 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
             # Treat Ctrl-Backspace as producing Backspace rather than Ctrl-H
             KeyModifiers.CTRL: [(KEY_BACKSPACE, 0x7f)],
         },
+        'il': {
+            # Redefine some otherwise unreachable ASCII characters
+            # using the closest available approximation
+            KeyModifiers.ALTGR: [(0x28, ord('\'')), (0x2b, ord('`')),
+                                 (0x35, ord('/'))],
+        },
     }
     """Fixups for erroneous keymappings produced by 'loadkeys -b'"""
 
