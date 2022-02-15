@@ -1563,7 +1563,7 @@ endif # defined(BIN)
 #
 
 hci/keymap/keymap_%.c :
-	$(Q)$(PERL) $(GENKEYMAP) $* > $@
+	$(Q)$(PYTHON) $(GENKEYMAP) $* > $@
 
 ###############################################################################
 #

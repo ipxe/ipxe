@@ -24,6 +24,7 @@ CP		:= cp
 ECHO		:= echo
 PRINTF		:= printf
 PERL		:= perl
+PYTHON		:= python
 TRUE		:= true
 CC		:= $(CROSS_COMPILE)gcc
 CPP		:= $(CC) -E
