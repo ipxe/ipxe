@@ -39,10 +39,15 @@ static struct keymap_key no_latin1_basic[] = {
 
 /** "no-latin1" AltGr remapping */
 static struct keymap_key no_latin1_altgr[] = {
+	{ 0x22, 0x5b },	/* '"' => '[' */
+	{ 0x27, 0x7b },	/* '\'' => '{' */
 	{ 0x30, 0x7d },	/* '0' => '}' */
 	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x37, 0x7b },	/* '7' => '{' */
+	{ 0x38, 0x5b },	/* '8' => '[' */
 	{ 0x39, 0x5d },	/* '9' => ']' */
 	{ 0x5b, 0x7d },	/* '[' => '}' */
+	{ 0x7b, 0x5d },	/* '{' => ']' */
 	{ 0, 0 }
 };
 

@@ -33,6 +33,10 @@ import textwrap
 from typing import ClassVar, Optional
 
 
+BACKSPACE = chr(0x7f)
+"""Backspace character"""
+
+
 class KeyType(IntEnum):
     """Key types"""
 
@@ -174,7 +178,7 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
             KeyModifiers.NONE: [(KEY_NON_US, ord('\\'))],
             KeyModifiers.SHIFT: [(KEY_NON_US, ord('|'))],
             # Treat Ctrl-Backspace as producing Backspace rather than Ctrl-H
-            KeyModifiers.CTRL: [(KEY_BACKSPACE, 0x7f)],
+            KeyModifiers.CTRL: [(KEY_BACKSPACE, ord(BACKSPACE))],
         },
         'il': {
             # Redefine some otherwise unreachable ASCII characters
@@ -199,11 +203,6 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
     def shifted(self):
         """Basic shifted keyboard layout"""
         return self[KeyModifiers.SHIFT]
-
-    @property
-    def altgr(self):
-        """AltGr keyboard layout"""
-        return self.get(KeyModifiers.ALTGR, self.unshifted)
 
     @classmethod
     def load(cls, name: str) -> KeyLayout:
@@ -281,7 +280,7 @@ class BiosKeyLayout(KeyLayout):
         return inverse
 
 
-class KeymapKeys(UserDict[str, str]):
+class KeymapKeys(UserDict[str, Optional[str]]):
     """An ASCII character remapping"""
 
     @classmethod
@@ -312,7 +311,8 @@ class KeymapKeys(UserDict[str, str]):
                 self.ascii_name(source), self.ascii_name(target)
             )
             for source, target in self.items()
-            if ord(source) & ~BiosKeyLayout.KEY_PSEUDO != ord(target)
+            if target
+            and ord(source) & ~BiosKeyLayout.KEY_PSEUDO != ord(target)
         ) + '\t{ 0, 0 }\n}'
 
 
@@ -335,13 +335,12 @@ class Keymap:
         # Construct raw mapping from source ASCII to target ASCII
         raw = {source: self.target[key.modifiers][key.keycode].ascii
                for source, key in self.source.inverse.items()}
-        # Eliminate any null mappings, mappings that attempt to remap
-        # the backspace key, or identity mappings
+        # Eliminate any identity mappings, or mappings that attempt to
+        # remap the backspace key
         table = {source: target for source, target in raw.items()
-                 if target
-                 and ord(source) != 0x7f
-                 and ord(target) != 0x7f
-                 and source != target}
+                 if source != target
+                 and source != BACKSPACE
+                 and target != BACKSPACE}
         # Recursively delete any mappings that would produce
         # unreachable alphanumerics (e.g. the "il" keymap, which maps
         # away the whole lower-case alphabet)
@@ -354,8 +353,8 @@ class Keymap:
         # Sanity check: ensure that all numerics are reachable using
         # the same shift state
         digits = '1234567890'
-        unshifted = ''.join(table.get(x, x) for x in '1234567890')
-        shifted = ''.join(table.get(x, x) for x in '!@#$%^&*()')
+        unshifted = ''.join(table.get(x) or x for x in '1234567890')
+        shifted = ''.join(table.get(x) or x for x in '!@#$%^&*()')
         if digits not in (shifted, unshifted):
             raise ValueError("Inconsistent numeric remapping %s / %s" %
                              (unshifted, shifted))
@@ -365,21 +364,22 @@ class Keymap:
     def altgr(self) -> KeymapKeys:
         """AltGr remapping table"""
         # Construct raw mapping from source ASCII to target ASCII
-        raw = {source: self.target.altgr[key.keycode].ascii
-               for source, key in self.source.inverse.items()
-               if key.modifiers == KeyModifiers.NONE}
+        raw = {
+            source:
+            self.target.get((key.modifiers | KeyModifiers.ALTGR),
+                            self.target[key.modifiers])[key.keycode].ascii
+            for source, key in self.source.inverse.items()
+        }
         # Identify printable keys that are unreachable via the basic map
         basic = self.basic
         unmapped = set(x for x in basic.keys()
                        if x.isascii() and x.isprintable())
         remapped = set(basic.values())
         unreachable = unmapped - remapped
-        # Eliminate any null mappings, mappings for unprintable
-        # characters, or mappings for characters that are reachable
-        # via the basic map
+        # Eliminate any mappings for unprintable characters, or
+        # mappings for characters that are reachable via the basic map
         table = {source: target for source, target in raw.items()
                  if source.isprintable()
-                 and target
                  and target in unreachable}
         # Check that all characters are now reachable
         unreachable -= set(table.values())
