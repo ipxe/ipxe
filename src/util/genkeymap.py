@@ -54,6 +54,14 @@ class KeyType(IntEnum):
     UNKNOWN = 0xf0
 
 
+class DeadKey(IntEnum):
+    """Dead keys"""
+
+    GRAVE = 0
+    CIRCUMFLEX = 2
+    TILDE = 3
+
+
 class KeyModifiers(Flag):
     """Key modifiers"""
 
@@ -96,6 +104,13 @@ class Key:
                                            KeyType.LETTER}
     """Key types with direct ASCII values"""
 
+    DEAD_KEYS: ClassVar[Mapping[int, str]] = {
+        DeadKey.GRAVE: '`',
+        DeadKey.CIRCUMFLEX: '^',
+        DeadKey.TILDE: '~',
+    }
+    """Dead key replacement ASCII values"""
+
     @property
     def keytype(self) -> Optional[KeyType]:
         """Key type"""
@@ -112,11 +127,14 @@ class Key:
     @property
     def ascii(self) -> Optional[str]:
         """ASCII character"""
-        if self.keytype in self.ASCII_TYPES:
-            value = self.value
+        keytype = self.keytype
+        value = self.value
+        if keytype in self.ASCII_TYPES:
             char = chr(value)
             if value and char.isascii():
                 return char
+        if keytype == KeyType.DEAD:
+            return self.DEAD_KEYS.get(value)
         return None
 
 

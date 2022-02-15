@@ -12,6 +12,7 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 /** "pt" basic remapping */
 static struct keymap_key pt_basic[] = {
+	{ 0x1c, 0x7e },	/* 0x1c => '~' */
 	{ 0x1e, 0x36 },	/* 0x1e => '6' */
 	{ 0x26, 0x2f },	/* '&' => '/' */
 	{ 0x28, 0x29 },	/* '(' => ')' */
@@ -24,10 +25,13 @@ static struct keymap_key pt_basic[] = {
 	{ 0x3f, 0x5f },	/* '?' => '_' */
 	{ 0x40, 0x22 },	/* '@' => '"' */
 	{ 0x5b, 0x2b },	/* '[' => '+' */
+	{ 0x5c, 0x7e },	/* '\\' => '~' */
 	{ 0x5e, 0x26 },	/* '^' => '&' */
 	{ 0x5f, 0x3f },	/* '_' => '?' */
 	{ 0x60, 0x5c },	/* '`' => '\\' */
 	{ 0x7b, 0x2a },	/* '{' => '*' */
+	{ 0x7c, 0x5e },	/* '|' => '^' */
+	{ 0x7d, 0x60 },	/* '}' => '`' */
 	{ 0x7e, 0x7c },	/* '~' => '|' */
 	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
 	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
@@ -36,6 +40,7 @@ static struct keymap_key pt_basic[] = {
 
 /** "pt" AltGr remapping */
 static struct keymap_key pt_altgr[] = {
+	{ 0x30, 0x7d },	/* '0' => '}' */
 	{ 0x32, 0x40 },	/* '2' => '@' */
 	{ 0x37, 0x7b },	/* '7' => '{' */
 	{ 0x38, 0x5b },	/* '8' => '[' */
