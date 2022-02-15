@@ -17,6 +17,10 @@ static struct keymap_key lt_basic[] = {
 
 /** "lt" AltGr remapping */
 static struct keymap_key lt_altgr[] = {
+	{ 0x22, 0x5e },	/* '"' => '^' */
+	{ 0x27, 0x5e },	/* '\'' => '^' */
+	{ 0x4b, 0x26 },	/* 'K' => '&' */
+	{ 0x71, 0x40 },	/* 'q' => '@' */
 	{ 0, 0 }
 };
 
