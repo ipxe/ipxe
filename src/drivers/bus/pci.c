@@ -121,6 +121,11 @@ static void pci_read_bases ( struct pci_device *pci ) {
 	unsigned long bar;
 	int reg;
 
+	/* Clear any existing base addresses */
+	pci->ioaddr = 0;
+	pci->membase = 0;
+
+	/* Get first memory and I/O BAR addresses */
 	for ( reg = PCI_BASE_ADDRESS_0; reg <= PCI_BASE_ADDRESS_5; reg += 4 ) {
 		bar = pci_bar ( pci, reg );
 		if ( bar & PCI_BASE_ADDRESS_SPACE_IO ) {
