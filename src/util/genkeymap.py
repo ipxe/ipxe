@@ -399,6 +399,7 @@ class Keymap:
         keymap_name = self.cname("keymap")
         basic_name = self.cname("basic")
         altgr_name = self.cname("altgr")
+        attribute = "__keymap_default" if self.name == "us" else "__keymap"
         code = textwrap.dedent(f"""
         /** @file
          *
@@ -419,7 +420,7 @@ class Keymap:
         static struct keymap_key {altgr_name}[] = %s;
 
         /** "{self.name}" keyboard map */
-        struct keymap {keymap_name} __keymap = {{
+        struct keymap {keymap_name} {attribute} = {{
         \t.name = "{self.name}",
         \t.basic = {basic_name},
         \t.altgr = {altgr_name},

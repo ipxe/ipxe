@@ -21,7 +21,7 @@ static struct keymap_key us_altgr[] = {
 };
 
 /** "us" keyboard map */
-struct keymap us_keymap __keymap = {
+struct keymap us_keymap __keymap_default = {
 	.name = "us",
 	.basic = us_basic,
 	.altgr = us_altgr,

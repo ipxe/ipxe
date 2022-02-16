@@ -39,8 +39,11 @@ struct keymap {
 /** Keyboard mapping table */
 #define KEYMAP __table ( struct keymap, "keymap" )
 
+/** Define a default keyboard mapping */
+#define __keymap_default __table_entry ( KEYMAP, 01 )
+
 /** Define a keyboard mapping */
-#define __keymap __table_entry ( KEYMAP, 01 )
+#define __keymap __table_entry ( KEYMAP, 02 )
 
 /** Mappable character mask */
 #define KEYMAP_MASK 0xff
