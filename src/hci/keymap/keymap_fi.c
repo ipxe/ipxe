@@ -35,6 +35,8 @@ static struct keymap_key fi_basic[] = {
 
 /** "fi" AltGr remapping */
 static struct keymap_key fi_altgr[] = {
+	{ 0x26, 0x7b },	/* '&' => '{' */
+	{ 0x29, 0x7d },	/* ')' => '}' */
 	{ 0x2d, 0x5c },	/* '-' => '\\' */
 	{ 0x30, 0x7d },	/* '0' => '}' */
 	{ 0x32, 0x40 },	/* '2' => '@' */
@@ -44,6 +46,8 @@ static struct keymap_key fi_altgr[] = {
 	{ 0x39, 0x5d },	/* '9' => ']' */
 	{ 0x49, 0x7c },	/* 'I' => '|' */
 	{ 0x5d, 0x7e },	/* ']' => '~' */
+	{ 0x5f, 0x5c },	/* '_' => '\\' */
+	{ 0x7d, 0x7e },	/* '}' => '~' */
 	{ 0xdc, 0x7c },	/* Pseudo-'\\' => '|' */
 	{ 0, 0 }
 };

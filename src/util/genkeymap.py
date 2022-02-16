@@ -365,9 +365,11 @@ class Keymap:
         """AltGr remapping table"""
         # Construct raw mapping from source ASCII to target ASCII
         raw = {
-            source:
-            self.target.get((key.modifiers | KeyModifiers.ALTGR),
-                            self.target[key.modifiers])[key.keycode].ascii
+            source: next((self.target[x][key.keycode].ascii
+                          for x in (key.modifiers | KeyModifiers.ALTGR,
+                                    KeyModifiers.ALTGR, key.modifiers)
+                          if x in self.target
+                          and self.target[x][key.keycode].ascii), None)
             for source, key in self.source.inverse.items()
         }
         # Identify printable keys that are unreachable via the basic map
