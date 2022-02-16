@@ -39,6 +39,7 @@ static struct keymap_key al_basic[] = {
 static struct keymap_key al_altgr[] = {
 	{ 0x21, 0x7e },	/* '!' => '~' */
 	{ 0x26, 0x60 },	/* '&' => '`' */
+	{ 0x29, 0x7e },	/* ')' => '~' */
 	{ 0x30, 0x7e },	/* '0' => '~' */
 	{ 0x31, 0x7e },	/* '1' => '~' */
 	{ 0x34, 0x7e },	/* '4' => '~' */
