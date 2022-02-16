@@ -870,6 +870,7 @@ static int xsmp_rx_xve_modify ( struct xsigo_manager *xcm,
 	 * erroneously transmitted as little-endian.
 	 */
 	mtu = ntohs ( msg->mtu );
+	memset ( &tca, 0, sizeof ( tca ) );
 	tca.qpn = ntohl ( msg->tca.data );
 	tca.qkey = ntohs ( msg->tca.qkey );
 	tca.gid_present = 1;
