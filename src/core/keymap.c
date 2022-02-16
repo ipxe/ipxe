@@ -23,6 +23,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <string.h>
 #include <ctype.h>
 #include <ipxe/keys.h>
 #include <ipxe/keymap.h>
@@ -49,7 +50,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static TABLE_START ( keymap_start, KEYMAP );
 
 /** Current keyboard mapping */
-static struct keymap *keymap = keymap_start;
+static struct keymap *keymap_current = keymap_start;
 
 /**
  * Remap a key
@@ -58,6 +59,7 @@ static struct keymap *keymap = keymap_start;
  * @ret mapped		Mapped character
  */
 unsigned int key_remap ( unsigned int character ) {
+	struct keymap *keymap = keymap_current;
 	unsigned int mapped = ( character & KEYMAP_MASK );
 	struct keymap_key *key;
 
@@ -88,6 +90,42 @@ unsigned int key_remap ( unsigned int character ) {
 	/* Clear flags */
 	mapped &= ASCII_MASK;
 
-	DBGC2 ( &keymap, "KEYMAP mapped %04x => %02x\n", character, mapped );
+	DBGC2 ( &keymap_current, "KEYMAP mapped %04x => %02x\n",
+		character, mapped );
 	return mapped;
+}
+
+/**
+ * Find keyboard map by name
+ *
+ * @v name		Keyboard map name
+ * @ret keymap		Keyboard map, or NULL if not found
+ */
+struct keymap * keymap_find ( const char *name ) {
+	struct keymap *keymap;
+
+	/* Find matching keyboard map */
+	for_each_table_entry ( keymap, KEYMAP ) {
+		if ( strcmp ( keymap->name, name ) == 0 )
+			return keymap;
+	}
+
+	return NULL;
+}
+
+/**
+ * Set keyboard map
+ *
+ * @v keymap		Keyboard map, or NULL to use default
+ */
+void keymap_set ( struct keymap *keymap ) {
+
+	/* Use default keymap if none specified */
+	if ( ! keymap )
+		keymap = keymap_start;
+
+	/* Set new keyboard map */
+	if ( keymap != keymap_current )
+		DBGC ( &keymap_current, "KEYMAP using \"%s\"\n", keymap->name );
+	keymap_current = keymap;
 }

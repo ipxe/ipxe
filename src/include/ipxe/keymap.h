@@ -73,5 +73,7 @@ struct keymap {
 #define KEYMAP_ALTGR 0x0800
 
 extern unsigned int key_remap ( unsigned int character );
+extern struct keymap * keymap_find ( const char *name );
+extern void keymap_set ( struct keymap *keymap );
 
 #endif /* _IPXE_KEYMAP_H */
