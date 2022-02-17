@@ -179,6 +179,101 @@ static physaddr_t multiboot_add_cmdline ( struct image *image ) {
 }
 
 /**
+ * What is the total size of all modules?
+ *
+ * @v image		Multiboot image
+ * @ret total_len		Return total size in bytes
+ */
+static size_t multiboot_total_modules_size (struct image *image) {
+	struct image *module_image;
+	size_t total_len = 0;
+
+	for_each_image ( module_image ) {
+		if (module_image == image) {
+			continue;
+		}
+
+		total_len += module_image->len;
+	}
+
+	return total_len;
+}
+
+/**
+ * Find a segment where all concatenatee modules fit.
+ *
+ * After placing the image, grab the memory map and find a segment that has
+ * space for all modules.
+ *
+ * Returns ERANGE_SEGMENT if there isn't enough room anywhere for all the
+ * modules, 0 otherwise.
+ *
+ * @v image		Multiboot image
+ * @v image_max		Max physical address of image
+ * @ret modules_start_addr		Physical address to place all modules
+ * @ret rc		Return status code
+ */
+static int multiboot_find_modules_start_addr(struct image *image,
+		physaddr_t image_max, physaddr_t * modules_start_addr) {
+	size_t total_len = multiboot_total_modules_size(image);
+	DBGC ( image, "MULTIBOOT %p total size of modules is %d\n", image,
+			total_len);
+
+	struct memory_map memmap;
+	get_memmap ( &memmap );
+
+	DBGC ( image, "MULTIBOOT %p searching for module region\n", image );
+
+	/* Find index of memory region that will fit all modules */
+	unsigned int i = 0;
+	for ( i = 0 ; i < memmap.count ; i++ ) {
+		uint64_t start = memmap.regions[i].start;
+		uint64_t end = memmap.regions[i].end;
+
+		/* If memory region contains image_max, it contains the image so don't
+		 * overwrite it. Test fit from image_max to end.
+		 */
+		if ((start <= image_max) && (image_max < end)) {
+			uint64_t region_size = end - image_max;
+
+			DBGC ( image, "MULTIBOOT %p memmap region %d start %llx end %llx sz "
+					"%llx contains image_max %lx\n", image, i, start, end, region_size,
+					image_max );
+
+			if (region_size >= total_len) {
+				DBGC ( image, "MULTIBOOT %p memmap region %d has enough space\n",
+						image, i );
+				*modules_start_addr = image_max;
+				break;
+			}
+		}
+		/* Otherwise, test fit from start to end of segment. */
+		else
+		{
+			uint64_t region_size = end - start;
+			DBGC ( image, "MULTIBOOT %p memmap region %d start %llx end %llx sz "
+					"%llx\n", image, i, start, end, region_size );
+
+			if (region_size >= total_len) {
+				DBGC ( image, "MULTIBOOT %p memmap region %d has enough space\n",
+						image, i );
+				*modules_start_addr = start;
+				break;
+			}
+		}
+	}
+
+	if (i == memmap.count) {
+		DBGC ( image, "MULTIBOOT %p can't fit modules in available memory", image);
+		return -ENOMEM;
+	}
+
+	DBGC ( image, "MULTIBOOT %p module start set at %lx\n", image,
+			*modules_start_addr );
+	return 0;
+}
+
+/**
  * Add multiboot modules
  *
  * @v image		Multiboot image
@@ -416,6 +511,12 @@ static int multiboot_exec ( struct image *image ) {
 	     ( ( rc = multiboot_load_raw ( image, &hdr, &entry, &max ) ) != 0 ))
 		return rc;
 
+	/* Find modules start address */
+	physaddr_t modules_start_addr = 0;
+	if ((rc = multiboot_find_modules_start_addr(image, max, &modules_start_addr)) != 0) {
+		return rc;
+	}
+
 	/* Populate multiboot information structure */
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
 	mbinfo.flags = ( MBI_FLAG_LOADER | MBI_FLAG_MEM | MBI_FLAG_MMAP |
@@ -427,7 +528,7 @@ static int multiboot_exec ( struct image *image ) {
 	snprintf ( mb_bootloader_name, sizeof ( mb_bootloader_name ),
 		   "iPXE %s", product_version );
 	mbinfo.boot_loader_name = virt_to_phys ( mb_bootloader_name );
-	if ( ( rc = multiboot_add_modules ( image, max, &mbinfo, mbmodules,
+	if ( ( rc = multiboot_add_modules ( image, modules_start_addr, &mbinfo, mbmodules,
 					    ( sizeof ( mbmodules ) /
 					      sizeof ( mbmodules[0] ) ) ) ) !=0)
 		return rc;
