@@ -79,7 +79,7 @@ set pingidx:int8 0
 :call_home
   # Only use --count=1, otherwise a successful ping will continue needlessly.
   # This loop will ensure an unsuccessful ping retries without holding up a successful ping.
-  ping --count 1 ${server-ip} && goto called_home ||
+  ping --count=11 ${server-ip} && goto called_home ||
   iseq ${pingidx} 20 || inc pingidx && goto call_home
 :called_home
 echo Successfully called home; deployment server is reachable
