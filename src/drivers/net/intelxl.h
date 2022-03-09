@@ -940,9 +940,9 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 
 /** Number of receive descriptors
  *
- * Must be a multiple of 32.
+ * Must be a multiple of 32 and greater than or equal to 64.
  */
-#define INTELXL_RX_NUM_DESC 32
+#define INTELXL_RX_NUM_DESC 64
 
 /** Receive descriptor ring fill level
  *
