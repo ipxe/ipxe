@@ -847,18 +847,8 @@ int intelxl_open_admin ( struct intelxl_nic *intelxl ) {
 	/* (Re)open admin queues */
 	intelxl_reopen_admin ( intelxl );
 
-	/* Get firmware version */
-	if ( ( rc = intelxl_admin_version ( intelxl ) ) != 0 )
-		goto err_version;
-
-	/* Report driver version */
-	if ( ( rc = intelxl_admin_driver ( intelxl ) ) != 0 )
-		goto err_driver;
-
 	return 0;
 
- err_driver:
- err_version:
 	intelxl_disable_admin ( intelxl, &intelxl->command );
 	intelxl_disable_admin ( intelxl, &intelxl->event );
 	intelxl_free_admin ( intelxl, &intelxl->command );
@@ -1717,6 +1707,14 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	if ( ( rc = intelxl_open_admin ( intelxl ) ) != 0 )
 		goto err_open_admin;
 
+	/* Get firmware version */
+	if ( ( rc = intelxl_admin_version ( intelxl ) ) != 0 )
+		goto err_admin_version;
+
+	/* Report driver version */
+	if ( ( rc = intelxl_admin_driver ( intelxl ) ) != 0 )
+		goto err_admin_driver;
+
 	/* Clear PXE mode */
 	if ( ( rc = intelxl_admin_clear_pxe ( intelxl ) ) != 0 )
 		goto err_admin_clear_pxe;
@@ -1768,6 +1766,8 @@ static int intelxl_probe ( struct pci_device *pci ) {
  err_admin_vsi:
  err_admin_switch:
  err_admin_clear_pxe:
+ err_admin_driver:
+ err_admin_version:
 	intelxl_close_admin ( intelxl );
  err_open_admin:
 	intelxl_msix_disable ( intelxl, pci, INTELXL_MSIX_VECTOR );

@@ -306,6 +306,47 @@ void intelxlvf_admin_event ( struct net_device *netdev,
 }
 
 /**
+ * Negotiate API version
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int intelxlvf_admin_version ( struct net_device *netdev ) {
+	struct intelxl_nic *intelxl = netdev->priv;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_vf_version_buffer *ver;
+	union intelxl_admin_buffer *buf;
+	unsigned int api;
+	int rc;
+
+	/* Populate descriptor */
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->vopcode = cpu_to_le32 ( INTELXL_ADMIN_VF_VERSION );
+	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
+	cmd->len = cpu_to_le16 ( sizeof ( buf->ver ) );
+	buf = intelxl_admin_command_buffer ( intelxl );
+	buf->ver.major = cpu_to_le32 ( INTELXL_ADMIN_VF_API_MAJOR );
+	buf->ver.minor = cpu_to_le32 ( INTELXL_ADMIN_VF_API_MINOR );
+
+	/* Issue command */
+	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
+		return rc;
+	ver = &intelxl->vbuf.ver;
+	api = le32_to_cpu ( ver->major );
+	DBGC ( intelxl, "INTELXL %p API v%d.%d\n",
+	       intelxl, api, le32_to_cpu ( ver->minor ) );
+
+	/* Check for API compatibility */
+	if ( api > INTELXL_ADMIN_VF_API_MAJOR ) {
+		DBGC ( intelxl, "INTELXL %p unsupported API v%d\n",
+		       intelxl, api );
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+
+/**
  * Get resources
  *
  * @v netdev		Network device
@@ -636,6 +677,10 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	if ( ( rc = intelxlvf_reset_admin ( intelxl ) ) != 0 )
 		goto err_reset_admin;
 
+	/* Negotiate API version */
+	if ( ( rc = intelxlvf_admin_version ( netdev ) ) != 0 )
+		goto err_version;
+
 	/* Get MAC address */
 	if ( ( rc = intelxlvf_admin_get_resources ( netdev ) ) != 0 )
 		goto err_get_resources;
@@ -649,6 +694,7 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	unregister_netdev ( netdev );
  err_register_netdev:
  err_get_resources:
+ err_version:
  err_reset_admin:
 	intelxl_close_admin ( intelxl );
  err_open_admin:

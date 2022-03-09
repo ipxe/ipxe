@@ -311,6 +311,17 @@ struct intelxl_admin_link_params {
 /** Admin queue Send Message to VF command */
 #define INTELXL_ADMIN_SEND_TO_VF 0x0802
 
+/** Admin Queue VF Version opcode */
+#define INTELXL_ADMIN_VF_VERSION 0x00000001
+
+/** Admin Queue VF Version data buffer */
+struct intelxl_admin_vf_version_buffer {
+	/** Major version */
+	uint32_t major;
+	/** Minor version */
+	uint32_t minor;
+} __attribute__ (( packed ));
+
 /** Admin Queue VF Reset opcode */
 #define INTELXL_ADMIN_VF_RESET 0x00000002
 
@@ -503,6 +514,8 @@ union intelxl_admin_buffer {
 	struct intelxl_admin_switch_buffer sw;
 	/** Get VSI Parameters data buffer */
 	struct intelxl_admin_vsi_buffer vsi;
+	/** VF Version data buffer */
+	struct intelxl_admin_vf_version_buffer ver;
 	/** VF Get Resources data buffer */
 	struct intelxl_admin_vf_get_resources_buffer res;
 	/** VF Status Change Event data buffer */
@@ -597,6 +610,12 @@ intelxl_init_admin ( struct intelxl_admin *admin, unsigned int base,
 
 /** Admin queue API major version */
 #define INTELXL_ADMIN_API_MAJOR 1
+
+/** Admin queue VF API major version */
+#define INTELXL_ADMIN_VF_API_MAJOR 1
+
+/** Admin queue VF API minor version */
+#define INTELXL_ADMIN_VF_API_MINOR 0
 
 /******************************************************************************
  *
