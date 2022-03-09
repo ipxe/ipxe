@@ -1035,7 +1035,10 @@ struct intelxl_msix {
 	struct dma_mapping map;
 };
 
-/** An Intel 40Gigabit network card */
+/** MSI-X interrupt vector */
+#define INTELXL_MSIX_VECTOR 0
+
+/** An Intel 40 Gigabit network card */
 struct intelxl_nic {
 	/** Registers */
 	void *regs;
@@ -1084,9 +1087,11 @@ struct intelxl_nic {
 };
 
 extern int intelxl_msix_enable ( struct intelxl_nic *intelxl,
-				 struct pci_device *pci );
+				 struct pci_device *pci,
+				 unsigned int vector );
 extern void intelxl_msix_disable ( struct intelxl_nic *intelxl,
-				   struct pci_device *pci );
+				   struct pci_device *pci,
+				   unsigned int vector  );
 extern struct intelxl_admin_descriptor *
 intelxl_admin_command_descriptor ( struct intelxl_nic *intelxl );
 extern union intelxl_admin_buffer *

@@ -104,10 +104,11 @@ static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
  *
  * @v intelxl		Intel device
  * @v pci		PCI device
+ * @v vector		MSI-X vector
  * @ret rc		Return status code
  */
 int intelxl_msix_enable ( struct intelxl_nic *intelxl,
-			  struct pci_device *pci ) {
+			  struct pci_device *pci, unsigned int vector ) {
 	int rc;
 
 	/* Map dummy target location */
@@ -126,12 +127,12 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
 		goto err_enable;
 	}
 
-	/* Configure interrupt zero to write to dummy location */
-	pci_msix_map ( &intelxl->msix.cap, 0,
+	/* Configure interrupt to write to dummy location */
+	pci_msix_map ( &intelxl->msix.cap, vector,
 		       dma ( &intelxl->msix.map, &intelxl->msix.msg ), 0 );
 
-	/* Enable dummy interrupt zero */
-	pci_msix_unmask ( &intelxl->msix.cap, 0 );
+	/* Enable dummy interrupt */
+	pci_msix_unmask ( &intelxl->msix.cap, vector );
 
 	return 0;
 
@@ -147,12 +148,13 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
  *
  * @v intelxl		Intel device
  * @v pci		PCI device
+ * @v vector		MSI-X vector
  */
 void intelxl_msix_disable ( struct intelxl_nic *intelxl,
-			    struct pci_device *pci ) {
+			    struct pci_device *pci, unsigned int vector ) {
 
-	/* Disable dummy interrupt zero */
-	pci_msix_mask ( &intelxl->msix.cap, 0 );
+	/* Disable dummy interrupts */
+	pci_msix_mask ( &intelxl->msix.cap, vector );
 
 	/* Disable MSI-X capability */
 	pci_msix_disable ( pci, &intelxl->msix.cap );
@@ -1707,7 +1709,8 @@ static int intelxl_probe ( struct pci_device *pci ) {
 		goto err_fetch_mac;
 
 	/* Enable MSI-X dummy interrupt */
-	if ( ( rc = intelxl_msix_enable ( intelxl, pci ) ) != 0 )
+	if ( ( rc = intelxl_msix_enable ( intelxl, pci,
+					  INTELXL_MSIX_VECTOR ) ) != 0 )
 		goto err_msix;
 
 	/* Open admin queues */
@@ -1767,7 +1770,7 @@ static int intelxl_probe ( struct pci_device *pci ) {
  err_admin_clear_pxe:
 	intelxl_close_admin ( intelxl );
  err_open_admin:
-	intelxl_msix_disable ( intelxl, pci );
+	intelxl_msix_disable ( intelxl, pci, INTELXL_MSIX_VECTOR );
  err_msix:
  err_fetch_mac:
 	pci_reset ( pci, intelxl->exp );
@@ -1796,7 +1799,7 @@ static void intelxl_remove ( struct pci_device *pci ) {
 	intelxl_close_admin ( intelxl );
 
 	/* Disable MSI-X dummy interrupt */
-	intelxl_msix_disable ( intelxl, pci );
+	intelxl_msix_disable ( intelxl, pci, INTELXL_MSIX_VECTOR );
 
 	/* Reset the NIC */
 	pci_reset ( pci, intelxl->exp );

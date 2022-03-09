@@ -14,11 +14,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** BAR size */
 #define INTELXLVF_BAR_SIZE 0x10000
 
+/** MSI-X vector
+ *
+ * The 100 Gigabit physical function driver requires a virtual
+ * function driver to request that transmit and receive queues are
+ * mapped to MSI-X vector 1 or higher.
+ */
+#define INTELXLVF_MSIX_VECTOR 1
+
 /** Transmit Queue Tail Register */
 #define INTELXLVF_QTX_TAIL 0x00000
 
 /** Receive Queue Tail Register */
 #define INTELXLVF_QRX_TAIL 0x02000
+
+/** VF Interrupt N Dynamic Control Register */
+#define INTELXLVF_VFINT_DYN_CTLN( x ) ( 0x3800 + ( 0x4 * ( (x) - 1  ) ) )
 
 /** VF Interrupt Zero Dynamic Control Register */
 #define INTELXLVF_VFINT_DYN_CTL0 0x5c00

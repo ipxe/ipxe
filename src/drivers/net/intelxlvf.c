@@ -399,6 +399,7 @@ static int intelxlvf_admin_irq_map ( struct net_device *netdev ) {
 	buf = intelxl_admin_command_buffer ( intelxl );
 	buf->irq.count = cpu_to_le16 ( 1 );
 	buf->irq.vsi = cpu_to_le16 ( intelxl->vsi );
+	buf->irq.vec = cpu_to_le16 ( INTELXLVF_MSIX_VECTOR );
 	buf->irq.rxmap = cpu_to_le16 ( 0x0001 );
 	buf->irq.txmap = cpu_to_le16 ( 0x0001 );
 
@@ -583,7 +584,7 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
-	intelxl->intr = INTELXLVF_VFINT_DYN_CTL0;
+	intelxl->intr = INTELXLVF_VFINT_DYN_CTLN ( INTELXLVF_MSIX_VECTOR );
 	intelxl_init_admin ( &intelxl->command, INTELXLVF_ADMIN,
 			     &intelxlvf_admin_command_offsets );
 	intelxl_init_admin ( &intelxl->event, INTELXLVF_ADMIN,
@@ -623,7 +624,8 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	pci_reset ( pci, intelxl->exp );
 
 	/* Enable MSI-X dummy interrupt */
-	if ( ( rc = intelxl_msix_enable ( intelxl, pci ) ) != 0 )
+	if ( ( rc = intelxl_msix_enable ( intelxl, pci,
+					  INTELXLVF_MSIX_VECTOR ) ) != 0 )
 		goto err_msix;
 
 	/* Open admin queues */
@@ -650,7 +652,7 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
  err_reset_admin:
 	intelxl_close_admin ( intelxl );
  err_open_admin:
-	intelxl_msix_disable ( intelxl, pci );
+	intelxl_msix_disable ( intelxl, pci, INTELXLVF_MSIX_VECTOR );
  err_msix:
 	pci_reset ( pci, intelxl->exp );
  err_exp:
@@ -681,7 +683,7 @@ static void intelxlvf_remove ( struct pci_device *pci ) {
 	intelxl_close_admin ( intelxl );
 
 	/* Disable MSI-X dummy interrupt */
-	intelxl_msix_disable ( intelxl, pci );
+	intelxl_msix_disable ( intelxl, pci, INTELXLVF_MSIX_VECTOR );
 
 	/* Reset the function via PCIe FLR */
 	pci_reset ( pci, intelxl->exp );
