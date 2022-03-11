@@ -50,6 +50,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/acpi.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_utils.h>
@@ -235,7 +236,7 @@ static int efi_boot_create_map ( void ) {
 	EFI_DEVICE_PATH_PROTOCOL	**TmpDevicePathList;
 	VOID				*buffer;
 	const char			*path2;
-	char				 path1buf[256]; // 256 is the max buf
+	char				 path1buf[512]; // 512 is the max buf
 							// size used internally
 							// by efi_devpath_text()
 
@@ -325,9 +326,9 @@ static int efi_boot_create_map ( void ) {
 			DBG ( "EFIBOOT %d: next=%d, comparing %s to %s\n",
 			     (int) i, (int) NextIndex, path2, path1buf );
 			if ( NextIndex == -1 || strncmp ( path2, path1buf,
-							  256 )  < 0 ) {
+							  512 )  < 0 ) {
 				NextIndex = j;
-				strncpy ( path1buf, path2, 256 );
+				strncpy ( path1buf, path2, 512 );
 			}
 		}
 		if ( NextIndex != -1 ) {
@@ -369,7 +370,7 @@ static int efi_boot_local_fs ( EFI_DEVICE_PATH_PROTOCOL *dp,
 	      efi_devpath_text ( dp ) );
 
 	/* Construct device path for boot image */
-	end = efi_devpath_end ( dp );
+	end = efi_path_end ( dp );
 	prefix_len =  ( ( (void *) end ) - ( (void *) dp ) );
 	filepath_len = ( SIZE_OF_FILEPATH_DEVICE_PATH +
 			 ( filename ? ( ( strlen ( filename ) + 1 ) *
