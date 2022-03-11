@@ -127,6 +127,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	AUTOBOOT_CMD		/* Automatic booting */
 #define	NVO_CMD			/* Non-volatile option storage commands */
 #define	CONFIG_CMD		/* Option configuration console */
+#define EFIMAP_CMD              /* EFI Map command */
 #define	IFMGMT_CMD		/* Interface management commands */
 #define	IWMGMT_CMD		/* Wireless interface management commands */
 #define IBMGMT_CMD		/* Infiniband management commands */

@@ -1,8 +1,10 @@
 /*
+ * Copyright (C) 2019 Oracle. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of the
- * License, or (at your option) any later version.
+ * License, or any later version.
  *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,39 +23,13 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <config/general.h>
-#include <config/console.h>
-
-/** @file
+/**
+ * @file
  *
- * EFI-specific configuration options
+ * EFI boot local protocols
  *
  */
 
-PROVIDE_REQUIRING_SYMBOL();
-
-/*
- * Drag in all requested console types
- *
- */
-
-#ifdef CONSOLE_EFI
-REQUIRE_OBJECT ( efi_console );
-#endif
-#ifdef CONSOLE_EFIFB
-REQUIRE_OBJECT ( efi_fbcon );
-#endif
-#ifdef CONSOLE_FRAMEBUFFER
-REQUIRE_OBJECT ( efi_fbcon );
-#endif
-#ifdef DOWNLOAD_PROTO_FILE
-REQUIRE_OBJECT ( efi_local );
-#endif
-
-/*
- * Drag in EFI-specific commands
- *
- */
-#ifdef EFIMAP_CMD
-REQUIRE_OBJECT ( efimap_cmd );
-#endif
+void efi_boot_display_map ( void ) {
+	return;
+}
