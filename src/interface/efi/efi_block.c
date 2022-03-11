@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <usr/efiboot.h>
 #include <ipxe/refcnt.h>
 #include <ipxe/list.h>
 #include <ipxe/uri.h>
@@ -632,7 +633,12 @@ static int efi_block_boot ( unsigned int drive, const char *filename ) {
 	sandev = sandev_find ( drive );
 	if ( ! sandev ) {
 		DBG ( "EFIBLK cannot find drive %#02x\n", drive );
-		rc = -ENODEV;
+		DBG ( "EFIBLK attempting local boot for drive %#02x, "
+		      "filename=%s\n", drive, filename );
+		rc = efi_boot_local( drive, filename );
+		if (rc)
+			rc = -ENODEV;
+
 		goto err_sandev_find;
 	}
 

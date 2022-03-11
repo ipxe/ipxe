@@ -30,6 +30,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
 void efi_boot_display_map ( void ) {
 	return;
+}
+
+int efi_boot_local ( unsigned int drive, const char *filename ) {
+
+	// Dummy code to get around compiler for now.
+	if (filename)
+		return drive;
+
+	return 0;
 }
