@@ -744,7 +744,7 @@ static void intelxlvf_remove ( struct pci_device *pci ) {
 static struct pci_device_id intelxlvf_nics[] = {
 	PCI_ROM ( 0x8086, 0x154c, "xl710-vf", "XL710 VF", 0 ),
 	PCI_ROM ( 0x8086, 0x1571, "xl710-vf-hv", "XL710 VF (Hyper-V)", 0 ),
-	PCI_ROM ( 0x8086, 0x1889, "xl710-vf-ad", "XL710 VF (adaptive)", 0 ),
+	PCI_ROM ( 0x8086, 0x1889, "iavf", "Intel adaptive VF", 0 ),
 	PCI_ROM ( 0x8086, 0x37cd, "x722-vf", "X722 VF", 0 ),
 	PCI_ROM ( 0x8086, 0x37d9, "x722-vf-hv", "X722 VF (Hyper-V)", 0 ),
 };
