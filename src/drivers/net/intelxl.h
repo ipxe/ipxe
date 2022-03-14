@@ -993,7 +993,7 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 /** Function Requester ID Information Register */
 #define INTELXL_PFFUNC_RID 0x09c000
 #define INTELXL_PFFUNC_RID_FUNC_NUM(x) \
-	( ( (x) >> 0 ) & 0x3 )				/**< Function number */
+	( ( (x) >> 0 ) & 0x7 )				/**< Function number */
 
 /** PF Queue Allocation Register */
 #define INTELXL_PFLAN_QALLOC 0x1c0400
