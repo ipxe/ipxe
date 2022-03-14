@@ -593,18 +593,20 @@ static int intelxl_admin_switch ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin_descriptor *cmd;
 	struct intelxl_admin_switch_params *sw;
 	union intelxl_admin_buffer *buf;
+	uint16_t next = 0;
 	int rc;
-
-	/* Populate descriptor */
-	cmd = intelxl_admin_command_descriptor ( intelxl );
-	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_SWITCH );
-	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
-	cmd->len = cpu_to_le16 ( sizeof ( buf->sw ) );
-	sw = &cmd->params.sw;
-	buf = intelxl_admin_command_buffer ( intelxl );
 
 	/* Get each configuration in turn */
 	do {
+		/* Populate descriptor */
+		cmd = intelxl_admin_command_descriptor ( intelxl );
+		cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_SWITCH );
+		cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_BUF );
+		cmd->len = cpu_to_le16 ( sizeof ( buf->sw ) );
+		sw = &cmd->params.sw;
+		sw->next = next;
+		buf = intelxl_admin_command_buffer ( intelxl );
+
 		/* Issue command */
 		if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 			return rc;
@@ -624,7 +626,7 @@ static int intelxl_admin_switch ( struct intelxl_nic *intelxl ) {
 			       buf->sw.cfg.connection );
 		}
 
-	} while ( sw->next );
+	} while ( ( next = sw->next ) );
 
 	/* Check that we found a VSI */
 	if ( ! intelxl->vsi ) {
