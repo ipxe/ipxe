@@ -78,6 +78,15 @@ struct console_driver bios_console __attribute__ (( weak ));
 /** Font corresponding to selected character width and height */
 #define VESAFB_FONT VBE_FONT_8x16
 
+/** Number of ASCII glyphs within the font */
+#define VESAFB_ASCII 128
+
+/** Glyph to render for non-ASCII characters
+ *
+ * We choose to use one of the box-drawing glyphs.
+ */
+#define VESAFB_UNKNOWN 0xfe
+
 /* Forward declaration */
 struct console_driver vesafb_console __console_driver;
 
@@ -130,12 +139,24 @@ static int vesafb_rc ( unsigned int status ) {
 /**
  * Get character glyph
  *
- * @v character		Character
+ * @v character		Unicode character
  * @v glyph		Character glyph to fill in
  */
 static void vesafb_glyph ( unsigned int character, uint8_t *glyph ) {
-	size_t offset = ( character * VESAFB_CHAR_HEIGHT );
+	unsigned int index;
+	size_t offset;
 
+	/* Identify glyph */
+	if ( character < VESAFB_ASCII ) {
+		/* ASCII character: use corresponding glyph */
+		index = character;
+	} else {
+		/* Non-ASCII character: use "unknown" glyph */
+		index = VESAFB_UNKNOWN;
+	}
+
+	/* Copy glyph from BIOS font table */
+	offset = ( index * VESAFB_CHAR_HEIGHT );
 	copy_from_real ( glyph, vesafb.glyphs.segment,
 			 ( vesafb.glyphs.offset + offset ), VESAFB_CHAR_HEIGHT);
 }

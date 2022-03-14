@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/ansiesc.h>
+#include <ipxe/utf8.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/console.h>
 
@@ -36,7 +37,7 @@ struct fbcon_font {
 	/**
 	 * Get character glyph
 	 *
-	 * @v character		Character
+	 * @v character		Unicode character
 	 * @v glyph		Character glyph to fill in
 	 */
 	void ( * glyph ) ( unsigned int character, uint8_t *glyph );
@@ -92,7 +93,7 @@ struct fbcon_text_cell {
 	uint32_t foreground;
 	/** Background colour */
 	uint32_t background;
-	/** Character */
+	/** Unicode character */
 	unsigned int character;
 };
 
@@ -138,6 +139,8 @@ struct fbcon {
 	unsigned int ypos;
 	/** ANSI escape sequence context */
 	struct ansiesc_context ctx;
+	/** UTF-8 accumulator */
+	struct utf8_accumulator utf8;
 	/** Text array */
 	struct fbcon_text text;
 	/** Background picture */

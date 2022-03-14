@@ -446,6 +446,11 @@ void fbcon_putchar ( struct fbcon *fbcon, int character ) {
 	if ( character < 0 )
 		return;
 
+	/* Accumulate Unicode characters */
+	character = utf8_accumulate ( &fbcon->utf8, character );
+	if ( character == 0 )
+		return;
+
 	/* Handle control characters */
 	switch ( character ) {
 	case '\r':
