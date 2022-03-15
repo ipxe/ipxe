@@ -65,6 +65,9 @@ struct console_driver efi_console __attribute__ (( weak ));
 /** Number of ASCII glyphs in cache */
 #define EFIFB_ASCII 128
 
+/** Number of dynamic non-ASCII glyphs in cache */
+#define EFIFB_DYNAMIC 32
+
 /* Forward declaration */
 struct console_driver efifb_console __console_driver;
 
@@ -89,6 +92,10 @@ struct efifb {
 	struct fbcon_font font;
 	/** Character glyph cache */
 	userptr_t glyphs;
+	/** Dynamic characters in cache */
+	unsigned int dynamic[EFIFB_DYNAMIC];
+	/** Next dynamic character cache entry to evict */
+	unsigned int next;
 };
 
 /** The EFI frame buffer */
@@ -178,6 +185,41 @@ static int efifb_draw_unknown ( unsigned int index ) {
 }
 
 /**
+ * Get dynamic glyph index
+ *
+ * @v character		Unicode character
+ * @ret index		Glyph cache index
+ */
+static unsigned int efifb_dynamic ( unsigned int character ) {
+	unsigned int dynamic;
+	unsigned int index;
+	unsigned int i;
+	int height;
+
+	/* Search existing cached entries */
+	for ( i = 0 ; i < EFIFB_DYNAMIC ; i++ ) {
+		if ( character == efifb.dynamic[i] )
+			return ( EFIFB_ASCII + i );
+	}
+
+	/* Overwrite the oldest cache entry */
+	dynamic = ( efifb.next++ % EFIFB_DYNAMIC );
+	index = ( EFIFB_ASCII + dynamic );
+	DBGC2 ( &efifb, "EFIFB dynamic %#02x is glyph %#02x\n",
+		dynamic, character );
+
+	/* Draw glyph */
+	height = efifb_draw ( character, index, 0 );
+	if ( height < 0 )
+		efifb_draw_unknown ( index );
+
+	/* Record cached character */
+	efifb.dynamic[dynamic] = character;
+
+	return index;
+}
+
+/**
  * Get character glyph
  *
  * @v character		Unicode character
@@ -195,8 +237,8 @@ static void efifb_glyph ( unsigned int character, uint8_t *glyph ) {
 
 	} else {
 
-		/* Non-ASCII character: use an "unknown" glyph */
-		index = 0;
+		/* Non-ASCII character: use dynamic glyph cache */
+		index = efifb_dynamic ( character );
 	}
 
 	/* Copy cached glyph */
@@ -248,7 +290,7 @@ static int efifb_glyphs ( void ) {
 	efifb.font.height = max;
 
 	/* Allocate glyph data */
-	len = ( EFIFB_ASCII * efifb.font.height );
+	len = ( ( EFIFB_ASCII + EFIFB_DYNAMIC ) * efifb.font.height );
 	efifb.glyphs = umalloc ( len );
 	if ( ! efifb.glyphs ) {
 		rc = -ENOMEM;
@@ -272,6 +314,9 @@ static int efifb_glyphs ( void ) {
 			goto err_draw;
 		}
 	}
+
+	/* Clear dynamic glyph character cache */
+	memset ( efifb.dynamic, 0, sizeof ( efifb.dynamic ) );
 
 	efifb.font.glyph = efifb_glyph;
 	return 0;
