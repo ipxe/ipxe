@@ -377,6 +377,9 @@ struct intelxl_admin_descriptor {
 /** Admin descriptor uses data buffer */
 #define INTELXL_ADMIN_FL_BUF 0x1000
 
+/** Error: attempt to create something that already exists */
+#define INTELXL_ADMIN_EEXIST 13
+
 /** Admin queue */
 struct intelxl_admin {
 	/** Descriptors */
@@ -576,10 +579,6 @@ struct intelxl_context_rx {
 
 /** Queue Tail Pointer Register (offset) */
 #define INTELXL_QXX_TAIL 0x8000
-
-/** Global RLAN Control 0 register */
-#define INTELXL_GLLAN_RCTL_0 0x12a500
-#define INTELXL_GLLAN_RCTL_0_PXE_MODE	0x00000001UL	/**< PXE mode */
 
 /** Transmit data descriptor */
 struct intelxl_tx_data_descriptor {

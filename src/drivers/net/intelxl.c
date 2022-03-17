@@ -544,26 +544,25 @@ static int intelxl_admin_shutdown ( struct intelxl_nic *intelxl ) {
 static int intelxl_admin_clear_pxe ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin_descriptor *cmd;
 	struct intelxl_admin_clear_pxe_params *pxe;
-	uint32_t gllan_rctl_0;
 	int rc;
-
-	/* Do nothing if device is already out of PXE mode */
-	gllan_rctl_0 = readl ( intelxl->regs + INTELXL_GLLAN_RCTL_0 );
-	if ( ! ( gllan_rctl_0 & INTELXL_GLLAN_RCTL_0_PXE_MODE ) ) {
-		DBGC2 ( intelxl, "INTELXL %p already in non-PXE mode\n",
-			intelxl );
-		return 0;
-	}
 
 	/* Populate descriptor */
 	cmd = intelxl_admin_command_descriptor ( intelxl );
 	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_CLEAR_PXE );
+	cmd->ret = cpu_to_le16 ( INTELXL_ADMIN_EEXIST );
 	pxe = &cmd->params.pxe;
 	pxe->magic = INTELXL_ADMIN_CLEAR_PXE_MAGIC;
 
 	/* Issue command */
 	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
 		return rc;
+
+	/* Check for expected errors */
+	if ( cmd->ret == cpu_to_le16 ( INTELXL_ADMIN_EEXIST ) ) {
+		DBGC ( intelxl, "INTELXL %p already in non-PXE mode\n",
+		       intelxl );
+		return 0;
+	}
 
 	return 0;
 }
