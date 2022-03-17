@@ -122,7 +122,7 @@ static int intelxlvf_reset_admin ( struct intelxl_nic *intelxl ) {
 		goto err_command;
 
 	/* Wait for minimum reset time */
-	mdelay ( INTELXL_RESET_DELAY_MS );
+	mdelay ( INTELXLVF_RESET_DELAY_MS );
 
 	/* Wait for reset to take effect */
 	if ( ( rc = intelxlvf_reset_wait_teardown ( intelxl ) ) != 0 )

@@ -985,13 +985,6 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 	INTELXL_QINT_TQCTL_NEXTQ_TYPE ( 0x1 )		/**< Transmit queue */
 #define INTELXL_QINT_TQCTL_CAUSE_ENA	0x40000000UL	/**< Enable */
 
-/** PF Control Register */
-#define INTELXL_PFGEN_CTRL 0x092400
-#define INTELXL_PFGEN_CTRL_PFSWR	0x00000001UL	/**< Software Reset */
-
-/** Time to delay for device reset, in milliseconds */
-#define INTELXL_RESET_DELAY_MS 100
-
 /** Function Requester ID Information Register */
 #define INTELXL_PFFUNC_RID 0x09c000
 #define INTELXL_PFFUNC_RID_FUNC_NUM(x) \

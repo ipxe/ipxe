@@ -64,6 +64,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define INTELXLVF_VFGEN_RSTAT_VFR_STATE(x) ( (x) & 0x3 )
 #define INTELXLVF_VFGEN_RSTAT_VFR_STATE_ACTIVE 0x2
 
+/** Minimum time to wait for reset to complete */
+#define INTELXLVF_RESET_DELAY_MS 100
+
 /** Maximum time to wait for reset to complete */
 #define INTELXLVF_RESET_MAX_WAIT_MS 1000
 
