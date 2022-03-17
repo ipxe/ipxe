@@ -1688,10 +1688,6 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	       intelxl, intelxl->pf, intelxl->port, intelxl->base,
 	       INTELXL_PFLAN_QALLOC_LASTQ ( pflan_qalloc ) );
 
-	/* Fetch MAC address and maximum frame size */
-	if ( ( rc = intelxl_fetch_mac ( intelxl, netdev ) ) != 0 )
-		goto err_fetch_mac;
-
 	/* Enable MSI-X dummy interrupt */
 	if ( ( rc = intelxl_msix_enable ( intelxl, pci,
 					  INTELXL_MSIX_VECTOR ) ) != 0 )
@@ -1725,6 +1721,10 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	if ( ( rc = intelxl_admin_promisc ( intelxl ) ) != 0 )
 		goto err_admin_promisc;
 
+	/* Fetch MAC address and maximum frame size */
+	if ( ( rc = intelxl_fetch_mac ( intelxl, netdev ) ) != 0 )
+		goto err_fetch_mac;
+
 	/* Configure queue register addresses */
 	intelxl->tx.reg = INTELXL_QTX ( intelxl->queue );
 	intelxl->tx.tail = ( intelxl->tx.reg + INTELXL_QXX_TAIL );
@@ -1756,6 +1756,7 @@ static int intelxl_probe ( struct pci_device *pci ) {
 
 	unregister_netdev ( netdev );
  err_register_netdev:
+ err_fetch_mac:
  err_admin_promisc:
  err_admin_vsi:
  err_admin_switch:
@@ -1766,7 +1767,6 @@ static int intelxl_probe ( struct pci_device *pci ) {
  err_open_admin:
 	intelxl_msix_disable ( intelxl, pci, INTELXL_MSIX_VECTOR );
  err_msix:
- err_fetch_mac:
 	pci_reset ( pci, intelxl->exp );
  err_exp:
 	iounmap ( intelxl->regs );
