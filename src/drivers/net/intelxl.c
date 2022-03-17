@@ -348,6 +348,7 @@ int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 	union intelxl_admin_buffer *buf;
 	uint64_t address;
 	uint32_t cookie;
+	uint16_t silence;
 	unsigned int index;
 	unsigned int tail;
 	unsigned int i;
@@ -364,11 +365,14 @@ int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 		DBGC2 ( intelxl, "/%#08x", le32_to_cpu ( cmd->cookie ) );
 	DBGC2 ( intelxl, ":\n" );
 
+	/* Allow expected errors to be silenced */
+	silence = cmd->ret;
+	cmd->ret = 0;
+
 	/* Sanity checks */
 	assert ( ! ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_DD ) ) );
 	assert ( ! ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_CMP ) ) );
 	assert ( ! ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_ERR ) ) );
-	assert ( cmd->ret == 0 );
 
 	/* Populate data buffer address if applicable */
 	if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
@@ -419,8 +423,8 @@ int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 			goto err;
 		}
 
-		/* Check for errors */
-		if ( cmd->ret != 0 ) {
+		/* Check for unexpected errors */
+		if ( ( cmd->ret != 0 ) && ( cmd->ret != silence ) ) {
 			DBGC ( intelxl, "INTELXL %p admin command %#x error "
 			       "%d\n", intelxl, index,
 			       le16_to_cpu ( cmd->ret ) );
