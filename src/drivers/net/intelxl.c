@@ -409,7 +409,7 @@ int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 
 	/* Post command descriptor */
 	DBGC2_HDA ( intelxl, virt_to_phys ( cmd ), cmd, sizeof ( *cmd ) );
-	if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
+	if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_RD ) ) {
 		DBGC2_HDA ( intelxl, virt_to_phys ( buf ), buf,
 			    le16_to_cpu ( cmd->len ) );
 	}
@@ -428,6 +428,10 @@ int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 			intelxl, index );
 		DBGC2_HDA ( intelxl, virt_to_phys ( cmd ), cmd,
 			    sizeof ( *cmd ) );
+		if ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_BUF ) ) {
+			DBGC2_HDA ( intelxl, virt_to_phys ( buf ), buf,
+				    le16_to_cpu ( cmd->len ) );
+		}
 
 		/* Check for cookie mismatch */
 		if ( cmd->cookie != cookie ) {
