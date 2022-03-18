@@ -145,6 +145,32 @@ struct intelxl_admin_shutdown_params {
 /** Driver is unloading */
 #define INTELXL_ADMIN_SHUTDOWN_UNLOADING 0x01
 
+/** Admin queue Manage MAC Address Read command */
+#define INTELXL_ADMIN_MAC_READ 0x0107
+
+/** Admin queue Manage MAC Address Read command parameters */
+struct intelxl_admin_mac_read_params {
+	/** Valid addresses */
+	uint8_t valid;
+	/** Reserved */
+	uint8_t reserved[15];
+} __attribute__ (( packed ));
+
+/** LAN MAC address is valid */
+#define INTELXL_ADMIN_MAC_READ_VALID_LAN 0x10
+
+/** Admin queue Manage MAC Address Read data buffer */
+struct intelxl_admin_mac_read_buffer {
+	/** Physical function MAC address */
+	uint8_t pf[ETH_ALEN];
+	/** Reserved */
+	uint8_t reserved[ETH_ALEN];
+	/** Port MAC address */
+	uint8_t port[ETH_ALEN];
+	/** Physical function wake-on-LAN MAC address */
+	uint8_t wol[ETH_ALEN];
+} __attribute__ (( packed ));
+
 /** Admin queue Clear PXE Mode command */
 #define INTELXL_ADMIN_CLEAR_PXE 0x0110
 
@@ -315,6 +341,8 @@ union intelxl_admin_params {
 	struct intelxl_admin_driver_params driver;
 	/** Shutdown command parameters */
 	struct intelxl_admin_shutdown_params shutdown;
+	/** Manage MAC Address Read command parameters */
+	struct intelxl_admin_mac_read_params mac_read;
 	/** Clear PXE Mode command parameters */
 	struct intelxl_admin_clear_pxe_params pxe;
 	/** Get Switch Configuration command parameters */
@@ -336,6 +364,8 @@ union intelxl_admin_params {
 union intelxl_admin_buffer {
 	/** Driver Version data buffer */
 	struct intelxl_admin_driver_buffer driver;
+	/** Manage MAC Address Read data buffer */
+	struct intelxl_admin_mac_read_buffer mac_read;
 	/** Get Switch Configuration data buffer */
 	struct intelxl_admin_switch_buffer sw;
 	/** Get VSI Parameters data buffer */
@@ -830,12 +860,6 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 /** Port MAC Address High Register */
 #define INTELXL_PRTGL_SAH 0x1e2140
 #define INTELXL_PRTGL_SAH_MFS(x)	( (x) << 16 )	/**< Max frame size */
-
-/** Physical Function MAC Address Low Register */
-#define INTELXL_PRTPM_SAL 0x1e4440
-
-/** Physical Function MAC Address High Register */
-#define INTELXL_PRTPM_SAH 0x1e44c0
 
 /** Receive address */
 union intelxl_receive_address {
