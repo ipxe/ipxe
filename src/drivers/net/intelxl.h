@@ -171,6 +171,23 @@ struct intelxl_admin_mac_read_buffer {
 	uint8_t wol[ETH_ALEN];
 } __attribute__ (( packed ));
 
+/** Admin queue Manage MAC Address Write command */
+#define INTELXL_ADMIN_MAC_WRITE 0x0108
+
+/** Admin queue Manage MAC Address Write command parameters */
+struct intelxl_admin_mac_write_params {
+	/** Reserved */
+	uint8_t reserved_a[1];
+	/** Write type */
+	uint8_t type;
+	/** MAC address first 16 bits, byte-swapped */
+	uint16_t high;
+	/** MAC address last 32 bits, byte-swapped */
+	uint32_t low;
+	/** Reserved */
+	uint8_t reserved_b[8];
+} __attribute__ (( packed ));
+
 /** Admin queue Clear PXE Mode command */
 #define INTELXL_ADMIN_CLEAR_PXE 0x0110
 
@@ -289,6 +306,22 @@ struct intelxl_admin_promisc_params {
 /** Promiscuous VLAN mode */
 #define INTELXL_ADMIN_PROMISC_FL_VLAN 0x0010
 
+/** Admin queue Set MAC Configuration command */
+#define INTELXL_ADMIN_MAC_CONFIG 0x0603
+
+/** Admin queue Set MAC Configuration command parameters */
+struct intelxl_admin_mac_config_params {
+	/** Maximum frame size */
+	uint16_t mfs;
+	/** Flags */
+	uint8_t flags;
+	/** Reserved */
+	uint8_t reserved[13];
+} __attribute__ (( packed ));
+
+/** Append CRC on transmit */
+#define INTELXL_ADMIN_MAC_CONFIG_FL_CRC 0x04
+
 /** Admin queue Restart Autonegotiation command */
 #define INTELXL_ADMIN_AUTONEG 0x0605
 
@@ -343,6 +376,8 @@ union intelxl_admin_params {
 	struct intelxl_admin_shutdown_params shutdown;
 	/** Manage MAC Address Read command parameters */
 	struct intelxl_admin_mac_read_params mac_read;
+	/** Manage MAC Address Write command parameters */
+	struct intelxl_admin_mac_write_params mac_write;
 	/** Clear PXE Mode command parameters */
 	struct intelxl_admin_clear_pxe_params pxe;
 	/** Get Switch Configuration command parameters */
@@ -351,6 +386,8 @@ union intelxl_admin_params {
 	struct intelxl_admin_vsi_params vsi;
 	/** Set VSI Promiscuous Modes command parameters */
 	struct intelxl_admin_promisc_params promisc;
+	/** Set MAC Configuration command parameters */
+	struct intelxl_admin_mac_config_params mac_config;
 	/** Restart Autonegotiation command parameters */
 	struct intelxl_admin_autoneg_params autoneg;
 	/** Get Link Status command parameters */
@@ -853,22 +890,6 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 #define INTELXL_PFGEN_PORTNUM 0x1c0480
 #define INTELXL_PFGEN_PORTNUM_PORT_NUM(x) \
 	( ( (x) >> 0 ) & 0x3 )				/**< Port number */
-
-/** Port MAC Address Low Register */
-#define INTELXL_PRTGL_SAL 0x1e2120
-
-/** Port MAC Address High Register */
-#define INTELXL_PRTGL_SAH 0x1e2140
-#define INTELXL_PRTGL_SAH_MFS(x)	( (x) << 16 )	/**< Max frame size */
-
-/** Receive address */
-union intelxl_receive_address {
-	struct {
-		uint32_t low;
-		uint32_t high;
-	} __attribute__ (( packed )) reg;
-	uint8_t raw[ETH_ALEN];
-};
 
 /** MSI-X interrupt */
 struct intelxl_msix {

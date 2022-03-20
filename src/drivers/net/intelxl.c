@@ -536,6 +536,40 @@ static int intelxl_admin_mac_read ( struct net_device *netdev ) {
 }
 
 /**
+ * Set MAC address
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int intelxl_admin_mac_write ( struct net_device *netdev ) {
+	struct intelxl_nic *intelxl = netdev->priv;
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_mac_write_params *write;
+	union {
+		uint8_t raw[ETH_ALEN];
+		struct {
+			uint16_t high;
+			uint32_t low;
+		} __attribute__ (( packed ));
+	} mac;
+	int rc;
+
+	/* Populate descriptor */
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_MAC_WRITE );
+	write = &cmd->params.mac_write;
+	memcpy ( mac.raw, netdev->ll_addr, ETH_ALEN );
+	write->high = bswap_16 ( mac.high );
+	write->low = bswap_32 ( mac.low );
+
+	/* Issue command */
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
  * Clear PXE mode
  *
  * @v intelxl		Intel device
@@ -678,6 +712,31 @@ static int intelxl_admin_promisc ( struct intelxl_nic *intelxl ) {
 	promisc->flags = cpu_to_le16 ( flags );
 	promisc->valid = cpu_to_le16 ( flags );
 	promisc->vsi = cpu_to_le16 ( intelxl->vsi );
+
+	/* Issue command */
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Set MAC configuration
+ *
+ * @v intelxl		Intel device
+ * @ret rc		Return status code
+ */
+static int intelxl_admin_mac_config ( struct intelxl_nic *intelxl ) {
+	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_mac_config_params *config;
+	int rc;
+
+	/* Populate descriptor */
+	cmd = intelxl_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_MAC_CONFIG );
+	config = &cmd->params.mac_config;
+	config->mfs = cpu_to_le16 ( intelxl->mfs );
+	config->flags = INTELXL_ADMIN_MAC_CONFIG_FL_CRC;
 
 	/* Issue command */
 	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
@@ -1348,24 +1407,20 @@ void intelxl_empty_rx ( struct intelxl_nic *intelxl ) {
  */
 static int intelxl_open ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	union intelxl_receive_address mac;
 	unsigned int queue;
-	uint32_t prtgl_sal;
-	uint32_t prtgl_sah;
 	int rc;
 
 	/* Calculate maximum frame size */
 	intelxl->mfs = ( ( ETH_HLEN + netdev->mtu + 4 /* CRC */ +
 			   INTELXL_ALIGN - 1 ) & ~( INTELXL_ALIGN - 1 ) );
 
-	/* Program MAC address and maximum frame size */
-	memset ( &mac, 0, sizeof ( mac ) );
-	memcpy ( mac.raw, netdev->ll_addr, sizeof ( mac.raw ) );
-	prtgl_sal = le32_to_cpu ( mac.reg.low );
-	prtgl_sah = ( le32_to_cpu ( mac.reg.high ) |
-		      INTELXL_PRTGL_SAH_MFS ( intelxl->mfs ) );
-	writel ( prtgl_sal, intelxl->regs + INTELXL_PRTGL_SAL );
-	writel ( prtgl_sah, intelxl->regs + INTELXL_PRTGL_SAH );
+	/* Set MAC address */
+	if ( ( rc = intelxl_admin_mac_write ( netdev ) ) != 0 )
+		goto err_mac_write;
+
+	/* Set maximum frame size */
+	if ( ( rc = intelxl_admin_mac_config ( intelxl ) ) != 0 )
+		goto err_mac_config;
 
 	/* Associate transmit queue to PF */
 	writel ( ( INTELXL_QXX_CTL_PFVF_Q_PF |
@@ -1408,6 +1463,8 @@ static int intelxl_open ( struct net_device *netdev ) {
  err_create_tx:
 	intelxl_destroy_ring ( intelxl, &intelxl->rx );
  err_create_rx:
+ err_mac_config:
+ err_mac_write:
 	return rc;
 }
 
