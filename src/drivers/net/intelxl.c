@@ -965,8 +965,7 @@ int intelxl_alloc_ring ( struct intelxl_nic *intelxl,
 	ring->cons = 0;
 
 	DBGC ( intelxl, "INTELXL %p ring %06x is at [%08lx,%08lx)\n",
-	       intelxl, ( ring->reg + ring->tail ),
-	       virt_to_phys ( ring->desc.raw ),
+	       intelxl, ring->tail, virt_to_phys ( ring->desc.raw ),
 	       ( virt_to_phys ( ring->desc.raw ) + ring->len ) );
 
 	return 0;
@@ -1205,7 +1204,7 @@ static int intelxl_enable_ring ( struct intelxl_nic *intelxl,
 	qxx_ena = readl ( ring_regs + INTELXL_QXX_ENA );
 	if ( ! ( qxx_ena & INTELXL_QXX_ENA_STAT ) ) {
 		DBGC ( intelxl, "INTELXL %p ring %06x failed to enable: "
-		       "%#08x\n", intelxl, ring->reg, qxx_ena );
+		       "%#08x\n", intelxl, ring->tail, qxx_ena );
 		return -EIO;
 	}
 
@@ -1241,7 +1240,7 @@ static int intelxl_disable_ring ( struct intelxl_nic *intelxl,
 	}
 
 	DBGC ( intelxl, "INTELXL %p ring %06x timed out waiting for disable: "
-	       "%#08x\n", intelxl, ring->reg, qxx_ena );
+	       "%#08x\n", intelxl, ring->tail, qxx_ena );
 	return -ETIMEDOUT;
 }
 
