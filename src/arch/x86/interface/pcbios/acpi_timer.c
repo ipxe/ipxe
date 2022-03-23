@@ -107,7 +107,7 @@ static int acpi_timer_probe ( void ) {
 	unsigned int pm_tmr_blk;
 
 	/* Locate FADT */
-	fadt = acpi_find ( FADT_SIGNATURE, 0 );
+	fadt = acpi_table ( FADT_SIGNATURE, 0 );
 	if ( ! fadt ) {
 		DBGC ( &acpi_timer, "ACPI could not find FADT\n" );
 		return -ENOENT;
