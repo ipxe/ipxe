@@ -8,6 +8,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <ipxe/timer.h>
+#include <ipxe/profile.h>
 
 static int32_t rnd_seed = 0;
 
@@ -15,11 +16,21 @@ static int32_t rnd_seed = 0;
  * Seed the pseudo-random number generator
  *
  * @v seed		Seed value
+ *
+ * Will use the following entropy sources if @c seed is 0:
+ *  - system time ticks
+ *  - cpu profiling timestamp
+ *  - address of stack variable
+ *  - fair dice roll (ensures nonzero seed)
  */
 void srandom ( unsigned int seed ) {
-	rnd_seed = seed;
-	if ( ! rnd_seed )
-		rnd_seed = 4; /* Chosen by fair dice roll */
+	if ( ! ( rnd_seed = seed ) ) {
+		rnd_seed = ( currticks()
+			^ profile_timestamp()
+			^ ( size_t ) &seed
+		) | 4;
+	}
+	DBG ( "seed=%08x ", rnd_seed );
 }
 
 /**
@@ -31,7 +42,7 @@ long int random ( void ) {
 	int32_t q;
 
 	if ( ! rnd_seed ) /* Initialize linear congruential generator */
-		srandom ( currticks() );
+		srandom ( 0 );
 
 	/* simplified version of the LCG given in Bruce Schneier's
 	   "Applied Cryptography" */
