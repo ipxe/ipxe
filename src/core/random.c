@@ -21,14 +21,16 @@ static int32_t rnd_seed = 0;
  *  - system time ticks
  *  - cpu profiling timestamp
  *  - address of stack variable
- *  - fair dice roll (ensures nonzero seed)
+ *
+ * The RNG implementation requires that the seed is non-zero;
+ * this function guarantees that with `| 4`
  */
 void srandom ( unsigned int seed ) {
 	if ( ! ( rnd_seed = seed ) ) {
 		rnd_seed = ( currticks()
 			^ profile_timestamp()
 			^ ( size_t ) &seed
-		) | 4;
+		) | 4; /* Chosen by fair dice roll */
 	}
 	DBG ( "seed=%08x ", rnd_seed );
 }
@@ -41,7 +43,9 @@ void srandom ( unsigned int seed ) {
 long int random ( void ) {
 	int32_t q;
 
-	if ( ! rnd_seed ) /* Initialize linear congruential generator */
+	if ( ! rnd_seed )
+		/* Initialize linear congruential generator,
+		   providing 0 to autoselect a seed */
 		srandom ( 0 );
 
 	/* simplified version of the LCG given in Bruce Schneier's
