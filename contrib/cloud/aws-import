@@ -16,7 +16,7 @@ BLOCKSIZE = 512 * 1024
 def detect_architecture(image):
     """Detect CPU architecture"""
     mdir = subprocess.run(['mdir', '-b', '-i', image, '::/EFI/BOOT'],
-                          capture_output=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if any(b'BOOTAA64.EFI' in x for x in mdir.stdout.splitlines()):
         return 'arm64'
     return 'x86_64'
