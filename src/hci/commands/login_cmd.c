@@ -23,6 +23,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <getopt.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/login_ui.h>
@@ -43,7 +44,8 @@ static struct option_descriptor login_opts[] = {};
 
 /** "login" command descriptor */
 static struct command_descriptor login_cmd =
-	COMMAND_DESC ( struct login_options, login_opts, 0, 0, NULL );
+	COMMAND_DESC ( struct login_options, login_opts, 0, MAX_ARGUMENTS,
+		       "[<title>]" );
 
 /**
  * "login" command
@@ -54,14 +56,21 @@ static struct command_descriptor login_cmd =
  */
 static int login_exec ( int argc, char **argv ) {
 	struct login_options opts;
+	char *title;
 	int rc;
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &login_cmd, &opts ) ) != 0 )
 		return rc;
 
+	/* Parse title */
+	title = concat_args ( &argv[optind] );
+	if ( ! title ) {
+		title = "";
+	}
+
 	/* Show login UI */
-	if ( ( rc = login_ui() ) != 0 ) {
+	if ( ( rc = login_ui( title ) ) != 0 ) {
 		printf ( "Could not set credentials: %s\n",
 			 strerror ( rc ) );
 		return rc;

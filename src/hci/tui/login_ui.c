@@ -38,8 +38,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/keys.h>
 #include <ipxe/ansicol.h>
 #include <ipxe/login_ui.h>
+#include <config/colour.h>
+
+/* Colour pairs */
+#define CPAIR_NORMAL		1
+#ifndef CPAIR_EDIT
+	#define CPAIR_EDIT		2
+#endif
 
 /* Screen layout */
+#define TITLE_ROW		1U
 #define USERNAME_LABEL_ROW	( ( LINES / 2U ) - 4U )
 #define USERNAME_ROW		( ( LINES / 2U ) - 2U )
 #define PASSWORD_LABEL_ROW	( ( LINES / 2U ) + 2U )
@@ -48,12 +56,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EDITBOX_COL		( ( COLS / 2U ) - 10U )
 #define EDITBOX_WIDTH		20U
 
-int login_ui ( void ) {
+int login_ui ( const char *title ) {
 	char username[64];
 	char password[64];
 	struct edit_box username_box;
 	struct edit_box password_box;
 	struct edit_box *current_box = &username_box;
+	char buf[ COLS + 1 /* NUL */ ];
 	int key;
 	int rc = -EINPROGRESS;
 
@@ -66,6 +75,8 @@ int login_ui ( void ) {
 	/* Initialise UI */
 	initscr();
 	start_color();
+	init_pair ( CPAIR_NORMAL, COLOR_NORMAL_FG, COLOR_NORMAL_BG );
+	init_pair ( CPAIR_EDIT, COLOR_EDIT_FG, COLOR_EDIT_BG );
 	init_editbox ( &username_box, username, sizeof ( username ), NULL,
 		       USERNAME_ROW, EDITBOX_COL, EDITBOX_WIDTH, 0 );
 	init_editbox ( &password_box, password, sizeof ( password ), NULL,
@@ -75,10 +86,16 @@ int login_ui ( void ) {
 	/* Draw initial UI */
 	color_set ( CPAIR_NORMAL, NULL );
 	erase();
+
 	attron ( A_BOLD );
+	snprintf ( buf, sizeof ( buf ), "%s", title );
+	mvprintw ( TITLE_ROW, ( ( COLS - strlen ( buf ) ) / 2 ), "%s", buf );
+	attroff ( A_BOLD );
+
+	//attron ( A_BOLD );
 	mvprintw ( USERNAME_LABEL_ROW, LABEL_COL, "Username:" );
 	mvprintw ( PASSWORD_LABEL_ROW, LABEL_COL, "Password:" );
-	attroff ( A_BOLD );
+	//attroff ( A_BOLD );
 	color_set ( CPAIR_EDIT, NULL );
 	draw_editbox ( &username_box );
 	draw_editbox ( &password_box );
