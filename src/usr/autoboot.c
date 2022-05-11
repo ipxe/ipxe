@@ -531,6 +531,8 @@ static int autoboot ( void ) {
 		if ( is_autoboot_device && ( ! is_autoboot_device ( netdev ) ) )
 			continue;
 
+		if(! netdev_link_ok ( netdev ))
+		   continue;
 		/* Attempt booting from this device */
 		rc = netboot ( netdev );
 	}
