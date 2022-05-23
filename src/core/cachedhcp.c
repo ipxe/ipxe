@@ -90,29 +90,62 @@ static void cachedhcp_free ( struct cached_dhcp_packet *cache ) {
  */
 static int cachedhcp_apply ( struct cached_dhcp_packet *cache,
 			     struct net_device *netdev ) {
-	struct settings *settings;
+	struct settings *settings = NULL;
+	struct ll_protocol *ll_protocol;
+	const uint8_t *chaddr;
+	uint8_t *hw_addr;
+	uint8_t *ll_addr;
+	size_t ll_addr_len;
 	int rc;
 
 	/* Do nothing if cache is empty */
 	if ( ! cache->dhcppkt )
 		return 0;
+	chaddr = cache->dhcppkt->dhcphdr->chaddr;
 
-	/* Do nothing unless cached packet's MAC address matches this
-	 * network device, if specified.
-	 */
+	/* Handle association with network device, if specified */
 	if ( netdev ) {
-		if ( memcmp ( netdev->ll_addr, cache->dhcppkt->dhcphdr->chaddr,
-			      netdev->ll_protocol->ll_addr_len ) != 0 ) {
+		hw_addr = netdev->hw_addr;
+		ll_addr = netdev->ll_addr;
+		ll_protocol = netdev->ll_protocol;
+		ll_addr_len = ll_protocol->ll_addr_len;
+
+		/* If cached packet's MAC address matches the network
+		 * device's permanent MAC address, then assume that
+		 * the permanent MAC address ought to be the network
+		 * device's current link-layer address.
+		 *
+		 * This situation can arise when the PXE ROM does not
+		 * understand the system-specific mechanism for
+		 * overriding the MAC address, and so uses the
+		 * permanent MAC address instead.  We choose to match
+		 * this behaviour in order to minimise surprise.
+		 */
+		if ( memcmp ( hw_addr, chaddr, ll_addr_len ) == 0 ) {
+			if ( memcmp ( hw_addr, ll_addr, ll_addr_len ) != 0 ) {
+				DBGC ( colour, "CACHEDHCP %s resetting %s MAC "
+				       "%s ", cache->name, netdev->name,
+				       ll_protocol->ntoa ( ll_addr ) );
+				DBGC ( colour, "-> %s\n",
+				       ll_protocol->ntoa ( hw_addr ) );
+			}
+			memcpy ( ll_addr, hw_addr, ll_addr_len );
+		}
+
+		/* Do nothing unless cached packet's MAC address
+		 * matches this network device.
+		 */
+		if ( memcmp ( ll_addr, chaddr, ll_addr_len ) != 0 ) {
 			DBGC ( colour, "CACHEDHCP %s does not match %s\n",
 			       cache->name, netdev->name );
 			return 0;
 		}
 		DBGC ( colour, "CACHEDHCP %s is for %s\n",
 		       cache->name, netdev->name );
-	}
 
-	/* Select appropriate parent settings block */
-	settings = ( netdev ? netdev_settings ( netdev ) : NULL );
+		/* Use network device's settings block */
+		settings = netdev_settings ( netdev );
+	}
 
 	/* Register settings */
 	if ( ( rc = register_settings ( &cache->dhcppkt->settings, settings,
