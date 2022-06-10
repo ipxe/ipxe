@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/base16.h>
 #include <ipxe/ethernet.h>
 #include <ipxe/if_ether.h>
+#include <ipxe/settings.h>
 #include <ipxe/acpimac.h>
 
 /** @file
@@ -249,3 +250,39 @@ int acpi_mac ( uint8_t *hw_addr ) {
 
 	return -ENOENT;
 }
+
+/**
+ * Fetch system MAC address setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int sysmac_fetch ( void *data, size_t len ) {
+	uint8_t mac[ETH_ALEN];
+	int rc;
+
+	/* Try fetching ACPI MAC address */
+	if ( ( rc = acpi_mac ( mac ) ) != 0 )
+		return rc;
+
+	/* Return MAC address */
+	if ( len > sizeof ( mac ) )
+		len = sizeof ( mac );
+	memcpy ( data, mac, len );
+	return ( sizeof ( mac ) );
+}
+
+/** System MAC address setting */
+const struct setting sysmac_setting __setting ( SETTING_MISC, sysmac ) = {
+	.name = "sysmac",
+	.description = "System MAC",
+	.type = &setting_type_hex,
+	.scope = &builtin_scope,
+};
+
+/** System MAC address built-in setting */
+struct builtin_setting sysmac_builtin_setting __builtin_setting = {
+	.setting = &sysmac_setting,
+	.fetch = sysmac_fetch,
+};
