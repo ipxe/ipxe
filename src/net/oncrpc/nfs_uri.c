@@ -103,7 +103,7 @@ int nfs_uri_symlink ( struct nfs_uri *uri, const char *symlink ) {
 		strcpy ( new_path + strlen ( new_path ), uri->lookup_pos );
 
 	} else {
-		len = strlen ( uri->lookup_pos ) + strlen ( symlink );
+		len = strlen ( uri->lookup_pos ) + strlen ( symlink ) + 1; // +1 for NULL terminator
 		if ( ! ( new_path = malloc ( len * sizeof ( char ) ) ) )
 			return -ENOMEM;
 
