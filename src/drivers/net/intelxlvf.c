@@ -109,13 +109,13 @@ static int intelxlvf_reset_wait_active ( struct intelxl_nic *intelxl ) {
  * @ret rc		Return status code
  */
 static int intelxlvf_reset_admin ( struct intelxl_nic *intelxl ) {
-	struct intelxl_admin_descriptor *cmd;
+	struct intelxlvf_admin_descriptor *cmd;
 	int rc;
 
 	/* Populate descriptor */
-	cmd = intelxl_admin_command_descriptor ( intelxl );
-	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_SEND_TO_PF );
-	cmd->vopcode = cpu_to_le32 ( INTELXL_ADMIN_VF_RESET );
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXLVF_ADMIN_SEND_TO_PF );
+	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_RESET );
 
 	/* Issue command */
 	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
@@ -173,13 +173,15 @@ static const struct intelxl_admin_offsets intelxlvf_admin_event_offsets = {
 static int intelxlvf_admin_command ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	struct intelxl_admin *admin = &intelxl->command;
-	struct intelxl_admin_descriptor *cmd;
+	struct intelxl_admin_descriptor *xlcmd;
+	struct intelxlvf_admin_descriptor *cmd;
 	unsigned int i;
 	int rc;
 
 	/* Populate descriptor */
-	cmd = &admin->desc[ admin->index % INTELXL_ADMIN_NUM_DESC ];
-	cmd->opcode = cpu_to_le16 ( INTELXL_ADMIN_SEND_TO_PF );
+	xlcmd = &admin->desc[ admin->index % INTELXL_ADMIN_NUM_DESC ];
+	cmd = container_of ( xlcmd, struct intelxlvf_admin_descriptor, xl );
+	cmd->opcode = cpu_to_le16 ( INTELXLVF_ADMIN_SEND_TO_PF );
 
 	/* Record opcode */
 	intelxl->vopcode = le32_to_cpu ( cmd->vopcode );
@@ -222,7 +224,7 @@ static int intelxlvf_admin_command ( struct net_device *netdev ) {
  * @v link		Link status
  */
 static void intelxlvf_admin_link ( struct net_device *netdev,
-				   struct intelxl_admin_vf_status_link *link ) {
+				   struct intelxlvf_admin_status_link *link ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 
 	DBGC ( intelxl, "INTELXL %p link %#02x speed %#02x\n", intelxl,
@@ -244,12 +246,12 @@ static void intelxlvf_admin_link ( struct net_device *netdev,
  */
 static void
 intelxlvf_admin_status ( struct net_device *netdev,
-			 struct intelxl_admin_vf_status_buffer *stat ) {
+			 struct intelxlvf_admin_status_buffer *stat ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 
 	/* Handle event */
 	switch ( stat->event ) {
-	case cpu_to_le32 ( INTELXL_ADMIN_VF_STATUS_LINK ):
+	case cpu_to_le32 ( INTELXLVF_ADMIN_STATUS_LINK ):
 		intelxlvf_admin_link ( netdev, &stat->data.link );
 		break;
 	default:
@@ -264,19 +266,23 @@ intelxlvf_admin_status ( struct net_device *netdev,
  * Handle admin event
  *
  * @v netdev		Network device
- * @v evt		Admin queue event descriptor
- * @v buf		Admin queue event data buffer
+ * @v xlevt		Admin queue event descriptor
+ * @v xlbuf		Admin queue event data buffer
  */
 static void intelxlvf_admin_event ( struct net_device *netdev,
-				    struct intelxl_admin_descriptor *evt,
-				    union intelxl_admin_buffer *buf ) {
+				    struct intelxl_admin_descriptor *xlevt,
+				    union intelxl_admin_buffer *xlbuf ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	struct intelxl_admin *admin = &intelxl->command;
+	struct intelxlvf_admin_descriptor *evt =
+		container_of ( xlevt, struct intelxlvf_admin_descriptor, xl );
+	union intelxlvf_admin_buffer *buf =
+		container_of ( xlbuf, union intelxlvf_admin_buffer, xl );
 	unsigned int vopcode;
 	unsigned int index;
 
 	/* Ignore unrecognised events */
-	if ( evt->opcode != cpu_to_le16 ( INTELXL_ADMIN_SEND_TO_VF ) ) {
+	if ( evt->opcode != cpu_to_le16 ( INTELXLVF_ADMIN_SEND_TO_VF ) ) {
 		DBGC ( intelxl, "INTELXL %p unrecognised event opcode "
 		       "%#04x\n", intelxl, le16_to_cpu ( evt->opcode ) );
 		return;
@@ -303,7 +309,7 @@ static void intelxlvf_admin_event ( struct net_device *netdev,
 
 	/* Handle unsolicited events */
 	switch ( vopcode ) {
-	case INTELXL_ADMIN_VF_STATUS:
+	case INTELXLVF_ADMIN_STATUS:
 		intelxlvf_admin_status ( netdev, &buf->stat );
 		break;
 	default:
@@ -325,19 +331,19 @@ static void intelxlvf_admin_event ( struct net_device *netdev,
  */
 static int intelxlvf_admin_version ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	struct intelxl_admin_descriptor *cmd;
-	union intelxl_admin_buffer *buf;
+	struct intelxlvf_admin_descriptor *cmd;
+	union intelxlvf_admin_buffer *buf;
 	unsigned int api;
 	int rc;
 
 	/* Populate descriptor */
-	cmd = intelxl_admin_command_descriptor ( intelxl );
-	cmd->vopcode = cpu_to_le32 ( INTELXL_ADMIN_VF_VERSION );
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_VERSION );
 	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
 	cmd->len = cpu_to_le16 ( sizeof ( buf->ver ) );
-	buf = intelxl_admin_command_buffer ( intelxl );
-	buf->ver.major = cpu_to_le32 ( INTELXL_ADMIN_VF_API_MAJOR );
-	buf->ver.minor = cpu_to_le32 ( INTELXL_ADMIN_VF_API_MINOR );
+	buf = intelxlvf_admin_command_buffer ( intelxl );
+	buf->ver.major = cpu_to_le32 ( INTELXLVF_ADMIN_API_MAJOR );
+	buf->ver.minor = cpu_to_le32 ( INTELXLVF_ADMIN_API_MINOR );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
@@ -347,7 +353,7 @@ static int intelxlvf_admin_version ( struct net_device *netdev ) {
 	       intelxl, api, le32_to_cpu ( buf->ver.minor ) );
 
 	/* Check for API compatibility */
-	if ( api > INTELXL_ADMIN_VF_API_MAJOR ) {
+	if ( api > INTELXLVF_ADMIN_API_MAJOR ) {
 		DBGC ( intelxl, "INTELXL %p unsupported API v%d\n",
 		       intelxl, api );
 		return -ENOTSUP;
@@ -364,14 +370,14 @@ static int intelxlvf_admin_version ( struct net_device *netdev ) {
  */
 static int intelxlvf_admin_get_resources ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	struct intelxl_admin_descriptor *cmd;
-	union intelxl_admin_buffer *buf;
+	struct intelxlvf_admin_descriptor *cmd;
+	union intelxlvf_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
-	cmd = intelxl_admin_command_descriptor ( intelxl );
-	cmd->vopcode = cpu_to_le32 ( INTELXL_ADMIN_VF_GET_RESOURCES );
-	buf = intelxl_admin_command_buffer ( intelxl );
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_GET_RESOURCES );
+	buf = intelxlvf_admin_command_buffer ( intelxl );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
@@ -400,16 +406,16 @@ static int intelxlvf_admin_get_resources ( struct net_device *netdev ) {
  */
 static int intelxlvf_admin_configure ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	struct intelxl_admin_descriptor *cmd;
-	union intelxl_admin_buffer *buf;
+	struct intelxlvf_admin_descriptor *cmd;
+	union intelxlvf_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
-	cmd = intelxl_admin_command_descriptor ( intelxl );
-	cmd->vopcode = cpu_to_le32 ( INTELXL_ADMIN_VF_CONFIGURE );
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_CONFIGURE );
 	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
 	cmd->len = cpu_to_le16 ( sizeof ( buf->cfg ) );
-	buf = intelxl_admin_command_buffer ( intelxl );
+	buf = intelxlvf_admin_command_buffer ( intelxl );
 	buf->cfg.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->cfg.count = cpu_to_le16 ( 1 );
 	buf->cfg.tx.vsi = cpu_to_le16 ( intelxl->vsi );
@@ -438,16 +444,16 @@ static int intelxlvf_admin_configure ( struct net_device *netdev ) {
  */
 static int intelxlvf_admin_irq_map ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	struct intelxl_admin_descriptor *cmd;
-	union intelxl_admin_buffer *buf;
+	struct intelxlvf_admin_descriptor *cmd;
+	union intelxlvf_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
-	cmd = intelxl_admin_command_descriptor ( intelxl );
-	cmd->vopcode = cpu_to_le32 ( INTELXL_ADMIN_VF_IRQ_MAP );
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_IRQ_MAP );
 	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
 	cmd->len = cpu_to_le16 ( sizeof ( buf->irq ) );
-	buf = intelxl_admin_command_buffer ( intelxl );
+	buf = intelxlvf_admin_command_buffer ( intelxl );
 	buf->irq.count = cpu_to_le16 ( 1 );
 	buf->irq.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->irq.vec = cpu_to_le16 ( INTELXLVF_MSIX_VECTOR );
@@ -470,17 +476,17 @@ static int intelxlvf_admin_irq_map ( struct net_device *netdev ) {
  */
 static int intelxlvf_admin_queues ( struct net_device *netdev, int enable ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	struct intelxl_admin_descriptor *cmd;
-	union intelxl_admin_buffer *buf;
+	struct intelxlvf_admin_descriptor *cmd;
+	union intelxlvf_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
-	cmd = intelxl_admin_command_descriptor ( intelxl );
-	cmd->vopcode = ( enable ? cpu_to_le32 ( INTELXL_ADMIN_VF_ENABLE ) :
-			 cpu_to_le32 ( INTELXL_ADMIN_VF_DISABLE ) );
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->vopcode = ( enable ? cpu_to_le32 ( INTELXLVF_ADMIN_ENABLE ) :
+			 cpu_to_le32 ( INTELXLVF_ADMIN_DISABLE ) );
 	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
 	cmd->len = cpu_to_le16 ( sizeof ( buf->queues ) );
-	buf = intelxl_admin_command_buffer ( intelxl );
+	buf = intelxlvf_admin_command_buffer ( intelxl );
 	buf->queues.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->queues.rx = cpu_to_le32 ( 1 );
 	buf->queues.tx = cpu_to_le32 ( 1 );
@@ -500,16 +506,16 @@ static int intelxlvf_admin_queues ( struct net_device *netdev, int enable ) {
  */
 static int intelxlvf_admin_promisc ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	struct intelxl_admin_descriptor *cmd;
-	union intelxl_admin_buffer *buf;
+	struct intelxlvf_admin_descriptor *cmd;
+	union intelxlvf_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
-	cmd = intelxl_admin_command_descriptor ( intelxl );
-	cmd->vopcode = cpu_to_le32 ( INTELXL_ADMIN_VF_PROMISC );
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_PROMISC );
 	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
 	cmd->len = cpu_to_le16 ( sizeof ( buf->promisc ) );
-	buf = intelxl_admin_command_buffer ( intelxl );
+	buf = intelxlvf_admin_command_buffer ( intelxl );
 	buf->promisc.vsi = cpu_to_le16 ( intelxl->vsi );
 	buf->promisc.flags = cpu_to_le16 ( INTELXL_ADMIN_PROMISC_FL_UNICAST |
 					   INTELXL_ADMIN_PROMISC_FL_MULTICAST );
