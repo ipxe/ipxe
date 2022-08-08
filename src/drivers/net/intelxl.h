@@ -685,6 +685,8 @@ struct intelxl_context_rx {
 	uint8_t reserved_b[7];
 	/** Maximum frame size */
 	uint16_t mfs;
+	/** Reserved */
+	uint8_t reserved_c[8];
 } __attribute__ (( packed ));
 
 /** Receive queue base address and queue count */
