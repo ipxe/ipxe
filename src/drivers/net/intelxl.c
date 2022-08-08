@@ -1826,6 +1826,10 @@ static void intelxl_remove ( struct pci_device *pci ) {
 
 /** PCI device IDs */
 static struct pci_device_id intelxl_nics[] = {
+	PCI_ROM ( 0x8086, 0x0cf8, "x710-n3000", "X710 FPGA N3000", 0 ),
+	PCI_ROM ( 0x8086, 0x0d58, "xxv710-n3000", "XXV710 FPGA N3000", 0 ),
+	PCI_ROM ( 0x8086, 0x104e, "x710-sfp-b", "X710 10GbE SFP+", 0 ),
+	PCI_ROM ( 0x8086, 0x104f, "x710-kx-b", "X710 10GbE backplane", 0 ),
 	PCI_ROM ( 0x8086, 0x1572, "x710-sfp", "X710 10GbE SFP+", 0 ),
 	PCI_ROM ( 0x8086, 0x1574, "xl710-qemu", "Virtual XL710", 0 ),
 	PCI_ROM ( 0x8086, 0x1580, "xl710-kx-b", "XL710 40GbE backplane", 0 ),
@@ -1839,6 +1843,7 @@ static struct pci_device_id intelxl_nics[] = {
 	PCI_ROM ( 0x8086, 0x1589, "x710-10gt4", "X710 10GBASE-T4", 0 ),
 	PCI_ROM ( 0x8086, 0x158a, "xxv710", "XXV710 25GbE backplane", 0 ),
 	PCI_ROM ( 0x8086, 0x158b, "xxv710-sfp28", "XXV710 25GbE SFP28", 0 ),
+	PCI_ROM ( 0x8086, 0x15ff, "x710-10gt-b", "X710 10GBASE-T", 0 ),
 	PCI_ROM ( 0x8086, 0x37ce, "x722-kx", "X722 10GbE backplane", 0 ),
 	PCI_ROM ( 0x8086, 0x37cf, "x722-qsfp", "X722 10GbE QSFP+", 0 ),
 	PCI_ROM ( 0x8086, 0x37d0, "x722-sfp", "X722 10GbE SFP+", 0 ),
