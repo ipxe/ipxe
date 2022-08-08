@@ -123,7 +123,7 @@ void intelxl_msix_disable ( struct intelxl_nic *intelxl,
  */
 
 /** Admin queue register offsets */
-static const struct intelxl_admin_offsets intelxl_admin_offsets = {
+const struct intelxl_admin_offsets intelxl_admin_offsets = {
 	.bal = INTELXL_ADMIN_BAL,
 	.bah = INTELXL_ADMIN_BAH,
 	.len = INTELXL_ADMIN_LEN,
@@ -575,7 +575,7 @@ static int intelxl_admin_mac_write ( struct net_device *netdev ) {
  * @v intelxl		Intel device
  * @ret rc		Return status code
  */
-static int intelxl_admin_clear_pxe ( struct intelxl_nic *intelxl ) {
+int intelxl_admin_clear_pxe ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin_descriptor *cmd;
 	struct intelxl_admin_clear_pxe_params *pxe;
 	int rc;
@@ -726,7 +726,7 @@ static int intelxl_admin_promisc ( struct intelxl_nic *intelxl ) {
  * @v intelxl		Intel device
  * @ret rc		Return status code
  */
-static int intelxl_admin_mac_config ( struct intelxl_nic *intelxl ) {
+int intelxl_admin_mac_config ( struct intelxl_nic *intelxl ) {
 	struct intelxl_admin_descriptor *cmd;
 	struct intelxl_admin_mac_config_params *config;
 	int rc;
@@ -1280,8 +1280,8 @@ static int intelxl_disable_ring ( struct intelxl_nic *intelxl,
  * @v ring		Descriptor ring
  * @ret rc		Return status code
  */
-static int intelxl_create_ring ( struct intelxl_nic *intelxl,
-				 struct intelxl_ring *ring ) {
+int intelxl_create_ring ( struct intelxl_nic *intelxl,
+			  struct intelxl_ring *ring ) {
 	physaddr_t address;
 	int rc;
 
@@ -1314,8 +1314,8 @@ static int intelxl_create_ring ( struct intelxl_nic *intelxl,
  * @v intelxl		Intel device
  * @v ring		Descriptor ring
  */
-static void intelxl_destroy_ring ( struct intelxl_nic *intelxl,
-				   struct intelxl_ring *ring ) {
+void intelxl_destroy_ring ( struct intelxl_nic *intelxl,
+			    struct intelxl_ring *ring ) {
 	int rc;
 
 	/* Disable ring */
