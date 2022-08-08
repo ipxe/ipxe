@@ -1092,10 +1092,6 @@ struct intelxl_nic {
 
 	/** Current VF opcode */
 	unsigned int vopcode;
-	/** Current VF return value */
-	int vret;
-	/** Current VF event data buffer */
-	union intelxl_admin_buffer vbuf;
 
 	/** Transmit descriptor ring */
 	struct intelxl_ring tx;

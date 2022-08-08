@@ -201,7 +201,7 @@ static int intelxlvf_admin_command ( struct net_device *netdev ) {
 		}
 
 		/* Check for errors */
-		if ( intelxl->vret != 0 )
+		if ( cmd->vret != 0 )
 			return -EIO;
 
 		return 0;
@@ -271,7 +271,9 @@ static void intelxlvf_admin_event ( struct net_device *netdev,
 				    struct intelxl_admin_descriptor *evt,
 				    union intelxl_admin_buffer *buf ) {
 	struct intelxl_nic *intelxl = netdev->priv;
+	struct intelxl_admin *admin = &intelxl->command;
 	unsigned int vopcode;
+	unsigned int index;
 
 	/* Ignore unrecognised events */
 	if ( evt->opcode != cpu_to_le16 ( INTELXL_ADMIN_SEND_TO_VF ) ) {
@@ -283,12 +285,14 @@ static void intelxlvf_admin_event ( struct net_device *netdev,
 	/* Record command response if applicable */
 	vopcode = le32_to_cpu ( evt->vopcode );
 	if ( vopcode == intelxl->vopcode ) {
-		memcpy ( &intelxl->vbuf, buf, sizeof ( intelxl->vbuf ) );
+		index = ( ( admin->index - 1 ) % INTELXL_ADMIN_NUM_DESC );
+		memcpy ( &admin->desc[index], evt, sizeof ( *evt ) );
+		memcpy ( &admin->buf[index], buf, sizeof ( *buf ) );
 		intelxl->vopcode = 0;
-		intelxl->vret = le32_to_cpu ( evt->vret );
-		if ( intelxl->vret != 0 ) {
+		if ( evt->vret != 0 ) {
 			DBGC ( intelxl, "INTELXL %p admin VF command %#x "
-			       "error %d\n", intelxl, vopcode, intelxl->vret );
+			       "error %d\n", intelxl, vopcode,
+			       le32_to_cpu ( evt->vret ) );
 			DBGC_HDA ( intelxl, virt_to_phys ( evt ), evt,
 				   sizeof ( *evt ) );
 			DBGC_HDA ( intelxl, virt_to_phys ( buf ), buf,
@@ -322,7 +326,6 @@ static void intelxlvf_admin_event ( struct net_device *netdev,
 static int intelxlvf_admin_version ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	struct intelxl_admin_descriptor *cmd;
-	struct intelxl_admin_vf_version_buffer *ver;
 	union intelxl_admin_buffer *buf;
 	unsigned int api;
 	int rc;
@@ -339,10 +342,9 @@ static int intelxlvf_admin_version ( struct net_device *netdev ) {
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
 		return rc;
-	ver = &intelxl->vbuf.ver;
-	api = le32_to_cpu ( ver->major );
+	api = le32_to_cpu ( buf->ver.major );
 	DBGC ( intelxl, "INTELXL %p API v%d.%d\n",
-	       intelxl, api, le32_to_cpu ( ver->minor ) );
+	       intelxl, api, le32_to_cpu ( buf->ver.minor ) );
 
 	/* Check for API compatibility */
 	if ( api > INTELXL_ADMIN_VF_API_MAJOR ) {
@@ -363,21 +365,21 @@ static int intelxlvf_admin_version ( struct net_device *netdev ) {
 static int intelxlvf_admin_get_resources ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	struct intelxl_admin_descriptor *cmd;
-	struct intelxl_admin_vf_get_resources_buffer *res;
+	union intelxl_admin_buffer *buf;
 	int rc;
 
 	/* Populate descriptor */
 	cmd = intelxl_admin_command_descriptor ( intelxl );
 	cmd->vopcode = cpu_to_le32 ( INTELXL_ADMIN_VF_GET_RESOURCES );
+	buf = intelxl_admin_command_buffer ( intelxl );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
 		return rc;
 
 	/* Parse response */
-	res = &intelxl->vbuf.res;
-	intelxl->vsi = le16_to_cpu ( res->vsi );
-	memcpy ( netdev->hw_addr, res->mac, ETH_ALEN );
+	intelxl->vsi = le16_to_cpu ( buf->res.vsi );
+	memcpy ( netdev->hw_addr, buf->res.mac, ETH_ALEN );
 	DBGC ( intelxl, "INTELXL %p VSI %#04x\n", intelxl, intelxl->vsi );
 
 	return 0;
