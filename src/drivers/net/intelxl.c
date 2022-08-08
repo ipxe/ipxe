@@ -743,18 +743,26 @@ static int intelxl_admin_link ( struct net_device *netdev ) {
 }
 
 /**
- * Handle virtual function event (when VF driver is not present)
+ * Handle admin event
  *
  * @v netdev		Network device
- * @v evt		Admin queue event descriptor
- * @v buf		Admin queue event data buffer
+ * @v evt		Event descriptor
+ * @v buf		Data buffer
  */
-__weak void
-intelxlvf_admin_event ( struct net_device *netdev __unused,
-			struct intelxl_admin_descriptor *evt __unused,
-			union intelxl_admin_buffer *buf __unused ) {
+static void intelxl_admin_event ( struct net_device *netdev,
+				  struct intelxl_admin_descriptor *evt,
+				  union intelxl_admin_buffer *buf __unused ) {
+	struct intelxl_nic *intelxl = netdev->priv;
 
-	/* Nothing to do */
+	/* Ignore unrecognised events */
+	if ( evt->opcode != cpu_to_le16 ( INTELXL_ADMIN_LINK ) ) {
+		DBGC ( intelxl, "INTELXL %p unrecognised event opcode "
+		       "%#04x\n", intelxl, le16_to_cpu ( evt->opcode ) );
+		return;
+	}
+
+	/* Update link status */
+	intelxl_admin_link ( netdev );
 }
 
 /**
@@ -806,19 +814,7 @@ void intelxl_poll_admin ( struct net_device *netdev ) {
 		}
 
 		/* Handle event */
-		switch ( evt->opcode ) {
-		case cpu_to_le16 ( INTELXL_ADMIN_LINK ):
-			intelxl_admin_link ( netdev );
-			break;
-		case cpu_to_le16 ( INTELXL_ADMIN_SEND_TO_VF ):
-			intelxlvf_admin_event ( netdev, evt, buf );
-			break;
-		default:
-			DBGC ( intelxl, "INTELXL %p admin event %#x "
-			       "unrecognised opcode %#04x\n", intelxl,
-			       admin->index, le16_to_cpu ( evt->opcode ) );
-			break;
-		}
+		intelxl->handle ( netdev, evt, buf );
 
 		/* Reset descriptor and refill queue */
 		intelxl_admin_event_init ( intelxl, admin->index );
@@ -1645,6 +1641,7 @@ static int intelxl_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
 	intelxl->intr = INTELXL_PFINT_DYN_CTL0;
+	intelxl->handle = intelxl_admin_event;
 	intelxl_init_admin ( &intelxl->command, INTELXL_ADMIN_CMD,
 			     &intelxl_admin_offsets );
 	intelxl_init_admin ( &intelxl->event, INTELXL_ADMIN_EVT,

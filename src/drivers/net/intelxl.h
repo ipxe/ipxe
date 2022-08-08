@@ -1103,6 +1103,17 @@ struct intelxl_nic {
 	struct intelxl_ring rx;
 	/** Receive I/O buffers */
 	struct io_buffer *rx_iobuf[INTELXL_RX_NUM_DESC];
+
+	/**
+	 * Handle admin event
+	 *
+	 * @v netdev		Network device
+	 * @v evt		Event descriptor
+	 * @v buf		Data buffer
+	 */
+	void ( * handle ) ( struct net_device *netdev,
+			    struct intelxl_admin_descriptor *evt,
+			    union intelxl_admin_buffer *buf );
 };
 
 extern int intelxl_msix_enable ( struct intelxl_nic *intelxl,
@@ -1128,9 +1139,5 @@ extern void intelxl_empty_rx ( struct intelxl_nic *intelxl );
 extern int intelxl_transmit ( struct net_device *netdev,
 			      struct io_buffer *iobuf );
 extern void intelxl_poll ( struct net_device *netdev );
-
-extern void intelxlvf_admin_event ( struct net_device *netdev,
-				    struct intelxl_admin_descriptor *evt,
-				    union intelxl_admin_buffer *buf );
 
 #endif /* _INTELXL_H */

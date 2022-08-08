@@ -261,19 +261,27 @@ intelxlvf_admin_status ( struct net_device *netdev,
 }
 
 /**
- * Handle virtual function event
+ * Handle admin event
  *
  * @v netdev		Network device
  * @v evt		Admin queue event descriptor
  * @v buf		Admin queue event data buffer
  */
-void intelxlvf_admin_event ( struct net_device *netdev,
-			     struct intelxl_admin_descriptor *evt,
-			     union intelxl_admin_buffer *buf ) {
+static void intelxlvf_admin_event ( struct net_device *netdev,
+				    struct intelxl_admin_descriptor *evt,
+				    union intelxl_admin_buffer *buf ) {
 	struct intelxl_nic *intelxl = netdev->priv;
-	unsigned int vopcode = le32_to_cpu ( evt->vopcode );
+	unsigned int vopcode;
+
+	/* Ignore unrecognised events */
+	if ( evt->opcode != cpu_to_le16 ( INTELXL_ADMIN_SEND_TO_VF ) ) {
+		DBGC ( intelxl, "INTELXL %p unrecognised event opcode "
+		       "%#04x\n", intelxl, le16_to_cpu ( evt->opcode ) );
+		return;
+	}
 
 	/* Record command response if applicable */
+	vopcode = le32_to_cpu ( evt->vopcode );
 	if ( vopcode == intelxl->vopcode ) {
 		memcpy ( &intelxl->vbuf, buf, sizeof ( intelxl->vbuf ) );
 		intelxl->vopcode = 0;
@@ -626,6 +634,7 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	netdev->dev = &pci->dev;
 	memset ( intelxl, 0, sizeof ( *intelxl ) );
 	intelxl->intr = INTELXLVF_VFINT_DYN_CTLN ( INTELXLVF_MSIX_VECTOR );
+	intelxl->handle = intelxlvf_admin_event;
 	intelxl_init_admin ( &intelxl->command, INTELXLVF_ADMIN,
 			     &intelxlvf_admin_command_offsets );
 	intelxl_init_admin ( &intelxl->event, INTELXLVF_ADMIN,
