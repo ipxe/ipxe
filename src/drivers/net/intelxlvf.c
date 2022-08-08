@@ -46,23 +46,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Reset hardware via PCIe function-level reset
- *
- * @v intelxl		Intel device
- */
-static void intelxlvf_reset_flr ( struct intelxl_nic *intelxl,
-				  struct pci_device *pci ) {
-	uint16_t control;
-
-	/* Perform a PCIe function-level reset */
-	pci_read_config_word ( pci, ( intelxl->exp + PCI_EXP_DEVCTL ),
-			       &control );
-	pci_write_config_word ( pci, ( intelxl->exp + PCI_EXP_DEVCTL ),
-				( control | PCI_EXP_DEVCTL_FLR ) );
-	mdelay ( INTELXL_RESET_DELAY_MS );
-}
-
-/**
  * Wait for admin event queue to be torn down
  *
  * @v intelxl		Intel device
@@ -637,7 +620,7 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	}
 
 	/* Reset the function via PCIe FLR */
-	intelxlvf_reset_flr ( intelxl, pci );
+	pci_reset ( pci, intelxl->exp );
 
 	/* Enable MSI-X dummy interrupt */
 	if ( ( rc = intelxl_msix_enable ( intelxl, pci ) ) != 0 )
@@ -669,7 +652,7 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
  err_open_admin:
 	intelxl_msix_disable ( intelxl, pci );
  err_msix:
-	intelxlvf_reset_flr ( intelxl, pci );
+	pci_reset ( pci, intelxl->exp );
  err_exp:
 	iounmap ( intelxl->regs );
  err_ioremap:
@@ -701,7 +684,7 @@ static void intelxlvf_remove ( struct pci_device *pci ) {
 	intelxl_msix_disable ( intelxl, pci );
 
 	/* Reset the function via PCIe FLR */
-	intelxlvf_reset_flr ( intelxl, pci );
+	pci_reset ( pci, intelxl->exp );
 
 	/* Free network device */
 	iounmap ( intelxl->regs );
