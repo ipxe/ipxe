@@ -510,7 +510,7 @@ static int intelxlvf_open ( struct net_device *netdev ) {
 	return 0;
 
  err_promisc:
-	intelxlvf_admin_queues ( netdev, INTELXL_ADMIN_VF_DISABLE );
+	intelxlvf_admin_queues ( netdev, 0 );
  err_enable:
  err_irq_map:
  err_configure:
