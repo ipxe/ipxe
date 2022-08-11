@@ -329,6 +329,9 @@ union intelxl_admin_params {
 	struct intelxl_admin_link_params link;
 } __attribute__ (( packed ));
 
+/** Maximum size of a data buffer */
+#define INTELXL_ADMIN_BUFFER_SIZE 0x1000
+
 /** Admin queue data buffer */
 union intelxl_admin_buffer {
 	/** Driver Version data buffer */
@@ -337,8 +340,8 @@ union intelxl_admin_buffer {
 	struct intelxl_admin_switch_buffer sw;
 	/** Get VSI Parameters data buffer */
 	struct intelxl_admin_vsi_buffer vsi;
-	/** Alignment padding */
-	uint8_t pad[INTELXL_ALIGN];
+	/** Maximum buffer size */
+	uint8_t pad[INTELXL_ADMIN_BUFFER_SIZE];
 } __attribute__ (( packed ));
 
 /** Admin queue descriptor */
