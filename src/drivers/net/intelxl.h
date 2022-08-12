@@ -750,6 +750,9 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
  */
 #define INTELXL_RX_FILL 16
 
+/** Maximum packet length (excluding CRC) */
+#define INTELXL_MAX_PKT_LEN ( 9728 - 4 /* CRC */ )
+
 /******************************************************************************
  *
  * Top level
@@ -826,8 +829,7 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 
 /** Port MAC Address High Register */
 #define INTELXL_PRTGL_SAH 0x1e2140
-#define INTELXL_PRTGL_SAH_MFS_GET(x)	( (x) >> 16 )	/**< Max frame size */
-#define INTELXL_PRTGL_SAH_MFS_SET(x)	( (x) << 16 )	/**< Max frame size */
+#define INTELXL_PRTGL_SAH_MFS(x)	( (x) << 16 )	/**< Max frame size */
 
 /** Physical Function MAC Address Low Register */
 #define INTELXL_PRTPM_SAL 0x1e4440

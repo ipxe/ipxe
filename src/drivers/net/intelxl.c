@@ -63,8 +63,6 @@ static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
 	union intelxl_receive_address mac;
 	uint32_t prtpm_sal;
 	uint32_t prtpm_sah;
-	uint32_t prtgl_sah;
-	size_t mfs;
 
 	/* Read NVM-loaded address */
 	prtpm_sal = readl ( intelxl->regs + INTELXL_PRTPM_SAL );
@@ -83,11 +81,6 @@ static int intelxl_fetch_mac ( struct intelxl_nic *intelxl,
 	DBGC ( intelxl, "INTELXL %p has autoloaded MAC address %s\n",
 	       intelxl, eth_ntoa ( mac.raw ) );
 	memcpy ( netdev->hw_addr, mac.raw, ETH_ALEN );
-
-	/* Get maximum frame size */
-	prtgl_sah = readl ( intelxl->regs + INTELXL_PRTGL_SAH );
-	mfs = INTELXL_PRTGL_SAH_MFS_GET ( prtgl_sah );
-	netdev->max_pkt_len = ( mfs - 4 /* CRC */ );
 
 	return 0;
 }
@@ -1363,7 +1356,7 @@ static int intelxl_open ( struct net_device *netdev ) {
 	memcpy ( mac.raw, netdev->ll_addr, sizeof ( mac.raw ) );
 	prtgl_sal = le32_to_cpu ( mac.reg.low );
 	prtgl_sah = ( le32_to_cpu ( mac.reg.high ) |
-		      INTELXL_PRTGL_SAH_MFS_SET ( intelxl->mfs ) );
+		      INTELXL_PRTGL_SAH_MFS ( intelxl->mfs ) );
 	writel ( prtgl_sal, intelxl->regs + INTELXL_PRTGL_SAL );
 	writel ( prtgl_sah, intelxl->regs + INTELXL_PRTGL_SAH );
 
@@ -1639,6 +1632,7 @@ static int intelxl_probe ( struct pci_device *pci ) {
 		goto err_alloc;
 	}
 	netdev_init ( netdev, &intelxl_operations );
+	netdev->max_pkt_len = INTELXL_MAX_PKT_LEN;
 	intelxl = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
