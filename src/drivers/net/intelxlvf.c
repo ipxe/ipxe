@@ -391,6 +391,57 @@ static int intelxlvf_admin_get_resources ( struct net_device *netdev ) {
 	return 0;
 }
 
+/**
+ * Get statistics (for debugging)
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int intelxlvf_admin_stats ( struct net_device *netdev ) {
+	struct intelxl_nic *intelxl = netdev->priv;
+	struct intelxlvf_admin_descriptor *cmd;
+	union intelxlvf_admin_buffer *buf;
+	struct intelxlvf_admin_stats *tx;
+	struct intelxlvf_admin_stats *rx;
+	int rc;
+
+	/* Populate descriptor */
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_GET_STATS );
+	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
+	cmd->len = cpu_to_le16 ( sizeof ( buf->queues ) );
+	buf = intelxlvf_admin_command_buffer ( intelxl );
+	buf->queues.vsi = cpu_to_le16 ( intelxl->vsi );
+	tx = &buf->stats.tx;
+	rx = &buf->stats.rx;
+
+	/* Issue command */
+	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
+		return rc;
+	DBGC ( intelxl, "INTELXL %p TX bytes %#llx discards %#llx errors "
+	       "%#llx\n", intelxl,
+	       ( ( unsigned long long ) le64_to_cpu ( tx->bytes ) ),
+	       ( ( unsigned long long ) le64_to_cpu ( tx->discards ) ),
+	       ( ( unsigned long long ) le64_to_cpu ( tx->errors ) ) );
+	DBGC ( intelxl, "INTELXL %p TX unicasts %#llx multicasts %#llx "
+	       "broadcasts %#llx\n", intelxl,
+	       ( ( unsigned long long ) le64_to_cpu ( tx->unicasts ) ),
+	       ( ( unsigned long long ) le64_to_cpu ( tx->multicasts ) ),
+	       ( ( unsigned long long ) le64_to_cpu ( tx->broadcasts ) ) );
+	DBGC ( intelxl, "INTELXL %p RX bytes %#llx discards %#llx errors "
+	       "%#llx\n", intelxl,
+	       ( ( unsigned long long ) le64_to_cpu ( rx->bytes ) ),
+	       ( ( unsigned long long ) le64_to_cpu ( rx->discards ) ),
+	       ( ( unsigned long long ) le64_to_cpu ( rx->errors ) ) );
+	DBGC ( intelxl, "INTELXL %p RX unicasts %#llx multicasts %#llx "
+	       "broadcasts %#llx\n", intelxl,
+	       ( ( unsigned long long ) le64_to_cpu ( rx->unicasts ) ),
+	       ( ( unsigned long long ) le64_to_cpu ( rx->multicasts ) ),
+	       ( ( unsigned long long ) le64_to_cpu ( rx->broadcasts ) ) );
+
+	return 0;
+}
+
 /******************************************************************************
  *
  * Network device interface
@@ -565,6 +616,10 @@ static int intelxlvf_open ( struct net_device *netdev ) {
 	if ( ( rc = intelxlvf_admin_promisc ( netdev ) ) != 0 )
 		goto err_promisc;
 
+	/* Reset statistics counters (if debugging) */
+	if ( DBG_LOG )
+		intelxlvf_admin_stats ( netdev );
+
 	return 0;
 
  err_promisc:
@@ -587,6 +642,10 @@ static int intelxlvf_open ( struct net_device *netdev ) {
 static void intelxlvf_close ( struct net_device *netdev ) {
 	struct intelxl_nic *intelxl = netdev->priv;
 	int rc;
+
+	/* Show statistics (if debugging) */
+	if ( DBG_LOG )
+		intelxlvf_admin_stats ( netdev );
 
 	/* Disable queues */
 	if ( ( rc = intelxlvf_admin_queues ( netdev, 0 ) ) != 0 ) {

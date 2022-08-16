@@ -253,6 +253,33 @@ struct intelxlvf_admin_promisc_buffer {
 	uint16_t flags;
 } __attribute__ (( packed ));
 
+/** Admin Queue VF Get Statistics opcode */
+#define INTELXLVF_ADMIN_GET_STATS 0x0000000f
+
+/** VF statistics */
+struct intelxlvf_admin_stats {
+	/** Bytes */
+	uint64_t bytes;
+	/** Unicast packets */
+	uint64_t unicasts;
+	/** Multicast packets */
+	uint64_t multicasts;
+	/** Broadcast packets */
+	uint64_t broadcasts;
+	/** Discarded packets */
+	uint64_t discards;
+	/** Errors */
+	uint64_t errors;
+} __attribute__ (( packed ));
+
+/** Admin Queue VF Get Statistics data buffer */
+struct intelxlvf_admin_stats_buffer {
+	/** Receive statistics */
+	struct intelxlvf_admin_stats rx;
+	/** Transmit statistics */
+	struct intelxlvf_admin_stats tx;
+} __attribute__ (( packed ));
+
 /** Admin queue data buffer */
 union intelxlvf_admin_buffer {
 	/** Original 40 Gigabit Ethernet data buffer */
@@ -271,6 +298,8 @@ union intelxlvf_admin_buffer {
 	struct intelxlvf_admin_promisc_buffer promisc;
 	/** VF IRQ Map data buffer */
 	struct intelxlvf_admin_irq_map_buffer irq;
+	/** VF Get Statistics data buffer */
+	struct intelxlvf_admin_stats_buffer stats;
 } __attribute__ (( packed ));
 
 /** Admin queue descriptor */
