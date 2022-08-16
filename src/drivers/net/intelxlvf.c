@@ -103,6 +103,32 @@ static int intelxlvf_reset_wait_active ( struct intelxl_nic *intelxl ) {
 }
 
 /**
+ * Wait for reset to complete
+ *
+ * @v intelxl		Intel device
+ * @ret rc		Return status code
+ */
+static int intelxlvf_reset_wait ( struct intelxl_nic *intelxl ) {
+	int rc;
+
+	/* Wait for minimum reset time */
+	mdelay ( INTELXLVF_RESET_DELAY_MS );
+
+	/* Wait for reset to take effect */
+	if ( ( rc = intelxlvf_reset_wait_teardown ( intelxl ) ) != 0 )
+		goto err_teardown;
+
+	/* Wait for virtual function to become active */
+	if ( ( rc = intelxlvf_reset_wait_active ( intelxl ) ) != 0 )
+		goto err_active;
+
+ err_active:
+ err_teardown:
+	intelxl_reopen_admin ( intelxl );
+	return rc;
+}
+
+/**
  * Reset hardware via admin queue
  *
  * @v intelxl		Intel device
@@ -119,24 +145,13 @@ static int intelxlvf_reset_admin ( struct intelxl_nic *intelxl ) {
 
 	/* Issue command */
 	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
-		goto err_command;
+		return rc;
 
-	/* Wait for minimum reset time */
-	mdelay ( INTELXLVF_RESET_DELAY_MS );
+	/* Wait for reset to complete */
+	if ( ( rc = intelxlvf_reset_wait ( intelxl ) ) != 0 )
+		return rc;
 
-	/* Wait for reset to take effect */
-	if ( ( rc = intelxlvf_reset_wait_teardown ( intelxl ) ) != 0 )
-		goto err_teardown;
-
-	/* Wait for virtual function to become active */
-	if ( ( rc = intelxlvf_reset_wait_active ( intelxl ) ) != 0 )
-		goto err_active;
-
- err_active:
- err_teardown:
-	intelxl_reopen_admin ( intelxl );
- err_command:
-	return rc;
+	return 0;
 }
 
 /******************************************************************************
