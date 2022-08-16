@@ -130,6 +130,9 @@ struct intelxlvf_admin_get_resources_buffer {
 /** Layer 2 capabilities (add/remove MAC, configure promiscuous mode) */
 #define INTELXLVF_ADMIN_CAP_L2 0x00000001
 
+/** Request Queues capabilities */
+#define INTELXLVF_ADMIN_CAP_RQPS 0x00000040
+
 /** Admin Queue VF Status Change Event opcode */
 #define INTELXLVF_ADMIN_STATUS 0x00000011
 
@@ -299,6 +302,15 @@ struct intelxlvf_admin_stats_buffer {
 	struct intelxlvf_admin_stats tx;
 } __attribute__ (( packed ));
 
+/** Admin Queue VF Request Queues opcode */
+#define INTELXLVF_ADMIN_REQUEST_QPS 0x0000001d
+
+/** Admin Queue VF Request Queues data buffer */
+struct intelxlvf_admin_request_qps_buffer {
+	/** Number of queue pairs */
+	uint16_t count;
+} __attribute__ (( packed ));
+
 /** Admin queue data buffer */
 union intelxlvf_admin_buffer {
 	/** Original 40 Gigabit Ethernet data buffer */
@@ -321,6 +333,8 @@ union intelxlvf_admin_buffer {
 	struct intelxlvf_admin_irq_map_buffer irq;
 	/** VF Get Statistics data buffer */
 	struct intelxlvf_admin_stats_buffer stats;
+	/** VF Request Queues data buffer */
+	struct intelxlvf_admin_request_qps_buffer rqps;
 } __attribute__ (( packed ));
 
 /** Admin queue descriptor */

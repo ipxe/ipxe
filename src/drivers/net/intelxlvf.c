@@ -395,7 +395,8 @@ static int intelxlvf_admin_get_resources ( struct net_device *netdev ) {
 	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
 	cmd->len = cpu_to_le16 ( sizeof ( buf->caps ) );
 	buf = intelxlvf_admin_command_buffer ( intelxl );
-	buf->caps.caps = cpu_to_le32 ( INTELXLVF_ADMIN_CAP_L2 );
+	buf->caps.caps = cpu_to_le32 ( INTELXLVF_ADMIN_CAP_L2 |
+				       INTELXLVF_ADMIN_CAP_RQPS );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
@@ -458,6 +459,42 @@ static int intelxlvf_admin_stats ( struct net_device *netdev ) {
 	       ( ( unsigned long long ) le64_to_cpu ( rx->unicasts ) ),
 	       ( ( unsigned long long ) le64_to_cpu ( rx->multicasts ) ),
 	       ( ( unsigned long long ) le64_to_cpu ( rx->broadcasts ) ) );
+
+	return 0;
+}
+
+/**
+ * Configure number of queue pairs
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int intelxlvf_admin_request_qps ( struct net_device *netdev ) {
+	struct intelxl_nic *intelxl = netdev->priv;
+	struct intelxlvf_admin_descriptor *cmd;
+	union intelxlvf_admin_buffer *buf;
+	int rc;
+
+	/* Populate descriptor */
+	cmd = intelxlvf_admin_command_descriptor ( intelxl );
+	cmd->opcode = cpu_to_le16 ( INTELXLVF_ADMIN_SEND_TO_PF );
+	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_REQUEST_QPS );
+	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
+	cmd->len = cpu_to_le16 ( sizeof ( buf->rqps ) );
+	buf = intelxlvf_admin_command_buffer ( intelxl );
+	buf->rqps.count = cpu_to_le16 ( 1 );
+
+	/* Issue command (which will trigger a reset) */
+	if ( ( rc = intelxl_admin_command ( intelxl ) ) != 0 )
+		return rc;
+
+	/* Wait for reset to complete */
+	if ( ( rc = intelxlvf_reset_wait ( intelxl ) ) != 0 )
+		return rc;
+
+	/* Reestablish capabilities to reactivate VF after reset */
+	if ( ( rc = intelxlvf_admin_get_resources ( netdev ) ) != 0 )
+		return rc;
 
 	return 0;
 }
@@ -781,6 +818,11 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 	if ( ( rc = intelxlvf_admin_get_resources ( netdev ) ) != 0 )
 		goto err_get_resources;
 
+	/* Configure number of queue pairs, if applicable */
+	if ( ( intelxl->caps & INTELXLVF_ADMIN_CAP_RQPS ) &&
+	     ( ( rc = intelxlvf_admin_request_qps ( netdev ) ) != 0 ) )
+		goto err_rqps;
+
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register_netdev;
@@ -789,6 +831,7 @@ static int intelxlvf_probe ( struct pci_device *pci ) {
 
 	unregister_netdev ( netdev );
  err_register_netdev:
+ err_rqps:
  err_get_resources:
  err_version:
  err_reset_admin:
