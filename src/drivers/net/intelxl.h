@@ -927,6 +927,8 @@ struct intelxl_nic {
 	unsigned int qset;
 	/** Transmit element ID */
 	uint32_t teid;
+	/** Device capabilities */
+	uint32_t caps;
 	/** Interrupt control register */
 	unsigned int intr;
 	/** PCI Express capability offset */

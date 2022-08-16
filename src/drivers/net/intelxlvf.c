@@ -377,16 +377,21 @@ static int intelxlvf_admin_get_resources ( struct net_device *netdev ) {
 	/* Populate descriptor */
 	cmd = intelxlvf_admin_command_descriptor ( intelxl );
 	cmd->vopcode = cpu_to_le32 ( INTELXLVF_ADMIN_GET_RESOURCES );
+	cmd->flags = cpu_to_le16 ( INTELXL_ADMIN_FL_RD | INTELXL_ADMIN_FL_BUF );
+	cmd->len = cpu_to_le16 ( sizeof ( buf->caps ) );
 	buf = intelxlvf_admin_command_buffer ( intelxl );
+	buf->caps.caps = cpu_to_le32 ( INTELXLVF_ADMIN_CAP_L2 );
 
 	/* Issue command */
 	if ( ( rc = intelxlvf_admin_command ( netdev ) ) != 0 )
 		return rc;
 
 	/* Parse response */
+	intelxl->caps = le32_to_cpu ( buf->res.caps );
 	intelxl->vsi = le16_to_cpu ( buf->res.vsi );
 	memcpy ( netdev->hw_addr, buf->res.mac, ETH_ALEN );
-	DBGC ( intelxl, "INTELXL %p VSI %#04x\n", intelxl, intelxl->vsi );
+	DBGC ( intelxl, "INTELXL %p capabilities %#08x VSI %#04x\n",
+	       intelxl, intelxl->caps, intelxl->vsi );
 
 	return 0;
 }
