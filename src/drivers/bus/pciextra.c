@@ -1,6 +1,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
+#include <ipxe/timer.h>
 #include <ipxe/pci.h>
 
 static int pci_find_capability_common ( struct pci_device *pci,
@@ -111,4 +112,25 @@ unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg ) {
 	/* Find the lowest bit set */
 	size = size & ~( size - 1 );
 	return size;
+}
+
+/**
+ * Perform PCI Express function-level reset (FLR)
+ *
+ * @v pci		PCI device
+ * @v exp		PCI Express Capability address
+ */
+void pci_reset ( struct pci_device *pci, unsigned int exp ) {
+	uint16_t control;
+
+	/* Perform a PCIe function-level reset */
+	pci_read_config_word ( pci, ( exp + PCI_EXP_DEVCTL ), &control );
+	control |= PCI_EXP_DEVCTL_FLR;
+	pci_write_config_word ( pci, ( exp + PCI_EXP_DEVCTL ), control );
+
+	/* Allow time for reset to complete */
+	mdelay ( PCI_EXP_FLR_DELAY_MS );
+
+	/* Re-enable device */
+	adjust_pci_device ( pci );
 }
