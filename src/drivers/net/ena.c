@@ -24,6 +24,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -34,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iobuf.h>
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
+#include <ipxe/version.h>
 #include "ena.h"
 
 /** @file
@@ -608,6 +610,32 @@ static int ena_get_device_attributes ( struct net_device *netdev ) {
 }
 
 /**
+ * Set host attributes
+ *
+ * @v ena		ENA device
+ * @ret rc		Return status code
+ */
+static int ena_set_host_attributes ( struct ena_nic *ena ) {
+	union ena_aq_req *req;
+	union ena_acq_rsp *rsp;
+	union ena_feature *feature;
+	int rc;
+
+	/* Construct request */
+	req = ena_admin_req ( ena );
+	req->header.opcode = ENA_SET_FEATURE;
+	req->set_feature.id = ENA_HOST_ATTRIBUTES;
+	feature = &req->set_feature.feature;
+	feature->host.info = cpu_to_le64 ( virt_to_bus ( ena->info ) );
+
+	/* Issue request */
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
  * Get statistics (for debugging)
  *
  * @v ena		ENA device
@@ -965,6 +993,7 @@ static struct net_device_operations ena_operations = {
 static int ena_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct ena_nic *ena;
+	struct ena_host_info *info;
 	int rc;
 
 	/* Allocate and initialise net device */
@@ -998,6 +1027,25 @@ static int ena_probe ( struct pci_device *pci ) {
 		goto err_ioremap;
 	}
 
+	/* Allocate and initialise host info */
+	info = malloc_phys ( PAGE_SIZE, PAGE_SIZE );
+	if ( ! info ) {
+		rc = -ENOMEM;
+		goto err_info;
+	}
+	ena->info = info;
+	memset ( info, 0, PAGE_SIZE );
+	info->type = cpu_to_le32 ( ENA_HOST_INFO_TYPE_LINUX );
+	snprintf ( info->dist_str, sizeof ( info->dist_str ), "%s",
+		   ( product_name[0] ? product_name : product_short_name ) );
+	snprintf ( info->kernel_str, sizeof ( info->kernel_str ), "%s",
+		   product_version );
+	info->version = cpu_to_le32 ( ENA_HOST_INFO_VERSION_WTF );
+	info->spec = cpu_to_le16 ( ENA_HOST_INFO_SPEC_2_0 );
+	info->busdevfn = cpu_to_le16 ( pci->busdevfn );
+	DBGC2 ( ena, "ENA %p host info:\n", ena );
+	DBGC2_HDA ( ena, virt_to_phys ( info ), info, sizeof ( *info ) );
+
 	/* Reset the NIC */
 	if ( ( rc = ena_reset ( ena ) ) != 0 )
 		goto err_reset;
@@ -1005,6 +1053,10 @@ static int ena_probe ( struct pci_device *pci ) {
 	/* Create admin queues */
 	if ( ( rc = ena_create_admin ( ena ) ) != 0 )
 		goto err_create_admin;
+
+	/* Set host attributes */
+	if ( ( rc = ena_set_host_attributes ( ena ) ) != 0 )
+		goto err_set_host_attributes;
 
 	/* Fetch MAC address */
 	if ( ( rc = ena_get_device_attributes ( netdev ) ) != 0 )
@@ -1024,10 +1076,13 @@ static int ena_probe ( struct pci_device *pci ) {
 	unregister_netdev ( netdev );
  err_register_netdev:
  err_get_device_attributes:
+ err_set_host_attributes:
 	ena_destroy_admin ( ena );
  err_create_admin:
 	ena_reset ( ena );
  err_reset:
+	free_phys ( ena->info, PAGE_SIZE );
+ err_info:
 	iounmap ( ena->regs );
  err_ioremap:
 	netdev_nullify ( netdev );
@@ -1053,6 +1108,9 @@ static void ena_remove ( struct pci_device *pci ) {
 
 	/* Reset card */
 	ena_reset ( ena );
+
+	/* Free host info */
+	free_phys ( ena->info, PAGE_SIZE );
 
 	/* Free network device */
 	iounmap ( ena->regs );
