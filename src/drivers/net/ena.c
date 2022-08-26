@@ -359,6 +359,7 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 			   struct ena_cq *cq ) {
 	union ena_aq_req *req;
 	union ena_acq_rsp *rsp;
+	unsigned int i;
 	int rc;
 
 	/* Allocate submission queue entries */
@@ -395,6 +396,10 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	sq->fill = sq->count;
 	if ( sq->fill > cq->actual )
 		sq->fill = cq->actual;
+
+	/* Initialise buffer ID ring */
+	for ( i = 0 ; i < sq->count ; i++ )
+		sq->ids[i] = i;
 
 	DBGC ( ena, "ENA %p %s SQ%d at [%08lx,%08lx) fill %d db +%04x CQ%d\n",
 	       ena, ena_direction ( sq->direction ), sq->id,
@@ -657,10 +662,11 @@ static void ena_refill_rx ( struct net_device *netdev ) {
 	struct ena_nic *ena = netdev->priv;
 	struct io_buffer *iobuf;
 	struct ena_rx_sqe *sqe;
-	unsigned int index;
 	physaddr_t address;
 	size_t len = netdev->max_pkt_len;
 	unsigned int refilled = 0;
+	unsigned int index;
+	unsigned int id;
 
 	/* Refill queue */
 	while ( ( ena->rx.sq.prod - ena->rx.cq.cons ) < ena->rx.sq.fill ) {
@@ -672,14 +678,15 @@ static void ena_refill_rx ( struct net_device *netdev ) {
 			break;
 		}
 
-		/* Get next submission queue entry */
+		/* Get next submission queue entry and buffer ID */
 		index = ( ena->rx.sq.prod % ENA_RX_COUNT );
 		sqe = &ena->rx.sq.sqe.rx[index];
+		id = ena->rx_ids[index];
 
 		/* Construct submission queue entry */
 		address = virt_to_bus ( iobuf->data );
 		sqe->len = cpu_to_le16 ( len );
-		sqe->id = cpu_to_le16 ( ena->rx.sq.prod );
+		sqe->id = cpu_to_le16 ( id );
 		sqe->address = cpu_to_le64 ( address );
 		wmb();
 		sqe->flags = ( ENA_SQE_FIRST | ENA_SQE_LAST | ENA_SQE_CPL |
@@ -691,10 +698,10 @@ static void ena_refill_rx ( struct net_device *netdev ) {
 			ena->rx.sq.phase ^= ENA_SQE_PHASE;
 
 		/* Record I/O buffer */
-		assert ( ena->rx_iobuf[index] == NULL );
-		ena->rx_iobuf[index] = iobuf;
+		assert ( ena->rx_iobuf[id] == NULL );
+		ena->rx_iobuf[id] = iobuf;
 
-		DBGC2 ( ena, "ENA %p RX %d at [%08llx,%08llx)\n", ena, sqe->id,
+		DBGC2 ( ena, "ENA %p RX %d at [%08llx,%08llx)\n", ena, id,
 			( ( unsigned long long ) address ),
 			( ( unsigned long long ) address + len ) );
 		refilled++;
@@ -783,8 +790,9 @@ static void ena_close ( struct net_device *netdev ) {
 static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct ena_nic *ena = netdev->priv;
 	struct ena_tx_sqe *sqe;
-	unsigned int index;
 	physaddr_t address;
+	unsigned int index;
+	unsigned int id;
 	size_t len;
 
 	/* Get next submission queue entry */
@@ -794,12 +802,13 @@ static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	}
 	index = ( ena->tx.sq.prod % ENA_TX_COUNT );
 	sqe = &ena->tx.sq.sqe.tx[index];
+	id = ena->tx_ids[index];
 
 	/* Construct submission queue entry */
 	address = virt_to_bus ( iobuf->data );
 	len = iob_len ( iobuf );
 	sqe->len = cpu_to_le16 ( len );
-	sqe->id = ena->tx.sq.prod;
+	sqe->id = cpu_to_le16 ( id );
 	sqe->address = cpu_to_le64 ( address );
 	wmb();
 	sqe->flags = ( ENA_SQE_FIRST | ENA_SQE_LAST | ENA_SQE_CPL |
@@ -811,10 +820,14 @@ static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	if ( ( ena->tx.sq.prod % ENA_TX_COUNT ) == 0 )
 		ena->tx.sq.phase ^= ENA_SQE_PHASE;
 
+	/* Record I/O buffer */
+	assert ( ena->tx_iobuf[id] == NULL );
+	ena->tx_iobuf[id] = iobuf;
+
 	/* Ring doorbell */
 	writel ( ena->tx.sq.prod, ( ena->regs + ena->tx.sq.doorbell ) );
 
-	DBGC2 ( ena, "ENA %p TX %d at [%08llx,%08llx)\n", ena, sqe->id,
+	DBGC2 ( ena, "ENA %p TX %d at [%08llx,%08llx)\n", ena, id,
 		( ( unsigned long long ) address ),
 		( ( unsigned long long ) address + len ) );
 	return 0;
@@ -828,7 +841,9 @@ static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 static void ena_poll_tx ( struct net_device *netdev ) {
 	struct ena_nic *ena = netdev->priv;
 	struct ena_tx_cqe *cqe;
+	struct io_buffer *iobuf;
 	unsigned int index;
+	unsigned int id;
 
 	/* Check for completed packets */
 	while ( ena->tx.cq.cons != ena->tx.sq.prod ) {
@@ -840,16 +855,24 @@ static void ena_poll_tx ( struct net_device *netdev ) {
 		/* Stop if completion queue entry is empty */
 		if ( ( cqe->flags ^ ena->tx.cq.phase ) & ENA_CQE_PHASE )
 			return;
-		DBGC2 ( ena, "ENA %p TX %d complete\n", ena,
-			( le16_to_cpu ( cqe->id ) >> 2 /* Don't ask */ ) );
 
 		/* Increment consumer counter */
 		ena->tx.cq.cons++;
 		if ( ! ( ena->tx.cq.cons & ena->tx.cq.mask ) )
 			ena->tx.cq.phase ^= ENA_CQE_PHASE;
 
+		/* Identify and free buffer ID */
+		id = ENA_TX_CQE_ID ( le16_to_cpu ( cqe->id ) );
+		ena->tx_ids[index] = id;
+
+		/* Identify I/O buffer */
+		iobuf = ena->tx_iobuf[id];
+		assert ( iobuf != NULL );
+		ena->tx_iobuf[id] = NULL;
+
 		/* Complete transmit */
-		netdev_tx_complete_next ( netdev );
+		DBGC2 ( ena, "ENA %p TX %d complete\n", ena, id );
+		netdev_tx_complete ( netdev, iobuf );
 	}
 }
 
@@ -863,13 +886,14 @@ static void ena_poll_rx ( struct net_device *netdev ) {
 	struct ena_rx_cqe *cqe;
 	struct io_buffer *iobuf;
 	unsigned int index;
+	unsigned int id;
 	size_t len;
 
 	/* Check for received packets */
 	while ( ena->rx.cq.cons != ena->rx.sq.prod ) {
 
 		/* Get next completion queue entry */
-		index = ( ena->rx.cq.cons % ENA_RX_COUNT );
+		index = ( ena->rx.cq.cons & ena->rx.cq.mask );
 		cqe = &ena->rx.cq.cqe.rx[index];
 
 		/* Stop if completion queue entry is empty */
@@ -881,15 +905,20 @@ static void ena_poll_rx ( struct net_device *netdev ) {
 		if ( ! ( ena->rx.cq.cons & ena->rx.cq.mask ) )
 			ena->rx.cq.phase ^= ENA_CQE_PHASE;
 
+		/* Identify and free buffer ID */
+		id = le16_to_cpu ( cqe->id );
+		ena->rx_ids[index] = id;
+
 		/* Populate I/O buffer */
-		iobuf = ena->rx_iobuf[index];
-		ena->rx_iobuf[index] = NULL;
+		iobuf = ena->rx_iobuf[id];
+		assert ( iobuf != NULL );
+		ena->rx_iobuf[id] = NULL;
 		len = le16_to_cpu ( cqe->len );
 		iob_put ( iobuf, len );
 
 		/* Hand off to network stack */
 		DBGC2 ( ena, "ENA %p RX %d complete (length %zd)\n",
-			ena, le16_to_cpu ( cqe->id ), len );
+			ena, id, len );
 		netdev_rx ( netdev, iobuf );
 	}
 }
@@ -952,11 +981,11 @@ static int ena_probe ( struct pci_device *pci ) {
 	ena_cq_init ( &ena->tx.cq, ENA_TX_COUNT,
 		      sizeof ( ena->tx.cq.cqe.tx[0] ) );
 	ena_sq_init ( &ena->tx.sq, ENA_SQ_TX, ENA_TX_COUNT,
-		      sizeof ( ena->tx.sq.sqe.tx[0] ) );
+		      sizeof ( ena->tx.sq.sqe.tx[0] ), ena->tx_ids );
 	ena_cq_init ( &ena->rx.cq, ENA_RX_COUNT,
 		      sizeof ( ena->rx.cq.cqe.rx[0] ) );
 	ena_sq_init ( &ena->rx.sq, ENA_SQ_RX, ENA_RX_COUNT,
-		      sizeof ( ena->rx.sq.sqe.rx[0] ) );
+		      sizeof ( ena->rx.sq.sqe.rx[0] ), ena->rx_ids );
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );

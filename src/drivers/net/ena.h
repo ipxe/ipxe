@@ -454,6 +454,9 @@ struct ena_tx_cqe {
 	uint16_t cons;
 } __attribute__ (( packed ));
 
+/** Transmit completion request identifier */
+#define ENA_TX_CQE_ID(id) ( (id) >> 2 )
+
 /** Receive completion queue entry */
 struct ena_rx_cqe {
 	/** Reserved */
@@ -482,6 +485,8 @@ struct ena_sq {
 		/** Raw data */
 		void *raw;
 	} sqe;
+	/** Buffer IDs */
+	uint8_t *ids;
 	/** Doorbell register offset */
 	unsigned int doorbell;
 	/** Total length of entries */
@@ -507,14 +512,16 @@ struct ena_sq {
  * @v direction		Direction
  * @v count		Number of entries
  * @v size		Size of each entry
+ * @v ids		Buffer IDs
  */
 static inline __attribute__ (( always_inline )) void
 ena_sq_init ( struct ena_sq *sq, unsigned int direction, unsigned int count,
-	      size_t size ) {
+	      size_t size, uint8_t *ids ) {
 
 	sq->len = ( count * size );
 	sq->direction = direction;
 	sq->count = count;
+	sq->ids = ids;
 }
 
 /** Completion queue */
@@ -583,7 +590,13 @@ struct ena_nic {
 	struct ena_qp tx;
 	/** Receive queue */
 	struct ena_qp rx;
-	/** Receive I/O buffers */
+	/** Transmit buffer IDs */
+	uint8_t tx_ids[ENA_TX_COUNT];
+	/** Transmit I/O buffers, indexed by buffer ID */
+	struct io_buffer *tx_iobuf[ENA_TX_COUNT];
+	/** Receive buffer IDs */
+	uint8_t rx_ids[ENA_RX_COUNT];
+	/** Receive I/O buffers, indexed by buffer ID */
 	struct io_buffer *rx_iobuf[ENA_RX_COUNT];
 };
 
