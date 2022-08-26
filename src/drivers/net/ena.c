@@ -391,11 +391,16 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	sq->prod = 0;
 	sq->phase = ENA_SQE_PHASE;
 
-	DBGC ( ena, "ENA %p %s SQ%d at [%08lx,%08lx) db +%04x CQ%d\n",
+	/* Calculate fill level */
+	sq->fill = sq->count;
+	if ( sq->fill > cq->actual )
+		sq->fill = cq->actual;
+
+	DBGC ( ena, "ENA %p %s SQ%d at [%08lx,%08lx) fill %d db +%04x CQ%d\n",
 	       ena, ena_direction ( sq->direction ), sq->id,
 	       virt_to_phys ( sq->sqe.raw ),
 	       ( virt_to_phys ( sq->sqe.raw ) + sq->len ),
-	       sq->doorbell, cq->id );
+	       sq->fill, sq->doorbell, cq->id );
 	return 0;
 
  err_admin:
@@ -658,7 +663,7 @@ static void ena_refill_rx ( struct net_device *netdev ) {
 	unsigned int refilled = 0;
 
 	/* Refill queue */
-	while ( ( ena->rx.sq.prod - ena->rx.cq.cons ) < ENA_RX_COUNT ) {
+	while ( ( ena->rx.sq.prod - ena->rx.cq.cons ) < ena->rx.sq.fill ) {
 
 		/* Allocate I/O buffer */
 		iobuf = alloc_iob ( len );
@@ -783,7 +788,7 @@ static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	size_t len;
 
 	/* Get next submission queue entry */
-	if ( ( ena->tx.sq.prod - ena->tx.cq.cons ) >= ENA_TX_COUNT ) {
+	if ( ( ena->tx.sq.prod - ena->tx.cq.cons ) >= ena->tx.sq.fill ) {
 		DBGC ( ena, "ENA %p out of transmit descriptors\n", ena );
 		return -ENOBUFS;
 	}

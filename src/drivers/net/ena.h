@@ -496,6 +496,8 @@ struct ena_sq {
 	uint8_t direction;
 	/** Number of entries */
 	uint8_t count;
+	/** Fill level (limited to completion queue size) */
+	uint8_t fill;
 };
 
 /**
