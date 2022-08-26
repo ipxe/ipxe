@@ -28,7 +28,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ENA_TX_COUNT 16
 
 /** Number of receive queue entries */
-#define ENA_RX_COUNT 16
+#define ENA_RX_COUNT 128
+
+/** Receive queue maximum fill level */
+#define ENA_RX_FILL 16
 
 /** Base address low register offset */
 #define ENA_BASE_LO 0x0
@@ -608,6 +611,8 @@ struct ena_sq {
 	uint8_t direction;
 	/** Number of entries */
 	uint8_t count;
+	/** Maximum fill level */
+	uint8_t max;
 	/** Fill level (limited to completion queue size) */
 	uint8_t fill;
 };
@@ -618,16 +623,18 @@ struct ena_sq {
  * @v sq		Submission queue
  * @v direction		Direction
  * @v count		Number of entries
+ * @v max		Maximum fill level
  * @v size		Size of each entry
  * @v ids		Buffer IDs
  */
 static inline __attribute__ (( always_inline )) void
 ena_sq_init ( struct ena_sq *sq, unsigned int direction, unsigned int count,
-	      size_t size, uint8_t *ids ) {
+	      unsigned int max, size_t size, uint8_t *ids ) {
 
 	sq->len = ( count * size );
 	sq->direction = direction;
 	sq->count = count;
+	sq->max = max;
 	sq->ids = ids;
 }
 
