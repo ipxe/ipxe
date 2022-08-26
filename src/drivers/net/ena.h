@@ -230,6 +230,14 @@ struct ena_create_cq_req {
 	uint64_t address;
 } __attribute__ (( packed ));
 
+/** Empty MSI-X vector
+ *
+ * Some versions of the ENA firmware will complain if the completion
+ * queue's MSI-X vector field is left empty, even though the queue
+ * configuration specifies that interrupts are not used.
+ */
+#define ENA_MSIX_NONE 0xffffffffUL
+
 /** Create completion queue response */
 struct ena_create_cq_rsp {
 	/** Header */

@@ -469,6 +469,7 @@ static int ena_create_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	req->header.opcode = ENA_CREATE_CQ;
 	req->create_cq.size = cq->size;
 	req->create_cq.count = cpu_to_le16 ( cq->requested );
+	req->create_cq.vector = cpu_to_le32 ( ENA_MSIX_NONE );
 	req->create_cq.address = cpu_to_le64 ( virt_to_bus ( cq->cqe.raw ) );
 
 	/* Issue request */
