@@ -612,6 +612,8 @@ struct ndp_settings {
 	struct in6_addr router;
 	/** Router lifetime */
 	unsigned int lifetime;
+	/** Router advertisement flags (used to check if using dhcpv6 in ndp_prefix_fetch_ip6) **/
+	uint8_t radv_flags;
 	/** Length of NDP options */
 	size_t len;
 	/** NDP options */
@@ -802,8 +804,14 @@ static int ndp_prefix_fetch_ip6 ( struct settings *settings, void *data,
 		prefix_len = ipv6_eui64 ( &ip6, netdev );
 		if ( prefix_len < 0 )
 			return prefix_len;
-		if ( prefix_len != prefix->prefix_len )
-			return -EINVAL;
+		if ( prefix_len != prefix->prefix_len ) {
+			if ( ndpset->radv_flags & NDP_ROUTER_MANAGED ) {
+				// if SLAAC fails, but dhcpv6 is in use keep the prefix address
+				memcpy ( &ip6, &prefix->prefix, sizeof ( ip6 ) );
+			}
+			else
+				return -EINVAL;
+		}
 	}
 
 	/* Fill in IPv6 address */
@@ -934,6 +942,7 @@ static struct settings_operations ndp_prefix_settings_operations = {
 static int ndp_register_settings ( struct net_device *netdev,
 				   struct in6_addr *router,
 				   unsigned int lifetime,
+				   uint8_t radv_flags,
 				   union ndp_option *options, size_t len ) {
 	struct settings *parent = netdev_settings ( netdev );
 	union ndp_option *option;
@@ -980,6 +989,7 @@ static int ndp_register_settings ( struct net_device *netdev,
 	ndpset->settings.order = order;
 	memcpy ( &ndpset->router, router, sizeof ( ndpset->router ) );
 	ndpset->lifetime = lifetime;
+	ndpset->radv_flags = radv_flags;
 	ndpset->len = len;
 	memcpy ( ndpset->options, options, len );
 	prefset = ( ( ( void * ) ndpset->options ) + len );
@@ -1200,7 +1210,7 @@ ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 	/* Register NDP settings */
 	option_len = ( len - offsetof ( typeof ( *radv ), option ) );
 	if ( ( rc = ndp_register_settings ( netdev, router,
-					    ntohl ( radv->lifetime ),
+					    ntohl ( radv->lifetime ), radv->flags,
 					    radv->option, option_len ) ) != 0 )
 		return rc;
 
