@@ -41,12 +41,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Define inline IPv6 address */
 #define IPV6(...) { __VA_ARGS__ }
 
+/** An IPv6 test prefix */
+struct ipv6_test_prefix {
+	/** Prefix length */
+	unsigned int len;
+	/** Prefix mask */
+	const char *mask;
+};
+
 /** An IPv6 test routing table entry */
 struct ipv6_test_route {
 	/** Local address */
 	const char *address;
-	/** Prefix length */
-	unsigned int prefix_len;
+	/** Prefix */
+	const struct ipv6_test_prefix *prefix;
 	/** Router address (if any) */
 	const char *router;
 };
@@ -60,6 +68,13 @@ struct ipv6_test_table {
 	/** Constructed routing table */
 	struct list_head list;
 };
+
+/** Define a test prefix */
+#define PREFIX( name, LEN, MASK )					\
+	static const struct ipv6_test_prefix name = {			\
+		.len = LEN,						\
+		.mask = MASK,						\
+	};
 
 /** Define a test routing table */
 #define TABLE( name, ... )						\
@@ -116,23 +131,26 @@ static struct net_device ipv6_test_netdev = {
 	.state = NETDEV_OPEN,
 };
 
+/** /64 prefix */
+PREFIX ( prefix64, 64, "ffff:ffff:ffff:ffff::" );
+
 /** Routing table with only a link-local address */
 TABLE ( table_link_local,
-	{ "fe80::69ff:fe50:5845", 64, NULL } );
+	{ "fe80::69ff:fe50:5845", &prefix64, NULL } );
 
 /** Routing table with a global address */
 TABLE ( table_normal,
-	{ "fe80::69ff:fe50:5845", 64, NULL },
-	{ "2001:db8:3::1", 64, "fe80::1" } );
+	{ "fe80::69ff:fe50:5845", &prefix64, NULL },
+	{ "2001:db8:3::1", &prefix64, "fe80::1" } );
 
 /** Routing table with multiple addresses and routers */
 TABLE ( table_multi,
-	{ "fe80::69ff:fe50:5845", 64, NULL },
-	{ "2001:db8:3::1", 64, "fe80::1" },
-	{ "2001:db8:5::1", 64, NULL },
-	{ "2001:db8:42::1", 64, "fe80::2" },
-	{ "fd44:9112:6442::69ff:fe50:5845", 64, "fe80::1" },
-	{ "fd70:6ba9:50ae::69ff:fe50:5845", 64, "fe80::3" } );
+	{ "fe80::69ff:fe50:5845", &prefix64, NULL },
+	{ "2001:db8:3::1", &prefix64, "fe80::1" },
+	{ "2001:db8:5::1", &prefix64, NULL },
+	{ "2001:db8:42::1", &prefix64, "fe80::2" },
+	{ "fd44:9112:6442::69ff:fe50:5845", &prefix64, "fe80::1" },
+	{ "fd70:6ba9:50ae::69ff:fe50:5845", &prefix64, "fe80::3" } );
 
 /**
  * Report an inet6_ntoa() test result
@@ -212,8 +230,10 @@ static void inet6_aton_fail_okx ( const char *text, const char *file,
 static void ipv6_table_okx ( struct ipv6_test_table *table, const char *file,
 			     unsigned int line ) {
 	const struct ipv6_test_route *route;
+	struct ipv6_miniroute *miniroute;
 	struct in6_addr address;
 	struct in6_addr router;
+	struct in6_addr mask;
 	struct list_head saved;
 	unsigned int i;
 
@@ -235,13 +255,33 @@ static void ipv6_table_okx ( struct ipv6_test_table *table, const char *file,
 			okx ( inet6_aton ( route->router, &router ) == 0,
 			      file, line );
 		}
+		okx ( inet6_aton ( route->prefix->mask, &mask ) == 0,
+		      file, line );
 
 		/* Add routing table entry */
 		okx ( ipv6_add_miniroute ( &ipv6_test_netdev, &address,
-					   route->prefix_len,
+					   route->prefix->len,
 					   ( route->router ?
 					     &router : NULL ) ) == 0,
 		      file, line );
+
+		/* Check routing table entry */
+		miniroute = list_first_entry ( &ipv6_miniroutes,
+					       struct ipv6_miniroute, list );
+		okx ( miniroute != NULL, file, line );
+		okx ( memcmp ( &miniroute->address, &address,
+			       sizeof ( address ) ) == 0, file, line );
+		okx ( miniroute->prefix_len == route->prefix->len,
+		      file, line );
+		okx ( memcmp ( &miniroute->prefix_mask, &mask,
+			       sizeof ( mask ) ) == 0, file, line );
+		if ( route->router ) {
+			okx ( memcmp ( &miniroute->router, &router,
+				       sizeof ( router ) ) == 0, file, line );
+		} else {
+			okx ( IN6_IS_ADDR_UNSPECIFIED ( &miniroute->router ),
+			      file, line );
+		}
 	}
 
 	/* Save constructed routing table */
