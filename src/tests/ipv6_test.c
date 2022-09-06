@@ -131,8 +131,20 @@ static struct net_device ipv6_test_netdev = {
 	.state = NETDEV_OPEN,
 };
 
+/** /48 prefix */
+PREFIX ( prefix48, 48, "ffff:ffff:ffff::" );
+
 /** /64 prefix */
 PREFIX ( prefix64, 64, "ffff:ffff:ffff:ffff::" );
+
+/** /126 prefix */
+PREFIX ( prefix126, 126, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffc" );
+
+/** /127 prefix */
+PREFIX ( prefix127, 127, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe" );
+
+/** /128 prefix */
+PREFIX ( prefix128, 128, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" );
 
 /** Routing table with only a link-local address */
 TABLE ( table_link_local,
@@ -151,6 +163,13 @@ TABLE ( table_multi,
 	{ "2001:db8:42::1", &prefix64, "fe80::2" },
 	{ "fd44:9112:6442::69ff:fe50:5845", &prefix64, "fe80::1" },
 	{ "fd70:6ba9:50ae::69ff:fe50:5845", &prefix64, "fe80::3" } );
+
+/** Routing table with unusual prefix lengths */
+TABLE ( table_unusual,
+	{ "2001:db8:1::1", &prefix48, "fe80::1" },
+	{ "2001:db8:2::1", &prefix126, NULL },
+	{ "2001:db8:3::1", &prefix127, NULL },
+	{ "2001:db8:4::1", &prefix128, NULL } );
 
 /**
  * Report an inet6_ntoa() test result
@@ -502,6 +521,7 @@ static void ipv6_test_exec ( void ) {
 	ipv6_table_ok ( &table_link_local );
 	ipv6_table_ok ( &table_normal );
 	ipv6_table_ok ( &table_multi );
+	ipv6_table_ok ( &table_unusual );
 
 	/* Routing table with only a link-local address */
 	ipv6_route_ok ( &table_link_local, "fe80::1",
@@ -545,10 +565,27 @@ static void ipv6_test_exec ( void ) {
 	ipv6_route_ok ( &table_multi, "ff02::1",
 			"fe80::69ff:fe50:5845", NULL );
 
+	/* Routing table with unusual prefix lengths */
+	ipv6_route_ok ( &table_unusual, "2001:db8:2::1",
+			"2001:db8:2::1", NULL );
+	ipv6_route_ok ( &table_unusual, "2001:db8:2::3",
+			"2001:db8:2::1", NULL );
+	ipv6_route_ok ( &table_unusual, "2001:db8:3::1",
+			"2001:db8:3::1", NULL );
+	ipv6_route_ok ( &table_unusual, "2001:db8:3::2",
+			"2001:db8:1::1", "fe80::1" );
+	ipv6_route_ok ( &table_unusual, "2001:db8:4::1",
+			"2001:db8:4::1", NULL );
+	ipv6_route_ok ( &table_unusual, "2001:db8:4::0",
+			"2001:db8:1::1", "fe80::1" );
+	ipv6_route_ok ( &table_unusual, "2001:db8:4::2",
+			"2001:db8:1::1", "fe80::1" );
+
 	/* Destroy test routing tables */
 	ipv6_table_del ( &table_link_local );
 	ipv6_table_del ( &table_normal );
 	ipv6_table_del ( &table_multi );
+	ipv6_table_del ( &table_unusual );
 }
 
 /** IPv6 self-test */

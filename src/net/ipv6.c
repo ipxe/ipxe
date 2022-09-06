@@ -251,7 +251,7 @@ int ipv6_add_miniroute ( struct net_device *netdev, struct in6_addr *address,
 			*prefix_mask = 0xff;
 		}
 		if ( remaining )
-			*prefix_mask <<= ( 8 - remaining );
+			*prefix_mask = ( 0xff << ( 8 - remaining ) );
 	}
 
 	/* Add to start of routing table */
