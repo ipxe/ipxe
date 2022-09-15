@@ -34,11 +34,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Determine number of PCI buses within system
+ * Find next PCI bus:dev.fn address range in system
  *
- * @ret num_bus		Number of buses
+ * @v busdevfn		Starting PCI bus:dev.fn address
+ * @v range		PCI bus:dev.fn address range to fill in
  */
-static int pcibios_num_bus ( void ) {
+static void pcibios_discover ( uint32_t busdevfn __unused,
+			       struct pci_range *range ) {
 	int discard_a, discard_D;
 	uint8_t max_bus;
 
@@ -57,7 +59,9 @@ static int pcibios_num_bus ( void ) {
 				 "D" ( 0 )
 			       : "ebx", "edx" );
 
-	return ( max_bus + 1 );
+	/* Populate range */
+	range->start = PCI_BUSDEVFN ( 0, 0, 0, 0 );
+	range->count = PCI_BUSDEVFN ( 0, ( max_bus + 1 ), 0, 0 );
 }
 
 /**
@@ -114,7 +118,7 @@ int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 	return ( status >> 8 );
 }
 
-PROVIDE_PCIAPI ( pcbios, pci_num_bus, pcibios_num_bus );
+PROVIDE_PCIAPI ( pcbios, pci_discover, pcibios_discover );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_dword );

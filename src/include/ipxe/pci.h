@@ -262,9 +262,6 @@ struct pci_driver {
 #define PCI_BUS( busdevfn )		( ( (busdevfn) >> 8 ) & 0xff )
 #define PCI_SLOT( busdevfn )		( ( (busdevfn) >> 3 ) & 0x1f )
 #define PCI_FUNC( busdevfn )		( ( (busdevfn) >> 0 ) & 0x07 )
-#define PCI_BUSDEVFN( segment, bus, slot, func )			\
-	( ( (segment) << 16 ) | ( (bus) << 8 ) |			\
-	  ( (slot) << 3 ) | ( (func) << 0 ) )
 #define PCI_FIRST_FUNC( busdevfn )	( (busdevfn) & ~0x07 )
 #define PCI_LAST_FUNC( busdevfn )	( (busdevfn) | 0x07 )
 

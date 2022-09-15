@@ -14,6 +14,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iomap.h>
 #include <config/ioapi.h>
 
+struct pci_device;
+
+/** A PCI bus:dev.fn address range */
+struct pci_range {
+	/** Starting bus:dev.fn address */
+	uint32_t start;
+	/** Number of bus:dev.fn addresses within this range */
+	unsigned int count;
+};
+
+#define PCI_BUSDEVFN( segment, bus, slot, func )			\
+	( ( (segment) << 16 ) | ( (bus) << 8 ) |			\
+	  ( (slot) << 3 ) | ( (func) << 0 ) )
+
 /**
  * Calculate static inline PCI I/O API function name
  *
@@ -51,11 +65,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <bits/pci_io.h>
 
 /**
- * Determine number of PCI buses within system
+ * Find next PCI bus:dev.fn address range in system
  *
- * @ret num_bus		Number of buses
+ * @v busdevfn		Starting PCI bus:dev.fn address
+ * @v range		PCI bus:dev.fn address range to fill in
  */
-int pci_num_bus ( void );
+void pci_discover ( uint32_t busdevfn, struct pci_range *range );
 
 /**
  * Read byte from PCI configuration space

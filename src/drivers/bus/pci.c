@@ -233,18 +233,23 @@ int pci_read_config ( struct pci_device *pci ) {
  * @ret rc		Return status code
  */
 int pci_find_next ( struct pci_device *pci, uint32_t *busdevfn ) {
-	static unsigned int end;
-	unsigned int sub_end;
+	static struct pci_range range;
 	uint8_t hdrtype;
 	uint8_t sub;
+	uint32_t end;
+	unsigned int count;
 	int rc;
 
-	/* Determine number of PCI buses */
-	if ( ! end )
-		end = PCI_BUSDEVFN ( 0, pci_num_bus(), 0, 0 );
-
 	/* Find next PCI device, if any */
-	for ( ; *busdevfn < end ; (*busdevfn)++ ) {
+	do {
+		/* Find next PCI bus:dev.fn address range, if necessary */
+		if ( ( *busdevfn - range.start ) >= range.count ) {
+			pci_discover ( *busdevfn, &range );
+			if ( *busdevfn < range.start )
+				*busdevfn = range.start;
+			if ( ( *busdevfn - range.start ) >= range.count )
+				break;
+		}
 
 		/* Check for PCI device existence */
 		memset ( pci, 0, sizeof ( *pci ) );
@@ -252,24 +257,27 @@ int pci_find_next ( struct pci_device *pci, uint32_t *busdevfn ) {
 		if ( ( rc = pci_read_config ( pci ) ) != 0 )
 			continue;
 
-		/* If device is a bridge, expand the number of PCI
-		 * buses as needed.
+		/* If device is a bridge, expand the PCI bus:dev.fn
+		 * address range as needed.
 		 */
 		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdrtype );
 		hdrtype &= PCI_HEADER_TYPE_MASK;
 		if ( hdrtype == PCI_HEADER_TYPE_BRIDGE ) {
 			pci_read_config_byte ( pci, PCI_SUBORDINATE, &sub );
-			sub_end = PCI_BUSDEVFN ( 0, ( sub + 1 ), 0, 0 );
-			if ( end < sub_end ) {
+			end = PCI_BUSDEVFN ( PCI_SEG ( *busdevfn ),
+					     ( sub + 1 ), 0, 0 );
+			count = ( end - range.start );
+			if ( count > range.count ) {
 				DBGC ( pci, PCI_FMT " found subordinate bus "
 				       "%#02x\n", PCI_ARGS ( pci ), sub );
-				end = sub_end;
+				range.count = count;
 			}
 		}
 
 		/* Return this device */
 		return 0;
-	}
+
+	} while ( ++(*busdevfn) );
 
 	return -ENODEV;
 }
