@@ -58,7 +58,7 @@ static int pciscan_exec ( int argc, char **argv ) {
 	struct named_setting setting;
 	struct pci_device pci;
 	unsigned long prev;
-	int next;
+	uint32_t busdevfn;
 	int len;
 	int rc;
 
@@ -75,17 +75,15 @@ static int pciscan_exec ( int argc, char **argv ) {
 	if ( ( len = fetchn_setting ( setting.settings, &setting.setting,
 				      NULL, &setting.setting, &prev ) ) < 0 ) {
 		/* Setting not yet defined: start searching from 00:00.0 */
-		prev = 0;
+		busdevfn = 0;
 	} else {
 		/* Setting is defined: start searching from next location */
-		prev++;
+		busdevfn = ( prev + 1 );
 	}
 
 	/* Find next existent PCI device */
-	if ( ( next = pci_find_next ( &pci, prev ) ) < 0 ) {
-		rc = next;
+	if ( ( rc = pci_find_next ( &pci, &busdevfn ) ) != 0 )
 		goto err_find_next;
-	}
 
 	/* Apply default type if necessary.  Use ":uint16" rather than
 	 * ":busdevfn" to allow for easy inclusion within a
@@ -96,7 +94,7 @@ static int pciscan_exec ( int argc, char **argv ) {
 
 	/* Store setting */
 	if ( ( rc = storen_setting ( setting.settings, &setting.setting,
-				     next ) ) != 0 ) {
+				     busdevfn ) ) != 0 ) {
 		printf ( "Could not store \"%s\": %s\n",
 			 setting.setting.name, strerror ( rc ) );
 		goto err_store;

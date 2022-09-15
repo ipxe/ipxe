@@ -301,7 +301,7 @@ extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
 extern int pci_read_config ( struct pci_device *pci );
-extern int pci_find_next ( struct pci_device *pci, unsigned int busdevfn );
+extern int pci_find_next ( struct pci_device *pci, uint32_t *busdevfn );
 extern int pci_find_driver ( struct pci_device *pci );
 extern int pci_probe ( struct pci_device *pci );
 extern void pci_remove ( struct pci_device *pci );

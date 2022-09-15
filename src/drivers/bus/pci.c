@@ -229,9 +229,10 @@ int pci_read_config ( struct pci_device *pci ) {
  *
  * @v pci		PCI device to fill in
  * @v busdevfn		Starting bus:dev.fn address
- * @ret busdevfn	Bus:dev.fn address of next PCI device, or negative error
+ * @ret busdevfn	Bus:dev.fn address of next PCI device
+ * @ret rc		Return status code
  */
-int pci_find_next ( struct pci_device *pci, unsigned int busdevfn ) {
+int pci_find_next ( struct pci_device *pci, uint32_t *busdevfn ) {
 	static unsigned int end;
 	unsigned int sub_end;
 	uint8_t hdrtype;
@@ -243,11 +244,11 @@ int pci_find_next ( struct pci_device *pci, unsigned int busdevfn ) {
 		end = PCI_BUSDEVFN ( 0, pci_num_bus(), 0, 0 );
 
 	/* Find next PCI device, if any */
-	for ( ; busdevfn < end ; busdevfn++ ) {
+	for ( ; *busdevfn < end ; (*busdevfn)++ ) {
 
 		/* Check for PCI device existence */
 		memset ( pci, 0, sizeof ( *pci ) );
-		pci_init ( pci, busdevfn );
+		pci_init ( pci, *busdevfn );
 		if ( ( rc = pci_read_config ( pci ) ) != 0 )
 			continue;
 
@@ -267,7 +268,7 @@ int pci_find_next ( struct pci_device *pci, unsigned int busdevfn ) {
 		}
 
 		/* Return this device */
-		return busdevfn;
+		return 0;
 	}
 
 	return -ENODEV;
@@ -348,7 +349,7 @@ void pci_remove ( struct pci_device *pci ) {
  */
 static int pcibus_probe ( struct root_device *rootdev ) {
 	struct pci_device *pci = NULL;
-	int busdevfn = 0;
+	uint32_t busdevfn = 0;
 	int rc;
 
 	for ( busdevfn = 0 ; 1 ; busdevfn++ ) {
@@ -362,8 +363,7 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 		}
 
 		/* Find next PCI device, if any */
-		busdevfn = pci_find_next ( pci, busdevfn );
-		if ( busdevfn < 0 )
+		if ( ( rc = pci_find_next ( pci, &busdevfn ) ) != 0 )
 			break;
 
 		/* Look for a driver */
