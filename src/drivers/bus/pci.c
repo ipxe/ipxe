@@ -352,8 +352,7 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 	uint32_t busdevfn = 0;
 	int rc;
 
-	for ( busdevfn = 0 ; 1 ; busdevfn++ ) {
-
+	do {
 		/* Allocate struct pci_device */
 		if ( ! pci )
 			pci = malloc ( sizeof ( *pci ) );
@@ -386,7 +385,8 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			/* Not registered; re-use struct pci_device */
 			list_del ( &pci->dev.siblings );
 		}
-	}
+
+	} while ( ++busdevfn );
 
 	free ( pci );
 	return 0;

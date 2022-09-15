@@ -22,6 +22,7 @@
  */
 
 #include <stdio.h>
+#include <errno.h>
 #include <getopt.h>
 #include <ipxe/pci.h>
 #include <ipxe/command.h>
@@ -79,6 +80,10 @@ static int pciscan_exec ( int argc, char **argv ) {
 	} else {
 		/* Setting is defined: start searching from next location */
 		busdevfn = ( prev + 1 );
+		if ( ! busdevfn ) {
+			rc = -ENOENT;
+			goto err_end;
+		}
 	}
 
 	/* Find next existent PCI device */
@@ -101,6 +106,7 @@ static int pciscan_exec ( int argc, char **argv ) {
 	}
 
  err_store:
+ err_end:
  err_find_next:
  err_parse_setting:
  err_parse_options:
