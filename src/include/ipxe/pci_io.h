@@ -15,6 +15,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <config/ioapi.h>
 
 struct pci_device;
+struct pci_api;
 
 /** A PCI bus:dev.fn address range */
 struct pci_range {
@@ -148,5 +149,37 @@ int pci_write_config_dword ( struct pci_device *pci, unsigned int where,
  */
 void * pci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 		     size_t len );
+
+/** A runtime selectable PCI I/O API */
+struct pci_api {
+	const char *name;
+	typeof ( pci_discover ) ( * pci_discover );
+	typeof ( pci_read_config_byte ) ( * pci_read_config_byte );
+	typeof ( pci_read_config_word ) ( * pci_read_config_word );
+	typeof ( pci_read_config_dword ) ( * pci_read_config_dword );
+	typeof ( pci_write_config_byte ) ( * pci_write_config_byte );
+	typeof ( pci_write_config_word ) ( * pci_write_config_word );
+	typeof ( pci_write_config_dword ) ( * pci_write_config_dword );
+	typeof ( pci_ioremap ) ( * pci_ioremap );
+};
+
+/** Provide a runtime selectable PCI I/O API */
+#define PCIAPI_RUNTIME( _subsys ) {					\
+	.name = #_subsys,						\
+	.pci_discover = PCIAPI_INLINE ( _subsys, pci_discover ),	\
+	.pci_read_config_byte =						\
+		PCIAPI_INLINE ( _subsys, pci_read_config_byte ),	\
+	.pci_read_config_word =						\
+		PCIAPI_INLINE ( _subsys, pci_read_config_word ),	\
+	.pci_read_config_dword =					\
+		PCIAPI_INLINE ( _subsys, pci_read_config_dword ),	\
+	.pci_write_config_byte =					\
+		PCIAPI_INLINE ( _subsys, pci_write_config_byte ),	\
+	.pci_write_config_word =					\
+		PCIAPI_INLINE ( _subsys, pci_write_config_word ),	\
+	.pci_write_config_dword =					\
+		PCIAPI_INLINE ( _subsys, pci_write_config_dword ),	\
+	.pci_ioremap = PCIAPI_INLINE ( _subsys, pci_ioremap ),		\
+	}
 
 #endif /* _IPXE_PCI_IO_H */

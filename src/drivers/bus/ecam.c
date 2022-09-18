@@ -263,3 +263,5 @@ PROVIDE_PCIAPI_INLINE ( ecam, pci_write_config_byte );
 PROVIDE_PCIAPI_INLINE ( ecam, pci_write_config_word );
 PROVIDE_PCIAPI_INLINE ( ecam, pci_write_config_dword );
 PROVIDE_PCIAPI_INLINE ( ecam, pci_ioremap );
+
+struct pci_api ecam_api = PCIAPI_RUNTIME ( ecam );

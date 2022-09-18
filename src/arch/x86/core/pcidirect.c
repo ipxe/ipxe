@@ -53,3 +53,5 @@ PROVIDE_PCIAPI_INLINE ( direct, pci_write_config_byte );
 PROVIDE_PCIAPI_INLINE ( direct, pci_write_config_word );
 PROVIDE_PCIAPI_INLINE ( direct, pci_write_config_dword );
 PROVIDE_PCIAPI_INLINE ( direct, pci_ioremap );
+
+struct pci_api pcidirect_api = PCIAPI_RUNTIME ( direct );

@@ -145,4 +145,6 @@ PCIAPI_INLINE ( pcbios, pci_ioremap ) ( struct pci_device *pci __unused,
 	return ioremap ( bus_addr, len );
 }
 
+extern struct pci_api pcibios_api;
+
 #endif /* _IPXE_PCIBIOS_H */

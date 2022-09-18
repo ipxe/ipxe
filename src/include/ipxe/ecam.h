@@ -52,4 +52,6 @@ struct ecam_mapping {
 	void *regs;
 };
 
+extern struct pci_api ecam_api;
+
 #endif /* _IPXE_ECAM_H */

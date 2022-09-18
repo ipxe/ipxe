@@ -128,3 +128,5 @@ PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_byte );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_word );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_dword );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_ioremap );
+
+struct pci_api pcibios_api = PCIAPI_RUNTIME ( pcbios );
