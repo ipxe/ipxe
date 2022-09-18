@@ -42,7 +42,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static void pcibios_discover ( uint32_t busdevfn __unused,
 			       struct pci_range *range ) {
 	int discard_a, discard_D;
-	uint8_t max_bus;
+	uint16_t num_bus;
 
 	/* We issue this call using flat real mode, to work around a
 	 * bug in some HP BIOSes.
@@ -50,10 +50,12 @@ static void pcibios_discover ( uint32_t busdevfn __unused,
 	__asm__ __volatile__ ( REAL_CODE ( "call flatten_real_mode\n\t"
 					   "stc\n\t"
 					   "int $0x1a\n\t"
+					   "movzbw %%cl, %%cx\n\t"
+					   "incw %%cx\n\t"
 					   "jnc 1f\n\t"
 					   "xorw %%cx, %%cx\n\t"
 					   "\n1:\n\t" )
-			       : "=c" ( max_bus ), "=a" ( discard_a ),
+			       : "=c" ( num_bus ), "=a" ( discard_a ),
 				 "=D" ( discard_D )
 			       : "a" ( PCIBIOS_INSTALLATION_CHECK >> 16 ),
 				 "D" ( 0 )
@@ -61,7 +63,7 @@ static void pcibios_discover ( uint32_t busdevfn __unused,
 
 	/* Populate range */
 	range->start = PCI_BUSDEVFN ( 0, 0, 0, 0 );
-	range->count = PCI_BUSDEVFN ( 0, ( max_bus + 1 ), 0, 0 );
+	range->count = PCI_BUSDEVFN ( 0, num_bus, 0, 0 );
 }
 
 /**
