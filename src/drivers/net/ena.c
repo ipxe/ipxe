@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iobuf.h>
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
+#include <ipxe/pcibridge.h>
 #include <ipxe/version.h>
 #include "ena.h"
 
@@ -985,6 +986,45 @@ static struct net_device_operations ena_operations = {
  */
 
 /**
+ * Assign memory BAR
+ *
+ * @v ena		ENA device
+ * @v pci		PCI device
+ * @ret rc		Return status code
+ *
+ * Some BIOSes in AWS EC2 are observed to fail to assign a base
+ * address to the ENA device.  The device is the only device behind
+ * its bridge, and the BIOS does assign a memory window to the bridge.
+ * We therefore place the device at the start of the memory window.
+ */
+static int ena_membase ( struct ena_nic *ena, struct pci_device *pci ) {
+	struct pci_bridge *bridge;
+
+	/* Locate PCI bridge */
+	bridge = pcibridge_find ( pci );
+	if ( ! bridge ) {
+		DBGC ( ena, "ENA %p found no PCI bridge\n", ena );
+		return -ENOTCONN;
+	}
+
+	/* Sanity check */
+	if ( PCI_SLOT ( pci->busdevfn ) || PCI_FUNC ( pci->busdevfn ) ) {
+		DBGC ( ena, "ENA %p at " PCI_FMT " may not be only device "
+		       "on bus\n", ena, PCI_ARGS ( pci ) );
+		return -ENOTSUP;
+	}
+
+	/* Place device at start of memory window */
+	pci_write_config_dword ( pci, PCI_BASE_ADDRESS_0, bridge->membase );
+	pci->membase = bridge->membase;
+	DBGC ( ena, "ENA %p at " PCI_FMT " claiming bridge " PCI_FMT " mem "
+	       "%08x\n", ena, PCI_ARGS ( pci ), PCI_ARGS ( bridge->pci ),
+	       bridge->membase );
+
+	return 0;
+}
+
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -1019,6 +1059,10 @@ static int ena_probe ( struct pci_device *pci ) {
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
+
+	/* Fix up PCI BAR if left unassigned by BIOS */
+	if ( ( ! pci->membase ) && ( ( rc = ena_membase ( ena, pci ) ) != 0 ) )
+		goto err_membase;
 
 	/* Map registers */
 	ena->regs = pci_ioremap ( pci, pci->membase, ENA_BAR_SIZE );
@@ -1085,6 +1129,7 @@ static int ena_probe ( struct pci_device *pci ) {
  err_info:
 	iounmap ( ena->regs );
  err_ioremap:
+ err_membase:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
