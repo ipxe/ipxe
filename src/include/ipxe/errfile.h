@@ -217,6 +217,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_rdc		     ( ERRFILE_DRIVER | 0x00d10000 )
 #define ERRFILE_ice		     ( ERRFILE_DRIVER | 0x00d20000 )
 #define ERRFILE_ecam		     ( ERRFILE_DRIVER | 0x00d30000 )
+#define ERRFILE_pcibridge	     ( ERRFILE_DRIVER | 0x00d40000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )

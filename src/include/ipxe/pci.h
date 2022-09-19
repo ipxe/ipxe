@@ -127,6 +127,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Network controller */
 #define PCI_CLASS_NETWORK	0x02
 
+/** Bridge device */
+#define PCI_CLASS_BRIDGE	0x06
+#define PCI_CLASS_BRIDGE_PCI		0x04	/**< PCI-to-PCI bridge */
+
 /** Serial bus controller */
 #define PCI_CLASS_SERIAL	0x0c
 #define PCI_CLASS_SERIAL_USB		0x03	/**< USB controller */
@@ -135,8 +139,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CLASS_SERIAL_USB_EHCI	 0x20	/**< ECHI USB controller */
 #define PCI_CLASS_SERIAL_USB_XHCI	 0x30	/**< xHCI USB controller */
 
+/** Primary bus number */
+#define PCI_PRIMARY		0x18
+
+/** Secondary bus number */
+#define PCI_SECONDARY		0x19
+
 /** Subordinate bus number */
 #define PCI_SUBORDINATE		0x1a
+
+/** Memory base and limit */
+#define PCI_MEM_BASE		0x20
+#define PCI_MEM_LIMIT		0x22
+#define PCI_MEM_MASK			0x000f
 
 /** Construct PCI class
  *
