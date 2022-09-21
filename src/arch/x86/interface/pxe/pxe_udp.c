@@ -60,7 +60,12 @@ struct pxe_udp_connection {
 	struct sockaddr_in local;
 	/** List of received packets */
 	struct list_head list;
+	/** Current number of packets in list */
+	unsigned int npackets;
 };
+
+/** Number of packets to keep before dropping */
+#define PXE_UDP_QUEUE_LENGTH 48
 
 /**
  * Receive PXE UDP data
@@ -102,8 +107,17 @@ static int pxe_udp_deliver ( struct pxe_udp_connection *pxe_udp,
 	pshdr->dest_ip = sin_dest->sin_addr.s_addr;
 	pshdr->d_port = sin_dest->sin_port;
 
+	if (pxe_udp->npackets > PXE_UDP_QUEUE_LENGTH) {
+		DBG2 ( "Dropping packet above pxe_udp queue length %d\n",
+		        PXE_UDP_QUEUE_LENGTH );
+		rc = -EBUSY;
+		goto drop;
+	}
+
 	/* Add to queue */
 	list_add_tail ( &iobuf->list, &pxe_udp->list );
+	pxe_udp->npackets++;
+	DBG2 ( "Current pxe_udp npackets %d\n", pxe_udp->npackets );
 
 	return 0;
 
@@ -236,9 +250,12 @@ pxenv_udp_close ( struct s_PXENV_UDP_CLOSE *pxenv_udp_close ) {
 
 	/* Discard any received packets */
 	list_for_each_entry_safe ( iobuf, tmp, &pxe_udp.list, list ) {
+		pxe_udp.npackets--;
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
+
+	assert ( pxe_udp.npackets == 0 );
 
 	pxenv_udp_close->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
@@ -413,6 +430,8 @@ static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 		DBG2 ( "PXENV_UDP_READ\n" );
 		goto no_packet;
 	}
+	assert ( pxe_udp.npackets > 0 );
+	pxe_udp.npackets--;
 	list_del ( &iobuf->list );
 
 	/* Strip pseudo-header */
