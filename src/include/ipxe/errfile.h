@@ -400,6 +400,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_linux_acpi	      ( ERRFILE_OTHER | 0x00570000 )
 #define ERRFILE_dynkeymap	      ( ERRFILE_OTHER | 0x00580000 )
 #define ERRFILE_pci_cmd		      ( ERRFILE_OTHER | 0x00590000 )
+#define ERRFILE_dhe		      ( ERRFILE_OTHER | 0x005a0000 )
 
 /** @} */
 
