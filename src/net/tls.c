@@ -1220,6 +1220,16 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	int len;
 	int rc;
 
+	/* Generate master secret */
+	tls_generate_master_secret ( tls );
+
+	/* Generate keys */
+	if ( ( rc = tls_generate_keys ( tls ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not generate keys: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
 	/* Encrypt pre-master secret using server's public key */
 	memset ( &key_xchg, 0, sizeof ( key_xchg ) );
 	len = pubkey_encrypt ( pubkey, cipherspec->pubkey_ctx,
@@ -1622,7 +1632,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	if ( ( rc = tls_select_cipher ( tls, hello_b->cipher_suite ) ) != 0 )
 		return rc;
 
-	/* Reuse or generate master secret */
+	/* Check session ID */
 	if ( hello_a->session_id_len &&
 	     ( hello_a->session_id_len == tls->session_id_len ) &&
 	     ( memcmp ( session_id, tls->session_id,
@@ -1631,11 +1641,10 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		/* Session ID match: reuse master secret */
 		DBGC ( tls, "TLS %p resuming session ID:\n", tls );
 		DBGC_HDA ( tls, 0, tls->session_id, tls->session_id_len );
+		if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
+			return rc;
 
 	} else {
-
-		/* Generate new master secret */
-		tls_generate_master_secret ( tls );
 
 		/* Record new session ID, if present */
 		if ( hello_a->session_id_len &&
@@ -1648,10 +1657,6 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 				   tls->session_id_len );
 		}
 	}
-
-	/* Generate keys */
-	if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
-		return rc;
 
 	/* Handle secure renegotiation */
 	if ( tls->secure_renegotiation ) {
