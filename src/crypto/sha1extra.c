@@ -49,7 +49,7 @@ void prf_sha1 ( const void *key, size_t key_len, const char *label,
 	u8 in[strlen ( label ) + 1 + data_len + 1]; /* message to HMAC */
 	u8 *in_blknr;		/* pointer to last byte of in, block number */
 	u8 out[SHA1_DIGEST_SIZE]; /* HMAC-SHA1 result */
-	u8 sha1_ctx[SHA1_CTX_SIZE]; /* SHA1 context */
+	u8 ctx[SHA1_CTX_SIZE + SHA1_BLOCK_SIZE]; /* HMAC-SHA1 context */
 	const size_t label_len = strlen ( label );
 
 	/* The HMAC-SHA-1 is calculated using the given key on the
@@ -65,9 +65,9 @@ void prf_sha1 ( const void *key, size_t key_len, const char *label,
 	for ( blk = 0 ;; blk++ ) {
 		*in_blknr = blk;
 
-		hmac_init ( &sha1_algorithm, sha1_ctx, keym, &key_len );
-		hmac_update ( &sha1_algorithm, sha1_ctx, in, sizeof ( in ) );
-		hmac_final ( &sha1_algorithm, sha1_ctx, keym, &key_len, out );
+		hmac_init ( &sha1_algorithm, ctx, keym, key_len );
+		hmac_update ( &sha1_algorithm, ctx, in, sizeof ( in ) );
+		hmac_final ( &sha1_algorithm, ctx, out );
 
 		if ( prf_len <= sizeof ( out ) ) {
 			memcpy ( prf, out, prf_len );
@@ -100,7 +100,7 @@ static void pbkdf2_sha1_f ( const void *passphrase, size_t pass_len,
 	u8 pass[pass_len];	/* modifiable passphrase */
 	u8 in[salt_len + 4];	/* input buffer to first round */
 	u8 last[SHA1_DIGEST_SIZE]; /* output of round N, input of N+1 */
-	u8 sha1_ctx[SHA1_CTX_SIZE];
+	u8 ctx[SHA1_CTX_SIZE + SHA1_BLOCK_SIZE];
 	u8 *next_in = in;	/* changed to `last' after first round */
 	int next_size = sizeof ( in );
 	int i;
@@ -114,9 +114,9 @@ static void pbkdf2_sha1_f ( const void *passphrase, size_t pass_len,
 	memset ( block, 0, sizeof ( last ) );
 
 	for ( i = 0; i < iterations; i++ ) {
-		hmac_init ( &sha1_algorithm, sha1_ctx, pass, &pass_len );
-		hmac_update ( &sha1_algorithm, sha1_ctx, next_in, next_size );
-		hmac_final ( &sha1_algorithm, sha1_ctx, pass, &pass_len, last );
+		hmac_init ( &sha1_algorithm, ctx, pass, pass_len );
+		hmac_update ( &sha1_algorithm, ctx, next_in, next_size );
+		hmac_final ( &sha1_algorithm, ctx, last );
 
 		for ( j = 0; j < sizeof ( last ); j++ ) {
 			block[j] ^= last[j];

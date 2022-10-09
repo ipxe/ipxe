@@ -458,17 +458,17 @@ static int tls_generate_random ( struct tls_connection *tls,
  * Update HMAC with a list of ( data, len ) pairs
  *
  * @v digest		Hash function to use
- * @v digest_ctx	Digest context
+ * @v ctx		HMAC context
  * @v args		( data, len ) pairs of data, terminated by NULL
  */
 static void tls_hmac_update_va ( struct digest_algorithm *digest,
-				 void *digest_ctx, va_list args ) {
+				 void *ctx, va_list args ) {
 	void *data;
 	size_t len;
 
 	while ( ( data = va_arg ( args, void * ) ) ) {
 		len = va_arg ( args, size_t );
-		hmac_update ( digest, digest_ctx, data, len );
+		hmac_update ( digest, ctx, data, len );
 	}
 }
 
@@ -485,43 +485,38 @@ static void tls_hmac_update_va ( struct digest_algorithm *digest,
  */
 static void tls_p_hash_va ( struct tls_connection *tls,
 			    struct digest_algorithm *digest,
-			    void *secret, size_t secret_len,
+			    const void *secret, size_t secret_len,
 			    void *out, size_t out_len,
 			    va_list seeds ) {
-	uint8_t secret_copy[secret_len];
-	uint8_t digest_ctx[digest->ctxsize];
-	uint8_t digest_ctx_partial[digest->ctxsize];
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
+	uint8_t ctx_partial[ sizeof ( ctx ) ];
 	uint8_t a[digest->digestsize];
 	uint8_t out_tmp[digest->digestsize];
 	size_t frag_len = digest->digestsize;
 	va_list tmp;
 
-	/* Copy the secret, in case HMAC modifies it */
-	memcpy ( secret_copy, secret, secret_len );
-	secret = secret_copy;
 	DBGC2 ( tls, "TLS %p %s secret:\n", tls, digest->name );
 	DBGC2_HD ( tls, secret, secret_len );
 
 	/* Calculate A(1) */
-	hmac_init ( digest, digest_ctx, secret, &secret_len );
+	hmac_init ( digest, ctx, secret, secret_len );
 	va_copy ( tmp, seeds );
-	tls_hmac_update_va ( digest, digest_ctx, tmp );
+	tls_hmac_update_va ( digest, ctx, tmp );
 	va_end ( tmp );
-	hmac_final ( digest, digest_ctx, secret, &secret_len, a );
+	hmac_final ( digest, ctx, a );
 	DBGC2 ( tls, "TLS %p %s A(1):\n", tls, digest->name );
 	DBGC2_HD ( tls, &a, sizeof ( a ) );
 
 	/* Generate as much data as required */
 	while ( out_len ) {
 		/* Calculate output portion */
-		hmac_init ( digest, digest_ctx, secret, &secret_len );
-		hmac_update ( digest, digest_ctx, a, sizeof ( a ) );
-		memcpy ( digest_ctx_partial, digest_ctx, digest->ctxsize );
+		hmac_init ( digest, ctx, secret, secret_len );
+		hmac_update ( digest, ctx, a, sizeof ( a ) );
+		memcpy ( ctx_partial, ctx, sizeof ( ctx_partial ) );
 		va_copy ( tmp, seeds );
-		tls_hmac_update_va ( digest, digest_ctx, tmp );
+		tls_hmac_update_va ( digest, ctx, tmp );
 		va_end ( tmp );
-		hmac_final ( digest, digest_ctx,
-			     secret, &secret_len, out_tmp );
+		hmac_final ( digest, ctx, out_tmp );
 
 		/* Copy output */
 		if ( frag_len > out_len )
@@ -531,8 +526,7 @@ static void tls_p_hash_va ( struct tls_connection *tls,
 		DBGC2_HD ( tls, out, frag_len );
 
 		/* Calculate A(i) */
-		hmac_final ( digest, digest_ctx_partial,
-			     secret, &secret_len, a );
+		hmac_final ( digest, ctx_partial, a );
 		DBGC2 ( tls, "TLS %p %s A(n):\n", tls, digest->name );
 		DBGC2_HD ( tls, &a, sizeof ( a ) );
 
@@ -551,13 +545,13 @@ static void tls_p_hash_va ( struct tls_connection *tls,
  * @v out_len		Length of output buffer
  * @v ...		( data, len ) pairs of seed data, terminated by NULL
  */
-static void tls_prf ( struct tls_connection *tls, void *secret,
+static void tls_prf ( struct tls_connection *tls, const void *secret,
 		      size_t secret_len, void *out, size_t out_len, ... ) {
 	va_list seeds;
 	va_list tmp;
 	size_t subsecret_len;
-	void *md5_secret;
-	void *sha1_secret;
+	const void *md5_secret;
+	const void *sha1_secret;
 	uint8_t buf[out_len];
 	unsigned int i;
 
@@ -2213,7 +2207,7 @@ static void tls_hmac_init ( struct tls_cipherspec *cipherspec, void *ctx,
 			    uint64_t seq, struct tls_header *tlshdr ) {
 	struct digest_algorithm *digest = cipherspec->suite->digest;
 
-	hmac_init ( digest, ctx, cipherspec->mac_secret, &digest->digestsize );
+	hmac_init ( digest, ctx, cipherspec->mac_secret, digest->digestsize );
 	seq = cpu_to_be64 ( seq );
 	hmac_update ( digest, ctx, &seq, sizeof ( seq ) );
 	hmac_update ( digest, ctx, tlshdr, sizeof ( *tlshdr ) );
@@ -2245,8 +2239,7 @@ static void tls_hmac_final ( struct tls_cipherspec *cipherspec, void *ctx,
 			     void *hmac ) {
 	struct digest_algorithm *digest = cipherspec->suite->digest;
 
-	hmac_final ( digest, ctx, cipherspec->mac_secret,
-		     &digest->digestsize, hmac );
+	hmac_final ( digest, ctx, hmac );
 }
 
 /**
@@ -2263,7 +2256,7 @@ static void tls_hmac ( struct tls_cipherspec *cipherspec,
 		       uint64_t seq, struct tls_header *tlshdr,
 		       const void *data, size_t len, void *hmac ) {
 	struct digest_algorithm *digest = cipherspec->suite->digest;
-	uint8_t ctx[digest->ctxsize];
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 
 	tls_hmac_init ( cipherspec, ctx, seq, tlshdr );
 	tls_hmac_update ( cipherspec, ctx, data, len );
@@ -2545,7 +2538,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	struct tls_cipherspec *cipherspec = &tls->rx_cipherspec;
 	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
 	struct digest_algorithm *digest = cipherspec->suite->digest;
-	uint8_t ctx[digest->ctxsize];
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	uint8_t verify_mac[digest->digestsize];
 	struct io_buffer *iobuf;
 	void *mac;

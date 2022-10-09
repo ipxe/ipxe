@@ -545,15 +545,14 @@ struct net80211_crypto tkip_crypto __net80211_crypto = {
 static void tkip_kie_mic ( const void *kck, const void *msg, size_t len,
 			   void *mic )
 {
-	uint8_t ctx[MD5_CTX_SIZE];
+	uint8_t ctx[MD5_CTX_SIZE + MD5_BLOCK_SIZE];
 	u8 kckb[16];
-	size_t kck_len = 16;
 
-	memcpy ( kckb, kck, kck_len );
+	memcpy ( kckb, kck, sizeof ( kckb ) );
 
-	hmac_init ( &md5_algorithm, ctx, kckb, &kck_len );
+	hmac_init ( &md5_algorithm, ctx, kckb, sizeof ( kckb ) );
 	hmac_update ( &md5_algorithm, ctx, msg, len );
-	hmac_final ( &md5_algorithm, ctx, kckb, &kck_len, mic );
+	hmac_final ( &md5_algorithm, ctx, mic );
 }
 
 /**

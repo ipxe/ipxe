@@ -104,9 +104,8 @@ static void peerdist_info_segment_hash ( struct peerdist_info_segment *segment,
 					 const void *hash, const void *secret ){
 	const struct peerdist_info *info = segment->info;
 	struct digest_algorithm *digest = info->digest;
-	uint8_t ctx[digest->ctxsize];
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	size_t digestsize = info->digestsize;
-	size_t secretsize = digestsize;
 	static const uint16_t magic[] = PEERDIST_SEGMENT_ID_MAGIC;
 
 	/* Sanity check */
@@ -121,12 +120,10 @@ static void peerdist_info_segment_hash ( struct peerdist_info_segment *segment,
 	memcpy ( segment->secret, secret, digestsize );
 
 	/* Calculate segment identifier */
-	hmac_init ( digest, ctx, segment->secret, &secretsize );
-	assert ( secretsize == digestsize );
+	hmac_init ( digest, ctx, segment->secret, digestsize );
 	hmac_update ( digest, ctx, segment->hash, digestsize );
 	hmac_update ( digest, ctx, magic, sizeof ( magic ) );
-	hmac_final ( digest, ctx, segment->secret, &secretsize, segment->id );
-	assert ( secretsize == digestsize );
+	hmac_final ( digest, ctx, segment->id );
 }
 
 /******************************************************************************

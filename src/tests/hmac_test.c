@@ -100,26 +100,22 @@ struct hmac_test {
 static void hmac_okx ( struct hmac_test *test, const char *file,
 		       unsigned int line ) {
 	struct digest_algorithm *digest = test->digest;
-	uint8_t ctx[digest->ctxsize];
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	uint8_t hmac[digest->digestsize];
-	uint8_t key[test->key_len];
-	size_t key_len;
 
 	/* Sanity checks */
+	okx ( sizeof ( ctx ) == ( digest->ctxsize + digest->blocksize ),
+	      file, line );
 	okx ( test->expected_len == digest->digestsize, file, line );
-
-	/* Create modifiable copy of key */
-	memcpy ( key, test->key, test->key_len );
-	key_len = test->key_len;
 
 	/* Calculate HMAC */
 	DBGC ( test, "HMAC-%s key:\n", digest->name );
 	DBGC_HDA ( test, 0, test->key, test->key_len );
 	DBGC ( test, "HMAC-%s data:\n", digest->name );
 	DBGC_HDA ( test, 0, test->data, test->data_len );
-	hmac_init ( digest, ctx, key, &key_len );
+	hmac_init ( digest, ctx, test->key, test->key_len );
 	hmac_update ( digest, ctx, test->data, test->data_len );
-	hmac_final ( digest, ctx, key, &key_len, hmac );
+	hmac_final ( digest, ctx, hmac );
 	DBGC ( test, "HMAC-%s result:\n", digest->name );
 	DBGC_HDA ( test, 0, hmac, sizeof ( hmac ) );
 
