@@ -616,21 +616,23 @@ static void tls_prf ( struct tls_connection *tls, const void *secret,
  * Generate master secret
  *
  * @v tls		TLS connection
+ * @v pre_master_secret	Pre-master secret
+ * @v pre_master_secret_len Length of pre-master secret
  *
- * The pre-master secret and the client and server random values must
- * already be known.
+ * The client and server random values must already be known.
  */
-static void tls_generate_master_secret ( struct tls_connection *tls ) {
+static void tls_generate_master_secret ( struct tls_connection *tls,
+					 const void *pre_master_secret,
+					 size_t pre_master_secret_len ) {
+
 	DBGC ( tls, "TLS %p pre-master-secret:\n", tls );
-	DBGC_HD ( tls, &tls->pre_master_secret,
-		  sizeof ( tls->pre_master_secret ) );
+	DBGC_HD ( tls, pre_master_secret, pre_master_secret_len );
 	DBGC ( tls, "TLS %p client random bytes:\n", tls );
 	DBGC_HD ( tls, &tls->client_random, sizeof ( tls->client_random ) );
 	DBGC ( tls, "TLS %p server random bytes:\n", tls );
 	DBGC_HD ( tls, &tls->server_random, sizeof ( tls->server_random ) );
 
-	tls_prf_label ( tls, &tls->pre_master_secret,
-			sizeof ( tls->pre_master_secret ),
+	tls_prf_label ( tls, pre_master_secret, pre_master_secret_len,
 			&tls->master_secret, sizeof ( tls->master_secret ),
 			"master secret",
 			&tls->client_random, sizeof ( tls->client_random ),
@@ -1212,6 +1214,10 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	size_t max_len = pubkey_max_len ( pubkey, cipherspec->pubkey_ctx );
 	struct {
+		uint16_t version;
+		uint8_t random[46];
+	} __attribute__ (( packed )) pre_master_secret;
+	struct {
 		uint32_t type_length;
 		uint16_t encrypted_pre_master_secret_len;
 		uint8_t encrypted_pre_master_secret[max_len];
@@ -1220,8 +1226,16 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	int len;
 	int rc;
 
+	/* Generate pre-master secret */
+	pre_master_secret.version = htons ( TLS_VERSION_MAX );
+	if ( ( rc = tls_generate_random ( tls, &pre_master_secret.random,
+			  ( sizeof ( pre_master_secret.random ) ) ) ) != 0 ) {
+		return rc;
+	}
+
 	/* Generate master secret */
-	tls_generate_master_secret ( tls );
+	tls_generate_master_secret ( tls, &pre_master_secret,
+				     sizeof ( pre_master_secret ) );
 
 	/* Generate keys */
 	if ( ( rc = tls_generate_keys ( tls ) ) != 0 ) {
@@ -1233,8 +1247,7 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	/* Encrypt pre-master secret using server's public key */
 	memset ( &key_xchg, 0, sizeof ( key_xchg ) );
 	len = pubkey_encrypt ( pubkey, cipherspec->pubkey_ctx,
-			       &tls->pre_master_secret,
-			       sizeof ( tls->pre_master_secret ),
+			       &pre_master_secret, sizeof ( pre_master_secret ),
 			       key_xchg.encrypted_pre_master_secret );
 	if ( len < 0 ) {
 		rc = len;
@@ -3173,7 +3186,7 @@ int add_tls ( struct interface *xfer, const char *name,
 			       &tls->refcnt );
 	tls->key = privkey_get ( key ? key : &private_key );
 	tls->root = x509_root_get ( root ? root : &root_certificates );
-	tls->version = TLS_VERSION_TLS_1_2;
+	tls->version = TLS_VERSION_MAX;
 	tls_clear_cipher ( tls, &tls->tx_cipherspec );
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
@@ -3184,11 +3197,6 @@ int add_tls ( struct interface *xfer, const char *name,
 	INIT_LIST_HEAD ( &tls->rx_data );
 	if ( ( rc = tls_generate_random ( tls, &tls->client_random.random,
 			  ( sizeof ( tls->client_random.random ) ) ) ) != 0 ) {
-		goto err_random;
-	}
-	tls->pre_master_secret.version = htons ( tls->version );
-	if ( ( rc = tls_generate_random ( tls, &tls->pre_master_secret.random,
-		      ( sizeof ( tls->pre_master_secret.random ) ) ) ) != 0 ) {
 		goto err_random;
 	}
 	if ( ( rc = tls_session ( tls, name ) ) != 0 )

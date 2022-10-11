@@ -48,6 +48,9 @@ struct tls_header {
 /** TLS version 1.2 */
 #define TLS_VERSION_TLS_1_2 0x0303
 
+/** Maximum supported TLS version */
+#define TLS_VERSION_MAX TLS_VERSION_TLS_1_2
+
 /** Change cipher content type */
 #define TLS_TYPE_CHANGE_CIPHER 20
 
@@ -209,14 +212,6 @@ struct tls_signature_hash_algorithm {
 #define __tls_sig_hash_algorithm					\
 	__table_entry ( TLS_SIG_HASH_ALGORITHMS, 01 )
 
-/** TLS pre-master secret */
-struct tls_pre_master_secret {
-	/** TLS version */
-	uint16_t version;
-	/** Random data */
-	uint8_t random[46];
-} __attribute__ (( packed ));
-
 /** TLS client random data */
 struct tls_client_random {
 	/** GMT Unix time */
@@ -309,8 +304,6 @@ struct tls_connection {
 	struct tls_cipherspec rx_cipherspec;
 	/** Next RX cipher specification */
 	struct tls_cipherspec rx_cipherspec_pending;
-	/** Premaster secret */
-	struct tls_pre_master_secret pre_master_secret;
 	/** Master secret */
 	uint8_t master_secret[48];
 	/** Server random bytes */
