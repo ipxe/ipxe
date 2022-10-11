@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 struct tls_cipher_suite tls_rsa_with_aes_128_cbc_sha256 __tls_cipher_suite(01)={
 	.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 ),
 	.key_len = ( 128 / 8 ),
+	.exchange = &tls_pubkey_exchange_algorithm,
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha256_algorithm,
@@ -42,6 +43,7 @@ struct tls_cipher_suite tls_rsa_with_aes_128_cbc_sha256 __tls_cipher_suite(01)={
 struct tls_cipher_suite tls_rsa_with_aes_256_cbc_sha256 __tls_cipher_suite(02)={
 	.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 ),
 	.key_len = ( 256 / 8 ),
+	.exchange = &tls_pubkey_exchange_algorithm,
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha256_algorithm,

@@ -23,6 +23,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iobuf.h>
 #include <ipxe/tables.h>
 
+struct tls_connection;
+
 /** A TLS header */
 struct tls_header {
 	/** Content type
@@ -143,8 +145,23 @@ enum tls_tx_pending {
 	TLS_TX_FINISHED = 0x0020,
 };
 
+/** A TLS key exchange algorithm */
+struct tls_key_exchange_algorithm {
+	/** Algorithm name */
+	const char *name;
+	/**
+	 * Transmit Client Key Exchange record
+	 *
+	 * @v tls		TLS connection
+	 * @ret rc		Return status code
+	 */
+	int ( * exchange ) ( struct tls_connection *tls );
+};
+
 /** A TLS cipher suite */
 struct tls_cipher_suite {
+	/** Key exchange algorithm */
+	struct tls_key_exchange_algorithm *exchange;
 	/** Public-key encryption algorithm */
 	struct pubkey_algorithm *pubkey;
 	/** Bulk encryption cipher algorithm */
@@ -384,6 +401,8 @@ struct tls_connection {
 
 /** RX I/O buffer alignment */
 #define TLS_RX_ALIGN 16
+
+extern struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm;
 
 extern int add_tls ( struct interface *xfer, const char *name,
 		     struct x509_root *root, struct private_key *key );

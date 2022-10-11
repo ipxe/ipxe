@@ -734,6 +734,7 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 
 /** Null cipher suite */
 struct tls_cipher_suite tls_cipher_suite_null = {
+	.exchange = &tls_pubkey_exchange_algorithm,
 	.pubkey = &pubkey_null,
 	.cipher = &cipher_null,
 	.digest = &digest_null,
@@ -849,7 +850,8 @@ static int tls_select_cipher ( struct tls_connection *tls,
 				     suite ) ) != 0 )
 		return rc;
 
-	DBGC ( tls, "TLS %p selected %s-%s-%d-%s\n", tls, suite->pubkey->name,
+	DBGC ( tls, "TLS %p selected %s-%s-%s-%d-%s\n", tls,
+	       suite->exchange->name, suite->pubkey->name,
 	       suite->cipher->name, ( suite->key_len * 8 ),
 	       suite->digest->name );
 
@@ -1205,12 +1207,12 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 }
 
 /**
- * Transmit Client Key Exchange record
+ * Transmit Client Key Exchange record using public key exchange
  *
  * @v tls		TLS connection
  * @ret rc		Return status code
  */
-static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
+static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	size_t max_len = pubkey_max_len ( pubkey, cipherspec->pubkey_ctx );
@@ -1267,6 +1269,26 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 
 	return tls_send_handshake ( tls, &key_xchg,
 				    ( sizeof ( key_xchg ) - unused ) );
+}
+
+/** Public key exchange algorithm */
+struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
+	.name = "pubkey",
+	.exchange = tls_send_client_key_exchange_pubkey,
+};
+
+/**
+ * Transmit Client Key Exchange record
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
+	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
+	struct tls_cipher_suite *suite = cipherspec->suite;
+
+	/* Transmit Client Key Exchange record via key exchange algorithm */
+	return suite->exchange->exchange ( tls );
 }
 
 /**
