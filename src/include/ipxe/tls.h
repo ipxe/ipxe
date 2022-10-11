@@ -403,6 +403,7 @@ struct tls_connection {
 #define TLS_RX_ALIGN 16
 
 extern struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm;
+extern struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm;
 
 extern int add_tls ( struct interface *xfer, const char *name,
 		     struct x509_root *root, struct private_key *key );
