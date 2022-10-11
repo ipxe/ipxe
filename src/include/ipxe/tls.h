@@ -310,6 +310,10 @@ struct tls_connection {
 	uint8_t server_random[32];
 	/** Client random bytes */
 	struct tls_client_random client_random;
+	/** Server Key Exchange record (if any) */
+	void *server_key;
+	/** Server Key Exchange record length */
+	size_t server_key_len;
 	/** MD5+SHA1 context for handshake verification */
 	uint8_t handshake_md5_sha1_ctx[MD5_SHA1_CTX_SIZE];
 	/** SHA256 context for handshake verification */

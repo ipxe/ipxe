@@ -377,6 +377,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
+	free ( tls->server_key );
 	list_for_each_entry_safe ( iobuf, tmp, &tls->rx_data, list ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
@@ -1868,6 +1869,37 @@ static int tls_new_certificate ( struct tls_connection *tls,
 }
 
 /**
+ * Receive new Server Key Exchange handshake record
+ *
+ * @v tls		TLS connection
+ * @v data		Plaintext handshake record
+ * @v len		Length of plaintext handshake record
+ * @ret rc		Return status code
+ */
+static int tls_new_server_key_exchange ( struct tls_connection *tls,
+					 const void *data, size_t len ) {
+
+	/* Free any existing server key exchange record */
+	free ( tls->server_key );
+	tls->server_key_len = 0;
+
+	/* Allocate copy of server key exchange record */
+	tls->server_key = malloc ( len );
+	if ( ! tls->server_key )
+		return -ENOMEM;
+
+	/* Store copy of server key exchange record for later
+	 * processing.  We cannot verify the signature at this point
+	 * since the certificate validation will not yet have
+	 * completed.
+	 */
+	memcpy ( tls->server_key, data, len );
+	tls->server_key_len = len;
+
+	return 0;
+}
+
+/**
  * Receive new Certificate Request handshake record
  *
  * @v tls		TLS connection
@@ -2099,6 +2131,10 @@ static int tls_new_handshake ( struct tls_connection *tls,
 			break;
 		case TLS_CERTIFICATE:
 			rc = tls_new_certificate ( tls, payload, payload_len );
+			break;
+		case TLS_SERVER_KEY_EXCHANGE:
+			rc = tls_new_server_key_exchange ( tls, payload,
+							   payload_len );
 			break;
 		case TLS_CERTIFICATE_REQUEST:
 			rc = tls_new_certificate_request ( tls, payload,
