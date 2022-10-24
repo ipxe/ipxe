@@ -61,7 +61,7 @@ void cipher_encrypt_okx ( struct cipher_test *test, const char *file,
 	/* Initialise cipher */
 	okx ( cipher_setkey ( cipher, ctx, test->key, test->key_len ) == 0,
 	      file, line );
-	cipher_setiv ( cipher, ctx, test->iv );
+	cipher_setiv ( cipher, ctx, test->iv, test->iv_len );
 
 	/* Perform encryption */
 	cipher_encrypt ( cipher, ctx, test->plaintext, ciphertext, len );
@@ -87,7 +87,7 @@ void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
 	/* Initialise cipher */
 	okx ( cipher_setkey ( cipher, ctx, test->key, test->key_len ) == 0,
 	      file, line );
-	cipher_setiv ( cipher, ctx, test->iv );
+	cipher_setiv ( cipher, ctx, test->iv, test->iv_len );
 
 	/* Perform encryption */
 	cipher_decrypt ( cipher, ctx, test->ciphertext, plaintext, len );
@@ -143,7 +143,7 @@ cipher_cost ( struct cipher_algorithm *cipher, size_t key_len,
 	/* Initialise cipher */
 	rc = cipher_setkey ( cipher, ctx, key, key_len );
 	assert ( rc == 0 );
-	cipher_setiv ( cipher, ctx, iv );
+	cipher_setiv ( cipher, ctx, iv, sizeof ( iv ) );
 
 	/* Profile cipher operation */
 	memset ( &profiler, 0, sizeof ( profiler ) );

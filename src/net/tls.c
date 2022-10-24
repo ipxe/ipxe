@@ -717,14 +717,14 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 
 	/* TX initialisation vector */
 	cipher_setiv ( tx_cipherspec->suite->cipher,
-		       tx_cipherspec->cipher_ctx, key );
+		       tx_cipherspec->cipher_ctx, key, iv_size );
 	DBGC ( tls, "TLS %p TX IV:\n", tls );
 	DBGC_HD ( tls, key, iv_size );
 	key += iv_size;
 
 	/* RX initialisation vector */
 	cipher_setiv ( rx_cipherspec->suite->cipher,
-		       rx_cipherspec->cipher_ctx, key );
+		       rx_cipherspec->cipher_ctx, key, iv_size );
 	DBGC ( tls, "TLS %p RX IV:\n", tls );
 	DBGC_HD ( tls, key, iv_size );
 	key += iv_size;

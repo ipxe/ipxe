@@ -61,7 +61,8 @@ int cipher_null_setkey ( void *ctx __unused, const void *key __unused,
 	return 0;
 }
 
-void cipher_null_setiv ( void *ctx __unused, const void *iv __unused ) {
+void cipher_null_setiv ( void *ctx __unused, const void *iv __unused,
+			 size_t ivlen __unused ) {
 	/* Do nothing */
 }
 

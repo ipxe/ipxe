@@ -31,8 +31,9 @@ static int _ecb_name ## _setkey ( void *ctx, const void *key,		\
 				  size_t keylen ) {			\
 	return cipher_setkey ( &_raw_cipher, ctx, key, keylen );	\
 }									\
-static void _ecb_name ## _setiv ( void *ctx, const void *iv ) {		\
-	cipher_setiv ( &_raw_cipher, ctx, iv );				\
+static void _ecb_name ## _setiv ( void *ctx, const void *iv,		\
+				  size_t ivlen ) {			\
+	cipher_setiv ( &_raw_cipher, ctx, iv, ivlen );			\
 }									\
 static void _ecb_name ## _encrypt ( void *ctx, const void *src,		\
 				    void *dst, size_t len ) {		\
