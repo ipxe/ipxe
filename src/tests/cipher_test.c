@@ -57,6 +57,7 @@ void cipher_encrypt_okx ( struct cipher_test *test, const char *file,
 	size_t len = test->len;
 	uint8_t ctx[cipher->ctxsize];
 	uint8_t ciphertext[len];
+	uint8_t auth[cipher->authsize];
 
 	/* Initialise cipher */
 	okx ( cipher_setkey ( cipher, ctx, test->key, test->key_len ) == 0,
@@ -65,6 +66,7 @@ void cipher_encrypt_okx ( struct cipher_test *test, const char *file,
 
 	/* Process additional data, if applicable */
 	if ( test->additional_len ) {
+		okx ( is_auth_cipher ( cipher ), file, line );
 		cipher_encrypt ( cipher, ctx, test->additional, NULL,
 				 test->additional_len );
 	}
@@ -74,6 +76,11 @@ void cipher_encrypt_okx ( struct cipher_test *test, const char *file,
 
 	/* Compare against expected ciphertext */
 	okx ( memcmp ( ciphertext, test->ciphertext, len ) == 0, file, line );
+
+	/* Check authentication tag */
+	okx ( cipher->authsize == test->auth_len, file, line );
+	cipher_auth ( cipher, ctx, auth );
+	okx ( memcmp ( auth, test->auth, test->auth_len ) == 0, file, line );
 }
 
 /**
@@ -89,6 +96,7 @@ void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
 	size_t len = test->len;
 	uint8_t ctx[cipher->ctxsize];
 	uint8_t plaintext[len];
+	uint8_t auth[cipher->authsize];
 
 	/* Initialise cipher */
 	okx ( cipher_setkey ( cipher, ctx, test->key, test->key_len ) == 0,
@@ -97,6 +105,7 @@ void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
 
 	/* Process additional data, if applicable */
 	if ( test->additional_len ) {
+		okx ( is_auth_cipher ( cipher ), file, line );
 		cipher_decrypt ( cipher, ctx, test->additional, NULL,
 				 test->additional_len );
 	}
@@ -106,6 +115,11 @@ void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
 
 	/* Compare against expected plaintext */
 	okx ( memcmp ( plaintext, test->plaintext, len ) == 0, file, line );
+
+	/* Check authentication tag */
+	okx ( cipher->authsize == test->auth_len, file, line );
+	cipher_auth ( cipher, ctx, auth );
+	okx ( memcmp ( auth, test->auth, test->auth_len ) == 0, file, line );
 }
 
 /**

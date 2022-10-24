@@ -47,10 +47,12 @@ struct cipher_algorithm _ecb_cipher = {					\
 	.name		= #_ecb_name,					\
 	.ctxsize	= sizeof ( _raw_context ),			\
 	.blocksize	= _blocksize,					\
+	.authsize	= 0,						\
 	.setkey		= _ecb_name ## _setkey,				\
 	.setiv		= _ecb_name ## _setiv,				\
 	.encrypt	= _ecb_name ## _encrypt,			\
 	.decrypt	= _ecb_name ## _decrypt,			\
+	.auth		= cipher_null_auth,				\
 };
 
 #endif /* _IPXE_ECB_H */

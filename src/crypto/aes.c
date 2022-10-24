@@ -783,10 +783,12 @@ struct cipher_algorithm aes_algorithm = {
 	.name = "aes",
 	.ctxsize = sizeof ( struct aes_context ),
 	.blocksize = AES_BLOCKSIZE,
+	.authsize = 0,
 	.setkey = aes_setkey,
 	.setiv = cipher_null_setiv,
 	.encrypt = aes_encrypt,
 	.decrypt = aes_decrypt,
+	.auth = cipher_null_auth,
 };
 
 /* AES in Electronic Codebook mode */

@@ -52,6 +52,8 @@ struct cipher_algorithm {
 	size_t ctxsize;
 	/** Block size */
 	size_t blocksize;
+	/** Authentication tag size */
+	size_t authsize;
 	/** Set key
 	 *
 	 * @v ctx	Context
@@ -89,6 +91,12 @@ struct cipher_algorithm {
 	 */
 	void ( * decrypt ) ( void *ctx, const void *src, void *dst,
 			     size_t len );
+	/** Generate authentication tag
+	 *
+	 * @v ctx	Context
+	 * @v auth	Authentication tag
+	 */
+	void ( * auth ) ( void *ctx, void *auth );
 };
 
 /** A public key algorithm */
@@ -215,8 +223,17 @@ static inline void cipher_decrypt ( struct cipher_algorithm *cipher,
 	cipher_decrypt ( (cipher), (ctx), (src), (dst), (len) );	\
 	} while ( 0 )
 
+static inline void cipher_auth ( struct cipher_algorithm *cipher, void *ctx,
+				 void *auth ) {
+	cipher->auth ( ctx, auth );
+}
+
 static inline int is_stream_cipher ( struct cipher_algorithm *cipher ) {
 	return ( cipher->blocksize == 1 );
+}
+
+static inline int is_auth_cipher ( struct cipher_algorithm *cipher ) {
+	return cipher->authsize;
 }
 
 static inline int pubkey_init ( struct pubkey_algorithm *pubkey, void *ctx,
@@ -274,6 +291,7 @@ extern void cipher_null_encrypt ( void *ctx, const void *src, void *dst,
 				  size_t len );
 extern void cipher_null_decrypt ( void *ctx, const void *src, void *dst,
 				  size_t len );
+extern void cipher_null_auth ( void *ctx, void *auth );
 
 extern int pubkey_null_init ( void *ctx, const void *key, size_t key_len );
 extern size_t pubkey_null_max_len ( void *ctx );

@@ -76,14 +76,20 @@ void cipher_null_decrypt ( void *ctx __unused, const void *src, void *dst,
 	memcpy ( dst, src, len );
 }
 
+void cipher_null_auth ( void *ctx __unused, void *auth __unused ) {
+	/* Do nothing */
+}
+
 struct cipher_algorithm cipher_null = {
 	.name = "null",
 	.ctxsize = 0,
 	.blocksize = 1,
+	.authsize = 0,
 	.setkey = cipher_null_setkey,
 	.setiv = cipher_null_setiv,
 	.encrypt = cipher_null_encrypt,
 	.decrypt = cipher_null_decrypt,
+	.auth = cipher_null_auth,
 };
 
 int pubkey_null_init ( void *ctx __unused, const void *key __unused,

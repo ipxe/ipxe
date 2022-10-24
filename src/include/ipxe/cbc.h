@@ -95,10 +95,12 @@ struct cipher_algorithm _cbc_cipher = {					\
 	.name		= #_cbc_name,					\
 	.ctxsize	= sizeof ( struct _cbc_name ## _context ),	\
 	.blocksize	= _blocksize,					\
+	.authsize	= 0,						\
 	.setkey		= _cbc_name ## _setkey,				\
 	.setiv		= _cbc_name ## _setiv,				\
 	.encrypt	= _cbc_name ## _encrypt,			\
 	.decrypt	= _cbc_name ## _decrypt,			\
+	.auth		= cipher_null_auth,				\
 };
 
 #endif /* _IPXE_CBC_H */
