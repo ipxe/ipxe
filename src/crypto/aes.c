@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crypto.h>
 #include <ipxe/ecb.h>
 #include <ipxe/cbc.h>
+#include <ipxe/gcm.h>
 #include <ipxe/aes.h>
 
 /** AES strides
@@ -797,4 +798,8 @@ ECB_CIPHER ( aes_ecb, aes_ecb_algorithm,
 
 /* AES in Cipher Block Chaining mode */
 CBC_CIPHER ( aes_cbc, aes_cbc_algorithm,
+	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );
+
+/* AES in Galois/Counter mode */
+GCM_CIPHER ( aes_gcm, aes_gcm_algorithm,
 	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );
