@@ -63,6 +63,12 @@ void cipher_encrypt_okx ( struct cipher_test *test, const char *file,
 	      file, line );
 	cipher_setiv ( cipher, ctx, test->iv, test->iv_len );
 
+	/* Process additional data, if applicable */
+	if ( test->additional_len ) {
+		cipher_encrypt ( cipher, ctx, test->additional, NULL,
+				 test->additional_len );
+	}
+
 	/* Perform encryption */
 	cipher_encrypt ( cipher, ctx, test->plaintext, ciphertext, len );
 
@@ -89,7 +95,13 @@ void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
 	      file, line );
 	cipher_setiv ( cipher, ctx, test->iv, test->iv_len );
 
-	/* Perform encryption */
+	/* Process additional data, if applicable */
+	if ( test->additional_len ) {
+		cipher_decrypt ( cipher, ctx, test->additional, NULL,
+				 test->additional_len );
+	}
+
+	/* Perform decryption */
 	cipher_decrypt ( cipher, ctx, test->ciphertext, plaintext, len );
 
 	/* Compare against expected plaintext */

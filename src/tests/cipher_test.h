@@ -25,6 +25,10 @@ struct cipher_test {
 	const void *iv;
 	/** Length of initialisation vector */
 	size_t iv_len;
+	/** Additional data */
+	const void *additional;
+	/** Length of additional data */
+	size_t additional_len;
 	/** Plaintext */
 	const void *plaintext;
 	/** Ciphertext */
@@ -39,6 +43,9 @@ struct cipher_test {
 /** Define inline initialisation vector */
 #define IV(...) { __VA_ARGS__ }
 
+/** Define inline additional data */
+#define ADDITIONAL(...) { __VA_ARGS__ }
+
 /** Define inline plaintext data */
 #define PLAINTEXT(...) { __VA_ARGS__ }
 
@@ -52,13 +59,16 @@ struct cipher_test {
  * @v CIPHER		Cipher algorithm
  * @v KEY		Key
  * @v IV		Initialisation vector
+ * @v ADDITIONAL	Additional data
  * @v PLAINTEXT		Plaintext
  * @v CIPHERTEXT	Ciphertext
  * @ret test		Cipher test
  */
-#define CIPHER_TEST( name, CIPHER, KEY, IV, PLAINTEXT, CIPHERTEXT )	\
+#define CIPHER_TEST( name, CIPHER, KEY, IV, ADDITIONAL, PLAINTEXT,	\
+		     CIPHERTEXT )					\
 	static const uint8_t name ## _key [] = KEY;			\
 	static const uint8_t name ## _iv [] = IV;			\
+	static const uint8_t name ## _additional [] = ADDITIONAL;	\
 	static const uint8_t name ## _plaintext [] = PLAINTEXT;		\
 	static const uint8_t name ## _ciphertext			\
 		[ sizeof ( name ## _plaintext ) ] = CIPHERTEXT;		\
@@ -68,6 +78,8 @@ struct cipher_test {
 		.key_len = sizeof ( name ## _key ),			\
 		.iv = name ## _iv,					\
 		.iv_len = sizeof ( name ## _iv ),			\
+		.additional = name ## _additional,			\
+		.additional_len = sizeof ( name ## _additional ),	\
 		.plaintext = name ## _plaintext,			\
 		.ciphertext = name ## _ciphertext,			\
 		.len = sizeof ( name ## _plaintext ),			\

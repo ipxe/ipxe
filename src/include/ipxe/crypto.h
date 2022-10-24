@@ -54,25 +54,25 @@ struct cipher_algorithm {
 	size_t blocksize;
 	/** Set key
 	 *
-	 * @v ctx		Context
-	 * @v key		Key
-	 * @v keylen		Key length
-	 * @ret rc		Return status code
+	 * @v ctx	Context
+	 * @v key	Key
+	 * @v keylen	Key length
+	 * @ret rc	Return status code
 	 */
 	int ( * setkey ) ( void *ctx, const void *key, size_t keylen );
 	/** Set initialisation vector
 	 *
-	 * @v ctx		Context
-	 * @v iv		Initialisation vector
-	 * @v ivlen		Initialisation vector length
+	 * @v ctx	Context
+	 * @v iv	Initialisation vector
+	 * @v ivlen	Initialisation vector length
 	 */
 	void ( * setiv ) ( void *ctx, const void *iv, size_t ivlen );
 	/** Encrypt data
 	 *
-	 * @v ctx		Context
-	 * @v src		Data to encrypt
-	 * @v dst		Buffer for encrypted data
-	 * @v len		Length of data
+	 * @v ctx	Context
+	 * @v src	Data to encrypt
+	 * @v dst	Buffer for encrypted data, or NULL for additional data
+	 * @v len	Length of data
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
@@ -80,10 +80,10 @@ struct cipher_algorithm {
 			     size_t len );
 	/** Decrypt data
 	 *
-	 * @v ctx		Context
-	 * @v src		Data to decrypt
-	 * @v dst		Buffer for decrypted data
-	 * @v len		Length of data
+	 * @v ctx	Context
+	 * @v src	Data to decrypt
+	 * @v dst	Buffer for decrypted data, or NULL for additional data
+	 * @v len	Length of data
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
