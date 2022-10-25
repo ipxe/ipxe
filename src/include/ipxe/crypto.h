@@ -263,6 +263,29 @@ static inline int pubkey_match ( struct pubkey_algorithm *pubkey,
 			       public_key_len );
 }
 
+extern void digest_null_init ( void *ctx );
+extern void digest_null_update ( void *ctx, const void *src, size_t len );
+extern void digest_null_final ( void *ctx, void *out );
+
+extern int cipher_null_setkey ( void *ctx, const void *key, size_t keylen );
+extern void cipher_null_setiv ( void *ctx, const void *iv );
+extern void cipher_null_encrypt ( void *ctx, const void *src, void *dst,
+				  size_t len );
+extern void cipher_null_decrypt ( void *ctx, const void *src, void *dst,
+				  size_t len );
+
+extern int pubkey_null_init ( void *ctx, const void *key, size_t key_len );
+extern size_t pubkey_null_max_len ( void *ctx );
+extern int pubkey_null_encrypt ( void *ctx, const void *plaintext,
+				 size_t plaintext_len, void *ciphertext );
+extern int pubkey_null_decrypt ( void *ctx, const void *ciphertext,
+				 size_t ciphertext_len, void *plaintext );
+extern int pubkey_null_sign ( void *ctx, struct digest_algorithm *digest,
+			      const void *value, void *signature );
+extern int pubkey_null_verify ( void *ctx, struct digest_algorithm *digest,
+				const void *value, const void *signature ,
+				size_t signature_len );
+
 extern struct digest_algorithm digest_null;
 extern struct cipher_algorithm cipher_null;
 extern struct pubkey_algorithm pubkey_null;

@@ -778,23 +778,13 @@ static int aes_setkey ( void *ctx, const void *key, size_t keylen ) {
 	return 0;
 }
 
-/**
- * Set initialisation vector
- *
- * @v ctx		Context
- * @v iv		Initialisation vector
- */
-static void aes_setiv ( void *ctx __unused, const void *iv __unused ) {
-	/* Nothing to do */
-}
-
 /** Basic AES algorithm */
 struct cipher_algorithm aes_algorithm = {
 	.name = "aes",
 	.ctxsize = sizeof ( struct aes_context ),
 	.blocksize = AES_BLOCKSIZE,
 	.setkey = aes_setkey,
-	.setiv = aes_setiv,
+	.setiv = cipher_null_setiv,
 	.encrypt = aes_encrypt,
 	.decrypt = aes_decrypt,
 };
