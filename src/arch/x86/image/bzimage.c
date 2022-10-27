@@ -252,13 +252,17 @@ static void bzimage_update_header ( struct image *image,
  */
 static int bzimage_parse_cmdline ( struct image *image,
 				   struct bzimage_context *bzimg,
-				   const char *cmdline ) {
+				   char *cmdline ) {
+	char *sep;
 	char *vga;
 	char *mem;
 
 	/* Look for "vga=" */
 	if ( ( vga = strstr ( cmdline, "vga=" ) ) ) {
 		vga += 4;
+		sep = strchr ( vga, ' ' );
+		if ( sep )
+			*sep = '\0';
 		if ( strcmp ( vga, "normal" ) == 0 ) {
 			bzimg->vid_mode = BZI_VID_MODE_NORMAL;
 		} else if ( strcmp ( vga, "ext" ) == 0 ) {
@@ -267,11 +271,13 @@ static int bzimage_parse_cmdline ( struct image *image,
 			bzimg->vid_mode = BZI_VID_MODE_ASK;
 		} else {
 			bzimg->vid_mode = strtoul ( vga, &vga, 0 );
-			if ( *vga && ( *vga != ' ' ) ) {
-				DBGC ( image, "bzImage %p strange \"vga=\""
+			if ( *vga ) {
+				DBGC ( image, "bzImage %p strange \"vga=\" "
 				       "terminator '%c'\n", image, *vga );
 			}
 		}
+		if ( sep )
+			*sep = ' ';
 	}
 
 	/* Look for "mem=" */
@@ -522,7 +528,7 @@ static void bzimage_load_initrds ( struct image *image,
  */
 static int bzimage_exec ( struct image *image ) {
 	struct bzimage_context bzimg;
-	const char *cmdline = ( image->cmdline ? image->cmdline : "" );
+	char *cmdline = ( image->cmdline ? image->cmdline : "" );
 	int rc;
 
 	/* Read and parse header from image */
