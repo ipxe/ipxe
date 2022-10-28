@@ -121,6 +121,7 @@ struct cipher_algorithm _gcm_cipher = {					\
 	.name		= #_gcm_name,					\
 	.ctxsize	= sizeof ( struct _gcm_name ## _context ),	\
 	.blocksize	= 1,						\
+	.alignsize	= sizeof ( union gcm_block ),			\
 	.authsize	= sizeof ( union gcm_block ),			\
 	.setkey		= _gcm_name ## _setkey,				\
 	.setiv		= _gcm_name ## _setiv,				\

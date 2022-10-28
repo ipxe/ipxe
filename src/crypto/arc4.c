@@ -119,6 +119,7 @@ struct cipher_algorithm arc4_algorithm = {
 	.name = "ARC4",
 	.ctxsize = ARC4_CTX_SIZE,
 	.blocksize = 1,
+	.alignsize = 1,
 	.authsize = 0,
 	.setkey = arc4_setkey,
 	.setiv = cipher_null_setiv,

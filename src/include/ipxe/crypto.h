@@ -51,8 +51,24 @@ struct cipher_algorithm {
 	const char *name;
 	/** Context size */
 	size_t ctxsize;
-	/** Block size */
+	/** Block size
+	 *
+	 * Every call to encrypt() or decrypt() must be for a multiple
+	 * of this size.
+	 */
 	size_t blocksize;
+	/** Alignment size
+	 *
+	 * Every call to encrypt() or decrypt() must begin at a
+	 * multiple of this offset from the start of the stream.
+	 * (Equivalently: all but the last call to encrypt() or
+	 * decrypt() must be for a multiple of this size.)
+	 *
+	 * For ciphers supporting additional data, the main data
+	 * stream and additional data stream are both considered to
+	 * begin at offset zero.
+	 */
+	size_t alignsize;
 	/** Authentication tag size */
 	size_t authsize;
 	/** Set key

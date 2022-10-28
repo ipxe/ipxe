@@ -95,6 +95,7 @@ struct cipher_algorithm _cbc_cipher = {					\
 	.name		= #_cbc_name,					\
 	.ctxsize	= sizeof ( struct _cbc_name ## _context ),	\
 	.blocksize	= _blocksize,					\
+	.alignsize	= _blocksize,					\
 	.authsize	= 0,						\
 	.setkey		= _cbc_name ## _setkey,				\
 	.setiv		= _cbc_name ## _setiv,				\

@@ -131,8 +131,18 @@ void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
  */
 void cipher_okx ( struct cipher_test *test, const char *file,
 		  unsigned int line ) {
+	struct cipher_algorithm *cipher = test->cipher;
+	size_t len = test->len;
 
+	/* Sanity checks */
+	okx ( cipher->blocksize != 0, file, line );
+	okx ( ( len % cipher->blocksize ) == 0, file, line );
+	okx ( ( cipher->alignsize % cipher->blocksize ) == 0, file, line );
+
+	/* Report encryption test result */
 	cipher_encrypt_okx ( test, file, line );
+
+	/* Report decryption test result */
 	cipher_decrypt_okx ( test, file, line );
 }
 

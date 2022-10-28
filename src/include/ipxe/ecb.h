@@ -47,6 +47,7 @@ struct cipher_algorithm _ecb_cipher = {					\
 	.name		= #_ecb_name,					\
 	.ctxsize	= sizeof ( _raw_context ),			\
 	.blocksize	= _blocksize,					\
+	.alignsize	= _blocksize,					\
 	.authsize	= 0,						\
 	.setkey		= _ecb_name ## _setkey,				\
 	.setiv		= _ecb_name ## _setiv,				\

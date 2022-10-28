@@ -784,6 +784,7 @@ struct cipher_algorithm aes_algorithm = {
 	.name = "aes",
 	.ctxsize = sizeof ( struct aes_context ),
 	.blocksize = AES_BLOCKSIZE,
+	.alignsize = 0,
 	.authsize = 0,
 	.setkey = aes_setkey,
 	.setiv = cipher_null_setiv,

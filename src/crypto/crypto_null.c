@@ -84,6 +84,7 @@ struct cipher_algorithm cipher_null = {
 	.name = "null",
 	.ctxsize = 0,
 	.blocksize = 1,
+	.alignsize = 1,
 	.authsize = 0,
 	.setkey = cipher_null_setkey,
 	.setiv = cipher_null_setiv,
