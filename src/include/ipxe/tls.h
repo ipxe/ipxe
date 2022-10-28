@@ -169,10 +169,14 @@ struct tls_cipher_suite {
 	struct cipher_algorithm *cipher;
 	/** MAC digest algorithm */
 	struct digest_algorithm *digest;
-	/** Key length */
-	uint16_t key_len;
 	/** Numeric code (in network-endian order) */
 	uint16_t code;
+	/** Key length */
+	uint8_t key_len;
+	/** Fixed initialisation vector length */
+	uint8_t fixed_iv_len;
+	/** Record initialisation vector length */
+	uint8_t record_iv_len;
 };
 
 /** TLS cipher suite table */
@@ -195,6 +199,8 @@ struct tls_cipherspec {
 	void *cipher_ctx;
 	/** MAC secret */
 	void *mac_secret;
+	/** Fixed initialisation vector */
+	void *fixed_iv;
 };
 
 /** A TLS signature and hash algorithm identifier */

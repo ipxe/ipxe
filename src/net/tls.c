@@ -664,7 +664,8 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 	struct tls_cipherspec *rx_cipherspec = &tls->rx_cipherspec_pending;
 	size_t hash_size = tx_cipherspec->suite->digest->digestsize;
 	size_t key_size = tx_cipherspec->suite->key_len;
-	size_t total = ( 2 * ( hash_size + key_size ) );
+	size_t iv_size = tx_cipherspec->suite->fixed_iv_len;
+	size_t total = ( 2 * ( hash_size + key_size + iv_size ) );
 	uint8_t key_block[total];
 	uint8_t *key;
 	int rc;
@@ -713,6 +714,18 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 	DBGC ( tls, "TLS %p RX key:\n", tls );
 	DBGC_HD ( tls, key, key_size );
 	key += key_size;
+
+	/* TX initialisation vector */
+	memcpy ( tx_cipherspec->fixed_iv, key, iv_size );
+	DBGC ( tls, "TLS %p TX IV:\n", tls );
+	DBGC_HD ( tls, key, iv_size );
+	key += iv_size;
+
+	/* RX initialisation vector */
+	memcpy ( rx_cipherspec->fixed_iv, key, iv_size );
+	DBGC ( tls, "TLS %p RX IV:\n", tls );
+	DBGC_HD ( tls, key, iv_size );
+	key += iv_size;
 
 	assert ( ( key_block + total ) == key );
 
@@ -792,9 +805,10 @@ static int tls_set_cipher ( struct tls_connection *tls,
 
 	/* Clear out old cipher contents, if any */
 	tls_clear_cipher ( tls, cipherspec );
-	
+
 	/* Allocate dynamic storage */
-	total = ( pubkey->ctxsize + cipher->ctxsize + digest->digestsize );
+	total = ( pubkey->ctxsize + cipher->ctxsize + digest->digestsize +
+		  suite->fixed_iv_len );
 	dynamic = zalloc ( total );
 	if ( ! dynamic ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for crypto "
@@ -807,6 +821,7 @@ static int tls_set_cipher ( struct tls_connection *tls,
 	cipherspec->pubkey_ctx = dynamic;	dynamic += pubkey->ctxsize;
 	cipherspec->cipher_ctx = dynamic;	dynamic += cipher->ctxsize;
 	cipherspec->mac_secret = dynamic;	dynamic += digest->digestsize;
+	cipherspec->fixed_iv = dynamic;		dynamic += suite->fixed_iv_len;
 	assert ( ( cipherspec->dynamic + total ) == dynamic );
 
 	/* Store parameters */
@@ -2627,6 +2642,9 @@ static void * tls_assemble_block ( struct tls_connection *tls,
 	void *mac;
 	void *padding;
 
+	/* Sanity check */
+	assert ( iv_len == tls->tx_cipherspec.suite->record_iv_len );
+
 	/* Calculate block-ciphered struct length */
 	padding_len = ( ( blocksize - 1 ) & -( iv_len + len + mac_len + 1 ) );
 	*plaintext_len = ( iv_len + len + mac_len + padding_len + 1 );
@@ -2780,6 +2798,9 @@ static int tls_split_block ( struct tls_connection *tls,
 	uint8_t *padding_final;
 	uint8_t *padding;
 	size_t padding_len;
+
+	/* Sanity check */
+	assert ( iv_len == tls->rx_cipherspec.suite->record_iv_len );
 
 	/* Extract initialisation vector */
 	iobuf = list_first_entry ( rx_data, struct io_buffer, list );
