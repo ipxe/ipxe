@@ -41,9 +41,6 @@ struct tls_header {
 	uint16_t length;
 } __attribute__ (( packed ));
 
-/** TLS version 1.0 */
-#define TLS_VERSION_TLS_1_0 0x0301
-
 /** TLS version 1.1 */
 #define TLS_VERSION_TLS_1_1 0x0302
 
@@ -196,8 +193,6 @@ struct tls_cipherspec {
 	void *pubkey_ctx;
 	/** Bulk encryption cipher context */
 	void *cipher_ctx;
-	/** Next bulk encryption cipher context (TX only) */
-	void *cipher_next_ctx;
 	/** MAC secret */
 	void *mac_secret;
 };

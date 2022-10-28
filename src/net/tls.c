@@ -664,8 +664,7 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 	struct tls_cipherspec *rx_cipherspec = &tls->rx_cipherspec_pending;
 	size_t hash_size = tx_cipherspec->suite->digest->digestsize;
 	size_t key_size = tx_cipherspec->suite->key_len;
-	size_t iv_size = tx_cipherspec->suite->cipher->blocksize;
-	size_t total = ( 2 * ( hash_size + key_size + iv_size ) );
+	size_t total = ( 2 * ( hash_size + key_size ) );
 	uint8_t key_block[total];
 	uint8_t *key;
 	int rc;
@@ -714,20 +713,6 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 	DBGC ( tls, "TLS %p RX key:\n", tls );
 	DBGC_HD ( tls, key, key_size );
 	key += key_size;
-
-	/* TX initialisation vector */
-	cipher_setiv ( tx_cipherspec->suite->cipher,
-		       tx_cipherspec->cipher_ctx, key, iv_size );
-	DBGC ( tls, "TLS %p TX IV:\n", tls );
-	DBGC_HD ( tls, key, iv_size );
-	key += iv_size;
-
-	/* RX initialisation vector */
-	cipher_setiv ( rx_cipherspec->suite->cipher,
-		       rx_cipherspec->cipher_ctx, key, iv_size );
-	DBGC ( tls, "TLS %p RX IV:\n", tls );
-	DBGC_HD ( tls, key, iv_size );
-	key += iv_size;
 
 	assert ( ( key_block + total ) == key );
 
@@ -809,7 +794,7 @@ static int tls_set_cipher ( struct tls_connection *tls,
 	tls_clear_cipher ( tls, cipherspec );
 	
 	/* Allocate dynamic storage */
-	total = ( pubkey->ctxsize + 2 * cipher->ctxsize + digest->digestsize );
+	total = ( pubkey->ctxsize + cipher->ctxsize + digest->digestsize );
 	dynamic = zalloc ( total );
 	if ( ! dynamic ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for crypto "
@@ -821,7 +806,6 @@ static int tls_set_cipher ( struct tls_connection *tls,
 	cipherspec->dynamic = dynamic;
 	cipherspec->pubkey_ctx = dynamic;	dynamic += pubkey->ctxsize;
 	cipherspec->cipher_ctx = dynamic;	dynamic += cipher->ctxsize;
-	cipherspec->cipher_next_ctx = dynamic;	dynamic += cipher->ctxsize;
 	cipherspec->mac_secret = dynamic;	dynamic += digest->digestsize;
 	assert ( ( cipherspec->dynamic + total ) == dynamic );
 
@@ -2635,16 +2619,13 @@ static void * tls_assemble_block ( struct tls_connection *tls,
 				   void *digest, size_t *plaintext_len ) {
 	size_t blocksize = tls->tx_cipherspec.suite->cipher->blocksize;
 	size_t mac_len = tls->tx_cipherspec.suite->digest->digestsize;
-	size_t iv_len;
+	size_t iv_len = blocksize;
 	size_t padding_len;
 	void *plaintext;
 	void *iv;
 	void *content;
 	void *mac;
 	void *padding;
-
-	/* TLSv1.1 and later use an explicit IV */
-	iv_len = ( tls_version ( tls, TLS_VERSION_TLS_1_1 ) ? blocksize : 0 );
 
 	/* Calculate block-ciphered struct length */
 	padding_len = ( ( blocksize - 1 ) & -( iv_len + len + mac_len + 1 ) );
@@ -2732,9 +2713,7 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	tlshdr->type = type;
 	tlshdr->version = htons ( tls->version );
 	tlshdr->length = htons ( plaintext_len );
-	memcpy ( cipherspec->cipher_next_ctx, cipherspec->cipher_ctx,
-		 cipher->ctxsize );
-	cipher_encrypt ( cipher, cipherspec->cipher_next_ctx, plaintext,
+	cipher_encrypt ( cipher, cipherspec->cipher_ctx, plaintext,
 			 iob_put ( ciphertext, plaintext_len ), plaintext_len );
 
 	/* Free plaintext as soon as possible to conserve memory */
@@ -2751,8 +2730,6 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 
 	/* Update TX state machine to next record */
 	tls->tx_seq += 1;
-	memcpy ( tls->tx_cipherspec.cipher_ctx,
-		 tls->tx_cipherspec.cipher_next_ctx, cipher->ctxsize );
 
  done:
 	free ( plaintext );
@@ -2798,16 +2775,14 @@ static int tls_split_stream ( struct tls_connection *tls,
 static int tls_split_block ( struct tls_connection *tls,
 			     struct list_head *rx_data, void **mac ) {
 	size_t mac_len = tls->rx_cipherspec.suite->digest->digestsize;
+	size_t iv_len = tls->rx_cipherspec.suite->cipher->blocksize;
 	struct io_buffer *iobuf;
-	size_t iv_len;
 	uint8_t *padding_final;
 	uint8_t *padding;
 	size_t padding_len;
 
-	/* TLSv1.1 and later use an explicit IV */
+	/* Extract initialisation vector */
 	iobuf = list_first_entry ( rx_data, struct io_buffer, list );
-	iv_len = ( tls_version ( tls, TLS_VERSION_TLS_1_1 ) ?
-		   tls->rx_cipherspec.suite->cipher->blocksize : 0 );
 	if ( iob_len ( iobuf ) < iv_len ) {
 		DBGC ( tls, "TLS %p received underlength IV\n", tls );
 		DBGC_HD ( tls, iobuf->data, iob_len ( iobuf ) );
