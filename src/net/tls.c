@@ -3004,12 +3004,23 @@ static struct interface_descriptor tls_plainstream_desc =
  * @ret rc		Returned status code
  */
 static int tls_newdata_process_header ( struct tls_connection *tls ) {
+	struct tls_cipherspec *cipherspec = &tls->rx_cipherspec;
+	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
+	size_t iv_len = cipherspec->suite->record_iv_len;
 	size_t data_len = ntohs ( tls->rx_header.length );
 	size_t remaining = data_len;
 	size_t frag_len;
+	size_t reserve;
 	struct io_buffer *iobuf;
 	struct io_buffer *tmp;
 	int rc;
+
+	/* Sanity check */
+	assert ( ( TLS_RX_BUFSIZE % cipher->alignsize ) == 0 );
+
+	/* Calculate alignment reservation at start of first data buffer */
+	reserve = ( ( -iv_len ) & ( cipher->alignsize - 1 ) );
+	remaining += reserve;
 
 	/* Allocate data buffers now that we know the length */
 	assert ( list_empty ( &tls->rx_data ) );
@@ -3044,6 +3055,13 @@ static int tls_newdata_process_header ( struct tls_connection *tls ) {
 		 * before we switch to using a block cipher.
 		 */
 		iob_reserve ( iobuf, ( iob_tailroom ( iobuf ) - frag_len ) );
+
+		/* Ensure first buffer length will be aligned to a
+		 * multiple of the cipher alignment size after
+		 * stripping the record IV.
+		 */
+		iob_reserve ( iobuf, reserve );
+		reserve = 0;
 
 		/* Add I/O buffer to list */
 		list_add_tail ( &iobuf->list, &tls->rx_data );
