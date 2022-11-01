@@ -1,0 +1,54 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Enable stack protection if available
+#
+SPG_TEST = $(CC) -fstack-protector-strong -mstack-protector-guard=global \
+		 -x c -c /dev/null -o /dev/null >/dev/null 2>&1
+SPG_FLAGS := $(shell $(SPG_TEST) && $(ECHO) '-fstack-protector-strong ' \
+					    '-mstack-protector-guard=global')
+CFLAGS += $(SPG_FLAGS)
+
+# The EFI linker script
+#
+LDSCRIPT	= scripts/efi.lds
+
+# Retain relocation information for elf2efi
+#
+LDFLAGS		+= -q -S
+
+# Media types.
+#
+NON_AUTO_MEDIA	+= efi
+NON_AUTO_MEDIA	+= efidrv
+NON_AUTO_MEDIA	+= drv.efi
+NON_AUTO_MEDIA	+= efirom
+
+# Include SNP driver in the all-drivers build
+#
+DRIVERS_net += snp
+
+# Rules for building EFI files
+#
+$(BIN)/%.efi : $(BIN)/%.efi.tmp $(ELF2EFI)
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(ELF2EFI) --subsystem=10 $< $@
+
+$(BIN)/%.efidrv : $(BIN)/%.efidrv.tmp $(ELF2EFI)
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(ELF2EFI) --subsystem=11 $< $@
+
+$(BIN)/%.drv.efi : $(BIN)/%.efidrv
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(CP) $< $@
+
+$(BIN)/%.efirom : $(BIN)/%.efidrv $(EFIROM)
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(EFIROM) -v $(TGT_PCI_VENDOR) -d $(TGT_PCI_DEVICE) $< $@
+
+$(BIN)/efidrv.cab : $(BIN)/alldrv.efis # $(ALL_drv.efi) is not yet defined
+	$(QM)$(ECHO) "  [CAB] $@"
+	$(Q)$(LCAB) -n -q $(ALL_drv.efi) $@
+
+$(BIN)/%.iso $(BIN)/%.usb : $(BIN)/%.efi util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<

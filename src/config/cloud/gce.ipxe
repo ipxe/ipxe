@@ -1,0 +1,8 @@
+#!ipxe
+
+echo Google Compute Engine - iPXE boot via metadata
+echo CPU: ${cpuvendor} ${cpumodel}
+ifstat ||
+dhcp ||
+route ||
+chain -ar http://metadata.google.internal/computeMetadata/v1/instance/attributes/ipxeboot
