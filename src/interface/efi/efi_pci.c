@@ -524,6 +524,9 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 		goto err_alloc;
 	}
 
+	/* Clear buffer */
+	memset ( addr, 0, ( pages * EFI_PAGE_SIZE ) );
+
 	/* Map buffer */
 	if ( ( rc = efipci_dma_map ( dma, map, virt_to_phys ( addr ),
 				     ( pages * EFI_PAGE_SIZE ),
