@@ -249,6 +249,10 @@ static inline int is_stream_cipher ( struct cipher_algorithm *cipher ) {
 	return ( cipher->blocksize == 1 );
 }
 
+static inline int is_block_cipher ( struct cipher_algorithm *cipher ) {
+	return ( cipher->blocksize > 1 );
+}
+
 static inline int is_auth_cipher ( struct cipher_algorithm *cipher ) {
 	return cipher->authsize;
 }

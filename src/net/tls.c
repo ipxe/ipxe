@@ -86,14 +86,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_EINVAL_HANDSHAKE						\
 	__einfo_uniqify ( EINFO_EINVAL, 0x08,				\
 			  "Invalid Handshake record" )
-#define EINVAL_STREAM __einfo_error ( EINFO_EINVAL_STREAM )
-#define EINFO_EINVAL_STREAM						\
-	__einfo_uniqify ( EINFO_EINVAL, 0x09,				\
-			  "Invalid stream-ciphered record" )
-#define EINVAL_BLOCK __einfo_error ( EINFO_EINVAL_BLOCK )
-#define EINFO_EINVAL_BLOCK						\
+#define EINVAL_IV __einfo_error ( EINFO_EINVAL_IV )
+#define EINFO_EINVAL_IV							\
 	__einfo_uniqify ( EINFO_EINVAL, 0x0a,				\
-			  "Invalid block-ciphered record" )
+			  "Invalid initialisation vector" )
 #define EINVAL_PADDING __einfo_error ( EINFO_EINVAL_PADDING )
 #define EINFO_EINVAL_PADDING						\
 	__einfo_uniqify ( EINFO_EINVAL, 0x0b,				\
@@ -2581,86 +2577,26 @@ static void tls_hmac ( struct tls_cipherspec *cipherspec,
 }
 
 /**
- * Allocate and assemble stream-ciphered record from data and MAC portions
+ * Calculate HMAC over list of I/O buffers
  *
- * @v tls		TLS connection
- * @ret data		Data
- * @ret len		Length of data
- * @ret digest		MAC digest
- * @ret plaintext_len	Length of plaintext record
- * @ret plaintext	Allocated plaintext record
+ * @v cipherspec	Cipher specification
+ * @v authhdr		Authentication header
+ * @v list		List of I/O buffers
+ * @v mac		HMAC to fill in
  */
-static void * __malloc
-tls_assemble_stream ( struct tls_connection *tls, const void *data, size_t len,
-		      void *digest, size_t *plaintext_len ) {
-	size_t mac_len = tls->tx_cipherspec.suite->mac_len;
-	void *plaintext;
-	void *content;
-	void *mac;
+static void tls_hmac_list ( struct tls_cipherspec *cipherspec,
+			    struct tls_auth_header *authhdr,
+			    struct list_head *list, void *hmac ) {
+	struct digest_algorithm *digest = cipherspec->suite->digest;
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
+	struct io_buffer *iobuf;
 
-	/* Calculate stream-ciphered struct length */
-	*plaintext_len = ( len + mac_len );
-
-	/* Allocate stream-ciphered struct */
-	plaintext = malloc ( *plaintext_len );
-	if ( ! plaintext )
-		return NULL;
-	content = plaintext;
-	mac = ( content + len );
-
-	/* Fill in stream-ciphered struct */
-	memcpy ( content, data, len );
-	memcpy ( mac, digest, mac_len );
-
-	return plaintext;
-}
-
-/**
- * Allocate and assemble block-ciphered record from data and MAC portions
- *
- * @v tls		TLS connection
- * @ret data		Data
- * @ret len		Length of data
- * @ret digest		MAC digest
- * @ret plaintext_len	Length of plaintext record
- * @ret plaintext	Allocated plaintext record
- */
-static void * tls_assemble_block ( struct tls_connection *tls,
-				   const void *data, size_t len,
-				   void *digest, size_t *plaintext_len ) {
-	size_t blocksize = tls->tx_cipherspec.suite->cipher->blocksize;
-	size_t mac_len = tls->tx_cipherspec.suite->mac_len;
-	size_t iv_len = blocksize;
-	size_t padding_len;
-	void *plaintext;
-	void *iv;
-	void *content;
-	void *mac;
-	void *padding;
-
-	/* Sanity check */
-	assert ( iv_len == tls->tx_cipherspec.suite->record_iv_len );
-
-	/* Calculate block-ciphered struct length */
-	padding_len = ( ( blocksize - 1 ) & -( iv_len + len + mac_len + 1 ) );
-	*plaintext_len = ( iv_len + len + mac_len + padding_len + 1 );
-
-	/* Allocate block-ciphered struct */
-	plaintext = malloc ( *plaintext_len );
-	if ( ! plaintext )
-		return NULL;
-	iv = plaintext;
-	content = ( iv + iv_len );
-	mac = ( content + len );
-	padding = ( mac + mac_len );
-
-	/* Fill in block-ciphered struct */
-	tls_generate_random ( tls, iv, iv_len );
-	memcpy ( content, data, len );
-	memcpy ( mac, digest, mac_len );
-	memset ( padding, padding_len, ( padding_len + 1 ) );
-
-	return plaintext;
+	tls_hmac_init ( cipherspec, ctx, authhdr );
+	list_for_each_entry ( iobuf, list, list ) {
+		tls_hmac_update ( cipherspec, ctx, iobuf->data,
+				  iob_len ( iobuf ) );
+	}
+	tls_hmac_final ( cipherspec, ctx, hmac );
 }
 
 /**
@@ -2678,32 +2614,43 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	struct cipher_algorithm *cipher = suite->cipher;
 	struct digest_algorithm *digest = suite->digest;
+	struct {
+		uint8_t fixed[suite->fixed_iv_len];
+		uint8_t record[suite->record_iv_len];
+	} __attribute__ (( packed )) iv;
 	struct tls_auth_header authhdr;
 	struct tls_header *tlshdr;
 	void *plaintext = NULL;
-	size_t plaintext_len;
+	size_t plaintext_len = len;
 	struct io_buffer *ciphertext = NULL;
 	size_t ciphertext_len;
+	size_t padding_len;
 	uint8_t mac[digest->digestsize];
+	void *tmp;
 	int rc;
 
-	/* Construct header */
+	/* Construct initialisation vector */
+	memcpy ( iv.fixed, cipherspec->fixed_iv, sizeof ( iv.fixed ) );
+	tls_generate_random ( tls, iv.record, sizeof ( iv.record ) );
+
+	/* Construct authentication data */
 	authhdr.seq = cpu_to_be64 ( tls->tx_seq );
 	authhdr.header.type = type;
 	authhdr.header.version = htons ( tls->version );
 	authhdr.header.length = htons ( len );
 
-	/* Calculate MAC */
-	tls_hmac ( cipherspec, &authhdr, data, len, mac );
-
-	/* Allocate and assemble plaintext struct */
-	if ( is_stream_cipher ( cipher ) ) {
-		plaintext = tls_assemble_stream ( tls, data, len, mac,
-						  &plaintext_len );
+	/* Calculate padding length */
+	plaintext_len += suite->mac_len;
+	if ( is_block_cipher ( cipher ) ) {
+		padding_len = ( ( ( cipher->blocksize - 1 ) &
+				  -( plaintext_len + 1 ) ) + 1 );
 	} else {
-		plaintext = tls_assemble_block ( tls, data, len, mac,
-						 &plaintext_len );
+		padding_len = 0;
 	}
+	plaintext_len += padding_len;
+
+	/* Allocate plaintext */
+	plaintext = malloc ( plaintext_len );
 	if ( ! plaintext ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
 		       "plaintext\n", tls, plaintext_len );
@@ -2711,11 +2658,26 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 		goto done;
 	}
 
+	/* Assemble plaintext */
+	tmp = plaintext;
+	memcpy ( tmp, data, len );
+	tmp += len;
+	if ( suite->mac_len )
+		tls_hmac ( cipherspec, &authhdr, data, len, mac );
+	memcpy ( tmp, mac, suite->mac_len );
+	tmp += suite->mac_len;
+	memset ( tmp, ( padding_len - 1 ), padding_len );
+	tmp += padding_len;
+	assert ( tmp == ( plaintext + plaintext_len ) );
 	DBGC2 ( tls, "Sending plaintext data:\n" );
 	DBGC2_HD ( tls, plaintext, plaintext_len );
 
+	/* Set initialisation vector */
+	cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv, sizeof ( iv ) );
+
 	/* Allocate ciphertext */
-	ciphertext_len = ( sizeof ( *tlshdr ) + plaintext_len );
+	ciphertext_len = ( sizeof ( *tlshdr ) + sizeof ( iv.record ) +
+			   plaintext_len );
 	ciphertext = xfer_alloc_iob ( &tls->cipherstream, ciphertext_len );
 	if ( ! ciphertext ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
@@ -2728,9 +2690,12 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	tlshdr = iob_put ( ciphertext, sizeof ( *tlshdr ) );
 	tlshdr->type = type;
 	tlshdr->version = htons ( tls->version );
-	tlshdr->length = htons ( plaintext_len );
+	tlshdr->length = htons ( ciphertext_len - sizeof ( *tlshdr ) );
+	memcpy ( iob_put ( ciphertext, sizeof ( iv.record ) ), iv.record,
+		 sizeof ( iv.record ) );
 	cipher_encrypt ( cipher, cipherspec->cipher_ctx, plaintext,
 			 iob_put ( ciphertext, plaintext_len ), plaintext_len );
+	assert ( iob_len ( ciphertext ) == ciphertext_len );
 
 	/* Free plaintext as soon as possible to conserve memory */
 	free ( plaintext );
@@ -2754,89 +2719,38 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 }
 
 /**
- * Split stream-ciphered record into data and MAC portions
+ * Verify block padding
  *
  * @v tls		TLS connection
- * @v rx_data		List of received data buffers
- * @v mac		MAC to fill in
+ * @v iobuf		Last received I/O buffer
+ * @ret len		Padding length, or negative error
  * @ret rc		Return status code
  */
-static int tls_split_stream ( struct tls_connection *tls,
-			      struct list_head *rx_data, void **mac ) {
-	size_t mac_len = tls->rx_cipherspec.suite->mac_len;
-	struct io_buffer *iobuf;
-
-	/* Extract MAC */
-	iobuf = list_last_entry ( rx_data, struct io_buffer, list );
-	assert ( iobuf != NULL );
-	if ( iob_len ( iobuf ) < mac_len ) {
-		DBGC ( tls, "TLS %p received underlength MAC\n", tls );
-		DBGC_HD ( tls, iobuf->data, iob_len ( iobuf ) );
-		return -EINVAL_STREAM;
-	}
-	iob_unput ( iobuf, mac_len );
-	*mac = iobuf->tail;
-
-	return 0;
-}
-
-/**
- * Split block-ciphered record into data and MAC portions
- *
- * @v tls		TLS connection
- * @v rx_data		List of received data buffers
- * @v mac		MAC to fill in
- * @ret rc		Return status code
- */
-static int tls_split_block ( struct tls_connection *tls,
-			     struct list_head *rx_data, void **mac ) {
-	size_t mac_len = tls->rx_cipherspec.suite->mac_len;
-	size_t iv_len = tls->rx_cipherspec.suite->cipher->blocksize;
-	struct io_buffer *iobuf;
-	uint8_t *padding_final;
+static int tls_verify_padding ( struct tls_connection *tls,
+				struct io_buffer *iobuf ) {
 	uint8_t *padding;
-	size_t padding_len;
-
-	/* Sanity check */
-	assert ( iv_len == tls->rx_cipherspec.suite->record_iv_len );
-
-	/* Extract initialisation vector */
-	iobuf = list_first_entry ( rx_data, struct io_buffer, list );
-	if ( iob_len ( iobuf ) < iv_len ) {
-		DBGC ( tls, "TLS %p received underlength IV\n", tls );
-		DBGC_HD ( tls, iobuf->data, iob_len ( iobuf ) );
-		return -EINVAL_BLOCK;
-	}
-	iob_pull ( iobuf, iv_len );
+	unsigned int pad;
+	unsigned int i;
+	size_t len;
 
 	/* Extract and verify padding */
-	iobuf = list_last_entry ( rx_data, struct io_buffer, list );
-	padding_final = ( iobuf->tail - 1 );
-	padding_len = *padding_final;
-	if ( ( padding_len + 1 ) > iob_len ( iobuf ) ) {
+	padding = ( iobuf->tail - 1 );
+	pad = *padding;
+	len = ( pad + 1 );
+	if ( len > iob_len ( iobuf ) ) {
 		DBGC ( tls, "TLS %p received underlength padding\n", tls );
 		DBGC_HD ( tls, iobuf->data, iob_len ( iobuf ) );
-		return -EINVAL_BLOCK;
+		return -EINVAL_PADDING;
 	}
-	iob_unput ( iobuf, ( padding_len + 1 ) );
-	for ( padding = iobuf->tail ; padding < padding_final ; padding++ ) {
-		if ( *padding != padding_len ) {
+	for ( i = 0 ; i < pad ; i++ ) {
+		if ( *(--padding) != pad ) {
 			DBGC ( tls, "TLS %p received bad padding\n", tls );
-			DBGC_HD ( tls, padding, padding_len );
+			DBGC_HD ( tls, iobuf->data, iob_len ( iobuf ) );
 			return -EINVAL_PADDING;
 		}
 	}
 
-	/* Extract MAC */
-	if ( iob_len ( iobuf ) < mac_len ) {
-		DBGC ( tls, "TLS %p received underlength MAC\n", tls );
-		DBGC_HD ( tls, iobuf->data, iob_len ( iobuf ) );
-		return -EINVAL_BLOCK;
-	}
-	iob_unput ( iobuf, mac_len );
-	*mac = iobuf->tail;
-
-	return 0;
+	return len;
 }
 
 /**
@@ -2854,47 +2768,91 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	struct cipher_algorithm *cipher = suite->cipher;
 	struct digest_algorithm *digest = suite->digest;
+	size_t len = ntohs ( tlshdr->length );
+	struct {
+		uint8_t fixed[suite->fixed_iv_len];
+		uint8_t record[suite->record_iv_len];
+	} __attribute__ (( packed )) iv;
 	struct tls_auth_header authhdr;
-	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	uint8_t verify_mac[digest->digestsize];
+	struct io_buffer *first;
+	struct io_buffer *last;
 	struct io_buffer *iobuf;
 	void *mac;
-	size_t len = 0;
+	size_t check_len;
+	int pad_len;
 	int rc;
 
-	/* Decrypt the received data */
-	list_for_each_entry ( iobuf, &tls->rx_data, list ) {
-		cipher_decrypt ( cipher, cipherspec->cipher_ctx,
-				 iobuf->data, iobuf->data, iob_len ( iobuf ) );
-	}
+	/* Locate first and last data buffers */
+	assert ( ! list_empty ( rx_data ) );
+	first = list_first_entry ( rx_data, struct io_buffer, list );
+	last = list_last_entry ( rx_data, struct io_buffer, list );
 
-	/* Split record into content and MAC */
-	if ( is_stream_cipher ( cipher ) ) {
-		if ( ( rc = tls_split_stream ( tls, rx_data, &mac ) ) != 0 )
-			return rc;
-	} else {
-		if ( ( rc = tls_split_block ( tls, rx_data, &mac ) ) != 0 )
-			return rc;
+	/* Extract initialisation vector */
+	if ( iob_len ( first ) < sizeof ( iv.record ) ) {
+		DBGC ( tls, "TLS %p received underlength IV\n", tls );
+		DBGC_HD ( tls, first->data, iob_len ( first ) );
+		return -EINVAL_IV;
 	}
+	memcpy ( iv.fixed, cipherspec->fixed_iv, sizeof ( iv.fixed ) );
+	memcpy ( iv.record, first->data, sizeof ( iv.record ) );
+	iob_pull ( first, sizeof ( iv.record ) );
+	len -= sizeof ( iv.record );
 
-	/* Calculate total length */
-	DBGC2 ( tls, "Received plaintext data:\n" );
-	list_for_each_entry ( iobuf, rx_data, list ) {
-		DBGC2_HD ( tls, iobuf->data, iob_len ( iobuf ) );
-		len += iob_len ( iobuf );
-	}
-
-	/* Verify MAC */
+	/* Construct authentication data */
 	authhdr.seq = cpu_to_be64 ( tls->rx_seq );
 	authhdr.header.type = tlshdr->type;
 	authhdr.header.version = tlshdr->version;
 	authhdr.header.length = htons ( len );
-	tls_hmac_init ( cipherspec, ctx, &authhdr );
-	list_for_each_entry ( iobuf, rx_data, list ) {
-		tls_hmac_update ( cipherspec, ctx, iobuf->data,
-				  iob_len ( iobuf ) );
+
+	/* Set initialisation vector */
+	cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv, sizeof ( iv ) );
+
+	/* Decrypt the received data */
+	check_len = 0;
+	list_for_each_entry ( iobuf, &tls->rx_data, list ) {
+		cipher_decrypt ( cipher, cipherspec->cipher_ctx,
+				 iobuf->data, iobuf->data, iob_len ( iobuf ) );
+		check_len += iob_len ( iobuf );
 	}
-	tls_hmac_final ( cipherspec, ctx, verify_mac );
+	assert ( check_len == len );
+
+	/* Strip block padding, if applicable */
+	if ( is_block_cipher ( cipher ) ) {
+		pad_len = tls_verify_padding ( tls, last );
+		if ( pad_len < 0 ) {
+			rc = pad_len;
+			return rc;
+		}
+		iob_unput ( last, pad_len );
+		len -= pad_len;
+	}
+
+	/* Extract decrypted MAC */
+	if ( iob_len ( last ) < suite->mac_len ) {
+		DBGC ( tls, "TLS %p received underlength MAC\n", tls );
+		DBGC_HD ( tls, last->data, iob_len ( last ) );
+		return -EINVAL_MAC;
+	}
+	iob_unput ( last, suite->mac_len );
+	len -= suite->mac_len;
+	mac = last->tail;
+
+	/* Dump received data */
+	DBGC2 ( tls, "Received plaintext data:\n" );
+	check_len = 0;
+	list_for_each_entry ( iobuf, rx_data, list ) {
+		DBGC2_HD ( tls, iobuf->data, iob_len ( iobuf ) );
+		check_len += iob_len ( iobuf );
+	}
+	assert ( check_len == len );
+
+	/* Generate MAC */
+	authhdr.header.length = htons ( len );
+	if ( suite->mac_len )
+		tls_hmac_list ( cipherspec, &authhdr, rx_data, verify_mac );
+
+	/* Verify MAC */
 	if ( memcmp ( mac, verify_mac, suite->mac_len ) != 0 ) {
 		DBGC ( tls, "TLS %p failed MAC verification\n", tls );
 		return -EINVAL_MAC;
