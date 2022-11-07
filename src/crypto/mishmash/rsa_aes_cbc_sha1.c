@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** TLS_DHE_RSA_WITH_AES_128_CBC_SHA cipher suite */
 struct tls_cipher_suite
-tls_dhe_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 03 ) = {
+tls_dhe_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 05 ) = {
 	.code = htons ( TLS_DHE_RSA_WITH_AES_128_CBC_SHA ),
 	.key_len = ( 128 / 8 ),
 	.fixed_iv_len = 0,
@@ -47,7 +47,7 @@ tls_dhe_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 03 ) = {
 
 /** TLS_DHE_RSA_WITH_AES_256_CBC_SHA cipher suite */
 struct tls_cipher_suite
-tls_dhe_rsa_with_aes_256_cbc_sha __tls_cipher_suite ( 04 ) = {
+tls_dhe_rsa_with_aes_256_cbc_sha __tls_cipher_suite ( 06 ) = {
 	.code = htons ( TLS_DHE_RSA_WITH_AES_256_CBC_SHA ),
 	.key_len = ( 256 / 8 ),
 	.fixed_iv_len = 0,
@@ -62,7 +62,7 @@ tls_dhe_rsa_with_aes_256_cbc_sha __tls_cipher_suite ( 04 ) = {
 
 /** TLS_RSA_WITH_AES_128_CBC_SHA cipher suite */
 struct tls_cipher_suite
-tls_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 13 ) = {
+tls_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 15 ) = {
 	.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA ),
 	.key_len = ( 128 / 8 ),
 	.fixed_iv_len = 0,
@@ -77,7 +77,7 @@ tls_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 13 ) = {
 
 /** TLS_RSA_WITH_AES_256_CBC_SHA cipher suite */
 struct tls_cipher_suite
-tls_rsa_with_aes_256_cbc_sha __tls_cipher_suite ( 14 ) = {
+tls_rsa_with_aes_256_cbc_sha __tls_cipher_suite ( 16 ) = {
 	.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA ),
 	.key_len = ( 256 / 8 ),
 	.fixed_iv_len = 0,
