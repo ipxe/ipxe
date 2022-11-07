@@ -122,6 +122,14 @@ struct tls_header {
 /* TLS renegotiation information extension */
 #define TLS_RENEGOTIATION_INFO 0xff01
 
+/** TLS authentication header */
+struct tls_auth_header {
+	/** Sequence number */
+	uint64_t seq;
+	/** TLS header */
+	struct tls_header header;
+} __attribute__ (( packed ));
+
 /** TLS verification data */
 struct tls_verify_data {
 	/** Client verification data */

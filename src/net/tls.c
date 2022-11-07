@@ -2521,17 +2521,14 @@ static int tls_new_record ( struct tls_connection *tls, unsigned int type,
  *
  * @v cipherspec	Cipher specification
  * @v ctx		Context
- * @v seq		Sequence number
- * @v tlshdr		TLS header
+ * @v authhdr		Authentication header
  */
 static void tls_hmac_init ( struct tls_cipherspec *cipherspec, void *ctx,
-			    uint64_t seq, struct tls_header *tlshdr ) {
+			    struct tls_auth_header *authhdr ) {
 	struct digest_algorithm *digest = cipherspec->suite->digest;
 
 	hmac_init ( digest, ctx, cipherspec->mac_secret, digest->digestsize );
-	seq = cpu_to_be64 ( seq );
-	hmac_update ( digest, ctx, &seq, sizeof ( seq ) );
-	hmac_update ( digest, ctx, tlshdr, sizeof ( *tlshdr ) );
+	hmac_update ( digest, ctx, authhdr, sizeof ( *authhdr ) );
 }
 
 /**
@@ -2567,19 +2564,18 @@ static void tls_hmac_final ( struct tls_cipherspec *cipherspec, void *ctx,
  * Calculate HMAC
  *
  * @v cipherspec	Cipher specification
- * @v seq		Sequence number
- * @v tlshdr		TLS header
+ * @v authhdr		Authentication header
  * @v data		Data
  * @v len		Length of data
  * @v mac		HMAC to fill in
  */
 static void tls_hmac ( struct tls_cipherspec *cipherspec,
-		       uint64_t seq, struct tls_header *tlshdr,
+		       struct tls_auth_header *authhdr,
 		       const void *data, size_t len, void *hmac ) {
 	struct digest_algorithm *digest = cipherspec->suite->digest;
 	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 
-	tls_hmac_init ( cipherspec, ctx, seq, tlshdr );
+	tls_hmac_init ( cipherspec, ctx, authhdr );
 	tls_hmac_update ( cipherspec, ctx, data, len );
 	tls_hmac_final ( cipherspec, ctx, hmac );
 }
@@ -2678,10 +2674,10 @@ static void * tls_assemble_block ( struct tls_connection *tls,
  */
 static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				const void *data, size_t len ) {
-	struct tls_header plaintext_tlshdr;
-	struct tls_header *tlshdr;
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec;
 	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
+	struct tls_auth_header authhdr;
+	struct tls_header *tlshdr;
 	void *plaintext = NULL;
 	size_t plaintext_len;
 	struct io_buffer *ciphertext = NULL;
@@ -2691,12 +2687,13 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	int rc;
 
 	/* Construct header */
-	plaintext_tlshdr.type = type;
-	plaintext_tlshdr.version = htons ( tls->version );
-	plaintext_tlshdr.length = htons ( len );
+	authhdr.seq = cpu_to_be64 ( tls->tx_seq );
+	authhdr.header.type = type;
+	authhdr.header.version = htons ( tls->version );
+	authhdr.header.length = htons ( len );
 
 	/* Calculate MAC */
-	tls_hmac ( cipherspec, tls->tx_seq, &plaintext_tlshdr, data, len, mac );
+	tls_hmac ( cipherspec, &authhdr, data, len, mac );
 
 	/* Allocate and assemble plaintext struct */
 	if ( is_stream_cipher ( cipher ) ) {
@@ -2852,10 +2849,10 @@ static int tls_split_block ( struct tls_connection *tls,
 static int tls_new_ciphertext ( struct tls_connection *tls,
 				struct tls_header *tlshdr,
 				struct list_head *rx_data ) {
-	struct tls_header plaintext_tlshdr;
 	struct tls_cipherspec *cipherspec = &tls->rx_cipherspec;
 	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
 	struct digest_algorithm *digest = cipherspec->suite->digest;
+	struct tls_auth_header authhdr;
 	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	uint8_t verify_mac[digest->digestsize];
 	struct io_buffer *iobuf;
@@ -2886,10 +2883,11 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	}
 
 	/* Verify MAC */
-	plaintext_tlshdr.type = tlshdr->type;
-	plaintext_tlshdr.version = tlshdr->version;
-	plaintext_tlshdr.length = htons ( len );
-	tls_hmac_init ( cipherspec, ctx, tls->rx_seq, &plaintext_tlshdr );
+	authhdr.seq = cpu_to_be64 ( tls->rx_seq );
+	authhdr.header.type = tlshdr->type;
+	authhdr.header.version = tlshdr->version;
+	authhdr.header.length = htons ( len );
+	tls_hmac_init ( cipherspec, ctx, &authhdr );
 	list_for_each_entry ( iobuf, rx_data, list ) {
 		tls_hmac_update ( cipherspec, ctx, iobuf->data,
 				  iob_len ( iobuf ) );
