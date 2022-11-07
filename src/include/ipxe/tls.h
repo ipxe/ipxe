@@ -185,6 +185,8 @@ struct tls_cipher_suite {
 	uint8_t fixed_iv_len;
 	/** Record initialisation vector length */
 	uint8_t record_iv_len;
+	/** MAC length */
+	uint8_t mac_len;
 };
 
 /** TLS cipher suite table */

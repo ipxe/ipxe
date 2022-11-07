@@ -662,7 +662,7 @@ static void tls_generate_master_secret ( struct tls_connection *tls,
 static int tls_generate_keys ( struct tls_connection *tls ) {
 	struct tls_cipherspec *tx_cipherspec = &tls->tx_cipherspec_pending;
 	struct tls_cipherspec *rx_cipherspec = &tls->rx_cipherspec_pending;
-	size_t hash_size = tx_cipherspec->suite->digest->digestsize;
+	size_t hash_size = tx_cipherspec->suite->mac_len;
 	size_t key_size = tx_cipherspec->suite->key_len;
 	size_t iv_size = tx_cipherspec->suite->fixed_iv_len;
 	size_t total = ( 2 * ( hash_size + key_size + iv_size ) );
@@ -799,7 +799,6 @@ static int tls_set_cipher ( struct tls_connection *tls,
 			    struct tls_cipher_suite *suite ) {
 	struct pubkey_algorithm *pubkey = suite->pubkey;
 	struct cipher_algorithm *cipher = suite->cipher;
-	struct digest_algorithm *digest = suite->digest;
 	size_t total;
 	void *dynamic;
 
@@ -807,7 +806,7 @@ static int tls_set_cipher ( struct tls_connection *tls,
 	tls_clear_cipher ( tls, cipherspec );
 
 	/* Allocate dynamic storage */
-	total = ( pubkey->ctxsize + cipher->ctxsize + digest->digestsize +
+	total = ( pubkey->ctxsize + cipher->ctxsize + suite->mac_len +
 		  suite->fixed_iv_len );
 	dynamic = zalloc ( total );
 	if ( ! dynamic ) {
@@ -820,7 +819,7 @@ static int tls_set_cipher ( struct tls_connection *tls,
 	cipherspec->dynamic = dynamic;
 	cipherspec->pubkey_ctx = dynamic;	dynamic += pubkey->ctxsize;
 	cipherspec->cipher_ctx = dynamic;	dynamic += cipher->ctxsize;
-	cipherspec->mac_secret = dynamic;	dynamic += digest->digestsize;
+	cipherspec->mac_secret = dynamic;	dynamic += suite->mac_len;
 	cipherspec->fixed_iv = dynamic;		dynamic += suite->fixed_iv_len;
 	assert ( ( cipherspec->dynamic + total ) == dynamic );
 
@@ -2525,9 +2524,10 @@ static int tls_new_record ( struct tls_connection *tls, unsigned int type,
  */
 static void tls_hmac_init ( struct tls_cipherspec *cipherspec, void *ctx,
 			    struct tls_auth_header *authhdr ) {
-	struct digest_algorithm *digest = cipherspec->suite->digest;
+	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct digest_algorithm *digest = suite->digest;
 
-	hmac_init ( digest, ctx, cipherspec->mac_secret, digest->digestsize );
+	hmac_init ( digest, ctx, cipherspec->mac_secret, suite->mac_len );
 	hmac_update ( digest, ctx, authhdr, sizeof ( *authhdr ) );
 }
 
@@ -2593,7 +2593,7 @@ static void tls_hmac ( struct tls_cipherspec *cipherspec,
 static void * __malloc
 tls_assemble_stream ( struct tls_connection *tls, const void *data, size_t len,
 		      void *digest, size_t *plaintext_len ) {
-	size_t mac_len = tls->tx_cipherspec.suite->digest->digestsize;
+	size_t mac_len = tls->tx_cipherspec.suite->mac_len;
 	void *plaintext;
 	void *content;
 	void *mac;
@@ -2629,7 +2629,7 @@ static void * tls_assemble_block ( struct tls_connection *tls,
 				   const void *data, size_t len,
 				   void *digest, size_t *plaintext_len ) {
 	size_t blocksize = tls->tx_cipherspec.suite->cipher->blocksize;
-	size_t mac_len = tls->tx_cipherspec.suite->digest->digestsize;
+	size_t mac_len = tls->tx_cipherspec.suite->mac_len;
 	size_t iv_len = blocksize;
 	size_t padding_len;
 	void *plaintext;
@@ -2675,15 +2675,16 @@ static void * tls_assemble_block ( struct tls_connection *tls,
 static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				const void *data, size_t len ) {
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec;
-	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
+	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct cipher_algorithm *cipher = suite->cipher;
+	struct digest_algorithm *digest = suite->digest;
 	struct tls_auth_header authhdr;
 	struct tls_header *tlshdr;
 	void *plaintext = NULL;
 	size_t plaintext_len;
 	struct io_buffer *ciphertext = NULL;
 	size_t ciphertext_len;
-	size_t mac_len = cipherspec->suite->digest->digestsize;
-	uint8_t mac[mac_len];
+	uint8_t mac[digest->digestsize];
 	int rc;
 
 	/* Construct header */
@@ -2762,7 +2763,7 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
  */
 static int tls_split_stream ( struct tls_connection *tls,
 			      struct list_head *rx_data, void **mac ) {
-	size_t mac_len = tls->rx_cipherspec.suite->digest->digestsize;
+	size_t mac_len = tls->rx_cipherspec.suite->mac_len;
 	struct io_buffer *iobuf;
 
 	/* Extract MAC */
@@ -2789,7 +2790,7 @@ static int tls_split_stream ( struct tls_connection *tls,
  */
 static int tls_split_block ( struct tls_connection *tls,
 			     struct list_head *rx_data, void **mac ) {
-	size_t mac_len = tls->rx_cipherspec.suite->digest->digestsize;
+	size_t mac_len = tls->rx_cipherspec.suite->mac_len;
 	size_t iv_len = tls->rx_cipherspec.suite->cipher->blocksize;
 	struct io_buffer *iobuf;
 	uint8_t *padding_final;
@@ -2850,8 +2851,9 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 				struct tls_header *tlshdr,
 				struct list_head *rx_data ) {
 	struct tls_cipherspec *cipherspec = &tls->rx_cipherspec;
-	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
-	struct digest_algorithm *digest = cipherspec->suite->digest;
+	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct cipher_algorithm *cipher = suite->cipher;
+	struct digest_algorithm *digest = suite->digest;
 	struct tls_auth_header authhdr;
 	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	uint8_t verify_mac[digest->digestsize];
@@ -2893,7 +2895,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 				  iob_len ( iobuf ) );
 	}
 	tls_hmac_final ( cipherspec, ctx, verify_mac );
-	if ( memcmp ( mac, verify_mac, sizeof ( verify_mac ) ) != 0 ) {
+	if ( memcmp ( mac, verify_mac, suite->mac_len ) != 0 ) {
 		DBGC ( tls, "TLS %p failed MAC verification\n", tls );
 		return -EINVAL_MAC;
 	}
