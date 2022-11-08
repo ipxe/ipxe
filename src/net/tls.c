@@ -101,7 +101,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINVAL_MAC __einfo_error ( EINFO_EINVAL_MAC )
 #define EINFO_EINVAL_MAC						\
 	__einfo_uniqify ( EINFO_EINVAL, 0x0d,				\
-			  "Invalid MAC" )
+			  "Invalid MAC or authentication tag" )
 #define EINVAL_TICKET __einfo_error ( EINFO_EINVAL_TICKET )
 #define EINFO_EINVAL_TICKET						\
 	__einfo_uniqify ( EINFO_EINVAL, 0x0e,				\
@@ -2675,9 +2675,15 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	/* Set initialisation vector */
 	cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv, sizeof ( iv ) );
 
+	/* Process authentication data, if applicable */
+	if ( is_auth_cipher ( cipher ) ) {
+		cipher_encrypt ( cipher, cipherspec->cipher_ctx, &authhdr,
+				 NULL, sizeof ( authhdr ) );
+	}
+
 	/* Allocate ciphertext */
 	ciphertext_len = ( sizeof ( *tlshdr ) + sizeof ( iv.record ) +
-			   plaintext_len );
+			   plaintext_len + cipher->authsize );
 	ciphertext = xfer_alloc_iob ( &tls->cipherstream, ciphertext_len );
 	if ( ! ciphertext ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
@@ -2695,6 +2701,8 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 		 sizeof ( iv.record ) );
 	cipher_encrypt ( cipher, cipherspec->cipher_ctx, plaintext,
 			 iob_put ( ciphertext, plaintext_len ), plaintext_len );
+	cipher_auth ( cipher, cipherspec->cipher_ctx,
+		      iob_put ( ciphertext, cipher->authsize ) );
 	assert ( iob_len ( ciphertext ) == ciphertext_len );
 
 	/* Free plaintext as soon as possible to conserve memory */
@@ -2775,10 +2783,12 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	} __attribute__ (( packed )) iv;
 	struct tls_auth_header authhdr;
 	uint8_t verify_mac[digest->digestsize];
+	uint8_t verify_auth[cipher->authsize];
 	struct io_buffer *first;
 	struct io_buffer *last;
 	struct io_buffer *iobuf;
 	void *mac;
+	void *auth;
 	size_t check_len;
 	int pad_len;
 	int rc;
@@ -2799,6 +2809,17 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	iob_pull ( first, sizeof ( iv.record ) );
 	len -= sizeof ( iv.record );
 
+	/* Extract unencrypted authentication tag */
+	if ( iob_len ( last ) < cipher->authsize ) {
+		DBGC ( tls, "TLS %p received underlength authentication tag\n",
+		       tls );
+		DBGC_HD ( tls, last->data, iob_len ( last ) );
+		return -EINVAL_MAC;
+	}
+	iob_unput ( last, cipher->authsize );
+	len -= cipher->authsize;
+	auth = last->tail;
+
 	/* Construct authentication data */
 	authhdr.seq = cpu_to_be64 ( tls->rx_seq );
 	authhdr.header.type = tlshdr->type;
@@ -2807,6 +2828,12 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 
 	/* Set initialisation vector */
 	cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv, sizeof ( iv ) );
+
+	/* Process authentication data, if applicable */
+	if ( is_auth_cipher ( cipher ) ) {
+		cipher_decrypt ( cipher, cipherspec->cipher_ctx, &authhdr,
+				 NULL, sizeof ( authhdr ) );
+	}
 
 	/* Decrypt the received data */
 	check_len = 0;
@@ -2852,9 +2879,19 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	if ( suite->mac_len )
 		tls_hmac_list ( cipherspec, &authhdr, rx_data, verify_mac );
 
+	/* Generate authentication tag */
+	cipher_auth ( cipher, cipherspec->cipher_ctx, verify_auth );
+
 	/* Verify MAC */
 	if ( memcmp ( mac, verify_mac, suite->mac_len ) != 0 ) {
 		DBGC ( tls, "TLS %p failed MAC verification\n", tls );
+		return -EINVAL_MAC;
+	}
+
+	/* Verify authentication tag */
+	if ( memcmp ( auth, verify_auth, cipher->authsize ) != 0 ) {
+		DBGC ( tls, "TLS %p failed authentication tag verification\n",
+		       tls );
 		return -EINVAL_MAC;
 	}
 
