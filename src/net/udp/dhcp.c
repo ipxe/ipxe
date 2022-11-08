@@ -571,12 +571,6 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 	if ( peer->sin_port != htons ( BOOTPS_PORT ) )
 		return;
 
-	/* Handle DHCPNAK */
-	if ( msgtype == DHCPNAK ) {
-		dhcp_defer ( dhcp );
-		return;
-	}
-
 	/* Filter out unacceptable responses */
 	if ( msgtype /* BOOTP */ && ( msgtype != DHCPACK ) )
 		return;
@@ -584,6 +578,12 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 		return;
 	if ( ip.s_addr != dhcp->offer.s_addr )
 		return;
+
+	/* Handle DHCPNAK */
+	if ( msgtype == DHCPNAK ) {
+		dhcp_defer ( dhcp );
+		return;
+	}
 
 	/* Record assigned address */
 	dhcp->local.sin_addr = ip;
