@@ -2821,8 +2821,8 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	if ( is_block_cipher ( cipher ) ) {
 		pad_len = tls_verify_padding ( tls, last );
 		if ( pad_len < 0 ) {
-			rc = pad_len;
-			return rc;
+			/* Assume zero padding length to avoid timing attacks */
+			pad_len = 0;
 		}
 		iob_unput ( last, pad_len );
 		len -= pad_len;
