@@ -81,6 +81,25 @@ void cipher_encrypt_okx ( struct cipher_test *test, const char *file,
 	okx ( cipher->authsize == test->auth_len, file, line );
 	cipher_auth ( cipher, ctx, auth );
 	okx ( memcmp ( auth, test->auth, test->auth_len ) == 0, file, line );
+
+	/* Reset initialisation vector */
+	cipher_setiv ( cipher, ctx, test->iv, test->iv_len );
+
+	/* Process additional data, if applicable */
+	if ( test->additional_len ) {
+		cipher_encrypt ( cipher, ctx, test->additional, NULL,
+				 test->additional_len );
+	}
+
+	/* Perform encryption */
+	cipher_encrypt ( cipher, ctx, test->plaintext, ciphertext, len );
+
+	/* Compare against expected ciphertext */
+	okx ( memcmp ( ciphertext, test->ciphertext, len ) == 0, file, line );
+
+	/* Check authentication tag */
+	cipher_auth ( cipher, ctx, auth );
+	okx ( memcmp ( auth, test->auth, test->auth_len ) == 0, file, line );
 }
 
 /**
@@ -118,6 +137,25 @@ void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
 
 	/* Check authentication tag */
 	okx ( cipher->authsize == test->auth_len, file, line );
+	cipher_auth ( cipher, ctx, auth );
+	okx ( memcmp ( auth, test->auth, test->auth_len ) == 0, file, line );
+
+	/* Reset initialisation vector */
+	cipher_setiv ( cipher, ctx, test->iv, test->iv_len );
+
+	/* Process additional data, if applicable */
+	if ( test->additional_len ) {
+		cipher_decrypt ( cipher, ctx, test->additional, NULL,
+				 test->additional_len );
+	}
+
+	/* Perform decryption */
+	cipher_decrypt ( cipher, ctx, test->ciphertext, plaintext, len );
+
+	/* Compare against expected plaintext */
+	okx ( memcmp ( plaintext, test->plaintext, len ) == 0, file, line );
+
+	/* Check authentication tag */
 	cipher_auth ( cipher, ctx, auth );
 	okx ( memcmp ( auth, test->auth, test->auth_len ) == 0, file, line );
 }
