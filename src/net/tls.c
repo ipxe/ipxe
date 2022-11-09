@@ -1134,7 +1134,7 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
 	hello.type_length = ( cpu_to_le32 ( TLS_CLIENT_HELLO ) |
 			      htonl ( sizeof ( hello ) -
 				      sizeof ( hello.type_length ) ) );
-	hello.version = htons ( tls->version );
+	hello.version = htons ( TLS_VERSION_MAX );
 	memcpy ( &hello.random, &tls->client_random, sizeof ( hello.random ) );
 	hello.session_id_len = tls->session_id_len;
 	memcpy ( hello.session_id, tls->session_id,
