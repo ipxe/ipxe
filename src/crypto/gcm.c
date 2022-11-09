@@ -41,6 +41,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/gcm.h>
 
 /**
+ * Perform encryption
+ *
+ * This value is chosen to allow for ANDing with a fragment length.
+ */
+#define GCM_FL_ENCRYPT 0x00ff
+
+/**
+ * Calculate hash over an initialisation vector value
+ *
+ * The hash calculation for a non 96-bit initialisation vector is
+ * identical to the calculation used for additional data, except that
+ * the non-additional data length counter is used.
+ */
+#define GCM_FL_IV 0x0100
+
+/**
  * GCM field polynomial
  *
  * GCM treats 128-bit blocks as polynomials in GF(2^128) with the
@@ -292,22 +308,17 @@ static void gcm_multiply_key ( const union gcm_block *key,
  * Encrypt/decrypt/authenticate data
  *
  * @v context		Context
- * @v src		Input data, or NULL to process additional data
+ * @v src		Input data
  * @v dst		Output data, or NULL to process additional data
- * @v hash		Hash input data
  * @v len		Length of data
+ * @v flags		Operation flags
  */
 static void gcm_process ( struct gcm_context *context, const void *src,
-			  void *dst, const void *hash, size_t len ) {
+			  void *dst, size_t len, unsigned int flags ) {
 	union gcm_block tmp;
 	uint64_t *total;
 	size_t frag_len;
 	unsigned int block;
-
-	/* Sanity checks */
-	assert ( hash != NULL );
-	assert ( ( ( src == NULL ) && ( dst == NULL ) ) ||
-		 ( ( hash == src ) || ( hash == dst ) ) );
 
 	/* Calculate block number (for debugging) */
 	block = ( ( ( context->len.len.add + 8 * sizeof ( tmp ) - 1 ) /
@@ -316,16 +327,20 @@ static void gcm_process ( struct gcm_context *context, const void *src,
 		    ( 8 * sizeof ( tmp ) ) ) + 1 );
 
 	/* Update total length (in bits) */
-	total = ( src ? &context->len.len.data : &context->len.len.add );
+	total = ( ( dst || ( flags & GCM_FL_IV ) ) ?
+		  &context->len.len.data : &context->len.len.add );
 	*total += ( len * 8 );
 
 	/* Process data */
-	for ( ; len ; hash += frag_len, len -= frag_len, block++ ) {
+	for ( ; len ; src += frag_len, len -= frag_len, block++ ) {
 
 		/* Calculate fragment length */
 		frag_len = len;
 		if ( frag_len > sizeof ( tmp ) )
 			frag_len = sizeof ( tmp );
+
+		/* Update hash with input data */
+		gcm_xor ( src, &context->hash, &context->hash, frag_len );
 
 		/* Encrypt/decrypt block, if applicable */
 		if ( dst ) {
@@ -345,12 +360,14 @@ static void gcm_process ( struct gcm_context *context, const void *src,
 
 			/* Encrypt/decrypt data */
 			gcm_xor ( src, &tmp, dst, frag_len );
-			src += frag_len;
 			dst += frag_len;
+
+			/* Update hash with encrypted data, if applicable */
+			gcm_xor ( &tmp, &context->hash, &context->hash,
+				  ( frag_len & flags ) );
 		}
 
 		/* Update hash */
-		gcm_xor ( hash, &context->hash, &context->hash, frag_len );
 		gcm_multiply_key ( &context->key, &context->hash );
 		DBGC2 ( context, "GCM %p X[%d]:\n", context, block );
 		DBGC2_HDA ( context, 0, &context->hash,
@@ -475,7 +492,7 @@ void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
 	} else {
 
 		/* Calculate hash over initialisation vector */
-		gcm_process ( context, iv, NULL, iv, ivlen );
+		gcm_process ( context, iv, NULL, ivlen, GCM_FL_IV );
 		gcm_hash ( context, &context->ctr );
 		assert ( context->len.len.add == 0 );
 
@@ -497,20 +514,9 @@ void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
  */
 void gcm_encrypt ( struct gcm_context *context, const void *src, void *dst,
 		   size_t len ) {
-	const void *hash;
-
-	/* Determine hash input */
-	if ( dst ) {
-		/* Encrypting: hash the encrypted data */
-		hash = dst;
-	} else {
-		/* Authenticating: hash the input data */
-		hash = src;
-		src = NULL;
-	}
 
 	/* Process data */
-	gcm_process ( context, src, dst, hash, len );
+	gcm_process ( context, src, dst, len, GCM_FL_ENCRYPT );
 }
 
 /**
@@ -523,15 +529,7 @@ void gcm_encrypt ( struct gcm_context *context, const void *src, void *dst,
  */
 void gcm_decrypt ( struct gcm_context *context, const void *src, void *dst,
 		   size_t len ) {
-	const void *hash;
-
-	/* Determine hash input */
-	hash = src;
-	if ( ! dst ) {
-		/* Authenticating: only hash */
-		src = NULL;
-	}
 
 	/* Process data */
-	gcm_process ( context, src, dst, hash, len );
+	gcm_process ( context, src, dst, len, 0 );
 }
