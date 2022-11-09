@@ -16,7 +16,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
-#include <ipxe/sha256.h>
 #include <ipxe/x509.h>
 #include <ipxe/privkey.h>
 #include <ipxe/pending.h>
@@ -177,6 +176,8 @@ struct tls_cipher_suite {
 	struct cipher_algorithm *cipher;
 	/** MAC digest algorithm */
 	struct digest_algorithm *digest;
+	/** Handshake digest algorithm (for TLSv1.2 and above) */
+	struct digest_algorithm *handshake;
 	/** Numeric code (in network-endian order) */
 	uint16_t code;
 	/** Key length */
@@ -346,10 +347,6 @@ struct tls_connection {
 	void *server_key;
 	/** Server Key Exchange record length */
 	size_t server_key_len;
-	/** MD5+SHA1 context for handshake verification */
-	uint8_t handshake_md5_sha1_ctx[MD5_SHA1_CTX_SIZE];
-	/** SHA256 context for handshake verification */
-	uint8_t handshake_sha256_ctx[SHA256_CTX_SIZE];
 	/** Digest algorithm used for handshake verification */
 	struct digest_algorithm *handshake_digest;
 	/** Digest algorithm context used for handshake verification */

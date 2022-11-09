@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/rsa.h>
 #include <ipxe/aes.h>
 #include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
 #include <ipxe/tls.h>
 
 /** TLS_DHE_RSA_WITH_AES_128_CBC_SHA cipher suite */
@@ -41,6 +42,7 @@ tls_dhe_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 03 ) = {
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha1_algorithm,
+	.handshake = &sha256_algorithm,
 };
 
 /** TLS_DHE_RSA_WITH_AES_256_CBC_SHA cipher suite */
@@ -55,6 +57,7 @@ tls_dhe_rsa_with_aes_256_cbc_sha __tls_cipher_suite ( 04 ) = {
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha1_algorithm,
+	.handshake = &sha256_algorithm,
 };
 
 /** TLS_RSA_WITH_AES_128_CBC_SHA cipher suite */
@@ -69,6 +72,7 @@ tls_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 13 ) = {
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha1_algorithm,
+	.handshake = &sha256_algorithm,
 };
 
 /** TLS_RSA_WITH_AES_256_CBC_SHA cipher suite */
@@ -83,4 +87,5 @@ tls_rsa_with_aes_256_cbc_sha __tls_cipher_suite ( 14 ) = {
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha1_algorithm,
+	.handshake = &sha256_algorithm,
 };

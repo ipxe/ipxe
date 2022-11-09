@@ -41,6 +41,7 @@ tls_dhe_rsa_with_aes_128_cbc_sha256 __tls_cipher_suite ( 01 ) = {
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha256_algorithm,
+	.handshake = &sha256_algorithm,
 };
 
 /** TLS_DHE_RSA_WITH_AES_256_CBC_SHA256 cipher suite */
@@ -55,6 +56,7 @@ tls_dhe_rsa_with_aes_256_cbc_sha256 __tls_cipher_suite ( 02 ) = {
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha256_algorithm,
+	.handshake = &sha256_algorithm,
 };
 
 /** TLS_RSA_WITH_AES_128_CBC_SHA256 cipher suite */
@@ -69,6 +71,7 @@ tls_rsa_with_aes_128_cbc_sha256 __tls_cipher_suite ( 11 ) = {
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha256_algorithm,
+	.handshake = &sha256_algorithm,
 };
 
 /** TLS_RSA_WITH_AES_256_CBC_SHA256 cipher suite */
@@ -83,4 +86,5 @@ tls_rsa_with_aes_256_cbc_sha256 __tls_cipher_suite ( 12 ) = {
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
 	.digest = &sha256_algorithm,
+	.handshake = &sha256_algorithm,
 };

@@ -383,6 +383,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
 	free ( tls->server_key );
+	free ( tls->handshake_ctx );
 	list_for_each_entry_safe ( iobuf, tmp, &tls->rx_data, list ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
@@ -564,8 +565,8 @@ static void tls_prf ( struct tls_connection *tls, const void *secret,
 	va_start ( seeds, out_len );
 
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
-		/* Use P_SHA256 for TLSv1.2 and later */
-		tls_p_hash_va ( tls, &sha256_algorithm, secret, secret_len,
+		/* Use handshake digest PRF for TLSv1.2 and later */
+		tls_p_hash_va ( tls, tls->handshake_digest, secret, secret_len,
 				out, out_len, seeds );
 	} else {
 		/* Use combination of P_MD5 and P_SHA-1 for TLSv1.1
@@ -730,6 +731,83 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 
 /******************************************************************************
  *
+ * Handshake verification
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Clear handshake digest algorithm
+ *
+ * @v tls		TLS connection
+ */
+static void tls_clear_handshake ( struct tls_connection *tls ) {
+
+	/* Select null digest algorithm */
+	tls->handshake_digest = &digest_null;
+
+	/* Free any existing context */
+	free ( tls->handshake_ctx );
+	tls->handshake_ctx = NULL;
+}
+
+/**
+ * Select handshake digest algorithm
+ *
+ * @v tls		TLS connection
+ * @v digest		Handshake digest algorithm
+ * @ret rc		Return status code
+ */
+static int tls_select_handshake ( struct tls_connection *tls,
+				  struct digest_algorithm *digest ) {
+
+	/* Clear existing handshake digest */
+	tls_clear_handshake ( tls );
+
+	/* Allocate and initialise context */
+	tls->handshake_ctx = malloc ( digest->ctxsize );
+	if ( ! tls->handshake_ctx )
+		return -ENOMEM;
+	tls->handshake_digest = digest;
+	digest_init ( digest, tls->handshake_ctx );
+
+	return 0;
+}
+
+/**
+ * Add handshake record to verification hash
+ *
+ * @v tls		TLS connection
+ * @v data		Handshake record
+ * @v len		Length of handshake record
+ * @ret rc		Return status code
+ */
+static int tls_add_handshake ( struct tls_connection *tls,
+			       const void *data, size_t len ) {
+	struct digest_algorithm *digest = tls->handshake_digest;
+
+	digest_update ( digest, tls->handshake_ctx, data, len );
+	return 0;
+}
+
+/**
+ * Calculate handshake verification hash
+ *
+ * @v tls		TLS connection
+ * @v out		Output buffer
+ *
+ * Calculates the digest over all handshake messages seen so far.
+ */
+static void tls_verify_handshake ( struct tls_connection *tls, void *out ) {
+	struct digest_algorithm *digest = tls->handshake_digest;
+	uint8_t ctx[ digest->ctxsize ];
+
+	memcpy ( ctx, tls->handshake_ctx, sizeof ( ctx ) );
+	digest_final ( digest, ctx, out );
+}
+
+/******************************************************************************
+ *
  * Cipher suite management
  *
  ******************************************************************************
@@ -835,6 +913,7 @@ static int tls_set_cipher ( struct tls_connection *tls,
 static int tls_select_cipher ( struct tls_connection *tls,
 			       unsigned int cipher_suite ) {
 	struct tls_cipher_suite *suite;
+	struct digest_algorithm *digest;
 	int rc;
 
 	/* Identify cipher suite */
@@ -844,6 +923,12 @@ static int tls_select_cipher ( struct tls_connection *tls,
 		       tls, ntohs ( cipher_suite ) );
 		return -ENOTSUP_CIPHER;
 	}
+
+	/* Set handshake digest algorithm */
+	digest = ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ?
+		   suite->handshake : &md5_sha1_algorithm );
+	if ( ( rc = tls_select_handshake ( tls, digest ) ) != 0 )
+		return rc;
 
 	/* Set ciphers */
 	if ( ( rc = tls_set_cipher ( tls, &tls->tx_cipherspec_pending,
@@ -958,46 +1043,6 @@ tls_signature_hash_digest ( struct tls_signature_hash_id code ) {
 
 /******************************************************************************
  *
- * Handshake verification
- *
- ******************************************************************************
- */
-
-/**
- * Add handshake record to verification hash
- *
- * @v tls		TLS connection
- * @v data		Handshake record
- * @v len		Length of handshake record
- */
-static void tls_add_handshake ( struct tls_connection *tls,
-				const void *data, size_t len ) {
-
-	digest_update ( &md5_sha1_algorithm, tls->handshake_md5_sha1_ctx,
-			data, len );
-	digest_update ( &sha256_algorithm, tls->handshake_sha256_ctx,
-			data, len );
-}
-
-/**
- * Calculate handshake verification hash
- *
- * @v tls		TLS connection
- * @v out		Output buffer
- *
- * Calculates the MD5+SHA1 or SHA256 digest over all handshake
- * messages seen so far.
- */
-static void tls_verify_handshake ( struct tls_connection *tls, void *out ) {
-	struct digest_algorithm *digest = tls->handshake_digest;
-	uint8_t ctx[ digest->ctxsize ];
-
-	memcpy ( ctx, tls->handshake_ctx, sizeof ( ctx ) );
-	digest_final ( digest, ctx, out );
-}
-
-/******************************************************************************
- *
  * Record handling
  *
  ******************************************************************************
@@ -1037,12 +1082,6 @@ static void tls_restart ( struct tls_connection *tls ) {
 	assert ( ! is_pending ( &tls->server_negotiation ) );
 	assert ( ! is_pending ( &tls->validation ) );
 
-	/* (Re)initialise handshake context */
-	digest_init ( &md5_sha1_algorithm, tls->handshake_md5_sha1_ctx );
-	digest_init ( &sha256_algorithm, tls->handshake_sha256_ctx );
-	tls->handshake_digest = &sha256_algorithm;
-	tls->handshake_ctx = tls->handshake_sha256_ctx;
-
 	/* (Re)start negotiation */
 	tls->tx_pending = TLS_TX_CLIENT_HELLO;
 	tls_tx_resume ( tls );
@@ -1059,7 +1098,7 @@ static void tls_restart ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_handshake ( struct tls_connection *tls,
-				void *data, size_t len ) {
+				const void *data, size_t len ) {
 
 	/* Add to handshake digest */
 	tls_add_handshake ( tls, data, len );
@@ -1069,12 +1108,16 @@ static int tls_send_handshake ( struct tls_connection *tls,
 }
 
 /**
- * Transmit Client Hello record
+ * Digest or transmit Client Hello record
  *
  * @v tls		TLS connection
+ * @v action		Action to take on Client Hello record
  * @ret rc		Return status code
  */
-static int tls_send_client_hello ( struct tls_connection *tls ) {
+static int tls_client_hello ( struct tls_connection *tls,
+			      int ( * action ) ( struct tls_connection *tls,
+						 const void *data,
+						 size_t len ) ) {
 	struct tls_session *session = tls->session;
 	size_t name_len = strlen ( session->name );
 	struct {
@@ -1182,7 +1225,18 @@ static int tls_send_client_hello ( struct tls_connection *tls ) {
 	memcpy ( hello.extensions.session_ticket.data, session->ticket,
 		 sizeof ( hello.extensions.session_ticket.data ) );
 
-	return tls_send_handshake ( tls, &hello, sizeof ( hello ) );
+	return action ( tls, &hello, sizeof ( hello ) );
+}
+
+/**
+ * Transmit Client Hello record
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_send_client_hello ( struct tls_connection *tls ) {
+
+	return tls_client_hello ( tls, tls_send_handshake );
 }
 
 /**
@@ -1892,21 +1946,17 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	DBGC ( tls, "TLS %p using protocol version %d.%d\n",
 	       tls, ( version >> 8 ), ( version & 0xff ) );
 
-	/* Use MD5+SHA1 digest algorithm for handshake verification
-	 * for versions earlier than TLSv1.2.
-	 */
-	if ( ! tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
-		tls->handshake_digest = &md5_sha1_algorithm;
-		tls->handshake_ctx = tls->handshake_md5_sha1_ctx;
-	}
+	/* Select cipher suite */
+	if ( ( rc = tls_select_cipher ( tls, hello_b->cipher_suite ) ) != 0 )
+		return rc;
+
+	/* Add preceding Client Hello to handshake digest */
+	if ( ( rc = tls_client_hello ( tls, tls_add_handshake ) ) != 0 )
+		return rc;
 
 	/* Copy out server random bytes */
 	memcpy ( &tls->server_random, &hello_a->random,
 		 sizeof ( tls->server_random ) );
-
-	/* Select cipher suite */
-	if ( ( rc = tls_select_cipher ( tls, hello_b->cipher_suite ) ) != 0 )
-		return rc;
 
 	/* Check session ID */
 	if ( hello_a->session_id_len &&
@@ -3504,6 +3554,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec );
 	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
+	tls_clear_handshake ( tls );
 	tls->client_random.gmt_unix_time = time ( NULL );
 	iob_populate ( &tls->rx_header_iobuf, &tls->rx_header, 0,
 		       sizeof ( tls->rx_header ) );
