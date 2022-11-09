@@ -91,8 +91,9 @@ void cipher_encrypt_okx ( struct cipher_test *test, const char *file,
 				 test->additional_len );
 	}
 
-	/* Perform encryption */
-	cipher_encrypt ( cipher, ctx, test->plaintext, ciphertext, len );
+	/* Perform in-place encryption */
+	memcpy ( ciphertext, test->plaintext, len );
+	cipher_encrypt ( cipher, ctx, ciphertext, ciphertext, len );
 
 	/* Compare against expected ciphertext */
 	okx ( memcmp ( ciphertext, test->ciphertext, len ) == 0, file, line );
@@ -149,8 +150,9 @@ void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
 				 test->additional_len );
 	}
 
-	/* Perform decryption */
-	cipher_decrypt ( cipher, ctx, test->ciphertext, plaintext, len );
+	/* Perform in-place decryption */
+	memcpy ( plaintext, test->ciphertext, len );
+	cipher_decrypt ( cipher, ctx, plaintext, plaintext, len );
 
 	/* Compare against expected plaintext */
 	okx ( memcmp ( plaintext, test->plaintext, len ) == 0, file, line );
