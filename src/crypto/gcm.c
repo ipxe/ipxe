@@ -452,9 +452,18 @@ int gcm_setkey ( struct gcm_context *context, const void *key, size_t keylen,
  * @v ivlen		Initialisation vector length
  */
 void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
+	union gcm_block *check = ( ( void * ) context );
+
+	/* Sanity checks */
+	linker_assert ( &context->hash == check, gcm_bad_layout );
+	linker_assert ( &context->len == check + 1, gcm_bad_layout );
+	linker_assert ( &context->ctr == check + 2, gcm_bad_layout );
+	linker_assert ( &context->key == check + 3, gcm_bad_layout );
+
+	/* Reset non-key state */
+	memset ( context, 0, offsetof ( typeof ( *context ), key ) );
 
 	/* Reset counter */
-	memset ( context->ctr.ctr.iv, 0, sizeof ( context->ctr.ctr.iv ) );
 	context->ctr.ctr.value = cpu_to_be32 ( 1 );
 
 	/* Process initialisation vector */
@@ -468,13 +477,10 @@ void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
 		/* Calculate hash over initialisation vector */
 		gcm_process ( context, iv, NULL, iv, ivlen );
 		gcm_hash ( context, &context->ctr );
-
-		/* Reset accumulated hash */
-		memset ( &context->hash, 0, sizeof ( context->hash ) );
-
-		/* Reset data lengths */
 		assert ( context->len.len.add == 0 );
-		context->len.len.data = 0;
+
+		/* Reset non-key, non-counter state */
+		memset ( context, 0, offsetof ( typeof ( *context ), ctr ) );
 	}
 
 	DBGC2 ( context, "GCM %p Y[0]:\n", context );

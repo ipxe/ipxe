@@ -44,14 +44,14 @@ union gcm_block {
 
 /** GCM context */
 struct gcm_context {
-	/** Hash key (H) */
-	union gcm_block key;
-	/** Counter (Y) */
-	union gcm_block ctr;
 	/** Accumulated hash (X) */
 	union gcm_block hash;
 	/** Accumulated lengths */
 	union gcm_block len;
+	/** Counter (Y) */
+	union gcm_block ctr;
+	/** Hash key (H) */
+	union gcm_block key;
 	/** Underlying block cipher */
 	struct cipher_algorithm *raw_cipher;
 	/** Underlying block cipher context */
