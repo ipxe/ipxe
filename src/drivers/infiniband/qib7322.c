@@ -2256,7 +2256,7 @@ static void qib7322_reset ( struct qib7322 *qib7322, struct pci_device *pci ) {
 	struct pci_config_backup backup;
 
 	/* Back up PCI configuration space */
-	pci_backup ( pci, &backup, NULL );
+	pci_backup ( pci, &backup, PCI_CONFIG_BACKUP_ALL, NULL );
 
 	/* Assert reset */
 	memset ( &control, 0, sizeof ( control ) );
@@ -2267,7 +2267,7 @@ static void qib7322_reset ( struct qib7322 *qib7322, struct pci_device *pci ) {
 	mdelay ( 1000 );
 
 	/* Restore PCI configuration space */
-	pci_restore ( pci, &backup, NULL );
+	pci_restore ( pci, &backup, PCI_CONFIG_BACKUP_ALL, NULL );
 }
 
 /**
