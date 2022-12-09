@@ -288,17 +288,17 @@ struct net_protocol vlan_protocol __net_protocol = {
 };
 
 /**
- * Get the VLAN tag
+ * Get the VLAN tag control information
  *
  * @v netdev		Network device
- * @ret tag		VLAN tag, or 0 if device is not a VLAN device
+ * @ret tci		VLAN tag control information, or 0 if not a VLAN device
  */
-unsigned int vlan_tag ( struct net_device *netdev ) {
+unsigned int vlan_tci ( struct net_device *netdev ) {
 	struct vlan_device *vlan;
 
 	if ( netdev->op == &vlan_operations ) {
 		vlan = netdev->priv;
-		return vlan->tag;
+		return ( VLAN_TCI ( vlan->tag, vlan->priority ) );
 	} else {
 		return 0;
 	}

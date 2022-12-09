@@ -1171,12 +1171,12 @@ static void net_step ( struct process *process __unused ) {
 }
 
 /**
- * Get the VLAN tag (when VLAN support is not present)
+ * Get the VLAN tag control information (when VLAN support is not present)
  *
  * @v netdev		Network device
  * @ret tag		0, indicating that device is not a VLAN device
  */
-__weak unsigned int vlan_tag ( struct net_device *netdev __unused ) {
+__weak unsigned int vlan_tci ( struct net_device *netdev __unused ) {
 	return 0;
 }
 
