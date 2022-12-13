@@ -199,8 +199,7 @@ static void vlan_sync ( struct net_device *netdev ) {
  * @v tag		VLAN tag
  * @ret netdev		VLAN device, if any
  */
-static struct net_device * vlan_find ( struct net_device *trunk,
-				       unsigned int tag ) {
+struct net_device * vlan_find ( struct net_device *trunk, unsigned int tag ) {
 	struct net_device *netdev;
 	struct vlan_device *vlan;
 

@@ -19,9 +19,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/PxeBaseCode.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/Protocol/UsbIo.h>
+#include <ipxe/efi/Protocol/VlanConfig.h>
 
 extern void efi_nullify_snp ( EFI_SIMPLE_NETWORK_PROTOCOL *snp );
 extern void efi_nullify_nii ( EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL *nii );
+extern void efi_nullify_vlan ( EFI_VLAN_CONFIG_PROTOCOL *vcfg );
 extern void efi_nullify_name2 ( EFI_COMPONENT_NAME2_PROTOCOL *name2 );
 extern void efi_nullify_load_file ( EFI_LOAD_FILE_PROTOCOL *load_file );
 extern void efi_nullify_hii ( EFI_HII_CONFIG_ACCESS_PROTOCOL *hii );
