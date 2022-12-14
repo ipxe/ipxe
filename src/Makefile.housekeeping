@@ -461,8 +461,8 @@ CFLAGS		+= -g
 ifeq ($(CCTYPE),gcc)
 CFLAGS		+= -ffreestanding
 CFLAGS		+= -fcommon
-CFLAGS		+= -Wall -W -Wformat-nonliteral
-HOST_CFLAGS	+= -Wall -W -Wformat-nonliteral
+CFLAGS		+= -Wall -W -Wformat-nonliteral -Wno-array-bounds
+HOST_CFLAGS	+= -Wall -W -Wformat-nonliteral -Wno-array-bounds
 endif
 CFLAGS		+= $(WORKAROUND_CFLAGS) $(EXTRA_CFLAGS)
 ASFLAGS		+= $(WORKAROUND_ASFLAGS) $(EXTRA_ASFLAGS)
