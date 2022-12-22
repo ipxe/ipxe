@@ -425,7 +425,7 @@ static int efi_local_open_resolved ( struct efi_local *local,
 static int efi_local_open_path ( struct efi_local *local, const char *path ) {
 	FILEPATH_DEVICE_PATH *fp = container_of ( efi_loaded_image->FilePath,
 						  FILEPATH_DEVICE_PATH, Header);
-	size_t fp_len = ( fp ? efi_path_len ( &fp->Header ) : 0 );
+	size_t fp_len = efi_path_len ( &fp->Header );
 	char base[ fp_len / 2 /* Cannot exceed this length */ ];
 	size_t remaining = sizeof ( base );
 	size_t len;
