@@ -78,12 +78,13 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
  */
 static void efi_init_application ( void ) {
 	EFI_HANDLE device = efi_loaded_image->DeviceHandle;
+	EFI_DEVICE_PATH_PROTOCOL *path = efi_loaded_image_path;
 
 	/* Identify autoboot device, if any */
 	efi_set_autoboot_ll_addr ( device );
 
 	/* Store cached DHCP packet, if any */
-	efi_cachedhcp_record ( device );
+	efi_cachedhcp_record ( device, path );
 
 	/* Load autoexec script, if any */
 	efi_autoexec_load ( device );

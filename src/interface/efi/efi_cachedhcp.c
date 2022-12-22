@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/cachedhcp.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_cachedhcp.h>
 #include <ipxe/efi/Protocol/PxeBaseCode.h>
 
@@ -40,10 +41,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Record cached DHCP packet
  *
  * @v device		Device handle
+ * @v path		Device path
  * @ret rc		Return status code
  */
-int efi_cachedhcp_record ( EFI_HANDLE device ) {
-		EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+int efi_cachedhcp_record ( EFI_HANDLE device,
+			   EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	unsigned int vlan;
 	union {
 		EFI_PXE_BASE_CODE_PROTOCOL *pxe;
 		void *interface;
@@ -51,6 +55,9 @@ int efi_cachedhcp_record ( EFI_HANDLE device ) {
 	EFI_PXE_BASE_CODE_MODE *mode;
 	EFI_STATUS efirc;
 	int rc;
+
+	/* Get VLAN tag, if any */
+	vlan = efi_path_vlan ( path );
 
 	/* Look for a PXE base code instance on the image's device handle */
 	if ( ( efirc = bs->OpenProtocol ( device,
@@ -75,7 +82,7 @@ int efi_cachedhcp_record ( EFI_HANDLE device ) {
 
 	/* Record DHCPACK, if present */
 	if ( mode->DhcpAckReceived &&
-	     ( ( rc = cachedhcp_record ( &cached_dhcpack,
+	     ( ( rc = cachedhcp_record ( &cached_dhcpack, vlan,
 					 virt_to_user ( &mode->DhcpAck ),
 					 sizeof ( mode->DhcpAck ) ) ) != 0 ) ) {
 		DBGC ( device, "EFI %s could not record DHCPACK: %s\n",
@@ -85,7 +92,7 @@ int efi_cachedhcp_record ( EFI_HANDLE device ) {
 
 	/* Record ProxyDHCPOFFER, if present */
 	if ( mode->ProxyOfferReceived &&
-	     ( ( rc = cachedhcp_record ( &cached_proxydhcp,
+	     ( ( rc = cachedhcp_record ( &cached_proxydhcp, vlan,
 					 virt_to_user ( &mode->ProxyOffer ),
 					 sizeof ( mode->ProxyOffer ) ) ) != 0)){
 		DBGC ( device, "EFI %s could not record ProxyDHCPOFFER: %s\n",
@@ -95,7 +102,7 @@ int efi_cachedhcp_record ( EFI_HANDLE device ) {
 
 	/* Record PxeBSACK, if present */
 	if ( mode->PxeReplyReceived &&
-	     ( ( rc = cachedhcp_record ( &cached_pxebs,
+	     ( ( rc = cachedhcp_record ( &cached_pxebs, vlan,
 					 virt_to_user ( &mode->PxeReply ),
 					 sizeof ( mode->PxeReply ) ) ) != 0)){
 		DBGC ( device, "EFI %s could not record PXEBSACK: %s\n",
