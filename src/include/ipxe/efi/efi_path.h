@@ -22,6 +22,8 @@ struct ib_srp_device;
 struct usb_function;
 
 extern EFI_DEVICE_PATH_PROTOCOL *
+efi_path_next ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern EFI_DEVICE_PATH_PROTOCOL *
 efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first,
