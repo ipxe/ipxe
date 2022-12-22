@@ -246,31 +246,49 @@ int cachedhcp_record ( struct cached_dhcp_packet *cache, unsigned int vlan,
 }
 
 /**
- * Cached DHCPACK startup function
+ * Cached DHCP packet startup function
  *
  */
 static void cachedhcp_startup ( void ) {
 
 	/* Apply cached ProxyDHCPOFFER, if any */
 	cachedhcp_apply ( &cached_proxydhcp, NULL );
+	cachedhcp_free ( &cached_proxydhcp );
 
 	/* Apply cached PXEBSACK, if any */
 	cachedhcp_apply ( &cached_pxebs, NULL );
+	cachedhcp_free ( &cached_pxebs );
 
-	/* Free any remaining cached packets */
+	/* Report unclaimed DHCPACK, if any.  Do not free yet, since
+	 * it may still be claimed by a dynamically created device
+	 * such as a VLAN device.
+	 */
 	if ( cached_dhcpack.dhcppkt ) {
 		DBGC ( colour, "CACHEDHCP %s unclaimed\n",
 		       cached_dhcpack.name );
 	}
+}
+
+/**
+ * Cached DHCP packet shutdown function
+ *
+ * @v booting		System is shutting down for OS boot
+ */
+static void cachedhcp_shutdown ( int booting __unused ) {
+
+	/* Free cached DHCPACK, if any */
+	if ( cached_dhcpack.dhcppkt ) {
+		DBGC ( colour, "CACHEDHCP %s never claimed\n",
+		       cached_dhcpack.name );
+	}
 	cachedhcp_free ( &cached_dhcpack );
-	cachedhcp_free ( &cached_proxydhcp );
-	cachedhcp_free ( &cached_pxebs );
 }
 
 /** Cached DHCPACK startup function */
 struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
 	.name = "cachedhcp",
 	.startup = cachedhcp_startup,
+	.shutdown = cachedhcp_shutdown,
 };
 
 /**
