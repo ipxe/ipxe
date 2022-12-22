@@ -95,6 +95,29 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 }
 
 /**
+ * Get VLAN tag from device path
+ *
+ * @v path		Device path
+ * @ret tag		VLAN tag, or 0 if not a VLAN
+ */
+unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	VLAN_DEVICE_PATH *vlan;
+
+	/* Search for VLAN device path */
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+		if ( ( path->Type == MESSAGING_DEVICE_PATH ) &&
+		     ( path->SubType == MSG_VLAN_DP ) ) {
+			vlan = container_of ( path, VLAN_DEVICE_PATH, Header );
+			return vlan->VlanId;
+		}
+	}
+
+	/* No VLAN device path found */
+	return 0;
+}
+
+/**
  * Concatenate EFI device paths
  *
  * @v ...		List of device paths (NULL terminated)
