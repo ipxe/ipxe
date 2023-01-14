@@ -934,11 +934,11 @@ static uint8_t efi_undi_checksum ( void *data, size_t len ) {
  */
 static unsigned int efi_undi_ifnum ( struct efi_snp_device *snpdev ) {
 
-	/* iPXE network device indexes are one-based (leaving zero
+	/* iPXE network device scope IDs are one-based (leaving zero
 	 * meaning "unspecified").  UNDI interface numbers are
 	 * zero-based.
 	 */
-	return ( snpdev->netdev->index - 1 );
+	return ( snpdev->netdev->scope_id - 1 );
 }
 
 /**

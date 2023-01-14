@@ -140,7 +140,7 @@ static int ndp_tx_request ( struct net_device *netdev,
 	/* Construct multicast destination address */
 	memset ( &sin6_dest, 0, sizeof ( sin6_dest ) );
 	sin6_dest.sin6_family = AF_INET6;
-	sin6_dest.sin6_scope_id = netdev->index;
+	sin6_dest.sin6_scope_id = netdev->scope_id;
 	ipv6_solicited_node ( &sin6_dest.sin6_addr, net_dest );
 
 	/* Construct neighbour header */
@@ -177,7 +177,7 @@ static int ndp_tx_router_solicitation ( struct net_device *netdev ) {
 	/* Construct multicast destination address */
 	memset ( &sin6_dest, 0, sizeof ( sin6_dest ) );
 	sin6_dest.sin6_family = AF_INET6;
-	sin6_dest.sin6_scope_id = netdev->index;
+	sin6_dest.sin6_scope_id = netdev->scope_id;
 	ipv6_all_routers ( &sin6_dest.sin6_addr );
 
 	/* Construct router solicitation */

@@ -127,7 +127,7 @@ static const struct in6_addr sample_multicast = {
 /** Dummy network device used for routing tests */
 static struct net_device ipv6_test_netdev = {
 	.refcnt = REF_INIT ( ref_no_free ),
-	.index = 42,
+	.scope_id = 42,
 	.state = NETDEV_OPEN,
 };
 
@@ -349,7 +349,7 @@ static void ipv6_route_okx ( struct ipv6_test_table *table, const char *dest,
 
 	/* Perform routing */
 	actual = &in_dest;
-	miniroute = ipv6_route ( ipv6_test_netdev.index, &actual );
+	miniroute = ipv6_route ( ipv6_test_netdev.scope_id, &actual );
 
 	/* Validate result */
 	if ( src ) {

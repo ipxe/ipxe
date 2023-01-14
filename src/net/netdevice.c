@@ -55,9 +55,6 @@ struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 /** List of open network devices, in reverse order of opening */
 static struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
 
-/** Network device index */
-static unsigned int netdev_index = 0;
-
 /** Network polling profiler */
 static struct profiler net_poll_profiler __profiler = { .name = "net.poll" };
 
@@ -723,6 +720,7 @@ int register_netdev ( struct net_device *netdev ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct net_driver *driver;
 	struct net_device *duplicate;
+	unsigned int i;
 	uint32_t seed;
 	int rc;
 
@@ -757,12 +755,21 @@ int register_netdev ( struct net_device *netdev ) {
 		goto err_duplicate;
 	}
 
-	/* Record device index and create device name */
+	/* Assign a unique device name, if not already set */
 	if ( netdev->name[0] == '\0' ) {
-		snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
-			   netdev_index );
+		for ( i = 0 ; ; i++ ) {
+			snprintf ( netdev->name, sizeof ( netdev->name ),
+				   "net%d", i );
+			if ( find_netdev ( netdev->name ) == NULL )
+				break;
+		}
 	}
-	netdev->index = ++netdev_index;
+
+	/* Assign a unique non-zero scope ID */
+	for ( netdev->scope_id = 1 ; ; netdev->scope_id++ ) {
+		if ( find_netdev_by_scope_id ( netdev->scope_id ) == NULL )
+			break;
+	}
 
 	/* Use least significant bits of the link-layer address to
 	 * improve the randomness of the (non-cryptographic) random
@@ -916,10 +923,6 @@ void unregister_netdev ( struct net_device *netdev ) {
 	DBGC ( netdev, "NETDEV %s unregistered\n", netdev->name );
 	list_del ( &netdev->list );
 	netdev_put ( netdev );
-
-	/* Reset network device index if no devices remain */
-	if ( list_empty ( &net_devices ) )
-		netdev_index = 0;
 }
 
 /** Enable or disable interrupts
@@ -962,17 +965,17 @@ struct net_device * find_netdev ( const char *name ) {
 }
 
 /**
- * Get network device by index
+ * Get network device by scope ID
  *
  * @v index		Network device index
  * @ret netdev		Network device, or NULL
  */
-struct net_device * find_netdev_by_index ( unsigned int index ) {
+struct net_device * find_netdev_by_scope_id ( unsigned int scope_id ) {
 	struct net_device *netdev;
 
 	/* Identify network device by index */
 	list_for_each_entry ( netdev, &net_devices, list ) {
-		if ( netdev->index == index )
+		if ( netdev->scope_id == scope_id )
 			return netdev;
 	}
 
