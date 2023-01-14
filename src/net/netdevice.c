@@ -735,18 +735,6 @@ int register_netdev ( struct net_device *netdev ) {
 				ll_protocol->ll_header_len );
 	}
 
-	/* Reject network devices that are already available via a
-	 * different hardware device.
-	 */
-	duplicate = find_netdev_by_ll_addr ( ll_protocol, netdev->ll_addr );
-	if ( duplicate && ( duplicate->dev != netdev->dev ) ) {
-		DBGC ( netdev, "NETDEV rejecting duplicate (phys %s) of %s "
-		       "(phys %s)\n", netdev->dev->name, duplicate->name,
-		       duplicate->dev->name );
-		rc = -EEXIST;
-		goto err_duplicate;
-	}
-
 	/* Reject named network devices that already exist */
 	if ( netdev->name[0] && ( duplicate = find_netdev ( netdev->name ) ) ) {
 		DBGC ( netdev, "NETDEV rejecting duplicate name %s\n",
@@ -1000,27 +988,6 @@ struct net_device * find_netdev_by_location ( unsigned int bus_type,
 	}
 
 	return NULL;	
-}
-
-/**
- * Get network device by link-layer address
- *
- * @v ll_protocol	Link-layer protocol
- * @v ll_addr		Link-layer address
- * @ret netdev		Network device, or NULL
- */
-struct net_device * find_netdev_by_ll_addr ( struct ll_protocol *ll_protocol,
-					     const void *ll_addr ) {
-	struct net_device *netdev;
-
-	list_for_each_entry ( netdev, &net_devices, list ) {
-		if ( ( netdev->ll_protocol == ll_protocol ) &&
-		     ( memcmp ( netdev->ll_addr, ll_addr,
-				ll_protocol->ll_addr_len ) == 0 ) )
-			return netdev;
-	}
-
-	return NULL;
 }
 
 /**
