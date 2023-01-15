@@ -25,6 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <errno.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/vlan.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_autoboot.h>
@@ -78,6 +80,13 @@ int efi_set_autoboot_ll_addr ( EFI_HANDLE device,
 	DBGC_HDA ( device, 0, &mode->CurrentAddress, mode->HwAddressSize );
 	if ( vlan ) {
 		DBGC ( device, "EFI %s found autoboot VLAN %d\n",
+		       efi_handle_name ( device ), vlan );
+	}
+
+	/* Configure automatic VLAN device, if applicable */
+	if ( vlan && ( mode->HwAddressSize == ETH_ALEN ) ) {
+		vlan_auto ( &mode->CurrentAddress, vlan );
+		DBGC ( device, "EFI %s configured automatic VLAN %d\n",
 		       efi_handle_name ( device ), vlan );
 	}
 
