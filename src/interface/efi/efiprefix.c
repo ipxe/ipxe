@@ -81,7 +81,7 @@ static void efi_init_application ( void ) {
 	EFI_DEVICE_PATH_PROTOCOL *path = efi_loaded_image_path;
 
 	/* Identify autoboot device, if any */
-	efi_set_autoboot_ll_addr ( device );
+	efi_set_autoboot_ll_addr ( device, path );
 
 	/* Store cached DHCP packet, if any */
 	efi_cachedhcp_record ( device, path );

@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_autoboot.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <usr/autoboot.h>
@@ -40,9 +41,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Identify autoboot device
  *
  * @v device		Device handle
+ * @v path		Device path
  * @ret rc		Return status code
  */
-int efi_set_autoboot_ll_addr ( EFI_HANDLE device ) {
+int efi_set_autoboot_ll_addr ( EFI_HANDLE device,
+			       EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_SIMPLE_NETWORK_PROTOCOL *snp;
@@ -50,6 +53,7 @@ int efi_set_autoboot_ll_addr ( EFI_HANDLE device ) {
 	} snp;
 	EFI_SIMPLE_NETWORK_MODE *mode;
 	EFI_STATUS efirc;
+	unsigned int vlan;
 	int rc;
 
 	/* Look for an SNP instance on the image's device handle */
@@ -66,10 +70,16 @@ int efi_set_autoboot_ll_addr ( EFI_HANDLE device ) {
 
 	/* Record autoboot device */
 	mode = snp.snp->Mode;
-	set_autoboot_ll_addr ( &mode->CurrentAddress, mode->HwAddressSize );
+	vlan = efi_path_vlan ( path );
+	set_autoboot_ll_addr ( &mode->CurrentAddress, mode->HwAddressSize,
+			       vlan );
 	DBGC ( device, "EFI %s found autoboot link-layer address:\n",
 	       efi_handle_name ( device ) );
 	DBGC_HDA ( device, 0, &mode->CurrentAddress, mode->HwAddressSize );
+	if ( vlan ) {
+		DBGC ( device, "EFI %s found autoboot VLAN %d\n",
+		       efi_handle_name ( device ), vlan );
+	}
 
 	/* Close protocol */
 	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
