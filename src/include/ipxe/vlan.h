@@ -80,6 +80,7 @@ extern int vlan_can_be_trunk ( struct net_device *trunk );
 extern int vlan_create ( struct net_device *trunk, unsigned int tag,
 			 unsigned int priority );
 extern int vlan_destroy ( struct net_device *netdev );
+extern void vlan_auto ( const void *ll_addr, unsigned int tag );
 extern void vlan_netdev_rx ( struct net_device *netdev, unsigned int tag,
 			     struct io_buffer *iobuf );
 extern void vlan_netdev_rx_err ( struct net_device *netdev, unsigned int tag,
