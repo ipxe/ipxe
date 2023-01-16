@@ -351,6 +351,90 @@ static int ena_admin ( struct ena_nic *ena, union ena_aq_req *req,
 }
 
 /**
+ * Set async event notification queue config
+ *
+ * @v ena		ENA device
+ * @v enabled		Bitmask of the groups to enable
+ * @ret rc		Return status code
+ */
+static int ena_set_aenq_config ( struct ena_nic *ena, uint32_t enabled ) {
+	union ena_aq_req *req;
+	union ena_acq_rsp *rsp;
+	union ena_feature *feature;
+	int rc;
+
+	/* Construct request */
+	req = ena_admin_req ( ena );
+	req->header.opcode = ENA_SET_FEATURE;
+	req->set_feature.id = ENA_AENQ_CONFIG;
+	feature = &req->set_feature.feature;
+	feature->aenq.enabled = cpu_to_le32 ( enabled );
+
+	/* Issue request */
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Create async event notification queue
+ *
+ * @v ena		ENA device
+ * @ret rc		Return status code
+ */
+static int ena_create_async ( struct ena_nic *ena ) {
+	size_t aenq_len = ( ENA_AENQ_COUNT * sizeof ( ena->aenq.evt[0] ) );
+	int rc;
+
+	/* Allocate async event notification queue */
+	ena->aenq.evt = malloc_phys ( aenq_len, aenq_len );
+	if ( ! ena->aenq.evt ) {
+		rc = -ENOMEM;
+		goto err_alloc_aenq;
+	}
+	memset ( ena->aenq.evt, 0, aenq_len );
+
+	/* Program queue address and capabilities */
+	ena_set_base ( ena, ENA_AENQ_BASE, ena->aenq.evt );
+	ena_set_caps ( ena, ENA_AENQ_CAPS, ENA_AENQ_COUNT,
+		       sizeof ( ena->aenq.evt[0] ) );
+
+	DBGC ( ena, "ENA %p AENQ [%08lx,%08lx)\n",
+	       ena, virt_to_phys ( ena->aenq.evt ),
+	       ( virt_to_phys ( ena->aenq.evt ) + aenq_len ) );
+
+	/* Disable all events */
+	if ( ( rc = ena_set_aenq_config ( ena, 0 ) ) != 0 )
+		goto err_set_aenq_config;
+
+	return 0;
+
+ err_set_aenq_config:
+	ena_clear_caps ( ena, ENA_AENQ_CAPS );
+	free_phys ( ena->aenq.evt, aenq_len );
+ err_alloc_aenq:
+	return rc;
+}
+
+/**
+ * Destroy async event notification queue
+ *
+ * @v ena		ENA device
+ */
+static void ena_destroy_async ( struct ena_nic *ena ) {
+	size_t aenq_len = ( ENA_AENQ_COUNT * sizeof ( ena->aenq.evt[0] ) );
+
+	/* Clear queue capabilities */
+	ena_clear_caps ( ena, ENA_AENQ_CAPS );
+	wmb();
+
+	/* Free queue */
+	free_phys ( ena->aenq.evt, aenq_len );
+	DBGC ( ena, "ENA %p AENQ destroyed\n", ena );
+}
+
+/**
  * Create submission queue
  *
  * @v ena		ENA device
@@ -1098,6 +1182,10 @@ static int ena_probe ( struct pci_device *pci ) {
 	if ( ( rc = ena_create_admin ( ena ) ) != 0 )
 		goto err_create_admin;
 
+	/* Create async event notification queue */
+	if ( ( rc = ena_create_async ( ena ) ) != 0 )
+		goto err_create_async;
+
 	/* Set host attributes */
 	if ( ( rc = ena_set_host_attributes ( ena ) ) != 0 )
 		goto err_set_host_attributes;
@@ -1121,6 +1209,8 @@ static int ena_probe ( struct pci_device *pci ) {
  err_register_netdev:
  err_get_device_attributes:
  err_set_host_attributes:
+	ena_destroy_async ( ena );
+ err_create_async:
 	ena_destroy_admin ( ena );
  err_create_admin:
 	ena_reset ( ena );
@@ -1147,6 +1237,9 @@ static void ena_remove ( struct pci_device *pci ) {
 
 	/* Unregister network device */
 	unregister_netdev ( netdev );
+
+	/* Destroy async event notification queue */
+	ena_destroy_async ( ena );
 
 	/* Destroy admin queues */
 	ena_destroy_admin ( ena );

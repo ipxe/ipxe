@@ -24,6 +24,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Number of admin completion queue entries */
 #define ENA_ACQ_COUNT 2
 
+/** Number of async event notification queue entries */
+#define ENA_AENQ_COUNT 2
+
 /** Number of transmit queue entries */
 #define ENA_TX_COUNT 16
 
@@ -59,6 +62,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Maximum time to wait for admin requests */
 #define ENA_ADMIN_MAX_WAIT_MS 5000
+
+/** Async event notification queue capabilities register */
+#define ENA_AENQ_CAPS 0x34
+
+/** Async event notification queue base address register */
+#define ENA_AENQ_BASE 0x38
 
 /** Device control register */
 #define ENA_CTRL 0x54
@@ -128,6 +137,17 @@ struct ena_device_attributes {
 	uint8_t reserved_b[2];
 	/** Maximum MTU */
 	uint32_t mtu;
+} __attribute__ (( packed ));
+
+/** Async event notification queue config */
+#define ENA_AENQ_CONFIG 26
+
+/** Async event notification queue config */
+struct ena_aenq_config {
+	/** Bitmask of supported AENQ groups (device -> host) */
+	uint32_t supported;
+	/** Bitmask of enabled AENQ groups (host -> device) */
+	uint32_t enabled;
 } __attribute__ (( packed ));
 
 /** Host attributes */
@@ -208,6 +228,8 @@ struct ena_host_info {
 union ena_feature {
 	/** Device attributes */
 	struct ena_device_attributes device;
+	/** Async event notification queue config */
+	struct ena_aenq_config aenq;
 	/** Host attributes */
 	struct ena_host_attributes host;
 };
@@ -506,6 +528,28 @@ struct ena_acq {
 	unsigned int phase;
 };
 
+/** Async event notification queue event */
+struct ena_aenq_event {
+	/** Type of event */
+	uint16_t group;
+	/** ID of event */
+	uint16_t syndrome;
+	/** Phase */
+	uint8_t flags;
+	/** Reserved */
+	uint8_t reserved[3];
+	/** Timestamp */
+	uint64_t timestamp;
+	/** Additional event data */
+	uint8_t data[48];
+} __attribute__ (( packed ));
+
+/** Async event notification queue */
+struct ena_aenq {
+	/** Events */
+	struct ena_aenq_event *evt;
+};
+
 /** Transmit submission queue entry */
 struct ena_tx_sqe {
 	/** Length */
@@ -702,6 +746,8 @@ struct ena_nic {
 	struct ena_aq aq;
 	/** Admin completion queue */
 	struct ena_acq acq;
+	/** Async event notification queue */
+	struct ena_aenq aenq;
 	/** Transmit queue */
 	struct ena_qp tx;
 	/** Receive queue */
