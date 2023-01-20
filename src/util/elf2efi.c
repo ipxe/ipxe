@@ -33,6 +33,8 @@
 #include <fcntl.h>
 #include <elf.h>
 #include <libgen.h>
+
+#define EFI_HOSTONLY
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 
