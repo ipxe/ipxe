@@ -1,8 +1,8 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
-# Linker script
+# Starting virtual address
 #
-LDSCRIPT = arch/x86_64/scripts/linux.lds
+LDFLAGS += -Ttext=0x400000
 
 # Include generic Linux Makefile
 #
