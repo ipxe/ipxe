@@ -512,6 +512,10 @@ CFLAGS		+= -include include/compiler.h
 #
 CFLAGS		+= -DASM_TCHAR='$(ASM_TCHAR)' -DASM_TCHAR_OPS='$(ASM_TCHAR_OPS)'
 
+# Inhibit the default -Dlinux
+#
+CFLAGS		+= -Ulinux
+
 # CFLAGS for specific object types
 #
 CFLAGS_c	+=
