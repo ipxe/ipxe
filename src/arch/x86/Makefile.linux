@@ -1,9 +1,5 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
-# Include x86 Linux headers
-#
-INCDIRS += arch/x86/include/linux
-
 # Include generic Linux Makefile
 #
 MAKEDEPS	+= Makefile.linux

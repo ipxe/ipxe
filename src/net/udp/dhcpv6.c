@@ -40,7 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crc32.h>
 #include <ipxe/errortab.h>
 #include <ipxe/ipv6.h>
-#include <ipxe/dhcp_arch.h>
+#include <ipxe/dhcparch.h>
 #include <ipxe/dhcpv6.h>
 
 /** @file
