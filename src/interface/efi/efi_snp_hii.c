@@ -704,9 +704,7 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
 	vendor_path->Header.Length[0] = sizeof ( *vendor_path );
 	efi_snp_hii_random_guid ( &vendor_path->Guid );
 	path_end = ( ( void * ) ( vendor_path + 1 ) );
-	path_end->Type = END_DEVICE_PATH_TYPE;
-	path_end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	path_end->Length[0] = sizeof ( *path_end );
+	efi_path_terminate ( path_end );
 
 	/* Create device path and child handle for HII association */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
