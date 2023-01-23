@@ -13,6 +13,11 @@ ASFLAGS		+= -mthumb -mcpu=cortex-a15
 #
 CFLAGS		+= -fshort-wchar
 
+# EFI requires that enums are always 32 bits, and nothing else
+# currently cares
+#
+CFLAGS		+= -fno-short-enums
+
 # Include common ARM Makefile
 MAKEDEPS	+= arch/arm/Makefile
 include arch/arm/Makefile
