@@ -5,7 +5,7 @@ SRCDIRS		+= arch/arm32/libgcc
 
 # ARM32-specific flags
 #
-CFLAGS		+= -mthumb -mcpu=cortex-a15 -mabi=aapcs -mfloat-abi=soft
+CFLAGS		+= -mthumb -mcpu=cortex-a15 -mabi=aapcs
 CFLAGS		+= -mword-relocations
 ASFLAGS		+= -mthumb -mcpu=cortex-a15
 
