@@ -222,7 +222,7 @@ static int nii_pci_open ( struct nii_nic *nii ) {
 
 	/* Locate PCI I/O protocol */
 	if ( ( rc = efi_locate_device ( device, &efi_pci_io_protocol_guid,
-					&pci_device ) ) != 0 ) {
+					&pci_device, 0 ) ) != 0 ) {
 		DBGC ( nii, "NII %s could not locate PCI I/O protocol: %s\n",
 		       nii->dev.name, strerror ( rc ) );
 		goto err_locate;
