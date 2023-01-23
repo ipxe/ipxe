@@ -204,7 +204,7 @@ static void pxe_menu_draw_item ( struct pxe_menu *menu,
 	buf[ sizeof ( buf ) - 1 ] = '\0';
 
 	/* Draw row */
-	row = ( LINES - menu->num_items + index );
+	row = ( LINES - menu->num_items + index - 1 );
 	color_set ( ( selected ? CPAIR_PXE : CPAIR_DEFAULT ), NULL );
 	mvprintw ( row, 0, "%s", buf );
 	move ( row, 1 );
