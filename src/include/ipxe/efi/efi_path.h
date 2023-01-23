@@ -37,6 +37,9 @@ static inline void efi_path_terminate ( EFI_DEVICE_PATH_PROTOCOL *end ) {
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_path_next ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern EFI_DEVICE_PATH_PROTOCOL *
+efi_path_prev ( EFI_DEVICE_PATH_PROTOCOL *path,
+		EFI_DEVICE_PATH_PROTOCOL *curr );
+extern EFI_DEVICE_PATH_PROTOCOL *
 efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path );

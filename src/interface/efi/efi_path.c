@@ -66,20 +66,33 @@ EFI_DEVICE_PATH_PROTOCOL * efi_path_next ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 }
 
 /**
+ * Find previous element of device path
+ *
+ * @v path		Device path, or NULL for no path
+ * @v curr		Current element in device path, or NULL for end of path
+ * @ret prev		Previous element in device path, or NULL
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_path_prev ( EFI_DEVICE_PATH_PROTOCOL *path,
+					   EFI_DEVICE_PATH_PROTOCOL *curr ) {
+	EFI_DEVICE_PATH_PROTOCOL *tmp;
+
+	/* Find immediately preceding element */
+	while ( ( tmp = efi_path_next ( path ) ) != curr ) {
+		path = tmp;
+	}
+
+	return path;
+}
+
+/**
  * Find end of device path
  *
  * @v path		Device path, or NULL
  * @ret path_end	End of device path, or NULL
  */
 EFI_DEVICE_PATH_PROTOCOL * efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path ) {
-	EFI_DEVICE_PATH_PROTOCOL *next;
 
-	/* Find end of device path */
-	while ( ( next = efi_path_next ( path ) ) != NULL ) {
-		path = next;
-	}
-
-	return path;
+	return efi_path_prev ( path, NULL );
 }
 
 /**
