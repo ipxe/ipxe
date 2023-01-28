@@ -79,13 +79,13 @@ sub try_import_file {
 	print $outfh "$_\n";
 	# Apply FILE_LICENCE() immediately after include guard
 	if ( defined $maybe_guard && ! defined $guard ) {
-	  if ( /^\#define\s+_?_${maybe_guard}_?_$/ ) {
+	  if ( /^\#define\s+${maybe_guard}$/ ) {
 	    $guard = $maybe_guard;
 	    print $outfh "\nFILE_LICENCE ( $licence );\n" if $licence;
 	  }
 	  undef $maybe_guard;
 	}
-	if ( /^#ifndef\s+_?_(\S+)_?_/ ) {
+	if ( /^#ifndef\s+(_?_?\S+_?_)/ ) {
 	  $maybe_guard = $1;
 	}
       }
