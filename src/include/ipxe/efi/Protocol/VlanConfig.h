@@ -1,14 +1,8 @@
 /** @file
   EFI VLAN Config protocol is to provide manageability interface for VLAN configuration.
 
-  Copyright (c) 2009, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2009 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
   This Protocol is introduced in UEFI Specification 2.2
@@ -18,8 +12,7 @@
 #ifndef __EFI_VLANCONFIG_PROTOCOL_H__
 #define __EFI_VLANCONFIG_PROTOCOL_H__
 
-FILE_LICENCE ( BSD3 );
-
+FILE_LICENCE ( BSD2_PATENT );
 
 #define EFI_VLAN_CONFIG_PROTOCOL_GUID \
   { \
@@ -28,15 +21,13 @@ FILE_LICENCE ( BSD3 );
 
 typedef struct _EFI_VLAN_CONFIG_PROTOCOL EFI_VLAN_CONFIG_PROTOCOL;
 
-
 ///
 /// EFI_VLAN_FIND_DATA
 ///
 typedef struct {
-  UINT16          VlanId;     ///< Vlan Identifier.
-  UINT8           Priority;   ///< Priority of this VLAN.
+  UINT16    VlanId;           ///< Vlan Identifier.
+  UINT8     Priority;         ///< Priority of this VLAN.
 } EFI_VLAN_FIND_DATA;
-
 
 /**
   Create a VLAN device or modify the configuration parameter of an
@@ -135,11 +126,11 @@ EFI_STATUS
 /// VLAN tagging implementation is IEEE802.1Q.
 ///
 struct _EFI_VLAN_CONFIG_PROTOCOL {
-  EFI_VLAN_CONFIG_SET              Set;
-  EFI_VLAN_CONFIG_FIND             Find;
-  EFI_VLAN_CONFIG_REMOVE           Remove;
+  EFI_VLAN_CONFIG_SET       Set;
+  EFI_VLAN_CONFIG_FIND      Find;
+  EFI_VLAN_CONFIG_REMOVE    Remove;
 };
 
-extern EFI_GUID gEfiVlanConfigProtocolGuid;
+extern EFI_GUID  gEfiVlanConfigProtocolGuid;
 
 #endif

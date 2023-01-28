@@ -2,22 +2,20 @@
   Provides string functions, linked list functions, math functions, synchronization
   functions, file path functions, and CPU architecture-specific functions.
 
-Copyright (c) 2006 - 2017, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2021, Intel Corporation. All rights reserved.<BR>
 Portions copyright (c) 2008 - 2009, Apple Inc. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
+Copyright (c) Microsoft Corporation.<BR>
+Portions Copyright (c) 2020, Hewlett Packard Enterprise Development LP. All rights reserved.<BR>
+Portions Copyright (c) 2022, Loongson Technology Corporation Limited. All rights reserved.<BR>
 
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __BASE_LIB__
 #define __BASE_LIB__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 //
 // Definitions for architecture-specific types
@@ -27,88 +25,40 @@ FILE_LICENCE ( BSD3 );
 /// The IA-32 architecture context buffer used by SetJump() and LongJump().
 ///
 typedef struct {
-  UINT32                            Ebx;
-  UINT32                            Esi;
-  UINT32                            Edi;
-  UINT32                            Ebp;
-  UINT32                            Esp;
-  UINT32                            Eip;
+  UINT32    Ebx;
+  UINT32    Esi;
+  UINT32    Edi;
+  UINT32    Ebp;
+  UINT32    Esp;
+  UINT32    Eip;
+  UINT32    Ssp;
 } BASE_LIBRARY_JUMP_BUFFER;
 
-#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 4
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT  4
 
 #endif // defined (MDE_CPU_IA32)
-
-#if defined (MDE_CPU_IPF)
-
-///
-/// The Itanium architecture context buffer used by SetJump() and LongJump().
-///
-typedef struct {
-  UINT64                            F2[2];
-  UINT64                            F3[2];
-  UINT64                            F4[2];
-  UINT64                            F5[2];
-  UINT64                            F16[2];
-  UINT64                            F17[2];
-  UINT64                            F18[2];
-  UINT64                            F19[2];
-  UINT64                            F20[2];
-  UINT64                            F21[2];
-  UINT64                            F22[2];
-  UINT64                            F23[2];
-  UINT64                            F24[2];
-  UINT64                            F25[2];
-  UINT64                            F26[2];
-  UINT64                            F27[2];
-  UINT64                            F28[2];
-  UINT64                            F29[2];
-  UINT64                            F30[2];
-  UINT64                            F31[2];
-  UINT64                            R4;
-  UINT64                            R5;
-  UINT64                            R6;
-  UINT64                            R7;
-  UINT64                            SP;
-  UINT64                            BR0;
-  UINT64                            BR1;
-  UINT64                            BR2;
-  UINT64                            BR3;
-  UINT64                            BR4;
-  UINT64                            BR5;
-  UINT64                            InitialUNAT;
-  UINT64                            AfterSpillUNAT;
-  UINT64                            PFS;
-  UINT64                            BSP;
-  UINT64                            Predicates;
-  UINT64                            LoopCount;
-  UINT64                            FPSR;
-} BASE_LIBRARY_JUMP_BUFFER;
-
-#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 0x10
-
-#endif // defined (MDE_CPU_IPF)
 
 #if defined (MDE_CPU_X64)
 ///
 /// The x64 architecture context buffer used by SetJump() and LongJump().
 ///
 typedef struct {
-  UINT64                            Rbx;
-  UINT64                            Rsp;
-  UINT64                            Rbp;
-  UINT64                            Rdi;
-  UINT64                            Rsi;
-  UINT64                            R12;
-  UINT64                            R13;
-  UINT64                            R14;
-  UINT64                            R15;
-  UINT64                            Rip;
-  UINT64                            MxCsr;
-  UINT8                             XmmBuffer[160]; ///< XMM6-XMM15.
+  UINT64    Rbx;
+  UINT64    Rsp;
+  UINT64    Rbp;
+  UINT64    Rdi;
+  UINT64    Rsi;
+  UINT64    R12;
+  UINT64    R13;
+  UINT64    R14;
+  UINT64    R15;
+  UINT64    Rip;
+  UINT64    MxCsr;
+  UINT8     XmmBuffer[160];                         ///< XMM6-XMM15.
+  UINT64    Ssp;
 } BASE_LIBRARY_JUMP_BUFFER;
 
-#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 8
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT  8
 
 #endif // defined (MDE_CPU_X64)
 
@@ -117,14 +67,14 @@ typedef struct {
 /// The EBC context buffer used by SetJump() and LongJump().
 ///
 typedef struct {
-  UINT64                            R0;
-  UINT64                            R1;
-  UINT64                            R2;
-  UINT64                            R3;
-  UINT64                            IP;
+  UINT64    R0;
+  UINT64    R1;
+  UINT64    R2;
+  UINT64    R3;
+  UINT64    IP;
 } BASE_LIBRARY_JUMP_BUFFER;
 
-#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 8
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT  8
 
 #endif // defined (MDE_CPU_EBC)
 
@@ -144,9 +94,9 @@ typedef struct {
   UINT32    R14;
 } BASE_LIBRARY_JUMP_BUFFER;
 
-#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 4
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT  4
 
-#endif  // defined (MDE_CPU_ARM)
+#endif // defined (MDE_CPU_ARM)
 
 #if defined (MDE_CPU_AARCH64)
 typedef struct {
@@ -176,15 +126,61 @@ typedef struct {
   UINT64    D15;
 } BASE_LIBRARY_JUMP_BUFFER;
 
-#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT 8
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT  8
 
-#endif  // defined (MDE_CPU_AARCH64)
+#endif // defined (MDE_CPU_AARCH64)
 
+#if defined (MDE_CPU_RISCV64)
+///
+/// The RISC-V architecture context buffer used by SetJump() and LongJump().
+///
+typedef struct {
+  UINT64    RA;
+  UINT64    S0;
+  UINT64    S1;
+  UINT64    S2;
+  UINT64    S3;
+  UINT64    S4;
+  UINT64    S5;
+  UINT64    S6;
+  UINT64    S7;
+  UINT64    S8;
+  UINT64    S9;
+  UINT64    S10;
+  UINT64    S11;
+  UINT64    SP;
+} BASE_LIBRARY_JUMP_BUFFER;
+
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT  8
+
+#endif // defined (MDE_CPU_RISCV64)
+
+#if defined (MDE_CPU_LOONGARCH64)
+///
+/// The LoongArch architecture context buffer used by SetJump() and LongJump()
+///
+typedef struct {
+  UINT64    S0;
+  UINT64    S1;
+  UINT64    S2;
+  UINT64    S3;
+  UINT64    S4;
+  UINT64    S5;
+  UINT64    S6;
+  UINT64    S7;
+  UINT64    S8;
+  UINT64    SP;
+  UINT64    FP;
+  UINT64    RA;
+} BASE_LIBRARY_JUMP_BUFFER;
+
+#define BASE_LIBRARY_JUMP_BUFFER_ALIGNMENT  8
+
+#endif // defined (MDE_CPU_LOONGARCH64)
 
 //
 // String Services
 //
-
 
 /**
   Returns the length of a Null-terminated Unicode string.
@@ -205,8 +201,8 @@ typedef struct {
 UINTN
 EFIAPI
 StrnLenS (
-  IN CONST CHAR16              *String,
-  IN UINTN                     MaxSize
+  IN CONST CHAR16  *String,
+  IN UINTN         MaxSize
   );
 
 /**
@@ -233,8 +229,8 @@ StrnLenS (
 UINTN
 EFIAPI
 StrnSizeS (
-  IN CONST CHAR16              *String,
-  IN UINTN                     MaxSize
+  IN CONST CHAR16  *String,
+  IN UINTN         MaxSize
   );
 
 /**
@@ -245,7 +241,6 @@ StrnSizeS (
 
   If Destination is not aligned on a 16-bit boundary, then ASSERT().
   If Source is not aligned on a 16-bit boundary, then ASSERT().
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -267,9 +262,9 @@ StrnSizeS (
 RETURN_STATUS
 EFIAPI
 StrCpyS (
-  OUT CHAR16       *Destination,
-  IN  UINTN        DestMax,
-  IN  CONST CHAR16 *Source
+  OUT CHAR16        *Destination,
+  IN  UINTN         DestMax,
+  IN  CONST CHAR16  *Source
   );
 
 /**
@@ -281,7 +276,6 @@ StrCpyS (
 
   If Length > 0 and Destination is not aligned on a 16-bit boundary, then ASSERT().
   If Length > 0 and Source is not aligned on a 16-bit boundary, then ASSERT().
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -305,10 +299,10 @@ StrCpyS (
 RETURN_STATUS
 EFIAPI
 StrnCpyS (
-  OUT CHAR16       *Destination,
-  IN  UINTN        DestMax,
-  IN  CONST CHAR16 *Source,
-  IN  UINTN        Length
+  OUT CHAR16        *Destination,
+  IN  UINTN         DestMax,
+  IN  CONST CHAR16  *Source,
+  IN  UINTN         Length
   );
 
 /**
@@ -319,7 +313,6 @@ StrnCpyS (
 
   If Destination is not aligned on a 16-bit boundary, then ASSERT().
   If Source is not aligned on a 16-bit boundary, then ASSERT().
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -344,9 +337,9 @@ StrnCpyS (
 RETURN_STATUS
 EFIAPI
 StrCatS (
-  IN OUT CHAR16       *Destination,
-  IN     UINTN        DestMax,
-  IN     CONST CHAR16 *Source
+  IN OUT CHAR16        *Destination,
+  IN     UINTN         DestMax,
+  IN     CONST CHAR16  *Source
   );
 
 /**
@@ -359,7 +352,6 @@ StrCatS (
 
   If Destination is not aligned on a 16-bit boundary, then ASSERT().
   If Source is not aligned on a 16-bit boundary, then ASSERT().
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -385,10 +377,10 @@ StrCatS (
 RETURN_STATUS
 EFIAPI
 StrnCatS (
-  IN OUT CHAR16       *Destination,
-  IN     UINTN        DestMax,
-  IN     CONST CHAR16 *Source,
-  IN     UINTN        Length
+  IN OUT CHAR16        *Destination,
+  IN     UINTN         DestMax,
+  IN     CONST CHAR16  *Source,
+  IN     UINTN         Length
   );
 
 /**
@@ -406,12 +398,7 @@ StrnCatS (
   be ignored. Then, the function stops at the first character that is a not a
   valid decimal character or a Null-terminator, whichever one comes first.
 
-  If String is NULL, then ASSERT().
-  If Data is NULL, then ASSERT().
   If String is not aligned in a 16-bit boundary, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and String contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
 
   If String has no valid decimal digits in the above format, then 0 is stored
   at the location pointed to by Data.
@@ -442,9 +429,9 @@ StrnCatS (
 RETURN_STATUS
 EFIAPI
 StrDecimalToUintnS (
-  IN  CONST CHAR16             *String,
-  OUT       CHAR16             **EndPointer,  OPTIONAL
-  OUT       UINTN              *Data
+  IN  CONST CHAR16  *String,
+  OUT       CHAR16  **EndPointer   OPTIONAL,
+  OUT       UINTN   *Data
   );
 
 /**
@@ -462,12 +449,7 @@ StrDecimalToUintnS (
   be ignored. Then, the function stops at the first character that is a not a
   valid decimal character or a Null-terminator, whichever one comes first.
 
-  If String is NULL, then ASSERT().
-  If Data is NULL, then ASSERT().
   If String is not aligned in a 16-bit boundary, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and String contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
 
   If String has no valid decimal digits in the above format, then 0 is stored
   at the location pointed to by Data.
@@ -498,9 +480,9 @@ StrDecimalToUintnS (
 RETURN_STATUS
 EFIAPI
 StrDecimalToUint64S (
-  IN  CONST CHAR16             *String,
-  OUT       CHAR16             **EndPointer,  OPTIONAL
-  OUT       UINT64             *Data
+  IN  CONST CHAR16  *String,
+  OUT       CHAR16  **EndPointer   OPTIONAL,
+  OUT       UINT64  *Data
   );
 
 /**
@@ -523,12 +505,7 @@ StrDecimalToUint64S (
   the first character that is a not a valid hexadecimal character or NULL,
   whichever one comes first.
 
-  If String is NULL, then ASSERT().
-  If Data is NULL, then ASSERT().
   If String is not aligned in a 16-bit boundary, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and String contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
 
   If String has no valid hexadecimal digits in the above format, then 0 is
   stored at the location pointed to by Data.
@@ -559,9 +536,9 @@ StrDecimalToUint64S (
 RETURN_STATUS
 EFIAPI
 StrHexToUintnS (
-  IN  CONST CHAR16             *String,
-  OUT       CHAR16             **EndPointer,  OPTIONAL
-  OUT       UINTN              *Data
+  IN  CONST CHAR16  *String,
+  OUT       CHAR16  **EndPointer   OPTIONAL,
+  OUT       UINTN   *Data
   );
 
 /**
@@ -584,12 +561,7 @@ StrHexToUintnS (
   the first character that is a not a valid hexadecimal character or NULL,
   whichever one comes first.
 
-  If String is NULL, then ASSERT().
-  If Data is NULL, then ASSERT().
   If String is not aligned in a 16-bit boundary, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and String contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
 
   If String has no valid hexadecimal digits in the above format, then 0 is
   stored at the location pointed to by Data.
@@ -620,9 +592,9 @@ StrHexToUintnS (
 RETURN_STATUS
 EFIAPI
 StrHexToUint64S (
-  IN  CONST CHAR16             *String,
-  OUT       CHAR16             **EndPointer,  OPTIONAL
-  OUT       UINT64             *Data
+  IN  CONST CHAR16  *String,
+  OUT       CHAR16  **EndPointer   OPTIONAL,
+  OUT       UINT64  *Data
   );
 
 /**
@@ -642,8 +614,8 @@ StrHexToUint64S (
 UINTN
 EFIAPI
 AsciiStrnLenS (
-  IN CONST CHAR8               *String,
-  IN UINTN                     MaxSize
+  IN CONST CHAR8  *String,
+  IN UINTN        MaxSize
   );
 
 /**
@@ -668,8 +640,8 @@ AsciiStrnLenS (
 UINTN
 EFIAPI
 AsciiStrnSizeS (
-  IN CONST CHAR8               *String,
-  IN UINTN                     MaxSize
+  IN CONST CHAR8  *String,
+  IN UINTN        MaxSize
   );
 
 /**
@@ -677,8 +649,6 @@ AsciiStrnSizeS (
   to the array pointed to by Destination.
 
   This function is similar as strcpy_s defined in C11.
-
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -711,8 +681,6 @@ AsciiStrCpyS (
   Source, then Destination[Length] is always set to null.
 
   This function is similar as strncpy_s defined in C11.
-
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -747,8 +715,6 @@ AsciiStrnCpyS (
   null char) to the end of the string pointed to by Destination.
 
   This function is similar as strcat_s defined in C11.
-
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -785,8 +751,6 @@ AsciiStrCatS (
   set to null.
 
   This function is similar as strncat_s defined in C11.
-
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -833,12 +797,6 @@ AsciiStrnCatS (
   be ignored. Then, the function stops at the first character that is a not a
   valid decimal character or a Null-terminator, whichever one comes first.
 
-  If String is NULL, then ASSERT().
-  If Data is NULL, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and String contains more than
-  PcdMaximumAsciiStringLength Ascii characters, not including the
-  Null-terminator, then ASSERT().
-
   If String has no valid decimal digits in the above format, then 0 is stored
   at the location pointed to by Data.
   If the number represented by String exceeds the range defined by UINTN, then
@@ -868,9 +826,9 @@ AsciiStrnCatS (
 RETURN_STATUS
 EFIAPI
 AsciiStrDecimalToUintnS (
-  IN  CONST CHAR8              *String,
-  OUT       CHAR8              **EndPointer,  OPTIONAL
-  OUT       UINTN              *Data
+  IN  CONST CHAR8  *String,
+  OUT       CHAR8  **EndPointer   OPTIONAL,
+  OUT       UINTN  *Data
   );
 
 /**
@@ -887,12 +845,6 @@ AsciiStrDecimalToUintnS (
   [decimal digits]. The running zero in the beginning of [decimal digits] will
   be ignored. Then, the function stops at the first character that is a not a
   valid decimal character or a Null-terminator, whichever one comes first.
-
-  If String is NULL, then ASSERT().
-  If Data is NULL, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and String contains more than
-  PcdMaximumAsciiStringLength Ascii characters, not including the
-  Null-terminator, then ASSERT().
 
   If String has no valid decimal digits in the above format, then 0 is stored
   at the location pointed to by Data.
@@ -923,9 +875,9 @@ AsciiStrDecimalToUintnS (
 RETURN_STATUS
 EFIAPI
 AsciiStrDecimalToUint64S (
-  IN  CONST CHAR8              *String,
-  OUT       CHAR8              **EndPointer,  OPTIONAL
-  OUT       UINT64             *Data
+  IN  CONST CHAR8   *String,
+  OUT       CHAR8   **EndPointer   OPTIONAL,
+  OUT       UINT64  *Data
   );
 
 /**
@@ -946,12 +898,6 @@ AsciiStrDecimalToUint64S (
   the first valid hexadecimal digit. Then, the function stops at the first
   character that is a not a valid hexadecimal character or Null-terminator,
   whichever on comes first.
-
-  If String is NULL, then ASSERT().
-  If Data is NULL, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and String contains more than
-  PcdMaximumAsciiStringLength Ascii characters, not including the
-  Null-terminator, then ASSERT().
 
   If String has no valid hexadecimal digits in the above format, then 0 is
   stored at the location pointed to by Data.
@@ -982,9 +928,9 @@ AsciiStrDecimalToUint64S (
 RETURN_STATUS
 EFIAPI
 AsciiStrHexToUintnS (
-  IN  CONST CHAR8              *String,
-  OUT       CHAR8              **EndPointer,  OPTIONAL
-  OUT       UINTN              *Data
+  IN  CONST CHAR8  *String,
+  OUT       CHAR8  **EndPointer   OPTIONAL,
+  OUT       UINTN  *Data
   );
 
 /**
@@ -1005,12 +951,6 @@ AsciiStrHexToUintnS (
   the first valid hexadecimal digit. Then, the function stops at the first
   character that is a not a valid hexadecimal character or Null-terminator,
   whichever on comes first.
-
-  If String is NULL, then ASSERT().
-  If Data is NULL, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and String contains more than
-  PcdMaximumAsciiStringLength Ascii characters, not including the
-  Null-terminator, then ASSERT().
 
   If String has no valid hexadecimal digits in the above format, then 0 is
   stored at the location pointed to by Data.
@@ -1041,87 +981,10 @@ AsciiStrHexToUintnS (
 RETURN_STATUS
 EFIAPI
 AsciiStrHexToUint64S (
-  IN  CONST CHAR8              *String,
-  OUT       CHAR8              **EndPointer,  OPTIONAL
-  OUT       UINT64             *Data
+  IN  CONST CHAR8   *String,
+  OUT       CHAR8   **EndPointer   OPTIONAL,
+  OUT       UINT64  *Data
   );
-
-
-#ifndef DISABLE_NEW_DEPRECATED_INTERFACES
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Copies one Null-terminated Unicode string to another Null-terminated Unicode
-  string and returns the new Unicode string.
-
-  This function copies the contents of the Unicode string Source to the Unicode
-  string Destination, and returns Destination. If Source and Destination
-  overlap, then the results are undefined.
-
-  If Destination is NULL, then ASSERT().
-  If Destination is not aligned on a 16-bit boundary, then ASSERT().
-  If Source is NULL, then ASSERT().
-  If Source is not aligned on a 16-bit boundary, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Source contains more than
-  PcdMaximumUnicodeStringLength Unicode characters not including the
-  Null-terminator, then ASSERT().
-
-  @param  Destination The pointer to a Null-terminated Unicode string.
-  @param  Source      The pointer to a Null-terminated Unicode string.
-
-  @return Destination.
-
-**/
-CHAR16 *
-EFIAPI
-StrCpy (
-  OUT     CHAR16                    *Destination,
-  IN      CONST CHAR16              *Source
-  );
-
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Copies up to a specified length from one Null-terminated Unicode string to
-  another Null-terminated Unicode string and returns the new Unicode string.
-
-  This function copies the contents of the Unicode string Source to the Unicode
-  string Destination, and returns Destination. At most, Length Unicode
-  characters are copied from Source to Destination. If Length is 0, then
-  Destination is returned unmodified. If Length is greater that the number of
-  Unicode characters in Source, then Destination is padded with Null Unicode
-  characters. If Source and Destination overlap, then the results are
-  undefined.
-
-  If Length > 0 and Destination is NULL, then ASSERT().
-  If Length > 0 and Destination is not aligned on a 16-bit boundary, then ASSERT().
-  If Length > 0 and Source is NULL, then ASSERT().
-  If Length > 0 and Source is not aligned on a 16-bit boundary, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Length is greater than
-  PcdMaximumUnicodeStringLength, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Source contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the Null-terminator,
-  then ASSERT().
-
-  @param  Destination The pointer to a Null-terminated Unicode string.
-  @param  Source      The pointer to a Null-terminated Unicode string.
-  @param  Length      The maximum number of Unicode characters to copy.
-
-  @return Destination.
-
-**/
-CHAR16 *
-EFIAPI
-StrnCpy (
-  OUT     CHAR16                    *Destination,
-  IN      CONST CHAR16              *Source,
-  IN      UINTN                     Length
-  );
-#endif
 
 /**
   Returns the length of a Null-terminated Unicode string.
@@ -1143,9 +1006,8 @@ StrnCpy (
 UINTN
 EFIAPI
 StrLen (
-  IN      CONST CHAR16              *String
+  IN      CONST CHAR16  *String
   );
-
 
 /**
   Returns the size of a Null-terminated Unicode string in bytes, including the
@@ -1168,9 +1030,8 @@ StrLen (
 UINTN
 EFIAPI
 StrSize (
-  IN      CONST CHAR16              *String
+  IN      CONST CHAR16  *String
   );
-
 
 /**
   Compares two Null-terminated Unicode strings, and returns the difference
@@ -1203,10 +1064,9 @@ StrSize (
 INTN
 EFIAPI
 StrCmp (
-  IN      CONST CHAR16              *FirstString,
-  IN      CONST CHAR16              *SecondString
+  IN      CONST CHAR16  *FirstString,
+  IN      CONST CHAR16  *SecondString
   );
-
 
 /**
   Compares up to a specified length the contents of two Null-terminated Unicode strings,
@@ -1243,104 +1103,10 @@ StrCmp (
 INTN
 EFIAPI
 StrnCmp (
-  IN      CONST CHAR16              *FirstString,
-  IN      CONST CHAR16              *SecondString,
-  IN      UINTN                     Length
+  IN      CONST CHAR16  *FirstString,
+  IN      CONST CHAR16  *SecondString,
+  IN      UINTN         Length
   );
-
-
-#ifndef DISABLE_NEW_DEPRECATED_INTERFACES
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Concatenates one Null-terminated Unicode string to another Null-terminated
-  Unicode string, and returns the concatenated Unicode string.
-
-  This function concatenates two Null-terminated Unicode strings. The contents
-  of Null-terminated Unicode string Source are concatenated to the end of
-  Null-terminated Unicode string Destination. The Null-terminated concatenated
-  Unicode String is returned. If Source and Destination overlap, then the
-  results are undefined.
-
-  If Destination is NULL, then ASSERT().
-  If Destination is not aligned on a 16-bit boundary, then ASSERT().
-  If Source is NULL, then ASSERT().
-  If Source is not aligned on a 16-bit boundary, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Destination contains more
-  than PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Source contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and concatenating Destination
-  and Source results in a Unicode string with more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
-
-  @param  Destination The pointer to a Null-terminated Unicode string.
-  @param  Source      The pointer to a Null-terminated Unicode string.
-
-  @return Destination.
-
-**/
-CHAR16 *
-EFIAPI
-StrCat (
-  IN OUT  CHAR16                    *Destination,
-  IN      CONST CHAR16              *Source
-  );
-
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Concatenates up to a specified length one Null-terminated Unicode to the end
-  of another Null-terminated Unicode string, and returns the concatenated
-  Unicode string.
-
-  This function concatenates two Null-terminated Unicode strings. The contents
-  of Null-terminated Unicode string Source are concatenated to the end of
-  Null-terminated Unicode string Destination, and Destination is returned. At
-  most, Length Unicode characters are concatenated from Source to the end of
-  Destination, and Destination is always Null-terminated. If Length is 0, then
-  Destination is returned unmodified. If Source and Destination overlap, then
-  the results are undefined.
-
-  If Destination is NULL, then ASSERT().
-  If Length > 0 and Destination is not aligned on a 16-bit boundary, then ASSERT().
-  If Length > 0 and Source is NULL, then ASSERT().
-  If Length > 0 and Source is not aligned on a 16-bit boundary, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Length is greater than
-  PcdMaximumUnicodeStringLength, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Destination contains more
-  than PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Source contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and concatenating Destination
-  and Source results in a Unicode string with more than PcdMaximumUnicodeStringLength
-  Unicode characters, not including the Null-terminator, then ASSERT().
-
-  @param  Destination The pointer to a Null-terminated Unicode string.
-  @param  Source      The pointer to a Null-terminated Unicode string.
-  @param  Length      The maximum number of Unicode characters to concatenate from
-                      Source.
-
-  @return Destination.
-
-**/
-CHAR16 *
-EFIAPI
-StrnCat (
-  IN OUT  CHAR16                    *Destination,
-  IN      CONST CHAR16              *Source,
-  IN      UINTN                     Length
-  );
-#endif
 
 /**
   Returns the first occurrence of a Null-terminated Unicode sub-string
@@ -1370,8 +1136,8 @@ StrnCat (
 CHAR16 *
 EFIAPI
 StrStr (
-  IN      CONST CHAR16              *String,
-  IN      CONST CHAR16              *SearchString
+  IN      CONST CHAR16  *String,
+  IN      CONST CHAR16  *SearchString
   );
 
 /**
@@ -1411,7 +1177,7 @@ StrStr (
 UINTN
 EFIAPI
 StrDecimalToUintn (
-  IN      CONST CHAR16              *String
+  IN      CONST CHAR16  *String
   );
 
 /**
@@ -1451,9 +1217,8 @@ StrDecimalToUintn (
 UINT64
 EFIAPI
 StrDecimalToUint64 (
-  IN      CONST CHAR16              *String
+  IN      CONST CHAR16  *String
   );
-
 
 /**
   Convert a Null-terminated Unicode hexadecimal string to a value of type UINTN.
@@ -1493,9 +1258,8 @@ StrDecimalToUint64 (
 UINTN
 EFIAPI
 StrHexToUintn (
-  IN      CONST CHAR16              *String
+  IN      CONST CHAR16  *String
   );
-
 
 /**
   Convert a Null-terminated Unicode hexadecimal string to a value of type UINT64.
@@ -1535,7 +1299,7 @@ StrHexToUintn (
 UINT64
 EFIAPI
 StrHexToUint64 (
-  IN      CONST CHAR16             *String
+  IN      CONST CHAR16  *String
   );
 
 /**
@@ -1562,15 +1326,7 @@ StrHexToUint64 (
   "::" can be used to compress one or more groups of X when X contains only 0.
   The "::" can only appear once in the String.
 
-  If String is NULL, then ASSERT().
-
-  If Address is NULL, then ASSERT().
-
   If String is not aligned in a 16-bit boundary, then ASSERT().
-
-  If PcdMaximumUnicodeStringLength is not zero, and String contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
 
   If EndPointer is not NULL and Address is translated from String, a pointer
   to the character that stopped the scan is stored at the location pointed to
@@ -1599,10 +1355,10 @@ StrHexToUint64 (
 RETURN_STATUS
 EFIAPI
 StrToIpv6Address (
-  IN  CONST CHAR16       *String,
-  OUT CHAR16             **EndPointer, OPTIONAL
-  OUT IPv6_ADDRESS       *Address,
-  OUT UINT8              *PrefixLength OPTIONAL
+  IN  CONST CHAR16  *String,
+  OUT CHAR16        **EndPointer  OPTIONAL,
+  OUT IPv6_ADDRESS  *Address,
+  OUT UINT8         *PrefixLength OPTIONAL
   );
 
 /**
@@ -1623,15 +1379,7 @@ StrToIpv6Address (
   When /P is in the String, the function stops at the first character that is not
   a valid decimal digit character after P is converted.
 
-  If String is NULL, then ASSERT().
-
-  If Address is NULL, then ASSERT().
-
   If String is not aligned in a 16-bit boundary, then ASSERT().
-
-  If PcdMaximumUnicodeStringLength is not zero, and String contains more than
-  PcdMaximumUnicodeStringLength Unicode characters, not including the
-  Null-terminator, then ASSERT().
 
   If EndPointer is not NULL and Address is translated from String, a pointer
   to the character that stopped the scan is stored at the location pointed to
@@ -1657,10 +1405,10 @@ StrToIpv6Address (
 RETURN_STATUS
 EFIAPI
 StrToIpv4Address (
-  IN  CONST CHAR16       *String,
-  OUT CHAR16             **EndPointer, OPTIONAL
-  OUT IPv4_ADDRESS       *Address,
-  OUT UINT8              *PrefixLength OPTIONAL
+  IN  CONST CHAR16  *String,
+  OUT CHAR16        **EndPointer  OPTIONAL,
+  OUT IPv4_ADDRESS  *Address,
+  OUT UINT8         *PrefixLength OPTIONAL
   );
 
 #define GUID_STRING_LENGTH  36
@@ -1696,8 +1444,6 @@ StrToIpv4Address (
                   oo          Data4[48:55]
                   pp          Data4[56:63]
 
-  If String is NULL, then ASSERT().
-  If Guid is NULL, then ASSERT().
   If String is not aligned in a 16-bit boundary, then ASSERT().
 
   @param  String                   Pointer to a Null-terminated Unicode string.
@@ -1712,8 +1458,8 @@ StrToIpv4Address (
 RETURN_STATUS
 EFIAPI
 StrToGuid (
-  IN  CONST CHAR16       *String,
-  OUT GUID               *Guid
+  IN  CONST CHAR16  *String,
+  OUT GUID          *Guid
   );
 
 /**
@@ -1731,17 +1477,6 @@ StrToGuid (
   (Length / 2) bytes.
 
   If String is not aligned in a 16-bit boundary, then ASSERT().
-
-  If String is NULL, then ASSERT().
-
-  If Buffer is NULL, then ASSERT().
-
-  If Length is not multiple of 2, then ASSERT().
-
-  If PcdMaximumUnicodeStringLength is not zero and Length is greater than
-  PcdMaximumUnicodeStringLength, then ASSERT().
-
-  If MaxBufferSize is less than (Length / 2), then ASSERT().
 
   @param  String                   Pointer to a Null-terminated Unicode string.
   @param  Length                   The number of Unicode characters to decode.
@@ -1763,57 +1498,11 @@ StrToGuid (
 RETURN_STATUS
 EFIAPI
 StrHexToBytes (
-  IN  CONST CHAR16       *String,
-  IN  UINTN              Length,
-  OUT UINT8              *Buffer,
-  IN  UINTN              MaxBufferSize
+  IN  CONST CHAR16  *String,
+  IN  UINTN         Length,
+  OUT UINT8         *Buffer,
+  IN  UINTN         MaxBufferSize
   );
-
-#ifndef DISABLE_NEW_DEPRECATED_INTERFACES
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Convert a Null-terminated Unicode string to a Null-terminated
-  ASCII string and returns the ASCII string.
-
-  This function converts the content of the Unicode string Source
-  to the ASCII string Destination by copying the lower 8 bits of
-  each Unicode character. It returns Destination.
-
-  The caller is responsible to make sure Destination points to a buffer with size
-  equal or greater than ((StrLen (Source) + 1) * sizeof (CHAR8)) in bytes.
-
-  If any Unicode characters in Source contain non-zero value in
-  the upper 8 bits, then ASSERT().
-
-  If Destination is NULL, then ASSERT().
-  If Source is NULL, then ASSERT().
-  If Source is not aligned on a 16-bit boundary, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-
-  If PcdMaximumUnicodeStringLength is not zero, and Source contains
-  more than PcdMaximumUnicodeStringLength Unicode characters not including
-  the Null-terminator, then ASSERT().
-
-  If PcdMaximumAsciiStringLength is not zero, and Source contains more
-  than PcdMaximumAsciiStringLength Unicode characters not including the
-  Null-terminator, then ASSERT().
-
-  @param  Source        The pointer to a Null-terminated Unicode string.
-  @param  Destination   The pointer to a Null-terminated ASCII string.
-
-  @return Destination.
-
-**/
-CHAR8 *
-EFIAPI
-UnicodeStrToAsciiStr (
-  IN      CONST CHAR16              *Source,
-  OUT     CHAR8                     *Destination
-  );
-
-#endif
 
 /**
   Convert a Null-terminated Unicode string to a Null-terminated
@@ -1833,7 +1522,6 @@ UnicodeStrToAsciiStr (
   the upper 8 bits, then ASSERT().
 
   If Source is not aligned on a 16-bit boundary, then ASSERT().
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -1859,9 +1547,9 @@ UnicodeStrToAsciiStr (
 RETURN_STATUS
 EFIAPI
 UnicodeStrToAsciiStrS (
-  IN      CONST CHAR16              *Source,
-  OUT     CHAR8                     *Destination,
-  IN      UINTN                     DestMax
+  IN      CONST CHAR16  *Source,
+  OUT     CHAR8         *Destination,
+  IN      UINTN         DestMax
   );
 
 /**
@@ -1880,7 +1568,6 @@ UnicodeStrToAsciiStrS (
   If any Unicode characters in Source contain non-zero value in the upper 8
   bits, then ASSERT().
   If Source is not aligned on a 16-bit boundary, then ASSERT().
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -1911,83 +1598,12 @@ UnicodeStrToAsciiStrS (
 RETURN_STATUS
 EFIAPI
 UnicodeStrnToAsciiStrS (
-  IN      CONST CHAR16              *Source,
-  IN      UINTN                     Length,
-  OUT     CHAR8                     *Destination,
-  IN      UINTN                     DestMax,
-  OUT     UINTN                     *DestinationLength
+  IN      CONST CHAR16  *Source,
+  IN      UINTN         Length,
+  OUT     CHAR8         *Destination,
+  IN      UINTN         DestMax,
+  OUT     UINTN         *DestinationLength
   );
-
-#ifndef DISABLE_NEW_DEPRECATED_INTERFACES
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Copies one Null-terminated ASCII string to another Null-terminated ASCII
-  string and returns the new ASCII string.
-
-  This function copies the contents of the ASCII string Source to the ASCII
-  string Destination, and returns Destination. If Source and Destination
-  overlap, then the results are undefined.
-
-  If Destination is NULL, then ASSERT().
-  If Source is NULL, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero and Source contains more than
-  PcdMaximumAsciiStringLength ASCII characters not including the Null-terminator,
-  then ASSERT().
-
-  @param  Destination The pointer to a Null-terminated ASCII string.
-  @param  Source      The pointer to a Null-terminated ASCII string.
-
-  @return Destination
-
-**/
-CHAR8 *
-EFIAPI
-AsciiStrCpy (
-  OUT     CHAR8                     *Destination,
-  IN      CONST CHAR8               *Source
-  );
-
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Copies up to a specified length one Null-terminated ASCII string to another
-  Null-terminated ASCII string and returns the new ASCII string.
-
-  This function copies the contents of the ASCII string Source to the ASCII
-  string Destination, and returns Destination. At most, Length ASCII characters
-  are copied from Source to Destination. If Length is 0, then Destination is
-  returned unmodified. If Length is greater that the number of ASCII characters
-  in Source, then Destination is padded with Null ASCII characters. If Source
-  and Destination overlap, then the results are undefined.
-
-  If Destination is NULL, then ASSERT().
-  If Source is NULL, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and Length is greater than
-  PcdMaximumAsciiStringLength, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and Source contains more than
-  PcdMaximumAsciiStringLength ASCII characters, not including the Null-terminator,
-  then ASSERT().
-
-  @param  Destination The pointer to a Null-terminated ASCII string.
-  @param  Source      The pointer to a Null-terminated ASCII string.
-  @param  Length      The maximum number of ASCII characters to copy.
-
-  @return Destination
-
-**/
-CHAR8 *
-EFIAPI
-AsciiStrnCpy (
-  OUT     CHAR8                     *Destination,
-  IN      CONST CHAR8               *Source,
-  IN      UINTN                     Length
-  );
-#endif
 
 /**
   Returns the length of a Null-terminated ASCII string.
@@ -2009,9 +1625,8 @@ AsciiStrnCpy (
 UINTN
 EFIAPI
 AsciiStrLen (
-  IN      CONST CHAR8               *String
+  IN      CONST CHAR8  *String
   );
-
 
 /**
   Returns the size of a Null-terminated ASCII string in bytes, including the
@@ -2033,9 +1648,8 @@ AsciiStrLen (
 UINTN
 EFIAPI
 AsciiStrSize (
-  IN      CONST CHAR8               *String
+  IN      CONST CHAR8  *String
   );
-
 
 /**
   Compares two Null-terminated ASCII strings, and returns the difference
@@ -2066,10 +1680,9 @@ AsciiStrSize (
 INTN
 EFIAPI
 AsciiStrCmp (
-  IN      CONST CHAR8               *FirstString,
-  IN      CONST CHAR8               *SecondString
+  IN      CONST CHAR8  *FirstString,
+  IN      CONST CHAR8  *SecondString
   );
-
 
 /**
   Performs a case insensitive comparison of two Null-terminated ASCII strings,
@@ -2103,10 +1716,9 @@ AsciiStrCmp (
 INTN
 EFIAPI
 AsciiStriCmp (
-  IN      CONST CHAR8               *FirstString,
-  IN      CONST CHAR8               *SecondString
+  IN      CONST CHAR8  *FirstString,
+  IN      CONST CHAR8  *SecondString
   );
-
 
 /**
   Compares two Null-terminated ASCII strings with maximum lengths, and returns
@@ -2141,97 +1753,10 @@ AsciiStriCmp (
 INTN
 EFIAPI
 AsciiStrnCmp (
-  IN      CONST CHAR8               *FirstString,
-  IN      CONST CHAR8               *SecondString,
-  IN      UINTN                     Length
+  IN      CONST CHAR8  *FirstString,
+  IN      CONST CHAR8  *SecondString,
+  IN      UINTN        Length
   );
-
-
-#ifndef DISABLE_NEW_DEPRECATED_INTERFACES
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Concatenates one Null-terminated ASCII string to another Null-terminated
-  ASCII string, and returns the concatenated ASCII string.
-
-  This function concatenates two Null-terminated ASCII strings. The contents of
-  Null-terminated ASCII string Source are concatenated to the end of Null-
-  terminated ASCII string Destination. The Null-terminated concatenated ASCII
-  String is returned.
-
-  If Destination is NULL, then ASSERT().
-  If Source is NULL, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero and Destination contains more than
-  PcdMaximumAsciiStringLength ASCII characters not including the Null-terminator,
-  then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero and Source contains more than
-  PcdMaximumAsciiStringLength ASCII characters not including the Null-terminator,
-  then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero and concatenating Destination and
-  Source results in a ASCII string with more than PcdMaximumAsciiStringLength
-  ASCII characters, then ASSERT().
-
-  @param  Destination The pointer to a Null-terminated ASCII string.
-  @param  Source      The pointer to a Null-terminated ASCII string.
-
-  @return Destination
-
-**/
-CHAR8 *
-EFIAPI
-AsciiStrCat (
-  IN OUT CHAR8    *Destination,
-  IN CONST CHAR8  *Source
-  );
-
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Concatenates up to a specified length one Null-terminated ASCII string to
-  the end of another Null-terminated ASCII string, and returns the
-  concatenated ASCII string.
-
-  This function concatenates two Null-terminated ASCII strings. The contents
-  of Null-terminated ASCII string Source are concatenated to the end of Null-
-  terminated ASCII string Destination, and Destination is returned. At most,
-  Length ASCII characters are concatenated from Source to the end of
-  Destination, and Destination is always Null-terminated. If Length is 0, then
-  Destination is returned unmodified. If Source and Destination overlap, then
-  the results are undefined.
-
-  If Length > 0 and Destination is NULL, then ASSERT().
-  If Length > 0 and Source is NULL, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and Length is greater than
-  PcdMaximumAsciiStringLength, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and Destination contains more than
-  PcdMaximumAsciiStringLength ASCII characters, not including the Null-terminator,
-  then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and Source contains more than
-  PcdMaximumAsciiStringLength ASCII characters, not including the Null-terminator,
-  then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and concatenating Destination and
-  Source results in a ASCII string with more than PcdMaximumAsciiStringLength
-  ASCII characters, not including the Null-terminator, then ASSERT().
-
-  @param  Destination The pointer to a Null-terminated ASCII string.
-  @param  Source      The pointer to a Null-terminated ASCII string.
-  @param  Length      The maximum number of ASCII characters to concatenate from
-                      Source.
-
-  @return Destination
-
-**/
-CHAR8 *
-EFIAPI
-AsciiStrnCat (
-  IN OUT  CHAR8                     *Destination,
-  IN      CONST CHAR8               *Source,
-  IN      UINTN                     Length
-  );
-#endif
 
 /**
   Returns the first occurrence of a Null-terminated ASCII sub-string
@@ -2260,10 +1785,9 @@ AsciiStrnCat (
 CHAR8 *
 EFIAPI
 AsciiStrStr (
-  IN      CONST CHAR8               *String,
-  IN      CONST CHAR8               *SearchString
+  IN      CONST CHAR8  *String,
+  IN      CONST CHAR8  *SearchString
   );
-
 
 /**
   Convert a Null-terminated ASCII decimal string to a value of type
@@ -2298,9 +1822,8 @@ AsciiStrStr (
 UINTN
 EFIAPI
 AsciiStrDecimalToUintn (
-  IN      CONST CHAR8               *String
+  IN      CONST CHAR8  *String
   );
-
 
 /**
   Convert a Null-terminated ASCII decimal string to a value of type
@@ -2335,9 +1858,8 @@ AsciiStrDecimalToUintn (
 UINT64
 EFIAPI
 AsciiStrDecimalToUint64 (
-  IN      CONST CHAR8               *String
+  IN      CONST CHAR8  *String
   );
-
 
 /**
   Convert a Null-terminated ASCII hexadecimal string to a value of type UINTN.
@@ -2376,9 +1898,8 @@ AsciiStrDecimalToUint64 (
 UINTN
 EFIAPI
 AsciiStrHexToUintn (
-  IN      CONST CHAR8               *String
+  IN      CONST CHAR8  *String
   );
-
 
 /**
   Convert a Null-terminated ASCII hexadecimal string to a value of type UINT64.
@@ -2417,7 +1938,7 @@ AsciiStrHexToUintn (
 UINT64
 EFIAPI
 AsciiStrHexToUint64 (
-  IN      CONST CHAR8                *String
+  IN      CONST CHAR8  *String
   );
 
 /**
@@ -2443,10 +1964,6 @@ AsciiStrHexToUint64 (
 
   "::" can be used to compress one or more groups of X when X contains only 0.
   The "::" can only appear once in the String.
-
-  If String is NULL, then ASSERT().
-
-  If Address is NULL, then ASSERT().
 
   If EndPointer is not NULL and Address is translated from String, a pointer
   to the character that stopped the scan is stored at the location pointed to
@@ -2475,10 +1992,10 @@ AsciiStrHexToUint64 (
 RETURN_STATUS
 EFIAPI
 AsciiStrToIpv6Address (
-  IN  CONST CHAR8        *String,
-  OUT CHAR8              **EndPointer, OPTIONAL
-  OUT IPv6_ADDRESS       *Address,
-  OUT UINT8              *PrefixLength OPTIONAL
+  IN  CONST CHAR8   *String,
+  OUT CHAR8         **EndPointer  OPTIONAL,
+  OUT IPv6_ADDRESS  *Address,
+  OUT UINT8         *PrefixLength OPTIONAL
   );
 
 /**
@@ -2498,10 +2015,6 @@ AsciiStrToIpv6Address (
 
   When /P is in the String, the function stops at the first character that is not
   a valid decimal digit character after P is converted.
-
-  If String is NULL, then ASSERT().
-
-  If Address is NULL, then ASSERT().
 
   If EndPointer is not NULL and Address is translated from String, a pointer
   to the character that stopped the scan is stored at the location pointed to
@@ -2527,10 +2040,10 @@ AsciiStrToIpv6Address (
 RETURN_STATUS
 EFIAPI
 AsciiStrToIpv4Address (
-  IN  CONST CHAR8        *String,
-  OUT CHAR8              **EndPointer, OPTIONAL
-  OUT IPv4_ADDRESS       *Address,
-  OUT UINT8              *PrefixLength OPTIONAL
+  IN  CONST CHAR8   *String,
+  OUT CHAR8         **EndPointer  OPTIONAL,
+  OUT IPv4_ADDRESS  *Address,
+  OUT UINT8         *PrefixLength OPTIONAL
   );
 
 /**
@@ -2564,9 +2077,6 @@ AsciiStrToIpv4Address (
                   oo          Data4[48:55]
                   pp          Data4[56:63]
 
-  If String is NULL, then ASSERT().
-  If Guid is NULL, then ASSERT().
-
   @param  String                   Pointer to a Null-terminated ASCII string.
   @param  Guid                     Pointer to the converted GUID.
 
@@ -2579,8 +2089,8 @@ AsciiStrToIpv4Address (
 RETURN_STATUS
 EFIAPI
 AsciiStrToGuid (
-  IN  CONST CHAR8        *String,
-  OUT GUID               *Guid
+  IN  CONST CHAR8  *String,
+  OUT GUID         *Guid
   );
 
 /**
@@ -2596,17 +2106,6 @@ AsciiStrToGuid (
   The function decodes every two hexadecimal digit characters as one byte. The
   decoding stops after Length of characters and outputs Buffer containing
   (Length / 2) bytes.
-
-  If String is NULL, then ASSERT().
-
-  If Buffer is NULL, then ASSERT().
-
-  If Length is not multiple of 2, then ASSERT().
-
-  If PcdMaximumAsciiStringLength is not zero and Length is greater than
-  PcdMaximumAsciiStringLength, then ASSERT().
-
-  If MaxBufferSize is less than (Length / 2), then ASSERT().
 
   @param  String                   Pointer to a Null-terminated ASCII string.
   @param  Length                   The number of ASCII characters to decode.
@@ -2628,51 +2127,11 @@ AsciiStrToGuid (
 RETURN_STATUS
 EFIAPI
 AsciiStrHexToBytes (
-  IN  CONST CHAR8        *String,
-  IN  UINTN              Length,
-  OUT UINT8              *Buffer,
-  IN  UINTN              MaxBufferSize
+  IN  CONST CHAR8  *String,
+  IN  UINTN        Length,
+  OUT UINT8        *Buffer,
+  IN  UINTN        MaxBufferSize
   );
-
-#ifndef DISABLE_NEW_DEPRECATED_INTERFACES
-
-/**
-  [ATTENTION] This function is deprecated for security reason.
-
-  Convert one Null-terminated ASCII string to a Null-terminated
-  Unicode string and returns the Unicode string.
-
-  This function converts the contents of the ASCII string Source to the Unicode
-  string Destination, and returns Destination.  The function terminates the
-  Unicode string Destination by appending a Null-terminator character at the end.
-  The caller is responsible to make sure Destination points to a buffer with size
-  equal or greater than ((AsciiStrLen (Source) + 1) * sizeof (CHAR16)) in bytes.
-
-  If Destination is NULL, then ASSERT().
-  If Destination is not aligned on a 16-bit boundary, then ASSERT().
-  If Source is NULL, then ASSERT().
-  If Source and Destination overlap, then ASSERT().
-  If PcdMaximumAsciiStringLength is not zero, and Source contains more than
-  PcdMaximumAsciiStringLength ASCII characters not including the Null-terminator,
-  then ASSERT().
-  If PcdMaximumUnicodeStringLength is not zero, and Source contains more than
-  PcdMaximumUnicodeStringLength ASCII characters not including the
-  Null-terminator, then ASSERT().
-
-  @param  Source        The pointer to a Null-terminated ASCII string.
-  @param  Destination   The pointer to a Null-terminated Unicode string.
-
-  @return Destination.
-
-**/
-CHAR16 *
-EFIAPI
-AsciiStrToUnicodeStr (
-  IN      CONST CHAR8               *Source,
-  OUT     CHAR16                    *Destination
-  );
-
-#endif
 
 /**
   Convert one Null-terminated ASCII string to a Null-terminated
@@ -2688,7 +2147,6 @@ AsciiStrToUnicodeStr (
   equal or greater than ((AsciiStrLen (Source) + 1) * sizeof (CHAR16)) in bytes.
 
   If Destination is not aligned on a 16-bit boundary, then ASSERT().
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then the Destination is unmodified.
 
@@ -2714,9 +2172,9 @@ AsciiStrToUnicodeStr (
 RETURN_STATUS
 EFIAPI
 AsciiStrToUnicodeStrS (
-  IN      CONST CHAR8               *Source,
-  OUT     CHAR16                    *Destination,
-  IN      UINTN                     DestMax
+  IN      CONST CHAR8  *Source,
+  OUT     CHAR16       *Destination,
+  IN      UINTN        DestMax
   );
 
 /**
@@ -2734,7 +2192,6 @@ AsciiStrToUnicodeStrS (
   ((MIN(AsciiStrLen(Source), Length) + 1) * sizeof (CHAR8)) in bytes.
 
   If Destination is not aligned on a 16-bit boundary, then ASSERT().
-  If an error would be returned, then the function will also ASSERT().
 
   If an error is returned, then Destination and DestinationLength are
   unmodified.
@@ -2765,11 +2222,170 @@ AsciiStrToUnicodeStrS (
 RETURN_STATUS
 EFIAPI
 AsciiStrnToUnicodeStrS (
-  IN      CONST CHAR8               *Source,
-  IN      UINTN                     Length,
-  OUT     CHAR16                    *Destination,
-  IN      UINTN                     DestMax,
-  OUT     UINTN                     *DestinationLength
+  IN      CONST CHAR8  *Source,
+  IN      UINTN        Length,
+  OUT     CHAR16       *Destination,
+  IN      UINTN        DestMax,
+  OUT     UINTN        *DestinationLength
+  );
+
+/**
+  Convert a Unicode character to upper case only if
+  it maps to a valid small-case ASCII character.
+
+  This internal function only deal with Unicode character
+  which maps to a valid small-case ASCII character, i.e.
+  L'a' to L'z'. For other Unicode character, the input character
+  is returned directly.
+
+  @param  Char  The character to convert.
+
+  @retval LowerCharacter   If the Char is with range L'a' to L'z'.
+  @retval Unchanged        Otherwise.
+
+**/
+CHAR16
+EFIAPI
+CharToUpper (
+  IN      CHAR16  Char
+  );
+
+/**
+  Converts a lowercase Ascii character to upper one.
+
+  If Chr is lowercase Ascii character, then converts it to upper one.
+
+  If Value >= 0xA0, then ASSERT().
+  If (Value & 0x0F) >= 0x0A, then ASSERT().
+
+  @param  Chr   one Ascii character
+
+  @return The uppercase value of Ascii character
+
+**/
+CHAR8
+EFIAPI
+AsciiCharToUpper (
+  IN      CHAR8  Chr
+  );
+
+/**
+  Convert binary data to a Base64 encoded ascii string based on RFC4648.
+
+  Produce a Null-terminated Ascii string in the output buffer specified by Destination and DestinationSize.
+  The Ascii string is produced by converting the data string specified by Source and SourceLength.
+
+  @param Source           Input UINT8 data
+  @param SourceLength     Number of UINT8 bytes of data
+  @param Destination      Pointer to output string buffer
+  @param DestinationSize  Size of ascii buffer. Set to 0 to get the size needed.
+                          Caller is responsible for passing in buffer of DestinationSize
+
+  @retval RETURN_SUCCESS             When ascii buffer is filled in.
+  @retval RETURN_INVALID_PARAMETER   If Source is NULL or DestinationSize is NULL.
+  @retval RETURN_INVALID_PARAMETER   If SourceLength or DestinationSize is bigger than (MAX_ADDRESS - (UINTN)Destination).
+  @retval RETURN_BUFFER_TOO_SMALL    If SourceLength is 0 and DestinationSize is <1.
+  @retval RETURN_BUFFER_TOO_SMALL    If Destination is NULL or DestinationSize is smaller than required buffersize.
+
+**/
+RETURN_STATUS
+EFIAPI
+Base64Encode (
+  IN  CONST UINT8  *Source,
+  IN        UINTN  SourceLength,
+  OUT       CHAR8  *Destination  OPTIONAL,
+  IN OUT    UINTN  *DestinationSize
+  );
+
+/**
+  Decode Base64 ASCII encoded data to 8-bit binary representation, based on
+  RFC4648.
+
+  Decoding occurs according to "Table 1: The Base 64 Alphabet" in RFC4648.
+
+  Whitespace is ignored at all positions:
+  - 0x09 ('\t') horizontal tab
+  - 0x0A ('\n') new line
+  - 0x0B ('\v') vertical tab
+  - 0x0C ('\f') form feed
+  - 0x0D ('\r') carriage return
+  - 0x20 (' ')  space
+
+  The minimum amount of required padding (with ASCII 0x3D, '=') is tolerated
+  and enforced at the end of the Base64 ASCII encoded data, and only there.
+
+  Other characters outside of the encoding alphabet cause the function to
+  reject the Base64 ASCII encoded data.
+
+  @param[in] Source               Array of CHAR8 elements containing the Base64
+                                  ASCII encoding. May be NULL if SourceSize is
+                                  zero.
+
+  @param[in] SourceSize           Number of CHAR8 elements in Source.
+
+  @param[out] Destination         Array of UINT8 elements receiving the decoded
+                                  8-bit binary representation. Allocated by the
+                                  caller. May be NULL if DestinationSize is
+                                  zero on input. If NULL, decoding is
+                                  performed, but the 8-bit binary
+                                  representation is not stored. If non-NULL and
+                                  the function returns an error, the contents
+                                  of Destination are indeterminate.
+
+  @param[in,out] DestinationSize  On input, the number of UINT8 elements that
+                                  the caller allocated for Destination. On
+                                  output, if the function returns
+                                  RETURN_SUCCESS or RETURN_BUFFER_TOO_SMALL,
+                                  the number of UINT8 elements that are
+                                  required for decoding the Base64 ASCII
+                                  representation. If the function returns a
+                                  value different from both RETURN_SUCCESS and
+                                  RETURN_BUFFER_TOO_SMALL, then DestinationSize
+                                  is indeterminate on output.
+
+  @retval RETURN_SUCCESS            SourceSize CHAR8 elements at Source have
+                                    been decoded to on-output DestinationSize
+                                    UINT8 elements at Destination. Note that
+                                    RETURN_SUCCESS covers the case when
+                                    DestinationSize is zero on input, and
+                                    Source decodes to zero bytes (due to
+                                    containing at most ignored whitespace).
+
+  @retval RETURN_BUFFER_TOO_SMALL   The input value of DestinationSize is not
+                                    large enough for decoding SourceSize CHAR8
+                                    elements at Source. The required number of
+                                    UINT8 elements has been stored to
+                                    DestinationSize.
+
+  @retval RETURN_INVALID_PARAMETER  DestinationSize is NULL.
+
+  @retval RETURN_INVALID_PARAMETER  Source is NULL, but SourceSize is not zero.
+
+  @retval RETURN_INVALID_PARAMETER  Destination is NULL, but DestinationSize is
+                                    not zero on input.
+
+  @retval RETURN_INVALID_PARAMETER  Source is non-NULL, and (Source +
+                                    SourceSize) would wrap around MAX_ADDRESS.
+
+  @retval RETURN_INVALID_PARAMETER  Destination is non-NULL, and (Destination +
+                                    DestinationSize) would wrap around
+                                    MAX_ADDRESS, as specified on input.
+
+  @retval RETURN_INVALID_PARAMETER  None of Source and Destination are NULL,
+                                    and CHAR8[SourceSize] at Source overlaps
+                                    UINT8[DestinationSize] at Destination, as
+                                    specified on input.
+
+  @retval RETURN_INVALID_PARAMETER  Invalid CHAR8 element encountered in
+                                    Source.
+**/
+RETURN_STATUS
+EFIAPI
+Base64Decode (
+  IN     CONST CHAR8  *Source          OPTIONAL,
+  IN     UINTN        SourceSize,
+  OUT    UINT8        *Destination     OPTIONAL,
+  IN OUT UINTN        *DestinationSize
   );
 
 /**
@@ -2788,9 +2404,8 @@ AsciiStrnToUnicodeStrS (
 UINT8
 EFIAPI
 DecimalToBcd8 (
-  IN      UINT8                     Value
+  IN      UINT8  Value
   );
-
 
 /**
   Converts an 8-bit BCD value to an 8-bit value.
@@ -2809,7 +2424,7 @@ DecimalToBcd8 (
 UINT8
 EFIAPI
 BcdToDecimal8 (
-  IN      UINT8                     Value
+  IN      UINT8  Value
   );
 
 //
@@ -2826,8 +2441,8 @@ BcdToDecimal8 (
 **/
 BOOLEAN
 EFIAPI
-PathRemoveLastItem(
-  IN OUT CHAR16 *Path
+PathRemoveLastItem (
+  IN OUT CHAR16  *Path
   );
 
 /**
@@ -2843,10 +2458,10 @@ PathRemoveLastItem(
 
   @return       Returns Path, otherwise returns NULL to indicate that an error has occurred.
 **/
-CHAR16*
+CHAR16 *
 EFIAPI
-PathCleanUpDirectories(
-  IN CHAR16 *Path
+PathCleanUpDirectories (
+  IN CHAR16  *Path
   );
 
 //
@@ -2869,6 +2484,58 @@ PathCleanUpDirectories(
 **/
 #define INITIALIZE_LIST_HEAD_VARIABLE(ListHead)  {&(ListHead), &(ListHead)}
 
+/**
+  Iterates over each node in a doubly linked list using each node's forward link.
+
+  @param  Entry     A pointer to a list node used as a loop cursor during iteration
+  @param  ListHead  The head node of the doubly linked list
+
+**/
+#define BASE_LIST_FOR_EACH(Entry, ListHead)    \
+  for(Entry = (ListHead)->ForwardLink; Entry != (ListHead); Entry = Entry->ForwardLink)
+
+/**
+  Iterates over each node in a doubly linked list using each node's forward link
+  with safety against node removal.
+
+  This macro uses NextEntry to temporarily store the next list node so the node
+  pointed to by Entry may be deleted in the current loop iteration step and
+  iteration can continue from the node pointed to by NextEntry.
+
+  @param  Entry     A pointer to a list node used as a loop cursor during iteration
+  @param  NextEntry A pointer to a list node used to temporarily store the next node
+  @param  ListHead  The head node of the doubly linked list
+
+**/
+#define BASE_LIST_FOR_EACH_SAFE(Entry, NextEntry, ListHead)            \
+  for(Entry = (ListHead)->ForwardLink, NextEntry = Entry->ForwardLink;\
+      Entry != (ListHead); Entry = NextEntry, NextEntry = Entry->ForwardLink)
+
+/**
+  Checks whether FirstEntry and SecondEntry are part of the same doubly-linked
+  list.
+
+  If FirstEntry is NULL, then ASSERT().
+  If FirstEntry->ForwardLink is NULL, then ASSERT().
+  If FirstEntry->BackLink is NULL, then ASSERT().
+  If SecondEntry is NULL, then ASSERT();
+  If PcdMaximumLinkedListLength is not zero, and List contains more than
+  PcdMaximumLinkedListLength nodes, then ASSERT().
+
+  @param  FirstEntry   A pointer to a node in a linked list.
+  @param  SecondEntry  A pointer to the node to locate.
+
+  @retval TRUE   SecondEntry is in the same doubly-linked list as FirstEntry.
+  @retval FALSE  SecondEntry isn't in the same doubly-linked list as FirstEntry,
+                 or FirstEntry is invalid.
+
+**/
+BOOLEAN
+EFIAPI
+IsNodeInList (
+  IN      CONST LIST_ENTRY  *FirstEntry,
+  IN      CONST LIST_ENTRY  *SecondEntry
+  );
 
 /**
   Initializes the head node of a doubly linked list, and returns the pointer to
@@ -2889,9 +2556,8 @@ PathCleanUpDirectories(
 LIST_ENTRY *
 EFIAPI
 InitializeListHead (
-  IN OUT  LIST_ENTRY                *ListHead
+  IN OUT  LIST_ENTRY  *ListHead
   );
-
 
 /**
   Adds a node to the beginning of a doubly linked list, and returns the pointer
@@ -2918,10 +2584,9 @@ InitializeListHead (
 LIST_ENTRY *
 EFIAPI
 InsertHeadList (
-  IN OUT  LIST_ENTRY                *ListHead,
-  IN OUT  LIST_ENTRY                *Entry
+  IN OUT  LIST_ENTRY  *ListHead,
+  IN OUT  LIST_ENTRY  *Entry
   );
-
 
 /**
   Adds a node to the end of a doubly linked list, and returns the pointer to
@@ -2948,10 +2613,9 @@ InsertHeadList (
 LIST_ENTRY *
 EFIAPI
 InsertTailList (
-  IN OUT  LIST_ENTRY                *ListHead,
-  IN OUT  LIST_ENTRY                *Entry
+  IN OUT  LIST_ENTRY  *ListHead,
+  IN OUT  LIST_ENTRY  *Entry
   );
-
 
 /**
   Retrieves the first node of a doubly linked list.
@@ -2976,9 +2640,8 @@ InsertTailList (
 LIST_ENTRY *
 EFIAPI
 GetFirstNode (
-  IN      CONST LIST_ENTRY          *List
+  IN      CONST LIST_ENTRY  *List
   );
-
 
 /**
   Retrieves the next node of a doubly linked list.
@@ -3004,10 +2667,9 @@ GetFirstNode (
 LIST_ENTRY *
 EFIAPI
 GetNextNode (
-  IN      CONST LIST_ENTRY          *List,
-  IN      CONST LIST_ENTRY          *Node
+  IN      CONST LIST_ENTRY  *List,
+  IN      CONST LIST_ENTRY  *Node
   );
-
 
 /**
   Retrieves the previous node of a doubly linked list.
@@ -3033,10 +2695,9 @@ GetNextNode (
 LIST_ENTRY *
 EFIAPI
 GetPreviousNode (
-  IN      CONST LIST_ENTRY          *List,
-  IN      CONST LIST_ENTRY          *Node
+  IN      CONST LIST_ENTRY  *List,
+  IN      CONST LIST_ENTRY  *Node
   );
-
 
 /**
   Checks to see if a doubly linked list is empty or not.
@@ -3060,9 +2721,8 @@ GetPreviousNode (
 BOOLEAN
 EFIAPI
 IsListEmpty (
-  IN      CONST LIST_ENTRY          *ListHead
+  IN      CONST LIST_ENTRY  *ListHead
   );
-
 
 /**
   Determines if a node in a doubly linked list is the head node of a the same
@@ -3093,10 +2753,9 @@ IsListEmpty (
 BOOLEAN
 EFIAPI
 IsNull (
-  IN      CONST LIST_ENTRY          *List,
-  IN      CONST LIST_ENTRY          *Node
+  IN      CONST LIST_ENTRY  *List,
+  IN      CONST LIST_ENTRY  *Node
   );
-
 
 /**
   Determines if a node the last node in a doubly linked list.
@@ -3124,10 +2783,9 @@ IsNull (
 BOOLEAN
 EFIAPI
 IsNodeAtEnd (
-  IN      CONST LIST_ENTRY          *List,
-  IN      CONST LIST_ENTRY          *Node
+  IN      CONST LIST_ENTRY  *List,
+  IN      CONST LIST_ENTRY  *Node
   );
-
 
 /**
   Swaps the location of two nodes in a doubly linked list, and returns the
@@ -3158,10 +2816,9 @@ IsNodeAtEnd (
 LIST_ENTRY *
 EFIAPI
 SwapListEntries (
-  IN OUT  LIST_ENTRY                *FirstEntry,
-  IN OUT  LIST_ENTRY                *SecondEntry
+  IN OUT  LIST_ENTRY  *FirstEntry,
+  IN OUT  LIST_ENTRY  *SecondEntry
   );
-
 
 /**
   Removes a node from a doubly linked list, and returns the node that follows
@@ -3187,12 +2844,62 @@ SwapListEntries (
 LIST_ENTRY *
 EFIAPI
 RemoveEntryList (
-  IN      CONST LIST_ENTRY          *Entry
+  IN      CONST LIST_ENTRY  *Entry
   );
 
 //
 // Math Services
 //
+
+/**
+  Prototype for comparison function for any two element types.
+
+  @param[in] Buffer1                  The pointer to first buffer.
+  @param[in] Buffer2                  The pointer to second buffer.
+
+  @retval 0                           Buffer1 equal to Buffer2.
+  @return <0                          Buffer1 is less than Buffer2.
+  @return >0                          Buffer1 is greater than Buffer2.
+**/
+typedef
+INTN
+(EFIAPI *BASE_SORT_COMPARE)(
+  IN CONST VOID                 *Buffer1,
+  IN CONST VOID                 *Buffer2
+  );
+
+/**
+  This function is identical to perform QuickSort,
+  except that is uses the pre-allocated buffer so the in place sorting does not need to
+  allocate and free buffers constantly.
+
+  Each element must be equal sized.
+
+  if BufferToSort is NULL, then ASSERT.
+  if CompareFunction is NULL, then ASSERT.
+  if BufferOneElement is NULL, then ASSERT.
+  if ElementSize is < 1, then ASSERT.
+
+  if Count is < 2 then perform no action.
+
+  @param[in, out] BufferToSort   on call a Buffer of (possibly sorted) elements
+                                 on return a buffer of sorted elements
+  @param[in] Count               the number of elements in the buffer to sort
+  @param[in] ElementSize         Size of an element in bytes
+  @param[in] CompareFunction     The function to call to perform the comparison
+                                 of any 2 elements
+  @param[out] BufferOneElement   Caller provided buffer whose size equals to ElementSize.
+                                 It's used by QuickSort() for swapping in sorting.
+**/
+VOID
+EFIAPI
+QuickSort (
+  IN OUT VOID                 *BufferToSort,
+  IN CONST UINTN              Count,
+  IN CONST UINTN              ElementSize,
+  IN       BASE_SORT_COMPARE  CompareFunction,
+  OUT VOID                    *BufferOneElement
+  );
 
 /**
   Shifts a 64-bit integer left between 0 and 63 bits. The low bits are filled
@@ -3212,10 +2919,9 @@ RemoveEntryList (
 UINT64
 EFIAPI
 LShiftU64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     Count
+  IN      UINT64  Operand,
+  IN      UINTN   Count
   );
-
 
 /**
   Shifts a 64-bit integer right between 0 and 63 bits. This high bits are
@@ -3235,10 +2941,9 @@ LShiftU64 (
 UINT64
 EFIAPI
 RShiftU64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     Count
+  IN      UINT64  Operand,
+  IN      UINTN   Count
   );
-
 
 /**
   Shifts a 64-bit integer right between 0 and 63 bits. The high bits are filled
@@ -3258,10 +2963,9 @@ RShiftU64 (
 UINT64
 EFIAPI
 ARShiftU64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     Count
+  IN      UINT64  Operand,
+  IN      UINTN   Count
   );
-
 
 /**
   Rotates a 32-bit integer left between 0 and 31 bits, filling the low bits
@@ -3282,10 +2986,9 @@ ARShiftU64 (
 UINT32
 EFIAPI
 LRotU32 (
-  IN      UINT32                    Operand,
-  IN      UINTN                     Count
+  IN      UINT32  Operand,
+  IN      UINTN   Count
   );
-
 
 /**
   Rotates a 32-bit integer right between 0 and 31 bits, filling the high bits
@@ -3306,10 +3009,9 @@ LRotU32 (
 UINT32
 EFIAPI
 RRotU32 (
-  IN      UINT32                    Operand,
-  IN      UINTN                     Count
+  IN      UINT32  Operand,
+  IN      UINTN   Count
   );
-
 
 /**
   Rotates a 64-bit integer left between 0 and 63 bits, filling the low bits
@@ -3330,10 +3032,9 @@ RRotU32 (
 UINT64
 EFIAPI
 LRotU64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     Count
+  IN      UINT64  Operand,
+  IN      UINTN   Count
   );
-
 
 /**
   Rotates a 64-bit integer right between 0 and 63 bits, filling the high bits
@@ -3354,10 +3055,9 @@ LRotU64 (
 UINT64
 EFIAPI
 RRotU64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     Count
+  IN      UINT64  Operand,
+  IN      UINTN   Count
   );
-
 
 /**
   Returns the bit position of the lowest bit set in a 32-bit value.
@@ -3375,9 +3075,8 @@ RRotU64 (
 INTN
 EFIAPI
 LowBitSet32 (
-  IN      UINT32                    Operand
+  IN      UINT32  Operand
   );
-
 
 /**
   Returns the bit position of the lowest bit set in a 64-bit value.
@@ -3396,9 +3095,8 @@ LowBitSet32 (
 INTN
 EFIAPI
 LowBitSet64 (
-  IN      UINT64                    Operand
+  IN      UINT64  Operand
   );
-
 
 /**
   Returns the bit position of the highest bit set in a 32-bit value. Equivalent
@@ -3417,9 +3115,8 @@ LowBitSet64 (
 INTN
 EFIAPI
 HighBitSet32 (
-  IN      UINT32                    Operand
+  IN      UINT32  Operand
   );
-
 
 /**
   Returns the bit position of the highest bit set in a 64-bit value. Equivalent
@@ -3438,9 +3135,8 @@ HighBitSet32 (
 INTN
 EFIAPI
 HighBitSet64 (
-  IN      UINT64                    Operand
+  IN      UINT64  Operand
   );
-
 
 /**
   Returns the value of the highest bit set in a 32-bit value. Equivalent to
@@ -3458,9 +3154,8 @@ HighBitSet64 (
 UINT32
 EFIAPI
 GetPowerOfTwo32 (
-  IN      UINT32                    Operand
+  IN      UINT32  Operand
   );
-
 
 /**
   Returns the value of the highest bit set in a 64-bit value. Equivalent to
@@ -3478,9 +3173,8 @@ GetPowerOfTwo32 (
 UINT64
 EFIAPI
 GetPowerOfTwo64 (
-  IN      UINT64                    Operand
+  IN      UINT64  Operand
   );
-
 
 /**
   Switches the endianness of a 16-bit integer.
@@ -3497,9 +3191,8 @@ GetPowerOfTwo64 (
 UINT16
 EFIAPI
 SwapBytes16 (
-  IN      UINT16                    Value
+  IN      UINT16  Value
   );
-
 
 /**
   Switches the endianness of a 32-bit integer.
@@ -3516,9 +3209,8 @@ SwapBytes16 (
 UINT32
 EFIAPI
 SwapBytes32 (
-  IN      UINT32                    Value
+  IN      UINT32  Value
   );
-
 
 /**
   Switches the endianness of a 64-bit integer.
@@ -3535,9 +3227,8 @@ SwapBytes32 (
 UINT64
 EFIAPI
 SwapBytes64 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Multiples a 64-bit unsigned integer by a 32-bit unsigned integer and
@@ -3556,10 +3247,9 @@ SwapBytes64 (
 UINT64
 EFIAPI
 MultU64x32 (
-  IN      UINT64                    Multiplicand,
-  IN      UINT32                    Multiplier
+  IN      UINT64  Multiplicand,
+  IN      UINT32  Multiplier
   );
-
 
 /**
   Multiples a 64-bit unsigned integer by a 64-bit unsigned integer and
@@ -3578,10 +3268,9 @@ MultU64x32 (
 UINT64
 EFIAPI
 MultU64x64 (
-  IN      UINT64                    Multiplicand,
-  IN      UINT64                    Multiplier
+  IN      UINT64  Multiplicand,
+  IN      UINT64  Multiplier
   );
-
 
 /**
   Multiples a 64-bit signed integer by a 64-bit signed integer and generates a
@@ -3600,10 +3289,9 @@ MultU64x64 (
 INT64
 EFIAPI
 MultS64x64 (
-  IN      INT64                     Multiplicand,
-  IN      INT64                     Multiplier
+  IN      INT64  Multiplicand,
+  IN      INT64  Multiplier
   );
-
 
 /**
   Divides a 64-bit unsigned integer by a 32-bit unsigned integer and generates
@@ -3624,10 +3312,9 @@ MultS64x64 (
 UINT64
 EFIAPI
 DivU64x32 (
-  IN      UINT64                    Dividend,
-  IN      UINT32                    Divisor
+  IN      UINT64  Dividend,
+  IN      UINT32  Divisor
   );
-
 
 /**
   Divides a 64-bit unsigned integer by a 32-bit unsigned integer and generates
@@ -3648,10 +3335,9 @@ DivU64x32 (
 UINT32
 EFIAPI
 ModU64x32 (
-  IN      UINT64                    Dividend,
-  IN      UINT32                    Divisor
+  IN      UINT64  Dividend,
+  IN      UINT32  Divisor
   );
-
 
 /**
   Divides a 64-bit unsigned integer by a 32-bit unsigned integer and generates
@@ -3675,11 +3361,10 @@ ModU64x32 (
 UINT64
 EFIAPI
 DivU64x32Remainder (
-  IN      UINT64                    Dividend,
-  IN      UINT32                    Divisor,
-  OUT     UINT32                    *Remainder  OPTIONAL
+  IN      UINT64  Dividend,
+  IN      UINT32  Divisor,
+  OUT     UINT32  *Remainder  OPTIONAL
   );
-
 
 /**
   Divides a 64-bit unsigned integer by a 64-bit unsigned integer and generates
@@ -3703,11 +3388,10 @@ DivU64x32Remainder (
 UINT64
 EFIAPI
 DivU64x64Remainder (
-  IN      UINT64                    Dividend,
-  IN      UINT64                    Divisor,
-  OUT     UINT64                    *Remainder  OPTIONAL
+  IN      UINT64  Dividend,
+  IN      UINT64  Divisor,
+  OUT     UINT64  *Remainder  OPTIONAL
   );
-
 
 /**
   Divides a 64-bit signed integer by a 64-bit signed integer and generates a
@@ -3735,11 +3419,10 @@ DivU64x64Remainder (
 INT64
 EFIAPI
 DivS64x64Remainder (
-  IN      INT64                     Dividend,
-  IN      INT64                     Divisor,
-  OUT     INT64                     *Remainder  OPTIONAL
+  IN      INT64  Dividend,
+  IN      INT64  Divisor,
+  OUT     INT64  *Remainder  OPTIONAL
   );
-
 
 /**
   Reads a 16-bit value from memory that may be unaligned.
@@ -3757,9 +3440,8 @@ DivS64x64Remainder (
 UINT16
 EFIAPI
 ReadUnaligned16 (
-  IN CONST UINT16              *Buffer
+  IN CONST UINT16  *Buffer
   );
-
 
 /**
   Writes a 16-bit value to memory that may be unaligned.
@@ -3779,10 +3461,9 @@ ReadUnaligned16 (
 UINT16
 EFIAPI
 WriteUnaligned16 (
-  OUT UINT16                    *Buffer,
-  IN  UINT16                    Value
+  OUT UINT16  *Buffer,
+  IN  UINT16  Value
   );
-
 
 /**
   Reads a 24-bit value from memory that may be unaligned.
@@ -3800,9 +3481,8 @@ WriteUnaligned16 (
 UINT32
 EFIAPI
 ReadUnaligned24 (
-  IN CONST UINT32              *Buffer
+  IN CONST UINT32  *Buffer
   );
-
 
 /**
   Writes a 24-bit value to memory that may be unaligned.
@@ -3822,10 +3502,9 @@ ReadUnaligned24 (
 UINT32
 EFIAPI
 WriteUnaligned24 (
-  OUT UINT32                    *Buffer,
-  IN  UINT32                    Value
+  OUT UINT32  *Buffer,
+  IN  UINT32  Value
   );
-
 
 /**
   Reads a 32-bit value from memory that may be unaligned.
@@ -3843,9 +3522,8 @@ WriteUnaligned24 (
 UINT32
 EFIAPI
 ReadUnaligned32 (
-  IN CONST UINT32              *Buffer
+  IN CONST UINT32  *Buffer
   );
-
 
 /**
   Writes a 32-bit value to memory that may be unaligned.
@@ -3865,10 +3543,9 @@ ReadUnaligned32 (
 UINT32
 EFIAPI
 WriteUnaligned32 (
-  OUT UINT32                    *Buffer,
-  IN  UINT32                    Value
+  OUT UINT32  *Buffer,
+  IN  UINT32  Value
   );
-
 
 /**
   Reads a 64-bit value from memory that may be unaligned.
@@ -3886,9 +3563,8 @@ WriteUnaligned32 (
 UINT64
 EFIAPI
 ReadUnaligned64 (
-  IN CONST UINT64              *Buffer
+  IN CONST UINT64  *Buffer
   );
-
 
 /**
   Writes a 64-bit value to memory that may be unaligned.
@@ -3908,10 +3584,9 @@ ReadUnaligned64 (
 UINT64
 EFIAPI
 WriteUnaligned64 (
-  OUT UINT64                    *Buffer,
-  IN  UINT64                    Value
+  OUT UINT64  *Buffer,
+  IN  UINT64  Value
   );
-
 
 //
 // Bit Field Functions
@@ -3939,11 +3614,10 @@ WriteUnaligned64 (
 UINT8
 EFIAPI
 BitFieldRead8 (
-  IN      UINT8                     Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit
+  IN      UINT8  Operand,
+  IN      UINTN  StartBit,
+  IN      UINTN  EndBit
   );
-
 
 /**
   Writes a bit field to an 8-bit value, and returns the result.
@@ -3971,12 +3645,11 @@ BitFieldRead8 (
 UINT8
 EFIAPI
 BitFieldWrite8 (
-  IN      UINT8                     Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT8                     Value
+  IN      UINT8  Operand,
+  IN      UINTN  StartBit,
+  IN      UINTN  EndBit,
+  IN      UINT8  Value
   );
-
 
 /**
   Reads a bit field from an 8-bit value, performs a bitwise OR, and returns the
@@ -4005,12 +3678,11 @@ BitFieldWrite8 (
 UINT8
 EFIAPI
 BitFieldOr8 (
-  IN      UINT8                     Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT8                     OrData
+  IN      UINT8  Operand,
+  IN      UINTN  StartBit,
+  IN      UINTN  EndBit,
+  IN      UINT8  OrData
   );
-
 
 /**
   Reads a bit field from an 8-bit value, performs a bitwise AND, and returns
@@ -4039,12 +3711,11 @@ BitFieldOr8 (
 UINT8
 EFIAPI
 BitFieldAnd8 (
-  IN      UINT8                     Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT8                     AndData
+  IN      UINT8  Operand,
+  IN      UINTN  StartBit,
+  IN      UINTN  EndBit,
+  IN      UINT8  AndData
   );
-
 
 /**
   Reads a bit field from an 8-bit value, performs a bitwise AND followed by a
@@ -4076,13 +3747,12 @@ BitFieldAnd8 (
 UINT8
 EFIAPI
 BitFieldAndThenOr8 (
-  IN      UINT8                     Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT8                     AndData,
-  IN      UINT8                     OrData
+  IN      UINT8  Operand,
+  IN      UINTN  StartBit,
+  IN      UINTN  EndBit,
+  IN      UINT8  AndData,
+  IN      UINT8  OrData
   );
-
 
 /**
   Returns a bit field from a 16-bit value.
@@ -4106,11 +3776,10 @@ BitFieldAndThenOr8 (
 UINT16
 EFIAPI
 BitFieldRead16 (
-  IN      UINT16                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit
+  IN      UINT16  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit
   );
-
 
 /**
   Writes a bit field to a 16-bit value, and returns the result.
@@ -4138,12 +3807,11 @@ BitFieldRead16 (
 UINT16
 EFIAPI
 BitFieldWrite16 (
-  IN      UINT16                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT16                    Value
+  IN      UINT16  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT16  Value
   );
-
 
 /**
   Reads a bit field from a 16-bit value, performs a bitwise OR, and returns the
@@ -4172,12 +3840,11 @@ BitFieldWrite16 (
 UINT16
 EFIAPI
 BitFieldOr16 (
-  IN      UINT16                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT16                    OrData
+  IN      UINT16  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT16  OrData
   );
-
 
 /**
   Reads a bit field from a 16-bit value, performs a bitwise AND, and returns
@@ -4206,12 +3873,11 @@ BitFieldOr16 (
 UINT16
 EFIAPI
 BitFieldAnd16 (
-  IN      UINT16                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT16                    AndData
+  IN      UINT16  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT16  AndData
   );
-
 
 /**
   Reads a bit field from a 16-bit value, performs a bitwise AND followed by a
@@ -4243,13 +3909,12 @@ BitFieldAnd16 (
 UINT16
 EFIAPI
 BitFieldAndThenOr16 (
-  IN      UINT16                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT16                    AndData,
-  IN      UINT16                    OrData
+  IN      UINT16  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT16  AndData,
+  IN      UINT16  OrData
   );
-
 
 /**
   Returns a bit field from a 32-bit value.
@@ -4273,11 +3938,10 @@ BitFieldAndThenOr16 (
 UINT32
 EFIAPI
 BitFieldRead32 (
-  IN      UINT32                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit
+  IN      UINT32  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit
   );
-
 
 /**
   Writes a bit field to a 32-bit value, and returns the result.
@@ -4305,12 +3969,11 @@ BitFieldRead32 (
 UINT32
 EFIAPI
 BitFieldWrite32 (
-  IN      UINT32                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT32                    Value
+  IN      UINT32  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT32  Value
   );
-
 
 /**
   Reads a bit field from a 32-bit value, performs a bitwise OR, and returns the
@@ -4339,12 +4002,11 @@ BitFieldWrite32 (
 UINT32
 EFIAPI
 BitFieldOr32 (
-  IN      UINT32                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT32                    OrData
+  IN      UINT32  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT32  OrData
   );
-
 
 /**
   Reads a bit field from a 32-bit value, performs a bitwise AND, and returns
@@ -4373,12 +4035,11 @@ BitFieldOr32 (
 UINT32
 EFIAPI
 BitFieldAnd32 (
-  IN      UINT32                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT32                    AndData
+  IN      UINT32  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT32  AndData
   );
-
 
 /**
   Reads a bit field from a 32-bit value, performs a bitwise AND followed by a
@@ -4410,13 +4071,12 @@ BitFieldAnd32 (
 UINT32
 EFIAPI
 BitFieldAndThenOr32 (
-  IN      UINT32                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT32                    AndData,
-  IN      UINT32                    OrData
+  IN      UINT32  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT32  AndData,
+  IN      UINT32  OrData
   );
-
 
 /**
   Returns a bit field from a 64-bit value.
@@ -4440,11 +4100,10 @@ BitFieldAndThenOr32 (
 UINT64
 EFIAPI
 BitFieldRead64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit
+  IN      UINT64  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit
   );
-
 
 /**
   Writes a bit field to a 64-bit value, and returns the result.
@@ -4472,12 +4131,11 @@ BitFieldRead64 (
 UINT64
 EFIAPI
 BitFieldWrite64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT64                    Value
+  IN      UINT64  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT64  Value
   );
-
 
 /**
   Reads a bit field from a 64-bit value, performs a bitwise OR, and returns the
@@ -4506,12 +4164,11 @@ BitFieldWrite64 (
 UINT64
 EFIAPI
 BitFieldOr64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT64                    OrData
+  IN      UINT64  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT64  OrData
   );
-
 
 /**
   Reads a bit field from a 64-bit value, performs a bitwise AND, and returns
@@ -4540,12 +4197,11 @@ BitFieldOr64 (
 UINT64
 EFIAPI
 BitFieldAnd64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT64                    AndData
+  IN      UINT64  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT64  AndData
   );
-
 
 /**
   Reads a bit field from a 64-bit value, performs a bitwise AND followed by a
@@ -4577,11 +4233,67 @@ BitFieldAnd64 (
 UINT64
 EFIAPI
 BitFieldAndThenOr64 (
-  IN      UINT64                    Operand,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT64                    AndData,
-  IN      UINT64                    OrData
+  IN      UINT64  Operand,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT64  AndData,
+  IN      UINT64  OrData
+  );
+
+/**
+  Reads a bit field from a 32-bit value, counts and returns
+  the number of set bits.
+
+  Counts the number of set bits in the  bit field specified by
+  StartBit and EndBit in Operand. The count is returned.
+
+  If StartBit is greater than 31, then ASSERT().
+  If EndBit is greater than 31, then ASSERT().
+  If EndBit is less than StartBit, then ASSERT().
+
+  @param  Operand   Operand on which to perform the bitfield operation.
+  @param  StartBit  The ordinal of the least significant bit in the bit field.
+                    Range 0..31.
+  @param  EndBit    The ordinal of the most significant bit in the bit field.
+                    Range 0..31.
+
+  @return The number of bits set between StartBit and EndBit.
+
+**/
+UINT8
+EFIAPI
+BitFieldCountOnes32 (
+  IN       UINT32  Operand,
+  IN       UINTN   StartBit,
+  IN       UINTN   EndBit
+  );
+
+/**
+   Reads a bit field from a 64-bit value, counts and returns
+   the number of set bits.
+
+   Counts the number of set bits in the  bit field specified by
+   StartBit and EndBit in Operand. The count is returned.
+
+   If StartBit is greater than 63, then ASSERT().
+   If EndBit is greater than 63, then ASSERT().
+   If EndBit is less than StartBit, then ASSERT().
+
+   @param  Operand   Operand on which to perform the bitfield operation.
+   @param  StartBit  The ordinal of the least significant bit in the bit field.
+   Range 0..63.
+   @param  EndBit    The ordinal of the most significant bit in the bit field.
+   Range 0..63.
+
+   @return The number of bits set between StartBit and EndBit.
+
+**/
+UINT8
+EFIAPI
+BitFieldCountOnes64 (
+  IN       UINT64  Operand,
+  IN       UINTN   StartBit,
+  IN       UINTN   EndBit
   );
 
 //
@@ -4609,10 +4321,9 @@ BitFieldAndThenOr64 (
 UINT8
 EFIAPI
 CalculateSum8 (
-  IN      CONST UINT8              *Buffer,
-  IN      UINTN                     Length
+  IN      CONST UINT8  *Buffer,
+  IN      UINTN        Length
   );
-
 
 /**
   Returns the two's complement checksum of all elements in a buffer
@@ -4635,10 +4346,9 @@ CalculateSum8 (
 UINT8
 EFIAPI
 CalculateCheckSum8 (
-  IN      CONST UINT8              *Buffer,
-  IN      UINTN                     Length
+  IN      CONST UINT8  *Buffer,
+  IN      UINTN        Length
   );
-
 
 /**
   Returns the sum of all elements in a buffer of 16-bit values.  During
@@ -4662,10 +4372,9 @@ CalculateCheckSum8 (
 UINT16
 EFIAPI
 CalculateSum16 (
-  IN      CONST UINT16             *Buffer,
-  IN      UINTN                     Length
+  IN      CONST UINT16  *Buffer,
+  IN      UINTN         Length
   );
-
 
 /**
   Returns the two's complement checksum of all elements in a buffer of
@@ -4690,10 +4399,9 @@ CalculateSum16 (
 UINT16
 EFIAPI
 CalculateCheckSum16 (
-  IN      CONST UINT16             *Buffer,
-  IN      UINTN                     Length
+  IN      CONST UINT16  *Buffer,
+  IN      UINTN         Length
   );
-
 
 /**
   Returns the sum of all elements in a buffer of 32-bit values. During
@@ -4717,10 +4425,9 @@ CalculateCheckSum16 (
 UINT32
 EFIAPI
 CalculateSum32 (
-  IN      CONST UINT32             *Buffer,
-  IN      UINTN                     Length
+  IN      CONST UINT32  *Buffer,
+  IN      UINTN         Length
   );
-
 
 /**
   Returns the two's complement checksum of all elements in a buffer of
@@ -4745,10 +4452,9 @@ CalculateSum32 (
 UINT32
 EFIAPI
 CalculateCheckSum32 (
-  IN      CONST UINT32             *Buffer,
-  IN      UINTN                     Length
+  IN      CONST UINT32  *Buffer,
+  IN      UINTN         Length
   );
-
 
 /**
   Returns the sum of all elements in a buffer of 64-bit values.  During
@@ -4772,10 +4478,9 @@ CalculateCheckSum32 (
 UINT64
 EFIAPI
 CalculateSum64 (
-  IN      CONST UINT64             *Buffer,
-  IN      UINTN                     Length
+  IN      CONST UINT64  *Buffer,
+  IN      UINTN         Length
   );
-
 
 /**
   Returns the two's complement checksum of all elements in a buffer of
@@ -4800,10 +4505,63 @@ CalculateSum64 (
 UINT64
 EFIAPI
 CalculateCheckSum64 (
-  IN      CONST UINT64             *Buffer,
-  IN      UINTN                     Length
+  IN      CONST UINT64  *Buffer,
+  IN      UINTN         Length
   );
 
+/**
+  Computes and returns a 32-bit CRC for a data buffer.
+  CRC32 value bases on ITU-T V.42.
+
+  If Buffer is NULL, then ASSERT().
+  If Length is greater than (MAX_ADDRESS - Buffer + 1), then ASSERT().
+
+  @param[in]  Buffer       A pointer to the buffer on which the 32-bit CRC is to be computed.
+  @param[in]  Length       The number of bytes in the buffer Data.
+
+  @retval Crc32            The 32-bit CRC was computed for the data buffer.
+
+**/
+UINT32
+EFIAPI
+CalculateCrc32 (
+  IN  VOID   *Buffer,
+  IN  UINTN  Length
+  );
+
+/**
+   Calculates the CRC16-ANSI checksum of the given buffer.
+
+   @param[in]      Buffer        Pointer to the buffer.
+   @param[in]      Length        Length of the buffer, in bytes.
+   @param[in]      InitialValue  Initial value of the CRC.
+
+   @return The CRC16-ANSI checksum.
+**/
+UINT16
+EFIAPI
+CalculateCrc16Ansi (
+  IN  CONST VOID  *Buffer,
+  IN  UINTN       Length,
+  IN  UINT16      InitialValue
+  );
+
+/**
+   Calculates the CRC32c checksum of the given buffer.
+
+   @param[in]      Buffer        Pointer to the buffer.
+   @param[in]      Length        Length of the buffer, in bytes.
+   @param[in]      InitialValue  Initial value of the CRC.
+
+   @return The CRC32c checksum.
+**/
+UINT32
+EFIAPI
+CalculateCrc32c (
+  IN CONST VOID  *Buffer,
+  IN UINTN       Length,
+  IN UINT32      InitialValue
+  );
 
 //
 // Base Library CPU Functions
@@ -4814,15 +4572,13 @@ CalculateCheckSum64 (
 
   @param  Context1        Context1 parameter passed into SwitchStack().
   @param  Context2        Context2 parameter passed into SwitchStack().
-
 **/
 typedef
 VOID
 (EFIAPI *SWITCH_STACK_ENTRY_POINT)(
-  IN      VOID                      *Context1,  OPTIONAL
+  IN      VOID                      *Context1   OPTIONAL,
   IN      VOID                      *Context2   OPTIONAL
   );
-
 
 /**
   Used to serialize load and store operations.
@@ -4836,7 +4592,6 @@ EFIAPI
 MemoryFence (
   VOID
   );
-
 
 /**
   Saves the current CPU context that can be restored with a call to LongJump()
@@ -4859,12 +4614,12 @@ MemoryFence (
   @retval 0 Indicates a return from SetJump().
 
 **/
+RETURNS_TWICE
 UINTN
 EFIAPI
 SetJump (
   OUT     BASE_LIBRARY_JUMP_BUFFER  *JumpBuffer
   );
-
 
 /**
   Restores the CPU context that was saved with SetJump().
@@ -4889,7 +4644,6 @@ LongJump (
   IN      UINTN                     Value
   );
 
-
 /**
   Enables CPU interrupts.
 
@@ -4900,7 +4654,6 @@ EnableInterrupts (
   VOID
   );
 
-
 /**
   Disables CPU interrupts.
 
@@ -4910,7 +4663,6 @@ EFIAPI
 DisableInterrupts (
   VOID
   );
-
 
 /**
   Disables CPU interrupts and returns the interrupt state prior to the disable
@@ -4926,7 +4678,6 @@ SaveAndDisableInterrupts (
   VOID
   );
 
-
 /**
   Enables CPU interrupts for the smallest window required to capture any
   pending interrupts.
@@ -4937,7 +4688,6 @@ EFIAPI
 EnableDisableInterrupts (
   VOID
   );
-
 
 /**
   Retrieves the current CPU interrupt state.
@@ -4954,7 +4704,6 @@ EFIAPI
 GetInterruptState (
   VOID
   );
-
 
 /**
   Set the current CPU interrupt state.
@@ -4973,9 +4722,8 @@ GetInterruptState (
 BOOLEAN
 EFIAPI
 SetInterruptState (
-  IN      BOOLEAN                   InterruptState
+  IN      BOOLEAN  InterruptState
   );
-
 
 /**
   Requests CPU to pause for a short period of time.
@@ -4989,7 +4737,6 @@ EFIAPI
 CpuPause (
   VOID
   );
-
 
 /**
   Transfers control to a function starting with a new stack.
@@ -5024,12 +4771,11 @@ VOID
 EFIAPI
 SwitchStack (
   IN      SWITCH_STACK_ENTRY_POINT  EntryPoint,
-  IN      VOID                      *Context1,  OPTIONAL
-  IN      VOID                      *Context2,  OPTIONAL
+  IN      VOID                      *Context1   OPTIONAL,
+  IN      VOID                      *Context2   OPTIONAL,
   IN      VOID                      *NewStack,
   ...
   );
-
 
 /**
   Generates a breakpoint on the CPU.
@@ -5043,7 +4789,6 @@ EFIAPI
 CpuBreakpoint (
   VOID
   );
-
 
 /**
   Executes an infinite loop.
@@ -5060,1396 +4805,169 @@ CpuDeadLoop (
   VOID
   );
 
-#if defined (MDE_CPU_IPF)
-
 /**
-  Flush a range of  cache lines in the cache coherency domain of the calling
-  CPU.
+  Uses as a barrier to stop speculative execution.
 
-  Flushes the cache lines specified by Address and Length.  If Address is not aligned
-  on a cache line boundary, then entire cache line containing Address is flushed.
-  If Address + Length is not aligned on a cache line boundary, then the entire cache
-  line containing Address + Length - 1 is flushed.  This function may choose to flush
-  the entire cache if that is more efficient than flushing the specified range.  If
-  Length is 0, the no cache lines are flushed.  Address is returned.
-  This function is only available on Itanium processors.
-
-  If Length is greater than (MAX_ADDRESS - Address + 1), then ASSERT().
-
-  @param  Address The base address of the instruction lines to invalidate. If
-                  the CPU is in a physical addressing mode, then Address is a
-                  physical address. If the CPU is in a virtual addressing mode,
-                  then Address is a virtual address.
-
-  @param  Length  The number of bytes to invalidate from the instruction cache.
-
-  @return Address.
-
-**/
-VOID *
-EFIAPI
-AsmFlushCacheRange (
-  IN      VOID                      *Address,
-  IN      UINTN                     Length
-  );
-
-
-/**
-  Executes an FC instruction.
-  Executes an FC instruction on the cache line specified by Address.
-  The cache line size affected is at least 32-bytes (aligned on a 32-byte boundary).
-  An implementation may flush a larger region.  This function is only available on Itanium processors.
-
-  @param Address    The Address of cache line to be flushed.
-
-  @return The address of FC instruction executed.
-
-**/
-UINT64
-EFIAPI
-AsmFc (
-  IN  UINT64  Address
-  );
-
-
-/**
-  Executes an FC.I instruction.
-  Executes an FC.I instruction on the cache line specified by Address.
-  The cache line size affected is at least 32-bytes (aligned on a 32-byte boundary).
-  An implementation may flush a larger region.  This function is only available on Itanium processors.
-
-  @param Address    The Address of cache line to be flushed.
-
-  @return The address of the FC.I instruction executed.
-
-**/
-UINT64
-EFIAPI
-AsmFci (
-  IN  UINT64  Address
-  );
-
-
-/**
-  Reads the current value of a Processor Identifier Register (CPUID).
-
-  Reads and returns the current value of Processor Identifier Register specified by Index.
-  The Index of largest implemented CPUID (One less than the number of implemented CPUID
-  registers) is determined by CPUID [3] bits {7:0}.
-  No parameter checking is performed on Index.  If the Index value is beyond the
-  implemented CPUID register range, a Reserved Register/Field fault may occur.  The caller
-  must either guarantee that Index is valid, or the caller must set up fault handlers to
-  catch the faults.  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Processor Identifier Register index to read.
-
-  @return The current value of Processor Identifier Register specified by Index.
-
-**/
-UINT64
-EFIAPI
-AsmReadCpuid (
-  IN  UINT8   Index
-  );
-
-
-/**
-  Reads the current value of 64-bit Processor Status Register (PSR).
-  This function is only available on Itanium processors.
-
-  @return The current value of PSR.
-
-**/
-UINT64
-EFIAPI
-AsmReadPsr (
-  VOID
-  );
-
-
-/**
-  Writes the current value of 64-bit Processor Status Register (PSR).
-
-  No parameter checking is performed on Value.  All bits of Value corresponding to
-  reserved fields of PSR must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults. This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to PSR.
-
-  @return The 64-bit value written to the PSR.
-
-**/
-UINT64
-EFIAPI
-AsmWritePsr (
-  IN UINT64  Value
-  );
-
-
-/**
-  Reads the current value of 64-bit Kernel Register #0 (KR0).
-
-  Reads and returns the current value of KR0.
-  This function is only available on Itanium processors.
-
-  @return The current value of KR0.
-
-**/
-UINT64
-EFIAPI
-AsmReadKr0 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of 64-bit Kernel Register #1 (KR1).
-
-  Reads and returns the current value of KR1.
-  This function is only available on Itanium processors.
-
-  @return The current value of KR1.
-
-**/
-UINT64
-EFIAPI
-AsmReadKr1 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of 64-bit Kernel Register #2 (KR2).
-
-  Reads and returns the current value of KR2.
-  This function is only available on Itanium processors.
-
-  @return The current value of KR2.
-
-**/
-UINT64
-EFIAPI
-AsmReadKr2 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of 64-bit Kernel Register #3 (KR3).
-
-  Reads and returns the current value of KR3.
-  This function is only available on Itanium processors.
-
-  @return The current value of KR3.
-
-**/
-UINT64
-EFIAPI
-AsmReadKr3 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of 64-bit Kernel Register #4 (KR4).
-
-  Reads and returns the current value of KR4.
-  This function is only available on Itanium processors.
-
-  @return The current value of KR4.
-
-**/
-UINT64
-EFIAPI
-AsmReadKr4 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of 64-bit Kernel Register #5 (KR5).
-
-  Reads and returns the current value of KR5.
-  This function is only available on Itanium processors.
-
-  @return The current value of KR5.
-
-**/
-UINT64
-EFIAPI
-AsmReadKr5 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of 64-bit Kernel Register #6 (KR6).
-
-  Reads and returns the current value of KR6.
-  This function is only available on Itanium processors.
-
-  @return The current value of KR6.
-
-**/
-UINT64
-EFIAPI
-AsmReadKr6 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of 64-bit Kernel Register #7 (KR7).
-
-  Reads and returns the current value of KR7.
-  This function is only available on Itanium processors.
-
-  @return The current value of KR7.
-
-**/
-UINT64
-EFIAPI
-AsmReadKr7 (
-  VOID
-  );
-
-
-/**
-  Write the current value of 64-bit Kernel Register #0 (KR0).
-
-  Writes the current value of KR0.  The 64-bit value written to
-  the KR0 is returned. This function is only available on Itanium processors.
-
-  @param  Value   The 64-bit value to write to KR0.
-
-  @return The 64-bit value written to the KR0.
-
-**/
-UINT64
-EFIAPI
-AsmWriteKr0 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Write the current value of 64-bit Kernel Register #1 (KR1).
-
-  Writes the current value of KR1.  The 64-bit value written to
-  the KR1 is returned. This function is only available on Itanium processors.
-
-  @param  Value   The 64-bit value to write to KR1.
-
-  @return The 64-bit value written to the KR1.
-
-**/
-UINT64
-EFIAPI
-AsmWriteKr1 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Write the current value of 64-bit Kernel Register #2 (KR2).
-
-  Writes the current value of KR2.  The 64-bit value written to
-  the KR2 is returned. This function is only available on Itanium processors.
-
-  @param  Value   The 64-bit value to write to KR2.
-
-  @return The 64-bit value written to the KR2.
-
-**/
-UINT64
-EFIAPI
-AsmWriteKr2 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Write the current value of 64-bit Kernel Register #3 (KR3).
-
-  Writes the current value of KR3.  The 64-bit value written to
-  the KR3 is returned. This function is only available on Itanium processors.
-
-  @param  Value   The 64-bit value to write to KR3.
-
-  @return The 64-bit value written to the KR3.
-
-**/
-UINT64
-EFIAPI
-AsmWriteKr3 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Write the current value of 64-bit Kernel Register #4 (KR4).
-
-  Writes the current value of KR4.  The 64-bit value written to
-  the KR4 is returned. This function is only available on Itanium processors.
-
-  @param  Value   The 64-bit value to write to KR4.
-
-  @return The 64-bit value written to the KR4.
-
-**/
-UINT64
-EFIAPI
-AsmWriteKr4 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Write the current value of 64-bit Kernel Register #5 (KR5).
-
-  Writes the current value of KR5.  The 64-bit value written to
-  the KR5 is returned. This function is only available on Itanium processors.
-
-  @param  Value   The 64-bit value to write to KR5.
-
-  @return The 64-bit value written to the KR5.
-
-**/
-UINT64
-EFIAPI
-AsmWriteKr5 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Write the current value of 64-bit Kernel Register #6 (KR6).
-
-  Writes the current value of KR6.  The 64-bit value written to
-  the KR6 is returned. This function is only available on Itanium processors.
-
-  @param  Value   The 64-bit value to write to KR6.
-
-  @return The 64-bit value written to the KR6.
-
-**/
-UINT64
-EFIAPI
-AsmWriteKr6 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Write the current value of 64-bit Kernel Register #7 (KR7).
-
-  Writes the current value of KR7.  The 64-bit value written to
-  the KR7 is returned. This function is only available on Itanium processors.
-
-  @param  Value   The 64-bit value to write to KR7.
-
-  @return The 64-bit value written to the KR7.
-
-**/
-UINT64
-EFIAPI
-AsmWriteKr7 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Reads the current value of Interval Timer Counter Register (ITC).
-
-  Reads and returns the current value of ITC.
-  This function is only available on Itanium processors.
-
-  @return The current value of ITC.
-
-**/
-UINT64
-EFIAPI
-AsmReadItc (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Interval Timer Vector Register (ITV).
-
-  Reads and returns the current value of ITV.
-  This function is only available on Itanium processors.
-
-  @return The current value of ITV.
-
-**/
-UINT64
-EFIAPI
-AsmReadItv (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Interval Timer Match Register (ITM).
-
-  Reads and returns the current value of ITM.
-  This function is only available on Itanium processors.
-
-  @return The current value of ITM.
-**/
-UINT64
-EFIAPI
-AsmReadItm (
-  VOID
-  );
-
-
-/**
-  Writes the current value of 64-bit Interval Timer Counter Register (ITC).
-
-  Writes the current value of ITC.  The 64-bit value written to the ITC is returned.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to ITC.
-
-  @return The 64-bit value written to the ITC.
-
-**/
-UINT64
-EFIAPI
-AsmWriteItc (
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Interval Timer Match Register (ITM).
-
-  Writes the current value of ITM.  The 64-bit value written to the ITM is returned.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to ITM.
-
-  @return The 64-bit value written to the ITM.
-
-**/
-UINT64
-EFIAPI
-AsmWriteItm (
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Interval Timer Vector Register (ITV).
-
-  Writes the current value of ITV.  The 64-bit value written to the ITV is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding to
-  reserved fields of ITV must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to ITV.
-
-  @return The 64-bit value written to the ITV.
-
-**/
-UINT64
-EFIAPI
-AsmWriteItv (
-  IN UINT64  Value
-  );
-
-
-/**
-  Reads the current value of Default Control Register (DCR).
-
-  Reads and returns the current value of DCR.  This function is only available on Itanium processors.
-
-  @return The current value of DCR.
-
-**/
-UINT64
-EFIAPI
-AsmReadDcr (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Interruption Vector Address Register (IVA).
-
-  Reads and returns the current value of IVA.  This function is only available on Itanium processors.
-
-  @return The current value of IVA.
-**/
-UINT64
-EFIAPI
-AsmReadIva (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Page Table Address Register (PTA).
-
-  Reads and returns the current value of PTA.  This function is only available on Itanium processors.
-
-  @return The current value of PTA.
-
-**/
-UINT64
-EFIAPI
-AsmReadPta (
-  VOID
-  );
-
-
-/**
-  Writes the current value of 64-bit Default Control Register (DCR).
-
-  Writes the current value of DCR.  The 64-bit value written to the DCR is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding to
-  reserved fields of DCR must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to DCR.
-
-  @return The 64-bit value written to the DCR.
-
-**/
-UINT64
-EFIAPI
-AsmWriteDcr (
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Interruption Vector Address Register (IVA).
-
-  Writes the current value of IVA.  The 64-bit value written to the IVA is returned.
-  The size of vector table is 32 K bytes and is 32 K bytes aligned
-  the low 15 bits of Value is ignored when written.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to IVA.
-
-  @return The 64-bit value written to the IVA.
-
-**/
-UINT64
-EFIAPI
-AsmWriteIva (
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Page Table Address Register (PTA).
-
-  Writes the current value of PTA.  The 64-bit value written to the PTA is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding to
-  reserved fields of DCR must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to PTA.
-
-  @return The 64-bit value written to the PTA.
-**/
-UINT64
-EFIAPI
-AsmWritePta (
-  IN UINT64  Value
-  );
-
-
-/**
-  Reads the current value of Local Interrupt ID Register (LID).
-
-  Reads and returns the current value of LID.  This function is only available on Itanium processors.
-
-  @return The current value of LID.
-
-**/
-UINT64
-EFIAPI
-AsmReadLid (
-  VOID
-  );
-
-
-/**
-  Reads the current value of External Interrupt Vector Register (IVR).
-
-  Reads and returns the current value of IVR.  This function is only available on Itanium processors.
-
-  @return The current value of IVR.
-
-**/
-UINT64
-EFIAPI
-AsmReadIvr (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Task Priority Register (TPR).
-
-  Reads and returns the current value of TPR.  This function is only available on Itanium processors.
-
-  @return The current value of TPR.
-
-**/
-UINT64
-EFIAPI
-AsmReadTpr (
-  VOID
-  );
-
-
-/**
-  Reads the current value of External Interrupt Request Register #0 (IRR0).
-
-  Reads and returns the current value of IRR0.  This function is only available on Itanium processors.
-
-  @return The current value of IRR0.
-
-**/
-UINT64
-EFIAPI
-AsmReadIrr0 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of External Interrupt Request Register #1 (IRR1).
-
-  Reads and returns the current value of IRR1.  This function is only available on Itanium processors.
-
-  @return The current value of IRR1.
-
-**/
-UINT64
-EFIAPI
-AsmReadIrr1 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of External Interrupt Request Register #2 (IRR2).
-
-  Reads and returns the current value of IRR2.  This function is only available on Itanium processors.
-
-  @return The current value of IRR2.
-
-**/
-UINT64
-EFIAPI
-AsmReadIrr2 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of External Interrupt Request Register #3 (IRR3).
-
-  Reads and returns the current value of IRR3.  This function is only available on Itanium processors.
-
-  @return The current value of IRR3.
-
-**/
-UINT64
-EFIAPI
-AsmReadIrr3 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Performance Monitor Vector Register (PMV).
-
-  Reads and returns the current value of PMV.  This function is only available on Itanium processors.
-
-  @return The current value of PMV.
-
-**/
-UINT64
-EFIAPI
-AsmReadPmv (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Corrected Machine Check Vector Register (CMCV).
-
-  Reads and returns the current value of CMCV.  This function is only available on Itanium processors.
-
-  @return The current value of CMCV.
-
-**/
-UINT64
-EFIAPI
-AsmReadCmcv (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Local Redirection Register #0 (LRR0).
-
-  Reads and returns the current value of LRR0.  This function is only available on Itanium processors.
-
-  @return The current value of LRR0.
-
-**/
-UINT64
-EFIAPI
-AsmReadLrr0 (
-  VOID
-  );
-
-
-/**
-  Reads the current value of Local Redirection Register #1 (LRR1).
-
-  Reads and returns the current value of LRR1.  This function is only available on Itanium processors.
-
-  @return The current value of LRR1.
-
-**/
-UINT64
-EFIAPI
-AsmReadLrr1 (
-  VOID
-  );
-
-
-/**
-  Writes the current value of 64-bit Page Local Interrupt ID Register (LID).
-
-  Writes the current value of LID.  The 64-bit value written to the LID is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding to
-  reserved fields of LID must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to LID.
-
-  @return The 64-bit value written to the LID.
-
-**/
-UINT64
-EFIAPI
-AsmWriteLid (
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Task Priority Register (TPR).
-
-  Writes the current value of TPR.  The 64-bit value written to the TPR is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding to
-  reserved fields of TPR must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to TPR.
-
-  @return The 64-bit value written to the TPR.
-
-**/
-UINT64
-EFIAPI
-AsmWriteTpr (
-  IN UINT64  Value
-  );
-
-
-/**
-  Performs a write operation on End OF External Interrupt Register (EOI).
-
-  Writes a value of 0 to the EOI Register.  This function is only available on Itanium processors.
+  Ensures that no later instruction will execute speculatively, until all prior
+  instructions have completed.
 
 **/
 VOID
 EFIAPI
-AsmWriteEoi (
+SpeculationBarrier (
   VOID
   );
 
+#if defined (MDE_CPU_X64) || defined (MDE_CPU_IA32)
 
 /**
-  Writes the current value of 64-bit Performance Monitor Vector Register (PMV).
+  The TDCALL instruction causes a VM exit to the Intel TDX module.  It is
+  used to call guest-side Intel TDX functions, either local or a TD exit
+  to the host VMM, as selected by Leaf.
 
-  Writes the current value of PMV.  The 64-bit value written to the PMV is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding
-  to reserved fields of PMV must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
+  @param[in]      Leaf        Leaf number of TDCALL instruction
+  @param[in]      Arg1        Arg1
+  @param[in]      Arg2        Arg2
+  @param[in]      Arg3        Arg3
+  @param[in,out]  Results  Returned result of the Leaf function
 
-  @param Value    The 64-bit value to write to PMV.
-
-  @return The 64-bit value written to the PMV.
-
+  @return 0               A successful call
+  @return Other           See individual leaf functions
 **/
-UINT64
+UINTN
 EFIAPI
-AsmWritePmv (
-  IN UINT64  Value
+TdCall (
+  IN UINT64    Leaf,
+  IN UINT64    Arg1,
+  IN UINT64    Arg2,
+  IN UINT64    Arg3,
+  IN OUT VOID  *Results
   );
 
-
 /**
-  Writes the current value of 64-bit Corrected Machine Check Vector Register (CMCV).
+  TDVMALL is a leaf function 0 for TDCALL. It helps invoke services from the
+  host VMM to pass/receive information.
 
-  Writes the current value of CMCV.  The 64-bit value written to the CMCV is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding
-  to reserved fields of CMCV must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
+  @param[in]     Leaf        Number of sub-functions
+  @param[in]     Arg1        Arg1
+  @param[in]     Arg2        Arg2
+  @param[in]     Arg3        Arg3
+  @param[in]     Arg4        Arg4
+  @param[in,out] Results     Returned result of the sub-function
 
-  @param Value    The 64-bit value to write to CMCV.
-
-  @return The 64-bit value written to the CMCV.
+  @return 0               A successful call
+  @return Other           See individual sub-functions
 
 **/
-UINT64
+UINTN
 EFIAPI
-AsmWriteCmcv (
-  IN UINT64  Value
+TdVmCall (
+  IN UINT64    Leaf,
+  IN UINT64    Arg1,
+  IN UINT64    Arg2,
+  IN UINT64    Arg3,
+  IN UINT64    Arg4,
+  IN OUT VOID  *Results
   );
 
-
 /**
-  Writes the current value of 64-bit Local Redirection Register #0 (LRR0).
+  Probe if TD is enabled.
 
-  Writes the current value of LRR0.  The 64-bit value written to the LRR0 is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding
-  to reserved fields of LRR0 must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to LRR0.
-
-  @return The 64-bit value written to the LRR0.
-
+  @return TRUE    TD is enabled.
+  @return FALSE   TD is not enabled.
 **/
-UINT64
+BOOLEAN
 EFIAPI
-AsmWriteLrr0 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Local Redirection Register #1 (LRR1).
-
-  Writes the current value of LRR1.  The 64-bit value written to the LRR1 is returned.
-  No parameter checking is performed on Value.  All bits of Value corresponding
-  to reserved fields of LRR1 must be 0 or a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Value is valid, or the caller must
-  set up fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Value    The 64-bit value to write to LRR1.
-
-  @return The 64-bit value written to the LRR1.
-
-**/
-UINT64
-EFIAPI
-AsmWriteLrr1 (
-  IN UINT64  Value
-  );
-
-
-/**
-  Reads the current value of Instruction Breakpoint Register (IBR).
-
-  The Instruction Breakpoint Registers are used in pairs.  The even numbered
-  registers contain breakpoint addresses, and the odd numbered registers contain
-  breakpoint mask conditions.  At least four instruction registers pairs are implemented
-  on all processor models.   Implemented registers are contiguous starting with
-  register 0.  No parameter checking is performed on Index, and if the Index value
-  is beyond the implemented IBR register range, a Reserved Register/Field fault may
-  occur.  The caller must either guarantee that Index is valid, or the caller must
-  set up fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Instruction Breakpoint Register index to read.
-
-  @return The current value of Instruction Breakpoint Register specified by Index.
-
-**/
-UINT64
-EFIAPI
-AsmReadIbr (
-  IN  UINT8   Index
-  );
-
-
-/**
-  Reads the current value of Data Breakpoint Register (DBR).
-
-  The Data Breakpoint Registers are used in pairs.  The even numbered registers
-  contain breakpoint addresses, and odd numbered registers contain breakpoint
-  mask conditions.  At least four data registers pairs are implemented on all processor
-  models.  Implemented registers are contiguous starting with register 0.
-  No parameter checking is performed on Index.  If the Index value is beyond
-  the implemented DBR register range, a Reserved Register/Field fault may occur.
-  The caller must either guarantee that Index is valid, or the caller must set up
-  fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Data Breakpoint Register index to read.
-
-  @return The current value of Data Breakpoint Register specified by Index.
-
-**/
-UINT64
-EFIAPI
-AsmReadDbr (
-  IN  UINT8   Index
-  );
-
-
-/**
-  Reads the current value of Performance Monitor Configuration Register (PMC).
-
-  All processor implementations provide at least four performance counters
-  (PMC/PMD [4]...PMC/PMD [7] pairs), and four performance monitor counter overflow
-  status registers (PMC [0]... PMC [3]).  Processor implementations may provide
-  additional implementation-dependent PMC and PMD to increase the number of
-  'generic' performance counters (PMC/PMD pairs).  The remainder of PMC and PMD
-  register set is implementation dependent.  No parameter checking is performed
-  on Index.  If the Index value is beyond the implemented PMC register range,
-  zero value will be returned.
-  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Performance Monitor Configuration Register index to read.
-
-  @return   The current value of Performance Monitor Configuration Register
-            specified by Index.
-
-**/
-UINT64
-EFIAPI
-AsmReadPmc (
-  IN  UINT8   Index
-  );
-
-
-/**
-  Reads the current value of Performance Monitor Data Register (PMD).
-
-  All processor implementations provide at least 4 performance counters
-  (PMC/PMD [4]...PMC/PMD [7] pairs), and 4 performance monitor counter
-  overflow status registers (PMC [0]... PMC [3]).  Processor implementations may
-  provide additional implementation-dependent PMC and PMD to increase the number
-  of 'generic' performance counters (PMC/PMD pairs).  The remainder of PMC and PMD
-  register set is implementation dependent.  No parameter checking is performed
-  on Index.  If the Index value is beyond the implemented PMD register range,
-  zero value will be returned.
-  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Performance Monitor Data Register index to read.
-
-  @return The current value of Performance Monitor Data Register specified by Index.
-
-**/
-UINT64
-EFIAPI
-AsmReadPmd (
-  IN  UINT8   Index
-  );
-
-
-/**
-  Writes the current value of 64-bit Instruction Breakpoint Register (IBR).
-
-  Writes current value of Instruction Breakpoint Register specified by Index.
-  The Instruction Breakpoint Registers are used in pairs.  The even numbered
-  registers contain breakpoint addresses, and odd numbered registers contain
-  breakpoint mask conditions.  At least four instruction registers pairs are implemented
-  on all processor models.  Implemented registers are contiguous starting with
-  register 0.  No parameter checking is performed on Index.  If the Index value
-  is beyond the implemented IBR register range, a Reserved Register/Field fault may
-  occur.  The caller must either guarantee that Index is valid, or the caller must
-  set up fault handlers to catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Instruction Breakpoint Register index to write.
-  @param Value    The 64-bit value to write to IBR.
-
-  @return The 64-bit value written to the IBR.
-
-**/
-UINT64
-EFIAPI
-AsmWriteIbr (
-  IN UINT8   Index,
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Data Breakpoint Register (DBR).
-
-  Writes current value of Data Breakpoint Register specified by Index.
-  The Data Breakpoint Registers are used in pairs.  The even numbered registers
-  contain breakpoint addresses, and odd numbered registers contain breakpoint
-  mask conditions.  At least four data registers pairs are implemented on all processor
-  models.  Implemented registers are contiguous starting with register 0.  No parameter
-  checking is performed on Index.  If the Index value is beyond the implemented
-  DBR register range, a Reserved Register/Field fault may occur.  The caller must
-  either guarantee that Index is valid, or the caller must set up fault handlers to
-  catch the faults.
-  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Data Breakpoint Register index to write.
-  @param Value    The 64-bit value to write to DBR.
-
-  @return The 64-bit value written to the DBR.
-
-**/
-UINT64
-EFIAPI
-AsmWriteDbr (
-  IN UINT8   Index,
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Performance Monitor Configuration Register (PMC).
-
-  Writes current value of Performance Monitor Configuration Register specified by Index.
-  All processor implementations provide at least four performance counters
-  (PMC/PMD [4]...PMC/PMD [7] pairs), and four performance monitor counter overflow status
-  registers (PMC [0]... PMC [3]).  Processor implementations may provide additional
-  implementation-dependent PMC and PMD to increase the number of 'generic' performance
-  counters (PMC/PMD pairs).  The remainder of PMC and PMD register set is implementation
-  dependent.  No parameter checking is performed on Index.  If the Index value is
-  beyond the implemented PMC register range, the write is ignored.
-  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Performance Monitor Configuration Register index to write.
-  @param Value    The 64-bit value to write to PMC.
-
-  @return The 64-bit value written to the PMC.
-
-**/
-UINT64
-EFIAPI
-AsmWritePmc (
-  IN UINT8   Index,
-  IN UINT64  Value
-  );
-
-
-/**
-  Writes the current value of 64-bit Performance Monitor Data Register (PMD).
-
-  Writes current value of Performance Monitor Data Register specified by Index.
-  All processor implementations provide at least four performance counters
-  (PMC/PMD [4]...PMC/PMD [7] pairs), and four performance monitor counter overflow
-  status registers (PMC [0]... PMC [3]).  Processor implementations may provide
-  additional implementation-dependent PMC and PMD to increase the number of 'generic'
-  performance counters (PMC/PMD pairs).  The remainder of PMC and PMD register set
-  is implementation dependent.  No parameter checking is performed on Index.  If the
-  Index value is beyond the implemented PMD register range, the write is ignored.
-  This function is only available on Itanium processors.
-
-  @param Index    The 8-bit Performance Monitor Data Register index to write.
-  @param Value    The 64-bit value to write to PMD.
-
-  @return The 64-bit value written to the PMD.
-
-**/
-UINT64
-EFIAPI
-AsmWritePmd (
-  IN UINT8   Index,
-  IN UINT64  Value
-  );
-
-
-/**
-  Reads the current value of 64-bit Global Pointer (GP).
-
-  Reads and returns the current value of GP.
-  This function is only available on Itanium processors.
-
-  @return The current value of GP.
-
-**/
-UINT64
-EFIAPI
-AsmReadGp (
+TdIsEnabled (
   VOID
   );
 
+#endif
+
+#if defined (MDE_CPU_X64)
+//
+// The page size for the PVALIDATE instruction
+//
+typedef enum {
+  PvalidatePageSize4K = 0,
+  PvalidatePageSize2MB,
+} PVALIDATE_PAGE_SIZE;
+
+//
+// PVALIDATE Return Code.
+//
+#define PVALIDATE_RET_SUCCESS        0
+#define PVALIDATE_RET_FAIL_INPUT     1
+#define PVALIDATE_RET_SIZE_MISMATCH  6
+
+//
+// The PVALIDATE instruction did not make any changes to the RMP entry.
+//
+#define PVALIDATE_RET_NO_RMPUPDATE  255
 
 /**
-  Write the current value of 64-bit Global Pointer (GP).
+ Execute a PVALIDATE instruction to validate or to rescinds validation of a guest
+ page's RMP entry.
 
-  Writes the current value of GP. The 64-bit value written to the GP is returned.
-  No parameter checking is performed on Value.
-  This function is only available on Itanium processors.
+ The instruction is available only when CPUID Fn8000_001F_EAX[SNP]=1.
 
-  @param Value  The 64-bit value to write to GP.
+ The function is available on X64.
 
-  @return The 64-bit value written to the GP.
+ @param[in]    PageSize         The page size to use.
+ @param[in]    Validate         If TRUE, validate the guest virtual address
+                                otherwise invalidate the guest virtual address.
+ @param[in]    Address          The guest virtual address.
 
+ @retval PVALIDATE_RET_SUCCESS        The PVALIDATE instruction succeeded, and
+                                      updated the RMP entry.
+ @retval PVALIDATE_RET_NO_RMPUPDATE   The PVALIDATE instruction succeeded, but
+                                      did not update the RMP entry.
+ @return                              Failure code from the PVALIDATE
+                                      instruction.
 **/
-UINT64
+UINT32
 EFIAPI
-AsmWriteGp (
-  IN UINT64  Value
+AsmPvalidate (
+  IN   PVALIDATE_PAGE_SIZE  PageSize,
+  IN   BOOLEAN              Validate,
+  IN   PHYSICAL_ADDRESS     Address
   );
 
+//
+// RDX settings for RMPADJUST
+//
+#define RMPADJUST_VMPL_MAX               3
+#define RMPADJUST_VMPL_MASK              0xFF
+#define RMPADJUST_VMPL_SHIFT             0
+#define RMPADJUST_PERMISSION_MASK_MASK   0xFF
+#define RMPADJUST_PERMISSION_MASK_SHIFT  8
+#define RMPADJUST_VMSA_PAGE_BIT          BIT16
 
 /**
-  Reads the current value of 64-bit Stack Pointer (SP).
+  Adjusts the permissions of an SEV-SNP guest page.
 
-  Reads and returns the current value of SP.
-  This function is only available on Itanium processors.
+  Executes a RMPADJUST instruction with the register state specified by Rax,
+  Rcx, and Rdx. Returns Eax. This function is only available on X64.
 
-  @return The current value of SP.
+  The instruction is available only when CPUID Fn8000_001F_EAX[SNP]=1.
 
+  @param[in]  Rax   The value to load into RAX before executing the RMPADJUST
+                    instruction.
+  @param[in]  Rcx   The value to load into RCX before executing the RMPADJUST
+                    instruction.
+  @param[in]  Rdx   The value to load into RDX before executing the RMPADJUST
+                    instruction.
+
+  @return     Eax
 **/
-UINT64
+UINT32
 EFIAPI
-AsmReadSp (
-  VOID
+AsmRmpAdjust (
+  IN      UINT64  Rax,
+  IN      UINT64  Rcx,
+  IN      UINT64  Rdx
   );
 
-
-///
-/// Valid Index value for AsmReadControlRegister().
-///
-#define IPF_CONTROL_REGISTER_DCR   0
-#define IPF_CONTROL_REGISTER_ITM   1
-#define IPF_CONTROL_REGISTER_IVA   2
-#define IPF_CONTROL_REGISTER_PTA   8
-#define IPF_CONTROL_REGISTER_IPSR  16
-#define IPF_CONTROL_REGISTER_ISR   17
-#define IPF_CONTROL_REGISTER_IIP   19
-#define IPF_CONTROL_REGISTER_IFA   20
-#define IPF_CONTROL_REGISTER_ITIR  21
-#define IPF_CONTROL_REGISTER_IIPA  22
-#define IPF_CONTROL_REGISTER_IFS   23
-#define IPF_CONTROL_REGISTER_IIM   24
-#define IPF_CONTROL_REGISTER_IHA   25
-#define IPF_CONTROL_REGISTER_LID   64
-#define IPF_CONTROL_REGISTER_IVR   65
-#define IPF_CONTROL_REGISTER_TPR   66
-#define IPF_CONTROL_REGISTER_EOI   67
-#define IPF_CONTROL_REGISTER_IRR0  68
-#define IPF_CONTROL_REGISTER_IRR1  69
-#define IPF_CONTROL_REGISTER_IRR2  70
-#define IPF_CONTROL_REGISTER_IRR3  71
-#define IPF_CONTROL_REGISTER_ITV   72
-#define IPF_CONTROL_REGISTER_PMV   73
-#define IPF_CONTROL_REGISTER_CMCV  74
-#define IPF_CONTROL_REGISTER_LRR0  80
-#define IPF_CONTROL_REGISTER_LRR1  81
-
-/**
-  Reads a 64-bit control register.
-
-  Reads and returns the control register specified by Index. The valid Index valued
-  are defined above in "Related Definitions".
-  If Index is invalid then 0xFFFFFFFFFFFFFFFF is returned.  This function is only
-  available on Itanium processors.
-
-  @param  Index                     The index of the control register to read.
-
-  @return The control register specified by Index.
-
-**/
-UINT64
-EFIAPI
-AsmReadControlRegister (
-  IN UINT64  Index
-  );
-
-
-///
-/// Valid Index value for AsmReadApplicationRegister().
-///
-#define IPF_APPLICATION_REGISTER_K0        0
-#define IPF_APPLICATION_REGISTER_K1        1
-#define IPF_APPLICATION_REGISTER_K2        2
-#define IPF_APPLICATION_REGISTER_K3        3
-#define IPF_APPLICATION_REGISTER_K4        4
-#define IPF_APPLICATION_REGISTER_K5        5
-#define IPF_APPLICATION_REGISTER_K6        6
-#define IPF_APPLICATION_REGISTER_K7        7
-#define IPF_APPLICATION_REGISTER_RSC       16
-#define IPF_APPLICATION_REGISTER_BSP       17
-#define IPF_APPLICATION_REGISTER_BSPSTORE  18
-#define IPF_APPLICATION_REGISTER_RNAT      19
-#define IPF_APPLICATION_REGISTER_FCR       21
-#define IPF_APPLICATION_REGISTER_EFLAG     24
-#define IPF_APPLICATION_REGISTER_CSD       25
-#define IPF_APPLICATION_REGISTER_SSD       26
-#define IPF_APPLICATION_REGISTER_CFLG      27
-#define IPF_APPLICATION_REGISTER_FSR       28
-#define IPF_APPLICATION_REGISTER_FIR       29
-#define IPF_APPLICATION_REGISTER_FDR       30
-#define IPF_APPLICATION_REGISTER_CCV       32
-#define IPF_APPLICATION_REGISTER_UNAT      36
-#define IPF_APPLICATION_REGISTER_FPSR      40
-#define IPF_APPLICATION_REGISTER_ITC       44
-#define IPF_APPLICATION_REGISTER_PFS       64
-#define IPF_APPLICATION_REGISTER_LC        65
-#define IPF_APPLICATION_REGISTER_EC        66
-
-/**
-  Reads a 64-bit application register.
-
-  Reads and returns the application register specified by Index. The valid Index
-  valued are defined above in "Related Definitions".
-  If Index is invalid then 0xFFFFFFFFFFFFFFFF is returned.  This function is only
-  available on Itanium processors.
-
-  @param  Index                     The index of the application register to read.
-
-  @return The application register specified by Index.
-
-**/
-UINT64
-EFIAPI
-AsmReadApplicationRegister (
-  IN UINT64  Index
-  );
-
-
-/**
-  Reads the current value of a Machine Specific Register (MSR).
-
-  Reads and returns the current value of the Machine Specific Register specified by Index.  No
-  parameter checking is performed on Index, and if the Index value is beyond the implemented MSR
-  register range, a Reserved Register/Field fault may occur.  The caller must either guarantee that
-  Index is valid, or the caller must set up fault handlers to catch the faults.  This function is
-  only available on Itanium processors.
-
-  @param  Index                     The 8-bit Machine Specific Register index to read.
-
-  @return The current value of the Machine Specific Register specified by Index.
-
-**/
-UINT64
-EFIAPI
-AsmReadMsr (
-  IN UINT8   Index
-  );
-
-
-/**
-  Writes the current value of a Machine Specific Register (MSR).
-
-  Writes Value to the Machine Specific Register specified by Index.  Value is returned.  No
-  parameter checking is performed on Index, and if the Index value is beyond the implemented MSR
-  register range, a Reserved Register/Field fault may occur.  The caller must either guarantee that
-  Index is valid, or the caller must set up fault handlers to catch the faults.  This function is
-  only available on Itanium processors.
-
-  @param  Index                     The 8-bit Machine Specific Register index to write.
-  @param  Value                     The 64-bit value to write to the Machine Specific Register.
-
-  @return The 64-bit value to write to the Machine Specific Register.
-
-**/
-UINT64
-EFIAPI
-AsmWriteMsr (
-  IN UINT8   Index,
-  IN UINT64  Value
-  );
-
-
-/**
-  Determines if the CPU is currently executing in virtual, physical, or mixed mode.
-
-  Determines the current execution mode of the CPU.
-  If the CPU is in virtual mode(PSR.RT=1, PSR.DT=1, PSR.IT=1), then 1 is returned.
-  If the CPU is in physical mode(PSR.RT=0, PSR.DT=0, PSR.IT=0), then 0 is returned.
-  If the CPU is not in physical mode or virtual mode, then it is in mixed mode,
-  and -1 is returned.
-  This function is only available on Itanium processors.
-
-  @retval  1  The CPU is in virtual mode.
-  @retval  0  The CPU is in physical mode.
-  @retval -1  The CPU is in mixed mode.
-
-**/
-INT64
-EFIAPI
-AsmCpuVirtual (
-  VOID
-  );
-
-
-/**
-  Makes a PAL procedure call.
-
-  This is a wrapper function to make a PAL procedure call.  Based on the Index
-  value this API will make static or stacked PAL call.  The following table
-  describes the usage of PAL Procedure Index Assignment. Architected procedures
-  may be designated as required or optional.  If a PAL procedure is specified
-  as optional, a unique return code of 0xFFFFFFFFFFFFFFFF is returned in the
-  Status field of the PAL_CALL_RETURN structure.
-  This indicates that the procedure is not present in this PAL implementation.
-  It is the caller's responsibility to check for this return code after calling
-  any optional PAL procedure.
-  No parameter checking is performed on the 5 input parameters, but there are
-  some common rules that the caller should follow when making a PAL call.  Any
-  address passed to PAL as buffers for return parameters must be 8-byte aligned.
-  Unaligned addresses may cause undefined results.  For those parameters defined
-  as reserved or some fields defined as reserved must be zero filled or the invalid
-  argument return value may be returned or undefined result may occur during the
-  execution of the procedure.  If the PalEntryPoint  does not point to a valid
-  PAL entry point then the system behavior is undefined.  This function is only
-  available on Itanium processors.
-
-  @param PalEntryPoint  The PAL procedure calls entry point.
-  @param Index          The PAL procedure Index number.
-  @param Arg2           The 2nd parameter for PAL procedure calls.
-  @param Arg3           The 3rd parameter for PAL procedure calls.
-  @param Arg4           The 4th parameter for PAL procedure calls.
-
-  @return structure returned from the PAL Call procedure, including the status and return value.
-
-**/
-PAL_CALL_RETURN
-EFIAPI
-AsmPalCall (
-  IN UINT64  PalEntryPoint,
-  IN UINT64  Index,
-  IN UINT64  Arg2,
-  IN UINT64  Arg3,
-  IN UINT64  Arg4
-  );
 #endif
 
 #if defined (MDE_CPU_IA32) || defined (MDE_CPU_X64)
@@ -6459,21 +4977,21 @@ AsmPalCall (
 ///
 typedef union {
   struct {
-    UINT32  CF:1;           ///< Carry Flag.
-    UINT32  Reserved_0:1;   ///< Reserved.
-    UINT32  PF:1;           ///< Parity Flag.
-    UINT32  Reserved_1:1;   ///< Reserved.
-    UINT32  AF:1;           ///< Auxiliary Carry Flag.
-    UINT32  Reserved_2:1;   ///< Reserved.
-    UINT32  ZF:1;           ///< Zero Flag.
-    UINT32  SF:1;           ///< Sign Flag.
-    UINT32  TF:1;           ///< Trap Flag.
-    UINT32  IF:1;           ///< Interrupt Enable Flag.
-    UINT32  DF:1;           ///< Direction Flag.
-    UINT32  OF:1;           ///< Overflow Flag.
-    UINT32  IOPL:2;         ///< I/O Privilege Level.
-    UINT32  NT:1;           ///< Nested Task.
-    UINT32  Reserved_3:1;   ///< Reserved.
+    UINT32    CF         : 1; ///< Carry Flag.
+    UINT32    Reserved_0 : 1; ///< Reserved.
+    UINT32    PF         : 1; ///< Parity Flag.
+    UINT32    Reserved_1 : 1; ///< Reserved.
+    UINT32    AF         : 1; ///< Auxiliary Carry Flag.
+    UINT32    Reserved_2 : 1; ///< Reserved.
+    UINT32    ZF         : 1; ///< Zero Flag.
+    UINT32    SF         : 1; ///< Sign Flag.
+    UINT32    TF         : 1; ///< Trap Flag.
+    UINT32    IF         : 1; ///< Interrupt Enable Flag.
+    UINT32    DF         : 1; ///< Direction Flag.
+    UINT32    OF         : 1; ///< Overflow Flag.
+    UINT32    IOPL       : 2; ///< I/O Privilege Level.
+    UINT32    NT         : 1; ///< Nested Task.
+    UINT32    Reserved_3 : 1; ///< Reserved.
   } Bits;
   UINT16    Uint16;
 } IA32_FLAGS16;
@@ -6485,30 +5003,30 @@ typedef union {
 ///
 typedef union {
   struct {
-    UINT32  CF:1;           ///< Carry Flag.
-    UINT32  Reserved_0:1;   ///< Reserved.
-    UINT32  PF:1;           ///< Parity Flag.
-    UINT32  Reserved_1:1;   ///< Reserved.
-    UINT32  AF:1;           ///< Auxiliary Carry Flag.
-    UINT32  Reserved_2:1;   ///< Reserved.
-    UINT32  ZF:1;           ///< Zero Flag.
-    UINT32  SF:1;           ///< Sign Flag.
-    UINT32  TF:1;           ///< Trap Flag.
-    UINT32  IF:1;           ///< Interrupt Enable Flag.
-    UINT32  DF:1;           ///< Direction Flag.
-    UINT32  OF:1;           ///< Overflow Flag.
-    UINT32  IOPL:2;         ///< I/O Privilege Level.
-    UINT32  NT:1;           ///< Nested Task.
-    UINT32  Reserved_3:1;   ///< Reserved.
-    UINT32  RF:1;           ///< Resume Flag.
-    UINT32  VM:1;           ///< Virtual 8086 Mode.
-    UINT32  AC:1;           ///< Alignment Check.
-    UINT32  VIF:1;          ///< Virtual Interrupt Flag.
-    UINT32  VIP:1;          ///< Virtual Interrupt Pending.
-    UINT32  ID:1;           ///< ID Flag.
-    UINT32  Reserved_4:10;  ///< Reserved.
+    UINT32    CF         : 1;  ///< Carry Flag.
+    UINT32    Reserved_0 : 1;  ///< Reserved.
+    UINT32    PF         : 1;  ///< Parity Flag.
+    UINT32    Reserved_1 : 1;  ///< Reserved.
+    UINT32    AF         : 1;  ///< Auxiliary Carry Flag.
+    UINT32    Reserved_2 : 1;  ///< Reserved.
+    UINT32    ZF         : 1;  ///< Zero Flag.
+    UINT32    SF         : 1;  ///< Sign Flag.
+    UINT32    TF         : 1;  ///< Trap Flag.
+    UINT32    IF         : 1;  ///< Interrupt Enable Flag.
+    UINT32    DF         : 1;  ///< Direction Flag.
+    UINT32    OF         : 1;  ///< Overflow Flag.
+    UINT32    IOPL       : 2;  ///< I/O Privilege Level.
+    UINT32    NT         : 1;  ///< Nested Task.
+    UINT32    Reserved_3 : 1;  ///< Reserved.
+    UINT32    RF         : 1;  ///< Resume Flag.
+    UINT32    VM         : 1;  ///< Virtual 8086 Mode.
+    UINT32    AC         : 1;  ///< Alignment Check.
+    UINT32    VIF        : 1;  ///< Virtual Interrupt Flag.
+    UINT32    VIP        : 1;  ///< Virtual Interrupt Pending.
+    UINT32    ID         : 1;  ///< ID Flag.
+    UINT32    Reserved_4 : 10; ///< Reserved.
   } Bits;
-  UINTN     UintN;
+  UINTN    UintN;
 } IA32_EFLAGS32;
 
 ///
@@ -6518,22 +5036,22 @@ typedef union {
 ///
 typedef union {
   struct {
-    UINT32  PE:1;           ///< Protection Enable.
-    UINT32  MP:1;           ///< Monitor Coprocessor.
-    UINT32  EM:1;           ///< Emulation.
-    UINT32  TS:1;           ///< Task Switched.
-    UINT32  ET:1;           ///< Extension Type.
-    UINT32  NE:1;           ///< Numeric Error.
-    UINT32  Reserved_0:10;  ///< Reserved.
-    UINT32  WP:1;           ///< Write Protect.
-    UINT32  Reserved_1:1;   ///< Reserved.
-    UINT32  AM:1;           ///< Alignment Mask.
-    UINT32  Reserved_2:10;  ///< Reserved.
-    UINT32  NW:1;           ///< Mot Write-through.
-    UINT32  CD:1;           ///< Cache Disable.
-    UINT32  PG:1;           ///< Paging.
+    UINT32    PE         : 1;  ///< Protection Enable.
+    UINT32    MP         : 1;  ///< Monitor Coprocessor.
+    UINT32    EM         : 1;  ///< Emulation.
+    UINT32    TS         : 1;  ///< Task Switched.
+    UINT32    ET         : 1;  ///< Extension Type.
+    UINT32    NE         : 1;  ///< Numeric Error.
+    UINT32    Reserved_0 : 10; ///< Reserved.
+    UINT32    WP         : 1;  ///< Write Protect.
+    UINT32    Reserved_1 : 1;  ///< Reserved.
+    UINT32    AM         : 1;  ///< Alignment Mask.
+    UINT32    Reserved_2 : 10; ///< Reserved.
+    UINT32    NW         : 1;  ///< Mot Write-through.
+    UINT32    CD         : 1;  ///< Cache Disable.
+    UINT32    PG         : 1;  ///< Paging.
   } Bits;
-  UINTN     UintN;
+  UINTN    UintN;
 } IA32_CR0;
 
 ///
@@ -6543,26 +5061,36 @@ typedef union {
 ///
 typedef union {
   struct {
-    UINT32  VME:1;          ///< Virtual-8086 Mode Extensions.
-    UINT32  PVI:1;          ///< Protected-Mode Virtual Interrupts.
-    UINT32  TSD:1;          ///< Time Stamp Disable.
-    UINT32  DE:1;           ///< Debugging Extensions.
-    UINT32  PSE:1;          ///< Page Size Extensions.
-    UINT32  PAE:1;          ///< Physical Address Extension.
-    UINT32  MCE:1;          ///< Machine Check Enable.
-    UINT32  PGE:1;          ///< Page Global Enable.
-    UINT32  PCE:1;          ///< Performance Monitoring Counter
-                            ///< Enable.
-    UINT32  OSFXSR:1;       ///< Operating System Support for
-                            ///< FXSAVE and FXRSTOR instructions
-    UINT32  OSXMMEXCPT:1;   ///< Operating System Support for
-                            ///< Unmasked SIMD Floating Point
-                            ///< Exceptions.
-    UINT32  Reserved_0:2;   ///< Reserved.
-    UINT32  VMXE:1;         ///< VMX Enable
-    UINT32  Reserved_1:18;  ///< Reserved.
+    UINT32    VME        : 1; ///< Virtual-8086 Mode Extensions.
+    UINT32    PVI        : 1; ///< Protected-Mode Virtual Interrupts.
+    UINT32    TSD        : 1; ///< Time Stamp Disable.
+    UINT32    DE         : 1; ///< Debugging Extensions.
+    UINT32    PSE        : 1; ///< Page Size Extensions.
+    UINT32    PAE        : 1; ///< Physical Address Extension.
+    UINT32    MCE        : 1; ///< Machine Check Enable.
+    UINT32    PGE        : 1; ///< Page Global Enable.
+    UINT32    PCE        : 1; ///< Performance Monitoring Counter
+                              ///< Enable.
+    UINT32    OSFXSR     : 1; ///< Operating System Support for
+                              ///< FXSAVE and FXRSTOR instructions
+    UINT32    OSXMMEXCPT : 1; ///< Operating System Support for
+                              ///< Unmasked SIMD Floating Point
+                              ///< Exceptions.
+    UINT32    UMIP       : 1; ///< User-Mode Instruction Prevention.
+    UINT32    LA57       : 1; ///< Linear Address 57bit.
+    UINT32    VMXE       : 1; ///< VMX Enable.
+    UINT32    SMXE       : 1; ///< SMX Enable.
+    UINT32    Reserved_3 : 1; ///< Reserved.
+    UINT32    FSGSBASE   : 1; ///< FSGSBASE Enable.
+    UINT32    PCIDE      : 1; ///< PCID Enable.
+    UINT32    OSXSAVE    : 1; ///< XSAVE and Processor Extended States Enable.
+    UINT32    Reserved_4 : 1; ///< Reserved.
+    UINT32    SMEP       : 1; ///< SMEP Enable.
+    UINT32    SMAP       : 1; ///< SMAP Enable.
+    UINT32    PKE        : 1; ///< Protection-Key Enable.
+    UINT32    Reserved_5 : 9; ///< Reserved.
   } Bits;
-  UINTN     UintN;
+  UINTN    UintN;
 } IA32_CR4;
 
 ///
@@ -6570,32 +5098,32 @@ typedef union {
 ///
 typedef union {
   struct {
-    UINT32  LimitLow:16;
-    UINT32  BaseLow:16;
-    UINT32  BaseMid:8;
-    UINT32  Type:4;
-    UINT32  S:1;
-    UINT32  DPL:2;
-    UINT32  P:1;
-    UINT32  LimitHigh:4;
-    UINT32  AVL:1;
-    UINT32  L:1;
-    UINT32  DB:1;
-    UINT32  G:1;
-    UINT32  BaseHigh:8;
+    UINT32    LimitLow  : 16;
+    UINT32    BaseLow   : 16;
+    UINT32    BaseMid   : 8;
+    UINT32    Type      : 4;
+    UINT32    S         : 1;
+    UINT32    DPL       : 2;
+    UINT32    P         : 1;
+    UINT32    LimitHigh : 4;
+    UINT32    AVL       : 1;
+    UINT32    L         : 1;
+    UINT32    DB        : 1;
+    UINT32    G         : 1;
+    UINT32    BaseHigh  : 8;
   } Bits;
-  UINT64  Uint64;
+  UINT64    Uint64;
 } IA32_SEGMENT_DESCRIPTOR;
 
 ///
 /// Byte packed structure for an IDTR, GDTR, LDTR descriptor.
 ///
-#pragma pack (1)
+  #pragma pack (1)
 typedef struct {
-  UINT16  Limit;
-  UINTN   Base;
+  UINT16    Limit;
+  UINTN     Base;
 } IA32_DESCRIPTOR;
-#pragma pack ()
+  #pragma pack ()
 
 #define IA32_IDT_GATE_TYPE_TASK          0x85
 #define IA32_IDT_GATE_TYPE_INTERRUPT_16  0x86
@@ -6603,132 +5131,254 @@ typedef struct {
 #define IA32_IDT_GATE_TYPE_INTERRUPT_32  0x8E
 #define IA32_IDT_GATE_TYPE_TRAP_32       0x8F
 
+#define IA32_GDT_TYPE_TSS   0x9
+#define IA32_GDT_ALIGNMENT  8
 
-#if defined (MDE_CPU_IA32)
+  #if defined (MDE_CPU_IA32)
 ///
 /// Byte packed structure for an IA-32 Interrupt Gate Descriptor.
 ///
 typedef union {
   struct {
-    UINT32  OffsetLow:16;   ///< Offset bits 15..0.
-    UINT32  Selector:16;    ///< Selector.
-    UINT32  Reserved_0:8;   ///< Reserved.
-    UINT32  GateType:8;     ///< Gate Type.  See #defines above.
-    UINT32  OffsetHigh:16;  ///< Offset bits 31..16.
+    UINT32    OffsetLow  : 16; ///< Offset bits 15..0.
+    UINT32    Selector   : 16; ///< Selector.
+    UINT32    Reserved_0 : 8;  ///< Reserved.
+    UINT32    GateType   : 8;  ///< Gate Type.  See #defines above.
+    UINT32    OffsetHigh : 16; ///< Offset bits 31..16.
   } Bits;
-  UINT64  Uint64;
+  UINT64    Uint64;
 } IA32_IDT_GATE_DESCRIPTOR;
 
-#endif
+    #pragma pack (1)
+//
+// IA32 Task-State Segment Definition
+//
+typedef struct {
+  UINT16    PreviousTaskLink;
+  UINT16    Reserved_2;
+  UINT32    ESP0;
+  UINT16    SS0;
+  UINT16    Reserved_10;
+  UINT32    ESP1;
+  UINT16    SS1;
+  UINT16    Reserved_18;
+  UINT32    ESP2;
+  UINT16    SS2;
+  UINT16    Reserved_26;
+  UINT32    CR3;
+  UINT32    EIP;
+  UINT32    EFLAGS;
+  UINT32    EAX;
+  UINT32    ECX;
+  UINT32    EDX;
+  UINT32    EBX;
+  UINT32    ESP;
+  UINT32    EBP;
+  UINT32    ESI;
+  UINT32    EDI;
+  UINT16    ES;
+  UINT16    Reserved_74;
+  UINT16    CS;
+  UINT16    Reserved_78;
+  UINT16    SS;
+  UINT16    Reserved_82;
+  UINT16    DS;
+  UINT16    Reserved_86;
+  UINT16    FS;
+  UINT16    Reserved_90;
+  UINT16    GS;
+  UINT16    Reserved_94;
+  UINT16    LDTSegmentSelector;
+  UINT16    Reserved_98;
+  UINT16    T;
+  UINT16    IOMapBaseAddress;
+} IA32_TASK_STATE_SEGMENT;
 
-#if defined (MDE_CPU_X64)
+typedef union {
+  struct {
+    UINT32    LimitLow    : 16; ///< Segment Limit 15..00
+    UINT32    BaseLow     : 16; ///< Base Address  15..00
+    UINT32    BaseMid     : 8;  ///< Base Address  23..16
+    UINT32    Type        : 4;  ///< Type (1 0 B 1)
+    UINT32    Reserved_43 : 1;  ///< 0
+    UINT32    DPL         : 2;  ///< Descriptor Privilege Level
+    UINT32    P           : 1;  ///< Segment Present
+    UINT32    LimitHigh   : 4;  ///< Segment Limit 19..16
+    UINT32    AVL         : 1;  ///< Available for use by system software
+    UINT32    Reserved_52 : 2;  ///< 0 0
+    UINT32    G           : 1;  ///< Granularity
+    UINT32    BaseHigh    : 8;  ///< Base Address 31..24
+  } Bits;
+  UINT64    Uint64;
+} IA32_TSS_DESCRIPTOR;
+    #pragma pack ()
+
+  #endif // defined (MDE_CPU_IA32)
+
+  #if defined (MDE_CPU_X64)
 ///
 /// Byte packed structure for an x64 Interrupt Gate Descriptor.
 ///
 typedef union {
   struct {
-    UINT32  OffsetLow:16;   ///< Offset bits 15..0.
-    UINT32  Selector:16;    ///< Selector.
-    UINT32  Reserved_0:8;   ///< Reserved.
-    UINT32  GateType:8;     ///< Gate Type.  See #defines above.
-    UINT32  OffsetHigh:16;  ///< Offset bits 31..16.
-    UINT32  OffsetUpper:32; ///< Offset bits 63..32.
-    UINT32  Reserved_1:32;  ///< Reserved.
+    UINT32    OffsetLow   : 16; ///< Offset bits 15..0.
+    UINT32    Selector    : 16; ///< Selector.
+    UINT32    Reserved_0  : 8;  ///< Reserved.
+    UINT32    GateType    : 8;  ///< Gate Type.  See #defines above.
+    UINT32    OffsetHigh  : 16; ///< Offset bits 31..16.
+    UINT32    OffsetUpper : 32; ///< Offset bits 63..32.
+    UINT32    Reserved_1  : 32; ///< Reserved.
   } Bits;
   struct {
-    UINT64  Uint64;
-    UINT64  Uint64_1;
+    UINT64    Uint64;
+    UINT64    Uint64_1;
   } Uint128;
 } IA32_IDT_GATE_DESCRIPTOR;
 
-#endif
+    #pragma pack (1)
+//
+// IA32 Task-State Segment Definition
+//
+typedef struct {
+  UINT32    Reserved_0;
+  UINT64    RSP0;
+  UINT64    RSP1;
+  UINT64    RSP2;
+  UINT64    Reserved_28;
+  UINT64    IST[7];
+  UINT64    Reserved_92;
+  UINT16    Reserved_100;
+  UINT16    IOMapBaseAddress;
+} IA32_TASK_STATE_SEGMENT;
+
+typedef union {
+  struct {
+    UINT32    LimitLow    : 16; ///< Segment Limit 15..00
+    UINT32    BaseLow     : 16; ///< Base Address  15..00
+    UINT32    BaseMidl    : 8;  ///< Base Address  23..16
+    UINT32    Type        : 4;  ///< Type (1 0 B 1)
+    UINT32    Reserved_43 : 1;  ///< 0
+    UINT32    DPL         : 2;  ///< Descriptor Privilege Level
+    UINT32    P           : 1;  ///< Segment Present
+    UINT32    LimitHigh   : 4;  ///< Segment Limit 19..16
+    UINT32    AVL         : 1;  ///< Available for use by system software
+    UINT32    Reserved_52 : 2;  ///< 0 0
+    UINT32    G           : 1;  ///< Granularity
+    UINT32    BaseMidh    : 8;  ///< Base Address  31..24
+    UINT32    BaseHigh    : 32; ///< Base Address  63..32
+    UINT32    Reserved_96 : 32; ///< Reserved
+  } Bits;
+  struct {
+    UINT64    Uint64;
+    UINT64    Uint64_1;
+  } Uint128;
+} IA32_TSS_DESCRIPTOR;
+    #pragma pack ()
+
+  #endif // defined (MDE_CPU_X64)
 
 ///
 /// Byte packed structure for an FP/SSE/SSE2 context.
 ///
 typedef struct {
-  UINT8  Buffer[512];
+  UINT8    Buffer[512];
 } IA32_FX_BUFFER;
 
 ///
 /// Structures for the 16-bit real mode thunks.
 ///
 typedef struct {
-  UINT32                            Reserved1;
-  UINT32                            Reserved2;
-  UINT32                            Reserved3;
-  UINT32                            Reserved4;
-  UINT8                             BL;
-  UINT8                             BH;
-  UINT16                            Reserved5;
-  UINT8                             DL;
-  UINT8                             DH;
-  UINT16                            Reserved6;
-  UINT8                             CL;
-  UINT8                             CH;
-  UINT16                            Reserved7;
-  UINT8                             AL;
-  UINT8                             AH;
-  UINT16                            Reserved8;
+  UINT32    Reserved1;
+  UINT32    Reserved2;
+  UINT32    Reserved3;
+  UINT32    Reserved4;
+  UINT8     BL;
+  UINT8     BH;
+  UINT16    Reserved5;
+  UINT8     DL;
+  UINT8     DH;
+  UINT16    Reserved6;
+  UINT8     CL;
+  UINT8     CH;
+  UINT16    Reserved7;
+  UINT8     AL;
+  UINT8     AH;
+  UINT16    Reserved8;
 } IA32_BYTE_REGS;
 
 typedef struct {
-  UINT16                            DI;
-  UINT16                            Reserved1;
-  UINT16                            SI;
-  UINT16                            Reserved2;
-  UINT16                            BP;
-  UINT16                            Reserved3;
-  UINT16                            SP;
-  UINT16                            Reserved4;
-  UINT16                            BX;
-  UINT16                            Reserved5;
-  UINT16                            DX;
-  UINT16                            Reserved6;
-  UINT16                            CX;
-  UINT16                            Reserved7;
-  UINT16                            AX;
-  UINT16                            Reserved8;
+  UINT16    DI;
+  UINT16    Reserved1;
+  UINT16    SI;
+  UINT16    Reserved2;
+  UINT16    BP;
+  UINT16    Reserved3;
+  UINT16    SP;
+  UINT16    Reserved4;
+  UINT16    BX;
+  UINT16    Reserved5;
+  UINT16    DX;
+  UINT16    Reserved6;
+  UINT16    CX;
+  UINT16    Reserved7;
+  UINT16    AX;
+  UINT16    Reserved8;
 } IA32_WORD_REGS;
 
 typedef struct {
-  UINT32                            EDI;
-  UINT32                            ESI;
-  UINT32                            EBP;
-  UINT32                            ESP;
-  UINT32                            EBX;
-  UINT32                            EDX;
-  UINT32                            ECX;
-  UINT32                            EAX;
-  UINT16                            DS;
-  UINT16                            ES;
-  UINT16                            FS;
-  UINT16                            GS;
-  IA32_EFLAGS32                     EFLAGS;
-  UINT32                            Eip;
-  UINT16                            CS;
-  UINT16                            SS;
+  UINT32           EDI;
+  UINT32           ESI;
+  UINT32           EBP;
+  UINT32           ESP;
+  UINT32           EBX;
+  UINT32           EDX;
+  UINT32           ECX;
+  UINT32           EAX;
+  UINT16           DS;
+  UINT16           ES;
+  UINT16           FS;
+  UINT16           GS;
+  IA32_EFLAGS32    EFLAGS;
+  UINT32           Eip;
+  UINT16           CS;
+  UINT16           SS;
 } IA32_DWORD_REGS;
 
 typedef union {
-  IA32_DWORD_REGS                   E;
-  IA32_WORD_REGS                    X;
-  IA32_BYTE_REGS                    H;
+  IA32_DWORD_REGS    E;
+  IA32_WORD_REGS     X;
+  IA32_BYTE_REGS     H;
 } IA32_REGISTER_SET;
 
 ///
 /// Byte packed structure for an 16-bit real mode thunks.
 ///
 typedef struct {
-  IA32_REGISTER_SET                 *RealModeState;
-  VOID                              *RealModeBuffer;
-  UINT32                            RealModeBufferSize;
-  UINT32                            ThunkAttributes;
+  IA32_REGISTER_SET    *RealModeState;
+  VOID                 *RealModeBuffer;
+  UINT32               RealModeBufferSize;
+  UINT32               ThunkAttributes;
 } THUNK_CONTEXT;
 
-#define THUNK_ATTRIBUTE_BIG_REAL_MODE             0x00000001
-#define THUNK_ATTRIBUTE_DISABLE_A20_MASK_INT_15   0x00000002
-#define THUNK_ATTRIBUTE_DISABLE_A20_MASK_KBD_CTRL 0x00000004
+#define THUNK_ATTRIBUTE_BIG_REAL_MODE              0x00000001
+#define THUNK_ATTRIBUTE_DISABLE_A20_MASK_INT_15    0x00000002
+#define THUNK_ATTRIBUTE_DISABLE_A20_MASK_KBD_CTRL  0x00000004
+
+///
+/// Type definition for representing labels in NASM source code that allow for
+/// the patching of immediate operands of IA32 and X64 instructions.
+///
+/// While the type is technically defined as a function type (note: not a
+/// pointer-to-function type), such labels in NASM source code never stand for
+/// actual functions, and identifiers declared with this function type should
+/// never be called. This is also why the EFIAPI calling convention specifier
+/// is missing from the typedef, and why the typedef does not follow the usual
+/// edk2 coding style for function (or pointer-to-function) typedefs. The VOID
+/// return type and the VOID argument list are merely artifacts.
+///
+typedef VOID (X86_ASSEMBLY_PATCH_LABEL) (
+  VOID
+  );
 
 /**
   Retrieves CPUID information.
@@ -6758,13 +5408,12 @@ typedef struct {
 UINT32
 EFIAPI
 AsmCpuid (
-  IN      UINT32                    Index,
-  OUT     UINT32                    *Eax,  OPTIONAL
-  OUT     UINT32                    *Ebx,  OPTIONAL
-  OUT     UINT32                    *Ecx,  OPTIONAL
-  OUT     UINT32                    *Edx   OPTIONAL
+  IN      UINT32  Index,
+  OUT     UINT32  *Eax   OPTIONAL,
+  OUT     UINT32  *Ebx   OPTIONAL,
+  OUT     UINT32  *Ecx   OPTIONAL,
+  OUT     UINT32  *Edx   OPTIONAL
   );
-
 
 /**
   Retrieves CPUID information using an extended leaf identifier.
@@ -6801,14 +5450,13 @@ AsmCpuid (
 UINT32
 EFIAPI
 AsmCpuidEx (
-  IN      UINT32                    Index,
-  IN      UINT32                    SubIndex,
-  OUT     UINT32                    *Eax,  OPTIONAL
-  OUT     UINT32                    *Ebx,  OPTIONAL
-  OUT     UINT32                    *Ecx,  OPTIONAL
-  OUT     UINT32                    *Edx   OPTIONAL
+  IN      UINT32  Index,
+  IN      UINT32  SubIndex,
+  OUT     UINT32  *Eax   OPTIONAL,
+  OUT     UINT32  *Ebx   OPTIONAL,
+  OUT     UINT32  *Ecx   OPTIONAL,
+  OUT     UINT32  *Edx   OPTIONAL
   );
-
 
 /**
   Set CD bit and clear NW bit of CR0 followed by a WBINVD.
@@ -6823,7 +5471,6 @@ AsmDisableCache (
   VOID
   );
 
-
 /**
   Perform a WBINVD and clear both the CD and NW bits of CR0.
 
@@ -6836,7 +5483,6 @@ EFIAPI
 AsmEnableCache (
   VOID
   );
-
 
 /**
   Returns the lower 32-bits of a Machine Specific Register(MSR).
@@ -6855,9 +5501,8 @@ AsmEnableCache (
 UINT32
 EFIAPI
 AsmReadMsr32 (
-  IN      UINT32                    Index
+  IN      UINT32  Index
   );
-
 
 /**
   Writes a 32-bit value to a Machine Specific Register(MSR), and returns the value.
@@ -6879,10 +5524,9 @@ AsmReadMsr32 (
 UINT32
 EFIAPI
 AsmWriteMsr32 (
-  IN      UINT32                    Index,
-  IN      UINT32                    Value
+  IN      UINT32  Index,
+  IN      UINT32  Value
   );
-
 
 /**
   Reads a 64-bit MSR, performs a bitwise OR on the lower 32-bits, and
@@ -6906,10 +5550,9 @@ AsmWriteMsr32 (
 UINT32
 EFIAPI
 AsmMsrOr32 (
-  IN      UINT32                    Index,
-  IN      UINT32                    OrData
+  IN      UINT32  Index,
+  IN      UINT32  OrData
   );
-
 
 /**
   Reads a 64-bit MSR, performs a bitwise AND on the lower 32-bits, and writes
@@ -6933,10 +5576,9 @@ AsmMsrOr32 (
 UINT32
 EFIAPI
 AsmMsrAnd32 (
-  IN      UINT32                    Index,
-  IN      UINT32                    AndData
+  IN      UINT32  Index,
+  IN      UINT32  AndData
   );
-
 
 /**
   Reads a 64-bit MSR, performs a bitwise AND followed by a bitwise OR
@@ -6963,11 +5605,10 @@ AsmMsrAnd32 (
 UINT32
 EFIAPI
 AsmMsrAndThenOr32 (
-  IN      UINT32                    Index,
-  IN      UINT32                    AndData,
-  IN      UINT32                    OrData
+  IN      UINT32  Index,
+  IN      UINT32  AndData,
+  IN      UINT32  OrData
   );
-
 
 /**
   Reads a bit field of an MSR.
@@ -6994,11 +5635,10 @@ AsmMsrAndThenOr32 (
 UINT32
 EFIAPI
 AsmMsrBitFieldRead32 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit
   );
-
 
 /**
   Writes a bit field to an MSR.
@@ -7028,12 +5668,11 @@ AsmMsrBitFieldRead32 (
 UINT32
 EFIAPI
 AsmMsrBitFieldWrite32 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT32                    Value
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT32  Value
   );
-
 
 /**
   Reads a bit field in a 64-bit MSR, performs a bitwise OR, and writes the
@@ -7065,12 +5704,11 @@ AsmMsrBitFieldWrite32 (
 UINT32
 EFIAPI
 AsmMsrBitFieldOr32 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT32                    OrData
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT32  OrData
   );
-
 
 /**
   Reads a bit field in a 64-bit MSR, performs a bitwise AND, and writes the
@@ -7102,12 +5740,11 @@ AsmMsrBitFieldOr32 (
 UINT32
 EFIAPI
 AsmMsrBitFieldAnd32 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT32                    AndData
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT32  AndData
   );
-
 
 /**
   Reads a bit field in a 64-bit MSR, performs a bitwise AND followed by a
@@ -7143,13 +5780,12 @@ AsmMsrBitFieldAnd32 (
 UINT32
 EFIAPI
 AsmMsrBitFieldAndThenOr32 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT32                    AndData,
-  IN      UINT32                    OrData
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT32  AndData,
+  IN      UINT32  OrData
   );
-
 
 /**
   Returns a 64-bit Machine Specific Register(MSR).
@@ -7168,9 +5804,8 @@ AsmMsrBitFieldAndThenOr32 (
 UINT64
 EFIAPI
 AsmReadMsr64 (
-  IN      UINT32                    Index
+  IN      UINT32  Index
   );
-
 
 /**
   Writes a 64-bit value to a Machine Specific Register(MSR), and returns the
@@ -7192,10 +5827,9 @@ AsmReadMsr64 (
 UINT64
 EFIAPI
 AsmWriteMsr64 (
-  IN      UINT32                    Index,
-  IN      UINT64                    Value
+  IN      UINT32  Index,
+  IN      UINT64  Value
   );
-
 
 /**
   Reads a 64-bit MSR, performs a bitwise OR, and writes the result
@@ -7218,10 +5852,9 @@ AsmWriteMsr64 (
 UINT64
 EFIAPI
 AsmMsrOr64 (
-  IN      UINT32                    Index,
-  IN      UINT64                    OrData
+  IN      UINT32  Index,
+  IN      UINT64  OrData
   );
-
 
 /**
   Reads a 64-bit MSR, performs a bitwise AND, and writes the result back to the
@@ -7244,10 +5877,9 @@ AsmMsrOr64 (
 UINT64
 EFIAPI
 AsmMsrAnd64 (
-  IN      UINT32                    Index,
-  IN      UINT64                    AndData
+  IN      UINT32  Index,
+  IN      UINT64  AndData
   );
-
 
 /**
   Reads a 64-bit MSR, performs a bitwise AND followed by a bitwise
@@ -7273,11 +5905,10 @@ AsmMsrAnd64 (
 UINT64
 EFIAPI
 AsmMsrAndThenOr64 (
-  IN      UINT32                    Index,
-  IN      UINT64                    AndData,
-  IN      UINT64                    OrData
+  IN      UINT32  Index,
+  IN      UINT64  AndData,
+  IN      UINT64  OrData
   );
-
 
 /**
   Reads a bit field of an MSR.
@@ -7304,11 +5935,10 @@ AsmMsrAndThenOr64 (
 UINT64
 EFIAPI
 AsmMsrBitFieldRead64 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit
   );
-
 
 /**
   Writes a bit field to an MSR.
@@ -7337,12 +5967,11 @@ AsmMsrBitFieldRead64 (
 UINT64
 EFIAPI
 AsmMsrBitFieldWrite64 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT64                    Value
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT64  Value
   );
-
 
 /**
   Reads a bit field in a 64-bit MSR, performs a bitwise OR, and
@@ -7374,12 +6003,11 @@ AsmMsrBitFieldWrite64 (
 UINT64
 EFIAPI
 AsmMsrBitFieldOr64 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT64                    OrData
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT64  OrData
   );
-
 
 /**
   Reads a bit field in a 64-bit MSR, performs a bitwise AND, and writes the
@@ -7411,12 +6039,11 @@ AsmMsrBitFieldOr64 (
 UINT64
 EFIAPI
 AsmMsrBitFieldAnd64 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT64                    AndData
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT64  AndData
   );
-
 
 /**
   Reads a bit field in a 64-bit MSR, performs a bitwise AND followed by a
@@ -7451,13 +6078,12 @@ AsmMsrBitFieldAnd64 (
 UINT64
 EFIAPI
 AsmMsrBitFieldAndThenOr64 (
-  IN      UINT32                    Index,
-  IN      UINTN                     StartBit,
-  IN      UINTN                     EndBit,
-  IN      UINT64                    AndData,
-  IN      UINT64                    OrData
+  IN      UINT32  Index,
+  IN      UINTN   StartBit,
+  IN      UINTN   EndBit,
+  IN      UINT64  AndData,
+  IN      UINT64  OrData
   );
-
 
 /**
   Reads the current value of the EFLAGS register.
@@ -7475,7 +6101,6 @@ AsmReadEflags (
   VOID
   );
 
-
 /**
   Reads the current value of the Control Register 0 (CR0).
 
@@ -7491,7 +6116,6 @@ EFIAPI
 AsmReadCr0 (
   VOID
   );
-
 
 /**
   Reads the current value of the Control Register 2 (CR2).
@@ -7509,7 +6133,6 @@ AsmReadCr2 (
   VOID
   );
 
-
 /**
   Reads the current value of the Control Register 3 (CR3).
 
@@ -7526,7 +6149,6 @@ AsmReadCr3 (
   VOID
   );
 
-
 /**
   Reads the current value of the Control Register 4 (CR4).
 
@@ -7542,7 +6164,6 @@ EFIAPI
 AsmReadCr4 (
   VOID
   );
-
 
 /**
   Writes a value to Control Register 0 (CR0).
@@ -7561,7 +6182,6 @@ AsmWriteCr0 (
   UINTN  Cr0
   );
 
-
 /**
   Writes a value to Control Register 2 (CR2).
 
@@ -7578,7 +6198,6 @@ EFIAPI
 AsmWriteCr2 (
   UINTN  Cr2
   );
-
 
 /**
   Writes a value to Control Register 3 (CR3).
@@ -7597,7 +6216,6 @@ AsmWriteCr3 (
   UINTN  Cr3
   );
 
-
 /**
   Writes a value to Control Register 4 (CR4).
 
@@ -7615,7 +6233,6 @@ AsmWriteCr4 (
   UINTN  Cr4
   );
 
-
 /**
   Reads the current value of Debug Register 0 (DR0).
 
@@ -7631,7 +6248,6 @@ EFIAPI
 AsmReadDr0 (
   VOID
   );
-
 
 /**
   Reads the current value of Debug Register 1 (DR1).
@@ -7649,7 +6265,6 @@ AsmReadDr1 (
   VOID
   );
 
-
 /**
   Reads the current value of Debug Register 2 (DR2).
 
@@ -7665,7 +6280,6 @@ EFIAPI
 AsmReadDr2 (
   VOID
   );
-
 
 /**
   Reads the current value of Debug Register 3 (DR3).
@@ -7683,7 +6297,6 @@ AsmReadDr3 (
   VOID
   );
 
-
 /**
   Reads the current value of Debug Register 4 (DR4).
 
@@ -7699,7 +6312,6 @@ EFIAPI
 AsmReadDr4 (
   VOID
   );
-
 
 /**
   Reads the current value of Debug Register 5 (DR5).
@@ -7717,7 +6329,6 @@ AsmReadDr5 (
   VOID
   );
 
-
 /**
   Reads the current value of Debug Register 6 (DR6).
 
@@ -7734,7 +6345,6 @@ AsmReadDr6 (
   VOID
   );
 
-
 /**
   Reads the current value of Debug Register 7 (DR7).
 
@@ -7750,7 +6360,6 @@ EFIAPI
 AsmReadDr7 (
   VOID
   );
-
 
 /**
   Writes a value to Debug Register 0 (DR0).
@@ -7769,7 +6378,6 @@ AsmWriteDr0 (
   UINTN  Dr0
   );
 
-
 /**
   Writes a value to Debug Register 1 (DR1).
 
@@ -7786,7 +6394,6 @@ EFIAPI
 AsmWriteDr1 (
   UINTN  Dr1
   );
-
 
 /**
   Writes a value to Debug Register 2 (DR2).
@@ -7805,7 +6412,6 @@ AsmWriteDr2 (
   UINTN  Dr2
   );
 
-
 /**
   Writes a value to Debug Register 3 (DR3).
 
@@ -7822,7 +6428,6 @@ EFIAPI
 AsmWriteDr3 (
   UINTN  Dr3
   );
-
 
 /**
   Writes a value to Debug Register 4 (DR4).
@@ -7841,7 +6446,6 @@ AsmWriteDr4 (
   UINTN  Dr4
   );
 
-
 /**
   Writes a value to Debug Register 5 (DR5).
 
@@ -7858,7 +6462,6 @@ EFIAPI
 AsmWriteDr5 (
   UINTN  Dr5
   );
-
 
 /**
   Writes a value to Debug Register 6 (DR6).
@@ -7877,7 +6480,6 @@ AsmWriteDr6 (
   UINTN  Dr6
   );
 
-
 /**
   Writes a value to Debug Register 7 (DR7).
 
@@ -7895,7 +6497,6 @@ AsmWriteDr7 (
   UINTN  Dr7
   );
 
-
 /**
   Reads the current value of Code Segment Register (CS).
 
@@ -7910,7 +6511,6 @@ EFIAPI
 AsmReadCs (
   VOID
   );
-
 
 /**
   Reads the current value of Data Segment Register (DS).
@@ -7927,7 +6527,6 @@ AsmReadDs (
   VOID
   );
 
-
 /**
   Reads the current value of Extra Segment Register (ES).
 
@@ -7942,7 +6541,6 @@ EFIAPI
 AsmReadEs (
   VOID
   );
-
 
 /**
   Reads the current value of FS Data Segment Register (FS).
@@ -7959,7 +6557,6 @@ AsmReadFs (
   VOID
   );
 
-
 /**
   Reads the current value of GS Data Segment Register (GS).
 
@@ -7974,7 +6571,6 @@ EFIAPI
 AsmReadGs (
   VOID
   );
-
 
 /**
   Reads the current value of Stack Segment Register (SS).
@@ -7991,7 +6587,6 @@ AsmReadSs (
   VOID
   );
 
-
 /**
   Reads the current value of Task Register (TR).
 
@@ -8007,7 +6602,6 @@ AsmReadTr (
   VOID
   );
 
-
 /**
   Reads the current Global Descriptor Table Register(GDTR) descriptor.
 
@@ -8022,9 +6616,8 @@ AsmReadTr (
 VOID
 EFIAPI
 AsmReadGdtr (
-  OUT     IA32_DESCRIPTOR           *Gdtr
+  OUT     IA32_DESCRIPTOR  *Gdtr
   );
-
 
 /**
   Writes the current Global Descriptor Table Register (GDTR) descriptor.
@@ -8040,9 +6633,8 @@ AsmReadGdtr (
 VOID
 EFIAPI
 AsmWriteGdtr (
-  IN      CONST IA32_DESCRIPTOR     *Gdtr
+  IN      CONST IA32_DESCRIPTOR  *Gdtr
   );
-
 
 /**
   Reads the current Interrupt Descriptor Table Register(IDTR) descriptor.
@@ -8058,9 +6650,8 @@ AsmWriteGdtr (
 VOID
 EFIAPI
 AsmReadIdtr (
-  OUT     IA32_DESCRIPTOR           *Idtr
+  OUT     IA32_DESCRIPTOR  *Idtr
   );
-
 
 /**
   Writes the current Interrupt Descriptor Table Register(IDTR) descriptor.
@@ -8076,9 +6667,8 @@ AsmReadIdtr (
 VOID
 EFIAPI
 AsmWriteIdtr (
-  IN      CONST IA32_DESCRIPTOR     *Idtr
+  IN      CONST IA32_DESCRIPTOR  *Idtr
   );
-
 
 /**
   Reads the current Local Descriptor Table Register(LDTR) selector.
@@ -8095,7 +6685,6 @@ AsmReadLdtr (
   VOID
   );
 
-
 /**
   Writes the current Local Descriptor Table Register (LDTR) selector.
 
@@ -8108,9 +6697,8 @@ AsmReadLdtr (
 VOID
 EFIAPI
 AsmWriteLdtr (
-  IN      UINT16                    Ldtr
+  IN      UINT16  Ldtr
   );
-
 
 /**
   Save the current floating point/SSE/SSE2 context to a buffer.
@@ -8128,9 +6716,8 @@ AsmWriteLdtr (
 VOID
 EFIAPI
 AsmFxSave (
-  OUT     IA32_FX_BUFFER            *Buffer
+  OUT     IA32_FX_BUFFER  *Buffer
   );
-
 
 /**
   Restores the current floating point/SSE/SSE2 context from a buffer.
@@ -8149,9 +6736,8 @@ AsmFxSave (
 VOID
 EFIAPI
 AsmFxRestore (
-  IN      CONST IA32_FX_BUFFER      *Buffer
+  IN      CONST IA32_FX_BUFFER  *Buffer
   );
-
 
 /**
   Reads the current value of 64-bit MMX Register #0 (MM0).
@@ -8168,7 +6754,6 @@ AsmReadMm0 (
   VOID
   );
 
-
 /**
   Reads the current value of 64-bit MMX Register #1 (MM1).
 
@@ -8183,7 +6768,6 @@ EFIAPI
 AsmReadMm1 (
   VOID
   );
-
 
 /**
   Reads the current value of 64-bit MMX Register #2 (MM2).
@@ -8200,7 +6784,6 @@ AsmReadMm2 (
   VOID
   );
 
-
 /**
   Reads the current value of 64-bit MMX Register #3 (MM3).
 
@@ -8215,7 +6798,6 @@ EFIAPI
 AsmReadMm3 (
   VOID
   );
-
 
 /**
   Reads the current value of 64-bit MMX Register #4 (MM4).
@@ -8232,7 +6814,6 @@ AsmReadMm4 (
   VOID
   );
 
-
 /**
   Reads the current value of 64-bit MMX Register #5 (MM5).
 
@@ -8247,7 +6828,6 @@ EFIAPI
 AsmReadMm5 (
   VOID
   );
-
 
 /**
   Reads the current value of 64-bit MMX Register #6 (MM6).
@@ -8264,7 +6844,6 @@ AsmReadMm6 (
   VOID
   );
 
-
 /**
   Reads the current value of 64-bit MMX Register #7 (MM7).
 
@@ -8280,7 +6859,6 @@ AsmReadMm7 (
   VOID
   );
 
-
 /**
   Writes the current value of 64-bit MMX Register #0 (MM0).
 
@@ -8293,9 +6871,8 @@ AsmReadMm7 (
 VOID
 EFIAPI
 AsmWriteMm0 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Writes the current value of 64-bit MMX Register #1 (MM1).
@@ -8309,9 +6886,8 @@ AsmWriteMm0 (
 VOID
 EFIAPI
 AsmWriteMm1 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Writes the current value of 64-bit MMX Register #2 (MM2).
@@ -8325,9 +6901,8 @@ AsmWriteMm1 (
 VOID
 EFIAPI
 AsmWriteMm2 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Writes the current value of 64-bit MMX Register #3 (MM3).
@@ -8341,9 +6916,8 @@ AsmWriteMm2 (
 VOID
 EFIAPI
 AsmWriteMm3 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Writes the current value of 64-bit MMX Register #4 (MM4).
@@ -8357,9 +6931,8 @@ AsmWriteMm3 (
 VOID
 EFIAPI
 AsmWriteMm4 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Writes the current value of 64-bit MMX Register #5 (MM5).
@@ -8373,9 +6946,8 @@ AsmWriteMm4 (
 VOID
 EFIAPI
 AsmWriteMm5 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Writes the current value of 64-bit MMX Register #6 (MM6).
@@ -8389,9 +6961,8 @@ AsmWriteMm5 (
 VOID
 EFIAPI
 AsmWriteMm6 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Writes the current value of 64-bit MMX Register #7 (MM7).
@@ -8405,9 +6976,8 @@ AsmWriteMm6 (
 VOID
 EFIAPI
 AsmWriteMm7 (
-  IN      UINT64                    Value
+  IN      UINT64  Value
   );
-
 
 /**
   Reads the current value of Time Stamp Counter (TSC).
@@ -8424,7 +6994,6 @@ AsmReadTsc (
   VOID
   );
 
-
 /**
   Reads the current value of a Performance Counter (PMC).
 
@@ -8439,9 +7008,8 @@ AsmReadTsc (
 UINT64
 EFIAPI
 AsmReadPmc (
-  IN      UINT32                    Index
+  IN      UINT32  Index
   );
-
 
 /**
   Sets up a monitor buffer that is used by AsmMwait().
@@ -8462,11 +7030,10 @@ AsmReadPmc (
 UINTN
 EFIAPI
 AsmMonitor (
-  IN      UINTN                     Eax,
-  IN      UINTN                     Ecx,
-  IN      UINTN                     Edx
+  IN      UINTN  Eax,
+  IN      UINTN  Ecx,
+  IN      UINTN  Edx
   );
-
 
 /**
   Executes an MWAIT instruction.
@@ -8485,10 +7052,9 @@ AsmMonitor (
 UINTN
 EFIAPI
 AsmMwait (
-  IN      UINTN                     Eax,
-  IN      UINTN                     Ecx
+  IN      UINTN  Eax,
+  IN      UINTN  Ecx
   );
-
 
 /**
   Executes a WBINVD instruction.
@@ -8503,7 +7069,6 @@ AsmWbinvd (
   VOID
   );
 
-
 /**
   Executes a INVD instruction.
 
@@ -8516,7 +7081,6 @@ EFIAPI
 AsmInvd (
   VOID
   );
-
 
 /**
   Flushes a cache line from all the instruction and data caches within the
@@ -8536,9 +7100,8 @@ AsmInvd (
 VOID *
 EFIAPI
 AsmFlushCacheLine (
-  IN      VOID                      *LinearAddress
+  IN      VOID  *LinearAddress
   );
-
 
 /**
   Enables the 32-bit paging mode on the CPU.
@@ -8581,11 +7144,10 @@ VOID
 EFIAPI
 AsmEnablePaging32 (
   IN      SWITCH_STACK_ENTRY_POINT  EntryPoint,
-  IN      VOID                      *Context1,  OPTIONAL
-  IN      VOID                      *Context2,  OPTIONAL
+  IN      VOID                      *Context1   OPTIONAL,
+  IN      VOID                      *Context2   OPTIONAL,
   IN      VOID                      *NewStack
   );
-
 
 /**
   Disables the 32-bit paging mode on the CPU.
@@ -8625,11 +7187,10 @@ VOID
 EFIAPI
 AsmDisablePaging32 (
   IN      SWITCH_STACK_ENTRY_POINT  EntryPoint,
-  IN      VOID                      *Context1,  OPTIONAL
-  IN      VOID                      *Context2,  OPTIONAL
+  IN      VOID                      *Context1   OPTIONAL,
+  IN      VOID                      *Context2   OPTIONAL,
   IN      VOID                      *NewStack
   );
-
 
 /**
   Enables the 64-bit paging mode on the CPU.
@@ -8666,13 +7227,12 @@ AsmDisablePaging32 (
 VOID
 EFIAPI
 AsmEnablePaging64 (
-  IN      UINT16                    Cs,
-  IN      UINT64                    EntryPoint,
-  IN      UINT64                    Context1,  OPTIONAL
-  IN      UINT64                    Context2,  OPTIONAL
-  IN      UINT64                    NewStack
+  IN      UINT16  Cs,
+  IN      UINT64  EntryPoint,
+  IN      UINT64  Context1   OPTIONAL,
+  IN      UINT64  Context2   OPTIONAL,
+  IN      UINT64  NewStack
   );
-
 
 /**
   Disables the 64-bit paging mode on the CPU.
@@ -8707,13 +7267,12 @@ AsmEnablePaging64 (
 VOID
 EFIAPI
 AsmDisablePaging64 (
-  IN      UINT16                    Cs,
-  IN      UINT32                    EntryPoint,
-  IN      UINT32                    Context1,  OPTIONAL
-  IN      UINT32                    Context2,  OPTIONAL
-  IN      UINT32                    NewStack
+  IN      UINT16  Cs,
+  IN      UINT32  EntryPoint,
+  IN      UINT32  Context1   OPTIONAL,
+  IN      UINT32  Context2   OPTIONAL,
+  IN      UINT32  NewStack
   );
-
 
 //
 // 16-bit thunking services
@@ -8743,10 +7302,9 @@ AsmDisablePaging64 (
 VOID
 EFIAPI
 AsmGetThunk16Properties (
-  OUT     UINT32                    *RealModeBufferSize,
-  OUT     UINT32                    *ExtraStackSize
+  OUT     UINT32  *RealModeBufferSize,
+  OUT     UINT32  *ExtraStackSize
   );
-
 
 /**
   Prepares all structures a code required to use AsmThunk16().
@@ -8765,9 +7323,8 @@ AsmGetThunk16Properties (
 VOID
 EFIAPI
 AsmPrepareThunk16 (
-  IN OUT  THUNK_CONTEXT             *ThunkContext
+  IN OUT  THUNK_CONTEXT  *ThunkContext
   );
-
 
 /**
   Transfers control to a 16-bit real mode entry point and returns the results.
@@ -8825,9 +7382,8 @@ AsmPrepareThunk16 (
 VOID
 EFIAPI
 AsmThunk16 (
-  IN OUT  THUNK_CONTEXT             *ThunkContext
+  IN OUT  THUNK_CONTEXT  *ThunkContext
   );
-
 
 /**
   Prepares all structures and code for a 16-bit real mode thunk, transfers
@@ -8852,7 +7408,7 @@ AsmThunk16 (
 VOID
 EFIAPI
 AsmPrepareAndThunk16 (
-  IN OUT  THUNK_CONTEXT             *ThunkContext
+  IN OUT  THUNK_CONTEXT  *ThunkContext
   );
 
 /**
@@ -8869,7 +7425,7 @@ AsmPrepareAndThunk16 (
 BOOLEAN
 EFIAPI
 AsmRdRand16 (
-  OUT     UINT16                    *Rand
+  OUT     UINT16  *Rand
   );
 
 /**
@@ -8886,7 +7442,7 @@ AsmRdRand16 (
 BOOLEAN
 EFIAPI
 AsmRdRand32 (
-  OUT     UINT32                    *Rand
+  OUT     UINT32  *Rand
   );
 
 /**
@@ -8903,10 +7459,127 @@ AsmRdRand32 (
 BOOLEAN
 EFIAPI
 AsmRdRand64  (
-  OUT     UINT64                    *Rand
+  OUT     UINT64  *Rand
   );
 
-#endif
-#endif
+/**
+  Load given selector into TR register.
 
+  @param[in] Selector     Task segment selector
+**/
+VOID
+EFIAPI
+AsmWriteTr (
+  IN UINT16  Selector
+  );
 
+/**
+  Performs a serializing operation on all load-from-memory instructions that
+  were issued prior the AsmLfence function.
+
+  Executes a LFENCE instruction. This function is only available on IA-32 and x64.
+
+**/
+VOID
+EFIAPI
+AsmLfence (
+  VOID
+  );
+
+/**
+  Executes a XGETBV instruction
+
+  Executes a XGETBV instruction. This function is only available on IA-32 and
+  x64.
+
+  @param[in] Index        Extended control register index
+
+  @return                 The current value of the extended control register
+**/
+UINT64
+EFIAPI
+AsmXGetBv (
+  IN UINT32  Index
+  );
+
+/**
+  Executes a XSETBV instruction to write a 64-bit value to a Extended Control
+  Register(XCR), and returns the value.
+
+  Writes the 64-bit value specified by Value to the XCR specified by Index. The
+  64-bit value written to the XCR is returned. No parameter checking is
+  performed on Index or Value, and some of these may cause CPU exceptions. The
+  caller must either guarantee that Index and Value are valid, or the caller
+  must establish proper exception handlers. This function is only available on
+  IA-32 and x64.
+
+  @param  Index The 32-bit XCR index to write.
+  @param  Value The 64-bit value to write to the XCR.
+
+  @return Value
+
+**/
+UINT64
+EFIAPI
+AsmXSetBv (
+  IN UINT32  Index,
+  IN UINT64  Value
+  );
+
+/**
+  Executes a VMGEXIT instruction (VMMCALL with a REP prefix)
+
+  Executes a VMGEXIT instruction. This function is only available on IA-32 and
+  x64.
+
+**/
+VOID
+EFIAPI
+AsmVmgExit (
+  VOID
+  );
+
+/**
+  Patch the immediate operand of an IA32 or X64 instruction such that the byte,
+  word, dword or qword operand is encoded at the end of the instruction's
+  binary representation.
+
+  This function should be used to update object code that was compiled with
+  NASM from assembly source code. Example:
+
+  NASM source code:
+
+        mov     eax, strict dword 0 ; the imm32 zero operand will be patched
+    ASM_PFX(gPatchCr3):
+        mov     cr3, eax
+
+  C source code:
+
+    X86_ASSEMBLY_PATCH_LABEL gPatchCr3;
+    PatchInstructionX86 (gPatchCr3, AsmReadCr3 (), 4);
+
+  @param[out] InstructionEnd  Pointer right past the instruction to patch. The
+                              immediate operand to patch is expected to
+                              comprise the trailing bytes of the instruction.
+                              If InstructionEnd is closer to address 0 than
+                              ValueSize permits, then ASSERT().
+
+  @param[in] PatchValue       The constant to write to the immediate operand.
+                              The caller is responsible for ensuring that
+                              PatchValue can be represented in the byte, word,
+                              dword or qword operand (as indicated through
+                              ValueSize); otherwise ASSERT().
+
+  @param[in] ValueSize        The size of the operand in bytes; must be 1, 2,
+                              4, or 8. ASSERT() otherwise.
+**/
+VOID
+EFIAPI
+PatchInstructionX86 (
+  OUT X86_ASSEMBLY_PATCH_LABEL  *InstructionEnd,
+  IN  UINT64                    PatchValue,
+  IN  UINTN                     ValueSize
+  );
+
+#endif // defined (MDE_CPU_IA32) || defined (MDE_CPU_X64)
+#endif // !defined (__BASE_LIB__)

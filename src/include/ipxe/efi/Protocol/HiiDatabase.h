@@ -2,38 +2,34 @@
   The file provides Database manager for HII-related data
   structures.
 
-Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials are licensed and made available under
-the terms and conditions of the BSD License that accompanies this distribution.
-The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  @par Revision Reference:
+  This Protocol was introduced in UEFI Specification 2.1.
 
 **/
 
 #ifndef __HII_DATABASE_H__
 #define __HII_DATABASE_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 #define EFI_HII_DATABASE_PROTOCOL_GUID \
   { 0xef9fc172, 0xa1b2, 0x4693, { 0xb3, 0x27, 0x6d, 0x32, 0xfc, 0x41, 0x60, 0x42 } }
 
-
 typedef struct _EFI_HII_DATABASE_PROTOCOL EFI_HII_DATABASE_PROTOCOL;
-
 
 ///
 /// EFI_HII_DATABASE_NOTIFY_TYPE.
 ///
-typedef UINTN   EFI_HII_DATABASE_NOTIFY_TYPE;
+typedef UINTN EFI_HII_DATABASE_NOTIFY_TYPE;
 
-#define EFI_HII_DATABASE_NOTIFY_NEW_PACK    0x00000001
-#define EFI_HII_DATABASE_NOTIFY_REMOVE_PACK 0x00000002
-#define EFI_HII_DATABASE_NOTIFY_EXPORT_PACK 0x00000004
-#define EFI_HII_DATABASE_NOTIFY_ADD_PACK    0x00000008
+#define EFI_HII_DATABASE_NOTIFY_NEW_PACK     0x00000001
+#define EFI_HII_DATABASE_NOTIFY_REMOVE_PACK  0x00000002
+#define EFI_HII_DATABASE_NOTIFY_EXPORT_PACK  0x00000004
+#define EFI_HII_DATABASE_NOTIFY_ADD_PACK     0x00000008
+
 /**
 
   Functions which are registered to receive notification of
@@ -68,7 +64,7 @@ EFI_STATUS
   IN CONST  EFI_HII_PACKAGE_HEADER        *Package,
   IN        EFI_HII_HANDLE                 Handle,
   IN        EFI_HII_DATABASE_NOTIFY_TYPE  NotifyType
-);
+  );
 
 /**
 
@@ -108,10 +104,9 @@ EFI_STATUS
 (EFIAPI *EFI_HII_DATABASE_NEW_PACK)(
   IN CONST  EFI_HII_DATABASE_PROTOCOL   *This,
   IN CONST  EFI_HII_PACKAGE_LIST_HEADER *PackageList,
-  IN        EFI_HANDLE                  DriverHandle, OPTIONAL
+  IN        EFI_HANDLE                  DriverHandle  OPTIONAL,
   OUT       EFI_HII_HANDLE               *Handle
-);
-
+  );
 
 /**
 
@@ -137,8 +132,7 @@ EFI_STATUS
 (EFIAPI *EFI_HII_DATABASE_REMOVE_PACK)(
   IN CONST  EFI_HII_DATABASE_PROTOCOL *This,
   IN        EFI_HII_HANDLE             Handle
-);
-
+  );
 
 /**
 
@@ -186,8 +180,7 @@ EFI_STATUS
   IN CONST  EFI_HII_DATABASE_PROTOCOL   *This,
   IN        EFI_HII_HANDLE               Handle,
   IN CONST  EFI_HII_PACKAGE_LIST_HEADER *PackageList
-);
-
+  );
 
 /**
 
@@ -240,7 +233,7 @@ EFI_STATUS
   IN CONST  EFI_GUID                  *PackageGuid,
   IN OUT    UINTN                     *HandleBufferLength,
   OUT       EFI_HII_HANDLE            *Handle
-);
+  );
 
 /**
 
@@ -290,8 +283,7 @@ EFI_STATUS
   IN        EFI_HII_HANDLE                 Handle,
   IN OUT    UINTN                          *BufferSize,
   OUT       EFI_HII_PACKAGE_LIST_HEADER    *Buffer
-);
-
+  );
 
 /**
 
@@ -353,8 +345,7 @@ EFI_STATUS
   IN        EFI_HII_DATABASE_NOTIFY       PackageNotifyFn,
   IN        EFI_HII_DATABASE_NOTIFY_TYPE  NotifyType,
   OUT       EFI_HANDLE                    *NotifyHandle
-);
-
+  );
 
 /**
 
@@ -376,8 +367,7 @@ EFI_STATUS
 (EFIAPI *EFI_HII_DATABASE_UNREGISTER_NOTIFY)(
   IN CONST  EFI_HII_DATABASE_PROTOCOL *This,
   IN        EFI_HANDLE                NotificationHandle
-);
-
+  );
 
 /**
 
@@ -417,8 +407,7 @@ EFI_STATUS
   IN CONST  EFI_HII_DATABASE_PROTOCOL *This,
   IN OUT    UINT16                    *KeyGuidBufferLength,
   OUT       EFI_GUID                  *KeyGuidBuffer
-);
-
+  );
 
 /**
 
@@ -453,7 +442,7 @@ EFI_STATUS
   IN CONST  EFI_GUID                  *KeyGuid,
   IN OUT UINT16                       *KeyboardLayoutLength,
   OUT       EFI_HII_KEYBOARD_LAYOUT   *KeyboardLayout
-);
+  );
 
 /**
 
@@ -480,7 +469,7 @@ EFI_STATUS
 (EFIAPI *EFI_HII_SET_KEYBOARD_LAYOUT)(
   IN CONST  EFI_HII_DATABASE_PROTOCOL *This,
   IN CONST  EFI_GUID                  *KeyGuid
-);
+  );
 
 /**
 
@@ -507,27 +496,25 @@ EFI_STATUS
   IN CONST  EFI_HII_DATABASE_PROTOCOL *This,
   IN        EFI_HII_HANDLE             PackageListHandle,
   OUT       EFI_HANDLE                *DriverHandle
-);
+  );
 
 ///
 /// Database manager for HII-related data structures.
 ///
 struct _EFI_HII_DATABASE_PROTOCOL {
-  EFI_HII_DATABASE_NEW_PACK           NewPackageList;
-  EFI_HII_DATABASE_REMOVE_PACK        RemovePackageList;
-  EFI_HII_DATABASE_UPDATE_PACK        UpdatePackageList;
-  EFI_HII_DATABASE_LIST_PACKS         ListPackageLists;
-  EFI_HII_DATABASE_EXPORT_PACKS       ExportPackageLists;
-  EFI_HII_DATABASE_REGISTER_NOTIFY    RegisterPackageNotify;
-  EFI_HII_DATABASE_UNREGISTER_NOTIFY  UnregisterPackageNotify;
-  EFI_HII_FIND_KEYBOARD_LAYOUTS       FindKeyboardLayouts;
-  EFI_HII_GET_KEYBOARD_LAYOUT         GetKeyboardLayout;
-  EFI_HII_SET_KEYBOARD_LAYOUT         SetKeyboardLayout;
-  EFI_HII_DATABASE_GET_PACK_HANDLE    GetPackageListHandle;
+  EFI_HII_DATABASE_NEW_PACK             NewPackageList;
+  EFI_HII_DATABASE_REMOVE_PACK          RemovePackageList;
+  EFI_HII_DATABASE_UPDATE_PACK          UpdatePackageList;
+  EFI_HII_DATABASE_LIST_PACKS           ListPackageLists;
+  EFI_HII_DATABASE_EXPORT_PACKS         ExportPackageLists;
+  EFI_HII_DATABASE_REGISTER_NOTIFY      RegisterPackageNotify;
+  EFI_HII_DATABASE_UNREGISTER_NOTIFY    UnregisterPackageNotify;
+  EFI_HII_FIND_KEYBOARD_LAYOUTS         FindKeyboardLayouts;
+  EFI_HII_GET_KEYBOARD_LAYOUT           GetKeyboardLayout;
+  EFI_HII_SET_KEYBOARD_LAYOUT           SetKeyboardLayout;
+  EFI_HII_DATABASE_GET_PACK_HANDLE      GetPackageListHandle;
 };
 
-extern EFI_GUID gEfiHiiDatabaseProtocolGuid;
+extern EFI_GUID  gEfiHiiDatabaseProtocolGuid;
 
 #endif
-
-

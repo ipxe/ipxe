@@ -6,21 +6,15 @@
   instance of this protocol for every PCI controller that has a PCI option ROM that contains one or
   more UEFI drivers. The protocol instance is attached to the handle of the PCI controller.
 
-  Copyright (c) 2006 - 2008, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_H_
 #define _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_H_
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 ///
 /// Global ID for the Bus Specific Driver Override Protocol
@@ -30,7 +24,7 @@ FILE_LICENCE ( BSD3 );
     0x3bc1b285, 0x8a15, 0x4a82, {0xaa, 0xbf, 0x4d, 0x7d, 0x13, 0xfb, 0x32, 0x65 } \
   }
 
-typedef struct _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL  EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL;
+typedef struct _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL;
 
 //
 // Prototypes for the Bus Specific Driver Override Protocol
@@ -66,9 +60,9 @@ EFI_STATUS
 /// drivers to controllers.
 ///
 struct _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL {
-  EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_GET_DRIVER GetDriver;
+  EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_GET_DRIVER    GetDriver;
 };
 
-extern EFI_GUID gEfiBusSpecificDriverOverrideProtocolGuid;
+extern EFI_GUID  gEfiBusSpecificDriverOverrideProtocolGuid;
 
 #endif

@@ -3,21 +3,15 @@
   This protocol is used to retrieve user readable names of drivers
   and controllers managed by UEFI Drivers.
 
-  Copyright (c) 2006 - 2011, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __EFI_COMPONENT_NAME2_H__
 #define __EFI_COMPONENT_NAME2_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 ///
 /// Global ID for the Component Name Protocol
@@ -25,8 +19,7 @@ FILE_LICENCE ( BSD3 );
 #define EFI_COMPONENT_NAME2_PROTOCOL_GUID \
   {0x6a7a5cff, 0xe8d9, 0x4f70, { 0xba, 0xda, 0x75, 0xab, 0x30, 0x25, 0xce, 0x14 } }
 
-typedef struct _EFI_COMPONENT_NAME2_PROTOCOL  EFI_COMPONENT_NAME2_PROTOCOL;
-
+typedef struct _EFI_COMPONENT_NAME2_PROTOCOL EFI_COMPONENT_NAME2_PROTOCOL;
 
 /**
   Retrieves a string that is the user readable name of
@@ -71,7 +64,6 @@ EFI_STATUS
   IN  CHAR8                                *Language,
   OUT CHAR16                               **DriverName
   );
-
 
 /**
   Retrieves a string that is the user readable name of
@@ -156,8 +148,8 @@ EFI_STATUS
 /// and controllers managed by UEFI Drivers.
 ///
 struct _EFI_COMPONENT_NAME2_PROTOCOL {
-  EFI_COMPONENT_NAME2_GET_DRIVER_NAME      GetDriverName;
-  EFI_COMPONENT_NAME2_GET_CONTROLLER_NAME  GetControllerName;
+  EFI_COMPONENT_NAME2_GET_DRIVER_NAME        GetDriverName;
+  EFI_COMPONENT_NAME2_GET_CONTROLLER_NAME    GetControllerName;
 
   ///
   /// A Null-terminated ASCII string array that contains one or more
@@ -166,9 +158,9 @@ struct _EFI_COMPONENT_NAME2_PROTOCOL {
   /// driver is up to the driver writer. SupportedLanguages is
   /// specified in RFC 4646 format.
   ///
-  CHAR8                                    *SupportedLanguages;
+  CHAR8    *SupportedLanguages;
 };
 
-extern EFI_GUID gEfiComponentName2ProtocolGuid;
+extern EFI_GUID  gEfiComponentName2ProtocolGuid;
 
 #endif

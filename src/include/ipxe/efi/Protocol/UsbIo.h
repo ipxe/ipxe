@@ -5,21 +5,15 @@
   mice and mass storage devices. In particular, functions for managing devices
   on USB buses are defined here.
 
-  Copyright (c) 2006 - 2008, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __USB_IO_H__
 #define __USB_IO_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 #include <ipxe/efi/IndustryStandard/Usb.h>
 
@@ -31,7 +25,7 @@ FILE_LICENCE ( BSD3 );
     0x2B2F68D6, 0x0CD2, 0x44cf, {0x8E, 0x8B, 0xBB, 0xA2, 0x0B, 0x1B, 0x5B, 0x75 } \
   }
 
-typedef struct _EFI_USB_IO_PROTOCOL   EFI_USB_IO_PROTOCOL;
+typedef struct _EFI_USB_IO_PROTOCOL EFI_USB_IO_PROTOCOL;
 
 //
 // Related Definition for EFI USB I/O protocol
@@ -40,11 +34,11 @@ typedef struct _EFI_USB_IO_PROTOCOL   EFI_USB_IO_PROTOCOL;
 //
 // USB standard descriptors and reqeust
 //
-typedef USB_DEVICE_REQUEST        EFI_USB_DEVICE_REQUEST;
-typedef USB_DEVICE_DESCRIPTOR     EFI_USB_DEVICE_DESCRIPTOR;
-typedef USB_CONFIG_DESCRIPTOR     EFI_USB_CONFIG_DESCRIPTOR;
-typedef USB_INTERFACE_DESCRIPTOR  EFI_USB_INTERFACE_DESCRIPTOR;
-typedef USB_ENDPOINT_DESCRIPTOR   EFI_USB_ENDPOINT_DESCRIPTOR;
+typedef USB_DEVICE_REQUEST       EFI_USB_DEVICE_REQUEST;
+typedef USB_DEVICE_DESCRIPTOR    EFI_USB_DEVICE_DESCRIPTOR;
+typedef USB_CONFIG_DESCRIPTOR    EFI_USB_CONFIG_DESCRIPTOR;
+typedef USB_INTERFACE_DESCRIPTOR EFI_USB_INTERFACE_DESCRIPTOR;
+typedef USB_ENDPOINT_DESCRIPTOR  EFI_USB_ENDPOINT_DESCRIPTOR;
 
 ///
 /// USB data transfer direction
@@ -58,16 +52,16 @@ typedef enum {
 //
 // USB Transfer Results
 //
-#define EFI_USB_NOERROR             0x00
-#define EFI_USB_ERR_NOTEXECUTE      0x01
-#define EFI_USB_ERR_STALL           0x02
-#define EFI_USB_ERR_BUFFER          0x04
-#define EFI_USB_ERR_BABBLE          0x08
-#define EFI_USB_ERR_NAK             0x10
-#define EFI_USB_ERR_CRC             0x20
-#define EFI_USB_ERR_TIMEOUT         0x40
-#define EFI_USB_ERR_BITSTUFF        0x80
-#define EFI_USB_ERR_SYSTEM          0x100
+#define EFI_USB_NOERROR         0x00
+#define EFI_USB_ERR_NOTEXECUTE  0x01
+#define EFI_USB_ERR_STALL       0x02
+#define EFI_USB_ERR_BUFFER      0x04
+#define EFI_USB_ERR_BABBLE      0x08
+#define EFI_USB_ERR_NAK         0x10
+#define EFI_USB_ERR_CRC         0x20
+#define EFI_USB_ERR_TIMEOUT     0x40
+#define EFI_USB_ERR_BITSTUFF    0x80
+#define EFI_USB_ERR_SYSTEM      0x100
 
 /**
   Async USB transfer callback routine.
@@ -96,7 +90,6 @@ EFI_STATUS
 // Prototype for EFI USB I/O protocol
 //
 
-
 /**
   This function is used to manage a USB device with a control transfer pipe. A control transfer is
   typically used to perform device initialization and configuration.
@@ -114,7 +107,7 @@ EFI_STATUS
 
   @retval EFI_SUCCESS           The control transfer has been successfully executed.
   @retval EFI_DEVICE_ERROR      The transfer failed. The transfer status is returned in Status.
-  @retval EFI_INVALID_PARAMETE  One or more parameters are invalid.
+  @retval EFI_INVALID_PARAMETER One or more parameters are invalid.
   @retval EFI_OUT_OF_RESOURCES  The request could not be completed due to a lack of resources.
   @retval EFI_TIMEOUT           The control transfer fails due to timeout.
 
@@ -157,7 +150,7 @@ EFI_STATUS
 
   @retval EFI_SUCCESS           The bulk transfer has been successfully executed.
   @retval EFI_DEVICE_ERROR      The transfer failed. The transfer status is returned in Status.
-  @retval EFI_INVALID_PARAMETE  One or more parameters are invalid.
+  @retval EFI_INVALID_PARAMETER One or more parameters are invalid.
   @retval EFI_OUT_OF_RESOURCES  The request could not be submitted due to a lack of resources.
   @retval EFI_TIMEOUT           The control transfer fails due to timeout.
 
@@ -486,29 +479,29 @@ struct _EFI_USB_IO_PROTOCOL {
   //
   // IO transfer
   //
-  EFI_USB_IO_CONTROL_TRANSFER           UsbControlTransfer;
-  EFI_USB_IO_BULK_TRANSFER              UsbBulkTransfer;
-  EFI_USB_IO_ASYNC_INTERRUPT_TRANSFER   UsbAsyncInterruptTransfer;
-  EFI_USB_IO_SYNC_INTERRUPT_TRANSFER    UsbSyncInterruptTransfer;
-  EFI_USB_IO_ISOCHRONOUS_TRANSFER       UsbIsochronousTransfer;
-  EFI_USB_IO_ASYNC_ISOCHRONOUS_TRANSFER UsbAsyncIsochronousTransfer;
+  EFI_USB_IO_CONTROL_TRANSFER              UsbControlTransfer;
+  EFI_USB_IO_BULK_TRANSFER                 UsbBulkTransfer;
+  EFI_USB_IO_ASYNC_INTERRUPT_TRANSFER      UsbAsyncInterruptTransfer;
+  EFI_USB_IO_SYNC_INTERRUPT_TRANSFER       UsbSyncInterruptTransfer;
+  EFI_USB_IO_ISOCHRONOUS_TRANSFER          UsbIsochronousTransfer;
+  EFI_USB_IO_ASYNC_ISOCHRONOUS_TRANSFER    UsbAsyncIsochronousTransfer;
 
   //
   // Common device request
   //
-  EFI_USB_IO_GET_DEVICE_DESCRIPTOR      UsbGetDeviceDescriptor;
-  EFI_USB_IO_GET_CONFIG_DESCRIPTOR      UsbGetConfigDescriptor;
-  EFI_USB_IO_GET_INTERFACE_DESCRIPTOR   UsbGetInterfaceDescriptor;
-  EFI_USB_IO_GET_ENDPOINT_DESCRIPTOR    UsbGetEndpointDescriptor;
-  EFI_USB_IO_GET_STRING_DESCRIPTOR      UsbGetStringDescriptor;
-  EFI_USB_IO_GET_SUPPORTED_LANGUAGE     UsbGetSupportedLanguages;
+  EFI_USB_IO_GET_DEVICE_DESCRIPTOR         UsbGetDeviceDescriptor;
+  EFI_USB_IO_GET_CONFIG_DESCRIPTOR         UsbGetConfigDescriptor;
+  EFI_USB_IO_GET_INTERFACE_DESCRIPTOR      UsbGetInterfaceDescriptor;
+  EFI_USB_IO_GET_ENDPOINT_DESCRIPTOR       UsbGetEndpointDescriptor;
+  EFI_USB_IO_GET_STRING_DESCRIPTOR         UsbGetStringDescriptor;
+  EFI_USB_IO_GET_SUPPORTED_LANGUAGE        UsbGetSupportedLanguages;
 
   //
   // Reset controller's parent port
   //
-  EFI_USB_IO_PORT_RESET                 UsbPortReset;
+  EFI_USB_IO_PORT_RESET                    UsbPortReset;
 };
 
-extern EFI_GUID gEfiUsbIoProtocolGuid;
+extern EFI_GUID  gEfiUsbIoProtocolGuid;
 
 #endif
