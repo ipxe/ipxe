@@ -40,6 +40,9 @@ typedef uint8_t BOOLEAN;
 /* Define an architecture-neutral MDE_CPU macro to prevent build errors */
 #define MDE_CPU_EBC
 
+/* Define MAX_BIT in terms of UINTN */
+#define MAX_BIT ( ( ( UINTN ) 1U ) << ( ( 8 * sizeof ( UINTN ) ) - 1 ) )
+
 #else /* EFI_HOSTONLY */
 
 #ifdef __i386__
