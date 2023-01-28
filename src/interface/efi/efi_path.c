@@ -17,6 +17,8 @@
  * 02110-1301, USA.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
