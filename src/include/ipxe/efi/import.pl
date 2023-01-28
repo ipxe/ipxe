@@ -71,9 +71,9 @@ sub try_import_file {
 	  push @dependencies, $1;
 	}
 	# Check for BSD licence statement
-	if ( /^\s*THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE/ ) {
+	if ( /^\s*SPDX-License-Identifier: BSD-2-Clause-Patent$/ ) {
 	  die "Licence detected after header guard\n" if $guard;
-	  $licence = "BSD3";
+	  $licence = "BSD2_PATENT";
 	}
 	# Write out line
 	print $outfh "$_\n";
