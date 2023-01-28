@@ -29,6 +29,7 @@ my $known_licences = {
       public_domain => 1,
       bsd3 => 1,
       bsd2 => 1,
+      bsd2_patent => 1,
       mit  => 1,
       isc  => 1,
     },
@@ -41,6 +42,7 @@ my $known_licences = {
       public_domain => 1,
       bsd3 => 1,
       bsd2 => 1,
+      bsd2_patent => 1,
       mit  => 1,
       isc  => 1,
     },
@@ -54,6 +56,7 @@ my $known_licences = {
       public_domain => 1,
       bsd3 => 1,
       bsd2 => 1,
+      bsd2_patent => 1,
       mit  => 1,
       isc  => 1,
     },
@@ -65,6 +68,7 @@ my $known_licences = {
       public_domain => 1,
       bsd3 => 1,
       bsd2 => 1,
+      bsd2_patent => 1,
       mit => 1,
       isc => 1,
     },
@@ -96,6 +100,16 @@ my $known_licences = {
     desc => "BSD Licence (without advertising or endorsement clauses)",
     can_subsume => {
       public_domain => 1,
+      mit  => 1,
+      isc  => 1,
+    },
+  },
+  bsd2_patent => {
+    desc => ( "BSD Licence (without advertising or endorsement clauses, ".
+	      "with patent clause)" ),
+    can_subsume => {
+      public_domain => 1,
+      bsd2 => 1,
       mit  => 1,
       isc  => 1,
     },
