@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_path.h>
+#include <ipxe/efi/efi_cmdline.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 
 /** Image handle passed to entry point */
@@ -253,6 +254,10 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	efi_loaded_image = loaded_image;
 	DBGC ( systab, "EFI image base address %p\n",
 	       efi_loaded_image->ImageBase );
+
+	/* Record command line */
+	efi_cmdline = efi_loaded_image->LoadOptions;
+	efi_cmdline_len = efi_loaded_image->LoadOptionsSize;
 
 	/* Get loaded image's device handle's device path */
 	if ( ( efirc = bs->OpenProtocol ( efi_loaded_image->DeviceHandle,
