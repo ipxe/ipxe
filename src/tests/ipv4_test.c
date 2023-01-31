@@ -88,6 +88,28 @@ static void inet_aton_okx ( const char *text, uint32_t addr, const char *file,
 	inet_aton_okx ( text, addr, __FILE__, __LINE__ )
 
 /**
+ * Report an inaddr_is_broadcast() test result
+ *
+ * @v dst		Destination IPv4 address
+ * @v netmask	Destination IPv4 netmask
+ * @v res		Expected result
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static void inaddr_is_broadcast_okx ( uint32_t dst, uint32_t netmask,
+				      bool expected, const char *file,
+				      unsigned int line ) {
+	struct in_addr in_dst = { .s_addr = dst };
+	struct in_addr in_netmask = { .s_addr = netmask };
+	bool actual = inaddr_is_broadcast ( &in_dst, &in_netmask );
+	okx ( actual == expected, file, line );
+};
+#define inaddr_is_broadcast_ok( dst, netmask ) \
+	inaddr_is_broadcast_okx ( dst, netmask, true, __FILE__, __LINE__ )
+#define inaddr_is_not_broadcast_ok( dst, netmask ) \
+	inaddr_is_broadcast_okx ( dst, netmask, false, __FILE__, __LINE__ )
+
+/**
  * Report an inet_aton() failure test result
  *
  * @v text		Textual representation
@@ -145,6 +167,26 @@ static void ipv4_test_exec ( void ) {
 	inet_aton_fail_ok ( "127.0.0" ); /* Too short */
 	inet_aton_fail_ok ( "1.2.3.a" ); /* Invalid characters */
 	inet_aton_fail_ok ( "127.0..1" ); /* Missing bytes */
+
+	/* inaddr_is_broadcast() tests */
+	/* Link-local broadcast in /24 */
+	inaddr_is_broadcast_ok ( IPV4( 255, 255, 255, 255 ),
+				 IPV4( 255, 255, 255, 0 ) );
+	/* Link-local broadcast in /31 */
+	inaddr_is_broadcast_ok ( IPV4( 255, 255, 255, 255 ),
+				 IPV4( 255, 255, 255, 254 ) );
+	/* Directed broadcast in /24 */
+	inaddr_is_broadcast_ok ( IPV4( 192, 168, 1, 255 ),
+				 IPV4( 255, 255, 255, 0 ) );
+	/* Directed broadcast in /31 */
+	inaddr_is_not_broadcast_ok ( IPV4( 192, 168, 1, 255 ),
+				     IPV4( 255, 255, 255, 254 ) );
+	/* Regular host in /24 */
+	inaddr_is_not_broadcast_ok ( IPV4( 192, 168, 1, 1 ),
+				     IPV4( 255, 255, 255, 0 ) );
+	/* Regular host in /31 */
+	inaddr_is_not_broadcast_ok ( IPV4( 192, 168, 1, 1 ),
+				     IPV4( 255, 255, 255, 254 ) );
 }
 
 /** IPv4 self-test */

@@ -4,6 +4,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <byteswap.h>
 #include <ipxe/socket.h>
 
@@ -148,5 +149,29 @@ extern int inet_aton ( const char *cp, struct in_addr *inp );
 extern char * inet_ntoa ( struct in_addr in );
 extern int inet6_aton ( const char *string, struct in6_addr *in );
 extern char * inet6_ntoa ( const struct in6_addr *in );
+
+/**
+ * Check whether the given destination IPv4 address is a broadcast
+ * address, given the netmask of the destination network.
+ *
+ * @v dst		Destination IPv4 address
+ * @v netmask		Destination IPv4 netmask
+ * @ret is_broadcast	Whether this is a broadcast
+ */
+static inline __always_inline bool
+inaddr_is_broadcast( struct in_addr *dst, struct in_addr *netmask ) {
+	if ( dst->s_addr == INADDR_BROADCAST ) {
+		/* Destination is the link-local broadcast address. */
+		return true;
+	}
+	if ( netmask->s_addr == htonl ( 0xfffffffe ) ) {
+		/* Destination is on a /31 link. In that case, there is
+		 * no directed broadcast address, so treat it as a
+		 * regular nexthop. See RFC 3021 for details. */
+		return false;
+	}
+	/* If all host bits are set, this is a directed broadcast. */
+	return ( dst->s_addr | netmask->s_addr ) == INADDR_BROADCAST;
+}
 
 #endif	/* _IPXE_IN_H */
