@@ -54,12 +54,14 @@ static void *efi_autoexec;
 static size_t efi_autoexec_len;
 
 /**
- * Load autoexec script from filesystem
+ * Load autoexec script from path within filesystem
  *
  * @v device		Device handle
+ * @v path		Relative path to image, or NULL to load from root
  * @ret rc		Return status code
  */
-static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
+static int efi_autoexec_filesystem ( EFI_HANDLE device,
+				     EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		void *interface;
@@ -70,12 +72,57 @@ static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 		CHAR16 name[ sizeof ( efi_autoexec_wname ) /
 			     sizeof ( efi_autoexec_wname[0] ) ];
 	} info;
+	FILEPATH_DEVICE_PATH *filepath;
 	EFI_FILE_PROTOCOL *root;
 	EFI_FILE_PROTOCOL *file;
 	UINTN size;
 	VOID *data;
+	unsigned int dirlen;
+	size_t len;
+	CHAR16 *wname;
 	EFI_STATUS efirc;
 	int rc;
+
+	/* Identify directory */
+	if ( path ) {
+
+		/* Check relative device path is a file path */
+		if ( ! ( ( path->Type == MEDIA_DEVICE_PATH ) &&
+			 ( path->SubType == MEDIA_FILEPATH_DP ) ) ) {
+			DBGC ( device, "EFI %s image path ",
+			       efi_handle_name ( device ) );
+			DBGC ( device, " \"%s\" is not a file path\n",
+			       efi_devpath_text ( path ) );
+			rc = -ENOTTY;
+			goto err_not_filepath;
+		}
+		filepath = container_of ( path, FILEPATH_DEVICE_PATH, Header );
+
+		/* Find length of containing directory */
+		dirlen = ( ( ( ( path->Length[1] << 8 ) | path->Length[0] )
+			     - offsetof ( typeof ( *filepath ), PathName ) )
+			   / sizeof ( filepath->PathName[0] ) );
+		for ( ; dirlen ; dirlen-- ) {
+			if ( filepath->PathName[ dirlen - 1 ] == L'\\' )
+				break;
+		}
+
+	} else {
+
+		/* Use root directory */
+		filepath = NULL;
+		dirlen = 0;
+	}
+
+	/* Allocate filename */
+	len = ( ( dirlen * sizeof ( wname[0] ) ) + sizeof ( efi_autoexec_wname ) );
+	wname = malloc ( len );
+	if ( ! wname ) {
+		rc = -ENOMEM;
+		goto err_wname;
+	}
+	memcpy ( wname, filepath->PathName, ( dirlen * sizeof ( wname[0] ) ) );
+	memcpy ( &wname[dirlen], efi_autoexec_wname, sizeof ( efi_autoexec_wname ) );
 
 	/* Open simple file system protocol */
 	if ( ( efirc = bs->OpenProtocol ( device,
@@ -98,12 +145,11 @@ static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 	}
 
 	/* Open autoexec script */
-	if ( ( efirc = root->Open ( root, &file, efi_autoexec_wname,
+	if ( ( efirc = root->Open ( root, &file, wname,
 				    EFI_FILE_MODE_READ, 0 ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s has no %ls: %s\n",
-		       efi_handle_name ( device ), efi_autoexec_wname,
-		       strerror ( rc ) );
+		       efi_handle_name ( device ), wname, strerror ( rc ) );
 		goto err_open;
 	}
 
@@ -113,8 +159,7 @@ static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 				       &info ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s could not get %ls info: %s\n",
-		       efi_handle_name ( device ), efi_autoexec_wname,
-		       strerror ( rc ) );
+		       efi_handle_name ( device ), wname, strerror ( rc ) );
 		goto err_getinfo;
 	}
 	size = info.info.FileSize;
@@ -123,7 +168,7 @@ static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 	if ( ! size ) {
 		rc = -EINVAL;
 		DBGC ( device, "EFI %s has zero-length %ls\n",
-		       efi_handle_name ( device ), efi_autoexec_wname );
+		       efi_handle_name ( device ), wname );
 		goto err_empty;
 	}
 
@@ -132,8 +177,7 @@ static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 					  &data ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s could not allocate %ls: %s\n",
-		       efi_handle_name ( device ), efi_autoexec_wname,
-		       strerror ( rc ) );
+		       efi_handle_name ( device ), wname, strerror ( rc ) );
 		goto err_alloc;
 	}
 
@@ -141,8 +185,7 @@ static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 	if ( ( efirc = file->Read ( file, &size, data ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s could not read %ls: %s\n",
-		       efi_handle_name ( device ), efi_autoexec_wname,
-		       strerror ( rc ) );
+		       efi_handle_name ( device ), wname, strerror ( rc ) );
 		goto err_read;
 	}
 
@@ -150,8 +193,7 @@ static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 	efi_autoexec = data;
 	efi_autoexec_len = size;
 	data = NULL;
-	DBGC ( device, "EFI %s found %ls\n",
-	       efi_handle_name ( device ), efi_autoexec_wname );
+	DBGC ( device, "EFI %s found %ls\n", efi_handle_name ( device ), wname );
 
 	/* Success */
 	rc = 0;
@@ -169,6 +211,9 @@ static int efi_autoexec_filesystem ( EFI_HANDLE device ) {
 	bs->CloseProtocol ( device, &efi_simple_file_system_protocol_guid,
 			    efi_image_handle, device );
  err_filesystem:
+	free ( wname );
+ err_wname:
+ err_not_filepath:
 	return rc;
 }
 
@@ -345,17 +390,23 @@ static int efi_autoexec_tftp ( EFI_HANDLE device ) {
  * Load autoexec script
  *
  * @v device		Device handle
+ * @v path		Image path within device handle
  * @ret rc		Return status code
  */
-int efi_autoexec_load ( EFI_HANDLE device ) {
+int efi_autoexec_load ( EFI_HANDLE device,
+			EFI_DEVICE_PATH_PROTOCOL *path ) {
 	int rc;
 
 	/* Sanity check */
 	assert ( efi_autoexec == NULL );
 	assert ( efi_autoexec_len == 0 );
 
-	/* Try loading from file system, if supported */
-	if ( ( rc = efi_autoexec_filesystem ( device ) ) == 0 )
+	/* Try loading from file system loaded image directory, if supported */
+	if ( ( rc = efi_autoexec_filesystem ( device, path ) ) == 0 )
+		return 0;
+
+	/* Try loading from file system root directory, if supported */
+	if ( ( rc = efi_autoexec_filesystem ( device, NULL ) ) == 0 )
 		return 0;
 
 	/* Try loading via TFTP, if supported */
