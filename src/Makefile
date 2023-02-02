@@ -16,6 +16,7 @@ SYMBOL_PREFIX	:=
 #
 # Locations of tools
 #
+CC		?= gcc
 HOST_CC		:= $(CC)
 RM		:= rm -f
 TOUCH		:= touch
@@ -26,7 +27,7 @@ PRINTF		:= printf
 PERL		:= perl
 PYTHON		:= python
 TRUE		:= true
-CC		:= $(CROSS_COMPILE)$(CC)
+CC		:= $(CROSS_COMPILE)gcc
 CPP		:= $(CC) -E
 AS		:= $(CROSS_COMPILE)as
 LD		:= $(CROSS_COMPILE)ld
