@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * arch-arm.h
  *
  * Guest OS interface to ARM Xen.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright 2011 (C) Citrix Systems
  */
@@ -63,15 +46,15 @@ FILE_LICENCE ( MIT );
  *
  * All memory which is shared with other entities in the system
  * (including the hypervisor and other guests) must reside in memory
- * which is mapped as Normal Inner-cacheable. This applies to:
+ * which is mapped as Normal Inner Write-Back Outer Write-Back Inner-Shareable.
+ * This applies to:
  *  - hypercall arguments passed via a pointer to guest memory.
  *  - memory shared via the grant table mechanism (including PV I/O
  *    rings etc).
  *  - memory shared with the hypervisor (struct shared_info, struct
  *    vcpu_info, the grant table, etc).
  *
- * Any Inner cache allocation strategy (Write-Back, Write-Through etc)
- * is acceptable. There is no restriction on the Outer-cacheability.
+ * Any cache allocation hints are acceptable.
  */
 
 /*
@@ -89,15 +72,10 @@ FILE_LICENCE ( MIT );
  * unavailable/unsupported.
  *
  *  HYPERVISOR_memory_op
- *   All generic sub-operations.
- *
- *   In addition the following arch specific sub-ops:
- *    * XENMEM_add_to_physmap
- *    * XENMEM_add_to_physmap_batch
+ *   All generic sub-operations
  *
  *  HYPERVISOR_domctl
  *   All generic sub-operations, with the exception of:
- *    * XEN_DOMCTL_iomem_permission (not yet implemented)
  *    * XEN_DOMCTL_irq_permission (not yet implemented)
  *
  *  HYPERVISOR_sched_op
@@ -114,7 +92,9 @@ FILE_LICENCE ( MIT );
  *   All generic sub-operations
  *
  *  HYPERVISOR_physdev_op
- *   No sub-operations are currenty supported
+ *   Exactly these sub-operations are supported:
+ *   PHYSDEVOP_pci_device_add
+ *   PHYSDEVOP_pci_device_remove
  *
  *  HYPERVISOR_sysctl
  *   All generic sub-operations, with the exception of:
@@ -135,6 +115,8 @@ FILE_LICENCE ( MIT );
  *    * VCPUOP_register_vcpu_info
  *    * VCPUOP_register_runstate_memory_area
  *
+ *  HYPERVISOR_argo_op
+ *   All generic sub-operations
  *
  * Other notes on the ARM ABI:
  *
@@ -172,6 +154,7 @@ FILE_LICENCE ( MIT );
 
 #define XEN_HYPERCALL_TAG   0XEA1
 
+#define  int64_aligned_t  int64_t __attribute__((aligned(8)))
 #define uint64_aligned_t uint64_t __attribute__((aligned(8)))
 
 #ifndef __ASSEMBLY__
@@ -179,14 +162,14 @@ FILE_LICENCE ( MIT );
     typedef union { type *p; unsigned long q; }                 \
         __guest_handle_ ## name;                                \
     typedef union { type *p; uint64_aligned_t q; }              \
-        __guest_handle_64_ ## name;
+        __guest_handle_64_ ## name
 
 /*
  * XEN_GUEST_HANDLE represents a guest pointer, when passed as a field
  * in a struct in memory. On ARM is always 8 bytes sizes and 8 bytes
  * aligned.
- * XEN_GUEST_HANDLE_PARAM represent a guest pointer, when passed as an
- * hypercall argument. It is 4 bytes on aarch and 8 bytes on aarch64.
+ * XEN_GUEST_HANDLE_PARAM represents a guest pointer, when passed as an
+ * hypercall argument. It is 4 bytes on aarch32 and 8 bytes on aarch64.
  */
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     ___DEFINE_XEN_GUEST_HANDLE(name, type);   \
@@ -194,19 +177,29 @@ FILE_LICENCE ( MIT );
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define __XEN_GUEST_HANDLE(name)        __guest_handle_64_ ## name
 #define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
-/* this is going to be changed on 64 bit */
 #define XEN_GUEST_HANDLE_PARAM(name)    __guest_handle_ ## name
 #define set_xen_guest_handle_raw(hnd, val)                  \
     do {                                                    \
-        typeof(&(hnd)) _sxghr_tmp = &(hnd);                 \
+        __typeof__(&(hnd)) _sxghr_tmp = &(hnd);             \
         _sxghr_tmp->q = 0;                                  \
         _sxghr_tmp->p = val;                                \
     } while ( 0 )
-#ifdef __XEN_TOOLS__
-#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
-#endif
 #define set_xen_guest_handle(hnd, val) set_xen_guest_handle_raw(hnd, val)
 
+typedef uint64_t xen_pfn_t;
+#define PRI_xen_pfn PRIx64
+#define PRIu_xen_pfn PRIu64
+
+/*
+ * Maximum number of virtual CPUs in legacy multi-processor guests.
+ * Only one. All other VCPUS must use VCPUOP_register_vcpu_info.
+ */
+#define XEN_LEGACY_MAX_VCPUS 1
+
+typedef uint64_t xen_ulong_t;
+#define PRI_xen_ulong PRIx64
+
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
 /* Anonymous union includes both 32- and 64-bit names (e.g., r0/x0). */
 # define __DECL_REG(n64, n32) union {          \
@@ -263,10 +256,10 @@ struct vcpu_guest_core_regs
 
     /* Return address and mode */
     __DECL_REG(pc64,         pc32);             /* ELR_EL2 */
-    uint32_t cpsr;                              /* SPSR_EL2 */
+    uint64_t cpsr;                              /* SPSR_EL2 */
 
     union {
-        uint32_t spsr_el1;       /* AArch64 */
+        uint64_t spsr_el1;       /* AArch64 */
         uint32_t spsr_svc;       /* AArch32 */
     };
 
@@ -282,17 +275,6 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_core_regs_t);
 
 #undef __DECL_REG
 
-typedef uint64_t xen_pfn_t;
-#define PRI_xen_pfn PRIx64
-
-/* Maximum number of virtual CPUs in legacy multi-processor guests. */
-/* Only one. All other VCPUS must use VCPUOP_register_vcpu_info */
-#define XEN_LEGACY_MAX_VCPUS 1
-
-typedef uint64_t xen_ulong_t;
-#define PRI_xen_ulong PRIx64
-
-#if defined(__XEN__) || defined(__XEN_TOOLS__)
 struct vcpu_guest_context {
 #define _VGCF_online                   0
 #define VGCF_online                    (1<<_VGCF_online)
@@ -300,12 +282,46 @@ struct vcpu_guest_context {
 
     struct vcpu_guest_core_regs user_regs;  /* Core CPU registers */
 
-    uint32_t sctlr;
+    uint64_t sctlr;
     uint64_t ttbcr, ttbr0, ttbr1;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
-#endif
+
+/*
+ * struct xen_arch_domainconfig's ABI is covered by
+ * XEN_DOMCTL_INTERFACE_VERSION.
+ */
+#define XEN_DOMCTL_CONFIG_GIC_NATIVE    0
+#define XEN_DOMCTL_CONFIG_GIC_V2        1
+#define XEN_DOMCTL_CONFIG_GIC_V3        2
+
+#define XEN_DOMCTL_CONFIG_TEE_NONE      0
+#define XEN_DOMCTL_CONFIG_TEE_OPTEE     1
+
+struct xen_arch_domainconfig {
+    /* IN/OUT */
+    uint8_t gic_version;
+    /* IN */
+    uint16_t tee_type;
+    /* IN */
+    uint32_t nr_spis;
+    /*
+     * OUT
+     * Based on the property clock-frequency in the DT timer node.
+     * The property may be present when the bootloader/firmware doesn't
+     * set correctly CNTFRQ which hold the timer frequency.
+     *
+     * As it's not possible to trap this register, we have to replicate
+     * the value in the guest DT.
+     *
+     * = 0 => property not present
+     * > 0 => Value of the property
+     *
+     */
+    uint32_t clock_frequency;
+};
+#endif /* __XEN__ || __XEN_TOOLS__ */
 
 struct arch_vcpu_info {
 };
@@ -320,7 +336,7 @@ typedef uint64_t xen_callback_t;
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
-/* PSR bits (CPSR, SPSR)*/
+/* PSR bits (CPSR, SPSR) */
 
 #define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
 #define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */
@@ -330,6 +346,7 @@ typedef uint64_t xen_callback_t;
 #define PSR_DBG_MASK    (1<<9)        /* arm64: Debug Exception mask */
 #define PSR_IT_MASK     (0x0600fc00)  /* Thumb If-Then Mask */
 #define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
+#define PSR_Z           (1<<30)       /* Zero condition flag */
 
 /* 32 bit modes */
 #define PSR_MODE_USR 0x10
@@ -352,10 +369,18 @@ typedef uint64_t xen_callback_t;
 #define PSR_MODE_EL1t 0x04
 #define PSR_MODE_EL0t 0x00
 
-#define PSR_GUEST32_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC)
+/*
+ * We set PSR_Z to be able to boot Linux kernel versions with an invalid
+ * encoding of the first 8 NOP instructions. See commit a92882a4d270 in
+ * Linux.
+ *
+ * Note that PSR_Z is also set by U-Boot and QEMU -kernel when loading
+ * zImage kernels on aarch32.
+ */
+#define PSR_GUEST32_INIT (PSR_Z|PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC)
 #define PSR_GUEST64_INIT (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_EL1h)
 
-#define SCTLR_GUEST_INIT    0x00c50078
+#define SCTLR_GUEST_INIT    xen_mk_ullong(0x00c50078)
 
 /*
  * Virtual machine platform (memory layout, interrupts)
@@ -366,27 +391,78 @@ typedef uint64_t xen_callback_t;
  */
 
 /* Physical Address Space */
-#define GUEST_GICD_BASE   0x03001000ULL
-#define GUEST_GICD_SIZE   0x00001000ULL
-#define GUEST_GICC_BASE   0x03002000ULL
-#define GUEST_GICC_SIZE   0x00000100ULL
 
-/* 16MB == 4096 pages reserved for guest to use as a region to map its
+/* Virtio MMIO mappings */
+#define GUEST_VIRTIO_MMIO_BASE   xen_mk_ullong(0x02000000)
+#define GUEST_VIRTIO_MMIO_SIZE   xen_mk_ullong(0x00100000)
+
+/*
+ * vGIC mappings: Only one set of mapping is used by the guest.
+ * Therefore they can overlap.
+ */
+
+/* vGIC v2 mappings */
+#define GUEST_GICD_BASE   xen_mk_ullong(0x03001000)
+#define GUEST_GICD_SIZE   xen_mk_ullong(0x00001000)
+#define GUEST_GICC_BASE   xen_mk_ullong(0x03002000)
+#define GUEST_GICC_SIZE   xen_mk_ullong(0x00002000)
+
+/* vGIC v3 mappings */
+#define GUEST_GICV3_GICD_BASE      xen_mk_ullong(0x03001000)
+#define GUEST_GICV3_GICD_SIZE      xen_mk_ullong(0x00010000)
+
+#define GUEST_GICV3_RDIST_REGIONS  1
+
+#define GUEST_GICV3_GICR0_BASE     xen_mk_ullong(0x03020000) /* vCPU0..127 */
+#define GUEST_GICV3_GICR0_SIZE     xen_mk_ullong(0x01000000)
+
+/*
+ * 256 MB is reserved for VPCI configuration space based on calculation
+ * 256 buses x 32 devices x 8 functions x 4 KB = 256 MB
+ */
+#define GUEST_VPCI_ECAM_BASE    xen_mk_ullong(0x10000000)
+#define GUEST_VPCI_ECAM_SIZE    xen_mk_ullong(0x10000000)
+
+/* ACPI tables physical address */
+#define GUEST_ACPI_BASE xen_mk_ullong(0x20000000)
+#define GUEST_ACPI_SIZE xen_mk_ullong(0x02000000)
+
+/* PL011 mappings */
+#define GUEST_PL011_BASE    xen_mk_ullong(0x22000000)
+#define GUEST_PL011_SIZE    xen_mk_ullong(0x00001000)
+
+/* Guest PCI-PCIe memory space where config space and BAR will be available.*/
+#define GUEST_VPCI_ADDR_TYPE_MEM            xen_mk_ullong(0x02000000)
+#define GUEST_VPCI_MEM_ADDR                 xen_mk_ullong(0x23000000)
+#define GUEST_VPCI_MEM_SIZE                 xen_mk_ullong(0x10000000)
+
+/*
+ * 16MB == 4096 pages reserved for guest to use as a region to map its
  * grant table in.
  */
-#define GUEST_GNTTAB_BASE 0x38000000ULL
-#define GUEST_GNTTAB_SIZE 0x01000000ULL
+#define GUEST_GNTTAB_BASE xen_mk_ullong(0x38000000)
+#define GUEST_GNTTAB_SIZE xen_mk_ullong(0x01000000)
 
-#define GUEST_MAGIC_BASE  0x39000000ULL
-#define GUEST_MAGIC_SIZE  0x01000000ULL
+#define GUEST_MAGIC_BASE  xen_mk_ullong(0x39000000)
+#define GUEST_MAGIC_SIZE  xen_mk_ullong(0x01000000)
 
 #define GUEST_RAM_BANKS   2
 
-#define GUEST_RAM0_BASE   0x40000000ULL /* 3GB of low RAM @ 1GB */
-#define GUEST_RAM0_SIZE   0xc0000000ULL
+/*
+ * The way to find the extended regions (to be exposed to the guest as unused
+ * address space) relies on the fact that the regions reserved for the RAM
+ * below are big enough to also accommodate such regions.
+ */
+#define GUEST_RAM0_BASE   xen_mk_ullong(0x40000000) /* 3GB of low RAM @ 1GB */
+#define GUEST_RAM0_SIZE   xen_mk_ullong(0xc0000000)
 
-#define GUEST_RAM1_BASE   0x0200000000ULL /* 1016GB of RAM @ 8GB */
-#define GUEST_RAM1_SIZE   0xfe00000000ULL
+/* 4GB @ 4GB Prefetch Memory for VPCI */
+#define GUEST_VPCI_ADDR_TYPE_PREFETCH_MEM   xen_mk_ullong(0x42000000)
+#define GUEST_VPCI_PREFETCH_MEM_ADDR        xen_mk_ullong(0x100000000)
+#define GUEST_VPCI_PREFETCH_MEM_SIZE        xen_mk_ullong(0x100000000)
+
+#define GUEST_RAM1_BASE   xen_mk_ullong(0x0200000000) /* 1016GB of RAM @ 8GB */
+#define GUEST_RAM1_SIZE   xen_mk_ullong(0xfe00000000)
 
 #define GUEST_RAM_BASE    GUEST_RAM0_BASE /* Lowest RAM address */
 /* Largest amount of actual RAM, not including holes */
@@ -395,11 +471,19 @@ typedef uint64_t xen_callback_t;
 #define GUEST_RAM_BANK_BASES   { GUEST_RAM0_BASE, GUEST_RAM1_BASE }
 #define GUEST_RAM_BANK_SIZES   { GUEST_RAM0_SIZE, GUEST_RAM1_SIZE }
 
+/* Current supported guest VCPUs */
+#define GUEST_MAX_VCPUS 128
+
 /* Interrupts */
 #define GUEST_TIMER_VIRT_PPI    27
 #define GUEST_TIMER_PHYS_S_PPI  29
 #define GUEST_TIMER_PHYS_NS_PPI 30
 #define GUEST_EVTCHN_PPI        31
+
+#define GUEST_VPL011_SPI        32
+
+#define GUEST_VIRTIO_MMIO_SPI_FIRST   33
+#define GUEST_VIRTIO_MMIO_SPI_LAST    43
 
 /* PSCI functions */
 #define PSCI_cpu_suspend 0
@@ -407,6 +491,11 @@ typedef uint64_t xen_callback_t;
 #define PSCI_cpu_on      2
 #define PSCI_migrate     3
 
+#endif
+
+#ifndef __ASSEMBLY__
+/* Stub definition of PMU structure */
+typedef struct xen_pmu_arch { uint8_t dummy; } xen_pmu_arch_t;
 #endif
 
 #endif /*  __XEN_PUBLIC_ARCH_ARM_H__ */

@@ -1,26 +1,9 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * grant_table.h
  *
  * Interface for granting foreign access to page frames, and receiving
  * page-ownership transfers.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2004, K A Fraser
  */
@@ -45,7 +28,7 @@ FILE_LICENCE ( MIT );
  * table are identified by grant references. A grant reference is an
  * integer, which indexes into the grant table. It acts as a
  * capability which the grantee can use to perform operations on the
- * granter’s memory.
+ * granter's memory.
  *
  * This capability-based system allows shared-memory communications
  * between unprivileged domains. A grant reference also encapsulates
@@ -123,8 +106,9 @@ typedef uint32_t grant_ref_t;
  */
 
 /*
- * Version 1 of the grant table entry structure is maintained purely
- * for backwards compatibility.  New guests should use version 2.
+ * Version 1 of the grant table entry structure is maintained largely for
+ * backwards compatibility.  New guests are recommended to support using
+ * version 2 to overcome version 1 limitations, but to default to version 1.
  */
 #if __XEN_INTERFACE_VERSION__ < 0x0003020a
 #define grant_entry_v1 grant_entry
@@ -136,8 +120,10 @@ struct grant_entry_v1 {
     /* The domain being granted foreign privileges. [GST] */
     domid_t  domid;
     /*
-     * GTF_permit_access: Frame that @domid is allowed to map and access. [GST]
-     * GTF_accept_transfer: Frame whose ownership transferred by @domid. [XEN]
+     * GTF_permit_access: GFN that @domid is allowed to map and access. [GST]
+     * GTF_accept_transfer: GFN that @domid is allowed to transfer into. [GST]
+     * GTF_transfer_completed: MFN whose ownership transferred by @domid
+     *                         (non-translated guests only). [XEN]
      */
     uint32_t frame;
 };
@@ -166,11 +152,13 @@ typedef struct grant_entry_v1 grant_entry_v1_t;
 #define GTF_type_mask       (3U<<0)
 
 /*
- * Subflags for GTF_permit_access.
+ * Subflags for GTF_permit_access and GTF_transitive.
  *  GTF_readonly: Restrict @domid to read-only mappings and accesses. [GST]
  *  GTF_reading: Grant entry is currently mapped for reading by @domid. [XEN]
  *  GTF_writing: Grant entry is currently mapped for writing by @domid. [XEN]
- *  GTF_PAT, GTF_PWT, GTF_PCD: (x86) cache attribute flags for the grant [GST]
+ * Further subflags for GTF_permit_access only.
+ *  GTF_PAT, GTF_PWT, GTF_PCD: (x86) cache attribute flags to be used for
+ *                             mappings of the grant [GST]
  *  GTF_sub_page: Grant access to only a subrange of the page.  @domid
  *                will only be allowed to copy from the grant, and not
  *                map it. [GST]
@@ -311,6 +299,7 @@ typedef uint16_t grant_status_t;
 #define GNTTABOP_get_status_frames    9
 #define GNTTABOP_get_version          10
 #define GNTTABOP_swap_grant_ref	      11
+#define GNTTABOP_cache_flush	      12
 #endif /* __XEN_INTERFACE_VERSION__ */
 /* ` } */
 
@@ -322,7 +311,7 @@ typedef uint32_t grant_handle_t;
 /*
  * GNTTABOP_map_grant_ref: Map the grant entry (<dom>,<ref>) for access
  * by devices and/or host CPUs. If successful, <handle> is a tracking number
- * that must be presented later to destroy the mapping(s). On error, <handle>
+ * that must be presented later to destroy the mapping(s). On error, <status>
  * is a negative status code.
  * NOTES:
  *  1. If GNTMAP_device_map is specified then <dev_bus_addr> is the address
@@ -410,12 +399,13 @@ typedef struct gnttab_dump_table gnttab_dump_table_t;
 DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
 
 /*
- * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain. The
- * foreign domain has previously registered its interest in the transfer via
- * <domid, ref>.
+ * GNTTABOP_transfer: Transfer <frame> to a foreign domain. The foreign domain
+ * has previously registered its interest in the transfer via <domid, ref>.
  *
  * Note that, even if the transfer fails, the specified page no longer belongs
  * to the calling domain *unless* the error is GNTST_bad_page.
+ *
+ * Note further that only PV guests can use this operation.
  */
 struct gnttab_transfer {
     /* IN parameters. */
@@ -454,7 +444,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 
 struct gnttab_copy {
     /* IN parameters. */
-    struct {
+    struct gnttab_copy_ptr {
         union {
             grant_ref_t ref;
             xen_pfn_t   gmfn;
@@ -513,10 +503,9 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
 #if __XEN_INTERFACE_VERSION__ >= 0x0003020a
 /*
  * GNTTABOP_set_version: Request a particular version of the grant
- * table shared table structure.  This operation can only be performed
- * once in any given domain.  It must be performed before any grants
- * are activated; otherwise, the domain will be stuck with version 1.
- * The only defined versions are 1 and 2.
+ * table shared table structure.  This operation may be used to toggle
+ * between different versions, but must be performed while no grants
+ * are active.  The only defined versions are 1 and 2.
  */
 struct gnttab_set_version {
     /* IN/OUT parameters */
@@ -576,6 +565,25 @@ struct gnttab_swap_grant_ref {
 typedef struct gnttab_swap_grant_ref gnttab_swap_grant_ref_t;
 DEFINE_XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t);
 
+/*
+ * Issue one or more cache maintenance operations on a portion of a
+ * page granted to the calling domain by a foreign domain.
+ */
+struct gnttab_cache_flush {
+    union {
+        uint64_t dev_bus_addr;
+        grant_ref_t ref;
+    } a;
+    uint16_t offset; /* offset from start of grant */
+    uint16_t length; /* size within the grant */
+#define GNTTAB_CACHE_CLEAN          (1u<<0)
+#define GNTTAB_CACHE_INVAL          (1u<<1)
+#define GNTTAB_CACHE_SOURCE_GREF    (1u<<31)
+    uint32_t op;
+};
+typedef struct gnttab_cache_flush gnttab_cache_flush_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_cache_flush_t);
+
 #endif /* __XEN_INTERFACE_VERSION__ */
 
 /*
@@ -606,9 +614,6 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t);
 #define _GNTMAP_contains_pte    (4)
 #define GNTMAP_contains_pte     (1<<_GNTMAP_contains_pte)
 
-#define _GNTMAP_can_fail        (5)
-#define GNTMAP_can_fail         (1<<_GNTMAP_can_fail)
-
 /*
  * Bits to be placed in guest kernel available PTE bits (architecture
  * dependent; only supported when XENFEAT_gnttab_map_avail_bits is set).
@@ -633,6 +638,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t);
 #define GNTST_bad_copy_arg    (-10) /* copy arguments cross page boundary.   */
 #define GNTST_address_too_big (-11) /* transfer page address too large.      */
 #define GNTST_eagain          (-12) /* Operation not done; try again.        */
+#define GNTST_no_space        (-13) /* Out of space (handles etc).           */
 /* ` } */
 
 #define GNTTABOP_error_msgs {                   \
@@ -648,7 +654,8 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t);
     "bad page",                                 \
     "copy arguments cross page boundary",       \
     "page address size too large",              \
-    "operation not done; try again"             \
+    "operation not done; try again",            \
+    "out of space",                             \
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */
