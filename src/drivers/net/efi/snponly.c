@@ -80,7 +80,7 @@ static int chained_locate ( struct chained_protocol *chained ) {
 
 	/* Locate handle supporting this protocol */
 	if ( ( rc = efi_locate_device ( device, chained->protocol,
-					&parent ) ) != 0 ) {
+					&parent, 0 ) ) != 0 ) {
 		DBGC ( device, "CHAINED %s does not support %s: %s\n",
 		       efi_handle_name ( device ),
 		       efi_guid_ntoa ( chained->protocol ), strerror ( rc ) );

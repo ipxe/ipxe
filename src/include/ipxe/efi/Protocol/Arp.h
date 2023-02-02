@@ -7,14 +7,8 @@
   The EFI ARP Protocol provides services to map IP network
   address to hardware address used by a data link protocol.
 
-Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials are licensed and made available under
-the terms and conditions of the BSD License that accompanies this distribution.
-The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
   This Protocol was introduced in UEFI Specification 2.0.
@@ -24,7 +18,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __EFI_ARP_PROTOCOL_H__
 #define __EFI_ARP_PROTOCOL_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 #define EFI_ARP_SERVICE_BINDING_PROTOCOL_GUID \
   { \
@@ -42,51 +36,51 @@ typedef struct {
   ///
   /// Length in bytes of this entry.
   ///
-  UINT32                      Size;
+  UINT32     Size;
 
   ///
   /// Set to TRUE if this entry is a "deny" entry.
   /// Set to FALSE if this entry is a "normal" entry.
   ///
-  BOOLEAN                     DenyFlag;
+  BOOLEAN    DenyFlag;
 
   ///
   /// Set to TRUE if this entry will not time out.
   /// Set to FALSE if this entry will time out.
   ///
-  BOOLEAN                     StaticFlag;
+  BOOLEAN    StaticFlag;
 
   ///
   /// 16-bit ARP hardware identifier number.
   ///
-  UINT16                      HwAddressType;
+  UINT16     HwAddressType;
 
   ///
   /// 16-bit protocol type number.
   ///
-  UINT16                      SwAddressType;
+  UINT16     SwAddressType;
 
   ///
   /// The length of the hardware address.
   ///
-  UINT8                       HwAddressLength;
+  UINT8      HwAddressLength;
 
   ///
   /// The length of the protocol address.
   ///
-  UINT8                       SwAddressLength;
+  UINT8      SwAddressLength;
 } EFI_ARP_FIND_DATA;
 
 typedef struct {
   ///
   /// 16-bit protocol type number in host byte order.
   ///
-  UINT16                    SwAddressType;
+  UINT16    SwAddressType;
 
   ///
   /// The length in bytes of the station's protocol address to register.
   ///
-  UINT8                     SwAddressLength;
+  UINT8     SwAddressLength;
 
   ///
   /// The pointer to the first byte of the protocol address to register. For
@@ -94,29 +88,28 @@ typedef struct {
   /// StationAddress points to the first byte of this station's IP
   /// address stored in network byte order.
   ///
-  VOID                      *StationAddress;
+  VOID      *StationAddress;
 
   ///
   /// The timeout value in 100-ns units that is associated with each
   /// new dynamic ARP cache entry. If it is set to zero, the value is
   /// implementation-specific.
   ///
-  UINT32                    EntryTimeOut;
+  UINT32    EntryTimeOut;
 
   ///
   /// The number of retries before a MAC address is resolved. If it is
   /// set to zero, the value is implementation-specific.
   ///
-  UINT32                    RetryCount;
+  UINT32    RetryCount;
 
   ///
   /// The timeout value in 100-ns units that is used to wait for the ARP
   /// reply packet or the timeout value between two retries. Set to zero
   /// to use implementation-specific value.
   ///
-  UINT32                    RetryTimeOut;
+  UINT32    RetryTimeOut;
 } EFI_ARP_CONFIG_DATA;
-
 
 /**
   This function is used to assign a station address to the ARP cache for this instance
@@ -255,7 +248,6 @@ EFI_STATUS
   IN BOOLEAN                Refresh
   );
 
-
 /**
   This function removes specified ARP cache entries.
 
@@ -371,17 +363,16 @@ EFI_STATUS
 /// network hardware addresses.
 ///
 struct _EFI_ARP_PROTOCOL {
-  EFI_ARP_CONFIGURE         Configure;
-  EFI_ARP_ADD               Add;
-  EFI_ARP_FIND              Find;
-  EFI_ARP_DELETE            Delete;
-  EFI_ARP_FLUSH             Flush;
-  EFI_ARP_REQUEST           Request;
-  EFI_ARP_CANCEL            Cancel;
+  EFI_ARP_CONFIGURE    Configure;
+  EFI_ARP_ADD          Add;
+  EFI_ARP_FIND         Find;
+  EFI_ARP_DELETE       Delete;
+  EFI_ARP_FLUSH        Flush;
+  EFI_ARP_REQUEST      Request;
+  EFI_ARP_CANCEL       Cancel;
 };
 
-
-extern EFI_GUID gEfiArpServiceBindingProtocolGuid;
-extern EFI_GUID gEfiArpProtocolGuid;
+extern EFI_GUID  gEfiArpServiceBindingProtocolGuid;
+extern EFI_GUID  gEfiArpProtocolGuid;
 
 #endif

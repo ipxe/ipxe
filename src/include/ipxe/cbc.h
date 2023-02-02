@@ -33,12 +33,15 @@ static inline int cbc_setkey ( void *ctx, const void *key, size_t keylen,
  *
  * @v ctx		Context
  * @v iv		Initialisation vector
+ * @v ivlen		Initialisation vector length
  * @v raw_cipher	Underlying cipher algorithm
  * @v cbc_ctx		CBC context
  */
-static inline void cbc_setiv ( void *ctx __unused, const void *iv,
+static inline void cbc_setiv ( void *ctx __unused,
+			       const void *iv, size_t ivlen,
 			       struct cipher_algorithm *raw_cipher,
 			       void *cbc_ctx ) {
+	assert ( ivlen == raw_cipher->blocksize );
 	memcpy ( cbc_ctx, iv, raw_cipher->blocksize );
 }
 
@@ -70,9 +73,10 @@ static int _cbc_name ## _setkey ( void *ctx, const void *key,		\
 	return cbc_setkey ( &_cbc_name ## _ctx->raw_ctx, key, keylen,	\
 			    &_raw_cipher, &_cbc_name ## _ctx->cbc_ctx );\
 }									\
-static void _cbc_name ## _setiv ( void *ctx, const void *iv ) {		\
+static void _cbc_name ## _setiv ( void *ctx, const void *iv,		\
+				   size_t ivlen ) {			\
 	struct _cbc_name ## _context * _cbc_name ## _ctx = ctx;		\
-	cbc_setiv ( &_cbc_name ## _ctx->raw_ctx, iv,			\
+	cbc_setiv ( &_cbc_name ## _ctx->raw_ctx, iv, ivlen,		\
 		    &_raw_cipher, &aes_cbc_ctx->cbc_ctx );		\
 }									\
 static void _cbc_name ## _encrypt ( void *ctx, const void *src,		\
@@ -91,10 +95,13 @@ struct cipher_algorithm _cbc_cipher = {					\
 	.name		= #_cbc_name,					\
 	.ctxsize	= sizeof ( struct _cbc_name ## _context ),	\
 	.blocksize	= _blocksize,					\
+	.alignsize	= _blocksize,					\
+	.authsize	= 0,						\
 	.setkey		= _cbc_name ## _setkey,				\
 	.setiv		= _cbc_name ## _setiv,				\
 	.encrypt	= _cbc_name ## _encrypt,			\
 	.decrypt	= _cbc_name ## _decrypt,			\
+	.auth		= cipher_null_auth,				\
 };
 
 #endif /* _IPXE_CBC_H */

@@ -755,6 +755,53 @@ char __debug_disable(OBJECT) = ( DBGLVL_MAX & ~DBGLVL_DFLT );
 #define FILE_LICENCE_BSD2 \
 	PROVIDE_SYMBOL ( PREFIX_OBJECT ( __licence__bsd2__ ) )
 
+/** Declare a file as being under the two-clause BSD plus patent licence
+ *
+ * This licence declaration is applicable when a file states itself to
+ * be licensed under terms allowing redistribution in source and
+ * binary forms (with or without modification) provided that:
+ *
+ *     redistributions of source code retain the copyright notice,
+ *     list of conditions and any attached disclaimers
+ *
+ *     redistributions in binary form reproduce the copyright notice,
+ *     list of conditions and any attached disclaimers in the
+ *     documentation and/or other materials provided with the
+ *     distribution
+ *
+ * and in addition states that
+ *
+ *     Subject to the terms and conditions of this license, each
+ *     copyright holder and contributor hereby grants to those
+ *     receiving rights under this license a perpetual, worldwide,
+ *     non-exclusive, no-charge, royalty-free, irrevocable (except for
+ *     failure to satisfy the conditions of this license) patent
+ *     license to make, have made, use, offer to sell, sell, import,
+ *     and otherwise transfer this software, where such license
+ *     applies only to those patent claims, already acquired or
+ *     hereafter acquired, licensable by such copyright holder or
+ *     contributor that are necessarily infringed by:
+ *
+ *       their Contribution(s) (the licensed copyrights of copyright
+ *       holders and non-copyrightable additions of contributors, in
+ *       source or binary form) alone; or
+ *
+ *       combination of their Contribution(s) with the work of
+ *       authorship to which such Contribution(s) was added by such
+ *       copyright holder or contributor, if, at the time the
+ *       Contribution is added, such addition causes such combination
+ *       to be necessarily infringed. The patent license shall not
+ *       apply to any other combinations which include the
+ *       Contribution.
+ *
+ * It is not necessary for the file to explicitly state that it is
+ * under a "BSD" licence; only that the licensing terms be
+ * functionally equivalent to the standard two-clause BSD licence with
+ * patent grant.
+ */
+#define FILE_LICENCE_BSD2_PATENT \
+	PROVIDE_SYMBOL ( PREFIX_OBJECT ( __licence__bsd2_patent__ ) )
+
 /** Declare a file as being under the one-clause MIT-style licence
  *
  * This licence declaration is applicable when a file states itself to

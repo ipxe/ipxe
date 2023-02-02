@@ -199,7 +199,7 @@ static void efi_pxe_ip_sockaddr ( struct efi_pxe *pxe, EFI_IP_ADDRESS *ip,
 	memset ( sockaddr, 0, sizeof ( *sockaddr ) );
 	sockaddr->sa.sa_family = pxe->tcpip->sa_family;
 	memcpy ( &sockaddr->se.se_addr, ip, pxe->net->net_addr_len );
-	sockaddr->se.se_scope_id = pxe->netdev->index;
+	sockaddr->se.se_scope_id = pxe->netdev->scope_id;
 }
 
 /**

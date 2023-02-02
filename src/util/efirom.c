@@ -28,6 +28,8 @@
 #include <errno.h>
 #include <assert.h>
 #include <getopt.h>
+
+#define EFI_HOSTONLY
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 #include <ipxe/efi/IndustryStandard/Pci22.h>

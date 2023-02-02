@@ -28,7 +28,8 @@ enum uriboot_flags {
 
 extern void set_autoboot_busloc ( unsigned int bus_type,
 				  unsigned int location );
-extern void set_autoboot_ll_addr ( const void *ll_addr, size_t len );
+extern void set_autoboot_ll_addr ( const void *ll_addr, size_t len,
+				   unsigned int vlan );
 
 extern int uriboot ( struct uri *filename, struct uri **root_paths,
 		     unsigned int root_path_count, int drive,

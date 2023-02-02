@@ -6,107 +6,48 @@
   environment. There are a set of base libraries in the Mde Package that can
   be used to implement base modules.
 
-Copyright (c) 2006 - 2017, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2021, Intel Corporation. All rights reserved.<BR>
 Portions copyright (c) 2008 - 2009, Apple Inc. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
-
 
 #ifndef __BASE_H__
 #define __BASE_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 //
 // Include processor specific binding
 //
 #include <ipxe/efi/ProcessorBind.h>
 
-#if defined(_MSC_EXTENSIONS)
+#if defined (_MSC_EXTENSIONS)
 //
 // Disable warning when last field of data structure is a zero sized array.
 //
-#pragma warning ( disable : 4200 )
+  #pragma warning ( disable : 4200 )
 #endif
-
-/**
-  Verifies the storage size of a given data type.
-
-  This macro generates a divide by zero error or a zero size array declaration in
-  the preprocessor if the size is incorrect.  These are declared as "extern" so
-  the space for these arrays will not be in the modules.
-
-  @param  TYPE  The date type to determine the size of.
-  @param  Size  The expected size for the TYPE.
-
-**/
-#define VERIFY_SIZE_OF(TYPE, Size) extern UINT8 _VerifySizeof##TYPE[(sizeof(TYPE) == (Size)) / (sizeof(TYPE) == (Size))]
-
-//
-// Verify that ProcessorBind.h produced UEFI Data Types that are compliant with
-// Section 2.3.1 of the UEFI 2.3 Specification.
-//
-VERIFY_SIZE_OF (BOOLEAN, 1);
-VERIFY_SIZE_OF (INT8, 1);
-VERIFY_SIZE_OF (UINT8, 1);
-VERIFY_SIZE_OF (INT16, 2);
-VERIFY_SIZE_OF (UINT16, 2);
-VERIFY_SIZE_OF (INT32, 4);
-VERIFY_SIZE_OF (UINT32, 4);
-VERIFY_SIZE_OF (INT64, 8);
-VERIFY_SIZE_OF (UINT64, 8);
-VERIFY_SIZE_OF (CHAR8, 1);
-VERIFY_SIZE_OF (CHAR16, 2);
-
-//
-// The following three enum types are used to verify that the compiler
-// configuration for enum types is compliant with Section 2.3.1 of the
-// UEFI 2.3 Specification. These enum types and enum values are not
-// intended to be used. A prefix of '__' is used avoid conflicts with
-// other types.
-//
-typedef enum {
-  __VerifyUint8EnumValue = 0xff
-} __VERIFY_UINT8_ENUM_SIZE;
-
-typedef enum {
-  __VerifyUint16EnumValue = 0xffff
-} __VERIFY_UINT16_ENUM_SIZE;
-
-typedef enum {
-  __VerifyUint32EnumValue = 0xffffffff
-} __VERIFY_UINT32_ENUM_SIZE;
-
-VERIFY_SIZE_OF (__VERIFY_UINT8_ENUM_SIZE, 4);
-VERIFY_SIZE_OF (__VERIFY_UINT16_ENUM_SIZE, 4);
-VERIFY_SIZE_OF (__VERIFY_UINT32_ENUM_SIZE, 4);
 
 //
 // The Microsoft* C compiler can removed references to unreferenced data items
 //  if the /OPT:REF linker option is used. We defined a macro as this is a
 //  a non standard extension
 //
-#if defined(_MSC_EXTENSIONS) && !defined (MDE_CPU_EBC)
-  ///
-  /// Remove global variable from the linked image if there are no references to
-  /// it after all compiler and linker optimizations have been performed.
-  ///
-  ///
-  #define GLOBAL_REMOVE_IF_UNREFERENCED __declspec(selectany)
+#if defined (_MSC_VER) && _MSC_VER < 1800 && !defined (MDE_CPU_EBC)
+///
+/// Remove global variable from the linked image if there are no references to
+/// it after all compiler and linker optimizations have been performed.
+///
+///
+#define GLOBAL_REMOVE_IF_UNREFERENCED  __declspec(selectany)
 #else
-  ///
-  /// Remove the global variable from the linked image if there are no references
-  ///  to it after all compiler and linker optimizations have been performed.
-  ///
-  ///
-  #define GLOBAL_REMOVE_IF_UNREFERENCED
+///
+/// Remove the global variable from the linked image if there are no references
+///  to it after all compiler and linker optimizations have been performed.
+///
+///
+#define GLOBAL_REMOVE_IF_UNREFERENCED
 #endif
 
 //
@@ -114,29 +55,28 @@ VERIFY_SIZE_OF (__VERIFY_UINT32_ENUM_SIZE, 4);
 // warnings.
 //
 #ifndef UNREACHABLE
-  #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 4)
-    ///
-    /// Signal compilers and analyzers that this call is not reachable.  It is
-    /// up to the compiler to remove any code past that point.
-    /// Not implemented by GCC 4.4 or earlier.
-    ///
-    #define UNREACHABLE()  __builtin_unreachable ()
+  #ifdef __GNUC__
+///
+/// Signal compilers and analyzers that this call is not reachable.  It is
+/// up to the compiler to remove any code past that point.
+///
+#define UNREACHABLE()  __builtin_unreachable ()
   #elif defined (__has_feature)
     #if __has_builtin (__builtin_unreachable)
-      ///
-      /// Signal compilers and analyzers that this call is not reachable.  It is
-      /// up to the compiler to remove any code past that point.
-      ///
-      #define UNREACHABLE()  __builtin_unreachable ()
+///
+/// Signal compilers and analyzers that this call is not reachable.  It is
+/// up to the compiler to remove any code past that point.
+///
+#define UNREACHABLE()  __builtin_unreachable ()
     #endif
   #endif
 
   #ifndef UNREACHABLE
-    ///
-    /// Signal compilers and analyzers that this call is not reachable.  It is
-    /// up to the compiler to remove any code past that point.
-    ///
-    #define UNREACHABLE()
+///
+/// Signal compilers and analyzers that this call is not reachable.  It is
+/// up to the compiler to remove any code past that point.
+///
+#define UNREACHABLE()
   #endif
 #endif
 
@@ -147,26 +87,26 @@ VERIFY_SIZE_OF (__VERIFY_UINT32_ENUM_SIZE, 4);
 //
 #ifndef NORETURN
   #if defined (__GNUC__) || defined (__clang__)
-    ///
-    /// Signal compilers and analyzers that the function cannot return.
-    /// It is up to the compiler to remove any code past a call to functions
-    /// flagged with this attribute.
-    ///
-    #define NORETURN  __attribute__((noreturn))
-  #elif defined(_MSC_EXTENSIONS) && !defined(MDE_CPU_EBC)
-    ///
-    /// Signal compilers and analyzers that the function cannot return.
-    /// It is up to the compiler to remove any code past a call to functions
-    /// flagged with this attribute.
-    ///
-    #define NORETURN  __declspec(noreturn)
+///
+/// Signal compilers and analyzers that the function cannot return.
+/// It is up to the compiler to remove any code past a call to functions
+/// flagged with this attribute.
+///
+#define NORETURN  __attribute__((noreturn))
+  #elif defined (_MSC_EXTENSIONS) && !defined (MDE_CPU_EBC)
+///
+/// Signal compilers and analyzers that the function cannot return.
+/// It is up to the compiler to remove any code past a call to functions
+/// flagged with this attribute.
+///
+#define NORETURN  __declspec(noreturn)
   #else
-    ///
-    /// Signal compilers and analyzers that the function cannot return.
-    /// It is up to the compiler to remove any code past a call to functions
-    /// flagged with this attribute.
-    ///
-    #define NORETURN
+///
+/// Signal compilers and analyzers that the function cannot return.
+/// It is up to the compiler to remove any code past a call to functions
+/// flagged with this attribute.
+///
+#define NORETURN
   #endif
 #endif
 
@@ -177,20 +117,20 @@ VERIFY_SIZE_OF (__VERIFY_UINT32_ENUM_SIZE, 4);
 #ifndef ANALYZER_UNREACHABLE
   #ifdef __clang_analyzer__
     #if __has_builtin (__builtin_unreachable)
-      ///
-      /// Signal the analyzer that this call is not reachable.
-      /// This excludes compilers.
-      ///
-      #define ANALYZER_UNREACHABLE()  __builtin_unreachable ()
+///
+/// Signal the analyzer that this call is not reachable.
+/// This excludes compilers.
+///
+#define ANALYZER_UNREACHABLE()  __builtin_unreachable ()
     #endif
   #endif
 
   #ifndef ANALYZER_UNREACHABLE
-    ///
-    /// Signal the analyzer that this call is not reachable.
-    /// This excludes compilers.
-    ///
-    #define ANALYZER_UNREACHABLE()
+///
+/// Signal the analyzer that this call is not reachable.
+/// This excludes compilers.
+///
+#define ANALYZER_UNREACHABLE()
   #endif
 #endif
 
@@ -203,20 +143,40 @@ VERIFY_SIZE_OF (__VERIFY_UINT32_ENUM_SIZE, 4);
 #ifndef ANALYZER_NORETURN
   #ifdef __has_feature
     #if __has_feature (attribute_analyzer_noreturn)
-      ///
-      /// Signal analyzers that the function cannot return.
-      /// This excludes compilers.
-      ///
-      #define ANALYZER_NORETURN  __attribute__((analyzer_noreturn))
+///
+/// Signal analyzers that the function cannot return.
+/// This excludes compilers.
+///
+#define ANALYZER_NORETURN  __attribute__((analyzer_noreturn))
     #endif
   #endif
 
   #ifndef ANALYZER_NORETURN
-    ///
-    /// Signal the analyzer that the function cannot return.
-    /// This excludes compilers.
-    ///
-    #define ANALYZER_NORETURN
+///
+/// Signal the analyzer that the function cannot return.
+/// This excludes compilers.
+///
+#define ANALYZER_NORETURN
+  #endif
+#endif
+
+///
+/// Tell the code optimizer that the function will return twice.
+/// This prevents wrong optimizations which can cause bugs.
+///
+#ifndef RETURNS_TWICE
+  #if defined (__GNUC__) || defined (__clang__)
+///
+/// Tell the code optimizer that the function will return twice.
+/// This prevents wrong optimizations which can cause bugs.
+///
+#define RETURNS_TWICE  __attribute__((returns_twice))
+  #else
+///
+/// Tell the code optimizer that the function will return twice.
+/// This prevents wrong optimizations which can cause bugs.
+///
+#define RETURNS_TWICE
   #endif
 #endif
 
@@ -227,58 +187,50 @@ VERIFY_SIZE_OF (__VERIFY_UINT32_ENUM_SIZE, 4);
 ///
 /// Private worker functions for ASM_PFX()
 ///
-#define _CONCATENATE(a, b)  __CONCATENATE(a, b)
-#define __CONCATENATE(a, b) a ## b
+#define _CONCATENATE(a, b)   __CONCATENATE(a, b)
+#define __CONCATENATE(a, b)  a ## b
 
 ///
 /// The __USER_LABEL_PREFIX__ macro predefined by GNUC represents the prefix
 /// on symbols in assembly language.
 ///
-#define ASM_PFX(name) _CONCATENATE (__USER_LABEL_PREFIX__, name)
+#define ASM_PFX(name)  _CONCATENATE (__USER_LABEL_PREFIX__, name)
 
-#if __APPLE__
-  //
-  // Apple extension that is used by the linker to optimize code size
-  // with assembly functions. Put at the end of your .S files
-  //
-  #define ASM_FUNCTION_REMOVE_IF_UNREFERENCED  .subsections_via_symbols
+#ifdef __APPLE__
+//
+// Apple extension that is used by the linker to optimize code size
+// with assembly functions. Put at the end of your .S files
+//
+#define ASM_FUNCTION_REMOVE_IF_UNREFERENCED  .subsections_via_symbols
 #else
-  #define ASM_FUNCTION_REMOVE_IF_UNREFERENCED
+#define ASM_FUNCTION_REMOVE_IF_UNREFERENCED
 #endif
 
-#ifdef __CC_ARM
-  //
-  // Older RVCT ARM compilers don't fully support #pragma pack and require __packed
-  // as a prefix for the structure.
-  //
-  #define PACKED  __packed
-#else
-  #define PACKED
-#endif
+#define PACKED
 
 ///
 /// 128 bit buffer containing a unique identifier value.
 /// Unless otherwise specified, aligned on a 64 bit boundary.
 ///
 typedef struct {
-  UINT32  Data1;
-  UINT16  Data2;
-  UINT16  Data3;
-  UINT8   Data4[8];
+  UINT32    Data1;
+  UINT16    Data2;
+  UINT16    Data3;
+  UINT8     Data4[8];
 } GUID;
 
 ///
 /// 4-byte buffer. An IPv4 internet protocol address.
 ///
 typedef struct {
-  UINT8 Addr[4];
+  UINT8    Addr[4];
 } IPv4_ADDRESS;
 
 ///
 /// 16-byte buffer. An IPv6 internet protocol address.
 ///
 typedef struct {
-  UINT8 Addr[16];
+  UINT8    Addr[16];
 } IPv6_ADDRESS;
 
 //
@@ -295,8 +247,8 @@ typedef struct _LIST_ENTRY LIST_ENTRY;
 /// _LIST_ENTRY structure definition.
 ///
 struct _LIST_ENTRY {
-  LIST_ENTRY  *ForwardLink;
-  LIST_ENTRY  *BackLink;
+  LIST_ENTRY    *ForwardLink;
+  LIST_ENTRY    *BackLink;
 };
 
 //
@@ -306,17 +258,17 @@ struct _LIST_ENTRY {
 ///
 /// Datum is read-only.
 ///
-#define CONST     const
+#define CONST  const
 
 ///
 /// Datum is scoped to the current file or function.
 ///
-#define STATIC    static
+#define STATIC  static
 
 ///
 /// Undeclared type.
 ///
-#define VOID      void
+#define VOID  void
 
 //
 // Modifiers for Data Types used to self document code.
@@ -354,17 +306,25 @@ struct _LIST_ENTRY {
 /// Boolean false value.  UEFI Specification defines this value to be 0,
 /// but this form is more portable.
 ///
-#define FALSE ((BOOLEAN)(0==1))
+#define FALSE  ((BOOLEAN)(0==1))
 
 ///
 /// NULL pointer (VOID *)
 ///
+#if defined (__cplusplus)
+  #if defined (_MSC_EXTENSIONS)
+#define NULL  nullptr
+  #else
+#define NULL  __null
+  #endif
+#else
 #define NULL  ((VOID *) 0)
+#endif
 
 //
 // Null character
 //
-#define CHAR_NULL             0x0000
+#define CHAR_NULL  0x0000
 
 ///
 /// Maximum values for common UEFI Data Types
@@ -378,70 +338,78 @@ struct _LIST_ENTRY {
 #define MAX_INT64   ((INT64)0x7FFFFFFFFFFFFFFFULL)
 #define MAX_UINT64  ((UINT64)0xFFFFFFFFFFFFFFFFULL)
 
-#define  BIT0     0x00000001
-#define  BIT1     0x00000002
-#define  BIT2     0x00000004
-#define  BIT3     0x00000008
-#define  BIT4     0x00000010
-#define  BIT5     0x00000020
-#define  BIT6     0x00000040
-#define  BIT7     0x00000080
-#define  BIT8     0x00000100
-#define  BIT9     0x00000200
-#define  BIT10    0x00000400
-#define  BIT11    0x00000800
-#define  BIT12    0x00001000
-#define  BIT13    0x00002000
-#define  BIT14    0x00004000
-#define  BIT15    0x00008000
-#define  BIT16    0x00010000
-#define  BIT17    0x00020000
-#define  BIT18    0x00040000
-#define  BIT19    0x00080000
-#define  BIT20    0x00100000
-#define  BIT21    0x00200000
-#define  BIT22    0x00400000
-#define  BIT23    0x00800000
-#define  BIT24    0x01000000
-#define  BIT25    0x02000000
-#define  BIT26    0x04000000
-#define  BIT27    0x08000000
-#define  BIT28    0x10000000
-#define  BIT29    0x20000000
-#define  BIT30    0x40000000
-#define  BIT31    0x80000000
-#define  BIT32    0x0000000100000000ULL
-#define  BIT33    0x0000000200000000ULL
-#define  BIT34    0x0000000400000000ULL
-#define  BIT35    0x0000000800000000ULL
-#define  BIT36    0x0000001000000000ULL
-#define  BIT37    0x0000002000000000ULL
-#define  BIT38    0x0000004000000000ULL
-#define  BIT39    0x0000008000000000ULL
-#define  BIT40    0x0000010000000000ULL
-#define  BIT41    0x0000020000000000ULL
-#define  BIT42    0x0000040000000000ULL
-#define  BIT43    0x0000080000000000ULL
-#define  BIT44    0x0000100000000000ULL
-#define  BIT45    0x0000200000000000ULL
-#define  BIT46    0x0000400000000000ULL
-#define  BIT47    0x0000800000000000ULL
-#define  BIT48    0x0001000000000000ULL
-#define  BIT49    0x0002000000000000ULL
-#define  BIT50    0x0004000000000000ULL
-#define  BIT51    0x0008000000000000ULL
-#define  BIT52    0x0010000000000000ULL
-#define  BIT53    0x0020000000000000ULL
-#define  BIT54    0x0040000000000000ULL
-#define  BIT55    0x0080000000000000ULL
-#define  BIT56    0x0100000000000000ULL
-#define  BIT57    0x0200000000000000ULL
-#define  BIT58    0x0400000000000000ULL
-#define  BIT59    0x0800000000000000ULL
-#define  BIT60    0x1000000000000000ULL
-#define  BIT61    0x2000000000000000ULL
-#define  BIT62    0x4000000000000000ULL
-#define  BIT63    0x8000000000000000ULL
+///
+/// Minimum values for the signed UEFI Data Types
+///
+#define MIN_INT8   (((INT8)  -127) - 1)
+#define MIN_INT16  (((INT16) -32767) - 1)
+#define MIN_INT32  (((INT32) -2147483647) - 1)
+#define MIN_INT64  (((INT64) -9223372036854775807LL) - 1)
+
+#define  BIT0   0x00000001
+#define  BIT1   0x00000002
+#define  BIT2   0x00000004
+#define  BIT3   0x00000008
+#define  BIT4   0x00000010
+#define  BIT5   0x00000020
+#define  BIT6   0x00000040
+#define  BIT7   0x00000080
+#define  BIT8   0x00000100
+#define  BIT9   0x00000200
+#define  BIT10  0x00000400
+#define  BIT11  0x00000800
+#define  BIT12  0x00001000
+#define  BIT13  0x00002000
+#define  BIT14  0x00004000
+#define  BIT15  0x00008000
+#define  BIT16  0x00010000
+#define  BIT17  0x00020000
+#define  BIT18  0x00040000
+#define  BIT19  0x00080000
+#define  BIT20  0x00100000
+#define  BIT21  0x00200000
+#define  BIT22  0x00400000
+#define  BIT23  0x00800000
+#define  BIT24  0x01000000
+#define  BIT25  0x02000000
+#define  BIT26  0x04000000
+#define  BIT27  0x08000000
+#define  BIT28  0x10000000
+#define  BIT29  0x20000000
+#define  BIT30  0x40000000
+#define  BIT31  0x80000000
+#define  BIT32  0x0000000100000000ULL
+#define  BIT33  0x0000000200000000ULL
+#define  BIT34  0x0000000400000000ULL
+#define  BIT35  0x0000000800000000ULL
+#define  BIT36  0x0000001000000000ULL
+#define  BIT37  0x0000002000000000ULL
+#define  BIT38  0x0000004000000000ULL
+#define  BIT39  0x0000008000000000ULL
+#define  BIT40  0x0000010000000000ULL
+#define  BIT41  0x0000020000000000ULL
+#define  BIT42  0x0000040000000000ULL
+#define  BIT43  0x0000080000000000ULL
+#define  BIT44  0x0000100000000000ULL
+#define  BIT45  0x0000200000000000ULL
+#define  BIT46  0x0000400000000000ULL
+#define  BIT47  0x0000800000000000ULL
+#define  BIT48  0x0001000000000000ULL
+#define  BIT49  0x0002000000000000ULL
+#define  BIT50  0x0004000000000000ULL
+#define  BIT51  0x0008000000000000ULL
+#define  BIT52  0x0010000000000000ULL
+#define  BIT53  0x0020000000000000ULL
+#define  BIT54  0x0040000000000000ULL
+#define  BIT55  0x0080000000000000ULL
+#define  BIT56  0x0100000000000000ULL
+#define  BIT57  0x0200000000000000ULL
+#define  BIT58  0x0400000000000000ULL
+#define  BIT59  0x0800000000000000ULL
+#define  BIT60  0x1000000000000000ULL
+#define  BIT61  0x2000000000000000ULL
+#define  BIT62  0x4000000000000000ULL
+#define  BIT63  0x8000000000000000ULL
 
 #define  SIZE_1KB    0x00000400
 #define  SIZE_2KB    0x00000800
@@ -554,21 +522,24 @@ struct _LIST_ENTRY {
 #define  BASE_8EB    0x8000000000000000ULL
 
 //
-//  Support for variable length argument lists using the ANSI standard.
+//  Support for variable argument lists in freestanding edk2 modules.
 //
-//  Since we are using the ANSI standard we used the standard naming and
-//  did not follow the coding convention
+//  For modules that use the ISO C library interfaces for variable
+//  argument lists, refer to "StdLib/Include/stdarg.h".
 //
 //  VA_LIST  - typedef for argument list.
 //  VA_START (VA_LIST Marker, argument before the ...) - Init Marker for use.
 //  VA_END (VA_LIST Marker) - Clear Marker
-//  VA_ARG (VA_LIST Marker, var arg size) - Use Marker to get an argument from
-//    the ... list. You must know the size and pass it in this macro.
+//  VA_ARG (VA_LIST Marker, var arg type) - Use Marker to get an argument from
+//    the ... list. You must know the type and pass it in this macro.  Type
+//    must be compatible with the type of the actual next argument (as promoted
+//    according to the default argument promotions.)
 //  VA_COPY (VA_LIST Dest, VA_LIST Start) - Initialize Dest as a copy of Start.
 //
-//  example:
+//  Example:
 //
 //  UINTN
+//  EFIAPI
 //  ExampleVarArg (
 //    IN UINTN  NumberOfArgs,
 //    ...
@@ -584,14 +555,20 @@ struct _LIST_ENTRY {
 //    VA_START (Marker, NumberOfArgs);
 //    for (Index = 0, Result = 0; Index < NumberOfArgs; Index++) {
 //      //
-//      // The ... list is a series of UINTN values, so average them up.
+//      // The ... list is a series of UINTN values, so sum them up.
 //      //
 //      Result += VA_ARG (Marker, UINTN);
 //    }
 //
 //    VA_END (Marker);
-//    return Result
+//    return Result;
 //  }
+//
+//  Notes:
+//  - Functions that call VA_START() / VA_END() must have a variable
+//    argument list and must be declared EFIAPI.
+//  - Functions that call VA_COPY() / VA_END() must be declared EFIAPI.
+//  - Functions that only use VA_LIST and VA_ARG() need not be EFIAPI.
 //
 
 /**
@@ -601,41 +578,23 @@ struct _LIST_ENTRY {
 
   @return The aligned size.
 **/
-#define _INT_SIZE_OF(n) ((sizeof (n) + sizeof (UINTN) - 1) &~(sizeof (UINTN) - 1))
+#define _INT_SIZE_OF(n)  ((sizeof (n) + sizeof (UINTN) - 1) &~(sizeof (UINTN) - 1))
 
-#if defined(__CC_ARM)
+#if defined (_M_ARM) || defined (_M_ARM64)
 //
-// RVCT ARM variable argument list support.
+// MSFT ARM variable argument list support.
 //
 
-///
-/// Variable used to traverse the list of arguments. This type can vary by
-/// implementation and could be an array or structure.
-///
-#ifdef __APCS_ADSABI
-  typedef int         *va_list[1];
-  #define VA_LIST     va_list
-#else
-  typedef struct __va_list { void *__ap; } va_list;
-  #define VA_LIST                          va_list
-#endif
+typedef char *VA_LIST;
 
-#define VA_START(Marker, Parameter)   __va_start(Marker, Parameter)
+#define VA_START(Marker, Parameter)  __va_start (&Marker, &Parameter, _INT_SIZE_OF (Parameter), __alignof(Parameter), &Parameter)
+#define VA_ARG(Marker, TYPE)         (*(TYPE *) ((Marker += _INT_SIZE_OF (TYPE) + ((-(INTN)Marker) & (sizeof(TYPE) - 1))) - _INT_SIZE_OF (TYPE)))
+#define VA_END(Marker)               (Marker = (VA_LIST) 0)
+#define VA_COPY(Dest, Start)         ((void)((Dest) = (Start)))
 
-#define VA_ARG(Marker, TYPE)          __va_arg(Marker, TYPE)
+#elif defined (__GNUC__) || defined (__clang__)
 
-#define VA_END(Marker)                ((void)0)
-
-// For some ARM RVCT compilers, __va_copy is not defined
-#ifndef __va_copy
-  #define __va_copy(dest, src) ((void)((dest) = (src)))
-#endif
-
-#define VA_COPY(Dest, Start)          __va_copy (Dest, Start)
-
-#elif defined(__GNUC__)
-
-#if defined(MDE_CPU_X64) && !defined(NO_MSABI_VA_FUNCS)
+  #if defined (MDE_CPU_X64) && !defined (NO_MSABI_VA_FUNCS)
 //
 // X64 only. Use MS ABI version of GCC built-in macros for variable argument lists.
 //
@@ -651,13 +610,13 @@ typedef __builtin_ms_va_list VA_LIST;
 
 #define VA_START(Marker, Parameter)  __builtin_ms_va_start (Marker, Parameter)
 
-#define VA_ARG(Marker, TYPE)         ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
+#define VA_ARG(Marker, TYPE)  ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
 
-#define VA_END(Marker)               __builtin_ms_va_end (Marker)
+#define VA_END(Marker)  __builtin_ms_va_end (Marker)
 
-#define VA_COPY(Dest, Start)         __builtin_ms_va_copy (Dest, Start)
+#define VA_COPY(Dest, Start)  __builtin_ms_va_copy (Dest, Start)
 
-#else
+  #else
 //
 // Use GCC built-in macros for variable argument lists.
 //
@@ -670,13 +629,13 @@ typedef __builtin_va_list VA_LIST;
 
 #define VA_START(Marker, Parameter)  __builtin_va_start (Marker, Parameter)
 
-#define VA_ARG(Marker, TYPE)         ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
+#define VA_ARG(Marker, TYPE)  ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
 
-#define VA_END(Marker)               __builtin_va_end (Marker)
+#define VA_END(Marker)  __builtin_va_end (Marker)
 
-#define VA_COPY(Dest, Start)         __builtin_va_copy (Dest, Start)
+#define VA_COPY(Dest, Start)  __builtin_va_copy (Dest, Start)
 
-#endif
+  #endif
 
 #else
 ///
@@ -701,7 +660,7 @@ typedef CHAR8 *VA_LIST;
   @return  A pointer to the beginning of a variable argument list.
 
 **/
-#define VA_START(Marker, Parameter) (Marker = (VA_LIST) ((UINTN) & (Parameter) + _INT_SIZE_OF (Parameter)))
+#define VA_START(Marker, Parameter)  (Marker = (VA_LIST) ((UINTN) & (Parameter) + _INT_SIZE_OF (Parameter)))
 
 /**
   Returns an argument of a specified type from a variable argument list and updates
@@ -719,7 +678,7 @@ typedef CHAR8 *VA_LIST;
   @return  An argument of the type specified by TYPE.
 
 **/
-#define VA_ARG(Marker, TYPE)   (*(TYPE *) ((Marker += _INT_SIZE_OF (TYPE)) - _INT_SIZE_OF (TYPE)))
+#define VA_ARG(Marker, TYPE)  (*(TYPE *) ((Marker += _INT_SIZE_OF (TYPE)) - _INT_SIZE_OF (TYPE)))
 
 /**
   Terminates the use of a variable argument list.
@@ -731,7 +690,7 @@ typedef CHAR8 *VA_LIST;
   @param   Marker   VA_LIST used to traverse the list of arguments.
 
 **/
-#define VA_END(Marker)      (Marker = (VA_LIST) 0)
+#define VA_END(Marker)  (Marker = (VA_LIST) 0)
 
 /**
   Initializes a VA_LIST as a copy of an existing VA_LIST.
@@ -751,7 +710,7 @@ typedef CHAR8 *VA_LIST;
 ///
 /// Pointer to the start of a variable argument list stored in a memory buffer. Same as UINT8 *.
 ///
-typedef UINTN  *BASE_LIST;
+typedef UINTN *BASE_LIST;
 
 /**
   Returns the size of a data type in sizeof(UINTN) units rounded up to the nearest UINTN boundary.
@@ -760,7 +719,7 @@ typedef UINTN  *BASE_LIST;
 
   @return The size of TYPE in sizeof (UINTN) units rounded up to the nearest UINTN boundary.
 **/
-#define _BASE_INT_SIZE_OF(TYPE) ((sizeof (TYPE) + sizeof (UINTN) - 1) / sizeof (UINTN))
+#define _BASE_INT_SIZE_OF(TYPE)  ((sizeof (TYPE) + sizeof (UINTN) - 1) / sizeof (UINTN))
 
 /**
   Returns an argument of a specified type from a variable argument list and updates
@@ -778,7 +737,7 @@ typedef UINTN  *BASE_LIST;
   @return  An argument of the type specified by TYPE.
 
 **/
-#define BASE_ARG(Marker, TYPE)   (*(TYPE *) ((Marker += _BASE_INT_SIZE_OF (TYPE)) - _BASE_INT_SIZE_OF (TYPE)))
+#define BASE_ARG(Marker, TYPE)  (*(TYPE *) ((Marker += _BASE_INT_SIZE_OF (TYPE)) - _BASE_INT_SIZE_OF (TYPE)))
 
 /**
   The macro that returns the byte offset of a field in a data structure.
@@ -793,15 +752,71 @@ typedef UINTN  *BASE_LIST;
   @return  Offset, in bytes, of field.
 
 **/
-#ifdef __GNUC__
-#if __GNUC__ >= 4
-#define OFFSET_OF(TYPE, Field) ((UINTN) __builtin_offsetof(TYPE, Field))
-#endif
+#if (defined (__GNUC__) && __GNUC__ >= 4) || defined (__clang__)
+#define OFFSET_OF(TYPE, Field)  ((UINTN) __builtin_offsetof(TYPE, Field))
 #endif
 
 #ifndef OFFSET_OF
-#define OFFSET_OF(TYPE, Field) ((UINTN) &(((TYPE *)0)->Field))
+#define OFFSET_OF(TYPE, Field)  ((UINTN) &(((TYPE *)0)->Field))
 #endif
+
+/**
+  Portable definition for compile time assertions.
+  Equivalent to C11 static_assert macro from assert.h.
+
+  @param  Expression  Boolean expression.
+  @param  Message     Raised compiler diagnostic message when expression is false.
+
+**/
+#ifdef MDE_CPU_EBC
+#define STATIC_ASSERT(Expression, Message)
+#elif defined (_MSC_EXTENSIONS) || defined (__cplusplus)
+#define STATIC_ASSERT  static_assert
+#else
+#define STATIC_ASSERT  _Static_assert
+#endif
+
+//
+// Verify that ProcessorBind.h produced UEFI Data Types that are compliant with
+// Section 2.3.1 of the UEFI 2.3 Specification.
+//
+
+STATIC_ASSERT (sizeof (BOOLEAN) == 1, "sizeof (BOOLEAN) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (INT8)    == 1, "sizeof (INT8) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (UINT8)   == 1, "sizeof (UINT8) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (INT16)   == 2, "sizeof (INT16) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (UINT16)  == 2, "sizeof (UINT16) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (INT32)   == 4, "sizeof (INT32) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (UINT32)  == 4, "sizeof (UINT32) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (INT64)   == 8, "sizeof (INT64) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (UINT64)  == 8, "sizeof (UINT64) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (CHAR8)   == 1, "sizeof (CHAR8) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (CHAR16)  == 2, "sizeof (CHAR16) does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (L'A')    == 2, "sizeof (L'A') does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (L"A")    == 4, "sizeof (L\"A\") does not meet UEFI Specification Data Type requirements");
+
+//
+// The following three enum types are used to verify that the compiler
+// configuration for enum types is compliant with Section 2.3.1 of the
+// UEFI 2.3 Specification. These enum types and enum values are not
+// intended to be used. A prefix of '__' is used avoid conflicts with
+// other types.
+//
+typedef enum {
+  __VerifyUint8EnumValue = 0xff
+} __VERIFY_UINT8_ENUM_SIZE;
+
+typedef enum {
+  __VerifyUint16EnumValue = 0xffff
+} __VERIFY_UINT16_ENUM_SIZE;
+
+typedef enum {
+  __VerifyUint32EnumValue = 0xffffffff
+} __VERIFY_UINT32_ENUM_SIZE;
+
+STATIC_ASSERT (sizeof (__VERIFY_UINT8_ENUM_SIZE) == 4, "Size of enum does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (__VERIFY_UINT16_ENUM_SIZE) == 4, "Size of enum does not meet UEFI Specification Data Type requirements");
+STATIC_ASSERT (sizeof (__VERIFY_UINT32_ENUM_SIZE) == 4, "Size of enum does not meet UEFI Specification Data Type requirements");
 
 /**
   Macro that returns a pointer to the data structure that contains a specified field of
@@ -822,7 +837,7 @@ typedef UINTN  *BASE_LIST;
   @return  A pointer to the structure from one of it's elements.
 
 **/
-#define BASE_CR(Record, TYPE, Field)  ((TYPE *) ((CHAR8 *) (Record) - (CHAR8 *) &(((TYPE *) 0)->Field)))
+#define BASE_CR(Record, TYPE, Field)  ((TYPE *) ((CHAR8 *) (Record) - OFFSET_OF (TYPE, Field)))
 
 /**
   Rounds a value up to the next boundary using a specified alignment.
@@ -836,7 +851,7 @@ typedef UINTN  *BASE_LIST;
   @return  A value up to the next boundary.
 
 **/
-#define ALIGN_VALUE(Value, Alignment) ((Value) + (((Alignment) - (Value)) & ((Alignment) - 1)))
+#define ALIGN_VALUE(Value, Alignment)  ((Value) + (((Alignment) - (Value)) & ((Alignment) - 1)))
 
 /**
   Adjust a pointer by adding the minimum offset required for it to be aligned on
@@ -851,7 +866,7 @@ typedef UINTN  *BASE_LIST;
   @return  Pointer to the aligned address.
 
 **/
-#define ALIGN_POINTER(Pointer, Alignment) ((VOID *) (ALIGN_VALUE ((UINTN)(Pointer), (Alignment))))
+#define ALIGN_POINTER(Pointer, Alignment)  ((VOID *) (ALIGN_VALUE ((UINTN)(Pointer), (Alignment))))
 
 /**
   Rounds a value up to the next natural boundary for the current CPU.
@@ -866,7 +881,6 @@ typedef UINTN  *BASE_LIST;
 
 **/
 #define ALIGN_VARIABLE(Value)  ALIGN_VALUE ((Value), sizeof (UINTN))
-
 
 /**
   Return the maximum of two operands.
@@ -926,7 +940,7 @@ typedef UINTN RETURN_STATUS;
   @return The value specified by StatusCode with the highest bit set.
 
 **/
-#define ENCODE_ERROR(StatusCode)     ((RETURN_STATUS)(MAX_BIT | (StatusCode)))
+#define ENCODE_ERROR(StatusCode)  ((RETURN_STATUS)(MAX_BIT | (StatusCode)))
 
 /**
   Produces a RETURN_STATUS code with the highest bit clear.
@@ -937,7 +951,7 @@ typedef UINTN RETURN_STATUS;
   @return The value specified by StatusCode with the highest bit clear.
 
 **/
-#define ENCODE_WARNING(StatusCode)   ((RETURN_STATUS)(StatusCode))
+#define ENCODE_WARNING(StatusCode)  ((RETURN_STATUS)(StatusCode))
 
 /**
   Returns TRUE if a specified RETURN_STATUS code is an error code.
@@ -950,138 +964,138 @@ typedef UINTN RETURN_STATUS;
   @retval FALSE         The high bit of StatusCode is clear.
 
 **/
-#define RETURN_ERROR(StatusCode)     (((INTN)(RETURN_STATUS)(StatusCode)) < 0)
+#define RETURN_ERROR(StatusCode)  (((INTN)(RETURN_STATUS)(StatusCode)) < 0)
 
 ///
 /// The operation completed successfully.
 ///
-#define RETURN_SUCCESS               0
+#define RETURN_SUCCESS  (RETURN_STATUS)(0)
 
 ///
 /// The image failed to load.
 ///
-#define RETURN_LOAD_ERROR            ENCODE_ERROR (1)
+#define RETURN_LOAD_ERROR  ENCODE_ERROR (1)
 
 ///
 /// The parameter was incorrect.
 ///
-#define RETURN_INVALID_PARAMETER     ENCODE_ERROR (2)
+#define RETURN_INVALID_PARAMETER  ENCODE_ERROR (2)
 
 ///
 /// The operation is not supported.
 ///
-#define RETURN_UNSUPPORTED           ENCODE_ERROR (3)
+#define RETURN_UNSUPPORTED  ENCODE_ERROR (3)
 
 ///
 /// The buffer was not the proper size for the request.
 ///
-#define RETURN_BAD_BUFFER_SIZE       ENCODE_ERROR (4)
+#define RETURN_BAD_BUFFER_SIZE  ENCODE_ERROR (4)
 
 ///
 /// The buffer was not large enough to hold the requested data.
 /// The required buffer size is returned in the appropriate
 /// parameter when this error occurs.
 ///
-#define RETURN_BUFFER_TOO_SMALL      ENCODE_ERROR (5)
+#define RETURN_BUFFER_TOO_SMALL  ENCODE_ERROR (5)
 
 ///
 /// There is no data pending upon return.
 ///
-#define RETURN_NOT_READY             ENCODE_ERROR (6)
+#define RETURN_NOT_READY  ENCODE_ERROR (6)
 
 ///
 /// The physical device reported an error while attempting the
 /// operation.
 ///
-#define RETURN_DEVICE_ERROR          ENCODE_ERROR (7)
+#define RETURN_DEVICE_ERROR  ENCODE_ERROR (7)
 
 ///
 /// The device can not be written to.
 ///
-#define RETURN_WRITE_PROTECTED       ENCODE_ERROR (8)
+#define RETURN_WRITE_PROTECTED  ENCODE_ERROR (8)
 
 ///
 /// The resource has run out.
 ///
-#define RETURN_OUT_OF_RESOURCES      ENCODE_ERROR (9)
+#define RETURN_OUT_OF_RESOURCES  ENCODE_ERROR (9)
 
 ///
 /// An inconsistency was detected on the file system causing the
 /// operation to fail.
 ///
-#define RETURN_VOLUME_CORRUPTED      ENCODE_ERROR (10)
+#define RETURN_VOLUME_CORRUPTED  ENCODE_ERROR (10)
 
 ///
 /// There is no more space on the file system.
 ///
-#define RETURN_VOLUME_FULL           ENCODE_ERROR (11)
+#define RETURN_VOLUME_FULL  ENCODE_ERROR (11)
 
 ///
 /// The device does not contain any medium to perform the
 /// operation.
 ///
-#define RETURN_NO_MEDIA              ENCODE_ERROR (12)
+#define RETURN_NO_MEDIA  ENCODE_ERROR (12)
 
 ///
 /// The medium in the device has changed since the last
 /// access.
 ///
-#define RETURN_MEDIA_CHANGED         ENCODE_ERROR (13)
+#define RETURN_MEDIA_CHANGED  ENCODE_ERROR (13)
 
 ///
 /// The item was not found.
 ///
-#define RETURN_NOT_FOUND             ENCODE_ERROR (14)
+#define RETURN_NOT_FOUND  ENCODE_ERROR (14)
 
 ///
 /// Access was denied.
 ///
-#define RETURN_ACCESS_DENIED         ENCODE_ERROR (15)
+#define RETURN_ACCESS_DENIED  ENCODE_ERROR (15)
 
 ///
 /// The server was not found or did not respond to the request.
 ///
-#define RETURN_NO_RESPONSE           ENCODE_ERROR (16)
+#define RETURN_NO_RESPONSE  ENCODE_ERROR (16)
 
 ///
 /// A mapping to the device does not exist.
 ///
-#define RETURN_NO_MAPPING            ENCODE_ERROR (17)
+#define RETURN_NO_MAPPING  ENCODE_ERROR (17)
 
 ///
 /// A timeout time expired.
 ///
-#define RETURN_TIMEOUT               ENCODE_ERROR (18)
+#define RETURN_TIMEOUT  ENCODE_ERROR (18)
 
 ///
 /// The protocol has not been started.
 ///
-#define RETURN_NOT_STARTED           ENCODE_ERROR (19)
+#define RETURN_NOT_STARTED  ENCODE_ERROR (19)
 
 ///
 /// The protocol has already been started.
 ///
-#define RETURN_ALREADY_STARTED       ENCODE_ERROR (20)
+#define RETURN_ALREADY_STARTED  ENCODE_ERROR (20)
 
 ///
 /// The operation was aborted.
 ///
-#define RETURN_ABORTED               ENCODE_ERROR (21)
+#define RETURN_ABORTED  ENCODE_ERROR (21)
 
 ///
 /// An ICMP error occurred during the network operation.
 ///
-#define RETURN_ICMP_ERROR            ENCODE_ERROR (22)
+#define RETURN_ICMP_ERROR  ENCODE_ERROR (22)
 
 ///
 /// A TFTP error occurred during the network operation.
 ///
-#define RETURN_TFTP_ERROR            ENCODE_ERROR (23)
+#define RETURN_TFTP_ERROR  ENCODE_ERROR (23)
 
 ///
 /// A protocol error occurred during the network operation.
 ///
-#define RETURN_PROTOCOL_ERROR        ENCODE_ERROR (24)
+#define RETURN_PROTOCOL_ERROR  ENCODE_ERROR (24)
 
 ///
 /// A function encountered an internal version that was
@@ -1092,74 +1106,73 @@ typedef UINTN RETURN_STATUS;
 ///
 /// The function was not performed due to a security violation.
 ///
-#define RETURN_SECURITY_VIOLATION    ENCODE_ERROR (26)
+#define RETURN_SECURITY_VIOLATION  ENCODE_ERROR (26)
 
 ///
 /// A CRC error was detected.
 ///
-#define RETURN_CRC_ERROR             ENCODE_ERROR (27)
+#define RETURN_CRC_ERROR  ENCODE_ERROR (27)
 
 ///
 /// The beginning or end of media was reached.
 ///
-#define RETURN_END_OF_MEDIA          ENCODE_ERROR (28)
+#define RETURN_END_OF_MEDIA  ENCODE_ERROR (28)
 
 ///
 /// The end of the file was reached.
 ///
-#define RETURN_END_OF_FILE           ENCODE_ERROR (31)
+#define RETURN_END_OF_FILE  ENCODE_ERROR (31)
 
 ///
 /// The language specified was invalid.
 ///
-#define RETURN_INVALID_LANGUAGE      ENCODE_ERROR (32)
+#define RETURN_INVALID_LANGUAGE  ENCODE_ERROR (32)
 
 ///
 /// The security status of the data is unknown or compromised
 /// and the data must be updated or replaced to restore a valid
 /// security status.
 ///
-#define RETURN_COMPROMISED_DATA      ENCODE_ERROR (33)
+#define RETURN_COMPROMISED_DATA  ENCODE_ERROR (33)
 
 ///
 /// A HTTP error occurred during the network operation.
 ///
-#define RETURN_HTTP_ERROR            ENCODE_ERROR (35)
+#define RETURN_HTTP_ERROR  ENCODE_ERROR (35)
 
 ///
 /// The string contained one or more characters that
 /// the device could not render and were skipped.
 ///
-#define RETURN_WARN_UNKNOWN_GLYPH    ENCODE_WARNING (1)
+#define RETURN_WARN_UNKNOWN_GLYPH  ENCODE_WARNING (1)
 
 ///
 /// The handle was closed, but the file was not deleted.
 ///
-#define RETURN_WARN_DELETE_FAILURE   ENCODE_WARNING (2)
+#define RETURN_WARN_DELETE_FAILURE  ENCODE_WARNING (2)
 
 ///
 /// The handle was closed, but the data to the file was not
 /// flushed properly.
 ///
-#define RETURN_WARN_WRITE_FAILURE    ENCODE_WARNING (3)
+#define RETURN_WARN_WRITE_FAILURE  ENCODE_WARNING (3)
 
 ///
 /// The resulting buffer was too small, and the data was
 /// truncated to the buffer size.
 ///
-#define RETURN_WARN_BUFFER_TOO_SMALL ENCODE_WARNING (4)
+#define RETURN_WARN_BUFFER_TOO_SMALL  ENCODE_WARNING (4)
 
 ///
 /// The data has not been updated within the timeframe set by
 /// local policy for this type of data.
 ///
-#define RETURN_WARN_STALE_DATA       ENCODE_WARNING (5)
+#define RETURN_WARN_STALE_DATA  ENCODE_WARNING (5)
 
 ///
 /// The resulting buffer contains UEFI-compliant file system.
 ///
-#define RETURN_WARN_FILE_SYSTEM      ENCODE_WARNING (6)
-
+#define RETURN_WARN_FILE_SYSTEM  ENCODE_WARNING (6)
 
 /**
   Returns a 16-bit signature built from 2 ASCII characters.
@@ -1173,7 +1186,7 @@ typedef UINTN RETURN_STATUS;
   @return A 16-bit value built from the two ASCII characters specified by A and B.
 
 **/
-#define SIGNATURE_16(A, B)        ((A) | (B << 8))
+#define SIGNATURE_16(A, B)  ((A) | (B << 8))
 
 /**
   Returns a 32-bit signature built from 4 ASCII characters.
@@ -1214,45 +1227,52 @@ typedef UINTN RETURN_STATUS;
 #define SIGNATURE_64(A, B, C, D, E, F, G, H) \
     (SIGNATURE_32 (A, B, C, D) | ((UINT64) (SIGNATURE_32 (E, F, G, H)) << 32))
 
-#if defined(_MSC_EXTENSIONS) && !defined (__INTEL_COMPILER) && !defined (MDE_CPU_EBC)
+#if defined (_MSC_EXTENSIONS) && !defined (__INTEL_COMPILER) && !defined (MDE_CPU_EBC)
+void *
+_ReturnAddress (
+  void
+  );
+
   #pragma intrinsic(_ReturnAddress)
-  /**
-    Get the return address of the calling function.
 
-    Based on intrinsic function _ReturnAddress that provides the address of
-    the instruction in the calling function that will be executed after
-    control returns to the caller.
+/**
+  Get the return address of the calling function.
 
-    @param L    Return Level.
+  Based on intrinsic function _ReturnAddress that provides the address of
+  the instruction in the calling function that will be executed after
+  control returns to the caller.
 
-    @return The return address of the calling function or 0 if L != 0.
+  @param L    Return Level.
 
-  **/
-  #define RETURN_ADDRESS(L)     ((L == 0) ? _ReturnAddress() : (VOID *) 0)
-#elif defined(__GNUC__)
-  void * __builtin_return_address (unsigned int level);
-  /**
-    Get the return address of the calling function.
+  @return The return address of the calling function or 0 if L != 0.
 
-    Based on built-in Function __builtin_return_address that returns
-    the return address of the current function, or of one of its callers.
+**/
+#define RETURN_ADDRESS(L)  ((L == 0) ? _ReturnAddress() : (VOID *) 0)
+#elif defined (__GNUC__) || defined (__clang__)
 
-    @param L    Return Level.
+/**
+  Get the return address of the calling function.
 
-    @return The return address of the calling function.
+  Based on built-in Function __builtin_return_address that returns
+  the return address of the current function, or of one of its callers.
 
-  **/
-  #define RETURN_ADDRESS(L)     __builtin_return_address (L)
+  @param L    Return Level.
+
+  @return The return address of the calling function.
+
+**/
+#define RETURN_ADDRESS(L)  __builtin_return_address (L)
 #else
-  /**
-    Get the return address of the calling function.
 
-    @param L    Return Level.
+/**
+  Get the return address of the calling function.
 
-    @return 0 as compilers don't support this feature.
+  @param L    Return Level.
 
-  **/
-  #define RETURN_ADDRESS(L)     ((VOID *) 0)
+  @return 0 as compilers don't support this feature.
+
+**/
+#define RETURN_ADDRESS(L)  ((VOID *) 0)
 #endif
 
 /**
@@ -1266,7 +1286,6 @@ typedef UINTN RETURN_STATUS;
   @return The number of elements in Array. The result has type UINTN.
 
 **/
-#define ARRAY_SIZE(Array) (sizeof (Array) / sizeof ((Array)[0]))
+#define ARRAY_SIZE(Array)  (sizeof (Array) / sizeof ((Array)[0]))
 
 #endif
-

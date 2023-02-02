@@ -189,7 +189,7 @@ static void peerdisc_socket_tx ( const char *uuid, const char *id ) {
 			/* Skip unopened network devices */
 			if ( ! netdev_is_open ( netdev ) )
 				continue;
-			address.st.st_scope_id = netdev->index;
+			address.st.st_scope_id = netdev->scope_id;
 
 			/* Discard request (for test purposes) if applicable */
 			if ( inject_fault ( PEERDISC_DISCARD_RATE ) )

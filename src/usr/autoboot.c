@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdio.h>
 #include <errno.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/vlan.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/settings.h>
 #include <ipxe/image.h>
@@ -56,6 +57,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Link-layer address of preferred autoboot device, if known */
 static uint8_t autoboot_ll_addr[MAX_LL_ADDR_LEN];
+
+/** VLAN tag of preferred autoboot device, if known */
+static unsigned int autoboot_vlan;
 
 /** Device location of preferred autoboot device, if known */
 static struct device_description autoboot_desc;
@@ -494,8 +498,9 @@ void set_autoboot_busloc ( unsigned int bus_type, unsigned int location ) {
  */
 static int is_autoboot_ll_addr ( struct net_device *netdev ) {
 
-	return ( memcmp ( netdev->ll_addr, autoboot_ll_addr,
-			  netdev->ll_protocol->ll_addr_len ) == 0 );
+	return ( ( memcmp ( netdev->ll_addr, autoboot_ll_addr,
+			    netdev->ll_protocol->ll_addr_len ) == 0 ) &&
+		 ( vlan_tag ( netdev ) == autoboot_vlan ) );
 }
 
 /**
@@ -503,13 +508,18 @@ static int is_autoboot_ll_addr ( struct net_device *netdev ) {
  *
  * @v ll_addr		Link-layer address
  * @v len		Length of link-layer address
+ * @v vlan		VLAN tag
  */
-void set_autoboot_ll_addr ( const void *ll_addr, size_t len ) {
+void set_autoboot_ll_addr ( const void *ll_addr, size_t len,
+			    unsigned int vlan ) {
 
 	/* Record autoboot link-layer address (truncated if necessary) */
 	if ( len > sizeof ( autoboot_ll_addr ) )
 		len = sizeof ( autoboot_ll_addr );
 	memcpy ( autoboot_ll_addr, ll_addr, len );
+
+	/* Record autoboot VLAN tag */
+	autoboot_vlan = vlan;
 
 	/* Mark autoboot device as present */
 	is_autoboot_device = is_autoboot_ll_addr;

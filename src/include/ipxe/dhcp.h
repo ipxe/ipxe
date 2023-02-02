@@ -274,8 +274,9 @@ struct dhcp_client_architecture {
 
 /** DHCP client architecture values
  *
- * These are defined by the PXE specification and redefined by
- * RFC4578.
+ * These are originally defined by the PXE specification, redefined by
+ * RFC4578, redefined again by RFC5970, and now maintained in the IANA
+ * DHCPv6 parameters registry.
  */
 enum dhcp_client_architecture_values {
 	/** Intel x86 PC */
@@ -302,6 +303,24 @@ enum dhcp_client_architecture_values {
 	DHCP_CLIENT_ARCHITECTURE_ARM32 = 0x000a,
 	/** EFI 64-bit ARM */
 	DHCP_CLIENT_ARCHITECTURE_ARM64 = 0x000b,
+	/** EFI 32-bit RISC-V */
+	DHCP_CLIENT_ARCHITECTURE_RISCV32 = 0x0019,
+	/** EFI 64-bit RISC-V */
+	DHCP_CLIENT_ARCHITECTURE_RISCV64 = 0x001b,
+	/** EFI 128-bit RISC-V */
+	DHCP_CLIENT_ARCHITECTURE_RISCV128 = 0x001d,
+	/** EFI 32-bit MIPS */
+	DHCP_CLIENT_ARCHITECTURE_MIPS32 = 0x0021,
+	/** EFI 64-bit MIPS */
+	DHCP_CLIENT_ARCHITECTURE_MIPS64 = 0x0022,
+	/** EFI 32-bit Sunway */
+	DHCP_CLIENT_ARCHITECTURE_SUNWAY32 = 0x0023,
+	/** EFI 64-bit Sunway */
+	DHCP_CLIENT_ARCHITECTURE_SUNWAY64 = 0x0024,
+	/** EFI 32-bit LoongArch */
+	DHCP_CLIENT_ARCHITECTURE_LOONG32 = 0x0025,
+	/** EFI 64-bit LoongArch */
+	DHCP_CLIENT_ARCHITECTURE_LOONG64 = 0x0027,
 };
 
 /** Client network device interface */

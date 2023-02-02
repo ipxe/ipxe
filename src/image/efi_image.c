@@ -96,9 +96,7 @@ efi_image_path ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
 	efi_snprintf ( filepath->PathName, ( name_len + 1 /* NUL */ ),
 		       "%s", image->name );
 	end = ( ( ( void * ) filepath ) + filepath_len );
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 
 	return path;
 }

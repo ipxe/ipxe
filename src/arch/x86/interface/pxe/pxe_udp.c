@@ -12,6 +12,7 @@
 #include <ipxe/uaccess.h>
 #include <ipxe/process.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/malloc.h>
 #include <realmode.h>
 #include <pxe.h>
 
@@ -481,4 +482,29 @@ struct pxe_api_call pxe_udp_api[] __pxe_api_call = {
 		       struct s_PXENV_UDP_WRITE ),
 	PXE_API_CALL ( PXENV_UDP_READ, pxenv_udp_read,
 		       struct s_PXENV_UDP_READ ),
+};
+
+/**
+ * Discard some cached PXE UDP data
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int pxe_udp_discard ( void ) {
+	struct io_buffer *iobuf;
+	unsigned int discarded = 0;
+
+	/* Try to discard the oldest received UDP packet */
+	iobuf = list_first_entry ( &pxe_udp.list, struct io_buffer, list );
+	if ( iobuf ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+		discarded++;
+	}
+
+	return discarded;
+}
+
+/** PXE UDP cache discarder */
+struct cache_discarder pxe_udp_discarder __cache_discarder ( CACHE_NORMAL ) = {
+	.discard = pxe_udp_discard,
 };

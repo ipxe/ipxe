@@ -369,7 +369,6 @@ endif
 # Include architecture-specific include path
 ifdef ARCH
 INCDIRS		+= arch/$(ARCH)/include
-INCDIRS		+= arch/$(ARCH)/include/$(PLATFORM)
 endif
 
 ###############################################################################
@@ -462,7 +461,9 @@ ifeq ($(CCTYPE),gcc)
 CFLAGS		+= -ffreestanding
 CFLAGS		+= -fcommon
 CFLAGS		+= -Wall -W -Wformat-nonliteral
+CFLAGS		+= -Wno-array-bounds -Wno-dangling-pointer
 HOST_CFLAGS	+= -Wall -W -Wformat-nonliteral
+HOST_CFLAGS	+= -Wno-array-bounds -Wno-dangling-pointer
 endif
 CFLAGS		+= $(WORKAROUND_CFLAGS) $(EXTRA_CFLAGS)
 ASFLAGS		+= $(WORKAROUND_ASFLAGS) $(EXTRA_ASFLAGS)
@@ -509,6 +510,10 @@ CFLAGS		+= -include include/compiler.h
 # architecture.
 #
 CFLAGS		+= -DASM_TCHAR='$(ASM_TCHAR)' -DASM_TCHAR_OPS='$(ASM_TCHAR_OPS)'
+
+# Inhibit the default -Dlinux
+#
+CFLAGS		+= -Ulinux
 
 # CFLAGS for specific object types
 #

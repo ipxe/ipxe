@@ -370,8 +370,8 @@ struct settings_operations netdev_settings_operations = {
 static struct settings * netdev_redirect ( struct settings *settings ) {
 	struct net_device *netdev;
 
-	/* Redirect to most recently opened network device */
-	netdev = last_opened_netdev();
+	/* Redirect to "netX" network device */
+	netdev = find_netdev ( settings->name );
 	if ( netdev ) {
 		return netdev_settings ( netdev );
 	} else {

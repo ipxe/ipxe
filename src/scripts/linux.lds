@@ -1,17 +1,12 @@
 /* -*- sh -*- */
 
 /*
- * Linker script for i386 Linux images
+ * Linker script for Linux images
  *
  */
 
-OUTPUT_FORMAT ( "elf32-i386", "elf32-i386", "elf32-i386" )
-OUTPUT_ARCH ( i386 )
-
 SECTIONS {
 	_max_align = 32;
-
-	. = 0x08048000;
 
 	/*
 	 * The text section
@@ -86,16 +81,13 @@ SECTIONS {
 	_assert = ASSERT ( ( _weak == _eweak ), ".weak is non-zero length" );
 
 	/*
-	 * Dispose of the comment and note sections to make the link map
-	 * easier to read
+	 * Dispose of unwanted sections to make the link map easier to read
 	 *
 	 */
 
 	/DISCARD/ : {
 		*(.comment)
 		*(.comment.*)
-		*(.note)
-		*(.note.*)
 		*(.rel)
 		*(.rel.*)
 		*(.discard)

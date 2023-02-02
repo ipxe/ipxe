@@ -356,8 +356,8 @@ struct net_device {
 	struct list_head list;
 	/** List of open network devices */
 	struct list_head open_list;
-	/** Index of this network device */
-	unsigned int index;
+	/** Scope ID */
+	unsigned int scope_id;
 	/** Name of this network device */
 	char name[NETDEV_NAME_LEN];
 	/** Underlying hardware device */
@@ -726,11 +726,9 @@ extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void netdev_irq ( struct net_device *netdev, int enable );
 extern struct net_device * find_netdev ( const char *name );
-extern struct net_device * find_netdev_by_index ( unsigned int index );
+extern struct net_device * find_netdev_by_scope_id ( unsigned int scope_id );
 extern struct net_device * find_netdev_by_location ( unsigned int bus_type,
 						     unsigned int location );
-extern struct net_device *
-find_netdev_by_ll_addr ( struct ll_protocol *ll_protocol, const void *ll_addr );
 extern struct net_device * last_opened_netdev ( void );
 extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest,

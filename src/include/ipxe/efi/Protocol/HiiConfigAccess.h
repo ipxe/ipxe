@@ -5,44 +5,40 @@
   This protocol is published by drivers providing and requesting
   configuration data from HII. It may only be invoked by HII.
 
-Copyright (c) 2006 - 2016, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials are licensed and made available under
-the terms and conditions of the BSD License that accompanies this distribution.
-The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  @par Revision Reference:
+  This Protocol was introduced in UEFI Specification 2.1.
 
 **/
-
 
 #ifndef __EFI_HII_CONFIG_ACCESS_H__
 #define __EFI_HII_CONFIG_ACCESS_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 #include <ipxe/efi/Protocol/FormBrowser2.h>
 
 #define EFI_HII_CONFIG_ACCESS_PROTOCOL_GUID  \
   { 0x330d4706, 0xf2a0, 0x4e4f, { 0xa3, 0x69, 0xb6, 0x6f, 0xa8, 0xd5, 0x43, 0x85 } }
 
-typedef struct _EFI_HII_CONFIG_ACCESS_PROTOCOL  EFI_HII_CONFIG_ACCESS_PROTOCOL;
+typedef struct _EFI_HII_CONFIG_ACCESS_PROTOCOL EFI_HII_CONFIG_ACCESS_PROTOCOL;
 
 typedef UINTN EFI_BROWSER_ACTION;
 
-#define EFI_BROWSER_ACTION_CHANGING   0
-#define EFI_BROWSER_ACTION_CHANGED    1
-#define EFI_BROWSER_ACTION_RETRIEVE   2
-#define EFI_BROWSER_ACTION_FORM_OPEN  3
-#define EFI_BROWSER_ACTION_FORM_CLOSE 4
-#define EFI_BROWSER_ACTION_SUBMITTED  5
-#define EFI_BROWSER_ACTION_DEFAULT_STANDARD      0x1000
-#define EFI_BROWSER_ACTION_DEFAULT_MANUFACTURING 0x1001
-#define EFI_BROWSER_ACTION_DEFAULT_SAFE          0x1002
-#define EFI_BROWSER_ACTION_DEFAULT_PLATFORM      0x2000
-#define EFI_BROWSER_ACTION_DEFAULT_HARDWARE      0x3000
-#define EFI_BROWSER_ACTION_DEFAULT_FIRMWARE      0x4000
+#define EFI_BROWSER_ACTION_CHANGING               0
+#define EFI_BROWSER_ACTION_CHANGED                1
+#define EFI_BROWSER_ACTION_RETRIEVE               2
+#define EFI_BROWSER_ACTION_FORM_OPEN              3
+#define EFI_BROWSER_ACTION_FORM_CLOSE             4
+#define EFI_BROWSER_ACTION_SUBMITTED              5
+#define EFI_BROWSER_ACTION_DEFAULT_STANDARD       0x1000
+#define EFI_BROWSER_ACTION_DEFAULT_MANUFACTURING  0x1001
+#define EFI_BROWSER_ACTION_DEFAULT_SAFE           0x1002
+#define EFI_BROWSER_ACTION_DEFAULT_PLATFORM       0x2000
+#define EFI_BROWSER_ACTION_DEFAULT_HARDWARE       0x3000
+#define EFI_BROWSER_ACTION_DEFAULT_FIRMWARE       0x4000
 
 /**
 
@@ -114,13 +110,12 @@ typedef UINTN EFI_BROWSER_ACTION;
 **/
 typedef
 EFI_STATUS
-(EFIAPI * EFI_HII_ACCESS_EXTRACT_CONFIG)(
+(EFIAPI *EFI_HII_ACCESS_EXTRACT_CONFIG)(
   IN CONST  EFI_HII_CONFIG_ACCESS_PROTOCOL  *This,
   IN CONST  EFI_STRING                      Request,
   OUT       EFI_STRING                      *Progress,
   OUT       EFI_STRING                      *Results
-);
-
+  );
 
 /**
 
@@ -164,11 +159,11 @@ EFI_STATUS
 **/
 typedef
 EFI_STATUS
-(EFIAPI * EFI_HII_ACCESS_ROUTE_CONFIG)(
+(EFIAPI *EFI_HII_ACCESS_ROUTE_CONFIG)(
   IN CONST  EFI_HII_CONFIG_ACCESS_PROTOCOL  *This,
   IN CONST  EFI_STRING                      Configuration,
   OUT       EFI_STRING                      *Progress
-);
+  );
 
 /**
 
@@ -205,7 +200,7 @@ EFI_STATUS
   IN OUT EFI_IFR_TYPE_VALUE                     *Value,
   OUT    EFI_BROWSER_ACTION_REQUEST             *ActionRequest
   )
-  ;
+;
 
 ///
 /// This protocol provides a callable interface between the HII and
@@ -213,13 +208,11 @@ EFI_STATUS
 /// to publish this protocol.
 ///
 struct _EFI_HII_CONFIG_ACCESS_PROTOCOL {
-  EFI_HII_ACCESS_EXTRACT_CONFIG     ExtractConfig;
-  EFI_HII_ACCESS_ROUTE_CONFIG       RouteConfig;
-  EFI_HII_ACCESS_FORM_CALLBACK      Callback;
-} ;
+  EFI_HII_ACCESS_EXTRACT_CONFIG    ExtractConfig;
+  EFI_HII_ACCESS_ROUTE_CONFIG      RouteConfig;
+  EFI_HII_ACCESS_FORM_CALLBACK     Callback;
+};
 
-extern EFI_GUID gEfiHiiConfigAccessProtocolGuid;
+extern EFI_GUID  gEfiHiiConfigAccessProtocolGuid;
 
 #endif
-
-

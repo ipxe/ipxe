@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/dhcppkt.h>
 #include <ipxe/init.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/vlan.h>
 #include <ipxe/cachedhcp.h>
 
 /** @file
@@ -43,6 +44,8 @@ struct cached_dhcp_packet {
 	const char *name;
 	/** DHCP packet (if any) */
 	struct dhcp_packet *dhcppkt;
+	/** VLAN tag (if applicable) */
+	unsigned int vlan;
 };
 
 /** Cached DHCPACK */
@@ -136,15 +139,26 @@ static int cachedhcp_apply ( struct cached_dhcp_packet *cache,
 		 * matches this network device.
 		 */
 		if ( memcmp ( ll_addr, chaddr, ll_addr_len ) != 0 ) {
-			DBGC ( colour, "CACHEDHCP %s does not match %s\n",
-			       cache->name, netdev->name );
+			DBGC ( colour, "CACHEDHCP %s %s does not match %s\n",
+			       cache->name, ll_protocol->ntoa ( chaddr ),
+			       netdev->name );
 			return 0;
 		}
-		DBGC ( colour, "CACHEDHCP %s is for %s\n",
-		       cache->name, netdev->name );
+
+		/* Do nothing unless cached packet's VLAN tag matches
+		 * this network device.
+		 */
+		if ( vlan_tag ( netdev ) != cache->vlan ) {
+			DBGC ( colour, "CACHEDHCP %s VLAN %d does not match "
+			       "%s\n", cache->name, cache->vlan,
+			       netdev->name );
+			return 0;
+		}
 
 		/* Use network device's settings block */
 		settings = netdev_settings ( netdev );
+		DBGC ( colour, "CACHEDHCP %s is for %s\n",
+		       cache->name, netdev->name );
 	}
 
 	/* Register settings */
@@ -165,12 +179,13 @@ static int cachedhcp_apply ( struct cached_dhcp_packet *cache,
  * Record cached DHCP packet
  *
  * @v cache		Cached DHCP packet
+ * @v vlan		VLAN tag, if any
  * @v data		DHCPACK packet buffer
  * @v max_len		Maximum possible length
  * @ret rc		Return status code
  */
-int cachedhcp_record ( struct cached_dhcp_packet *cache, userptr_t data,
-		       size_t max_len ) {
+int cachedhcp_record ( struct cached_dhcp_packet *cache, unsigned int vlan,
+		       userptr_t data, size_t max_len ) {
 	struct dhcp_packet *dhcppkt;
 	struct dhcp_packet *tmp;
 	struct dhcphdr *dhcphdr;
@@ -225,36 +240,55 @@ int cachedhcp_record ( struct cached_dhcp_packet *cache, userptr_t data,
 	DBGC ( colour, "CACHEDHCP %s at %#08lx+%#zx/%#zx\n", cache->name,
 	       user_to_phys ( data, 0 ), len, max_len );
 	cache->dhcppkt = dhcppkt;
+	cache->vlan = vlan;
 
 	return 0;
 }
 
 /**
- * Cached DHCPACK startup function
+ * Cached DHCP packet startup function
  *
  */
 static void cachedhcp_startup ( void ) {
 
 	/* Apply cached ProxyDHCPOFFER, if any */
 	cachedhcp_apply ( &cached_proxydhcp, NULL );
+	cachedhcp_free ( &cached_proxydhcp );
 
 	/* Apply cached PXEBSACK, if any */
 	cachedhcp_apply ( &cached_pxebs, NULL );
+	cachedhcp_free ( &cached_pxebs );
 
-	/* Free any remaining cached packets */
+	/* Report unclaimed DHCPACK, if any.  Do not free yet, since
+	 * it may still be claimed by a dynamically created device
+	 * such as a VLAN device.
+	 */
 	if ( cached_dhcpack.dhcppkt ) {
 		DBGC ( colour, "CACHEDHCP %s unclaimed\n",
 		       cached_dhcpack.name );
 	}
+}
+
+/**
+ * Cached DHCP packet shutdown function
+ *
+ * @v booting		System is shutting down for OS boot
+ */
+static void cachedhcp_shutdown ( int booting __unused ) {
+
+	/* Free cached DHCPACK, if any */
+	if ( cached_dhcpack.dhcppkt ) {
+		DBGC ( colour, "CACHEDHCP %s never claimed\n",
+		       cached_dhcpack.name );
+	}
 	cachedhcp_free ( &cached_dhcpack );
-	cachedhcp_free ( &cached_proxydhcp );
-	cachedhcp_free ( &cached_pxebs );
 }
 
 /** Cached DHCPACK startup function */
 struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
 	.name = "cachedhcp",
 	.startup = cachedhcp_startup,
+	.shutdown = cachedhcp_shutdown,
 };
 
 /**

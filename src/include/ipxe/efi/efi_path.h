@@ -21,9 +21,28 @@ struct fcp_description;
 struct ib_srp_device;
 struct usb_function;
 
+/**
+ * Terminate device path
+ *
+ * @v end		End of device path to fill in
+ */
+static inline void efi_path_terminate ( EFI_DEVICE_PATH_PROTOCOL *end ) {
+
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+	end->Length[1] = 0;
+}
+
+extern EFI_DEVICE_PATH_PROTOCOL *
+efi_path_next ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern EFI_DEVICE_PATH_PROTOCOL *
+efi_path_prev ( EFI_DEVICE_PATH_PROTOCOL *path,
+		EFI_DEVICE_PATH_PROTOCOL *curr );
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first,
 					      ... );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev );

@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2015 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2023 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of the
- * License, or (at your option) any later version.
+ * License, or any later version.
  *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,20 +21,33 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-#ifndef _DHCP_ARCH_H
-#define _DHCP_ARCH_H
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * Architecture-specific DHCP options
+ * CPU sleeping test
+ *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+/* Forcibly enable assertions */
+#undef NDEBUG
 
-#include <ipxe/dhcp.h>
+#include <ipxe/nap.h>
+#include <ipxe/test.h>
 
-#define DHCP_ARCH_CLIENT_ARCHITECTURE DHCP_CLIENT_ARCHITECTURE_ARM32
+/**
+ * Perform CPU sleeping self-test
+ *
+ */
+static void nap_test_exec ( void ) {
 
-#define DHCP_ARCH_CLIENT_NDI 1 /* UNDI */ , 3, 10 /* v3.10 */
+	/* Check that we can sleep without crashing or halting forever */
+	cpu_nap();
+	ok ( 1 );
+}
 
-#endif
+/** CPU sleeping self-test */
+struct self_test nap_test __self_test = {
+	.name = "nap",
+	.exec = nap_test_exec,
+};

@@ -32,16 +32,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <ipxe/crypto.h>
 
-static void digest_null_init ( void *ctx __unused ) {
+void digest_null_init ( void *ctx __unused ) {
 	/* Do nothing */
 }
 
-static void digest_null_update ( void *ctx __unused, const void *src __unused,
-				 size_t len __unused ) {
+void digest_null_update ( void *ctx __unused, const void *src __unused,
+			  size_t len __unused ) {
 	/* Do nothing */
 }
 
-static void digest_null_final ( void *ctx __unused, void *out __unused ) {
+void digest_null_final ( void *ctx __unused, void *out __unused ) {
 	/* Do nothing */
 }
 
@@ -55,76 +55,80 @@ struct digest_algorithm digest_null = {
 	.final = digest_null_final,
 };
 
-static int cipher_null_setkey ( void *ctx __unused, const void *key __unused,
-				size_t keylen __unused ) {
+int cipher_null_setkey ( void *ctx __unused, const void *key __unused,
+			 size_t keylen __unused ) {
 	/* Do nothing */
 	return 0;
 }
 
-static void cipher_null_setiv ( void *ctx __unused,
-				const void *iv __unused ) {
+void cipher_null_setiv ( void *ctx __unused, const void *iv __unused,
+			 size_t ivlen __unused ) {
 	/* Do nothing */
 }
 
-static void cipher_null_encrypt ( void *ctx __unused, const void *src,
-				  void *dst, size_t len ) {
+void cipher_null_encrypt ( void *ctx __unused, const void *src, void *dst,
+			   size_t len ) {
 	memcpy ( dst, src, len );
 }
 
-static void cipher_null_decrypt ( void *ctx __unused, const void *src,
-				  void *dst, size_t len ) {
+void cipher_null_decrypt ( void *ctx __unused, const void *src, void *dst,
+			   size_t len ) {
 	memcpy ( dst, src, len );
+}
+
+void cipher_null_auth ( void *ctx __unused, void *auth __unused ) {
+	/* Do nothing */
 }
 
 struct cipher_algorithm cipher_null = {
 	.name = "null",
 	.ctxsize = 0,
 	.blocksize = 1,
+	.alignsize = 1,
+	.authsize = 0,
 	.setkey = cipher_null_setkey,
 	.setiv = cipher_null_setiv,
 	.encrypt = cipher_null_encrypt,
 	.decrypt = cipher_null_decrypt,
+	.auth = cipher_null_auth,
 };
 
-static int pubkey_null_init ( void *ctx __unused, const void *key __unused,
-			      size_t key_len __unused ) {
+int pubkey_null_init ( void *ctx __unused, const void *key __unused,
+		       size_t key_len __unused ) {
 	return 0;
 }
 
-static size_t pubkey_null_max_len ( void *ctx __unused ) {
+size_t pubkey_null_max_len ( void *ctx __unused ) {
 	return 0;
 }
 
-static int pubkey_null_encrypt ( void *ctx __unused,
-				 const void *plaintext __unused,
-				 size_t plaintext_len __unused,
-				 void *ciphertext __unused ) {
+int pubkey_null_encrypt ( void *ctx __unused, const void *plaintext __unused,
+			  size_t plaintext_len __unused,
+			  void *ciphertext __unused ) {
 	return 0;
 }
 
-static int pubkey_null_decrypt ( void *ctx __unused,
-				 const void *ciphertext __unused,
-				 size_t ciphertext_len __unused,
-				 void *plaintext __unused ) {
+int pubkey_null_decrypt ( void *ctx __unused, const void *ciphertext __unused,
+			  size_t ciphertext_len __unused,
+			  void *plaintext __unused ) {
 	return 0;
 }
 
-static int pubkey_null_sign ( void *ctx __unused,
-			      struct digest_algorithm *digest __unused,
-			      const void *value __unused,
-			      void *signature __unused ) {
+int pubkey_null_sign ( void *ctx __unused,
+		       struct digest_algorithm *digest __unused,
+		       const void *value __unused, void *signature __unused ) {
 	return 0;
 }
 
-static int pubkey_null_verify ( void *ctx __unused,
-				struct digest_algorithm *digest __unused,
-				const void *value __unused,
-				const void *signature __unused ,
-				size_t signature_len __unused ) {
+int pubkey_null_verify ( void *ctx __unused,
+			 struct digest_algorithm *digest __unused,
+			 const void *value __unused,
+			 const void *signature __unused ,
+			 size_t signature_len __unused ) {
 	return 0;
 }
 
-static void pubkey_null_final ( void *ctx __unused ) {
+void pubkey_null_final ( void *ctx __unused ) {
 	/* Do nothing */
 }
 

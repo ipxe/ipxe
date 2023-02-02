@@ -70,6 +70,9 @@ struct sha256_context {
 /** SHA-256 context size */
 #define SHA256_CTX_SIZE sizeof ( struct sha256_context )
 
+/** SHA-256 block size */
+#define SHA256_BLOCK_SIZE sizeof ( union sha256_block )
+
 /** SHA-256 digest size */
 #define SHA256_DIGEST_SIZE sizeof ( struct sha256_digest )
 

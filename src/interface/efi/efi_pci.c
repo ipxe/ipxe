@@ -362,7 +362,7 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	return ioremap ( bus_addr, len );
 }
 
-PROVIDE_PCIAPI_INLINE ( efi, pci_num_bus );
+PROVIDE_PCIAPI_INLINE ( efi, pci_discover );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_dword );
@@ -523,6 +523,9 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 		       "%s\n", PCI_ARGS ( pci ), len, strerror ( rc ) );
 		goto err_alloc;
 	}
+
+	/* Clear buffer */
+	memset ( addr, 0, ( pages * EFI_PAGE_SIZE ) );
 
 	/* Map buffer */
 	if ( ( rc = efipci_dma_map ( dma, map, virt_to_phys ( addr ),

@@ -251,7 +251,7 @@ int ipv6_add_miniroute ( struct net_device *netdev, struct in6_addr *address,
 			*prefix_mask = 0xff;
 		}
 		if ( remaining )
-			*prefix_mask <<= ( 8 - remaining );
+			*prefix_mask = ( 0xff << ( 8 - remaining ) );
 	}
 
 	/* Add to start of routing table */
@@ -330,7 +330,7 @@ struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 		/* Skip entries with a non-matching scope ID, if
 		 * destination specifies a scope ID.
 		 */
-		if ( scope_id && ( miniroute->netdev->index != scope_id ) )
+		if ( scope_id && ( miniroute->netdev->scope_id != scope_id ) )
 			continue;
 
 		/* Skip entries that are out of scope */
@@ -789,12 +789,12 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	src.sin6.sin6_family = AF_INET6;
 	memcpy ( &src.sin6.sin6_addr, &iphdr->src,
 		 sizeof ( src.sin6.sin6_addr ) );
-	src.sin6.sin6_scope_id = netdev->index;
+	src.sin6.sin6_scope_id = netdev->scope_id;
 	memset ( &dest, 0, sizeof ( dest ) );
 	dest.sin6.sin6_family = AF_INET6;
 	memcpy ( &dest.sin6.sin6_addr, &iphdr->dest,
 		 sizeof ( dest.sin6.sin6_addr ) );
-	dest.sin6.sin6_scope_id = netdev->index;
+	dest.sin6.sin6_scope_id = netdev->scope_id;
 	iob_pull ( iobuf, hdrlen );
 	pshdr_csum = ipv6_pshdr_chksum ( iphdr, iob_len ( iobuf ),
 					 next_header, TCPIP_EMPTY_CSUM );
@@ -957,7 +957,7 @@ static const char * ipv6_sock_ntoa ( struct sockaddr *sa ) {
 
 	/* Identify network device, if applicable */
 	if ( IN6_IS_ADDR_LINKLOCAL ( in ) || IN6_IS_ADDR_MULTICAST ( in ) ) {
-		netdev = find_netdev_by_index ( sin6->sin6_scope_id );
+		netdev = find_netdev_by_scope_id ( sin6->sin6_scope_id );
 		netdev_name = ( netdev ? netdev->name : "UNKNOWN" );
 	} else {
 		netdev_name = NULL;
@@ -1020,7 +1020,7 @@ static int ipv6_sock_aton ( const char *string, struct sockaddr *sa ) {
 			rc = -ENODEV;
 			goto err_find_netdev;
 		}
-		sin6->sin6_scope_id = netdev->index;
+		sin6->sin6_scope_id = netdev->scope_id;
 
 	} else if ( IN6_IS_ADDR_LINKLOCAL ( &in ) ||
 		    IN6_IS_ADDR_MULTICAST ( &in ) ) {
@@ -1031,7 +1031,7 @@ static int ipv6_sock_aton ( const char *string, struct sockaddr *sa ) {
 		 */
 		netdev = last_opened_netdev();
 		if ( netdev )
-			sin6->sin6_scope_id = netdev->index;
+			sin6->sin6_scope_id = netdev->scope_id;
 	}
 
 	/* Copy IPv6 address portion to socket address */

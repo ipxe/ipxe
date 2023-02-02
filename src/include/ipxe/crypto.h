@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stddef.h>
+#include <assert.h>
 
 /** A message digest algorithm */
 struct digest_algorithm {
@@ -50,28 +51,47 @@ struct cipher_algorithm {
 	const char *name;
 	/** Context size */
 	size_t ctxsize;
-	/** Block size */
+	/** Block size
+	 *
+	 * Every call to encrypt() or decrypt() must be for a multiple
+	 * of this size.
+	 */
 	size_t blocksize;
+	/** Alignment size
+	 *
+	 * Every call to encrypt() or decrypt() must begin at a
+	 * multiple of this offset from the start of the stream.
+	 * (Equivalently: all but the last call to encrypt() or
+	 * decrypt() must be for a multiple of this size.)
+	 *
+	 * For ciphers supporting additional data, the main data
+	 * stream and additional data stream are both considered to
+	 * begin at offset zero.
+	 */
+	size_t alignsize;
+	/** Authentication tag size */
+	size_t authsize;
 	/** Set key
 	 *
-	 * @v ctx		Context
-	 * @v key		Key
-	 * @v keylen		Key length
-	 * @ret rc		Return status code
+	 * @v ctx	Context
+	 * @v key	Key
+	 * @v keylen	Key length
+	 * @ret rc	Return status code
 	 */
 	int ( * setkey ) ( void *ctx, const void *key, size_t keylen );
 	/** Set initialisation vector
 	 *
-	 * @v ctx		Context
-	 * @v iv		Initialisation vector
+	 * @v ctx	Context
+	 * @v iv	Initialisation vector
+	 * @v ivlen	Initialisation vector length
 	 */
-	void ( * setiv ) ( void *ctx, const void *iv );
+	void ( * setiv ) ( void *ctx, const void *iv, size_t ivlen );
 	/** Encrypt data
 	 *
-	 * @v ctx		Context
-	 * @v src		Data to encrypt
-	 * @v dst		Buffer for encrypted data
-	 * @v len		Length of data
+	 * @v ctx	Context
+	 * @v src	Data to encrypt
+	 * @v dst	Buffer for encrypted data, or NULL for additional data
+	 * @v len	Length of data
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
@@ -79,15 +99,21 @@ struct cipher_algorithm {
 			     size_t len );
 	/** Decrypt data
 	 *
-	 * @v ctx		Context
-	 * @v src		Data to decrypt
-	 * @v dst		Buffer for decrypted data
-	 * @v len		Length of data
+	 * @v ctx	Context
+	 * @v src	Data to decrypt
+	 * @v dst	Buffer for decrypted data, or NULL for additional data
+	 * @v len	Length of data
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
 	void ( * decrypt ) ( void *ctx, const void *src, void *dst,
 			     size_t len );
+	/** Generate authentication tag
+	 *
+	 * @v ctx	Context
+	 * @v auth	Authentication tag
+	 */
+	void ( * auth ) ( void *ctx, void *auth );
 };
 
 /** A public key algorithm */
@@ -190,8 +216,8 @@ static inline int cipher_setkey ( struct cipher_algorithm *cipher,
 }
 
 static inline void cipher_setiv ( struct cipher_algorithm *cipher,
-				  void *ctx, const void *iv ) {
-	cipher->setiv ( ctx, iv );
+				  void *ctx, const void *iv, size_t ivlen ) {
+	cipher->setiv ( ctx, iv, ivlen );
 }
 
 static inline void cipher_encrypt ( struct cipher_algorithm *cipher,
@@ -214,8 +240,21 @@ static inline void cipher_decrypt ( struct cipher_algorithm *cipher,
 	cipher_decrypt ( (cipher), (ctx), (src), (dst), (len) );	\
 	} while ( 0 )
 
+static inline void cipher_auth ( struct cipher_algorithm *cipher, void *ctx,
+				 void *auth ) {
+	cipher->auth ( ctx, auth );
+}
+
 static inline int is_stream_cipher ( struct cipher_algorithm *cipher ) {
 	return ( cipher->blocksize == 1 );
+}
+
+static inline int is_block_cipher ( struct cipher_algorithm *cipher ) {
+	return ( cipher->blocksize > 1 );
+}
+
+static inline int is_auth_cipher ( struct cipher_algorithm *cipher ) {
+	return cipher->authsize;
 }
 
 static inline int pubkey_init ( struct pubkey_algorithm *pubkey, void *ctx,
@@ -262,6 +301,30 @@ static inline int pubkey_match ( struct pubkey_algorithm *pubkey,
 	return pubkey->match ( private_key, private_key_len, public_key,
 			       public_key_len );
 }
+
+extern void digest_null_init ( void *ctx );
+extern void digest_null_update ( void *ctx, const void *src, size_t len );
+extern void digest_null_final ( void *ctx, void *out );
+
+extern int cipher_null_setkey ( void *ctx, const void *key, size_t keylen );
+extern void cipher_null_setiv ( void *ctx, const void *iv, size_t ivlen );
+extern void cipher_null_encrypt ( void *ctx, const void *src, void *dst,
+				  size_t len );
+extern void cipher_null_decrypt ( void *ctx, const void *src, void *dst,
+				  size_t len );
+extern void cipher_null_auth ( void *ctx, void *auth );
+
+extern int pubkey_null_init ( void *ctx, const void *key, size_t key_len );
+extern size_t pubkey_null_max_len ( void *ctx );
+extern int pubkey_null_encrypt ( void *ctx, const void *plaintext,
+				 size_t plaintext_len, void *ciphertext );
+extern int pubkey_null_decrypt ( void *ctx, const void *ciphertext,
+				 size_t ciphertext_len, void *plaintext );
+extern int pubkey_null_sign ( void *ctx, struct digest_algorithm *digest,
+			      const void *value, void *signature );
+extern int pubkey_null_verify ( void *ctx, struct digest_algorithm *digest,
+				const void *value, const void *signature ,
+				size_t signature_len );
 
 extern struct digest_algorithm digest_null;
 extern struct cipher_algorithm cipher_null;

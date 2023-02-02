@@ -195,6 +195,48 @@ void efi_nullify_nii ( EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL *nii ) {
 
 /******************************************************************************
  *
+ * VLAN configuration protocol
+ *
+ ******************************************************************************
+ */
+
+static EFI_STATUS EFIAPI
+efi_null_vlan_set ( EFI_VLAN_CONFIG_PROTOCOL *vcfg __unused,
+		    UINT16 tag __unused, UINT8 priority __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_vlan_find ( EFI_VLAN_CONFIG_PROTOCOL *vcfg __unused,
+		     UINT16 *filter __unused, UINT16 *count __unused,
+		     EFI_VLAN_FIND_DATA **entries __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_STATUS EFIAPI
+efi_null_vlan_remove ( EFI_VLAN_CONFIG_PROTOCOL *vcfg __unused,
+		       UINT16 tag __unused ) {
+	return EFI_UNSUPPORTED;
+}
+
+static EFI_VLAN_CONFIG_PROTOCOL efi_null_vlan = {
+	.Set		= efi_null_vlan_set,
+	.Find		= efi_null_vlan_find,
+	.Remove		= efi_null_vlan_remove,
+};
+
+/**
+ * Nullify VLAN configuration interface
+ *
+ * @v vcfg		VLAN configuration protocol
+ */
+void efi_nullify_vlan ( EFI_VLAN_CONFIG_PROTOCOL *vcfg ) {
+
+	memcpy ( vcfg, &efi_null_vlan, sizeof ( *vcfg ) );
+}
+
+/******************************************************************************
+ *
  * Component name protocol
  *
  ******************************************************************************

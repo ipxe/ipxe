@@ -159,6 +159,11 @@ struct netfront_nic {
 	/** Grant references */
 	grant_ref_t refs[NETFRONT_REF_COUNT];
 
+	/** Network device */
+	struct net_device *netdev;
+	/** List of netfront NICs */
+	struct list_head list;
+
 	/** Transmit ring */
 	struct netfront_ring tx;
 	/** Transmit front ring */

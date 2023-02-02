@@ -1,14 +1,8 @@
 /** @file
   Terminal Device Path Vendor Guid.
 
-  Copyright (c) 2006 - 2009, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
   GUIDs defined in UEFI 2.0 spec.
@@ -18,7 +12,7 @@
 #ifndef __PC_ANSI_H__
 #define __PC_ANSI_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE ( BSD2_PATENT );
 
 #define EFI_PC_ANSI_GUID \
   { \
@@ -50,11 +44,11 @@ FILE_LICENCE ( BSD3 );
     0xd487ddb4, 0x008b, 0x11d9, {0xaf, 0xdc, 0x00, 0x10, 0x83, 0xff, 0xca, 0x4d } \
   }
 
-extern EFI_GUID gEfiPcAnsiGuid;
-extern EFI_GUID gEfiVT100Guid;
-extern EFI_GUID gEfiVT100PlusGuid;
-extern EFI_GUID gEfiVTUTF8Guid;
-extern EFI_GUID gEfiUartDevicePathGuid;
-extern EFI_GUID gEfiSasDevicePathGuid;
+extern EFI_GUID  gEfiPcAnsiGuid;
+extern EFI_GUID  gEfiVT100Guid;
+extern EFI_GUID  gEfiVT100PlusGuid;
+extern EFI_GUID  gEfiVTUTF8Guid;
+extern EFI_GUID  gEfiUartDevicePathGuid;
+extern EFI_GUID  gEfiSasDevicePathGuid;
 
 #endif

@@ -55,6 +55,12 @@ struct vlan_device {
 	unsigned int priority;
 };
 
+/** Automatic VLAN device link-layer address */
+static uint8_t vlan_auto_ll_addr[ETH_ALEN];
+
+/** Automatic VLAN tag */
+static unsigned int vlan_auto_tag;
+
 /**
  * Open VLAN device
  *
@@ -199,8 +205,7 @@ static void vlan_sync ( struct net_device *netdev ) {
  * @v tag		VLAN tag
  * @ret netdev		VLAN device, if any
  */
-static struct net_device * vlan_find ( struct net_device *trunk,
-				       unsigned int tag ) {
+struct net_device * vlan_find ( struct net_device *trunk, unsigned int tag ) {
 	struct net_device *netdev;
 	struct vlan_device *vlan;
 
@@ -288,17 +293,17 @@ struct net_protocol vlan_protocol __net_protocol = {
 };
 
 /**
- * Get the VLAN tag
+ * Get the VLAN tag control information
  *
  * @v netdev		Network device
- * @ret tag		VLAN tag, or 0 if device is not a VLAN device
+ * @ret tci		VLAN tag control information, or 0 if not a VLAN device
  */
-unsigned int vlan_tag ( struct net_device *netdev ) {
+unsigned int vlan_tci ( struct net_device *netdev ) {
 	struct vlan_device *vlan;
 
 	if ( netdev->op == &vlan_operations ) {
 		vlan = netdev->priv;
-		return vlan->tag;
+		return ( VLAN_TCI ( vlan->tag, vlan->priority ) );
 	} else {
 		return 0;
 	}
@@ -449,6 +454,47 @@ int vlan_destroy ( struct net_device *netdev ) {
 }
 
 /**
+ * Configure automatic VLAN device
+ *
+ * @v ll_addr		Link-layer address
+ * @v tag		VLAN tag
+ */
+void vlan_auto ( const void *ll_addr, unsigned int tag ) {
+
+	/* Record link-layer address and VLAN tag */
+	memcpy ( vlan_auto_ll_addr, ll_addr, ETH_ALEN );
+	vlan_auto_tag = tag;
+}
+
+/**
+ * Create automatic VLAN device
+ *
+ * @v trunk		Trunk network device
+ * @ret rc		Return status code
+ */
+static int vlan_probe ( struct net_device *trunk ) {
+	int rc;
+
+	/* Do nothing unless an automatic VLAN exists */
+	if ( ! vlan_auto_tag )
+		return 0;
+
+	/* Ignore non-trunk devices */
+	if ( ! vlan_can_be_trunk ( trunk ) )
+		return 0;
+
+	/* Ignore non-matching link-layer addresses */
+	if ( memcmp ( trunk->ll_addr, vlan_auto_ll_addr, ETH_ALEN ) != 0 )
+		return 0;
+
+	/* Create automatic VLAN device */
+	if ( ( rc = vlan_create ( trunk, vlan_auto_tag, 0 ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
  * Handle trunk network device link state change
  *
  * @v trunk		Trunk network device
@@ -504,6 +550,7 @@ static void vlan_remove ( struct net_device *trunk ) {
 /** VLAN driver */
 struct net_driver vlan_driver __net_driver = {
 	.name = "VLAN",
+	.probe = vlan_probe,
 	.notify = vlan_notify,
 	.remove = vlan_remove,
 };

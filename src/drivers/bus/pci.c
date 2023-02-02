@@ -229,46 +229,55 @@ int pci_read_config ( struct pci_device *pci ) {
  *
  * @v pci		PCI device to fill in
  * @v busdevfn		Starting bus:dev.fn address
- * @ret busdevfn	Bus:dev.fn address of next PCI device, or negative error
+ * @ret busdevfn	Bus:dev.fn address of next PCI device
+ * @ret rc		Return status code
  */
-int pci_find_next ( struct pci_device *pci, unsigned int busdevfn ) {
-	static unsigned int end;
-	unsigned int sub_end;
+int pci_find_next ( struct pci_device *pci, uint32_t *busdevfn ) {
+	static struct pci_range range;
 	uint8_t hdrtype;
 	uint8_t sub;
+	uint32_t end;
+	unsigned int count;
 	int rc;
 
-	/* Determine number of PCI buses */
-	if ( ! end )
-		end = PCI_BUSDEVFN ( 0, pci_num_bus(), 0, 0 );
-
 	/* Find next PCI device, if any */
-	for ( ; busdevfn < end ; busdevfn++ ) {
+	do {
+		/* Find next PCI bus:dev.fn address range, if necessary */
+		if ( ( *busdevfn - range.start ) >= range.count ) {
+			pci_discover ( *busdevfn, &range );
+			if ( *busdevfn < range.start )
+				*busdevfn = range.start;
+			if ( ( *busdevfn - range.start ) >= range.count )
+				break;
+		}
 
 		/* Check for PCI device existence */
 		memset ( pci, 0, sizeof ( *pci ) );
-		pci_init ( pci, busdevfn );
+		pci_init ( pci, *busdevfn );
 		if ( ( rc = pci_read_config ( pci ) ) != 0 )
 			continue;
 
-		/* If device is a bridge, expand the number of PCI
-		 * buses as needed.
+		/* If device is a bridge, expand the PCI bus:dev.fn
+		 * address range as needed.
 		 */
 		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdrtype );
 		hdrtype &= PCI_HEADER_TYPE_MASK;
 		if ( hdrtype == PCI_HEADER_TYPE_BRIDGE ) {
 			pci_read_config_byte ( pci, PCI_SUBORDINATE, &sub );
-			sub_end = PCI_BUSDEVFN ( 0, ( sub + 1 ), 0, 0 );
-			if ( end < sub_end ) {
+			end = PCI_BUSDEVFN ( PCI_SEG ( *busdevfn ),
+					     ( sub + 1 ), 0, 0 );
+			count = ( end - range.start );
+			if ( count > range.count ) {
 				DBGC ( pci, PCI_FMT " found subordinate bus "
 				       "%#02x\n", PCI_ARGS ( pci ), sub );
-				end = sub_end;
+				range.count = count;
 			}
 		}
 
 		/* Return this device */
-		return busdevfn;
-	}
+		return 0;
+
+	} while ( ++(*busdevfn) );
 
 	return -ENODEV;
 }
@@ -348,11 +357,10 @@ void pci_remove ( struct pci_device *pci ) {
  */
 static int pcibus_probe ( struct root_device *rootdev ) {
 	struct pci_device *pci = NULL;
-	int busdevfn = 0;
+	uint32_t busdevfn = 0;
 	int rc;
 
-	for ( busdevfn = 0 ; 1 ; busdevfn++ ) {
-
+	do {
 		/* Allocate struct pci_device */
 		if ( ! pci )
 			pci = malloc ( sizeof ( *pci ) );
@@ -362,8 +370,7 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 		}
 
 		/* Find next PCI device, if any */
-		busdevfn = pci_find_next ( pci, busdevfn );
-		if ( busdevfn < 0 )
+		if ( ( rc = pci_find_next ( pci, &busdevfn ) ) != 0 )
 			break;
 
 		/* Look for a driver */
@@ -386,7 +393,8 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 			/* Not registered; re-use struct pci_device */
 			list_del ( &pci->dev.siblings );
 		}
-	}
+
+	} while ( ++busdevfn );
 
 	free ( pci );
 	return 0;

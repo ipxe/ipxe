@@ -222,7 +222,7 @@ static int nii_pci_open ( struct nii_nic *nii ) {
 
 	/* Locate PCI I/O protocol */
 	if ( ( rc = efi_locate_device ( device, &efi_pci_io_protocol_guid,
-					&pci_device ) ) != 0 ) {
+					&pci_device, 0 ) ) != 0 ) {
 		DBGC ( nii, "NII %s could not locate PCI I/O protocol: %s\n",
 		       nii->dev.name, strerror ( rc ) );
 		goto err_locate;
@@ -921,18 +921,17 @@ static int nii_set_station_address ( struct nii_nic *nii,
  * Set receive filters
  *
  * @v nii		NII NIC
+ * @v flags		Flags
  * @ret rc		Return status code
  */
-static int nii_set_rx_filters ( struct nii_nic *nii ) {
+static int nii_set_rx_filters ( struct nii_nic *nii, unsigned int flags ) {
 	uint32_t implementation = nii->undi->Implementation;
-	unsigned int flags;
 	unsigned int op;
 	int stat;
 	int rc;
 
 	/* Construct receive filter set */
-	flags = ( PXE_OPFLAGS_RECEIVE_FILTER_ENABLE |
-		  PXE_OPFLAGS_RECEIVE_FILTER_UNICAST );
+	flags |= PXE_OPFLAGS_RECEIVE_FILTER_UNICAST;
 	if ( implementation & PXE_ROMID_IMP_BROADCAST_RX_SUPPORTED )
 		flags |= PXE_OPFLAGS_RECEIVE_FILTER_BROADCAST;
 	if ( implementation & PXE_ROMID_IMP_PROMISCUOUS_RX_SUPPORTED )
@@ -944,12 +943,38 @@ static int nii_set_rx_filters ( struct nii_nic *nii ) {
 	op = NII_OP ( PXE_OPCODE_RECEIVE_FILTERS, flags );
 	if ( ( stat = nii_issue ( nii, op ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
-		DBGC ( nii, "NII %s could not set receive filters %#04x: %s\n",
-		       nii->dev.name, flags, strerror ( rc ) );
+		DBGC ( nii, "NII %s could not %s%sable receive filters "
+		       "%#04x: %s\n", nii->dev.name,
+		       ( ( flags & PXE_OPFLAGS_RECEIVE_FILTER_ENABLE ) ?
+			 "en" : "" ),
+		       ( ( flags & PXE_OPFLAGS_RECEIVE_FILTER_DISABLE ) ?
+			 "dis" : "" ), flags, strerror ( rc ) );
 		return rc;
 	}
 
 	return 0;
+}
+
+/**
+ * Enable receive filters
+ *
+ * @v nii		NII NIC
+ * @ret rc		Return status code
+ */
+static int nii_enable_rx_filters ( struct nii_nic *nii ) {
+
+	return nii_set_rx_filters ( nii, PXE_OPFLAGS_RECEIVE_FILTER_ENABLE );
+}
+
+/**
+ * Disable receive filters
+ *
+ * @v nii		NII NIC
+ * @ret rc		Return status code
+ */
+static int nii_disable_rx_filters ( struct nii_nic *nii ) {
+
+	return nii_set_rx_filters ( nii, PXE_OPFLAGS_RECEIVE_FILTER_DISABLE );
 }
 
 /**
@@ -1175,13 +1200,25 @@ static int nii_open ( struct net_device *netdev ) {
 		/* Treat as non-fatal */
 	}
 
-	/* Set receive filters */
-	if ( ( rc = nii_set_rx_filters ( nii ) ) != 0 )
-		goto err_set_rx_filters;
+	/* Disable receive filters
+	 *
+	 * We have no reason to disable receive filters here (or
+	 * anywhere), but some NII drivers have a bug which prevents
+	 * packets from being received unless we attempt to disable
+	 * the receive filters.
+	 *
+	 * Ignore any failures, since we genuinely don't care if the
+	 * NII driver cannot disable the filters.
+	 */
+	nii_disable_rx_filters ( nii );
+
+	/* Enable receive filters */
+	if ( ( rc = nii_enable_rx_filters ( nii ) ) != 0 )
+		goto err_enable_rx_filters;
 
 	return 0;
 
- err_set_rx_filters:
+ err_enable_rx_filters:
 	nii_shutdown ( nii );
  err_initialise:
 	return rc;
