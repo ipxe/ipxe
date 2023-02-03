@@ -72,6 +72,9 @@ efi_boot_name() {
 	"c201" )
 	    echo "BOOTARM.EFI"
 	    ;;
+	"6462" )
+	    echo "BOOTLOONGARCH64.EFI"
+	    ;;
 	"64aa" )
 	    echo "BOOTAA64.EFI"
 	    ;;
