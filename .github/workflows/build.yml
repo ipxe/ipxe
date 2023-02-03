@@ -6,7 +6,7 @@ jobs:
 
   x86:
     name: x86
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -32,7 +32,7 @@ jobs:
 
   arm32:
     name: ARM32
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -52,7 +52,7 @@ jobs:
 
   arm64:
     name: ARM64
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check out code
         uses: actions/checkout@v3
