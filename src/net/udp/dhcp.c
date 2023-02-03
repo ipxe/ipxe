@@ -571,6 +571,10 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 	if ( peer->sin_port != htons ( BOOTPS_PORT ) )
 		return;
 
+	/* Filter out non-selected servers */
+	if ( server_id.s_addr != dhcp->server.s_addr )
+		return;
+
 	/* Handle DHCPNAK */
 	if ( msgtype == DHCPNAK ) {
 		dhcp_defer ( dhcp );
@@ -579,8 +583,6 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 
 	/* Filter out unacceptable responses */
 	if ( msgtype /* BOOTP */ && ( msgtype != DHCPACK ) )
-		return;
-	if ( server_id.s_addr != dhcp->server.s_addr )
 		return;
 	if ( ip.s_addr != dhcp->offer.s_addr )
 		return;
