@@ -205,6 +205,7 @@ int pci_read_config ( struct pci_device *pci ) {
 	pci_read_config_dword ( pci, PCI_REVISION, &tmp );
 	pci->class = ( tmp >> 8 );
 	pci_read_config_byte ( pci, PCI_INTERRUPT_LINE, &pci->irq );
+	pci_read_config_byte ( pci, PCI_HEADER_TYPE, &pci->hdrtype );
 	pci_read_bases ( pci );
 
 	/* Initialise generic device component */

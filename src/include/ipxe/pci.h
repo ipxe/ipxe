@@ -227,6 +227,8 @@ struct pci_device {
 	uint32_t class;
 	/** Interrupt number */
 	uint8_t irq;
+	/** Header type */
+	uint8_t hdrtype;
 	/** Segment, bus, device, and function (bus:dev.fn) number */
 	uint32_t busdevfn;
 	/** Driver for this device */

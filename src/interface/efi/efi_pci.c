@@ -785,11 +785,21 @@ int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
  */
 static int efipci_supported ( EFI_HANDLE device ) {
 	struct efi_pci_device efipci;
+	uint8_t hdrtype;
 	int rc;
 
 	/* Get PCI device information */
 	if ( ( rc = efipci_info ( device, &efipci ) ) != 0 )
 		return rc;
+
+	/* Do not attempt to drive bridges */
+	hdrtype = efipci.pci.hdrtype;
+	if ( ( hdrtype & PCI_HEADER_TYPE_MASK ) != PCI_HEADER_TYPE_NORMAL ) {
+		DBGC ( device, "EFIPCI " PCI_FMT " type %02x is not type %02x\n",
+		       PCI_ARGS ( &efipci.pci ), hdrtype,
+		       PCI_HEADER_TYPE_NORMAL );
+		return -ENOTTY;
+	}
 
 	/* Look for a driver */
 	if ( ( rc = pci_find_driver ( &efipci.pci ) ) != 0 ) {
