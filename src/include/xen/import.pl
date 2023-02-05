@@ -59,6 +59,10 @@ sub try_import_file {
     if ( /^\#include\s+[<\"](\S+)[>\"]/ ) {
       push @dependencies, catfile ( $subdir, $1 );
     }
+    # Patch "Unsupported architecture" line
+    if ( /^\#error\s+"Unsupported\sarchitecture"/ ) {
+      $_ = "#include <bits/xen.h>"
+    }
     # Write out line
     print $outfh "$_\n";
     # Apply FILE_LICENCE() immediately after include guard

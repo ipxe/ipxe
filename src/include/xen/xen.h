@@ -19,7 +19,7 @@ FILE_LICENCE ( MIT );
 #elif defined(__arm__) || defined (__aarch64__)
 #include "arch-arm.h"
 #else
-#error "Unsupported architecture"
+#include <bits/xen.h>
 #endif
 
 #ifndef __ASSEMBLY__
