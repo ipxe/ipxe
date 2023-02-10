@@ -98,7 +98,15 @@ static void eisa_remove ( struct eisa_device *eisa ) {
 static int eisabus_probe ( struct root_device *rootdev ) {
 	struct eisa_device *eisa = NULL;
 	unsigned int slot;
+	uint8_t system;
 	int rc;
+
+	/* Check for EISA system board */
+	system = inb ( EISA_VENDOR_ID );
+	if ( system & 0x80 ) {
+		DBG ( "No EISA system board (read %02x)\n", system );
+		return -ENODEV;
+	}
 
 	for ( slot = EISA_MIN_SLOT ; slot <= EISA_MAX_SLOT ; slot++ ) {
 		/* Allocate struct eisa_device */
