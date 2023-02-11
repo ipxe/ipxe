@@ -42,6 +42,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Maximum time to wait for an RTC interrupt, in milliseconds */
 #define RTC_MAX_WAIT_MS 100
 
+/** Number of RTC interrupts to check for */
+#define RTC_CHECK_COUNT 3
+
 /** RTC interrupt handler */
 extern void rtc_isr ( void );
 
@@ -145,6 +148,7 @@ static void rtc_disable_int ( void ) {
  * @ret rc		Return status code
  */
 static int rtc_entropy_check ( void ) {
+	unsigned int count = 0;
 	unsigned int i;
 
 	/* Check that RTC interrupts are working */
@@ -158,14 +162,18 @@ static int rtc_entropy_check ( void ) {
 				       "cli\n\t" );
 
 		/* Check for RTC interrupt flag */
-		if ( rtc_flag )
-			return 0;
+		if ( rtc_flag ) {
+			rtc_flag = 0;
+			if ( ++count >= RTC_CHECK_COUNT )
+				return 0;
+		}
 
 		/* Delay */
 		mdelay ( 1 );
 	}
 
-	DBGC ( &rtc_flag, "RTC timed out waiting for interrupt\n" );
+	DBGC ( &rtc_flag, "RTC timed out waiting for interrupt %d/%d\n",
+	       ( count + 1 ), RTC_CHECK_COUNT );
 	return -ETIMEDOUT;
 }
 
