@@ -77,17 +77,12 @@ size_t cpio_name_len ( struct image *image ) {
  */
 static void cpio_parse_cmdline ( struct image *image,
 				 struct cpio_header *cpio ) {
-	const char *cmdline;
-	char *arg;
+	const char *arg;
 	char *end;
 	unsigned int mode;
 
-	/* Skip image filename */
-	cmdline = ( cpio_name ( image ) + cpio_name_len ( image ) );
-
 	/* Look for "mode=" */
-	if ( ( arg = strstr ( cmdline, "mode=" ) ) ) {
-		arg += 5;
+	if ( ( arg = image_argument ( image, "mode=" ) ) ) {
 		mode = strtoul ( arg, &end, 8 /* Octal for file mode */ );
 		if ( *end && ( *end != ' ' ) ) {
 			DBGC ( image, "CPIO %p strange \"mode=\" "

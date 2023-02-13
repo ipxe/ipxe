@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <errno.h>
 #include <assert.h>
 #include <libgen.h>
@@ -567,5 +568,35 @@ struct image * image_memory ( const char *name, userptr_t data, size_t len ) {
  err_set_name:
 	image_put ( image );
  err_alloc_image:
+	return NULL;
+}
+
+/**
+ * Find argument within image command line
+ *
+ * @v image		Image
+ * @v key		Argument search key (including trailing delimiter)
+ * @ret value		Argument value, or NULL if not found
+ */
+const char * image_argument ( struct image *image, const char *key ) {
+	const char *cmdline = image->cmdline;
+	const char *search;
+	const char *match;
+	const char *next;
+
+	/* Find argument */
+	for ( search = cmdline ; search ; search = next ) {
+
+		/* Find next occurrence, if any */
+		match = strstr ( search, key );
+		if ( ! match )
+			break;
+		next = ( match + strlen ( key ) );
+
+		/* Check preceding delimiter, if any */
+		if ( ( match == cmdline ) || isspace ( match[-1] ) )
+			return next;
+	}
+
 	return NULL;
 }
