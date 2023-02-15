@@ -10,5 +10,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/rtc_entropy.h>
+#include <ipxe/rdrand.h>
 
 #endif /* _BITS_ENTROPY_H */
