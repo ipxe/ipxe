@@ -528,7 +528,7 @@ static EFI_STATUS EFIAPI efi_file_read ( EFI_FILE_PROTOCOL *this,
 
 	/* Read from the file */
 	DBGC ( file, "EFIFILE %s read [%#08zx,%#08zx)\n",
-	       efi_file_name ( file ), pos, file->pos );
+	       efi_file_name ( file ), pos, ( ( size_t ) ( pos + *len ) ) );
 	*len = file->read ( &reader );
 	assert ( ( pos + *len ) == file->pos );
 
