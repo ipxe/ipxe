@@ -46,6 +46,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/base16.h>
 #include <ipxe/base64.h>
 #include <ipxe/ibft.h>
+#include <ipxe/blockdev.h>
 #include <ipxe/efi/efi_path.h>
 #include <ipxe/iscsi.h>
 
@@ -86,6 +87,10 @@ FEATURE ( FEATURE_PROTOCOL, "iSCSI", DHCP_EB_FEATURE_ISCSI, 1 );
 	__einfo_error ( EINFO_EINVAL_NO_INITIATOR_IQN )
 #define EINFO_EINVAL_NO_INITIATOR_IQN \
 	__einfo_uniqify ( EINFO_EINVAL, 0x05, "No initiator IQN" )
+#define EINVAL_MAXBURSTLENGTH				\
+	__einfo_error ( EINFO_EINVAL_MAXBURSTLENGTH )
+#define EINFO_EINVAL_MAXBURSTLENGTH \
+	__einfo_uniqify ( EINFO_EINVAL, 0x06, "Invalid MaxBurstLength" )
 #define EIO_TARGET_UNAVAILABLE \
 	__einfo_error ( EINFO_EIO_TARGET_UNAVAILABLE )
 #define EINFO_EIO_TARGET_UNAVAILABLE \
@@ -280,6 +285,9 @@ static int iscsi_open_connection ( struct iscsi_session *iscsi ) {
 
 	/* Assign fresh initiator task tag */
 	iscsi_new_itt ( iscsi );
+
+	/* Set default operational parameters */
+	iscsi->max_burst_len = ISCSI_MAX_BURST_LEN;
 
 	/* Initiate login */
 	iscsi_start_login ( iscsi );
@@ -736,16 +744,20 @@ static int iscsi_build_login_request_strings ( struct iscsi_session *iscsi,
 				    "MaxConnections=1%c"
 				    "InitialR2T=Yes%c"
 				    "ImmediateData=No%c"
-				    "MaxRecvDataSegmentLength=8192%c"
-				    "MaxBurstLength=262144%c"
-				    "FirstBurstLength=65536%c"
+				    "MaxRecvDataSegmentLength=%d%c"
+				    "MaxBurstLength=%d%c"
+				    "FirstBurstLength=%d%c"
 				    "DefaultTime2Wait=0%c"
 				    "DefaultTime2Retain=0%c"
 				    "MaxOutstandingR2T=1%c"
 				    "DataPDUInOrder=Yes%c"
 				    "DataSequenceInOrder=Yes%c"
 				    "ErrorRecoveryLevel=0%c",
-				    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
+				    0, 0, 0, 0, 0,
+				    ISCSI_MAX_RECV_DATA_SEG_LEN, 0,
+				    ISCSI_MAX_BURST_LEN, 0,
+				    ISCSI_FIRST_BURST_LEN, 0,
+				    0, 0, 0, 0, 0, 0 );
 	}
 
 	return used;
@@ -904,6 +916,31 @@ static int iscsi_handle_authmethod_value ( struct iscsi_session *iscsi,
 		iscsi->status |= ( ISCSI_STATUS_STRINGS_CHAP_ALGORITHM |
 				   ISCSI_STATUS_AUTH_FORWARD_REQUIRED );
 	}
+
+	return 0;
+}
+
+/**
+ * Handle iSCSI MaxBurstLength text value
+ *
+ * @v iscsi		iSCSI session
+ * @v value		MaxBurstLength value
+ * @ret rc		Return status code
+ */
+static int iscsi_handle_maxburstlength_value ( struct iscsi_session *iscsi,
+					       const char *value ) {
+	unsigned long max_burst_len;
+	char *end;
+
+	/* Update maximum burst length */
+	max_burst_len = strtoul ( value, &end, 0 );
+	if ( *end ) {
+		DBGC ( iscsi, "iSCSI %p invalid MaxBurstLength \"%s\"\n",
+		       iscsi, value );
+		return -EINVAL_MAXBURSTLENGTH;
+	}
+	if ( max_burst_len < iscsi->max_burst_len )
+		iscsi->max_burst_len = max_burst_len;
 
 	return 0;
 }
@@ -1148,6 +1185,7 @@ struct iscsi_string_type {
 /** iSCSI text strings that we want to handle */
 static struct iscsi_string_type iscsi_string_types[] = {
 	{ "TargetAddress", iscsi_handle_targetaddress_value },
+	{ "MaxBurstLength", iscsi_handle_maxburstlength_value },
 	{ "AuthMethod", iscsi_handle_authmethod_value },
 	{ "CHAP_A", iscsi_handle_chap_a_value },
 	{ "CHAP_I", iscsi_handle_chap_i_value },
@@ -1848,6 +1886,24 @@ static int iscsi_scsi_command ( struct iscsi_session *iscsi,
 }
 
 /**
+ * Update SCSI block device capacity
+ *
+ * @v iscsi		iSCSI session
+ * @v capacity		Block device capacity
+ */
+static void iscsi_scsi_capacity ( struct iscsi_session *iscsi,
+				  struct block_device_capacity *capacity ) {
+	unsigned int max_count;
+
+	/* Limit maximum number of blocks per transfer to fit MaxBurstLength */
+	if ( capacity->blksize ) {
+		max_count = ( iscsi->max_burst_len / capacity->blksize );
+		if ( max_count < capacity->max_count )
+			capacity->max_count = max_count;
+	}
+}
+
+/**
  * Get iSCSI ACPI descriptor
  *
  * @v iscsi		iSCSI session
@@ -1862,6 +1918,7 @@ static struct acpi_descriptor * iscsi_describe ( struct iscsi_session *iscsi ) {
 static struct interface_operation iscsi_control_op[] = {
 	INTF_OP ( scsi_command, struct iscsi_session *, iscsi_scsi_command ),
 	INTF_OP ( xfer_window, struct iscsi_session *, iscsi_scsi_window ),
+	INTF_OP ( block_capacity, struct iscsi_session *, iscsi_scsi_capacity ),
 	INTF_OP ( intf_close, struct iscsi_session *, iscsi_close ),
 	INTF_OP ( acpi_describe, struct iscsi_session *, iscsi_describe ),
 	EFI_INTF_OP ( efi_describe, struct iscsi_session *, efi_iscsi_path ),

@@ -609,6 +609,7 @@ static void scsicmd_read_capacity_cmd ( struct scsi_command *scsicmd,
  */
 static void scsicmd_read_capacity_done ( struct scsi_command *scsicmd,
 					 int rc ) {
+	struct scsi_device *scsidev = scsicmd->scsidev;
 	struct scsi_read_capacity_private *priv = scsicmd_priv ( scsicmd );
 	struct scsi_capacity_16 *capacity16 = &priv->capacity.capacity16;
 	struct scsi_capacity_10 *capacity10 = &priv->capacity.capacity10;
@@ -644,6 +645,9 @@ static void scsicmd_read_capacity_done ( struct scsi_command *scsicmd,
 		}
 	}
 	capacity.max_count = -1U;
+
+	/* Allow transport layer to update capacity */
+	block_capacity ( &scsidev->scsi, &capacity );
 
 	/* Return capacity to caller */
 	block_capacity ( &scsicmd->block, &capacity );
