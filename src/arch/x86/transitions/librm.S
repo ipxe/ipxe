@@ -98,6 +98,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  * "non absolute segment" error.  This is most probably a bug in gas.
  ****************************************************************************
  */
+	.section ".note.GNU-stack", "", @progbits
 	.section ".data16.gdt", "aw", @progbits
 	.balign 16
 gdt:

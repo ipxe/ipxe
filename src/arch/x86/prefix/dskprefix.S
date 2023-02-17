@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_ONLY )
 
 	.org	0
 	.arch i386
+	.section ".note.GNU-stack", "", @progbits
 	.text
 	.section ".prefix", "ax", @progbits
 	.code16
