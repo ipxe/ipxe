@@ -32,12 +32,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/cpuid.h>
 #include <ipxe/entropy.h>
+#include <ipxe/drbg.h>
+
+struct entropy_source rdrand_entropy __entropy_source ( ENTROPY_PREFERRED );
 
 /** Number of times to retry RDRAND instruction */
 #define RDRAND_RETRY_COUNT 16
 
 /** Colour for debug messages */
-#define colour CPUID_FEATURES_INTEL_ECX_RDRAND
+#define colour &rdrand_entropy
 
 /**
  * Enable entropy gathering
@@ -54,16 +57,15 @@ static int rdrand_entropy_enable ( void ) {
 		return -ENOTSUP;
 	}
 
+	/* Data returned by RDRAND is theoretically full entropy, up
+	 * to a security strength of 128 bits, so assume that each
+	 * sample contains exactly 8 bits of entropy.
+	 */
+	if ( DRBG_SECURITY_STRENGTH > 128 )
+		return -ENOTSUP;
+	entropy_init ( &rdrand_entropy, MIN_ENTROPY ( 8.0 ) );
+
 	return 0;
-}
-
-/**
- * Disable entropy gathering
- *
- */
-static void rdrand_entropy_disable ( void ) {
-
-	/* Nothing to do */
 }
 
 /**
@@ -93,7 +95,9 @@ static int rdrand_get_noise ( noise_sample_t *noise ) {
 	return 0;
 }
 
-PROVIDE_ENTROPY_INLINE ( rdrand, min_entropy_per_sample );
-PROVIDE_ENTROPY ( rdrand, entropy_enable, rdrand_entropy_enable );
-PROVIDE_ENTROPY ( rdrand, entropy_disable, rdrand_entropy_disable );
-PROVIDE_ENTROPY ( rdrand, get_noise, rdrand_get_noise );
+/** Hardware random number generator entropy source */
+struct entropy_source rdrand_entropy __entropy_source ( ENTROPY_PREFERRED ) = {
+	.name = "rdrand",
+	.enable = rdrand_entropy_enable,
+	.get_noise = rdrand_get_noise,
+};

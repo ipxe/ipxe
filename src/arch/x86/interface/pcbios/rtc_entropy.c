@@ -39,6 +39,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/cpuid.h>
 #include <ipxe/entropy.h>
 
+struct entropy_source rtc_entropy __entropy_source ( ENTROPY_NORMAL );
+
 /** Maximum time to wait for an RTC interrupt, in milliseconds */
 #define RTC_MAX_WAIT_MS 100
 
@@ -203,6 +205,21 @@ static int rtc_entropy_enable ( void ) {
 	if ( ( rc = rtc_entropy_check() ) != 0 )
 		goto err_check;
 
+	/* The min-entropy has been measured on several platforms
+	 * using the entropy_sample test code.  Modelling the samples
+	 * as independent, and using a confidence level of 99.99%, the
+	 * measurements were as follows:
+	 *
+	 *    qemu-kvm		: 7.38 bits
+	 *    VMware		: 7.46 bits
+	 *    Physical hardware	: 2.67 bits
+	 *
+	 * We choose the lowest of these (2.67 bits) and apply a 50%
+	 * safety margin to allow for some potential non-independence
+	 * of samples.
+	 */
+	entropy_init ( &rtc_entropy, MIN_ENTROPY ( 1.3 ) );
+
 	return 0;
 
  err_check:
@@ -226,11 +243,12 @@ static void rtc_entropy_disable ( void ) {
 }
 
 /**
- * Measure a single RTC tick
+ * Get noise sample
  *
- * @ret delta		Length of RTC tick (in TSC units)
+ * @ret noise		Noise sample
+ * @ret rc		Return status code
  */
-uint8_t rtc_sample ( void ) {
+static int rtc_get_noise ( noise_sample_t *noise ) {
 	uint32_t before;
 	uint32_t after;
 	uint32_t temp;
@@ -265,10 +283,14 @@ uint8_t rtc_sample ( void ) {
 		: "=a" ( after ), "=d" ( before ), "=Q" ( temp )
 		: "2" ( 0 ) );
 
-	return ( after - before );
+	*noise = ( after - before );
+	return 0;
 }
 
-PROVIDE_ENTROPY_INLINE ( rtc, min_entropy_per_sample );
-PROVIDE_ENTROPY ( rtc, entropy_enable, rtc_entropy_enable );
-PROVIDE_ENTROPY ( rtc, entropy_disable, rtc_entropy_disable );
-PROVIDE_ENTROPY_INLINE ( rtc, get_noise );
+/** RTC entropy source */
+struct entropy_source rtc_entropy __entropy_source ( ENTROPY_NORMAL ) = {
+	.name = "rtc",
+	.enable = rtc_entropy_enable,
+	.disable = rtc_entropy_disable,
+	.get_noise = rtc_get_noise,
+};

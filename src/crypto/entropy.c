@@ -50,46 +50,61 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EINFO_EPIPE_ADAPTIVE_PROPORTION_TEST \
 	__einfo_uniqify ( EINFO_EPIPE, 0x02, "Adaptive proportion test failed" )
 
+/** Current entropy source */
+static struct entropy_source *entropy_source;
+
 /**
- * Calculate cutoff value for the repetition count test
+ * Enable entropy gathering
  *
- * @ret cutoff		Cutoff value
- *
- * This is the cutoff value for the Repetition Count Test defined in
- * ANS X9.82 Part 2 (October 2011 Draft) Section 8.5.2.1.2.
+ * @ret rc		Return status code
  */
-static inline __attribute__ (( always_inline )) unsigned int
-repetition_count_cutoff ( void ) {
-	double max_repetitions;
-	unsigned int cutoff;
+int entropy_enable ( void ) {
+	int rc;
 
-	/* The cutoff formula for the repetition test is:
-	 *
-	 *   C = ( 1 + ( -log2(W) / H_min ) )
-	 *
-	 * where W is set at 2^(-30) (in ANS X9.82 Part 2 (October
-	 * 2011 Draft) Section 8.5.2.1.3.1).
-	 */
-	max_repetitions = ( 1 + ( MIN_ENTROPY ( 30 ) /
-				  min_entropy_per_sample() ) );
+	/* Enable selected source, if applicable */
+	if ( entropy_source ) {
 
-	/* Round up to a whole number of repetitions.  We don't have
-	 * the ceil() function available, so do the rounding by hand.
-	 */
-	cutoff = max_repetitions;
-	if ( cutoff < max_repetitions )
-		cutoff++;
-	linker_assert ( ( cutoff >= max_repetitions ), rounding_error );
+		/* Enable entropy source */
+		if ( ( rc = entropy_source->enable() ) != 0 ) {
+			DBGC ( &entropy_source, "ENTROPY could not enable "
+			       "source \"%s\": %s\n", entropy_source->name,
+			       strerror ( rc ) );
+			return rc;
+		}
 
-	/* Floating-point operations are not allowed in iPXE since we
-	 * never set up a suitable environment.  Abort the build
-	 * unless the calculated number of repetitions is a
-	 * compile-time constant.
-	 */
-	linker_assert ( __builtin_constant_p ( cutoff ),
-			repetition_count_cutoff_not_constant );
+		/* Sanity checks */
+		assert ( entropy_source->min_entropy_per_sample > 0 );
+		assert ( entropy_source->repetition_count_cutoff > 0 );
+		assert ( entropy_source->adaptive_proportion_cutoff > 0 );
+		assert ( entropy_source->startup_test_count > 0 );
 
-	return cutoff;
+		return 0;
+	}
+
+	/* Find the first working source */
+	rc = -ENOENT;
+	for_each_table_entry ( entropy_source, ENTROPY_SOURCES ) {
+		if ( ( rc = entropy_enable() ) == 0 ) {
+			DBGC ( &entropy_source, "ENTROPY using source \"%s\"\n",
+			       entropy_source->name );
+			break;
+		}
+	}
+	return rc;
+}
+
+/**
+ * Disable entropy gathering
+ *
+ */
+void entropy_disable ( void ) {
+
+	/* Sanity check */
+	assert ( entropy_source != NULL );
+
+	/* Disable entropy gathering, if applicable */
+	if ( entropy_source->disable )
+		entropy_source->disable();
 }
 
 /**
@@ -104,6 +119,8 @@ repetition_count_cutoff ( void ) {
 static int repetition_count_test ( noise_sample_t sample ) {
 	static noise_sample_t most_recent_sample;
 	static unsigned int repetition_count = 0;
+	unsigned int repetition_count_cutoff =
+		entropy_source->repetition_count_cutoff;
 
 	/* A = the most recently seen sample value
 	 * B = the number of times that value A has been seen in a row
@@ -124,7 +141,7 @@ static int repetition_count_test ( noise_sample_t sample ) {
 		/*    i.  If B >= C, then an error condition is raised
 		 *        due to a failure of the test
 		 */
-		if ( repetition_count >= repetition_count_cutoff() )
+		if ( repetition_count >= repetition_count_cutoff )
 			return -EPIPE_REPETITION_COUNT_TEST;
 
 	} else {
@@ -142,117 +159,6 @@ static int repetition_count_test ( noise_sample_t sample ) {
 }
 
 /**
- * Window size for the adaptive proportion test
- *
- * ANS X9.82 Part 2 (October 2011 Draft) Section 8.5.2.1.3.1.1 allows
- * five possible window sizes: 16, 64, 256, 4096 and 65536.
- *
- * We expect to generate relatively few (<256) entropy samples during
- * a typical iPXE run; the use of a large window size would mean that
- * the test would never complete a single cycle.  We use a window size
- * of 64, which is the smallest window size that permits values of
- * H_min down to one bit per sample.
- */
-#define ADAPTIVE_PROPORTION_WINDOW_SIZE 64
-
-/**
- * Combine adaptive proportion test window size and min-entropy
- *
- * @v n			N (window size)
- * @v h			H (min-entropy)
- * @ret n_h		(N,H) combined value
- */
-#define APC_N_H( n, h ) ( ( (n) << 8 ) | (h) )
-
-/**
- * Define a row of the adaptive proportion cutoff table
- *
- * @v h			H (min-entropy)
- * @v c16		Cutoff for N=16
- * @v c64		Cutoff for N=64
- * @v c256		Cutoff for N=256
- * @v c4096		Cutoff for N=4096
- * @v c65536		Cutoff for N=65536
- */
-#define APC_TABLE_ROW( h, c16, c64, c256, c4096, c65536)	   \
-	case APC_N_H ( 16, h ) :	return c16;		   \
-	case APC_N_H ( 64, h ) :	return c64;   		   \
-	case APC_N_H ( 256, h ) :	return c256;		   \
-	case APC_N_H ( 4096, h ) :	return c4096;		   \
-	case APC_N_H ( 65536, h ) :	return c65536;
-
-/** Value used to represent "N/A" in adaptive proportion cutoff table */
-#define APC_NA 0
-
-/**
- * Look up value in adaptive proportion test cutoff table
- *
- * @v n			N (window size)
- * @v h			H (min-entropy)
- * @ret cutoff		Cutoff
- *
- * This is the table of cutoff values defined in ANS X9.82 Part 2
- * (October 2011 Draft) Section 8.5.2.1.3.1.2.
- */
-static inline __attribute__ (( always_inline )) unsigned int
-adaptive_proportion_cutoff_lookup ( unsigned int n, unsigned int h ) {
-	switch ( APC_N_H ( n, h ) ) {
-		APC_TABLE_ROW (  1, APC_NA,     51,    168,   2240,  33537 );
-		APC_TABLE_ROW (  2, APC_NA,     35,    100,   1193,  17053 );
-		APC_TABLE_ROW (  3,     10,     24,     61,    643,   8705 );
-		APC_TABLE_ROW (  4,      8,     16,     38,    354,   4473 );
-		APC_TABLE_ROW (  5,      6,     12,     25,    200,   2321 );
-		APC_TABLE_ROW (  6,      5,      9,     17,    117,   1220 );
-		APC_TABLE_ROW (  7,      4,      7,     15,     71,    653 );
-		APC_TABLE_ROW (  8,      4,      5,      9,     45,    358 );
-		APC_TABLE_ROW (  9,      3,      4,      7,     30,    202 );
-		APC_TABLE_ROW ( 10,      3,      4,      5,     21,    118 );
-		APC_TABLE_ROW ( 11,      2,      3,      4,     15,     71 );
-		APC_TABLE_ROW ( 12,      2,      3,      4,     11,     45 );
-		APC_TABLE_ROW ( 13,      2,      2,      3,      9,     30 );
-		APC_TABLE_ROW ( 14,      2,      2,      3,      7,     21 );
-		APC_TABLE_ROW ( 15,      1,      2,      2,      6,     15 );
-		APC_TABLE_ROW ( 16,      1,      2,      2,      5,     11 );
-		APC_TABLE_ROW ( 17,      1,      1,      2,      4,      9 );
-		APC_TABLE_ROW ( 18,      1,      1,      2,      4,      7 );
-		APC_TABLE_ROW ( 19,      1,      1,      1,      3,      6 );
-		APC_TABLE_ROW ( 20,      1,      1,      1,      3,      5 );
-	default:
-		return APC_NA;
-	}
-}
-
-/**
- * Calculate cutoff value for the adaptive proportion test
- *
- * @ret cutoff		Cutoff value
- *
- * This is the cutoff value for the Adaptive Proportion Test defined
- * in ANS X9.82 Part 2 (October 2011 Draft) Section 8.5.2.1.3.1.2.
- */
-static inline __attribute__ (( always_inline )) unsigned int
-adaptive_proportion_cutoff ( void ) {
-	unsigned int h;
-	unsigned int n;
-	unsigned int cutoff;
-
-	/* Look up cutoff value in cutoff table */
-	n = ADAPTIVE_PROPORTION_WINDOW_SIZE;
-	h = ( min_entropy_per_sample() / MIN_ENTROPY_SCALE );
-	cutoff = adaptive_proportion_cutoff_lookup ( n, h );
-
-	/* Fail unless cutoff value is a build-time constant */
-	linker_assert ( __builtin_constant_p ( cutoff ),
-			adaptive_proportion_cutoff_not_constant );
-
-	/* Fail if cutoff value is N/A */
-	linker_assert ( ( cutoff != APC_NA ),
-			adaptive_proportion_cutoff_not_applicable );
-
-	return cutoff;
-}
-
-/**
  * Perform adaptive proportion test
  *
  * @v sample		Noise sample
@@ -265,6 +171,8 @@ static int adaptive_proportion_test ( noise_sample_t sample ) {
 	static noise_sample_t current_counted_sample;
 	static unsigned int sample_count = ADAPTIVE_PROPORTION_WINDOW_SIZE;
 	static unsigned int repetition_count;
+	unsigned int adaptive_proportion_cutoff =
+		entropy_source->adaptive_proportion_cutoff;
 
 	/* A = the sample value currently being counted
 	 * B = the number of samples examined in this run of the test so far
@@ -312,13 +220,30 @@ static int adaptive_proportion_test ( noise_sample_t sample ) {
 			 *      condition, because the test has
 			 *      detected a failure
 			 */
-			if ( repetition_count > adaptive_proportion_cutoff() )
+			if ( repetition_count > adaptive_proportion_cutoff )
 				return -EPIPE_ADAPTIVE_PROPORTION_TEST;
 
 		}
 	}
 
 	return 0;
+}
+
+/**
+ * Get noise sample
+ *
+ * @ret noise		Noise sample
+ * @ret rc		Return status code
+ *
+ * This is the GetNoise function defined in ANS X9.82 Part 2
+ * (October 2011 Draft) Section 6.5.2.
+ */
+int get_noise ( noise_sample_t *noise ) {
+
+	/* Sanity check */
+	assert ( entropy_source != NULL );
+
+	return entropy_source->get_noise ( noise );
 }
 
 /**
@@ -333,6 +258,9 @@ static int adaptive_proportion_test ( noise_sample_t sample ) {
 static int get_entropy ( entropy_sample_t *entropy ) {
 	static int rc = 0;
 	noise_sample_t noise;
+
+	/* Sanity check */
+	assert ( entropy_source != NULL );
 
 	/* Any failure is permanent */
 	if ( rc != 0 )
@@ -358,31 +286,6 @@ static int get_entropy ( entropy_sample_t *entropy ) {
 }
 
 /**
- * Calculate number of samples required for startup tests
- *
- * @ret num_samples	Number of samples required
- *
- * ANS X9.82 Part 2 (October 2011 Draft) Section 8.5.2.1.5 requires
- * that at least one full cycle of the continuous tests must be
- * performed at start-up.
- */
-static inline __attribute__ (( always_inline )) unsigned int
-startup_test_count ( void ) {
-	unsigned int num_samples;
-
-	/* At least max(N,C) samples shall be generated by the noise
-	 * source for start-up testing.
-	 */
-	num_samples = repetition_count_cutoff();
-	if ( num_samples < adaptive_proportion_cutoff() )
-		num_samples = adaptive_proportion_cutoff();
-	linker_assert ( __builtin_constant_p ( num_samples ),
-			startup_test_count_not_constant );
-
-	return num_samples;
-}
-
-/**
  * Create next nonce value
  *
  * @ret nonce		Nonce
@@ -402,7 +305,7 @@ static uint32_t make_next_nonce ( void ) {
 /**
  * Obtain entropy input temporary buffer
  *
- * @v num_samples	Number of entropy samples
+ * @v min_entropy	Min-entropy required
  * @v tmp		Temporary buffer
  * @v tmp_len		Length of temporary buffer
  * @ret rc		Return status code
@@ -412,11 +315,8 @@ static uint32_t make_next_nonce ( void ) {
  * and condensing each entropy source output after each GetEntropy
  * call) as defined in ANS X9.82 Part 4 (April 2011 Draft) Section
  * 13.3.4.2.
- *
- * To minimise code size, the number of samples required is calculated
- * at compilation time.
  */
-int get_entropy_input_tmp ( unsigned int num_samples, uint8_t *tmp,
+int get_entropy_input_tmp ( min_entropy_t min_entropy, uint8_t *tmp,
 			    size_t tmp_len ) {
 	static unsigned int startup_tested = 0;
 	struct {
@@ -424,6 +324,8 @@ int get_entropy_input_tmp ( unsigned int num_samples, uint8_t *tmp,
 		entropy_sample_t sample;
 	} __attribute__ (( packed )) data;;
 	uint8_t df_buf[tmp_len];
+	min_entropy_t entropy_total;
+	unsigned int num_samples;
 	unsigned int i;
 	int rc;
 
@@ -432,22 +334,20 @@ int get_entropy_input_tmp ( unsigned int num_samples, uint8_t *tmp,
 		return rc;
 
 	/* Perform mandatory startup tests, if not yet performed */
-	for ( ; startup_tested < startup_test_count() ; startup_tested++ ) {
+	for ( ; startup_tested < entropy_source->startup_test_count ;
+	      startup_tested++ ) {
 		if ( ( rc = get_entropy ( &data.sample ) ) != 0 )
 			goto err_get_entropy;
 	}
 
-	/* 3.  entropy_total = 0
-	 *
-	 * (Nothing to do; the number of entropy samples required has
-	 * already been precalculated.)
-	 */
+	/* 3.  entropy_total = 0 */
+	entropy_total = MIN_ENTROPY ( 0 );
 
 	/* 4.  tmp = a fixed n-bit value, such as 0^n */
 	memset ( tmp, 0, tmp_len );
 
 	/* 5.  While ( entropy_total < min_entropy ) */
-	while ( num_samples-- ) {
+	for ( num_samples = 0 ; entropy_total < min_entropy ; num_samples++ ) {
 		/* 5.1.  ( status, entropy_bitstring, assessed_entropy )
 		 *       = GetEntropy()
 		 * 5.2.  If status indicates an error, return ( status, Null )
@@ -466,19 +366,24 @@ int get_entropy_input_tmp ( unsigned int num_samples, uint8_t *tmp,
 		for ( i = 0 ; i < tmp_len ; i++ )
 			tmp[i] ^= df_buf[i];
 
-		/* 5.5.  entropy_total = entropy_total + assessed_entropy
-		 *
-		 * (Nothing to do; the number of entropy samples
-		 * required has already been precalculated.)
-		 */
+		/* 5.5.  entropy_total = entropy_total + assessed_entropy */
+		entropy_total += entropy_source->min_entropy_per_sample;
 	}
 
 	/* Disable entropy gathering */
 	entropy_disable();
 
+	DBGC ( &entropy_source, "ENTROPY gathered %d bits in %d samples\n",
+	       ( min_entropy / MIN_ENTROPY_SCALE ), num_samples );
 	return 0;
 
  err_get_entropy:
 	entropy_disable();
 	return rc;
 }
+
+/* Drag in objects via entropy_enable */
+REQUIRING_SYMBOL ( entropy_enable );
+
+/* Drag in entropy configuration */
+REQUIRE_OBJECT ( config_entropy );

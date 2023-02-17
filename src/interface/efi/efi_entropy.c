@@ -36,6 +36,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+struct entropy_source efi_entropy __entropy_source ( ENTROPY_NORMAL );
+
 /** Random number generator protocol */
 static EFI_RNG_PROTOCOL *efirng;
 EFI_REQUEST_PROTOCOL ( EFI_RNG_PROTOCOL, &efirng );
@@ -90,6 +92,12 @@ static int efi_entropy_enable ( void ) {
 		       strerror ( rc ) );
 		return rc;
 	}
+
+	/* We use essentially the same mechanism as for the BIOS
+	 * RTC-based entropy source, and so assume the same
+	 * min-entropy per sample.
+	 */
+	entropy_init ( &efi_entropy, MIN_ENTROPY ( 1.3 ) );
 
 	return 0;
 }
@@ -235,7 +243,10 @@ static int efi_get_noise ( noise_sample_t *noise ) {
 	return 0;
 }
 
-PROVIDE_ENTROPY_INLINE ( efi, min_entropy_per_sample );
-PROVIDE_ENTROPY ( efi, entropy_enable, efi_entropy_enable );
-PROVIDE_ENTROPY ( efi, entropy_disable, efi_entropy_disable );
-PROVIDE_ENTROPY ( efi, get_noise, efi_get_noise );
+/** EFI entropy source */
+struct entropy_source efi_entropy __entropy_source ( ENTROPY_NORMAL ) = {
+	.name = "efi",
+	.enable = efi_entropy_enable,
+	.disable = efi_entropy_disable,
+	.get_noise = efi_get_noise,
+};
