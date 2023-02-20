@@ -19,7 +19,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMBIOS_EFI
 #define SANBOOT_EFI
 #define BOFM_EFI
-#define ENTROPY_EFI
+#define ENTROPY_EFITICK
+#define ENTROPY_EFIRNG
 #define TIME_EFI
 #define REBOOT_EFI
 #define ACPI_EFI

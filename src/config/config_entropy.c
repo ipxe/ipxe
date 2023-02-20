@@ -37,8 +37,11 @@ PROVIDE_REQUIRING_SYMBOL();
 #ifdef ENTROPY_RTC
 REQUIRE_OBJECT ( rtc_entropy );
 #endif
-#ifdef ENTROPY_EFI
+#ifdef ENTROPY_EFITICK
 REQUIRE_OBJECT ( efi_entropy );
+#endif
+#ifdef ENTROPY_EFIRNG
+REQUIRE_OBJECT ( efi_rng );
 #endif
 #ifdef ENTROPY_LINUX
 REQUIRE_OBJECT ( linux_entropy );
