@@ -42,6 +42,76 @@ typedef unsigned int min_entropy_t;
 #define MIN_ENTROPY( bits ) \
 	( ( min_entropy_t ) ( (bits) * MIN_ENTROPY_SCALE ) )
 
+/**
+ * Repetition count test state
+ *
+ * This is the state for the repetition Count Test defined in ANS
+ * X9.82 Part 2 (October 2011 Draft) Section 8.5.2.1.2.
+ */
+struct entropy_repetition_count_test {
+	/**
+	 * A = the most recently seen sample value
+	 */
+	noise_sample_t most_recent_sample;
+	/**
+	 * B = the number of times that value A has been seen in a row
+	 */
+	unsigned int repetition_count;
+	/**
+	 * C = the cutoff value above which the repetition test should fail
+	 *
+	 * Filled in by entropy_init().
+	 */
+	unsigned int cutoff;
+};
+
+/**
+ * Adaptive proportion test state
+ *
+ * This is the state for the Adaptive Proportion Test for the Most
+ * Common Value defined in ANS X9.82 Part 2 (October 2011 Draft)
+ * Section 8.5.2.1.3.
+ */
+struct entropy_adaptive_proportion_test {
+	/**
+	 * A = the sample value currently being counted
+	 */
+	noise_sample_t current_counted_sample;
+	/**
+	 * S = the number of samples examined in this run of the test so far
+	 */
+	unsigned int sample_count;
+	/**
+	 * B = the current number of times that S (sic) has been seen
+	 *     in the W (sic) samples examined so far
+	 */
+	unsigned int repetition_count;
+	/**
+	 * C = the cutoff value above which the repetition test should fail
+	 *
+	 * Filled in by entropy_init().
+	 */
+	unsigned int cutoff;
+};
+
+/**
+ * Startup test state
+ *
+ * ANS X9.82 Part 2 (October 2011 Draft) Section 8.5.2.1.5 requires
+ * that at least one full cycle of the continuous tests must be
+ * performed at start-up.
+ */
+struct entropy_startup_test {
+	/** Number of startup tests performed */
+	unsigned int tested;
+	/**
+	 * Number of startup tests required for one full cycle
+	 *
+	 * Filled in by entropy_init().
+	 */
+	unsigned int count;
+};
+
 /** An entropy source */
 struct entropy_source {
 	/** Name */
@@ -59,34 +129,19 @@ struct entropy_source {
 	 * Filled in by entropy_init().
 	 */
 	min_entropy_t min_entropy_per_sample;
+	/** Repetition count test state */
+	struct entropy_repetition_count_test repetition_count_test;
+	/** Adaptive proportion test state */
+	struct entropy_adaptive_proportion_test adaptive_proportion_test;
+	/** Startup test state */
+	struct entropy_startup_test startup_test;
 	/**
-	 * Repetition count test cutoff value
+	 * Failure status (if any)
 	 *
-	 * This is the cutoff value for the Repetition Count Test
-	 * defined in ANS X9.82 Part 2 (October 2011 Draft) Section
-	 * 8.5.2.1.2.
-	 *
-	 * Filled in by entropy_init().
+	 * Any failure of an entropy source is regarded as permanent.
 	 */
-	unsigned int repetition_count_cutoff;
-	/**
-	 * Adaptive proportion test cutoff value
-	 *
-	 * This is the cutoff value for the Adaptive Proportion Test
-	 * defined in ANS X9.82 Part 2 (October 2011 Draft) Section
-	 * 8.5.2.1.3.1.2.
-	 *
-	 * Filled in by entropy_init().
-	 */
-	unsigned int adaptive_proportion_cutoff;
-	/**
-	 * Startup test count
-	 *
-	 * ANS X9.82 Part 2 (October 2011 Draft) Section 8.5.2.1.5
-	 * requires that at least one full cycle of the continuous
-	 * tests must be performed at start-up.
-	 */
-	unsigned int startup_test_count;
+	int rc;
+
 	/**
 	 * Enable entropy gathering
 	 *
@@ -138,6 +193,22 @@ extern int get_entropy_input_tmp ( min_entropy_t min_entropy, uint8_t *tmp,
 
 /** Underlying hash algorithm output length (in bytes) */
 #define ENTROPY_HASH_DF_OUTLEN_BYTES SHA256_DIGEST_SIZE
+
+/**
+ * Get noise sample
+ *
+ * @v source		Entropy source
+ * @ret noise		Noise sample
+ * @ret rc		Return status code
+ *
+ * This is the GetNoise function defined in ANS X9.82 Part 2
+ * (October 2011 Draft) Section 6.5.2.
+ */
+static inline __attribute__ (( always_inline )) int
+get_noise ( struct entropy_source *source, noise_sample_t *noise ) {
+
+	return source->get_noise ( noise );
+}
 
 /**
  * Obtain entropy input
@@ -445,13 +516,13 @@ entropy_init ( struct entropy_source *source,
 
 	/* Record min-entropy per sample and test cutoff values */
 	source->min_entropy_per_sample = min_entropy_per_sample;
-	source->repetition_count_cutoff = repetition_count_cutoff;
-	source->adaptive_proportion_cutoff = adaptive_proportion_cutoff;
-	source->startup_test_count = startup_test_count;
+	source->repetition_count_test.cutoff = repetition_count_cutoff;
+	source->adaptive_proportion_test.cutoff = adaptive_proportion_cutoff;
+	source->startup_test.count = startup_test_count;
 }
 
-extern int entropy_enable ( void );
-extern void entropy_disable ( void );
-extern int get_noise ( noise_sample_t *noise );
+extern int entropy_enable ( struct entropy_source *source );
+extern void entropy_disable ( struct entropy_source *source );
+extern int get_noise ( struct entropy_source *source, noise_sample_t *noise );
 
 #endif /* _IPXE_ENTROPY_H */

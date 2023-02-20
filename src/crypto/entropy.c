@@ -50,77 +50,34 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EINFO_EPIPE_ADAPTIVE_PROPORTION_TEST \
 	__einfo_uniqify ( EINFO_EPIPE, 0x02, "Adaptive proportion test failed" )
 
-/** Current entropy source */
-static struct entropy_source *entropy_source;
-
 /**
- * Enable entropy gathering
+ * Initialise repetition count test
  *
- * @ret rc		Return status code
+ * @v source		Entropy source
  */
-int entropy_enable ( void ) {
-	int rc;
+static void repetition_count_test_init ( struct entropy_source *source ) {
+	struct entropy_repetition_count_test *test =
+		&source->repetition_count_test;
 
-	/* Enable selected source, if applicable */
-	if ( entropy_source ) {
-
-		/* Enable entropy source */
-		if ( ( rc = entropy_source->enable() ) != 0 ) {
-			DBGC ( &entropy_source, "ENTROPY could not enable "
-			       "source \"%s\": %s\n", entropy_source->name,
-			       strerror ( rc ) );
-			return rc;
-		}
-
-		/* Sanity checks */
-		assert ( entropy_source->min_entropy_per_sample > 0 );
-		assert ( entropy_source->repetition_count_cutoff > 0 );
-		assert ( entropy_source->adaptive_proportion_cutoff > 0 );
-		assert ( entropy_source->startup_test_count > 0 );
-
-		return 0;
-	}
-
-	/* Find the first working source */
-	rc = -ENOENT;
-	for_each_table_entry ( entropy_source, ENTROPY_SOURCES ) {
-		if ( ( rc = entropy_enable() ) == 0 ) {
-			DBGC ( &entropy_source, "ENTROPY using source \"%s\"\n",
-			       entropy_source->name );
-			break;
-		}
-	}
-	return rc;
-}
-
-/**
- * Disable entropy gathering
- *
- */
-void entropy_disable ( void ) {
-
-	/* Sanity check */
-	assert ( entropy_source != NULL );
-
-	/* Disable entropy gathering, if applicable */
-	if ( entropy_source->disable )
-		entropy_source->disable();
+	/* Sanity checks */
+	assert ( test->repetition_count == 0 );
+	assert ( test->cutoff > 0 );
 }
 
 /**
  * Perform repetition count test
  *
+ * @v source		Entropy source
  * @v sample		Noise sample
  * @ret rc		Return status code
  *
  * This is the Repetition Count Test defined in ANS X9.82 Part 2
  * (October 2011 Draft) Section 8.5.2.1.2.
  */
-static int repetition_count_test ( noise_sample_t sample ) {
-	static noise_sample_t most_recent_sample;
-	static unsigned int repetition_count = 0;
-	unsigned int repetition_count_cutoff =
-		entropy_source->repetition_count_cutoff;
+static int repetition_count_test ( struct entropy_source *source,
+				   noise_sample_t sample ) {
+	struct entropy_repetition_count_test *test =
+		&source->repetition_count_test;
 
 	/* A = the most recently seen sample value
 	 * B = the number of times that value A has been seen in a row
@@ -133,49 +90,71 @@ static int repetition_count_test ( noise_sample_t sample ) {
 	 * the initial value of most_recent_sample is treated as being
 	 * undefined.)
 	 */
-	if ( ( sample == most_recent_sample ) && ( repetition_count > 0 ) ) {
+	if ( ( sample == test->most_recent_sample ) &&
+	     ( test->repetition_count > 0 ) ) {
 
 		/* a) If the new sample = A, then B is incremented by one. */
-		repetition_count++;
+		test->repetition_count++;
 
 		/*    i.  If B >= C, then an error condition is raised
 		 *        due to a failure of the test
 		 */
-		if ( repetition_count >= repetition_count_cutoff )
+		if ( test->repetition_count >= test->cutoff ) {
+			DBGC ( source, "ENTROPY %s excessively repeated "
+			       "value %d (%d/%d)\n", source->name, sample,
+			       test->repetition_count, test->cutoff );
 			return -EPIPE_REPETITION_COUNT_TEST;
+		}
 
 	} else {
 
 		/* b) Else:
 		 *    i.  A = new sample
 		 */
-		most_recent_sample = sample;
+		test->most_recent_sample = sample;
 
 		/*    ii. B = 1 */
-		repetition_count = 1;
+		test->repetition_count = 1;
 	}
 
 	return 0;
 }
 
 /**
+ * Initialise adaptive proportion test
+ *
+ * @v source		Entropy source
+ */
+static void adaptive_proportion_test_init ( struct entropy_source *source ) {
+	struct entropy_adaptive_proportion_test *test =
+		&source->adaptive_proportion_test;
+
+	/* Sanity checks */
+	assert ( test->sample_count == 0 );
+	assert ( test->repetition_count == 0 );
+	assert ( test->cutoff > 0 );
+
+	/* Ensure that a new test run starts immediately */
+	test->sample_count = ADAPTIVE_PROPORTION_WINDOW_SIZE;
+}
+
+/**
  * Perform adaptive proportion test
  *
+ * @v source		Entropy source
  * @v sample		Noise sample
  * @ret rc		Return status code
  *
  * This is the Adaptive Proportion Test for the Most Common Value
  * defined in ANS X9.82 Part 2 (October 2011 Draft) Section 8.5.2.1.3.
  */
-static int adaptive_proportion_test ( noise_sample_t sample ) {
-	static noise_sample_t current_counted_sample;
-	static unsigned int sample_count = ADAPTIVE_PROPORTION_WINDOW_SIZE;
-	static unsigned int repetition_count;
-	unsigned int adaptive_proportion_cutoff =
-		entropy_source->adaptive_proportion_cutoff;
+static int adaptive_proportion_test ( struct entropy_source *source,
+				      noise_sample_t sample ) {
+	struct entropy_adaptive_proportion_test *test =
+		&source->adaptive_proportion_test;
 
 	/* A = the sample value currently being counted
-	 * B = the number of samples examined in this run of the test so far
+	 * S = the number of samples examined in this run of the test so far
 	 * N = the total number of samples that must be observed in
 	 *     one run of the test, also known as the "window size" of
 	 *     the test
@@ -192,37 +171,41 @@ static int adaptive_proportion_test ( noise_sample_t sample ) {
 	 */
 
 	/* 2.  If S = N, then a new run of the test begins: */
-	if ( sample_count == ADAPTIVE_PROPORTION_WINDOW_SIZE ) {
+	if ( test->sample_count == ADAPTIVE_PROPORTION_WINDOW_SIZE ) {
 
 		/* a.  A = the current sample */
-		current_counted_sample = sample;
+		test->current_counted_sample = sample;
 
 		/* b.  S = 0 */
-		sample_count = 0;
+		test->sample_count = 0;
 
 		/* c. B = 0 */
-		repetition_count = 0;
+		test->repetition_count = 0;
 
 	} else {
 
 		/* Else: (the test is already running)
 		 * a.  S = S + 1
 		 */
-		sample_count++;
+		test->sample_count++;
 
 		/* b.  If A = the current sample, then: */
-		if ( sample == current_counted_sample ) {
+		if ( sample == test->current_counted_sample ) {
 
 			/* i.   B = B + 1 */
-			repetition_count++;
+			test->repetition_count++;
 
 			/* ii.  If S (sic) > C then raise an error
 			 *      condition, because the test has
 			 *      detected a failure
 			 */
-			if ( repetition_count > adaptive_proportion_cutoff )
+			if ( test->repetition_count > test->cutoff ) {
+				DBGC ( source, "ENTROPY %s excessively "
+				       "repeated value %d (%d/%d)\n",
+				       source->name, sample,
+				       test->repetition_count, test->cutoff );
 				return -EPIPE_ADAPTIVE_PROPORTION_TEST;
-
+			}
 		}
 	}
 
@@ -230,59 +213,182 @@ static int adaptive_proportion_test ( noise_sample_t sample ) {
 }
 
 /**
- * Get noise sample
- *
- * @ret noise		Noise sample
- * @ret rc		Return status code
- *
- * This is the GetNoise function defined in ANS X9.82 Part 2
- * (October 2011 Draft) Section 6.5.2.
- */
-int get_noise ( noise_sample_t *noise ) {
-
-	/* Sanity check */
-	assert ( entropy_source != NULL );
-
-	return entropy_source->get_noise ( noise );
-}
-
-/**
  * Get entropy sample
  *
+ * @v source		Entropy source
  * @ret entropy		Entropy sample
  * @ret rc		Return status code
  *
  * This is the GetEntropy function defined in ANS X9.82 Part 2
  * (October 2011 Draft) Section 6.5.1.
  */
-static int get_entropy ( entropy_sample_t *entropy ) {
-	static int rc = 0;
+static int get_entropy ( struct entropy_source *source,
+			 entropy_sample_t *entropy ) {
 	noise_sample_t noise;
-
-	/* Sanity check */
-	assert ( entropy_source != NULL );
+	int rc;
 
 	/* Any failure is permanent */
-	if ( rc != 0 )
-		return rc;
+	if ( ( rc = source->rc ) != 0 )
+		goto err_broken;
 
 	/* Get noise sample */
-	if ( ( rc = get_noise ( &noise ) ) != 0 )
-		return rc;
+	if ( ( rc = get_noise ( source, &noise ) ) != 0 )
+		goto err_get_noise;
 
 	/* Perform Repetition Count Test and Adaptive Proportion Test
 	 * as mandated by ANS X9.82 Part 2 (October 2011 Draft)
 	 * Section 8.5.2.1.1.
 	 */
-	if ( ( rc = repetition_count_test ( noise ) ) != 0 )
-		return rc;
-	if ( ( rc = adaptive_proportion_test ( noise ) ) != 0 )
-		return rc;
+	if ( ( rc = repetition_count_test ( source, noise ) ) != 0 )
+		goto err_repetition_count_test;
+	if ( ( rc = adaptive_proportion_test ( source, noise ) ) != 0 )
+		goto err_adaptive_proportion_test;
 
 	/* We do not use any optional conditioning component */
 	*entropy = noise;
 
 	return 0;
+
+ err_adaptive_proportion_test:
+ err_repetition_count_test:
+ err_get_noise:
+	source->rc = rc;
+ err_broken:
+	return rc;
+}
+
+/**
+ * Initialise startup test
+ *
+ * @v source		Entropy source
+ */
+static void startup_test_init ( struct entropy_source *source ) {
+	struct entropy_startup_test *test = &source->startup_test;
+
+	/* Sanity check */
+	assert ( test->tested == 0 );
+	assert ( test->count > 0 );
+}
+
+/**
+ * Perform startup test
+ *
+ * @v source		Entropy source
+ * @ret rc		Return status code
+ */
+static int startup_test ( struct entropy_source *source ) {
+	struct entropy_startup_test *test = &source->startup_test;
+	entropy_sample_t sample;
+	int rc;
+
+	/* Perform mandatory number of startup tests */
+	for ( ; test->tested < test->count ; test->tested++ ) {
+		if ( ( rc = get_entropy ( source, &sample ) ) != 0 ) {
+			DBGC ( source, "ENTROPY %s failed: %s\n",
+			       source->name, strerror ( rc ) );
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Enable entropy gathering
+ *
+ * @v source		Entropy source
+ * @ret rc		Return status code
+ */
+int entropy_enable ( struct entropy_source *source ) {
+	int rc;
+
+	/* Refuse to enable a previously failed source */
+	if ( ( rc = source->rc ) != 0 )
+		return rc;
+
+	/* Enable entropy source */
+	if ( ( rc = source->enable() ) != 0 ) {
+		DBGC ( source, "ENTROPY %s could not enable: %s\n",
+		       source->name, strerror ( rc ) );
+		source->rc = rc;
+		return rc;
+	}
+
+	/* Sanity check */
+	assert ( source->min_entropy_per_sample > 0 );
+
+	/* Initialise test state if this source has not previously been used */
+	if ( source->startup_test.tested == 0 ) {
+		repetition_count_test_init ( source );
+		adaptive_proportion_test_init ( source );
+		startup_test_init ( source );
+	}
+
+	DBGC ( source, "ENTROPY %s enabled\n", source->name );
+	return 0;
+}
+
+/**
+ * Enable and test entropy source
+ *
+ * @v source		Entropy source
+ * @ret rc		Return status code
+ */
+static int entropy_enable_and_test ( struct entropy_source *source ) {
+	int rc;
+
+	/* Enable source */
+	if ( ( rc = entropy_enable ( source ) ) != 0 )
+		goto err_enable;
+
+	/* Test source */
+	if ( ( rc = startup_test ( source ) ) != 0 )
+		goto err_test;
+
+	DBGC ( source, "ENTROPY %s passed %d startup tests\n",
+	       source->name, source->startup_test.count );
+	return 0;
+
+ err_test:
+	entropy_disable ( source );
+ err_enable:
+	assert ( source->rc == rc );
+	return rc;
+}
+
+/**
+ * Enable first working entropy source
+ *
+ * @v source		Entropy source to fill in
+ * @ret rc		Return status code
+ */
+static int entropy_enable_working ( struct entropy_source **source ) {
+	int rc;
+
+	/* Find the first working source */
+	rc = -ENOENT;
+	for_each_table_entry ( *source, ENTROPY_SOURCES ) {
+		if ( ( rc = entropy_enable_and_test ( *source ) ) == 0 )
+			return 0;
+	}
+
+	DBGC ( *source, "ENTROPY has no working sources: %s\n",
+	       strerror ( rc ) );
+	return rc;
+}
+
+/**
+ * Disable entropy gathering
+ *
+ * @v source		Entropy source
+ */
+void entropy_disable ( struct entropy_source *source ) {
+
+	/* Disable entropy gathering, if applicable */
+	if ( source->disable )
+		source->disable();
+
+	DBGC ( source, "ENTROPY %s disabled\n", source->name );
 }
 
 /**
@@ -318,7 +424,7 @@ static uint32_t make_next_nonce ( void ) {
  */
 int get_entropy_input_tmp ( min_entropy_t min_entropy, uint8_t *tmp,
 			    size_t tmp_len ) {
-	static unsigned int startup_tested = 0;
+	struct entropy_source *source;
 	struct {
 		uint32_t nonce;
 		entropy_sample_t sample;
@@ -330,15 +436,12 @@ int get_entropy_input_tmp ( min_entropy_t min_entropy, uint8_t *tmp,
 	int rc;
 
 	/* Enable entropy gathering */
-	if ( ( rc = entropy_enable() ) != 0 )
-		return rc;
+	if ( ( rc = entropy_enable_working ( &source ) ) != 0 )
+		goto err_enable_working;
 
-	/* Perform mandatory startup tests, if not yet performed */
-	for ( ; startup_tested < entropy_source->startup_test_count ;
-	      startup_tested++ ) {
-		if ( ( rc = get_entropy ( &data.sample ) ) != 0 )
-			goto err_get_entropy;
-	}
+	/* Sanity checks */
+	assert ( source->startup_test.count > 0 );
+	assert ( source->startup_test.tested >= source->startup_test.count );
 
 	/* 3.  entropy_total = 0 */
 	entropy_total = MIN_ENTROPY ( 0 );
@@ -352,7 +455,7 @@ int get_entropy_input_tmp ( min_entropy_t min_entropy, uint8_t *tmp,
 		 *       = GetEntropy()
 		 * 5.2.  If status indicates an error, return ( status, Null )
 		 */
-		if ( ( rc = get_entropy ( &data.sample ) ) != 0 )
+		if ( ( rc = get_entropy ( source, &data.sample ) ) != 0 )
 			goto err_get_entropy;
 
 		/* 5.3.  nonce = MakeNextNonce() */
@@ -367,18 +470,20 @@ int get_entropy_input_tmp ( min_entropy_t min_entropy, uint8_t *tmp,
 			tmp[i] ^= df_buf[i];
 
 		/* 5.5.  entropy_total = entropy_total + assessed_entropy */
-		entropy_total += entropy_source->min_entropy_per_sample;
+		entropy_total += source->min_entropy_per_sample;
 	}
 
 	/* Disable entropy gathering */
-	entropy_disable();
+	entropy_disable ( source );
 
-	DBGC ( &entropy_source, "ENTROPY gathered %d bits in %d samples\n",
-	       ( min_entropy / MIN_ENTROPY_SCALE ), num_samples );
+	DBGC ( source, "ENTROPY %s gathered %d bits in %d samples\n",
+	       source->name, ( min_entropy / MIN_ENTROPY_SCALE ), num_samples );
 	return 0;
 
  err_get_entropy:
-	entropy_disable();
+	entropy_disable ( source );
+	assert ( source->rc == rc );
+ err_enable_working:
 	return rc;
 }
 
