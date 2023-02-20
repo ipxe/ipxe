@@ -383,9 +383,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #define for_each_table_entry( pointer, table )				\
-	for ( pointer = table_start ( table ) ;				\
-	      pointer < table_end ( table ) ;				\
-	      pointer++ )
+	for ( (pointer) = table_start ( table ) ;			\
+	      (pointer) < table_end ( table ) ;				\
+	      (pointer)++ )
 
 /**
  * Iterate through all remaining entries within a linker table
@@ -412,9 +412,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #define for_each_table_entry_continue( pointer, table )			\
-	for ( pointer++ ;						\
-	      pointer < table_end ( table ) ;				\
-	      pointer++ )
+	for ( (pointer)++ ;						\
+	      (pointer) < table_end ( table ) ;				\
+	      (pointer)++ )
 
 /**
  * Iterate through all entries within a linker table in reverse order
@@ -438,9 +438,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #define for_each_table_entry_reverse( pointer, table )			\
-	for ( pointer = ( table_end ( table ) - 1 ) ;			\
-	      pointer >= table_start ( table ) ;			\
-	      pointer-- )
+	for ( (pointer) = ( table_end ( table ) - 1 ) ;			\
+	      (pointer) >= table_start ( table ) ;			\
+	      (pointer)-- )
 
 /**
  * Iterate through all remaining entries within a linker table in reverse order
@@ -467,8 +467,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #define for_each_table_entry_continue_reverse( pointer, table )		\
-	for ( pointer-- ;						\
-	      pointer >= table_start ( table ) ;			\
-	      pointer-- )
+	for ( (pointer)-- ;						\
+	      (pointer) >= table_start ( table ) ;			\
+	      (pointer)-- )
 
 #endif /* _IPXE_TABLES_H */
