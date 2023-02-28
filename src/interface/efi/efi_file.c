@@ -1020,6 +1020,7 @@ static int efi_file_path_install ( EFI_DEVICE_PATH_PROTOCOL *path,
  */
 int efi_file_install ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_LOAD_FILE2_PROTOCOL *load;
 	union {
 		EFI_DISK_IO_PROTOCOL *diskio;
 		void *interface;
@@ -1082,9 +1083,17 @@ int efi_file_install ( EFI_HANDLE handle ) {
 	}
 	assert ( diskio.diskio == &efi_disk_io_protocol );
 
-	/* Install Linux initrd fixed device path file */
+	/* Install Linux initrd fixed device path file
+	 *
+	 * Install the device path handle unconditionally, since we
+	 * are definitively the bootloader providing the initrd, if
+	 * any, to the booted image.  Install the load file protocol
+	 * instance only if the initrd is non-empty, since Linux does
+	 * not gracefully handle a zero-length initrd.
+	 */
+	load = ( list_is_singular ( &images ) ? NULL : &efi_file_initrd.load );
 	if ( ( rc = efi_file_path_install ( &efi_file_initrd_path.vendor.Header,
-					    &efi_file_initrd.load ) ) != 0 ) {
+					    load ) ) != 0 ) {
 		goto err_initrd;
 	}
 
