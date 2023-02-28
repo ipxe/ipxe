@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * Form parameter commands
+ * Request parameter commands
  *
  */
 
@@ -154,7 +154,7 @@ static int param_exec ( int argc, char **argv ) {
 	return rc;
 }
 
-/** Form parameter commands */
+/** Request parameter commands */
 struct command param_commands[] __command = {
 	{
 		.name = "params",

@@ -302,7 +302,7 @@ int parse_autovivified_setting ( char *text, struct named_setting *setting ) {
 }
 
 /**
- * Parse form parameter list name
+ * Parse request parameter list name
  *
  * @v text		Text
  * @ret params		Parameter list

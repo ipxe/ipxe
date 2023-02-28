@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * Form parameters
+ * Request parameters
  *
  */
 
@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static LIST_HEAD ( parameters );
 
 /**
- * Free form parameter list
+ * Free request parameter list
  *
  * @v refcnt		Reference count
  */
@@ -60,7 +60,7 @@ static void free_parameters ( struct refcnt *refcnt ) {
 }
 
 /**
- * Find form parameter list by name
+ * Find request parameter list by name
  *
  * @v name		Parameter list name (may be NULL)
  * @ret params		Parameter list, or NULL if not found
@@ -78,7 +78,7 @@ struct parameters * find_parameters ( const char *name ) {
 }
 
 /**
- * Create form parameter list
+ * Create request parameter list
  *
  * @v name		Parameter list name (may be NULL)
  * @ret params		Parameter list, or NULL on failure
@@ -118,7 +118,7 @@ struct parameters * create_parameters ( const char *name ) {
 }
 
 /**
- * Add form parameter
+ * Add request parameter
  *
  * @v params		Parameter list
  * @v key		Parameter key

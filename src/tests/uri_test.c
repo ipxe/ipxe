@@ -92,7 +92,7 @@ struct uri_churi_test {
 	const char *expected;
 };
 
-/** A form parameter URI test list */
+/** A request parameter URI test list */
 struct uri_params_test_list {
 	/** Key */
 	const char *key;
@@ -100,7 +100,7 @@ struct uri_params_test_list {
 	const char *value;
 };
 
-/** A form parameter URI test */
+/** A request parameter URI test */
 struct uri_params_test {
 	/** URI string */
 	const char *string;
@@ -403,9 +403,9 @@ static void uri_churi_okx ( struct uri_churi_test *test, const char *file,
 #define uri_churi_ok( test ) uri_churi_okx ( test, __FILE__, __LINE__ )
 
 /**
- * Report form parameter URI test list result
+ * Report request parameter URI test list result
  *
- * @v test		Form parameter URI test
+ * @v test		Request parameter URI test
  * @v uri		URI
  * @v file		Test code file
  * @v line		Test code line
@@ -437,9 +437,9 @@ static void uri_params_list_okx ( struct uri_params_test *test,
 	uri_params_list_okx ( test, __FILE__, __LINE__ )
 
 /**
- * Report form parameter URI test result
+ * Report request parameter URI test result
  *
- * @v test		Form parameter URI test
+ * @v test		Request parameter URI test
  * @v file		Test code file
  * @v line		Test code line
  */
@@ -879,7 +879,7 @@ static struct uri_churi_test uri_churi[] = {
 	}
 };
 
-/** Form parameter URI test list */
+/** Request parameter URI test list */
 static struct uri_params_test_list uri_params_list[] = {
 	{
 		"vendor",
@@ -899,7 +899,7 @@ static struct uri_params_test_list uri_params_list[] = {
 	}
 };
 
-/** Form parameter URI test */
+/** Request parameter URI test */
 static struct uri_params_test uri_params = {
 	"http://boot.ipxe.org/demo/boot.php##params",
 	{
@@ -912,7 +912,7 @@ static struct uri_params_test uri_params = {
 	uri_params_list,
 };
 
-/** Named form parameter URI test list */
+/** Named request parameter URI test list */
 static struct uri_params_test_list uri_named_params_list[] = {
 	{
 		"mac",
@@ -928,7 +928,7 @@ static struct uri_params_test_list uri_named_params_list[] = {
 	}
 };
 
-/** Named form parameter URI test */
+/** Named request parameter URI test */
 static struct uri_params_test uri_named_params = {
 	"http://192.168.100.4:3001/register##params=foo",
 	{
@@ -996,7 +996,7 @@ static void uri_test_exec ( void ) {
 	/* Current working URI tests */
 	uri_churi_ok ( uri_churi );
 
-	/* Form parameter URI tests */
+	/* Request parameter URI tests */
 	uri_params_ok ( &uri_params );
 	uri_params_ok ( &uri_named_params );
 }

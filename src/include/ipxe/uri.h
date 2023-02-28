@@ -84,7 +84,7 @@ struct uri {
 	const char *equery;
 	/** Fragment (with original URI encoding) */
 	const char *efragment;
-	/** Form parameters */
+	/** Request parameters */
 	struct parameters *params;
 } __attribute__ (( packed ));
 
