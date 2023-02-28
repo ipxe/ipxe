@@ -98,6 +98,8 @@ struct uri_params_test_list {
 	const char *key;
 	/** Value */
 	const char *value;
+	/** Flags */
+	unsigned int flags;
 };
 
 /** A request parameter URI test */
@@ -428,6 +430,7 @@ static void uri_params_list_okx ( struct uri_params_test *test,
 			      file, line );
 			okx ( strcmp ( param->value, list->value ) == 0,
 			      file, line );
+			okx ( param->flags == list->flags, file, line );
 			list++;
 		}
 		okx ( list->key == NULL, file, line );
@@ -456,7 +459,8 @@ static void uri_params_okx ( struct uri_params_test *test, const char *file,
 	okx ( params != NULL, file, line );
 	if ( params ) {
 		for ( list = test->list ; list->key ; list++ ) {
-			param = add_parameter ( params, list->key, list->value);
+			param = add_parameter ( params, list->key, list->value,
+						list->flags );
 			okx ( param != NULL, file, line );
 		}
 	}
@@ -884,18 +888,22 @@ static struct uri_params_test_list uri_params_list[] = {
 	{
 		"vendor",
 		"10ec",
+		PARAMETER_FORM,
 	},
 	{
 		"device",
 		"8139",
+		PARAMETER_FORM,
 	},
 	{
 		"uuid",
 		"f59fac00-758f-498f-9fe5-87d790045d94",
+		PARAMETER_HEADER,
 	},
 	{
 		NULL,
 		NULL,
+		0,
 	}
 };
 
@@ -917,14 +925,17 @@ static struct uri_params_test_list uri_named_params_list[] = {
 	{
 		"mac",
 		"00:1e:65:80:d3:b6",
+		PARAMETER_FORM,
 	},
 	{
 		"serial",
 		"LXTQ20Z1139322762F2000",
+		PARAMETER_FORM,
 	},
 	{
 		NULL,
 		NULL,
+		0,
 	}
 };
 

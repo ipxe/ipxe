@@ -123,10 +123,12 @@ struct parameters * create_parameters ( const char *name ) {
  * @v params		Parameter list
  * @v key		Parameter key
  * @v value		Parameter value
+ * @v flags		Parameter flags
  * @ret param		Parameter, or NULL on failure
  */
 struct parameter * add_parameter ( struct parameters *params,
-				   const char *key, const char *value ) {
+				   const char *key, const char *value,
+				   unsigned int flags ) {
 	struct parameter *param;
 	size_t key_len;
 	size_t value_len;
@@ -147,11 +149,14 @@ struct parameter * add_parameter ( struct parameters *params,
 	param->key = key_copy;
 	strcpy ( value_copy, value );
 	param->value = value_copy;
+	param->flags = flags;
 
 	/* Add to list of parameters */
 	list_add_tail ( &param->list, &params->entries );
 
-	DBGC ( params, "PARAMS \"%s\" added \"%s\"=\"%s\"\n",
-	       params->name, param->key, param->value );
+	DBGC ( params, "PARAMS \"%s\" added \"%s\"=\"%s\"%s%s\n",
+	       params->name, param->key, param->value,
+	       ( ( param->flags & PARAMETER_FORM ) ? " (form)" : "" ),
+	       ( ( param->flags & PARAMETER_HEADER ) ? " (header)" : "" ) );
 	return param;
 }

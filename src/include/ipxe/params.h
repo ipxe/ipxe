@@ -32,7 +32,15 @@ struct parameter {
 	const char *key;
 	/** Value */
 	const char *value;
+	/** Flags */
+	unsigned int flags;
 };
+
+/** Request parameter is a form parameter */
+#define PARAMETER_FORM 0x0001
+
+/** Request parameter is a header parameter */
+#define PARAMETER_HEADER 0x0002
 
 /**
  * Increment request parameter list reference count
@@ -78,6 +86,7 @@ claim_parameters ( struct parameters *params ) {
 extern struct parameters * find_parameters ( const char *name );
 extern struct parameters * create_parameters ( const char *name );
 extern struct parameter * add_parameter ( struct parameters *params,
-					  const char *key, const char *value );
+					  const char *key, const char *value,
+					  unsigned int flags );
 
 #endif /* _IPXE_PARAMS_H */

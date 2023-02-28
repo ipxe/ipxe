@@ -830,7 +830,9 @@ static int http_transfer_complete ( struct http_transaction *http ) {
  */
 static int http_format_headers ( struct http_transaction *http, char *buf,
 				 size_t len ) {
+	struct parameters *params = http->uri->params;
 	struct http_request_header *header;
+	struct parameter *param;
 	size_t used;
 	size_t remaining;
 	char *line;
@@ -844,7 +846,7 @@ static int http_format_headers ( struct http_transaction *http, char *buf,
 		DBGC2 ( http, "HTTP %p TX %s\n", http, buf );
 	used += ssnprintf ( ( buf + used ), ( len - used ), "\r\n" );
 
-	/* Construct all headers */
+	/* Construct all fixed headers */
 	for_each_table_entry ( header, HTTP_REQUEST_HEADERS ) {
 
 		/* Determine header value length */
@@ -867,6 +869,23 @@ static int http_format_headers ( struct http_transaction *http, char *buf,
 		if ( used < len )
 			DBGC2 ( http, "HTTP %p TX %s\n", http, line );
 		used += ssnprintf ( ( buf + used ), ( len - used ), "\r\n" );
+	}
+
+	/* Construct parameter headers, if any */
+	if ( params ) {
+
+		/* Construct all parameter headers */
+		for_each_param ( param, params ) {
+
+			/* Skip non-header parameters */
+			if ( ! ( param->flags & PARAMETER_HEADER ) )
+				continue;
+
+			/* Add parameter */
+			used += ssnprintf ( ( buf + used ), ( len - used ),
+					    "%s: %s\r\n", param->key,
+					    param->value );
+		}
 	}
 
 	/* Construct terminating newline */
@@ -1851,14 +1870,15 @@ static struct http_state http_trailers = {
  */
 
 /**
- * Construct HTTP parameter list
+ * Construct HTTP form parameter list
  *
  * @v params		Parameter list
  * @v buf		Buffer to contain HTTP POST parameters
  * @v len		Length of buffer
  * @ret len		Length of parameter list (excluding terminating NUL)
  */
-static size_t http_params ( struct parameters *params, char *buf, size_t len ) {
+static size_t http_form_params ( struct parameters *params, char *buf,
+				 size_t len ) {
 	struct parameter *param;
 	ssize_t remaining = len;
 	size_t frag_len;
@@ -1866,6 +1886,10 @@ static size_t http_params ( struct parameters *params, char *buf, size_t len ) {
 	/* Add each parameter in the form "key=value", joined with "&" */
 	len = 0;
 	for_each_param ( param, params ) {
+
+		/* Skip non-form parameters */
+		if ( ! ( param->flags & PARAMETER_FORM ) )
+			continue;
 
 		/* Add the "&", if applicable */
 		if ( len ) {
@@ -1920,25 +1944,26 @@ int http_open_uri ( struct interface *xfer, struct uri *uri ) {
 	size_t check_len;
 	int rc;
 
-	/* Calculate length of parameter list, if any */
-	len = ( params ? http_params ( params, NULL, 0 ) : 0 );
+	/* Calculate length of form parameter list, if any */
+	len = ( params ? http_form_params ( params, NULL, 0 ) : 0 );
 
-	/* Use POST if and only if there are parameters */
+	/* Use POST if and only if there are form parameters */
 	if ( len ) {
 
 		/* Use POST */
 		method = &http_post;
 		type = "application/x-www-form-urlencoded";
 
-		/* Allocate temporary parameter list */
+		/* Allocate temporary form parameter list */
 		data = zalloc ( len + 1 /* NUL */ );
 		if ( ! data ) {
 			rc = -ENOMEM;
 			goto err_alloc;
 		}
 
-		/* Construct temporary parameter list */
-		check_len = http_params ( params, data, ( len + 1 /* NUL */ ) );
+		/* Construct temporary form parameter list */
+		check_len = http_form_params ( params, data,
+					       ( len + 1 /* NUL */ ) );
 		assert ( check_len == len );
 
 	} else {
