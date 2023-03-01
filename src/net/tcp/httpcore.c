@@ -1904,62 +1904,6 @@ static size_t http_params ( struct parameters *params, char *buf, size_t len ) {
 }
 
 /**
- * Open HTTP transaction for simple GET URI
- *
- * @v xfer		Data transfer interface
- * @v uri		Request URI
- * @ret rc		Return status code
- */
-static int http_open_get_uri ( struct interface *xfer, struct uri *uri ) {
-
-	return http_open ( xfer, &http_get, uri, NULL, NULL );
-}
-
-/**
- * Open HTTP transaction for simple POST URI
- *
- * @v xfer		Data transfer interface
- * @v uri		Request URI
- * @ret rc		Return status code
- */
-static int http_open_post_uri ( struct interface *xfer, struct uri *uri ) {
-	struct parameters *params = uri->params;
-	struct http_request_content content;
-	void *data;
-	size_t len;
-	size_t check_len;
-	int rc;
-
-	/* Calculate length of parameter list */
-	len = http_params ( params, NULL, 0 );
-
-	/* Allocate temporary parameter list */
-	data = zalloc ( len + 1 /* NUL */ );
-	if ( ! data ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-
-	/* Construct temporary parameter list */
-	check_len = http_params ( params, data, ( len + 1 /* NUL */ ) );
-	assert ( check_len == len );
-
-	/* Construct request content */
-	content.type = "application/x-www-form-urlencoded";
-	content.data = data;
-	content.len = len;
-
-	/* Open HTTP transaction */
-	if ( ( rc = http_open ( xfer, &http_post, uri, NULL, &content ) ) != 0 )
-		goto err_open;
-
- err_open:
-	free ( data );
- err_alloc:
-	return rc;
-}
-
-/**
  * Open HTTP transaction for simple URI
  *
  * @v xfer		Data transfer interface
@@ -1967,13 +1911,57 @@ static int http_open_post_uri ( struct interface *xfer, struct uri *uri ) {
  * @ret rc		Return status code
  */
 int http_open_uri ( struct interface *xfer, struct uri *uri ) {
+	struct parameters *params = uri->params;
+	struct http_request_content content;
+	struct http_method *method;
+	const char *type;
+	void *data;
+	size_t len;
+	size_t check_len;
+	int rc;
 
-	/* Open GET/POST URI as applicable */
-	if ( uri->params ) {
-		return http_open_post_uri ( xfer, uri );
+	/* Calculate length of parameter list, if any */
+	len = ( params ? http_params ( params, NULL, 0 ) : 0 );
+
+	/* Use POST if and only if there are parameters */
+	if ( len ) {
+
+		/* Use POST */
+		method = &http_post;
+		type = "application/x-www-form-urlencoded";
+
+		/* Allocate temporary parameter list */
+		data = zalloc ( len + 1 /* NUL */ );
+		if ( ! data ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+
+		/* Construct temporary parameter list */
+		check_len = http_params ( params, data, ( len + 1 /* NUL */ ) );
+		assert ( check_len == len );
+
 	} else {
-		return http_open_get_uri ( xfer, uri );
+
+		/* Use GET */
+		method = &http_get;
+		type = NULL;
+		data = NULL;
 	}
+
+	/* Construct request content */
+	content.type = type;
+	content.data = data;
+	content.len = len;
+
+	/* Open HTTP transaction */
+	if ( ( rc = http_open ( xfer, method, uri, NULL, &content ) ) != 0 )
+		goto err_open;
+
+ err_open:
+	free ( data );
+ err_alloc:
+	return rc;
 }
 
 /* Drag in HTTP extensions */
