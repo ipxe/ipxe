@@ -130,7 +130,7 @@ static struct image * efi_file_find ( const char *name ) {
 	struct image *image;
 
 	/* Find image */
-	list_for_each_entry ( image, &images, list ) {
+	for_each_image ( image ) {
 		if ( strcasecmp ( image->name, name ) == 0 )
 			return image;
 	}

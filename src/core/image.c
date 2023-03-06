@@ -312,7 +312,7 @@ void unregister_image ( struct image *image ) {
 struct image * find_image ( const char *name ) {
 	struct image *image;
 
-	list_for_each_entry ( image, &images, list ) {
+	for_each_image ( image ) {
 		if ( strcmp ( image->name, name ) == 0 )
 			return image;
 	}
