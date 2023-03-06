@@ -355,10 +355,6 @@ static size_t bzimage_load_initrd ( struct image *image,
 	size_t offset;
 	size_t pad_len;
 
-	/* Do not include kernel image itself as an initrd */
-	if ( initrd == image )
-		return 0;
-
 	/* Create cpio header for non-prebuilt images */
 	offset = cpio_header ( initrd, &cpio );
 
@@ -405,10 +401,6 @@ static int bzimage_check_initrds ( struct image *image,
 
 	/* Calculate total loaded length of initrds */
 	for_each_image ( initrd ) {
-
-		/* Skip kernel */
-		if ( initrd == image )
-			continue;
 
 		/* Calculate length */
 		len += bzimage_load_initrd ( image, initrd, UNULL );

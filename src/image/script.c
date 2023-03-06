@@ -197,11 +197,6 @@ static int script_exec ( struct image *image ) {
 	size_t saved_offset;
 	int rc;
 
-	/* Temporarily de-register image, so that a "boot" command
-	 * doesn't throw us into an execution loop.
-	 */
-	unregister_image ( image );
-
 	/* Preserve state of any currently-running script */
 	saved_offset = script_offset;
 
@@ -211,10 +206,6 @@ static int script_exec ( struct image *image ) {
 
 	/* Restore saved state */
 	script_offset = saved_offset;
-
-	/* Re-register image (unless we have been replaced) */
-	if ( ! image->replacement )
-		register_image ( image );
 
 	return rc;
 }

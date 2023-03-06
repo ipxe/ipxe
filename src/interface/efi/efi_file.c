@@ -240,10 +240,6 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
 	len = 0;
 	for_each_image ( image ) {
 
-		/* Ignore currently executing image */
-		if ( image == current_image )
-			continue;
-
 		/* Pad to alignment boundary */
 		pad_len = ( ( -reader->pos ) & ( INITRD_ALIGN - 1 ) );
 		if ( pad_len ) {
@@ -1091,7 +1087,7 @@ int efi_file_install ( EFI_HANDLE handle ) {
 	 * instance only if the initrd is non-empty, since Linux does
 	 * not gracefully handle a zero-length initrd.
 	 */
-	load = ( list_is_singular ( &images ) ? NULL : &efi_file_initrd.load );
+	load = ( have_images() ? &efi_file_initrd.load : NULL );
 	if ( ( rc = efi_file_path_install ( &efi_file_initrd_path.vendor.Header,
 					    load ) ) != 0 ) {
 		goto err_initrd;

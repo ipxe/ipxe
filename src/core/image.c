@@ -349,9 +349,8 @@ int image_exec ( struct image *image ) {
 	/* Preserve record of any currently-running image */
 	saved_current_image = current_image;
 
-	/* Take out a temporary reference to the image.  This allows
-	 * the image to unregister itself if necessary, without
-	 * automatically freeing itself.
+	/* Take out a temporary reference to the image, so that it
+	 * does not get freed when temporarily unregistered.
 	 */
 	current_image = image_get ( image );
 
@@ -371,6 +370,9 @@ int image_exec ( struct image *image ) {
 	/* Record boot attempt */
 	syslog ( LOG_NOTICE, "Executing \"%s\"\n", image->name );
 
+	/* Temporarily unregister the image during its execution */
+	unregister_image ( image );
+
 	/* Try executing the image */
 	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
 		DBGC ( image, "IMAGE %s could not execute: %s\n",
@@ -386,6 +388,10 @@ int image_exec ( struct image *image ) {
 		syslog ( LOG_ERR, "Execution of \"%s\" failed: %s\n",
 			 image->name, strerror ( rc ) );
 	}
+
+	/* Re-register image (unless due to be replaced) */
+	if ( ! image->replacement )
+		register_image ( image );
 
 	/* Pick up replacement image before we drop the original
 	 * image's temporary reference.  The replacement image must
