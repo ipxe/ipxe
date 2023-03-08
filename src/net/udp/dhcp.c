@@ -601,6 +601,12 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 		return;
 	}
 
+	/* Unregister any existing ProxyDHCP or PXEBS settings */
+	if ( ( settings = find_settings ( PROXYDHCP_SETTINGS_NAME ) ) != NULL )
+		unregister_settings ( settings );
+	if ( ( settings = find_settings ( PXEBS_SETTINGS_NAME ) ) != NULL )
+		unregister_settings ( settings );
+
 	/* Perform ProxyDHCP if applicable */
 	if ( dhcp->proxy_offer /* Have ProxyDHCP offer */ &&
 	     ( ! dhcp->no_pxedhcp ) /* ProxyDHCP not disabled */ ) {
