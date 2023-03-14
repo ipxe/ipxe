@@ -138,6 +138,10 @@ struct intel_descriptor {
 /** Packet Buffer Size */
 #define INTEL_PBS 0x01008UL
 
+/** Receive packet buffer size */
+#define INTEL_RXPBS 0x02404UL
+#define INTEL_RXPBS_I210	0x000000a2UL	/**< I210 power-up default */
+
 /** Receive Descriptor register block */
 #define INTEL_RD 0x02800UL
 
@@ -153,6 +157,10 @@ struct intel_descriptor {
 
 /** Receive buffer length */
 #define INTEL_RX_MAX_LEN 2048
+
+/** Transmit packet buffer size */
+#define INTEL_TXPBS 0x03404UL
+#define INTEL_TXPBS_I210	0x04000014UL	/**< I210 power-up default */
 
 /** Transmit Descriptor register block */
 #define INTEL_TD 0x03800UL
@@ -319,6 +327,8 @@ enum intel_flags {
 	INTEL_NO_ASDE = 0x0008,
 	/** Reset may cause a complete device hang */
 	INTEL_RST_HANG = 0x0010,
+	/** PBSIZE registers must be explicitly reset */
+	INTEL_PBSIZE_RST = 0x0020,
 };
 
 /** The i219 has a seriously broken reset mechanism */
