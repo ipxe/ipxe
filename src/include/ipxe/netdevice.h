@@ -723,6 +723,7 @@ extern struct net_device * alloc_netdev ( size_t priv_size );
 extern int register_netdev ( struct net_device *netdev );
 extern int netdev_open ( struct net_device *netdev );
 extern void netdev_close ( struct net_device *netdev );
+extern int netdev_reset ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void netdev_irq ( struct net_device *netdev, int enable );
 extern struct net_device * find_netdev ( const char *name );

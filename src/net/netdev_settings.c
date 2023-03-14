@@ -453,11 +453,10 @@ static int apply_netdev_settings ( void ) {
 			       netdev->name, mtu );
 		}
 
-		/* Close and reopen network device if MTU has increased */
+		/* Reset network device if MTU has increased */
 		if ( netdev_is_open ( netdev ) && ( mtu > old_mtu ) ) {
-			netdev_close ( netdev );
-			if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
-				DBGC ( netdev, "NETDEV %s could not reopen: "
+			if ( ( rc = netdev_reset ( netdev ) ) != 0 ) {
+				DBGC ( netdev, "NETDEV %s could not reset: "
 				       "%s\n", netdev->name, strerror ( rc ) );
 				return rc;
 			}

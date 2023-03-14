@@ -852,16 +852,9 @@ static int netvsc_reset ( struct vmbus_device *vmdev ) {
 	struct net_device *netdev = rndis->netdev;
 	int rc;
 
-	/* A closed device holds no NetVSC (or RNDIS) state, so there
-	 * is nothing to reset.
-	 */
-	if ( ! netdev_is_open ( netdev ) )
-		return 0;
-
-	/* Close and reopen device to reset any stale state */
-	netdev_close ( netdev );
-	if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
-		DBGC ( netvsc, "NETVSC %s could not reopen: %s\n",
+	/* Reset network device */
+	if ( ( rc = netdev_reset ( netdev ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not reset: %s\n",
 		       netvsc->name, strerror ( rc ) );
 		return rc;
 	}

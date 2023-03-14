@@ -613,6 +613,23 @@ static void netdev_rx_flush ( struct net_device *netdev ) {
 }
 
 /**
+ * Flush device's transmit and receive queues
+ *
+ * @v netdev		Network device
+ */
+static void netdev_flush ( struct net_device *netdev ) {
+
+	/* Sanity check */
+	assert ( ! ( netdev->state & NETDEV_OPEN ) );
+
+	/* Flush TX queue */
+	netdev_tx_flush ( netdev );
+
+	/* Flush RX queue */
+	netdev_rx_flush ( netdev );
+}
+
+/**
  * Finish network device configuration
  *
  * @v config		Network device configuration
@@ -657,8 +674,7 @@ static void free_netdev ( struct refcnt *refcnt ) {
 		container_of ( refcnt, struct net_device, refcnt );
 
 	stop_timer ( &netdev->link_block );
-	netdev_tx_flush ( netdev );
-	netdev_rx_flush ( netdev );
+	netdev_flush ( netdev );
 	clear_settings ( netdev_settings ( netdev ) );
 	free ( netdev );
 }
@@ -880,8 +896,47 @@ void netdev_close ( struct net_device *netdev ) {
 	netdev->op->close ( netdev );
 
 	/* Flush TX and RX queues */
-	netdev_tx_flush ( netdev );
-	netdev_rx_flush ( netdev );
+	netdev_flush ( netdev );
+}
+
+/**
+ * Reset transmit and receive queues
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+int netdev_reset ( struct net_device *netdev ) {
+	int rc;
+
+	/* Do nothing unless device is open */
+	if ( ! ( netdev->state & NETDEV_OPEN ) )
+		return 0;
+
+	DBGC ( netdev, "NETDEV %s resetting\n", netdev->name );
+
+	/* Mark as closed */
+	netdev->state &= ~NETDEV_OPEN;
+
+	/* Close the device */
+	netdev->op->close ( netdev );
+
+	/* Flush TX and RX queues */
+	netdev_flush ( netdev );
+
+	/* Mark as opened */
+	netdev->state |= NETDEV_OPEN;
+
+	/* Reopen device */
+	if ( ( rc = netdev->op->open ( netdev ) ) != 0 )
+		goto err;
+
+	return 0;
+
+ err:
+	netdev->state &= ~NETDEV_OPEN;
+	list_del ( &netdev->open_list );
+	netdev_notify ( netdev );
+	return rc;
 }
 
 /**
