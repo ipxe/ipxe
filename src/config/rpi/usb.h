@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * Use EFI_USB_IO_PROTOCOL
  *

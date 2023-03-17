@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -51,33 +51,33 @@ struct self_test iobuf_test __self_test;
  * @v file		Test code file
  * @v line		Test code line
  */
-static inline void alloc_iob_okx ( size_t len, size_t align, size_t offset,
-				   const char *file, unsigned int line ) {
-	struct io_buffer *iobuf;
+static inline void alloc_iob_okx(size_t len, size_t align, size_t offset,
+                                 const char* file, unsigned int line) {
+    struct io_buffer* iobuf;
 
-	/* Allocate I/O buffer */
-	iobuf = alloc_iob_raw ( len, align, offset );
-	okx ( iobuf != NULL, file, line );
-	DBGC ( &iobuf_test, "IOBUF %p (%#08lx+%#zx) for %#zx align %#zx "
-	       "offset %#zx\n", iobuf, virt_to_phys ( iobuf->data ),
-	       iob_tailroom ( iobuf ), len, align, offset );
+    /* Allocate I/O buffer */
+    iobuf = alloc_iob_raw(len, align, offset);
+    okx(iobuf != NULL, file, line);
+    DBGC(&iobuf_test, "IOBUF %p (%#08lx+%#zx) for %#zx align %#zx "
+                      "offset %#zx\n", iobuf, virt_to_phys(iobuf->data),
+         iob_tailroom(iobuf), len, align, offset);
 
-	/* Validate requested length and alignment */
-	okx ( ( ( ( intptr_t ) iobuf ) & ( __alignof__ ( *iobuf ) - 1 ) ) == 0,
-		file, line );
-	okx ( iob_tailroom ( iobuf ) >= len, file, line );
-	okx ( ( ( align == 0 ) ||
-		( ( virt_to_phys ( iobuf->data ) & ( align - 1 ) ) ==
-		  ( offset & ( align - 1 ) ) ) ), file, line );
+    /* Validate requested length and alignment */
+    okx((((intptr_t)iobuf) & (__alignof__(*iobuf) - 1)) == 0,
+        file, line);
+    okx(iob_tailroom(iobuf) >= len, file, line);
+    okx(((align == 0) ||
+         ((virt_to_phys(iobuf->data) & (align - 1)) ==
+          (offset & (align - 1)))), file, line);
 
-	/* Overwrite entire content of I/O buffer (for Valgrind) */
-	memset ( iob_put ( iobuf, len ), 0x55, len );
+    /* Overwrite entire content of I/O buffer (for Valgrind) */
+    memset(iob_put(iobuf, len), 0x55, len);
 
-	/* Free I/O buffer */
-	free_iob ( iobuf );
+    /* Free I/O buffer */
+    free_iob(iobuf);
 }
-#define alloc_iob_ok( len, align, offset ) \
-	alloc_iob_okx ( len, align, offset, __FILE__, __LINE__ )
+#define alloc_iob_ok(len, align, offset) \
+    alloc_iob_okx(len, align, offset, __FILE__, __LINE__)
 
 /**
  * Report I/O buffer allocation failure test result
@@ -88,49 +88,48 @@ static inline void alloc_iob_okx ( size_t len, size_t align, size_t offset,
  * @v file		Test code file
  * @v line		Test code line
  */
-static inline void alloc_iob_fail_okx ( size_t len, size_t align, size_t offset,
-					const char *file, unsigned int line ) {
-	struct io_buffer *iobuf;
+static inline void alloc_iob_fail_okx(size_t len, size_t align, size_t offset,
+                                      const char* file, unsigned int line) {
+    struct io_buffer* iobuf;
 
-	/* Allocate I/O buffer */
-	iobuf = alloc_iob_raw ( len, align, offset );
-	okx ( iobuf == NULL, file, line );
+    /* Allocate I/O buffer */
+    iobuf = alloc_iob_raw(len, align, offset);
+    okx(iobuf == NULL, file, line);
 }
-#define alloc_iob_fail_ok( len, align, offset ) \
-	alloc_iob_fail_okx ( len, align, offset, __FILE__, __LINE__ )
+#define alloc_iob_fail_ok(len, align, offset) \
+    alloc_iob_fail_okx(len, align, offset, __FILE__, __LINE__)
 
 /**
  * Perform I/O buffer self-tests
  *
  */
-static void iobuf_test_exec ( void ) {
+static void iobuf_test_exec(void) {
+    /* Check zero-length allocations */
+    alloc_iob_ok(0, 0, 0);
+    alloc_iob_ok(0, 0, 1);
+    alloc_iob_ok(0, 1, 0);
+    alloc_iob_ok(0, 1024, 0);
+    alloc_iob_ok(0, 139, -17);
 
-	/* Check zero-length allocations */
-	alloc_iob_ok ( 0, 0, 0 );
-	alloc_iob_ok ( 0, 0, 1 );
-	alloc_iob_ok ( 0, 1, 0 );
-	alloc_iob_ok ( 0, 1024, 0 );
-	alloc_iob_ok ( 0, 139, -17 );
+    /* Check various sensible allocations */
+    alloc_iob_ok(1, 0, 0);
+    alloc_iob_ok(16, 16, 0);
+    alloc_iob_ok(64, 0, 0);
+    alloc_iob_ok(65, 0, 0);
+    alloc_iob_ok(65, 1024, 19);
+    alloc_iob_ok(1536, 1536, 0);
+    alloc_iob_ok(2048, 2048, 0);
+    alloc_iob_ok(2048, 2048, -10);
 
-	/* Check various sensible allocations */
-	alloc_iob_ok ( 1, 0, 0 );
-	alloc_iob_ok ( 16, 16, 0 );
-	alloc_iob_ok ( 64, 0, 0 );
-	alloc_iob_ok ( 65, 0, 0 );
-	alloc_iob_ok ( 65, 1024, 19 );
-	alloc_iob_ok ( 1536, 1536, 0 );
-	alloc_iob_ok ( 2048, 2048, 0 );
-	alloc_iob_ok ( 2048, 2048, -10 );
-
-	/* Excessively large or excessively aligned allocations should fail */
-	alloc_iob_fail_ok ( -1UL, 0, 0 );
-	alloc_iob_fail_ok ( -1UL, 1024, 0 );
-	alloc_iob_fail_ok ( 0, -1UL, 0 );
-	alloc_iob_fail_ok ( 1024, -1UL, 0 );
+    /* Excessively large or excessively aligned allocations should fail */
+    alloc_iob_fail_ok(-1UL, 0, 0);
+    alloc_iob_fail_ok(-1UL, 1024, 0);
+    alloc_iob_fail_ok(0, -1UL, 0);
+    alloc_iob_fail_ok(1024, -1UL, 0);
 }
 
 /** I/O buffer self-test */
 struct self_test iobuf_test __self_test = {
-	.name = "iobuf",
-	.exec = iobuf_test_exec,
+    .name = "iobuf",
+    .exec = iobuf_test_exec,
 };

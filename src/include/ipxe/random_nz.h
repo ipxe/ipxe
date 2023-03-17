@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_RANDOM_NZ_H
-#define _IPXE_RANDOM_NZ_H
+    #define _IPXE_RANDOM_NZ_H
 
 /** @file
  *
@@ -7,10 +9,10 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <stdint.h>
+    #include <stdint.h>
 
-extern int get_random_nz ( void *data, size_t len );
+extern int get_random_nz(void* data, size_t len);
 
 #endif /* _IPXE_RANDOM_NZ_H */

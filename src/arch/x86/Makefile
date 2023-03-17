@@ -22,9 +22,6 @@ SRCDIRS		+= arch/x86/drivers/xen
 SRCDIRS		+= arch/x86/drivers/hyperv
 SRCDIRS		+= arch/x86/transitions
 
-# breaks building some of the linux-related objects
-CFLAGS		+= -Ulinux
-
 # disable valgrind
 CFLAGS		+= -DNVALGRIND
 

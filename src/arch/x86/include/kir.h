@@ -1,18 +1,20 @@
+#pragma once
+
 #ifndef KIR_H
-#define KIR_H
+    #define KIR_H
 
-#ifndef KEEP_IT_REAL
-#error "kir.h can be used only with -DKEEP_IT_REAL"
-#endif
+    #ifndef KEEP_IT_REAL
+        #error "kir.h can be used only with -DKEEP_IT_REAL"
+    #endif
 
-#ifdef ASSEMBLY
+    #ifdef ASSEMBLY
 
-#define code32 code16gcc
+        #define code32 code16gcc
 
-#else /* ASSEMBLY */
+    #else /* ASSEMBLY */
 
-__asm__ ( ".code16gcc" );
+__asm__(".code16gcc");
 
-#endif /* ASSEMBLY */
+    #endif /* ASSEMBLY */
 
 #endif /* KIR_H */

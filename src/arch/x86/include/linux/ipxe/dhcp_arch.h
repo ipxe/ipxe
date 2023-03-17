@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * Copyright (C) 2010 Piotr Jaroszyński <p.jaroszynski@gmail.com>
  *
@@ -22,7 +24,7 @@
  */
 
 #ifndef _LINUX_DHCP_ARCH_H
-#define _LINUX_DHCP_ARCH_H
+    #define _LINUX_DHCP_ARCH_H
 
 /** @file
  *
@@ -31,10 +33,10 @@
 
 FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <ipxe/dhcp.h>
+    #include <ipxe/dhcp.h>
 
-// Emulate one of the supported arch-platforms
-#include <arch/i386/include/pcbios/ipxe/dhcp_arch.h>
+    // Emulate one of the supported arch-platforms
+    #include <arch/i386/include/pcbios/ipxe/dhcp_arch.h>
 //#include <arch/i386/include/efi/ipxe/dhcp_arch.h>
 //#include <arch/x86_64/include/efi/ipxe/dhcp_arch.h>
 

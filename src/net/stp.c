@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <errno.h>
 #include <byteswap.h>
@@ -38,18 +38,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /* Disambiguate the various error causes */
-#define ENOTSUP_PROTOCOL __einfo_error ( EINFO_ENOTSUP_PROTOCOL )
-#define EINFO_ENOTSUP_PROTOCOL					\
-	__einfo_uniqify ( EINFO_ENOTSUP, 0x02,			\
-			  "Non-STP packet received" )
-#define ENOTSUP_VERSION __einfo_error ( EINFO_ENOTSUP_VERSION )
-#define EINFO_ENOTSUP_VERSION					\
-	__einfo_uniqify ( EINFO_ENOTSUP, 0x03,			\
-			  "Legacy STP packet received" )
-#define ENOTSUP_TYPE __einfo_error ( EINFO_ENOTSUP_TYPE )
-#define EINFO_ENOTSUP_TYPE					\
-	__einfo_uniqify ( EINFO_ENOTSUP, 0x04,			\
-			  "Non-RSTP packet received" )
+#define ENOTSUP_PROTOCOL __einfo_error(EINFO_ENOTSUP_PROTOCOL)
+#define EINFO_ENOTSUP_PROTOCOL           \
+    __einfo_uniqify(EINFO_ENOTSUP, 0x02, \
+                    "Non-STP packet received")
+#define ENOTSUP_VERSION __einfo_error(EINFO_ENOTSUP_VERSION)
+#define EINFO_ENOTSUP_VERSION            \
+    __einfo_uniqify(EINFO_ENOTSUP, 0x03, \
+                    "Legacy STP packet received")
+#define ENOTSUP_TYPE __einfo_error(EINFO_ENOTSUP_TYPE)
+#define EINFO_ENOTSUP_TYPE               \
+    __einfo_uniqify(EINFO_ENOTSUP, 0x04, \
+                    "Non-RSTP packet received")
 
 /**
  * Process incoming STP packets
@@ -60,75 +60,75 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v flags		Packet flags
  * @ret rc		Return status code
  */
-static int stp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
-		    const void *ll_dest __unused,
-		    const void *ll_source __unused,
-		    unsigned int flags __unused ) {
-	struct stp_bpdu *stp;
-	unsigned int hello;
-	int rc;
+static int stp_rx(struct io_buffer* iobuf, struct net_device* netdev,
+                  const void* ll_dest __unused,
+                  const void* ll_source __unused,
+                  unsigned int flags __unused) {
+    struct stp_bpdu* stp;
+    unsigned int hello;
+    int rc;
 
-	/* Sanity check */
-	if ( iob_len ( iobuf ) < sizeof ( *stp ) ) {
-		DBGC ( netdev, "STP %s received underlength packet (%zd "
-		       "bytes):\n", netdev->name, iob_len ( iobuf ) );
-		DBGC_HDA ( netdev, 0, iobuf->data, iob_len ( iobuf ) );
-		rc = -EINVAL;
-		goto done;
-	}
-	stp = iobuf->data;
+    /* Sanity check */
+    if (iob_len(iobuf) < sizeof(*stp)) {
+        DBGC(netdev, "STP %s received underlength packet (%zd "
+                     "bytes):\n", netdev->name, iob_len(iobuf));
+        DBGC_HDA(netdev, 0, iobuf->data, iob_len(iobuf));
+        rc = -EINVAL;
+        goto done;
+    }
+    stp = iobuf->data;
 
-	/* Ignore non-RSTP packets */
-	if ( stp->protocol != htons ( STP_PROTOCOL ) ) {
-		DBGC ( netdev, "STP %s ignoring non-STP packet (protocol "
-		       "%#04x)\n", netdev->name, ntohs ( stp->protocol ) );
-		rc = -ENOTSUP_PROTOCOL;
-		goto done;
-	}
-	if ( stp->version < STP_VERSION_RSTP ) {
-		DBGC ( netdev, "STP %s received legacy STP packet (version "
-		       "%#02x)\n", netdev->name, stp->version );
-		rc = -ENOTSUP_VERSION;
-		goto done;
-	}
-	if ( stp->type != STP_TYPE_RSTP ) {
-		DBGC ( netdev, "STP %s received non-RSTP packet (type %#02x)\n",
-		       netdev->name, stp->type );
-		rc = -ENOTSUP_TYPE;
-		goto done;
-	}
+    /* Ignore non-RSTP packets */
+    if (stp->protocol != htons(STP_PROTOCOL)) {
+        DBGC(netdev, "STP %s ignoring non-STP packet (protocol "
+                     "%#04x)\n", netdev->name, ntohs(stp->protocol));
+        rc = -ENOTSUP_PROTOCOL;
+        goto done;
+    }
+    if (stp->version < STP_VERSION_RSTP) {
+        DBGC(netdev, "STP %s received legacy STP packet (version "
+                     "%#02x)\n", netdev->name, stp->version);
+        rc = -ENOTSUP_VERSION;
+        goto done;
+    }
+    if (stp->type != STP_TYPE_RSTP) {
+        DBGC(netdev, "STP %s received non-RSTP packet (type %#02x)\n",
+             netdev->name, stp->type);
+        rc = -ENOTSUP_TYPE;
+        goto done;
+    }
 
-	/* Dump information */
-	DBGC2 ( netdev, "STP %s %s port %#04x flags %#02x hello %d delay %d\n",
-		netdev->name, eth_ntoa ( stp->sender.mac ), ntohs ( stp->port ),
-		stp->flags, ntohs ( stp->hello ), ntohs ( stp->delay ) );
+    /* Dump information */
+    DBGC2(netdev, "STP %s %s port %#04x flags %#02x hello %d delay %d\n",
+          netdev->name, eth_ntoa(stp->sender.mac), ntohs(stp->port),
+          stp->flags, ntohs(stp->hello), ntohs(stp->delay));
 
-	/* Check if port is forwarding */
-	if ( ! ( stp->flags & STP_FL_FORWARDING ) ) {
-		/* Port is not forwarding: block link for two hello times */
-		DBGC ( netdev, "STP %s %s port %#04x flags %#02x is not "
-		       "forwarding\n",
-		       netdev->name, eth_ntoa ( stp->sender.mac ),
-		       ntohs ( stp->port ), stp->flags );
-		hello = ( ntohs ( stp->hello ) * ( TICKS_PER_SEC / 256 ) );
-		netdev_link_block ( netdev, ( hello * 2 ) );
-		rc = -ENETUNREACH;
-		goto done;
-	}
+    /* Check if port is forwarding */
+    if (!(stp->flags & STP_FL_FORWARDING)) {
+        /* Port is not forwarding: block link for two hello times */
+        DBGC(netdev, "STP %s %s port %#04x flags %#02x is not "
+                     "forwarding\n",
+             netdev->name, eth_ntoa(stp->sender.mac),
+             ntohs(stp->port), stp->flags);
+        hello = (ntohs(stp->hello) * (TICKS_PER_SEC / 256));
+        netdev_link_block(netdev, (hello * 2));
+        rc = -ENETUNREACH;
+        goto done;
+    }
 
-	/* Success */
-	if ( netdev_link_blocked ( netdev ) ) {
-		DBGC ( netdev, "STP %s %s port %#04x flags %#02x is "
-		       "forwarding\n",
-		       netdev->name, eth_ntoa ( stp->sender.mac ),
-		       ntohs ( stp->port ), stp->flags );
-	}
-	netdev_link_unblock ( netdev );
-	rc = 0;
+    /* Success */
+    if (netdev_link_blocked(netdev)) {
+        DBGC(netdev, "STP %s %s port %#04x flags %#02x is "
+                     "forwarding\n",
+             netdev->name, eth_ntoa(stp->sender.mac),
+             ntohs(stp->port), stp->flags);
+    }
+    netdev_link_unblock(netdev);
+    rc = 0;
 
- done:
-	free_iob ( iobuf );
-	return rc;
+done:
+    free_iob(iobuf);
+    return rc;
 }
 
 /**
@@ -139,14 +139,14 @@ static int stp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
  *
  * This operation is meaningless for the STP protocol.
  */
-static const char * stp_ntoa ( const void *net_addr __unused ) {
-	return "<STP>";
+static const char* stp_ntoa(const void* net_addr __unused) {
+    return "<STP>";
 }
 
 /** STP network protocol */
 struct net_protocol stp_protocol __net_protocol = {
-	.name = "STP",
-	.net_proto = htons ( ETH_P_STP ),
-	.rx = stp_rx,
-	.ntoa = stp_ntoa,
+    .name = "STP",
+    .net_proto = htons(ETH_P_STP),
+    .rx = stp_rx,
+    .ntoa = stp_ntoa,
 };

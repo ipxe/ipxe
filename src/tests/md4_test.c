@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -39,38 +39,37 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include "digest_test.h"
 
 /* Empty test vector */
-DIGEST_TEST ( md4_empty, &md4_algorithm, DIGEST_EMPTY,
-	      DIGEST ( 0x31, 0xd6, 0xcf, 0xe0, 0xd1, 0x6a, 0xe9, 0x31, 0xb7,
-		       0x3c, 0x59, 0xd7, 0xe0, 0xc0, 0x89, 0xc0 ) );
+DIGEST_TEST(md4_empty, &md4_algorithm, DIGEST_EMPTY,
+            DIGEST(0x31, 0xd6, 0xcf, 0xe0, 0xd1, 0x6a, 0xe9, 0x31, 0xb7,
+                   0x3c, 0x59, 0xd7, 0xe0, 0xc0, 0x89, 0xc0));
 
 /* NIST test vector "abc" */
-DIGEST_TEST ( md4_nist_abc, &md4_algorithm, DIGEST_NIST_ABC,
-	      DIGEST ( 0xa4, 0x48, 0x01, 0x7a, 0xaf, 0x21, 0xd8, 0x52, 0x5f,
-		       0xc1, 0x0a, 0xe8, 0x7a, 0xa6, 0x72, 0x9d ) );
+DIGEST_TEST(md4_nist_abc, &md4_algorithm, DIGEST_NIST_ABC,
+            DIGEST(0xa4, 0x48, 0x01, 0x7a, 0xaf, 0x21, 0xd8, 0x52, 0x5f,
+                   0xc1, 0x0a, 0xe8, 0x7a, 0xa6, 0x72, 0x9d));
 
 /* NIST test vector "abc...opq" */
-DIGEST_TEST ( md4_nist_abc_opq, &md4_algorithm, DIGEST_NIST_ABC_OPQ,
-	      DIGEST ( 0x46, 0x91, 0xa9, 0xec, 0x81, 0xb1, 0xa6, 0xbd, 0x1a,
-		       0xb8, 0x55, 0x72, 0x40, 0xb2, 0x45, 0xc5 ) );
+DIGEST_TEST(md4_nist_abc_opq, &md4_algorithm, DIGEST_NIST_ABC_OPQ,
+            DIGEST(0x46, 0x91, 0xa9, 0xec, 0x81, 0xb1, 0xa6, 0xbd, 0x1a,
+                   0xb8, 0x55, 0x72, 0x40, 0xb2, 0x45, 0xc5));
 
 /**
  * Perform MD4 self-test
  *
  */
-static void md4_test_exec ( void ) {
+static void md4_test_exec(void) {
+    /* Correctness tests */
+    digest_ok(&md4_empty);
+    digest_ok(&md4_nist_abc);
+    digest_ok(&md4_nist_abc_opq);
 
-	/* Correctness tests */
-	digest_ok ( &md4_empty );
-	digest_ok ( &md4_nist_abc );
-	digest_ok ( &md4_nist_abc_opq );
-
-	/* Speed tests */
-	DBG ( "MD4 required %ld cycles per byte\n",
-	      digest_cost ( &md4_algorithm ) );
+    /* Speed tests */
+    DBG("MD4 required %ld cycles per byte\n",
+        digest_cost(&md4_algorithm));
 }
 
 /** MD4 self-test */
 struct self_test md4_test __self_test = {
-	.name = "md4",
-	.exec = md4_test_exec,
+    .name = "md4",
+    .exec = md4_test_exec,
 };

@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_ACPIPWR_H
-#define _IPXE_ACPIPWR_H
+    #define _IPXE_ACPIPWR_H
 
 /** @file
  *
@@ -7,8 +9,8 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-extern int acpi_poweroff ( void );
+extern int acpi_poweroff(void);
 
 #endif /* _IPXE_ACPIPWR_H */

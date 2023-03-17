@@ -565,7 +565,7 @@ EOM
     return join("\n", @output);
 }
 
-# Output NIC list in DokuWiki format (for http://ipxe.org)
+# Output NIC list in DokuWiki format (for https://ipxe.org)
 sub format_nic_list_dokuwiki {
     my ($nic_list, $column_names) = @_;
     my @output;

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdlib.h>
 #include <errno.h>
@@ -48,22 +48,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * The caller is responsible for eventually calling free() on the
  * allocated ASN.1 cursor.
  */
-static int der_asn1 ( struct image *image, size_t offset __unused,
-		      struct asn1_cursor **cursor ) {
-	void *data;
+static int der_asn1(struct image* image, size_t offset __unused,
+                    struct asn1_cursor** cursor) {
+    void* data;
 
-	/* Allocate cursor and data buffer */
-	*cursor = malloc ( sizeof ( **cursor ) + image->len );
-	if ( ! *cursor )
-		return -ENOMEM;
-	data = ( ( ( void * ) *cursor ) + sizeof ( **cursor ) );
+    /* Allocate cursor and data buffer */
+    *cursor = malloc(sizeof(**cursor) + image->len);
+    if (!*cursor)
+        return -ENOMEM;
+    data = (((void*)*cursor) + sizeof(**cursor));
 
-	/* Populate cursor and data buffer */
-	(*cursor)->data = data;
-	(*cursor)->len = image->len;
-	copy_from_user ( data, image->data, 0, image->len );
+    /* Populate cursor and data buffer */
+    (*cursor)->data = data;
+    (*cursor)->len = image->len;
+    copy_from_user(data, image->data, 0, image->len);
 
-	return image->len;
+    return image->len;
 }
 
 /**
@@ -72,49 +72,49 @@ static int der_asn1 ( struct image *image, size_t offset __unused,
  * @v image		DER image
  * @ret rc		Return status code
  */
-static int der_probe ( struct image *image ) {
-	struct asn1_cursor cursor;
-	uint8_t buf[8];
-	size_t extra;
-	size_t total;
-	int len;
-	int rc;
+static int der_probe(struct image* image) {
+    struct asn1_cursor cursor;
+    uint8_t buf[8];
+    size_t extra;
+    size_t total;
+    int len;
+    int rc;
 
-	/* Sanity check: no realistic DER image can be smaller than this */
-	if ( image->len < sizeof ( buf ) )
-		return -ENOEXEC;
+    /* Sanity check: no realistic DER image can be smaller than this */
+    if (image->len < sizeof(buf))
+        return -ENOEXEC;
 
-	/* Prepare partial cursor */
-	cursor.data = buf;
-	cursor.len = sizeof ( buf );
-	copy_from_user ( buf, image->data, 0, sizeof ( buf ) );
-	extra = ( image->len - sizeof ( buf ) );
+    /* Prepare partial cursor */
+    cursor.data = buf;
+    cursor.len = sizeof(buf);
+    copy_from_user(buf, image->data, 0, sizeof(buf));
+    extra = (image->len - sizeof(buf));
 
-	/* Get length of ASN.1 sequence */
-	len = asn1_start ( &cursor, ASN1_SEQUENCE, extra );
-	if ( len < 0 ) {
-		rc = len;
-		DBGC ( image, "DER %s is not valid ASN.1: %s\n",
-		       image->name, strerror ( rc ) );
-		return rc;
-	}
+    /* Get length of ASN.1 sequence */
+    len = asn1_start(&cursor, ASN1_SEQUENCE, extra);
+    if (len < 0) {
+        rc = len;
+        DBGC(image, "DER %s is not valid ASN.1: %s\n",
+             image->name, strerror(rc));
+        return rc;
+    }
 
-	/* Add length of tag and length bytes consumed by asn1_start() */
-	total = ( len + ( cursor.data - ( ( void * ) buf ) ) );
-	assert ( total <= image->len );
+    /* Add length of tag and length bytes consumed by asn1_start() */
+    total = (len + (cursor.data - ((void*)buf)));
+    assert(total <= image->len);
 
-	/* Check that image comprises a single well-formed ASN.1 object */
-	if ( total != image->len ) {
-		DBGC ( image, "DER %s is not single ASN.1\n", image->name );
-		return -ENOEXEC;
-	}
+    /* Check that image comprises a single well-formed ASN.1 object */
+    if (total != image->len) {
+        DBGC(image, "DER %s is not single ASN.1\n", image->name);
+        return -ENOEXEC;
+    }
 
-	return 0;
+    return 0;
 }
 
 /** DER image type */
-struct image_type der_image_type __image_type ( PROBE_NORMAL ) = {
-	.name = "DER",
-	.probe = der_probe,
-	.asn1 = der_asn1,
+struct image_type der_image_type __image_type(PROBE_NORMAL) = {
+    .name = "DER",
+    .probe = der_probe,
+    .asn1 = der_asn1,
 };

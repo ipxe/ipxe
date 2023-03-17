@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -59,22 +59,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Method described in ANS X9.82 Part 1-2006 Section 9.2.1 (NIST SP
  * 800-90 Section B.5.1.1).
  */
-int get_random_nz ( void *data, size_t len ) {
-	uint8_t *bytes = data;
-	int rc;
+int get_random_nz(void* data, size_t len) {
+    uint8_t* bytes = data;
+    int rc;
 
-	while ( len ) {
+    while (len) {
+        /* Generate random byte */
+        if ((rc = rbg_generate(NULL, 0, 0, bytes, 1)) != 0)
+            return rc;
 
-		/* Generate random byte */
-		if ( ( rc = rbg_generate ( NULL, 0, 0, bytes, 1 ) ) != 0 )
-			return rc;
+        /* Move to next byte if this byte is acceptable */
+        if (*bytes != 0) {
+            bytes++;
+            len--;
+        }
+    }
 
-		/* Move to next byte if this byte is acceptable */
-		if ( *bytes != 0 ) {
-			bytes++;
-			len--;
-		}
-	}
-
-	return 0;
+    return 0;
 }

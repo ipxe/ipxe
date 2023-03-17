@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdio.h>
 #include <errno.h>
@@ -45,7 +45,7 @@ static struct option_descriptor ibstat_opts[] = {};
 
 /** "ibstat" command descriptor */
 static struct command_descriptor ibstat_cmd =
-	COMMAND_DESC ( struct ibstat_options, ibstat_opts, 0, 0, "" );
+    COMMAND_DESC(struct ibstat_options, ibstat_opts, 0, 0, "");
 
 /**
  * The "ibstat" command
@@ -54,26 +54,26 @@ static struct command_descriptor ibstat_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int ibstat_exec ( int argc, char **argv ) {
-	struct ibstat_options opts;
-	struct ib_device *ibdev;
-	int rc;
+static int ibstat_exec(int argc, char** argv) {
+    struct ibstat_options opts;
+    struct ib_device* ibdev;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &ibstat_cmd, &opts ) ) != 0 )
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &ibstat_cmd, &opts)) != 0)
+        return rc;
 
-	/* Show all Infiniband devices */
-	for_each_ibdev ( ibdev )
-		ibstat ( ibdev );
+    /* Show all Infiniband devices */
+    for_each_ibdev(ibdev)
+        ibstat(ibdev);
 
-	return 0;
+    return 0;
 }
 
 /** Infiniband commands */
 struct command ibmgmt_commands[] __command = {
-	{
-		.name = "ibstat",
-		.exec = ibstat_exec,
-	},
+    {
+        .name = "ibstat",
+        .exec = ibstat_exec,
+    },
 };

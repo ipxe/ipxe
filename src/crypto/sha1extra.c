@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 #include <string.h>
 #include <ipxe/crypto.h>
@@ -41,43 +41,43 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * 8.5.5.1. EAP-FAST uses a different SHA1-based PRF, and TLS uses an
  * MD5-based PRF.
  */
-void prf_sha1 ( const void *key, size_t key_len, const char *label,
-		const void *data, size_t data_len, void *prf, size_t prf_len )
+void prf_sha1(const void* key, size_t key_len, const char* label,
+              const void* data, size_t data_len, void* prf, size_t prf_len)
 {
-	u32 blk;
-	u8 keym[key_len];	/* modifiable copy of key */
-	u8 in[strlen ( label ) + 1 + data_len + 1]; /* message to HMAC */
-	u8 *in_blknr;		/* pointer to last byte of in, block number */
-	u8 out[SHA1_DIGEST_SIZE]; /* HMAC-SHA1 result */
-	u8 sha1_ctx[SHA1_CTX_SIZE]; /* SHA1 context */
-	const size_t label_len = strlen ( label );
+    u32 blk;
+    u8 keym[key_len];                        /* modifiable copy of key */
+    u8 in[strlen(label) + 1 + data_len + 1]; /* message to HMAC */
+    u8* in_blknr;                            /* pointer to last byte of in, block number */
+    u8 out[SHA1_DIGEST_SIZE];                /* HMAC-SHA1 result */
+    u8 ctx[SHA1_CTX_SIZE + SHA1_BLOCK_SIZE]; /* HMAC-SHA1 context */
+    const size_t label_len = strlen(label);
 
-	/* The HMAC-SHA-1 is calculated using the given key on the
-	   message text `label', followed by a NUL, followed by one
-	   byte indicating the block number (0 for first). */
+    /* The HMAC-SHA-1 is calculated using the given key on the
+       message text `label', followed by a NUL, followed by one
+       byte indicating the block number (0 for first). */
 
-	memcpy ( keym, key, key_len );
+    memcpy(keym, key, key_len);
 
-	memcpy ( in, label, strlen ( label ) + 1 );
-	memcpy ( in + label_len + 1, data, data_len );
-	in_blknr = in + label_len + 1 + data_len;
+    memcpy(in, label, strlen(label) + 1);
+    memcpy(in + label_len + 1, data, data_len);
+    in_blknr = in + label_len + 1 + data_len;
 
-	for ( blk = 0 ;; blk++ ) {
-		*in_blknr = blk;
+    for (blk = 0;; blk++) {
+        *in_blknr = blk;
 
-		hmac_init ( &sha1_algorithm, sha1_ctx, keym, &key_len );
-		hmac_update ( &sha1_algorithm, sha1_ctx, in, sizeof ( in ) );
-		hmac_final ( &sha1_algorithm, sha1_ctx, keym, &key_len, out );
+        hmac_init(&sha1_algorithm, ctx, keym, key_len);
+        hmac_update(&sha1_algorithm, ctx, in, sizeof(in));
+        hmac_final(&sha1_algorithm, ctx, out);
 
-		if ( prf_len <= sizeof ( out ) ) {
-			memcpy ( prf, out, prf_len );
-			break;
-		}
+        if (prf_len <= sizeof(out)) {
+            memcpy(prf, out, prf_len);
+            break;
+        }
 
-		memcpy ( prf, out, sizeof ( out ) );
-		prf_len -= sizeof ( out );
-		prf += sizeof ( out );
-	}
+        memcpy(prf, out, sizeof(out));
+        prf_len -= sizeof(out);
+        prf += sizeof(out);
+    }
 }
 
 /**
@@ -93,38 +93,38 @@ void prf_sha1 ( const void *key, size_t key_len, const char *label,
  *
  * The operation of this function is described in RFC 2898.
  */
-static void pbkdf2_sha1_f ( const void *passphrase, size_t pass_len,
-			    const void *salt, size_t salt_len,
-			    int iterations, u32 blocknr, u8 *block )
+static void pbkdf2_sha1_f(const void* passphrase, size_t pass_len,
+                          const void* salt, size_t salt_len,
+                          int iterations, u32 blocknr, u8* block)
 {
-	u8 pass[pass_len];	/* modifiable passphrase */
-	u8 in[salt_len + 4];	/* input buffer to first round */
-	u8 last[SHA1_DIGEST_SIZE]; /* output of round N, input of N+1 */
-	u8 sha1_ctx[SHA1_CTX_SIZE];
-	u8 *next_in = in;	/* changed to `last' after first round */
-	int next_size = sizeof ( in );
-	int i;
-	unsigned int j;
+    u8 pass[pass_len];         /* modifiable passphrase */
+    u8 in[salt_len + 4];       /* input buffer to first round */
+    u8 last[SHA1_DIGEST_SIZE]; /* output of round N, input of N+1 */
+    u8 ctx[SHA1_CTX_SIZE + SHA1_BLOCK_SIZE];
+    u8* next_in = in; /* changed to `last' after first round */
+    int next_size = sizeof(in);
+    int i;
+    unsigned int j;
 
-	blocknr = htonl ( blocknr );
+    blocknr = htonl(blocknr);
 
-	memcpy ( pass, passphrase, pass_len );
-	memcpy ( in, salt, salt_len );
-	memcpy ( in + salt_len, &blocknr, 4 );
-	memset ( block, 0, sizeof ( last ) );
+    memcpy(pass, passphrase, pass_len);
+    memcpy(in, salt, salt_len);
+    memcpy(in + salt_len, &blocknr, 4);
+    memset(block, 0, sizeof(last));
 
-	for ( i = 0; i < iterations; i++ ) {
-		hmac_init ( &sha1_algorithm, sha1_ctx, pass, &pass_len );
-		hmac_update ( &sha1_algorithm, sha1_ctx, next_in, next_size );
-		hmac_final ( &sha1_algorithm, sha1_ctx, pass, &pass_len, last );
+    for (i = 0; i < iterations; i++) {
+        hmac_init(&sha1_algorithm, ctx, pass, pass_len);
+        hmac_update(&sha1_algorithm, ctx, next_in, next_size);
+        hmac_final(&sha1_algorithm, ctx, last);
 
-		for ( j = 0; j < sizeof ( last ); j++ ) {
-			block[j] ^= last[j];
-		}
+        for (j = 0; j < sizeof(last); j++) {
+            block[j] ^= last[j];
+        }
 
-		next_in = last;
-		next_size = sizeof ( last );
-	}
+        next_in = last;
+        next_size = sizeof(last);
+    }
 }
 
 /**
@@ -145,24 +145,24 @@ static void pbkdf2_sha1_f ( const void *passphrase, size_t pass_len,
  *
  * The operation of this function is further described in RFC 2898.
  */
-void pbkdf2_sha1 ( const void *passphrase, size_t pass_len,
-		   const void *salt, size_t salt_len,
-		   int iterations, void *key, size_t key_len )
+void pbkdf2_sha1(const void* passphrase, size_t pass_len,
+                 const void* salt, size_t salt_len,
+                 int iterations, void* key, size_t key_len)
 {
-	u32 blocks = ( key_len + SHA1_DIGEST_SIZE - 1 ) / SHA1_DIGEST_SIZE;
-	u32 blk;
-	u8 buf[SHA1_DIGEST_SIZE];
+    u32 blocks = (key_len + SHA1_DIGEST_SIZE - 1) / SHA1_DIGEST_SIZE;
+    u32 blk;
+    u8 buf[SHA1_DIGEST_SIZE];
 
-	for ( blk = 1; blk <= blocks; blk++ ) {
-		pbkdf2_sha1_f ( passphrase, pass_len, salt, salt_len,
-				iterations, blk, buf );
-		if ( key_len <= sizeof ( buf ) ) {
-			memcpy ( key, buf, key_len );
-			break;
-		}
+    for (blk = 1; blk <= blocks; blk++) {
+        pbkdf2_sha1_f(passphrase, pass_len, salt, salt_len,
+                      iterations, blk, buf);
+        if (key_len <= sizeof(buf)) {
+            memcpy(key, buf, key_len);
+            break;
+        }
 
-		memcpy ( key, buf, sizeof ( buf ) );
-		key_len -= sizeof ( buf );
-		key += sizeof ( buf );
-	}
+        memcpy(key, buf, sizeof(buf));
+        key_len -= sizeof(buf);
+        key += sizeof(buf);
+    }
 }

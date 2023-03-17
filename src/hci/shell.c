@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -50,58 +50,58 @@ static const char shell_prompt[] = PRODUCT_SHORT_NAME "> ";
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int help_exec ( int argc __unused, char **argv __unused ) {
-	struct command *command;
-	unsigned int hpos = 0;
+static int help_exec(int argc __unused, char** argv __unused) {
+    struct command* command;
+    unsigned int hpos = 0;
 
-	printf ( "\nAvailable commands:\n\n" );
-	for_each_table_entry ( command, COMMANDS ) {
-		hpos += printf ( "  %s", command->name );
-		if ( hpos > ( 16 * 4 ) ) {
-			printf ( "\n" );
-			hpos = 0;
-		} else {
-			while ( hpos % 16 ) {
-				printf ( " " );
-				hpos++;
-			}
-		}
-	}
-	printf ( "\n\nType \"<command> --help\" for further information\n\n" );
-	return 0;
+    printf("\nAvailable commands:\n\n");
+    for_each_table_entry(command, COMMANDS) {
+        hpos += printf("  %s", command->name);
+        if (hpos > (16 * 4)) {
+            printf("\n");
+            hpos = 0;
+        } else {
+            while (hpos % 16) {
+                printf(" ");
+                hpos++;
+            }
+        }
+    }
+    printf("\n\nType \"<command> --help\" for further information\n\n");
+    return 0;
 }
 
 /** "help" command */
 struct command help_command __command = {
-	.name = "help",
-	.exec = help_exec,
+    .name = "help",
+    .exec = help_exec,
 };
 
 /**
  * Start command shell
  *
  */
-int shell ( void ) {
-	struct readline_history history;
-	char *line;
-	int rc = 0;
+int shell(void) {
+    struct readline_history history;
+    char* line;
+    int rc = 0;
 
-	/* Initialise shell history */
-	memset ( &history, 0, sizeof ( history ) );
+    /* Initialise shell history */
+    memset(&history, 0, sizeof(history));
 
-	/* Read and execute commands */
-	do {
-		readline_history ( shell_prompt, NULL, &history, &line );
-		if ( line ) {
-			rc = system ( line );
-			free ( line );
-		}
-	} while ( ! shell_stopped ( SHELL_STOP_COMMAND_SEQUENCE ) );
+    /* Read and execute commands */
+    do {
+        readline_history(shell_prompt, NULL, &history, 0, &line);
+        if (line) {
+            rc = system(line);
+            free(line);
+        }
+    } while (!shell_stopped(SHELL_STOP_COMMAND_SEQUENCE));
 
-	/* Discard shell history */
-	history_free ( &history );
+    /* Discard shell history */
+    history_free(&history);
 
-	return rc;
+    return rc;
 }
 
 /** "shell" options */
@@ -112,7 +112,7 @@ static struct option_descriptor shell_opts[] = {};
 
 /** "shell" command descriptor */
 static struct command_descriptor shell_cmd =
-	COMMAND_DESC ( struct shell_options, shell_opts, 0, 0, NULL );
+    COMMAND_DESC(struct shell_options, shell_opts, 0, 0, NULL);
 
 /**
  * "shell" command
@@ -121,23 +121,23 @@ static struct command_descriptor shell_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int shell_exec ( int argc, char **argv ) {
-	struct shell_options opts;
-	int rc;
+static int shell_exec(int argc, char** argv) {
+    struct shell_options opts;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &shell_cmd, &opts ) ) != 0 )
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &shell_cmd, &opts)) != 0)
+        return rc;
 
-	/* Start shell */
-	if ( ( rc = shell() ) != 0 )
-		return rc;
+    /* Start shell */
+    if ((rc = shell()) != 0)
+        return rc;
 
-	return 0;
+    return 0;
 }
 
 /** "shell" command */
 struct command shell_command __command = {
-	.name = "shell",
-	.exec = shell_exec,
+    .name = "shell",
+    .exec = shell_exec,
 };

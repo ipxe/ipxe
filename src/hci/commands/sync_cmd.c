@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <stdio.h>
@@ -38,19 +38,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** "sync" options */
 struct sync_options {
-	/** Timeout */
-	unsigned long timeout;
+    /** Timeout */
+    unsigned long timeout;
 };
 
 /** "sync" option list */
 static struct option_descriptor sync_opts[] = {
-	OPTION_DESC ( "timeout", 't', required_argument,
-		      struct sync_options, timeout, parse_timeout ),
+    OPTION_DESC("timeout", 't', required_argument,
+                struct sync_options, timeout, parse_timeout),
 };
 
 /** "sync" command descriptor */
 static struct command_descriptor sync_cmd =
-	COMMAND_DESC ( struct sync_options, sync_opts, 0, 0, NULL );
+    COMMAND_DESC(struct sync_options, sync_opts, 0, 0, NULL);
 
 /**
  * "sync" command
@@ -59,25 +59,25 @@ static struct command_descriptor sync_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int sync_exec ( int argc, char **argv ) {
-	struct sync_options opts;
-	int rc;
+static int sync_exec(int argc, char** argv) {
+    struct sync_options opts;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &sync_cmd, &opts ) ) != 0 )
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &sync_cmd, &opts)) != 0)
+        return rc;
 
-	/* Wait for pending operations to complete */
-	if ( ( rc = sync ( opts.timeout ) ) != 0 ) {
-		printf ( "Operations did not complete: %s\n", strerror ( rc ) );
-		return rc;
-	}
+    /* Wait for pending operations to complete */
+    if ((rc = sync(opts.timeout)) != 0) {
+        printf("Operations did not complete: %s\n", strerror(rc));
+        return rc;
+    }
 
-	return 0;
+    return 0;
 }
 
 /** Sync commands */
 struct command sync_command __command = {
-	.name = "sync",
-	.exec = sync_exec,
+    .name = "sync",
+    .exec = sync_exec,
 };

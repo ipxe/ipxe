@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -42,61 +42,61 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Perform bit operations self-tests
  *
  */
-static void bitops_test_exec ( void ) {
-	uint8_t bits[32];
+static void bitops_test_exec(void) {
+    uint8_t bits[32];
 
-	/* Initialise bits */
-	memset ( bits, 0, sizeof ( bits ) );
+    /* Initialise bits */
+    memset(bits, 0, sizeof(bits));
 
-	/* Test set_bit() */
-	set_bit ( 0, bits );
-	ok ( bits[0] == 0x01 );
-	set_bit ( 17, bits );
-	ok ( bits[2] == 0x02 );
-	set_bit ( 22, bits );
-	ok ( bits[2] == 0x42 );
-	set_bit ( 22, bits );
-	ok ( bits[2] == 0x42 );
+    /* Test set_bit() */
+    set_bit(0, bits);
+    ok(bits[0] == 0x01);
+    set_bit(17, bits);
+    ok(bits[2] == 0x02);
+    set_bit(22, bits);
+    ok(bits[2] == 0x42);
+    set_bit(22, bits);
+    ok(bits[2] == 0x42);
 
-	/* Test clear_bit() */
-	clear_bit ( 0, bits );
-	ok ( bits[0] == 0x00 );
-	bits[5] = 0xff;
-	clear_bit ( 42, bits );
-	ok ( bits[5] == 0xfb );
-	clear_bit ( 42, bits );
-	ok ( bits[5] == 0xfb );
-	clear_bit ( 44, bits );
-	ok ( bits[5] == 0xeb );
+    /* Test clear_bit() */
+    clear_bit(0, bits);
+    ok(bits[0] == 0x00);
+    bits[5] = 0xff;
+    clear_bit(42, bits);
+    ok(bits[5] == 0xfb);
+    clear_bit(42, bits);
+    ok(bits[5] == 0xfb);
+    clear_bit(44, bits);
+    ok(bits[5] == 0xeb);
 
-	/* Test test_and_set_bit() */
-	ok ( test_and_set_bit ( 0, bits ) == 0 );
-	ok ( bits[0] == 0x01 );
-	ok ( test_and_set_bit ( 0, bits ) != 0 );
-	ok ( bits[0] == 0x01 );
-	ok ( test_and_set_bit ( 69, bits ) == 0 );
-	ok ( bits[8] == 0x20 );
-	ok ( test_and_set_bit ( 69, bits ) != 0 );
-	ok ( bits[8] == 0x20 );
-	ok ( test_and_set_bit ( 69, bits ) != 0 );
-	ok ( bits[8] == 0x20 );
+    /* Test test_and_set_bit() */
+    ok(test_and_set_bit(0, bits) == 0);
+    ok(bits[0] == 0x01);
+    ok(test_and_set_bit(0, bits) != 0);
+    ok(bits[0] == 0x01);
+    ok(test_and_set_bit(69, bits) == 0);
+    ok(bits[8] == 0x20);
+    ok(test_and_set_bit(69, bits) != 0);
+    ok(bits[8] == 0x20);
+    ok(test_and_set_bit(69, bits) != 0);
+    ok(bits[8] == 0x20);
 
-	/* Test test_and_clear_bit() */
-	ok ( test_and_clear_bit ( 0, bits ) != 0 );
-	ok ( bits[0] == 0x00 );
-	ok ( test_and_clear_bit ( 0, bits ) == 0 );
-	ok ( bits[0] == 0x00 );
-	bits[31] = 0xeb;
-	ok ( test_and_clear_bit ( 255, bits ) != 0 );
-	ok ( bits[31] == 0x6b );
-	ok ( test_and_clear_bit ( 255, bits ) == 0 );
-	ok ( bits[31] == 0x6b );
-	ok ( test_and_clear_bit ( 255, bits ) == 0 );
-	ok ( bits[31] == 0x6b );
+    /* Test test_and_clear_bit() */
+    ok(test_and_clear_bit(0, bits) != 0);
+    ok(bits[0] == 0x00);
+    ok(test_and_clear_bit(0, bits) == 0);
+    ok(bits[0] == 0x00);
+    bits[31] = 0xeb;
+    ok(test_and_clear_bit(255, bits) != 0);
+    ok(bits[31] == 0x6b);
+    ok(test_and_clear_bit(255, bits) == 0);
+    ok(bits[31] == 0x6b);
+    ok(test_and_clear_bit(255, bits) == 0);
+    ok(bits[31] == 0x6b);
 }
 
 /** Bit operations self-test */
 struct self_test bitops_test __self_test = {
-	.name = "bitops",
-	.exec = bitops_test_exec,
+    .name = "bitops",
+    .exec = bitops_test_exec,
 };

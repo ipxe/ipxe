@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <stdio.h>
@@ -38,13 +38,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-int pxebs ( struct net_device *netdev, unsigned int pxe_type ) {
-	int rc;
+int pxebs(struct net_device* netdev, unsigned int pxe_type) {
+    int rc;
 
-	/* Perform PXE Boot Server Discovery */
-	printf ( "PXEBS (%s type %d)", netdev->name, pxe_type );
-	if ( ( rc = start_pxebs ( &monojob, netdev, pxe_type ) ) == 0 )
-		rc = monojob_wait ( "", 0 );
+    /* Perform PXE Boot Server Discovery */
+    printf("PXEBS (%s type %d)", netdev->name, pxe_type);
+    if ((rc = start_pxebs(&monojob, netdev, pxe_type)) == 0)
+        rc = monojob_wait("", 0);
 
-	return rc;
+    return rc;
 }

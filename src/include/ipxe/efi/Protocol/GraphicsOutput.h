@@ -1,97 +1,95 @@
+#pragma once
+
 /** @file
   Graphics Output Protocol from the UEFI 2.0 specification.
 
   Abstraction of a very simple graphics device.
 
-  Copyright (c) 2006 - 2012, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __GRAPHICS_OUTPUT_H__
-#define __GRAPHICS_OUTPUT_H__
+    #define __GRAPHICS_OUTPUT_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-#define EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID \
-  { \
-    0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a } \
-  }
+    #define EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID                  \
+        {                                                      \
+            0x9042a9de, 0x23dc, 0x4a38, {                      \
+                0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a \
+            }                                                  \
+        }
 
 typedef struct _EFI_GRAPHICS_OUTPUT_PROTOCOL EFI_GRAPHICS_OUTPUT_PROTOCOL;
 
 typedef struct {
-  UINT32            RedMask;
-  UINT32            GreenMask;
-  UINT32            BlueMask;
-  UINT32            ReservedMask;
+    UINT32 RedMask;
+    UINT32 GreenMask;
+    UINT32 BlueMask;
+    UINT32 ReservedMask;
 } EFI_PIXEL_BITMASK;
 
 typedef enum {
-  ///
-  /// A pixel is 32-bits and byte zero represents red, byte one represents green,
-  /// byte two represents blue, and byte three is reserved. This is the definition
-  /// for the physical frame buffer. The byte values for the red, green, and blue
-  /// components represent the color intensity. This color intensity value range
-  /// from a minimum intensity of 0 to maximum intensity of 255.
-  ///
-  PixelRedGreenBlueReserved8BitPerColor,
-  ///
-  /// A pixel is 32-bits and byte zero represents blue, byte one represents green,
-  /// byte two represents red, and byte three is reserved. This is the definition
-  /// for the physical frame buffer. The byte values for the red, green, and blue
-  /// components represent the color intensity. This color intensity value range
-  /// from a minimum intensity of 0 to maximum intensity of 255.
-  ///
-  PixelBlueGreenRedReserved8BitPerColor,
-  ///
-  /// The Pixel definition of the physical frame buffer.
-  ///
-  PixelBitMask,
-  ///
-  /// This mode does not support a physical frame buffer.
-  ///
-  PixelBltOnly,
-  ///
-  /// Valid EFI_GRAPHICS_PIXEL_FORMAT enum values are less than this value.
-  ///
-  PixelFormatMax
+    ///
+    /// A pixel is 32-bits and byte zero represents red, byte one represents green,
+    /// byte two represents blue, and byte three is reserved. This is the definition
+    /// for the physical frame buffer. The byte values for the red, green, and blue
+    /// components represent the color intensity. This color intensity value range
+    /// from a minimum intensity of 0 to maximum intensity of 255.
+    ///
+    PixelRedGreenBlueReserved8BitPerColor,
+    ///
+    /// A pixel is 32-bits and byte zero represents blue, byte one represents green,
+    /// byte two represents red, and byte three is reserved. This is the definition
+    /// for the physical frame buffer. The byte values for the red, green, and blue
+    /// components represent the color intensity. This color intensity value range
+    /// from a minimum intensity of 0 to maximum intensity of 255.
+    ///
+    PixelBlueGreenRedReserved8BitPerColor,
+    ///
+    /// The Pixel definition of the physical frame buffer.
+    ///
+    PixelBitMask,
+    ///
+    /// This mode does not support a physical frame buffer.
+    ///
+    PixelBltOnly,
+    ///
+    /// Valid EFI_GRAPHICS_PIXEL_FORMAT enum values are less than this value.
+    ///
+    PixelFormatMax
 } EFI_GRAPHICS_PIXEL_FORMAT;
 
 typedef struct {
-  ///
-  /// The version of this data structure. A value of zero represents the
-  /// EFI_GRAPHICS_OUTPUT_MODE_INFORMATION structure as defined in this specification.
-  ///
-  UINT32                     Version;
-  ///
-  /// The size of video screen in pixels in the X dimension.
-  ///
-  UINT32                     HorizontalResolution;
-  ///
-  /// The size of video screen in pixels in the Y dimension.
-  ///
-  UINT32                     VerticalResolution;
-  ///
-  /// Enumeration that defines the physical format of the pixel. A value of PixelBltOnly
-  /// implies that a linear frame buffer is not available for this mode.
-  ///
-  EFI_GRAPHICS_PIXEL_FORMAT  PixelFormat;
-  ///
-  /// This bit-mask is only valid if PixelFormat is set to PixelPixelBitMask.
-  /// A bit being set defines what bits are used for what purpose such as Red, Green, Blue, or Reserved.
-  ///
-  EFI_PIXEL_BITMASK          PixelInformation;
-  ///
-  /// Defines the number of pixel elements per video memory line.
-  ///
-  UINT32                     PixelsPerScanLine;
+    ///
+    /// The version of this data structure. A value of zero represents the
+    /// EFI_GRAPHICS_OUTPUT_MODE_INFORMATION structure as defined in this specification.
+    ///
+    UINT32 Version;
+    ///
+    /// The size of video screen in pixels in the X dimension.
+    ///
+    UINT32 HorizontalResolution;
+    ///
+    /// The size of video screen in pixels in the Y dimension.
+    ///
+    UINT32 VerticalResolution;
+    ///
+    /// Enumeration that defines the physical format of the pixel. A value of PixelBltOnly
+    /// implies that a linear frame buffer is not available for this mode.
+    ///
+    EFI_GRAPHICS_PIXEL_FORMAT PixelFormat;
+    ///
+    /// This bit-mask is only valid if PixelFormat is set to PixelPixelBitMask.
+    /// A bit being set defines what bits are used for what purpose such as Red, Green, Blue, or Reserved.
+    ///
+    EFI_PIXEL_BITMASK PixelInformation;
+    ///
+    /// Defines the number of pixel elements per video memory line.
+    ///
+    UINT32 PixelsPerScanLine;
 } EFI_GRAPHICS_OUTPUT_MODE_INFORMATION;
 
 /**
@@ -108,14 +106,11 @@ typedef struct {
   @retval EFI_INVALID_PARAMETER ModeNumber is not valid.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE)(
-  IN  EFI_GRAPHICS_OUTPUT_PROTOCOL          *This,
-  IN  UINT32                                ModeNumber,
-  OUT UINTN                                 *SizeOfInfo,
-  OUT EFI_GRAPHICS_OUTPUT_MODE_INFORMATION  **Info
-  );
+typedef EFI_STATUS(EFIAPI* EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE)(
+    IN EFI_GRAPHICS_OUTPUT_PROTOCOL* This,
+    IN UINT32 ModeNumber,
+    OUT UINTN* SizeOfInfo,
+    OUT EFI_GRAPHICS_OUTPUT_MODE_INFORMATION** Info);
 
 /**
   Set the video device into the specified mode and clears the visible portions of
@@ -129,66 +124,63 @@ EFI_STATUS
   @retval EFI_UNSUPPORTED   ModeNumber is not supported by this device.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE)(
-  IN  EFI_GRAPHICS_OUTPUT_PROTOCOL *This,
-  IN  UINT32                       ModeNumber
-  );
+typedef EFI_STATUS(EFIAPI* EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE)(
+    IN EFI_GRAPHICS_OUTPUT_PROTOCOL* This,
+    IN UINT32 ModeNumber);
 
 typedef struct {
-  UINT8 Blue;
-  UINT8 Green;
-  UINT8 Red;
-  UINT8 Reserved;
+    UINT8 Blue;
+    UINT8 Green;
+    UINT8 Red;
+    UINT8 Reserved;
 } EFI_GRAPHICS_OUTPUT_BLT_PIXEL;
 
 typedef union {
-  EFI_GRAPHICS_OUTPUT_BLT_PIXEL Pixel;
-  UINT32                        Raw;
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL Pixel;
+    UINT32 Raw;
 } EFI_GRAPHICS_OUTPUT_BLT_PIXEL_UNION;
 
 ///
 /// actions for BltOperations
 ///
 typedef enum {
-  ///
-  /// Write data from the BltBuffer pixel (0, 0)
-  /// directly to every pixel of the video display rectangle
-  /// (DestinationX, DestinationY) (DestinationX + Width, DestinationY + Height).
-  /// Only one pixel will be used from the BltBuffer. Delta is NOT used.
-  ///
-  EfiBltVideoFill,
+    ///
+    /// Write data from the BltBuffer pixel (0, 0)
+    /// directly to every pixel of the video display rectangle
+    /// (DestinationX, DestinationY) (DestinationX + Width, DestinationY + Height).
+    /// Only one pixel will be used from the BltBuffer. Delta is NOT used.
+    ///
+    EfiBltVideoFill,
 
-  ///
-  /// Read data from the video display rectangle
-  /// (SourceX, SourceY) (SourceX + Width, SourceY + Height) and place it in
-  /// the BltBuffer rectangle (DestinationX, DestinationY )
-  /// (DestinationX + Width, DestinationY + Height). If DestinationX or
-  /// DestinationY is not zero then Delta must be set to the length in bytes
-  /// of a row in the BltBuffer.
-  ///
-  EfiBltVideoToBltBuffer,
+    ///
+    /// Read data from the video display rectangle
+    /// (SourceX, SourceY) (SourceX + Width, SourceY + Height) and place it in
+    /// the BltBuffer rectangle (DestinationX, DestinationY )
+    /// (DestinationX + Width, DestinationY + Height). If DestinationX or
+    /// DestinationY is not zero then Delta must be set to the length in bytes
+    /// of a row in the BltBuffer.
+    ///
+    EfiBltVideoToBltBuffer,
 
-  ///
-  /// Write data from the BltBuffer rectangle
-  /// (SourceX, SourceY) (SourceX + Width, SourceY + Height) directly to the
-  /// video display rectangle (DestinationX, DestinationY)
-  /// (DestinationX + Width, DestinationY + Height). If SourceX or SourceY is
-  /// not zero then Delta must be set to the length in bytes of a row in the
-  /// BltBuffer.
-  ///
-  EfiBltBufferToVideo,
+    ///
+    /// Write data from the BltBuffer rectangle
+    /// (SourceX, SourceY) (SourceX + Width, SourceY + Height) directly to the
+    /// video display rectangle (DestinationX, DestinationY)
+    /// (DestinationX + Width, DestinationY + Height). If SourceX or SourceY is
+    /// not zero then Delta must be set to the length in bytes of a row in the
+    /// BltBuffer.
+    ///
+    EfiBltBufferToVideo,
 
-  ///
-  /// Copy from the video display rectangle (SourceX, SourceY)
-  /// (SourceX + Width, SourceY + Height) to the video display rectangle
-  /// (DestinationX, DestinationY) (DestinationX + Width, DestinationY + Height).
-  /// The BltBuffer and Delta are not used in this mode.
-  ///
-  EfiBltVideoToVideo,
+    ///
+    /// Copy from the video display rectangle (SourceX, SourceY)
+    /// (SourceX + Width, SourceY + Height) to the video display rectangle
+    /// (DestinationX, DestinationY) (DestinationX + Width, DestinationY + Height).
+    /// The BltBuffer and Delta are not used in this mode.
+    ///
+    EfiBltVideoToVideo,
 
-  EfiGraphicsOutputBltOperationMax
+    EfiGraphicsOutputBltOperationMax
 } EFI_GRAPHICS_OUTPUT_BLT_OPERATION;
 
 /**
@@ -214,48 +206,45 @@ typedef enum {
   @retval EFI_DEVICE_ERROR      The device had an error and could not complete the request.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT)(
-  IN  EFI_GRAPHICS_OUTPUT_PROTOCOL            *This,
-  IN  EFI_GRAPHICS_OUTPUT_BLT_PIXEL           *BltBuffer,   OPTIONAL
-  IN  EFI_GRAPHICS_OUTPUT_BLT_OPERATION       BltOperation,
-  IN  UINTN                                   SourceX,
-  IN  UINTN                                   SourceY,
-  IN  UINTN                                   DestinationX,
-  IN  UINTN                                   DestinationY,
-  IN  UINTN                                   Width,
-  IN  UINTN                                   Height,
-  IN  UINTN                                   Delta         OPTIONAL
-  );
+typedef EFI_STATUS(EFIAPI* EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT)(
+    IN EFI_GRAPHICS_OUTPUT_PROTOCOL* This,
+    IN EFI_GRAPHICS_OUTPUT_BLT_PIXEL* BltBuffer OPTIONAL,
+    IN EFI_GRAPHICS_OUTPUT_BLT_OPERATION BltOperation,
+    IN UINTN SourceX,
+    IN UINTN SourceY,
+    IN UINTN DestinationX,
+    IN UINTN DestinationY,
+    IN UINTN Width,
+    IN UINTN Height,
+    IN UINTN Delta OPTIONAL);
 
 typedef struct {
-  ///
-  /// The number of modes supported by QueryMode() and SetMode().
-  ///
-  UINT32                                 MaxMode;
-  ///
-  /// Current Mode of the graphics device. Valid mode numbers are 0 to MaxMode -1.
-  ///
-  UINT32                                 Mode;
-  ///
-  /// Pointer to read-only EFI_GRAPHICS_OUTPUT_MODE_INFORMATION data.
-  ///
-  EFI_GRAPHICS_OUTPUT_MODE_INFORMATION   *Info;
-  ///
-  /// Size of Info structure in bytes.
-  ///
-  UINTN                                  SizeOfInfo;
-  ///
-  /// Base address of graphics linear frame buffer.
-  /// Offset zero in FrameBufferBase represents the upper left pixel of the display.
-  ///
-  EFI_PHYSICAL_ADDRESS                   FrameBufferBase;
-  ///
-  /// Amount of frame buffer needed to support the active mode as defined by
-  /// PixelsPerScanLine xVerticalResolution x PixelElementSize.
-  ///
-  UINTN                                  FrameBufferSize;
+    ///
+    /// The number of modes supported by QueryMode() and SetMode().
+    ///
+    UINT32 MaxMode;
+    ///
+    /// Current Mode of the graphics device. Valid mode numbers are 0 to MaxMode -1.
+    ///
+    UINT32 Mode;
+    ///
+    /// Pointer to read-only EFI_GRAPHICS_OUTPUT_MODE_INFORMATION data.
+    ///
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* Info;
+    ///
+    /// Size of Info structure in bytes.
+    ///
+    UINTN SizeOfInfo;
+    ///
+    /// Base address of graphics linear frame buffer.
+    /// Offset zero in FrameBufferBase represents the upper left pixel of the display.
+    ///
+    EFI_PHYSICAL_ADDRESS FrameBufferBase;
+    ///
+    /// Amount of frame buffer needed to support the active mode as defined by
+    /// PixelsPerScanLine xVerticalResolution x PixelElementSize.
+    ///
+    UINTN FrameBufferSize;
 } EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE;
 
 ///
@@ -264,13 +253,13 @@ typedef struct {
 /// frame buffer is also exposed so software can write directly to the video hardware.
 ///
 struct _EFI_GRAPHICS_OUTPUT_PROTOCOL {
-  EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE  QueryMode;
-  EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE    SetMode;
-  EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT         Blt;
-  ///
-  /// Pointer to EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE data.
-  ///
-  EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE        *Mode;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE QueryMode;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE SetMode;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT Blt;
+    ///
+    /// Pointer to EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE data.
+    ///
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE* Mode;
 };
 
 extern EFI_GUID gEfiGraphicsOutputProtocolGuid;

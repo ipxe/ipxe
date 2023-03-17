@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -42,7 +42,7 @@ static struct option_descriptor nstat_opts[] = {};
 
 /** "nstat" command descriptor */
 static struct command_descriptor nstat_cmd =
-	COMMAND_DESC ( struct nstat_options, nstat_opts, 0, 0, NULL );
+    COMMAND_DESC(struct nstat_options, nstat_opts, 0, 0, NULL);
 
 /**
  * The "nstat" command
@@ -51,23 +51,23 @@ static struct command_descriptor nstat_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int nstat_exec ( int argc, char **argv ) {
-	struct nstat_options opts;
-	int rc;
+static int nstat_exec(int argc, char** argv) {
+    struct nstat_options opts;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &nstat_cmd, &opts ) ) != 0)
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &nstat_cmd, &opts)) != 0)
+        return rc;
 
-	nstat();
+    nstat();
 
-	return 0;
+    return 0;
 }
 
 /** Neighbour management commands */
 struct command neighbour_commands[] __command = {
-	{
-		.name = "nstat",
-		.exec = nstat_exec,
-	},
+    {
+        .name = "nstat",
+        .exec = nstat_exec,
+    },
 };

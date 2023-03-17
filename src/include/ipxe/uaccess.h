@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_UACCESS_H
-#define _IPXE_UACCESS_H
+    #define _IPXE_UACCESS_H
 
 /**
  * @file
@@ -19,12 +21,12 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <stdint.h>
-#include <string.h>
-#include <ipxe/api.h>
-#include <config/ioapi.h>
+    #include <stdint.h>
+    #include <string.h>
+    #include <ipxe/api.h>
+    #include <config/ioapi.h>
 
 /**
  * A pointer to a user buffer
@@ -32,8 +34,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 typedef unsigned long userptr_t;
 
-/** Equivalent of NULL for user pointers */
-#define UNULL ( ( userptr_t ) 0 )
+    /** Equivalent of NULL for user pointers */
+    #define UNULL ((userptr_t)0)
 
 /**
  * @defgroup uaccess_trivial Trivial user access API implementations
@@ -52,8 +54,8 @@ typedef unsigned long userptr_t;
  * @ret userptr		User pointer
  */
 static inline __always_inline userptr_t
-trivial_virt_to_user ( volatile const void *addr ) {
-	return ( ( userptr_t ) addr );
+trivial_virt_to_user(volatile const void* addr) {
+    return ((userptr_t)addr);
 }
 
 /**
@@ -65,9 +67,9 @@ trivial_virt_to_user ( volatile const void *addr ) {
  *
  * This operation is not available under all memory models.
  */
-static inline __always_inline void *
-trivial_user_to_virt ( userptr_t userptr, off_t offset ) {
-	return ( ( void * ) userptr + offset );
+static inline __always_inline void*
+trivial_user_to_virt(userptr_t userptr, off_t offset) {
+    return ((void*)userptr + offset);
 }
 
 /**
@@ -78,8 +80,8 @@ trivial_user_to_virt ( userptr_t userptr, off_t offset ) {
  * @ret userptr		New pointer value
  */
 static inline __always_inline userptr_t
-trivial_userptr_add ( userptr_t userptr, off_t offset ) {
-	return ( userptr + offset );
+trivial_userptr_add(userptr_t userptr, off_t offset) {
+    return (userptr + offset);
 }
 
 /**
@@ -90,8 +92,8 @@ trivial_userptr_add ( userptr_t userptr, off_t offset ) {
  * @ret offset		Offset
  */
 static inline __always_inline off_t
-trivial_userptr_sub ( userptr_t userptr, userptr_t subtrahend ) {
-	return ( userptr - subtrahend );
+trivial_userptr_sub(userptr_t userptr, userptr_t subtrahend) {
+    return (userptr - subtrahend);
 }
 
 /**
@@ -104,10 +106,10 @@ trivial_userptr_sub ( userptr_t userptr, userptr_t subtrahend ) {
  * @v len		Length
  */
 static inline __always_inline void
-trivial_memcpy_user ( userptr_t dest, off_t dest_off,
-		      userptr_t src, off_t src_off, size_t len ) {
-	memcpy ( ( ( void * ) dest + dest_off ),
-		 ( ( void * ) src + src_off ), len );
+trivial_memcpy_user(userptr_t dest, off_t dest_off,
+                    userptr_t src, off_t src_off, size_t len) {
+    memcpy(((void*)dest + dest_off),
+           ((void*)src + src_off), len);
 }
 
 /**
@@ -120,10 +122,10 @@ trivial_memcpy_user ( userptr_t dest, off_t dest_off,
  * @v len		Length
  */
 static inline __always_inline void
-trivial_memmove_user ( userptr_t dest, off_t dest_off,
-		       userptr_t src, off_t src_off, size_t len ) {
-	memmove ( ( ( void * ) dest + dest_off ),
-		  ( ( void * ) src + src_off ), len );
+trivial_memmove_user(userptr_t dest, off_t dest_off,
+                     userptr_t src, off_t src_off, size_t len) {
+    memmove(((void*)dest + dest_off),
+            ((void*)src + src_off), len);
 }
 
 /**
@@ -137,10 +139,10 @@ trivial_memmove_user ( userptr_t dest, off_t dest_off,
  * @ret diff		Difference
  */
 static inline __always_inline int
-trivial_memcmp_user ( userptr_t first, off_t first_off,
-		      userptr_t second, off_t second_off, size_t len ) {
-	return memcmp ( ( ( void * ) first + first_off ),
-			( ( void * ) second + second_off ), len );
+trivial_memcmp_user(userptr_t first, off_t first_off,
+                    userptr_t second, off_t second_off, size_t len) {
+    return memcmp(((void*)first + first_off),
+                  ((void*)second + second_off), len);
 }
 
 /**
@@ -152,8 +154,8 @@ trivial_memcmp_user ( userptr_t first, off_t first_off,
  * @v len		Length
  */
 static inline __always_inline void
-trivial_memset_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
-	memset ( ( ( void * ) buffer + offset ), c, len );
+trivial_memset_user(userptr_t buffer, off_t offset, int c, size_t len) {
+    memset(((void*)buffer + offset), c, len);
 }
 
 /**
@@ -164,8 +166,8 @@ trivial_memset_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
  * @ret len		Length of string (excluding NUL)
  */
 static inline __always_inline size_t
-trivial_strlen_user ( userptr_t buffer, off_t offset ) {
-	return strlen ( ( void * ) buffer + offset );
+trivial_strlen_user(userptr_t buffer, off_t offset) {
+    return strlen((void*)buffer + offset);
 }
 
 /**
@@ -178,50 +180,50 @@ trivial_strlen_user ( userptr_t buffer, off_t offset ) {
  * @ret offset		Offset of character, or <0 if not found
  */
 static inline __always_inline off_t
-trivial_memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
-	void *found;
+trivial_memchr_user(userptr_t buffer, off_t offset, int c, size_t len) {
+    void* found;
 
-	found = memchr ( ( ( void * ) buffer + offset ), c, len );
-	return ( found ? ( found - ( void * ) buffer ) : -1 );
+    found = memchr(((void*)buffer + offset), c, len);
+    return (found ? (found - (void*)buffer) : -1);
 }
 
-/** @} */
+    /** @} */
 
-/**
- * Calculate static inline user access API function name
- *
- * @v _prefix		Subsystem prefix
- * @v _api_func		API function
- * @ret _subsys_func	Subsystem API function
- */
-#define UACCESS_INLINE( _subsys, _api_func ) \
-	SINGLE_API_INLINE ( UACCESS_PREFIX_ ## _subsys, _api_func )
+    /**
+     * Calculate static inline user access API function name
+     *
+     * @v _prefix		Subsystem prefix
+     * @v _api_func		API function
+     * @ret _subsys_func	Subsystem API function
+     */
+    #define UACCESS_INLINE(_subsys, _api_func) \
+        SINGLE_API_INLINE(UACCESS_PREFIX_##_subsys, _api_func)
 
-/**
- * Provide an user access API implementation
- *
- * @v _prefix		Subsystem prefix
- * @v _api_func		API function
- * @v _func		Implementing function
- */
-#define PROVIDE_UACCESS( _subsys, _api_func, _func ) \
-	PROVIDE_SINGLE_API ( UACCESS_PREFIX_ ## _subsys, _api_func, _func )
+    /**
+     * Provide an user access API implementation
+     *
+     * @v _prefix		Subsystem prefix
+     * @v _api_func		API function
+     * @v _func		Implementing function
+     */
+    #define PROVIDE_UACCESS(_subsys, _api_func, _func) \
+        PROVIDE_SINGLE_API(UACCESS_PREFIX_##_subsys, _api_func, _func)
 
-/**
- * Provide a static inline user access API implementation
- *
- * @v _prefix		Subsystem prefix
- * @v _api_func		API function
- */
-#define PROVIDE_UACCESS_INLINE( _subsys, _api_func ) \
-	PROVIDE_SINGLE_API_INLINE ( UACCESS_PREFIX_ ## _subsys, _api_func )
+    /**
+     * Provide a static inline user access API implementation
+     *
+     * @v _prefix		Subsystem prefix
+     * @v _api_func		API function
+     */
+    #define PROVIDE_UACCESS_INLINE(_subsys, _api_func) \
+        PROVIDE_SINGLE_API_INLINE(UACCESS_PREFIX_##_subsys, _api_func)
 
-/* Include all architecture-independent user access API headers */
-#include <ipxe/efi/efi_uaccess.h>
-#include <ipxe/linux/linux_uaccess.h>
+    /* Include all architecture-independent user access API headers */
+    #include <ipxe/efi/efi_uaccess.h>
+    #include <ipxe/linux/linux_uaccess.h>
 
-/* Include all architecture-dependent user access API headers */
-#include <bits/uaccess.h>
+    /* Include all architecture-dependent user access API headers */
+    #include <bits/uaccess.h>
 
 /**
  * Convert physical address to user pointer
@@ -229,7 +231,7 @@ trivial_memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
  * @v phys_addr		Physical address
  * @ret userptr		User pointer
  */
-userptr_t phys_to_user ( unsigned long phys_addr );
+userptr_t phys_to_user(unsigned long phys_addr);
 
 /**
  * Convert user pointer to physical address
@@ -238,7 +240,7 @@ userptr_t phys_to_user ( unsigned long phys_addr );
  * @v offset		Offset from user pointer
  * @ret phys_addr	Physical address
  */
-unsigned long user_to_phys ( userptr_t userptr, off_t offset );
+unsigned long user_to_phys(userptr_t userptr, off_t offset);
 
 /**
  * Convert virtual address to user pointer
@@ -246,7 +248,7 @@ unsigned long user_to_phys ( userptr_t userptr, off_t offset );
  * @v addr		Virtual address
  * @ret userptr		User pointer
  */
-userptr_t virt_to_user ( volatile const void *addr );
+userptr_t virt_to_user(volatile const void* addr);
 
 /**
  * Convert user pointer to virtual address
@@ -257,7 +259,7 @@ userptr_t virt_to_user ( volatile const void *addr );
  *
  * This operation is not available under all memory models.
  */
-void * user_to_virt ( userptr_t userptr, off_t offset );
+void* user_to_virt(userptr_t userptr, off_t offset);
 
 /**
  * Add offset to user pointer
@@ -266,7 +268,7 @@ void * user_to_virt ( userptr_t userptr, off_t offset );
  * @v offset		Offset
  * @ret userptr		New pointer value
  */
-userptr_t userptr_add ( userptr_t userptr, off_t offset );
+userptr_t userptr_add(userptr_t userptr, off_t offset);
 
 /**
  * Subtract user pointers
@@ -275,7 +277,7 @@ userptr_t userptr_add ( userptr_t userptr, off_t offset );
  * @v subtrahend	User pointer to be subtracted
  * @ret offset		Offset
  */
-off_t userptr_sub ( userptr_t userptr, userptr_t subtrahend );
+off_t userptr_sub(userptr_t userptr, userptr_t subtrahend);
 
 /**
  * Convert virtual address to a physical address
@@ -284,8 +286,8 @@ off_t userptr_sub ( userptr_t userptr, userptr_t subtrahend );
  * @ret phys_addr	Physical address
  */
 static inline __always_inline unsigned long
-virt_to_phys ( volatile const void *addr ) {
-	return user_to_phys ( virt_to_user ( addr ), 0 );
+virt_to_phys(volatile const void* addr) {
+    return user_to_phys(virt_to_user(addr), 0);
 }
 
 /**
@@ -296,8 +298,8 @@ virt_to_phys ( volatile const void *addr ) {
  *
  * This operation is not available under all memory models.
  */
-static inline __always_inline void * phys_to_virt ( unsigned long phys_addr ) {
-	return user_to_virt ( phys_to_user ( phys_addr ), 0 );
+static inline __always_inline void* phys_to_virt(unsigned long phys_addr) {
+    return user_to_virt(phys_to_user(phys_addr), 0);
 }
 
 /**
@@ -309,8 +311,8 @@ static inline __always_inline void * phys_to_virt ( unsigned long phys_addr ) {
  * @v src_off		Source offset
  * @v len		Length
  */
-void memcpy_user ( userptr_t dest, off_t dest_off,
-		   userptr_t src, off_t src_off, size_t len );
+void memcpy_user(userptr_t dest, off_t dest_off,
+                 userptr_t src, off_t src_off, size_t len);
 
 /**
  * Copy data to user buffer
@@ -321,8 +323,8 @@ void memcpy_user ( userptr_t dest, off_t dest_off,
  * @v len		Length
  */
 static inline __always_inline void
-copy_to_user ( userptr_t dest, off_t dest_off, const void *src, size_t len ) {
-	memcpy_user ( dest, dest_off, virt_to_user ( src ), 0, len );
+copy_to_user(userptr_t dest, off_t dest_off, const void* src, size_t len) {
+    memcpy_user(dest, dest_off, virt_to_user(src), 0, len);
 }
 
 /**
@@ -334,8 +336,8 @@ copy_to_user ( userptr_t dest, off_t dest_off, const void *src, size_t len ) {
  * @v len		Length
  */
 static inline __always_inline void
-copy_from_user ( void *dest, userptr_t src, off_t src_off, size_t len ) {
-	memcpy_user ( virt_to_user ( dest ), 0, src, src_off, len );
+copy_from_user(void* dest, userptr_t src, off_t src_off, size_t len) {
+    memcpy_user(virt_to_user(dest), 0, src, src_off, len);
 }
 
 /**
@@ -347,8 +349,8 @@ copy_from_user ( void *dest, userptr_t src, off_t src_off, size_t len ) {
  * @v src_off		Source offset
  * @v len		Length
  */
-void memmove_user ( userptr_t dest, off_t dest_off,
-		    userptr_t src, off_t src_off, size_t len );
+void memmove_user(userptr_t dest, off_t dest_off,
+                  userptr_t src, off_t src_off, size_t len);
 
 /**
  * Compare data between user buffers
@@ -360,8 +362,8 @@ void memmove_user ( userptr_t dest, off_t dest_off,
  * @v len		Length
  * @ret diff		Difference
  */
-int memcmp_user ( userptr_t first, off_t first_off,
-		  userptr_t second, off_t second_off, size_t len );
+int memcmp_user(userptr_t first, off_t first_off,
+                userptr_t second, off_t second_off, size_t len);
 
 /**
  * Fill user buffer with a constant byte
@@ -371,7 +373,7 @@ int memcmp_user ( userptr_t first, off_t first_off,
  * @v c			Constant byte with which to fill
  * @v len		Length
  */
-void memset_user ( userptr_t userptr, off_t offset, int c, size_t len );
+void memset_user(userptr_t userptr, off_t offset, int c, size_t len);
 
 /**
  * Find length of NUL-terminated string in user buffer
@@ -380,7 +382,7 @@ void memset_user ( userptr_t userptr, off_t offset, int c, size_t len );
  * @v offset		Offset within buffer
  * @ret len		Length of string (excluding NUL)
  */
-size_t strlen_user ( userptr_t userptr, off_t offset );
+size_t strlen_user(userptr_t userptr, off_t offset);
 
 /**
  * Find character in user buffer
@@ -391,6 +393,6 @@ size_t strlen_user ( userptr_t userptr, off_t offset );
  * @v len		Length of user buffer
  * @ret offset		Offset of character, or <0 if not found
  */
-off_t memchr_user ( userptr_t userptr, off_t offset, int c, size_t len );
+off_t memchr_user(userptr_t userptr, off_t offset, int c, size_t len);
 
 #endif /* _IPXE_UACCESS_H */

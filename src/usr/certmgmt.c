@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdio.h>
 #include <errno.h>
@@ -41,23 +41,23 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v cert		X.509 certificate
  */
-void certstat ( struct x509_certificate *cert ) {
-	struct digest_algorithm *digest = &sha1_algorithm;
-	uint8_t fingerprint[ digest->digestsize ];
-	char buf[ base16_encoded_len ( sizeof ( fingerprint ) ) + 1 /* NUL */ ];
+void certstat(struct x509_certificate* cert) {
+    struct digest_algorithm* digest = &sha1_algorithm;
+    uint8_t fingerprint[digest->digestsize];
+    char buf[base16_encoded_len(sizeof(fingerprint)) + 1 /* NUL */];
 
-	/* Generate fingerprint */
-	x509_fingerprint ( cert, digest, fingerprint );
-	base16_encode ( fingerprint, sizeof ( fingerprint ),
-			buf, sizeof ( buf ) );
+    /* Generate fingerprint */
+    x509_fingerprint(cert, digest, fingerprint);
+    base16_encode(fingerprint, sizeof(fingerprint),
+                  buf, sizeof(buf));
 
-	/* Print certificate status */
-	printf ( "%s : %s", x509_name ( cert ), buf );
-	if ( cert->flags & X509_FL_PERMANENT )
-		printf ( " [PERMANENT]" );
-	if ( cert->flags & X509_FL_EXPLICIT )
-		printf ( " [EXPLICIT]" );
-	if ( x509_is_valid ( cert, NULL ) )
-		printf ( " [VALIDATED]" );
-	printf ( "\n" );
+    /* Print certificate status */
+    printf("%s : %s", x509_name(cert), buf);
+    if (cert->flags & X509_FL_PERMANENT)
+        printf(" [PERMANENT]");
+    if (cert->flags & X509_FL_EXPLICIT)
+        printf(" [EXPLICIT]");
+    if (x509_is_valid(cert, NULL))
+        printf(" [VALIDATED]");
+    printf("\n");
 }

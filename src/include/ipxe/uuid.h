@@ -1,32 +1,34 @@
+#pragma once
+
 #ifndef _IPXE_UUID_H
-#define _IPXE_UUID_H
+    #define _IPXE_UUID_H
 
 /** @file
  *
  * Universally unique IDs
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <stdint.h>
-#include <byteswap.h>
+    #include <stdint.h>
+    #include <byteswap.h>
 
 /** A universally unique ID */
 union uuid {
-	/** Canonical form (00000000-0000-0000-0000-000000000000) */
-	struct {
-		/** 8 hex digits, big-endian */
-		uint32_t a;
-		/** 2 hex digits, big-endian */
-		uint16_t b;
-		/** 2 hex digits, big-endian */
-		uint16_t c;
-		/** 2 hex digits, big-endian */
-		uint16_t d;
-		/** 12 hex digits, big-endian */
-		uint8_t e[6];
-	} canonical;
-	uint8_t raw[16];
+    /** Canonical form (00000000-0000-0000-0000-000000000000) */
+    struct {
+        /** 8 hex digits, big-endian */
+        uint32_t a;
+        /** 2 hex digits, big-endian */
+        uint16_t b;
+        /** 2 hex digits, big-endian */
+        uint16_t c;
+        /** 2 hex digits, big-endian */
+        uint16_t d;
+        /** 12 hex digits, big-endian */
+        uint8_t e[6];
+    } canonical;
+    uint8_t raw[16];
 };
 
 /**
@@ -40,13 +42,12 @@ union uuid {
  * (versions 2.6 and above) treat the first three fields as being
  * little-endian.
  */
-static inline void uuid_mangle ( union uuid *uuid ) {
-
-	__bswap_32s ( &uuid->canonical.a );
-	__bswap_16s ( &uuid->canonical.b );
-	__bswap_16s ( &uuid->canonical.c );
+static inline void uuid_mangle(union uuid* uuid) {
+    __bswap_32s(&uuid->canonical.a);
+    __bswap_16s(&uuid->canonical.b);
+    __bswap_16s(&uuid->canonical.c);
 }
 
-extern const char * uuid_ntoa ( const union uuid *uuid );
+extern const char* uuid_ntoa(const union uuid* uuid);
 
 #endif /* _IPXE_UUID_H */

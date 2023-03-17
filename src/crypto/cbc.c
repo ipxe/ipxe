@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <assert.h>
@@ -41,16 +41,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v dst		Second input data and output data buffer
  * @v len		Length of data
  */
-static void cbc_xor ( const void *src, void *dst, size_t len ) {
-	const uint32_t *srcl = src;
-	uint32_t *dstl = dst;
-	unsigned int i;
+static void cbc_xor(const void* src, void* dst, size_t len) {
+    const uint32_t* srcl = src;
+    uint32_t* dstl = dst;
+    unsigned int i;
 
-	/* Assume that block sizes will always be dword-aligned, for speed */
-	assert ( ( len % sizeof ( *srcl ) ) == 0 );
+    /* Assume that block sizes will always be dword-aligned, for speed */
+    assert((len % sizeof(*srcl)) == 0);
 
-	for ( i = 0 ; i < ( len / sizeof ( *srcl ) ) ; i++ )
-		dstl[i] ^= srcl[i];
+    for (i = 0; i < (len / sizeof(*srcl)); i++)
+        dstl[i] ^= srcl[i];
 }
 
 /**
@@ -63,20 +63,20 @@ static void cbc_xor ( const void *src, void *dst, size_t len ) {
  * @v raw_cipher	Underlying cipher algorithm
  * @v cbc_ctx		CBC context
  */
-void cbc_encrypt ( void *ctx, const void *src, void *dst, size_t len,
-		   struct cipher_algorithm *raw_cipher, void *cbc_ctx ) {
-	size_t blocksize = raw_cipher->blocksize;
+void cbc_encrypt(void* ctx, const void* src, void* dst, size_t len,
+                 struct cipher_algorithm* raw_cipher, void* cbc_ctx) {
+    size_t blocksize = raw_cipher->blocksize;
 
-	assert ( ( len % blocksize ) == 0 );
+    assert((len % blocksize) == 0);
 
-	while ( len ) {
-		cbc_xor ( src, cbc_ctx, blocksize );
-		cipher_encrypt ( raw_cipher, ctx, cbc_ctx, dst, blocksize );
-		memcpy ( cbc_ctx, dst, blocksize );
-		dst += blocksize;
-		src += blocksize;
-		len -= blocksize;
-	}
+    while (len) {
+        cbc_xor(src, cbc_ctx, blocksize);
+        cipher_encrypt(raw_cipher, ctx, cbc_ctx, dst, blocksize);
+        memcpy(cbc_ctx, dst, blocksize);
+        dst += blocksize;
+        src += blocksize;
+        len -= blocksize;
+    }
 }
 
 /**
@@ -89,20 +89,20 @@ void cbc_encrypt ( void *ctx, const void *src, void *dst, size_t len,
  * @v raw_cipher	Underlying cipher algorithm
  * @v cbc_ctx		CBC context
  */
-void cbc_decrypt ( void *ctx, const void *src, void *dst, size_t len,
-		   struct cipher_algorithm *raw_cipher, void *cbc_ctx ) {
-	size_t blocksize = raw_cipher->blocksize;
-	uint8_t next_cbc_ctx[blocksize];
+void cbc_decrypt(void* ctx, const void* src, void* dst, size_t len,
+                 struct cipher_algorithm* raw_cipher, void* cbc_ctx) {
+    size_t blocksize = raw_cipher->blocksize;
+    uint8_t next_cbc_ctx[blocksize];
 
-	assert ( ( len % blocksize ) == 0 );
+    assert((len % blocksize) == 0);
 
-	while ( len ) {
-		memcpy ( next_cbc_ctx, src, blocksize );
-		cipher_decrypt ( raw_cipher, ctx, src, dst, blocksize );
-		cbc_xor ( cbc_ctx, dst, blocksize );
-		memcpy ( cbc_ctx, next_cbc_ctx, blocksize );
-		dst += blocksize;
-		src += blocksize;
-		len -= blocksize;
-	}
+    while (len) {
+        memcpy(next_cbc_ctx, src, blocksize);
+        cipher_decrypt(raw_cipher, ctx, src, dst, blocksize);
+        cbc_xor(cbc_ctx, dst, blocksize);
+        memcpy(cbc_ctx, next_cbc_ctx, blocksize);
+        dst += blocksize;
+        src += blocksize;
+        len -= blocksize;
+    }
 }

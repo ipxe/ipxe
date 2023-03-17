@@ -26,7 +26,7 @@
 #include <ipxe/parseopt.h>
 #include <ipxe/reboot.h>
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -36,19 +36,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** "reboot" options */
 struct reboot_options {
-	/** Perform a warm reboot */
-	int warm;
+    /** Perform a warm reboot */
+    int warm;
 };
 
 /** "reboot" option list */
 static struct option_descriptor reboot_opts[] = {
-	OPTION_DESC ( "warm", 'w', no_argument,
-		      struct reboot_options, warm, parse_flag ),
+    OPTION_DESC("warm", 'w', no_argument,
+                struct reboot_options, warm, parse_flag),
 };
 
 /** "reboot" command descriptor */
 static struct command_descriptor reboot_cmd =
-	COMMAND_DESC ( struct reboot_options, reboot_opts, 0, 0, NULL );
+    COMMAND_DESC(struct reboot_options, reboot_opts, 0, 0, NULL);
 
 /**
  * The "reboot" command
@@ -57,22 +57,22 @@ static struct command_descriptor reboot_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int reboot_exec ( int argc, char **argv ) {
-	struct reboot_options opts;
-	int rc;
+static int reboot_exec(int argc, char** argv) {
+    struct reboot_options opts;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &reboot_cmd, &opts ) ) != 0 )
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &reboot_cmd, &opts)) != 0)
+        return rc;
 
-	/* Reboot system */
-	reboot ( opts.warm );
+    /* Reboot system */
+    reboot(opts.warm);
 
-	return 0;
+    return 0;
 }
 
 /** "reboot" command */
 struct command reboot_command __command = {
-	.name = "reboot",
-	.exec = reboot_exec,
+    .name = "reboot",
+    .exec = reboot_exec,
 };

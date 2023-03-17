@@ -1,14 +1,16 @@
+#pragma once
+
 #ifndef _SYS_TIME_H
-#define _SYS_TIME_H
+    #define _SYS_TIME_H
 
 /** @file
  *
  * Date and time
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <stdint.h>
+    #include <stdint.h>
 
 /** Seconds since the Epoch
  *

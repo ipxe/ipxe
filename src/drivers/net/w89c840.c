@@ -30,7 +30,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 /*
  *              date       version  by   what
@@ -46,7 +46,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *                                       using timer2 routines. Proposed
  *                                       by Ken Yap to eliminate CPU speed
  *                                       dependency.
- *             Dec 12 2003  V0.94   timlegge	Fixed issues in 5.2, removed 
+ *             Dec 12 2003  V0.94   timlegge	Fixed issues in 5.2, removed
  *             					interrupt usage, enabled
  *             					multicast support
  *
@@ -85,11 +85,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/pci.h>
 #include <ipxe/ethernet.h>
 
-static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
+static const char* w89c840_version = "driver Version 0.94 - December 12, 2003";
 
 /* Linux support functions */
-#define virt_to_le32desc(addr)  virt_to_bus(addr)
-#define le32desc_to_virt(addr)  bus_to_virt(addr)
+#define virt_to_le32desc(addr) virt_to_bus(addr)
+#define le32desc_to_virt(addr) bus_to_virt(addr)
 
 /*
 #define cpu_to_le32(val) (val)
@@ -103,21 +103,21 @@ static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
    Making the Tx ring too large decreases the effectiveness of channel
    bonding and packet priority.
    There are no ill effects from too-large receive rings. */
-#define TX_RING_SIZE    2
-#define RX_RING_SIZE    2
+#define TX_RING_SIZE 2
+#define RX_RING_SIZE 2
 
 /* The presumed FIFO size for working around the Tx-FIFO-overflow bug.
    To avoid overflowing we don't queue again until we have room for a
    full-size packet.
  */
 #define TX_FIFO_SIZE (2048)
-#define TX_BUG_FIFO_LIMIT (TX_FIFO_SIZE-1514-16)
+#define TX_BUG_FIFO_LIMIT (TX_FIFO_SIZE - 1514 - 16)
 
 /* Operational parameters that usually are not changed. */
 /* Time in jiffies before concluding the transmitter is hung. */
-#define TX_TIMEOUT  (10*1000)
+#define TX_TIMEOUT (10 * 1000)
 
-#define PKT_BUF_SZ  1536  /* Size of each temporary Rx buffer.*/
+#define PKT_BUF_SZ 1536 /* Size of each temporary Rx buffer.*/
 
 /*
  * Used to be this much CPU loops on Celeron@400 (?),
@@ -126,17 +126,20 @@ static const char *w89c840_version = "driver Version 0.94 - December 12, 2003";
  */
 
 #if !defined(__OPTIMIZE__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
+    #warning You must compile this file with the correct options!
+    #warning See the last lines of the source file.
+    #error You must compile this driver with "-O".
 #endif
 
-enum chip_capability_flags {CanHaveMII=1, HasBrokenTx=2};
+enum chip_capability_flags {
+    CanHaveMII = 1,
+    HasBrokenTx = 2
+};
 
 #ifdef USE_IO_OPS
-#define W840_FLAGS (PCI_USES_IO | PCI_ADDR0 | PCI_USES_MASTER)
+    #define W840_FLAGS (PCI_USES_IO | PCI_ADDR0 | PCI_USES_MASTER)
 #else
-#define W840_FLAGS (PCI_USES_MEM | PCI_ADDR1 | PCI_USES_MASTER)
+    #define W840_FLAGS (PCI_USES_MEM | PCI_ADDR1 | PCI_USES_MASTER)
 #endif
 
 static u32 driver_flags = CanHaveMII | HasBrokenTx;
@@ -146,18 +149,18 @@ static u32 driver_flags = CanHaveMII | HasBrokenTx;
    accesses instead of memory space. */
 
 #ifdef USE_IO_OPS
-#undef readb
-#undef readw
-#undef readl
-#undef writeb
-#undef writew
-#undef writel
-#define readb inb
-#define readw inw
-#define readl inl
-#define writeb outb
-#define writew outw
-#define writel outl
+    #undef readb
+    #undef readw
+    #undef readl
+    #undef writeb
+    #undef writew
+    #undef writel
+    #define readb inb
+    #define readw inw
+    #define readl inl
+    #define writeb outb
+    #define writew outw
+    #define writel outl
 #endif
 
 /* Offsets to the Command and Status Registers, "CSRs".
@@ -167,35 +170,61 @@ static u32 driver_flags = CanHaveMII | HasBrokenTx;
    the driver longer and more difficult to read.
 */
 enum w840_offsets {
-    PCIBusCfg=0x00, TxStartDemand=0x04, RxStartDemand=0x08,
-    RxRingPtr=0x0C, TxRingPtr=0x10,
-    IntrStatus=0x14, NetworkConfig=0x18, IntrEnable=0x1C,
-    RxMissed=0x20, EECtrl=0x24, MIICtrl=0x24, BootRom=0x28, GPTimer=0x2C,
-    CurRxDescAddr=0x30, CurRxBufAddr=0x34,            /* Debug use */
-    MulticastFilter0=0x38, MulticastFilter1=0x3C, StationAddr=0x40,
-    CurTxDescAddr=0x4C, CurTxBufAddr=0x50,
+    PCIBusCfg = 0x00,
+    TxStartDemand = 0x04,
+    RxStartDemand = 0x08,
+    RxRingPtr = 0x0C,
+    TxRingPtr = 0x10,
+    IntrStatus = 0x14,
+    NetworkConfig = 0x18,
+    IntrEnable = 0x1C,
+    RxMissed = 0x20,
+    EECtrl = 0x24,
+    MIICtrl = 0x24,
+    BootRom = 0x28,
+    GPTimer = 0x2C,
+    CurRxDescAddr = 0x30,
+    CurRxBufAddr = 0x34, /* Debug use */
+    MulticastFilter0 = 0x38,
+    MulticastFilter1 = 0x3C,
+    StationAddr = 0x40,
+    CurTxDescAddr = 0x4C,
+    CurTxBufAddr = 0x50,
 };
 
 /* Bits in the interrupt status/enable registers. */
 /* The bits in the Intr Status/Enable registers, mostly interrupt sources. */
 enum intr_status_bits {
-    NormalIntr=0x10000, AbnormalIntr=0x8000,
-    IntrPCIErr=0x2000, TimerInt=0x800,
-    IntrRxDied=0x100, RxNoBuf=0x80, IntrRxDone=0x40,
-    TxFIFOUnderflow=0x20, RxErrIntr=0x10,
-    TxIdle=0x04, IntrTxStopped=0x02, IntrTxDone=0x01,
+    NormalIntr = 0x10000,
+    AbnormalIntr = 0x8000,
+    IntrPCIErr = 0x2000,
+    TimerInt = 0x800,
+    IntrRxDied = 0x100,
+    RxNoBuf = 0x80,
+    IntrRxDone = 0x40,
+    TxFIFOUnderflow = 0x20,
+    RxErrIntr = 0x10,
+    TxIdle = 0x04,
+    IntrTxStopped = 0x02,
+    IntrTxDone = 0x01,
 };
 
 /* Bits in the NetworkConfig register. */
 enum rx_mode_bits {
-    AcceptErr=0x80, AcceptRunt=0x40,
-    AcceptBroadcast=0x20, AcceptMulticast=0x10,
-    AcceptAllPhys=0x08, AcceptMyPhys=0x02,
+    AcceptErr = 0x80,
+    AcceptRunt = 0x40,
+    AcceptBroadcast = 0x20,
+    AcceptMulticast = 0x10,
+    AcceptAllPhys = 0x08,
+    AcceptMyPhys = 0x02,
 };
 
 enum mii_reg_bits {
-    MDIO_ShiftClk=0x10000, MDIO_DataIn=0x80000, MDIO_DataOut=0x20000,
-    MDIO_EnbOutput=0x40000, MDIO_EnbIn = 0x00000,
+    MDIO_ShiftClk = 0x10000,
+    MDIO_DataIn = 0x80000,
+    MDIO_DataOut = 0x20000,
+    MDIO_EnbOutput = 0x40000,
+    MDIO_EnbIn = 0x00000,
 };
 
 /* The Tulip Rx and Tx buffer descriptors. */
@@ -209,58 +238,61 @@ struct w840_rx_desc {
 struct w840_tx_desc {
     s32 status;
     s32 length;
-    u32 buffer1, buffer2;                /* We use only buffer 1.  */
+    u32 buffer1, buffer2; /* We use only buffer 1.  */
 };
 
 /* Bits in network_desc.status */
 enum desc_status_bits {
-    DescOwn=0x80000000, DescEndRing=0x02000000, DescUseLink=0x01000000,
-    DescWholePkt=0x60000000, DescStartPkt=0x20000000, DescEndPkt=0x40000000,
-    DescIntr=0x80000000,
+    DescOwn = 0x80000000,
+    DescEndRing = 0x02000000,
+    DescUseLink = 0x01000000,
+    DescWholePkt = 0x60000000,
+    DescStartPkt = 0x20000000,
+    DescEndPkt = 0x40000000,
+    DescIntr = 0x80000000,
 };
-#define PRIV_ALIGN    15     /* Required alignment mask */
+#define PRIV_ALIGN 15 /* Required alignment mask */
 #define PRIV_ALIGN_BYTES 32
 
-static struct winbond_private
-{
+static struct winbond_private {
     /* Descriptor rings first for alignment. */
     struct w840_rx_desc rx_ring[RX_RING_SIZE];
     struct w840_tx_desc tx_ring[TX_RING_SIZE];
-    struct net_device *next_module;        /* Link for devices of this type. */
-    void *priv_addr;                    /* Unaligned address for kfree */
-    const char *product_name;
+    struct net_device* next_module; /* Link for devices of this type. */
+    void* priv_addr;                /* Unaligned address for kfree */
+    const char* product_name;
     /* Frequently used values: keep some adjacent for cache effect. */
     int chip_id, drv_flags;
-    struct pci_dev *pci_dev;
+    struct pci_dev* pci_dev;
     int csr6;
-    struct w840_rx_desc *rx_head_desc;
-    unsigned int cur_rx, dirty_rx;        /* Producer/consumer ring indices */
-    unsigned int rx_buf_sz;                /* Based on MTU+slack. */
+    struct w840_rx_desc* rx_head_desc;
+    unsigned int cur_rx, dirty_rx; /* Producer/consumer ring indices */
+    unsigned int rx_buf_sz;        /* Based on MTU+slack. */
     unsigned int cur_tx, dirty_tx;
     int tx_q_bytes;
-    unsigned int tx_full:1;                /* The Tx queue is full. */
+    unsigned int tx_full : 1; /* The Tx queue is full. */
     /* These values are keep track of the transceiver/media in use. */
-    unsigned int full_duplex:1;            /* Full-duplex operation requested. */
-    unsigned int duplex_lock:1;
-    unsigned int medialock:1;            /* Do not sense media. */
-    unsigned int default_port:4;        /* Last dev->if_port value. */
+    unsigned int full_duplex : 1; /* Full-duplex operation requested. */
+    unsigned int duplex_lock : 1;
+    unsigned int medialock : 1;    /* Do not sense media. */
+    unsigned int default_port : 4; /* Last dev->if_port value. */
     /* MII transceiver section. */
-    int mii_cnt;                        /* MII device addresses. */
-    u16 advertising;                    /* NWay media advertisement */
-    unsigned char phys[4];                /* MII device addresses. */
-} w840private __attribute__ ((aligned (PRIV_ALIGN_BYTES)));
+    int mii_cnt;           /* MII device addresses. */
+    u16 advertising;       /* NWay media advertisement */
+    unsigned char phys[4]; /* MII device addresses. */
+} w840private __attribute__((aligned(PRIV_ALIGN_BYTES)));
 
 /* NIC specific static variables go here */
 
 static int ioaddr;
-static unsigned short eeprom [0x40];
+static unsigned short eeprom[0x40];
 struct {
-	char        rx_packet[PKT_BUF_SZ * RX_RING_SIZE];
-	char        tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
+    char rx_packet[PKT_BUF_SZ * RX_RING_SIZE];
+    char tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
 } w89c840_buf __shared;
 
-static int  eeprom_read(long ioaddr, int location);
-static int  mdio_read(int base_address, int phy_id, int location);
+static int eeprom_read(long ioaddr, int location);
+static int mdio_read(int base_address, int phy_id, int location);
 #if 0
 static void mdio_write(int base_address, int phy_id, int location, int value);
 #endif
@@ -274,8 +306,10 @@ static void decode_interrupt(u32 intr_status)
 {
     printf("Interrupt status: ");
 
-#define TRACE_INTR(_intr_) \
-    if (intr_status & (_intr_)) { printf (" " #_intr_); }
+    #define TRACE_INTR(_intr_)        \
+        if (intr_status & (_intr_)) { \
+            printf(" " #_intr_);      \
+        }
 
     TRACE_INTR(NormalIntr);
     TRACE_INTR(AbnormalIntr);
@@ -298,7 +332,7 @@ static void decode_interrupt(u32 intr_status)
 /**************************************************************************
 w89c840_reset - Reset adapter
 ***************************************************************************/
-static void w89c840_reset(struct nic *nic)
+static void w89c840_reset(struct nic* nic)
 {
     int i;
 
@@ -358,9 +392,9 @@ static void handle_intr(u32 intr_stat)
         /* There was an abnormal interrupt */
         printf("\n-=- Abnormal interrupt.\n");
 
-#if defined(W89C840_DEBUG)
+    #if defined(W89C840_DEBUG)
         decode_interrupt(intr_stat);
-#endif
+    #endif
 
         if (intr_stat & RxNoBuf) {
             /* There was an interrupt */
@@ -374,7 +408,7 @@ static void handle_intr(u32 intr_stat)
 /**************************************************************************
 w89c840_poll - Wait for a frame
 ***************************************************************************/
-static int w89c840_poll(struct nic *nic, int retrieve)
+static int w89c840_poll(struct nic* nic, int retrieve)
 {
     /* return true if there's an ethernet packet ready to read */
     /* nic->packet should contain data on return */
@@ -390,7 +424,7 @@ static int w89c840_poll(struct nic *nic, int retrieve)
 
         int entry = w840private.cur_rx % RX_RING_SIZE;
 
-        struct w840_rx_desc *desc = w840private.rx_head_desc;
+        struct w840_rx_desc* desc = w840private.rx_head_desc;
         s32 status = desc->status;
 
         if (status & DescOwn) {
@@ -399,7 +433,7 @@ static int w89c840_poll(struct nic *nic, int retrieve)
             break;
         }
 
-        if ( !retrieve ) {
+        if (!retrieve) {
             packet_received = 1;
             break;
         }
@@ -410,7 +444,7 @@ static int w89c840_poll(struct nic *nic, int retrieve)
                 if ((status & 0xffff) != 0x7fff) {
                     printf("winbond-840 : Oversized Ethernet frame spanned "
                            "multiple buffers, entry %d status %X !\n",
-                           w840private.cur_rx, (unsigned int) status);
+                           w840private.cur_rx, (unsigned int)status);
                 }
             } else if (status & 0x8000) {
                 /* There was a fatal error. */
@@ -458,20 +492,19 @@ static int w89c840_poll(struct nic *nic, int retrieve)
             printf("  Rx data %hhX:%hhX:%hhX:%hhX:%hhX:"
                    "%hhX %hhX:%hhX:%hhX:%hhX:%hhX:%hhX %hhX%hhX "
                    "%hhX.%hhX.%hhX.%hhX.\n",
-                   nic->packet[0],  nic->packet[1],  nic->packet[2], nic->packet[3],
-                   nic->packet[4],  nic->packet[5],  nic->packet[6], nic->packet[7],
-                   nic->packet[8],  nic->packet[9],  nic->packet[10],
+                   nic->packet[0], nic->packet[1], nic->packet[2], nic->packet[3],
+                   nic->packet[4], nic->packet[5], nic->packet[6], nic->packet[7],
+                   nic->packet[8], nic->packet[9], nic->packet[10],
                    nic->packet[11], nic->packet[12], nic->packet[13],
                    nic->packet[14], nic->packet[15], nic->packet[16],
                    nic->packet[17]);
 #endif
-
         }
 
         entry = (++w840private.cur_rx) % RX_RING_SIZE;
         w840private.rx_head_desc = &w840private.rx_ring[entry];
     } while (0);
-    
+
     return packet_received;
 }
 
@@ -480,11 +513,11 @@ w89c840_transmit - Transmit a frame
 ***************************************************************************/
 
 static void w89c840_transmit(
-    struct nic *nic,
-    const char *d,            /* Destination */
-    unsigned int t,            /* Type */
-    unsigned int s,            /* size */
-    const char *p)            /* Packet */
+    struct nic* nic,
+    const char* d,  /* Destination */
+    unsigned int t, /* Type */
+    unsigned int s, /* size */
+    const char* p)  /* Packet */
 {
     /* send the packet to destination */
     unsigned entry;
@@ -497,28 +530,27 @@ static void w89c840_transmit(
     /* Fill in our transmit buffer */
     entry = w840private.cur_tx % TX_RING_SIZE;
 
-    memcpy (w89c840_buf.tx_packet, d, ETH_ALEN);    /* dst */
-    memcpy (w89c840_buf.tx_packet + ETH_ALEN, nic->node_addr, ETH_ALEN);/*src*/
+    memcpy(w89c840_buf.tx_packet, d, ETH_ALEN);                         /* dst */
+    memcpy(w89c840_buf.tx_packet + ETH_ALEN, nic->node_addr, ETH_ALEN); /*src*/
 
-    *((char *) w89c840_buf.tx_packet + 12) = t >> 8;    /* type */
-    *((char *) w89c840_buf.tx_packet + 13) = t;
+    *((char*)w89c840_buf.tx_packet + 12) = t >> 8; /* type */
+    *((char*)w89c840_buf.tx_packet + 13) = t;
 
-    memcpy (w89c840_buf.tx_packet + ETH_HLEN, p, s);
+    memcpy(w89c840_buf.tx_packet + ETH_HLEN, p, s);
     s += ETH_HLEN;
 
     while (s < ETH_ZLEN)
-    *((char *) w89c840_buf.tx_packet + ETH_HLEN + (s++)) = 0;
+        *((char*)w89c840_buf.tx_packet + ETH_HLEN + (s++)) = 0;
 
-    w840private.tx_ring[entry].buffer1
-	    = virt_to_le32desc(w89c840_buf.tx_packet);
+    w840private.tx_ring[entry].buffer1 = virt_to_le32desc(w89c840_buf.tx_packet);
 
-    w840private.tx_ring[entry].length = (DescWholePkt | (u32) s);
-    if (entry >= TX_RING_SIZE-1)         /* Wrap ring */
+    w840private.tx_ring[entry].length = (DescWholePkt | (u32)s);
+    if (entry >= TX_RING_SIZE - 1) /* Wrap ring */
         w840private.tx_ring[entry].length |= (DescIntr | DescEndRing);
     w840private.tx_ring[entry].status = (DescOwn);
     w840private.cur_tx++;
 
-    w840private.tx_q_bytes = (u16) s;
+    w840private.tx_q_bytes = (u16)s;
     writel(0, ioaddr + TxStartDemand);
 
     /* Work around horrible bug in the chip by marking the queue as full
@@ -544,25 +576,22 @@ static void w89c840_transmit(
         u32 intr_stat = 0;
 #endif
         while (1) {
-
 #if defined(W89C840_DEBUG)
-	      decode_interrupt(intr_stat);
+            decode_interrupt(intr_stat);
 #endif
 
-                while ( (transmit_status & DescOwn) && ct + TX_TIMEOUT < currticks()) {
+            while ((transmit_status & DescOwn) && ct + TX_TIMEOUT < currticks()) {
+                transmit_status = w840private.tx_ring[entry].status;
+            }
 
-                    transmit_status = w840private.tx_ring[entry].status;
-                }
-
-                break;
+            break;
         }
     }
 
     if ((transmit_status & DescOwn) == 0) {
-
 #if defined(W89C840_DEBUG)
         printf("winbond-840 : transmission complete after wait loop iterations, status %X\n",
-                w840private.tx_ring[entry].status);
+               w840private.tx_ring[entry].status);
 #endif
 
         return;
@@ -570,8 +599,8 @@ static void w89c840_transmit(
 
     /* Transmit timed out... */
 
-    printf("winbond-840 : transmission TIMEOUT : status %X\n", 
-	   (unsigned int) w840private.tx_ring[entry].status);
+    printf("winbond-840 : transmission TIMEOUT : status %X\n",
+           (unsigned int)w840private.tx_ring[entry].status);
 
     return;
 }
@@ -579,8 +608,7 @@ static void w89c840_transmit(
 /**************************************************************************
 w89c840_disable - Turn off ethernet interface
 ***************************************************************************/
-static void w89c840_disable ( struct nic *nic ) {
-
+static void w89c840_disable(struct nic* nic) {
     w89c840_reset(nic);
 
     /* Don't know what to do to disable the board. Is this needed at all? */
@@ -592,39 +620,37 @@ static void w89c840_disable ( struct nic *nic ) {
 /**************************************************************************
 w89c840_irq - Enable, Disable, or Force interrupts
 ***************************************************************************/
-static void w89c840_irq(struct nic *nic __unused, irq_action_t action __unused)
+static void w89c840_irq(struct nic* nic __unused, irq_action_t action __unused)
 {
-  switch ( action ) {
-  case DISABLE :
-    break;
-  case ENABLE :
-    break;
-  case FORCE :
-    break;
-  }
+    switch (action) {
+        case DISABLE:
+            break;
+        case ENABLE:
+            break;
+        case FORCE:
+            break;
+    }
 }
 
 static struct nic_operations w89c840_operations = {
-	.connect	= dummy_connect,
-	.poll		= w89c840_poll,
-	.transmit	= w89c840_transmit,
-	.irq		= w89c840_irq,
+    .connect = dummy_connect,
+    .poll = w89c840_poll,
+    .transmit = w89c840_transmit,
+    .irq = w89c840_irq,
 
 };
 
 static struct pci_device_id w89c840_nics[] = {
-PCI_ROM(0x1050, 0x0840, "winbond840",     "Winbond W89C840F", 0),
-PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX", 0),
+    PCI_ROM(0x1050, 0x0840, "winbond840", "Winbond W89C840F", 0),
+    PCI_ROM(0x11f6, 0x2011, "compexrl100atx", "Compex RL100ATX", 0),
 };
 
-PCI_DRIVER ( w89c840_driver, w89c840_nics, PCI_NO_CLASS );
+PCI_DRIVER(w89c840_driver, w89c840_nics, PCI_NO_CLASS);
 
 /**************************************************************************
 w89c840_probe - Look for an adapter, this routine's visible to the outside
 ***************************************************************************/
-static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
-
-
+static int w89c840_probe(struct nic* nic, struct pci_device* p) {
     u16 sum = 0;
     int i;
     unsigned short value;
@@ -633,7 +659,7 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
         return 0;
 
     nic->ioaddr = p->ioaddr;
-    nic->irqno  = 0;
+    nic->irqno = 0;
 
 #if defined(W89C840_DEBUG)
     printf("winbond-840: PCI bus %hhX device function %hhX: I/O address: %hX\n", p->bus, p->devfn, ioaddr);
@@ -641,26 +667,22 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
 
     ioaddr = ioaddr & ~3; /* Mask the bit that says "this is an io addr" */
 
-#define PCI_VENDOR_ID_WINBOND2		0x1050
-#define PCI_DEVICE_ID_WINBOND2_89C840   0x0840
-#define PCI_VENDOR_ID_COMPEX		0x11f6
-#define PCI_DEVICE_ID_COMPEX_RL100ATX   0x2011
+#define PCI_VENDOR_ID_WINBOND2 0x1050
+#define PCI_DEVICE_ID_WINBOND2_89C840 0x0840
+#define PCI_VENDOR_ID_COMPEX 0x11f6
+#define PCI_DEVICE_ID_COMPEX_RL100ATX 0x2011
 
     /* From Matt Hortman <mbhortman@acpthinclient.com> */
-    if (p->vendor == PCI_VENDOR_ID_WINBOND2
-        && p->device == PCI_DEVICE_ID_WINBOND2_89C840) {
-
+    if (p->vendor == PCI_VENDOR_ID_WINBOND2 && p->device == PCI_DEVICE_ID_WINBOND2_89C840) {
         /* detected "Winbond W89c840 Fast Ethernet PCI NIC" */
 
-    } else if ( p->vendor == PCI_VENDOR_ID_COMPEX
-                && p->device == PCI_DEVICE_ID_COMPEX_RL100ATX) {
-
+    } else if (p->vendor == PCI_VENDOR_ID_COMPEX && p->device == PCI_DEVICE_ID_COMPEX_RL100ATX) {
         /* detected "Compex RL100ATX Fast Ethernet PCI NIC" */
 
     } else {
         /* Gee, guess what? They missed again. */
         printf("device ID : %X - is not a Compex RL100ATX NIC.\n",
-	       p->device);
+               p->device);
         return 0;
     }
 
@@ -675,11 +697,11 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
         sum += value;
     }
 
-    for (i=0;i<ETH_ALEN;i++) {
-        nic->node_addr[i] =  (eeprom[i/2] >> (8*(i&1))) & 0xff;
+    for (i = 0; i < ETH_ALEN; i++) {
+        nic->node_addr[i] = (eeprom[i / 2] >> (8 * (i & 1))) & 0xff;
     }
 
-    DBG ( "Ethernet addr: %s\n", eth_ntoa ( nic->node_addr ) );
+    DBG("Ethernet addr: %s\n", eth_ntoa(nic->node_addr));
 
 #if defined(W89C840_DEBUG)
     printf("winbond-840: EEPROM checksum %hX, got eeprom", sum);
@@ -693,7 +715,7 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
         int phy, phy_idx = 0;
         for (phy = 1; phy < 32 && phy_idx < 4; phy++) {
             int mii_status = mdio_read(ioaddr, phy, 1);
-            if (mii_status != 0xffff  &&  mii_status != 0x0000) {
+            if (mii_status != 0xffff && mii_status != 0x0000) {
                 w840private.phys[phy_idx++] = phy;
                 w840private.advertising = mdio_read(ioaddr, phy, 4);
 
@@ -701,19 +723,18 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
                 printf("winbond-840 : MII PHY found at address %d, status "
                        "%X advertising %hX.\n", phy, mii_status, w840private.advertising);
 #endif
-
             }
         }
 
         w840private.mii_cnt = phy_idx;
 
         if (phy_idx == 0) {
-                printf("winbond-840 : MII PHY not found -- this device may not operate correctly.\n");
+            printf("winbond-840 : MII PHY not found -- this device may not operate correctly.\n");
         }
     }
 
     /* point to NIC specific routines */
-    nic->nic_op	= &w89c840_operations;
+    nic->nic_op = &w89c840_operations;
 
     w89c840_reset(nic);
 
@@ -731,16 +752,21 @@ static int w89c840_probe ( struct nic *nic, struct pci_device *p ) {
    The old method of using an ISA access as a delay, __SLOW_DOWN_IO__, is
    depricated.
 */
-#define eeprom_delay(ee_addr)    readl(ee_addr)
+#define eeprom_delay(ee_addr) readl(ee_addr)
 
 enum EEPROM_Ctrl_Bits {
-    EE_ShiftClk=0x02, EE_Write0=0x801, EE_Write1=0x805,
-    EE_ChipSelect=0x801, EE_DataIn=0x08,
+    EE_ShiftClk = 0x02,
+    EE_Write0 = 0x801,
+    EE_Write1 = 0x805,
+    EE_ChipSelect = 0x801,
+    EE_DataIn = 0x08,
 };
 
 /* The EEPROM commands include the alway-set leading bit. */
 enum EEPROM_Cmds {
-    EE_WriteCmd=(5 << 6), EE_ReadCmd=(6 << 6), EE_EraseCmd=(7 << 6),
+    EE_WriteCmd = (5 << 6),
+    EE_ReadCmd = (6 << 6),
+    EE_EraseCmd = (7 << 6),
 };
 
 static int eeprom_read(long addr, int location)
@@ -832,7 +858,7 @@ static int mdio_read(int base_address, int phy_id, int location)
         writel(MDIO_EnbIn | MDIO_ShiftClk, mdio_addr);
         mdio_delay(mdio_addr);
     }
-    return (retval>>1) & 0xffff;
+    return (retval >> 1) & 0xffff;
 }
 
 #if 0
@@ -871,15 +897,15 @@ static void mdio_write(int base_address, int phy_id, int location, int value)
 static void check_duplex(void)
 {
     int mii_reg5 = mdio_read(ioaddr, w840private.phys[0], 5);
-    int negotiated =  mii_reg5 & w840private.advertising;
+    int negotiated = mii_reg5 & w840private.advertising;
     int duplex;
 
-    if (w840private.duplex_lock  ||  mii_reg5 == 0xffff)
+    if (w840private.duplex_lock || mii_reg5 == 0xffff)
         return;
 
     duplex = (negotiated & 0x0100) || (negotiated & 0x01C0) == 0x0040;
     if (w840private.full_duplex != duplex) {
-        w840private.full_duplex = duplex;       
+        w840private.full_duplex = duplex;
 
 #if defined(W89C840_DEBUG)
         printf("winbond-840 : Setting %s-duplex based on MII # %d negotiated capability %X\n",
@@ -893,15 +919,15 @@ static void check_duplex(void)
 
 static void set_rx_mode(void)
 {
-    u32 mc_filter[2];            /* Multicast hash filter */
+    u32 mc_filter[2]; /* Multicast hash filter */
     u32 rx_mode;
 
     /* Accept all multicasts from now on. */
     memset(mc_filter, 0xff, sizeof(mc_filter));
 
-/*
- * works OK with multicast enabled. 
- */
+    /*
+     * works OK with multicast enabled.
+     */
 
     rx_mode = AcceptBroadcast | AcceptMyPhys | AcceptMulticast;
 
@@ -920,7 +946,7 @@ static void set_rx_mode(void)
 static void init_ring(void)
 {
     int i;
-    char * p;
+    char* p;
 
     w840private.tx_full = 0;
     w840private.tx_q_bytes = w840private.cur_rx = w840private.cur_tx = 0;
@@ -936,15 +962,15 @@ static void init_ring(void)
     for (i = 0; i < RX_RING_SIZE; i++) {
         w840private.rx_ring[i].length = w840private.rx_buf_sz;
         w840private.rx_ring[i].status = 0;
-        w840private.rx_ring[i].next_desc = virt_to_le32desc(&w840private.rx_ring[i+1]);
+        w840private.rx_ring[i].next_desc = virt_to_le32desc(&w840private.rx_ring[i + 1]);
 
         w840private.rx_ring[i].buffer1 = virt_to_le32desc(p + (PKT_BUF_SZ * i));
         w840private.rx_ring[i].status = DescOwn | DescIntr;
     }
 
     /* Mark the last entry as wrapping the ring. */
-    w840private.rx_ring[i-1].length |= DescEndRing;
-    w840private.rx_ring[i-1].next_desc = virt_to_le32desc(&w840private.rx_ring[0]);
+    w840private.rx_ring[i - 1].length |= DescEndRing;
+    w840private.rx_ring[i - 1].next_desc = virt_to_le32desc(&w840private.rx_ring[0]);
 
     w840private.dirty_rx = (unsigned int)(i - RX_RING_SIZE);
 
@@ -954,9 +980,8 @@ static void init_ring(void)
     return;
 }
 
-
-DRIVER ( "W89C840F", nic_driver, pci_driver, w89c840_driver,
-	 w89c840_probe, w89c840_disable );
+DRIVER("W89C840F", nic_driver, pci_driver, w89c840_driver,
+       w89c840_probe, w89c840_disable);
 
 /*
  * Local variables:

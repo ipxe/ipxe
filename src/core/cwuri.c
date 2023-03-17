@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stddef.h>
 #include <ipxe/uri.h>
@@ -35,19 +35,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** Current working URI */
-struct uri *cwuri = NULL;
+struct uri* cwuri = NULL;
 
 /**
  * Change working URI
  *
  * @v uri		New working URI, or NULL
  */
-void churi ( struct uri *uri ) {
-	struct uri *new_uri = NULL;
+void churi(struct uri* uri) {
+    struct uri* new_uri = NULL;
 
-	if ( uri )
-		new_uri = resolve_uri ( cwuri, uri );
+    if (uri)
+        new_uri = resolve_uri(cwuri, uri);
 
-	uri_put ( cwuri );
-	cwuri = new_uri;
+    uri_put(cwuri);
+    cwuri = new_uri;
 }

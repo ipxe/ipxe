@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef NODNIC_CMD_H_
-#define NODNIC_CMD_H_
+    #define NODNIC_CMD_H_
 
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
@@ -20,24 +22,22 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
-#include "mlx_nodnic_data_structures.h"
-#include "../../mlx_utils/include/public/mlx_utils.h"
-#include "../../mlx_utils/include/public/mlx_pci_gw.h"
+    #include "mlx_nodnic_data_structures.h"
+    #include "../../mlx_utils/include/public/mlx_utils.h"
+    #include "../../mlx_utils/include/public/mlx_pci_gw.h"
 
 mlx_status
 nodnic_cmd_read(
-				IN nodnic_device_priv *device_priv,
-				IN mlx_uint32 address,
-				OUT mlx_pci_gw_buffer *buffer
-				);
+    IN nodnic_device_priv* device_priv,
+    IN mlx_uint32 address,
+    OUT mlx_pci_gw_buffer* buffer);
 
 mlx_status
 nodnic_cmd_write(
-				IN nodnic_device_priv *device_priv,
-				IN mlx_uint32 address,
-				IN mlx_pci_gw_buffer buffer
-				);
+    IN nodnic_device_priv* device_priv,
+    IN mlx_uint32 address,
+    IN mlx_pci_gw_buffer buffer);
 
 #endif /* STUB_NODNIC_CMD_H_ */

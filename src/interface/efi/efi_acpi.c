@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * @file
@@ -36,21 +36,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi_acpi.h>
 
 /** ACPI configuration table */
-static EFI_ACPI_1_0_ROOT_SYSTEM_DESCRIPTION_POINTER *rsdp;
-EFI_USE_TABLE ( ACPI_10_TABLE, &rsdp, 0 );
+static EFI_ACPI_1_0_ROOT_SYSTEM_DESCRIPTION_POINTER* rsdp;
+EFI_USE_TABLE(ACPI_10_TABLE, &rsdp, 0);
 
 /**
  * Locate ACPI root system description table
  *
  * @ret rsdt		ACPI root system description table, or UNULL
  */
-static userptr_t efi_find_rsdt ( void ) {
+static userptr_t efi_find_rsdt(void) {
+    /* Locate RSDT via ACPI configuration table, if available */
+    if (rsdp)
+        return phys_to_user(rsdp->RsdtAddress);
 
-	/* Locate RSDT via ACPI configuration table, if available */
-	if ( rsdp )
-		return phys_to_user ( rsdp->RsdtAddress );
-
-	return UNULL;
+    return UNULL;
 }
 
-PROVIDE_ACPI ( efi, acpi_find_rsdt, efi_find_rsdt );
+PROVIDE_ACPI(efi, acpi_find_rsdt, efi_find_rsdt);
+PROVIDE_ACPI_INLINE(efi, acpi_find);

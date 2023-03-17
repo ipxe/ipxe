@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdio.h>
 #include <ipxe/netdevice.h>
@@ -39,24 +39,24 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v netdev		Network device
  */
-static void route_ipv4_print ( struct net_device *netdev ) {
-	struct ipv4_miniroute *miniroute;
+static void route_ipv4_print(struct net_device* netdev) {
+    struct ipv4_miniroute* miniroute;
 
-	list_for_each_entry ( miniroute, &ipv4_miniroutes, list ) {
-		if ( miniroute->netdev != netdev )
-			continue;
-		printf ( "%s: %s/", netdev->name,
-			 inet_ntoa ( miniroute->address ) );
-		printf ( "%s", inet_ntoa ( miniroute->netmask ) );
-		if ( miniroute->gateway.s_addr )
-			printf ( " gw %s", inet_ntoa ( miniroute->gateway ) );
-		if ( ! netdev_is_open ( miniroute->netdev ) )
-			printf ( " (inaccessible)" );
-		printf ( "\n" );
-	}
+    list_for_each_entry(miniroute, &ipv4_miniroutes, list) {
+        if (miniroute->netdev != netdev)
+            continue;
+        printf("%s: %s/", netdev->name,
+               inet_ntoa(miniroute->address));
+        printf("%s", inet_ntoa(miniroute->netmask));
+        if (miniroute->gateway.s_addr)
+            printf(" gw %s", inet_ntoa(miniroute->gateway));
+        if (!netdev_is_open(miniroute->netdev))
+            printf(" (inaccessible)");
+        printf("\n");
+    }
 }
 
 /** IPv4 routing family */
-struct routing_family ipv4_routing_family __routing_family ( ROUTING_IPV4 ) = {
-	.print = route_ipv4_print,
+struct routing_family ipv4_routing_family __routing_family(ROUTING_IPV4) = {
+    .print = route_ipv4_print,
 };

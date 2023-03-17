@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -36,16 +36,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** SHA-384 initial digest values */
 static const struct sha512_digest sha384_init_digest = {
-	.h = {
-		cpu_to_be64 ( 0xcbbb9d5dc1059ed8ULL ),
-		cpu_to_be64 ( 0x629a292a367cd507ULL ),
-		cpu_to_be64 ( 0x9159015a3070dd17ULL ),
-		cpu_to_be64 ( 0x152fecd8f70e5939ULL ),
-		cpu_to_be64 ( 0x67332667ffc00b31ULL ),
-		cpu_to_be64 ( 0x8eb44a8768581511ULL ),
-		cpu_to_be64 ( 0xdb0c2e0d64f98fa7ULL ),
-		cpu_to_be64 ( 0x47b5481dbefa4fa4ULL ),
-	},
+    .h = {
+        cpu_to_be64(0xcbbb9d5dc1059ed8ULL),
+        cpu_to_be64(0x629a292a367cd507ULL),
+        cpu_to_be64(0x9159015a3070dd17ULL),
+        cpu_to_be64(0x152fecd8f70e5939ULL),
+        cpu_to_be64(0x67332667ffc00b31ULL),
+        cpu_to_be64(0x8eb44a8768581511ULL),
+        cpu_to_be64(0xdb0c2e0d64f98fa7ULL),
+        cpu_to_be64(0x47b5481dbefa4fa4ULL),
+    },
 };
 
 /**
@@ -53,19 +53,19 @@ static const struct sha512_digest sha384_init_digest = {
  *
  * @v ctx		SHA-384 context
  */
-static void sha384_init ( void *ctx ) {
-	struct sha512_context *context = ctx;
+static void sha384_init(void* ctx) {
+    struct sha512_context* context = ctx;
 
-	sha512_family_init ( context, &sha384_init_digest, SHA384_DIGEST_SIZE );
+    sha512_family_init(context, &sha384_init_digest, SHA384_DIGEST_SIZE);
 }
 
 /** SHA-384 algorithm */
 struct digest_algorithm sha384_algorithm = {
-	.name		= "sha384",
-	.ctxsize	= sizeof ( struct sha512_context ),
-	.blocksize	= sizeof ( union sha512_block ),
-	.digestsize	= SHA384_DIGEST_SIZE,
-	.init		= sha384_init,
-	.update		= sha512_update,
-	.final		= sha512_final,
+    .name = "sha384",
+    .ctxsize = sizeof(struct sha512_context),
+    .blocksize = sizeof(union sha512_block),
+    .digestsize = SHA384_DIGEST_SIZE,
+    .init = sha384_init,
+    .update = sha512_update,
+    .final = sha512_final,
 };

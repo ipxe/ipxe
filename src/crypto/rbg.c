@@ -33,7 +33,7 @@
  *     with the distribution.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -70,63 +70,60 @@ struct random_bit_generator rbg;
  * This is the RBG_Startup function defined in ANS X9.82 Part 4 (April
  * 2011 Draft) Section 9.1.2.2.
  */
-static int rbg_startup ( void ) {
-	union uuid uuid;
-	int len;
-	int rc;
+static int rbg_startup(void) {
+    union uuid uuid;
+    int len;
+    int rc;
 
-	/* Try to obtain system UUID for use as personalisation
-	 * string, in accordance with ANS X9.82 Part 3-2007 Section
-	 * 8.5.2.  If no UUID is available, proceed without a
-	 * personalisation string.
-	 */
-	if ( ( len = fetch_uuid_setting ( NULL, &uuid_setting, &uuid ) ) < 0 ) {
-		rc = len;
-		DBGC ( &rbg, "RBG could not fetch personalisation string: "
-		       "%s\n", strerror ( rc ) );
-		len = 0;
-	}
+    /* Try to obtain system UUID for use as personalisation
+     * string, in accordance with ANS X9.82 Part 3-2007 Section
+     * 8.5.2.  If no UUID is available, proceed without a
+     * personalisation string.
+     */
+    if ((len = fetch_uuid_setting(NULL, &uuid_setting, &uuid)) < 0) {
+        rc = len;
+        DBGC(&rbg, "RBG could not fetch personalisation string: "
+                   "%s\n", strerror(rc));
+        len = 0;
+    }
 
-	/* Instantiate DRBG */
-	if ( ( rc = drbg_instantiate ( &rbg.state, &uuid, len ) ) != 0 ) {
-		DBGC ( &rbg, "RBG could not instantiate DRBG: %s\n",
-		       strerror ( rc ) );
-		return rc;
-	}
+    /* Instantiate DRBG */
+    if ((rc = drbg_instantiate(&rbg.state, &uuid, len)) != 0) {
+        DBGC(&rbg, "RBG could not instantiate DRBG: %s\n",
+             strerror(rc));
+        return rc;
+    }
 
-	return 0;
+    return 0;
 }
 
 /**
  * Shut down RBG
  *
  */
-static void rbg_shutdown ( void ) {
-
-	/* Uninstantiate DRBG */
-	drbg_uninstantiate ( &rbg.state );
+static void rbg_shutdown(void) {
+    /* Uninstantiate DRBG */
+    drbg_uninstantiate(&rbg.state);
 }
 
 /** RBG startup function */
-static void rbg_startup_fn ( void ) {
-
-	/* Start up RBG.  There is no way to report an error at this
-	 * stage, but a failed startup will result in an invalid DRBG
-	 * that refuses to generate bits.
-	 */
-	rbg_startup();
+static void rbg_startup_fn(void) {
+    /* Start up RBG.  There is no way to report an error at this
+     * stage, but a failed startup will result in an invalid DRBG
+     * that refuses to generate bits.
+     */
+    rbg_startup();
 }
 
 /** RBG shutdown function */
-static void rbg_shutdown_fn ( int booting __unused ) {
-
-	/* Shut down RBG */
-	rbg_shutdown();
+static void rbg_shutdown_fn(int booting __unused) {
+    /* Shut down RBG */
+    rbg_shutdown();
 }
 
 /** RBG startup table entry */
-struct startup_fn startup_rbg __startup_fn ( STARTUP_NORMAL ) = {
-	.name = "rbg",
-	.startup = rbg_startup_fn,
-	.shutdown = rbg_shutdown_fn,
+struct startup_fn startup_rbg __startup_fn(STARTUP_NORMAL) = {
+    .name = "rbg",
+    .startup = rbg_startup_fn,
+    .shutdown = rbg_shutdown_fn,
 };

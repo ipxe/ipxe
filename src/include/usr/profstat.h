@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _USR_PROFSTAT_H
-#define _USR_PROFSTAT_H
+    #define _USR_PROFSTAT_H
 
 /** @file
  *
@@ -7,8 +9,8 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-extern void profstat ( void );
+extern void profstat(void);
 
 #endif /* _USR_PROFSTAT_H */

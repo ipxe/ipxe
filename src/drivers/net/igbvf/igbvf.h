@@ -1,3 +1,5 @@
+#pragma once
+
 /*******************************************************************************
 
   Intel(R) 82576 Virtual Function Linux driver
@@ -26,75 +28,75 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_ONLY );
+FILE_LICENCE(GPL2_ONLY);
 
 /* Linux PRO/1000 Ethernet Driver main header file */
 
 #ifndef _IGBVF_H_
-#define _IGBVF_H_
+    #define _IGBVF_H_
 
-#include "igbvf_vf.h"
+    #include "igbvf_vf.h"
 
 /* Forward declarations */
 struct igbvf_info;
 struct igbvf_adapter;
 
-/* Interrupt defines */
-#define IGBVF_START_ITR                    648 /* ~6000 ints/sec */
+    /* Interrupt defines */
+    #define IGBVF_START_ITR 648 /* ~6000 ints/sec */
 
-/* Tx/Rx descriptor defines */
-#define IGBVF_DEFAULT_TXD		256
-#define IGBVF_MAX_TXD			4096
-#define IGBVF_MIN_TXD			80
+    /* Tx/Rx descriptor defines */
+    #define IGBVF_DEFAULT_TXD 256
+    #define IGBVF_MAX_TXD 4096
+    #define IGBVF_MIN_TXD 80
 
-#define IGBVF_DEFAULT_RXD		256
-#define IGBVF_MAX_RXD			4096
-#define IGBVF_MIN_RXD			80
+    #define IGBVF_DEFAULT_RXD 256
+    #define IGBVF_MAX_RXD 4096
+    #define IGBVF_MIN_RXD 80
 
-#define IGBVF_MIN_ITR_USECS		10 /* 100000 irq/sec */
-#define IGBVF_MAX_ITR_USECS		10000 /* 100    irq/sec */
+    #define IGBVF_MIN_ITR_USECS 10    /* 100000 irq/sec */
+    #define IGBVF_MAX_ITR_USECS 10000 /* 100    irq/sec */
 
-/* RX descriptor control thresholds.
- * PTHRESH - MAC will consider prefetch if it has fewer than this number of
- *           descriptors available in its onboard memory.
- *           Setting this to 0 disables RX descriptor prefetch.
- * HTHRESH - MAC will only prefetch if there are at least this many descriptors
- *           available in host memory.
- *           If PTHRESH is 0, this should also be 0.
- * WTHRESH - RX descriptor writeback threshold - MAC will delay writing back
- *           descriptors until either it has this many to write back, or the
- *           ITR timer expires.
- */
-#define IGBVF_RX_PTHRESH                    16
-#define IGBVF_RX_HTHRESH                     8
-#define IGBVF_RX_WTHRESH                     1
+    /* RX descriptor control thresholds.
+     * PTHRESH - MAC will consider prefetch if it has fewer than this number of
+     *           descriptors available in its onboard memory.
+     *           Setting this to 0 disables RX descriptor prefetch.
+     * HTHRESH - MAC will only prefetch if there are at least this many descriptors
+     *           available in host memory.
+     *           If PTHRESH is 0, this should also be 0.
+     * WTHRESH - RX descriptor writeback threshold - MAC will delay writing back
+     *           descriptors until either it has this many to write back, or the
+     *           ITR timer expires.
+     */
+    #define IGBVF_RX_PTHRESH 16
+    #define IGBVF_RX_HTHRESH 8
+    #define IGBVF_RX_WTHRESH 1
 
-#define IGBVF_TX_PTHRESH                     8
-#define IGBVF_TX_HTHRESH                     1
-#define IGBVF_TX_WTHRESH                     1
+    #define IGBVF_TX_PTHRESH 8
+    #define IGBVF_TX_HTHRESH 1
+    #define IGBVF_TX_WTHRESH 1
 
-/* this is the size past which hardware will drop packets when setting LPE=0 */
-#define MAXIMUM_ETHERNET_VLAN_SIZE 1522
+    /* this is the size past which hardware will drop packets when setting LPE=0 */
+    #define MAXIMUM_ETHERNET_VLAN_SIZE 1522
 
-#define IGBVF_FC_PAUSE_TIME		0x0680 /* 858 usec */
+    #define IGBVF_FC_PAUSE_TIME 0x0680 /* 858 usec */
 
-/* How many Tx Descriptors do we need to call netif_wake_queue ? */
-#define IGBVF_TX_QUEUE_WAKE	32
-/* How many Rx Buffers do we bundle into one write to the hardware ? */
-#define IGBVF_RX_BUFFER_WRITE		16 /* Must be power of 2 */
+    /* How many Tx Descriptors do we need to call netif_wake_queue ? */
+    #define IGBVF_TX_QUEUE_WAKE 32
+    /* How many Rx Buffers do we bundle into one write to the hardware ? */
+    #define IGBVF_RX_BUFFER_WRITE 16 /* Must be power of 2 */
 
-#define AUTO_ALL_MODES			0
-#define IGBVF_EEPROM_APME		0x0400
+    #define AUTO_ALL_MODES 0
+    #define IGBVF_EEPROM_APME 0x0400
 
-#define IGBVF_MNG_VLAN_NONE		(-1)
+    #define IGBVF_MNG_VLAN_NONE (-1)
 
 enum igbvf_boards {
-	board_vf,
+    board_vf,
 };
 
 struct igbvf_queue_stats {
-	u64 packets;
-	u64 bytes;
+    u64 packets;
+    u64 bytes;
 };
 
 /*
@@ -102,7 +104,7 @@ struct igbvf_queue_stats {
  * so a DMA handle can be stored along with the buffer
  */
 struct igbvf_buffer {
-#if 0
+    #if 0
 	dma_addr_t dma;
 	dma_addr_t page_dma;
 	struct sk_buff *skb;
@@ -120,11 +122,11 @@ struct igbvf_buffer {
 		};
 	};
 	struct page *page;
-#endif
+    #endif
 };
 
 struct igbvf_ring {
-#if 0
+    #if 0
 	struct igbvf_adapter *adapter;  /* backlink */
 	void *desc;			/* pointer to ring memory  */
 	dma_addr_t dma;			/* phys address of ring    */
@@ -150,12 +152,12 @@ struct igbvf_ring {
 	struct sk_buff *rx_skb_top;
 
 	struct igbvf_queue_stats stats;
-#endif
+    #endif
 };
 
 /* board specific private data structure */
 struct igbvf_adapter {
-#if 0
+    #if 0
 	struct timer_list watchdog_timer;
 	struct timer_list blink_timer;
 
@@ -263,115 +265,115 @@ struct igbvf_adapter {
 	unsigned int flags;
 	unsigned long last_reset;
 	u32 *config_space;
-#endif
-        /* OS defined structs */
-        struct net_device *netdev;
-        struct pci_device *pdev;
-        struct net_device_stats net_stats;
+    #endif
+    /* OS defined structs */
+    struct net_device* netdev;
+    struct pci_device* pdev;
+    struct net_device_stats net_stats;
 
-        /* structs defined in e1000_hw.h */
-        struct e1000_hw hw;
+    /* structs defined in e1000_hw.h */
+    struct e1000_hw hw;
 
-        u32 min_frame_size;
-        u32 max_frame_size;
+    u32 min_frame_size;
+    u32 max_frame_size;
 
-        u32 max_hw_frame_size;
+    u32 max_hw_frame_size;
 
-#define NUM_TX_DESC     8
-#define NUM_RX_DESC     8
+    #define NUM_TX_DESC 8
+    #define NUM_RX_DESC 8
 
-        struct io_buffer *tx_iobuf[NUM_TX_DESC];
-        struct io_buffer *rx_iobuf[NUM_RX_DESC];
+    struct io_buffer* tx_iobuf[NUM_TX_DESC];
+    struct io_buffer* rx_iobuf[NUM_RX_DESC];
 
-        union e1000_adv_tx_desc *tx_base;
-        union e1000_adv_rx_desc *rx_base;
+    union e1000_adv_tx_desc* tx_base;
+    union e1000_adv_rx_desc* rx_base;
 
-        uint32_t tx_ring_size;
-        uint32_t rx_ring_size;
+    uint32_t tx_ring_size;
+    uint32_t rx_ring_size;
 
-        uint32_t tx_head;
-        uint32_t tx_tail;
-        uint32_t tx_fill_ctr;
+    uint32_t tx_head;
+    uint32_t tx_tail;
+    uint32_t tx_fill_ctr;
 
-        uint32_t rx_curr;
+    uint32_t rx_curr;
 
-        uint32_t ioaddr;
-        uint32_t irqno;
+    uint32_t ioaddr;
+    uint32_t irqno;
 
-        uint32_t tx_int_delay;
-        uint32_t tx_abs_int_delay;
-        uint32_t txd_cmd;
+    uint32_t tx_int_delay;
+    uint32_t tx_abs_int_delay;
+    uint32_t txd_cmd;
 };
 
 struct igbvf_info {
-	enum e1000_mac_type	mac;
-	unsigned int		flags;
-	u32			pba;
-	void			(*init_ops)(struct e1000_hw *);
-	s32			(*get_variants)(struct igbvf_adapter *);
+    enum e1000_mac_type mac;
+    unsigned int flags;
+    u32 pba;
+    void (*init_ops)(struct e1000_hw*);
+    s32 (*get_variants)(struct igbvf_adapter*);
 };
 
-/* hardware capability, feature, and workaround flags */
-#define IGBVF_FLAG_RX_CSUM_DISABLED       (1 << 0)
+    /* hardware capability, feature, and workaround flags */
+    #define IGBVF_FLAG_RX_CSUM_DISABLED (1 << 0)
 
-#define IGBVF_DESC_UNUSED(R) \
-	((((R)->next_to_clean > (R)->next_to_use) ? 0 : (R)->count) + \
-	(R)->next_to_clean - (R)->next_to_use - 1)
+    #define IGBVF_DESC_UNUSED(R)                                      \
+        ((((R)->next_to_clean > (R)->next_to_use) ? 0 : (R)->count) + \
+         (R)->next_to_clean - (R)->next_to_use - 1)
 
-#define IGBVF_RX_DESC_ADV(R, i)	    \
-	(&(((union e1000_adv_rx_desc *)((R).desc))[i]))
-#define IGBVF_TX_DESC_ADV(R, i)	    \
-	(&(((union e1000_adv_tx_desc *)((R).desc))[i]))
-#define IGBVF_TX_CTXTDESC_ADV(R, i)	    \
-	(&(((struct e1000_adv_tx_context_desc *)((R).desc))[i]))
+    #define IGBVF_RX_DESC_ADV(R, i) \
+        (&(((union e1000_adv_rx_desc*)((R).desc))[i]))
+    #define IGBVF_TX_DESC_ADV(R, i) \
+        (&(((union e1000_adv_tx_desc*)((R).desc))[i]))
+    #define IGBVF_TX_CTXTDESC_ADV(R, i) \
+        (&(((struct e1000_adv_tx_context_desc*)((R).desc))[i]))
 
 enum igbvf_state_t {
-	__IGBVF_TESTING,
-	__IGBVF_RESETTING,
-	__IGBVF_DOWN
+    __IGBVF_TESTING,
+    __IGBVF_RESETTING,
+    __IGBVF_DOWN
 };
 
 enum latency_range {
-	lowest_latency = 0,
-	low_latency = 1,
-	bulk_latency = 2,
-	latency_invalid = 255
+    lowest_latency = 0,
+    low_latency = 1,
+    bulk_latency = 2,
+    latency_invalid = 255
 };
 
 extern char igbvf_driver_name[];
 extern const char igbvf_driver_version[];
 
-extern void igbvf_check_options(struct igbvf_adapter *adapter);
-extern void igbvf_set_ethtool_ops(struct net_device *netdev);
-#ifdef ETHTOOL_OPS_COMPAT
-extern int ethtool_ioctl(struct ifreq *ifr);
-#endif
+extern void igbvf_check_options(struct igbvf_adapter* adapter);
+extern void igbvf_set_ethtool_ops(struct net_device* netdev);
+    #ifdef ETHTOOL_OPS_COMPAT
+extern int ethtool_ioctl(struct ifreq* ifr);
+    #endif
 
-extern int igbvf_up(struct igbvf_adapter *adapter);
-extern void igbvf_down(struct igbvf_adapter *adapter);
-extern void igbvf_reinit_locked(struct igbvf_adapter *adapter);
-extern void igbvf_reset(struct igbvf_adapter *adapter);
-extern int igbvf_setup_rx_resources(struct igbvf_adapter *adapter);
-extern int igbvf_setup_tx_resources(struct igbvf_adapter *adapter);
-extern void igbvf_free_rx_resources(struct igbvf_adapter *adapter);
-extern void igbvf_free_tx_resources(struct igbvf_adapter *adapter);
-extern void igbvf_update_stats(struct igbvf_adapter *adapter);
-extern void igbvf_set_interrupt_capability(struct igbvf_adapter *adapter);
-extern void igbvf_reset_interrupt_capability(struct igbvf_adapter *adapter);
+extern int igbvf_up(struct igbvf_adapter* adapter);
+extern void igbvf_down(struct igbvf_adapter* adapter);
+extern void igbvf_reinit_locked(struct igbvf_adapter* adapter);
+extern void igbvf_reset(struct igbvf_adapter* adapter);
+extern int igbvf_setup_rx_resources(struct igbvf_adapter* adapter);
+extern int igbvf_setup_tx_resources(struct igbvf_adapter* adapter);
+extern void igbvf_free_rx_resources(struct igbvf_adapter* adapter);
+extern void igbvf_free_tx_resources(struct igbvf_adapter* adapter);
+extern void igbvf_update_stats(struct igbvf_adapter* adapter);
+extern void igbvf_set_interrupt_capability(struct igbvf_adapter* adapter);
+extern void igbvf_reset_interrupt_capability(struct igbvf_adapter* adapter);
 
 extern unsigned int copybreak;
 
-static inline u32 __er32(struct e1000_hw *hw, unsigned long reg)
+static inline u32 __er32(struct e1000_hw* hw, unsigned long reg)
 {
-	return readl(hw->hw_addr + reg);
+    return readl(hw->hw_addr + reg);
 }
 
-static inline void __ew32(struct e1000_hw *hw, unsigned long reg, u32 val)
+static inline void __ew32(struct e1000_hw* hw, unsigned long reg, u32 val)
 {
-	writel(val, hw->hw_addr + reg);
+    writel(val, hw->hw_addr + reg);
 }
-#define er32(reg)	E1000_READ_REG(hw, E1000_##reg)
-#define ew32(reg,val)	E1000_WRITE_REG(hw, E1000_##reg, (val))
-#define e1e_flush()	er32(STATUS)
+    #define er32(reg) E1000_READ_REG(hw, E1000_##reg)
+    #define ew32(reg, val) E1000_WRITE_REG(hw, E1000_##reg, (val))
+    #define e1e_flush() er32(STATUS)
 
 #endif /* _IGBVF_H_ */

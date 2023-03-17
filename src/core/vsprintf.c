@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stddef.h>
 #include <stdarg.h>
@@ -32,20 +32,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file */
 
-#define CHAR_LEN	0	/**< "hh" length modifier */
-#define SHORT_LEN	1	/**< "h" length modifier */
-#define INT_LEN		2	/**< no length modifier */
-#define LONG_LEN	3	/**< "l" length modifier */
-#define LONGLONG_LEN	4	/**< "ll" length modifier */
-#define SIZE_T_LEN	5	/**< "z" length modifier */
+#define CHAR_LEN 0     /**< "hh" length modifier */
+#define SHORT_LEN 1    /**< "h" length modifier */
+#define INT_LEN 2      /**< no length modifier */
+#define LONG_LEN 3     /**< "l" length modifier */
+#define LONGLONG_LEN 4 /**< "ll" length modifier */
+#define SIZE_T_LEN 5   /**< "z" length modifier */
 
 static uint8_t type_sizes[] = {
-	[CHAR_LEN]	= sizeof ( char ),
-	[SHORT_LEN]	= sizeof ( short ),
-	[INT_LEN]	= sizeof ( int ),
-	[LONG_LEN]	= sizeof ( long ),
-	[LONGLONG_LEN]	= sizeof ( long long ),
-	[SIZE_T_LEN]	= sizeof ( size_t ),
+    [CHAR_LEN] = sizeof(char),
+    [SHORT_LEN] = sizeof(short),
+    [INT_LEN] = sizeof(int),
+    [LONG_LEN] = sizeof(long),
+    [LONGLONG_LEN] = sizeof(long long),
+    [SIZE_T_LEN] = sizeof(size_t),
 };
 
 /**
@@ -90,29 +90,29 @@ static uint8_t type_sizes[] = {
  * There must be enough space in the buffer to contain the largest
  * number that this function can format.
  */
-static char * format_hex ( char *end, unsigned long long num, int width,
-			   int flags ) {
-	char *ptr = end;
-	int case_mod = ( flags & LCASE );
-	int pad = ( ( flags & ZPAD ) | ' ' );
+static char* format_hex(char* end, unsigned long long num, int width,
+                        int flags) {
+    char* ptr = end;
+    int case_mod = (flags & LCASE);
+    int pad = ((flags & ZPAD) | ' ');
 
-	/* Generate the number */
-	do {
-		*(--ptr) = "0123456789ABCDEF"[ num & 0xf ] | case_mod;
-		num >>= 4;
-	} while ( num );
+    /* Generate the number */
+    do {
+        *(--ptr) = "0123456789ABCDEF"[num & 0xf] | case_mod;
+        num >>= 4;
+    } while (num);
 
-	/* Pad to width */
-	while ( ( end - ptr ) < width )
-		*(--ptr) = pad;
+    /* Pad to width */
+    while ((end - ptr) < width)
+        *(--ptr) = pad;
 
-	/* Add "0x" or "0X" if alternate form specified */
-	if ( flags & ALT_FORM ) {
-		*(--ptr) = 'X' | case_mod;
-		*(--ptr) = '0';
-	}
+    /* Add "0x" or "0X" if alternate form specified */
+    if (flags & ALT_FORM) {
+        *(--ptr) = 'X' | case_mod;
+        *(--ptr) = '0';
+    }
 
-	return ptr;
+    return ptr;
 }
 
 /**
@@ -130,36 +130,36 @@ static char * format_hex ( char *end, unsigned long long num, int width,
  * There must be enough space in the buffer to contain the largest
  * number that this function can format.
  */
-static char * format_decimal ( char *end, signed long num, int width,
-			       int flags ) {
-	char *ptr = end;
-	int negative = 0;
-	int zpad = ( flags & ZPAD );
-	int pad = ( zpad | ' ' );
+static char* format_decimal(char* end, signed long num, int width,
+                            int flags) {
+    char* ptr = end;
+    int negative = 0;
+    int zpad = (flags & ZPAD);
+    int pad = (zpad | ' ');
 
-	/* Generate the number */
-	if ( num < 0 ) {
-		negative = 1;
-		num = -num;
-	}
-	do {
-		*(--ptr) = '0' + ( num % 10 );
-		num /= 10;
-	} while ( num );
+    /* Generate the number */
+    if (num < 0) {
+        negative = 1;
+        num = -num;
+    }
+    do {
+        *(--ptr) = '0' + (num % 10);
+        num /= 10;
+    } while (num);
 
-	/* Add "-" if necessary */
-	if ( negative && ( ! zpad ) )
-		*(--ptr) = '-';
+    /* Add "-" if necessary */
+    if (negative && (!zpad))
+        *(--ptr) = '-';
 
-	/* Pad to width */
-	while ( ( end - ptr ) < width )
-		*(--ptr) = pad;
+    /* Pad to width */
+    while ((end - ptr) < width)
+        *(--ptr) = pad;
 
-	/* Add "-" if necessary */
-	if ( negative && zpad )
-		*ptr = '-';
+    /* Add "-" if necessary */
+    if (negative && zpad)
+        *ptr = '-';
 
-	return ptr;
+    return ptr;
 }
 
 /**
@@ -171,9 +171,9 @@ static char * format_decimal ( char *end, signed long num, int width,
  * Call's the printf_context::handler() method and increments
  * printf_context::len.
  */
-static inline void cputchar ( struct printf_context *ctx, unsigned char c ) {
-	ctx->handler ( ctx, c );
-	++ctx->len;
+static inline void cputchar(struct printf_context* ctx, unsigned char c) {
+    ctx->handler(ctx, c);
+    ++ctx->len;
 }
 
 /**
@@ -184,141 +184,141 @@ static inline void cputchar ( struct printf_context *ctx, unsigned char c ) {
  * @v args		Arguments corresponding to the format string
  * @ret len		Length of formatted string
  */
-size_t vcprintf ( struct printf_context *ctx, const char *fmt, va_list args ) {
-	int flags;
-	int width;
-	uint8_t *length;
-	char *ptr;
-	char tmp_buf[32]; /* 32 is enough for all numerical formats.
-			   * Insane width fields could overflow this buffer. */
-	wchar_t *wptr;
+size_t vcprintf(struct printf_context* ctx, const char* fmt, va_list args) {
+    int flags;
+    int width;
+    uint8_t* length;
+    char* ptr;
+    char tmp_buf[32]; /* 32 is enough for all numerical formats.
+                       * Insane width fields could overflow this buffer. */
+    wchar_t* wptr;
 
-	/* Initialise context */
-	ctx->len = 0;
+    /* Initialise context */
+    ctx->len = 0;
 
-	for ( ; *fmt ; fmt++ ) {
-		/* Pass through ordinary characters */
-		if ( *fmt != '%' ) {
-			cputchar ( ctx, *fmt );
-			continue;
-		}
-		fmt++;
-		/* Process flag characters */
-		flags = 0;
-		for ( ; ; fmt++ ) {
-			if ( *fmt == '#' ) {
-				flags |= ALT_FORM;
-			} else if ( *fmt == '0' ) {
-				flags |= ZPAD;
-			} else {
-				/* End of flag characters */
-				break;
-			}
-		}
-		/* Process field width */
-		width = 0;
-		for ( ; ; fmt++ ) {
-			if ( ( ( unsigned ) ( *fmt - '0' ) ) < 10 ) {
-				width = ( width * 10 ) + ( *fmt - '0' );
-			} else {
-				break;
-			}
-		}
-		/* We don't do floating point */
-		/* Process length modifier */
-		length = &type_sizes[INT_LEN];
-		for ( ; ; fmt++ ) {
-			if ( *fmt == 'h' ) {
-				length--;
-			} else if ( *fmt == 'l' ) {
-				length++;
-			} else if ( *fmt == 'z' ) {
-				length = &type_sizes[SIZE_T_LEN];
-			} else {
-				break;
-			}
-		}
-		/* Process conversion specifier */
-		ptr = tmp_buf + sizeof ( tmp_buf ) - 1;
-		*ptr = '\0';
-		wptr = NULL;
-		if ( *fmt == 'c' ) {
-			if ( length < &type_sizes[LONG_LEN] ) {
-				cputchar ( ctx, va_arg ( args, unsigned int ) );
-			} else {
-				wchar_t wc;
-				size_t len;
+    for (; *fmt; fmt++) {
+        /* Pass through ordinary characters */
+        if (*fmt != '%') {
+            cputchar(ctx, *fmt);
+            continue;
+        }
+        fmt++;
+        /* Process flag characters */
+        flags = 0;
+        for (;; fmt++) {
+            if (*fmt == '#') {
+                flags |= ALT_FORM;
+            } else if (*fmt == '0') {
+                flags |= ZPAD;
+            } else {
+                /* End of flag characters */
+                break;
+            }
+        }
+        /* Process field width */
+        width = 0;
+        for (;; fmt++) {
+            if (((unsigned)(*fmt - '0')) < 10) {
+                width = (width * 10) + (*fmt - '0');
+            } else {
+                break;
+            }
+        }
+        /* We don't do floating point */
+        /* Process length modifier */
+        length = &type_sizes[INT_LEN];
+        for (;; fmt++) {
+            if (*fmt == 'h') {
+                length--;
+            } else if (*fmt == 'l') {
+                length++;
+            } else if (*fmt == 'z') {
+                length = &type_sizes[SIZE_T_LEN];
+            } else {
+                break;
+            }
+        }
+        /* Process conversion specifier */
+        ptr = tmp_buf + sizeof(tmp_buf) - 1;
+        *ptr = '\0';
+        wptr = NULL;
+        if (*fmt == 'c') {
+            if (length < &type_sizes[LONG_LEN]) {
+                cputchar(ctx, va_arg(args, unsigned int));
+            } else {
+                wchar_t wc;
+                size_t len;
 
-				wc = va_arg ( args, wint_t );
-				len = wcrtomb ( tmp_buf, wc, NULL );
-				tmp_buf[len] = '\0';
-				ptr = tmp_buf;
-			}
-		} else if ( *fmt == 's' ) {
-			if ( length < &type_sizes[LONG_LEN] ) {
-				ptr = va_arg ( args, char * );
-				if ( ! ptr )
-					ptr = "<NULL>";
-			} else {
-				wptr = va_arg ( args, wchar_t * );
-				if ( ! wptr )
-					ptr = "<NULL>";
-			}
-		} else if ( *fmt == 'p' ) {
-			intptr_t ptrval;
+                wc = va_arg(args, wint_t);
+                len = wcrtomb(tmp_buf, wc, NULL);
+                tmp_buf[len] = '\0';
+                ptr = tmp_buf;
+            }
+        } else if (*fmt == 's') {
+            if (length < &type_sizes[LONG_LEN]) {
+                ptr = va_arg(args, char*);
+                if (!ptr)
+                    ptr = "<NULL>";
+            } else {
+                wptr = va_arg(args, wchar_t*);
+                if (!wptr)
+                    ptr = "<NULL>";
+            }
+        } else if (*fmt == 'p') {
+            intptr_t ptrval;
 
-			ptrval = ( intptr_t ) va_arg ( args, void * );
-			ptr = format_hex ( ptr, ptrval, width, 
-					   ( ALT_FORM | LCASE ) );
-		} else if ( ( *fmt & ~0x20 ) == 'X' ) {
-			unsigned long long hex;
+            ptrval = (intptr_t)va_arg(args, void*);
+            ptr = format_hex(ptr, ptrval, width,
+                             (ALT_FORM | LCASE));
+        } else if ((*fmt & ~0x20) == 'X') {
+            unsigned long long hex;
 
-			flags |= ( *fmt & 0x20 ); /* LCASE */
-			if ( *length >= sizeof ( unsigned long long ) ) {
-				hex = va_arg ( args, unsigned long long );
-			} else if ( *length >= sizeof ( unsigned long ) ) {
-				hex = va_arg ( args, unsigned long );
-			} else {
-				hex = va_arg ( args, unsigned int );
-			}
-			ptr = format_hex ( ptr, hex, width, flags );
-		} else if ( ( *fmt == 'd' ) || ( *fmt == 'i' ) ){
-			signed long decimal;
+            flags |= (*fmt & 0x20); /* LCASE */
+            if (*length >= sizeof(unsigned long long)) {
+                hex = va_arg(args, unsigned long long);
+            } else if (*length >= sizeof(unsigned long)) {
+                hex = va_arg(args, unsigned long);
+            } else {
+                hex = va_arg(args, unsigned int);
+            }
+            ptr = format_hex(ptr, hex, width, flags);
+        } else if ((*fmt == 'd') || (*fmt == 'i')) {
+            signed long decimal;
 
-			if ( *length >= sizeof ( signed long ) ) {
-				decimal = va_arg ( args, signed long );
-			} else {
-				decimal = va_arg ( args, signed int );
-			}
-			ptr = format_decimal ( ptr, decimal, width, flags );
-		} else {
-			*(--ptr) = *fmt;
-		}
-		/* Write out conversion result */
-		if ( wptr == NULL ) {
-			for ( ; *ptr ; ptr++ ) {
-				cputchar ( ctx, *ptr );
-			}
-		} else {
-			for ( ; *wptr ; wptr++ ) {
-				size_t len = wcrtomb ( tmp_buf, *wptr, NULL );
-				for ( ptr = tmp_buf ; len-- ; ptr++ ) {
-					cputchar ( ctx, *ptr );
-				}
-			}
-		}
-	}
+            if (*length >= sizeof(signed long)) {
+                decimal = va_arg(args, signed long);
+            } else {
+                decimal = va_arg(args, signed int);
+            }
+            ptr = format_decimal(ptr, decimal, width, flags);
+        } else {
+            *(--ptr) = *fmt;
+        }
+        /* Write out conversion result */
+        if (wptr == NULL) {
+            for (; *ptr; ptr++) {
+                cputchar(ctx, *ptr);
+            }
+        } else {
+            for (; *wptr; wptr++) {
+                size_t len = wcrtomb(tmp_buf, *wptr, NULL);
+                for (ptr = tmp_buf; len--; ptr++) {
+                    cputchar(ctx, *ptr);
+                }
+            }
+        }
+    }
 
-	return ctx->len;
+    return ctx->len;
 }
 
 /** Context used by vsnprintf() and friends */
 struct sputc_context {
-	struct printf_context ctx;
-	/** Buffer for formatted string (used by printf_sputc()) */
-	char *buf;
-	/** Buffer length (used by printf_sputc()) */
-	size_t max_len;	
+    struct printf_context ctx;
+    /** Buffer for formatted string (used by printf_sputc()) */
+    char* buf;
+    /** Buffer length (used by printf_sputc()) */
+    size_t max_len;
 };
 
 /**
@@ -327,12 +327,12 @@ struct sputc_context {
  * @v ctx		Context
  * @v c			Character
  */
-static void printf_sputc ( struct printf_context *ctx, unsigned int c ) {
-	struct sputc_context * sctx =
-		container_of ( ctx, struct sputc_context, ctx );
+static void printf_sputc(struct printf_context* ctx, unsigned int c) {
+    struct sputc_context* sctx =
+        container_of(ctx, struct sputc_context, ctx);
 
-	if ( ctx->len < sctx->max_len )
-		sctx->buf[ctx->len] = c;
+    if (ctx->len < sctx->max_len)
+        sctx->buf[ctx->len] = c;
 }
 
 /**
@@ -348,26 +348,26 @@ static void printf_sputc ( struct printf_context *ctx, unsigned int c ) {
  * length is the length that would have been written had enough space
  * been available.
  */
-int vsnprintf ( char *buf, size_t size, const char *fmt, va_list args ) {
-	struct sputc_context sctx;
-	size_t len;
-	size_t end;
+int vsnprintf(char* buf, size_t size, const char* fmt, va_list args) {
+    struct sputc_context sctx;
+    size_t len;
+    size_t end;
 
-	/* Hand off to vcprintf */
-	sctx.ctx.handler = printf_sputc;
-	sctx.buf = buf;
-	sctx.max_len = size;
-	len = vcprintf ( &sctx.ctx, fmt, args );
+    /* Hand off to vcprintf */
+    sctx.ctx.handler = printf_sputc;
+    sctx.buf = buf;
+    sctx.max_len = size;
+    len = vcprintf(&sctx.ctx, fmt, args);
 
-	/* Add trailing NUL */
-	if ( size ) {
-		end = size - 1;
-		if ( len < end )
-			end = len;
-		buf[end] = '\0';
-	}
+    /* Add trailing NUL */
+    if (size) {
+        end = size - 1;
+        if (len < end)
+            end = len;
+        buf[end] = '\0';
+    }
 
-	return len;
+    return len;
 }
 
 /**
@@ -379,14 +379,14 @@ int vsnprintf ( char *buf, size_t size, const char *fmt, va_list args ) {
  * @v ...		Arguments corresponding to the format string
  * @ret len		Length of formatted string
  */
-int snprintf ( char *buf, size_t size, const char *fmt, ... ) {
-	va_list args;
-	int i;
+int snprintf(char* buf, size_t size, const char* fmt, ...) {
+    va_list args;
+    int i;
 
-	va_start ( args, fmt );
-	i = vsnprintf ( buf, size, fmt, args );
-	va_end ( args );
-	return i;
+    va_start(args, fmt);
+    i = vsnprintf(buf, size, fmt, args);
+    va_end(args);
+    return i;
 }
 
 /**
@@ -398,14 +398,13 @@ int snprintf ( char *buf, size_t size, const char *fmt, ... ) {
  * @v args		Arguments corresponding to the format string
  * @ret len		Length of formatted string
  */
-int vssnprintf ( char *buf, ssize_t ssize, const char *fmt, va_list args ) {
+int vssnprintf(char* buf, ssize_t ssize, const char* fmt, va_list args) {
+    /* Treat negative buffer size as zero buffer size */
+    if (ssize < 0)
+        ssize = 0;
 
-	/* Treat negative buffer size as zero buffer size */
-	if ( ssize < 0 )
-		ssize = 0;
-
-	/* Hand off to vsnprintf */
-	return vsnprintf ( buf, ssize, fmt, args );
+    /* Hand off to vsnprintf */
+    return vsnprintf(buf, ssize, fmt, args);
 }
 
 /**
@@ -417,15 +416,15 @@ int vssnprintf ( char *buf, ssize_t ssize, const char *fmt, va_list args ) {
  * @v ...		Arguments corresponding to the format string
  * @ret len		Length of formatted string
  */
-int ssnprintf ( char *buf, ssize_t ssize, const char *fmt, ... ) {
-	va_list args;
-	int len;
+int ssnprintf(char* buf, ssize_t ssize, const char* fmt, ...) {
+    va_list args;
+    int len;
 
-	/* Hand off to vssnprintf */
-	va_start ( args, fmt );
-	len = vssnprintf ( buf, ssize, fmt, args );
-	va_end ( args );
-	return len;
+    /* Hand off to vssnprintf */
+    va_start(args, fmt);
+    len = vssnprintf(buf, ssize, fmt, args);
+    va_end(args);
+    return len;
 }
 
 /**
@@ -434,9 +433,9 @@ int ssnprintf ( char *buf, ssize_t ssize, const char *fmt, ... ) {
  * @v ctx		Context
  * @v c			Character
  */
-static void printf_putchar ( struct printf_context *ctx __unused,
-			     unsigned int c ) {
-	putchar ( c );
+static void printf_putchar(struct printf_context* ctx __unused,
+                           unsigned int c) {
+    putchar(c);
 }
 
 /**
@@ -446,12 +445,12 @@ static void printf_putchar ( struct printf_context *ctx __unused,
  * @v args		Arguments corresponding to the format string
  * @ret len		Length of formatted string
  */
-int vprintf ( const char *fmt, va_list args ) {
-	struct printf_context ctx;
+int vprintf(const char* fmt, va_list args) {
+    struct printf_context ctx;
 
-	/* Hand off to vcprintf */
-	ctx.handler = printf_putchar;	
-	return vcprintf ( &ctx, fmt, args );	
+    /* Hand off to vcprintf */
+    ctx.handler = printf_putchar;
+    return vcprintf(&ctx, fmt, args);
 }
 
 /**
@@ -461,12 +460,12 @@ int vprintf ( const char *fmt, va_list args ) {
  * @v ...		Arguments corresponding to the format string
  * @ret	len		Length of formatted string
  */
-int printf ( const char *fmt, ... ) {
-	va_list args;
-	int i;
+int printf(const char* fmt, ...) {
+    va_list args;
+    int i;
 
-	va_start ( args, fmt );
-	i = vprintf ( fmt, args );
-	va_end ( args );
-	return i;
+    va_start(args, fmt);
+    i = vprintf(fmt, args);
+    va_end(args);
+    return i;
 }

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <errno.h>
@@ -40,39 +40,39 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v hid		USB human interface device
  * @ret rc		Return status code
  */
-int usbhid_open ( struct usb_hid *hid ) {
-	int rc;
+int usbhid_open(struct usb_hid* hid) {
+    int rc;
 
-	/* Open interrupt IN endpoint */
-	if ( ( rc = usb_endpoint_open ( &hid->in ) ) != 0 ) {
-		DBGC ( hid, "HID %s could not open interrupt IN: %s\n",
-		       hid->func->name, strerror ( rc ) );
-		goto err_open_in;
-	}
+    /* Open interrupt IN endpoint */
+    if ((rc = usb_endpoint_open(&hid->in)) != 0) {
+        DBGC(hid, "HID %s could not open interrupt IN: %s\n",
+             hid->func->name, strerror(rc));
+        goto err_open_in;
+    }
 
-	/* Refill interrupt IN endpoint */
-	if ( ( rc = usb_refill ( &hid->in ) ) != 0 ) {
-		DBGC ( hid, "HID %s could not refill interrupt IN: %s\n",
-		       hid->func->name, strerror ( rc ) );
-		goto err_refill_in;
-	}
+    /* Refill interrupt IN endpoint */
+    if ((rc = usb_refill(&hid->in)) != 0) {
+        DBGC(hid, "HID %s could not refill interrupt IN: %s\n",
+             hid->func->name, strerror(rc));
+        goto err_refill_in;
+    }
 
-	/* Open interrupt OUT endpoint, if applicable */
-	if ( hid->out.usb &&
-	     ( ( rc = usb_endpoint_open ( &hid->out ) ) != 0 ) ) {
-		DBGC ( hid, "HID %s could not open interrupt OUT: %s\n",
-		       hid->func->name, strerror ( rc ) );
-		goto err_open_out;
-	}
+    /* Open interrupt OUT endpoint, if applicable */
+    if (hid->out.usb &&
+        ((rc = usb_endpoint_open(&hid->out)) != 0)) {
+        DBGC(hid, "HID %s could not open interrupt OUT: %s\n",
+             hid->func->name, strerror(rc));
+        goto err_open_out;
+    }
 
-	return 0;
+    return 0;
 
-	usb_endpoint_close ( &hid->out );
- err_open_out:
- err_refill_in:
-	usb_endpoint_close ( &hid->in );
- err_open_in:
-	return rc;
+    usb_endpoint_close(&hid->out);
+err_open_out:
+err_refill_in:
+    usb_endpoint_close(&hid->in);
+err_open_in:
+    return rc;
 }
 
 /**
@@ -80,14 +80,13 @@ int usbhid_open ( struct usb_hid *hid ) {
  *
  * @v hid		USB human interface device
  */
-void usbhid_close ( struct usb_hid *hid ) {
+void usbhid_close(struct usb_hid* hid) {
+    /* Close interrupt OUT endpoint, if applicable */
+    if (hid->out.usb)
+        usb_endpoint_close(&hid->out);
 
-	/* Close interrupt OUT endpoint, if applicable */
-	if ( hid->out.usb )
-		usb_endpoint_close ( &hid->out );
-
-	/* Close interrupt IN endpoint */
-	usb_endpoint_close ( &hid->in );
+    /* Close interrupt IN endpoint */
+    usb_endpoint_close(&hid->in);
 }
 
 /**
@@ -96,18 +95,18 @@ void usbhid_close ( struct usb_hid *hid ) {
  * @v hid		USB human interface device
  * @ret rc		Return status code
  */
-int usbhid_refill ( struct usb_hid *hid ) {
-	int rc;
+int usbhid_refill(struct usb_hid* hid) {
+    int rc;
 
-	/* Refill interrupt IN endpoint */
-	if ( ( rc = usb_refill ( &hid->in ) ) != 0 )
-		return rc;
+    /* Refill interrupt IN endpoint */
+    if ((rc = usb_refill(&hid->in)) != 0)
+        return rc;
 
-	/* Refill interrupt OUT endpoint, if applicable */
-	if ( hid->out.usb && ( ( rc = usb_refill ( &hid->out ) ) != 0 ) )
-		return rc;
+    /* Refill interrupt OUT endpoint, if applicable */
+    if (hid->out.usb && ((rc = usb_refill(&hid->out)) != 0))
+        return rc;
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -117,35 +116,35 @@ int usbhid_refill ( struct usb_hid *hid ) {
  * @v config		Configuration descriptor
  * @ret rc		Return status code
  */
-int usbhid_describe ( struct usb_hid *hid,
-		      struct usb_configuration_descriptor *config ) {
-	struct usb_interface_descriptor *desc;
-	int rc;
+int usbhid_describe(struct usb_hid* hid,
+                    struct usb_configuration_descriptor* config) {
+    struct usb_interface_descriptor* desc;
+    int rc;
 
-	/* Locate interface descriptor */
-	desc = usb_interface_descriptor ( config, hid->func->interface[0], 0 );
-	if ( ! desc ) {
-		DBGC ( hid, "HID %s has no interface descriptor\n",
-		       hid->func->name );
-		return -EINVAL;
-	}
+    /* Locate interface descriptor */
+    desc = usb_interface_descriptor(config, hid->func->interface[0], 0);
+    if (!desc) {
+        DBGC(hid, "HID %s has no interface descriptor\n",
+             hid->func->name);
+        return -EINVAL;
+    }
 
-	/* Describe interrupt IN endpoint */
-	if ( ( rc = usb_endpoint_described ( &hid->in, config, desc,
-					     USB_INTERRUPT_IN, 0 ) ) != 0 ) {
-		DBGC ( hid, "HID %s could not describe interrupt IN: %s\n",
-		       hid->func->name, strerror ( rc ) );
-		return rc;
-	}
+    /* Describe interrupt IN endpoint */
+    if ((rc = usb_endpoint_described(&hid->in, config, desc,
+                                     USB_INTERRUPT_IN, 0)) != 0) {
+        DBGC(hid, "HID %s could not describe interrupt IN: %s\n",
+             hid->func->name, strerror(rc));
+        return rc;
+    }
 
-	/* Describe interrupt OUT endpoint, if applicable */
-	if ( hid->out.usb &&
-	     ( ( rc = usb_endpoint_described ( &hid->out, config, desc,
-					       USB_INTERRUPT_OUT, 0 ) ) != 0 )){
-		DBGC ( hid, "HID %s could not describe interrupt OUT: %s\n",
-		       hid->func->name, strerror ( rc ) );
-		return rc;
-	}
+    /* Describe interrupt OUT endpoint, if applicable */
+    if (hid->out.usb &&
+        ((rc = usb_endpoint_described(&hid->out, config, desc,
+                                      USB_INTERRUPT_OUT, 0)) != 0)) {
+        DBGC(hid, "HID %s could not describe interrupt OUT: %s\n",
+             hid->func->name, strerror(rc));
+        return rc;
+    }
 
-	return 0;
+    return 0;
 }

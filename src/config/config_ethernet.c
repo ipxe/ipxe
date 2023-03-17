@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <config/general.h>
 
@@ -35,17 +35,20 @@ PROVIDE_REQUIRING_SYMBOL();
  * Drag in Ethernet-specific protocols
  */
 #ifdef SANBOOT_PROTO_AOE
-REQUIRE_OBJECT ( aoe );
+REQUIRE_OBJECT(aoe);
 #endif
 #ifdef NET_PROTO_FCOE
-REQUIRE_OBJECT ( fcoe );
+REQUIRE_OBJECT(fcoe);
 #endif
 #ifdef NET_PROTO_STP
-REQUIRE_OBJECT ( stp );
+REQUIRE_OBJECT(stp);
 #endif
 #ifdef NET_PROTO_LACP
-REQUIRE_OBJECT ( eth_slow );
+REQUIRE_OBJECT(eth_slow);
 #endif
 #ifdef NET_PROTO_EAPOL
-REQUIRE_OBJECT ( eapol );
+REQUIRE_OBJECT(eapol);
+#endif
+#ifdef NET_PROTO_LLDP
+REQUIRE_OBJECT(lldp);
 #endif

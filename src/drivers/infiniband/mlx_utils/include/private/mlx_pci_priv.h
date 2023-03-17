@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef STUB_MLXUTILS_INCLUDE_PRIVATE_PCIPRIV_H_
-#define STUB_MLXUTILS_INCLUDE_PRIVATE_PCIPRIV_H_
+    #define STUB_MLXUTILS_INCLUDE_PRIVATE_PCIPRIV_H_
 
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
@@ -20,58 +22,51 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
-#include "../../include/public/mlx_pci.h"
-#include "../../include/public/mlx_utils.h"
+    #include "../../include/public/mlx_pci.h"
+    #include "../../include/public/mlx_utils.h"
 
 mlx_status
 mlx_pci_init_priv(
-			IN mlx_utils *utils
-			);
+    IN mlx_utils* utils);
 
 mlx_status
 mlx_pci_teardown_priv(
-			IN mlx_utils *utils
-			);
+    IN mlx_utils* utils);
 
 mlx_status
 mlx_pci_read_priv(
-			IN mlx_utils *utils,
-			IN mlx_pci_width width,
-			IN mlx_uint32 offset,
-			IN mlx_uintn count,
-			OUT mlx_void *buffer
-			);
+    IN mlx_utils* utils,
+    IN mlx_pci_width width,
+    IN mlx_uint32 offset,
+    IN mlx_uintn count,
+    OUT mlx_void* buffer);
 
 mlx_status
 mlx_pci_write_priv(
-			IN mlx_utils *utils,
-			IN mlx_pci_width width,
-			IN mlx_uint32 offset,
-			IN mlx_uintn count,
-			IN mlx_void *buffer
-			);
+    IN mlx_utils* utils,
+    IN mlx_pci_width width,
+    IN mlx_uint32 offset,
+    IN mlx_uintn count,
+    IN mlx_void* buffer);
 
 mlx_status
 mlx_pci_mem_read_priv(
-				IN mlx_utils *utils,
-				IN mlx_pci_width width,
-				IN mlx_uint8 bar_index,
-				IN mlx_uint64 offset,
-				IN mlx_uintn count,
-				OUT mlx_void *buffer
-				);
+    IN mlx_utils* utils,
+    IN mlx_pci_width width,
+    IN mlx_uint8 bar_index,
+    IN mlx_uint64 offset,
+    IN mlx_uintn count,
+    OUT mlx_void* buffer);
 
 mlx_status
 mlx_pci_mem_write_priv(
-				IN mlx_utils *utils,
-				IN mlx_pci_width width,
-				IN mlx_uint8 bar_index,
-				IN mlx_uint64 offset,
-				IN mlx_uintn count,
-				IN mlx_void *buffer
-				);
-
+    IN mlx_utils* utils,
+    IN mlx_pci_width width,
+    IN mlx_uint8 bar_index,
+    IN mlx_uint64 offset,
+    IN mlx_uintn count,
+    IN mlx_void* buffer);
 
 #endif /* STUB_MLXUTILS_INCLUDE_PRIVATE_PCIPRIV_H_ */

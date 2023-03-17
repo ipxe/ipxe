@@ -6,5 +6,5 @@
 
 __libgcc int64_t __divdi3(int64_t num, int64_t den)
 {
-  return __divmoddi4(num, den, NULL);
+    return __divmoddi4(num, den, NULL);
 }

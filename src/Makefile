@@ -10,6 +10,7 @@ LDFLAGS		:=
 HOST_CFLAGS	:=
 MAKEDEPS	:= Makefile
 CROSS_COMPILE	?= $(CROSS)
+SYMBOL_PREFIX	:=
 
 ###############################################################################
 #
@@ -23,6 +24,7 @@ CP		:= cp
 ECHO		:= echo
 PRINTF		:= printf
 PERL		:= perl
+PYTHON		:= python
 TRUE		:= true
 CC		:= $(CROSS_COMPILE)gcc
 CPP		:= $(CC) -E
@@ -48,9 +50,8 @@ ELF2EFI32	:= ./util/elf2efi32
 ELF2EFI64	:= ./util/elf2efi64
 EFIROM		:= ./util/efirom
 EFIFATBIN	:= ./util/efifatbin
-ICCFIX		:= ./util/iccfix
 EINFO		:= ./util/einfo
-GENKEYMAP	:= ./util/genkeymap.pl
+GENKEYMAP	:= ./util/genkeymap.py
 DOXYGEN		:= doxygen
 LCAB		:= lcab
 QEMUIMG		:= qemu-img
@@ -190,7 +191,7 @@ vmware : bin/8086100f.mrom bin/808610d3.mrom bin/10222000.rom bin/15ad07b0.rom
 	@$(ECHO) '    bin/10222000.rom  -- vlance/pcnet32'
 	@$(ECHO) '    bin/15ad07b0.rom  -- vmxnet3'
 	@$(ECHO) 
-	@$(ECHO) 'For more information, see http://ipxe.org/howto/vmware'
+	@$(ECHO) 'For more information, see https://ipxe.org/howto/vmware'
 	@$(ECHO)
 	@$(ECHO) '==========================================================='
 

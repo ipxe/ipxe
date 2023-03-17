@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <string.h>
@@ -44,22 +44,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v smbios		SMBIOS entry point descriptor structure to fill in
  * @ret rc		Return status code
  */
-static int bios_find_smbios ( struct smbios *smbios ) {
-	struct smbios_entry entry;
-	int rc;
+static int bios_find_smbios(struct smbios* smbios) {
+    struct smbios_entry entry;
+    int rc;
 
-	/* Scan through BIOS segment to find SMBIOS entry point */
-	if ( ( rc = find_smbios_entry ( real_to_user ( BIOS_SEG, 0 ), 0x10000,
-					&entry ) ) != 0 )
-		return rc;
+    /* Scan through BIOS segment to find SMBIOS entry point */
+    if ((rc = find_smbios_entry(real_to_user(BIOS_SEG, 0), 0x10000,
+                                &entry)) != 0)
+        return rc;
 
-	/* Fill in entry point descriptor structure */
-	smbios->address = phys_to_user ( entry.smbios_address );
-	smbios->len = entry.smbios_len;
-	smbios->count = entry.smbios_count;
-	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );
+    /* Fill in entry point descriptor structure */
+    smbios->address = phys_to_user(entry.smbios_address);
+    smbios->len = entry.smbios_len;
+    smbios->count = entry.smbios_count;
+    smbios->version = SMBIOS_VERSION(entry.major, entry.minor);
 
-	return 0;
+    return 0;
 }
 
-PROVIDE_SMBIOS ( pcbios, find_smbios, bios_find_smbios );
+PROVIDE_SMBIOS(pcbios, find_smbios, bios_find_smbios);

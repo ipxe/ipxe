@@ -1,7 +1,9 @@
-#ifndef ISA_IDS_H
-#define ISA_IDS_H
+#pragma once
 
-/* 
+#ifndef ISA_IDS_H
+    #define ISA_IDS_H
+
+/*
  * This file defines IDs as used by ISAPnP and EISA devices.  These
  * IDs have the format:
  *
@@ -19,33 +21,33 @@
  * the underlying "meaning" is big-endian.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <byteswap.h>
+    #include <byteswap.h>
 
-/*
- * Construct a vendor ID from three ASCII characters
- *
- */
-#define ISA_VENDOR( a, b, c )					\
-	bswap_16 ( ( ( ( (a) - 'A' + 1 ) & 0x1f ) << 10 ) |	\
-		   ( ( ( (b) - 'A' + 1 ) & 0x1f ) << 5 ) |	\
-		   ( ( ( (c) - 'A' + 1 ) & 0x1f ) << 0 ) )
+    /*
+     * Construct a vendor ID from three ASCII characters
+     *
+     */
+    #define ISA_VENDOR(a, b, c)                     \
+        bswap_16(((((a) - 'A' + 1) & 0x1f) << 10) | \
+                 ((((b) - 'A' + 1) & 0x1f) << 5) |  \
+                 ((((c) - 'A' + 1) & 0x1f) << 0))
 
-#define ISAPNP_VENDOR( a, b, c )	ISA_VENDOR ( a, b, c )
-#define EISA_VENDOR( a, b, c )		ISA_VENDOR ( a, b, c )
+    #define ISAPNP_VENDOR(a, b, c) ISA_VENDOR(a, b, c)
+    #define EISA_VENDOR(a, b, c) ISA_VENDOR(a, b, c)
 
-#define	GENERIC_ISAPNP_VENDOR		ISAPNP_VENDOR ( 'P','N','P' )
+    #define GENERIC_ISAPNP_VENDOR ISAPNP_VENDOR('P', 'N', 'P')
 
-/*
- * Extract product ID and revision from combined product field
- *
- */
-#define ISA_PROD_ID_MASK	( 0xf0ff )
-#define ISA_PROD_ID(product)	( (product) & ISA_PROD_ID_MASK )
-#define ISA_PROD_REV(product)	( ( (product) & ~ISA_PROD_ID_MASK ) >> 8 )
+    /*
+     * Extract product ID and revision from combined product field
+     *
+     */
+    #define ISA_PROD_ID_MASK (0xf0ff)
+    #define ISA_PROD_ID(product) ((product)&ISA_PROD_ID_MASK)
+    #define ISA_PROD_REV(product) (((product) & ~ISA_PROD_ID_MASK) >> 8)
 
 /* Functions in isa_ids.c */
-extern char * isa_id_string ( unsigned int vendor, unsigned int product );
+extern char* isa_id_string(unsigned int vendor, unsigned int product);
 
 #endif /* ISA_IDS_H */

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -31,6 +31,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/iomap.h>
 
-PROVIDE_IOMAP_INLINE ( virt, ioremap );
-PROVIDE_IOMAP_INLINE ( virt, iounmap );
-PROVIDE_IOMAP_INLINE ( virt, io_to_bus );
+PROVIDE_IOMAP_INLINE(virt, ioremap);
+PROVIDE_IOMAP_INLINE(virt, iounmap);
+PROVIDE_IOMAP_INLINE(virt, io_to_bus);

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <errno.h>
@@ -51,72 +51,72 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v usbnet		USB network device
  * @ret rc		Return status code
  */
-int usbnet_open ( struct usbnet_device *usbnet ) {
-	struct usb_device *usb = usbnet->func->usb;
-	int rc;
+int usbnet_open(struct usbnet_device* usbnet) {
+    struct usb_device* usb = usbnet->func->usb;
+    int rc;
 
-	/* Open interrupt endpoint, if applicable */
-	if ( usbnet_has_intr ( usbnet ) &&
-	     ( rc = usb_endpoint_open ( &usbnet->intr ) ) != 0 ) {
-		DBGC ( usbnet, "USBNET %s could not open interrupt: %s\n",
-		       usbnet->func->name, strerror ( rc ) );
-		goto err_open_intr;
-	}
+    /* Open interrupt endpoint, if applicable */
+    if (usbnet_has_intr(usbnet) &&
+        (rc = usb_endpoint_open(&usbnet->intr)) != 0) {
+        DBGC(usbnet, "USBNET %s could not open interrupt: %s\n",
+             usbnet->func->name, strerror(rc));
+        goto err_open_intr;
+    }
 
-	/* Refill interrupt endpoint, if applicable */
-	if ( usbnet_has_intr ( usbnet ) &&
-	     ( rc = usb_refill ( &usbnet->intr ) ) != 0 ) {
-		DBGC ( usbnet, "USBNET %s could not refill interrupt: %s\n",
-		       usbnet->func->name, strerror ( rc ) );
-		goto err_refill_intr;
-	}
+    /* Refill interrupt endpoint, if applicable */
+    if (usbnet_has_intr(usbnet) &&
+        (rc = usb_refill(&usbnet->intr)) != 0) {
+        DBGC(usbnet, "USBNET %s could not refill interrupt: %s\n",
+             usbnet->func->name, strerror(rc));
+        goto err_refill_intr;
+    }
 
-	/* Select alternate setting for data interface, if applicable */
-	if ( usbnet->alternate &&
-	     ( ( rc = usb_set_interface ( usb, usbnet->data,
-					  usbnet->alternate ) ) != 0 ) ) {
-		DBGC ( usbnet, "USBNET %s could not set alternate interface "
-		       "%d: %s\n", usbnet->func->name, usbnet->alternate,
-		       strerror ( rc ) );
-		goto err_set_interface;
-	}
+    /* Select alternate setting for data interface, if applicable */
+    if (usbnet->alternate &&
+        ((rc = usb_set_interface(usb, usbnet->data,
+                                 usbnet->alternate)) != 0)) {
+        DBGC(usbnet, "USBNET %s could not set alternate interface "
+                     "%d: %s\n", usbnet->func->name, usbnet->alternate,
+             strerror(rc));
+        goto err_set_interface;
+    }
 
-	/* Open bulk IN endpoint */
-	if ( ( rc = usb_endpoint_open ( &usbnet->in ) ) != 0 ) {
-		DBGC ( usbnet, "USBNET %s could not open bulk IN: %s\n",
-		       usbnet->func->name, strerror ( rc ) );
-		goto err_open_in;
-	}
+    /* Open bulk IN endpoint */
+    if ((rc = usb_endpoint_open(&usbnet->in)) != 0) {
+        DBGC(usbnet, "USBNET %s could not open bulk IN: %s\n",
+             usbnet->func->name, strerror(rc));
+        goto err_open_in;
+    }
 
-	/* Open bulk OUT endpoint */
-	if ( ( rc = usb_endpoint_open ( &usbnet->out ) ) != 0 ) {
-		DBGC ( usbnet, "USBNET %s could not open bulk OUT: %s\n",
-		       usbnet->func->name, strerror ( rc ) );
-		goto err_open_out;
-	}
+    /* Open bulk OUT endpoint */
+    if ((rc = usb_endpoint_open(&usbnet->out)) != 0) {
+        DBGC(usbnet, "USBNET %s could not open bulk OUT: %s\n",
+             usbnet->func->name, strerror(rc));
+        goto err_open_out;
+    }
 
-	/* Refill bulk IN endpoint */
-	if ( ( rc = usb_refill ( &usbnet->in ) ) != 0 ) {
-		DBGC ( usbnet, "USBNET %s could not refill bulk IN: %s\n",
-		       usbnet->func->name, strerror ( rc ) );
-		goto err_refill_in;
-	}
+    /* Refill bulk IN endpoint */
+    if ((rc = usb_refill(&usbnet->in)) != 0) {
+        DBGC(usbnet, "USBNET %s could not refill bulk IN: %s\n",
+             usbnet->func->name, strerror(rc));
+        goto err_refill_in;
+    }
 
-	return 0;
+    return 0;
 
- err_refill_in:
-	usb_endpoint_close ( &usbnet->out );
- err_open_out:
-	usb_endpoint_close ( &usbnet->in );
- err_open_in:
-	if ( usbnet->alternate )
-		usb_set_interface ( usb, usbnet->data, 0 );
- err_set_interface:
- err_refill_intr:
-	if ( usbnet_has_intr ( usbnet ) )
-		usb_endpoint_close ( &usbnet->intr );
- err_open_intr:
-	return rc;
+err_refill_in:
+    usb_endpoint_close(&usbnet->out);
+err_open_out:
+    usb_endpoint_close(&usbnet->in);
+err_open_in:
+    if (usbnet->alternate)
+        usb_set_interface(usb, usbnet->data, 0);
+err_set_interface:
+err_refill_intr:
+    if (usbnet_has_intr(usbnet))
+        usb_endpoint_close(&usbnet->intr);
+err_open_intr:
+    return rc;
 }
 
 /**
@@ -124,22 +124,22 @@ int usbnet_open ( struct usbnet_device *usbnet ) {
  *
  * @v usbnet		USB network device
  */
-void usbnet_close ( struct usbnet_device *usbnet ) {
-	struct usb_device *usb = usbnet->func->usb;
+void usbnet_close(struct usbnet_device* usbnet) {
+    struct usb_device* usb = usbnet->func->usb;
 
-	/* Close bulk OUT endpoint */
-	usb_endpoint_close ( &usbnet->out );
+    /* Close bulk OUT endpoint */
+    usb_endpoint_close(&usbnet->out);
 
-	/* Close bulk IN endpoint */
-	usb_endpoint_close ( &usbnet->in );
+    /* Close bulk IN endpoint */
+    usb_endpoint_close(&usbnet->in);
 
-	/* Reset alternate setting for data interface, if applicable */
-	if ( usbnet->alternate )
-		usb_set_interface ( usb, usbnet->data, 0 );
+    /* Reset alternate setting for data interface, if applicable */
+    if (usbnet->alternate)
+        usb_set_interface(usb, usbnet->data, 0);
 
-	/* Close interrupt endpoint, if applicable */
-	if ( usbnet_has_intr ( usbnet ) )
-		usb_endpoint_close ( &usbnet->intr );
+    /* Close interrupt endpoint, if applicable */
+    if (usbnet_has_intr(usbnet))
+        usb_endpoint_close(&usbnet->intr);
 }
 
 /**
@@ -148,20 +148,20 @@ void usbnet_close ( struct usbnet_device *usbnet ) {
  * @v usbnet		USB network device
  * @ret rc		Return status code
  */
-int usbnet_refill ( struct usbnet_device *usbnet ) {
-	int rc;
+int usbnet_refill(struct usbnet_device* usbnet) {
+    int rc;
 
-	/* Refill bulk IN endpoint */
-	if ( ( rc = usb_refill ( &usbnet->in ) ) != 0 )
-		return rc;
+    /* Refill bulk IN endpoint */
+    if ((rc = usb_refill(&usbnet->in)) != 0)
+        return rc;
 
-	/* Refill interrupt endpoint, if applicable */
-	if ( usbnet_has_intr ( usbnet ) &&
-	     ( rc = usb_refill ( &usbnet->intr ) ) != 0 ) {
-		return rc;
-	}
+    /* Refill interrupt endpoint, if applicable */
+    if (usbnet_has_intr(usbnet) &&
+        (rc = usb_refill(&usbnet->intr)) != 0) {
+        return rc;
+    }
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -171,40 +171,39 @@ int usbnet_refill ( struct usbnet_device *usbnet ) {
  * @v config		Configuration descriptor
  * @ret rc		Return status code
  */
-static int usbnet_comms_describe ( struct usbnet_device *usbnet,
-				   struct usb_configuration_descriptor *config){
-	struct usb_interface_descriptor *desc;
-	unsigned int comms;
-	unsigned int i;
-	int rc;
+static int usbnet_comms_describe(struct usbnet_device* usbnet,
+                                 struct usb_configuration_descriptor* config) {
+    struct usb_interface_descriptor* desc;
+    unsigned int comms;
+    unsigned int i;
+    int rc;
 
-	/* Iterate over all available interfaces */
-	for ( i = 0 ; i < usbnet->func->desc.count ; i++ ) {
+    /* Iterate over all available interfaces */
+    for (i = 0; i < usbnet->func->desc.count; i++) {
+        /* Get interface number */
+        comms = usbnet->func->interface[i];
 
-		/* Get interface number */
-		comms = usbnet->func->interface[i];
+        /* Locate interface descriptor */
+        desc = usb_interface_descriptor(config, comms, 0);
+        if (!desc)
+            continue;
 
-		/* Locate interface descriptor */
-		desc = usb_interface_descriptor ( config, comms, 0 );
-		if ( ! desc )
-			continue;
+        /* Describe interrupt endpoint */
+        if ((rc = usb_endpoint_described(&usbnet->intr, config,
+                                         desc, USB_INTERRUPT_IN,
+                                         0)) != 0)
+            continue;
 
-		/* Describe interrupt endpoint */
-		if ( ( rc = usb_endpoint_described ( &usbnet->intr, config,
-						     desc, USB_INTERRUPT_IN,
-						     0 ) ) != 0 )
-			continue;
+        /* Record communications interface */
+        usbnet->comms = comms;
+        DBGC(usbnet, "USBNET %s found communications interface %d\n",
+             usbnet->func->name, comms);
+        return 0;
+    }
 
-		/* Record communications interface */
-		usbnet->comms = comms;
-		DBGC ( usbnet, "USBNET %s found communications interface %d\n",
-		       usbnet->func->name, comms );
-		return 0;
-	}
-
-	DBGC ( usbnet, "USBNET %s found no communications interface\n",
-	       usbnet->func->name );
-	return -ENOENT;
+    DBGC(usbnet, "USBNET %s found no communications interface\n",
+         usbnet->func->name);
+    return -ENOENT;
 }
 
 /**
@@ -214,57 +213,55 @@ static int usbnet_comms_describe ( struct usbnet_device *usbnet,
  * @v config		Configuration descriptor
  * @ret rc		Return status code
  */
-static int usbnet_data_describe ( struct usbnet_device *usbnet,
-				  struct usb_configuration_descriptor *config ){
-	struct usb_interface_descriptor *desc;
-	unsigned int data;
-	unsigned int alt;
-	unsigned int i;
-	int rc;
+static int usbnet_data_describe(struct usbnet_device* usbnet,
+                                struct usb_configuration_descriptor* config) {
+    struct usb_interface_descriptor* desc;
+    unsigned int data;
+    unsigned int alt;
+    unsigned int i;
+    int rc;
 
-	/* Iterate over all available interfaces */
-	for ( i = 0 ; i < usbnet->func->desc.count ; i++ ) {
+    /* Iterate over all available interfaces */
+    for (i = 0; i < usbnet->func->desc.count; i++) {
+        /* Get interface number */
+        data = usbnet->func->interface[i];
 
-		/* Get interface number */
-		data = usbnet->func->interface[i];
+        /* Iterate over all existent alternate settings */
+        for (alt = 0;; alt++) {
+            /* Locate interface descriptor */
+            desc = usb_interface_descriptor(config, data, alt);
+            if (!desc)
+                break;
 
-		/* Iterate over all existent alternate settings */
-		for ( alt = 0 ; ; alt++ ) {
+            /* Describe bulk IN endpoint */
+            if ((rc = usb_endpoint_described(&usbnet->in,
+                                             config, desc,
+                                             USB_BULK_IN,
+                                             0)) != 0)
+                continue;
 
-			/* Locate interface descriptor */
-			desc = usb_interface_descriptor ( config, data, alt );
-			if ( ! desc )
-				break;
+            /* Describe bulk OUT endpoint */
+            if ((rc = usb_endpoint_described(&usbnet->out,
+                                             config, desc,
+                                             USB_BULK_OUT,
+                                             0)) != 0)
+                continue;
 
-			/* Describe bulk IN endpoint */
-			if ( ( rc = usb_endpoint_described ( &usbnet->in,
-							     config, desc,
-							     USB_BULK_IN,
-							     0 ) ) != 0 )
-				continue;
+            /* Record data interface and alternate setting */
+            usbnet->data = data;
+            usbnet->alternate = alt;
+            DBGC(usbnet, "USBNET %s found data interface %d",
+                 usbnet->func->name, data);
+            if (alt)
+                DBGC(usbnet, " using alternate %d", alt);
+            DBGC(usbnet, "\n");
+            return 0;
+        }
+    }
 
-			/* Describe bulk OUT endpoint */
-			if ( ( rc = usb_endpoint_described ( &usbnet->out,
-							     config, desc,
-							     USB_BULK_OUT,
-							     0 ) ) != 0 )
-				continue;
-
-			/* Record data interface and alternate setting */
-			usbnet->data = data;
-			usbnet->alternate = alt;
-			DBGC ( usbnet, "USBNET %s found data interface %d",
-			       usbnet->func->name, data );
-			if ( alt )
-				DBGC ( usbnet, " using alternate %d", alt );
-			DBGC ( usbnet, "\n" );
-			return 0;
-		}
-	}
-
-	DBGC ( usbnet, "USBNET %s found no data interface\n",
-	       usbnet->func->name );
-	return -ENOENT;
+    DBGC(usbnet, "USBNET %s found no data interface\n",
+         usbnet->func->name);
+    return -ENOENT;
 }
 
 /**
@@ -274,19 +271,19 @@ static int usbnet_data_describe ( struct usbnet_device *usbnet,
  * @v config		Configuration descriptor
  * @ret rc		Return status code
  */
-int usbnet_describe ( struct usbnet_device *usbnet,
-		      struct usb_configuration_descriptor *config ) {
-	int rc;
+int usbnet_describe(struct usbnet_device* usbnet,
+                    struct usb_configuration_descriptor* config) {
+    int rc;
 
-	/* Describe communications interface, if applicable */
-	if ( usbnet_has_intr ( usbnet ) &&
-	     ( rc = usbnet_comms_describe ( usbnet, config ) ) != 0 ) {
-		return rc;
-	}
+    /* Describe communications interface, if applicable */
+    if (usbnet_has_intr(usbnet) &&
+        (rc = usbnet_comms_describe(usbnet, config)) != 0) {
+        return rc;
+    }
 
-	/* Describe data interface */
-	if ( ( rc = usbnet_data_describe ( usbnet, config ) ) != 0 )
-		return rc;
+    /* Describe data interface */
+    if ((rc = usbnet_data_describe(usbnet, config)) != 0)
+        return rc;
 
-	return 0;
+    return 0;
 }

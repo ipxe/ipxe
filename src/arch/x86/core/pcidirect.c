@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <ipxe/io.h>
 #include <ipxe/pci.h>
@@ -38,18 +38,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v pci		PCI device
  * @v where		Location within PCI configuration space
  */
-void pcidirect_prepare ( struct pci_device *pci, int where ) {
-	uint16_t busdevfn = ( pci->busdevfn & 0xffff );
+void pcidirect_prepare(struct pci_device* pci, int where) {
+    uint16_t busdevfn = (pci->busdevfn & 0xffff);
 
-	outl ( ( 0x80000000 | ( busdevfn << 8 ) | ( where & ~3 ) ),
-	       PCIDIRECT_CONFIG_ADDRESS );
+    outl((0x80000000 | (busdevfn << 8) | (where & ~3)),
+         PCIDIRECT_CONFIG_ADDRESS);
 }
 
-PROVIDE_PCIAPI_INLINE ( direct, pci_num_bus );
-PROVIDE_PCIAPI_INLINE ( direct, pci_read_config_byte );
-PROVIDE_PCIAPI_INLINE ( direct, pci_read_config_word );
-PROVIDE_PCIAPI_INLINE ( direct, pci_read_config_dword );
-PROVIDE_PCIAPI_INLINE ( direct, pci_write_config_byte );
-PROVIDE_PCIAPI_INLINE ( direct, pci_write_config_word );
-PROVIDE_PCIAPI_INLINE ( direct, pci_write_config_dword );
-PROVIDE_PCIAPI_INLINE ( direct, pci_ioremap );
+PROVIDE_PCIAPI_INLINE(direct, pci_discover);
+PROVIDE_PCIAPI_INLINE(direct, pci_read_config_byte);
+PROVIDE_PCIAPI_INLINE(direct, pci_read_config_word);
+PROVIDE_PCIAPI_INLINE(direct, pci_read_config_dword);
+PROVIDE_PCIAPI_INLINE(direct, pci_write_config_byte);
+PROVIDE_PCIAPI_INLINE(direct, pci_write_config_word);
+PROVIDE_PCIAPI_INLINE(direct, pci_write_config_dword);
+PROVIDE_PCIAPI_INLINE(direct, pci_ioremap);
+
+struct pci_api pcidirect_api = PCIAPI_RUNTIME(direct);

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -44,17 +44,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret name		String representation of the tag
  *
  */
-static inline char * dhcp_tag_name ( unsigned int tag ) {
-	static char name[8];
+static inline char* dhcp_tag_name(unsigned int tag) {
+    static char name[8];
 
-	if ( DHCP_IS_ENCAP_OPT ( tag ) ) {
-		snprintf ( name, sizeof ( name ), "%d.%d",
-			   DHCP_ENCAPSULATOR ( tag ),
-			   DHCP_ENCAPSULATED ( tag ) );
-	} else {
-		snprintf ( name, sizeof ( name ), "%d", tag );
-	}
-	return name;
+    if (DHCP_IS_ENCAP_OPT(tag)) {
+        snprintf(name, sizeof(name), "%d.%d",
+                 DHCP_ENCAPSULATOR(tag),
+                 DHCP_ENCAPSULATED(tag));
+    } else {
+        snprintf(name, sizeof(name), "%d", tag);
+    }
+    return name;
 }
 
 /**
@@ -64,9 +64,9 @@ static inline char * dhcp_tag_name ( unsigned int tag ) {
  * @v offset		Offset within options block
  * @ret option		DHCP option
  */
-static inline __attribute__ (( always_inline )) struct dhcp_option *
-dhcp_option ( struct dhcp_options *options, unsigned int offset ) {
-	return ( ( struct dhcp_option * ) ( options->data + offset ) );
+static inline __attribute__((always_inline)) struct dhcp_option*
+dhcp_option(struct dhcp_options* options, unsigned int offset) {
+    return ((struct dhcp_option*)(options->data + offset));
 }
 
 /**
@@ -76,10 +76,10 @@ dhcp_option ( struct dhcp_options *options, unsigned int offset ) {
  * @v option		DHCP option
  * @ret offset		Offset within options block
  */
-static inline __attribute__ (( always_inline )) int
-dhcp_option_offset ( struct dhcp_options *options,
-		     struct dhcp_option *option ) {
-	return ( ( ( void * ) option ) - options->data );
+static inline __attribute__((always_inline)) int
+dhcp_option_offset(struct dhcp_options* options,
+                   struct dhcp_option* option) {
+    return (((void*)option) - options->data);
 }
 
 /**
@@ -88,12 +88,12 @@ dhcp_option_offset ( struct dhcp_options *options,
  * @v option		DHCP option
  * @ret len		Length (including tag and length field)
  */
-static unsigned int dhcp_option_len ( struct dhcp_option *option ) {
-	if ( ( option->tag == DHCP_END ) || ( option->tag == DHCP_PAD ) ) {
-		return 1;
-	} else {
-		return ( option->len + DHCP_OPTION_HEADER_LEN );
-	}
+static unsigned int dhcp_option_len(struct dhcp_option* option) {
+    if ((option->tag == DHCP_END) || (option->tag == DHCP_PAD)) {
+        return 1;
+    } else {
+        return (option->len + DHCP_OPTION_HEADER_LEN);
+    }
 }
 
 /**
@@ -116,62 +116,62 @@ static unsigned int dhcp_option_len ( struct dhcp_option *option ) {
  * such as options missing a @c DHCP_END terminator, or options whose
  * length would take them beyond the end of the data block.
  */
-static int find_dhcp_option_with_encap ( struct dhcp_options *options,
-					 unsigned int tag,
-					 int *encap_offset ) {
-	unsigned int original_tag __attribute__ (( unused )) = tag;
-	struct dhcp_option *option;
-	int offset = 0;
-	ssize_t remaining = options->used_len;
-	unsigned int option_len;
+static int find_dhcp_option_with_encap(struct dhcp_options* options,
+                                       unsigned int tag,
+                                       int* encap_offset) {
+    unsigned int original_tag __attribute__((unused)) = tag;
+    struct dhcp_option* option;
+    int offset = 0;
+    ssize_t remaining = options->used_len;
+    unsigned int option_len;
 
-	/* Sanity check */
-	if ( tag == DHCP_PAD )
-		return -ENOENT;
+    /* Sanity check */
+    if (tag == DHCP_PAD)
+        return -ENOENT;
 
-	/* Search for option */
-	while ( remaining ) {
-		/* Calculate length of this option.  Abort processing
-		 * if the length is malformed (i.e. takes us beyond
-		 * the end of the data block).
-		 */
-		option = dhcp_option ( options, offset );
-		option_len = dhcp_option_len ( option );
-		remaining -= option_len;
-		if ( remaining < 0 )
-			break;
-		/* Check for explicit end marker */
-		if ( option->tag == DHCP_END ) {
-			if ( tag == DHCP_END )
-				/* Special case where the caller is interested
-				 * in whether we have this marker or not.
-				 */
-				return offset;
-			else
-				break;
-		}
-		/* Check for matching tag */
-		if ( option->tag == tag ) {
-			DBGC ( options, "DHCPOPT %p found %s (length %d)\n",
-			       options, dhcp_tag_name ( original_tag ),
-			       option_len );
-			return offset;
-		}
-		/* Check for start of matching encapsulation block */
-		if ( DHCP_IS_ENCAP_OPT ( tag ) &&
-		     ( option->tag == DHCP_ENCAPSULATOR ( tag ) ) ) {
-			if ( encap_offset )
-				*encap_offset = offset;
-			/* Continue search within encapsulated option block */
-			tag = DHCP_ENCAPSULATED ( tag );
-			remaining = option_len;
-			offset += DHCP_OPTION_HEADER_LEN;
-			continue;
-		}
-		offset += option_len;
-	}
+    /* Search for option */
+    while (remaining) {
+        /* Calculate length of this option.  Abort processing
+         * if the length is malformed (i.e. takes us beyond
+         * the end of the data block).
+         */
+        option = dhcp_option(options, offset);
+        option_len = dhcp_option_len(option);
+        remaining -= option_len;
+        if (remaining < 0)
+            break;
+        /* Check for explicit end marker */
+        if (option->tag == DHCP_END) {
+            if (tag == DHCP_END)
+                /* Special case where the caller is interested
+                 * in whether we have this marker or not.
+                 */
+                return offset;
+            else
+                break;
+        }
+        /* Check for matching tag */
+        if (option->tag == tag) {
+            DBGC(options, "DHCPOPT %p found %s (length %d)\n",
+                 options, dhcp_tag_name(original_tag),
+                 option_len);
+            return offset;
+        }
+        /* Check for start of matching encapsulation block */
+        if (DHCP_IS_ENCAP_OPT(tag) &&
+            (option->tag == DHCP_ENCAPSULATOR(tag))) {
+            if (encap_offset)
+                *encap_offset = offset;
+            /* Continue search within encapsulated option block */
+            tag = DHCP_ENCAPSULATED(tag);
+            remaining = option_len;
+            offset += DHCP_OPTION_HEADER_LEN;
+            continue;
+        }
+        offset += option_len;
+    }
 
-	return -ENOENT;
+    return -ENOENT;
 }
 
 /**
@@ -181,8 +181,8 @@ static int find_dhcp_option_with_encap ( struct dhcp_options *options,
  * @v len		New length
  * @ret rc		Return status code
  */
-int dhcpopt_no_realloc ( struct dhcp_options *options, size_t len ) {
-	return ( ( len <= options->alloc_len ) ? 0 : -ENOSPC );
+int dhcpopt_no_realloc(struct dhcp_options* options, size_t len) {
+    return ((len <= options->alloc_len) ? 0 : -ENOSPC);
 }
 
 /**
@@ -195,71 +195,71 @@ int dhcpopt_no_realloc ( struct dhcp_options *options, size_t len ) {
  * @v new_len		New length (including header)
  * @ret rc		Return status code
  */
-static int resize_dhcp_option ( struct dhcp_options *options,
-				int offset, int encap_offset,
-				size_t old_len, size_t new_len ) {
-	struct dhcp_option *encapsulator;
-	struct dhcp_option *option;
-	ssize_t delta = ( new_len - old_len );
-	size_t old_alloc_len;
-	size_t new_used_len;
-	size_t new_encapsulator_len;
-	void *source;
-	void *dest;
-	int rc;
+static int resize_dhcp_option(struct dhcp_options* options,
+                              int offset, int encap_offset,
+                              size_t old_len, size_t new_len) {
+    struct dhcp_option* encapsulator;
+    struct dhcp_option* option;
+    ssize_t delta = (new_len - old_len);
+    size_t old_alloc_len;
+    size_t new_used_len;
+    size_t new_encapsulator_len;
+    void* source;
+    void* dest;
+    int rc;
 
-	/* Check for sufficient space */
-	if ( new_len > DHCP_MAX_LEN ) {
-		DBGC ( options, "DHCPOPT %p overlength option\n", options );
-		return -ENOSPC;
-	}
-	new_used_len = ( options->used_len + delta );
+    /* Check for sufficient space */
+    if (new_len > DHCP_MAX_LEN) {
+        DBGC(options, "DHCPOPT %p overlength option\n", options);
+        return -ENOSPC;
+    }
+    new_used_len = (options->used_len + delta);
 
-	/* Expand options block, if necessary */
-	if ( new_used_len > options->alloc_len ) {
-		/* Reallocate options block */
-		old_alloc_len = options->alloc_len;
-		if ( ( rc = options->realloc ( options, new_used_len ) ) != 0 ){
-			DBGC ( options, "DHCPOPT %p could not reallocate to "
-			       "%zd bytes\n", options, new_used_len );
-			return rc;
-		}
-		/* Clear newly allocated space */
-		memset ( ( options->data + old_alloc_len ), 0,
-			 ( options->alloc_len - old_alloc_len ) );
-	}
+    /* Expand options block, if necessary */
+    if (new_used_len > options->alloc_len) {
+        /* Reallocate options block */
+        old_alloc_len = options->alloc_len;
+        if ((rc = options->realloc(options, new_used_len)) != 0) {
+            DBGC(options, "DHCPOPT %p could not reallocate to "
+                          "%zd bytes\n", options, new_used_len);
+            return rc;
+        }
+        /* Clear newly allocated space */
+        memset((options->data + old_alloc_len), 0,
+               (options->alloc_len - old_alloc_len));
+    }
 
-	/* Update encapsulator, if applicable */
-	if ( encap_offset >= 0 ) {
-		encapsulator = dhcp_option ( options, encap_offset );
-		new_encapsulator_len = ( encapsulator->len + delta );
-		if ( new_encapsulator_len > DHCP_MAX_LEN ) {
-			DBGC ( options, "DHCPOPT %p overlength encapsulator\n",
-			       options );
-			return -ENOSPC;
-		}
-		encapsulator->len = new_encapsulator_len;
-	}
+    /* Update encapsulator, if applicable */
+    if (encap_offset >= 0) {
+        encapsulator = dhcp_option(options, encap_offset);
+        new_encapsulator_len = (encapsulator->len + delta);
+        if (new_encapsulator_len > DHCP_MAX_LEN) {
+            DBGC(options, "DHCPOPT %p overlength encapsulator\n",
+                 options);
+            return -ENOSPC;
+        }
+        encapsulator->len = new_encapsulator_len;
+    }
 
-	/* Update used length */
-	options->used_len = new_used_len;
+    /* Update used length */
+    options->used_len = new_used_len;
 
-	/* Move remainder of option data */
-	option = dhcp_option ( options, offset );
-	source = ( ( ( void * ) option ) + old_len );
-	dest = ( ( ( void * ) option ) + new_len );
-	memmove ( dest, source, ( new_used_len - offset - new_len ) );
+    /* Move remainder of option data */
+    option = dhcp_option(options, offset);
+    source = (((void*)option) + old_len);
+    dest = (((void*)option) + new_len);
+    memmove(dest, source, (new_used_len - offset - new_len));
 
-	/* Shrink options block, if applicable */
-	if ( new_used_len < options->alloc_len ) {
-		if ( ( rc = options->realloc ( options, new_used_len ) ) != 0 ){
-			DBGC ( options, "DHCPOPT %p could not reallocate to "
-			       "%zd bytes\n", options, new_used_len );
-			return rc;
-		}
-	}
+    /* Shrink options block, if applicable */
+    if (new_used_len < options->alloc_len) {
+        if ((rc = options->realloc(options, new_used_len)) != 0) {
+            DBGC(options, "DHCPOPT %p could not reallocate to "
+                          "%zd bytes\n", options, new_used_len);
+            return rc;
+        }
+    }
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -279,75 +279,75 @@ static int resize_dhcp_option ( struct dhcp_options *options,
  * If it does fail, and the option existed previously, the option will
  * be left with its original value.
  */
-static int set_dhcp_option ( struct dhcp_options *options, unsigned int tag,
-			     const void *data, size_t len ) {
-	static const uint8_t empty_encap[] = { DHCP_END };
-	int offset;
-	int encap_offset = -1;
-	int creation_offset;
-	struct dhcp_option *option;
-	unsigned int encap_tag = DHCP_ENCAPSULATOR ( tag );
-	size_t old_len = 0;
-	size_t new_len = ( len ? ( len + DHCP_OPTION_HEADER_LEN ) : 0 );
-	int rc;
+static int set_dhcp_option(struct dhcp_options* options, unsigned int tag,
+                           const void* data, size_t len) {
+    static const uint8_t empty_encap[] = {DHCP_END};
+    int offset;
+    int encap_offset = -1;
+    int creation_offset;
+    struct dhcp_option* option;
+    unsigned int encap_tag = DHCP_ENCAPSULATOR(tag);
+    size_t old_len = 0;
+    size_t new_len = (len ? (len + DHCP_OPTION_HEADER_LEN) : 0);
+    int rc;
 
-	/* Sanity check */
-	if ( tag == DHCP_PAD )
-		return -ENOTTY;
+    /* Sanity check */
+    if (tag == DHCP_PAD)
+        return -ENOTTY;
 
-	creation_offset = find_dhcp_option_with_encap ( options, DHCP_END,
-							NULL );
-	if ( creation_offset < 0 )
-		creation_offset = options->used_len;
-	/* Find old instance of this option, if any */
-	offset = find_dhcp_option_with_encap ( options, tag, &encap_offset );
-	if ( offset >= 0 ) {
-		old_len = dhcp_option_len ( dhcp_option ( options, offset ) );
-		DBGC ( options, "DHCPOPT %p resizing %s from %zd to %zd\n",
-		       options, dhcp_tag_name ( tag ), old_len, new_len );
-	} else {
-		DBGC ( options, "DHCPOPT %p creating %s (length %zd)\n",
-		       options, dhcp_tag_name ( tag ), new_len );
-	}
+    creation_offset = find_dhcp_option_with_encap(options, DHCP_END,
+                                                  NULL);
+    if (creation_offset < 0)
+        creation_offset = options->used_len;
+    /* Find old instance of this option, if any */
+    offset = find_dhcp_option_with_encap(options, tag, &encap_offset);
+    if (offset >= 0) {
+        old_len = dhcp_option_len(dhcp_option(options, offset));
+        DBGC(options, "DHCPOPT %p resizing %s from %zd to %zd\n",
+             options, dhcp_tag_name(tag), old_len, new_len);
+    } else {
+        DBGC(options, "DHCPOPT %p creating %s (length %zd)\n",
+             options, dhcp_tag_name(tag), new_len);
+    }
 
-	/* Ensure that encapsulator exists, if required */
-	if ( encap_tag ) {
-		if ( encap_offset < 0 ) {
-			encap_offset =
-				set_dhcp_option ( options, encap_tag,
-						  empty_encap,
-						  sizeof ( empty_encap ) );
-		}
-		if ( encap_offset < 0 )
-			return encap_offset;
-		creation_offset = ( encap_offset + DHCP_OPTION_HEADER_LEN );
-	}
+    /* Ensure that encapsulator exists, if required */
+    if (encap_tag) {
+        if (encap_offset < 0) {
+            encap_offset =
+                set_dhcp_option(options, encap_tag,
+                                empty_encap,
+                                sizeof(empty_encap));
+        }
+        if (encap_offset < 0)
+            return encap_offset;
+        creation_offset = (encap_offset + DHCP_OPTION_HEADER_LEN);
+    }
 
-	/* Create new option if necessary */
-	if ( offset < 0 )
-		offset = creation_offset;
+    /* Create new option if necessary */
+    if (offset < 0)
+        offset = creation_offset;
 
-	/* Resize option to fit new data */
-	if ( ( rc = resize_dhcp_option ( options, offset, encap_offset,
-					 old_len, new_len ) ) != 0 )
-		return rc;
+    /* Resize option to fit new data */
+    if ((rc = resize_dhcp_option(options, offset, encap_offset,
+                                 old_len, new_len)) != 0)
+        return rc;
 
-	/* Copy new data into option, if applicable */
-	if ( len ) {
-		option = dhcp_option ( options, offset );
-		option->tag = tag;
-		option->len = len;
-		memcpy ( &option->data, data, len );
-	}
+    /* Copy new data into option, if applicable */
+    if (len) {
+        option = dhcp_option(options, offset);
+        option->tag = tag;
+        option->len = len;
+        memcpy(&option->data, data, len);
+    }
 
-	/* Delete encapsulator if there's nothing else left in it */
-	if ( encap_offset >= 0 ) {
-		option = dhcp_option ( options, encap_offset );
-		if ( option->len <= 1 )
-			set_dhcp_option ( options, encap_tag, NULL, 0 );
-	}
+    /* Delete encapsulator if there's nothing else left in it */
+    if (encap_offset >= 0) {
+        option = dhcp_option(options, encap_offset);
+        if (option->len <= 1)
+            set_dhcp_option(options, encap_tag, NULL, 0);
+    }
 
-	return offset;
+    return offset;
 }
 
 /**
@@ -356,10 +356,9 @@ static int set_dhcp_option ( struct dhcp_options *options, unsigned int tag,
  * @v tag		Setting tag number
  * @ret applies		Setting applies to this option block
  */
-int dhcpopt_applies ( unsigned int tag ) {
-
-	return ( tag && ( tag <= DHCP_ENCAP_OPT ( DHCP_MAX_OPTION,
-						  DHCP_MAX_OPTION ) ) );
+int dhcpopt_applies(unsigned int tag) {
+    return (tag && (tag <= DHCP_ENCAP_OPT(DHCP_MAX_OPTION,
+                                          DHCP_MAX_OPTION)));
 }
 
 /**
@@ -371,14 +370,14 @@ int dhcpopt_applies ( unsigned int tag ) {
  * @v len		Length of setting data
  * @ret rc		Return status code
  */
-int dhcpopt_store ( struct dhcp_options *options, unsigned int tag,
-		    const void *data, size_t len ) {
-	int offset;
+int dhcpopt_store(struct dhcp_options* options, unsigned int tag,
+                  const void* data, size_t len) {
+    int offset;
 
-	offset = set_dhcp_option ( options, tag, data, len );
-	if ( offset < 0 )
-		return offset;
-	return 0;
+    offset = set_dhcp_option(options, tag, data, len);
+    if (offset < 0)
+        return offset;
+    return 0;
 }
 
 /**
@@ -390,23 +389,23 @@ int dhcpopt_store ( struct dhcp_options *options, unsigned int tag,
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-int dhcpopt_fetch ( struct dhcp_options *options, unsigned int tag,
-		    void *data, size_t len ) {
-	int offset;
-	struct dhcp_option *option;
-	size_t option_len;
+int dhcpopt_fetch(struct dhcp_options* options, unsigned int tag,
+                  void* data, size_t len) {
+    int offset;
+    struct dhcp_option* option;
+    size_t option_len;
 
-	offset = find_dhcp_option_with_encap ( options, tag, NULL );
-	if ( offset < 0 )
-		return offset;
+    offset = find_dhcp_option_with_encap(options, tag, NULL);
+    if (offset < 0)
+        return offset;
 
-	option = dhcp_option ( options, offset );
-	option_len = option->len;
-	if ( len > option_len )
-		len = option_len;
-	memcpy ( data, option->data, len );
+    option = dhcp_option(options, offset);
+    option_len = option->len;
+    if (len > option_len)
+        len = option_len;
+    memcpy(data, option->data, len);
 
-	return option_len;
+    return option_len;
 }
 
 /**
@@ -417,24 +416,24 @@ int dhcpopt_fetch ( struct dhcp_options *options, unsigned int tag,
  * The "used length" field will be updated based on scanning through
  * the block to find the end of the options.
  */
-void dhcpopt_update_used_len ( struct dhcp_options *options ) {
-	struct dhcp_option *option;
-	int offset = 0;
-	ssize_t remaining = options->alloc_len;
-	unsigned int option_len;
+void dhcpopt_update_used_len(struct dhcp_options* options) {
+    struct dhcp_option* option;
+    int offset = 0;
+    ssize_t remaining = options->alloc_len;
+    unsigned int option_len;
 
-	/* Find last non-pad option */
-	options->used_len = 0;
-	while ( remaining ) {
-		option = dhcp_option ( options, offset );
-		option_len = dhcp_option_len ( option );
-		remaining -= option_len;
-		if ( remaining < 0 )
-			break;
-		offset += option_len;
-		if ( option->tag != DHCP_PAD )
-			options->used_len = offset;
-	}
+    /* Find last non-pad option */
+    options->used_len = 0;
+    while (remaining) {
+        option = dhcp_option(options, offset);
+        option_len = dhcp_option_len(option);
+        remaining -= option_len;
+        if (remaining < 0)
+            break;
+        offset += option_len;
+        if (option->tag != DHCP_PAD)
+            options->used_len = offset;
+    }
 }
 
 /**
@@ -448,18 +447,17 @@ void dhcpopt_update_used_len ( struct dhcp_options *options ) {
  * The memory content must already be filled with valid DHCP options.
  * A zeroed block counts as a block of valid DHCP options.
  */
-void dhcpopt_init ( struct dhcp_options *options, void *data, size_t alloc_len,
-		    int ( * realloc ) ( struct dhcp_options *options,
-					size_t len ) ) {
+void dhcpopt_init(struct dhcp_options* options, void* data, size_t alloc_len,
+                  int (*realloc)(struct dhcp_options* options,
+                                 size_t len)) {
+    /* Fill in fields */
+    options->data = data;
+    options->alloc_len = alloc_len;
+    options->realloc = realloc;
 
-	/* Fill in fields */
-	options->data = data;
-	options->alloc_len = alloc_len;
-	options->realloc = realloc;
+    /* Update length */
+    dhcpopt_update_used_len(options);
 
-	/* Update length */
-	dhcpopt_update_used_len ( options );
-
-	DBGC ( options, "DHCPOPT %p created (data %p lengths %#zx,%#zx)\n",
-	       options, options->data, options->used_len, options->alloc_len );
+    DBGC(options, "DHCPOPT %p created (data %p lengths %#zx,%#zx)\n",
+         options, options->data, options->used_len, options->alloc_len);
 }

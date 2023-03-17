@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdlib.h>
 #include <errno.h>
@@ -39,17 +39,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v rate		Reciprocal of fault probability (must be non-zero)
  * @ret rc		Return status code
  */
-int inject_fault_nonzero ( unsigned int rate ) {
+int inject_fault_nonzero(unsigned int rate) {
+    /* Do nothing unless we want to inject a fault now */
+    if ((random() % rate) != 0)
+        return 0;
 
-	/* Do nothing unless we want to inject a fault now */
-	if ( ( random() % rate ) != 0 )
-		return 0;
-
-	/* Generate error number here so that faults can be injected
-	 * into files that don't themselves have error file
-	 * identifiers (via errfile.h).
-	 */
-	return -EFAULT;
+    /* Generate error number here so that faults can be injected
+     * into files that don't themselves have error file
+     * identifiers (via errfile.h).
+     */
+    return -EFAULT;
 }
 
 /**
@@ -60,23 +59,23 @@ int inject_fault_nonzero ( unsigned int rate ) {
  * @v len		Length of data
  * @ret rc		Return status code
  */
-void inject_corruption_nonzero ( unsigned int rate, const void *data,
-				 size_t len ) {
-	uint8_t *writable;
-	size_t offset;
+void inject_corruption_nonzero(unsigned int rate, const void* data,
+                               size_t len) {
+    uint8_t* writable;
+    size_t offset;
 
-	/* Do nothing if we have no data to corrupt */
-	if ( ! len )
-		return;
+    /* Do nothing if we have no data to corrupt */
+    if (!len)
+        return;
 
-	/* Do nothing unless we want to inject a fault now */
-	if ( ! inject_fault_nonzero ( rate ) )
-		return;
+    /* Do nothing unless we want to inject a fault now */
+    if (!inject_fault_nonzero(rate))
+        return;
 
-	/* Get a writable pointer to the nominally read-only data */
-	writable = ( ( uint8_t * ) data );
+    /* Get a writable pointer to the nominally read-only data */
+    writable = ((uint8_t*)data);
 
-	/* Pick a random victim byte and zap it */
-	offset = ( random() % len );
-	writable[offset] ^= random();
+    /* Pick a random victim byte and zap it */
+    offset = (random() % len);
+    writable[offset] ^= random();
 }

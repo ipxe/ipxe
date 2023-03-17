@@ -110,7 +110,7 @@ overlay:
 	/* Overlay number */
 	.word	0
 
-	.align 16, 0
+	.balign 16, 0
 
 	.globl	_exe_start
 _exe_start:

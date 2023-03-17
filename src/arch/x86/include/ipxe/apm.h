@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_APM_H
-#define _IPXE_APM_H
+    #define _IPXE_APM_H
 
 /** @file
  *
@@ -7,8 +9,8 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-extern int apm_poweroff ( void );
+extern int apm_poweroff(void);
 
 #endif /* _IPXE_APM_H */

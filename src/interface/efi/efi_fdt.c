@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <ipxe/fdt.h>
@@ -34,37 +34,41 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-#define DEVICE_TREE_TABLE_GUID						\
-	{ 0xb1b621d5, 0xf19c, 0x41a5,					\
-	  { 0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0 } }
+#define DEVICE_TREE_TABLE_GUID                             \
+    {                                                      \
+        0xb1b621d5, 0xf19c, 0x41a5,                        \
+        {                                                  \
+            0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0 \
+        }                                                  \
+    }
 
 /** EFI Flattened Device Tree configuration table */
-static struct fdt_header *efi_fdt;
-EFI_USE_TABLE ( DEVICE_TREE_TABLE, &efi_fdt, 0 );
+static struct fdt_header* efi_fdt;
+EFI_USE_TABLE(DEVICE_TREE_TABLE, &efi_fdt, 0);
 
 /**
  * Initialise EFI Flattened Device Tree
  *
  */
-static void efi_fdt_init ( void ) {
-	int rc;
+static void efi_fdt_init(void) {
+    int rc;
 
-	/* Do nothing if no configuration table is present */
-	if ( ! efi_fdt ) {
-		DBGC ( &efi_fdt, "EFIFDT has no configuration table\n" );
-		return;
-	}
-	DBGC ( &efi_fdt, "EFIFDT configuration table at %p\n", efi_fdt );
+    /* Do nothing if no configuration table is present */
+    if (!efi_fdt) {
+        DBGC(&efi_fdt, "EFIFDT has no configuration table\n");
+        return;
+    }
+    DBGC(&efi_fdt, "EFIFDT configuration table at %p\n", efi_fdt);
 
-	/* Register device tree */
-	if ( ( rc = register_fdt ( efi_fdt ) ) != 0 ) {
-		DBGC ( &efi_fdt, "EFIFDT could not register: %s\n",
-		       strerror ( rc ) );
-		return;
-	}
+    /* Register device tree */
+    if ((rc = register_fdt(efi_fdt)) != 0) {
+        DBGC(&efi_fdt, "EFIFDT could not register: %s\n",
+             strerror(rc));
+        return;
+    }
 }
 
 /** EFI Flattened Device Tree initialisation function */
-struct init_fn efi_fdt_init_fn __init_fn ( INIT_EARLY ) = {
-	.initialise = efi_fdt_init,
+struct init_fn efi_fdt_init_fn __init_fn(INIT_EARLY) = {
+    .initialise = efi_fdt_init,
 };

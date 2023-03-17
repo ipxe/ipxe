@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_VERSION_H
-#define _IPXE_VERSION_H
+    #define _IPXE_VERSION_H
 
 /** @file
  *
@@ -7,9 +9,9 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <wchar.h>
+    #include <wchar.h>
 
 extern unsigned long build_timestamp;
 extern unsigned long build_id;

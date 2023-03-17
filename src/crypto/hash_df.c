@@ -33,7 +33,7 @@
  *     with the distribution.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -81,74 +81,73 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * There is no way for the Hash_df function to fail.  The returned
  * status SUCCESS is implicit.
  */
-void hash_df ( struct digest_algorithm *hash, const void *input,
-	       size_t input_len, void *output, size_t output_len ) {
-	uint8_t context[hash->ctxsize];
-	uint8_t digest[hash->digestsize];
-	size_t frag_len;
-	struct {
-		uint8_t pad[3];
-		uint8_t counter;
-		uint32_t no_of_bits_to_return;
-	} __attribute__ (( packed )) prefix;
-	void *temp;
-	size_t remaining;
+void hash_df(struct digest_algorithm* hash, const void* input,
+             size_t input_len, void* output, size_t output_len) {
+    uint8_t context[hash->ctxsize];
+    uint8_t digest[hash->digestsize];
+    size_t frag_len;
+    struct {
+        uint8_t pad[3];
+        uint8_t counter;
+        uint32_t no_of_bits_to_return;
+    } __attribute__((packed)) prefix;
+    void* temp;
+    size_t remaining;
 
-	DBGC ( &hash_df, "HASH_DF input:\n" );
-	DBGC_HDA ( &hash_df, 0, input, input_len );
+    DBGC(&hash_df, "HASH_DF input:\n");
+    DBGC_HDA(&hash_df, 0, input, input_len);
 
-	/* Sanity checks */
-	assert ( input != NULL );
-	assert ( output != NULL );
+    /* Sanity checks */
+    assert(input != NULL);
+    assert(output != NULL);
 
-	/* 1.  temp = the Null string
-	 * 2.  len = ceil ( no_of_bits_to_return / outlen )
-	 *
-	 * (Nothing to do.  We fill the output buffer incrementally,
-	 * rather than constructing the complete "temp" in-memory.
-	 * "len" is implicit in the number of iterations required to
-	 * fill the output buffer, and so is not calculated
-	 * explicitly.)
-	 */
+    /* 1.  temp = the Null string
+     * 2.  len = ceil ( no_of_bits_to_return / outlen )
+     *
+     * (Nothing to do.  We fill the output buffer incrementally,
+     * rather than constructing the complete "temp" in-memory.
+     * "len" is implicit in the number of iterations required to
+     * fill the output buffer, and so is not calculated
+     * explicitly.)
+     */
 
-	/* 3.  counter = an 8-bit binary value representing the integer "1" */
-	prefix.counter = 1;
+    /* 3.  counter = an 8-bit binary value representing the integer "1" */
+    prefix.counter = 1;
 
-	/* 4.  For i = 1 to len do */
-	for ( temp = output, remaining = output_len ; remaining > 0 ; ) {
+    /* 4.  For i = 1 to len do */
+    for (temp = output, remaining = output_len; remaining > 0;) {
+        /* Comment: in step 5.1 (sic), no_of_bits_to_return is
+         * used as a 32-bit string.
+         *
+         * 4.1  temp = temp || Hash ( counter || no_of_bits_to_return
+         *                            || input_string )
+         */
+        prefix.no_of_bits_to_return = htonl(output_len * 8);
+        digest_init(hash, context);
+        digest_update(hash, context, &prefix.counter,
+                      (sizeof(prefix) -
+                       offsetof(typeof(prefix), counter)));
+        digest_update(hash, context, input, input_len);
+        digest_final(hash, context, digest);
 
-		/* Comment: in step 5.1 (sic), no_of_bits_to_return is
-		 * used as a 32-bit string.
-		 *
-		 * 4.1  temp = temp || Hash ( counter || no_of_bits_to_return
-		 *                            || input_string )
-		 */
-		prefix.no_of_bits_to_return = htonl ( output_len * 8 );
-		digest_init ( hash, context );
-		digest_update ( hash, context, &prefix.counter,
-				( sizeof ( prefix ) -
-				  offsetof ( typeof ( prefix ), counter ) ) );
-		digest_update ( hash, context, input, input_len );
-		digest_final ( hash, context, digest );
+        /* 4.2  counter = counter + 1 */
+        prefix.counter++;
 
-		/* 4.2  counter = counter + 1 */
-		prefix.counter++;
+        /* 5.    requested_bits = Leftmost ( no_of_bits_to_return )
+         *       of temp
+         *
+         * (We fill the output buffer incrementally.)
+         */
+        frag_len = sizeof(digest);
+        if (frag_len > remaining)
+            frag_len = remaining;
+        memcpy(temp, digest, frag_len);
+        temp += frag_len;
+        remaining -= frag_len;
+    }
 
-		/* 5.    requested_bits = Leftmost ( no_of_bits_to_return )
-		 *       of temp
-		 *
-		 * (We fill the output buffer incrementally.)
-		 */
-		frag_len = sizeof ( digest );
-		if ( frag_len > remaining )
-			frag_len = remaining;
-		memcpy ( temp, digest, frag_len );
-		temp += frag_len;
-		remaining -= frag_len;
-	}
-
-	/* 6.  Return SUCCESS and requested_bits */
-	DBGC ( &hash_df, "HASH_DF output:\n" );
-	DBGC_HDA ( &hash_df, 0, output, output_len );
-	return;
+    /* 6.  Return SUCCESS and requested_bits */
+    DBGC(&hash_df, "HASH_DF output:\n");
+    DBGC_HDA(&hash_df, 0, output, output_len);
+    return;
 }

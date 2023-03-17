@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -45,83 +45,84 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** A TCP/IP fixed-data test */
 struct tcpip_test {
-	/** Data */
-	const void *data;
-	/** Length of data */
-	size_t len;
+    /** Data */
+    const void* data;
+    /** Length of data */
+    size_t len;
 };
 
 /** A TCP/IP pseudorandom-data test */
 struct tcpip_random_test {
-	/** Seed */
-	unsigned int seed;
-	/** Length of data */
-	size_t len;
-	/** Alignment offset */
-	size_t offset;
+    /** Seed */
+    unsigned int seed;
+    /** Length of data */
+    size_t len;
+    /** Alignment offset */
+    size_t offset;
 };
 
 /** Define inline data */
-#define DATA(...) { __VA_ARGS__ }
+#define DATA(...) \
+    { __VA_ARGS__ }
 
 /** Define a TCP/IP fixed-data test */
-#define TCPIP_TEST( name, DATA )					\
-	static const uint8_t __attribute__ (( aligned ( 16 ) ))		\
-		name ## _data[] = DATA;					\
-	static struct tcpip_test name = {				\
-		.data = name ## _data,					\
-		.len = sizeof ( name ## _data ),			\
-	}
+#define TCPIP_TEST(name, DATA)                        \
+    static const uint8_t __attribute__((aligned(16))) \
+    name##_data[] = DATA;                             \
+    static struct tcpip_test name = {                 \
+        .data = name##_data,                          \
+        .len = sizeof(name##_data),                   \
+    }
 
 /** Define a TCP/IP pseudorandom-data test */
-#define TCPIP_RANDOM_TEST( name, SEED, LEN, OFFSET )			\
-	static struct tcpip_random_test name = {			\
-		.seed = SEED,						\
-		.len = LEN,						\
-		.offset = OFFSET,					\
-	}
+#define TCPIP_RANDOM_TEST(name, SEED, LEN, OFFSET) \
+    static struct tcpip_random_test name = {       \
+        .seed = SEED,                              \
+        .len = LEN,                                \
+        .offset = OFFSET,                          \
+    }
 
 /** Buffer for pseudorandom-data tests */
-static uint8_t __attribute__ (( aligned ( 16 ) ))
-	tcpip_data[ 4096 + 7 /* offset */ ];
+static uint8_t __attribute__((aligned(16)))
+tcpip_data[4096 + 7 /* offset */];
 
 /** Empty data */
-TCPIP_TEST ( empty, DATA() );
+TCPIP_TEST(empty, DATA());
 
 /** Single byte */
-TCPIP_TEST ( one_byte, DATA ( 0xeb ) );
+TCPIP_TEST(one_byte, DATA(0xeb));
 
 /** Double byte */
-TCPIP_TEST ( two_bytes, DATA ( 0xba, 0xbe ) );
+TCPIP_TEST(two_bytes, DATA(0xba, 0xbe));
 
 /** Positive zero data */
-TCPIP_TEST ( positive_zero, DATA ( 0x00, 0x00 ) );
+TCPIP_TEST(positive_zero, DATA(0x00, 0x00));
 
 /** Negative zero data */
-TCPIP_TEST ( negative_zero, DATA ( 0xff, 0xff ) );
+TCPIP_TEST(negative_zero, DATA(0xff, 0xff));
 
 /** Final wrap-around carry (big-endian) */
-TCPIP_TEST ( final_carry_big,
-	     DATA ( 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 ) );
+TCPIP_TEST(final_carry_big,
+           DATA(0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01));
 
 /** Final wrap-around carry (little-endian) */
-TCPIP_TEST ( final_carry_little,
-	     DATA ( 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00 ) );
+TCPIP_TEST(final_carry_little,
+           DATA(0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00));
 
 /** Random data (aligned) */
-TCPIP_RANDOM_TEST ( random_aligned, 0x12345678UL, 4096, 0 );
+TCPIP_RANDOM_TEST(random_aligned, 0x12345678UL, 4096, 0);
 
 /** Random data (unaligned, +1) */
-TCPIP_RANDOM_TEST ( random_unaligned_1, 0x12345678UL, 4096, 1 );
+TCPIP_RANDOM_TEST(random_unaligned_1, 0x12345678UL, 4096, 1);
 
 /** Random data (unaligned, +2) */
-TCPIP_RANDOM_TEST ( random_unaligned_2, 0x12345678UL, 4096, 2 );
+TCPIP_RANDOM_TEST(random_unaligned_2, 0x12345678UL, 4096, 2);
 
 /** Random data (aligned, truncated) */
-TCPIP_RANDOM_TEST ( random_aligned_truncated, 0x12345678UL, 4095, 0 );
+TCPIP_RANDOM_TEST(random_aligned_truncated, 0x12345678UL, 4095, 0);
 
 /** Random data (unaligned start and finish) */
-TCPIP_RANDOM_TEST ( partial, 0xcafebabe, 121, 5 );
+TCPIP_RANDOM_TEST(partial, 0xcafebabe, 121, 5);
 
 /**
  * Calculate TCP/IP checksum
@@ -141,23 +142,23 @@ TCPIP_RANDOM_TEST ( partial, 0xcafebabe, 121, 5 );
  * zeros) but positive zero (0x0000) for any other data which sums to
  * zero.
  */
-static uint16_t rfc_tcpip_chksum ( const void *data, size_t len ) {
-	unsigned long sum = 0xffff;
+static uint16_t rfc_tcpip_chksum(const void* data, size_t len) {
+    unsigned long sum = 0xffff;
 
-        while ( len > 1 )  {
-		sum += *( ( uint16_t * ) data );
-		data += 2;
-		len -= 2;
-	}
+    while (len > 1) {
+        sum += *((uint16_t*)data);
+        data += 2;
+        len -= 2;
+    }
 
-	if ( len > 0 )
-		sum += *( ( uint8_t * ) data );
+    if (len > 0)
+        sum += *((uint8_t*)data);
 
-	while ( sum >> 16 )
-		sum = ( ( sum & 0xffff ) + ( sum >> 16 ) );
+    while (sum >> 16)
+        sum = ((sum & 0xffff) + (sum >> 16));
 
-	assert ( sum != 0x0000 );
-	return ~sum;
+    assert(sum != 0x0000);
+    return ~sum;
 }
 
 /**
@@ -167,23 +168,23 @@ static uint16_t rfc_tcpip_chksum ( const void *data, size_t len ) {
  * @v file		Test code file
  * @v line		Test code line
  */
-static void tcpip_okx ( struct tcpip_test *test, const char *file,
-			unsigned int line ) {
-	uint16_t expected;
-	uint16_t generic_sum;
-	uint16_t sum;
+static void tcpip_okx(struct tcpip_test* test, const char* file,
+                      unsigned int line) {
+    uint16_t expected;
+    uint16_t generic_sum;
+    uint16_t sum;
 
-	/* Verify generic_tcpip_continue_chksum() result */
-	expected = rfc_tcpip_chksum ( test->data, test->len );
-	generic_sum = generic_tcpip_continue_chksum ( TCPIP_EMPTY_CSUM,
-						      test->data, test->len );
-	okx ( generic_sum == expected, file, line );
+    /* Verify generic_tcpip_continue_chksum() result */
+    expected = rfc_tcpip_chksum(test->data, test->len);
+    generic_sum = generic_tcpip_continue_chksum(TCPIP_EMPTY_CSUM,
+                                                test->data, test->len);
+    okx(generic_sum == expected, file, line);
 
-	/* Verify optimised tcpip_continue_chksum() result */
-	sum = tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, test->data, test->len );
-	okx ( sum == expected, file, line );
+    /* Verify optimised tcpip_continue_chksum() result */
+    sum = tcpip_continue_chksum(TCPIP_EMPTY_CSUM, test->data, test->len);
+    okx(sum == expected, file, line);
 }
-#define tcpip_ok( test ) tcpip_okx ( test, __FILE__, __LINE__ )
+#define tcpip_ok(test) tcpip_okx(test, __FILE__, __LINE__)
 
 /**
  * Report TCP/IP pseudorandom-data test result
@@ -192,69 +193,68 @@ static void tcpip_okx ( struct tcpip_test *test, const char *file,
  * @v file		Test code file
  * @v line		Test code line
  */
-static void tcpip_random_okx ( struct tcpip_random_test *test,
-			       const char *file, unsigned int line ) {
-	uint8_t *data = ( tcpip_data + test->offset );
-	struct profiler profiler;
-	uint16_t expected;
-	uint16_t generic_sum;
-	uint16_t sum;
-	unsigned int i;
+static void tcpip_random_okx(struct tcpip_random_test* test,
+                             const char* file, unsigned int line) {
+    uint8_t* data = (tcpip_data + test->offset);
+    struct profiler profiler;
+    uint16_t expected;
+    uint16_t generic_sum;
+    uint16_t sum;
+    unsigned int i;
 
-	/* Sanity check */
-	assert ( ( test->len + test->offset ) <= sizeof ( tcpip_data ) );
+    /* Sanity check */
+    assert((test->len + test->offset) <= sizeof(tcpip_data));
 
-	/* Generate random data */
-	srandom ( test->seed );
-	for ( i = 0 ; i < test->len ; i++ )
-		data[i] = random();
+    /* Generate random data */
+    srandom(test->seed);
+    for (i = 0; i < test->len; i++)
+        data[i] = random();
 
-	/* Verify generic_tcpip_continue_chksum() result */
-	expected = rfc_tcpip_chksum ( data, test->len );
-	generic_sum = generic_tcpip_continue_chksum ( TCPIP_EMPTY_CSUM,
-						      data, test->len );
-	okx ( generic_sum == expected, file, line );
+    /* Verify generic_tcpip_continue_chksum() result */
+    expected = rfc_tcpip_chksum(data, test->len);
+    generic_sum = generic_tcpip_continue_chksum(TCPIP_EMPTY_CSUM,
+                                                data, test->len);
+    okx(generic_sum == expected, file, line);
 
-	/* Verify optimised tcpip_continue_chksum() result */
-	sum = tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, data, test->len );
-	okx ( sum == expected, file, line );
+    /* Verify optimised tcpip_continue_chksum() result */
+    sum = tcpip_continue_chksum(TCPIP_EMPTY_CSUM, data, test->len);
+    okx(sum == expected, file, line);
 
-	/* Profile optimised calculation */
-	memset ( &profiler, 0, sizeof ( profiler ) );
-	for ( i = 0 ; i < PROFILE_COUNT ; i++ ) {
-		profile_start ( &profiler );
-		sum = tcpip_continue_chksum ( TCPIP_EMPTY_CSUM, data,
-					      test->len );
-		profile_stop ( &profiler );
-	}
-	DBG ( "TCPIP checksummed %zd bytes (+%zd) in %ld +/- %ld ticks\n",
-	      test->len, test->offset, profile_mean ( &profiler ),
-	      profile_stddev ( &profiler ) );
+    /* Profile optimised calculation */
+    memset(&profiler, 0, sizeof(profiler));
+    for (i = 0; i < PROFILE_COUNT; i++) {
+        profile_start(&profiler);
+        sum = tcpip_continue_chksum(TCPIP_EMPTY_CSUM, data,
+                                    test->len);
+        profile_stop(&profiler);
+    }
+    DBG("TCPIP checksummed %zd bytes (+%zd) in %ld +/- %ld ticks\n",
+        test->len, test->offset, profile_mean(&profiler),
+        profile_stddev(&profiler));
 }
-#define tcpip_random_ok( test ) tcpip_random_okx ( test, __FILE__, __LINE__ )
+#define tcpip_random_ok(test) tcpip_random_okx(test, __FILE__, __LINE__)
 
 /**
  * Perform TCP/IP self-tests
  *
  */
-static void tcpip_test_exec ( void ) {
-
-	tcpip_ok ( &empty );
-	tcpip_ok ( &one_byte );
-	tcpip_ok ( &two_bytes );
-	tcpip_ok ( &positive_zero );
-	tcpip_ok ( &negative_zero );
-	tcpip_ok ( &final_carry_big );
-	tcpip_ok ( &final_carry_little );
-	tcpip_random_ok ( &random_aligned );
-	tcpip_random_ok ( &random_unaligned_1 );
-	tcpip_random_ok ( &random_unaligned_2 );
-	tcpip_random_ok ( &random_aligned_truncated );
-	tcpip_random_ok ( &partial );
+static void tcpip_test_exec(void) {
+    tcpip_ok(&empty);
+    tcpip_ok(&one_byte);
+    tcpip_ok(&two_bytes);
+    tcpip_ok(&positive_zero);
+    tcpip_ok(&negative_zero);
+    tcpip_ok(&final_carry_big);
+    tcpip_ok(&final_carry_little);
+    tcpip_random_ok(&random_aligned);
+    tcpip_random_ok(&random_unaligned_1);
+    tcpip_random_ok(&random_unaligned_2);
+    tcpip_random_ok(&random_aligned_truncated);
+    tcpip_random_ok(&partial);
 }
 
 /** TCP/IP self-test */
 struct self_test tcpip_test __self_test = {
-	.name = "tcpip",
-	.exec = tcpip_test_exec,
+    .name = "tcpip",
+    .exec = tcpip_test_exec,
 };

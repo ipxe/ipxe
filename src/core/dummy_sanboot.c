@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -41,32 +41,32 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v flags		Flags
  * @ret drive		Drive number, or negative error
  */
-static int dummy_san_hook ( unsigned int drive, struct uri **uris,
-			    unsigned int count, unsigned int flags ) {
-	struct san_device *sandev;
-	int rc;
+static int dummy_san_hook(unsigned int drive, struct uri** uris,
+                          unsigned int count, unsigned int flags) {
+    struct san_device* sandev;
+    int rc;
 
-	/* Allocate SAN device */
-	sandev = alloc_sandev ( uris, count, 0 );
-	if ( ! sandev ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
+    /* Allocate SAN device */
+    sandev = alloc_sandev(uris, count, 0);
+    if (!sandev) {
+        rc = -ENOMEM;
+        goto err_alloc;
+    }
 
-	/* Register SAN device */
-	if ( ( rc = register_sandev ( sandev, drive, flags ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x could not register: %s\n",
-		       sandev->drive, strerror ( rc ) );
-		goto err_register;
-	}
+    /* Register SAN device */
+    if ((rc = register_sandev(sandev, drive, flags)) != 0) {
+        DBGC(sandev, "SAN %#02x could not register: %s\n",
+             sandev->drive, strerror(rc));
+        goto err_register;
+    }
 
-	return drive;
+    return drive;
 
-	unregister_sandev ( sandev );
- err_register:
-	sandev_put ( sandev );
- err_alloc:
-	return rc;
+    unregister_sandev(sandev);
+err_register:
+    sandev_put(sandev);
+err_alloc:
+    return rc;
 }
 
 /**
@@ -74,21 +74,21 @@ static int dummy_san_hook ( unsigned int drive, struct uri **uris,
  *
  * @v drive		Drive number
  */
-static void dummy_san_unhook ( unsigned int drive ) {
-	struct san_device *sandev;
+static void dummy_san_unhook(unsigned int drive) {
+    struct san_device* sandev;
 
-	/* Find drive */
-	sandev = sandev_find ( drive );
-	if ( ! sandev ) {
-		DBG ( "SAN %#02x does not exist\n", drive );
-		return;
-	}
+    /* Find drive */
+    sandev = sandev_find(drive);
+    if (!sandev) {
+        DBG("SAN %#02x does not exist\n", drive);
+        return;
+    }
 
-	/* Unregister SAN device */
-	unregister_sandev ( sandev );
+    /* Unregister SAN device */
+    unregister_sandev(sandev);
 
-	/* Drop reference to drive */
-	sandev_put ( sandev );
+    /* Drop reference to drive */
+    sandev_put(sandev);
 }
 
 /**
@@ -98,10 +98,9 @@ static void dummy_san_unhook ( unsigned int drive ) {
  * @v filename		Filename (or NULL to use default)
  * @ret rc		Return status code
  */
-static int dummy_san_boot ( unsigned int drive __unused,
-			    const char *filename __unused ) {
-
-	return -EOPNOTSUPP;
+static int dummy_san_boot(unsigned int drive __unused,
+                          const char* filename __unused) {
+    return -EOPNOTSUPP;
 }
 
 /**
@@ -110,11 +109,10 @@ static int dummy_san_boot ( unsigned int drive __unused,
  * @v acpi		ACPI description header
  * @ret rc		Return status code
  */
-static int dummy_install ( struct acpi_header *acpi ) {
-
-	DBGC ( acpi, "ACPI table %s:\n", acpi_name ( acpi->signature ) );
-	DBGC_HDA ( acpi, 0, acpi, le32_to_cpu ( acpi->length ) );
-	return 0;
+static int dummy_install(struct acpi_header* acpi) {
+    DBGC(acpi, "ACPI table %s:\n", acpi_name(acpi->signature));
+    DBGC_HDA(acpi, 0, acpi, le32_to_cpu(acpi->length));
+    return 0;
 }
 
 /**
@@ -122,12 +120,11 @@ static int dummy_install ( struct acpi_header *acpi ) {
  *
  * @ret rc		Return status code
  */
-static int dummy_san_describe ( void ) {
-
-	return acpi_install ( dummy_install );
+static int dummy_san_describe(void) {
+    return acpi_install(dummy_install);
 }
 
-PROVIDE_SANBOOT ( dummy, san_hook, dummy_san_hook );
-PROVIDE_SANBOOT ( dummy, san_unhook, dummy_san_unhook );
-PROVIDE_SANBOOT ( dummy, san_boot, dummy_san_boot );
-PROVIDE_SANBOOT ( dummy, san_describe, dummy_san_describe );
+PROVIDE_SANBOOT(dummy, san_hook, dummy_san_hook);
+PROVIDE_SANBOOT(dummy, san_unhook, dummy_san_unhook);
+PROVIDE_SANBOOT(dummy, san_boot, dummy_san_boot);
+PROVIDE_SANBOOT(dummy, san_describe, dummy_san_describe);

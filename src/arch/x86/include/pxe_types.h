@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef PXE_TYPES_H
-#define PXE_TYPES_H
+    #define PXE_TYPES_H
 
 /** @file
  *
@@ -7,10 +9,10 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <stdint.h>
-#include <errno.h> /* PXE status codes */
+    #include <stdint.h>
+    #include <errno.h> /* PXE status codes */
 
 /** @addtogroup pxe Preboot eXecution Environment (PXE) API
  *  @{
@@ -42,8 +44,8 @@ typedef uint32_t UINT32_t;
  *
  */
 typedef UINT16_t PXENV_EXIT_t;
-#define PXENV_EXIT_SUCCESS	0x0000	/**< No error occurred */
-#define PXENV_EXIT_FAILURE	0x0001	/**< An error occurred */
+    #define PXENV_EXIT_SUCCESS 0x0000 /**< No error occurred */
+    #define PXENV_EXIT_FAILURE 0x0001 /**< An error occurred */
 
 /** A PXE status code.
  *
@@ -66,13 +68,13 @@ typedef UINT32_t IP4_t;
  */
 typedef UINT16_t UDP_PORT_t;
 
-/** Maximum length of a MAC address */
-#define MAC_ADDR_LEN 16
+    /** Maximum length of a MAC address */
+    #define MAC_ADDR_LEN 16
 
 /** A MAC address */
 typedef UINT8_t MAC_ADDR_t[MAC_ADDR_LEN];
 
-#ifndef HAVE_ARCH_ADDR32
+    #ifndef HAVE_ARCH_ADDR32
 /** A physical address.
  *
  * For x86, this is a 32-bit physical address, and is therefore
@@ -80,9 +82,9 @@ typedef UINT8_t MAC_ADDR_t[MAC_ADDR_LEN];
  *
  */
 typedef UINT32_t ADDR32_t;
-#endif
+    #endif
 
-#ifndef HAVE_ARCH_SEGSEL
+    #ifndef HAVE_ARCH_SEGSEL
 /** A segment selector.
  *
  * For x86, this is a real mode segment (0x0000-0xffff), or a
@@ -91,16 +93,16 @@ typedef UINT32_t ADDR32_t;
  *
  */
 typedef UINT16_t SEGSEL_t;
-#endif
+    #endif
 
-#ifndef HAVE_ARCH_OFF16
+    #ifndef HAVE_ARCH_OFF16
 /** An offset within a segment identified by #SEGSEL
  *
  * For x86, this is a 16-bit offset.
  *
  */
 typedef UINT16_t OFF16_t;
-#endif
+    #endif
 
 /** A segment:offset address
  *
@@ -109,16 +111,16 @@ typedef UINT16_t OFF16_t;
  *
  */
 typedef struct s_SEGOFF16 {
-	OFF16_t		offset;		/**< Offset within the segment */
-	SEGSEL_t	segment;	/**< Segment selector */
-} __attribute__ (( packed )) SEGOFF16_t;
+    OFF16_t offset;   /**< Offset within the segment */
+    SEGSEL_t segment; /**< Segment selector */
+} __attribute__((packed)) SEGOFF16_t;
 
 /** A segment descriptor */
 typedef struct s_SEGDESC {
-	SEGSEL_t	segment_address;	/**< Segment selector */
-	ADDR32_t	Physical_address;	/**< Segment base address */
-	OFF16_t		Seg_size;		/**< Size of the segment */
-} __attribute__ (( packed )) SEGDESC_t;
+    SEGSEL_t segment_address;  /**< Segment selector */
+    ADDR32_t Physical_address; /**< Segment base address */
+    OFF16_t Seg_size;          /**< Size of the segment */
+} __attribute__((packed)) SEGDESC_t;
 
 /** @} */ /* pxe_types */
 

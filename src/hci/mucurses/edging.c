@@ -8,7 +8,7 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * Draw borders from single-byte characters and renditions around a
@@ -19,10 +19,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v horch	horizontal chtype
  * @ret rc	return status code
  */
-int box ( WINDOW *win, chtype verch, chtype horch ) {
-	chtype corner = '+' | win->attrs; /* default corner character */
-	return wborder( win, verch, verch, horch, horch,
-			corner, corner, corner, corner );
+int box(WINDOW* win, chtype verch, chtype horch) {
+    chtype corner = '+' | win->attrs; /* default corner character */
+    return wborder(win, verch, verch, horch, horch,
+                   corner, corner, corner, corner);
 }
 
 /**
@@ -40,35 +40,35 @@ int box ( WINDOW *win, chtype verch, chtype horch ) {
  * @v br	bottom right corner
  * @ret rc	return status code
  */
-int wborder ( WINDOW *win, chtype ls, chtype rs,
-	      chtype ts, chtype bs, chtype tl,
-	      chtype tr, chtype bl, chtype br ) {
-	struct cursor_pos pos;
+int wborder(WINDOW* win, chtype ls, chtype rs,
+            chtype ts, chtype bs, chtype tl,
+            chtype tr, chtype bl, chtype br) {
+    struct cursor_pos pos;
 
-	_store_curs_pos( win, &pos );
-	wmove(win,0,0);
+    _store_curs_pos(win, &pos);
+    wmove(win, 0, 0);
 
-	_wputch(win,tl,WRAP);
-	while ( ( win->width - 1 ) - win->curs_x ) {
-		_wputch(win,ts,WRAP);
-	}
-	_wputch(win,tr,WRAP);
+    _wputch(win, tl, WRAP);
+    while ((win->width - 1) - win->curs_x) {
+        _wputch(win, ts, WRAP);
+    }
+    _wputch(win, tr, WRAP);
 
-	while ( ( win->height - 1 ) - win->curs_y ) {
-		_wputch(win,ls,WRAP);
-		wmove(win,win->curs_y,(win->width)-1);
-		_wputch(win,rs,WRAP);
-	}
+    while ((win->height - 1) - win->curs_y) {
+        _wputch(win, ls, WRAP);
+        wmove(win, win->curs_y, (win->width) - 1);
+        _wputch(win, rs, WRAP);
+    }
 
-	_wputch(win,bl,WRAP);
-	while ( ( win->width -1 ) - win->curs_x ) {
-		_wputch(win,bs,WRAP);
-	}
-	_wputch(win,br,NOWRAP); /* do not wrap last char to leave
-				   cursor in last position */
-	_restore_curs_pos( win, &pos );
+    _wputch(win, bl, WRAP);
+    while ((win->width - 1) - win->curs_x) {
+        _wputch(win, bs, WRAP);
+    }
+    _wputch(win, br, NOWRAP); /* do not wrap last char to leave
+                     cursor in last position */
+    _restore_curs_pos(win, &pos);
 
-	return OK;
+    return OK;
 }
 
 /**
@@ -79,16 +79,16 @@ int wborder ( WINDOW *win, chtype ls, chtype rs,
  * @v n		max number of chars (wide) to render
  * @ret rc	return status code
  */
-int whline ( WINDOW *win, chtype ch, int n ) {
-	struct cursor_pos pos;
+int whline(WINDOW* win, chtype ch, int n) {
+    struct cursor_pos pos;
 
-	_store_curs_pos ( win, &pos );
-	while ( ( win->curs_x - win->width ) && n-- ) {
-		_wputch ( win, ch, NOWRAP );
-	}
-	_restore_curs_pos ( win, &pos );
+    _store_curs_pos(win, &pos);
+    while ((win->curs_x - win->width) && n--) {
+        _wputch(win, ch, NOWRAP);
+    }
+    _restore_curs_pos(win, &pos);
 
-	return OK;
+    return OK;
 }
 
 /**
@@ -99,15 +99,15 @@ int whline ( WINDOW *win, chtype ch, int n ) {
  * @v n		max number of chars (high) to render
  * @ret rc	return status code
  */
-int wvline ( WINDOW *win, chtype ch, int n ) {
-	struct cursor_pos pos;
+int wvline(WINDOW* win, chtype ch, int n) {
+    struct cursor_pos pos;
 
-	_store_curs_pos ( win, &pos );
-	while ( ( win->curs_y - win->height ) && n-- ) {
-		_wputch ( win, ch, NOWRAP );
-		wmove( win, ++(win->curs_y), pos.x);
-	}
-	_restore_curs_pos ( win, &pos );
+    _store_curs_pos(win, &pos);
+    while ((win->curs_y - win->height) && n--) {
+        _wputch(win, ch, NOWRAP);
+        wmove(win, ++(win->curs_y), pos.x);
+    }
+    _restore_curs_pos(win, &pos);
 
-	return OK;
+    return OK;
 }

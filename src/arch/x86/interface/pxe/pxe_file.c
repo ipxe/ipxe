@@ -37,9 +37,9 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-FEATURE ( FEATURE_MISC, "PXEXT", DHCP_EB_FEATURE_PXE_EXT, 2 );
+FEATURE(FEATURE_MISC, "PXEXT", DHCP_EB_FEATURE_PXE_EXT, 2);
 
 /**
  * FILE OPEN
@@ -52,36 +52,36 @@ FEATURE ( FEATURE_MISC, "PXEXT", DHCP_EB_FEATURE_PXE_EXT, 2 );
  * @ret s_PXENV_FILE_OPEN::FileHandle	Handle of opened file
  *
  */
-static PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open ) {
-	userptr_t filename;
-	size_t filename_len;
-	int fd;
+static PXENV_EXIT_t pxenv_file_open(struct s_PXENV_FILE_OPEN* file_open) {
+    userptr_t filename;
+    size_t filename_len;
+    int fd;
 
-	DBG ( "PXENV_FILE_OPEN" );
+    DBG("PXENV_FILE_OPEN");
 
-	/* Copy name from external program, and open it */
-	filename = real_to_user ( file_open->FileName.segment,
-			      file_open->FileName.offset );
-	filename_len = strlen_user ( filename, 0 );
-	{
-		char uri_string[ filename_len + 1 ];
+    /* Copy name from external program, and open it */
+    filename = real_to_user(file_open->FileName.segment,
+                            file_open->FileName.offset);
+    filename_len = strlen_user(filename, 0);
+    {
+        char uri_string[filename_len + 1];
 
-		copy_from_user ( uri_string, filename, 0,
-				 sizeof ( uri_string ) );
-		DBG ( " %s", uri_string );
-		fd = open ( uri_string );
-	}
+        copy_from_user(uri_string, filename, 0,
+                       sizeof(uri_string));
+        DBG(" %s", uri_string);
+        fd = open(uri_string);
+    }
 
-	if ( fd < 0 ) {
-		file_open->Status = PXENV_STATUS ( fd );
-		return PXENV_EXIT_FAILURE;
-	}
+    if (fd < 0) {
+        file_open->Status = PXENV_STATUS(fd);
+        return PXENV_EXIT_FAILURE;
+    }
 
-	DBG ( " as file %d", fd );
+    DBG(" as file %d", fd);
 
-	file_open->FileHandle = fd;
-	file_open->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+    file_open->FileHandle = fd;
+    file_open->Status = PXENV_STATUS_SUCCESS;
+    return PXENV_EXIT_SUCCESS;
 }
 
 /**
@@ -94,13 +94,12 @@ static PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open ) {
  * @ret s_PXENV_FILE_CLOSE::Status	PXE status code
  *
  */
-static PXENV_EXIT_t pxenv_file_close ( struct s_PXENV_FILE_CLOSE *file_close ) {
+static PXENV_EXIT_t pxenv_file_close(struct s_PXENV_FILE_CLOSE* file_close) {
+    DBG("PXENV_FILE_CLOSE %d", file_close->FileHandle);
 
-	DBG ( "PXENV_FILE_CLOSE %d", file_close->FileHandle );
-
-	close ( file_close->FileHandle );
-	file_close->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+    close(file_close->FileHandle);
+    file_close->Status = PXENV_STATUS_SUCCESS;
+    return PXENV_EXIT_SUCCESS;
 }
 
 /**
@@ -115,22 +114,22 @@ static PXENV_EXIT_t pxenv_file_close ( struct s_PXENV_FILE_CLOSE *file_close ) {
  *
  */
 static PXENV_EXIT_t
-pxenv_file_select ( struct s_PXENV_FILE_SELECT *file_select ) {
-	fd_set fdset;
-	int ready;
+pxenv_file_select(struct s_PXENV_FILE_SELECT* file_select) {
+    fd_set fdset;
+    int ready;
 
-	DBG ( "PXENV_FILE_SELECT %d", file_select->FileHandle );
+    DBG("PXENV_FILE_SELECT %d", file_select->FileHandle);
 
-	FD_ZERO ( &fdset );
-	FD_SET ( file_select->FileHandle, &fdset );
-	if ( ( ready = select ( &fdset, 0 ) ) < 0 ) {
-		file_select->Status = PXENV_STATUS ( ready );
-		return PXENV_EXIT_FAILURE;
-	}
+    FD_ZERO(&fdset);
+    FD_SET(file_select->FileHandle, &fdset);
+    if ((ready = select(&fdset, 0)) < 0) {
+        file_select->Status = PXENV_STATUS(ready);
+        return PXENV_EXIT_FAILURE;
+    }
 
-	file_select->Ready = ( ready ? RDY_READ : 0 );
-	file_select->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+    file_select->Ready = (ready ? RDY_READ : 0);
+    file_select->Status = PXENV_STATUS_SUCCESS;
+    return PXENV_EXIT_SUCCESS;
 }
 
 /**
@@ -147,27 +146,27 @@ pxenv_file_select ( struct s_PXENV_FILE_SELECT *file_select ) {
  * @ret s_PXENV_FILE_READ::BufferSize	Length of data read
  *
  */
-static PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read ) {
-	userptr_t buffer;
-	ssize_t len;
+static PXENV_EXIT_t pxenv_file_read(struct s_PXENV_FILE_READ* file_read) {
+    userptr_t buffer;
+    ssize_t len;
 
-	DBG ( "PXENV_FILE_READ %d to %04x:%04x+%04x", file_read->FileHandle,
-	      file_read->Buffer.segment, file_read->Buffer.offset,
-	      file_read->BufferSize );
+    DBG("PXENV_FILE_READ %d to %04x:%04x+%04x", file_read->FileHandle,
+        file_read->Buffer.segment, file_read->Buffer.offset,
+        file_read->BufferSize);
 
-	buffer = real_to_user ( file_read->Buffer.segment,
-				file_read->Buffer.offset );
-	if ( ( len = read_user ( file_read->FileHandle, buffer, 0,
-				file_read->BufferSize ) ) < 0 ) {
-		file_read->Status = PXENV_STATUS ( len );
-		return PXENV_EXIT_FAILURE;
-	}
+    buffer = real_to_user(file_read->Buffer.segment,
+                          file_read->Buffer.offset);
+    if ((len = read_user(file_read->FileHandle, buffer, 0,
+                         file_read->BufferSize)) < 0) {
+        file_read->Status = PXENV_STATUS(len);
+        return PXENV_EXIT_FAILURE;
+    }
 
-	DBG ( " read %04zx", ( ( size_t ) len ) );
+    DBG(" read %04zx", ((size_t)len));
 
-	file_read->BufferSize = len;
-	file_read->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+    file_read->BufferSize = len;
+    file_read->Status = PXENV_STATUS_SUCCESS;
+    return PXENV_EXIT_SUCCESS;
 }
 
 /**
@@ -181,22 +180,22 @@ static PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read ) {
  * @ret s_PXENV_GET_FILE_SIZE::FileSize	Size of file
  */
 static PXENV_EXIT_t
-pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE *get_file_size ) {
-	ssize_t filesize;
+pxenv_get_file_size(struct s_PXENV_GET_FILE_SIZE* get_file_size) {
+    ssize_t filesize;
 
-	DBG ( "PXENV_GET_FILE_SIZE %d", get_file_size->FileHandle );
+    DBG("PXENV_GET_FILE_SIZE %d", get_file_size->FileHandle);
 
-	filesize = fsize ( get_file_size->FileHandle );
-	if ( filesize < 0 ) {
-		get_file_size->Status = PXENV_STATUS ( filesize );
-		return PXENV_EXIT_FAILURE;
-	}
+    filesize = fsize(get_file_size->FileHandle);
+    if (filesize < 0) {
+        get_file_size->Status = PXENV_STATUS(filesize);
+        return PXENV_EXIT_FAILURE;
+    }
 
-	DBG ( " is %zd", ( ( size_t ) filesize ) );
+    DBG(" is %zd", ((size_t)filesize));
 
-	get_file_size->FileSize = filesize;
-	get_file_size->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+    get_file_size->FileSize = filesize;
+    get_file_size->Status = PXENV_STATUS_SUCCESS;
+    return PXENV_EXIT_SUCCESS;
 }
 
 /**
@@ -209,32 +208,32 @@ pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE *get_file_size ) {
  * @ret s_PXENV_FILE_EXEC::Status	PXE status code
  *
  */
-static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
-	userptr_t command;
-	size_t command_len;
-	int rc;
+static PXENV_EXIT_t pxenv_file_exec(struct s_PXENV_FILE_EXEC* file_exec) {
+    userptr_t command;
+    size_t command_len;
+    int rc;
 
-	DBG ( "PXENV_FILE_EXEC" );
+    DBG("PXENV_FILE_EXEC");
 
-	/* Copy name from external program, and exec it */
-	command = real_to_user ( file_exec->Command.segment,
-				 file_exec->Command.offset );
-	command_len = strlen_user ( command, 0 );
-	{
-		char command_string[ command_len + 1 ];
+    /* Copy name from external program, and exec it */
+    command = real_to_user(file_exec->Command.segment,
+                           file_exec->Command.offset);
+    command_len = strlen_user(command, 0);
+    {
+        char command_string[command_len + 1];
 
-		copy_from_user ( command_string, command, 0,
-				 sizeof ( command_string ) );
-		DBG ( " %s", command_string );
+        copy_from_user(command_string, command, 0,
+                       sizeof(command_string));
+        DBG(" %s", command_string);
 
-		if ( ( rc = system ( command_string ) ) != 0 ) {
-			file_exec->Status = PXENV_STATUS ( rc );
-			return PXENV_EXIT_FAILURE;
-		}
-	}
+        if ((rc = system(command_string)) != 0) {
+            file_exec->Status = PXENV_STATUS(rc);
+            return PXENV_EXIT_FAILURE;
+        }
+    }
 
-	file_exec->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+    file_exec->Status = PXENV_STATUS_SUCCESS;
+    return PXENV_EXIT_SUCCESS;
 }
 
 /**
@@ -250,27 +249,26 @@ static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
  *
  */
 static PXENV_EXIT_t
-pxenv_file_cmdline ( struct s_PXENV_FILE_CMDLINE *file_cmdline ) {
-	userptr_t buffer;
-	size_t max_len;
-	size_t len;
+pxenv_file_cmdline(struct s_PXENV_FILE_CMDLINE* file_cmdline) {
+    userptr_t buffer;
+    size_t max_len;
+    size_t len;
 
-	DBG ( "PXENV_FILE_CMDLINE to %04x:%04x+%04x \"%s\"\n",
-	      file_cmdline->Buffer.segment, file_cmdline->Buffer.offset,
-	      file_cmdline->BufferSize, pxe_cmdline );
+    DBG("PXENV_FILE_CMDLINE to %04x:%04x+%04x \"%s\"\n",
+        file_cmdline->Buffer.segment, file_cmdline->Buffer.offset,
+        file_cmdline->BufferSize, pxe_cmdline);
 
-	buffer = real_to_user ( file_cmdline->Buffer.segment,
-				file_cmdline->Buffer.offset );
-	len = file_cmdline->BufferSize;
-	max_len = ( pxe_cmdline ?
-		    ( strlen ( pxe_cmdline ) + 1 /* NUL */ ) : 0 );
-	if ( len > max_len )
-		len = max_len;
-	copy_to_user ( buffer, 0, pxe_cmdline, len );
-	file_cmdline->BufferSize = max_len;
+    buffer = real_to_user(file_cmdline->Buffer.segment,
+                          file_cmdline->Buffer.offset);
+    len = file_cmdline->BufferSize;
+    max_len = (pxe_cmdline ? (strlen(pxe_cmdline) + 1 /* NUL */) : 0);
+    if (len > max_len)
+        len = max_len;
+    copy_to_user(buffer, 0, pxe_cmdline, len);
+    file_cmdline->BufferSize = max_len;
 
-	file_cmdline->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+    file_cmdline->Status = PXENV_STATUS_SUCCESS;
+    return PXENV_EXIT_SUCCESS;
 }
 
 /**
@@ -288,59 +286,59 @@ pxenv_file_cmdline ( struct s_PXENV_FILE_CMDLINE *file_cmdline ) {
  *
  */
 static PXENV_EXIT_t
-pxenv_file_api_check ( struct s_PXENV_FILE_API_CHECK *file_api_check ) {
-	struct pxe_api_call *call;
-	unsigned int mask = 0;
-	unsigned int offset;
+pxenv_file_api_check(struct s_PXENV_FILE_API_CHECK* file_api_check) {
+    struct pxe_api_call* call;
+    unsigned int mask = 0;
+    unsigned int offset;
 
-	DBG ( "PXENV_FILE_API_CHECK" );
+    DBG("PXENV_FILE_API_CHECK");
 
-	/* Check for magic value */
-	if ( file_api_check->Magic != 0x91d447b2 ) {
-		file_api_check->Status = PXENV_STATUS_BAD_FUNC;
-		return PXENV_EXIT_FAILURE;
-	}
+    /* Check for magic value */
+    if (file_api_check->Magic != 0x91d447b2) {
+        file_api_check->Status = PXENV_STATUS_BAD_FUNC;
+        return PXENV_EXIT_FAILURE;
+    }
 
-	/* Check for required parameter size */
-	if ( file_api_check->Size < sizeof ( *file_api_check ) ) {
-		file_api_check->Status = PXENV_STATUS_OUT_OF_RESOURCES;
-		return PXENV_EXIT_FAILURE;
-	}
+    /* Check for required parameter size */
+    if (file_api_check->Size < sizeof(*file_api_check)) {
+        file_api_check->Status = PXENV_STATUS_OUT_OF_RESOURCES;
+        return PXENV_EXIT_FAILURE;
+    }
 
-	/* Determine supported calls */
-	for_each_table_entry ( call, PXE_API_CALLS ) {
-		offset = ( call->opcode - PXENV_FILE_MIN );
-		if ( offset <= ( PXENV_FILE_MAX - PXENV_FILE_MIN ) )
-			mask |= ( 1 << offset );
-	}
+    /* Determine supported calls */
+    for_each_table_entry(call, PXE_API_CALLS) {
+        offset = (call->opcode - PXENV_FILE_MIN);
+        if (offset <= (PXENV_FILE_MAX - PXENV_FILE_MIN))
+            mask |= (1 << offset);
+    }
 
-	/* Fill in parameters */
-	file_api_check->Size = sizeof ( *file_api_check );
-	file_api_check->Magic = 0xe9c17b20;
-	file_api_check->Provider = 0x45585067; /* "iPXE" */
-	file_api_check->APIMask = mask;
-	file_api_check->Flags = 0; /* None defined */
+    /* Fill in parameters */
+    file_api_check->Size = sizeof(*file_api_check);
+    file_api_check->Magic = 0xe9c17b20;
+    file_api_check->Provider = 0x45585067; /* "iPXE" */
+    file_api_check->APIMask = mask;
+    file_api_check->Flags = 0; /* None defined */
 
-	file_api_check->Status = PXENV_STATUS_SUCCESS;
-	return PXENV_EXIT_SUCCESS;
+    file_api_check->Status = PXENV_STATUS_SUCCESS;
+    return PXENV_EXIT_SUCCESS;
 }
 
 /** PXE file API */
 struct pxe_api_call pxe_file_api[] __pxe_api_call = {
-	PXE_API_CALL ( PXENV_FILE_OPEN, pxenv_file_open,
-		       struct s_PXENV_FILE_OPEN ),
-	PXE_API_CALL ( PXENV_FILE_CLOSE, pxenv_file_close,
-		       struct s_PXENV_FILE_CLOSE ),
-	PXE_API_CALL ( PXENV_FILE_SELECT, pxenv_file_select,
-		       struct s_PXENV_FILE_SELECT ),
-	PXE_API_CALL ( PXENV_FILE_READ, pxenv_file_read,
-		       struct s_PXENV_FILE_READ ),
-	PXE_API_CALL ( PXENV_GET_FILE_SIZE, pxenv_get_file_size,
-		       struct s_PXENV_GET_FILE_SIZE ),
-	PXE_API_CALL ( PXENV_FILE_EXEC, pxenv_file_exec,
-		       struct s_PXENV_FILE_EXEC ),
-	PXE_API_CALL ( PXENV_FILE_CMDLINE, pxenv_file_cmdline,
-		       struct s_PXENV_FILE_CMDLINE ),
-	PXE_API_CALL ( PXENV_FILE_API_CHECK, pxenv_file_api_check,
-		       struct s_PXENV_FILE_API_CHECK ),
+    PXE_API_CALL(PXENV_FILE_OPEN, pxenv_file_open,
+                 struct s_PXENV_FILE_OPEN),
+    PXE_API_CALL(PXENV_FILE_CLOSE, pxenv_file_close,
+                 struct s_PXENV_FILE_CLOSE),
+    PXE_API_CALL(PXENV_FILE_SELECT, pxenv_file_select,
+                 struct s_PXENV_FILE_SELECT),
+    PXE_API_CALL(PXENV_FILE_READ, pxenv_file_read,
+                 struct s_PXENV_FILE_READ),
+    PXE_API_CALL(PXENV_GET_FILE_SIZE, pxenv_get_file_size,
+                 struct s_PXENV_GET_FILE_SIZE),
+    PXE_API_CALL(PXENV_FILE_EXEC, pxenv_file_exec,
+                 struct s_PXENV_FILE_EXEC),
+    PXE_API_CALL(PXENV_FILE_CMDLINE, pxenv_file_cmdline,
+                 struct s_PXENV_FILE_CMDLINE),
+    PXE_API_CALL(PXENV_FILE_API_CHECK, pxenv_file_api_check,
+                 struct s_PXENV_FILE_API_CHECK),
 };

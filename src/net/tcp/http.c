@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * @file
@@ -34,16 +34,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/http.h>
 #include <ipxe/features.h>
 
-FEATURE ( FEATURE_PROTOCOL, "HTTP", DHCP_EB_FEATURE_HTTP, 1 );
+FEATURE(FEATURE_PROTOCOL, "HTTP", DHCP_EB_FEATURE_HTTP, 1);
 
 /** HTTP URI opener */
 struct uri_opener http_uri_opener __uri_opener = {
-	.scheme	= "http",
-	.open	= http_open_uri,
+    .scheme = "http",
+    .open = http_open_uri,
 };
 
 /** HTTP URI scheme */
 struct http_scheme http_scheme __http_scheme = {
-	.name = "http",
-	.port = HTTP_PORT,
+    .name = "http",
+    .port = HTTP_PORT,
 };

@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _BITS_ENTROPY_H
-#define _BITS_ENTROPY_H
+    #define _BITS_ENTROPY_H
 
 /** @file
  *
@@ -7,8 +9,8 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <ipxe/rtc_entropy.h>
+    #include <ipxe/rtc_entropy.h>
 
 #endif /* _BITS_ENTROPY_H */

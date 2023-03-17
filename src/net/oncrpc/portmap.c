@@ -56,18 +56,18 @@
  * @v proto             Protocol (TCP or UDP)
  * @ret rc              Return status code
  */
-int portmap_getport ( struct interface *intf, struct oncrpc_session *session,
-                      uint32_t prog, uint32_t vers, uint32_t proto ) {
-	struct oncrpc_field fields[] = {
-		ONCRPC_FIELD ( int32, prog ),
-		ONCRPC_FIELD ( int32, vers ),
-		ONCRPC_FIELD ( int32, proto ),
-		ONCRPC_FIELD ( int32, 0 ), /* The port field is only meaningful
-		                              in GETPORT reply */
-		ONCRPC_FIELD_END,
-	};
+int portmap_getport(struct interface* intf, struct oncrpc_session* session,
+                    uint32_t prog, uint32_t vers, uint32_t proto) {
+    struct oncrpc_field fields[] = {
+        ONCRPC_FIELD(int32, prog),
+        ONCRPC_FIELD(int32, vers),
+        ONCRPC_FIELD(int32, proto),
+        ONCRPC_FIELD(int32, 0), /* The port field is only meaningful
+                                   in GETPORT reply */
+        ONCRPC_FIELD_END,
+    };
 
-	return oncrpc_call ( intf, session, PORTMAP_GETPORT, fields );
+    return oncrpc_call(intf, session, PORTMAP_GETPORT, fields);
 }
 
 /**
@@ -77,14 +77,14 @@ int portmap_getport ( struct interface *intf, struct oncrpc_session *session,
  * @v reply             The ONC RPC reply to get data from
  * @ret rc              Return status code
  */
-int portmap_get_getport_reply ( struct portmap_getport_reply *getport_reply,
-                                struct oncrpc_reply *reply ) {
-	if ( ! getport_reply || ! reply )
-		return -EINVAL;
+int portmap_get_getport_reply(struct portmap_getport_reply* getport_reply,
+                              struct oncrpc_reply* reply) {
+    if (!getport_reply || !reply)
+        return -EINVAL;
 
-	getport_reply->port = oncrpc_iob_get_int ( reply->data );
-	if ( getport_reply == 0 || getport_reply->port >= 65536 )
-		return -EINVAL;
+    getport_reply->port = oncrpc_iob_get_int(reply->data);
+    if (getport_reply == 0 || getport_reply->port >= 65536)
+        return -EINVAL;
 
-	return 0;
+    return 0;
 }

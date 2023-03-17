@@ -6,10 +6,9 @@
  *
  */
 
-FILE_LICENCE ( PUBLIC_DOMAIN );
+FILE_LICENCE(PUBLIC_DOMAIN);
 
 #include <ipxe/keymap.h>
 
 /** "th" keyboard mapping */
-struct key_mapping th_mapping[] __keymap = {
-};
+struct key_mapping th_mapping[] __keymap = {};

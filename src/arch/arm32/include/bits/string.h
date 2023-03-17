@@ -1,7 +1,9 @@
-#ifndef BITS_STRING_H
-#define BITS_STRING_H
+#pragma once
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+#ifndef BITS_STRING_H
+    #define BITS_STRING_H
+
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -17,12 +19,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v len		Length
  * @ret dest		Destination region
  */
-static inline __attribute__ (( always_inline )) void *
-memset ( void *dest, int character, size_t len ) {
-
-	/* Not yet optimised */
-	generic_memset ( dest, character, len );
-	return dest;
+static inline __attribute__((always_inline)) void*
+memset(void* dest, int character, size_t len) {
+    /* Not yet optimised */
+    generic_memset(dest, character, len);
+    return dest;
 }
 
 /**
@@ -33,12 +34,11 @@ memset ( void *dest, int character, size_t len ) {
  * @v len		Length
  * @ret dest		Destination region
  */
-static inline __attribute__ (( always_inline )) void *
-memcpy ( void *dest, const void *src, size_t len ) {
-
-	/* Not yet optimised */
-	generic_memcpy ( dest, src, len );
-	return dest;
+static inline __attribute__((always_inline)) void*
+memcpy(void* dest, const void* src, size_t len) {
+    /* Not yet optimised */
+    generic_memcpy(dest, src, len);
+    return dest;
 }
 
 /**
@@ -49,12 +49,11 @@ memcpy ( void *dest, const void *src, size_t len ) {
  * @v len		Length
  * @ret dest		Destination region
  */
-static inline __attribute__ (( always_inline )) void *
-memmove ( void *dest, const void *src, size_t len ) {
-
-	/* Not yet optimised */
-	generic_memmove ( dest, src, len );
-	return dest;
+static inline __attribute__((always_inline)) void*
+memmove(void* dest, const void* src, size_t len) {
+    /* Not yet optimised */
+    generic_memmove(dest, src, len);
+    return dest;
 }
 
 #endif /* BITS_STRING_H */

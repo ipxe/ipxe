@@ -5,7 +5,7 @@
 
 /** @file */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** Current console usage */
 int console_usage = CONSOLE_USAGE_STDOUT;
@@ -20,23 +20,26 @@ unsigned int console_height = CONSOLE_DEFAULT_HEIGHT;
  * Write a single character to each console device
  *
  * @v character		Character to be written
+ * @ret character	Character written
  *
  * The character is written out to all enabled console devices, using
  * each device's console_driver::putchar() method.
  */
-void putchar ( int character ) {
-	struct console_driver *console;
+int putchar(int character) {
+    struct console_driver* console;
 
-	/* Automatic LF -> CR,LF translation */
-	if ( character == '\n' )
-		putchar ( '\r' );
+    /* Automatic LF -> CR,LF translation */
+    if (character == '\n')
+        putchar('\r');
 
-	for_each_table_entry ( console, CONSOLES ) {
-		if ( ( ! ( console->disabled & CONSOLE_DISABLED_OUTPUT ) ) &&
-		     ( console_usage & console->usage ) &&
-		     console->putchar )
-			console->putchar ( character );
-	}
+    for_each_table_entry(console, CONSOLES) {
+        if ((!(console->disabled & CONSOLE_DISABLED_OUTPUT)) &&
+            (console_usage & console->usage) &&
+            console->putchar)
+            console->putchar(character);
+    }
+
+    return character;
 }
 
 /**
@@ -48,17 +51,17 @@ void putchar ( int character ) {
  * using each device's console_driver::iskey() method.  The first
  * console device that has available input will be returned, if any.
  */
-static struct console_driver * has_input ( void ) {
-	struct console_driver *console;
+static struct console_driver* has_input(void) {
+    struct console_driver* console;
 
-	for_each_table_entry ( console, CONSOLES ) {
-		if ( ( ! ( console->disabled & CONSOLE_DISABLED_INPUT ) ) &&
-		     console->iskey ) {
-			if ( console->iskey () )
-				return console;
-		}
-	}
-	return NULL;
+    for_each_table_entry(console, CONSOLES) {
+        if ((!(console->disabled & CONSOLE_DISABLED_INPUT)) &&
+            console->iskey) {
+            if (console->iskey())
+                return console;
+        }
+    }
+    return NULL;
 }
 
 /**
@@ -79,38 +82,38 @@ static struct console_driver * has_input ( void ) {
  *
  * The character read will not be echoed back to any console.
  */
-int getchar ( void ) {
-	struct console_driver *console;
-	int character;
+int getchar(void) {
+    struct console_driver* console;
+    int character;
 
-	while ( 1 ) {
-		console = has_input();
-		if ( console && console->getchar ) {
-			character = console->getchar ();
-			break;
-		}
+    while (1) {
+        console = has_input();
+        if (console && console->getchar) {
+            character = console->getchar();
+            break;
+        }
 
-		/* Doze for a while (until the next interrupt).  This works
-		 * fine, because the keyboard is interrupt-driven, and the
-		 * timer interrupt (approx. every 50msec) takes care of the
-		 * serial port, which is read by polling.  This reduces the
-		 * power dissipation of a modern CPU considerably, and also
-		 * makes Etherboot waiting for user interaction waste a lot
-		 * less CPU time in a VMware session.
-		 */
-		cpu_nap();
+        /* Doze for a while (until the next interrupt).  This works
+         * fine, because the keyboard is interrupt-driven, and the
+         * timer interrupt (approx. every 50msec) takes care of the
+         * serial port, which is read by polling.  This reduces the
+         * power dissipation of a modern CPU considerably, and also
+         * makes Etherboot waiting for user interaction waste a lot
+         * less CPU time in a VMware session.
+         */
+        cpu_nap();
 
-		/* Keep processing background tasks while we wait for
-		 * input.
-		 */
-		step();
-	}
+        /* Keep processing background tasks while we wait for
+         * input.
+         */
+        step();
+    }
 
-	/* CR -> LF translation */
-	if ( character == '\r' )
-		character = '\n';
+    /* CR -> LF translation */
+    if (character == '\r')
+        character = '\n';
 
-	return character;
+    return character;
 }
 
 /**
@@ -124,8 +127,8 @@ int getchar ( void ) {
  * call returns true, you can then safely call getchar() without
  * blocking.
  */
-int iskey ( void ) {
-	return has_input() ? 1 : 0;
+int iskey(void) {
+    return has_input() ? 1 : 0;
 }
 
 /**
@@ -140,25 +143,25 @@ int iskey ( void ) {
  *
  * If configuration fails, then all consoles will be reset.
  */
-int console_configure ( struct console_configuration *config ) {
-	struct console_driver *console;
-	int rc;
+int console_configure(struct console_configuration* config) {
+    struct console_driver* console;
+    int rc;
 
-	/* Reset console width and height */
-	console_set_size ( CONSOLE_DEFAULT_WIDTH, CONSOLE_DEFAULT_HEIGHT );
+    /* Reset console width and height */
+    console_set_size(CONSOLE_DEFAULT_WIDTH, CONSOLE_DEFAULT_HEIGHT);
 
-	/* Try to configure each console */
-	for_each_table_entry ( console, CONSOLES ) {
-		if ( ( console->configure ) &&
-		     ( ( rc = console->configure ( config ) ) != 0 ) )
-				goto err;
-	}
+    /* Try to configure each console */
+    for_each_table_entry(console, CONSOLES) {
+        if ((console->configure) &&
+            ((rc = console->configure(config)) != 0))
+            goto err;
+    }
 
-	return 0;
+    return 0;
 
- err:
-	/* Reset all consoles, avoiding a potential infinite loop */
-	if ( config )
-		console_reset();
-	return rc;
+err:
+    /* Reset all consoles, avoiding a potential infinite loop */
+    if (config)
+        console_reset();
+    return rc;
 }

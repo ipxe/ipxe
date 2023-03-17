@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _BITS_BITOPS_H
-#define _BITS_BITOPS_H
+    #define _BITS_BITOPS_H
 
 /** @file
  *
@@ -13,9 +15,9 @@
  * subsequently read other bits from the same bit field.)
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <stdint.h>
+    #include <stdint.h>
 
 /**
  * Set bit atomically
@@ -23,14 +25,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v bit		Bit to set
  * @v bits		Bit field
  */
-static inline __attribute__ (( always_inline )) void
-set_bit ( unsigned int bit, volatile void *bits ) {
-	volatile struct {
-		uint8_t byte[ ( bit / 8 ) + 1 ];
-	} *bytes = bits;
+static inline __attribute__((always_inline)) void
+set_bit(unsigned int bit, volatile void* bits) {
+    volatile struct {
+        uint8_t byte[(bit / 8) + 1];
+    }* bytes = bits;
 
-	__asm__ __volatile__ ( "lock bts %1, %0"
-			       : "+m" ( *bytes ) : "Ir" ( bit ) );
+    __asm__ __volatile__("lock btsl %k1, %0"
+                         : "+m"(*bytes)
+                         : "Ir"(bit));
 }
 
 /**
@@ -39,14 +42,15 @@ set_bit ( unsigned int bit, volatile void *bits ) {
  * @v bit		Bit to set
  * @v bits		Bit field
  */
-static inline __attribute__ (( always_inline )) void
-clear_bit ( unsigned int bit, volatile void *bits ) {
-	volatile struct {
-		uint8_t byte[ ( bit / 8 ) + 1 ];
-	} *bytes = bits;
+static inline __attribute__((always_inline)) void
+clear_bit(unsigned int bit, volatile void* bits) {
+    volatile struct {
+        uint8_t byte[(bit / 8) + 1];
+    }* bytes = bits;
 
-	__asm__ __volatile__ ( "lock btr %1, %0"
-			       : "+m" ( *bytes ) : "Ir" ( bit ) );
+    __asm__ __volatile__("lock btrl %k1, %0"
+                         : "+m"(*bytes)
+                         : "Ir"(bit));
 }
 
 /**
@@ -56,18 +60,18 @@ clear_bit ( unsigned int bit, volatile void *bits ) {
  * @v bits		Bit field
  * @ret old		Old value of bit (zero or non-zero)
  */
-static inline __attribute__ (( always_inline )) int
-test_and_set_bit ( unsigned int bit, volatile void *bits ) {
-	volatile struct {
-		uint8_t byte[ ( bit / 8 ) + 1 ];
-	} *bytes = bits;
-	int old;
+static inline __attribute__((always_inline)) int
+test_and_set_bit(unsigned int bit, volatile void* bits) {
+    volatile struct {
+        uint8_t byte[(bit / 8) + 1];
+    }* bytes = bits;
+    int old;
 
-	__asm__ __volatile__ ( "lock bts %2, %0\n\t"
-			       "sbb %1, %1\n\t"
-			       : "+m" ( *bytes ), "=r"  ( old )
-			       : "Ir" ( bit ) );
-	return old;
+    __asm__ __volatile__("lock btsl %k2, %0\n\t"
+                         "sbb %1, %1\n\t"
+                         : "+m"(*bytes), "=r"(old)
+                         : "Ir"(bit));
+    return old;
 }
 
 /**
@@ -77,18 +81,18 @@ test_and_set_bit ( unsigned int bit, volatile void *bits ) {
  * @v bits		Bit field
  * @ret old		Old value of bit (zero or non-zero)
  */
-static inline __attribute__ (( always_inline )) int
-test_and_clear_bit ( unsigned int bit, volatile void *bits ) {
-	volatile struct {
-		uint8_t byte[ ( bit / 8 ) + 1 ];
-	} *bytes = bits;
-	int old;
+static inline __attribute__((always_inline)) int
+test_and_clear_bit(unsigned int bit, volatile void* bits) {
+    volatile struct {
+        uint8_t byte[(bit / 8) + 1];
+    }* bytes = bits;
+    int old;
 
-	__asm__ __volatile__ ( "lock btr %2, %0\n\t"
-			       "sbb %1, %1\n\t"
-			       : "+m" ( *bytes ), "=r"  ( old )
-			       : "Ir" ( bit ) );
-	return old;
+    __asm__ __volatile__("lock btrl %k2, %0\n\t"
+                         "sbb %1, %1\n\t"
+                         : "+m"(*bytes), "=r"(old)
+                         : "Ir"(bit));
+    return old;
 }
 
 #endif /* _BITS_BITOPS_H */

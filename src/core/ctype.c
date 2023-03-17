@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * @file
@@ -38,17 +38,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v character		Character
  * @ret isspace		Character is a space
  */
-int isspace ( int character ) {
-
-	switch ( character ) {
-	case ' ' :
-	case '\f' :
-	case '\n' :
-	case '\r' :
-	case '\t' :
-	case '\v' :
-		return 1;
-	default:
-		return 0;
-	}
+int isspace(int character) {
+    switch (character) {
+        case ' ':
+        case '\f':
+        case '\n':
+        case '\r':
+        case '\t':
+        case '\v':
+            return 1;
+        default:
+            return 0;
+    }
 }

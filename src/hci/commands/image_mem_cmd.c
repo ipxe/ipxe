@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <getopt.h>
 #include <ipxe/command.h>
@@ -36,20 +36,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** "imgmem" options */
 struct imgmem_options {
-	/** Image name */
-	char *name;
+    /** Image name */
+    char* name;
 };
 
 /** "imgmem" option list */
 static struct option_descriptor imgmem_opts[] = {
-	OPTION_DESC ( "name", 'n', required_argument,
-		      struct imgmem_options, name, parse_string ),
+    OPTION_DESC("name", 'n', required_argument,
+                struct imgmem_options, name, parse_string),
 };
 
 /** "imgmem" command descriptor */
 static struct command_descriptor imgmem_cmd =
-	COMMAND_DESC ( struct imgmem_options, imgmem_opts, 2, 2,
-		       "<address> <length>" );
+    COMMAND_DESC(struct imgmem_options, imgmem_opts, 2, 2,
+                 "<address> <length>");
 
 /**
  * The "imgmem" command
@@ -58,39 +58,39 @@ static struct command_descriptor imgmem_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int imgmem_exec ( int argc, char **argv ) {
-	struct imgmem_options opts;
-	unsigned int data;
-	unsigned int len;
-	int rc;
+static int imgmem_exec(int argc, char** argv) {
+    struct imgmem_options opts;
+    unsigned int data;
+    unsigned int len;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &imgmem_cmd, &opts ) ) != 0 )
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &imgmem_cmd, &opts)) != 0)
+        return rc;
 
-	/* Use start address as name if none specified */
-	if ( ! opts.name )
-		opts.name = argv[optind];
+    /* Use start address as name if none specified */
+    if (!opts.name)
+        opts.name = argv[optind];
 
-	/* Parse address */
-	if ( ( rc = parse_integer ( argv[optind++], &data ) ) != 0 )
-		return rc;
+    /* Parse address */
+    if ((rc = parse_integer(argv[optind++], &data)) != 0)
+        return rc;
 
-	/* Parse length */
-	if ( ( rc = parse_integer ( argv[optind++], &len ) ) != 0 )
-		return rc;
+    /* Parse length */
+    if ((rc = parse_integer(argv[optind++], &len)) != 0)
+        return rc;
 
-	/* Create image */
-	if ( ( rc = imgmem ( opts.name, phys_to_user ( data ), len ) ) != 0 )
-		return rc;
+    /* Create image */
+    if ((rc = imgmem(opts.name, phys_to_user(data), len)) != 0)
+        return rc;
 
-	return 0;
+    return 0;
 }
 
 /** Read memory command */
 struct command imgmem_commands[] __command = {
-	{
-		.name = "imgmem",
-		.exec = imgmem_exec,
-	},
+    {
+        .name = "imgmem",
+        .exec = imgmem_exec,
+    },
 };

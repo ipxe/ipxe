@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _BITS_SMBIOS_H
-#define _BITS_SMBIOS_H
+    #define _BITS_SMBIOS_H
 
 /** @file
  *
@@ -7,8 +9,8 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <ipxe/bios_smbios.h>
+    #include <ipxe/bios_smbios.h>
 
 #endif /* _BITS_SMBIOS_H */

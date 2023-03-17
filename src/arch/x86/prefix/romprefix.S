@@ -88,7 +88,7 @@ checksum:
 	.previous
 
 .ifeqs	BUSTYPE, "PCIR"
-	.align	4
+	.balign	4
 pciheader:
 	.ascii	"PCIR"			/* Signature */
 	.word	pci_vendor_id		/* Vendor identification */ 
@@ -136,7 +136,7 @@ pci_devlist_end:
 	 * BIOSes will scan on 16-byte boundaries rather than using
 	 * the offset stored at 0x1a
 	 */
-	.align	16
+	.balign	16
 pnpheader:
 	.ascii	"$PnP"			/* Signature */
 	.byte	0x01			/* Structure revision */
@@ -161,7 +161,7 @@ pnpheader:
 
 /* Manufacturer string */
 mfgstr:
-	.asciz	"http://ipxe.org"
+	.asciz	"https://ipxe.org"
 	.size mfgstr, . - mfgstr
 
 /* Product string
@@ -184,7 +184,7 @@ prodstr_pci_id:
 
 	.globl	undiheader	
 	.weak	undiloader
-	.align	4
+	.balign	4
 undiheader:
 	.ascii	"UNDI"			/* Signature */
 	.byte	undiheader_len		/* Length of structure */
@@ -199,7 +199,7 @@ undiheader:
 	.equ undiheader_len, . - undiheader
 	.size undiheader, . - undiheader
 
-	.align	4
+	.balign	4
 ipxeheader:
 	.ascii	"iPXE"			/* Signature */
 	.byte	ipxeheader_len		/* Length of structure */
@@ -607,7 +607,7 @@ get_pmm_decompress_to:
  * strings PRODUCT_NAME and PRODUCT_SHORT_NAME in config/branding.h.
  *
  * While nothing in the GPL prevents you from removing all references
- * to iPXE or http://ipxe.org, we prefer you not to do so.
+ * to iPXE or https://ipxe.org, we prefer you not to do so.
  *
  * If you have an OEM-mandated branding requirement that cannot be
  * satisfied simply by defining PRODUCT_NAME and PRODUCT_SHORT_NAME,

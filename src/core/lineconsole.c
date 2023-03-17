@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -40,39 +40,38 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v character		Character to be printed
  * @ret print		Print line
  */
-size_t line_putchar ( struct line_console *line, int character ) {
+size_t line_putchar(struct line_console* line, int character) {
+    /* Strip ANSI escape sequences */
+    character = ansiesc_process(&line->ctx, character);
+    if (character < 0)
+        return 0;
 
-	/* Strip ANSI escape sequences */
-	character = ansiesc_process ( &line->ctx, character );
-	if ( character < 0 )
-		return 0;
+    /* Handle backspace characters */
+    if (character == '\b') {
+        if (line->index)
+            line->index--;
+        return 0;
+    }
 
-	/* Handle backspace characters */
-	if ( character == '\b' ) {
-		if ( line->index )
-			line->index--;
-		return 0;
-	}
+    /* Ignore carriage return */
+    if (character == '\r')
+        return 0;
 
-	/* Ignore carriage return */
-	if ( character == '\r' )
-		return 0;
+    /* Treat newline as a terminator */
+    if (character == '\n')
+        character = 0;
 
-	/* Treat newline as a terminator */
-	if ( character == '\n' )
-		character = 0;
+    /* Add character to buffer */
+    line->buffer[line->index++] = character;
 
-	/* Add character to buffer */
-	line->buffer[line->index++] = character;
+    /* Do nothing more unless we reach end-of-line (or end-of-buffer) */
+    if ((character != 0) &&
+        (line->index < (line->len - 1 /* NUL */))) {
+        return 0;
+    }
 
-	/* Do nothing more unless we reach end-of-line (or end-of-buffer) */
-	if ( ( character != 0 ) &&
-	     ( line->index < ( line->len - 1 /* NUL */ ) ) ) {
-		return 0;
-	}
+    /* Reset to start of buffer */
+    line->index = 0;
 
-	/* Reset to start of buffer */
-	line->index = 0;
-
-	return 1;
+    return 1;
 }

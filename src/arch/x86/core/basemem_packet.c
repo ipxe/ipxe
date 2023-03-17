@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * @file
@@ -34,4 +34,4 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <basemem_packet.h>
 
 #undef basemem_packet
-char __bss16_array ( basemem_packet, [BASEMEM_PACKET_LEN] );
+char __bss16_array(basemem_packet, [BASEMEM_PACKET_LEN]);

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdio.h>
 #include <stdint.h>
@@ -35,18 +35,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v data		Data to checksum
  * @v len		Length of data
  */
-void dbg_md5_da ( unsigned long dispaddr, const void *data,
-		  unsigned long len ) {
-	struct digest_algorithm *digest = &md5_algorithm;
-	uint8_t digest_ctx[digest->ctxsize];
-	uint8_t digest_out[digest->digestsize];
-	unsigned int i;
+void dbg_md5_da(unsigned long dispaddr, const void* data,
+                unsigned long len) {
+    struct digest_algorithm* digest = &md5_algorithm;
+    uint8_t digest_ctx[digest->ctxsize];
+    uint8_t digest_out[digest->digestsize];
+    unsigned int i;
 
-	printf ( "md5sum ( %#08lx, %#lx ) = ", dispaddr, len );
-	digest_init ( digest, digest_ctx );
-	digest_update ( digest, digest_ctx, data, len );
-	digest_final ( digest, digest_ctx, digest_out );
-	for ( i = 0 ; i < sizeof ( digest_out ) ; i++ )
-		printf ( "%02x", digest_out[i] );
-	printf ( "\n" );
+    printf("md5sum ( %#08lx, %#lx ) = ", dispaddr, len);
+    digest_init(digest, digest_ctx);
+    digest_update(digest, digest_ctx, data, len);
+    digest_final(digest, digest_ctx, digest_out);
+    for (i = 0; i < sizeof(digest_out); i++)
+        printf("%02x", digest_out[i]);
+    printf("\n");
 }

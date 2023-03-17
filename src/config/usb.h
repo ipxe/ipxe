@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef CONFIG_USB_H
-#define CONFIG_USB_H
+    #define CONFIG_USB_H
 
 /** @file
  *
@@ -7,9 +9,9 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <config/defaults.h>
+    #include <config/defaults.h>
 
 /*
  * USB host controllers (all enabled by default)
@@ -33,9 +35,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 //#undef	USB_EFI		/* Provide EFI_USB_IO_PROTOCOL interface */
 
-#include <config/named.h>
-#include NAMED_CONFIG(usb.h)
-#include <config/local/usb.h>
-#include LOCAL_NAMED_CONFIG(usb.h)
+    #include <config/named.h>
+    #include NAMED_CONFIG(usb.h)
+    #include <config/local/usb.h>
+    #include LOCAL_NAMED_CONFIG(usb.h)
 
 #endif /* CONFIG_USB_H */

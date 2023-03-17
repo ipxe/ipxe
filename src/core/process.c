@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <ipxe/list.h>
 #include <ipxe/init.h>
@@ -36,7 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** Process run queue */
-static LIST_HEAD ( run_queue );
+static LIST_HEAD(run_queue);
 
 /**
  * Get pointer to object containing process
@@ -44,8 +44,8 @@ static LIST_HEAD ( run_queue );
  * @v process		Process
  * @ret object		Containing object
  */
-void * process_object ( struct process *process ) {
-	return ( ( ( void * ) process ) - process->desc->offset );
+void* process_object(struct process* process) {
+    return (((void*)process) - process->desc->offset);
 }
 
 /**
@@ -56,16 +56,14 @@ void * process_object ( struct process *process ) {
  * It is safe to call process_add() multiple times; further calls will
  * have no effect.
  */
-void process_add ( struct process *process ) {
-	if ( ! process_running ( process ) ) {
-		DBGC ( PROC_COL ( process ), "PROCESS " PROC_FMT
-		       " starting\n", PROC_DBG ( process ) );
-		ref_get ( process->refcnt );
-		list_add_tail ( &process->list, &run_queue );
-	} else {
-		DBGC ( PROC_COL ( process ), "PROCESS " PROC_FMT
-		       " already started\n", PROC_DBG ( process ) );
-	}
+void process_add(struct process* process) {
+    if (!process_running(process)) {
+        DBGC(PROC_COL(process), "PROCESS " PROC_FMT " starting\n", PROC_DBG(process));
+        ref_get(process->refcnt);
+        list_add_tail(&process->list, &run_queue);
+    } else {
+        DBGC(PROC_COL(process), "PROCESS " PROC_FMT " already started\n", PROC_DBG(process));
+    }
 }
 
 /**
@@ -76,17 +74,15 @@ void process_add ( struct process *process ) {
  * It is safe to call process_del() multiple times; further calls will
  * have no effect.
  */
-void process_del ( struct process *process ) {
-	if ( process_running ( process ) ) {
-		DBGC ( PROC_COL ( process ), "PROCESS " PROC_FMT
-		       " stopping\n", PROC_DBG ( process ) );
-		list_del ( &process->list );
-		INIT_LIST_HEAD ( &process->list );
-		ref_put ( process->refcnt );
-	} else {
-		DBGC ( PROC_COL ( process ), "PROCESS " PROC_FMT
-		       " already stopped\n", PROC_DBG ( process ) );
-	}
+void process_del(struct process* process) {
+    if (process_running(process)) {
+        DBGC(PROC_COL(process), "PROCESS " PROC_FMT " stopping\n", PROC_DBG(process));
+        list_del(&process->list);
+        INIT_LIST_HEAD(&process->list);
+        ref_put(process->refcnt);
+    } else {
+        DBGC(PROC_COL(process), "PROCESS " PROC_FMT " already stopped\n", PROC_DBG(process));
+    }
 }
 
 /**
@@ -95,43 +91,41 @@ void process_del ( struct process *process ) {
  * This executes a single step of the first process in the run queue,
  * and moves the process to the end of the run queue.
  */
-void step ( void ) {
-	struct process *process;
-	struct process_descriptor *desc;
-	void *object;
+void step(void) {
+    struct process* process;
+    struct process_descriptor* desc;
+    void* object;
 
-	if ( ( process = list_first_entry ( &run_queue, struct process,
-					    list ) ) ) {
-		ref_get ( process->refcnt ); /* Inhibit destruction mid-step */
-		desc = process->desc;
-		object = process_object ( process );
-		if ( desc->reschedule ) {
-			list_del ( &process->list );
-			list_add_tail ( &process->list, &run_queue );
-		} else {
-			process_del ( process );
-		}
-		DBGC2 ( PROC_COL ( process ), "PROCESS " PROC_FMT
-			" executing\n", PROC_DBG ( process ) );
-		desc->step ( object );
-		DBGC2 ( PROC_COL ( process ), "PROCESS " PROC_FMT
-			" finished executing\n", PROC_DBG ( process ) );
-		ref_put ( process->refcnt ); /* Allow destruction */
-	}
+    if ((process = list_first_entry(&run_queue, struct process,
+                                    list))) {
+        ref_get(process->refcnt); /* Inhibit destruction mid-step */
+        desc = process->desc;
+        object = process_object(process);
+        if (desc->reschedule) {
+            list_del(&process->list);
+            list_add_tail(&process->list, &run_queue);
+        } else {
+            process_del(process);
+        }
+        DBGC2(PROC_COL(process), "PROCESS " PROC_FMT " executing\n", PROC_DBG(process));
+        desc->step(object);
+        DBGC2(PROC_COL(process), "PROCESS " PROC_FMT " finished executing\n", PROC_DBG(process));
+        ref_put(process->refcnt); /* Allow destruction */
+    }
 }
 
 /**
  * Initialise processes
  *
  */
-static void init_processes ( void ) {
-	struct process *process;
+static void init_processes(void) {
+    struct process* process;
 
-	for_each_table_entry ( process, PERMANENT_PROCESSES )
-		process_add ( process );
+    for_each_table_entry(process, PERMANENT_PROCESSES)
+        process_add(process);
 }
 
 /** Process initialiser */
-struct init_fn process_init_fn __init_fn ( INIT_NORMAL ) = {
-	.initialise = init_processes,
+struct init_fn process_init_fn __init_fn(INIT_NORMAL) = {
+    .initialise = init_processes,
 };

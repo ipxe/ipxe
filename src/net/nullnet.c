@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <errno.h>
@@ -34,32 +34,32 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-static int null_open ( struct net_device *netdev __unused ) {
-	return -ENODEV;
+static int null_open(struct net_device* netdev __unused) {
+    return -ENODEV;
 };
 
-static void null_close ( struct net_device *netdev __unused ) {
-	/* Do nothing */
+static void null_close(struct net_device* netdev __unused){
+    /* Do nothing */
 };
 
-static int null_transmit ( struct net_device *netdev __unused,
-			   struct io_buffer *iobuf __unused ) {
-	return -ENODEV;
+static int null_transmit(struct net_device* netdev __unused,
+                         struct io_buffer* iobuf __unused) {
+    return -ENODEV;
 };
 
-static void null_poll ( struct net_device *netdev __unused ) {
-	/* Do nothing */
+static void null_poll(struct net_device* netdev __unused) {
+    /* Do nothing */
 }
 
-static void null_irq ( struct net_device *netdev __unused,
-		       int enable __unused ) {
-	/* Do nothing */
+static void null_irq(struct net_device* netdev __unused,
+                     int enable __unused) {
+    /* Do nothing */
 }
 
 struct net_device_operations null_netdev_operations = {
-	.open		= null_open,
-	.close		= null_close,
-	.transmit	= null_transmit,
-	.poll		= null_poll,
-	.irq   		= null_irq,
+    .open = null_open,
+    .close = null_close,
+    .transmit = null_transmit,
+    .poll = null_poll,
+    .irq = null_irq,
 };

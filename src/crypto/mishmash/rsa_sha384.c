@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <ipxe/rsa.h>
 #include <ipxe/sha512.h>
@@ -30,33 +30,33 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** "sha384WithRSAEncryption" object identifier */
 static uint8_t oid_sha384_with_rsa_encryption[] =
-	{ ASN1_OID_SHA384WITHRSAENCRYPTION };
+    {ASN1_OID_SHA384WITHRSAENCRYPTION};
 
 /** "sha384WithRSAEncryption" OID-identified algorithm */
 struct asn1_algorithm sha384_with_rsa_encryption_algorithm __asn1_algorithm = {
-	.name = "sha384WithRSAEncryption",
-	.pubkey = &rsa_algorithm,
-	.digest = &sha384_algorithm,
-	.oid = ASN1_CURSOR ( oid_sha384_with_rsa_encryption ),
+    .name = "sha384WithRSAEncryption",
+    .pubkey = &rsa_algorithm,
+    .digest = &sha384_algorithm,
+    .oid = ASN1_CURSOR(oid_sha384_with_rsa_encryption),
 };
 
 /** SHA-384 digestInfo prefix */
 static const uint8_t rsa_sha384_prefix_data[] =
-	{ RSA_DIGESTINFO_PREFIX ( SHA384_DIGEST_SIZE, ASN1_OID_SHA384 ) };
+    {RSA_DIGESTINFO_PREFIX(SHA384_DIGEST_SIZE, ASN1_OID_SHA384)};
 
 /** SHA-384 digestInfo prefix */
 struct rsa_digestinfo_prefix rsa_sha384_prefix __rsa_digestinfo_prefix = {
-	.digest = &sha384_algorithm,
-	.data = rsa_sha384_prefix_data,
-	.len = sizeof ( rsa_sha384_prefix_data ),
+    .digest = &sha384_algorithm,
+    .data = rsa_sha384_prefix_data,
+    .len = sizeof(rsa_sha384_prefix_data),
 };
 
 /** RSA with SHA-384 signature hash algorithm */
 struct tls_signature_hash_algorithm tls_rsa_sha384 __tls_sig_hash_algorithm = {
-	.code = {
-		.signature = TLS_RSA_ALGORITHM,
-		.hash = TLS_SHA384_ALGORITHM,
-	},
-	.pubkey = &rsa_algorithm,
-	.digest = &sha384_algorithm,
+    .code = {
+        .signature = TLS_RSA_ALGORITHM,
+        .hash = TLS_SHA384_ALGORITHM,
+    },
+    .pubkey = &rsa_algorithm,
+    .digest = &sha384_algorithm,
 };
