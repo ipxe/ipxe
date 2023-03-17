@@ -1,8 +1,8 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
-# UEFI requires that enums are always 32 bits
+# EFI uses the soft float ABI
 #
-CFLAGS		+= -fno-short-enums
+CFLAGS		+= -mfloat-abi=soft
 
 # Specify EFI image builder
 #

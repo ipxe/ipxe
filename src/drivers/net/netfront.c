@@ -59,6 +59,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	EUNIQ ( EINFO_EIO, ( -(status) & 0x1f ),			\
 		EIO_NETIF_RSP_ERROR, EIO_NETIF_RSP_DROPPED )
 
+/** List of netfront devices */
+static LIST_HEAD ( netfront_devices );
+
 /******************************************************************************
  *
  * XenStore interface
@@ -952,6 +955,7 @@ static int netfront_probe ( struct xen_device *xendev ) {
 	netdev->dev = &xendev->dev;
 	netfront = netdev->priv;
 	netfront->xendev = xendev;
+	netfront->netdev = netdev;
 	INIT_LIST_HEAD ( &netfront->rx_partial );
 	DBGC ( netfront, "NETFRONT %s backend=\"%s\" in domain %ld\n",
 	       xendev->key, xendev->backend, xendev->backend_id );
@@ -991,9 +995,13 @@ static int netfront_probe ( struct xen_device *xendev ) {
 	/* Set initial link state */
 	netdev_link_down ( netdev );
 
+	/* Add to list of netfront devices */
+	list_add_tail ( &netfront->list, &netfront_devices );
+
 	xen_set_drvdata ( xendev, netdev );
 	return 0;
 
+	list_del ( &netfront->list );
 	unregister_netdev ( netdev );
  err_register_netdev:
  err_read_mac:
@@ -1015,6 +1023,9 @@ static void netfront_remove ( struct xen_device *xendev ) {
 	struct netfront_nic *netfront = netdev->priv;
 	struct xen_hypervisor *xen = xendev->xen;
 
+	/* Remove from list of netfront devices */
+	list_del ( &netfront->list );
+
 	/* Unregister network device */
 	unregister_netdev ( netdev );
 
@@ -1032,4 +1043,42 @@ struct xen_driver netfront_driver __xen_driver = {
 	.type = "vif",
 	.probe = netfront_probe,
 	.remove = netfront_remove,
+};
+
+/******************************************************************************
+ *
+ * Emulated PCI device inhibitor
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Inhibit emulated PCI devices
+ *
+ * @v netdev		Network device
+ * @ret rc		Return status code
+ */
+static int netfront_net_probe ( struct net_device *netdev ) {
+	struct netfront_nic *netfront;
+
+	/* Inhibit emulated PCI devices matching an existing netfront device */
+	list_for_each_entry ( netfront, &netfront_devices, list ) {
+		if ( ( netdev->dev != netfront->netdev->dev ) &&
+		     ( netdev->ll_protocol->ll_addr_len == ETH_ALEN ) &&
+		     ( memcmp ( netdev->hw_addr, netfront->netdev->hw_addr,
+				ETH_ALEN ) == 0 ) ) {
+			DBGC ( netfront, "NETFRONT %s inhibiting emulated %s "
+			       "%s\n", netfront->xendev->key,
+			       netdev->dev->driver_name, netdev->dev->name );
+			return -EEXIST;
+		}
+	}
+
+	return 0;
+}
+
+/** Emulated PCI device inhibitor driver */
+struct net_driver netfront_net_driver __net_driver = {
+	.name = "netfront",
+	.probe = netfront_net_probe,
 };

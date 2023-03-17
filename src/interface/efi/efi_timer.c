@@ -137,7 +137,7 @@ static unsigned long efi_currticks ( void ) {
 		efi_jiffies++;
 	} else {
 		bs->RestoreTPL ( efi_external_tpl );
-		bs->RaiseTPL ( TPL_CALLBACK );
+		bs->RaiseTPL ( efi_internal_tpl );
 	}
 
 	return ( efi_jiffies * ( TICKS_PER_SEC / EFI_JIFFIES_PER_SEC ) );

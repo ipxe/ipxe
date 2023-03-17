@@ -88,7 +88,7 @@ static int acpi_settings_fetch ( struct settings *settings,
 	       acpi_name ( tag_signature ), tag_index, tag_offset, tag_len );
 
 	/* Locate ACPI table */
-	table = acpi_find ( tag_signature, tag_index );
+	table = acpi_table ( tag_signature, tag_index );
 	if ( ! table )
 		return -ENOENT;
 

@@ -34,13 +34,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Determine number of PCI buses within system
+ * Find next PCI bus:dev.fn address range in system
  *
- * @ret num_bus		Number of buses
+ * @v busdevfn		Starting PCI bus:dev.fn address
+ * @v range		PCI bus:dev.fn address range to fill in
  */
-static int pcibios_num_bus ( void ) {
+static void pcibios_discover ( uint32_t busdevfn __unused,
+			       struct pci_range *range ) {
 	int discard_a, discard_D;
-	uint8_t max_bus;
+	uint16_t num_bus;
 
 	/* We issue this call using flat real mode, to work around a
 	 * bug in some HP BIOSes.
@@ -48,16 +50,20 @@ static int pcibios_num_bus ( void ) {
 	__asm__ __volatile__ ( REAL_CODE ( "call flatten_real_mode\n\t"
 					   "stc\n\t"
 					   "int $0x1a\n\t"
+					   "movzbw %%cl, %%cx\n\t"
+					   "incw %%cx\n\t"
 					   "jnc 1f\n\t"
 					   "xorw %%cx, %%cx\n\t"
 					   "\n1:\n\t" )
-			       : "=c" ( max_bus ), "=a" ( discard_a ),
+			       : "=c" ( num_bus ), "=a" ( discard_a ),
 				 "=D" ( discard_D )
 			       : "a" ( PCIBIOS_INSTALLATION_CHECK >> 16 ),
 				 "D" ( 0 )
 			       : "ebx", "edx" );
 
-	return ( max_bus + 1 );
+	/* Populate range */
+	range->start = PCI_BUSDEVFN ( 0, 0, 0, 0 );
+	range->count = PCI_BUSDEVFN ( 0, num_bus, 0, 0 );
 }
 
 /**
@@ -114,7 +120,7 @@ int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 	return ( status >> 8 );
 }
 
-PROVIDE_PCIAPI ( pcbios, pci_num_bus, pcibios_num_bus );
+PROVIDE_PCIAPI ( pcbios, pci_discover, pcibios_discover );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_dword );
@@ -122,3 +128,5 @@ PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_byte );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_word );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_write_config_dword );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_ioremap );
+
+struct pci_api pcibios_api = PCIAPI_RUNTIME ( pcbios );

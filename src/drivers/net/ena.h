@@ -24,11 +24,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Number of admin completion queue entries */
 #define ENA_ACQ_COUNT 2
 
+/** Number of async event notification queue entries */
+#define ENA_AENQ_COUNT 2
+
 /** Number of transmit queue entries */
 #define ENA_TX_COUNT 16
 
 /** Number of receive queue entries */
-#define ENA_RX_COUNT 16
+#define ENA_RX_COUNT 128
+
+/** Receive queue maximum fill level */
+#define ENA_RX_FILL 16
 
 /** Base address low register offset */
 #define ENA_BASE_LO 0x0
@@ -56,6 +62,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Maximum time to wait for admin requests */
 #define ENA_ADMIN_MAX_WAIT_MS 5000
+
+/** Async event notification queue capabilities register */
+#define ENA_AENQ_CAPS 0x34
+
+/** Async event notification queue base address register */
+#define ENA_AENQ_BASE 0x38
 
 /** Device control register */
 #define ENA_CTRL 0x54
@@ -127,10 +139,99 @@ struct ena_device_attributes {
 	uint32_t mtu;
 } __attribute__ (( packed ));
 
+/** Async event notification queue config */
+#define ENA_AENQ_CONFIG 26
+
+/** Async event notification queue config */
+struct ena_aenq_config {
+	/** Bitmask of supported AENQ groups (device -> host) */
+	uint32_t supported;
+	/** Bitmask of enabled AENQ groups (host -> device) */
+	uint32_t enabled;
+} __attribute__ (( packed ));
+
+/** Host attributes */
+#define ENA_HOST_ATTRIBUTES 28
+
+/** Host attributes */
+struct ena_host_attributes {
+	/** Host info base address */
+	uint64_t info;
+	/** Debug area base address */
+	uint64_t debug;
+	/** Debug area size */
+	uint32_t debug_len;
+} __attribute__ (( packed ));
+
+/** Host information */
+struct ena_host_info {
+	/** Operating system type */
+	uint32_t type;
+	/** Operating system distribution (string) */
+	char dist_str[128];
+	/** Operating system distribution (numeric) */
+	uint32_t dist;
+	/** Kernel version (string) */
+	char kernel_str[32];
+	/** Kernel version (numeric) */
+	uint32_t kernel;
+	/** Driver version */
+	uint32_t version;
+	/** Linux network device features */
+	uint64_t linux_features;
+	/** ENA specification version */
+	uint16_t spec;
+	/** PCI bus:dev.fn address */
+	uint16_t busdevfn;
+	/** Number of CPUs */
+	uint16_t cpus;
+	/** Reserved */
+	uint8_t reserved_a[2];
+	/** Supported features */
+	uint32_t features;
+} __attribute__ (( packed ));
+
+/** Linux operating system type
+ *
+ * There is a defined "iPXE" operating system type (with value 5).
+ * However, some very broken versions of the ENA firmware will refuse
+ * to allow a completion queue to be created if the "iPXE" type is
+ * used.
+ */
+#define ENA_HOST_INFO_TYPE_LINUX 1
+
+/** Driver version
+ *
+ * The driver version field is nominally used to report a version
+ * number outside of the VM for consumption by humans (and potentially
+ * by automated monitoring tools that could e.g. check for outdated
+ * versions with known security flaws).
+ *
+ * However, at some point in the development of the ENA firmware, some
+ * unknown person at AWS thought it would be sensible to apply a
+ * machine interpretation to this field and adjust the behaviour of
+ * the firmware based on its value, thereby creating a maintenance and
+ * debugging nightmare for all existing and future drivers.
+ *
+ * Hint to engineers: if you ever find yourself writing code of the
+ * form "if (version == SOME_MAGIC_NUMBER)" then something has gone
+ * very, very wrong.  This *always* indicates that something is
+ * broken, either in your own code or in the code with which you are
+ * forced to interact.
+ */
+#define ENA_HOST_INFO_VERSION_WTF 0x00000002UL
+
+/** ENA specification version */
+#define ENA_HOST_INFO_SPEC_2_0 0x0200
+
 /** Feature */
 union ena_feature {
 	/** Device attributes */
 	struct ena_device_attributes device;
+	/** Async event notification queue config */
+	struct ena_aenq_config aenq;
+	/** Host attributes */
+	struct ena_host_attributes host;
 };
 
 /** Submission queue direction */
@@ -230,6 +331,14 @@ struct ena_create_cq_req {
 	uint64_t address;
 } __attribute__ (( packed ));
 
+/** Empty MSI-X vector
+ *
+ * Some versions of the ENA firmware will complain if the completion
+ * queue's MSI-X vector field is left empty, even though the queue
+ * configuration specifies that interrupts are not used.
+ */
+#define ENA_MSIX_NONE 0xffffffffUL
+
 /** Create completion queue response */
 struct ena_create_cq_rsp {
 	/** Header */
@@ -288,6 +397,27 @@ struct ena_get_feature_req {
 struct ena_get_feature_rsp {
 	/** Header */
 	struct ena_acq_header header;
+	/** Feature */
+	union ena_feature feature;
+} __attribute__ (( packed ));
+
+/** Set feature */
+#define ENA_SET_FEATURE 9
+
+/** Set feature request */
+struct ena_set_feature_req {
+	/** Header */
+	struct ena_aq_header header;
+	/** Length */
+	uint32_t len;
+	/** Address */
+	uint64_t address;
+	/** Flags */
+	uint8_t flags;
+	/** Feature identifier */
+	uint8_t id;
+	/** Reserved */
+	uint8_t reserved[2];
 	/** Feature */
 	union ena_feature feature;
 } __attribute__ (( packed ));
@@ -352,6 +482,8 @@ union ena_aq_req {
 	struct ena_destroy_cq_req destroy_cq;
 	/** Get feature */
 	struct ena_get_feature_req get_feature;
+	/** Set feature */
+	struct ena_set_feature_req set_feature;
 	/** Get statistics */
 	struct ena_get_stats_req get_stats;
 	/** Padding */
@@ -394,6 +526,28 @@ struct ena_acq {
 	unsigned int cons;
 	/** Phase */
 	unsigned int phase;
+};
+
+/** Async event notification queue event */
+struct ena_aenq_event {
+	/** Type of event */
+	uint16_t group;
+	/** ID of event */
+	uint16_t syndrome;
+	/** Phase */
+	uint8_t flags;
+	/** Reserved */
+	uint8_t reserved[3];
+	/** Timestamp */
+	uint64_t timestamp;
+	/** Additional event data */
+	uint8_t data[48];
+} __attribute__ (( packed ));
+
+/** Async event notification queue */
+struct ena_aenq {
+	/** Events */
+	struct ena_aenq_event *evt;
 };
 
 /** Transmit submission queue entry */
@@ -454,6 +608,9 @@ struct ena_tx_cqe {
 	uint16_t cons;
 } __attribute__ (( packed ));
 
+/** Transmit completion request identifier */
+#define ENA_TX_CQE_ID(id) ( (id) >> 2 )
+
 /** Receive completion queue entry */
 struct ena_rx_cqe {
 	/** Reserved */
@@ -482,6 +639,8 @@ struct ena_sq {
 		/** Raw data */
 		void *raw;
 	} sqe;
+	/** Buffer IDs */
+	uint8_t *ids;
 	/** Doorbell register offset */
 	unsigned int doorbell;
 	/** Total length of entries */
@@ -496,6 +655,10 @@ struct ena_sq {
 	uint8_t direction;
 	/** Number of entries */
 	uint8_t count;
+	/** Maximum fill level */
+	uint8_t max;
+	/** Fill level (limited to completion queue size) */
+	uint8_t fill;
 };
 
 /**
@@ -504,15 +667,19 @@ struct ena_sq {
  * @v sq		Submission queue
  * @v direction		Direction
  * @v count		Number of entries
+ * @v max		Maximum fill level
  * @v size		Size of each entry
+ * @v ids		Buffer IDs
  */
 static inline __attribute__ (( always_inline )) void
 ena_sq_init ( struct ena_sq *sq, unsigned int direction, unsigned int count,
-	      size_t size ) {
+	      unsigned int max, size_t size, uint8_t *ids ) {
 
 	sq->len = ( count * size );
 	sq->direction = direction;
 	sq->count = count;
+	sq->max = max;
+	sq->ids = ids;
 }
 
 /** Completion queue */
@@ -573,15 +740,25 @@ struct ena_qp {
 struct ena_nic {
 	/** Registers */
 	void *regs;
+	/** Host info */
+	struct ena_host_info *info;
 	/** Admin queue */
 	struct ena_aq aq;
 	/** Admin completion queue */
 	struct ena_acq acq;
+	/** Async event notification queue */
+	struct ena_aenq aenq;
 	/** Transmit queue */
 	struct ena_qp tx;
 	/** Receive queue */
 	struct ena_qp rx;
-	/** Receive I/O buffers */
+	/** Transmit buffer IDs */
+	uint8_t tx_ids[ENA_TX_COUNT];
+	/** Transmit I/O buffers, indexed by buffer ID */
+	struct io_buffer *tx_iobuf[ENA_TX_COUNT];
+	/** Receive buffer IDs */
+	uint8_t rx_ids[ENA_RX_COUNT];
+	/** Receive I/O buffers, indexed by buffer ID */
 	struct io_buffer *rx_iobuf[ENA_RX_COUNT];
 };
 

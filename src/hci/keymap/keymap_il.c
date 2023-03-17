@@ -10,6 +10,39 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "il" keyboard mapping */
-struct key_mapping il_mapping[] __keymap = {
+/** "il" basic remapping */
+static struct keymap_key il_basic[] = {
+	{ 0x1d, 0x1b },	/* 0x1d => 0x1b */
+	{ 0x27, 0x2c },	/* '\'' => ',' */
+	{ 0x28, 0x29 },	/* '(' => ')' */
+	{ 0x29, 0x28 },	/* ')' => '(' */
+	{ 0x2f, 0x2e },	/* '/' => '.' */
+	{ 0x3c, 0x3e },	/* '<' => '>' */
+	{ 0x3e, 0x3c },	/* '>' => '<' */
+	{ 0x5b, 0x5d },	/* '[' => ']' */
+	{ 0x5d, 0x5b },	/* ']' => '[' */
+	{ 0x60, 0x3b },	/* '`' => ';' */
+	{ 0x7b, 0x7d },	/* '{' => '}' */
+	{ 0x7d, 0x7b },	/* '}' => '{' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "il" AltGr remapping */
+static struct keymap_key il_altgr[] = {
+	{ 0x22, 0x27 },	/* '"' => '\'' */
+	{ 0x3f, 0x2f },	/* '?' => '/' */
+	{ 0x5c, 0x60 },	/* '\\' => '`' */
+	{ 0x71, 0x2f },	/* 'q' => '/' */
+	{ 0x77, 0x27 },	/* 'w' => '\'' */
+	{ 0x7c, 0x60 },	/* '|' => '`' */
+	{ 0, 0 }
+};
+
+/** "il" keyboard map */
+struct keymap il_keymap __keymap = {
+	.name = "il",
+	.basic = il_basic,
+	.altgr = il_altgr,
 };

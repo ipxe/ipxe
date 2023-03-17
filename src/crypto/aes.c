@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crypto.h>
 #include <ipxe/ecb.h>
 #include <ipxe/cbc.h>
+#include <ipxe/gcm.h>
 #include <ipxe/aes.h>
 
 /** AES strides
@@ -778,25 +779,18 @@ static int aes_setkey ( void *ctx, const void *key, size_t keylen ) {
 	return 0;
 }
 
-/**
- * Set initialisation vector
- *
- * @v ctx		Context
- * @v iv		Initialisation vector
- */
-static void aes_setiv ( void *ctx __unused, const void *iv __unused ) {
-	/* Nothing to do */
-}
-
 /** Basic AES algorithm */
 struct cipher_algorithm aes_algorithm = {
 	.name = "aes",
 	.ctxsize = sizeof ( struct aes_context ),
 	.blocksize = AES_BLOCKSIZE,
+	.alignsize = 0,
+	.authsize = 0,
 	.setkey = aes_setkey,
-	.setiv = aes_setiv,
+	.setiv = cipher_null_setiv,
 	.encrypt = aes_encrypt,
 	.decrypt = aes_decrypt,
+	.auth = cipher_null_auth,
 };
 
 /* AES in Electronic Codebook mode */
@@ -805,4 +799,8 @@ ECB_CIPHER ( aes_ecb, aes_ecb_algorithm,
 
 /* AES in Cipher Block Chaining mode */
 CBC_CIPHER ( aes_cbc, aes_cbc_algorithm,
+	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );
+
+/* AES in Galois/Counter mode */
+GCM_CIPHER ( aes_gcm, aes_gcm_algorithm,
 	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );

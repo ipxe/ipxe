@@ -598,7 +598,7 @@ static int ncm_probe ( struct usb_function *func,
 	}
 
 	/* Fetch MAC address */
-	if ( ( rc = ecm_fetch_mac ( func, ethernet, netdev->hw_addr ) ) != 0 ) {
+	if ( ( rc = ecm_fetch_mac ( func, ethernet, netdev ) ) != 0 ) {
 		DBGC ( ncm, "NCM %p could not fetch MAC address: %s\n",
 		       ncm, strerror ( rc ) );
 		goto err_fetch_mac;

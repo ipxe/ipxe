@@ -411,9 +411,8 @@ struct settings * find_settings ( const char *name ) {
 /**
  * Apply all settings
  *
- * @ret rc		Return status code
  */
-static int apply_settings ( void ) {
+static void apply_settings ( void ) {
 	struct settings_applicator *applicator;
 	int rc;
 
@@ -422,11 +421,9 @@ static int apply_settings ( void ) {
 		if ( ( rc = applicator->apply() ) != 0 ) {
 			DBG ( "Could not apply settings using applicator "
 			      "%p: %s\n", applicator, strerror ( rc ) );
-			return rc;
+			/* Continue to apply remaining settings */
 		}
 	}
-
-	return 0;
 }
 
 /**
@@ -644,8 +641,7 @@ int store_setting ( struct settings *settings, const struct setting *setting,
 	 */
 	for ( ; settings ; settings = settings->parent ) {
 		if ( settings == &settings_root ) {
-			if ( ( rc = apply_settings() ) != 0 )
-				return rc;
+			apply_settings();
 			break;
 		}
 	}
@@ -2199,7 +2195,7 @@ const struct setting_type setting_type_base64 __setting_type = {
 };
 
 /**
- * Format UUID setting value
+ * Format UUID/GUID setting value
  *
  * @v type		Setting type
  * @v raw		Raw setting value
@@ -2208,22 +2204,35 @@ const struct setting_type setting_type_base64 __setting_type = {
  * @v len		Length of buffer
  * @ret len		Length of formatted value, or negative error
  */
-static int format_uuid_setting ( const struct setting_type *type __unused,
+static int format_uuid_setting ( const struct setting_type *type,
 				 const void *raw, size_t raw_len, char *buf,
 				 size_t len ) {
-	const union uuid *uuid = raw;
+	union uuid uuid;
 
 	/* Range check */
-	if ( raw_len != sizeof ( *uuid ) )
+	if ( raw_len != sizeof ( uuid ) )
 		return -ERANGE;
 
+	/* Copy value */
+	memcpy ( &uuid, raw, sizeof ( uuid ) );
+
+	/* Mangle GUID byte ordering */
+	if ( type == &setting_type_guid )
+		uuid_mangle ( &uuid );
+
 	/* Format value */
-	return snprintf ( buf, len, "%s", uuid_ntoa ( uuid ) );
+	return snprintf ( buf, len, "%s", uuid_ntoa ( &uuid ) );
 }
 
 /** UUID setting type */
 const struct setting_type setting_type_uuid __setting_type = {
 	.name = "uuid",
+	.format = format_uuid_setting,
+};
+
+/** GUID setting type */
+const struct setting_type setting_type_guid __setting_type = {
+	.name = "guid",
 	.format = format_uuid_setting,
 };
 

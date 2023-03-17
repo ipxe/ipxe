@@ -46,7 +46,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/dhcp.h>
 #include <ipxe/dhcpopts.h>
 #include <ipxe/dhcppkt.h>
-#include <ipxe/dhcp_arch.h>
+#include <ipxe/dhcparch.h>
 #include <ipxe/features.h>
 #include <config/dhcp.h>
 
@@ -571,6 +571,10 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 	if ( peer->sin_port != htons ( BOOTPS_PORT ) )
 		return;
 
+	/* Filter out non-selected servers */
+	if ( server_id.s_addr != dhcp->server.s_addr )
+		return;
+
 	/* Handle DHCPNAK */
 	if ( msgtype == DHCPNAK ) {
 		dhcp_defer ( dhcp );
@@ -579,8 +583,6 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 
 	/* Filter out unacceptable responses */
 	if ( msgtype /* BOOTP */ && ( msgtype != DHCPACK ) )
-		return;
-	if ( server_id.s_addr != dhcp->server.s_addr )
 		return;
 	if ( ip.s_addr != dhcp->offer.s_addr )
 		return;
@@ -598,6 +600,12 @@ static void dhcp_request_rx ( struct dhcp_session *dhcp,
 		dhcp_finished ( dhcp, rc );
 		return;
 	}
+
+	/* Unregister any existing ProxyDHCP or PXEBS settings */
+	if ( ( settings = find_settings ( PROXYDHCP_SETTINGS_NAME ) ) != NULL )
+		unregister_settings ( settings );
+	if ( ( settings = find_settings ( PXEBS_SETTINGS_NAME ) ) != NULL )
+		unregister_settings ( settings );
 
 	/* Perform ProxyDHCP if applicable */
 	if ( dhcp->proxy_offer /* Have ProxyDHCP offer */ &&

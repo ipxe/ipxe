@@ -8,10 +8,10 @@ on:
 jobs:
   submit:
     name: Submit
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download Coverity Scan
         run: |
           curl --form token=${{ secrets.COVERITY_SCAN_TOKEN }} \

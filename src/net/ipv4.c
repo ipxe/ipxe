@@ -163,7 +163,7 @@ static struct ipv4_miniroute * ipv4_route ( unsigned int scope_id,
 			/* If destination is non-global, and the scope ID
 			 * matches this network device, then use this route.
 			 */
-			if ( miniroute->netdev->index == scope_id )
+			if ( miniroute->netdev->scope_id == scope_id )
 				return miniroute;
 
 		} else {

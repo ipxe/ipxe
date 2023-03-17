@@ -65,6 +65,9 @@ struct sha1_context {
 /** SHA-1 context size */
 #define SHA1_CTX_SIZE sizeof ( struct sha1_context )
 
+/** SHA-1 block size */
+#define SHA1_BLOCK_SIZE sizeof ( union sha1_block )
+
 /** SHA-1 digest size */
 #define SHA1_DIGEST_SIZE sizeof ( struct sha1_digest )
 

@@ -33,4 +33,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define SANBOOT_PROTO_FCP
 #define SANBOOT_PROTO_HTTP
 
+#if defined ( __i386__ ) || defined ( __x86_64__ )
+#define ENTROPY_RDRAND
+#endif
+
 #endif /* CONFIG_DEFAULTS_LINUX_H */

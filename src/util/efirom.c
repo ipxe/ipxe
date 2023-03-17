@@ -28,6 +28,8 @@
 #include <errno.h>
 #include <assert.h>
 #include <getopt.h>
+
+#define EFI_HOSTONLY
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 #include <ipxe/efi/IndustryStandard/Pci22.h>
@@ -93,6 +95,7 @@ static void read_pe_info ( void *pe, uint16_t *machine,
 		break;
 	case EFI_IMAGE_MACHINE_X64:
 	case EFI_IMAGE_MACHINE_AARCH64:
+	case EFI_IMAGE_MACHINE_LOONGARCH64:
 		*subsystem = nt->nt64.OptionalHeader.Subsystem;
 		break;
 	default:

@@ -339,11 +339,17 @@ struct tcp_options {
  *    a) Gigabit LAN: expected bandwidth 125MB/s, typical RTT 0.5ms,
  *       minimum required window 64kB
  *
- *    b) Home Internet connection: expected bandwidth 10MB/s, typical
- *       RTT 25ms, minimum required window 256kB
+ *    b) 10-Gigabit LAN: expected bandwidth 1250MB/s, typical RTT
+ *       0.5ms, minimum required window 640kB
  *
- *    c) WAN: expected bandwidth 2MB/s, typical RTT 100ms, minimum
- *       required window 200kB.
+ *    c) Home Internet connection: expected bandwidth 50MB/s, typical
+ *       RTT 25ms, minimum required window 1280kB
+ *
+ *    d) International WAN: expected bandwidth 50MB/s, typical RTT
+ *       25ms, minimum required window 1280kB
+ *
+ *    e) Intercontinental WAN: expected bandwidth 5MB/s, typical RTT
+ *       250ms, minimum required window 1280kB.
  *
  * The maximum possible value for the TCP window size is 1GB (using
  * the maximum window scale of 2**14).  However, it is advisable to
@@ -351,9 +357,9 @@ struct tcp_options {
  * bandwidth), since in the event of a lost packet the window size
  * represents the maximum amount that will need to be retransmitted.
  *
- * We therefore choose a maximum window size of 256kB.
+ * We therefore choose a (rounded up) maximum window size of 2048kB.
  */
-#define TCP_MAX_WINDOW_SIZE	( 256 * 1024 )
+#define TCP_MAX_WINDOW_SIZE	( 2048 * 1024 )
 
 /**
  * Path MTU

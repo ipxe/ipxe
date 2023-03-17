@@ -96,9 +96,7 @@ efi_image_path ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
 	efi_snprintf ( filepath->PathName, ( name_len + 1 /* NUL */ ),
 		       "%s", image->name );
 	end = ( ( ( void * ) filepath ) + filepath_len );
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 
 	return path;
 }
@@ -149,38 +147,38 @@ static int efi_image_exec ( struct image *image ) {
 	/* Find an appropriate device handle to use */
 	snpdev = last_opened_snpdev();
 	if ( ! snpdev ) {
-		DBGC ( image, "EFIIMAGE %p could not identify SNP device\n",
-		       image );
+		DBGC ( image, "EFIIMAGE %s could not identify SNP device\n",
+		       image->name );
 		rc = -ENODEV;
 		goto err_no_snpdev;
 	}
 
 	/* Install file I/O protocols */
 	if ( ( rc = efi_file_install ( snpdev->handle ) ) != 0 ) {
-		DBGC ( image, "EFIIMAGE %p could not install file protocol: "
-		       "%s\n", image, strerror ( rc ) );
+		DBGC ( image, "EFIIMAGE %s could not install file protocol: "
+		       "%s\n", image->name, strerror ( rc ) );
 		goto err_file_install;
 	}
 
 	/* Install PXE base code protocol */
 	if ( ( rc = efi_pxe_install ( snpdev->handle, snpdev->netdev ) ) != 0 ){
-		DBGC ( image, "EFIIMAGE %p could not install PXE protocol: "
-		       "%s\n", image, strerror ( rc ) );
+		DBGC ( image, "EFIIMAGE %s could not install PXE protocol: "
+		       "%s\n", image->name, strerror ( rc ) );
 		goto err_pxe_install;
 	}
 
 	/* Install iPXE download protocol */
 	if ( ( rc = efi_download_install ( snpdev->handle ) ) != 0 ) {
-		DBGC ( image, "EFIIMAGE %p could not install iPXE download "
-		       "protocol: %s\n", image, strerror ( rc ) );
+		DBGC ( image, "EFIIMAGE %s could not install iPXE download "
+		       "protocol: %s\n", image->name, strerror ( rc ) );
 		goto err_download_install;
 	}
 
 	/* Create device path for image */
 	path = efi_image_path ( image, snpdev->path );
 	if ( ! path ) {
-		DBGC ( image, "EFIIMAGE %p could not create device path\n",
-		       image );
+		DBGC ( image, "EFIIMAGE %s could not create device path\n",
+		       image->name );
 		rc = -ENOMEM;
 		goto err_image_path;
 	}
@@ -188,8 +186,8 @@ static int efi_image_exec ( struct image *image ) {
 	/* Create command line for image */
 	cmdline = efi_image_cmdline ( image );
 	if ( ! cmdline ) {
-		DBGC ( image, "EFIIMAGE %p could not create command line\n",
-		       image );
+		DBGC ( image, "EFIIMAGE %s could not create command line\n",
+		       image->name );
 		rc = -ENOMEM;
 		goto err_cmdline;
 	}
@@ -201,8 +199,8 @@ static int efi_image_exec ( struct image *image ) {
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
 		rc = -EEFI_LOAD ( efirc );
-		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "EFIIMAGE %s could not load: %s\n",
+		       image->name, strerror ( rc ) );
 		if ( efirc == EFI_SECURITY_VIOLATION ) {
 			goto err_load_image_security_violation;
 		} else {
@@ -222,8 +220,8 @@ static int efi_image_exec ( struct image *image ) {
 
 	/* Some EFI 1.10 implementations seem not to fill in DeviceHandle */
 	if ( loaded.image->DeviceHandle == NULL ) {
-		DBGC ( image, "EFIIMAGE %p filling in missing DeviceHandle\n",
-		       image );
+		DBGC ( image, "EFIIMAGE %s filling in missing DeviceHandle\n",
+		       image->name );
 		loaded.image->DeviceHandle = snpdev->handle;
 	}
 
@@ -253,14 +251,14 @@ static int efi_image_exec ( struct image *image ) {
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
 		rc = -EEFI_START ( efirc );
-		DBGC ( image, "EFIIMAGE %p could not start (or returned with "
-		       "error): %s\n", image, strerror ( rc ) );
+		DBGC ( image, "EFIIMAGE %s could not start (or returned with "
+		       "error): %s\n", image->name, strerror ( rc ) );
 		goto err_start_image;
 	}
 
 	/* If image was a driver, connect it up to anything available */
 	if ( type == EfiBootServicesCode ) {
-		DBGC ( image, "EFIIMAGE %p connecting drivers\n", image );
+		DBGC ( image, "EFIIMAGE %s connecting drivers\n", image->name );
 		efi_driver_reconnect_all();
 	}
 
@@ -326,8 +324,8 @@ static int efi_image_probe ( struct image *image ) {
 				       image->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
 		rc = -EEFI_LOAD ( efirc );
-		DBGC ( image, "EFIIMAGE %p could not load: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "EFIIMAGE %s could not load: %s\n",
+		       image->name, strerror ( rc ) );
 		if ( efirc == EFI_SECURITY_VIOLATION ) {
 			goto err_load_image_security_violation;
 		} else {

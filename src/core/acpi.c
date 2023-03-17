@@ -38,6 +38,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Colour for debug messages */
 #define colour FADT_SIGNATURE
 
+/** ACPI table finder
+ *
+ * May be overridden at link time to inject tables for testing.
+ */
+typeof ( acpi_find ) *acpi_finder __attribute__ (( weak )) = acpi_find;
+
 /******************************************************************************
  *
  * Utility functions
@@ -80,6 +86,18 @@ void acpi_fix_checksum ( struct acpi_header *acpi ) {
 
 	/* Update checksum */
 	acpi->checksum -= acpi_checksum ( virt_to_user ( acpi ) );
+}
+
+/**
+ * Locate ACPI table
+ *
+ * @v signature		Requested table signature
+ * @v index		Requested index of table with this signature
+ * @ret table		Table, or UNULL if not found
+ */
+userptr_t acpi_table ( uint32_t signature, unsigned int index ) {
+
+	return ( *acpi_finder ) ( signature, index );
 }
 
 /**
@@ -230,7 +248,7 @@ int acpi_extract ( uint32_t signature, void *data,
 	int rc;
 
 	/* Try DSDT first */
-	fadt = acpi_find ( FADT_SIGNATURE, 0 );
+	fadt = acpi_table ( FADT_SIGNATURE, 0 );
 	if ( fadt ) {
 		copy_from_user ( &fadtab, fadt, 0, sizeof ( fadtab ) );
 		dsdt = phys_to_user ( fadtab.dsdt );
@@ -241,7 +259,7 @@ int acpi_extract ( uint32_t signature, void *data,
 
 	/* Try all SSDTs */
 	for ( i = 0 ; ; i++ ) {
-		ssdt = acpi_find ( SSDT_SIGNATURE, i );
+		ssdt = acpi_table ( SSDT_SIGNATURE, i );
 		if ( ! ssdt )
 			break;
 		if ( ( rc = acpi_zsdt ( ssdt, signature, data,

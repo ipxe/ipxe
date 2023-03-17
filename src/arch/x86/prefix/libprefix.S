@@ -380,6 +380,11 @@ process_bytes:
 	pushl	%eax
 	pushl	%ebp
 
+	/* Construct ljmp code on stack (since .prefix may not be writable) */
+	.equ	LJMP_LEN, 0x06
+	pushw	%cs		/* "nop ; ljmp %cs, $2f" */
+	pushw	$2f
+	pushw	$0xea90
 	/* Construct GDT on stack (since .prefix may not be writable) */
 	.equ	GDT_LEN, 0x20
 	.equ	PM_DS, 0x18	/* Flat data segment */
@@ -410,8 +415,9 @@ process_bytes:
 	pushw	%es
 	pushw	%ds
 	pushw	%ss
-	pushw	%cs
-	pushw	$2f
+	pushw	%ss		/* Far pointer to ljmp code on stack */
+	leaw	(GDT_LEN + 1)(%bp), %ax
+	pushw	%ax
 	cli
 	data32 lgdt (%bp)
 	movl	%cr0, %eax
@@ -438,7 +444,7 @@ process_bytes:
 	popfw
 	movl	%eax, %cr0
 	lret
-2:	/* lret will ljmp to here */
+2:	/* lret will ljmp to here (via constructed ljmp on stack) */
 	popw	%ss
 	popw	%ds
 	popw	%es
@@ -461,7 +467,7 @@ process_bytes:
 
 	/* Restore GDT */
 	data32 lgdt -8(%bp)
-	leaw	GDT_LEN(%bp), %sp
+	leaw	(GDT_LEN + LJMP_LEN)(%bp), %sp
 
 	/* Restore registers and return */
 	popl	%ebp

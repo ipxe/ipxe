@@ -290,6 +290,18 @@ static int intel_reset ( struct intel_nic *intel ) {
 		       pba, readl ( intel->regs + INTEL_PBA ) );
 	}
 
+	/* The Intel I210's packet buffer size registers reset only on
+	 * power up.  If an operating system changes these but then
+	 * the computer recieves a reset signal without losing power,
+	 * the registers will stay the same (but be incompatible with
+	 * other register defaults), thus making the device unable to
+	 * pass traffic.
+	 */
+	if ( intel->flags & INTEL_PBSIZE_RST ) {
+		writel ( INTEL_RXPBS_I210, intel->regs + INTEL_RXPBS );
+		writel ( INTEL_TXPBS_I210, intel->regs + INTEL_TXPBS );
+	}
+
 	/* Always reset MAC.  Required to reset the TX and RX rings. */
 	writel ( ( ctrl | INTEL_CTRL_RST ), intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
@@ -1139,7 +1151,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1525, "82567v-4", "82567V-4", 0 ),
 	PCI_ROM ( 0x8086, 0x1526, "82576-5", "82576", 0 ),
 	PCI_ROM ( 0x8086, 0x1527, "82580-f2", "82580 Fiber", 0 ),
-	PCI_ROM ( 0x8086, 0x1533, "i210", "I210", 0 ),
+	PCI_ROM ( 0x8086, 0x1533, "i210", "I210", INTEL_PBSIZE_RST ),
 	PCI_ROM ( 0x8086, 0x1539, "i211", "I211", 0 ),
 	PCI_ROM ( 0x8086, 0x153a, "i217lm", "I217-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x153b, "i217v", "I217-V", 0 ),
@@ -1147,7 +1159,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x155a, "i218lm", "I218-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x156f, "i219lm", "I219-LM", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x1570, "i219v", "I219-V", INTEL_I219 ),
-	PCI_ROM ( 0x8086, 0x157b, "i210-2", "I210", 0 ),
+	PCI_ROM ( 0x8086, 0x157b, "i210-2", "I210", INTEL_PBSIZE_RST ),
 	PCI_ROM ( 0x8086, 0x15a0, "i218lm-2", "I218-LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x15a1, "i218v-2", "I218-V", 0 ),
 	PCI_ROM ( 0x8086, 0x15a2, "i218lm-3", "I218-LM", INTEL_NO_PHY_RST ),
@@ -1173,6 +1185,10 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x15fa, "i219v-14", "I219-V (14)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x15fb, "i219lm-13", "I219-LM (13)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x15fc, "i219v-13", "I219-V (13)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x1a1c, "i219lm-17", "I219-LM (17)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x1a1d, "i219v-17", "I219-V (17)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x1a1e, "i219lm-16", "I219-LM (16)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x1a1f, "i219v-16", "I219-V (16)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x1f41, "i354", "I354", INTEL_NO_ASDE ),
 	PCI_ROM ( 0x8086, 0x294c, "82566dc-2", "82566DC-2", 0 ),
 	PCI_ROM ( 0x8086, 0x2e6e, "cemedia", "CE Media Processor", 0 ),

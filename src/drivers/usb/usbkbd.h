@@ -75,6 +75,7 @@ enum usb_keycode {
 	USBKBD_KEY_PAD_ENTER = 0x58,
 	USBKBD_KEY_PAD_1 = 0x59,
 	USBKBD_KEY_PAD_DOT = 0x63,
+	USBKBD_KEY_NON_US = 0x64,
 };
 
 /** USB keyboard LEDs */

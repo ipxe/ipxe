@@ -40,7 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crc32.h>
 #include <ipxe/errortab.h>
 #include <ipxe/ipv6.h>
-#include <ipxe/dhcp_arch.h>
+#include <ipxe/dhcparch.h>
 #include <ipxe/dhcpv6.h>
 
 /** @file
@@ -955,7 +955,7 @@ int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
 	addresses.client.sin6.sin6_port = htons ( DHCPV6_CLIENT_PORT );
 	addresses.server.sin6.sin6_family = AF_INET6;
 	ipv6_all_dhcp_relay_and_servers ( &addresses.server.sin6.sin6_addr );
-	addresses.server.sin6.sin6_scope_id = netdev->index;
+	addresses.server.sin6.sin6_scope_id = netdev->scope_id;
 	addresses.server.sin6.sin6_port = htons ( DHCPV6_SERVER_PORT );
 
 	/* Construct client DUID from system UUID */

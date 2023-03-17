@@ -164,6 +164,10 @@ static int snpnet_transmit ( struct net_device *netdev,
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Do nothing if shutdown is in progress */
+	if ( efi_shutdown_in_progress )
+		return -ECANCELED;
+
 	/* Defer the packet if there is already a transmission in progress */
 	if ( snp->txbuf ) {
 		netdev_tx_defer ( netdev, iobuf );
@@ -282,6 +286,10 @@ static void snpnet_poll_rx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void snpnet_poll ( struct net_device *netdev ) {
+
+	/* Do nothing if shutdown is in progress */
+	if ( efi_shutdown_in_progress )
+		return;
 
 	/* Process any TX completions */
 	snpnet_poll_tx ( netdev );
@@ -426,8 +434,9 @@ static void snpnet_close ( struct net_device *netdev ) {
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Shut down NIC */
-	if ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) {
+	/* Shut down NIC (unless whole system shutdown is in progress) */
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) ) {
 		rc = -EEFI ( efirc );
 		DBGC ( snp, "SNP %s could not shut down: %s\n",
 		       netdev->name, strerror ( rc ) );
@@ -589,8 +598,9 @@ void snpnet_stop ( struct efi_device *efidev ) {
 	/* Unregister network device */
 	unregister_netdev ( netdev );
 
-	/* Stop SNP protocol */
-	if ( ( efirc = snp->snp->Stop ( snp->snp ) ) != 0 ) {
+	/* Stop SNP protocol (unless whole system shutdown is in progress) */
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = snp->snp->Stop ( snp->snp ) ) != 0 ) ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "SNP %s could not stop: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );

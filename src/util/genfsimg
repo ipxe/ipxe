@@ -72,6 +72,9 @@ efi_boot_name() {
 	"c201" )
 	    echo "BOOTARM.EFI"
 	    ;;
+	"6462" )
+	    echo "BOOTLOONGARCH64.EFI"
+	    ;;
 	"64aa" )
 	    echo "BOOTAA64.EFI"
 	    ;;
@@ -308,6 +311,9 @@ if [ -n "${ISOIMG}" ] ; then
 	    ${ISOARGS} "${ISODIR}"
     if isohybrid --version >/dev/null 2>&1 ; then
 	ISOHYBRIDARGS=
+	if [ -n "${EFI}" ] ; then
+	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --uefi"
+	fi
 	if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
 	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --id ${SOURCE_DATE_EPOCH}"
 	fi

@@ -10,6 +10,19 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "ro" keyboard mapping */
-struct key_mapping ro_mapping[] __keymap = {
+/** "ro" basic remapping */
+static struct keymap_key ro_basic[] = {
+	{ 0, 0 }
+};
+
+/** "ro" AltGr remapping */
+static struct keymap_key ro_altgr[] = {
+	{ 0, 0 }
+};
+
+/** "ro" keyboard map */
+struct keymap ro_keymap __keymap = {
+	.name = "ro",
+	.basic = ro_basic,
+	.altgr = ro_altgr,
 };

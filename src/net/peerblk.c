@@ -1033,7 +1033,8 @@ static int peerblk_parse_iv ( struct peerdist_block *peerblk, size_t buf_len,
 	}
 
 	/* Set initialisation vector */
-	cipher_setiv ( peerblk->cipher, peerblk->cipherctx, msg->msg.iv.data );
+	cipher_setiv ( peerblk->cipher, peerblk->cipherctx, msg->msg.iv.data,
+		       blksize );
 
 	return 0;
 }

@@ -23,6 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_pci.h>
 #include <ipxe/efi/efi_utils.h>
 
@@ -38,23 +39,26 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v device		EFI device handle
  * @v protocol		Protocol GUID
  * @v parent		Parent EFI device handle to fill in
+ * @v skip		Number of protocol-supporting parent devices to skip
  * @ret rc		Return status code
  */
 int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
-			EFI_HANDLE *parent ) {
+			EFI_HANDLE *parent, unsigned int skip ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_DEVICE_PATH_PROTOCOL *path;
 		void *interface;
-	} path;
-	EFI_DEVICE_PATH_PROTOCOL *devpath;
+	} u;
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	size_t len;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Get device path */
 	if ( ( efirc = bs->OpenProtocol ( device,
 					  &efi_device_path_protocol_guid,
-					  &path.interface,
+					  &u.interface,
 					  efi_image_handle, device,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
 		rc = -EEFI ( efirc );
@@ -62,22 +66,46 @@ int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
 		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open_device_path;
 	}
-	devpath = path.path;
 
-	/* Check for presence of specified protocol */
-	if ( ( efirc = bs->LocateDevicePath ( protocol, &devpath,
-					      parent ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( device, "EFIDEV %s has no parent supporting %s: %s\n",
-		       efi_handle_name ( device ),
-		       efi_guid_ntoa ( protocol ), strerror ( rc ) );
-		goto err_locate_protocol;
+	/* Create modifiable copy of device path */
+	len = ( efi_path_len ( u.path ) + sizeof ( EFI_DEVICE_PATH_PROTOCOL ));
+	path = malloc ( len );
+	if ( ! path ) {
+		rc = -ENOMEM;
+		goto err_alloc_path;
+	}
+	memcpy ( path, u.path, len );
+
+	/* Locate parent device(s) */
+	while ( 1 ) {
+
+		/* Check for presence of specified protocol */
+		end = path;
+		if ( ( efirc = bs->LocateDevicePath ( protocol, &end,
+						      parent ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( device, "EFIDEV %s has no parent supporting "
+			       "%s: %s\n", efi_devpath_text ( path ),
+			       efi_guid_ntoa ( protocol ), strerror ( rc ) );
+			goto err_locate_protocol;
+		}
+
+		/* Stop if we have skipped the requested number of devices */
+		if ( ! skip-- )
+			break;
+
+		/* Trim device path */
+		efi_path_terminate ( end );
+		end = efi_path_prev ( path, end );
+		efi_path_terminate ( end );
 	}
 
 	/* Success */
 	rc = 0;
 
  err_locate_protocol:
+	free ( path );
+ err_alloc_path:
 	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
 			    efi_image_handle, device );
  err_open_device_path:
@@ -150,7 +178,7 @@ static int efi_pci_info ( EFI_HANDLE device, const char *prefix,
 
 	/* Find parent PCI device */
 	if ( ( rc = efi_locate_device ( device, &efi_pci_io_protocol_guid,
-					&pci_device ) ) != 0 ) {
+					&pci_device, 0 ) ) != 0 ) {
 		DBGC ( device, "EFIDEV %s is not a PCI device: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		return rc;

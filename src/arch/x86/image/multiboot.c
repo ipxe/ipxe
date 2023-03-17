@@ -204,10 +204,6 @@ static int multiboot_add_modules ( struct image *image, physaddr_t start,
 			break;
 		}
 
-		/* Do not include kernel image itself as a module */
-		if ( module_image == image )
-			continue;
-
 		/* Page-align the module */
 		start = ( ( start + 0xfff ) & ~0xfff );
 

@@ -582,9 +582,7 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 			 sizeof ( efi_block_boot_filename ) );
 	}
 	end = ( ( ( void * ) filepath ) + filepath_len );
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 	DBGC ( sandev, "EFIBLK %#02x trying to load %s\n",
 	       sandev->drive, efi_devpath_text ( boot_path ) );
 

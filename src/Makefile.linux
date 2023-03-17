@@ -8,6 +8,10 @@ SYMBOL_PREFIX	= _ipxe__
 #
 CFLAGS		+= -UNVALGRIND
 
+# The Linux linker script
+#
+LDSCRIPT	= scripts/linux.lds
+
 # Use a two-stage link
 #
 LDFLAGS		+= -r -d

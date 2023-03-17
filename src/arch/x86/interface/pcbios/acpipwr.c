@@ -123,7 +123,7 @@ int acpi_poweroff ( void ) {
 	int rc;
 
 	/* Locate FADT */
-	fadt = acpi_find ( FADT_SIGNATURE, 0 );
+	fadt = acpi_table ( FADT_SIGNATURE, 0 );
 	if ( ! fadt ) {
 		DBGC ( colour, "ACPI could not find FADT\n" );
 		return -ENOENT;

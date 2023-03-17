@@ -127,6 +127,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Network controller */
 #define PCI_CLASS_NETWORK	0x02
 
+/** Bridge device */
+#define PCI_CLASS_BRIDGE	0x06
+#define PCI_CLASS_BRIDGE_PCI		0x04	/**< PCI-to-PCI bridge */
+
 /** Serial bus controller */
 #define PCI_CLASS_SERIAL	0x0c
 #define PCI_CLASS_SERIAL_USB		0x03	/**< USB controller */
@@ -135,8 +139,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define PCI_CLASS_SERIAL_USB_EHCI	 0x20	/**< ECHI USB controller */
 #define PCI_CLASS_SERIAL_USB_XHCI	 0x30	/**< xHCI USB controller */
 
+/** Primary bus number */
+#define PCI_PRIMARY		0x18
+
+/** Secondary bus number */
+#define PCI_SECONDARY		0x19
+
 /** Subordinate bus number */
 #define PCI_SUBORDINATE		0x1a
+
+/** Memory base and limit */
+#define PCI_MEM_BASE		0x20
+#define PCI_MEM_LIMIT		0x22
+#define PCI_MEM_MASK			0x000f
 
 /** Construct PCI class
  *
@@ -212,6 +227,8 @@ struct pci_device {
 	uint32_t class;
 	/** Interrupt number */
 	uint8_t irq;
+	/** Header type */
+	uint8_t hdrtype;
 	/** Segment, bus, device, and function (bus:dev.fn) number */
 	uint32_t busdevfn;
 	/** Driver for this device */
@@ -262,9 +279,6 @@ struct pci_driver {
 #define PCI_BUS( busdevfn )		( ( (busdevfn) >> 8 ) & 0xff )
 #define PCI_SLOT( busdevfn )		( ( (busdevfn) >> 3 ) & 0x1f )
 #define PCI_FUNC( busdevfn )		( ( (busdevfn) >> 0 ) & 0x07 )
-#define PCI_BUSDEVFN( segment, bus, slot, func )			\
-	( ( (segment) << 16 ) | ( (bus) << 8 ) |			\
-	  ( (slot) << 3 ) | ( (func) << 0 ) )
 #define PCI_FIRST_FUNC( busdevfn )	( (busdevfn) & ~0x07 )
 #define PCI_LAST_FUNC( busdevfn )	( (busdevfn) | 0x07 )
 
@@ -301,7 +315,7 @@ extern void adjust_pci_device ( struct pci_device *pci );
 extern unsigned long pci_bar_start ( struct pci_device *pci,
 				     unsigned int reg );
 extern int pci_read_config ( struct pci_device *pci );
-extern int pci_find_next ( struct pci_device *pci, unsigned int busdevfn );
+extern int pci_find_next ( struct pci_device *pci, uint32_t *busdevfn );
 extern int pci_find_driver ( struct pci_device *pci );
 extern int pci_probe ( struct pci_device *pci );
 extern void pci_remove ( struct pci_device *pci );
@@ -309,6 +323,7 @@ extern int pci_find_capability ( struct pci_device *pci, int capability );
 extern int pci_find_next_capability ( struct pci_device *pci,
 				      int pos, int capability );
 extern unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg );
+extern void pci_reset ( struct pci_device *pci, unsigned int exp );
 
 /**
  * Initialise PCI device

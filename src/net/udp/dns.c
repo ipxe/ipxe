@@ -87,9 +87,6 @@ static struct dns_server dns6;
 /** Total number of DNS servers */
 static unsigned int dns_count;
 
-/** Current DNS server index */
-static unsigned int dns_index;
-
 /** The DNS search list */
 static struct dns_name dns_search;
 
@@ -489,6 +486,8 @@ struct dns_request {
 	size_t offset;
 	/** Search list */
 	struct dns_name search;
+	/** Server index */
+	unsigned int index;
 	/** Recursion counter */
 	unsigned int recursion;
 };
@@ -606,7 +605,7 @@ static int dns_send_packet ( struct dns_request *dns ) {
 		DBGC ( dns, "DNS %p lost DNS servers mid query\n", dns );
 		return -EINVAL;
 	}
-	index = ( dns_index % dns_count );
+	index = ( dns->index % dns_count );
 	if ( index < dns6.count ) {
 		nameserver.sin6.sin6_family = AF_INET6;
 		memcpy ( &nameserver.sin6.sin6_addr, &dns6.in6[index],
@@ -651,7 +650,7 @@ static void dns_timer_expired ( struct retry_timer *timer, int fail ) {
 
 	/* Move to next DNS server if this is a retransmission */
 	if ( dns->buf.query.id )
-		dns_index++;
+		dns->index++;
 
 	/* Send DNS query */
 	dns_send_packet ( dns );

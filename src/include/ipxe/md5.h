@@ -65,6 +65,9 @@ struct md5_context {
 /** MD5 context size */
 #define MD5_CTX_SIZE sizeof ( struct md5_context )
 
+/** MD5 block size */
+#define MD5_BLOCK_SIZE sizeof ( union md5_block )
+
 /** MD5 digest size */
 #define MD5_DIGEST_SIZE sizeof ( struct md5_digest )
 

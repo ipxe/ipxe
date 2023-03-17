@@ -140,7 +140,7 @@ static int ndp_tx_request ( struct net_device *netdev,
 	/* Construct multicast destination address */
 	memset ( &sin6_dest, 0, sizeof ( sin6_dest ) );
 	sin6_dest.sin6_family = AF_INET6;
-	sin6_dest.sin6_scope_id = netdev->index;
+	sin6_dest.sin6_scope_id = netdev->scope_id;
 	ipv6_solicited_node ( &sin6_dest.sin6_addr, net_dest );
 
 	/* Construct neighbour header */
@@ -177,7 +177,7 @@ static int ndp_tx_router_solicitation ( struct net_device *netdev ) {
 	/* Construct multicast destination address */
 	memset ( &sin6_dest, 0, sizeof ( sin6_dest ) );
 	sin6_dest.sin6_family = AF_INET6;
-	sin6_dest.sin6_scope_id = netdev->index;
+	sin6_dest.sin6_scope_id = netdev->scope_id;
 	ipv6_all_routers ( &sin6_dest.sin6_addr );
 
 	/* Construct router solicitation */
@@ -789,29 +789,43 @@ static int ndp_prefix_fetch_ip6 ( struct settings *settings, void *data,
 		container_of ( ndpset->settings.parent, struct net_device,
 			       settings.settings );
 	struct ndp_prefix_information_option *prefix = prefset->prefix;
-	struct in6_addr ip6;
+	struct in6_addr *ip6 = &prefix->prefix;
+	struct in6_addr slaac;
 	int prefix_len;
+	int rc;
 
 	/* Skip dead prefixes */
 	if ( ! prefix->valid )
 		return -ENOENT;
 
 	/* Construct IPv6 address via SLAAC, if applicable */
-	memcpy ( &ip6, &prefix->prefix, sizeof ( ip6 ) );
 	if ( prefix->flags & NDP_PREFIX_AUTONOMOUS ) {
-		prefix_len = ipv6_eui64 ( &ip6, netdev );
-		if ( prefix_len < 0 )
-			return prefix_len;
-		if ( prefix_len != prefix->prefix_len )
-			return -EINVAL;
+		memcpy ( &slaac, ip6, sizeof ( slaac ) );
+		prefix_len = ipv6_eui64 ( &slaac, netdev );
+		if ( prefix_len == prefix->prefix_len ) {
+			/* Correctly configured prefix: use SLAAC address */
+			ip6 = &slaac;
+		} else if ( prefix_len < 0 ) {
+			/* Link layer does not support SLAAC */
+			rc = prefix_len;
+			DBGC ( netdev, "NDP %s does not support SLAAC: %s\n",
+			       netdev->name, strerror ( rc ) );
+		} else {
+			/* Prefix length incorrect: assume a badly
+			 * configured router and ignore SLAAC address.
+			 */
+			DBGC ( netdev, "NDP %s ignoring misconfigured SLAAC "
+			       "on prefix %s/%d\n", netdev->name,
+			       inet6_ntoa ( ip6 ), prefix->prefix_len );
+		}
 	}
 
 	/* Fill in IPv6 address */
-	if ( len > sizeof ( ip6 ) )
-		len = sizeof ( ip6 );
-	memcpy ( data, &ip6, len );
+	if ( len > sizeof ( *ip6 ) )
+		len = sizeof ( *ip6 );
+	memcpy ( data, ip6, len );
 
-	return sizeof ( ip6 );
+	return sizeof ( *ip6 );
 }
 
 /**

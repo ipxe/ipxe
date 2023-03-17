@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #endif
 
 /**
- * Convert user buffer to physical address
+ * Convert user pointer to physical address
  *
  * @v userptr		User pointer
  * @v offset		Offset from user pointer
@@ -44,6 +44,19 @@ UACCESS_INLINE ( linux, user_to_phys ) ( userptr_t userptr, off_t offset ) {
 	 * alignment.
 	 */
 	return ( userptr + offset );
+}
+
+/**
+ * Convert physical address to user pointer
+ *
+ * @v phys_addr		Physical address
+ * @ret userptr		User pointer
+ */
+static inline __always_inline userptr_t
+UACCESS_INLINE ( linux, phys_to_user ) ( physaddr_t phys_addr ) {
+
+	/* For symmetry with the stub user_to_phys() */
+	return phys_addr;
 }
 
 static inline __always_inline userptr_t

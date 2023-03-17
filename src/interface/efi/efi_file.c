@@ -43,13 +43,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
 #include <ipxe/efi/Protocol/DiskIo.h>
+#include <ipxe/efi/Protocol/LoadFile2.h>
 #include <ipxe/efi/Guid/FileInfo.h>
 #include <ipxe/efi/Guid/FileSystemInfo.h>
 #include <ipxe/efi/efi_strings.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_file.h>
 
 /** EFI media ID */
 #define EFI_MEDIA_ID_MAGIC 0x69505845
+
+/** Linux initrd fixed device path vendor GUID */
+#define LINUX_INITRD_VENDOR_GUID					\
+	{ 0x5568e427, 0x68fc, 0x4f3d,					\
+	  { 0xac, 0x74, 0xca, 0x55, 0x52, 0x31, 0xcc, 0x68 } }
 
 /** An EFI virtual file reader */
 struct efi_file_reader {
@@ -69,6 +76,8 @@ struct efi_file {
 	struct refcnt refcnt;
 	/** EFI file protocol */
 	EFI_FILE_PROTOCOL file;
+	/** EFI load file protocol */
+	EFI_LOAD_FILE2_PROTOCOL load;
 	/** Image (if any) */
 	struct image *image;
 	/** Filename */
@@ -84,8 +93,18 @@ struct efi_file {
 	size_t ( * read ) ( struct efi_file_reader *reader );
 };
 
+/** An EFI fixed device path file */
+struct efi_file_path {
+	/** EFI file */
+	struct efi_file file;
+	/** Device path */
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	/** EFI handle */
+	EFI_HANDLE handle;
+};
+
 static struct efi_file efi_file_root;
-static struct efi_file efi_file_initrd;
+static struct efi_file_path efi_file_initrd;
 
 /**
  * Free EFI file
@@ -121,7 +140,7 @@ static struct image * efi_file_find ( const char *name ) {
 	struct image *image;
 
 	/* Find image */
-	list_for_each_entry ( image, &images, list ) {
+	for_each_image ( image ) {
 		if ( strcasecmp ( image->name, name ) == 0 )
 			return image;
 	}
@@ -230,10 +249,6 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
 	/* Read from file */
 	len = 0;
 	for_each_image ( image ) {
-
-		/* Ignore currently executing image */
-		if ( image == current_image )
-			continue;
 
 		/* Pad to alignment boundary */
 		pad_len = ( ( -reader->pos ) & ( INITRD_ALIGN - 1 ) );
@@ -353,8 +368,8 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 	}
 
 	/* Allow magic initrd to be opened */
-	if ( strcasecmp ( name, efi_file_initrd.name ) == 0 )
-		return efi_file_open_fixed ( &efi_file_initrd, new );
+	if ( strcasecmp ( name, efi_file_initrd.file.name ) == 0 )
+		return efi_file_open_fixed ( &efi_file_initrd.file, new );
 
 	/* Identify image */
 	image = efi_file_find ( name );
@@ -370,6 +385,8 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 	ref_init ( &file->refcnt, efi_file_free );
 	memcpy ( &new_file->file, &efi_file_root.file,
 		 sizeof ( new_file->file ) );
+	memcpy ( &new_file->load, &efi_file_root.load,
+		 sizeof ( new_file->load ) );
 	efi_file_image ( new_file, image_get ( image ) );
 	*new = &new_file->file;
 	DBGC ( new_file, "EFIFILE %s opened\n", efi_file_name ( new_file ) );
@@ -528,7 +545,7 @@ static EFI_STATUS EFIAPI efi_file_read ( EFI_FILE_PROTOCOL *this,
 
 	/* Read from the file */
 	DBGC ( file, "EFIFILE %s read [%#08zx,%#08zx)\n",
-	       efi_file_name ( file ), pos, file->pos );
+	       efi_file_name ( file ), pos, ( ( size_t ) ( pos + *len ) ) );
 	*len = file->read ( &reader );
 	assert ( ( pos + *len ) == file->pos );
 
@@ -684,6 +701,44 @@ static EFI_STATUS EFIAPI efi_file_flush ( EFI_FILE_PROTOCOL *this ) {
 	return 0;
 }
 
+/**
+ * Load file
+ *
+ * @v this		EFI file loader
+ * @v path		File path
+ * @v boot		Boot policy
+ * @v len		Buffer size
+ * @v data		Buffer, or NULL
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_file_load ( EFI_LOAD_FILE2_PROTOCOL *this,
+		EFI_DEVICE_PATH_PROTOCOL *path __unused,
+		BOOLEAN boot __unused, UINTN *len, VOID *data ) {
+	struct efi_file *file = container_of ( this, struct efi_file, load );
+	size_t max_len;
+	size_t file_len;
+	EFI_STATUS efirc;
+
+	/* Calculate maximum length */
+	max_len = ( data ? *len : 0 );
+	DBGC ( file, "EFIFILE %s load at %p+%#zx\n",
+	       efi_file_name ( file ), data, max_len );
+
+	/* Check buffer size */
+	file_len = efi_file_len ( file );
+	if ( file_len > max_len ) {
+		*len = file_len;
+		return EFI_BUFFER_TOO_SMALL;
+	}
+
+	/* Read from file */
+	if ( ( efirc = efi_file_read ( &file->file, len, data ) ) != 0 )
+		return efirc;
+
+	return 0;
+}
+
 /** Root directory */
 static struct efi_file efi_file_root = {
 	.refcnt = REF_INIT ( ref_no_free ),
@@ -700,29 +755,58 @@ static struct efi_file efi_file_root = {
 		.SetInfo = efi_file_set_info,
 		.Flush = efi_file_flush,
 	},
+	.load = {
+		.LoadFile = efi_file_load,
+	},
 	.image = NULL,
 	.name = "",
 };
 
-/** Magic initrd file */
-static struct efi_file efi_file_initrd = {
-	.refcnt = REF_INIT ( ref_no_free ),
-	.file = {
-		.Revision = EFI_FILE_PROTOCOL_REVISION,
-		.Open = efi_file_open,
-		.Close = efi_file_close,
-		.Delete = efi_file_delete,
-		.Read = efi_file_read,
-		.Write = efi_file_write,
-		.GetPosition = efi_file_get_position,
-		.SetPosition = efi_file_set_position,
-		.GetInfo = efi_file_get_info,
-		.SetInfo = efi_file_set_info,
-		.Flush = efi_file_flush,
+/** Linux initrd fixed device path */
+static struct {
+	VENDOR_DEVICE_PATH vendor;
+	EFI_DEVICE_PATH_PROTOCOL end;
+} __attribute__ (( packed )) efi_file_initrd_path = {
+	.vendor = {
+		.Header = {
+			.Type = MEDIA_DEVICE_PATH,
+			.SubType = MEDIA_VENDOR_DP,
+			.Length[0] = sizeof ( efi_file_initrd_path.vendor ),
+		},
+		.Guid = LINUX_INITRD_VENDOR_GUID,
 	},
-	.image = NULL,
-	.name = "initrd.magic",
-	.read = efi_file_read_initrd,
+	.end = {
+		.Type = END_DEVICE_PATH_TYPE,
+		.SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE,
+		.Length[0] = sizeof ( efi_file_initrd_path.end ),
+	},
+};
+
+/** Magic initrd file */
+static struct efi_file_path efi_file_initrd = {
+	.file = {
+		.refcnt = REF_INIT ( ref_no_free ),
+		.file = {
+			.Revision = EFI_FILE_PROTOCOL_REVISION,
+			.Open = efi_file_open,
+			.Close = efi_file_close,
+			.Delete = efi_file_delete,
+			.Read = efi_file_read,
+			.Write = efi_file_write,
+			.GetPosition = efi_file_get_position,
+			.SetPosition = efi_file_set_position,
+			.GetInfo = efi_file_get_info,
+			.SetInfo = efi_file_set_info,
+			.Flush = efi_file_flush,
+		},
+		.load = {
+			.LoadFile = efi_file_load,
+		},
+		.image = NULL,
+		.name = "initrd.magic",
+		.read = efi_file_read_initrd,
+	},
+	.path = &efi_file_initrd_path.vendor.Header,
 };
 
 /**
@@ -834,6 +918,151 @@ static EFI_DISK_IO_PROTOCOL efi_disk_io_protocol = {
 };
 
 /**
+ * Claim use of fixed device path
+ *
+ * @v file		Fixed device path file
+ * @ret rc		Return status code
+ *
+ * The design choice in Linux of using a single fixed device path is
+ * unfortunately messy to support, since device paths must be unique
+ * within a system.  When multiple bootloaders are used (e.g. GRUB
+ * loading iPXE loading Linux) then only one bootloader can ever
+ * install the device path onto a handle.  Bootloaders must therefore
+ * be prepared to locate an existing handle and uninstall its device
+ * path protocol instance before installing a new handle with the
+ * required device path.
+ */
+static int efi_file_path_claim ( struct efi_file_path *file ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_DEVICE_PATH_PROTOCOL *end;
+	EFI_HANDLE handle;
+	VOID *old;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Sanity check */
+	assert ( file->handle == NULL );
+
+	/* Locate handle with this device path, if any */
+	end = file->path;
+	if ( ( ( efirc = bs->LocateDevicePath ( &efi_device_path_protocol_guid,
+						&end, &handle ) ) != 0 ) ||
+	     ( end->Type != END_DEVICE_PATH_TYPE ) ) {
+		return 0;
+	}
+
+	/* Locate device path protocol on this handle */
+	if ( ( ( efirc = bs->HandleProtocol ( handle,
+					      &efi_device_path_protocol_guid,
+					      &old ) ) != 0 ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( file, "EFIFILE %s could not locate %s: %s\n",
+		       efi_file_name ( &file->file ),
+		       efi_devpath_text ( file->path ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Uninstall device path protocol, leaving other protocols untouched */
+	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+				handle,
+				&efi_device_path_protocol_guid, old,
+				NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( file, "EFIFILE %s could not claim %s: %s\n",
+		       efi_file_name ( &file->file ),
+		       efi_devpath_text ( file->path ), strerror ( rc ) );
+		return rc;
+	}
+
+	DBGC ( file, "EFIFILE %s claimed %s",
+	       efi_file_name ( &file->file ), efi_devpath_text ( file->path ) );
+	DBGC ( file, " from %s\n", efi_handle_name ( handle ) );
+	return 0;
+}
+
+/**
+ * Install fixed device path file
+ *
+ * @v file		Fixed device path file
+ * @ret rc		Return status code
+ *
+ * Linux 5.7 added the ability to autodetect an initrd by searching
+ * for a handle via a fixed vendor-specific "Linux initrd device path"
+ * and then locating and using the EFI_LOAD_FILE2_PROTOCOL instance on
+ * that handle.
+ */
+static int efi_file_path_install ( struct efi_file_path *file ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Sanity check */
+	assert ( file->handle == NULL );
+
+	/* Create a new handle with this device path */
+	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
+				&file->handle,
+				&efi_device_path_protocol_guid, file->path,
+				&efi_load_file2_protocol_guid, &file->file.load,
+				NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( file, "EFIFILE %s could not install %s: %s\n",
+		       efi_file_name ( &file->file ),
+		       efi_devpath_text ( file->path ), strerror ( rc ) );
+		return rc;
+	}
+
+	DBGC ( file, "EFIFILE %s installed as %s\n",
+	       efi_file_name ( &file->file ), efi_devpath_text ( file->path ) );
+	return 0;
+}
+
+/**
+ * Uninstall fixed device path file
+ *
+ * @v file		Fixed device path file
+ * @ret rc		Return status code
+ */
+static void efi_file_path_uninstall ( struct efi_file_path *file ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Do nothing if file is already uninstalled */
+	if ( ! file->handle )
+		return;
+
+	/* Uninstall protocols.  Do this via two separate calls, in
+	 * case another executable has already uninstalled the device
+	 * path protocol from our handle.
+	 */
+	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+				file->handle,
+				&efi_device_path_protocol_guid, file->path,
+				NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( file, "EFIFILE %s could not uninstall %s: %s\n",
+		       efi_file_name ( &file->file ),
+		       efi_devpath_text ( file->path ), strerror ( rc ) );
+		/* Continue uninstalling */
+	}
+	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+				file->handle,
+				&efi_load_file2_protocol_guid, &file->file.load,
+				NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( file, "EFIFILE %s could not uninstall %s: %s\n",
+		       efi_file_name ( &file->file ),
+		       efi_guid_ntoa ( &efi_load_file2_protocol_guid ),
+		       strerror ( rc ) );
+		/* Continue uninstalling */
+	}
+
+	/* Mark handle as uninstalled */
+	file->handle = NULL;
+}
+
+/**
  * Install EFI simple file system protocol
  *
  * @v handle		EFI handle
@@ -903,8 +1132,21 @@ int efi_file_install ( EFI_HANDLE handle ) {
 	}
 	assert ( diskio.diskio == &efi_disk_io_protocol );
 
+	/* Claim Linux initrd fixed device path */
+	if ( ( rc = efi_file_path_claim ( &efi_file_initrd ) ) != 0 )
+		goto err_initrd_claim;
+
+	/* Install Linux initrd fixed device path file if non-empty */
+	if ( have_images() &&
+	     ( ( rc = efi_file_path_install ( &efi_file_initrd ) ) != 0 ) ) {
+		goto err_initrd_install;
+	}
+
 	return 0;
 
+	efi_file_path_uninstall ( &efi_file_initrd );
+ err_initrd_install:
+ err_initrd_claim:
 	bs->CloseProtocol ( handle, &efi_disk_io_protocol_guid,
 			    efi_image_handle, handle );
  err_open:
@@ -929,6 +1171,9 @@ void efi_file_uninstall ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_STATUS efirc;
 	int rc;
+
+	/* Uninstall Linux initrd fixed device path file */
+	efi_file_path_uninstall ( &efi_file_initrd );
 
 	/* Close our own disk I/O protocol */
 	bs->CloseProtocol ( handle, &efi_disk_io_protocol_guid,

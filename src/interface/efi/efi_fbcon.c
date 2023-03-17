@@ -62,6 +62,12 @@ struct console_driver efi_console __attribute__ (( weak ));
 #define CONSOLE_EFIFB ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )
 #endif
 
+/** Number of ASCII glyphs in cache */
+#define EFIFB_ASCII 128
+
+/** Number of dynamic non-ASCII glyphs in cache */
+#define EFIFB_DYNAMIC 32
+
 /* Forward declaration */
 struct console_driver efifb_console __console_driver;
 
@@ -84,22 +90,159 @@ struct efifb {
 	struct fbcon_colour_map map;
 	/** Font definition */
 	struct fbcon_font font;
-	/** Character glyphs */
+	/** Character glyph cache */
 	userptr_t glyphs;
+	/** Dynamic characters in cache */
+	unsigned int dynamic[EFIFB_DYNAMIC];
+	/** Next dynamic character cache entry to evict */
+	unsigned int next;
 };
 
 /** The EFI frame buffer */
 static struct efifb efifb;
 
 /**
- * Get character glyph
+ * Draw character glyph
  *
  * @v character		Character
+ * @v index		Index within glyph cache
+ * @v toggle		Bits to toggle in each bitmask
+ * @ret height		Character height, or negative error
+ */
+static int efifb_draw ( unsigned int character, unsigned int index,
+			unsigned int toggle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_IMAGE_OUTPUT *blt;
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *pixel;
+	unsigned int height;
+	unsigned int x;
+	unsigned int y;
+	uint8_t bitmask;
+	size_t offset;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Clear existing glyph */
+	offset = ( index * efifb.font.height );
+	memset_user ( efifb.glyphs, offset, 0, efifb.font.height );
+
+	/* Get glyph */
+	blt = NULL;
+	if ( ( efirc = efifb.hiifont->GetGlyph ( efifb.hiifont, character,
+						 NULL, &blt, NULL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( &efifb, "EFIFB could not get glyph %#02x: %s\n",
+		       character, strerror ( rc ) );
+		goto err_get;
+	}
+	assert ( blt != NULL );
+
+	/* Sanity check */
+	if ( blt->Width > 8 ) {
+		DBGC ( &efifb, "EFIFB glyph %#02x invalid width %d\n",
+		       character, blt->Width );
+		rc = -EINVAL;
+		goto err_width;
+	}
+
+	/* Convert glyph to bitmap */
+	pixel = blt->Image.Bitmap;
+	height = blt->Height;
+	for ( y = 0 ; ( ( y < height ) && ( y < efifb.font.height ) ) ; y++ ) {
+		bitmask = 0;
+		for ( x = 0 ; x < blt->Width ; x++ ) {
+			bitmask = rol8 ( bitmask, 1 );
+			if ( pixel->Blue || pixel->Green || pixel->Red )
+				bitmask |= 0x01;
+			pixel++;
+		}
+		bitmask ^= toggle;
+		copy_to_user ( efifb.glyphs, offset++, &bitmask,
+			       sizeof ( bitmask ) );
+	}
+
+	/* Free glyph */
+	bs->FreePool ( blt );
+
+	return height;
+
+ err_width:
+	bs->FreePool ( blt );
+ err_get:
+	return rc;
+}
+
+/**
+ * Draw "unknown character" glyph
+ *
+ * @v index		Index within glyph cache
+ * @ret rc		Return status code
+ */
+static int efifb_draw_unknown ( unsigned int index ) {
+
+	/* Draw an inverted '?' glyph */
+	return efifb_draw ( '?', index, -1U );
+}
+
+/**
+ * Get dynamic glyph index
+ *
+ * @v character		Unicode character
+ * @ret index		Glyph cache index
+ */
+static unsigned int efifb_dynamic ( unsigned int character ) {
+	unsigned int dynamic;
+	unsigned int index;
+	unsigned int i;
+	int height;
+
+	/* Search existing cached entries */
+	for ( i = 0 ; i < EFIFB_DYNAMIC ; i++ ) {
+		if ( character == efifb.dynamic[i] )
+			return ( EFIFB_ASCII + i );
+	}
+
+	/* Overwrite the oldest cache entry */
+	dynamic = ( efifb.next++ % EFIFB_DYNAMIC );
+	index = ( EFIFB_ASCII + dynamic );
+	DBGC2 ( &efifb, "EFIFB dynamic %#02x is glyph %#02x\n",
+		dynamic, character );
+
+	/* Draw glyph */
+	height = efifb_draw ( character, index, 0 );
+	if ( height < 0 )
+		efifb_draw_unknown ( index );
+
+	/* Record cached character */
+	efifb.dynamic[dynamic] = character;
+
+	return index;
+}
+
+/**
+ * Get character glyph
+ *
+ * @v character		Unicode character
  * @v glyph		Character glyph to fill in
  */
 static void efifb_glyph ( unsigned int character, uint8_t *glyph ) {
-	size_t offset = ( character * efifb.font.height );
+	unsigned int index;
+	size_t offset;
 
+	/* Identify glyph */
+	if ( character < EFIFB_ASCII ) {
+
+		/* ASCII character: use fixed cache entry */
+		index = character;
+
+	} else {
+
+		/* Non-ASCII character: use dynamic glyph cache */
+		index = efifb_dynamic ( character );
+	}
+
+	/* Copy cached glyph */
+	offset = ( index * efifb.font.height );
 	copy_from_user ( glyph, efifb.glyphs, offset, efifb.font.height );
 }
 
@@ -109,16 +252,10 @@ static void efifb_glyph ( unsigned int character, uint8_t *glyph ) {
  * @ret rc		Return status code
  */
 static int efifb_glyphs ( void ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_IMAGE_OUTPUT *blt;
-	EFI_GRAPHICS_OUTPUT_BLT_PIXEL *pixel;
-	size_t offset;
-	size_t len;
-	uint8_t bitmask;
 	unsigned int character;
-	unsigned int x;
-	unsigned int y;
-	EFI_STATUS efirc;
+	int height;
+	int max;
+	size_t len;
 	int rc;
 
 	/* Get font height.  The GetFontInfo() call nominally returns
@@ -128,38 +265,32 @@ static int efifb_glyphs ( void ) {
 	 * height.
 	 */
 	efifb.font.height = 0;
-	for ( character = 0 ; character < 256 ; character++ ) {
+	max = 0;
+	for ( character = 0 ; character < EFIFB_ASCII ; character++ ) {
 
 		/* Skip non-printable characters */
 		if ( ! isprint ( character ) )
 			continue;
 
 		/* Get glyph */
-		blt = NULL;
-		if ( ( efirc = efifb.hiifont->GetGlyph ( efifb.hiifont,
-							 character, NULL, &blt,
-							 NULL ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( &efifb, "EFIFB could not get glyph %d: %s\n",
-			       character, strerror ( rc ) );
-			continue;
+		height = efifb_draw ( character, 0, 0 );
+		if ( height < 0 ) {
+			rc = height;
+			goto err_height;
 		}
-		assert ( blt != NULL );
 
 		/* Calculate maximum height */
-		if ( efifb.font.height < blt->Height )
-			efifb.font.height = blt->Height;
-
-		/* Free glyph */
-		bs->FreePool ( blt );
+		if ( max < height )
+			max = height;
 	}
-	if ( ! efifb.font.height ) {
+	if ( ! max ) {
 		DBGC ( &efifb, "EFIFB could not get font height\n" );
 		return -ENOENT;
 	}
+	efifb.font.height = max;
 
 	/* Allocate glyph data */
-	len = ( 256 * efifb.font.height * sizeof ( bitmask ) );
+	len = ( ( EFIFB_ASCII + EFIFB_DYNAMIC ) * efifb.font.height );
 	efifb.glyphs = umalloc ( len );
 	if ( ! efifb.glyphs ) {
 		rc = -ENOMEM;
@@ -168,60 +299,32 @@ static int efifb_glyphs ( void ) {
 	memset_user ( efifb.glyphs, 0, 0, len );
 
 	/* Get font data */
-	for ( character = 0 ; character < 256 ; character++ ) {
+	for ( character = 0 ; character < EFIFB_ASCII ; character++ ) {
 
 		/* Skip non-printable characters */
-		if ( ! isprint ( character ) )
+		if ( ! isprint ( character ) ) {
+			efifb_draw_unknown ( character );
 			continue;
+		}
 
 		/* Get glyph */
-		blt = NULL;
-		if ( ( efirc = efifb.hiifont->GetGlyph ( efifb.hiifont,
-							 character, NULL, &blt,
-							 NULL ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( &efifb, "EFIFB could not get glyph %d: %s\n",
-			       character, strerror ( rc ) );
-			continue;
+		height = efifb_draw ( character, character, 0 );
+		if ( height < 0 ) {
+			rc = height;
+			goto err_draw;
 		}
-		assert ( blt != NULL );
-
-		/* Sanity check */
-		if ( blt->Width > 8 ) {
-			DBGC ( &efifb, "EFIFB glyph %d invalid width %d\n",
-			       character, blt->Width );
-			continue;
-		}
-		if ( blt->Height > efifb.font.height ) {
-			DBGC ( &efifb, "EFIFB glyph %d invalid height %d\n",
-			       character, blt->Height );
-			continue;
-		}
-
-		/* Convert glyph to bitmap */
-		pixel = blt->Image.Bitmap;
-		offset = ( character * efifb.font.height );
-		for ( y = 0 ; y < blt->Height ; y++ ) {
-			bitmask = 0;
-			for ( x = 0 ; x < blt->Width ; x++ ) {
-				bitmask = rol8 ( bitmask, 1 );
-				if ( pixel->Blue || pixel->Green || pixel->Red )
-					bitmask |= 0x01;
-				pixel++;
-			}
-			copy_to_user ( efifb.glyphs, offset++, &bitmask,
-				       sizeof ( bitmask ) );
-		}
-
-		/* Free glyph */
-		bs->FreePool ( blt );
 	}
+
+	/* Clear dynamic glyph character cache */
+	memset ( efifb.dynamic, 0, sizeof ( efifb.dynamic ) );
 
 	efifb.font.glyph = efifb_glyph;
 	return 0;
 
+ err_draw:
 	ufree ( efifb.glyphs );
  err_alloc:
+ err_height:
 	return rc;
 }
 

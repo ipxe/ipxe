@@ -17,6 +17,8 @@
  * 02110-1301, USA.
  */
 
+FILE_LICENCE ( GPL2_OR_LATER );
+
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
@@ -41,33 +43,93 @@
  */
 
 /**
- * Find end of device path
+ * Find next element in device path
  *
- * @v path		Path to device
- * @ret path_end	End of device path
+ * @v path		Device path, or NULL
+ * @v next		Next element in device path, or NULL if at end
  */
-EFI_DEVICE_PATH_PROTOCOL * efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+EFI_DEVICE_PATH_PROTOCOL * efi_path_next ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 
-	while ( path->Type != END_DEVICE_PATH_TYPE ) {
-		path = ( ( ( void * ) path ) +
-			 /* There's this amazing new-fangled thing known as
-			  * a UINT16, but who wants to use one of those? */
-			 ( ( path->Length[1] << 8 ) | path->Length[0] ) );
+	/* Check for non-existent device path */
+	if ( ! path )
+		return NULL;
+
+	/* Check for end of device path */
+	if ( path->Type == END_DEVICE_PATH_TYPE )
+		return NULL;
+
+	/* Move to next component of the device path */
+	path = ( ( ( void * ) path ) +
+		 /* There's this amazing new-fangled thing known as
+		  * a UINT16, but who wants to use one of those? */
+		 ( ( path->Length[1] << 8 ) | path->Length[0] ) );
+
+	return path;
+}
+
+/**
+ * Find previous element of device path
+ *
+ * @v path		Device path, or NULL for no path
+ * @v curr		Current element in device path, or NULL for end of path
+ * @ret prev		Previous element in device path, or NULL
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_path_prev ( EFI_DEVICE_PATH_PROTOCOL *path,
+					   EFI_DEVICE_PATH_PROTOCOL *curr ) {
+	EFI_DEVICE_PATH_PROTOCOL *tmp;
+
+	/* Find immediately preceding element */
+	while ( ( tmp = efi_path_next ( path ) ) != curr ) {
+		path = tmp;
 	}
 
 	return path;
 }
 
 /**
+ * Find end of device path
+ *
+ * @v path		Device path, or NULL
+ * @ret path_end	End of device path, or NULL
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+
+	return efi_path_prev ( path, NULL );
+}
+
+/**
  * Find length of device path (excluding terminator)
  *
- * @v path		Path to device
+ * @v path		Device path, or NULL
  * @ret path_len	Length of device path
  */
 size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_DEVICE_PATH_PROTOCOL *end = efi_path_end ( path );
 
 	return ( ( ( void * ) end ) - ( ( void * ) path ) );
+}
+
+/**
+ * Get VLAN tag from device path
+ *
+ * @v path		Device path
+ * @ret tag		VLAN tag, or 0 if not a VLAN
+ */
+unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	VLAN_DEVICE_PATH *vlan;
+
+	/* Search for VLAN device path */
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+		if ( ( path->Type == MESSAGING_DEVICE_PATH ) &&
+		     ( path->SubType == MSG_VLAN_DP ) ) {
+			vlan = container_of ( path, VLAN_DEVICE_PATH, Header );
+			return vlan->VlanId;
+		}
+	}
+
+	/* No VLAN device path found */
+	return 0;
 }
 
 /**
@@ -114,9 +176,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first, ... ) {
 	}
 	va_end ( args );
 	end = dst;
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 
 	return path;
 }
@@ -176,9 +236,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev ) {
 	} else {
 		end = ( ( ( void * ) macpath ) + sizeof ( *macpath ) );
 	}
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 
 	return path;
 }
@@ -218,9 +276,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_uri_path ( struct uri *uri ) {
 	uripath->Header.Length[1] = ( uripath_len >> 8 );
 	format_uri ( uri, uripath->Uri, uri_len );
 	end = ( ( ( void * ) path ) + uripath_len );
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 
 	return path;
 }
@@ -277,9 +333,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_iscsi_path ( struct iscsi_session *iscsi ) {
 	name = ( ( ( void * ) iscsipath ) + sizeof ( *iscsipath ) );
 	memcpy ( name, iscsi->target_iqn, name_len );
 	end = ( ( ( void * ) name ) + name_len );
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 
 	/* Free temporary paths */
 	free ( netpath );
@@ -319,9 +373,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_aoe_path ( struct aoe_device *aoedev ) {
 	satapath.sata.Header.Length[0] = sizeof ( satapath.sata );
 	satapath.sata.HBAPortNumber = aoedev->major;
 	satapath.sata.PortMultiplierPortNumber = aoedev->minor;
-	satapath.end.Type = END_DEVICE_PATH_TYPE;
-	satapath.end.SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	satapath.end.Length[0] = sizeof ( satapath.end );
+	efi_path_terminate ( &satapath.end );
 
 	/* Construct overall device path */
 	path = efi_paths ( netpath, &satapath, NULL );
@@ -362,9 +414,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_fcp_path ( struct fcp_description *desc ) {
 	path->fc.Header.Length[0] = sizeof ( path->fc );
 	memcpy ( path->fc.WWN, &desc->wwn, sizeof ( path->fc.WWN ) );
 	memcpy ( path->fc.Lun, &desc->lun, sizeof ( path->fc.Lun ) );
-	path->end.Type = END_DEVICE_PATH_TYPE;
-	path->end.SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	path->end.Length[0] = sizeof ( path->end );
+	efi_path_terminate ( &path->end );
 
 	return &path->fc.Header;
 }
@@ -416,9 +466,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_ib_srp_path ( struct ib_srp_device *ib_srp ) {
 	memcpy ( &ibpath->DeviceId, &id->ib.id_ext,
 		 sizeof ( ibpath->DeviceId ) );
 	end = ( ( ( void * ) ibpath ) + sizeof ( *ibpath ) );
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 
 	return path;
 }
@@ -464,9 +512,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func ) {
 	/* Construct device path */
 	memcpy ( path, efidev->path, prefix_len );
 	end = ( ( ( void * ) path ) + len - sizeof ( *end ) );
-	end->Type = END_DEVICE_PATH_TYPE;
-	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	end->Length[0] = sizeof ( *end );
+	efi_path_terminate ( end );
 	usbpath = ( ( ( void * ) end ) - sizeof ( *usbpath ) );
 	usbpath->InterfaceNumber = func->interface[0];
 	for ( ; usb ; usbpath--, usb = usb->port->hub->usb ) {

@@ -84,23 +84,17 @@ ecm_ethernet_descriptor ( struct usb_configuration_descriptor *config,
  *
  * @v func		USB function
  * @v desc		Ethernet functional descriptor
- * @v hw_addr		Hardware address to fill in
+ * @v netdev		Network device
  * @ret rc		Return status code
  */
 int ecm_fetch_mac ( struct usb_function *func,
-		    struct ecm_ethernet_descriptor *desc, uint8_t *hw_addr ) {
+		    struct ecm_ethernet_descriptor *desc,
+		    struct net_device *netdev ) {
 	struct usb_device *usb = func->usb;
 	char buf[ base16_encoded_len ( ETH_ALEN ) + 1 /* NUL */ ];
+	uint8_t amac[ETH_ALEN];
 	int len;
 	int rc;
-
-	/* Use system-specific MAC address, if present and not already used */
-	if ( ( ( rc = acpi_mac ( hw_addr ) ) == 0 ) &&
-	     ! find_netdev_by_ll_addr ( &ethernet_protocol, hw_addr ) ) {
-		DBGC ( usb, "USB %s using system-specific MAC %s\n",
-		       func->name, eth_ntoa ( hw_addr ) );
-		return 0;
-	}
 
 	/* Fetch MAC address string */
 	len = usb_get_string_descriptor ( usb, desc->mac, 0, buf,
@@ -118,12 +112,21 @@ int ecm_fetch_mac ( struct usb_function *func,
 	}
 
 	/* Decode MAC address */
-	len = base16_decode ( buf, hw_addr, ETH_ALEN );
+	len = base16_decode ( buf, netdev->hw_addr, ETH_ALEN );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( usb, "USB %s could not decode ECM MAC \"%s\": %s\n",
 		       func->name, buf, strerror ( rc ) );
 		return rc;
+	}
+
+	/* Apply system-specific MAC address as current link-layer
+	 * address, if present.
+	 */
+	if ( ( rc = acpi_mac ( amac ) ) == 0 ) {
+		memcpy ( netdev->ll_addr, amac, ETH_ALEN );
+		DBGC ( usb, "USB %s using system-specific MAC %s\n",
+		       func->name, eth_ntoa ( netdev->ll_addr ) );
 	}
 
 	return 0;
@@ -474,7 +477,7 @@ static int ecm_probe ( struct usb_function *func,
 	}
 
 	/* Fetch MAC address */
-	if ( ( rc = ecm_fetch_mac ( func, ethernet, netdev->hw_addr ) ) != 0 ) {
+	if ( ( rc = ecm_fetch_mac ( func, ethernet, netdev ) ) != 0 ) {
 		DBGC ( ecm, "ECM %p could not fetch MAC address: %s\n",
 		       ecm, strerror ( rc ) );
 		goto err_fetch_mac;

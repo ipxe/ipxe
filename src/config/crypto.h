@@ -18,6 +18,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** AES-CBC block cipher */
 #define CRYPTO_CIPHER_AES_CBC
 
+/** AES-GCM block cipher */
+#define CRYPTO_CIPHER_AES_GCM
+
 /** MD4 digest algorithm */
 //#define CRYPTO_DIGEST_MD4
 

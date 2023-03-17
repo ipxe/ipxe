@@ -10,6 +10,21 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "gr" keyboard mapping */
-struct key_mapping gr_mapping[] __keymap = {
+/** "gr" basic remapping */
+static struct keymap_key gr_basic[] = {
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "gr" AltGr remapping */
+static struct keymap_key gr_altgr[] = {
+	{ 0, 0 }
+};
+
+/** "gr" keyboard map */
+struct keymap gr_keymap __keymap = {
+	.name = "gr",
+	.basic = gr_basic,
+	.altgr = gr_altgr,
 };

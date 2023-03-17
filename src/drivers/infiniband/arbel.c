@@ -2561,7 +2561,7 @@ static void arbel_reset ( struct arbel *arbel ) {
 	unsigned int i;
 
 	/* Perform device reset and preserve PCI configuration */
-	pci_backup ( pci, &backup, backup_exclude );
+	pci_backup ( pci, &backup, PCI_CONFIG_BACKUP_ALL, backup_exclude );
 	writel ( ARBEL_RESET_MAGIC,
 		 ( arbel->config + ARBEL_RESET_OFFSET ) );
 	for ( i = 0 ; i < ARBEL_RESET_WAIT_TIME_MS ; i++ ) {
@@ -2570,7 +2570,7 @@ static void arbel_reset ( struct arbel *arbel ) {
 		if ( vendor != 0xffff )
 			break;
 	}
-	pci_restore ( pci, &backup, backup_exclude );
+	pci_restore ( pci, &backup, PCI_CONFIG_BACKUP_ALL, backup_exclude );
 }
 
 /**

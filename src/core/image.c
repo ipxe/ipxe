@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <errno.h>
 #include <assert.h>
 #include <libgen.h>
@@ -311,7 +312,7 @@ void unregister_image ( struct image *image ) {
 struct image * find_image ( const char *name ) {
 	struct image *image;
 
-	list_for_each_entry ( image, &images, list ) {
+	for_each_image ( image ) {
 		if ( strcmp ( image->name, name ) == 0 )
 			return image;
 	}
@@ -338,16 +339,18 @@ int image_exec ( struct image *image ) {
 	/* Sanity check */
 	assert ( image->flags & IMAGE_REGISTERED );
 
-	/* Switch current working directory to be that of the image itself */
+	/* Switch current working directory to be that of the image
+	 * itself, if applicable
+	 */
 	old_cwuri = uri_get ( cwuri );
-	churi ( image->uri );
+	if ( image->uri )
+		churi ( image->uri );
 
 	/* Preserve record of any currently-running image */
 	saved_current_image = current_image;
 
-	/* Take out a temporary reference to the image.  This allows
-	 * the image to unregister itself if necessary, without
-	 * automatically freeing itself.
+	/* Take out a temporary reference to the image, so that it
+	 * does not get freed when temporarily unregistered.
 	 */
 	current_image = image_get ( image );
 
@@ -367,6 +370,9 @@ int image_exec ( struct image *image ) {
 	/* Record boot attempt */
 	syslog ( LOG_NOTICE, "Executing \"%s\"\n", image->name );
 
+	/* Temporarily unregister the image during its execution */
+	unregister_image ( image );
+
 	/* Try executing the image */
 	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
 		DBGC ( image, "IMAGE %s could not execute: %s\n",
@@ -382,6 +388,10 @@ int image_exec ( struct image *image ) {
 		syslog ( LOG_ERR, "Execution of \"%s\" failed: %s\n",
 			 image->name, strerror ( rc ) );
 	}
+
+	/* Re-register image (unless due to be replaced) */
+	if ( ! image->replacement )
+		register_image ( image );
 
 	/* Pick up replacement image before we drop the original
 	 * image's temporary reference.  The replacement image must
@@ -564,5 +574,35 @@ struct image * image_memory ( const char *name, userptr_t data, size_t len ) {
  err_set_name:
 	image_put ( image );
  err_alloc_image:
+	return NULL;
+}
+
+/**
+ * Find argument within image command line
+ *
+ * @v image		Image
+ * @v key		Argument search key (including trailing delimiter)
+ * @ret value		Argument value, or NULL if not found
+ */
+const char * image_argument ( struct image *image, const char *key ) {
+	const char *cmdline = image->cmdline;
+	const char *search;
+	const char *match;
+	const char *next;
+
+	/* Find argument */
+	for ( search = cmdline ; search ; search = next ) {
+
+		/* Find next occurrence, if any */
+		match = strstr ( search, key );
+		if ( ! match )
+			break;
+		next = ( match + strlen ( key ) );
+
+		/* Check preceding delimiter, if any */
+		if ( ( match == cmdline ) || isspace ( match[-1] ) )
+			return next;
+	}
+
 	return NULL;
 }

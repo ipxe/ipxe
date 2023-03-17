@@ -119,7 +119,7 @@ static int run_all_tests ( void ) {
 	unsigned int total = 0;
 
 	/* Run all compiled-in self-tests */
-	printf ( "Starting self-tests\n" );
+	printf ( "Starting %s self-tests\n", _S2 ( ARCH ) );
 	for_each_table_entry ( tests, SELF_TESTS )
 		run_tests ( tests );
 

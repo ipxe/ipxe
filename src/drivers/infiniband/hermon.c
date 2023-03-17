@@ -2840,7 +2840,7 @@ static int hermon_reset ( struct hermon *hermon ) {
 	hermon->toggle = 0;
 
 	/* Perform device reset and preserve PCI configuration */
-	pci_backup ( pci, &backup, backup_exclude );
+	pci_backup ( pci, &backup, PCI_CONFIG_BACKUP_ALL, backup_exclude );
 	writel ( HERMON_RESET_MAGIC,
 		 ( hermon->config + HERMON_RESET_OFFSET ) );
 
@@ -2852,7 +2852,8 @@ static int hermon_reset ( struct hermon *hermon ) {
 		if ( vendor == pci->vendor ) {
 
 			/* Restore PCI configuration */
-			pci_restore ( pci, &backup, backup_exclude );
+			pci_restore ( pci, &backup, PCI_CONFIG_BACKUP_ALL,
+				      backup_exclude );
 
 			DBGC ( hermon, "Hermon %p reset after %dms\n",
 			       hermon, i );

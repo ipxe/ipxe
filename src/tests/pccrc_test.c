@@ -467,11 +467,10 @@ peerdist_info_passphrase_okx ( struct peerdist_info_segment_test *test,
 			       uint8_t *pass, size_t pass_len,
 			       const char *file, unsigned int line ) {
 	struct digest_algorithm *digest = info->digest;
-	uint8_t ctx[digest->ctxsize];
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	uint8_t secret[digest->digestsize];
 	uint8_t expected[digest->digestsize];
 	size_t digestsize = info->digestsize;
-	size_t secretsize = digestsize;
 
 	/* Calculate server secret */
 	digest_init ( digest, ctx );
@@ -479,11 +478,9 @@ peerdist_info_passphrase_okx ( struct peerdist_info_segment_test *test,
 	digest_final ( digest, ctx, secret );
 
 	/* Calculate expected segment secret */
-	hmac_init ( digest, ctx, secret, &secretsize );
-	assert ( secretsize == digestsize );
+	hmac_init ( digest, ctx, secret, digestsize );
 	hmac_update ( digest, ctx, test->expected_hash, digestsize );
-	hmac_final ( digest, ctx, secret, &secretsize, expected );
-	assert ( secretsize == digestsize );
+	hmac_final ( digest, ctx, expected );
 
 	/* Verify segment secret */
 	okx ( memcmp ( test->expected_secret, expected, digestsize ) == 0,

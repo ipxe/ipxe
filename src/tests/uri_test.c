@@ -92,15 +92,17 @@ struct uri_churi_test {
 	const char *expected;
 };
 
-/** A form parameter URI test list */
+/** A request parameter URI test list */
 struct uri_params_test_list {
 	/** Key */
 	const char *key;
 	/** Value */
 	const char *value;
+	/** Flags */
+	unsigned int flags;
 };
 
-/** A form parameter URI test */
+/** A request parameter URI test */
 struct uri_params_test {
 	/** URI string */
 	const char *string;
@@ -403,9 +405,9 @@ static void uri_churi_okx ( struct uri_churi_test *test, const char *file,
 #define uri_churi_ok( test ) uri_churi_okx ( test, __FILE__, __LINE__ )
 
 /**
- * Report form parameter URI test list result
+ * Report request parameter URI test list result
  *
- * @v test		Form parameter URI test
+ * @v test		Request parameter URI test
  * @v uri		URI
  * @v file		Test code file
  * @v line		Test code line
@@ -428,6 +430,7 @@ static void uri_params_list_okx ( struct uri_params_test *test,
 			      file, line );
 			okx ( strcmp ( param->value, list->value ) == 0,
 			      file, line );
+			okx ( param->flags == list->flags, file, line );
 			list++;
 		}
 		okx ( list->key == NULL, file, line );
@@ -437,9 +440,9 @@ static void uri_params_list_okx ( struct uri_params_test *test,
 	uri_params_list_okx ( test, __FILE__, __LINE__ )
 
 /**
- * Report form parameter URI test result
+ * Report request parameter URI test result
  *
- * @v test		Form parameter URI test
+ * @v test		Request parameter URI test
  * @v file		Test code file
  * @v line		Test code line
  */
@@ -456,7 +459,8 @@ static void uri_params_okx ( struct uri_params_test *test, const char *file,
 	okx ( params != NULL, file, line );
 	if ( params ) {
 		for ( list = test->list ; list->key ; list++ ) {
-			param = add_parameter ( params, list->key, list->value);
+			param = add_parameter ( params, list->key, list->value,
+						list->flags );
 			okx ( param != NULL, file, line );
 		}
 	}
@@ -654,6 +658,15 @@ static struct uri_test uri_file_volume = {
 		.host = "hpilo",
 		.path = "/boot/script.ipxe",
 		.epath = "/boot/script.ipxe",
+	},
+};
+
+/** Relative URI with colons in path */
+static struct uri_test uri_colons = {
+	"/boot/52:54:00:12:34:56/boot.ipxe",
+	{
+		.path = "/boot/52:54:00:12:34:56/boot.ipxe",
+		.epath = "/boot/52:54:00:12:34:56/boot.ipxe",
 	},
 };
 
@@ -870,27 +883,31 @@ static struct uri_churi_test uri_churi[] = {
 	}
 };
 
-/** Form parameter URI test list */
+/** Request parameter URI test list */
 static struct uri_params_test_list uri_params_list[] = {
 	{
 		"vendor",
 		"10ec",
+		PARAMETER_FORM,
 	},
 	{
 		"device",
 		"8139",
+		PARAMETER_FORM,
 	},
 	{
 		"uuid",
 		"f59fac00-758f-498f-9fe5-87d790045d94",
+		PARAMETER_HEADER,
 	},
 	{
 		NULL,
 		NULL,
+		0,
 	}
 };
 
-/** Form parameter URI test */
+/** Request parameter URI test */
 static struct uri_params_test uri_params = {
 	"http://boot.ipxe.org/demo/boot.php##params",
 	{
@@ -903,23 +920,26 @@ static struct uri_params_test uri_params = {
 	uri_params_list,
 };
 
-/** Named form parameter URI test list */
+/** Named request parameter URI test list */
 static struct uri_params_test_list uri_named_params_list[] = {
 	{
 		"mac",
 		"00:1e:65:80:d3:b6",
+		PARAMETER_FORM,
 	},
 	{
 		"serial",
 		"LXTQ20Z1139322762F2000",
+		PARAMETER_FORM,
 	},
 	{
 		NULL,
 		NULL,
+		0,
 	}
 };
 
-/** Named form parameter URI test */
+/** Named request parameter URI test */
 static struct uri_params_test uri_named_params = {
 	"http://192.168.100.4:3001/register##params=foo",
 	{
@@ -957,6 +977,7 @@ static void uri_test_exec ( void ) {
 	uri_parse_format_dup_ok ( &uri_file_relative );
 	uri_parse_format_dup_ok ( &uri_file_absolute );
 	uri_parse_format_dup_ok ( &uri_file_volume );
+	uri_parse_format_dup_ok ( &uri_colons );
 
 	/** URI port number tests */
 	uri_port_ok ( &uri_explicit_port );
@@ -986,7 +1007,7 @@ static void uri_test_exec ( void ) {
 	/* Current working URI tests */
 	uri_churi_ok ( uri_churi );
 
-	/* Form parameter URI tests */
+	/* Request parameter URI tests */
 	uri_params_ok ( &uri_params );
 	uri_params_ok ( &uri_named_params );
 }

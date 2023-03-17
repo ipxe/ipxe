@@ -419,14 +419,15 @@ static int efi_local_open_resolved ( struct efi_local *local,
  * Open specified path
  *
  * @v local		Local file
- * @v path		Path to file
+ * @v filename		Path to file relative to our own image
  * @ret rc		Return status code
  */
-static int efi_local_open_path ( struct efi_local *local, const char *path ) {
-	FILEPATH_DEVICE_PATH *fp = container_of ( efi_loaded_image->FilePath,
-						  FILEPATH_DEVICE_PATH, Header);
-	size_t fp_len = ( fp ? efi_path_len ( &fp->Header ) : 0 );
-	char base[ fp_len / 2 /* Cannot exceed this length */ ];
+static int efi_local_open_path ( struct efi_local *local,
+				 const char *filename ) {
+	EFI_DEVICE_PATH_PROTOCOL *path = efi_loaded_image->FilePath;
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	FILEPATH_DEVICE_PATH *fp;
+	char base[ efi_path_len ( path ) / 2 /* Cannot exceed this length */ ];
 	size_t remaining = sizeof ( base );
 	size_t len;
 	char *resolved;
@@ -436,13 +437,12 @@ static int efi_local_open_path ( struct efi_local *local, const char *path ) {
 	/* Construct base path to our own image, if possible */
 	memset ( base, 0, sizeof ( base ) );
 	tmp = base;
-	while ( fp && ( fp->Header.Type != END_DEVICE_PATH_TYPE ) ) {
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+		fp = container_of ( path, FILEPATH_DEVICE_PATH, Header );
 		len = snprintf ( tmp, remaining, "%ls", fp->PathName );
 		assert ( len < remaining );
 		tmp += len;
 		remaining -= len;
-		fp = ( ( ( void * ) fp ) + ( ( fp->Header.Length[1] << 8 ) |
-					     fp->Header.Length[0] ) );
 	}
 	DBGC2 ( local, "LOCAL %p base path \"%s\"\n",
 		local, base );
@@ -454,7 +454,7 @@ static int efi_local_open_path ( struct efi_local *local, const char *path ) {
 	}
 
 	/* Resolve path */
-	resolved = resolve_path ( base, path );
+	resolved = resolve_path ( base, filename );
 	if ( ! resolved ) {
 		rc = -ENOMEM;
 		goto err_resolve;

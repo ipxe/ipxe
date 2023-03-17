@@ -228,8 +228,9 @@ enum realtek_legacy_status {
 
 /** C+ Command Register (word) */
 #define RTL_CPCR 0xe0
-#define RTL_CPCR_DAC		0x0010	/**< PCI Dual Address Cycle Enable */
-#define RTL_CPCR_MULRW		0x0008	/**< PCI Multiple Read/Write Enable */
+#define RTL_CPCR_VLAN		0x0040	/**< VLAN tag stripping enable */
+#define RTL_CPCR_DAC		0x0010	/**< PCI Dual Address Cycle enable */
+#define RTL_CPCR_MULRW		0x0008	/**< PCI Multiple Read/Write enable */
 #define RTL_CPCR_CPRX		0x0002	/**< C+ receive enable */
 #define RTL_CPCR_CPTX		0x0001	/**< C+ transmit enable */
 

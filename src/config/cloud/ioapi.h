@@ -3,5 +3,5 @@
  */
 #ifdef PLATFORM_pcbios
 #undef PCIAPI_PCBIOS
-#define PCIAPI_DIRECT
+#define PCIAPI_CLOUD
 #endif

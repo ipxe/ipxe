@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * version.h
  *
  * Xen version, type, and compile information.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2005, Nguyen Anh Quynh <aquynh@gmail.com>
  * Copyright (c) 2005, Keir Fraser <keir@xensource.com>
@@ -32,7 +15,8 @@ FILE_LICENCE ( MIT );
 
 #include "xen.h"
 
-/* NB. All ops return zero on success, except XENVER_{version,pagesize} */
+/* NB. All ops return zero on success, except XENVER_{version,pagesize}
+ * XENVER_{version,pagesize,build_id} */
 
 /* arg == NULL; returns major:minor (16:16). */
 #define XENVER_version      0
@@ -68,7 +52,7 @@ typedef struct xen_platform_parameters xen_platform_parameters_t;
 
 #define XENVER_get_features 6
 struct xen_feature_info {
-    unsigned int submap_idx;    /* IN: which 32-bit submap to return */
+    uint32_t     submap_idx;    /* IN: which 32-bit submap to return */
     uint32_t     submap;        /* OUT: 32-bit submap */
 };
 typedef struct xen_feature_info xen_feature_info_t;
@@ -79,11 +63,27 @@ typedef struct xen_feature_info xen_feature_info_t;
 /* arg == NULL; returns host memory page size. */
 #define XENVER_pagesize 7
 
-/* arg == xen_domain_handle_t. */
+/* arg == xen_domain_handle_t.
+ *
+ * The toolstack fills it out for guest consumption. It is intended to hold
+ * the UUID of the guest.
+ */
 #define XENVER_guest_handle 8
 
 #define XENVER_commandline 9
 typedef char xen_commandline_t[1024];
+
+/*
+ * Return value is the number of bytes written, or XEN_Exx on error.
+ * Calling with empty parameter returns the size of build_id.
+ */
+#define XENVER_build_id 10
+struct xen_build_id {
+        uint32_t        len; /* IN: size of buf[]. */
+        unsigned char   buf[XEN_FLEX_ARRAY_DIM];
+                             /* OUT: Variable length buffer with build_id. */
+};
+typedef struct xen_build_id xen_build_id_t;
 
 #endif /* __XEN_PUBLIC_VERSION_H__ */
 

@@ -59,7 +59,7 @@ static void cachedhcp_init ( void ) {
 	}
 
 	/* Record cached DHCPACK */
-	if ( ( rc = cachedhcp_record ( &cached_dhcpack,
+	if ( ( rc = cachedhcp_record ( &cached_dhcpack, 0,
 				       phys_to_user ( cached_dhcpack_phys ),
 				       sizeof ( BOOTPLAYER_t ) ) ) != 0 ) {
 		DBGC ( colour, "CACHEDHCP could not record DHCPACK: %s\n",

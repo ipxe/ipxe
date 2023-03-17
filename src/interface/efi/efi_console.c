@@ -26,7 +26,9 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/ConsoleControl/ConsoleControl.h>
 #include <ipxe/ansiesc.h>
+#include <ipxe/utf8.h>
 #include <ipxe/console.h>
+#include <ipxe/keymap.h>
 #include <ipxe/init.h>
 #include <config/console.h>
 
@@ -53,8 +55,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define ATTR_BCOL_WHITE		0x70
 
 #define ATTR_DEFAULT		ATTR_FCOL_WHITE
-
-#define CTRL_MASK		0x1f
 
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_EFI ) && CONSOLE_EXPLICIT ( CONSOLE_EFI ) )
@@ -202,6 +202,9 @@ static struct ansiesc_context efi_ansiesc_ctx = {
 	.handlers = efi_ansiesc_handlers,
 };
 
+/** EFI console UTF-8 accumulator */
+static struct utf8_accumulator efi_utf8_acc;
+
 /**
  * Print a character to EFI console
  *
@@ -209,13 +212,25 @@ static struct ansiesc_context efi_ansiesc_ctx = {
  */
 static void efi_putchar ( int character ) {
 	EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *conout = efi_systab->ConOut;
-	wchar_t wstr[] = { character, 0 };
+	wchar_t wstr[2];
 
 	/* Intercept ANSI escape sequences */
 	character = ansiesc_process ( &efi_ansiesc_ctx, character );
 	if ( character < 0 )
 		return;
 
+	/* Accumulate Unicode characters */
+	character = utf8_accumulate ( &efi_utf8_acc, character );
+	if ( character == 0 )
+		return;
+
+	/* Treat unrepresentable (non-UCS2) characters as invalid */
+	if ( character & ~( ( wchar_t ) -1UL ) )
+		character = UTF8_INVALID;
+
+	/* Output character */
+	wstr[0] = character;
+	wstr[1] = L'\0';
 	conout->OutputString ( conout, wstr );
 }
 
@@ -285,6 +300,9 @@ static int efi_getchar ( void ) {
 	EFI_SIMPLE_TEXT_INPUT_PROTOCOL *conin = efi_systab->ConIn;
 	EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *conin_ex = efi_conin_ex;
 	const char *ansi_seq;
+	unsigned int character;
+	unsigned int shift;
+	unsigned int toggle;
 	EFI_KEY_DATA key;
 	EFI_STATUS efirc;
 	int rc;
@@ -317,16 +335,37 @@ static int efi_getchar ( void ) {
 	       key.KeyState.KeyToggleState, key.Key.UnicodeChar,
 	       key.Key.ScanCode );
 
-	/* Translate Ctrl-<key> */
-	if ( ( key.KeyState.KeyShiftState & EFI_SHIFT_STATE_VALID ) &&
-	     ( key.KeyState.KeyShiftState & ( EFI_LEFT_CONTROL_PRESSED |
-					      EFI_RIGHT_CONTROL_PRESSED ) ) ) {
-		key.Key.UnicodeChar &= CTRL_MASK;
-	}
+	/* If key has a Unicode representation, remap and return it.
+	 * There is unfortunately no way to avoid remapping the
+	 * numeric keypad, since EFI destroys the scan code
+	 * information that would allow us to differentiate between
+	 * main keyboard and numeric keypad.
+	 */
+	if ( ( character = key.Key.UnicodeChar ) != 0 ) {
 
-	/* If key has a Unicode representation, return it */
-	if ( key.Key.UnicodeChar )
-		return key.Key.UnicodeChar;
+		/* Apply shift state */
+		shift = key.KeyState.KeyShiftState;
+		if ( shift & EFI_SHIFT_STATE_VALID ) {
+			if ( shift & ( EFI_LEFT_CONTROL_PRESSED |
+				       EFI_RIGHT_CONTROL_PRESSED ) ) {
+				character |= KEYMAP_CTRL;
+			}
+			if ( shift & EFI_RIGHT_ALT_PRESSED ) {
+				character |= KEYMAP_ALTGR;
+			}
+		}
+
+		/* Apply toggle state */
+		toggle = key.KeyState.KeyToggleState;
+		if ( toggle & EFI_TOGGLE_STATE_VALID ) {
+			if ( toggle & EFI_CAPS_LOCK_ACTIVE ) {
+				character |= KEYMAP_CAPSLOCK_REDO;
+			}
+		}
+
+		/* Remap and return key */
+		return key_remap ( character );
+	}
 
 	/* Otherwise, check for a special key that we know about */
 	if ( ( ansi_seq = scancode_to_ansi_seq ( key.Key.ScanCode ) ) ) {

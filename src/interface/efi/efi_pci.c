@@ -362,7 +362,7 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	return ioremap ( bus_addr, len );
 }
 
-PROVIDE_PCIAPI_INLINE ( efi, pci_num_bus );
+PROVIDE_PCIAPI_INLINE ( efi, pci_discover );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_dword );
@@ -523,6 +523,9 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 		       "%s\n", PCI_ARGS ( pci ), len, strerror ( rc ) );
 		goto err_alloc;
 	}
+
+	/* Clear buffer */
+	memset ( addr, 0, ( pages * EFI_PAGE_SIZE ) );
 
 	/* Map buffer */
 	if ( ( rc = efipci_dma_map ( dma, map, virt_to_phys ( addr ),
@@ -782,11 +785,21 @@ int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
  */
 static int efipci_supported ( EFI_HANDLE device ) {
 	struct efi_pci_device efipci;
+	uint8_t hdrtype;
 	int rc;
 
 	/* Get PCI device information */
 	if ( ( rc = efipci_info ( device, &efipci ) ) != 0 )
 		return rc;
+
+	/* Do not attempt to drive bridges */
+	hdrtype = efipci.pci.hdrtype;
+	if ( ( hdrtype & PCI_HEADER_TYPE_MASK ) != PCI_HEADER_TYPE_NORMAL ) {
+		DBGC ( device, "EFIPCI " PCI_FMT " type %02x is not type %02x\n",
+		       PCI_ARGS ( &efipci.pci ), hdrtype,
+		       PCI_HEADER_TYPE_NORMAL );
+		return -ENOTTY;
+	}
 
 	/* Look for a driver */
 	if ( ( rc = pci_find_driver ( &efipci.pci ) ) != 0 ) {

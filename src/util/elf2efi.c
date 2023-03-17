@@ -33,6 +33,8 @@
 #include <fcntl.h>
 #include <elf.h>
 #include <libgen.h>
+
+#define EFI_HOSTONLY
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 
@@ -79,6 +81,9 @@
 #ifndef EM_AARCH64
 #define EM_AARCH64 183
 #endif
+#ifndef EM_LOONGARCH
+#define EM_LOONGARCH 258
+#endif
 #ifndef R_AARCH64_NONE
 #define R_AARCH64_NONE 0
 #endif
@@ -123,6 +128,27 @@
 #endif
 #ifndef R_ARM_V4BX
 #define R_ARM_V4BX 40
+#endif
+#ifndef R_LARCH_NONE
+#define R_LARCH_NONE 0
+#endif
+#ifndef R_LARCH_64
+#define R_LARCH_64 2
+#endif
+#ifndef R_LARCH_B26
+#define R_LARCH_B26 66
+#endif
+#ifndef R_LARCH_PCALA_HI20
+#define R_LARCH_PCALA_HI20 71
+#endif
+#ifndef R_LARCH_PCALA_LO12
+#define R_LARCH_PCALA_LO12 72
+#endif
+#ifndef R_LARCH_GOT_PC_HI20
+#define R_LARCH_GOT_PC_HI20 75
+#endif
+#ifndef R_LARCH_GOT_PC_LO12
+#define R_LARCH_GOT_PC_LO12 76
 #endif
 
 /**
@@ -484,6 +510,9 @@ static void set_machine ( struct elf_file *elf, struct pe_header *pe_header ) {
 	case EM_AARCH64:
 		machine = EFI_IMAGE_MACHINE_AARCH64;
 		break;
+	case EM_LOONGARCH:
+		machine = EFI_IMAGE_MACHINE_LOONGARCH64;
+		break;
 	default:
 		eprintf ( "Unknown ELF architecture %d\n", ehdr->e_machine );
 		exit ( 1 );
@@ -669,6 +698,7 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 		case ELF_MREL ( EM_X86_64, R_X86_64_NONE ) :
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_NONE ) :
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_NULL ) :
+		case ELF_MREL ( EM_LOONGARCH, R_LARCH_NONE ) :
 			/* Ignore dummy relocations used by REQUIRE_SYMBOL() */
 			break;
 		case ELF_MREL ( EM_386, R_386_32 ) :
@@ -678,6 +708,7 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 			break;
 		case ELF_MREL ( EM_X86_64, R_X86_64_64 ) :
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_ABS64 ) :
+		case ELF_MREL ( EM_LOONGARCH, R_LARCH_64 ) :
 			/* Generate an 8-byte PE relocation */
 			generate_pe_reloc ( pe_reltab, offset, 8 );
 			break;
@@ -698,6 +729,11 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_LDST16_ABS_LO12_NC ) :
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_LDST32_ABS_LO12_NC ) :
 		case ELF_MREL ( EM_AARCH64, R_AARCH64_LDST64_ABS_LO12_NC ) :
+		case ELF_MREL ( EM_LOONGARCH, R_LARCH_B26):
+		case ELF_MREL ( EM_LOONGARCH, R_LARCH_PCALA_HI20 ):
+		case ELF_MREL ( EM_LOONGARCH, R_LARCH_PCALA_LO12 ):
+		case ELF_MREL ( EM_LOONGARCH, R_LARCH_GOT_PC_HI20 ):
+		case ELF_MREL ( EM_LOONGARCH, R_LARCH_GOT_PC_LO12 ):
 			/* Skip PC-relative relocations; all relative
 			 * offsets remain unaltered when the object is
 			 * loaded.
@@ -753,15 +789,13 @@ static struct pe_section *
 create_reloc_section ( struct pe_header *pe_header,
 		       struct pe_relocs *pe_reltab ) {
 	struct pe_section *reloc;
-	size_t section_rawsz;
 	size_t section_memsz;
 	size_t section_filesz;
 	EFI_IMAGE_DATA_DIRECTORY *relocdir;
 
 	/* Allocate PE section */
-	section_rawsz = output_pe_reltab ( pe_reltab, NULL );
-	section_filesz = efi_file_align ( section_rawsz );
-	section_memsz = efi_image_align ( section_rawsz );
+	section_memsz = output_pe_reltab ( pe_reltab, NULL );
+	section_filesz = efi_file_align ( section_memsz );
 	reloc = xmalloc ( sizeof ( *reloc ) + section_filesz );
 	memset ( reloc, 0, sizeof ( *reloc ) + section_filesz );
 
@@ -782,11 +816,12 @@ create_reloc_section ( struct pe_header *pe_header,
 	/* Update file header details */
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( reloc->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage += section_memsz;
+	pe_header->nt.OptionalHeader.SizeOfImage +=
+		efi_image_align ( section_memsz );
 	relocdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC]);
 	relocdir->VirtualAddress = reloc->hdr.VirtualAddress;
-	relocdir->Size = section_rawsz;
+	relocdir->Size = section_memsz;
 
 	return reloc;
 }
@@ -824,8 +859,8 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	} *contents;
 
 	/* Allocate PE section */
-	section_memsz = efi_image_align ( sizeof ( *contents ) );
-	section_filesz = efi_file_align ( sizeof ( *contents ) );
+	section_memsz = sizeof ( *contents );
+	section_filesz = efi_file_align ( section_memsz );
 	debug = xmalloc ( sizeof ( *debug ) + section_filesz );
 	memset ( debug, 0, sizeof ( *debug ) + section_filesz );
 	contents = ( void * ) debug->contents;
@@ -857,7 +892,8 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	/* Update file header details */
 	pe_header->nt.FileHeader.NumberOfSections++;
 	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( debug->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage += section_memsz;
+	pe_header->nt.OptionalHeader.SizeOfImage +=
+		efi_image_align ( section_memsz );
 	debugdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]);
 	debugdir->VirtualAddress = debug->hdr.VirtualAddress;

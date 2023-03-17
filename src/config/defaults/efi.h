@@ -19,13 +19,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMBIOS_EFI
 #define SANBOOT_EFI
 #define BOFM_EFI
-#define ENTROPY_EFI
+#define ENTROPY_EFITICK
+#define ENTROPY_EFIRNG
 #define TIME_EFI
 #define REBOOT_EFI
 #define ACPI_EFI
 #define FDT_EFI
 
 #define	NET_PROTO_IPV6		/* IPv6 protocol */
+#define	NET_PROTO_LLDP		/* Link Layer Discovery protocol */
 
 #define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
 
@@ -49,6 +51,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
 #define NAP_EFIX86
+#define ENTROPY_RDRAND
 #define	CPUID_CMD		/* x86 CPU feature detection command */
 #define	UNSAFE_STD		/* Avoid setting direction flag */
 #endif
@@ -56,6 +59,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #if defined ( __arm__ ) || defined ( __aarch64__ )
 #define IOAPI_ARM
 #define NAP_EFIARM
+#endif
+
+#if defined ( __aarch64__ )
+#define	IMAGE_GZIP		/* GZIP image support */
 #endif
 
 #endif /* CONFIG_DEFAULTS_EFI_H */
