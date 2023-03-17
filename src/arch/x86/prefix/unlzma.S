@@ -44,7 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 	.text
-	.arch i586
+	.arch i486
 	.section ".prefix.lib", "ax", @progbits
 
 #ifdef CODE16
@@ -231,7 +231,7 @@ rep_len_dec:	.space	sizeof__lzma_len_dec
 literal:	.rept	( ( 1 << LZMA_LC ) * 0x300 )
 		.word	0
 		.endr
-	.align	4
+	.balign	4
 	.equ	sizeof__lzma_dec, . - lzma_dec
 	.previous
 

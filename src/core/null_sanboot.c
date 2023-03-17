@@ -21,32 +21,32 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <errno.h>
 #include <ipxe/sanboot.h>
 
-static int null_san_hook ( unsigned int drive __unused,
-			   struct uri **uris __unused,
-			   unsigned int count __unused,
-			   unsigned int flags __unused ) {
-	return -EOPNOTSUPP;
+static int null_san_hook(unsigned int drive __unused,
+                         struct uri** uris __unused,
+                         unsigned int count __unused,
+                         unsigned int flags __unused) {
+    return -EOPNOTSUPP;
 }
 
-static void null_san_unhook ( unsigned int drive __unused ) {
-	/* Do nothing */
+static void null_san_unhook(unsigned int drive __unused) {
+    /* Do nothing */
 }
 
-static int null_san_boot ( unsigned int drive __unused,
-			   const char *filename __unused ) {
-	return -EOPNOTSUPP;
+static int null_san_boot(unsigned int drive __unused,
+                         const char* filename __unused) {
+    return -EOPNOTSUPP;
 }
 
-static int null_san_describe ( void ) {
-	return -EOPNOTSUPP;
+static int null_san_describe(void) {
+    return -EOPNOTSUPP;
 }
 
-PROVIDE_SANBOOT ( null, san_hook, null_san_hook );
-PROVIDE_SANBOOT ( null, san_unhook, null_san_unhook );
-PROVIDE_SANBOOT ( null, san_boot, null_san_boot );
-PROVIDE_SANBOOT ( null, san_describe, null_san_describe );
+PROVIDE_SANBOOT(null, san_hook, null_san_hook);
+PROVIDE_SANBOOT(null, san_unhook, null_san_unhook);
+PROVIDE_SANBOOT(null, san_boot, null_san_boot);
+PROVIDE_SANBOOT(null, san_describe, null_san_describe);

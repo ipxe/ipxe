@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_DEVICE_H
-#define _IPXE_DEVICE_H
+    #define _IPXE_DEVICE_H
 
 /**
  * @file
@@ -8,81 +10,81 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <ipxe/list.h>
-#include <ipxe/tables.h>
+    #include <ipxe/list.h>
+    #include <ipxe/tables.h>
 
 struct interface;
 
 /** A hardware device description */
 struct device_description {
-	/** Bus type
-	 *
-	 * This must be a BUS_TYPE_XXX constant.
-	 */
-	unsigned int bus_type;
-	/** Location
-	 *
-	 * The interpretation of this field is bus-type-specific.
-	 */
-	unsigned int location;
-	/** Vendor ID */
-	unsigned int vendor;
-	/** Device ID */
-	unsigned int device;
-	/** Device class */
-	unsigned long class;
-	/** I/O address */
-	unsigned long ioaddr;
-	/** IRQ */
-	unsigned int irq;
+    /** Bus type
+     *
+     * This must be a BUS_TYPE_XXX constant.
+     */
+    unsigned int bus_type;
+    /** Location
+     *
+     * The interpretation of this field is bus-type-specific.
+     */
+    unsigned int location;
+    /** Vendor ID */
+    unsigned int vendor;
+    /** Device ID */
+    unsigned int device;
+    /** Device class */
+    unsigned long class;
+    /** I/O address */
+    unsigned long ioaddr;
+    /** IRQ */
+    unsigned int irq;
 };
 
-/** PCI bus type */
-#define BUS_TYPE_PCI 1
+    /** PCI bus type */
+    #define BUS_TYPE_PCI 1
 
-/** ISAPnP bus type */
-#define BUS_TYPE_ISAPNP 2
+    /** ISAPnP bus type */
+    #define BUS_TYPE_ISAPNP 2
 
-/** EISA bus type */
-#define BUS_TYPE_EISA 3
+    /** EISA bus type */
+    #define BUS_TYPE_EISA 3
 
-/** MCA bus type */
-#define BUS_TYPE_MCA 4
+    /** MCA bus type */
+    #define BUS_TYPE_MCA 4
 
-/** ISA bus type */
-#define BUS_TYPE_ISA 5
+    /** ISA bus type */
+    #define BUS_TYPE_ISA 5
 
-/** TAP bus type */
-#define BUS_TYPE_TAP 6
+    /** TAP bus type */
+    #define BUS_TYPE_TAP 6
 
-/** EFI bus type */
-#define BUS_TYPE_EFI 7
+    /** EFI bus type */
+    #define BUS_TYPE_EFI 7
 
-/** Xen bus type */
-#define BUS_TYPE_XEN 8
+    /** Xen bus type */
+    #define BUS_TYPE_XEN 8
 
-/** Hyper-V bus type */
-#define BUS_TYPE_HV 9
+    /** Hyper-V bus type */
+    #define BUS_TYPE_HV 9
 
-/** USB bus type */
-#define BUS_TYPE_USB 10
+    /** USB bus type */
+    #define BUS_TYPE_USB 10
 
 /** A hardware device */
 struct device {
-	/** Name */
-	char name[40];
-	/** Driver name */
-	const char *driver_name;
-	/** Device description */
-	struct device_description desc;
-	/** Devices on the same bus */
-	struct list_head siblings;
-	/** Devices attached to this device */
-	struct list_head children;
-	/** Bus device */
-	struct device *parent;
+    /** Name */
+    char name[40];
+    /** Driver name */
+    const char* driver_name;
+    /** Device description */
+    struct device_description desc;
+    /** Devices on the same bus */
+    struct list_head siblings;
+    /** Devices attached to this device */
+    struct list_head children;
+    /** Bus device */
+    struct device* parent;
 };
 
 /**
@@ -92,44 +94,44 @@ struct device {
  *
  */
 struct root_device {
-	/** Device chain
-	 *
-	 * A root device has a NULL parent field.
-	 */
-	struct device dev;
-	/** Root device driver */
-	struct root_driver *driver;
-	/** Driver-private data */
-	void *priv;
+    /** Device chain
+     *
+     * A root device has a NULL parent field.
+     */
+    struct device dev;
+    /** Root device driver */
+    struct root_driver* driver;
+    /** Driver-private data */
+    void* priv;
 };
 
 /** A root device driver */
 struct root_driver {
-	/**
-	 * Add root device
-	 *
-	 * @v rootdev	Root device
-	 * @ret rc	Return status code
-	 *
-	 * Called from probe_devices() for all root devices in the build.
-	 */
-	int ( * probe ) ( struct root_device *rootdev );
-	/**
-	 * Remove root device
-	 *
-	 * @v rootdev	Root device
-	 *
-	 * Called from remove_device() for all successfully-probed
-	 * root devices.
-	 */
-	void ( * remove ) ( struct root_device *rootdev );
+    /**
+     * Add root device
+     *
+     * @v rootdev	Root device
+     * @ret rc	Return status code
+     *
+     * Called from probe_devices() for all root devices in the build.
+     */
+    int (*probe)(struct root_device* rootdev);
+    /**
+     * Remove root device
+     *
+     * @v rootdev	Root device
+     *
+     * Called from remove_device() for all successfully-probed
+     * root devices.
+     */
+    void (*remove)(struct root_device* rootdev);
 };
 
-/** Root device table */
-#define ROOT_DEVICES __table ( struct root_device, "root_devices" )
+    /** Root device table */
+    #define ROOT_DEVICES __table(struct root_device, "root_devices")
 
-/** Declare a root device */
-#define __root_device __table_entry ( ROOT_DEVICES, 01 )
+    /** Declare a root device */
+    #define __root_device __table_entry(ROOT_DEVICES, 01)
 
 /**
  * Set root device driver-private data
@@ -137,9 +139,9 @@ struct root_driver {
  * @v rootdev		Root device
  * @v priv		Private data
  */
-static inline void rootdev_set_drvdata ( struct root_device *rootdev,
-					 void *priv ){
-	rootdev->priv = priv;
+static inline void rootdev_set_drvdata(struct root_device* rootdev,
+                                       void* priv) {
+    rootdev->priv = priv;
 }
 
 /**
@@ -148,8 +150,8 @@ static inline void rootdev_set_drvdata ( struct root_device *rootdev,
  * @v rootdev		Root device
  * @ret priv		Private data
  */
-static inline void * rootdev_get_drvdata ( struct root_device *rootdev ) {
-	return rootdev->priv;
+static inline void* rootdev_get_drvdata(struct root_device* rootdev) {
+    return rootdev->priv;
 }
 
 extern int device_keep_count;
@@ -158,20 +160,20 @@ extern int device_keep_count;
  * Prevent devices from being removed on shutdown
  *
  */
-static inline void devices_get ( void ) {
-	device_keep_count++;
+static inline void devices_get(void) {
+    device_keep_count++;
 }
 
 /**
  * Allow devices to be removed on shutdown
  *
  */
-static inline void devices_put ( void ) {
-	device_keep_count--;
+static inline void devices_put(void) {
+    device_keep_count--;
 }
 
-extern struct device * identify_device ( struct interface *intf );
-#define identify_device_TYPE( object_type ) \
-	typeof ( struct device * ( object_type ) )
+extern struct device* identify_device(struct interface* intf);
+    #define identify_device_TYPE(object_type) \
+        typeof(struct device * (object_type))
 
 #endif /* _IPXE_DEVICE_H */

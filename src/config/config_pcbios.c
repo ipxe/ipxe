@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <config/console.h>
 
@@ -37,14 +37,14 @@ PROVIDE_REQUIRING_SYMBOL();
  */
 
 #ifdef CONSOLE_PCBIOS
-REQUIRE_OBJECT ( bios_console );
+REQUIRE_OBJECT(bios_console);
 #endif
 #ifdef CONSOLE_VESAFB
-REQUIRE_OBJECT ( vesafb );
+REQUIRE_OBJECT(vesafb);
 #endif
 #ifdef CONSOLE_FRAMEBUFFER
-REQUIRE_OBJECT ( vesafb );
+REQUIRE_OBJECT(vesafb);
 #endif
 #ifdef CONSOLE_INT13
-REQUIRE_OBJECT ( int13con );
+REQUIRE_OBJECT(int13con);
 #endif

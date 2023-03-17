@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <ipxe/bitbash.h>
 
@@ -37,13 +37,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v basher		Bit-bashing interface
  * @v bit_id		Bit number
  * @v data		Value to write
- * 
+ *
  * If @c data is 0, a logic 0 will be written.  If @c data is
  * non-zero, a logic 1 will be written.
  */
-void write_bit ( struct bit_basher *basher, unsigned int bit_id,
-		 unsigned long data ) {
-	basher->op->write ( basher, bit_id, ( data ? -1UL : 0 ) );
+void write_bit(struct bit_basher* basher, unsigned int bit_id,
+               unsigned long data) {
+    basher->op->write(basher, bit_id, (data ? -1UL : 0));
 }
 
 /**
@@ -57,6 +57,6 @@ void write_bit ( struct bit_basher *basher, unsigned int bit_id,
  * caller can simply binary-AND the returned value with whatever mask
  * it needs to apply.
  */
-int read_bit ( struct bit_basher *basher, unsigned int bit_id ) {
-	return ( basher->op->read ( basher, bit_id ) ? -1UL : 0 );
+int read_bit(struct bit_basher* basher, unsigned int bit_id) {
+    return (basher->op->read(basher, bit_id) ? -1UL : 0);
 }

@@ -1,35 +1,34 @@
+#pragma once
+
 /** @file
   This file provides a definition of the EFI IPv4 Configuration
   Protocol.
 
-Copyright (c) 2006 - 2014, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials are licensed and made available under
-the terms and conditions of the BSD License that accompanies this distribution.
-The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
   This Protocol is introduced in UEFI Specification 2.0.
 
 **/
+
 #ifndef __EFI_IP4CONFIG_PROTOCOL_H__
-#define __EFI_IP4CONFIG_PROTOCOL_H__
+    #define __EFI_IP4CONFIG_PROTOCOL_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-#include <ipxe/efi/Protocol/Ip4.h>
+    #include <ipxe/efi/Protocol/Ip4.h>
 
-#define EFI_IP4_CONFIG_PROTOCOL_GUID \
-  { \
-    0x3b95aa31, 0x3793, 0x434b, {0x86, 0x67, 0xc8, 0x07, 0x08, 0x92, 0xe0, 0x5e } \
-  }
+    #define EFI_IP4_CONFIG_PROTOCOL_GUID                       \
+        {                                                      \
+            0x3b95aa31, 0x3793, 0x434b, {                      \
+                0x86, 0x67, 0xc8, 0x07, 0x08, 0x92, 0xe0, 0x5e \
+            }                                                  \
+        }
 
 typedef struct _EFI_IP4_CONFIG_PROTOCOL EFI_IP4_CONFIG_PROTOCOL;
 
-#define IP4_CONFIG_VARIABLE_ATTRIBUTES \
+    #define IP4_CONFIG_VARIABLE_ATTRIBUTES \
         (EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS)
 
 ///
@@ -41,25 +40,24 @@ typedef struct _EFI_IP4_CONFIG_PROTOCOL EFI_IP4_CONFIG_PROTOCOL;
 /// last entry in the table being the default route.
 ///
 typedef struct {
-  ///
-  /// Default station IP address, stored in network byte order.
-  ///
-  EFI_IPv4_ADDRESS             StationAddress;
-  ///
-  /// Default subnet mask, stored in network byte order.
-  ///
-  EFI_IPv4_ADDRESS             SubnetMask;
-  ///
-  /// Number of entries in the following RouteTable. May be zero.
-  ///
-  UINT32                       RouteTableSize;
-  ///
-  /// Default routing table data (stored in network byte order).
-  /// Ignored if RouteTableSize is zero.
-  ///
-  EFI_IP4_ROUTE_TABLE          *RouteTable;
+    ///
+    /// Default station IP address, stored in network byte order.
+    ///
+    EFI_IPv4_ADDRESS StationAddress;
+    ///
+    /// Default subnet mask, stored in network byte order.
+    ///
+    EFI_IPv4_ADDRESS SubnetMask;
+    ///
+    /// Number of entries in the following RouteTable. May be zero.
+    ///
+    UINT32 RouteTableSize;
+    ///
+    /// Default routing table data (stored in network byte order).
+    /// Ignored if RouteTableSize is zero.
+    ///
+    EFI_IP4_ROUTE_TABLE* RouteTable;
 } EFI_IP4_IPCONFIG_DATA;
-
 
 /**
   Starts running the configuration policy for the EFI IPv4 Protocol driver.
@@ -107,13 +105,10 @@ typedef struct {
                                  driver configuration.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_IP4_CONFIG_START)(
-  IN EFI_IP4_CONFIG_PROTOCOL   *This,
-  IN EFI_EVENT                 DoneEvent,
-  IN EFI_EVENT                 ReconfigEvent
-  );
+typedef EFI_STATUS(EFIAPI* EFI_IP4_CONFIG_START)(
+    IN EFI_IP4_CONFIG_PROTOCOL* This,
+    IN EFI_EVENT DoneEvent,
+    IN EFI_EVENT ReconfigEvent);
 
 /**
   Stops running the configuration policy for the EFI IPv4 Protocol driver.
@@ -130,11 +125,8 @@ EFI_STATUS
                                  driver was not started.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_IP4_CONFIG_STOP)(
-  IN EFI_IP4_CONFIG_PROTOCOL   *This
-  );
+typedef EFI_STATUS(EFIAPI* EFI_IP4_CONFIG_STOP)(
+    IN EFI_IP4_CONFIG_PROTOCOL* This);
 
 /**
   Returns the default configuration data (if any) for the EFI IPv4 Protocol driver.
@@ -161,22 +153,19 @@ EFI_STATUS
                                  data buffer or IpConfigData is NULL.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_IP4_CONFIG_GET_DATA)(
-  IN EFI_IP4_CONFIG_PROTOCOL   *This,
-  IN OUT UINTN                 *IpConfigDataSize,
-  OUT EFI_IP4_IPCONFIG_DATA    *IpConfigData    OPTIONAL
-  );
+typedef EFI_STATUS(EFIAPI* EFI_IP4_CONFIG_GET_DATA)(
+    IN EFI_IP4_CONFIG_PROTOCOL* This,
+    IN OUT UINTN* IpConfigDataSize,
+    OUT EFI_IP4_IPCONFIG_DATA* IpConfigData OPTIONAL);
 
 ///
 /// The EFI_IP4_CONFIG_PROTOCOL driver performs platform-dependent and policy-dependent
 /// configurations for the EFI IPv4 Protocol driver.
 ///
 struct _EFI_IP4_CONFIG_PROTOCOL {
-  EFI_IP4_CONFIG_START         Start;
-  EFI_IP4_CONFIG_STOP          Stop;
-  EFI_IP4_CONFIG_GET_DATA      GetData;
+    EFI_IP4_CONFIG_START Start;
+    EFI_IP4_CONFIG_STOP Stop;
+    EFI_IP4_CONFIG_GET_DATA GetData;
 };
 
 extern EFI_GUID gEfiIp4ConfigProtocolGuid;

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -45,20 +45,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v uart		UART
  * @v data		Data
  */
-void uart_transmit ( struct uart *uart, uint8_t data ) {
-	unsigned int i;
-	uint8_t lsr;
+void uart_transmit(struct uart* uart, uint8_t data) {
+    unsigned int i;
+    uint8_t lsr;
 
-	/* Wait for transmitter holding register to become empty */
-	for ( i = 0 ; i < UART_THRE_TIMEOUT_MS ; i++ ) {
-		lsr = uart_read ( uart, UART_LSR );
-		if ( lsr & UART_LSR_THRE )
-			break;
-		mdelay ( 1 );
-	}
+    /* Wait for transmitter holding register to become empty */
+    for (i = 0; i < UART_THRE_TIMEOUT_MS; i++) {
+        lsr = uart_read(uart, UART_LSR);
+        if (lsr & UART_LSR_THRE)
+            break;
+        mdelay(1);
+    }
 
-	/* Transmit data (even if we timed out) */
-	uart_write ( uart, UART_THR, data );
+    /* Transmit data (even if we timed out) */
+    uart_write(uart, UART_THR, data);
 }
 
 /**
@@ -66,17 +66,17 @@ void uart_transmit ( struct uart *uart, uint8_t data ) {
  *
  * @v uart		UART
  */
-void uart_flush ( struct uart *uart ) {
-	unsigned int i;
-	uint8_t lsr;
+void uart_flush(struct uart* uart) {
+    unsigned int i;
+    uint8_t lsr;
 
-	/* Wait for transmitter and receiver to become empty */
-	for ( i = 0 ; i < UART_TEMT_TIMEOUT_MS ; i++ ) {
-		uart_read ( uart, UART_RBR );
-		lsr = uart_read ( uart, UART_LSR );
-		if ( ( lsr & UART_LSR_TEMT ) && ! ( lsr & UART_LSR_DR ) )
-			break;
-	}
+    /* Wait for transmitter and receiver to become empty */
+    for (i = 0; i < UART_TEMT_TIMEOUT_MS; i++) {
+        uart_read(uart, UART_RBR);
+        lsr = uart_read(uart, UART_LSR);
+        if ((lsr & UART_LSR_TEMT) && !(lsr & UART_LSR_DR))
+            break;
+    }
 }
 
 /**
@@ -85,21 +85,20 @@ void uart_flush ( struct uart *uart ) {
  * @v uart		UART
  * @ret rc		Return status code
  */
-int uart_exists ( struct uart *uart ) {
+int uart_exists(struct uart* uart) {
+    /* Fail if no UART port is defined */
+    if (!uart->base)
+        return -ENODEV;
 
-	/* Fail if no UART port is defined */
-	if ( ! uart->base )
-		return -ENODEV;
+    /* Fail if UART scratch register seems not to be present */
+    uart_write(uart, UART_SCR, 0x18);
+    if (uart_read(uart, UART_SCR) != 0x18)
+        return -ENODEV;
+    uart_write(uart, UART_SCR, 0xae);
+    if (uart_read(uart, UART_SCR) != 0xae)
+        return -ENODEV;
 
-	/* Fail if UART scratch register seems not to be present */
-	uart_write ( uart, UART_SCR, 0x18 );
-	if ( uart_read ( uart, UART_SCR ) != 0x18 )
-		return -ENODEV;
-	uart_write ( uart, UART_SCR, 0xae );
-	if ( uart_read ( uart, UART_SCR ) != 0xae )
-		return -ENODEV;
-
-	return 0;
+    return 0;
 }
 
 /**
@@ -110,44 +109,44 @@ int uart_exists ( struct uart *uart ) {
  * @v lcr		Line control register value, or zero to leave unchanged
  * @ret rc		Return status code
  */
-int uart_init ( struct uart *uart, unsigned int baud, uint8_t lcr ) {
-	uint8_t dlm;
-	uint8_t dll;
-	int rc;
+int uart_init(struct uart* uart, unsigned int baud, uint8_t lcr) {
+    uint8_t dlm;
+    uint8_t dll;
+    int rc;
 
-	/* Check for existence of UART */
-	if ( ( rc = uart_exists ( uart ) ) != 0 )
-		return rc;
+    /* Check for existence of UART */
+    if ((rc = uart_exists(uart)) != 0)
+        return rc;
 
-	/* Configure divisor and line control register, if applicable */
-	if ( ! lcr )
-		lcr = uart_read ( uart, UART_LCR );
-	uart->lcr = lcr;
-	uart_write ( uart, UART_LCR, ( lcr | UART_LCR_DLAB ) );
-	if ( baud ) {
-		uart->divisor = ( UART_MAX_BAUD / baud );
-		dlm = ( ( uart->divisor >> 8 ) & 0xff );
-		dll = ( ( uart->divisor >> 0 ) & 0xff );
-		uart_write ( uart, UART_DLM, dlm );
-		uart_write ( uart, UART_DLL, dll );
-	} else {
-		dlm = uart_read ( uart, UART_DLM );
-		dll = uart_read ( uart, UART_DLL );
-		uart->divisor = ( ( dlm << 8 ) | dll );
-	}
-	uart_write ( uart, UART_LCR, ( lcr & ~UART_LCR_DLAB ) );
+    /* Configure divisor and line control register, if applicable */
+    if (!lcr)
+        lcr = uart_read(uart, UART_LCR);
+    uart->lcr = lcr;
+    uart_write(uart, UART_LCR, (lcr | UART_LCR_DLAB));
+    if (baud) {
+        uart->divisor = (UART_MAX_BAUD / baud);
+        dlm = ((uart->divisor >> 8) & 0xff);
+        dll = ((uart->divisor >> 0) & 0xff);
+        uart_write(uart, UART_DLM, dlm);
+        uart_write(uart, UART_DLL, dll);
+    } else {
+        dlm = uart_read(uart, UART_DLM);
+        dll = uart_read(uart, UART_DLL);
+        uart->divisor = ((dlm << 8) | dll);
+    }
+    uart_write(uart, UART_LCR, (lcr & ~UART_LCR_DLAB));
 
-	/* Disable interrupts */
-	uart_write ( uart, UART_IER, 0 );
+    /* Disable interrupts */
+    uart_write(uart, UART_IER, 0);
 
-	/* Enable FIFOs */
-	uart_write ( uart, UART_FCR, UART_FCR_FE );
+    /* Enable FIFOs */
+    uart_write(uart, UART_FCR, UART_FCR_FE);
 
-	/* Assert DTR and RTS */
-	uart_write ( uart, UART_MCR, ( UART_MCR_DTR | UART_MCR_RTS ) );
+    /* Assert DTR and RTS */
+    uart_write(uart, UART_MCR, (UART_MCR_DTR | UART_MCR_RTS));
 
-	/* Flush any stale data */
-	uart_flush ( uart );
+    /* Flush any stale data */
+    uart_flush(uart);
 
-	return 0;
+    return 0;
 }

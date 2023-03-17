@@ -72,6 +72,9 @@ efi_boot_name() {
 	"c201" )
 	    echo "BOOTARM.EFI"
 	    ;;
+	"6462" )
+	    echo "BOOTLOONGARCH64.EFI"
+	    ;;
 	"64aa" )
 	    echo "BOOTAA64.EFI"
 	    ;;
@@ -230,7 +233,7 @@ done
 # since isohybrid will refuse to work without them.
 #
 if [ -n "${ISOIMG}" ] ; then
-    ISOARGS="-J -R"
+    ISOARGS="-J -R -l"
     copy_syslinux_file "isolinux.bin" "${ISODIR}"
     copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
     ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
@@ -240,12 +243,22 @@ if [ -n "${ISOIMG}" ] ; then
     else
 	FATIMG=
     fi
+    if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
+	DATE_FMT="+%Y%m%d%H%M%S00"
+	BUILD_DATE=$(date -u -d "@${SOURCE_DATE_EPOCH}" "${DATE_FMT}" \
+			  2>/dev/null || \
+		     date -u -r "${SOURCE_DATE_EPOCH}" "${DATE_FMT}" \
+			  2>/dev/null || \
+		     date -u "${DATE_FMT}")
+	ISOARGS="${ISOARGS} --set_all_file_dates ${BUILD_DATE}"
+	ISOARGS="${ISOARGS} --modification-date=${BUILD_DATE}"
+    fi
 fi
 
 # Create FAT filesystem image, if applicable
 #
 if [ -n "${FATIMG}" ] ; then
-    FATSIZE=$(du -s -k ${FATDIR} | cut -f1)
+    FATSIZE=$(du -s -k "${FATDIR}" | cut -f1)
     FATSIZE=$(( FATSIZE + PAD + 256 ))
     touch "${FATIMG}"
     if [ "${FATSIZE}" -le "1440" ] ; then
@@ -268,13 +281,27 @@ fi
 #
 if [ -n "${ISOIMG}" ] ; then
     MKISOFS=
+    MKISOFS_MISSING=
+    MKISOFS_NOTSUP=
     for CMD in genisoimage mkisofs xorrisofs ; do
-	if "${CMD}" ${ISOARGS} --version "${ISODIR}" >/dev/null 2>&1 ; then
-	    MKISOFS="${CMD}"
-	    break
+	if ! "${CMD}" --version >/dev/null 2>&1 ; then
+	    MKISOFS_MISSING="${MKISOFS_MISSING} ${CMD}"
+	    continue
 	fi
+	if ! "${CMD}" ${ISOARGS} --version "${ISODIR}" >/dev/null 2>&1 ; then
+	    MKISOFS_NOTSUP="${MKISOFS_NOTSUP} ${CMD}"
+	    continue
+	fi
+	MKISOFS="${CMD}"
+	break
     done
     if [ -z "${MKISOFS}" ] ; then
+	if [ -n "${MKISOFS_MISSING}" ] ; then
+	    echo "${0}:${MKISOFS_MISSING}: not installed" >&2
+	fi
+	if [ -n "${MKISOFS_NOTSUP}" ] ; then
+	    echo "${0}:${MKISOFS_NOTSUP}: cannot handle ${ISOARGS}" >&2
+	fi
 	echo "${0}: cannot find a suitable mkisofs or equivalent" >&2
 	exit 1
     fi
@@ -283,7 +310,14 @@ if [ -n "${ISOIMG}" ] ; then
 	    -publisher "ipxe.org" -sysid "iPXE" -o "${ISOIMG}" \
 	    ${ISOARGS} "${ISODIR}"
     if isohybrid --version >/dev/null 2>&1 ; then
-	isohybrid "${ISOIMG}"
+	ISOHYBRIDARGS=
+	if [ -n "${EFI}" ] ; then
+	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --uefi"
+	fi
+	if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
+	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --id ${SOURCE_DATE_EPOCH}"
+	fi
+	isohybrid ${ISOHYBRIDARGS} "${ISOIMG}"
     fi
 fi
 

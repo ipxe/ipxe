@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 /** @file
  *
@@ -29,121 +29,121 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <asm/unistd.h>
 #include <string.h>
 
-int linux_open ( const char *pathname, int flags ) {
-	return linux_syscall ( __NR_open, pathname, flags );
+int linux_open(const char* pathname, int flags) {
+    return linux_syscall(__NR_open, pathname, flags);
 }
 
-int linux_close ( int fd ) {
-	return linux_syscall ( __NR_close, fd );
+int linux_close(int fd) {
+    return linux_syscall(__NR_close, fd);
 }
 
-off_t linux_lseek ( int fd, off_t offset, int whence ) {
-	return linux_syscall ( __NR_lseek, fd, offset, whence );
+off_t linux_lseek(int fd, off_t offset, int whence) {
+    return linux_syscall(__NR_lseek, fd, offset, whence);
 }
 
-__kernel_ssize_t linux_read ( int fd, void *buf, __kernel_size_t count ) {
-	return linux_syscall ( __NR_read, fd, buf, count );
+__kernel_ssize_t linux_read(int fd, void* buf, __kernel_size_t count) {
+    return linux_syscall(__NR_read, fd, buf, count);
 }
 
-__kernel_ssize_t linux_write ( int fd, const void *buf,
-			       __kernel_size_t count ) {
-	return linux_syscall  (  __NR_write, fd, buf, count );
+__kernel_ssize_t linux_write(int fd, const void* buf,
+                             __kernel_size_t count) {
+    return linux_syscall(__NR_write, fd, buf, count);
 }
 
-int linux_fcntl ( int fd, int cmd, ... ) {
-	long arg;
-	va_list list;
+int linux_fcntl(int fd, int cmd, ...) {
+    long arg;
+    va_list list;
 
-	va_start ( list, cmd );
-	arg = va_arg ( list, long );
-	va_end ( list );
+    va_start(list, cmd);
+    arg = va_arg(list, long);
+    va_end(list);
 
-	return linux_syscall ( __NR_fcntl, fd, cmd, arg );
+    return linux_syscall(__NR_fcntl, fd, cmd, arg);
 }
 
-int linux_ioctl ( int fd, int request, ... ) {
-	void *arg;
-	va_list list;
+int linux_ioctl(int fd, int request, ...) {
+    void* arg;
+    va_list list;
 
-	va_start ( list, request );
-	arg = va_arg ( list, void * );
-	va_end ( list );
+    va_start(list, request);
+    arg = va_arg(list, void*);
+    va_end(list);
 
-	return linux_syscall ( __NR_ioctl, fd, request, arg );
+    return linux_syscall(__NR_ioctl, fd, request, arg);
 }
 
-int linux_poll ( struct pollfd *fds, nfds_t nfds, int timeout ) {
-	return linux_syscall ( __NR_poll, fds, nfds, timeout );
+int linux_poll(struct pollfd* fds, nfds_t nfds, int timeout) {
+    return linux_syscall(__NR_poll, fds, nfds, timeout);
 }
 
-int linux_nanosleep ( const struct timespec *req, struct timespec *rem ) {
-	return linux_syscall ( __NR_nanosleep, req, rem );
+int linux_nanosleep(const struct timespec* req, struct timespec* rem) {
+    return linux_syscall(__NR_nanosleep, req, rem);
 }
 
-int linux_usleep ( useconds_t usec ) {
-	struct timespec ts = {
-		.tv_sec = ( ( long ) ( usec / 1000000 ) ),
-		.tv_nsec = ( ( long ) ( usec % 1000000 ) * 1000UL ),
-	};
+int linux_usleep(useconds_t usec) {
+    struct timespec ts = {
+        .tv_sec = ((long)(usec / 1000000)),
+        .tv_nsec = ((long)(usec % 1000000) * 1000UL),
+    };
 
-	return linux_nanosleep ( &ts, NULL );
+    return linux_nanosleep(&ts, NULL);
 }
 
-int linux_gettimeofday ( struct timeval *tv, struct timezone *tz ) {
-	return linux_syscall ( __NR_gettimeofday, tv, tz );
+int linux_gettimeofday(struct timeval* tv, struct timezone* tz) {
+    return linux_syscall(__NR_gettimeofday, tv, tz);
 }
 
-void * linux_mmap ( void *addr, __kernel_size_t length, int prot, int flags,
-		    int fd, __kernel_off_t offset ) {
-	return ( void * ) linux_syscall ( __SYSCALL_mmap, addr, length, prot,
-					  flags, fd, offset );
+void* linux_mmap(void* addr, __kernel_size_t length, int prot, int flags,
+                 int fd, __kernel_off_t offset) {
+    return (void*)linux_syscall(__SYSCALL_mmap, addr, length, prot,
+                                flags, fd, offset);
 }
 
-void * linux_mremap ( void *old_address, __kernel_size_t old_size,
-		      __kernel_size_t new_size, int flags ) {
-	return ( void * ) linux_syscall ( __NR_mremap, old_address, old_size,
-					  new_size, flags );
+void* linux_mremap(void* old_address, __kernel_size_t old_size,
+                   __kernel_size_t new_size, int flags) {
+    return (void*)linux_syscall(__NR_mremap, old_address, old_size,
+                                new_size, flags);
 }
 
-int linux_munmap ( void *addr, __kernel_size_t length ) {
-	return linux_syscall ( __NR_munmap, addr, length );
+int linux_munmap(void* addr, __kernel_size_t length) {
+    return linux_syscall(__NR_munmap, addr, length);
 }
 
-int linux_socket ( int domain, int type_, int protocol ) {
+int linux_socket(int domain, int type_, int protocol) {
 #ifdef __NR_socket
-	return linux_syscall ( __NR_socket, domain, type_, protocol );
+    return linux_syscall(__NR_socket, domain, type_, protocol);
 #else
-#ifndef SOCKOP_socket
-# define SOCKOP_socket 1
-#endif
-	unsigned long sc_args[] = { domain, type_, protocol };
-	return linux_syscall ( __NR_socketcall, SOCKOP_socket, sc_args );
+    #ifndef SOCKOP_socket
+        #define SOCKOP_socket 1
+    #endif
+    unsigned long sc_args[] = {domain, type_, protocol};
+    return linux_syscall(__NR_socketcall, SOCKOP_socket, sc_args);
 #endif
 }
 
-int linux_bind ( int fd, const struct sockaddr *addr, socklen_t addrlen ) {
+int linux_bind(int fd, const struct sockaddr* addr, socklen_t addrlen) {
 #ifdef __NR_bind
-	return linux_syscall ( __NR_bind, fd, addr, addrlen );
+    return linux_syscall(__NR_bind, fd, addr, addrlen);
 #else
-#ifndef SOCKOP_bind
-# define SOCKOP_bind 2
-#endif
-	unsigned long sc_args[] = { fd, (unsigned long)addr, addrlen };
-	return linux_syscall ( __NR_socketcall, SOCKOP_bind, sc_args );
+    #ifndef SOCKOP_bind
+        #define SOCKOP_bind 2
+    #endif
+    unsigned long sc_args[] = {fd, (unsigned long)addr, addrlen};
+    return linux_syscall(__NR_socketcall, SOCKOP_bind, sc_args);
 #endif
 }
 
-ssize_t linux_sendto ( int fd, const void *buf, size_t len, int flags,
-		       const struct sockaddr *daddr, socklen_t addrlen ) {
+ssize_t linux_sendto(int fd, const void* buf, size_t len, int flags,
+                     const struct sockaddr* daddr, socklen_t addrlen) {
 #ifdef __NR_sendto
-	return linux_syscall ( __NR_sendto, fd, buf, len, flags,
-			       daddr, addrlen );
+    return linux_syscall(__NR_sendto, fd, buf, len, flags,
+                         daddr, addrlen);
 #else
-#ifndef SOCKOP_sendto
-# define SOCKOP_sendto 11
-#endif
-	unsigned long sc_args[] = { fd, (unsigned long)buf, len,
-				    flags, (unsigned long)daddr, addrlen };
-	return linux_syscall ( __NR_socketcall, SOCKOP_sendto, sc_args );
+    #ifndef SOCKOP_sendto
+        #define SOCKOP_sendto 11
+    #endif
+    unsigned long sc_args[] = {fd, (unsigned long)buf, len,
+                               flags, (unsigned long)daddr, addrlen};
+    return linux_syscall(__NR_socketcall, SOCKOP_sendto, sc_args);
 #endif
 }

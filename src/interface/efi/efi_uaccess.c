@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <ipxe/uaccess.h>
 #include <ipxe/efi/efi.h>
@@ -32,13 +32,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-PROVIDE_UACCESS_INLINE ( efi, phys_to_user );
-PROVIDE_UACCESS_INLINE ( efi, user_to_phys );
-PROVIDE_UACCESS_INLINE ( efi, virt_to_user );
-PROVIDE_UACCESS_INLINE ( efi, user_to_virt );
-PROVIDE_UACCESS_INLINE ( efi, userptr_add );
-PROVIDE_UACCESS_INLINE ( efi, memcpy_user );
-PROVIDE_UACCESS_INLINE ( efi, memmove_user );
-PROVIDE_UACCESS_INLINE ( efi, memset_user );
-PROVIDE_UACCESS_INLINE ( efi, strlen_user );
-PROVIDE_UACCESS_INLINE ( efi, memchr_user );
+PROVIDE_UACCESS_INLINE(efi, phys_to_user);
+PROVIDE_UACCESS_INLINE(efi, user_to_phys);
+PROVIDE_UACCESS_INLINE(efi, virt_to_user);
+PROVIDE_UACCESS_INLINE(efi, user_to_virt);
+PROVIDE_UACCESS_INLINE(efi, userptr_add);
+PROVIDE_UACCESS_INLINE(efi, memcpy_user);
+PROVIDE_UACCESS_INLINE(efi, memmove_user);
+PROVIDE_UACCESS_INLINE(efi, memset_user);
+PROVIDE_UACCESS_INLINE(efi, strlen_user);
+PROVIDE_UACCESS_INLINE(efi, memchr_user);

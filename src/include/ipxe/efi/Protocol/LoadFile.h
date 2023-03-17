@@ -1,3 +1,5 @@
+#pragma once
+
 /** @file
   Load File protocol as defined in the UEFI 2.0 specification.
 
@@ -7,38 +9,34 @@
 
   UEFI 2.0 can boot from any device that produces a LoadFile protocol.
 
-Copyright (c) 2006 - 2016, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials are licensed and made available under
-the terms and conditions of the BSD License that accompanies this distribution.
-The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __EFI_LOAD_FILE_PROTOCOL_H__
-#define __EFI_LOAD_FILE_PROTOCOL_H__
+    #define __EFI_LOAD_FILE_PROTOCOL_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-#define EFI_LOAD_FILE_PROTOCOL_GUID \
-  { \
-    0x56EC3091, 0x954C, 0x11d2, {0x8E, 0x3F, 0x00, 0xA0, 0xC9, 0x69, 0x72, 0x3B } \
-  }
+    #define EFI_LOAD_FILE_PROTOCOL_GUID                        \
+        {                                                      \
+            0x56EC3091, 0x954C, 0x11d2, {                      \
+                0x8E, 0x3F, 0x00, 0xA0, 0xC9, 0x69, 0x72, 0x3B \
+            }                                                  \
+        }
 
-///
-/// Protocol Guid defined by EFI1.1.
-///
-#define LOAD_FILE_PROTOCOL EFI_LOAD_FILE_PROTOCOL_GUID
+    ///
+    /// Protocol Guid defined by EFI1.1.
+    ///
+    #define LOAD_FILE_PROTOCOL EFI_LOAD_FILE_PROTOCOL_GUID
 
 typedef struct _EFI_LOAD_FILE_PROTOCOL EFI_LOAD_FILE_PROTOCOL;
 
 ///
 /// Backward-compatible with EFI1.1
 ///
-typedef EFI_LOAD_FILE_PROTOCOL  EFI_LOAD_FILE_INTERFACE;
+typedef EFI_LOAD_FILE_PROTOCOL EFI_LOAD_FILE_INTERFACE;
 
 /**
   Causes the driver to load a specified file.
@@ -68,21 +66,18 @@ typedef EFI_LOAD_FILE_PROTOCOL  EFI_LOAD_FILE_INTERFACE;
   @retval EFI_ABORTED           The file load process was manually cancelled.
   @retval EFI_WARN_FILE_SYSTEM  The resulting Buffer contains UEFI-compliant file system.
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_LOAD_FILE)(
-  IN EFI_LOAD_FILE_PROTOCOL           *This,
-  IN EFI_DEVICE_PATH_PROTOCOL         *FilePath,
-  IN BOOLEAN                          BootPolicy,
-  IN OUT UINTN                        *BufferSize,
-  IN VOID                             *Buffer OPTIONAL
-  );
+typedef EFI_STATUS(EFIAPI* EFI_LOAD_FILE)(
+    IN EFI_LOAD_FILE_PROTOCOL* This,
+    IN EFI_DEVICE_PATH_PROTOCOL* FilePath,
+    IN BOOLEAN BootPolicy,
+    IN OUT UINTN* BufferSize,
+    IN VOID* Buffer OPTIONAL);
 
 ///
 /// The EFI_LOAD_FILE_PROTOCOL is a simple protocol used to obtain files from arbitrary devices.
 ///
 struct _EFI_LOAD_FILE_PROTOCOL {
-  EFI_LOAD_FILE LoadFile;
+    EFI_LOAD_FILE LoadFile;
 };
 
 extern EFI_GUID gEfiLoadFileProtocolGuid;

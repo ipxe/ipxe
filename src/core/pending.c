@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <errno.h>
 #include <ipxe/process.h>
@@ -42,12 +42,11 @@ int pending_total;
  *
  * @v pending		Pending operation
  */
-void pending_get ( struct pending_operation *pending ) {
-
-	pending->count++;
-	pending_total++;
-	DBGC ( pending, "PENDING %p incremented to %d (total %d)\n",
-	       pending, pending->count, pending_total );
+void pending_get(struct pending_operation* pending) {
+    pending->count++;
+    pending_total++;
+    DBGC(pending, "PENDING %p incremented to %d (total %d)\n",
+         pending, pending->count, pending_total);
 }
 
 /**
@@ -55,12 +54,11 @@ void pending_get ( struct pending_operation *pending ) {
  *
  * @v pending		Pending operation
  */
-void pending_put ( struct pending_operation *pending ) {
-
-	if ( pending->count ) {
-		pending_total--;
-		pending->count--;
-		DBGC ( pending, "PENDING %p decremented to %d (total %d)\n",
-		       pending, pending->count, pending_total );
-	}
+void pending_put(struct pending_operation* pending) {
+    if (pending->count) {
+        pending_total--;
+        pending->count--;
+        DBGC(pending, "PENDING %p decremented to %d (total %d)\n",
+             pending, pending->count, pending_total);
+    }
 }

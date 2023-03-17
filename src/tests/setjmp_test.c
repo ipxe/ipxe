@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -39,18 +39,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** A setjmp()/longjmp() test */
 struct setjmp_test {
-	/** Jump buffer */
-	jmp_buf env;
-	/** Expected value */
-	int expected;
-	/** Test code file */
-	const char *file;
-	/** Test code line */
-	unsigned int line;
+    /** Jump buffer */
+    jmp_buf env;
+    /** Expected value */
+    int expected;
+    /** Test code file */
+    const char* file;
+    /** Test code line */
+    unsigned int line;
 };
 
 /** Expected jump */
-static struct setjmp_test *jumped;
+static struct setjmp_test* jumped;
 
 /**
  * Report a setjmp() test result
@@ -61,19 +61,20 @@ static struct setjmp_test *jumped;
  * then the context saved by setjmp() would be invalidated when the
  * function returned.
  */
-#define setjmp_ok( test ) do {						\
-	int value;							\
-	/* Sanity check */						\
-	assert ( jumped == NULL );					\
-	/* Initialise test */						\
-	(test)->expected = 0;						\
-	(test)->file = __FILE__;					\
-	(test)->line = __LINE__;					\
-	/* Perform setjmp() */						\
-	value = setjmp ( (test)->env );					\
-	/* Report setjmp()/longjmp() result */				\
-	setjmp_return_ok ( (test), value );				\
-	} while ( 0 )
+#define setjmp_ok(test)                        \
+    do {                                       \
+        int value;                             \
+        /* Sanity check */                     \
+        assert(jumped == NULL);                \
+        /* Initialise test */                  \
+        (test)->expected = 0;                  \
+        (test)->file = __FILE__;               \
+        (test)->line = __LINE__;               \
+        /* Perform setjmp() */                 \
+        value = setjmp((test)->env);           \
+        /* Report setjmp()/longjmp() result */ \
+        setjmp_return_ok((test), value);       \
+    } while (0)
 
 /**
  * Report a setjmp()/longjmp() test result
@@ -87,21 +88,20 @@ static struct setjmp_test *jumped;
  * line stored in the test structure, which will represent the line
  * from which either setjmp() or longjmp() was called.
  */
-static void setjmp_return_ok ( struct setjmp_test *test, int value ) {
+static void setjmp_return_ok(struct setjmp_test* test, int value) {
+    /* Determine whether this was reached via setjmp() or longjmp() */
+    if (value == 0) {
+        /* This is the initial call to setjmp() */
+        okx(test->expected == 0, test->file, test->line);
+        okx(jumped == NULL, test->file, test->line);
+    } else {
+        /* This is reached via a call to longjmp() */
+        okx(value == test->expected, test->file, test->line);
+        okx(jumped == test, test->file, test->line);
+    }
 
-	/* Determine whether this was reached via setjmp() or longjmp() */
-	if ( value == 0 ) {
-		/* This is the initial call to setjmp() */
-		okx ( test->expected == 0, test->file, test->line );
-		okx ( jumped == NULL, test->file, test->line );
-	} else {
-		/* This is reached via a call to longjmp() */
-		okx ( value == test->expected, test->file, test->line );
-		okx ( jumped == test, test->file, test->line );
-	}
-
-	/* Clear expected jump */
-	jumped = NULL;
+    /* Clear expected jump */
+    jumped = NULL;
 }
 
 /**
@@ -111,62 +111,73 @@ static void setjmp_return_ok ( struct setjmp_test *test, int value ) {
  * @v file		Test code file
  * @v line		Test code line
  */
-static void __attribute__ (( noreturn ))
-longjmp_okx ( struct setjmp_test *test, int value,
-	      const char *file, unsigned int line ) {
+static void __attribute__((noreturn))
+longjmp_okx(struct setjmp_test* test, int value,
+            const char* file, unsigned int line) {
+    /* Record expected value.  A zero passed to longjmp() should
+     * result in setjmp() returning a value of one.
+     */
+    test->expected = (value ? value : 1);
 
-	/* Record expected value.  A zero passed to longjmp() should
-	 * result in setjmp() returning a value of one.
-	 */
-	test->expected = ( value ? value : 1 );
+    /* Record test code file and line */
+    test->file = file;
+    test->line = line;
 
-	/* Record test code file and line */
-	test->file = file;
-	test->line = line;
+    /* Record expected jump */
+    jumped = test;
 
-	/* Record expected jump */
-	jumped = test;
+    /* Perform longjmp().  Should return via setjmp_okx() */
+    longjmp(test->env, value);
 
-	/* Perform longjmp().  Should return via setjmp_okx() */
-	longjmp ( test->env, value );
-
-	/* longjmp() should never return */
-	assert ( 0 );
+    /* longjmp() should never return */
+    assert(0);
 }
-#define longjmp_ok( test, value ) \
-	longjmp_okx ( test, value, __FILE__, __LINE__ )
+#define longjmp_ok(test, value) \
+    longjmp_okx(test, value, __FILE__, __LINE__)
 
 /**
  * Perform setjmp()/longjmp() self-tests
  *
  */
-static void setjmp_test_exec ( void ) {
-	static struct setjmp_test alpha;
-	static struct setjmp_test beta;
-	static int iteration;
+static void setjmp_test_exec(void) {
+    static struct setjmp_test alpha;
+    static struct setjmp_test beta;
+    static int iteration;
 
-	/* This is one of the very few situations in which the
-	 * "for-case" pattern is justified.
-	 */
-	for ( iteration = 0 ; iteration < 10 ; iteration++ ) {
-		DBGC ( jumped, "SETJMP test iteration %d\n", iteration );
-		switch ( iteration ) {
-		case 0: setjmp_ok ( &alpha ); break;
-		case 1: setjmp_ok ( &beta ); break;
-		case 2:	longjmp_ok ( &alpha, 0 );
-		case 3: longjmp_ok ( &alpha, 1 );
-		case 4: longjmp_ok ( &alpha, 2 );
-		case 5: longjmp_ok ( &beta, 17 );
-		case 6: longjmp_ok ( &beta, 29 );
-		case 7: longjmp_ok ( &alpha, -1 );
-		case 8: longjmp_ok ( &beta, 0 );
-		case 9: longjmp_ok ( &beta, 42 );
-		}
-	}
+    /* This is one of the very few situations in which the
+     * "for-case" pattern is justified.
+     */
+    for (iteration = 0; iteration < 10; iteration++) {
+        DBGC(jumped, "SETJMP test iteration %d\n", iteration);
+        switch (iteration) {
+            case 0:
+                setjmp_ok(&alpha);
+                break;
+            case 1:
+                setjmp_ok(&beta);
+                break;
+            case 2:
+                longjmp_ok(&alpha, 0);
+            case 3:
+                longjmp_ok(&alpha, 1);
+            case 4:
+                longjmp_ok(&alpha, 2);
+            case 5:
+                longjmp_ok(&beta, 17);
+            case 6:
+                longjmp_ok(&beta, 29);
+            case 7:
+                longjmp_ok(&alpha, -1);
+            case 8:
+                longjmp_ok(&beta, 0);
+            case 9:
+                longjmp_ok(&beta, 42);
+        }
+    }
 }
 
 /** setjmp()/longjmp() self-test */
 struct self_test setjmp_test __self_test = {
-	.name = "setjmp",
-	.exec = setjmp_test_exec,
+    .name = "setjmp",
+    .exec = setjmp_test_exec,
 };

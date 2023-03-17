@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <stdio.h>
@@ -41,22 +41,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v ibdev		Infiniband device
  */
-void ibstat ( struct ib_device *ibdev ) {
-	struct ib_queue_pair *qp;
+void ibstat(struct ib_device* ibdev) {
+    struct ib_queue_pair* qp;
 
-	printf ( "%s: " IB_GUID_FMT " using %s on %s port %d (%s)\n",
-		 ibdev->name, IB_GUID_ARGS ( &ibdev->gid.s.guid ),
-		 ibdev->dev->driver_name, ibdev->dev->name, ibdev->port,
-		 ( ib_is_open ( ibdev ) ? "open" : "closed" ) );
-	if ( ib_link_ok ( ibdev ) ) {
-		printf ( "  [Link:up LID %d prefix " IB_GUID_FMT "]\n",
-			 ibdev->lid, IB_GUID_ARGS ( &ibdev->gid.s.prefix ) );
-	} else {
-		printf ( "  [Link:down, port state %d]\n", ibdev->port_state );
-	}
-	list_for_each_entry ( qp, &ibdev->qps, list ) {
-		printf ( "  QPN %#lx send %d/%d recv %d/%d %s\n",
-			 qp->qpn, qp->send.fill, qp->send.num_wqes,
-			 qp->recv.fill, qp->recv.num_wqes, qp->name );
-	}
+    printf("%s: " IB_GUID_FMT " using %s on %s port %d (%s)\n",
+           ibdev->name, IB_GUID_ARGS(&ibdev->gid.s.guid),
+           ibdev->dev->driver_name, ibdev->dev->name, ibdev->port,
+           (ib_is_open(ibdev) ? "open" : "closed"));
+    if (ib_link_ok(ibdev)) {
+        printf("  [Link:up LID %d prefix " IB_GUID_FMT "]\n",
+               ibdev->lid, IB_GUID_ARGS(&ibdev->gid.s.prefix));
+    } else {
+        printf("  [Link:down, port state %d]\n", ibdev->port_state);
+    }
+    list_for_each_entry(qp, &ibdev->qps, list) {
+        printf("  QPN %#lx send %d/%d recv %d/%d %s\n",
+               qp->qpn, qp->send.fill, qp->send.num_wqes,
+               qp->recv.fill, qp->recv.num_wqes, qp->name);
+    }
 }

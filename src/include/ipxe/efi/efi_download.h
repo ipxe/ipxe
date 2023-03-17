@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_DOWNLOAD_H
-#define _IPXE_DOWNLOAD_H
+    #define _IPXE_DOWNLOAD_H
 
 /*
  * Copyright (C) 2010 VMware, Inc.  All Rights Reserved.
@@ -19,7 +21,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 /** @file
  *
@@ -31,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 typedef struct _IPXE_DOWNLOAD_PROTOCOL IPXE_DOWNLOAD_PROTOCOL;
 
 /** Token to represent a currently downloading file */
-typedef VOID *IPXE_DOWNLOAD_FILE;
+typedef VOID* IPXE_DOWNLOAD_FILE;
 
 /**
  * Callback function that is invoked when data arrives for a particular file.
@@ -52,14 +54,11 @@ typedef VOID *IPXE_DOWNLOAD_FILE;
  * @ret Status		EFI_SUCCESS to continue the download,
  *			or any error code to abort.
  */
-typedef
-EFI_STATUS
-(EFIAPI *IPXE_DOWNLOAD_DATA_CALLBACK)(
-  IN VOID *Context,
-  IN VOID *Buffer,
-  IN UINTN BufferLength,
-  IN UINTN FileOffset
-  );
+typedef EFI_STATUS(EFIAPI* IPXE_DOWNLOAD_DATA_CALLBACK)(
+    IN VOID* Context,
+    IN VOID* Buffer,
+    IN UINTN BufferLength,
+    IN UINTN FileOffset);
 
 /**
  * Callback function that is invoked when the file is finished downloading, or
@@ -73,12 +72,9 @@ EFI_STATUS
  * 			file was transferred successfully, or an error
  * 			otherwise
  */
-typedef
-void
-(EFIAPI *IPXE_DOWNLOAD_FINISH_CALLBACK)(
-  IN VOID *Context,
-  IN EFI_STATUS Status
-  );
+typedef void(EFIAPI* IPXE_DOWNLOAD_FINISH_CALLBACK)(
+    IN VOID* Context,
+    IN EFI_STATUS Status);
 
 /**
  * Start downloading a file, and register callback functions to handle the
@@ -92,16 +88,13 @@ void
  * @v File		Token that can be used to abort the download
  * @ret Status		EFI status code
  */
-typedef
-EFI_STATUS
-(EFIAPI *IPXE_DOWNLOAD_START)(
-  IN IPXE_DOWNLOAD_PROTOCOL *This,
-  IN CHAR8 *Url,
-  IN IPXE_DOWNLOAD_DATA_CALLBACK DataCallback,
-  IN IPXE_DOWNLOAD_FINISH_CALLBACK FinishCallback,
-  IN VOID *Context,
-  OUT IPXE_DOWNLOAD_FILE *File
-  );
+typedef EFI_STATUS(EFIAPI* IPXE_DOWNLOAD_START)(
+    IN IPXE_DOWNLOAD_PROTOCOL* This,
+    IN CHAR8* Url,
+    IN IPXE_DOWNLOAD_DATA_CALLBACK DataCallback,
+    IN IPXE_DOWNLOAD_FINISH_CALLBACK FinishCallback,
+    IN VOID* Context,
+    OUT IPXE_DOWNLOAD_FILE* File);
 
 /**
  * Forcibly abort downloading a file that is currently in progress.
@@ -113,13 +106,10 @@ EFI_STATUS
  * @v Status		Reason for aborting the download
  * @ret Status		EFI status code
  */
-typedef
-EFI_STATUS
-(EFIAPI *IPXE_DOWNLOAD_ABORT)(
-  IN IPXE_DOWNLOAD_PROTOCOL *This,
-  IN IPXE_DOWNLOAD_FILE File,
-  IN EFI_STATUS Status
-  );
+typedef EFI_STATUS(EFIAPI* IPXE_DOWNLOAD_ABORT)(
+    IN IPXE_DOWNLOAD_PROTOCOL* This,
+    IN IPXE_DOWNLOAD_FILE File,
+    IN EFI_STATUS Status);
 
 /**
  * Poll for more data from iPXE. This function will invoke the registered
@@ -128,11 +118,8 @@ EFI_STATUS
  * @v This		iPXE Download Protocol instance
  * @ret Status		EFI status code
  */
-typedef
-EFI_STATUS
-(EFIAPI *IPXE_DOWNLOAD_POLL)(
-  IN IPXE_DOWNLOAD_PROTOCOL *This
-  );
+typedef EFI_STATUS(EFIAPI* IPXE_DOWNLOAD_POLL)(
+    IN IPXE_DOWNLOAD_PROTOCOL* This);
 
 /**
  * The iPXE Download Protocol.
@@ -141,17 +128,19 @@ EFI_STATUS
  * Image Protocol of all child EFI applications.
  */
 struct _IPXE_DOWNLOAD_PROTOCOL {
-   IPXE_DOWNLOAD_START Start;
-   IPXE_DOWNLOAD_ABORT Abort;
-   IPXE_DOWNLOAD_POLL Poll;
+    IPXE_DOWNLOAD_START Start;
+    IPXE_DOWNLOAD_ABORT Abort;
+    IPXE_DOWNLOAD_POLL Poll;
 };
 
-#define IPXE_DOWNLOAD_PROTOCOL_GUID \
-  { \
-    0x3eaeaebd, 0xdecf, 0x493b, { 0x9b, 0xd1, 0xcd, 0xb2, 0xde, 0xca, 0xe7, 0x19 } \
-  }
+    #define IPXE_DOWNLOAD_PROTOCOL_GUID                        \
+        {                                                      \
+            0x3eaeaebd, 0xdecf, 0x493b, {                      \
+                0x9b, 0xd1, 0xcd, 0xb2, 0xde, 0xca, 0xe7, 0x19 \
+            }                                                  \
+        }
 
-extern int efi_download_install ( EFI_HANDLE handle );
-extern void efi_download_uninstall ( EFI_HANDLE handle );
+extern int efi_download_install(EFI_HANDLE handle);
+extern void efi_download_uninstall(EFI_HANDLE handle);
 
 #endif /* _IPXE_DOWNLOAD_H */

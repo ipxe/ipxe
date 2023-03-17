@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdlib.h>
 #include <errno.h>
@@ -48,66 +48,66 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v name		Required common name, or NULL to allow any name
  * @ret rc		Return status code
  */
-int imgverify ( struct image *image, struct image *signature,
-		const char *name ) {
-	struct asn1_cursor *data;
-	struct cms_signature *sig;
-	struct cms_signer_info *info;
-	time_t now;
-	int next;
-	int rc;
+int imgverify(struct image* image, struct image* signature,
+              const char* name) {
+    struct asn1_cursor* data;
+    struct cms_signature* sig;
+    struct cms_signer_info* info;
+    time_t now;
+    int next;
+    int rc;
 
-	/* Mark image as untrusted */
-	image_untrust ( image );
+    /* Mark image as untrusted */
+    image_untrust(image);
 
-	/* Get raw signature data */
-	next = image_asn1 ( signature, 0, &data );
-	if ( next < 0 ) {
-		rc = next;
-		goto err_asn1;
-	}
+    /* Get raw signature data */
+    next = image_asn1(signature, 0, &data);
+    if (next < 0) {
+        rc = next;
+        goto err_asn1;
+    }
 
-	/* Parse signature */
-	if ( ( rc = cms_signature ( data->data, data->len, &sig ) ) != 0 )
-		goto err_parse;
+    /* Parse signature */
+    if ((rc = cms_signature(data->data, data->len, &sig)) != 0)
+        goto err_parse;
 
-	/* Free raw signature data */
-	free ( data );
-	data = NULL;
+    /* Free raw signature data */
+    free(data);
+    data = NULL;
 
-	/* Complete all certificate chains */
-	list_for_each_entry ( info, &sig->info, list ) {
-		if ( ( rc = create_validator ( &monojob, info->chain,
-					       NULL ) ) != 0 )
-			goto err_create_validator;
-		if ( ( rc = monojob_wait ( NULL, 0 ) ) != 0 )
-			goto err_validator_wait;
-	}
+    /* Complete all certificate chains */
+    list_for_each_entry(info, &sig->info, list) {
+        if ((rc = create_validator(&monojob, info->chain,
+                                   NULL)) != 0)
+            goto err_create_validator;
+        if ((rc = monojob_wait(NULL, 0)) != 0)
+            goto err_validator_wait;
+    }
 
-	/* Use signature to verify image */
-	now = time ( NULL );
-	if ( ( rc = cms_verify ( sig, image->data, image->len,
-				 name, now, NULL, NULL ) ) != 0 )
-		goto err_verify;
+    /* Use signature to verify image */
+    now = time(NULL);
+    if ((rc = cms_verify(sig, image->data, image->len,
+                         name, now, NULL, NULL)) != 0)
+        goto err_verify;
 
-	/* Drop reference to signature */
-	cms_put ( sig );
-	sig = NULL;
+    /* Drop reference to signature */
+    cms_put(sig);
+    sig = NULL;
 
-	/* Mark image as trusted */
-	image_trust ( image );
-	syslog ( LOG_NOTICE, "Image \"%s\" signature OK\n", image->name );
+    /* Mark image as trusted */
+    image_trust(image);
+    syslog(LOG_NOTICE, "Image \"%s\" signature OK\n", image->name);
 
-	return 0;
+    return 0;
 
- err_verify:
- err_validator_wait:
- err_create_validator:
-	cms_put ( sig );
- err_parse:
-	free ( data );
- err_asn1:
-	syslog ( LOG_ERR, "Image \"%s\" signature bad: %s\n",
-		 image->name, strerror ( rc ) );
-	return rc;
+err_verify:
+err_validator_wait:
+err_create_validator:
+    cms_put(sig);
+err_parse:
+    free(data);
+err_asn1:
+    syslog(LOG_ERR, "Image \"%s\" signature bad: %s\n",
+           image->name, strerror(rc));
+    return rc;
 }

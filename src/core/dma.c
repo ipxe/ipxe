@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <assert.h>
 #include <errno.h>
@@ -40,14 +40,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  ******************************************************************************
  */
 
-PROVIDE_DMAAPI_INLINE ( flat, dma_map );
-PROVIDE_DMAAPI_INLINE ( flat, dma_unmap );
-PROVIDE_DMAAPI_INLINE ( flat, dma_alloc );
-PROVIDE_DMAAPI_INLINE ( flat, dma_free );
-PROVIDE_DMAAPI_INLINE ( flat, dma_umalloc );
-PROVIDE_DMAAPI_INLINE ( flat, dma_ufree );
-PROVIDE_DMAAPI_INLINE ( flat, dma_set_mask );
-PROVIDE_DMAAPI_INLINE ( flat, dma_phys );
+PROVIDE_DMAAPI_INLINE(flat, dma_map);
+PROVIDE_DMAAPI_INLINE(flat, dma_unmap);
+PROVIDE_DMAAPI_INLINE(flat, dma_alloc);
+PROVIDE_DMAAPI_INLINE(flat, dma_free);
+PROVIDE_DMAAPI_INLINE(flat, dma_umalloc);
+PROVIDE_DMAAPI_INLINE(flat, dma_ufree);
+PROVIDE_DMAAPI_INLINE(flat, dma_set_mask);
+PROVIDE_DMAAPI_INLINE(flat, dma_phys);
 
 /******************************************************************************
  *
@@ -66,13 +66,13 @@ PROVIDE_DMAAPI_INLINE ( flat, dma_phys );
  * @v flags		Mapping flags
  * @ret rc		Return status code
  */
-static int dma_op_map ( struct dma_device *dma, struct dma_mapping *map,
-			physaddr_t addr, size_t len, int flags ) {
-	struct dma_operations *op = dma->op;
+static int dma_op_map(struct dma_device* dma, struct dma_mapping* map,
+                      physaddr_t addr, size_t len, int flags) {
+    struct dma_operations* op = dma->op;
 
-	if ( ! op )
-		return -ENODEV;
-	return op->map ( dma, map, addr, len, flags );
+    if (!op)
+        return -ENODEV;
+    return op->map(dma, map, addr, len, flags);
 }
 
 /**
@@ -80,12 +80,12 @@ static int dma_op_map ( struct dma_device *dma, struct dma_mapping *map,
  *
  * @v map		DMA mapping
  */
-static void dma_op_unmap ( struct dma_mapping *map ) {
-	struct dma_device *dma = map->dma;
+static void dma_op_unmap(struct dma_mapping* map) {
+    struct dma_device* dma = map->dma;
 
-	assert ( dma != NULL );
-	assert ( dma->op != NULL );
-	dma->op->unmap ( dma, map );
+    assert(dma != NULL);
+    assert(dma->op != NULL);
+    dma->op->unmap(dma, map);
 }
 
 /**
@@ -97,13 +97,13 @@ static void dma_op_unmap ( struct dma_mapping *map ) {
  * @v align		Physical alignment
  * @ret addr		Buffer address, or NULL on error
  */
-static void * dma_op_alloc ( struct dma_device *dma, struct dma_mapping *map,
-			     size_t len, size_t align ) {
-	struct dma_operations *op = dma->op;
+static void* dma_op_alloc(struct dma_device* dma, struct dma_mapping* map,
+                          size_t len, size_t align) {
+    struct dma_operations* op = dma->op;
 
-	if ( ! op )
-		return NULL;
-	return op->alloc ( dma, map, len, align );
+    if (!op)
+        return NULL;
+    return op->alloc(dma, map, len, align);
 }
 
 /**
@@ -113,12 +113,12 @@ static void * dma_op_alloc ( struct dma_device *dma, struct dma_mapping *map,
  * @v addr		Buffer address
  * @v len		Length of buffer
  */
-static void dma_op_free ( struct dma_mapping *map, void *addr, size_t len ) {
-	struct dma_device *dma = map->dma;
+static void dma_op_free(struct dma_mapping* map, void* addr, size_t len) {
+    struct dma_device* dma = map->dma;
 
-	assert ( dma != NULL );
-	assert ( dma->op != NULL );
-	dma->op->free ( dma, map, addr, len );
+    assert(dma != NULL);
+    assert(dma->op != NULL);
+    dma->op->free(dma, map, addr, len);
 }
 
 /**
@@ -130,14 +130,14 @@ static void dma_op_free ( struct dma_mapping *map, void *addr, size_t len ) {
  * @v align		Physical alignment
  * @ret addr		Buffer address, or NULL on error
  */
-static userptr_t dma_op_umalloc ( struct dma_device *dma,
-				  struct dma_mapping *map,
-				  size_t len, size_t align ) {
-	struct dma_operations *op = dma->op;
+static userptr_t dma_op_umalloc(struct dma_device* dma,
+                                struct dma_mapping* map,
+                                size_t len, size_t align) {
+    struct dma_operations* op = dma->op;
 
-	if ( ! op )
-		return UNULL;
-	return op->umalloc ( dma, map, len, align );
+    if (!op)
+        return UNULL;
+    return op->umalloc(dma, map, len, align);
 }
 
 /**
@@ -147,13 +147,13 @@ static userptr_t dma_op_umalloc ( struct dma_device *dma,
  * @v addr		Buffer address
  * @v len		Length of buffer
  */
-static void dma_op_ufree ( struct dma_mapping *map, userptr_t addr,
-			   size_t len ) {
-	struct dma_device *dma = map->dma;
+static void dma_op_ufree(struct dma_mapping* map, userptr_t addr,
+                         size_t len) {
+    struct dma_device* dma = map->dma;
 
-	assert ( dma != NULL );
-	assert ( dma->op != NULL );
-	dma->op->ufree ( dma, map, addr, len );
+    assert(dma != NULL);
+    assert(dma->op != NULL);
+    dma->op->ufree(dma, map, addr, len);
 }
 
 /**
@@ -162,18 +162,18 @@ static void dma_op_ufree ( struct dma_mapping *map, userptr_t addr,
  * @v dma		DMA device
  * @v mask		Addressable space mask
  */
-static void dma_op_set_mask ( struct dma_device *dma, physaddr_t mask ) {
-	struct dma_operations *op = dma->op;
+static void dma_op_set_mask(struct dma_device* dma, physaddr_t mask) {
+    struct dma_operations* op = dma->op;
 
-	if ( op )
-		op->set_mask ( dma, mask );
+    if (op)
+        op->set_mask(dma, mask);
 }
 
-PROVIDE_DMAAPI ( op, dma_map, dma_op_map );
-PROVIDE_DMAAPI ( op, dma_unmap, dma_op_unmap );
-PROVIDE_DMAAPI ( op, dma_alloc, dma_op_alloc );
-PROVIDE_DMAAPI ( op, dma_free, dma_op_free );
-PROVIDE_DMAAPI ( op, dma_umalloc, dma_op_umalloc );
-PROVIDE_DMAAPI ( op, dma_ufree, dma_op_ufree );
-PROVIDE_DMAAPI ( op, dma_set_mask, dma_op_set_mask );
-PROVIDE_DMAAPI_INLINE ( op, dma_phys );
+PROVIDE_DMAAPI(op, dma_map, dma_op_map);
+PROVIDE_DMAAPI(op, dma_unmap, dma_op_unmap);
+PROVIDE_DMAAPI(op, dma_alloc, dma_op_alloc);
+PROVIDE_DMAAPI(op, dma_free, dma_op_free);
+PROVIDE_DMAAPI(op, dma_umalloc, dma_op_umalloc);
+PROVIDE_DMAAPI(op, dma_ufree, dma_op_ufree);
+PROVIDE_DMAAPI(op, dma_set_mask, dma_op_set_mask);
+PROVIDE_DMAAPI_INLINE(op, dma_phys);

@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <config/general.h>
 
@@ -36,8 +36,8 @@ PROVIDE_REQUIRING_SYMBOL();
  *
  */
 #ifdef NET_PROTO_IPV4
-REQUIRE_OBJECT ( route_ipv4 );
+REQUIRE_OBJECT(route_ipv4);
 #endif
 #ifdef NET_PROTO_IPV6
-REQUIRE_OBJECT ( route_ipv6 );
+REQUIRE_OBJECT(route_ipv6);
 #endif

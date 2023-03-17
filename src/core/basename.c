@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * @file
@@ -39,11 +39,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v path		Full path
  * @ret basename	Base name
  */
-char * basename ( char *path ) {
-	char *basename;
+char* basename(char* path) {
+    char* basename;
 
-	basename = strrchr ( path, '/' );
-	return ( basename ? ( basename + 1 ) : path );
+    basename = strrchr(path, '/');
+    return (basename ? (basename + 1) : path);
 }
 
 /**
@@ -54,16 +54,16 @@ char * basename ( char *path ) {
  *
  * Note that this function may modify its argument.
  */
-char * dirname ( char *path ) {
-	char *separator;
+char* dirname(char* path) {
+    char* separator;
 
-	separator = strrchr ( path, '/' );
-	if ( separator == path ) {
-		return "/";
-	} else if ( separator ) {
-		*separator = 0;
-		return path;
-	} else {
-		return ".";
-	}
+    separator = strrchr(path, '/');
+    if (separator == path) {
+        return "/";
+    } else if (separator) {
+        *separator = 0;
+        return path;
+    } else {
+        return ".";
+    }
 }

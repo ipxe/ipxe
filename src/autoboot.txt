@@ -1,0 +1,11 @@
+#!ipxe
+
+
+set dhcp6.user-class einebox
+autoboot ||
+
+echo Autoconfiguration has failed...
+
+prompt --key 0x02 --timeout 5000 Press Ctrl-B for the iPXE command line... && shell ||
+exit
+

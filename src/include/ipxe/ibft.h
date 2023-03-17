@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_IBFT_H
-#define _IPXE_IBFT_H
+    #define _IPXE_IBFT_H
 
 /*
  * Copyright Fen Systems Ltd. 2007.  Portions of this code are derived
@@ -28,7 +30,7 @@
  *
  */
 
-FILE_LICENCE ( BSD2 );
+FILE_LICENCE(BSD2);
 
 /** @file
  *
@@ -41,16 +43,16 @@ FILE_LICENCE ( BSD2 );
  *
  */
 
-#include <stdint.h>
-#include <ipxe/acpi.h>
-#include <ipxe/scsi.h>
-#include <ipxe/in.h>
+    #include <stdint.h>
+    #include <ipxe/acpi.h>
+    #include <ipxe/scsi.h>
+    #include <ipxe/in.h>
 
-/** iSCSI Boot Firmware Table signature */
-#define IBFT_SIG ACPI_SIGNATURE ( 'i', 'B', 'F', 'T' )
+    /** iSCSI Boot Firmware Table signature */
+    #define IBFT_SIG ACPI_SIGNATURE('i', 'B', 'F', 'T')
 
-/** Alignment of structures within iBFT */
-#define IBFT_ALIGN 16
+    /** Alignment of structures within iBFT */
+    #define IBFT_ALIGN 16
 
 /** An offset from the start of the iBFT */
 typedef uint16_t ibft_off_t;
@@ -60,21 +62,21 @@ typedef uint16_t ibft_size_t;
 
 /** A string within the iBFT */
 struct ibft_string {
-	/** Length of string */
-	ibft_size_t len;
-	/** Offset to string */
-	ibft_off_t offset;
-} __attribute__ (( packed ));
+    /** Length of string */
+    ibft_size_t len;
+    /** Offset to string */
+    ibft_off_t offset;
+} __attribute__((packed));
 
 /** An IP address within the iBFT */
 struct ibft_ipaddr {
-	/** Reserved; must be zero */
-	uint16_t zeroes[5];
-	/** Must be 0xffff if IPv4 address is present, otherwise zero */
-	uint16_t ones;
-	/** The IPv4 address, or zero if not present */
-	struct in_addr in;
-} __attribute__ (( packed ));
+    /** Reserved; must be zero */
+    uint16_t zeroes[5];
+    /** Must be 0xffff if IPv4 address is present, otherwise zero */
+    uint16_t ones;
+    /** The IPv4 address, or zero if not present */
+    struct in_addr in;
+} __attribute__((packed));
 
 /**
  * iBFT structure header
@@ -82,23 +84,23 @@ struct ibft_ipaddr {
  * This structure is common to several sections within the iBFT.
  */
 struct ibft_header {
-	/** Structure ID
-	 *
-	 * This is an IBFT_STRUCTURE_ID_XXX constant
-	 */
-	uint8_t structure_id;
-	/** Version (always 1) */
-	uint8_t version;
-	/** Length, including this header */
-	uint16_t length;
-	/** Index 
-	 *
-	 * This is the number of the NIC or Target, when applicable.
-	 */
-	uint8_t index;
-	/** Flags */
-	uint8_t flags;
-} __attribute__ (( packed ));
+    /** Structure ID
+     *
+     * This is an IBFT_STRUCTURE_ID_XXX constant
+     */
+    uint8_t structure_id;
+    /** Version (always 1) */
+    uint8_t version;
+    /** Length, including this header */
+    uint16_t length;
+    /** Index
+     *
+     * This is the number of the NIC or Target, when applicable.
+     */
+    uint8_t index;
+    /** Flags */
+    uint8_t flags;
+} __attribute__((packed));
 
 /**
  * iBFT NIC and Target offset pair
@@ -108,177 +110,177 @@ struct ibft_header {
  * matching the expected table layout.
  */
 struct ibft_offset_pair {
-	/** Offset to NIC structure */
-	ibft_off_t nic;
-	/** Offset to Target structure */
-	ibft_off_t target;
-} __attribute__ (( packed ));
+    /** Offset to NIC structure */
+    ibft_off_t nic;
+    /** Offset to Target structure */
+    ibft_off_t target;
+} __attribute__((packed));
 
 /**
  * iBFT Control structure
  *
  */
 struct ibft_control {
-	/** Common header */
-	struct ibft_header header;
-	/** Extensions */
-	uint16_t extensions;
-	/** Offset to Initiator structure */
-	ibft_off_t initiator;
-	/** Offsets to NIC and Target structures */
-	struct ibft_offset_pair pair[2];
-} __attribute__ (( packed ));
+    /** Common header */
+    struct ibft_header header;
+    /** Extensions */
+    uint16_t extensions;
+    /** Offset to Initiator structure */
+    ibft_off_t initiator;
+    /** Offsets to NIC and Target structures */
+    struct ibft_offset_pair pair[2];
+} __attribute__((packed));
 
-/** Structure ID for Control section */
-#define IBFT_STRUCTURE_ID_CONTROL 0x01
+    /** Structure ID for Control section */
+    #define IBFT_STRUCTURE_ID_CONTROL 0x01
 
-/** Attempt login only to specified target
- *
- * If this flag is not set, all targets will be logged in to.
- */
-#define IBFT_FL_CONTROL_SINGLE_LOGIN_ONLY 0x01
+    /** Attempt login only to specified target
+     *
+     * If this flag is not set, all targets will be logged in to.
+     */
+    #define IBFT_FL_CONTROL_SINGLE_LOGIN_ONLY 0x01
 
 /**
  * iBFT Initiator structure
  *
  */
 struct ibft_initiator {
-	/** Common header */
-	struct ibft_header header;
-	/** iSNS server */
-	struct ibft_ipaddr isns_server;
-	/** SLP server */
-	struct ibft_ipaddr slp_server;
-	/** Primary and secondary Radius servers */
-	struct ibft_ipaddr radius[2];
-	/** Initiator name */
-	struct ibft_string initiator_name;
-} __attribute__ (( packed ));
+    /** Common header */
+    struct ibft_header header;
+    /** iSNS server */
+    struct ibft_ipaddr isns_server;
+    /** SLP server */
+    struct ibft_ipaddr slp_server;
+    /** Primary and secondary Radius servers */
+    struct ibft_ipaddr radius[2];
+    /** Initiator name */
+    struct ibft_string initiator_name;
+} __attribute__((packed));
 
-/** Structure ID for Initiator section */
-#define IBFT_STRUCTURE_ID_INITIATOR 0x02
+    /** Structure ID for Initiator section */
+    #define IBFT_STRUCTURE_ID_INITIATOR 0x02
 
-/** Initiator block valid */
-#define IBFT_FL_INITIATOR_BLOCK_VALID 0x01
+    /** Initiator block valid */
+    #define IBFT_FL_INITIATOR_BLOCK_VALID 0x01
 
-/** Initiator firmware boot selected */
-#define IBFT_FL_INITIATOR_FIRMWARE_BOOT_SELECTED 0x02
+    /** Initiator firmware boot selected */
+    #define IBFT_FL_INITIATOR_FIRMWARE_BOOT_SELECTED 0x02
 
 /**
  * iBFT NIC structure
  *
  */
 struct ibft_nic {
-	/** Common header */
-	struct ibft_header header;
-	/** IP address */
-	struct ibft_ipaddr ip_address;
-	/** Subnet mask
-	 *
-	 * This is the length of the subnet mask in bits (e.g. /24).
-	 */
-	uint8_t subnet_mask_prefix;
-	/** Origin */
-	uint8_t origin;
-	/** Default gateway */
-	struct ibft_ipaddr gateway;
-	/** Primary and secondary DNS servers */
-	struct ibft_ipaddr dns[2];
-	/** DHCP server */
-	struct ibft_ipaddr dhcp;
-	/** VLAN tag */
-	uint16_t vlan;
-	/** MAC address */
-	uint8_t mac_address[6];
-	/** PCI bus:dev:fn */
-	uint16_t pci_bus_dev_func;
-	/** Hostname */
-	struct ibft_string hostname;
-} __attribute__ (( packed ));
+    /** Common header */
+    struct ibft_header header;
+    /** IP address */
+    struct ibft_ipaddr ip_address;
+    /** Subnet mask
+     *
+     * This is the length of the subnet mask in bits (e.g. /24).
+     */
+    uint8_t subnet_mask_prefix;
+    /** Origin */
+    uint8_t origin;
+    /** Default gateway */
+    struct ibft_ipaddr gateway;
+    /** Primary and secondary DNS servers */
+    struct ibft_ipaddr dns[2];
+    /** DHCP server */
+    struct ibft_ipaddr dhcp;
+    /** VLAN tag */
+    uint16_t vlan;
+    /** MAC address */
+    uint8_t mac_address[6];
+    /** PCI bus:dev:fn */
+    uint16_t pci_bus_dev_func;
+    /** Hostname */
+    struct ibft_string hostname;
+} __attribute__((packed));
 
-/** Structure ID for NIC section */
-#define IBFT_STRUCTURE_ID_NIC 0x03
+    /** Structure ID for NIC section */
+    #define IBFT_STRUCTURE_ID_NIC 0x03
 
-/** NIC block valid */
-#define IBFT_FL_NIC_BLOCK_VALID 0x01
+    /** NIC block valid */
+    #define IBFT_FL_NIC_BLOCK_VALID 0x01
 
-/** NIC firmware boot selected */
-#define IBFT_FL_NIC_FIRMWARE_BOOT_SELECTED 0x02
+    /** NIC firmware boot selected */
+    #define IBFT_FL_NIC_FIRMWARE_BOOT_SELECTED 0x02
 
-/** NIC global / link local */
-#define IBFT_FL_NIC_GLOBAL 0x04
+    /** NIC global / link local */
+    #define IBFT_FL_NIC_GLOBAL 0x04
 
-/** NIC IP address origin */
-#define IBFT_NIC_ORIGIN_OTHER 0x00
-#define IBFT_NIC_ORIGIN_MANUAL 0x01
-#define IBFT_NIC_ORIGIN_WELLKNOWN 0x02
-#define IBFT_NIC_ORIGIN_DHCP 0x03
-#define IBFT_NIC_ORIGIN_RA 0x04
-#define IBFT_NIC_ORIGIN_UNCHANGED 0x0f
+    /** NIC IP address origin */
+    #define IBFT_NIC_ORIGIN_OTHER 0x00
+    #define IBFT_NIC_ORIGIN_MANUAL 0x01
+    #define IBFT_NIC_ORIGIN_WELLKNOWN 0x02
+    #define IBFT_NIC_ORIGIN_DHCP 0x03
+    #define IBFT_NIC_ORIGIN_RA 0x04
+    #define IBFT_NIC_ORIGIN_UNCHANGED 0x0f
 
 /**
  * iBFT Target structure
  *
  */
 struct ibft_target {
-	/** Common header */
-	struct ibft_header header;
-	/** IP address */
-	struct ibft_ipaddr ip_address;
-	/** TCP port */
-	uint16_t socket;
-	/** Boot LUN */
-	struct scsi_lun boot_lun;
-	/** CHAP type
-	 *
-	 * This is an IBFT_CHAP_XXX constant.
-	 */
-	uint8_t chap_type;
-	/** NIC association */
-	uint8_t nic_association;
-	/** Target name */
-	struct ibft_string target_name;
-	/** CHAP name */
-	struct ibft_string chap_name;
-	/** CHAP secret */
-	struct ibft_string chap_secret;
-	/** Reverse CHAP name */
-	struct ibft_string reverse_chap_name;
-	/** Reverse CHAP secret */
-	struct ibft_string reverse_chap_secret;
-} __attribute__ (( packed ));
+    /** Common header */
+    struct ibft_header header;
+    /** IP address */
+    struct ibft_ipaddr ip_address;
+    /** TCP port */
+    uint16_t socket;
+    /** Boot LUN */
+    struct scsi_lun boot_lun;
+    /** CHAP type
+     *
+     * This is an IBFT_CHAP_XXX constant.
+     */
+    uint8_t chap_type;
+    /** NIC association */
+    uint8_t nic_association;
+    /** Target name */
+    struct ibft_string target_name;
+    /** CHAP name */
+    struct ibft_string chap_name;
+    /** CHAP secret */
+    struct ibft_string chap_secret;
+    /** Reverse CHAP name */
+    struct ibft_string reverse_chap_name;
+    /** Reverse CHAP secret */
+    struct ibft_string reverse_chap_secret;
+} __attribute__((packed));
 
-/** Structure ID for Target section */
-#define IBFT_STRUCTURE_ID_TARGET 0x04
+    /** Structure ID for Target section */
+    #define IBFT_STRUCTURE_ID_TARGET 0x04
 
-/** Target block valid */
-#define IBFT_FL_TARGET_BLOCK_VALID 0x01
+    /** Target block valid */
+    #define IBFT_FL_TARGET_BLOCK_VALID 0x01
 
-/** Target firmware boot selected */
-#define IBFT_FL_TARGET_FIRMWARE_BOOT_SELECTED 0x02
+    /** Target firmware boot selected */
+    #define IBFT_FL_TARGET_FIRMWARE_BOOT_SELECTED 0x02
 
-/** Target use Radius CHAP */
-#define IBFT_FL_TARGET_USE_CHAP 0x04
+    /** Target use Radius CHAP */
+    #define IBFT_FL_TARGET_USE_CHAP 0x04
 
-/** Target use Radius rCHAP */
-#define IBFT_FL_TARGET_USE_RCHAP 0x08
+    /** Target use Radius rCHAP */
+    #define IBFT_FL_TARGET_USE_RCHAP 0x08
 
-/* Values for chap_type */
-#define IBFT_CHAP_NONE		0	/**< No CHAP authentication */
-#define IBFT_CHAP_ONE_WAY	1	/**< One-way CHAP */
-#define IBFT_CHAP_MUTUAL	2	/**< Mutual CHAP */
+    /* Values for chap_type */
+    #define IBFT_CHAP_NONE 0    /**< No CHAP authentication */
+    #define IBFT_CHAP_ONE_WAY 1 /**< One-way CHAP */
+    #define IBFT_CHAP_MUTUAL 2  /**< Mutual CHAP */
 
 /**
  * iSCSI Boot Firmware Table (iBFT)
  */
 struct ibft_table {
-	/** ACPI header */
-	struct acpi_header acpi;
-	/** Reserved */
-	uint8_t reserved[12];
-	/** Control structure */
-	struct ibft_control control;
-} __attribute__ (( packed ));
+    /** ACPI header */
+    struct acpi_header acpi;
+    /** Reserved */
+    uint8_t reserved[12];
+    /** Control structure */
+    struct ibft_control control;
+} __attribute__((packed));
 
 extern struct acpi_model ibft_model __acpi_model;
 

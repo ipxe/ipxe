@@ -30,7 +30,7 @@
 #include <ipxe/settings.h>
 #include <ipxe/settings_ui.h>
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -46,7 +46,7 @@ static struct option_descriptor config_opts[] = {};
 
 /** "config" command descriptor */
 static struct command_descriptor config_cmd =
-	COMMAND_DESC ( struct config_options, config_opts, 0, 1, "[<scope>]" );
+    COMMAND_DESC(struct config_options, config_opts, 0, 1, "[<scope>]");
 
 /**
  * "config" command
@@ -55,31 +55,31 @@ static struct command_descriptor config_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int config_exec ( int argc, char **argv ) {
-	struct config_options opts;
-	struct settings *settings;
-	int rc;
+static int config_exec(int argc, char** argv) {
+    struct config_options opts;
+    struct settings* settings;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &config_cmd, &opts ) ) != 0 )
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &config_cmd, &opts)) != 0)
+        return rc;
 
-	/* Parse settings option, if present */
-	if ( ( rc = parse_settings ( ( ( optind < argc ) ? argv[optind] : "" ),
-				     &settings ) ) != 0 )
-		return rc;
+    /* Parse settings option, if present */
+    if ((rc = parse_settings(((optind < argc) ? argv[optind] : ""),
+                             &settings)) != 0)
+        return rc;
 
-	/* Run settings UI */
-	if ( ( rc = settings_ui ( settings ) ) != 0 ) {
-		printf ( "Could not save settings: %s\n", strerror ( rc ) );
-		return rc;
-	}
+    /* Run settings UI */
+    if ((rc = settings_ui(settings)) != 0) {
+        printf("Could not save settings: %s\n", strerror(rc));
+        return rc;
+    }
 
-	return 0;
+    return 0;
 }
 
 /** Configuration UI commands */
 struct command config_command __command = {
-	.name = "config",
-	.exec = config_exec,
+    .name = "config",
+    .exec = config_exec,
 };

@@ -1,81 +1,69 @@
+#pragma once
+
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * event_channel.h
  *
  * Event channels between domains.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *
  * Copyright (c) 2003-2004, K A Fraser.
  */
 
 #ifndef __XEN_PUBLIC_EVENT_CHANNEL_H__
-#define __XEN_PUBLIC_EVENT_CHANNEL_H__
+    #define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
-FILE_LICENCE ( MIT );
+FILE_LICENCE(MIT);
 
-#include "xen.h"
+    #include "xen.h"
 
-/*
- * `incontents 150 evtchn Event Channels
- *
- * Event channels are the basic primitive provided by Xen for event
- * notifications. An event is the Xen equivalent of a hardware
- * interrupt. They essentially store one bit of information, the event
- * of interest is signalled by transitioning this bit from 0 to 1.
- *
- * Notifications are received by a guest via an upcall from Xen,
- * indicating when an event arrives (setting the bit). Further
- * notifications are masked until the bit is cleared again (therefore,
- * guests must check the value of the bit after re-enabling event
- * delivery to ensure no missed notifications).
- *
- * Event notifications can be masked by setting a flag; this is
- * equivalent to disabling interrupts and can be used to ensure
- * atomicity of certain operations in the guest kernel.
- *
- * Event channels are represented by the evtchn_* fields in
- * struct shared_info and struct vcpu_info.
- */
+    /*
+     * `incontents 150 evtchn Event Channels
+     *
+     * Event channels are the basic primitive provided by Xen for event
+     * notifications. An event is the Xen equivalent of a hardware
+     * interrupt. They essentially store one bit of information, the event
+     * of interest is signalled by transitioning this bit from 0 to 1.
+     *
+     * Notifications are received by a guest via an upcall from Xen,
+     * indicating when an event arrives (setting the bit). Further
+     * notifications are masked until the bit is cleared again (therefore,
+     * guests must check the value of the bit after re-enabling event
+     * delivery to ensure no missed notifications).
+     *
+     * Event notifications can be masked by setting a flag; this is
+     * equivalent to disabling interrupts and can be used to ensure
+     * atomicity of certain operations in the guest kernel.
+     *
+     * Event channels are represented by the evtchn_* fields in
+     * struct shared_info and struct vcpu_info.
+     */
 
-/*
- * ` enum neg_errnoval
- * ` HYPERVISOR_event_channel_op(enum event_channel_op cmd, void *args)
- * `
- * @cmd  == EVTCHNOP_* (event-channel operation).
- * @args == struct evtchn_* Operation-specific extra arguments (NULL if none).
- */
+    /*
+     * ` enum neg_errnoval
+     * ` HYPERVISOR_event_channel_op(enum event_channel_op cmd, void *args)
+     * `
+     * @cmd  == EVTCHNOP_* (event-channel operation).
+     * @args == struct evtchn_* Operation-specific extra arguments (NULL if none).
+     */
 
-/* ` enum event_channel_op { // EVTCHNOP_* => struct evtchn_* */
-#define EVTCHNOP_bind_interdomain 0
-#define EVTCHNOP_bind_virq        1
-#define EVTCHNOP_bind_pirq        2
-#define EVTCHNOP_close            3
-#define EVTCHNOP_send             4
-#define EVTCHNOP_status           5
-#define EVTCHNOP_alloc_unbound    6
-#define EVTCHNOP_bind_ipi         7
-#define EVTCHNOP_bind_vcpu        8
-#define EVTCHNOP_unmask           9
-#define EVTCHNOP_reset           10
-#define EVTCHNOP_init_control    11
-#define EVTCHNOP_expand_array    12
-#define EVTCHNOP_set_priority    13
+    /* ` enum event_channel_op { // EVTCHNOP_* => struct evtchn_* */
+    #define EVTCHNOP_bind_interdomain 0
+    #define EVTCHNOP_bind_virq 1
+    #define EVTCHNOP_bind_pirq 2
+    #define EVTCHNOP_close 3
+    #define EVTCHNOP_send 4
+    #define EVTCHNOP_status 5
+    #define EVTCHNOP_alloc_unbound 6
+    #define EVTCHNOP_bind_ipi 7
+    #define EVTCHNOP_bind_vcpu 8
+    #define EVTCHNOP_unmask 9
+    #define EVTCHNOP_reset 10
+    #define EVTCHNOP_init_control 11
+    #define EVTCHNOP_expand_array 12
+    #define EVTCHNOP_set_priority 13
+    #ifdef __XEN__
+        #define EVTCHNOP_reset_cont 14
+    #endif
 /* ` } */
 
 typedef uint32_t evtchn_port_t;
@@ -87,7 +75,7 @@ DEFINE_XEN_GUEST_HANDLE(evtchn_port_t);
  * is allocated in <dom> and returned as <port>.
  * NOTES:
  *  1. If the caller is unprivileged then <dom> must be DOMID_SELF.
- *  2. <rdom> may be DOMID_SELF, allowing loopback connections.
+ *  2. <remote_dom> may be DOMID_SELF, allowing loopback connections.
  */
 struct evtchn_alloc_unbound {
     /* IN parameters */
@@ -156,7 +144,7 @@ typedef struct evtchn_bind_virq evtchn_bind_virq_t;
 struct evtchn_bind_pirq {
     /* IN parameters. */
     uint32_t pirq;
-#define BIND_PIRQ__WILL_SHARE 1
+    #define BIND_PIRQ__WILL_SHARE 1
     uint32_t flags; /* BIND_PIRQ__* */
     /* OUT parameters. */
     evtchn_port_t port;
@@ -207,27 +195,27 @@ typedef struct evtchn_send evtchn_send_t;
  */
 struct evtchn_status {
     /* IN parameters */
-    domid_t  dom;
+    domid_t dom;
     evtchn_port_t port;
     /* OUT parameters */
-#define EVTCHNSTAT_closed       0  /* Channel is not in use.                 */
-#define EVTCHNSTAT_unbound      1  /* Channel is waiting interdom connection.*/
-#define EVTCHNSTAT_interdomain  2  /* Channel is connected to remote domain. */
-#define EVTCHNSTAT_pirq         3  /* Channel is bound to a phys IRQ line.   */
-#define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
-#define EVTCHNSTAT_ipi          5  /* Channel is bound to a virtual IPI line */
+    #define EVTCHNSTAT_closed 0      /* Channel is not in use.                 */
+    #define EVTCHNSTAT_unbound 1     /* Channel is waiting interdom connection.*/
+    #define EVTCHNSTAT_interdomain 2 /* Channel is connected to remote domain. */
+    #define EVTCHNSTAT_pirq 3        /* Channel is bound to a phys IRQ line.   */
+    #define EVTCHNSTAT_virq 4        /* Channel is bound to a virtual IRQ line */
+    #define EVTCHNSTAT_ipi 5         /* Channel is bound to a virtual IPI line */
     uint32_t status;
-    uint32_t vcpu;                 /* VCPU to which this channel is bound.   */
+    uint32_t vcpu; /* VCPU to which this channel is bound.   */
     union {
         struct {
             domid_t dom;
-        } unbound;                 /* EVTCHNSTAT_unbound */
+        } unbound; /* EVTCHNSTAT_unbound */
         struct {
             domid_t dom;
             evtchn_port_t port;
-        } interdomain;             /* EVTCHNSTAT_interdomain */
-        uint32_t pirq;             /* EVTCHNSTAT_pirq        */
-        uint32_t virq;             /* EVTCHNSTAT_virq        */
+        } interdomain; /* EVTCHNSTAT_interdomain */
+        uint32_t pirq; /* EVTCHNSTAT_pirq        */
+        uint32_t virq; /* EVTCHNSTAT_virq        */
     } u;
 };
 typedef struct evtchn_status evtchn_status_t;
@@ -266,6 +254,10 @@ typedef struct evtchn_unmask evtchn_unmask_t;
  * NOTES:
  *  1. <dom> may be specified as DOMID_SELF.
  *  2. Only a sufficiently-privileged domain may specify other than DOMID_SELF.
+ *  3. Destroys all control blocks and event array, resets event channel
+ *     operations to 2-level ABI if called with <dom> == DOMID_SELF and FIFO
+ *     ABI was used. Guests should not bind events during EVTCHNOP_reset call
+ *     as these events are likely to be lost.
  */
 struct evtchn_reset {
     /* IN parameters. */
@@ -305,7 +297,7 @@ typedef struct evtchn_expand_array evtchn_expand_array_t;
  */
 struct evtchn_set_priority {
     /* IN parameters. */
-    uint32_t port;
+    evtchn_port_t port;
     uint32_t priority;
 };
 typedef struct evtchn_set_priority evtchn_set_priority_t;
@@ -319,16 +311,16 @@ typedef struct evtchn_set_priority evtchn_set_priority_t;
 struct evtchn_op {
     uint32_t cmd; /* enum event_channel_op */
     union {
-        struct evtchn_alloc_unbound    alloc_unbound;
-        struct evtchn_bind_interdomain bind_interdomain;
-        struct evtchn_bind_virq        bind_virq;
-        struct evtchn_bind_pirq        bind_pirq;
-        struct evtchn_bind_ipi         bind_ipi;
-        struct evtchn_close            close;
-        struct evtchn_send             send;
-        struct evtchn_status           status;
-        struct evtchn_bind_vcpu        bind_vcpu;
-        struct evtchn_unmask           unmask;
+        evtchn_alloc_unbound_t alloc_unbound;
+        evtchn_bind_interdomain_t bind_interdomain;
+        evtchn_bind_virq_t bind_virq;
+        evtchn_bind_pirq_t bind_pirq;
+        evtchn_bind_ipi_t bind_ipi;
+        evtchn_close_t close;
+        evtchn_send_t send;
+        evtchn_status_t status;
+        evtchn_bind_vcpu_t bind_vcpu;
+        evtchn_unmask_t unmask;
     } u;
 };
 typedef struct evtchn_op evtchn_op_t;
@@ -338,30 +330,30 @@ DEFINE_XEN_GUEST_HANDLE(evtchn_op_t);
  * 2-level ABI
  */
 
-#define EVTCHN_2L_NR_CHANNELS (sizeof(xen_ulong_t) * sizeof(xen_ulong_t) * 64)
+    #define EVTCHN_2L_NR_CHANNELS (sizeof(xen_ulong_t) * sizeof(xen_ulong_t) * 64)
 
-/*
- * FIFO ABI
- */
+    /*
+     * FIFO ABI
+     */
 
-/* Events may have priorities from 0 (highest) to 15 (lowest). */
-#define EVTCHN_FIFO_PRIORITY_MAX     0
-#define EVTCHN_FIFO_PRIORITY_DEFAULT 7
-#define EVTCHN_FIFO_PRIORITY_MIN     15
+    /* Events may have priorities from 0 (highest) to 15 (lowest). */
+    #define EVTCHN_FIFO_PRIORITY_MAX 0
+    #define EVTCHN_FIFO_PRIORITY_DEFAULT 7
+    #define EVTCHN_FIFO_PRIORITY_MIN 15
 
-#define EVTCHN_FIFO_MAX_QUEUES (EVTCHN_FIFO_PRIORITY_MIN + 1)
+    #define EVTCHN_FIFO_MAX_QUEUES (EVTCHN_FIFO_PRIORITY_MIN + 1)
 
 typedef uint32_t event_word_t;
 
-#define EVTCHN_FIFO_PENDING 31
-#define EVTCHN_FIFO_MASKED  30
-#define EVTCHN_FIFO_LINKED  29
-#define EVTCHN_FIFO_BUSY    28
+    #define EVTCHN_FIFO_PENDING 31
+    #define EVTCHN_FIFO_MASKED 30
+    #define EVTCHN_FIFO_LINKED 29
+    #define EVTCHN_FIFO_BUSY 28
 
-#define EVTCHN_FIFO_LINK_BITS 17
-#define EVTCHN_FIFO_LINK_MASK ((1 << EVTCHN_FIFO_LINK_BITS) - 1)
+    #define EVTCHN_FIFO_LINK_BITS 17
+    #define EVTCHN_FIFO_LINK_MASK ((1 << EVTCHN_FIFO_LINK_BITS) - 1)
 
-#define EVTCHN_FIFO_NR_CHANNELS (1 << EVTCHN_FIFO_LINK_BITS)
+    #define EVTCHN_FIFO_NR_CHANNELS (1 << EVTCHN_FIFO_LINK_BITS)
 
 struct evtchn_fifo_control_block {
     uint32_t ready;

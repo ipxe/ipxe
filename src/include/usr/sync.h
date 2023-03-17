@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _USR_SYNC_H
-#define _USR_SYNC_H
+    #define _USR_SYNC_H
 
 /** @file
  *
@@ -7,8 +9,8 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-extern int sync ( unsigned long timeout );
+extern int sync(unsigned long timeout);
 
 #endif /* _USR_SYNC_H */

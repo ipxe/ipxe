@@ -1,17 +1,13 @@
+#pragma once
+
 /** @file
   EFI TCPv4(Transmission Control Protocol version 4) Protocol Definition
   The EFI TCPv4 Service Binding Protocol is used to locate EFI TCPv4 Protocol drivers to create
   and destroy child of the driver to communicate with other host using TCP protocol.
   The EFI TCPv4 Protocol provides services to send and receive data stream.
 
-Copyright (c) 2006 - 2014, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials are licensed and made available under
-the terms and conditions of the BSD License that accompanies this distribution.
-The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
   This Protocol is introduced in UEFI Specification 2.0.
@@ -19,21 +15,25 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 **/
 
 #ifndef __EFI_TCP4_PROTOCOL_H__
-#define __EFI_TCP4_PROTOCOL_H__
+    #define __EFI_TCP4_PROTOCOL_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-#include <ipxe/efi/Protocol/Ip4.h>
+    #include <ipxe/efi/Protocol/Ip4.h>
 
-#define EFI_TCP4_SERVICE_BINDING_PROTOCOL_GUID \
-  { \
-    0x00720665, 0x67EB, 0x4a99, {0xBA, 0xF7, 0xD3, 0xC3, 0x3A, 0x1C, 0x7C, 0xC9 } \
-  }
+    #define EFI_TCP4_SERVICE_BINDING_PROTOCOL_GUID             \
+        {                                                      \
+            0x00720665, 0x67EB, 0x4a99, {                      \
+                0xBA, 0xF7, 0xD3, 0xC3, 0x3A, 0x1C, 0x7C, 0xC9 \
+            }                                                  \
+        }
 
-#define EFI_TCP4_PROTOCOL_GUID \
-  { \
-    0x65530BC7, 0xA359, 0x410f, {0xB0, 0x10, 0x5A, 0xAD, 0xC7, 0xEC, 0x2B, 0x62 } \
-  }
+    #define EFI_TCP4_PROTOCOL_GUID                             \
+        {                                                      \
+            0x65530BC7, 0xA359, 0x410f, {                      \
+                0xB0, 0x10, 0x5A, 0xAD, 0xC7, 0xEC, 0x2B, 0x62 \
+            }                                                  \
+        }
 
 typedef struct _EFI_TCP4_PROTOCOL EFI_TCP4_PROTOCOL;
 
@@ -42,11 +42,11 @@ typedef struct _EFI_TCP4_PROTOCOL EFI_TCP4_PROTOCOL;
 /// The definition in here is only present to provide backwards compatability.
 ///
 typedef struct {
-  EFI_HANDLE              InstanceHandle;
-  EFI_IPv4_ADDRESS        LocalAddress;
-  UINT16                  LocalPort;
-  EFI_IPv4_ADDRESS        RemoteAddress;
-  UINT16                  RemotePort;
+    EFI_HANDLE InstanceHandle;
+    EFI_IPv4_ADDRESS LocalAddress;
+    UINT16 LocalPort;
+    EFI_IPv4_ADDRESS RemoteAddress;
+    UINT16 RemotePort;
 } EFI_TCP4_SERVICE_POINT;
 
 ///
@@ -54,178 +54,178 @@ typedef struct {
 /// The definition in here is only present to provide backwards compatability.
 ///
 typedef struct {
-  EFI_HANDLE              DriverHandle;
-  UINT32                  ServiceCount;
-  EFI_TCP4_SERVICE_POINT  Services[1];
+    EFI_HANDLE DriverHandle;
+    UINT32 ServiceCount;
+    EFI_TCP4_SERVICE_POINT Services[1];
 } EFI_TCP4_VARIABLE_DATA;
 
 typedef struct {
-  BOOLEAN                 UseDefaultAddress;
-  EFI_IPv4_ADDRESS        StationAddress;
-  EFI_IPv4_ADDRESS        SubnetMask;
-  UINT16                  StationPort;
-  EFI_IPv4_ADDRESS        RemoteAddress;
-  UINT16                  RemotePort;
-  BOOLEAN                 ActiveFlag;
+    BOOLEAN UseDefaultAddress;
+    EFI_IPv4_ADDRESS StationAddress;
+    EFI_IPv4_ADDRESS SubnetMask;
+    UINT16 StationPort;
+    EFI_IPv4_ADDRESS RemoteAddress;
+    UINT16 RemotePort;
+    BOOLEAN ActiveFlag;
 } EFI_TCP4_ACCESS_POINT;
 
 typedef struct {
-  UINT32                  ReceiveBufferSize;
-  UINT32                  SendBufferSize;
-  UINT32                  MaxSynBackLog;
-  UINT32                  ConnectionTimeout;
-  UINT32                  DataRetries;
-  UINT32                  FinTimeout;
-  UINT32                  TimeWaitTimeout;
-  UINT32                  KeepAliveProbes;
-  UINT32                  KeepAliveTime;
-  UINT32                  KeepAliveInterval;
-  BOOLEAN                 EnableNagle;
-  BOOLEAN                 EnableTimeStamp;
-  BOOLEAN                 EnableWindowScaling;
-  BOOLEAN                 EnableSelectiveAck;
-  BOOLEAN                 EnablePathMtuDiscovery;
+    UINT32 ReceiveBufferSize;
+    UINT32 SendBufferSize;
+    UINT32 MaxSynBackLog;
+    UINT32 ConnectionTimeout;
+    UINT32 DataRetries;
+    UINT32 FinTimeout;
+    UINT32 TimeWaitTimeout;
+    UINT32 KeepAliveProbes;
+    UINT32 KeepAliveTime;
+    UINT32 KeepAliveInterval;
+    BOOLEAN EnableNagle;
+    BOOLEAN EnableTimeStamp;
+    BOOLEAN EnableWindowScaling;
+    BOOLEAN EnableSelectiveAck;
+    BOOLEAN EnablePathMtuDiscovery;
 } EFI_TCP4_OPTION;
 
 typedef struct {
-  //
-  // I/O parameters
-  //
-  UINT8                   TypeOfService;
-  UINT8                   TimeToLive;
+    //
+    // I/O parameters
+    //
+    UINT8 TypeOfService;
+    UINT8 TimeToLive;
 
-  //
-  // Access Point
-  //
-  EFI_TCP4_ACCESS_POINT   AccessPoint;
+    //
+    // Access Point
+    //
+    EFI_TCP4_ACCESS_POINT AccessPoint;
 
-  //
-  // TCP Control Options
-  //
-  EFI_TCP4_OPTION         *ControlOption;
+    //
+    // TCP Control Options
+    //
+    EFI_TCP4_OPTION* ControlOption;
 } EFI_TCP4_CONFIG_DATA;
 
 ///
 /// TCP4 connnection state
 ///
 typedef enum {
-  Tcp4StateClosed         = 0,
-  Tcp4StateListen         = 1,
-  Tcp4StateSynSent        = 2,
-  Tcp4StateSynReceived    = 3,
-  Tcp4StateEstablished    = 4,
-  Tcp4StateFinWait1       = 5,
-  Tcp4StateFinWait2       = 6,
-  Tcp4StateClosing        = 7,
-  Tcp4StateTimeWait       = 8,
-  Tcp4StateCloseWait      = 9,
-  Tcp4StateLastAck        = 10
+    Tcp4StateClosed = 0,
+    Tcp4StateListen = 1,
+    Tcp4StateSynSent = 2,
+    Tcp4StateSynReceived = 3,
+    Tcp4StateEstablished = 4,
+    Tcp4StateFinWait1 = 5,
+    Tcp4StateFinWait2 = 6,
+    Tcp4StateClosing = 7,
+    Tcp4StateTimeWait = 8,
+    Tcp4StateCloseWait = 9,
+    Tcp4StateLastAck = 10
 } EFI_TCP4_CONNECTION_STATE;
 
 typedef struct {
-  EFI_EVENT   Event;
-  EFI_STATUS  Status;
+    EFI_EVENT Event;
+    EFI_STATUS Status;
 } EFI_TCP4_COMPLETION_TOKEN;
 
 typedef struct {
-  ///
-  /// The Status in the CompletionToken will be set to one of
-  /// the following values if the active open succeeds or an unexpected
-  /// error happens:
-  /// EFI_SUCCESS:              The active open succeeds and the instance's
-  ///                           state is Tcp4StateEstablished.
-  /// EFI_CONNECTION_RESET:     The connect fails because the connection is reset
-  ///                           either by instance itself or the communication peer.
-  /// EFI_CONNECTION_REFUSED:   The connect fails because this connection is initiated with
-  ///                           an active open and the connection is refused.
-  /// EFI_ABORTED:              The active open is aborted.
-  /// EFI_TIMEOUT:              The connection establishment timer expires and
-  ///                           no more specific information is available.
-  /// EFI_NETWORK_UNREACHABLE:  The active open fails because
-  ///                           an ICMP network unreachable error is received.
-  /// EFI_HOST_UNREACHABLE:     The active open fails because an
-  ///                           ICMP host unreachable error is received.
-  /// EFI_PROTOCOL_UNREACHABLE: The active open fails
-  ///                           because an ICMP protocol unreachable error is received.
-  /// EFI_PORT_UNREACHABLE:     The connection establishment
-  ///                           timer times out and an ICMP port unreachable error is received.
-  /// EFI_ICMP_ERROR:           The connection establishment timer timeout and some other ICMP
-  ///                           error is received.
-  /// EFI_DEVICE_ERROR:         An unexpected system or network error occurred.
-  /// EFI_NO_MEDIA:             There was a media error.
-  ///
-  EFI_TCP4_COMPLETION_TOKEN CompletionToken;
+    ///
+    /// The Status in the CompletionToken will be set to one of
+    /// the following values if the active open succeeds or an unexpected
+    /// error happens:
+    /// EFI_SUCCESS:              The active open succeeds and the instance's
+    ///                           state is Tcp4StateEstablished.
+    /// EFI_CONNECTION_RESET:     The connect fails because the connection is reset
+    ///                           either by instance itself or the communication peer.
+    /// EFI_CONNECTION_REFUSED:   The connect fails because this connection is initiated with
+    ///                           an active open and the connection is refused.
+    /// EFI_ABORTED:              The active open is aborted.
+    /// EFI_TIMEOUT:              The connection establishment timer expires and
+    ///                           no more specific information is available.
+    /// EFI_NETWORK_UNREACHABLE:  The active open fails because
+    ///                           an ICMP network unreachable error is received.
+    /// EFI_HOST_UNREACHABLE:     The active open fails because an
+    ///                           ICMP host unreachable error is received.
+    /// EFI_PROTOCOL_UNREACHABLE: The active open fails
+    ///                           because an ICMP protocol unreachable error is received.
+    /// EFI_PORT_UNREACHABLE:     The connection establishment
+    ///                           timer times out and an ICMP port unreachable error is received.
+    /// EFI_ICMP_ERROR:           The connection establishment timer timeout and some other ICMP
+    ///                           error is received.
+    /// EFI_DEVICE_ERROR:         An unexpected system or network error occurred.
+    /// EFI_NO_MEDIA:             There was a media error.
+    ///
+    EFI_TCP4_COMPLETION_TOKEN CompletionToken;
 } EFI_TCP4_CONNECTION_TOKEN;
 
 typedef struct {
-  EFI_TCP4_COMPLETION_TOKEN CompletionToken;
-  EFI_HANDLE                NewChildHandle;
+    EFI_TCP4_COMPLETION_TOKEN CompletionToken;
+    EFI_HANDLE NewChildHandle;
 } EFI_TCP4_LISTEN_TOKEN;
 
 typedef struct {
-  UINT32 FragmentLength;
-  VOID   *FragmentBuffer;
+    UINT32 FragmentLength;
+    VOID* FragmentBuffer;
 } EFI_TCP4_FRAGMENT_DATA;
 
 typedef struct {
-  BOOLEAN                   UrgentFlag;
-  UINT32                    DataLength;
-  UINT32                    FragmentCount;
-  EFI_TCP4_FRAGMENT_DATA    FragmentTable[1];
+    BOOLEAN UrgentFlag;
+    UINT32 DataLength;
+    UINT32 FragmentCount;
+    EFI_TCP4_FRAGMENT_DATA FragmentTable[1];
 } EFI_TCP4_RECEIVE_DATA;
 
 typedef struct {
-  BOOLEAN                   Push;
-  BOOLEAN                   Urgent;
-  UINT32                    DataLength;
-  UINT32                    FragmentCount;
-  EFI_TCP4_FRAGMENT_DATA    FragmentTable[1];
+    BOOLEAN Push;
+    BOOLEAN Urgent;
+    UINT32 DataLength;
+    UINT32 FragmentCount;
+    EFI_TCP4_FRAGMENT_DATA FragmentTable[1];
 } EFI_TCP4_TRANSMIT_DATA;
 
 typedef struct {
-  ///
-  /// When transmission finishes or meets any unexpected error it will
-  /// be set to one of the following values:
-  /// EFI_SUCCESS:              The receiving or transmission operation
-  ///                           completes successfully.
-  /// EFI_CONNECTION_FIN:       The receiving operation fails because the communication peer
-  ///                           has closed the connection and there is no more data in the
-  ///                           receive buffer of the instance.
-  /// EFI_CONNECTION_RESET:     The receiving or transmission operation fails
-  ///                           because this connection is reset either by instance
-  ///                           itself or the communication peer.
-  /// EFI_ABORTED:              The receiving or transmission is aborted.
-  /// EFI_TIMEOUT:              The transmission timer expires and no more
-  ///                           specific information is available.
-  /// EFI_NETWORK_UNREACHABLE:  The transmission fails
-  ///                           because an ICMP network unreachable error is received.
-  /// EFI_HOST_UNREACHABLE:     The transmission fails because an
-  ///                           ICMP host unreachable error is received.
-  /// EFI_PROTOCOL_UNREACHABLE: The transmission fails
-  ///                           because an ICMP protocol unreachable error is received.
-  /// EFI_PORT_UNREACHABLE:     The transmission fails and an
-  ///                           ICMP port unreachable error is received.
-  /// EFI_ICMP_ERROR:           The transmission fails and some other
-  ///                           ICMP error is received.
-  /// EFI_DEVICE_ERROR:         An unexpected system or network error occurs.
-  /// EFI_NO_MEDIA:             There was a media error.
-  ///
-  EFI_TCP4_COMPLETION_TOKEN CompletionToken;
-  union {
     ///
-    /// When this token is used for receiving, RxData is a pointer to EFI_TCP4_RECEIVE_DATA.
+    /// When transmission finishes or meets any unexpected error it will
+    /// be set to one of the following values:
+    /// EFI_SUCCESS:              The receiving or transmission operation
+    ///                           completes successfully.
+    /// EFI_CONNECTION_FIN:       The receiving operation fails because the communication peer
+    ///                           has closed the connection and there is no more data in the
+    ///                           receive buffer of the instance.
+    /// EFI_CONNECTION_RESET:     The receiving or transmission operation fails
+    ///                           because this connection is reset either by instance
+    ///                           itself or the communication peer.
+    /// EFI_ABORTED:              The receiving or transmission is aborted.
+    /// EFI_TIMEOUT:              The transmission timer expires and no more
+    ///                           specific information is available.
+    /// EFI_NETWORK_UNREACHABLE:  The transmission fails
+    ///                           because an ICMP network unreachable error is received.
+    /// EFI_HOST_UNREACHABLE:     The transmission fails because an
+    ///                           ICMP host unreachable error is received.
+    /// EFI_PROTOCOL_UNREACHABLE: The transmission fails
+    ///                           because an ICMP protocol unreachable error is received.
+    /// EFI_PORT_UNREACHABLE:     The transmission fails and an
+    ///                           ICMP port unreachable error is received.
+    /// EFI_ICMP_ERROR:           The transmission fails and some other
+    ///                           ICMP error is received.
+    /// EFI_DEVICE_ERROR:         An unexpected system or network error occurs.
+    /// EFI_NO_MEDIA:             There was a media error.
     ///
-    EFI_TCP4_RECEIVE_DATA   *RxData;
-    ///
-    /// When this token is used for transmitting, TxData is a pointer to EFI_TCP4_TRANSMIT_DATA.
-    ///
-    EFI_TCP4_TRANSMIT_DATA  *TxData;
-  } Packet;
+    EFI_TCP4_COMPLETION_TOKEN CompletionToken;
+    union {
+        ///
+        /// When this token is used for receiving, RxData is a pointer to EFI_TCP4_RECEIVE_DATA.
+        ///
+        EFI_TCP4_RECEIVE_DATA* RxData;
+        ///
+        /// When this token is used for transmitting, TxData is a pointer to EFI_TCP4_TRANSMIT_DATA.
+        ///
+        EFI_TCP4_TRANSMIT_DATA* TxData;
+    } Packet;
 } EFI_TCP4_IO_TOKEN;
 
 typedef struct {
-  EFI_TCP4_COMPLETION_TOKEN CompletionToken;
-  BOOLEAN                   AbortOnClose;
+    EFI_TCP4_COMPLETION_TOKEN CompletionToken;
+    BOOLEAN AbortOnClose;
 } EFI_TCP4_CLOSE_TOKEN;
 
 //
@@ -251,16 +251,13 @@ typedef struct {
                                  been started.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_GET_MODE_DATA)(
-  IN   EFI_TCP4_PROTOCOL                  *This,
-  OUT  EFI_TCP4_CONNECTION_STATE          *Tcp4State      OPTIONAL,
-  OUT  EFI_TCP4_CONFIG_DATA               *Tcp4ConfigData OPTIONAL,
-  OUT  EFI_IP4_MODE_DATA                  *Ip4ModeData    OPTIONAL,
-  OUT  EFI_MANAGED_NETWORK_CONFIG_DATA    *MnpConfigData  OPTIONAL,
-  OUT  EFI_SIMPLE_NETWORK_MODE            *SnpModeData    OPTIONAL
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_GET_MODE_DATA)(
+    IN EFI_TCP4_PROTOCOL* This,
+    OUT EFI_TCP4_CONNECTION_STATE* Tcp4State OPTIONAL,
+    OUT EFI_TCP4_CONFIG_DATA* Tcp4ConfigData OPTIONAL,
+    OUT EFI_IP4_MODE_DATA* Ip4ModeData OPTIONAL,
+    OUT EFI_MANAGED_NETWORK_CONFIG_DATA* MnpConfigData OPTIONAL,
+    OUT EFI_SIMPLE_NETWORK_MODE* SnpModeData OPTIONAL);
 
 /**
   Initialize or brutally reset the operational parameters for this EFI TCPv4 instance.
@@ -282,13 +279,9 @@ EFI_STATUS
                                 executing Configure().
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_CONFIGURE)(
-  IN EFI_TCP4_PROTOCOL                   *This,
-  IN EFI_TCP4_CONFIG_DATA                *TcpConfigData OPTIONAL
-  );
-
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_CONFIGURE)(
+    IN EFI_TCP4_PROTOCOL* This,
+    IN EFI_TCP4_CONFIG_DATA* TcpConfigData OPTIONAL);
 
 /**
   Add or delete a route entry to the route table
@@ -323,15 +316,12 @@ EFI_STATUS
   @retval EFI_UNSUPPORTED       The TCP driver does not support this operation.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_ROUTES)(
-  IN EFI_TCP4_PROTOCOL                   *This,
-  IN BOOLEAN                             DeleteRoute,
-  IN EFI_IPv4_ADDRESS                    *SubnetAddress,
-  IN EFI_IPv4_ADDRESS                    *SubnetMask,
-  IN EFI_IPv4_ADDRESS                    *GatewayAddress
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_ROUTES)(
+    IN EFI_TCP4_PROTOCOL* This,
+    IN BOOLEAN DeleteRoute,
+    IN EFI_IPv4_ADDRESS* SubnetAddress,
+    IN EFI_IPv4_ADDRESS* SubnetMask,
+    IN EFI_IPv4_ADDRESS* GatewayAddress);
 
 /**
   Initiate a nonblocking TCP connection request for an active TCP instance.
@@ -354,13 +344,9 @@ EFI_STATUS
   @retval EFI_DEVICE_ERROR      An unexpected system or network error occurred.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_CONNECT)(
-  IN EFI_TCP4_PROTOCOL                   *This,
-  IN EFI_TCP4_CONNECTION_TOKEN           *ConnectionToken
-  );
-
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_CONNECT)(
+    IN EFI_TCP4_PROTOCOL* This,
+    IN EFI_TCP4_CONNECTION_TOKEN* ConnectionToken);
 
 /**
   Listen on the passive instance to accept an incoming connection request. This is a nonblocking operation.
@@ -383,12 +369,9 @@ EFI_STATUS
   @retval EFI_DEVICE_ERROR      Any unexpected and not belonged to above category error.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_ACCEPT)(
-  IN EFI_TCP4_PROTOCOL                   *This,
-  IN EFI_TCP4_LISTEN_TOKEN               *ListenToken
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_ACCEPT)(
+    IN EFI_TCP4_PROTOCOL* This,
+    IN EFI_TCP4_LISTEN_TOKEN* ListenToken);
 
 /**
   Queues outgoing data into the transmit queue.
@@ -421,13 +404,9 @@ EFI_STATUS
   @retval EFI_NETWORK_UNREACHABLE There is no route to the destination network or address.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_TRANSMIT)(
-  IN EFI_TCP4_PROTOCOL                   *This,
-  IN EFI_TCP4_IO_TOKEN                   *Token
-  );
-
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_TRANSMIT)(
+    IN EFI_TCP4_PROTOCOL* This,
+    IN EFI_TCP4_IO_TOKEN* Token);
 
 /**
   Places an asynchronous receive request into the receiving queue.
@@ -464,12 +443,9 @@ EFI_STATUS
   @retval EFI_NOT_READY        The receive request could not be queued because the receive queue is full.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_RECEIVE)(
-  IN EFI_TCP4_PROTOCOL                   *This,
-  IN EFI_TCP4_IO_TOKEN                   *Token
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_RECEIVE)(
+    IN EFI_TCP4_PROTOCOL* This,
+    IN EFI_TCP4_IO_TOKEN* Token);
 
 /**
   Disconnecting a TCP connection gracefully or reset a TCP connection. This function is a
@@ -494,12 +470,9 @@ EFI_STATUS
   @retval EFI_DEVICE_ERROR      Any unexpected and not belonged to above category error.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_CLOSE)(
-  IN EFI_TCP4_PROTOCOL                   *This,
-  IN EFI_TCP4_CLOSE_TOKEN                *CloseToken
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_CLOSE)(
+    IN EFI_TCP4_PROTOCOL* This,
+    IN EFI_TCP4_CLOSE_TOKEN* CloseToken);
 
 /**
   Abort an asynchronous connection, listen, transmission or receive request.
@@ -526,13 +499,9 @@ EFI_STATUS
   @retval  EFI_UNSUPPORTED         The implementation does not support this function.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_CANCEL)(
-  IN EFI_TCP4_PROTOCOL                   *This,
-  IN EFI_TCP4_COMPLETION_TOKEN           *Token OPTIONAL
-  );
-
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_CANCEL)(
+    IN EFI_TCP4_PROTOCOL* This,
+    IN EFI_TCP4_COMPLETION_TOKEN* Token OPTIONAL);
 
 /**
   Poll to receive incoming data and transmit outgoing segments.
@@ -547,11 +516,8 @@ EFI_STATUS
                                  Consider increasing the polling rate.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCP4_POLL)(
-  IN EFI_TCP4_PROTOCOL                   *This
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCP4_POLL)(
+    IN EFI_TCP4_PROTOCOL* This);
 
 ///
 /// The EFI_TCP4_PROTOCOL defines the EFI TCPv4 Protocol child to be used by
@@ -561,16 +527,16 @@ EFI_STATUS
 /// such as the routing table.
 ///
 struct _EFI_TCP4_PROTOCOL {
-  EFI_TCP4_GET_MODE_DATA                 GetModeData;
-  EFI_TCP4_CONFIGURE                     Configure;
-  EFI_TCP4_ROUTES                        Routes;
-  EFI_TCP4_CONNECT                       Connect;
-  EFI_TCP4_ACCEPT                        Accept;
-  EFI_TCP4_TRANSMIT                      Transmit;
-  EFI_TCP4_RECEIVE                       Receive;
-  EFI_TCP4_CLOSE                         Close;
-  EFI_TCP4_CANCEL                        Cancel;
-  EFI_TCP4_POLL                          Poll;
+    EFI_TCP4_GET_MODE_DATA GetModeData;
+    EFI_TCP4_CONFIGURE Configure;
+    EFI_TCP4_ROUTES Routes;
+    EFI_TCP4_CONNECT Connect;
+    EFI_TCP4_ACCEPT Accept;
+    EFI_TCP4_TRANSMIT Transmit;
+    EFI_TCP4_RECEIVE Receive;
+    EFI_TCP4_CLOSE Close;
+    EFI_TCP4_CANCEL Cancel;
+    EFI_TCP4_POLL Poll;
 };
 
 extern EFI_GUID gEfiTcp4ServiceBindingProtocolGuid;

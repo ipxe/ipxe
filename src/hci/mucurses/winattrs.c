@@ -6,7 +6,7 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * Get the background rendition attributes for a window
@@ -14,8 +14,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v *win	subject window
  * @ret ch	chtype rendition representation
  */
-inline chtype getbkgd ( WINDOW *win ) {
-	return win->attrs;
+inline chtype getbkgd(WINDOW* win) {
+    return win->attrs;
 }
 
 /**
@@ -25,9 +25,9 @@ inline chtype getbkgd ( WINDOW *win ) {
  * @v attrs	attributes to enable
  * @ret rc	return status code
  */
-int wattroff ( WINDOW *win, int attrs ) {
-	win->attrs &= ~attrs;
-	return OK;
+int wattroff(WINDOW* win, int attrs) {
+    win->attrs &= ~attrs;
+    return OK;
 }
 
 /**
@@ -37,9 +37,9 @@ int wattroff ( WINDOW *win, int attrs ) {
  * @v attrs	attributes to enable
  * @ret rc	return status code
  */
-int wattron ( WINDOW *win, int attrs ) {
-	win->attrs |= attrs;
-	return OK;
+int wattron(WINDOW* win, int attrs) {
+    win->attrs |= attrs;
+    return OK;
 }
 
 /**
@@ -49,9 +49,9 @@ int wattron ( WINDOW *win, int attrs ) {
  * @v attrs	attributes to enable
  * @ret rc	return status code
  */
-int wattrset ( WINDOW *win, int attrs ) {
-	win->attrs = ( attrs | ( win->attrs & A_COLOR ) );
-	return OK;
+int wattrset(WINDOW* win, int attrs) {
+    win->attrs = (attrs | (win->attrs & A_COLOR));
+    return OK;
 }
 
 /**
@@ -63,11 +63,11 @@ int wattrset ( WINDOW *win, int attrs ) {
  * @v *opts	undefined (for future implementation)
  * @ret rc	return status cude
  */
-int wattr_get ( WINDOW *win, attr_t *attrs, short *pair, 
-		void *opts __unused ) {
-	*attrs = win->attrs & A_ATTRIBUTES;
-	*pair = PAIR_NUMBER ( win->attrs );
-	return OK;
+int wattr_get(WINDOW* win, attr_t* attrs, short* pair,
+              void* opts __unused) {
+    *attrs = win->attrs & A_ATTRIBUTES;
+    *pair = PAIR_NUMBER(win->attrs);
+    return OK;
 }
 
 /**
@@ -78,10 +78,10 @@ int wattr_get ( WINDOW *win, attr_t *attrs, short *pair,
  * @v *opts	undefined (for future implementation)
  * @ret rc	return status code
  */
-int wattr_off ( WINDOW *win, attr_t attrs, 
-		void *opts __unused ) {
-	wattroff( win, attrs );
-	return OK;
+int wattr_off(WINDOW* win, attr_t attrs,
+              void* opts __unused) {
+    wattroff(win, attrs);
+    return OK;
 }
 
 /**
@@ -92,10 +92,10 @@ int wattr_off ( WINDOW *win, attr_t attrs,
  * @v *opts	undefined (for future implementation)
  * @ret rc	return status code
  */
-int wattr_on ( WINDOW *win, attr_t attrs, 
-	       void *opts __unused ) {
-	wattron( win, attrs );
-	return OK;
+int wattr_on(WINDOW* win, attr_t attrs,
+             void* opts __unused) {
+    wattron(win, attrs);
+    return OK;
 }
 
 /**
@@ -107,10 +107,10 @@ int wattr_on ( WINDOW *win, attr_t attrs,
  * @v *opts	undefined (for future implementation)
  * @ret rc	return status code
  */
-int wattr_set ( WINDOW *win, attr_t attrs, short cpair, 
-		void *opts __unused ) {
-	wattrset( win, attrs | COLOUR_PAIR ( cpair ) );
-	return OK;
+int wattr_set(WINDOW* win, attr_t attrs, short cpair,
+              void* opts __unused) {
+    wattrset(win, attrs | COLOUR_PAIR(cpair));
+    return OK;
 }
 
 /**
@@ -121,13 +121,12 @@ int wattr_set ( WINDOW *win, attr_t attrs, short cpair,
  * @v *opts			undefined (for future implementation)
  * @ret rc			return status code
  */
-int wcolour_set ( WINDOW *win, short colour_pair_number, 
-		  void *opts __unused ) {
-	if ( ( unsigned short )colour_pair_number > COLOUR_PAIRS )
-		return ERR;
+int wcolour_set(WINDOW* win, short colour_pair_number,
+                void* opts __unused) {
+    if ((unsigned short)colour_pair_number > COLOUR_PAIRS)
+        return ERR;
 
-	win->attrs = ( ( win->attrs & A_ATTRIBUTES ) |
-		       COLOUR_PAIR ( colour_pair_number ) );
-	return OK;
+    win->attrs = ((win->attrs & A_ATTRIBUTES) |
+                  COLOUR_PAIR(colour_pair_number));
+    return OK;
 }
-

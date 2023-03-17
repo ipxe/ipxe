@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <config/usb.h>
 
@@ -35,31 +35,31 @@ PROVIDE_REQUIRING_SYMBOL();
  * Drag in USB controllers
  */
 #ifdef USB_HCD_XHCI
-REQUIRE_OBJECT ( xhci );
+REQUIRE_OBJECT(xhci);
 #endif
 #ifdef USB_HCD_EHCI
-REQUIRE_OBJECT ( ehci );
+REQUIRE_OBJECT(ehci);
 #endif
 #ifdef USB_HCD_UHCI
-REQUIRE_OBJECT ( uhci );
+REQUIRE_OBJECT(uhci);
 #endif
 #ifdef USB_HCD_USBIO
-REQUIRE_OBJECT ( usbio );
+REQUIRE_OBJECT(usbio);
 #endif
 
 /*
  * Drag in USB peripherals
  */
 #ifdef USB_KEYBOARD
-REQUIRE_OBJECT ( usbkbd );
+REQUIRE_OBJECT(usbkbd);
 #endif
 #ifdef USB_BLOCK
-REQUIRE_OBJECT ( usbblk );
+REQUIRE_OBJECT(usbblk);
 #endif
 
 /*
  * Drag in USB external interfaces
  */
 #ifdef USB_EFI
-REQUIRE_OBJECT ( efi_usb );
+REQUIRE_OBJECT(efi_usb);
 #endif

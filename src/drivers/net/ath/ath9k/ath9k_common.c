@@ -26,44 +26,44 @@
 /*
  * Update internal channel flags.
  */
-void ath9k_cmn_update_ichannel(struct ath9k_channel *ichan,
-			       struct net80211_channel *chan)
+void ath9k_cmn_update_ichannel(struct ath9k_channel* ichan,
+                               struct net80211_channel* chan)
 {
-	ichan->channel = chan->center_freq;
-	ichan->chan = chan;
+    ichan->channel = chan->center_freq;
+    ichan->chan = chan;
 
-	if (chan->band == NET80211_BAND_2GHZ) {
-		ichan->chanmode = CHANNEL_G;
-		ichan->channelFlags = CHANNEL_2GHZ | CHANNEL_OFDM;
-	} else {
-		ichan->chanmode = CHANNEL_A;
-		ichan->channelFlags = CHANNEL_5GHZ | CHANNEL_OFDM;
-	}
+    if (chan->band == NET80211_BAND_2GHZ) {
+        ichan->chanmode = CHANNEL_G;
+        ichan->channelFlags = CHANNEL_2GHZ | CHANNEL_OFDM;
+    } else {
+        ichan->chanmode = CHANNEL_A;
+        ichan->channelFlags = CHANNEL_5GHZ | CHANNEL_OFDM;
+    }
 }
 
 /*
  * Get the internal channel reference.
  */
-struct ath9k_channel *ath9k_cmn_get_curchannel(struct net80211_device *dev,
-					       struct ath_hw *ah)
+struct ath9k_channel* ath9k_cmn_get_curchannel(struct net80211_device* dev,
+                                               struct ath_hw* ah)
 {
-	struct net80211_channel *curchan = dev->channels + dev->channel;
-	struct ath9k_channel *channel;
-	u8 chan_idx;
+    struct net80211_channel* curchan = dev->channels + dev->channel;
+    struct ath9k_channel* channel;
+    u8 chan_idx;
 
-	chan_idx = curchan->hw_value;
-	channel = &ah->channels[chan_idx];
-	ath9k_cmn_update_ichannel(channel, curchan);
+    chan_idx = curchan->hw_value;
+    channel = &ah->channels[chan_idx];
+    ath9k_cmn_update_ichannel(channel, curchan);
 
-	return channel;
+    return channel;
 }
 
-void ath9k_cmn_update_txpow(struct ath_hw *ah, u16 cur_txpow,
-			    u16 new_txpow, u16 *txpower)
+void ath9k_cmn_update_txpow(struct ath_hw* ah, u16 cur_txpow,
+                            u16 new_txpow, u16* txpower)
 {
-	if (cur_txpow != new_txpow) {
-		ath9k_hw_set_txpowerlimit(ah, new_txpow, 0);
-		/* read back in case value is clamped */
-		*txpower = ath9k_hw_regulatory(ah)->power_limit;
-	}
+    if (cur_txpow != new_txpow) {
+        ath9k_hw_set_txpowerlimit(ah, new_txpow, 0);
+        /* read back in case value is clamped */
+        *txpower = ath9k_hw_regulatory(ah)->power_limit;
+    }
 }

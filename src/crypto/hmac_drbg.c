@@ -33,7 +33,7 @@
  *     with the distribution.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -75,34 +75,32 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * as used by hmac_drbg_update()
  */
-static void hmac_drbg_update_key ( struct digest_algorithm *hash,
-				   struct hmac_drbg_state *state,
-				   const void *data, size_t len,
-				   const uint8_t single ) {
-	uint8_t context[ hash->ctxsize ];
-	size_t out_len = hash->digestsize;
+static void hmac_drbg_update_key(struct digest_algorithm* hash,
+                                 struct hmac_drbg_state* state,
+                                 const void* data, size_t len,
+                                 const uint8_t single) {
+    uint8_t context[hmac_ctxsize(hash)];
+    size_t out_len = hash->digestsize;
 
-	DBGC ( state, "HMAC_DRBG_%s %p provided data :\n", hash->name, state );
-	DBGC_HDA ( state, 0, data, len );
+    DBGC(state, "HMAC_DRBG_%s %p provided data :\n", hash->name, state);
+    DBGC_HDA(state, 0, data, len);
 
-	/* Sanity checks */
-	assert ( hash != NULL );
-	assert ( state != NULL );
-	assert ( ( data != NULL ) || ( len == 0 ) );
-	assert ( ( single == 0x00 ) || ( single == 0x01 ) );
+    /* Sanity checks */
+    assert(hash != NULL);
+    assert(state != NULL);
+    assert((data != NULL) || (len == 0));
+    assert((single == 0x00) || (single == 0x01));
 
-	/* K = HMAC ( K, V || single || provided_data ) */
-	hmac_init ( hash, context, state->key, &out_len );
-	assert ( out_len == hash->digestsize );
-	hmac_update ( hash, context, state->value, out_len );
-	hmac_update ( hash, context, &single, sizeof ( single ) );
-	hmac_update ( hash, context, data, len );
-	hmac_final ( hash, context, state->key, &out_len, state->key );
-	assert ( out_len == hash->digestsize );
+    /* K = HMAC ( K, V || single || provided_data ) */
+    hmac_init(hash, context, state->key, out_len);
+    hmac_update(hash, context, state->value, out_len);
+    hmac_update(hash, context, &single, sizeof(single));
+    hmac_update(hash, context, data, len);
+    hmac_final(hash, context, state->key);
 
-	DBGC ( state, "HMAC_DRBG_%s %p K = HMAC ( K, V || %#02x || "
-	       "provided_data ) :\n", hash->name, state, single );
-	DBGC_HDA ( state, 0, state->key, out_len );
+    DBGC(state, "HMAC_DRBG_%s %p K = HMAC ( K, V || %#02x || "
+                "provided_data ) :\n", hash->name, state, single);
+    DBGC_HDA(state, 0, state->key, out_len);
 }
 
 /**
@@ -120,25 +118,23 @@ static void hmac_drbg_update_key ( struct digest_algorithm *hash,
  *
  * as used by hmac_drbg_update() and hmac_drbg_generate()
  */
-static void hmac_drbg_update_value ( struct digest_algorithm *hash,
-				     struct hmac_drbg_state *state ) {
-	uint8_t context[ hash->ctxsize ];
-	size_t out_len = hash->digestsize;
+static void hmac_drbg_update_value(struct digest_algorithm* hash,
+                                   struct hmac_drbg_state* state) {
+    uint8_t context[hmac_ctxsize(hash)];
+    size_t out_len = hash->digestsize;
 
-	/* Sanity checks */
-	assert ( hash != NULL );
-	assert ( state != NULL );
+    /* Sanity checks */
+    assert(hash != NULL);
+    assert(state != NULL);
 
-	/* V = HMAC ( K, V ) */
-	hmac_init ( hash, context, state->key, &out_len );
-	assert ( out_len == hash->digestsize );
-	hmac_update ( hash, context, state->value, out_len );
-	hmac_final ( hash, context, state->key, &out_len, state->value );
-	assert ( out_len == hash->digestsize );
+    /* V = HMAC ( K, V ) */
+    hmac_init(hash, context, state->key, out_len);
+    hmac_update(hash, context, state->value, out_len);
+    hmac_final(hash, context, state->value);
 
-	DBGC ( state, "HMAC_DRBG_%s %p V = HMAC ( K, V ) :\n",
-	       hash->name, state );
-	DBGC_HDA ( state, 0, state->value, out_len );
+    DBGC(state, "HMAC_DRBG_%s %p V = HMAC ( K, V ) :\n",
+         hash->name, state);
+    DBGC_HDA(state, 0, state->value, out_len);
 }
 
 /**
@@ -155,34 +151,33 @@ static void hmac_drbg_update_value ( struct digest_algorithm *hash,
  * The key and value are updated in-place within the HMAC_DRBG
  * internal state.
  */
-static void hmac_drbg_update ( struct digest_algorithm *hash,
-			       struct hmac_drbg_state *state,
-			       const void *data, size_t len ) {
+static void hmac_drbg_update(struct digest_algorithm* hash,
+                             struct hmac_drbg_state* state,
+                             const void* data, size_t len) {
+    DBGC(state, "HMAC_DRBG_%s %p update\n", hash->name, state);
 
-	DBGC ( state, "HMAC_DRBG_%s %p update\n", hash->name, state );
+    /* Sanity checks */
+    assert(hash != NULL);
+    assert(state != NULL);
+    assert((data != NULL) || (len == 0));
 
-	/* Sanity checks */
-	assert ( hash != NULL );
-	assert ( state != NULL );
-	assert ( ( data != NULL ) || ( len == 0 ) );
+    /* 1.  K = HMAC ( K, V || 0x00 || provided_data ) */
+    hmac_drbg_update_key(hash, state, data, len, 0x00);
 
-	/* 1.  K = HMAC ( K, V || 0x00 || provided_data ) */
-	hmac_drbg_update_key ( hash, state, data, len, 0x00 );
+    /* 2.  V = HMAC ( K, V ) */
+    hmac_drbg_update_value(hash, state);
 
-	/* 2.  V = HMAC ( K, V ) */
-	hmac_drbg_update_value ( hash, state );
+    /* 3.  If ( provided_data = Null ), then return K and V */
+    if (!len)
+        return;
 
-	/* 3.  If ( provided_data = Null ), then return K and V */
-	if ( ! len )
-		return;
+    /* 4.  K = HMAC ( K, V || 0x01 || provided_data ) */
+    hmac_drbg_update_key(hash, state, data, len, 0x01);
 
-	/* 4.  K = HMAC ( K, V || 0x01 || provided_data ) */
-	hmac_drbg_update_key ( hash, state, data, len, 0x01 );
+    /* 5.  V = HMAC ( K, V ) */
+    hmac_drbg_update_value(hash, state);
 
-	/* 5.  V = HMAC ( K, V ) */
-	hmac_drbg_update_value ( hash, state );
-
-	/* 6.  Return K and V */
+    /* 6.  Return K and V */
 }
 
 /**
@@ -207,37 +202,37 @@ static void hmac_drbg_update ( struct digest_algorithm *hash,
  * The key, value and reseed counter are updated in-place within the
  * HMAC_DRBG internal state.
  */
-void hmac_drbg_instantiate ( struct digest_algorithm *hash,
-			     struct hmac_drbg_state *state,
-			     const void *entropy, size_t entropy_len,
-			     const void *personal, size_t personal_len ){
-	size_t out_len = hash->digestsize;
+void hmac_drbg_instantiate(struct digest_algorithm* hash,
+                           struct hmac_drbg_state* state,
+                           const void* entropy, size_t entropy_len,
+                           const void* personal, size_t personal_len) {
+    size_t out_len = hash->digestsize;
 
-	DBGC ( state, "HMAC_DRBG_%s %p instantiate\n", hash->name, state );
+    DBGC(state, "HMAC_DRBG_%s %p instantiate\n", hash->name, state);
 
-	/* Sanity checks */
-	assert ( hash != NULL );
-	assert ( state != NULL );
-	assert ( entropy != NULL );
-	assert ( ( personal != NULL ) || ( personal_len == 0 ) );
+    /* Sanity checks */
+    assert(hash != NULL);
+    assert(state != NULL);
+    assert(entropy != NULL);
+    assert((personal != NULL) || (personal_len == 0));
 
-	/* 1.  seed_material = entropy_input || nonce ||
-	 *     personalisation_string
-	 */
+    /* 1.  seed_material = entropy_input || nonce ||
+     *     personalisation_string
+     */
 
-	/* 2.  Key = 0x00 00..00 */
-	memset ( state->key, 0x00, out_len );
+    /* 2.  Key = 0x00 00..00 */
+    memset(state->key, 0x00, out_len);
 
-	/* 3.  V = 0x01 01...01 */
-	memset ( state->value, 0x01, out_len );
+    /* 3.  V = 0x01 01...01 */
+    memset(state->value, 0x01, out_len);
 
-	/* 4.  ( Key, V ) = HMAC_DBRG_Update ( seed_material, Key, V )
-	 * 5.  reseed_counter = 1
-	 * 6.  Return V, Key and reseed_counter as the
-	 *     initial_working_state
-	 */
-	hmac_drbg_reseed ( hash, state, entropy, entropy_len,
-			   personal, personal_len );
+    /* 4.  ( Key, V ) = HMAC_DBRG_Update ( seed_material, Key, V )
+     * 5.  reseed_counter = 1
+     * 6.  Return V, Key and reseed_counter as the
+     *     initial_working_state
+     */
+    hmac_drbg_reseed(hash, state, entropy, entropy_len,
+                     personal, personal_len);
 }
 
 /**
@@ -256,34 +251,34 @@ void hmac_drbg_instantiate ( struct digest_algorithm *hash,
  * The key, value and reseed counter are updated in-place within the
  * HMAC_DRBG internal state.
  */
-void hmac_drbg_reseed ( struct digest_algorithm *hash,
-			struct hmac_drbg_state *state,
-			const void *entropy, size_t entropy_len,
-			const void *additional, size_t additional_len ) {
-	uint8_t seed_material[ entropy_len + additional_len ];
+void hmac_drbg_reseed(struct digest_algorithm* hash,
+                      struct hmac_drbg_state* state,
+                      const void* entropy, size_t entropy_len,
+                      const void* additional, size_t additional_len) {
+    uint8_t seed_material[entropy_len + additional_len];
 
-	DBGC ( state, "HMAC_DRBG_%s %p (re)seed\n", hash->name, state );
+    DBGC(state, "HMAC_DRBG_%s %p (re)seed\n", hash->name, state);
 
-	/* Sanity checks */
-	assert ( hash != NULL );
-	assert ( state != NULL );
-	assert ( entropy != NULL );
-	assert ( ( additional != NULL ) || ( additional_len == 0 ) );
+    /* Sanity checks */
+    assert(hash != NULL);
+    assert(state != NULL);
+    assert(entropy != NULL);
+    assert((additional != NULL) || (additional_len == 0));
 
-	/* 1.  seed_material = entropy_input || additional_input */
-	memcpy ( seed_material, entropy, entropy_len );
-	memcpy ( ( seed_material + entropy_len ), additional, additional_len );
-	DBGC ( state, "HMAC_DRBG_%s %p seed material :\n", hash->name, state );
-	DBGC_HDA ( state, 0, seed_material, sizeof ( seed_material ) );
+    /* 1.  seed_material = entropy_input || additional_input */
+    memcpy(seed_material, entropy, entropy_len);
+    memcpy((seed_material + entropy_len), additional, additional_len);
+    DBGC(state, "HMAC_DRBG_%s %p seed material :\n", hash->name, state);
+    DBGC_HDA(state, 0, seed_material, sizeof(seed_material));
 
-	/* 2.  ( Key, V ) = HMAC_DBRG_Update ( seed_material, Key, V ) */
-	hmac_drbg_update ( hash, state, seed_material,
-			   sizeof ( seed_material ) );
+    /* 2.  ( Key, V ) = HMAC_DBRG_Update ( seed_material, Key, V ) */
+    hmac_drbg_update(hash, state, seed_material,
+                     sizeof(seed_material));
 
-	/* 3.  reseed_counter = 1 */
-	state->reseed_counter = 1;
+    /* 3.  reseed_counter = 1 */
+    state->reseed_counter = 1;
 
-	/* 4.  Return V, Key and reseed_counter as the new_working_state */
+    /* 4.  Return V, Key and reseed_counter as the new_working_state */
 }
 
 /**
@@ -307,69 +302,68 @@ void hmac_drbg_reseed ( struct digest_algorithm *hash,
  *
  * Note that the only permitted error is "reseed required".
  */
-int hmac_drbg_generate ( struct digest_algorithm *hash,
-			 struct hmac_drbg_state *state,
-			 const void *additional, size_t additional_len,
-			 void *data, size_t len ) {
-	size_t out_len = hash->digestsize;
-	void *orig_data = data;
-	size_t orig_len = len;
-	size_t frag_len;
+int hmac_drbg_generate(struct digest_algorithm* hash,
+                       struct hmac_drbg_state* state,
+                       const void* additional, size_t additional_len,
+                       void* data, size_t len) {
+    size_t out_len = hash->digestsize;
+    void* orig_data = data;
+    size_t orig_len = len;
+    size_t frag_len;
 
-	DBGC ( state, "HMAC_DRBG_%s %p generate\n", hash->name, state );
+    DBGC(state, "HMAC_DRBG_%s %p generate\n", hash->name, state);
 
-	/* Sanity checks */
-	assert ( hash != NULL );
-	assert ( state != NULL );
-	assert ( data != NULL );
-	assert ( ( additional != NULL ) || ( additional_len == 0 ) );
+    /* Sanity checks */
+    assert(hash != NULL);
+    assert(state != NULL);
+    assert(data != NULL);
+    assert((additional != NULL) || (additional_len == 0));
 
-	/* 1.  If reseed_counter > reseed_interval, then return an
-	 *     indication that a reseed is required
-	 */
-	if ( state->reseed_counter > HMAC_DRBG_RESEED_INTERVAL ) {
-		DBGC ( state, "HMAC_DRBG_%s %p reseed interval exceeded\n",
-		       hash->name, state );
-		return -ESTALE;
-	}
+    /* 1.  If reseed_counter > reseed_interval, then return an
+     *     indication that a reseed is required
+     */
+    if (state->reseed_counter > HMAC_DRBG_RESEED_INTERVAL) {
+        DBGC(state, "HMAC_DRBG_%s %p reseed interval exceeded\n",
+             hash->name, state);
+        return -ESTALE;
+    }
 
-	/* 2.  If additional_input != Null, then
-	 *     ( Key, V ) = HMAC_DRBG_Update ( additional_input, Key, V )
-	 */
-	if ( additional_len )
-		hmac_drbg_update ( hash, state, additional, additional_len );
+    /* 2.  If additional_input != Null, then
+     *     ( Key, V ) = HMAC_DRBG_Update ( additional_input, Key, V )
+     */
+    if (additional_len)
+        hmac_drbg_update(hash, state, additional, additional_len);
 
-	/* 3.  temp = Null
-	 * 4.  While ( len ( temp ) < requested_number_of_bits ) do:
-	 */
-	while ( len ) {
+    /* 3.  temp = Null
+     * 4.  While ( len ( temp ) < requested_number_of_bits ) do:
+     */
+    while (len) {
+        /* 4.1  V = HMAC ( Key, V ) */
+        hmac_drbg_update_value(hash, state);
 
-		/* 4.1  V = HMAC ( Key, V ) */
-		hmac_drbg_update_value ( hash, state );
+        /* 4.2.  temp = temp || V
+         * 5.    returned_bits = Leftmost requested_number_of_bits
+         *       of temp
+         */
+        frag_len = len;
+        if (frag_len > out_len)
+            frag_len = out_len;
+        memcpy(data, state->value, frag_len);
+        data += frag_len;
+        len -= frag_len;
+    }
 
-		/* 4.2.  temp = temp || V
-		 * 5.    returned_bits = Leftmost requested_number_of_bits
-		 *       of temp
-		 */
-		frag_len = len;
-		if ( frag_len > out_len )
-			frag_len = out_len;
-		memcpy ( data, state->value, frag_len );
-		data += frag_len;
-		len -= frag_len;
-	}
+    /* 6.  ( Key, V ) = HMAC_DRBG_Update ( additional_input, Key, V ) */
+    hmac_drbg_update(hash, state, additional, additional_len);
 
-	/* 6.  ( Key, V ) = HMAC_DRBG_Update ( additional_input, Key, V ) */
-	hmac_drbg_update ( hash, state, additional, additional_len );
+    /* 7.  reseed_counter = reseed_counter + 1 */
+    state->reseed_counter++;
 
-	/* 7.  reseed_counter = reseed_counter + 1 */
-	state->reseed_counter++;
+    DBGC(state, "HMAC_DRBG_%s %p generated :\n", hash->name, state);
+    DBGC_HDA(state, 0, orig_data, orig_len);
 
-	DBGC ( state, "HMAC_DRBG_%s %p generated :\n", hash->name, state );
-	DBGC_HDA ( state, 0, orig_data, orig_len );
-
-	/* 8.  Return SUCCESS, returned_bits, and the new values of
-	 *     Key, V and reseed_counter as the new_working_state
-	 */
-	return 0;
+    /* 8.  Return SUCCESS, returned_bits, and the new values of
+     *     Key, V and reseed_counter as the new_working_state
+     */
+    return 0;
 }

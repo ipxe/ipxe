@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <realmode.h>
 #include <undipreload.h>
@@ -39,4 +39,4 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * execution (i.e. when loading a .kpxe image).  The first driver to
  * claim this device must zero out this data structure.
  */
-struct undi_device __data16 ( preloaded_undi );
+struct undi_device __data16(preloaded_undi);

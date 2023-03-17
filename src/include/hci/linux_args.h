@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * Copyright (C) 2010 Piotr Jaroszyński <p.jaroszynski@gmail.com>
  *
@@ -17,7 +19,7 @@
  */
 
 #ifndef _HCI_LINUX_ARGS_H
-#define _HCI_LINUX_ARGS_H
+    #define _HCI_LINUX_ARGS_H
 
 FILE_LICENCE(GPL2_OR_LATER);
 
@@ -26,6 +28,6 @@ FILE_LICENCE(GPL2_OR_LATER);
  *
  * To be called by linuxprefix
  */
-extern __asmcall void save_args(int argc, char **argv);
+extern __asmcall void save_args(int argc, char** argv);
 
 #endif /* _HCI_LINUX_ARGS_H */

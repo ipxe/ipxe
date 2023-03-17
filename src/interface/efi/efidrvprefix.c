@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 #include <stdlib.h>
 #include <ipxe/init.h>
@@ -32,29 +32,29 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @v systab		System table
  * @ret efirc		EFI return status code
  */
-EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
-				  EFI_SYSTEM_TABLE *systab ) {
-	static struct efi_saved_tpl tpl; /* avoid triggering stack protector */
-	EFI_STATUS efirc;
+EFI_STATUS EFIAPI _efidrv_start(EFI_HANDLE image_handle,
+                                EFI_SYSTEM_TABLE* systab) {
+    static struct efi_saved_tpl tpl; /* avoid triggering stack protector */
+    EFI_STATUS efirc;
 
-	/* Initialise stack cookie */
-	efi_init_stack_guard ( image_handle );
+    /* Initialise stack cookie */
+    efi_init_stack_guard(image_handle);
 
-	/* Initialise EFI environment */
-	if ( ( efirc = efi_init ( image_handle, systab ) ) != 0 )
-		return efirc;
+    /* Initialise EFI environment */
+    if ((efirc = efi_init(image_handle, systab)) != 0)
+        return efirc;
 
-	/* Raise TPL */
-	efi_raise_tpl ( &tpl );
+    /* Raise TPL */
+    efi_raise_tpl(&tpl);
 
-	/* Initialise iPXE environment */
-	initialise();
-	startup();
+    /* Initialise iPXE environment */
+    initialise();
+    startup();
 
-	/* Restore TPL */
-	efi_restore_tpl ( &tpl );
+    /* Restore TPL */
+    efi_restore_tpl(&tpl);
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -62,10 +62,9 @@ EFI_STATUS EFIAPI _efidrv_start ( EFI_HANDLE image_handle,
  *
  * @v rootdev		EFI root device
  */
-static int efi_probe ( struct root_device *rootdev __unused ) {
-
-	/* Do nothing */
-	return 0;
+static int efi_probe(struct root_device* rootdev __unused) {
+    /* Do nothing */
+    return 0;
 }
 
 /**
@@ -73,19 +72,18 @@ static int efi_probe ( struct root_device *rootdev __unused ) {
  *
  * @v rootdev		EFI root device
  */
-static void efi_remove ( struct root_device *rootdev __unused ) {
-
-	efi_driver_disconnect_all();
+static void efi_remove(struct root_device* rootdev __unused) {
+    efi_driver_disconnect_all();
 }
 
 /** EFI root device driver */
 static struct root_driver efi_root_driver = {
-	.probe = efi_probe,
-	.remove = efi_remove,
+    .probe = efi_probe,
+    .remove = efi_remove,
 };
 
 /** EFI root device */
 struct root_device efi_root_device __root_device = {
-	.dev = { .name = "EFI" },
-	.driver = &efi_root_driver,
+    .dev = {.name = "EFI"},
+    .driver = &efi_root_driver,
 };

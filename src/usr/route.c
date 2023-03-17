@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <ipxe/netdevice.h>
 #include <usr/route.h>
@@ -36,17 +36,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Print routing table
  *
  */
-void route ( void ) {
-	struct net_device *netdev;
-	struct routing_family *family;
+void route(void) {
+    struct net_device* netdev;
+    struct routing_family* family;
 
-	for_each_netdev ( netdev ) {
-		for_each_table_entry ( family, ROUTING_FAMILIES ) {
-			family->print ( netdev );
-		}
-	}
+    for_each_netdev(netdev) {
+        for_each_table_entry(family, ROUTING_FAMILIES) {
+            family->print(netdev);
+        }
+    }
 }
 
 /* Drag in routing management configuration */
-REQUIRING_SYMBOL ( route );
-REQUIRE_OBJECT ( config_route );
+REQUIRING_SYMBOL(route);
+REQUIRE_OBJECT(config_route);

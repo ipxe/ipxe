@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * @file
@@ -38,9 +38,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v intf		Data transfer interface
  */
-void pool_recycle ( struct interface *intf ) {
-
-	intf_poke ( intf, pool_recycle );
+void pool_recycle(struct interface* intf) {
+    intf_poke(intf, pool_recycle);
 }
 
 /**
@@ -48,9 +47,8 @@ void pool_recycle ( struct interface *intf ) {
  *
  * @v intf		Data transfer interface
  */
-void pool_reopen ( struct interface *intf ) {
-
-	intf_poke ( intf, pool_reopen );
+void pool_reopen(struct interface* intf) {
+    intf_poke(intf, pool_reopen);
 }
 
 /**
@@ -60,18 +58,17 @@ void pool_reopen ( struct interface *intf ) {
  * @v list		List of pooled connections
  * @v expiry		Expiry time
  */
-void pool_add ( struct pooled_connection *pool, struct list_head *list,
-		unsigned long expiry ) {
+void pool_add(struct pooled_connection* pool, struct list_head* list,
+              unsigned long expiry) {
+    /* Sanity check */
+    assert(list_empty(&pool->list));
+    assert(!timer_running(&pool->timer));
 
-	/* Sanity check */
-	assert ( list_empty ( &pool->list ) );
-	assert ( ! timer_running ( &pool->timer ) );
+    /* Add to list of pooled connections */
+    list_add_tail(&pool->list, list);
 
-	/* Add to list of pooled connections */
-	list_add_tail ( &pool->list, list );
-
-	/* Start expiry timer */
-	start_timer_fixed ( &pool->timer, expiry );
+    /* Start expiry timer */
+    start_timer_fixed(&pool->timer, expiry);
 }
 
 /**
@@ -79,17 +76,16 @@ void pool_add ( struct pooled_connection *pool, struct list_head *list,
  *
  * @v pool		Pooled connection
  */
-void pool_del ( struct pooled_connection *pool ) {
+void pool_del(struct pooled_connection* pool) {
+    /* Remove from list of pooled connections */
+    list_del(&pool->list);
+    INIT_LIST_HEAD(&pool->list);
 
-	/* Remove from list of pooled connections */
-	list_del ( &pool->list );
-	INIT_LIST_HEAD ( &pool->list );
+    /* Stop expiry timer */
+    stop_timer(&pool->timer);
 
-	/* Stop expiry timer */
-	stop_timer ( &pool->timer );
-
-	/* Mark as a freshly recycled connection */
-	pool->flags = POOL_RECYCLED;
+    /* Mark as a freshly recycled connection */
+    pool->flags = POOL_RECYCLED;
 }
 
 /**
@@ -98,17 +94,17 @@ void pool_del ( struct pooled_connection *pool ) {
  * @v timer		Expiry timer
  * @v over		Failure indicator
  */
-void pool_expired ( struct retry_timer *timer, int over __unused ) {
-	struct pooled_connection *pool =
-		container_of ( timer, struct pooled_connection, timer );
+void pool_expired(struct retry_timer* timer, int over __unused) {
+    struct pooled_connection* pool =
+        container_of(timer, struct pooled_connection, timer);
 
-	/* Sanity check */
-	assert ( ! list_empty ( &pool->list ) );
+    /* Sanity check */
+    assert(!list_empty(&pool->list));
 
-	/* Remove from connection pool */
-	list_del ( &pool->list );
-	INIT_LIST_HEAD ( &pool->list );
+    /* Remove from connection pool */
+    list_del(&pool->list);
+    INIT_LIST_HEAD(&pool->list);
 
-	/* Close expired connection */
-	pool->expired ( pool );
+    /* Close expired connection */
+    pool->expired(pool);
 }

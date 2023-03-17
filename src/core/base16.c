@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <stdio.h>
@@ -47,21 +47,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v len		Length of buffer
  * @ret len		Encoded length
  */
-size_t hex_encode ( char separator, const void *raw, size_t raw_len,
-		    char *data, size_t len ) {
-	const uint8_t *bytes = raw;
-	const char delimiter[2] = { separator, '\0' };
-	size_t used = 0;
-	unsigned int i;
+size_t hex_encode(char separator, const void* raw, size_t raw_len,
+                  char* data, size_t len) {
+    const uint8_t* bytes = raw;
+    const char delimiter[2] = {separator, '\0'};
+    size_t used = 0;
+    unsigned int i;
 
-	if ( len )
-		data[0] = 0; /* Ensure that a terminating NUL exists */
-	for ( i = 0 ; i < raw_len ; i++ ) {
-		used += ssnprintf ( ( data + used ), ( len - used ),
-				    "%s%02x", ( used ? delimiter : "" ),
-				    bytes[i] );
-	}
-	return used;
+    if (len)
+        data[0] = 0; /* Ensure that a terminating NUL exists */
+    for (i = 0; i < raw_len; i++) {
+        used += ssnprintf((data + used), (len - used),
+                          "%s%02x", (used ? delimiter : ""),
+                          bytes[i]);
+    }
+    return used;
 }
 
 /**
@@ -73,35 +73,33 @@ size_t hex_encode ( char separator, const void *raw, size_t raw_len,
  * @v len		Length of buffer
  * @ret len		Length of data, or negative error
  */
-int hex_decode ( char separator, const char *encoded, void *data, size_t len ) {
-	uint8_t *out = data;
-	unsigned int count = 0;
-	unsigned int sixteens;
-	unsigned int units;
+int hex_decode(char separator, const char* encoded, void* data, size_t len) {
+    uint8_t* out = data;
+    unsigned int count = 0;
+    unsigned int sixteens;
+    unsigned int units;
 
-	while ( *encoded ) {
+    while (*encoded) {
+        /* Check separator, if applicable */
+        if (count && separator && ((*(encoded++) != separator)))
+            return -EINVAL;
 
-		/* Check separator, if applicable */
-		if ( count && separator && ( ( *(encoded++) != separator ) ) )
-			return -EINVAL;
+        /* Extract digits.  Note that either digit may be NUL,
+         * which would be interpreted as an invalid value by
+         * digit_value(); there is therefore no need for an
+         * explicit end-of-string check.
+         */
+        sixteens = digit_value(*(encoded++));
+        if (sixteens >= 16)
+            return -EINVAL;
+        units = digit_value(*(encoded++));
+        if (units >= 16)
+            return -EINVAL;
 
-		/* Extract digits.  Note that either digit may be NUL,
-		 * which would be interpreted as an invalid value by
-		 * digit_value(); there is therefore no need for an
-		 * explicit end-of-string check.
-		 */
-		sixteens = digit_value ( *(encoded++) );
-		if ( sixteens >= 16 )
-			return -EINVAL;
-		units = digit_value ( *(encoded++) );
-		if ( units >= 16 )
-			return -EINVAL;
-
-		/* Store result */
-		if ( count < len )
-			out[count] = ( ( sixteens << 4 ) | units );
-		count++;
-
-	}
-	return count;
+        /* Store result */
+        if (count < len)
+            out[count] = ((sixteens << 4) | units);
+        count++;
+    }
+    return count;
 }

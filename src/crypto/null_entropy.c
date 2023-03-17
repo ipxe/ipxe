@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -34,7 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/entropy.h>
 
-PROVIDE_ENTROPY_INLINE ( null, min_entropy_per_sample );
-PROVIDE_ENTROPY_INLINE ( null, entropy_enable );
-PROVIDE_ENTROPY_INLINE ( null, entropy_disable );
-PROVIDE_ENTROPY_INLINE ( null, get_noise );
+PROVIDE_ENTROPY_INLINE(null, min_entropy_per_sample);
+PROVIDE_ENTROPY_INLINE(null, entropy_enable);
+PROVIDE_ENTROPY_INLINE(null, entropy_disable);
+PROVIDE_ENTROPY_INLINE(null, get_noise);

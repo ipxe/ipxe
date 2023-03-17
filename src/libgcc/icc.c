@@ -3,6 +3,6 @@
  * start of main().
  *
  */
-void __libgcc __intel_new_proc_init ( void ) {
-	/* Do nothing */
+void __libgcc __intel_new_proc_init(void) {
+    /* Do nothing */
 }

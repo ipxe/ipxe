@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_NULL_ENTROPY_H
-#define _IPXE_NULL_ENTROPY_H
+    #define _IPXE_NULL_ENTROPY_H
 
 /** @file
  *
@@ -9,44 +11,43 @@
  * security-sensitive environment.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <stdint.h>
+    #include <stdint.h>
 
-#ifdef ENTROPY_NULL
-#define ENTROPY_PREFIX_null
-#else
-#define ENTROPY_PREFIX_null __null_
-#endif
+    #ifdef ENTROPY_NULL
+        #define ENTROPY_PREFIX_null
+    #else
+        #define ENTROPY_PREFIX_null __null_
+    #endif
 
 static inline __always_inline int
-ENTROPY_INLINE ( null, entropy_enable ) ( void ) {
-	/* Do nothing */
-	return 0;
+ENTROPY_INLINE(null, entropy_enable)(void) {
+    /* Do nothing */
+    return 0;
 }
 
 static inline __always_inline void
-ENTROPY_INLINE ( null, entropy_disable ) ( void ) {
-	/* Do nothing */
+ENTROPY_INLINE(null, entropy_disable)(void) {
+    /* Do nothing */
 }
 
 static inline __always_inline min_entropy_t
-ENTROPY_INLINE ( null, min_entropy_per_sample ) ( void ) {
-	/* Actual amount of min-entropy is zero.  To avoid
-	 * division-by-zero errors and to allow compilation of
-	 * entropy-consuming code, pretend to have 1 bit of entropy in
-	 * each sample.
-	 */
-	return MIN_ENTROPY ( 1.0 );
+ENTROPY_INLINE(null, min_entropy_per_sample)(void) {
+    /* Actual amount of min-entropy is zero.  To avoid
+     * division-by-zero errors and to allow compilation of
+     * entropy-consuming code, pretend to have 1 bit of entropy in
+     * each sample.
+     */
+    return MIN_ENTROPY(1.0);
 }
 
 static inline __always_inline int
-ENTROPY_INLINE ( null, get_noise ) ( noise_sample_t *noise ) {
+ENTROPY_INLINE(null, get_noise)(noise_sample_t* noise) {
+    /* All sample values are constant */
+    *noise = 0x01;
 
-	/* All sample values are constant */
-	*noise = 0x01;
-
-	return 0;
+    return 0;
 }
 
 #endif /* _IPXE_NULL_ENTROPY_H */

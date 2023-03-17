@@ -7,7 +7,7 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * Hook INT vector
@@ -21,36 +21,36 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * the address of the previously-installed handler for this interrupt;
  * the handler should probably exit by ljmping via this vector.
  */
-void hook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
-			   struct segoff *chain_vector ) {
-	struct segoff vector = {
-		.segment = rm_cs,
-		.offset = handler,
-	};
+void hook_bios_interrupt(unsigned int interrupt, unsigned int handler,
+                         struct segoff* chain_vector) {
+    struct segoff vector = {
+        .segment = rm_cs,
+        .offset = handler,
+    };
 
-	DBG ( "Hooking INT %#02x to %04x:%04x\n",
-	      interrupt, rm_cs, handler );
+    DBG("Hooking INT %#02x to %04x:%04x\n",
+        interrupt, rm_cs, handler);
 
-	if ( ( chain_vector->segment != 0 ) ||
-	     ( chain_vector->offset != 0 ) ) {
-		/* Already hooked; do nothing */
-		DBG ( "...already hooked\n" );
-		return;
-	}
+    if ((chain_vector->segment != 0) ||
+        (chain_vector->offset != 0)) {
+        /* Already hooked; do nothing */
+        DBG("...already hooked\n");
+        return;
+    }
 
-	copy_from_real ( chain_vector, 0, ( interrupt * 4 ),
-			 sizeof ( *chain_vector ) );
-	DBG ( "...chaining to %04x:%04x\n",
-	      chain_vector->segment, chain_vector->offset );
-	if ( DBG_LOG ) {
-		char code[64];
-		copy_from_real ( code, chain_vector->segment,
-				 chain_vector->offset, sizeof ( code ) );
-		DBG_HDA ( *chain_vector, code, sizeof ( code ) );
-	}
+    copy_from_real(chain_vector, 0, (interrupt * 4),
+                   sizeof(*chain_vector));
+    DBG("...chaining to %04x:%04x\n",
+        chain_vector->segment, chain_vector->offset);
+    if (DBG_LOG) {
+        char code[64];
+        copy_from_real(code, chain_vector->segment,
+                       chain_vector->offset, sizeof(code));
+        DBG_HDA(*chain_vector, code, sizeof(code));
+    }
 
-	copy_to_real ( 0, ( interrupt * 4 ), &vector, sizeof ( vector ) );
-	hooked_bios_interrupts++;
+    copy_to_real(0, (interrupt * 4), &vector, sizeof(vector));
+    hooked_bios_interrupts++;
 }
 
 /**
@@ -66,54 +66,54 @@ void hook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
  * that it is not possible to unhook our handler, and we must leave it
  * (and its chaining vector) resident in memory.
  */
-int unhook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
-			    struct segoff *chain_vector ) {
-	struct segoff vector;
+int unhook_bios_interrupt(unsigned int interrupt, unsigned int handler,
+                          struct segoff* chain_vector) {
+    struct segoff vector;
 
-	DBG ( "Unhooking INT %#02x from %04x:%04x\n",
-	      interrupt, rm_cs, handler );
+    DBG("Unhooking INT %#02x from %04x:%04x\n",
+        interrupt, rm_cs, handler);
 
-	copy_from_real ( &vector, 0, ( interrupt * 4 ), sizeof ( vector ) );
-	if ( ( vector.segment != rm_cs ) || ( vector.offset != handler ) ) {
-		DBG ( "...cannot unhook; vector points to %04x:%04x\n",
-		      vector.segment, vector.offset );
-		return -EBUSY;
-	}
+    copy_from_real(&vector, 0, (interrupt * 4), sizeof(vector));
+    if ((vector.segment != rm_cs) || (vector.offset != handler)) {
+        DBG("...cannot unhook; vector points to %04x:%04x\n",
+            vector.segment, vector.offset);
+        return -EBUSY;
+    }
 
-	DBG ( "...restoring to %04x:%04x\n",
-	      chain_vector->segment, chain_vector->offset );
-	copy_to_real ( 0, ( interrupt * 4 ), chain_vector,
-		       sizeof ( *chain_vector ) );
+    DBG("...restoring to %04x:%04x\n",
+        chain_vector->segment, chain_vector->offset);
+    copy_to_real(0, (interrupt * 4), chain_vector,
+                 sizeof(*chain_vector));
 
-	chain_vector->segment = 0;
-	chain_vector->offset = 0;
-	hooked_bios_interrupts--;
-	return 0;
+    chain_vector->segment = 0;
+    chain_vector->offset = 0;
+    hooked_bios_interrupts--;
+    return 0;
 }
 
 /**
  * Dump changes to interrupt vector table (for debugging)
  *
  */
-void check_bios_interrupts ( void ) {
-	static struct segoff vectors[256];
-	static uint8_t initialised;
-	struct segoff vector;
-	unsigned int i;
+void check_bios_interrupts(void) {
+    static struct segoff vectors[256];
+    static uint8_t initialised;
+    struct segoff vector;
+    unsigned int i;
 
-	/* Print any changed interrupt vectors */
-	for ( i = 0; i < ( sizeof ( vectors ) / sizeof ( vectors[0] ) ); i++ ) {
-		copy_from_real ( &vector, 0, ( i * sizeof ( vector ) ),
-				 sizeof ( vector ) );
-		if ( memcmp ( &vector, &vectors[i], sizeof ( vector ) ) == 0 )
-			continue;
-		if ( initialised ) {
-			dbg_printf ( "INT %02x changed %04x:%04x => "
-				     "%04x:%04x\n", i, vectors[i].segment,
-				     vectors[i].offset, vector.segment,
-				     vector.offset );
-		}
-		memcpy ( &vectors[i], &vector, sizeof ( vectors[i] ) );
-	}
-	initialised = 1;
+    /* Print any changed interrupt vectors */
+    for (i = 0; i < (sizeof(vectors) / sizeof(vectors[0])); i++) {
+        copy_from_real(&vector, 0, (i * sizeof(vector)),
+                       sizeof(vector));
+        if (memcmp(&vector, &vectors[i], sizeof(vector)) == 0)
+            continue;
+        if (initialised) {
+            dbg_printf("INT %02x changed %04x:%04x => "
+                       "%04x:%04x\n", i, vectors[i].segment,
+                       vectors[i].offset, vector.segment,
+                       vector.offset);
+        }
+        memcpy(&vectors[i], &vector, sizeof(vectors[i]));
+    }
+    initialised = 1;
 }

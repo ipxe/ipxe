@@ -136,6 +136,8 @@ SECTIONS {
 	*(.note.*)
 	*(.discard)
 	*(.discard.*)
+	*(.sbat)
+	*(.sbat.*)
     }
 
     /*

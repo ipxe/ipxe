@@ -21,17 +21,17 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <ipxe/sha1.h>
 #include <ipxe/asn1.h>
 
 /** "sha1" object identifier */
-static uint8_t oid_sha1[] = { ASN1_OID_SHA1 };
+static uint8_t oid_sha1[] = {ASN1_OID_SHA1};
 
 /** "sha1" OID-identified algorithm */
 struct asn1_algorithm oid_sha1_algorithm __asn1_algorithm = {
-	.name = "sha1",
-	.digest = &sha1_algorithm,
-	.oid = ASN1_CURSOR ( oid_sha1 ),
+    .name = "sha1",
+    .digest = &sha1_algorithm,
+    .oid = ASN1_CURSOR(oid_sha1),
 };

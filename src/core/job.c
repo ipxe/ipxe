@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <errno.h>
@@ -40,28 +40,28 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v progress		Progress data to fill in
  * @ret ongoing_rc	Ongoing job status code (if known)
  */
-int job_progress ( struct interface *intf, struct job_progress *progress ) {
-	struct interface *dest;
-	job_progress_TYPE ( void * ) *op =
-		intf_get_dest_op ( intf, job_progress, &dest );
-	void *object = intf_object ( dest );
-	int ongoing_rc;
+int job_progress(struct interface* intf, struct job_progress* progress) {
+    struct interface* dest;
+    job_progress_TYPE(void*)* op =
+        intf_get_dest_op(intf, job_progress, &dest);
+    void* object = intf_object(dest);
+    int ongoing_rc;
 
-	DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " job_progress\n",
-	       INTF_INTF_DBG ( intf, dest ) );
+    DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " job_progress\n",
+         INTF_INTF_DBG(intf, dest));
 
-	/* Initialise progress to zero */
-	memset ( progress, 0, sizeof ( *progress ) );
+    /* Initialise progress to zero */
+    memset(progress, 0, sizeof(*progress));
 
-	if ( op ) {
-		ongoing_rc = op ( object, progress );
-	} else {
-		/* Default is to leave progress as zero and have no
-		 * known return status code.
-		 */
-		ongoing_rc = 0;
-	}
+    if (op) {
+        ongoing_rc = op(object, progress);
+    } else {
+        /* Default is to leave progress as zero and have no
+         * known return status code.
+         */
+        ongoing_rc = 0;
+    }
 
-	intf_put ( dest );
-	return ongoing_rc;
+    intf_put(dest);
+    return ongoing_rc;
 }

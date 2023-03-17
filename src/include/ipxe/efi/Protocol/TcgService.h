@@ -1,48 +1,48 @@
+#pragma once
+
 /** @file
   TCG Service Protocol as defined in TCG_EFI_Protocol_1_22_Final
   See http://trustedcomputinggroup.org for the latest specification
 
-Copyright (c) 2007 - 2014, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials are licensed and made available under
-the terms and conditions of the BSD License that accompanies this distribution.
-The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2007 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef _TCG_SERVICE_PROTOCOL_H_
-#define _TCG_SERVICE_PROTOCOL_H_
+    #define _TCG_SERVICE_PROTOCOL_H_
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-#include <ipxe/efi/IndustryStandard/UefiTcgPlatform.h>
+    #include <ipxe/efi/IndustryStandard/UefiTcgPlatform.h>
 
-#define EFI_TCG_PROTOCOL_GUID  \
-  {0xf541796d, 0xa62e, 0x4954, { 0xa7, 0x75, 0x95, 0x84, 0xf6, 0x1b, 0x9c, 0xdd } }
+    #define EFI_TCG_PROTOCOL_GUID                              \
+        {                                                      \
+            0xf541796d, 0xa62e, 0x4954, {                      \
+                0xa7, 0x75, 0x95, 0x84, 0xf6, 0x1b, 0x9c, 0xdd \
+            }                                                  \
+        }
 
 typedef struct _EFI_TCG_PROTOCOL EFI_TCG_PROTOCOL;
 
 typedef struct {
-  UINT8  Major;
-  UINT8  Minor;
-  UINT8  RevMajor;
-  UINT8  RevMinor;
+    UINT8 Major;
+    UINT8 Minor;
+    UINT8 RevMajor;
+    UINT8 RevMinor;
 } TCG_VERSION;
 
 typedef struct _TCG_EFI_BOOT_SERVICE_CAPABILITY {
-  UINT8          Size;                /// Size of this structure.
-  TCG_VERSION    StructureVersion;
-  TCG_VERSION    ProtocolSpecVersion;
-  UINT8          HashAlgorithmBitmap; /// Hash algorithms .
-                                      /// This protocol is capable of : 01=SHA-1.
-  BOOLEAN        TPMPresentFlag;      /// 00h = TPM not present.
-  BOOLEAN        TPMDeactivatedFlag;  /// 01h = TPM currently deactivated.
+    UINT8 Size; /// Size of this structure.
+    TCG_VERSION StructureVersion;
+    TCG_VERSION ProtocolSpecVersion;
+    UINT8 HashAlgorithmBitmap;  /// Hash algorithms .
+                                /// This protocol is capable of : 01=SHA-1.
+    BOOLEAN TPMPresentFlag;     /// 00h = TPM not present.
+    BOOLEAN TPMDeactivatedFlag; /// 01h = TPM currently deactivated.
 } TCG_EFI_BOOT_SERVICE_CAPABILITY;
 
-typedef UINT32   TCG_ALGORITHM_ID;
+typedef UINT32 TCG_ALGORITHM_ID;
 
 /**
   This service provides EFI protocol capability information, state information
@@ -65,16 +65,12 @@ typedef UINT32   TCG_ALGORITHM_ID;
   @retval EFI_SUCCESS            The operation completed successfully.
   @retval EFI_INVALID_PARAMETER  ProtocolCapability does not match TCG capability.
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCG_STATUS_CHECK)(
-  IN      EFI_TCG_PROTOCOL          *This,
-  OUT     TCG_EFI_BOOT_SERVICE_CAPABILITY
-                                    *ProtocolCapability,
-  OUT     UINT32                    *TCGFeatureFlags,
-  OUT     EFI_PHYSICAL_ADDRESS      *EventLogLocation,
-  OUT     EFI_PHYSICAL_ADDRESS      *EventLogLastEntry
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCG_STATUS_CHECK)(
+    IN EFI_TCG_PROTOCOL* This,
+    OUT TCG_EFI_BOOT_SERVICE_CAPABILITY* ProtocolCapability,
+    OUT UINT32* TCGFeatureFlags,
+    OUT EFI_PHYSICAL_ADDRESS* EventLogLocation,
+    OUT EFI_PHYSICAL_ADDRESS* EventLogLastEntry);
 
 /**
   This service abstracts the capability to do a hash operation on a data buffer.
@@ -93,16 +89,13 @@ EFI_STATUS
   @retval EFI_UNSUPPORTED        AlgorithmId not supported.
   @retval EFI_BUFFER_TOO_SMALL   *HashedDataLen < sizeof (TCG_DIGEST).
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCG_HASH_ALL)(
-  IN      EFI_TCG_PROTOCOL          *This,
-  IN      UINT8                     *HashData,
-  IN      UINT64                    HashDataLen,
-  IN      TCG_ALGORITHM_ID          AlgorithmId,
-  IN OUT  UINT64                    *HashedDataLen,
-  IN OUT  UINT8                     **HashedDataResult
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCG_HASH_ALL)(
+    IN EFI_TCG_PROTOCOL* This,
+    IN UINT8* HashData,
+    IN UINT64 HashDataLen,
+    IN TCG_ALGORITHM_ID AlgorithmId,
+    IN OUT UINT64* HashedDataLen,
+    IN OUT UINT8** HashedDataResult);
 
 /**
   This service abstracts the capability to add an entry to the Event Log.
@@ -120,14 +113,11 @@ EFI_STATUS
   @retval EFI_SUCCESS            The operation completed successfully.
   @retval EFI_OUT_OF_RESOURCES   Insufficient memory in the event log to complete this action.
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCG_LOG_EVENT)(
-  IN      EFI_TCG_PROTOCOL          *This,
-  IN      TCG_PCR_EVENT             *TCGLogData,
-  IN OUT  UINT32                    *EventNumber,
-  IN      UINT32                    Flags
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCG_LOG_EVENT)(
+    IN EFI_TCG_PROTOCOL* This,
+    IN TCG_PCR_EVENT* TCGLogData,
+    IN OUT UINT32* EventNumber,
+    IN UINT32 Flags);
 
 /**
   This service is a proxy for commands to the TPM.
@@ -143,15 +133,12 @@ EFI_STATUS
   @retval EFI_UNSUPPORTED        Current Task Priority Level  >= EFI_TPL_CALLBACK.
   @retval EFI_TIMEOUT            The TIS timed-out.
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCG_PASS_THROUGH_TO_TPM)(
-  IN      EFI_TCG_PROTOCOL          *This,
-  IN      UINT32                    TpmInputParameterBlockSize,
-  IN      UINT8                     *TpmInputParameterBlock,
-  IN      UINT32                    TpmOutputParameterBlockSize,
-  IN      UINT8                     *TpmOutputParameterBlock
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCG_PASS_THROUGH_TO_TPM)(
+    IN EFI_TCG_PROTOCOL* This,
+    IN UINT32 TpmInputParameterBlockSize,
+    IN UINT8* TpmInputParameterBlock,
+    IN UINT32 TpmOutputParameterBlockSize,
+    IN UINT8* TpmOutputParameterBlock);
 
 /**
   This service abstracts the capability to do a hash operation on a data buffer, extend a specific TPM PCR with the hash result, and add an entry to the Event Log
@@ -175,27 +162,24 @@ EFI_STATUS
   @retval EFI_UNSUPPORTED        Current TPL >= EFI_TPL_CALLBACK.
   @retval EFI_DEVICE_ERROR       The command was unsuccessful.
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_TCG_HASH_LOG_EXTEND_EVENT)(
-  IN      EFI_TCG_PROTOCOL          *This,
-  IN      EFI_PHYSICAL_ADDRESS      HashData,
-  IN      UINT64                    HashDataLen,
-  IN      TCG_ALGORITHM_ID          AlgorithmId,
-  IN OUT  TCG_PCR_EVENT             *TCGLogData,
-  IN OUT  UINT32                    *EventNumber,
-     OUT  EFI_PHYSICAL_ADDRESS      *EventLogLastEntry
-  );
+typedef EFI_STATUS(EFIAPI* EFI_TCG_HASH_LOG_EXTEND_EVENT)(
+    IN EFI_TCG_PROTOCOL* This,
+    IN EFI_PHYSICAL_ADDRESS HashData,
+    IN UINT64 HashDataLen,
+    IN TCG_ALGORITHM_ID AlgorithmId,
+    IN OUT TCG_PCR_EVENT* TCGLogData,
+    IN OUT UINT32* EventNumber,
+    OUT EFI_PHYSICAL_ADDRESS* EventLogLastEntry);
 
 ///
 /// The EFI_TCG Protocol abstracts TCG activity.
 ///
 struct _EFI_TCG_PROTOCOL {
-  EFI_TCG_STATUS_CHECK              StatusCheck;
-  EFI_TCG_HASH_ALL                  HashAll;
-  EFI_TCG_LOG_EVENT                 LogEvent;
-  EFI_TCG_PASS_THROUGH_TO_TPM       PassThroughToTpm;
-  EFI_TCG_HASH_LOG_EXTEND_EVENT     HashLogExtendEvent;
+    EFI_TCG_STATUS_CHECK StatusCheck;
+    EFI_TCG_HASH_ALL HashAll;
+    EFI_TCG_LOG_EVENT LogEvent;
+    EFI_TCG_PASS_THROUGH_TO_TPM PassThroughToTpm;
+    EFI_TCG_HASH_LOG_EXTEND_EVENT HashLogExtendEvent;
 };
 
 extern EFI_GUID gEfiTcgProtocolGuid;

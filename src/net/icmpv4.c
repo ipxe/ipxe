@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <errno.h>
@@ -48,66 +48,66 @@ struct icmp_echo_protocol icmpv4_echo_protocol __icmp_echo_protocol;
  * @v pshdr_csum	Pseudo-header checksum
  * @ret rc		Return status code
  */
-static int icmpv4_rx ( struct io_buffer *iobuf,
-		       struct net_device *netdev __unused,
-		       struct sockaddr_tcpip *st_src,
-		       struct sockaddr_tcpip *st_dest __unused,
-		       uint16_t pshdr_csum __unused ) {
-	struct icmp_header *icmp = iobuf->data;
-	size_t len = iob_len ( iobuf );
-	unsigned int csum;
-	unsigned int type;
-	int rc;
+static int icmpv4_rx(struct io_buffer* iobuf,
+                     struct net_device* netdev __unused,
+                     struct sockaddr_tcpip* st_src,
+                     struct sockaddr_tcpip* st_dest __unused,
+                     uint16_t pshdr_csum __unused) {
+    struct icmp_header* icmp = iobuf->data;
+    size_t len = iob_len(iobuf);
+    unsigned int csum;
+    unsigned int type;
+    int rc;
 
-	/* Sanity check */
-	if ( len < sizeof ( *icmp ) ) {
-		DBG ( "ICMP packet too short at %zd bytes (min %zd bytes)\n",
-		      len, sizeof ( *icmp ) );
-		rc = -EINVAL;
-		goto discard;
-	}
+    /* Sanity check */
+    if (len < sizeof(*icmp)) {
+        DBG("ICMP packet too short at %zd bytes (min %zd bytes)\n",
+            len, sizeof(*icmp));
+        rc = -EINVAL;
+        goto discard;
+    }
 
-	/* Verify checksum */
-	csum = tcpip_chksum ( icmp, len );
-	if ( csum != 0 ) {
-		DBG ( "ICMP checksum incorrect (is %04x, should be 0000)\n",
-		      csum );
-		DBG_HD ( icmp, len );
-		rc = -EINVAL;
-		goto discard;
-	}
+    /* Verify checksum */
+    csum = tcpip_chksum(icmp, len);
+    if (csum != 0) {
+        DBG("ICMP checksum incorrect (is %04x, should be 0000)\n",
+            csum);
+        DBG_HD(icmp, len);
+        rc = -EINVAL;
+        goto discard;
+    }
 
-	/* Handle ICMP packet */
-	type = icmp->type;
-	switch ( type ) {
-	case ICMP_ECHO_REQUEST:
-		return icmp_rx_echo_request ( iobuf, st_src,
-					      &icmpv4_echo_protocol );
-	case ICMP_ECHO_REPLY:
-		return icmp_rx_echo_reply ( iobuf, st_src );
-	default:
-		DBG ( "ICMP ignoring type %d\n", type );
-		rc = 0;
-		break;
-	}
+    /* Handle ICMP packet */
+    type = icmp->type;
+    switch (type) {
+        case ICMP_ECHO_REQUEST:
+            return icmp_rx_echo_request(iobuf, st_src,
+                                        &icmpv4_echo_protocol);
+        case ICMP_ECHO_REPLY:
+            return icmp_rx_echo_reply(iobuf, st_src);
+        default:
+            DBG("ICMP ignoring type %d\n", type);
+            rc = 0;
+            break;
+    }
 
- discard:
-	free_iob ( iobuf );
-	return rc;
+discard:
+    free_iob(iobuf);
+    return rc;
 }
 
 /** ICMPv4 TCP/IP protocol */
 struct tcpip_protocol icmpv4_protocol __tcpip_protocol = {
-	.name = "ICMPv4",
-	.rx = icmpv4_rx,
-	.tcpip_proto = IP_ICMP,
+    .name = "ICMPv4",
+    .rx = icmpv4_rx,
+    .tcpip_proto = IP_ICMP,
 };
 
 /** ICMPv4 echo protocol */
 struct icmp_echo_protocol icmpv4_echo_protocol __icmp_echo_protocol = {
-	.family = AF_INET,
-	.request = ICMP_ECHO_REQUEST,
-	.reply = ICMP_ECHO_REPLY,
-	.tcpip_protocol = &icmpv4_protocol,
-	.net_checksum = 0,
+    .family = AF_INET,
+    .request = ICMP_ECHO_REQUEST,
+    .reply = ICMP_ECHO_REPLY,
+    .tcpip_protocol = &icmpv4_protocol,
+    .net_checksum = 0,
 };

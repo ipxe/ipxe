@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <unistd.h>
 #include <errno.h>
@@ -50,28 +50,28 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Power management timer register address */
 static unsigned int pm_tmr;
 
-struct timer acpi_timer __timer ( TIMER_PREFERRED );
+struct timer acpi_timer __timer(TIMER_PREFERRED);
 
 /**
  * Get current system time in ticks
  *
  * @ret ticks		Current time, in ticks
  */
-static unsigned long acpi_currticks ( void ) {
-	static unsigned long offset;
-	static uint32_t prev;
-	uint32_t now;
+static unsigned long acpi_currticks(void) {
+    static unsigned long offset;
+    static uint32_t prev;
+    uint32_t now;
 
-	/* Read timer and account for wraparound */
-	now = ( inl ( pm_tmr ) & ACPI_TIMER_MASK );
-	if ( now < prev ) {
-		offset += ( ( ACPI_TIMER_MASK + 1 ) /
-			    ( ACPI_TIMER_HZ / TICKS_PER_SEC ) );
-	}
-	prev = now;
+    /* Read timer and account for wraparound */
+    now = (inl(pm_tmr) & ACPI_TIMER_MASK);
+    if (now < prev) {
+        offset += ((ACPI_TIMER_MASK + 1) /
+                   (ACPI_TIMER_HZ / TICKS_PER_SEC));
+    }
+    prev = now;
 
-	/* Convert to timer ticks */
-	return ( offset + ( now / ( ACPI_TIMER_HZ / TICKS_PER_SEC ) ) );
+    /* Convert to timer ticks */
+    return (offset + (now / (ACPI_TIMER_HZ / TICKS_PER_SEC)));
 }
 
 /**
@@ -79,21 +79,21 @@ static unsigned long acpi_currticks ( void ) {
  *
  * @v usecs		Number of microseconds for which to delay
  */
-static void acpi_udelay ( unsigned long usecs ) {
-	uint32_t start;
-	uint32_t elapsed;
-	uint32_t threshold;
+static void acpi_udelay(unsigned long usecs) {
+    uint32_t start;
+    uint32_t elapsed;
+    uint32_t threshold;
 
-	/* Delay until a suitable number of ticks have elapsed.  We do
-	 * not need to allow for multiple wraparound, since the
-	 * wraparound period for a 24-bit timer at 3.579545MHz is
-	 * around 4700000us.
-	 */
-	start = inl ( pm_tmr );
-	threshold = ( ( usecs * ACPI_TIMER_HZ ) / 1000000 );
-	do {
-		elapsed = ( ( inl ( pm_tmr ) - start ) & ACPI_TIMER_MASK );
-	} while ( elapsed < threshold );
+    /* Delay until a suitable number of ticks have elapsed.  We do
+     * not need to allow for multiple wraparound, since the
+     * wraparound period for a 24-bit timer at 3.579545MHz is
+     * around 4700000us.
+     */
+    start = inl(pm_tmr);
+    threshold = ((usecs * ACPI_TIMER_HZ) / 1000000);
+    do {
+        elapsed = ((inl(pm_tmr) - start) & ACPI_TIMER_MASK);
+    } while (elapsed < threshold);
 }
 
 /**
@@ -101,36 +101,36 @@ static void acpi_udelay ( unsigned long usecs ) {
  *
  * @ret rc		Return status code
  */
-static int acpi_timer_probe ( void ) {
-	struct acpi_fadt fadtab;
-	userptr_t fadt;
-	unsigned int pm_tmr_blk;
+static int acpi_timer_probe(void) {
+    struct acpi_fadt fadtab;
+    userptr_t fadt;
+    unsigned int pm_tmr_blk;
 
-	/* Locate FADT */
-	fadt = acpi_find ( FADT_SIGNATURE, 0 );
-	if ( ! fadt ) {
-		DBGC ( &acpi_timer, "ACPI could not find FADT\n" );
-		return -ENOENT;
-	}
+    /* Locate FADT */
+    fadt = acpi_table(FADT_SIGNATURE, 0);
+    if (!fadt) {
+        DBGC(&acpi_timer, "ACPI could not find FADT\n");
+        return -ENOENT;
+    }
 
-	/* Read FADT */
-	copy_from_user ( &fadtab, fadt, 0, sizeof ( fadtab ) );
-	pm_tmr_blk = le32_to_cpu ( fadtab.pm_tmr_blk );
-	if ( ! pm_tmr_blk ) {
-		DBGC ( &acpi_timer, "ACPI has no timer\n" );
-		return -ENOENT;
-	}
+    /* Read FADT */
+    copy_from_user(&fadtab, fadt, 0, sizeof(fadtab));
+    pm_tmr_blk = le32_to_cpu(fadtab.pm_tmr_blk);
+    if (!pm_tmr_blk) {
+        DBGC(&acpi_timer, "ACPI has no timer\n");
+        return -ENOENT;
+    }
 
-	/* Record power management timer register address */
-	pm_tmr = ( pm_tmr_blk + ACPI_PM_TMR );
+    /* Record power management timer register address */
+    pm_tmr = (pm_tmr_blk + ACPI_PM_TMR);
 
-	return 0;
+    return 0;
 }
 
 /** ACPI timer */
-struct timer acpi_timer __timer ( TIMER_PREFERRED ) = {
-	.name = "acpi",
-	.probe = acpi_timer_probe,
-	.currticks = acpi_currticks,
-	.udelay = acpi_udelay,
+struct timer acpi_timer __timer(TIMER_PREFERRED) = {
+    .name = "acpi",
+    .probe = acpi_timer_probe,
+    .currticks = acpi_currticks,
+    .udelay = acpi_udelay,
 };

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <string.h>
@@ -40,56 +40,57 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v result0		Element 0 of big integer to hold result
  * @v size		Number of elements
  */
-void bigint_multiply_raw ( const uint32_t *multiplicand0,
-			   const uint32_t *multiplier0,
-			   uint32_t *result0, unsigned int size ) {
-	const bigint_t ( size ) __attribute__ (( may_alias )) *multiplicand =
-		( ( const void * ) multiplicand0 );
-	const bigint_t ( size ) __attribute__ (( may_alias )) *multiplier =
-		( ( const void * ) multiplier0 );
-	bigint_t ( size * 2 ) __attribute__ (( may_alias )) *result =
-		( ( void * ) result0 );
-	unsigned int i;
-	unsigned int j;
-	uint32_t multiplicand_element;
-	uint32_t multiplier_element;
-	uint32_t *result_elements;
-	uint32_t discard_a;
-	uint32_t discard_d;
-	long index;
+void bigint_multiply_raw(const uint32_t* multiplicand0,
+                         const uint32_t* multiplier0,
+                         uint32_t* result0, unsigned int size) {
+    const bigint_t(size) __attribute__((may_alias))* multiplicand =
+        ((const void*)multiplicand0);
+    const bigint_t(size) __attribute__((may_alias))* multiplier =
+        ((const void*)multiplier0);
+    bigint_t(size * 2) __attribute__((may_alias))* result =
+        ((void*)result0);
+    unsigned int i;
+    unsigned int j;
+    uint32_t multiplicand_element;
+    uint32_t multiplier_element;
+    uint32_t* result_elements;
+    uint32_t discard_a;
+    uint32_t discard_d;
+    long index;
 
-	/* Zero result */
-	memset ( result, 0, sizeof ( *result ) );
+    /* Zero result */
+    memset(result, 0, sizeof(*result));
 
-	/* Multiply integers one element at a time */
-	for ( i = 0 ; i < size ; i++ ) {
-		multiplicand_element = multiplicand->element[i];
-		for ( j = 0 ; j < size ; j++ ) {
-			multiplier_element = multiplier->element[j];
-			result_elements = &result->element[ i + j ];
-			/* Perform a single multiply, and add the
-			 * resulting double-element into the result,
-			 * carrying as necessary.  The carry can
-			 * never overflow beyond the end of the
-			 * result, since:
-			 *
-			 *     a < 2^{n}, b < 2^{n} => ab < 2^{2n}
-			 */
-			__asm__ __volatile__ ( "mull %4\n\t"
-					       "addl %%eax, (%5,%2,4)\n\t"
-					       "adcl %%edx, 4(%5,%2,4)\n\t"
-					       "\n1:\n\t"
-					       "adcl $0, 8(%5,%2,4)\n\t"
-					       "inc %2\n\t"
-						       /* Does not affect CF */
-					       "jc 1b\n\t"
-					       : "=&a" ( discard_a ),
-						 "=&d" ( discard_d ),
-						 "=&r" ( index )
-					       : "0" ( multiplicand_element ),
-						 "g" ( multiplier_element ),
-						 "r" ( result_elements ),
-						 "2" ( 0 ) );
-		}
-	}
+    /* Multiply integers one element at a time */
+    for (i = 0; i < size; i++) {
+        multiplicand_element = multiplicand->element[i];
+        for (j = 0; j < size; j++) {
+            multiplier_element = multiplier->element[j];
+            result_elements = &result->element[i + j];
+            /* Perform a single multiply, and add the
+             * resulting double-element into the result,
+             * carrying as necessary.  The carry can
+             * never overflow beyond the end of the
+             * result, since:
+             *
+             *     a < 2^{n}, b < 2^{n} => ab < 2^{2n}
+             */
+            __asm__ __volatile__("mull %5\n\t"
+                                 "addl %%eax, (%6,%2,4)\n\t"
+                                 "adcl %%edx, 4(%6,%2,4)\n\t"
+                                 "\n1:\n\t"
+                                 "adcl $0, 8(%6,%2,4)\n\t"
+                                 "inc %2\n\t"
+                                 /* Does not affect CF */
+                                 "jc 1b\n\t"
+                                 : "=&a"(discard_a),
+                                   "=&d"(discard_d),
+                                   "=&r"(index),
+                                   "+m"(*result)
+                                 : "0"(multiplicand_element),
+                                   "g"(multiplier_element),
+                                   "r"(result_elements),
+                                   "2"(0));
+        }
+    }
 }

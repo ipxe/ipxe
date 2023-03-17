@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * Copyright (C) 2010 VMware, Inc.  All Rights Reserved.
  *
@@ -22,19 +24,19 @@
  */
 
 #ifndef _DHCP_ARCH_H
-#define _DHCP_ARCH_H
+    #define _DHCP_ARCH_H
 
 /** @file
  *
  * Architecture-specific DHCP options
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <ipxe/dhcp.h>
+    #include <ipxe/dhcp.h>
 
-#define DHCP_ARCH_CLIENT_ARCHITECTURE DHCP_CLIENT_ARCHITECTURE_X86
+    #define DHCP_ARCH_CLIENT_ARCHITECTURE DHCP_CLIENT_ARCHITECTURE_X86
 
-#define DHCP_ARCH_CLIENT_NDI 1 /* UNDI */ , 2, 1 /* v2.1 */
+    #define DHCP_ARCH_CLIENT_NDI 1 /* UNDI */, 2, 1 /* v2.1 */
 
 #endif

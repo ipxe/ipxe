@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -43,18 +43,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * separator.  The caller may restore the string using
  * netbios_domain_undo().
  */
-const char * netbios_domain ( char **username ) {
-	char *domain_username = *username;
-	char *sep;
+const char* netbios_domain(char** username) {
+    char* domain_username = *username;
+    char* sep;
 
-	/* Find separator, if present */
-	sep = strchr ( domain_username, '\\' );
-	if ( ! sep )
-		return NULL;
+    /* Find separator, if present */
+    sep = strchr(domain_username, '\\');
+    if (!sep)
+        return NULL;
 
-	/* Overwrite separator with NUL terminator and update username string */
-	*sep = '\0';
-	*username = ( sep + 1 );
+    /* Overwrite separator with NUL terminator and update username string */
+    *sep = '\0';
+    *username = (sep + 1);
 
-	return domain_username;
+    return domain_username;
 }

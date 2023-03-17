@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <string.h>
@@ -41,19 +41,25 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-FEATURE ( FEATURE_PROTOCOL, "VLAN", DHCP_EB_FEATURE_VLAN, 1 );
+FEATURE(FEATURE_PROTOCOL, "VLAN", DHCP_EB_FEATURE_VLAN, 1);
 
 struct net_protocol vlan_protocol __net_protocol;
 
 /** VLAN device private data */
 struct vlan_device {
-	/** Trunk network device */
-	struct net_device *trunk;
-	/** VLAN tag */
-	unsigned int tag;
-	/** Default priority */
-	unsigned int priority;
+    /** Trunk network device */
+    struct net_device* trunk;
+    /** VLAN tag */
+    unsigned int tag;
+    /** Default priority */
+    unsigned int priority;
 };
+
+/** Automatic VLAN device link-layer address */
+static uint8_t vlan_auto_ll_addr[ETH_ALEN];
+
+/** Automatic VLAN tag */
+static unsigned int vlan_auto_tag;
 
 /**
  * Open VLAN device
@@ -61,10 +67,10 @@ struct vlan_device {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-static int vlan_open ( struct net_device *netdev ) {
-	struct vlan_device *vlan = netdev->priv;
+static int vlan_open(struct net_device* netdev) {
+    struct vlan_device* vlan = netdev->priv;
 
-	return netdev_open ( vlan->trunk );
+    return netdev_open(vlan->trunk);
 }
 
 /**
@@ -72,10 +78,10 @@ static int vlan_open ( struct net_device *netdev ) {
  *
  * @v netdev		Network device
  */
-static void vlan_close ( struct net_device *netdev ) {
-	struct vlan_device *vlan = netdev->priv;
+static void vlan_close(struct net_device* netdev) {
+    struct vlan_device* vlan = netdev->priv;
 
-	netdev_close ( vlan->trunk );
+    netdev_close(vlan->trunk);
 }
 
 /**
@@ -85,51 +91,51 @@ static void vlan_close ( struct net_device *netdev ) {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int vlan_transmit ( struct net_device *netdev,
-			   struct io_buffer *iobuf ) {
-	struct vlan_device *vlan = netdev->priv;
-	struct net_device *trunk = vlan->trunk;
-	struct ll_protocol *ll_protocol;
-	struct vlan_header *vlanhdr;
-	uint8_t ll_dest_copy[ETH_ALEN];
-	uint8_t ll_source_copy[ETH_ALEN];
-	const void *ll_dest;
-	const void *ll_source;
-	uint16_t net_proto;
-	unsigned int flags;
-	int rc;
+static int vlan_transmit(struct net_device* netdev,
+                         struct io_buffer* iobuf) {
+    struct vlan_device* vlan = netdev->priv;
+    struct net_device* trunk = vlan->trunk;
+    struct ll_protocol* ll_protocol;
+    struct vlan_header* vlanhdr;
+    uint8_t ll_dest_copy[ETH_ALEN];
+    uint8_t ll_source_copy[ETH_ALEN];
+    const void* ll_dest;
+    const void* ll_source;
+    uint16_t net_proto;
+    unsigned int flags;
+    int rc;
 
-	/* Strip link-layer header and preserve link-layer header fields */
-	ll_protocol = netdev->ll_protocol;
-	if ( ( rc = ll_protocol->pull ( netdev, iobuf, &ll_dest, &ll_source,
-					&net_proto, &flags ) ) != 0 ) {
-		DBGC ( netdev, "VLAN %s could not parse link-layer header: "
-		       "%s\n", netdev->name, strerror ( rc ) );
-		return rc;
-	}
-	memcpy ( ll_dest_copy, ll_dest, ETH_ALEN );
-	memcpy ( ll_source_copy, ll_source, ETH_ALEN );
+    /* Strip link-layer header and preserve link-layer header fields */
+    ll_protocol = netdev->ll_protocol;
+    if ((rc = ll_protocol->pull(netdev, iobuf, &ll_dest, &ll_source,
+                                &net_proto, &flags)) != 0) {
+        DBGC(netdev, "VLAN %s could not parse link-layer header: "
+                     "%s\n", netdev->name, strerror(rc));
+        return rc;
+    }
+    memcpy(ll_dest_copy, ll_dest, ETH_ALEN);
+    memcpy(ll_source_copy, ll_source, ETH_ALEN);
 
-	/* Construct VLAN header */
-	vlanhdr = iob_push ( iobuf, sizeof ( *vlanhdr ) );
-	vlanhdr->tci = htons ( VLAN_TCI ( vlan->tag, vlan->priority ) );
-	vlanhdr->net_proto = net_proto;
+    /* Construct VLAN header */
+    vlanhdr = iob_push(iobuf, sizeof(*vlanhdr));
+    vlanhdr->tci = htons(VLAN_TCI(vlan->tag, vlan->priority));
+    vlanhdr->net_proto = net_proto;
 
-	/* Reclaim I/O buffer from VLAN device's TX queue */
-	list_del ( &iobuf->list );
+    /* Reclaim I/O buffer from VLAN device's TX queue */
+    list_del(&iobuf->list);
 
-	/* Transmit packet on trunk device */
-	if ( ( rc = net_tx ( iob_disown ( iobuf ), trunk, &vlan_protocol,
-			     ll_dest_copy, ll_source_copy ) ) != 0 ) {
-		DBGC ( netdev, "VLAN %s could not transmit: %s\n",
-		       netdev->name, strerror ( rc ) );
-		/* Cannot return an error status, since that would
-		 * cause the I/O buffer to be double-freed.
-		 */
-		return 0;
-	}
+    /* Transmit packet on trunk device */
+    if ((rc = net_tx(iob_disown(iobuf), trunk, &vlan_protocol,
+                     ll_dest_copy, ll_source_copy)) != 0) {
+        DBGC(netdev, "VLAN %s could not transmit: %s\n",
+             netdev->name, strerror(rc));
+        /* Cannot return an error status, since that would
+         * cause the I/O buffer to be double-freed.
+         */
+        return 0;
+    }
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -137,11 +143,11 @@ static int vlan_transmit ( struct net_device *netdev,
  *
  * @v netdev		Network device
  */
-static void vlan_poll ( struct net_device *netdev ) {
-	struct vlan_device *vlan = netdev->priv;
+static void vlan_poll(struct net_device* netdev) {
+    struct vlan_device* vlan = netdev->priv;
 
-	/* Poll trunk device */
-	netdev_poll ( vlan->trunk );
+    /* Poll trunk device */
+    netdev_poll(vlan->trunk);
 }
 
 /**
@@ -150,23 +156,23 @@ static void vlan_poll ( struct net_device *netdev ) {
  * @v netdev		Network device
  * @v enable		Interrupts should be enabled
  */
-static void vlan_irq ( struct net_device *netdev, int enable ) {
-	struct vlan_device *vlan = netdev->priv;
+static void vlan_irq(struct net_device* netdev, int enable) {
+    struct vlan_device* vlan = netdev->priv;
 
-	/* Enable/disable interrupts on trunk device.  This is not at
-	 * all robust, but there is no sensible course of action
-	 * available.
-	 */
-	netdev_irq ( vlan->trunk, enable );
+    /* Enable/disable interrupts on trunk device.  This is not at
+     * all robust, but there is no sensible course of action
+     * available.
+     */
+    netdev_irq(vlan->trunk, enable);
 }
 
 /** VLAN device operations */
 static struct net_device_operations vlan_operations = {
-	.open		= vlan_open,
-	.close		= vlan_close,
-	.transmit	= vlan_transmit,
-	.poll		= vlan_poll,
-	.irq		= vlan_irq,
+    .open = vlan_open,
+    .close = vlan_close,
+    .transmit = vlan_transmit,
+    .poll = vlan_poll,
+    .irq = vlan_irq,
 };
 
 /**
@@ -174,22 +180,22 @@ static struct net_device_operations vlan_operations = {
  *
  * @v netdev		Network device
  */
-static void vlan_sync ( struct net_device *netdev ) {
-	struct vlan_device *vlan = netdev->priv;
-	struct net_device *trunk = vlan->trunk;
+static void vlan_sync(struct net_device* netdev) {
+    struct vlan_device* vlan = netdev->priv;
+    struct net_device* trunk = vlan->trunk;
 
-	/* Synchronise link status */
-	if ( netdev->link_rc != trunk->link_rc )
-		netdev_link_err ( netdev, trunk->link_rc );
+    /* Synchronise link status */
+    if (netdev->link_rc != trunk->link_rc)
+        netdev_link_err(netdev, trunk->link_rc);
 
-	/* Synchronise open/closed status */
-	if ( netdev_is_open ( trunk ) ) {
-		if ( ! netdev_is_open ( netdev ) )
-			netdev_open ( netdev );
-	} else {
-		if ( netdev_is_open ( netdev ) )
-			netdev_close ( netdev );
-	}
+    /* Synchronise open/closed status */
+    if (netdev_is_open(trunk)) {
+        if (!netdev_is_open(netdev))
+            netdev_open(netdev);
+    } else {
+        if (netdev_is_open(netdev))
+            netdev_close(netdev);
+    }
 }
 
 /**
@@ -199,19 +205,18 @@ static void vlan_sync ( struct net_device *netdev ) {
  * @v tag		VLAN tag
  * @ret netdev		VLAN device, if any
  */
-static struct net_device * vlan_find ( struct net_device *trunk,
-				       unsigned int tag ) {
-	struct net_device *netdev;
-	struct vlan_device *vlan;
+struct net_device* vlan_find(struct net_device* trunk, unsigned int tag) {
+    struct net_device* netdev;
+    struct vlan_device* vlan;
 
-	for_each_netdev ( netdev ) {
-		if ( netdev->op != &vlan_operations )
-			continue;
-		vlan = netdev->priv;
-		if ( ( vlan->trunk == trunk ) && ( vlan->tag == tag ) )
-			return netdev;
-	}
-	return NULL;
+    for_each_netdev(netdev) {
+        if (netdev->op != &vlan_operations)
+            continue;
+        vlan = netdev->priv;
+        if ((vlan->trunk == trunk) && (vlan->tag == tag))
+            return netdev;
+    }
+    return NULL;
 }
 
 /**
@@ -224,84 +229,84 @@ static struct net_device * vlan_find ( struct net_device *trunk,
  * @v flags		Packet flags
  * @ret rc		Return status code
  */
-static int vlan_rx ( struct io_buffer *iobuf, struct net_device *trunk,
-		     const void *ll_dest, const void *ll_source,
-		     unsigned int flags __unused ) {
-	struct vlan_header *vlanhdr = iobuf->data;
-	struct net_device *netdev;
-	struct ll_protocol *ll_protocol;
-	uint8_t ll_dest_copy[ETH_ALEN];
-	uint8_t ll_source_copy[ETH_ALEN];
-	uint16_t tag;
-	int rc;
+static int vlan_rx(struct io_buffer* iobuf, struct net_device* trunk,
+                   const void* ll_dest, const void* ll_source,
+                   unsigned int flags __unused) {
+    struct vlan_header* vlanhdr = iobuf->data;
+    struct net_device* netdev;
+    struct ll_protocol* ll_protocol;
+    uint8_t ll_dest_copy[ETH_ALEN];
+    uint8_t ll_source_copy[ETH_ALEN];
+    uint16_t tag;
+    int rc;
 
-	/* Sanity check */
-	if ( iob_len ( iobuf ) < sizeof ( *vlanhdr ) ) {
-		DBGC ( trunk, "VLAN %s received underlength packet (%zd "
-		       "bytes)\n", trunk->name, iob_len ( iobuf ) );
-		rc = -EINVAL;
-		goto err_sanity;
-	}
+    /* Sanity check */
+    if (iob_len(iobuf) < sizeof(*vlanhdr)) {
+        DBGC(trunk, "VLAN %s received underlength packet (%zd "
+                    "bytes)\n", trunk->name, iob_len(iobuf));
+        rc = -EINVAL;
+        goto err_sanity;
+    }
 
-	/* Identify VLAN device */
-	tag = VLAN_TAG ( ntohs ( vlanhdr->tci ) );
-	netdev = vlan_find ( trunk, tag );
-	if ( ! netdev ) {
-		DBGC2 ( trunk, "VLAN %s received packet for unknown VLAN "
-			"%d\n", trunk->name, tag );
-		rc = -EPIPE;
-		goto err_no_vlan;
-	}
+    /* Identify VLAN device */
+    tag = VLAN_TAG(ntohs(vlanhdr->tci));
+    netdev = vlan_find(trunk, tag);
+    if (!netdev) {
+        DBGC2(trunk, "VLAN %s received packet for unknown VLAN "
+                     "%d\n", trunk->name, tag);
+        rc = -EPIPE;
+        goto err_no_vlan;
+    }
 
-	/* Strip VLAN header and preserve original link-layer header fields */
-	iob_pull ( iobuf, sizeof ( *vlanhdr ) );
-	ll_protocol = trunk->ll_protocol;
-	memcpy ( ll_dest_copy, ll_dest, ETH_ALEN );
-	memcpy ( ll_source_copy, ll_source, ETH_ALEN );
+    /* Strip VLAN header and preserve original link-layer header fields */
+    iob_pull(iobuf, sizeof(*vlanhdr));
+    ll_protocol = trunk->ll_protocol;
+    memcpy(ll_dest_copy, ll_dest, ETH_ALEN);
+    memcpy(ll_source_copy, ll_source, ETH_ALEN);
 
-	/* Reconstruct link-layer header for VLAN device */
-	ll_protocol = netdev->ll_protocol;
-	if ( ( rc = ll_protocol->push ( netdev, iobuf, ll_dest_copy,
-					ll_source_copy,
-					vlanhdr->net_proto ) ) != 0 ) {
-		DBGC ( netdev, "VLAN %s could not reconstruct link-layer "
-		       "header: %s\n", netdev->name, strerror ( rc ) );
-		goto err_ll_push;
-	}
+    /* Reconstruct link-layer header for VLAN device */
+    ll_protocol = netdev->ll_protocol;
+    if ((rc = ll_protocol->push(netdev, iobuf, ll_dest_copy,
+                                ll_source_copy,
+                                vlanhdr->net_proto)) != 0) {
+        DBGC(netdev, "VLAN %s could not reconstruct link-layer "
+                     "header: %s\n", netdev->name, strerror(rc));
+        goto err_ll_push;
+    }
 
-	/* Enqueue packet on VLAN device */
-	netdev_rx ( netdev, iob_disown ( iobuf ) );
-	return 0;
+    /* Enqueue packet on VLAN device */
+    netdev_rx(netdev, iob_disown(iobuf));
+    return 0;
 
- err_ll_push:
- err_no_vlan:
- err_sanity:
-	free_iob ( iobuf );
-	return rc;
+err_ll_push:
+err_no_vlan:
+err_sanity:
+    free_iob(iobuf);
+    return rc;
 }
 
 /** VLAN protocol */
 struct net_protocol vlan_protocol __net_protocol = {
-	.name = "VLAN",
-	.net_proto = htons ( ETH_P_8021Q ),
-	.rx = vlan_rx,
+    .name = "VLAN",
+    .net_proto = htons(ETH_P_8021Q),
+    .rx = vlan_rx,
 };
 
 /**
- * Get the VLAN tag
+ * Get the VLAN tag control information
  *
  * @v netdev		Network device
- * @ret tag		VLAN tag, or 0 if device is not a VLAN device
+ * @ret tci		VLAN tag control information, or 0 if not a VLAN device
  */
-unsigned int vlan_tag ( struct net_device *netdev ) {
-	struct vlan_device *vlan;
+unsigned int vlan_tci(struct net_device* netdev) {
+    struct vlan_device* vlan;
 
-	if ( netdev->op == &vlan_operations ) {
-		vlan = netdev->priv;
-		return vlan->tag;
-	} else {
-		return 0;
-	}
+    if (netdev->op == &vlan_operations) {
+        vlan = netdev->priv;
+        return (VLAN_TCI(vlan->tag, vlan->priority));
+    } else {
+        return 0;
+    }
 }
 
 /**
@@ -321,10 +326,9 @@ unsigned int vlan_tag ( struct net_device *netdev ) {
  * As an additional check, and primarily to assist with the sanity of
  * the FCoE code, we refuse to allow nested VLANs.
  */
-int vlan_can_be_trunk ( struct net_device *trunk ) {
-
-	return ( ( trunk->ll_protocol->ll_addr_len == ETH_ALEN ) &&
-		 ( trunk->op != &vlan_operations ) );
+int vlan_can_be_trunk(struct net_device* trunk) {
+    return ((trunk->ll_protocol->ll_addr_len == ETH_ALEN) &&
+            (trunk->op != &vlan_operations));
 }
 
 /**
@@ -335,88 +339,88 @@ int vlan_can_be_trunk ( struct net_device *trunk ) {
  * @v priority		Default VLAN priority
  * @ret rc		Return status code
  */
-int vlan_create ( struct net_device *trunk, unsigned int tag,
-		  unsigned int priority ) {
-	struct net_device *netdev;
-	struct vlan_device *vlan;
-	int rc;
+int vlan_create(struct net_device* trunk, unsigned int tag,
+                unsigned int priority) {
+    struct net_device* netdev;
+    struct vlan_device* vlan;
+    int rc;
 
-	/* If VLAN already exists, just update the priority */
-	if ( ( netdev = vlan_find ( trunk, tag ) ) != NULL ) {
-		vlan = netdev->priv;
-		if ( priority != vlan->priority ) {
-			DBGC ( netdev, "VLAN %s priority changed from %d to "
-			       "%d\n", netdev->name, vlan->priority, priority );
-		}
-		vlan->priority = priority;
-		return 0;
-	}
+    /* If VLAN already exists, just update the priority */
+    if ((netdev = vlan_find(trunk, tag)) != NULL) {
+        vlan = netdev->priv;
+        if (priority != vlan->priority) {
+            DBGC(netdev, "VLAN %s priority changed from %d to "
+                         "%d\n", netdev->name, vlan->priority, priority);
+        }
+        vlan->priority = priority;
+        return 0;
+    }
 
-	/* Sanity checks */
-	if ( ! vlan_can_be_trunk ( trunk ) ) {
-		DBGC ( trunk, "VLAN %s cannot create VLAN on non-trunk "
-		       "device\n", trunk->name );
-		rc = -ENOTTY;
-		goto err_sanity;
-	}
-	if ( ! VLAN_TAG_IS_VALID ( tag ) ) {
-		DBGC ( trunk, "VLAN %s cannot create VLAN with invalid tag "
-		       "%d\n", trunk->name, tag );
-		rc = -EINVAL;
-		goto err_sanity;
-	}
-	if ( ! VLAN_PRIORITY_IS_VALID ( priority ) ) {
-		DBGC ( trunk, "VLAN %s cannot create VLAN with invalid "
-		       "priority %d\n", trunk->name, priority );
-		rc = -EINVAL;
-		goto err_sanity;
-	}
+    /* Sanity checks */
+    if (!vlan_can_be_trunk(trunk)) {
+        DBGC(trunk, "VLAN %s cannot create VLAN on non-trunk "
+                    "device\n", trunk->name);
+        rc = -ENOTTY;
+        goto err_sanity;
+    }
+    if (!VLAN_TAG_IS_VALID(tag)) {
+        DBGC(trunk, "VLAN %s cannot create VLAN with invalid tag "
+                    "%d\n", trunk->name, tag);
+        rc = -EINVAL;
+        goto err_sanity;
+    }
+    if (!VLAN_PRIORITY_IS_VALID(priority)) {
+        DBGC(trunk, "VLAN %s cannot create VLAN with invalid "
+                    "priority %d\n", trunk->name, priority);
+        rc = -EINVAL;
+        goto err_sanity;
+    }
 
-	/* Allocate and initialise structure */
-	netdev = alloc_etherdev ( sizeof ( *vlan ) );
-	if ( ! netdev ) {
-		rc = -ENOMEM;
-		goto err_alloc_etherdev;
-	}
-	netdev_init ( netdev, &vlan_operations );
-	netdev->dev = trunk->dev;
-	memcpy ( netdev->hw_addr, trunk->ll_addr, ETH_ALEN );
-	vlan = netdev->priv;
-	vlan->trunk = netdev_get ( trunk );
-	vlan->tag = tag;
-	vlan->priority = priority;
+    /* Allocate and initialise structure */
+    netdev = alloc_etherdev(sizeof(*vlan));
+    if (!netdev) {
+        rc = -ENOMEM;
+        goto err_alloc_etherdev;
+    }
+    netdev_init(netdev, &vlan_operations);
+    netdev->dev = trunk->dev;
+    memcpy(netdev->hw_addr, trunk->ll_addr, ETH_ALEN);
+    vlan = netdev->priv;
+    vlan->trunk = netdev_get(trunk);
+    vlan->tag = tag;
+    vlan->priority = priority;
 
-	/* Construct VLAN device name */
-	snprintf ( netdev->name, sizeof ( netdev->name ), "%s-%d",
-		   trunk->name, vlan->tag );
+    /* Construct VLAN device name */
+    snprintf(netdev->name, sizeof(netdev->name), "%s-%d",
+             trunk->name, vlan->tag);
 
-	/* Mark device as not supporting interrupts, if applicable */
-	if ( ! netdev_irq_supported ( trunk ) )
-		netdev->state |= NETDEV_IRQ_UNSUPPORTED;
+    /* Mark device as not supporting interrupts, if applicable */
+    if (!netdev_irq_supported(trunk))
+        netdev->state |= NETDEV_IRQ_UNSUPPORTED;
 
-	/* Register VLAN device */
-	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
-		DBGC ( netdev, "VLAN %s could not register: %s\n",
-		       netdev->name, strerror ( rc ) );
-		goto err_register;
-	}
+    /* Register VLAN device */
+    if ((rc = register_netdev(netdev)) != 0) {
+        DBGC(netdev, "VLAN %s could not register: %s\n",
+             netdev->name, strerror(rc));
+        goto err_register;
+    }
 
-	/* Synchronise with trunk device */
-	vlan_sync ( netdev );
+    /* Synchronise with trunk device */
+    vlan_sync(netdev);
 
-	DBGC ( netdev, "VLAN %s created with tag %d and priority %d\n",
-	       netdev->name, vlan->tag, vlan->priority );
+    DBGC(netdev, "VLAN %s created with tag %d and priority %d\n",
+         netdev->name, vlan->tag, vlan->priority);
 
-	return 0;
+    return 0;
 
-	unregister_netdev ( netdev );
- err_register:
-	netdev_nullify ( netdev );
-	netdev_put ( netdev );
-	netdev_put ( trunk );
- err_alloc_etherdev:
- err_sanity:
-	return rc;
+    unregister_netdev(netdev);
+err_register:
+    netdev_nullify(netdev);
+    netdev_put(netdev);
+    netdev_put(trunk);
+err_alloc_etherdev:
+err_sanity:
+    return rc;
 }
 
 /**
@@ -425,27 +429,67 @@ int vlan_create ( struct net_device *trunk, unsigned int tag,
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-int vlan_destroy ( struct net_device *netdev ) {
-	struct vlan_device *vlan = netdev->priv;
-	struct net_device *trunk;
+int vlan_destroy(struct net_device* netdev) {
+    struct vlan_device* vlan = netdev->priv;
+    struct net_device* trunk;
 
-	/* Sanity check */
-	if ( netdev->op != &vlan_operations ) {
-		DBGC ( netdev, "VLAN %s cannot destroy non-VLAN device\n",
-		       netdev->name );
-		return -ENOTTY;
-	}
+    /* Sanity check */
+    if (netdev->op != &vlan_operations) {
+        DBGC(netdev, "VLAN %s cannot destroy non-VLAN device\n",
+             netdev->name);
+        return -ENOTTY;
+    }
 
-	DBGC ( netdev, "VLAN %s destroyed\n", netdev->name );
+    DBGC(netdev, "VLAN %s destroyed\n", netdev->name);
 
-	/* Remove VLAN device */
-	unregister_netdev ( netdev );
-	trunk = vlan->trunk;
-	netdev_nullify ( netdev );
-	netdev_put ( netdev );
-	netdev_put ( trunk );
+    /* Remove VLAN device */
+    unregister_netdev(netdev);
+    trunk = vlan->trunk;
+    netdev_nullify(netdev);
+    netdev_put(netdev);
+    netdev_put(trunk);
 
-	return 0;
+    return 0;
+}
+
+/**
+ * Configure automatic VLAN device
+ *
+ * @v ll_addr		Link-layer address
+ * @v tag		VLAN tag
+ */
+void vlan_auto(const void* ll_addr, unsigned int tag) {
+    /* Record link-layer address and VLAN tag */
+    memcpy(vlan_auto_ll_addr, ll_addr, ETH_ALEN);
+    vlan_auto_tag = tag;
+}
+
+/**
+ * Create automatic VLAN device
+ *
+ * @v trunk		Trunk network device
+ * @ret rc		Return status code
+ */
+static int vlan_probe(struct net_device* trunk) {
+    int rc;
+
+    /* Do nothing unless an automatic VLAN exists */
+    if (!vlan_auto_tag)
+        return 0;
+
+    /* Ignore non-trunk devices */
+    if (!vlan_can_be_trunk(trunk))
+        return 0;
+
+    /* Ignore non-matching link-layer addresses */
+    if (memcmp(trunk->ll_addr, vlan_auto_ll_addr, ETH_ALEN) != 0)
+        return 0;
+
+    /* Create automatic VLAN device */
+    if ((rc = vlan_create(trunk, vlan_auto_tag, 0)) != 0)
+        return rc;
+
+    return 0;
 }
 
 /**
@@ -453,17 +497,17 @@ int vlan_destroy ( struct net_device *netdev ) {
  *
  * @v trunk		Trunk network device
  */
-static void vlan_notify ( struct net_device *trunk ) {
-	struct net_device *netdev;
-	struct vlan_device *vlan;
+static void vlan_notify(struct net_device* trunk) {
+    struct net_device* netdev;
+    struct vlan_device* vlan;
 
-	for_each_netdev ( netdev ) {
-		if ( netdev->op != &vlan_operations )
-			continue;
-		vlan = netdev->priv;
-		if ( vlan->trunk == trunk )
-			vlan_sync ( netdev );
-	}
+    for_each_netdev(netdev) {
+        if (netdev->op != &vlan_operations)
+            continue;
+        vlan = netdev->priv;
+        if (vlan->trunk == trunk)
+            vlan_sync(netdev);
+    }
 }
 
 /**
@@ -472,20 +516,20 @@ static void vlan_notify ( struct net_device *trunk ) {
  * @v trunk		Trunk network device
  * @ret found		A VLAN device was found
  */
-static int vlan_remove_first ( struct net_device *trunk ) {
-	struct net_device *netdev;
-	struct vlan_device *vlan;
+static int vlan_remove_first(struct net_device* trunk) {
+    struct net_device* netdev;
+    struct vlan_device* vlan;
 
-	for_each_netdev ( netdev ) {
-		if ( netdev->op != &vlan_operations )
-			continue;
-		vlan = netdev->priv;
-		if ( vlan->trunk == trunk ) {
-			vlan_destroy ( netdev );
-			return 1;
-		}
-	}
-	return 0;
+    for_each_netdev(netdev) {
+        if (netdev->op != &vlan_operations)
+            continue;
+        vlan = netdev->priv;
+        if (vlan->trunk == trunk) {
+            vlan_destroy(netdev);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /**
@@ -493,19 +537,20 @@ static int vlan_remove_first ( struct net_device *trunk ) {
  *
  * @v trunk		Trunk network device
  */
-static void vlan_remove ( struct net_device *trunk ) {
-
-	/* Remove all VLAN devices attached to this trunk, safe
-	 * against arbitrary net device removal.
-	 */
-	while ( vlan_remove_first ( trunk ) ) {}
+static void vlan_remove(struct net_device* trunk) {
+    /* Remove all VLAN devices attached to this trunk, safe
+     * against arbitrary net device removal.
+     */
+    while (vlan_remove_first(trunk)) {
+    }
 }
 
 /** VLAN driver */
 struct net_driver vlan_driver __net_driver = {
-	.name = "VLAN",
-	.notify = vlan_notify,
-	.remove = vlan_remove,
+    .name = "VLAN",
+    .probe = vlan_probe,
+    .notify = vlan_notify,
+    .remove = vlan_remove,
 };
 
 /**
@@ -515,21 +560,21 @@ struct net_driver vlan_driver __net_driver = {
  * @v tag		VLAN tag, or zero
  * @v iobuf		I/O buffer
  */
-void vlan_netdev_rx ( struct net_device *netdev, unsigned int tag,
-		      struct io_buffer *iobuf ) {
-	struct net_device *vlan;
+void vlan_netdev_rx(struct net_device* netdev, unsigned int tag,
+                    struct io_buffer* iobuf) {
+    struct net_device* vlan;
 
-	/* Identify VLAN device, if applicable */
-	if ( tag ) {
-		if ( ( vlan = vlan_find ( netdev, tag ) ) == NULL ) {
-			netdev_rx_err ( netdev, iobuf, -ENODEV );
-			return;
-		}
-		netdev = vlan;
-	}
+    /* Identify VLAN device, if applicable */
+    if (tag) {
+        if ((vlan = vlan_find(netdev, tag)) == NULL) {
+            netdev_rx_err(netdev, iobuf, -ENODEV);
+            return;
+        }
+        netdev = vlan;
+    }
 
-	/* Hand off to network device */
-	netdev_rx ( netdev, iobuf );
+    /* Hand off to network device */
+    netdev_rx(netdev, iobuf);
 }
 
 /**
@@ -540,14 +585,14 @@ void vlan_netdev_rx ( struct net_device *netdev, unsigned int tag,
  * @v iobuf		I/O buffer, or NULL
  * @v rc		Packet status code
  */
-void vlan_netdev_rx_err ( struct net_device *netdev, unsigned int tag,
-			  struct io_buffer *iobuf, int rc ) {
-	struct net_device *vlan;
+void vlan_netdev_rx_err(struct net_device* netdev, unsigned int tag,
+                        struct io_buffer* iobuf, int rc) {
+    struct net_device* vlan;
 
-	/* Identify VLAN device, if applicable */
-	if ( tag && ( ( vlan = vlan_find ( netdev, tag ) ) != NULL ) )
-		netdev = vlan;
+    /* Identify VLAN device, if applicable */
+    if (tag && ((vlan = vlan_find(netdev, tag)) != NULL))
+        netdev = vlan;
 
-	/* Hand off to network device */
-	netdev_rx_err ( netdev, iobuf, rc );
+    /* Hand off to network device */
+    netdev_rx_err(netdev, iobuf, rc);
 }

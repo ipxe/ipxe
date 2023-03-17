@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 #include <stdlib.h>
 #include <string.h>
@@ -30,25 +30,24 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_download.h>
 
 /** iPXE download protocol GUID */
-static EFI_GUID ipxe_download_protocol_guid
-	= IPXE_DOWNLOAD_PROTOCOL_GUID;
+static EFI_GUID ipxe_download_protocol_guid = IPXE_DOWNLOAD_PROTOCOL_GUID;
 
 /** A single in-progress file */
 struct efi_download_file {
-	/** Data transfer interface that provides downloaded data */
-	struct interface xfer;
+    /** Data transfer interface that provides downloaded data */
+    struct interface xfer;
 
-	/** Current file position */
-	size_t pos;
+    /** Current file position */
+    size_t pos;
 
-	/** Data callback */
-	IPXE_DOWNLOAD_DATA_CALLBACK data_callback;
+    /** Data callback */
+    IPXE_DOWNLOAD_DATA_CALLBACK data_callback;
 
-	/** Finish callback */
-	IPXE_DOWNLOAD_FINISH_CALLBACK finish_callback;
+    /** Finish callback */
+    IPXE_DOWNLOAD_FINISH_CALLBACK finish_callback;
 
-	/** Callback context */
-	void *context;
+    /** Callback context */
+    void* context;
 };
 
 /* xfer interface */
@@ -59,13 +58,12 @@ struct efi_download_file {
  * @v file		Data transfer file
  * @v rc		Reason for close
  */
-static void efi_download_close ( struct efi_download_file *file, int rc ) {
+static void efi_download_close(struct efi_download_file* file, int rc) {
+    file->finish_callback(file->context, EFIRC(rc));
 
-	file->finish_callback ( file->context, EFIRC ( rc ) );
+    intf_shutdown(&file->xfer, rc);
 
-	intf_shutdown ( &file->xfer, rc );
-
-	efi_snp_release();
+    efi_snp_release();
 }
 
 /**
@@ -76,45 +74,45 @@ static void efi_download_close ( struct efi_download_file *file, int rc ) {
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int efi_download_deliver_iob ( struct efi_download_file *file,
-				      struct io_buffer *iobuf,
-				      struct xfer_metadata *meta ) {
-	EFI_STATUS efirc;
-	size_t len = iob_len ( iobuf );
-	int rc;
+static int efi_download_deliver_iob(struct efi_download_file* file,
+                                    struct io_buffer* iobuf,
+                                    struct xfer_metadata* meta) {
+    EFI_STATUS efirc;
+    size_t len = iob_len(iobuf);
+    int rc;
 
-	/* Calculate new buffer position */
-	if ( meta->flags & XFER_FL_ABS_OFFSET )
-		file->pos = 0;
-	file->pos += meta->offset;
+    /* Calculate new buffer position */
+    if (meta->flags & XFER_FL_ABS_OFFSET)
+        file->pos = 0;
+    file->pos += meta->offset;
 
-	/* Call out to the data handler */
-	if ( ( efirc = file->data_callback ( file->context, iobuf->data,
-					     len, file->pos ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		goto err_callback;
-	}
+    /* Call out to the data handler */
+    if ((efirc = file->data_callback(file->context, iobuf->data,
+                                     len, file->pos)) != 0) {
+        rc = -EEFI(efirc);
+        goto err_callback;
+    }
 
-	/* Update current buffer position */
-	file->pos += len;
+    /* Update current buffer position */
+    file->pos += len;
 
-	/* Success */
-	rc = 0;
+    /* Success */
+    rc = 0;
 
- err_callback:
-	free_iob ( iobuf );
-	return rc;
+err_callback:
+    free_iob(iobuf);
+    return rc;
 }
 
 /** Data transfer interface operations */
 static struct interface_operation efi_xfer_operations[] = {
-	INTF_OP ( xfer_deliver, struct efi_download_file *, efi_download_deliver_iob ),
-	INTF_OP ( intf_close, struct efi_download_file *, efi_download_close ),
+    INTF_OP(xfer_deliver, struct efi_download_file*, efi_download_deliver_iob),
+    INTF_OP(intf_close, struct efi_download_file*, efi_download_close),
 };
 
 /** EFI download data transfer interface descriptor */
 static struct interface_descriptor efi_download_file_xfer_desc =
-	INTF_DESC ( struct efi_download_file, xfer, efi_xfer_operations );
+    INTF_DESC(struct efi_download_file, xfer, efi_xfer_operations);
 
 /**
  * Start downloading a file, and register callback functions to handle the
@@ -129,37 +127,37 @@ static struct interface_descriptor efi_download_file_xfer_desc =
  * @ret Status		EFI status code
  */
 static EFI_STATUS EFIAPI
-efi_download_start ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
-		     CHAR8 *Url,
-		     IPXE_DOWNLOAD_DATA_CALLBACK DataCallback,
-		     IPXE_DOWNLOAD_FINISH_CALLBACK FinishCallback,
-		     VOID *Context,
-		     IPXE_DOWNLOAD_FILE *File ) {
-	struct efi_download_file *file;
-	int rc;
+efi_download_start(IPXE_DOWNLOAD_PROTOCOL* This __unused,
+                   CHAR8* Url,
+                   IPXE_DOWNLOAD_DATA_CALLBACK DataCallback,
+                   IPXE_DOWNLOAD_FINISH_CALLBACK FinishCallback,
+                   VOID* Context,
+                   IPXE_DOWNLOAD_FILE* File) {
+    struct efi_download_file* file;
+    int rc;
 
-	efi_snp_claim();
+    efi_snp_claim();
 
-	file = malloc ( sizeof ( struct efi_download_file ) );
-	if ( file == NULL ) {
-		efi_snp_release();
-		return EFI_OUT_OF_RESOURCES;
-	}
+    file = malloc(sizeof(struct efi_download_file));
+    if (file == NULL) {
+        efi_snp_release();
+        return EFI_OUT_OF_RESOURCES;
+    }
 
-	intf_init ( &file->xfer, &efi_download_file_xfer_desc, NULL );
-	rc = xfer_open ( &file->xfer, LOCATION_URI_STRING, Url );
-	if ( rc ) {
-		free ( file );
-		efi_snp_release();
-		return EFIRC ( rc );
-	}
+    intf_init(&file->xfer, &efi_download_file_xfer_desc, NULL);
+    rc = xfer_open(&file->xfer, LOCATION_URI_STRING, Url);
+    if (rc) {
+        free(file);
+        efi_snp_release();
+        return EFIRC(rc);
+    }
 
-	file->pos = 0;
-	file->data_callback = DataCallback;
-	file->finish_callback = FinishCallback;
-	file->context = Context;
-	*File = file;
-	return EFI_SUCCESS;
+    file->pos = 0;
+    file->data_callback = DataCallback;
+    file->finish_callback = FinishCallback;
+    file->context = Context;
+    *File = file;
+    return EFI_SUCCESS;
 }
 
 /**
@@ -173,13 +171,13 @@ efi_download_start ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
  * @ret Status		EFI status code
  */
 static EFI_STATUS EFIAPI
-efi_download_abort ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
-		     IPXE_DOWNLOAD_FILE File,
-		     EFI_STATUS Status ) {
-	struct efi_download_file *file = File;
+efi_download_abort(IPXE_DOWNLOAD_PROTOCOL* This __unused,
+                   IPXE_DOWNLOAD_FILE File,
+                   EFI_STATUS Status) {
+    struct efi_download_file* file = File;
 
-	efi_download_close ( file, -EEFI ( Status ) );
-	return EFI_SUCCESS;
+    efi_download_close(file, -EEFI(Status));
+    return EFI_SUCCESS;
 }
 
 /**
@@ -190,17 +188,16 @@ efi_download_abort ( IPXE_DOWNLOAD_PROTOCOL *This __unused,
  * @ret Status		EFI status code
  */
 static EFI_STATUS EFIAPI
-efi_download_poll ( IPXE_DOWNLOAD_PROTOCOL *This __unused ) {
-	step();
-	return EFI_SUCCESS;
+efi_download_poll(IPXE_DOWNLOAD_PROTOCOL* This __unused) {
+    step();
+    return EFI_SUCCESS;
 }
 
 /** Publicly exposed iPXE download protocol */
 static IPXE_DOWNLOAD_PROTOCOL ipxe_download_protocol_interface = {
-	.Start = efi_download_start,
-	.Abort = efi_download_abort,
-	.Poll = efi_download_poll
-};
+    .Start = efi_download_start,
+    .Abort = efi_download_abort,
+    .Poll = efi_download_poll};
 
 /**
  * Install iPXE download protocol
@@ -208,24 +205,24 @@ static IPXE_DOWNLOAD_PROTOCOL ipxe_download_protocol_interface = {
  * @v handle		EFI handle
  * @ret rc		Return status code
  */
-int efi_download_install ( EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_STATUS efirc;
-	int rc;
+int efi_download_install(EFI_HANDLE handle) {
+    EFI_BOOT_SERVICES* bs = efi_systab->BootServices;
+    EFI_STATUS efirc;
+    int rc;
 
-	efirc = bs->InstallMultipleProtocolInterfaces (
-			&handle,
-			&ipxe_download_protocol_guid,
-			&ipxe_download_protocol_interface,
-			NULL );
-	if ( efirc ) {
-		rc = -EEFI ( efirc );
-		DBG ( "Could not install download protocol: %s\n",
-		      strerror ( rc ) );
-		return rc;
-	}
+    efirc = bs->InstallMultipleProtocolInterfaces(
+        &handle,
+        &ipxe_download_protocol_guid,
+        &ipxe_download_protocol_interface,
+        NULL);
+    if (efirc) {
+        rc = -EEFI(efirc);
+        DBG("Could not install download protocol: %s\n",
+            strerror(rc));
+        return rc;
+    }
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -233,11 +230,11 @@ int efi_download_install ( EFI_HANDLE handle ) {
  *
  * @v handle		EFI handle
  */
-void efi_download_uninstall ( EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+void efi_download_uninstall(EFI_HANDLE handle) {
+    EFI_BOOT_SERVICES* bs = efi_systab->BootServices;
 
-	bs->UninstallMultipleProtocolInterfaces (
-			handle,
-			&ipxe_download_protocol_guid,
-			&ipxe_download_protocol_interface, NULL );
+    bs->UninstallMultipleProtocolInterfaces(
+        handle,
+        &ipxe_download_protocol_guid,
+        &ipxe_download_protocol_interface, NULL);
 }

@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _BITS_TCPIP_H
-#define _BITS_TCPIP_H
+    #define _BITS_TCPIP_H
 
 /** @file
  *
@@ -7,9 +9,9 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-extern uint16_t tcpip_continue_chksum ( uint16_t partial, const void *data,
-					size_t len );
+extern uint16_t tcpip_continue_chksum(uint16_t partial, const void* data,
+                                      size_t len);
 
 #endif /* _BITS_TCPIP_H */

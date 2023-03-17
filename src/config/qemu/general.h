@@ -1,3 +1,5 @@
+#pragma once
+
 /* Disable entry during POST */
 #undef ROM_BANNER_TIMEOUT
 #define ROM_BANNER_TIMEOUT 0

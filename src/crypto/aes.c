@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crypto.h>
 #include <ipxe/ecb.h>
 #include <ipxe/cbc.h>
+#include <ipxe/gcm.h>
 #include <ipxe/aes.h>
 
 /** AES strides
@@ -46,28 +47,28 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * input state bytes in order of byte position after [Inv]ShiftRows.
  */
 enum aes_stride {
-	/** Input stride for ShiftRows
-	 *
-	 *    0 4 8 c
-	 *     \ \ \
-	 *    1 5 9 d
-	 *     \ \ \
-	 *    2 6 a e
-	 *     \ \ \
-	 *    3 7 b f
-	 */
-	AES_STRIDE_SHIFTROWS = +5,
-	/** Input stride for InvShiftRows
-	 *
-	 *    0 4 8 c
-	 *     / / /
-	 *    1 5 9 d
-	 *     / / /
-	 *    2 6 a e
-	 *     / / /
-	 *    3 7 b f
-	 */
-	AES_STRIDE_INVSHIFTROWS = -3,
+    /** Input stride for ShiftRows
+     *
+     *    0 4 8 c
+     *     \ \ \
+     *    1 5 9 d
+     *     \ \ \
+     *    2 6 a e
+     *     \ \ \
+     *    3 7 b f
+     */
+    AES_STRIDE_SHIFTROWS = +5,
+    /** Input stride for InvShiftRows
+     *
+     *    0 4 8 c
+     *     / / /
+     *    1 5 9 d
+     *     / / /
+     *    2 6 a e
+     *     / / /
+     *    3 7 b f
+     */
+    AES_STRIDE_INVSHIFTROWS = -3,
 };
 
 /** A single AES lookup table entry
@@ -109,9 +110,9 @@ enum aes_stride {
  * is always chosen to be 1).
  */
 union aes_table_entry {
-	/** Viewed as an array of bytes */
-	uint8_t byte[8];
-} __attribute__ (( packed ));
+    /** Viewed as an array of bytes */
+    uint8_t byte[8];
+} __attribute__((packed));
 
 /** An AES lookup table
  *
@@ -137,9 +138,9 @@ union aes_table_entry {
  * the first byte of the Nth table entry.
  */
 struct aes_table {
-	/** Table entries, indexed by S(N) */
-	union aes_table_entry entry[256];
-} __attribute__ (( aligned ( 8 ) ));
+    /** Table entries, indexed by S(N) */
+    union aes_table_entry entry[256];
+} __attribute__((aligned(8)));
 
 /** AES MixColumns lookup table */
 static struct aes_table aes_mixcolumns;
@@ -154,19 +155,19 @@ static struct aes_table aes_invmixcolumns;
  * @v column		[Inv]MixColumns matrix column index
  * @ret product		Product of matrix column with scalar multiplicand
  */
-static inline __attribute__ (( always_inline )) uint32_t
-aes_entry_column ( const union aes_table_entry *entry, unsigned int column ) {
-	const union {
-		uint8_t byte;
-		uint32_t column;
-	} __attribute__ (( may_alias )) *product;
+static inline __attribute__((always_inline)) uint32_t
+aes_entry_column(const union aes_table_entry* entry, unsigned int column) {
+    const union {
+        uint8_t byte;
+        uint32_t column;
+    } __attribute__((may_alias)) * product;
 
-	/* Locate relevant four-byte subset */
-	product = container_of ( &entry->byte[ 4 - column ],
-				 typeof ( *product ), byte );
+    /* Locate relevant four-byte subset */
+    product = container_of(&entry->byte[4 - column],
+                           typeof(*product), byte);
 
-	/* Extract this four-byte subset */
-	return product->column;
+    /* Extract this four-byte subset */
+    return product->column;
 }
 
 /**
@@ -188,26 +189,26 @@ aes_entry_column ( const union aes_table_entry *entry, unsigned int column ) {
  * generate a single x86 memory reference expression which can then be
  * used directly within a single "xorl" instruction.
  */
-static inline __attribute__ (( always_inline )) uint32_t
-aes_column ( const struct aes_table *table, size_t stride,
-	     const union aes_matrix *in, size_t offset ) {
-	const union aes_table_entry *entry;
-	unsigned int byte;
+static inline __attribute__((always_inline)) uint32_t
+aes_column(const struct aes_table* table, size_t stride,
+           const union aes_matrix* in, size_t offset) {
+    const union aes_table_entry* entry;
+    unsigned int byte;
 
-	/* Extract input byte corresponding to this output byte offset
-	 * (i.e. perform [Inv]ShiftRows).
-	 */
-	byte = in->byte[ ( stride * offset ) & 0xf ];
+    /* Extract input byte corresponding to this output byte offset
+     * (i.e. perform [Inv]ShiftRows).
+     */
+    byte = in->byte[(stride * offset) & 0xf];
 
-	/* Locate lookup table entry for this input byte (i.e. perform
-	 * [Inv]SubBytes).
-	 */
-	entry = &table->entry[byte];
+    /* Locate lookup table entry for this input byte (i.e. perform
+     * [Inv]SubBytes).
+     */
+    entry = &table->entry[byte];
 
-	/* Multiply appropriate matrix column by this input byte
-	 * (i.e. perform [Inv]MixColumns).
-	 */
-	return aes_entry_column ( entry, ( offset & 0x3 ) );
+    /* Multiply appropriate matrix column by this input byte
+     * (i.e. perform [Inv]MixColumns).
+     */
+    return aes_entry_column(entry, (offset & 0x3));
 }
 
 /**
@@ -220,21 +221,21 @@ aes_column ( const struct aes_table *table, size_t stride,
  * @v column		Column index
  * @ret output		Output column value
  */
-static inline __attribute__ (( always_inline )) uint32_t
-aes_output ( const struct aes_table *table, size_t stride,
-	     const union aes_matrix *in, const union aes_matrix *key,
-	     unsigned int column ) {
-	size_t offset = ( column * 4 );
+static inline __attribute__((always_inline)) uint32_t
+aes_output(const struct aes_table* table, size_t stride,
+           const union aes_matrix* in, const union aes_matrix* key,
+           unsigned int column) {
+    size_t offset = (column * 4);
 
-	/* Perform [Inv]ShiftRows, [Inv]SubBytes, [Inv]MixColumns, and
-	 * AddRoundKey for this column.  The loop is unrolled to allow
-	 * for the required compile-time constant optimisations.
-	 */
-	return ( aes_column ( table, stride, in, ( offset + 0 ) ) ^
-		 aes_column ( table, stride, in, ( offset + 1 ) ) ^
-		 aes_column ( table, stride, in, ( offset + 2 ) ) ^
-		 aes_column ( table, stride, in, ( offset + 3 ) ) ^
-		 key->column[column] );
+    /* Perform [Inv]ShiftRows, [Inv]SubBytes, [Inv]MixColumns, and
+     * AddRoundKey for this column.  The loop is unrolled to allow
+     * for the required compile-time constant optimisations.
+     */
+    return (aes_column(table, stride, in, (offset + 0)) ^
+            aes_column(table, stride, in, (offset + 1)) ^
+            aes_column(table, stride, in, (offset + 2)) ^
+            aes_column(table, stride, in, (offset + 3)) ^
+            key->column[column]);
 }
 
 /**
@@ -246,19 +247,18 @@ aes_output ( const struct aes_table *table, size_t stride,
  * @v out		AES output state
  * @v key		AES round key
  */
-static inline __attribute__ (( always_inline )) void
-aes_round ( const struct aes_table *table, size_t stride,
-	    const union aes_matrix *in, union aes_matrix *out,
-	    const union aes_matrix *key ) {
-
-	/* Perform [Inv]ShiftRows, [Inv]SubBytes, [Inv]MixColumns, and
-	 * AddRoundKey for all columns.  The loop is unrolled to allow
-	 * for the required compile-time constant optimisations.
-	 */
-	out->column[0] = aes_output ( table, stride, in, key, 0 );
-	out->column[1] = aes_output ( table, stride, in, key, 1 );
-	out->column[2] = aes_output ( table, stride, in, key, 2 );
-	out->column[3] = aes_output ( table, stride, in, key, 3 );
+static inline __attribute__((always_inline)) void
+aes_round(const struct aes_table* table, size_t stride,
+          const union aes_matrix* in, union aes_matrix* out,
+          const union aes_matrix* key) {
+    /* Perform [Inv]ShiftRows, [Inv]SubBytes, [Inv]MixColumns, and
+     * AddRoundKey for all columns.  The loop is unrolled to allow
+     * for the required compile-time constant optimisations.
+     */
+    out->column[0] = aes_output(table, stride, in, key, 0);
+    out->column[1] = aes_output(table, stride, in, key, 1);
+    out->column[2] = aes_output(table, stride, in, key, 2);
+    out->column[3] = aes_output(table, stride, in, key, 3);
 }
 
 /**
@@ -274,23 +274,23 @@ aes_round ( const struct aes_table *table, size_t stride,
  * which has a tendency to otherwise spill performance-critical
  * registers to the stack.
  */
-static __attribute__ (( noinline )) void
-aes_encrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
-		     const union aes_matrix *key, unsigned int rounds ) {
-	union aes_matrix *tmp;
+static __attribute__((noinline)) void
+aes_encrypt_rounds(union aes_matrix* in, union aes_matrix* out,
+                   const union aes_matrix* key, unsigned int rounds) {
+    union aes_matrix* tmp;
 
-	/* Perform intermediate rounds */
-	do {
-		/* Perform one intermediate round */
-		aes_round ( &aes_mixcolumns, AES_STRIDE_SHIFTROWS,
-			    in, out, key++ );
+    /* Perform intermediate rounds */
+    do {
+        /* Perform one intermediate round */
+        aes_round(&aes_mixcolumns, AES_STRIDE_SHIFTROWS,
+                  in, out, key++);
 
-		/* Swap input and output states for next round */
-		tmp = in;
-		in = out;
-		out = tmp;
+        /* Swap input and output states for next round */
+        tmp = in;
+        in = out;
+        out = tmp;
 
-	} while ( --rounds );
+    } while (--rounds);
 }
 
 /**
@@ -315,23 +315,23 @@ aes_encrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
  * being spilled to the stack.  We therefore use two separate but very
  * similar binary functions based on the same C source.
  */
-static __attribute__ (( noinline )) void
-aes_decrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
-		     const union aes_matrix *key, unsigned int rounds ) {
-	union aes_matrix *tmp;
+static __attribute__((noinline)) void
+aes_decrypt_rounds(union aes_matrix* in, union aes_matrix* out,
+                   const union aes_matrix* key, unsigned int rounds) {
+    union aes_matrix* tmp;
 
-	/* Perform intermediate rounds */
-	do {
-		/* Perform one intermediate round */
-		aes_round ( &aes_invmixcolumns, AES_STRIDE_INVSHIFTROWS,
-			    in, out, key++ );
+    /* Perform intermediate rounds */
+    do {
+        /* Perform one intermediate round */
+        aes_round(&aes_invmixcolumns, AES_STRIDE_INVSHIFTROWS,
+                  in, out, key++);
 
-		/* Swap input and output states for next round */
-		tmp = in;
-		in = out;
-		out = tmp;
+        /* Swap input and output states for next round */
+        tmp = in;
+        in = out;
+        out = tmp;
 
-	} while ( --rounds );
+    } while (--rounds);
 }
 
 /**
@@ -340,13 +340,12 @@ aes_decrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
  * @v state		AES state
  * @v key		AES round key
  */
-static inline __attribute__ (( always_inline )) void
-aes_addroundkey ( union aes_matrix *state, const union aes_matrix *key ) {
-
-	state->column[0] ^= key->column[0];
-	state->column[1] ^= key->column[1];
-	state->column[2] ^= key->column[2];
-	state->column[3] ^= key->column[3];
+static inline __attribute__((always_inline)) void
+aes_addroundkey(union aes_matrix* state, const union aes_matrix* key) {
+    state->column[0] ^= key->column[0];
+    state->column[1] ^= key->column[1];
+    state->column[2] ^= key->column[2];
+    state->column[3] ^= key->column[3];
 }
 
 /**
@@ -358,32 +357,31 @@ aes_addroundkey ( union aes_matrix *state, const union aes_matrix *key ) {
  * @v out		AES output state
  * @v key		AES round key
  */
-static void aes_final ( const struct aes_table *table, size_t stride,
-			const union aes_matrix *in, union aes_matrix *out,
-			const union aes_matrix *key ) {
-	const union aes_table_entry *entry;
-	unsigned int byte;
-	size_t out_offset;
-	size_t in_offset;
+static void aes_final(const struct aes_table* table, size_t stride,
+                      const union aes_matrix* in, union aes_matrix* out,
+                      const union aes_matrix* key) {
+    const union aes_table_entry* entry;
+    unsigned int byte;
+    size_t out_offset;
+    size_t in_offset;
 
-	/* Perform [Inv]ShiftRows and [Inv]SubBytes */
-	for ( out_offset = 0, in_offset = 0 ; out_offset < 16 ;
-	      out_offset++, in_offset = ( ( in_offset + stride ) & 0xf ) ) {
+    /* Perform [Inv]ShiftRows and [Inv]SubBytes */
+    for (out_offset = 0, in_offset = 0; out_offset < 16;
+         out_offset++, in_offset = ((in_offset + stride) & 0xf)) {
+        /* Extract input byte (i.e. perform [Inv]ShiftRows) */
+        byte = in->byte[in_offset];
 
-		/* Extract input byte (i.e. perform [Inv]ShiftRows) */
-		byte = in->byte[in_offset];
+        /* Locate lookup table entry for this input byte
+         * (i.e. perform [Inv]SubBytes).
+         */
+        entry = &table->entry[byte];
 
-		/* Locate lookup table entry for this input byte
-		 * (i.e. perform [Inv]SubBytes).
-		 */
-		entry = &table->entry[byte];
+        /* Store output byte */
+        out->byte[out_offset] = entry->byte[0];
+    }
 
-		/* Store output byte */
-		out->byte[out_offset] = entry->byte[0];
-	}
-
-	/* Perform AddRoundKey */
-	aes_addroundkey ( out, key );
+    /* Perform AddRoundKey */
+    aes_addroundkey(out, key);
 }
 
 /**
@@ -394,32 +392,32 @@ static void aes_final ( const struct aes_table *table, size_t stride,
  * @v dst		Buffer for encrypted data
  * @v len		Length of data
  */
-static void aes_encrypt ( void *ctx, const void *src, void *dst, size_t len ) {
-	struct aes_context *aes = ctx;
-	union aes_matrix buffer[2];
-	union aes_matrix *in = &buffer[0];
-	union aes_matrix *out = &buffer[1];
-	unsigned int rounds = aes->rounds;
+static void aes_encrypt(void* ctx, const void* src, void* dst, size_t len) {
+    struct aes_context* aes = ctx;
+    union aes_matrix buffer[2];
+    union aes_matrix* in = &buffer[0];
+    union aes_matrix* out = &buffer[1];
+    unsigned int rounds = aes->rounds;
 
-	/* Sanity check */
-	assert ( len == sizeof ( *in ) );
+    /* Sanity check */
+    assert(len == sizeof(*in));
 
-	/* Initialise input state */
-	memcpy ( in, src, sizeof ( *in ) );
+    /* Initialise input state */
+    memcpy(in, src, sizeof(*in));
 
-	/* Perform initial round (AddRoundKey) */
-	aes_addroundkey ( in, &aes->encrypt.key[0] );
+    /* Perform initial round (AddRoundKey) */
+    aes_addroundkey(in, &aes->encrypt.key[0]);
 
-	/* Perform intermediate rounds (ShiftRows, SubBytes,
-	 * MixColumns, AddRoundKey).
-	 */
-	aes_encrypt_rounds ( in, out, &aes->encrypt.key[1], ( rounds - 2 ) );
-	in = out;
+    /* Perform intermediate rounds (ShiftRows, SubBytes,
+     * MixColumns, AddRoundKey).
+     */
+    aes_encrypt_rounds(in, out, &aes->encrypt.key[1], (rounds - 2));
+    in = out;
 
-	/* Perform final round (ShiftRows, SubBytes, AddRoundKey) */
-	out = dst;
-	aes_final ( &aes_mixcolumns, AES_STRIDE_SHIFTROWS, in, out,
-		    &aes->encrypt.key[ rounds - 1 ] );
+    /* Perform final round (ShiftRows, SubBytes, AddRoundKey) */
+    out = dst;
+    aes_final(&aes_mixcolumns, AES_STRIDE_SHIFTROWS, in, out,
+              &aes->encrypt.key[rounds - 1]);
 }
 
 /**
@@ -430,32 +428,32 @@ static void aes_encrypt ( void *ctx, const void *src, void *dst, size_t len ) {
  * @v dst		Buffer for decrypted data
  * @v len		Length of data
  */
-static void aes_decrypt ( void *ctx, const void *src, void *dst, size_t len ) {
-	struct aes_context *aes = ctx;
-	union aes_matrix buffer[2];
-	union aes_matrix *in = &buffer[0];
-	union aes_matrix *out = &buffer[1];
-	unsigned int rounds = aes->rounds;
+static void aes_decrypt(void* ctx, const void* src, void* dst, size_t len) {
+    struct aes_context* aes = ctx;
+    union aes_matrix buffer[2];
+    union aes_matrix* in = &buffer[0];
+    union aes_matrix* out = &buffer[1];
+    unsigned int rounds = aes->rounds;
 
-	/* Sanity check */
-	assert ( len == sizeof ( *in ) );
+    /* Sanity check */
+    assert(len == sizeof(*in));
 
-	/* Initialise input state */
-	memcpy ( in, src, sizeof ( *in ) );
+    /* Initialise input state */
+    memcpy(in, src, sizeof(*in));
 
-	/* Perform initial round (AddRoundKey) */
-	aes_addroundkey ( in, &aes->decrypt.key[0] );
+    /* Perform initial round (AddRoundKey) */
+    aes_addroundkey(in, &aes->decrypt.key[0]);
 
-	/* Perform intermediate rounds (InvShiftRows, InvSubBytes,
-	 * InvMixColumns, AddRoundKey).
-	 */
-	aes_decrypt_rounds ( in, out, &aes->decrypt.key[1], ( rounds - 2 ) );
-	in = out;
+    /* Perform intermediate rounds (InvShiftRows, InvSubBytes,
+     * InvMixColumns, AddRoundKey).
+     */
+    aes_decrypt_rounds(in, out, &aes->decrypt.key[1], (rounds - 2));
+    in = out;
 
-	/* Perform final round (InvShiftRows, InvSubBytes, AddRoundKey) */
-	out = dst;
-	aes_final ( &aes_invmixcolumns, AES_STRIDE_INVSHIFTROWS, in, out,
-		    &aes->decrypt.key[ rounds - 1 ] );
+    /* Perform final round (InvShiftRows, InvSubBytes, AddRoundKey) */
+    out = dst;
+    aes_final(&aes_invmixcolumns, AES_STRIDE_INVSHIFTROWS, in, out,
+              &aes->decrypt.key[rounds - 1]);
 }
 
 /**
@@ -464,22 +462,21 @@ static void aes_decrypt ( void *ctx, const void *src, void *dst, size_t len ) {
  * @v poly		Polynomial to be multiplied
  * @ret result		Result
  */
-static __attribute__ (( const )) unsigned int aes_double ( unsigned int poly ) {
+static __attribute__((const)) unsigned int aes_double(unsigned int poly) {
+    /* Multiply polynomial by (x), placing the resulting x^8
+     * coefficient in the LSB (i.e. rotate byte left by one).
+     */
+    poly = rol8(poly, 1);
 
-	/* Multiply polynomial by (x), placing the resulting x^8
-	 * coefficient in the LSB (i.e. rotate byte left by one).
-	 */
-	poly = rol8 ( poly, 1 );
+    /* If coefficient of x^8 (in LSB) is non-zero, then reduce by
+     * subtracting (x^8 + x^4 + x^3 + x^2 + 1) in GF(2^8).
+     */
+    if (poly & 0x01) {
+        poly ^= 0x01; /* Subtract x^8 (currently in LSB) */
+        poly ^= 0x1b; /* Subtract (x^4 + x^3 + x^2 + 1) */
+    }
 
-	/* If coefficient of x^8 (in LSB) is non-zero, then reduce by
-	 * subtracting (x^8 + x^4 + x^3 + x^2 + 1) in GF(2^8).
-	 */
-	if ( poly & 0x01 ) {
-		poly ^= 0x01; /* Subtract x^8 (currently in LSB) */
-		poly ^= 0x1b; /* Subtract (x^4 + x^3 + x^2 + 1) */
-	}
-
-	return poly;
+    return poly;
 }
 
 /**
@@ -489,26 +486,26 @@ static __attribute__ (( const )) unsigned int aes_double ( unsigned int poly ) {
  *
  * The MixColumns lookup table vector multiplier is {1,1,1,3,2,1,1,3}.
  */
-static void aes_mixcolumns_entry ( union aes_table_entry *entry ) {
-	unsigned int scalar_x_1;
-	unsigned int scalar_x;
-	unsigned int scalar;
+static void aes_mixcolumns_entry(union aes_table_entry* entry) {
+    unsigned int scalar_x_1;
+    unsigned int scalar_x;
+    unsigned int scalar;
 
-	/* Retrieve scalar multiplicand */
-	scalar = entry->byte[0];
-	entry->byte[1] = scalar;
-	entry->byte[2] = scalar;
-	entry->byte[5] = scalar;
-	entry->byte[6] = scalar;
+    /* Retrieve scalar multiplicand */
+    scalar = entry->byte[0];
+    entry->byte[1] = scalar;
+    entry->byte[2] = scalar;
+    entry->byte[5] = scalar;
+    entry->byte[6] = scalar;
 
-	/* Calculate scalar multiplied by (x) */
-	scalar_x = aes_double ( scalar );
-	entry->byte[4] = scalar_x;
+    /* Calculate scalar multiplied by (x) */
+    scalar_x = aes_double(scalar);
+    entry->byte[4] = scalar_x;
 
-	/* Calculate scalar multiplied by (x + 1) */
-	scalar_x_1 = ( scalar_x ^ scalar );
-	entry->byte[3] = scalar_x_1;
-	entry->byte[7] = scalar_x_1;
+    /* Calculate scalar multiplied by (x + 1) */
+    scalar_x_1 = (scalar_x ^ scalar);
+    entry->byte[3] = scalar_x_1;
+    entry->byte[7] = scalar_x_1;
 }
 
 /**
@@ -518,109 +515,107 @@ static void aes_mixcolumns_entry ( union aes_table_entry *entry ) {
  *
  * The InvMixColumns lookup table vector multiplier is {1,9,13,11,14,9,13,11}.
  */
-static void aes_invmixcolumns_entry ( union aes_table_entry *entry ) {
-	unsigned int scalar_x3_x2_x;
-	unsigned int scalar_x3_x2_1;
-	unsigned int scalar_x3_x2;
-	unsigned int scalar_x3_x_1;
-	unsigned int scalar_x3_1;
-	unsigned int scalar_x3;
-	unsigned int scalar_x2;
-	unsigned int scalar_x;
-	unsigned int scalar;
+static void aes_invmixcolumns_entry(union aes_table_entry* entry) {
+    unsigned int scalar_x3_x2_x;
+    unsigned int scalar_x3_x2_1;
+    unsigned int scalar_x3_x2;
+    unsigned int scalar_x3_x_1;
+    unsigned int scalar_x3_1;
+    unsigned int scalar_x3;
+    unsigned int scalar_x2;
+    unsigned int scalar_x;
+    unsigned int scalar;
 
-	/* Retrieve scalar multiplicand */
-	scalar = entry->byte[0];
+    /* Retrieve scalar multiplicand */
+    scalar = entry->byte[0];
 
-	/* Calculate scalar multiplied by (x) */
-	scalar_x = aes_double ( scalar );
+    /* Calculate scalar multiplied by (x) */
+    scalar_x = aes_double(scalar);
 
-	/* Calculate scalar multiplied by (x^2) */
-	scalar_x2 = aes_double ( scalar_x );
+    /* Calculate scalar multiplied by (x^2) */
+    scalar_x2 = aes_double(scalar_x);
 
-	/* Calculate scalar multiplied by (x^3) */
-	scalar_x3 = aes_double ( scalar_x2 );
+    /* Calculate scalar multiplied by (x^3) */
+    scalar_x3 = aes_double(scalar_x2);
 
-	/* Calculate scalar multiplied by (x^3 + 1) */
-	scalar_x3_1 = ( scalar_x3 ^ scalar );
-	entry->byte[1] = scalar_x3_1;
-	entry->byte[5] = scalar_x3_1;
+    /* Calculate scalar multiplied by (x^3 + 1) */
+    scalar_x3_1 = (scalar_x3 ^ scalar);
+    entry->byte[1] = scalar_x3_1;
+    entry->byte[5] = scalar_x3_1;
 
-	/* Calculate scalar multiplied by (x^3 + x + 1) */
-	scalar_x3_x_1 = ( scalar_x3_1 ^ scalar_x );
-	entry->byte[3] = scalar_x3_x_1;
-	entry->byte[7] = scalar_x3_x_1;
+    /* Calculate scalar multiplied by (x^3 + x + 1) */
+    scalar_x3_x_1 = (scalar_x3_1 ^ scalar_x);
+    entry->byte[3] = scalar_x3_x_1;
+    entry->byte[7] = scalar_x3_x_1;
 
-	/* Calculate scalar multiplied by (x^3 + x^2) */
-	scalar_x3_x2 = ( scalar_x3 ^ scalar_x2 );
+    /* Calculate scalar multiplied by (x^3 + x^2) */
+    scalar_x3_x2 = (scalar_x3 ^ scalar_x2);
 
-	/* Calculate scalar multiplied by (x^3 + x^2 + 1) */
-	scalar_x3_x2_1 = ( scalar_x3_x2 ^ scalar );
-	entry->byte[2] = scalar_x3_x2_1;
-	entry->byte[6] = scalar_x3_x2_1;
+    /* Calculate scalar multiplied by (x^3 + x^2 + 1) */
+    scalar_x3_x2_1 = (scalar_x3_x2 ^ scalar);
+    entry->byte[2] = scalar_x3_x2_1;
+    entry->byte[6] = scalar_x3_x2_1;
 
-	/* Calculate scalar multiplied by (x^3 + x^2 + x) */
-	scalar_x3_x2_x = ( scalar_x3_x2 ^ scalar_x );
-	entry->byte[4] = scalar_x3_x2_x;
+    /* Calculate scalar multiplied by (x^3 + x^2 + x) */
+    scalar_x3_x2_x = (scalar_x3_x2 ^ scalar_x);
+    entry->byte[4] = scalar_x3_x2_x;
 }
 
 /**
  * Generate AES lookup tables
  *
  */
-static void aes_generate ( void ) {
-	union aes_table_entry *entry;
-	union aes_table_entry *inventry;
-	unsigned int poly = 0x01;
-	unsigned int invpoly = 0x01;
-	unsigned int transformed;
-	unsigned int i;
+static void aes_generate(void) {
+    union aes_table_entry* entry;
+    union aes_table_entry* inventry;
+    unsigned int poly = 0x01;
+    unsigned int invpoly = 0x01;
+    unsigned int transformed;
+    unsigned int i;
 
-	/* Iterate over non-zero values of GF(2^8) using generator (x + 1) */
-	do {
+    /* Iterate over non-zero values of GF(2^8) using generator (x + 1) */
+    do {
+        /* Multiply polynomial by (x + 1) */
+        poly ^= aes_double(poly);
 
-		/* Multiply polynomial by (x + 1) */
-		poly ^= aes_double ( poly );
+        /* Divide inverse polynomial by (x + 1).  This code
+         * fragment is taken directly from the Wikipedia page
+         * on the Rijndael S-box.  An explanation of why it
+         * works would be greatly appreciated.
+         */
+        invpoly ^= (invpoly << 1);
+        invpoly ^= (invpoly << 2);
+        invpoly ^= (invpoly << 4);
+        if (invpoly & 0x80)
+            invpoly ^= 0x09;
+        invpoly &= 0xff;
 
-		/* Divide inverse polynomial by (x + 1).  This code
-		 * fragment is taken directly from the Wikipedia page
-		 * on the Rijndael S-box.  An explanation of why it
-		 * works would be greatly appreciated.
-		 */
-		invpoly ^= ( invpoly << 1 );
-		invpoly ^= ( invpoly << 2 );
-		invpoly ^= ( invpoly << 4 );
-		if ( invpoly & 0x80 )
-			invpoly ^= 0x09;
-		invpoly &= 0xff;
+        /* Apply affine transformation */
+        transformed = (0x63 ^ invpoly ^ rol8(invpoly, 1) ^
+                       rol8(invpoly, 2) ^ rol8(invpoly, 3) ^
+                       rol8(invpoly, 4));
 
-		/* Apply affine transformation */
-		transformed = ( 0x63 ^ invpoly ^ rol8 ( invpoly, 1 ) ^
-				rol8 ( invpoly, 2 ) ^ rol8 ( invpoly, 3 ) ^
-				rol8 ( invpoly, 4 ) );
+        /* Populate S-box (within MixColumns lookup table) */
+        aes_mixcolumns.entry[poly].byte[0] = transformed;
 
-		/* Populate S-box (within MixColumns lookup table) */
-		aes_mixcolumns.entry[poly].byte[0] = transformed;
+    } while (poly != 0x01);
 
-	} while ( poly != 0x01 );
+    /* Populate zeroth S-box entry (which has no inverse) */
+    aes_mixcolumns.entry[0].byte[0] = 0x63;
 
-	/* Populate zeroth S-box entry (which has no inverse) */
-	aes_mixcolumns.entry[0].byte[0] = 0x63;
+    /* Fill in MixColumns and InvMixColumns lookup tables */
+    for (i = 0; i < 256; i++) {
+        /* Fill in MixColumns lookup table entry */
+        entry = &aes_mixcolumns.entry[i];
+        aes_mixcolumns_entry(entry);
 
-	/* Fill in MixColumns and InvMixColumns lookup tables */
-	for ( i = 0 ; i < 256 ; i++ ) {
+        /* Populate inverse S-box (within InvMixColumns lookup table) */
+        inventry = &aes_invmixcolumns.entry[entry->byte[0]];
+        inventry->byte[0] = i;
 
-		/* Fill in MixColumns lookup table entry */
-		entry = &aes_mixcolumns.entry[i];
-		aes_mixcolumns_entry ( entry );
-
-		/* Populate inverse S-box (within InvMixColumns lookup table) */
-		inventry = &aes_invmixcolumns.entry[ entry->byte[0] ];
-		inventry->byte[0] = i;
-
-		/* Fill in InvMixColumns lookup table entry */
-		aes_invmixcolumns_entry ( inventry );
-	}
+        /* Fill in InvMixColumns lookup table entry */
+        aes_invmixcolumns_entry(inventry);
+    }
 }
 
 /**
@@ -629,11 +624,9 @@ static void aes_generate ( void ) {
  * @v column		Key column
  * @ret column		Updated key column
  */
-static inline __attribute__ (( always_inline )) uint32_t
-aes_key_rotate ( uint32_t column ) {
-
-	return ( ( __BYTE_ORDER == __LITTLE_ENDIAN ) ?
-		 ror32 ( column, 8 ) : rol32 ( column, 8 ) );
+static inline __attribute__((always_inline)) uint32_t
+aes_key_rotate(uint32_t column) {
+    return ((__BYTE_ORDER == __LITTLE_ENDIAN) ? ror32(column, 8) : rol32(column, 8));
 }
 
 /**
@@ -642,17 +635,17 @@ aes_key_rotate ( uint32_t column ) {
  * @v column		Key column
  * @ret column		Updated key column
  */
-static uint32_t aes_key_sbox ( uint32_t column ) {
-	unsigned int i;
-	uint8_t byte;
+static uint32_t aes_key_sbox(uint32_t column) {
+    unsigned int i;
+    uint8_t byte;
 
-	for ( i = 0 ; i < 4 ; i++ ) {
-		byte = ( column & 0xff );
-		byte = aes_mixcolumns.entry[byte].byte[0];
-		column = ( ( column & ~0xff ) | byte );
-		column = rol32 ( column, 8 );
-	}
-	return column;
+    for (i = 0; i < 4; i++) {
+        byte = (column & 0xff);
+        byte = aes_mixcolumns.entry[byte].byte[0];
+        column = ((column & ~0xff) | byte);
+        column = rol32(column, 8);
+    }
+    return column;
 }
 
 /**
@@ -662,11 +655,9 @@ static uint32_t aes_key_sbox ( uint32_t column ) {
  * @v rcon		Round constant
  * @ret column		Updated key column
  */
-static inline __attribute__ (( always_inline )) uint32_t
-aes_key_rcon ( uint32_t column, unsigned int rcon ) {
-
-	return ( ( __BYTE_ORDER == __LITTLE_ENDIAN ) ?
-		 ( column ^ rcon ) : ( column ^ ( rcon << 24 ) ) );
+static inline __attribute__((always_inline)) uint32_t
+aes_key_rcon(uint32_t column, unsigned int rcon) {
+    return ((__BYTE_ORDER == __LITTLE_ENDIAN) ? (column ^ rcon) : (column ^ (rcon << 24)));
 }
 
 /**
@@ -677,132 +668,128 @@ aes_key_rcon ( uint32_t column, unsigned int rcon ) {
  * @v keylen		Key length
  * @ret rc		Return status code
  */
-static int aes_setkey ( void *ctx, const void *key, size_t keylen ) {
-	struct aes_context *aes = ctx;
-	union aes_matrix *enc;
-	union aes_matrix *dec;
-	union aes_matrix temp;
-	union aes_matrix zero;
-	unsigned int rcon = 0x01;
-	unsigned int rounds;
-	size_t offset = 0;
-	uint32_t *prev;
-	uint32_t *next;
-	uint32_t *end;
-	uint32_t tmp;
+static int aes_setkey(void* ctx, const void* key, size_t keylen) {
+    struct aes_context* aes = ctx;
+    union aes_matrix* enc;
+    union aes_matrix* dec;
+    union aes_matrix temp;
+    union aes_matrix zero;
+    unsigned int rcon = 0x01;
+    unsigned int rounds;
+    size_t offset = 0;
+    uint32_t* prev;
+    uint32_t* next;
+    uint32_t* end;
+    uint32_t tmp;
 
-	/* Generate lookup tables, if not already done */
-	if ( ! aes_mixcolumns.entry[0].byte[0] )
-		aes_generate();
+    /* Generate lookup tables, if not already done */
+    if (!aes_mixcolumns.entry[0].byte[0])
+        aes_generate();
 
-	/* Validate key length and calculate number of intermediate rounds */
-	switch ( keylen ) {
-	case ( 128 / 8 ) :
-		rounds = 11;
-		break;
-	case ( 192 / 8 ) :
-		rounds = 13;
-		break;
-	case ( 256 / 8 ) :
-		rounds = 15;
-		break;
-	default:
-		DBGC ( aes, "AES %p unsupported key length (%zd bits)\n",
-		       aes, ( keylen * 8 ) );
-		return -EINVAL;
-	}
-	aes->rounds = rounds;
-	enc = aes->encrypt.key;
-	end = enc[rounds].column;
+    /* Validate key length and calculate number of intermediate rounds */
+    switch (keylen) {
+        case (128 / 8):
+            rounds = 11;
+            break;
+        case (192 / 8):
+            rounds = 13;
+            break;
+        case (256 / 8):
+            rounds = 15;
+            break;
+        default:
+            DBGC(aes, "AES %p unsupported key length (%zd bits)\n",
+                 aes, (keylen * 8));
+            return -EINVAL;
+    }
+    aes->rounds = rounds;
+    enc = aes->encrypt.key;
+    end = enc[rounds].column;
 
-	/* Copy raw key */
-	memcpy ( enc, key, keylen );
-	prev = enc->column;
-	next = ( ( ( void * ) prev ) + keylen );
-	tmp = next[-1];
+    /* Copy raw key */
+    memcpy(enc, key, keylen);
+    prev = enc->column;
+    next = (((void*)prev) + keylen);
+    tmp = next[-1];
 
-	/* Construct expanded key */
-	while ( next < end ) {
+    /* Construct expanded key */
+    while (next < end) {
+        /* If this is the first column of an expanded key
+         * block, or the middle column of an AES-256 key
+         * block, then apply the S-box.
+         */
+        if ((offset == 0) || ((offset | keylen) == 48))
+            tmp = aes_key_sbox(tmp);
 
-		/* If this is the first column of an expanded key
-		 * block, or the middle column of an AES-256 key
-		 * block, then apply the S-box.
-		 */
-		if ( ( offset == 0 ) || ( ( offset | keylen ) == 48 ) )
-			tmp = aes_key_sbox ( tmp );
+        /* If this is the first column of an expanded key
+         * block then rotate and apply the round constant.
+         */
+        if (offset == 0) {
+            tmp = aes_key_rotate(tmp);
+            tmp = aes_key_rcon(tmp, rcon);
+            rcon = aes_double(rcon);
+        }
 
-		/* If this is the first column of an expanded key
-		 * block then rotate and apply the round constant.
-		 */
-		if ( offset == 0 ) {
-			tmp = aes_key_rotate ( tmp );
-			tmp = aes_key_rcon ( tmp, rcon );
-			rcon = aes_double ( rcon );
-		}
+        /* XOR with previous key column */
+        tmp ^= *prev;
 
-		/* XOR with previous key column */
-		tmp ^= *prev;
+        /* Store column */
+        *next = tmp;
 
-		/* Store column */
-		*next = tmp;
+        /* Move to next column */
+        offset += sizeof(*next);
+        if (offset == keylen)
+            offset = 0;
+        next++;
+        prev++;
+    }
+    DBGC2(aes, "AES %p expanded %zd-bit key:\n", aes, (keylen * 8));
+    DBGC2_HDA(aes, 0, &aes->encrypt, (rounds * sizeof(*enc)));
 
-		/* Move to next column */
-		offset += sizeof ( *next );
-		if ( offset == keylen )
-			offset = 0;
-		next++;
-		prev++;
-	}
-	DBGC2 ( aes, "AES %p expanded %zd-bit key:\n", aes, ( keylen * 8 ) );
-	DBGC2_HDA ( aes, 0, &aes->encrypt, ( rounds * sizeof ( *enc ) ) );
+    /* Convert to decryption key */
+    memset(&zero, 0, sizeof(zero));
+    dec = &aes->decrypt.key[rounds - 1];
+    memcpy(dec--, enc++, sizeof(*dec));
+    while (dec > aes->decrypt.key) {
+        /* Perform InvMixColumns (by reusing the encryption
+         * final-round code to perform ShiftRows+SubBytes and
+         * reusing the decryption intermediate-round code to
+         * perform InvShiftRows+InvSubBytes+InvMixColumns, all
+         * with a zero encryption key).
+         */
+        aes_final(&aes_mixcolumns, AES_STRIDE_SHIFTROWS,
+                  enc++, &temp, &zero);
+        aes_decrypt_rounds(&temp, dec--, &zero, 1);
+    }
+    memcpy(dec--, enc++, sizeof(*dec));
+    DBGC2(aes, "AES %p inverted %zd-bit key:\n", aes, (keylen * 8));
+    DBGC2_HDA(aes, 0, &aes->decrypt, (rounds * sizeof(*dec)));
 
-	/* Convert to decryption key */
-	memset ( &zero, 0, sizeof ( zero ) );
-	dec = &aes->decrypt.key[ rounds - 1 ];
-	memcpy ( dec--, enc++, sizeof ( *dec ) );
-	while ( dec > aes->decrypt.key ) {
-		/* Perform InvMixColumns (by reusing the encryption
-		 * final-round code to perform ShiftRows+SubBytes and
-		 * reusing the decryption intermediate-round code to
-		 * perform InvShiftRows+InvSubBytes+InvMixColumns, all
-		 * with a zero encryption key).
-		 */
-		aes_final ( &aes_mixcolumns, AES_STRIDE_SHIFTROWS,
-			    enc++, &temp, &zero );
-		aes_decrypt_rounds ( &temp, dec--, &zero, 1 );
-	}
-	memcpy ( dec--, enc++, sizeof ( *dec ) );
-	DBGC2 ( aes, "AES %p inverted %zd-bit key:\n", aes, ( keylen * 8 ) );
-	DBGC2_HDA ( aes, 0, &aes->decrypt, ( rounds * sizeof ( *dec ) ) );
-
-	return 0;
-}
-
-/**
- * Set initialisation vector
- *
- * @v ctx		Context
- * @v iv		Initialisation vector
- */
-static void aes_setiv ( void *ctx __unused, const void *iv __unused ) {
-	/* Nothing to do */
+    return 0;
 }
 
 /** Basic AES algorithm */
 struct cipher_algorithm aes_algorithm = {
-	.name = "aes",
-	.ctxsize = sizeof ( struct aes_context ),
-	.blocksize = AES_BLOCKSIZE,
-	.setkey = aes_setkey,
-	.setiv = aes_setiv,
-	.encrypt = aes_encrypt,
-	.decrypt = aes_decrypt,
+    .name = "aes",
+    .ctxsize = sizeof(struct aes_context),
+    .blocksize = AES_BLOCKSIZE,
+    .alignsize = 0,
+    .authsize = 0,
+    .setkey = aes_setkey,
+    .setiv = cipher_null_setiv,
+    .encrypt = aes_encrypt,
+    .decrypt = aes_decrypt,
+    .auth = cipher_null_auth,
 };
 
 /* AES in Electronic Codebook mode */
-ECB_CIPHER ( aes_ecb, aes_ecb_algorithm,
-	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );
+ECB_CIPHER(aes_ecb, aes_ecb_algorithm,
+           aes_algorithm, struct aes_context, AES_BLOCKSIZE);
 
 /* AES in Cipher Block Chaining mode */
-CBC_CIPHER ( aes_cbc, aes_cbc_algorithm,
-	     aes_algorithm, struct aes_context, AES_BLOCKSIZE );
+CBC_CIPHER(aes_cbc, aes_cbc_algorithm,
+           aes_algorithm, struct aes_context, AES_BLOCKSIZE);
+
+/* AES in Galois/Counter mode */
+GCM_CIPHER(aes_gcm, aes_gcm_algorithm,
+           aes_algorithm, struct aes_context, AES_BLOCKSIZE);

@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
  *
@@ -17,31 +19,31 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 #ifndef SRC_DRIVERS_INFINIBAND_MLX_NODNIC_INCLUDE_PRM_NODNIC_PRM_H_
-#define SRC_DRIVERS_INFINIBAND_MLX_NODNIC_INCLUDE_PRM_NODNIC_PRM_H_
+    #define SRC_DRIVERS_INFINIBAND_MLX_NODNIC_INCLUDE_PRM_NODNIC_PRM_H_
 
-#include "mlx_bitops.h"
+    #include "mlx_bitops.h"
 
-struct nodnic_wqe_segment_data_ptr_st {	/* Little Endian */
-    pseudo_bit_t	byte_count[0x0001f];
-    pseudo_bit_t	always0[0x00001];
-/* -------------- */
-    pseudo_bit_t	l_key[0x00020];
-/* -------------- */
-    pseudo_bit_t	local_address_h[0x00020];
-/* -------------- */
-    pseudo_bit_t	local_address_l[0x00020];
-/* -------------- */
+struct nodnic_wqe_segment_data_ptr_st { /* Little Endian */
+    pseudo_bit_t byte_count[0x0001f];
+    pseudo_bit_t always0[0x00001];
+    /* -------------- */
+    pseudo_bit_t l_key[0x00020];
+    /* -------------- */
+    pseudo_bit_t local_address_h[0x00020];
+    /* -------------- */
+    pseudo_bit_t local_address_l[0x00020];
+    /* -------------- */
 };
 
-struct MLX_DECLARE_STRUCT ( nodnic_wqe_segment_data_ptr );
+struct MLX_DECLARE_STRUCT(nodnic_wqe_segment_data_ptr);
 
-#define NODNIC_MAX_SCATTER 1
+    #define NODNIC_MAX_SCATTER 1
 
 struct nodnic_recv_wqe {
-	struct nodnic_wqe_segment_data_ptr data[NODNIC_MAX_SCATTER];
-} __attribute__ (( packed ));
+    struct nodnic_wqe_segment_data_ptr data[NODNIC_MAX_SCATTER];
+} __attribute__((packed));
 
 #endif /* SRC_DRIVERS_INFINIBAND_MLX_NODNIC_INCLUDE_PRM_NODNIC_PRM_H_ */

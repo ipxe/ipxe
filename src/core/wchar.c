@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * @file
@@ -38,10 +38,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v string		String
  * @ret len		Length (excluding terminating NUL)
  */
-size_t wcslen ( const wchar_t *string ) {
-	size_t len = 0;
+size_t wcslen(const wchar_t* string) {
+    size_t len = 0;
 
-	while ( *(string++) )
-		len++;
-	return len;
+    while (*(string++))
+        len++;
+    return len;
 }

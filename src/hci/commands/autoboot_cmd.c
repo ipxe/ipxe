@@ -29,7 +29,7 @@
 #include <hci/ifmgmt_cmd.h>
 #include <usr/autoboot.h>
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -50,16 +50,16 @@ static struct option_descriptor autoboot_opts[] = {};
  * @v opts		Command options
  * @ret rc		Return status code
  */
-static int autoboot_payload ( struct net_device *netdev,
-			      struct autoboot_options *opts __unused ) {
-	return netboot ( netdev );
+static int autoboot_payload(struct net_device* netdev,
+                            struct autoboot_options* opts __unused) {
+    return netboot(netdev);
 }
 
 /** "autoboot" command descriptor */
 static struct ifcommon_command_descriptor autoboot_cmd =
-	IFCOMMON_COMMAND_DESC ( struct autoboot_options, autoboot_opts,
-				0, MAX_ARGUMENTS, "[<interface>...]",
-				autoboot_payload, 0 );
+    IFCOMMON_COMMAND_DESC(struct autoboot_options, autoboot_opts,
+                          0, MAX_ARGUMENTS, "[<interface>...]",
+                          autoboot_payload, 0);
 
 /**
  * "autoboot" command
@@ -68,14 +68,14 @@ static struct ifcommon_command_descriptor autoboot_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int autoboot_exec ( int argc, char **argv ) {
-	return ifcommon_exec ( argc, argv, &autoboot_cmd );
+static int autoboot_exec(int argc, char** argv) {
+    return ifcommon_exec(argc, argv, &autoboot_cmd);
 }
 
 /** Booting commands */
 struct command autoboot_commands[] __command = {
-	{
-		.name = "autoboot",
-		.exec = autoboot_exec,
-	},
+    {
+        .name = "autoboot",
+        .exec = autoboot_exec,
+    },
 };

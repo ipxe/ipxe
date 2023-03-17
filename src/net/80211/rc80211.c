@@ -19,7 +19,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 #include <stdlib.h>
 #include <ipxe/net80211.h>
@@ -85,10 +85,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** Two-bit packet status indicator for a packet with no retries */
-#define RC_PKT_OK		0x3
+#define RC_PKT_OK 0x3
 
 /** Two-bit packet status indicator for a packet with one retry */
-#define RC_PKT_RETRIED_ONCE	0x2
+#define RC_PKT_RETRIED_ONCE 0x2
 
 /** Two-bit packet status indicator for a TX packet with multiple retries
  *
@@ -97,7 +97,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * get to us at all, so if we receive a lot of RX packets on a certain
  * rate it must be pretty good.
  */
-#define RC_PKT_RETRIED_MULTI	0x1
+#define RC_PKT_RETRIED_MULTI 0x1
 
 /** Two-bit packet status indicator for a TX packet that was never ACKed
  *
@@ -106,43 +106,42 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * the goodness for its rate. This asymmetry is part of why TX packets
  * are weighted much more heavily than RX.
  */
-#define RC_PKT_FAILED		0x0
+#define RC_PKT_FAILED 0x0
 
 /** Number of times to weight TX packets more heavily than RX packets */
-#define RC_TX_FACTOR		4
+#define RC_TX_FACTOR 4
 
 /** Number of consecutive failed TX packets that cause an automatic rate drop */
-#define RC_TX_EMERG_FAIL	3
+#define RC_TX_EMERG_FAIL 3
 
 /** Minimum net goodness below which we will search for a better rate */
-#define RC_GOODNESS_MIN		85
+#define RC_GOODNESS_MIN 85
 
 /** Maximum net goodness above which we will try to increase our rate */
-#define RC_GOODNESS_MAX		95
+#define RC_GOODNESS_MAX 95
 
 /** Minimum (num RX + @c RC_TX_FACTOR * num TX) to use a certain rate */
-#define RC_UNCERTAINTY_THRESH	4
+#define RC_UNCERTAINTY_THRESH 4
 
 /** TX direction */
-#define TX	0
+#define TX 0
 
 /** RX direction */
-#define RX	1
+#define RX 1
 
 /** A rate control context */
-struct rc80211_ctx
-{
-	/** Goodness state for each rate, TX and RX */
-	u32 goodness[2][NET80211_MAX_RATES];
+struct rc80211_ctx {
+    /** Goodness state for each rate, TX and RX */
+    u32 goodness[2][NET80211_MAX_RATES];
 
-	/** Number of packets recorded for each rate */
-	u8 count[2][NET80211_MAX_RATES];
+    /** Number of packets recorded for each rate */
+    u8 count[2][NET80211_MAX_RATES];
 
-	/** Indication of whether we've set the device rate yet */
-	int started;
+    /** Indication of whether we've set the device rate yet */
+    int started;
 
-	/** Counter of all packets sent and received */
-	int packets;
+    /** Counter of all packets sent and received */
+    int packets;
 };
 
 /**
@@ -151,10 +150,10 @@ struct rc80211_ctx
  * @v dev	802.11 device
  * @ret ctx	Rate-control context, to be stored in @c dev->rctl
  */
-struct rc80211_ctx * rc80211_init ( struct net80211_device *dev __unused )
+struct rc80211_ctx* rc80211_init(struct net80211_device* dev __unused)
 {
-	struct rc80211_ctx *ret = zalloc ( sizeof ( *ret ) );
-	return ret;
+    struct rc80211_ctx* ret = zalloc(sizeof(*ret));
+    return ret;
 }
 
 /**
@@ -163,26 +162,26 @@ struct rc80211_ctx * rc80211_init ( struct net80211_device *dev __unused )
  * @v ctx	Rate-control context
  * @v rate_idx	Index of rate to calculate net goodness for
  */
-static int rc80211_calc_net_goodness ( struct rc80211_ctx *ctx,
-				       int rate_idx )
+static int rc80211_calc_net_goodness(struct rc80211_ctx* ctx,
+                                     int rate_idx)
 {
-	int sum[2], num[2], dir, pkt;
+    int sum[2], num[2], dir, pkt;
 
-	for ( dir = 0; dir < 2; dir++ ) {
-		u32 good = ctx->goodness[dir][rate_idx];
+    for (dir = 0; dir < 2; dir++) {
+        u32 good = ctx->goodness[dir][rate_idx];
 
-		num[dir] = ctx->count[dir][rate_idx];
-		sum[dir] = 0;
+        num[dir] = ctx->count[dir][rate_idx];
+        sum[dir] = 0;
 
-		for ( pkt = 0; pkt < num[dir]; pkt++ )
-			sum[dir] += ( good >> ( 2 * pkt ) ) & 0x3;
-	}
+        for (pkt = 0; pkt < num[dir]; pkt++)
+            sum[dir] += (good >> (2 * pkt)) & 0x3;
+    }
 
-	if ( ( num[TX] * RC_TX_FACTOR + num[RX] ) < RC_UNCERTAINTY_THRESH )
-		return -1;
+    if ((num[TX] * RC_TX_FACTOR + num[RX]) < RC_UNCERTAINTY_THRESH)
+        return -1;
 
-	return ( 33 * ( sum[TX] * RC_TX_FACTOR + sum[RX] ) /
-		      ( num[TX] * RC_TX_FACTOR + num[RX] ) );
+    return (33 * (sum[TX] * RC_TX_FACTOR + sum[RX]) /
+            (num[TX] * RC_TX_FACTOR + num[RX]));
 }
 
 /**
@@ -191,33 +190,33 @@ static int rc80211_calc_net_goodness ( struct rc80211_ctx *ctx,
  * @v dev		802.11 device
  * @ret rate_idx	Index of the best rate to switch to
  */
-static int rc80211_pick_best ( struct net80211_device *dev )
+static int rc80211_pick_best(struct net80211_device* dev)
 {
-	struct rc80211_ctx *ctx = dev->rctl;
-	int best_net_good = 0, best_rate = -1, i;
+    struct rc80211_ctx* ctx = dev->rctl;
+    int best_net_good = 0, best_rate = -1, i;
 
-	for ( i = 0; i < dev->nr_rates; i++ ) {
-		int net_good = rc80211_calc_net_goodness ( ctx, i );
+    for (i = 0; i < dev->nr_rates; i++) {
+        int net_good = rc80211_calc_net_goodness(ctx, i);
 
-		if ( net_good > best_net_good ||
-		     ( best_net_good > RC_GOODNESS_MIN &&
-		       net_good > RC_GOODNESS_MIN ) ) {
-			best_net_good = net_good;
-			best_rate = i;
-		}
-	}
+        if (net_good > best_net_good ||
+            (best_net_good > RC_GOODNESS_MIN &&
+             net_good > RC_GOODNESS_MIN)) {
+            best_net_good = net_good;
+            best_rate = i;
+        }
+    }
 
-	if ( best_rate >= 0 ) {
-		int old_good = rc80211_calc_net_goodness ( ctx, dev->rate );
-		if ( old_good != best_net_good )
-			DBGC ( ctx, "802.11 RC %p switching from goodness "
-			       "%d to %d\n", ctx, old_good, best_net_good );
+    if (best_rate >= 0) {
+        int old_good = rc80211_calc_net_goodness(ctx, dev->rate);
+        if (old_good != best_net_good)
+            DBGC(ctx, "802.11 RC %p switching from goodness "
+                      "%d to %d\n", ctx, old_good, best_net_good);
 
-		ctx->started = 1;
-		return best_rate;
-	}
+        ctx->started = 1;
+        return best_rate;
+    }
 
-	return dev->rate;
+    return dev->rate;
 }
 
 /**
@@ -229,13 +228,13 @@ static int rc80211_pick_best ( struct net80211_device *dev )
  * This is a thin wrapper around net80211_set_rate_idx to insert a
  * debugging message where appropriate.
  */
-static inline void rc80211_set_rate ( struct net80211_device *dev,
-				      int rate_idx )
+static inline void rc80211_set_rate(struct net80211_device* dev,
+                                    int rate_idx)
 {
-	DBGC ( dev->rctl, "802.11 RC %p changing rate %d->%d Mbps\n", dev->rctl,
-	       dev->rates[dev->rate] / 10, dev->rates[rate_idx] / 10 );
+    DBGC(dev->rctl, "802.11 RC %p changing rate %d->%d Mbps\n", dev->rctl,
+         dev->rates[dev->rate] / 10, dev->rates[rate_idx] / 10);
 
-	net80211_set_rate_idx ( dev, rate_idx );
+    net80211_set_rate_idx(dev, rate_idx);
 }
 
 /**
@@ -243,32 +242,32 @@ static inline void rc80211_set_rate ( struct net80211_device *dev,
  *
  * @v dev	802.11 device
  */
-static void rc80211_maybe_set_new ( struct net80211_device *dev )
+static void rc80211_maybe_set_new(struct net80211_device* dev)
 {
-	struct rc80211_ctx *ctx = dev->rctl;
-	int net_good;
+    struct rc80211_ctx* ctx = dev->rctl;
+    int net_good;
 
-	net_good = rc80211_calc_net_goodness ( ctx, dev->rate );
+    net_good = rc80211_calc_net_goodness(ctx, dev->rate);
 
-	if ( ! ctx->started ) {
-		rc80211_set_rate ( dev, rc80211_pick_best ( dev ) );
-		return;
-	}
+    if (!ctx->started) {
+        rc80211_set_rate(dev, rc80211_pick_best(dev));
+        return;
+    }
 
-	if ( net_good < 0 )	/* insufficient data */
-		return;
+    if (net_good < 0) /* insufficient data */
+        return;
 
-	if ( net_good > RC_GOODNESS_MAX && dev->rate + 1 < dev->nr_rates ) {
-		int higher = rc80211_calc_net_goodness ( ctx, dev->rate + 1 );
-		if ( higher > net_good || higher < 0 )
-			rc80211_set_rate ( dev, dev->rate + 1 );
-		else
-			rc80211_set_rate ( dev, rc80211_pick_best ( dev ) );
-	}
+    if (net_good > RC_GOODNESS_MAX && dev->rate + 1 < dev->nr_rates) {
+        int higher = rc80211_calc_net_goodness(ctx, dev->rate + 1);
+        if (higher > net_good || higher < 0)
+            rc80211_set_rate(dev, dev->rate + 1);
+        else
+            rc80211_set_rate(dev, rc80211_pick_best(dev));
+    }
 
-	if ( net_good < RC_GOODNESS_MIN ) {
-		rc80211_set_rate ( dev, rc80211_pick_best ( dev ) );
-	}
+    if (net_good < RC_GOODNESS_MIN) {
+        rc80211_set_rate(dev, rc80211_pick_best(dev));
+    }
 }
 
 /**
@@ -280,30 +279,30 @@ static void rc80211_maybe_set_new ( struct net80211_device *dev )
  * @v retries		Number of times packet was retried before success
  * @v failed		If nonzero, the packet failed to get through
  */
-static void rc80211_update ( struct net80211_device *dev, int direction,
-			     int rate_idx, int retries, int failed )
+static void rc80211_update(struct net80211_device* dev, int direction,
+                           int rate_idx, int retries, int failed)
 {
-	struct rc80211_ctx *ctx = dev->rctl;
-	u32 goodness = ctx->goodness[direction][rate_idx];
+    struct rc80211_ctx* ctx = dev->rctl;
+    u32 goodness = ctx->goodness[direction][rate_idx];
 
-	if ( ctx->count[direction][rate_idx] < 16 )
-		ctx->count[direction][rate_idx]++;
+    if (ctx->count[direction][rate_idx] < 16)
+        ctx->count[direction][rate_idx]++;
 
-	goodness <<= 2;
-	if ( failed )
-		goodness |= RC_PKT_FAILED;
-	else if ( retries > 1 )
-		goodness |= RC_PKT_RETRIED_MULTI;
-	else if ( retries )
-		goodness |= RC_PKT_RETRIED_ONCE;
-	else
-		goodness |= RC_PKT_OK;
+    goodness <<= 2;
+    if (failed)
+        goodness |= RC_PKT_FAILED;
+    else if (retries > 1)
+        goodness |= RC_PKT_RETRIED_MULTI;
+    else if (retries)
+        goodness |= RC_PKT_RETRIED_ONCE;
+    else
+        goodness |= RC_PKT_OK;
 
-	ctx->goodness[direction][rate_idx] = goodness;
+    ctx->goodness[direction][rate_idx] = goodness;
 
-	ctx->packets++;
+    ctx->packets++;
 
-	rc80211_maybe_set_new ( dev );
+    rc80211_maybe_set_new(dev);
 }
 
 /**
@@ -313,32 +312,32 @@ static void rc80211_update ( struct net80211_device *dev, int direction,
  * @v retries	Number of times packet was transmitted before success
  * @v rc	Return status code for transmission
  */
-void rc80211_update_tx ( struct net80211_device *dev, int retries, int rc )
+void rc80211_update_tx(struct net80211_device* dev, int retries, int rc)
 {
-	struct rc80211_ctx *ctx = dev->rctl;
+    struct rc80211_ctx* ctx = dev->rctl;
 
-	if ( ! ctx->started )
-		return;
+    if (!ctx->started)
+        return;
 
-	rc80211_update ( dev, TX, dev->rate, retries, rc );
+    rc80211_update(dev, TX, dev->rate, retries, rc);
 
-	/* Check if the last RC_TX_EMERG_FAIL packets have all failed */
-	if ( ! ( ctx->goodness[TX][dev->rate] &
-		 ( ( 1 << ( 2 * RC_TX_EMERG_FAIL ) ) - 1 ) ) ) {
-		if ( dev->rate == 0 )
-			DBGC ( dev->rctl, "802.11 RC %p saw %d consecutive "
-			       "failed TX, but cannot lower rate any further\n",
-			       dev->rctl, RC_TX_EMERG_FAIL );
-		else {
-			DBGC ( dev->rctl, "802.11 RC %p lowering rate (%d->%d "
-			       "Mbps) due to %d consecutive TX failures\n",
-			       dev->rctl, dev->rates[dev->rate] / 10,
-			       dev->rates[dev->rate - 1] / 10,
-			       RC_TX_EMERG_FAIL );
+    /* Check if the last RC_TX_EMERG_FAIL packets have all failed */
+    if (!(ctx->goodness[TX][dev->rate] &
+          ((1 << (2 * RC_TX_EMERG_FAIL)) - 1))) {
+        if (dev->rate == 0)
+            DBGC(dev->rctl, "802.11 RC %p saw %d consecutive "
+                            "failed TX, but cannot lower rate any further\n",
+                 dev->rctl, RC_TX_EMERG_FAIL);
+        else {
+            DBGC(dev->rctl, "802.11 RC %p lowering rate (%d->%d "
+                            "Mbps) due to %d consecutive TX failures\n",
+                 dev->rctl, dev->rates[dev->rate] / 10,
+                 dev->rates[dev->rate - 1] / 10,
+                 RC_TX_EMERG_FAIL);
 
-			rc80211_set_rate ( dev, dev->rate - 1 );
-		}
-	}
+            rc80211_set_rate(dev, dev->rate - 1);
+        }
+    }
 }
 
 /**
@@ -348,17 +347,17 @@ void rc80211_update_tx ( struct net80211_device *dev, int retries, int rc )
  * @v retry	Whether the received packet had been retransmitted
  * @v rate	Rate at which packet was received, in 100 kbps units
  */
-void rc80211_update_rx ( struct net80211_device *dev, int retry, u16 rate )
+void rc80211_update_rx(struct net80211_device* dev, int retry, u16 rate)
 {
-	int ridx;
+    int ridx;
 
-	for ( ridx = 0; ridx < dev->nr_rates && dev->rates[ridx] != rate;
-	      ridx++ )
-		;
-	if ( ridx >= dev->nr_rates )
-		return;		/* couldn't find the rate */
+    for (ridx = 0; ridx < dev->nr_rates && dev->rates[ridx] != rate;
+         ridx++)
+        ;
+    if (ridx >= dev->nr_rates)
+        return; /* couldn't find the rate */
 
-	rc80211_update ( dev, RX, ridx, retry, 0 );
+    rc80211_update(dev, RX, ridx, retry, 0);
 }
 
 /**
@@ -366,7 +365,7 @@ void rc80211_update_rx ( struct net80211_device *dev, int retry, u16 rate )
  *
  * @v ctx	Rate-control context
  */
-void rc80211_free ( struct rc80211_ctx *ctx )
+void rc80211_free(struct rc80211_ctx* ctx)
 {
-	free ( ctx );
+    free(ctx);
 }

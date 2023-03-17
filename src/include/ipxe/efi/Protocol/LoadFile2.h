@@ -1,3 +1,5 @@
+#pragma once
+
 /** @file
   Load File protocol as defined in the UEFI 2.0 specification.
 
@@ -7,34 +9,29 @@
 
   UEFI 2.0 can boot from any device that produces a LoadFile protocol.
 
-  Copyright (c) 2006 - 2008, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __EFI_LOAD_FILE2_PROTOCOL_H__
-#define __EFI_LOAD_FILE2_PROTOCOL_H__
+    #define __EFI_LOAD_FILE2_PROTOCOL_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-#define EFI_LOAD_FILE2_PROTOCOL_GUID \
-  { \
-    0x4006c0c1, 0xfcb3, 0x403e, {0x99, 0x6d, 0x4a, 0x6c, 0x87, 0x24, 0xe0, 0x6d } \
-  }
+    #define EFI_LOAD_FILE2_PROTOCOL_GUID                       \
+        {                                                      \
+            0x4006c0c1, 0xfcb3, 0x403e, {                      \
+                0x99, 0x6d, 0x4a, 0x6c, 0x87, 0x24, 0xe0, 0x6d \
+            }                                                  \
+        }
 
-///
-/// Protocol Guid defined by UEFI2.1.
-///
-#define LOAD_FILE2_PROTOCOL EFI_LOAD_FILE2_PROTOCOL_GUID
+    ///
+    /// Protocol Guid defined by UEFI2.1.
+    ///
+    #define LOAD_FILE2_PROTOCOL EFI_LOAD_FILE2_PROTOCOL_GUID
 
 typedef struct _EFI_LOAD_FILE2_PROTOCOL EFI_LOAD_FILE2_PROTOCOL;
-
 
 /**
   Causes the driver to load a specified file.
@@ -65,21 +62,18 @@ typedef struct _EFI_LOAD_FILE2_PROTOCOL EFI_LOAD_FILE2_PROTOCOL;
 
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_LOAD_FILE2)(
-  IN EFI_LOAD_FILE2_PROTOCOL           *This,
-  IN EFI_DEVICE_PATH_PROTOCOL         *FilePath,
-  IN BOOLEAN                          BootPolicy,
-  IN OUT UINTN                        *BufferSize,
-  IN VOID                             *Buffer OPTIONAL
-  );
+typedef EFI_STATUS(EFIAPI* EFI_LOAD_FILE2)(
+    IN EFI_LOAD_FILE2_PROTOCOL* This,
+    IN EFI_DEVICE_PATH_PROTOCOL* FilePath,
+    IN BOOLEAN BootPolicy,
+    IN OUT UINTN* BufferSize,
+    IN VOID* Buffer OPTIONAL);
 
 ///
 /// The EFI_LOAD_FILE_PROTOCOL is a simple protocol used to obtain files from arbitrary devices.
 ///
 struct _EFI_LOAD_FILE2_PROTOCOL {
-  EFI_LOAD_FILE2 LoadFile;
+    EFI_LOAD_FILE2 LoadFile;
 };
 
 extern EFI_GUID gEfiLoadFile2ProtocolGuid;

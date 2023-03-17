@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdlib.h>
 #include <string.h>
@@ -48,13 +48,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** List of discovery segments */
-static LIST_HEAD ( peerdisc_segments );
+static LIST_HEAD(peerdisc_segments);
 
 /** Number of repeated discovery attempts */
 #define PEERDISC_REPEAT_COUNT 2
 
 /** Time between repeated discovery attempts */
-#define PEERDISC_REPEAT_TIMEOUT ( 1 * TICKS_PER_SEC )
+#define PEERDISC_REPEAT_TIMEOUT (1 * TICKS_PER_SEC)
 
 /** Default discovery timeout (in seconds) */
 #define PEERDISC_DEFAULT_TIMEOUT_SECS 2
@@ -73,12 +73,15 @@ static LIST_HEAD ( peerdisc_segments );
  */
 unsigned int peerdisc_timeout_secs = PEERDISC_DEFAULT_TIMEOUT_SECS;
 
-/** Hosted cache server */
-static char *peerhost;
+/** Most recently discovered peer (for any block) */
+static char* peerdisc_recent;
 
-static struct peerdisc_segment * peerdisc_find ( const char *id );
-static int peerdisc_discovered ( struct peerdisc_segment *segment,
-				 const char *location );
+/** Hosted cache server */
+static char* peerhost;
+
+static struct peerdisc_segment* peerdisc_find(const char* id);
+static int peerdisc_discovered(struct peerdisc_segment* segment,
+                               const char* location);
 
 /******************************************************************************
  *
@@ -94,20 +97,20 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
  * @v peer		Selected peer (or NULL)
  * @v peers		List of available peers
  */
-void peerdisc_stat ( struct interface *intf, struct peerdisc_peer *peer,
-		     struct list_head *peers ) {
-	struct interface *dest;
-	peerdisc_stat_TYPE ( void * ) *op =
-		intf_get_dest_op ( intf, peerdisc_stat, &dest );
-	void *object = intf_object ( dest );
+void peerdisc_stat(struct interface* intf, struct peerdisc_peer* peer,
+                   struct list_head* peers) {
+    struct interface* dest;
+    peerdisc_stat_TYPE(void*)* op =
+        intf_get_dest_op(intf, peerdisc_stat, &dest);
+    void* object = intf_object(dest);
 
-	if ( op ) {
-		op ( object, peer, peers );
-	} else {
-		/* Default is to do nothing */
-	}
+    if (op) {
+        op(object, peer, peers);
+    } else {
+        /* Default is to do nothing */
+    }
 
-	intf_put ( dest );
+    intf_put(dest);
 }
 
 /******************************************************************************
@@ -122,27 +125,27 @@ void peerdisc_stat ( struct interface *intf, struct peerdisc_peer *peer,
  *
  * @ret rc		Return status code
  */
-static int peerdisc_socket_open ( void ) {
-	struct peerdisc_socket *socket;
-	int rc;
+static int peerdisc_socket_open(void) {
+    struct peerdisc_socket* socket;
+    int rc;
 
-	/* Open each socket */
-	for_each_table_entry ( socket, PEERDISC_SOCKETS ) {
-		if ( ( rc = xfer_open_socket ( &socket->xfer, SOCK_DGRAM,
-					       &socket->address.sa,
-					       NULL ) ) != 0 ) {
-			DBGC ( socket, "PEERDISC %s could not open socket: "
-			       "%s\n", socket->name, strerror ( rc ) );
-			goto err;
-		}
-	}
+    /* Open each socket */
+    for_each_table_entry(socket, PEERDISC_SOCKETS) {
+        if ((rc = xfer_open_socket(&socket->xfer, SOCK_DGRAM,
+                                   &socket->address.sa,
+                                   NULL)) != 0) {
+            DBGC(socket, "PEERDISC %s could not open socket: "
+                         "%s\n", socket->name, strerror(rc));
+            goto err;
+        }
+    }
 
-	return 0;
+    return 0;
 
- err:
-	for_each_table_entry_continue_reverse ( socket, PEERDISC_SOCKETS )
-		intf_restart ( &socket->xfer, rc );
-	return rc;
+err:
+    for_each_table_entry_continue_reverse(socket, PEERDISC_SOCKETS)
+        intf_restart(&socket->xfer, rc);
+    return rc;
 }
 
 /**
@@ -151,63 +154,61 @@ static int peerdisc_socket_open ( void ) {
  * @v uuid		Message UUID string
  * @v id		Segment identifier string
  */
-static void peerdisc_socket_tx ( const char *uuid, const char *id ) {
-	struct peerdisc_socket *socket;
-	struct net_device *netdev;
-	struct xfer_metadata meta;
-	union {
-		struct sockaddr sa;
-		struct sockaddr_tcpip st;
-	} address;
-	char *request;
-	size_t len;
-	int rc;
+static void peerdisc_socket_tx(const char* uuid, const char* id) {
+    struct peerdisc_socket* socket;
+    struct net_device* netdev;
+    struct xfer_metadata meta;
+    union {
+        struct sockaddr sa;
+        struct sockaddr_tcpip st;
+    } address;
+    char* request;
+    size_t len;
+    int rc;
 
-	/* Construct discovery request */
-	request = peerdist_discovery_request ( uuid, id );
-	if ( ! request )
-		goto err_request;
-	len = strlen ( request );
+    /* Construct discovery request */
+    request = peerdist_discovery_request(uuid, id);
+    if (!request)
+        goto err_request;
+    len = strlen(request);
 
-	/* Initialise data transfer metadata */
-	memset ( &meta, 0, sizeof ( meta ) );
-	meta.dest = &address.sa;
+    /* Initialise data transfer metadata */
+    memset(&meta, 0, sizeof(meta));
+    meta.dest = &address.sa;
 
-	/* Send message on each socket */
-	for_each_table_entry ( socket, PEERDISC_SOCKETS ) {
+    /* Send message on each socket */
+    for_each_table_entry(socket, PEERDISC_SOCKETS) {
+        /* Initialise socket address */
+        memcpy(&address.sa, &socket->address.sa,
+               sizeof(address.sa));
 
-		/* Initialise socket address */
-		memcpy ( &address.sa, &socket->address.sa,
-			 sizeof ( address.sa ) );
+        /* Send message on each open network device */
+        for_each_netdev(netdev) {
+            /* Skip unopened network devices */
+            if (!netdev_is_open(netdev))
+                continue;
+            address.st.st_scope_id = netdev->scope_id;
 
-		/* Send message on each open network device */
-		for_each_netdev ( netdev ) {
+            /* Discard request (for test purposes) if applicable */
+            if (inject_fault(PEERDISC_DISCARD_RATE))
+                continue;
 
-			/* Skip unopened network devices */
-			if ( ! netdev_is_open ( netdev ) )
-				continue;
-			address.st.st_scope_id = netdev->index;
+            /* Transmit request */
+            if ((rc = xfer_deliver_raw_meta(&socket->xfer,
+                                            request, len,
+                                            &meta)) != 0) {
+                DBGC(socket, "PEERDISC %s could not transmit "
+                             "via %s: %s\n", socket->name,
+                     netdev->name, strerror(rc));
+                /* Contine to try other net devices/sockets */
+                continue;
+            }
+        }
+    }
 
-			/* Discard request (for test purposes) if applicable */
-			if ( inject_fault ( PEERDISC_DISCARD_RATE ) )
-				continue;
-
-			/* Transmit request */
-			if ( ( rc = xfer_deliver_raw_meta ( &socket->xfer,
-							    request, len,
-							    &meta ) ) != 0 ) {
-				DBGC ( socket, "PEERDISC %s could not transmit "
-				       "via %s: %s\n", socket->name,
-				       netdev->name, strerror ( rc ) );
-				/* Contine to try other net devices/sockets */
-				continue;
-			}
-		}
-	}
-
-	free ( request );
- err_request:
-	return;
+    free(request);
+err_request:
+    return;
 }
 
 /**
@@ -218,63 +219,61 @@ static void peerdisc_socket_tx ( const char *uuid, const char *id ) {
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int peerdisc_socket_rx ( struct peerdisc_socket *socket,
-				struct io_buffer *iobuf,
-				struct xfer_metadata *meta __unused ) {
-	struct peerdist_discovery_reply reply;
-	struct peerdisc_segment *segment;
-	char *id;
-	char *location;
-	int rc;
+static int peerdisc_socket_rx(struct peerdisc_socket* socket,
+                              struct io_buffer* iobuf,
+                              struct xfer_metadata* meta __unused) {
+    struct peerdist_discovery_reply reply;
+    struct peerdisc_segment* segment;
+    char* id;
+    char* location;
+    int rc;
 
-	/* Discard reply (for test purposes) if applicable */
-	if ( ( rc = inject_fault ( PEERDISC_DISCARD_RATE ) ) != 0 )
-		goto err;
+    /* Discard reply (for test purposes) if applicable */
+    if ((rc = inject_fault(PEERDISC_DISCARD_RATE)) != 0)
+        goto err;
 
-	/* Parse reply */
-	if ( ( rc = peerdist_discovery_reply ( iobuf->data, iob_len ( iobuf ),
-					       &reply ) ) != 0 ) {
-		DBGC ( socket, "PEERDISC %s could not parse reply: %s\n",
-		       socket->name, strerror ( rc ) );
-		DBGC_HDA ( socket, 0, iobuf->data, iob_len ( iobuf ) );
-		goto err;
-	}
+    /* Parse reply */
+    if ((rc = peerdist_discovery_reply(iobuf->data, iob_len(iobuf),
+                                       &reply)) != 0) {
+        DBGC(socket, "PEERDISC %s could not parse reply: %s\n",
+             socket->name, strerror(rc));
+        DBGC_HDA(socket, 0, iobuf->data, iob_len(iobuf));
+        goto err;
+    }
 
-	/* Any kind of discovery reply indicates that there are active
-	 * peers on a local network, so restore the recommended
-	 * discovery timeout to its default value for future requests.
-	 */
-	if ( peerdisc_timeout_secs != PEERDISC_DEFAULT_TIMEOUT_SECS ) {
-		DBGC ( socket, "PEERDISC %s restoring timeout to %d seconds\n",
-		       socket->name, PEERDISC_DEFAULT_TIMEOUT_SECS );
-	}
-	peerdisc_timeout_secs = PEERDISC_DEFAULT_TIMEOUT_SECS;
+    /* Any kind of discovery reply indicates that there are active
+     * peers on a local network, so restore the recommended
+     * discovery timeout to its default value for future requests.
+     */
+    if (peerdisc_timeout_secs != PEERDISC_DEFAULT_TIMEOUT_SECS) {
+        DBGC(socket, "PEERDISC %s restoring timeout to %d seconds\n",
+             socket->name, PEERDISC_DEFAULT_TIMEOUT_SECS);
+    }
+    peerdisc_timeout_secs = PEERDISC_DEFAULT_TIMEOUT_SECS;
 
-	/* Iterate over segment IDs */
-	for ( id = reply.ids ; *id ; id += ( strlen ( id ) + 1 /* NUL */ ) ) {
+    /* Iterate over segment IDs */
+    for (id = reply.ids; *id; id += (strlen(id) + 1 /* NUL */)) {
+        /* Find corresponding segment */
+        segment = peerdisc_find(id);
+        if (!segment) {
+            DBGC(socket, "PEERDISC %s ignoring reply for %s\n",
+                 socket->name, id);
+            continue;
+        }
 
-		/* Find corresponding segment */
-		segment = peerdisc_find ( id );
-		if ( ! segment ) {
-			DBGC ( socket, "PEERDISC %s ignoring reply for %s\n",
-			       socket->name, id );
-			continue;
-		}
+        /* Report all discovered peer locations */
+        for (location = reply.locations; *location;
+             location += (strlen(location) + 1 /* NUL */)) {
+            /* Report discovered peer location */
+            if ((rc = peerdisc_discovered(segment,
+                                          location)) != 0)
+                goto err;
+        }
+    }
 
-		/* Report all discovered peer locations */
-		for ( location = reply.locations ; *location ;
-		      location += ( strlen ( location ) + 1 /* NUL */ ) ) {
-
-			/* Report discovered peer location */
-			if ( ( rc = peerdisc_discovered ( segment,
-							  location ) ) != 0 )
-				goto err;
-		}
-	}
-
- err:
-	free_iob ( iobuf );
-	return rc;
+err:
+    free_iob(iobuf);
+    return rc;
 }
 
 /**
@@ -282,47 +281,47 @@ static int peerdisc_socket_rx ( struct peerdisc_socket *socket,
  *
  * @v rc		Reason for close
  */
-static void peerdisc_socket_close ( int rc ) {
-	struct peerdisc_socket *socket;
+static void peerdisc_socket_close(int rc) {
+    struct peerdisc_socket* socket;
 
-	/* Close all sockets */
-	for_each_table_entry ( socket, PEERDISC_SOCKETS )
-		intf_restart ( &socket->xfer, rc );
+    /* Close all sockets */
+    for_each_table_entry(socket, PEERDISC_SOCKETS)
+        intf_restart(&socket->xfer, rc);
 }
 
 /** PeerDist discovery socket interface operations */
 static struct interface_operation peerdisc_socket_operations[] = {
-	INTF_OP ( xfer_deliver, struct peerdisc_socket *, peerdisc_socket_rx ),
+    INTF_OP(xfer_deliver, struct peerdisc_socket*, peerdisc_socket_rx),
 };
 
 /** PeerDist discovery socket interface descriptor */
 static struct interface_descriptor peerdisc_socket_desc =
-	INTF_DESC ( struct peerdisc_socket, xfer, peerdisc_socket_operations );
+    INTF_DESC(struct peerdisc_socket, xfer, peerdisc_socket_operations);
 
 /** PeerDist discovery IPv4 socket */
 struct peerdisc_socket peerdisc_socket_ipv4 __peerdisc_socket = {
-	.name = "IPv4",
-	.address = {
-		.sin = {
-			.sin_family = AF_INET,
-			.sin_port = htons ( PEERDIST_DISCOVERY_PORT ),
-			.sin_addr.s_addr = htonl ( PEERDIST_DISCOVERY_IPV4 ),
-		},
-	},
-	.xfer = INTF_INIT ( peerdisc_socket_desc ),
+    .name = "IPv4",
+    .address = {
+        .sin = {
+            .sin_family = AF_INET,
+            .sin_port = htons(PEERDIST_DISCOVERY_PORT),
+            .sin_addr.s_addr = htonl(PEERDIST_DISCOVERY_IPV4),
+        },
+    },
+    .xfer = INTF_INIT(peerdisc_socket_desc),
 };
 
 /** PeerDist discovery IPv6 socket */
 struct peerdisc_socket peerdisc_socket_ipv6 __peerdisc_socket = {
-	.name = "IPv6",
-	.address = {
-		.sin6 = {
-			.sin6_family = AF_INET6,
-			.sin6_port = htons ( PEERDIST_DISCOVERY_PORT ),
-			.sin6_addr.s6_addr = PEERDIST_DISCOVERY_IPV6,
-		},
-	},
-	.xfer = INTF_INIT ( peerdisc_socket_desc ),
+    .name = "IPv6",
+    .address = {
+        .sin6 = {
+            .sin6_family = AF_INET6,
+            .sin6_port = htons(PEERDIST_DISCOVERY_PORT),
+            .sin6_addr.s6_addr = PEERDIST_DISCOVERY_IPV6,
+        },
+    },
+    .xfer = INTF_INIT(peerdisc_socket_desc),
 };
 
 /******************************************************************************
@@ -337,20 +336,20 @@ struct peerdisc_socket peerdisc_socket_ipv6 __peerdisc_socket = {
  *
  * @v refcnt		Reference count
  */
-static void peerdisc_free ( struct refcnt *refcnt ) {
-	struct peerdisc_segment *segment =
-		container_of ( refcnt, struct peerdisc_segment, refcnt );
-	struct peerdisc_peer *peer;
-	struct peerdisc_peer *tmp;
+static void peerdisc_free(struct refcnt* refcnt) {
+    struct peerdisc_segment* segment =
+        container_of(refcnt, struct peerdisc_segment, refcnt);
+    struct peerdisc_peer* peer;
+    struct peerdisc_peer* tmp;
 
-	/* Free all discovered peers */
-	list_for_each_entry_safe ( peer, tmp, &segment->peers, list ) {
-		list_del ( &peer->list );
-		free ( peer );
-	}
+    /* Free all discovered peers */
+    list_for_each_entry_safe(peer, tmp, &segment->peers, list) {
+        list_del(&peer->list);
+        free(peer);
+    }
 
-	/* Free segment */
-	free ( segment );
+    /* Free segment */
+    free(segment);
 }
 
 /**
@@ -359,16 +358,16 @@ static void peerdisc_free ( struct refcnt *refcnt ) {
  * @v id		Segment ID
  * @ret segment		PeerDist discovery segment, or NULL if not found
  */
-static struct peerdisc_segment * peerdisc_find ( const char *id ) {
-	struct peerdisc_segment *segment;
+static struct peerdisc_segment* peerdisc_find(const char* id) {
+    struct peerdisc_segment* segment;
 
-	/* Look for a matching segment */
-	list_for_each_entry ( segment, &peerdisc_segments, list ) {
-		if ( strcmp ( id, segment->id ) == 0 )
-			return segment;
-	}
+    /* Look for a matching segment */
+    list_for_each_entry(segment, &peerdisc_segments, list) {
+        if (strcmp(id, segment->id) == 0)
+            return segment;
+    }
 
-	return NULL;
+    return NULL;
 }
 
 /**
@@ -378,36 +377,46 @@ static struct peerdisc_segment * peerdisc_find ( const char *id ) {
  * @v location		Peer location
  * @ret rc		Return status code
  */
-static int peerdisc_discovered ( struct peerdisc_segment *segment,
-				 const char *location ) {
-	struct peerdisc_peer *peer;
-	struct peerdisc_client *peerdisc;
-	struct peerdisc_client *tmp;
+static int peerdisc_discovered(struct peerdisc_segment* segment,
+                               const char* location) {
+    struct peerdisc_peer* peer;
+    struct peerdisc_client* peerdisc;
+    struct peerdisc_client* tmp;
+    char* recent;
 
-	/* Ignore duplicate peers */
-	list_for_each_entry ( peer, &segment->peers, list ) {
-		if ( strcmp ( peer->location, location ) == 0 ) {
-			DBGC2 ( segment, "PEERDISC %p duplicate %s\n",
-				segment, location );
-			return 0;
-		}
-	}
-	DBGC2 ( segment, "PEERDISC %p discovered %s\n", segment, location );
+    /* Ignore duplicate peers */
+    list_for_each_entry(peer, &segment->peers, list) {
+        if (strcmp(peer->location, location) == 0) {
+            DBGC2(segment, "PEERDISC %p duplicate %s\n",
+                  segment, location);
+            return 0;
+        }
+    }
+    DBGC2(segment, "PEERDISC %p discovered %s\n", segment, location);
 
-	/* Allocate and initialise structure */
-	peer = zalloc ( sizeof ( *peer ) + strlen ( location ) + 1 /* NUL */ );
-	if ( ! peer )
-		return -ENOMEM;
-	strcpy ( peer->location, location );
+    /* Allocate and initialise structure */
+    peer = zalloc(sizeof(*peer) + strlen(location) + 1 /* NUL */);
+    if (!peer)
+        return -ENOMEM;
+    strcpy(peer->location, location);
 
-	/* Add to end of list of peers */
-	list_add_tail ( &peer->list, &segment->peers );
+    /* Add to end of list of peers */
+    list_add_tail(&peer->list, &segment->peers);
 
-	/* Notify all clients */
-	list_for_each_entry_safe ( peerdisc, tmp, &segment->clients, list )
-		peerdisc->op->discovered ( peerdisc );
+    /* Record as most recently discovered peer */
+    if (location != peerdisc_recent) {
+        recent = strdup(location);
+        if (recent) {
+            free(peerdisc_recent);
+            peerdisc_recent = recent;
+        }
+    }
 
-	return 0;
+    /* Notify all clients */
+    list_for_each_entry_safe(peerdisc, tmp, &segment->clients, list)
+        peerdisc->op->discovered(peerdisc);
+
+    return 0;
 }
 
 /**
@@ -416,16 +425,16 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
  * @v timer		Discovery timer
  * @v over		Failure indicator
  */
-static void peerdisc_expired ( struct retry_timer *timer, int over __unused ) {
-	struct peerdisc_segment *segment =
-		container_of ( timer, struct peerdisc_segment, timer );
+static void peerdisc_expired(struct retry_timer* timer, int over __unused) {
+    struct peerdisc_segment* segment =
+        container_of(timer, struct peerdisc_segment, timer);
 
-	/* Attempt to transmit discovery requests */
-	peerdisc_socket_tx ( segment->uuid, segment->id );
+    /* Attempt to transmit discovery requests */
+    peerdisc_socket_tx(segment->uuid, segment->id);
 
-	/* Schedule next transmission, if applicable */
-	if ( timer->count < PEERDISC_REPEAT_COUNT )
-		start_timer_fixed ( &segment->timer, PEERDISC_REPEAT_TIMEOUT );
+    /* Schedule next transmission, if applicable */
+    if (timer->count < PEERDISC_REPEAT_COUNT)
+        start_timer_fixed(&segment->timer, PEERDISC_REPEAT_TIMEOUT);
 }
 
 /**
@@ -434,70 +443,79 @@ static void peerdisc_expired ( struct retry_timer *timer, int over __unused ) {
  * @v id		Segment ID
  * @ret segment		PeerDist discovery segment, or NULL on error
  */
-static struct peerdisc_segment * peerdisc_create ( const char *id ) {
-	struct peerdisc_segment *segment;
-	union {
-		union uuid uuid;
-		uint32_t dword[ sizeof ( union uuid ) / sizeof ( uint32_t ) ];
-	} random_uuid;
-	size_t uuid_len;
-	size_t id_len;
-	const char *uuid;
-	char *uuid_copy;
-	char *id_copy;
-	unsigned int i;
-	int rc;
+static struct peerdisc_segment* peerdisc_create(const char* id) {
+    struct peerdisc_segment* segment;
+    union {
+        union uuid uuid;
+        uint32_t dword[sizeof(union uuid) / sizeof(uint32_t)];
+    } random_uuid;
+    size_t uuid_len;
+    size_t id_len;
+    const char* uuid;
+    char* uuid_copy;
+    char* id_copy;
+    unsigned int i;
+    int rc;
 
-	/* Generate a random message UUID.  This does not require high
-	 * quality randomness.
-	 */
-	for ( i = 0 ; i < ( sizeof ( random_uuid.dword ) /
-			    sizeof ( random_uuid.dword[0] ) ) ; i++ )
-		random_uuid.dword[i] = random();
-	uuid = uuid_ntoa ( &random_uuid.uuid );
+    /* Generate a random message UUID.  This does not require high
+     * quality randomness.
+     */
+    for (i = 0; i < (sizeof(random_uuid.dword) /
+                     sizeof(random_uuid.dword[0]));
+         i++)
+        random_uuid.dword[i] = random();
+    uuid = uuid_ntoa(&random_uuid.uuid);
 
-	/* Calculate string lengths */
-	id_len = ( strlen ( id ) + 1 /* NUL */ );
-	uuid_len = ( strlen ( uuid ) + 1 /* NUL */ );
+    /* Calculate string lengths */
+    id_len = (strlen(id) + 1 /* NUL */);
+    uuid_len = (strlen(uuid) + 1 /* NUL */);
 
-	/* Allocate and initialise structure */
-	segment = zalloc ( sizeof ( *segment ) + id_len + uuid_len );
-	if ( ! segment )
-		goto err_alloc;
-	id_copy = ( ( ( void * ) segment ) + sizeof ( *segment ) );
-	memcpy ( id_copy, id, id_len );
-	uuid_copy = ( ( ( void * ) id_copy ) + id_len );
-	memcpy ( uuid_copy, uuid, uuid_len );
-	ref_init ( &segment->refcnt, peerdisc_free );
-	segment->id = id_copy;
-	segment->uuid = uuid_copy;
-	INIT_LIST_HEAD ( &segment->peers );
-	INIT_LIST_HEAD ( &segment->clients );
-	timer_init ( &segment->timer, peerdisc_expired, &segment->refcnt );
+    /* Allocate and initialise structure */
+    segment = zalloc(sizeof(*segment) + id_len + uuid_len);
+    if (!segment)
+        goto err_alloc;
+    id_copy = (((void*)segment) + sizeof(*segment));
+    memcpy(id_copy, id, id_len);
+    uuid_copy = (((void*)id_copy) + id_len);
+    memcpy(uuid_copy, uuid, uuid_len);
+    ref_init(&segment->refcnt, peerdisc_free);
+    segment->id = id_copy;
+    segment->uuid = uuid_copy;
+    INIT_LIST_HEAD(&segment->peers);
+    INIT_LIST_HEAD(&segment->clients);
+    timer_init(&segment->timer, peerdisc_expired, &segment->refcnt);
 
-	/* Add hosted cache server or initiate discovery */
-	if ( peerhost ) {
+    /* Add hosted cache server or initiate discovery */
+    if (peerhost) {
+        /* Add hosted cache server to list of peers */
+        if ((rc = peerdisc_discovered(segment, peerhost)) != 0)
+            goto err_peerhost;
 
-		/* Add hosted cache server to list of peers */
-		if ( ( rc = peerdisc_discovered ( segment, peerhost ) ) != 0 )
-			goto err_peerhost;
+    } else {
+        /* Add most recently discovered peer to list of peers
+         *
+         * This is a performance optimisation: we assume that
+         * the most recently discovered peer for any block has
+         * a high probability of also having a copy of the
+         * next block that we attempt to discover.
+         */
+        if (peerdisc_recent)
+            peerdisc_discovered(segment, peerdisc_recent);
 
-	} else {
+        /* Start discovery timer */
+        start_timer_nodelay(&segment->timer);
+        DBGC2(segment, "PEERDISC %p discovering %s\n",
+              segment, segment->id);
+    }
 
-		/* Start discovery timer */
-		start_timer_nodelay ( &segment->timer );
-		DBGC2 ( segment, "PEERDISC %p discovering %s\n",
-			segment, segment->id );
-	}
+    /* Add to list of segments, transfer reference to list, and return */
+    list_add_tail(&segment->list, &peerdisc_segments);
+    return segment;
 
-	/* Add to list of segments, transfer reference to list, and return */
-	list_add_tail ( &segment->list, &peerdisc_segments );
-	return segment;
-
- err_peerhost:
-	ref_put ( &segment->refcnt );
- err_alloc:
-	return NULL;
+err_peerhost:
+    ref_put(&segment->refcnt);
+err_alloc:
+    return NULL;
 }
 
 /**
@@ -505,17 +523,16 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
  *
  * @v segment		PeerDist discovery segment
  */
-static void peerdisc_destroy ( struct peerdisc_segment *segment ) {
+static void peerdisc_destroy(struct peerdisc_segment* segment) {
+    /* Sanity check */
+    assert(list_empty(&segment->clients));
 
-	/* Sanity check */
-	assert ( list_empty ( &segment->clients ) );
+    /* Stop timer */
+    stop_timer(&segment->timer);
 
-	/* Stop timer */
-	stop_timer ( &segment->timer );
-
-	/* Remove from list of segments and drop list's reference */
-	list_del ( &segment->list );
-	ref_put ( &segment->refcnt );
+    /* Remove from list of segments and drop list's reference */
+    list_del(&segment->list);
+    ref_put(&segment->refcnt);
 }
 
 /******************************************************************************
@@ -533,37 +550,37 @@ static void peerdisc_destroy ( struct peerdisc_segment *segment ) {
  * @v len		Length of segment ID
  * @ret rc		Return status code
  */
-int peerdisc_open ( struct peerdisc_client *peerdisc, const void *id,
-		    size_t len ) {
-	struct peerdisc_segment *segment;
-	char id_string[ base16_encoded_len ( len ) + 1 /* NUL */ ];
-	char *id_chr;
-	int rc;
+int peerdisc_open(struct peerdisc_client* peerdisc, const void* id,
+                  size_t len) {
+    struct peerdisc_segment* segment;
+    char id_string[base16_encoded_len(len) + 1 /* NUL */];
+    char* id_chr;
+    int rc;
 
-	/* Construct ID string */
-	base16_encode ( id, len, id_string, sizeof ( id_string ) );
-	for ( id_chr = id_string ; *id_chr ; id_chr++ )
-		*id_chr = toupper ( *id_chr );
+    /* Construct ID string */
+    base16_encode(id, len, id_string, sizeof(id_string));
+    for (id_chr = id_string; *id_chr; id_chr++)
+        *id_chr = toupper(*id_chr);
 
-	/* Sanity check */
-	assert ( peerdisc->segment == NULL );
+    /* Sanity check */
+    assert(peerdisc->segment == NULL);
 
-	/* Open socket if this is the first segment */
-	if ( list_empty ( &peerdisc_segments ) &&
-	     ( ( rc = peerdisc_socket_open() ) != 0 ) )
-		return rc;
+    /* Open socket if this is the first segment */
+    if (list_empty(&peerdisc_segments) &&
+        ((rc = peerdisc_socket_open()) != 0))
+        return rc;
 
-	/* Find or create segment */
-	if ( ! ( ( segment = peerdisc_find ( id_string ) ) ||
-		 ( segment = peerdisc_create ( id_string ) ) ) )
-		return -ENOMEM;
+    /* Find or create segment */
+    if (!((segment = peerdisc_find(id_string)) ||
+          (segment = peerdisc_create(id_string))))
+        return -ENOMEM;
 
-	/* Add to list of clients */
-	ref_get ( &segment->refcnt );
-	peerdisc->segment = segment;
-	list_add_tail ( &peerdisc->list, &segment->clients );
+    /* Add to list of clients */
+    ref_get(&segment->refcnt);
+    peerdisc->segment = segment;
+    list_add_tail(&peerdisc->list, &segment->clients);
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -571,34 +588,34 @@ int peerdisc_open ( struct peerdisc_client *peerdisc, const void *id,
  *
  * @v peerdisc		PeerDist discovery client
  */
-void peerdisc_close ( struct peerdisc_client *peerdisc ) {
-	struct peerdisc_segment *segment = peerdisc->segment;
+void peerdisc_close(struct peerdisc_client* peerdisc) {
+    struct peerdisc_segment* segment = peerdisc->segment;
 
-	/* Ignore if discovery is already closed */
-	if ( ! segment )
-		return;
+    /* Ignore if discovery is already closed */
+    if (!segment)
+        return;
 
-	/* If no peers were discovered, reduce the recommended
-	 * discovery timeout to minimise delays on future requests.
-	 */
-	if ( list_empty ( &segment->peers ) && peerdisc_timeout_secs ) {
-		peerdisc_timeout_secs--;
-		DBGC ( segment, "PEERDISC %p reducing timeout to %d "
-		       "seconds\n", peerdisc, peerdisc_timeout_secs );
-	}
+    /* If no peers were discovered, reduce the recommended
+     * discovery timeout to minimise delays on future requests.
+     */
+    if (list_empty(&segment->peers) && peerdisc_timeout_secs) {
+        peerdisc_timeout_secs--;
+        DBGC(segment, "PEERDISC %p reducing timeout to %d "
+                      "seconds\n", peerdisc, peerdisc_timeout_secs);
+    }
 
-	/* Remove from list of clients */
-	peerdisc->segment = NULL;
-	list_del ( &peerdisc->list );
-	ref_put ( &segment->refcnt );
+    /* Remove from list of clients */
+    peerdisc->segment = NULL;
+    list_del(&peerdisc->list);
+    ref_put(&segment->refcnt);
 
-	/* If this was the last clients, destroy the segment */
-	if ( list_empty ( &segment->clients ) )
-		peerdisc_destroy ( segment );
+    /* If this was the last clients, destroy the segment */
+    if (list_empty(&segment->clients))
+        peerdisc_destroy(segment);
 
-	/* If there are no more segments, close the socket */
-	if ( list_empty ( &peerdisc_segments ) )
-		peerdisc_socket_close ( 0 );
+    /* If there are no more segments, close the socket */
+    if (list_empty(&peerdisc_segments))
+        peerdisc_socket_close(0);
 }
 
 /******************************************************************************
@@ -609,10 +626,10 @@ void peerdisc_close ( struct peerdisc_client *peerdisc ) {
  */
 
 /** PeerDist hosted cache server setting */
-const struct setting peerhost_setting __setting ( SETTING_MISC, peerhost ) = {
-	.name = "peerhost",
-	.description = "PeerDist hosted cache",
-	.type = &setting_type_string,
+const struct setting peerhost_setting __setting(SETTING_MISC, peerhost) = {
+    .name = "peerhost",
+    .description = "PeerDist hosted cache",
+    .type = &setting_type_string,
 };
 
 /**
@@ -620,23 +637,22 @@ const struct setting peerhost_setting __setting ( SETTING_MISC, peerhost ) = {
  *
  * @ret rc		Return status code
  */
-static int apply_peerdisc_settings ( void ) {
+static int apply_peerdisc_settings(void) {
+    /* Free any existing hosted cache server */
+    free(peerhost);
+    peerhost = NULL;
 
-	/* Free any existing hosted cache server */
-	free ( peerhost );
-	peerhost = NULL;
+    /* Fetch hosted cache server */
+    fetch_string_setting_copy(NULL, &peerhost_setting, &peerhost);
+    if (peerhost) {
+        DBGC(&peerhost, "PEERDISC using hosted cache %s\n",
+             peerhost);
+    }
 
-	/* Fetch hosted cache server */
-	fetch_string_setting_copy ( NULL, &peerhost_setting, &peerhost );
-	if ( peerhost ) {
-		DBGC ( &peerhost, "PEERDISC using hosted cache %s\n",
-		       peerhost );
-	}
-
-	return 0;
+    return 0;
 }
 
 /** PeerDist discovery settings applicator */
 struct settings_applicator peerdisc_applicator __settings_applicator = {
-	.apply = apply_peerdisc_settings,
+    .apply = apply_peerdisc_settings,
 };

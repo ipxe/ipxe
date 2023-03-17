@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -41,94 +41,93 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * This can be set by the prefix.
  */
-uint32_t __bss16 ( cached_dhcpack_phys );
-#define cached_dhcpack_phys __use_data16 ( cached_dhcpack_phys )
+uint32_t __bss16(cached_dhcpack_phys);
+#define cached_dhcpack_phys __use_data16(cached_dhcpack_phys)
 
 /** Colour for debug messages */
 #define colour &cached_dhcpack_phys
 
 /** Cached DHCPACK */
-static struct dhcp_packet *cached_dhcpack;
+static struct dhcp_packet* cached_dhcpack;
 
 /**
  * Cached DHCPACK startup function
  *
  */
-static void cachedhcp_init ( void ) {
-	struct dhcp_packet *dhcppkt;
-	struct dhcp_packet *tmp;
-	struct dhcphdr *dhcphdr;
-	size_t max_len;
-	size_t len;
+static void cachedhcp_init(void) {
+    struct dhcp_packet* dhcppkt;
+    struct dhcp_packet* tmp;
+    struct dhcphdr* dhcphdr;
+    size_t max_len;
+    size_t len;
 
-	/* Do nothing if no cached DHCPACK is present */
-	if ( ! cached_dhcpack_phys ) {
-		DBGC ( colour, "CACHEDHCP found no cached DHCPACK\n" );
-		return;
-	}
+    /* Do nothing if no cached DHCPACK is present */
+    if (!cached_dhcpack_phys) {
+        DBGC(colour, "CACHEDHCP found no cached DHCPACK\n");
+        return;
+    }
 
-	/* No reliable way to determine length before parsing packet;
-	 * start by assuming maximum length permitted by PXE.
-	 */
-	max_len = sizeof ( BOOTPLAYER_t );
+    /* No reliable way to determine length before parsing packet;
+     * start by assuming maximum length permitted by PXE.
+     */
+    max_len = sizeof(BOOTPLAYER_t);
 
-	/* Allocate and populate DHCP packet */
-	dhcppkt = zalloc ( sizeof ( *dhcppkt ) + max_len );
-	if ( ! dhcppkt ) {
-		DBGC ( colour, "CACHEDHCP could not allocate copy\n" );
-		return;
-	}
-	dhcphdr = ( ( ( void * ) dhcppkt ) + sizeof ( *dhcppkt ) );
-	copy_from_user ( dhcphdr, phys_to_user ( cached_dhcpack_phys ), 0,
-			 max_len );
-	dhcppkt_init ( dhcppkt, dhcphdr, max_len );
+    /* Allocate and populate DHCP packet */
+    dhcppkt = zalloc(sizeof(*dhcppkt) + max_len);
+    if (!dhcppkt) {
+        DBGC(colour, "CACHEDHCP could not allocate copy\n");
+        return;
+    }
+    dhcphdr = (((void*)dhcppkt) + sizeof(*dhcppkt));
+    copy_from_user(dhcphdr, phys_to_user(cached_dhcpack_phys), 0,
+                   max_len);
+    dhcppkt_init(dhcppkt, dhcphdr, max_len);
 
-	/* Shrink packet to required length.  If reallocation fails,
-	 * just continue to use the original packet and waste the
-	 * unused space.
-	 */
-	len = dhcppkt_len ( dhcppkt );
-	assert ( len <= max_len );
-	tmp = realloc ( dhcppkt, ( sizeof ( *dhcppkt ) + len ) );
-	if ( tmp )
-		dhcppkt = tmp;
+    /* Shrink packet to required length.  If reallocation fails,
+     * just continue to use the original packet and waste the
+     * unused space.
+     */
+    len = dhcppkt_len(dhcppkt);
+    assert(len <= max_len);
+    tmp = realloc(dhcppkt, (sizeof(*dhcppkt) + len));
+    if (tmp)
+        dhcppkt = tmp;
 
-	/* Reinitialise packet at new address */
-	dhcphdr = ( ( ( void * ) dhcppkt ) + sizeof ( *dhcppkt ) );
-	dhcppkt_init ( dhcppkt, dhcphdr, len );
+    /* Reinitialise packet at new address */
+    dhcphdr = (((void*)dhcppkt) + sizeof(*dhcppkt));
+    dhcppkt_init(dhcppkt, dhcphdr, len);
 
-	/* Store as cached DHCPACK, and mark original copy as consumed */
-	DBGC ( colour, "CACHEDHCP found cached DHCPACK at %08x+%zx\n",
-	       cached_dhcpack_phys, len );
-	cached_dhcpack = dhcppkt;
-	cached_dhcpack_phys = 0;
+    /* Store as cached DHCPACK, and mark original copy as consumed */
+    DBGC(colour, "CACHEDHCP found cached DHCPACK at %08x+%zx\n",
+         cached_dhcpack_phys, len);
+    cached_dhcpack = dhcppkt;
+    cached_dhcpack_phys = 0;
 }
 
 /**
  * Cached DHCPACK startup function
  *
  */
-static void cachedhcp_startup ( void ) {
-
-	/* If cached DHCP packet was not claimed by any network device
-	 * during startup, then free it.
-	 */
-	if ( cached_dhcpack ) {
-		DBGC ( colour, "CACHEDHCP freeing unclaimed cached DHCPACK\n" );
-		dhcppkt_put ( cached_dhcpack );
-		cached_dhcpack = NULL;
-	}
+static void cachedhcp_startup(void) {
+    /* If cached DHCP packet was not claimed by any network device
+     * during startup, then free it.
+     */
+    if (cached_dhcpack) {
+        DBGC(colour, "CACHEDHCP freeing unclaimed cached DHCPACK\n");
+        dhcppkt_put(cached_dhcpack);
+        cached_dhcpack = NULL;
+    }
 }
 
 /** Cached DHCPACK initialisation function */
-struct init_fn cachedhcp_init_fn __init_fn ( INIT_NORMAL ) = {
-	.initialise = cachedhcp_init,
+struct init_fn cachedhcp_init_fn __init_fn(INIT_NORMAL) = {
+    .initialise = cachedhcp_init,
 };
 
 /** Cached DHCPACK startup function */
-struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
-	.name = "cachedhcp",
-	.startup = cachedhcp_startup,
+struct startup_fn cachedhcp_startup_fn __startup_fn(STARTUP_LATE) = {
+    .name = "cachedhcp",
+    .startup = cachedhcp_startup,
 };
 
 /**
@@ -137,43 +136,43 @@ struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-static int cachedhcp_probe ( struct net_device *netdev ) {
-	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	int rc;
+static int cachedhcp_probe(struct net_device* netdev) {
+    struct ll_protocol* ll_protocol = netdev->ll_protocol;
+    int rc;
 
-	/* Do nothing unless we have a cached DHCPACK */
-	if ( ! cached_dhcpack )
-		return 0;
+    /* Do nothing unless we have a cached DHCPACK */
+    if (!cached_dhcpack)
+        return 0;
 
-	/* Do nothing unless cached DHCPACK's MAC address matches this
-	 * network device.
-	 */
-	if ( memcmp ( netdev->ll_addr, cached_dhcpack->dhcphdr->chaddr,
-		      ll_protocol->ll_addr_len ) != 0 ) {
-		DBGC ( colour, "CACHEDHCP cached DHCPACK does not match %s\n",
-		       netdev->name );
-		return 0;
-	}
-	DBGC ( colour, "CACHEDHCP cached DHCPACK is for %s\n", netdev->name );
+    /* Do nothing unless cached DHCPACK's MAC address matches this
+     * network device.
+     */
+    if (memcmp(netdev->ll_addr, cached_dhcpack->dhcphdr->chaddr,
+               ll_protocol->ll_addr_len) != 0) {
+        DBGC(colour, "CACHEDHCP cached DHCPACK does not match %s\n",
+             netdev->name);
+        return 0;
+    }
+    DBGC(colour, "CACHEDHCP cached DHCPACK is for %s\n", netdev->name);
 
-	/* Register as DHCP settings for this network device */
-	if ( ( rc = register_settings ( &cached_dhcpack->settings,
-					netdev_settings ( netdev ),
-					DHCP_SETTINGS_NAME ) ) != 0 ) {
-		DBGC ( colour, "CACHEDHCP could not register settings: %s\n",
-		       strerror ( rc ) );
-		return rc;
-	}
+    /* Register as DHCP settings for this network device */
+    if ((rc = register_settings(&cached_dhcpack->settings,
+                                netdev_settings(netdev),
+                                DHCP_SETTINGS_NAME)) != 0) {
+        DBGC(colour, "CACHEDHCP could not register settings: %s\n",
+             strerror(rc));
+        return rc;
+    }
 
-	/* Claim cached DHCPACK */
-	dhcppkt_put ( cached_dhcpack );
-	cached_dhcpack = NULL;
+    /* Claim cached DHCPACK */
+    dhcppkt_put(cached_dhcpack);
+    cached_dhcpack = NULL;
 
-	return 0;
+    return 0;
 }
 
 /** Cached DHCP packet network device driver */
 struct net_driver cachedhcp_driver __net_driver = {
-	.name = "cachedhcp",
-	.probe = cachedhcp_probe,
+    .name = "cachedhcp",
+    .probe = cachedhcp_probe,
 };

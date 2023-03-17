@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef MLX_BLINK_LEDS_H_
-#define MLX_BLINK_LEDS_H_
+    #define MLX_BLINK_LEDS_H_
 
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
@@ -20,27 +22,26 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
-#include "../../mlx_lib/mlx_reg_access/mlx_reg_access.h"
-#include "../../include/public/mlx_utils.h"
+    #include "../../mlx_lib/mlx_reg_access/mlx_reg_access.h"
+    #include "../../include/public/mlx_utils.h"
 
 struct mlx_led_control {
-	mlx_uint32 reserved1	:16;
-	mlx_uint32 port	:8;
-	mlx_uint32 bla	:8;
-/* -------------- */
-	mlx_uint32 beacon_duration	:16;
-	mlx_uint32 reserved2	:16;
-/* -------------- */
-	mlx_uint32 beacon_remain	:16;
-	mlx_uint32 reserved3	:16;
+    mlx_uint32 reserved1 : 16;
+    mlx_uint32 port : 8;
+    mlx_uint32 bla : 8;
+    /* -------------- */
+    mlx_uint32 beacon_duration : 16;
+    mlx_uint32 reserved2 : 16;
+    /* -------------- */
+    mlx_uint32 beacon_remain : 16;
+    mlx_uint32 reserved3 : 16;
 };
 
 mlx_status
 mlx_blink_leds(
-		IN mlx_utils *utils,
-		IN mlx_uint16 secs
-		);
+    IN mlx_utils* utils,
+    IN mlx_uint16 secs);
 
 #endif /* MLX_NVCONFIG_H_ */

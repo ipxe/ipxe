@@ -28,36 +28,36 @@
  */
 
 /* Only these channels all allow active scan on all world regulatory domains */
-#define ATH9K_2GHZ_CH01_11	REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
+#define ATH9K_2GHZ_CH01_11 REG_RULE(2412 - 10, 2462 + 10, 40, 0, 20, 0)
 
 /* We enable active scan on these a case by case basis by regulatory domain */
-#define ATH9K_2GHZ_CH12_13	REG_RULE(2467-10, 2472+10, 40, 0, 20,\
-					NL80211_RRF_PASSIVE_SCAN)
-#define ATH9K_2GHZ_CH14		REG_RULE(2484-10, 2484+10, 40, 0, 20,\
-				NL80211_RRF_PASSIVE_SCAN | NL80211_RRF_NO_OFDM)
+#define ATH9K_2GHZ_CH12_13 REG_RULE(2467 - 10, 2472 + 10, 40, 0, 20, \
+                                    NL80211_RRF_PASSIVE_SCAN)
+#define ATH9K_2GHZ_CH14 REG_RULE(2484 - 10, 2484 + 10, 40, 0, 20, \
+                                 NL80211_RRF_PASSIVE_SCAN | NL80211_RRF_NO_OFDM)
 
 /* We allow IBSS on these on a case by case basis by regulatory domain */
-#define ATH9K_5GHZ_5150_5350	REG_RULE(5150-10, 5350+10, 40, 0, 30,\
-				NL80211_RRF_PASSIVE_SCAN | NL80211_RRF_NO_IBSS)
-#define ATH9K_5GHZ_5470_5850	REG_RULE(5470-10, 5850+10, 40, 0, 30,\
-				NL80211_RRF_PASSIVE_SCAN | NL80211_RRF_NO_IBSS)
-#define ATH9K_5GHZ_5725_5850	REG_RULE(5725-10, 5850+10, 40, 0, 30,\
-				NL80211_RRF_PASSIVE_SCAN | NL80211_RRF_NO_IBSS)
+#define ATH9K_5GHZ_5150_5350 REG_RULE(5150 - 10, 5350 + 10, 40, 0, 30, \
+                                      NL80211_RRF_PASSIVE_SCAN | NL80211_RRF_NO_IBSS)
+#define ATH9K_5GHZ_5470_5850 REG_RULE(5470 - 10, 5850 + 10, 40, 0, 30, \
+                                      NL80211_RRF_PASSIVE_SCAN | NL80211_RRF_NO_IBSS)
+#define ATH9K_5GHZ_5725_5850 REG_RULE(5725 - 10, 5850 + 10, 40, 0, 30, \
+                                      NL80211_RRF_PASSIVE_SCAN | NL80211_RRF_NO_IBSS)
 
-#define ATH9K_2GHZ_ALL		ATH9K_2GHZ_CH01_11, \
-				ATH9K_2GHZ_CH12_13, \
-				ATH9K_2GHZ_CH14
+#define ATH9K_2GHZ_ALL ATH9K_2GHZ_CH01_11, \
+                       ATH9K_2GHZ_CH12_13, \
+                       ATH9K_2GHZ_CH14
 
-#define ATH9K_5GHZ_ALL		ATH9K_5GHZ_5150_5350, \
-				ATH9K_5GHZ_5470_5850
+#define ATH9K_5GHZ_ALL ATH9K_5GHZ_5150_5350, \
+                       ATH9K_5GHZ_5470_5850
 
 /* This one skips what we call "mid band" */
-#define ATH9K_5GHZ_NO_MIDBAND	ATH9K_5GHZ_5150_5350, \
-				ATH9K_5GHZ_5725_5850
+#define ATH9K_5GHZ_NO_MIDBAND ATH9K_5GHZ_5150_5350, \
+                              ATH9K_5GHZ_5725_5850
 
 ///* Can be used for:
 // * 0x60, 0x61, 0x62 */
-//static const struct ieee80211_regdomain ath_world_regdom_60_61_62 = {
+// static const struct ieee80211_regdomain ath_world_regdom_60_61_62 = {
 //	.n_reg_rules = 5,
 //	.alpha2 =  "99",
 //	.reg_rules = {
@@ -67,7 +67,7 @@
 //};
 //
 ///* Can be used by 0x63 and 0x65 */
-//static const struct ieee80211_regdomain ath_world_regdom_63_65 = {
+// static const struct ieee80211_regdomain ath_world_regdom_63_65 = {
 //	.n_reg_rules = 4,
 //	.alpha2 =  "99",
 //	.reg_rules = {
@@ -75,30 +75,30 @@
 //		ATH9K_2GHZ_CH12_13,
 //		ATH9K_5GHZ_NO_MIDBAND,
 //	}
-//};
+// };
 //
 ///* Can be used by 0x64 only */
-//static const struct ieee80211_regdomain ath_world_regdom_64 = {
+// static const struct ieee80211_regdomain ath_world_regdom_64 = {
 //	.n_reg_rules = 3,
 //	.alpha2 =  "99",
 //	.reg_rules = {
 //		ATH9K_2GHZ_CH01_11,
 //		ATH9K_5GHZ_NO_MIDBAND,
 //	}
-//};
+// };
 //
 ///* Can be used by 0x66 and 0x69 */
-//static const struct ieee80211_regdomain ath_world_regdom_66_69 = {
+// static const struct ieee80211_regdomain ath_world_regdom_66_69 = {
 //	.n_reg_rules = 3,
 //	.alpha2 =  "99",
 //	.reg_rules = {
 //		ATH9K_2GHZ_CH01_11,
 //		ATH9K_5GHZ_ALL,
 //	}
-//};
+// };
 //
 ///* Can be used by 0x67, 0x68, 0x6A and 0x6C */
-//static const struct ieee80211_regdomain ath_world_regdom_67_68_6A_6C = {
+// static const struct ieee80211_regdomain ath_world_regdom_67_68_6A_6C = {
 //	.n_reg_rules = 4,
 //	.alpha2 =  "99",
 //	.reg_rules = {
@@ -106,33 +106,33 @@
 //		ATH9K_2GHZ_CH12_13,
 //		ATH9K_5GHZ_ALL,
 //	}
-//};
+// };
 //
-//static inline int is_wwr_sku(u16 regd)
+// static inline int is_wwr_sku(u16 regd)
 //{
 //	return ((regd & COUNTRY_ERD_FLAG) != COUNTRY_ERD_FLAG) &&
 //		(((regd & WORLD_SKU_MASK) == WORLD_SKU_PREFIX) ||
 //		(regd == WORLD));
-//}
+// }
 //
-//static u16 ath_regd_get_eepromRD(struct ath_regulatory *reg)
+// static u16 ath_regd_get_eepromRD(struct ath_regulatory *reg)
 //{
 //	return reg->current_rd & ~WORLDWIDE_ROAMING_FLAG;
-//}
+// }
 //
-//int ath_is_world_regd(struct ath_regulatory *reg)
+// int ath_is_world_regd(struct ath_regulatory *reg)
 //{
 //	return is_wwr_sku(ath_regd_get_eepromRD(reg));
-//}
+// }
 //
-//static const struct ieee80211_regdomain *ath_default_world_regdomain(void)
+// static const struct ieee80211_regdomain *ath_default_world_regdomain(void)
 //{
 //	/* this is the most restrictive */
 //	return &ath_world_regdom_64;
-//}
+// }
 //
-//static const struct
-//ieee80211_regdomain *ath_world_regdomain(struct ath_regulatory *reg)
+// static const struct
+// ieee80211_regdomain *ath_world_regdomain(struct ath_regulatory *reg)
 //{
 //	switch (reg->regpair->regDmnEnum) {
 //	case 0x60:
@@ -156,19 +156,19 @@
 //		WARN_ON(1);
 //		return ath_default_world_regdomain();
 //	}
-//}
+// }
 //
-//int ath_is_49ghz_allowed(u16 regdomain)
+// int ath_is_49ghz_allowed(u16 regdomain)
 //{
 //	/* possibly more */
 //	return regdomain == MKK9_MKKC;
-//}
+// }
 //
 ///* Frequency is one where radar detection is required */
-//static int ath_is_radar_freq(u16 center_freq)
+// static int ath_is_radar_freq(u16 center_freq)
 //{
 //	return (center_freq >= 5260 && center_freq <= 5700);
-//}
+// }
 //
 ///*
 // * N.B: These exception rules do not apply radar freqs.
@@ -179,8 +179,8 @@
 // *   received a beacon on a channel we can enable active scan and
 // *   adhoc (or beaconing).
 // */
-//static void
-//ath_reg_apply_beaconing_flags(struct wiphy *wiphy,
+// static void
+// ath_reg_apply_beaconing_flags(struct wiphy *wiphy,
 //			      enum nl80211_reg_initiator initiator)
 //{
 //	int band;
@@ -240,8 +240,8 @@
 //}
 //
 ///* Allows active scan scan on Ch 12 and 13 */
-//static void
-//ath_reg_apply_active_scan_flags(struct wiphy *wiphy,
+// static void
+// ath_reg_apply_active_scan_flags(struct wiphy *wiphy,
 //				enum nl80211_reg_initiator initiator)
 //{
 //	struct ieee80211_supported_band *sband;
@@ -288,10 +288,10 @@
 //			if (ch->flags & IEEE80211_CHAN_PASSIVE_SCAN)
 //				ch->flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
 //	}
-//}
+// }
 //
 ///* Always apply Radar/DFS rules on freq range 5260 MHz - 5700 MHz */
-//static void ath_reg_apply_radar_flags(struct wiphy *wiphy)
+// static void ath_reg_apply_radar_flags(struct wiphy *wiphy)
 //{
 //	struct ieee80211_supported_band *sband;
 //	struct net80211_channel *ch;
@@ -321,9 +321,9 @@
 //				     IEEE80211_CHAN_NO_IBSS |
 //				     IEEE80211_CHAN_PASSIVE_SCAN;
 //	}
-//}
+// }
 //
-//static void ath_reg_apply_world_flags(struct wiphy *wiphy,
+// static void ath_reg_apply_world_flags(struct wiphy *wiphy,
 //				      enum nl80211_reg_initiator initiator,
 //				      struct ath_regulatory *reg)
 //{
@@ -340,9 +340,9 @@
 //		ath_reg_apply_active_scan_flags(wiphy, initiator);
 //		break;
 //	}
-//}
+// }
 //
-//int ath_reg_notifier_apply(struct wiphy *wiphy,
+// int ath_reg_notifier_apply(struct wiphy *wiphy,
 //			   struct regulatory_request *request,
 //			   struct ath_regulatory *reg)
 //{
@@ -370,9 +370,9 @@
 //	}
 //
 //	return 0;
-//}
+// }
 //
-//static int ath_regd_is_eeprom_valid(struct ath_regulatory *reg)
+// static int ath_regd_is_eeprom_valid(struct ath_regulatory *reg)
 //{
 //	u16 rd = ath_regd_get_eepromRD(reg);
 //	int i;
@@ -398,11 +398,11 @@
 //	DBG(
 //		 "ath: invalid regulatory domain/country code 0x%x\n", rd);
 //	return 0;
-//}
+// }
 //
 ///* EEPROM country code to regpair mapping */
-//static struct country_code_to_enum_rd*
-//ath_regd_find_country(u16 countryCode)
+// static struct country_code_to_enum_rd*
+// ath_regd_find_country(u16 countryCode)
 //{
 //	int i;
 //
@@ -411,11 +411,11 @@
 //			return &allCountries[i];
 //	}
 //	return NULL;
-//}
+// }
 //
 ///* EEPROM rd code to regpair mapping */
-//static struct country_code_to_enum_rd*
-//ath_regd_find_country_by_rd(int regdmn)
+// static struct country_code_to_enum_rd*
+// ath_regd_find_country_by_rd(int regdmn)
 //{
 //	int i;
 //
@@ -424,10 +424,10 @@
 //			return &allCountries[i];
 //	}
 //	return NULL;
-//}
+// }
 //
 ///* Returns the map of the EEPROM set RD to a country code */
-//static u16 ath_regd_get_default_country(u16 rd)
+// static u16 ath_regd_get_default_country(u16 rd)
 //{
 //	if (rd & COUNTRY_ERD_FLAG) {
 //		struct country_code_to_enum_rd *country = NULL;
@@ -439,10 +439,10 @@
 //	}
 //
 //	return CTRY_DEFAULT;
-//}
+// }
 //
-//static struct reg_dmn_pair_mapping*
-//ath_get_regpair(int regdmn)
+// static struct reg_dmn_pair_mapping*
+// ath_get_regpair(int regdmn)
 //{
 //	int i;
 //
@@ -453,10 +453,10 @@
 //			return &regDomainPairs[i];
 //	}
 //	return NULL;
-//}
+// }
 //
-//static int
-//ath_regd_init_wiphy(struct ath_regulatory *reg,
+// static int
+// ath_regd_init_wiphy(struct ath_regulatory *reg,
 //		    struct wiphy *wiphy,
 //		    int (*reg_notifier)(struct wiphy *wiphy,
 //					struct regulatory_request *request))
@@ -485,7 +485,7 @@
 //	ath_reg_apply_radar_flags(wiphy);
 //	ath_reg_apply_world_flags(wiphy, NL80211_REGDOM_SET_BY_DRIVER, reg);
 //	return 0;
-//}
+// }
 //
 ///*
 // * Some users have reported their EEPROM programmed with
@@ -494,7 +494,7 @@
 // * a solution for them. We default to 0x64, which is the
 // * default Atheros world regulatory domain.
 // */
-//static void ath_regd_sanitize(struct ath_regulatory *reg)
+// static void ath_regd_sanitize(struct ath_regulatory *reg)
 //{
 //	if (reg->current_rd != COUNTRY_ERD_FLAG)
 //		return;
@@ -502,8 +502,8 @@
 //	reg->current_rd = 0x64;
 //}
 //
-//int
-//ath_regd_init(struct ath_regulatory *reg,
+// int
+// ath_regd_init(struct ath_regulatory *reg,
 //	      struct wiphy *wiphy,
 //	      int (*reg_notifier)(struct wiphy *wiphy,
 //				  struct regulatory_request *request))
@@ -581,22 +581,22 @@
 //	return 0;
 //}
 
-u32 ath_regd_get_band_ctl(struct ath_regulatory *reg,
-			  int band)
+u32 ath_regd_get_band_ctl(struct ath_regulatory* reg,
+                          int band)
 {
-	/* TODO Cottsay: reg */
-//	if (!reg->regpair ||
-//	    (reg->country_code == CTRY_DEFAULT &&
-//	     is_wwr_sku(ath_regd_get_eepromRD(reg)))) {
-//		return SD_NO_CTL;
-//	}
+    /* TODO Cottsay: reg */
+    //	if (!reg->regpair ||
+    //	    (reg->country_code == CTRY_DEFAULT &&
+    //	     is_wwr_sku(ath_regd_get_eepromRD(reg)))) {
+    //		return SD_NO_CTL;
+    //	}
 
-	switch (band) {
-	case NET80211_BAND_2GHZ:
-		return reg->regpair->reg_2ghz_ctl;
-	case NET80211_BAND_5GHZ:
-		return reg->regpair->reg_5ghz_ctl;
-	default:
-		return NO_CTL;
-	}
+    switch (band) {
+        case NET80211_BAND_2GHZ:
+            return reg->regpair->reg_2ghz_ctl;
+        case NET80211_BAND_5GHZ:
+            return reg->regpair->reg_5ghz_ctl;
+        default:
+            return NO_CTL;
+    }
 }

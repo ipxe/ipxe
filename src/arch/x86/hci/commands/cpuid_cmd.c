@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <stdio.h>
@@ -39,26 +39,26 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** "cpuid" options */
 struct cpuid_options {
-	/** Check AMD-defined features (%eax=0x80000001) */
-	int amd;
-	/** Check features defined via %ecx */
-	int ecx;
+    /** Check AMD-defined features (%eax=0x80000001) */
+    int amd;
+    /** Check features defined via %ecx */
+    int ecx;
 };
 
 /** "cpuid" option list */
 static struct option_descriptor cpuid_opts[] = {
-	OPTION_DESC ( "ext", 'e', no_argument,
-		      struct cpuid_options, amd, parse_flag ),
-	/* "--amd" retained for backwards compatibility */
-	OPTION_DESC ( "amd", 'a', no_argument,
-		      struct cpuid_options, amd, parse_flag ),
-	OPTION_DESC ( "ecx", 'c', no_argument,
-		      struct cpuid_options, ecx, parse_flag ),
+    OPTION_DESC("ext", 'e', no_argument,
+                struct cpuid_options, amd, parse_flag),
+    /* "--amd" retained for backwards compatibility */
+    OPTION_DESC("amd", 'a', no_argument,
+                struct cpuid_options, amd, parse_flag),
+    OPTION_DESC("ecx", 'c', no_argument,
+                struct cpuid_options, ecx, parse_flag),
 };
 
 /** "cpuid" command descriptor */
 static struct command_descriptor cpuid_cmd =
-	COMMAND_DESC ( struct cpuid_options, cpuid_opts, 1, 1, "<bit>" );
+    COMMAND_DESC(struct cpuid_options, cpuid_opts, 1, 1, "<bit>");
 
 /**
  * The "cpuid" command
@@ -67,35 +67,35 @@ static struct command_descriptor cpuid_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int cpuid_exec ( int argc, char **argv ) {
-	struct cpuid_options opts;
-	struct x86_features features;
-	struct x86_feature_registers *feature_regs;
-	uint32_t feature_reg;
-	unsigned int bit;
-	int rc;
+static int cpuid_exec(int argc, char** argv) {
+    struct cpuid_options opts;
+    struct x86_features features;
+    struct x86_feature_registers* feature_regs;
+    uint32_t feature_reg;
+    unsigned int bit;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &cpuid_cmd, &opts ) ) != 0 )
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &cpuid_cmd, &opts)) != 0)
+        return rc;
 
-	/* Parse bit number */
-	if ( ( rc = parse_integer ( argv[optind], &bit ) ) != 0 )
-		return rc;
+    /* Parse bit number */
+    if ((rc = parse_integer(argv[optind], &bit)) != 0)
+        return rc;
 
-	/* Get CPU features */
-	x86_features ( &features );
+    /* Get CPU features */
+    x86_features(&features);
 
-	/* Extract relevant feature register */
-	feature_regs = ( opts.amd ? &features.amd : &features.intel );
-	feature_reg = ( opts.ecx ? feature_regs->ecx : feature_regs->edx );
+    /* Extract relevant feature register */
+    feature_regs = (opts.amd ? &features.amd : &features.intel);
+    feature_reg = (opts.ecx ? feature_regs->ecx : feature_regs->edx);
 
-	/* Check presence of specified feature */
-	return ( ( feature_reg & ( 1 << bit ) ) ? 0 : -ENOENT );
+    /* Check presence of specified feature */
+    return ((feature_reg & (1 << bit)) ? 0 : -ENOENT);
 }
 
 /** x86 CPU feature detection command */
 struct command cpuid_command __command = {
-	.name = "cpuid",
-	.exec = cpuid_exec,
+    .name = "cpuid",
+    .exec = cpuid_exec,
 };

@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <config/timer.h>
 
@@ -35,17 +35,17 @@ PROVIDE_REQUIRING_SYMBOL();
  * Drag in timers
  */
 #ifdef TIMER_PCBIOS
-REQUIRE_OBJECT ( bios_timer );
+REQUIRE_OBJECT(bios_timer);
 #endif
 #ifdef TIMER_RDTSC
-REQUIRE_OBJECT ( rdtsc_timer );
+REQUIRE_OBJECT(rdtsc_timer);
 #endif
 #ifdef TIMER_EFI
-REQUIRE_OBJECT ( efi_timer );
+REQUIRE_OBJECT(efi_timer);
 #endif
 #ifdef TIMER_LINUX
-REQUIRE_OBJECT ( linux_timer );
+REQUIRE_OBJECT(linux_timer);
 #endif
 #ifdef TIMER_ACPI
-REQUIRE_OBJECT ( acpi_timer );
+REQUIRE_OBJECT(acpi_timer);
 #endif

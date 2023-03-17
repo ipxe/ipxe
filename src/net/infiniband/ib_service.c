@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <string.h>
 #include <stdio.h>
@@ -45,23 +45,23 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v op		Management transaction operations
  * @ret madx		Management transaction, or NULL on error
  */
-struct ib_mad_transaction *
-ib_create_service_madx ( struct ib_device *ibdev,
-			 struct ib_mad_interface *mi, const char *name,
-			 struct ib_mad_transaction_operations *op ) {
-	union ib_mad mad;
-	struct ib_mad_sa *sa = &mad.sa;
-	struct ib_service_record *svc = &sa->sa_data.service_record;
+struct ib_mad_transaction*
+ib_create_service_madx(struct ib_device* ibdev,
+                       struct ib_mad_interface* mi, const char* name,
+                       struct ib_mad_transaction_operations* op) {
+    union ib_mad mad;
+    struct ib_mad_sa* sa = &mad.sa;
+    struct ib_service_record* svc = &sa->sa_data.service_record;
 
-	/* Construct service record request */
-	memset ( sa, 0, sizeof ( *sa ) );
-	sa->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
-	sa->mad_hdr.class_version = IB_SA_CLASS_VERSION;
-	sa->mad_hdr.method = IB_MGMT_METHOD_GET;
-	sa->mad_hdr.attr_id = htons ( IB_SA_ATTR_SERVICE_REC );
-	sa->sa_hdr.comp_mask[1] = htonl ( IB_SA_SERVICE_REC_NAME );
-	snprintf ( svc->name, sizeof ( svc->name ), "%s", name );
+    /* Construct service record request */
+    memset(sa, 0, sizeof(*sa));
+    sa->mad_hdr.mgmt_class = IB_MGMT_CLASS_SUBN_ADM;
+    sa->mad_hdr.class_version = IB_SA_CLASS_VERSION;
+    sa->mad_hdr.method = IB_MGMT_METHOD_GET;
+    sa->mad_hdr.attr_id = htons(IB_SA_ATTR_SERVICE_REC);
+    sa->sa_hdr.comp_mask[1] = htonl(IB_SA_SERVICE_REC_NAME);
+    snprintf(svc->name, sizeof(svc->name), "%s", name);
 
-	/* Create management transaction */
-	return ib_create_madx ( ibdev, mi, &mad, NULL, op );
+    /* Create management transaction */
+    return ib_create_madx(ibdev, mi, &mad, NULL, op);
 }

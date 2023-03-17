@@ -41,53 +41,53 @@
  *
  */
 
-size_t oncrpc_iob_add_fields ( struct io_buffer *io_buf,
-                               const struct oncrpc_field fields[] ) {
-	size_t i;
-	size_t s = 0;
+size_t oncrpc_iob_add_fields(struct io_buffer* io_buf,
+                             const struct oncrpc_field fields[]) {
+    size_t i;
+    size_t s = 0;
 
-	struct oncrpc_field f;
+    struct oncrpc_field f;
 
-	if ( ! io_buf )
-		return 0;
+    if (!io_buf)
+        return 0;
 
-	for ( i = 0; fields[i].type != oncrpc_none; i++ ) {
-		f = fields[i];
-		switch ( f.type ) {
-		case oncrpc_int32:
-			s += oncrpc_iob_add_int ( io_buf, f.value.int32 );
-			break;
+    for (i = 0; fields[i].type != oncrpc_none; i++) {
+        f = fields[i];
+        switch (f.type) {
+            case oncrpc_int32:
+                s += oncrpc_iob_add_int(io_buf, f.value.int32);
+                break;
 
-		case oncrpc_int64:
-			s += oncrpc_iob_add_int64 ( io_buf, f.value.int64 );
-			break;
+            case oncrpc_int64:
+                s += oncrpc_iob_add_int64(io_buf, f.value.int64);
+                break;
 
-		case oncrpc_str:
-			s += oncrpc_iob_add_string ( io_buf, f.value.str );
-			break;
+            case oncrpc_str:
+                s += oncrpc_iob_add_string(io_buf, f.value.str);
+                break;
 
-		case oncrpc_array:
-			s += oncrpc_iob_add_array ( io_buf,
-			                            f.value.array.length,
-			                            f.value.array.ptr );
-			break;
+            case oncrpc_array:
+                s += oncrpc_iob_add_array(io_buf,
+                                          f.value.array.length,
+                                          f.value.array.ptr);
+                break;
 
-		case oncrpc_intarray:
-			s += oncrpc_iob_add_intarray ( io_buf,
-			                               f.value.intarray.length,
-			                               f.value.intarray.ptr );
-			break;
+            case oncrpc_intarray:
+                s += oncrpc_iob_add_intarray(io_buf,
+                                             f.value.intarray.length,
+                                             f.value.intarray.ptr);
+                break;
 
-		case oncrpc_cred:
-			s += oncrpc_iob_add_cred ( io_buf, f.value.cred);
-			break;
+            case oncrpc_cred:
+                s += oncrpc_iob_add_cred(io_buf, f.value.cred);
+                break;
 
-		default:
-			return s;
-		}
-	}
+            default:
+                return s;
+        }
+    }
 
-	return s;
+    return s;
 }
 
 /**
@@ -100,15 +100,15 @@ size_t oncrpc_iob_add_fields ( struct io_buffer *io_buf,
  * In the ONC RPC protocol, every data is four byte paded, we add padding when
  * necessary by using oncrpc_align()
  */
-size_t oncrpc_iob_add_array ( struct io_buffer *io_buf, size_t length,
-                              const void *data ) {
-	size_t padding = oncrpc_align ( length ) - length;
+size_t oncrpc_iob_add_array(struct io_buffer* io_buf, size_t length,
+                            const void* data) {
+    size_t padding = oncrpc_align(length) - length;
 
-	oncrpc_iob_add_int ( io_buf, length );
-	memcpy ( iob_put ( io_buf, length ), data, length );
-	memset ( iob_put ( io_buf, padding ), 0, padding );
+    oncrpc_iob_add_int(io_buf, length);
+    memcpy(iob_put(io_buf, length), data, length);
+    memset(iob_put(io_buf, padding), 0, padding);
 
-	return length + padding + sizeof ( uint32_t );
+    return length + padding + sizeof(uint32_t);
 }
 
 /**
@@ -119,16 +119,16 @@ size_t oncrpc_iob_add_array ( struct io_buffer *io_buf, size_t length,
  * @v val               Int array
  * @ret size            Size of the data written
  */
-size_t oncrpc_iob_add_intarray ( struct io_buffer *io_buf, size_t length,
-                                 const uint32_t *array ) {
-	size_t                  i;
+size_t oncrpc_iob_add_intarray(struct io_buffer* io_buf, size_t length,
+                               const uint32_t* array) {
+    size_t i;
 
-	oncrpc_iob_add_int ( io_buf, length );
+    oncrpc_iob_add_int(io_buf, length);
 
-	for ( i = 0; i < length; ++i )
-		oncrpc_iob_add_int ( io_buf, array[i] );
+    for (i = 0; i < length; ++i)
+        oncrpc_iob_add_int(io_buf, array[i]);
 
-	return ( ( length + 1 ) * sizeof ( uint32_t ) );
+    return ((length + 1) * sizeof(uint32_t));
 }
 
 /**
@@ -138,45 +138,45 @@ size_t oncrpc_iob_add_intarray ( struct io_buffer *io_buf, size_t length,
  * @v cred              Credential information
  * @ret size            Size of the data written
  */
-size_t oncrpc_iob_add_cred ( struct io_buffer *io_buf,
-                             const struct oncrpc_cred *cred ) {
-	struct oncrpc_cred_sys  *syscred;
-	size_t                  s;
+size_t oncrpc_iob_add_cred(struct io_buffer* io_buf,
+                           const struct oncrpc_cred* cred) {
+    struct oncrpc_cred_sys* syscred;
+    size_t s;
 
-	struct oncrpc_field credfields[] = {
-		ONCRPC_FIELD ( int32, cred->flavor ),
-		ONCRPC_FIELD ( int32, cred->length ),
-		ONCRPC_FIELD_END,
-	};
+    struct oncrpc_field credfields[] = {
+        ONCRPC_FIELD(int32, cred->flavor),
+        ONCRPC_FIELD(int32, cred->length),
+        ONCRPC_FIELD_END,
+    };
 
-	if ( ! io_buf || ! cred )
-		return 0;
+    if (!io_buf || !cred)
+        return 0;
 
-	s  = oncrpc_iob_add_fields ( io_buf, credfields);
+    s = oncrpc_iob_add_fields(io_buf, credfields);
 
-	switch ( cred->flavor ) {
-	case ONCRPC_AUTH_NONE:
-		break;
+    switch (cred->flavor) {
+        case ONCRPC_AUTH_NONE:
+            break;
 
-	case ONCRPC_AUTH_SYS:
-		syscred = container_of ( cred, struct oncrpc_cred_sys,
-		                         credential );
+        case ONCRPC_AUTH_SYS:
+            syscred = container_of(cred, struct oncrpc_cred_sys,
+                                   credential);
 
-		struct oncrpc_field syscredfields[] = {
-			ONCRPC_FIELD ( int32, syscred->stamp ),
-			ONCRPC_FIELD ( str, syscred->hostname ),
-			ONCRPC_FIELD ( int32, syscred->uid ),
-			ONCRPC_FIELD ( int32, syscred->gid ),
-			ONCRPC_SUBFIELD ( intarray, syscred->aux_gid_len,
-			                  syscred->aux_gid ),
-			ONCRPC_FIELD_END,
-		};
+            struct oncrpc_field syscredfields[] = {
+                ONCRPC_FIELD(int32, syscred->stamp),
+                ONCRPC_FIELD(str, syscred->hostname),
+                ONCRPC_FIELD(int32, syscred->uid),
+                ONCRPC_FIELD(int32, syscred->gid),
+                ONCRPC_SUBFIELD(intarray, syscred->aux_gid_len,
+                                syscred->aux_gid),
+                ONCRPC_FIELD_END,
+            };
 
-		s += oncrpc_iob_add_fields ( io_buf, syscredfields );
-		break;
-	}
+            s += oncrpc_iob_add_fields(io_buf, syscredfields);
+            break;
+    }
 
-	return s;
+    return s;
 }
 
 /**
@@ -186,15 +186,15 @@ size_t oncrpc_iob_add_cred ( struct io_buffer *io_buf,
  * @v cred              Struct where the information will be saved
  * @ret size            Size of the data read
  */
-size_t oncrpc_iob_get_cred ( struct io_buffer *io_buf,
-                             struct oncrpc_cred *cred ) {
-	if ( cred == NULL )
-		return * ( uint32_t * ) io_buf->data;
+size_t oncrpc_iob_get_cred(struct io_buffer* io_buf,
+                           struct oncrpc_cred* cred) {
+    if (cred == NULL)
+        return *(uint32_t*)io_buf->data;
 
-	cred->flavor = oncrpc_iob_get_int ( io_buf );
-	cred->length = oncrpc_iob_get_int ( io_buf );
+    cred->flavor = oncrpc_iob_get_int(io_buf);
+    cred->length = oncrpc_iob_get_int(io_buf);
 
-	iob_pull ( io_buf, cred->length );
+    iob_pull(io_buf, cred->length);
 
-	return ( 2 * sizeof ( uint32_t ) + cred->length );
+    return (2 * sizeof(uint32_t) + cred->length);
 }

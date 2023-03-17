@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _IPXE_EFI_TIME_H
-#define _IPXE_EFI_TIME_H
+    #define _IPXE_EFI_TIME_H
 
 /** @file
  *
@@ -7,14 +9,14 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <stdint.h>
+    #include <stdint.h>
 
-#ifdef TIME_EFI
-#define TIME_PREFIX_efi
-#else
-#define TIME_PREFIX_efi __efi_
-#endif
+    #ifdef TIME_EFI
+        #define TIME_PREFIX_efi
+    #else
+        #define TIME_PREFIX_efi __efi_
+    #endif
 
 #endif /* _IPXE_EFI_TIME_H */

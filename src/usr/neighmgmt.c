@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdio.h>
 #include <ipxe/neighbour.h>
@@ -37,24 +37,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Print neighbour table
  *
  */
-void nstat ( void ) {
-	struct neighbour *neighbour;
-	struct net_device *netdev;
-	struct ll_protocol *ll_protocol;
-	struct net_protocol *net_protocol;
+void nstat(void) {
+    struct neighbour* neighbour;
+    struct net_device* netdev;
+    struct ll_protocol* ll_protocol;
+    struct net_protocol* net_protocol;
 
-	list_for_each_entry ( neighbour, &neighbours, list ) {
-		netdev = neighbour->netdev;
-		ll_protocol = netdev->ll_protocol;
-		net_protocol = neighbour->net_protocol;
-		printf ( "%s %s %s is %s %s", netdev->name, net_protocol->name,
-			 net_protocol->ntoa ( neighbour->net_dest ),
-			 ll_protocol->name,
-			 ( neighbour_has_ll_dest ( neighbour ) ?
-			   ll_protocol->ntoa ( neighbour->ll_dest ) :
-			   "(incomplete)" ) );
-		if ( neighbour->discovery )
-			printf ( " (%s)", neighbour->discovery->name );
-		printf ( "\n" );
-	}
+    list_for_each_entry(neighbour, &neighbours, list) {
+        netdev = neighbour->netdev;
+        ll_protocol = netdev->ll_protocol;
+        net_protocol = neighbour->net_protocol;
+        printf("%s %s %s is %s %s", netdev->name, net_protocol->name,
+               net_protocol->ntoa(neighbour->net_dest),
+               ll_protocol->name,
+               (neighbour_has_ll_dest(neighbour) ? ll_protocol->ntoa(neighbour->ll_dest) : "(incomplete)"));
+        if (neighbour->discovery)
+            printf(" (%s)", neighbour->discovery->name);
+        printf("\n");
+    }
 }

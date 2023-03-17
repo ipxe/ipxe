@@ -1,3 +1,5 @@
+#pragma once
+
 /** @file
   SimpleFileSystem protocol as defined in the UEFI 2.0 specification.
 
@@ -7,42 +9,38 @@
 
   UEFI 2.0 can boot from any valid EFI image contained in a SimpleFileSystem.
 
-Copyright (c) 2006 - 2014, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials are licensed and made available under
-the terms and conditions of the BSD License that accompanies this distribution.
-The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php.
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __SIMPLE_FILE_SYSTEM_H__
-#define __SIMPLE_FILE_SYSTEM_H__
+    #define __SIMPLE_FILE_SYSTEM_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-#define EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID \
-  { \
-    0x964e5b22, 0x6459, 0x11d2, {0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b } \
-  }
+    #define EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID              \
+        {                                                     \
+            0x964e5b22, 0x6459, 0x11d2, {                     \
+                0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b \
+            }                                                 \
+        }
 
-typedef struct _EFI_SIMPLE_FILE_SYSTEM_PROTOCOL  EFI_SIMPLE_FILE_SYSTEM_PROTOCOL;
+typedef struct _EFI_SIMPLE_FILE_SYSTEM_PROTOCOL EFI_SIMPLE_FILE_SYSTEM_PROTOCOL;
 
-typedef struct _EFI_FILE_PROTOCOL         EFI_FILE_PROTOCOL;
-typedef struct _EFI_FILE_PROTOCOL         *EFI_FILE_HANDLE;
+typedef struct _EFI_FILE_PROTOCOL EFI_FILE_PROTOCOL;
+typedef struct _EFI_FILE_PROTOCOL* EFI_FILE_HANDLE;
 
-///
-/// Protocol GUID name defined in EFI1.1.
-///
-#define SIMPLE_FILE_SYSTEM_PROTOCOL       EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID
+    ///
+    /// Protocol GUID name defined in EFI1.1.
+    ///
+    #define SIMPLE_FILE_SYSTEM_PROTOCOL EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID
 
 ///
 /// Protocol name defined in EFI1.1.
 ///
-typedef EFI_SIMPLE_FILE_SYSTEM_PROTOCOL   EFI_FILE_IO_INTERFACE;
-typedef EFI_FILE_PROTOCOL                 EFI_FILE;
+typedef EFI_SIMPLE_FILE_SYSTEM_PROTOCOL EFI_FILE_IO_INTERFACE;
+typedef EFI_FILE_PROTOCOL EFI_FILE;
 
 /**
   Open the root directory on a volume.
@@ -64,28 +62,25 @@ typedef EFI_FILE_PROTOCOL                 EFI_FILE;
                                volume must be reopened with OpenVolume().
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME)(
-  IN EFI_SIMPLE_FILE_SYSTEM_PROTOCOL    *This,
-  OUT EFI_FILE_PROTOCOL                 **Root
-  );
+typedef EFI_STATUS(EFIAPI* EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME)(
+    IN EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* This,
+    OUT EFI_FILE_PROTOCOL** Root);
 
-#define EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_REVISION  0x00010000
+    #define EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_REVISION 0x00010000
 
-///
-/// Revision defined in EFI1.1
-///
-#define EFI_FILE_IO_INTERFACE_REVISION  EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_REVISION
+    ///
+    /// Revision defined in EFI1.1
+    ///
+    #define EFI_FILE_IO_INTERFACE_REVISION EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_REVISION
 
 struct _EFI_SIMPLE_FILE_SYSTEM_PROTOCOL {
-  ///
-  /// The version of the EFI_SIMPLE_FILE_SYSTEM_PROTOCOL. The version
-  /// specified by this specification is 0x00010000. All future revisions
-  /// must be backwards compatible.
-  ///
-  UINT64                                      Revision;
-  EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME OpenVolume;
+    ///
+    /// The version of the EFI_SIMPLE_FILE_SYSTEM_PROTOCOL. The version
+    /// specified by this specification is 0x00010000. All future revisions
+    /// must be backwards compatible.
+    ///
+    UINT64 Revision;
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME OpenVolume;
 };
 
 /**
@@ -118,33 +113,30 @@ struct _EFI_SIMPLE_FILE_SYSTEM_PROTOCOL {
   @retval EFI_VOLUME_FULL      The volume is full.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_OPEN)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT EFI_FILE_PROTOCOL       **NewHandle,
-  IN CHAR16                   *FileName,
-  IN UINT64                   OpenMode,
-  IN UINT64                   Attributes
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_OPEN)(
+    IN EFI_FILE_PROTOCOL* This,
+    OUT EFI_FILE_PROTOCOL** NewHandle,
+    IN CHAR16* FileName,
+    IN UINT64 OpenMode,
+    IN UINT64 Attributes);
 
-//
-// Open modes
-//
-#define EFI_FILE_MODE_READ    0x0000000000000001ULL
-#define EFI_FILE_MODE_WRITE   0x0000000000000002ULL
-#define EFI_FILE_MODE_CREATE  0x8000000000000000ULL
+    //
+    // Open modes
+    //
+    #define EFI_FILE_MODE_READ 0x0000000000000001ULL
+    #define EFI_FILE_MODE_WRITE 0x0000000000000002ULL
+    #define EFI_FILE_MODE_CREATE 0x8000000000000000ULL
 
-//
-// File attributes
-//
-#define EFI_FILE_READ_ONLY  0x0000000000000001ULL
-#define EFI_FILE_HIDDEN     0x0000000000000002ULL
-#define EFI_FILE_SYSTEM     0x0000000000000004ULL
-#define EFI_FILE_RESERVED   0x0000000000000008ULL
-#define EFI_FILE_DIRECTORY  0x0000000000000010ULL
-#define EFI_FILE_ARCHIVE    0x0000000000000020ULL
-#define EFI_FILE_VALID_ATTR 0x0000000000000037ULL
+    //
+    // File attributes
+    //
+    #define EFI_FILE_READ_ONLY 0x0000000000000001ULL
+    #define EFI_FILE_HIDDEN 0x0000000000000002ULL
+    #define EFI_FILE_SYSTEM 0x0000000000000004ULL
+    #define EFI_FILE_RESERVED 0x0000000000000008ULL
+    #define EFI_FILE_DIRECTORY 0x0000000000000010ULL
+    #define EFI_FILE_ARCHIVE 0x0000000000000020ULL
+    #define EFI_FILE_VALID_ATTR 0x0000000000000037ULL
 
 /**
   Closes a specified file handle.
@@ -155,11 +147,8 @@ EFI_STATUS
   @retval EFI_SUCCESS   The file was closed.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_CLOSE)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_CLOSE)(
+    IN EFI_FILE_PROTOCOL* This);
 
 /**
   Close and delete the file handle.
@@ -171,11 +160,8 @@ EFI_STATUS
   @retval EFI_WARN_DELETE_FAILURE  The handle was closed, but the file was not deleted.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_DELETE)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_DELETE)(
+    IN EFI_FILE_PROTOCOL* This);
 
 /**
   Reads data from a file.
@@ -197,13 +183,10 @@ EFI_STATUS
                                needed to complete the request.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_READ)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT UINTN                *BufferSize,
-  OUT VOID                    *Buffer
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_READ)(
+    IN EFI_FILE_PROTOCOL* This,
+    IN OUT UINTN* BufferSize,
+    OUT VOID* Buffer);
 
 /**
   Writes data to a file.
@@ -225,13 +208,10 @@ EFI_STATUS
   @retval EFI_VOLUME_FULL      The volume is full.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_WRITE)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT UINTN                *BufferSize,
-  IN VOID                     *Buffer
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_WRITE)(
+    IN EFI_FILE_PROTOCOL* This,
+    IN OUT UINTN* BufferSize,
+    IN VOID* Buffer);
 
 /**
   Sets a file's current position.
@@ -246,12 +226,9 @@ EFI_STATUS
   @retval EFI_DEVICE_ERROR An attempt was made to set the position of a deleted file.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_SET_POSITION)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN UINT64                   Position
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_SET_POSITION)(
+    IN EFI_FILE_PROTOCOL* This,
+    IN UINT64 Position);
 
 /**
   Returns a file's current position.
@@ -265,12 +242,9 @@ EFI_STATUS
   @retval EFI_DEVICE_ERROR An attempt was made to get the position from a deleted file.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_GET_POSITION)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT UINT64                  *Position
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_GET_POSITION)(
+    IN EFI_FILE_PROTOCOL* This,
+    OUT UINT64* Position);
 
 /**
   Returns information about a file.
@@ -292,14 +266,11 @@ EFI_STATUS
                                BufferSize has been updated with the size needed to complete
                                the request.
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_GET_INFO)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN EFI_GUID                 *InformationType,
-  IN OUT UINTN                *BufferSize,
-  OUT VOID                    *Buffer
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_GET_INFO)(
+    IN EFI_FILE_PROTOCOL* This,
+    IN EFI_GUID* InformationType,
+    IN OUT UINTN* BufferSize,
+    OUT VOID* Buffer);
 
 /**
   Sets information about a file.
@@ -335,14 +306,11 @@ EFI_STATUS
                                by InformationType.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_SET_INFO)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN EFI_GUID                 *InformationType,
-  IN UINTN                    BufferSize,
-  IN VOID                     *Buffer
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_SET_INFO)(
+    IN EFI_FILE_PROTOCOL* This,
+    IN EFI_GUID* InformationType,
+    IN UINTN BufferSize,
+    IN VOID* Buffer);
 
 /**
   Flushes all modified data associated with a file to a device.
@@ -359,44 +327,41 @@ EFI_STATUS
   @retval EFI_VOLUME_FULL      The volume is full.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_FLUSH)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_FLUSH)(
+    IN EFI_FILE_PROTOCOL* This);
 
 typedef struct {
-  //
-  // If Event is NULL, then blocking I/O is performed.
-  // If Event is not NULL and non-blocking I/O is supported, then non-blocking I/O is performed,
-  // and Event will be signaled when the read request is completed.
-  // The caller must be prepared to handle the case where the callback associated with Event
-  // occurs before the original asynchronous I/O request call returns.
-  //
-  EFI_EVENT                   Event;
+    //
+    // If Event is NULL, then blocking I/O is performed.
+    // If Event is not NULL and non-blocking I/O is supported, then non-blocking I/O is performed,
+    // and Event will be signaled when the read request is completed.
+    // The caller must be prepared to handle the case where the callback associated with Event
+    // occurs before the original asynchronous I/O request call returns.
+    //
+    EFI_EVENT Event;
 
-  //
-  // Defines whether or not the signaled event encountered an error.
-  //
-  EFI_STATUS                  Status;
+    //
+    // Defines whether or not the signaled event encountered an error.
+    //
+    EFI_STATUS Status;
 
-  //
-  // For OpenEx():  Not Used, ignored.
-  // For ReadEx():  On input, the size of the Buffer. On output, the amount of data returned in Buffer.
-  //                In both cases, the size is measured in bytes.
-  // For WriteEx(): On input, the size of the Buffer. On output, the amount of data actually written.
-  //                In both cases, the size is measured in bytes.
-  // For FlushEx(): Not used, ignored.
-  //
-  UINTN                       BufferSize;
+    //
+    // For OpenEx():  Not Used, ignored.
+    // For ReadEx():  On input, the size of the Buffer. On output, the amount of data returned in Buffer.
+    //                In both cases, the size is measured in bytes.
+    // For WriteEx(): On input, the size of the Buffer. On output, the amount of data actually written.
+    //                In both cases, the size is measured in bytes.
+    // For FlushEx(): Not used, ignored.
+    //
+    UINTN BufferSize;
 
-  //
-  // For OpenEx():  Not Used, ignored.
-  // For ReadEx():  The buffer into which the data is read.
-  // For WriteEx(): The buffer of data to write.
-  // For FlushEx(): Not Used, ignored.
-  //
-  VOID                        *Buffer;
+    //
+    // For OpenEx():  Not Used, ignored.
+    // For ReadEx():  The buffer into which the data is read.
+    // For WriteEx(): The buffer of data to write.
+    // For FlushEx(): Not Used, ignored.
+    //
+    VOID* Buffer;
 } EFI_FILE_IO_TOKEN;
 
 /**
@@ -431,17 +396,13 @@ typedef struct {
   @retval EFI_VOLUME_FULL      The volume is full.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_OPEN_EX)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT EFI_FILE_PROTOCOL       **NewHandle,
-  IN CHAR16                   *FileName,
-  IN UINT64                   OpenMode,
-  IN UINT64                   Attributes,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-  );
-
+typedef EFI_STATUS(EFIAPI* EFI_FILE_OPEN_EX)(
+    IN EFI_FILE_PROTOCOL* This,
+    OUT EFI_FILE_PROTOCOL** NewHandle,
+    IN CHAR16* FileName,
+    IN UINT64 OpenMode,
+    IN UINT64 Attributes,
+    IN OUT EFI_FILE_IO_TOKEN* Token);
 
 /**
   Reads data from a file.
@@ -459,13 +420,9 @@ EFI_STATUS
   @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
   @retval EFI_OUT_OF_RESOURCES Unable to queue the request due to lack of resources.
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_READ_EX) (
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-);
-
+typedef EFI_STATUS(EFIAPI* EFI_FILE_READ_EX)(
+    IN EFI_FILE_PROTOCOL* This,
+    IN OUT EFI_FILE_IO_TOKEN* Token);
 
 /**
   Writes data to a file.
@@ -486,12 +443,9 @@ EFI_STATUS
   @retval EFI_VOLUME_FULL      The volume is full.
   @retval EFI_OUT_OF_RESOURCES Unable to queue the request due to lack of resources.
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_WRITE_EX) (
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-);
+typedef EFI_STATUS(EFIAPI* EFI_FILE_WRITE_EX)(
+    IN EFI_FILE_PROTOCOL* This,
+    IN OUT EFI_FILE_IO_TOKEN* Token);
 
 /**
   Flushes all modified data associated with a file to a device.
@@ -512,21 +466,18 @@ EFI_STATUS
   @retval EFI_OUT_OF_RESOURCES Unable to queue the request due to lack of resources.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_FLUSH_EX) (
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-  );
+typedef EFI_STATUS(EFIAPI* EFI_FILE_FLUSH_EX)(
+    IN EFI_FILE_PROTOCOL* This,
+    IN OUT EFI_FILE_IO_TOKEN* Token);
 
-#define EFI_FILE_PROTOCOL_REVISION        0x00010000
-#define EFI_FILE_PROTOCOL_REVISION2       0x00020000
-#define EFI_FILE_PROTOCOL_LATEST_REVISION EFI_FILE_PROTOCOL_REVISION2
+    #define EFI_FILE_PROTOCOL_REVISION 0x00010000
+    #define EFI_FILE_PROTOCOL_REVISION2 0x00020000
+    #define EFI_FILE_PROTOCOL_LATEST_REVISION EFI_FILE_PROTOCOL_REVISION2
 
-//
-// Revision defined in EFI1.1.
-//
-#define EFI_FILE_REVISION   EFI_FILE_PROTOCOL_REVISION
+    //
+    // Revision defined in EFI1.1.
+    //
+    #define EFI_FILE_REVISION EFI_FILE_PROTOCOL_REVISION
 
 ///
 /// The EFI_FILE_PROTOCOL provides file IO access to supported file systems.
@@ -536,28 +487,27 @@ EFI_STATUS
 /// relative to this file's location, yielding new file handles.
 ///
 struct _EFI_FILE_PROTOCOL {
-  ///
-  /// The version of the EFI_FILE_PROTOCOL interface. The version specified
-  /// by this specification is EFI_FILE_PROTOCOL_LATEST_REVISION.
-  /// Future versions are required to be backward compatible to version 1.0.
-  ///
-  UINT64                Revision;
-  EFI_FILE_OPEN         Open;
-  EFI_FILE_CLOSE        Close;
-  EFI_FILE_DELETE       Delete;
-  EFI_FILE_READ         Read;
-  EFI_FILE_WRITE        Write;
-  EFI_FILE_GET_POSITION GetPosition;
-  EFI_FILE_SET_POSITION SetPosition;
-  EFI_FILE_GET_INFO     GetInfo;
-  EFI_FILE_SET_INFO     SetInfo;
-  EFI_FILE_FLUSH        Flush;
-  EFI_FILE_OPEN_EX      OpenEx;
-  EFI_FILE_READ_EX      ReadEx;
-  EFI_FILE_WRITE_EX     WriteEx;
-  EFI_FILE_FLUSH_EX     FlushEx;
+    ///
+    /// The version of the EFI_FILE_PROTOCOL interface. The version specified
+    /// by this specification is EFI_FILE_PROTOCOL_LATEST_REVISION.
+    /// Future versions are required to be backward compatible to version 1.0.
+    ///
+    UINT64 Revision;
+    EFI_FILE_OPEN Open;
+    EFI_FILE_CLOSE Close;
+    EFI_FILE_DELETE Delete;
+    EFI_FILE_READ Read;
+    EFI_FILE_WRITE Write;
+    EFI_FILE_GET_POSITION GetPosition;
+    EFI_FILE_SET_POSITION SetPosition;
+    EFI_FILE_GET_INFO GetInfo;
+    EFI_FILE_SET_INFO SetInfo;
+    EFI_FILE_FLUSH Flush;
+    EFI_FILE_OPEN_EX OpenEx;
+    EFI_FILE_READ_EX ReadEx;
+    EFI_FILE_WRITE_EX WriteEx;
+    EFI_FILE_FLUSH_EX FlushEx;
 };
-
 
 extern EFI_GUID gEfiSimpleFileSystemProtocolGuid;
 

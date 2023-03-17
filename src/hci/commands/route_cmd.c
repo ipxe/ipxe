@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdio.h>
 #include <getopt.h>
@@ -43,7 +43,7 @@ static struct option_descriptor route_opts[] = {};
 
 /** "route" command descriptor */
 static struct command_descriptor route_cmd =
-	COMMAND_DESC ( struct route_options, route_opts, 0, 0, NULL );
+    COMMAND_DESC(struct route_options, route_opts, 0, 0, NULL);
 
 /**
  * The "route" command
@@ -52,23 +52,23 @@ static struct command_descriptor route_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int route_exec ( int argc, char **argv ) {
-	struct route_options opts;
-	int rc;
+static int route_exec(int argc, char** argv) {
+    struct route_options opts;
+    int rc;
 
-	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &route_cmd, &opts ) ) != 0 )
-		return rc;
+    /* Parse options */
+    if ((rc = parse_options(argc, argv, &route_cmd, &opts)) != 0)
+        return rc;
 
-	route();
+    route();
 
-	return 0;
+    return 0;
 }
 
 /** Routing table management commands */
 struct command route_commands[] __command = {
-	{
-		.name = "route",
-		.exec = route_exec,
-	},
+    {
+        .name = "route",
+        .exec = route_exec,
+    },
 };

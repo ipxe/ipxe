@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stddef.h>
 #include <errno.h>
@@ -39,14 +39,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v sa		Socket address
  * @ret string		Socket address string
  */
-const char * sock_ntoa ( struct sockaddr *sa ) {
-	struct sockaddr_converter *converter;
+const char* sock_ntoa(struct sockaddr* sa) {
+    struct sockaddr_converter* converter;
 
-	for_each_table_entry ( converter, SOCKADDR_CONVERTERS ) {
-		if ( converter->family == sa->sa_family )
-			return converter->ntoa ( sa );
-	}
-	return NULL;
+    for_each_table_entry(converter, SOCKADDR_CONVERTERS) {
+        if (converter->family == sa->sa_family)
+            return converter->ntoa(sa);
+    }
+    return NULL;
 }
 
 /**
@@ -56,14 +56,14 @@ const char * sock_ntoa ( struct sockaddr *sa ) {
  * @v sa		Socket address to fill in
  * @ret rc		Return status code
  */
-int sock_aton ( const char *string, struct sockaddr *sa ) {
-	struct sockaddr_converter *converter;
+int sock_aton(const char* string, struct sockaddr* sa) {
+    struct sockaddr_converter* converter;
 
-	for_each_table_entry ( converter, SOCKADDR_CONVERTERS ) {
-		if ( converter->aton ( string, sa ) == 0 ) {
-			sa->sa_family = converter->family;
-			return 0;
-		}
-	}
-	return -EINVAL;
+    for_each_table_entry(converter, SOCKADDR_CONVERTERS) {
+        if (converter->aton(string, sa) == 0) {
+            sa->sa_family = converter->family;
+            return 0;
+        }
+    }
+    return -EINVAL;
 }

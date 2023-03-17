@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <config/general.h>
 
@@ -32,8 +32,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 PROVIDE_REQUIRING_SYMBOL();
 
 #ifdef IMAGE_PNM
-REQUIRE_OBJECT ( pnm );
+REQUIRE_OBJECT(pnm);
 #endif
 #ifdef IMAGE_PNG
-REQUIRE_OBJECT ( png );
+REQUIRE_OBJECT(png);
 #endif

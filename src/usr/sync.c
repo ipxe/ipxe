@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stddef.h>
 #include <ipxe/job.h>
@@ -42,27 +42,26 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v progress		Progress report to fill in
  * @ret ongoing_rc	Ongoing job status code (if known)
  */
-static int sync_progress ( struct interface *intf,
-			   struct job_progress *progress __unused ) {
+static int sync_progress(struct interface* intf,
+                         struct job_progress* progress __unused) {
+    /* Terminate successfully if no pending operations remain */
+    if (!have_pending())
+        intf_close(intf, 0);
 
-	/* Terminate successfully if no pending operations remain */
-	if ( ! have_pending() )
-		intf_close ( intf, 0 );
-
-	return 0;
+    return 0;
 }
 
 /** Synchroniser interface operations */
 static struct interface_operation sync_intf_op[] = {
-	INTF_OP ( job_progress, struct interface *, sync_progress ),
+    INTF_OP(job_progress, struct interface*, sync_progress),
 };
 
 /** Synchroniser interface descriptor */
 static struct interface_descriptor sync_intf_desc =
-	INTF_DESC_PURE ( sync_intf_op );
+    INTF_DESC_PURE(sync_intf_op);
 
 /** Synchroniser */
-static struct interface sync_intf = INTF_INIT ( sync_intf_desc );
+static struct interface sync_intf = INTF_INIT(sync_intf_desc);
 
 /**
  * Wait for pending operations to complete
@@ -70,9 +69,8 @@ static struct interface sync_intf = INTF_INIT ( sync_intf_desc );
  * @v timeout		Timeout period, in ticks (0=indefinite)
  * @ret rc		Return status code
  */
-int sync ( unsigned long timeout ) {
-
-	/* Attach synchroniser and wait for completion */
-	intf_plug_plug ( &monojob, &sync_intf );
-	return monojob_wait ( NULL, timeout );
+int sync(unsigned long timeout) {
+    /* Attach synchroniser and wait for completion */
+    intf_plug_plug(&monojob, &sync_intf);
+    return monojob_wait(NULL, timeout);
 }

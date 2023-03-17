@@ -1,14 +1,10 @@
+#pragma once
+
 /** @file
   EFI VLAN Config protocol is to provide manageability interface for VLAN configuration.
 
-  Copyright (c) 2009, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2009 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
   This Protocol is introduced in UEFI Specification 2.2
@@ -16,27 +12,26 @@
 **/
 
 #ifndef __EFI_VLANCONFIG_PROTOCOL_H__
-#define __EFI_VLANCONFIG_PROTOCOL_H__
+    #define __EFI_VLANCONFIG_PROTOCOL_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-
-#define EFI_VLAN_CONFIG_PROTOCOL_GUID \
-  { \
-    0x9e23d768, 0xd2f3, 0x4366, {0x9f, 0xc3, 0x3a, 0x7a, 0xba, 0x86, 0x43, 0x74 } \
-  }
+    #define EFI_VLAN_CONFIG_PROTOCOL_GUID                      \
+        {                                                      \
+            0x9e23d768, 0xd2f3, 0x4366, {                      \
+                0x9f, 0xc3, 0x3a, 0x7a, 0xba, 0x86, 0x43, 0x74 \
+            }                                                  \
+        }
 
 typedef struct _EFI_VLAN_CONFIG_PROTOCOL EFI_VLAN_CONFIG_PROTOCOL;
-
 
 ///
 /// EFI_VLAN_FIND_DATA
 ///
 typedef struct {
-  UINT16          VlanId;     ///< Vlan Identifier.
-  UINT8           Priority;   ///< Priority of this VLAN.
+    UINT16 VlanId;  ///< Vlan Identifier.
+    UINT8 Priority; ///< Priority of this VLAN.
 } EFI_VLAN_FIND_DATA;
-
 
 /**
   Create a VLAN device or modify the configuration parameter of an
@@ -69,13 +64,10 @@ typedef struct {
   @retval EFI_OUT_OF_RESOURCES   There is not enough system memory to perform the registration.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_VLAN_CONFIG_SET)(
-  IN  EFI_VLAN_CONFIG_PROTOCOL     *This,
-  IN  UINT16                       VlanId,
-  IN  UINT8                        Priority
-  );
+typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_SET)(
+    IN EFI_VLAN_CONFIG_PROTOCOL* This,
+    IN UINT16 VlanId,
+    IN UINT8 Priority);
 
 /**
   Find configuration information for specified VLAN or all configured VLANs.
@@ -96,14 +88,11 @@ EFI_STATUS
   @retval EFI_NOT_FOUND          No matching VLAN is found.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_VLAN_CONFIG_FIND)(
-  IN  EFI_VLAN_CONFIG_PROTOCOL     *This,
-  IN  UINT16                       *VlanId  OPTIONAL,
-  OUT UINT16                       *NumberOfVlan,
-  OUT EFI_VLAN_FIND_DATA           **Entries
-  );
+typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_FIND)(
+    IN EFI_VLAN_CONFIG_PROTOCOL* This,
+    IN UINT16* VlanId OPTIONAL,
+    OUT UINT16* NumberOfVlan,
+    OUT EFI_VLAN_FIND_DATA** Entries);
 
 /**
   Remove the configured VLAN device.
@@ -122,12 +111,9 @@ EFI_STATUS
   @retval EFI_NOT_FOUND          The to-be-removed VLAN does not exist.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_VLAN_CONFIG_REMOVE)(
-  IN  EFI_VLAN_CONFIG_PROTOCOL     *This,
-  IN  UINT16                       VlanId
-  );
+typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_REMOVE)(
+    IN EFI_VLAN_CONFIG_PROTOCOL* This,
+    IN UINT16 VlanId);
 
 ///
 /// EFI_VLAN_CONFIG_PROTOCOL
@@ -135,9 +121,9 @@ EFI_STATUS
 /// VLAN tagging implementation is IEEE802.1Q.
 ///
 struct _EFI_VLAN_CONFIG_PROTOCOL {
-  EFI_VLAN_CONFIG_SET              Set;
-  EFI_VLAN_CONFIG_FIND             Find;
-  EFI_VLAN_CONFIG_REMOVE           Remove;
+    EFI_VLAN_CONFIG_SET Set;
+    EFI_VLAN_CONFIG_FIND Find;
+    EFI_VLAN_CONFIG_REMOVE Remove;
 };
 
 extern EFI_GUID gEfiVlanConfigProtocolGuid;

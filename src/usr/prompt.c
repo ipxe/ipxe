@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** @file
  *
@@ -45,26 +45,26 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Returns success if the specified key was pressed within the
  * specified timeout period.
  */
-int prompt ( const char *text, unsigned long timeout, int key ) {
-	int key_pressed;
+int prompt(const char* text, unsigned long timeout, int key) {
+    int key_pressed;
 
-	/* Display prompt */
-	printf ( "%s", text );
+    /* Display prompt */
+    printf("%s", text);
 
-	/* Wait for key */
-	key_pressed = getkey ( timeout );
+    /* Wait for key */
+    key_pressed = getkey(timeout);
 
-	/* Clear the prompt line */
-	while ( *(text++) )
-		printf ( "\b \b" );
+    /* Clear the prompt line */
+    while (*(text++))
+        printf("\b \b");
 
-	/* Check for timeout */
-	if ( key_pressed < 0 )
-		return -ETIMEDOUT;
+    /* Check for timeout */
+    if (key_pressed < 0)
+        return -ETIMEDOUT;
 
-	/* Check for correct key pressed */
-	if ( key && ( key_pressed != key ) )
-		return -ECANCELED;
+    /* Check for correct key pressed */
+    if (key && (key_pressed != key))
+        return -ECANCELED;
 
-	return 0;
+    return 0;
 }

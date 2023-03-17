@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * @file
@@ -69,16 +69,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <config/branding.h>
 
 /** EFI platform setup formset GUID */
-static EFI_GUID efi_hii_platform_setup_formset_guid
-	= EFI_HII_PLATFORM_SETUP_FORMSET_GUID;
+static EFI_GUID efi_hii_platform_setup_formset_guid = EFI_HII_PLATFORM_SETUP_FORMSET_GUID;
 
 /** EFI IBM UCM compliant formset GUID */
-static EFI_GUID efi_hii_ibm_ucm_compliant_formset_guid
-	= EFI_HII_IBM_UCM_COMPLIANT_FORMSET_GUID;
+static EFI_GUID efi_hii_ibm_ucm_compliant_formset_guid = EFI_HII_IBM_UCM_COMPLIANT_FORMSET_GUID;
 
 /** EFI HII database protocol */
-static EFI_HII_DATABASE_PROTOCOL *efihii;
-EFI_REQUEST_PROTOCOL ( EFI_HII_DATABASE_PROTOCOL, &efihii );
+static EFI_HII_DATABASE_PROTOCOL* efihii;
+EFI_REQUEST_PROTOCOL(EFI_HII_DATABASE_PROTOCOL, &efihii);
 
 /**
  * Identify settings to be exposed via HII
@@ -86,10 +84,9 @@ EFI_REQUEST_PROTOCOL ( EFI_HII_DATABASE_PROTOCOL, &efihii );
  * @v snpdev		SNP device
  * @ret settings	Settings, or NULL
  */
-static struct settings * efi_snp_hii_settings ( struct efi_snp_device *snpdev ){
-
-	return find_child_settings ( netdev_settings ( snpdev->netdev ),
-				     NVO_SETTINGS_NAME );
+static struct settings* efi_snp_hii_settings(struct efi_snp_device* snpdev) {
+    return find_child_settings(netdev_settings(snpdev->netdev),
+                               NVO_SETTINGS_NAME);
 }
 
 /**
@@ -99,10 +96,9 @@ static struct settings * efi_snp_hii_settings ( struct efi_snp_device *snpdev ){
  * @v setting		Setting
  * @ret applies		Setting applies
  */
-static int efi_snp_hii_setting_applies ( struct efi_snp_device *snpdev,
-					 struct setting *setting ) {
-
-	return nvo_applies ( efi_snp_hii_settings ( snpdev ), setting );
+static int efi_snp_hii_setting_applies(struct efi_snp_device* snpdev,
+                                       struct setting* setting) {
+    return nvo_applies(efi_snp_hii_settings(snpdev), setting);
 }
 
 /**
@@ -110,12 +106,12 @@ static int efi_snp_hii_setting_applies ( struct efi_snp_device *snpdev,
  *
  * @v guid		GUID to fill in
  */
-static void efi_snp_hii_random_guid ( EFI_GUID *guid ) {
-	uint8_t *byte = ( ( uint8_t * ) guid );
-	unsigned int i;
+static void efi_snp_hii_random_guid(EFI_GUID* guid) {
+    uint8_t* byte = ((uint8_t*)guid);
+    unsigned int i;
 
-	for ( i = 0 ; i < sizeof ( *guid ) ; i++ )
-		*(byte++) = random();
+    for (i = 0; i < sizeof(*guid); i++)
+        *(byte++) = random();
 }
 
 /**
@@ -125,32 +121,32 @@ static void efi_snp_hii_random_guid ( EFI_GUID *guid ) {
  * @v ifr		IFR builder
  * @v varstore_id	Variable store identifier
  */
-static void efi_snp_hii_questions ( struct efi_snp_device *snpdev,
-				    struct efi_ifr_builder *ifr,
-				    unsigned int varstore_id ) {
-	struct setting *setting;
-	struct setting *previous = NULL;
-	unsigned int name_id;
-	unsigned int prompt_id;
-	unsigned int help_id;
-	unsigned int question_id;
+static void efi_snp_hii_questions(struct efi_snp_device* snpdev,
+                                  struct efi_ifr_builder* ifr,
+                                  unsigned int varstore_id) {
+    struct setting* setting;
+    struct setting* previous = NULL;
+    unsigned int name_id;
+    unsigned int prompt_id;
+    unsigned int help_id;
+    unsigned int question_id;
 
-	/* Add all applicable settings */
-	for_each_table_entry ( setting, SETTINGS ) {
-		if ( ! efi_snp_hii_setting_applies ( snpdev, setting ) )
-			continue;
-		if ( previous && ( setting_cmp ( setting, previous ) == 0 ) )
-			continue;
-		previous = setting;
-		name_id = efi_ifr_string ( ifr, "%s", setting->name );
-		prompt_id = efi_ifr_string ( ifr, "%s", setting->description );
-		help_id = efi_ifr_string ( ifr, PRODUCT_SETTING_URI,
-					   setting->name );
-		question_id = setting->tag;
-		efi_ifr_string_op ( ifr, prompt_id, help_id,
-				    question_id, varstore_id, name_id,
-				    0, 0x00, 0xff, 0 );
-	}
+    /* Add all applicable settings */
+    for_each_table_entry(setting, SETTINGS) {
+        if (!efi_snp_hii_setting_applies(snpdev, setting))
+            continue;
+        if (previous && (setting_cmp(setting, previous) == 0))
+            continue;
+        previous = setting;
+        name_id = efi_ifr_string(ifr, "%s", setting->name);
+        prompt_id = efi_ifr_string(ifr, "%s", setting->description);
+        help_id = efi_ifr_string(ifr, PRODUCT_SETTING_URI,
+                                 setting->name);
+        question_id = setting->tag;
+        efi_ifr_string_op(ifr, prompt_id, help_id,
+                          question_id, varstore_id, name_id,
+                          0, 0x00, 0xff, 0);
+    }
 }
 
 /**
@@ -159,77 +155,77 @@ static void efi_snp_hii_questions ( struct efi_snp_device *snpdev,
  * @v snpdev		SNP device
  * @ret package		Package list, or NULL on error
  */
-static EFI_HII_PACKAGE_LIST_HEADER *
-efi_snp_hii_package_list ( struct efi_snp_device *snpdev ) {
-	struct net_device *netdev = snpdev->netdev;
-	struct device *dev = netdev->dev;
-	struct efi_ifr_builder ifr;
-	EFI_HII_PACKAGE_LIST_HEADER *package;
-	const char *name;
-	EFI_GUID package_guid;
-	EFI_GUID formset_guid;
-	EFI_GUID varstore_guid;
-	unsigned int title_id;
-	unsigned int varstore_id;
+static EFI_HII_PACKAGE_LIST_HEADER*
+efi_snp_hii_package_list(struct efi_snp_device* snpdev) {
+    struct net_device* netdev = snpdev->netdev;
+    struct device* dev = netdev->dev;
+    struct efi_ifr_builder ifr;
+    EFI_HII_PACKAGE_LIST_HEADER* package;
+    const char* name;
+    EFI_GUID package_guid;
+    EFI_GUID formset_guid;
+    EFI_GUID varstore_guid;
+    unsigned int title_id;
+    unsigned int varstore_id;
 
-	/* Initialise IFR builder */
-	efi_ifr_init ( &ifr );
+    /* Initialise IFR builder */
+    efi_ifr_init(&ifr);
 
-	/* Determine product name */
-	name = ( product_name[0] ? product_name : product_short_name );
+    /* Determine product name */
+    name = (product_name[0] ? product_name : product_short_name);
 
-	/* Generate GUIDs */
-	efi_snp_hii_random_guid ( &package_guid );
-	efi_snp_hii_random_guid ( &formset_guid );
-	efi_snp_hii_random_guid ( &varstore_guid );
+    /* Generate GUIDs */
+    efi_snp_hii_random_guid(&package_guid);
+    efi_snp_hii_random_guid(&formset_guid);
+    efi_snp_hii_random_guid(&varstore_guid);
 
-	/* Generate title string (used more than once) */
-	title_id = efi_ifr_string ( &ifr, "%s (%s)", name,
-				    netdev_addr ( netdev ) );
+    /* Generate title string (used more than once) */
+    title_id = efi_ifr_string(&ifr, "%s (%s)", name,
+                              netdev_addr(netdev));
 
-	/* Generate opcodes */
-	efi_ifr_form_set_op ( &ifr, &formset_guid, title_id,
-			      efi_ifr_string ( &ifr, "Configure %s",
-					       product_short_name ),
-			      &efi_hii_platform_setup_formset_guid,
-			      &efi_hii_ibm_ucm_compliant_formset_guid, NULL );
-	efi_ifr_guid_class_op ( &ifr, EFI_NETWORK_DEVICE_CLASS );
-	efi_ifr_guid_subclass_op ( &ifr, 0x03 );
-	varstore_id = efi_ifr_varstore_name_value_op ( &ifr, &varstore_guid );
-	efi_ifr_form_op ( &ifr, title_id );
-	efi_ifr_text_op ( &ifr,
-			  efi_ifr_string ( &ifr, "Name" ),
-			  efi_ifr_string ( &ifr, "Firmware product name" ),
-			  efi_ifr_string ( &ifr, "%s", name ) );
-	efi_ifr_text_op ( &ifr,
-			  efi_ifr_string ( &ifr, "Version" ),
-			  efi_ifr_string ( &ifr, "Firmware version" ),
-			  efi_ifr_string ( &ifr, "%s", product_version ) );
-	efi_ifr_text_op ( &ifr,
-			  efi_ifr_string ( &ifr, "Driver" ),
-			  efi_ifr_string ( &ifr, "Firmware driver" ),
-			  efi_ifr_string ( &ifr, "%s", dev->driver_name ) );
-	efi_ifr_text_op ( &ifr,
-			  efi_ifr_string ( &ifr, "Device" ),
-			  efi_ifr_string ( &ifr, "Hardware device" ),
-			  efi_ifr_string ( &ifr, "%s", dev->name ) );
-	efi_snp_hii_questions ( snpdev, &ifr, varstore_id );
-	efi_ifr_end_op ( &ifr );
-	efi_ifr_end_op ( &ifr );
+    /* Generate opcodes */
+    efi_ifr_form_set_op(&ifr, &formset_guid, title_id,
+                        efi_ifr_string(&ifr, "Configure %s",
+                                       product_short_name),
+                        &efi_hii_platform_setup_formset_guid,
+                        &efi_hii_ibm_ucm_compliant_formset_guid, NULL);
+    efi_ifr_guid_class_op(&ifr, EFI_NETWORK_DEVICE_CLASS);
+    efi_ifr_guid_subclass_op(&ifr, 0x03);
+    varstore_id = efi_ifr_varstore_name_value_op(&ifr, &varstore_guid);
+    efi_ifr_form_op(&ifr, title_id);
+    efi_ifr_text_op(&ifr,
+                    efi_ifr_string(&ifr, "Name"),
+                    efi_ifr_string(&ifr, "Firmware product name"),
+                    efi_ifr_string(&ifr, "%s", name));
+    efi_ifr_text_op(&ifr,
+                    efi_ifr_string(&ifr, "Version"),
+                    efi_ifr_string(&ifr, "Firmware version"),
+                    efi_ifr_string(&ifr, "%s", product_version));
+    efi_ifr_text_op(&ifr,
+                    efi_ifr_string(&ifr, "Driver"),
+                    efi_ifr_string(&ifr, "Firmware driver"),
+                    efi_ifr_string(&ifr, "%s", dev->driver_name));
+    efi_ifr_text_op(&ifr,
+                    efi_ifr_string(&ifr, "Device"),
+                    efi_ifr_string(&ifr, "Hardware device"),
+                    efi_ifr_string(&ifr, "%s", dev->name));
+    efi_snp_hii_questions(snpdev, &ifr, varstore_id);
+    efi_ifr_end_op(&ifr);
+    efi_ifr_end_op(&ifr);
 
-	/* Build package */
-	package = efi_ifr_package ( &ifr, &package_guid, "en-us",
-				    efi_ifr_string ( &ifr, "English" ) );
-	if ( ! package ) {
-		DBGC ( snpdev, "SNPDEV %p could not build IFR package\n",
-		       snpdev );
-		efi_ifr_free ( &ifr );
-		return NULL;
-	}
+    /* Build package */
+    package = efi_ifr_package(&ifr, &package_guid, "en-us",
+                              efi_ifr_string(&ifr, "English"));
+    if (!package) {
+        DBGC(snpdev, "SNPDEV %p could not build IFR package\n",
+             snpdev);
+        efi_ifr_free(&ifr);
+        return NULL;
+    }
 
-	/* Free temporary storage */
-	efi_ifr_free ( &ifr );
-	return package;
+    /* Free temporary storage */
+    efi_ifr_free(&ifr);
+    return package;
 }
 
 /**
@@ -245,29 +241,29 @@ efi_snp_hii_package_list ( struct efi_snp_device *snpdev ) {
  * BootServices::AllocatePool(), and the caller is responsible for
  * eventually calling BootServices::FreePool().
  */
-static int efi_snp_hii_append ( struct efi_snp_device *snpdev __unused,
-				const char *key, const char *value,
-				wchar_t **results ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_STATUS efirc;
-	size_t len;
-	void *new;
+static int efi_snp_hii_append(struct efi_snp_device* snpdev __unused,
+                              const char* key, const char* value,
+                              wchar_t** results) {
+    EFI_BOOT_SERVICES* bs = efi_systab->BootServices;
+    EFI_STATUS efirc;
+    size_t len;
+    void* new;
 
-	/* Allocate new string */
-	len = ( ( *results ? ( wcslen ( *results ) + 1 /* "&" */ ) : 0 ) +
-		strlen ( key ) + 1 /* "=" */ + strlen ( value ) + 1 /* NUL */ );
-	if ( ( efirc = bs->AllocatePool ( EfiBootServicesData,
-					  ( len * sizeof ( wchar_t ) ),
-					  &new ) ) != 0 )
-		return -EEFI ( efirc );
+    /* Allocate new string */
+    len = ((*results ? (wcslen(*results) + 1 /* "&" */) : 0) +
+           strlen(key) + 1 /* "=" */ + strlen(value) + 1 /* NUL */);
+    if ((efirc = bs->AllocatePool(EfiBootServicesData,
+                                  (len * sizeof(wchar_t)),
+                                  &new)) != 0)
+        return -EEFI(efirc);
 
-	/* Populate string */
-	efi_snprintf ( new, len, "%ls%s%s=%s", ( *results ? *results : L"" ),
-		       ( *results ? L"&" : L"" ), key, value );
-	bs->FreePool ( *results );
-	*results = new;
+    /* Populate string */
+    efi_snprintf(new, len, "%ls%s%s=%s", (*results ? *results : L""),
+                 (*results ? L"&" : L""), key, value);
+    bs->FreePool(*results);
+    *results = new;
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -280,95 +276,93 @@ static int efi_snp_hii_append ( struct efi_snp_device *snpdev __unused,
  * @v have_setting	Flag indicating detection of a setting
  * @ret rc		Return status code
  */
-static int efi_snp_hii_fetch ( struct efi_snp_device *snpdev,
-			       const char *key, const char *value,
-			       wchar_t **results, int *have_setting ) {
-	struct settings *settings = efi_snp_hii_settings ( snpdev );
-	struct settings *origin;
-	struct setting *setting;
-	struct setting fetched;
-	int len;
-	char *buf;
-	char *encoded;
-	int i;
-	int rc;
+static int efi_snp_hii_fetch(struct efi_snp_device* snpdev,
+                             const char* key, const char* value,
+                             wchar_t** results, int* have_setting) {
+    struct settings* settings = efi_snp_hii_settings(snpdev);
+    struct settings* origin;
+    struct setting* setting;
+    struct setting fetched;
+    int len;
+    char* buf;
+    char* encoded;
+    int i;
+    int rc;
 
-	/* Handle ConfigHdr components */
-	if ( ( strcasecmp ( key, "GUID" ) == 0 ) ||
-	     ( strcasecmp ( key, "NAME" ) == 0 ) ||
-	     ( strcasecmp ( key, "PATH" ) == 0 ) ) {
-		return efi_snp_hii_append ( snpdev, key, value, results );
-	}
-	if ( have_setting )
-		*have_setting = 1;
+    /* Handle ConfigHdr components */
+    if ((strcasecmp(key, "GUID") == 0) ||
+        (strcasecmp(key, "NAME") == 0) ||
+        (strcasecmp(key, "PATH") == 0)) {
+        return efi_snp_hii_append(snpdev, key, value, results);
+    }
+    if (have_setting)
+        *have_setting = 1;
 
-	/* Do nothing more unless we have a settings block */
-	if ( ! settings ) {
-		rc = -ENOTSUP;
-		goto err_no_settings;
-	}
+    /* Do nothing more unless we have a settings block */
+    if (!settings) {
+        rc = -ENOTSUP;
+        goto err_no_settings;
+    }
 
-	/* Identify setting */
-	setting = find_setting ( key );
-	if ( ! setting ) {
-		DBGC ( snpdev, "SNPDEV %p no such setting \"%s\"\n",
-		       snpdev, key );
-		rc = -ENODEV;
-		goto err_find_setting;
-	}
+    /* Identify setting */
+    setting = find_setting(key);
+    if (!setting) {
+        DBGC(snpdev, "SNPDEV %p no such setting \"%s\"\n",
+             snpdev, key);
+        rc = -ENODEV;
+        goto err_find_setting;
+    }
 
-	/* Encode value */
-	if ( setting_exists ( settings, setting ) ) {
+    /* Encode value */
+    if (setting_exists(settings, setting)) {
+        /* Calculate formatted length */
+        len = fetchf_setting(settings, setting, &origin, &fetched,
+                             NULL, 0);
+        if (len < 0) {
+            rc = len;
+            DBGC(snpdev, "SNPDEV %p could not fetch %s: %s\n",
+                 snpdev, setting->name, strerror(rc));
+            goto err_fetchf_len;
+        }
 
-		/* Calculate formatted length */
-		len = fetchf_setting ( settings, setting, &origin, &fetched,
-				       NULL, 0 );
-		if ( len < 0 ) {
-			rc = len;
-			DBGC ( snpdev, "SNPDEV %p could not fetch %s: %s\n",
-			       snpdev, setting->name, strerror ( rc ) );
-			goto err_fetchf_len;
-		}
+        /* Allocate buffer for formatted value and HII-encoded value */
+        buf = zalloc(len + 1 /* NUL */ + (len * 4) + 1 /* NUL */);
+        if (!buf) {
+            rc = -ENOMEM;
+            goto err_alloc;
+        }
+        encoded = (buf + len + 1 /* NUL */);
 
-		/* Allocate buffer for formatted value and HII-encoded value */
-		buf = zalloc ( len + 1 /* NUL */ + ( len * 4 ) + 1 /* NUL */ );
-		if ( ! buf ) {
-			rc = -ENOMEM;
-			goto err_alloc;
-		}
-		encoded = ( buf + len + 1 /* NUL */ );
+        /* Format value */
+        fetchf_setting(origin, &fetched, NULL, NULL, buf,
+                       (len + 1 /* NUL */));
+        for (i = 0; i < len; i++) {
+            sprintf((encoded + (4 * i)), "%04x",
+                    *((uint8_t*)buf + i));
+        }
 
-		/* Format value */
-		fetchf_setting ( origin, &fetched, NULL, NULL, buf,
-				 ( len + 1 /* NUL */ ) );
-		for ( i = 0 ; i < len ; i++ ) {
-			sprintf ( ( encoded + ( 4 * i ) ), "%04x",
-				  *( ( uint8_t * ) buf + i ) );
-		}
+    } else {
+        /* Non-existent or inapplicable setting */
+        buf = NULL;
+        encoded = "";
+    }
 
-	} else {
+    /* Append results */
+    if ((rc = efi_snp_hii_append(snpdev, key, encoded,
+                                 results)) != 0) {
+        goto err_append;
+    }
 
-		/* Non-existent or inapplicable setting */
-		buf = NULL;
-		encoded = "";
-	}
+    /* Success */
+    rc = 0;
 
-	/* Append results */
-	if ( ( rc = efi_snp_hii_append ( snpdev, key, encoded,
-					 results ) ) != 0 ) {
-		goto err_append;
-	}
-
-	/* Success */
-	rc = 0;
-
- err_append:
-	free ( buf );
- err_alloc:
- err_fetchf_len:
- err_find_setting:
- err_no_settings:
-	return rc;
+err_append:
+    free(buf);
+err_alloc:
+err_fetchf_len:
+err_find_setting:
+err_no_settings:
+    return rc;
 }
 
 /**
@@ -381,80 +375,80 @@ static int efi_snp_hii_fetch ( struct efi_snp_device *snpdev,
  * @v have_setting	Flag indicating detection of a setting (unused)
  * @ret rc		Return status code
  */
-static int efi_snp_hii_store ( struct efi_snp_device *snpdev,
-			       const char *key, const char *value,
-			       wchar_t **results __unused,
-			       int *have_setting __unused ) {
-	struct settings *settings = efi_snp_hii_settings ( snpdev );
-	struct setting *setting;
-	char *buf;
-	char tmp[5];
-	char *endp;
-	int len;
-	int i;
-	int rc;
+static int efi_snp_hii_store(struct efi_snp_device* snpdev,
+                             const char* key, const char* value,
+                             wchar_t** results __unused,
+                             int* have_setting __unused) {
+    struct settings* settings = efi_snp_hii_settings(snpdev);
+    struct setting* setting;
+    char* buf;
+    char tmp[5];
+    char* endp;
+    int len;
+    int i;
+    int rc;
 
-	/* Handle ConfigHdr components */
-	if ( ( strcasecmp ( key, "GUID" ) == 0 ) ||
-	     ( strcasecmp ( key, "NAME" ) == 0 ) ||
-	     ( strcasecmp ( key, "PATH" ) == 0 ) ) {
-		/* Nothing to do */
-		return 0;
-	}
+    /* Handle ConfigHdr components */
+    if ((strcasecmp(key, "GUID") == 0) ||
+        (strcasecmp(key, "NAME") == 0) ||
+        (strcasecmp(key, "PATH") == 0)) {
+        /* Nothing to do */
+        return 0;
+    }
 
-	/* Do nothing more unless we have a settings block */
-	if ( ! settings ) {
-		rc = -ENOTSUP;
-		goto err_no_settings;
-	}
+    /* Do nothing more unless we have a settings block */
+    if (!settings) {
+        rc = -ENOTSUP;
+        goto err_no_settings;
+    }
 
-	/* Identify setting */
-	setting = find_setting ( key );
-	if ( ! setting ) {
-		DBGC ( snpdev, "SNPDEV %p no such setting \"%s\"\n",
-		       snpdev, key );
-		rc = -ENODEV;
-		goto err_find_setting;
-	}
+    /* Identify setting */
+    setting = find_setting(key);
+    if (!setting) {
+        DBGC(snpdev, "SNPDEV %p no such setting \"%s\"\n",
+             snpdev, key);
+        rc = -ENODEV;
+        goto err_find_setting;
+    }
 
-	/* Allocate buffer */
-	len = ( strlen ( value ) / 4 );
-	buf = zalloc ( len + 1 /* NUL */ );
-	if ( ! buf ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
+    /* Allocate buffer */
+    len = (strlen(value) / 4);
+    buf = zalloc(len + 1 /* NUL */);
+    if (!buf) {
+        rc = -ENOMEM;
+        goto err_alloc;
+    }
 
-	/* Decode value */
-	tmp[4] = '\0';
-	for ( i = 0 ; i < len ; i++ ) {
-		memcpy ( tmp, ( value + ( i * 4 ) ), 4 );
-		buf[i] = strtoul ( tmp, &endp, 16 );
-		if ( endp != &tmp[4] ) {
-			DBGC ( snpdev, "SNPDEV %p invalid character %s\n",
-			       snpdev, tmp );
-			rc = -EINVAL;
-			goto err_inval;
-		}
-	}
+    /* Decode value */
+    tmp[4] = '\0';
+    for (i = 0; i < len; i++) {
+        memcpy(tmp, (value + (i * 4)), 4);
+        buf[i] = strtoul(tmp, &endp, 16);
+        if (endp != &tmp[4]) {
+            DBGC(snpdev, "SNPDEV %p invalid character %s\n",
+                 snpdev, tmp);
+            rc = -EINVAL;
+            goto err_inval;
+        }
+    }
 
-	/* Store value */
-	if ( ( rc = storef_setting ( settings, setting, buf ) ) != 0 ) {
-		DBGC ( snpdev, "SNPDEV %p could not store \"%s\" into %s: %s\n",
-		       snpdev, buf, setting->name, strerror ( rc ) );
-		goto err_storef;
-	}
+    /* Store value */
+    if ((rc = storef_setting(settings, setting, buf)) != 0) {
+        DBGC(snpdev, "SNPDEV %p could not store \"%s\" into %s: %s\n",
+             snpdev, buf, setting->name, strerror(rc));
+        goto err_storef;
+    }
 
-	/* Success */
-	rc = 0;
+    /* Success */
+    rc = 0;
 
- err_storef:
- err_inval:
-	free ( buf );
- err_alloc:
- err_find_setting:
- err_no_settings:
-	return rc;
+err_storef:
+err_inval:
+    free(buf);
+err_alloc:
+err_find_setting:
+err_no_settings:
+    return rc;
 }
 
 /**
@@ -468,61 +462,61 @@ static int efi_snp_hii_store ( struct efi_snp_device *snpdev,
  * @v process		Function used to process key=value pairs
  * @ret rc		Return status code
  */
-static int efi_snp_hii_process ( struct efi_snp_device *snpdev,
-				 wchar_t *string, wchar_t **progress,
-				 wchar_t **results, int *have_setting,
-				 int ( * process ) ( struct efi_snp_device *,
-						     const char *key,
-						     const char *value,
-						     wchar_t **results,
-						     int *have_setting ) ) {
-	wchar_t *wkey = string;
-	wchar_t *wend = string;
-	wchar_t *wvalue = NULL;
-	size_t key_len;
-	size_t value_len;
-	void *temp;
-	char *key;
-	char *value;
-	int rc;
+static int efi_snp_hii_process(struct efi_snp_device* snpdev,
+                               wchar_t* string, wchar_t** progress,
+                               wchar_t** results, int* have_setting,
+                               int (*process)(struct efi_snp_device*,
+                                              const char* key,
+                                              const char* value,
+                                              wchar_t** results,
+                                              int* have_setting)) {
+    wchar_t* wkey = string;
+    wchar_t* wend = string;
+    wchar_t* wvalue = NULL;
+    size_t key_len;
+    size_t value_len;
+    void* temp;
+    char* key;
+    char* value;
+    int rc;
 
-	/* Locate key, value (if any), and end */
-	while ( *wend ) {
-		if ( *wend == L'&' )
-			break;
-		if ( *(wend++) == L'=' )
-			wvalue = wend;
-	}
+    /* Locate key, value (if any), and end */
+    while (*wend) {
+        if (*wend == L'&')
+            break;
+        if (*(wend++) == L'=')
+            wvalue = wend;
+    }
 
-	/* Allocate memory for key and value */
-	key_len = ( ( wvalue ? ( wvalue - 1 ) : wend ) - wkey );
-	value_len = ( wvalue ? ( wend - wvalue ) : 0 );
-	temp = zalloc ( key_len + 1 /* NUL */ + value_len + 1 /* NUL */ );
-	if ( ! temp )
-		return -ENOMEM;
-	key = temp;
-	value = ( temp + key_len + 1 /* NUL */ );
+    /* Allocate memory for key and value */
+    key_len = ((wvalue ? (wvalue - 1) : wend) - wkey);
+    value_len = (wvalue ? (wend - wvalue) : 0);
+    temp = zalloc(key_len + 1 /* NUL */ + value_len + 1 /* NUL */);
+    if (!temp)
+        return -ENOMEM;
+    key = temp;
+    value = (temp + key_len + 1 /* NUL */);
 
-	/* Copy key and value */
-	while ( key_len-- )
-		key[key_len] = wkey[key_len];
-	while ( value_len-- )
-		value[value_len] = wvalue[value_len];
+    /* Copy key and value */
+    while (key_len--)
+        key[key_len] = wkey[key_len];
+    while (value_len--)
+        value[value_len] = wvalue[value_len];
 
-	/* Process key and value */
-	if ( ( rc = process ( snpdev, key, value, results,
-			      have_setting ) ) != 0 ) {
-		goto err;
-	}
+    /* Process key and value */
+    if ((rc = process(snpdev, key, value, results,
+                      have_setting)) != 0) {
+        goto err;
+    }
 
-	/* Update progress marker */
-	*progress = wend;
+    /* Update progress marker */
+    *progress = wend;
 
- err:
-	/* Free temporary storage */
-	free ( temp );
+err:
+    /* Free temporary storage */
+    free(temp);
 
-	return rc;
+    return rc;
 }
 
 /**
@@ -535,56 +529,56 @@ static int efi_snp_hii_process ( struct efi_snp_device *snpdev,
  * @ret efirc		EFI status code
  */
 static EFI_STATUS EFIAPI
-efi_snp_hii_extract_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
-			     EFI_STRING request, EFI_STRING *progress,
-			     EFI_STRING *results ) {
-	struct efi_snp_device *snpdev =
-		container_of ( hii, struct efi_snp_device, hii );
-	int have_setting = 0;
-	wchar_t *pos;
-	int rc;
+efi_snp_hii_extract_config(const EFI_HII_CONFIG_ACCESS_PROTOCOL* hii,
+                           EFI_STRING request, EFI_STRING* progress,
+                           EFI_STRING* results) {
+    struct efi_snp_device* snpdev =
+        container_of(hii, struct efi_snp_device, hii);
+    int have_setting = 0;
+    wchar_t* pos;
+    int rc;
 
-	DBGC ( snpdev, "SNPDEV %p ExtractConfig request \"%ls\"\n",
-	       snpdev, request );
+    DBGC(snpdev, "SNPDEV %p ExtractConfig request \"%ls\"\n",
+         snpdev, request);
 
-	/* Initialise results */
-	*results = NULL;
+    /* Initialise results */
+    *results = NULL;
 
-	/* Work around apparently broken UEFI specification */
-	if ( ! ( request && request[0] ) ) {
-		DBGC ( snpdev, "SNPDEV %p ExtractConfig ignoring malformed "
-		       "request\n", snpdev );
-		return EFI_INVALID_PARAMETER;
-	}
+    /* Work around apparently broken UEFI specification */
+    if (!(request && request[0])) {
+        DBGC(snpdev, "SNPDEV %p ExtractConfig ignoring malformed "
+                     "request\n", snpdev);
+        return EFI_INVALID_PARAMETER;
+    }
 
-	/* Process all request fragments */
-	for ( pos = *progress = request ; *progress && **progress ;
-	      pos = *progress + 1 ) {
-		if ( ( rc = efi_snp_hii_process ( snpdev, pos, progress,
-						  results, &have_setting,
-						  efi_snp_hii_fetch ) ) != 0 ) {
-			return EFIRC ( rc );
-		}
-	}
+    /* Process all request fragments */
+    for (pos = *progress = request; *progress && **progress;
+         pos = *progress + 1) {
+        if ((rc = efi_snp_hii_process(snpdev, pos, progress,
+                                      results, &have_setting,
+                                      efi_snp_hii_fetch)) != 0) {
+            return EFIRC(rc);
+        }
+    }
 
-	/* If we have no explicit request, return all settings */
-	if ( ! have_setting ) {
-		struct setting *setting;
+    /* If we have no explicit request, return all settings */
+    if (!have_setting) {
+        struct setting* setting;
 
-		for_each_table_entry ( setting, SETTINGS ) {
-			if ( ! efi_snp_hii_setting_applies ( snpdev, setting ) )
-				continue;
-			if ( ( rc = efi_snp_hii_fetch ( snpdev, setting->name,
-							NULL, results,
-							NULL ) ) != 0 ) {
-				return EFIRC ( rc );
-			}
-		}
-	}
+        for_each_table_entry(setting, SETTINGS) {
+            if (!efi_snp_hii_setting_applies(snpdev, setting))
+                continue;
+            if ((rc = efi_snp_hii_fetch(snpdev, setting->name,
+                                        NULL, results,
+                                        NULL)) != 0) {
+                return EFIRC(rc);
+            }
+        }
+    }
 
-	DBGC ( snpdev, "SNPDEV %p ExtractConfig results \"%ls\"\n",
-	       snpdev, *results );
-	return 0;
+    DBGC(snpdev, "SNPDEV %p ExtractConfig results \"%ls\"\n",
+         snpdev, *results);
+    return 0;
 }
 
 /**
@@ -596,26 +590,26 @@ efi_snp_hii_extract_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
  * @ret efirc		EFI status code
  */
 static EFI_STATUS EFIAPI
-efi_snp_hii_route_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
-			   EFI_STRING config, EFI_STRING *progress ) {
-	struct efi_snp_device *snpdev =
-		container_of ( hii, struct efi_snp_device, hii );
-	wchar_t *pos;
-	int rc;
+efi_snp_hii_route_config(const EFI_HII_CONFIG_ACCESS_PROTOCOL* hii,
+                         EFI_STRING config, EFI_STRING* progress) {
+    struct efi_snp_device* snpdev =
+        container_of(hii, struct efi_snp_device, hii);
+    wchar_t* pos;
+    int rc;
 
-	DBGC ( snpdev, "SNPDEV %p RouteConfig \"%ls\"\n", snpdev, config );
+    DBGC(snpdev, "SNPDEV %p RouteConfig \"%ls\"\n", snpdev, config);
 
-	/* Process all request fragments */
-	for ( pos = *progress = config ; *progress && **progress ;
-	      pos = *progress + 1 ) {
-		if ( ( rc = efi_snp_hii_process ( snpdev, pos, progress,
-						  NULL, NULL,
-						  efi_snp_hii_store ) ) != 0 ) {
-			return EFIRC ( rc );
-		}
-	}
+    /* Process all request fragments */
+    for (pos = *progress = config; *progress && **progress;
+         pos = *progress + 1) {
+        if ((rc = efi_snp_hii_process(snpdev, pos, progress,
+                                      NULL, NULL,
+                                      efi_snp_hii_store)) != 0) {
+            return EFIRC(rc);
+        }
+    }
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -630,23 +624,23 @@ efi_snp_hii_route_config ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
  * @ret efirc		EFI status code
  */
 static EFI_STATUS EFIAPI
-efi_snp_hii_callback ( const EFI_HII_CONFIG_ACCESS_PROTOCOL *hii,
-		       EFI_BROWSER_ACTION action __unused,
-		       EFI_QUESTION_ID question_id __unused,
-		       UINT8 type __unused, EFI_IFR_TYPE_VALUE *value __unused,
-		       EFI_BROWSER_ACTION_REQUEST *action_request __unused ) {
-	struct efi_snp_device *snpdev =
-		container_of ( hii, struct efi_snp_device, hii );
+efi_snp_hii_callback(const EFI_HII_CONFIG_ACCESS_PROTOCOL* hii,
+                     EFI_BROWSER_ACTION action __unused,
+                     EFI_QUESTION_ID question_id __unused,
+                     UINT8 type __unused, EFI_IFR_TYPE_VALUE* value __unused,
+                     EFI_BROWSER_ACTION_REQUEST* action_request __unused) {
+    struct efi_snp_device* snpdev =
+        container_of(hii, struct efi_snp_device, hii);
 
-	DBGC ( snpdev, "SNPDEV %p Callback\n", snpdev );
-	return EFI_UNSUPPORTED;
+    DBGC(snpdev, "SNPDEV %p Callback\n", snpdev);
+    return EFI_UNSUPPORTED;
 }
 
 /** HII configuration access protocol */
 static EFI_HII_CONFIG_ACCESS_PROTOCOL efi_snp_device_hii = {
-	.ExtractConfig	= efi_snp_hii_extract_config,
-	.RouteConfig	= efi_snp_hii_route_config,
-	.Callback	= efi_snp_hii_callback,
+    .ExtractConfig = efi_snp_hii_extract_config,
+    .RouteConfig = efi_snp_hii_route_config,
+    .Callback = efi_snp_hii_callback,
 };
 
 /**
@@ -655,138 +649,136 @@ static EFI_HII_CONFIG_ACCESS_PROTOCOL efi_snp_device_hii = {
  * @v snpdev		SNP device
  * @ret rc		Return status code
  */
-int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	VENDOR_DEVICE_PATH *vendor_path;
-	EFI_DEVICE_PATH_PROTOCOL *path_end;
-	size_t path_prefix_len;
-	int leak = 0;
-	EFI_STATUS efirc;
-	int rc;
+int efi_snp_hii_install(struct efi_snp_device* snpdev) {
+    EFI_BOOT_SERVICES* bs = efi_systab->BootServices;
+    VENDOR_DEVICE_PATH* vendor_path;
+    EFI_DEVICE_PATH_PROTOCOL* path_end;
+    size_t path_prefix_len;
+    int leak = 0;
+    EFI_STATUS efirc;
+    int rc;
 
-	/* Do nothing if HII database protocol is not supported */
-	if ( ! efihii ) {
-		rc = -ENOTSUP;
-		goto err_no_hii;
-	}
+    /* Do nothing if HII database protocol is not supported */
+    if (!efihii) {
+        rc = -ENOTSUP;
+        goto err_no_hii;
+    }
 
-	/* Initialise HII protocol */
-	memcpy ( &snpdev->hii, &efi_snp_device_hii, sizeof ( snpdev->hii ) );
+    /* Initialise HII protocol */
+    memcpy(&snpdev->hii, &efi_snp_device_hii, sizeof(snpdev->hii));
 
-	/* Create HII package list */
-	snpdev->package_list = efi_snp_hii_package_list ( snpdev );
-	if ( ! snpdev->package_list ) {
-		DBGC ( snpdev, "SNPDEV %p could not create HII package list\n",
-		       snpdev );
-		rc = -ENOMEM;
-		goto err_build_package_list;
-	}
+    /* Create HII package list */
+    snpdev->package_list = efi_snp_hii_package_list(snpdev);
+    if (!snpdev->package_list) {
+        DBGC(snpdev, "SNPDEV %p could not create HII package list\n",
+             snpdev);
+        rc = -ENOMEM;
+        goto err_build_package_list;
+    }
 
-	/* Allocate the new device path */
-	path_prefix_len = efi_path_len ( snpdev->path );
-	snpdev->hii_child_path = zalloc ( path_prefix_len +
-					  sizeof ( *vendor_path ) +
-					  sizeof ( *path_end ) );
-	if ( ! snpdev->hii_child_path ) {
-		DBGC ( snpdev,
-		       "SNPDEV %p could not allocate HII child device path\n",
-		       snpdev );
-		rc = -ENOMEM;
-		goto err_alloc_child_path;
-	}
+    /* Allocate the new device path */
+    path_prefix_len = efi_path_len(snpdev->path);
+    snpdev->hii_child_path = zalloc(path_prefix_len +
+                                    sizeof(*vendor_path) +
+                                    sizeof(*path_end));
+    if (!snpdev->hii_child_path) {
+        DBGC(snpdev,
+             "SNPDEV %p could not allocate HII child device path\n",
+             snpdev);
+        rc = -ENOMEM;
+        goto err_alloc_child_path;
+    }
 
-	/* Populate the device path */
-	memcpy ( snpdev->hii_child_path, snpdev->path, path_prefix_len );
-	vendor_path = ( ( ( void * ) snpdev->hii_child_path ) +
-			path_prefix_len );
-	vendor_path->Header.Type = HARDWARE_DEVICE_PATH;
-	vendor_path->Header.SubType = HW_VENDOR_DP;
-	vendor_path->Header.Length[0] = sizeof ( *vendor_path );
-	efi_snp_hii_random_guid ( &vendor_path->Guid );
-	path_end = ( ( void * ) ( vendor_path + 1 ) );
-	path_end->Type = END_DEVICE_PATH_TYPE;
-	path_end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-	path_end->Length[0] = sizeof ( *path_end );
+    /* Populate the device path */
+    memcpy(snpdev->hii_child_path, snpdev->path, path_prefix_len);
+    vendor_path = (((void*)snpdev->hii_child_path) +
+                   path_prefix_len);
+    vendor_path->Header.Type = HARDWARE_DEVICE_PATH;
+    vendor_path->Header.SubType = HW_VENDOR_DP;
+    vendor_path->Header.Length[0] = sizeof(*vendor_path);
+    efi_snp_hii_random_guid(&vendor_path->Guid);
+    path_end = ((void*)(vendor_path + 1));
+    efi_path_terminate(path_end);
 
-	/* Create device path and child handle for HII association */
-	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
-			&snpdev->hii_child_handle,
-			&efi_device_path_protocol_guid, snpdev->hii_child_path,
-			NULL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( snpdev, "SNPDEV %p could not create HII child handle: "
-		       "%s\n", snpdev, strerror ( rc ) );
-		goto err_hii_child_handle;
-	}
+    /* Create device path and child handle for HII association */
+    if ((efirc = bs->InstallMultipleProtocolInterfaces(
+             &snpdev->hii_child_handle,
+             &efi_device_path_protocol_guid, snpdev->hii_child_path,
+             NULL)) != 0) {
+        rc = -EEFI(efirc);
+        DBGC(snpdev, "SNPDEV %p could not create HII child handle: "
+                     "%s\n", snpdev, strerror(rc));
+        goto err_hii_child_handle;
+    }
 
-	/* Add HII packages */
-	if ( ( efirc = efihii->NewPackageList ( efihii, snpdev->package_list,
-						snpdev->hii_child_handle,
-						&snpdev->hii_handle ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( snpdev, "SNPDEV %p could not add HII packages: %s\n",
-		       snpdev, strerror ( rc ) );
-		goto err_new_package_list;
-	}
+    /* Add HII packages */
+    if ((efirc = efihii->NewPackageList(efihii, snpdev->package_list,
+                                        snpdev->hii_child_handle,
+                                        &snpdev->hii_handle)) != 0) {
+        rc = -EEFI(efirc);
+        DBGC(snpdev, "SNPDEV %p could not add HII packages: %s\n",
+             snpdev, strerror(rc));
+        goto err_new_package_list;
+    }
 
-	/* Install HII protocol */
-	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
-			 &snpdev->hii_child_handle,
-			 &efi_hii_config_access_protocol_guid, &snpdev->hii,
-			 NULL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( snpdev, "SNPDEV %p could not install HII protocol: %s\n",
-		       snpdev, strerror ( rc ) );
-		goto err_install_protocol;
-	}
+    /* Install HII protocol */
+    if ((efirc = bs->InstallMultipleProtocolInterfaces(
+             &snpdev->hii_child_handle,
+             &efi_hii_config_access_protocol_guid, &snpdev->hii,
+             NULL)) != 0) {
+        rc = -EEFI(efirc);
+        DBGC(snpdev, "SNPDEV %p could not install HII protocol: %s\n",
+             snpdev, strerror(rc));
+        goto err_install_protocol;
+    }
 
-	/* Add as child of handle with SNP instance */
-	if ( ( rc = efi_child_add ( snpdev->handle,
-				    snpdev->hii_child_handle ) ) != 0 ) {
-		DBGC ( snpdev,
-		       "SNPDEV %p could not adopt HII child handle: %s\n",
-		       snpdev, strerror ( rc ) );
-		goto err_efi_child_add;
-	}
+    /* Add as child of handle with SNP instance */
+    if ((rc = efi_child_add(snpdev->handle,
+                            snpdev->hii_child_handle)) != 0) {
+        DBGC(snpdev,
+             "SNPDEV %p could not adopt HII child handle: %s\n",
+             snpdev, strerror(rc));
+        goto err_efi_child_add;
+    }
 
-	return 0;
+    return 0;
 
-	efi_child_del ( snpdev->handle, snpdev->hii_child_handle );
- err_efi_child_add:
-	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
-			snpdev->hii_child_handle,
-			&efi_hii_config_access_protocol_guid, &snpdev->hii,
-			NULL ) ) != 0 ) {
-		DBGC ( snpdev, "SNPDEV %p could not uninstall HII protocol: "
-		       "%s\n", snpdev, strerror ( -EEFI ( efirc ) ) );
-		leak = 1;
-	}
-	efi_nullify_hii ( &snpdev->hii );
- err_install_protocol:
-	if ( ! leak )
-		efihii->RemovePackageList ( efihii, snpdev->hii_handle );
- err_new_package_list:
-	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
-			snpdev->hii_child_handle,
-			&efi_device_path_protocol_guid, snpdev->hii_child_path,
-			NULL ) ) != 0 ) {
-		DBGC ( snpdev, "SNPDEV %p could not uninstall HII path: %s\n",
-		       snpdev, strerror ( -EEFI ( efirc ) ) );
-		leak = 1;
-	}
- err_hii_child_handle:
-	if ( ! leak ) {
-		free ( snpdev->hii_child_path );
-		snpdev->hii_child_path = NULL;
-	}
- err_alloc_child_path:
-	if ( ! leak ) {
-		free ( snpdev->package_list );
-		snpdev->package_list = NULL;
-	}
- err_build_package_list:
- err_no_hii:
-	return rc;
+    efi_child_del(snpdev->handle, snpdev->hii_child_handle);
+err_efi_child_add:
+    if ((efirc = bs->UninstallMultipleProtocolInterfaces(
+             snpdev->hii_child_handle,
+             &efi_hii_config_access_protocol_guid, &snpdev->hii,
+             NULL)) != 0) {
+        DBGC(snpdev, "SNPDEV %p could not uninstall HII protocol: "
+                     "%s\n", snpdev, strerror(-EEFI(efirc)));
+        leak = 1;
+    }
+    efi_nullify_hii(&snpdev->hii);
+err_install_protocol:
+    if (!leak)
+        efihii->RemovePackageList(efihii, snpdev->hii_handle);
+err_new_package_list:
+    if ((efirc = bs->UninstallMultipleProtocolInterfaces(
+             snpdev->hii_child_handle,
+             &efi_device_path_protocol_guid, snpdev->hii_child_path,
+             NULL)) != 0) {
+        DBGC(snpdev, "SNPDEV %p could not uninstall HII path: %s\n",
+             snpdev, strerror(-EEFI(efirc)));
+        leak = 1;
+    }
+err_hii_child_handle:
+    if (!leak) {
+        free(snpdev->hii_child_path);
+        snpdev->hii_child_path = NULL;
+    }
+err_alloc_child_path:
+    if (!leak) {
+        free(snpdev->package_list);
+        snpdev->package_list = NULL;
+    }
+err_build_package_list:
+err_no_hii:
+    return rc;
 }
 
 /**
@@ -795,47 +787,47 @@ int efi_snp_hii_install ( struct efi_snp_device *snpdev ) {
  * @v snpdev		SNP device
  * @ret leak		Uninstallation failed: leak memory
  */
-int efi_snp_hii_uninstall ( struct efi_snp_device *snpdev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	int leak = efi_shutdown_in_progress;
-	EFI_STATUS efirc;
+int efi_snp_hii_uninstall(struct efi_snp_device* snpdev) {
+    EFI_BOOT_SERVICES* bs = efi_systab->BootServices;
+    int leak = efi_shutdown_in_progress;
+    EFI_STATUS efirc;
 
-	/* Do nothing if HII database protocol is not supported */
-	if ( ! efihii )
-		return 0;
+    /* Do nothing if HII database protocol is not supported */
+    if (!efihii)
+        return 0;
 
-	/* Uninstall protocols and remove package list */
-	efi_child_del ( snpdev->handle, snpdev->hii_child_handle );
-	if ( ( ! efi_shutdown_in_progress ) &&
-	     ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
-			snpdev->hii_child_handle,
-			&efi_hii_config_access_protocol_guid, &snpdev->hii,
-			NULL ) ) != 0 ) ) {
-		DBGC ( snpdev, "SNPDEV %p could not uninstall HII protocol: "
-		       "%s\n", snpdev, strerror ( -EEFI ( efirc ) ) );
-		leak = 1;
-	}
-	efi_nullify_hii ( &snpdev->hii );
-	if ( ! leak )
-		efihii->RemovePackageList ( efihii, snpdev->hii_handle );
-	if ( ( ! efi_shutdown_in_progress ) &&
-	     ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
-			snpdev->hii_child_handle,
-			&efi_device_path_protocol_guid, snpdev->hii_child_path,
-			NULL ) ) != 0 ) ) {
-		DBGC ( snpdev, "SNPDEV %p could not uninstall HII path: %s\n",
-		       snpdev, strerror ( -EEFI ( efirc ) ) );
-		leak = 1;
-	}
-	if ( ! leak ) {
-		free ( snpdev->hii_child_path );
-		snpdev->hii_child_path = NULL;
-		free ( snpdev->package_list );
-		snpdev->package_list = NULL;
-	}
+    /* Uninstall protocols and remove package list */
+    efi_child_del(snpdev->handle, snpdev->hii_child_handle);
+    if ((!efi_shutdown_in_progress) &&
+        ((efirc = bs->UninstallMultipleProtocolInterfaces(
+              snpdev->hii_child_handle,
+              &efi_hii_config_access_protocol_guid, &snpdev->hii,
+              NULL)) != 0)) {
+        DBGC(snpdev, "SNPDEV %p could not uninstall HII protocol: "
+                     "%s\n", snpdev, strerror(-EEFI(efirc)));
+        leak = 1;
+    }
+    efi_nullify_hii(&snpdev->hii);
+    if (!leak)
+        efihii->RemovePackageList(efihii, snpdev->hii_handle);
+    if ((!efi_shutdown_in_progress) &&
+        ((efirc = bs->UninstallMultipleProtocolInterfaces(
+              snpdev->hii_child_handle,
+              &efi_device_path_protocol_guid, snpdev->hii_child_path,
+              NULL)) != 0)) {
+        DBGC(snpdev, "SNPDEV %p could not uninstall HII path: %s\n",
+             snpdev, strerror(-EEFI(efirc)));
+        leak = 1;
+    }
+    if (!leak) {
+        free(snpdev->hii_child_path);
+        snpdev->hii_child_path = NULL;
+        free(snpdev->package_list);
+        snpdev->package_list = NULL;
+    }
 
-	/* Report leakage, if applicable */
-	if ( leak && ( ! efi_shutdown_in_progress ) )
-		DBGC ( snpdev, "SNPDEV %p HII nullified and leaked\n", snpdev );
-	return leak;
+    /* Report leakage, if applicable */
+    if (leak && (!efi_shutdown_in_progress))
+        DBGC(snpdev, "SNPDEV %p HII nullified and leaked\n", snpdev);
+    return leak;
 }

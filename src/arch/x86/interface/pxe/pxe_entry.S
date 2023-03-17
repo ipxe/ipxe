@@ -34,7 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  */
 	.section ".text16.data", "aw", @progbits
 	.globl ppxe
-	.align 16
+	.balign 16
 ppxe:
 	.ascii "!PXE"			/* Signature */
 	.byte pxe_length		/* StructLength */
@@ -72,7 +72,7 @@ undiheader:
  */
 	.section ".text16.data", "aw", @progbits
 	.globl pxenv
-	.align 16
+	.balign 16
 pxenv:
 	.ascii "PXENV+"			/* Signature */
 	.word 0x0201			/* Version */

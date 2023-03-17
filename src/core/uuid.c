@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <stdint.h>
 #include <stdio.h>
@@ -40,16 +40,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v uuid		UUID
  * @ret string		UUID in canonical form
  */
-const char * uuid_ntoa ( const union uuid *uuid ) {
-	static char buf[37]; /* "00000000-0000-0000-0000-000000000000" */
+const char* uuid_ntoa(const union uuid* uuid) {
+    static char buf[37]; /* "00000000-0000-0000-0000-000000000000" */
 
-	sprintf ( buf, "%08x-%04x-%04x-%04x-%02x%02x%02x%02x%02x%02x",
-		  be32_to_cpu ( uuid->canonical.a ),
-		  be16_to_cpu ( uuid->canonical.b ),
-		  be16_to_cpu ( uuid->canonical.c ),
-		  be16_to_cpu ( uuid->canonical.d ),
-		  uuid->canonical.e[0], uuid->canonical.e[1],
-		  uuid->canonical.e[2], uuid->canonical.e[3],
-		  uuid->canonical.e[4], uuid->canonical.e[5] );
-	return buf;
+    sprintf(buf, "%08x-%04x-%04x-%04x-%02x%02x%02x%02x%02x%02x",
+            be32_to_cpu(uuid->canonical.a),
+            be16_to_cpu(uuid->canonical.b),
+            be16_to_cpu(uuid->canonical.c),
+            be16_to_cpu(uuid->canonical.d),
+            uuid->canonical.e[0], uuid->canonical.e[1],
+            uuid->canonical.e[2], uuid->canonical.e[3],
+            uuid->canonical.e[4], uuid->canonical.e[5]);
+    return buf;
 }

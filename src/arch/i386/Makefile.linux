@@ -1,6 +1,14 @@
-LDSCRIPT = arch/i386/scripts/linux.lds
+# -*- makefile -*- : Force emacs to use Makefile mode
 
-SRCDIRS += arch/i386/core/linux
+# Starting virtual address
+#
+LDFLAGS += -Ttext=0x08048000
 
+# Compiler flags for building host API wrapper
+#
+LINUX_CFLAGS	+= -m32
+
+# Include generic Linux Makefile
+#
 MAKEDEPS += arch/x86/Makefile.linux
 include arch/x86/Makefile.linux

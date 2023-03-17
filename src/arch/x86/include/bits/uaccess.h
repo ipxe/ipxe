@@ -1,5 +1,7 @@
+#pragma once
+
 #ifndef _BITS_UACCESS_H
-#define _BITS_UACCESS_H
+    #define _BITS_UACCESS_H
 
 /** @file
  *
@@ -7,8 +9,8 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
-#include <librm.h>
+    #include <librm.h>
 
 #endif /* _BITS_UACCESS_H */

@@ -1,3 +1,5 @@
+#pragma once
+
 /** @file
   PCI Root Bridge I/O protocol as defined in the UEFI 2.0 specification.
 
@@ -5,30 +7,26 @@
   and PCI Configuration cycles on a PCI Root Bridge. It also provides services to perform
   defferent types of bus mastering DMA.
 
-  Copyright (c) 2006 - 2011, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __PCI_ROOT_BRIDGE_IO_H__
-#define __PCI_ROOT_BRIDGE_IO_H__
+    #define __PCI_ROOT_BRIDGE_IO_H__
 
-FILE_LICENCE ( BSD3 );
+FILE_LICENCE(BSD2_PATENT);
 
-#include <ipxe/efi/Library/BaseLib.h>
+    #include <ipxe/efi/Library/BaseLib.h>
 
-#define EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID \
-  { \
-    0x2f707ebb, 0x4a1a, 0x11d4, {0x9a, 0x38, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d } \
-  }
+    #define EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID               \
+        {                                                      \
+            0x2f707ebb, 0x4a1a, 0x11d4, {                      \
+                0x9a, 0x38, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d \
+            }                                                  \
+        }
 
-typedef struct _EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL;
+typedef struct _EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL;
 
 ///
 /// *******************************************************
@@ -36,19 +34,19 @@ typedef struct _EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL
 /// *******************************************************
 ///
 typedef enum {
-  EfiPciWidthUint8,
-  EfiPciWidthUint16,
-  EfiPciWidthUint32,
-  EfiPciWidthUint64,
-  EfiPciWidthFifoUint8,
-  EfiPciWidthFifoUint16,
-  EfiPciWidthFifoUint32,
-  EfiPciWidthFifoUint64,
-  EfiPciWidthFillUint8,
-  EfiPciWidthFillUint16,
-  EfiPciWidthFillUint32,
-  EfiPciWidthFillUint64,
-  EfiPciWidthMaximum
+    EfiPciWidthUint8,
+    EfiPciWidthUint16,
+    EfiPciWidthUint32,
+    EfiPciWidthUint64,
+    EfiPciWidthFifoUint8,
+    EfiPciWidthFifoUint16,
+    EfiPciWidthFifoUint32,
+    EfiPciWidthFifoUint64,
+    EfiPciWidthFillUint8,
+    EfiPciWidthFillUint16,
+    EfiPciWidthFillUint32,
+    EfiPciWidthFillUint64,
+    EfiPciWidthMaximum
 } EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH;
 
 ///
@@ -57,71 +55,71 @@ typedef enum {
 /// *******************************************************
 ///
 typedef enum {
-  ///
-  /// A read operation from system memory by a bus master that is not capable of producing
-  /// PCI dual address cycles.
-  ///
-  EfiPciOperationBusMasterRead,
-  ///
-  /// A write operation from system memory by a bus master that is not capable of producing
-  /// PCI dual address cycles.
-  ///
-  EfiPciOperationBusMasterWrite,
-  ///
-  /// Provides both read and write access to system memory by both the processor and a bus
-  /// master that is not capable of producing PCI dual address cycles.
-  ///
-  EfiPciOperationBusMasterCommonBuffer,
-  ///
-  /// A read operation from system memory by a bus master that is capable of producing PCI
-  /// dual address cycles.
-  ///
-  EfiPciOperationBusMasterRead64,
-  ///
-  /// A write operation to system memory by a bus master that is capable of producing PCI
-  /// dual address cycles.
-  ///
-  EfiPciOperationBusMasterWrite64,
-  ///
-  /// Provides both read and write access to system memory by both the processor and a bus
-  /// master that is capable of producing PCI dual address cycles.
-  ///
-  EfiPciOperationBusMasterCommonBuffer64,
-  EfiPciOperationMaximum
+    ///
+    /// A read operation from system memory by a bus master that is not capable of producing
+    /// PCI dual address cycles.
+    ///
+    EfiPciOperationBusMasterRead,
+    ///
+    /// A write operation from system memory by a bus master that is not capable of producing
+    /// PCI dual address cycles.
+    ///
+    EfiPciOperationBusMasterWrite,
+    ///
+    /// Provides both read and write access to system memory by both the processor and a bus
+    /// master that is not capable of producing PCI dual address cycles.
+    ///
+    EfiPciOperationBusMasterCommonBuffer,
+    ///
+    /// A read operation from system memory by a bus master that is capable of producing PCI
+    /// dual address cycles.
+    ///
+    EfiPciOperationBusMasterRead64,
+    ///
+    /// A write operation to system memory by a bus master that is capable of producing PCI
+    /// dual address cycles.
+    ///
+    EfiPciOperationBusMasterWrite64,
+    ///
+    /// Provides both read and write access to system memory by both the processor and a bus
+    /// master that is capable of producing PCI dual address cycles.
+    ///
+    EfiPciOperationBusMasterCommonBuffer64,
+    EfiPciOperationMaximum
 } EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_OPERATION;
 
-#define EFI_PCI_ATTRIBUTE_ISA_MOTHERBOARD_IO          0x0001
-#define EFI_PCI_ATTRIBUTE_ISA_IO                      0x0002
-#define EFI_PCI_ATTRIBUTE_VGA_PALETTE_IO              0x0004
-#define EFI_PCI_ATTRIBUTE_VGA_MEMORY                  0x0008
-#define EFI_PCI_ATTRIBUTE_VGA_IO                      0x0010
-#define EFI_PCI_ATTRIBUTE_IDE_PRIMARY_IO              0x0020
-#define EFI_PCI_ATTRIBUTE_IDE_SECONDARY_IO            0x0040
-#define EFI_PCI_ATTRIBUTE_MEMORY_WRITE_COMBINE        0x0080
-#define EFI_PCI_ATTRIBUTE_MEMORY_CACHED               0x0800
-#define EFI_PCI_ATTRIBUTE_MEMORY_DISABLE              0x1000
-#define EFI_PCI_ATTRIBUTE_DUAL_ADDRESS_CYCLE          0x8000
-#define EFI_PCI_ATTRIBUTE_ISA_IO_16                   0x10000
-#define EFI_PCI_ATTRIBUTE_VGA_PALETTE_IO_16           0x20000
-#define EFI_PCI_ATTRIBUTE_VGA_IO_16                   0x40000
+    #define EFI_PCI_ATTRIBUTE_ISA_MOTHERBOARD_IO 0x0001
+    #define EFI_PCI_ATTRIBUTE_ISA_IO 0x0002
+    #define EFI_PCI_ATTRIBUTE_VGA_PALETTE_IO 0x0004
+    #define EFI_PCI_ATTRIBUTE_VGA_MEMORY 0x0008
+    #define EFI_PCI_ATTRIBUTE_VGA_IO 0x0010
+    #define EFI_PCI_ATTRIBUTE_IDE_PRIMARY_IO 0x0020
+    #define EFI_PCI_ATTRIBUTE_IDE_SECONDARY_IO 0x0040
+    #define EFI_PCI_ATTRIBUTE_MEMORY_WRITE_COMBINE 0x0080
+    #define EFI_PCI_ATTRIBUTE_MEMORY_CACHED 0x0800
+    #define EFI_PCI_ATTRIBUTE_MEMORY_DISABLE 0x1000
+    #define EFI_PCI_ATTRIBUTE_DUAL_ADDRESS_CYCLE 0x8000
+    #define EFI_PCI_ATTRIBUTE_ISA_IO_16 0x10000
+    #define EFI_PCI_ATTRIBUTE_VGA_PALETTE_IO_16 0x20000
+    #define EFI_PCI_ATTRIBUTE_VGA_IO_16 0x40000
 
-#define EFI_PCI_ATTRIBUTE_VALID_FOR_ALLOCATE_BUFFER   (EFI_PCI_ATTRIBUTE_MEMORY_WRITE_COMBINE | EFI_PCI_ATTRIBUTE_MEMORY_CACHED | EFI_PCI_ATTRIBUTE_DUAL_ADDRESS_CYCLE)
+    #define EFI_PCI_ATTRIBUTE_VALID_FOR_ALLOCATE_BUFFER (EFI_PCI_ATTRIBUTE_MEMORY_WRITE_COMBINE | EFI_PCI_ATTRIBUTE_MEMORY_CACHED | EFI_PCI_ATTRIBUTE_DUAL_ADDRESS_CYCLE)
 
-#define EFI_PCI_ATTRIBUTE_INVALID_FOR_ALLOCATE_BUFFER (~EFI_PCI_ATTRIBUTE_VALID_FOR_ALLOCATE_BUFFER)
+    #define EFI_PCI_ATTRIBUTE_INVALID_FOR_ALLOCATE_BUFFER (~EFI_PCI_ATTRIBUTE_VALID_FOR_ALLOCATE_BUFFER)
 
-#define EFI_PCI_ADDRESS(bus, dev, func, reg) \
-  (UINT64) ( \
-  (((UINTN) bus) << 24) | \
-  (((UINTN) dev) << 16) | \
-  (((UINTN) func) << 8) | \
-  (((UINTN) (reg)) < 256 ? ((UINTN) (reg)) : (UINT64) (LShiftU64 ((UINT64) (reg), 32))))
+    #define EFI_PCI_ADDRESS(bus, dev, func, reg) \
+        (UINT64)(                                \
+            (((UINTN)bus) << 24) |               \
+            (((UINTN)dev) << 16) |               \
+            (((UINTN)func) << 8) |               \
+            (((UINTN)(reg)) < 256 ? ((UINTN)(reg)) : (UINT64)(LShiftU64((UINT64)(reg), 32))))
 
 typedef struct {
-  UINT8   Register;
-  UINT8   Function;
-  UINT8   Device;
-  UINT8   Bus;
-  UINT32  ExtendedRegister;
+    UINT8 Register;
+    UINT8 Function;
+    UINT8 Device;
+    UINT8 Bus;
+    UINT32 ExtendedRegister;
 } EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADDRESS;
 
 /**
@@ -142,17 +140,14 @@ typedef struct {
   @retval EFI_INVALID_PARAMETER One or more parameters are invalid.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_POLL_IO_MEM)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL           *This,
-  IN  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH    Width,
-  IN  UINT64                                   Address,
-  IN  UINT64                                   Mask,
-  IN  UINT64                                   Value,
-  IN  UINT64                                   Delay,
-  OUT UINT64                                   *Result
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_POLL_IO_MEM)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH Width,
+    IN UINT64 Address,
+    IN UINT64 Mask,
+    IN UINT64 Value,
+    IN UINT64 Delay,
+    OUT UINT64* Result);
 
 /**
   Enables a PCI driver to access PCI controller registers in the PCI root bridge memory space.
@@ -169,25 +164,22 @@ EFI_STATUS
   @retval EFI_INVALID_PARAMETER One or more parameters are invalid.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_IO_MEM)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL              *This,
-  IN     EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH    Width,
-  IN     UINT64                                   Address,
-  IN     UINTN                                    Count,
-  IN OUT VOID                                     *Buffer
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_IO_MEM)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH Width,
+    IN UINT64 Address,
+    IN UINTN Count,
+    IN OUT VOID* Buffer);
 
 typedef struct {
-  ///
-  /// Read PCI controller registers in the PCI root bridge memory space.
-  ///
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_IO_MEM  Read;
-  ///
-  /// Write PCI controller registers in the PCI root bridge memory space.
-  ///
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_IO_MEM  Write;
+    ///
+    /// Read PCI controller registers in the PCI root bridge memory space.
+    ///
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_IO_MEM Read;
+    ///
+    /// Write PCI controller registers in the PCI root bridge memory space.
+    ///
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_IO_MEM Write;
 } EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ACCESS;
 
 /**
@@ -205,15 +197,12 @@ typedef struct {
   @retval EFI_OUT_OF_RESOURCES  The request could not be completed due to a lack of resources.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_COPY_MEM)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL              *This,
-  IN     EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH    Width,
-  IN     UINT64                                   DestAddress,
-  IN     UINT64                                   SrcAddress,
-  IN     UINTN                                    Count
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_COPY_MEM)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_WIDTH Width,
+    IN UINT64 DestAddress,
+    IN UINT64 SrcAddress,
+    IN UINTN Count);
 
 /**
   Provides the PCI controller-specific addresses required to access system memory from a
@@ -235,16 +224,13 @@ EFI_STATUS
   @retval EFI_DEVICE_ERROR      The system hardware could not map the requested address.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_MAP)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL                *This,
-  IN     EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_OPERATION  Operation,
-  IN     VOID                                       *HostAddress,
-  IN OUT UINTN                                      *NumberOfBytes,
-  OUT    EFI_PHYSICAL_ADDRESS                       *DeviceAddress,
-  OUT    VOID                                       **Mapping
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_MAP)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_OPERATION Operation,
+    IN VOID* HostAddress,
+    IN OUT UINTN* NumberOfBytes,
+    OUT EFI_PHYSICAL_ADDRESS* DeviceAddress,
+    OUT VOID** Mapping);
 
 /**
   Completes the Map() operation and releases any corresponding resources.
@@ -257,12 +243,9 @@ EFI_STATUS
   @retval EFI_DEVICE_ERROR      The data was not committed to the target system memory.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_UNMAP)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL           *This,
-  IN  VOID                                     *Mapping
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_UNMAP)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    IN VOID* Mapping);
 
 /**
   Allocates pages that are suitable for an EfiPciOperationBusMasterCommonBuffer or
@@ -284,16 +267,13 @@ EFI_STATUS
   @retval EFI_OUT_OF_RESOURCES  The memory pages could not be allocated.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ALLOCATE_BUFFER)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL              *This,
-  IN     EFI_ALLOCATE_TYPE                        Type,
-  IN     EFI_MEMORY_TYPE                          MemoryType,
-  IN     UINTN                                    Pages,
-  IN OUT VOID                                     **HostAddress,
-  IN     UINT64                                   Attributes
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ALLOCATE_BUFFER)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    IN EFI_ALLOCATE_TYPE Type,
+    IN EFI_MEMORY_TYPE MemoryType,
+    IN UINTN Pages,
+    IN OUT VOID** HostAddress,
+    IN UINT64 Attributes);
 
 /**
   Frees memory that was allocated with AllocateBuffer().
@@ -307,13 +287,10 @@ EFI_STATUS
                                 was not allocated with AllocateBuffer().
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_FREE_BUFFER)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL           *This,
-  IN  UINTN                                    Pages,
-  IN  VOID                                     *HostAddress
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_FREE_BUFFER)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    IN UINTN Pages,
+    IN VOID* HostAddress);
 
 /**
   Flushes all PCI posted write transactions from a PCI host bridge to system memory.
@@ -326,11 +303,8 @@ EFI_STATUS
                                 host bridge due to a hardware error.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_FLUSH)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL  *This
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_FLUSH)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This);
 
 /**
   Gets the attributes that a PCI root bridge supports setting with SetAttributes(), and the
@@ -350,13 +324,10 @@ EFI_STATUS
 
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GET_ATTRIBUTES)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL           *This,
-  OUT UINT64                                   *Supports,
-  OUT UINT64                                   *Attributes
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GET_ATTRIBUTES)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    OUT UINT64* Supports,
+    OUT UINT64* Attributes);
 
 /**
   Sets attributes for a resource range on a PCI root bridge.
@@ -379,21 +350,18 @@ EFI_STATUS
   @retval EFI_INVALID_PARAMETER One or more parameters are invalid.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_SET_ATTRIBUTES)(
-  IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL              *This,
-  IN     UINT64                                   Attributes,
-  IN OUT UINT64                                   *ResourceBase,
-  IN OUT UINT64                                   *ResourceLength
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_SET_ATTRIBUTES)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    IN UINT64 Attributes,
+    IN OUT UINT64* ResourceBase,
+    IN OUT UINT64* ResourceLength);
 
 /**
-  Retrieves the current resource settings of this PCI root bridge in the form of a set of ACPI 2.0
+  Retrieves the current resource settings of this PCI root bridge in the form of a set of ACPI
   resource descriptors.
 
   @param  This                  A pointer to the EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL.
-  @param  Resources             A pointer to the ACPI 2.0 resource descriptors that describe the current
+  @param  Resources             A pointer to the resource descriptors that describe the current
                                 configuration of this PCI root bridge.
 
   @retval EFI_SUCCESS           The current configuration of this PCI root bridge was returned in
@@ -402,41 +370,38 @@ EFI_STATUS
                                 retrieved.
 
 **/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_CONFIGURATION)(
-  IN  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL          *This,
-  OUT VOID                                     **Resources
-  );
+typedef EFI_STATUS(EFIAPI* EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_CONFIGURATION)(
+    IN EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL* This,
+    OUT VOID** Resources);
 
 ///
 /// Provides the basic Memory, I/O, PCI configuration, and DMA interfaces that are
 /// used to abstract accesses to PCI controllers behind a PCI Root Bridge Controller.
 ///
 struct _EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL {
-  ///
-  /// The EFI_HANDLE of the PCI Host Bridge of which this PCI Root Bridge is a member.
-  ///
-  EFI_HANDLE                                      ParentHandle;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_POLL_IO_MEM     PollMem;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_POLL_IO_MEM     PollIo;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ACCESS          Mem;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ACCESS          Io;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ACCESS          Pci;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_COPY_MEM        CopyMem;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_MAP             Map;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_UNMAP           Unmap;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ALLOCATE_BUFFER AllocateBuffer;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_FREE_BUFFER     FreeBuffer;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_FLUSH           Flush;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GET_ATTRIBUTES  GetAttributes;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_SET_ATTRIBUTES  SetAttributes;
-  EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_CONFIGURATION   Configuration;
+    ///
+    /// The EFI_HANDLE of the PCI Host Bridge of which this PCI Root Bridge is a member.
+    ///
+    EFI_HANDLE ParentHandle;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_POLL_IO_MEM PollMem;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_POLL_IO_MEM PollIo;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ACCESS Mem;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ACCESS Io;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ACCESS Pci;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_COPY_MEM CopyMem;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_MAP Map;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_UNMAP Unmap;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_ALLOCATE_BUFFER AllocateBuffer;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_FREE_BUFFER FreeBuffer;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_FLUSH Flush;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GET_ATTRIBUTES GetAttributes;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_SET_ATTRIBUTES SetAttributes;
+    EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_CONFIGURATION Configuration;
 
-  ///
-  /// The segment number that this PCI root bridge resides.
-  ///
-  UINT32                                          SegmentNumber;
+    ///
+    /// The segment number that this PCI root bridge resides.
+    ///
+    UINT32 SegmentNumber;
 };
 
 extern EFI_GUID gEfiPciRootBridgeIoProtocolGuid;

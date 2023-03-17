@@ -8,7 +8,7 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /**
  * Clear a window to the bottom from current cursor position
@@ -16,16 +16,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v *win	subject window
  * @ret rc	return status code
  */
-int wclrtobot ( WINDOW *win ) {
-	struct cursor_pos pos;
+int wclrtobot(WINDOW* win) {
+    struct cursor_pos pos;
 
-	_store_curs_pos( win, &pos );
-	do {
-		_wputc( win, ' ', WRAP );
-	} while ( win->curs_y + win->curs_x );
-	_restore_curs_pos( win, &pos );
+    _store_curs_pos(win, &pos);
+    do {
+        _wputc(win, ' ', WRAP);
+    } while (win->curs_y + win->curs_x);
+    _restore_curs_pos(win, &pos);
 
-	return OK;
+    return OK;
 }
 
 /**
@@ -34,16 +34,16 @@ int wclrtobot ( WINDOW *win ) {
  * @v *win	subject window
  * @ret rc	return status code
  */
-int wclrtoeol ( WINDOW *win ) {
-	struct cursor_pos pos;
+int wclrtoeol(WINDOW* win) {
+    struct cursor_pos pos;
 
-	_store_curs_pos( win, &pos );
-	while ( ( win->curs_y - pos.y ) == 0 ) {
-		_wputc( win, ' ', WRAP );
-	}
-	_restore_curs_pos( win, &pos );
+    _store_curs_pos(win, &pos);
+    while ((win->curs_y - pos.y) == 0) {
+        _wputc(win, ' ', WRAP);
+    }
+    _restore_curs_pos(win, &pos);
 
-	return OK;
+    return OK;
 }
 
 /**
@@ -52,11 +52,11 @@ int wclrtoeol ( WINDOW *win ) {
  * @v *win	subject window
  * @ret rc	return status code
  */
-int wdelch ( WINDOW *win ) {
-	_wputc( win, ' ', NOWRAP );
-	_wcursback( win );
+int wdelch(WINDOW* win) {
+    _wputc(win, ' ', NOWRAP);
+    _wcursback(win);
 
-	return OK;
+    return OK;
 }
 
 /**
@@ -65,16 +65,16 @@ int wdelch ( WINDOW *win ) {
  * @v *win	subject window
  * @ret rc	return status code
  */
-int wdeleteln ( WINDOW *win ) {
-	struct cursor_pos pos;
+int wdeleteln(WINDOW* win) {
+    struct cursor_pos pos;
 
-	_store_curs_pos( win, &pos );
-	/* let's just set the cursor to the beginning of the line and
-	   let wclrtoeol do the work :) */
-	wmove( win, win->curs_y, 0 );
-	wclrtoeol( win );
-	_restore_curs_pos( win, &pos );
-	return OK;
+    _store_curs_pos(win, &pos);
+    /* let's just set the cursor to the beginning of the line and
+       let wclrtoeol do the work :) */
+    wmove(win, win->curs_y, 0);
+    wclrtoeol(win);
+    _restore_curs_pos(win, &pos);
+    return OK;
 }
 
 /**
@@ -83,10 +83,10 @@ int wdeleteln ( WINDOW *win ) {
  * @v *win	subject window
  * @ret rc	return status code
  */
-int werase ( WINDOW *win ) {
-	wmove( win, 0, 0 );
-	wclrtobot( win );
-	return OK;
+int werase(WINDOW* win) {
+    wmove(win, 0, 0);
+    wclrtobot(win);
+    return OK;
 }
 
 /**
@@ -94,7 +94,7 @@ int werase ( WINDOW *win ) {
  *
  * @ret rc	return status code
  */
-int erase ( void ) {
-	stdscr->scr->erase( stdscr->scr, stdscr->attrs );
-	return OK;
+int erase(void) {
+    stdscr->scr->erase(stdscr->scr, stdscr->attrs);
+    return OK;
 }
