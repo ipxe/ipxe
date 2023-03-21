@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -45,37 +45,39 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v file		Test code file
  * @v line		Test code line
  */
-void pixbuf_okx(struct pixel_buffer_test* test, const char* file,
-                unsigned int line) {
-    struct pixel_buffer* pixbuf;
-    int rc;
+void pixbuf_okx ( struct pixel_buffer_test *test, const char *file,
+		  unsigned int line ) {
+	struct pixel_buffer *pixbuf;
+	int rc;
 
-    /* Sanity check */
-    assert((test->width * test->height * sizeof(test->data[0])) == test->len);
+	/* Sanity check */
+	assert ( ( test->width * test->height * sizeof ( test->data[0] ) )
+		 == test->len );
 
-    /* Correct image data pointer */
-    test->image->data = virt_to_user((void*)test->image->data);
+	/* Correct image data pointer */
+	test->image->data = virt_to_user ( ( void * ) test->image->data );
 
-    /* Check that image is detected as correct type */
-    okx(register_image(test->image) == 0, file, line);
-    okx(test->image->type == test->type, file, line);
+	/* Check that image is detected as correct type */
+	okx ( register_image ( test->image ) == 0, file, line );
+	okx ( test->image->type == test->type, file, line );
 
-    /* Check that a pixel buffer can be created from the image */
-    okx((rc = image_pixbuf(test->image, &pixbuf)) == 0, file, line);
-    if (rc == 0) {
-        /* Check pixel buffer dimensions */
-        okx(pixbuf->width == test->width, file, line);
-        okx(pixbuf->height == test->height, file, line);
+	/* Check that a pixel buffer can be created from the image */
+	okx ( ( rc = image_pixbuf ( test->image, &pixbuf ) ) == 0, file, line );
+	if ( rc == 0 ) {
 
-        /* Check pixel buffer data */
-        okx(pixbuf->len == test->len, file, line);
-        okx(memcmp_user(pixbuf->data, 0,
-                        virt_to_user(test->data), 0,
-                        test->len) == 0, file, line);
+		/* Check pixel buffer dimensions */
+		okx ( pixbuf->width == test->width, file, line );
+		okx ( pixbuf->height == test->height, file, line );
 
-        pixbuf_put(pixbuf);
-    }
+		/* Check pixel buffer data */
+		okx ( pixbuf->len == test->len, file, line );
+		okx ( memcmp_user ( pixbuf->data, 0,
+				    virt_to_user ( test->data ), 0,
+				    test->len ) == 0, file, line );
 
-    /* Unregister image */
-    unregister_image(test->image);
+		pixbuf_put ( pixbuf );
+	}
+
+	/* Unregister image */
+	unregister_image ( test->image );
 }

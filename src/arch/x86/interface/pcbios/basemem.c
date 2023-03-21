@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <realmode.h>
@@ -40,12 +40,12 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @v new_fbms		New free base memory counter (in kB)
  */
-void set_fbms(unsigned int new_fbms) {
-    uint16_t fbms = new_fbms;
+void set_fbms ( unsigned int new_fbms ) {
+	uint16_t fbms = new_fbms;
 
-    /* Update the BIOS memory counter */
-    put_real(fbms, BDA_SEG, BDA_FBMS);
+	/* Update the BIOS memory counter */
+	put_real ( fbms, BDA_SEG, BDA_FBMS );
 
-    /* Update our hidden memory region map */
-    hide_basemem();
+	/* Update our hidden memory region map */
+	hide_basemem();
 }

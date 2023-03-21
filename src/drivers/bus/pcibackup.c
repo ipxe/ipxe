@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/pci.h>
@@ -41,18 +41,19 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v exclude		PCI configuration space backup exclusion list, or NULL
  */
 static int
-pci_backup_excluded(struct pci_device* pci, unsigned int offset,
-                    const uint8_t* exclude) {
-    if (!exclude)
-        return 0;
-    for (; *exclude != PCI_CONFIG_BACKUP_EXCLUDE_END; exclude++) {
-        if (offset == *exclude) {
-            DBGC(pci, "PCI %p skipping configuration offset "
-                      "%02x\n", pci, offset);
-            return 1;
-        }
-    }
-    return 0;
+pci_backup_excluded ( struct pci_device *pci, unsigned int offset,
+		      const uint8_t *exclude ) {
+
+	if ( ! exclude )
+		return 0;
+	for ( ; *exclude != PCI_CONFIG_BACKUP_EXCLUDE_END ; exclude++ ) {
+		if ( offset == *exclude ) {
+			DBGC ( pci, "PCI %p skipping configuration offset "
+			       "%02x\n", pci, offset );
+			return 1;
+		}
+	}
+	return 0;
 }
 
 /**
@@ -63,16 +64,16 @@ pci_backup_excluded(struct pci_device* pci, unsigned int offset,
  * @v limit		Maximum offset in PCI configuration space
  * @v exclude		PCI configuration space backup exclusion list, or NULL
  */
-void pci_backup(struct pci_device* pci, struct pci_config_backup* backup,
-                unsigned int limit, const uint8_t* exclude) {
-    unsigned int offset;
-    uint32_t* dword;
+void pci_backup ( struct pci_device *pci, struct pci_config_backup *backup,
+		  unsigned int limit, const uint8_t *exclude ) {
+	unsigned int offset;
+	uint32_t *dword;
 
-    for (offset = 0, dword = backup->dwords; offset < limit;
-         offset += sizeof(*dword), dword++) {
-        if (!pci_backup_excluded(pci, offset, exclude))
-            pci_read_config_dword(pci, offset, dword);
-    }
+	for ( offset = 0, dword = backup->dwords ; offset < limit ;
+	      offset += sizeof ( *dword ) , dword++ ) {
+		if ( ! pci_backup_excluded ( pci, offset, exclude ) )
+			pci_read_config_dword ( pci, offset, dword );
+	}
 }
 
 /**
@@ -83,14 +84,14 @@ void pci_backup(struct pci_device* pci, struct pci_config_backup* backup,
  * @v limit		Maximum offset in PCI configuration space
  * @v exclude		PCI configuration space backup exclusion list, or NULL
  */
-void pci_restore(struct pci_device* pci, struct pci_config_backup* backup,
-                 unsigned int limit, const uint8_t* exclude) {
-    unsigned int offset;
-    uint32_t* dword;
+void pci_restore ( struct pci_device *pci, struct pci_config_backup *backup,
+		   unsigned int limit, const uint8_t *exclude ) {
+	unsigned int offset;
+	uint32_t *dword;
 
-    for (offset = 0, dword = backup->dwords; offset < limit;
-         offset += sizeof(*dword), dword++) {
-        if (!pci_backup_excluded(pci, offset, exclude))
-            pci_write_config_dword(pci, offset, *dword);
-    }
+	for ( offset = 0, dword = backup->dwords ; offset < limit ;
+	      offset += sizeof ( *dword ) , dword++ ) {
+		if ( ! pci_backup_excluded ( pci, offset, exclude ) )
+			pci_write_config_dword ( pci, offset, *dword );
+	}
 }

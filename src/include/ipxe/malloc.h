@@ -1,9 +1,7 @@
-#pragma once
-
 #ifndef _IPXE_MALLOC_H
-    #define _IPXE_MALLOC_H
+#define _IPXE_MALLOC_H
 
-    #include <stdint.h>
+#include <stdint.h>
 
 /** @file
  *
@@ -11,27 +9,27 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    /*
-     * Prototypes for the standard functions (malloc() et al) are in
-     * stdlib.h.  Include <ipxe/malloc.h> only if you need the
-     * non-standard functions, such as malloc_phys().
-     *
-     */
-    #include <stdlib.h>
-    #include <ipxe/tables.h>
-    #include <valgrind/memcheck.h>
+/*
+ * Prototypes for the standard functions (malloc() et al) are in
+ * stdlib.h.  Include <ipxe/malloc.h> only if you need the
+ * non-standard functions, such as malloc_phys().
+ *
+ */
+#include <stdlib.h>
+#include <ipxe/tables.h>
+#include <valgrind/memcheck.h>
 
 extern size_t freemem;
 extern size_t usedmem;
 extern size_t maxusedmem;
 
-extern void* __malloc alloc_memblock(size_t size, size_t align,
-                                     size_t offset);
-extern void free_memblock(void* ptr, size_t size);
-extern void mpopulate(void* start, size_t len);
-extern void mdumpfree(void);
+extern void * __malloc alloc_memblock ( size_t size, size_t align,
+					size_t offset );
+extern void free_memblock ( void *ptr, size_t size );
+extern void mpopulate ( void *start, size_t len );
+extern void mdumpfree ( void );
 
 /**
  * Allocate memory with specified physical alignment and offset
@@ -43,13 +41,13 @@ extern void mdumpfree(void);
  *
  * @c align must be a power of two.  @c size may not be zero.
  */
-static inline void* __malloc malloc_phys_offset(size_t size,
-                                                size_t phys_align,
-                                                size_t offset) {
-    void* ptr = alloc_memblock(size, phys_align, offset);
-    if (ptr && size)
-        VALGRIND_MALLOCLIKE_BLOCK(ptr, size, 0, 0);
-    return ptr;
+static inline void * __malloc malloc_phys_offset ( size_t size,
+						   size_t phys_align,
+						   size_t offset ) {
+	void * ptr = alloc_memblock ( size, phys_align, offset );
+	if ( ptr && size )
+		VALGRIND_MALLOCLIKE_BLOCK ( ptr, size, 0, 0 );
+	return ptr;
 }
 
 /**
@@ -61,8 +59,8 @@ static inline void* __malloc malloc_phys_offset(size_t size,
  *
  * @c align must be a power of two.  @c size may not be zero.
  */
-static inline void* __malloc malloc_phys(size_t size, size_t phys_align) {
-    return malloc_phys_offset(size, phys_align, 0);
+static inline void * __malloc malloc_phys ( size_t size, size_t phys_align ) {
+	return malloc_phys_offset ( size, phys_align, 0 );
 }
 
 /**
@@ -76,35 +74,35 @@ static inline void* __malloc malloc_phys(size_t size, size_t phys_align) {
  *
  * If @c ptr is NULL, no action is taken.
  */
-static inline void free_phys(void* ptr, size_t size) {
-    VALGRIND_FREELIKE_BLOCK(ptr, 0);
-    free_memblock(ptr, size);
+static inline void free_phys ( void *ptr, size_t size ) {
+	VALGRIND_FREELIKE_BLOCK ( ptr, 0 );
+	free_memblock ( ptr, size );
 }
 
 /** A cache discarder */
 struct cache_discarder {
-    /**
-     * Discard some cached data
-     *
-     * @ret discarded	Number of cached items discarded
-     */
-    unsigned int (*discard)(void);
+	/**
+	 * Discard some cached data
+	 *
+	 * @ret discarded	Number of cached items discarded
+	 */
+	unsigned int ( * discard ) ( void );
 };
 
-    /** Cache discarder table */
-    #define CACHE_DISCARDERS __table(struct cache_discarder, "cache_discarders")
+/** Cache discarder table */
+#define CACHE_DISCARDERS __table ( struct cache_discarder, "cache_discarders" )
 
-    /** Declare a cache discarder */
-    #define __cache_discarder(cost) __table_entry(CACHE_DISCARDERS, cost)
+/** Declare a cache discarder */
+#define __cache_discarder( cost ) __table_entry ( CACHE_DISCARDERS, cost )
 
 /** @defgroup cache_cost Cache discarder costs
  *
  * @{
  */
 
-    #define CACHE_CHEAP 01     /**< Items with a low replacement cost */
-    #define CACHE_NORMAL 02    /**< Items with a normal replacement cost */
-    #define CACHE_EXPENSIVE 03 /**< Items with a high replacement cost */
+#define CACHE_CHEAP	01	/**< Items with a low replacement cost */
+#define CACHE_NORMAL	02	/**< Items with a normal replacement cost */
+#define CACHE_EXPENSIVE	03	/**< Items with a high replacement cost */
 
 /** @} */
 

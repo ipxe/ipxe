@@ -1,3 +1,3 @@
 #include <ipxe/acpi.h>
 
-PROVIDE_ACPI_INLINE(null, acpi_find);
+PROVIDE_ACPI_INLINE ( null, acpi_find );

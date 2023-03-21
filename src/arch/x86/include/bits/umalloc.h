@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _BITS_UMALLOC_H
-    #define _BITS_UMALLOC_H
+#define _BITS_UMALLOC_H
 
 /** @file
  *
@@ -9,8 +7,8 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #include <ipxe/memtop_umalloc.h>
+#include <ipxe/memtop_umalloc.h>
 
 #endif /* _BITS_UMALLOC_H */

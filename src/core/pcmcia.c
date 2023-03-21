@@ -28,13 +28,13 @@
 
 FILE_LICENCE ( GPL2_ONLY );
 
-    #include <stdio.h>
-    #include <pcmcia.h>
-    #include <i82365.h>
-    #define CODE_STATUS "alpha"
-    #define CODE_VERSION "0.1.3"
-    #include <pcmcia-opts.h>
-    #include <ipxe/init.h>
+#include <stdio.h>
+#include <pcmcia.h>
+#include <i82365.h>
+#define CODE_STATUS "alpha"
+#define	CODE_VERSION "0.1.3"
+#include <pcmcia-opts.h>
+#include <ipxe/init.h>
 
 int	sockets; /* AHTODO: Phase this out! */
 u_int	pccsocks;
@@ -43,12 +43,12 @@ int	inited = -1;
 struct	pcc_config_t pccconfig[MAXPCCCONFIGS];
 
 struct	driver_interact_t driver[] = {
-    #ifdef SUPPORT_I82365
+#ifdef	SUPPORT_I82365
 	{ I82365, i82365_interfacer, "Intel_82365" },
-    #endif
+#endif
 };
 
-    #define NUM_DRIVERS (sizeof(driver) / (sizeof(struct driver_interact_t)))
+#define	NUM_DRIVERS (sizeof(driver)/(sizeof(struct driver_interact_t)))
 
 void	sleepticks(int numticks ) {
 	u_int	tmo;

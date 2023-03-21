@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdio.h>
@@ -45,14 +45,15 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v len		Payload length
  * @v rc		Status code
  */
-static void ping_callback(struct sockaddr* peer, unsigned int sequence,
-                          size_t len, int rc) {
-    /* Display ping response */
-    printf("%zd bytes from %s: seq=%d",
-           len, (peer ? sock_ntoa(peer) : "<none>"), sequence);
-    if (rc != 0)
-        printf(": %s", strerror(rc));
-    printf("\n");
+static void ping_callback ( struct sockaddr *peer, unsigned int sequence,
+			    size_t len, int rc ) {
+
+	/* Display ping response */
+	printf ( "%zd bytes from %s: seq=%d",
+		 len, ( peer ? sock_ntoa ( peer ) : "<none>" ), sequence );
+	if ( rc != 0 )
+		printf ( ": %s", strerror ( rc ) );
+	printf ( "\n" );
 }
 
 /**
@@ -65,23 +66,23 @@ static void ping_callback(struct sockaddr* peer, unsigned int sequence,
  * @v quiet		Inhibit output
  * @ret rc		Return status code
  */
-int ping(const char* hostname, unsigned long timeout, size_t len,
-         unsigned int count, int quiet) {
-    int rc;
+int ping ( const char *hostname, unsigned long timeout, size_t len,
+	   unsigned int count, int quiet ) {
+	int rc;
 
-    /* Create pinger */
-    if ((rc = create_pinger(&monojob, hostname, timeout, len, count,
-                            (quiet ? NULL : ping_callback))) != 0) {
-        printf("Could not start ping: %s\n", strerror(rc));
-        return rc;
-    }
+	/* Create pinger */
+	if ( ( rc = create_pinger ( &monojob, hostname, timeout, len, count,
+				    ( quiet ? NULL : ping_callback ) ) ) != 0 ){
+		printf ( "Could not start ping: %s\n", strerror ( rc ) );
+		return rc;
+	}
 
-    /* Wait for ping to complete */
-    if ((rc = monojob_wait(NULL, 0)) != 0) {
-        if (!quiet)
-            printf("Finished: %s\n", strerror(rc));
-        return rc;
-    }
+	/* Wait for ping to complete */
+	if ( ( rc = monojob_wait ( NULL, 0 ) ) != 0 ) {
+		if ( ! quiet )
+			printf ( "Finished: %s\n", strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <errno.h>
@@ -45,66 +45,67 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v extracted		Extracted image
  * @ret rc		Return status code
  */
-int zlib_deflate(enum deflate_format format, struct deflate_chunk* in,
-                 struct image* extracted) {
-    struct deflate* deflate;
-    struct deflate_chunk out;
-    int rc;
+int zlib_deflate ( enum deflate_format format, struct deflate_chunk *in,
+		   struct image *extracted ) {
+	struct deflate *deflate;
+	struct deflate_chunk out;
+	int rc;
 
-    /* Allocate and initialise decompressor */
-    deflate = zalloc(sizeof(*deflate));
-    if (!deflate) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
+	/* Allocate and initialise decompressor */
+	deflate = zalloc ( sizeof ( *deflate ) );
+	if ( ! deflate ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 
-    /* Decompress data, (re)allocating if necessary */
-    while (1) {
-        /* (Re)initialise decompressor */
-        deflate_init(deflate, format);
+	/* Decompress data, (re)allocating if necessary */
+	while ( 1 ) {
 
-        /* (Re)initialise input chunk */
-        in->offset = 0;
+		/* (Re)initialise decompressor */
+		deflate_init ( deflate, format );
 
-        /* Initialise output chunk */
-        deflate_chunk_init(&out, extracted->data, 0, extracted->len);
+		/* (Re)initialise input chunk */
+		in->offset = 0;
 
-        /* Decompress data */
-        if ((rc = deflate_inflate(deflate, in, &out)) != 0) {
-            DBGC(extracted, "ZLIB %p could not decompress: %s\n",
-                 extracted, strerror(rc));
-            goto err_inflate;
-        }
+		/* Initialise output chunk */
+		deflate_chunk_init ( &out, extracted->data, 0, extracted->len );
 
-        /* Check that decompression is valid */
-        if (!deflate_finished(deflate)) {
-            DBGC(extracted, "ZLIB %p decompression incomplete\n",
-                 extracted);
-            rc = -EINVAL;
-            goto err_unfinished;
-        }
+		/* Decompress data */
+		if ( ( rc = deflate_inflate ( deflate, in, &out ) ) != 0 ) {
+			DBGC ( extracted, "ZLIB %p could not decompress: %s\n",
+			       extracted, strerror ( rc ) );
+			goto err_inflate;
+		}
 
-        /* Finish if output image size was correct */
-        if (out.offset == extracted->len)
-            break;
+		/* Check that decompression is valid */
+		if ( ! deflate_finished ( deflate ) ) {
+			DBGC ( extracted, "ZLIB %p decompression incomplete\n",
+			       extracted );
+			rc = -EINVAL;
+			goto err_unfinished;
+		}
 
-        /* Otherwise, resize output image and retry */
-        if ((rc = image_set_len(extracted, out.offset)) != 0) {
-            DBGC(extracted, "ZLIB %p could not resize: %s\n",
-                 extracted, strerror(rc));
-            goto err_set_size;
-        }
-    }
+		/* Finish if output image size was correct */
+		if ( out.offset == extracted->len )
+			break;
 
-    /* Success */
-    rc = 0;
+		/* Otherwise, resize output image and retry */
+		if ( ( rc = image_set_len ( extracted, out.offset ) ) != 0 ) {
+			DBGC ( extracted, "ZLIB %p could not resize: %s\n",
+			       extracted, strerror ( rc ) );
+			goto err_set_size;
+		}
+	}
 
-err_set_size:
-err_unfinished:
-err_inflate:
-    free(deflate);
-err_alloc:
-    return rc;
+	/* Success */
+	rc = 0;
+
+ err_set_size:
+ err_unfinished:
+ err_inflate:
+	free ( deflate );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -114,18 +115,18 @@ err_alloc:
  * @v extracted		Extracted image
  * @ret rc		Return status code
  */
-static int zlib_extract(struct image* image, struct image* extracted) {
-    struct deflate_chunk in;
-    int rc;
+static int zlib_extract ( struct image *image, struct image *extracted ) {
+	struct deflate_chunk in;
+	int rc;
 
-    /* Initialise input chunk */
-    deflate_chunk_init(&in, image->data, 0, image->len);
+	/* Initialise input chunk */
+	deflate_chunk_init ( &in, image->data, 0, image->len );
 
-    /* Decompress image */
-    if ((rc = zlib_deflate(DEFLATE_ZLIB, &in, extracted)) != 0)
-        return rc;
+	/* Decompress image */
+	if ( ( rc = zlib_deflate ( DEFLATE_ZLIB, &in, extracted ) ) != 0 )
+		return rc;
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -134,29 +135,29 @@ static int zlib_extract(struct image* image, struct image* extracted) {
  * @v image		zlib image
  * @ret rc		Return status code
  */
-static int zlib_probe(struct image* image) {
-    union zlib_magic magic;
+static int zlib_probe ( struct image *image ) {
+	union zlib_magic magic;
 
-    /* Sanity check */
-    if (image->len < sizeof(magic)) {
-        DBGC(image, "ZLIB %p image too short\n", image);
-        return -ENOEXEC;
-    }
+	/* Sanity check */
+	if ( image->len < sizeof ( magic ) ) {
+		DBGC ( image, "ZLIB %p image too short\n", image );
+		return -ENOEXEC;
+	}
 
-    /* Check magic header */
-    copy_from_user(&magic, image->data, 0, sizeof(magic));
-    if (!zlib_magic_is_valid(&magic)) {
-        DBGC(image, "ZLIB %p invalid magic data\n", image);
-        return -ENOEXEC;
-    }
+	/* Check magic header */
+	copy_from_user ( &magic, image->data, 0, sizeof ( magic ) );
+	if ( ! zlib_magic_is_valid ( &magic ) ) {
+		DBGC ( image, "ZLIB %p invalid magic data\n", image );
+		return -ENOEXEC;
+	}
 
-    return 0;
+	return 0;
 }
 
 /** zlib image type */
-struct image_type zlib_image_type __image_type(PROBE_NORMAL) = {
-    .name = "zlib",
-    .probe = zlib_probe,
-    .extract = zlib_extract,
-    .exec = image_extract_exec,
+struct image_type zlib_image_type __image_type ( PROBE_NORMAL ) = {
+	.name = "zlib",
+	.probe = zlib_probe,
+	.extract = zlib_extract,
+	.exec = image_extract_exec,
 };

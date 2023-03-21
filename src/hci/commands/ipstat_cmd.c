@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <getopt.h>
@@ -43,7 +43,7 @@ static struct option_descriptor ipstat_opts[] = {};
 
 /** "ipstat" command descriptor */
 static struct command_descriptor ipstat_cmd =
-    COMMAND_DESC(struct ipstat_options, ipstat_opts, 0, 0, NULL);
+	COMMAND_DESC ( struct ipstat_options, ipstat_opts, 0, 0, NULL );
 
 /**
  * The "ipstat" command
@@ -52,23 +52,23 @@ static struct command_descriptor ipstat_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int ipstat_exec(int argc, char** argv) {
-    struct ipstat_options opts;
-    int rc;
+static int ipstat_exec ( int argc, char **argv ) {
+	struct ipstat_options opts;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &ipstat_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &ipstat_cmd, &opts ) ) != 0 )
+		return rc;
 
-    ipstat();
+	ipstat();
 
-    return 0;
+	return 0;
 }
 
 /** Routing table management commands */
 struct command ipstat_commands[] __command = {
-    {
-        .name = "ipstat",
-        .exec = ipstat_exec,
-    },
+	{
+		.name = "ipstat",
+		.exec = ipstat_exec,
+	},
 };

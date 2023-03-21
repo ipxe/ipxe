@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   Unicode Collation protocol that follows the UEFI 2.0 specification.
   This protocol is used to allow code running in the boot services environment
@@ -11,40 +9,36 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef __UNICODE_COLLATION_H__
-    #define __UNICODE_COLLATION_H__
+#define __UNICODE_COLLATION_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #define EFI_UNICODE_COLLATION_PROTOCOL_GUID              \
-        {                                                    \
-            0x1d85cd7f, 0xf43d, 0x11d2, {                    \
-                0x9a, 0xc, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d \
-            }                                                \
-        }
+#define EFI_UNICODE_COLLATION_PROTOCOL_GUID \
+  { \
+    0x1d85cd7f, 0xf43d, 0x11d2, {0x9a, 0xc, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d } \
+  }
 
-    #define EFI_UNICODE_COLLATION_PROTOCOL2_GUID               \
-        {                                                      \
-            0xa4c751fc, 0x23ae, 0x4c3e, {                      \
-                0x92, 0xe9, 0x49, 0x64, 0xcf, 0x63, 0xf3, 0x49 \
-            }                                                  \
-        }
+#define EFI_UNICODE_COLLATION_PROTOCOL2_GUID \
+  { \
+    0xa4c751fc, 0x23ae, 0x4c3e, {0x92, 0xe9, 0x49, 0x64, 0xcf, 0x63, 0xf3, 0x49 } \
+  }
 
 typedef struct _EFI_UNICODE_COLLATION_PROTOCOL EFI_UNICODE_COLLATION_PROTOCOL;
 
-    ///
-    /// Protocol GUID name defined in EFI1.1.
-    ///
-    #define UNICODE_COLLATION_PROTOCOL EFI_UNICODE_COLLATION_PROTOCOL_GUID
+///
+/// Protocol GUID name defined in EFI1.1.
+///
+#define UNICODE_COLLATION_PROTOCOL  EFI_UNICODE_COLLATION_PROTOCOL_GUID
 
 ///
 /// Protocol defined in EFI1.1.
 ///
 typedef EFI_UNICODE_COLLATION_PROTOCOL UNICODE_COLLATION_INTERFACE;
 
-    ///
-    /// Protocol data structures and defines
-    ///
-    #define EFI_UNICODE_BYTE_ORDER_MARK (CHAR16)(0xfeff)
+///
+/// Protocol data structures and defines
+///
+#define EFI_UNICODE_BYTE_ORDER_MARK  (CHAR16) (0xfeff)
 
 //
 // Protocol member functions
@@ -62,10 +56,13 @@ typedef EFI_UNICODE_COLLATION_PROTOCOL UNICODE_COLLATION_INTERFACE;
   @retval <0  Str1 is lexically less than Str2.
 
 **/
-typedef INTN(EFIAPI* EFI_UNICODE_COLLATION_STRICOLL)(
-    IN EFI_UNICODE_COLLATION_PROTOCOL* This,
-    IN CHAR16* Str1,
-    IN CHAR16* Str2);
+typedef
+INTN
+(EFIAPI *EFI_UNICODE_COLLATION_STRICOLL)(
+  IN EFI_UNICODE_COLLATION_PROTOCOL         *This,
+  IN CHAR16                                 *Str1,
+  IN CHAR16                                 *Str2
+  );
 
 /**
   Performs a case-insensitive comparison of a Null-terminated
@@ -79,10 +76,13 @@ typedef INTN(EFIAPI* EFI_UNICODE_COLLATION_STRICOLL)(
   @retval FALSE   Pattern was not found in String.
 
 **/
-typedef BOOLEAN(EFIAPI* EFI_UNICODE_COLLATION_METAIMATCH)(
-    IN EFI_UNICODE_COLLATION_PROTOCOL* This,
-    IN CHAR16* String,
-    IN CHAR16* Pattern);
+typedef
+BOOLEAN
+(EFIAPI *EFI_UNICODE_COLLATION_METAIMATCH)(
+  IN EFI_UNICODE_COLLATION_PROTOCOL         *This,
+  IN CHAR16                                 *String,
+  IN CHAR16                                 *Pattern
+  );
 
 /**
   Converts all the characters in a Null-terminated string to
@@ -92,9 +92,12 @@ typedef BOOLEAN(EFIAPI* EFI_UNICODE_COLLATION_METAIMATCH)(
   @param  String A pointer to a Null-terminated string.
 
 **/
-typedef VOID(EFIAPI* EFI_UNICODE_COLLATION_STRLWR)(
-    IN EFI_UNICODE_COLLATION_PROTOCOL* This,
-    IN OUT CHAR16* Str);
+typedef
+VOID
+(EFIAPI *EFI_UNICODE_COLLATION_STRLWR)(
+  IN EFI_UNICODE_COLLATION_PROTOCOL         *This,
+  IN OUT CHAR16                             *Str
+  );
 
 /**
   Converts all the characters in a Null-terminated string to upper
@@ -104,9 +107,12 @@ typedef VOID(EFIAPI* EFI_UNICODE_COLLATION_STRLWR)(
   @param  String A pointer to a Null-terminated string.
 
 **/
-typedef VOID(EFIAPI* EFI_UNICODE_COLLATION_STRUPR)(
-    IN EFI_UNICODE_COLLATION_PROTOCOL* This,
-    IN OUT CHAR16* Str);
+typedef
+VOID
+(EFIAPI *EFI_UNICODE_COLLATION_STRUPR)(
+  IN EFI_UNICODE_COLLATION_PROTOCOL         *This,
+  IN OUT CHAR16                             *Str
+  );
 
 /**
   Converts an 8.3 FAT file name in an OEM character set to a Null-terminated
@@ -120,11 +126,14 @@ typedef VOID(EFIAPI* EFI_UNICODE_COLLATION_STRUPR)(
                   be allocated in advance to hold FatSize characters.
 
 **/
-typedef VOID(EFIAPI* EFI_UNICODE_COLLATION_FATTOSTR)(
-    IN EFI_UNICODE_COLLATION_PROTOCOL* This,
-    IN UINTN FatSize,
-    IN CHAR8* Fat,
-    OUT CHAR16* String);
+typedef
+VOID
+(EFIAPI *EFI_UNICODE_COLLATION_FATTOSTR)(
+  IN EFI_UNICODE_COLLATION_PROTOCOL         *This,
+  IN UINTN                                  FatSize,
+  IN CHAR8                                  *Fat,
+  OUT CHAR16                                *String
+  );
 
 /**
   Converts a Null-terminated string to legal characters in a FAT
@@ -140,37 +149,40 @@ typedef VOID(EFIAPI* EFI_UNICODE_COLLATION_FATTOSTR)(
   @retval FALSE   None of the conversions failed.
 
 **/
-typedef BOOLEAN(EFIAPI* EFI_UNICODE_COLLATION_STRTOFAT)(
-    IN EFI_UNICODE_COLLATION_PROTOCOL* This,
-    IN CHAR16* String,
-    IN UINTN FatSize,
-    OUT CHAR8* Fat);
+typedef
+BOOLEAN
+(EFIAPI *EFI_UNICODE_COLLATION_STRTOFAT)(
+  IN EFI_UNICODE_COLLATION_PROTOCOL         *This,
+  IN CHAR16                                 *String,
+  IN UINTN                                  FatSize,
+  OUT CHAR8                                 *Fat
+  );
 
 ///
 /// The EFI_UNICODE_COLLATION_PROTOCOL is used to perform case-insensitive
 /// comparisons of strings.
 ///
 struct _EFI_UNICODE_COLLATION_PROTOCOL {
-    EFI_UNICODE_COLLATION_STRICOLL StriColl;
-    EFI_UNICODE_COLLATION_METAIMATCH MetaiMatch;
-    EFI_UNICODE_COLLATION_STRLWR StrLwr;
-    EFI_UNICODE_COLLATION_STRUPR StrUpr;
+  EFI_UNICODE_COLLATION_STRICOLL      StriColl;
+  EFI_UNICODE_COLLATION_METAIMATCH    MetaiMatch;
+  EFI_UNICODE_COLLATION_STRLWR        StrLwr;
+  EFI_UNICODE_COLLATION_STRUPR        StrUpr;
 
-    //
-    // for supporting fat volumes
-    //
-    EFI_UNICODE_COLLATION_FATTOSTR FatToStr;
-    EFI_UNICODE_COLLATION_STRTOFAT StrToFat;
+  //
+  // for supporting fat volumes
+  //
+  EFI_UNICODE_COLLATION_FATTOSTR      FatToStr;
+  EFI_UNICODE_COLLATION_STRTOFAT      StrToFat;
 
-    ///
-    /// A Null-terminated ASCII string array that contains one or more language codes.
-    /// When this field is used for UnicodeCollation2, it is specified in RFC 4646 format.
-    /// When it is used for UnicodeCollation, it is specified in ISO 639-2 format.
-    ///
-    CHAR8* SupportedLanguages;
+  ///
+  /// A Null-terminated ASCII string array that contains one or more language codes.
+  /// When this field is used for UnicodeCollation2, it is specified in RFC 4646 format.
+  /// When it is used for UnicodeCollation, it is specified in ISO 639-2 format.
+  ///
+  CHAR8                               *SupportedLanguages;
 };
 
-extern EFI_GUID gEfiUnicodeCollationProtocolGuid;
-extern EFI_GUID gEfiUnicodeCollation2ProtocolGuid;
+extern EFI_GUID  gEfiUnicodeCollationProtocolGuid;
+extern EFI_GUID  gEfiUnicodeCollation2ProtocolGuid;
 
 #endif

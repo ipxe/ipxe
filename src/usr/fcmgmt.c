@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <stdio.h>
@@ -42,22 +42,22 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @v port		Fibre Channel port
  */
-void fcportstat(struct fc_port* port) {
-    printf("%s: %s id %s", port->name, fc_ntoa(&port->port_wwn),
-           fc_id_ntoa(&port->port_id));
-    printf(" node %s\n  [Link:", fc_ntoa(&port->node_wwn));
-    if (fc_link_ok(&port->link)) {
-        printf(" up, %s", fc_ntoa(&port->link_port_wwn));
-        if ((port->flags & FC_PORT_HAS_FABRIC)) {
-            printf(" fabric");
-        } else {
-            printf(" id %s",
-                   fc_id_ntoa(&port->ptp_link_port_id));
-        }
-        printf(" node %s]\n", fc_ntoa(&port->link_node_wwn));
-    } else {
-        printf(" down: %s]\n", strerror(port->link.rc));
-    }
+void fcportstat ( struct fc_port *port ) {
+	printf ( "%s: %s id %s", port->name, fc_ntoa ( &port->port_wwn ),
+		 fc_id_ntoa ( &port->port_id ) );
+	printf ( " node %s\n  [Link:", fc_ntoa ( &port->node_wwn ) );
+	if ( fc_link_ok ( &port->link ) ) {
+		printf ( " up, %s", fc_ntoa ( &port->link_port_wwn ) );
+		if ( ( port->flags & FC_PORT_HAS_FABRIC ) ) {
+			printf ( " fabric" );
+		} else {
+			printf ( " id %s",
+				 fc_id_ntoa ( &port->ptp_link_port_id ) );
+		}
+		printf ( " node %s]\n", fc_ntoa ( &port->link_node_wwn ) );
+	} else {
+		printf ( " down: %s]\n", strerror ( port->link.rc ) );
+	}
 }
 
 /**
@@ -65,33 +65,33 @@ void fcportstat(struct fc_port* port) {
  *
  * @v peer		Fibre Channel peer
  */
-void fcpeerstat(struct fc_peer* peer) {
-    struct fc_ulp* ulp;
-    uint8_t* param;
-    unsigned int i;
+void fcpeerstat ( struct fc_peer *peer ) {
+	struct fc_ulp *ulp;
+	uint8_t *param;
+	unsigned int i;
 
-    printf("%s:\n  [Link:", fc_ntoa(&peer->port_wwn));
-    if (fc_link_ok(&peer->link)) {
-        printf(" up, port %s id %s]\n", peer->port->name,
-               fc_id_ntoa(&peer->port_id));
-    } else {
-        printf(" down: %s]\n", strerror(peer->link.rc));
-    }
+	printf ( "%s:\n  [Link:", fc_ntoa ( &peer->port_wwn ) );
+	if ( fc_link_ok ( &peer->link ) ) {
+		printf ( " up, port %s id %s]\n", peer->port->name,
+			 fc_id_ntoa ( &peer->port_id ) );
+	} else {
+		printf ( " down: %s]\n", strerror ( peer->link.rc ) );
+	}
 
-    list_for_each_entry(ulp, &peer->ulps, list) {
-        printf("  [Type %02x link:", ulp->type);
-        if (fc_link_ok(&ulp->link)) {
-            printf(" up, params");
-            param = ulp->param;
-            for (i = 0; i < ulp->param_len; i++) {
-                printf("%c%02x", ((i == 0) ? ' ' : ':'),
-                       param[i]);
-            }
-        } else {
-            printf(" down: %s", strerror(ulp->link.rc));
-        }
-        printf("]\n");
-    }
+	list_for_each_entry ( ulp, &peer->ulps, list ) {
+		printf ( "  [Type %02x link:", ulp->type );
+		if ( fc_link_ok ( &ulp->link ) ) {
+			printf ( " up, params" );
+			param = ulp->param;
+			for ( i = 0 ; i < ulp->param_len ; i++ ) {
+				printf ( "%c%02x", ( ( i == 0 ) ? ' ' : ':' ),
+					 param[i] );
+			}
+		} else {
+			printf ( " down: %s", strerror ( ulp->link.rc ) );
+		}
+		printf ( "]\n" );
+	}
 }
 
 /**
@@ -102,19 +102,19 @@ void fcpeerstat(struct fc_peer* peer) {
  * @v handler		ELS handler
  * @ret rc		Return status code
  */
-int fcels(struct fc_port* port, struct fc_port_id* peer_port_id,
-          struct fc_els_handler* handler) {
-    int rc;
+int fcels ( struct fc_port *port, struct fc_port_id *peer_port_id,
+	    struct fc_els_handler *handler ) {
+	int rc;
 
-    /* Initiate ELS */
-    printf("%s %s to %s...",
-           port->name, handler->name, fc_id_ntoa(peer_port_id));
-    if ((rc = fc_els_request(&monojob, port, peer_port_id,
-                             handler)) != 0) {
-        printf("%s\n", strerror(rc));
-        return rc;
-    }
+	/* Initiate ELS */
+	printf ( "%s %s to %s...",
+		 port->name, handler->name, fc_id_ntoa ( peer_port_id ) );
+	if ( ( rc = fc_els_request ( &monojob, port, peer_port_id,
+				     handler ) ) != 0 ) {
+		printf ( "%s\n", strerror ( rc ) );
+		return rc;
+	}
 
-    /* Wait for ELS to complete */
-    return monojob_wait("", 0);
+	/* Wait for ELS to complete */
+	return monojob_wait ( "", 0 );
 }

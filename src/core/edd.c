@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <ipxe/interface.h>
@@ -41,21 +41,21 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v path		EDD device path
  * @ret rc		Return status code
  */
-int edd_describe(struct interface* intf, struct edd_interface_type* type,
-                 union edd_device_path* path) {
-    struct interface* dest;
-    edd_describe_TYPE(void*)* op =
-        intf_get_dest_op(intf, edd_describe, &dest);
-    void* object = intf_object(dest);
-    int rc;
+int edd_describe ( struct interface *intf, struct edd_interface_type *type,
+		   union edd_device_path *path ) {
+	struct interface *dest;
+	edd_describe_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, edd_describe, &dest );
+	void *object = intf_object ( dest );
+	int rc;
 
-    if (op) {
-        rc = op(object, type, path);
-    } else {
-        /* Default is to not support this operation */
-        rc = -ENOTSUP;
-    }
+	if ( op ) {
+		rc = op ( object, type, path );
+	} else {
+		/* Default is to not support this operation */
+		rc = -ENOTSUP;
+	}
 
-    intf_put(dest);
-    return rc;
+	intf_put ( dest );
+	return rc;
 }

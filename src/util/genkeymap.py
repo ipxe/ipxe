@@ -33,7 +33,7 @@ import textwrap
 from typing import ClassVar, Optional
 
 
-BACKSPACE = chr(0x7F)
+BACKSPACE = chr(0x7f)
 """Backspace character"""
 
 
@@ -55,7 +55,7 @@ class KeyType(IntEnum):
     SLOCK = 12
     DEAD2 = 13
     BRL = 14
-    UNKNOWN = 0xF0
+    UNKNOWN = 0xf0
 
 
 class DeadKey(IntEnum):
@@ -104,7 +104,8 @@ class Key:
     modifiers: KeyModifiers
     """Applied modifiers"""
 
-    ASCII_TYPES: ClassVar[set[KeyType]] = {KeyType.LATIN, KeyType.ASCII, KeyType.LETTER}
+    ASCII_TYPES: ClassVar[set[KeyType]] = {KeyType.LATIN, KeyType.ASCII,
+                                           KeyType.LETTER}
     """Key types with direct ASCII values"""
 
     DEAD_KEYS: ClassVar[Mapping[int, str]] = {
@@ -125,7 +126,7 @@ class Key:
     @property
     def value(self) -> int:
         """Key value"""
-        return self.keysym & 0xFF
+        return self.keysym & 0xff
 
     @property
     def ascii(self) -> Optional[str]:
@@ -170,7 +171,8 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
     "\\|" or omit it entirely.
     """
 
-    FIXUPS: ClassVar[Mapping[str, Mapping[KeyModifiers, Sequence[tuple[int, int]]]]] = {
+    FIXUPS: ClassVar[Mapping[str, Mapping[KeyModifiers,
+                                          Sequence[tuple[int, int]]]]] = {
         'us': {
             # Redefine erroneous key 86 as generating "\\|"
             KeyModifiers.NONE: [(KEY_NON_US, ord('\\'))],
@@ -181,7 +183,8 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
         'il': {
             # Redefine some otherwise unreachable ASCII characters
             # using the closest available approximation
-            KeyModifiers.ALTGR: [(0x28, ord('\'')), (0x2B, ord('`')), (0x35, ord('/'))],
+            KeyModifiers.ALTGR: [(0x28, ord('\'')), (0x2b, ord('`')),
+                                 (0x35, ord('/'))],
         },
         'mt': {
             # Redefine erroneous key 86 as generating "\\|"
@@ -207,28 +210,30 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
         bkeymap = subprocess.check_output(["loadkeys", "-u", "-b", name])
         if not bkeymap.startswith(cls.BKEYMAP_MAGIC):
             raise ValueError("Invalid bkeymap magic signature")
-        bkeymap = bkeymap[len(cls.BKEYMAP_MAGIC) :]
-        included = bkeymap[: cls.MAX_NR_KEYMAPS]
+        bkeymap = bkeymap[len(cls.BKEYMAP_MAGIC):]
+        included = bkeymap[:cls.MAX_NR_KEYMAPS]
         if len(included) != cls.MAX_NR_KEYMAPS:
             raise ValueError("Invalid bkeymap inclusion list")
-        bkeymap = bkeymap[cls.MAX_NR_KEYMAPS :]
+        bkeymap = bkeymap[cls.MAX_NR_KEYMAPS:]
         keys = {}
         for modifiers in map(KeyModifiers, range(cls.MAX_NR_KEYMAPS)):
             if included[modifiers.value]:
                 fmt = Struct('<%dH' % cls.NR_KEYS)
-                bkeylist = bkeymap[: fmt.size]
+                bkeylist = bkeymap[:fmt.size]
                 if len(bkeylist) != fmt.size:
-                    raise ValueError("Invalid bkeymap map %#x" % modifiers.value)
+                    raise ValueError("Invalid bkeymap map %#x" %
+                                     modifiers.value)
                 keys[modifiers] = [
                     Key(modifiers=modifiers, keycode=keycode, keysym=keysym)
                     for keycode, keysym in enumerate(fmt.unpack(bkeylist))
                 ]
-                bkeymap = bkeymap[len(bkeylist) :]
+                bkeymap = bkeymap[len(bkeylist):]
         if bkeymap:
             raise ValueError("Trailing bkeymap data")
         for modifiers, fixups in cls.FIXUPS.get(name, {}).items():
             for keycode, keysym in fixups:
-                keys[modifiers][keycode] = Key(modifiers=modifiers, keycode=keycode, keysym=keysym)
+                keys[modifiers][keycode] = Key(modifiers=modifiers,
+                                               keycode=keycode, keysym=keysym)
         return cls(keys)
 
     @property
@@ -237,7 +242,8 @@ class KeyLayout(UserDict[KeyModifiers, Sequence[Key]]):
         return {
             key.ascii: key
             # Give priority to simplest modifier for a given ASCII code
-            for modifiers in sorted(self.keys(), reverse=True, key=lambda x: (x.complexity, x.value))
+            for modifiers in sorted(self.keys(), reverse=True,
+                                    key=lambda x: (x.complexity, x.value))
             # Give priority to lowest keycode for a given ASCII code
             for key in reversed(self[modifiers])
             # Ignore keys with no ASCII value
@@ -265,10 +271,12 @@ class BiosKeyLayout(KeyLayout):
     @property
     def inverse(self) -> MutableMapping[str, Key]:
         inverse = super().inverse
-        assert len(inverse) == 0x7F
+        assert len(inverse) == 0x7f
         inverse[self.KEY_NON_US_UNSHIFTED] = self.unshifted[self.KEY_NON_US]
         inverse[self.KEY_NON_US_SHIFTED] = self.shifted[self.KEY_NON_US]
-        assert all(x.modifiers in {KeyModifiers.NONE, KeyModifiers.SHIFT, KeyModifiers.CTRL} for x in inverse.values())
+        assert all(x.modifiers in {KeyModifiers.NONE, KeyModifiers.SHIFT,
+                                   KeyModifiers.CTRL}
+                   for x in inverse.values())
         return inverse
 
 
@@ -283,10 +291,12 @@ class KeymapKeys(UserDict[str, Optional[str]]):
         elif char == '\'':
             name = "'\\\''"
         elif ord(char) & BiosKeyLayout.KEY_PSEUDO:
-            name = "Pseudo-%s" % cls.ascii_name(chr(ord(char) & ~BiosKeyLayout.KEY_PSEUDO))
+            name = "Pseudo-%s" % cls.ascii_name(
+                chr(ord(char) & ~BiosKeyLayout.KEY_PSEUDO)
+            )
         elif char.isprintable():
             name = "'%s'" % char
-        elif ord(char) <= 0x1A:
+        elif ord(char) <= 0x1a:
             name = "Ctrl-%c" % (ord(char) + 0x40)
         else:
             name = "0x%02x" % ord(char)
@@ -295,16 +305,15 @@ class KeymapKeys(UserDict[str, Optional[str]]):
     @property
     def code(self):
         """Generated source code for C array"""
-        return (
-            '{\n'
-            + ''.join(
-                '\t{ 0x%02x, 0x%02x },\t/* %s => %s */\n'
-                % (ord(source), ord(target), self.ascii_name(source), self.ascii_name(target))
-                for source, target in self.items()
-                if target and ord(source) & ~BiosKeyLayout.KEY_PSEUDO != ord(target)
+        return '{\n' + ''.join(
+            '\t{ 0x%02x, 0x%02x },\t/* %s => %s */\n' % (
+                ord(source), ord(target),
+                self.ascii_name(source), self.ascii_name(target)
             )
-            + '\t{ 0, 0 }\n}'
-        )
+            for source, target in self.items()
+            if target
+            and ord(source) & ~BiosKeyLayout.KEY_PSEUDO != ord(target)
+        ) + '\t{ 0, 0 }\n}'
 
 
 @dataclass
@@ -324,14 +333,14 @@ class Keymap:
     def basic(self) -> KeymapKeys:
         """Basic remapping table"""
         # Construct raw mapping from source ASCII to target ASCII
-        raw = {source: self.target[key.modifiers][key.keycode].ascii for source, key in self.source.inverse.items()}
+        raw = {source: self.target[key.modifiers][key.keycode].ascii
+               for source, key in self.source.inverse.items()}
         # Eliminate any identity mappings, or mappings that attempt to
         # remap the backspace key
-        table = {
-            source: target
-            for source, target in raw.items()
-            if source != target and source != BACKSPACE and target != BACKSPACE
-        }
+        table = {source: target for source, target in raw.items()
+                 if source != target
+                 and source != BACKSPACE
+                 and target != BACKSPACE}
         # Recursively delete any mappings that would produce
         # unreachable alphanumerics (e.g. the "il" keymap, which maps
         # away the whole lower-case alphabet)
@@ -347,7 +356,8 @@ class Keymap:
         unshifted = ''.join(table.get(x) or x for x in '1234567890')
         shifted = ''.join(table.get(x) or x for x in '!@#$%^&*()')
         if digits not in (shifted, unshifted):
-            raise ValueError("Inconsistent numeric remapping %s / %s" % (unshifted, shifted))
+            raise ValueError("Inconsistent numeric remapping %s / %s" %
+                             (unshifted, shifted))
         return KeymapKeys(dict(sorted(table.items())))
 
     @property
@@ -355,30 +365,30 @@ class Keymap:
         """AltGr remapping table"""
         # Construct raw mapping from source ASCII to target ASCII
         raw = {
-            source: next(
-                (
-                    self.target[x][key.keycode].ascii
-                    for x in (key.modifiers | KeyModifiers.ALTGR, KeyModifiers.ALTGR, key.modifiers)
-                    if x in self.target and self.target[x][key.keycode].ascii
-                ),
-                None,
-            )
+            source: next((self.target[x][key.keycode].ascii
+                          for x in (key.modifiers | KeyModifiers.ALTGR,
+                                    KeyModifiers.ALTGR, key.modifiers)
+                          if x in self.target
+                          and self.target[x][key.keycode].ascii), None)
             for source, key in self.source.inverse.items()
         }
         # Identify printable keys that are unreachable via the basic map
         basic = self.basic
-        unmapped = set(x for x in basic.keys() if x.isascii() and x.isprintable())
+        unmapped = set(x for x in basic.keys()
+                       if x.isascii() and x.isprintable())
         remapped = set(basic.values())
         unreachable = unmapped - remapped
         # Eliminate any mappings for unprintable characters, or
         # mappings for characters that are reachable via the basic map
-        table = {source: target for source, target in raw.items() if source.isprintable() and target in unreachable}
+        table = {source: target for source, target in raw.items()
+                 if source.isprintable()
+                 and target in unreachable}
         # Check that all characters are now reachable
         unreachable -= set(table.values())
         if unreachable:
-            raise ValueError(
-                "Unreachable characters: %s" % ', '.join(KeymapKeys.ascii_name(x) for x in sorted(unreachable))
-            )
+            raise ValueError("Unreachable characters: %s" % ', '.join(
+                KeymapKeys.ascii_name(x) for x in sorted(unreachable)
+            ))
         return KeymapKeys(dict(sorted(table.items())))
 
     def cname(self, suffix: str) -> str:
@@ -392,9 +402,7 @@ class Keymap:
         basic_name = self.cname("basic")
         altgr_name = self.cname("altgr")
         attribute = "__keymap_default" if self.name == "us" else "__keymap"
-        code = (
-            textwrap.dedent(
-                f"""
+        code = textwrap.dedent(f"""
         /** @file
          *
          * "{self.name}" keyboard mapping
@@ -419,10 +427,7 @@ class Keymap:
         \t.basic = {basic_name},
         \t.altgr = {altgr_name},
         }};
-        """
-            ).strip()
-            % (self.basic.code, self.altgr.code)
-        )
+        """).strip() % (self.basic.code, self.altgr.code)
         return code
 
 
@@ -430,7 +435,8 @@ if __name__ == '__main__':
 
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Generate iPXE keymaps")
-    parser.add_argument('--verbose', '-v', action='count', default=0, help="Increase verbosity")
+    parser.add_argument('--verbose', '-v', action='count', default=0,
+                        help="Increase verbosity")
     parser.add_argument('layout', help="Target keyboard layout")
     args = parser.parse_args()
 

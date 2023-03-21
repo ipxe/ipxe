@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
 
   The EFI HII results processing protocol invokes this type of protocol
@@ -16,35 +14,31 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef __EFI_HII_CONFIG_ACCESS_H__
-    #define __EFI_HII_CONFIG_ACCESS_H__
+#define __EFI_HII_CONFIG_ACCESS_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #include <ipxe/efi/Protocol/FormBrowser2.h>
+#include <ipxe/efi/Protocol/FormBrowser2.h>
 
-    #define EFI_HII_CONFIG_ACCESS_PROTOCOL_GUID                \
-        {                                                      \
-            0x330d4706, 0xf2a0, 0x4e4f, {                      \
-                0xa3, 0x69, 0xb6, 0x6f, 0xa8, 0xd5, 0x43, 0x85 \
-            }                                                  \
-        }
+#define EFI_HII_CONFIG_ACCESS_PROTOCOL_GUID  \
+  { 0x330d4706, 0xf2a0, 0x4e4f, { 0xa3, 0x69, 0xb6, 0x6f, 0xa8, 0xd5, 0x43, 0x85 } }
 
 typedef struct _EFI_HII_CONFIG_ACCESS_PROTOCOL EFI_HII_CONFIG_ACCESS_PROTOCOL;
 
 typedef UINTN EFI_BROWSER_ACTION;
 
-    #define EFI_BROWSER_ACTION_CHANGING 0
-    #define EFI_BROWSER_ACTION_CHANGED 1
-    #define EFI_BROWSER_ACTION_RETRIEVE 2
-    #define EFI_BROWSER_ACTION_FORM_OPEN 3
-    #define EFI_BROWSER_ACTION_FORM_CLOSE 4
-    #define EFI_BROWSER_ACTION_SUBMITTED 5
-    #define EFI_BROWSER_ACTION_DEFAULT_STANDARD 0x1000
-    #define EFI_BROWSER_ACTION_DEFAULT_MANUFACTURING 0x1001
-    #define EFI_BROWSER_ACTION_DEFAULT_SAFE 0x1002
-    #define EFI_BROWSER_ACTION_DEFAULT_PLATFORM 0x2000
-    #define EFI_BROWSER_ACTION_DEFAULT_HARDWARE 0x3000
-    #define EFI_BROWSER_ACTION_DEFAULT_FIRMWARE 0x4000
+#define EFI_BROWSER_ACTION_CHANGING               0
+#define EFI_BROWSER_ACTION_CHANGED                1
+#define EFI_BROWSER_ACTION_RETRIEVE               2
+#define EFI_BROWSER_ACTION_FORM_OPEN              3
+#define EFI_BROWSER_ACTION_FORM_CLOSE             4
+#define EFI_BROWSER_ACTION_SUBMITTED              5
+#define EFI_BROWSER_ACTION_DEFAULT_STANDARD       0x1000
+#define EFI_BROWSER_ACTION_DEFAULT_MANUFACTURING  0x1001
+#define EFI_BROWSER_ACTION_DEFAULT_SAFE           0x1002
+#define EFI_BROWSER_ACTION_DEFAULT_PLATFORM       0x2000
+#define EFI_BROWSER_ACTION_DEFAULT_HARDWARE       0x3000
+#define EFI_BROWSER_ACTION_DEFAULT_FIRMWARE       0x4000
 
 /**
 
@@ -114,11 +108,14 @@ typedef UINTN EFI_BROWSER_ACTION;
                                   question.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_HII_ACCESS_EXTRACT_CONFIG)(
-    IN CONST EFI_HII_CONFIG_ACCESS_PROTOCOL* This,
-    IN CONST EFI_STRING Request,
-    OUT EFI_STRING* Progress,
-    OUT EFI_STRING* Results);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_HII_ACCESS_EXTRACT_CONFIG)(
+  IN CONST  EFI_HII_CONFIG_ACCESS_PROTOCOL  *This,
+  IN CONST  EFI_STRING                      Request,
+  OUT       EFI_STRING                      *Progress,
+  OUT       EFI_STRING                      *Results
+  );
 
 /**
 
@@ -160,10 +157,13 @@ typedef EFI_STATUS(EFIAPI* EFI_HII_ACCESS_EXTRACT_CONFIG)(
                                   was not found
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_HII_ACCESS_ROUTE_CONFIG)(
-    IN CONST EFI_HII_CONFIG_ACCESS_PROTOCOL* This,
-    IN CONST EFI_STRING Configuration,
-    OUT EFI_STRING* Progress);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_HII_ACCESS_ROUTE_CONFIG)(
+  IN CONST  EFI_HII_CONFIG_ACCESS_PROTOCOL  *This,
+  IN CONST  EFI_STRING                      Configuration,
+  OUT       EFI_STRING                      *Progress
+  );
 
 /**
 
@@ -190,13 +190,17 @@ typedef EFI_STATUS(EFIAPI* EFI_HII_ACCESS_ROUTE_CONFIG)(
   @retval EFI_UNSUPPORTED        The specified Action is not supported by the
                                  callback.
 **/
-typedef EFI_STATUS(EFIAPI* EFI_HII_ACCESS_FORM_CALLBACK)(
-    IN CONST EFI_HII_CONFIG_ACCESS_PROTOCOL* This,
-    IN EFI_BROWSER_ACTION Action,
-    IN EFI_QUESTION_ID QuestionId,
-    IN UINT8 Type,
-    IN OUT EFI_IFR_TYPE_VALUE* Value,
-    OUT EFI_BROWSER_ACTION_REQUEST* ActionRequest);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_HII_ACCESS_FORM_CALLBACK)(
+  IN     CONST EFI_HII_CONFIG_ACCESS_PROTOCOL   *This,
+  IN     EFI_BROWSER_ACTION                     Action,
+  IN     EFI_QUESTION_ID                        QuestionId,
+  IN     UINT8                                  Type,
+  IN OUT EFI_IFR_TYPE_VALUE                     *Value,
+  OUT    EFI_BROWSER_ACTION_REQUEST             *ActionRequest
+  )
+;
 
 ///
 /// This protocol provides a callable interface between the HII and
@@ -204,11 +208,11 @@ typedef EFI_STATUS(EFIAPI* EFI_HII_ACCESS_FORM_CALLBACK)(
 /// to publish this protocol.
 ///
 struct _EFI_HII_CONFIG_ACCESS_PROTOCOL {
-    EFI_HII_ACCESS_EXTRACT_CONFIG ExtractConfig;
-    EFI_HII_ACCESS_ROUTE_CONFIG RouteConfig;
-    EFI_HII_ACCESS_FORM_CALLBACK Callback;
+  EFI_HII_ACCESS_EXTRACT_CONFIG    ExtractConfig;
+  EFI_HII_ACCESS_ROUTE_CONFIG      RouteConfig;
+  EFI_HII_ACCESS_FORM_CALLBACK     Callback;
 };
 
-extern EFI_GUID gEfiHiiConfigAccessProtocolGuid;
+extern EFI_GUID  gEfiHiiConfigAccessProtocolGuid;
 
 #endif

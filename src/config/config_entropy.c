@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/entropy.h>
 
@@ -35,17 +35,17 @@ PROVIDE_REQUIRING_SYMBOL();
  * Drag in entropy sources
  */
 #ifdef ENTROPY_RTC
-REQUIRE_OBJECT(rtc_entropy);
+REQUIRE_OBJECT ( rtc_entropy );
 #endif
 #ifdef ENTROPY_EFITICK
-REQUIRE_OBJECT(efi_entropy);
+REQUIRE_OBJECT ( efi_entropy );
 #endif
 #ifdef ENTROPY_EFIRNG
-REQUIRE_OBJECT(efi_rng);
+REQUIRE_OBJECT ( efi_rng );
 #endif
 #ifdef ENTROPY_LINUX
-REQUIRE_OBJECT(linux_entropy);
+REQUIRE_OBJECT ( linux_entropy );
 #endif
 #ifdef ENTROPY_RDRAND
-REQUIRE_OBJECT(rdrand);
+REQUIRE_OBJECT ( rdrand );
 #endif

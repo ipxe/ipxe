@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
 #include <stdint.h>
@@ -44,12 +44,12 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v len		Length
  * @ret dest		Destination region
  */
-void* generic_memset(void* dest, int character, size_t len) {
-    uint8_t* dest_bytes = dest;
+void * generic_memset ( void *dest, int character, size_t len ) {
+	uint8_t *dest_bytes = dest;
 
-    while (len--)
-        *(dest_bytes++) = character;
-    return dest;
+	while ( len-- )
+		*(dest_bytes++) = character;
+	return dest;
 }
 
 /**
@@ -60,13 +60,13 @@ void* generic_memset(void* dest, int character, size_t len) {
  * @v len		Length
  * @ret dest		Destination region
  */
-void* generic_memcpy(void* dest, const void* src, size_t len) {
-    const uint8_t* src_bytes = src;
-    uint8_t* dest_bytes = dest;
+void * generic_memcpy ( void *dest, const void *src, size_t len ) {
+	const uint8_t *src_bytes = src;
+	uint8_t *dest_bytes = dest;
 
-    while (len--)
-        *(dest_bytes++) = *(src_bytes++);
-    return dest;
+	while ( len-- )
+		*(dest_bytes++) = *(src_bytes++);
+	return dest;
 }
 
 /**
@@ -77,13 +77,13 @@ void* generic_memcpy(void* dest, const void* src, size_t len) {
  * @v len		Length
  * @ret dest		Destination region
  */
-void* generic_memcpy_reverse(void* dest, const void* src, size_t len) {
-    const uint8_t* src_bytes = (src + len);
-    uint8_t* dest_bytes = (dest + len);
+void * generic_memcpy_reverse ( void *dest, const void *src, size_t len ) {
+	const uint8_t *src_bytes = ( src + len );
+	uint8_t *dest_bytes = ( dest + len );
 
-    while (len--)
-        *(--dest_bytes) = *(--src_bytes);
-    return dest;
+	while ( len-- )
+		*(--dest_bytes) = *(--src_bytes);
+	return dest;
 }
 
 /**
@@ -94,12 +94,13 @@ void* generic_memcpy_reverse(void* dest, const void* src, size_t len) {
  * @v len		Length
  * @ret dest		Destination region
  */
-void* generic_memmove(void* dest, const void* src, size_t len) {
-    if (dest < src) {
-        return generic_memcpy(dest, src, len);
-    } else {
-        return generic_memcpy_reverse(dest, src, len);
-    }
+void * generic_memmove ( void *dest, const void *src, size_t len ) {
+
+	if ( dest < src ) {
+		return generic_memcpy ( dest, src, len );
+	} else {
+		return generic_memcpy_reverse ( dest, src, len );
+	}
 }
 
 /**
@@ -110,17 +111,17 @@ void* generic_memmove(void* dest, const void* src, size_t len) {
  * @v len		Length
  * @ret diff		Difference
  */
-int memcmp(const void* first, const void* second, size_t len) {
-    const uint8_t* first_bytes = first;
-    const uint8_t* second_bytes = second;
-    int diff;
+int memcmp ( const void *first, const void *second, size_t len ) {
+	const uint8_t *first_bytes = first;
+	const uint8_t *second_bytes = second;
+	int diff;
 
-    while (len--) {
-        diff = (*(first_bytes++) - *(second_bytes++));
-        if (diff)
-            return diff;
-    }
-    return 0;
+	while ( len-- ) {
+		diff = ( *(first_bytes++) - *(second_bytes++) );
+		if ( diff )
+			return diff;
+	}
+	return 0;
 }
 
 /**
@@ -131,14 +132,14 @@ int memcmp(const void* first, const void* second, size_t len) {
  * @v len		Length
  * @ret found		Found character, or NULL if not found
  */
-void* memchr(const void* src, int character, size_t len) {
-    const uint8_t* src_bytes = src;
+void * memchr ( const void *src, int character, size_t len ) {
+	const uint8_t *src_bytes = src;
 
-    for (; len--; src_bytes++) {
-        if (*src_bytes == character)
-            return ((void*)src_bytes);
-    }
-    return NULL;
+	for ( ; len-- ; src_bytes++ ) {
+		if ( *src_bytes == character )
+			return ( ( void * ) src_bytes );
+	}
+	return NULL;
 }
 
 /**
@@ -149,17 +150,17 @@ void* memchr(const void* src, int character, size_t len) {
  * @v len		Length
  * @ret first		First region
  */
-void* memswap(void* first, void* second, size_t len) {
-    uint8_t* first_bytes = first;
-    uint8_t* second_bytes = second;
-    uint8_t temp;
+void * memswap ( void *first, void *second, size_t len ) {
+	uint8_t *first_bytes = first;
+	uint8_t *second_bytes = second;
+	uint8_t temp;
 
-    for (; len--; first_bytes++, second_bytes++) {
-        temp = *first_bytes;
-        *first_bytes = *second_bytes;
-        *second_bytes = temp;
-    }
-    return first;
+	for ( ; len-- ; first_bytes++, second_bytes++ ) {
+		temp = *first_bytes;
+		*first_bytes = *second_bytes;
+		*second_bytes = temp;
+	}
+	return first;
 }
 
 /**
@@ -169,8 +170,9 @@ void* memswap(void* first, void* second, size_t len) {
  * @v second		Second string
  * @ret diff		Difference
  */
-int strcmp(const char* first, const char* second) {
-    return strncmp(first, second, ~((size_t)0));
+int strcmp ( const char *first, const char *second ) {
+
+	return strncmp ( first, second, ~( ( size_t ) 0 ) );
 }
 
 /**
@@ -181,19 +183,19 @@ int strcmp(const char* first, const char* second) {
  * @v max		Maximum length to compare
  * @ret diff		Difference
  */
-int strncmp(const char* first, const char* second, size_t max) {
-    const uint8_t* first_bytes = ((const uint8_t*)first);
-    const uint8_t* second_bytes = ((const uint8_t*)second);
-    int diff;
+int strncmp ( const char *first, const char *second, size_t max ) {
+	const uint8_t *first_bytes = ( ( const uint8_t * ) first );
+	const uint8_t *second_bytes = ( ( const uint8_t * ) second );
+	int diff;
 
-    for (; max--; first_bytes++, second_bytes++) {
-        diff = (*first_bytes - *second_bytes);
-        if (diff)
-            return diff;
-        if (!*first_bytes)
-            return 0;
-    }
-    return 0;
+	for ( ; max-- ; first_bytes++, second_bytes++ ) {
+		diff = ( *first_bytes - *second_bytes );
+		if ( diff )
+			return diff;
+		if ( ! *first_bytes )
+			return 0;
+	}
+	return 0;
 }
 
 /**
@@ -203,8 +205,9 @@ int strncmp(const char* first, const char* second, size_t max) {
  * @v second		Second string
  * @ret diff		Difference
  */
-int strcasecmp(const char* first, const char* second) {
-    return strncasecmp(first, second, ~((size_t)0));
+int strcasecmp ( const char *first, const char *second ) {
+
+	return strncasecmp ( first, second, ~( ( size_t ) 0 ) );
 }
 
 /**
@@ -215,20 +218,20 @@ int strcasecmp(const char* first, const char* second) {
  * @v max		Maximum length to compare
  * @ret diff		Difference
  */
-int strncasecmp(const char* first, const char* second, size_t max) {
-    const uint8_t* first_bytes = ((const uint8_t*)first);
-    const uint8_t* second_bytes = ((const uint8_t*)second);
-    int diff;
+int strncasecmp ( const char *first, const char *second, size_t max ) {
+	const uint8_t *first_bytes = ( ( const uint8_t * ) first );
+	const uint8_t *second_bytes = ( ( const uint8_t * ) second );
+	int diff;
 
-    for (; max--; first_bytes++, second_bytes++) {
-        diff = (toupper(*first_bytes) -
-                toupper(*second_bytes));
-        if (diff)
-            return diff;
-        if (!*first_bytes)
-            return 0;
-    }
-    return 0;
+	for ( ; max-- ; first_bytes++, second_bytes++ ) {
+		diff = ( toupper ( *first_bytes ) -
+			 toupper ( *second_bytes ) );
+		if ( diff )
+			return diff;
+		if ( ! *first_bytes )
+			return 0;
+	}
+	return 0;
 }
 
 /**
@@ -237,8 +240,9 @@ int strncasecmp(const char* first, const char* second, size_t max) {
  * @v src		String
  * @ret len		Length
  */
-size_t strlen(const char* src) {
-    return strnlen(src, ~((size_t)0));
+size_t strlen ( const char *src ) {
+
+	return strnlen ( src, ~( ( size_t ) 0 ) );
 }
 
 /**
@@ -248,13 +252,13 @@ size_t strlen(const char* src) {
  * @v max		Maximum length
  * @ret len		Length
  */
-size_t strnlen(const char* src, size_t max) {
-    const uint8_t* src_bytes = ((const uint8_t*)src);
-    size_t len = 0;
+size_t strnlen ( const char *src, size_t max ) {
+	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
+	size_t len = 0;
 
-    while (max-- && *(src_bytes++))
-        len++;
-    return len;
+	while ( max-- && *(src_bytes++) )
+		len++;
+	return len;
 }
 
 /**
@@ -264,15 +268,15 @@ size_t strnlen(const char* src, size_t max) {
  * @v character		Character to find
  * @ret found		Found character, or NULL if not found
  */
-char* strchr(const char* src, int character) {
-    const uint8_t* src_bytes = ((const uint8_t*)src);
+char * strchr ( const char *src, int character ) {
+	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
 
-    for (;; src_bytes++) {
-        if (*src_bytes == character)
-            return ((char*)src_bytes);
-        if (!*src_bytes)
-            return NULL;
-    }
+	for ( ; ; src_bytes++ ) {
+		if ( *src_bytes == character )
+			return ( ( char * ) src_bytes );
+		if ( ! *src_bytes )
+			return NULL;
+	}
 }
 
 /**
@@ -282,17 +286,17 @@ char* strchr(const char* src, int character) {
  * @v character		Character to find
  * @ret found		Found character, or NULL if not found
  */
-char* strrchr(const char* src, int character) {
-    const uint8_t* src_bytes = ((const uint8_t*)src);
-    const uint8_t* start = src_bytes;
+char * strrchr ( const char *src, int character ) {
+	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
+	const uint8_t *start = src_bytes;
 
-    while (*src_bytes)
-        src_bytes++;
-    for (src_bytes--; src_bytes >= start; src_bytes--) {
-        if (*src_bytes == character)
-            return ((char*)src_bytes);
-    }
-    return NULL;
+	while ( *src_bytes )
+		src_bytes++;
+	for ( src_bytes-- ; src_bytes >= start ; src_bytes-- ) {
+		if ( *src_bytes == character )
+			return ( ( char * ) src_bytes );
+	}
+	return NULL;
 }
 
 /**
@@ -302,14 +306,14 @@ char* strrchr(const char* src, int character) {
  * @v needle		Substring
  * @ret found		Found substring, or NULL if not found
  */
-char* strstr(const char* haystack, const char* needle) {
-    size_t len = strlen(needle);
+char * strstr ( const char *haystack, const char *needle ) {
+	size_t len = strlen ( needle );
 
-    for (; *haystack; haystack++) {
-        if (memcmp(haystack, needle, len) == 0)
-            return ((char*)haystack);
-    }
-    return NULL;
+	for ( ; *haystack ; haystack++ ) {
+		if ( memcmp ( haystack, needle, len ) == 0 )
+			return ( ( char * ) haystack );
+	}
+	return NULL;
 }
 
 /**
@@ -319,17 +323,17 @@ char* strstr(const char* haystack, const char* needle) {
  * @v src		Source string
  * @ret dest		Destination string
  */
-char* strcpy(char* dest, const char* src) {
-    const uint8_t* src_bytes = ((const uint8_t*)src);
-    uint8_t* dest_bytes = ((uint8_t*)dest);
+char * strcpy ( char *dest, const char *src ) {
+	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
+	uint8_t *dest_bytes = ( ( uint8_t * ) dest );
 
-    /* We cannot use strncpy(), since that would pad the destination */
-    for (;; src_bytes++, dest_bytes++) {
-        *dest_bytes = *src_bytes;
-        if (!*dest_bytes)
-            break;
-    }
-    return dest;
+	/* We cannot use strncpy(), since that would pad the destination */
+	for ( ; ; src_bytes++, dest_bytes++ ) {
+		*dest_bytes = *src_bytes;
+		if ( ! *dest_bytes )
+			break;
+	}
+	return dest;
 }
 
 /**
@@ -340,18 +344,18 @@ char* strcpy(char* dest, const char* src) {
  * @v max		Maximum length
  * @ret dest		Destination string
  */
-char* strncpy(char* dest, const char* src, size_t max) {
-    const uint8_t* src_bytes = ((const uint8_t*)src);
-    uint8_t* dest_bytes = ((uint8_t*)dest);
+char * strncpy ( char *dest, const char *src, size_t max ) {
+	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
+	uint8_t *dest_bytes = ( ( uint8_t * ) dest );
 
-    for (; max; max--, src_bytes++, dest_bytes++) {
-        *dest_bytes = *src_bytes;
-        if (!*dest_bytes)
-            break;
-    }
-    while (max--)
-        *(dest_bytes++) = '\0';
-    return dest;
+	for ( ; max ; max--, src_bytes++, dest_bytes++ ) {
+		*dest_bytes = *src_bytes;
+		if ( ! *dest_bytes )
+			break;
+	}
+	while ( max-- )
+		*(dest_bytes++) = '\0';
+	return dest;
 }
 
 /**
@@ -361,9 +365,10 @@ char* strncpy(char* dest, const char* src, size_t max) {
  * @v src		Source string
  * @ret dest		Destination string
  */
-char* strcat(char* dest, const char* src) {
-    strcpy((dest + strlen(dest)), src);
-    return dest;
+char * strcat ( char *dest, const char *src ) {
+
+	strcpy ( ( dest + strlen ( dest ) ), src );
+	return dest;
 }
 
 /**
@@ -372,8 +377,9 @@ char* strcat(char* dest, const char* src) {
  * @v src		Source string
  * @ret dup		Duplicated string, or NULL if allocation failed
  */
-char* strdup(const char* src) {
-    return strndup(src, ~((size_t)0));
+char * strdup ( const char *src ) {
+
+	return strndup ( src, ~( ( size_t ) 0 ) );
 }
 
 /**
@@ -383,16 +389,16 @@ char* strdup(const char* src) {
  * @v max		Maximum length
  * @ret dup		Duplicated string, or NULL if allocation failed
  */
-char* strndup(const char* src, size_t max) {
-    size_t len = strnlen(src, max);
-    char* dup;
+char * strndup ( const char *src, size_t max ) {
+	size_t len = strnlen ( src, max );
+        char *dup;
 
-    dup = malloc(len + 1 /* NUL */);
-    if (dup) {
-        memcpy(dup, src, len);
-        dup[len] = '\0';
-    }
-    return dup;
+        dup = malloc ( len + 1 /* NUL */ );
+        if ( dup ) {
+		memcpy ( dup, src, len );
+		dup[len] = '\0';
+        }
+        return dup;
 }
 
 /**
@@ -404,14 +410,15 @@ char* strndup(const char* src, size_t max) {
  * Invalid digits will be returned as a value greater than or equal to
  * the numeric base.
  */
-unsigned int digit_value(unsigned int character) {
-    if (character >= 'a')
-        return (character - ('a' - 10));
-    if (character >= 'A')
-        return (character - ('A' - 10));
-    if (character <= '9')
-        return (character - '0');
-    return character;
+unsigned int digit_value ( unsigned int character ) {
+
+	if ( character >= 'a' )
+		return ( character - ( 'a' - 10 ) );
+	if ( character >= 'A' )
+		return ( character - ( 'A' - 10 ) );
+	if ( character <= '9' )
+		return ( character - '0' );
+	return character;
 }
 
 /**
@@ -422,34 +429,35 @@ unsigned int digit_value(unsigned int character) {
  * @v base		Numeric base
  * @ret string		Remaining string
  */
-static const char* strtoul_pre(const char* string, int* negate, int* base) {
-    /* Skip any leading whitespace */
-    while (isspace(*string))
-        string++;
+static const char * strtoul_pre ( const char *string, int *negate, int *base ) {
 
-    /* Process arithmetic sign, if present */
-    *negate = 0;
-    if (*string == '-') {
-        string++;
-        *negate = 1;
-    } else if (*string == '+') {
-        string++;
-    }
+	/* Skip any leading whitespace */
+	while ( isspace ( *string ) )
+		string++;
 
-    /* Process base, if present */
-    if (*base == 0) {
-        *base = 10;
-        if (*string == '0') {
-            string++;
-            *base = 8;
-            if ((*string & ~0x20) == 'X') {
-                string++;
-                *base = 16;
-            }
-        }
-    }
+	/* Process arithmetic sign, if present */
+	*negate = 0;
+	if ( *string == '-' ) {
+		string++;
+		*negate = 1;
+	} else if ( *string == '+' ) {
+		string++;
+	}
 
-    return string;
+	/* Process base, if present */
+	if ( *base == 0 ) {
+		*base = 10;
+		if ( *string == '0' ) {
+			string++;
+			*base = 8;
+			if ( ( *string & ~0x20 ) == 'X' ) {
+				string++;
+				*base = 16;
+			}
+		}
+	}
+
+	return string;
 }
 
 /**
@@ -460,31 +468,31 @@ static const char* strtoul_pre(const char* string, int* negate, int* base) {
  * @v base		Numeric base (or zero to autodetect)
  * @ret value		Numeric value
  */
-unsigned long strtoul(const char* string, char** endp, int base) {
-    unsigned long value = 0;
-    unsigned int digit;
-    int negate;
+unsigned long strtoul ( const char *string, char **endp, int base ) {
+	unsigned long value = 0;
+	unsigned int digit;
+	int negate;
 
-    /* Preprocess string */
-    string = strtoul_pre(string, &negate, &base);
+	/* Preprocess string */
+	string = strtoul_pre ( string, &negate, &base );
 
-    /* Process digits */
-    for (;; string++) {
-        digit = digit_value(*string);
-        if (digit >= (unsigned int)base)
-            break;
-        value = ((value * base) + digit);
-    }
+	/* Process digits */
+	for ( ; ; string++ ) {
+		digit = digit_value ( *string );
+		if ( digit >= ( unsigned int ) base )
+			break;
+		value = ( ( value * base ) + digit );
+	}
 
-    /* Negate value if, applicable */
-    if (negate)
-        value = -value;
+	/* Negate value if, applicable */
+	if ( negate )
+		value = -value;
 
-    /* Fill in end pointer, if applicable */
-    if (endp)
-        *endp = ((char*)string);
+	/* Fill in end pointer, if applicable */
+	if ( endp )
+		*endp = ( ( char * ) string );
 
-    return value;
+	return value;
 }
 
 /**
@@ -495,29 +503,29 @@ unsigned long strtoul(const char* string, char** endp, int base) {
  * @v base		Numeric base (or zero to autodetect)
  * @ret value		Numeric value
  */
-unsigned long long strtoull(const char* string, char** endp, int base) {
-    unsigned long long value = 0;
-    unsigned int digit;
-    int negate;
+unsigned long long strtoull ( const char *string, char **endp, int base ) {
+	unsigned long long value = 0;
+	unsigned int digit;
+	int negate;
 
-    /* Preprocess string */
-    string = strtoul_pre(string, &negate, &base);
+	/* Preprocess string */
+	string = strtoul_pre ( string, &negate, &base );
 
-    /* Process digits */
-    for (;; string++) {
-        digit = digit_value(*string);
-        if (digit >= (unsigned int)base)
-            break;
-        value = ((value * base) + digit);
-    }
+	/* Process digits */
+	for ( ; ; string++ ) {
+		digit = digit_value ( *string );
+		if ( digit >= ( unsigned int ) base )
+			break;
+		value = ( ( value * base ) + digit );
+	}
 
-    /* Negate value if, applicable */
-    if (negate)
-        value = -value;
+	/* Negate value if, applicable */
+	if ( negate )
+		value = -value;
 
-    /* Fill in end pointer, if applicable */
-    if (endp)
-        *endp = ((char*)string);
+	/* Fill in end pointer, if applicable */
+	if ( endp )
+		*endp = ( ( char * ) string );
 
-    return value;
+	return value;
 }

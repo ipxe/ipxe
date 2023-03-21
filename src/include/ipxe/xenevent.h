@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _IPXE_XENEVENT_H
-    #define _IPXE_XENEVENT_H
+#define _IPXE_XENEVENT_H
 
 /** @file
  *
@@ -9,10 +7,10 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #include <ipxe/xen.h>
-    #include <xen/event_channel.h>
+#include <ipxe/xen.h>
+#include <xen/event_channel.h>
 
 /**
  * Close event channel
@@ -21,10 +19,11 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v close		Event descriptor
  * @ret xenrc		Xen status code
  */
-static inline __attribute__((always_inline)) int
-xenevent_close(struct xen_hypervisor* xen, struct evtchn_close* close) {
-    return xen_hypercall_2(xen, __HYPERVISOR_event_channel_op,
-                           EVTCHNOP_close, virt_to_phys(close));
+static inline __attribute__ (( always_inline )) int
+xenevent_close ( struct xen_hypervisor *xen, struct evtchn_close *close ) {
+
+	return xen_hypercall_2 ( xen, __HYPERVISOR_event_channel_op,
+				 EVTCHNOP_close, virt_to_phys ( close ) );
 }
 
 /**
@@ -34,10 +33,11 @@ xenevent_close(struct xen_hypervisor* xen, struct evtchn_close* close) {
  * @v send		Event descriptor
  * @ret xenrc		Xen status code
  */
-static inline __attribute__((always_inline)) int
-xenevent_send(struct xen_hypervisor* xen, struct evtchn_send* send) {
-    return xen_hypercall_2(xen, __HYPERVISOR_event_channel_op,
-                           EVTCHNOP_send, virt_to_phys(send));
+static inline __attribute__ (( always_inline )) int
+xenevent_send ( struct xen_hypervisor *xen, struct evtchn_send *send ) {
+
+	return xen_hypercall_2 ( xen, __HYPERVISOR_event_channel_op,
+				 EVTCHNOP_send, virt_to_phys ( send ) );
 }
 
 /**
@@ -47,12 +47,13 @@ xenevent_send(struct xen_hypervisor* xen, struct evtchn_send* send) {
  * @v alloc_unbound	Event descriptor
  * @ret xenrc		Xen status code
  */
-static inline __attribute__((always_inline)) int
-xenevent_alloc_unbound(struct xen_hypervisor* xen,
-                       struct evtchn_alloc_unbound* alloc_unbound) {
-    return xen_hypercall_2(xen, __HYPERVISOR_event_channel_op,
-                           EVTCHNOP_alloc_unbound,
-                           virt_to_phys(alloc_unbound));
+static inline __attribute__ (( always_inline )) int
+xenevent_alloc_unbound ( struct xen_hypervisor *xen,
+			 struct evtchn_alloc_unbound *alloc_unbound ) {
+
+	return xen_hypercall_2 ( xen, __HYPERVISOR_event_channel_op,
+				 EVTCHNOP_alloc_unbound,
+				 virt_to_phys ( alloc_unbound ) );
 }
 
 #endif /* _IPXE_XENEVENT_H */

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -42,11 +42,11 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * This error happens sufficiently often to merit a user-friendly
  * description.
  */
-#define ERANGE_SEGMENT __einfo_error(EINFO_ERANGE_SEGMENT)
+#define ERANGE_SEGMENT __einfo_error ( EINFO_ERANGE_SEGMENT )
 #define EINFO_ERANGE_SEGMENT \
-    __einfo_uniqify(EINFO_ERANGE, 0x01, "Requested memory not available")
+	__einfo_uniqify ( EINFO_ERANGE, 0x01, "Requested memory not available" )
 struct errortab segment_errors[] __errortab = {
-    __einfo_errortab(EINFO_ERANGE_SEGMENT),
+	__einfo_errortab ( EINFO_ERANGE_SEGMENT ),
 };
 
 /**
@@ -57,39 +57,39 @@ struct errortab segment_errors[] __errortab = {
  * @v memsz		Size of the segment
  * @ret rc		Return status code
  */
-int prep_segment(userptr_t segment, size_t filesz, size_t memsz) {
-    struct memory_map memmap;
-    physaddr_t start = user_to_phys(segment, 0);
-    physaddr_t mid = user_to_phys(segment, filesz);
-    physaddr_t end = user_to_phys(segment, memsz);
-    unsigned int i;
+int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
+	struct memory_map memmap;
+	physaddr_t start = user_to_phys ( segment, 0 );
+	physaddr_t mid = user_to_phys ( segment, filesz );
+	physaddr_t end = user_to_phys ( segment, memsz );
+	unsigned int i;
 
-    DBG("Preparing segment [%lx,%lx,%lx)\n", start, mid, end);
+	DBG ( "Preparing segment [%lx,%lx,%lx)\n", start, mid, end );
 
-    /* Sanity check */
-    if (filesz > memsz) {
-        DBG("Insane segment [%lx,%lx,%lx)\n", start, mid, end);
-        return -EINVAL;
-    }
+	/* Sanity check */
+	if ( filesz > memsz ) {
+		DBG ( "Insane segment [%lx,%lx,%lx)\n", start, mid, end );
+		return -EINVAL;
+	}
 
-    /* Get a fresh memory map.  This allows us to automatically
-     * avoid treading on any regions that Etherboot is currently
-     * editing out of the memory map.
-     */
-    get_memmap(&memmap);
+	/* Get a fresh memory map.  This allows us to automatically
+	 * avoid treading on any regions that Etherboot is currently
+	 * editing out of the memory map.
+	 */
+	get_memmap ( &memmap );
 
-    /* Look for a suitable memory region */
-    for (i = 0; i < memmap.count; i++) {
-        if ((start >= memmap.regions[i].start) &&
-            (end <= memmap.regions[i].end)) {
-            /* Found valid region: zero bss and return */
-            memset_user(segment, filesz, 0, (memsz - filesz));
-            return 0;
-        }
-    }
+	/* Look for a suitable memory region */
+	for ( i = 0 ; i < memmap.count ; i++ ) {
+		if ( ( start >= memmap.regions[i].start ) &&
+		     ( end <= memmap.regions[i].end ) ) {
+			/* Found valid region: zero bss and return */
+			memset_user ( segment, filesz, 0, ( memsz - filesz ) );
+			return 0;
+		}
+	}
 
-    /* No suitable memory region found */
-    DBG("Segment [%lx,%lx,%lx) does not fit into available memory\n",
-        start, mid, end);
-    return -ERANGE_SEGMENT;
+	/* No suitable memory region found */
+	DBG ( "Segment [%lx,%lx,%lx) does not fit into available memory\n",
+	      start, mid, end );
+	return -ERANGE_SEGMENT;
 }

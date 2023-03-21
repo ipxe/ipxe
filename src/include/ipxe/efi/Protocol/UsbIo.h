@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   EFI Usb I/O Protocol as defined in UEFI specification.
   This protocol is used by code, typically drivers, running in the EFI
@@ -13,21 +11,19 @@
 **/
 
 #ifndef __USB_IO_H__
-    #define __USB_IO_H__
+#define __USB_IO_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #include <ipxe/efi/IndustryStandard/Usb.h>
+#include <ipxe/efi/IndustryStandard/Usb.h>
 
-    //
-    // Global ID for the USB I/O Protocol
-    //
-    #define EFI_USB_IO_PROTOCOL_GUID                           \
-        {                                                      \
-            0x2B2F68D6, 0x0CD2, 0x44cf, {                      \
-                0x8E, 0x8B, 0xBB, 0xA2, 0x0B, 0x1B, 0x5B, 0x75 \
-            }                                                  \
-        }
+//
+// Global ID for the USB I/O Protocol
+//
+#define EFI_USB_IO_PROTOCOL_GUID \
+  { \
+    0x2B2F68D6, 0x0CD2, 0x44cf, {0x8E, 0x8B, 0xBB, 0xA2, 0x0B, 0x1B, 0x5B, 0x75 } \
+  }
 
 typedef struct _EFI_USB_IO_PROTOCOL EFI_USB_IO_PROTOCOL;
 
@@ -38,34 +34,34 @@ typedef struct _EFI_USB_IO_PROTOCOL EFI_USB_IO_PROTOCOL;
 //
 // USB standard descriptors and reqeust
 //
-typedef USB_DEVICE_REQUEST EFI_USB_DEVICE_REQUEST;
-typedef USB_DEVICE_DESCRIPTOR EFI_USB_DEVICE_DESCRIPTOR;
-typedef USB_CONFIG_DESCRIPTOR EFI_USB_CONFIG_DESCRIPTOR;
+typedef USB_DEVICE_REQUEST       EFI_USB_DEVICE_REQUEST;
+typedef USB_DEVICE_DESCRIPTOR    EFI_USB_DEVICE_DESCRIPTOR;
+typedef USB_CONFIG_DESCRIPTOR    EFI_USB_CONFIG_DESCRIPTOR;
 typedef USB_INTERFACE_DESCRIPTOR EFI_USB_INTERFACE_DESCRIPTOR;
-typedef USB_ENDPOINT_DESCRIPTOR EFI_USB_ENDPOINT_DESCRIPTOR;
+typedef USB_ENDPOINT_DESCRIPTOR  EFI_USB_ENDPOINT_DESCRIPTOR;
 
 ///
 /// USB data transfer direction
 ///
 typedef enum {
-    EfiUsbDataIn,
-    EfiUsbDataOut,
-    EfiUsbNoData
+  EfiUsbDataIn,
+  EfiUsbDataOut,
+  EfiUsbNoData
 } EFI_USB_DATA_DIRECTION;
 
-    //
-    // USB Transfer Results
-    //
-    #define EFI_USB_NOERROR 0x00
-    #define EFI_USB_ERR_NOTEXECUTE 0x01
-    #define EFI_USB_ERR_STALL 0x02
-    #define EFI_USB_ERR_BUFFER 0x04
-    #define EFI_USB_ERR_BABBLE 0x08
-    #define EFI_USB_ERR_NAK 0x10
-    #define EFI_USB_ERR_CRC 0x20
-    #define EFI_USB_ERR_TIMEOUT 0x40
-    #define EFI_USB_ERR_BITSTUFF 0x80
-    #define EFI_USB_ERR_SYSTEM 0x100
+//
+// USB Transfer Results
+//
+#define EFI_USB_NOERROR         0x00
+#define EFI_USB_ERR_NOTEXECUTE  0x01
+#define EFI_USB_ERR_STALL       0x02
+#define EFI_USB_ERR_BUFFER      0x04
+#define EFI_USB_ERR_BABBLE      0x08
+#define EFI_USB_ERR_NAK         0x10
+#define EFI_USB_ERR_CRC         0x20
+#define EFI_USB_ERR_TIMEOUT     0x40
+#define EFI_USB_ERR_BITSTUFF    0x80
+#define EFI_USB_ERR_SYSTEM      0x100
 
 /**
   Async USB transfer callback routine.
@@ -81,11 +77,14 @@ typedef enum {
   @retval EFI_DEVICE_ERROR      The asynchronous USB transfer request failed.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_ASYNC_USB_TRANSFER_CALLBACK)(
-    IN VOID* Data,
-    IN UINTN DataLength,
-    IN VOID* Context,
-    IN UINT32 Status);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_ASYNC_USB_TRANSFER_CALLBACK)(
+  IN VOID         *Data,
+  IN UINTN        DataLength,
+  IN VOID         *Context,
+  IN UINT32       Status
+  );
 
 //
 // Prototype for EFI USB I/O protocol
@@ -113,14 +112,17 @@ typedef EFI_STATUS(EFIAPI* EFI_ASYNC_USB_TRANSFER_CALLBACK)(
   @retval EFI_TIMEOUT           The control transfer fails due to timeout.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_CONTROL_TRANSFER)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    IN EFI_USB_DEVICE_REQUEST* Request,
-    IN EFI_USB_DATA_DIRECTION Direction,
-    IN UINT32 Timeout,
-    IN OUT VOID* Data OPTIONAL,
-    IN UINTN DataLength OPTIONAL,
-    OUT UINT32* Status);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_CONTROL_TRANSFER)(
+  IN EFI_USB_IO_PROTOCOL                        *This,
+  IN EFI_USB_DEVICE_REQUEST                     *Request,
+  IN EFI_USB_DATA_DIRECTION                     Direction,
+  IN UINT32                                     Timeout,
+  IN OUT VOID                                   *Data OPTIONAL,
+  IN UINTN                                      DataLength  OPTIONAL,
+  OUT UINT32                                    *Status
+  );
 
 /**
   This function is used to manage a USB device with the bulk transfer pipe. Bulk Transfers are
@@ -153,13 +155,16 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_CONTROL_TRANSFER)(
   @retval EFI_TIMEOUT           The control transfer fails due to timeout.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_BULK_TRANSFER)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    IN UINT8 DeviceEndpoint,
-    IN OUT VOID* Data,
-    IN OUT UINTN* DataLength,
-    IN UINTN Timeout,
-    OUT UINT32* Status);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_BULK_TRANSFER)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  IN UINT8                          DeviceEndpoint,
+  IN OUT VOID                       *Data,
+  IN OUT UINTN                      *DataLength,
+  IN UINTN                          Timeout,
+  OUT UINT32                        *Status
+  );
 
 /**
   This function is used to manage a USB device with an interrupt transfer pipe. An Asynchronous
@@ -195,14 +200,17 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_BULK_TRANSFER)(
   @retval EFI_DEVICE_ERROR      The asynchronous USB transfer request failed.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_ASYNC_INTERRUPT_TRANSFER)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    IN UINT8 DeviceEndpoint,
-    IN BOOLEAN IsNewTransfer,
-    IN UINTN PollingInterval OPTIONAL,
-    IN UINTN DataLength OPTIONAL,
-    IN EFI_ASYNC_USB_TRANSFER_CALLBACK InterruptCallBack OPTIONAL,
-    IN VOID* Context OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_ASYNC_INTERRUPT_TRANSFER)(
+  IN EFI_USB_IO_PROTOCOL                                 *This,
+  IN UINT8                                               DeviceEndpoint,
+  IN BOOLEAN                                             IsNewTransfer,
+  IN UINTN                                               PollingInterval    OPTIONAL,
+  IN UINTN                                               DataLength         OPTIONAL,
+  IN EFI_ASYNC_USB_TRANSFER_CALLBACK                     InterruptCallBack  OPTIONAL,
+  IN VOID                                                *Context OPTIONAL
+  );
 
 /**
   This function is used to manage a USB device with an interrupt transfer pipe.
@@ -232,13 +240,16 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_ASYNC_INTERRUPT_TRANSFER)(
   @retval EFI_OUT_OF_RESOURCES  The request could not be submitted due to a lack of resources.
   @retval EFI_TIMEOUT           The transfer fails due to timeout.
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_SYNC_INTERRUPT_TRANSFER)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    IN UINT8 DeviceEndpoint,
-    IN OUT VOID* Data,
-    IN OUT UINTN* DataLength,
-    IN UINTN Timeout,
-    OUT UINT32* Status);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_SYNC_INTERRUPT_TRANSFER)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  IN     UINT8                      DeviceEndpoint,
+  IN OUT VOID                       *Data,
+  IN OUT UINTN                      *DataLength,
+  IN     UINTN                      Timeout,
+  OUT    UINT32                     *Status
+  );
 
 /**
   This function is used to manage a USB device with an isochronous transfer pipe. An Isochronous
@@ -265,12 +276,15 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_SYNC_INTERRUPT_TRANSFER)(
   @retval EFI_OUT_OF_RESOURCES  The request could not be submitted due to a lack of resources.
   @retval EFI_TIMEOUT           The transfer fails due to timeout.
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_ISOCHRONOUS_TRANSFER)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    IN UINT8 DeviceEndpoint,
-    IN OUT VOID* Data,
-    IN UINTN DataLength,
-    OUT UINT32* Status);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_ISOCHRONOUS_TRANSFER)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  IN     UINT8                      DeviceEndpoint,
+  IN OUT VOID                       *Data,
+  IN     UINTN                      DataLength,
+  OUT    UINT32                     *Status
+  );
 
 /**
   This function is used to manage a USB device with an isochronous transfer pipe. An Isochronous
@@ -299,13 +313,16 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_ISOCHRONOUS_TRANSFER)(
   @retval EFI_OUT_OF_RESOURCES  The request could not be submitted due to a lack of resources.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_ASYNC_ISOCHRONOUS_TRANSFER)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    IN UINT8 DeviceEndpoint,
-    IN OUT VOID* Data,
-    IN UINTN DataLength,
-    IN EFI_ASYNC_USB_TRANSFER_CALLBACK IsochronousCallBack,
-    IN VOID* Context OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_ASYNC_ISOCHRONOUS_TRANSFER)(
+  IN EFI_USB_IO_PROTOCOL              *This,
+  IN UINT8                            DeviceEndpoint,
+  IN OUT VOID                         *Data,
+  IN     UINTN                        DataLength,
+  IN EFI_ASYNC_USB_TRANSFER_CALLBACK  IsochronousCallBack,
+  IN VOID                             *Context OPTIONAL
+  );
 
 /**
   Resets and reconfigures the USB controller. This function will work for all USB devices except
@@ -318,8 +335,11 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_ASYNC_ISOCHRONOUS_TRANSFER)(
   @retval EFI_DEVICE_ERROR      An error occurred during the reconfiguration process.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_PORT_RESET)(
-    IN EFI_USB_IO_PROTOCOL* This);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_PORT_RESET)(
+  IN EFI_USB_IO_PROTOCOL    *This
+  );
 
 /**
   Retrieves the USB Device Descriptor.
@@ -332,9 +352,12 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_PORT_RESET)(
   @retval EFI_NOT_FOUND         The device descriptor was not found. The device may not be configured.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_DEVICE_DESCRIPTOR)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    OUT EFI_USB_DEVICE_DESCRIPTOR* DeviceDescriptor);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_GET_DEVICE_DESCRIPTOR)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  OUT EFI_USB_DEVICE_DESCRIPTOR     *DeviceDescriptor
+  );
 
 /**
   Retrieves the USB Device Descriptor.
@@ -348,9 +371,12 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_DEVICE_DESCRIPTOR)(
                                   be configured.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_CONFIG_DESCRIPTOR)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    OUT EFI_USB_CONFIG_DESCRIPTOR* ConfigurationDescriptor);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_GET_CONFIG_DESCRIPTOR)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  OUT EFI_USB_CONFIG_DESCRIPTOR     *ConfigurationDescriptor
+  );
 
 /**
   Retrieves the Interface Descriptor for a USB Device Controller. As stated earlier, an interface
@@ -365,9 +391,12 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_CONFIG_DESCRIPTOR)(
                                   correctly configured.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_INTERFACE_DESCRIPTOR)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    OUT EFI_USB_INTERFACE_DESCRIPTOR* InterfaceDescriptor);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_GET_INTERFACE_DESCRIPTOR)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  OUT EFI_USB_INTERFACE_DESCRIPTOR  *InterfaceDescriptor
+  );
 
 /**
   Retrieves an Endpoint Descriptor within a USB Controller.
@@ -383,10 +412,13 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_INTERFACE_DESCRIPTOR)(
                                   correctly configured.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_ENDPOINT_DESCRIPTOR)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    IN UINT8 EndpointIndex,
-    OUT EFI_USB_ENDPOINT_DESCRIPTOR* EndpointDescriptor);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_GET_ENDPOINT_DESCRIPTOR)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  IN  UINT8                         EndpointIndex,
+  OUT EFI_USB_ENDPOINT_DESCRIPTOR   *EndpointDescriptor
+  );
 
 /**
   Retrieves a string stored in a USB Device.
@@ -405,11 +437,14 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_ENDPOINT_DESCRIPTOR)(
   @retval EFI_OUT_OF_RESOURCES    There are not enough resources to allocate the return buffer String.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_STRING_DESCRIPTOR)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    IN UINT16 LangID,
-    IN UINT8 StringID,
-    OUT CHAR16** String);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_GET_STRING_DESCRIPTOR)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  IN  UINT16                        LangID,
+  IN  UINT8                         StringID,
+  OUT CHAR16                        **String
+  );
 
 /**
   Retrieves all the language ID codes that the USB device supports.
@@ -425,10 +460,13 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_STRING_DESCRIPTOR)(
   @retval EFI_SUCCESS             The support languages were retrieved successfully.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_SUPPORTED_LANGUAGE)(
-    IN EFI_USB_IO_PROTOCOL* This,
-    OUT UINT16** LangIDTable,
-    OUT UINT16* TableSize);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_IO_GET_SUPPORTED_LANGUAGE)(
+  IN EFI_USB_IO_PROTOCOL            *This,
+  OUT UINT16                        **LangIDTable,
+  OUT UINT16                        *TableSize
+  );
 
 ///
 /// The EFI_USB_IO_PROTOCOL provides four basic transfers types described
@@ -438,32 +476,32 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_IO_GET_SUPPORTED_LANGUAGE)(
 /// interfaces. A USB device driver uses the services of this protocol to manage USB devices.
 ///
 struct _EFI_USB_IO_PROTOCOL {
-    //
-    // IO transfer
-    //
-    EFI_USB_IO_CONTROL_TRANSFER UsbControlTransfer;
-    EFI_USB_IO_BULK_TRANSFER UsbBulkTransfer;
-    EFI_USB_IO_ASYNC_INTERRUPT_TRANSFER UsbAsyncInterruptTransfer;
-    EFI_USB_IO_SYNC_INTERRUPT_TRANSFER UsbSyncInterruptTransfer;
-    EFI_USB_IO_ISOCHRONOUS_TRANSFER UsbIsochronousTransfer;
-    EFI_USB_IO_ASYNC_ISOCHRONOUS_TRANSFER UsbAsyncIsochronousTransfer;
+  //
+  // IO transfer
+  //
+  EFI_USB_IO_CONTROL_TRANSFER              UsbControlTransfer;
+  EFI_USB_IO_BULK_TRANSFER                 UsbBulkTransfer;
+  EFI_USB_IO_ASYNC_INTERRUPT_TRANSFER      UsbAsyncInterruptTransfer;
+  EFI_USB_IO_SYNC_INTERRUPT_TRANSFER       UsbSyncInterruptTransfer;
+  EFI_USB_IO_ISOCHRONOUS_TRANSFER          UsbIsochronousTransfer;
+  EFI_USB_IO_ASYNC_ISOCHRONOUS_TRANSFER    UsbAsyncIsochronousTransfer;
 
-    //
-    // Common device request
-    //
-    EFI_USB_IO_GET_DEVICE_DESCRIPTOR UsbGetDeviceDescriptor;
-    EFI_USB_IO_GET_CONFIG_DESCRIPTOR UsbGetConfigDescriptor;
-    EFI_USB_IO_GET_INTERFACE_DESCRIPTOR UsbGetInterfaceDescriptor;
-    EFI_USB_IO_GET_ENDPOINT_DESCRIPTOR UsbGetEndpointDescriptor;
-    EFI_USB_IO_GET_STRING_DESCRIPTOR UsbGetStringDescriptor;
-    EFI_USB_IO_GET_SUPPORTED_LANGUAGE UsbGetSupportedLanguages;
+  //
+  // Common device request
+  //
+  EFI_USB_IO_GET_DEVICE_DESCRIPTOR         UsbGetDeviceDescriptor;
+  EFI_USB_IO_GET_CONFIG_DESCRIPTOR         UsbGetConfigDescriptor;
+  EFI_USB_IO_GET_INTERFACE_DESCRIPTOR      UsbGetInterfaceDescriptor;
+  EFI_USB_IO_GET_ENDPOINT_DESCRIPTOR       UsbGetEndpointDescriptor;
+  EFI_USB_IO_GET_STRING_DESCRIPTOR         UsbGetStringDescriptor;
+  EFI_USB_IO_GET_SUPPORTED_LANGUAGE        UsbGetSupportedLanguages;
 
-    //
-    // Reset controller's parent port
-    //
-    EFI_USB_IO_PORT_RESET UsbPortReset;
+  //
+  // Reset controller's parent port
+  //
+  EFI_USB_IO_PORT_RESET                    UsbPortReset;
 };
 
-extern EFI_GUID gEfiUsbIoProtocolGuid;
+extern EFI_GUID  gEfiUsbIoProtocolGuid;
 
 #endif

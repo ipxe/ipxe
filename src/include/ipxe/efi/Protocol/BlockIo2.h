@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   Block IO2 protocol as defined in the UEFI 2.3.1 specification.
 
@@ -13,18 +11,16 @@
 **/
 
 #ifndef __BLOCK_IO2_H__
-    #define __BLOCK_IO2_H__
+#define __BLOCK_IO2_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #include <ipxe/efi/Protocol/BlockIo.h>
+#include <ipxe/efi/Protocol/BlockIo.h>
 
-    #define EFI_BLOCK_IO2_PROTOCOL_GUID                        \
-        {                                                      \
-            0xa77b2472, 0xe282, 0x4e9f, {                      \
-                0xa2, 0x45, 0xc2, 0xc0, 0xe2, 0x7b, 0xbc, 0xc1 \
-            }                                                  \
-        }
+#define EFI_BLOCK_IO2_PROTOCOL_GUID \
+  { \
+    0xa77b2472, 0xe282, 0x4e9f, {0xa2, 0x45, 0xc2, 0xc0, 0xe2, 0x7b, 0xbc, 0xc1} \
+  }
 
 typedef struct _EFI_BLOCK_IO2_PROTOCOL EFI_BLOCK_IO2_PROTOCOL;
 
@@ -32,17 +28,17 @@ typedef struct _EFI_BLOCK_IO2_PROTOCOL EFI_BLOCK_IO2_PROTOCOL;
   The struct of Block IO2 Token.
 **/
 typedef struct {
-    ///
-    /// If Event is NULL, then blocking I/O is performed.If Event is not NULL and
-    /// non-blocking I/O is supported, then non-blocking I/O is performed, and
-    /// Event will be signaled when the read request is completed.
-    ///
-    EFI_EVENT Event;
+  ///
+  /// If Event is NULL, then blocking I/O is performed.If Event is not NULL and
+  /// non-blocking I/O is supported, then non-blocking I/O is performed, and
+  /// Event will be signaled when the read request is completed.
+  ///
+  EFI_EVENT     Event;
 
-    ///
-    /// Defines whether or not the signaled event encountered an error.
-    ///
-    EFI_STATUS TransactionStatus;
+  ///
+  /// Defines whether or not the signaled event encountered an error.
+  ///
+  EFI_STATUS    TransactionStatus;
 } EFI_BLOCK_IO2_TOKEN;
 
 /**
@@ -58,9 +54,12 @@ typedef struct {
                                not be reset.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_BLOCK_RESET_EX)(
-    IN EFI_BLOCK_IO2_PROTOCOL* This,
-    IN BOOLEAN ExtendedVerification);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_BLOCK_RESET_EX)(
+  IN EFI_BLOCK_IO2_PROTOCOL  *This,
+  IN BOOLEAN                 ExtendedVerification
+  );
 
 /**
   Read BufferSize bytes from Lba into Buffer.
@@ -95,13 +94,16 @@ typedef EFI_STATUS(EFIAPI* EFI_BLOCK_RESET_EX)(
   @retval EFI_OUT_OF_RESOURCES  The request could not be completed due to a lack
                                 of resources.
 **/
-typedef EFI_STATUS(EFIAPI* EFI_BLOCK_READ_EX)(
-    IN EFI_BLOCK_IO2_PROTOCOL* This,
-    IN UINT32 MediaId,
-    IN EFI_LBA LBA,
-    IN OUT EFI_BLOCK_IO2_TOKEN* Token,
-    IN UINTN BufferSize,
-    OUT VOID* Buffer);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_BLOCK_READ_EX)(
+  IN     EFI_BLOCK_IO2_PROTOCOL *This,
+  IN     UINT32                 MediaId,
+  IN     EFI_LBA                LBA,
+  IN OUT EFI_BLOCK_IO2_TOKEN    *Token,
+  IN     UINTN                  BufferSize,
+  OUT VOID                  *Buffer
+  );
 
 /**
   Write BufferSize bytes from Lba into Buffer.
@@ -134,13 +136,16 @@ typedef EFI_STATUS(EFIAPI* EFI_BLOCK_READ_EX)(
                                 of resources.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_BLOCK_WRITE_EX)(
-    IN EFI_BLOCK_IO2_PROTOCOL* This,
-    IN UINT32 MediaId,
-    IN EFI_LBA LBA,
-    IN OUT EFI_BLOCK_IO2_TOKEN* Token,
-    IN UINTN BufferSize,
-    IN VOID* Buffer);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_BLOCK_WRITE_EX)(
+  IN     EFI_BLOCK_IO2_PROTOCOL  *This,
+  IN     UINT32                 MediaId,
+  IN     EFI_LBA                LBA,
+  IN OUT EFI_BLOCK_IO2_TOKEN    *Token,
+  IN     UINTN                  BufferSize,
+  IN     VOID                   *Buffer
+  );
 
 /**
   Flush the Block Device.
@@ -164,9 +169,12 @@ typedef EFI_STATUS(EFIAPI* EFI_BLOCK_WRITE_EX)(
                                of resources.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_BLOCK_FLUSH_EX)(
-    IN EFI_BLOCK_IO2_PROTOCOL* This,
-    IN OUT EFI_BLOCK_IO2_TOKEN* Token);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_BLOCK_FLUSH_EX)(
+  IN     EFI_BLOCK_IO2_PROTOCOL   *This,
+  IN OUT EFI_BLOCK_IO2_TOKEN      *Token
+  );
 
 ///
 ///  The Block I/O2 protocol defines an extension to the Block I/O protocol which
@@ -174,18 +182,18 @@ typedef EFI_STATUS(EFIAPI* EFI_BLOCK_FLUSH_EX)(
 //   manner.
 ///
 struct _EFI_BLOCK_IO2_PROTOCOL {
-    ///
-    /// A pointer to the EFI_BLOCK_IO_MEDIA data for this device.
-    /// Type EFI_BLOCK_IO_MEDIA is defined in BlockIo.h.
-    ///
-    EFI_BLOCK_IO_MEDIA* Media;
+  ///
+  /// A pointer to the EFI_BLOCK_IO_MEDIA data for this device.
+  /// Type EFI_BLOCK_IO_MEDIA is defined in BlockIo.h.
+  ///
+  EFI_BLOCK_IO_MEDIA    *Media;
 
-    EFI_BLOCK_RESET_EX Reset;
-    EFI_BLOCK_READ_EX ReadBlocksEx;
-    EFI_BLOCK_WRITE_EX WriteBlocksEx;
-    EFI_BLOCK_FLUSH_EX FlushBlocksEx;
+  EFI_BLOCK_RESET_EX    Reset;
+  EFI_BLOCK_READ_EX     ReadBlocksEx;
+  EFI_BLOCK_WRITE_EX    WriteBlocksEx;
+  EFI_BLOCK_FLUSH_EX    FlushBlocksEx;
 };
 
-extern EFI_GUID gEfiBlockIo2ProtocolGuid;
+extern EFI_GUID  gEfiBlockIo2ProtocolGuid;
 
 #endif

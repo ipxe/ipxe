@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/general.h>
 #include <config/console.h>
@@ -38,14 +38,14 @@ PROVIDE_REQUIRING_SYMBOL();
  */
 
 #ifdef CONSOLE_EFI
-REQUIRE_OBJECT(efi_console);
+REQUIRE_OBJECT ( efi_console );
 #endif
 #ifdef CONSOLE_EFIFB
-REQUIRE_OBJECT(efi_fbcon);
+REQUIRE_OBJECT ( efi_fbcon );
 #endif
 #ifdef CONSOLE_FRAMEBUFFER
-REQUIRE_OBJECT(efi_fbcon);
+REQUIRE_OBJECT ( efi_fbcon );
 #endif
 #ifdef DOWNLOAD_PROTO_FILE
-REQUIRE_OBJECT(efi_local);
+REQUIRE_OBJECT ( efi_local );
 #endif

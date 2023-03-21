@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   EFI ARP Protocol Definition
 
@@ -18,103 +16,99 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef __EFI_ARP_PROTOCOL_H__
-    #define __EFI_ARP_PROTOCOL_H__
+#define __EFI_ARP_PROTOCOL_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #define EFI_ARP_SERVICE_BINDING_PROTOCOL_GUID           \
-        {                                                   \
-            0xf44c00ee, 0x1f2c, 0x4a00, {                   \
-                0xaa, 0x9, 0x1c, 0x9f, 0x3e, 0x8, 0x0, 0xa3 \
-            }                                               \
-        }
+#define EFI_ARP_SERVICE_BINDING_PROTOCOL_GUID \
+  { \
+    0xf44c00ee, 0x1f2c, 0x4a00, {0xaa, 0x9, 0x1c, 0x9f, 0x3e, 0x8, 0x0, 0xa3 } \
+  }
 
-    #define EFI_ARP_PROTOCOL_GUID                              \
-        {                                                      \
-            0xf4b427bb, 0xba21, 0x4f16, {                      \
-                0xbc, 0x4e, 0x43, 0xe4, 0x16, 0xab, 0x61, 0x9c \
-            }                                                  \
-        }
+#define EFI_ARP_PROTOCOL_GUID \
+  { \
+    0xf4b427bb, 0xba21, 0x4f16, {0xbc, 0x4e, 0x43, 0xe4, 0x16, 0xab, 0x61, 0x9c } \
+  }
 
 typedef struct _EFI_ARP_PROTOCOL EFI_ARP_PROTOCOL;
 
 typedef struct {
-    ///
-    /// Length in bytes of this entry.
-    ///
-    UINT32 Size;
+  ///
+  /// Length in bytes of this entry.
+  ///
+  UINT32     Size;
 
-    ///
-    /// Set to TRUE if this entry is a "deny" entry.
-    /// Set to FALSE if this entry is a "normal" entry.
-    ///
-    BOOLEAN DenyFlag;
+  ///
+  /// Set to TRUE if this entry is a "deny" entry.
+  /// Set to FALSE if this entry is a "normal" entry.
+  ///
+  BOOLEAN    DenyFlag;
 
-    ///
-    /// Set to TRUE if this entry will not time out.
-    /// Set to FALSE if this entry will time out.
-    ///
-    BOOLEAN StaticFlag;
+  ///
+  /// Set to TRUE if this entry will not time out.
+  /// Set to FALSE if this entry will time out.
+  ///
+  BOOLEAN    StaticFlag;
 
-    ///
-    /// 16-bit ARP hardware identifier number.
-    ///
-    UINT16 HwAddressType;
+  ///
+  /// 16-bit ARP hardware identifier number.
+  ///
+  UINT16     HwAddressType;
 
-    ///
-    /// 16-bit protocol type number.
-    ///
-    UINT16 SwAddressType;
+  ///
+  /// 16-bit protocol type number.
+  ///
+  UINT16     SwAddressType;
 
-    ///
-    /// The length of the hardware address.
-    ///
-    UINT8 HwAddressLength;
+  ///
+  /// The length of the hardware address.
+  ///
+  UINT8      HwAddressLength;
 
-    ///
-    /// The length of the protocol address.
-    ///
-    UINT8 SwAddressLength;
+  ///
+  /// The length of the protocol address.
+  ///
+  UINT8      SwAddressLength;
 } EFI_ARP_FIND_DATA;
 
 typedef struct {
-    ///
-    /// 16-bit protocol type number in host byte order.
-    ///
-    UINT16 SwAddressType;
+  ///
+  /// 16-bit protocol type number in host byte order.
+  ///
+  UINT16    SwAddressType;
 
-    ///
-    /// The length in bytes of the station's protocol address to register.
-    ///
-    UINT8 SwAddressLength;
+  ///
+  /// The length in bytes of the station's protocol address to register.
+  ///
+  UINT8     SwAddressLength;
 
-    ///
-    /// The pointer to the first byte of the protocol address to register. For
-    /// example, if SwAddressType is 0x0800 (IP), then
-    /// StationAddress points to the first byte of this station's IP
-    /// address stored in network byte order.
-    ///
-    VOID* StationAddress;
+  ///
+  /// The pointer to the first byte of the protocol address to register. For
+  /// example, if SwAddressType is 0x0800 (IP), then
+  /// StationAddress points to the first byte of this station's IP
+  /// address stored in network byte order.
+  ///
+  VOID      *StationAddress;
 
-    ///
-    /// The timeout value in 100-ns units that is associated with each
-    /// new dynamic ARP cache entry. If it is set to zero, the value is
-    /// implementation-specific.
-    ///
-    UINT32 EntryTimeOut;
+  ///
+  /// The timeout value in 100-ns units that is associated with each
+  /// new dynamic ARP cache entry. If it is set to zero, the value is
+  /// implementation-specific.
+  ///
+  UINT32    EntryTimeOut;
 
-    ///
-    /// The number of retries before a MAC address is resolved. If it is
-    /// set to zero, the value is implementation-specific.
-    ///
-    UINT32 RetryCount;
+  ///
+  /// The number of retries before a MAC address is resolved. If it is
+  /// set to zero, the value is implementation-specific.
+  ///
+  UINT32    RetryCount;
 
-    ///
-    /// The timeout value in 100-ns units that is used to wait for the ARP
-    /// reply packet or the timeout value between two retries. Set to zero
-    /// to use implementation-specific value.
-    ///
-    UINT32 RetryTimeOut;
+  ///
+  /// The timeout value in 100-ns units that is used to wait for the ARP
+  /// reply packet or the timeout value between two retries. Set to zero
+  /// to use implementation-specific value.
+  ///
+  UINT32    RetryTimeOut;
 } EFI_ARP_CONFIG_DATA;
 
 /**
@@ -145,9 +139,12 @@ typedef struct {
                                  allocated.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_ARP_CONFIGURE)(
-    IN EFI_ARP_PROTOCOL* This,
-    IN EFI_ARP_CONFIG_DATA* ConfigData OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_ARP_CONFIGURE)(
+  IN EFI_ARP_PROTOCOL       *This,
+  IN EFI_ARP_CONFIG_DATA    *ConfigData   OPTIONAL
+  );
 
 /**
   This function is used to insert entries into the ARP cache.
@@ -194,13 +191,16 @@ typedef EFI_STATUS(EFIAPI* EFI_ARP_CONFIGURE)(
   @retval EFI_NOT_STARTED        The ARP driver instance has not been configured.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_ARP_ADD)(
-    IN EFI_ARP_PROTOCOL* This,
-    IN BOOLEAN DenyFlag,
-    IN VOID* TargetSwAddress OPTIONAL,
-    IN VOID* TargetHwAddress OPTIONAL,
-    IN UINT32 TimeoutValue,
-    IN BOOLEAN Overwrite);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_ARP_ADD)(
+  IN EFI_ARP_PROTOCOL       *This,
+  IN BOOLEAN                DenyFlag,
+  IN VOID                   *TargetSwAddress  OPTIONAL,
+  IN VOID                   *TargetHwAddress  OPTIONAL,
+  IN UINT32                 TimeoutValue,
+  IN BOOLEAN                Overwrite
+  );
 
 /**
   This function searches the ARP cache for matching entries and allocates a buffer into
@@ -236,14 +236,17 @@ typedef EFI_STATUS(EFIAPI* EFI_ARP_ADD)(
   @retval EFI_NOT_STARTED        The ARP driver instance has not been configured.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_ARP_FIND)(
-    IN EFI_ARP_PROTOCOL* This,
-    IN BOOLEAN BySwAddress,
-    IN VOID* AddressBuffer OPTIONAL,
-    OUT UINT32* EntryLength OPTIONAL,
-    OUT UINT32* EntryCount OPTIONAL,
-    OUT EFI_ARP_FIND_DATA** Entries OPTIONAL,
-    IN BOOLEAN Refresh);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_ARP_FIND)(
+  IN EFI_ARP_PROTOCOL       *This,
+  IN BOOLEAN                BySwAddress,
+  IN VOID                   *AddressBuffer    OPTIONAL,
+  OUT UINT32                *EntryLength      OPTIONAL,
+  OUT UINT32                *EntryCount       OPTIONAL,
+  OUT EFI_ARP_FIND_DATA     **Entries         OPTIONAL,
+  IN BOOLEAN                Refresh
+  );
 
 /**
   This function removes specified ARP cache entries.
@@ -262,10 +265,13 @@ typedef EFI_STATUS(EFIAPI* EFI_ARP_FIND)(
   @retval EFI_NOT_STARTED        The ARP driver instance has not been configured.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_ARP_DELETE)(
-    IN EFI_ARP_PROTOCOL* This,
-    IN BOOLEAN BySwAddress,
-    IN VOID* AddressBuffer OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_ARP_DELETE)(
+  IN EFI_ARP_PROTOCOL       *This,
+  IN BOOLEAN                BySwAddress,
+  IN VOID                   *AddressBuffer   OPTIONAL
+  );
 
 /**
   This function delete all dynamic entries from the ARP cache that match the specified
@@ -279,8 +285,11 @@ typedef EFI_STATUS(EFIAPI* EFI_ARP_DELETE)(
   @retval EFI_NOT_STARTED        The ARP driver instance has not been configured.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_ARP_FLUSH)(
-    IN EFI_ARP_PROTOCOL* This);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_ARP_FLUSH)(
+  IN EFI_ARP_PROTOCOL       *This
+  );
 
 /**
   This function tries to resolve the TargetSwAddress and optionally returns a
@@ -304,11 +313,14 @@ typedef EFI_STATUS(EFIAPI* EFI_ARP_FLUSH)(
   @retval EFI_NOT_READY          The request has been started and is not finished.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_ARP_REQUEST)(
-    IN EFI_ARP_PROTOCOL* This,
-    IN VOID* TargetSwAddress OPTIONAL,
-    IN EFI_EVENT ResolvedEvent OPTIONAL,
-    OUT VOID* TargetHwAddress);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_ARP_REQUEST)(
+  IN EFI_ARP_PROTOCOL       *This,
+  IN VOID                   *TargetSwAddress  OPTIONAL,
+  IN EFI_EVENT              ResolvedEvent     OPTIONAL,
+  OUT VOID                  *TargetHwAddress
+  );
 
 /**
   This function aborts the previous ARP request (identified by This, TargetSwAddress
@@ -338,26 +350,29 @@ typedef EFI_STATUS(EFIAPI* EFI_ARP_REQUEST)(
 
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_ARP_CANCEL)(
-    IN EFI_ARP_PROTOCOL* This,
-    IN VOID* TargetSwAddress OPTIONAL,
-    IN EFI_EVENT ResolvedEvent OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_ARP_CANCEL)(
+  IN EFI_ARP_PROTOCOL       *This,
+  IN VOID                   *TargetSwAddress  OPTIONAL,
+  IN EFI_EVENT              ResolvedEvent     OPTIONAL
+  );
 
 ///
 /// ARP is used to resolve local network protocol addresses into
 /// network hardware addresses.
 ///
 struct _EFI_ARP_PROTOCOL {
-    EFI_ARP_CONFIGURE Configure;
-    EFI_ARP_ADD Add;
-    EFI_ARP_FIND Find;
-    EFI_ARP_DELETE Delete;
-    EFI_ARP_FLUSH Flush;
-    EFI_ARP_REQUEST Request;
-    EFI_ARP_CANCEL Cancel;
+  EFI_ARP_CONFIGURE    Configure;
+  EFI_ARP_ADD          Add;
+  EFI_ARP_FIND         Find;
+  EFI_ARP_DELETE       Delete;
+  EFI_ARP_FLUSH        Flush;
+  EFI_ARP_REQUEST      Request;
+  EFI_ARP_CANCEL       Cancel;
 };
 
-extern EFI_GUID gEfiArpServiceBindingProtocolGuid;
-extern EFI_GUID gEfiArpProtocolGuid;
+extern EFI_GUID  gEfiArpServiceBindingProtocolGuid;
+extern EFI_GUID  gEfiArpProtocolGuid;
 
 #endif

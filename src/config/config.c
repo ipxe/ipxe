@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/general.h>
 #include <config/console.h>
@@ -52,31 +52,31 @@ PROVIDE_REQUIRING_SYMBOL();
  */
 
 #ifdef CONSOLE_SERIAL
-REQUIRE_OBJECT(serial);
+REQUIRE_OBJECT ( serial );
 #endif
 #ifdef CONSOLE_DIRECT_VGA
-REQUIRE_OBJECT(video_subr);
+REQUIRE_OBJECT ( video_subr );
 #endif
 #ifdef CONSOLE_PC_KBD
-REQUIRE_OBJECT(pc_kbd);
+REQUIRE_OBJECT ( pc_kbd );
 #endif
 #ifdef CONSOLE_SYSLOG
-REQUIRE_OBJECT(syslog);
+REQUIRE_OBJECT ( syslog );
 #endif
 #ifdef CONSOLE_SYSLOGS
-REQUIRE_OBJECT(syslogs);
+REQUIRE_OBJECT ( syslogs );
 #endif
 #ifdef CONSOLE_EFI
-REQUIRE_OBJECT(efi_console);
+REQUIRE_OBJECT ( efi_console );
 #endif
 #ifdef CONSOLE_LINUX
-REQUIRE_OBJECT(linux_console);
+REQUIRE_OBJECT ( linux_console );
 #endif
 #ifdef CONSOLE_VMWARE
-REQUIRE_OBJECT(vmconsole);
+REQUIRE_OBJECT ( vmconsole );
 #endif
 #ifdef CONSOLE_DEBUGCON
-REQUIRE_OBJECT(debugcon);
+REQUIRE_OBJECT ( debugcon );
 #endif
 
 /*
@@ -84,10 +84,10 @@ REQUIRE_OBJECT(debugcon);
  *
  */
 #ifdef NET_PROTO_IPV4
-REQUIRE_OBJECT(ipv4);
+REQUIRE_OBJECT ( ipv4 );
 #endif
 #ifdef NET_PROTO_IPV6
-REQUIRE_OBJECT(ipv6);
+REQUIRE_OBJECT ( ipv6 );
 #endif
 
 /*
@@ -95,10 +95,10 @@ REQUIRE_OBJECT(ipv6);
  *
  */
 #ifdef PXE_MENU
-REQUIRE_OBJECT(pxemenu);
+REQUIRE_OBJECT ( pxemenu );
 #endif
 #ifdef PXE_STACK
-REQUIRE_OBJECT(pxe_call);
+REQUIRE_OBJECT ( pxe_call );
 #endif
 
 /*
@@ -106,22 +106,22 @@ REQUIRE_OBJECT(pxe_call);
  *
  */
 #ifdef DOWNLOAD_PROTO_TFTP
-REQUIRE_OBJECT(tftp);
+REQUIRE_OBJECT ( tftp );
 #endif
 #ifdef DOWNLOAD_PROTO_HTTP
-REQUIRE_OBJECT(http);
+REQUIRE_OBJECT ( http );
 #endif
 #ifdef DOWNLOAD_PROTO_HTTPS
-REQUIRE_OBJECT(https);
+REQUIRE_OBJECT ( https );
 #endif
 #ifdef DOWNLOAD_PROTO_FTP
-REQUIRE_OBJECT(ftp);
+REQUIRE_OBJECT ( ftp );
 #endif
 #ifdef DOWNLOAD_PROTO_NFS
-REQUIRE_OBJECT(nfs_open);
+REQUIRE_OBJECT ( nfs_open );
 #endif
 #ifdef DOWNLOAD_PROTO_SLAM
-REQUIRE_OBJECT(slam);
+REQUIRE_OBJECT ( slam );
 #endif
 
 /*
@@ -129,10 +129,10 @@ REQUIRE_OBJECT(slam);
  *
  */
 #ifdef SANBOOT_PROTO_ISCSI
-REQUIRE_OBJECT(iscsi);
+REQUIRE_OBJECT ( iscsi );
 #endif
 #ifdef SANBOOT_PROTO_HTTP
-REQUIRE_OBJECT(httpblock);
+REQUIRE_OBJECT ( httpblock );
 #endif
 
 /*
@@ -140,7 +140,7 @@ REQUIRE_OBJECT(httpblock);
  *
  */
 #ifdef DNS_RESOLVER
-REQUIRE_OBJECT(dns);
+REQUIRE_OBJECT ( dns );
 #endif
 
 /*
@@ -148,45 +148,45 @@ REQUIRE_OBJECT(dns);
  *
  */
 #ifdef IMAGE_NBI
-REQUIRE_OBJECT(nbi);
+REQUIRE_OBJECT ( nbi );
 #endif
 #ifdef IMAGE_ELF
-REQUIRE_OBJECT(elfboot);
+REQUIRE_OBJECT ( elfboot );
 #endif
 #ifdef IMAGE_MULTIBOOT
-REQUIRE_OBJECT(multiboot);
+REQUIRE_OBJECT ( multiboot );
 #endif
 #ifdef IMAGE_PXE
-REQUIRE_OBJECT(pxe_image);
+REQUIRE_OBJECT ( pxe_image );
 #endif
 #ifdef IMAGE_SCRIPT
-REQUIRE_OBJECT(script);
+REQUIRE_OBJECT ( script );
 #endif
 #ifdef IMAGE_BZIMAGE
-REQUIRE_OBJECT(bzimage);
+REQUIRE_OBJECT ( bzimage );
 #endif
 #ifdef IMAGE_ELTORITO
-REQUIRE_OBJECT(eltorito);
+REQUIRE_OBJECT ( eltorito );
 #endif
 #ifdef IMAGE_COMBOOT
-REQUIRE_OBJECT(comboot);
-REQUIRE_OBJECT(com32);
-REQUIRE_OBJECT(comboot_call);
-REQUIRE_OBJECT(com32_call);
-REQUIRE_OBJECT(com32_wrapper);
-REQUIRE_OBJECT(comboot_resolv);
+REQUIRE_OBJECT ( comboot );
+REQUIRE_OBJECT ( com32 );
+REQUIRE_OBJECT ( comboot_call );
+REQUIRE_OBJECT ( com32_call );
+REQUIRE_OBJECT ( com32_wrapper );
+REQUIRE_OBJECT ( comboot_resolv );
 #endif
 #ifdef IMAGE_EFI
-REQUIRE_OBJECT(efi_image);
+REQUIRE_OBJECT ( efi_image );
 #endif
 #ifdef IMAGE_SDI
-REQUIRE_OBJECT(sdi);
+REQUIRE_OBJECT ( sdi );
 #endif
 #ifdef IMAGE_ZLIB
-REQUIRE_OBJECT(zlib);
+REQUIRE_OBJECT ( zlib );
 #endif
 #ifdef IMAGE_GZIP
-REQUIRE_OBJECT(gzip);
+REQUIRE_OBJECT ( gzip );
 #endif
 
 /*
@@ -194,101 +194,101 @@ REQUIRE_OBJECT(gzip);
  *
  */
 #ifdef AUTOBOOT_CMD
-REQUIRE_OBJECT(autoboot_cmd);
+REQUIRE_OBJECT ( autoboot_cmd );
 #endif
 #ifdef NVO_CMD
-REQUIRE_OBJECT(nvo_cmd);
+REQUIRE_OBJECT ( nvo_cmd );
 #endif
 #ifdef CONFIG_CMD
-REQUIRE_OBJECT(config_cmd);
+REQUIRE_OBJECT ( config_cmd );
 #endif
 #ifdef IFMGMT_CMD
-REQUIRE_OBJECT(ifmgmt_cmd);
+REQUIRE_OBJECT ( ifmgmt_cmd );
 #endif
 /* IWMGMT_CMD is brought in by net80211.c if requested */
 #ifdef ROUTE_CMD
-REQUIRE_OBJECT(route_cmd);
+REQUIRE_OBJECT ( route_cmd );
 #endif
 #ifdef IMAGE_CMD
-REQUIRE_OBJECT(image_cmd);
+REQUIRE_OBJECT ( image_cmd );
 #endif
 #ifdef IMAGE_TRUST_CMD
-REQUIRE_OBJECT(image_trust_cmd);
+REQUIRE_OBJECT ( image_trust_cmd );
 #endif
 #ifdef DHCP_CMD
-REQUIRE_OBJECT(dhcp_cmd);
+REQUIRE_OBJECT ( dhcp_cmd );
 #endif
 #ifdef SANBOOT_CMD
-REQUIRE_OBJECT(sanboot_cmd);
+REQUIRE_OBJECT ( sanboot_cmd );
 #endif
 #ifdef MENU_CMD
-REQUIRE_OBJECT(menu_cmd);
+REQUIRE_OBJECT ( menu_cmd );
 #endif
 #ifdef LOGIN_CMD
-REQUIRE_OBJECT(login_cmd);
+REQUIRE_OBJECT ( login_cmd );
 #endif
 #ifdef TIME_CMD
-REQUIRE_OBJECT(time_cmd);
+REQUIRE_OBJECT ( time_cmd );
 #endif
 #ifdef DIGEST_CMD
-REQUIRE_OBJECT(digest_cmd);
+REQUIRE_OBJECT ( digest_cmd );
 #endif
 #ifdef PXE_CMD
-REQUIRE_OBJECT(pxe_cmd);
+REQUIRE_OBJECT ( pxe_cmd );
 #endif
 #ifdef LOTEST_CMD
-REQUIRE_OBJECT(lotest_cmd);
+REQUIRE_OBJECT ( lotest_cmd );
 #endif
 #ifdef VLAN_CMD
-REQUIRE_OBJECT(vlan_cmd);
+REQUIRE_OBJECT ( vlan_cmd );
 #endif
 #ifdef POWEROFF_CMD
-REQUIRE_OBJECT(poweroff_cmd);
+REQUIRE_OBJECT ( poweroff_cmd );
 #endif
 #ifdef REBOOT_CMD
-REQUIRE_OBJECT(reboot_cmd);
+REQUIRE_OBJECT ( reboot_cmd );
 #endif
 #ifdef CPUID_CMD
-REQUIRE_OBJECT(cpuid_cmd);
+REQUIRE_OBJECT ( cpuid_cmd );
 #endif
 #ifdef SYNC_CMD
-REQUIRE_OBJECT(sync_cmd);
+REQUIRE_OBJECT ( sync_cmd );
 #endif
 #ifdef SHELL_CMD
-REQUIRE_OBJECT(shell);
+REQUIRE_OBJECT ( shell );
 #endif
 #ifdef NSLOOKUP_CMD
-REQUIRE_OBJECT(nslookup_cmd);
+REQUIRE_OBJECT ( nslookup_cmd );
 #endif
 #ifdef PCI_CMD
-REQUIRE_OBJECT(pci_cmd);
+REQUIRE_OBJECT ( pci_cmd );
 #endif
 #ifdef PARAM_CMD
-REQUIRE_OBJECT(param_cmd);
+REQUIRE_OBJECT ( param_cmd );
 #endif
 #ifdef NEIGHBOUR_CMD
-REQUIRE_OBJECT(neighbour_cmd);
+REQUIRE_OBJECT ( neighbour_cmd );
 #endif
 #ifdef PING_CMD
-REQUIRE_OBJECT(ping_cmd);
+REQUIRE_OBJECT ( ping_cmd );
 #endif
 #ifdef CONSOLE_CMD
-REQUIRE_OBJECT(console_cmd);
+REQUIRE_OBJECT ( console_cmd );
 #endif
 #ifdef IPSTAT_CMD
-REQUIRE_OBJECT(ipstat_cmd);
+REQUIRE_OBJECT ( ipstat_cmd );
 #endif
 #ifdef PROFSTAT_CMD
-REQUIRE_OBJECT(profstat_cmd);
+REQUIRE_OBJECT ( profstat_cmd );
 #endif
 #ifdef NTP_CMD
-REQUIRE_OBJECT(ntp_cmd);
+REQUIRE_OBJECT ( ntp_cmd );
 #endif
 #ifdef CERT_CMD
-REQUIRE_OBJECT(cert_cmd);
+REQUIRE_OBJECT ( cert_cmd );
 #endif
 #ifdef IMAGE_MEM_CMD
-REQUIRE_OBJECT(image_mem_cmd);
+REQUIRE_OBJECT ( image_mem_cmd );
 #endif
 
 /*
@@ -296,17 +296,17 @@ REQUIRE_OBJECT(image_mem_cmd);
  *
  */
 #ifdef NULL_TRAP
-REQUIRE_OBJECT(nulltrap);
+REQUIRE_OBJECT ( nulltrap );
 #endif
 #ifdef GDBSERIAL
-REQUIRE_OBJECT(gdbidt);
-REQUIRE_OBJECT(gdbserial);
-REQUIRE_OBJECT(gdbstub_cmd);
+REQUIRE_OBJECT ( gdbidt );
+REQUIRE_OBJECT ( gdbserial );
+REQUIRE_OBJECT ( gdbstub_cmd );
 #endif
 #ifdef GDBUDP
-REQUIRE_OBJECT(gdbidt);
-REQUIRE_OBJECT(gdbudp);
-REQUIRE_OBJECT(gdbstub_cmd);
+REQUIRE_OBJECT ( gdbidt );
+REQUIRE_OBJECT ( gdbudp );
+REQUIRE_OBJECT ( gdbstub_cmd );
 #endif
 
 /*
@@ -314,48 +314,48 @@ REQUIRE_OBJECT(gdbstub_cmd);
  * symbol dependencies.
  *
  */
-REQUIRE_OBJECT(device);
-REQUIRE_OBJECT(embedded);
+REQUIRE_OBJECT ( device );
+REQUIRE_OBJECT ( embedded );
 
 /* linux drivers aren't picked up by the parserom utility so drag them in here */
 #ifdef DRIVERS_LINUX
-REQUIRE_OBJECT(tap);
+REQUIRE_OBJECT ( tap );
 #endif
 
 /*
  * Drag in relevant sideband entry points
  */
 #ifdef CONFIG_BOFM
-    #ifdef BOFM_EFI
-REQUIRE_OBJECT(efi_bofm);
-    #endif /* BOFM_EFI */
-#endif     /* CONFIG_BOFM */
+#ifdef BOFM_EFI
+REQUIRE_OBJECT ( efi_bofm );
+#endif /* BOFM_EFI */
+#endif /* CONFIG_BOFM */
 
 /*
  * Drag in relevant settings sources
  */
 #ifdef PCI_SETTINGS
-REQUIRE_OBJECT(pci_settings);
+REQUIRE_OBJECT ( pci_settings );
 #endif
 #ifdef VMWARE_SETTINGS
-REQUIRE_OBJECT(guestinfo);
+REQUIRE_OBJECT ( guestinfo );
 #endif
 #ifdef CPUID_SETTINGS
-REQUIRE_OBJECT(cpuid_settings);
+REQUIRE_OBJECT ( cpuid_settings );
 #endif
 #ifdef MEMMAP_SETTINGS
-REQUIRE_OBJECT(memmap_settings);
+REQUIRE_OBJECT ( memmap_settings );
 #endif
 #ifdef VRAM_SETTINGS
-REQUIRE_OBJECT(vram_settings);
+REQUIRE_OBJECT ( vram_settings );
 #endif
 #ifdef ACPI_SETTINGS
-REQUIRE_OBJECT(acpi_settings);
+REQUIRE_OBJECT ( acpi_settings );
 #endif
 
 /*
  * Drag in selected keyboard map
  */
-#define REQUIRE_KEYMAP_OBJECT(_map) REQUIRE_OBJECT(keymap_##_map)
-#define REQUIRE_KEYMAP(_map) REQUIRE_KEYMAP_OBJECT(_map)
-REQUIRE_KEYMAP(KEYBOARD_MAP);
+#define REQUIRE_KEYMAP_OBJECT( _map ) REQUIRE_OBJECT ( keymap_ ## _map )
+#define REQUIRE_KEYMAP( _map ) REQUIRE_KEYMAP_OBJECT ( _map )
+REQUIRE_KEYMAP ( KEYBOARD_MAP );

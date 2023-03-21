@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <ipxe/netdevice.h>
@@ -39,26 +39,26 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @v netdev		Network device
  */
-static void route_ipv6_print(struct net_device* netdev) {
-    struct ipv6_miniroute* miniroute;
+static void route_ipv6_print ( struct net_device *netdev ) {
+	struct ipv6_miniroute *miniroute;
 
-    list_for_each_entry(miniroute, &ipv6_miniroutes, list) {
-        if (miniroute->netdev != netdev)
-            continue;
-        printf("%s: %s/%d", netdev->name,
-               inet6_ntoa(&miniroute->address),
-               miniroute->prefix_len);
-        if (miniroute->flags & IPV6_HAS_ROUTER)
-            printf(" gw %s", inet6_ntoa(&miniroute->router));
-        if (!(miniroute->flags & IPV6_HAS_ADDRESS))
-            printf(" (no address)");
-        if (!netdev_is_open(miniroute->netdev))
-            printf(" (inaccessible)");
-        printf("\n");
-    }
+	list_for_each_entry ( miniroute, &ipv6_miniroutes, list ) {
+		if ( miniroute->netdev != netdev )
+			continue;
+		printf ( "%s: %s/%d", netdev->name,
+			 inet6_ntoa ( &miniroute->address ),
+			 miniroute->prefix_len );
+		if ( miniroute->flags & IPV6_HAS_ROUTER )
+			printf ( " gw %s", inet6_ntoa ( &miniroute->router ) );
+		if ( ! ( miniroute->flags & IPV6_HAS_ADDRESS ) )
+			printf ( " (no address)" );
+		if ( ! netdev_is_open ( miniroute->netdev ) )
+			printf ( " (inaccessible)" );
+		printf ( "\n" );
+	}
 }
 
 /** IPv6 routing family */
-struct routing_family ipv6_routing_family __routing_family(ROUTING_IPV6) = {
-    .print = route_ipv6_print,
+struct routing_family ipv6_routing_family __routing_family ( ROUTING_IPV6 ) = {
+	.print = route_ipv6_print,
 };

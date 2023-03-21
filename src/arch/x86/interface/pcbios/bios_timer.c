@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -43,7 +43,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** Number of ticks per BIOS tick */
 #define TICKS_PER_BIOS_TICK \
-    ((TICKS_PER_SEC * 60 * 60 * 24) / BIOS_TICKS_PER_DAY)
+	( ( TICKS_PER_SEC * 60 * 60 * 24 ) / BIOS_TICKS_PER_DAY )
 
 /**
  * Get current system time in ticks
@@ -54,36 +54,36 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * (ticks today) and byte 0040:0070 (midnight crossover flag) instead
  * of calling timeofday BIOS interrupt.
  */
-static unsigned long bios_currticks(void) {
-    static uint32_t offset;
-    uint32_t ticks;
-    uint8_t midnight;
+static unsigned long bios_currticks ( void ) {
+	static uint32_t offset;
+	uint32_t ticks;
+	uint8_t midnight;
 
-    /* Re-enable interrupts so that the timer interrupt can occur */
-    __asm__ __volatile__("sti\n\t"
-                         "nop\n\t"
-                         "nop\n\t"
-                         "cli\n\t");
+	/* Re-enable interrupts so that the timer interrupt can occur */
+	__asm__ __volatile__ ( "sti\n\t"
+			       "nop\n\t"
+			       "nop\n\t"
+			       "cli\n\t" );
 
-    /* Read current BIOS time of day */
-    get_real(ticks, BDA_SEG, BDA_TICKS);
-    get_real(midnight, BDA_SEG, BDA_MIDNIGHT);
+	/* Read current BIOS time of day */
+	get_real ( ticks, BDA_SEG, BDA_TICKS );
+	get_real ( midnight, BDA_SEG, BDA_MIDNIGHT );
 
-    /* Handle midnight rollover */
-    if (midnight) {
-        midnight = 0;
-        put_real(midnight, BDA_SEG, BDA_MIDNIGHT);
-        offset += BIOS_TICKS_PER_DAY;
-    }
-    ticks += offset;
+	/* Handle midnight rollover */
+	if ( midnight ) {
+		midnight = 0;
+		put_real ( midnight, BDA_SEG, BDA_MIDNIGHT );
+		offset += BIOS_TICKS_PER_DAY;
+	}
+	ticks += offset;
 
-    /* Convert to timer ticks */
-    return (ticks * TICKS_PER_BIOS_TICK);
+	/* Convert to timer ticks */
+	return ( ticks * TICKS_PER_BIOS_TICK );
 }
 
 /** BIOS timer */
-struct timer bios_timer __timer(TIMER_NORMAL) = {
-    .name = "bios",
-    .currticks = bios_currticks,
-    .udelay = pit8254_udelay,
+struct timer bios_timer __timer ( TIMER_NORMAL ) = {
+	.name = "bios",
+	.currticks = bios_currticks,
+	.udelay = pit8254_udelay,
 };

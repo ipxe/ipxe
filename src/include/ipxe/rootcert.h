@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _IPXE_ROOTCERT_H
-    #define _IPXE_ROOTCERT_H
+#define _IPXE_ROOTCERT_H
 
 /** @file
  *
@@ -9,9 +7,9 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #include <ipxe/x509.h>
+#include <ipxe/x509.h>
 
 extern struct x509_root root_certificates;
 

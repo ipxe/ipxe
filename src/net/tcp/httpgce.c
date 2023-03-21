@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -52,20 +52,21 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v len		Length of buffer
  * @ret len		Length of header value, or negative error
  */
-static int http_format_metadata_flavor(struct http_transaction* http,
-                                       char* buf, size_t len) {
-    /* Do nothing unless this appears to be a Google Compute
-     * Engine metadata request.
-     */
-    if (strcasecmp(http->request.host, GCE_METADATA_HOST_NAME) != 0)
-        return 0;
+static int http_format_metadata_flavor ( struct http_transaction *http,
+					 char *buf, size_t len ) {
 
-    /* Construct host URI */
-    return snprintf(buf, len, "Google");
+	/* Do nothing unless this appears to be a Google Compute
+	 * Engine metadata request.
+	 */
+	if ( strcasecmp ( http->request.host, GCE_METADATA_HOST_NAME ) != 0 )
+		return 0;
+
+	/* Construct host URI */
+	return snprintf ( buf, len, "Google" );
 }
 
 /** HTTP "Metadata-Flavor" header */
-struct http_request_header http_request_metadata_flavor __http_request_header = {
-    .name = "Metadata-Flavor",
-    .format = http_format_metadata_flavor,
+struct http_request_header http_request_metadata_flavor __http_request_header ={
+	.name = "Metadata-Flavor",
+	.format = http_format_metadata_flavor,
 };

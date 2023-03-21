@@ -10,7 +10,7 @@
  * published by the Free Software Foundation.
  */
 
-FILE_LICENCE(GPL2_ONLY);
+FILE_LICENCE ( GPL2_ONLY );
 
 /*
  * stupid library routines.. The optimized versions should generally be found
@@ -30,7 +30,7 @@ FILE_LICENCE(GPL2_ONLY);
  * if anything ever does want to use a function of these, consider moving
  * the function in question back into string.c
  */
-
+ 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,17 +44,17 @@ FILE_LICENCE(GPL2_ONLY);
  * @cs: The string to be searched
  * @ct: The characters to search for
  */
-char* strpbrk(const char* cs, const char* ct)
+char * strpbrk(const char * cs,const char * ct)
 {
-    const char *sc1, *sc2;
+	const char *sc1,*sc2;
 
-    for (sc1 = cs; *sc1 != '\0'; ++sc1) {
-        for (sc2 = ct; *sc2 != '\0'; ++sc2) {
-            if (*sc1 == *sc2)
-                return (char*)sc1;
-        }
-    }
-    return NULL;
+	for( sc1 = cs; *sc1 != '\0'; ++sc1) {
+		for( sc2 = ct; *sc2 != '\0'; ++sc2) {
+			if (*sc1 == *sc2)
+				return (char *) sc1;
+		}
+	}
+	return NULL;
 }
 #endif
 
@@ -70,18 +70,18 @@ char* strpbrk(const char* cs, const char* ct)
  * of that name. In fact, it was stolen from glibc2 and de-fancy-fied.
  * Same semantics, slimmer shape. ;)
  */
-char* strsep(char** s, const char* ct)
+char * strsep(char **s, const char *ct)
 {
-    char *sbegin = *s, *end;
+	char *sbegin = *s, *end;
 
-    if (sbegin == NULL)
-        return NULL;
+	if (sbegin == NULL)
+		return NULL;
 
-    end = strpbrk(sbegin, ct);
-    if (end)
-        *end++ = '\0';
-    *s = end;
+	end = strpbrk(sbegin, ct);
+	if (end)
+		*end++ = '\0';
+	*s = end;
 
-    return sbegin;
+	return sbegin;
 }
 #endif

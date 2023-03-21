@@ -19,13 +19,13 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/crypto.h>
 #include <ipxe/arc4.h>
 
-#define SWAP(ary, i, j) \
-    ({ u8 temp = ary[i]; ary[i] = ary[j]; ary[j] = temp; })
+#define SWAP( ary, i, j )	\
+	({ u8 temp = ary[i]; ary[i] = ary[j]; ary[j] = temp; })
 
 /**
  * Set ARC4 key
@@ -39,24 +39,24 @@ FILE_LICENCE(GPL2_OR_LATER);
  * there is no standard length for an initialisation vector in the
  * cipher.
  */
-static int arc4_setkey(void* ctxv, const void* keyv, size_t keylen)
+static int arc4_setkey ( void *ctxv, const void *keyv, size_t keylen )
 {
-    struct arc4_ctx* ctx = ctxv;
-    const u8* key = keyv;
-    u8* S = ctx->state;
-    int i, j;
+	struct arc4_ctx *ctx = ctxv;
+	const u8 *key = keyv;
+	u8 *S = ctx->state;
+	int i, j;
 
-    for (i = 0; i < 256; i++) {
-        S[i] = i;
-    }
+	for ( i = 0; i < 256; i++ ) {
+		S[i] = i;
+	}
 
-    for (i = j = 0; i < 256; i++) {
-        j = (j + S[i] + key[i % keylen]) & 0xff;
-        SWAP(S, i, j);
-    }
+	for ( i = j = 0; i < 256; i++ ) {
+		j = ( j + S[i] + key[i % keylen] ) & 0xff;
+		SWAP ( S, i, j );
+	}
 
-    ctx->i = ctx->j = 0;
-    return 0;
+	ctx->i = ctx->j = 0;
+	return 0;
 }
 
 /**
@@ -75,25 +75,25 @@ static int arc4_setkey(void* ctxv, const void* keyv, size_t keylen)
  * If you pass a @c NULL source or destination pointer, @a len
  * keystream bytes will be consumed without encrypting any data.
  */
-static void arc4_xor(void* ctxv, const void* srcv, void* dstv,
-                     size_t len)
+static void arc4_xor ( void *ctxv, const void *srcv, void *dstv,
+		       size_t len )
 {
-    struct arc4_ctx* ctx = ctxv;
-    const u8* src = srcv;
-    u8* dst = dstv;
-    u8* S = ctx->state;
-    int i = ctx->i, j = ctx->j;
+	struct arc4_ctx *ctx = ctxv;
+	const u8 *src = srcv;
+	u8 *dst = dstv;
+	u8 *S = ctx->state;
+	int i = ctx->i, j = ctx->j;
 
-    while (len--) {
-        i = (i + 1) & 0xff;
-        j = (j + S[i]) & 0xff;
-        SWAP(S, i, j);
-        if (srcv && dstv)
-            *dst++ = *src++ ^ S[(S[i] + S[j]) & 0xff];
-    }
+	while ( len-- ) {
+		i = ( i + 1 ) & 0xff;
+		j = ( j + S[i] ) & 0xff;
+		SWAP ( S, i, j );
+		if ( srcv && dstv )
+			*dst++ = *src++ ^ S[(S[i] + S[j]) & 0xff];
+	}
 
-    ctx->i = i;
-    ctx->j = j;
+	ctx->i = i;
+	ctx->j = j;
 }
 
 /**
@@ -106,24 +106,24 @@ static void arc4_xor(void* ctxv, const void* srcv, void* dstv,
  * @v msglen	Length of message
  * @ret dst	Encrypted or decrypted message
  */
-void arc4_skip(const void* key, size_t keylen, size_t skip,
-               const void* src, void* dst, size_t msglen)
+void arc4_skip ( const void *key, size_t keylen, size_t skip,
+		 const void *src, void *dst, size_t msglen )
 {
-    struct arc4_ctx ctx;
-    arc4_setkey(&ctx, key, keylen);
-    arc4_xor(&ctx, NULL, NULL, skip);
-    arc4_xor(&ctx, src, dst, msglen);
+	struct arc4_ctx ctx;
+	arc4_setkey ( &ctx, key, keylen );
+	arc4_xor ( &ctx, NULL, NULL, skip );
+	arc4_xor ( &ctx, src, dst, msglen );
 }
 
 struct cipher_algorithm arc4_algorithm = {
-    .name = "ARC4",
-    .ctxsize = ARC4_CTX_SIZE,
-    .blocksize = 1,
-    .alignsize = 1,
-    .authsize = 0,
-    .setkey = arc4_setkey,
-    .setiv = cipher_null_setiv,
-    .encrypt = arc4_xor,
-    .decrypt = arc4_xor,
-    .auth = cipher_null_auth,
+	.name = "ARC4",
+	.ctxsize = ARC4_CTX_SIZE,
+	.blocksize = 1,
+	.alignsize = 1,
+	.authsize = 0,
+	.setkey = arc4_setkey,
+	.setiv = cipher_null_setiv,
+	.encrypt = arc4_xor,
+	.decrypt = arc4_xor,
+	.auth = cipher_null_auth,
 };

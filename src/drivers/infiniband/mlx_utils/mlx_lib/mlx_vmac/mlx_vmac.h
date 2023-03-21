@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef MLX_VMAC_H_
-    #define MLX_VMAC_H_
+#define MLX_VMAC_H_
 
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
@@ -22,39 +20,41 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
-    #include "../../include/public/mlx_utils.h"
+#include "../../include/public/mlx_utils.h"
 
 struct mlx_vmac_query_virt_mac {
-    mlx_uint32 reserved0 : 30;
-    mlx_uint32 mac_aux_v : 1;
-    mlx_uint32 virtual_mac_en : 1;
-    mlx_uint32 parmanent_mac_high : 16;
-    mlx_uint32 reserved1 : 16;
-    mlx_uint32 parmanent_mac_low : 32;
-    mlx_uint32 virtual_mac_high : 16;
-    mlx_uint32 Reserved2 : 16;
-    mlx_uint32 virtual_mac_low : 32;
+	mlx_uint32 reserved0	:30;
+	mlx_uint32 mac_aux_v	:1;
+	mlx_uint32 virtual_mac_en	:1;
+	mlx_uint32 parmanent_mac_high	:16;
+	mlx_uint32 reserved1	:16;
+	mlx_uint32 parmanent_mac_low	:32;
+	mlx_uint32 virtual_mac_high	:16;
+	mlx_uint32 Reserved2	:16;
+	mlx_uint32 virtual_mac_low	:32;
 };
 
 struct mlx_vmac_set_virt_mac {
-    mlx_uint32 Reserved0 : 30;
-    mlx_uint32 mac_aux_v : 1;
-    mlx_uint32 virtual_mac_en : 1;
-    mlx_uint32 reserved1 : 32;
-    mlx_uint32 reserved2 : 32;
-    mlx_uint32 virtual_mac_high;
-    mlx_uint32 virtual_mac_low;
+	mlx_uint32 Reserved0	:30;
+	mlx_uint32 mac_aux_v	:1;
+	mlx_uint32 virtual_mac_en	:1;
+	mlx_uint32 reserved1	:32;
+	mlx_uint32 reserved2	:32;
+	mlx_uint32 virtual_mac_high;
+	mlx_uint32 virtual_mac_low;
 };
 
 mlx_status
-mlx_vmac_query_virt_mac(
-    IN mlx_utils* utils,
-    OUT struct mlx_vmac_query_virt_mac* virt_mac);
+mlx_vmac_query_virt_mac (
+	IN mlx_utils *utils,
+	OUT struct mlx_vmac_query_virt_mac *virt_mac
+	);
 
 mlx_status
-mlx_vmac_set_virt_mac(
-    IN mlx_utils* utils,
-    OUT struct mlx_vmac_set_virt_mac* virt_mac);
+mlx_vmac_set_virt_mac (
+	IN mlx_utils *utils,
+	OUT struct mlx_vmac_set_virt_mac *virt_mac
+	);
 #endif /* MLX_VMAC_H_ */

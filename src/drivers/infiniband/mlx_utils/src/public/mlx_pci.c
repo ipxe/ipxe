@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
 
@@ -26,102 +26,108 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 mlx_status
 mlx_pci_init(
-    IN mlx_utils* utils)
+			IN mlx_utils *utils
+			)
 {
-    mlx_status status = MLX_SUCCESS;
-    if (utils == NULL) {
-        status = MLX_INVALID_PARAMETER;
-        goto bail;
-    }
-    status = mlx_pci_init_priv(utils);
+	mlx_status status = MLX_SUCCESS;
+	if( utils == NULL){
+		status = MLX_INVALID_PARAMETER;
+		goto bail;
+	}
+	status = mlx_pci_init_priv(utils);
 bail:
-    return status;
+	return status;
 }
 
 mlx_status
 mlx_pci_teardown(
-    IN mlx_utils* utils)
+			IN mlx_utils *utils
+			)
 {
-    mlx_status status = MLX_SUCCESS;
-    if (utils == NULL) {
-        status = MLX_INVALID_PARAMETER;
-        goto bail;
-    }
-    status = mlx_pci_teardown_priv(utils);
+	mlx_status status = MLX_SUCCESS;
+	if( utils == NULL){
+		status = MLX_INVALID_PARAMETER;
+		goto bail;
+	}
+	status = mlx_pci_teardown_priv(utils);
 bail:
-    return status;
+	return status;
 }
 
 mlx_status
 mlx_pci_read(
-    IN mlx_utils* utils,
-    IN mlx_pci_width width,
-    IN mlx_uint32 offset,
-    IN mlx_uintn count,
-    OUT mlx_void* buffer)
+			IN mlx_utils *utils,
+			IN mlx_pci_width width,
+			IN mlx_uint32 offset,
+			IN mlx_uintn count,
+			OUT mlx_void *buffer
+			)
 {
-    mlx_status status = MLX_SUCCESS;
-    if (utils == NULL || count == 0) {
-        status = MLX_INVALID_PARAMETER;
-        goto bail;
-    }
-    status = mlx_pci_read_priv(utils, width, offset, count, buffer);
+	mlx_status status = MLX_SUCCESS;
+	if( utils == NULL || count == 0){
+		status = MLX_INVALID_PARAMETER;
+		goto bail;
+	}
+	status = mlx_pci_read_priv(utils, width, offset, count, buffer);
 bail:
-    return status;
+	return status;
 }
 
 mlx_status
 mlx_pci_write(
-    IN mlx_utils* utils,
-    IN mlx_pci_width width,
-    IN mlx_uint32 offset,
-    IN mlx_uintn count,
-    IN mlx_void* buffer)
+			IN mlx_utils *utils,
+			IN mlx_pci_width width,
+			IN mlx_uint32 offset,
+			IN mlx_uintn count,
+			IN mlx_void *buffer
+			)
 {
-    mlx_status status = MLX_SUCCESS;
-    if (utils == NULL || count == 0) {
-        status = MLX_INVALID_PARAMETER;
-        goto bail;
-    }
-    status = mlx_pci_write_priv(utils, width, offset, count, buffer);
+	mlx_status status = MLX_SUCCESS;
+	if( utils == NULL || count == 0){
+		status = MLX_INVALID_PARAMETER;
+		goto bail;
+	}
+	status = mlx_pci_write_priv(utils, width, offset, count, buffer);
 bail:
-    return status;
+	return status;
 }
 
 mlx_status
 mlx_pci_mem_read(
-    IN mlx_utils* utils,
-    IN mlx_pci_width width,
-    IN mlx_uint8 bar_index,
-    IN mlx_uint64 offset,
-    IN mlx_uintn count,
-    OUT mlx_void* buffer)
+				IN mlx_utils *utils,
+				IN mlx_pci_width width,
+				IN mlx_uint8 bar_index,
+				IN mlx_uint64 offset,
+				IN mlx_uintn count,
+				OUT mlx_void *buffer
+				)
 {
-    mlx_status status = MLX_SUCCESS;
-    if (utils == NULL || count == 0) {
-        status = MLX_INVALID_PARAMETER;
-        goto bail;
-    }
-    status = mlx_pci_mem_read_priv(utils, width, bar_index, offset, count, buffer);
+	mlx_status status = MLX_SUCCESS;
+	if( utils == NULL || count == 0){
+		status = MLX_INVALID_PARAMETER;
+		goto bail;
+	}
+	status = mlx_pci_mem_read_priv(utils, width,bar_index, offset, count, buffer);
 bail:
-    return status;
+	return status;
 }
 
 mlx_status
 mlx_pci_mem_write(
-    IN mlx_utils* utils,
-    IN mlx_pci_width width,
-    IN mlx_uint8 bar_index,
-    IN mlx_uint64 offset,
-    IN mlx_uintn count,
-    IN mlx_void* buffer)
+				IN mlx_utils *utils,
+				IN mlx_pci_width width,
+				IN mlx_uint8 bar_index,
+				IN mlx_uint64 offset,
+				IN mlx_uintn count,
+				IN mlx_void *buffer
+				)
 {
-    mlx_status status = MLX_SUCCESS;
-    if (utils == NULL || count == 0) {
-        status = MLX_INVALID_PARAMETER;
-        goto bail;
-    }
-    status = mlx_pci_mem_write_priv(utils, width, bar_index, offset, count, buffer);
+	mlx_status status = MLX_SUCCESS;
+	if( utils == NULL || count == 0){
+		status = MLX_INVALID_PARAMETER;
+		goto bail;
+	}
+	status = mlx_pci_mem_write_priv(utils, width, bar_index, offset, count, buffer);
 bail:
-    return status;
+	return status;
 }

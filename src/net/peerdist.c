@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <ipxe/http.h>
@@ -45,25 +45,26 @@ static long peerdist_enabled = 1;
  * @v http		HTTP transaction
  * @ret supported	PeerDist encoding is supported for this request
  */
-static int http_peerdist_supported(struct http_transaction* http) {
-    /* Allow PeerDist to be globally enabled/disabled */
-    if (!peerdist_enabled)
-        return 0;
+static int http_peerdist_supported ( struct http_transaction *http ) {
 
-    /* Support PeerDist encoding only if we can directly access an
-     * underlying data transfer buffer.  Direct access is required
-     * in order to support decryption of data received via the
-     * retrieval protocol (which provides the AES initialisation
-     * vector only after all of the encrypted data has been
-     * received).
-     *
-     * This test simultaneously ensures that we do not attempt to
-     * use PeerDist encoding on a request which is itself a
-     * PeerDist individual block download, since the individual
-     * block downloads do not themselves provide direct access to
-     * an underlying data transfer buffer.
-     */
-    return (xfer_buffer(&http->xfer) != NULL);
+	/* Allow PeerDist to be globally enabled/disabled */
+	if ( ! peerdist_enabled )
+		return 0;
+
+	/* Support PeerDist encoding only if we can directly access an
+	 * underlying data transfer buffer.  Direct access is required
+	 * in order to support decryption of data received via the
+	 * retrieval protocol (which provides the AES initialisation
+	 * vector only after all of the encrypted data has been
+	 * received).
+	 *
+	 * This test simultaneously ensures that we do not attempt to
+	 * use PeerDist encoding on a request which is itself a
+	 * PeerDist individual block download, since the individual
+	 * block downloads do not themselves provide direct access to
+	 * an underlying data transfer buffer.
+	 */
+	return ( xfer_buffer ( &http->xfer ) != NULL );
 }
 
 /**
@@ -74,36 +75,36 @@ static int http_peerdist_supported(struct http_transaction* http) {
  * @v len		Length of buffer
  * @ret len		Length of header value, or negative error
  */
-static int http_format_p2p_peerdist(struct http_transaction* http,
-                                    char* buf, size_t len) {
-    int supported = http_peerdist_supported(http);
-    int missing;
+static int http_format_p2p_peerdist ( struct http_transaction *http,
+				      char *buf, size_t len ) {
+	int supported = http_peerdist_supported ( http );
+	int missing;
 
-    /* PeerDist wants us to inform the server whenever we make a
-     * request for data that was missing from local peers
-     * (presumably for statistical purposes only).  We use the
-     * heuristic of assuming that the combination of "this request
-     * may not itself use PeerDist content encoding" and "this is
-     * a range request" probably indicates that we are making a
-     * PeerDist block raw range request for missing data.
-     */
-    missing = (http->request.range.len && (!supported));
+	/* PeerDist wants us to inform the server whenever we make a
+	 * request for data that was missing from local peers
+	 * (presumably for statistical purposes only).  We use the
+	 * heuristic of assuming that the combination of "this request
+	 * may not itself use PeerDist content encoding" and "this is
+	 * a range request" probably indicates that we are making a
+	 * PeerDist block raw range request for missing data.
+	 */
+	missing = ( http->request.range.len && ( ! supported ) );
 
-    /* Omit header if PeerDist encoding is not supported and we
-     * are not reporting a missing data request.
-     */
-    if (!(supported || missing))
-        return 0;
+	/* Omit header if PeerDist encoding is not supported and we
+	 * are not reporting a missing data request.
+	 */
+	if ( ! ( supported || missing ) )
+		return 0;
 
-    /* Construct header */
-    return snprintf(buf, len, "Version=1.1%s",
-                    (missing ? ", MissingDataRequest=true" : ""));
+	/* Construct header */
+	return snprintf ( buf, len, "Version=1.1%s",
+			  ( missing ? ", MissingDataRequest=true" : "" ) );
 }
 
 /** HTTP "X-P2P-PeerDist" header */
 struct http_request_header http_request_p2p_peerdist __http_request_header = {
-    .name = "X-P2P-PeerDist",
-    .format = http_format_p2p_peerdist,
+	.name = "X-P2P-PeerDist",
+	.format = http_format_p2p_peerdist,
 };
 
 /**
@@ -114,23 +115,23 @@ struct http_request_header http_request_p2p_peerdist __http_request_header = {
  * @v len		Length of buffer
  * @ret len		Length of header value, or negative error
  */
-static int http_format_p2p_peerdistex(struct http_transaction* http,
-                                      char* buf, size_t len) {
-    int supported = http_peerdist_supported(http);
+static int http_format_p2p_peerdistex ( struct http_transaction *http,
+					char *buf, size_t len ) {
+	int supported = http_peerdist_supported ( http );
 
-    /* Omit header if PeerDist encoding is not supported */
-    if (!supported)
-        return 0;
+	/* Omit header if PeerDist encoding is not supported */
+	if ( ! supported )
+		return 0;
 
-    /* Construct header */
-    return snprintf(buf, len, ("MinContentInformation=1.0, "
-                               "MaxContentInformation=2.0"));
+	/* Construct header */
+	return snprintf ( buf, len, ( "MinContentInformation=1.0, "
+				      "MaxContentInformation=2.0" ) );
 }
 
 /** HTTP "X-P2P-PeerDist" header */
 struct http_request_header http_request_p2p_peerdistex __http_request_header = {
-    .name = "X-P2P-PeerDistEx",
-    .format = http_format_p2p_peerdistex,
+	.name = "X-P2P-PeerDistEx",
+	.format = http_format_p2p_peerdistex,
 };
 
 /**
@@ -139,22 +140,23 @@ struct http_request_header http_request_p2p_peerdistex __http_request_header = {
  * @v http		HTTP transaction
  * @ret rc		Return status code
  */
-static int http_peerdist_init(struct http_transaction* http) {
-    return peermux_filter(&http->content, &http->transfer, http->uri);
+static int http_peerdist_init ( struct http_transaction *http ) {
+
+	return peermux_filter ( &http->content, &http->transfer, http->uri );
 }
 
 /** PeerDist HTTP content encoding */
 struct http_content_encoding peerdist_encoding __http_content_encoding = {
-    .name = "peerdist",
-    .supported = http_peerdist_supported,
-    .init = http_peerdist_init,
+	.name = "peerdist",
+	.supported = http_peerdist_supported,
+	.init = http_peerdist_init,
 };
 
 /** PeerDist enabled setting */
-const struct setting peerdist_setting __setting(SETTING_MISC, peerdist) = {
-    .name = "peerdist",
-    .description = "PeerDist enabled",
-    .type = &setting_type_int8,
+const struct setting peerdist_setting __setting ( SETTING_MISC, peerdist ) = {
+	.name = "peerdist",
+	.description = "PeerDist enabled",
+	.type = &setting_type_int8,
 };
 
 /**
@@ -162,19 +164,20 @@ const struct setting peerdist_setting __setting(SETTING_MISC, peerdist) = {
  *
  * @ret rc		Return status code
  */
-static int apply_peerdist_settings(void) {
-    /* Fetch global PeerDist enabled setting */
-    if (fetch_int_setting(NULL, &peerdist_setting,
-                          &peerdist_enabled) < 0) {
-        peerdist_enabled = 1;
-    }
-    DBGC(&peerdist_enabled, "PEERDIST is %s\n",
-         (peerdist_enabled ? "enabled" : "disabled"));
+static int apply_peerdist_settings ( void ) {
 
-    return 0;
+	/* Fetch global PeerDist enabled setting */
+	if ( fetch_int_setting ( NULL, &peerdist_setting,
+				 &peerdist_enabled ) < 0 ) {
+		peerdist_enabled = 1;
+	}
+	DBGC ( &peerdist_enabled, "PEERDIST is %s\n",
+	       ( peerdist_enabled ? "enabled" : "disabled" ) );
+
+	return 0;
 }
 
 /** PeerDist settings applicator */
 struct settings_applicator peerdist_applicator __settings_applicator = {
-    .apply = apply_peerdist_settings,
+	.apply = apply_peerdist_settings,
 };

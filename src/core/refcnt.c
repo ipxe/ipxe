@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <ipxe/refcnt.h>
@@ -39,12 +39,13 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * If @c refcnt is NULL, no action is taken.
  */
-void ref_increment(struct refcnt* refcnt) {
-    if (refcnt) {
-        refcnt->count++;
-        DBGC2(refcnt, "REFCNT %p incremented to %d\n",
-              refcnt, refcnt->count);
-    }
+void ref_increment ( struct refcnt *refcnt ) {
+
+	if ( refcnt ) {
+		refcnt->count++;
+		DBGC2 ( refcnt, "REFCNT %p incremented to %d\n",
+			refcnt, refcnt->count );
+	}
 }
 
 /**
@@ -57,35 +58,36 @@ void ref_increment(struct refcnt* refcnt) {
  *
  * If @c refcnt is NULL, no action is taken.
  */
-void ref_decrement(struct refcnt* refcnt) {
-    if (!refcnt)
-        return;
+void ref_decrement ( struct refcnt *refcnt ) {
 
-    refcnt->count--;
-    DBGC2(refcnt, "REFCNT %p decremented to %d\n",
-          refcnt, refcnt->count);
+	if ( ! refcnt )
+		return;
 
-    if (refcnt->count >= 0)
-        return;
+	refcnt->count--;
+	DBGC2 ( refcnt, "REFCNT %p decremented to %d\n",
+		refcnt, refcnt->count );
 
-    if (refcnt->count < -1) {
-        DBGC(refcnt, "REFCNT %p decremented too far (%d)!\n",
-             refcnt, refcnt->count);
-        /* Avoid multiple calls to free(), which typically
-         * result in memory corruption that is very hard to
-         * track down.
-         */
-        return;
-    }
+	if ( refcnt->count >= 0 )
+		return;
 
-    if (refcnt->free) {
-        DBGC(refcnt, "REFCNT %p being freed via method %p\n",
-             refcnt, refcnt->free);
-        refcnt->free(refcnt);
-    } else {
-        DBGC(refcnt, "REFCNT %p being freed\n", refcnt);
-        free(refcnt);
-    }
+	if ( refcnt->count < -1 ) {
+		DBGC ( refcnt, "REFCNT %p decremented too far (%d)!\n",
+		       refcnt, refcnt->count );
+		/* Avoid multiple calls to free(), which typically
+		 * result in memory corruption that is very hard to
+		 * track down.
+		 */
+		return;
+	}
+
+	if ( refcnt->free ) {
+		DBGC ( refcnt, "REFCNT %p being freed via method %p\n",
+		       refcnt, refcnt->free );
+		refcnt->free ( refcnt );
+	} else {
+		DBGC ( refcnt, "REFCNT %p being freed\n", refcnt );
+		free ( refcnt );
+	}
 }
 
 /**
@@ -96,6 +98,6 @@ void ref_decrement(struct refcnt* refcnt) {
  * This is meant for initializing a reference counter structure in a
  * statically allocated object.
  */
-void ref_no_free(struct refcnt* refcnt __unused) {
-    /* Do nothing */
+void ref_no_free ( struct refcnt *refcnt __unused ) {
+	/* Do nothing */
 }

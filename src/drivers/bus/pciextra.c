@@ -1,26 +1,26 @@
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/timer.h>
 #include <ipxe/pci.h>
 #include <ipxe/pcibackup.h>
 
-static int pci_find_capability_common(struct pci_device* pci,
-                                      uint8_t pos, int cap) {
-    uint8_t id;
-    int ttl = 48;
+static int pci_find_capability_common ( struct pci_device *pci,
+					uint8_t pos, int cap ) {
+	uint8_t id;
+	int ttl = 48;
 
-    while (ttl-- && pos >= 0x40) {
-        pos &= ~3;
-        pci_read_config_byte(pci, pos + PCI_CAP_ID, &id);
-        DBG("PCI Capability: %d\n", id);
-        if (id == 0xff)
-            break;
-        if (id == cap)
-            return pos;
-        pci_read_config_byte(pci, pos + PCI_CAP_NEXT, &pos);
-    }
-    return 0;
+	while ( ttl-- && pos >= 0x40 ) {
+		pos &= ~3;
+		pci_read_config_byte ( pci, pos + PCI_CAP_ID, &id );
+		DBG ( "PCI Capability: %d\n", id );
+		if ( id == 0xff )
+			break;
+		if ( id == cap )
+			return pos;
+		pci_read_config_byte ( pci, pos + PCI_CAP_NEXT, &pos );
+	}
+	return 0;
 }
 
 /**
@@ -35,27 +35,27 @@ static int pci_find_capability_common(struct pci_device* pci,
  * the device's PCI configuration space, or 0 if the device does not
  * support it.
  */
-int pci_find_capability(struct pci_device* pci, int cap) {
-    uint16_t status;
-    uint8_t pos;
-    uint8_t hdr_type;
+int pci_find_capability ( struct pci_device *pci, int cap ) {
+	uint16_t status;
+	uint8_t pos;
+	uint8_t hdr_type;
 
-    pci_read_config_word(pci, PCI_STATUS, &status);
-    if (!(status & PCI_STATUS_CAP_LIST))
-        return 0;
+	pci_read_config_word ( pci, PCI_STATUS, &status );
+	if ( ! ( status & PCI_STATUS_CAP_LIST ) )
+		return 0;
 
-    pci_read_config_byte(pci, PCI_HEADER_TYPE, &hdr_type);
-    switch (hdr_type & PCI_HEADER_TYPE_MASK) {
-        case PCI_HEADER_TYPE_NORMAL:
-        case PCI_HEADER_TYPE_BRIDGE:
-        default:
-            pci_read_config_byte(pci, PCI_CAPABILITY_LIST, &pos);
-            break;
-        case PCI_HEADER_TYPE_CARDBUS:
-            pci_read_config_byte(pci, PCI_CB_CAPABILITY_LIST, &pos);
-            break;
-    }
-    return pci_find_capability_common(pci, pos, cap);
+	pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdr_type );
+	switch ( hdr_type & PCI_HEADER_TYPE_MASK ) {
+	case PCI_HEADER_TYPE_NORMAL:
+	case PCI_HEADER_TYPE_BRIDGE:
+	default:
+		pci_read_config_byte ( pci, PCI_CAPABILITY_LIST, &pos );
+		break;
+	case PCI_HEADER_TYPE_CARDBUS:
+		pci_read_config_byte ( pci, PCI_CB_CAPABILITY_LIST, &pos );
+		break;
+	}
+	return pci_find_capability_common ( pci, pos, cap );
 }
 
 /**
@@ -72,11 +72,11 @@ int pci_find_capability(struct pci_device* pci, int cap) {
  * structure within the device's PCI configuration space, or 0 if the
  * device does not support another such capability.
  */
-int pci_find_next_capability(struct pci_device* pci, int pos, int cap) {
-    uint8_t new_pos;
+int pci_find_next_capability ( struct pci_device *pci, int pos, int cap ) {
+	uint8_t new_pos;
 
-    pci_read_config_byte(pci, pos + PCI_CAP_NEXT, &new_pos);
-    return pci_find_capability_common(pci, new_pos, cap);
+	pci_read_config_byte ( pci, pos + PCI_CAP_NEXT, &new_pos );
+	return pci_find_capability_common ( pci, new_pos, cap );
 }
 
 /**
@@ -89,30 +89,30 @@ int pci_find_next_capability(struct pci_device* pci, int pos, int cap) {
  * It should not be necessary for any Etherboot code to call this
  * function.
  */
-unsigned long pci_bar_size(struct pci_device* pci, unsigned int reg) {
-    uint16_t cmd;
-    uint32_t start, size;
+unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg ) {
+	uint16_t cmd;
+	uint32_t start, size;
 
-    /* Save the original command register */
-    pci_read_config_word(pci, PCI_COMMAND, &cmd);
-    /* Save the original bar */
-    pci_read_config_dword(pci, reg, &start);
-    /* Compute which bits can be set */
-    pci_write_config_dword(pci, reg, ~0);
-    pci_read_config_dword(pci, reg, &size);
-    /* Restore the original size */
-    pci_write_config_dword(pci, reg, start);
-    /* Find the significant bits */
-    /* Restore the original command register. This reenables decoding. */
-    pci_write_config_word(pci, PCI_COMMAND, cmd);
-    if (start & PCI_BASE_ADDRESS_SPACE_IO) {
-        size &= ~PCI_BASE_ADDRESS_IO_MASK;
-    } else {
-        size &= ~PCI_BASE_ADDRESS_MEM_MASK;
-    }
-    /* Find the lowest bit set */
-    size = size & ~(size - 1);
-    return size;
+	/* Save the original command register */
+	pci_read_config_word ( pci, PCI_COMMAND, &cmd );
+	/* Save the original bar */
+	pci_read_config_dword ( pci, reg, &start );
+	/* Compute which bits can be set */
+	pci_write_config_dword ( pci, reg, ~0 );
+	pci_read_config_dword ( pci, reg, &size );
+	/* Restore the original size */
+	pci_write_config_dword ( pci, reg, start );
+	/* Find the significant bits */
+	/* Restore the original command register. This reenables decoding. */
+	pci_write_config_word ( pci, PCI_COMMAND, cmd );
+	if ( start & PCI_BASE_ADDRESS_SPACE_IO ) {
+		size &= ~PCI_BASE_ADDRESS_IO_MASK;
+	} else {
+		size &= ~PCI_BASE_ADDRESS_MEM_MASK;
+	}
+	/* Find the lowest bit set */
+	size = size & ~( size - 1 );
+	return size;
 }
 
 /**
@@ -121,21 +121,21 @@ unsigned long pci_bar_size(struct pci_device* pci, unsigned int reg) {
  * @v pci		PCI device
  * @v exp		PCI Express Capability address
  */
-void pci_reset(struct pci_device* pci, unsigned int exp) {
-    struct pci_config_backup backup;
-    uint16_t control;
+void pci_reset ( struct pci_device *pci, unsigned int exp ) {
+	struct pci_config_backup backup;
+	uint16_t control;
 
-    /* Back up configuration space */
-    pci_backup(pci, &backup, PCI_CONFIG_BACKUP_STANDARD, NULL);
+	/* Back up configuration space */
+	pci_backup ( pci, &backup, PCI_CONFIG_BACKUP_STANDARD, NULL );
 
-    /* Perform a PCIe function-level reset */
-    pci_read_config_word(pci, (exp + PCI_EXP_DEVCTL), &control);
-    control |= PCI_EXP_DEVCTL_FLR;
-    pci_write_config_word(pci, (exp + PCI_EXP_DEVCTL), control);
+	/* Perform a PCIe function-level reset */
+	pci_read_config_word ( pci, ( exp + PCI_EXP_DEVCTL ), &control );
+	control |= PCI_EXP_DEVCTL_FLR;
+	pci_write_config_word ( pci, ( exp + PCI_EXP_DEVCTL ), control );
 
-    /* Allow time for reset to complete */
-    mdelay(PCI_EXP_FLR_DELAY_MS);
+	/* Allow time for reset to complete */
+	mdelay ( PCI_EXP_FLR_DELAY_MS );
 
-    /* Restore configuration */
-    pci_restore(pci, &backup, PCI_CONFIG_BACKUP_STANDARD, NULL);
+	/* Restore configuration */
+	pci_restore ( pci, &backup, PCI_CONFIG_BACKUP_STANDARD, NULL );
 }

@@ -11,16 +11,16 @@
 
 #include <string.h>
 
-void* gcc_implicit_memcpy(void* dest, const void* src,
-                          size_t len) asm("memcpy");
+void * gcc_implicit_memcpy ( void *dest, const void *src,
+			     size_t len ) asm ( "memcpy" );
 
-void* gcc_implicit_memcpy(void* dest, const void* src, size_t len) {
-    return memcpy(dest, src, len);
+void * gcc_implicit_memcpy ( void *dest, const void *src, size_t len ) {
+	return memcpy ( dest, src, len );
 }
 
-void* gcc_implicit_memset(void* dest, int character,
-                          size_t len) asm("memset");
+void * gcc_implicit_memset ( void *dest, int character,
+			     size_t len ) asm ( "memset" );
 
-void* gcc_implicit_memset(void* dest, int character, size_t len) {
-    return memset(dest, character, len);
+void * gcc_implicit_memset ( void *dest, int character, size_t len ) {
+	return memset ( dest, character, len );
 }

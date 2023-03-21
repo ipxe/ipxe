@@ -27,15 +27,15 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <realmode.h>
 #include <pxe.h>
 
 /** PXE exit hook */
-extern segoff_t __data16(pxe_exit_hook);
-#define pxe_exit_hook __use_data16(pxe_exit_hook)
+extern segoff_t __data16 ( pxe_exit_hook );
+#define pxe_exit_hook __use_data16 ( pxe_exit_hook )
 
 /**
  * FILE EXIT HOOK
@@ -49,17 +49,17 @@ extern segoff_t __data16(pxe_exit_hook);
  *
  */
 static PXENV_EXIT_t
-pxenv_file_exit_hook(struct s_PXENV_FILE_EXIT_HOOK* file_exit_hook) {
-    DBG("PXENV_FILE_EXIT_HOOK");
+pxenv_file_exit_hook ( struct s_PXENV_FILE_EXIT_HOOK *file_exit_hook ) {
+	DBG ( "PXENV_FILE_EXIT_HOOK" );
 
-    /* We'll jump to the specified SEG16:OFF16 during exit */
-    pxe_exit_hook.segment = file_exit_hook->Hook.segment;
-    pxe_exit_hook.offset = file_exit_hook->Hook.offset;
-    file_exit_hook->Status = PXENV_STATUS_SUCCESS;
-    return PXENV_EXIT_SUCCESS;
+	/* We'll jump to the specified SEG16:OFF16 during exit */
+	pxe_exit_hook.segment = file_exit_hook->Hook.segment;
+	pxe_exit_hook.offset = file_exit_hook->Hook.offset;
+	file_exit_hook->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }
 
 /** PXE file API */
 struct pxe_api_call pxe_file_api_exit_hook __pxe_api_call =
-    PXE_API_CALL(PXENV_FILE_EXIT_HOOK, pxenv_file_exit_hook,
-                 struct s_PXENV_FILE_EXIT_HOOK);
+	PXE_API_CALL ( PXENV_FILE_EXIT_HOOK, pxenv_file_exit_hook,
+		       struct s_PXENV_FILE_EXIT_HOOK );

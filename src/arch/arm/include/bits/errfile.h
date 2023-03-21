@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _BITS_ERRFILE_H
-    #define _BITS_ERRFILE_H
+#define _BITS_ERRFILE_H
 
 /** @file
  *
@@ -9,7 +7,7 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @addtogroup errfile Error file identifiers

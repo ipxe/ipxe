@@ -22,10 +22,10 @@
 #include "ipxe/virtio-pci.h"
 #include "ipxe/virtio-ring.h"
 
-static int vp_alloc_vq(struct vring_virtqueue* vq, u16 num, size_t header_size)
+static int vp_alloc_vq(struct vring_virtqueue *vq, u16 num, size_t header_size)
 {
     size_t ring_size = PAGE_MASK + vring_size(num);
-    size_t vdata_size = num * sizeof(void*);
+    size_t vdata_size = num * sizeof(void *);
     size_t queue_size = ring_size + vdata_size + header_size;
 
     vq->queue = dma_alloc(vq->dma, &vq->map, queue_size, queue_size);
@@ -33,19 +33,19 @@ static int vp_alloc_vq(struct vring_virtqueue* vq, u16 num, size_t header_size)
         return -ENOMEM;
     }
 
-    memset(vq->queue, 0, queue_size);
+    memset ( vq->queue, 0, queue_size );
     vq->queue_size = queue_size;
 
     /* vdata immediately follows the ring */
-    vq->vdata = (void**)(vq->queue + ring_size);
+    vq->vdata = (void **)(vq->queue + ring_size);
 
     /* empty header immediately follows vdata */
-    vq->empty_header = (struct virtio_net_hdr_modern*)(vq->queue + ring_size + vdata_size);
+    vq->empty_header = (struct virtio_net_hdr_modern *)(vq->queue + ring_size + vdata_size);
 
     return 0;
 }
 
-void vp_free_vq(struct vring_virtqueue* vq)
+void vp_free_vq(struct vring_virtqueue *vq)
 {
     if (vq->queue && vq->queue_size) {
         dma_free(&vq->map, vq->queue, vq->queue_size);
@@ -56,198 +56,198 @@ void vp_free_vq(struct vring_virtqueue* vq)
 }
 
 int vp_find_vq(unsigned int ioaddr, int queue_index,
-               struct vring_virtqueue* vq, struct dma_device* dma_dev,
+               struct vring_virtqueue *vq, struct dma_device *dma_dev,
                size_t header_size)
 {
-    struct vring* vr = &vq->vring;
-    u16 num;
-    int rc;
+   struct vring * vr = &vq->vring;
+   u16 num;
+   int rc;
 
-    /* select the queue */
+   /* select the queue */
 
-    outw(queue_index, ioaddr + VIRTIO_PCI_QUEUE_SEL);
+   outw(queue_index, ioaddr + VIRTIO_PCI_QUEUE_SEL);
 
-    /* check if the queue is available */
+   /* check if the queue is available */
 
-    num = inw(ioaddr + VIRTIO_PCI_QUEUE_NUM);
-    if (!num) {
-        DBG("VIRTIO-PCI ERROR: queue size is 0\n");
-        return -1;
-    }
+   num = inw(ioaddr + VIRTIO_PCI_QUEUE_NUM);
+   if (!num) {
+           DBG("VIRTIO-PCI ERROR: queue size is 0\n");
+           return -1;
+   }
 
-    /* check if the queue is already active */
+   /* check if the queue is already active */
 
-    if (inl(ioaddr + VIRTIO_PCI_QUEUE_PFN)) {
-        DBG("VIRTIO-PCI ERROR: queue already active\n");
-        return -1;
-    }
+   if (inl(ioaddr + VIRTIO_PCI_QUEUE_PFN)) {
+           DBG("VIRTIO-PCI ERROR: queue already active\n");
+           return -1;
+   }
 
-    vq->queue_index = queue_index;
-    vq->dma = dma_dev;
+   vq->queue_index = queue_index;
+   vq->dma = dma_dev;
 
-    /* initialize the queue */
-    rc = vp_alloc_vq(vq, num, header_size);
-    if (rc) {
-        DBG("VIRTIO-PCI ERROR: failed to allocate queue memory\n");
-        return rc;
-    }
-    vring_init(vr, num, vq->queue);
+   /* initialize the queue */
+   rc = vp_alloc_vq(vq, num, header_size);
+   if (rc) {
+           DBG("VIRTIO-PCI ERROR: failed to allocate queue memory\n");
+           return rc;
+   }
+   vring_init(vr, num, vq->queue);
 
-    /* activate the queue
-     *
-     * NOTE: vr->desc is initialized by vring_init()
-     */
+   /* activate the queue
+    *
+    * NOTE: vr->desc is initialized by vring_init()
+    */
 
-    outl(dma(&vq->map, vr->desc) >> PAGE_SHIFT, ioaddr + VIRTIO_PCI_QUEUE_PFN);
+   outl(dma(&vq->map, vr->desc) >> PAGE_SHIFT, ioaddr + VIRTIO_PCI_QUEUE_PFN);
 
-    return num;
+   return num;
 }
 
 #define CFG_POS(vdev, field) \
     (vdev->cfg_cap_pos + offsetof(struct virtio_pci_cfg_cap, field))
 
-static void prep_pci_cfg_cap(struct virtio_pci_modern_device* vdev,
-                             struct virtio_pci_region* region,
+static void prep_pci_cfg_cap(struct virtio_pci_modern_device *vdev,
+                             struct virtio_pci_region *region,
                              size_t offset, u32 length)
 {
     pci_write_config_byte(vdev->pci, CFG_POS(vdev, cap.bar), region->bar);
     pci_write_config_dword(vdev->pci, CFG_POS(vdev, cap.length), length);
     pci_write_config_dword(vdev->pci, CFG_POS(vdev, cap.offset),
-                           (intptr_t)(region->base + offset));
+        (intptr_t)(region->base + offset));
 }
 
-void vpm_iowrite8(struct virtio_pci_modern_device* vdev,
-                  struct virtio_pci_region* region, u8 data, size_t offset)
+void vpm_iowrite8(struct virtio_pci_modern_device *vdev,
+                  struct virtio_pci_region *region, u8 data, size_t offset)
 {
     switch (region->flags & VIRTIO_PCI_REGION_TYPE_MASK) {
-        case VIRTIO_PCI_REGION_MEMORY:
-            writeb(data, region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PORT:
-            outb(data, region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PCI_CONFIG:
-            prep_pci_cfg_cap(vdev, region, offset, 1);
-            pci_write_config_byte(vdev->pci, CFG_POS(vdev, pci_cfg_data), data);
-            break;
-        default:
-            assert(0);
-            break;
+    case VIRTIO_PCI_REGION_MEMORY:
+        writeb(data, region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PORT:
+        outb(data, region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PCI_CONFIG:
+        prep_pci_cfg_cap(vdev, region, offset, 1);
+        pci_write_config_byte(vdev->pci, CFG_POS(vdev, pci_cfg_data), data);
+        break;
+    default:
+        assert(0);
+        break;
     }
 }
 
-void vpm_iowrite16(struct virtio_pci_modern_device* vdev,
-                   struct virtio_pci_region* region, u16 data, size_t offset)
+void vpm_iowrite16(struct virtio_pci_modern_device *vdev,
+                   struct virtio_pci_region *region, u16 data, size_t offset)
 {
     data = cpu_to_le16(data);
     switch (region->flags & VIRTIO_PCI_REGION_TYPE_MASK) {
-        case VIRTIO_PCI_REGION_MEMORY:
-            writew(data, region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PORT:
-            outw(data, region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PCI_CONFIG:
-            prep_pci_cfg_cap(vdev, region, offset, 2);
-            pci_write_config_word(vdev->pci, CFG_POS(vdev, pci_cfg_data), data);
-            break;
-        default:
-            assert(0);
-            break;
+    case VIRTIO_PCI_REGION_MEMORY:
+        writew(data, region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PORT:
+        outw(data, region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PCI_CONFIG:
+        prep_pci_cfg_cap(vdev, region, offset, 2);
+        pci_write_config_word(vdev->pci, CFG_POS(vdev, pci_cfg_data), data);
+        break;
+    default:
+        assert(0);
+        break;
     }
 }
 
-void vpm_iowrite32(struct virtio_pci_modern_device* vdev,
-                   struct virtio_pci_region* region, u32 data, size_t offset)
+void vpm_iowrite32(struct virtio_pci_modern_device *vdev,
+                   struct virtio_pci_region *region, u32 data, size_t offset)
 {
     data = cpu_to_le32(data);
     switch (region->flags & VIRTIO_PCI_REGION_TYPE_MASK) {
-        case VIRTIO_PCI_REGION_MEMORY:
-            writel(data, region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PORT:
-            outl(data, region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PCI_CONFIG:
-            prep_pci_cfg_cap(vdev, region, offset, 4);
-            pci_write_config_dword(vdev->pci, CFG_POS(vdev, pci_cfg_data), data);
-            break;
-        default:
-            assert(0);
-            break;
+    case VIRTIO_PCI_REGION_MEMORY:
+        writel(data, region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PORT:
+        outl(data, region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PCI_CONFIG:
+        prep_pci_cfg_cap(vdev, region, offset, 4);
+        pci_write_config_dword(vdev->pci, CFG_POS(vdev, pci_cfg_data), data);
+        break;
+    default:
+        assert(0);
+        break;
     }
 }
 
-u8 vpm_ioread8(struct virtio_pci_modern_device* vdev,
-               struct virtio_pci_region* region, size_t offset)
+u8 vpm_ioread8(struct virtio_pci_modern_device *vdev,
+               struct virtio_pci_region *region, size_t offset)
 {
     uint8_t data;
     switch (region->flags & VIRTIO_PCI_REGION_TYPE_MASK) {
-        case VIRTIO_PCI_REGION_MEMORY:
-            data = readb(region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PORT:
-            data = inb(region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PCI_CONFIG:
-            prep_pci_cfg_cap(vdev, region, offset, 1);
-            pci_read_config_byte(vdev->pci, CFG_POS(vdev, pci_cfg_data), &data);
-            break;
-        default:
-            assert(0);
-            data = 0;
-            break;
+    case VIRTIO_PCI_REGION_MEMORY:
+        data = readb(region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PORT:
+        data = inb(region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PCI_CONFIG:
+        prep_pci_cfg_cap(vdev, region, offset, 1);
+        pci_read_config_byte(vdev->pci, CFG_POS(vdev, pci_cfg_data), &data);
+        break;
+    default:
+        assert(0);
+        data = 0;
+        break;
     }
     return data;
 }
 
-u16 vpm_ioread16(struct virtio_pci_modern_device* vdev,
-                 struct virtio_pci_region* region, size_t offset)
+u16 vpm_ioread16(struct virtio_pci_modern_device *vdev,
+                 struct virtio_pci_region *region, size_t offset)
 {
     uint16_t data;
     switch (region->flags & VIRTIO_PCI_REGION_TYPE_MASK) {
-        case VIRTIO_PCI_REGION_MEMORY:
-            data = readw(region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PORT:
-            data = inw(region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PCI_CONFIG:
-            prep_pci_cfg_cap(vdev, region, offset, 2);
-            pci_read_config_word(vdev->pci, CFG_POS(vdev, pci_cfg_data), &data);
-            break;
-        default:
-            assert(0);
-            data = 0;
-            break;
+    case VIRTIO_PCI_REGION_MEMORY:
+        data = readw(region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PORT:
+        data = inw(region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PCI_CONFIG:
+        prep_pci_cfg_cap(vdev, region, offset, 2);
+        pci_read_config_word(vdev->pci, CFG_POS(vdev, pci_cfg_data), &data);
+        break;
+    default:
+        assert(0);
+        data = 0;
+        break;
     }
     return le16_to_cpu(data);
 }
 
-u32 vpm_ioread32(struct virtio_pci_modern_device* vdev,
-                 struct virtio_pci_region* region, size_t offset)
+u32 vpm_ioread32(struct virtio_pci_modern_device *vdev,
+                 struct virtio_pci_region *region, size_t offset)
 {
     uint32_t data;
     switch (region->flags & VIRTIO_PCI_REGION_TYPE_MASK) {
-        case VIRTIO_PCI_REGION_MEMORY:
-            data = readw(region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PORT:
-            data = inw(region->base + offset);
-            break;
-        case VIRTIO_PCI_REGION_PCI_CONFIG:
-            prep_pci_cfg_cap(vdev, region, offset, 4);
-            pci_read_config_dword(vdev->pci, CFG_POS(vdev, pci_cfg_data), &data);
-            break;
-        default:
-            assert(0);
-            data = 0;
-            break;
+    case VIRTIO_PCI_REGION_MEMORY:
+        data = readw(region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PORT:
+        data = inw(region->base + offset);
+        break;
+    case VIRTIO_PCI_REGION_PCI_CONFIG:
+        prep_pci_cfg_cap(vdev, region, offset, 4);
+        pci_read_config_dword(vdev->pci, CFG_POS(vdev, pci_cfg_data), &data);
+        break;
+    default:
+        assert(0);
+        data = 0;
+        break;
     }
     return le32_to_cpu(data);
 }
 
-int virtio_pci_find_capability(struct pci_device* pci, uint8_t cfg_type)
+int virtio_pci_find_capability(struct pci_device *pci, uint8_t cfg_type)
 {
     int pos;
     uint8_t type, bar;
@@ -255,8 +255,11 @@ int virtio_pci_find_capability(struct pci_device* pci, uint8_t cfg_type)
     for (pos = pci_find_capability(pci, PCI_CAP_ID_VNDR);
          pos > 0;
          pos = pci_find_next_capability(pci, pos, PCI_CAP_ID_VNDR)) {
-        pci_read_config_byte(pci, pos + offsetof(struct virtio_pci_cap, cfg_type), &type);
-        pci_read_config_byte(pci, pos + offsetof(struct virtio_pci_cap, bar), &bar);
+
+        pci_read_config_byte(pci, pos + offsetof(struct virtio_pci_cap,
+            cfg_type), &type);
+        pci_read_config_byte(pci, pos + offsetof(struct virtio_pci_cap,
+            bar), &bar);
 
         /* Ignore structures with reserved BAR values */
         if (bar > 0x5) {
@@ -270,9 +273,9 @@ int virtio_pci_find_capability(struct pci_device* pci, uint8_t cfg_type)
     return 0;
 }
 
-int virtio_pci_map_capability(struct pci_device* pci, int cap, size_t minlen,
+int virtio_pci_map_capability(struct pci_device *pci, int cap, size_t minlen,
                               u32 align, u32 start, u32 size,
-                              struct virtio_pci_region* region)
+                              struct virtio_pci_region *region)
 {
     u8 bar;
     u32 offset, length, base_raw;
@@ -324,7 +327,7 @@ int virtio_pci_map_capability(struct pci_device* pci, int cap, size_t minlen,
 
         if (base_raw & PCI_BASE_ADDRESS_SPACE_IO) {
             /* Region accessed using port I/O */
-            region->base = (void*)(base + offset);
+            region->base = (void *)(base + offset);
             region->flags = VIRTIO_PCI_REGION_PORT;
         } else {
             /* Region mapped into memory space */
@@ -334,13 +337,13 @@ int virtio_pci_map_capability(struct pci_device* pci, int cap, size_t minlen,
     }
     if (!region->base) {
         /* Region accessed via PCI config space window */
-        region->base = (void*)(intptr_t)offset;
+	    region->base = (void *)(intptr_t)offset;
         region->flags = VIRTIO_PCI_REGION_PCI_CONFIG;
     }
     return 0;
 }
 
-void virtio_pci_unmap_capability(struct virtio_pci_region* region)
+void virtio_pci_unmap_capability(struct virtio_pci_region *region)
 {
     unsigned region_type = region->flags & VIRTIO_PCI_REGION_TYPE_MASK;
     if (region_type == VIRTIO_PCI_REGION_MEMORY) {
@@ -348,18 +351,18 @@ void virtio_pci_unmap_capability(struct virtio_pci_region* region)
     }
 }
 
-void vpm_notify(struct virtio_pci_modern_device* vdev,
-                struct vring_virtqueue* vq)
+void vpm_notify(struct virtio_pci_modern_device *vdev,
+                struct vring_virtqueue *vq)
 {
     vpm_iowrite16(vdev, &vq->notification, (u16)vq->queue_index, 0);
 }
 
-int vpm_find_vqs(struct virtio_pci_modern_device* vdev,
-                 unsigned nvqs, struct vring_virtqueue* vqs,
-                 struct dma_device* dma_dev, size_t header_size)
+int vpm_find_vqs(struct virtio_pci_modern_device *vdev,
+                 unsigned nvqs, struct vring_virtqueue *vqs,
+                 struct dma_device *dma_dev, size_t header_size)
 {
     unsigned i;
-    struct vring_virtqueue* vq;
+    struct vring_virtqueue *vq;
     u16 size, off;
     u32 notify_offset_multiplier;
     int err;
@@ -370,9 +373,9 @@ int vpm_find_vqs(struct virtio_pci_modern_device* vdev,
 
     /* Read notify_off_multiplier from config space. */
     pci_read_config_dword(vdev->pci,
-                          vdev->notify_cap_pos + offsetof(struct virtio_pci_notify_cap,
-                                                          notify_off_multiplier),
-                          &notify_offset_multiplier);
+        vdev->notify_cap_pos + offsetof(struct virtio_pci_notify_cap,
+        notify_off_multiplier),
+        &notify_offset_multiplier);
 
     for (i = 0; i < nvqs; i++) {
         /* Select the queue we're interested in */
@@ -429,9 +432,9 @@ int vpm_find_vqs(struct virtio_pci_modern_device* vdev,
                       COMMON_OFFSET(queue_used_hi));
 
         err = virtio_pci_map_capability(vdev->pci,
-                                        vdev->notify_cap_pos, 2, 2,
-                                        off * notify_offset_multiplier, 2,
-                                        &vq->notification);
+            vdev->notify_cap_pos, 2, 2,
+            off * notify_offset_multiplier, 2,
+            &vq->notification);
         if (err) {
             return err;
         }

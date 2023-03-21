@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <byteswap.h>
@@ -48,14 +48,15 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * This is a dummy method which simply discards RARP packets.
  */
-static int rarp_rx(struct io_buffer* iobuf,
-                   struct net_device* netdev __unused,
-                   const void* ll_dest __unused,
-                   const void* ll_source __unused,
-                   unsigned int flags __unused) {
-    free_iob(iobuf);
-    return 0;
+static int rarp_rx ( struct io_buffer *iobuf,
+		     struct net_device *netdev __unused,
+		     const void *ll_dest __unused,
+		     const void *ll_source __unused,
+		     unsigned int flags __unused ) {
+	free_iob ( iobuf );
+	return 0;
 }
+
 
 /**
  * Transcribe RARP address
@@ -65,14 +66,14 @@ static int rarp_rx(struct io_buffer* iobuf,
  *
  * This operation is meaningless for the RARP protocol.
  */
-static const char* rarp_ntoa(const void* net_addr __unused) {
-    return "<RARP>";
+static const char * rarp_ntoa ( const void *net_addr __unused ) {
+	return "<RARP>";
 }
 
 /** RARP protocol */
 struct net_protocol rarp_protocol __net_protocol = {
-    .name = "RARP",
-    .net_proto = htons(ETH_P_RARP),
-    .rx = rarp_rx,
-    .ntoa = rarp_ntoa,
+	.name = "RARP",
+	.net_proto = htons ( ETH_P_RARP ),
+	.rx = rarp_rx,
+	.ntoa = rarp_ntoa,
 };

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -42,21 +42,21 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @ret rc		Return status code
  */
-int vmware_present(void) {
-    uint32_t version;
-    uint32_t magic;
-    uint32_t product_type;
+int vmware_present ( void ) {
+	uint32_t version;
+	uint32_t magic;
+	uint32_t product_type;
 
-    /* Perform backdoor call */
-    vmware_cmd_get_version(&version, &magic, &product_type);
+	/* Perform backdoor call */
+	vmware_cmd_get_version ( &version, &magic, &product_type );
 
-    /* Check for VMware presence */
-    if (magic != VMW_MAGIC) {
-        DBGC(VMW_MAGIC, "VMware not present\n");
-        return -ENOENT;
-    }
+	/* Check for VMware presence */
+	if ( magic != VMW_MAGIC ) {
+		DBGC ( VMW_MAGIC, "VMware not present\n" );
+		return -ENOENT;
+	}
 
-    DBGC(VMW_MAGIC, "VMware product type %04x version %08x detected\n",
-         product_type, version);
-    return 0;
+	DBGC ( VMW_MAGIC, "VMware product type %04x version %08x detected\n",
+	       product_type, version );
+	return 0;
 }

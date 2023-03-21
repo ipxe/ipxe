@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,24 +41,24 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** "lotest" options */
 struct lotest_options {
-    /** MTU */
-    unsigned int mtu;
-    /** Broadcast */
-    int broadcast;
+	/** MTU */
+	unsigned int mtu;
+	/** Broadcast */
+	int broadcast;
 };
 
 /** "lotest" option list */
 static struct option_descriptor lotest_opts[] = {
-    OPTION_DESC("mtu", 'm', required_argument,
-                struct lotest_options, mtu, parse_integer),
-    OPTION_DESC("broadcast", 'b', no_argument,
-                struct lotest_options, broadcast, parse_flag),
+	OPTION_DESC ( "mtu", 'm', required_argument,
+		      struct lotest_options, mtu, parse_integer ),
+	OPTION_DESC ( "broadcast", 'b', no_argument,
+		      struct lotest_options, broadcast, parse_flag ),
 };
 
 /** "lotest" command descriptor */
 static struct command_descriptor lotest_cmd =
-    COMMAND_DESC(struct lotest_options, lotest_opts, 2, 2,
-                 "<sending interface> <receiving interface>");
+	COMMAND_DESC ( struct lotest_options, lotest_opts, 2, 2,
+		       "<sending interface> <receiving interface>" );
 
 /**
  * "lotest" command
@@ -67,40 +67,40 @@ static struct command_descriptor lotest_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int lotest_exec(int argc, char** argv) {
-    struct lotest_options opts;
-    struct net_device* sender;
-    struct net_device* receiver;
-    int rc;
+static int lotest_exec ( int argc, char **argv ) {
+	struct lotest_options opts;
+	struct net_device *sender;
+	struct net_device *receiver;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &lotest_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &lotest_cmd, &opts ) ) != 0 )
+		return rc;
 
-    /* Parse sending interface name */
-    if ((rc = parse_netdev(argv[optind], &sender)) != 0)
-        return rc;
+	/* Parse sending interface name */
+	if ( ( rc = parse_netdev ( argv[optind], &sender ) ) != 0 )
+		return rc;
 
-    /* Parse receiving interface name */
-    if ((rc = parse_netdev(argv[optind + 1], &receiver)) != 0)
-        return rc;
+	/* Parse receiving interface name */
+	if ( ( rc = parse_netdev ( argv[ optind + 1 ], &receiver ) ) != 0 )
+		return rc;
 
-    /* Use default MTU if none specified */
-    if (!opts.mtu)
-        opts.mtu = ETH_MAX_MTU;
+	/* Use default MTU if none specified */
+	if ( ! opts.mtu )
+		opts.mtu = ETH_MAX_MTU;
 
-    /* Perform loopback test */
-    if ((rc = loopback_test(sender, receiver, opts.mtu,
-                            opts.broadcast)) != 0) {
-        printf("Test failed: %s\n", strerror(rc));
-        return rc;
-    }
+	/* Perform loopback test */
+	if ( ( rc = loopback_test ( sender, receiver, opts.mtu,
+				    opts.broadcast ) ) != 0 ) {
+		printf ( "Test failed: %s\n", strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /** Loopback testing commands */
 struct command lotest_command __command = {
-    .name = "lotest",
-    .exec = lotest_exec,
+	.name = "lotest",
+	.exec = lotest_exec,
 };

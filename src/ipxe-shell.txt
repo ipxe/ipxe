@@ -1,7 +1,0 @@
-#!ipxe
-
-sync --timeout 500
-
-shell ||
-
-exit 0

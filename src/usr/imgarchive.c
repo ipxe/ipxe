@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <ipxe/image.h>
@@ -40,15 +40,15 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v name		Extracted image name (or NULL to use default)
  * @ret rc		Return status code
  */
-int imgextract(struct image* image, const char* name) {
-    struct image* extracted;
-    int rc;
+int imgextract ( struct image *image, const char *name ) {
+	struct image *extracted;
+	int rc;
 
-    /* Extract archive image */
-    if ((rc = image_extract(image, name, &extracted)) != 0) {
-        printf("Could not extract image: %s\n", strerror(rc));
-        return rc;
-    }
+	/* Extract archive image */
+	if ( ( rc = image_extract ( image, name, &extracted ) ) != 0 ) {
+		printf ( "Could not extract image: %s\n", strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }

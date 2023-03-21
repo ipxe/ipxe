@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -40,31 +40,31 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/efi/efi_cmdline.h>
 
 /** EFI command line (may not be wNUL-terminated */
-const wchar_t* efi_cmdline;
+const wchar_t *efi_cmdline;
 
 /** Length of EFI command line (in bytes) */
 size_t efi_cmdline_len;
 
 /** Internal copy of the command line */
-static char* efi_cmdline_copy;
+static char *efi_cmdline_copy;
 
 /**
  * Free command line image
  *
  * @v refcnt		Reference count
  */
-static void efi_cmdline_free(struct refcnt* refcnt) {
-    struct image* image = container_of(refcnt, struct image, refcnt);
+static void efi_cmdline_free ( struct refcnt *refcnt ) {
+	struct image *image = container_of ( refcnt, struct image, refcnt );
 
-    DBGC(image, "CMDLINE freeing command line\n");
-    free(efi_cmdline_copy);
+	DBGC ( image, "CMDLINE freeing command line\n" );
+	free ( efi_cmdline_copy );
 }
 
 /** Embedded script representing the command line */
 static struct image efi_cmdline_image = {
-    .refcnt = REF_INIT(efi_cmdline_free),
-    .name = "<CMDLINE>",
-    .type = &script_image_type,
+	.refcnt = REF_INIT ( efi_cmdline_free ),
+	.name = "<CMDLINE>",
+	.type = &script_image_type,
 };
 
 /** Colour for debug messages */
@@ -75,77 +75,77 @@ static struct image efi_cmdline_image = {
  *
  * @ret rc		Return status code
  */
-static int efi_cmdline_init(void) {
-    char* cmdline;
-    size_t len;
-    int rc;
+static int efi_cmdline_init ( void ) {
+	char *cmdline;
+	size_t len;
+	int rc;
 
-    /* Do nothing if no command line was specified */
-    if (!efi_cmdline_len) {
-        DBGC(colour, "CMDLINE found no command line\n");
-        return 0;
-    }
+	/* Do nothing if no command line was specified */
+	if ( ! efi_cmdline_len ) {
+		DBGC ( colour, "CMDLINE found no command line\n" );
+		return 0;
+	}
 
-    /* Allocate ASCII copy of command line */
-    len = ((efi_cmdline_len / sizeof(efi_cmdline[0])) + 1 /* NUL */);
-    efi_cmdline_copy = malloc(len);
-    if (!efi_cmdline_copy) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
-    cmdline = efi_cmdline_copy;
-    snprintf(cmdline, len, "%ls", efi_cmdline);
-    DBGC(colour, "CMDLINE found command line \"%s\"\n", cmdline);
+	/* Allocate ASCII copy of command line */
+	len = ( ( efi_cmdline_len / sizeof ( efi_cmdline[0] ) ) + 1 /* NUL */ );
+	efi_cmdline_copy = malloc ( len );
+	if ( ! efi_cmdline_copy ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	cmdline = efi_cmdline_copy;
+	snprintf ( cmdline, len, "%ls", efi_cmdline );
+	DBGC ( colour, "CMDLINE found command line \"%s\"\n", cmdline );
 
-    /* Mark command line as consumed */
-    efi_cmdline_len = 0;
+	/* Mark command line as consumed */
+	efi_cmdline_len = 0;
 
-    /* Strip image name and surrounding whitespace */
-    while (isspace(*cmdline))
-        cmdline++;
-    while (*cmdline && (!isspace(*cmdline)))
-        cmdline++;
-    while (isspace(*cmdline))
-        cmdline++;
-    DBGC(colour, "CMDLINE using command line \"%s\"\n", cmdline);
+	/* Strip image name and surrounding whitespace */
+	while ( isspace ( *cmdline ) )
+		cmdline++;
+	while ( *cmdline && ( ! isspace ( *cmdline ) ) )
+		cmdline++;
+	while ( isspace ( *cmdline ) )
+		cmdline++;
+	DBGC ( colour, "CMDLINE using command line \"%s\"\n", cmdline );
 
-    /* Prepare and register image */
-    efi_cmdline_image.data = virt_to_user(cmdline);
-    efi_cmdline_image.len = strlen(cmdline);
-    if (efi_cmdline_image.len &&
-        ((rc = register_image(&efi_cmdline_image)) != 0)) {
-        DBGC(colour, "CMDLINE could not register command line: %s\n",
-             strerror(rc));
-        goto err_register_image;
-    }
+	/* Prepare and register image */
+	efi_cmdline_image.data = virt_to_user ( cmdline );
+	efi_cmdline_image.len = strlen ( cmdline );
+	if ( efi_cmdline_image.len &&
+	     ( ( rc = register_image ( &efi_cmdline_image ) ) != 0 ) ) {
+		DBGC ( colour, "CMDLINE could not register command line: %s\n",
+		       strerror ( rc ) );
+		goto err_register_image;
+	}
 
-    /* Drop our reference to the image */
-    image_put(&efi_cmdline_image);
+	/* Drop our reference to the image */
+	image_put ( &efi_cmdline_image );
 
-    return 0;
+	return 0;
 
-err_register_image:
-    image_put(&efi_cmdline_image);
-err_alloc:
-    return rc;
+ err_register_image:
+	image_put ( &efi_cmdline_image );
+ err_alloc:
+	return rc;
 }
 
 /**
  * EFI command line startup function
  *
  */
-static void efi_cmdline_startup(void) {
-    int rc;
+static void efi_cmdline_startup ( void ) {
+	int rc;
 
-    /* Initialise command line */
-    if ((rc = efi_cmdline_init()) != 0) {
-        /* No way to report failure */
-        return;
-    }
+	/* Initialise command line */
+	if ( ( rc = efi_cmdline_init() ) != 0 ) {
+		/* No way to report failure */
+		return;
+	}
 }
 
 /** Command line and initrd initialisation function */
-struct startup_fn efi_cmdline_startup_fn __startup_fn(STARTUP_NORMAL) = {
-    .name = "efi_cmdline",
-    .startup = efi_cmdline_startup,
+struct startup_fn efi_cmdline_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "efi_cmdline",
+	.startup = efi_cmdline_startup,
 };

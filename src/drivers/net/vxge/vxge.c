@@ -14,6 +14,6 @@ REQUIRE_OBJECT(vxge_main);
 
 /** vxge PCI IDs for util/parserom.pl which are put into bin/NIC */
 static struct pci_device_id vxge_nics[] __unused = {
-    /* If you change this, also adjust vxge_main_nics[] in vxge_main.c */
-    PCI_ROM(0x17d5, 0x5833, "vxge-x3100", "Neterion X3100 Series", 0),
+	/* If you change this, also adjust vxge_main_nics[] in vxge_main.c */
+	PCI_ROM(0x17d5, 0x5833, "vxge-x3100", "Neterion X3100 Series", 0),
 };

@@ -1,17 +1,15 @@
-#pragma once
-
 #ifndef _BITS_BIGINT_H
-    #define _BITS_BIGINT_H
+#define _BITS_BIGINT_H
 
 /** @file
  *
  * Big integer support
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #include <stdint.h>
-    #include <string.h>
+#include <stdint.h>
+#include <string.h>
 
 /** Element of a big integer */
 typedef uint32_t bigint_element_t;
@@ -24,28 +22,28 @@ typedef uint32_t bigint_element_t;
  * @v data		Raw data
  * @v len		Length of raw data
  */
-static inline __attribute__((always_inline)) void
-bigint_init_raw(uint32_t* value0, unsigned int size,
-                const void* data, size_t len) {
-    bigint_t(size) __attribute__((may_alias))* value =
-        ((void*)value0);
-    long pad_len = (sizeof(*value) - len);
-    void* discard_D;
-    long discard_c;
+static inline __attribute__ (( always_inline )) void
+bigint_init_raw ( uint32_t *value0, unsigned int size,
+		  const void *data, size_t len ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	long pad_len = ( sizeof ( *value ) - len );
+	void *discard_D;
+	long discard_c;
 
-    /* Copy raw data in reverse order, padding with zeros */
-    __asm__ __volatile__("\n1:\n\t"
-                         "movb -1(%3,%1), %%al\n\t"
-                         "stosb\n\t"
-                         "loop 1b\n\t"
-                         "xorl %%eax, %%eax\n\t"
-                         "mov %4, %1\n\t"
-                         "rep stosb\n\t"
-                         : "=&D"(discard_D), "=&c"(discard_c),
-                           "+m"(*value)
-                         : "r"(data), "g"(pad_len), "0"(value0),
-                           "1"(len)
-                         : "eax");
+	/* Copy raw data in reverse order, padding with zeros */
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "movb -1(%3,%1), %%al\n\t"
+			       "stosb\n\t"
+			       "loop 1b\n\t"
+			       "xorl %%eax, %%eax\n\t"
+			       "mov %4, %1\n\t"
+			       "rep stosb\n\t"
+			       : "=&D" ( discard_D ), "=&c" ( discard_c ),
+				 "+m" ( *value )
+			       : "r" ( data ), "g" ( pad_len ), "0" ( value0 ),
+				 "1" ( len )
+			       : "eax" );
 }
 
 /**
@@ -55,25 +53,25 @@ bigint_init_raw(uint32_t* value0, unsigned int size,
  * @v value0		Element 0 of big integer to be added to
  * @v size		Number of elements
  */
-static inline __attribute__((always_inline)) void
-bigint_add_raw(const uint32_t* addend0, uint32_t* value0,
-               unsigned int size) {
-    bigint_t(size) __attribute__((may_alias))* value =
-        ((void*)value0);
-    long index;
-    void* discard_S;
-    long discard_c;
+static inline __attribute__ (( always_inline )) void
+bigint_add_raw ( const uint32_t *addend0, uint32_t *value0,
+		 unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	long index;
+	void *discard_S;
+	long discard_c;
 
-    __asm__ __volatile__("xor %0, %0\n\t" /* Zero %0 and clear CF */
-                         "\n1:\n\t"
-                         "lodsl\n\t"
-                         "adcl %%eax, (%4,%0,4)\n\t"
-                         "inc %0\n\t" /* Does not affect CF */
-                         "loop 1b\n\t"
-                         : "=&r"(index), "=&S"(discard_S),
-                           "=&c"(discard_c), "+m"(*value)
-                         : "r"(value0), "1"(addend0), "2"(size)
-                         : "eax");
+	__asm__ __volatile__ ( "xor %0, %0\n\t" /* Zero %0 and clear CF */
+			       "\n1:\n\t"
+			       "lodsl\n\t"
+			       "adcl %%eax, (%4,%0,4)\n\t"
+			       "inc %0\n\t" /* Does not affect CF */
+			       "loop 1b\n\t"
+			       : "=&r" ( index ), "=&S" ( discard_S ),
+				 "=&c" ( discard_c ), "+m" ( *value )
+			       : "r" ( value0 ), "1" ( addend0 ), "2" ( size )
+			       : "eax" );
 }
 
 /**
@@ -83,26 +81,26 @@ bigint_add_raw(const uint32_t* addend0, uint32_t* value0,
  * @v value0		Element 0 of big integer to be subtracted from
  * @v size		Number of elements
  */
-static inline __attribute__((always_inline)) void
-bigint_subtract_raw(const uint32_t* subtrahend0, uint32_t* value0,
-                    unsigned int size) {
-    bigint_t(size) __attribute__((may_alias))* value =
-        ((void*)value0);
-    long index;
-    void* discard_S;
-    long discard_c;
+static inline __attribute__ (( always_inline )) void
+bigint_subtract_raw ( const uint32_t *subtrahend0, uint32_t *value0,
+		      unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	long index;
+	void *discard_S;
+	long discard_c;
 
-    __asm__ __volatile__("xor %0, %0\n\t" /* Zero %0 and clear CF */
-                         "\n1:\n\t"
-                         "lodsl\n\t"
-                         "sbbl %%eax, (%4,%0,4)\n\t"
-                         "inc %0\n\t" /* Does not affect CF */
-                         "loop 1b\n\t"
-                         : "=&r"(index), "=&S"(discard_S),
-                           "=&c"(discard_c), "+m"(*value)
-                         : "r"(value0), "1"(subtrahend0),
-                           "2"(size)
-                         : "eax");
+	__asm__ __volatile__ ( "xor %0, %0\n\t" /* Zero %0 and clear CF */
+			       "\n1:\n\t"
+			       "lodsl\n\t"
+			       "sbbl %%eax, (%4,%0,4)\n\t"
+			       "inc %0\n\t" /* Does not affect CF */
+			       "loop 1b\n\t"
+			       : "=&r" ( index ), "=&S" ( discard_S ),
+				 "=&c" ( discard_c ), "+m" ( *value )
+			       : "r" ( value0 ), "1" ( subtrahend0 ),
+				 "2" ( size )
+			       : "eax" );
 }
 
 /**
@@ -111,21 +109,21 @@ bigint_subtract_raw(const uint32_t* subtrahend0, uint32_t* value0,
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
  */
-static inline __attribute__((always_inline)) void
-bigint_rol_raw(uint32_t* value0, unsigned int size) {
-    bigint_t(size) __attribute__((may_alias))* value =
-        ((void*)value0);
-    long index;
-    long discard_c;
+static inline __attribute__ (( always_inline )) void
+bigint_rol_raw ( uint32_t *value0, unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	long index;
+	long discard_c;
 
-    __asm__ __volatile__("xor %0, %0\n\t" /* Zero %0 and clear CF */
-                         "\n1:\n\t"
-                         "rcll $1, (%3,%0,4)\n\t"
-                         "inc %0\n\t" /* Does not affect CF */
-                         "loop 1b\n\t"
-                         : "=&r"(index), "=&c"(discard_c),
-                           "+m"(*value)
-                         : "r"(value0), "1"(size));
+	__asm__ __volatile__ ( "xor %0, %0\n\t" /* Zero %0 and clear CF */
+			       "\n1:\n\t"
+			       "rcll $1, (%3,%0,4)\n\t"
+			       "inc %0\n\t" /* Does not affect CF */
+			       "loop 1b\n\t"
+			       : "=&r" ( index ), "=&c" ( discard_c ),
+				 "+m" ( *value )
+			       : "r" ( value0 ), "1" ( size ) );
 }
 
 /**
@@ -134,18 +132,18 @@ bigint_rol_raw(uint32_t* value0, unsigned int size) {
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
  */
-static inline __attribute__((always_inline)) void
-bigint_ror_raw(uint32_t* value0, unsigned int size) {
-    bigint_t(size) __attribute__((may_alias))* value =
-        ((void*)value0);
-    long discard_c;
+static inline __attribute__ (( always_inline )) void
+bigint_ror_raw ( uint32_t *value0, unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	long discard_c;
 
-    __asm__ __volatile__("clc\n\t"
-                         "\n1:\n\t"
-                         "rcrl $1, -4(%2,%0,4)\n\t"
-                         "loop 1b\n\t"
-                         : "=&c"(discard_c), "+m"(*value)
-                         : "r"(value0), "0"(size));
+	__asm__ __volatile__ ( "clc\n\t"
+			       "\n1:\n\t"
+			       "rcrl $1, -4(%2,%0,4)\n\t"
+			       "loop 1b\n\t"
+			       : "=&c" ( discard_c ), "+m" ( *value )
+			       : "r" ( value0 ), "0" ( size ) );
 }
 
 /**
@@ -155,19 +153,19 @@ bigint_ror_raw(uint32_t* value0, unsigned int size) {
  * @v size		Number of elements
  * @ret is_zero		Big integer is equal to zero
  */
-static inline __attribute__((always_inline, pure)) int
-bigint_is_zero_raw(const uint32_t* value0, unsigned int size) {
-    void* discard_D;
-    long discard_c;
-    int result;
+static inline __attribute__ (( always_inline, pure )) int
+bigint_is_zero_raw ( const uint32_t *value0, unsigned int size ) {
+	void *discard_D;
+	long discard_c;
+	int result;
 
-    __asm__ __volatile__("xor %0, %0\n\t" /* Set ZF */
-                         "repe scasl\n\t"
-                         "sete %b0\n\t"
-                         : "=&a"(result), "=&D"(discard_D),
-                           "=&c"(discard_c)
-                         : "1"(value0), "2"(size));
-    return result;
+	__asm__ __volatile__ ( "xor %0, %0\n\t" /* Set ZF */
+			       "repe scasl\n\t"
+			       "sete %b0\n\t"
+			       : "=&a" ( result ), "=&D" ( discard_D ),
+				 "=&c" ( discard_c )
+			       : "1" ( value0 ), "2" ( size ) );
+	return result;
 }
 
 /**
@@ -178,23 +176,23 @@ bigint_is_zero_raw(const uint32_t* value0, unsigned int size) {
  * @v size		Number of elements
  * @ret geq		Big integer is greater than or equal to the reference
  */
-static inline __attribute__((always_inline, pure)) int
-bigint_is_geq_raw(const uint32_t* value0, const uint32_t* reference0,
-                  unsigned int size) {
-    long discard_c;
-    long discard_tmp;
-    int result;
+static inline __attribute__ (( always_inline, pure )) int
+bigint_is_geq_raw ( const uint32_t *value0, const uint32_t *reference0,
+		    unsigned int size ) {
+	long discard_c;
+	long discard_tmp;
+	int result;
 
-    __asm__ __volatile__("\n1:\n\t"
-                         "movl -4(%3, %1, 4), %k2\n\t"
-                         "cmpl -4(%4, %1, 4), %k2\n\t"
-                         "loope 1b\n\t"
-                         "setae %b0\n\t"
-                         : "=q"(result), "=&c"(discard_c),
-                           "=&r"(discard_tmp)
-                         : "r"(value0), "r"(reference0),
-                           "0"(0), "1"(size));
-    return result;
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "movl -4(%3, %1, 4), %k2\n\t"
+			       "cmpl -4(%4, %1, 4), %k2\n\t"
+			       "loope 1b\n\t"
+			       "setae %b0\n\t"
+			       : "=q" ( result ), "=&c" ( discard_c ),
+				 "=&r" ( discard_tmp )
+			       : "r" ( value0 ), "r" ( reference0 ),
+				 "0" ( 0 ), "1" ( size ) );
+	return result;
 }
 
 /**
@@ -205,15 +203,15 @@ bigint_is_geq_raw(const uint32_t* value0, const uint32_t* reference0,
  * @v bit		Bit to test
  * @ret is_set		Bit is set
  */
-static inline __attribute__((always_inline)) int
-bigint_bit_is_set_raw(const uint32_t* value0, unsigned int size,
-                      unsigned int bit) {
-    const bigint_t(size) __attribute__((may_alias))* value =
-        ((const void*)value0);
-    unsigned int index = (bit / (8 * sizeof(value->element[0])));
-    unsigned int subindex = (bit % (8 * sizeof(value->element[0])));
+static inline __attribute__ (( always_inline )) int
+bigint_bit_is_set_raw ( const uint32_t *value0, unsigned int size,
+			unsigned int bit ) {
+	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( const void * ) value0 );
+	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
+	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
 
-    return (value->element[index] & (1 << subindex));
+	return ( value->element[index] & ( 1 << subindex ) );
 }
 
 /**
@@ -223,23 +221,23 @@ bigint_bit_is_set_raw(const uint32_t* value0, unsigned int size,
  * @v size		Number of elements
  * @ret max_bit		Highest bit set + 1 (or 0 if no bits set)
  */
-static inline __attribute__((always_inline)) int
-bigint_max_set_bit_raw(const uint32_t* value0, unsigned int size) {
-    long discard_c;
-    int result;
+static inline __attribute__ (( always_inline )) int
+bigint_max_set_bit_raw ( const uint32_t *value0, unsigned int size ) {
+	long discard_c;
+	int result;
 
-    __asm__ __volatile__("\n1:\n\t"
-                         "bsrl -4(%2,%1,4), %0\n\t"
-                         "loopz 1b\n\t"
-                         "rol %1\n\t" /* Does not affect ZF */
-                         "rol %1\n\t"
-                         "leal 1(%k0,%k1,8), %k0\n\t"
-                         "jnz 2f\n\t"
-                         "xor %0, %0\n\t"
-                         "\n2:\n\t"
-                         : "=&r"(result), "=&c"(discard_c)
-                         : "r"(value0), "1"(size));
-    return result;
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "bsrl -4(%2,%1,4), %0\n\t"
+			       "loopz 1b\n\t"
+			       "rol %1\n\t" /* Does not affect ZF */
+			       "rol %1\n\t"
+			       "leal 1(%k0,%k1,8), %k0\n\t"
+			       "jnz 2f\n\t"
+			       "xor %0, %0\n\t"
+			       "\n2:\n\t"
+			       : "=&r" ( result ), "=&c" ( discard_c )
+			       : "r" ( value0 ), "1" ( size ) );
+	return result;
 }
 
 /**
@@ -250,25 +248,25 @@ bigint_max_set_bit_raw(const uint32_t* value0, unsigned int size) {
  * @v dest0		Element 0 of destination big integer
  * @v dest_size		Number of elements in destination big integer
  */
-static inline __attribute__((always_inline)) void
-bigint_grow_raw(const uint32_t* source0, unsigned int source_size,
-                uint32_t* dest0, unsigned int dest_size) {
-    bigint_t(dest_size) __attribute__((may_alias))* dest =
-        ((void*)dest0);
-    long pad_size = (dest_size - source_size);
-    void* discard_D;
-    void* discard_S;
-    long discard_c;
+static inline __attribute__ (( always_inline )) void
+bigint_grow_raw ( const uint32_t *source0, unsigned int source_size,
+		  uint32_t *dest0, unsigned int dest_size ) {
+	bigint_t ( dest_size ) __attribute__ (( may_alias )) *dest =
+		( ( void * ) dest0 );
+	long pad_size = ( dest_size - source_size );
+	void *discard_D;
+	void *discard_S;
+	long discard_c;
 
-    __asm__ __volatile__("rep movsl\n\t"
-                         "xorl %%eax, %%eax\n\t"
-                         "mov %4, %2\n\t"
-                         "rep stosl\n\t"
-                         : "=&D"(discard_D), "=&S"(discard_S),
-                           "=&c"(discard_c), "+m"(*dest)
-                         : "g"(pad_size), "0"(dest0),
-                           "1"(source0), "2"(source_size)
-                         : "eax");
+	__asm__ __volatile__ ( "rep movsl\n\t"
+			       "xorl %%eax, %%eax\n\t"
+			       "mov %4, %2\n\t"
+			       "rep stosl\n\t"
+			       : "=&D" ( discard_D ), "=&S" ( discard_S ),
+				 "=&c" ( discard_c ), "+m" ( *dest )
+			       : "g" ( pad_size ), "0" ( dest0 ),
+				 "1" ( source0 ), "2" ( source_size )
+			       : "eax" );
 }
 
 /**
@@ -279,21 +277,21 @@ bigint_grow_raw(const uint32_t* source0, unsigned int source_size,
  * @v dest0		Element 0 of destination big integer
  * @v dest_size		Number of elements in destination big integer
  */
-static inline __attribute__((always_inline)) void
-bigint_shrink_raw(const uint32_t* source0, unsigned int source_size __unused,
-                  uint32_t* dest0, unsigned int dest_size) {
-    bigint_t(dest_size) __attribute__((may_alias))* dest =
-        ((void*)dest0);
-    void* discard_D;
-    void* discard_S;
-    long discard_c;
+static inline __attribute__ (( always_inline )) void
+bigint_shrink_raw ( const uint32_t *source0, unsigned int source_size __unused,
+		    uint32_t *dest0, unsigned int dest_size ) {
+	bigint_t ( dest_size ) __attribute__ (( may_alias )) *dest =
+		( ( void * ) dest0 );
+	void *discard_D;
+	void *discard_S;
+	long discard_c;
 
-    __asm__ __volatile__("rep movsl\n\t"
-                         : "=&D"(discard_D), "=&S"(discard_S),
-                           "=&c"(discard_c), "+m"(*dest)
-                         : "0"(dest0), "1"(source0),
-                           "2"(dest_size)
-                         : "eax");
+	__asm__ __volatile__ ( "rep movsl\n\t"
+			       : "=&D" ( discard_D ), "=&S" ( discard_S ),
+				 "=&c" ( discard_c ), "+m" ( *dest )
+			       : "0" ( dest0 ), "1" ( source0 ),
+				 "2" ( dest_size )
+			       : "eax" );
 }
 
 /**
@@ -304,28 +302,28 @@ bigint_shrink_raw(const uint32_t* source0, unsigned int source_size __unused,
  * @v out		Output buffer
  * @v len		Length of output buffer
  */
-static inline __attribute__((always_inline)) void
-bigint_done_raw(const uint32_t* value0, unsigned int size __unused,
-                void* out, size_t len) {
-    struct {
-        uint8_t bytes[len];
-    } __attribute__((may_alias))* out_bytes = out;
-    void* discard_D;
-    long discard_c;
+static inline __attribute__ (( always_inline )) void
+bigint_done_raw ( const uint32_t *value0, unsigned int size __unused,
+		  void *out, size_t len ) {
+	struct {
+		uint8_t bytes[len];
+	} __attribute__ (( may_alias )) *out_bytes = out;
+	void *discard_D;
+	long discard_c;
 
-    /* Copy raw data in reverse order */
-    __asm__ __volatile__("\n1:\n\t"
-                         "movb -1(%3,%1), %%al\n\t"
-                         "stosb\n\t"
-                         "loop 1b\n\t"
-                         : "=&D"(discard_D), "=&c"(discard_c),
-                           "+m"(*out_bytes)
-                         : "r"(value0), "0"(out), "1"(len)
-                         : "eax");
+	/* Copy raw data in reverse order */
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "movb -1(%3,%1), %%al\n\t"
+			       "stosb\n\t"
+			       "loop 1b\n\t"
+			       : "=&D" ( discard_D ), "=&c" ( discard_c ),
+				 "+m" ( *out_bytes )
+			       : "r" ( value0 ), "0" ( out ), "1" ( len )
+			       : "eax" );
 }
 
-extern void bigint_multiply_raw(const uint32_t* multiplicand0,
-                                const uint32_t* multiplier0,
-                                uint32_t* value0, unsigned int size);
+extern void bigint_multiply_raw ( const uint32_t *multiplicand0,
+				  const uint32_t *multiplier0,
+				  uint32_t *value0, unsigned int size );
 
 #endif /* _BITS_BIGINT_H */

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdio.h>
@@ -40,23 +40,23 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** "imgtrust" options */
 struct imgtrust_options {
-    /** Allow trusted images */
-    int allow;
-    /** Make trust requirement permanent */
-    int permanent;
+	/** Allow trusted images */
+	int allow;
+	/** Make trust requirement permanent */
+	int permanent;
 };
 
 /** "imgtrust" option list */
 static struct option_descriptor imgtrust_opts[] = {
-    OPTION_DESC("allow", 'a', no_argument,
-                struct imgtrust_options, allow, parse_flag),
-    OPTION_DESC("permanent", 'p', no_argument,
-                struct imgtrust_options, permanent, parse_flag),
+	OPTION_DESC ( "allow", 'a', no_argument,
+		      struct imgtrust_options, allow, parse_flag ),
+	OPTION_DESC ( "permanent", 'p', no_argument,
+		      struct imgtrust_options, permanent, parse_flag ),
 };
 
 /** "imgtrust" command descriptor */
 static struct command_descriptor imgtrust_cmd =
-    COMMAND_DESC(struct imgtrust_options, imgtrust_opts, 0, 0, NULL);
+	COMMAND_DESC ( struct imgtrust_options, imgtrust_opts, 0, 0, NULL );
 
 /**
  * The "imgtrust" command
@@ -65,49 +65,49 @@ static struct command_descriptor imgtrust_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int imgtrust_exec(int argc, char** argv) {
-    struct imgtrust_options opts;
-    int rc;
+static int imgtrust_exec ( int argc, char **argv ) {
+	struct imgtrust_options opts;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &imgtrust_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &imgtrust_cmd, &opts ) ) != 0 )
+		return rc;
 
-    /* Set trust requirement */
-    if ((rc = image_set_trust((!opts.allow),
-                              opts.permanent)) != 0) {
-        printf("Could not set image trust requirement: %s\n",
-               strerror(rc));
-        return rc;
-    }
+	/* Set trust requirement */
+	if ( ( rc = image_set_trust ( ( ! opts.allow ),
+				      opts.permanent ) ) != 0 ) {
+		printf ( "Could not set image trust requirement: %s\n",
+			 strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /** "imgverify" options */
 struct imgverify_options {
-    /** Required signer common name */
-    char* signer;
-    /** Keep signature after verification */
-    int keep;
-    /** Download timeout */
-    unsigned long timeout;
+	/** Required signer common name */
+	char *signer;
+	/** Keep signature after verification */
+	int keep;
+	/** Download timeout */
+	unsigned long timeout;
 };
 
 /** "imgverify" option list */
 static struct option_descriptor imgverify_opts[] = {
-    OPTION_DESC("signer", 's', required_argument,
-                struct imgverify_options, signer, parse_string),
-    OPTION_DESC("keep", 'k', no_argument,
-                struct imgverify_options, keep, parse_flag),
-    OPTION_DESC("timeout", 't', required_argument,
-                struct imgverify_options, timeout, parse_timeout),
+	OPTION_DESC ( "signer", 's', required_argument,
+		      struct imgverify_options, signer, parse_string ),
+	OPTION_DESC ( "keep", 'k', no_argument,
+		      struct imgverify_options, keep, parse_flag ),
+	OPTION_DESC ( "timeout", 't', required_argument,
+		      struct imgverify_options, timeout, parse_timeout),
 };
 
 /** "imgverify" command descriptor */
 static struct command_descriptor imgverify_cmd =
-    COMMAND_DESC(struct imgverify_options, imgverify_opts, 2, 2,
-                 "<uri|image> <signature uri|image>");
+	COMMAND_DESC ( struct imgverify_options, imgverify_opts, 2, 2,
+		       "<uri|image> <signature uri|image>" );
 
 /**
  * The "imgverify" command
@@ -116,59 +116,59 @@ static struct command_descriptor imgverify_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int imgverify_exec(int argc, char** argv) {
-    struct imgverify_options opts;
-    const char* image_name_uri;
-    const char* signature_name_uri;
-    struct image* image;
-    struct image* signature;
-    int rc;
+static int imgverify_exec ( int argc, char **argv ) {
+	struct imgverify_options opts;
+	const char *image_name_uri;
+	const char *signature_name_uri;
+	struct image *image;
+	struct image *signature;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &imgverify_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &imgverify_cmd, &opts ) ) != 0 )
+		return rc;
 
-    /* Parse image name/URI string */
-    image_name_uri = argv[optind];
+	/* Parse image name/URI string */
+	image_name_uri = argv[optind];
 
-    /* Parse signature name/URI string */
-    signature_name_uri = argv[optind + 1];
+	/* Parse signature name/URI string */
+	signature_name_uri = argv[ optind + 1 ];
 
-    /* Acquire the image */
-    if ((rc = imgacquire(image_name_uri, opts.timeout, &image)) != 0)
-        goto err_acquire_image;
+	/* Acquire the image */
+	if ( ( rc = imgacquire ( image_name_uri, opts.timeout, &image ) ) != 0 )
+		goto err_acquire_image;
 
-    /* Acquire the signature image */
-    if ((rc = imgacquire(signature_name_uri, opts.timeout,
-                         &signature)) != 0)
-        goto err_acquire_signature;
+	/* Acquire the signature image */
+	if ( ( rc = imgacquire ( signature_name_uri, opts.timeout,
+				 &signature ) ) != 0 )
+		goto err_acquire_signature;
 
-    /* Verify image */
-    if ((rc = imgverify(image, signature, opts.signer)) != 0) {
-        printf("Could not verify: %s\n", strerror(rc));
-        goto err_verify;
-    }
+	/* Verify image */
+	if ( ( rc = imgverify ( image, signature, opts.signer ) ) != 0 ) {
+		printf ( "Could not verify: %s\n", strerror ( rc ) );
+		goto err_verify;
+	}
 
-    /* Success */
-    rc = 0;
+	/* Success */
+	rc = 0;
 
-err_verify:
-    /* Discard signature unless --keep was specified */
-    if (!opts.keep)
-        unregister_image(signature);
-err_acquire_signature:
-err_acquire_image:
-    return rc;
+ err_verify:
+	/* Discard signature unless --keep was specified */
+	if ( ! opts.keep )
+		unregister_image ( signature );
+ err_acquire_signature:
+ err_acquire_image:
+	return rc;
 }
 
 /** Image trust management commands */
 struct command image_trust_commands[] __command = {
-    {
-        .name = "imgtrust",
-        .exec = imgtrust_exec,
-    },
-    {
-        .name = "imgverify",
-        .exec = imgverify_exec,
-    },
+	{
+		.name = "imgtrust",
+		.exec = imgtrust_exec,
+	},
+	{
+		.name = "imgverify",
+		.exec = imgverify_exec,
+	},
 };

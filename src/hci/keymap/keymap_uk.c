@@ -6,25 +6,27 @@
  *
  */
 
-FILE_LICENCE(PUBLIC_DOMAIN);
+FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
 /** "uk" basic remapping */
 static struct keymap_key uk_basic[] = {
-    {0x22, 0x40}, /* '"' => '@' */
-    {0x40, 0x22}, /* '@' => '"' */
-    {0x5c, 0x23}, /* '\\' => '#' */
-    {0x7c, 0x7e}, /* '|' => '~' */
-    {0, 0}};
+	{ 0x22, 0x40 },	/* '"' => '@' */
+	{ 0x40, 0x22 },	/* '@' => '"' */
+	{ 0x5c, 0x23 },	/* '\\' => '#' */
+	{ 0x7c, 0x7e },	/* '|' => '~' */
+	{ 0, 0 }
+};
 
 /** "uk" AltGr remapping */
 static struct keymap_key uk_altgr[] = {
-    {0, 0}};
+	{ 0, 0 }
+};
 
 /** "uk" keyboard map */
 struct keymap uk_keymap __keymap = {
-    .name = "uk",
-    .basic = uk_basic,
-    .altgr = uk_altgr,
+	.name = "uk",
+	.basic = uk_basic,
+	.altgr = uk_altgr,
 };

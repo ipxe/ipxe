@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdarg.h>
 #include <string.h>
@@ -44,14 +44,14 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v scheme		URI scheme
  * @ret opener		Opener, or NULL
  */
-struct uri_opener* xfer_uri_opener(const char* scheme) {
-    struct uri_opener* opener;
+struct uri_opener * xfer_uri_opener ( const char *scheme ) {
+	struct uri_opener *opener;
 
-    for_each_table_entry(opener, URI_OPENERS) {
-        if (strcasecmp(scheme, opener->scheme) == 0)
-            return opener;
-    }
-    return NULL;
+	for_each_table_entry ( opener, URI_OPENERS ) {
+		if ( strcasecmp ( scheme, opener->scheme ) == 0 )
+			return opener;
+	}
+	return NULL;
 }
 
 /**
@@ -64,42 +64,42 @@ struct uri_opener* xfer_uri_opener(const char* scheme) {
  * The URI will be regarded as being relative to the current working
  * URI (see churi()).
  */
-int xfer_open_uri(struct interface* intf, struct uri* uri) {
-    struct uri_opener* opener;
-    struct uri* resolved_uri;
-    int rc;
+int xfer_open_uri ( struct interface *intf, struct uri *uri ) {
+	struct uri_opener *opener;
+	struct uri *resolved_uri;
+	int rc;
 
-    /* Resolve URI */
-    resolved_uri = resolve_uri(cwuri, uri);
-    if (!resolved_uri) {
-        rc = -ENOMEM;
-        goto err_resolve_uri;
-    }
+	/* Resolve URI */
+	resolved_uri = resolve_uri ( cwuri, uri );
+	if ( ! resolved_uri ) {
+		rc = -ENOMEM;
+		goto err_resolve_uri;
+	}
 
-    /* Find opener which supports this URI scheme */
-    opener = xfer_uri_opener(resolved_uri->scheme);
-    if (!opener) {
-        DBGC(INTF_COL(intf), "INTF " INTF_FMT " attempted to open "
-                             "unsupported URI scheme \"%s\"\n",
-             INTF_DBG(intf), resolved_uri->scheme);
-        rc = -ENOTSUP;
-        goto err_opener;
-    }
+	/* Find opener which supports this URI scheme */
+	opener = xfer_uri_opener ( resolved_uri->scheme );
+	if ( ! opener ) {
+		DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " attempted to open "
+		       "unsupported URI scheme \"%s\"\n",
+		       INTF_DBG ( intf ), resolved_uri->scheme );
+		rc = -ENOTSUP;
+		goto err_opener;
+	}
 
-    /* Call opener */
-    DBGC(INTF_COL(intf), "INTF " INTF_FMT " opening %s URI\n",
-         INTF_DBG(intf), resolved_uri->scheme);
-    if ((rc = opener->open(intf, resolved_uri)) != 0) {
-        DBGC(INTF_COL(intf), "INTF " INTF_FMT " could not open: "
-                             "%s\n", INTF_DBG(intf), strerror(rc));
-        goto err_open;
-    }
+	/* Call opener */
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " opening %s URI\n",
+	       INTF_DBG ( intf ), resolved_uri->scheme );
+	if ( ( rc = opener->open ( intf, resolved_uri ) ) != 0 ) {
+		DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " could not open: "
+		       "%s\n", INTF_DBG ( intf ), strerror ( rc ) );
+		goto err_open;
+	}
 
-err_open:
-err_opener:
-    uri_put(resolved_uri);
-err_resolve_uri:
-    return rc;
+ err_open:
+ err_opener:
+	uri_put ( resolved_uri );
+ err_resolve_uri:
+	return rc;
 }
 
 /**
@@ -112,22 +112,22 @@ err_resolve_uri:
  * The URI will be regarded as being relative to the current working
  * URI (see churi()).
  */
-int xfer_open_uri_string(struct interface* intf,
-                         const char* uri_string) {
-    struct uri* uri;
-    int rc;
+int xfer_open_uri_string ( struct interface *intf,
+			   const char *uri_string ) {
+	struct uri *uri;
+	int rc;
 
-    DBGC(INTF_COL(intf), "INTF " INTF_FMT " opening URI %s\n",
-         INTF_DBG(intf), uri_string);
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " opening URI %s\n",
+	       INTF_DBG ( intf ), uri_string );
 
-    uri = parse_uri(uri_string);
-    if (!uri)
-        return -ENOMEM;
+	uri = parse_uri ( uri_string );
+	if ( ! uri )
+		return -ENOMEM;
 
-    rc = xfer_open_uri(intf, uri);
+	rc = xfer_open_uri ( intf, uri );
 
-    uri_put(uri);
-    return rc;
+	uri_put ( uri );
+	return rc;
 }
 
 /**
@@ -139,24 +139,24 @@ int xfer_open_uri_string(struct interface* intf,
  * @v local		Local socket address, or NULL
  * @ret rc		Return status code
  */
-int xfer_open_socket(struct interface* intf, int semantics,
-                     struct sockaddr* peer, struct sockaddr* local) {
-    struct socket_opener* opener;
+int xfer_open_socket ( struct interface *intf, int semantics,
+		       struct sockaddr *peer, struct sockaddr *local ) {
+	struct socket_opener *opener;
 
-    DBGC(INTF_COL(intf), "INTF " INTF_FMT " opening (%s,%s) socket\n",
-         INTF_DBG(intf), socket_semantics_name(semantics),
-         socket_family_name(peer->sa_family));
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " opening (%s,%s) socket\n",
+	       INTF_DBG ( intf ), socket_semantics_name ( semantics ),
+	       socket_family_name ( peer->sa_family ) );
 
-    for_each_table_entry(opener, SOCKET_OPENERS) {
-        if (opener->semantics == semantics)
-            return opener->open(intf, peer, local);
-    }
+	for_each_table_entry ( opener, SOCKET_OPENERS ) {
+		if ( opener->semantics == semantics )
+			return opener->open ( intf, peer, local );
+	}
 
-    DBGC(INTF_COL(intf), "INTF " INTF_FMT " attempted to open "
-                         "unsupported socket type (%s,%s)\n",
-         INTF_DBG(intf), socket_semantics_name(semantics),
-         socket_family_name(peer->sa_family));
-    return -ENOTSUP;
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " attempted to open "
+	       "unsupported socket type (%s,%s)\n",
+	       INTF_DBG ( intf ), socket_semantics_name ( semantics ),
+	       socket_family_name ( peer->sa_family ) );
+	return -ENOTSUP;
 }
 
 /**
@@ -167,31 +167,28 @@ int xfer_open_socket(struct interface* intf, int semantics,
  * @v args		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int xfer_vopen(struct interface* intf, int type, va_list args) {
-    switch (type) {
-        case LOCATION_URI_STRING: {
-            const char* uri_string = va_arg(args, const char*);
+int xfer_vopen ( struct interface *intf, int type, va_list args ) {
+	switch ( type ) {
+	case LOCATION_URI_STRING: {
+		const char *uri_string = va_arg ( args, const char * );
 
-            return xfer_open_uri_string(intf, uri_string);
-        }
-        case LOCATION_URI: {
-            struct uri* uri = va_arg(args, struct uri*);
+		return xfer_open_uri_string ( intf, uri_string ); }
+	case LOCATION_URI: {
+		struct uri *uri = va_arg ( args, struct uri * );
 
-            return xfer_open_uri(intf, uri);
-        }
-        case LOCATION_SOCKET: {
-            int semantics = va_arg(args, int);
-            struct sockaddr* peer = va_arg(args, struct sockaddr*);
-            struct sockaddr* local = va_arg(args, struct sockaddr*);
+		return xfer_open_uri ( intf, uri ); }
+	case LOCATION_SOCKET: {
+		int semantics = va_arg ( args, int );
+		struct sockaddr *peer = va_arg ( args, struct sockaddr * );
+		struct sockaddr *local = va_arg ( args, struct sockaddr * );
 
-            return xfer_open_socket(intf, semantics, peer, local);
-        }
-        default:
-            DBGC(INTF_COL(intf), "INTF " INTF_FMT " attempted to "
-                                 "open unsupported location type %d\n",
-                 INTF_DBG(intf), type);
-            return -ENOTSUP;
-    }
+		return xfer_open_socket ( intf, semantics, peer, local ); }
+	default:
+		DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " attempted to "
+		       "open unsupported location type %d\n",
+		       INTF_DBG ( intf ), type );
+		return -ENOTSUP;
+	}
 }
 
 /**
@@ -202,14 +199,14 @@ int xfer_vopen(struct interface* intf, int type, va_list args) {
  * @v ...		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int xfer_open(struct interface* intf, int type, ...) {
-    va_list args;
-    int rc;
+int xfer_open ( struct interface *intf, int type, ... ) {
+	va_list args;
+	int rc;
 
-    va_start(args, type);
-    rc = xfer_vopen(intf, type, args);
-    va_end(args);
-    return rc;
+	va_start ( args, type );
+	rc = xfer_vopen ( intf, type, args );
+	va_end ( args );
+	return rc;
 }
 
 /**
@@ -224,10 +221,11 @@ int xfer_open(struct interface* intf, int type, ...) {
  * using xfer_vopen().  It is intended to be used as a .vredirect
  * method handler.
  */
-int xfer_vreopen(struct interface* intf, int type, va_list args) {
-    /* Close existing connection */
-    intf_restart(intf, 0);
+int xfer_vreopen ( struct interface *intf, int type, va_list args ) {
 
-    /* Open new location */
-    return xfer_vopen(intf, type, args);
+	/* Close existing connection */
+	intf_restart ( intf, 0 );
+
+	/* Open new location */
+	return xfer_vopen ( intf, type, args );
 }

@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef SRC_DRIVERS_INFINIBAND_MLX_UTILS_INCLUDE_PRIVATE_MLX_UTILS_PRIV_H_
-    #define SRC_DRIVERS_INFINIBAND_MLX_UTILS_INCLUDE_PRIVATE_MLX_UTILS_PRIV_H_
+#define SRC_DRIVERS_INFINIBAND_MLX_UTILS_INCLUDE_PRIVATE_MLX_UTILS_PRIV_H_
 
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
@@ -22,41 +20,49 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
-    #include "../../include/public/mlx_utils.h"
+#include "../../include/public/mlx_utils.h"
 
 mlx_status
 mlx_utils_delay_in_ms_priv(
-    IN mlx_uint32 msecs);
+			IN mlx_uint32 msecs
+		);
 
 mlx_status
 mlx_utils_delay_in_us_priv(
-    IN mlx_uint32 usecs);
+			IN mlx_uint32 usecs
+		);
 
 mlx_status
 mlx_utils_ilog2_priv(
-    IN mlx_uint32 i,
-    OUT mlx_uint32* log);
+			IN mlx_uint32 i,
+			OUT mlx_uint32 *log
+		);
 
 mlx_status
 mlx_utils_init_lock_priv(
-    OUT void** lock);
+			OUT void **lock
+		);
 
 mlx_status
 mlx_utils_free_lock_priv(
-    IN void* lock);
+			IN void *lock
+		);
 
 mlx_status
-mlx_utils_acquire_lock_priv(
-    IN void* lock);
+mlx_utils_acquire_lock_priv (
+			IN void *lock
+		);
 
 mlx_status
-mlx_utils_release_lock_priv(
-    IN void* lock);
+mlx_utils_release_lock_priv (
+			IN void *lock
+		);
 
 mlx_status
-mlx_utils_rand_priv(
-    IN mlx_utils* utils,
-    OUT mlx_uint32* rand_num);
+mlx_utils_rand_priv (
+		IN mlx_utils *utils,
+		OUT mlx_uint32 *rand_num
+		);
 #endif /* SRC_DRIVERS_INFINIBAND_MLX_UTILS_INCLUDE_PRIVATE_MLX_UTILS_PRIV_H_ */

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -36,16 +36,16 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** SHA-512/256 initial digest values */
 static const struct sha512_digest sha512_256_init_digest = {
-    .h = {
-        cpu_to_be64(0x22312194fc2bf72cULL),
-        cpu_to_be64(0x9f555fa3c84c64c2ULL),
-        cpu_to_be64(0x2393b86b6f53b151ULL),
-        cpu_to_be64(0x963877195940eabdULL),
-        cpu_to_be64(0x96283ee2a88effe3ULL),
-        cpu_to_be64(0xbe5e1e2553863992ULL),
-        cpu_to_be64(0x2b0199fc2c85b8aaULL),
-        cpu_to_be64(0x0eb72ddc81c52ca2ULL),
-    },
+	.h = {
+		cpu_to_be64 ( 0x22312194fc2bf72cULL ),
+		cpu_to_be64 ( 0x9f555fa3c84c64c2ULL ),
+		cpu_to_be64 ( 0x2393b86b6f53b151ULL ),
+		cpu_to_be64 ( 0x963877195940eabdULL ),
+		cpu_to_be64 ( 0x96283ee2a88effe3ULL ),
+		cpu_to_be64 ( 0xbe5e1e2553863992ULL ),
+		cpu_to_be64 ( 0x2b0199fc2c85b8aaULL ),
+		cpu_to_be64 ( 0x0eb72ddc81c52ca2ULL ),
+	},
 };
 
 /**
@@ -53,20 +53,20 @@ static const struct sha512_digest sha512_256_init_digest = {
  *
  * @v ctx		SHA-512/256 context
  */
-static void sha512_256_init(void* ctx) {
-    struct sha512_context* context = ctx;
+static void sha512_256_init ( void *ctx ) {
+	struct sha512_context *context = ctx;
 
-    sha512_family_init(context, &sha512_256_init_digest,
-                       SHA512_256_DIGEST_SIZE);
+	sha512_family_init ( context, &sha512_256_init_digest,
+			     SHA512_256_DIGEST_SIZE );
 }
 
 /** SHA-512/256 algorithm */
 struct digest_algorithm sha512_256_algorithm = {
-    .name = "sha512/256",
-    .ctxsize = sizeof(struct sha512_context),
-    .blocksize = sizeof(union sha512_block),
-    .digestsize = SHA512_256_DIGEST_SIZE,
-    .init = sha512_256_init,
-    .update = sha512_update,
-    .final = sha512_final,
+	.name		= "sha512/256",
+	.ctxsize	= sizeof ( struct sha512_context ),
+	.blocksize	= sizeof ( union sha512_block ),
+	.digestsize	= SHA512_256_DIGEST_SIZE,
+	.init		= sha512_256_init,
+	.update		= sha512_update,
+	.final		= sha512_final,
 };

@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef SYS_INFO_H
-    #define SYS_INFO_H
+#define SYS_INFO_H
 
 /* Information collected from firmware/bootloader */
 
@@ -11,9 +9,9 @@ struct sys_info {
     unsigned long boot_data;
     unsigned long boot_arg;
 
-    char* firmware;     /* "PCBIOS", "LinuxBIOS", etc. */
-    char* command_line; /* command line given to us */
-    #if 0
+    char *firmware; /* "PCBIOS", "LinuxBIOS", etc. */
+    char *command_line; /* command line given to us */
+#if 0
 //By LYH
 //Will use meminfo in Etherboot 
     /* memory map */
@@ -22,12 +20,12 @@ struct sys_info {
 	unsigned long long base;
 	unsigned long long size;
     } *memrange;
-    #endif
+#endif
 };
 
-void collect_sys_info(struct sys_info* info);
-void collect_elfboot_info(struct sys_info* info);
-void collect_linuxbios_info(struct sys_info* info);
+void collect_sys_info(struct sys_info *info);
+void collect_elfboot_info(struct sys_info *info);
+void collect_linuxbios_info(struct sys_info *info);
 
 /* Our name and version. I want to see single instance of these in the image */
 extern const char *program_name, *program_version;

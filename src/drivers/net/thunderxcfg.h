@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _THUNDERXCFG_H
-    #define _THUNDERXCFG_H
+#define _THUNDERXCFG_H
 
 /** @file
  *
@@ -12,9 +10,9 @@
  *
  */
 
-FILE_LICENCE(BSD2);
+FILE_LICENCE ( BSD2 );
 
-    #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi.h>
 
 /******************************************************************************
  *
@@ -53,17 +51,17 @@ FILE_LICENCE(BSD2);
  *
  */
 
-    #define MAX_NODES 2
-    #define CLUSTER_COUNT 3
-    #define CORE_PER_CLUSTER_COUNT 16
-    #define CORE_COUNT (CLUSTER_COUNT * CORE_PER_CLUSTER_COUNT)
-    #define BGX_PER_NODE_COUNT 2
-    #define LMAC_PER_BGX_COUNT 4
-    #define PEM_PER_NODE_COUNT 6
-    #define LMC_PER_NODE_COUNT 4
-    #define DIMM_PER_LMC_COUNT 2
+#define MAX_NODES		2
+#define CLUSTER_COUNT		3
+#define CORE_PER_CLUSTER_COUNT  16
+#define CORE_COUNT		(CLUSTER_COUNT*CORE_PER_CLUSTER_COUNT)
+#define BGX_PER_NODE_COUNT	2
+#define LMAC_PER_BGX_COUNT	4
+#define PEM_PER_NODE_COUNT	6
+#define LMC_PER_NODE_COUNT	4
+#define DIMM_PER_LMC_COUNT	2
 
-    #define THUNDERX_CPU_ID(node, cluster, core) (((node) << 16) | ((cluster) << 8) | (core))
+#define THUNDERX_CPU_ID(node, cluster, core) (((node) << 16) | ((cluster) << 8) | (core))
 
 /******************************************************************************
  *
@@ -86,12 +84,8 @@ FILE_LICENCE(BSD2);
  *
  */
 
-    #define EFI_THUNDER_CONFIG_PROTOCOL_GUID                   \
-        {                                                      \
-            0xc12b1873, 0xac17, 0x4176, {                      \
-                0xac, 0x77, 0x7e, 0xcb, 0x4d, 0xef, 0xff, 0xec \
-            }                                                  \
-        }
+#define EFI_THUNDER_CONFIG_PROTOCOL_GUID \
+  {0xc12b1873, 0xac17, 0x4176, {0xac, 0x77, 0x7e, 0xcb, 0x4d, 0xef, 0xff, 0xec}}
 
 ///
 /// Forward declaration
@@ -99,54 +93,63 @@ FILE_LICENCE(BSD2);
 typedef struct _EFI_THUNDER_CONFIG_PROTOCOL EFI_THUNDER_CONFIG_PROTOCOL;
 
 typedef enum {
-    BGX_ENABLED,
-    BGX_MODE,
-    LMAC_COUNT,
-    BASE_ADDRESS,
-    LMAC_TYPE_BGX,
-    QLM_MASK,
-    QLM_FREQ,
-    USE_TRAINING
+  BGX_ENABLED,
+  BGX_MODE,
+  LMAC_COUNT,
+  BASE_ADDRESS,
+  LMAC_TYPE_BGX,
+  QLM_MASK,
+  QLM_FREQ,
+  USE_TRAINING
 } BGX_PROPERTY;
 
 typedef enum {
-    ENABLED,
-    LANE_TO_SDS,
-    MAC_ADDRESS
+  ENABLED,
+  LANE_TO_SDS,
+  MAC_ADDRESS
 } LMAC_PROPERTY;
 
 ///
 /// Function prototypes
 ///
-typedef EFI_STATUS(EFIAPI* EFI_THUNDER_CONFIG_PROTOCOL_GET_CONFIG)(
-    IN EFI_THUNDER_CONFIG_PROTOCOL* This,
-    OUT VOID** cfg);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_THUNDER_CONFIG_PROTOCOL_GET_CONFIG)(
+  IN EFI_THUNDER_CONFIG_PROTOCOL  *This,
+  OUT VOID** cfg
+  );
 
-typedef EFI_STATUS(EFIAPI* EFI_THUNDER_CONFIG_PROTOCOL_GET_BGX_PROP)(
-    IN EFI_THUNDER_CONFIG_PROTOCOL* This,
-    IN UINTN NodeId,
-    IN UINTN BgxId,
-    IN BGX_PROPERTY BgxProp,
-    IN UINT64 ValueSize,
-    OUT UINT64* Value);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_THUNDER_CONFIG_PROTOCOL_GET_BGX_PROP)(
+  IN EFI_THUNDER_CONFIG_PROTOCOL   *This,
+  IN UINTN                         NodeId,
+  IN UINTN                         BgxId,
+  IN BGX_PROPERTY                  BgxProp,
+  IN UINT64                        ValueSize,
+  OUT UINT64                       *Value
+  );
 
-typedef EFI_STATUS(EFIAPI* EFI_THUNDER_CONFIG_PROTOCOL_GET_LMAC_PROP)(
-    IN EFI_THUNDER_CONFIG_PROTOCOL* This,
-    IN UINTN NodeId,
-    IN UINTN BgxId,
-    IN UINTN LmacId,
-    IN LMAC_PROPERTY LmacProp,
-    IN UINT64 ValueSize,
-    OUT UINT64* Value);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_THUNDER_CONFIG_PROTOCOL_GET_LMAC_PROP)(
+  IN EFI_THUNDER_CONFIG_PROTOCOL   *This,
+  IN UINTN                         NodeId,
+  IN UINTN                         BgxId,
+  IN UINTN                         LmacId,
+  IN LMAC_PROPERTY                 LmacProp,
+  IN UINT64                        ValueSize,
+  OUT UINT64                       *Value
+  );
 
 ///
 /// Protocol structure
 ///
 struct _EFI_THUNDER_CONFIG_PROTOCOL {
-    EFI_THUNDER_CONFIG_PROTOCOL_GET_CONFIG GetConfig;
-    EFI_THUNDER_CONFIG_PROTOCOL_GET_BGX_PROP GetBgxProp;
-    EFI_THUNDER_CONFIG_PROTOCOL_GET_LMAC_PROP GetLmacProp;
-    VOID* BoardConfig;
+  EFI_THUNDER_CONFIG_PROTOCOL_GET_CONFIG GetConfig;
+  EFI_THUNDER_CONFIG_PROTOCOL_GET_BGX_PROP GetBgxProp;
+  EFI_THUNDER_CONFIG_PROTOCOL_GET_LMAC_PROP GetLmacProp;
+  VOID* BoardConfig;
 };
 
 #endif /* _THUNDERXCFG_H */

@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   Bus Specific Driver Override protocol as defined in the UEFI 2.0 specification.
 
@@ -14,19 +12,17 @@
 **/
 
 #ifndef _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_H_
-    #define _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_H_
+#define _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_H_
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    ///
-    /// Global ID for the Bus Specific Driver Override Protocol
-    ///
-    #define EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_GUID     \
-        {                                                      \
-            0x3bc1b285, 0x8a15, 0x4a82, {                      \
-                0xaa, 0xbf, 0x4d, 0x7d, 0x13, 0xfb, 0x32, 0x65 \
-            }                                                  \
-        }
+///
+/// Global ID for the Bus Specific Driver Override Protocol
+///
+#define EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_GUID \
+  { \
+    0x3bc1b285, 0x8a15, 0x4a82, {0xaa, 0xbf, 0x4d, 0x7d, 0x13, 0xfb, 0x32, 0x65 } \
+  }
 
 typedef struct _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL;
 
@@ -51,9 +47,12 @@ typedef struct _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL EFI_BUS_SPECIFIC_DRIVE
                                 previous call to GetDriver().
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_GET_DRIVER)(
-    IN EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL* This,
-    IN OUT EFI_HANDLE* DriverImageHandle);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_GET_DRIVER)(
+  IN EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL              *This,
+  IN OUT EFI_HANDLE                                         *DriverImageHandle
+  );
 
 ///
 /// This protocol matches one or more drivers to a controller. This protocol is produced by a bus driver,
@@ -61,9 +60,9 @@ typedef EFI_STATUS(EFIAPI* EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_GET_DRIVER)(
 /// drivers to controllers.
 ///
 struct _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL {
-    EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_GET_DRIVER GetDriver;
+  EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_GET_DRIVER    GetDriver;
 };
 
-extern EFI_GUID gEfiBusSpecificDriverOverrideProtocolGuid;
+extern EFI_GUID  gEfiBusSpecificDriverOverrideProtocolGuid;
 
 #endif

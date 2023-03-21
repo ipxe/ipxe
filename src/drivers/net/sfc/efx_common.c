@@ -35,7 +35,7 @@
 #include "efx_bitfield.h"
 #include "mc_driver_pcol.h"
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /*******************************************************************************
  *
@@ -45,18 +45,20 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  ******************************************************************************/
 
-void efx_writel(struct efx_nic* efx, efx_dword_t* value, unsigned int reg)
+void
+efx_writel(struct efx_nic *efx, efx_dword_t *value, unsigned int reg)
 {
-    DBGCIO(efx, "Writing partial register %x with " EFX_DWORD_FMT "\n",
-           reg, EFX_DWORD_VAL(*value));
-    _efx_writel(efx, value->u32[0], reg);
+	DBGCIO(efx, "Writing partial register %x with " EFX_DWORD_FMT "\n",
+	       reg, EFX_DWORD_VAL(*value));
+	_efx_writel(efx, value->u32[0], reg);
 }
 
-void efx_readl(struct efx_nic* efx, efx_dword_t* value, unsigned int reg)
+void
+efx_readl(struct efx_nic *efx, efx_dword_t *value, unsigned int reg)
 {
-    value->u32[0] = _efx_readl(efx, reg);
-    DBGCIO(efx, "Read from register %x, got " EFX_DWORD_FMT "\n",
-           reg, EFX_DWORD_VAL(*value));
+	value->u32[0] = _efx_readl(efx, reg);
+	DBGCIO(efx, "Read from register %x, got " EFX_DWORD_FMT "\n",
+	       reg, EFX_DWORD_VAL(*value));
 }
 
 /*******************************************************************************
@@ -66,37 +68,37 @@ void efx_readl(struct efx_nic* efx, efx_dword_t* value, unsigned int reg)
  *
  *
  ******************************************************************************/
-void efx_probe(struct net_device* netdev, enum efx_revision revision)
+void efx_probe(struct net_device *netdev, enum efx_revision revision)
 {
-    struct efx_nic* efx = netdev_priv(netdev);
-    struct pci_device* pci = container_of(netdev->dev,
-                                          struct pci_device, dev);
-    unsigned int reg = PCI_BASE_ADDRESS_0;
-    uint32_t bar_low;
+	struct efx_nic *efx = netdev_priv(netdev);
+	struct pci_device *pci = container_of(netdev->dev,
+					      struct pci_device, dev);
+	unsigned int reg = PCI_BASE_ADDRESS_0;
+	uint32_t bar_low;
 
-    efx->netdev = netdev;
-    efx->revision = revision;
+	efx->netdev = netdev;
+	efx->revision = revision;
 
-    /* Find the memory bar to use */
-    pci_read_config_dword(pci, reg, &bar_low);
-    if ((bar_low & PCI_BASE_ADDRESS_IO_MASK) == PCI_BASE_ADDRESS_SPACE_IO)
-        reg = PCI_BASE_ADDRESS_2;
+	/* Find the memory bar to use */
+	pci_read_config_dword(pci, reg, &bar_low);
+	if ((bar_low & PCI_BASE_ADDRESS_IO_MASK) == PCI_BASE_ADDRESS_SPACE_IO)
+		reg = PCI_BASE_ADDRESS_2;
 
-    efx->mmio_start = pci_bar_start(pci, reg);
-    efx->mmio_len = pci_bar_size(pci, reg);
-    efx->membase = pci_ioremap(pci, efx->mmio_start, efx->mmio_len);
+	efx->mmio_start = pci_bar_start(pci, reg);
+	efx->mmio_len = pci_bar_size(pci, reg);
+	efx->membase = pci_ioremap(pci, efx->mmio_start, efx->mmio_len);
 
-    DBGCP(efx, "BAR of %lx bytes at phys %lx mapped at %p\n",
-          efx->mmio_len, efx->mmio_start, efx->membase);
+	DBGCP(efx, "BAR of %lx bytes at phys %lx mapped at %p\n",
+	      efx->mmio_len, efx->mmio_start, efx->membase);
 
-    /* Enable PCI access */
-    adjust_pci_device(pci);
+	/* Enable PCI access */
+	adjust_pci_device(pci);
 }
 
-void efx_remove(struct net_device* netdev)
+void efx_remove(struct net_device *netdev)
 {
-    struct efx_nic* efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev_priv(netdev);
 
-    iounmap(efx->membase);
-    efx->membase = NULL;
+	iounmap(efx->membase);
+	efx->membase = NULL;
 }

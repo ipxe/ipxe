@@ -28,7 +28,7 @@
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -44,8 +44,8 @@ static struct option_descriptor pciscan_opts[] = {};
 
 /** "pciscan" command descriptor */
 static struct command_descriptor pciscan_cmd =
-    COMMAND_DESC(struct pciscan_options, pciscan_opts, 1, 1,
-                 "<setting>");
+	COMMAND_DESC ( struct pciscan_options, pciscan_opts, 1, 1,
+		       "<setting>" );
 
 /**
  * "pciscan" command
@@ -54,69 +54,69 @@ static struct command_descriptor pciscan_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int pciscan_exec(int argc, char** argv) {
-    struct pciscan_options opts;
-    struct named_setting setting;
-    struct pci_device pci;
-    unsigned long prev;
-    uint32_t busdevfn;
-    int len;
-    int rc;
+static int pciscan_exec ( int argc, char **argv ) {
+	struct pciscan_options opts;
+	struct named_setting setting;
+	struct pci_device pci;
+	unsigned long prev;
+	uint32_t busdevfn;
+	int len;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &pciscan_cmd, &opts)) != 0)
-        goto err_parse_options;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &pciscan_cmd, &opts ) ) != 0 )
+		goto err_parse_options;
 
-    /* Parse setting name */
-    if ((rc = parse_autovivified_setting(argv[optind],
-                                         &setting)) != 0)
-        goto err_parse_setting;
+	/* Parse setting name */
+	if ( ( rc = parse_autovivified_setting ( argv[optind],
+						 &setting ) ) != 0 )
+		goto err_parse_setting;
 
-    /* Determine starting bus:dev.fn address */
-    if ((len = fetchn_setting(setting.settings, &setting.setting,
-                              NULL, &setting.setting, &prev)) < 0) {
-        /* Setting not yet defined: start searching from 00:00.0 */
-        busdevfn = 0;
-    } else {
-        /* Setting is defined: start searching from next location */
-        busdevfn = (prev + 1);
-        if (!busdevfn) {
-            rc = -ENOENT;
-            goto err_end;
-        }
-    }
+	/* Determine starting bus:dev.fn address */
+	if ( ( len = fetchn_setting ( setting.settings, &setting.setting,
+				      NULL, &setting.setting, &prev ) ) < 0 ) {
+		/* Setting not yet defined: start searching from 00:00.0 */
+		busdevfn = 0;
+	} else {
+		/* Setting is defined: start searching from next location */
+		busdevfn = ( prev + 1 );
+		if ( ! busdevfn ) {
+			rc = -ENOENT;
+			goto err_end;
+		}
+	}
 
-    /* Find next existent PCI device */
-    if ((rc = pci_find_next(&pci, &busdevfn)) != 0)
-        goto err_find_next;
+	/* Find next existent PCI device */
+	if ( ( rc = pci_find_next ( &pci, &busdevfn ) ) != 0 )
+		goto err_find_next;
 
-    /* Apply default type if necessary.  Use ":uint16" rather than
-     * ":busdevfn" to allow for easy inclusion within a
-     * "${pci/${location}.x.y}" constructed setting.
-     */
-    if (!setting.setting.type)
-        setting.setting.type = &setting_type_uint16;
+	/* Apply default type if necessary.  Use ":uint16" rather than
+	 * ":busdevfn" to allow for easy inclusion within a
+	 * "${pci/${location}.x.y}" constructed setting.
+	 */
+	if ( ! setting.setting.type )
+		setting.setting.type = &setting_type_uint16;
 
-    /* Store setting */
-    if ((rc = storen_setting(setting.settings, &setting.setting,
-                             busdevfn)) != 0) {
-        printf("Could not store \"%s\": %s\n",
-               setting.setting.name, strerror(rc));
-        goto err_store;
-    }
+	/* Store setting */
+	if ( ( rc = storen_setting ( setting.settings, &setting.setting,
+				     busdevfn ) ) != 0 ) {
+		printf ( "Could not store \"%s\": %s\n",
+			 setting.setting.name, strerror ( rc ) );
+		goto err_store;
+	}
 
-err_store:
-err_end:
-err_find_next:
-err_parse_setting:
-err_parse_options:
-    return rc;
+ err_store:
+ err_end:
+ err_find_next:
+ err_parse_setting:
+ err_parse_options:
+	return rc;
 }
 
 /** PCI commands */
 struct command pci_commands[] __command = {
-    {
-        .name = "pciscan",
-        .exec = pciscan_exec,
-    },
+	{
+		.name = "pciscan",
+		.exec = pciscan_exec,
+	},
 };

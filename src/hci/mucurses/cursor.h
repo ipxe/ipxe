@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef CURSOR_H
-    #define CURSOR_H
+#define CURSOR_H
 
 /** @file
  *
@@ -9,10 +7,10 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 struct cursor_pos {
-    unsigned int y, x;
+	unsigned int y, x;
 };
 
 /**
@@ -21,8 +19,8 @@ struct cursor_pos {
  * @v *win	window on which to operate
  * @v *pos	pointer to struct in which original cursor position is stored
  */
-static inline void _restore_curs_pos(WINDOW* win, struct cursor_pos* pos) {
-    wmove(win, pos->y, pos->x);
+static inline void _restore_curs_pos ( WINDOW *win, struct cursor_pos *pos ) {
+	wmove ( win, pos->y, pos->x );
 }
 
 /**
@@ -31,9 +29,9 @@ static inline void _restore_curs_pos(WINDOW* win, struct cursor_pos* pos) {
  * @v *win	window on which to operate
  * @v *pos	pointer to struct in which to store cursor position
  */
-static inline void _store_curs_pos(WINDOW* win, struct cursor_pos* pos) {
-    pos->y = win->curs_y;
-    pos->x = win->curs_x;
+static inline void _store_curs_pos ( WINDOW *win, struct cursor_pos *pos ) {
+	pos->y = win->curs_y;
+	pos->x = win->curs_x;
 }
 
 #endif /* CURSOR_H */

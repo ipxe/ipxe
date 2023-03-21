@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <ipxe/net80211.h>
@@ -36,9 +36,9 @@ FILE_LICENCE(GPL2_OR_LATER);
  * @v dev	802.11 device
  * @ret rc	Return status code
  */
-static int wpa_psk_init(struct net80211_device* dev)
+static int wpa_psk_init ( struct net80211_device *dev )
 {
-    return wpa_make_rsn_ie(dev, &dev->rsn_ie);
+	return wpa_make_rsn_ie ( dev, &dev->rsn_ie );
 }
 
 /**
@@ -47,31 +47,31 @@ static int wpa_psk_init(struct net80211_device* dev)
  * @v dev	802.11 device
  * @ret rc	Return status code
  */
-static int wpa_psk_start(struct net80211_device* dev)
+static int wpa_psk_start ( struct net80211_device *dev )
 {
-    char passphrase[64 + 1];
-    u8 pmk[WPA_PMK_LEN];
-    int len;
-    struct wpa_common_ctx* ctx = dev->handshaker->priv;
+	char passphrase[64+1];
+	u8 pmk[WPA_PMK_LEN];
+	int len;
+	struct wpa_common_ctx *ctx = dev->handshaker->priv;
 
-    len = fetch_string_setting(netdev_settings(dev->netdev),
-                               &net80211_key_setting, passphrase,
-                               64 + 1);
+	len = fetch_string_setting ( netdev_settings ( dev->netdev ),
+				     &net80211_key_setting, passphrase,
+				     64 + 1 );
 
-    if (len <= 0) {
-        DBGC(ctx, "WPA-PSK %p: no passphrase provided!\n", ctx);
-        net80211_deauthenticate(dev, -EACCES);
-        return -EACCES;
-    }
+	if ( len <= 0 ) {
+		DBGC ( ctx, "WPA-PSK %p: no passphrase provided!\n", ctx );
+		net80211_deauthenticate ( dev, -EACCES );
+		return -EACCES;
+	}
 
-    pbkdf2_sha1(passphrase, len, dev->essid, strlen(dev->essid),
-                4096, pmk, WPA_PMK_LEN);
+	pbkdf2_sha1 ( passphrase, len, dev->essid, strlen ( dev->essid ),
+		      4096, pmk, WPA_PMK_LEN );
 
-    DBGC(ctx, "WPA-PSK %p: derived PMK from passphrase `%s':\n", ctx,
-         passphrase);
-    DBGC_HD(ctx, pmk, WPA_PMK_LEN);
+	DBGC ( ctx, "WPA-PSK %p: derived PMK from passphrase `%s':\n", ctx,
+	       passphrase );
+	DBGC_HD ( ctx, pmk, WPA_PMK_LEN );
 
-    return wpa_start(dev, ctx, pmk, WPA_PMK_LEN);
+	return wpa_start ( dev, ctx, pmk, WPA_PMK_LEN );
 }
 
 /**
@@ -80,18 +80,18 @@ static int wpa_psk_start(struct net80211_device* dev)
  * @v dev	802.11 device
  * @ret rc	Return status code
  */
-static int wpa_psk_step(struct net80211_device* dev)
+static int wpa_psk_step ( struct net80211_device *dev )
 {
-    struct wpa_common_ctx* ctx = dev->handshaker->priv;
+	struct wpa_common_ctx *ctx = dev->handshaker->priv;
 
-    switch (ctx->state) {
-        case WPA_SUCCESS:
-            return 1;
-        case WPA_FAILURE:
-            return -EACCES;
-        default:
-            return 0;
-    }
+	switch ( ctx->state ) {
+	case WPA_SUCCESS:
+		return 1;
+	case WPA_FAILURE:
+		return -EACCES;
+	default:
+		return 0;
+	}
 }
 
 /**
@@ -100,9 +100,9 @@ static int wpa_psk_step(struct net80211_device* dev)
  * @v dev	802.11 device
  * @ret rc	Return status code
  */
-static int wpa_psk_no_change_key(struct net80211_device* dev __unused)
+static int wpa_psk_no_change_key ( struct net80211_device *dev __unused )
 {
-    return 0;
+	return 0;
 }
 
 /**
@@ -110,18 +110,18 @@ static int wpa_psk_no_change_key(struct net80211_device* dev __unused)
  *
  * @v dev	802.11 device
  */
-static void wpa_psk_stop(struct net80211_device* dev)
+static void wpa_psk_stop ( struct net80211_device *dev )
 {
-    wpa_stop(dev);
+	wpa_stop ( dev );
 }
 
 /** WPA-PSK security handshaker */
 struct net80211_handshaker wpa_psk_handshaker __net80211_handshaker = {
-    .protocol = NET80211_SECPROT_PSK,
-    .init = wpa_psk_init,
-    .start = wpa_psk_start,
-    .step = wpa_psk_step,
-    .change_key = wpa_psk_no_change_key,
-    .stop = wpa_psk_stop,
-    .priv_len = sizeof(struct wpa_common_ctx),
+	.protocol = NET80211_SECPROT_PSK,
+	.init = wpa_psk_init,
+	.start = wpa_psk_start,
+	.step = wpa_psk_step,
+	.change_key = wpa_psk_no_change_key,
+	.stop = wpa_psk_stop,
+	.priv_len = sizeof ( struct wpa_common_ctx ),
 };

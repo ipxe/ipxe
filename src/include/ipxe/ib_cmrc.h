@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _IPXE_IB_CMRC_H
-    #define _IPXE_IB_CMRC_H
+#define _IPXE_IB_CMRC_H
 
 /** @file
  *
@@ -9,13 +7,13 @@
  *
  */
 
-FILE_LICENCE(BSD2);
+FILE_LICENCE ( BSD2 );
 
-    #include <ipxe/infiniband.h>
-    #include <ipxe/xfer.h>
+#include <ipxe/infiniband.h>
+#include <ipxe/xfer.h>
 
-extern int ib_cmrc_open(struct interface* xfer, struct ib_device* ibdev,
-                        union ib_gid* dgid, union ib_guid* service_id,
-                        const char* name);
+extern int ib_cmrc_open ( struct interface *xfer, struct ib_device *ibdev,
+			  union ib_gid *dgid, union ib_guid *service_id,
+			  const char *name );
 
 #endif /* _IPXE_IB_CMRC_H */

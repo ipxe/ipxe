@@ -1,16 +1,14 @@
-#pragma once
-
 #ifndef BIOSINT_H
-    #define BIOSINT_H
+#define BIOSINT_H
 
 /**
  * @file BIOS interrupts
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #include <realmode.h>
+#include <realmode.h>
 
 struct segoff;
 
@@ -23,14 +21,14 @@ struct segoff;
  * memory we are using.  (Note that this also implies that we should
  * re-hook INT 15 in order to hide ourselves from the memory map).
  */
-extern uint16_t __text16(hooked_bios_interrupts);
-    #define hooked_bios_interrupts __use_text16(hooked_bios_interrupts)
+extern uint16_t __text16 ( hooked_bios_interrupts );
+#define hooked_bios_interrupts __use_text16 ( hooked_bios_interrupts )
 
-extern void hook_bios_interrupt(unsigned int interrupt, unsigned int handler,
-                                struct segoff* chain_vector);
-extern int unhook_bios_interrupt(unsigned int interrupt,
-                                 unsigned int handler,
-                                 struct segoff* chain_vector);
-extern void check_bios_interrupts(void);
+extern void hook_bios_interrupt ( unsigned int interrupt, unsigned int handler,
+				  struct segoff *chain_vector );
+extern int unhook_bios_interrupt ( unsigned int interrupt,
+				   unsigned int handler,
+				   struct segoff *chain_vector );
+extern void check_bios_interrupts ( void );
 
 #endif /* BIOSINT_H */

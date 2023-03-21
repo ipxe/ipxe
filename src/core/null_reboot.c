@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -39,10 +39,10 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @v warm		Perform a warm reboot
  */
-static void null_reboot(int warm __unused) {
-    printf("Cannot reboot; not implemented\n");
-    while (1) {
-    }
+static void null_reboot ( int warm __unused ) {
+
+	printf ( "Cannot reboot; not implemented\n" );
+	while ( 1 ) {}
 }
 
 /**
@@ -50,9 +50,10 @@ static void null_reboot(int warm __unused) {
  *
  * @ret rc		Return status code
  */
-static int null_poweroff(void) {
-    return -ENOTSUP;
+static int null_poweroff ( void ) {
+
+	return -ENOTSUP;
 }
 
-PROVIDE_REBOOT(null, reboot, null_reboot);
-PROVIDE_REBOOT(null, poweroff, null_poweroff);
+PROVIDE_REBOOT ( null, reboot, null_reboot );
+PROVIDE_REBOOT ( null, poweroff, null_poweroff );

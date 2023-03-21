@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <ipxe/entropy.h>
@@ -34,7 +34,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  */
 
-struct entropy_source efitick_entropy __entropy_source(ENTROPY_FALLBACK);
+struct entropy_source efitick_entropy __entropy_source ( ENTROPY_FALLBACK );
 
 /** Time (in 100ns units) to delay waiting for timer tick
  *
@@ -54,44 +54,44 @@ static EFI_EVENT tick;
  *
  * @ret rc		Return status code
  */
-static int efi_entropy_enable(void) {
-    EFI_BOOT_SERVICES* bs = efi_systab->BootServices;
-    EFI_STATUS efirc;
-    int rc;
+static int efi_entropy_enable ( void ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
+	int rc;
 
-    /* Drop to external TPL to allow timer tick event to take place */
-    bs->RestoreTPL(efi_external_tpl);
+	/* Drop to external TPL to allow timer tick event to take place */
+	bs->RestoreTPL ( efi_external_tpl );
 
-    /* Create timer tick event */
-    if ((efirc = bs->CreateEvent(EVT_TIMER, TPL_NOTIFY, NULL, NULL,
-                                 &tick)) != 0) {
-        rc = -EEFI(efirc);
-        DBGC(&tick, "ENTROPY could not create event: %s\n",
-             strerror(rc));
-        return rc;
-    }
+	/* Create timer tick event */
+	if ( ( efirc = bs->CreateEvent ( EVT_TIMER, TPL_NOTIFY, NULL, NULL,
+					 &tick ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( &tick, "ENTROPY could not create event: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
 
-    /* We use essentially the same mechanism as for the BIOS
-     * RTC-based entropy source, and so assume the same
-     * min-entropy per sample.
-     */
-    entropy_init(&efitick_entropy, MIN_ENTROPY(1.3));
+	/* We use essentially the same mechanism as for the BIOS
+	 * RTC-based entropy source, and so assume the same
+	 * min-entropy per sample.
+	 */
+	entropy_init ( &efitick_entropy, MIN_ENTROPY ( 1.3 ) );
 
-    return 0;
+	return 0;
 }
 
 /**
  * Disable entropy gathering
  *
  */
-static void efi_entropy_disable(void) {
-    EFI_BOOT_SERVICES* bs = efi_systab->BootServices;
+static void efi_entropy_disable ( void ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
-    /* Close timer tick event */
-    bs->CloseEvent(tick);
+	/* Close timer tick event */
+	bs->CloseEvent ( tick );
 
-    /* Return to internal TPL */
-    bs->RaiseTPL(efi_internal_tpl);
+	/* Return to internal TPL */
+	bs->RaiseTPL ( efi_internal_tpl );
 }
 
 /**
@@ -99,32 +99,32 @@ static void efi_entropy_disable(void) {
  *
  * @ret low		CPU profiling low-order bits, or negative error
  */
-static int efi_entropy_tick(void) {
-    EFI_BOOT_SERVICES* bs = efi_systab->BootServices;
-    UINTN index;
-    uint16_t low;
-    EFI_STATUS efirc;
-    int rc;
+static int efi_entropy_tick ( void ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	UINTN index;
+	uint16_t low;
+	EFI_STATUS efirc;
+	int rc;
 
-    /* Wait for next timer tick */
-    if ((efirc = bs->SetTimer(tick, TimerRelative,
-                              EFI_ENTROPY_TRIGGER_TIME)) != 0) {
-        rc = -EEFI(efirc);
-        DBGC(&tick, "ENTROPY could not set timer: %s\n",
-             strerror(rc));
-        return rc;
-    }
-    if ((efirc = bs->WaitForEvent(1, &tick, &index)) != 0) {
-        rc = -EEFI(efirc);
-        DBGC(&tick, "ENTROPY could not wait for timer tick: %s\n",
-             strerror(rc));
-        return rc;
-    }
+	/* Wait for next timer tick */
+	if ( ( efirc = bs->SetTimer ( tick, TimerRelative,
+				      EFI_ENTROPY_TRIGGER_TIME ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( &tick, "ENTROPY could not set timer: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+	if ( ( efirc = bs->WaitForEvent ( 1, &tick, &index ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( &tick, "ENTROPY could not wait for timer tick: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
 
-    /* Get current CPU profiling timestamp low-order bits */
-    low = profile_timestamp();
+	/* Get current CPU profiling timestamp low-order bits */
+	low = profile_timestamp();
 
-    return low;
+	return low;
 }
 
 /**
@@ -133,35 +133,35 @@ static int efi_entropy_tick(void) {
  * @ret noise		Noise sample
  * @ret rc		Return status code
  */
-static int efi_get_noise(noise_sample_t* noise) {
-    int before;
-    int after;
-    int rc;
+static int efi_get_noise ( noise_sample_t *noise ) {
+	int before;
+	int after;
+	int rc;
 
-    /* Wait for a timer tick */
-    before = efi_entropy_tick();
-    if (before < 0) {
-        rc = before;
-        return rc;
-    }
+	/* Wait for a timer tick */
+	before = efi_entropy_tick();
+	if ( before < 0 ) {
+		rc = before;
+		return rc;
+	}
 
-    /* Wait for another timer tick */
-    after = efi_entropy_tick();
-    if (after < 0) {
-        rc = after;
-        return rc;
-    }
+	/* Wait for another timer tick */
+	after = efi_entropy_tick();
+	if ( after < 0 ) {
+		rc = after;
+		return rc;
+	}
 
-    /* Use TSC delta as noise sample */
-    *noise = (after - before);
+	/* Use TSC delta as noise sample */
+	*noise = ( after - before );
 
-    return 0;
+	return 0;
 }
 
 /** EFI entropy source */
-struct entropy_source efitick_entropy __entropy_source(ENTROPY_FALLBACK) = {
-    .name = "efitick",
-    .enable = efi_entropy_enable,
-    .disable = efi_entropy_disable,
-    .get_noise = efi_get_noise,
+struct entropy_source efitick_entropy __entropy_source ( ENTROPY_FALLBACK ) = {
+	.name = "efitick",
+	.enable = efi_entropy_enable,
+	.disable = efi_entropy_disable,
+	.get_noise = efi_get_noise,
 };

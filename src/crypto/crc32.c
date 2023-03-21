@@ -19,11 +19,11 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/crc32.h>
 
-#define CRCPOLY 0xedb88320
+#define CRCPOLY		0xedb88320
 
 /**
  * Calculate 32-bit little-endian CRC checksum
@@ -36,20 +36,20 @@ FILE_LICENCE(GPL2_OR_LATER);
  * protocol. To continue a CRC checksum over multiple calls, pass the
  * return value from one call as the @a seed parameter to the next.
  */
-u32 crc32_le(u32 seed, const void* data, size_t len)
+u32 crc32_le ( u32 seed, const void *data, size_t len )
 {
-    u32 crc = seed;
-    const u8* src = data;
-    u32 mult;
-    int i;
+	u32 crc = seed;
+	const u8 *src = data;
+	u32 mult;
+	int i;
 
-    while (len--) {
-        crc ^= *src++;
-        for (i = 0; i < 8; i++) {
-            mult = (crc & 1) ? CRCPOLY : 0;
-            crc = (crc >> 1) ^ mult;
-        }
-    }
+	while ( len-- ) {
+		crc ^= *src++;
+		for ( i = 0; i < 8; i++ ) {
+			mult = ( crc & 1 ) ? CRCPOLY : 0;
+			crc = ( crc >> 1 ) ^ mult;
+		}
+	}
 
-    return crc;
+	return crc;
 }

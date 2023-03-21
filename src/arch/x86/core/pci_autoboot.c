@@ -22,7 +22,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/device.h>
@@ -30,18 +30,19 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <realmode.h>
 #include <usr/autoboot.h>
 
-uint16_t __bss16(autoboot_busdevfn);
-#define autoboot_busdevfn __use_data16(autoboot_busdevfn)
+uint16_t __bss16 ( autoboot_busdevfn );
+#define autoboot_busdevfn __use_data16 ( autoboot_busdevfn )
 
 /**
  * Initialise PCI autoboot device
  */
-static void pci_autoboot_init(void) {
-    if (autoboot_busdevfn)
-        set_autoboot_busloc(BUS_TYPE_PCI, autoboot_busdevfn);
+static void pci_autoboot_init ( void ) {
+
+	if ( autoboot_busdevfn )
+		set_autoboot_busloc ( BUS_TYPE_PCI, autoboot_busdevfn );
 }
 
 /** PCI autoboot device initialisation function */
-struct init_fn pci_autoboot_init_fn __init_fn(INIT_NORMAL) = {
-    .initialise = pci_autoboot_init,
+struct init_fn pci_autoboot_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = pci_autoboot_init,
 };

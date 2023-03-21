@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <strings.h>
@@ -67,73 +67,74 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v xen		Xen hypervisor
  * @ret rc		Return status code
  */
-int xengrant_init(struct xen_hypervisor* xen) {
-    struct gnttab_query_size size;
-    struct gnttab_set_version set_version;
-    struct gnttab_get_version get_version;
-    struct grant_entry_v1* v1;
-    union grant_entry_v2* v2;
-    unsigned int version;
-    int xenrc;
-    int rc;
+int xengrant_init ( struct xen_hypervisor *xen ) {
+	struct gnttab_query_size size;
+	struct gnttab_set_version set_version;
+	struct gnttab_get_version get_version;
+	struct grant_entry_v1 *v1;
+	union grant_entry_v2 *v2;
+	unsigned int version;
+	int xenrc;
+	int rc;
 
-    /* Get grant table size */
-    size.dom = DOMID_SELF;
-    if ((xenrc = xengrant_query_size(xen, &size)) != 0) {
-        rc = -EXEN(xenrc);
-        DBGC(xen, "XENGRANT could not get table size: %s\n",
-             strerror(rc));
-        return rc;
-    }
-    xen->grant.len = (size.nr_frames * PAGE_SIZE);
+	/* Get grant table size */
+	size.dom = DOMID_SELF;
+	if ( ( xenrc = xengrant_query_size ( xen, &size ) ) != 0 ) {
+		rc = -EXEN ( xenrc );
+		DBGC ( xen, "XENGRANT could not get table size: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+	xen->grant.len = ( size.nr_frames * PAGE_SIZE );
 
-    /* Set grant table version, if applicable */
-    set_version.version = XENGRANT_TRY_VERSION;
-    if ((xenrc = xengrant_set_version(xen, &set_version)) != 0) {
-        rc = -EXEN(xenrc);
-        DBGC(xen, "XENGRANT could not set version %d: %s\n",
-             XENGRANT_TRY_VERSION, strerror(rc));
-        /* Continue; use whatever version is current */
-    }
+	/* Set grant table version, if applicable */
+	set_version.version = XENGRANT_TRY_VERSION;
+	if ( ( xenrc = xengrant_set_version ( xen, &set_version ) ) != 0 ) {
+		rc = -EXEN ( xenrc );
+		DBGC ( xen, "XENGRANT could not set version %d: %s\n",
+		       XENGRANT_TRY_VERSION, strerror ( rc ) );
+		/* Continue; use whatever version is current */
+	}
 
-    /* Get grant table version */
-    get_version.dom = DOMID_SELF;
-    get_version.pad = 0;
-    if ((xenrc = xengrant_get_version(xen, &get_version)) == 0) {
-        version = get_version.version;
-        switch (version) {
-            case 0:
-                /* Version not yet specified: will be version 1 */
-                version = 1;
-                break;
+	/* Get grant table version */
+	get_version.dom = DOMID_SELF;
+	get_version.pad = 0;
+	if ( ( xenrc = xengrant_get_version ( xen, &get_version ) ) == 0 ) {
+		version = get_version.version;
+		switch ( version ) {
 
-            case 1:
-                /* Version 1 table: nothing special to do */
-                break;
+		case 0:
+			/* Version not yet specified: will be version 1 */
+			version = 1;
+			break;
 
-            case 2:
-                /* Version 2 table: configure shift appropriately */
-                xen->grant.shift = (fls(sizeof(*v2) /
-                                        sizeof(*v1)) -
-                                    1);
-                break;
+		case 1 :
+			/* Version 1 table: nothing special to do */
+			break;
 
-            default:
-                /* Unsupported version */
-                DBGC(xen, "XENGRANT detected unsupported version "
-                          "%d\n", version);
-                return -ENOTSUP;
-        }
-    } else {
-        rc = -EXEN(xenrc);
-        DBGC(xen, "XENGRANT could not get version (assuming v1): "
-                  "%s\n", strerror(rc));
-        version = 1;
-    }
+		case 2:
+			/* Version 2 table: configure shift appropriately */
+			xen->grant.shift = ( fls ( sizeof ( *v2 ) /
+						   sizeof ( *v1 ) ) - 1 );
+			break;
 
-    DBGC(xen, "XENGRANT using v%d table with %d entries\n",
-         version, xengrant_entries(xen));
-    return 0;
+		default:
+			/* Unsupported version */
+			DBGC ( xen, "XENGRANT detected unsupported version "
+			       "%d\n", version );
+			return -ENOTSUP;
+
+		}
+	} else {
+		rc = -EXEN ( xenrc );
+		DBGC ( xen, "XENGRANT could not get version (assuming v1): "
+		       "%s\n", strerror ( rc ) );
+		version = 1;
+	}
+
+	DBGC ( xen, "XENGRANT using v%d table with %d entries\n",
+	       version, xengrant_entries ( xen ) );
+	return 0;
 }
 
 /**
@@ -144,62 +145,63 @@ int xengrant_init(struct xen_hypervisor* xen) {
  * @v count		Number of references
  * @ret rc		Return status code
  */
-int xengrant_alloc(struct xen_hypervisor* xen, grant_ref_t* refs,
-                   unsigned int count) {
-    struct grant_entry_header* hdr;
-    unsigned int entries = xengrant_entries(xen);
-    unsigned int mask = (entries - 1);
-    unsigned int check = 0;
-    unsigned int avail;
-    unsigned int ref;
+int xengrant_alloc ( struct xen_hypervisor *xen, grant_ref_t *refs,
+		     unsigned int count ) {
+	struct grant_entry_header *hdr;
+	unsigned int entries = xengrant_entries ( xen );
+	unsigned int mask = ( entries - 1 );
+	unsigned int check = 0;
+	unsigned int avail;
+	unsigned int ref;
 
-    /* Fail unless we have enough references available */
-    avail = (entries - xen->grant.used - GNTTAB_NR_RESERVED_ENTRIES);
-    if (avail < count) {
-        DBGC(xen, "XENGRANT cannot allocate %d references (only %d "
-                  "of %d available)\n", count, avail, entries);
-        return -ENOBUFS;
-    }
-    DBGC(xen, "XENGRANT allocating %d references (from %d of %d "
-              "available)\n", count, avail, entries);
+	/* Fail unless we have enough references available */
+	avail = ( entries - xen->grant.used - GNTTAB_NR_RESERVED_ENTRIES );
+	if ( avail < count ) {
+		DBGC ( xen, "XENGRANT cannot allocate %d references (only %d "
+		       "of %d available)\n", count, avail, entries );
+		return -ENOBUFS;
+	}
+	DBGC ( xen, "XENGRANT allocating %d references (from %d of %d "
+	       "available)\n", count, avail, entries );
 
-    /* Update number of references used */
-    xen->grant.used += count;
+	/* Update number of references used */
+	xen->grant.used += count;
 
-    /* Find unused references */
-    for (ref = xen->grant.ref; count; ref = ((ref + 1) & mask)) {
-        /* Sanity check */
-        assert(check++ < entries);
+	/* Find unused references */
+	for ( ref = xen->grant.ref ; count ; ref = ( ( ref + 1 ) & mask ) ) {
 
-        /* Skip reserved references */
-        if (ref < GNTTAB_NR_RESERVED_ENTRIES)
-            continue;
+		/* Sanity check */
+		assert ( check++ < entries );
 
-        /* Skip in-use references */
-        hdr = xengrant_header(xen, ref);
-        if (readw(&hdr->flags) & GTF_type_mask)
-            continue;
-        if (readw(&hdr->domid) == DOMID_SELF)
-            continue;
+		/* Skip reserved references */
+		if ( ref < GNTTAB_NR_RESERVED_ENTRIES )
+			continue;
 
-        /* Zero reference */
-        xengrant_zero(xen, hdr);
+		/* Skip in-use references */
+		hdr = xengrant_header ( xen, ref );
+		if ( readw ( &hdr->flags ) & GTF_type_mask )
+			continue;
+		if ( readw ( &hdr->domid ) == DOMID_SELF )
+			continue;
 
-        /* Mark reference as in-use.  We leave the flags as
-         * empty (to avoid creating a valid grant table entry)
-         * and set the domid to DOMID_SELF.
-         */
-        writew(DOMID_SELF, &hdr->domid);
-        DBGC2(xen, "XENGRANT allocated ref %d\n", ref);
+		/* Zero reference */
+		xengrant_zero ( xen, hdr );
 
-        /* Record reference */
-        refs[--count] = ref;
-    }
+		/* Mark reference as in-use.  We leave the flags as
+		 * empty (to avoid creating a valid grant table entry)
+		 * and set the domid to DOMID_SELF.
+		 */
+		writew ( DOMID_SELF, &hdr->domid );
+		DBGC2 ( xen, "XENGRANT allocated ref %d\n", ref );
 
-    /* Update cursor */
-    xen->grant.ref = ref;
+		/* Record reference */
+		refs[--count] = ref;
+	}
 
-    return 0;
+	/* Update cursor */
+	xen->grant.ref = ref;
+
+	return 0;
 }
 
 /**
@@ -209,21 +211,22 @@ int xengrant_alloc(struct xen_hypervisor* xen, grant_ref_t* refs,
  * @v refs		Grant references
  * @v count		Number of references
  */
-void xengrant_free(struct xen_hypervisor* xen, grant_ref_t* refs,
-                   unsigned int count) {
-    struct grant_entry_header* hdr;
-    unsigned int ref;
-    unsigned int i;
+void xengrant_free ( struct xen_hypervisor *xen, grant_ref_t *refs,
+		     unsigned int count ) {
+	struct grant_entry_header *hdr;
+	unsigned int ref;
+	unsigned int i;
 
-    /* Free references */
-    for (i = 0; i < count; i++) {
-        /* Sanity check */
-        ref = refs[i];
-        assert(ref < xengrant_entries(xen));
+	/* Free references */
+	for ( i = 0 ; i < count ; i++ ) {
 
-        /* Zero reference */
-        hdr = xengrant_header(xen, ref);
-        xengrant_zero(xen, hdr);
-        DBGC2(xen, "XENGRANT freed ref %d\n", ref);
-    }
+		/* Sanity check */
+		ref = refs[i];
+		assert ( ref < xengrant_entries ( xen ) );
+
+		/* Zero reference */
+		hdr = xengrant_header ( xen, ref );
+		xengrant_zero ( xen, hdr );
+		DBGC2 ( xen, "XENGRANT freed ref %d\n", ref );
+	}
 }

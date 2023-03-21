@@ -28,7 +28,7 @@
 #include <ipxe/parseopt.h>
 #include <ipxe/reboot.h>
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -44,7 +44,7 @@ static struct option_descriptor poweroff_opts[] = {};
 
 /** "poweroff" command descriptor */
 static struct command_descriptor poweroff_cmd =
-    COMMAND_DESC(struct poweroff_options, poweroff_opts, 0, 0, NULL);
+	COMMAND_DESC ( struct poweroff_options, poweroff_opts, 0, 0, NULL );
 
 /**
  * The "poweroff" command
@@ -53,24 +53,24 @@ static struct command_descriptor poweroff_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int poweroff_exec(int argc, char** argv) {
-    struct poweroff_options opts;
-    int rc;
+static int poweroff_exec ( int argc, char **argv ) {
+	struct poweroff_options opts;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &poweroff_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &poweroff_cmd, &opts ) ) != 0 )
+		return rc;
 
-    /* Power off system */
-    rc = poweroff();
-    if (rc != 0)
-        printf("Could not power off: %s\n", strerror(rc));
+	/* Power off system */
+	rc = poweroff();
+	if ( rc != 0 )
+		printf ( "Could not power off: %s\n", strerror ( rc ) );
 
-    return rc;
+	return rc;
 }
 
 /** "poweroff" command */
 struct command poweroff_command __command = {
-    .name = "poweroff",
-    .exec = poweroff_exec,
+	.name = "poweroff",
+	.exec = poweroff_exec,
 };

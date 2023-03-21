@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/fdt.h>
 
@@ -37,5 +37,5 @@ PROVIDE_REQUIRING_SYMBOL();
  * Drag in devicetree sources
  */
 #ifdef FDT_EFI
-REQUIRE_OBJECT(efi_fdt);
+REQUIRE_OBJECT ( efi_fdt );
 #endif

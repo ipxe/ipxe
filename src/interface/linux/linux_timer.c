@@ -36,7 +36,7 @@ FILE_LICENCE(GPL2_OR_LATER);
  */
 static void linux_udelay(unsigned long usecs)
 {
-    linux_usleep(usecs);
+	linux_usleep(usecs);
 }
 
 /**
@@ -55,27 +55,27 @@ static void linux_udelay(unsigned long usecs)
  */
 static unsigned long linux_currticks(void)
 {
-    static struct timeval start;
-    static int initialized = 0;
-    struct timeval now;
-    unsigned long ticks;
+	static struct timeval start;
+	static int initialized = 0;
+	struct timeval now;
+	unsigned long ticks;
 
-    if (!initialized) {
-        linux_gettimeofday(&start, NULL);
-        initialized = 1;
-    }
+	if (! initialized) {
+		linux_gettimeofday(&start, NULL);
+		initialized = 1;
+	}
 
-    linux_gettimeofday(&now, NULL);
+	linux_gettimeofday(&now, NULL);
 
-    ticks = ((now.tv_sec - start.tv_sec) * TICKS_PER_SEC);
-    ticks += (now.tv_usec / (1000000 / TICKS_PER_SEC));
+	ticks = ( ( now.tv_sec - start.tv_sec ) * TICKS_PER_SEC );
+	ticks += ( now.tv_usec / ( 1000000 / TICKS_PER_SEC ) );
 
-    return ticks;
+	return ticks;
 }
 
 /** Linux timer */
-struct timer linux_timer __timer(TIMER_NORMAL) = {
-    .name = "linux",
-    .currticks = linux_currticks,
-    .udelay = linux_udelay,
+struct timer linux_timer __timer ( TIMER_NORMAL ) = {
+	.name = "linux",
+	.currticks = linux_currticks,
+	.udelay = linux_udelay,
 };

@@ -21,18 +21,18 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/rsa.h>
 #include <ipxe/asn1.h>
 
 /** "rsaEncryption" object identifier */
-static uint8_t oid_rsa_encryption[] = {ASN1_OID_RSAENCRYPTION};
+static uint8_t oid_rsa_encryption[] = { ASN1_OID_RSAENCRYPTION };
 
 /** "rsaEncryption" OID-identified algorithm */
 struct asn1_algorithm rsa_encryption_algorithm __asn1_algorithm = {
-    .name = "rsaEncryption",
-    .pubkey = &rsa_algorithm,
-    .digest = NULL,
-    .oid = ASN1_CURSOR(oid_rsa_encryption),
+	.name = "rsaEncryption",
+	.pubkey = &rsa_algorithm,
+	.digest = NULL,
+	.oid = ASN1_CURSOR ( oid_rsa_encryption ),
 };

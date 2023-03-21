@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/uaccess.h>
 #include <ipxe/settings.h>
@@ -37,7 +37,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** Video RAM length */
 #define VRAM_LEN \
-    (80 /* columns */ * 25 /* rows */ * 2 /* bytes per character */)
+	( 80 /* columns */ * 25 /* rows */ * 2 /* bytes per character */ )
 
 /**
  * Fetch video RAM setting
@@ -46,27 +46,27 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-static int vram_fetch(void* data, size_t len) {
-    userptr_t vram = phys_to_user(VRAM_BASE);
+static int vram_fetch ( void *data, size_t len ) {
+	userptr_t vram = phys_to_user ( VRAM_BASE );
 
-    /* Copy video RAM */
-    if (len > VRAM_LEN)
-        len = VRAM_LEN;
-    copy_from_user(data, vram, 0, len);
+	/* Copy video RAM */
+	if ( len > VRAM_LEN )
+		len = VRAM_LEN;
+	copy_from_user ( data, vram, 0, len );
 
-    return VRAM_LEN;
+	return VRAM_LEN;
 }
 
 /** Video RAM setting */
-const struct setting vram_setting __setting(SETTING_MISC, vram) = {
-    .name = "vram",
-    .description = "Video RAM",
-    .type = &setting_type_base64,
-    .scope = &builtin_scope,
+const struct setting vram_setting __setting ( SETTING_MISC, vram ) = {
+	.name = "vram",
+	.description = "Video RAM",
+	.type = &setting_type_base64,
+	.scope = &builtin_scope,
 };
 
 /** Video RAM built-in setting */
 struct builtin_setting vram_builtin_setting __builtin_setting = {
-    .setting = &vram_setting,
-    .fetch = vram_fetch,
+	.setting = &vram_setting,
+	.fetch = vram_fetch,
 };

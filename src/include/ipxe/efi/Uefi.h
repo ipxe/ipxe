@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
 
   Root include file for Mde Package UEFI, UEFI_APPLICATION type modules.
@@ -14,11 +12,11 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef __PI_UEFI_H__
-    #define __PI_UEFI_H__
+#define __PI_UEFI_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #include <ipxe/efi/Uefi/UefiBaseType.h>
-    #include <ipxe/efi/Uefi/UefiSpec.h>
+#include <ipxe/efi/Uefi/UefiBaseType.h>
+#include <ipxe/efi/Uefi/UefiSpec.h>
 
 #endif

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -39,13 +39,13 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @v name		Keyboard map name
  */
-#define REQUIRE_KEYMAP(name) REQUIRE_OBJECT(keymap_##name)
+#define REQUIRE_KEYMAP( name ) REQUIRE_OBJECT ( keymap_ ## name )
 
 /** Keyboard map setting */
-const struct setting keymap_setting __setting(SETTING_MISC, keymap) = {
-    .name = "keymap",
-    .description = "Keyboard map",
-    .type = &setting_type_string,
+const struct setting keymap_setting __setting ( SETTING_MISC, keymap ) = {
+	.name = "keymap",
+	.description = "Keyboard map",
+	.type = &setting_type_string,
 };
 
 /**
@@ -53,79 +53,79 @@ const struct setting keymap_setting __setting(SETTING_MISC, keymap) = {
  *
  * @ret rc		Return status code
  */
-static int keymap_apply(void) {
-    struct keymap* keymap;
-    char* name;
-    int rc;
+static int keymap_apply ( void ) {
+	struct keymap *keymap;
+	char *name;
+	int rc;
 
-    /* Fetch keyboard map name */
-    fetch_string_setting_copy(NULL, &keymap_setting, &name);
+	/* Fetch keyboard map name */
+	fetch_string_setting_copy ( NULL, &keymap_setting, &name );
 
-    /* Identify keyboard map */
-    if (name) {
-        /* Identify named keyboard map */
-        keymap = keymap_find(name);
-        if (!keymap) {
-            DBGC(&keymap_setting, "KEYMAP could not identify "
-                                  "\"%s\"\n", name);
-            rc = -ENOENT;
-            goto err_unknown;
-        }
-    } else {
-        /* Use default keyboard map */
-        keymap = NULL;
-    }
+	/* Identify keyboard map */
+	if ( name ) {
+		/* Identify named keyboard map */
+		keymap = keymap_find ( name );
+		if ( ! keymap ) {
+			DBGC ( &keymap_setting, "KEYMAP could not identify "
+			       "\"%s\"\n", name );
+			rc = -ENOENT;
+			goto err_unknown;
+		}
+	} else {
+		/* Use default keyboard map */
+		keymap = NULL;
+	}
 
-    /* Set keyboard map */
-    keymap_set(keymap);
+	/* Set keyboard map */
+	keymap_set ( keymap );
 
-    /* Success */
-    rc = 0;
+	/* Success */
+	rc = 0;
 
-err_unknown:
-    free(name);
-    return rc;
+ err_unknown:
+	free ( name );
+	return rc;
 }
 
 /** Keyboard map setting applicator */
 struct settings_applicator keymap_applicator __settings_applicator = {
-    .apply = keymap_apply,
+	.apply = keymap_apply,
 };
 
 /* Provide virtual "dynamic" keyboard map for linker */
-PROVIDE_SYMBOL(obj_keymap_dynamic);
+PROVIDE_SYMBOL ( obj_keymap_dynamic );
 
 /* Drag in keyboard maps via keymap_setting */
-REQUIRING_SYMBOL(keymap_setting);
+REQUIRING_SYMBOL ( keymap_setting );
 
 /* Require all known keyboard maps */
-REQUIRE_KEYMAP(al);
-REQUIRE_KEYMAP(by);
-REQUIRE_KEYMAP(cf);
-REQUIRE_KEYMAP(cz);
-REQUIRE_KEYMAP(de);
-REQUIRE_KEYMAP(dk);
-REQUIRE_KEYMAP(es);
-REQUIRE_KEYMAP(et);
-REQUIRE_KEYMAP(fi);
-REQUIRE_KEYMAP(fr);
-REQUIRE_KEYMAP(gr);
-REQUIRE_KEYMAP(hu);
-REQUIRE_KEYMAP(il);
-REQUIRE_KEYMAP(it);
-REQUIRE_KEYMAP(lt);
-REQUIRE_KEYMAP(mk);
-REQUIRE_KEYMAP(mt);
-REQUIRE_KEYMAP(nl);
-REQUIRE_KEYMAP(no);
-REQUIRE_KEYMAP(no_latin1);
-REQUIRE_KEYMAP(pl);
-REQUIRE_KEYMAP(pt);
-REQUIRE_KEYMAP(ro);
-REQUIRE_KEYMAP(ru);
-REQUIRE_KEYMAP(se);
-REQUIRE_KEYMAP(sg);
-REQUIRE_KEYMAP(sr_latin);
-REQUIRE_KEYMAP(ua);
-REQUIRE_KEYMAP(uk);
-REQUIRE_KEYMAP(us);
+REQUIRE_KEYMAP ( al );
+REQUIRE_KEYMAP ( by );
+REQUIRE_KEYMAP ( cf );
+REQUIRE_KEYMAP ( cz );
+REQUIRE_KEYMAP ( de );
+REQUIRE_KEYMAP ( dk );
+REQUIRE_KEYMAP ( es );
+REQUIRE_KEYMAP ( et );
+REQUIRE_KEYMAP ( fi );
+REQUIRE_KEYMAP ( fr );
+REQUIRE_KEYMAP ( gr );
+REQUIRE_KEYMAP ( hu );
+REQUIRE_KEYMAP ( il );
+REQUIRE_KEYMAP ( it );
+REQUIRE_KEYMAP ( lt );
+REQUIRE_KEYMAP ( mk );
+REQUIRE_KEYMAP ( mt );
+REQUIRE_KEYMAP ( nl );
+REQUIRE_KEYMAP ( no );
+REQUIRE_KEYMAP ( no_latin1 );
+REQUIRE_KEYMAP ( pl );
+REQUIRE_KEYMAP ( pt );
+REQUIRE_KEYMAP ( ro );
+REQUIRE_KEYMAP ( ru );
+REQUIRE_KEYMAP ( se );
+REQUIRE_KEYMAP ( sg );
+REQUIRE_KEYMAP ( sr_latin );
+REQUIRE_KEYMAP ( ua );
+REQUIRE_KEYMAP ( uk );
+REQUIRE_KEYMAP ( us );

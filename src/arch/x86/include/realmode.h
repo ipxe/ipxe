@@ -1,18 +1,16 @@
-#pragma once
-
 #ifndef REALMODE_H
-    #define REALMODE_H
+#define REALMODE_H
 
-    #include <stdint.h>
-    #include <registers.h>
-    #include <ipxe/uaccess.h>
+#include <stdint.h>
+#include <registers.h>
+#include <ipxe/uaccess.h>
 
 /*
  * Data structures and type definitions
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /*
  * Declaration of variables in .data16
@@ -74,8 +72,8 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @ret buffer		User buffer
  */
 static inline __always_inline userptr_t
-real_to_user(unsigned int segment, unsigned int offset) {
-    return (phys_to_user((segment << 4) + offset));
+real_to_user ( unsigned int segment, unsigned int offset ) {
+	return ( phys_to_user ( ( segment << 4 ) + offset ) );
 }
 
 /**
@@ -87,9 +85,9 @@ real_to_user(unsigned int segment, unsigned int offset) {
  * @v len		Length
  */
 static inline __always_inline void
-copy_to_real(unsigned int dest_seg, unsigned int dest_off,
-             void* src, size_t n) {
-    copy_to_user(real_to_user(dest_seg, dest_off), 0, src, n);
+copy_to_real ( unsigned int dest_seg, unsigned int dest_off,
+	       void *src, size_t n ) {
+	copy_to_user ( real_to_user ( dest_seg, dest_off ), 0, src, n );
 }
 
 /**
@@ -101,30 +99,30 @@ copy_to_real(unsigned int dest_seg, unsigned int dest_off,
  * @v len		Length
  */
 static inline __always_inline void
-copy_from_real(void* dest, unsigned int src_seg,
-               unsigned int src_off, size_t n) {
-    copy_from_user(dest, real_to_user(src_seg, src_off), 0, n);
+copy_from_real ( void *dest, unsigned int src_seg,
+		 unsigned int src_off, size_t n ) {
+	copy_from_user ( dest, real_to_user ( src_seg, src_off ), 0, n );
 }
 
-    /**
-     * Write a single variable to base memory
-     *
-     * @v var		Variable to write
-     * @v dest_seg		Destination segment
-     * @v dest_off		Destination offset
-     */
-    #define put_real(var, dest_seg, dest_off) \
-        copy_to_real((dest_seg), (dest_off), &(var), sizeof(var))
+/**
+ * Write a single variable to base memory
+ *
+ * @v var		Variable to write
+ * @v dest_seg		Destination segment
+ * @v dest_off		Destination offset
+ */
+#define put_real( var, dest_seg, dest_off ) \
+	copy_to_real ( (dest_seg), (dest_off), &(var), sizeof (var) )
 
-    /**
-     * Read a single variable from base memory
-     *
-     * @v var		Variable to read
-     * @v src_seg		Source segment
-     * @v src_off		Source offset
-     */
-    #define get_real(var, src_seg, src_off) \
-        copy_from_real(&(var), (src_seg), (src_off), sizeof(var))
+/**
+ * Read a single variable from base memory
+ *
+ * @v var		Variable to read
+ * @v src_seg		Source segment
+ * @v src_off		Source offset
+ */
+#define get_real( var, src_seg, src_off ) \
+	copy_from_real ( &(var), (src_seg), (src_off), sizeof (var) )
 
 /*
  * REAL_CODE ( asm_code_str )

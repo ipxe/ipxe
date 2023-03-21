@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <errno.h>
@@ -42,13 +42,13 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define colour FADT_SIGNATURE
 
 /** AMAC signature */
-#define AMAC_SIGNATURE ACPI_SIGNATURE('A', 'M', 'A', 'C')
+#define AMAC_SIGNATURE ACPI_SIGNATURE ( 'A', 'M', 'A', 'C' )
 
 /** MACA signature */
-#define MACA_SIGNATURE ACPI_SIGNATURE('M', 'A', 'C', 'A')
+#define MACA_SIGNATURE ACPI_SIGNATURE ( 'M', 'A', 'C', 'A' )
 
 /** RTMA signature */
-#define RTMA_SIGNATURE ACPI_SIGNATURE('R', 'T', 'M', 'A')
+#define RTMA_SIGNATURE ACPI_SIGNATURE ( 'R', 'T', 'M', 'A' )
 
 /** Maximum number of bytes to skip after ACPI signature
  *
@@ -58,17 +58,17 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** An ACPI MAC extraction mechanism */
 struct acpimac_extractor {
-    /** Prefix string */
-    const char* prefix;
-    /** Encoded MAC length */
-    size_t len;
-    /** Decode MAC
-     *
-     * @v mac	Encoded MAC
-     * @v hw_addr	MAC address to fill in
-     * @ret rc	Return status code
-     */
-    int (*decode)(const char* mac, uint8_t* hw_addr);
+	/** Prefix string */
+	const char *prefix;
+	/** Encoded MAC length */
+	size_t len;
+	/** Decode MAC
+	 *
+	 * @v mac	Encoded MAC
+	 * @v hw_addr	MAC address to fill in
+	 * @ret rc	Return status code
+	 */
+	int ( * decode ) ( const char *mac, uint8_t *hw_addr );
 };
 
 /**
@@ -78,20 +78,20 @@ struct acpimac_extractor {
  * @v hw_addr		MAC address to fill in
  * @ret rc		Return status code
  */
-static int acpimac_decode_base16(const char* mac, uint8_t* hw_addr) {
-    int len;
-    int rc;
+static int acpimac_decode_base16 ( const char *mac, uint8_t *hw_addr ) {
+	int len;
+	int rc;
 
-    /* Attempt to base16-decode MAC address */
-    len = base16_decode(mac, hw_addr, ETH_ALEN);
-    if (len < 0) {
-        rc = len;
-        DBGC(colour, "ACPI could not decode base16 MAC \"%s\": %s\n",
-             mac, strerror(rc));
-        return rc;
-    }
+	/* Attempt to base16-decode MAC address */
+	len = base16_decode ( mac, hw_addr, ETH_ALEN );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( colour, "ACPI could not decode base16 MAC \"%s\": %s\n",
+		       mac, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -101,23 +101,24 @@ static int acpimac_decode_base16(const char* mac, uint8_t* hw_addr) {
  * @v hw_addr		MAC address to fill in
  * @ret rc		Return status code
  */
-static int acpimac_decode_raw(const char* mac, uint8_t* hw_addr) {
-    memcpy(hw_addr, mac, ETH_ALEN);
-    return 0;
+static int acpimac_decode_raw ( const char *mac, uint8_t *hw_addr ) {
+
+	memcpy ( hw_addr, mac, ETH_ALEN );
+	return 0;
 }
 
 /** "_AUXMAC_" extraction mechanism */
 static struct acpimac_extractor acpimac_auxmac = {
-    .prefix = "_AUXMAC_#",
-    .len = (ETH_ALEN * 2),
-    .decode = acpimac_decode_base16,
+	.prefix = "_AUXMAC_#",
+	.len = ( ETH_ALEN * 2 ),
+	.decode = acpimac_decode_base16,
 };
 
 /** "_RTXMAC_" extraction mechanism */
 static struct acpimac_extractor acpimac_rtxmac = {
-    .prefix = "_RTXMAC_#",
-    .len = ETH_ALEN,
-    .decode = acpimac_decode_raw,
+	.prefix = "_RTXMAC_#",
+	.len = ETH_ALEN,
+	.decode = acpimac_decode_raw,
 };
 
 /**
@@ -141,55 +142,56 @@ static struct acpimac_extractor acpimac_rtxmac = {
  * string that appears shortly after an "AMAC" or "MACA" signature.
  * This should work for most implementations encountered in practice.
  */
-static int acpimac_extract(userptr_t zsdt, size_t len, size_t offset,
-                           void* data, struct acpimac_extractor* extractor) {
-    size_t prefix_len = strlen(extractor->prefix);
-    uint8_t* hw_addr = data;
-    size_t skip = 0;
-    char buf[prefix_len + extractor->len + 1 /* "#" */ + 1 /* NUL */];
-    char* mac = &buf[prefix_len];
-    int rc;
+static int acpimac_extract ( userptr_t zsdt, size_t len, size_t offset,
+			     void *data, struct acpimac_extractor *extractor ){
+	size_t prefix_len = strlen ( extractor->prefix );
+	uint8_t *hw_addr = data;
+	size_t skip = 0;
+	char buf[ prefix_len + extractor->len + 1 /* "#" */ + 1 /* NUL */ ];
+	char *mac = &buf[prefix_len];
+	int rc;
 
-    /* Skip signature and at least one tag byte */
-    offset += (4 /* signature */ + 1 /* tag byte */);
+	/* Skip signature and at least one tag byte */
+	offset += ( 4 /* signature */ + 1 /* tag byte */ );
 
-    /* Scan for suitable string close to signature */
-    for (skip = 0;
-         ((skip < ACPIMAC_MAX_SKIP) &&
-          (offset + skip + sizeof(buf)) <= len);
-         skip++) {
-        /* Read value */
-        copy_from_user(buf, zsdt, (offset + skip),
-                       sizeof(buf));
+	/* Scan for suitable string close to signature */
+	for ( skip = 0 ;
+	      ( ( skip < ACPIMAC_MAX_SKIP ) &&
+		( offset + skip + sizeof ( buf ) ) <= len ) ;
+	      skip++ ) {
 
-        /* Check for expected format */
-        if (memcmp(buf, extractor->prefix, prefix_len) != 0)
-            continue;
-        if (buf[sizeof(buf) - 2] != '#')
-            continue;
-        if (buf[sizeof(buf) - 1] != '\0')
-            continue;
-        DBGC(colour, "ACPI found MAC:\n");
-        DBGC_HDA(colour, (offset + skip), buf, sizeof(buf));
+		/* Read value */
+		copy_from_user ( buf, zsdt, ( offset + skip ),
+				 sizeof ( buf ) );
 
-        /* Terminate MAC address string */
-        mac[extractor->len] = '\0';
+		/* Check for expected format */
+		if ( memcmp ( buf, extractor->prefix, prefix_len ) != 0 )
+			continue;
+		if ( buf[ sizeof ( buf ) - 2 ] != '#' )
+			continue;
+		if ( buf[ sizeof ( buf ) - 1 ] != '\0' )
+			continue;
+		DBGC ( colour, "ACPI found MAC:\n" );
+		DBGC_HDA ( colour, ( offset + skip ), buf, sizeof ( buf ) );
 
-        /* Decode MAC address */
-        if ((rc = extractor->decode(mac, hw_addr)) != 0)
-            return rc;
+		/* Terminate MAC address string */
+		mac[extractor->len] = '\0';
 
-        /* Check MAC address validity */
-        if (!is_valid_ether_addr(hw_addr)) {
-            DBGC(colour, "ACPI has invalid MAC %s\n",
-                 eth_ntoa(hw_addr));
-            return -EINVAL;
-        }
+		/* Decode MAC address */
+		if ( ( rc = extractor->decode ( mac, hw_addr ) ) != 0 )
+			return rc;
 
-        return 0;
-    }
+		/* Check MAC address validity */
+		if ( ! is_valid_ether_addr ( hw_addr ) ) {
+			DBGC ( colour, "ACPI has invalid MAC %s\n",
+			       eth_ntoa ( hw_addr ) );
+			return -EINVAL;
+		}
 
-    return -ENOENT;
+		return 0;
+	}
+
+	return -ENOENT;
 }
 
 /**
@@ -201,9 +203,10 @@ static int acpimac_extract(userptr_t zsdt, size_t len, size_t offset,
  * @v data		Data buffer
  * @ret rc		Return status code
  */
-static int acpimac_extract_auxmac(userptr_t zsdt, size_t len, size_t offset,
-                                  void* data) {
-    return acpimac_extract(zsdt, len, offset, data, &acpimac_auxmac);
+static int acpimac_extract_auxmac ( userptr_t zsdt, size_t len, size_t offset,
+				    void *data ) {
+
+	return acpimac_extract ( zsdt, len, offset, data, &acpimac_auxmac );
 }
 
 /**
@@ -215,9 +218,10 @@ static int acpimac_extract_auxmac(userptr_t zsdt, size_t len, size_t offset,
  * @v data		Data buffer
  * @ret rc		Return status code
  */
-static int acpimac_extract_rtxmac(userptr_t zsdt, size_t len, size_t offset,
-                                  void* data) {
-    return acpimac_extract(zsdt, len, offset, data, &acpimac_rtxmac);
+static int acpimac_extract_rtxmac ( userptr_t zsdt, size_t len, size_t offset,
+				    void *data ) {
+
+	return acpimac_extract ( zsdt, len, offset, data, &acpimac_rtxmac );
 }
 
 /**
@@ -226,25 +230,25 @@ static int acpimac_extract_rtxmac(userptr_t zsdt, size_t len, size_t offset,
  * @v hw_addr		MAC address to fill in
  * @ret rc		Return status code
  */
-int acpi_mac(uint8_t* hw_addr) {
-    int rc;
+int acpi_mac ( uint8_t *hw_addr ) {
+	int rc;
 
-    /* Look for an "AMAC" address */
-    if ((rc = acpi_extract(AMAC_SIGNATURE, hw_addr,
-                           acpimac_extract_auxmac)) == 0)
-        return 0;
+	/* Look for an "AMAC" address */
+	if ( ( rc = acpi_extract ( AMAC_SIGNATURE, hw_addr,
+				   acpimac_extract_auxmac ) ) == 0 )
+		return 0;
 
-    /* Look for a "MACA" address */
-    if ((rc = acpi_extract(MACA_SIGNATURE, hw_addr,
-                           acpimac_extract_auxmac)) == 0)
-        return 0;
+	/* Look for a "MACA" address */
+	if ( ( rc = acpi_extract ( MACA_SIGNATURE, hw_addr,
+				   acpimac_extract_auxmac ) ) == 0 )
+		return 0;
 
-    /* Look for a "RTMA" address */
-    if ((rc = acpi_extract(RTMA_SIGNATURE, hw_addr,
-                           acpimac_extract_rtxmac)) == 0)
-        return 0;
+	/* Look for a "RTMA" address */
+	if ( ( rc = acpi_extract ( RTMA_SIGNATURE, hw_addr,
+				   acpimac_extract_rtxmac ) ) == 0 )
+		return 0;
 
-    return -ENOENT;
+	return -ENOENT;
 }
 
 /**
@@ -254,31 +258,31 @@ int acpi_mac(uint8_t* hw_addr) {
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-static int sysmac_fetch(void* data, size_t len) {
-    uint8_t mac[ETH_ALEN];
-    int rc;
+static int sysmac_fetch ( void *data, size_t len ) {
+	uint8_t mac[ETH_ALEN];
+	int rc;
 
-    /* Try fetching ACPI MAC address */
-    if ((rc = acpi_mac(mac)) != 0)
-        return rc;
+	/* Try fetching ACPI MAC address */
+	if ( ( rc = acpi_mac ( mac ) ) != 0 )
+		return rc;
 
-    /* Return MAC address */
-    if (len > sizeof(mac))
-        len = sizeof(mac);
-    memcpy(data, mac, len);
-    return (sizeof(mac));
+	/* Return MAC address */
+	if ( len > sizeof ( mac ) )
+		len = sizeof ( mac );
+	memcpy ( data, mac, len );
+	return ( sizeof ( mac ) );
 }
 
 /** System MAC address setting */
-const struct setting sysmac_setting __setting(SETTING_MISC, sysmac) = {
-    .name = "sysmac",
-    .description = "System MAC",
-    .type = &setting_type_hex,
-    .scope = &builtin_scope,
+const struct setting sysmac_setting __setting ( SETTING_MISC, sysmac ) = {
+	.name = "sysmac",
+	.description = "System MAC",
+	.type = &setting_type_hex,
+	.scope = &builtin_scope,
 };
 
 /** System MAC address built-in setting */
 struct builtin_setting sysmac_builtin_setting __builtin_setting = {
-    .setting = &sysmac_setting,
-    .fetch = sysmac_fetch,
+	.setting = &sysmac_setting,
+	.fetch = sysmac_fetch,
 };

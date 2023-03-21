@@ -34,68 +34,74 @@
  * THE POSSIBILITY OF SUCH DAMAGES.
  */
 
-FILE_LICENCE(MIT);
+FILE_LICENCE ( MIT );
 
 #include "base.h"
 
-static inline void ath5k_rfkill_disable(struct ath5k_softc* sc)
+
+static inline void ath5k_rfkill_disable(struct ath5k_softc *sc)
 {
-    DBG("ath5k: rfkill disable (gpio:%d polarity:%d)\n",
-        sc->rf_kill.gpio, sc->rf_kill.polarity);
-    ath5k_hw_set_gpio_output(sc->ah, sc->rf_kill.gpio);
-    ath5k_hw_set_gpio(sc->ah, sc->rf_kill.gpio, !sc->rf_kill.polarity);
+	DBG("ath5k: rfkill disable (gpio:%d polarity:%d)\n",
+	    sc->rf_kill.gpio, sc->rf_kill.polarity);
+	ath5k_hw_set_gpio_output(sc->ah, sc->rf_kill.gpio);
+	ath5k_hw_set_gpio(sc->ah, sc->rf_kill.gpio, !sc->rf_kill.polarity);
 }
 
-static inline void ath5k_rfkill_enable(struct ath5k_softc* sc)
+
+static inline void ath5k_rfkill_enable(struct ath5k_softc *sc)
 {
-    DBG("ath5k: rfkill enable (gpio:%d polarity:%d)\n",
-        sc->rf_kill.gpio, sc->rf_kill.polarity);
-    ath5k_hw_set_gpio_output(sc->ah, sc->rf_kill.gpio);
-    ath5k_hw_set_gpio(sc->ah, sc->rf_kill.gpio, sc->rf_kill.polarity);
+	DBG("ath5k: rfkill enable (gpio:%d polarity:%d)\n",
+	    sc->rf_kill.gpio, sc->rf_kill.polarity);
+	ath5k_hw_set_gpio_output(sc->ah, sc->rf_kill.gpio);
+	ath5k_hw_set_gpio(sc->ah, sc->rf_kill.gpio, sc->rf_kill.polarity);
 }
 
-static inline void ath5k_rfkill_set_intr(struct ath5k_softc* sc, int enable)
+static inline void ath5k_rfkill_set_intr(struct ath5k_softc *sc, int enable)
 {
-    struct ath5k_hw* ah = sc->ah;
-    u32 curval;
+	struct ath5k_hw *ah = sc->ah;
+	u32 curval;
 
-    ath5k_hw_set_gpio_input(ah, sc->rf_kill.gpio);
-    curval = ath5k_hw_get_gpio(ah, sc->rf_kill.gpio);
-    ath5k_hw_set_gpio_intr(ah, sc->rf_kill.gpio, enable ? !!curval : !curval);
+	ath5k_hw_set_gpio_input(ah, sc->rf_kill.gpio);
+	curval = ath5k_hw_get_gpio(ah, sc->rf_kill.gpio);
+	ath5k_hw_set_gpio_intr(ah, sc->rf_kill.gpio, enable ?
+			       !!curval : !curval);
 }
 
 static int __unused
-ath5k_is_rfkill_set(struct ath5k_softc* sc)
+ath5k_is_rfkill_set(struct ath5k_softc *sc)
 {
-    /* configuring GPIO for input for some reason disables rfkill */
-    /*ath5k_hw_set_gpio_input(sc->ah, sc->rf_kill.gpio);*/
-    return (ath5k_hw_get_gpio(sc->ah, sc->rf_kill.gpio) ==
-            sc->rf_kill.polarity);
+	/* configuring GPIO for input for some reason disables rfkill */
+	/*ath5k_hw_set_gpio_input(sc->ah, sc->rf_kill.gpio);*/
+	return (ath5k_hw_get_gpio(sc->ah, sc->rf_kill.gpio) ==
+		sc->rf_kill.polarity);
 }
 
-void ath5k_rfkill_hw_start(struct ath5k_hw* ah)
+void
+ath5k_rfkill_hw_start(struct ath5k_hw *ah)
 {
-    struct ath5k_softc* sc = ah->ah_sc;
+	struct ath5k_softc *sc = ah->ah_sc;
 
-    /* read rfkill GPIO configuration from EEPROM header */
-    sc->rf_kill.gpio = ah->ah_capabilities.cap_eeprom.ee_rfkill_pin;
-    sc->rf_kill.polarity = ah->ah_capabilities.cap_eeprom.ee_rfkill_pol;
+	/* read rfkill GPIO configuration from EEPROM header */
+	sc->rf_kill.gpio = ah->ah_capabilities.cap_eeprom.ee_rfkill_pin;
+	sc->rf_kill.polarity = ah->ah_capabilities.cap_eeprom.ee_rfkill_pol;
 
-    ath5k_rfkill_disable(sc);
+	ath5k_rfkill_disable(sc);
 
-    /* enable interrupt for rfkill switch */
-    if (AR5K_EEPROM_HDR_RFKILL(ah->ah_capabilities.cap_eeprom.ee_header))
-        ath5k_rfkill_set_intr(sc, 1);
+	/* enable interrupt for rfkill switch */
+	if (AR5K_EEPROM_HDR_RFKILL(ah->ah_capabilities.cap_eeprom.ee_header))
+		ath5k_rfkill_set_intr(sc, 1);
 }
 
-void ath5k_rfkill_hw_stop(struct ath5k_hw* ah)
+
+void
+ath5k_rfkill_hw_stop(struct ath5k_hw *ah)
 {
-    struct ath5k_softc* sc = ah->ah_sc;
+	struct ath5k_softc *sc = ah->ah_sc;
 
-    /* disable interrupt for rfkill switch */
-    if (AR5K_EEPROM_HDR_RFKILL(ah->ah_capabilities.cap_eeprom.ee_header))
-        ath5k_rfkill_set_intr(sc, 0);
+	/* disable interrupt for rfkill switch */
+	if (AR5K_EEPROM_HDR_RFKILL(ah->ah_capabilities.cap_eeprom.ee_header))
+		ath5k_rfkill_set_intr(sc, 0);
 
-    /* enable RFKILL when stopping HW so Wifi LED is turned off */
-    ath5k_rfkill_enable(sc);
+	/* enable RFKILL when stopping HW so Wifi LED is turned off */
+	ath5k_rfkill_enable(sc);
 }

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -34,7 +34,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/linux_api.h>
 #include <ipxe/entropy.h>
 
-struct entropy_source linux_entropy __entropy_source(ENTROPY_NORMAL);
+struct entropy_source linux_entropy __entropy_source ( ENTROPY_NORMAL );
 
 /** Entropy source filename */
 static const char entropy_filename[] = "/dev/random";
@@ -47,32 +47,34 @@ static int entropy_fd;
  *
  * @ret rc		Return status code
  */
-static int linux_entropy_enable(void) {
-    /* Open entropy source */
-    entropy_fd = linux_open(entropy_filename, O_RDONLY);
-    if (entropy_fd < 0) {
-        DBGC(&entropy_fd, "ENTROPY could not open %s: %s\n",
-             entropy_filename, linux_strerror(linux_errno));
-        return entropy_fd;
-    }
+static int linux_entropy_enable ( void ) {
 
-    /* linux_get_noise() reads a single byte from /dev/random,
-     * which is supposed to block until a sufficient amount of
-     * entropy is available.  We therefore assume that each sample
-     * contains exactly 8 bits of entropy.
-     */
-    entropy_init(&linux_entropy, MIN_ENTROPY(8.0));
+	/* Open entropy source */
+	entropy_fd = linux_open ( entropy_filename, O_RDONLY );
+	if ( entropy_fd < 0 ) {
+		DBGC ( &entropy_fd, "ENTROPY could not open %s: %s\n",
+		       entropy_filename, linux_strerror ( linux_errno ) );
+		return entropy_fd;
+	}
 
-    return 0;
+	/* linux_get_noise() reads a single byte from /dev/random,
+	 * which is supposed to block until a sufficient amount of
+	 * entropy is available.  We therefore assume that each sample
+	 * contains exactly 8 bits of entropy.
+	 */
+	entropy_init ( &linux_entropy, MIN_ENTROPY ( 8.0 ) );
+
+	return 0;
 }
 
 /**
  * Disable entropy gathering
  *
  */
-static void linux_entropy_disable(void) {
-    /* Close entropy source */
-    linux_close(entropy_fd);
+static void linux_entropy_disable ( void ) {
+
+	/* Close entropy source */
+	linux_close ( entropy_fd );
 }
 
 /**
@@ -81,31 +83,31 @@ static void linux_entropy_disable(void) {
  * @ret noise		Noise sample
  * @ret rc		Return status code
  */
-static int linux_get_noise(noise_sample_t* noise) {
-    uint8_t byte;
-    ssize_t len;
+static int linux_get_noise ( noise_sample_t *noise ) {
+	uint8_t byte;
+	ssize_t len;
 
-    /* Read a single byte from entropy source */
-    len = linux_read(entropy_fd, &byte, sizeof(byte));
-    if (len < 0) {
-        DBGC(&entropy_fd, "ENTROPY could not read from %s: %s\n",
-             entropy_filename, linux_strerror(linux_errno));
-        return len;
-    }
-    if (len == 0) {
-        DBGC(&entropy_fd, "ENTROPY EOF on reading from %s: %s\n",
-             entropy_filename, linux_strerror(linux_errno));
-        return -EPIPE;
-    }
-    *noise = byte;
+	/* Read a single byte from entropy source */
+	len = linux_read ( entropy_fd, &byte, sizeof ( byte ) );
+	if ( len < 0 ) {
+		DBGC ( &entropy_fd, "ENTROPY could not read from %s: %s\n",
+		       entropy_filename, linux_strerror ( linux_errno ) );
+		return len;
+	}
+	if ( len == 0 ) {
+		DBGC ( &entropy_fd, "ENTROPY EOF on reading from %s: %s\n",
+		       entropy_filename, linux_strerror ( linux_errno ) );
+		return -EPIPE;
+	}
+	*noise = byte;
 
-    return 0;
+	return 0;
 }
 
 /** Linux entropy source */
-struct entropy_source linux_entropy __entropy_source(ENTROPY_NORMAL) = {
-    .name = "linux",
-    .enable = linux_entropy_enable,
-    .disable = linux_entropy_disable,
-    .get_noise = linux_get_noise,
+struct entropy_source linux_entropy __entropy_source ( ENTROPY_NORMAL ) = {
+	.name = "linux",
+	.enable = linux_entropy_enable,
+	.disable = linux_entropy_disable,
+	.get_noise = linux_get_noise,
 };

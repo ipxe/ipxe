@@ -41,9 +41,9 @@
  */
 
 /** MNT procedure number */
-#define MOUNT_MNT 1
+#define MOUNT_MNT       1
 /** UMNT procedure number */
-#define MOUNT_UMNT 3
+#define MOUNT_UMNT      3
 
 /**
  * Send a MNT request
@@ -53,14 +53,14 @@
  * @v mountpoinrt       The path of the directory to mount.
  * @ret rc              Return status code
  */
-int mount_mnt(struct interface* intf, struct oncrpc_session* session,
-              const char* mountpoint) {
-    struct oncrpc_field fields[] = {
-        ONCRPC_FIELD(str, mountpoint),
-        ONCRPC_FIELD_END,
-    };
+int mount_mnt ( struct interface *intf, struct oncrpc_session *session,
+                const char *mountpoint ) {
+	struct oncrpc_field fields[] = {
+		ONCRPC_FIELD ( str, mountpoint ),
+		ONCRPC_FIELD_END,
+	};
 
-    return oncrpc_call(intf, session, MOUNT_MNT, fields);
+	return oncrpc_call ( intf, session, MOUNT_MNT, fields );
 }
 
 /**
@@ -71,14 +71,14 @@ int mount_mnt(struct interface* intf, struct oncrpc_session* session,
  * @v mountpoinrt       The path of the directory to unmount.
  * @ret rc              Return status code
  */
-int mount_umnt(struct interface* intf, struct oncrpc_session* session,
-               const char* mountpoint) {
-    struct oncrpc_field fields[] = {
-        ONCRPC_FIELD(str, mountpoint),
-        ONCRPC_FIELD_END,
-    };
+int mount_umnt ( struct interface *intf, struct oncrpc_session *session,
+                 const char *mountpoint ) {
+	struct oncrpc_field fields[] = {
+		ONCRPC_FIELD ( str, mountpoint ),
+		ONCRPC_FIELD_END,
+	};
 
-    return oncrpc_call(intf, session, MOUNT_UMNT, fields);
+	return oncrpc_call ( intf, session, MOUNT_UMNT, fields );
 }
 
 /**
@@ -88,32 +88,32 @@ int mount_umnt(struct interface* intf, struct oncrpc_session* session,
  * @v reply             The ONC RPC reply to get data from
  * @ret rc              Return status code
  */
-int mount_get_mnt_reply(struct mount_mnt_reply* mnt_reply,
-                        struct oncrpc_reply* reply) {
-    if (!mnt_reply || !reply)
-        return -EINVAL;
+int mount_get_mnt_reply ( struct mount_mnt_reply *mnt_reply,
+                          struct oncrpc_reply *reply ) {
+	if (  ! mnt_reply || ! reply )
+		return -EINVAL;
 
-    mnt_reply->status = oncrpc_iob_get_int(reply->data);
+	mnt_reply->status = oncrpc_iob_get_int ( reply->data );
 
-    switch (mnt_reply->status)
-    {
-        case MNT3_OK:
-            break;
-        case MNT3ERR_NOENT:
-            return -ENOENT;
-        case MNT3ERR_IO:
-            return -EIO;
-        case MNT3ERR_ACCES:
-            return -EACCES;
-        case MNT3ERR_NOTDIR:
-            return -ENOTDIR;
-        case MNT3ERR_NAMETOOLONG:
-            return -ENAMETOOLONG;
-        default:
-            return -EPROTO;
-    }
+	switch ( mnt_reply->status )
+	{
+	case MNT3_OK:
+		break;
+	case MNT3ERR_NOENT:
+		return -ENOENT;
+	case MNT3ERR_IO:
+		return -EIO;
+	case MNT3ERR_ACCES:
+		return -EACCES;
+	case MNT3ERR_NOTDIR:
+		return -ENOTDIR;
+	case MNT3ERR_NAMETOOLONG:
+		return -ENAMETOOLONG;
+	default:
+		return -EPROTO;
+	}
 
-    nfs_iob_get_fh(reply->data, &mnt_reply->fh);
+	nfs_iob_get_fh ( reply->data, &mnt_reply->fh );
 
-    return 0;
+	return 0;
 }

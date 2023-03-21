@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <ipxe/io.h>
 #include <pic8259.h>
@@ -35,12 +35,12 @@ FILE_LICENCE(GPL2_OR_LATER);
  *
  * This seems to be inherently unsafe.
  */
-static inline void send_nonspecific_eoi(unsigned int irq) {
-    DBG("Sending non-specific EOI for IRQ %d\n", irq);
-    if (irq >= IRQ_PIC_CUTOFF) {
-        outb(ICR_EOI_NON_SPECIFIC, PIC2_ICR);
-    }
-    outb(ICR_EOI_NON_SPECIFIC, PIC1_ICR);
+static inline void send_nonspecific_eoi ( unsigned int irq ) {
+	DBG ( "Sending non-specific EOI for IRQ %d\n", irq );
+	if ( irq >= IRQ_PIC_CUTOFF ) {
+		outb ( ICR_EOI_NON_SPECIFIC, PIC2_ICR );
+	}		
+	outb ( ICR_EOI_NON_SPECIFIC, PIC1_ICR );
 }
 
 /**
@@ -48,13 +48,13 @@ static inline void send_nonspecific_eoi(unsigned int irq) {
  *
  * @v irq		IRQ number
  */
-static inline void send_specific_eoi(unsigned int irq) {
-    DBG("Sending specific EOI for IRQ %d\n", irq);
-    if (irq >= IRQ_PIC_CUTOFF) {
-        outb((ICR_EOI_SPECIFIC | ICR_VALUE(CHAINED_IRQ)),
-             ICR_REG(CHAINED_IRQ));
-    }
-    outb((ICR_EOI_SPECIFIC | ICR_VALUE(irq)), ICR_REG(irq));
+static inline void send_specific_eoi ( unsigned int irq ) {
+	DBG ( "Sending specific EOI for IRQ %d\n", irq );
+	if ( irq >= IRQ_PIC_CUTOFF ) {
+		outb ( ( ICR_EOI_SPECIFIC | ICR_VALUE ( CHAINED_IRQ ) ),
+		       ICR_REG ( CHAINED_IRQ ) );
+	}
+	outb ( ( ICR_EOI_SPECIFIC | ICR_VALUE ( irq ) ), ICR_REG ( irq ) );
 }
 
 /**
@@ -62,6 +62,6 @@ static inline void send_specific_eoi(unsigned int irq) {
  *
  * @v irq		IRQ number
  */
-void send_eoi(unsigned int irq) {
-    send_specific_eoi(irq);
+void send_eoi ( unsigned int irq ) {
+	send_specific_eoi ( irq );
 }

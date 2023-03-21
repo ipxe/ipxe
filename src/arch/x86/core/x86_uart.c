@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -34,10 +34,10 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** UART port bases */
 static uint16_t uart_base[] = {
-    [COM1] = 0x3f8,
-    [COM2] = 0x2f8,
-    [COM3] = 0x3e8,
-    [COM4] = 0x2e8,
+	[COM1] = 0x3f8,
+	[COM2] = 0x2f8,
+	[COM3] = 0x3e8,
+	[COM4] = 0x2e8,
 };
 
 /**
@@ -47,23 +47,23 @@ static uint16_t uart_base[] = {
  * @v port		Port number, or 0 to disable
  * @ret rc		Return status code
  */
-int uart_select(struct uart* uart, unsigned int port) {
-    int rc;
+int uart_select ( struct uart *uart, unsigned int port ) {
+	int rc;
 
-    /* Set new UART base */
-    if (port >= (sizeof(uart_base) / sizeof(uart_base[0]))) {
-        rc = -ENODEV;
-        goto err;
-    }
-    uart->base = ((void*)(intptr_t)uart_base[port]);
+	/* Set new UART base */
+	if ( port >= ( sizeof ( uart_base ) / sizeof ( uart_base[0] ) ) ) {
+		rc = -ENODEV;
+		goto err;
+	}
+	uart->base = ( ( void * ) ( intptr_t ) uart_base[port] );
 
-    /* Check that UART exists */
-    if ((rc = uart_exists(uart)) != 0)
-        goto err;
+	/* Check that UART exists */
+	if ( ( rc = uart_exists ( uart ) ) != 0 )
+		goto err;
 
-    return 0;
+	return 0;
 
-err:
-    uart->base = NULL;
-    return rc;
+ err:
+	uart->base = NULL;
+	return rc;
 }

@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _IPXE_USBNET_H
-    #define _IPXE_USBNET_H
+#define _IPXE_USBNET_H
 
 /** @file
  *
@@ -9,28 +7,28 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #include <ipxe/usb.h>
+#include <ipxe/usb.h>
 
 /** A USB network device */
 struct usbnet_device {
-    /** USB function */
-    struct usb_function* func;
+	/** USB function */
+	struct usb_function *func;
 
-    /** Communications interface */
-    unsigned int comms;
-    /** Data interface */
-    unsigned int data;
-    /** Alternate setting for data interface */
-    unsigned int alternate;
+	/** Communications interface */
+	unsigned int comms;
+	/** Data interface */
+	unsigned int data;
+	/** Alternate setting for data interface */
+	unsigned int alternate;
 
-    /** Interrupt endpoint */
-    struct usb_endpoint intr;
-    /** Bulk IN endpoint */
-    struct usb_endpoint in;
-    /** Bulk OUT endpoint */
-    struct usb_endpoint out;
+	/** Interrupt endpoint */
+	struct usb_endpoint intr;
+	/** Bulk IN endpoint */
+	struct usb_endpoint in;
+	/** Bulk OUT endpoint */
+	struct usb_endpoint out;
 };
 
 /**
@@ -42,17 +40,17 @@ struct usbnet_device {
  * @v in		Bulk IN endpoint operations
  * @v out		Bulk OUT endpoint operations
  */
-static inline __attribute__((always_inline)) void
-usbnet_init(struct usbnet_device* usbnet, struct usb_function* func,
-            struct usb_endpoint_driver_operations* intr,
-            struct usb_endpoint_driver_operations* in,
-            struct usb_endpoint_driver_operations* out) {
-    struct usb_device* usb = func->usb;
+static inline __attribute__ (( always_inline )) void
+usbnet_init ( struct usbnet_device *usbnet, struct usb_function *func,
+	      struct usb_endpoint_driver_operations *intr,
+	      struct usb_endpoint_driver_operations *in,
+	      struct usb_endpoint_driver_operations *out ) {
+	struct usb_device *usb = func->usb;
 
-    usbnet->func = func;
-    usb_endpoint_init(&usbnet->intr, usb, intr);
-    usb_endpoint_init(&usbnet->in, usb, in);
-    usb_endpoint_init(&usbnet->out, usb, out);
+	usbnet->func = func;
+	usb_endpoint_init ( &usbnet->intr, usb, intr );
+	usb_endpoint_init ( &usbnet->in, usb, in );
+	usb_endpoint_init ( &usbnet->out, usb, out );
 }
 
 /**
@@ -61,15 +59,16 @@ usbnet_init(struct usbnet_device* usbnet, struct usb_function* func,
  * @v usbnet		USB network device
  * @ret has_intr	Device has an interrupt endpoint
  */
-static inline __attribute__((always_inline)) int
-usbnet_has_intr(struct usbnet_device* usbnet) {
-    return (usbnet->intr.driver != NULL);
+static inline __attribute__ (( always_inline )) int
+usbnet_has_intr ( struct usbnet_device *usbnet ) {
+
+	return ( usbnet->intr.driver != NULL );
 }
 
-extern int usbnet_open(struct usbnet_device* usbnet);
-extern void usbnet_close(struct usbnet_device* usbnet);
-extern int usbnet_refill(struct usbnet_device* usbnet);
-extern int usbnet_describe(struct usbnet_device* usbnet,
-                           struct usb_configuration_descriptor* config);
+extern int usbnet_open ( struct usbnet_device *usbnet );
+extern void usbnet_close ( struct usbnet_device *usbnet );
+extern int usbnet_refill ( struct usbnet_device *usbnet );
+extern int usbnet_describe ( struct usbnet_device *usbnet,
+			     struct usb_configuration_descriptor *config );
 
 #endif /* _IPXE_USBNET_H */

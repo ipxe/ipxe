@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef INCLUDE_PUBLIC_MLXTYPES_H_
-    #define INCLUDE_PUBLIC_MLXTYPES_H_
+#define INCLUDE_PUBLIC_MLXTYPES_H_
 
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
@@ -22,8 +20,8 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
-    #include "../../../mlx_utils_flexboot/include/mlx_types_priv.h"
+#include "../../../mlx_utils_flexboot/include/mlx_types_priv.h"
 
 #endif /* INCLUDE_PUBLIC_MLXBAIL_H_ */

@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
 #include <getopt.h>
@@ -39,8 +39,8 @@ static struct option_descriptor nslookup_opts[] = {};
 
 /** "nslookup" command descriptor */
 static struct command_descriptor nslookup_cmd =
-    COMMAND_DESC(struct nslookup_options, nslookup_opts, 2, 2,
-                 "<setting> <name>");
+	COMMAND_DESC ( struct nslookup_options, nslookup_opts, 2, 2,
+		       "<setting> <name>" );
 
 /**
  * The "nslookup" command
@@ -49,31 +49,31 @@ static struct command_descriptor nslookup_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int nslookup_exec(int argc, char** argv) {
-    struct nslookup_options opts;
-    const char* name;
-    const char* setting_name;
-    int rc;
+static int nslookup_exec ( int argc, char **argv ) {
+	struct nslookup_options opts;
+	const char *name;
+	const char *setting_name;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &nslookup_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &nslookup_cmd, &opts ) ) != 0 )
+		return rc;
 
-    /* Parse setting name */
-    setting_name = argv[optind];
+	/* Parse setting name */
+	setting_name = argv[optind];
 
-    /* Parse name to be resolved */
-    name = argv[optind + 1];
+	/* Parse name to be resolved */
+	name = argv[ optind + 1 ];
 
-    /* Look up name */
-    if ((rc = nslookup(name, setting_name)) != 0)
-        return rc;
+	/* Look up name */
+	if ( ( rc = nslookup ( name, setting_name ) ) != 0 )
+		return rc;
 
-    return 0;
+	return 0;
 }
 
 /** The "nslookup" command */
 struct command nslookup_command __command = {
-    .name = "nslookup",
-    .exec = nslookup_exec,
+	.name = "nslookup",
+	.exec = nslookup_exec,
 };

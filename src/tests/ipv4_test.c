@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -39,8 +39,8 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/test.h>
 
 /** Define inline IPv4 address */
-#define IPV4(a, b, c, d) \
-    htonl(((a) << 24) | ((b) << 16) | ((c) << 8) | (d))
+#define IPV4(a,b,c,d) \
+	htonl ( ( (a) << 24 ) | ( (b) << 16 ) | ( (c) << 8 ) | (d) )
 
 /**
  * Report an inet_ntoa() test result
@@ -50,22 +50,22 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v file		Test code file
  * @v line		Test code line
  */
-static void inet_ntoa_okx(uint32_t addr, const char* text, const char* file,
-                          unsigned int line) {
-    struct in_addr in = {.s_addr = addr};
-    char* actual;
+static void inet_ntoa_okx ( uint32_t addr, const char *text, const char *file,
+			    unsigned int line ) {
+	struct in_addr in = { .s_addr = addr };
+	char *actual;
 
-    /* Format address */
-    actual = inet_ntoa(in);
-    DBG("inet_ntoa ( %d.%d.%d.%d ) = %s\n",
-        ((ntohl(addr) >> 24) & 0xff),
-        ((ntohl(addr) >> 16) & 0xff),
-        ((ntohl(addr) >> 8) & 0xff),
-        ((ntohl(addr) >> 0) & 0xff), actual);
-    okx(strcmp(actual, text) == 0, file, line);
+	/* Format address */
+	actual = inet_ntoa ( in );
+	DBG ( "inet_ntoa ( %d.%d.%d.%d ) = %s\n",
+	      ( ( ntohl ( addr ) >> 24 ) & 0xff ),
+	      ( ( ntohl ( addr ) >> 16 ) & 0xff ),
+	      ( ( ntohl ( addr ) >> 8 ) & 0xff ),
+	      ( ( ntohl ( addr ) >> 0 ) & 0xff ), actual );
+	okx ( strcmp ( actual, text ) == 0, file, line );
 }
-#define inet_ntoa_ok(addr, text) \
-    inet_ntoa_okx(addr, text, __FILE__, __LINE__)
+#define inet_ntoa_ok( addr, text ) \
+	inet_ntoa_okx ( addr, text, __FILE__, __LINE__ )
 
 /**
  * Report an inet_aton() test result
@@ -75,17 +75,17 @@ static void inet_ntoa_okx(uint32_t addr, const char* text, const char* file,
  * @v file		Test code file
  * @v line		Test code line
  */
-static void inet_aton_okx(const char* text, uint32_t addr, const char* file,
-                          unsigned int line) {
-    struct in_addr actual;
+static void inet_aton_okx ( const char *text, uint32_t addr, const char *file,
+			    unsigned int line ) {
+	struct in_addr actual;
 
-    /* Parse address */
-    okx(inet_aton(text, &actual) != 0, file, line);
-    DBG("inet_aton ( \"%s\" ) = %s\n", text, inet_ntoa(actual));
-    okx(actual.s_addr == addr, file, line);
+	/* Parse address */
+	okx ( inet_aton ( text, &actual ) != 0, file, line );
+	DBG ( "inet_aton ( \"%s\" ) = %s\n", text, inet_ntoa ( actual ) );
+	okx ( actual.s_addr == addr, file, line );
 };
-#define inet_aton_ok(text, addr) \
-    inet_aton_okx(text, addr, __FILE__, __LINE__)
+#define inet_aton_ok( text, addr ) \
+	inet_aton_okx ( text, addr, __FILE__, __LINE__ )
 
 /**
  * Report an inet_aton() failure test result
@@ -94,60 +94,61 @@ static void inet_aton_okx(const char* text, uint32_t addr, const char* file,
  * @v file		Test code file
  * @v line		Test code line
  */
-static void inet_aton_fail_okx(const char* text, const char* file,
-                               unsigned int line) {
-    struct in_addr actual;
+static void inet_aton_fail_okx ( const char *text, const char *file,
+				 unsigned int line ) {
+	struct in_addr actual;
 
-    /* Attempt to parse address */
-    okx(inet_aton(text, &actual) == 0, file, line);
+	/* Attempt to parse address */
+	okx ( inet_aton ( text, &actual ) == 0, file, line );
 }
-#define inet_aton_fail_ok(text) \
-    inet_aton_fail_okx(text, __FILE__, __LINE__)
+#define inet_aton_fail_ok( text ) \
+	inet_aton_fail_okx ( text, __FILE__, __LINE__ )
 
 /**
  * Perform IPv4 self-tests
  *
  */
-static void ipv4_test_exec(void) {
-    /* Address testing macros */
-    ok(IN_IS_CLASSA(IPV4(10, 0, 0, 1)));
-    ok(!IN_IS_CLASSB(IPV4(10, 0, 0, 1)));
-    ok(!IN_IS_CLASSC(IPV4(10, 0, 0, 1)));
-    ok(!IN_IS_CLASSA(IPV4(172, 16, 0, 1)));
-    ok(IN_IS_CLASSB(IPV4(172, 16, 0, 1)));
-    ok(!IN_IS_CLASSC(IPV4(172, 16, 0, 1)));
-    ok(!IN_IS_CLASSA(IPV4(192, 168, 0, 1)));
-    ok(!IN_IS_CLASSB(IPV4(192, 168, 0, 1)));
-    ok(IN_IS_CLASSC(IPV4(192, 168, 0, 1)));
-    ok(!IN_IS_MULTICAST(IPV4(127, 0, 0, 1)));
-    ok(!IN_IS_MULTICAST(IPV4(8, 8, 8, 8)));
-    ok(!IN_IS_MULTICAST(IPV4(0, 0, 0, 0)));
-    ok(!IN_IS_MULTICAST(IPV4(223, 0, 0, 1)));
-    ok(!IN_IS_MULTICAST(IPV4(240, 0, 0, 1)));
-    ok(IN_IS_MULTICAST(IPV4(224, 0, 0, 1)));
-    ok(IN_IS_MULTICAST(IPV4(231, 89, 0, 2)));
-    ok(IN_IS_MULTICAST(IPV4(239, 6, 1, 17)));
+static void ipv4_test_exec ( void ) {
 
-    /* inet_ntoa() tests */
-    inet_ntoa_ok(IPV4(127, 0, 0, 1), "127.0.0.1");
-    inet_ntoa_ok(IPV4(0, 0, 0, 0), "0.0.0.0");
-    inet_ntoa_ok(IPV4(255, 255, 255, 255), "255.255.255.255");
-    inet_ntoa_ok(IPV4(212, 13, 204, 60), "212.13.204.60");
+	/* Address testing macros */
+	ok (   IN_IS_CLASSA ( IPV4 ( 10, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSB ( IPV4 ( 10, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSC ( IPV4 ( 10, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSA ( IPV4 ( 172, 16, 0, 1 ) ) );
+	ok (   IN_IS_CLASSB ( IPV4 ( 172, 16, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSC ( IPV4 ( 172, 16, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSA ( IPV4 ( 192, 168, 0, 1 ) ) );
+	ok ( ! IN_IS_CLASSB ( IPV4 ( 192, 168, 0, 1 ) ) );
+	ok (   IN_IS_CLASSC ( IPV4 ( 192, 168, 0, 1 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 127, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 8, 8, 8, 8 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 0, 0, 0, 0 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 223, 0, 0, 1 ) ) );
+	ok ( ! IN_IS_MULTICAST ( IPV4 ( 240, 0, 0, 1 ) ) );
+	ok (   IN_IS_MULTICAST ( IPV4 ( 224, 0, 0, 1 ) ) );
+	ok (   IN_IS_MULTICAST ( IPV4 ( 231, 89, 0, 2 ) ) );
+	ok (   IN_IS_MULTICAST ( IPV4 ( 239, 6, 1, 17 ) ) );
 
-    /* inet_aton() tests */
-    inet_aton_ok("212.13.204.60", IPV4(212, 13, 204, 60));
-    inet_aton_ok("127.0.0.1", IPV4(127, 0, 0, 1));
+	/* inet_ntoa() tests */
+	inet_ntoa_ok ( IPV4 ( 127, 0, 0, 1 ), "127.0.0.1" );
+	inet_ntoa_ok ( IPV4 ( 0, 0, 0, 0 ), "0.0.0.0" );
+	inet_ntoa_ok ( IPV4 ( 255, 255, 255, 255 ), "255.255.255.255" );
+	inet_ntoa_ok ( IPV4 ( 212, 13, 204, 60 ), "212.13.204.60" );
 
-    /* inet_aton() failure tests */
-    inet_aton_fail_ok("256.0.0.1");       /* Byte out of range */
-    inet_aton_fail_ok("212.13.204.60.1"); /* Too long */
-    inet_aton_fail_ok("127.0.0");         /* Too short */
-    inet_aton_fail_ok("1.2.3.a");         /* Invalid characters */
-    inet_aton_fail_ok("127.0..1");        /* Missing bytes */
+	/* inet_aton() tests */
+	inet_aton_ok ( "212.13.204.60", IPV4 ( 212, 13, 204, 60 ) );
+	inet_aton_ok ( "127.0.0.1", IPV4 ( 127, 0, 0, 1 ) );
+
+	/* inet_aton() failure tests */
+	inet_aton_fail_ok ( "256.0.0.1" ); /* Byte out of range */
+	inet_aton_fail_ok ( "212.13.204.60.1" ); /* Too long */
+	inet_aton_fail_ok ( "127.0.0" ); /* Too short */
+	inet_aton_fail_ok ( "1.2.3.a" ); /* Invalid characters */
+	inet_aton_fail_ok ( "127.0..1" ); /* Missing bytes */
 }
 
 /** IPv4 self-test */
 struct self_test ipv4_test __self_test = {
-    .name = "ipv4",
-    .exec = ipv4_test_exec,
+	.name = "ipv4",
+	.exec = ipv4_test_exec,
 };

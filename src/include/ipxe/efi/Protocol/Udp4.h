@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   UDP4 Service Binding Protocol as defined in UEFI specification.
 
@@ -15,27 +13,23 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef __EFI_UDP4_PROTOCOL_H__
-    #define __EFI_UDP4_PROTOCOL_H__
+#define __EFI_UDP4_PROTOCOL_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #include <ipxe/efi/Protocol/Ip4.h>
-    //
-    // GUID definitions
-    //
-    #define EFI_UDP4_SERVICE_BINDING_PROTOCOL_GUID             \
-        {                                                      \
-            0x83f01464, 0x99bd, 0x45e5, {                      \
-                0xb3, 0x83, 0xaf, 0x63, 0x05, 0xd8, 0xe9, 0xe6 \
-            }                                                  \
-        }
+#include <ipxe/efi/Protocol/Ip4.h>
+//
+// GUID definitions
+//
+#define EFI_UDP4_SERVICE_BINDING_PROTOCOL_GUID \
+  { \
+    0x83f01464, 0x99bd, 0x45e5, {0xb3, 0x83, 0xaf, 0x63, 0x05, 0xd8, 0xe9, 0xe6 } \
+  }
 
-    #define EFI_UDP4_PROTOCOL_GUID                             \
-        {                                                      \
-            0x3ad9df29, 0x4501, 0x478d, {                      \
-                0xb1, 0xf8, 0x7f, 0x7f, 0xe7, 0x0e, 0x50, 0xf3 \
-            }                                                  \
-        }
+#define EFI_UDP4_PROTOCOL_GUID \
+  { \
+    0x3ad9df29, 0x4501, 0x478d, {0xb1, 0xf8, 0x7f, 0x7f, 0xe7, 0x0e, 0x50, 0xf3 } \
+  }
 
 typedef struct _EFI_UDP4_PROTOCOL EFI_UDP4_PROTOCOL;
 
@@ -44,11 +38,11 @@ typedef struct _EFI_UDP4_PROTOCOL EFI_UDP4_PROTOCOL;
 /// The definition in here is only present to provide backwards compatability.
 ///
 typedef struct {
-    EFI_HANDLE InstanceHandle;
-    EFI_IPv4_ADDRESS LocalAddress;
-    UINT16 LocalPort;
-    EFI_IPv4_ADDRESS RemoteAddress;
-    UINT16 RemotePort;
+  EFI_HANDLE          InstanceHandle;
+  EFI_IPv4_ADDRESS    LocalAddress;
+  UINT16              LocalPort;
+  EFI_IPv4_ADDRESS    RemoteAddress;
+  UINT16              RemotePort;
 } EFI_UDP4_SERVICE_POINT;
 
 ///
@@ -56,73 +50,73 @@ typedef struct {
 /// The definition in here is only present to provide backwards compatability.
 ///
 typedef struct {
-    EFI_HANDLE DriverHandle;
-    UINT32 ServiceCount;
-    EFI_UDP4_SERVICE_POINT Services[1];
+  EFI_HANDLE                DriverHandle;
+  UINT32                    ServiceCount;
+  EFI_UDP4_SERVICE_POINT    Services[1];
 } EFI_UDP4_VARIABLE_DATA;
 
 typedef struct {
-    UINT32 FragmentLength;
-    VOID* FragmentBuffer;
+  UINT32    FragmentLength;
+  VOID      *FragmentBuffer;
 } EFI_UDP4_FRAGMENT_DATA;
 
 typedef struct {
-    EFI_IPv4_ADDRESS SourceAddress;
-    UINT16 SourcePort;
-    EFI_IPv4_ADDRESS DestinationAddress;
-    UINT16 DestinationPort;
+  EFI_IPv4_ADDRESS    SourceAddress;
+  UINT16              SourcePort;
+  EFI_IPv4_ADDRESS    DestinationAddress;
+  UINT16              DestinationPort;
 } EFI_UDP4_SESSION_DATA;
 typedef struct {
-    //
-    // Receiving Filters
-    //
-    BOOLEAN AcceptBroadcast;
-    BOOLEAN AcceptPromiscuous;
-    BOOLEAN AcceptAnyPort;
-    BOOLEAN AllowDuplicatePort;
-    //
-    // I/O parameters
-    //
-    UINT8 TypeOfService;
-    UINT8 TimeToLive;
-    BOOLEAN DoNotFragment;
-    UINT32 ReceiveTimeout;
-    UINT32 TransmitTimeout;
-    //
-    // Access Point
-    //
-    BOOLEAN UseDefaultAddress;
-    EFI_IPv4_ADDRESS StationAddress;
-    EFI_IPv4_ADDRESS SubnetMask;
-    UINT16 StationPort;
-    EFI_IPv4_ADDRESS RemoteAddress;
-    UINT16 RemotePort;
+  //
+  // Receiving Filters
+  //
+  BOOLEAN             AcceptBroadcast;
+  BOOLEAN             AcceptPromiscuous;
+  BOOLEAN             AcceptAnyPort;
+  BOOLEAN             AllowDuplicatePort;
+  //
+  // I/O parameters
+  //
+  UINT8               TypeOfService;
+  UINT8               TimeToLive;
+  BOOLEAN             DoNotFragment;
+  UINT32              ReceiveTimeout;
+  UINT32              TransmitTimeout;
+  //
+  // Access Point
+  //
+  BOOLEAN             UseDefaultAddress;
+  EFI_IPv4_ADDRESS    StationAddress;
+  EFI_IPv4_ADDRESS    SubnetMask;
+  UINT16              StationPort;
+  EFI_IPv4_ADDRESS    RemoteAddress;
+  UINT16              RemotePort;
 } EFI_UDP4_CONFIG_DATA;
 
 typedef struct {
-    EFI_UDP4_SESSION_DATA* UdpSessionData; // OPTIONAL
-    EFI_IPv4_ADDRESS* GatewayAddress;      // OPTIONAL
-    UINT32 DataLength;
-    UINT32 FragmentCount;
-    EFI_UDP4_FRAGMENT_DATA FragmentTable[1];
+  EFI_UDP4_SESSION_DATA     *UdpSessionData;       // OPTIONAL
+  EFI_IPv4_ADDRESS          *GatewayAddress;       // OPTIONAL
+  UINT32                    DataLength;
+  UINT32                    FragmentCount;
+  EFI_UDP4_FRAGMENT_DATA    FragmentTable[1];
 } EFI_UDP4_TRANSMIT_DATA;
 
 typedef struct {
-    EFI_TIME TimeStamp;
-    EFI_EVENT RecycleSignal;
-    EFI_UDP4_SESSION_DATA UdpSession;
-    UINT32 DataLength;
-    UINT32 FragmentCount;
-    EFI_UDP4_FRAGMENT_DATA FragmentTable[1];
+  EFI_TIME                  TimeStamp;
+  EFI_EVENT                 RecycleSignal;
+  EFI_UDP4_SESSION_DATA     UdpSession;
+  UINT32                    DataLength;
+  UINT32                    FragmentCount;
+  EFI_UDP4_FRAGMENT_DATA    FragmentTable[1];
 } EFI_UDP4_RECEIVE_DATA;
 
 typedef struct {
-    EFI_EVENT Event;
-    EFI_STATUS Status;
-    union {
-        EFI_UDP4_RECEIVE_DATA* RxData;
-        EFI_UDP4_TRANSMIT_DATA* TxData;
-    } Packet;
+  EFI_EVENT     Event;
+  EFI_STATUS    Status;
+  union {
+    EFI_UDP4_RECEIVE_DATA     *RxData;
+    EFI_UDP4_TRANSMIT_DATA    *TxData;
+  } Packet;
 } EFI_UDP4_COMPLETION_TOKEN;
 
 /**
@@ -145,12 +139,15 @@ typedef struct {
   @retval EFI_INVALID_PARAMETER This is NULL.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_UDP4_GET_MODE_DATA)(
-    IN EFI_UDP4_PROTOCOL* This,
-    OUT EFI_UDP4_CONFIG_DATA* Udp4ConfigData OPTIONAL,
-    OUT EFI_IP4_MODE_DATA* Ip4ModeData OPTIONAL,
-    OUT EFI_MANAGED_NETWORK_CONFIG_DATA* MnpConfigData OPTIONAL,
-    OUT EFI_SIMPLE_NETWORK_MODE* SnpModeData OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UDP4_GET_MODE_DATA)(
+  IN  EFI_UDP4_PROTOCOL                *This,
+  OUT EFI_UDP4_CONFIG_DATA             *Udp4ConfigData OPTIONAL,
+  OUT EFI_IP4_MODE_DATA                *Ip4ModeData    OPTIONAL,
+  OUT EFI_MANAGED_NETWORK_CONFIG_DATA  *MnpConfigData  OPTIONAL,
+  OUT EFI_SIMPLE_NETWORK_MODE          *SnpModeData    OPTIONAL
+  );
 
 /**
   Initializes, changes, or resets the operational parameters for this instance of the EFI UDPv4
@@ -190,9 +187,12 @@ typedef EFI_STATUS(EFIAPI* EFI_UDP4_GET_MODE_DATA)(
                                  was not opened.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_UDP4_CONFIGURE)(
-    IN EFI_UDP4_PROTOCOL* This,
-    IN EFI_UDP4_CONFIG_DATA* UdpConfigData OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UDP4_CONFIGURE)(
+  IN EFI_UDP4_PROTOCOL      *This,
+  IN EFI_UDP4_CONFIG_DATA   *UdpConfigData OPTIONAL
+  );
 
 /**
   Joins and leaves multicast groups.
@@ -223,10 +223,13 @@ typedef EFI_STATUS(EFIAPI* EFI_UDP4_CONFIGURE)(
   @retval EFI_DEVICE_ERROR      An unexpected system or network error occurred.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_UDP4_GROUPS)(
-    IN EFI_UDP4_PROTOCOL* This,
-    IN BOOLEAN JoinFlag,
-    IN EFI_IPv4_ADDRESS* MulticastAddress OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UDP4_GROUPS)(
+  IN EFI_UDP4_PROTOCOL      *This,
+  IN BOOLEAN                JoinFlag,
+  IN EFI_IPv4_ADDRESS       *MulticastAddress    OPTIONAL
+  );
 
 /**
   Adds and deletes routing table entries.
@@ -266,12 +269,15 @@ typedef EFI_STATUS(EFIAPI* EFI_UDP4_GROUPS)(
   @retval EFI_ACCESS_DENIED     The route is already defined in the routing table.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_UDP4_ROUTES)(
-    IN EFI_UDP4_PROTOCOL* This,
-    IN BOOLEAN DeleteRoute,
-    IN EFI_IPv4_ADDRESS* SubnetAddress,
-    IN EFI_IPv4_ADDRESS* SubnetMask,
-    IN EFI_IPv4_ADDRESS* GatewayAddress);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UDP4_ROUTES)(
+  IN EFI_UDP4_PROTOCOL      *This,
+  IN BOOLEAN                DeleteRoute,
+  IN EFI_IPv4_ADDRESS       *SubnetAddress,
+  IN EFI_IPv4_ADDRESS       *SubnetMask,
+  IN EFI_IPv4_ADDRESS       *GatewayAddress
+  );
 
 /**
   Polls for incoming data packets and processes outgoing data packets.
@@ -293,8 +299,11 @@ typedef EFI_STATUS(EFIAPI* EFI_UDP4_ROUTES)(
   @retval EFI_TIMEOUT           Data was dropped out of the transmit and/or receive queue.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_UDP4_POLL)(
-    IN EFI_UDP4_PROTOCOL* This);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UDP4_POLL)(
+  IN EFI_UDP4_PROTOCOL      *This
+  );
 
 /**
   Places an asynchronous receive request into the receiving queue.
@@ -327,9 +336,12 @@ typedef EFI_STATUS(EFIAPI* EFI_UDP4_POLL)(
   @retval EFI_NOT_READY         The receive request could not be queued because the receive queue is full.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_UDP4_RECEIVE)(
-    IN EFI_UDP4_PROTOCOL* This,
-    IN EFI_UDP4_COMPLETION_TOKEN* Token);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UDP4_RECEIVE)(
+  IN EFI_UDP4_PROTOCOL          *This,
+  IN EFI_UDP4_COMPLETION_TOKEN  *Token
+  );
 
 /**
   Queues outgoing data packets into the transmit queue.
@@ -361,9 +373,12 @@ typedef EFI_STATUS(EFIAPI* EFI_UDP4_RECEIVE)(
                                 length is greater than MTU if DoNotFragment is TRUE.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_UDP4_TRANSMIT)(
-    IN EFI_UDP4_PROTOCOL* This,
-    IN EFI_UDP4_COMPLETION_TOKEN* Token);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UDP4_TRANSMIT)(
+  IN EFI_UDP4_PROTOCOL           *This,
+  IN EFI_UDP4_COMPLETION_TOKEN   *Token
+  );
 
 /**
   Aborts an asynchronous transmit or receive request.
@@ -393,9 +408,12 @@ typedef EFI_STATUS(EFIAPI* EFI_UDP4_TRANSMIT)(
                                  or was not issued by Transmit() and Receive().
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_UDP4_CANCEL)(
-    IN EFI_UDP4_PROTOCOL* This,
-    IN EFI_UDP4_COMPLETION_TOKEN* Token OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_UDP4_CANCEL)(
+  IN EFI_UDP4_PROTOCOL          *This,
+  IN EFI_UDP4_COMPLETION_TOKEN  *Token  OPTIONAL
+  );
 
 ///
 /// The EFI_UDP4_PROTOCOL defines an EFI UDPv4 Protocol session that can be used
@@ -405,17 +423,17 @@ typedef EFI_STATUS(EFIAPI* EFI_UDP4_CANCEL)(
 /// such as the routing table and group table, which are independent from each other.
 ///
 struct _EFI_UDP4_PROTOCOL {
-    EFI_UDP4_GET_MODE_DATA GetModeData;
-    EFI_UDP4_CONFIGURE Configure;
-    EFI_UDP4_GROUPS Groups;
-    EFI_UDP4_ROUTES Routes;
-    EFI_UDP4_TRANSMIT Transmit;
-    EFI_UDP4_RECEIVE Receive;
-    EFI_UDP4_CANCEL Cancel;
-    EFI_UDP4_POLL Poll;
+  EFI_UDP4_GET_MODE_DATA    GetModeData;
+  EFI_UDP4_CONFIGURE        Configure;
+  EFI_UDP4_GROUPS           Groups;
+  EFI_UDP4_ROUTES           Routes;
+  EFI_UDP4_TRANSMIT         Transmit;
+  EFI_UDP4_RECEIVE          Receive;
+  EFI_UDP4_CANCEL           Cancel;
+  EFI_UDP4_POLL             Poll;
 };
 
-extern EFI_GUID gEfiUdp4ServiceBindingProtocolGuid;
-extern EFI_GUID gEfiUdp4ProtocolGuid;
+extern EFI_GUID  gEfiUdp4ServiceBindingProtocolGuid;
+extern EFI_GUID  gEfiUdp4ProtocolGuid;
 
 #endif

@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _BITS_ACPI_H
-    #define _BITS_ACPI_H
+#define _BITS_ACPI_H
 
 /** @file
  *
@@ -9,8 +7,8 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #include <ipxe/rsdp.h>
+#include <ipxe/rsdp.h>
 
 #endif /* _BITS_ACPI_H */

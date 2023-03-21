@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
 #include <ipxe/usb.h>
@@ -40,15 +40,15 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v interface		Interface descriptor
  * @ret desc		Union functional descriptor, or NULL if not found
  */
-struct cdc_union_descriptor*
-cdc_union_descriptor(struct usb_configuration_descriptor* config,
-                     struct usb_interface_descriptor* interface) {
-    struct cdc_union_descriptor* desc;
+struct cdc_union_descriptor *
+cdc_union_descriptor ( struct usb_configuration_descriptor *config,
+		       struct usb_interface_descriptor *interface ) {
+	struct cdc_union_descriptor *desc;
 
-    for_each_interface_descriptor(desc, config, interface) {
-        if ((desc->header.type == USB_CS_INTERFACE_DESCRIPTOR) &&
-            (desc->subtype == CDC_SUBTYPE_UNION))
-            return desc;
-    }
-    return NULL;
+	for_each_interface_descriptor ( desc, config, interface ) {
+		if ( ( desc->header.type == USB_CS_INTERFACE_DESCRIPTOR ) &&
+		     ( desc->subtype == CDC_SUBTYPE_UNION ) )
+			return desc;
+	}
+	return NULL;
 }

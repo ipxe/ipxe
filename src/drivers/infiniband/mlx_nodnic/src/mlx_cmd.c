@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "../include/mlx_cmd.h"
 #include "../../mlx_utils/include/public/mlx_pci_gw.h"
@@ -27,47 +27,51 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 mlx_status
 nodnic_cmd_read(
-    IN nodnic_device_priv* device_priv,
-    IN mlx_uint32 address,
-    OUT mlx_pci_gw_buffer* buffer)
+				IN nodnic_device_priv *device_priv,
+				IN mlx_uint32 address,
+				OUT mlx_pci_gw_buffer *buffer
+				)
 {
-    mlx_status status = MLX_SUCCESS;
-    mlx_utils* utils = NULL;
+	mlx_status 		status = MLX_SUCCESS;
+	mlx_utils 		*utils = NULL;
 
-    if (device_priv == NULL || buffer == NULL) {
-        status = MLX_INVALID_PARAMETER;
-        goto bad_param;
-    }
+	if ( device_priv == NULL || buffer == NULL ) {
+		status = MLX_INVALID_PARAMETER;
+		goto bad_param;
+	}
 
-    utils = device_priv->utils;
+	utils = device_priv->utils;
 
-    status = mlx_pci_gw_read(utils, PCI_GW_SPACE_NODNIC, address, buffer);
-    MLX_CHECK_STATUS(device_priv, status, read_error, "mlx_pci_gw_read failed");
+	status = mlx_pci_gw_read(utils, PCI_GW_SPACE_NODNIC, address, buffer);
+	MLX_CHECK_STATUS(device_priv, status, read_error,"mlx_pci_gw_read failed");
 
 read_error:
 bad_param:
-    return status;
+	return status;
 }
 
 mlx_status
 nodnic_cmd_write(
-    IN nodnic_device_priv* device_priv,
-    IN mlx_uint32 address,
-    IN mlx_pci_gw_buffer buffer)
+				IN nodnic_device_priv *device_priv,
+				IN mlx_uint32 address,
+				IN mlx_pci_gw_buffer buffer
+				)
 {
-    mlx_status status = MLX_SUCCESS;
-    mlx_utils* utils = NULL;
+	mlx_status 		status = MLX_SUCCESS;
+	mlx_utils 		*utils = NULL;
 
-    if (device_priv == NULL) {
-        status = MLX_INVALID_PARAMETER;
-        goto bad_param;
-    }
 
-    utils = device_priv->utils;
+	if ( device_priv == NULL ) {
+		status = MLX_INVALID_PARAMETER;
+		goto bad_param;
+	}
 
-    status = mlx_pci_gw_write(utils, PCI_GW_SPACE_NODNIC, address, buffer);
-    MLX_CHECK_STATUS(device_priv, status, write_error, "mlx_pci_gw_write failed");
+	utils = device_priv->utils;
+
+
+	status = mlx_pci_gw_write(utils, PCI_GW_SPACE_NODNIC, address, buffer);
+	MLX_CHECK_STATUS(device_priv, status, write_error,"mlx_pci_gw_write failed");
 write_error:
 bad_param:
-    return status;
+	return status;
 }
