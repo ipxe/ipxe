@@ -1,0 +1,24 @@
+#!ipxe
+
+prompt --key 0x02 --timeout 3000 Press Ctrl-B for the iPXE command line... && shell ||
+
+set idx:int32 0
+set domain einebox.net
+#set dns6 fc00:1::1
+
+echo [Einebox netboot] Trying to boot via Netboot...
+
+:loop isset ${net${idx}/mac} || goto fail
+   echo Try setup net${idx}
+   ifconf net${idx} && chain http://[fc00:1::1]/tftpboot/eine.ipxe ||
+   inc idx && goto loop
+
+:fail
+
+echo Autoconfiguration has failed
+
+prompt --key 0x02 --timeout 3000 Press Ctrl-B for the iPXE command line... && shell ||
+
+sanboot --no-describe --drive 0x80 ||
+exit
+
